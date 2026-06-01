@@ -7,8 +7,34 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
+
+const validResourcesJSON = `{"cpu":{"num":"2","type":"intel"},"memory":"8G"}`
+
+func TestValidateResources(t *testing.T) {
+	t.Run("empty resources", func(t *testing.T) {
+		err := validateResources("")
+		require.True(t, errors.Is(err, errorx.ErrBadRequest))
+	})
+	t.Run("blank resources", func(t *testing.T) {
+		err := validateResources("   ")
+		require.True(t, errors.Is(err, errorx.ErrBadRequest))
+	})
+	t.Run("invalid json", func(t *testing.T) {
+		err := validateResources("not-json")
+		require.True(t, errors.Is(err, errorx.ErrBadRequest))
+	})
+	t.Run("valid hardware json", func(t *testing.T) {
+		err := validateResources(validResourcesJSON)
+		require.Nil(t, err)
+	})
+	t.Run("empty json object", func(t *testing.T) {
+		err := validateResources("{}")
+		require.Nil(t, err)
+	})
+}
 
 func TestSpaceResourceComponent_Update(t *testing.T) {
 	ctx := context.TODO()
@@ -19,20 +45,32 @@ func TestSpaceResourceComponent_Update(t *testing.T) {
 	)
 	sc.mocks.stores.SpaceResourceMock().EXPECT().Update(ctx, database.SpaceResource{
 		Name:      "n",
-		Resources: "r",
-	}).Return(&database.SpaceResource{ID: 1, Name: "n", Resources: "r"}, nil)
+		Resources: validResourcesJSON,
+	}).Return(&database.SpaceResource{ID: 1, Name: "n", Resources: validResourcesJSON}, nil)
 
 	data, err := sc.Update(ctx, &types.UpdateSpaceResourceReq{
 		ID:        1,
 		Name:      "n",
-		Resources: "r",
+		Resources: validResourcesJSON,
 	})
 	require.Nil(t, err)
 	require.Equal(t, &types.SpaceResource{
 		ID:        1,
 		Name:      "n",
-		Resources: "r",
+		Resources: validResourcesJSON,
 	}, data)
+}
+
+func TestSpaceResourceComponent_Update_InvalidResources(t *testing.T) {
+	ctx := context.TODO()
+	sc := initializeTestSpaceResourceComponent(ctx, t)
+
+	_, err := sc.Update(ctx, &types.UpdateSpaceResourceReq{
+		ID:        1,
+		Name:      "n",
+		Resources: "invalid",
+	})
+	require.True(t, errors.Is(err, errorx.ErrBadRequest))
 }
 
 func TestSpaceResourceComponent_Create(t *testing.T) {
@@ -41,21 +79,45 @@ func TestSpaceResourceComponent_Create(t *testing.T) {
 
 	sc.mocks.stores.SpaceResourceMock().EXPECT().Create(ctx, database.SpaceResource{
 		Name:      "n",
-		Resources: "r",
+		Resources: validResourcesJSON,
 		ClusterID: "c",
-	}).Return(&database.SpaceResource{ID: 1, Name: "n", Resources: "r"}, nil)
+	}).Return(&database.SpaceResource{ID: 1, Name: "n", Resources: validResourcesJSON}, nil)
 
 	data, err := sc.Create(ctx, &types.CreateSpaceResourceReq{
 		Name:      "n",
-		Resources: "r",
+		Resources: validResourcesJSON,
 		ClusterID: "c",
 	})
 	require.Nil(t, err)
 	require.Equal(t, &types.SpaceResource{
 		ID:        1,
 		Name:      "n",
-		Resources: "r",
+		Resources: validResourcesJSON,
 	}, data)
+}
+
+func TestSpaceResourceComponent_Create_EmptyResources(t *testing.T) {
+	ctx := context.TODO()
+	sc := initializeTestSpaceResourceComponent(ctx, t)
+
+	_, err := sc.Create(ctx, &types.CreateSpaceResourceReq{
+		Name:      "n",
+		Resources: "",
+		ClusterID: "c",
+	})
+	require.True(t, errors.Is(err, errorx.ErrBadRequest))
+}
+
+func TestSpaceResourceComponent_Create_InvalidResources(t *testing.T) {
+	ctx := context.TODO()
+	sc := initializeTestSpaceResourceComponent(ctx, t)
+
+	_, err := sc.Create(ctx, &types.CreateSpaceResourceReq{
+		Name:      "n",
+		Resources: "not-json",
+		ClusterID: "c",
+	})
+	require.True(t, errors.Is(err, errorx.ErrBadRequest))
 }
 
 func TestSpaceResourceComponent_Delete(t *testing.T) {
