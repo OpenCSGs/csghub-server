@@ -628,6 +628,11 @@ type Config struct {
 		QueryLastReportTimeout int    `env:"STARHUB_SERVER_LOGCOLLECTOR_QUERY_LAST_REPORT_TIMEOUT" default:"10"`
 	}
 
+	FederationAdapter struct {
+		Host string `env:"STARHUB_SERVER_FEDERATION_ADAPTER_ENDPOINT" default:"http://localhost"`
+		Port int    `env:"STARHUB_SERVER_FEDERATION_ADAPTER_PORT" default:"8099"`
+	}
+
 	TrustRegistry struct {
 		Host string `env:"STARHUB_SERVER_FEDERATION_REGISTRY_HOST" default:"http://localhost"`
 		Port int    `env:"STARHUB_SERVER_FEDERATION_REGISTRY_PORT" default:"8098"`

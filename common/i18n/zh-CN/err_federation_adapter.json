@@ -1,0 +1,26 @@
+{
+  "error.FEDAP-ERR-0": {
+    "other": "令牌已过期，请重新授权"
+  },
+  "error.FEDAP-ERR-1": {
+    "other": "令牌兑换失败"
+  },
+  "error.FEDAP-ERR-2": {
+    "other": "获取联邦对端失败"
+  },
+  "error.FEDAP-ERR-3": {
+    "other": "联邦对端服务不可用"
+  },
+  "error.FEDAP-ERR-4": {
+    "other": "OAuth 认证失败"
+  },
+  "error.FEDAP-ERR-5": {
+    "other": "无效令牌"
+  },
+  "error.FEDAP-ERR-6": {
+    "other": "获取用户信息失败"
+  },
+  "error.FEDAP-ERR-7": {
+    "other": "处理 fedap 代理请求失败"
+  }
+}
