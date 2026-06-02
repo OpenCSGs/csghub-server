@@ -296,7 +296,7 @@ func (c *lokiClient) StreamAllLogs(
 	timeLoc *time.Location) (chan string, error) {
 	labels[types.StreamKeyDeployID] = id
 	query := c.GenerateLabelQuery(labels)
-	lokiCh, err := c.lokiClient.Tail(ctx, query, start)
+	lokiCh, err := c.lokiClient.Tail(ctx, query, start, loki.MaxLimit)
 	if err != nil {
 		return nil, fmt.Errorf("failed to tail logs from loki: %w", err)
 	}

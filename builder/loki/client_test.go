@@ -180,7 +180,7 @@ func TestClient_Tail(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	logChan, err := client.Tail(ctx, `{app="test-app"}`, time.Now())
+	logChan, err := client.Tail(ctx, `{app="test-app"}`, time.Now(), 100)
 	require.NoError(t, err)
 	require.NotNil(t, logChan)
 

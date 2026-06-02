@@ -19,7 +19,7 @@ type Client interface {
 	Push(ctx context.Context, req *LokiPushRequest) error
 	Query(ctx context.Context, query string, limit int, start time.Time, direction string) (*LokiQueryResponse, error)
 	QueryRange(ctx context.Context, params QueryRangeParams) (*LokiQueryResponse, error)
-	Tail(ctx context.Context, query string, start time.Time) (<-chan *LokiPushRequest, error)
+	Tail(ctx context.Context, query string, start time.Time, limit int) (<-chan *LokiPushRequest, error)
 	Ready(ctx context.Context) error
 }
 
@@ -152,7 +152,7 @@ func (c *client) QueryRange(ctx context.Context, params QueryRangeParams) (*Loki
 	return &queryResponse, nil
 }
 
-func (c *client) Tail(ctx context.Context, query string, start time.Time) (<-chan *LokiPushRequest, error) {
+func (c *client) Tail(ctx context.Context, query string, start time.Time, limit int) (<-chan *LokiPushRequest, error) {
 	base, err := url.Parse(c.url)
 	if err != nil {
 		return nil, err
@@ -173,6 +173,9 @@ func (c *client) Tail(ctx context.Context, query string, start time.Time) (<-cha
 	params.Add("query", query)
 	if !start.IsZero() {
 		params.Add("start", fmt.Sprintf("%d", start.UnixNano()))
+	}
+	if limit > 0 {
+		params.Add("limit", fmt.Sprintf("%d", limit))
 	}
 	u.RawQuery = params.Encode()
 	slog.Info("loki-tail", slog.Any("url", u.String()))
@@ -216,6 +219,10 @@ func (c *client) Tail(ctx context.Context, query string, start time.Time) (<-cha
 			if err := json.Unmarshal(message, &lokiLog); err != nil {
 				slog.Error("Failed to unmarshal Loki log from websocket", "err", err)
 				continue
+			}
+
+			if len(lokiLog.DroppedEntries) > 0 {
+				slog.Warn("Loki tail dropped entries detected", slog.Int("count", len(lokiLog.DroppedEntries)), slog.Any("dropped_entries", lokiLog.DroppedEntries))
 			}
 
 			select {
