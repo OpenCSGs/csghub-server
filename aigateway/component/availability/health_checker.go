@@ -259,22 +259,27 @@ func (h *healthCheckerImpl) performL7APICheck(ctx context.Context, upstream *dat
 	}
 
 	modelsURL := strings.TrimSuffix(upstream.URL, "/chat/completions") + "/models"
+	log := slog.With(
+		slog.Int64("upstream_id", upstream.ID),
+		slog.String("model_name", upstream.ModelName),
+		slog.String("url", modelsURL),
+	)
 	req, err := http.NewRequestWithContext(checkCtx, "GET", modelsURL, nil)
 	if err != nil {
-		slog.WarnContext(ctx, "Failed to create health check request", "upstream_id", upstream.ID, "url", modelsURL, "error", err)
+		log.WarnContext(ctx, "Failed to create health check request", "error", err)
 		result.Error = err.Error()
 		return result
 	}
 
 	if err = types.ApplyRequestAuthHeaders(req.Header, upstream.AuthHeader); err != nil {
-		slog.WarnContext(ctx, "Failed to apply auth headers", "upstream_id", upstream.ID, "url", modelsURL, "error", err)
+		log.WarnContext(ctx, "Failed to apply auth headers", "error", err)
 		result.Error = err.Error()
 		return result
 	}
 
 	resp, err := h.httpClient.Do(req)
 	if err != nil {
-		slog.WarnContext(ctx, "Failed to perform health check", "upstream_id", upstream.ID, "url", modelsURL, "error", err)
+		log.WarnContext(ctx, "Failed to perform health check", "error", err)
 		result.Error = err.Error()
 		return result
 	}
@@ -286,7 +291,7 @@ func (h *healthCheckerImpl) performL7APICheck(ctx context.Context, upstream *dat
 	} else {
 		result.Healthy = false
 		result.Error = fmt.Sprintf("HTTP %d", resp.StatusCode)
-		slog.WarnContext(ctx, "Health check probe failed with non-2xx status", "upstream_id", upstream.ID, "url", modelsURL, "status_code", resp.StatusCode)
+		log.WarnContext(ctx, "Health check probe failed with non-2xx status", "status_code", resp.StatusCode)
 	}
 	return result
 }
@@ -306,6 +311,12 @@ func (h *healthCheckerImpl) performInferenceCheck(ctx context.Context, upstream 
 		Timestamp:  startTime,
 	}
 
+	log := slog.With(
+		slog.Int64("upstream_id", upstream.ID),
+		slog.String("model_name", upstream.ModelName),
+		slog.String("url", upstream.URL),
+	)
+
 	reqBody := map[string]interface{}{
 		"model": upstream.ModelName,
 		"messages": []map[string]string{
@@ -317,28 +328,28 @@ func (h *healthCheckerImpl) performInferenceCheck(ctx context.Context, upstream 
 
 	bodyBytes, err := json.Marshal(reqBody)
 	if err != nil {
-		slog.WarnContext(ctx, "Failed to marshal inference check body", "upstream_id", upstream.ID, "error", err)
+		log.WarnContext(ctx, "Failed to marshal inference check body", "error", err)
 		result.Error = err.Error()
 		return result
 	}
 
 	req, err := http.NewRequestWithContext(checkCtx, "POST", upstream.URL, bytes.NewReader(bodyBytes))
 	if err != nil {
-		slog.WarnContext(ctx, "Failed to create inference check request", "upstream_id", upstream.ID, "url", upstream.URL, "error", err)
+		log.WarnContext(ctx, "Failed to create inference check request", "error", err)
 		result.Error = err.Error()
 		return result
 	}
 	req.Header.Set("Content-Type", "application/json")
 
 	if err = types.ApplyRequestAuthHeaders(req.Header, upstream.AuthHeader); err != nil {
-		slog.WarnContext(ctx, "Failed to apply auth headers for inference check", "upstream_id", upstream.ID, "error", err)
+		log.WarnContext(ctx, "Failed to apply auth headers for inference check", "error", err)
 		result.Error = err.Error()
 		return result
 	}
 
 	resp, err := h.httpClient.Do(req)
 	if err != nil {
-		slog.WarnContext(ctx, "Failed to perform inference check", "upstream_id", upstream.ID, "url", upstream.URL, "error", err)
+		log.WarnContext(ctx, "Failed to perform inference check", "error", err)
 		result.Error = err.Error()
 		return result
 	}
@@ -350,7 +361,7 @@ func (h *healthCheckerImpl) performInferenceCheck(ctx context.Context, upstream 
 	} else {
 		result.Healthy = false
 		result.Error = fmt.Sprintf("HTTP %d", resp.StatusCode)
-		slog.WarnContext(ctx, "Inference check failed with non-2xx status", "upstream_id", upstream.ID, "url", upstream.URL, "status_code", resp.StatusCode)
+		log.WarnContext(ctx, "Inference check failed with non-2xx status", "status_code", resp.StatusCode)
 	}
 	return result
 }
