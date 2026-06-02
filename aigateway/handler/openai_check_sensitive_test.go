@@ -28,7 +28,7 @@ func TestOpenAIHandler_checkSensitive(t *testing.T) {
 				NeedSensitiveCheck: false,
 			},
 		}
-		needCheck, result, err := tester.handler.sensitivePolicy.CheckChatSensitive(ctx, model, chatReq.Messages, userUUID, false)
+		needCheck, result, err := tester.handler.sensitivePolicy.CheckChatSensitive(ctx, model, chatReq.Messages, userUUID, false, "")
 		assert.NoError(t, err)
 		assert.False(t, needCheck)
 		assert.Nil(t, result)
@@ -40,7 +40,7 @@ func TestOpenAIHandler_checkSensitive(t *testing.T) {
 		tester.mocks.moderationComp.ExpectedCalls = nil
 		model := &types.Model{
 			BaseModel: types.BaseModel{
-				ID:           "another/model",
+				ID: "another/model",
 			},
 			ExternalModelInfo: types.ExternalModelInfo{
 				NeedSensitiveCheck: true,
@@ -51,7 +51,7 @@ func TestOpenAIHandler_checkSensitive(t *testing.T) {
 		}, nil).Once()
 		tester.mocks.moderationComp.EXPECT().CheckChatPrompts(mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, nil).Maybe()
 
-		needCheck, result, err := tester.handler.sensitivePolicy.CheckChatSensitive(ctx, model, chatReq.Messages, userUUID, false)
+		needCheck, result, err := tester.handler.sensitivePolicy.CheckChatSensitive(ctx, model, chatReq.Messages, userUUID, false, "")
 		assert.NoError(t, err)
 		assert.False(t, needCheck)
 		assert.Nil(t, result)
@@ -65,7 +65,7 @@ func TestOpenAIHandler_checkSensitive(t *testing.T) {
 		tester.mocks.moderationComp.ExpectedCalls = nil
 		model := &types.Model{
 			BaseModel: types.BaseModel{
-				ID:           "another/model",
+				ID: "another/model",
 			},
 			ExternalModelInfo: types.ExternalModelInfo{
 				NeedSensitiveCheck: true,
@@ -74,7 +74,7 @@ func TestOpenAIHandler_checkSensitive(t *testing.T) {
 		tester.mocks.whitelistRule.EXPECT().ListBySensitiveCheckTargets(ctx, []string{"another"}, "another/model").Return(nil, errors.New("db error")).Once()
 		tester.mocks.moderationComp.EXPECT().CheckChatPrompts(mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, nil).Maybe()
 
-		needCheck, result, err := tester.handler.sensitivePolicy.CheckChatSensitive(ctx, model, chatReq.Messages, userUUID, false)
+		needCheck, result, err := tester.handler.sensitivePolicy.CheckChatSensitive(ctx, model, chatReq.Messages, userUUID, false, "")
 		assert.ErrorContains(t, err, "failed to query white list rules: db error")
 		assert.False(t, needCheck)
 		assert.Nil(t, result)
@@ -97,7 +97,7 @@ func TestOpenAIHandler_checkSensitive(t *testing.T) {
 		}, nil).Once()
 		tester.mocks.moderationComp.EXPECT().CheckChatPrompts(mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, nil).Maybe()
 
-		needCheck, result, err := tester.handler.sensitivePolicy.CheckChatSensitive(ctx, model, chatReq.Messages, userUUID, false)
+		needCheck, result, err := tester.handler.sensitivePolicy.CheckChatSensitive(ctx, model, chatReq.Messages, userUUID, false, "")
 		assert.NoError(t, err)
 		assert.False(t, needCheck)
 		assert.Nil(t, result)
@@ -119,7 +119,7 @@ func TestOpenAIHandler_checkSensitive(t *testing.T) {
 		expectedResult := &rpc.CheckResult{IsSensitive: false}
 		tester.mocks.moderationComp.EXPECT().CheckChatPrompts(ctx, chatReq.Messages, "test-uuid:Qwen/Qwen3Guard", false).Return(expectedResult, nil).Once()
 
-		needCheck, result, err := tester.handler.sensitivePolicy.CheckChatSensitive(ctx, model, chatReq.Messages, userUUID, false)
+		needCheck, result, err := tester.handler.sensitivePolicy.CheckChatSensitive(ctx, model, chatReq.Messages, userUUID, false, "")
 		assert.NoError(t, err)
 		assert.True(t, needCheck)
 		assert.Equal(t, expectedResult, result)
@@ -142,7 +142,7 @@ func TestOpenAIHandler_checkSensitive(t *testing.T) {
 		expectedResult := &rpc.CheckResult{IsSensitive: true}
 		tester.mocks.moderationComp.EXPECT().CheckChatPrompts(ctx, chatReq.Messages, "test-uuid:Qwen/Qwen3Guard", false).Return(expectedResult, nil).Once()
 
-		needCheck, result, err := tester.handler.sensitivePolicy.CheckChatSensitive(ctx, model, chatReq.Messages, userUUID, false)
+		needCheck, result, err := tester.handler.sensitivePolicy.CheckChatSensitive(ctx, model, chatReq.Messages, userUUID, false, "")
 		assert.NoError(t, err)
 		assert.True(t, needCheck)
 		assert.Equal(t, expectedResult, result)
@@ -165,7 +165,7 @@ func TestOpenAIHandler_checkSensitive(t *testing.T) {
 		}, nil).Once()
 		tester.mocks.moderationComp.EXPECT().CheckChatPrompts(mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, nil).Maybe()
 
-		needCheck, result, err := tester.handler.sensitivePolicy.CheckChatSensitive(ctx, model, chatReq.Messages, userUUID, false)
+		needCheck, result, err := tester.handler.sensitivePolicy.CheckChatSensitive(ctx, model, chatReq.Messages, userUUID, false, "")
 		assert.NoError(t, err)
 		assert.False(t, needCheck)
 		assert.Nil(t, result)
@@ -188,7 +188,7 @@ func TestOpenAIHandler_checkSensitive(t *testing.T) {
 		}, nil).Once()
 		tester.mocks.moderationComp.EXPECT().CheckChatPrompts(mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, nil).Maybe()
 
-		needCheck, result, err := tester.handler.sensitivePolicy.CheckChatSensitive(ctx, model, chatReq.Messages, userUUID, false)
+		needCheck, result, err := tester.handler.sensitivePolicy.CheckChatSensitive(ctx, model, chatReq.Messages, userUUID, false, "")
 		assert.NoError(t, err)
 		assert.False(t, needCheck)
 		assert.Nil(t, result)
@@ -209,10 +209,78 @@ func TestOpenAIHandler_checkSensitive(t *testing.T) {
 		tester.mocks.whitelistRule.EXPECT().ListBySensitiveCheckTargets(ctx, []string{"qwen"}, "Qwen/Qwen3Guard").Return([]database.RepositoryFileCheckRule{}, nil).Once()
 		tester.mocks.moderationComp.EXPECT().CheckChatPrompts(ctx, chatReq.Messages, "test-uuid:Qwen/Qwen3Guard", false).Return(nil, errors.New("mod api error")).Once()
 
-		needCheck, result, err := tester.handler.sensitivePolicy.CheckChatSensitive(ctx, model, chatReq.Messages, userUUID, false)
+		needCheck, result, err := tester.handler.sensitivePolicy.CheckChatSensitive(ctx, model, chatReq.Messages, userUUID, false, "")
 		assert.ErrorContains(t, err, "failed to call moderation error:mod api error")
 		assert.False(t, needCheck)
 		assert.Nil(t, result)
+	})
+
+	t.Run("Provider in whitelist skips check", func(t *testing.T) {
+		tester, _, _ := setupTest(t)
+		tester.mocks.whitelistRule.ExpectedCalls = nil
+		tester.mocks.moderationComp.ExpectedCalls = nil
+		model := &types.Model{
+			BaseModel: types.BaseModel{
+				ID: "Qwen/Qwen3Guard",
+			},
+			ExternalModelInfo: types.ExternalModelInfo{
+				NeedSensitiveCheck: true,
+			},
+		}
+		tester.mocks.whitelistRule.EXPECT().ListBySensitiveCheckTargets(ctx, []string{"qwen", "openai"}, "Qwen/Qwen3Guard").Return([]database.RepositoryFileCheckRule{
+			{RuleType: database.RuleTypeNamespace, Pattern: "openai"},
+		}, nil).Once()
+		tester.mocks.moderationComp.EXPECT().CheckChatPrompts(mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, nil).Maybe()
+
+		needCheck, result, err := tester.handler.sensitivePolicy.CheckChatSensitive(ctx, model, chatReq.Messages, userUUID, false, "openai")
+		assert.NoError(t, err)
+		assert.False(t, needCheck)
+		assert.Nil(t, result)
+	})
+
+	t.Run("Provider only no modelID namespace continues moderation", func(t *testing.T) {
+		tester, _, _ := setupTest(t)
+		tester.mocks.whitelistRule.ExpectedCalls = nil
+		tester.mocks.moderationComp.ExpectedCalls = nil
+		model := &types.Model{
+			BaseModel: types.BaseModel{
+				ID: "simplemodel",
+			},
+			ExternalModelInfo: types.ExternalModelInfo{
+				NeedSensitiveCheck: true,
+			},
+		}
+		tester.mocks.whitelistRule.EXPECT().ListBySensitiveCheckTargets(ctx, []string{"simplemodel", "aws_bedrock"}, "simplemodel").Return([]database.RepositoryFileCheckRule{}, nil).Once()
+		expectedResult := &rpc.CheckResult{IsSensitive: false}
+		tester.mocks.moderationComp.EXPECT().CheckChatPrompts(ctx, chatReq.Messages, "test-uuid:simplemodel", false).Return(expectedResult, nil).Once()
+
+		needCheck, result, err := tester.handler.sensitivePolicy.CheckChatSensitive(ctx, model, chatReq.Messages, userUUID, false, "aws_bedrock")
+		assert.NoError(t, err)
+		assert.True(t, needCheck)
+		assert.Equal(t, expectedResult, result)
+	})
+
+	t.Run("Provider deduplicated with modelID namespace", func(t *testing.T) {
+		tester, _, _ := setupTest(t)
+		tester.mocks.whitelistRule.ExpectedCalls = nil
+		tester.mocks.moderationComp.ExpectedCalls = nil
+		model := &types.Model{
+			BaseModel: types.BaseModel{
+				ID: "openai/gpt-4",
+			},
+			ExternalModelInfo: types.ExternalModelInfo{
+				NeedSensitiveCheck: true,
+			},
+		}
+		// Provider "openai" is same as namespace extracted from model ID, should be deduplicated
+		tester.mocks.whitelistRule.EXPECT().ListBySensitiveCheckTargets(ctx, []string{"openai"}, "openai/gpt-4").Return([]database.RepositoryFileCheckRule{}, nil).Once()
+		expectedResult := &rpc.CheckResult{IsSensitive: false}
+		tester.mocks.moderationComp.EXPECT().CheckChatPrompts(ctx, chatReq.Messages, "test-uuid:openai/gpt-4", false).Return(expectedResult, nil).Once()
+
+		needCheck, result, err := tester.handler.sensitivePolicy.CheckChatSensitive(ctx, model, chatReq.Messages, userUUID, false, "openai")
+		assert.NoError(t, err)
+		assert.True(t, needCheck)
+		assert.Equal(t, expectedResult, result)
 	})
 }
 
@@ -264,12 +332,37 @@ func Test_extractNamespaceTarget(t *testing.T) {
 
 func Test_buildNamespaceTargets(t *testing.T) {
 	t.Run("deduplicate namespaces from model id", func(t *testing.T) {
-		targets := comp.BuildNamespaceTargets("///Qwen////model")
+		targets := comp.BuildNamespaceTargets("///Qwen////model", "")
 		assert.Equal(t, []string{"qwen"}, targets)
 	})
 
 	t.Run("support one slash and special symbols", func(t *testing.T) {
-		targets := comp.BuildNamespaceTargets("ns-_.+@123/model")
+		targets := comp.BuildNamespaceTargets("ns-_.+@123/model", "")
 		assert.Equal(t, []string{"ns-_.+@123"}, targets)
+	})
+
+	t.Run("provider added as namespace target", func(t *testing.T) {
+		targets := comp.BuildNamespaceTargets("Qwen/model", "huggingface")
+		assert.Equal(t, []string{"qwen", "huggingface"}, targets)
+	})
+
+	t.Run("provider only no modelID namespace", func(t *testing.T) {
+		targets := comp.BuildNamespaceTargets("onlymodel", "openai")
+		assert.Equal(t, []string{"onlymodel", "openai"}, targets)
+	})
+
+	t.Run("provider deduplicated with modelID namespace", func(t *testing.T) {
+		targets := comp.BuildNamespaceTargets("openai/gpt-4", "openai")
+		assert.Equal(t, []string{"openai"}, targets)
+	})
+
+	t.Run("empty modelID and empty provider", func(t *testing.T) {
+		targets := comp.BuildNamespaceTargets("", "")
+		assert.Empty(t, targets)
+	})
+
+	t.Run("provider with whitespace", func(t *testing.T) {
+		targets := comp.BuildNamespaceTargets("Qwen/model", "  OpenAI  ")
+		assert.Equal(t, []string{"qwen", "openai"}, targets)
 	})
 }

@@ -26,9 +26,9 @@ func (_m *MockSensitivePolicy) EXPECT() *MockSensitivePolicy_Expecter {
 	return &MockSensitivePolicy_Expecter{mock: &_m.Mock}
 }
 
-// CheckChatSensitive provides a mock function with given fields: ctx, model, messages, userUUID, stream
-func (_m *MockSensitivePolicy) CheckChatSensitive(ctx context.Context, model *types.Model, messages []openai.ChatCompletionMessageParamUnion, userUUID string, stream bool) (bool, *rpc.CheckResult, error) {
-	ret := _m.Called(ctx, model, messages, userUUID, stream)
+// CheckChatSensitive provides a mock function with given fields: ctx, model, messages, userUUID, stream, provider
+func (_m *MockSensitivePolicy) CheckChatSensitive(ctx context.Context, model *types.Model, messages []openai.ChatCompletionMessageParamUnion, userUUID string, stream bool, provider string) (bool, *rpc.CheckResult, error) {
+	ret := _m.Called(ctx, model, messages, userUUID, stream, provider)
 
 	if len(ret) == 0 {
 		panic("no return value specified for CheckChatSensitive")
@@ -37,25 +37,25 @@ func (_m *MockSensitivePolicy) CheckChatSensitive(ctx context.Context, model *ty
 	var r0 bool
 	var r1 *rpc.CheckResult
 	var r2 error
-	if rf, ok := ret.Get(0).(func(context.Context, *types.Model, []openai.ChatCompletionMessageParamUnion, string, bool) (bool, *rpc.CheckResult, error)); ok {
-		return rf(ctx, model, messages, userUUID, stream)
+	if rf, ok := ret.Get(0).(func(context.Context, *types.Model, []openai.ChatCompletionMessageParamUnion, string, bool, string) (bool, *rpc.CheckResult, error)); ok {
+		return rf(ctx, model, messages, userUUID, stream, provider)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, *types.Model, []openai.ChatCompletionMessageParamUnion, string, bool) bool); ok {
-		r0 = rf(ctx, model, messages, userUUID, stream)
+	if rf, ok := ret.Get(0).(func(context.Context, *types.Model, []openai.ChatCompletionMessageParamUnion, string, bool, string) bool); ok {
+		r0 = rf(ctx, model, messages, userUUID, stream, provider)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, *types.Model, []openai.ChatCompletionMessageParamUnion, string, bool) *rpc.CheckResult); ok {
-		r1 = rf(ctx, model, messages, userUUID, stream)
+	if rf, ok := ret.Get(1).(func(context.Context, *types.Model, []openai.ChatCompletionMessageParamUnion, string, bool, string) *rpc.CheckResult); ok {
+		r1 = rf(ctx, model, messages, userUUID, stream, provider)
 	} else {
 		if ret.Get(1) != nil {
 			r1 = ret.Get(1).(*rpc.CheckResult)
 		}
 	}
 
-	if rf, ok := ret.Get(2).(func(context.Context, *types.Model, []openai.ChatCompletionMessageParamUnion, string, bool) error); ok {
-		r2 = rf(ctx, model, messages, userUUID, stream)
+	if rf, ok := ret.Get(2).(func(context.Context, *types.Model, []openai.ChatCompletionMessageParamUnion, string, bool, string) error); ok {
+		r2 = rf(ctx, model, messages, userUUID, stream, provider)
 	} else {
 		r2 = ret.Error(2)
 	}
@@ -74,13 +74,14 @@ type MockSensitivePolicy_CheckChatSensitive_Call struct {
 //   - messages []openai.ChatCompletionMessageParamUnion
 //   - userUUID string
 //   - stream bool
-func (_e *MockSensitivePolicy_Expecter) CheckChatSensitive(ctx interface{}, model interface{}, messages interface{}, userUUID interface{}, stream interface{}) *MockSensitivePolicy_CheckChatSensitive_Call {
-	return &MockSensitivePolicy_CheckChatSensitive_Call{Call: _e.mock.On("CheckChatSensitive", ctx, model, messages, userUUID, stream)}
+//   - provider string
+func (_e *MockSensitivePolicy_Expecter) CheckChatSensitive(ctx interface{}, model interface{}, messages interface{}, userUUID interface{}, stream interface{}, provider interface{}) *MockSensitivePolicy_CheckChatSensitive_Call {
+	return &MockSensitivePolicy_CheckChatSensitive_Call{Call: _e.mock.On("CheckChatSensitive", ctx, model, messages, userUUID, stream, provider)}
 }
 
-func (_c *MockSensitivePolicy_CheckChatSensitive_Call) Run(run func(ctx context.Context, model *types.Model, messages []openai.ChatCompletionMessageParamUnion, userUUID string, stream bool)) *MockSensitivePolicy_CheckChatSensitive_Call {
+func (_c *MockSensitivePolicy_CheckChatSensitive_Call) Run(run func(ctx context.Context, model *types.Model, messages []openai.ChatCompletionMessageParamUnion, userUUID string, stream bool, provider string)) *MockSensitivePolicy_CheckChatSensitive_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(*types.Model), args[2].([]openai.ChatCompletionMessageParamUnion), args[3].(string), args[4].(bool))
+		run(args[0].(context.Context), args[1].(*types.Model), args[2].([]openai.ChatCompletionMessageParamUnion), args[3].(string), args[4].(bool), args[5].(string))
 	})
 	return _c
 }
@@ -90,7 +91,7 @@ func (_c *MockSensitivePolicy_CheckChatSensitive_Call) Return(_a0 bool, _a1 *rpc
 	return _c
 }
 
-func (_c *MockSensitivePolicy_CheckChatSensitive_Call) RunAndReturn(run func(context.Context, *types.Model, []openai.ChatCompletionMessageParamUnion, string, bool) (bool, *rpc.CheckResult, error)) *MockSensitivePolicy_CheckChatSensitive_Call {
+func (_c *MockSensitivePolicy_CheckChatSensitive_Call) RunAndReturn(run func(context.Context, *types.Model, []openai.ChatCompletionMessageParamUnion, string, bool, string) (bool, *rpc.CheckResult, error)) *MockSensitivePolicy_CheckChatSensitive_Call {
 	_c.Call.Return(run)
 	return _c
 }

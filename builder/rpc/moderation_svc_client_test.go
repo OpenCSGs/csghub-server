@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"opencsg.com/csghub-server/api/httpbase"
@@ -143,47 +144,74 @@ func TestModerationSvcHttpClient_PassLLMRespCheck(t *testing.T) {
 }
 
 func TestModerationSvcHttpClient_PassLLMPromptCheck(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, "/api/v1/llmprompt", r.URL.Path)
-		assert.Equal(t, http.MethodPost, r.Method)
+	t.Run("normal", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			assert.Equal(t, "/api/v1/llmprompt", r.URL.Path)
+			assert.Equal(t, http.MethodPost, r.Method)
 
-		var req types.LLMCheckRequest
-		err := json.NewDecoder(r.Body).Decode(&req)
-		assert.NoError(t, err)
-		assert.Equal(t, types.ScenarioLLMQueryModeration, req.Scenario)
-		assert.Equal(t, "test_prompt", req.Text)
-		assert.Equal(t, "test_account", req.AccountId)
+			var req types.LLMCheckRequest
+			err := json.NewDecoder(r.Body).Decode(&req)
+			assert.NoError(t, err)
+			assert.Equal(t, types.ScenarioLLMQueryModeration, req.Scenario)
+			assert.Equal(t, "test_prompt", req.Text)
+			assert.Equal(t, "test_account", req.AccountId)
 
-		resp := httpbase.R{
-			Data: CheckResult{
-				IsSensitive: false,
-				Reason:      "",
-			},
+			resp := httpbase.R{
+				Data: CheckResult{
+					IsSensitive: false,
+					Reason:      "",
+				},
+			}
+			err = json.NewEncoder(w).Encode(resp)
+			assert.NoError(t, err)
+		}))
+		hc := &HttpClient{
+			endpoint: server.URL,
+			hc:       server.Client(),
+			logger:   slog.New(slog.NewJSONHandler(os.Stdout, nil)),
 		}
-		err = json.NewEncoder(w).Encode(resp)
+
+		defer server.Close()
+
+		client := &ModerationSvcHttpClient{
+			hc: hc,
+		}
+		res, err := client.PassLLMPromptCheck(context.Background(), types.LLMCheckRequest{
+			Scenario:  types.ScenarioLLMQueryModeration,
+			Text:      "test_prompt",
+			AccountId: "test_account",
+		})
+
 		assert.NoError(t, err)
-	}))
-	hc := &HttpClient{
-		endpoint: server.URL,
-		hc:       server.Client(),
-		logger:   slog.New(slog.NewJSONHandler(os.Stdout, nil)),
-	}
-
-	defer server.Close()
-
-	client := &ModerationSvcHttpClient{
-		hc: hc,
-	}
-	res, err := client.PassLLMPromptCheck(context.Background(), types.LLMCheckRequest{
-		Scenario:  types.ScenarioLLMQueryModeration,
-		Text:      "test_prompt",
-		AccountId: "test_account",
+		assert.NotNil(t, res)
+		assert.False(t, res.IsSensitive)
+		assert.Empty(t, res.Reason)
 	})
 
-	assert.NoError(t, err)
-	assert.NotNil(t, res)
-	assert.False(t, res.IsSensitive)
-	assert.Empty(t, res.Reason)
+	t.Run("timeout after 2s", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			time.Sleep(3 * time.Second)
+		}))
+		hc := &HttpClient{
+			endpoint: server.URL,
+			hc:       server.Client(),
+			logger:   slog.New(slog.NewJSONHandler(os.Stdout, nil)),
+			retry:    1,
+		}
+
+		defer server.Close()
+
+		client := &ModerationSvcHttpClient{
+			hc: hc,
+		}
+		_, err := client.PassLLMPromptCheck(context.Background(), types.LLMCheckRequest{
+			Scenario: types.ScenarioLLMQueryModeration,
+			Text:     "test_prompt",
+		})
+
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "context deadline exceeded")
+	})
 }
 func TestModerationSvcHttpClient_SubmitRepoCheck(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

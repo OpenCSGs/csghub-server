@@ -415,7 +415,7 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 		}
 	}
 	var modComponent component.Moderation = nil
-	isCheck, result, err := h.sensitivePolicy.CheckChatSensitive(ctx, modelTarget.Model, chatReq.Messages, nsUUID, chatReq.Stream)
+	isCheck, result, err := h.sensitivePolicy.CheckChatSensitive(ctx, modelTarget.Model, chatReq.Messages, nsUUID, chatReq.Stream, modelTarget.Upstream.Provider)
 	if err != nil {
 		slog.ErrorContext(ctx, "failed to check sensitive",
 			slog.String("model_id", modelID),
