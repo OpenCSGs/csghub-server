@@ -95,9 +95,7 @@ func NewHealthChecker(
 		healthStore:    healthStore,
 		upstreamStore:  upstreamStore,
 		stateCache:     NewStateCache(redisClient),
-		httpClient: &http.Client{
-			Timeout: healthConfig.Config.L7APICheck.Timeout,
-		},
+		httpClient: &http.Client{},
 		stopCh:       make(chan struct{}),
 		leaderNodeID: fmt.Sprintf("%s-%d", hostname, time.Now().UnixNano()),
 	}

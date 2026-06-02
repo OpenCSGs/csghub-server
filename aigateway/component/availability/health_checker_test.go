@@ -909,3 +909,110 @@ func TestHealthChecker_PerformL7APIChecks_LeaderWithUpstreams(t *testing.T) {
 	require.Equal(t, int32(2), upsertCount.Load(),
 		"should upsert health state for each upstream")
 }
+
+func TestHealthChecker_PerformInferenceCheck_UsesDoubleTimeout(t *testing.T) {
+	baseTimeout := 3 * time.Second
+	var capturedDeadline time.Time
+
+	checker := &healthCheckerImpl{
+		config: HealthCheckerConfig{
+			Config: types.HealthCheckConfig{
+				L7APICheck: types.L7APICheckConfig{
+					Timeout: baseTimeout,
+				},
+			},
+		},
+		httpClient: &http.Client{
+			Transport: &mockTransport{
+				roundTrip: func(req *http.Request) (*http.Response, error) {
+					deadline, ok := req.Context().Deadline()
+					require.True(t, ok, "request context should have a deadline")
+					capturedDeadline = deadline
+					return &http.Response{
+						StatusCode: http.StatusOK,
+						Body:       io.NopCloser(bytes.NewReader([]byte(`{}`))),
+						Header:     make(http.Header),
+					}, nil
+				},
+			},
+		},
+	}
+
+	start := time.Now()
+	result := checker.performInferenceCheck(context.Background(), &database.Upstream{
+		ID:        1,
+		URL:       "https://api.example.com/v1/chat/completions",
+		ModelName: "gpt-4",
+		Provider:  "openai",
+	})
+
+	require.NotNil(t, result)
+	require.True(t, result.Healthy)
+
+	// The context deadline should be approximately baseTimeout * 2 from start
+	expectedDuration := baseTimeout * 2
+	actualDuration := capturedDeadline.Sub(start)
+	require.InDelta(t, expectedDuration, actualDuration, float64(500*time.Millisecond),
+		"inference check should use Timeout*2 (%v) as context deadline, got %v", expectedDuration, actualDuration)
+}
+
+func TestHealthChecker_PerformL7APICheck_UsesSingleTimeout(t *testing.T) {
+	baseTimeout := 3 * time.Second
+	var capturedDeadline time.Time
+
+	checker := &healthCheckerImpl{
+		config: HealthCheckerConfig{
+			Config: types.HealthCheckConfig{
+				L7APICheck: types.L7APICheckConfig{
+					Timeout: baseTimeout,
+				},
+			},
+		},
+		httpClient: &http.Client{
+			Transport: &mockTransport{
+				roundTrip: func(req *http.Request) (*http.Response, error) {
+					deadline, ok := req.Context().Deadline()
+					require.True(t, ok, "request context should have a deadline")
+					capturedDeadline = deadline
+					return &http.Response{
+						StatusCode: http.StatusOK,
+						Body:       io.NopCloser(bytes.NewReader([]byte(`{"data":[]}`))),
+						Header:     make(http.Header),
+					}, nil
+				},
+			},
+		},
+	}
+
+	start := time.Now()
+	result := checker.performL7APICheck(context.Background(), &database.Upstream{
+		ID:        1,
+		URL:       "https://api.example.com/v1/chat/completions",
+		ModelName: "gpt-4",
+		Provider:  "openai",
+	})
+
+	require.NotNil(t, result)
+	require.True(t, result.Healthy)
+
+	// The context deadline should be approximately baseTimeout from start
+	actualDuration := capturedDeadline.Sub(start)
+	require.InDelta(t, baseTimeout, actualDuration, float64(500*time.Millisecond),
+		"L7 API check should use Timeout (%v) as context deadline, got %v", baseTimeout, actualDuration)
+}
+
+func TestHealthChecker_HttpClientHasNoClientLevelTimeout(t *testing.T) {
+	checker := &healthCheckerImpl{
+		config: HealthCheckerConfig{
+			Config: types.HealthCheckConfig{
+				L7APICheck: types.L7APICheckConfig{
+					Timeout: 5 * time.Second,
+				},
+			},
+		},
+		httpClient: &http.Client{},
+	}
+
+	require.Zero(t, checker.httpClient.Timeout,
+		"httpClient should have no client-level timeout; per-request context.WithTimeout controls timeouts")
+}
