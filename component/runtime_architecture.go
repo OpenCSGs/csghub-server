@@ -221,7 +221,8 @@ func (c *runtimeArchitectureComponentImpl) ScanModel(ctx context.Context, curren
 			Ref:               repo.DefaultBranch,
 		})
 		if err != nil {
-			return fmt.Errorf("fail to update model description, %w", err)
+			slog.Warn("fail to update model description, continue with metadata scan",
+				slog.String("namespace", namespace), slog.String("name", name), slog.Any("error", err))
 		}
 	}
 	modelInfo, err := c.UpdateModelMetadata(ctx, repo)
