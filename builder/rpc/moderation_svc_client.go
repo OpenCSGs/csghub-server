@@ -3,6 +3,7 @@ package rpc
 import (
 	"context"
 	"log/slog"
+	"time"
 
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/common/errorx"
@@ -11,6 +12,8 @@ import (
 )
 
 const PRINT_STRING_LEN = 1000
+
+const defaultModerationSvcTimeout = 5 * time.Second
 
 type ModerationSvcClient interface {
 	PassTextCheck(ctx context.Context, scenario types.SensitiveScenario, text string) (*CheckResult, error)
@@ -31,8 +34,10 @@ type ModerationSvcHttpClient struct {
 }
 
 func NewModerationSvcHttpClient(endpoint string, opts ...RequestOption) ModerationSvcClient {
+	hc := NewHttpClient(endpoint, opts...)
+	hc.SetTimeout(defaultModerationSvcTimeout)
 	return &ModerationSvcHttpClient{
-		hc: NewHttpClient(endpoint, opts...),
+		hc: hc,
 	}
 }
 
@@ -157,6 +162,10 @@ func (c *ModerationSvcHttpClient) SubmitRepoCheck(ctx context.Context, repoType 
 func (c *ModerationSvcHttpClient) PassLLMPromptCheck(ctx context.Context, req types.LLMCheckRequest) (*CheckResult, error) {
 	req.Scenario = types.ScenarioLLMQueryModeration
 	const path = "/api/v1/llmprompt"
+
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+
 	var resp httpbase.R
 	resp.Data = &CheckResult{}
 	err := c.hc.Post(ctx, path, req, &resp)

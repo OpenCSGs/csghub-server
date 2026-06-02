@@ -14,7 +14,7 @@ import (
 )
 
 type SensitivePolicy interface {
-	CheckChatSensitive(ctx context.Context, model *types.Model, messages []openai.ChatCompletionMessageParamUnion, userUUID string, stream bool) (bool, *rpc.CheckResult, error)
+	CheckChatSensitive(ctx context.Context, model *types.Model, messages []openai.ChatCompletionMessageParamUnion, userUUID string, stream bool, provider string) (bool, *rpc.CheckResult, error)
 }
 
 type sensitivePolicyImpl struct {
@@ -29,13 +29,13 @@ func NewSensitivePolicy(moderation Moderation, whitelistRule database.Repository
 	}
 }
 
-func (s *sensitivePolicyImpl) CheckChatSensitive(ctx context.Context, model *types.Model, messages []openai.ChatCompletionMessageParamUnion, userUUID string, stream bool) (bool, *rpc.CheckResult, error) {
+func (s *sensitivePolicyImpl) CheckChatSensitive(ctx context.Context, model *types.Model, messages []openai.ChatCompletionMessageParamUnion, userUUID string, stream bool, provider string) (bool, *rpc.CheckResult, error) {
 	if model == nil || !model.NeedSensitiveCheck || s.moderation == nil {
 		return false, nil, nil
 	}
 
 	if s.whitelistRule != nil {
-		namespaceTargets := BuildNamespaceTargets(model.ID)
+		namespaceTargets := BuildNamespaceTargets(model.ID, provider)
 		rules, err := s.whitelistRule.ListBySensitiveCheckTargets(ctx, namespaceTargets, model.ID)
 		if err != nil {
 			return false, nil, fmt.Errorf("failed to query white list rules: %w", err)
@@ -54,13 +54,20 @@ func (s *sensitivePolicyImpl) CheckChatSensitive(ctx context.Context, model *typ
 	return true, result, nil
 }
 
-func BuildNamespaceTargets(modelID string) []string {
-	targetSet := make(map[string]struct{}, 2)
-	targets := make([]string, 0, 2)
+func BuildNamespaceTargets(modelID string, provider string) []string {
+	targetSet := make(map[string]struct{}, 3)
+	targets := make([]string, 0, 3)
 	if namespace := ExtractNamespaceTarget(modelID); namespace != "" {
 		if _, exists := targetSet[namespace]; !exists {
 			targetSet[namespace] = struct{}{}
 			targets = append(targets, namespace)
+		}
+	}
+	if provider != "" {
+		providerLower := strings.ToLower(strings.TrimSpace(provider))
+		if _, exists := targetSet[providerLower]; !exists {
+			targetSet[providerLower] = struct{}{}
+			targets = append(targets, providerLower)
 		}
 	}
 	return targets
