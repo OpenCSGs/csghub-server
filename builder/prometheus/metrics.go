@@ -46,18 +46,18 @@ func InitMetrics() {
 	}, []string{"cluster_id", "region"})
 
 	// AIGateway upstream health state gauge
-	// Labels: upstream_id, model_name, provider, url, state
+	// Labels: upstream_id, model_name, provider, state
 	AIGatewayUpstreamHealthState = promauto.NewGaugeVec(prometheus.GaugeOpts{
 		Name: "csghub_aigateway_upstream_health_state",
 		Help: "Health state of aigateway upstreams (0=unhealthy, 1=degraded, 2=healthy)",
-	}, []string{"upstream_id", "model_name", "provider", "url", "state"})
+	}, []string{"upstream_id", "model_name", "provider", "state"})
 
 	// AIGateway upstream circuit state gauge
-	// Labels: upstream_id, circuit_state
+	// Labels: upstream_id, model_name, provider, circuit_state
 	AIGatewayUpstreamCircuitState = promauto.NewGaugeVec(prometheus.GaugeOpts{
 		Name: "csghub_aigateway_upstream_circuit_state",
 		Help: "Circuit breaker state of aigateway upstreams (0=open, 1=half_open, 2=closed)",
-	}, []string{"upstream_id", "circuit_state"})
+	}, []string{"upstream_id", "model_name", "provider", "circuit_state"})
 
 	// AIGateway upstream health check latency
 	AIGatewayUpstreamHealthLatency = promauto.NewGaugeVec(prometheus.GaugeOpts{

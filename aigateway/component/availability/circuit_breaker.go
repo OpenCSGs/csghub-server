@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"opencsg.com/csghub-server/aigateway/types"
+	prom "opencsg.com/csghub-server/builder/prometheus"
 	"opencsg.com/csghub-server/builder/store/cache"
 	"opencsg.com/csghub-server/builder/store/database"
 )
@@ -432,7 +433,27 @@ func (c *circuitBreakerImpl) persistCircuitState(ctx context.Context, status *ty
 			"upstream_id", status.UpstreamID)
 	}
 	c.setLocalCircuitCache(c.localCacheKey(status.UpstreamID), status)
+	// Report metric
+	if prom.AIGatewayUpstreamCircuitState != nil {
+		prom.AIGatewayUpstreamCircuitState.WithLabelValues(
+			strconv.FormatInt(status.UpstreamID, 10),
+			status.ModelName,
+			status.Provider,
+			string(status.CircuitState),
+		).Set(circuitStateToGaugeValue(status.CircuitState))
+	}
 	return nil
+}
+
+func circuitStateToGaugeValue(state types.CircuitState) float64 {
+	switch state {
+	case types.CircuitStateOpen:
+		return 0
+	case types.CircuitStateHalfOpen:
+		return 1
+	default:
+		return 2
+	}
 }
 
 func (c *circuitBreakerImpl) newDefaultCircuitStatus(upstreamID int64, now time.Time) *types.ProviderCircuitStatus {
