@@ -7,6 +7,7 @@ const (
 	subscriptionExist
 	invalidUnitType
 	wrongTimeRange
+	negativePrice
 )
 
 var (
@@ -58,4 +59,16 @@ var (
 	//
 	// zh-HK: 不在訂閱有效期內
 	ErrWrongTimeRange error = CustomError{prefix: errAccountPrefix, code: wrongTimeRange}
+	// the price provided is negative
+	//
+	// Description: The price specified in the request is negative.
+	//
+	// Description_ZH: 请求中指定的价格为负数。
+	//
+	// en-US: Price must be non-negative
+	//
+	// zh-CN: 必须为非负数价格
+	//
+	// zh-HK: 必须為非負數價格
+	ErrNegativePrice error = CustomError{prefix: errAccountPrefix, code: negativePrice}
 )

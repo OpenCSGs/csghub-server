@@ -368,7 +368,7 @@ type MeteringEvent struct {
 
 type AcctPriceCreateReq struct {
 	SkuType          SKUType     `json:"sku_type" binding:"required,oneof=1 2"`
-	SkuPrice         int64       `json:"sku_price" binding:"required,min=0"`
+	SkuPrice         int64       `json:"sku_price"`
 	SkuUnit          int64       `json:"sku_unit" binding:"required,min=1"`
 	SkuDesc          string      `json:"sku_desc" binding:"required"`
 	ResourceID       string      `json:"resource_id" binding:"required"`

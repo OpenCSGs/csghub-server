@@ -10,5 +10,8 @@
     },
     "error.ACT-ERR-3": {
         "other": "不在訂閱有效期內"
+    },
+    "error.ACT-ERR-4": {
+        "other": "必须為非負數價格"
     }
 }

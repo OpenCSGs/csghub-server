@@ -10,5 +10,8 @@
     },
     "error.ACT-ERR-3": {
         "other": "Invalid subscription time range"
+    },
+    "error.ACT-ERR-4": {
+        "other": "Price must be non-negative"
     }
 }
