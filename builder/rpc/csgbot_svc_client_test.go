@@ -29,6 +29,22 @@ func setupTestCsgbotClient(server *httptest.Server) *CsgbotSvcHttpClientImpl {
 	return &CsgbotSvcHttpClientImpl{hc: hc}
 }
 
+func TestReadLimitedResponseBody(t *testing.T) {
+	t.Run("exact limit", func(t *testing.T) {
+		body, err := readLimitedResponseBody(strings.NewReader("abcd"), 4)
+
+		assert.NoError(t, err)
+		assert.Equal(t, "abcd", body)
+	})
+
+	t.Run("over limit", func(t *testing.T) {
+		body, err := readLimitedResponseBody(strings.NewReader("abcde"), 4)
+
+		assert.NoError(t, err)
+		assert.Equal(t, "abcd", body)
+	})
+}
+
 func TestDeleteWorkspaceFiles_Success(t *testing.T) {
 	userUUID := "test-user-uuid"
 	username := "test-username"
@@ -1192,6 +1208,7 @@ func TestCreateOpenClaw_NilRequest(t *testing.T) {
 func TestCreateOpenClaw_Non200Status(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte(`{"error":"quota exceeded"}`))
 	}))
 	defer server.Close()
 
@@ -1281,8 +1298,10 @@ func TestDeleteOpenClaw_FailureNoError(t *testing.T) {
 }
 
 func TestDeleteOpenClaw_Non200Status(t *testing.T) {
+	largeBody := strings.Repeat("x", csgbotErrorBodyLogLimit+1)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte(largeBody))
 	}))
 	defer server.Close()
 
