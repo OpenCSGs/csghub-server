@@ -471,9 +471,9 @@ type Config struct {
 		HealthCheckEnabled             bool   `env:"OPENCSG_AIGATEWAY_HEALTH_CHECK_ENABLED" default:"true"`
 		HealthCheckL7APIEnabled        bool   `env:"OPENCSG_AIGATEWAY_HEALTH_CHECK_L7_API_ENABLED" default:"true"`
 		HealthCheckL7APIInterval       int    `env:"OPENCSG_AIGATEWAY_HEALTH_CHECK_L7_API_INTERVAL" default:"60"`
-		HealthCheckL7APITimeout        int    `env:"OPENCSG_AIGATEWAY_HEALTH_CHECK_L7_API_TIMEOUT" default:"5"`
+		HealthCheckL7APITimeout        int    `env:"OPENCSG_AIGATEWAY_HEALTH_CHECK_L7_API_TIMEOUT" default:"15"`
 		HealthCheckConsecutiveFailures int    `env:"OPENCSG_AIGATEWAY_HEALTH_CHECK_CONSECUTIVE_FAILURES" default:"3"`
-		HealthCheckLatencyDegradedMs   int    `env:"OPENCSG_AIGATEWAY_HEALTH_CHECK_LATENCY_DEGRADED_MS" default:"5000"`
+		HealthCheckLatencyDegradedMs   int    `env:"OPENCSG_AIGATEWAY_HEALTH_CHECK_LATENCY_DEGRADED_MS" default:"10000"`
 		CircuitBreakerEnabled          bool   `env:"OPENCSG_AIGATEWAY_CIRCUIT_BREAKER_ENABLED" default:"true"`
 		CircuitBreakerFailureThreshold int    `env:"OPENCSG_AIGATEWAY_CIRCUIT_BREAKER_FAILURE_THRESHOLD" default:"3"`
 		CircuitBreakerOpenDuration     int    `env:"OPENCSG_AIGATEWAY_CIRCUIT_BREAKER_OPEN_DURATION" default:"30"`

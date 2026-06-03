@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"time"
+
 	"opencsg.com/csghub-server/aigateway/types"
 )
 
@@ -105,6 +107,9 @@ type chatAttemptReportParams struct {
 func (h *OpenAIHandlerImpl) reportChatAttemptResult(ctx context.Context, p chatAttemptReportParams) {
 	recordChatAttemptMetrics(p)
 
+	// Use context.WithoutCancel so the background work is not cancelled when
+	// the outer request ctx is done. Wrap with a timeout to bound the goroutine
+	// lifetime in case Redis/DB operations hang.
 	bgCtx := context.WithoutCancel(ctx)
 	if types.ShouldAttemptFailureStatus(p.StatusCode) {
 		event := ChatAttemptFailureEvent{
@@ -120,10 +125,18 @@ func (h *OpenAIHandlerImpl) reportChatAttemptResult(ctx context.Context, p chatA
 			Retryable:       p.Retryable,
 			FallbackAttempt: p.FallbackAttempt,
 		}
-		go h.reportChatAttemptFailure(bgCtx, event)
+		go func() {
+			timeoutCtx, cancel := context.WithTimeout(bgCtx, 30*time.Second)
+			defer cancel()
+			h.reportChatAttemptFailure(timeoutCtx, event)
+		}()
 	} else {
 		upstreamID := p.UpstreamID
 		modelID := resolveFailureEventModelID(p.RequestModelID, p.Model)
-		go h.reportChatAttemptSuccess(bgCtx, upstreamID, modelID)
+		go func() {
+			timeoutCtx, cancel := context.WithTimeout(bgCtx, 5*time.Second)
+			defer cancel()
+			h.reportChatAttemptSuccess(timeoutCtx, upstreamID, modelID)
+		}()
 	}
 }

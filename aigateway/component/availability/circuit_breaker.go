@@ -14,10 +14,29 @@ import (
 	"opencsg.com/csghub-server/builder/store/database"
 )
 
+// Circuit breaker timing constants
+//
+// These values are carefully chosen to prevent a deadlock scenario:
+//
+// Problem: If localCache TTL >= transitionInterval, the following deadlock occurs:
+// 1. Circuit opens, localCache stores state=open (TTL=8s)
+// 2. After openDuration, transitionWatcher tries open→half_open
+// 3. TryTransitionToHalfOpen succeeds in Redis
+// 4. getCircuitState reads from localCache (still valid, returns open)
+// 5. persistCircuitState writes open back to Redis/DB, overwriting half_open
+// 6. Circuit stays open forever (deadlock)
+//
+// Solution: localCache TTL (4s) < transitionInterval (5s) < Redis TTL (10s)
+// - localCache expires before next transition check, forcing fresh Redis read
+// - Redis TTL is longest to survive local cache misses
+// - transitionInterval is between them to ensure cache is stale when checking
+//
+// This ensures that when we check for transitions, localCache has expired,
+// so we always read the latest state from Redis and don't overwrite it.
 const (
-	circuitStateCacheTTL      = 10 * time.Second
-	circuitStateLocalCacheTTL = 8 * time.Second
-	circuitTransitionInterval = 5 * time.Second
+	circuitStateCacheTTL      = 10 * time.Second // Redis cache TTL - longest to survive local misses
+	circuitStateLocalCacheTTL = 4 * time.Second  // Local cache TTL - shortest to prevent deadlock
+	circuitTransitionInterval = 5 * time.Second  // Check interval - between local and Redis TTL
 	modelCacheKey             = "aigateway:models"
 )
 
@@ -102,6 +121,15 @@ func (c *circuitBreakerImpl) IsAvailable(ctx context.Context, upstreamID int64) 
 				return false, nil
 			}
 			if transitioned {
+				slog.InfoContext(ctx, "circuit breaker transitioned to half-open",
+					"upstream_id", upstreamID,
+					"old_state", string(types.CircuitStateOpen),
+					"new_state", string(types.CircuitStateHalfOpen),
+				)
+				// Invalidate localCache so the next getCircuitState reads the
+				// freshly-transitioned half_open state from Redis instead of
+				// returning the stale open state.
+				c.invalidateLocalCache(c.localCacheKey(upstreamID))
 				updated, getErr := c.getCircuitState(ctx, upstreamID)
 				if getErr == nil {
 					_ = c.persistCircuitState(ctx, updated)
@@ -109,6 +137,9 @@ func (c *circuitBreakerImpl) IsAvailable(ctx context.Context, upstreamID int64) 
 				return true, nil
 			}
 
+			// Also invalidate localCache here so we don't read a stale open state
+			// that was cached before another goroutine transitioned to half_open.
+			c.invalidateLocalCache(c.localCacheKey(upstreamID))
 			latest, getErr := c.getCircuitState(ctx, upstreamID)
 			if getErr == nil && latest.CircuitState != types.CircuitStateOpen {
 				return true, nil
@@ -162,6 +193,11 @@ func (c *circuitBreakerImpl) RecordSuccess(ctx context.Context, upstreamID int64
 	state.SuccessCount++
 	state.FailureCount = 0
 	if state.CircuitState == types.CircuitStateHalfOpen {
+		slog.InfoContext(ctx, "circuit breaker closed after successful half-open request",
+			"upstream_id", upstreamID,
+			"old_state", string(types.CircuitStateHalfOpen),
+			"new_state", string(types.CircuitStateClosed),
+		)
 		state.CircuitState = types.CircuitStateClosed
 		state.LastStateChange = now
 		state.SuccessCount = 0
@@ -185,6 +221,13 @@ func (c *circuitBreakerImpl) RecordFailure(ctx context.Context, upstreamID int64
 	if c.stateCache.Enabled() {
 		status, err := c.stateCache.RecordFailure(ctx, input, c.getFailureThreshold(), c.getOpenDuration())
 		if err == nil {
+			if status.CircuitState == types.CircuitStateOpen {
+				slog.InfoContext(ctx, "circuit breaker opened",
+					"upstream_id", upstreamID,
+					"model_id", modelID,
+					"next_retry_at", status.NextRetryAt,
+					"error", failErr)
+			}
 			c.invalidateModelCacheOnOpenAsync(ctx, modelID, upstreamID, status.CircuitState)
 			return c.persistCircuitState(ctx, status)
 		}
@@ -272,6 +315,10 @@ func (c *circuitBreakerImpl) ForceOpen(ctx context.Context, upstreamID int64, re
 	if err != nil {
 		state = c.newDefaultCircuitStatus(upstreamID, time.Now())
 	}
+	if state.CircuitState == types.CircuitStateOpen {
+		slog.DebugContext(ctx, "circuit breaker already open, skipping persist", "upstream_id", upstreamID)
+		return nil
+	}
 	now := time.Now()
 	nextRetry := now.Add(c.getOpenDuration())
 	state.CircuitState = types.CircuitStateOpen
@@ -287,6 +334,10 @@ func (c *circuitBreakerImpl) ForceClose(ctx context.Context, upstreamID int64) e
 	state, err := c.getCircuitState(ctx, upstreamID)
 	if err != nil {
 		state = c.newDefaultCircuitStatus(upstreamID, time.Now())
+	}
+	if state.CircuitState == types.CircuitStateClosed && state.FailureCount == 0 && state.NextRetryAt == nil {
+		slog.DebugContext(ctx, "circuit breaker already closed, skipping persist", "upstream_id", upstreamID)
+		return nil
 	}
 	state.CircuitState = types.CircuitStateClosed
 	state.LastStateChange = time.Now()
@@ -368,6 +419,14 @@ func (c *circuitBreakerImpl) checkAndTransitionOpenCircuits(ctx context.Context)
 		if !transitioned {
 			continue
 		}
+		slog.InfoContext(ctx, "circuit breaker transitioned to half-open by watcher",
+			"upstream_id", dbState.UpstreamID,
+			"old_state", string(types.CircuitStateOpen),
+			"new_state", string(types.CircuitStateHalfOpen),
+		)
+		// Invalidate localCache so getCircuitState reads the freshly-transitioned
+		// half_open state from Redis instead of returning the stale open state.
+		c.invalidateLocalCache(c.localCacheKey(dbState.UpstreamID))
 		updated, getErr := c.getCircuitState(ctx, dbState.UpstreamID)
 		if getErr != nil {
 			slog.WarnContext(ctx, "failed to read circuit state after half-open transition",
@@ -468,6 +527,12 @@ func (c *circuitBreakerImpl) setLocalCircuitCache(cacheKey string, status *types
 		status:    &copyStatus,
 		expiresAt: time.Now().Add(circuitStateLocalCacheTTL),
 	}
+}
+
+func (c *circuitBreakerImpl) invalidateLocalCache(cacheKey string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	delete(c.localCache, cacheKey)
 }
 
 func (c *circuitBreakerImpl) localCacheKey(upstreamID int64) string {
