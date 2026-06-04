@@ -31,6 +31,8 @@ type CsgbotSvcClient interface {
 	DeleteOpenClaw(ctx context.Context, userUUID, username, token, contentID string) error
 }
 
+const csgbotErrorBodyLogLimit = 1024
+
 type CsgbotChatMessage struct {
 	Role    string `json:"role"`
 	Content any    `json:"content"` // can be a string or []map[string]any for Claude content blocks
@@ -450,6 +452,14 @@ func (c *CsgbotSvcHttpClientImpl) doStreamChatRequest(ctx context.Context, path,
 	return hresp.Body, nil
 }
 
+func readLimitedResponseBody(body io.Reader, limit int64) (string, error) {
+	data, err := io.ReadAll(io.LimitReader(body, limit))
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
+}
+
 func (c *CsgbotSvcHttpClientImpl) CreateOpenClaw(ctx context.Context, userUUID, username, token string, req CreateOpenClawRequest) (*CreateOpenClawResponse, error) {
 	// Ensure req is not nil to avoid null JSON body
 	if req == nil {
@@ -484,7 +494,16 @@ func (c *CsgbotSvcHttpClientImpl) CreateOpenClaw(ctx context.Context, userUUID, 
 	defer hresp.Body.Close()
 
 	if hresp.StatusCode != http.StatusOK {
-		slog.ErrorContext(ctx, "failed to create openclaw sandbox", "status_code", hresp.StatusCode, "rpc_error_ctx", rpcErrorCtx)
+		body, readErr := readLimitedResponseBody(hresp.Body, csgbotErrorBodyLogLimit)
+		logArgs := []any{
+			"status_code", hresp.StatusCode,
+			"response_body", body,
+			"rpc_error_ctx", rpcErrorCtx,
+		}
+		if readErr != nil {
+			logArgs = append(logArgs, "read_body_error", readErr)
+		}
+		slog.ErrorContext(ctx, "failed to create openclaw sandbox", logArgs...)
 		return nil, errorx.RemoteSvcFail(errors.New("failed to create openclaw sandbox"), rpcErrorCtx)
 	}
 
@@ -528,7 +547,16 @@ func (c *CsgbotSvcHttpClientImpl) DeleteOpenClaw(ctx context.Context, userUUID, 
 	defer hresp.Body.Close()
 
 	if hresp.StatusCode != http.StatusOK {
-		slog.ErrorContext(ctx, "failed to delete openclaw sandbox", "status_code", hresp.StatusCode, "rpc_error_ctx", rpcErrorCtx)
+		body, readErr := readLimitedResponseBody(hresp.Body, csgbotErrorBodyLogLimit)
+		logArgs := []any{
+			"status_code", hresp.StatusCode,
+			"response_body", body,
+			"rpc_error_ctx", rpcErrorCtx,
+		}
+		if readErr != nil {
+			logArgs = append(logArgs, "read_body_error", readErr)
+		}
+		slog.ErrorContext(ctx, "failed to delete openclaw sandbox", logArgs...)
 		return errorx.RemoteSvcFail(errors.New("failed to delete openclaw sandbox"), rpcErrorCtx)
 	}
 
