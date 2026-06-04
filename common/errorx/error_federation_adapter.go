@@ -119,6 +119,33 @@ const (
 	//
 	// zh-HK: 處理 fedap 代理請求失敗
 	proxyRequestProcessFailed
+
+	// oauthAccessDenied means the end user denied the upstream OAuth authorization request.
+	//
+	// Description: The upstream OAuth provider returned access_denied because the user declined the authorization request.
+	//
+	// Description_ZH: 上游 OAuth 提供方返回 access_denied，表示用户拒绝了授权请求。
+	//
+	// en-US: OAuth access denied
+	//
+	// zh-CN: OAuth 授权被拒绝
+	//
+	// zh-HK: OAuth 授權被拒絕
+	oauthAccessDenied
+
+	// oauthCredentialProcessingFailed means token/userinfo handling succeeded far enough to reach
+	// local credential processing, but local encryption or persistence failed.
+	//
+	// Description: Failed to process locally issued OAuth credentials, such as encrypting tokens or persisting authorization records.
+	//
+	// Description_ZH: 处理本地 OAuth 凭证失败，例如加密令牌或持久化授权记录失败。
+	//
+	// en-US: OAuth credential processing failed
+	//
+	// zh-CN: OAuth 凭证处理失败
+	//
+	// zh-HK: OAuth 憑證處理失敗
+	oauthCredentialProcessingFailed
 )
 
 // Sentinel error variables for use with errors.Is().
@@ -141,6 +168,10 @@ var (
 	ErrUserInfoFetchFailed error = CustomError{prefix: errFederationAdapterPrefix, code: userInfoFetchFailed}
 	// ErrProxyRequestProcess indicates a general fedap proxy request processing failure.
 	ErrProxyRequestProcess error = CustomError{prefix: errFederationAdapterPrefix, code: proxyRequestProcessFailed}
+	// ErrOAuthAccessDenied indicates the user denied the upstream OAuth authorization request.
+	ErrOAuthAccessDenied error = CustomError{prefix: errFederationAdapterPrefix, code: oauthAccessDenied}
+	// ErrOAuthCredentialProcessingFailed indicates local token encryption or persistence failed.
+	ErrOAuthCredentialProcessingFailed error = CustomError{prefix: errFederationAdapterPrefix, code: oauthCredentialProcessingFailed}
 )
 
 // TokenExpiredErr wraps err as a token-expired error with optional context.
@@ -181,4 +212,14 @@ func UserInfoFetchFailedErr(err error, ctx context) error {
 // ProxyRequestProcessErr wraps err as a general fedap proxy request processing failure with optional context.
 func ProxyRequestProcessErr(err error, ctx context) error {
 	return CustomError{prefix: errFederationAdapterPrefix, code: proxyRequestProcessFailed, err: err, context: ctx}
+}
+
+// OAuthAccessDeniedErr wraps err as an OAuth-access-denied error with optional context.
+func OAuthAccessDeniedErr(err error, ctx context) error {
+	return CustomError{prefix: errFederationAdapterPrefix, code: oauthAccessDenied, err: err, context: ctx}
+}
+
+// OAuthCredentialProcessingFailedErr wraps err as an OAuth-credential-processing-failed error with optional context.
+func OAuthCredentialProcessingFailedErr(err error, ctx context) error {
+	return CustomError{prefix: errFederationAdapterPrefix, code: oauthCredentialProcessingFailed, err: err, context: ctx}
 }
