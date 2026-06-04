@@ -333,10 +333,10 @@ type EmailRechargeSuccessNotification struct {
 }
 
 type EmailWeeklyRechargesNotification struct {
-	Email     string `json:"email"`
-	FileData  string `json:"file_data"`
-	StartDate string `json:"start_date"`
-	EndDate   string `json:"end_date"`
+	Emails    []string `json:"emails"`
+	FileData  string   `json:"file_data"`
+	StartDate string   `json:"start_date"`
+	EndDate   string   `json:"end_date"`
 }
 
 type SMSReq struct {
