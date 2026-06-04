@@ -471,7 +471,6 @@ func (h *healthCheckerImpl) updateHealthState(ctx context.Context, result *types
 			strconv.FormatInt(result.UpstreamID, 10),
 			result.ModelName,
 			result.Provider,
-			result.Endpoint,
 			string(status.HealthState),
 		).Set(healthStateToGaugeValue(status.HealthState))
 	}

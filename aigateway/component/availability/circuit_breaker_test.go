@@ -9,10 +9,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	mockcache "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/cache"
 	"opencsg.com/csghub-server/aigateway/types"
+	prom "opencsg.com/csghub-server/builder/prometheus"
 	"opencsg.com/csghub-server/builder/store/database"
 )
 
@@ -681,4 +683,115 @@ func TestCircuitBreaker_IsAvailable_StaleLocalCache(t *testing.T) {
 		require.False(t, available,
 			"should be unavailable: fresh Redis read still shows open with future NextRetryAt")
 	})
+}
+
+func TestCircuitStateToGaugeValue(t *testing.T) {
+	tests := []struct {
+		name     string
+		state    types.CircuitState
+		expected float64
+	}{
+		{"open state", types.CircuitStateOpen, 0},
+		{"half_open state", types.CircuitStateHalfOpen, 1},
+		{"closed state", types.CircuitStateClosed, 2},
+		{"unknown state defaults to closed value", types.CircuitState("unknown"), 2},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.expected, circuitStateToGaugeValue(tt.state))
+		})
+	}
+}
+
+// TestCircuitBreaker_PersistCircuitState_MetricReporting verifies that
+// persistCircuitState correctly sets the AIGatewayUpstreamCircuitState
+// Prometheus GaugeVec metric. It uses a fresh registry (the same gatherer
+// interface that promhttp.HandlerFor consumers use) to scrape and assert
+// the metric values end-to-end.
+func TestCircuitBreaker_PersistCircuitState_MetricReporting(t *testing.T) {
+	// Create a fresh registry so we don't pollute the global default registry.
+	reg := prometheus.NewRegistry()
+	metric := prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "csghub_aigateway_upstream_circuit_state",
+		Help: "Circuit breaker state of aigateway upstreams (0=open, 1=half_open, 2=closed)",
+	}, []string{"upstream_id", "model_name", "provider", "circuit_state"})
+	reg.MustRegister(metric)
+
+	// Swap the global metric with our isolated one; restore after the test.
+	origMetric := prom.AIGatewayUpstreamCircuitState
+	prom.AIGatewayUpstreamCircuitState = metric
+	defer func() { prom.AIGatewayUpstreamCircuitState = origMetric }()
+
+	store := newFakeCircuitStore()
+	cb := NewCircuitBreaker(types.CircuitBreakerConfig{Enabled: true}, store, nil).(*circuitBreakerImpl)
+
+	now := time.Now()
+	nextRetry := now.Add(30 * time.Second)
+
+	// ---- open ----
+	statusOpen := &types.ProviderCircuitStatus{
+		UpstreamID:      42,
+		ModelName:       "gpt-4",
+		Provider:        "OpenAI",
+		CircuitState:    types.CircuitStateOpen,
+		FailureCount:    3,
+		SuccessCount:    0,
+		LastStateChange: now,
+		NextRetryAt:     &nextRetry,
+	}
+	require.NoError(t, cb.persistCircuitState(context.Background(), statusOpen))
+	assertCircuitMetricValue(t, reg, "42", "gpt-4", "OpenAI", "open", 0)
+
+	// ---- half_open ----
+	metric.Reset()
+	statusHalfOpen := &types.ProviderCircuitStatus{
+		UpstreamID:      42,
+		ModelName:       "gpt-4",
+		Provider:        "OpenAI",
+		CircuitState:    types.CircuitStateHalfOpen,
+		FailureCount:    0,
+		SuccessCount:    0,
+		LastStateChange: now,
+	}
+	require.NoError(t, cb.persistCircuitState(context.Background(), statusHalfOpen))
+	assertCircuitMetricValue(t, reg, "42", "gpt-4", "OpenAI", "half_open", 1)
+
+	// ---- closed ----
+	metric.Reset()
+	statusClosed := &types.ProviderCircuitStatus{
+		UpstreamID:      42,
+		ModelName:       "gpt-4",
+		Provider:        "OpenAI",
+		CircuitState:    types.CircuitStateClosed,
+		FailureCount:    0,
+		SuccessCount:    1,
+		LastStateChange: now,
+	}
+	require.NoError(t, cb.persistCircuitState(context.Background(), statusClosed))
+	assertCircuitMetricValue(t, reg, "42", "gpt-4", "OpenAI", "closed", 2)
+}
+
+func assertCircuitMetricValue(t *testing.T, reg *prometheus.Registry, upstreamID, modelName, provider, circuitState string, want float64) {
+	t.Helper()
+	families, err := reg.Gather()
+	require.NoError(t, err)
+	require.Len(t, families, 1, "expect exactly one metric family")
+
+	family := families[0]
+	require.Equal(t, "csghub_aigateway_upstream_circuit_state", family.GetName())
+	require.Len(t, family.GetMetric(), 1, "expect exactly one metric")
+
+	m := family.GetMetric()[0]
+	require.Equal(t, want, m.GetGauge().GetValue(), "unexpected gauge value for state %q", circuitState)
+
+	gotLabels := make(map[string]string)
+	for _, l := range m.GetLabel() {
+		gotLabels[l.GetName()] = l.GetValue()
+	}
+	require.Equal(t, upstreamID, gotLabels["upstream_id"])
+	require.Equal(t, modelName, gotLabels["model_name"])
+	require.Equal(t, provider, gotLabels["provider"])
+	require.Equal(t, circuitState, gotLabels["circuit_state"])
+	require.Equal(t, "", gotLabels["url"], "url label should not exist")
 }
