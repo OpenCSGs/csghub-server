@@ -26,6 +26,14 @@ func (c *logCaptureImpl) SetModelID(_ string) {
 func (c *logCaptureImpl) SetProvider(_ string) {
 }
 
+func (c *logCaptureImpl) Messages() ([]commontypes.LLMLogMessage, []commontypes.LLMLogMessage) {
+	return nil, nil
+}
+
+func (c *logCaptureImpl) TraceInfo() commontypes.LLMLogTraceInfo {
+	return commontypes.LLMLogTraceInfo{}
+}
+
 func (c *logCaptureImpl) Record() (*commontypes.LLMLogRecord, error) {
 	return nil, nil
 }

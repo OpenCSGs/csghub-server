@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/openai/openai-go/v3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"opencsg.com/csghub-server/aigateway/types"
@@ -44,6 +45,8 @@ func TestHFInferenceToolkitAdapter_TransformResponse_responseFormatURL(t *testin
 		}
 		opts := &types.TransformResponseOptions{
 			ResponseFormat: "url",
+			Size:           "1024x1024",
+			OutputFormat:   "png",
 			Storage:        storage,
 			Bucket:         "my-bucket",
 		}
@@ -51,6 +54,8 @@ func TestHFInferenceToolkitAdapter_TransformResponse_responseFormatURL(t *testin
 		require.NoError(t, err)
 		require.NotNil(t, resp)
 		require.Len(t, resp.Data, 1)
+		assert.Equal(t, openai.ImagesResponseSize("1024x1024"), resp.Size)
+		assert.Equal(t, openai.ImagesResponseOutputFormatPNG, resp.OutputFormat)
 		assert.Equal(t, presignedURL, resp.Data[0].URL)
 		assert.Empty(t, resp.Data[0].B64JSON)
 		var decoded map[string]any
@@ -89,6 +94,27 @@ func TestHFInferenceToolkitAdapter_TransformResponse_responseFormatURL(t *testin
 		assert.Empty(t, resp.Data[0].URL)
 		assert.Equal(t, base64.StdEncoding.EncodeToString(pngBytes), resp.Data[0].B64JSON)
 		_ = body
+	})
+
+	t.Run("infers output_format from png bytes", func(t *testing.T) {
+		opts := &types.TransformResponseOptions{
+			Size: "1024x1024",
+		}
+		_, resp, err := adapter.TransformResponse(ctx, pngBytes, "", "", opts)
+		require.NoError(t, err)
+		require.NotNil(t, resp)
+		assert.Equal(t, openai.ImagesResponseSize("1024x1024"), resp.Size)
+		assert.Equal(t, openai.ImagesResponseOutputFormatPNG, resp.OutputFormat)
+	})
+
+	t.Run("uses explicit output_format", func(t *testing.T) {
+		opts := &types.TransformResponseOptions{
+			OutputFormat: "webp",
+		}
+		_, resp, err := adapter.TransformResponse(ctx, pngBytes, contentType, "", opts)
+		require.NoError(t, err)
+		require.NotNil(t, resp)
+		assert.Equal(t, openai.ImagesResponseOutputFormatWebP, resp.OutputFormat)
 	})
 
 	t.Run("response_format=url but storage nil returns B64JSON", func(t *testing.T) {

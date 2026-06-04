@@ -16,10 +16,12 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"opencsg.com/csghub-server/aigateway/component/adapter/text2video"
+	llmtrace "opencsg.com/csghub-server/aigateway/component/trace"
 	"opencsg.com/csghub-server/aigateway/types"
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/builder/proxy"
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/common/utils/trace"
 )
 
 // CreateVideo godoc
@@ -45,41 +47,80 @@ func (h *OpenAIHandlerImpl) CreateVideo(c *gin.Context) {
 	username := httpbase.GetCurrentUser(c)
 	nsUUID := httpbase.GetCurrentNamespaceUUID(c)
 	ctx := c.Request.Context()
+	requestID := trace.GetTraceIDInGinContext(c)
+	ctx, preflight := startPreflightTrace(ctx, preflightTraceStart{
+		API:       c.FullPath(),
+		RequestID: requestID,
+		UserID:    nsUUID,
+	})
+	c.Request = c.Request.WithContext(ctx)
 
-	input, ok := parseCreateVideoInput(c)
+	input, parseErr, ok := parseCreateVideoInput(c)
 	if !ok {
+		preflight.RecordError(parseErr, "bad_request")
 		return
 	}
 
 	modelTarget, err := h.resolveModelTarget(ctx, username, input.modelID, c.Request.Header)
 	if err != nil {
+		preflight.RecordError(err, "model_resolve")
 		handleModelTargetError(c, ctx, input.modelID, "failed to get video target address", err)
 		return
 	}
+	preflight.SetTargetModel(input.modelID, modelTarget)
+	preflight.End()
+
+	traceCtx, generationRecorder := h.startModalGenerationTrace(ctx, modalTraceStartInput{
+		API:           c.FullPath(),
+		OperationName: modalTraceOperationGenerateContent,
+		OutputType:    modalTraceOutputVideo,
+		RequestID:     requestID,
+		NSUUID:        nsUUID,
+		ModelID:       input.modelID,
+		ModelTarget:   modelTarget,
+		Metadata: map[string]any{
+			llmtrace.TraceMetadataKeyVideoSize:    input.adapterReq.Size,
+			llmtrace.TraceMetadataKeyVideoSeconds: input.adapterReq.Seconds,
+		},
+	})
+	ctx = traceCtx
+	c.Request = c.Request.WithContext(traceCtx)
 
 	adapter := h.t2vRegistry.GetAdapter(modelTarget.Model)
 	if !validateCreateVideoAdapter(c, input, adapter, modelTarget.Model) {
+		finishModalGenerationTraceWithError(generationRecorder, fmt.Errorf("unsupported video model '%s'", input.modelID), types.TraceErrUpstreamUnavailable)
 		return
 	}
 
-	if !h.authorizeCreateVideo(c, ctx, nsUUID, input, modelTarget) {
+	if !h.authorizeCreateVideo(c, ctx, nsUUID, input, modelTarget, generationRecorder) {
 		return
 	}
 
-	providerReq, ok := buildCreateVideoProviderRequest(c, ctx, input, adapter, modelTarget)
+	providerReq, ok := buildCreateVideoProviderRequest(c, ctx, input, adapter, modelTarget, generationRecorder)
 	if !ok {
 		return
 	}
-	capture, ok := proxyCreateVideoRequest(c, ctx, providerReq, modelTarget)
+	capture, ok := proxyCreateVideoRequest(c, ctx, providerReq, modelTarget, generationRecorder)
 	if !ok {
 		return
 	}
 	body := capture.Body()
+	var videoResp *types.VideoObject
 	if capture.StatusCode() < http.StatusBadRequest {
-		body, ok = h.normalizeCreateVideoResponse(c, ctx, nsUUID, input.modelID, adapter, body)
+		body, videoResp, ok = h.normalizeCreateVideoResponse(c, ctx, nsUUID, input.modelID, adapter, body, generationRecorder)
 		if !ok {
 			return
 		}
+	}
+	if generationRecorder != nil {
+		recordModalGenerationTraceCompletion(modalTraceCompletionInput{
+			Recorder:   generationRecorder,
+			Provider:   modelTarget.Model.Provider,
+			Model:      modelTarget.ModelName,
+			StatusCode: capture.StatusCode(),
+			Metadata:   videoTraceCompletionMetadata(videoResp, input),
+		})
+		generationRecorder.End()
 	}
 
 	copyProxyResponse(c, capture.Header(), capture.StatusCode(), body)
@@ -93,7 +134,7 @@ type createVideoInput struct {
 	hasMultipartInputReference bool
 }
 
-func parseCreateVideoInput(c *gin.Context) (*createVideoInput, bool) {
+func parseCreateVideoInput(c *gin.Context) (*createVideoInput, error, bool) {
 	input := &createVideoInput{
 		isMultipart: strings.HasPrefix(c.ContentType(), "multipart/form-data"),
 	}
@@ -103,21 +144,22 @@ func parseCreateVideoInput(c *gin.Context) (*createVideoInput, bool) {
 	return parseCreateVideoJSONInput(c, input)
 }
 
-func parseCreateVideoMultipartInput(c *gin.Context, input *createVideoInput) (*createVideoInput, bool) {
+func parseCreateVideoMultipartInput(c *gin.Context, input *createVideoInput) (*createVideoInput, error, bool) {
 	form, err := c.MultipartForm()
 	if err != nil {
 		writeVideoAPIError(c, http.StatusBadRequest, "invalid_request_error", "invalid multipart form: "+err.Error(), "invalid_request_error")
-		return nil, false
+		return nil, fmt.Errorf("invalid multipart form: %w", err), false
 	}
 	modelID := strings.TrimSpace(firstMultipartValue(form, "model"))
 	prompt := firstMultipartValue(form, "prompt")
 	if modelID == "" || strings.TrimSpace(prompt) == "" {
+		err := fmt.Errorf("model and prompt cannot be empty")
 		writeVideoAPIError(c, http.StatusBadRequest, "invalid_request_error", "Model and prompt cannot be empty", "invalid_request_error")
-		return nil, false
+		return nil, err, false
 	}
 	if err := validateVideoMultipartInputReference(form); err != nil {
 		writeVideoAPIError(c, http.StatusBadRequest, "invalid_request_error", err.Error(), "invalid_request_error")
-		return nil, false
+		return nil, err, false
 	}
 
 	input.form = form
@@ -134,24 +176,25 @@ func parseCreateVideoMultipartInput(c *gin.Context, input *createVideoInput) (*c
 			input.adapterReq.Seconds = parsed
 		}
 	}
-	return input, true
+	return input, nil, true
 }
 
-func parseCreateVideoJSONInput(c *gin.Context, input *createVideoInput) (*createVideoInput, bool) {
+func parseCreateVideoJSONInput(c *gin.Context, input *createVideoInput) (*createVideoInput, error, bool) {
 	if err := c.ShouldBindJSON(&input.adapterReq); err != nil {
 		writeVideoAPIError(c, http.StatusBadRequest, "invalid_request_error", err.Error(), "invalid_request_error")
-		return nil, false
+		return nil, err, false
 	}
 	input.modelID = input.adapterReq.Model
 	if strings.TrimSpace(input.modelID) == "" || strings.TrimSpace(input.adapterReq.Prompt) == "" {
+		err := fmt.Errorf("model and prompt cannot be empty")
 		writeVideoAPIError(c, http.StatusBadRequest, "invalid_request_error", "Model and prompt cannot be empty", "invalid_request_error")
-		return nil, false
+		return nil, err, false
 	}
 	if err := validateVideoJSONInputReference(input.adapterReq); err != nil {
 		writeVideoAPIError(c, http.StatusBadRequest, "invalid_request_error", err.Error(), "invalid_request_error")
-		return nil, false
+		return nil, err, false
 	}
-	return input, true
+	return input, nil, true
 }
 
 func validateCreateVideoAdapter(c *gin.Context, input *createVideoInput, adapter text2video.T2VAdapter, model *types.Model) bool {
@@ -171,9 +214,10 @@ func validateCreateVideoAdapter(c *gin.Context, input *createVideoInput, adapter
 	return true
 }
 
-func (h *OpenAIHandlerImpl) authorizeCreateVideo(c *gin.Context, ctx context.Context, nsUUID string, input *createVideoInput, modelTarget *resolvedModelTarget) bool {
+func (h *OpenAIHandlerImpl) authorizeCreateVideo(c *gin.Context, ctx context.Context, nsUUID string, input *createVideoInput, modelTarget *resolvedModelTarget, recorder llmtrace.GenerationRecorder) bool {
 	if !modelTarget.Model.SkipBalance() {
 		if err := h.openaiComponent.CheckBalance(ctx, nsUUID); err != nil {
+			finishModalGenerationTraceWithError(recorder, err, types.TraceErrInsufficientBalance)
 			h.handleInsufficientBalance(c, false, nsUUID, input.modelID, err)
 			return false
 		}
@@ -181,17 +225,19 @@ func (h *OpenAIHandlerImpl) authorizeCreateVideo(c *gin.Context, ctx context.Con
 
 	result, err := h.modComponent.CheckImagePrompts(ctx, input.adapterReq.Prompt, nsUUID)
 	if err != nil {
+		finishModalGenerationTraceWithError(recorder, err, types.TraceErrUpstreamUnavailable)
 		writeVideoAPIError(c, http.StatusInternalServerError, "moderation_error", "failed to check video prompts: "+err.Error(), "internal_error")
 		return false
 	}
 	if result != nil && result.IsSensitive {
+		finishModalGenerationTraceWithError(recorder, ErrSensitiveContent, types.TraceErrSensitivePrompt)
 		writeVideoAPIError(c, http.StatusBadRequest, "content_policy_violation", "Input data may contain inappropriate content.", "invalid_request_error")
 		return false
 	}
 	return true
 }
 
-func buildCreateVideoProviderRequest(c *gin.Context, ctx context.Context, input *createVideoInput, adapter text2video.T2VAdapter, modelTarget *resolvedModelTarget) (*text2video.ProviderRequest, bool) {
+func buildCreateVideoProviderRequest(c *gin.Context, ctx context.Context, input *createVideoInput, adapter text2video.T2VAdapter, modelTarget *resolvedModelTarget, recorder llmtrace.GenerationRecorder) (*text2video.ProviderRequest, bool) {
 	req := input.adapterReq
 	req.Model = modelTarget.ModelName
 	providerReq, err := adapter.BuildCreateRequest(ctx, modelTarget.Model, text2video.CreateRequestInput{
@@ -200,6 +246,7 @@ func buildCreateVideoProviderRequest(c *gin.Context, ctx context.Context, input 
 		IsMultipart: input.isMultipart,
 	})
 	if err != nil {
+		finishModalGenerationTraceWithError(recorder, err, types.TraceErrUpstreamUnavailable)
 		var requestValidationErr *text2video.RequestValidationError
 		if errors.As(err, &requestValidationErr) {
 			writeVideoAPIError(c, http.StatusBadRequest, "invalid_request_error", requestValidationErr.Error(), "invalid_request_error")
@@ -211,13 +258,14 @@ func buildCreateVideoProviderRequest(c *gin.Context, ctx context.Context, input 
 	return providerReq, true
 }
 
-func proxyCreateVideoRequest(c *gin.Context, ctx context.Context, providerReq *text2video.ProviderRequest, modelTarget *resolvedModelTarget) (*videoProxyCapture, bool) {
+func proxyCreateVideoRequest(c *gin.Context, ctx context.Context, providerReq *text2video.ProviderRequest, modelTarget *resolvedModelTarget, recorder llmtrace.GenerationRecorder) (*videoProxyCapture, bool) {
 	if err := applyModelAuthHeaders(c.Request.Header, modelTarget.Model); err != nil {
 		slog.WarnContext(ctx, "invalid auth head", slog.String("model", modelTarget.ModelName), slog.Any("error", err))
 	}
 
 	rp, err := proxy.NewReverseProxy(modelTarget.Target, proxy.WithoutAcceptEncoding())
 	if err != nil {
+		finishModalGenerationTraceWithError(recorder, err, types.TraceErrUpstreamUnavailable)
 		slog.ErrorContext(ctx, "failed to create reverse proxy", slog.Any("error", err))
 		writeVideoAPIError(c, http.StatusInternalServerError, "internal_error", fmt.Errorf("failed to create reverse proxy:%w", err).Error(), "internal_error")
 		return nil, false
@@ -228,24 +276,25 @@ func proxyCreateVideoRequest(c *gin.Context, ctx context.Context, providerReq *t
 	return capture, true
 }
 
-func (h *OpenAIHandlerImpl) normalizeCreateVideoResponse(c *gin.Context, ctx context.Context, nsUUID, modelID string, adapter text2video.T2VAdapter, body []byte) ([]byte, bool) {
+func (h *OpenAIHandlerImpl) normalizeCreateVideoResponse(c *gin.Context, ctx context.Context, nsUUID, modelID string, adapter text2video.T2VAdapter, body []byte, recorder llmtrace.GenerationRecorder) ([]byte, *types.VideoObject, bool) {
 	videoProviderResp, err := adapter.ParseCreateResponse(ctx, body)
 	if err != nil {
+		finishModalGenerationTraceWithError(recorder, err, types.TraceErrUpstreamError)
 		var requestValidationErr *text2video.RequestValidationError
 		if errors.As(err, &requestValidationErr) {
 			writeVideoAPIError(c, http.StatusBadRequest, "invalid_request_error", requestValidationErr.Error(), "invalid_request_error")
-			return nil, false
+			return nil, nil, false
 		}
 		message := "failed to parse downstream video response: " + err.Error()
 		if downstreamPayload := downstreamErrorPayload(body); downstreamPayload != "" {
 			message += "; downstream payload: " + downstreamPayload
 		}
 		writeVideoAPIError(c, http.StatusInternalServerError, "internal_error", message, "internal_error")
-		return nil, false
+		return nil, nil, false
 	}
 	videoResp := videoProviderResp.Video
 	if videoResp.ID == "" || h.aiGenerationStore == nil {
-		return body, true
+		return body, videoResp, true
 	}
 
 	providerResourceID := videoResp.ID
@@ -259,11 +308,14 @@ func (h *OpenAIHandlerImpl) normalizeCreateVideoResponse(c *gin.Context, ctx con
 		ModelID:            modelID,
 		Status:             videoResp.Status,
 	}); err != nil {
+		finishModalGenerationTraceWithError(recorder, err, types.TraceErrUpstreamError)
 		slog.ErrorContext(ctx, "failed to persist ai video generation", slog.Any("error", err), slog.String("video_id", videoID), slog.String("provider_resource_id", providerResourceID))
 		writeVideoAPIError(c, http.StatusInternalServerError, "internal_error", "failed to persist ai generation", "internal_error")
-		return nil, false
+		return nil, nil, false
 	}
-	return normalizeVideoResponseBody(adapter, body, videoResp, videoID), true
+	normalized := *videoResp
+	normalized.ID = videoID
+	return normalizeVideoResponseBody(adapter, body, videoResp, videoID), &normalized, true
 }
 
 func writeVideoAPIError(c *gin.Context, status int, code, message, errorType string) {

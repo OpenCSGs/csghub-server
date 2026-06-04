@@ -1,8 +1,9 @@
 package handler
 
 import (
+	"bytes"
 	"context"
-	"fmt"
+	"encoding/json"
 	"net/http"
 	"strings"
 	"time"
@@ -10,6 +11,7 @@ import (
 	llmtrace "opencsg.com/csghub-server/aigateway/component/trace"
 	"opencsg.com/csghub-server/aigateway/token"
 	"opencsg.com/csghub-server/aigateway/types"
+	commontypes "opencsg.com/csghub-server/common/types"
 )
 
 const (
@@ -35,12 +37,10 @@ func (h *OpenAIHandlerImpl) startChatTrace(ctx context.Context, headers http.Hea
 		return ctx, nil
 	}
 	mode := types.GenerationModeSync
-	start := h.llmTracer.StartGeneration
 	if chatReq.Stream {
 		mode = types.GenerationModeStream
-		start = h.llmTracer.StartStreamingGeneration
 	}
-	traceCtx, recorder := start(ctx, types.GenerationStart{
+	return h.startLLMTrace(ctx, types.GenerationStart{
 		RequestID:      requestID,
 		ConversationID: extractChatSessionID(headers),
 		UserID:         userID,
@@ -48,18 +48,84 @@ func (h *OpenAIHandlerImpl) startChatTrace(ctx context.Context, headers http.Hea
 		RequestModel:   modelID,
 		ResolvedModel:  modelTarget.ModelName,
 		Mode:           mode,
+		Tools:          chatTraceTools(chatReq),
 		ToolCount:      len(chatReq.Tools),
 		MaxTokens:      chatTraceMaxTokens(chatReq),
 		Temperature:    chatTraceTemperature(chatReq),
 		TopP:           chatTraceTopP(chatReq),
+		ToolChoice:     chatTraceToolChoice(chatReq),
 		Metadata: map[string]any{
-			"aigateway.model.id": modelTarget.Model.ID,
+			llmtrace.TraceMetadataKeyAIGatewayAPI:     "/v1/chat/completions",
+			llmtrace.TraceMetadataKeyAIGatewayModelID: modelTarget.Model.ID,
 		},
-	})
-	if traceCtx == nil {
-		traceCtx = ctx
+	}, chatReq.Stream)
+}
+
+type chatTraceToolDefinition struct {
+	Type     string `json:"type"`
+	Function struct {
+		Name        string          `json:"name"`
+		Description string          `json:"description"`
+		Parameters  json.RawMessage `json:"parameters"`
+	} `json:"function"`
+}
+
+func chatTraceTools(chatReq *ChatCompletionRequest) []types.GenerationToolDefinition {
+	if chatReq == nil || len(chatReq.Tools) == 0 {
+		return nil
 	}
-	return traceCtx, recorder
+	tools := make([]types.GenerationToolDefinition, 0, len(chatReq.Tools))
+	for _, tool := range chatReq.Tools {
+		data, err := json.Marshal(tool)
+		if err != nil {
+			continue
+		}
+		var parsed chatTraceToolDefinition
+		if err := json.Unmarshal(data, &parsed); err != nil {
+			continue
+		}
+		if parsed.Function.Name == "" {
+			continue
+		}
+		toolType := parsed.Type
+		if toolType == "" {
+			toolType = "function"
+		}
+		tools = append(tools, types.GenerationToolDefinition{
+			Name:        parsed.Function.Name,
+			Description: parsed.Function.Description,
+			Type:        toolType,
+			InputSchema: parsed.Function.Parameters,
+		})
+	}
+	return tools
+}
+
+func chatTraceToolChoice(chatReq *ChatCompletionRequest) *string {
+	if chatReq == nil {
+		return nil
+	}
+	data, err := json.Marshal(chatReq.ToolChoice)
+	if err != nil {
+		return nil
+	}
+	value := strings.TrimSpace(string(data))
+	if value == "" || value == "null" || value == "{}" {
+		return nil
+	}
+	var stringValue string
+	if err := json.Unmarshal(data, &stringValue); err == nil {
+		if stringValue = strings.TrimSpace(stringValue); stringValue != "" {
+			return &stringValue
+		}
+		return nil
+	}
+	var compacted bytes.Buffer
+	if err := json.Compact(&compacted, data); err == nil {
+		compactValue := compacted.String()
+		return &compactValue
+	}
+	return &value
 }
 
 func chatTraceMaxTokens(chatReq *ChatCompletionRequest) *int64 {
@@ -86,20 +152,6 @@ func chatTraceTopP(chatReq *ChatCompletionRequest) *float64 {
 	return &value
 }
 
-func recordChatTraceUsage(recorder llmtrace.GenerationRecorder, usage *token.Usage) {
-	if recorder == nil || usage == nil {
-		return
-	}
-	recorder.SetUsage(types.TokenUsage{
-		InputTokens:           usage.PromptTokens,
-		OutputTokens:          usage.CompletionTokens,
-		TotalTokens:           usage.TotalTokens,
-		CacheReadInputTokens:  usage.CachedPromptTokens,
-		CacheWriteInputTokens: usage.CacheCreationPromptTokens,
-		ReasoningTokens:       usage.ReasoningTokens,
-	})
-}
-
 type chatTracePostProcessInput struct {
 	Recorder     llmtrace.GenerationRecorder
 	Completion   bool
@@ -123,53 +175,28 @@ func newChatTracePostProcessInput(recorder llmtrace.GenerationRecorder, chatReq 
 	return input
 }
 
-func recordChatTraceCompletion(input chatTracePostProcessInput, provider string, model string, usage *token.Usage) {
+func recordChatTraceCompletion(input chatTracePostProcessInput, provider string, model string, usage *token.Usage, inputMsgs []types.GenerationMessage, outputMsgs []types.GenerationMessage, traceInfo commontypes.LLMLogTraceInfo) {
 	if input.Recorder == nil {
 		return
 	}
 	if input.Completion {
-		recordChatTraceFirstChunk(input.Recorder, input.Stream, input.FirstWriteAt)
-		recordChatTraceResponse(input.Recorder, provider, model)
-		recordChatTraceHTTPStatus(input.Recorder, input.StatusCode)
-	}
-	recordChatTraceUsage(input.Recorder, usage)
-}
-
-func recordChatTraceFirstChunk(recorder llmtrace.GenerationRecorder, stream bool, firstWriteAt time.Time) {
-	if recorder == nil || !stream || firstWriteAt.IsZero() {
+		firstChunkAt := time.Time{}
+		if input.Stream {
+			firstChunkAt = input.FirstWriteAt
+		}
+		recordLLMTraceCompletion(llmTraceCompletionInput{
+			Recorder:      input.Recorder,
+			Provider:      provider,
+			Model:         model,
+			Usage:         usage,
+			Input:         inputMsgs,
+			Output:        outputMsgs,
+			ResponseID:    traceInfo.ResponseID,
+			FinishReasons: traceInfo.FinishReasons,
+			FirstChunkAt:  firstChunkAt,
+			StatusCode:    input.StatusCode,
+		})
 		return
 	}
-	recorder.SetFirstChunk(types.GenerationFirstChunk{
-		At: firstWriteAt,
-	})
-}
-
-func recordChatTraceResponse(recorder llmtrace.GenerationRecorder, provider string, model string) {
-	if recorder == nil {
-		return
-	}
-	response := types.GenerationResponse{
-		Provider:      provider,
-		Model:         model,
-		ResponseModel: model,
-	}
-	recorder.SetResponse(response)
-}
-
-func recordChatTraceHTTPStatus(recorder llmtrace.GenerationRecorder, statusCode int) {
-	if recorder == nil {
-		return
-	}
-	if statusCode < http.StatusBadRequest {
-		return
-	}
-	recorder.SetError(fmt.Errorf("HTTP %d", statusCode), types.TraceErrUpstreamError)
-}
-
-func finishChatTraceWithError(recorder llmtrace.GenerationRecorder, err error, code string) {
-	if recorder == nil || err == nil {
-		return
-	}
-	recorder.SetError(err, code)
-	recorder.End()
+	recordLLMTraceUsage(input.Recorder, usage)
 }

@@ -12,6 +12,8 @@ type Storage interface {
 // wants to influence the response (e.g. return URL instead of b64 when response_format=url).
 type TransformResponseOptions struct {
 	ResponseFormat string // "url" or "b64_json" from the image generation request
+	Size           string // requested image size, e.g. "1024x1024"
+	OutputFormat   string // requested output format, e.g. "png", "jpeg", or "webp"
 	Storage        Storage
 	Bucket         string // bucket for upload when using Storage (e.g. from config)
 }

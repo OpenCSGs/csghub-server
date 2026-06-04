@@ -20,6 +20,11 @@ type LLMLogMessage struct {
 	FinishReason     string          `json:"finish_reason,omitempty"`
 }
 
+type LLMLogTraceInfo struct {
+	ResponseID    string
+	FinishReasons []string
+}
+
 type LLMLogRecord struct {
 	RequestID  string          `json:"request_id"`
 	EventTime  string          `json:"event_time"`

@@ -31,7 +31,7 @@ func TestImageGeneration_Write_Finalize(t *testing.T) {
 		w := httptest.NewRecorder()
 		ctx, _ := gin.CreateTestContext(w)
 
-		imageGen := NewImageGeneration(ctx.Writer, adapter, mockModeration, sensitiveDefaultImg, nil, "", nil, "")
+		imageGen := NewImageGeneration(ctx.Writer, adapter, mockModeration, sensitiveDefaultImg, nil, "", "", "", nil, "")
 		imageGen.WriteHeader(http.StatusOK)
 		responseData := []byte(`{"created":1625625600,"data":[{"url":"https://example.com/image1.png"}]}`)
 		_, err := imageGen.Write(responseData)
@@ -49,7 +49,7 @@ func TestImageGeneration_Write_Finalize(t *testing.T) {
 		w := httptest.NewRecorder()
 		ctx, _ := gin.CreateTestContext(w)
 
-		imageGen := NewImageGeneration(ctx.Writer, adapter, mockModeration, sensitiveDefaultImg, nil, "", nil, "")
+		imageGen := NewImageGeneration(ctx.Writer, adapter, mockModeration, sensitiveDefaultImg, nil, "", "", "", nil, "")
 		imageGen.WriteHeader(http.StatusOK)
 		responseData := []byte(`{"created":1625625600,"data":[{"url":"https://example.com/sensitive.png"}]}`)
 		_, err := imageGen.Write(responseData)
@@ -74,7 +74,7 @@ func TestImageGeneration_Write_Finalize(t *testing.T) {
 		w := httptest.NewRecorder()
 		ctx, _ := gin.CreateTestContext(w)
 
-		imageGen := NewImageGeneration(ctx.Writer, adapter, mockModeration, sensitiveDefaultImg, nil, "", nil, "")
+		imageGen := NewImageGeneration(ctx.Writer, adapter, mockModeration, sensitiveDefaultImg, nil, "", "", "", nil, "")
 		imageGen.WriteHeader(http.StatusOK)
 		responseData := []byte(`{"created":1625625600,"data":[{"url":"https://example.com/image1.png"}]}`)
 		_, err := imageGen.Write(responseData)
@@ -93,7 +93,7 @@ func TestImageGeneration_Write_Finalize(t *testing.T) {
 		ctx, _ := gin.CreateTestContext(w)
 		counter := token.NewImageUsageCounter()
 
-		imageGen := NewImageGeneration(ctx.Writer, adapter, mockModeration, sensitiveDefaultImg, counter, "", nil, "")
+		imageGen := NewImageGeneration(ctx.Writer, adapter, mockModeration, sensitiveDefaultImg, counter, "", "", "", nil, "")
 		imageGen.WriteHeader(http.StatusOK)
 		responseData := []byte(`{"created":1625625600,"data":[{"url":"https://example.com/img.png"}],"usage":{"total_tokens":10,"input_tokens":2,"output_tokens":8}}`)
 		_, err := imageGen.Write(responseData)
@@ -107,4 +107,33 @@ func TestImageGeneration_Write_Finalize(t *testing.T) {
 		require.Equal(t, int64(8), usage.CompletionTokens)
 		require.Equal(t, int64(10), usage.TotalTokens)
 	})
+
+	t.Run("hf response includes size and inferred output format", func(t *testing.T) {
+		mockModeration := mock_component.NewMockModeration(t)
+		mockModeration.EXPECT().CheckImage(mock.Anything, mock.Anything).Return(&rpc.CheckResult{IsSensitive: false}, nil)
+
+		w := httptest.NewRecorder()
+		ctx, _ := gin.CreateTestContext(w)
+
+		imageGen := NewImageGeneration(ctx.Writer, text2image.NewHFInferenceToolkitAdapter(), mockModeration, sensitiveDefaultImg, nil, "b64_json", "1024x1024", "", nil, "")
+		ctx.Writer.Header().Set("Content-Type", "image/png")
+		imageGen.WriteHeader(http.StatusOK)
+		_, err := imageGen.Write([]byte{0x89, 0x50, 0x4e, 0x47})
+		require.NoError(t, err)
+		err = imageGen.Finalize()
+		require.NoError(t, err)
+
+		require.JSONEq(t, `{"created":0,"background":"","data":[{"b64_json":"iVBORw==","revised_prompt":"","url":""}],"output_format":"png","quality":"","size":"1024x1024","usage":{"input_tokens":0,"input_tokens_details":{"image_tokens":0,"text_tokens":0},"output_tokens":0,"total_tokens":0}}`, normalizeCreatedAt(t, w.Body.Bytes()))
+	})
+}
+
+func normalizeCreatedAt(t *testing.T, body []byte) string {
+	t.Helper()
+
+	var resp map[string]any
+	require.NoError(t, json.Unmarshal(body, &resp))
+	resp["created"] = float64(0)
+	normalized, err := json.Marshal(resp)
+	require.NoError(t, err)
+	return string(normalized)
 }

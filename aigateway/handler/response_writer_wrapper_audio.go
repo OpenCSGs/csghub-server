@@ -17,12 +17,17 @@ type audioResponseWriter interface {
 	WriteHeader(int)
 	Write([]byte) (int, error)
 	Flush()
+	StatusCode() int
+	DurationSeconds() (float64, bool)
 }
 
 type ResponseWriterWrapperAudio struct {
 	internalWritter http.ResponseWriter
 	tokenCounter    *token.AudioUsageCounter
 	buffer          bytes.Buffer
+	statusCode      int
+	durationSeconds float64
+	hasDuration     bool
 }
 
 func NewResponseWriterWrapperAudio(internalWritter http.ResponseWriter, tokenCounter *token.AudioUsageCounter) audioResponseWriter {
@@ -37,6 +42,7 @@ func (rw *ResponseWriterWrapperAudio) Header() http.Header {
 }
 
 func (rw *ResponseWriterWrapperAudio) WriteHeader(statusCode int) {
+	rw.statusCode = statusCode
 	rw.internalWritter.WriteHeader(statusCode)
 }
 
@@ -69,14 +75,17 @@ func (rw *ResponseWriterWrapperAudio) captureText(data []byte) {
 	}
 
 	var resp struct {
-		Text  string `json:"text"`
-		Usage struct {
-			PromptTokens     int64 `json:"prompt_tokens"`
-			CompletionTokens int64 `json:"completion_tokens"`
-			TotalTokens      int64 `json:"total_tokens"`
+		Text     string   `json:"text"`
+		Duration *float64 `json:"duration"`
+		Usage    struct {
+			PromptTokens     int64    `json:"prompt_tokens"`
+			CompletionTokens int64    `json:"completion_tokens"`
+			TotalTokens      int64    `json:"total_tokens"`
+			Seconds          *float64 `json:"seconds"`
 		} `json:"usage"`
 	}
 	if err := json.Unmarshal(body, &resp); err == nil {
+		rw.captureDuration(resp.Usage.Seconds, resp.Duration)
 		if resp.Usage.TotalTokens > 0 || resp.Usage.PromptTokens > 0 || resp.Usage.CompletionTokens > 0 {
 			rw.tokenCounter.SetUsage(token.Usage{
 				TotalTokens:      resp.Usage.TotalTokens,
@@ -102,4 +111,31 @@ func (rw *ResponseWriterWrapperAudio) captureText(data []byte) {
 			rw.tokenCounter.Text(text)
 		}
 	}
+}
+
+func (rw *ResponseWriterWrapperAudio) captureDuration(candidates ...*float64) {
+	for _, candidate := range candidates {
+		if candidate != nil && *candidate > 0 {
+			rw.durationSeconds = *candidate
+			rw.hasDuration = true
+			return
+		}
+	}
+}
+
+func (rw *ResponseWriterWrapperAudio) StatusCode() int {
+	// Match net/http behavior: a body write without WriteHeader implies 200 OK.
+	// Audio proxying is synchronous; trace completion reads this only after
+	// ReverseProxy.ServeHTTP returns and wrapper writes have completed.
+	if rw == nil || rw.statusCode == 0 {
+		return http.StatusOK
+	}
+	return rw.statusCode
+}
+
+func (rw *ResponseWriterWrapperAudio) DurationSeconds() (float64, bool) {
+	if rw == nil || !rw.hasDuration {
+		return 0, false
+	}
+	return rw.durationSeconds, true
 }
