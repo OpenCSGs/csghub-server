@@ -94,6 +94,12 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 		internalUserGroup.GET("/emails", userHandler.GetEmailsInternal)
 	}
 
+	middlewareCollection := middleware.MiddlewareCollection{}
+	middlewareCollection.Auth.NeedLogin = mustLogin()
+	if err := extendRoutes(apiV1Group, middlewareCollection, config); err != nil {
+		return nil, fmt.Errorf("error extending routes:%w", err)
+	}
+
 	apiV1Group.Use(mustLogin())
 	userMatch := userMatch()
 
@@ -166,13 +172,6 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 
 	{
 		userGroup.POST("/tags", mustLogin(), userHandler.ResetUserTags)
-	}
-
-	middlewareCollection := middleware.MiddlewareCollection{}
-	middlewareCollection.Auth.NeedLogin = mustLogin()
-
-	if err := extendRoutes(apiV1Group, middlewareCollection, config); err != nil {
-		return nil, fmt.Errorf("error extending routes:%w", err)
 	}
 
 	return r, nil

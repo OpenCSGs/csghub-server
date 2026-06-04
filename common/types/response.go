@@ -19,4 +19,6 @@ type APIUnauthorized struct{}
 
 type APIForbidden struct{}
 
+type APITooManyRequests struct{}
+
 type APINotFound struct{}
