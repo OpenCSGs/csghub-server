@@ -61,6 +61,7 @@ type Organization struct {
 	Namespace    *Namespace         `bun:"rel:has-one,join:path=path" json:"namespace"`
 	VerifyStatus types.VerifyStatus `bun:",notnull,default:'none'" json:"verify_status"` // none, pending, approved, rejected
 	UUID         uuid.UUID          `bun:"type:uuid,notnull,unique" json:"uuid"`
+	Role string `bun:",scanonly" json:"role,omitempty"`
 	times
 }
 
@@ -168,6 +169,8 @@ func (s *orgStoreImpl) GetUserBelongOrgs(ctx context.Context, userID int64) (org
 		NewSelect().
 		Model(&orgs).
 		Relation("Namespace").
+		ColumnExpr("organization.*").
+		ColumnExpr("members.role AS role").
 		Join("join members on members.organization_id = organization.id").
 		Where("members.user_id = ? and members.deleted_at is null", userID).
 		Scan(ctx, &orgs)

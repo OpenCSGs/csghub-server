@@ -138,6 +138,7 @@ type Organization struct {
 	VerifyStatus string     `json:"verify_status,omitempty"`
 	UUID         uuid.UUID  `json:"uuid,omitempty"`
 	Namespace    *Namespace `json:"namespace,omitempty"`
+	Role         string     `json:"role,omitempty"`
 }
 
 type Member struct {
