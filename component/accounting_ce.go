@@ -101,6 +101,6 @@ func (ac *accountingComponentImpl) ListPresents(ctx context.Context, req types.P
 	return nil, 0, nil
 }
 
-func (ac *accountingComponentImpl) WeeklyRecharges(ctx context.Context) error {
+func (ac *accountingComponentImpl) WeeklyRecharges(ctx context.Context, emails []string) error {
 	return nil
 }

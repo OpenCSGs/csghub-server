@@ -637,6 +637,10 @@ type RechargesIndexResp struct {
 	Sum   int64                `json:"sum"` // Total recharge amount
 }
 
+type WeeklyRechargesReq struct {
+	Emails []string `json:"emails" binding:"required,min=1,dive,email"`
+}
+
 type PresentIndexResp struct {
 	ID              int64                `json:"id"`
 	EventUUID       string               `json:"event_uuid"`

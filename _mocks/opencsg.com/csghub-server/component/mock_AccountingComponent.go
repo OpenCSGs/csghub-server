@@ -1465,17 +1465,17 @@ func (_c *MockAccountingComponent_UpdatePrice_Call) RunAndReturn(run func(string
 	return _c
 }
 
-// WeeklyRecharges provides a mock function with given fields: ctx
-func (_m *MockAccountingComponent) WeeklyRecharges(ctx context.Context) error {
-	ret := _m.Called(ctx)
+// WeeklyRecharges provides a mock function with given fields: ctx, emails
+func (_m *MockAccountingComponent) WeeklyRecharges(ctx context.Context, emails []string) error {
+	ret := _m.Called(ctx, emails)
 
 	if len(ret) == 0 {
 		panic("no return value specified for WeeklyRecharges")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context) error); ok {
-		r0 = rf(ctx)
+	if rf, ok := ret.Get(0).(func(context.Context, []string) error); ok {
+		r0 = rf(ctx, emails)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -1490,13 +1490,14 @@ type MockAccountingComponent_WeeklyRecharges_Call struct {
 
 // WeeklyRecharges is a helper method to define mock.On call
 //   - ctx context.Context
-func (_e *MockAccountingComponent_Expecter) WeeklyRecharges(ctx interface{}) *MockAccountingComponent_WeeklyRecharges_Call {
-	return &MockAccountingComponent_WeeklyRecharges_Call{Call: _e.mock.On("WeeklyRecharges", ctx)}
+//   - emails []string
+func (_e *MockAccountingComponent_Expecter) WeeklyRecharges(ctx interface{}, emails interface{}) *MockAccountingComponent_WeeklyRecharges_Call {
+	return &MockAccountingComponent_WeeklyRecharges_Call{Call: _e.mock.On("WeeklyRecharges", ctx, emails)}
 }
 
-func (_c *MockAccountingComponent_WeeklyRecharges_Call) Run(run func(ctx context.Context)) *MockAccountingComponent_WeeklyRecharges_Call {
+func (_c *MockAccountingComponent_WeeklyRecharges_Call) Run(run func(ctx context.Context, emails []string)) *MockAccountingComponent_WeeklyRecharges_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context))
+		run(args[0].(context.Context), args[1].([]string))
 	})
 	return _c
 }
@@ -1506,7 +1507,7 @@ func (_c *MockAccountingComponent_WeeklyRecharges_Call) Return(_a0 error) *MockA
 	return _c
 }
 
-func (_c *MockAccountingComponent_WeeklyRecharges_Call) RunAndReturn(run func(context.Context) error) *MockAccountingComponent_WeeklyRecharges_Call {
+func (_c *MockAccountingComponent_WeeklyRecharges_Call) RunAndReturn(run func(context.Context, []string) error) *MockAccountingComponent_WeeklyRecharges_Call {
 	_c.Call.Return(run)
 	return _c
 }
