@@ -466,14 +466,14 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 			slog.Any("error", err))
 	}
 
+	proxyStartTime := time.Now()
 	log := slog.With(
+		slog.String("proxy_start_time", proxyStartTime.Format(time.RFC3339)),
 		slog.Any("model_name", modelTarget.ModelName),
 		slog.Any("current_user", username),
 		slog.Any("target", modelTarget.Target),
 		slog.Any("host", modelTarget.Host),
-		slog.Any("model_name", modelTarget.ModelName),
 	)
-
 	primaryWriter, proxyErr := h.executeChatProxyAttempt(c, chatCtx.responseWriter, modelTarget, nsUUID, chatReq)
 	if proxyErr != nil {
 		finishLLMTraceWithError(generationRecorder, proxyErr, types.TraceErrUpstreamUnavailable)
@@ -481,8 +481,7 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 		log.ErrorContext(ctx, "failed to execute chat proxy", slog.Int("status", retryWriterStatusCode(primaryWriter)), slog.Any("error", proxyErr))
 		return
 	}
-
-	log.InfoContext(ctx, "proxy chat request to model target", slog.Int("status", primaryWriter.statusCode))
+	log.InfoContext(ctx, "proxy chat request to model target", slog.Int("status", primaryWriter.statusCode), slog.Int64("proxy_latency(ms)", time.Since(proxyStartTime).Milliseconds()), slog.Int64("ttft(ms)", retryWriterTTFTMs(primaryWriter, proxyStartTime)))
 
 	finalWriter, err := h.executeChatWithFallback(c, chatCtx, modelTarget, nsUUID, chatReq, primaryWriter, username, modelID)
 	if err != nil {
@@ -491,6 +490,7 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 		log.ErrorContext(ctx, "failed to execute chat fallback", slog.Int("status", retryWriterStatusCode(finalWriter)), slog.Any("error", err))
 		return
 	}
+	log.InfoContext(ctx, "fallback chat request to model target", slog.Int("status", retryWriterStatusCode(finalWriter)), slog.Int64("proxy_latency(ms)", time.Since(proxyStartTime).Milliseconds()), slog.Int64("ttft(ms)", retryWriterTTFTMs(finalWriter, proxyStartTime)))
 
 	h.runChatPostProcessAsync(ctx, chatPostProcessInput{
 		NSUUID:          nsUUID,
@@ -896,4 +896,17 @@ func retryWriterStatusCode(w *chatRetryResponseWriter) int {
 		return w.statusCode
 	}
 	return 0
+}
+
+// retryWriterTTFTMs safely computes TTFT (Time To First Token) in milliseconds.
+// Returns 0 if writer is nil or firstWriteAt is zero.
+func retryWriterTTFTMs(w *chatRetryResponseWriter, startTime time.Time) int64 {
+	if w == nil {
+		return 0
+	}
+	firstWriteAt := w.firstWriteAt
+	if firstWriteAt.IsZero() {
+		return 0
+	}
+	return firstWriteAt.Sub(startTime).Milliseconds()
 }

@@ -58,6 +58,7 @@ func Log() gin.HandlerFunc {
 
 			slog.InfoContext(logCtx, "http request", slog.String("ip", ctx.ClientIP()),
 				slog.String("method", ctx.Request.Method),
+				slog.String("start_time", startTime.Format(time.RFC3339)),
 				slog.Int("latency(ms)", int(latency)),
 				slog.Int("status", status),
 				slog.String("current_user", httpbase.GetCurrentUser(ctx)),
