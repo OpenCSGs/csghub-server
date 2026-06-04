@@ -10,10 +10,12 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	llmtrace "opencsg.com/csghub-server/aigateway/component/trace"
 	"opencsg.com/csghub-server/aigateway/token"
 	"opencsg.com/csghub-server/aigateway/types"
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/builder/proxy"
+	"opencsg.com/csghub-server/common/utils/trace"
 )
 
 // Transcription godoc
@@ -35,9 +37,17 @@ func (h *OpenAIHandlerImpl) Transcription(c *gin.Context) {
 	nsUUID := httpbase.GetCurrentNamespaceUUID(c)
 	apikey := httpbase.GetAccessToken(c)
 	ctx := c.Request.Context()
+	requestID := trace.GetTraceIDInGinContext(c)
+	ctx, preflight := startPreflightTrace(ctx, preflightTraceStart{
+		API:       c.FullPath(),
+		RequestID: requestID,
+		UserID:    nsUUID,
+	})
+	c.Request = c.Request.WithContext(ctx)
 
 	form, err := c.MultipartForm()
 	if err != nil {
+		preflight.RecordError(err, "bad_request")
 		c.JSON(http.StatusBadRequest, gin.H{"error": types.Error{
 			Code:    "invalid_request_error",
 			Message: "invalid multipart form: " + err.Error(),
@@ -46,6 +56,7 @@ func (h *OpenAIHandlerImpl) Transcription(c *gin.Context) {
 		return
 	}
 	if form == nil {
+		preflight.RecordError(fmt.Errorf("request must be multipart/form-data"), "bad_request")
 		c.JSON(http.StatusBadRequest, gin.H{"error": types.Error{
 			Code:    "invalid_request_error",
 			Message: "request must be multipart/form-data",
@@ -56,6 +67,7 @@ func (h *OpenAIHandlerImpl) Transcription(c *gin.Context) {
 
 	modelID := strings.TrimSpace(firstMultipartValue(form, "model"))
 	if modelID == "" {
+		preflight.RecordError(fmt.Errorf("model cannot be empty"), "bad_request")
 		c.JSON(http.StatusBadRequest, gin.H{"error": types.Error{
 			Code:    "invalid_request_error",
 			Message: "Model cannot be empty",
@@ -64,6 +76,7 @@ func (h *OpenAIHandlerImpl) Transcription(c *gin.Context) {
 		return
 	}
 	if len(form.File["file"]) == 0 {
+		preflight.RecordError(fmt.Errorf("file cannot be empty"), "bad_request")
 		c.JSON(http.StatusBadRequest, gin.H{"error": types.Error{
 			Code:    "invalid_request_error",
 			Message: "File cannot be empty",
@@ -74,12 +87,32 @@ func (h *OpenAIHandlerImpl) Transcription(c *gin.Context) {
 
 	modelTarget, err := h.resolveModelTarget(ctx, username, modelID, c.Request.Header)
 	if err != nil {
+		preflight.RecordError(err, "model_resolve")
 		handleModelTargetError(c, ctx, modelID, "failed to get transcription target address", err)
 		return
 	}
+	preflight.SetTargetModel(modelID, modelTarget)
+	preflight.End()
+
+	traceCtx, generationRecorder := h.startModalGenerationTrace(ctx, modalTraceStartInput{
+		API:           c.FullPath(),
+		OperationName: modalTraceOperationGenerateContent,
+		OutputType:    modalTraceOutputText,
+		RequestID:     requestID,
+		NSUUID:        nsUUID,
+		ModelID:       modelID,
+		ModelTarget:   modelTarget,
+		Metadata: map[string]any{
+			"aigateway.audio.response_format": firstMultipartValue(form, "response_format"),
+			"aigateway.audio.language":        firstMultipartValue(form, "language"),
+		},
+	})
+	ctx = traceCtx
+	c.Request = c.Request.WithContext(traceCtx)
 
 	if !modelTarget.Model.SkipBalance() {
 		if err := h.openaiComponent.CheckBalance(ctx, nsUUID); err != nil {
+			finishModalGenerationTraceWithError(generationRecorder, err, types.TraceErrInsufficientBalance)
 			h.handleInsufficientBalance(c, false, nsUUID, modelID, err)
 			return
 		}
@@ -97,6 +130,7 @@ func (h *OpenAIHandlerImpl) Transcription(c *gin.Context) {
 
 	rp, err := proxy.NewReverseProxy(modelTarget.Target, proxy.WithoutAcceptEncoding())
 	if err != nil {
+		finishModalGenerationTraceWithError(generationRecorder, err, types.TraceErrUpstreamUnavailable)
 		slog.ErrorContext(ctx, "failed to create reverse proxy", slog.Any("error", err))
 		c.String(http.StatusInternalServerError, fmt.Errorf("failed to create reverse proxy:%w", err).Error())
 		return
@@ -122,8 +156,30 @@ func (h *OpenAIHandlerImpl) Transcription(c *gin.Context) {
 		usageCtx, cancel := context.WithTimeout(context.WithoutCancel(c.Request.Context()), 3*time.Second)
 		defer cancel()
 
-		if err := h.openaiComponent.RecordUsage(usageCtx, nsUUID, modelTarget.Model, modelTarget.ModelName, audioCounter, apikey); err != nil {
-			slog.ErrorContext(usageCtx, "failed to record audio transcription usage", slog.Any("error", err))
+		usage, usageErr := audioCounter.Usage(usageCtx)
+		if usageErr != nil {
+			slog.ErrorContext(usageCtx, "failed to get audio transcription token usage", slog.Any("error", usageErr))
+		}
+		if generationRecorder != nil {
+			metadata := map[string]any{}
+			if durationSeconds, ok := w.DurationSeconds(); ok {
+				metadata[llmtrace.TraceMetadataKeyAudioDurationSeconds] = durationSeconds
+			}
+			recordModalGenerationTraceCompletion(modalTraceCompletionInput{
+				Recorder:   generationRecorder,
+				Provider:   modelTarget.Model.Provider,
+				Model:      modelTarget.ModelName,
+				Usage:      usage,
+				StatusCode: w.StatusCode(),
+				Metadata:   metadata,
+			})
+			generationRecorder.End()
+		}
+
+		if usage != nil {
+			if err := h.openaiComponent.RecordUsageFromTokenUsage(usageCtx, nsUUID, modelTarget.Model, modelTarget.ModelName, usage, apikey); err != nil {
+				slog.ErrorContext(usageCtx, "failed to record audio transcription usage", slog.Any("error", err))
+			}
 		}
 	}()
 }

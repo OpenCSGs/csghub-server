@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	mocktoken "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/aigateway/token"
+	llmtrace "opencsg.com/csghub-server/aigateway/component/trace"
 	"opencsg.com/csghub-server/aigateway/token"
 	commontypes "opencsg.com/csghub-server/common/types"
 
@@ -43,6 +44,102 @@ type testGenerationRecorderWithMutex struct {
 	errorCode  string
 	ended      bool
 	events     []string
+}
+
+type testLLMTracerWithMutex struct {
+	mu                sync.Mutex
+	recorder          *testGenerationRecorderWithMutex
+	embeddingRecorder *testEmbeddingRecorderWithMutex
+	starts            []types.GenerationStart
+	embeddingStarts   []types.EmbeddingStart
+	streams           []bool
+}
+
+type testEmbeddingRecorderWithMutex struct {
+	mu        sync.Mutex
+	result    *types.EmbeddingResult
+	errorCode string
+	ended     bool
+	events    []string
+}
+
+func (t *testLLMTracerWithMutex) StartGeneration(ctx context.Context, input types.GenerationStart) (context.Context, llmtrace.GenerationRecorder) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.starts = append(t.starts, input)
+	t.streams = append(t.streams, false)
+	return ctx, t.recorder
+}
+
+func (t *testLLMTracerWithMutex) StartStreamingGeneration(ctx context.Context, input types.GenerationStart) (context.Context, llmtrace.GenerationRecorder) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.starts = append(t.starts, input)
+	t.streams = append(t.streams, true)
+	return ctx, t.recorder
+}
+
+func (t *testLLMTracerWithMutex) StartEmbedding(ctx context.Context, input types.EmbeddingStart) (context.Context, llmtrace.EmbeddingRecorder) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.embeddingStarts = append(t.embeddingStarts, input)
+	return ctx, t.embeddingRecorder
+}
+
+func (t *testLLMTracerWithMutex) Shutdown(context.Context) error {
+	return nil
+}
+
+func (t *testLLMTracerWithMutex) Starts() []types.GenerationStart {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	starts := make([]types.GenerationStart, len(t.starts))
+	copy(starts, t.starts)
+	return starts
+}
+
+func (t *testLLMTracerWithMutex) EmbeddingStarts() []types.EmbeddingStart {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	starts := make([]types.EmbeddingStart, len(t.embeddingStarts))
+	copy(starts, t.embeddingStarts)
+	return starts
+}
+
+func (t *testLLMTracerWithMutex) Streams() []bool {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	streams := make([]bool, len(t.streams))
+	copy(streams, t.streams)
+	return streams
+}
+
+func (r *testEmbeddingRecorderWithMutex) SetResult(result types.EmbeddingResult) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.result = &result
+	r.events = append(r.events, "result")
+}
+
+func (r *testEmbeddingRecorderWithMutex) SetError(_ error, code string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.errorCode = code
+	r.events = append(r.events, "error")
+}
+
+func (r *testEmbeddingRecorderWithMutex) End() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.ended = true
+	r.events = append(r.events, "end")
+}
+
+func (r *testEmbeddingRecorderWithMutex) snapshot() (*types.EmbeddingResult, string, bool, []string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	events := append([]string(nil), r.events...)
+	return r.result, r.errorCode, r.ended, events
 }
 
 func (r *testGenerationRecorderWithMutex) SetUsage(usage types.TokenUsage) {

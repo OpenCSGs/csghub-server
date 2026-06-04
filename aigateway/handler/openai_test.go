@@ -16,6 +16,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/openai/openai-go/v3"
@@ -30,6 +31,7 @@ import (
 	comp "opencsg.com/csghub-server/aigateway/component"
 	"opencsg.com/csghub-server/aigateway/component/adapter/text2image"
 	"opencsg.com/csghub-server/aigateway/component/adapter/text2video"
+	llmtrace "opencsg.com/csghub-server/aigateway/component/trace"
 	"opencsg.com/csghub-server/aigateway/token"
 	"opencsg.com/csghub-server/aigateway/types"
 	"opencsg.com/csghub-server/api/httpbase"
@@ -37,7 +39,9 @@ import (
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/testutil"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/errorx"
 	commontypes "opencsg.com/csghub-server/common/types"
+	"opencsg.com/csghub-server/common/utils/trace"
 )
 
 type testerOpenAIHandler struct {
@@ -1190,6 +1194,186 @@ func TestOpenAIHandler_Embedding(t *testing.T) {
 	})
 }
 
+func TestOpenAIHandler_EmbeddingTrace(t *testing.T) {
+	t.Run("successful passthrough records trace", func(t *testing.T) {
+		tester, c, _ := setupTest(t)
+		tester.mocks.openAIComp.ExpectedCalls = nil
+
+		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			require.Equal(t, "/api/v1/services/embeddings/text-embedding/text-embedding", r.URL.Path)
+			require.Equal(t, "identity", r.Header.Get("Accept-Encoding"))
+			w.WriteHeader(http.StatusOK)
+			_, err := w.Write([]byte(`{"object":"list","data":[],"model":"resolved-embedding","usage":{"prompt_tokens":7,"total_tokens":7}}`))
+			require.NoError(t, err)
+		}))
+		defer upstream.Close()
+
+		recorder := &testEmbeddingRecorderWithMutex{}
+		tracer := &testLLMTracerWithMutex{embeddingRecorder: recorder}
+		tester.handler.llmTracer = tracer
+
+		model := &types.Model{
+			BaseModel: types.BaseModel{ID: "embedding-model", Object: "model", OwnedBy: "testuser"},
+			ExternalModelInfo: types.ExternalModelInfo{
+				Provider: "openai",
+			},
+			Upstreams: []commontypes.UpstreamConfig{
+				{
+					URL:       upstream.URL + "/api/v1/services/embeddings/text-embedding/text-embedding",
+					Enabled:   true,
+					ModelName: "resolved-embedding",
+					Provider:  "openai",
+				},
+			},
+		}
+		counter := mocktoken.NewMockEmbeddingTokenCounter(t)
+		counter.EXPECT().Embedding(mock.MatchedBy(func(usage openai.CreateEmbeddingResponseUsage) bool {
+			return usage.PromptTokens == 7 && usage.TotalTokens == 7
+		})).Return().Once()
+		counter.EXPECT().Usage(mock.Anything).Return(&token.Usage{PromptTokens: 7, TotalTokens: 7}, nil).Once()
+		tester.mocks.tokenCounterFactory.EXPECT().NewEmbedding(token.CreateParam{
+			Endpoint: upstream.URL + "/api/v1/services/embeddings/text-embedding/text-embedding",
+			Model:    "resolved-embedding",
+			Provider: "openai",
+		}).Return(counter).Once()
+		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "embedding-model").Return(model, nil).Once()
+		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil).Once()
+		tester.mocks.openAIComp.EXPECT().RecordUsage(mock.Anything, "testuuid", model, "resolved-embedding", counter, "").Return(nil).Once()
+
+		req := EmbeddingRequest{EmbeddingNewParams: openai.EmbeddingNewParams{
+			Model: "embedding-model",
+			Input: openai.EmbeddingNewParamsInputUnion{OfArrayOfStrings: []string{"test input"}},
+		}}
+		body, err := json.Marshal(req)
+		require.NoError(t, err)
+		c.Request = httptest.NewRequest(http.MethodPost, "/v1/embeddings", bytes.NewReader(body))
+		c.Set(trace.HeaderRequestID, "req-embedding-ok")
+		httpbase.SetCurrentUser(c, "testuser")
+		httpbase.SetCurrentNamespaceUUID(c, "testuuid")
+
+		tester.handler.Embedding(c)
+
+		require.Eventually(t, func() bool {
+			_, _, ended, _ := recorder.snapshot()
+			return ended
+		}, time.Second, 10*time.Millisecond)
+		starts := tracer.EmbeddingStarts()
+		require.Len(t, starts, 1)
+		require.Equal(t, "openai", starts[0].Provider)
+		require.Equal(t, "embedding-model", starts[0].RequestModel)
+		require.Equal(t, "resolved-embedding", starts[0].ResolvedModel)
+		require.Equal(t, "/v1/embeddings", starts[0].Metadata[llmtrace.TraceMetadataKeyAIGatewayAPI])
+		require.Equal(t, "req-embedding-ok", starts[0].Metadata["request_id"])
+		require.Equal(t, "testuuid", starts[0].Metadata["user_id"])
+
+		result, errorCode, ended, events := recorder.snapshot()
+		require.True(t, ended)
+		require.NotNil(t, result)
+		require.Equal(t, int64(7), result.InputTokens)
+		require.Equal(t, 1, result.InputCount)
+		require.Equal(t, "resolved-embedding", result.ResponseModel)
+		require.Empty(t, errorCode)
+		require.Equal(t, []string{"result", "end"}, events)
+	})
+
+	t.Run("balance failure records trace error", func(t *testing.T) {
+		tester, c, _ := setupTest(t)
+		tester.mocks.openAIComp.ExpectedCalls = nil
+
+		recorder := &testEmbeddingRecorderWithMutex{}
+		tester.handler.llmTracer = &testLLMTracerWithMutex{embeddingRecorder: recorder}
+
+		model := &types.Model{
+			BaseModel: types.BaseModel{ID: "embedding-model", Object: "model", OwnedBy: "testuser"},
+			ExternalModelInfo: types.ExternalModelInfo{
+				Provider: "openai",
+			},
+			Upstreams: []commontypes.UpstreamConfig{
+				{URL: "https://upstream.example.test", Enabled: true, ModelName: "resolved-embedding", Provider: "openai"},
+			},
+		}
+		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "embedding-model").Return(model, nil).Once()
+		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(errorx.ErrInsufficientBalance).Once()
+
+		req := EmbeddingRequest{EmbeddingNewParams: openai.EmbeddingNewParams{
+			Model: "embedding-model",
+			Input: openai.EmbeddingNewParamsInputUnion{OfArrayOfStrings: []string{"test input"}},
+		}}
+		body, err := json.Marshal(req)
+		require.NoError(t, err)
+		c.Request = httptest.NewRequest(http.MethodPost, "/v1/embeddings", bytes.NewReader(body))
+		httpbase.SetCurrentUser(c, "testuser")
+		httpbase.SetCurrentNamespaceUUID(c, "testuuid")
+
+		tester.handler.Embedding(c)
+
+		_, errorCode, ended, _ := recorder.snapshot()
+		require.True(t, ended)
+		require.Equal(t, types.TraceErrInsufficientBalance, errorCode)
+	})
+
+	t.Run("upstream error status records trace error", func(t *testing.T) {
+		tester, c, _ := setupTest(t)
+		tester.mocks.openAIComp.ExpectedCalls = nil
+
+		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusInternalServerError)
+			_, err := w.Write([]byte(`{"object":"list","data":[],"model":"resolved-embedding","usage":{"prompt_tokens":3,"total_tokens":3}}`))
+			require.NoError(t, err)
+		}))
+		defer upstream.Close()
+
+		recorder := &testEmbeddingRecorderWithMutex{}
+		tester.handler.llmTracer = &testLLMTracerWithMutex{embeddingRecorder: recorder}
+
+		model := &types.Model{
+			BaseModel: types.BaseModel{ID: "embedding-model", Object: "model", OwnedBy: "testuser"},
+			ExternalModelInfo: types.ExternalModelInfo{
+				Provider: "openai",
+			},
+			Upstreams: []commontypes.UpstreamConfig{
+				{URL: upstream.URL, Enabled: true, ModelName: "resolved-embedding", Provider: "openai"},
+			},
+		}
+		counter := mocktoken.NewMockEmbeddingTokenCounter(t)
+		counter.EXPECT().Embedding(mock.MatchedBy(func(usage openai.CreateEmbeddingResponseUsage) bool {
+			return usage.PromptTokens == 3 && usage.TotalTokens == 3
+		})).Return().Once()
+		counter.EXPECT().Usage(mock.Anything).Return(&token.Usage{PromptTokens: 3, TotalTokens: 3}, nil).Once()
+		tester.mocks.tokenCounterFactory.EXPECT().NewEmbedding(token.CreateParam{
+			Endpoint: upstream.URL,
+			Model:    "resolved-embedding",
+			Provider: "openai",
+		}).Return(counter).Once()
+		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "embedding-model").Return(model, nil).Once()
+		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil).Once()
+		tester.mocks.openAIComp.EXPECT().RecordUsage(mock.Anything, "testuuid", model, "resolved-embedding", counter, "").Return(nil).Once()
+
+		req := EmbeddingRequest{EmbeddingNewParams: openai.EmbeddingNewParams{
+			Model: "embedding-model",
+			Input: openai.EmbeddingNewParamsInputUnion{OfArrayOfStrings: []string{"test input"}},
+		}}
+		body, err := json.Marshal(req)
+		require.NoError(t, err)
+		c.Request = httptest.NewRequest(http.MethodPost, "/v1/embeddings", bytes.NewReader(body))
+		httpbase.SetCurrentUser(c, "testuser")
+		httpbase.SetCurrentNamespaceUUID(c, "testuuid")
+
+		tester.handler.Embedding(c)
+
+		require.Eventually(t, func() bool {
+			_, _, ended, _ := recorder.snapshot()
+			return ended
+		}, time.Second, 10*time.Millisecond)
+		result, errorCode, ended, events := recorder.snapshot()
+		require.True(t, ended)
+		require.NotNil(t, result)
+		require.Equal(t, int64(3), result.InputTokens)
+		require.Equal(t, types.TraceErrUpstreamError, errorCode)
+		require.Equal(t, []string{"error", "result", "end"}, events)
+	})
+}
+
 func TestOpenAIHandler_Transcription(t *testing.T) {
 	t.Run("successful multipart passthrough with rewritten model", func(t *testing.T) {
 		tester, c, w := setupTest(t)
@@ -1213,18 +1397,23 @@ func TestOpenAIHandler_Transcription(t *testing.T) {
 			require.NoError(t, err)
 			downstreamFile = string(data)
 			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"text":"hello world","usage":{"prompt_tokens":371,"completion_tokens":52,"total_tokens":423}}`))
+			_, _ = w.Write([]byte(`{"text":"hello world","usage":{"prompt_tokens":371,"completion_tokens":52,"total_tokens":423,"seconds":9.2}}`))
 		}))
 		defer server.Close()
 
 		c.Request = newMultipartTranscriptionRequest(t, "model1", "audio-bytes", map[string]string{
 			"prompt": "meeting",
 		})
+		c.Set(trace.HeaderRequestID, "req-audio-ok")
+		recorder := &testGenerationRecorderWithMutex{}
+		tracer := &testLLMTracerWithMutex{recorder: recorder}
+		tester.handler.llmTracer = tracer
 		model := &types.Model{
 			BaseModel: types.BaseModel{
 				ID:       "backend-model",
 				Object:   "model",
 				Metadata: map[string]any{},
+				Task:     "audio-transcription",
 			},
 			Endpoint: server.URL + "/v1/audio/transcriptions",
 			Upstreams: []commontypes.UpstreamConfig{
@@ -1239,10 +1428,13 @@ func TestOpenAIHandler_Transcription(t *testing.T) {
 		wg.Add(1)
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "model1").Return(model, nil).Once()
 		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil).Once()
-		tester.mocks.openAIComp.EXPECT().RecordUsage(mock.Anything, "testuuid", model, mock.Anything, mock.Anything, "").RunAndReturn(
-			func(ctx context.Context, userUUID string, model *types.Model, targetModelName string, counter token.Counter, apikey string) error {
-				usage, err := counter.Usage(ctx)
-				require.NoError(t, err)
+		tester.mocks.openAIComp.EXPECT().RecordUsageFromTokenUsage(mock.Anything, "testuuid", model, mock.Anything, mock.MatchedBy(func(usage *token.Usage) bool {
+			return usage != nil &&
+				usage.TotalTokens == 423 &&
+				usage.PromptTokens == 371 &&
+				usage.CompletionTokens == 52
+		}), "").RunAndReturn(
+			func(ctx context.Context, userUUID string, model *types.Model, targetModelName string, usage *token.Usage, apikey string) error {
 				require.Equal(t, int64(423), usage.TotalTokens)
 				require.Equal(t, int64(371), usage.PromptTokens)
 				require.Equal(t, int64(52), usage.CompletionTokens)
@@ -1253,13 +1445,27 @@ func TestOpenAIHandler_Transcription(t *testing.T) {
 		tester.handler.Transcription(c)
 		wg.Wait()
 
-		require.Equal(t, http.StatusOK, w.Code)
-		require.JSONEq(t, `{"text":"hello world","usage":{"prompt_tokens":371,"completion_tokens":52,"total_tokens":423}}`, w.Body.String())
+		require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+		require.JSONEq(t, `{"text":"hello world","usage":{"prompt_tokens":371,"completion_tokens":52,"total_tokens":423,"seconds":9.2}}`, w.Body.String())
 		require.Equal(t, "backend-model", downstreamModel)
 		require.Equal(t, "meeting", downstreamPrompt)
 		require.Equal(t, "audio-bytes", downstreamFile)
 		require.Equal(t, "Bearer provider-token", downstreamAuth)
 		require.Equal(t, "identity", downstreamAcceptEncoding)
+		starts := tracer.Starts()
+		require.Len(t, starts, 1)
+		require.Equal(t, "req-audio-ok", starts[0].RequestID)
+		require.Equal(t, "generate_content", starts[0].OperationName)
+		require.Equal(t, "text", starts[0].Metadata[llmtrace.TraceMetadataKeyGenAIOutputType])
+		usage, response, errorCode, ended, events := generationTraceSnapshot(recorder)
+		require.True(t, ended)
+		require.NotNil(t, response)
+		require.Equal(t, "backend-model", response.Model)
+		require.Equal(t, 9.2, response.Metadata[llmtrace.TraceMetadataKeyAudioDurationSeconds])
+		require.NotNil(t, usage)
+		require.Equal(t, int64(423), usage.TotalTokens)
+		require.Empty(t, errorCode)
+		require.Equal(t, []string{"response", "usage", "end"}, events)
 	})
 
 	t.Run("missing model", func(t *testing.T) {
@@ -1532,6 +1738,9 @@ func TestOpenAIHandler_CreateVideo(t *testing.T) {
 		tester, c, w := setupTest(t)
 		var downstreamModel string
 		var createdGeneration database.AIGeneration
+		recorder := &testGenerationRecorderWithMutex{}
+		tracer := &testLLMTracerWithMutex{recorder: recorder}
+		tester.handler.llmTracer = tracer
 
 		downstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			require.Equal(t, "/v1/videos", r.URL.Path)
@@ -1548,7 +1757,7 @@ func TestOpenAIHandler_CreateVideo(t *testing.T) {
 			ExternalModelInfo: types.ExternalModelInfo{Provider: "openai"},
 			Endpoint:          downstream.URL + "/v1/videos",
 			Upstreams: []commontypes.UpstreamConfig{
-				{URL: downstream.URL + "/v1/videos", Enabled: true, ModelName: "video-model"},
+				{URL: downstream.URL + "/v1/videos", Enabled: true, ModelName: "video-model", Provider: "openai"},
 			},
 		}
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "video-model").Return(model, nil).Once()
@@ -1567,6 +1776,7 @@ func TestOpenAIHandler_CreateVideo(t *testing.T) {
 		body := `{"model":"video-model","prompt":"make a flying car","seconds":5}`
 		c.Request = httptest.NewRequest(http.MethodPost, "/v1/videos", bytes.NewBufferString(body))
 		c.Request.Header.Set("Content-Type", "application/json")
+		c.Set(trace.HeaderRequestID, "req-video-ok")
 
 		tester.handler.CreateVideo(c)
 
@@ -1582,6 +1792,23 @@ func TestOpenAIHandler_CreateVideo(t *testing.T) {
 		require.Equal(t, "testuuid", generation.OwnerUUID)
 		require.Equal(t, "vid_123", generation.ProviderResourceID)
 		require.Equal(t, model.ID, downstreamModel)
+		starts := tracer.Starts()
+		require.Len(t, starts, 1)
+		require.Equal(t, "req-video-ok", starts[0].RequestID)
+		require.Equal(t, "generate_content", starts[0].OperationName)
+		require.Equal(t, "video", starts[0].Metadata[llmtrace.TraceMetadataKeyGenAIOutputType])
+		require.Equal(t, int64(5), starts[0].Metadata[llmtrace.TraceMetadataKeyVideoSeconds])
+		usage, response, errorCode, ended, events := generationTraceSnapshot(recorder)
+		require.True(t, ended)
+		require.Nil(t, usage)
+		require.NotNil(t, response)
+		require.Equal(t, "openai", response.Provider)
+		require.Equal(t, "video-model", response.Model)
+		require.Equal(t, resp.ID, response.Metadata[llmtrace.TraceMetadataKeyVideoID])
+		require.Equal(t, "queued", response.Metadata[llmtrace.TraceMetadataKeyVideoStatus])
+		require.Equal(t, int64(5), response.Metadata[llmtrace.TraceMetadataKeyVideoSeconds])
+		require.Empty(t, errorCode)
+		require.Equal(t, []string{"response", "end"}, events)
 	})
 
 	t.Run("create video with json image_url input_reference for image-to-video task", func(t *testing.T) {

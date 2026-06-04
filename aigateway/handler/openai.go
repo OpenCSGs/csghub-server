@@ -93,9 +93,11 @@ func NewOpenAIHandlerFromConfig(config *config.Config) (OpenAIHandler, error) {
 	aiGenerationStore := database.NewAIGenerationStore()
 	handler := newOpenAIHandler(modelService, repoComp, modComponent, clusterComp, token.NewCounterFactory(), text2image.NewRegistry(), text2video.NewRegistry(), config, storage, whitelistRule, aiGenerationStore)
 
-	if config.AIGateway.EnableLLMTrace {
+	if config.AIGateway.EnableLLMTrace && config.Instrumentation.OTLPEndpoint != "" {
 		llmTracer, traceErr := llmtrace.NewSigilTracer(llmtrace.SigilConfig{
-			ContentCapture: config.AIGateway.LLMTraceContentCapture,
+			ContentCapture:       config.AIGateway.LLMTraceContentCapture,
+			MaxContentLength:     config.AIGateway.LLMTraceMaxContentLength,
+			MaxInputUserMessages: config.AIGateway.LLMTraceMaxInputUserMessages,
 		})
 		if traceErr != nil {
 			slog.Warn("failed to create llm tracer", slog.Any("error", traceErr))
@@ -372,18 +374,30 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 	username := httpbase.GetCurrentUser(c)
 	nsUUID := httpbase.GetCurrentNamespaceUUID(c)
 	apikey := httpbase.GetAccessToken(c)
+	requestID := trace.GetTraceIDInGinContext(c)
+	ctx, preflight := startPreflightTrace(ctx, preflightTraceStart{
+		API:       c.FullPath(),
+		RequestID: requestID,
+		UserID:    nsUUID,
+	})
+	c.Request = c.Request.WithContext(ctx)
+
 	chatReq := &ChatCompletionRequest{}
 	if err := c.BindJSON(chatReq); err != nil {
 		slog.ErrorContext(ctx, "invalid chat completion request body", slog.Any("error", err))
+		preflight.RecordError(err, "bad_request")
 		c.String(http.StatusBadRequest, fmt.Errorf("invalid chat completion request body:%w", err).Error())
 		return
 	}
 	modelID := chatReq.Model
+
 	modelTarget, err := h.resolveModelTarget(ctx, username, modelID, c.Request.Header)
 	if err != nil {
+		preflight.RecordError(err, "model_resolve")
 		handleModelTargetError(c, ctx, modelID, "failed to get model target address", err)
 		return
 	}
+	preflight.SetTargetModel(modelID, modelTarget)
 	chatReq.Model = modelTarget.ModelName
 	if chatReq.Stream {
 		c.Writer.Header().Set("Content-Type", "text/event-stream")
@@ -394,13 +408,15 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 		}
 	}
 
+	preflight.End()
+
 	traceCtx, generationRecorder := h.startChatTrace(
 		ctx,
 		c.Request.Header,
 		modelID,
 		modelTarget,
 		chatReq,
-		trace.GetTraceIDInGinContext(c),
+		requestID,
 		nsUUID,
 	)
 	ctx = traceCtx
@@ -409,7 +425,7 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 	// Check balance before processing request
 	if !modelTarget.Model.SkipBalance() {
 		if err := h.openaiComponent.CheckBalance(ctx, nsUUID); err != nil {
-			finishChatTraceWithError(generationRecorder, err, types.TraceErrInsufficientBalance)
+			finishLLMTraceWithError(generationRecorder, err, types.TraceErrInsufficientBalance)
 			h.handleInsufficientBalance(c, chatReq.Stream, nsUUID, modelID, err)
 			return
 		}
@@ -425,7 +441,7 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 	if isCheck {
 		modComponent = h.modComponent
 		if result != nil && result.IsSensitive {
-			finishChatTraceWithError(generationRecorder, ErrSensitiveContent, types.TraceErrSensitivePrompt)
+			finishLLMTraceWithError(generationRecorder, ErrSensitiveContent, types.TraceErrSensitivePrompt)
 			handleSensitiveResponse(c, chatReq.Stream, result)
 			return
 		}
@@ -460,7 +476,7 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 
 	primaryWriter, proxyErr := h.executeChatProxyAttempt(c, chatCtx.responseWriter, modelTarget, nsUUID, chatReq)
 	if proxyErr != nil {
-		finishChatTraceWithError(generationRecorder, proxyErr, types.TraceErrUpstreamUnavailable)
+		finishLLMTraceWithError(generationRecorder, proxyErr, types.TraceErrUpstreamUnavailable)
 		h.handleProxyError(c, chatReq.Stream, username, modelID, proxyErr)
 		log.ErrorContext(ctx, "failed to execute chat proxy", slog.Int("status", retryWriterStatusCode(primaryWriter)), slog.Any("error", proxyErr))
 		return
@@ -470,7 +486,7 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 
 	finalWriter, err := h.executeChatWithFallback(c, chatCtx, modelTarget, nsUUID, chatReq, primaryWriter, username, modelID)
 	if err != nil {
-		finishChatTraceWithError(generationRecorder, err, types.TraceErrUpstreamUnavailable)
+		finishLLMTraceWithError(generationRecorder, err, types.TraceErrUpstreamUnavailable)
 		h.handleProxyError(c, chatReq.Stream, username, modelID, err)
 		log.ErrorContext(ctx, "failed to execute chat fallback", slog.Int("status", retryWriterStatusCode(finalWriter)), slog.Any("error", err))
 		return
@@ -633,7 +649,15 @@ func (h *OpenAIHandlerImpl) runChatPostProcessAsync(ctx context.Context, input c
 			if input.Model != nil {
 				provider = input.Model.Provider
 			}
-			recordChatTraceCompletion(input.Trace, provider, input.TargetModelName, usage)
+			var inputMsgs, outputMsgs []types.GenerationMessage
+			var traceInfo commonType.LLMLogTraceInfo
+			if input.LogCapture != nil {
+				in, out := input.LogCapture.Messages()
+				inputMsgs = llmlogMessagesToGenerationMessages(in)
+				outputMsgs = llmlogMessagesToGenerationMessages(out)
+				traceInfo = input.LogCapture.TraceInfo()
+			}
+			recordChatTraceCompletion(input.Trace, provider, input.TargetModelName, usage, inputMsgs, outputMsgs, traceInfo)
 			input.Trace.Recorder.End()
 		}
 
@@ -751,12 +775,26 @@ func resolveFailureEventModelID(requestModelID string, model *types.Model) strin
 // @Failure      500  {object}  error "Internal server error"
 // @Router       /v1/embeddings [post]
 func (h *OpenAIHandlerImpl) Embedding(c *gin.Context) {
+	ctx := c.Request.Context()
+	username := httpbase.GetCurrentUser(c)
+	nsUUID := httpbase.GetCurrentNamespaceUUID(c)
+	apikey := httpbase.GetAccessToken(c)
+	requestID := trace.GetTraceIDInGinContext(c)
+	ctx, preflight := startPreflightTrace(ctx, preflightTraceStart{
+		API:       c.FullPath(),
+		RequestID: requestID,
+		UserID:    nsUUID,
+	})
+	c.Request = c.Request.WithContext(ctx)
+
 	var req EmbeddingRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		preflight.RecordError(err, "bad_request")
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 	if req.Model == "" {
+		preflight.RecordError(fmt.Errorf("model cannot be empty"), "bad_request")
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Model cannot be empty"})
 		return
 	}
@@ -764,21 +802,34 @@ func (h *OpenAIHandlerImpl) Embedding(c *gin.Context) {
 		len(req.Input.OfArrayOfStrings) == 0 &&
 		len(req.Input.OfArrayOfTokenArrays) == 0 &&
 		len(req.Input.OfArrayOfTokens) == 0 {
+		preflight.RecordError(fmt.Errorf("input cannot be empty"), "bad_request")
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Input cannot be empty"})
 		return
 	}
 	modelID := req.Model
-	username := httpbase.GetCurrentUser(c)
-	nsUUID := httpbase.GetCurrentNamespaceUUID(c)
-	apikey := httpbase.GetAccessToken(c)
-	modelTarget, err := h.resolveModelTarget(c.Request.Context(), username, modelID, c.Request.Header)
+	modelTarget, err := h.resolveModelTarget(ctx, username, modelID, c.Request.Header)
 	if err != nil {
-		handleModelTargetError(c, c.Request.Context(), modelID, "failed to get embedding target address", err)
+		preflight.RecordError(err, "model_resolve")
+		handleModelTargetError(c, ctx, modelID, "failed to get embedding target address", err)
 		return
 	}
 
+	preflight.SetTargetModel(modelID, modelTarget)
+	preflight.End()
+
+	traceCtx, embeddingRecorder := h.startEmbeddingTrace(
+		ctx,
+		modelID,
+		modelTarget,
+		&req,
+		requestID,
+		nsUUID,
+	)
+	c.Request = c.Request.WithContext(traceCtx)
+
 	// Check balance before processing request
 	if err := h.openaiComponent.CheckBalance(c.Request.Context(), nsUUID); err != nil {
+		finishEmbeddingTraceWithError(embeddingRecorder, err, types.TraceErrInsufficientBalance)
 		h.handleInsufficientBalance(c, false, nsUUID, modelID, err)
 		return
 	}
@@ -791,7 +842,13 @@ func (h *OpenAIHandlerImpl) Embedding(c *gin.Context) {
 		slog.WarnContext(c.Request.Context(), "invalid auth head", slog.String("model", modelTarget.ModelName), slog.Any("error", err))
 	}
 	slog.InfoContext(c, "proxy embedding request to model endpoint", slog.Any("target", modelTarget.Target), slog.Any("host", modelTarget.Host), slog.Any("user", username), slog.Any("model_id", modelID))
-	rp, _ := proxy.NewReverseProxy(modelTarget.Target)
+	proxyToAPI := resolveProxyPathFromModelEndpoint(modelTarget.Model.Endpoint, modelTarget.ModelName)
+	rp, err := proxy.NewReverseProxy(modelTarget.Target, proxy.WithoutAcceptEncoding())
+	if err != nil {
+		finishEmbeddingTraceWithError(embeddingRecorder, err, types.TraceErrUpstreamUnavailable)
+		httpbase.ServerError(c, err)
+		return
+	}
 
 	tokenCounter := h.tokenCounterFactory.NewEmbedding(token.CreateParam{
 		Endpoint: modelTarget.Target,
@@ -805,10 +862,25 @@ func (h *OpenAIHandlerImpl) Embedding(c *gin.Context) {
 		tokenCounter.Input(req.Input.OfString.Value)
 	}
 
-	rp.ServeHTTP(w, c.Request, "", modelTarget.Host)
+	rp.ServeHTTP(w, c.Request, proxyToAPI, modelTarget.Host)
 	go func() {
 		usageCtx, cancel := context.WithTimeout(context.WithoutCancel(c.Request.Context()), 3*time.Second)
 		defer cancel()
+
+		w.CaptureEmbeddingUsage()
+
+		if embeddingRecorder != nil {
+			var usage *token.Usage
+			if tokenCounter != nil {
+				var usageErr error
+				usage, usageErr = tokenCounter.Usage(usageCtx)
+				if usageErr != nil {
+					slog.ErrorContext(usageCtx, "failed to get embedding token usage", slog.Any("error", usageErr))
+				}
+			}
+			recordEmbeddingTraceCompletion(embeddingRecorder, &req, modelTarget.ModelName, usage, w.StatusCode())
+			embeddingRecorder.End()
+		}
 
 		err := h.openaiComponent.RecordUsage(usageCtx, nsUUID, modelTarget.Model, modelTarget.ModelName, tokenCounter, apikey)
 		if err != nil {

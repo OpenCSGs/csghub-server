@@ -89,6 +89,65 @@ func (_c *MockLLMLogRecorder_Completion_Call) RunAndReturn(run func(types.ChatCo
 	return _c
 }
 
+// Messages provides a mock function with no fields
+func (_m *MockLLMLogRecorder) Messages() ([]commontypes.LLMLogMessage, []commontypes.LLMLogMessage) {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for Messages")
+	}
+
+	var r0 []commontypes.LLMLogMessage
+	var r1 []commontypes.LLMLogMessage
+	if rf, ok := ret.Get(0).(func() ([]commontypes.LLMLogMessage, []commontypes.LLMLogMessage)); ok {
+		return rf()
+	}
+	if rf, ok := ret.Get(0).(func() []commontypes.LLMLogMessage); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]commontypes.LLMLogMessage)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func() []commontypes.LLMLogMessage); ok {
+		r1 = rf()
+	} else {
+		if ret.Get(1) != nil {
+			r1 = ret.Get(1).([]commontypes.LLMLogMessage)
+		}
+	}
+
+	return r0, r1
+}
+
+// MockLLMLogRecorder_Messages_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Messages'
+type MockLLMLogRecorder_Messages_Call struct {
+	*mock.Call
+}
+
+// Messages is a helper method to define mock.On call
+func (_e *MockLLMLogRecorder_Expecter) Messages() *MockLLMLogRecorder_Messages_Call {
+	return &MockLLMLogRecorder_Messages_Call{Call: _e.mock.On("Messages")}
+}
+
+func (_c *MockLLMLogRecorder_Messages_Call) Run(run func()) *MockLLMLogRecorder_Messages_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockLLMLogRecorder_Messages_Call) Return(input []commontypes.LLMLogMessage, output []commontypes.LLMLogMessage) *MockLLMLogRecorder_Messages_Call {
+	_c.Call.Return(input, output)
+	return _c
+}
+
+func (_c *MockLLMLogRecorder_Messages_Call) RunAndReturn(run func() ([]commontypes.LLMLogMessage, []commontypes.LLMLogMessage)) *MockLLMLogRecorder_Messages_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Record provides a mock function with no fields
 func (_m *MockLLMLogRecorder) Record() (*commontypes.LLMLogRecord, error) {
 	ret := _m.Called()
@@ -142,6 +201,51 @@ func (_c *MockLLMLogRecorder_Record_Call) Return(_a0 *commontypes.LLMLogRecord, 
 }
 
 func (_c *MockLLMLogRecorder_Record_Call) RunAndReturn(run func() (*commontypes.LLMLogRecord, error)) *MockLLMLogRecorder_Record_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// TraceInfo provides a mock function with no fields
+func (_m *MockLLMLogRecorder) TraceInfo() commontypes.LLMLogTraceInfo {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for TraceInfo")
+	}
+
+	var r0 commontypes.LLMLogTraceInfo
+	if rf, ok := ret.Get(0).(func() commontypes.LLMLogTraceInfo); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(commontypes.LLMLogTraceInfo)
+	}
+
+	return r0
+}
+
+// MockLLMLogRecorder_TraceInfo_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'TraceInfo'
+type MockLLMLogRecorder_TraceInfo_Call struct {
+	*mock.Call
+}
+
+// TraceInfo is a helper method to define mock.On call
+func (_e *MockLLMLogRecorder_Expecter) TraceInfo() *MockLLMLogRecorder_TraceInfo_Call {
+	return &MockLLMLogRecorder_TraceInfo_Call{Call: _e.mock.On("TraceInfo")}
+}
+
+func (_c *MockLLMLogRecorder_TraceInfo_Call) Run(run func()) *MockLLMLogRecorder_TraceInfo_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockLLMLogRecorder_TraceInfo_Call) Return(_a0 commontypes.LLMLogTraceInfo) *MockLLMLogRecorder_TraceInfo_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockLLMLogRecorder_TraceInfo_Call) RunAndReturn(run func() commontypes.LLMLogTraceInfo) *MockLLMLogRecorder_TraceInfo_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -89,21 +89,24 @@ func (a *HFInferenceToolkitAdapter) TransformResponse(ctx context.Context, respB
 	if err != nil {
 		decoded = respBody
 	}
-	isPNG := strings.HasPrefix(contentType, "image/") ||
-		(len(decoded) >= 4 && decoded[0] == 0x89 && string(decoded[1:4]) == "PNG")
-	if isPNG {
+	mediaType, imageExt, isImageResponse := detectImageResponse(contentType, decoded)
+	if isImageResponse {
 		openaiResp := &types.ImageGenerationResponse{
 			ImagesResponse: openai.ImagesResponse{
 				Created: time.Now().Unix(),
 				Data:    []openai.Image{},
 			},
 		}
+		if opts != nil && opts.Size != "" {
+			openaiResp.Size = openai.ImagesResponseSize(opts.Size)
+		}
+		if outputFormat := resolveOutputFormat(opts, imageExt); outputFormat != "" {
+			openaiResp.OutputFormat = openai.ImagesResponseOutputFormat(outputFormat)
+		}
 		if opts != nil && opts.ResponseFormat == "url" && opts.Storage != nil && opts.Bucket != "" {
-			mediaType, _, _ := strings.Cut(contentType, ";")
-			mediaType = strings.TrimSpace(mediaType)
-			ext := "png"
-			if strings.HasPrefix(mediaType, "image/") {
-				ext = strings.TrimSpace(mediaType[len("image/"):])
+			ext := imageExt
+			if ext == "" {
+				ext = "png"
 			}
 			if mediaType == "" {
 				mediaType = "image/" + ext
@@ -131,6 +134,45 @@ func (a *HFInferenceToolkitAdapter) TransformResponse(ctx context.Context, respB
 		return nil, nil, fmt.Errorf("hf-inference-toolkit error: %s", errResp.Error)
 	}
 	return nil, nil, fmt.Errorf("unexpected response format, content-type: %s", contentType)
+}
+
+func detectImageResponse(contentType string, decoded []byte) (mediaType, ext string, ok bool) {
+	mediaType, _, _ = strings.Cut(contentType, ";")
+	mediaType = strings.TrimSpace(mediaType)
+	if strings.HasPrefix(mediaType, "image/") {
+		ext = strings.TrimSpace(mediaType[len("image/"):])
+		if ext == "jpg" {
+			ext = "jpeg"
+		}
+		return mediaType, ext, true
+	}
+	if isPNGBytes(decoded) {
+		return "image/png", "png", true
+	}
+	return "", "", false
+}
+
+func isPNGBytes(decoded []byte) bool {
+	return len(decoded) >= 4 && decoded[0] == 0x89 && string(decoded[1:4]) == "PNG"
+}
+
+func resolveOutputFormat(opts *types.TransformResponseOptions, ext string) string {
+	if opts != nil && isSupportedOutputFormat(opts.OutputFormat) {
+		return opts.OutputFormat
+	}
+	if isSupportedOutputFormat(ext) {
+		return ext
+	}
+	return ""
+}
+
+func isSupportedOutputFormat(format string) bool {
+	switch format {
+	case "png", "jpeg", "webp":
+		return true
+	default:
+		return false
+	}
 }
 
 func (a *HFInferenceToolkitAdapter) GetHeaders(model *types.Model, req *types.ImageGenerationRequest) map[string]string {

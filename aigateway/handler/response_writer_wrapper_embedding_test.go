@@ -5,11 +5,13 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
+	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/openai/openai-go/v3"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	mocktoken "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/aigateway/token"
 	"opencsg.com/csghub-server/aigateway/token"
 )
@@ -109,6 +111,7 @@ func TestResponseWriterWrapperEmbedding_Write(t *testing.T) {
 
 			// Execute Write method
 			n, err := wrapper.Write(data)
+			wrapper.CaptureEmbeddingUsage()
 
 			// Verify results
 			if tt.expectedError {
@@ -129,6 +132,27 @@ func TestResponseWriterWrapperEmbedding_Write(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestResponseWriterWrapperEmbedding_StatusCode(t *testing.T) {
+	w := httptest.NewRecorder()
+	wrapper := NewResponseWriterWrapperEmbedding(w, nil)
+
+	assert.Equal(t, http.StatusOK, wrapper.StatusCode())
+
+	wrapper.WriteHeader(http.StatusTooManyRequests)
+
+	assert.Equal(t, http.StatusTooManyRequests, wrapper.StatusCode())
+}
+
+func TestResponseWriterWrapperEmbedding_StatusCode_DefaultsToOKOnWrite(t *testing.T) {
+	w := httptest.NewRecorder()
+	wrapper := NewResponseWriterWrapperEmbedding(w, nil)
+
+	_, err := wrapper.Write([]byte(`{"object":"list","data":[]}`))
+
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, wrapper.StatusCode())
 }
 
 func TestResponseWriterWrapperEmbedding_Write_Gzip(t *testing.T) {
@@ -179,6 +203,7 @@ func TestResponseWriterWrapperEmbedding_Write_Gzip(t *testing.T) {
 
 	// Execute Write method with gzipped data
 	n, err := wrapper.Write(gzippedData.Bytes())
+	wrapper.CaptureEmbeddingUsage()
 
 	// Verify results
 	assert.NoError(t, err)
@@ -190,4 +215,41 @@ func TestResponseWriterWrapperEmbedding_Write_Gzip(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, response.Usage.TotalTokens, usage.TotalTokens)
 	assert.Equal(t, response.Usage.PromptTokens, usage.PromptTokens)
+}
+
+func TestResponseWriterWrapperEmbedding_CaptureUsageAfterChunkedWrites(t *testing.T) {
+	w := httptest.NewRecorder()
+	counter := mocktoken.NewMockEmbeddingTokenCounter(t)
+	wrapper := NewResponseWriterWrapperEmbedding(w, counter)
+
+	data := []byte(`{"object":"list","data":[{"object":"embedding","embedding":[0.1,0.2,0.3],"index":0}],"model":"text-embedding-ada-002","usage":{"prompt_tokens":10,"total_tokens":10}}`)
+	counter.EXPECT().Embedding(mock.MatchedBy(func(usage openai.CreateEmbeddingResponseUsage) bool {
+		return usage.PromptTokens == 10 && usage.TotalTokens == 10
+	})).Return().Once()
+
+	n, err := wrapper.Write(data[:60])
+	assert.NoError(t, err)
+	assert.Equal(t, 60, n)
+	n, err = wrapper.Write(data[60:])
+	assert.NoError(t, err)
+	assert.Equal(t, len(data)-60, n)
+
+	wrapper.CaptureEmbeddingUsage()
+
+	assert.Equal(t, data, w.Body.Bytes())
+}
+
+func TestResponseWriterWrapperEmbedding_SkipsUsageCaptureWhenTruncated(t *testing.T) {
+	w := httptest.NewRecorder()
+	counter := mocktoken.NewMockEmbeddingTokenCounter(t)
+	wrapper := newResponseWriterWrapperEmbedding(w, counter, 8)
+
+	data := []byte(`{"object":"list","data":[],"usage":{"prompt_tokens":10,"total_tokens":10}}`)
+	n, err := wrapper.Write(data)
+	assert.NoError(t, err)
+	assert.Equal(t, len(data), n)
+
+	wrapper.CaptureEmbeddingUsage()
+
+	assert.Equal(t, data, w.Body.Bytes())
 }

@@ -25,12 +25,15 @@ type ImageGeneration struct {
 	sensitiveDefaultImg string
 	imageCounter        *token.ImageUsageCounter
 	responseFormat      string
+	size                string
+	outputFormat        string
 	storage             types.Storage
 	bucket              string
 	buffer              bytes.Buffer
 	statusCode          int
 	contentType         string
 	headerWritten       bool
+	response            *types.ImageGenerationResponse
 }
 
 func NewImageGeneration(
@@ -40,6 +43,8 @@ func NewImageGeneration(
 	sensitiveDefaultImg string,
 	imageCounter *token.ImageUsageCounter,
 	responseFormat string,
+	size string,
+	outputFormat string,
 	storage types.Storage,
 	bucket string,
 ) *ImageGeneration {
@@ -50,6 +55,8 @@ func NewImageGeneration(
 		sensitiveDefaultImg: sensitiveDefaultImg,
 		imageCounter:        imageCounter,
 		responseFormat:      responseFormat,
+		size:                size,
+		outputFormat:        outputFormat,
 		storage:             storage,
 		bucket:              bucket,
 		statusCode:          http.StatusOK,
@@ -89,9 +96,11 @@ func (w *ImageGeneration) Finalize() error {
 
 	encodingHeader := w.internalWritter.Header().Get("Content-Encoding")
 	var opts *types.TransformResponseOptions
-	if w.responseFormat != "" || w.storage != nil {
+	if w.responseFormat != "" || w.size != "" || w.outputFormat != "" || w.storage != nil {
 		opts = &types.TransformResponseOptions{
 			ResponseFormat: w.responseFormat,
+			Size:           w.size,
+			OutputFormat:   w.outputFormat,
 			Storage:        w.storage,
 			Bucket:         w.bucket,
 		}
@@ -110,6 +119,7 @@ func (w *ImageGeneration) Finalize() error {
 	if w.imageCounter != nil {
 		w.imageCounter.ImageResponse(openaiResp)
 	}
+	w.response = openaiResp
 
 	result, err := w.moderationComponent.CheckImage(context.Background(), *openaiResp)
 	if err != nil {
@@ -134,4 +144,18 @@ func (w *ImageGeneration) Finalize() error {
 	w.internalWritter.WriteHeader(w.statusCode)
 	_, err = w.internalWritter.Write(body)
 	return err
+}
+
+func (w *ImageGeneration) StatusCode() int {
+	if w == nil || w.statusCode == 0 {
+		return http.StatusOK
+	}
+	return w.statusCode
+}
+
+func (w *ImageGeneration) Response() *types.ImageGenerationResponse {
+	if w == nil {
+		return nil
+	}
+	return w.response
 }

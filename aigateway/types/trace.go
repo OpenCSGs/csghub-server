@@ -55,12 +55,12 @@ type GenerationMessage struct {
 }
 
 type GenerationPart struct {
-	Kind       string                 `json:"kind"`
-	Text       string                 `json:"text,omitempty"`
-	Thinking   string                 `json:"thinking,omitempty"`
-	ToolCall   *GenerationToolCall    `json:"tool_call,omitempty"`
-	ToolResult *GenerationToolResult  `json:"tool_result,omitempty"`
-	Metadata   GenerationPartMetadata `json:"metadata,omitempty"`
+	Kind       string                  `json:"kind"`
+	Text       string                  `json:"text,omitempty"`
+	Thinking   string                  `json:"thinking,omitempty"`
+	ToolCall   *GenerationToolCall     `json:"tool_call,omitempty"`
+	ToolResult *GenerationToolResult   `json:"tool_result,omitempty"`
+	Metadata   *GenerationPartMetadata `json:"metadata,omitempty"`
 }
 
 type GenerationPartMetadata struct {
@@ -129,4 +129,24 @@ type GenerationResponse struct {
 	Metadata      map[string]any
 	Artifacts     []GenerationArtifact
 	CallError     string
+}
+
+type EmbeddingStart struct {
+	Provider       string
+	RequestModel   string
+	ResolvedModel  string
+	AgentName      string
+	AgentVersion   string
+	Dimensions     *int64
+	EncodingFormat string
+	Tags           map[string]string
+	Metadata       map[string]any
+	StartedAt      time.Time
+}
+
+type EmbeddingResult struct {
+	InputCount    int
+	InputTokens   int64
+	ResponseModel string
+	Dimensions    *int64
 }
