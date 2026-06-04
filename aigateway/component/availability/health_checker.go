@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"os"
@@ -95,9 +96,9 @@ func NewHealthChecker(
 		healthStore:    healthStore,
 		upstreamStore:  upstreamStore,
 		stateCache:     NewStateCache(redisClient),
-		httpClient: &http.Client{},
-		stopCh:       make(chan struct{}),
-		leaderNodeID: fmt.Sprintf("%s-%d", hostname, time.Now().UnixNano()),
+		httpClient:     &http.Client{},
+		stopCh:         make(chan struct{}),
+		leaderNodeID:   fmt.Sprintf("%s-%d", hostname, time.Now().UnixNano()),
 	}
 }
 
@@ -288,8 +289,12 @@ func (h *healthCheckerImpl) performL7APICheck(ctx context.Context, upstream *dat
 		result.Healthy = true
 	} else {
 		result.Healthy = false
-		result.Error = fmt.Sprintf("HTTP %d", resp.StatusCode)
-		log.WarnContext(ctx, "Health check probe failed with non-2xx status", "status_code", resp.StatusCode)
+		respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
+		result.Error = fmt.Sprintf("HTTP %d, url: %s, response: %s", resp.StatusCode, modelsURL, string(respBody))
+		log.WarnContext(ctx, "Health check probe failed with non-2xx status",
+			"status_code", resp.StatusCode,
+			"url", modelsURL,
+			"response", string(respBody))
 	}
 	return result
 }
@@ -358,8 +363,12 @@ func (h *healthCheckerImpl) performInferenceCheck(ctx context.Context, upstream 
 		result.Healthy = true
 	} else {
 		result.Healthy = false
-		result.Error = fmt.Sprintf("HTTP %d", resp.StatusCode)
-		log.WarnContext(ctx, "Inference check failed with non-2xx status", "status_code", resp.StatusCode)
+		respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
+		result.Error = fmt.Sprintf("HTTP %d, url: %s, response: %s", resp.StatusCode, upstream.URL, string(respBody))
+		log.WarnContext(ctx, "Inference check failed with non-2xx status",
+			"status_code", resp.StatusCode,
+			"url", upstream.URL,
+			"response", string(respBody))
 	}
 	return result
 }
@@ -390,6 +399,8 @@ func (h *healthCheckerImpl) updateHealthState(ctx context.Context, result *types
 		}
 	}
 
+	oldHealthState := existingState.HealthState
+
 	threshold := h.config.Config.HealthRules.ConsecutiveFailuresForUnhealthy
 	if threshold <= 0 {
 		threshold = 3
@@ -409,6 +420,30 @@ func (h *healthCheckerImpl) updateHealthState(ctx context.Context, result *types
 		if existingState.ConsecutiveFailures >= threshold {
 			existingState.HealthState = string(types.HealthStateUnhealthy)
 		}
+		slog.InfoContext(ctx, "health check unhealthy",
+			"upstream_id", result.UpstreamID,
+			"model_name", result.ModelName,
+			"provider", result.Provider,
+			"consecutive_failures", existingState.ConsecutiveFailures,
+			"threshold", threshold,
+			"error", result.Error,
+			"check_type", result.CheckType,
+			"latency_ms", result.LatencyMs,
+		)
+	}
+
+	if existingState.HealthState != oldHealthState {
+		slog.InfoContext(ctx, "health state changed",
+			"upstream_id", result.UpstreamID,
+			"model_name", result.ModelName,
+			"provider", result.Provider,
+			"old_state", oldHealthState,
+			"new_state", existingState.HealthState,
+			"consecutive_failures", existingState.ConsecutiveFailures,
+			"last_error", existingState.LastError,
+			"latency_ms", result.LatencyMs,
+			"check_type", result.CheckType,
+		)
 	}
 
 	existingState.LastCheckAt = result.Timestamp

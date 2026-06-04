@@ -431,12 +431,6 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 		}
 	}
 
-	slog.InfoContext(ctx, "proxy chat request to model target",
-		slog.Any("target", modelTarget.Target),
-		slog.Any("host", modelTarget.Host),
-		slog.Any("ns_uuid", nsUUID),
-		slog.Any("model_name", modelTarget.ModelName))
-
 	chatCtx := h.setupChatContext(
 		ctx,
 		modelTarget,
@@ -456,17 +450,29 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 			slog.Any("error", err))
 	}
 
+	log := slog.With(
+		slog.Any("model_name", modelTarget.ModelName),
+		slog.Any("current_user", username),
+		slog.Any("target", modelTarget.Target),
+		slog.Any("host", modelTarget.Host),
+		slog.Any("model_name", modelTarget.ModelName),
+	)
+
 	primaryWriter, proxyErr := h.executeChatProxyAttempt(c, chatCtx.responseWriter, modelTarget, nsUUID, chatReq)
 	if proxyErr != nil {
 		finishChatTraceWithError(generationRecorder, proxyErr, types.TraceErrUpstreamUnavailable)
 		h.handleProxyError(c, chatReq.Stream, username, modelID, proxyErr)
+		log.ErrorContext(ctx, "failed to execute chat proxy", slog.Int("status", retryWriterStatusCode(primaryWriter)), slog.Any("error", proxyErr))
 		return
 	}
+
+	log.InfoContext(ctx, "proxy chat request to model target", slog.Int("status", primaryWriter.statusCode))
 
 	finalWriter, err := h.executeChatWithFallback(c, chatCtx, modelTarget, nsUUID, chatReq, primaryWriter, username, modelID)
 	if err != nil {
 		finishChatTraceWithError(generationRecorder, err, types.TraceErrUpstreamUnavailable)
 		h.handleProxyError(c, chatReq.Stream, username, modelID, err)
+		log.ErrorContext(ctx, "failed to execute chat fallback", slog.Int("status", retryWriterStatusCode(finalWriter)), slog.Any("error", err))
 		return
 	}
 
@@ -809,4 +815,13 @@ func (h *OpenAIHandlerImpl) Embedding(c *gin.Context) {
 			slog.ErrorContext(c, "failed to record embedding token usage", "error", err)
 		}
 	}()
+}
+
+// retryWriterStatusCode safely extracts the status code from a chatRetryResponseWriter.
+// Returns 0 if the writer is nil (e.g., when an error occurs before any response is written).
+func retryWriterStatusCode(w *chatRetryResponseWriter) int {
+	if w != nil {
+		return w.statusCode
+	}
+	return 0
 }
