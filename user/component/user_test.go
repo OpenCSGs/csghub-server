@@ -1315,3 +1315,181 @@ func TestUserComponent_Get_WithTags(t *testing.T) {
 	require.Equal(t, "developer", user.Tags[1].Name)
 	require.Equal(t, "role", user.Tags[1].Category)
 }
+
+func TestUserComponent_Get_RoleVisibility(t *testing.T) {
+	t.Run("self_user_can_see_role", func(t *testing.T) {
+		mockUserStore := mockdb.NewMockUserStore(t)
+		mockOrgStore := mockdb.NewMockOrgStore(t)
+		mockUserTagStore := mockdb.NewMockUserTagStore(t)
+
+		dbUser := database.User{
+			ID:       1,
+			UUID:     "user-uuid-123",
+			Username: "testuser",
+			NickName: "Test User",
+			Avatar:   "https://example.com/avatar.png",
+			Namespaces: []database.Namespace{
+				{
+					ID:            1,
+					Path:          "testuser",
+					NamespaceType: database.UserNamespace,
+					UUID:          "ns-uuid-123",
+				},
+			},
+		}
+
+		dbOrgs := []database.Organization{
+			{
+				ID:       1,
+				UUID:     uuid.MustParse("11111111-1111-1111-1111-111111111111"),
+				Homepage: "https://org1.com",
+				OrgType:  "company",
+				Verified: true,
+				Role:     "admin",
+				Namespace: &database.Namespace{
+					ID:            2,
+					Path:          "org_path_1",
+					NamespaceType: database.OrgNamespace,
+					UUID:          "ns-org-1",
+				},
+			},
+			{
+				ID:       2,
+				UUID:     uuid.MustParse("22222222-2222-2222-2222-222222222222"),
+				Homepage: "https://org2.com",
+				OrgType:  "school",
+				Verified: false,
+				Role:     "member",
+			},
+		}
+
+		mockUserStore.EXPECT().FindByUsername(mock.Anything, "testuser").Return(dbUser, nil)
+		mockUserTagStore.EXPECT().GetUserTags(mock.Anything, dbUser.ID).Return([]*database.Tag{}, nil)
+		mockOrgStore.EXPECT().GetUserBelongOrgs(mock.Anything, dbUser.ID).Return(dbOrgs, nil)
+
+		uc := &userComponentImpl{
+			userStore: mockUserStore,
+			orgStore:  mockOrgStore,
+			uts:       mockUserTagStore,
+		}
+
+		user, err := uc.Get(context.Background(), "testuser", "testuser", false)
+		require.NoError(t, err)
+		require.Len(t, user.Orgs, 2)
+
+		require.Equal(t, "admin", user.Orgs[0].Role)
+		require.Equal(t, "member", user.Orgs[1].Role)
+	})
+
+	t.Run("admin_can_see_role", func(t *testing.T) {
+		mockUserStore := mockdb.NewMockUserStore(t)
+		mockOrgStore := mockdb.NewMockOrgStore(t)
+		mockUserTagStore := mockdb.NewMockUserTagStore(t)
+
+		dbUser := database.User{
+			ID:       1,
+			UUID:     "user-uuid-123",
+			Username: "testuser",
+			NickName: "Test User",
+			Avatar:   "https://example.com/avatar.png",
+			Namespaces: []database.Namespace{
+				{
+					ID:            1,
+					Path:          "testuser",
+					NamespaceType: database.UserNamespace,
+					UUID:          "ns-uuid-123",
+				},
+			},
+		}
+
+		adminUser := database.User{
+			ID:       2,
+			Username: "adminuser",
+			RoleMask: "admin",
+		}
+
+		dbOrgs := []database.Organization{
+			{
+				ID:       1,
+				UUID:     uuid.MustParse("11111111-1111-1111-1111-111111111111"),
+				Homepage: "https://org1.com",
+				OrgType:  "company",
+				Verified: true,
+				Role:     "admin",
+			},
+		}
+
+		mockUserStore.EXPECT().FindByUsername(mock.Anything, "testuser").Return(dbUser, nil)
+		mockUserStore.EXPECT().FindByUsername(mock.Anything, "adminuser").Return(adminUser, nil)
+		mockUserTagStore.EXPECT().GetUserTags(mock.Anything, dbUser.ID).Return([]*database.Tag{}, nil)
+		mockOrgStore.EXPECT().GetUserBelongOrgs(mock.Anything, dbUser.ID).Return(dbOrgs, nil)
+
+		uc := &userComponentImpl{
+			userStore: mockUserStore,
+			orgStore:  mockOrgStore,
+			uts:       mockUserTagStore,
+		}
+
+		user, err := uc.Get(context.Background(), "testuser", "adminuser", false)
+		require.NoError(t, err)
+		require.Len(t, user.Orgs, 1)
+
+		require.Equal(t, "admin", user.Orgs[0].Role)
+	})
+
+	t.Run("non_admin_other_user_cannot_see_role", func(t *testing.T) {
+		mockUserStore := mockdb.NewMockUserStore(t)
+		mockOrgStore := mockdb.NewMockOrgStore(t)
+		mockUserTagStore := mockdb.NewMockUserTagStore(t)
+
+		dbUser := database.User{
+			ID:       1,
+			UUID:     "user-uuid-123",
+			Username: "testuser",
+			NickName: "Test User",
+			Avatar:   "https://example.com/avatar.png",
+			Namespaces: []database.Namespace{
+				{
+					ID:            1,
+					Path:          "testuser",
+					NamespaceType: database.UserNamespace,
+					UUID:          "ns-uuid-123",
+				},
+			},
+		}
+
+		otherUser := database.User{
+			ID:       2,
+			Username: "otheruser",
+			RoleMask: "",
+		}
+
+		dbOrgs := []database.Organization{
+			{
+				ID:       1,
+				UUID:     uuid.MustParse("11111111-1111-1111-1111-111111111111"),
+				Homepage: "https://org1.com",
+				OrgType:  "company",
+				Verified: true,
+				Role:     "admin",
+			},
+		}
+
+		mockUserStore.EXPECT().FindByUsername(mock.Anything, "testuser").Return(dbUser, nil)
+		mockUserStore.EXPECT().FindByUsername(mock.Anything, "otheruser").Return(otherUser, nil)
+		mockUserTagStore.EXPECT().GetUserTags(mock.Anything, dbUser.ID).Return([]*database.Tag{}, nil)
+		mockOrgStore.EXPECT().GetUserBelongOrgs(mock.Anything, dbUser.ID).Return(dbOrgs, nil)
+
+		uc := &userComponentImpl{
+			userStore: mockUserStore,
+			orgStore:  mockOrgStore,
+			uts:       mockUserTagStore,
+		}
+
+		user, err := uc.Get(context.Background(), "testuser", "otheruser", false)
+		require.NoError(t, err)
+		require.Len(t, user.Orgs, 1)
+
+		require.Empty(t, user.Orgs[0].Role)
+	})
+}

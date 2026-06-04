@@ -858,6 +858,9 @@ func (c *userComponentImpl) buildUserInfo(ctx context.Context, dbuser *database.
 				UserID:   org.UserID,
 				UUID:     org.UUID,
 			}
+			if !onlyBasicInfo {
+				o.Role = org.Role
+			}
 			if org.Namespace != nil {
 				o.Namespace = &types.Namespace{
 					Path: org.Nickname,
