@@ -560,8 +560,13 @@ type Config struct {
 	}
 
 	Prometheus struct {
-		ApiAddress string `env:"STARHUB_SERVER_PROMETHEUS_API_ADDRESS" default:""`
-		BasicAuth  string `env:"STARHUB_SERVER_PROMETHEUS_BASIC_AUTH" default:""`
+		ApiAddress           string `env:"STARHUB_SERVER_PROMETHEUS_API_ADDRESS" default:""`
+		BasicAuth            string `env:"STARHUB_SERVER_PROMETHEUS_BASIC_AUTH" default:""`
+		CPUUsageMetric       string `env:"STARHUB_SERVER_PROMETHEUS_CPU_USAGE_METRIC" default:"container_cpu_usage_seconds_total"`
+		CPULimitMetric       string `env:"STARHUB_SERVER_PROMETHEUS_CPU_LIMIT_METRIC" default:"kube_pod_container_resource_limits"`
+		MemoryUsageMetric    string `env:"STARHUB_SERVER_PROMETHEUS_MEMORY_USAGE_METRIC" default:"container_memory_usage_bytes"`
+		RequestCountMetric   string `env:"STARHUB_SERVER_PROMETHEUS_REQUEST_COUNT_METRIC" default:"revision_request_count"`
+		RequestLatencyMetric string `env:"STARHUB_SERVER_PROMETHEUS_REQUEST_LATENCY_METRIC" default:"revision_app_request_latencies_bucket"`
 	}
 
 	Feishu struct {

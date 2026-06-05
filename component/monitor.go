@@ -31,6 +31,15 @@ type monitorComponentImpl struct {
 	repoStore       database.RepoStore
 	k8sNameSpace    string
 	deployer        deploy.Deployer
+	metrics         metricNames
+}
+
+type metricNames struct {
+	cpuUsage       string
+	cpuLimit       string
+	memoryUsage    string
+	requestCount   string
+	requestLatency string
 }
 
 func NewMonitorComponent(cfg *config.Config) (MonitorComponent, error) {
@@ -44,6 +53,13 @@ func NewMonitorComponent(cfg *config.Config) (MonitorComponent, error) {
 		deployTaskStore: database.NewDeployTaskStore(),
 		repoStore:       database.NewRepoStore(),
 		deployer:        deploy.NewDeployer(),
+		metrics: metricNames{
+			cpuUsage:       cfg.Prometheus.CPUUsageMetric,
+			cpuLimit:       cfg.Prometheus.CPULimitMetric,
+			memoryUsage:    cfg.Prometheus.MemoryUsageMetric,
+			requestCount:   cfg.Prometheus.RequestCountMetric,
+			requestLatency: cfg.Prometheus.RequestLatencyMetric,
+		},
 	}, nil
 }
 
@@ -55,12 +71,13 @@ func (m *monitorComponentImpl) CPUUsage(ctx context.Context, req *types.MonitorR
 	if !access {
 		return nil, fmt.Errorf("user %s has no permission to access cpu usage", req.CurrentUser)
 	}
-	query := fmt.Sprintf("avg_over_time(rate(container_cpu_usage_seconds_total{pod='%s',namespace='%s',container='%s'}[1m])[%s:])[%s:%s]", req.Instance, namespace, container, req.LastDuration, req.LastDuration, req.TimeRange)
-	slog.Debug("cpu-usage", slog.Any("query", query))
+	query := fmt.Sprintf("avg_over_time(rate(%s{pod='%s',namespace='%s',container='%s'}[1m])[%s:])[%s:%s]",
+		m.metrics.cpuUsage, req.Instance, namespace, container, req.LastDuration, req.LastDuration, req.TimeRange)
+	slog.InfoContext(ctx, "cpu-usage", slog.Any("query", query))
 
 	promeResp, err := m.client.SerialData(query)
 	if err != nil {
-		return nil, fmt.Errorf("fail to get cpu usage error: %w", err)
+		return nil, fmt.Errorf("failed to get cpu usage error: %w", err)
 	}
 	slog.Debug("get cpu usage", slog.Any("promeResp", promeResp))
 	resp := types.MonitorCPUResp{}
@@ -74,7 +91,7 @@ func (m *monitorComponentImpl) CPUUsage(ctx context.Context, req *types.MonitorR
 
 	limit, err := m.CPULimit(ctx, req)
 	if err != nil {
-		slog.Warn("fail to get cpu limit", slog.Any("err", err))
+		slog.Warn("failed to get cpu limit", slog.Any("err", err))
 	}
 
 	for _, values := range pResult.Values {
@@ -96,28 +113,28 @@ func (m *monitorComponentImpl) CPUUsage(ctx context.Context, req *types.MonitorR
 }
 
 func (m *monitorComponentImpl) CPULimit(ctx context.Context, req *types.MonitorReq) (float64, error) {
-	query := fmt.Sprintf("kube_pod_container_resource_limits{pod='%s',namespace='%s',resource='cpu'}", req.Instance, m.k8sNameSpace)
-	slog.Info("cpu-limit", slog.Any("query", query))
+	query := fmt.Sprintf("%s{pod='%s',namespace='%s',resource='cpu'}", m.metrics.cpuLimit, req.Instance, m.k8sNameSpace)
+	slog.InfoContext(ctx, "cpu-limit", slog.Any("query", query))
 
 	promeResp, err := m.client.SerialData(query)
 	if err != nil {
-		return 0, fmt.Errorf("fail to get cpu limit error: %w", err)
+		return 0, fmt.Errorf("failed to get cpu limit error: %w", err)
 	}
 	slog.Debug("get cpu limit", slog.Any("promeResp", promeResp))
 	if len(promeResp.Data.Result) < 1 {
-		return 0, fmt.Errorf("fail to get cpu limit, no result found")
+		return 0, fmt.Errorf("failed to get cpu limit, no result found")
 	}
 	pResult := promeResp.Data.Result[0]
 	if len(pResult.Value) < 2 {
-		return 0, fmt.Errorf("fail to get cpu limit, no value found")
+		return 0, fmt.Errorf("failed to get cpu limit, no value found")
 	}
 	valueArray := pResult.Value
 	v, err := convertToFloat64(valueArray[1])
 	if err != nil {
-		return 0, fmt.Errorf("fail to convert cpu limit value %v to float64, error: %w", valueArray[1], err)
+		return 0, fmt.Errorf("failed to convert cpu limit value %v to float64, error: %w", valueArray[1], err)
 	}
 	if v <= 0 {
-		return 1, fmt.Errorf("fail to get cpu limit, value %v is less than 0", v)
+		return 1, fmt.Errorf("failed to get cpu limit, value %v is less than 0", v)
 	}
 	return v, nil
 }
@@ -131,9 +148,9 @@ func (m *monitorComponentImpl) MemoryUsage(ctx context.Context, req *types.Monit
 		return nil, fmt.Errorf("user %s has no permission to access memory usage", req.CurrentUser)
 	}
 
-	query := fmt.Sprintf("avg_over_time(container_memory_usage_bytes{pod='%s',namespace='%s',container='%s'}[%s:])[%s:%s]",
-		req.Instance, namespace, container, req.LastDuration, req.LastDuration, req.TimeRange)
-	slog.Debug("memory-usage", slog.Any("query", query))
+	query := fmt.Sprintf("avg_over_time(%s{pod='%s',namespace='%s',container='%s'}[%s:])[%s:%s]",
+		m.metrics.memoryUsage, req.Instance, namespace, container, req.LastDuration, req.LastDuration, req.TimeRange)
+	slog.InfoContext(ctx, "memory-usage", slog.Any("query", query))
 
 	promeResp, err := m.client.SerialData(query)
 	if err != nil {
@@ -176,13 +193,13 @@ func (m *monitorComponentImpl) RequestCount(ctx context.Context, req *types.Moni
 	}
 
 	// issue: github.com/knative/serving/issues/14925
-	query := fmt.Sprintf("avg_over_time(revision_request_count{pod_name='%s',namespace='%s'}[%s:])[%s:%s]",
-		req.Instance, namespace, req.LastDuration, req.LastDuration, req.TimeRange)
-	slog.Debug("request-count", slog.Any("query", query))
+	query := fmt.Sprintf("avg_over_time(%s{pod_name='%s',namespace='%s'}[%s:])[%s:%s]",
+		m.metrics.requestCount, req.Instance, namespace, req.LastDuration, req.LastDuration, req.TimeRange)
+	slog.InfoContext(ctx, "request-count", slog.Any("query", query))
 
 	promeResp, err := m.client.SerialData(query)
 	if err != nil {
-		return nil, fmt.Errorf("fail to get memory limit error: %w", err)
+		return nil, fmt.Errorf("failed to get memory limit error: %w", err)
 	}
 	slog.Debug("get request count", slog.Any("promeResp", promeResp))
 	resp := types.MonitorRequestCountResp{}
@@ -233,8 +250,8 @@ func (m *monitorComponentImpl) RequestLatency(ctx context.Context, req *types.Mo
 		return nil, fmt.Errorf("user %s has no permission to access request latency", req.CurrentUser)
 	}
 
-	query := fmt.Sprintf("sum(increase(revision_app_request_latencies_bucket{pod_name='%s',namespace='%s'}[%s:])) by (le)",
-		req.Instance, namespace, req.LastDuration)
+	query := fmt.Sprintf("sum(increase(%s{pod_name='%s',namespace='%s'}[%s:])) by (le)",
+		m.metrics.requestLatency, req.Instance, namespace, req.LastDuration)
 	slog.Debug("request-latency", slog.Any("query", query))
 
 	promeResp, err := m.client.SerialData(query)

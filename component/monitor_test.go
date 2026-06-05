@@ -18,12 +18,21 @@ import (
 	"opencsg.com/csghub-server/common/types"
 )
 
+var defaultTestMetrics = metricNames{
+	cpuUsage:          "container_cpu_usage_seconds_total",
+	cpuLimit:          "kube_pod_container_resource_limits",
+	memoryUsage:       "container_memory_usage_bytes",
+	requestCount:      "revision_request_count",
+	requestLatency:    "revision_app_request_latencies_bucket",
+}
+
 func NewTestMonitorComponent(cfg *config.Config,
 	client prometheus.PrometheusClient,
 	usc rpc.UserSvcClient,
 	deployTaskStore database.DeployTaskStore,
 	repoStore database.RepoStore,
 	deployer deployer.Deployer,
+	metrics metricNames,
 ) (MonitorComponent, error) {
 	return &monitorComponentImpl{
 		k8sNameSpace:    cfg.Cluster.SpaceNamespace,
@@ -32,6 +41,7 @@ func NewTestMonitorComponent(cfg *config.Config,
 		deployTaskStore: deployTaskStore,
 		repoStore:       repoStore,
 		deployer:        deployer,
+		metrics:         metrics,
 	}, nil
 }
 
@@ -92,7 +102,7 @@ func TestMonitor_RequestLatency(t *testing.T) {
 		},
 	}, nil)
 
-	mon, err := NewTestMonitorComponent(cfg, client, usc, deployTaskStore, repoStore, nil)
+	mon, err := NewTestMonitorComponent(cfg, client, usc, deployTaskStore, repoStore, nil, defaultTestMetrics)
 	require.Nil(t, err)
 
 	resp, err := mon.RequestLatency(ctx, req)
@@ -172,7 +182,7 @@ func TestMonitor_RequestCount(t *testing.T) {
 		},
 	}, nil)
 
-	mon, err := NewTestMonitorComponent(cfg, client, usc, deployTaskStore, repoStore, nil)
+	mon, err := NewTestMonitorComponent(cfg, client, usc, deployTaskStore, repoStore, nil, defaultTestMetrics)
 	require.Nil(t, err)
 
 	resp, err := mon.RequestCount(ctx, req)
@@ -256,7 +266,7 @@ func TestMonitor_MemoryUsage(t *testing.T) {
 		},
 	}, nil)
 
-	mon, err := NewTestMonitorComponent(cfg, client, usc, deployTaskStore, repoStore, nil)
+	mon, err := NewTestMonitorComponent(cfg, client, usc, deployTaskStore, repoStore, nil, defaultTestMetrics)
 	require.Nil(t, err)
 
 	resp, err := mon.MemoryUsage(ctx, req)
@@ -345,7 +355,7 @@ func TestMonitor_MemoryUsage_Evaluation(t *testing.T) {
 		},
 	}, nil)
 
-	mon, err := NewTestMonitorComponent(cfg, client, usc, deployTaskStore, repoStore, mockDeployer)
+	mon, err := NewTestMonitorComponent(cfg, client, usc, deployTaskStore, repoStore, mockDeployer, defaultTestMetrics)
 	require.Nil(t, err)
 
 	resp, err := mon.MemoryUsage(ctx, req)
@@ -445,7 +455,7 @@ func TestMonitor_CPUUsage(t *testing.T) {
 		},
 	}, nil)
 
-	mon, err := NewTestMonitorComponent(cfg, client, usc, deployTaskStore, repoStore, nil)
+	mon, err := NewTestMonitorComponent(cfg, client, usc, deployTaskStore, repoStore, nil, defaultTestMetrics)
 	require.Nil(t, err)
 
 	resp, err := mon.CPUUsage(ctx, req)
