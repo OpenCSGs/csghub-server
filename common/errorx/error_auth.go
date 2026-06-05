@@ -20,6 +20,8 @@ const (
 	userPhoneNotVerified
 	needAccessToken
 	quotaExceeded
+	//need old token, often reported when user refresh token
+	needOldToken
 )
 
 var (
@@ -191,6 +193,19 @@ var (
 	//
 	// zh-HK: 請求限额已超過
 	ErrQuotaExceeded error = CustomError{prefix: errAuthPrefix, code: quotaExceeded}
+
+	// refresh request is missing old token
+	//
+	// Description: Refreshing a token requires the old token.
+	//
+	// Description_ZH: 必须携带旧Token。
+	//
+	// en-US: old token is required to refresh token
+	//
+	// zh-CN: 必须携带旧Token
+	//
+	// zh-HK: 必須攜帶舊Token
+	ErrNeedOldToken error = CustomError{prefix: errAuthPrefix, code: needOldToken}
 )
 
 /*
@@ -310,5 +325,14 @@ func ErrForbiddenMsg(msg string) error {
 		code:    forbidden,
 		err:     errors.New(msg),
 		context: nil,
+	}
+}
+
+func NeedOldToken(err error, errCtx context) error {
+	return CustomError{
+		prefix:  errAuthPrefix,
+		code:    needOldToken,
+		err:     err,
+		context: errCtx,
 	}
 }

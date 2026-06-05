@@ -1007,7 +1007,7 @@ func (c *userComponentImpl) Signin(ctx context.Context, code, state string) (*ty
 			}
 		}()
 	}
-	hubToken, signed, err := c.jwtc.GenerateToken(ctx, types.CreateJWTReq{
+	hubToken, signed, err := c.jwtc.GenerateLoginToken(ctx, types.CreateJWTReq{
 		UUID: dbu.UUID,
 	})
 	if err != nil {

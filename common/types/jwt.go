@@ -8,7 +8,13 @@ import (
 
 type CreateJWTReq struct {
 	UUID          string   `json:"uuid" binding:"required"`
+	OldToken      string   `json:"old_token,omitempty"`
 	Organizations []string `json:"-"`
+}
+
+type RefreshJWTReq struct {
+	UUID     string `json:"uuid" binding:"required"`
+	OldToken string `json:"old_token" binding:"required"`
 }
 
 type CreateJWTResp struct {

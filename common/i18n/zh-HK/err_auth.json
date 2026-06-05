@@ -14,6 +14,9 @@
     "error.AUTH-ERR-12": {
         "other": "請求限额已超過"
     },
+    "error.AUTH-ERR-13": {
+        "other": "必須攜帶舊Token"
+    },
     "error.AUTH-ERR-2": {
         "other": "權限被拒絕"
     },

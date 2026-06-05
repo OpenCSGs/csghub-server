@@ -1,12 +1,14 @@
 package handler
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/user/component"
 )
@@ -40,10 +42,14 @@ func (h *JWTHandler) Create(ctx *gin.Context) {
 		return
 	}
 
-	slog.InfoContext(ctx.Request.Context(), "Create JWT token", "req", req)
+	slog.InfoContext(ctx.Request.Context(), "Create JWT token", slog.String("uuid", req.UUID), slog.Any("orgs", req.Organizations))
 	claims, signed, err := h.c.GenerateToken(ctx.Request.Context(), req)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "failed to generate JWT token", slog.Any("error", err))
+		if errors.Is(err, errorx.ErrInvalidJWT) || errors.Is(err, errorx.ErrNeedOldToken) {
+			httpbase.UnauthorizedError(ctx, err)
+			return
+		}
 		httpbase.ServerError(ctx, err)
 		return
 	}
