@@ -6,6 +6,15 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
+const (
+	ClusterCFGKubeSchedulerKey        = "kube_scheduler"
+	ClusterCFGVolcanoQueueKey         = "volcano_queue"
+	ClusterCFGVGPUNodeResourceNameKey = "vgpu_node_resource_name"
+	ClusterCFGVGPUPodResourceNameKey  = "vgpu_pod_resource_name"
+	ClusterCFGVGPUResourceReqKey      = "vgpu_resource_req"
+	ClusterCFGVGPUMemoryReqKey        = "vgpu_memory_req"
+)
+
 type ClusterRequest struct {
 	ClusterID     string `json:"cluster_id"`
 	ClusterConfig string `json:"cluster_config"`
@@ -77,7 +86,8 @@ type ClusterRes struct {
 	XPUVendors     string `json:"xpu_vendors"` // NVIDIA, AMD
 	XPUModels      string `json:"xpu_models"`  // A10(32 GB),H100(80 GB)
 
-	Enable bool `json:"enable"`
+	Enable     bool              `json:"enable"`
+	VXPUConfig map[string]string `json:"vxpu_config"`
 }
 type DeployRes struct {
 	ClusterID       string    `json:"cluster_id"`

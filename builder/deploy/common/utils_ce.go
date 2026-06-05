@@ -4,6 +4,6 @@ package common
 
 import "opencsg.com/csghub-server/common/types"
 
-func GenerateScheduler(config DeployConfig) *types.Scheduler {
+func GenerateScheduler(VXPUConfig map[string]string) *types.Scheduler {
 	return nil
 }

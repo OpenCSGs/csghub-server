@@ -164,6 +164,7 @@ func TestDeployWorkflowSuccess(t *testing.T) {
 			Name: "node1",
 		},
 	}, nil)
+	mockClusterStore.EXPECT().ByClusterID(mock.Anything, mock.Anything).Return(database.ClusterInfo{}, nil).Maybe()
 
 	env.ExecuteWorkflow(DeployWorkflow, buildTask.ID, runTask.ID)
 

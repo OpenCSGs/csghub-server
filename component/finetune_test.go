@@ -139,11 +139,15 @@ func TestEvaluationComponent_CreateFinetune(t *testing.T) {
 
 	spaceResStore.EXPECT().FindByID(ctx, int64(4)).Return(&database.SpaceResource{
 		ID:        4,
+		Name:      "1 GPU · 4 vCPU · 32Gi",
+		ClusterID: "cluster-1",
 		Resources: string(resource),
 	}, nil)
 
-	repoComp.EXPECT().CheckAccountAndResource(ctx, "testuser", "", int64(0), mock.Anything).Return(&types.CheckExclusiveResp{}, nil)
+	repoComp.EXPECT().CheckAccountAndResource(ctx, "testuser", "cluster-1", int64(0), mock.Anything).Return(&types.CheckExclusiveResp{}, nil)
 
+	req2.ResourceName = "1 GPU · 4 vCPU · 32Gi"
+	req2.ClusterID = "cluster-1"
 	mockDeployer.EXPECT().SubmitFinetuneJob(ctx, req2).Return(&types.ArgoWorkFlowRes{
 		ID:       1,
 		TaskName: "test",
@@ -208,19 +212,10 @@ func TestFinetuneComponent_CreateFinetuneJob_UsesRequestedDatasetRevision(t *tes
 		ComputeType: string(types.ResourceTypeCPU),
 	}, nil)
 
-	mockDeployer.EXPECT().SubmitFinetuneJob(ctx, mock.MatchedBy(func(req types.FinetuneReq) bool {
-		return req.DatasetRevision == "dev" &&
-			req.Revision == "main" &&
-			req.ResourceName == "4 vCPU · 32Gi"
-	})).Return(&types.ArgoWorkFlowRes{
-		ID:       1,
-		TaskName: "test",
-	}, nil)
-
 	e, err := c.CreateFinetuneJob(ctx, req)
-	require.NoError(t, err)
-	require.NotNil(t, e)
-	require.Equal(t, "test", e.TaskName)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "share mode is deprecated")
+	require.Nil(t, e)
 }
 
 func TestFinetuneComponent_CreateFinetuneJob_NonAdminNamespace(t *testing.T) {

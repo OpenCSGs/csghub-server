@@ -71,6 +71,7 @@ type ClusterInfo struct {
 	Mode             types.ClusterMode    `bun:"," json:"mode"`                    //used for multi-host, e.g., host, bridge
 	AppEndpoint      string               `bun:"," json:"app_endpoint"`            //runner app endpoint
 	ResourceStatus   types.ResourceStatus `bun:"," json:"resource_status"`
+	VXPUConfig       map[string]string    `bun:",type:jsonb,nullzero" json:"vxpu_config"`
 	times
 }
 
@@ -230,6 +231,7 @@ func (s *clusterInfoStoreImpl) BatchUpdateStatus(ctx context.Context, statusEven
 			_, err := tx.NewUpdate().Model(&ClusterInfo{}).
 				Set("Status = ?", types.ClusterStatusRunning).
 				Set("resource_status = ?", cluster.ResourceStatus).
+				Set("vxpu_config = ?", cluster.VXPUConfig).
 				Set("updated_at = now()").
 				Where("cluster_id = ?", cluster.ClusterID).
 				Exec(ctx)
@@ -390,6 +392,7 @@ func (s *clusterInfoStoreImpl) GetClusterResources(ctx context.Context, clusterI
 		NodeNumber:     len(resources),
 		Resources:      resources,
 		LastUpdateTime: clusterInfo.UpdatedAt.Unix(),
+		VXPUConfig:     clusterInfo.VXPUConfig,
 	}, nil
 }
 

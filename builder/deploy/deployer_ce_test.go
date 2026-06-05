@@ -145,11 +145,11 @@ func Test_CheckNodeResource(t *testing.T) {
 
 	baseNode := types.NodeResourceInfo{
 		NodeHardware: types.NodeHardware{
-			AvailableCPU:      16,
-			AvailableMem:      8, // 8 GiB
-			AvailableXPU:      2,
-			XPUModel:          "NVIDIA-A100",
-			XPUCapacityLabel:  "nvidia.com/gpu",
+			AvailableCPU:     16,
+			AvailableMem:     8, // 8 GiB
+			AvailableXPU:     2,
+			XPUModel:         "NVIDIA-A100",
+			XPUCapacityLabel: "nvidia.com/gpu",
 		},
 	}
 
@@ -207,7 +207,7 @@ func Test_CheckNodeResource(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := checkNodeResource(tc.node, tc.hardware, config)
+			got := checkNodeResource(tc.node, tc.hardware, config, map[string]string{})
 			if got.Available != tc.want {
 				t.Errorf("checkNodeResource() = %v, want %v", got.Available, tc.want)
 			}
@@ -218,11 +218,11 @@ func Test_CheckNodeResource(t *testing.T) {
 func Test_CheckNodeResource_AllowCPUScheduleToGPUNode(t *testing.T) {
 	baseNode := types.NodeResourceInfo{
 		NodeHardware: types.NodeHardware{
-			AvailableCPU:      16,
-			AvailableMem:      8,
-			AvailableXPU:      2,
-			XPUModel:          "NVIDIA-A100",
-			XPUCapacityLabel:  "nvidia.com/gpu",
+			AvailableCPU:     16,
+			AvailableMem:     8,
+			AvailableXPU:     2,
+			XPUModel:         "NVIDIA-A100",
+			XPUCapacityLabel: "nvidia.com/gpu",
 		},
 	}
 
@@ -235,7 +235,7 @@ func Test_CheckNodeResource_AllowCPUScheduleToGPUNode(t *testing.T) {
 			Memory: "4Gi",
 		}
 
-		got := checkNodeResource(baseNode, hardware, config)
+		got := checkNodeResource(baseNode, hardware, config, map[string]string{})
 		require.True(t, got.Available, "Expected CPU-only workload to be allowed on GPU node when flag is enabled")
 	})
 
@@ -248,7 +248,7 @@ func Test_CheckNodeResource_AllowCPUScheduleToGPUNode(t *testing.T) {
 			Memory: "4Gi",
 		}
 
-		got := checkNodeResource(baseNode, hardware, config)
+		got := checkNodeResource(baseNode, hardware, config, map[string]string{})
 		require.False(t, got.Available, "Expected CPU-only workload to be blocked on GPU node when flag is disabled")
 	})
 }
