@@ -299,3 +299,8 @@ direct_mail_access_key_secret = ""
 [prometheus]
 api_address = "http://prometheus.opencsg.com/api/v1/query"
 basic_auth = "myauth"
+cpu_usage_metric = "container_cpu_usage_seconds_total"
+cpu_limit_metric = "kube_pod_container_resource_limits"
+memory_usage_metric = "container_memory_usage_bytes"
+request_count_metric = "revision_request_count"
+request_latency_metric = "revision_app_request_latencies_bucket"
