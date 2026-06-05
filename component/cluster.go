@@ -307,11 +307,12 @@ func (c *clusterComponentImpl) GetClusterUsages(ctx context.Context) ([]types.Cl
 				slog.Any("error", err))
 
 			result = append(result, types.ClusterRes{
-				ClusterID: cluster.ClusterID,
-				Status:    types.ClusterStatusUnavailable,
-				Region:    cluster.Region,
-				Zone:      cluster.Zone,
-				Provider:  cluster.Provider,
+				ClusterID:  cluster.ClusterID,
+				Status:     types.ClusterStatusUnavailable,
+				Region:     cluster.Region,
+				Zone:       cluster.Zone,
+				Provider:   cluster.Provider,
+				VXPUConfig: cluster.VXPUConfig,
 			})
 		}
 
@@ -335,6 +336,7 @@ func (d *clusterComponentImpl) getClusterUsageById(ctx context.Context, clusterI
 		Status:         cluster.Status,
 		LastUpdateTime: cluster.LastUpdateTime,
 		Enable:         cluster.Enable,
+		VXPUConfig:     cluster.VXPUConfig,
 	}
 
 	var vendorSet = make(map[string]struct{}, 0)
