@@ -157,17 +157,18 @@ func (c *evaluationComponentImpl) CreateEvaluation(ctx context.Context, req type
 		req.NodeAffinity = exclusiveResp.NodeAffinity
 		req.Tolerations = exclusiveResp.Tolerations
 	} else {
-		// for share mode
-		resource := ""
-		if frame.ComputeType == string(types.ResourceTypeGPU) {
-			hardware.Gpu.Num = c.config.Argo.QuotaGPUNumber
-			hardware.Gpu.ResourceName = c.deployer.GetSharedModeResourceName(c.config)
-			resource = fmt.Sprintf("%s GPU · ", c.config.Argo.QuotaGPUNumber)
-		}
-		hardware.Cpu.Num = "4"
-		hardware.Memory = "32Gi"
-		resource = fmt.Sprintf("%s%s vCPU · %s", resource, hardware.Cpu.Num, hardware.Memory)
-		req.ResourceName = resource
+		// Deprecated for share mode
+		return nil, fmt.Errorf("share mode is deprecated.")
+		// resource := ""
+		// if frame.ComputeType == string(types.ResourceTypeGPU) {
+		// 	hardware.Gpu.Num = c.config.Argo.QuotaGPUNumber
+		// 	hardware.Gpu.ResourceName = c.deployer.GetSharedModeResourceName(c.config)
+		// 	resource = fmt.Sprintf("%s GPU · ", c.config.Argo.QuotaGPUNumber)
+		// }
+		// hardware.Cpu.Num = "4"
+		// hardware.Memory = "32Gi"
+		// resource = fmt.Sprintf("%s%s vCPU · %s", resource, hardware.Cpu.Num, hardware.Memory)
+		// req.ResourceName = resource
 	}
 
 	clusterNodes, err := c.clusterStore.FindNodeByClusterID(ctx, req.ClusterID)

@@ -7,7 +7,10 @@ import (
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	mockdb "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/database"
 	mockrunner "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/deploy/imagerunner"
+	"opencsg.com/csghub-server/builder/deploy/common"
+	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/types"
 )
 
@@ -59,6 +62,8 @@ func TestDeployer_CreateDataflowWorkflow(t *testing.T) {
 		}
 
 		mockRunner := mockrunner.NewMockRunner(t)
+		mockClusterStore := mockdb.NewMockClusterInfoStore(t)
+		mockClusterStore.EXPECT().ByClusterID(ctx, req.ClusterID).Return(database.ClusterInfo{}, nil)
 		mockRunner.EXPECT().CreateDataflowWorkflow(ctx, mock.Anything).RunAndReturn(
 			func(ctx context.Context, r *types.DataflowArgoJobReq) (*types.DataflowArgoJobResp, error) {
 				require.Equal(t, req.ID, r.ID)
@@ -85,7 +90,8 @@ func TestDeployer_CreateDataflowWorkflow(t *testing.T) {
 		)
 
 		d := &deployer{
-			imageRunner: mockRunner,
+			imageRunner:   mockRunner,
+			clusterStore:  mockClusterStore,
 		}
 
 		resp, err := d.CreateDataflowJob(ctx, req)
@@ -107,10 +113,13 @@ func TestDeployer_CreateDataflowWorkflow(t *testing.T) {
 		}
 
 		mockRunner := mockrunner.NewMockRunner(t)
+		mockClusterStore := mockdb.NewMockClusterInfoStore(t)
+		mockClusterStore.EXPECT().ByClusterID(ctx, req.ClusterID).Return(database.ClusterInfo{}, nil)
 		mockRunner.EXPECT().CreateDataflowWorkflow(ctx, mock.Anything).Return(nil, errors.New("runner error"))
 
 		d := &deployer{
-			imageRunner: mockRunner,
+			imageRunner:   mockRunner,
+			clusterStore:  mockClusterStore,
 		}
 
 		resp, err := d.CreateDataflowJob(ctx, req)
@@ -136,11 +145,11 @@ func TestDeployer_CreateDataflowWorkflow(t *testing.T) {
 			Entrypoint:   "main.py",
 		}
 
-		scheduler := &types.Scheduler{
-			Volcano: &types.VolcanoConfig{
-				SchedulerName: "custom-scheduler",
-			},
+		clusterVXPUConfig := map[string]string{
+			"kube_scheduler": "volcano",
+			"volcano_queue":  "default",
 		}
+		expectedScheduler := common.GenerateScheduler(clusterVXPUConfig)
 
 		expectedResp := &types.DataflowArgoJobResp{
 			ID:         1,
@@ -151,17 +160,20 @@ func TestDeployer_CreateDataflowWorkflow(t *testing.T) {
 		}
 
 		mockRunner := mockrunner.NewMockRunner(t)
+		mockClusterStore := mockdb.NewMockClusterInfoStore(t)
+		mockClusterStore.EXPECT().ByClusterID(ctx, req.ClusterID).Return(database.ClusterInfo{
+			VXPUConfig: clusterVXPUConfig,
+		}, nil)
 		mockRunner.EXPECT().CreateDataflowWorkflow(ctx, mock.Anything).RunAndReturn(
 			func(ctx context.Context, r *types.DataflowArgoJobReq) (*types.DataflowArgoJobResp, error) {
-				require.NotNil(t, r.Scheduler)
-				require.Equal(t, scheduler, r.Scheduler)
+				require.Equal(t, expectedScheduler, r.Scheduler)
 				return expectedResp, nil
 			},
 		)
 
 		d := &deployer{
 			imageRunner:   mockRunner,
-			kubeScheduler: scheduler,
+			clusterStore:  mockClusterStore,
 		}
 
 		resp, err := d.CreateDataflowJob(ctx, req)

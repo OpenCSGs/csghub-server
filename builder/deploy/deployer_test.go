@@ -54,15 +54,15 @@ func TestDeployer_GenerateUniqueSvcName(t *testing.T) {
 	}
 
 	dr.Type = types.SpaceType
-	name := d.GenerateUniqueSvcName(dr)
+	name := d.generateUniqueSvcName(dr)
 	require.True(t, strings.HasPrefix(name, "u"))
 
 	dr.Type = types.ServerlessType
-	name = d.GenerateUniqueSvcName(dr)
+	name = d.generateUniqueSvcName(dr)
 	require.True(t, strings.HasPrefix(name, "s"))
 
 	dr.Type = types.InferenceType
-	name = d.GenerateUniqueSvcName(dr)
+	name = d.generateUniqueSvcName(dr)
 	require.False(t, strings.Contains(name, "-"))
 
 }
@@ -771,23 +771,23 @@ func TestDeployer_CheckResource(t *testing.T) {
 	}{
 		{&types.HardWare{}, true},
 		{&types.HardWare{
-			Gpu: types.Processor{Num: "1", Type: "t1"},
+			Gpu: types.Processor{Num: "1", Type: "t1", ResourceName: "nvidia.com/gpu"},
 			Cpu: types.CPU{Num: "2"},
 		}, true},
 		{&types.HardWare{
-			Gpu: types.Processor{Num: "1", Type: "t2"},
+			Gpu: types.Processor{Num: "1", Type: "t2", ResourceName: "nvidia.com/gpu"},
 			Cpu: types.CPU{Num: "2"},
 		}, false},
 		{&types.HardWare{
-			Gpu: types.Processor{Num: "15", Type: "t1"},
+			Gpu: types.Processor{Num: "15", Type: "t1", ResourceName: "nvidia.com/gpu"},
 			Cpu: types.CPU{Num: "2"},
 		}, false},
 		{&types.HardWare{
-			Gpu: types.Processor{Num: "1", Type: "t1"},
+			Gpu: types.Processor{Num: "1", Type: "t1", ResourceName: "nvidia.com/gpu"},
 			Cpu: types.CPU{Num: "20"},
 		}, false},
 		{&types.HardWare{
-			Gpu: types.Processor{Num: "1", Type: "t1"},
+			Gpu: types.Processor{Num: "1", Type: "t1", ResourceName: "nvidia.com/gpu"},
 			Cpu: types.CPU{Num: "12"},
 		}, true},
 	}
@@ -817,6 +817,7 @@ func TestDeployer_SubmitEvaluation(t *testing.T) {
 	tester := newTestDeployer(t)
 	ctx := context.TODO()
 
+	tester.mocks.stores.ClusterInfoMock().EXPECT().ByClusterID(ctx, "").Return(database.ClusterInfo{}, nil)
 	tester.mocks.runner.EXPECT().SubmitWorkFlow(ctx, mock.Anything).RunAndReturn(
 		func(ctx context.Context, awfr *types.ArgoWorkFlowReq) (*types.ArgoWorkFlowRes, error) {
 			require.Equal(t, map[string]string{
@@ -858,6 +859,7 @@ func TestDeployer_SubmitFinetune(t *testing.T) {
 	tester := newTestDeployer(t)
 	ctx := context.TODO()
 
+	tester.mocks.stores.ClusterInfoMock().EXPECT().ByClusterID(ctx, "").Return(database.ClusterInfo{}, nil)
 	tester.mocks.runner.EXPECT().SubmitFinetuneJob(ctx, mock.Anything).RunAndReturn(
 		func(ctx context.Context, awfr *types.ArgoWorkFlowReq) (*types.ArgoWorkFlowRes, error) {
 			require.Equal(t, map[string]string{
@@ -1063,17 +1065,14 @@ func TestDeployer_CheckHeartbeatTimeout(t *testing.T) {
 
 func TestDeployer_IsDefaultScheduler(t *testing.T) {
 	t.Run("default scheduler", func(t *testing.T) {
-		d := &deployer{
-			kubeScheduler: nil,
-		}
-		require.True(t, d.IsDefaultScheduler())
+		d := &deployer{}
+		require.True(t, d.IsDefaultScheduler(map[string]string{}))
 	})
 
-	t.Run("custom scheduler", func(t *testing.T) {
-		d := &deployer{
-			kubeScheduler: &types.Scheduler{},
-		}
-		require.False(t, d.IsDefaultScheduler())
+	t.Run("with scheduler config", func(t *testing.T) {
+		d := &deployer{}
+		expectedResult := common.GenerateScheduler(map[string]string{types.ClusterCFGKubeSchedulerKey: types.KubeSchedulerVolcano.ToString()}) == nil
+		require.Equal(t, expectedResult, d.IsDefaultScheduler(map[string]string{types.ClusterCFGKubeSchedulerKey: types.KubeSchedulerVolcano.ToString()}))
 	})
 }
 
@@ -1082,19 +1081,22 @@ func TestDeployer_GetSharedModeResourceName(t *testing.T) {
 	config.Runner.VGPUResourceReqKey = "nvidia.com/vgpu"
 
 	t.Run("default scheduler", func(t *testing.T) {
-		d := &deployer{
-			kubeScheduler: nil,
-		}
-		name := d.GetSharedModeResourceName(config)
+		d := &deployer{}
+		name := d.GetSharedModeResourceName(map[string]string{})
 		require.Equal(t, common.DefaultResourceName, name)
 	})
 
 	t.Run("custom scheduler", func(t *testing.T) {
-		d := &deployer{
-			kubeScheduler: &types.Scheduler{},
+		d := &deployer{}
+		vxpuConfig := map[string]string{
+			types.ClusterCFGKubeSchedulerKey: types.KubeSchedulerVolcano.ToString(),
+			types.ClusterCFGVGPUResourceReqKey: "nvidia.com/vgpu",
 		}
-		name := d.GetSharedModeResourceName(config)
-		require.Equal(t, "nvidia.com/vgpu", name)
+		if common.GenerateScheduler(vxpuConfig) == nil {
+			require.Equal(t, common.DefaultResourceName, d.GetSharedModeResourceName(vxpuConfig))
+		} else {
+			require.Equal(t, "nvidia.com/vgpu", d.GetSharedModeResourceName(vxpuConfig))
+		}
 	})
 }
 

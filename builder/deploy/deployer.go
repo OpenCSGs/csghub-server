@@ -17,7 +17,6 @@ import (
 	"opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/builder/loki"
 	"opencsg.com/csghub-server/builder/store/database"
-	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 	hubcom "opencsg.com/csghub-server/common/utils/common"
@@ -60,14 +59,14 @@ type Deployer interface {
 	DeleteFinetuneJob(ctx context.Context, req types.ArgoWorkFlowDeleteReq) error
 	GetWorkflowLogsInStream(ctx context.Context, req types.WorkflowLogReq, labels map[string]string) (*MultiLogReader, error)
 	GetWorkflowLogsNonStream(ctx context.Context, req types.WorkflowLogReq, labels map[string]string) (*loki.LokiQueryResponse, error)
-	IsDefaultScheduler() bool
-	GetSharedModeResourceName(config *config.Config) string
+	IsDefaultScheduler(VXPUConfig map[string]string) bool
+	GetSharedModeResourceName(VXPUConfig map[string]string) string
 	LabelNode(ctx context.Context, req *types.NodeLabel) error
 	CreateDataflowJob(ctx context.Context, req *types.DataflowArgoJobReq) (*types.DataflowArgoJobResp, error)
 	DeleteDataflowJob(ctx context.Context, req *types.DataflowArgoReq) error
 }
 
-func (d *deployer) GenerateUniqueSvcName(dr types.DeployRequest) string {
+func (d *deployer) generateUniqueSvcName(dr types.DeployRequest) string {
 	uniqueSvcName := ""
 	switch dr.Type {
 	case types.SpaceType:
@@ -137,7 +136,7 @@ func (d *deployer) serverlessDeploy(ctx context.Context, dr types.DeployRequest)
 }
 
 func (d *deployer) dedicatedDeploy(ctx context.Context, dr types.DeployRequest) (*database.Deploy, error) {
-	uniqueSvcName := d.GenerateUniqueSvcName(dr)
+	uniqueSvcName := d.generateUniqueSvcName(dr)
 	if len(uniqueSvcName) < 1 {
 		err := fmt.Errorf("failed to generate uuid for deploy")
 		return nil, errorx.InternalServerError(err,
@@ -815,6 +814,11 @@ func (d *deployer) startJobs() {
 
 // SubmitEvaluation
 func (d *deployer) SubmitEvaluation(ctx context.Context, req types.EvaluationReq) (*types.ArgoWorkFlowRes, error) {
+	cluster, err := d.clusterStore.ByClusterID(ctx, req.ClusterID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get cluster %s for evaluation job, error: %w", req.ClusterID, err)
+	}
+
 	env := make(map[string]string)
 	env["REVISIONS"] = strings.Join(req.Revisions, ",")
 	env["DATASET_REVISIONS"] = strings.Join(req.DatasetRevisions, ",")
@@ -853,7 +857,7 @@ func (d *deployer) SubmitEvaluation(ctx context.Context, req types.EvaluationReq
 		ResourceId:   req.ResourceId,
 		ResourceName: req.ResourceName,
 		Nodes:        req.Nodes,
-		Scheduler:    d.kubeScheduler,
+		Scheduler:    common.GenerateScheduler(cluster.VXPUConfig),
 		DeployExtend: types.DeployExtend{
 			NodeAffinity: req.NodeAffinity,
 			Tolerations:  req.Tolerations,
@@ -907,6 +911,11 @@ func (d *deployer) CheckHeartbeatTimeout(ctx context.Context, clusterId string) 
 }
 
 func (d *deployer) SubmitFinetuneJob(ctx context.Context, req types.FinetuneReq) (*types.ArgoWorkFlowRes, error) {
+	cluster, err := d.clusterStore.ByClusterID(ctx, req.ClusterID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get cluster %s for finetune job, error: %w", req.ClusterID, err)
+	}
+
 	finetunedModelName := ""
 	orgModelNames := strings.Split(req.ModelId, "/")
 	if len(orgModelNames) == 2 {
@@ -935,12 +944,13 @@ func (d *deployer) SubmitFinetuneJob(ctx context.Context, req types.FinetuneReq)
 	common.UpdateEvaluationEnvHardware(env, req.Hardware)
 
 	templates := []types.ArgoFlowTemplate{}
-	templates = append(templates, types.ArgoFlowTemplate{
-		Name:     "finetune",
-		Env:      env,
-		HardWare: req.Hardware,
-		Image:    req.Image,
-	},
+	templates = append(templates,
+		types.ArgoFlowTemplate{
+			Name:     "finetune",
+			Env:      env,
+			HardWare: req.Hardware,
+			Image:    req.Image,
+		},
 	)
 	uniqueFlowName := d.snowflakeNode.Generate().Base36()
 	flowReq := &types.ArgoWorkFlowReq{
@@ -960,7 +970,7 @@ func (d *deployer) SubmitFinetuneJob(ctx context.Context, req types.FinetuneReq)
 		ResourceId:         req.ResourceId,
 		ResourceName:       req.ResourceName,
 		FinetunedModelName: finetunedModelName,
-		Scheduler:          d.kubeScheduler,
+		Scheduler:          common.GenerateScheduler(cluster.VXPUConfig),
 		DeployExtend: types.DeployExtend{
 			NodeAffinity: req.NodeAffinity,
 			Tolerations:  req.Tolerations,
@@ -1036,17 +1046,17 @@ func (d *deployer) GetWorkflowLogsNonStream(ctx context.Context, req types.Workf
 func (d *deployer) CheckClusterHealthy(ctx context.Context, deployId string) bool {
 	clusterRes, err := d.clusterStore.GetClusterResources(ctx, deployId)
 	if err != nil {
-		slog.ErrorContext(ctx, "fail to get cluster resources", slog.Any("error", err))
+		slog.ErrorContext(ctx, "failed to get cluster resources", slog.Any("error", err))
 		return false
 	}
 
 	if !clusterRes.Enable {
-		slog.WarnContext(ctx, "cluster resources unhealthy, cluster disabled")
+		slog.WarnContext(ctx, "cluster resources unhealthy, cluster is disabled")
 		return false
 	}
 
 	if clusterRes.Status == types.ClusterStatusUnavailable {
-		slog.WarnContext(ctx, "cluster resources unhealthy, cluster status unavailable")
+		slog.WarnContext(ctx, "cluster resources unhealthy, cluster status is unavailable")
 		return false
 	}
 
@@ -1058,14 +1068,14 @@ func (d *deployer) CheckClusterHealthy(ctx context.Context, deployId string) boo
 	return true
 }
 
-func (d *deployer) IsDefaultScheduler() bool {
-	return d.kubeScheduler == nil
+func (d *deployer) IsDefaultScheduler(VXPUConfig map[string]string) bool {
+	return common.GenerateScheduler(VXPUConfig) == nil
 }
 
-func (d *deployer) GetSharedModeResourceName(config *config.Config) string {
+func (d *deployer) GetSharedModeResourceName(VXPUConfig map[string]string) string {
 	resourceName := common.DefaultResourceName
-	if !d.IsDefaultScheduler() {
-		resourceName = config.Runner.VGPUResourceReqKey
+	if !d.IsDefaultScheduler(VXPUConfig) {
+		resourceName = VXPUConfig[types.ClusterCFGVGPUResourceReqKey]
 	}
 	return resourceName
 }

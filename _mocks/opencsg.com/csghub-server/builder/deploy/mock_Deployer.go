@@ -5,11 +5,8 @@ package deploy
 import (
 	context "context"
 
-	config "opencsg.com/csghub-server/common/config"
-
-	database "opencsg.com/csghub-server/builder/store/database"
-
 	deploy "opencsg.com/csghub-server/builder/deploy"
+	database "opencsg.com/csghub-server/builder/store/database"
 
 	loki "opencsg.com/csghub-server/builder/loki"
 
@@ -661,17 +658,17 @@ func (_c *MockDeployer_GetReplica_Call) RunAndReturn(run func(context.Context, t
 	return _c
 }
 
-// GetSharedModeResourceName provides a mock function with given fields: _a0
-func (_m *MockDeployer) GetSharedModeResourceName(_a0 *config.Config) string {
-	ret := _m.Called(_a0)
+// GetSharedModeResourceName provides a mock function with given fields: VXPUConfig
+func (_m *MockDeployer) GetSharedModeResourceName(VXPUConfig map[string]string) string {
+	ret := _m.Called(VXPUConfig)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetSharedModeResourceName")
 	}
 
 	var r0 string
-	if rf, ok := ret.Get(0).(func(*config.Config) string); ok {
-		r0 = rf(_a0)
+	if rf, ok := ret.Get(0).(func(map[string]string) string); ok {
+		r0 = rf(VXPUConfig)
 	} else {
 		r0 = ret.Get(0).(string)
 	}
@@ -685,14 +682,14 @@ type MockDeployer_GetSharedModeResourceName_Call struct {
 }
 
 // GetSharedModeResourceName is a helper method to define mock.On call
-//   - _a0 *config.Config
-func (_e *MockDeployer_Expecter) GetSharedModeResourceName(_a0 interface{}) *MockDeployer_GetSharedModeResourceName_Call {
-	return &MockDeployer_GetSharedModeResourceName_Call{Call: _e.mock.On("GetSharedModeResourceName", _a0)}
+//   - VXPUConfig map[string]string
+func (_e *MockDeployer_Expecter) GetSharedModeResourceName(VXPUConfig interface{}) *MockDeployer_GetSharedModeResourceName_Call {
+	return &MockDeployer_GetSharedModeResourceName_Call{Call: _e.mock.On("GetSharedModeResourceName", VXPUConfig)}
 }
 
-func (_c *MockDeployer_GetSharedModeResourceName_Call) Run(run func(_a0 *config.Config)) *MockDeployer_GetSharedModeResourceName_Call {
+func (_c *MockDeployer_GetSharedModeResourceName_Call) Run(run func(VXPUConfig map[string]string)) *MockDeployer_GetSharedModeResourceName_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(*config.Config))
+		run(args[0].(map[string]string))
 	})
 	return _c
 }
@@ -702,7 +699,7 @@ func (_c *MockDeployer_GetSharedModeResourceName_Call) Return(_a0 string) *MockD
 	return _c
 }
 
-func (_c *MockDeployer_GetSharedModeResourceName_Call) RunAndReturn(run func(*config.Config) string) *MockDeployer_GetSharedModeResourceName_Call {
+func (_c *MockDeployer_GetSharedModeResourceName_Call) RunAndReturn(run func(map[string]string) string) *MockDeployer_GetSharedModeResourceName_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -886,17 +883,17 @@ func (_c *MockDeployer_InstanceLogs_Call) RunAndReturn(run func(context.Context,
 	return _c
 }
 
-// IsDefaultScheduler provides a mock function with no fields
-func (_m *MockDeployer) IsDefaultScheduler() bool {
-	ret := _m.Called()
+// IsDefaultScheduler provides a mock function with given fields: VXPUConfig
+func (_m *MockDeployer) IsDefaultScheduler(VXPUConfig map[string]string) bool {
+	ret := _m.Called(VXPUConfig)
 
 	if len(ret) == 0 {
 		panic("no return value specified for IsDefaultScheduler")
 	}
 
 	var r0 bool
-	if rf, ok := ret.Get(0).(func() bool); ok {
-		r0 = rf()
+	if rf, ok := ret.Get(0).(func(map[string]string) bool); ok {
+		r0 = rf(VXPUConfig)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
@@ -910,13 +907,14 @@ type MockDeployer_IsDefaultScheduler_Call struct {
 }
 
 // IsDefaultScheduler is a helper method to define mock.On call
-func (_e *MockDeployer_Expecter) IsDefaultScheduler() *MockDeployer_IsDefaultScheduler_Call {
-	return &MockDeployer_IsDefaultScheduler_Call{Call: _e.mock.On("IsDefaultScheduler")}
+//   - VXPUConfig map[string]string
+func (_e *MockDeployer_Expecter) IsDefaultScheduler(VXPUConfig interface{}) *MockDeployer_IsDefaultScheduler_Call {
+	return &MockDeployer_IsDefaultScheduler_Call{Call: _e.mock.On("IsDefaultScheduler", VXPUConfig)}
 }
 
-func (_c *MockDeployer_IsDefaultScheduler_Call) Run(run func()) *MockDeployer_IsDefaultScheduler_Call {
+func (_c *MockDeployer_IsDefaultScheduler_Call) Run(run func(VXPUConfig map[string]string)) *MockDeployer_IsDefaultScheduler_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run()
+		run(args[0].(map[string]string))
 	})
 	return _c
 }
@@ -926,7 +924,7 @@ func (_c *MockDeployer_IsDefaultScheduler_Call) Return(_a0 bool) *MockDeployer_I
 	return _c
 }
 
-func (_c *MockDeployer_IsDefaultScheduler_Call) RunAndReturn(run func() bool) *MockDeployer_IsDefaultScheduler_Call {
+func (_c *MockDeployer_IsDefaultScheduler_Call) RunAndReturn(run func(map[string]string) bool) *MockDeployer_IsDefaultScheduler_Call {
 	_c.Call.Return(run)
 	return _c
 }

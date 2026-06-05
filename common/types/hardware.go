@@ -10,6 +10,7 @@ const (
 	UnAvailableTypeInvalidMemorySize    ResourceReasonType = "invalid_memory_size"
 	UnAvailableTypeInvalidXPUNum        ResourceReasonType = "invalid_xpu_num"
 	UnAvailableTypeInvalidXPUMemorySize ResourceReasonType = "invalid_xpu_memory_size"
+	UnAvailableTypeInvalidXPUMemoryLoss ResourceReasonType = "invalid_xpu_memory_loss"
 	UnAvailableTypeInsufficientCPU      ResourceReasonType = "insufficient_cpu"
 	UnAvailableTypeInsufficientMemory   ResourceReasonType = "insufficient_memory"
 	UnAvailableTypeInsufficientXPU      ResourceReasonType = "insufficient_xpu"

@@ -120,6 +120,8 @@ func TestActivities_createBuildRequest(t *testing.T) {
 		},
 	}, nil)
 
+	tester.mockClusterStore.EXPECT().ByClusterID(tester.ctx, task.Deploy.ClusterID).Return(database.ClusterInfo{}, nil)
+
 	tester.mockGitServer.EXPECT().GetRepoLastCommit(tester.ctx, gitserver.GetRepoLastCommitReq{
 		RepoType:  types.RepositoryType(repoInfo.RepoType),
 		Namespace: "org",
@@ -461,6 +463,8 @@ func TestBuildFailed(t *testing.T) {
 		User:   &database.User{},
 	}, nil)
 
+	tester.mockClusterStore.EXPECT().ByClusterID(mock.Anything, mock.Anything).Return(database.ClusterInfo{}, nil)
+
 	tester.mockGitServer.EXPECT().GetRepoLastCommit(mock.Anything, mock.Anything).Return(&types.Commit{}, nil)
 	tester.mockDeployTaskStore.EXPECT().UpdateDeployTask(mock.Anything, mock.Anything).Return(nil).Maybe()
 	tester.mockDeployTaskStore.EXPECT().GetLastTaskByType(mock.Anything, mock.Anything, mock.Anything).Return(buildTask, nil)
@@ -572,6 +576,7 @@ func TestDeploy(t *testing.T) {
 			Name: "node1",
 		},
 	}, nil)
+	tester.mockClusterStore.EXPECT().ByClusterID(mock.Anything, mock.Anything).Return(database.ClusterInfo{}, nil)
 
 	err := tester.activities.Deploy(tester.ctx, runTask.ID)
 

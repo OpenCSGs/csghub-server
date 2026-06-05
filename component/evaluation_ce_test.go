@@ -54,7 +54,7 @@ func TestEvaluationComponent_CreateEvaluation(t *testing.T) {
 		Token:    "foo",
 		Nodes:    []types.Node{{Name: "node1", EnableVXPU: false}},
 	}
-	t.Run("create evaluation without resource id", func(t *testing.T) {
+t.Run("create evaluation without resource id", func(t *testing.T) {
 		c := initializeTestEvaluationComponent(ctx, t)
 		c.config.Argo.QuotaGPUNumber = "1"
 		c.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, req.Username).Return(database.User{
@@ -71,37 +71,22 @@ func TestEvaluationComponent_CreateEvaluation(t *testing.T) {
 				},
 			}, nil,
 		).Maybe()
-		c.mocks.stores.RuntimeFrameworkMock().EXPECT().FindEnabledByID(ctx, int64(1)).Return(&database.RuntimeFramework{
-			ID:          1,
-			FrameImage:  "lm-evaluation-harness:0.4.6",
-			ComputeType: string(types.ResourceTypeGPU),
-		}, nil)
-		c.mocks.stores.AccessTokenMock().EXPECT().FindByUID(ctx, int64(1)).Return(&database.AccessToken{Token: "foo"}, nil)
 		c.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.DatasetRepo, "opencsg", "hellaswag").Return(&database.Repository{
 			ID:            1,
 			DefaultBranch: "main",
 			HFPath:        "Rowan/hellaswag",
 		}, nil)
-		req2.ResourceName = "1 GPU · 4 vCPU · 32Gi"
-		c.mocks.deployer.EXPECT().GetSharedModeResourceName(mock.Anything).Return("nvidia.com/gpu").Maybe()
-		c.mocks.deployer.EXPECT().SubmitEvaluation(ctx, req2).Return(&types.ArgoWorkFlowRes{
-			ID:       1,
-			TaskName: "test",
-		}, nil)
-		req.ResourceName = "1 GPU · 4 vCPU · 32Gi"
-
-		c.mocks.stores.ClusterInfoMock().EXPECT().FindNodeByClusterID(ctx, req.ClusterID).Return([]database.ClusterNode{
-			{
-				Name: "node1",
-			},
+		c.mocks.stores.AccessTokenMock().EXPECT().FindByUID(ctx, int64(1)).Return(&database.AccessToken{Token: "foo"}, nil)
+		c.mocks.stores.RuntimeFrameworkMock().EXPECT().FindEnabledByID(ctx, int64(1)).Return(&database.RuntimeFramework{
+			ID:          1,
+			FrameImage:  "lm-evaluation-harness:0.4.6",
+			ComputeType: string(types.ResourceTypeGPU),
 		}, nil)
 
 		e, err := c.CreateEvaluation(ctx, req)
-		require.NotNil(t, e)
-		require.Equal(t, "test", e.TaskName)
-		require.Nil(t, err)
-		req2.ResourceName = ""
-		req.ResourceName = ""
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "share mode is deprecated")
+		require.Nil(t, e)
 	})
 	t.Run("create evaluation with resource id", func(t *testing.T) {
 		req.ResourceId = 1
@@ -135,22 +120,23 @@ func TestEvaluationComponent_CreateEvaluation(t *testing.T) {
 		}, nil)
 		resource, err := json.Marshal(req2.Hardware)
 		require.Nil(t, err)
-		c.mocks.components.repo.EXPECT().CheckAccountAndResource(ctx, "test", "", int64(0), mock.Anything).Return(&types.CheckExclusiveResp{}, nil)
-		c.mocks.stores.SpaceResourceMock().EXPECT().FindByID(ctx, int64(1)).Return(&database.SpaceResource{
+c.mocks.stores.SpaceResourceMock().EXPECT().FindByID(ctx, int64(1)).Return(&database.SpaceResource{
 			ID:        1,
+			Name:      "1 GPU · 4 vCPU · 32Gi",
 			Resources: string(resource),
+			ClusterID: "c1",
 		}, nil)
-		c.mocks.deployer.EXPECT().GetSharedModeResourceName(mock.Anything).Return("nvidia.com/gpu").Maybe()
-		c.mocks.deployer.EXPECT().SubmitEvaluation(ctx, req2).Return(&types.ArgoWorkFlowRes{
-			ID:       1,
-			TaskName: "test",
-		}, nil)
-		req.ResourceName = "1 GPU · 4 vCPU · 32Gi"
-
-		c.mocks.stores.ClusterInfoMock().EXPECT().FindNodeByClusterID(ctx, req.ClusterID).Return([]database.ClusterNode{
+		c.mocks.components.repo.EXPECT().CheckAccountAndResource(ctx, "test", "c1", int64(0), mock.Anything).Return(&types.CheckExclusiveResp{}, nil)
+		c.mocks.stores.ClusterInfoMock().EXPECT().FindNodeByClusterID(ctx, "c1").Return([]database.ClusterNode{
 			{
 				Name: "node1",
 			},
+		}, nil)
+		c.mocks.deployer.EXPECT().SubmitEvaluation(ctx, mock.MatchedBy(func(r types.EvaluationReq) bool {
+			return r.ResourceName == "1 GPU · 4 vCPU · 32Gi" && r.ClusterID == "c1"
+		})).Return(&types.ArgoWorkFlowRes{
+			ID:       1,
+			TaskName: "test",
 		}, nil)
 
 		e, err := c.CreateEvaluation(ctx, req)
@@ -322,22 +308,11 @@ func TestEvaluationComponent_CreateEvaluation(t *testing.T) {
 			FrameImage:  "lm-evaluation-harness:0.4.6",
 			ComputeType: string(types.ResourceTypeGPU),
 		}, nil)
-		c.mocks.stores.ClusterInfoMock().EXPECT().FindNodeByClusterID(ctx, "").Return([]database.ClusterNode{
-			{Name: "node1"},
-		}, nil)
-		c.mocks.deployer.EXPECT().GetSharedModeResourceName(mock.Anything).Return("nvidia.com/gpu").Maybe()
-		c.mocks.components.repo.EXPECT().GetNamespaceBillingUUID(ctx, "org1").Return("org-uuid-123", nil)
-		c.mocks.deployer.EXPECT().SubmitEvaluation(ctx, mock.MatchedBy(func(req types.EvaluationReq) bool {
-			return req.UserUUID == "org-uuid-123" && req.Username == "org1"
-		})).Return(&types.ArgoWorkFlowRes{
-			ID:       1,
-			TaskName: "org-eval",
-		}, nil)
 
 		e, err := c.CreateEvaluation(ctx, orgReq)
-		require.Nil(t, err)
-		require.NotNil(t, e)
-		require.Equal(t, "org-eval", e.TaskName)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "share mode is deprecated")
+		require.Nil(t, e)
 	})
 }
 

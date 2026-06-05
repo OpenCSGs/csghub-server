@@ -1477,7 +1477,7 @@ func createClusterRoutes(apiGroup *gin.RouterGroup, adminGrp *gin.RouterGroup, m
 	// cluster infos
 	clusterHandler, err := handler.NewClusterHandler(config)
 	if err != nil {
-		return fmt.Errorf("fail to creating cluster handler: %w", err)
+		return fmt.Errorf("failed to creating cluster handler: %w", err)
 	}
 	clusterGrp := apiGroup.Group("/cluster")
 	{

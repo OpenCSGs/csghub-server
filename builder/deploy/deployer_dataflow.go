@@ -4,10 +4,16 @@ import (
 	"context"
 	"fmt"
 
+	"opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/common/types"
 )
 
 func (d *deployer) CreateDataflowJob(ctx context.Context, req *types.DataflowCreateReq) (*types.DataflowArgoJobResp, error) {
+	cluster, err := d.clusterStore.ByClusterID(ctx, req.ClusterID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get cluster %s for dataflow job, error: %w", req.ClusterID, err)
+	}
+
 	runnerReq := &types.DataflowArgoJobReq{
 		ID:           req.ID,
 		ClusterID:    req.ClusterID,
@@ -29,7 +35,7 @@ func (d *deployer) CreateDataflowJob(ctx context.Context, req *types.DataflowCre
 		AccessToken: req.AccessToken,
 		// extra
 		Nodes:     req.Nodes,
-		Scheduler: d.kubeScheduler,
+		Scheduler: common.GenerateScheduler(cluster.VXPUConfig),
 		DeployExtend: types.DeployExtend{
 			NodeAffinity: req.NodeAffinity,
 			Tolerations:  req.Tolerations,

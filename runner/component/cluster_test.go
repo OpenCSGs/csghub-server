@@ -35,7 +35,7 @@ func TestClusterComponent_ByClusterID_Success(t *testing.T) {
 	clusterStore.EXPECT().ByClusterID(mock.Anything, "test-cluster-id").Return(expectedClusterInfo, nil)
 
 	clusterComponent := &clusterComponentImpl{
-		env:          &config.Config{},
+		cfg:          &config.Config{},
 		clusterStore: clusterStore,
 		clusterPool:  pool,
 	}
@@ -54,7 +54,7 @@ func TestClusterComponent_ByClusterID_Error(t *testing.T) {
 	clusterStore.EXPECT().ByClusterID(mock.Anything, "test-cluster-id").Return(database.ClusterInfo{}, fmt.Errorf("cluster not found"))
 
 	clusterComponent := &clusterComponentImpl{
-		env:          &config.Config{},
+		cfg:          &config.Config{},
 		clusterStore: clusterStore,
 		clusterPool:  pool,
 	}
@@ -85,7 +85,7 @@ func TestClusterComponent_GetResourceByID_Success(t *testing.T) {
 	pool.EXPECT().GetClusterByID(mock.Anything, "test-cluster-id").Return(testCluster, nil)
 
 	clusterComponent := &clusterComponentImpl{
-		env:          &config.Config{},
+		cfg:          &config.Config{},
 		clusterStore: mockdb.NewMockClusterInfoStore(t),
 		clusterPool:  pool,
 	}
@@ -104,7 +104,7 @@ func TestClusterComponent_GetResourceByID_NotFound(t *testing.T) {
 	pool.EXPECT().GetClusterByID(mock.Anything, "non-existent-id").Return(nil, fmt.Errorf("cluster not found"))
 
 	clusterComponent := &clusterComponentImpl{
-		env:          &config.Config{},
+		cfg:          &config.Config{},
 		clusterStore: mockdb.NewMockClusterInfoStore(t),
 		clusterPool:  pool,
 	}
@@ -149,7 +149,7 @@ func TestClusterComponent_collectResourceByID_Success(t *testing.T) {
 	pool.EXPECT().GetClusterByID(mock.Anything, "test-cluster-id").Return(testCluster, nil)
 
 	clusterComponent := &clusterComponentImpl{
-		env:          &config.Config{},
+		cfg:          &config.Config{},
 		clusterStore: clusterStore,
 		clusterPool:  pool,
 	}
@@ -174,7 +174,7 @@ func TestClusterComponent_collectResourceByID_GetClusterInfoError(t *testing.T) 
 	clusterStore.EXPECT().ByClusterID(mock.Anything, "test-cluster-id").Return(database.ClusterInfo{}, fmt.Errorf("database error"))
 
 	clusterComponent := &clusterComponentImpl{
-		env:          &config.Config{},
+		cfg:          &config.Config{},
 		clusterStore: clusterStore,
 		clusterPool:  pool,
 	}
@@ -205,7 +205,7 @@ func TestClusterComponent_collectResourceByID_GetResourceError(t *testing.T) {
 	pool.EXPECT().GetClusterByID(mock.Anything, "test-cluster-id").Return(nil, fmt.Errorf("cluster not found"))
 
 	clusterComponent := &clusterComponentImpl{
-		env:          &config.Config{},
+		cfg:          &config.Config{},
 		clusterStore: clusterStore,
 		clusterPool:  pool,
 	}
@@ -272,7 +272,7 @@ func TestClusterComponent_collectAllClusters_Success(t *testing.T) {
 	pool.EXPECT().GetClusterByID(mock.Anything, "cluster-2").Return(testCluster2, nil)
 
 	clusterComponent := &clusterComponentImpl{
-		env:          &config.Config{},
+		cfg:          &config.Config{},
 		clusterStore: clusterStore,
 		clusterPool:  pool,
 	}
@@ -330,7 +330,7 @@ func TestClusterComponent_collectAllClusters_ErrorContinue(t *testing.T) {
 	// pool.EXPECT().GetClusterByID(mock.Anything, "cluster-2").Return(nil, fmt.Errorf("not found"))
 
 	clusterComponent := &clusterComponentImpl{
-		env:          &config.Config{},
+		cfg:          &config.Config{},
 		clusterStore: clusterStore,
 		clusterPool:  pool,
 	}

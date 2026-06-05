@@ -42,7 +42,6 @@ type deployer struct {
 	lokiClient            sender.LogSender
 	logReporter           reporter.LogCollector
 	config                *config.Config
-	kubeScheduler         *types.Scheduler
 }
 
 func newDeployer(ib imagebuilder.Builder, ir imagerunner.Runner, c common.DeployConfig, logReporter reporter.LogCollector, config *config.Config, startJobs bool) (*deployer, error) {
@@ -71,7 +70,6 @@ func newDeployer(ib imagebuilder.Builder, ir imagerunner.Runner, c common.Deploy
 		logReporter:           logReporter,
 		argoWorkflowStore:     database.NewArgoWorkFlowStore(),
 		config:                config,
-		kubeScheduler:         common.GenerateScheduler(c),
 	}
 	if startJobs {
 		d.startJobs()
@@ -99,7 +97,8 @@ func (d *deployer) startAccounting() {
 	go d.startAcctMetering()
 }
 
-func checkNodeResource(node types.NodeResourceInfo, hardware *types.HardWare, config *config.Config) types.ResourceAvailableStatus {
+func checkNodeResource(node types.NodeResourceInfo, hardware *types.HardWare,
+	config *config.Config, VXPUConfig map[string]string) types.ResourceAvailableStatus {
 	if !config.Cluster.AllowCPUResScheduleToGPUNode && isCPUOnlyWorkload(hardware) && isXPUNode(node) {
 		return types.ResourceAvailableStatus{
 			Available: false,
@@ -111,7 +110,10 @@ func checkNodeResource(node types.NodeResourceInfo, hardware *types.HardWare, co
 	if hardware.Cpu.Num != "" {
 		requestedCPU, err := resource.ParseQuantity(hardware.Cpu.Num)
 		if err != nil {
-			slog.Error("failed to parse hardware cpu num", slog.String("cpu", hardware.Cpu.Num), slog.Any("error", err))
+			slog.Error("check node resource - failed to parse hardware cpu num",
+				slog.String("cpu", hardware.Cpu.Num),
+				slog.Any("error", err),
+				slog.Any("NodeName", node.NodeName))
 			return types.ResourceAvailableStatus{
 				Available: false,
 				NodeName:  node.NodeName,
@@ -133,7 +135,10 @@ func checkNodeResource(node types.NodeResourceInfo, hardware *types.HardWare, co
 		// use resource.ParseQuantity parse "2Gi", "1024M" ...
 		requestedMemory, err := resource.ParseQuantity(hardware.Memory)
 		if err != nil {
-			slog.Error("failed to parse hardware memory", slog.String("memory", hardware.Memory), slog.Any("error", err))
+			slog.Error("check node resource - failed to parse hardware memory",
+				slog.String("memory", hardware.Memory),
+				slog.Any("error", err),
+				slog.Any("NodeName", node.NodeName))
 			return types.ResourceAvailableStatus{
 				Available: false,
 				NodeName:  node.NodeName,
@@ -144,9 +149,10 @@ func checkNodeResource(node types.NodeResourceInfo, hardware *types.HardWare, co
 		requestedMemoryGiB := float32(requestedMemory.Value()) / (1024 * 1024 * 1024)
 
 		if requestedMemoryGiB > node.AvailableMem {
-			slog.Warn("insufficient memory resources",
+			slog.Warn("check node resource - insufficient memory resources",
 				slog.Any("requestedGiB", requestedMemoryGiB),
-				slog.Any("availableGiB", node.AvailableMem))
+				slog.Any("availableGiB", node.AvailableMem),
+				slog.Any("NodeName", node.NodeName))
 			return types.ResourceAvailableStatus{
 				Available: false,
 				NodeName:  node.NodeName,
@@ -156,16 +162,32 @@ func checkNodeResource(node types.NodeResourceInfo, hardware *types.HardWare, co
 	}
 
 	if hardware.Gpu.Num != "" {
+		if hardware.Gpu.Type != node.XPUModel {
+			slog.Warn("check node resource - incorrect node xpu type",
+				slog.String("node name", node.NodeName),
+				slog.Any("requested xpu type", hardware.Gpu.Type),
+				slog.Any("xpu model of node", node.XPUModel),
+				slog.Any("hardware", hardware))
+			return types.ResourceAvailableStatus{
+				Available: false,
+				NodeName:  node.NodeName,
+				Reason:    types.UnAvailableTypeInvalidXPUType,
+			}
+		}
+
 		gpu, err := strconv.Atoi(hardware.Gpu.Num)
 		if err != nil {
-			slog.Error("failed to parse hardware gpu ", slog.Any("error", err))
+			slog.Error("check node resource - failed to parse hardware gpu num",
+				slog.String("gpu", hardware.Gpu.Num),
+				slog.Any("error", err),
+				slog.Any("NodeName", node.NodeName))
 			return types.ResourceAvailableStatus{
 				Available: false,
 				NodeName:  node.NodeName,
 				Reason:    types.UnAvailableTypeInvalidXPUNum,
 			}
 		}
-		if gpu > int(node.AvailableXPU) || hardware.Gpu.Type != node.XPUModel {
+		if gpu > int(node.AvailableXPU) {
 			return types.ResourceAvailableStatus{
 				Available: false,
 				NodeName:  node.NodeName,

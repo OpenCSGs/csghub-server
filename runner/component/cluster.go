@@ -15,7 +15,7 @@ import (
 )
 
 type clusterComponentImpl struct {
-	env          *config.Config
+	cfg          *config.Config
 	clusterStore database.ClusterInfoStore
 	clusterPool  cluster.Pool
 }
@@ -28,7 +28,7 @@ type ClusterComponent interface {
 
 func NewClusterComponent(config *config.Config, clusterPool cluster.Pool) ClusterComponent {
 	sc := &clusterComponentImpl{
-		env:          config,
+		cfg:          config,
 		clusterStore: database.NewClusterInfoStore(),
 		clusterPool:  clusterPool,
 	}
@@ -61,7 +61,7 @@ func (s *clusterComponentImpl) initCluster() {
 					},
 					Data: data,
 				}
-				err := rcommon.Push(s.env.Runner.WebHookEndpoint, s.env.APIToken, event)
+				err := rcommon.Push(s.cfg.Runner.WebHookEndpoint, s.cfg.APIToken, event)
 				if err != nil {
 					slog.Error("failed to push cluster create event during start runner", slog.Any("error", err), slog.Any("event", event))
 				}
@@ -72,20 +72,20 @@ func (s *clusterComponentImpl) initCluster() {
 		go func(c *cluster.Cluster) {
 			watcher := &clusterWatcher{
 				cluster: c,
-				env:     s.env,
+				env:     s.cfg,
 			}
 			configmapWatch, err := rcommon.NewConfigmapWatcher(
 				watcher.cluster.Client,
 				watcher,
-				s.env)
+				s.cfg)
 			if err != nil {
 				slog.Error("failed to create configmap watcher", slog.String("cluster", c.CID), slog.Any("error", err))
 				return
 			}
 			slog.Info("start watching configmap",
 				slog.String("cluster", c.CID), slog.Any("cluster_mode", c.ConnectMode),
-				slog.String("namespace", s.env.Runner.RunnerNamespace),
-				slog.String("configmap_name", s.env.Runner.WatchConfigmapName))
+				slog.String("namespace", s.cfg.Runner.RunnerNamespace),
+				slog.String("configmap_name", s.cfg.Runner.WatchConfigmapName))
 			configmapWatch.Watch(context.Background())
 		}(c)
 	}
@@ -100,7 +100,7 @@ func (c *clusterComponentImpl) GetResourceByID(ctx context.Context, clusterId st
 	if err != nil {
 		return "", nil, fmt.Errorf("failed to find cluster, error: %w", err)
 	}
-	return client.GetResourceAvailability(c.env)
+	return client.GetResourceAvailability(c.cfg)
 }
 
 func (c *clusterComponentImpl) heartBeat() {
@@ -111,7 +111,7 @@ func (c *clusterComponentImpl) heartBeat() {
 			c.pushHeartBeatEvent()
 		}
 		escapedTime := time.Now().Unix() - startTime
-		sleepTime := int64(c.env.Runner.HearBeatIntervalInSec) - escapedTime
+		sleepTime := int64(c.cfg.Runner.HearBeatIntervalInSec) - escapedTime
 		sleepTime = int64(math.Max(1, float64(sleepTime)))
 		time.Sleep(time.Duration(sleepTime) * time.Second)
 	}
@@ -119,7 +119,7 @@ func (c *clusterComponentImpl) heartBeat() {
 
 func (c *clusterComponentImpl) pushHeartBeatEvent() {
 	ctx, cancel := context.WithTimeout(context.Background(),
-		time.Duration(c.env.Runner.HearBeatIntervalInSec)*time.Second)
+		time.Duration(c.cfg.Runner.HearBeatIntervalInSec)*time.Second)
 	defer cancel()
 
 	clusterResArray := c.collectAllClusters(ctx)
@@ -133,15 +133,15 @@ func (c *clusterComponentImpl) pushHeartBeatEvent() {
 		Data: clusterResArray,
 	}
 
-	err := rcommon.Push(c.env.Runner.WebHookEndpoint, c.env.APIToken, event)
+	err := rcommon.Push(c.cfg.Runner.WebHookEndpoint, c.cfg.APIToken, event)
 	slog.InfoContext(ctx, "push cluster heart beat event", slog.Any("len(clusters)", len(clusterResArray)))
 	if err != nil {
 		slog.Error("failed to report cluster heartbeat resource event",
 			slog.Any("error", err),
 			slog.Any("event", event),
-			slog.Any("HearBeatIntervalInSec", c.env.Runner.HearBeatIntervalInSec))
+			slog.Any("HearBeatIntervalInSec", c.cfg.Runner.HearBeatIntervalInSec))
 	} else {
-		go rcommon.PushCachedFailedEvents(c.env.Runner.WebHookEndpoint, c.env.APIToken)
+		go rcommon.PushCachedFailedEvents(c.cfg.Runner.WebHookEndpoint, c.cfg.APIToken)
 	}
 	slog.DebugContext(ctx, "heartbeat_event_sent", slog.Any("event_body", event.Data))
 }
@@ -180,5 +180,13 @@ func (c *clusterComponentImpl) collectResourceByID(ctx context.Context, clusterI
 		clusterInfo.Resources = append(clusterInfo.Resources, v)
 	}
 	clusterInfo.ResourceStatus = availabilityStatus
+	clusterInfo.VXPUConfig = map[string]string{
+		types.ClusterCFGKubeSchedulerKey:        c.cfg.Runner.KubeScheduler,
+		types.ClusterCFGVolcanoQueueKey:         c.cfg.Runner.Volcano.Queue,
+		types.ClusterCFGVGPUNodeResourceNameKey: c.cfg.Runner.VGPUNodeResourceName,
+		types.ClusterCFGVGPUPodResourceNameKey:  c.cfg.Runner.VGPUPodResourceName,
+		types.ClusterCFGVGPUResourceReqKey:      c.cfg.Runner.VGPUResourceReqKey,
+		types.ClusterCFGVGPUMemoryReqKey:        c.cfg.Runner.VGPUMemoryReqKey,
+	}
 	return &clusterInfo, nil
 }

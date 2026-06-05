@@ -34,6 +34,7 @@ func (d *deployer) GetClusterById(ctx context.Context, clusterId string) (*types
 		ResourceStatus: clusterRes.ResourceStatus,
 		Status:         types.ClusterStatusRunning,
 		NodeNumber:     len(resources),
+		VXPUConfig:     clusterRes.VXPUConfig,
 	}
 	for _, node := range result.Resources {
 		result.TotalCPU += node.TotalCPU                  // cpu
@@ -96,7 +97,8 @@ func (d *deployer) CheckResourceAvailable(ctx context.Context, clusterId string,
 	}
 
 	available, availableStatusList := CheckResource(clusterResources, hardWare, d.config)
-	if d.IsDefaultScheduler() && clusterResources.ResourceStatus == types.StatusUncertain {
+	isDefaultScheduler := d.IsDefaultScheduler(clusterResources.VXPUConfig)
+	if isDefaultScheduler && clusterResources.ResourceStatus == types.StatusUncertain {
 		err := fmt.Errorf("resource status on cluster %s is uncertain, cannot verify resource availability. Please ensure ClusterRole permissions or ResourceQuota is configured",
 			clusterId)
 		return false, availableStatusList, errorx.ResourceStatusUncertain(err, errorx.Ctx().
@@ -104,7 +106,7 @@ func (d *deployer) CheckResourceAvailable(ctx context.Context, clusterId string,
 			Set("region", clusterResources.Region))
 	}
 
-	if d.IsDefaultScheduler() && !available {
+	if isDefaultScheduler && !available {
 		err := fmt.Errorf("required resource on cluster %s is not enough with resource status %s",
 			clusterId, clusterResources.ResourceStatus)
 		return false, availableStatusList, errorx.NotEnoughResource(err, errorx.Ctx().
@@ -136,7 +138,7 @@ func CheckResource(clusterResources *types.ClusterRes, hardware *types.HardWare,
 func checkSingleNodeResource(clusterResources *types.ClusterRes, hardware *types.HardWare, config *config.Config) (bool, []types.ResourceAvailableStatus) {
 	var availableStatusList []types.ResourceAvailableStatus
 	for _, node := range clusterResources.Resources {
-		availableStatus := checkNodeResource(node, hardware, config)
+		availableStatus := checkNodeResource(node, hardware, config, clusterResources.VXPUConfig)
 		availableStatusList = append(availableStatusList, availableStatus)
 		if availableStatus.Available {
 			// if true return, otherwise continue check next node
@@ -150,7 +152,7 @@ func checkMultiNodeResource(clusterResources *types.ClusterRes, hardware *types.
 	var availableStatusList []types.ResourceAvailableStatus
 	ready := 0
 	for _, node := range clusterResources.Resources {
-		availableStatus := checkNodeResource(node, hardware, config)
+		availableStatus := checkNodeResource(node, hardware, config, clusterResources.VXPUConfig)
 		availableStatusList = append(availableStatusList, availableStatus)
 		if availableStatus.Available {
 			ready++

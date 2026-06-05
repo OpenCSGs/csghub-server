@@ -156,17 +156,18 @@ func (c *finetuneComponentImpl) CreateFinetuneJob(ctx context.Context, req types
 		req.ClusterID = resource.ClusterID
 		req.ResourceName = resource.Name
 	} else {
-		// for share mode
-		resource := ""
-		if frame.ComputeType == string(types.ResourceTypeGPU) {
-			hardware.Gpu.Num = c.config.Argo.QuotaGPUNumber
-			hardware.Gpu.ResourceName = c.deployer.GetSharedModeResourceName(c.config)
-			resource = fmt.Sprintf("%s GPU · ", c.config.Argo.QuotaGPUNumber)
-		}
-		hardware.Cpu.Num = "4"
-		hardware.Memory = "32Gi"
-		resource = fmt.Sprintf("%s%s vCPU · %s", resource, hardware.Cpu.Num, hardware.Memory)
-		req.ResourceName = resource
+		// Deprecated for share mode
+		return nil, fmt.Errorf("share mode is deprecated.")
+		// resource := ""
+		// if frame.ComputeType == string(types.ResourceTypeGPU) {
+		// 	hardware.Gpu.Num = c.config.Argo.QuotaGPUNumber
+		// 	hardware.Gpu.ResourceName = c.deployer.GetSharedModeResourceName(c.config)
+		// 	resource = fmt.Sprintf("%s GPU · ", c.config.Argo.QuotaGPUNumber)
+		// }
+		// hardware.Cpu.Num = "4"
+		// hardware.Memory = "32Gi"
+		// resource = fmt.Sprintf("%s%s vCPU · %s", resource, hardware.Cpu.Num, hardware.Memory)
+		// req.ResourceName = resource
 	}
 
 	req.Hardware = hardware

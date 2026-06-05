@@ -488,6 +488,11 @@ func (a *DeployActivity) reportLog(message string, step types.Step, task *databa
 
 // createBuildRequest
 func (a *DeployActivity) createBuildRequest(ctx context.Context, task *database.DeployTask, repoInfo common.RepoInfo) (*types.ImageBuilderRequest, error) {
+	cluster, err := a.cls.ByClusterID(ctx, task.Deploy.ClusterID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get cluster %s for build deploy task %d, error: %w", task.Deploy.ClusterID, task.ID, err)
+	}
+
 	accessToken, err := a.ts.FindByUID(ctx, task.Deploy.UserID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get git access for user id %d error: %w", task.Deploy.UserID, err)
@@ -527,13 +532,18 @@ func (a *DeployActivity) createBuildRequest(ctx context.Context, task *database.
 		LastCommitID:   lastCommit.ID,
 		TaskId:         task.ID,
 		RepoId:         repoInfo.RepoID,
-		Scheduler:      common.GenerateScheduler(a.cfg),
+		Scheduler:      common.GenerateScheduler(cluster.VXPUConfig),
 	}, nil
 }
 
 // createDeployRequest
 func (a *DeployActivity) createDeployRequest(ctx context.Context, task *database.DeployTask, repoInfo common.RepoInfo) (*types.RunRequest, error) {
 	logger := a.getLogger(ctx)
+
+	cluster, err := a.cls.ByClusterID(ctx, task.Deploy.ClusterID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get cluster %s for deploy task %d, error: %w", task.Deploy.ClusterID, task.ID, err)
+	}
 
 	accessToken, err := a.ts.FindByUID(ctx, task.Deploy.UserID)
 	if err != nil {
@@ -639,7 +649,7 @@ func (a *DeployActivity) createDeployRequest(ctx context.Context, task *database
 		OrderDetailID: deployInfo.OrderDetailID,
 		TaskId:        task.ID,
 		Nodes:         requestNodes,
-		Scheduler:     common.GenerateScheduler(a.cfg),
+		Scheduler:     common.GenerateScheduler(cluster.VXPUConfig),
 		DeployExtend: types.DeployExtend{
 			NodeAffinity: deployInfo.NodeAffinity,
 			Tolerations:  deployInfo.Tolerations,
