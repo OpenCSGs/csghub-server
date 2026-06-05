@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	commontypes "opencsg.com/csghub-server/common/types"
@@ -120,4 +121,24 @@ func TestSessionKeyDigest(t *testing.T) {
 	require.NotEmpty(t, digest1)
 	require.Equal(t, digest1, digest2)
 	require.NotEqual(t, digest1, digest3)
+}
+
+func TestRetryWriterTTFTMs(t *testing.T) {
+	startTime := time.Now()
+
+	// Test nil writer
+	require.Equal(t, int64(0), retryWriterTTFTMs(nil, startTime))
+
+	// Test writer with zero firstWriteAt
+	downstream := newTestRetryResponseWriter()
+	writer := newChatRetryResponseWriter(downstream)
+	require.Equal(t, int64(0), retryWriterTTFTMs(writer, startTime))
+
+	// Test writer with firstWriteAt
+	time.Sleep(10 * time.Millisecond) // Add a small delay to ensure TTFT > 0
+	_, err := writer.Write([]byte("first token"))
+	require.NoError(t, err)
+	ttftMs := retryWriterTTFTMs(writer, startTime)
+	require.Greater(t, ttftMs, int64(0))
+	require.Less(t, ttftMs, int64(1000)) // Should be less than 1 second
 }
