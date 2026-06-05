@@ -87,19 +87,23 @@ const (
 	EntryFileNginx      = "nginx.conf"
 	EntryFileDockerfile = "Dockerfile"
 
-	TextGeneration     PipelineTask    = "text-generation"
-	Text2Image         PipelineTask    = "text-to-image"
-	Text2Video         PipelineTask    = "text-to-video"
-	Image2Video        PipelineTask    = "image-to-video"
-	ImageText2Text     PipelineTask    = "image-text-to-text"
-	FeatureExtraction  PipelineTask    = "feature-extraction"
-	SentenceSimilarity PipelineTask    = "sentence-similarity"
-	TaskAutoDetection  PipelineTask    = "task-auto-detection"
-	VideoText2Text     PipelineTask    = "video-text-to-text"
-	TextToSpeech       PipelineTask    = "text-to-speech"
-	LlamaCpp           InferenceEngine = "llama.cpp"
-	TEI                InferenceEngine = "tei"
-	Ktransformers      InferenceEngine = "ktransformers"
+	TextGeneration     PipelineTask = "text-generation"
+	Text2Image         PipelineTask = "text-to-image"
+	Text2Video         PipelineTask = "text-to-video"
+	Image2Video        PipelineTask = "image-to-video"
+	ImageText2Text     PipelineTask = "image-text-to-text"
+	FeatureExtraction  PipelineTask = "feature-extraction"
+	SentenceSimilarity PipelineTask = "sentence-similarity"
+	TaskAutoDetection  PipelineTask = "task-auto-detection"
+	VideoText2Text     PipelineTask = "video-text-to-text"
+	TextToSpeech       PipelineTask = "text-to-speech"
+	// AutomaticSpeechRecognition is the Hugging Face pipeline task name. Keep
+	// AutoSpeechRecognition as a legacy tag alias for existing seeded data.
+	AutomaticSpeechRecognition PipelineTask    = "automatic-speech-recognition"
+	AutoSpeechRecognition      PipelineTask    = "auto-speech-recognition"
+	LlamaCpp                   InferenceEngine = "llama.cpp"
+	TEI                        InferenceEngine = "tei"
+	Ktransformers              InferenceEngine = "ktransformers"
 
 	MaxFileTreeSize int = 500
 )

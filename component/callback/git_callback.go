@@ -608,6 +608,9 @@ func GetPipelineTaskFromTags(tags []database.Tag) types.PipelineTask {
 		if tag.Name == string(types.TextToSpeech) {
 			return types.TextToSpeech
 		}
+		if tag.Name == string(types.AutomaticSpeechRecognition) || tag.Name == string(types.AutoSpeechRecognition) {
+			return types.AutomaticSpeechRecognition
+		}
 	}
 	return ""
 }

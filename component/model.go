@@ -1473,6 +1473,9 @@ func GetBuiltInTaskFromTags(tags []database.Tag) string {
 		if tag.Name == string(types.TextToSpeech) {
 			return tag.Name
 		}
+		if tag.Name == string(types.AutomaticSpeechRecognition) || tag.Name == string(types.AutoSpeechRecognition) {
+			return string(types.AutomaticSpeechRecognition)
+		}
 	}
 	return string(types.TextGeneration)
 }

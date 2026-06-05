@@ -1,0 +1,31 @@
+{
+  "engine_name": "amd-funasr",
+  "enabled": 1,
+  "container_port": 8000,
+  "model_format": "pytorch",
+  "description": "FunASR OpenAI-compatible speech recognition service for ROCm",
+  "engine_images": [
+    {
+      "compute_type": "gpu",
+      "image": "opencsghq/funasr-rocm:1.3.9",
+      "driver_version": "7.2.2",
+      "engine_version": "1.3.9"
+    }
+  ],
+  "supported_archs": [
+    "Qwen3ASRForConditionalGeneration",
+    "GlmAsrForConditionalGeneration",
+    "WhisperForConditionalGeneration"
+  ],
+  "supported_models": [
+    "SenseVoiceSmall",
+    "Fun-ASR-Nano-2512",
+    "GLM-ASR-Nano-2512",
+    "Whisper-large-v3",
+    "Whisper-large-v3-turbo",
+    "Qwen3-ASR-0.6B",
+    "Qwen3-ASR-1.7B",
+    "Paraformer-zh",
+    "Paraformer-zh-streaming"
+  ]
+}

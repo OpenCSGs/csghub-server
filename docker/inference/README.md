@@ -71,6 +71,26 @@ docker buildx build --platform linux/amd64,linux/arm64 \
   -t ${OPENCSG_ACR}/opencsghq/hf-inference-toolkit:latest \
   -f Dockerfile.hf-inference-toolkit \
   --push .
+# For FunASR CUDA: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/funasr:cuda12.8
+export IMAGE_TAG=cuda12.8
+docker buildx build --platform linux/amd64 \
+  -t ${OPENCSG_ACR}/opencsghq/funasr:${IMAGE_TAG} \
+  -t ${OPENCSG_ACR}/opencsghq/funasr:latest \
+  -f Dockerfile.funasr \
+  --push .
+# For FunASR ROCm: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/funasr-rocm:rocm7.2.2
+export IMAGE_TAG=rocm7.2.2
+docker buildx build --platform linux/amd64 \
+  -t ${OPENCSG_ACR}/opencsghq/funasr-rocm:${IMAGE_TAG} \
+  -t ${OPENCSG_ACR}/opencsghq/funasr-rocm:latest \
+  -f Dockerfile.funasr-rocm \
+  --push .
+# For FunASR CPU: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/funasr-cpu:latest
+export IMAGE_TAG=latest
+docker buildx build --platform linux/amd64,linux/arm64 \
+  -t ${OPENCSG_ACR}/opencsghq/funasr-cpu:${IMAGE_TAG} \
+  -f Dockerfile.funasr-cpu \
+  --push .
 # For Text Embeddings Inference: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/tei:cpu-1.6
 export IMAGE_TAG=cpu-1.6
 docker buildx build --platform linux/amd64 \
@@ -132,8 +152,25 @@ docker run -d \
   --gpus device=7 \
   -p 8000:8000
   ${OPENCSG_ACR}/opencsghq/mindie:1.8-csg-1.0.RC2
+
+# Run FunASR CPU with a CSGHub model
+docker run --rm -it \
+  --name funasr-cpu-test \
+  -p 8000:8000 \
+  -e REPO_ID="AIWizards/FunAudioLLM_Fun-ASR-Nano-2512" \
+  -e REVISION="master" \
+  -e ACCESS_TOKEN="xxx" \
+  -e HF_ENDPOINT="https://opencsg-stg.com" \
+  opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/funasr-cpu:latest
+
+# Call FunASR OpenAI-compatible transcription API
+curl --max-time 600 -X POST http://127.0.0.1:8000/v1/audio/transcriptions \
+  -F "file=@/path/to/audio.mp3" \
+  -F "model=local" \
+  -F "response_format=text"
 ```
 *Note: HF_ENDPOINT should be use the real csghub address.*
+*Note: FunASR downloads `REPO_ID` to `/workspace/${REPO_ID}` and preloads that local model at startup. The OpenAI-compatible `model` field can use `local`, the repo id, or the repo name.*
 
 ## inference image name, version and cuda version
 | Task| Image Name | Version | CUDA Version | Fix
@@ -144,6 +181,9 @@ docker run -d \
 |text generation| tgi | 2.2 | 12.1 |- |
 |text generation| tgi | 3.2 | 12.4 |fix hf hub timestamp|
 |image generation| hf-inference-toolkit | 0.5.3 | 12.1 |-|
+|speech recognition| funasr | cuda12.8 | 12.8 |-|
+|speech recognition| funasr-rocm | rocm7.2.2 | - |-|
+|speech recognition| funasr-cpu | latest | - |-|
 |text generation| sglang | v0.4.6.post1-cu124-srt| 12.4 |- |
 |text generation| mindie | 2.0-csg-1.0.RC2 | 1.0.RC2 |- |
 |text generation| llama.cpp | b5215 | - |- |
