@@ -14,6 +14,9 @@
     "error.AUTH-ERR-12": {
         "other": "请求限额已超过"
     },
+    "error.AUTH-ERR-13": {
+        "other": "必须携带旧Token"
+    },
     "error.AUTH-ERR-2": {
         "other": "访问被禁止，权限不足"
     },

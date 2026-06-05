@@ -14,6 +14,9 @@
     "error.AUTH-ERR-12": {
         "other": "Request quota limit exceeded"
     },
+    "error.AUTH-ERR-13": {
+        "other": "old token is required to refresh token"
+    },
     "error.AUTH-ERR-2": {
         "other": "Access forbidden, insufficient permissions"
     },
