@@ -203,6 +203,25 @@ func Test_CheckNodeResource(t *testing.T) {
 			},
 			want: false,
 		},
+		{
+			name: "Failure - Node is offline",
+			node: types.NodeResourceInfo{
+				NodeStatus: string(types.NodeStatusOffline),
+				NodeHardware: types.NodeHardware{
+					AvailableCPU:     16,
+					AvailableMem:     8,
+					AvailableXPU:     2,
+					XPUModel:         "NVIDIA-A100",
+					XPUCapacityLabel: "nvidia.com/gpu",
+				},
+			},
+			hardware: &types.HardWare{
+				Cpu:    types.CPU{Num: "8"},
+				Memory: "4Gi",
+				Gpu:    types.Processor{Num: "1", Type: "NVIDIA-A100"},
+			},
+			want: false,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -210,6 +229,10 @@ func Test_CheckNodeResource(t *testing.T) {
 			got := checkNodeResource(tc.node, tc.hardware, config, map[string]string{})
 			if got.Available != tc.want {
 				t.Errorf("checkNodeResource() = %v, want %v", got.Available, tc.want)
+			}
+			// Check that offline nodes have the correct reason
+			if tc.node.NodeStatus == string(types.NodeStatusOffline) {
+				require.Equal(t, types.UnAvailableTypeNodeOffline, got.Reason)
 			}
 		})
 	}

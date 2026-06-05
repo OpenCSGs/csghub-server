@@ -99,6 +99,14 @@ func (d *deployer) startAccounting() {
 
 func checkNodeResource(node types.NodeResourceInfo, hardware *types.HardWare,
 	config *config.Config, VXPUConfig map[string]string) types.ResourceAvailableStatus {
+	if node.NodeStatus == string(types.NodeStatusOffline) {
+		return types.ResourceAvailableStatus{
+			Available: false,
+			NodeName:  node.NodeName,
+			Reason:    types.UnAvailableTypeNodeOffline,
+		}
+	}
+
 	if !config.Cluster.AllowCPUResScheduleToGPUNode && isCPUOnlyWorkload(hardware) && isXPUNode(node) {
 		return types.ResourceAvailableStatus{
 			Available: false,
