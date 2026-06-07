@@ -23,6 +23,28 @@ func TestGitCallbackComponent_SetRepoVisibility(t *testing.T) {
 	require.True(t, gc.setRepoVisibility)
 }
 
+func TestGetPipelineTaskFromTags_ASR(t *testing.T) {
+	tests := []struct {
+		name string
+		tags []database.Tag
+	}{
+		{
+			name: "canonical hf task",
+			tags: []database.Tag{{Name: string(types.AutomaticSpeechRecognition)}},
+		},
+		{
+			name: "legacy auto speech recognition tag",
+			tags: []database.Tag{{Name: string(types.AutoSpeechRecognition)}},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, types.AutomaticSpeechRecognition, GetPipelineTaskFromTags(tt.tags))
+		})
+	}
+}
+
 func TestGitCallbackComponent_WatchSpaceChange(t *testing.T) {
 	ctx := mock.Anything
 	gc := initializeTestGitCallbackComponent(context.TODO(), t)

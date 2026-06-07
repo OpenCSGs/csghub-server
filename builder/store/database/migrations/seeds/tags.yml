@@ -181,6 +181,12 @@ tags:
   built_in: true
 - category: task
   group: audio_processing
+  name: automatic-speech-recognition
+  scope: model
+  show_name: 语音识别
+  built_in: true
+- category: task
+  group: audio_processing
   name: text-to-speech
   scope: model
   show_name: 语音合成
@@ -318,6 +324,12 @@ tags:
   show_name: 图像生成
   built_in: true
 - name: auto-speech-recognition
+  category: task
+  group: audio
+  scope: dataset
+  show_name: 语音识别
+  built_in: true
+- name: automatic-speech-recognition
   category: task
   group: audio
   scope: dataset

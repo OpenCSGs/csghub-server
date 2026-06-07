@@ -89,6 +89,9 @@
     "Tag.I18nKey.auto-speech-recognition": {
         "other": "自動語音辨識"
     },
+    "Tag.I18nKey.automatic-speech-recognition": {
+        "other": "自動語音辨識"
+    },
     "Tag.I18nKey.text-to-speech": {
         "other": "文本轉語音"
     },
