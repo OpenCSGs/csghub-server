@@ -30,9 +30,21 @@ func TestValidateResources(t *testing.T) {
 		err := validateResources(validResourcesJSON)
 		require.Nil(t, err)
 	})
-	t.Run("empty json object", func(t *testing.T) {
+	t.Run("empty json object missing required fields", func(t *testing.T) {
 		err := validateResources("{}")
-		require.Nil(t, err)
+		require.True(t, errors.Is(err, errorx.ErrBadRequest))
+	})
+	t.Run("json missing cpu type", func(t *testing.T) {
+		err := validateResources(`{"cpu":{"num":"2"},"memory":"8G"}`)
+		require.True(t, errors.Is(err, errorx.ErrBadRequest))
+	})
+	t.Run("json missing cpu num", func(t *testing.T) {
+		err := validateResources(`{"cpu":{"type":"intel"},"memory":"8G"}`)
+		require.True(t, errors.Is(err, errorx.ErrBadRequest))
+	})
+	t.Run("json missing memory", func(t *testing.T) {
+		err := validateResources(`{"cpu":{"type":"intel","num":"2"}}`)
+		require.True(t, errors.Is(err, errorx.ErrBadRequest))
 	})
 }
 
