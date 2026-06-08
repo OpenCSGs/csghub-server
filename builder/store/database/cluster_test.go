@@ -257,6 +257,124 @@ func TestClusterStore_BatchUpdateStatus_OfflineTimeout(t *testing.T) {
 	require.Equal(t, string(types.NodeStatusOffline), updatedNode.Status)
 }
 
+func TestClusterStore_BatchUpdateStatus_AllNodesOffline(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewClusterInfoStoreWithDB(db)
+
+	cluster, err := store.Add(ctx, "test-config", "test-region", types.ConnectModeKubeConfig)
+	require.NoError(t, err)
+
+	_, err = db.Core.NewUpdate().Model(&database.ClusterInfo{}).
+		Set("status = ?", types.ClusterStatusRunning).
+		Where("cluster_id = ?", cluster.ClusterID).
+		Exec(ctx)
+	require.NoError(t, err)
+
+	node1 := &database.ClusterNode{
+		ClusterID: cluster.ClusterID,
+		Name:      "node-1",
+		Status:    "Ready",
+	}
+	node2 := &database.ClusterNode{
+		ClusterID: cluster.ClusterID,
+		Name:      "node-2",
+		Status:    "Ready",
+	}
+	_, err = db.Core.NewInsert().Model(node1).Exec(ctx)
+	require.NoError(t, err)
+	_, err = db.Core.NewInsert().Model(node2).Exec(ctx)
+	require.NoError(t, err)
+
+	oldTime := time.Now().Add(-250 * time.Second)
+	_, err = db.Core.NewUpdate().Model(&database.ClusterNode{}).
+		Set("updated_at = ?", oldTime).
+		Where("cluster_id = ?", cluster.ClusterID).
+		Exec(ctx)
+	require.NoError(t, err)
+
+	statusEvent := []*types.ClusterRes{}
+	err = store.BatchUpdateStatus(ctx, statusEvent, time.Now())
+	require.NoError(t, err)
+
+	nodes, err := store.FindNodeByClusterID(ctx, cluster.ClusterID)
+	require.NoError(t, err)
+	require.Len(t, nodes, 2)
+	for _, node := range nodes {
+		require.Equal(t, string(types.NodeStatusOffline), node.Status)
+	}
+
+	updatedCluster, err := store.ByClusterID(ctx, cluster.ClusterID)
+	require.NoError(t, err)
+	require.Equal(t, types.ClusterStatusUnavailable, updatedCluster.Status)
+}
+
+func TestClusterStore_BatchUpdateStatus_PartialNodesOffline(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewClusterInfoStoreWithDB(db)
+
+	cluster, err := store.Add(ctx, "test-config2", "test-region2", types.ConnectModeKubeConfig)
+	require.NoError(t, err)
+
+	_, err = db.Core.NewUpdate().Model(&database.ClusterInfo{}).
+		Set("status = ?", types.ClusterStatusRunning).
+		Where("cluster_id = ?", cluster.ClusterID).
+		Exec(ctx)
+	require.NoError(t, err)
+
+	node1 := &database.ClusterNode{
+		ClusterID: cluster.ClusterID,
+		Name:      "node-1",
+		Status:    "Ready",
+	}
+	node2 := &database.ClusterNode{
+		ClusterID: cluster.ClusterID,
+		Name:      "node-2",
+		Status:    "Ready",
+	}
+	_, err = db.Core.NewInsert().Model(node1).Exec(ctx)
+	require.NoError(t, err)
+	_, err = db.Core.NewInsert().Model(node2).Exec(ctx)
+	require.NoError(t, err)
+
+	oldTime := time.Now().Add(-250 * time.Second)
+	_, err = db.Core.NewUpdate().Model(&database.ClusterNode{}).
+		Set("updated_at = ?", oldTime).
+		Where("id = ?", node1.ID).
+		Exec(ctx)
+	require.NoError(t, err)
+
+	cutoffTime := time.Now().Add(-100 * time.Second)
+	statusEvent := []*types.ClusterRes{}
+	err = store.BatchUpdateStatus(ctx, statusEvent, cutoffTime)
+	require.NoError(t, err)
+
+	nodes, err := store.FindNodeByClusterID(ctx, cluster.ClusterID)
+	require.NoError(t, err)
+	require.Len(t, nodes, 2)
+	
+	offlineCount := 0
+	readyCount := 0
+	for _, node := range nodes {
+		if node.Status == string(types.NodeStatusOffline) {
+			offlineCount++
+		} else {
+			readyCount++
+		}
+	}
+	require.Equal(t, 1, offlineCount, "Should have exactly 1 offline node")
+	require.Equal(t, 1, readyCount, "Should have exactly 1 ready node")
+
+	updatedCluster, err := store.ByClusterID(ctx, cluster.ClusterID)
+	require.NoError(t, err)
+	require.Equal(t, types.ClusterStatusRunning, updatedCluster.Status)
+}
+
 func TestClusterStore_ListAllNodes(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()

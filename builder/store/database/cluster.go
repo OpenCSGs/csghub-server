@@ -292,9 +292,36 @@ func (s *clusterInfoStoreImpl) BatchUpdateStatus(ctx context.Context, statusEven
 			return errorx.HandleDBError(err, nil)
 		}
 
+		err = s.updateClusterStatusIfAllNodesOffline(ctx, tx)
+		if err != nil {
+			return errorx.HandleDBError(err, nil)
+		}
+
 		return nil
 	})
 
+	return err
+}
+
+func (s *clusterInfoStoreImpl) updateClusterStatusIfAllNodesOffline(ctx context.Context, tx bun.Tx) error {
+	// Find clusters where all nodes are offline using a single SQL query
+	// Subquery logic:
+	// 1. GROUP BY cluster_id to get per-cluster aggregation
+	// 2. COUNT(*) > 0 ensures cluster has at least one node
+	// 3. COUNT(*) = SUM(CASE WHEN status = 'Offline' THEN 1 ELSE 0 END) means all nodes are offline
+	offlineStatus := string(types.NodeStatusOffline)
+	_, err := tx.NewUpdate().Model(&ClusterInfo{}).
+		Set("Status = ?", types.ClusterStatusUnavailable).
+		Set("updated_at = now()").
+		Where("cluster_id IN ("+
+			"SELECT cn.cluster_id "+
+			"FROM cluster_nodes cn "+
+			"GROUP BY cn.cluster_id "+
+			"HAVING COUNT(*) > 0 "+
+			"AND COUNT(*) = SUM(CASE WHEN cn.status = '"+offlineStatus+"' THEN 1 ELSE 0 END)"+
+			")").
+		Where("Status != ?", types.ClusterStatusUnavailable).
+		Exec(ctx)
 	return err
 }
 

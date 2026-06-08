@@ -232,7 +232,6 @@ otlp_endpoint = "http://localhost:4317"
 otlp_logging = false
 
 [runner]
-public_domain = "http://localhost:8082"
 image_builder_cluster_id = ""
 image_builder_git_image = "opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/alpine/git:2.36.2"
 image_builder_kaniko_image = "opencsg-registry.cn-beijing.cr.aliyuncs.com/public/kaniko-project-executor:v1.23.2"
