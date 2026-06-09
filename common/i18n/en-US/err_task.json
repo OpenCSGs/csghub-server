@@ -10,5 +10,14 @@
     },
     "error.TASK-ERR-3": {
         "other": "Multi-host notebook is not supported"
+    },
+    "error.TASK-ERR-4": {
+        "other": "Not enough resource to run the task"
+    },
+    "error.TASK-ERR-5": {
+        "other": "Cluster is unavailable to run the task"
+    },
+    "error.TASK-ERR-6": {
+        "other": "Resource status uncertain, cannot verify availability"
     }
 }

@@ -7,5 +7,20 @@
     },
     "error.DAT-ERR-2": {
         "other": "No valid Parquet file found"
+    },
+    "error.DAT-ERR-3": {
+        "other": "Application status does not allow this operation"
+    },
+    "error.DAT-ERR-4": {
+        "other": "Dataset status does not allow this operation"
+    },
+    "error.DAT-ERR-5": {
+        "other": "Dataset is already referenced by another dataset"
+    },
+    "error.DAT-ERR-6": {
+        "other": "Related dataset is already referenced by another dataset"
+    },
+    "error.DAT-ERR-7": {
+        "other": "A pending application already exists for this dataset"
     }
 }

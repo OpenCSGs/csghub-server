@@ -95,6 +95,9 @@
     "error.GIT-ERR-4": {
         "other": "Failed to find commit"
     },
+    "error.GIT-ERR-40": {
+        "other": "Failed to get git archive"
+    },
     "error.GIT-ERR-5": {
         "other": "Failed to count commits"
     },
@@ -109,8 +112,5 @@
     },
     "error.GIT-ERR-9": {
         "other": "Repository not found"
-    },
-    "error.GIT-ERR-40": {
-        "other": "Failed to get git archive"
     }
 }

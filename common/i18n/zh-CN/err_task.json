@@ -10,5 +10,14 @@
     },
     "error.TASK-ERR-3": {
         "other": "不支持多主机 Notebook"
+    },
+    "error.TASK-ERR-4": {
+        "other": "集群资源不足"
+    },
+    "error.TASK-ERR-5": {
+        "other": "集群当前不可用"
+    },
+    "error.TASK-ERR-6": {
+        "other": "无法确定资源状态"
     }
 }

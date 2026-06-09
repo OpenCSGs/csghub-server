@@ -138,6 +138,30 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Name:** `runtimeCredentialGrantUnavailable`
 - **Description:** The runtime credential token is valid, but the requested credential is not granted, revoked, expired, or unavailable.
 
+---
+
+### `AGENT-ERR-13`
+
+- **Error Code:** `AGENT-ERR-13`
+- **Error Name:** `credentialVerifyURLInvalid`
+- **Description:** The credential verification URL or API endpoint is invalid.
+
+---
+
+### `AGENT-ERR-14`
+
+- **Error Code:** `AGENT-ERR-14`
+- **Error Name:** `credentialVerifyTokenInvalid`
+- **Description:** The credential token is invalid, expired, or missing required permissions.
+
+---
+
+### `AGENT-ERR-15`
+
+- **Error Code:** `AGENT-ERR-15`
+- **Error Name:** `credentialVerifyFailed`
+- **Description:** Credential verification failed.
+
 ## Auth Errors
 
 ### `AUTH-ERR-0`
@@ -273,6 +297,110 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Code:** `DAT-ERR-2`
 - **Error Name:** `noValidParquetFile`
 - **Description:** The dataset does not contain any valid Parquet files, which are required for this operation.
+
+---
+
+### `DAT-ERR-3`
+
+- **Error Code:** `DAT-ERR-3`
+- **Error Name:** `applicationStatusNotAllowed`
+- **Description:** The dataset application is not in a pending state and cannot be approved or rejected.
+
+---
+
+### `DAT-ERR-4`
+
+- **Error Code:** `DAT-ERR-4`
+- **Error Name:** `datasetStatusNotAllowed`
+- **Description:** The dataset is not in a state that allows the application action to be applied.
+
+---
+
+### `DAT-ERR-5`
+
+- **Error Code:** `DAT-ERR-5`
+- **Error Name:** `datasetAlreadyReferenced`
+- **Description:** The dataset is already referenced by another dataset as a related dataset and cannot be referenced again.
+
+---
+
+### `DAT-ERR-6`
+
+- **Error Code:** `DAT-ERR-6`
+- **Error Name:** `relatedDatasetAlreadyReferenced`
+- **Description:** The related dataset is already referenced by another dataset and cannot be used for this application.
+
+---
+
+### `DAT-ERR-7`
+
+- **Error Code:** `DAT-ERR-7`
+- **Error Name:** `pendingApplicationExists`
+- **Description:** There is already a pending application for this dataset. Only one pending application is allowed per dataset at a time.
+
+## Federation_adapter Errors
+
+### `FEDAP-ERR-0`
+
+- **Error Code:** `FEDAP-ERR-0`
+- **Error Name:** `tokenExpired`
+- **Description:** 
+
+---
+
+### `FEDAP-ERR-1`
+
+- **Error Code:** `FEDAP-ERR-1`
+- **Error Name:** `tokenExchangeFailed`
+- **Description:** 
+
+---
+
+### `FEDAP-ERR-2`
+
+- **Error Code:** `FEDAP-ERR-2`
+- **Error Name:** `siteFetchFailed`
+- **Description:** 
+
+---
+
+### `FEDAP-ERR-3`
+
+- **Error Code:** `FEDAP-ERR-3`
+- **Error Name:** `siteUnavailable`
+- **Description:** 
+
+---
+
+### `FEDAP-ERR-4`
+
+- **Error Code:** `FEDAP-ERR-4`
+- **Error Name:** `oauthAuthenticationFailed`
+- **Description:** 
+
+---
+
+### `FEDAP-ERR-5`
+
+- **Error Code:** `FEDAP-ERR-5`
+- **Error Name:** `invalidToken`
+- **Description:** 
+
+---
+
+### `FEDAP-ERR-6`
+
+- **Error Code:** `FEDAP-ERR-6`
+- **Error Name:** `userInfoFetchFailed`
+- **Description:** 
+
+---
+
+### `FEDAP-ERR-7`
+
+- **Error Code:** `FEDAP-ERR-7`
+- **Error Name:** `proxyRequestProcessFailed`
+- **Description:** 
 
 ## Federation_site Errors
 
@@ -617,6 +745,14 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Code:** `GIT-ERR-39`
 - **Error Name:** `gitCreateForkFailed`
 - **Description:** 
+
+---
+
+### `GIT-ERR-40`
+
+- **Error Code:** `GIT-ERR-40`
+- **Error Name:** `gitGetArchiveFailed`
+- **Description:** Failed to get archive from git repository.
 
 ## Invitation Errors
 
@@ -986,6 +1122,86 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Name:** `codeInvalidCommitIDErr`
 - **Description:** The commit id is invalid.
 
+## Skill Errors
+
+### `SKILL-ERR-0`
+
+- **Error Code:** `SKILL-ERR-0`
+- **Error Name:** `skillNotFound`
+- **Description:** The requested skill could not be found.
+
+---
+
+### `SKILL-ERR-1`
+
+- **Error Code:** `SKILL-ERR-1`
+- **Error Name:** `skillVersionNotFound`
+- **Description:** The requested skill version could not be found.
+
+---
+
+### `SKILL-ERR-2`
+
+- **Error Code:** `SKILL-ERR-2`
+- **Error Name:** `skillPublishFailed`
+- **Description:** Failed to publish the skill.
+
+---
+
+### `SKILL-ERR-3`
+
+- **Error Code:** `SKILL-ERR-3`
+- **Error Name:** `skillDownloadFailed`
+- **Description:** Failed to download the skill archive.
+
+---
+
+### `SKILL-ERR-4`
+
+- **Error Code:** `SKILL-ERR-4`
+- **Error Name:** `skillResolveFailed`
+- **Description:** Failed to resolve the skill.
+
+---
+
+### `SKILL-ERR-5`
+
+- **Error Code:** `SKILL-ERR-5`
+- **Error Name:** `skillUserNotFound`
+- **Description:** The user associated with the skill operation could not be found.
+
+---
+
+### `SKILL-ERR-6`
+
+- **Error Code:** `SKILL-ERR-6`
+- **Error Name:** `skillVersionCreateFailed`
+- **Description:** Failed to create skill version record.
+
+---
+
+### `SKILL-ERR-7`
+
+- **Error Code:** `SKILL-ERR-7`
+- **Error Name:** `skillVersionUpdateFailed`
+- **Description:** Failed to update skill version record.
+
+---
+
+### `SKILL-ERR-8`
+
+- **Error Code:** `SKILL-ERR-8`
+- **Error Name:** `skillPublishFileCountExceeded`
+- **Description:** The number of files in the skill publish request exceeds the allowed limit.
+
+---
+
+### `SKILL-ERR-9`
+
+- **Error Code:** `SKILL-ERR-9`
+- **Error Name:** `skillPublishFileSizeExceeded`
+- **Description:** The total size of files in the skill publish request exceeds the allowed limit.
+
 ## Spaces Errors
 
 ### `SPACE-ERR-0`
@@ -1129,6 +1345,14 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Code:** `TASK-ERR-5`
 - **Error Name:** `clusterUnavailable`
 - **Description:** The cluster is currently unavailable, either due to maintenance or other reasons. This error occurs when the cluster is not ready to accept new tasks.
+
+---
+
+### `TASK-ERR-6`
+
+- **Error Code:** `TASK-ERR-6`
+- **Error Name:** `resourceStatusUncertain`
+- **Description:** The resource availability could not be determined because the cluster lacks ClusterRole permissions to query node resources and no ResourceQuota is configured in the namespace. This error occurs when the system cannot verify if enough resources are available for the task.
 
 ## User Errors
 

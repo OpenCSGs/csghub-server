@@ -138,6 +138,30 @@
 - **错误名:** `runtimeCredentialGrantUnavailable`
 - **描述:** 运行时凭证令牌有效，但请求的凭证未授权、已撤销、已过期或不可用。
 
+---
+
+### `AGENT-ERR-13`
+
+- **错误代码:** `AGENT-ERR-13`
+- **错误名:** `credentialVerifyURLInvalid`
+- **描述:** 凭证验证 URL 或 API 端点无效。
+
+---
+
+### `AGENT-ERR-14`
+
+- **错误代码:** `AGENT-ERR-14`
+- **错误名:** `credentialVerifyTokenInvalid`
+- **描述:** 凭证令牌无效、已过期或缺少所需权限。
+
+---
+
+### `AGENT-ERR-15`
+
+- **错误代码:** `AGENT-ERR-15`
+- **错误名:** `credentialVerifyFailed`
+- **描述:** 凭证验证失败。
+
 ## Auth 错误
 
 ### `AUTH-ERR-0`
@@ -273,6 +297,110 @@
 - **错误代码:** `DAT-ERR-2`
 - **错误名:** `noValidParquetFile`
 - **描述:** 数据集中不包含任何有效的Parquet文件，而此操作需要该文件格式。
+
+---
+
+### `DAT-ERR-3`
+
+- **错误代码:** `DAT-ERR-3`
+- **错误名:** `applicationStatusNotAllowed`
+- **描述:** 数据集申请当前状态不允许审核操作，只有待审核状态的申请才能被批准或拒绝。
+
+---
+
+### `DAT-ERR-4`
+
+- **错误代码:** `DAT-ERR-4`
+- **错误名:** `datasetStatusNotAllowed`
+- **描述:** 数据集当前状态不允许执行此申请操作。
+
+---
+
+### `DAT-ERR-5`
+
+- **错误代码:** `DAT-ERR-5`
+- **错误名:** `datasetAlreadyReferenced`
+- **描述:** 该数据集已被其他数据集引用为关联数据集，不能再次被引用。
+
+---
+
+### `DAT-ERR-6`
+
+- **错误代码:** `DAT-ERR-6`
+- **错误名:** `relatedDatasetAlreadyReferenced`
+- **描述:** 关联数据集已被其他数据集引用，不能用于本次申请。
+
+---
+
+### `DAT-ERR-7`
+
+- **错误代码:** `DAT-ERR-7`
+- **错误名:** `pendingApplicationExists`
+- **描述:** 该数据集已有一个待审核的申请。每个数据集同时只允许一个待审核的申请。
+
+## Federation_adapter 错误
+
+### `FEDAP-ERR-0`
+
+- **错误代码:** `FEDAP-ERR-0`
+- **错误名:** `tokenExpired`
+- **描述:** 
+
+---
+
+### `FEDAP-ERR-1`
+
+- **错误代码:** `FEDAP-ERR-1`
+- **错误名:** `tokenExchangeFailed`
+- **描述:** 
+
+---
+
+### `FEDAP-ERR-2`
+
+- **错误代码:** `FEDAP-ERR-2`
+- **错误名:** `siteFetchFailed`
+- **描述:** 
+
+---
+
+### `FEDAP-ERR-3`
+
+- **错误代码:** `FEDAP-ERR-3`
+- **错误名:** `siteUnavailable`
+- **描述:** 
+
+---
+
+### `FEDAP-ERR-4`
+
+- **错误代码:** `FEDAP-ERR-4`
+- **错误名:** `oauthAuthenticationFailed`
+- **描述:** 
+
+---
+
+### `FEDAP-ERR-5`
+
+- **错误代码:** `FEDAP-ERR-5`
+- **错误名:** `invalidToken`
+- **描述:** 
+
+---
+
+### `FEDAP-ERR-6`
+
+- **错误代码:** `FEDAP-ERR-6`
+- **错误名:** `userInfoFetchFailed`
+- **描述:** 
+
+---
+
+### `FEDAP-ERR-7`
+
+- **错误代码:** `FEDAP-ERR-7`
+- **错误名:** `proxyRequestProcessFailed`
+- **描述:** 
 
 ## Federation_site 错误
 
@@ -617,6 +745,14 @@
 - **错误代码:** `GIT-ERR-39`
 - **错误名:** `gitCreateForkFailed`
 - **描述:** 
+
+---
+
+### `GIT-ERR-40`
+
+- **错误代码:** `GIT-ERR-40`
+- **错误名:** `gitGetArchiveFailed`
+- **描述:** 从 git 仓库获取归档文件失败。
 
 ## Invitation 错误
 
@@ -986,6 +1122,86 @@
 - **错误名:** `codeInvalidCommitIDErr`
 - **描述:** 无效的commitId
 
+## Skill 错误
+
+### `SKILL-ERR-0`
+
+- **错误代码:** `SKILL-ERR-0`
+- **错误名:** `skillNotFound`
+- **描述:** 找不到请求的技能。
+
+---
+
+### `SKILL-ERR-1`
+
+- **错误代码:** `SKILL-ERR-1`
+- **错误名:** `skillVersionNotFound`
+- **描述:** 找不到请求的技能版本。
+
+---
+
+### `SKILL-ERR-2`
+
+- **错误代码:** `SKILL-ERR-2`
+- **错误名:** `skillPublishFailed`
+- **描述:** 发布技能失败。
+
+---
+
+### `SKILL-ERR-3`
+
+- **错误代码:** `SKILL-ERR-3`
+- **错误名:** `skillDownloadFailed`
+- **描述:** 下载技能包失败。
+
+---
+
+### `SKILL-ERR-4`
+
+- **错误代码:** `SKILL-ERR-4`
+- **错误名:** `skillResolveFailed`
+- **描述:** 解析技能失败。
+
+---
+
+### `SKILL-ERR-5`
+
+- **错误代码:** `SKILL-ERR-5`
+- **错误名:** `skillUserNotFound`
+- **描述:** 找不到与该技能操作关联的用户。
+
+---
+
+### `SKILL-ERR-6`
+
+- **错误代码:** `SKILL-ERR-6`
+- **错误名:** `skillVersionCreateFailed`
+- **描述:** 创建技能版本记录失败。
+
+---
+
+### `SKILL-ERR-7`
+
+- **错误代码:** `SKILL-ERR-7`
+- **错误名:** `skillVersionUpdateFailed`
+- **描述:** 更新技能版本记录失败。
+
+---
+
+### `SKILL-ERR-8`
+
+- **错误代码:** `SKILL-ERR-8`
+- **错误名:** `skillPublishFileCountExceeded`
+- **描述:** 技能发布请求中的文件数量超过了允许的上限。
+
+---
+
+### `SKILL-ERR-9`
+
+- **错误代码:** `SKILL-ERR-9`
+- **错误名:** `skillPublishFileSizeExceeded`
+- **描述:** 技能发布请求中文件的总大小超过了允许的上限。
+
 ## Spaces 错误
 
 ### `SPACE-ERR-0`
@@ -1129,6 +1345,14 @@
 - **错误代码:** `TASK-ERR-5`
 - **错误名:** `clusterUnavailable`
 - **描述:** 集群当前不可用，可能是由于维护或其他原因。当集群未准备好接受新任务时，会出现此错误。
+
+---
+
+### `TASK-ERR-6`
+
+- **错误代码:** `TASK-ERR-6`
+- **错误名:** `resourceStatusUncertain`
+- **描述:** 无法确定资源可用性，因为集群缺少 ClusterRole 权限来查询节点资源，且命名空间中未配置 ResourceQuota。当系统无法验证是否有足够资源运行任务时，会出现此错误。
 
 ## User 错误
 

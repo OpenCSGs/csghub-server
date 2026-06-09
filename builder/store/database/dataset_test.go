@@ -259,6 +259,57 @@ func TestDatasetStore_FindWithOriginalPath(t *testing.T) {
 	require.Equal(t, "repo2", m2.Repository.Name)
 }
 
+func TestDatasetStore_FindByRelatedDatasetIDs(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewDatasetStoreWithDB(db)
+
+	// Create datasets with different RelatedDatasetID values
+	repos := []*database.Repository{
+		{Name: "ds1", Path: "ns/ds1", GitPath: "ns/ds1"},
+		{Name: "ds2", Path: "ns/ds2", GitPath: "ns/ds2"},
+		{Name: "ds3", Path: "ns/ds3", GitPath: "ns/ds3"},
+		{Name: "ds4", Path: "ns/ds4", GitPath: "ns/ds4"},
+	}
+	for _, repo := range repos {
+		err := db.Core.NewInsert().Model(repo).Scan(ctx, repo)
+		require.Nil(t, err)
+	}
+
+	_, err := store.Create(ctx, database.Dataset{RepositoryID: repos[0].ID, RelatedDatasetID: 100})
+	require.Nil(t, err)
+	_, err = store.Create(ctx, database.Dataset{RepositoryID: repos[1].ID, RelatedDatasetID: 200})
+	require.Nil(t, err)
+	_, err = store.Create(ctx, database.Dataset{RepositoryID: repos[2].ID, RelatedDatasetID: 300})
+	require.Nil(t, err)
+	_, err = store.Create(ctx, database.Dataset{RepositoryID: repos[3].ID, RelatedDatasetID: 0})
+	require.Nil(t, err)
+
+	// Find by a single RelatedDatasetID
+	datasets, err := store.FindByRelatedDatasetIDs(ctx, []int64{100})
+	require.Nil(t, err)
+	require.Len(t, datasets, 1)
+	require.Equal(t, repos[0].ID, datasets[0].RepositoryID)
+
+	// Find by multiple RelatedDatasetIDs
+	datasets, err = store.FindByRelatedDatasetIDs(ctx, []int64{100, 200})
+	require.Nil(t, err)
+	require.Len(t, datasets, 2)
+
+	// Find with unmatched IDs returns empty slice
+	datasets, err = store.FindByRelatedDatasetIDs(ctx, []int64{999})
+	require.Nil(t, err)
+	require.Len(t, datasets, 0)
+
+	// Find with 0 returns datasets with RelatedDatasetID=0
+	datasets, err = store.FindByRelatedDatasetIDs(ctx, []int64{0})
+	require.Nil(t, err)
+	require.Len(t, datasets, 1)
+	require.Equal(t, repos[3].ID, datasets[0].RepositoryID)
+}
+
 func TestDatasetStore_CreateAndUpdateRepoPath(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
