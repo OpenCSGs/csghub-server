@@ -591,7 +591,6 @@ type Config struct {
 	}
 
 	Runner struct {
-		PublicDomain            string   `env:"STARHUB_SERVER_RUNNER_PUBLIC_DOMAIN" default:"http://localhost:8082"`
 		ImageBuilderGitImage    string   `env:"STARHUB_SERVER_RUNNER_IMAGE_BUILDER_GIT_IMAGE" default:"opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/alpine/git:2.36.2"`
 		ImageBuilderKanikoImage string   `env:"STARHUB_SERVER_RUNNER_IMAGE_BUILDER_KANIKO_IMAGE" default:"opencsg-registry.cn-beijing.cr.aliyuncs.com/public/kaniko-project-executor:v1.23.2"`
 		ImageBuilderJobTTL      int      `env:"STARHUB_SERVER_RUNNER_IMAGE_BUILDER_JOB_TTL" default:"120"`
