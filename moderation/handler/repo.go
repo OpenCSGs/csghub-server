@@ -35,7 +35,7 @@ func (h *RepoHandler) FullCheck(c *gin.Context) {
 	var req request
 	// binding request and check error
 	if err := c.BindJSON(&req); err != nil {
-		slog.Error("invalid request for full check", slog.Any("error", err))
+		slog.ErrorContext(c.Request.Context(), "invalid request for full check", slog.Any("error", err))
 		httpbase.BadRequest(c, err.Error())
 		return
 	}

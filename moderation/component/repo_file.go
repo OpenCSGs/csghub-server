@@ -59,14 +59,14 @@ func (c *repoFileComponentImpl) GenRepoFileRecordsBatch(ctx context.Context, rep
 			<-tokens
 			wg.Add(1)
 			go func(repo database.Repository) {
-				slog.Info("start to get files of repository", slog.Any("repoType", repoType), slog.String("path", repo.Path))
-				//get file paths of repo
-				err := c.createRepoFileRecords(ctx, repo)
-				if err != nil {
-					slog.Error("fail to get all files of repository",
-						slog.String("path", repo.Path), slog.String("repo_type", string(repo.RepositoryType)),
-						slog.String("error", err.Error()))
-				}
+			slog.InfoContext(ctx, "start to get files of repository", slog.Any("repoType", repoType), slog.String("path", repo.Path))
+			//get file paths of repo
+			err := c.createRepoFileRecords(ctx, repo)
+			if err != nil {
+				slog.ErrorContext(ctx, "fail to get all files of repository",
+					slog.String("path", repo.Path), slog.String("repo_type", string(repo.RepositoryType)),
+					slog.String("error", err.Error()))
+			}
 				tokens <- struct{}{}
 				wg.Done()
 			}(repo)
@@ -135,17 +135,17 @@ func (c *repoFileComponentImpl) createRepoFileRecords(ctx context.Context, repo 
 		var exists bool
 		var err error
 		if exists, err = c.rfs.Exists(ctx, rf); err != nil {
-			slog.Error("failed to check repository file exists", slog.Any("repo_id", repo.ID),
+			slog.ErrorContext(ctx, "failed to check repository file exists", slog.Any("repo_id", repo.ID),
 				slog.String("file_path", rf.Path), slog.String("error", err.Error()))
 			continue
 		}
 
 		if exists {
-			slog.Info("skip create exist repository file", slog.Any("repo_id", repo.ID), slog.String("file_path", rf.Path))
+			slog.InfoContext(ctx, "skip create exist repository file", slog.Any("repo_id", repo.ID), slog.String("file_path", rf.Path))
 			continue
 		}
 		if err := c.rfs.Create(ctx, &rf); err != nil {
-			slog.Error("failed to save repository file", slog.Any("repo_id", repo.ID),
+			slog.ErrorContext(ctx, "failed to save repository file", slog.Any("repo_id", repo.ID),
 				slog.String("error", err.Error()))
 			return fmt.Errorf("failed to save repository file, error: %w", err)
 		}

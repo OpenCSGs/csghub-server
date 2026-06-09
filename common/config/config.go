@@ -165,14 +165,6 @@ type Config struct {
 			// GuardStream is the model config for stream sensitive checks.
 			GuardStream ModelConfig `env:",prefix=STARHUB_SERVER_SENSITIVE_CHECK_LLM_GUARD_STREAM_"`
 		}
-
-		StreamContextCache struct {
-			Enable     bool   `env:"STARHUB_SERVER_SENSITIVE_CHECK_STREAM_CONTEXT_CACHE_ENABLE" default:"true"`
-			Backend    string `env:"STARHUB_SERVER_SENSITIVE_CHECK_STREAM_CONTEXT_CACHE_BACKEND" default:"memory"` // redis | memory
-			TTLSeconds int    `env:"STARHUB_SERVER_SENSITIVE_CHECK_STREAM_CONTEXT_CACHE_TTL_SECONDS" default:"120"`
-			MaxChunks  int    `env:"STARHUB_SERVER_SENSITIVE_CHECK_STREAM_CONTEXT_CACHE_MAX_CHUNKS" default:"12"`
-			MaxChars   int    `env:"STARHUB_SERVER_SENSITIVE_CHECK_STREAM_CONTEXT_CACHE_MAX_CHARS" default:"2000"`
-		}
 	}
 
 	JWT struct {

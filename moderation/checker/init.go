@@ -11,11 +11,7 @@ func Init(config *config.Config) {
 	if !config.SensitiveCheck.Enable {
 		panic("SensitiveCheck is not enable")
 	}
-	//init aliyun green checker
-	contentChecker = sensitive.NewChainChecker(config,
-		sensitive.WithACAutomaton(sensitive.LoadFromConfig(config)),
-		sensitive.WithMutableACAutomaton(sensitive.LoadFromDB()),
-		sensitive.WithAliYunChecker())
+	contentChecker = sensitive.NewChainCheckerFromConfig(config)
 }
 
 // InitWithContentChecker supports custom sensitive checker, this func mostly used in unit test

@@ -32,11 +32,7 @@ type repoComponentImpl struct {
 }
 
 func NewRepoComponent(cfg *config.Config) (RepoComponent, error) {
-	c := &repoComponentImpl{checker: sensitive.NewChainChecker(cfg,
-		sensitive.WithACAutomaton(sensitive.LoadFromConfig(cfg)),
-		sensitive.WithMutableACAutomaton(sensitive.LoadFromDB()),
-		sensitive.WithAliYunChecker(),
-	)}
+	c := &repoComponentImpl{checker: sensitive.NewChainCheckerFromConfig(cfg)}
 	gs, err := git.NewGitServer(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create git server for sensitive component: %w", err)
@@ -183,13 +179,13 @@ func (c *repoComponentImpl) processFile(ctx context.Context, file *database.Repo
 	checker := checker.GetFileChecker(file.FileType, file.Path, file.LfsRelativePath)
 	status, msg := checker.Run(ctx, reader)
 	if status == types.SensitiveCheckException {
-		slog.Error("failed to check repo file content", slog.Int64("repo_id", file.RepositoryID), slog.Int64("repo_file_id", file.ID), slog.String("file", file.Path),
+		slog.ErrorContext(ctx, "failed to check repo file content", slog.Int64("repo_id", file.RepositoryID), slog.Int64("repo_file_id", file.ID), slog.String("file", file.Path),
 			slog.String("err", msg))
 	}
 
 	err := c.saveCheckResult(ctx, file, status, msg)
 	if err != nil {
-		slog.Error("save check result failed", "error", err)
+		slog.ErrorContext(ctx, "save check result failed", slog.Any("error", err))
 	}
 }
 
@@ -208,11 +204,11 @@ func (c *repoComponentImpl) saveCheckResult(ctx context.Context, file *database.
 		file.Repository.Private = true
 		file.Repository.SensitiveCheckStatus = types.SensitiveCheckFail
 		if _, err := c.rs.UpdateRepo(ctx, *file.Repository); err != nil {
-			slog.Error("failed to update repo sensitive check status", slog.Any("repository_id", file.Repository.ID),
+			slog.ErrorContext(ctx, "failed to update repo sensitive check status", slog.Any("repository_id", file.Repository.ID),
 				slog.Int64("repository_file_id", file.ID), slog.String("path", file.Path),
 				slog.Any("error", err))
 		}
-		slog.Info("detect sensitive file content, set repository to private",
+		slog.InfoContext(ctx, "detect sensitive file content, set repository to private",
 			slog.String("path", file.Path), slog.Int64("repository_file_id", file.ID),
 			slog.Any("repository_id", file.Repository.ID))
 	}
@@ -220,7 +216,7 @@ func (c *repoComponentImpl) saveCheckResult(ctx context.Context, file *database.
 	// create repository file check record
 	err := c.rfcs.Upsert(ctx, *fcr)
 	if err != nil {
-		slog.Error("failed to create or update repository file check record", slog.Any("error", err),
+		slog.ErrorContext(ctx, "failed to create or update repository file check record", slog.Any("error", err),
 			slog.String("path", file.Path), slog.Int64("repo_file_id", file.ID))
 	}
 	return err
@@ -231,11 +227,11 @@ func (cc *repoComponentImpl) CheckRequestV2(ctx context.Context, req types.Sensi
 	for _, field := range fields {
 		pass, err := cc.checker.PassTextCheck(ctx, field.Scenario, field.Value())
 		if err != nil {
-			slog.Error("fail to check request sensitivity", slog.String("field", field.Name), slog.Any("error", err))
+			slog.ErrorContext(ctx, "fail to check request sensitivity", slog.String("field", field.Name), slog.Any("error", err))
 			return false, fmt.Errorf("fail to check '%s' sensitivity, error: %w", field.Name, err)
 		}
 		if pass.IsSensitive {
-			slog.Error("found sensitive words in request", slog.String("field", field.Name))
+			slog.ErrorContext(ctx, "found sensitive words in request", slog.String("field", field.Name))
 			return false, errors.New("found sensitive words in field: " + field.Name)
 		}
 	}
