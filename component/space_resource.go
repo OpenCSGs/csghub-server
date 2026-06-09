@@ -41,6 +41,11 @@ func validateResources(resources string) error {
 	if err := json.Unmarshal([]byte(resources), &hw); err != nil {
 		return errorx.BadRequest(err, errorx.Ctx().Set("field", "resources"))
 	}
+	if len(strings.TrimSpace(hw.Cpu.Type)) < 1 ||
+		len(strings.TrimSpace(hw.Cpu.Num)) < 1 ||
+		len(strings.TrimSpace(hw.Memory)) < 1 {
+		return errorx.BadRequest(errors.New("cpu resource is required"), errorx.Ctx().Set("field", "resources"))
+	}
 	return nil
 }
 
