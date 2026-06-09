@@ -59,7 +59,7 @@ func (c *RepoFileContentReader) lazyInit() {
 		var err error
 		c.innerReader, _, err = c.git.GetRepoFileReader(ctx, req)
 		if err != nil {
-			slog.Error("failed to create git file reader", slog.Any("error", err), slog.String("path", c.file.Path), slog.Int64("repository_file_id", c.file.ID))
+			slog.ErrorContext(ctx, "failed to create git file reader", slog.Any("error", err), slog.String("path", c.file.Path), slog.Int64("repository_file_id", c.file.ID))
 		}
 	})
 }

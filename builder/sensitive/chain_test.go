@@ -13,6 +13,7 @@ import (
 	"github.com/alibabacloud-go/tea/tea"
 	mockgreen "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/sensitive"
 	"opencsg.com/csghub-server/builder/sensitive"
+	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
 )
 
@@ -357,5 +358,78 @@ func TestChainImpl_AliYun_PassLLMCheck_Sensitive(t *testing.T) {
 	expectedReason := fmt.Sprintf("label:%s,reason:%s,requestId:%s", labels, riskWords, requestId)
 	if result.Reason != expectedReason {
 		t.Fatalf("expected reason %s, got %s", expectedReason, result.Reason)
+	}
+}
+
+func TestNewChainCheckerFromConfig(t *testing.T) {
+	// Test with basic check chain (using providers that do not require external dependencies)
+	cfg := &config.Config{}
+	cfg.SensitiveCheck.Enable = true
+	cfg.SensitiveCheck.CheckChain = []string{
+		sensitive.ProviderACAutomaton,
+		sensitive.ProviderAliyunGreen,
+	}
+
+	chain := sensitive.NewChainCheckerFromConfig(cfg)
+	if chain == nil {
+		t.Fatalf("expected non-nil chain, got nil")
+	}
+
+	// Test with unknown provider (should be ignored)
+	cfg2 := &config.Config{}
+	cfg2.SensitiveCheck.Enable = true
+	cfg2.SensitiveCheck.CheckChain = []string{
+		sensitive.ProviderACAutomaton,
+		"unknown_provider",
+	}
+
+	chain2 := sensitive.NewChainCheckerFromConfig(cfg2)
+	if chain2 == nil {
+		t.Fatalf("expected non-nil chain, got nil")
+	}
+
+	// Test with empty CheckChain
+	cfg3 := &config.Config{}
+	cfg3.SensitiveCheck.Enable = true
+	cfg3.SensitiveCheck.CheckChain = []string{}
+
+	chain3 := sensitive.NewChainCheckerFromConfig(cfg3)
+	if chain3 == nil {
+		t.Fatalf("expected non-nil chain, got nil")
+	}
+}
+
+func TestNewChainCheckerFromConfig_WithAdvanceOptions(t *testing.T) {
+	// Track which providers are passed to the advance options function
+	var calledProviders []string
+
+	sensitive.RegisterAdvanceOptions(func(cfg *config.Config, provider string) []sensitive.ChainOption {
+		calledProviders = append(calledProviders, provider)
+		return nil
+	})
+	defer sensitive.RegisterAdvanceOptions(nil) // Clean up global state
+
+	cfg := &config.Config{}
+	cfg.SensitiveCheck.Enable = true
+	// Use custom providers that only go through advanceOptionsFunc, not defaultCheckOpts
+	cfg.SensitiveCheck.CheckChain = []string{
+		"custom_advance_provider",
+		"another_custom",
+	}
+
+	chain := sensitive.NewChainCheckerFromConfig(cfg)
+	if chain == nil {
+		t.Fatalf("expected non-nil chain, got nil")
+	}
+
+	// Verify the advance function was called for each provider
+	if len(calledProviders) != 2 {
+		t.Fatalf("expected advance function called 2 times, got %d", len(calledProviders))
+	}
+	if calledProviders[0] != "custom_advance_provider" {
+		t.Fatalf("expected first provider 'custom_advance_provider', got '%s'", calledProviders[0])
+	}
+	if calledProviders[1] != "another_custom" {
+		t.Fatalf("expected second provider 'another_custom', got '%s'", calledProviders[1])
 	}
 }

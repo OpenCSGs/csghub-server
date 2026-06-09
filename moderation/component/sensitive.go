@@ -2,22 +2,11 @@ package component
 
 import (
 	"context"
-	"log/slog"
-	"strings"
 
 	gwtype "opencsg.com/csghub-server/aigateway/types"
 	"opencsg.com/csghub-server/builder/sensitive"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
-)
-
-type CheckProvider string
-
-const (
-	CheckProviderACAutomaton        CheckProvider = "ac_automaton"
-	CheckProviderMutableACAutomaton CheckProvider = "mutable_ac_automaton"
-	CheckProviderAliyunGreen        CheckProvider = "aliyun_green"
-	CheckProviderLLMOpenAI          CheckProvider = "guard_llm"
 )
 
 type SensitiveComponent interface {
@@ -36,31 +25,8 @@ type SensitiveComponentImpl struct {
 }
 
 func NewSensitiveComponentFromConfig(config *config.Config) SensitiveComponent {
-	var opts []sensitive.ChainOption
-
-	for _, provider := range config.SensitiveCheck.CheckChain {
-		p := strings.TrimSpace(provider)
-		extendedOpts := sensitiveChainOption(config, p)
-		if len(extendedOpts) > 0 {
-			opts = append(opts, extendedOpts...)
-			continue
-		}
-		switch p {
-		case string(CheckProviderACAutomaton):
-			opts = append(opts, sensitive.WithACAutomaton(sensitive.LoadFromConfig(config)))
-		case string(CheckProviderMutableACAutomaton):
-			opts = append(opts, sensitive.WithMutableACAutomaton(sensitive.LoadFromDB()))
-		case string(CheckProviderAliyunGreen):
-			opts = append(opts, sensitive.WithAliYunChecker())
-		default:
-			if p != "" {
-				slog.Warn("unknown sensitive check provider ignored", slog.String("provider", p))
-			}
-		}
-	}
-
 	return SensitiveComponentImpl{
-		checker: sensitive.NewChainChecker(config, opts...),
+		checker: sensitive.NewChainCheckerFromConfig(config),
 		cfg:     config,
 	}
 }
