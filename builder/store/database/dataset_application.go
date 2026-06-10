@@ -10,6 +10,7 @@ import (
 
 	"github.com/looplab/fsm"
 	"github.com/uptrace/bun"
+	"github.com/uptrace/bun/driver/pgdriver"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
@@ -83,6 +84,19 @@ func (a *DatasetApplicationWithFSM) Current() string {
 	return a.fsm.Current()
 }
 
+// ReviewDatasetUpdate carries pre-computed dataset changes for an approved application.
+// The component layer computes these via FSM; the DB layer only applies them atomically.
+// ExpectedDatasetStatus is the dataset status observed before acquiring the lock,
+// used for CAS validation inside the transaction.
+type ReviewDatasetUpdate struct {
+	ExpectedDatasetStatus types.DatasetStatus
+	NewStatus             types.DatasetStatus
+	Price                 float64
+	RelatedDatasetID      int64
+	DatasetType           types.DatasetType
+	RepositoryPrivate     bool
+}
+
 type DatasetApplicationStore interface {
 	Create(ctx context.Context, input DatasetApplication) (*DatasetApplication, error)
 	Update(ctx context.Context, input DatasetApplication) error
@@ -93,9 +107,11 @@ type DatasetApplicationStore interface {
 	List(ctx context.Context, status, search string, per, page int) ([]*DatasetApplication, int, error)
 	// CreateApplicationAndLinkDataset creates an application and updates dataset's CurrentApplicationID in a transaction with row lock
 	CreateApplicationAndLinkDataset(ctx context.Context, app DatasetApplication) (*DatasetApplication, error)
-	// ReviewApplication executes the full review in a transaction with row locks.
-	// onApprove is called when status=approved to let the caller inspect the result.
-	ReviewApplication(ctx context.Context, appID int64, reviewerID int64, reviewMsg string, action string, onApprove func(app *DatasetApplication) error) (*DatasetApplication, error)
+	// ReviewApplication applies the review decision in a transaction with row locks.
+	// newAppStatus and dsUpdate are pre-computed by the component layer.
+	// expectedAppStatus is the application status observed before acquiring the lock (CAS check).
+	// dsUpdate is nil for reject; non-nil for approve.
+	ReviewApplication(ctx context.Context, appID int64, reviewerID int64, reviewMsg string, expectedAppStatus, newAppStatus types.DatasetApplicationStatus, dsUpdate *ReviewDatasetUpdate) (*DatasetApplication, error)
 }
 
 type datasetApplicationStoreImpl struct {
@@ -278,7 +294,7 @@ func (s *datasetApplicationStoreImpl) CreateApplicationAndLinkDataset(ctx contex
 	return &result, nil
 }
 
-func (s *datasetApplicationStoreImpl) ReviewApplication(ctx context.Context, appID int64, reviewerID int64, reviewMsg string, action string, onApprove func(app *DatasetApplication) error) (*DatasetApplication, error) {
+func (s *datasetApplicationStoreImpl) ReviewApplication(ctx context.Context, appID int64, reviewerID int64, reviewMsg string, expectedAppStatus, newAppStatus types.DatasetApplicationStatus, dsUpdate *ReviewDatasetUpdate) (*DatasetApplication, error) {
 	var result DatasetApplication
 	err := s.db.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		// Lock the application row
@@ -302,63 +318,72 @@ func (s *datasetApplicationStoreImpl) ReviewApplication(ctx context.Context, app
 			return fmt.Errorf("failed to load application relations: %w", err)
 		}
 
-		// Apply application FSM
-		var event string
-		switch action {
-		case "approve":
-			event = AppEventApprove
-		case "reject":
-			event = AppEventReject
-		default:
-			return fmt.Errorf("invalid review action: %s", action)
+		// CAS: verify application is still in the expected state
+		if app.Status != expectedAppStatus {
+			return fmt.Errorf("application status changed from %s to %s, expected %s", expectedAppStatus, app.Status, expectedAppStatus)
 		}
 
-		appFSM := NewDatasetApplicationWithFSM(&app)
-		if !appFSM.SubmitEvent(ctx, event) {
-			return fmt.Errorf("application status %s does not allow event %s", app.Status, event)
-		}
-		app.Status = types.DatasetApplicationStatus(appFSM.Current())
+		app.Status = newAppStatus
 		app.ReviewerID = reviewerID
 		app.ReviewMsg = reviewMsg
 
-		// On approve, update dataset and repository
-		if action == "approve" {
+		// On approve, update dataset and repository with pre-computed values
+		if dsUpdate != nil {
 			var ds Dataset
 			if err := tx.NewSelect().Model(&ds).Where("dataset.id = ?", app.DatasetID).For("UPDATE").Scan(ctx); err != nil {
 				return fmt.Errorf("failed to lock dataset: %w", err)
 			}
-			// Load repository relation separately after locking
 			if err := tx.NewSelect().Model(&ds).WherePK().Relation("Repository").Scan(ctx); err != nil {
 				return fmt.Errorf("failed to load dataset repository: %w", err)
 			}
 
-			var dsEvent string
-			switch app.Action {
-			case types.DatasetApplicationActionInitial, types.DatasetApplicationActionEdit, types.DatasetApplicationActionRelist:
-				dsEvent = DatasetEventList
-				if app.Price > 0 {
-					ds.Price = app.Price
-				}
-				if app.RelatedDatasetID > 0 {
-					ds.RelatedDatasetID = app.RelatedDatasetID
-				}
-				ds.DatasetType = types.DatasetTypeCommercial
-				ds.Repository.Private = false
-			case types.DatasetApplicationActionDelist:
-				dsEvent = DatasetEventDelist
-				ds.DatasetType = types.DatasetTypeNormal
-				ds.Price = 0
-				ds.RelatedDatasetID = 0
+			// CAS: verify dataset is still in the expected state before applying updates
+			if dsUpdate.ExpectedDatasetStatus != "" && ds.Status != dsUpdate.ExpectedDatasetStatus {
+				return fmt.Errorf("dataset status changed from %s to %s", dsUpdate.ExpectedDatasetStatus, ds.Status)
 			}
 
-			dsFSM := NewDatasetWithFSM(&ds)
-			if !dsFSM.SubmitEvent(ctx, dsEvent) {
-				return fmt.Errorf("dataset status %s does not allow event %s", ds.Status, dsEvent)
+			// Check for related dataset conflicts (safety net — component also checks)
+			if app.RelatedDatasetID > 0 {
+				var refs []Dataset
+				if err := tx.NewSelect().
+					Model(&refs).
+					Where("related_dataset_id IN (?)", bun.In([]int64{ds.ID, app.RelatedDatasetID})).
+					Where("id != ?", ds.ID).
+					For("UPDATE").
+					Scan(ctx); err != nil {
+					return fmt.Errorf("failed to check related dataset conflicts: %w", err)
+				}
+				for _, ref := range refs {
+					if ref.RelatedDatasetID == ds.ID {
+						return errorx.DatasetAlreadyReferenced(
+							fmt.Errorf("dataset %d is already referenced by dataset %d", ds.ID, ref.ID),
+							errorx.Ctx().Set("dataset_id", ds.ID).Set("ref_id", ref.ID),
+						)
+					}
+					if ref.RelatedDatasetID == app.RelatedDatasetID && ref.ID != ds.ID {
+						return errorx.RelatedDatasetAlreadyReferenced(
+							fmt.Errorf("related dataset %d is already referenced by dataset %d", app.RelatedDatasetID, ref.ID),
+							errorx.Ctx().Set("related_dataset_id", app.RelatedDatasetID).Set("ref_id", ref.ID),
+						)
+					}
+				}
 			}
-			ds.Status = types.DatasetStatus(dsFSM.Current())
 
+			ds.Status = dsUpdate.NewStatus
+			ds.Price = dsUpdate.Price
+			ds.RelatedDatasetID = dsUpdate.RelatedDatasetID
+			ds.DatasetType = dsUpdate.DatasetType
 			ds.LastUpdatedAt = time.Now()
+			ds.Repository.Private = dsUpdate.RepositoryPrivate
+
 			if _, err := tx.NewUpdate().Model(&ds).WherePK().Exec(ctx); err != nil {
+				var pgErr pgdriver.Error
+				if errors.As(err, &pgErr) && pgErr.IntegrityViolation() {
+					return errorx.RelatedDatasetAlreadyReferenced(
+						fmt.Errorf("related dataset %d is already referenced by another dataset", dsUpdate.RelatedDatasetID),
+						errorx.Ctx().Set("related_dataset_id", dsUpdate.RelatedDatasetID),
+					)
+				}
 				return fmt.Errorf("failed to update dataset: %w", err)
 			}
 			if _, err := tx.NewUpdate().Model(ds.Repository).WherePK().Exec(ctx); err != nil {
@@ -376,12 +401,6 @@ func (s *datasetApplicationStoreImpl) ReviewApplication(ctx context.Context, app
 	})
 	if err != nil {
 		return nil, err
-	}
-
-	if onApprove != nil {
-		if err := onApprove(&result); err != nil {
-			return nil, err
-		}
 	}
 	return &result, nil
 }

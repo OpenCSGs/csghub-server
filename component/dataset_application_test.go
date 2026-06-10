@@ -6,6 +6,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/mock"
@@ -25,8 +26,8 @@ func setupSaaSComponent(t *testing.T) (*datasetComponentImpl, *mockdb.MockDatase
 	appStore := mockdb.NewMockDatasetApplicationStore(t)
 
 	c := &datasetComponentImpl{
-		datasetStore: dsStore,
-		userStore:    userStore,
+		datasetStore:  dsStore,
+		userStore:     userStore,
 		repoComponent: repoComp,
 		extendDatasetImpl: extendDatasetImpl{
 			datasetApplicationStore: appStore,
@@ -40,8 +41,8 @@ func TestCreateDatasetApplication_NoPermission(t *testing.T) {
 	c, dsStore, userStore, repoComp, _ := setupSaaSComponent(t)
 
 	dataset := &database.Dataset{
-		ID:     1,
-		Status: types.DatasetStatusNormal,
+		ID:         1,
+		Status:     types.DatasetStatusNormal,
 		Repository: &database.Repository{Path: "user/d1"},
 	}
 	dsStore.On("FindByPath", ctx, "user", "d1").Return(dataset, nil)
@@ -66,8 +67,8 @@ func TestCreateDatasetApplication_PendingExists(t *testing.T) {
 	c, dsStore, userStore, repoComp, appStore := setupSaaSComponent(t)
 
 	dataset := &database.Dataset{
-		ID:     1,
-		Status: types.DatasetStatusNormal,
+		ID:         1,
+		Status:     types.DatasetStatusNormal,
 		Repository: &database.Repository{Path: "user/d1"},
 	}
 	dsStore.On("FindByPath", ctx, "user", "d1").Return(dataset, nil)
@@ -85,17 +86,16 @@ func TestCreateDatasetApplication_PendingExists(t *testing.T) {
 	}
 	_, err := c.CreateDatasetApplication(ctx, req)
 	require.NotNil(t, err)
-	require.Contains(t, err.Error(), "pending application already exists")
+	require.True(t, errors.Is(err, errorx.ErrPendingApplicationExists))
 }
-
 
 func TestCreateDatasetApplication_RelatedDatasetNotFound(t *testing.T) {
 	ctx := context.TODO()
 	c, dsStore, userStore, repoComp, appStore := setupSaaSComponent(t)
 
 	dataset := &database.Dataset{
-		ID:     1,
-		Status: types.DatasetStatusNormal,
+		ID:         1,
+		Status:     types.DatasetStatusNormal,
 		Repository: &database.Repository{Path: "user/d1"},
 	}
 	dsStore.On("FindByPath", ctx, "user", "d1").Return(dataset, nil)
@@ -122,8 +122,8 @@ func TestCreateDatasetApplication_Success(t *testing.T) {
 	c, dsStore, userStore, repoComp, appStore := setupSaaSComponent(t)
 
 	dataset := &database.Dataset{
-		ID:     1,
-		Status: types.DatasetStatusNormal,
+		ID:         1,
+		Status:     types.DatasetStatusNormal,
 		Repository: &database.Repository{Path: "user/d1"},
 	}
 	dsStore.On("FindByPath", ctx, "user", "d1").Return(dataset, nil)
@@ -137,6 +137,7 @@ func TestCreateDatasetApplication_Success(t *testing.T) {
 		Repository: &database.Repository{Path: "user/d2"},
 	}
 	dsStore.On("ByID", ctx, int64(2)).Return(relatedDs, nil)
+	dsStore.On("FindByRelatedDatasetIDs", ctx, []int64{1, 2}).Return([]database.Dataset{}, nil)
 	repoComp.On("GetUserRepoPermission", ctx, "u", relatedDs.Repository).Return(&types.UserRepoPermission{CanWrite: true}, nil)
 
 	created := &database.DatasetApplication{
@@ -164,6 +165,106 @@ func TestCreateDatasetApplication_Success(t *testing.T) {
 	require.Nil(t, err)
 	require.NotNil(t, app)
 	require.Equal(t, types.DatasetApplicationActionInitial, app.Action)
+}
+
+func TestCreateDatasetApplication_RelatedDatasetAlreadyReferenced(t *testing.T) {
+	ctx := context.TODO()
+	c, dsStore, userStore, repoComp, appStore := setupSaaSComponent(t)
+
+	dataset := &database.Dataset{
+		ID:         1,
+		Status:     types.DatasetStatusNormal,
+		Repository: &database.Repository{Path: "user/d1"},
+	}
+	dsStore.On("FindByPath", ctx, "user", "d1").Return(dataset, nil)
+	userStore.On("FindByUsername", ctx, "u").Return(database.User{ID: 1, Username: "u"}, nil)
+	repoComp.On("GetUserRepoPermission", ctx, "u", dataset.Repository).Return(&types.UserRepoPermission{CanWrite: true}, nil)
+	appStore.On("FindPendingByDatasetID", ctx, int64(1)).Return(nil, errorx.HandleDBError(sql.ErrNoRows, nil))
+
+	relatedDs := &database.Dataset{
+		ID:         2,
+		Status:     types.DatasetStatusNormal,
+		Repository: &database.Repository{Path: "user/d2"},
+	}
+	dsStore.On("ByID", ctx, int64(2)).Return(relatedDs, nil)
+	// Related dataset (ID=2) is already referenced by another dataset (ID=3)
+	dsStore.On("FindByRelatedDatasetIDs", ctx, []int64{1, 2}).Return([]database.Dataset{{ID: 3, RelatedDatasetID: 2}}, nil)
+
+	req := &types.CreateDatasetApplicationReq{
+		Namespace:        "user",
+		Name:             "d1",
+		Action:           "list",
+		Price:            99,
+		RelatedDatasetID: 2,
+		CurrentUser:      "u",
+	}
+	_, err := c.CreateDatasetApplication(ctx, req)
+	require.NotNil(t, err)
+	require.Contains(t, err.Error(), "related dataset is already referenced by another dataset")
+}
+
+func TestCreateDatasetApplication_DatasetAlreadyReferencingAnother(t *testing.T) {
+	ctx := context.TODO()
+	c, dsStore, userStore, repoComp, appStore := setupSaaSComponent(t)
+
+	// Current dataset (ID=1) is already referenced by another dataset (ID=3) as RelatedDatasetID
+	dataset := &database.Dataset{
+		ID:         1,
+		Status:     types.DatasetStatusNormal,
+		Repository: &database.Repository{Path: "user/d1"},
+	}
+	dsStore.On("FindByPath", ctx, "user", "d1").Return(dataset, nil)
+	userStore.On("FindByUsername", ctx, "u").Return(database.User{ID: 1, Username: "u"}, nil)
+	repoComp.On("GetUserRepoPermission", ctx, "u", dataset.Repository).Return(&types.UserRepoPermission{CanWrite: true}, nil)
+	appStore.On("FindPendingByDatasetID", ctx, int64(1)).Return(nil, errorx.HandleDBError(sql.ErrNoRows, nil))
+
+	relatedDs := &database.Dataset{
+		ID:         2,
+		Status:     types.DatasetStatusNormal,
+		Repository: &database.Repository{Path: "user/d2"},
+	}
+	dsStore.On("ByID", ctx, int64(2)).Return(relatedDs, nil)
+	// Current dataset (ID=1) is already referenced by another dataset (ID=3) as RelatedDatasetID
+	dsStore.On("FindByRelatedDatasetIDs", ctx, []int64{1, 2}).Return([]database.Dataset{{ID: 3, RelatedDatasetID: 1}}, nil)
+
+	req := &types.CreateDatasetApplicationReq{
+		Namespace:        "user",
+		Name:             "d1",
+		Action:           "list",
+		Price:            99,
+		RelatedDatasetID: 2,
+		CurrentUser:      "u",
+	}
+	_, err := c.CreateDatasetApplication(ctx, req)
+	require.NotNil(t, err)
+	require.Contains(t, err.Error(), "dataset is already referenced by another dataset")
+}
+
+func TestCreateDatasetApplication_SameDatasetAndRelatedDatasetID(t *testing.T) {
+	ctx := context.TODO()
+	c, dsStore, userStore, repoComp, appStore := setupSaaSComponent(t)
+
+	dataset := &database.Dataset{
+		ID:         1,
+		Status:     types.DatasetStatusNormal,
+		Repository: &database.Repository{Path: "user/d1"},
+	}
+	dsStore.On("FindByPath", ctx, "user", "d1").Return(dataset, nil)
+	userStore.On("FindByUsername", ctx, "u").Return(database.User{ID: 1, Username: "u"}, nil)
+	repoComp.On("GetUserRepoPermission", ctx, "u", dataset.Repository).Return(&types.UserRepoPermission{CanWrite: true}, nil)
+	appStore.On("FindPendingByDatasetID", ctx, int64(1)).Return(nil, errorx.HandleDBError(sql.ErrNoRows, nil))
+
+	req := &types.CreateDatasetApplicationReq{
+		Namespace:        "user",
+		Name:             "d1",
+		Action:           "list",
+		Price:            99,
+		RelatedDatasetID: 1, // same as dataset ID
+		CurrentUser:      "u",
+	}
+	_, err := c.CreateDatasetApplication(ctx, req)
+	require.NotNil(t, err)
+	require.Contains(t, err.Error(), "related dataset cannot be the same as current dataset")
 }
 
 func TestGetDatasetApplication_NotFound(t *testing.T) {
@@ -227,8 +328,14 @@ func TestReviewDatasetApplication_Reject(t *testing.T) {
 	ctx := context.TODO()
 	c, _, userStore, _, appStore := setupSaaSComponent(t)
 
+	pendingApp := &database.DatasetApplication{
+		ID:     1,
+		Status: types.DatasetApplicationStatusPending,
+		Action: types.DatasetApplicationActionInitial,
+	}
 	userStore.On("FindByUsername", ctx, "admin").Return(database.User{ID: 999, Username: "admin"}, nil)
-	appStore.On("ReviewApplication", ctx, int64(1), int64(999), "not good", "reject", mock.AnythingOfType("func(*database.DatasetApplication) error")).
+	appStore.On("FindByID", ctx, int64(1)).Return(pendingApp, nil)
+	appStore.On("ReviewApplication", ctx, int64(1), int64(999), "not good", types.DatasetApplicationStatusPending, types.DatasetApplicationStatusRejected, (*database.ReviewDatasetUpdate)(nil)).
 		Return(&database.DatasetApplication{ID: 1, Status: types.DatasetApplicationStatusRejected, Action: types.DatasetApplicationActionInitial}, nil)
 
 	req := &types.ReviewDatasetApplicationReq{
@@ -243,10 +350,29 @@ func TestReviewDatasetApplication_Reject(t *testing.T) {
 
 func TestReviewDatasetApplication_Approve(t *testing.T) {
 	ctx := context.TODO()
-	c, _, userStore, _, appStore := setupSaaSComponent(t)
+	c, dsStore, userStore, _, appStore := setupSaaSComponent(t)
 
+	pendingApp := &database.DatasetApplication{
+		ID:               1,
+		DatasetID:        10,
+		Action:           types.DatasetApplicationActionInitial,
+		Price:            9.99,
+		RelatedDatasetID: 0,
+		Status:           types.DatasetApplicationStatusPending,
+	}
 	userStore.On("FindByUsername", ctx, "admin").Return(database.User{ID: 999, Username: "admin"}, nil)
-	appStore.On("ReviewApplication", ctx, int64(1), int64(999), "", "approve", mock.AnythingOfType("func(*database.DatasetApplication) error")).
+	appStore.On("FindByID", ctx, int64(1)).Return(pendingApp, nil)
+	dsStore.On("ByID", ctx, int64(10)).Return(&database.Dataset{
+		ID:     10,
+		Status: types.DatasetStatusNormal,
+	}, nil)
+	appStore.On("ReviewApplication", ctx, int64(1), int64(999), "", types.DatasetApplicationStatusPending, types.DatasetApplicationStatusApproved, &database.ReviewDatasetUpdate{
+		ExpectedDatasetStatus: types.DatasetStatusNormal,
+		NewStatus:             types.DatasetStatusListed,
+		Price:                 9.99,
+		DatasetType:           types.DatasetTypeCommercial,
+		RepositoryPrivate:     false,
+	}).
 		Return(&database.DatasetApplication{ID: 1, Status: types.DatasetApplicationStatusApproved, Action: types.DatasetApplicationActionInitial}, nil)
 
 	req := &types.ReviewDatasetApplicationReq{
@@ -256,6 +382,106 @@ func TestReviewDatasetApplication_Approve(t *testing.T) {
 	}
 	_, err := c.ReviewDatasetApplication(ctx, req)
 	require.Nil(t, err)
+}
+
+func TestReviewDatasetApplication_Approve_ConflictDatasetReferenced(t *testing.T) {
+	ctx := context.TODO()
+	c, dsStore, userStore, _, appStore := setupSaaSComponent(t)
+
+	pendingApp := &database.DatasetApplication{
+		ID:               1,
+		DatasetID:        10,
+		Action:           types.DatasetApplicationActionInitial,
+		Price:            9.99,
+		RelatedDatasetID: 20,
+		Status:           types.DatasetApplicationStatusPending,
+	}
+	dataset := &database.Dataset{
+		ID:     10,
+		Status: types.DatasetStatusNormal,
+	}
+	userStore.On("FindByUsername", ctx, "admin").Return(database.User{ID: 999, Username: "admin"}, nil)
+	appStore.On("FindByID", ctx, int64(1)).Return(pendingApp, nil)
+	dsStore.On("ByID", ctx, int64(10)).Return(dataset, nil)
+	appStore.On("ReviewApplication", ctx, int64(1), int64(999), "", types.DatasetApplicationStatusPending, types.DatasetApplicationStatusApproved, &database.ReviewDatasetUpdate{
+		ExpectedDatasetStatus: types.DatasetStatusNormal,
+		NewStatus:             types.DatasetStatusListed,
+		Price:                 9.99,
+		RelatedDatasetID:      20,
+		DatasetType:           types.DatasetTypeCommercial,
+		RepositoryPrivate:     false,
+	}).
+		Return(nil, errorx.DatasetAlreadyReferenced(fmt.Errorf("conflict"), errorx.Ctx()))
+
+	req := &types.ReviewDatasetApplicationReq{
+		ID:          1,
+		Action:      "approve",
+		CurrentUser: "admin",
+	}
+	_, err := c.ReviewDatasetApplication(ctx, req)
+	require.NotNil(t, err)
+	require.True(t, errors.Is(err, errorx.ErrDatasetAlreadyReferenced))
+}
+
+func TestReviewDatasetApplication_Approve_ConflictRelatedDatasetReferenced(t *testing.T) {
+	ctx := context.TODO()
+	c, dsStore, userStore, _, appStore := setupSaaSComponent(t)
+
+	pendingApp := &database.DatasetApplication{
+		ID:               1,
+		DatasetID:        10,
+		Action:           types.DatasetApplicationActionInitial,
+		Price:            9.99,
+		RelatedDatasetID: 20,
+		Status:           types.DatasetApplicationStatusPending,
+	}
+	dataset := &database.Dataset{
+		ID:     10,
+		Status: types.DatasetStatusNormal,
+	}
+	userStore.On("FindByUsername", ctx, "admin").Return(database.User{ID: 999, Username: "admin"}, nil)
+	appStore.On("FindByID", ctx, int64(1)).Return(pendingApp, nil)
+	dsStore.On("ByID", ctx, int64(10)).Return(dataset, nil)
+	appStore.On("ReviewApplication", ctx, int64(1), int64(999), "", types.DatasetApplicationStatusPending, types.DatasetApplicationStatusApproved, &database.ReviewDatasetUpdate{
+		ExpectedDatasetStatus: types.DatasetStatusNormal,
+		NewStatus:             types.DatasetStatusListed,
+		Price:                 9.99,
+		RelatedDatasetID:      20,
+		DatasetType:           types.DatasetTypeCommercial,
+		RepositoryPrivate:     false,
+	}).
+		Return(nil, errorx.RelatedDatasetAlreadyReferenced(fmt.Errorf("conflict"), errorx.Ctx()))
+
+	req := &types.ReviewDatasetApplicationReq{
+		ID:          1,
+		Action:      "approve",
+		CurrentUser: "admin",
+	}
+	_, err := c.ReviewDatasetApplication(ctx, req)
+	require.NotNil(t, err)
+	require.True(t, errors.Is(err, errorx.ErrRelatedDatasetAlreadyReferenced))
+}
+
+func TestReviewDatasetApplication_FSMNotAllowed(t *testing.T) {
+	ctx := context.TODO()
+	c, _, userStore, _, appStore := setupSaaSComponent(t)
+
+	// Application is already approved, cannot be approved again
+	appStore.On("FindByID", ctx, int64(1)).Return(&database.DatasetApplication{
+		ID:     1,
+		Status: types.DatasetApplicationStatusApproved,
+		Action: types.DatasetApplicationActionInitial,
+	}, nil)
+	userStore.On("FindByUsername", ctx, "admin").Return(database.User{ID: 999, Username: "admin"}, nil)
+
+	req := &types.ReviewDatasetApplicationReq{
+		ID:          1,
+		Action:      "approve",
+		CurrentUser: "admin",
+	}
+	_, err := c.ReviewDatasetApplication(ctx, req)
+	require.NotNil(t, err)
+	require.True(t, errors.Is(err, errorx.ErrApplicationStatusNotAllowed))
 }
 
 func TestResolveApplicationAction(t *testing.T) {

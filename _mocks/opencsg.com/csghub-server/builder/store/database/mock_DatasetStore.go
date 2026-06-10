@@ -681,6 +681,65 @@ func (_c *MockDatasetStore_FindByPath_Call) RunAndReturn(run func(context.Contex
 	return _c
 }
 
+// FindByRelatedDatasetIDs provides a mock function with given fields: ctx, relatedDatasetIDs
+func (_m *MockDatasetStore) FindByRelatedDatasetIDs(ctx context.Context, relatedDatasetIDs []int64) ([]database.Dataset, error) {
+	ret := _m.Called(ctx, relatedDatasetIDs)
+
+	if len(ret) == 0 {
+		panic("no return value specified for FindByRelatedDatasetIDs")
+	}
+
+	var r0 []database.Dataset
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, []int64) ([]database.Dataset, error)); ok {
+		return rf(ctx, relatedDatasetIDs)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, []int64) []database.Dataset); ok {
+		r0 = rf(ctx, relatedDatasetIDs)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]database.Dataset)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, []int64) error); ok {
+		r1 = rf(ctx, relatedDatasetIDs)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockDatasetStore_FindByRelatedDatasetIDs_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FindByRelatedDatasetIDs'
+type MockDatasetStore_FindByRelatedDatasetIDs_Call struct {
+	*mock.Call
+}
+
+// FindByRelatedDatasetIDs is a helper method to define mock.On call
+//   - ctx context.Context
+//   - relatedDatasetIDs []int64
+func (_e *MockDatasetStore_Expecter) FindByRelatedDatasetIDs(ctx interface{}, relatedDatasetIDs interface{}) *MockDatasetStore_FindByRelatedDatasetIDs_Call {
+	return &MockDatasetStore_FindByRelatedDatasetIDs_Call{Call: _e.mock.On("FindByRelatedDatasetIDs", ctx, relatedDatasetIDs)}
+}
+
+func (_c *MockDatasetStore_FindByRelatedDatasetIDs_Call) Run(run func(ctx context.Context, relatedDatasetIDs []int64)) *MockDatasetStore_FindByRelatedDatasetIDs_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].([]int64))
+	})
+	return _c
+}
+
+func (_c *MockDatasetStore_FindByRelatedDatasetIDs_Call) Return(_a0 []database.Dataset, _a1 error) *MockDatasetStore_FindByRelatedDatasetIDs_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockDatasetStore_FindByRelatedDatasetIDs_Call) RunAndReturn(run func(context.Context, []int64) ([]database.Dataset, error)) *MockDatasetStore_FindByRelatedDatasetIDs_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ListByPath provides a mock function with given fields: ctx, paths
 func (_m *MockDatasetStore) ListByPath(ctx context.Context, paths []string) ([]database.Dataset, error) {
 	ret := _m.Called(ctx, paths)

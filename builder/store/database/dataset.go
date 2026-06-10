@@ -41,6 +41,7 @@ type DatasetStore interface {
 	CreateIfNotExist(ctx context.Context, input Dataset) (*Dataset, error)
 	CreateAndUpdateRepoPath(ctx context.Context, input Dataset, path string) (*Dataset, error)
 	UpdateDatasetAndRepo(ctx context.Context, dataset Dataset, repo Repository) error
+	FindByRelatedDatasetIDs(ctx context.Context, relatedDatasetIDs []int64) ([]Dataset, error)
 }
 
 func NewDatasetStore() DatasetStore {
@@ -391,4 +392,16 @@ func (s *datasetStoreImpl) UpdateDatasetAndRepo(ctx context.Context, dataset Dat
 		}
 		return nil
 	})
+}
+
+func (s *datasetStoreImpl) FindByRelatedDatasetIDs(ctx context.Context, relatedDatasetIDs []int64) ([]Dataset, error) {
+	var datasets []Dataset
+	err := s.db.Operator.Core.NewSelect().
+		Model(&datasets).
+		Where("related_dataset_id IN (?)", bun.In(relatedDatasetIDs)).
+		Scan(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find datasets by related_dataset_id: %v, error: %w", relatedDatasetIDs, err)
+	}
+	return datasets, nil
 }

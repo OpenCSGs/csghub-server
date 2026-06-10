@@ -7,5 +7,20 @@
     },
     "error.DAT-ERR-2": {
         "other": "未找到有效的Parquet文件"
+    },
+    "error.DAT-ERR-3": {
+        "other": "申请状态不允许此操作"
+    },
+    "error.DAT-ERR-4": {
+        "other": "数据集状态不允许此操作"
+    },
+    "error.DAT-ERR-5": {
+        "other": "该数据集已被其他数据集引用"
+    },
+    "error.DAT-ERR-6": {
+        "other": "关联数据集已被其他数据集引用"
+    },
+    "error.DAT-ERR-7": {
+        "other": "该数据集已有待审核的申请"
     }
 }

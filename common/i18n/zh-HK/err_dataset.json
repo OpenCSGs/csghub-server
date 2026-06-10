@@ -7,5 +7,20 @@
     },
     "error.DAT-ERR-2": {
         "other": "未找到有效的Parquet檔案"
+    },
+    "error.DAT-ERR-3": {
+        "other": "申請狀態不允許此操作"
+    },
+    "error.DAT-ERR-4": {
+        "other": "數據集狀態不允許此操作"
+    },
+    "error.DAT-ERR-5": {
+        "other": "該數據集已被其他數據集引用"
+    },
+    "error.DAT-ERR-6": {
+        "other": "關聯數據集已被其他數據集引用"
+    },
+    "error.DAT-ERR-7": {
+        "other": "該數據集已有待審核的申請"
     }
 }

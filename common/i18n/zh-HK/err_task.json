@@ -10,5 +10,14 @@
     },
     "error.TASK-ERR-3": {
         "other": "不支援多主機 Notebook"
+    },
+    "error.TASK-ERR-4": {
+        "other": "集群資源不足"
+    },
+    "error.TASK-ERR-5": {
+        "other": "集群當前不可用"
+    },
+    "error.TASK-ERR-6": {
+        "other": "無法確定資源狀態"
     }
 }
