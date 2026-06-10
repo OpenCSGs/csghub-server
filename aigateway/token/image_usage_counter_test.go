@@ -36,8 +36,11 @@ func TestImageUsageCounter_ImageResponse_Nil(t *testing.T) {
 
 func TestImageUsageCounter_ImageResponse_WithUsage(t *testing.T) {
 	c := NewImageUsageCounter()
+	c.SetRequestDetails("512x512", 3)
 	resp := &types.ImageGenerationResponse{
 		ImagesResponse: openai.ImagesResponse{
+			Data: []openai.Image{{URL: "https://example.com/1.png"}, {URL: "https://example.com/2.png"}},
+			Size: openai.ImagesResponseSize1024x1024,
 			Usage: openai.ImagesResponseUsage{
 				InputTokens:  2,
 				OutputTokens: 8,
@@ -52,6 +55,8 @@ func TestImageUsageCounter_ImageResponse_WithUsage(t *testing.T) {
 	assert.Equal(t, int64(2), usage.PromptTokens)
 	assert.Equal(t, int64(8), usage.CompletionTokens)
 	assert.Equal(t, int64(10), usage.TotalTokens)
+	assert.Equal(t, "1024x1024", usage.Resolution)
+	assert.Equal(t, int64(2), usage.CompletionRC)
 }
 
 func TestImageUsageCounter_ImageResponse_OverwritesPrevious(t *testing.T) {
@@ -83,6 +88,7 @@ func TestImageUsageCounter_ImageResponse_OverwritesPrevious(t *testing.T) {
 
 func TestImageUsageCounter_ImageResponse_ZeroUsage(t *testing.T) {
 	c := NewImageUsageCounter()
+	c.SetRequestDetails("1024x1536", 2)
 	resp := &types.ImageGenerationResponse{
 		ImagesResponse: openai.ImagesResponse{
 			Usage: openai.ImagesResponseUsage{},
@@ -95,4 +101,6 @@ func TestImageUsageCounter_ImageResponse_ZeroUsage(t *testing.T) {
 	assert.Equal(t, int64(0), usage.PromptTokens)
 	assert.Equal(t, int64(0), usage.CompletionTokens)
 	assert.Equal(t, int64(0), usage.TotalTokens)
+	assert.Equal(t, "1024x1536", usage.Resolution)
+	assert.Equal(t, int64(2), usage.CompletionRC)
 }

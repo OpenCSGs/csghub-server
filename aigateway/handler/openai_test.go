@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/openai/openai-go/v3"
 	"github.com/openai/openai-go/v3/option"
 	"github.com/stretchr/testify/assert"
@@ -118,6 +119,27 @@ func setupTest(t *testing.T) (*testerOpenAIHandler, *gin.Context, *httptest.Resp
 	tester.mocks.openAIComp.EXPECT().CommitUsageLimit(mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 
 	return tester, c, w
+}
+
+func expectBuildVideoMeteringEvent(t *testing.T, tester *testerOpenAIHandler) *commontypes.MeteringEvent {
+	event := &commontypes.MeteringEvent{
+		Uuid:         uuid.New(),
+		UserUUID:     "testuuid",
+		Value:        1,
+		ValueType:    commontypes.CountNumberType,
+		Scene:        int(commontypes.SceneMultiModalServerless),
+		OpUID:        string(commontypes.AccessTokenAppAIGateway),
+		ResourceID:   "resource-id",
+		ResourceName: "resource-id",
+		CustomerID:   "customer-id",
+		Extra:        `{"completion_data_type":"video"}`,
+	}
+	tester.mocks.openAIComp.EXPECT().BuildUsageMeteringEvent(mock.Anything, "testuuid", mock.Anything, mock.Anything, mock.MatchedBy(func(usage *token.Usage) bool {
+		return usage != nil &&
+			usage.DataType == string(commontypes.DataTypeVideo) &&
+			usage.CompletionRC == 1
+	}), "").Return(event, nil).Once()
+	return event
 }
 
 func TestOpenAIHandler_ListModels(t *testing.T) {
@@ -1432,12 +1454,14 @@ func TestOpenAIHandler_Transcription(t *testing.T) {
 			return usage != nil &&
 				usage.TotalTokens == 423 &&
 				usage.PromptTokens == 371 &&
-				usage.CompletionTokens == 52
+				usage.CompletionTokens == 52 &&
+				usage.Duration == 9.2
 		}), "").RunAndReturn(
 			func(ctx context.Context, userUUID string, model *types.Model, targetModelName string, usage *token.Usage, apikey string) error {
 				require.Equal(t, int64(423), usage.TotalTokens)
 				require.Equal(t, int64(371), usage.PromptTokens)
 				require.Equal(t, int64(52), usage.CompletionTokens)
+				require.Equal(t, 9.2, usage.Duration)
 				wg.Done()
 				return nil
 			}).Once()
@@ -1504,6 +1528,51 @@ func TestOpenAIHandler_Transcription(t *testing.T) {
 		require.Equal(t, http.StatusBadRequest, w.Code)
 		require.Contains(t, w.Body.String(), "model_not_found")
 	})
+
+	t.Run("upstream error status ends trace without billing", func(t *testing.T) {
+		tester, c, w := setupTest(t)
+		doneCh := make(chan struct{})
+		recorder := &testGenerationRecorderWithMutex{doneCh: doneCh}
+		tracer := &testLLMTracerWithMutex{recorder: recorder}
+		tester.handler.llmTracer = tracer
+
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusInternalServerError)
+			_, _ = w.Write([]byte(`{"error":{"message":"upstream unavailable"}}`))
+		}))
+		defer server.Close()
+
+		model := &types.Model{
+			BaseModel: types.BaseModel{
+				ID:       "backend-model",
+				Object:   "model",
+				Metadata: map[string]any{},
+				Task:     "audio-transcription",
+			},
+			Endpoint: server.URL + "/v1/audio/transcriptions",
+			Upstreams: []commontypes.UpstreamConfig{
+				{URL: server.URL + "/v1/audio/transcriptions", Enabled: true, ModelName: "backend-model"},
+			},
+		}
+		c.Request = newMultipartTranscriptionRequest(t, "model1", "audio-bytes", nil)
+		c.Set(trace.HeaderRequestID, "req-audio-error")
+
+		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "model1").Return(model, nil).Once()
+		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil).Once()
+
+		tester.handler.Transcription(c)
+		waitForGenerationTraceEnd(t, doneCh)
+
+		require.Equal(t, http.StatusInternalServerError, w.Code)
+		usage, response, errorCode, ended, events := generationTraceSnapshot(recorder)
+		require.True(t, ended)
+		require.Nil(t, usage)
+		require.NotNil(t, response)
+		require.Equal(t, "backend-model", response.Model)
+		require.Equal(t, types.TraceErrUpstreamError, errorCode)
+		require.Equal(t, []string{"response", "error", "end"}, events)
+	})
 }
 
 func newMultipartTranscriptionRequest(t *testing.T, model, fileContent string, fields map[string]string) *http.Request {
@@ -1528,6 +1597,15 @@ func newMultipartTranscriptionRequest(t *testing.T, model, fileContent string, f
 	req := httptest.NewRequest(http.MethodPost, "/v1/audio/transcriptions", &body)
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 	return req
+}
+
+func waitForGenerationTraceEnd(t *testing.T, doneCh <-chan struct{}) {
+	t.Helper()
+	select {
+	case <-doneCh:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for generation trace to end")
+	}
 }
 
 func TestOpenAIHandler_GenerateImage(t *testing.T) {
@@ -1702,6 +1780,64 @@ func TestOpenAIHandler_GenerateImage(t *testing.T) {
 		assert.Equal(t, http.StatusInternalServerError, w.Code)
 	})
 
+	t.Run("upstream error status ends trace without billing", func(t *testing.T) {
+		tester, c, w := setupTest(t)
+		doneCh := make(chan struct{})
+		recorder := &testGenerationRecorderWithMutex{doneCh: doneCh}
+		tracer := &testLLMTracerWithMutex{recorder: recorder}
+		tester.handler.llmTracer = tracer
+
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusInternalServerError)
+			_, _ = w.Write([]byte(`{"created":0,"data":[]}`))
+		}))
+		defer server.Close()
+
+		imageReq := ImageGenerationRequest{
+			ImageGenerateParams: openai.ImageGenerateParams{
+				Model:  "test-model",
+				Prompt: "test prompt",
+			},
+		}
+		body, err := json.Marshal(imageReq)
+		require.NoError(t, err)
+		c.Request = httptest.NewRequest(http.MethodPost, "/v1/images/generations", bytes.NewReader(body))
+		c.Request.Header.Set("Content-Type", "application/json")
+		c.Set(trace.HeaderRequestID, "req-image-error")
+
+		model := &types.Model{
+			BaseModel: types.BaseModel{
+				ID:      "test-model",
+				Object:  "model",
+				OwnedBy: "testuser",
+				Task:    "text-to-image",
+			},
+			ExternalModelInfo: types.ExternalModelInfo{
+				Provider: "openai",
+			},
+			Endpoint: server.URL + "/v1/images/generations",
+			Upstreams: []commontypes.UpstreamConfig{
+				{URL: server.URL + "/v1/images/generations", Enabled: true, ModelName: "test-model"},
+			},
+		}
+		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "test-model").Return(model, nil).Once()
+		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil).Once()
+		tester.mocks.moderationComp.EXPECT().CheckImagePrompts(mock.Anything, "test prompt", "testuuid").Return(&rpc.CheckResult{IsSensitive: false}, nil).Once()
+
+		tester.handler.GenerateImage(c)
+		waitForGenerationTraceEnd(t, doneCh)
+
+		require.Equal(t, http.StatusInternalServerError, w.Code)
+		usage, response, errorCode, ended, events := generationTraceSnapshot(recorder)
+		require.True(t, ended)
+		require.Nil(t, usage)
+		require.NotNil(t, response)
+		require.Equal(t, "test-model", response.Model)
+		require.Equal(t, types.TraceErrUpstreamError, errorCode)
+		require.Equal(t, []string{"response", "error", "end"}, events)
+	})
+
 	t.Run("proxyToApi is / when endpoint has no path (space deployment)", func(t *testing.T) {
 		// Spaces (HF Inference Toolkit) serve at root. When model.Endpoint is
 		// "http://svc.spaces.a800.external" (no path), we must use proxyToApi="/"
@@ -1753,16 +1889,39 @@ func TestOpenAIHandler_CreateVideo(t *testing.T) {
 		defer downstream.Close()
 
 		model := &types.Model{
-			BaseModel:         types.BaseModel{ID: "video-model", Task: "text-to-video"},
+			BaseModel: types.BaseModel{
+				ID:       "video-model",
+				Task:     "text-to-video",
+				Metadata: map[string]any{types.MetaKeyLLMType: types.ProviderTypeExternalLLM},
+			},
 			ExternalModelInfo: types.ExternalModelInfo{Provider: "openai"},
 			Endpoint:          downstream.URL + "/v1/videos",
 			Upstreams: []commontypes.UpstreamConfig{
-				{URL: downstream.URL + "/v1/videos", Enabled: true, ModelName: "video-model", Provider: "openai"},
+				{ID: 123, URL: downstream.URL + "/v1/videos", Enabled: true, ModelName: "video-model", Provider: "openai"},
 			},
 		}
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "video-model").Return(model, nil).Once()
 		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil).Once()
 		tester.mocks.moderationComp.EXPECT().CheckImagePrompts(mock.Anything, "make a flying car", "testuuid").Return(&rpc.CheckResult{IsSensitive: false}, nil).Once()
+		meteringEvent := &commontypes.MeteringEvent{
+			Uuid:         uuid.New(),
+			UserUUID:     "testuuid",
+			Value:        1,
+			ValueType:    commontypes.CountNumberType,
+			Scene:        int(commontypes.SceneMultiModalServerless),
+			OpUID:        string(commontypes.AccessTokenAppAIGateway),
+			ResourceID:   "resource-id",
+			ResourceName: "resource-id",
+			CustomerID:   "customer-id",
+			Extra:        `{"completion_data_type":"video"}`,
+		}
+		tester.mocks.openAIComp.EXPECT().BuildUsageMeteringEvent(mock.Anything, "testuuid", model, "video-model", mock.MatchedBy(func(usage *token.Usage) bool {
+			return usage != nil &&
+				usage.DataType == string(commontypes.DataTypeVideo) &&
+				usage.Duration == 5 &&
+				usage.CompletionRC == 1 &&
+				usage.CompletionDesc == "make a flying car"
+		}), "api-key").Return(meteringEvent, nil).Once()
 		tester.mocks.aiGenerationStore.EXPECT().Create(mock.Anything, mock.MatchedBy(func(generation database.AIGeneration) bool {
 			createdGeneration = generation
 			return generation.ResourceType == database.AIGenerationResourceTypeVideo &&
@@ -1776,6 +1935,7 @@ func TestOpenAIHandler_CreateVideo(t *testing.T) {
 		body := `{"model":"video-model","prompt":"make a flying car","seconds":5}`
 		c.Request = httptest.NewRequest(http.MethodPost, "/v1/videos", bytes.NewBufferString(body))
 		c.Request.Header.Set("Content-Type", "application/json")
+		httpbase.SetAccessToken(c, "api-key")
 		c.Set(trace.HeaderRequestID, "req-video-ok")
 
 		tester.handler.CreateVideo(c)
@@ -1791,6 +1951,13 @@ func TestOpenAIHandler_CreateVideo(t *testing.T) {
 		require.Equal(t, "video-model", generation.ModelID)
 		require.Equal(t, "testuuid", generation.OwnerUUID)
 		require.Equal(t, "vid_123", generation.ProviderResourceID)
+		require.NotEqual(t, uuid.Nil, generation.EventUUID)
+		require.NotContains(t, generation.ProviderMetadata, "prompt")
+		require.NotContains(t, generation.ProviderMetadata, "seconds")
+		require.NotContains(t, generation.ProviderMetadata, "target")
+		require.Equal(t, int64(123), generation.UpstreamID)
+		require.Equal(t, meteringEvent.Uuid, generation.EventUUID)
+		require.Equal(t, meteringEvent, generation.MeteringMetadata)
 		require.Equal(t, model.ID, downstreamModel)
 		starts := tracer.Starts()
 		require.Len(t, starts, 1)
@@ -1835,7 +2002,9 @@ func TestOpenAIHandler_CreateVideo(t *testing.T) {
 		}
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "image-video-model").Return(model, nil).Once()
 		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil).Once()
+		tester.mocks.openAIComp.EXPECT().RecordUsage(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 		tester.mocks.moderationComp.EXPECT().CheckImagePrompts(mock.Anything, "animate this image", "testuuid").Return(&rpc.CheckResult{IsSensitive: false}, nil).Once()
+		expectBuildVideoMeteringEvent(t, tester)
 		tester.mocks.aiGenerationStore.EXPECT().Create(mock.Anything, mock.Anything).
 			Return(&database.AIGeneration{}, nil).Once()
 
@@ -1872,7 +2041,9 @@ func TestOpenAIHandler_CreateVideo(t *testing.T) {
 		}
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "video-model").Return(model, nil).Once()
 		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil).Once()
+		tester.mocks.openAIComp.EXPECT().RecordUsage(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 		tester.mocks.moderationComp.EXPECT().CheckImagePrompts(mock.Anything, "animate this asset", "testuuid").Return(&rpc.CheckResult{IsSensitive: false}, nil).Once()
+		expectBuildVideoMeteringEvent(t, tester)
 		tester.mocks.aiGenerationStore.EXPECT().Create(mock.Anything, mock.Anything).
 			Return(&database.AIGeneration{}, nil).Once()
 
@@ -1923,7 +2094,9 @@ func TestOpenAIHandler_CreateVideo(t *testing.T) {
 		}
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "video-model").Return(model, nil).Once()
 		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil).Once()
+		tester.mocks.openAIComp.EXPECT().RecordUsage(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 		tester.mocks.moderationComp.EXPECT().CheckImagePrompts(mock.Anything, "make a boat", "testuuid").Return(&rpc.CheckResult{IsSensitive: false}, nil).Once()
+		expectBuildVideoMeteringEvent(t, tester)
 		tester.mocks.aiGenerationStore.EXPECT().Create(mock.Anything, mock.MatchedBy(func(generation database.AIGeneration) bool {
 			createdGeneration = generation
 			return strings.HasPrefix(generation.ResourceID, "video_") &&
@@ -1972,7 +2145,9 @@ func TestOpenAIHandler_CreateVideo(t *testing.T) {
 		}
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "video-model").Return(model, nil).Once()
 		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil).Once()
+		tester.mocks.openAIComp.EXPECT().RecordUsage(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 		tester.mocks.moderationComp.EXPECT().CheckImagePrompts(mock.Anything, "make a boat", "testuuid").Return(&rpc.CheckResult{IsSensitive: false}, nil).Once()
+		expectBuildVideoMeteringEvent(t, tester)
 		tester.mocks.aiGenerationStore.EXPECT().Create(mock.Anything, mock.MatchedBy(func(generation database.AIGeneration) bool {
 			createdGeneration = generation
 			return strings.HasPrefix(generation.ResourceID, "video_") &&
@@ -1992,7 +2167,7 @@ func TestOpenAIHandler_CreateVideo(t *testing.T) {
 		require.Equal(t, resp.ID, createdGeneration.ResourceID)
 		require.Equal(t, "task_123", createdGeneration.ProviderResourceID)
 		require.Equal(t, "video-model", gotReq["model"])
-		require.Equal(t, "720P", gotReq["resolution"])
+		require.Equal(t, "768P", gotReq["resolution"])
 		require.Equal(t, "https://example.com/frame.png", gotReq["first_frame_image"])
 	})
 
@@ -2013,6 +2188,7 @@ func TestOpenAIHandler_CreateVideo(t *testing.T) {
 		}
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "video-model").Return(model, nil).Once()
 		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil).Once()
+		tester.mocks.openAIComp.EXPECT().RecordUsage(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 		tester.mocks.moderationComp.EXPECT().CheckImagePrompts(mock.Anything, "make a boat", "testuuid").Return(&rpc.CheckResult{IsSensitive: false}, nil).Once()
 
 		body := `{"model":"video-model","prompt":"make a boat","size":"1024x1792"}`
@@ -2054,6 +2230,7 @@ func TestOpenAIHandler_CreateVideo(t *testing.T) {
 		}
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "video-model").Return(model, nil).Once()
 		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil).Once()
+		tester.mocks.openAIComp.EXPECT().RecordUsage(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 		tester.mocks.moderationComp.EXPECT().CheckImagePrompts(mock.Anything, "make a boat", "testuuid").Return(&rpc.CheckResult{IsSensitive: false}, nil).Once()
 
 		body := `{"model":"video-model","prompt":"make a boat","size":"1280x720"}`
@@ -2091,6 +2268,7 @@ func TestOpenAIHandler_CreateVideo(t *testing.T) {
 		}
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "video-model").Return(model, nil).Once()
 		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil).Once()
+		tester.mocks.openAIComp.EXPECT().RecordUsage(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 		tester.mocks.moderationComp.EXPECT().CheckImagePrompts(mock.Anything, "make a boat", "testuuid").Return(&rpc.CheckResult{IsSensitive: false}, nil).Once()
 
 		body := `{"model":"video-model","prompt":"make a boat"}`
@@ -2121,6 +2299,7 @@ func TestOpenAIHandler_CreateVideo(t *testing.T) {
 		}
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "video-model").Return(model, nil).Once()
 		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil).Once()
+		tester.mocks.openAIComp.EXPECT().RecordUsage(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 		tester.mocks.moderationComp.EXPECT().CheckImagePrompts(mock.Anything, "make a boat", "testuuid").Return(&rpc.CheckResult{IsSensitive: false}, nil).Once()
 
 		body := `{"model":"video-model","prompt":"make a boat","size":"1024x1792"}`
@@ -2167,7 +2346,9 @@ func TestOpenAIHandler_CreateVideo(t *testing.T) {
 		}
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "video-model").Return(model, nil).Once()
 		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil).Once()
+		tester.mocks.openAIComp.EXPECT().RecordUsage(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 		tester.mocks.moderationComp.EXPECT().CheckImagePrompts(mock.Anything, "make a boat", "testuuid").Return(&rpc.CheckResult{IsSensitive: false}, nil).Once()
+		expectBuildVideoMeteringEvent(t, tester)
 		tester.mocks.aiGenerationStore.EXPECT().Create(mock.Anything, mock.MatchedBy(func(generation database.AIGeneration) bool {
 			createdGeneration = generation
 			return strings.HasPrefix(generation.ResourceID, "video_") &&
@@ -2240,7 +2421,9 @@ func TestOpenAIHandler_CreateVideo(t *testing.T) {
 		}
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "video-model").Return(model, nil).Once()
 		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil).Once()
+		tester.mocks.openAIComp.EXPECT().RecordUsage(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 		tester.mocks.moderationComp.EXPECT().CheckImagePrompts(mock.Anything, "make a boat", "testuuid").Return(&rpc.CheckResult{IsSensitive: false}, nil).Once()
+		expectBuildVideoMeteringEvent(t, tester)
 		tester.mocks.aiGenerationStore.EXPECT().Create(mock.Anything, mock.MatchedBy(func(generation database.AIGeneration) bool {
 			createdGeneration = generation
 			return strings.HasPrefix(generation.ResourceID, "video_") &&
@@ -2303,10 +2486,10 @@ func TestOpenAIHandler_GetVideo(t *testing.T) {
 	}
 	tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "video-model").Return(model, nil).Once()
 	tester.mocks.aiGenerationStore.EXPECT().FindByResourceID(mock.Anything, database.AIGenerationResourceTypeVideo, "video_gateway").Return(&generation, nil).Once()
-	tester.mocks.aiGenerationStore.EXPECT().Update(mock.Anything, mock.MatchedBy(func(input database.AIGeneration) bool {
+	tester.mocks.aiGenerationStore.EXPECT().UpdateWithStatus(mock.Anything, mock.MatchedBy(func(input database.AIGeneration) bool {
 		generation = input
 		return input.ResourceID == "video_gateway" && input.Status == "completed"
-	})).Return(&database.AIGeneration{}, nil).Once()
+	}), "queued").Return(true, nil).Once()
 
 	c.Request = httptest.NewRequest(http.MethodGet, "/v1/videos/video_gateway", nil)
 	c.Params = gin.Params{{Key: "video_id", Value: "video_gateway"}}
@@ -2318,6 +2501,45 @@ func TestOpenAIHandler_GetVideo(t *testing.T) {
 	require.Equal(t, "completed", generation.Status)
 }
 
+func TestOpenAIHandler_GetVideo_ReturnsTerminalRowWithoutUpstreamFetch(t *testing.T) {
+	tester, c, w := setupTest(t)
+	generation := database.AIGeneration{
+		ID:                 1,
+		ResourceType:       database.AIGenerationResourceTypeVideo,
+		ResourceID:         "video_gateway",
+		ProviderResourceID: "vid_123",
+		OwnerUUID:          "testuuid",
+		ModelID:            "video-model",
+		Status:             "completed",
+	}
+
+	var upstreamCalls int
+	downstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		upstreamCalls++
+	}))
+	defer downstream.Close()
+
+	model := &types.Model{
+		BaseModel:         types.BaseModel{ID: "video-model", Task: "text-to-video"},
+		ExternalModelInfo: types.ExternalModelInfo{Provider: "openai"},
+		Endpoint:          downstream.URL + "/v1/videos",
+		Upstreams: []commontypes.UpstreamConfig{
+			{URL: downstream.URL + "/v1/videos", Enabled: true, ModelName: "video-model"},
+		},
+	}
+	tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "video-model").Return(model, nil).Once()
+	tester.mocks.aiGenerationStore.EXPECT().FindByResourceID(mock.Anything, database.AIGenerationResourceTypeVideo, "video_gateway").Return(&generation, nil).Once()
+
+	c.Request = httptest.NewRequest(http.MethodGet, "/v1/videos/video_gateway", nil)
+	c.Params = gin.Params{{Key: "video_id", Value: "video_gateway"}}
+
+	tester.handler.GetVideo(c)
+
+	require.Equal(t, http.StatusOK, w.Code)
+	require.JSONEq(t, `{"id":"video_gateway","object":"video","status":"completed","model":"video-model"}`, w.Body.String())
+	require.Zero(t, upstreamCalls)
+}
+
 func TestOpenAIHandler_GetVideoContent(t *testing.T) {
 	tester, _, _ := setupTest(t)
 	generation := database.AIGeneration{
@@ -2327,7 +2549,7 @@ func TestOpenAIHandler_GetVideoContent(t *testing.T) {
 		ProviderResourceID: "vid_123",
 		OwnerUUID:          "testuuid",
 		ModelID:            "video-model",
-		Status:             "queued",
+		Status:             "completed",
 	}
 
 	downstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -2364,6 +2586,53 @@ func TestOpenAIHandler_GetVideoContent(t *testing.T) {
 
 	require.Equal(t, http.StatusOK, w.Code)
 	require.Equal(t, "video-bytes", w.Body.String())
+}
+
+func TestOpenAIHandler_GetVideoContent_NotReadyDoesNotCallUpstream(t *testing.T) {
+	tester, _, _ := setupTest(t)
+	generation := database.AIGeneration{
+		ID:                 1,
+		ResourceType:       database.AIGenerationResourceTypeVideo,
+		ResourceID:         "video_gateway",
+		ProviderResourceID: "vid_123",
+		OwnerUUID:          "testuuid",
+		ModelID:            "video-model",
+		Status:             "queued",
+	}
+
+	upstreamCalls := 0
+	downstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		upstreamCalls++
+		t.Fatalf("upstream should not be called for non-completed video")
+	}))
+	defer downstream.Close()
+
+	model := &types.Model{
+		BaseModel:         types.BaseModel{ID: "video-model", Task: "text-to-video"},
+		ExternalModelInfo: types.ExternalModelInfo{Provider: "openai"},
+		Endpoint:          downstream.URL + "/v1/videos",
+		Upstreams: []commontypes.UpstreamConfig{
+			{URL: downstream.URL + "/v1/videos", Enabled: true, ModelName: "video-model"},
+		},
+	}
+	tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "video-model").Return(model, nil).Once()
+	tester.mocks.aiGenerationStore.EXPECT().FindByResourceID(mock.Anything, database.AIGenerationResourceTypeVideo, "video_gateway").Return(&generation, nil).Once()
+
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		httpbase.SetCurrentUser(c, "testuser")
+		httpbase.SetCurrentNamespaceUUID(c, "testuuid")
+		c.Next()
+	})
+	router.GET("/v1/videos/:video_id/content", tester.handler.GetVideoContent)
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/v1/videos/video_gateway/content", nil)
+	router.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusBadRequest, w.Code)
+	require.Contains(t, w.Body.String(), "video_not_ready")
+	require.Zero(t, upstreamCalls)
 }
 
 func TestOpenAIHandler_GetVideoContent_MiniMaxResolvesDownloadURL(t *testing.T) {
@@ -2414,10 +2683,10 @@ func TestOpenAIHandler_GetVideoContent_MiniMaxResolvesDownloadURL(t *testing.T) 
 	}
 	tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "video-model").Return(model, nil).Once()
 	tester.mocks.aiGenerationStore.EXPECT().FindByResourceID(mock.Anything, database.AIGenerationResourceTypeVideo, "video_gateway").Return(&generation, nil).Once()
-	tester.mocks.aiGenerationStore.EXPECT().Update(mock.Anything, mock.MatchedBy(func(input database.AIGeneration) bool {
-		generation = input
-		return input.ResourceID == "video_gateway" && input.ProviderMetadata["file_id"] == "file_123"
-	})).Return(&database.AIGeneration{}, nil).Once()
+	tester.mocks.aiGenerationStore.EXPECT().UpdateProviderMetadata(mock.Anything, int64(1), mock.MatchedBy(func(providerMetadata map[string]any) bool {
+		generation.ProviderMetadata = providerMetadata
+		return providerMetadata["file_id"] == "file_123"
+	})).Return(nil).Once()
 
 	router := gin.New()
 	router.Use(func(c *gin.Context) {

@@ -392,6 +392,7 @@ type Config struct {
 		DeletePendingDeletionCronExpression      string `env:"STARHUB_SERVER_CRON_JOB_DELETE_PENDING_DELETION_CRON_EXPRESSION" default:"0 16-20 * * *"`
 		ReleaseInvitationCreditCronExpression    string `env:"STARHUB_SERVER_CRON_JOB_RELEASE_INVITATION_CREDIT_CRON_EXPRESSION" default:"0 0 5 * *"`
 		MCPInspectCronExpression                 string `env:"STARHUB_SERVER_CRON_JOB_MCP_INSPECT_CRON_EXPRESSION" default:"*/5 * * * *"`
+		AIGatewayAsyncGenerationCronExpression   string `env:"STARHUB_SERVER_CRON_JOB_AIGATEWAY_ASYNC_GENERATION_CRON_EXPRESSION" default:"*/1 * * * *"`
 		SyncLLMLogsToDatasetCronExpression       string `env:"STARHUB_SERVER_SYNC_LLMLOGS_TO_DATASET_CRON_EXPRESSION" default:"0 1 * * *"`
 	}
 
@@ -451,27 +452,35 @@ type Config struct {
 	}
 
 	AIGateway struct {
-		Port                           int    `env:"OPENCSG_AIGATEWAY_PORT" default:"8094"`
-		AdvertiseAddr                  string `env:"OPENCSG_AIGATEWAY_ADVERTISE_ADDR" default:""`
-		ModerationBypassSensitiveCheck bool   `env:"OPENCSG_AIGATEWAY_MODERATION_BYPASS_SENSITIVE_CHECK" default:"false"`
-		SensitiveDefaultImg            string `env:"STARHUB_SERVER_AIGATEWAY_SENSITIVE_DEFAULT_IMG" default:""`
-		PresignExpirySeconds           int    `env:"OPENCSG_AIGATEWAY_PRESIGN_EXPIRY" default:"86400"`
-		EnableLLMLog                   bool   `env:"OPENCSG_AIGATEWAY_LLMLOG_ENABLE" default:"true"`
-		EnableLLMTrace                 bool   `env:"OPENCSG_AIGATEWAY_LLM_TRACE_ENABLE" default:"true"`
-		LLMTraceContentCapture         string `env:"OPENCSG_AIGATEWAY_LLM_TRACE_CONTENT_CAPTURE" default:"metadata_only"`
-		LLMTraceMaxContentLength       int    `env:"OPENCSG_AIGATEWAY_LLM_TRACE_MAX_CONTENT_LENGTH" default:"256"`
-		LLMTraceMaxInputUserMessages   int    `env:"OPENCSG_AIGATEWAY_LLM_TRACE_MAX_INPUT_USER_MESSAGES" default:"1"`
-		ChatMaxFallbackAttempts        int    `env:"OPENCSG_AIGATEWAY_CHAT_MAX_FALLBACK_ATTEMPTS" default:"2"`
-		HealthCheckEnabled             bool   `env:"OPENCSG_AIGATEWAY_HEALTH_CHECK_ENABLED" default:"true"`
-		HealthCheckL7APIEnabled        bool   `env:"OPENCSG_AIGATEWAY_HEALTH_CHECK_L7_API_ENABLED" default:"true"`
-		HealthCheckL7APIInterval       int    `env:"OPENCSG_AIGATEWAY_HEALTH_CHECK_L7_API_INTERVAL" default:"60"`
-		HealthCheckL7APITimeout        int    `env:"OPENCSG_AIGATEWAY_HEALTH_CHECK_L7_API_TIMEOUT" default:"15"`
-		HealthCheckConsecutiveFailures int    `env:"OPENCSG_AIGATEWAY_HEALTH_CHECK_CONSECUTIVE_FAILURES" default:"3"`
-		HealthCheckLatencyDegradedMs   int    `env:"OPENCSG_AIGATEWAY_HEALTH_CHECK_LATENCY_DEGRADED_MS" default:"10000"`
-		CircuitBreakerEnabled          bool   `env:"OPENCSG_AIGATEWAY_CIRCUIT_BREAKER_ENABLED" default:"true"`
-		CircuitBreakerFailureThreshold int    `env:"OPENCSG_AIGATEWAY_CIRCUIT_BREAKER_FAILURE_THRESHOLD" default:"3"`
-		CircuitBreakerOpenDuration     int    `env:"OPENCSG_AIGATEWAY_CIRCUIT_BREAKER_OPEN_DURATION" default:"30"`
-		CircuitBreakerHalfOpenMax      int    `env:"OPENCSG_AIGATEWAY_CIRCUIT_BREAKER_HALF_OPEN_MAX" default:"1"`
+		Port                                 int    `env:"OPENCSG_AIGATEWAY_PORT" default:"8094"`
+		AdvertiseAddr                        string `env:"OPENCSG_AIGATEWAY_ADVERTISE_ADDR" default:""`
+		ModerationBypassSensitiveCheck       bool   `env:"OPENCSG_AIGATEWAY_MODERATION_BYPASS_SENSITIVE_CHECK" default:"false"`
+		SensitiveDefaultImg                  string `env:"STARHUB_SERVER_AIGATEWAY_SENSITIVE_DEFAULT_IMG" default:""`
+		PresignExpirySeconds                 int    `env:"OPENCSG_AIGATEWAY_PRESIGN_EXPIRY" default:"86400"`
+		EnableLLMLog                         bool   `env:"OPENCSG_AIGATEWAY_LLMLOG_ENABLE" default:"true"`
+		EnableLLMTrace                       bool   `env:"OPENCSG_AIGATEWAY_LLM_TRACE_ENABLE" default:"true"`
+		LLMTraceContentCapture               string `env:"OPENCSG_AIGATEWAY_LLM_TRACE_CONTENT_CAPTURE" default:"metadata_only"`
+		LLMTraceMaxContentLength             int    `env:"OPENCSG_AIGATEWAY_LLM_TRACE_MAX_CONTENT_LENGTH" default:"256"`
+		LLMTraceMaxInputUserMessages         int    `env:"OPENCSG_AIGATEWAY_LLM_TRACE_MAX_INPUT_USER_MESSAGES" default:"1"`
+		ChatMaxFallbackAttempts              int    `env:"OPENCSG_AIGATEWAY_CHAT_MAX_FALLBACK_ATTEMPTS" default:"2"`
+		HealthCheckEnabled                   bool   `env:"OPENCSG_AIGATEWAY_HEALTH_CHECK_ENABLED" default:"true"`
+		HealthCheckL7APIEnabled              bool   `env:"OPENCSG_AIGATEWAY_HEALTH_CHECK_L7_API_ENABLED" default:"true"`
+		HealthCheckL7APIInterval             int    `env:"OPENCSG_AIGATEWAY_HEALTH_CHECK_L7_API_INTERVAL" default:"60"`
+		HealthCheckL7APITimeout              int    `env:"OPENCSG_AIGATEWAY_HEALTH_CHECK_L7_API_TIMEOUT" default:"15"`
+		HealthCheckConsecutiveFailures       int    `env:"OPENCSG_AIGATEWAY_HEALTH_CHECK_CONSECUTIVE_FAILURES" default:"3"`
+		HealthCheckLatencyDegradedMs         int    `env:"OPENCSG_AIGATEWAY_HEALTH_CHECK_LATENCY_DEGRADED_MS" default:"10000"`
+		CircuitBreakerEnabled                bool   `env:"OPENCSG_AIGATEWAY_CIRCUIT_BREAKER_ENABLED" default:"true"`
+		CircuitBreakerFailureThreshold       int    `env:"OPENCSG_AIGATEWAY_CIRCUIT_BREAKER_FAILURE_THRESHOLD" default:"3"`
+		CircuitBreakerOpenDuration           int    `env:"OPENCSG_AIGATEWAY_CIRCUIT_BREAKER_OPEN_DURATION" default:"30"`
+		CircuitBreakerHalfOpenMax            int    `env:"OPENCSG_AIGATEWAY_CIRCUIT_BREAKER_HALF_OPEN_MAX" default:"1"`
+		AsyncGenerationStatusRefreshInterval int    `env:"OPENCSG_AIGATEWAY_ASYNC_GENERATION_STATUS_REFRESH_INTERVAL" default:"60"`
+		AsyncGenerationMeteringBatchSize     int    `env:"OPENCSG_AIGATEWAY_ASYNC_GENERATION_METERING_BATCH_SIZE" default:"100"`
+		AsyncGenerationMaxAge                int    `env:"OPENCSG_AIGATEWAY_ASYNC_GENERATION_MAX_AGE_SECONDS" default:"86400"`
+		ModalAPIRateLimiter                  struct {
+			Enable bool  `env:"OPENCSG_AIGATEWAY_MODAL_API_RATE_LIMITER_ENABLE" default:"true"`
+			Limit  int64 `env:"OPENCSG_AIGATEWAY_MODAL_API_RATE_LIMITER_LIMIT" default:"2"`
+			Window int64 `env:"OPENCSG_AIGATEWAY_MODAL_API_RATE_LIMITER_WINDOW" default:"60"`
+		}
 	}
 
 	LLMLog struct {

@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"opencsg.com/csghub-server/aigateway/types"
+	commontypes "opencsg.com/csghub-server/common/types"
 	commonutils "opencsg.com/csghub-server/common/utils/common"
 )
 
@@ -95,7 +96,7 @@ func (a *SeedanceAdapter) ParseCreateResponse(ctx context.Context, body []byte) 
 		return nil, err
 	}
 	if video.Status == "" {
-		video.Status = "queued"
+		video.Status = string(commontypes.AIGatewayAsyncGenerationStatusQueued)
 	}
 	return &ProviderResponse{Video: video, ProviderMetadata: metadata}, nil
 }
@@ -154,13 +155,15 @@ func (a *SeedanceAdapter) parseResponse(body []byte) (*types.VideoObject, map[st
 	if id == "" {
 		return nil, nil, fmt.Errorf("seedance response missing id")
 	}
-	status := mapSeedanceStatus(stringAt(payload, "status"))
+	rawStatus := stringAt(payload, "status")
+	status := mapSeedanceStatus(rawStatus)
 	downloadURL := stringAt(payload, "content.video_url")
 	if downloadURL == "" {
 		downloadURL = stringAt(payload, "video_url")
 	}
 	video := &types.VideoObject{ID: id, Object: "video", Status: status}
-	if status == "failed" || status == "cancelled" {
+	if status == string(commontypes.AIGatewayAsyncGenerationStatusFailed) ||
+		status == string(commontypes.AIGatewayAsyncGenerationStatusCancelled) {
 		if message := seedanceFailureMessage(payload); message != "" {
 			video.Error = &types.VideoError{
 				Code:    "generation_failed",
@@ -168,21 +171,20 @@ func (a *SeedanceAdapter) parseResponse(body []byte) (*types.VideoObject, map[st
 			}
 		}
 	}
-	return video, map[string]any{"download_url": downloadURL}, nil
+	metadata := WithProviderStatus(map[string]any{"download_url": downloadURL}, rawStatus)
+	return video, metadata, nil
 }
 
 func mapSeedanceStatus(status string) string {
 	switch status {
 	case "queued", "pending":
-		return "queued"
+		return string(commontypes.AIGatewayAsyncGenerationStatusQueued)
 	case "running", "processing":
-		return "in_progress"
+		return string(commontypes.AIGatewayAsyncGenerationStatusInProgress)
 	case "succeeded", "success", "completed":
-		return "completed"
-	case "failed", "expired":
-		return "failed"
-	case "cancelled", "canceled":
-		return "cancelled"
+		return string(commontypes.AIGatewayAsyncGenerationStatusCompleted)
+	case "failed", "expired", "cancelled", "canceled":
+		return string(commontypes.AIGatewayAsyncGenerationStatusFailed)
 	default:
 		return status
 	}

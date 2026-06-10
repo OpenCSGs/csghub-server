@@ -66,7 +66,7 @@ func TestOpenAICompatibleAdapter_TransformAndParse(t *testing.T) {
 	resp, err := adapter.ParseVideoResponse(context.Background(), []byte(`{"id":"vid_123","object":"video","status":"queued"}`))
 	require.NoError(t, err)
 	require.Equal(t, "vid_123", resp.ID)
-	require.Equal(t, "queued", resp.Status)
+	require.Equal(t, string(commonTypes.AIGatewayAsyncGenerationStatusQueued), resp.Status)
 }
 
 func TestOpenAICompatibleAdapter_BuildCreateRequest_Multipart(t *testing.T) {
@@ -100,4 +100,14 @@ func TestOpenAICompatibleAdapter_BuildCreateRequest_Multipart(t *testing.T) {
 	require.Contains(t, string(providerReq.Body), "rewritten-model")
 	require.NotContains(t, string(providerReq.Body), "original-model")
 	require.Contains(t, string(providerReq.Body), `name="input_reference"`)
+}
+
+func TestOpenAICompatibleAdapter_ParseRetrieveResponseSetsProviderStatus(t *testing.T) {
+	adapter := NewOpenAICompatibleAdapter()
+
+	resp, err := adapter.ParseRetrieveResponse(context.Background(), []byte(`{"id":"vid_1","object":"video","status":"in_progress"}`))
+	require.NoError(t, err)
+	require.Equal(t, "vid_1", resp.Video.ID)
+	require.Equal(t, string(commonTypes.AIGatewayAsyncGenerationStatusInProgress), resp.Video.Status)
+	require.Equal(t, "in_progress", resp.ProviderMetadata[ProviderStatusMetadataKey])
 }

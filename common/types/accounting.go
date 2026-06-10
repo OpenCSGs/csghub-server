@@ -28,6 +28,23 @@ const (
 	CompletionDuration   = "completion_duration"
 )
 
+type DataType string
+
+const (
+	DataTypeImage DataType = "image"
+	DataTypeAudio DataType = "audio"
+	DataTypeVideo DataType = "video"
+)
+
+func (d DataType) IsMultiModal() bool {
+	switch d {
+	case DataTypeImage, DataTypeAudio, DataTypeVideo:
+		return true
+	default:
+		return false
+	}
+}
+
 type OrderStatus int
 
 var (

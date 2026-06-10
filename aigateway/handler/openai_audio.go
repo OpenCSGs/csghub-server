@@ -156,9 +156,13 @@ func (h *OpenAIHandlerImpl) Transcription(c *gin.Context) {
 		usageCtx, cancel := context.WithTimeout(context.WithoutCancel(c.Request.Context()), 3*time.Second)
 		defer cancel()
 
-		usage, usageErr := audioCounter.Usage(usageCtx)
-		if usageErr != nil {
-			slog.ErrorContext(usageCtx, "failed to get audio transcription token usage", slog.Any("error", usageErr))
+		var usage *token.Usage
+		if w.StatusCode() < http.StatusBadRequest {
+			var usageErr error
+			usage, usageErr = audioCounter.Usage(usageCtx)
+			if usageErr != nil {
+				slog.ErrorContext(usageCtx, "failed to get audio transcription token usage", slog.Any("error", usageErr))
+			}
 		}
 		if generationRecorder != nil {
 			metadata := map[string]any{}
@@ -176,7 +180,7 @@ func (h *OpenAIHandlerImpl) Transcription(c *gin.Context) {
 			generationRecorder.End()
 		}
 
-		if usage != nil {
+		if w.StatusCode() < http.StatusBadRequest && usage != nil {
 			if err := h.openaiComponent.RecordUsageFromTokenUsage(usageCtx, nsUUID, modelTarget.Model, modelTarget.ModelName, usage, apikey); err != nil {
 				slog.ErrorContext(usageCtx, "failed to record audio transcription usage", slog.Any("error", err))
 			}

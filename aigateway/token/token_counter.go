@@ -42,4 +42,11 @@ type Usage struct {
 	CachedPromptTokens        int64
 	CacheCreationPromptTokens int64
 	ReasoningTokens           int64
+	// multi-modal usage metadata
+	DataType   string
+	Resolution string
+	Duration   float64
+	// Completion resource count for multi-modal
+	CompletionRC   int64
+	CompletionDesc string
 }

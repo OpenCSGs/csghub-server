@@ -313,11 +313,21 @@ type ModelTokenPrice struct {
 	PricePerMillion float64 `json:"price_per_million,omitempty"`
 }
 
-// ModelScenePrice is Metadata["pricing"]: serverless and external_llm use input/output token prices (SaaS serverless scene).
+// ModelModalPrice is a unit-based media generation price.
+type ModelModalPrice struct {
+	Currency     string  `json:"currency,omitempty"`
+	PricePerUnit float64 `json:"price_per_unit,omitempty"`
+	SkuUnit      int64   `json:"sku_unit,omitempty"`
+	SkuUnitType  string  `json:"sku_unit_type,omitempty"`
+	Resolution   string  `json:"resolution,omitempty"`
+}
+
+// ModelScenePrice is Metadata["pricing"]: serverless and external_llm use token and modal generation prices.
 type ModelScenePrice struct {
-	InputTokenPrice  *ModelTokenPrice `json:"input_token_price,omitempty"`
-	OutputTokenPrice *ModelTokenPrice `json:"output_token_price,omitempty"`
-	TokenPrice       *ModelTokenPrice `json:"token_price,omitempty"`
+	InputTokenPrice  *ModelTokenPrice   `json:"input_token_price,omitempty"`
+	OutputTokenPrice *ModelTokenPrice   `json:"output_token_price,omitempty"`
+	TokenPrice       *ModelTokenPrice   `json:"token_price,omitempty"`
+	ModalPrices      []*ModelModalPrice `json:"modal_prices,omitempty"`
 }
 
 // ModelAvailability represents the availability information for a model

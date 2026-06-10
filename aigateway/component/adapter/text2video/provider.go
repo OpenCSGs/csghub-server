@@ -11,6 +11,11 @@ import (
 const (
 	videoAPITypeMiniMax  = "minimax"
 	videoAPITypeSeedance = "seedance"
+
+	// ProviderStatusMetadataKey is the ProviderMetadata key under which each
+	// T2V adapter records the raw upstream status string alongside the
+	// normalized AIGeneration.Status enum. Empty raw values are not written.
+	ProviderStatusMetadataKey = "provider_status"
 )
 
 func videoAPIType(model *types.Model) string {
@@ -88,6 +93,20 @@ func mergeMetadata(base map[string]any, extra map[string]any) map[string]any {
 // whether an empty provider value is meaningful.
 func MergeProviderMetadata(base map[string]any, extra map[string]any) map[string]any {
 	return mergeMetadata(base, extra)
+}
+
+// WithProviderStatus returns base with ProviderStatusMetadataKey set to raw
+// when raw is non-empty. An empty (or whitespace-only) raw is treated as
+// "no value to record" and base is returned untouched (which may be nil).
+func WithProviderStatus(base map[string]any, raw string) map[string]any {
+	if strings.TrimSpace(raw) == "" {
+		return base
+	}
+	if base == nil {
+		base = make(map[string]any, 1)
+	}
+	base[ProviderStatusMetadataKey] = raw
+	return base
 }
 
 type RequestValidationError struct {

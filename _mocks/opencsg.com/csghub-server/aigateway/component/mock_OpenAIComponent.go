@@ -3,9 +3,12 @@
 package component
 
 import (
+	commontypes "opencsg.com/csghub-server/common/types"
+
 	context "context"
 
 	mock "github.com/stretchr/testify/mock"
+
 	token "opencsg.com/csghub-server/aigateway/token"
 
 	types "opencsg.com/csghub-server/aigateway/types"
@@ -22,6 +25,69 @@ type MockOpenAIComponent_Expecter struct {
 
 func (_m *MockOpenAIComponent) EXPECT() *MockOpenAIComponent_Expecter {
 	return &MockOpenAIComponent_Expecter{mock: &_m.Mock}
+}
+
+// BuildUsageMeteringEvent provides a mock function with given fields: c, nsUUID, model, targetModelName, usage, apikey
+func (_m *MockOpenAIComponent) BuildUsageMeteringEvent(c context.Context, nsUUID string, model *types.Model, targetModelName string, usage *token.Usage, apikey string) (*commontypes.MeteringEvent, error) {
+	ret := _m.Called(c, nsUUID, model, targetModelName, usage, apikey)
+
+	if len(ret) == 0 {
+		panic("no return value specified for BuildUsageMeteringEvent")
+	}
+
+	var r0 *commontypes.MeteringEvent
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, *types.Model, string, *token.Usage, string) (*commontypes.MeteringEvent, error)); ok {
+		return rf(c, nsUUID, model, targetModelName, usage, apikey)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, *types.Model, string, *token.Usage, string) *commontypes.MeteringEvent); ok {
+		r0 = rf(c, nsUUID, model, targetModelName, usage, apikey)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*commontypes.MeteringEvent)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, *types.Model, string, *token.Usage, string) error); ok {
+		r1 = rf(c, nsUUID, model, targetModelName, usage, apikey)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockOpenAIComponent_BuildUsageMeteringEvent_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'BuildUsageMeteringEvent'
+type MockOpenAIComponent_BuildUsageMeteringEvent_Call struct {
+	*mock.Call
+}
+
+// BuildUsageMeteringEvent is a helper method to define mock.On call
+//   - c context.Context
+//   - nsUUID string
+//   - model *types.Model
+//   - targetModelName string
+//   - usage *token.Usage
+//   - apikey string
+func (_e *MockOpenAIComponent_Expecter) BuildUsageMeteringEvent(c interface{}, nsUUID interface{}, model interface{}, targetModelName interface{}, usage interface{}, apikey interface{}) *MockOpenAIComponent_BuildUsageMeteringEvent_Call {
+	return &MockOpenAIComponent_BuildUsageMeteringEvent_Call{Call: _e.mock.On("BuildUsageMeteringEvent", c, nsUUID, model, targetModelName, usage, apikey)}
+}
+
+func (_c *MockOpenAIComponent_BuildUsageMeteringEvent_Call) Run(run func(c context.Context, nsUUID string, model *types.Model, targetModelName string, usage *token.Usage, apikey string)) *MockOpenAIComponent_BuildUsageMeteringEvent_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(*types.Model), args[3].(string), args[4].(*token.Usage), args[5].(string))
+	})
+	return _c
+}
+
+func (_c *MockOpenAIComponent_BuildUsageMeteringEvent_Call) Return(_a0 *commontypes.MeteringEvent, _a1 error) *MockOpenAIComponent_BuildUsageMeteringEvent_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockOpenAIComponent_BuildUsageMeteringEvent_Call) RunAndReturn(run func(context.Context, string, *types.Model, string, *token.Usage, string) (*commontypes.MeteringEvent, error)) *MockOpenAIComponent_BuildUsageMeteringEvent_Call {
+	_c.Call.Return(run)
+	return _c
 }
 
 // CheckBalance provides a mock function with given fields: ctx, nsUUID

@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"opencsg.com/csghub-server/aigateway/types"
+	commontypes "opencsg.com/csghub-server/common/types"
 	commonutils "opencsg.com/csghub-server/common/utils/common"
 )
 
@@ -113,7 +114,7 @@ func (a *MiniMaxAdapter) ParseCreateResponse(ctx context.Context, body []byte) (
 	if id == "" {
 		return nil, fmt.Errorf("minimax response missing task_id")
 	}
-	return &ProviderResponse{Video: &types.VideoObject{ID: id, Object: "video", Status: "queued"}}, nil
+	return &ProviderResponse{Video: &types.VideoObject{ID: id, Object: "video", Status: string(commontypes.AIGatewayAsyncGenerationStatusQueued)}}, nil
 }
 
 func (a *MiniMaxAdapter) BuildRetrieveRequest(ctx context.Context, model *types.Model, providerResourceID string, providerMetadata map[string]any) (*ProviderRequest, error) {
@@ -194,12 +195,14 @@ func (a *MiniMaxAdapter) parseStatusResponse(body []byte) (*types.VideoObject, m
 		return nil, nil, err
 	}
 	id := strings.TrimSpace(payload.TaskID)
-	status := mapMiniMaxStatus(strings.TrimSpace(payload.Status))
+	rawStatus := strings.TrimSpace(payload.Status)
+	status := mapMiniMaxStatus(rawStatus)
 	fileID := parseMiniMaxFileID(payload.FileID)
 	if id == "" {
 		return nil, nil, fmt.Errorf("minimax response missing task_id")
 	}
-	return &types.VideoObject{ID: id, Object: "video", Status: status}, map[string]any{"file_id": fileID}, nil
+	metadata := WithProviderStatus(map[string]any{"file_id": fileID}, rawStatus)
+	return &types.VideoObject{ID: id, Object: "video", Status: status}, metadata, nil
 }
 
 func parseMiniMaxError(baseResp miniMaxBaseResp) error {
@@ -236,13 +239,13 @@ func parseMiniMaxFileID(raw json.RawMessage) string {
 func mapMiniMaxStatus(status string) string {
 	switch status {
 	case "Queueing", "Preparing":
-		return "queued"
+		return string(commontypes.AIGatewayAsyncGenerationStatusQueued)
 	case "Processing":
-		return "in_progress"
+		return string(commontypes.AIGatewayAsyncGenerationStatusInProgress)
 	case "Success":
-		return "completed"
+		return string(commontypes.AIGatewayAsyncGenerationStatusCompleted)
 	case "Fail":
-		return "failed"
+		return string(commontypes.AIGatewayAsyncGenerationStatusFailed)
 	default:
 		return status
 	}
@@ -289,15 +292,15 @@ func normalizeMiniMaxResolution(size string) (string, error) {
 	switch normalized {
 	case "":
 		return "", nil
-	case "720P", "768P", "1080P":
+	case "768P", "1080P":
 		return normalized, nil
 	case "1280X720", "720X1280":
-		return "720P", nil
+		return "768P", nil
 	case "1920X1080", "1080X1920":
 		return "1080P", nil
 	default:
 		return "", &RequestValidationError{
-			Message: fmt.Sprintf("MiniMax video backend does not support size %q; use an OpenAI-compatible size that maps to MiniMax resolution (1280x720, 720x1280, 1920x1080, 1080x1920) or native MiniMax resolution (720P, 768P, 1080P)", size),
+			Message: fmt.Sprintf("MiniMax video backend does not support size %q; supported sizes are 1280x720 (768P) and 1920x1080 (1080P)", size),
 		}
 	}
 }

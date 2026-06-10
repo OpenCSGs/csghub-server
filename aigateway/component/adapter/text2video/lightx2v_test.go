@@ -136,19 +136,41 @@ func TestLightX2VAdapter_ParseResponses(t *testing.T) {
 	resp, err := adapter.ParseCreateResponse(context.Background(), []byte(`{"task_id":"abc123","status":"submitted"}`))
 	require.NoError(t, err)
 	require.Equal(t, "abc123", resp.Video.ID)
-	require.Equal(t, "queued", resp.Video.Status)
+	require.Equal(t, string(commonTypes.AIGatewayAsyncGenerationStatusQueued), resp.Video.Status)
+	require.Equal(t, "submitted", resp.ProviderMetadata[ProviderStatusMetadataKey])
 
 	resp, err = adapter.ParseRetrieveResponse(context.Background(), []byte(`{"task_id":"abc123","status":"running","progress":0.5}`))
 	require.NoError(t, err)
-	require.Equal(t, "in_progress", resp.Video.Status)
+	require.Equal(t, string(commonTypes.AIGatewayAsyncGenerationStatusInProgress), resp.Video.Status)
 	require.NotNil(t, resp.Video.Progress)
 	require.Equal(t, 0.5, *resp.Video.Progress)
+	require.Equal(t, "running", resp.ProviderMetadata[ProviderStatusMetadataKey])
 
 	resp, err = adapter.ParseRetrieveResponse(context.Background(), []byte(`{"task_id":"abc123","status":"failed","message":"boom"}`))
 	require.NoError(t, err)
-	require.Equal(t, "failed", resp.Video.Status)
+	require.Equal(t, string(commonTypes.AIGatewayAsyncGenerationStatusFailed), resp.Video.Status)
 	require.NotNil(t, resp.Video.Error)
 	require.Equal(t, "boom", resp.Video.Error.Message)
+	require.Equal(t, "failed", resp.ProviderMetadata[ProviderStatusMetadataKey])
+}
+
+func TestLightX2VAdapter_ParseRetrieveResponsePersistsRawStatus(t *testing.T) {
+	adapter := NewLightX2VAdapter()
+
+	resp, err := adapter.ParseRetrieveResponse(context.Background(), []byte(`{"task_id":"abc123","status":"RUNNING"}`))
+	require.NoError(t, err)
+	require.Equal(t, string(commonTypes.AIGatewayAsyncGenerationStatusInProgress), resp.Video.Status)
+	require.Equal(t, "RUNNING", resp.ProviderMetadata[ProviderStatusMetadataKey])
+}
+
+func TestLightX2VAdapter_ParseResponseOmitsKeyOnEmpty(t *testing.T) {
+	adapter := NewLightX2VAdapter()
+
+	resp, err := adapter.ParseRetrieveResponse(context.Background(), []byte(`{"task_id":"abc123"}`))
+	require.NoError(t, err)
+	require.Equal(t, "abc123", resp.Video.ID)
+	_, hasKey := resp.ProviderMetadata[ProviderStatusMetadataKey]
+	require.False(t, hasKey)
 }
 
 func TestLightX2VAdapter_BuildContentRequest(t *testing.T) {

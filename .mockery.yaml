@@ -23,6 +23,12 @@ packages:
     config:
     interfaces:
       LogSender:
+  opencsg.com/csghub-server/aigateway/task:
+    config:
+    interfaces:
+      AsyncGenerationService:
+        config:
+          filename: "mock_AsyncGenerationService.go"
 
   opencsg.com/csghub-server/component/checker:
     config:

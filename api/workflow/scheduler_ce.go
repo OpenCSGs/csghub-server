@@ -70,6 +70,23 @@ func RegisterCronJobs(config *config.Config, temporalClient temporal.Client) err
 		return fmt.Errorf("unable to create delete pending deletion schedule, error:%w", err)
 	}
 
+	_, err = scheduler.Create(context.Background(), client.ScheduleOptions{
+		ID: "aigateway-async-generation-schedule",
+		Spec: client.ScheduleSpec{
+			CronExpressions: []string{config.CronJob.AIGatewayAsyncGenerationCronExpression},
+		},
+		Overlap: enumspb.SCHEDULE_OVERLAP_POLICY_SKIP,
+		Action: &client.ScheduleWorkflowAction{
+			ID:        "aigateway-async-generation-workflow",
+			TaskQueue: CronJobQueueName,
+			Workflow:  ProcessAIGatewayAsyncGenerationsWorkflow,
+			Args:      []interface{}{},
+		},
+	})
+	if err != nil && err.Error() != types.AlreadyScheduledMessage {
+		return fmt.Errorf("unable to create aigateway async generation schedule, error:%w", err)
+	}
+
 	return nil
 }
 
@@ -81,4 +98,5 @@ func RegisterCronWorker(config *config.Config, temporalClient temporal.Client, a
 	wfWorker.RegisterWorkflow(SyncAsClientWorkflow)
 	wfWorker.RegisterWorkflow(CalcRecomScoreWorkflow)
 	wfWorker.RegisterWorkflow(DeletePendingDeletionWorkflow)
+	wfWorker.RegisterWorkflow(ProcessAIGatewayAsyncGenerationsWorkflow)
 }

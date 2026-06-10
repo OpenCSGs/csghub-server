@@ -37,6 +37,7 @@ type OpenAIComponent interface {
 	GetModelByID(c context.Context, username, modelID string) (*types.Model, error)
 	RecordUsage(c context.Context, nsUUID string, model *types.Model, targetModelName string, tokenCounter token.Counter, apikey string) error
 	RecordUsageFromTokenUsage(c context.Context, nsUUID string, model *types.Model, targetModelName string, usage *token.Usage, apikey string) error
+	BuildUsageMeteringEvent(c context.Context, nsUUID string, model *types.Model, targetModelName string, usage *token.Usage, apikey string) (*commontypes.MeteringEvent, error)
 	CheckBalance(ctx context.Context, nsUUID string) error
 	CheckUsageLimit(ctx context.Context, userUUID string, model *types.Model, endpoint string) error
 	CommitUsageLimit(ctx context.Context, userUUID string, model *types.Model, tokenCounter token.Counter) error
@@ -613,14 +614,19 @@ func (m *openaiComponentImpl) resolveUsageOwnerType(c context.Context, nsUUID st
 	return commontypes.CSGHubOtherDeployedInference, nil
 }
 
-// tokenUsageMeteringExtra is serialized into MeteringEvent.Extra for token billing breakdown.
-type tokenUsageMeteringExtra struct {
+// usageMeteringExtra is serialized into MeteringEvent.Extra for usage billing breakdown.
+type usageMeteringExtra struct {
 	PromptTokenNum     string                     `json:"prompt_token_num"`
 	CompletionTokenNum string                     `json:"completion_token_num"`
 	OwnerType          commontypes.TokenUsageType `json:"owner_type"`
 	APIKey             string                     `json:"api_key"`
 	Provider           string                     `json:"provider"`
 	ModelName          string                     `json:"model_name"`
+	// multiModalMeteringExtra is serialized into MeteringEvent.Extra for multi-modal billing.
+	CompletionDataType   string `json:"completion_data_type"`
+	CompletionResolution string `json:"completion_resolution"`
+	CompletionDuration   string `json:"completion_duration"`
+	CompletionDesc       string `json:"completion_desc"`
 }
 
 func sanitizeMeteringEventForLog(event commontypes.MeteringEvent) commontypes.MeteringEvent {
@@ -632,18 +638,22 @@ func sanitizeMeteringEventForLog(event commontypes.MeteringEvent) commontypes.Me
 	return sanitized
 }
 
-func buildTokenUsageExtraData(usageModel *types.Model, upstreamModelName string, usage *token.Usage, apikey string, meteringInfo usageMeteringInfo) (string, error) {
-	extra := tokenUsageMeteringExtra{
-		PromptTokenNum:     fmt.Sprintf("%d", usage.PromptTokens),
-		CompletionTokenNum: fmt.Sprintf("%d", usage.CompletionTokens),
-		OwnerType:          meteringInfo.OwnerType,
-		APIKey:             apikey,
-		Provider:           usageModel.Provider,
-		ModelName:          upstreamModelName,
+func buildUsageExtraData(usageModel *types.Model, upstreamModelName string, usage *token.Usage, apikey string, meteringInfo usageMeteringInfo) (string, error) {
+	extra := usageMeteringExtra{
+		PromptTokenNum:       fmt.Sprintf("%d", usage.PromptTokens),
+		CompletionTokenNum:   fmt.Sprintf("%d", usage.CompletionTokens),
+		OwnerType:            meteringInfo.OwnerType,
+		APIKey:               apikey,
+		Provider:             usageModel.Provider,
+		ModelName:            upstreamModelName,
+		CompletionDataType:   usage.DataType,
+		CompletionResolution: usage.Resolution,
+		CompletionDuration:   fmt.Sprintf("%.2f", usage.Duration),
+		CompletionDesc:       usage.CompletionDesc,
 	}
 	extraData, err := json.Marshal(extra)
 	if err != nil {
-		return "", fmt.Errorf("failed to marshal token usage extra: %w", err)
+		return "", fmt.Errorf("failed to marshal usage extra: %w", err)
 	}
 	return string(extraData), nil
 }
@@ -656,28 +666,36 @@ func (m *openaiComponentImpl) RecordUsage(c context.Context, nsUUID string, mode
 	return m.RecordUsageFromTokenUsage(c, nsUUID, model, targetModelName, usage, apikey)
 }
 
-func (m *openaiComponentImpl) RecordUsageFromTokenUsage(c context.Context, nsUUID string, model *types.Model, targetModelName string, usage *token.Usage, apikey string) error {
+func (m *openaiComponentImpl) BuildUsageMeteringEvent(c context.Context, nsUUID string, model *types.Model, targetModelName string, usage *token.Usage, apikey string) (*commontypes.MeteringEvent, error) {
 	if usage == nil {
-		return fmt.Errorf("cannot record usage: nil token usage")
+		return nil, fmt.Errorf("cannot record usage: nil token usage")
 	}
 	meteringInfo, err := m.resolveUsageMeteringInfo(c, nsUUID, model)
 	if err != nil {
 		slog.ErrorContext(c, "cannot record usage: invalid model for resource id", slog.Any("error", err), slog.Any("model", model))
-		return fmt.Errorf("cannot record usage: %w", err)
+		return nil, fmt.Errorf("cannot record usage: %w", err)
 	}
 	if meteringInfo.Resource.ResourceID == "" {
 		slog.ErrorContext(c, "cannot record usage: empty resource id for model", slog.Any("model", model))
-		return fmt.Errorf("cannot record usage: empty resource id")
+		return nil, fmt.Errorf("cannot record usage: empty resource id")
 	}
-	extraData, err := buildTokenUsageExtraData(model, targetModelName, usage, apikey, meteringInfo)
+	valueType := commontypes.TokenNumberType
+	value := usage.TotalTokens
+	isMultiModal := commontypes.DataType(usage.DataType).IsMultiModal()
+	if isMultiModal {
+		meteringInfo.Scene = commontypes.SceneMultiModalServerless
+		valueType = commontypes.CountNumberType
+		value = usage.CompletionRC
+	}
+	extraData, err := buildUsageExtraData(model, targetModelName, usage, apikey, meteringInfo)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	event := commontypes.MeteringEvent{
 		Uuid:         uuid.New(),
 		UserUUID:     nsUUID,
-		Value:        usage.TotalTokens,
-		ValueType:    commontypes.TokenNumberType,
+		Value:        value,
+		ValueType:    valueType,
 		Scene:        int(meteringInfo.Scene),
 		OpUID:        string(commontypes.AccessTokenAppAIGateway),
 		ResourceID:   meteringInfo.Resource.ResourceID,
@@ -686,17 +704,25 @@ func (m *openaiComponentImpl) RecordUsageFromTokenUsage(c context.Context, nsUUI
 		CreatedAt:    time.Now(),
 		Extra:        extraData,
 	}
+	return &event, nil
+}
+
+func (m *openaiComponentImpl) RecordUsageFromTokenUsage(c context.Context, nsUUID string, model *types.Model, targetModelName string, usage *token.Usage, apikey string) error {
+	event, err := m.BuildUsageMeteringEvent(c, nsUUID, model, targetModelName, usage, apikey)
+	if err != nil {
+		return err
+	}
 	eventData, err := json.Marshal(event)
 	if err != nil {
 		return fmt.Errorf("failed to marshal metering event: %w", err)
 	}
 	err = m.eventPub.PublishMeteringEvent(eventData)
 	if err != nil {
-		slog.ErrorContext(c, "failed to publish token usage event", slog.Any("event", sanitizeMeteringEventForLog(event)), slog.Any("error", err))
+		slog.ErrorContext(c, "failed to publish token usage event", slog.Any("event", sanitizeMeteringEventForLog(*event)), slog.Any("error", err))
 		return fmt.Errorf("failed to publish token usage event: %w", err)
 	}
 
-	slog.InfoContext(c, "published token usage event success", slog.Any("event", sanitizeMeteringEventForLog(event)))
+	slog.InfoContext(c, "published token usage event success", slog.Any("event", sanitizeMeteringEventForLog(*event)))
 	return nil
 }
 

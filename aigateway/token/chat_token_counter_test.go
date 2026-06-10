@@ -2,6 +2,7 @@ package token_test
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 
 	"github.com/openai/openai-go/v3"
@@ -12,6 +13,7 @@ import (
 	mocktoken "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/aigateway/token"
 	"opencsg.com/csghub-server/aigateway/token"
 	"opencsg.com/csghub-server/aigateway/types"
+	commontypes "opencsg.com/csghub-server/common/types"
 )
 
 func TestChatTokenCounter_Usage_WithCompletion(t *testing.T) {
@@ -39,6 +41,94 @@ func TestChatTokenCounter_Usage_WithCompletion(t *testing.T) {
 	assert.Equal(t, int64(10), usage.PromptTokens)
 	assert.Equal(t, int64(20), usage.CompletionTokens)
 	assert.Equal(t, int64(30), usage.TotalTokens)
+}
+
+func TestChatTokenCounter_Usage_WithCompletionImagePrompt(t *testing.T) {
+	counter := token.NewLLMTokenCounter(nil)
+	counter.AppendPrompts([]openai.ChatCompletionMessageParamUnion{
+		openai.UserMessage([]openai.ChatCompletionContentPartUnionParam{
+			openai.TextContentPart("describe this"),
+			openai.ImageContentPart(openai.ChatCompletionContentPartImageImageURLParam{URL: "https://example.com/image.png"}),
+		}),
+	})
+	counter.Completion(types.ChatCompletion{
+		ChatCompletion: openai.ChatCompletion{
+			Usage: openai.CompletionUsage{
+				PromptTokens:     10,
+				CompletionTokens: 20,
+				TotalTokens:      30,
+			},
+		},
+	})
+
+	usage, err := counter.Usage(context.Background())
+
+	assert.NoError(t, err)
+	assert.Equal(t, string(commontypes.DataTypeImage), usage.DataType)
+	assert.Equal(t, int64(1), usage.CompletionRC)
+}
+
+func TestChatTokenCounter_Usage_KeepsFirstPromptModalType(t *testing.T) {
+	counter := token.NewLLMTokenCounter(nil)
+	counter.AppendPrompts([]openai.ChatCompletionMessageParamUnion{
+		openai.UserMessage([]openai.ChatCompletionContentPartUnionParam{
+			openai.ImageContentPart(openai.ChatCompletionContentPartImageImageURLParam{URL: "https://example.com/image.png"}),
+		}),
+	})
+	counter.AppendPrompts([]openai.ChatCompletionMessageParamUnion{
+		openai.UserMessage([]openai.ChatCompletionContentPartUnionParam{
+			openai.InputAudioContentPart(openai.ChatCompletionContentPartInputAudioInputAudioParam{Data: "audio-data"}),
+		}),
+	})
+	counter.Completion(types.ChatCompletion{
+		ChatCompletion: openai.ChatCompletion{
+			Usage: openai.CompletionUsage{
+				PromptTokens:     10,
+				CompletionTokens: 20,
+				TotalTokens:      30,
+			},
+		},
+	})
+
+	usage, err := counter.Usage(context.Background())
+
+	assert.NoError(t, err)
+	assert.Equal(t, string(commontypes.DataTypeImage), usage.DataType)
+	assert.Equal(t, int64(1), usage.CompletionRC)
+}
+
+func TestChatTokenCounter_Usage_WithCompletionAudioPromptSeconds(t *testing.T) {
+	counter := token.NewLLMTokenCounter(nil)
+	counter.AppendPrompts([]openai.ChatCompletionMessageParamUnion{
+		openai.UserMessage([]openai.ChatCompletionContentPartUnionParam{
+			openai.TextContentPart("transcribe this"),
+			openai.InputAudioContentPart(openai.ChatCompletionContentPartInputAudioInputAudioParam{Data: "audio-data"}),
+		}),
+	})
+
+	var completion types.ChatCompletion
+	err := json.Unmarshal([]byte(`{
+		"id": "chatcmpl-test",
+		"object": "chat.completion",
+		"created": 123,
+		"model": "test-model",
+		"choices": [],
+		"usage": {
+			"prompt_tokens": 10,
+			"completion_tokens": 20,
+			"total_tokens": 30,
+			"seconds": 7.5
+		}
+	}`), &completion)
+	assert.NoError(t, err)
+	counter.Completion(completion)
+
+	usage, err := counter.Usage(context.Background())
+
+	assert.NoError(t, err)
+	assert.Equal(t, string(commontypes.DataTypeAudio), usage.DataType)
+	assert.Equal(t, int64(1), usage.CompletionRC)
+	assert.Equal(t, float64(7.5), usage.Duration)
 }
 
 func TestChatTokenCounter_Usage_WithChunksContainingUsage(t *testing.T) {
@@ -80,6 +170,40 @@ func TestChatTokenCounter_Usage_WithChunksContainingUsage(t *testing.T) {
 	assert.Equal(t, int64(15), usage.PromptTokens)
 	assert.Equal(t, int64(25), usage.CompletionTokens)
 	assert.Equal(t, int64(40), usage.TotalTokens)
+}
+
+func TestChatTokenCounter_Usage_WithChunkSecondsString(t *testing.T) {
+	counter := token.NewLLMTokenCounter(nil)
+	counter.AppendPrompts([]openai.ChatCompletionMessageParamUnion{
+		openai.UserMessage([]openai.ChatCompletionContentPartUnionParam{
+			openai.TextContentPart("transcribe this"),
+			openai.InputAudioContentPart(openai.ChatCompletionContentPartInputAudioInputAudioParam{Data: "audio-data"}),
+		}),
+	})
+
+	var chunk types.ChatCompletionChunk
+	err := json.Unmarshal([]byte(`{
+		"id": "test-id",
+		"choices": [],
+		"created": 1234567890,
+		"model": "test-model",
+		"object": "chat.completion.chunk",
+		"usage": {
+			"prompt_tokens": 15,
+			"completion_tokens": 25,
+			"total_tokens": 40,
+			"seconds": "4.25"
+		}
+	}`), &chunk)
+	assert.NoError(t, err)
+	counter.AppendCompletionChunk(chunk)
+
+	usage, err := counter.Usage(context.Background())
+
+	assert.NoError(t, err)
+	assert.Equal(t, string(commontypes.DataTypeAudio), usage.DataType)
+	assert.Equal(t, int64(1), usage.CompletionRC)
+	assert.Equal(t, float64(4.25), usage.Duration)
 }
 
 func TestChatTokenCounter_Usage_WithTokenizer(t *testing.T) {
