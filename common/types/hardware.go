@@ -19,6 +19,7 @@ const (
 	UnAvailableTypeDisableVXPU          ResourceReasonType = "disable_vxpu"
 	UnAvailableTypeDisableScheduling    ResourceReasonType = "disable_scheduling"
 	UnAvailableTypeNodeOffline          ResourceReasonType = "node_offline"
+	UnAvailableTypePriceUndefined       ResourceReasonType = "price_undefined"
 )
 
 type (
