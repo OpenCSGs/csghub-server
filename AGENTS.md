@@ -63,6 +63,7 @@ Folders relative to the root of the repository for each service:
 - `builder/store/database/migrations/20240201061926_create_spaces.go` is an example of a database migration script that creates a space table.
 - use `go run cmd/csghub-server/main.go migration create_go` to generate a go database migration script.
 - use `go run cmd/csghub-server/main.go migration create_sql` to generate a sql database migration script. 
+- never manually create migration scripts; always generate them using the migration generator commands above.
 
 ### Space Deploy
 
