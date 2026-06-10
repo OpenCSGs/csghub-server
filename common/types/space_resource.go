@@ -50,6 +50,7 @@ type SpaceResource struct {
 	IsReserved          bool                      `json:"is_reserved"`
 	OrderDetailId       int64                     `json:"order_detail_id"`
 	AvailableStatusList []ResourceAvailableStatus `json:"available_status_list"`
+	PriceUndefined      bool                      `json:"price_undefined"`
 }
 
 type CreateSpaceResourceReq struct {

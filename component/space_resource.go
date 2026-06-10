@@ -62,13 +62,13 @@ func (c *spaceResourceComponentImpl) Index(ctx context.Context, req *types.Space
 		}
 		databaseSpaceResources, _, err := c.spaceResourceStore.Index(ctx, dbReq, math.MaxInt, 1)
 		if err != nil {
-			slog.Error("failed to index space resource", slog.String("clusterID", clusterID), slog.Any("error", err))
+			slog.ErrorContext(ctx, "failed to index space resource", slog.String("clusterID", clusterID), slog.Any("error", err))
 			continue
 		}
 
 		clusterResources, err := c.deployer.GetClusterById(ctx, clusterID)
 		if err != nil {
-			slog.Error("failed to get cluster by id", slog.String("clusterID", clusterID), slog.Any("error", err))
+			slog.ErrorContext(ctx, "failed to get cluster by id", slog.String("clusterID", clusterID), slog.Any("error", err))
 			continue
 		}
 		slog.InfoContext(ctx, "get space cluster resource", slog.Any("clusterResources", clusterResources))
@@ -115,8 +115,8 @@ func (c *spaceResourceComponentImpl) Index(ctx context.Context, req *types.Space
 
 		err = c.updatePriceInfo(req, singleClusterResult)
 		if err != nil {
-			slog.Error("failed to update price info", slog.String("clusterID", clusterID), slog.Any("error", err))
-			continue
+			slog.ErrorContext(ctx, "failed to update space resource price info", slog.String("clusterID", clusterID), slog.Any("error", err))
+			return nil, 0, err
 		}
 
 		// comment user reserved resource will update later
