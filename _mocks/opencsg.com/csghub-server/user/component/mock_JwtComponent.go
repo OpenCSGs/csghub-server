@@ -22,6 +22,72 @@ func (_m *MockJwtComponent) EXPECT() *MockJwtComponent_Expecter {
 	return &MockJwtComponent_Expecter{mock: &_m.Mock}
 }
 
+// GenerateLoginToken provides a mock function with given fields: ctx, req
+func (_m *MockJwtComponent) GenerateLoginToken(ctx context.Context, req types.CreateJWTReq) (*types.JWTClaims, string, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GenerateLoginToken")
+	}
+
+	var r0 *types.JWTClaims
+	var r1 string
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.CreateJWTReq) (*types.JWTClaims, string, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.CreateJWTReq) *types.JWTClaims); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*types.JWTClaims)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.CreateJWTReq) string); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Get(1).(string)
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, types.CreateJWTReq) error); ok {
+		r2 = rf(ctx, req)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
+// MockJwtComponent_GenerateLoginToken_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GenerateLoginToken'
+type MockJwtComponent_GenerateLoginToken_Call struct {
+	*mock.Call
+}
+
+// GenerateLoginToken is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req types.CreateJWTReq
+func (_e *MockJwtComponent_Expecter) GenerateLoginToken(ctx interface{}, req interface{}) *MockJwtComponent_GenerateLoginToken_Call {
+	return &MockJwtComponent_GenerateLoginToken_Call{Call: _e.mock.On("GenerateLoginToken", ctx, req)}
+}
+
+func (_c *MockJwtComponent_GenerateLoginToken_Call) Run(run func(ctx context.Context, req types.CreateJWTReq)) *MockJwtComponent_GenerateLoginToken_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.CreateJWTReq))
+	})
+	return _c
+}
+
+func (_c *MockJwtComponent_GenerateLoginToken_Call) Return(claims *types.JWTClaims, signed string, err error) *MockJwtComponent_GenerateLoginToken_Call {
+	_c.Call.Return(claims, signed, err)
+	return _c
+}
+
+func (_c *MockJwtComponent_GenerateLoginToken_Call) RunAndReturn(run func(context.Context, types.CreateJWTReq) (*types.JWTClaims, string, error)) *MockJwtComponent_GenerateLoginToken_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GenerateToken provides a mock function with given fields: ctx, req
 func (_m *MockJwtComponent) GenerateToken(ctx context.Context, req types.CreateJWTReq) (*types.JWTClaims, string, error) {
 	ret := _m.Called(ctx, req)
@@ -143,6 +209,72 @@ func (_c *MockJwtComponent_ParseToken_Call) Return(user *types.User, err error) 
 }
 
 func (_c *MockJwtComponent_ParseToken_Call) RunAndReturn(run func(context.Context, string) (*types.User, error)) *MockJwtComponent_ParseToken_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// RefreshToken provides a mock function with given fields: ctx, req
+func (_m *MockJwtComponent) RefreshToken(ctx context.Context, req types.RefreshJWTReq) (*types.JWTClaims, string, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for RefreshToken")
+	}
+
+	var r0 *types.JWTClaims
+	var r1 string
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.RefreshJWTReq) (*types.JWTClaims, string, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.RefreshJWTReq) *types.JWTClaims); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*types.JWTClaims)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.RefreshJWTReq) string); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Get(1).(string)
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, types.RefreshJWTReq) error); ok {
+		r2 = rf(ctx, req)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
+// MockJwtComponent_RefreshToken_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RefreshToken'
+type MockJwtComponent_RefreshToken_Call struct {
+	*mock.Call
+}
+
+// RefreshToken is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req types.RefreshJWTReq
+func (_e *MockJwtComponent_Expecter) RefreshToken(ctx interface{}, req interface{}) *MockJwtComponent_RefreshToken_Call {
+	return &MockJwtComponent_RefreshToken_Call{Call: _e.mock.On("RefreshToken", ctx, req)}
+}
+
+func (_c *MockJwtComponent_RefreshToken_Call) Run(run func(ctx context.Context, req types.RefreshJWTReq)) *MockJwtComponent_RefreshToken_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.RefreshJWTReq))
+	})
+	return _c
+}
+
+func (_c *MockJwtComponent_RefreshToken_Call) Return(claims *types.JWTClaims, signed string, err error) *MockJwtComponent_RefreshToken_Call {
+	_c.Call.Return(claims, signed, err)
+	return _c
+}
+
+func (_c *MockJwtComponent_RefreshToken_Call) RunAndReturn(run func(context.Context, types.RefreshJWTReq) (*types.JWTClaims, string, error)) *MockJwtComponent_RefreshToken_Call {
 	_c.Call.Return(run)
 	return _c
 }

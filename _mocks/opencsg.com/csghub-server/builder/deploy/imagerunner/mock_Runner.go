@@ -571,6 +571,66 @@ func (_c *MockRunner_GetReplica_Call) RunAndReturn(run func(context.Context, *ty
 	return _c
 }
 
+// GetSandbox provides a mock function with given fields: ctx, clusterID, sandboxName
+func (_m *MockRunner) GetSandbox(ctx context.Context, clusterID string, sandboxName string) (*runnertypes.SandboxDetail, error) {
+	ret := _m.Called(ctx, clusterID, sandboxName)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetSandbox")
+	}
+
+	var r0 *runnertypes.SandboxDetail
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) (*runnertypes.SandboxDetail, error)); ok {
+		return rf(ctx, clusterID, sandboxName)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) *runnertypes.SandboxDetail); ok {
+		r0 = rf(ctx, clusterID, sandboxName)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*runnertypes.SandboxDetail)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
+		r1 = rf(ctx, clusterID, sandboxName)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockRunner_GetSandbox_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetSandbox'
+type MockRunner_GetSandbox_Call struct {
+	*mock.Call
+}
+
+// GetSandbox is a helper method to define mock.On call
+//   - ctx context.Context
+//   - clusterID string
+//   - sandboxName string
+func (_e *MockRunner_Expecter) GetSandbox(ctx interface{}, clusterID interface{}, sandboxName interface{}) *MockRunner_GetSandbox_Call {
+	return &MockRunner_GetSandbox_Call{Call: _e.mock.On("GetSandbox", ctx, clusterID, sandboxName)}
+}
+
+func (_c *MockRunner_GetSandbox_Call) Run(run func(ctx context.Context, clusterID string, sandboxName string)) *MockRunner_GetSandbox_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(string))
+	})
+	return _c
+}
+
+func (_c *MockRunner_GetSandbox_Call) Return(_a0 *runnertypes.SandboxDetail, _a1 error) *MockRunner_GetSandbox_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockRunner_GetSandbox_Call) RunAndReturn(run func(context.Context, string, string) (*runnertypes.SandboxDetail, error)) *MockRunner_GetSandbox_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetWorkFlow provides a mock function with given fields: _a0, _a1
 func (_m *MockRunner) GetWorkFlow(_a0 context.Context, _a1 types.ArgoWorkFlowDeleteReq) (*types.ArgoWorkFlowRes, error) {
 	ret := _m.Called(_a0, _a1)
