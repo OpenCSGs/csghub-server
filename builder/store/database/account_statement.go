@@ -192,9 +192,13 @@ func (as *accountStatementStoreImpl) deductFeeStatement(ctx context.Context, inp
 		if utils.IsGetTokenID(input.Scene) && len(input.APIKey) > 0 {
 			token, err := findByTokenValue(ctx, tx, input.APIKey)
 			if err != nil {
-				slog.WarnContext(ctx, "find token by value failed, error", slog.Any("error", err))
+				slog.ErrorContext(ctx, "find token by value failed, error", slog.Any("error", err), slog.Any("input", input))
 			}
-			input.TokenID = token.ID
+			if token != nil {
+				input.TokenID = token.ID
+			} else {
+				slog.WarnContext(ctx, "token is nil", slog.Any("input", input))
+			}
 		}
 
 		err = DeductAccountFee(ctx, tx, input, checkBalance)
