@@ -579,6 +579,39 @@ func (h *RemoteRunner) DeleteSandbox(ctx context.Context, req *runnerTypes.Sandb
 	return nil
 }
 
+func (h *RemoteRunner) GetSandbox(ctx context.Context, clusterID, sandboxName string) (*runnerTypes.SandboxDetail, error) {
+	remote, err := h.GetRemoteRunnerHost(ctx, clusterID)
+	if err != nil {
+		return nil, err
+	}
+	url := fmt.Sprintf("%s/api/v1/sandboxes?cluster_id=%s&sandbox_name=%s", remote, clusterID, sandboxName)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, errorx.InternalServerError(err, nil)
+	}
+	req.Header.Set("Authorization", "Bearer "+h.config.APIKey)
+
+	resp, err := h.client.Do(req)
+	if err != nil {
+		return nil, errorx.RemoteSvcFail(err, nil)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, nil
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, fmt.Errorf("unexpected http status: %d", resp.StatusCode)
+	}
+
+	var res runnerTypes.SandboxDetail
+	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
+		return nil, errorx.InternalServerError(err, nil)
+	}
+	return &res, nil
+}
+
 func (h *RemoteRunner) CreateDataflowWorkflow(ctx context.Context, req *types.DataflowArgoJobReq) (*types.DataflowArgoJobResp, error) {
 	remote, err := h.GetRemoteRunnerHost(ctx, req.ClusterID)
 	if err != nil {

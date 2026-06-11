@@ -56,3 +56,15 @@ type SandboxStatus struct {
 	Message string
 	Reason  string
 }
+
+type SandboxDetail struct {
+	ID          string            `json:"id"`
+	Image       string            `json:"image"`
+	Status      int               `json:"status"`
+	Message     string            `json:"message,omitempty"`
+	Reason      string            `json:"reason,omitempty"`
+	ClusterID   string            `json:"cluster_id"`
+	Labels      map[string]string `json:"labels,omitempty"`
+	Annotations map[string]string `json:"annotations,omitempty"`
+	CreatedAt   time.Time         `json:"created_at"`
+}

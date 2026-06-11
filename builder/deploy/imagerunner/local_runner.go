@@ -128,6 +128,10 @@ func (h *LocalRunner) DeleteSandbox(ctx context.Context, req *runnerTypes.Sandbo
 	return nil
 }
 
+func (h *LocalRunner) GetSandbox(ctx context.Context, clusterID, sandboxName string) (*runnerTypes.SandboxDetail, error) {
+	return nil, nil
+}
+
 func (h *LocalRunner) CreateDataflowWorkflow(ctx context.Context, req *types.DataflowArgoJobReq) (*types.DataflowArgoJobResp, error) {
 	return nil, nil
 }

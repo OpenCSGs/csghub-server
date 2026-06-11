@@ -31,6 +31,7 @@ type Runner interface {
 	LabelNode(ctx context.Context, req *types.NodeLabel) error
 	CreateSandbox(ctx context.Context, req *runnerTypes.SandboxRequest) (*runnerTypes.Sandbox, error)
 	DeleteSandbox(ctx context.Context, req *runnerTypes.SandboxDeleteRequest) error
+	GetSandbox(ctx context.Context, clusterID, sandboxName string) (*runnerTypes.SandboxDetail, error)
 	CreateDataflowWorkflow(ctx context.Context, req *types.DataflowArgoJobReq) (*types.DataflowArgoJobResp, error)
 	DeleteDataflowWorkflow(ctx context.Context, req *types.DataflowArgoReq) error
 }
