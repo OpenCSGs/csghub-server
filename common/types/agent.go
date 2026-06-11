@@ -229,7 +229,8 @@ type SessionHistoryMessageEnvelope struct {
 	IsRewritten *bool  `json:"is_rewritten,omitempty"` // true: rewritten by user's request
 
 	// UpdateFeedback field
-	Feedback *AgentSessionHistoryFeedback `json:"feedback,omitempty"` // feedback: none, like, dislike
+	Feedback       *AgentSessionHistoryFeedback `json:"feedback,omitempty"`        // feedback: none, like, dislike
+	FeedbackReason *string                      `json:"feedback_reason,omitempty"` // optional reason supplied with the feedback
 
 	// Rewrite field
 	OriginalMsgUUID string `json:"original_msg_uuid,omitempty"` // original message UUID when rewriting
@@ -237,16 +238,17 @@ type SessionHistoryMessageEnvelope struct {
 
 // AgentInstanceSessionHistory represents a session history
 type AgentInstanceSessionHistory struct {
-	ID          int64                       `json:"id"`
-	MsgUUID     string                      `json:"msg_uuid"`
-	SessionID   int64                       `json:"session_id"`
-	SessionUUID string                      `json:"session_uuid"`
-	Request     bool                        `json:"request"`
-	Content     string                      `json:"content"`
-	Feedback    AgentSessionHistoryFeedback `json:"feedback"`
-	IsRewritten bool                        `json:"is_rewritten"`
-	CreatedAt   time.Time                   `json:"created_at"`
-	UpdatedAt   time.Time                   `json:"updated_at"`
+	ID             int64                       `json:"id"`
+	MsgUUID        string                      `json:"msg_uuid"`
+	SessionID      int64                       `json:"session_id"`
+	SessionUUID    string                      `json:"session_uuid"`
+	Request        bool                        `json:"request"`
+	Content        string                      `json:"content"`
+	Feedback       AgentSessionHistoryFeedback `json:"feedback"`
+	FeedbackReason string                      `json:"feedback_reason"`
+	IsRewritten    bool                        `json:"is_rewritten"`
+	CreatedAt      time.Time                   `json:"created_at"`
+	UpdatedAt      time.Time                   `json:"updated_at"`
 }
 
 type AgentInstanceSessionResponse struct {
@@ -291,6 +293,7 @@ const (
 type FeedbackSessionHistoryRequest struct {
 	MsgUUID  string                      `json:"-"`
 	Feedback AgentSessionHistoryFeedback `json:"feedback" binding:"required,oneof=none like dislike"`
+	Reason   string                      `json:"reason,omitempty" binding:"max=500"`
 }
 
 type RewriteSessionHistoryRequest struct {

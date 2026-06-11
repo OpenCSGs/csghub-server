@@ -26,15 +26,16 @@ type AgentInstanceSession struct {
 }
 
 type AgentInstanceSessionHistory struct {
-	ID          int64                             `bun:",pk,autoincrement" json:"id"`
-	UUID        string                            `bun:",notnull,unique" json:"uuid"` // used to identify the history message in the frontend, used to update the history
-	SessionID   int64                             `bun:",notnull" json:"session_id"`
-	Request     bool                              `bun:",notnull" json:"request"` // true=request(from user), false=response(from assistant)
-	Turn        int64                             `bun:",notnull" json:"turn"`    // use incremental turn number to indicate the response to its request, not just by time
-	Content     string                            `bun:",type:text" json:"content"`
-	Feedback    types.AgentSessionHistoryFeedback `bun:",notnull,default:'none'" json:"feedback"` // feedback options: none, like, dislike
-	IsRewritten bool                              `bun:",notnull,default:false" json:"is_rewritten"`
-	DeletedAt   time.Time                         `bun:",soft_delete,nullzero" json:"deleted_at"`
+	ID             int64                             `bun:",pk,autoincrement" json:"id"`
+	UUID           string                            `bun:",notnull,unique" json:"uuid"` // used to identify the history message in the frontend, used to update the history
+	SessionID      int64                             `bun:",notnull" json:"session_id"`
+	Request        bool                              `bun:",notnull" json:"request"` // true=request(from user), false=response(from assistant)
+	Turn           int64                             `bun:",notnull" json:"turn"`    // use incremental turn number to indicate the response to its request, not just by time
+	Content        string                            `bun:",type:text" json:"content"`
+	Feedback       types.AgentSessionHistoryFeedback `bun:",notnull,default:'none'" json:"feedback"` // feedback options: none, like, dislike
+	FeedbackReason string                            `bun:",nullzero" json:"feedback_reason"`        // optional reason supplied with the feedback (e.g. why a user disliked a message)
+	IsRewritten    bool                              `bun:",notnull,default:false" json:"is_rewritten"`
+	DeletedAt      time.Time                         `bun:",soft_delete,nullzero" json:"deleted_at"`
 	times
 }
 
