@@ -3,6 +3,7 @@
 package activity
 
 import (
+	aigatewaytask "opencsg.com/csghub-server/aigateway/task"
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
@@ -15,15 +16,16 @@ type stores struct {
 }
 
 type Activities struct {
-	config        *config.Config
-	callback      callback.GitCallbackComponent
-	recom         component.RecomComponent
-	gitServer     gitserver.GitServer
-	multisync     component.MultiSyncComponent
-	rftScanner    component.RuntimeArchitectureComponent
-	repoComponent component.RepoComponent
-	industryTag   component.IndustryTagComponent
-	stores        stores
+	config                 *config.Config
+	callback               callback.GitCallbackComponent
+	recom                  component.RecomComponent
+	gitServer              gitserver.GitServer
+	multisync              component.MultiSyncComponent
+	rftScanner             component.RuntimeArchitectureComponent
+	repoComponent          component.RepoComponent
+	industryTag            component.IndustryTagComponent
+	asyncGenerationService aigatewaytask.AsyncGenerationService
+	stores                 stores
 }
 
 func NewActivities(
@@ -36,20 +38,22 @@ func NewActivities(
 	rftScanner component.RuntimeArchitectureComponent,
 	repoComponent component.RepoComponent,
 	industryTag component.IndustryTagComponent,
+	asyncGenerationService aigatewaytask.AsyncGenerationService,
 ) *Activities {
 	stores := stores{
 		syncClientSetting: syncClientSetting,
 	}
 
 	return &Activities{
-		config:        cfg,
-		callback:      callback,
-		recom:         recom,
-		gitServer:     gitServer,
-		multisync:     multisync,
-		stores:        stores,
-		rftScanner:    rftScanner,
-		repoComponent: repoComponent,
-		industryTag:   industryTag,
+		config:                 cfg,
+		callback:               callback,
+		recom:                  recom,
+		gitServer:              gitServer,
+		multisync:              multisync,
+		stores:                 stores,
+		rftScanner:             rftScanner,
+		repoComponent:          repoComponent,
+		industryTag:            industryTag,
+		asyncGenerationService: asyncGenerationService,
 	}
 }

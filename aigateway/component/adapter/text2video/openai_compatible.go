@@ -92,7 +92,7 @@ func (a *OpenAICompatibleAdapter) ParseCreateResponse(ctx context.Context, body 
 	if err != nil {
 		return nil, err
 	}
-	return &ProviderResponse{Video: video}, nil
+	return &ProviderResponse{Video: video, ProviderMetadata: WithProviderStatus(nil, video.Status)}, nil
 }
 
 func (a *OpenAICompatibleAdapter) BuildRetrieveRequest(ctx context.Context, model *types.Model, providerResourceID string, providerMetadata map[string]any) (*ProviderRequest, error) {

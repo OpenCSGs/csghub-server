@@ -3,8 +3,9 @@ package router
 import (
 	"context"
 	"fmt"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"net/http"
+
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	bldprometheus "opencsg.com/csghub-server/builder/prometheus"
 
 	"opencsg.com/csghub-server/builder/instrumentation"
@@ -52,21 +53,32 @@ func NewRouter(config *config.Config) (*gin.Engine, func(), error) {
 	middlewareCollection.License.Check = middleware.CheckLicense(config)
 	middlewareCollection.Auth.MustUserOrgApiKey = middleware.MustUserOrgApiKey(config)
 
+	modalAPIRateLimiter := middleware.RateLimiter(config,
+		middleware.WithSlidingWindowRateLimter(config),
+		middleware.WithRateLimitConfig(
+			config.AIGateway.ModalAPIRateLimiter.Enable,
+			config.AIGateway.ModalAPIRateLimiter.Limit,
+			config.AIGateway.ModalAPIRateLimiter.Window,
+		),
+		middleware.WithOnLimitExceeded(aigatewayRateLimitHandler),
+	)
+
 	v1Group := r.Group("/v1")
 
 	openAIhandler, err := handler.NewOpenAIHandlerFromConfig(config)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error creating openai handler :%w", err)
 	}
+
 	v1Group.GET("/models", openAIhandler.ListModels)
 	v1Group.GET("/models/*model", openAIhandler.GetModel)
 	v1Group.POST("/chat/completions", middlewareCollection.Auth.MustUserOrgApiKey, openAIhandler.Chat)
 	v1Group.POST("/embeddings", middlewareCollection.Auth.MustUserOrgApiKey, openAIhandler.Embedding)
-	v1Group.POST("/images/generations", middlewareCollection.Auth.MustUserOrgApiKey, openAIhandler.GenerateImage)
-	v1Group.POST("/audio/transcriptions", middlewareCollection.Auth.MustUserOrgApiKey, openAIhandler.Transcription)
-	v1Group.POST("/videos", middlewareCollection.Auth.MustUserOrgApiKey, openAIhandler.CreateVideo)
+	v1Group.POST("/images/generations", middlewareCollection.Auth.MustUserOrgApiKey, modalAPIRateLimiter, openAIhandler.GenerateImage)
+	v1Group.POST("/audio/transcriptions", middlewareCollection.Auth.MustUserOrgApiKey, modalAPIRateLimiter, openAIhandler.Transcription)
+	v1Group.POST("/videos", middlewareCollection.Auth.MustUserOrgApiKey, modalAPIRateLimiter, openAIhandler.CreateVideo)
 	v1Group.GET("/videos/:video_id", middlewareCollection.Auth.MustUserOrgApiKey, openAIhandler.GetVideo)
-	v1Group.GET("/videos/:video_id/content", middlewareCollection.Auth.MustUserOrgApiKey, openAIhandler.GetVideoContent)
+	v1Group.GET("/videos/:video_id/content", middlewareCollection.Auth.MustUserOrgApiKey, modalAPIRateLimiter, openAIhandler.GetVideoContent)
 
 	apiV1Group := r.Group("/api/v1")
 	adminGroup := apiV1Group.Group("/admin", middlewareCollection.Auth.NeedAdmin)

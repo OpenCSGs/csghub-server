@@ -141,6 +141,54 @@ func (_c *MockAIGenerationStore_FindByResourceID_Call) RunAndReturn(run func(con
 	return _c
 }
 
+// PublishMeteringEventInTx provides a mock function with given fields: ctx, id, publishFn
+func (_m *MockAIGenerationStore) PublishMeteringEventInTx(ctx context.Context, id int64, publishFn func(database.AIGeneration) error) error {
+	ret := _m.Called(ctx, id, publishFn)
+
+	if len(ret) == 0 {
+		panic("no return value specified for PublishMeteringEventInTx")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, int64, func(database.AIGeneration) error) error); ok {
+		r0 = rf(ctx, id, publishFn)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockAIGenerationStore_PublishMeteringEventInTx_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PublishMeteringEventInTx'
+type MockAIGenerationStore_PublishMeteringEventInTx_Call struct {
+	*mock.Call
+}
+
+// PublishMeteringEventInTx is a helper method to define mock.On call
+//   - ctx context.Context
+//   - id int64
+//   - publishFn func(database.AIGeneration) error
+func (_e *MockAIGenerationStore_Expecter) PublishMeteringEventInTx(ctx interface{}, id interface{}, publishFn interface{}) *MockAIGenerationStore_PublishMeteringEventInTx_Call {
+	return &MockAIGenerationStore_PublishMeteringEventInTx_Call{Call: _e.mock.On("PublishMeteringEventInTx", ctx, id, publishFn)}
+}
+
+func (_c *MockAIGenerationStore_PublishMeteringEventInTx_Call) Run(run func(ctx context.Context, id int64, publishFn func(database.AIGeneration) error)) *MockAIGenerationStore_PublishMeteringEventInTx_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(int64), args[2].(func(database.AIGeneration) error))
+	})
+	return _c
+}
+
+func (_c *MockAIGenerationStore_PublishMeteringEventInTx_Call) Return(_a0 error) *MockAIGenerationStore_PublishMeteringEventInTx_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockAIGenerationStore_PublishMeteringEventInTx_Call) RunAndReturn(run func(context.Context, int64, func(database.AIGeneration) error) error) *MockAIGenerationStore_PublishMeteringEventInTx_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Update provides a mock function with given fields: ctx, input
 func (_m *MockAIGenerationStore) Update(ctx context.Context, input database.AIGeneration) (*database.AIGeneration, error) {
 	ret := _m.Called(ctx, input)
@@ -196,6 +244,112 @@ func (_c *MockAIGenerationStore_Update_Call) Return(_a0 *database.AIGeneration, 
 }
 
 func (_c *MockAIGenerationStore_Update_Call) RunAndReturn(run func(context.Context, database.AIGeneration) (*database.AIGeneration, error)) *MockAIGenerationStore_Update_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// UpdateProviderMetadata provides a mock function with given fields: ctx, id, providerMetadata
+func (_m *MockAIGenerationStore) UpdateProviderMetadata(ctx context.Context, id int64, providerMetadata map[string]any) error {
+	ret := _m.Called(ctx, id, providerMetadata)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdateProviderMetadata")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, int64, map[string]any) error); ok {
+		r0 = rf(ctx, id, providerMetadata)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockAIGenerationStore_UpdateProviderMetadata_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdateProviderMetadata'
+type MockAIGenerationStore_UpdateProviderMetadata_Call struct {
+	*mock.Call
+}
+
+// UpdateProviderMetadata is a helper method to define mock.On call
+//   - ctx context.Context
+//   - id int64
+//   - providerMetadata map[string]any
+func (_e *MockAIGenerationStore_Expecter) UpdateProviderMetadata(ctx interface{}, id interface{}, providerMetadata interface{}) *MockAIGenerationStore_UpdateProviderMetadata_Call {
+	return &MockAIGenerationStore_UpdateProviderMetadata_Call{Call: _e.mock.On("UpdateProviderMetadata", ctx, id, providerMetadata)}
+}
+
+func (_c *MockAIGenerationStore_UpdateProviderMetadata_Call) Run(run func(ctx context.Context, id int64, providerMetadata map[string]any)) *MockAIGenerationStore_UpdateProviderMetadata_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(int64), args[2].(map[string]any))
+	})
+	return _c
+}
+
+func (_c *MockAIGenerationStore_UpdateProviderMetadata_Call) Return(_a0 error) *MockAIGenerationStore_UpdateProviderMetadata_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockAIGenerationStore_UpdateProviderMetadata_Call) RunAndReturn(run func(context.Context, int64, map[string]any) error) *MockAIGenerationStore_UpdateProviderMetadata_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// UpdateWithStatus provides a mock function with given fields: ctx, input, fromStatus
+func (_m *MockAIGenerationStore) UpdateWithStatus(ctx context.Context, input database.AIGeneration, fromStatus string) (bool, error) {
+	ret := _m.Called(ctx, input, fromStatus)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdateWithStatus")
+	}
+
+	var r0 bool
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, database.AIGeneration, string) (bool, error)); ok {
+		return rf(ctx, input, fromStatus)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, database.AIGeneration, string) bool); ok {
+		r0 = rf(ctx, input, fromStatus)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, database.AIGeneration, string) error); ok {
+		r1 = rf(ctx, input, fromStatus)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAIGenerationStore_UpdateWithStatus_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdateWithStatus'
+type MockAIGenerationStore_UpdateWithStatus_Call struct {
+	*mock.Call
+}
+
+// UpdateWithStatus is a helper method to define mock.On call
+//   - ctx context.Context
+//   - input database.AIGeneration
+//   - fromStatus string
+func (_e *MockAIGenerationStore_Expecter) UpdateWithStatus(ctx interface{}, input interface{}, fromStatus interface{}) *MockAIGenerationStore_UpdateWithStatus_Call {
+	return &MockAIGenerationStore_UpdateWithStatus_Call{Call: _e.mock.On("UpdateWithStatus", ctx, input, fromStatus)}
+}
+
+func (_c *MockAIGenerationStore_UpdateWithStatus_Call) Run(run func(ctx context.Context, input database.AIGeneration, fromStatus string)) *MockAIGenerationStore_UpdateWithStatus_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(database.AIGeneration), args[2].(string))
+	})
+	return _c
+}
+
+func (_c *MockAIGenerationStore_UpdateWithStatus_Call) Return(_a0 bool, _a1 error) *MockAIGenerationStore_UpdateWithStatus_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAIGenerationStore_UpdateWithStatus_Call) RunAndReturn(run func(context.Context, database.AIGeneration, string) (bool, error)) *MockAIGenerationStore_UpdateWithStatus_Call {
 	_c.Call.Return(run)
 	return _c
 }

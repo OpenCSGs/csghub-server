@@ -153,6 +153,7 @@ func (h *OpenAIHandlerImpl) GenerateImage(c *gin.Context) {
 		slog.Any("user", username), slog.Any("model_name", modelTarget.ModelName))
 
 	imageCounter := token.NewImageUsageCounter()
+	imageCounter.SetRequestDetails(string(req.Size), req.N.Or(1))
 	responseFormat := string(req.ResponseFormat)
 	if responseFormat == "" {
 		responseFormat = "url"
@@ -189,7 +190,7 @@ func (h *OpenAIHandlerImpl) GenerateImage(c *gin.Context) {
 		defer cancel()
 
 		var usage *token.Usage
-		if imageCounter != nil {
+		if imageWrapper.StatusCode() < http.StatusBadRequest && imageCounter != nil {
 			var usageErr error
 			usage, usageErr = imageCounter.Usage(usageCtx)
 			if usageErr != nil {
@@ -211,11 +212,10 @@ func (h *OpenAIHandlerImpl) GenerateImage(c *gin.Context) {
 			})
 			generationRecorder.End()
 		}
-		if usage == nil {
-			return
-		}
-		if err := h.openaiComponent.RecordUsageFromTokenUsage(usageCtx, nsUUID, modelTarget.Model, modelTarget.ModelName, usage, apikey); err != nil {
-			slog.ErrorContext(usageCtx, "failed to record image usage", slog.Any("error", err))
+		if imageWrapper.StatusCode() < http.StatusBadRequest && usage != nil {
+			if err := h.openaiComponent.RecordUsageFromTokenUsage(usageCtx, nsUUID, modelTarget.Model, modelTarget.ModelName, usage, apikey); err != nil {
+				slog.ErrorContext(usageCtx, "failed to record image usage", slog.Any("error", err))
+			}
 		}
 	}()
 }

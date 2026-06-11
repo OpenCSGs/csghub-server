@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"opencsg.com/csghub-server/aigateway/token"
+	commontypes "opencsg.com/csghub-server/common/types"
 )
 
 type audioResponseWriter interface {
@@ -34,6 +35,7 @@ func NewResponseWriterWrapperAudio(internalWritter http.ResponseWriter, tokenCou
 	return &ResponseWriterWrapperAudio{
 		internalWritter: internalWritter,
 		tokenCounter:    tokenCounter,
+		statusCode:      http.StatusOK,
 	}
 }
 
@@ -87,10 +89,15 @@ func (rw *ResponseWriterWrapperAudio) captureText(data []byte) {
 	if err := json.Unmarshal(body, &resp); err == nil {
 		rw.captureDuration(resp.Usage.Seconds, resp.Duration)
 		if resp.Usage.TotalTokens > 0 || resp.Usage.PromptTokens > 0 || resp.Usage.CompletionTokens > 0 {
+			duration, _ := rw.DurationSeconds()
 			rw.tokenCounter.SetUsage(token.Usage{
 				TotalTokens:      resp.Usage.TotalTokens,
 				PromptTokens:     resp.Usage.PromptTokens,
 				CompletionTokens: resp.Usage.CompletionTokens,
+				DataType:         string(commontypes.DataTypeAudio),
+				Duration:         duration,
+				CompletionRC:     1,
+				CompletionDesc:   resp.Text,
 			})
 			return
 		}
@@ -118,6 +125,9 @@ func (rw *ResponseWriterWrapperAudio) captureDuration(candidates ...*float64) {
 		if candidate != nil && *candidate > 0 {
 			rw.durationSeconds = *candidate
 			rw.hasDuration = true
+			if rw.tokenCounter != nil {
+				rw.tokenCounter.Duration(*candidate)
+			}
 			return
 		}
 	}

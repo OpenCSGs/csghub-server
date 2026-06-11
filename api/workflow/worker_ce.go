@@ -10,6 +10,7 @@ import (
 	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/log"
 	"go.temporal.io/sdk/worker"
+	aigatewaytask "opencsg.com/csghub-server/aigateway/task"
 	"opencsg.com/csghub-server/api/workflow/activity"
 	"opencsg.com/csghub-server/builder/git"
 	"opencsg.com/csghub-server/builder/git/gitserver"
@@ -66,11 +67,15 @@ func StartWorkflow(cfg *config.Config, registerAsWorker bool) error {
 	if err != nil {
 		return err
 	}
+	asyncGenSvc, err := aigatewaytask.NewAsyncGenerationService(cfg)
+	if err != nil {
+		return err
+	}
 
 	return StartWorkflowDI(
 		cfg, gitcallback, recom,
 		gitserver, multisync, database.NewSyncClientSettingStore(), client,
-		rftScanner, repoComponent, industryTag, registerAsWorker,
+		rftScanner, repoComponent, industryTag, asyncGenSvc, registerAsWorker,
 	)
 }
 
@@ -85,11 +90,12 @@ func StartWorkflowDI(
 	rftScanner component.RuntimeArchitectureComponent,
 	repoComponent component.RepoComponent,
 	industryTag component.IndustryTagComponent,
+	asyncGenerationService aigatewaytask.AsyncGenerationService,
 	registerAsWorker bool,
 ) error {
 	if registerAsWorker {
 		worker := temporalClient.NewWorker(HandlePushQueueName, worker.Options{})
-		act := activity.NewActivities(cfg, callback, recom, gitServer, multisync, syncClientSetting, rftScanner, repoComponent, industryTag)
+		act := activity.NewActivities(cfg, callback, recom, gitServer, multisync, syncClientSetting, rftScanner, repoComponent, industryTag, asyncGenerationService)
 		worker.RegisterActivity(act)
 
 		worker.RegisterWorkflow(HandlePushWorkflow)

@@ -14,7 +14,7 @@ func TestResponseWriterWrapperAudio_UsesResponseUsage(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	w := NewResponseWriterWrapperAudio(recorder, counter)
 
-	_, err := w.Write([]byte(`{"text":"hello","usage":{"prompt_tokens":371,"completion_tokens":52,"total_tokens":423}}`))
+	_, err := w.Write([]byte(`{"text":"hello","usage":{"prompt_tokens":371,"completion_tokens":52,"total_tokens":423,"seconds":9.2}}`))
 	require.NoError(t, err)
 
 	usage, err := counter.Usage(context.Background())
@@ -22,6 +22,7 @@ func TestResponseWriterWrapperAudio_UsesResponseUsage(t *testing.T) {
 	require.Equal(t, int64(423), usage.TotalTokens)
 	require.Equal(t, int64(371), usage.PromptTokens)
 	require.Equal(t, int64(52), usage.CompletionTokens)
+	require.Equal(t, 9.2, usage.Duration)
 }
 
 func TestResponseWriterWrapperAudio_UsesResponseUsageFromChunkedJSON(t *testing.T) {
@@ -71,6 +72,10 @@ func TestResponseWriterWrapperAudio_CapturesDurationFromUsage(t *testing.T) {
 			duration, ok := w.DurationSeconds()
 			require.True(t, ok)
 			require.Equal(t, tt.want, duration)
+
+			usage, err := counter.Usage(context.Background())
+			require.NoError(t, err)
+			require.Equal(t, tt.want, usage.Duration)
 		})
 	}
 }

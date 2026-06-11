@@ -1,6 +1,10 @@
 package types
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"strconv"
+	"strings"
+)
 
 // ImageInputReferenceParam is the OpenAI-compatible image reference shape used
 // by AIGateway's public image-to-video request API.
@@ -114,4 +118,44 @@ type VideoObject struct {
 	Progress           *float64    `json:"progress,omitempty"`
 	Error              *VideoError `json:"error,omitempty"`
 	RemixedFromVideoID string      `json:"remixed_from_video_id,omitempty"`
+	Usage              *VideoUsage `json:"usage,omitempty"`
+}
+
+func (v *VideoObject) UnmarshalJSON(data []byte) error {
+	type videoObject VideoObject
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(data, &fields); err != nil {
+		return err
+	}
+	if rawSeconds, ok := fields["seconds"]; ok {
+		var seconds string
+		if err := json.Unmarshal(rawSeconds, &seconds); err == nil {
+			seconds = strings.TrimSpace(seconds)
+			if seconds != "" {
+				parsed, parseErr := strconv.ParseInt(seconds, 10, 64)
+				if parseErr != nil {
+					return parseErr
+				}
+				fields["seconds"] = []byte(strconv.FormatInt(parsed, 10))
+			}
+		}
+	}
+	normalized, err := json.Marshal(fields)
+	if err != nil {
+		return err
+	}
+	var alias videoObject
+	if err := json.Unmarshal(normalized, &alias); err != nil {
+		return err
+	}
+	*v = VideoObject(alias)
+	return nil
+}
+
+// VideoUsage carries OpenAI-compatible usage fields when a video provider
+// returns them with the asynchronous job object.
+type VideoUsage struct {
+	InputTokens  int64 `json:"input_tokens,omitempty"`
+	OutputTokens int64 `json:"output_tokens,omitempty"`
+	TotalTokens  int64 `json:"total_tokens,omitempty"`
 }

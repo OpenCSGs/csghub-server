@@ -2,14 +2,17 @@ package token
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"log/slog"
 	"math"
+	"strconv"
 	"strings"
 	"unicode/utf8"
 
 	"github.com/openai/openai-go/v3"
 	"opencsg.com/csghub-server/aigateway/types"
+	commontypes "opencsg.com/csghub-server/common/types"
 )
 
 var _ Counter = (*chatTokenCounterImpl)(nil)
@@ -22,14 +25,18 @@ type ChatTokenCounter interface {
 }
 
 type chatTokenCounterImpl struct {
-	prompts    []openai.ChatCompletionMessageParamUnion
-	completion *types.ChatCompletion
-	chunks     []types.ChatCompletionChunk
-	tokenizer  Tokenizer
+	prompts       []openai.ChatCompletionMessageParamUnion
+	completion    *types.ChatCompletion
+	chunks        []types.ChatCompletionChunk
+	tokenizer     Tokenizer
+	modalDataType commontypes.DataType
 }
 
 func (l *chatTokenCounterImpl) AppendPrompts(prompts []openai.ChatCompletionMessageParamUnion) {
 	l.prompts = append(l.prompts, prompts...)
+	if l.modalDataType == "" {
+		l.modalDataType = modalDataTypeFromChatMessages(prompts)
+	}
 }
 
 func NewLLMTokenCounter(tokenizer Tokenizer) ChatTokenCounter {
@@ -74,14 +81,15 @@ func (l *chatTokenCounterImpl) AppendCompletionChunk(chunk types.ChatCompletionC
 func (l *chatTokenCounterImpl) Usage(c context.Context) (*Usage, error) {
 	if l.completion != nil {
 		if l.completion.Usage.TotalTokens > 0 {
-			return &Usage{
+			return l.withPromptModalUsage(&Usage{
 				PromptTokens:              l.completion.Usage.PromptTokens,
 				CompletionTokens:          l.completion.Usage.CompletionTokens,
 				TotalTokens:               l.completion.Usage.TotalTokens,
 				CachedPromptTokens:        l.completion.Usage.PromptTokensDetails.CachedTokens,
 				ReasoningTokens:           l.completion.Usage.CompletionTokensDetails.ReasoningTokens,
 				CacheCreationPromptTokens: 0,
-			}, nil
+				Duration:                  completionUsageSeconds(l.completion.Usage),
+			}), nil
 		}
 		slog.WarnContext(c, "chat completion usage not found, fallback to local token estimate")
 	}
@@ -106,14 +114,15 @@ func (l *chatTokenCounterImpl) Usage(c context.Context) (*Usage, error) {
 		// contains usage data
 		if chunk.Usage.TotalTokens > 0 {
 			slog.Debug("llmTokenCounter generated", slog.String("content", contentBuf.String()))
-			return &Usage{
+			return l.withPromptModalUsage(&Usage{
 				PromptTokens:              chunk.Usage.PromptTokens,
 				CompletionTokens:          chunk.Usage.CompletionTokens,
 				TotalTokens:               chunk.Usage.TotalTokens,
 				CachedPromptTokens:        chunk.Usage.PromptTokensDetails.CachedTokens,
 				ReasoningTokens:           chunk.Usage.CompletionTokensDetails.ReasoningTokens,
 				CacheCreationPromptTokens: 0,
-			}, nil
+				Duration:                  completionUsageSeconds(chunk.Usage),
+			}), nil
 		}
 	}
 
@@ -127,11 +136,11 @@ func (l *chatTokenCounterImpl) Usage(c context.Context) (*Usage, error) {
 			slog.Int64("prompt_tokens", promptTokens),
 			slog.Int64("completion_tokens", completionTokens),
 			slog.Int64("total_tokens", totalTokens))
-		return &Usage{
+		return l.withPromptModalUsage(&Usage{
 			PromptTokens:     promptTokens,
 			CompletionTokens: completionTokens,
 			TotalTokens:      totalTokens,
-		}, nil
+		}), nil
 	}
 
 	var totalTokens, completionTokens, promptTokens int64
@@ -221,11 +230,52 @@ func (l *chatTokenCounterImpl) Usage(c context.Context) (*Usage, error) {
 	// between prompt and response
 	promptTokens += 3
 	totalTokens = promptTokens + completionTokens
-	return &Usage{
+	return l.withPromptModalUsage(&Usage{
 		CompletionTokens: completionTokens,
 		PromptTokens:     promptTokens,
 		TotalTokens:      totalTokens,
-	}, nil
+	}), nil
+}
+
+func (l *chatTokenCounterImpl) withPromptModalUsage(usage *Usage) *Usage {
+	if usage == nil || l.modalDataType == "" {
+		return usage
+	}
+	usage.DataType = string(l.modalDataType)
+	usage.CompletionRC = 1
+	return usage
+}
+
+func modalDataTypeFromChatMessages(messages []openai.ChatCompletionMessageParamUnion) commontypes.DataType {
+	for _, message := range messages {
+		if dataType := modalDataTypeFromContentParts(message.GetContent().AsAny()); dataType != "" {
+			return dataType
+		}
+	}
+	return ""
+}
+
+func modalDataTypeFromContentParts(content any) commontypes.DataType {
+	switch parts := content.(type) {
+	case *[]openai.ChatCompletionContentPartUnionParam:
+		return modalDataTypeFromParts(*parts)
+	case []openai.ChatCompletionContentPartUnionParam:
+		return modalDataTypeFromParts(parts)
+	default:
+		return ""
+	}
+}
+
+func modalDataTypeFromParts(parts []openai.ChatCompletionContentPartUnionParam) commontypes.DataType {
+	for _, part := range parts {
+		if part.OfImageURL != nil {
+			return commontypes.DataTypeImage
+		}
+		if part.OfInputAudio != nil {
+			return commontypes.DataTypeAudio
+		}
+	}
+	return ""
 }
 
 func approximatePromptAndCompletionTokens(prompts []openai.ChatCompletionMessageParamUnion, completion string) (int64, int64) {
@@ -256,6 +306,41 @@ func approximatePromptAndCompletionTokens(prompts []openai.ChatCompletionMessage
 	}
 	completionTokens := approxTokensByText(completion)
 	return promptTokens, completionTokens
+}
+
+func completionUsageSeconds(usage openai.CompletionUsage) float64 {
+	field, ok := usage.JSON.ExtraFields["seconds"]
+	if ok && field.Valid() {
+		return positiveJSONFloat(field.Raw())
+	}
+	var payload map[string]any
+	if err := json.Unmarshal([]byte(usage.RawJSON()), &payload); err != nil {
+		return 0
+	}
+	return positiveFloat(payload["seconds"])
+}
+
+func positiveJSONFloat(raw string) float64 {
+	var value any
+	if err := json.Unmarshal([]byte(raw), &value); err != nil {
+		return 0
+	}
+	return positiveFloat(value)
+}
+
+func positiveFloat(value any) float64 {
+	switch typed := value.(type) {
+	case float64:
+		if typed > 0 {
+			return typed
+		}
+	case string:
+		parsed, err := strconv.ParseFloat(strings.TrimSpace(typed), 64)
+		if err == nil && parsed > 0 {
+			return parsed
+		}
+	}
+	return 0
 }
 
 func approxTokensByText(content string) int64 {

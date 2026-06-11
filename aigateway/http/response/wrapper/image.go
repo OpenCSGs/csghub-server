@@ -107,6 +107,7 @@ func (w *ImageGeneration) Finalize() error {
 	}
 	body, openaiResp, err := w.adapter.TransformResponse(context.Background(), w.buffer.Bytes(), w.contentType, encodingHeader, opts)
 	if err != nil {
+		w.statusCode = http.StatusInternalServerError
 		w.internalWritter.Header().Set("Content-Type", "application/json")
 		w.internalWritter.WriteHeader(http.StatusInternalServerError)
 		return json.NewEncoder(w.internalWritter).Encode(gin.H{"error": types.Error{
@@ -131,6 +132,7 @@ func (w *ImageGeneration) Finalize() error {
 		}
 		body, err = common.MarshalJSONWithoutHTMLEscape(openaiResp)
 		if err != nil {
+			w.statusCode = http.StatusInternalServerError
 			w.internalWritter.Header().Set("Content-Type", "application/json")
 			w.internalWritter.WriteHeader(http.StatusInternalServerError)
 			return err

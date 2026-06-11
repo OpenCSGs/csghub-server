@@ -1030,6 +1030,180 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 	}
 }
 
+func TestOpenAIComponentImpl_RecordUsage_MultiModalImage(t *testing.T) {
+	mockBLDMQ := mockbldmq.NewMockMessageQueue(t)
+	eventPub := &event.EventPublisher{
+		SyncInterval: 1,
+		MQ:           mockBLDMQ,
+	}
+	mockCounter := mocktoken.NewMockCounter(t)
+
+	comp := &openaiComponentImpl{
+		eventPub: eventPub,
+	}
+
+	model := &types.Model{
+		BaseModel: types.BaseModel{
+			ID: "test-image-model",
+			Metadata: map[string]any{
+				types.MetaKeyLLMType: string(types.ProviderTypeServerless),
+			},
+		},
+		InternalModelInfo: types.InternalModelInfo{
+			CSGHubModelID: "test-image-model",
+			SvcName:       "test-service",
+		},
+		ExternalModelInfo: types.ExternalModelInfo{
+			Provider: "openai",
+		},
+	}
+
+	mockCounter.EXPECT().Usage(mock.Anything).Return(&token.Usage{
+		TotalTokens:      1,
+		PromptTokens:     10,
+		CompletionTokens: 20,
+		DataType:         "image",
+		Resolution:       "1024x1024",
+		CompletionRC:     2,
+		CompletionDesc:   "a cat on a mat",
+	}, nil)
+
+	mockBLDMQ.EXPECT().Publish(bldmq.MeterDurationSendSubject, mock.Anything).RunAndReturn(func(topic string, data []byte) error {
+		var evt commontypes.MeteringEvent
+		err := json.Unmarshal(data, &evt)
+		require.NoError(t, err)
+		require.Equal(t, int(commontypes.SceneMultiModalServerless), evt.Scene)
+		require.Equal(t, commontypes.CountNumberType, evt.ValueType)
+		require.Equal(t, int64(2), evt.Value)
+		var extra struct {
+			DataType   string `json:"completion_data_type"`
+			Resolution string `json:"completion_resolution"`
+			Desc       string `json:"completion_desc"`
+		}
+		err = json.Unmarshal([]byte(evt.Extra), &extra)
+		require.NoError(t, err)
+		require.Equal(t, "image", extra.DataType)
+		require.Equal(t, "1024x1024", extra.Resolution)
+		require.Equal(t, "a cat on a mat", extra.Desc)
+		return nil
+	})
+
+	err := comp.RecordUsage(context.Background(), "test-user-uuid", model, "dall-e-3", mockCounter, "")
+	require.NoError(t, err)
+}
+
+func TestOpenAIComponentImpl_RecordUsage_MultiModalVideo(t *testing.T) {
+	mockBLDMQ := mockbldmq.NewMockMessageQueue(t)
+	eventPub := &event.EventPublisher{
+		SyncInterval: 1,
+		MQ:           mockBLDMQ,
+	}
+	mockCounter := mocktoken.NewMockCounter(t)
+
+	comp := &openaiComponentImpl{
+		eventPub: eventPub,
+	}
+
+	model := &types.Model{
+		BaseModel: types.BaseModel{
+			ID: "test-video-model",
+			Metadata: map[string]any{
+				types.MetaKeyLLMType: string(types.ProviderTypeServerless),
+			},
+		},
+		InternalModelInfo: types.InternalModelInfo{
+			CSGHubModelID: "test-video-model",
+			SvcName:       "test-service",
+		},
+	}
+
+	mockCounter.EXPECT().Usage(mock.Anything).Return(&token.Usage{
+		TotalTokens:    1,
+		DataType:       "video",
+		Resolution:     "720p",
+		Duration:       10.5,
+		CompletionRC:   1,
+		CompletionDesc: "a flying car",
+	}, nil)
+
+	mockBLDMQ.EXPECT().Publish(bldmq.MeterDurationSendSubject, mock.Anything).RunAndReturn(func(topic string, data []byte) error {
+		var evt commontypes.MeteringEvent
+		err := json.Unmarshal(data, &evt)
+		require.NoError(t, err)
+		require.Equal(t, commontypes.CountNumberType, evt.ValueType)
+		require.Equal(t, int64(1), evt.Value)
+		var extra struct {
+			DataType   string `json:"completion_data_type"`
+			Resolution string `json:"completion_resolution"`
+			Duration   string `json:"completion_duration"`
+			Desc       string `json:"completion_desc"`
+		}
+		err = json.Unmarshal([]byte(evt.Extra), &extra)
+		require.NoError(t, err)
+		require.Equal(t, "video", extra.DataType)
+		require.Equal(t, "720p", extra.Resolution)
+		require.Equal(t, "10.50", extra.Duration)
+		require.Equal(t, "a flying car", extra.Desc)
+		return nil
+	})
+
+	err := comp.RecordUsage(context.Background(), "test-user-uuid", model, "sora", mockCounter, "")
+	require.NoError(t, err)
+}
+
+func TestOpenAIComponentImpl_RecordUsage_MultiModalAudio(t *testing.T) {
+	mockBLDMQ := mockbldmq.NewMockMessageQueue(t)
+	eventPub := &event.EventPublisher{
+		SyncInterval: 1,
+		MQ:           mockBLDMQ,
+	}
+	mockCounter := mocktoken.NewMockCounter(t)
+
+	comp := &openaiComponentImpl{
+		eventPub: eventPub,
+	}
+
+	model := &types.Model{
+		BaseModel: types.BaseModel{
+			ID: "test-audio-model",
+			Metadata: map[string]any{
+				types.MetaKeyLLMType: string(types.ProviderTypeServerless),
+			},
+		},
+		InternalModelInfo: types.InternalModelInfo{
+			CSGHubModelID: "test-audio-model",
+			SvcName:       "test-service",
+		},
+	}
+
+	mockCounter.EXPECT().Usage(mock.Anything).Return(&token.Usage{
+		TotalTokens:    1,
+		DataType:       "audio",
+		CompletionRC:   1,
+		CompletionDesc: "hello world",
+	}, nil)
+
+	mockBLDMQ.EXPECT().Publish(bldmq.MeterDurationSendSubject, mock.Anything).RunAndReturn(func(topic string, data []byte) error {
+		var evt commontypes.MeteringEvent
+		err := json.Unmarshal(data, &evt)
+		require.NoError(t, err)
+		require.Equal(t, commontypes.CountNumberType, evt.ValueType)
+		require.Equal(t, int64(1), evt.Value)
+		var extra struct {
+			DataType string `json:"completion_data_type"`
+			Desc     string `json:"completion_desc"`
+		}
+		err = json.Unmarshal([]byte(evt.Extra), &extra)
+		require.NoError(t, err)
+		require.Equal(t, "audio", extra.DataType)
+		require.Equal(t, "hello world", extra.Desc)
+		return nil
+	})
+
+	err := comp.RecordUsage(context.Background(), "test-user-uuid", model, "whisper-1", mockCounter, "")
+	require.NoError(t, err)
+}
+
 func TestOpenAIComponentImpl_RecordUsage_ExternalModel(t *testing.T) {
 	mockUserStore := &mockdb.MockUserStore{}
 	mockDeployStore := &mockdb.MockDeployTaskStore{}

@@ -307,7 +307,8 @@ func (a *LightX2VAdapter) parseProviderResponse(body []byte) (*ProviderResponse,
 	if taskID == "" {
 		return nil, fmt.Errorf("lightx2v response missing task_id")
 	}
-	status := mapLightX2VStatus(stringAt(payload, "status"))
+	rawStatus := stringAt(payload, "status")
+	status := mapLightX2VStatus(rawStatus)
 	video := &types.VideoObject{
 		ID:     taskID,
 		Object: "video",
@@ -316,7 +317,7 @@ func (a *LightX2VAdapter) parseProviderResponse(body []byte) (*ProviderResponse,
 	if progress, ok := float64At(payload, "progress"); ok {
 		video.Progress = &progress
 	}
-	if status == "failed" {
+	if status == string(commonTypes.AIGatewayAsyncGenerationStatusFailed) {
 		if message := stringAt(payload, "message"); message != "" {
 			video.Error = &types.VideoError{
 				Code:    "generation_failed",
@@ -324,19 +325,19 @@ func (a *LightX2VAdapter) parseProviderResponse(body []byte) (*ProviderResponse,
 			}
 		}
 	}
-	return &ProviderResponse{Video: video}, nil
+	return &ProviderResponse{Video: video, ProviderMetadata: WithProviderStatus(nil, rawStatus)}, nil
 }
 
 func mapLightX2VStatus(status string) string {
 	switch strings.ToLower(strings.TrimSpace(status)) {
 	case "submitted":
-		return "queued"
+		return string(commonTypes.AIGatewayAsyncGenerationStatusQueued)
 	case "running":
-		return "in_progress"
+		return string(commonTypes.AIGatewayAsyncGenerationStatusInProgress)
 	case "succeed":
-		return "completed"
+		return string(commonTypes.AIGatewayAsyncGenerationStatusCompleted)
 	case "failed":
-		return "failed"
+		return string(commonTypes.AIGatewayAsyncGenerationStatusFailed)
 	default:
 		return status
 	}

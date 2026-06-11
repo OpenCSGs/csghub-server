@@ -11,16 +11,20 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"opencsg.com/csghub-server/aigateway/component/adapter/text2video"
 	llmtrace "opencsg.com/csghub-server/aigateway/component/trace"
+	"opencsg.com/csghub-server/aigateway/token"
 	"opencsg.com/csghub-server/aigateway/types"
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/builder/proxy"
 	"opencsg.com/csghub-server/builder/store/database"
+	commontypes "opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/utils/trace"
 )
 
@@ -46,6 +50,7 @@ import (
 func (h *OpenAIHandlerImpl) CreateVideo(c *gin.Context) {
 	username := httpbase.GetCurrentUser(c)
 	nsUUID := httpbase.GetCurrentNamespaceUUID(c)
+	apikey := httpbase.GetAccessToken(c)
 	ctx := c.Request.Context()
 	requestID := trace.GetTraceIDInGinContext(c)
 	ctx, preflight := startPreflightTrace(ctx, preflightTraceStart{
@@ -107,9 +112,21 @@ func (h *OpenAIHandlerImpl) CreateVideo(c *gin.Context) {
 	body := capture.Body()
 	var videoResp *types.VideoObject
 	if capture.StatusCode() < http.StatusBadRequest {
-		body, videoResp, ok = h.normalizeCreateVideoResponse(c, ctx, nsUUID, input.modelID, adapter, body, generationRecorder)
+		var videoProviderResp *text2video.ProviderResponse
+		videoProviderResp, ok = parseCreateVideoProviderResponse(c, ctx, adapter, body, generationRecorder)
 		if !ok {
 			return
+		}
+		videoResp = videoProviderResp.Video
+		if videoResp != nil && videoResp.ID != "" && h.aiGenerationStore != nil {
+			videoID, ok := h.createVideoGenerationTask(c, ctx, nsUUID, apikey, input, modelTarget, videoProviderResp, videoResp, generationRecorder)
+			if !ok {
+				return
+			}
+			normalized := *videoResp
+			normalized.ID = videoID
+			videoResp = &normalized
+			body = normalizeVideoResponseBody(adapter, body, videoProviderResp.Video, videoID)
 		}
 	}
 	if generationRecorder != nil {
@@ -276,46 +293,70 @@ func proxyCreateVideoRequest(c *gin.Context, ctx context.Context, providerReq *t
 	return capture, true
 }
 
-func (h *OpenAIHandlerImpl) normalizeCreateVideoResponse(c *gin.Context, ctx context.Context, nsUUID, modelID string, adapter text2video.T2VAdapter, body []byte, recorder llmtrace.GenerationRecorder) ([]byte, *types.VideoObject, bool) {
+func parseCreateVideoProviderResponse(c *gin.Context, ctx context.Context, adapter text2video.T2VAdapter, body []byte, recorder llmtrace.GenerationRecorder) (*text2video.ProviderResponse, bool) {
 	videoProviderResp, err := adapter.ParseCreateResponse(ctx, body)
 	if err != nil {
 		finishModalGenerationTraceWithError(recorder, err, types.TraceErrUpstreamError)
 		var requestValidationErr *text2video.RequestValidationError
 		if errors.As(err, &requestValidationErr) {
 			writeVideoAPIError(c, http.StatusBadRequest, "invalid_request_error", requestValidationErr.Error(), "invalid_request_error")
-			return nil, nil, false
+			return nil, false
 		}
 		message := "failed to parse downstream video response: " + err.Error()
 		if downstreamPayload := downstreamErrorPayload(body); downstreamPayload != "" {
 			message += "; downstream payload: " + downstreamPayload
 		}
 		writeVideoAPIError(c, http.StatusInternalServerError, "internal_error", message, "internal_error")
-		return nil, nil, false
+		return nil, false
 	}
-	videoResp := videoProviderResp.Video
-	if videoResp.ID == "" || h.aiGenerationStore == nil {
-		return body, videoResp, true
-	}
+	return videoProviderResp, true
+}
 
+func (h *OpenAIHandlerImpl) createVideoGenerationTask(c *gin.Context, ctx context.Context, nsUUID, apikey string, input *createVideoInput, modelTarget *resolvedModelTarget, videoProviderResp *text2video.ProviderResponse, videoResp *types.VideoObject, recorder llmtrace.GenerationRecorder) (string, bool) {
 	providerResourceID := videoResp.ID
 	videoID := newGatewayResourceID()
+	meteringEvent, err := h.createVideoMeteringEvent(ctx, nsUUID, apikey, input, modelTarget)
+	if err != nil {
+		finishModalGenerationTraceWithError(recorder, err, types.TraceErrUpstreamError)
+		slog.ErrorContext(ctx, "failed to build video metering metadata", slog.Any("error", err), slog.String("video_id", videoID))
+		writeVideoAPIError(c, http.StatusInternalServerError, "internal_error", "failed to build metering metadata", "internal_error")
+		return "", false
+	}
 	if _, err := h.aiGenerationStore.Create(ctx, database.AIGeneration{
 		ResourceType:       database.AIGenerationResourceTypeVideo,
 		ResourceID:         videoID,
 		ProviderResourceID: providerResourceID,
 		ProviderMetadata:   videoProviderResp.ProviderMetadata,
+		UpstreamID:         modelTarget.Upstream.ID,
+		EventUUID:          meteringEvent.Uuid,
+		MeteringMetadata:   meteringEvent,
 		OwnerUUID:          nsUUID,
-		ModelID:            modelID,
+		ModelID:            input.modelID,
 		Status:             videoResp.Status,
 	}); err != nil {
 		finishModalGenerationTraceWithError(recorder, err, types.TraceErrUpstreamError)
 		slog.ErrorContext(ctx, "failed to persist ai video generation", slog.Any("error", err), slog.String("video_id", videoID), slog.String("provider_resource_id", providerResourceID))
 		writeVideoAPIError(c, http.StatusInternalServerError, "internal_error", "failed to persist ai generation", "internal_error")
-		return nil, nil, false
+		return "", false
 	}
-	normalized := *videoResp
-	normalized.ID = videoID
-	return normalizeVideoResponseBody(adapter, body, videoResp, videoID), &normalized, true
+	return videoID, true
+}
+
+func (h *OpenAIHandlerImpl) createVideoMeteringEvent(ctx context.Context, nsUUID, apikey string, input *createVideoInput, modelTarget *resolvedModelTarget) (*commontypes.MeteringEvent, error) {
+	if input == nil || modelTarget == nil || modelTarget.Model == nil {
+		return nil, fmt.Errorf("missing video metering input")
+	}
+	if h.openaiComponent == nil {
+		return nil, fmt.Errorf("openai component is not configured")
+	}
+	usage := &token.Usage{
+		DataType:       string(commontypes.DataTypeVideo),
+		Resolution:     input.adapterReq.Size,
+		Duration:       float64(input.adapterReq.Seconds),
+		CompletionRC:   1,
+		CompletionDesc: input.adapterReq.Prompt,
+	}
+	return h.openaiComponent.BuildUsageMeteringEvent(ctx, nsUUID, modelTarget.Model, modelTarget.ModelName, usage, apikey)
 }
 
 func writeVideoAPIError(c *gin.Context, status int, code, message, errorType string) {
@@ -325,6 +366,15 @@ func writeVideoAPIError(c *gin.Context, status int, code, message, errorType str
 		Type:    errorType,
 	}})
 }
+
+const (
+	// Video content uses OpenAI-compatible error responses instead of common
+	// errorx codes, so clients can keep reading error.code from the OpenAI
+	// response schema and still map these stable custom codes for i18n.
+	videoErrorNotReady  = "video_not_ready"
+	videoErrorFailed    = "video_generation_failed"
+	videoErrorCancelled = "video_generation_cancelled"
+)
 
 func downstreamErrorPayload(body []byte) string {
 	if len(body) == 0 {
@@ -360,6 +410,14 @@ func (h *OpenAIHandlerImpl) GetVideo(c *gin.Context) {
 	if !ok {
 		return
 	}
+	if isTerminalVideoStatus(target.generation.Status) {
+		c.JSON(http.StatusOK, videoObjectFromGeneration(target.generation))
+		return
+	}
+	if time.Since(target.generation.UpdatedAt) < h.asyncGenerationStatusRefreshInterval() {
+		c.JSON(http.StatusOK, videoObjectFromGeneration(target.generation))
+		return
+	}
 	adapter, ok := h.videoAdapterForGeneration(c, target)
 	if !ok {
 		return
@@ -378,6 +436,46 @@ func (h *OpenAIHandlerImpl) GetVideo(c *gin.Context) {
 		videoResp = videoProviderResp.Video
 	}
 	copyProxyResponse(c, capture.Header(), capture.StatusCode(), normalizeVideoResponseBody(adapter, body, videoResp, target.generation.ResourceID))
+}
+
+func (h *OpenAIHandlerImpl) asyncGenerationStatusRefreshInterval() time.Duration {
+	if h != nil && h.config != nil && h.config.AIGateway.AsyncGenerationStatusRefreshInterval > 0 {
+		return time.Duration(h.config.AIGateway.AsyncGenerationStatusRefreshInterval) * time.Second
+	}
+	return 60 * time.Second
+}
+
+func isTerminalVideoStatus(status string) bool {
+	switch strings.ToLower(strings.TrimSpace(status)) {
+	case string(commontypes.AIGatewayAsyncGenerationStatusCompleted),
+		string(commontypes.AIGatewayAsyncGenerationStatusFailed),
+		string(commontypes.AIGatewayAsyncGenerationStatusCancelled):
+		return true
+	default:
+		return false
+	}
+}
+
+func videoObjectFromGeneration(generation *database.AIGeneration) types.VideoObject {
+	if generation == nil {
+		return types.VideoObject{}
+	}
+	status := generation.Status
+	resp := types.VideoObject{
+		ID:     generation.ResourceID,
+		Object: "video",
+		Status: status,
+		Model:  generation.ModelID,
+	}
+	if generation.Progress != "" {
+		if progress, err := strconv.ParseFloat(generation.Progress, 64); err == nil {
+			resp.Progress = &progress
+		}
+	}
+	if generation.FailReason != "" {
+		resp.Error = &types.VideoError{Message: generation.FailReason}
+	}
+	return resp
 }
 
 // GetVideoContent godoc
@@ -403,6 +501,9 @@ func (h *OpenAIHandlerImpl) GetVideoContent(c *gin.Context) {
 	if !ok {
 		return
 	}
+	if !ensureVideoContentReady(c, target.generation) {
+		return
+	}
 	adapter, ok := h.videoAdapterForGeneration(c, target)
 	if !ok {
 		return
@@ -426,6 +527,33 @@ func (h *OpenAIHandlerImpl) GetVideoContent(c *gin.Context) {
 		return
 	}
 	streamVideoDownloadURL(c, contentResp.DownloadURL)
+}
+
+func ensureVideoContentReady(c *gin.Context, generation *database.AIGeneration) bool {
+	if generation == nil {
+		writeVideoAPIError(c, http.StatusInternalServerError, "internal_error", "ai generation not found", "internal_error")
+		return false
+	}
+	status := strings.ToLower(strings.TrimSpace(generation.Status))
+	switch status {
+	case string(commontypes.AIGatewayAsyncGenerationStatusCompleted):
+		return true
+	case string(commontypes.AIGatewayAsyncGenerationStatusFailed):
+		message := "video generation failed"
+		if failReason := strings.TrimSpace(generation.FailReason); failReason != "" {
+			message += ": " + failReason
+		}
+		writeVideoAPIError(c, http.StatusBadRequest, videoErrorFailed, message, "invalid_request_error")
+	case string(commontypes.AIGatewayAsyncGenerationStatusCancelled):
+		writeVideoAPIError(c, http.StatusBadRequest, videoErrorCancelled, "video generation was cancelled", "invalid_request_error")
+	default:
+		message := "video generation is not completed"
+		if status != "" {
+			message += fmt.Sprintf(", current status is %q", status)
+		}
+		writeVideoAPIError(c, http.StatusBadRequest, videoErrorNotReady, message, "invalid_request_error")
+	}
+	return false
 }
 
 type videoGenerationTarget struct {
@@ -508,10 +636,34 @@ func (h *OpenAIHandlerImpl) updateVideoGenerationFromRetrieve(ctx context.Contex
 	if videoProviderResp == nil || videoProviderResp.Video == nil || h.aiGenerationStore == nil {
 		return
 	}
-	generation.Status = videoProviderResp.Video.Status
+	oldStatus := generation.Status
+	updateVideoGenerationTaskFields(generation, videoProviderResp.Video)
 	generation.ProviderMetadata = text2video.MergeProviderMetadata(generation.ProviderMetadata, videoProviderResp.ProviderMetadata)
-	if _, updateErr := h.aiGenerationStore.Update(ctx, *generation); updateErr != nil {
+	won, updateErr := h.aiGenerationStore.UpdateWithStatus(ctx, *generation, oldStatus)
+	if updateErr != nil {
 		slog.WarnContext(ctx, "failed to update video generation status", slog.Any("error", updateErr), slog.String("video_id", generation.ResourceID))
+	} else if !won {
+		slog.WarnContext(ctx, "video generation status already changed by another process", slog.String("video_id", generation.ResourceID))
+	}
+}
+
+func updateVideoGenerationTaskFields(generation *database.AIGeneration, video *types.VideoObject) {
+	if generation == nil || video == nil {
+		return
+	}
+	now := time.Now()
+	generation.Status = video.Status
+	if video.Progress != nil {
+		generation.Progress = strconv.FormatFloat(*video.Progress, 'f', -1, 64)
+	}
+	if video.Error != nil {
+		generation.FailReason = strings.TrimSpace(video.Error.Message)
+	}
+	if strings.EqualFold(strings.TrimSpace(video.Status), string(commontypes.AIGatewayAsyncGenerationStatusInProgress)) && generation.StartedAt == nil {
+		generation.StartedAt = &now
+	}
+	if isTerminalVideoStatus(video.Status) && generation.FinishedAt == nil {
+		generation.FinishedAt = &now
 	}
 }
 
@@ -567,7 +719,7 @@ func (h *OpenAIHandlerImpl) updateVideoGenerationMetadata(ctx context.Context, g
 		return
 	}
 	generation.ProviderMetadata = text2video.MergeProviderMetadata(generation.ProviderMetadata, providerMetadata)
-	if _, updateErr := h.aiGenerationStore.Update(ctx, *generation); updateErr != nil {
+	if updateErr := h.aiGenerationStore.UpdateProviderMetadata(ctx, generation.ID, generation.ProviderMetadata); updateErr != nil {
 		slog.WarnContext(ctx, "failed to update video generation metadata", slog.Any("error", updateErr), slog.String("video_id", generation.ResourceID))
 	}
 }
