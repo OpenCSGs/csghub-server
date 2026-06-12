@@ -2,11 +2,34 @@ package httpbase
 
 import (
 	"net/http"
+	"reflect"
 
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/i18n"
 )
+
+// normalizeEmptySlice converts nil slices to empty slices to ensure JSON serialization returns [] instead of null
+func normalizeEmptySlice(data interface{}) interface{} {
+	if data == nil {
+		return data
+	}
+	v := reflect.ValueOf(data)
+	if v.Kind() == reflect.Ptr && v.Type().Elem().Kind() == reflect.Slice {
+		if v.IsNil() {
+			return reflect.MakeSlice(v.Type().Elem(), 0, 0).Interface()
+		}
+		elem := v.Elem()
+		if elem.IsNil() {
+			return reflect.MakeSlice(elem.Type(), 0, 0).Interface()
+		}
+		return data
+	}
+	if v.Kind() == reflect.Slice && v.IsNil() {
+		return reflect.MakeSlice(v.Type(), 0, 0).Interface()
+	}
+	return data
+}
 
 // OK responds the client with standard JSON.
 //
@@ -54,9 +77,10 @@ func Created(c *gin.Context, data interface{}) {
 // * ok(c, something)
 // * ok(c, nil)
 func OKWithTotal(c *gin.Context, data interface{}, total int) {
+	normalizedData := normalizeEmptySlice(data)
 	respData := R{
 		Msg:   "OK",
-		Data:  data,
+		Data:  normalizedData,
 		Total: total,
 	}
 	if c.Request == nil || c.Request.Header == nil {
@@ -64,7 +88,7 @@ func OKWithTotal(c *gin.Context, data interface{}, total int) {
 		return
 	}
 	lang := c.GetHeader("Accept-Language")
-	modifiedData := i18n.TranslateInterface(data, lang)
+	modifiedData := i18n.TranslateInterface(normalizedData, lang)
 	respData.Data = modifiedData
 	c.PureJSON(http.StatusOK, respData)
 }
