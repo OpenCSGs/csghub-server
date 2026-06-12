@@ -549,7 +549,14 @@ func (s *deployTaskStoreImpl) GetRunningDeployByUserUUID(ctx context.Context, us
 	var result []Deploy
 	_, err := s.db.Operator.Core.NewSelect().Model(&result).
 		Where("user_uuid = ?", userUUID).
-		Where("type in (?)", bun.In([]int{types.SpaceType, types.InferenceType, types.FinetuneType, types.EvaluationType, types.SandboxType})).
+		Where("type in (?)", bun.In([]int{
+			types.SpaceType,
+			types.InferenceType,
+			types.FinetuneType,
+			types.EvaluationType,
+			types.NotebookType,
+			types.SandboxType,
+		})).
 		Where("status not in (?)", bun.In([]int{common.Stopped, common.Deleted})).
 		Exec(ctx, &result)
 	if err != nil && errors.Is(err, sql.ErrNoRows) {
