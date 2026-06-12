@@ -899,6 +899,65 @@ func (_c *MockUserComponent_Index_Call) RunAndReturn(run func(context.Context, t
 	return _c
 }
 
+// OAuthExchangeToken provides a mock function with given fields: ctx, req
+func (_m *MockUserComponent) OAuthExchangeToken(ctx context.Context, req *types.OAuthExchangeTokenReq) (*types.OAuthExchangeTokenResp, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for OAuthExchangeToken")
+	}
+
+	var r0 *types.OAuthExchangeTokenResp
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *types.OAuthExchangeTokenReq) (*types.OAuthExchangeTokenResp, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *types.OAuthExchangeTokenReq) *types.OAuthExchangeTokenResp); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*types.OAuthExchangeTokenResp)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *types.OAuthExchangeTokenReq) error); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockUserComponent_OAuthExchangeToken_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'OAuthExchangeToken'
+type MockUserComponent_OAuthExchangeToken_Call struct {
+	*mock.Call
+}
+
+// OAuthExchangeToken is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req *types.OAuthExchangeTokenReq
+func (_e *MockUserComponent_Expecter) OAuthExchangeToken(ctx interface{}, req interface{}) *MockUserComponent_OAuthExchangeToken_Call {
+	return &MockUserComponent_OAuthExchangeToken_Call{Call: _e.mock.On("OAuthExchangeToken", ctx, req)}
+}
+
+func (_c *MockUserComponent_OAuthExchangeToken_Call) Run(run func(ctx context.Context, req *types.OAuthExchangeTokenReq)) *MockUserComponent_OAuthExchangeToken_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(*types.OAuthExchangeTokenReq))
+	})
+	return _c
+}
+
+func (_c *MockUserComponent_OAuthExchangeToken_Call) Return(_a0 *types.OAuthExchangeTokenResp, _a1 error) *MockUserComponent_OAuthExchangeToken_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockUserComponent_OAuthExchangeToken_Call) RunAndReturn(run func(context.Context, *types.OAuthExchangeTokenReq) (*types.OAuthExchangeTokenResp, error)) *MockUserComponent_OAuthExchangeToken_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ResetUserTags provides a mock function with given fields: ctx, uid, tagIDs
 func (_m *MockUserComponent) ResetUserTags(ctx context.Context, uid string, tagIDs []int64) error {
 	ret := _m.Called(ctx, uid, tagIDs)
@@ -1212,6 +1271,72 @@ func (_c *MockUserComponent_UpdateUserLabels_Call) Return(_a0 error) *MockUserCo
 }
 
 func (_c *MockUserComponent_UpdateUserLabels_Call) RunAndReturn(run func(context.Context, *types.UserLabelsRequest) error) *MockUserComponent_UpdateUserLabels_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// VerifyFederationToken provides a mock function with given fields: ctx, token
+func (_m *MockUserComponent) VerifyFederationToken(ctx context.Context, token string) (*types.JWTClaims, string, error) {
+	ret := _m.Called(ctx, token)
+
+	if len(ret) == 0 {
+		panic("no return value specified for VerifyFederationToken")
+	}
+
+	var r0 *types.JWTClaims
+	var r1 string
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*types.JWTClaims, string, error)); ok {
+		return rf(ctx, token)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) *types.JWTClaims); ok {
+		r0 = rf(ctx, token)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*types.JWTClaims)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) string); ok {
+		r1 = rf(ctx, token)
+	} else {
+		r1 = ret.Get(1).(string)
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, string) error); ok {
+		r2 = rf(ctx, token)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
+// MockUserComponent_VerifyFederationToken_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'VerifyFederationToken'
+type MockUserComponent_VerifyFederationToken_Call struct {
+	*mock.Call
+}
+
+// VerifyFederationToken is a helper method to define mock.On call
+//   - ctx context.Context
+//   - token string
+func (_e *MockUserComponent_Expecter) VerifyFederationToken(ctx interface{}, token interface{}) *MockUserComponent_VerifyFederationToken_Call {
+	return &MockUserComponent_VerifyFederationToken_Call{Call: _e.mock.On("VerifyFederationToken", ctx, token)}
+}
+
+func (_c *MockUserComponent_VerifyFederationToken_Call) Run(run func(ctx context.Context, token string)) *MockUserComponent_VerifyFederationToken_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockUserComponent_VerifyFederationToken_Call) Return(_a0 *types.JWTClaims, _a1 string, _a2 error) *MockUserComponent_VerifyFederationToken_Call {
+	_c.Call.Return(_a0, _a1, _a2)
+	return _c
+}
+
+func (_c *MockUserComponent_VerifyFederationToken_Call) RunAndReturn(run func(context.Context, string) (*types.JWTClaims, string, error)) *MockUserComponent_VerifyFederationToken_Call {
 	_c.Call.Return(run)
 	return _c
 }

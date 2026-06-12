@@ -8,13 +8,21 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/api/httpbase"
+	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/common/config"
 )
 
+// isValidOAuthToken always returns false because OAuth token exchange is not supported in CE.
+func isValidOAuthToken(_ *gin.Context, _ rpc.UserSvcClient, _ string) bool {
+	return false
+}
+
+// NeedPhoneVerified falls back to the default login requirement in CE.
 func NeedPhoneVerified(config *config.Config) gin.HandlerFunc {
 	return MustLogin()
 }
 
+// MustUserOrgApiKey validates the auth context for CE requests.
 func MustUserOrgApiKey(config *config.Config) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		authType := httpbase.GetAuthType(ctx)

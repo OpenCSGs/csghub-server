@@ -20,6 +20,8 @@ type UserSvcClient interface {
 	GetUserInfo(ctx context.Context, userName, visitorName string) (*User, error)
 	GetOrCreateFirstAvaiTokens(ctx context.Context, userName, visitorName, app, tokenName string) (string, error)
 	VerifyByAccessToken(ctx context.Context, token string) (*types.CheckAccessTokenResp, error)
+	// OAuthExchangeToken exchanges an OAuth access token for a locally issued JWT.
+	OAuthExchangeToken(ctx context.Context, req *types.OAuthExchangeTokenReq) (*types.OAuthExchangeTokenResp, error)
 	GetUserByName(ctx context.Context, userName string) (*types.User, error)
 	GetUserByUUID(ctx context.Context, userUUID string) (*types.User, error)
 	GetOrgByName(ctx context.Context, orgName string) (*types.Organization, error)

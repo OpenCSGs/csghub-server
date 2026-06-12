@@ -122,6 +122,25 @@ type UpdateUserResp struct {
 	Email    string `json:"email"`
 }
 
+// OAuthExchangeTokenReq contains the payload for exchanging a Casdoor JWT
+// access token for a locally issued JWT.
+type OAuthExchangeTokenReq struct {
+	// AccessToken is the Casdoor-issued JWT access token.
+	AccessToken string `json:"access_token" binding:"required"`
+	// Scopes is a reserved field for future authorization checks.
+	// The current implementation keeps the parameter for forward compatibility
+	// but does not validate or enforce any scope values yet.
+	Scopes []string `json:"scopes"`
+}
+
+// OAuthExchangeTokenResp contains the locally issued JWT and mapped user
+// identity after a successful token exchange.
+type OAuthExchangeTokenResp struct {
+	JWT         string `json:"jwt"`
+	CurrentUser string `json:"current_user"`
+	UserUUID    string `json:"user_uuid"`
+}
+
 type CreateUserTokenRequest struct {
 	ID        int64  `json:"-"`
 	Username  string `json:"-" `

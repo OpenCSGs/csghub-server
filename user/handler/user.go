@@ -797,10 +797,10 @@ func (h *UserHandler) GetUserUUIDs(ctx *gin.Context) {
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /user/email-verification-code/{email} [post]
-func (e *UserHandler) GenerateVerificationCodeAndSendEmail(ctx *gin.Context) {
+func (h *UserHandler) GenerateVerificationCodeAndSendEmail(ctx *gin.Context) {
 	uid := httpbase.GetCurrentUserUUID(ctx)
 	email := ctx.Param("email")
-	err := e.c.GenerateVerificationCodeAndSendEmail(ctx, uid, email)
+	err := h.c.GenerateVerificationCodeAndSendEmail(ctx, uid, email)
 	if err != nil {
 		if errors.Is(err, errorx.ErrUserNotFound) {
 			httpbase.ForbiddenError(ctx, err)
@@ -826,7 +826,7 @@ func (e *UserHandler) GenerateVerificationCodeAndSendEmail(ctx *gin.Context) {
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /user/tags [post]
-func (e *UserHandler) ResetUserTags(ctx *gin.Context) {
+func (h *UserHandler) ResetUserTags(ctx *gin.Context) {
 	uid := httpbase.GetCurrentUserUUID(ctx)
 	var req []int64
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -835,7 +835,7 @@ func (e *UserHandler) ResetUserTags(ctx *gin.Context) {
 		return
 	}
 
-	if err := e.c.ResetUserTags(ctx, uid, req); err != nil {
+	if err := h.c.ResetUserTags(ctx, uid, req); err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "ResetUserTags failed", slog.Any("err", err))
 		httpbase.ServerError(ctx, err)
 		return

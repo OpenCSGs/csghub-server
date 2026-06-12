@@ -34,6 +34,14 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Name:** `wrongTimeRange`
 - **Description:** The specified time range is invalid, for example, the start time is after the end time.
 
+---
+
+### `ACT-ERR-4`
+
+- **Error Code:** `ACT-ERR-4`
+- **Error Name:** `negativePrice`
+- **Description:** The price specified in the request is negative.
+
 ## Agent Errors
 
 ### `AGENT-ERR-0`
@@ -266,6 +274,14 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Name:** `quotaExceeded`
 - **Description:** The request quota limit has been exceeded.
 
+---
+
+### `AUTH-ERR-13`
+
+- **Error Code:** `AUTH-ERR-13`
+- **Error Name:** `needOldToken`
+- **Description:** Refreshing a token requires the old token.
+
 ## Collection Errors
 
 ### `COLL-ERR-0`
@@ -297,6 +313,7 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Code:** `DAT-ERR-2`
 - **Error Name:** `noValidParquetFile`
 - **Description:** The dataset does not contain any valid Parquet files, which are required for this operation.
+
 
 ---
 
@@ -344,7 +361,7 @@ This document lists all the custom error codes defined in the project, categoriz
 
 - **Error Code:** `FEDAP-ERR-0`
 - **Error Name:** `tokenExpired`
-- **Description:** 
+- **Description:** Both access token and refresh token have expired. Please re-authorize to continue accessing the remote site.
 
 ---
 
@@ -352,7 +369,7 @@ This document lists all the custom error codes defined in the project, categoriz
 
 - **Error Code:** `FEDAP-ERR-1`
 - **Error Name:** `tokenExchangeFailed`
-- **Description:** 
+- **Description:** Failed to exchange the access token for a scoped token via RFC 8693 Token Exchange.
 
 ---
 
@@ -360,7 +377,7 @@ This document lists all the custom error codes defined in the project, categoriz
 
 - **Error Code:** `FEDAP-ERR-2`
 - **Error Name:** `siteFetchFailed`
-- **Description:** 
+- **Description:** Failed to load the specified federation site configuration. The site may not exist, or the upstream site registry lookup may have failed.
 
 ---
 
@@ -368,7 +385,7 @@ This document lists all the custom error codes defined in the project, categoriz
 
 - **Error Code:** `FEDAP-ERR-3`
 - **Error Name:** `siteUnavailable`
-- **Description:** 
+- **Description:** The remote federation site service is currently unavailable.
 
 ---
 
@@ -376,7 +393,7 @@ This document lists all the custom error codes defined in the project, categoriz
 
 - **Error Code:** `FEDAP-ERR-4`
 - **Error Name:** `oauthAuthenticationFailed`
-- **Description:** 
+- **Description:** A general error occurred during the OAuth authentication flow that does not fall into a more specific federation adapter error category.
 
 ---
 
@@ -384,7 +401,7 @@ This document lists all the custom error codes defined in the project, categoriz
 
 - **Error Code:** `FEDAP-ERR-5`
 - **Error Name:** `invalidToken`
-- **Description:** 
+- **Description:** The provided token is invalid or unauthorized and cannot be used to access the requested resource. It may be malformed, rejected by the remote service, or otherwise not accepted.
 
 ---
 
@@ -392,7 +409,7 @@ This document lists all the custom error codes defined in the project, categoriz
 
 - **Error Code:** `FEDAP-ERR-6`
 - **Error Name:** `userInfoFetchFailed`
-- **Description:** 
+- **Description:** Failed to fetch or parse user information from the remote OAuth provider after token exchange.
 
 ---
 
@@ -400,7 +417,55 @@ This document lists all the custom error codes defined in the project, categoriz
 
 - **Error Code:** `FEDAP-ERR-7`
 - **Error Name:** `proxyRequestProcessFailed`
-- **Description:** 
+- **Description:** Failed to process the fedap proxy request. This includes proxy URL build failures, outbound request construction or execution failures, upstream response handling failures, and response header processing failures.
+
+---
+
+### `FEDAP-ERR-8`
+
+- **Error Code:** `FEDAP-ERR-8`
+- **Error Name:** `oauthAccessDenied`
+- **Description:** The upstream OAuth provider returned access_denied because the user declined the authorization request.
+
+---
+
+### `FEDAP-ERR-9`
+
+- **Error Code:** `FEDAP-ERR-9`
+- **Error Name:** `oauthCredentialProcessingFailed`
+- **Description:** Failed to process locally issued OAuth credentials, such as encrypting tokens or persisting authorization records.
+
+---
+
+### `FEDAP-ERR-10`
+
+- **Error Code:** `FEDAP-ERR-10`
+- **Error Name:** `federationAdapterUnauthorized`
+- **Description:** The current user has not authorized the requested federation site, or the local authorization is not usable.
+
+---
+
+### `FEDAP-ERR-11`
+
+- **Error Code:** `FEDAP-ERR-11`
+- **Error Name:** `federationAdapterSyncRepoFailed`
+- **Description:** Failed to sync the remote repository into a local repository, or failed to query the repository sync status.
+
+---
+
+### `FEDAP-ERR-12`
+
+- **Error Code:** `FEDAP-ERR-12`
+- **Error Name:** `applicationScopesFetchFailed`
+- **Description:** Failed to fetch custom scopes from the remote Casdoor application. This may be caused by an unreachable server, invalid application ID, or an unexpected server response.
+
+---
+
+### `FEDAP-ERR-13`
+
+- **Error Code:** `FEDAP-ERR-13`
+- **Error Name:** `federationAdapterRepositoryAlreadyExists`
+- **Description:** The requested federation repository already exists locally, or the existing federation sync mapping conflicts with the requested repository.
 
 ## Federation_site Errors
 
@@ -1513,4 +1578,3 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Code:** `USER-ERR-19`
 - **Error Name:** `uuidConflict`
 - **Description:** The UUID generated for the organization already exists in the system.
-

@@ -95,8 +95,9 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 	}
 
 	middlewareCollection := middleware.MiddlewareCollection{}
+	middlewareCollection.Auth.NeedAPIKey = needAPIKey
 	middlewareCollection.Auth.NeedLogin = mustLogin()
-	if err := extendRoutes(apiV1Group, middlewareCollection, config); err != nil {
+	if err := extendRoutes(apiV1Group, middlewareCollection, config, userHandler); err != nil {
 		return nil, fmt.Errorf("error extending routes:%w", err)
 	}
 

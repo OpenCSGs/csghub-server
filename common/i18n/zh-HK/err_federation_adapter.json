@@ -28,5 +28,17 @@
     },
     "error.FEDAP-ERR-9": {
         "other": "OAuth 憑證處理失敗"
+    },
+    "error.FEDAP-ERR-10": {
+        "other": "需要完成聯邦適配器授權"
+    },
+    "error.FEDAP-ERR-11": {
+        "other": "同步倉庫失敗"
+    },
+    "error.FEDAP-ERR-12": {
+        "other": "獲取應用權限範圍失敗"
+    },
+    "error.FEDAP-ERR-13": {
+        "other": "倉庫已存在"
     }
 }
