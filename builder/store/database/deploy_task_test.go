@@ -286,12 +286,16 @@ func TestDeployTaskStore_GetRunningDeployByUserUUID(t *testing.T) {
 
 	store := database.NewDeployTaskStoreWithDB(db)
 	deploys := []database.Deploy{
-		{UserID: 123, Type: 1, Status: common.Running, DeployName: "d1", UserUUID: "user-uuid-123"},
-		{UserID: 123, Type: 0, Status: common.Running, DeployName: "d2", UserUUID: "user-uuid-123"},
-		{UserID: 123, Type: 2, Status: common.Running, DeployName: "d3", UserUUID: "user-uuid-123"},
-		{UserID: 123, Type: 3, Status: common.Running, DeployName: "d4", UserUUID: "user-uuid-123"},
-		{UserID: 123, Type: 1, Status: common.Stopped, DeployName: "d5", UserUUID: "user-uuid-123"},
-		{UserID: 456, Type: 1, Status: common.Running, DeployName: "d6", UserUUID: "user-uuid-456"},
+		{UserID: 123, Type: types.InferenceType, Status: common.Running, DeployName: "d1", UserUUID: "user-uuid-123"},
+		{UserID: 123, Type: types.SpaceType, Status: common.Running, DeployName: "d2", UserUUID: "user-uuid-123"},
+		{UserID: 123, Type: types.FinetuneType, Status: common.Running, DeployName: "d3", UserUUID: "user-uuid-123"},
+		{UserID: 123, Type: types.EvaluationType, Status: common.Running, DeployName: "d4", UserUUID: "user-uuid-123"},
+		{UserID: 123, Type: types.NotebookType, Status: common.Running, DeployName: "d5", UserUUID: "user-uuid-123"},
+		{UserID: 123, Type: types.SandboxType, Status: common.Running, DeployName: "d6", UserUUID: "user-uuid-123"},
+		{UserID: 123, Type: types.InferenceType, Status: common.Stopped, DeployName: "d-stopped", UserUUID: "user-uuid-123"},
+		{UserID: 123, Type: types.InferenceType, Status: common.Deleted, DeployName: "d-deleted", UserUUID: "user-uuid-123"},
+		{UserID: 123, Type: 3, Status: common.Running, DeployName: "d-serverless", UserUUID: "user-uuid-123"},
+		{UserID: 456, Type: types.InferenceType, Status: common.Running, DeployName: "d-other-user", UserUUID: "user-uuid-456"},
 	}
 
 	for _, dp := range deploys {
@@ -305,7 +309,7 @@ func TestDeployTaskStore_GetRunningDeployByUserUUID(t *testing.T) {
 	for _, dp := range dps {
 		names = append(names, dp.DeployName)
 	}
-	require.ElementsMatch(t, []string{"d1", "d2", "d3"}, names)
+	require.ElementsMatch(t, []string{"d1", "d2", "d3", "d4", "d5", "d6"}, names)
 
 }
 
