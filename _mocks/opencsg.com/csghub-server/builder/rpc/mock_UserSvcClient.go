@@ -870,6 +870,65 @@ func (_c *MockUserSvcClient_GetUserUUIDs_Call) RunAndReturn(run func(context.Con
 	return _c
 }
 
+// OAuthExchangeToken provides a mock function with given fields: ctx, req
+func (_m *MockUserSvcClient) OAuthExchangeToken(ctx context.Context, req *types.OAuthExchangeTokenReq) (*types.OAuthExchangeTokenResp, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for OAuthExchangeToken")
+	}
+
+	var r0 *types.OAuthExchangeTokenResp
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *types.OAuthExchangeTokenReq) (*types.OAuthExchangeTokenResp, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *types.OAuthExchangeTokenReq) *types.OAuthExchangeTokenResp); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*types.OAuthExchangeTokenResp)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *types.OAuthExchangeTokenReq) error); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockUserSvcClient_OAuthExchangeToken_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'OAuthExchangeToken'
+type MockUserSvcClient_OAuthExchangeToken_Call struct {
+	*mock.Call
+}
+
+// OAuthExchangeToken is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req *types.OAuthExchangeTokenReq
+func (_e *MockUserSvcClient_Expecter) OAuthExchangeToken(ctx interface{}, req interface{}) *MockUserSvcClient_OAuthExchangeToken_Call {
+	return &MockUserSvcClient_OAuthExchangeToken_Call{Call: _e.mock.On("OAuthExchangeToken", ctx, req)}
+}
+
+func (_c *MockUserSvcClient_OAuthExchangeToken_Call) Run(run func(ctx context.Context, req *types.OAuthExchangeTokenReq)) *MockUserSvcClient_OAuthExchangeToken_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(*types.OAuthExchangeTokenReq))
+	})
+	return _c
+}
+
+func (_c *MockUserSvcClient_OAuthExchangeToken_Call) Return(_a0 *types.OAuthExchangeTokenResp, _a1 error) *MockUserSvcClient_OAuthExchangeToken_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockUserSvcClient_OAuthExchangeToken_Call) RunAndReturn(run func(context.Context, *types.OAuthExchangeTokenReq) (*types.OAuthExchangeTokenResp, error)) *MockUserSvcClient_OAuthExchangeToken_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // VerifyByAccessToken provides a mock function with given fields: ctx, token
 func (_m *MockUserSvcClient) VerifyByAccessToken(ctx context.Context, token string) (*types.CheckAccessTokenResp, error) {
 	ret := _m.Called(ctx, token)

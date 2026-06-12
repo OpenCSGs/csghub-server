@@ -28,5 +28,17 @@
     },
     "error.FEDAP-ERR-9": {
         "other": "OAuth credential processing failed"
+    },
+    "error.FEDAP-ERR-10": {
+        "other": "Federation adapter authorization required"
+    },
+    "error.FEDAP-ERR-11": {
+        "other": "Failed to sync repository"
+    },
+    "error.FEDAP-ERR-12": {
+        "other": "Failed to fetch application scopes"
+    },
+    "error.FEDAP-ERR-13": {
+        "other": "Repository already exists"
     }
 }

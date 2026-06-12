@@ -34,6 +34,14 @@
 - **错误名:** `wrongTimeRange`
 - **描述:** 指定的时间范围无效，例如开始时间晚于结束时间。
 
+---
+
+### `ACT-ERR-4`
+
+- **错误代码:** `ACT-ERR-4`
+- **错误名:** `negativePrice`
+- **描述:** 请求中指定的价格为负数。
+
 ## Agent 错误
 
 ### `AGENT-ERR-0`
@@ -266,6 +274,14 @@
 - **错误名:** `quotaExceeded`
 - **描述:** 请求限额已超过。
 
+---
+
+### `AUTH-ERR-13`
+
+- **错误代码:** `AUTH-ERR-13`
+- **错误名:** `needOldToken`
+- **描述:** 必须携带旧Token。
+
 ## Collection 错误
 
 ### `COLL-ERR-0`
@@ -344,7 +360,7 @@
 
 - **错误代码:** `FEDAP-ERR-0`
 - **错误名:** `tokenExpired`
-- **描述:** 
+- **描述:** 访问令牌和刷新令牌均已过期，请重新授权以继续访问远端资源。
 
 ---
 
@@ -352,7 +368,7 @@
 
 - **错误代码:** `FEDAP-ERR-1`
 - **错误名:** `tokenExchangeFailed`
-- **描述:** 
+- **描述:** 通过 RFC 8693 Token Exchange 兑换受限令牌失败。
 
 ---
 
@@ -360,7 +376,7 @@
 
 - **错误代码:** `FEDAP-ERR-2`
 - **错误名:** `siteFetchFailed`
-- **描述:** 
+- **描述:** 获取指定的联邦对端配置失败。可能是该对端不存在，或上游站点注册表查询失败。
 
 ---
 
@@ -368,7 +384,7 @@
 
 - **错误代码:** `FEDAP-ERR-3`
 - **错误名:** `siteUnavailable`
-- **描述:** 
+- **描述:** 远端联邦服务当前不可用。
 
 ---
 
@@ -376,7 +392,7 @@
 
 - **错误代码:** `FEDAP-ERR-4`
 - **错误名:** `oauthAuthenticationFailed`
-- **描述:** 
+- **描述:** OAuth 认证流程中发生了通用错误，且不属于更具体的联邦适配器错误分类。
 
 ---
 
@@ -384,7 +400,7 @@
 
 - **错误代码:** `FEDAP-ERR-5`
 - **错误名:** `invalidToken`
-- **描述:** 
+- **描述:** 提供的令牌无效、未授权或格式错误，无法用于访问请求的资源。它可能格式不正确、被远端服务拒绝，或因其他原因不被接受。
 
 ---
 
@@ -392,7 +408,7 @@
 
 - **错误代码:** `FEDAP-ERR-6`
 - **错误名:** `userInfoFetchFailed`
-- **描述:** 
+- **描述:** 在令牌兑换成功后，从远端 OAuth 提供方获取或解析用户信息失败。
 
 ---
 
@@ -400,7 +416,55 @@
 
 - **错误代码:** `FEDAP-ERR-7`
 - **错误名:** `proxyRequestProcessFailed`
-- **描述:** 
+- **描述:** 处理 fedap 代理请求失败。包括代理 URL 构建失败、外发请求构建或执行失败、上游响应处理失败，以及响应头处理失败等通用代理处理错误。
+
+---
+
+### `FEDAP-ERR-8`
+
+- **错误代码:** `FEDAP-ERR-8`
+- **错误名:** `oauthAccessDenied`
+- **描述:** 上游 OAuth 提供方返回 access_denied，表示用户拒绝了授权请求。
+
+---
+
+### `FEDAP-ERR-9`
+
+- **错误代码:** `FEDAP-ERR-9`
+- **错误名:** `oauthCredentialProcessingFailed`
+- **描述:** 处理本地 OAuth 凭证失败，例如加密令牌或持久化授权记录失败。
+
+---
+
+### `FEDAP-ERR-10`
+
+- **错误代码:** `FEDAP-ERR-10`
+- **错误名:** `federationAdapterUnauthorized`
+- **描述:** 当前用户未授权请求的联邦对端，或本地授权不可用。
+
+---
+
+### `FEDAP-ERR-11`
+
+- **错误代码:** `FEDAP-ERR-11`
+- **错误名:** `federationAdapterSyncRepoFailed`
+- **描述:** 同步远端仓库到本地仓库失败，或查询仓库同步状态失败。
+
+---
+
+### `FEDAP-ERR-12`
+
+- **错误代码:** `FEDAP-ERR-12`
+- **错误名:** `applicationScopesFetchFailed`
+- **描述:** 从远端 Casdoor 应用获取自定义权限范围失败，可能是因为服务器不可达、应用 ID 无效或服务器返回异常。
+
+---
+
+### `FEDAP-ERR-13`
+
+- **错误代码:** `FEDAP-ERR-13`
+- **错误名:** `federationAdapterRepositoryAlreadyExists`
+- **描述:** 请求的联邦仓库已在本地存在，或已有联邦同步映射与请求的仓库冲突。
 
 ## Federation_site 错误
 
@@ -1513,4 +1577,3 @@
 - **错误代码:** `USER-ERR-19`
 - **错误名:** `uuidConflict`
 - **描述:** 组织生成的UUID已存在于系统中
-

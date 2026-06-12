@@ -236,3 +236,12 @@ func Test_Err_SYS_HandleDB(t *testing.T) {
 		},
 	)
 }
+
+func Test_Err_FEDAP_RepositoryAlreadyExists(t *testing.T) {
+	// The repository-exists error is a fedap business error, not a database duplicate-key error.
+	err := FederationAdapterRepositoryAlreadyExistsErr(errors.New("repository exists"), Ctx().Set("site_id", "site-1"))
+
+	assert.Equal(t, "FEDAP-ERR-13", ErrFederationAdapterRepositoryAlreadyExists.(CustomError).Code())
+	assert.True(t, errors.Is(err, ErrFederationAdapterRepositoryAlreadyExists))
+	assert.False(t, errors.Is(err, ErrDatabaseDuplicateKey))
+}

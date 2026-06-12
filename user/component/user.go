@@ -96,6 +96,8 @@ type UserComponent interface {
 	GenerateVerificationCodeAndSendEmail(ctx context.Context, uid, email string) error
 	ResetUserTags(ctx context.Context, uid string, tagIDs []int64) error
 	StreamExportUsers(ctx context.Context, req types.UserIndexReq) (data chan types.UserIndexResp, err error)
+	OAuthExchangeToken(ctx context.Context, req *types.OAuthExchangeTokenReq) (*types.OAuthExchangeTokenResp, error)
+	VerifyFederationToken(ctx context.Context, token string) (*types.JWTClaims, string, error)
 }
 
 func NewUserComponent(config *config.Config) (UserComponent, error) {
@@ -935,6 +937,8 @@ func (c *userComponentImpl) Index(ctx context.Context, req types.UserListReq) ([
 	return respUsers, count, nil
 }
 
+// Signin exchanges the OAuth callback code for a Casdoor access token and then
+// issues a local JWT for the mapped user.
 func (c *userComponentImpl) Signin(ctx context.Context, code, state string) (*types.JWTClaims, string, error) {
 	c.lazyInit()
 
@@ -952,61 +956,44 @@ func (c *userComponentImpl) Signin(ctx context.Context, code, state string) (*ty
 		return nil, "", fmt.Errorf("failed to get user info from casdoor,error:%w", err)
 	}
 
+	dbu, err := c.ensureLocalUserFromSSO(ctx, cu)
+	if err != nil {
+		return nil, "", err
+	}
+
+	return c.generateLocalJWT(ctx, dbu)
+}
+
+// ensureLocalUserFromSSO makes sure a local user exists for the given SSO
+// identity and returns the mapped database user.
+func (c *userComponentImpl) ensureLocalUserFromSSO(ctx context.Context, cu *rpc.SSOUserInfo) (*database.User, error) {
 	exists, err := c.userStore.IsExistByUUID(ctx, cu.UUID)
 	if err != nil {
-		return nil, "", fmt.Errorf("failed to check user existence by name in db,error:%w", err)
+		return nil, fmt.Errorf("failed to check user existence by name in db,error:%w", err)
 	}
 
 	var dbu *database.User
 	if !exists {
 		dbu, err = c.createFromSSOUser(ctx, cu)
 		if err != nil {
-			return nil, "", fmt.Errorf("failed to create user,error:%w", err)
+			return nil, fmt.Errorf("failed to create user,error:%w", err)
 		}
-		// auto create git access token for the new user
-		go func(username string) {
-			ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
-			defer cancel()
-			_, err := c.tokenc.Create(ctx, &types.CreateUserTokenRequest{
-				Username:    username,
-				TokenName:   uuid.NewString(),
-				Application: types.AccessTokenAppGit,
-			})
-			if err != nil {
-				slog.ErrorContext(ctx, "failed to create git user access token", "error", err, slog.Any("username", dbu.Username))
-			}
-		}(dbu.Username)
-
-		if dbu.Phone != "" {
-			go func() {
-				ctx, cancel := context.WithTimeout(context.Background(), time.Second*60)
-				defer cancel()
-				if err := c.invitationc.AwardCreditToInvitee(ctx, types.AwardCreditToInviteeReq{
-					InviteeUUID: dbu.UUID,
-					InviteeName: dbu.Username,
-					RegisterAt:  dbu.CreatedAt,
-				}); err != nil {
-					slog.ErrorContext(ctx, "failed to award credit to invitee", "error", err, "invitee_uuid", dbu.UUID)
-				}
-			}()
-		}
+		c.createDefaultGitTokenAsync(dbu.Username)
+		c.awardInviteeCreditAsync(dbu)
 	} else {
 		// get user from db for username, as casdoor may have different username
 		dbu, err = c.userStore.FindByUUID(ctx, cu.UUID)
 		if err != nil {
-			return nil, "", fmt.Errorf("failed to find user by uuid in db, uuid:%s, error:%w", cu.UUID, err)
+			return nil, fmt.Errorf("failed to find user by uuid in db, uuid:%s, error:%w", cu.UUID, err)
 		}
-		// update user login time asynchronously
-		go func() {
-			updateCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), time.Second*5)
-			defer cancel()
-			dbu.LastLoginAt = time.Now().Format("2006-01-02 15:04:05")
-			err := c.userStore.Update(updateCtx, dbu, "")
-			if err != nil {
-				slog.ErrorContext(ctx, "failed to update user login time", "error", err, "username", dbu.Username)
-			}
-		}()
+		c.updateUserLastLoginAsync(ctx, dbu)
 	}
+
+	return dbu, nil
+}
+
+// generateLocalJWT issues a local JWT for the specified user UUID.
+func (c *userComponentImpl) generateLocalJWT(ctx context.Context, dbu *database.User) (*types.JWTClaims, string, error) {
 	hubToken, signed, err := c.jwtc.GenerateLoginToken(ctx, types.CreateJWTReq{
 		UUID: dbu.UUID,
 	})
@@ -1015,6 +1002,57 @@ func (c *userComponentImpl) Signin(ctx context.Context, code, state string) (*ty
 	}
 
 	return hubToken, signed, nil
+}
+
+// createDefaultGitTokenAsync creates the default git access token for a newly
+// created SSO user in a background goroutine.
+func (c *userComponentImpl) createDefaultGitTokenAsync(username string) {
+	go func(userName string) {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+		defer cancel()
+		_, err := c.tokenc.Create(ctx, &types.CreateUserTokenRequest{
+			Username:    userName,
+			TokenName:   uuid.NewString(),
+			Application: types.AccessTokenAppGit,
+		})
+		if err != nil {
+			slog.ErrorContext(ctx, "failed to create git user access token", "error", err, "username", userName)
+		}
+	}(username)
+}
+
+// awardInviteeCreditAsync awards invitation credit for a newly created SSO user
+// when the user has a bound phone number.
+func (c *userComponentImpl) awardInviteeCreditAsync(user *database.User) {
+	if user.Phone == "" {
+		return
+	}
+
+	go func(createdUser *database.User) {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second*60)
+		defer cancel()
+		if err := c.invitationc.AwardCreditToInvitee(ctx, types.AwardCreditToInviteeReq{
+			InviteeUUID: createdUser.UUID,
+			InviteeName: createdUser.Username,
+			RegisterAt:  createdUser.CreatedAt,
+		}); err != nil {
+			slog.ErrorContext(ctx, "failed to award credit to invitee", "error", err, "invitee_uuid", createdUser.UUID)
+		}
+	}(user)
+}
+
+// updateUserLastLoginAsync refreshes the last login time for an existing SSO
+// user without blocking the request path.
+func (c *userComponentImpl) updateUserLastLoginAsync(ctx context.Context, user *database.User) {
+	go func(existingUser *database.User) {
+		updateCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), time.Second*5)
+		defer cancel()
+		existingUser.LastLoginAt = time.Now().Format("2006-01-02 15:04:05")
+		err := c.userStore.Update(updateCtx, existingUser, "")
+		if err != nil {
+			slog.ErrorContext(ctx, "failed to update user login time", "error", err, "username", existingUser.Username)
+		}
+	}(user)
 }
 
 func (c *userComponentImpl) genUniqueName() (string, error) {
@@ -1202,7 +1240,7 @@ func (c *userComponentImpl) generateVerificationCode(ctx context.Context, uid, e
 	return code, nil
 }
 
-func (c *userComponentImpl) sendVerificationCodeEmail(ctx context.Context, uid, email, verificationCode string) error {
+func (c *userComponentImpl) sendVerificationCodeEmail(ctx context.Context, _, email, verificationCode string) error {
 	parameters := types.EmailVerifyCodeNotificationReq{
 		Email: email,
 		Code:  verificationCode,
@@ -1223,22 +1261,22 @@ func (c *userComponentImpl) sendVerificationCodeEmail(ctx context.Context, uid, 
 
 }
 
-func (e *userComponentImpl) VerifyVerificationCode(ctx context.Context, uid, email string, verificationCode string) error {
-	exists, err := e.cache.Exists(ctx, fmt.Sprintf("email_verification_code:%s:%s", uid, email))
+func (c *userComponentImpl) VerifyVerificationCode(ctx context.Context, uid, email string, verificationCode string) error {
+	exists, err := c.cache.Exists(ctx, fmt.Sprintf("email_verification_code:%s:%s", uid, email))
 	if err != nil {
 		return err
 	}
 	if exists == 0 {
 		return errors.New("verification code expired or not available")
 	}
-	code, err := e.cache.Get(ctx, fmt.Sprintf("email_verification_code:%s:%s", uid, email))
+	code, err := c.cache.Get(ctx, fmt.Sprintf("email_verification_code:%s:%s", uid, email))
 	if err != nil {
 		return err
 	}
 	if code != verificationCode {
 		return errors.New("email verification code is invalid")
 	}
-	err = e.cache.Del(ctx, fmt.Sprintf("email_verification_code:%s:%s", uid, email))
+	err = c.cache.Del(ctx, fmt.Sprintf("email_verification_code:%s:%s", uid, email))
 	if err != nil {
 		return err
 	}
@@ -1246,11 +1284,11 @@ func (e *userComponentImpl) VerifyVerificationCode(ctx context.Context, uid, ema
 	return nil
 }
 
-func (e *userComponentImpl) IsSSOUser(regProvider string) bool {
+func (c *userComponentImpl) IsSSOUser(regProvider string) bool {
 	if regProvider == "" {
 		return false
 	}
-	return regProvider == e.config.SSOType
+	return regProvider == c.config.SSOType
 }
 
 func (c *userComponentImpl) ResetUserTags(ctx context.Context, uid string, tagIDs []int64) error {
@@ -1340,4 +1378,32 @@ func (c *userComponentImpl) StreamExportUsers(ctx context.Context, req types.Use
 
 	slog.InfoContext(ctx, "stream export completed successfully")
 	return data, nil
+}
+
+func (c *userComponentImpl) VerifyFederationToken(ctx context.Context, token string) (*types.JWTClaims, string, error) {
+	cu, err := c.sso.GetUserInfo(ctx, token)
+	if err != nil {
+		slog.WarnContext(ctx, "failed to get user info from sso",
+			slog.Any("token", token),
+			slog.Any("error", err),
+		)
+		return nil, "", errorx.UserNotFound(err, errorx.Ctx().Set("token", token))
+	}
+
+	user, err := c.userStore.FindByUUID(ctx, cu.UUID)
+	if err != nil {
+		slog.WarnContext(ctx, "failed to check user existence by uuid in db",
+			slog.Any("uuid", cu.UUID),
+			slog.Any("error", err),
+		)
+		return nil, "", errorx.UserNotFound(err, errorx.Ctx().Set("uuid", cu.UUID))
+	}
+	if user == nil {
+		slog.WarnContext(ctx, "user not found in db",
+			slog.Any("uuid", cu.UUID),
+		)
+		return nil, "", errorx.UserNotFound(err, errorx.Ctx().Set("uuid", cu.UUID))
+	}
+
+	return c.generateLocalJWT(ctx, user)
 }

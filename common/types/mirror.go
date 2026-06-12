@@ -75,6 +75,10 @@ type CreateMirrorRepoReq struct {
 
 	//MCP only
 	MCPServerAttributes MCPServerAttributes `json:"mcp_server_attributes"`
+
+	// fork repo, local namespace/name
+	ForkNamespace string `json:"fork_namespace"`
+	ForkName      string `json:"fork_name"`
 }
 
 type MCPServerAttributes struct {

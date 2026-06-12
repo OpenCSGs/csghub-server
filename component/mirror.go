@@ -18,6 +18,7 @@ import (
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
+	"opencsg.com/csghub-server/common/types/enum"
 	"opencsg.com/csghub-server/common/utils/common"
 	"opencsg.com/csghub-server/mirror/cache"
 )
@@ -50,6 +51,8 @@ type mirrorComponentImpl struct {
 type MirrorComponent interface {
 	// CreateMirrorRepo often called by the crawler server to create new repo which will then be mirrored from other sources
 	CreateMirrorRepo(ctx context.Context, req types.CreateMirrorRepoReq) (*database.Mirror, error)
+	// CreateMirrorForkRepo creates a mirror-backed repository at a requested local fork namespace/name.
+	CreateMirrorForkRepo(ctx context.Context, req types.CreateMirrorRepoReq) (*database.Mirror, error)
 	Repos(ctx context.Context, per, page int) ([]types.MirrorRepo, int, error)
 	Index(ctx context.Context, per, page int, search string) ([]types.Mirror, int, error)
 	Statistics(ctx context.Context) ([]types.MirrorStatusCount, error)
@@ -303,6 +306,188 @@ func (c *mirrorComponentImpl) CreateMirrorRepo(ctx context.Context, req types.Cr
 			return nil, fmt.Errorf("failed to update source path in repo: %v", err)
 		}
 	}
+
+	reqMirror, err := c.mirrorStore.Create(ctx, &mirror)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create mirror")
+	}
+
+	reqMirror.Status = types.MirrorQueued
+	err = c.mirrorStore.Update(ctx, reqMirror)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update mirror status: %v", err)
+	}
+	mt := database.MirrorTask{
+		MirrorID: reqMirror.ID,
+		Status:   types.MirrorQueued,
+		Priority: mirror.Priority,
+	}
+	_, err = c.mirrorTaskStore.Create(ctx, mt)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create mirror task: %v", err)
+	}
+
+	return reqMirror, nil
+
+}
+
+// CreateMirrorForkRepo creates a mirror-backed local repository at the requested fork namespace/name.
+// Unlike CreateMirrorRepo, which mirrors a remote source into the mapped source namespace/name and
+// effectively treats source_url as globally unique, this mirror fork variant allows the same remote
+// source to be synchronized into different local target repositories. The local target path is the
+// uniqueness boundary for the fork repository, while mirror.SourceUrl keeps the remote source used
+// by the sync task.
+func (c *mirrorComponentImpl) CreateMirrorForkRepo(ctx context.Context, req types.CreateMirrorRepoReq) (*database.Mirror, error) {
+	var (
+		err error
+	)
+
+	// In this fork flow, one remote source can be synchronized into multiple local target repos.
+	// Therefore, this method does not globally deduplicate by source_url like CreateMirrorRepo;
+	// the target local path is the value that must stay unique.
+	namespace := req.ForkNamespace
+	name := req.ForkName
+	if namespace == "" || name == "" {
+		err := fmt.Errorf("fork namespace and fork name are required")
+		return nil, errorx.BadRequest(err,
+			errorx.Ctx().
+				Set("fork namespace", namespace).
+				Set("fork name", name),
+		)
+	}
+
+	// Validate the repository type before creating any local repository records.
+	switch req.RepoType {
+	case types.ModelRepo, types.DatasetRepo:
+	default:
+		err := fmt.Errorf("unsupported repo type for mirror fork: %s", req.RepoType)
+		return nil, errorx.BadRequest(err,
+			errorx.Ctx().
+				Set("repo type", req.RepoType).
+				Set("target namespace", namespace).
+				Set("target name", name),
+		)
+	}
+
+	// Check whether the target local repository already exists.
+	// If the target exists and already mirrors the same source_url, treat this as an idempotent resync request.
+	// If the target exists but is not the same mirror, do not overwrite it with a new mirror.
+	repo, err := c.repoStore.FindByPath(ctx, req.RepoType, namespace, name)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return nil, fmt.Errorf("failed to check target repo existence, error: %w", err)
+	}
+	if repo != nil && repo.ID != 0 {
+		mirror, err := c.mirrorStore.FindByRepoID(ctx, repo.ID)
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			return nil, fmt.Errorf("failed to find mirror by target repo, error: %w", err)
+		}
+
+		if mirror != nil && mirror.ID != 0 && mirror.SourceUrl == req.SourceGitCloneUrl {
+			// Same remote source and same local target: do not create duplicate repo/mirror records.
+			// Instead, enqueue a new sync task for the existing mirror.
+			err = c.repoComp.SyncMirror(ctx, req.RepoType, namespace, name, req.CurrentUser)
+			if err != nil {
+				return nil, fmt.Errorf("failed to sync mirror repo, error: %w", err)
+			}
+			return mirror, nil
+		}
+
+		{
+			err := fmt.Errorf(
+				"target repo already exists, repo type: %s, source namespace: %s, source name: %s, target namespace: %s, target name: %s",
+				req.RepoType, req.SourceNamespace, req.SourceName, namespace, name)
+			return &database.Mirror{RepositoryID: repo.ID}, errorx.DuplicateKey(err,
+				errorx.Ctx().
+					Set("repo type", req.RepoType).
+					Set("source namespace", req.SourceNamespace).
+					Set("source name", req.SourceName).
+					Set("target namespace", namespace).
+					Set("target name", name),
+			)
+		}
+	}
+
+	// Create the local target repository. Username uses CurrentUser so repoComp.CreateRepo can
+	// validate whether the current user may create a repository under fork_namespace. Do not use
+	// the source namespace here, and do not map the source namespace into a target namespace.
+	_, repo, _, err = c.repoComp.CreateRepo(ctx, types.CreateRepoReq{
+		Username:  req.CurrentUser,
+		Namespace: namespace,
+		Name:      name,
+		Nickname:  name,
+		// TODO: Translate the description automatically.
+		Description: req.Description,
+		// Mirror fork repositories are created as private by default.
+		Private:       true,
+		License:       req.License,
+		DefaultBranch: req.DefaultBranch,
+		RepoType:      req.RepoType,
+		ToolCount:     len(req.MCPServerAttributes.Tools),
+		StarCount:     req.MCPServerAttributes.StarCount,
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to create OpenCSG repo, error: %w", err)
+	}
+	repoPath := path.Join(namespace, name)
+
+	// repoComp.CreateRepo first creates the repository and git repo with a temporary UUID path.
+	// This step creates the type-specific business row and updates repositories.path / git_path
+	// to the requested local target path.
+	switch req.RepoType {
+	case types.ModelRepo:
+		dbModel := database.Model{
+			Repository:   repo,
+			RepositoryID: repo.ID,
+		}
+
+		_, err := c.modelStore.CreateAndUpdateRepoPath(ctx, dbModel, repoPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create model, error: %w", err)
+		}
+	case types.DatasetRepo:
+		dbDataset := database.Dataset{
+			Repository:   repo,
+			RepositoryID: repo.ID,
+		}
+
+		_, err := c.datasetStore.CreateAndUpdateRepoPath(ctx, dbDataset, repoPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create dataset, error: %w", err)
+		}
+	}
+
+	// Parse known source URLs to populate repository source-path columns used by search.
+	// Mirror forks can point at unsupported Git hosts, so those hosts are classified as "other"
+	// and skip repository source-path column updates.
+	sourceType, sourcePath, err := common.GetSourceTypeAndPathFromURL(req.SourceGitCloneUrl)
+	if err == nil {
+		// Update the repository external source path field, such as github_path / hf_path / ms_path / csg_path.
+		// This does not update repositories.path, which was already updated by CreateAndUpdateRepoPath.
+		err = c.repoStore.UpdateSourcePath(ctx, repo.ID, sourcePath, sourceType)
+		if err != nil {
+			return nil, fmt.Errorf("failed to update source path in repo: %v", err)
+		}
+	} else {
+		sourceType = enum.OtherSource
+	}
+
+	var mirror database.Mirror
+
+	// Mirror fork does not depend on mirror_sources to derive the source name.
+	// LocalRepoPath keeps the historical sourceName_repoType_namespace_name format,
+	// where namespace/name point to the local fork target repository.
+	mirror.LocalRepoPath = fmt.Sprintf("%s_%s_%s_%s", sourceType, req.RepoType, namespace, name)
+
+	// The mirror record describes which remote source_url this local repository syncs from.
+	mirror.SourceUrl = req.SourceGitCloneUrl
+	mirror.MirrorSourceID = req.MirrorSourceID
+	mirror.Username = req.SourceNamespace
+	mirror.RepositoryID = repo.ID
+	mirror.Repository = repo
+
+	mirror.SourceRepoPath = fmt.Sprintf("%s/%s", req.SourceNamespace, req.SourceName)
+	mirror.Priority = types.ASAPMirrorPriority
 
 	reqMirror, err := c.mirrorStore.Create(ctx, &mirror)
 	if err != nil {

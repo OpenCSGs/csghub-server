@@ -71,6 +71,65 @@ func (_c *MockMirrorComponent_BatchCreate_Call) RunAndReturn(run func(context.Co
 	return _c
 }
 
+// CreateMirrorForkRepo provides a mock function with given fields: ctx, req
+func (_m *MockMirrorComponent) CreateMirrorForkRepo(ctx context.Context, req types.CreateMirrorRepoReq) (*database.Mirror, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CreateMirrorForkRepo")
+	}
+
+	var r0 *database.Mirror
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.CreateMirrorRepoReq) (*database.Mirror, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.CreateMirrorRepoReq) *database.Mirror); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*database.Mirror)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.CreateMirrorRepoReq) error); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockMirrorComponent_CreateMirrorForkRepo_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateMirrorForkRepo'
+type MockMirrorComponent_CreateMirrorForkRepo_Call struct {
+	*mock.Call
+}
+
+// CreateMirrorForkRepo is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req types.CreateMirrorRepoReq
+func (_e *MockMirrorComponent_Expecter) CreateMirrorForkRepo(ctx interface{}, req interface{}) *MockMirrorComponent_CreateMirrorForkRepo_Call {
+	return &MockMirrorComponent_CreateMirrorForkRepo_Call{Call: _e.mock.On("CreateMirrorForkRepo", ctx, req)}
+}
+
+func (_c *MockMirrorComponent_CreateMirrorForkRepo_Call) Run(run func(ctx context.Context, req types.CreateMirrorRepoReq)) *MockMirrorComponent_CreateMirrorForkRepo_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.CreateMirrorRepoReq))
+	})
+	return _c
+}
+
+func (_c *MockMirrorComponent_CreateMirrorForkRepo_Call) Return(_a0 *database.Mirror, _a1 error) *MockMirrorComponent_CreateMirrorForkRepo_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockMirrorComponent_CreateMirrorForkRepo_Call) RunAndReturn(run func(context.Context, types.CreateMirrorRepoReq) (*database.Mirror, error)) *MockMirrorComponent_CreateMirrorForkRepo_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // CreateMirrorRepo provides a mock function with given fields: ctx, req
 func (_m *MockMirrorComponent) CreateMirrorRepo(ctx context.Context, req types.CreateMirrorRepoReq) (*database.Mirror, error) {
 	ret := _m.Called(ctx, req)
