@@ -143,6 +143,14 @@ func (h *UserHandler) Update(ctx *gin.Context) {
 		return
 	}
 
+	if req.Avatar != nil && *req.Avatar != "" {
+		if err := common.ValidateImageURL(*req.Avatar); err != nil {
+			slog.ErrorContext(ctx.Request.Context(), "invalid avatar url", slog.Any("error", err))
+			httpbase.BadRequestWithExt(ctx, errorx.ReqParamInvalid(err, errorx.Ctx().Set("param", "avatar")))
+			return
+		}
+	}
+
 	id := ctx.Param("id")
 	req.UUID = &id
 	req.OpUser = currentUser

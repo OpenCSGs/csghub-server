@@ -224,6 +224,128 @@ func TestValidateURLFormat(t *testing.T) {
 	}
 }
 
+func TestValidateImageURL(t *testing.T) {
+	tests := []struct {
+		name        string
+		urlString   string
+		expectError bool
+		errorMsg    string
+	}{
+		{
+			name:      "valid jpg url",
+			urlString: "https://example.com/avatar.jpg",
+		},
+		{
+			name:      "valid jpeg url",
+			urlString: "https://example.com/avatar.jpeg",
+		},
+		{
+			name:      "valid png url",
+			urlString: "https://example.com/avatar.png",
+		},
+		{
+			name:      "valid uppercase extension",
+			urlString: "https://example.com/avatar.JPG",
+		},
+		{
+			name:      "valid mixed case extension",
+			urlString: "https://example.com/avatar.PnG",
+		},
+		{
+			name:      "valid url with query string",
+			urlString: "https://example.com/avatar.jpg?size=100",
+		},
+		{
+			name:      "valid deep path jpg",
+			urlString: "https://cdn.example.com/images/user/avatar.jpg",
+		},
+		{
+			name:        "empty url",
+			urlString:   "",
+			expectError: true,
+			errorMsg:    "url is empty",
+		},
+		{
+			name:        "non-http scheme",
+			urlString:   "ftp://example.com/avatar.jpg",
+			expectError: true,
+			errorMsg:    "url scheme must be http or https",
+		},
+		{
+			name:        "url without scheme",
+			urlString:   "//example.com/avatar.jpg",
+			expectError: true,
+			errorMsg:    "url scheme must be http or https",
+		},
+		{
+			name:        "relative url - logout attack",
+			urlString:   "/logout",
+			expectError: true,
+			errorMsg:    "url scheme must be http or https",
+		},
+		{
+			name:        "relative path with extension",
+			urlString:   "/images/avatar.jpg",
+			expectError: true,
+			errorMsg:    "url scheme must be http or https",
+		},
+		{
+			name:        "unsupported image extension gif",
+			urlString:   "https://example.com/avatar.gif",
+			expectError: true,
+			errorMsg:    "avatar url must end with .jpg, .jpeg, or .png",
+		},
+		{
+			name:        "unsupported image extension svg",
+			urlString:   "https://example.com/avatar.svg",
+			expectError: true,
+			errorMsg:    "avatar url must end with .jpg, .jpeg, or .png",
+		},
+		{
+			name:        "no image extension",
+			urlString:   "https://example.com/avatar",
+			expectError: true,
+			errorMsg:    "avatar url must end with .jpg, .jpeg, or .png",
+		},
+		{
+			name:        "url without host",
+			urlString:   "https:///avatar.jpg",
+			expectError: true,
+			errorMsg:    "url must have a host",
+		},
+		{
+			name:        "malformed url",
+			urlString:   "https://ex ample.com/avatar.jpg",
+			expectError: true,
+		},
+		{
+			name:        "extension in query string not in path",
+			urlString:   "https://example.com/avatar?ext=.jpg",
+			expectError: true,
+			errorMsg:    "avatar url must end with .jpg, .jpeg, or .png",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateImageURL(tt.urlString)
+			if tt.expectError {
+				if err == nil {
+					t.Errorf("ValidateImageURL() expected error but got none")
+					return
+				}
+				if tt.errorMsg != "" && err.Error() != tt.errorMsg {
+					t.Errorf("ValidateImageURL() error = %v, want error containing %v", err.Error(), tt.errorMsg)
+				}
+			} else {
+				if err != nil {
+					t.Errorf("ValidateImageURL() unexpected error = %v", err)
+				}
+			}
+		})
+	}
+}
+
 func TestExtractURLPath(t *testing.T) {
 	tests := []struct {
 		name     string
