@@ -301,6 +301,10 @@ func (c *userComponentImpl) UpdateByUUID(ctx context.Context, req *types.UpdateU
 		if err != nil {
 			return fmt.Errorf("failed to find op user by name in db,user: '%s', error:%w", opUserName, err)
 		}
+
+		if !opUser.CanAdmin() {
+			return errorx.ErrForbidden
+		}
 	} else {
 		opUser = *user
 	}
