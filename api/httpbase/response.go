@@ -15,7 +15,7 @@ func normalizeEmptySlice(data interface{}) interface{} {
 		return data
 	}
 	v := reflect.ValueOf(data)
-	if v.Kind() == reflect.Ptr && v.Type().Elem().Kind() == reflect.Slice {
+	if v.Kind() == reflect.Pointer && v.Type().Elem().Kind() == reflect.Slice {
 		if v.IsNil() {
 			return reflect.MakeSlice(v.Type().Elem(), 0, 0).Interface()
 		}

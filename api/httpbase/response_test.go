@@ -97,11 +97,11 @@ func TestNormalizeEmptySlice(t *testing.T) {
 			// After normalization, any nil slice or pointer-to-nil-slice should become a non-nil empty slice
 			originalKind := reflect.TypeOf(tt.data).Kind()
 			isSliceInput := originalKind == reflect.Slice
-			isPtrToSlice := originalKind == reflect.Ptr && reflect.TypeOf(tt.data).Elem().Kind() == reflect.Slice
+			isPtrToSlice := originalKind == reflect.Pointer && reflect.TypeOf(tt.data).Elem().Kind() == reflect.Slice
 
 			if isSliceInput || isPtrToSlice {
 				rv := reflect.ValueOf(result)
-				if rv.Kind() == reflect.Ptr {
+				if rv.Kind() == reflect.Pointer {
 					rv = rv.Elem()
 				}
 				if rv.Kind() == reflect.Slice && rv.IsNil() {
