@@ -91,18 +91,33 @@ func TestAccountStatementStore_CreateSimple(t *testing.T) {
 			_, err := db.Core.NewInsert().Model(au).Exec(ctx)
 			require.Nil(t, err)
 
+			// SceneSpace triggers voucher deduction which requires a valid ResourceID and SpaceResource
+			if c.scene == types.SceneSpace {
+				sr := &database.SpaceResource{
+					Name:      "test-resource",
+					Resources: "{}",
+					ClusterID: "test-cluster",
+				}
+				_, err = db.Core.NewInsert().Model(sr).Exec(ctx, sr)
+				require.Nil(t, err)
+			}
+
 			store := database.NewAccountStatementStoreWithDB(db)
 
 			var v float64 = 20
 			if !c.charge {
 				v = -20
 			}
-			err = store.Create(ctx, database.AccountStatement{
+			input := database.AccountStatement{
 				EventUUID: uuid.New(),
 				UserUUID:  "foo",
 				Scene:     c.scene,
 				Value:     v,
-			})
+			}
+			if c.scene == types.SceneSpace {
+				input.ResourceID = "1"
+			}
+			err = store.Create(ctx, input)
 			require.Nil(t, err)
 
 			as := &database.AccountStatement{}
@@ -160,7 +175,7 @@ func TestAccountStatementStore_DeductAccountFee(t *testing.T) {
 				_, err := tx.NewInsert().Model(&au).Exec(ctx)
 				require.Nil(t, err)
 
-				err = database.DeductAccountFee(ctx, tx, database.AccountStatement{
+				_, err = database.DeductAccountFee(ctx, tx, database.AccountStatement{
 					Value:    c.remain,
 					UserUUID: "foo",
 				}, false)
@@ -204,7 +219,7 @@ func TestAccountStatementStore_DeductAccountFeeParallel(t *testing.T) {
 			tx, err := db.Core.BeginTx(ctx, nil)
 			require.Nil(t, err)
 
-			err = database.DeductAccountFee(ctx, tx, database.AccountStatement{
+			_, err = database.DeductAccountFee(ctx, tx, database.AccountStatement{
 				Value:     -cost,
 				UserUUID:  "foo",
 				EventUUID: uuid.New(),

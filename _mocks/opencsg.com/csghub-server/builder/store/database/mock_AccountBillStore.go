@@ -26,6 +26,65 @@ func (_m *MockAccountBillStore) EXPECT() *MockAccountBillStore_Expecter {
 	return &MockAccountBillStore_Expecter{mock: &_m.Mock}
 }
 
+// GetVoucherBills provides a mock function with given fields: ctx, req
+func (_m *MockAccountBillStore) GetVoucherBills(ctx context.Context, req types.VoucherBillReq) ([]database.VoucherBillGroupedResult, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetVoucherBills")
+	}
+
+	var r0 []database.VoucherBillGroupedResult
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.VoucherBillReq) ([]database.VoucherBillGroupedResult, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.VoucherBillReq) []database.VoucherBillGroupedResult); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]database.VoucherBillGroupedResult)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.VoucherBillReq) error); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAccountBillStore_GetVoucherBills_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetVoucherBills'
+type MockAccountBillStore_GetVoucherBills_Call struct {
+	*mock.Call
+}
+
+// GetVoucherBills is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req types.VoucherBillReq
+func (_e *MockAccountBillStore_Expecter) GetVoucherBills(ctx interface{}, req interface{}) *MockAccountBillStore_GetVoucherBills_Call {
+	return &MockAccountBillStore_GetVoucherBills_Call{Call: _e.mock.On("GetVoucherBills", ctx, req)}
+}
+
+func (_c *MockAccountBillStore_GetVoucherBills_Call) Run(run func(ctx context.Context, req types.VoucherBillReq)) *MockAccountBillStore_GetVoucherBills_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.VoucherBillReq))
+	})
+	return _c
+}
+
+func (_c *MockAccountBillStore_GetVoucherBills_Call) Return(_a0 []database.VoucherBillGroupedResult, _a1 error) *MockAccountBillStore_GetVoucherBills_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAccountBillStore_GetVoucherBills_Call) RunAndReturn(run func(context.Context, types.VoucherBillReq) ([]database.VoucherBillGroupedResult, error)) *MockAccountBillStore_GetVoucherBills_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ListBillsDetailByUserID provides a mock function with given fields: ctx, req
 func (_m *MockAccountBillStore) ListBillsDetailByUserID(ctx context.Context, req types.AcctBillsDetailReq) (database.AccountBillDetailRes, error) {
 	ret := _m.Called(ctx, req)

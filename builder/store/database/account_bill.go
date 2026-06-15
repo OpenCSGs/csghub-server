@@ -2,6 +2,7 @@ package database
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"opencsg.com/csghub-server/common/errorx"
@@ -17,6 +18,7 @@ type AccountBillStore interface {
 	ListBillsDetailByUserID(ctx context.Context, req types.AcctBillsDetailReq) (AccountBillDetailRes, error)
 	SumValueByAPIKey(ctx context.Context, tokenID int64) (float64, error)
 	SumValueByAPIKeyBetween(ctx context.Context, tokenID int64, start, end time.Time) (float64, error)
+	GetVoucherBills(ctx context.Context, req types.VoucherBillReq) ([]VoucherBillGroupedResult, error)
 }
 
 func NewAccountBillStore() AccountBillStore {
@@ -47,7 +49,17 @@ type AccountBill struct {
 	DataType        string          `bun:",notnull,default:''" json:"data_type"`
 	Resolution      string          `bun:",notnull,default:''" json:"resolution"`
 	Duration        float64         `bun:",notnull,default:0" json:"duration"`
+	VoucherNo       string          `bun:",notnull,default:''" json:"voucher_no"`
+	VoucherValue    float64         `bun:",notnull,default:0" json:"voucher_value"`
+	CashValue       float64         `bun:",notnull,default:0" json:"cash_value"`
 	times
+}
+
+type BillValues struct {
+	TotalValue   float64 `bun:"total_value"`
+	VoucherValue float64 `bun:"voucher_value"`
+	CashValue    float64 `bun:"cash_value"`
+	Consumption  float64 `bun:"consumption"`
 }
 
 type TotalResult struct {
@@ -58,7 +70,7 @@ type TotalResult struct {
 }
 
 type AccountBillRes struct {
-	Data []map[string]interface{} `json:"data"`
+	Data []types.ITEM `json:"data"`
 	types.AcctSummary
 }
 
@@ -69,8 +81,13 @@ type AccountBillDetailRes struct {
 
 func (s *accountBillStoreImpl) ListByUserIDAndDate(ctx context.Context, req types.AcctBillsReq) (AccountBillRes, error) {
 	var bill []AccountBill
-	var res []map[string]interface{}
-	q := s.db.Operator.Core.NewSelect().Model(&bill).ColumnExpr("customer_id as instance_name, sum(value) as value, sum(consumption) as consumption, sum(prompt_token) as prompt_token, sum(completion_token) as completion_token").Where("bill_date >= ? and bill_date <= ? and user_uuid = ? and scene = ?", req.StartDate, req.EndDate, req.TargetUUID, req.Scene).Group("customer_id")
+	var res []types.ITEM
+	q := s.db.Operator.Core.NewSelect().Model(&bill).
+		ColumnExpr("customer_id as instance_name, sum(value) as value, sum(consumption) as consumption, sum(prompt_token) as prompt_token, sum(completion_token) as completion_token, sum(voucher_value) as voucher_value, sum(cash_value) as cash_value").
+		Where("bill_date >= ? and bill_date <= ?", req.StartDate, req.EndDate).
+		Where("user_uuid = ?", req.TargetUUID).
+		Where("scene = ?", req.Scene).
+		Group("customer_id")
 
 	count, err := q.Count(ctx)
 	if err != nil {
@@ -157,4 +174,36 @@ func (s *accountBillStoreImpl) SumValueByAPIKeyBetween(ctx context.Context, toke
 		return 0, errorx.HandleDBError(err, nil)
 	}
 	return result.TotalValue, nil
+}
+
+type VoucherBillGroupedResult struct {
+	Scene        types.SceneType `json:"scene"`
+	InstanceName string          `json:"instance_name"`
+	VoucherValue float64         `json:"voucher_value"`
+	Consumption  float64         `json:"consumption"`
+}
+
+func (s *accountBillStoreImpl) GetVoucherBills(ctx context.Context, req types.VoucherBillReq) ([]VoucherBillGroupedResult, error) {
+	var results []VoucherBillGroupedResult
+	q := s.db.Core.NewSelect().
+		Model((*AccountBill)(nil)).
+		ColumnExpr("scene, customer_id as instance_name, SUM(voucher_value) AS voucher_value, SUM(consumption) AS consumption").
+		Where("bill_date >= ? and bill_date <= ?", req.StartDate, req.EndDate).
+		Where("user_uuid = ?", req.TargetUUID)
+
+	if req.Scene != 0 {
+		q = q.Where("scene = ?", req.Scene)
+	}
+
+	if req.InstanceName != "" {
+		q = q.Where("customer_id = ?", req.InstanceName)
+	}
+
+	q = q.Where("voucher_no = ?", req.VoucherNo)
+
+	err := q.Group("scene", "customer_id").Scan(ctx, &results)
+	if err != nil {
+		return nil, fmt.Errorf("query grouped voucher bills for target %s voucher %s: %w", req.TargetUUID, req.VoucherNo, err)
+	}
+	return results, nil
 }
