@@ -171,6 +171,7 @@ curl --max-time 600 -X POST http://127.0.0.1:8000/v1/audio/transcriptions \
 ```
 *Note: HF_ENDPOINT should be use the real csghub address.*
 *Note: FunASR downloads `REPO_ID` to `/workspace/${REPO_ID}` and preloads that local model at startup. The OpenAI-compatible `model` field can use `local`, the repo id, or the repo name.*
+*Note: FunASR enables VAD chunking by default for long audio with `FUNASR_VAD_MODEL=fsmn-vad`, `FUNASR_VAD_MAX_SINGLE_SEGMENT_TIME=30000`, `FUNASR_BATCH_SIZE_S=60`, and `FUNASR_BATCH_SIZE_THRESHOLD_S=30`. Set `FUNASR_VAD_MODEL=none` to disable VAD.*
 
 ## inference image name, version and cuda version
 | Task| Image Name | Version | CUDA Version | Fix
