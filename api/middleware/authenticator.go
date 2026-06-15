@@ -135,6 +135,21 @@ func Authenticator(config *config.Config) gin.HandlerFunc {
 			)
 			httpbase.UnauthorizedError(c, errorx.ErrInvalidAuthHeader)
 			c.Abort()
+		case strings.HasPrefix(authHeader, types.HeaderOAuthPrefix):
+			token := strings.TrimPrefix(authHeader, types.HeaderOAuthPrefix)
+			result = isValidOAuthToken(c, userSvcClient, token)
+			if result {
+				c.Next()
+				return
+			}
+
+			slog.ErrorContext(c, "invalid OAuth token",
+				slog.String("ip", c.ClientIP()),
+				slog.String("method", c.Request.Method),
+				slog.String("url", c.Request.URL.RequestURI()),
+			)
+			httpbase.UnauthorizedError(c, errorx.ErrInvalidAuthHeader)
+			c.Abort()
 		case strings.HasPrefix(authHeader, types.HeaderBasicPrefix):
 			token := strings.TrimPrefix(authHeader, types.HeaderBasicPrefix)
 			result = isValidBasicToken(c, userSvcClient, token)

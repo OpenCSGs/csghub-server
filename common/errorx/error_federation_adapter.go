@@ -146,6 +146,61 @@ const (
 	//
 	// zh-HK: OAuth 憑證處理失敗
 	oauthCredentialProcessingFailed
+
+	// federationAdapterUnauthorized means the current user has no usable OAuth authorization
+	// bound to the requested federation site.
+	//
+	// Description: The current user has not authorized the requested federation site, or the local authorization is not usable.
+	//
+	// Description_ZH: 当前用户未授权请求的联邦对端，或本地授权不可用。
+	//
+	// en-US: Federation adapter authorization required
+	//
+	// zh-CN: 需要完成联邦适配器授权
+	//
+	// zh-HK: 需要完成聯邦適配器授權
+	federationAdapterUnauthorized
+
+	// federationAdapterSyncRepoFailed means fedap failed to create or update a local
+	// mirror-backed repository, or failed to read its mirror status.
+	//
+	// Description: Failed to sync the remote repository into a local repository, or failed to query the repository sync status.
+	//
+	// Description_ZH: 同步远端仓库到本地仓库失败，或查询仓库同步状态失败。
+	//
+	// en-US: Failed to sync repository
+	//
+	// zh-CN: 同步仓库失败
+	//
+	// zh-HK: 同步倉庫失敗
+	federationAdapterSyncRepoFailed
+
+	// applicationScopesFetchFailed means fetching custom scopes from the remote application failed.
+	//
+	// Description: Failed to fetch custom scopes from the remote Casdoor application. This may be caused by an unreachable server, invalid application ID, or an unexpected server response.
+	//
+	// Description_ZH: 从远端 Casdoor 应用获取自定义权限范围失败，可能是因为服务器不可达、应用 ID 无效或服务器返回异常。
+	//
+	// en-US: Failed to fetch application scopes
+	//
+	// zh-CN: 获取应用权限范围失败
+	//
+	// zh-HK: 獲取應用權限範圍失敗
+	applicationScopesFetchFailed
+
+	// federationAdapterRepositoryAlreadyExists means a fedap repository sync target
+	// already exists for the current user, site, or source mapping.
+	//
+	// Description: The requested federation repository already exists locally, or the existing federation sync mapping conflicts with the requested repository.
+	//
+	// Description_ZH: 请求的联邦仓库已在本地存在，或已有联邦同步映射与请求的仓库冲突。
+	//
+	// en-US: Repository already exists
+	//
+	// zh-CN: 仓库已存在
+	//
+	// zh-HK: 倉庫已存在
+	federationAdapterRepositoryAlreadyExists
 )
 
 // Sentinel error variables for use with errors.Is().
@@ -172,6 +227,14 @@ var (
 	ErrOAuthAccessDenied error = CustomError{prefix: errFederationAdapterPrefix, code: oauthAccessDenied}
 	// ErrOAuthCredentialProcessingFailed indicates local token encryption or persistence failed.
 	ErrOAuthCredentialProcessingFailed error = CustomError{prefix: errFederationAdapterPrefix, code: oauthCredentialProcessingFailed}
+	// ErrFederationAdapterUnauthorized indicates the current user has no usable authorization for the requested federation site.
+	ErrFederationAdapterUnauthorized error = CustomError{prefix: errFederationAdapterPrefix, code: federationAdapterUnauthorized}
+	// ErrFederationAdapterSyncRepoFailed indicates creating or querying repository sync state failed.
+	ErrFederationAdapterSyncRepoFailed error = CustomError{prefix: errFederationAdapterPrefix, code: federationAdapterSyncRepoFailed}
+	// ErrApplicationScopesFetchFailed indicates fetching custom scopes from the remote application failed.
+	ErrApplicationScopesFetchFailed error = CustomError{prefix: errFederationAdapterPrefix, code: applicationScopesFetchFailed}
+	// ErrFederationAdapterRepositoryAlreadyExists indicates a federation repository sync conflict.
+	ErrFederationAdapterRepositoryAlreadyExists error = CustomError{prefix: errFederationAdapterPrefix, code: federationAdapterRepositoryAlreadyExists}
 )
 
 // TokenExpiredErr wraps err as a token-expired error with optional context.
@@ -222,4 +285,24 @@ func OAuthAccessDeniedErr(err error, ctx context) error {
 // OAuthCredentialProcessingFailedErr wraps err as an OAuth-credential-processing-failed error with optional context.
 func OAuthCredentialProcessingFailedErr(err error, ctx context) error {
 	return CustomError{prefix: errFederationAdapterPrefix, code: oauthCredentialProcessingFailed, err: err, context: ctx}
+}
+
+// FederationAdapterUnauthorizedErr wraps err as a federation-adapter unauthorized error with optional context.
+func FederationAdapterUnauthorizedErr(err error, ctx context) error {
+	return CustomError{prefix: errFederationAdapterPrefix, code: federationAdapterUnauthorized, err: err, context: ctx}
+}
+
+// FederationAdapterSyncRepoFailedErr wraps err as a repository sync failure with optional context.
+func FederationAdapterSyncRepoFailedErr(err error, ctx context) error {
+	return CustomError{prefix: errFederationAdapterPrefix, code: federationAdapterSyncRepoFailed, err: err, context: ctx}
+}
+
+// ApplicationScopesFetchFailedErr wraps err as an application-scopes-fetch-failed error with optional context.
+func ApplicationScopesFetchFailedErr(err error, ctx context) error {
+	return CustomError{prefix: errFederationAdapterPrefix, code: applicationScopesFetchFailed, err: err, context: ctx}
+}
+
+// FederationAdapterRepositoryAlreadyExistsErr wraps err as a federation repository conflict with optional context.
+func FederationAdapterRepositoryAlreadyExistsErr(err error, ctx context) error {
+	return CustomError{prefix: errFederationAdapterPrefix, code: federationAdapterRepositoryAlreadyExists, err: err, context: ctx}
 }
