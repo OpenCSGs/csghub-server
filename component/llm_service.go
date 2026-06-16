@@ -43,6 +43,8 @@ type llmServiceComponentImpl struct {
 	upstreamStore     database.UpstreamStore
 	promptPrefixStore database.PromptPrefixStore
 	repoStore         database.RepoStore
+	healthStateStore  database.AIGatewayUpstreamHealthStateStore
+	circuitStateStore database.AIGatewayUpstreamCircuitStateStore
 }
 
 var ErrInvalidLLMConfig = errors.New("invalid llm config")
@@ -52,11 +54,15 @@ func NewLLMServiceComponent(config *config.Config) (LLMServiceComponent, error) 
 	promptPrefixStore := database.NewPromptPrefixStore(config)
 	repoStore := database.NewRepoStore()
 	upstreamStore := database.NewUpstreamStore(config)
+	healthStateStore := database.NewAIGatewayUpstreamHealthStateStore()
+	circuitStateStore := database.NewAIGatewayUpstreamCircuitStateStore()
 	llmServiceComp := &llmServiceComponentImpl{
 		llmConfigStore:    llmConfigStore,
 		upstreamStore:     upstreamStore,
 		promptPrefixStore: promptPrefixStore,
 		repoStore:         repoStore,
+		healthStateStore:  healthStateStore,
+		circuitStateStore: circuitStateStore,
 	}
 	return llmServiceComp, nil
 }
@@ -452,6 +458,11 @@ func (s *llmServiceComponentImpl) UpdateUpstream(ctx context.Context, req *types
 	if err != nil {
 		return nil, fmt.Errorf("upstream not found: %w", err)
 	}
+	// Snapshot old state to detect transitions
+	wasEnabled := dbUp.Enabled
+	wasHealthCheckEnabled := dbUp.HealthCheckEnabled
+	wasCircuitBreakerEnabled := dbUp.CircuitBreakerEnabled
+
 	// Apply partial updates
 	if req.URL != nil {
 		dbUp.URL = strings.TrimSpace(*req.URL)
@@ -489,8 +500,52 @@ func (s *llmServiceComponentImpl) UpdateUpstream(ctx context.Context, req *types
 	if err := s.upstreamStore.Update(ctx, dbUp); err != nil {
 		return nil, fmt.Errorf("failed to update upstream: %w", err)
 	}
+
+	// When upstream or check is re-enabled, reset stale state to unknown.
+	// Existing DB records from the previous active period are outdated,
+	// but we preserve them by updating rather than deleting.
+	if dbUp.Enabled {
+		if (!wasEnabled || !wasHealthCheckEnabled) && dbUp.HealthCheckEnabled {
+			_ = s.resetHealthStateToUnknown(ctx, dbUp.ID)
+		}
+		if (!wasEnabled || !wasCircuitBreakerEnabled) && dbUp.CircuitBreakerEnabled {
+			_ = s.resetCircuitStateToUnknown(ctx, dbUp.ID)
+		}
+	}
+
+	// Re-read upstream to pick up refreshed health/circuit state
+	dbUp, err = s.upstreamStore.GetByID(ctx, req.ID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to reload upstream: %w", err)
+	}
 	res := buildUpstreamConfigs([]database.Upstream{*dbUp})
 	return &res[0], nil
+}
+
+// resetHealthStateToUnknown resets the health state of an upstream to unknown
+// if a DB record exists. No-op if no record exists (buildUpstreamConfigs
+// will treat nil as unknown).
+func (s *llmServiceComponentImpl) resetHealthStateToUnknown(ctx context.Context, upstreamID int64) error {
+	state, err := s.healthStateStore.GetByUpstreamID(ctx, upstreamID)
+	if err != nil {
+		// No record exists, nothing to reset
+		return nil
+	}
+	state.HealthState = string(aigatewaytypes.HealthStateUnknown)
+	return s.healthStateStore.Update(ctx, state)
+}
+
+// resetCircuitStateToUnknown resets the circuit state of an upstream to unknown
+// if a DB record exists. No-op if no record exists (buildUpstreamConfigs
+// will treat nil as unknown).
+func (s *llmServiceComponentImpl) resetCircuitStateToUnknown(ctx context.Context, upstreamID int64) error {
+	state, err := s.circuitStateStore.GetByUpstreamID(ctx, upstreamID)
+	if err != nil {
+		// No record exists, nothing to reset
+		return nil
+	}
+	state.CircuitState = string(aigatewaytypes.CircuitStateUnknown)
+	return s.circuitStateStore.Update(ctx, state)
 }
 
 func (s *llmServiceComponentImpl) DeleteUpstream(ctx context.Context, id int64) error {
@@ -525,9 +580,15 @@ func buildUpstreamConfigs(dbUpstreams []database.Upstream) []types.UpstreamConfi
 		}
 		if u.HealthState != nil {
 			uc.HealthState = u.HealthState.HealthState
+		} else if u.HealthCheckEnabled {
+			// No health check record yet, treat as unknown until first probe
+			uc.HealthState = string(aigatewaytypes.HealthStateUnknown)
 		}
 		if u.CircuitState != nil {
 			uc.CircuitState = u.CircuitState.CircuitState
+		} else if u.CircuitBreakerEnabled {
+			// No circuit state record yet, treat as unknown until first probe
+			uc.CircuitState = string(aigatewaytypes.CircuitStateUnknown)
 		}
 		uc.IsAvailable, _ = computeUpstreamAvailability(uc)
 		uc.AvailabilityStatus = computeUpstreamAvailabilityStatus(uc)
@@ -540,6 +601,14 @@ func computeUpstreamAvailability(u types.UpstreamConfig) (bool, string) {
 	if !u.Enabled {
 		return false, aigatewaytypes.ReasonUpstreamDisabled
 	}
+	// When health check or circuit breaker is enabled but state is unknown
+	// (not yet probed), treat upstream as unavailable to avoid misleading users.
+	if u.CircuitBreakerEnabled && u.CircuitState == string(aigatewaytypes.CircuitStateUnknown) {
+		return false, aigatewaytypes.ReasonCircuitStateUnknown
+	}
+	if u.HealthCheckEnabled && u.HealthState == string(aigatewaytypes.HealthStateUnknown) {
+		return false, aigatewaytypes.ReasonHealthStateUnknown
+	}
 	if unavailable, reason := aigatewaytypes.IsUpstreamUnavailable(u); unavailable {
 		return false, reason
 	}
@@ -549,6 +618,14 @@ func computeUpstreamAvailability(u types.UpstreamConfig) (bool, string) {
 func computeUpstreamAvailabilityStatus(u types.UpstreamConfig) string {
 	if !u.Enabled {
 		return string(aigatewaytypes.UpstreamStatusDisabled)
+	}
+	// When health check or circuit breaker is enabled but state is unknown
+	// (not yet probed), return unknown status to reflect real state.
+	if u.CircuitBreakerEnabled && u.CircuitState == string(aigatewaytypes.CircuitStateUnknown) {
+		return string(aigatewaytypes.UpstreamStatusUnknown)
+	}
+	if u.HealthCheckEnabled && u.HealthState == string(aigatewaytypes.HealthStateUnknown) {
+		return string(aigatewaytypes.UpstreamStatusUnknown)
 	}
 	if u.CircuitBreakerEnabled && u.CircuitState == string(aigatewaytypes.CircuitStateOpen) {
 		return string(aigatewaytypes.UpstreamStatusUnavailable)
