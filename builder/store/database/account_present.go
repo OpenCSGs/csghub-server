@@ -95,7 +95,7 @@ func (ap *accountPresentStoreImpl) AddPresent(ctx context.Context, input Account
 func (ap *accountPresentStoreImpl) FindPresentByUserAndActivity(ctx context.Context, userID string, activityID int64, participantUUID string) (*AccountPresent, error) {
 	present := &AccountPresent{}
 	q := ap.db.Core.NewSelect().Model(present).Where("user_uuid = ? and activity_id = ?", userID, activityID)
-	if participantUUID != "" {
+	if len(participantUUID) > 0 {
 		q = q.Where("participant_uuid = ?", participantUUID)
 	}
 

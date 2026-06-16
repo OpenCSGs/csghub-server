@@ -13,4 +13,5 @@ type InvitationComponent interface {
 	ListInvitationActivities(ctx context.Context, req types.InvitationActivityFilter) ([]types.InvitationActivity, int, error)
 	AwardCreditToInvitee(ctx context.Context, req types.AwardCreditToInviteeReq) error
 	AwardCreditToInviter(ctx context.Context, activityID int64) error
+	GetInvitationCode(ctx context.Context, userUUID string) (string, error)
 }

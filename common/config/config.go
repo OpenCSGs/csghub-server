@@ -267,6 +267,7 @@ type Config struct {
 		SigninSuccessRedirectURL       string `env:"OPENCSG_USER_SERVER_SIGNIN_SUCCESS_REDIRECT_URL" default:"http://localhost:3000/server/callback"`
 		CodeSoulerVScodeRedirectURL    string `env:"OPENCSG_USER_SERVER_CODESOULER_VSCODE_REDIRECT_URL" default:"http://127.0.0.1:37678/callback"`
 		CodeSoulerJetBrainsRedirectURL string `env:"OPENCSG_USER_SERVER_CODESOULER_JETBRAINS_REDIRECT_URL" default:"http://127.0.0.1:37679/callback"`
+		AwardSelfRegisterCredit        int    `env:"OPENCSG_USER_SERVER_AWARD_SELF_REGISTER_CREDIT" default:"5000"`
 	}
 
 	Credential struct {

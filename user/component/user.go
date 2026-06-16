@@ -13,6 +13,7 @@ import (
 
 	"github.com/bwmarrin/snowflake"
 	"github.com/google/uuid"
+	"opencsg.com/csghub-server/builder/accounting"
 	"opencsg.com/csghub-server/builder/git"
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/rpc"
@@ -56,6 +57,7 @@ type userComponentImpl struct {
 	notificationSvc rpc.NotificationSvcClient
 	ts              database.TagStore
 	uts             database.UserTagStore
+	acctClient      accounting.AccountingClient
 }
 
 type UserComponent interface {
@@ -155,6 +157,11 @@ func NewUserComponent(config *config.Config) (UserComponent, error) {
 	c.userPhonec, err = NewUserPhoneComponent(c.config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create user phone component, error: %w", err)
+	}
+
+	c.acctClient, err = accounting.NewAccountingClient(config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create accounting client,error: %w", err)
 	}
 
 	return c, nil
@@ -274,6 +281,10 @@ func (c *userComponentImpl) createFromSSOUser(ctx context.Context, cu *rpc.SSOUs
 		newError := fmt.Errorf("failed to create user in db,error:%w", err)
 		return nil, newError
 	}
+
+	namespace.NamespaceType = database.UserNamespace
+	user.Namespaces = []database.Namespace{*namespace}
+	c.processAwardSelfRegisterCredit(user)
 
 	return user, nil
 }
@@ -414,6 +425,8 @@ func (c *userComponentImpl) UpdateByUUID(ctx context.Context, req *types.UpdateU
 		}
 		return fmt.Errorf("failed to update user in db,error:%w", err)
 	}
+
+	c.processAwardSelfRegisterCredit(changedUser)
 
 	return nil
 

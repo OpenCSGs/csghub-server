@@ -291,6 +291,63 @@ func (_c *MockInvitationComponent_GetInvitationByUserUUID_Call) RunAndReturn(run
 	return _c
 }
 
+// GetInvitationCode provides a mock function with given fields: ctx, userUUID
+func (_m *MockInvitationComponent) GetInvitationCode(ctx context.Context, userUUID string) (string, error) {
+	ret := _m.Called(ctx, userUUID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetInvitationCode")
+	}
+
+	var r0 string
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (string, error)); ok {
+		return rf(ctx, userUUID)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) string); ok {
+		r0 = rf(ctx, userUUID)
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, userUUID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockInvitationComponent_GetInvitationCode_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetInvitationCode'
+type MockInvitationComponent_GetInvitationCode_Call struct {
+	*mock.Call
+}
+
+// GetInvitationCode is a helper method to define mock.On call
+//   - ctx context.Context
+//   - userUUID string
+func (_e *MockInvitationComponent_Expecter) GetInvitationCode(ctx interface{}, userUUID interface{}) *MockInvitationComponent_GetInvitationCode_Call {
+	return &MockInvitationComponent_GetInvitationCode_Call{Call: _e.mock.On("GetInvitationCode", ctx, userUUID)}
+}
+
+func (_c *MockInvitationComponent_GetInvitationCode_Call) Run(run func(ctx context.Context, userUUID string)) *MockInvitationComponent_GetInvitationCode_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockInvitationComponent_GetInvitationCode_Call) Return(_a0 string, _a1 error) *MockInvitationComponent_GetInvitationCode_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockInvitationComponent_GetInvitationCode_Call) RunAndReturn(run func(context.Context, string) (string, error)) *MockInvitationComponent_GetInvitationCode_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ListInvitationActivities provides a mock function with given fields: ctx, req
 func (_m *MockInvitationComponent) ListInvitationActivities(ctx context.Context, req types.InvitationActivityFilter) ([]types.InvitationActivity, int, error) {
 	ret := _m.Called(ctx, req)
