@@ -10,6 +10,7 @@ import (
 type HealthState string
 
 const (
+	HealthStateUnknown   HealthState = "unknown"
 	HealthStateHealthy   HealthState = "healthy"
 	HealthStateDegraded  HealthState = "degraded"
 	HealthStateUnhealthy HealthState = "unhealthy"
@@ -19,10 +20,11 @@ const (
 type UpstreamStatus string
 
 const (
-	UpstreamStatusDisabled    UpstreamStatus = "disabled"
+	UpstreamStatusUnknown    UpstreamStatus = "unknown"
+	UpstreamStatusDisabled   UpstreamStatus = "disabled"
 	UpstreamStatusUnavailable UpstreamStatus = "unavailable"
-	UpstreamStatusDegraded    UpstreamStatus = "degraded"
-	UpstreamStatusAvailable   UpstreamStatus = "available"
+	UpstreamStatusDegraded   UpstreamStatus = "degraded"
+	UpstreamStatusAvailable  UpstreamStatus = "available"
 )
 
 // Reason strings for upstream/LLM unavailability.
@@ -31,12 +33,15 @@ const (
 	ReasonCircuitBreakerOpen      = "circuit breaker is open"
 	ReasonHealthStateUnhealthy    = "health state is unhealthy"
 	ReasonAllUpstreamsUnavailable = "all upstreams unavailable"
+	ReasonHealthStateUnknown      = "health state is unknown"
+	ReasonCircuitStateUnknown     = "circuit state is unknown"
 )
 
 // CircuitState represents the circuit breaker state
 type CircuitState string
 
 const (
+	CircuitStateUnknown  CircuitState = "unknown"
 	CircuitStateClosed   CircuitState = "closed"
 	CircuitStateOpen     CircuitState = "open"
 	CircuitStateHalfOpen CircuitState = "half_open"
