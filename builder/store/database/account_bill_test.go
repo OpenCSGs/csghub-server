@@ -87,11 +87,10 @@ func TestAccountBillStore_List(t *testing.T) {
 	})
 	require.Nil(t, err)
 	require.Equal(t, 2, len(res.Data))
-	expectedData := []map[string]interface{}(
-		[]map[string]interface{}{
-			{"consumption": float64(31), "instance_name": "c1", "value": float64(28), "prompt_token": float64(0), "completion_token": float64(0)},
-			{"consumption": float64(21), "instance_name": "c2", "value": float64(20), "prompt_token": float64(0), "completion_token": float64(0)},
-		})
+	expectedData := []types.ITEM{
+		{Consumption: 31, InstanceName: "c1", Value: 28, PromptToken: 0, CompletionToken: 0},
+		{Consumption: 21, InstanceName: "c2", Value: 20, PromptToken: 0, CompletionToken: 0},
+	}
 	require.Equal(t, expectedData, res.Data)
 
 }

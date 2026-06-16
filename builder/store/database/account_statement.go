@@ -6,6 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math"
+	"slices"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -79,6 +83,7 @@ type AccountStatement struct {
 	DataType         string                `bun:",notnull,default:''" json:"data_type"`
 	Resolution       string                `bun:",notnull,default:''" json:"resolution"`
 	Duration         float64               `bun:",notnull,default:0" json:"duration"`
+	VoucherNo        string                `bun:",nullzero" json:"voucher_no"`
 }
 
 type AccountStatementRes struct {
@@ -86,14 +91,16 @@ type AccountStatementRes struct {
 	types.AcctSummary
 }
 
+type ChangedValue struct {
+	Cash    float64
+	Voucher float64
+}
+
 func (as *accountStatementStoreImpl) Create(ctx context.Context, input AccountStatement, checkBalance ...bool) error {
+	check := len(checkBalance) > 0 && checkBalance[0]
 	if input.Scene == types.ScenePortalCharge || input.Scene == types.SceneCashCharge {
 		return as.chargeFeeStatement(ctx, input)
 	} else {
-		check := false
-		if len(checkBalance) > 0 && checkBalance[0] {
-			check = true
-		}
 		return as.deductFeeStatement(ctx, input, check)
 	}
 }
@@ -188,6 +195,7 @@ func (as *accountStatementStoreImpl) deductFeeStatement(ctx context.Context, inp
 		}
 
 		var err error
+		var changed ChangedValue
 
 		if utils.IsGetTokenID(input.Scene) && len(input.APIKey) > 0 {
 			token, err := findByTokenValue(ctx, tx, input.APIKey)
@@ -201,7 +209,7 @@ func (as *accountStatementStoreImpl) deductFeeStatement(ctx context.Context, inp
 			}
 		}
 
-		err = DeductAccountFee(ctx, tx, input, checkBalance)
+		changed, err = DeductAccountFee(ctx, tx, input, checkBalance)
 		if err != nil {
 			if errors.Is(err, types.ErrDuplicatedEvent) {
 				slog.Warn("skip duplicated deduct fee by event uuid", slog.Any("input", input))
@@ -209,8 +217,15 @@ func (as *accountStatementStoreImpl) deductFeeStatement(ctx context.Context, inp
 			}
 			return fmt.Errorf("deduct account fee, error: %w", err)
 		}
+		eventValue := input.Value
+		calcValue := eventValue - changed.Voucher
+		err = updateFeeBill(ctx, tx, input, BillValues{
+			TotalValue:   calcValue,
+			VoucherValue: 0,
+			CashValue:    changed.Cash,
+			Consumption:  math.Abs(calcValue/eventValue) * input.Consumption,
+		})
 
-		err = updateFeeBill(ctx, tx, input)
 		if err != nil {
 			return fmt.Errorf("update account bill, error: %w", err)
 		}
@@ -230,73 +245,89 @@ func (as *accountStatementStoreImpl) deductFeeStatement(ctx context.Context, inp
 	return err
 }
 
-func DeductAccountFee(ctx context.Context, tx bun.Tx, input AccountStatement, checkBalance bool) error {
+func DeductAccountFee(ctx context.Context, tx bun.Tx, input AccountStatement, checkBalance bool) (ChangedValue, error) {
 	var err error
 	var acctUser AccountUser
+	changedValue := ChangedValue{
+		Cash:    0.0,
+		Voucher: 0.0,
+	}
 
 	// add lock
 	err = tx.NewSelect().Model(&acctUser).Where("user_uuid = ?", input.UserUUID).For("UPDATE").Scan(ctx, &acctUser)
 	if err != nil {
-		return fmt.Errorf("failed to get account user: %w", err)
+		return changedValue, fmt.Errorf("failed to get account user: %w", err)
 	}
 
 	err = CheckDuplicatedEvent(ctx, tx, input)
 	if err != nil {
 		if errors.Is(err, types.ErrDuplicatedEvent) {
 			// return duplicated error for check
-			return err
+			return changedValue, err
 		}
-		return fmt.Errorf("check duplicated event failed, error: %w", err)
+		return changedValue, fmt.Errorf("check duplicated event failed, error: %w", err)
 	}
 
 	// Check balance if needed
 	if checkBalance && input.Value < 0 {
 		if acctUser.Balance+acctUser.CashBalance < -input.Value {
-			return fmt.Errorf("insufficient balance")
+			return changedValue, fmt.Errorf("insufficient balance")
 		}
 	}
 
+	initValue := input.Value
 	remainValue := input.Value
+	cashChangePart1 := 0.0
+	cashChangePart2 := 0.0
 
 	if remainValue == 0 {
 		// only save statement
 		err = assertAffectedOneRow(tx.NewInsert().Model(&input).Exec(ctx))
 		if err != nil {
-			return fmt.Errorf("insert statement, error:%w", err)
+			return changedValue, fmt.Errorf("insert statement, error:%w", err)
 		}
-		return nil
+		return changedValue, nil
 	}
 
-	// 1. check and reduce cash
-	if remainValue < 0 && acctUser.CashBalance > 0 {
-		remainValue, err = deductFeeToCashBalance(ctx, tx, input, remainValue, acctUser.CashBalance)
+	// 1. check and reduce voucher
+	if remainValue < 0 && utils.IsUseVoucher(input.Scene) {
+		remainValue, err = deductFeeToVouchers(ctx, tx, input, remainValue)
 		if err != nil {
-			return fmt.Errorf("deduct cash balance, error:%w", err)
+			return changedValue, fmt.Errorf("deduct voucher, error:%w", err)
+		}
+		changedValue.Voucher = initValue - remainValue
+	}
+
+	// 2. check and reduce cash
+	if remainValue < 0 && acctUser.CashBalance > 0 {
+		remainValue, cashChangePart1, err = deductFeeToCashBalance(ctx, tx, input, remainValue, acctUser.CashBalance)
+		if err != nil {
+			return changedValue, fmt.Errorf("deduct cash balance, error:%w", err)
 		}
 	}
 
-	// 2. check and reduce bonus
+	// 3. check and reduce bonus
 	if remainValue < 0 && acctUser.Balance > 0 {
 		remainValue, err = deductFeeToBalance(ctx, tx, input, remainValue, acctUser.Balance)
 		if err != nil {
-			return fmt.Errorf("deduct balance, error:%w", err)
+			return changedValue, fmt.Errorf("deduct balance, error:%w", err)
 		}
 	}
 
-	// 3. check and reduce all in cash
+	// 4. check and reduce all in cash
 	if remainValue < 0 {
 		err = tx.NewSelect().Model(&acctUser).Where("user_uuid = ?", input.UserUUID).Scan(ctx, &acctUser)
 		if err != nil {
-			return fmt.Errorf("failed to get account user: %w", err)
+			return changedValue, fmt.Errorf("failed to get account user: %w", err)
 		}
 
-		_, err = deductFeeAllInCashBalance(ctx, tx, input, remainValue, acctUser.CashBalance)
+		_, cashChangePart2, err = deductFeeAllInCashBalance(ctx, tx, input, remainValue, acctUser.CashBalance)
 		if err != nil {
-			return fmt.Errorf("deduct all in balance, error:%w", err)
+			return changedValue, fmt.Errorf("deduct all in balance, error:%w", err)
 		}
 	}
-
-	return nil
+	changedValue.Cash = cashChangePart1 + cashChangePart2
+	return changedValue, nil
 }
 
 func deductFeeToBalance(ctx context.Context, tx bun.Tx, input AccountStatement, feeValue, balanceValue float64) (float64, error) {
@@ -327,9 +358,9 @@ func deductFeeToBalance(ctx context.Context, tx bun.Tx, input AccountStatement, 
 	return remainValue, nil
 }
 
-func deductFeeToCashBalance(ctx context.Context, tx bun.Tx, input AccountStatement, feeValue, cashBalanceValue float64) (float64, error) {
+func deductFeeToCashBalance(ctx context.Context, tx bun.Tx, input AccountStatement, feeValue, cashBalanceValue float64) (float64, float64, error) {
 	if cashBalanceValue <= 0 {
-		return 0, fmt.Errorf("cash balance is not enough")
+		return 0, 0, fmt.Errorf("cash balance is not enough")
 	}
 	statementValue := 0.0
 	remainValue := cashBalanceValue + feeValue
@@ -346,16 +377,16 @@ func deductFeeToCashBalance(ctx context.Context, tx bun.Tx, input AccountStateme
 
 	runSql := "update account_users set cash_balance=cash_balance + ? where user_uuid=?"
 	if err := assertAffectedOneRow(tx.Exec(runSql, input.Value, input.UserUUID)); err != nil {
-		return 0, fmt.Errorf("update cash balance, error:%w", err)
+		return 0, 0, fmt.Errorf("update cash balance, error:%w", err)
 	}
 
 	if err := assertAffectedOneRow(tx.NewInsert().Model(&input).Exec(ctx)); err != nil {
-		return 0, fmt.Errorf("insert statement for deduct cash balance, error:%w", err)
+		return 0, 0, fmt.Errorf("insert statement for deduct cash balance, error:%w", err)
 	}
-	return remainValue, nil
+	return remainValue, statementValue, nil
 }
 
-func deductFeeAllInCashBalance(ctx context.Context, tx bun.Tx, input AccountStatement, feeValue, cashBalanceValue float64) (float64, error) {
+func deductFeeAllInCashBalance(ctx context.Context, tx bun.Tx, input AccountStatement, feeValue, cashBalanceValue float64) (float64, float64, error) {
 	remainValue := cashBalanceValue + feeValue
 
 	input.Value = feeValue
@@ -364,11 +395,135 @@ func deductFeeAllInCashBalance(ctx context.Context, tx bun.Tx, input AccountStat
 
 	runSql := "update account_users set cash_balance=cash_balance + ? where user_uuid=?"
 	if err := assertAffectedOneRow(tx.Exec(runSql, input.Value, input.UserUUID)); err != nil {
-		return 0, fmt.Errorf("update balance for allin, error:%w", err)
+		return 0, 0, fmt.Errorf("update balance for allin, error:%w", err)
 	}
 
 	if err := assertAffectedOneRow(tx.NewInsert().Model(&input).Exec(ctx)); err != nil {
-		return 0, fmt.Errorf("insert statement for deduct allin balance, error:%w", err)
+		return 0, 0, fmt.Errorf("insert statement for deduct allin balance, error:%w", err)
+	}
+
+	return remainValue, feeValue, nil
+}
+
+func deductFeeToVouchers(ctx context.Context, tx bun.Tx, input AccountStatement, feeValue float64) (float64, error) {
+	var err error
+	remainValue := feeValue
+
+	err = updateVouchersStatus(ctx, tx)
+	if err != nil {
+		return remainValue, fmt.Errorf("refresh vouchers status, error: %w", err)
+	}
+
+	resID, err := strconv.ParseInt(input.ResourceID, 10, 64)
+	if err != nil {
+		return remainValue, fmt.Errorf("bad request resource id format %s for voucher, error: %w", input.ResourceID, err)
+	}
+
+	var res SpaceResource
+	res.ID = resID
+
+	err = tx.NewSelect().Model(&res).WherePK().Scan(ctx)
+	if err != nil {
+		return remainValue, fmt.Errorf("query resource id %s for voucher, error: %w", input.ResourceID, err)
+	}
+
+	reqClusterID := strings.TrimSpace(res.ClusterID)
+	reqXpuModel, err := utils.GetResXPUMode(res.Resources)
+	if err != nil {
+		return remainValue, fmt.Errorf("get resource xpu model for resource id %s for voucher, error: %w", input.ResourceID, err)
+	}
+	reqXpuModel = strings.TrimSpace(reqXpuModel)
+
+	if len(reqClusterID) < 1 {
+		return remainValue, fmt.Errorf("cluster id is empty for resource id %s for voucher", input.ResourceID)
+	}
+
+	if len(reqXpuModel) < 1 {
+		return remainValue, nil
+	}
+
+	var vouchers []AccountVoucher
+	err = tx.NewSelect().Model(&vouchers).
+		Where("target_uuid = ?", input.UserUUID).
+		Where("status = ?", types.VoucherStatusActive).
+		Where("begin_date <= ?", time.Now()).
+		Where("end_date > ?", time.Now()).
+		Where("(total - ABS(used)) > 0").
+		Order("end_date ASC", "created_at ASC").
+		Scan(ctx)
+	if err != nil {
+		return remainValue, fmt.Errorf("query active vouchers for target %s: %w", input.UserUUID, err)
+	}
+
+	if len(vouchers) < 1 {
+		return remainValue, nil
+	}
+
+	priorityVouchers := checkAndSortVouchers(vouchers, reqClusterID, reqXpuModel)
+
+	if len(priorityVouchers) < 1 {
+		return remainValue, nil
+	}
+
+	for _, v := range priorityVouchers {
+		if remainValue >= 0 {
+			break
+		}
+		remainValue, err = deductFeeToVoucher(ctx, tx, input, remainValue, v)
+		if err != nil {
+			return remainValue, fmt.Errorf("deduct single voucher id %d error: %w", v.ID, err)
+		}
+	}
+
+	return remainValue, nil
+}
+
+func deductFeeToVoucher(ctx context.Context, tx bun.Tx, input AccountStatement, feeValue float64, voucher AccountVoucher) (float64, error) {
+	eventValue := input.Value
+	remainValue := feeValue
+	if remainValue >= 0 {
+		return remainValue, nil
+	}
+
+	available := voucher.Total - math.Abs(voucher.Used)
+	if available <= 0 {
+		return remainValue, nil
+	}
+
+	statementValue := 0.0
+	remainValue = available + remainValue
+	if remainValue >= 0 {
+		remainValue = 0.0
+		statementValue = feeValue
+	} else {
+		statementValue = 0 - available
+	}
+
+	input.Value = statementValue
+	input.BalanceValue = available + statementValue
+	input.BalanceType = types.ChargeVoucher
+	input.VoucherNo = voucher.VoucherNo
+
+	err := assertAffectedOneRow(tx.NewInsert().Model(&input).Exec(ctx))
+	if err != nil {
+		return 0, fmt.Errorf("insert statement for deduct voucher id %d error:%w", voucher.ID, err)
+	}
+
+	_, err = tx.NewUpdate().Model(&AccountVoucher{}).
+		Set("used = used + ?", statementValue).Set("updated_at = ?", time.Now()).
+		Where("id = ?", voucher.ID).Exec(ctx)
+	if err != nil {
+		return remainValue, fmt.Errorf("update voucher id %d used amount error: %w", voucher.ID, err)
+	}
+
+	err = updateFeeBill(ctx, tx, input, BillValues{
+		TotalValue:   statementValue,
+		VoucherValue: statementValue,
+		CashValue:    0.0,
+		Consumption:  math.Abs(statementValue/eventValue) * input.Consumption,
+	})
+	if err != nil {
+		return remainValue, fmt.Errorf("update voucher bill for voucher %s error: %w", input.VoucherNo, err)
 	}
 
 	return remainValue, nil
@@ -390,7 +545,7 @@ func CheckDuplicatedEvent(ctx context.Context, tx bun.Tx, input AccountStatement
 	return nil
 }
 
-func updateFeeBill(ctx context.Context, tx bun.Tx, input AccountStatement) error {
+func updateFeeBill(ctx context.Context, tx bun.Tx, input AccountStatement, billValues BillValues) error {
 	if !utils.IsNeedCalculateBill(input.Scene) {
 		return nil
 	}
@@ -400,8 +555,8 @@ func updateFeeBill(ctx context.Context, tx bun.Tx, input AccountStatement) error
 		UserUUID:        input.UserUUID,
 		Scene:           input.Scene,
 		CustomerID:      input.CustomerID,
-		Value:           input.Value,
-		Consumption:     input.Consumption,
+		Value:           billValues.TotalValue,
+		Consumption:     billValues.Consumption,
 		PromptToken:     input.PromptToken,
 		CompletionToken: input.CompletionToken,
 		Count:           1,
@@ -409,44 +564,27 @@ func updateFeeBill(ctx context.Context, tx bun.Tx, input AccountStatement) error
 		DataType:        input.DataType,
 		Resolution:      input.Resolution,
 		Duration:        input.Duration,
+		VoucherNo:       input.VoucherNo,
+		VoucherValue:    billValues.VoucherValue,
+		CashValue:       billValues.CashValue,
 	}
-	err := tx.NewSelect().Model(&bill).
-		Where("bill_date = ?", input.EventDate).
-		Where("user_uuid = ?", input.UserUUID).
-		Where("scene = ?", input.Scene).
-		Where("customer_id = ?", input.CustomerID).
-		Where("token_id = ?", input.TokenID).
-		Where("data_type = ?", input.DataType).
-		Where("resolution = ?", input.Resolution).
-		For("UPDATE").Scan(ctx)
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return fmt.Errorf("select statement, error:%w", err)
-	}
-	if errors.Is(err, sql.ErrNoRows) {
-		_, err = tx.NewInsert().Model(&bill).Exec(ctx)
-		if err != nil {
-			return fmt.Errorf("create bill for %s, error:%w", input.EventUUID, err)
-		}
-	} else {
-		_, err = tx.NewUpdate().Model(&bill).
-			Where("bill_date = ?", input.EventDate).
-			Where("user_uuid = ?", input.UserUUID).
-			Where("scene = ?", input.Scene).
-			Where("customer_id = ?", input.CustomerID).
-			Where("token_id = ?", input.TokenID).
-			Where("data_type = ?", input.DataType).
-			Where("resolution = ?", input.Resolution).
-			Set("value = value + ?", input.Value).
-			Set("consumption = consumption + ?", input.Consumption).
-			Set("prompt_token = prompt_token + ?", input.PromptToken).
-			Set("completion_token = completion_token + ?", input.CompletionToken).
-			Set("count = count + 1").
-			Set("updated_at = current_timestamp").
-			Set("duration = duration + ?", input.Duration).
-			Exec(ctx)
-		if err != nil {
-			return fmt.Errorf("update bill for %s, error:%w", input.EventUUID, err)
-		}
+
+	// depend on unique index for update
+	_, err := tx.NewInsert().Model(&bill).
+		On("CONFLICT (bill_date, user_uuid, scene, customer_id, token_id, data_type, resolution, voucher_no) DO UPDATE").
+		Set("value = account_bill.value + ?", input.Value).
+		Set("consumption = account_bill.consumption + ?", billValues.Consumption).
+		Set("prompt_token = account_bill.prompt_token + ?", input.PromptToken).
+		Set("completion_token = account_bill.completion_token + ?", input.CompletionToken).
+		Set("duration = account_bill.duration + ?", input.Duration).
+		Set("count = account_bill.count + ?", 1).
+		Set("voucher_value = account_bill.voucher_value + ?", billValues.VoucherValue).
+		Set("cash_value = account_bill.cash_value + ?", billValues.CashValue).
+		Set("updated_at = current_timestamp").
+		Exec(ctx)
+
+	if err != nil {
+		return fmt.Errorf("update bill for %s user %s, error:%w", input.EventUUID, input.UserUUID, err)
 	}
 
 	if len(input.APIKey) > 0 {
@@ -657,4 +795,82 @@ func (as *accountStatementStoreImpl) HasUserPurchasedDataset(ctx context.Context
 	}
 
 	return count > 0, nil
+}
+
+func checkAndSortVouchers(vouchers []AccountVoucher, clusterID, xpuModel string) []AccountVoucher {
+	var (
+		matchedBoth         []AccountVoucher
+		matchedOnlyResource []AccountVoucher
+		matchedOnlyCluster  []AccountVoucher
+	)
+
+	for _, voucher := range vouchers {
+		matchedType := checkVoucherMatchType(voucher, clusterID, xpuModel)
+
+		switch matchedType {
+		case utils.VoucherMatchTypeBoth:
+			matchedBoth = append(matchedBoth, voucher)
+		case utils.VoucherMatchTypeXPU:
+			matchedOnlyResource = append(matchedOnlyResource, voucher)
+		case utils.VoucherMatchTypeCluster:
+			matchedOnlyCluster = append(matchedOnlyCluster, voucher)
+		default:
+			continue
+		}
+	}
+
+	sortedVouchers := []AccountVoucher{}
+	sortedVouchers = append(sortedVouchers, matchedBoth...)
+	sortedVouchers = append(sortedVouchers, matchedOnlyResource...)
+	sortedVouchers = append(sortedVouchers, matchedOnlyCluster...)
+
+	return sortedVouchers
+}
+
+func checkVoucherMatchType(voucher AccountVoucher, reqClusterID, reqXpuModel string) utils.VoucherMatchType {
+	if len(voucher.Rules) < 1 {
+		return utils.VoucherMatchTypeNone
+	}
+
+	voucherMatchResource := false
+	voucherMatchCluster := false
+
+	for _, rule := range voucher.Rules {
+		singleRuleMatchCluster := false
+		singleRuleMatchResource := false
+
+		if len(rule.XPUModels) > 0 && slices.Contains(rule.XPUModels, reqXpuModel) {
+			singleRuleMatchResource = true
+		}
+
+		if len(rule.ClusterIDs) > 0 && slices.Contains(rule.ClusterIDs, reqClusterID) {
+			singleRuleMatchCluster = true
+		}
+
+		if len(rule.XPUModels) > 0 &&
+			slices.Contains(rule.XPUModels, reqXpuModel) &&
+			len(rule.ClusterIDs) < 1 {
+			voucherMatchResource = true
+		}
+
+		if len(rule.ClusterIDs) > 0 &&
+			slices.Contains(rule.ClusterIDs, reqClusterID) &&
+			len(rule.XPUModels) < 1 {
+			voucherMatchCluster = true
+		}
+
+		if singleRuleMatchCluster && singleRuleMatchResource {
+			return utils.VoucherMatchTypeBoth
+		}
+	}
+
+	if voucherMatchResource {
+		return utils.VoucherMatchTypeXPU
+	}
+
+	if voucherMatchCluster {
+		return utils.VoucherMatchTypeCluster
+	}
+
+	return utils.VoucherMatchTypeNone
 }

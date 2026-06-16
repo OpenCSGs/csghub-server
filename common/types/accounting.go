@@ -88,7 +88,7 @@ type SKUType int
 var (
 	SKUReserve  SKUType = 0 // system reserve
 	SKUCSGHub   SKUType = 1 // csghub server
-	SKUStarship SKUType = 2 // starship
+	SKUStarship SKUType = 2 // starship is deprecated
 )
 
 type SKUKind int
@@ -113,6 +113,7 @@ var (
 var (
 	ChargeBalance     string = "balance"
 	ChargeCashBalance string = "cash_balance"
+	ChargeVoucher     string = "voucher"
 )
 
 type SceneType int
@@ -132,8 +133,8 @@ var (
 	SceneModelServerless      SceneType = 15 // serverless and external model from aigateway
 	SceneMultiModalServerless SceneType = 16 // Multi modal model from aigateway for image/audio/video
 	// starship
-	SceneStarship SceneType = 20 // starship
-	SceneGuiAgent SceneType = 22 // gui agent
+	SceneStarship SceneType = 20 // starship is deprecated
+	SceneGuiAgent SceneType = 22 // gui agent is deprecated
 	// dataset
 	SceneDatasetPurchase SceneType = 40 // dataset purchase
 	// unknow
@@ -259,13 +260,13 @@ type ActStatementsReq struct {
 }
 
 type AcctBillsReq struct {
-	CurrentUser string `json:"current_user"`
-	TargetUUID  string `json:"target_uuid"`
-	Scene       int    `json:"scene"`
-	StartDate   string `json:"start_date"`
-	EndDate     string `json:"end_date"`
-	Per         int    `json:"per"`
-	Page        int    `json:"page"`
+	CurrentUser string    `json:"current_user"`
+	TargetUUID  string    `json:"target_uuid"`
+	Scene       SceneType `json:"scene"`
+	StartDate   string    `json:"start_date"`
+	EndDate     string    `json:"end_date"`
+	Per         int       `json:"per"`
+	Page        int       `json:"page"`
 }
 
 type AcctBillsDetailReq struct {
@@ -357,6 +358,8 @@ type ITEM struct {
 	DeployUser      string    `json:"deploy_user"`
 	PromptToken     float64   `json:"prompt_token"`
 	CompletionToken float64   `json:"completion_token"`
+	VoucherValue    float64   `json:"voucher_value"`
+	CashValue       float64   `json:"cash_value"`
 }
 
 type BILLS struct {

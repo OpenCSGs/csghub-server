@@ -2,6 +2,18 @@ package utils
 
 import "opencsg.com/csghub-server/common/types"
 
+func IsUseVoucher(scene types.SceneType) bool {
+	switch scene {
+	case types.SceneModelInference,
+		types.SceneSpace,
+		types.SceneModelFinetune,
+		types.SceneEvaluation:
+		return true
+	default:
+		return false
+	}
+}
+
 func IsNeedCalculateBill(scene types.SceneType) bool {
 	switch scene {
 	case types.SceneModelInference,
