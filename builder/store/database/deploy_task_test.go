@@ -1109,6 +1109,20 @@ func TestDeployTaskStore_GetClusterDeploys(t *testing.T) {
 			GitBranch:   "main",
 			Template:    "test",
 		},
+		{
+			DeployName:  "deploy-cluster1-deleted",
+			SvcName:     "svc-cluster1-deleted",
+			RepoID:      6,
+			UserID:      user1.ID,
+			ClusterID:   "cluster-1",
+			ClusterNode: "node-a,node-b",
+			Status:      common.Deleted,
+			Hardware:    "nvidia-a100",
+			Type:        types.InferenceType,
+			GitPath:     "test",
+			GitBranch:   "main",
+			Template:    "test",
+		},
 	}
 
 	for _, dp := range deploys {
@@ -1116,7 +1130,7 @@ func TestDeployTaskStore_GetClusterDeploys(t *testing.T) {
 		require.Nil(t, err)
 	}
 
-	// Test 1: Filter by ClusterID
+	// Test 1: Filter by ClusterID (deleted deploy should be excluded)
 	result, total, err := store.GetClusterDeploys(ctx, types.ClusterDeployReq{
 		ClusterID: "cluster-1",
 		Per:       10,
@@ -1238,7 +1252,7 @@ func TestDeployTaskStore_GetClusterDeploys(t *testing.T) {
 	require.Equal(t, 3, total)
 	require.Equal(t, 1, len(result))
 
-	// Test 9: No filters (all deploys)
+	// Test 9: No filters (all deploys excluding deleted)
 	result, total, err = store.GetClusterDeploys(ctx, types.ClusterDeployReq{
 		Per:  10,
 		Page: 1,
@@ -1247,7 +1261,12 @@ func TestDeployTaskStore_GetClusterDeploys(t *testing.T) {
 	require.Equal(t, 5, total)
 	require.Equal(t, 5, len(result))
 
-	// Test 10: Non-existent cluster
+	// Test 10: Deleted deploys are excluded
+	for _, dp := range result {
+		require.NotEqual(t, common.Deleted, dp.Status, "deleted deploy should not appear in results")
+	}
+
+	// Test 11: Non-existent cluster
 	result, total, err = store.GetClusterDeploys(ctx, types.ClusterDeployReq{
 		ClusterID: "non-existent-cluster",
 		Per:       10,
@@ -1257,7 +1276,7 @@ func TestDeployTaskStore_GetClusterDeploys(t *testing.T) {
 	require.Equal(t, 0, total)
 	require.Equal(t, 0, len(result))
 
-	// Test 11: Verify User relation is loaded
+	// Test 12: Verify User relation is loaded
 	result, total, err = store.GetClusterDeploys(ctx, types.ClusterDeployReq{
 		ClusterID: "cluster-2",
 		Per:       10,

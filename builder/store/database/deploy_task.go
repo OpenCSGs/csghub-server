@@ -659,6 +659,7 @@ func (s *deployTaskStoreImpl) GetClusterDeploys(ctx context.Context, req types.C
 			req.ClusterNode,
 		)
 	}
+	query = query.Where("status != ?", common.Deleted)
 	if req.Status != 0 {
 		query = query.Where("status = ?", req.Status)
 	}
