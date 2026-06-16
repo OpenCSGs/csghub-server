@@ -27,6 +27,7 @@ type AccountVoucherStore interface {
 	GetByVoucherNo(ctx context.Context, voucherNo string) (*AccountVoucher, error)
 	GetLast(ctx context.Context) (*AccountVoucher, error)
 	List(ctx context.Context, filter types.VoucherFilter) ([]AccountVoucher, int, error)
+	ListByTargetUUID(ctx context.Context, filter types.VoucherNamespaceFilter) ([]AccountVoucher, int, error)
 	UpdateStatus(ctx context.Context, id int64, status types.VoucherStatus) (*AccountVoucher, error)
 	RefreshStatus(ctx context.Context) error
 	GetDashboard(ctx context.Context, req types.VoucherDashboardReq) ([]VoucherDashboardResult, error)
@@ -142,9 +143,6 @@ func (a *accountVoucherStoreImpl) List(ctx context.Context, filter types.Voucher
 	var vouchers []AccountVoucher
 	q := a.db.Core.NewSelect().Model(&vouchers)
 
-	if len(filter.TargetUUID) > 0 {
-		q = q.Where("target_uuid = ?", filter.TargetUUID)
-	}
 	if len(filter.TargetType) > 0 {
 		q = q.Where("target_type = ?", filter.TargetType)
 	}
@@ -190,6 +188,7 @@ func (a *accountVoucherStoreImpl) RefreshStatus(ctx context.Context) error {
 type VoucherDashboardResult struct {
 	Status types.VoucherStatus `json:"status"`
 	Total  float64             `json:"total"`
+	Used   float64             `json:"used"`
 	Count  int                 `json:"count"`
 }
 
@@ -197,7 +196,7 @@ func (a *accountVoucherStoreImpl) GetDashboard(ctx context.Context, req types.Vo
 	var results []VoucherDashboardResult
 	err := a.db.Core.NewSelect().
 		Model((*AccountVoucher)(nil)).
-		ColumnExpr("status, SUM(total) AS total, COUNT(*) AS count").
+		ColumnExpr("status, SUM(total) AS total, SUM(used) AS used, COUNT(*) AS count").
 		Where("target_uuid = ?", req.TargetUUID).
 		Group("status").
 		Scan(ctx, &results)
@@ -279,4 +278,31 @@ func parseVoucherSeq(s string) (int64, error) {
 	var n int64
 	_, err := fmt.Sscanf(s, "%d", &n)
 	return n, err
+}
+
+func (a *accountVoucherStoreImpl) ListByTargetUUID(ctx context.Context, filter types.VoucherNamespaceFilter) ([]AccountVoucher, int, error) {
+	var vouchers []AccountVoucher
+	q := a.db.Core.NewSelect().Model(&vouchers)
+
+	q = q.Where("target_uuid = ?", filter.TargetUUID)
+
+	if len(filter.Status) > 0 {
+		q = q.Where("status = ?", filter.Status)
+	}
+
+	total, err := q.Count(ctx)
+	if err != nil {
+		return nil, 0, errorx.HandleDBError(err, errorx.Ctx().Set("filter", filter))
+	}
+
+	if filter.Per > 0 && filter.Page > 0 {
+		q = q.Limit(filter.Per).Offset((filter.Page - 1) * filter.Per)
+	}
+
+	err = q.Order("id DESC").Scan(ctx)
+	if err != nil {
+		return nil, 0, errorx.HandleDBError(err, errorx.Ctx().Set("filter", filter))
+	}
+
+	return vouchers, total, nil
 }

@@ -19,13 +19,11 @@ type VoucherRules struct {
 }
 
 type VoucherFilter struct {
-	CurrentUser string        `json:"-"`
-	TargetUUID  string        `json:"-"`
-	TargetType  string        `json:"target_type" form:"target_type"`
-	Status      VoucherStatus `json:"status" form:"status"`
-	Search      string        `json:"search" form:"search"`
-	Per         int           `json:"per" form:"per"`
-	Page        int           `json:"page" form:"page"`
+	TargetType string        `json:"target_type" form:"target_type"`
+	Status     VoucherStatus `json:"status" form:"status"`
+	Search     string        `json:"search" form:"search"`
+	Per        int           `json:"per" form:"per"`
+	Page       int           `json:"page" form:"page"`
 }
 
 type CreateVoucherReq struct {
@@ -72,8 +70,17 @@ type VoucherDashboardStatusItem struct {
 	Status VoucherStatus `json:"status"`
 	Total  float64       `json:"total"`
 	Count  int           `json:"count"`
+	Used   float64       `json:"used"`
 }
 
 type VoucherDashboardResp struct {
 	Items []VoucherDashboardStatusItem `json:"items"`
+}
+
+type VoucherNamespaceFilter struct {
+	CurrentUser string        `json:"-"`
+	TargetUUID  string        `json:"-"`
+	Status      VoucherStatus `json:"status" form:"status"`
+	Per         int           `json:"per" form:"per"`
+	Page        int           `json:"page" form:"page"`
 }

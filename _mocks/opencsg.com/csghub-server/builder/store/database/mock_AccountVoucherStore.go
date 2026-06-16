@@ -431,6 +431,72 @@ func (_c *MockAccountVoucherStore_List_Call) RunAndReturn(run func(context.Conte
 	return _c
 }
 
+// ListByTargetUUID provides a mock function with given fields: ctx, filter
+func (_m *MockAccountVoucherStore) ListByTargetUUID(ctx context.Context, filter types.VoucherNamespaceFilter) ([]database.AccountVoucher, int, error) {
+	ret := _m.Called(ctx, filter)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListByTargetUUID")
+	}
+
+	var r0 []database.AccountVoucher
+	var r1 int
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.VoucherNamespaceFilter) ([]database.AccountVoucher, int, error)); ok {
+		return rf(ctx, filter)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.VoucherNamespaceFilter) []database.AccountVoucher); ok {
+		r0 = rf(ctx, filter)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]database.AccountVoucher)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.VoucherNamespaceFilter) int); ok {
+		r1 = rf(ctx, filter)
+	} else {
+		r1 = ret.Get(1).(int)
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, types.VoucherNamespaceFilter) error); ok {
+		r2 = rf(ctx, filter)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
+// MockAccountVoucherStore_ListByTargetUUID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListByTargetUUID'
+type MockAccountVoucherStore_ListByTargetUUID_Call struct {
+	*mock.Call
+}
+
+// ListByTargetUUID is a helper method to define mock.On call
+//   - ctx context.Context
+//   - filter types.VoucherNamespaceFilter
+func (_e *MockAccountVoucherStore_Expecter) ListByTargetUUID(ctx interface{}, filter interface{}) *MockAccountVoucherStore_ListByTargetUUID_Call {
+	return &MockAccountVoucherStore_ListByTargetUUID_Call{Call: _e.mock.On("ListByTargetUUID", ctx, filter)}
+}
+
+func (_c *MockAccountVoucherStore_ListByTargetUUID_Call) Run(run func(ctx context.Context, filter types.VoucherNamespaceFilter)) *MockAccountVoucherStore_ListByTargetUUID_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.VoucherNamespaceFilter))
+	})
+	return _c
+}
+
+func (_c *MockAccountVoucherStore_ListByTargetUUID_Call) Return(_a0 []database.AccountVoucher, _a1 int, _a2 error) *MockAccountVoucherStore_ListByTargetUUID_Call {
+	_c.Call.Return(_a0, _a1, _a2)
+	return _c
+}
+
+func (_c *MockAccountVoucherStore_ListByTargetUUID_Call) RunAndReturn(run func(context.Context, types.VoucherNamespaceFilter) ([]database.AccountVoucher, int, error)) *MockAccountVoucherStore_ListByTargetUUID_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // RefreshStatus provides a mock function with given fields: ctx
 func (_m *MockAccountVoucherStore) RefreshStatus(ctx context.Context) error {
 	ret := _m.Called(ctx)

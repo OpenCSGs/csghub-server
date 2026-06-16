@@ -148,7 +148,7 @@ func TestAccountVoucherStore_List(t *testing.T) {
 	require.Nil(t, err)
 
 	filter := types.VoucherFilter{
-		TargetUUID: "user-uuid-7",
+		TargetType: string(database.UserNamespace),
 		Per:        10,
 		Page:       1,
 	}
@@ -177,7 +177,7 @@ func TestAccountVoucherStore_ListWithStatusFilter(t *testing.T) {
 	require.Nil(t, err)
 
 	filter := types.VoucherFilter{
-		TargetUUID: "user-uuid-8",
+		TargetType: string(database.UserNamespace),
 		Status:     types.VoucherStatusActive,
 		Per:        10,
 		Page:       1,
@@ -232,6 +232,66 @@ func TestAccountVoucherStore_GetDashboard(t *testing.T) {
 	pendingResult := statusMap[types.VoucherStatusPending]
 	require.Equal(t, 200.0, pendingResult.Total)
 	require.Equal(t, 1, pendingResult.Count)
+}
+
+func TestAccountVoucherStore_ListByTargetUUID(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewAccountVoucherStoreWithDB(db)
+
+	v1 := createTestVoucher("user-uuid-11", 100.0)
+	v2 := createTestVoucher("user-uuid-11", 200.0)
+	v3 := createTestVoucher("other-uuid", 300.0)
+	_, err := store.Create(ctx, *v1)
+	require.Nil(t, err)
+	_, err = store.Create(ctx, *v2)
+	require.Nil(t, err)
+	_, err = store.Create(ctx, *v3)
+	require.Nil(t, err)
+
+	filter := types.VoucherNamespaceFilter{
+		TargetUUID: "user-uuid-11",
+		Per:        10,
+		Page:       1,
+	}
+
+	vouchers, total, err := store.ListByTargetUUID(ctx, filter)
+	require.Nil(t, err)
+	require.Equal(t, 2, total)
+	require.Len(t, vouchers, 2)
+}
+
+func TestAccountVoucherStore_ListByTargetUUIDWithStatusFilter(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewAccountVoucherStoreWithDB(db)
+
+	v1 := createTestVoucher("user-uuid-12", 100.0)
+	v2 := createTestVoucher("user-uuid-12", 200.0)
+	created1, err := store.Create(ctx, *v1)
+	require.Nil(t, err)
+	_, err = store.Create(ctx, *v2)
+	require.Nil(t, err)
+
+	_, err = store.UpdateStatus(ctx, created1.ID, types.VoucherStatusActive)
+	require.Nil(t, err)
+
+	filter := types.VoucherNamespaceFilter{
+		TargetUUID: "user-uuid-12",
+		Status:     types.VoucherStatusActive,
+		Per:        10,
+		Page:       1,
+	}
+
+	vouchers, total, err := store.ListByTargetUUID(ctx, filter)
+	require.Nil(t, err)
+	require.Equal(t, 1, total)
+	require.Len(t, vouchers, 1)
+	require.Equal(t, types.VoucherStatusActive, vouchers[0].Status)
 }
 
 func TestAccountVoucherStore_GenVoucherNo(t *testing.T) {
