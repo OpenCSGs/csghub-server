@@ -489,7 +489,7 @@ func TestRepoHandler_Commits(t *testing.T) {
 		Per:         10,
 		RepoType:    types.ModelRepo,
 		CurrentUser: "u",
-	}).Return([]types.Commit{{ID: "c1"}}, &types.RepoPageOpts{Total: 100, PageCount: 1}, nil)
+	}).Return([]types.Commit{{ID: "c1", Message: `<img src=x onerror=alert(1)>`}}, &types.RepoPageOpts{Total: 100, PageCount: 1}, nil)
 	tester.WithParam("file_path", "foo")
 	tester.WithQuery("ref", "main")
 	tester.AddPagination(1, 10)
@@ -497,7 +497,7 @@ func TestRepoHandler_Commits(t *testing.T) {
 
 	tester.Execute()
 	tester.ResponseEq(t, http.StatusOK, tester.OKText, gin.H{
-		"commits":    []types.Commit{{ID: "c1"}},
+		"commits":    []types.Commit{{ID: "c1", Message: `&lt;img src=x onerror=alert(1)&gt;`}},
 		"total":      100,
 		"page_count": 1,
 	})
@@ -980,10 +980,10 @@ func TestRepoHandler_CommitWithDiff(t *testing.T) {
 			RepoType:    types.ModelRepo,
 			CurrentUser: "u",
 		},
-	).Return(&types.CommitResponse{Commit: &types.Commit{ID: "foo"}}, nil)
+	).Return(&types.CommitResponse{Commit: &types.Commit{ID: "foo", Message: `<script>alert(1)</script>`}}, nil)
 
 	tester.Execute()
-	tester.ResponseEq(t, 200, tester.OKText, &types.CommitResponse{Commit: &types.Commit{ID: "foo"}})
+	tester.ResponseEq(t, 200, tester.OKText, &types.CommitResponse{Commit: &types.Commit{ID: "foo", Message: `&lt;script&gt;alert(1)&lt;/script&gt;`}})
 }
 
 func TestRepoHandler_CreateMirror(t *testing.T) {
