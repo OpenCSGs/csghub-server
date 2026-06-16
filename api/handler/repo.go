@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"html"
 	"io"
 	"log/slog"
 	"net/http"
@@ -28,6 +29,25 @@ import (
 	"opencsg.com/csghub-server/component"
 	"opencsg.com/csghub-server/component/validator"
 )
+
+// escapeCommitMessageForOutput returns a copy with an HTML-escaped commit message for output only.
+func escapeCommitMessageForOutput(commit types.Commit) types.Commit {
+	commit.Message = html.EscapeString(commit.Message)
+	return commit
+}
+
+// escapeCommitResponseMessageForOutput returns a shallow copy with an HTML-escaped commit message for output only.
+func escapeCommitResponseMessageForOutput(commit *types.CommitResponse) *types.CommitResponse {
+	if commit == nil {
+		return nil
+	}
+	escapedCommit := *commit
+	if commit.Commit != nil {
+		commitCopy := escapeCommitMessageForOutput(*commit.Commit)
+		escapedCommit.Commit = &commitCopy
+	}
+	return &escapedCommit
+}
 
 func NewRepoHandler(config *config.Config) (*RepoHandler, error) {
 	uc, err := component.NewRepoComponent(config)
@@ -420,8 +440,12 @@ func (h *RepoHandler) Commits(ctx *gin.Context) {
 	}
 
 	slog.Debug("Get repo commits succeed", slog.String("repo_type", string(req.RepoType)), slog.String("name", name), slog.String("ref", req.Ref))
+	escapedCommits := make([]types.Commit, 0, len(commits))
+	for _, commit := range commits {
+		escapedCommits = append(escapedCommits, escapeCommitMessageForOutput(commit))
+	}
 	resData := gin.H{
-		"commits":    commits,
+		"commits":    escapedCommits,
 		"total":      pageOpt.Total,
 		"page_count": pageOpt.PageCount,
 	}
@@ -1381,7 +1405,7 @@ func (h *RepoHandler) CommitWithDiff(ctx *gin.Context) {
 	}
 	slog.Debug("Get repo commit with diff succeed", slog.String("repo_type", string(req.RepoType)), slog.String("name", name), slog.String("commit id", req.Ref))
 	// client need base64 decode for diff, for example: echo <diff> | base64 -d
-	httpbase.OK(ctx, commit)
+	httpbase.OK(ctx, escapeCommitResponseMessageForOutput(commit))
 }
 
 // CreateMirror godoc
