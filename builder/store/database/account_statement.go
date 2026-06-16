@@ -219,11 +219,18 @@ func (as *accountStatementStoreImpl) deductFeeStatement(ctx context.Context, inp
 		}
 		eventValue := input.Value
 		calcValue := eventValue - changed.Voucher
+		consumption := 0.0
+		if eventValue != 0 {
+			consumption = math.Abs(calcValue/eventValue) * input.Consumption
+		} else {
+			consumption = input.Consumption
+		}
+
 		err = updateFeeBill(ctx, tx, input, BillValues{
 			TotalValue:   calcValue,
 			VoucherValue: 0,
 			CashValue:    changed.Cash,
-			Consumption:  math.Abs(calcValue/eventValue) * input.Consumption,
+			Consumption:  consumption,
 		})
 
 		if err != nil {
@@ -516,11 +523,16 @@ func deductFeeToVoucher(ctx context.Context, tx bun.Tx, input AccountStatement, 
 		return remainValue, fmt.Errorf("update voucher id %d used amount error: %w", voucher.ID, err)
 	}
 
+	consumption := 0.0
+	if eventValue != 0 {
+		consumption = math.Abs(statementValue/eventValue) * input.Consumption
+	}
+
 	err = updateFeeBill(ctx, tx, input, BillValues{
 		TotalValue:   statementValue,
 		VoucherValue: statementValue,
 		CashValue:    0.0,
-		Consumption:  math.Abs(statementValue/eventValue) * input.Consumption,
+		Consumption:  consumption,
 	})
 	if err != nil {
 		return remainValue, fmt.Errorf("update voucher bill for voucher %s error: %w", input.VoucherNo, err)
