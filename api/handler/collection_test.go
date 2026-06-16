@@ -118,7 +118,8 @@ func TestCollectionHandler_UpdateCollection(t *testing.T) {
 
 	tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.Ctx(), &types.CreateCollectionReq{}).Return(true, nil)
 	tester.mocks.collection.EXPECT().UpdateCollection(tester.Ctx(), types.CreateCollectionReq{
-		ID: 1,
+		ID:       1,
+		Username: "u",
 	}).Return(&database.Collection{ID: 1}, nil)
 	tester.WithParam("id", "1").WithBody(t, &types.CreateCollectionReq{}).Execute()
 

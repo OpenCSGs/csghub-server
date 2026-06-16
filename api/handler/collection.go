@@ -193,10 +193,19 @@ func (c *CollectionHandler) UpdateCollection(ctx *gin.Context) {
 	}
 
 	req.ID = id
+	req.Username = httpbase.GetCurrentUser(ctx)
 
 	collection, err := c.collection.UpdateCollection(ctx.Request.Context(), *req)
 	if err != nil {
-		slog.ErrorContext(ctx.Request.Context(), "Failed to create space", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to update collection", slog.Any("error", err))
+		if errors.Is(err, errorx.ErrDatabaseNoRows) {
+			httpbase.NotFoundError(ctx, err)
+			return
+		}
+		if errors.Is(err, errorx.ErrForbidden) {
+			httpbase.ForbiddenError(ctx, err)
+			return
+		}
 		httpbase.ServerError(ctx, err)
 		return
 	}

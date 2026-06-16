@@ -183,8 +183,13 @@ func (cc *collectionComponentImpl) GetPublicRepos(collection types.Collection) [
 func (cc *collectionComponentImpl) UpdateCollection(ctx context.Context, input types.CreateCollectionReq) (*database.Collection, error) {
 	collection, err := cc.collectionStore.GetCollection(ctx, input.ID)
 	if err != nil {
-		return nil, fmt.Errorf("cannot find collection to update, %w", err)
+		return nil, err
 	}
+
+	if collection.Username != input.Username {
+		return nil, errorx.ErrForbiddenMsg("no permission to operate this collection")
+	}
+
 	collection.Name = input.Name
 	collection.Nickname = input.Nickname
 	collection.Description = input.Description

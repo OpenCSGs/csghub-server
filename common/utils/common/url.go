@@ -24,6 +24,41 @@ var unsafeHTTPHeaders = map[string]struct{}{
 	"upgrade":             {},
 }
 
+// ValidateImageURL checks that the URL is a valid absolute URL and its path
+// ends with an allowed image extension (.jpg, .jpeg, .png).
+func ValidateImageURL(urlString string) error {
+	if urlString == "" {
+		return fmt.Errorf("url is empty")
+	}
+
+	u, err := url.Parse(urlString)
+	if err != nil {
+		return fmt.Errorf("failed to parse url: %w", err)
+	}
+
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return fmt.Errorf("url scheme must be http or https")
+	}
+	if u.Host == "" {
+		return fmt.Errorf("url must have a host")
+	}
+
+	// Extract the path portion without query string and check extension
+	path := strings.ToLower(u.Path)
+	ext := ""
+	for _, candidate := range []string{".jpeg", ".jpg", ".png"} {
+		if strings.HasSuffix(path, candidate) {
+			ext = candidate
+			break
+		}
+	}
+	if ext == "" {
+		return fmt.Errorf("avatar url must end with .jpg, .jpeg, or .png")
+	}
+
+	return nil
+}
+
 func ValidateURLFormat(urlString string) error {
 	if urlString == "" {
 		return fmt.Errorf("url is empty")
