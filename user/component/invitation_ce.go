@@ -39,3 +39,7 @@ func (c *invitationComponentImpl) AwardCreditToInvitee(_ context.Context, _ type
 func (c *invitationComponentImpl) AwardCreditToInviter(_ context.Context, _ int64) error {
 	return nil
 }
+
+func (c *invitationComponentImpl) GetInvitationCode(_ context.Context, _ string) (string, error) {
+	return "", nil
+}
