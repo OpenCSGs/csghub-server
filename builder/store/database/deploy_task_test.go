@@ -1288,6 +1288,119 @@ func TestDeployTaskStore_GetClusterDeploys(t *testing.T) {
 	require.Equal(t, "user3", result[0].User.Username)
 }
 
+func TestDeployTaskStore_CountRunningDeploysByNodeName(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewDeployTaskStoreWithDB(db)
+
+	// Create deploys with different cluster_node configurations and statuses
+	deploys := []database.Deploy{
+		{
+			DeployName:  "deploy-node-a-b",
+			SvcName:     "svc-node-a-b",
+			RepoID:      1,
+			UserID:      1,
+			ClusterID:   "cluster-1",
+			ClusterNode: "node-a,node-b",
+			Status:      common.Running,
+			Type:        types.InferenceType,
+			GitPath:     "test",
+			GitBranch:   "main",
+			Template:    "test",
+		},
+		{
+			DeployName:  "deploy-node-a-only",
+			SvcName:     "svc-node-a-only",
+			RepoID:      2,
+			UserID:      1,
+			ClusterID:   "cluster-1",
+			ClusterNode: "node-a",
+			Status:      common.Running,
+			Type:        types.InferenceType,
+			GitPath:     "test",
+			GitBranch:   "main",
+			Template:    "test",
+		},
+		{
+			DeployName:  "deploy-node-b-only",
+			SvcName:     "svc-node-b-only",
+			RepoID:      3,
+			UserID:      1,
+			ClusterID:   "cluster-1",
+			ClusterNode: "node-b",
+			Status:      common.Running,
+			Type:        types.InferenceType,
+			GitPath:     "test",
+			GitBranch:   "main",
+			Template:    "test",
+		},
+		{
+			DeployName:  "deploy-node-a-stopped",
+			SvcName:     "svc-node-a-stopped",
+			RepoID:      4,
+			UserID:      1,
+			ClusterID:   "cluster-1",
+			ClusterNode: "node-a",
+			Status:      common.Stopped,
+			Type:        types.InferenceType,
+			GitPath:     "test",
+			GitBranch:   "main",
+			Template:    "test",
+		},
+		{
+			DeployName:  "deploy-node-a-deleted",
+			SvcName:     "svc-node-a-deleted",
+			RepoID:      5,
+			UserID:      1,
+			ClusterID:   "cluster-1",
+			ClusterNode: "node-a",
+			Status:      common.Deleted,
+			Type:        types.InferenceType,
+			GitPath:     "test",
+			GitBranch:   "main",
+			Template:    "test",
+		},
+		{
+			DeployName: "deploy-no-cluster-node",
+			SvcName:    "svc-no-cluster-node",
+			RepoID:     6,
+			UserID:     1,
+			ClusterID:  "cluster-1",
+			ClusterNode: "",
+			Status:     common.Running,
+			Type:       types.InferenceType,
+			GitPath:    "test",
+			GitBranch:  "main",
+			Template:   "test",
+		},
+	}
+
+	for _, dp := range deploys {
+		err := store.CreateDeploy(ctx, &dp)
+		require.Nil(t, err)
+	}
+
+	// Test 1: node-a has 2 running deploys (deploy-node-a-b and deploy-node-a-only)
+	count, err := store.CountRunningDeploysByNodeName(ctx, "node-a")
+	require.Nil(t, err)
+	require.Equal(t, 2, count)
+
+	// Test 2: node-b has 2 running deploys (deploy-node-a-b and deploy-node-b-only)
+	count, err = store.CountRunningDeploysByNodeName(ctx, "node-b")
+	require.Nil(t, err)
+	require.Equal(t, 2, count)
+
+	// Test 3: node-c has no running deploys
+	count, err = store.CountRunningDeploysByNodeName(ctx, "node-c")
+	require.Nil(t, err)
+	require.Equal(t, 0, count)
+
+	// Test 4: stopped and deleted deploys are not counted for node-a
+	// Already verified in Test 1 (only 2, not 4)
+}
+
 func TestDeployTaskStore_ListDeploysByTimeRange(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()

@@ -24,6 +24,63 @@ func (_m *MockDeployTaskStore) EXPECT() *MockDeployTaskStore_Expecter {
 	return &MockDeployTaskStore_Expecter{mock: &_m.Mock}
 }
 
+// CountRunningDeploysByNodeName provides a mock function with given fields: ctx, nodeName
+func (_m *MockDeployTaskStore) CountRunningDeploysByNodeName(ctx context.Context, nodeName string) (int, error) {
+	ret := _m.Called(ctx, nodeName)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CountRunningDeploysByNodeName")
+	}
+
+	var r0 int
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (int, error)); ok {
+		return rf(ctx, nodeName)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) int); ok {
+		r0 = rf(ctx, nodeName)
+	} else {
+		r0 = ret.Get(0).(int)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, nodeName)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockDeployTaskStore_CountRunningDeploysByNodeName_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CountRunningDeploysByNodeName'
+type MockDeployTaskStore_CountRunningDeploysByNodeName_Call struct {
+	*mock.Call
+}
+
+// CountRunningDeploysByNodeName is a helper method to define mock.On call
+//   - ctx context.Context
+//   - nodeName string
+func (_e *MockDeployTaskStore_Expecter) CountRunningDeploysByNodeName(ctx interface{}, nodeName interface{}) *MockDeployTaskStore_CountRunningDeploysByNodeName_Call {
+	return &MockDeployTaskStore_CountRunningDeploysByNodeName_Call{Call: _e.mock.On("CountRunningDeploysByNodeName", ctx, nodeName)}
+}
+
+func (_c *MockDeployTaskStore_CountRunningDeploysByNodeName_Call) Run(run func(ctx context.Context, nodeName string)) *MockDeployTaskStore_CountRunningDeploysByNodeName_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockDeployTaskStore_CountRunningDeploysByNodeName_Call) Return(_a0 int, _a1 error) *MockDeployTaskStore_CountRunningDeploysByNodeName_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockDeployTaskStore_CountRunningDeploysByNodeName_Call) RunAndReturn(run func(context.Context, string) (int, error)) *MockDeployTaskStore_CountRunningDeploysByNodeName_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // CreateDeploy provides a mock function with given fields: ctx, deploy
 func (_m *MockDeployTaskStore) CreateDeploy(ctx context.Context, deploy *database.Deploy) error {
 	ret := _m.Called(ctx, deploy)
