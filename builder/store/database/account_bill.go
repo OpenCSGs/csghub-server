@@ -34,24 +34,25 @@ func NewAccountBillStoreWithDB(db *DB) AccountBillStore {
 }
 
 type AccountBill struct {
-	ID              int64           `bun:",pk,autoincrement" json:"id"`
-	BillDate        time.Time       `bun:"type:date" json:"bill_date"`
-	UserUUID        string          `bun:",notnull" json:"user_uuid"`
-	Scene           types.SceneType `bun:",notnull" json:"scene"`
-	CustomerID      string          `bun:",notnull" json:"customer_id"`
-	Value           float64         `bun:",notnull" json:"value"`
-	Consumption     float64         `bun:",notnull" json:"consumption"`
-	PromptToken     float64         `bun:",notnull" json:"prompt_token"`
-	CompletionToken float64         `bun:",notnull" json:"completion_token"`
-	APIKey          string          `bun:",notnull,default:''" json:"api_key"`
-	Count           float64         `bun:",notnull,default:0" json:"count"`
-	TokenID         int64           `bun:",notnull,default:0" json:"token_id"`
-	DataType        string          `bun:",notnull,default:''" json:"data_type"`
-	Resolution      string          `bun:",notnull,default:''" json:"resolution"`
-	Duration        float64         `bun:",notnull,default:0" json:"duration"`
-	VoucherNo       string          `bun:",notnull,default:''" json:"voucher_no"`
-	VoucherValue    float64         `bun:",notnull,default:0" json:"voucher_value"`
-	CashValue       float64         `bun:",notnull,default:0" json:"cash_value"`
+	ID              int64             `bun:",pk,autoincrement" json:"id"`
+	BillDate        time.Time         `bun:"type:date" json:"bill_date"`
+	UserUUID        string            `bun:",notnull" json:"user_uuid"`
+	Scene           types.SceneType   `bun:",notnull" json:"scene"`
+	CustomerID      string            `bun:",notnull" json:"customer_id"`
+	Value           float64           `bun:",notnull" json:"value"`
+	Consumption     float64           `bun:",notnull" json:"consumption"`
+	PromptToken     float64           `bun:",notnull" json:"prompt_token"`
+	CompletionToken float64           `bun:",notnull" json:"completion_token"`
+	APIKey          string            `bun:",notnull,default:''" json:"api_key"`
+	Count           float64           `bun:",notnull,default:0" json:"count"`
+	TokenID         int64             `bun:",notnull,default:0" json:"token_id"`
+	DataType        string            `bun:",notnull,default:''" json:"data_type"`
+	Resolution      string            `bun:",notnull,default:''" json:"resolution"`
+	Duration        float64           `bun:",notnull,default:0" json:"duration"`
+	VoucherNo       string            `bun:",notnull,default:''" json:"voucher_no"`
+	VoucherValue    float64           `bun:",notnull,default:0" json:"voucher_value"`
+	CashValue       float64           `bun:",notnull,default:0" json:"cash_value"`
+	UnitType        types.SkuUnitType `bun:",notnull,default:''" json:"unit_type"`
 	times
 }
 
@@ -67,6 +68,10 @@ type TotalResult struct {
 	TotalConsumption     float64 `bun:"total_consumption"`
 	TotalPromptToken     float64 `bun:"total_prompt_token"`
 	TotalCompletionToken float64 `bun:"total_completion_token"`
+	TotalVoucherValue    float64 `bun:"total_voucher_value"`
+	TotalCashValue       float64 `bun:"total_cash_value"`
+	TotalDuration        float64 `bun:"total_duration"`
+	TotalCount           float64 `bun:"total_count"`
 }
 
 type AccountBillRes struct {
@@ -83,11 +88,22 @@ func (s *accountBillStoreImpl) ListByUserIDAndDate(ctx context.Context, req type
 	var bill []AccountBill
 	var res []types.ITEM
 	q := s.db.Operator.Core.NewSelect().Model(&bill).
-		ColumnExpr("customer_id as instance_name, sum(value) as value, sum(consumption) as consumption, sum(prompt_token) as prompt_token, sum(completion_token) as completion_token, sum(voucher_value) as voucher_value, sum(cash_value) as cash_value").
+		ColumnExpr("customer_id as instance_name").
+		ColumnExpr("data_type").
+		ColumnExpr("resolution").
+		ColumnExpr("unit_type").
+		ColumnExpr("sum(value) as value").
+		ColumnExpr("sum(consumption) as consumption").
+		ColumnExpr("sum(prompt_token) as prompt_token").
+		ColumnExpr("sum(completion_token) as completion_token").
+		ColumnExpr("sum(voucher_value) as voucher_value").
+		ColumnExpr("sum(cash_value) as cash_value").
+		ColumnExpr("sum(duration) as duration").
+		ColumnExpr("sum(count) as count").
 		Where("bill_date >= ? and bill_date <= ?", req.StartDate, req.EndDate).
 		Where("user_uuid = ?", req.TargetUUID).
 		Where("scene = ?", req.Scene).
-		Group("customer_id")
+		Group("customer_id", "data_type", "resolution", "unit_type")
 
 	count, err := q.Count(ctx)
 	if err != nil {
@@ -96,7 +112,16 @@ func (s *accountBillStoreImpl) ListByUserIDAndDate(ctx context.Context, req type
 
 	var totalResult TotalResult
 
-	err = s.db.Operator.Core.NewSelect().With("grouped_items", q).TableExpr("grouped_items").ColumnExpr("SUM(value) AS total_value, SUM(consumption) as total_consumption, SUM(prompt_token) as total_prompt_token, SUM(completion_token) as total_completion_token").Scan(ctx, &totalResult)
+	err = s.db.Operator.Core.NewSelect().With("grouped_items", q).TableExpr("grouped_items").
+		ColumnExpr("SUM(value) AS total_value").
+		ColumnExpr("SUM(consumption) as total_consumption").
+		ColumnExpr("SUM(prompt_token) as total_prompt_token").
+		ColumnExpr("SUM(completion_token) as total_completion_token").
+		ColumnExpr("SUM(voucher_value) as total_voucher_value").
+		ColumnExpr("SUM(cash_value) as total_cash_value").
+		ColumnExpr("SUM(duration) as total_duration").
+		ColumnExpr("SUM(count) as total_count").
+		Scan(ctx, &totalResult)
 	if err != nil {
 		return AccountBillRes{}, errorx.HandleDBError(err, nil)
 	}
@@ -113,6 +138,10 @@ func (s *accountBillStoreImpl) ListByUserIDAndDate(ctx context.Context, req type
 			TotalConsumption:     totalResult.TotalConsumption,
 			TotalPromptToken:     totalResult.TotalPromptToken,
 			TotalCompletionToken: totalResult.TotalCompletionToken,
+			TotalVoucherValue:    totalResult.TotalVoucherValue,
+			TotalCashValue:       totalResult.TotalCashValue,
+			TotalDuration:        totalResult.TotalDuration,
+			TotalCount:           totalResult.TotalCount,
 		},
 	}, err
 }

@@ -580,10 +580,13 @@ func updateFeeBill(ctx context.Context, tx bun.Tx, input AccountStatement, billV
 		VoucherValue:    billValues.VoucherValue,
 		CashValue:       billValues.CashValue,
 	}
+	if input.Scene == types.SceneMultiModalServerless {
+		bill.UnitType = input.SkuUnitType
+	}
 
 	// depend on unique index for update
 	_, err := tx.NewInsert().Model(&bill).
-		On("CONFLICT (bill_date, user_uuid, scene, customer_id, token_id, data_type, resolution, voucher_no) DO UPDATE").
+		On("CONFLICT (bill_date, user_uuid, scene, customer_id, token_id, data_type, resolution, voucher_no, unit_type) DO UPDATE").
 		Set("value = account_bill.value + ?", input.Value).
 		Set("consumption = account_bill.consumption + ?", billValues.Consumption).
 		Set("prompt_token = account_bill.prompt_token + ?", input.PromptToken).
