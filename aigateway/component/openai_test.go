@@ -176,6 +176,17 @@ func TestFilterAndPaginateModels(t *testing.T) {
 		assert.Equal(t, "model-2", resp.Data[0].ID)
 	})
 
+	t.Run("task filter image-to-image", func(t *testing.T) {
+		modelsWithTask := []types.Model{
+			{BaseModel: types.BaseModel{ID: "model-1", Object: "model", OwnedBy: "u1", Task: "text-to-image"}},
+			{BaseModel: types.BaseModel{ID: "model-2", Object: "model", OwnedBy: "u1", Task: "image-to-image"}},
+		}
+		resp := filterAndPaginateModels(modelsWithTask, types.ListModelsReq{Task: "image-to-image"})
+		assert.Equal(t, 1, resp.TotalCount)
+		assert.Len(t, resp.Data, 1)
+		assert.Equal(t, "model-2", resp.Data[0].ID)
+	})
+
 	t.Run("task filter is case-insensitive", func(t *testing.T) {
 		modelsWithTask := []types.Model{
 			{BaseModel: types.BaseModel{ID: "model-1", Object: "model", OwnedBy: "u1", Task: "Text-Generation"}},

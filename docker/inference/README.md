@@ -91,6 +91,20 @@ docker buildx build --platform linux/amd64,linux/arm64 \
   -t ${OPENCSG_ACR}/opencsghq/funasr-cpu:${IMAGE_TAG} \
   -f Dockerfile.funasr-cpu \
   --push .
+# For Diffusers image editing: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/diffusers:0.38.0
+export IMAGE_TAG=0.38.0
+docker buildx build --platform linux/amd64 \
+  -t ${OPENCSG_ACR}/opencsghq/diffusers:${IMAGE_TAG} \
+  -t ${OPENCSG_ACR}/opencsghq/diffusers:latest \
+  -f Dockerfile.diffusers \
+  --push .
+# For Diffusers image editing ROCm: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/diffusers-rocm:0.38.0
+export IMAGE_TAG=0.38.0
+docker buildx build --platform linux/amd64 \
+  -t ${OPENCSG_ACR}/opencsghq/diffusers-rocm:${IMAGE_TAG} \
+  -t ${OPENCSG_ACR}/opencsghq/diffusers-rocm:latest \
+  -f Dockerfile.diffusers-rocm \
+  --push .
 # For Text Embeddings Inference: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/tei:cpu-1.6
 export IMAGE_TAG=cpu-1.6
 docker buildx build --platform linux/amd64 \
@@ -168,10 +182,29 @@ curl --max-time 600 -X POST http://127.0.0.1:8000/v1/audio/transcriptions \
   -F "file=@/path/to/audio.mp3" \
   -F "model=local" \
   -F "response_format=text"
+
+# Run image editing with a CSGHub Diffusers model
+docker run -d \
+  --name diffusers-test \
+  --gpus device=0 \
+  -p 8000:8000 \
+  -e REPO_ID="Qwen/Qwen-Image-Edit" \
+  -e REVISION="main" \
+  -e ACCESS_TOKEN="xxx" \
+  -e HF_ENDPOINT="https://hub.opencsg.com" \
+  opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/diffusers:0.38.0
+
+# Call OpenAI-compatible image edit API
+curl --max-time 600 -X POST http://127.0.0.1:8000/v1/images/edits \
+  -F "model=local" \
+  -F "prompt=make the sky sunset orange" \
+  -F "image=@/path/to/input.png" \
+  -F "response_format=b64_json"
 ```
 *Note: HF_ENDPOINT should be use the real csghub address.*
 *Note: FunASR downloads `REPO_ID` to `/workspace/${REPO_ID}` and preloads that local model at startup. The OpenAI-compatible `model` field can use `local`, the repo id, or the repo name.*
 *Note: FunASR enables VAD chunking by default for long audio with `FUNASR_VAD_MODEL=fsmn-vad`, `FUNASR_VAD_MAX_SINGLE_SEGMENT_TIME=30000`, `FUNASR_BATCH_SIZE_S=60`, and `FUNASR_BATCH_SIZE_THRESHOLD_S=30`. Set `FUNASR_VAD_MODEL=none` to disable VAD.*
+*Note: Diffusers image editing uses the same PyTorch CUDA 12.8 base image as FunASR and downloads `REPO_ID` to `/workspace/${REPO_ID}` before loading the local Diffusers pipeline. The image pins `diffusers==0.38.0` with `transformers==4.57.6` for Qwen Image and other recent pipelines.*
 
 ## inference image name, version and cuda version
 | Task| Image Name | Version | CUDA Version | Fix
@@ -185,6 +218,8 @@ curl --max-time 600 -X POST http://127.0.0.1:8000/v1/audio/transcriptions \
 |speech recognition| funasr | cuda12.8 | 12.8 |-|
 |speech recognition| funasr-rocm | rocm7.2.2 | - |-|
 |speech recognition| funasr-cpu | latest | - |-|
+|image editing| diffusers | 0.38.0 | 12.8 |diffusers 0.38.0, transformers 4.57.6|
+|image editing| diffusers-rocm | 0.38.0 | - |diffusers 0.38.0, transformers 4.57.6, ROCm 7.2.2|
 |text generation| sglang | v0.4.6.post1-cu124-srt| 12.4 |- |
 |text generation| mindie | 2.0-csg-1.0.RC2 | 1.0.RC2 |- |
 |text generation| llama.cpp | b5215 | - |- |

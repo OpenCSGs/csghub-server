@@ -37,6 +37,13 @@ func TestShouldSkipBenchmark(t *testing.T) {
 
 	shouldSkip, reason = ShouldSkipBenchmark(types.DeployRequest{
 		Endpoint: "http://example.com",
+		Task:     string(types.Image2Image),
+	})
+	require.True(t, shouldSkip)
+	require.Contains(t, reason, "unsupported task type")
+
+	shouldSkip, reason = ShouldSkipBenchmark(types.DeployRequest{
+		Endpoint: "http://example.com",
 		Task:     string(types.Image2Video),
 	})
 	require.True(t, shouldSkip)
