@@ -70,6 +70,7 @@ func TestOpenAIComponent_GetAvailableModels(t *testing.T) {
 				SecureLevel: commontypes.EndpointPublic,
 				Repository: &database.Repository{
 					HFPath: "hf-model2",
+					Path:   "model2",
 				},
 				User: &database.User{
 					Username: "serverless-owner",
@@ -84,7 +85,7 @@ func TestOpenAIComponent_GetAvailableModels(t *testing.T) {
 
 		mockDeployStore.EXPECT().RunningVisibleToUser(mock.Anything, int64(0)).
 			Return(deploys, nil).Once()
-		mockLLMConfigStore.EXPECT().Index(mock.Anything, 50, 1, mock.Anything).
+		mockLLMConfigStore.EXPECT().IndexWithRepo(mock.Anything, 50, 1, mock.Anything).
 			Return([]*database.LLMConfig{}, 0, nil)
 
 		var wg sync.WaitGroup
@@ -104,8 +105,10 @@ func TestOpenAIComponent_GetAvailableModels(t *testing.T) {
 		require.Len(t, models, 2)
 		assert.Equal(t, "model1:svc1", models[0].ID)
 		assert.Equal(t, "publicuser", models[0].OwnedBy)
+		assert.Equal(t, "model1", models[0].Metadata[types.MetaKeyRepoPath])
 		assert.Equal(t, "hf-model2:svc2", models[1].ID)
 		assert.Equal(t, "OpenCSG", models[1].OwnedBy)
+		assert.Equal(t, "model2", models[1].Metadata[types.MetaKeyRepoPath])
 		wg.Wait()
 	})
 
@@ -117,7 +120,7 @@ func TestOpenAIComponent_GetAvailableModels(t *testing.T) {
 		}
 		mockUserStore.EXPECT().FindByUsername(mock.Anything, "testuser").
 			Return(*user, nil).Once()
-		mockLLMConfigStore.EXPECT().Index(mock.Anything, 50, 1, mock.Anything).
+		mockLLMConfigStore.EXPECT().IndexWithRepo(mock.Anything, 50, 1, mock.Anything).
 			Return([]*database.LLMConfig{}, 0, nil)
 		now := time.Now()
 		deploys := []database.Deploy{
@@ -145,6 +148,7 @@ func TestOpenAIComponent_GetAvailableModels(t *testing.T) {
 				SecureLevel: commontypes.EndpointPublic,
 				Repository: &database.Repository{
 					HFPath: "hf-model2",
+					Path:   "model2",
 				},
 				User: &database.User{
 					Username: "testuser",
@@ -179,12 +183,14 @@ func TestOpenAIComponent_GetAvailableModels(t *testing.T) {
 		assert.Equal(t, "testuser", models[0].OwnedBy)
 		assert.Equal(t, "endpoint1", models[0].Endpoint)
 		assert.Equal(t, "text-generation", models[0].Task)
+		assert.Equal(t, "model1", models[0].Metadata[types.MetaKeyRepoPath])
 
 		// Verify second model (serverless)
 		assert.Equal(t, "hf-model2:svc2", models[1].ID)
 		assert.Equal(t, "OpenCSG", models[1].OwnedBy)
 		assert.Equal(t, "endpoint2", models[1].Endpoint)
 		assert.Equal(t, "text-to-image", models[1].Task)
+		assert.Equal(t, "model2", models[1].Metadata[types.MetaKeyRepoPath])
 		wg.Wait()
 	})
 
@@ -196,7 +202,7 @@ func TestOpenAIComponent_GetAvailableModels(t *testing.T) {
 		}
 		mockUserStore.EXPECT().FindByUsername(mock.Anything, "testuser").
 			Return(*user, nil).Once()
-		mockLLMConfigStore.EXPECT().Index(mock.Anything, 50, 1, mock.Anything).
+		mockLLMConfigStore.EXPECT().IndexWithRepo(mock.Anything, 50, 1, mock.Anything).
 			Return([]*database.LLMConfig{}, 0, nil)
 
 		now := time.Now()
@@ -294,7 +300,7 @@ func TestOpenAIComponent_GetAvailableModels_CacheUsesModelSnapshot(t *testing.T)
 
 	mockDeployStore.EXPECT().RunningVisibleToUser(mock.Anything, int64(0)).
 		Return(deploys, nil).Once()
-	mockLLMConfigStore.EXPECT().Index(mock.Anything, 50, 1, mock.Anything).
+	mockLLMConfigStore.EXPECT().IndexWithRepo(mock.Anything, 50, 1, mock.Anything).
 		Return([]*database.LLMConfig{}, 0, nil).Once()
 
 	firstWriteStarted := make(chan struct{})
@@ -367,7 +373,7 @@ func TestOpenAIComponent_ListModels_CacheUsesOriginalID(t *testing.T) {
 		SortBy:    "model_size_b",
 		SortOrder: "desc",
 	}
-	mockLLMConfigStore.EXPECT().Index(mock.Anything, 50, 1, search).
+	mockLLMConfigStore.EXPECT().IndexWithRepo(mock.Anything, 50, 1, search).
 		Return([]*database.LLMConfig{
 			{
 				ID:                 1,
@@ -463,7 +469,7 @@ func TestOpenAIComponent_GetModelByID(t *testing.T) {
 			Return(*user, nil)
 		mockCache.EXPECT().Exists(mock.Anything, modelCacheKey).
 			Return(0, nil).Once()
-		mockLLMConfigStore.EXPECT().Index(mock.Anything, 50, 1, mock.Anything).
+		mockLLMConfigStore.EXPECT().IndexWithRepo(mock.Anything, 50, 1, mock.Anything).
 			Return([]*database.LLMConfig{}, 0, nil).Once()
 		now := time.Now()
 		deploys := []database.Deploy{
@@ -513,7 +519,7 @@ func TestOpenAIComponent_GetModelByID(t *testing.T) {
 			Return("", redis.Nil).Once()
 		// Cache miss: GetModelByID falls through to GetAvailableModels, which calls getCSGHubModels and getExternalModels
 		mockDeployStore.EXPECT().RunningVisibleToUser(mock.Anything, int64(1)).Return([]database.Deploy{}, nil).Once()
-		mockLLMConfigStore.EXPECT().Index(mock.Anything, 50, 1, mock.Anything).
+		mockLLMConfigStore.EXPECT().IndexWithRepo(mock.Anything, 50, 1, mock.Anything).
 			Return([]*database.LLMConfig{}, 0, nil).Once()
 		model, err := comp.GetModelByID(context.Background(), "testuser", "nonexistent:svc")
 		assert.NoError(t, err)
@@ -540,7 +546,7 @@ func TestOpenAIComponent_GetModelByID(t *testing.T) {
 			SortBy:    "model_size_b",
 			SortOrder: "desc",
 		}
-		mockLLMConfigStore.EXPECT().Index(mock.Anything, 50, 1, search).
+		mockLLMConfigStore.EXPECT().IndexWithRepo(mock.Anything, 50, 1, search).
 			Return([]*database.LLMConfig{
 				{
 					ID:        1,
@@ -639,7 +645,7 @@ func TestOpenAIComponent_GetModelByID(t *testing.T) {
 			SortBy:    "model_size_b",
 			SortOrder: "desc",
 		}
-		mockLLMConfigStore.EXPECT().Index(mock.Anything, 50, 1, search).
+		mockLLMConfigStore.EXPECT().IndexWithRepo(mock.Anything, 50, 1, search).
 			Return([]*database.LLMConfig{
 				{
 					ID:        1,
@@ -685,10 +691,10 @@ func TestOpenAIComponent_saveModelsToCache(t *testing.T) {
 				},
 				Endpoint: "http://test-endpoint",
 				ExternalModelInfo: types.ExternalModelInfo{
-				Provider:           "openai",
-				AuthHead:           "Bearer test-token",
-				NeedSensitiveCheck: true,
-			},
+					Provider:           "openai",
+					AuthHead:           "Bearer test-token",
+					NeedSensitiveCheck: true,
+				},
 			},
 		}
 
@@ -794,7 +800,7 @@ func TestOpenAIComponent_ExtGetAvailableModels_Error(t *testing.T) {
 		SortBy:    "model_size_b",
 		SortOrder: "desc",
 	}
-	mockLLMConfigStore.EXPECT().Index(ctx, 50, 1, search).
+	mockLLMConfigStore.EXPECT().IndexWithRepo(ctx, 50, 1, search).
 		Return(nil, 0, errors.New("test error")).Once()
 	user := &database.User{
 		ID:       1,
@@ -823,6 +829,9 @@ func TestOpenAIComponent_ExtGetAvailableModels_SinglePage(t *testing.T) {
 		extllmStore:    mockLLMConfigStore,
 		modelListCache: mockCache,
 	}
+	originalMetadata := map[string]any{
+		types.MetaKeyTasks: []any{"text-generation", "text-to-image"},
+	}
 	mockModels := []*database.LLMConfig{
 		{
 			ID:        1,
@@ -830,6 +839,13 @@ func TestOpenAIComponent_ExtGetAvailableModels_SinglePage(t *testing.T) {
 			Type:      16,
 			Enabled:   true,
 			Provider:  "OpenAI",
+			Metadata:  originalMetadata,
+			RepoID:    100,
+			Repo: &database.Repository{
+				ID:      100,
+				Path:    "test-ns/test-model-1",
+				GitPath: "models/test-ns/test-model-1",
+			},
 		},
 	}
 	user := &database.User{
@@ -848,7 +864,7 @@ func TestOpenAIComponent_ExtGetAvailableModels_SinglePage(t *testing.T) {
 		SortBy:    "model_size_b",
 		SortOrder: "desc",
 	}
-	mockLLMConfigStore.EXPECT().Index(ctx, 50, 1, search).Return(mockModels, 1, nil)
+	mockLLMConfigStore.EXPECT().IndexWithRepo(ctx, 50, 1, search).Return(mockModels, 1, nil)
 	mockCache.EXPECT().HSet(mock.Anything, modelCacheKey, "test-model-1", mock.Anything).
 		Return(nil).Once()
 	var wg sync.WaitGroup
@@ -863,5 +879,44 @@ func TestOpenAIComponent_ExtGetAvailableModels_SinglePage(t *testing.T) {
 	require.Nil(t, err)
 	require.Len(t, models, 1)
 	require.Equal(t, "test-model-1", models[0].ID)
+	require.Equal(t, "text-generation,text-to-image", models[0].Task)
+	require.Equal(t, "test-ns/test-model-1", models[0].Metadata[types.MetaKeyRepoPath])
+	require.Equal(t, types.ProviderTypeExternalLLM, models[0].Metadata[types.MetaKeyLLMType])
+	require.NotContains(t, originalMetadata, types.MetaKeyRepoPath)
+	require.NotContains(t, originalMetadata, types.MetaKeyLLMType)
 	wg.Wait()
+}
+
+func TestOpenAIComponent_GetExternalModelsWithoutRepoOmitsRepoPath(t *testing.T) {
+	ctx := context.Background()
+	mockLLMConfigStore := mockdb.NewMockLLMConfigStore(t)
+	component := &openaiComponentImpl{
+		extllmStore: mockLLMConfigStore,
+	}
+	searchType := 16
+	enabled := true
+	search := &commontypes.SearchLLMConfig{
+		Type:      &searchType,
+		Enabled:   &enabled,
+		SortBy:    "model_size_b",
+		SortOrder: "desc",
+	}
+	mockLLMConfigStore.EXPECT().IndexWithRepo(ctx, 50, 1, search).Return([]*database.LLMConfig{
+		{
+			ID:        1,
+			ModelName: "model-without-repo",
+			Type:      16,
+			Enabled:   true,
+			Provider:  "OpenAI",
+			Metadata:  map[string]any{"existing": "value"},
+		},
+	}, 1, nil).Once()
+
+	models := component.getExternalModels(ctx)
+
+	require.Len(t, models, 1)
+	require.Equal(t, "model-without-repo", models[0].ID)
+	require.Equal(t, "value", models[0].Metadata["existing"])
+	require.Equal(t, types.ProviderTypeExternalLLM, models[0].Metadata[types.MetaKeyLLMType])
+	require.NotContains(t, models[0].Metadata, types.MetaKeyRepoPath)
 }

@@ -189,17 +189,30 @@ func filterByModelID(query string) modelFilter {
 	}
 }
 
-func filterBySource(source string) modelFilter {
+func filterByLLMTypes(llmTypes []string) modelFilter {
+	allowedTypes := parseLLMTypes(llmTypes)
 	return func(m *types.Model) bool {
-		switch source {
-		case string(types.ModelSourceCSGHub):
-			return m.CSGHubModelID != ""
-		case string(types.ModelSourceExternal):
-			return m.Provider != ""
-		default:
+		if len(allowedTypes) == 0 {
 			return true
 		}
+		if m == nil || m.Metadata == nil {
+			return false
+		}
+		llmType, _ := m.Metadata[types.MetaKeyLLMType].(string)
+		return allowedTypes[strings.ToLower(strings.TrimSpace(llmType))]
 	}
+}
+
+func parseLLMTypes(llmTypes []string) map[string]bool {
+	allowedTypes := make(map[string]bool)
+	for _, rawType := range llmTypes {
+		llmType := strings.ToLower(strings.TrimSpace(rawType))
+		if llmType == "" {
+			continue
+		}
+		allowedTypes[llmType] = true
+	}
+	return allowedTypes
 }
 
 func filterByTask(task string) modelFilter {
@@ -233,13 +246,13 @@ func applyFilters(models []types.Model, filters []modelFilter) []types.Model {
 }
 
 func filterAndPaginateModels(models []types.Model, req types.ListModelsReq) types.ModelList {
-	var filters []modelFilter
+	filters := modelListDefaultFilters()
 
 	if searchQuery := strings.ToLower(req.ModelID); searchQuery != "" {
 		filters = append(filters, filterByModelID(searchQuery))
 	}
-	if source := strings.ToLower(req.Source); source != "" {
-		filters = append(filters, filterBySource(source))
+	if len(req.LLMTypes) > 0 {
+		filters = append(filters, filterByLLMTypes(req.LLMTypes))
 	}
 	if task := strings.ToLower(req.Task); task != "" {
 		filters = append(filters, filterByTask(task))
@@ -328,7 +341,8 @@ func (c *openaiComponentImpl) getCSGHubModels(ctx context.Context, userID int64)
 				SupportFunctionCall: supportFunctionCall,
 				Task:                string(deploy.Task),
 				Metadata: map[string]any{
-					types.MetaKeyLLMType: providerTypeFromDeployType(deploy.Type),
+					types.MetaKeyLLMType:  providerTypeFromDeployType(deploy.Type),
+					types.MetaKeyRepoPath: deploy.Repository.Path,
 				},
 			},
 			InternalModelInfo: types.InternalModelInfo{
@@ -375,30 +389,35 @@ func (m *openaiComponentImpl) getExternalModels(c context.Context) []types.Model
 	page := 1
 	var models []types.Model
 	for {
-		extModels, _, err := m.extllmStore.Index(c, per, page, search)
+		extModels, _, err := m.extllmStore.IndexWithRepo(c, per, page, search)
 		if err != nil {
 			slog.Error("failed to get external models", "error", err)
 			break
 		}
 
 		for _, extModel := range extModels {
-			// Extract tasks from metadata if present
+			metadata := maps.Clone(extModel.Metadata)
+			if metadata == nil {
+				metadata = map[string]any{}
+			}
 			task := ""
-			if extModel.Metadata != nil {
-				if tasks, ok := extModel.Metadata[types.MetaKeyTasks].([]any); ok && len(tasks) > 0 {
-					tasksStrings := make([]string, 0, len(tasks))
-					for _, t := range tasks {
-						if s, ok := t.(string); ok {
-							tasksStrings = append(tasksStrings, s)
-						}
+			if tasks, ok := metadata[types.MetaKeyTasks].([]any); ok && len(tasks) > 0 {
+				tasksStrings := make([]string, 0, len(tasks))
+				for _, t := range tasks {
+					if s, ok := t.(string); ok {
+						tasksStrings = append(tasksStrings, s)
 					}
-					task = strings.Join(tasksStrings, ",")
+				}
+				task = strings.Join(tasksStrings, ",")
+			}
+			if extModel.RepoID != 0 {
+				if extModel.Repo != nil && extModel.Repo.Path != "" {
+					metadata[types.MetaKeyRepoPath] = extModel.Repo.Path
+				} else {
+					slog.WarnContext(c, "llm config repo relation unavailable", "llm_config_id", extModel.ID, "repo_id", extModel.RepoID)
 				}
 			}
-			if extModel.Metadata == nil {
-				extModel.Metadata = map[string]any{}
-			}
-			extModel.Metadata[types.MetaKeyLLMType] = types.ProviderTypeExternalLLM
+			metadata[types.MetaKeyLLMType] = types.ProviderTypeExternalLLM
 			// Convert relational upstreams to types.UpstreamConfig for routing
 			upstreams := dbUpstreamsToConfigs(extModel.Upstreams)
 			provider := extModel.PrimaryProvider()
@@ -407,7 +426,7 @@ func (m *openaiComponentImpl) getExternalModels(c context.Context) []types.Model
 					Object:   "model",
 					ID:       extModel.ModelName,
 					OwnedBy:  provider,
-					Metadata: extModel.Metadata,
+					Metadata: metadata,
 					Task:     task,
 				},
 				Endpoint:      router.FirstEnabledUpstream(upstreams),

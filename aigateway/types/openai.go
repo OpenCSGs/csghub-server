@@ -15,9 +15,11 @@ const (
 
 // Metadata key constants used when enriching model metadata.
 const (
-	MetaKeyLLMType = "llm_type"
-	MetaKeyPricing = "pricing"
-	MetaKeyTasks   = "tasks"
+	MetaKeyLLMType           = "llm_type"
+	MetaKeyPricing           = "pricing"
+	MetaKeyPricingConfigured = "pricing_configured"
+	MetaKeyRepoPath          = "repo_path"
+	MetaKeyTasks             = "tasks"
 )
 
 // Resource ID format strings for external LLM (model ID) and CSGHub internal (path segment, repo path).
@@ -275,11 +277,11 @@ type ModelList struct {
 // Fields are passed as strings so the component layer can own parsing,
 // filtering, and pagination behavior consistently.
 type ListModelsReq struct {
-	ModelID string `json:"model_id"`
-	Per     string `json:"per"`
-	Page    string `json:"page"`
-	Source  string `json:"source"` // filter by source (csghub for CSGHub models, external for external models)
-	Task    string `json:"task"`   // filter by task
+	ModelID  string   `json:"model_id"`
+	Per      string   `json:"per"`
+	Page     string   `json:"page"`
+	LLMTypes []string `json:"llm_types"` // filter by llm_type
+	Task     string   `json:"task"`      // filter by task
 }
 
 // UserPreferenceRequest defines the request parameters for UserPreference method
@@ -297,20 +299,10 @@ const (
 	MetaTaskValGuard = "guard"
 )
 
-// ModelSource represents the source of a model
-type ModelSource string
-
-const (
-	// ModelSourceCSGHub represents models from CSGHub (internal models)
-	ModelSourceCSGHub ModelSource = "csghub"
-	// ModelSourceExternal represents models from external providers
-	ModelSourceExternal ModelSource = "external"
-)
-
 // ModelTokenPrice is currency plus per-million-token rate (major units, from accounting cents + sku_unit).
 type ModelTokenPrice struct {
-	Currency        string  `json:"currency,omitempty"`
-	PricePerMillion float64 `json:"price_per_million,omitempty"`
+	Currency        string  `json:"currency"`
+	PricePerMillion float64 `json:"price_per_million"`
 }
 
 // ModelModalPrice is a unit-based media generation price.

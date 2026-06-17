@@ -118,6 +118,16 @@ func newInvalidRequestModelTargetError(code, message string, options modelTarget
 	})
 }
 
+func newServerModelTargetError(code, message string, options modelTargetErrorOptions) *modelTargetError {
+	return newModelTargetError(modelTargetErrorParams{
+		Status:  http.StatusInternalServerError,
+		Code:    code,
+		Message: message,
+		Type:    "server_error",
+		Options: options,
+	})
+}
+
 func (h *OpenAIHandlerImpl) resolveModelTarget(ctx context.Context, username, modelID string, headers http.Header) (*resolvedModelTarget, error) {
 	model, err := h.openaiComponent.GetModelByID(ctx, username, modelID)
 	if err != nil {
@@ -125,6 +135,14 @@ func (h *OpenAIHandlerImpl) resolveModelTarget(ctx context.Context, username, mo
 	}
 	if model == nil {
 		return nil, newInvalidRequestModelTargetError("model_not_found", fmt.Sprintf("model '%s' not found", modelID), modelTargetErrorOptions{})
+	}
+	requiresSKUPrice, hasConfiguredSKUPrice := modelSKUPriceStatus(model)
+	if requiresSKUPrice && !hasConfiguredSKUPrice {
+		return nil, newServerModelTargetError(
+			"model_price_not_configured",
+			"target model has no configured SKU price",
+			modelTargetErrorOptions{Model: model},
+		)
 	}
 
 	targetReq := commonType.EndpointReq{
@@ -293,16 +311,17 @@ func (h *OpenAIHandlerImpl) filterAvailableUpstreams(
 	}
 	return filtered, nil
 }
+
 // IsCacheUpstreamCircuitOpen returns true only when the runtime circuit cache
 // explicitly reports this upstream as open.
 //
 // Design note:
-// - If the availability manager is not initialized, return false and allow the
-//   proxy request to proceed.
-// - If reading the runtime circuit state fails, return false and allow the
-//   proxy request to proceed.
-// - If the runtime cache reports a non-open state, return false and allow the
-//   proxy request to proceed even when the persisted upstream state says open.
+//   - If the availability manager is not initialized, return false and allow the
+//     proxy request to proceed.
+//   - If reading the runtime circuit state fails, return false and allow the
+//     proxy request to proceed.
+//   - If the runtime cache reports a non-open state, return false and allow the
+//     proxy request to proceed even when the persisted upstream state says open.
 //
 // In short, we intentionally keep circuit filtering permissive here. We only
 // block an upstream when the runtime cache confirms it is truly open, so users

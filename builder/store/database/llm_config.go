@@ -161,7 +161,7 @@ func (s *lLMConfigStoreImpl) IndexWithRepo(ctx context.Context, per, page int, s
 	var configs []*LLMConfig
 	offset := (page - 1) * per
 
-	query := s.db.Operator.Core.NewSelect().Model(&configs).Relation("Repo").Relation("Upstreams").Limit(per).Offset(offset)
+	query := s.db.Operator.Core.NewSelect().Model(&configs).Relation("Repo").Relation("Upstreams.HealthState").Relation("Upstreams.CircuitState").Limit(per).Offset(offset)
 	buildSearchLLMConfigQuery(search, query)
 	err := query.Scan(ctx)
 	if err != nil {

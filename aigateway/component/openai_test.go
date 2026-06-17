@@ -91,64 +91,51 @@ func TestFilterAndPaginateModels(t *testing.T) {
 		assert.False(t, resp.HasMore)
 	})
 
-	t.Run("source filter csghub", func(t *testing.T) {
-		modelsWithSource := []types.Model{
-			{BaseModel: types.BaseModel{ID: "csghub-model:svc1", Object: "model", OwnedBy: "u1"}, InternalModelInfo: types.InternalModelInfo{CSGHubModelID: "user/model1"}},
-			{BaseModel: types.BaseModel{ID: "external-model", Object: "model", OwnedBy: "openai"}, ExternalModelInfo: types.ExternalModelInfo{Provider: "openai"}},
-			{BaseModel: types.BaseModel{ID: "csghub-model:svc2", Object: "model", OwnedBy: "u2"}, InternalModelInfo: types.InternalModelInfo{CSGHubModelID: "org/model2"}},
+	t.Run("llm_types filter external_llm", func(t *testing.T) {
+		modelsWithLLMTypes := []types.Model{
+			{BaseModel: types.BaseModel{ID: "inference-model", Object: "model", OwnedBy: "u1", Metadata: map[string]any{types.MetaKeyLLMType: types.ProviderTypeInference}}},
+			{BaseModel: types.BaseModel{ID: "external-model", Object: "model", OwnedBy: "openai", Metadata: map[string]any{types.MetaKeyLLMType: types.ProviderTypeExternalLLM, types.MetaKeyPricingConfigured: true}}},
+			{BaseModel: types.BaseModel{ID: "serverless-model", Object: "model", OwnedBy: "u2", Metadata: map[string]any{types.MetaKeyLLMType: types.ProviderTypeServerless, types.MetaKeyPricingConfigured: true}}},
 		}
-		resp := filterAndPaginateModels(modelsWithSource, types.ListModelsReq{Source: string(types.ModelSourceCSGHub)})
-		assert.Equal(t, 2, resp.TotalCount)
-		assert.Len(t, resp.Data, 2)
-		assert.Equal(t, "csghub-model:svc1", resp.Data[0].ID)
-		assert.Equal(t, "csghub-model:svc2", resp.Data[1].ID)
-	})
-
-	t.Run("source filter external", func(t *testing.T) {
-		modelsWithSource := []types.Model{
-			{BaseModel: types.BaseModel{ID: "csghub-model:svc1", Object: "model", OwnedBy: "u1"}, InternalModelInfo: types.InternalModelInfo{CSGHubModelID: "user/model1"}},
-			{BaseModel: types.BaseModel{ID: "gpt-4", Object: "model", OwnedBy: "openai"}, ExternalModelInfo: types.ExternalModelInfo{Provider: "openai"}},
-			{BaseModel: types.BaseModel{ID: "claude", Object: "model", OwnedBy: "anthropic"}, ExternalModelInfo: types.ExternalModelInfo{Provider: "anthropic"}},
-		}
-		resp := filterAndPaginateModels(modelsWithSource, types.ListModelsReq{Source: string(types.ModelSourceExternal)})
-		assert.Equal(t, 2, resp.TotalCount)
-		assert.Len(t, resp.Data, 2)
-		assert.Equal(t, "gpt-4", resp.Data[0].ID)
-		assert.Equal(t, "claude", resp.Data[1].ID)
-	})
-
-	t.Run("source filter is case-insensitive", func(t *testing.T) {
-		modelsWithSource := []types.Model{
-			{BaseModel: types.BaseModel{ID: "csghub-model:svc1", Object: "model", OwnedBy: "u1"}, InternalModelInfo: types.InternalModelInfo{CSGHubModelID: "user/model1"}},
-			{BaseModel: types.BaseModel{ID: "gpt-4", Object: "model", OwnedBy: "openai"}, ExternalModelInfo: types.ExternalModelInfo{Provider: "openai"}},
-		}
-		resp := filterAndPaginateModels(modelsWithSource, types.ListModelsReq{Source: "CSGHub"})
+		resp := filterAndPaginateModels(modelsWithLLMTypes, types.ListModelsReq{LLMTypes: []string{types.ProviderTypeExternalLLM}})
 		assert.Equal(t, 1, resp.TotalCount)
-		assert.Len(t, resp.Data, 1)
-		assert.Equal(t, "csghub-model:svc1", resp.Data[0].ID)
+		require.Len(t, resp.Data, 1)
+		assert.Equal(t, "external-model", resp.Data[0].ID)
 	})
 
-	t.Run("unknown source filter includes all", func(t *testing.T) {
-		modelsWithSource := []types.Model{
-			{BaseModel: types.BaseModel{ID: "csghub-model:svc1", Object: "model", OwnedBy: "u1"}, InternalModelInfo: types.InternalModelInfo{CSGHubModelID: "user/model1"}},
-			{BaseModel: types.BaseModel{ID: "gpt-4", Object: "model", OwnedBy: "openai"}, ExternalModelInfo: types.ExternalModelInfo{Provider: "openai"}},
+	t.Run("llm_types filter supports multiple values", func(t *testing.T) {
+		modelsWithLLMTypes := []types.Model{
+			{BaseModel: types.BaseModel{ID: "inference-model", Object: "model", OwnedBy: "u1", Metadata: map[string]any{types.MetaKeyLLMType: types.ProviderTypeInference}}},
+			{BaseModel: types.BaseModel{ID: "external-model", Object: "model", OwnedBy: "openai", Metadata: map[string]any{types.MetaKeyLLMType: types.ProviderTypeExternalLLM, types.MetaKeyPricingConfigured: true}}},
+			{BaseModel: types.BaseModel{ID: "serverless-model", Object: "model", OwnedBy: "u2", Metadata: map[string]any{types.MetaKeyLLMType: types.ProviderTypeServerless, types.MetaKeyPricingConfigured: true}}},
 		}
-		resp := filterAndPaginateModels(modelsWithSource, types.ListModelsReq{Source: "unknown"})
+		resp := filterAndPaginateModels(modelsWithLLMTypes, types.ListModelsReq{LLMTypes: []string{types.ProviderTypeServerless, types.ProviderTypeInference}})
 		assert.Equal(t, 2, resp.TotalCount)
-		assert.Len(t, resp.Data, 2)
+		require.Len(t, resp.Data, 2)
+		assert.Equal(t, "inference-model", resp.Data[0].ID)
+		assert.Equal(t, "serverless-model", resp.Data[1].ID)
 	})
 
-	t.Run("source filter csghub includes public and private deployments", func(t *testing.T) {
-		modelsWithSource := []types.Model{
-			{BaseModel: types.BaseModel{ID: "csghub-public", Object: "model", OwnedBy: "u1"}, InternalModelInfo: types.InternalModelInfo{CSGHubModelID: "user/model1"}},
-			{BaseModel: types.BaseModel{ID: "csghub-private", Object: "model", OwnedBy: "u1"}, InternalModelInfo: types.InternalModelInfo{CSGHubModelID: "user/model2"}},
-			{BaseModel: types.BaseModel{ID: "external-public", Object: "model", OwnedBy: "openai"}, ExternalModelInfo: types.ExternalModelInfo{Provider: "openai"}},
+	t.Run("llm_types filter is case-insensitive and trims spaces", func(t *testing.T) {
+		modelsWithLLMTypes := []types.Model{
+			{BaseModel: types.BaseModel{ID: "serverless-model", Object: "model", OwnedBy: "u1", Metadata: map[string]any{types.MetaKeyLLMType: types.ProviderTypeServerless, types.MetaKeyPricingConfigured: true}}},
+			{BaseModel: types.BaseModel{ID: "external-model", Object: "model", OwnedBy: "openai", Metadata: map[string]any{types.MetaKeyLLMType: types.ProviderTypeExternalLLM, types.MetaKeyPricingConfigured: true}}},
 		}
-		resp := filterAndPaginateModels(modelsWithSource, types.ListModelsReq{Source: string(types.ModelSourceCSGHub)})
-		assert.Equal(t, 2, resp.TotalCount)
-		assert.Len(t, resp.Data, 2)
-		assert.Equal(t, "csghub-public", resp.Data[0].ID)
-		assert.Equal(t, "csghub-private", resp.Data[1].ID)
+		resp := filterAndPaginateModels(modelsWithLLMTypes, types.ListModelsReq{LLMTypes: []string{" SERVERLESS "}})
+		assert.Equal(t, 1, resp.TotalCount)
+		require.Len(t, resp.Data, 1)
+		assert.Equal(t, "serverless-model", resp.Data[0].ID)
+	})
+
+	t.Run("llm_types filter excludes models without llm_type", func(t *testing.T) {
+		modelsWithLLMTypes := []types.Model{
+			{BaseModel: types.BaseModel{ID: "missing-llm-type", Object: "model", OwnedBy: "u1"}},
+			{BaseModel: types.BaseModel{ID: "external-model", Object: "model", OwnedBy: "openai", Metadata: map[string]any{types.MetaKeyLLMType: types.ProviderTypeExternalLLM, types.MetaKeyPricingConfigured: true}}},
+		}
+		resp := filterAndPaginateModels(modelsWithLLMTypes, types.ListModelsReq{LLMTypes: []string{types.ProviderTypeExternalLLM}})
+		assert.Equal(t, 1, resp.TotalCount)
+		require.Len(t, resp.Data, 1)
+		assert.Equal(t, "external-model", resp.Data[0].ID)
 	})
 
 	t.Run("task filter text-generation", func(t *testing.T) {
@@ -235,16 +222,16 @@ func TestFilterAndPaginateModels(t *testing.T) {
 		assert.Equal(t, 1, resp.TotalCount)
 	})
 
-	t.Run("task filter combined with source filter", func(t *testing.T) {
+	t.Run("task filter combined with llm_types filter", func(t *testing.T) {
 		modelsWithTask := []types.Model{
-			{BaseModel: types.BaseModel{ID: "csghub-gen", Object: "model", OwnedBy: "u1", Task: "text-generation"}, InternalModelInfo: types.InternalModelInfo{CSGHubModelID: "user/model1"}},
-			{BaseModel: types.BaseModel{ID: "csghub-image", Object: "model", OwnedBy: "u1", Task: "text-to-image"}, InternalModelInfo: types.InternalModelInfo{CSGHubModelID: "user/model2"}},
-			{BaseModel: types.BaseModel{ID: "external-gen", Object: "model", OwnedBy: "openai", Task: "text-generation"}, ExternalModelInfo: types.ExternalModelInfo{Provider: "openai"}},
+			{BaseModel: types.BaseModel{ID: "inference-gen", Object: "model", OwnedBy: "u1", Task: "text-generation", Metadata: map[string]any{types.MetaKeyLLMType: types.ProviderTypeInference}}},
+			{BaseModel: types.BaseModel{ID: "inference-image", Object: "model", OwnedBy: "u1", Task: "text-to-image", Metadata: map[string]any{types.MetaKeyLLMType: types.ProviderTypeInference}}},
+			{BaseModel: types.BaseModel{ID: "external-gen", Object: "model", OwnedBy: "openai", Task: "text-generation", Metadata: map[string]any{types.MetaKeyLLMType: types.ProviderTypeExternalLLM, types.MetaKeyPricingConfigured: true}}},
 		}
-		resp := filterAndPaginateModels(modelsWithTask, types.ListModelsReq{Source: string(types.ModelSourceCSGHub), Task: "text-generation"})
+		resp := filterAndPaginateModels(modelsWithTask, types.ListModelsReq{LLMTypes: []string{types.ProviderTypeInference}, Task: "text-generation"})
 		assert.Equal(t, 1, resp.TotalCount)
 		assert.Len(t, resp.Data, 1)
-		assert.Equal(t, "csghub-gen", resp.Data[0].ID)
+		assert.Equal(t, "inference-gen", resp.Data[0].ID)
 	})
 }
 
