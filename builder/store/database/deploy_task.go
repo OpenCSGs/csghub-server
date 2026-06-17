@@ -126,6 +126,7 @@ type DeployTaskStore interface {
 	GetClusterDeploys(ctx context.Context, req types.ClusterDeployReq) ([]Deploy, int, error)
 	ListDeploysByTimeRange(ctx context.Context, req types.DeployTimeRangeReq) ([]Deploy, int, error)
 	FindByDeployNameAndType(ctx context.Context, uuid, deployName string, deployType int) (*Deploy, error)
+	CountRunningDeploysByNodeName(ctx context.Context, nodeName string) (int, error)
 }
 
 func NewDeployTaskStore() DeployTaskStore {
@@ -630,6 +631,17 @@ func (s *deployTaskStoreImpl) ListAllRunningDeploys(ctx context.Context) ([]Depl
 		return nil, err
 	}
 	return result, nil
+}
+
+func (s *deployTaskStoreImpl) CountRunningDeploysByNodeName(ctx context.Context, nodeName string) (int, error) {
+	count, err := s.db.Operator.Core.NewSelect().Model(&Deploy{}).
+		Where("status = ?", common.Running).
+		Where("? = ANY(STRING_TO_ARRAY(COALESCE(cluster_node, ''), ','))", nodeName).
+		Count(ctx)
+	if err != nil {
+		return 0, errorx.HandleDBError(err, nil)
+	}
+	return count, nil
 }
 
 func (s *deployTaskStoreImpl) GetLastTaskByType(ctx context.Context, deployID int64, taskType int) (*DeployTask, error) {
