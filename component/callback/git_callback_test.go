@@ -45,6 +45,12 @@ func TestGetPipelineTaskFromTags_ASR(t *testing.T) {
 	}
 }
 
+func TestGetPipelineTaskFromTags_Image2Image(t *testing.T) {
+	task := GetPipelineTaskFromTags([]database.Tag{{Name: string(types.Image2Image)}})
+
+	require.Equal(t, types.Image2Image, task)
+}
+
 func TestGitCallbackComponent_WatchSpaceChange(t *testing.T) {
 	ctx := mock.Anything
 	gc := initializeTestGitCallbackComponent(context.TODO(), t)

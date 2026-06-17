@@ -9,12 +9,26 @@ import (
 )
 
 func rewriteMultipartModelStream(form *multipart.Form, modelName string) (io.ReadCloser, string) {
+	body, contentType, _ := rewriteMultipartModelStreamWithOptions(form, modelName, multipartRewriteOptions{})
+	return body, contentType
+}
+
+type multipartRewriteOptions struct {
+	defaultFields   map[string]string
+	normalizeFields map[string]func(string) string
+}
+
+func rewriteMultipartModelStreamWithOptions(form *multipart.Form, modelName string, options multipartRewriteOptions) (io.ReadCloser, string, error) {
+	if form == nil {
+		return nil, "", fmt.Errorf("multipart form is empty")
+	}
+
 	reader, writer := io.Pipe()
 	multipartWriter := multipart.NewWriter(writer)
 	contentType := multipartWriter.FormDataContentType()
 
 	go func() {
-		err := writeMultipartModel(form, modelName, multipartWriter)
+		err := writeMultipartModel(form, modelName, multipartWriter, options)
 		if closeErr := multipartWriter.Close(); err == nil {
 			err = closeErr
 		}
@@ -25,7 +39,7 @@ func rewriteMultipartModelStream(form *multipart.Form, modelName string) (io.Rea
 		_ = writer.Close()
 	}()
 
-	return reader, contentType
+	return reader, contentType, nil
 }
 
 func firstMultipartValue(form *multipart.Form, key string) string {
@@ -35,19 +49,35 @@ func firstMultipartValue(form *multipart.Form, key string) string {
 	return form.Value[key][0]
 }
 
-func writeMultipartModel(form *multipart.Form, modelName string, writer *multipart.Writer) error {
+func writeMultipartModel(form *multipart.Form, modelName string, writer *multipart.Writer, options multipartRewriteOptions) error {
+	wroteFields := map[string]bool{}
 	for key, vals := range form.Value {
 		if key == "model" {
 			continue
 		}
 		for _, val := range vals {
+			if normalize := options.normalizeFields[key]; normalize != nil {
+				val = normalize(val)
+			}
 			if err := writer.WriteField(key, val); err != nil {
 				return err
 			}
 		}
+		wroteFields[key] = true
 	}
 	if err := writer.WriteField("model", modelName); err != nil {
 		return err
+	}
+	for key, val := range options.defaultFields {
+		if wroteFields[key] {
+			continue
+		}
+		if normalize := options.normalizeFields[key]; normalize != nil {
+			val = normalize(val)
+		}
+		if err := writer.WriteField(key, val); err != nil {
+			return err
+		}
 	}
 
 	for fieldName, files := range form.File {

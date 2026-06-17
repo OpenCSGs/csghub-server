@@ -47,6 +47,8 @@ type OpenAIHandler interface {
 	Embedding(c *gin.Context)
 	// Generate image from text
 	GenerateImage(c *gin.Context)
+	// Edit image from prompt and input image
+	EditImage(c *gin.Context)
 	// Create a video generation
 	CreateVideo(c *gin.Context)
 	// Get a video generation
@@ -256,7 +258,7 @@ type OpenAIHandlerImpl struct {
 // @Produce      json
 // @Param        model_id query string false "Model ID for fuzzy search"
 // @Param        source query string false "Filter by source (csghub for CSGHub models, external for external models)" Enums(csghub, external)
-// @Param        task query string false "Filter by task (e.g., text-generation, text-to-image)"
+// @Param        task query string false "Filter by task (e.g., text-generation, text-to-image, image-to-image)"
 // @Param        per query int false "Models per page (default 20, max 100)"
 // @Param        page query int false "Page number (1-based, default 1)"
 // @Success      200  {object}  types.ModelList "OK"

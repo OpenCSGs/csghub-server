@@ -29,3 +29,9 @@ func TestGetBuiltInTaskFromTags_ASR(t *testing.T) {
 		})
 	}
 }
+
+func TestGetBuiltInTaskFromTags_Image2Image(t *testing.T) {
+	task := GetBuiltInTaskFromTags([]database.Tag{{Name: string(types.Image2Image)}})
+
+	require.Equal(t, string(types.Image2Image), task)
+}

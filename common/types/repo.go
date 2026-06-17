@@ -89,6 +89,7 @@ const (
 
 	TextGeneration     PipelineTask = "text-generation"
 	Text2Image         PipelineTask = "text-to-image"
+	Image2Image        PipelineTask = "image-to-image"
 	Text2Video         PipelineTask = "text-to-video"
 	Image2Video        PipelineTask = "image-to-video"
 	ImageText2Text     PipelineTask = "image-text-to-text"

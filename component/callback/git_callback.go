@@ -605,6 +605,9 @@ func GetPipelineTaskFromTags(tags []database.Tag) types.PipelineTask {
 		if tag.Name == string(types.Text2Image) {
 			return types.Text2Image
 		}
+		if tag.Name == string(types.Image2Image) {
+			return types.Image2Image
+		}
 		if tag.Name == string(types.TextToSpeech) {
 			return types.TextToSpeech
 		}
