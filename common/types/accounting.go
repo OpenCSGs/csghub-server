@@ -344,22 +344,31 @@ type AcctSummary struct {
 	TotalConsumption     float64 `json:"total_consumption"`
 	TotalPromptToken     float64 `json:"total_prompt_token"`
 	TotalCompletionToken float64 `json:"total_completion_token"`
+	TotalVoucherValue    float64 `json:"total_voucher_value"`
+	TotalCashValue       float64 `json:"total_cash_value"`
+	TotalDuration        float64 `json:"total_duration"`
+	TotalCount           float64 `json:"total_count"`
 }
 
 type ITEM struct {
-	Consumption     float64   `json:"consumption"`
-	InstanceName    string    `json:"instance_name"`
-	Value           float64   `json:"value"`
-	CreatedAt       time.Time `json:"created_at"`
-	Status          string    `json:"status"`
-	RepoPath        string    `json:"repo_path"`
-	DeployID        int64     `json:"deploy_id"`
-	DeployName      string    `json:"deploy_name"`
-	DeployUser      string    `json:"deploy_user"`
-	PromptToken     float64   `json:"prompt_token"`
-	CompletionToken float64   `json:"completion_token"`
-	VoucherValue    float64   `json:"voucher_value"`
-	CashValue       float64   `json:"cash_value"`
+	Consumption     float64     `json:"consumption"`
+	InstanceName    string      `json:"instance_name"`
+	Value           float64     `json:"value"`
+	CreatedAt       time.Time   `json:"created_at"`
+	Status          string      `json:"status"`
+	RepoPath        string      `json:"repo_path"`
+	DeployID        int64       `json:"deploy_id"`
+	DeployName      string      `json:"deploy_name"`
+	DeployUser      string      `json:"deploy_user"`
+	PromptToken     float64     `json:"prompt_token"`
+	CompletionToken float64     `json:"completion_token"`
+	VoucherValue    float64     `json:"voucher_value"`
+	CashValue       float64     `json:"cash_value"`
+	Duration        float64     `json:"duration"`
+	Count           float64     `json:"count"`
+	DataType        string      `json:"data_type"`
+	Resolution      string      `json:"resolution"`
+	UnitType        SkuUnitType `json:"unit_type"`
 }
 
 type BILLS struct {
