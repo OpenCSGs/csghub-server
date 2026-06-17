@@ -230,9 +230,9 @@ func TestOpenAIHandler_ListModels(t *testing.T) {
 		assert.Equal(t, http.StatusInternalServerError, w.Code)
 	})
 
-	t.Run("invalid source parameter", func(t *testing.T) {
+	t.Run("invalid llm_types parameter", func(t *testing.T) {
 		tester, c, w := setupTest(t)
-		tester.WithQuery("source", "invalid")
+		tester.WithQuery("llm_types", "invalid")
 
 		tester.handler.ListModels(c)
 
@@ -243,17 +243,18 @@ func TestOpenAIHandler_ListModels(t *testing.T) {
 		errObj, ok := response["error"].(map[string]interface{})
 		assert.True(t, ok)
 		assert.Equal(t, "invalid_request_error", errObj["code"])
-		assert.Contains(t, errObj["message"], "Invalid source parameter")
-		assert.Contains(t, errObj["message"], string(types.ModelSourceCSGHub))
-		assert.Contains(t, errObj["message"], string(types.ModelSourceExternal))
+		assert.Contains(t, errObj["message"], "Invalid llm_types parameter")
+		assert.Contains(t, errObj["message"], types.ProviderTypeExternalLLM)
+		assert.Contains(t, errObj["message"], types.ProviderTypeServerless)
+		assert.Contains(t, errObj["message"], types.ProviderTypeInference)
 	})
 
-	t.Run("valid source parameter csghub", func(t *testing.T) {
+	t.Run("valid llm_types parameter external_llm", func(t *testing.T) {
 		tester, c, w := setupTest(t)
-		tester.WithQuery("source", string(types.ModelSourceCSGHub))
+		tester.WithQuery("llm_types", types.ProviderTypeExternalLLM)
 
 		tester.mocks.openAIComp.EXPECT().
-			ListModels(mock.Anything, "testuser", types.ListModelsReq{Source: string(types.ModelSourceCSGHub)}).
+			ListModels(mock.Anything, "testuser", types.ListModelsReq{LLMTypes: []string{types.ProviderTypeExternalLLM}}).
 			Return(types.ModelList{Object: "list", Data: []types.Model{}, HasMore: false, TotalCount: 0}, nil).Once()
 
 		tester.handler.ListModels(c)
@@ -261,12 +262,13 @@ func TestOpenAIHandler_ListModels(t *testing.T) {
 		assert.Equal(t, http.StatusOK, w.Code)
 	})
 
-	t.Run("valid source parameter external", func(t *testing.T) {
+	t.Run("valid llm_types parameter multiple values", func(t *testing.T) {
 		tester, c, w := setupTest(t)
-		tester.WithQuery("source", string(types.ModelSourceExternal))
+		tester.WithQuery("llm_types", types.ProviderTypeServerless)
+		tester.WithQuery("llm_types", types.ProviderTypeInference)
 
 		tester.mocks.openAIComp.EXPECT().
-			ListModels(mock.Anything, "testuser", types.ListModelsReq{Source: string(types.ModelSourceExternal)}).
+			ListModels(mock.Anything, "testuser", types.ListModelsReq{LLMTypes: []string{types.ProviderTypeServerless, types.ProviderTypeInference}}).
 			Return(types.ModelList{Object: "list", Data: []types.Model{}, HasMore: false, TotalCount: 0}, nil).Once()
 
 		tester.handler.ListModels(c)
@@ -274,12 +276,12 @@ func TestOpenAIHandler_ListModels(t *testing.T) {
 		assert.Equal(t, http.StatusOK, w.Code)
 	})
 
-	t.Run("source parameter is case-insensitive", func(t *testing.T) {
+	t.Run("llm_types parameter is case-insensitive", func(t *testing.T) {
 		tester, c, w := setupTest(t)
-		tester.WithQuery("source", "CSGHub")
+		tester.WithQuery("llm_types", "SERVERLESS")
 
 		tester.mocks.openAIComp.EXPECT().
-			ListModels(mock.Anything, "testuser", types.ListModelsReq{Source: "CSGHub"}).
+			ListModels(mock.Anything, "testuser", types.ListModelsReq{LLMTypes: []string{"SERVERLESS"}}).
 			Return(types.ModelList{Object: "list", Data: []types.Model{}, HasMore: false, TotalCount: 0}, nil).Once()
 
 		tester.handler.ListModels(c)
@@ -1890,9 +1892,12 @@ func TestOpenAIHandler_CreateVideo(t *testing.T) {
 
 		model := &types.Model{
 			BaseModel: types.BaseModel{
-				ID:       "video-model",
-				Task:     "text-to-video",
-				Metadata: map[string]any{types.MetaKeyLLMType: types.ProviderTypeExternalLLM},
+				ID:   "video-model",
+				Task: "text-to-video",
+				Metadata: map[string]any{
+					types.MetaKeyLLMType:           types.ProviderTypeExternalLLM,
+					types.MetaKeyPricingConfigured: true,
+				},
 			},
 			ExternalModelInfo: types.ExternalModelInfo{Provider: "openai"},
 			Endpoint:          downstream.URL + "/v1/videos",

@@ -252,31 +252,33 @@ type OpenAIHandlerImpl struct {
 
 // ListModels godoc
 // @Summary      List available models
-// @Description  Returns a list of available models, supports fuzzy search by model_id query parameter and filtering by source and task
+// @Description  Returns a list of available models, supports fuzzy search by model_id query parameter and filtering by llm_types and task
 // @Tags         AIGateway
 // @Accept       json
 // @Produce      json
 // @Param        model_id query string false "Model ID for fuzzy search"
-// @Param        source query string false "Filter by source (csghub for CSGHub models, external for external models)" Enums(csghub, external)
+// @Param        llm_types query []string false "Filter by LLM types" Enums(external_llm, serverless, inference)
 // @Param        task query string false "Filter by task (e.g., text-generation, text-to-image, image-to-image)"
 // @Param        per query int false "Models per page (default 20, max 100)"
 // @Param        page query int false "Page number (1-based, default 1)"
 // @Success      200  {object}  types.ModelList "OK"
-// @Failure      400  {object}  error "Invalid source parameter"
+// @Failure      400  {object}  error "Invalid llm_types parameter"
 // @Failure      500  {object}  error "Internal server error"
 // @Router       /v1/models [get]
 func (h *OpenAIHandlerImpl) ListModels(c *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(c)
 
-	// Validate source parameter
-	source := strings.TrimSpace(c.Query("source"))
-	if source != "" {
-		sourceLower := strings.ToLower(source)
-		if sourceLower != string(types.ModelSourceCSGHub) && sourceLower != string(types.ModelSourceExternal) {
+	// Validate llm_types parameter
+	llmTypes := c.QueryArray("llm_types")
+	for _, llmType := range llmTypes {
+		if strings.TrimSpace(llmType) == "" {
+			continue
+		}
+		if !isValidListModelsLLMType(llmType) {
 			c.JSON(http.StatusBadRequest, gin.H{
 				"error": types.Error{
 					Code:    "invalid_request_error",
-					Message: fmt.Sprintf("Invalid source parameter. Must be '%s' or '%s'", types.ModelSourceCSGHub, types.ModelSourceExternal),
+					Message: invalidLLMTypesErrorMessage(),
 					Type:    "invalid_request_error",
 				}})
 			return
@@ -284,11 +286,11 @@ func (h *OpenAIHandlerImpl) ListModels(c *gin.Context) {
 	}
 
 	resp, err := h.openaiComponent.ListModels(c.Request.Context(), currentUser, types.ListModelsReq{
-		ModelID: c.Query("model_id"),
-		Source:  source,
-		Task:    c.Query("task"),
-		Per:     c.Query("per"),
-		Page:    c.Query("page"),
+		ModelID:  c.Query("model_id"),
+		LLMTypes: llmTypes,
+		Task:     c.Query("task"),
+		Per:      c.Query("per"),
+		Page:     c.Query("page"),
 	})
 	if err != nil {
 		slog.ErrorContext(c.Request.Context(), "failed to get available models", "error", err.Error(), "current_user", currentUser)
@@ -302,6 +304,19 @@ func (h *OpenAIHandlerImpl) ListModels(c *gin.Context) {
 	}
 
 	c.PureJSON(http.StatusOK, resp)
+}
+
+func isValidListModelsLLMType(llmType string) bool {
+	switch strings.ToLower(strings.TrimSpace(llmType)) {
+	case types.ProviderTypeExternalLLM, types.ProviderTypeServerless, types.ProviderTypeInference:
+		return true
+	default:
+		return false
+	}
+}
+
+func invalidLLMTypesErrorMessage() string {
+	return fmt.Sprintf("Invalid llm_types parameter. Allowed values: %s, %s, %s", types.ProviderTypeExternalLLM, types.ProviderTypeServerless, types.ProviderTypeInference)
 }
 
 // GetModel godoc

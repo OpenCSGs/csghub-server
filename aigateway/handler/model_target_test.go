@@ -360,6 +360,56 @@ func TestResolveModelTarget_ModelNotRunningWhenNoEndpoint(t *testing.T) {
 	require.Equal(t, http.StatusBadRequest, targetErr.Status)
 }
 
+func TestResolveModelTarget_PricedExternalLLM(t *testing.T) {
+	tester, _, _ := setupTest(t)
+	model := &types.Model{
+		BaseModel: types.BaseModel{
+			ID: "external-model",
+			Metadata: map[string]any{
+				types.MetaKeyLLMType:           types.ProviderTypeExternalLLM,
+				types.MetaKeyPricingConfigured: true,
+			},
+		},
+		ExternalModelInfo: types.ExternalModelInfo{Provider: "openai"},
+		Upstreams:         []commontypes.UpstreamConfig{{URL: "https://api.example.com/v1/chat/completions", Enabled: true, ModelName: "provider-model"}},
+	}
+	tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "external-model").Return(model, nil).Once()
+
+	resolved, err := tester.handler.resolveModelTarget(context.Background(), "testuser", "external-model", http.Header{})
+
+	require.NoError(t, err)
+	require.Equal(t, "https://api.example.com/v1/chat/completions", resolved.Target)
+	require.Equal(t, "provider-model", resolved.ModelName)
+}
+
+func TestResolveModelTarget_InferenceWithoutPricingFlag(t *testing.T) {
+	tester, _, _ := setupTest(t)
+	model := &types.Model{
+		BaseModel: types.BaseModel{
+			ID: "inference-model",
+			Metadata: map[string]any{
+				types.MetaKeyLLMType: types.ProviderTypeInference,
+			},
+		},
+		InternalModelInfo: types.InternalModelInfo{
+			CSGHubModelID: "namespace/model",
+			ClusterID:     "cluster-1",
+			SvcName:       "svc-model",
+		},
+		Endpoint: "https://model.internal/v1/chat/completions",
+	}
+	tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "inference-model").Return(model, nil).Once()
+	tester.mocks.mockClsComp.EXPECT().GetClusterByID(mock.Anything, "cluster-1").Return(&database.ClusterInfo{
+		ClusterID: "cluster-1",
+	}, nil).Once()
+
+	resolved, err := tester.handler.resolveModelTarget(context.Background(), "testuser", "inference-model", http.Header{})
+
+	require.NoError(t, err)
+	require.Equal(t, "https://model.internal/v1/chat/completions", resolved.Target)
+	require.Equal(t, "namespace/model", resolved.ModelName)
+}
+
 func TestExtractSessionKeyForModel(t *testing.T) {
 	model := &types.Model{
 		RoutingPolicy: commontypes.RoutingPolicy{
@@ -486,7 +536,7 @@ func TestFilterAvailableUpstreams_FiltersCircuitOpen(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, result, 3)
 	require.Equal(t, "https://api.example.com/closed", result[0].URL)
-	require.Equal(t, "https://api.example.com/open", result[1].URL) // no runtime circuit state, allow proxy
+	require.Equal(t, "https://api.example.com/open", result[1].URL)        // no runtime circuit state, allow proxy
 	require.Equal(t, "https://api.example.com/cb_disabled", result[2].URL) // CB disabled, passes
 }
 

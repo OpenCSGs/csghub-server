@@ -321,6 +321,7 @@ func TestLLMConfigStore_IndexWithRepo(t *testing.T) {
 
 	repo := database.Repository{
 		Path:        "test-ns-indexwithrepo/test-repo",
+		GitPath:     "models/test-ns-indexwithrepo/test-repo",
 		Name:        "test-repo",
 		Nickname:    "Test Repo",
 		Description: "A test repository",
@@ -372,6 +373,8 @@ func TestLLMConfigStore_IndexWithRepo(t *testing.T) {
 	require.NotNil(t, withRepo.Repo)
 	require.Equal(t, repo.ID, withRepo.Repo.ID)
 	require.Equal(t, "test-repo", withRepo.Repo.Name)
+	require.Equal(t, "test-ns-indexwithrepo/test-repo", withRepo.Repo.Path)
+	require.Equal(t, "models/test-ns-indexwithrepo/test-repo", withRepo.Repo.GitPath)
 	require.Equal(t, "Test Repo", withRepo.Repo.Nickname)
 	require.Equal(t, "A test repository", withRepo.Repo.Description)
 
