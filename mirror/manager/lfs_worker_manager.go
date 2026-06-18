@@ -29,7 +29,6 @@ func InitManger(cfg *config.Config) error {
 	once.Do(func() {
 		manager = &Manager{
 			workerNumber:     cfg.Mirror.WorkerNumber,
-			taskChan:         make(chan database.MirrorTask),
 			priorityTaskChan: make(chan database.MirrorTask),
 			mirrorTaskStore:  database.NewMirrorTaskStore(),
 			config:           cfg,
@@ -42,7 +41,6 @@ func InitManger(cfg *config.Config) error {
 
 type Manager struct {
 	config           *config.Config
-	taskChan         chan database.MirrorTask
 	priorityTaskChan chan database.MirrorTask
 	workerNumber     int
 	workers          map[int]*Worker
@@ -75,7 +73,6 @@ func (m *Manager) StopWorker(id int) error {
 	if worker, ok := m.workers[id]; ok {
 		worker.cancel()
 		delete(m.workers, id)
-		m.conChan <- id
 	} else {
 		return fmt.Errorf("worker %d not found", id)
 	}
@@ -83,21 +80,20 @@ func (m *Manager) StopWorker(id int) error {
 	return nil
 }
 
-func (m *Manager) StopWorkerByMirrorID(mirrorID int64) (bool, error) {
+func (m *Manager) StopWorkerByTaskID(taskID int64) (bool, error) {
 	var found bool
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	for id, worker := range m.workers {
-		if worker.RunningTask.MirrorID == mirrorID {
+		if worker.RunningTask != nil && worker.RunningTask.ID == taskID {
 			found = true
 			worker.cancel()
 			delete(m.workers, id)
-			m.conChan <- id
 		}
 	}
 
 	if !found {
-		return false, fmt.Errorf("worker for mirror %d not found", mirrorID)
+		return false, fmt.Errorf("worker for mirror %d not found", taskID)
 	}
 
 	return true, nil
@@ -115,9 +111,7 @@ func (m *Manager) ReRun(id int, mt *database.MirrorTask) error {
 	}
 	m.mu.Unlock()
 
-	go func() {
-		m.priorityTaskChan <- *mt
-	}()
+	m.priorityTaskChan <- *mt
 
 	return nil
 }
@@ -135,14 +129,12 @@ func (m *Manager) Start() {
 		m.conChan <- i
 	}
 
-	go m.dispatcher()
-
 	for id := range m.conChan {
 		select {
 		case mt := <-m.priorityTaskChan:
 			go m.startWorker(id, &mt)
-		case mt := <-m.taskChan:
-			go m.startWorker(id, &mt)
+		default:
+			go m.claimAndStartWorker(id)
 		}
 	}
 }
@@ -151,6 +143,7 @@ func (m *Manager) startWorker(id int, mt *database.MirrorTask) {
 	lfsSyncWorker, err := mirror.NewLFSSyncWorker(m.config, id)
 	if err != nil {
 		slog.Error("failed to create lfs sync worker", slog.Any("error", err))
+		m.conChan <- id
 		return
 	}
 
@@ -159,8 +152,17 @@ func (m *Manager) startWorker(id int, mt *database.MirrorTask) {
 	lfsSyncWorker.SetContext(ctx)
 
 	m.mu.Lock()
+
+	currentTask, err := m.mirrorTaskStore.FindByID(context.Background(), mt.ID)
+	if err == nil && currentTask.Status == types.MirrorCanceled {
+		m.mu.Unlock()
+		cancel()
+		m.conChan <- id
+		return
+	}
+
 	for workerID, worker := range m.workers {
-		if worker.RunningTask.MirrorID == mt.MirrorID {
+		if worker.RunningTask.ID == mt.ID {
 			slog.Warn("worker for mirror is running, cancel it", slog.Any("mirrorID", mt.MirrorID), slog.Any("workerID", workerID))
 			worker.cancel()
 			delete(m.workers, workerID)
@@ -184,25 +186,23 @@ func (m *Manager) startWorker(id int, mt *database.MirrorTask) {
 	m.conChan <- id
 }
 
-func (m *Manager) dispatcher() {
-	for {
-		ctx := context.Background()
-		task, err := m.mirrorTaskStore.GetHighestPriorityByTaskStatus(ctx, expectedMirrorTaskStatus)
-		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				slog.Info("no tasks to dispatch, sleep 5s")
-				time.Sleep(5 * time.Second)
-				continue
-			}
-			slog.Error("failed to get task from db", slog.Any("error", err))
-			time.Sleep(5 * time.Second)
-			continue
+func (m *Manager) claimAndStartWorker(id int) {
+	ctx := context.Background()
+	task, err := m.mirrorTaskStore.GetHighestPriorityByTaskStatus(ctx, expectedMirrorTaskStatus)
+	if err != nil {
+		if !errors.Is(err, sql.ErrNoRows) {
+			slog.Error("failed to claim task from db", slog.Any("error", err))
 		}
-		m.taskChan <- task
+		time.Sleep(5 * time.Second)
+		m.conChan <- id
+		return
 	}
+	m.startWorker(id, &task)
 }
 
 func (m *Manager) RunningTasks() map[int]database.MirrorTask {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	tasks := make(map[int]database.MirrorTask)
 	for id, worker := range m.workers {
 		tasks[id] = *worker.RunningTask

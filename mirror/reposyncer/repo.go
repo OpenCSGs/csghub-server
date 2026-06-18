@@ -205,21 +205,9 @@ func (w *RepoSyncWorker) handleTask(
 		}
 	}
 
-	mtFSM := database.NewMirrorTaskWithFSM(mt)
-	canContinue := mtFSM.SubmitEvent(ctx, statusAction)
-	if !canContinue {
-		slog.Error(
-			"failed to transition to next status",
-			slog.Any("before status", mt.Status),
-			slog.Any("action", statusAction),
-		)
-		return
-	}
-	mt.Status = types.MirrorTaskStatus(mtFSM.Current())
-	repoSyncStatus := common.MirrorTaskStatusToRepoStatus(mt.Status)
-	_, err = w.mirrorTaskStore.UpdateStatusAndRepoSyncStatus(ctx, *mt, repoSyncStatus)
+	_, err = w.mirrorTaskStore.UpdateStatusAndRepoSyncStatus(ctx, *mt, statusAction)
 	if err != nil {
-		slog.Error("failed to update mirror task status and repository status", slog.Any("error", err))
+		slog.Error("failed to update mirror task status and repository status", slog.Any("error", err), slog.Any("action", statusAction))
 	}
 }
 

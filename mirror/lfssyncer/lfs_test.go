@@ -192,7 +192,7 @@ func (suite *LfsSyncWorkerTestSuite) TestRun_MirrorNotFound() {
 
 	suite.mocks.mirrorStore.EXPECT().FindByID(suite.ctx, task.MirrorID).
 		Return(nil, errors.New("mirror not found"))
-	suite.mocks.mirrorTaskStore.EXPECT().Update(suite.ctx, mock.MatchedBy(func(mt database.MirrorTask) bool {
+	suite.mocks.mirrorTaskStore.EXPECT().Update(mock.Anything, mock.MatchedBy(func(mt database.MirrorTask) bool {
 		return mt.Status == types.MirrorLfsSyncFailed && mt.ErrorMessage == "mirror not found"
 	})).Return(*task, nil)
 
@@ -211,8 +211,12 @@ func (suite *LfsSyncWorkerTestSuite) TestRun_RepoNotFound() {
 	suite.mocks.repoStore.EXPECT().FindById(suite.ctx, mirror.RepositoryID).
 		Return(nil, errors.New("repo not found"))
 
+	suite.mocks.mirrorTaskStore.EXPECT().Update(mock.Anything, mock.MatchedBy(func(mt database.MirrorTask) bool {
+		return mt.Status == types.MirrorLfsSyncFailed
+	})).Return(*task, nil)
+
 	suite.worker.Run(task)
-	// Should return early without further processing
+	// Should return early but updates DB with failed status
 }
 
 func (suite *LfsSyncWorkerTestSuite) TestRun_ShouldNotSync() {
@@ -259,8 +263,11 @@ func (suite *LfsSyncWorkerTestSuite) TestRun_ContextCanceled() {
 	suite.mocks.lfsMetaObjectStore.EXPECT().FindByRepoID(mock.Anything, repo.ID).Return(nil, context.Canceled)
 
 	suite.mocks.mirrorTaskStore.EXPECT().UpdateStatusAndRepoSyncStatus(mock.Anything, mock.MatchedBy(func(mt database.MirrorTask) bool {
-		return mt.Status == types.MirrorCanceled
-	}), types.SyncStatusCanceled).Return(*task, nil)
+		return strings.Contains(mt.ErrorMessage, "canceled")
+	}), database.MirrorCancel).RunAndReturn(func(ctx context.Context, mt database.MirrorTask, action string) (database.MirrorTask, error) {
+		mt.Status = types.MirrorCanceled
+		return mt, nil
+	})
 
 	suite.mocks.msgSender.EXPECT().Send(mock.Anything, mock.Anything).Return(hook.Response{}, nil)
 	suite.mocks.recomComponent.EXPECT().SetOpWeight(mock.Anything, mock.Anything, mock.Anything).Return(nil)
@@ -305,8 +312,11 @@ func (suite *LfsSyncWorkerTestSuite) TestRun_Success_NoLfsFiles() {
 
 	// Final updates
 	suite.mocks.mirrorTaskStore.EXPECT().UpdateStatusAndRepoSyncStatus(mock.Anything, mock.MatchedBy(func(mt database.MirrorTask) bool {
-		return mt.Status == types.MirrorRepoSyncFinished && mt.Progress == 100
-	}), types.SyncStatusInProgress).Return(*task, nil)
+		return mt.Progress == 100
+	}), database.MirrorSuccess).RunAndReturn(func(ctx context.Context, mt database.MirrorTask, action string) (database.MirrorTask, error) {
+		mt.Status = types.MirrorRepoSyncFinished
+		return mt, nil
+	})
 
 	suite.mocks.msgSender.EXPECT().Send(mock.Anything, mock.MatchedBy(func(req types.MessageRequest) bool {
 		return strings.Contains(req.Parameters, "finished")
@@ -344,9 +354,11 @@ func (suite *LfsSyncWorkerTestSuite) TestRun_SyncLfsError() {
 
 	// Expect failure status update
 	suite.mocks.mirrorTaskStore.EXPECT().UpdateStatusAndRepoSyncStatus(mock.Anything, mock.MatchedBy(func(mt database.MirrorTask) bool {
-		return mt.Status == types.MirrorLfsSyncFailed &&
-			strings.Contains(mt.ErrorMessage, expectedError.Error())
-	}), types.SyncStatusFailed).Return(*task, nil)
+		return strings.Contains(mt.ErrorMessage, expectedError.Error())
+	}), database.MirrorFail).RunAndReturn(func(ctx context.Context, mt database.MirrorTask, action string) (database.MirrorTask, error) {
+		mt.Status = types.MirrorLfsSyncFailed
+		return mt, nil
+	})
 
 	// Failure message
 	suite.mocks.msgSender.EXPECT().Send(mock.Anything, mock.MatchedBy(func(req types.MessageRequest) bool {
@@ -448,8 +460,11 @@ func (suite *LfsSyncWorkerTestSuite) TestRun_Success_HasLfsFiles() {
 
 	// Final updates
 	suite.mocks.mirrorTaskStore.EXPECT().UpdateStatusAndRepoSyncStatus(mock.Anything, mock.MatchedBy(func(mt database.MirrorTask) bool {
-		return mt.Status == types.MirrorRepoSyncFinished && mt.Progress == 100
-	}), types.SyncStatusInProgress).Return(*task, nil)
+		return mt.Progress == 100
+	}), database.MirrorSuccess).RunAndReturn(func(ctx context.Context, mt database.MirrorTask, action string) (database.MirrorTask, error) {
+		mt.Status = types.MirrorRepoSyncFinished
+		return mt, nil
+	})
 
 	suite.mocks.msgSender.EXPECT().Send(mock.Anything, mock.MatchedBy(func(req types.MessageRequest) bool {
 		return strings.Contains(req.Parameters, "finished")
@@ -819,7 +834,7 @@ func (suite *LfsSyncWorkerTestSuite) TestDownloadRange() {
 	}))
 	defer server.Close()
 
-	resp, err := suite.worker.downloadRange(server.URL, 0, 9)
+	resp, err := suite.worker.downloadRange(suite.ctx, server.URL, 0, 9)
 
 	assert.NoError(suite.T(), err)
 	assert.NotNil(suite.T(), resp)
@@ -998,7 +1013,7 @@ func TestLfsSyncWorker_SetContext(t *testing.T) {
 func TestLfsSyncWorker_DownloadRange_InvalidURL(t *testing.T) {
 	worker, _ := newTestLfsSyncWorker(t, "")
 
-	resp, err := worker.downloadRange("invalid-url", 0, 10)
+	resp, err := worker.downloadRange(context.Background(), "invalid-url", 0, 10)
 	if resp != nil {
 		resp.Body.Close()
 	}
@@ -1014,7 +1029,7 @@ func TestLfsSyncWorker_DownloadRange_ServerError(t *testing.T) {
 	}))
 	defer server.Close()
 
-	resp, err := worker.downloadRange(server.URL, 0, 10)
+	resp, err := worker.downloadRange(context.Background(), server.URL, 0, 10)
 	if resp != nil {
 		resp.Body.Close()
 	}
@@ -1040,4 +1055,106 @@ func TestLfsSyncWorker_ConcurrentOperations(t *testing.T) {
 
 	// Worker should still be functional
 	assert.Equal(t, 1, worker.ID())
+}
+
+func TestLfsSyncWorker_DownloadRange_NotFoundError(t *testing.T) {
+	worker, _ := newTestLfsSyncWorker(t, "")
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer server.Close()
+
+	resp, err := worker.downloadRange(context.Background(), server.URL, 0, 10)
+	if resp != nil {
+		resp.Body.Close()
+	}
+
+	assert.Error(t, err)
+}
+
+func TestLfsSyncWorker_DownloadRange_ContextCanceled(t *testing.T) {
+	worker, _ := newTestLfsSyncWorker(t, "")
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(500 * time.Millisecond)
+		w.WriteHeader(http.StatusPartialContent)
+		_, _ = w.Write([]byte("data"))
+	}))
+	defer server.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	start := time.Now()
+	resp, err := worker.downloadRange(ctx, server.URL, 0, 10)
+	elapsed := time.Since(start)
+
+	if resp != nil {
+		resp.Body.Close()
+	}
+
+	assert.Error(t, err)
+	assert.True(t, elapsed < 100*time.Millisecond,
+		"downloadRange should fail fast on cancelled context, took %v", elapsed)
+}
+
+func TestLfsSyncWorker_DownloadRange_Success(t *testing.T) {
+	worker, _ := newTestLfsSyncWorker(t, "")
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Length", "4")
+		w.WriteHeader(http.StatusPartialContent)
+		_, _ = w.Write([]byte("data"))
+	}))
+	defer server.Close()
+
+	resp, err := worker.downloadRange(context.Background(), server.URL, 0, 3)
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+	assert.Equal(t, "data", string(body))
+}
+
+func TestLfsSyncWorker_DownloadAndUploadLFSFiles_ContextCanceled(t *testing.T) {
+	worker, mocks := newTestLfsSyncWorker(t, "")
+	ctx, cancel := context.WithCancel(context.Background())
+	ctx = context.WithValue(ctx, rk, "models/test/repo")
+	ctx = context.WithValue(ctx, suk, "http://example.com")
+	ctx = context.WithValue(ctx, dbk, "main")
+	cancel()
+
+	repo := createTestRepository()
+	mirror := createTestMirror(repo, "http://example.com/test/repo.git")
+	task := createTestMirrorTask(mirror, types.MirrorLfsSyncStart)
+
+	pointerGroups := [][]*types.Pointer{
+		{{Oid: "oid1", Size: 1024, DownloadURL: "http://example.com/file"}},
+	}
+
+	err := worker.downloadAndUploadLFSFiles(ctx, task, mirror, pointerGroups, repo)
+	assert.Error(t, err)
+	assert.True(t, errors.Is(err, context.Canceled),
+		"expected context.Canceled, got %v", err)
+	_ = mocks // unused mocks but needed for worker setup
+}
+
+func TestLfsSyncWorker_DownloadAndUploadSmallFile_ContextCanceled(t *testing.T) {
+	worker, _ := newTestLfsSyncWorker(t, "")
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	repo := createTestRepository()
+	pointer := &types.Pointer{
+		Oid:         "oid1",
+		Size:        1024,
+		DownloadURL: "http://example.com/file",
+	}
+
+	err := worker.downloadAndUploadSmallFile(ctx, repo, pointer, "test-key")
+	assert.Error(t, err)
+	assert.True(t, errors.Is(err, context.Canceled),
+		"expected context.Canceled, got %v", err)
 }
