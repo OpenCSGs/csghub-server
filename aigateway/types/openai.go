@@ -277,11 +277,12 @@ type ModelList struct {
 // Fields are passed as strings so the component layer can own parsing,
 // filtering, and pagination behavior consistently.
 type ListModelsReq struct {
-	ModelID  string   `json:"model_id"`
-	Per      string   `json:"per"`
-	Page     string   `json:"page"`
-	LLMTypes []string `json:"llm_types"` // filter by llm_type
-	Task     string   `json:"task"`      // filter by task
+	ModelID            string   `json:"model_id"`
+	Per                string   `json:"per"`
+	Page               string   `json:"page"`
+	LLMTypes           []string `json:"llm_types"` // filter by llm_type
+	Task               string   `json:"task"`      // filter by task
+	HasAssociatedModel *bool    `json:"has_associated_model"`
 }
 
 // UserPreferenceRequest defines the request parameters for UserPreference method

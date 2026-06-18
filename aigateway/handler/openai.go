@@ -9,6 +9,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -252,17 +253,18 @@ type OpenAIHandlerImpl struct {
 
 // ListModels godoc
 // @Summary      List available models
-// @Description  Returns a list of available models, supports fuzzy search by model_id query parameter and filtering by llm_types and task
+// @Description  Returns a list of available models, supports fuzzy search by model_id query parameter and filtering by llm_types, task, and associated CSGHub model repository
 // @Tags         AIGateway
 // @Accept       json
 // @Produce      json
 // @Param        model_id query string false "Model ID for fuzzy search"
 // @Param        llm_types query []string false "Filter by LLM types" Enums(external_llm, serverless, inference)
 // @Param        task query string false "Filter by task (e.g., text-generation, text-to-image, image-to-image)"
+// @Param        has_associated_model query bool false "Filter by whether models are linked to a CSGHub model repository"
 // @Param        per query int false "Models per page (default 20, max 100)"
 // @Param        page query int false "Page number (1-based, default 1)"
 // @Success      200  {object}  types.ModelList "OK"
-// @Failure      400  {object}  error "Invalid llm_types parameter"
+// @Failure      400  {object}  error "Invalid llm_types or has_associated_model parameter"
 // @Failure      500  {object}  error "Internal server error"
 // @Router       /v1/models [get]
 func (h *OpenAIHandlerImpl) ListModels(c *gin.Context) {
@@ -285,12 +287,28 @@ func (h *OpenAIHandlerImpl) ListModels(c *gin.Context) {
 		}
 	}
 
+	var hasAssociatedModel *bool
+	if hasAssociatedModelQuery := c.Query("has_associated_model"); hasAssociatedModelQuery != "" {
+		parsed, parseErr := strconv.ParseBool(hasAssociatedModelQuery)
+		if parseErr != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": types.Error{
+					Code:    "invalid_request_error",
+					Message: invalidHasAssociatedModelErrorMessage(),
+					Type:    "invalid_request_error",
+				}})
+			return
+		}
+		hasAssociatedModel = &parsed
+	}
+
 	resp, err := h.openaiComponent.ListModels(c.Request.Context(), currentUser, types.ListModelsReq{
-		ModelID:  c.Query("model_id"),
-		LLMTypes: llmTypes,
-		Task:     c.Query("task"),
-		Per:      c.Query("per"),
-		Page:     c.Query("page"),
+		ModelID:            c.Query("model_id"),
+		LLMTypes:           llmTypes,
+		Task:               c.Query("task"),
+		HasAssociatedModel: hasAssociatedModel,
+		Per:                c.Query("per"),
+		Page:               c.Query("page"),
 	})
 	if err != nil {
 		slog.ErrorContext(c.Request.Context(), "failed to get available models", "error", err.Error(), "current_user", currentUser)
@@ -317,6 +335,10 @@ func isValidListModelsLLMType(llmType string) bool {
 
 func invalidLLMTypesErrorMessage() string {
 	return fmt.Sprintf("Invalid llm_types parameter. Allowed values: %s, %s, %s", types.ProviderTypeExternalLLM, types.ProviderTypeServerless, types.ProviderTypeInference)
+}
+
+func invalidHasAssociatedModelErrorMessage() string {
+	return "Invalid has_associated_model parameter. Allowed values: true, false"
 }
 
 // GetModel godoc

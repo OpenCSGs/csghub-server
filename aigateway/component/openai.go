@@ -224,6 +224,17 @@ func filterByTask(task string) modelFilter {
 	}
 }
 
+func filterByHasAssociatedModel(hasAssociatedModel bool) modelFilter {
+	return func(m *types.Model) bool {
+		hasRepoPath := false
+		if m != nil && m.Metadata != nil {
+			repoPath, _ := m.Metadata[types.MetaKeyRepoPath].(string)
+			hasRepoPath = strings.TrimSpace(repoPath) != ""
+		}
+		return hasRepoPath == hasAssociatedModel
+	}
+}
+
 func applyFilters(models []types.Model, filters []modelFilter) []types.Model {
 	if len(filters) == 0 {
 		return models
@@ -256,6 +267,9 @@ func filterAndPaginateModels(models []types.Model, req types.ListModelsReq) type
 	}
 	if task := strings.ToLower(req.Task); task != "" {
 		filters = append(filters, filterByTask(task))
+	}
+	if req.HasAssociatedModel != nil {
+		filters = append(filters, filterByHasAssociatedModel(*req.HasAssociatedModel))
 	}
 
 	models = applyFilters(models, filters)
