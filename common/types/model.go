@@ -1,6 +1,7 @@
 package types
 
 import (
+	"encoding/json"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -452,6 +453,40 @@ type ModelConfig struct {
 	NumAttentionHeads int      `json:"num_attention_heads"`
 	TorchDtype        string   `json:"torch_dtype"`
 }
+
+type ModelTextConfig struct {
+	NumHiddenLayers   int    `json:"num_hidden_layers"`
+	HiddenSize        int    `json:"hidden_size"`
+	NumAttentionHeads int    `json:"num_attention_heads"`
+	Dtype             string `json:"dtype"`
+	TorchDtype        string `json:"torch_dtype"`
+}
+
+func (c *ModelConfig) UnmarshalJSON(data []byte) error {
+	type modelConfig ModelConfig
+	var cfg struct {
+		modelConfig
+		TextConfig *ModelTextConfig `json:"text_config"`
+	}
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		return err
+	}
+
+	*c = ModelConfig(cfg.modelConfig)
+	if cfg.TextConfig != nil {
+		c.NumHiddenLayers = cfg.TextConfig.NumHiddenLayers
+		c.HiddenSize = cfg.TextConfig.HiddenSize
+		c.NumAttentionHeads = cfg.TextConfig.NumAttentionHeads
+		if cfg.TextConfig.Dtype != "" {
+			c.TorchDtype = cfg.TextConfig.Dtype
+		}
+		if cfg.TextConfig.TorchDtype != "" {
+			c.TorchDtype = cfg.TextConfig.TorchDtype
+		}
+	}
+	return nil
+}
+
 type EngineConfig struct {
 	EngineName      string            `json:"engine_name"`
 	ContainerPort   int               `json:"container_port"`
