@@ -220,6 +220,57 @@ func TestOpenAIHandler_ListModels(t *testing.T) {
 		assert.Equal(t, "text-generation", response.Data[0].Task)
 	})
 
+	t.Run("passes has_associated_model true query param to component", func(t *testing.T) {
+		tester, c, w := setupTest(t)
+		hasAssociatedModel := true
+
+		tester.WithQuery("has_associated_model", "true")
+
+		tester.mocks.openAIComp.EXPECT().
+			ListModels(mock.Anything, "testuser", types.ListModelsReq{
+				HasAssociatedModel: &hasAssociatedModel,
+			}).
+			Return(types.ModelList{Object: "list", Data: []types.Model{}, HasMore: false, TotalCount: 0}, nil).Once()
+
+		tester.handler.ListModels(c)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+	})
+
+	t.Run("passes has_associated_model false query param to component", func(t *testing.T) {
+		tester, c, w := setupTest(t)
+		hasAssociatedModel := false
+
+		tester.WithQuery("has_associated_model", "false")
+
+		tester.mocks.openAIComp.EXPECT().
+			ListModels(mock.Anything, "testuser", types.ListModelsReq{
+				HasAssociatedModel: &hasAssociatedModel,
+			}).
+			Return(types.ModelList{Object: "list", Data: []types.Model{}, HasMore: false, TotalCount: 0}, nil).Once()
+
+		tester.handler.ListModels(c)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+	})
+
+	t.Run("accepts has_associated_model bool aliases", func(t *testing.T) {
+		tester, c, w := setupTest(t)
+		hasAssociatedModel := true
+
+		tester.WithQuery("has_associated_model", "TRUE")
+
+		tester.mocks.openAIComp.EXPECT().
+			ListModels(mock.Anything, "testuser", types.ListModelsReq{
+				HasAssociatedModel: &hasAssociatedModel,
+			}).
+			Return(types.ModelList{Object: "list", Data: []types.Model{}, HasMore: false, TotalCount: 0}, nil).Once()
+
+		tester.handler.ListModels(c)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+	})
+
 	t.Run("component error", func(t *testing.T) {
 		tester, c, w := setupTest(t)
 		tester.mocks.openAIComp.EXPECT().
@@ -248,6 +299,24 @@ func TestOpenAIHandler_ListModels(t *testing.T) {
 		assert.Contains(t, errObj["message"], types.ProviderTypeServerless)
 		assert.Contains(t, errObj["message"], types.ProviderTypeInference)
 	})
+
+	for _, value := range []string{"yes", "not-a-bool"} {
+		t.Run("invalid has_associated_model parameter "+value, func(t *testing.T) {
+			tester, c, w := setupTest(t)
+			tester.WithQuery("has_associated_model", value)
+
+			tester.handler.ListModels(c)
+
+			assert.Equal(t, http.StatusBadRequest, w.Code)
+			var response map[string]interface{}
+			err := json.Unmarshal(w.Body.Bytes(), &response)
+			assert.NoError(t, err)
+			errObj, ok := response["error"].(map[string]interface{})
+			assert.True(t, ok)
+			assert.Equal(t, "invalid_request_error", errObj["code"])
+			assert.Contains(t, errObj["message"], "Invalid has_associated_model parameter")
+		})
+	}
 
 	t.Run("valid llm_types parameter external_llm", func(t *testing.T) {
 		tester, c, w := setupTest(t)

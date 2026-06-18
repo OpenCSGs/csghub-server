@@ -233,6 +233,62 @@ func TestFilterAndPaginateModels(t *testing.T) {
 		assert.Len(t, resp.Data, 1)
 		assert.Equal(t, "inference-gen", resp.Data[0].ID)
 	})
+
+	t.Run("has_associated_model true keeps models with non-empty repo_path", func(t *testing.T) {
+		hasAssociatedModel := true
+		modelsWithRepoPath := []types.Model{
+			{BaseModel: types.BaseModel{ID: "associated", Object: "model", OwnedBy: "u1", Metadata: map[string]any{types.MetaKeyRepoPath: "ns/model"}}},
+			{BaseModel: types.BaseModel{ID: "blank", Object: "model", OwnedBy: "u1", Metadata: map[string]any{types.MetaKeyRepoPath: " "}}},
+			{BaseModel: types.BaseModel{ID: "missing", Object: "model", OwnedBy: "u1", Metadata: map[string]any{}}},
+			{BaseModel: types.BaseModel{ID: "nil-metadata", Object: "model", OwnedBy: "u1"}},
+			{BaseModel: types.BaseModel{ID: "non-string", Object: "model", OwnedBy: "u1", Metadata: map[string]any{types.MetaKeyRepoPath: 123}}},
+		}
+		resp := filterAndPaginateModels(modelsWithRepoPath, types.ListModelsReq{HasAssociatedModel: &hasAssociatedModel})
+		assert.Equal(t, 1, resp.TotalCount)
+		require.Len(t, resp.Data, 1)
+		assert.Equal(t, "associated", resp.Data[0].ID)
+	})
+
+	t.Run("has_associated_model false keeps models without non-empty repo_path", func(t *testing.T) {
+		hasAssociatedModel := false
+		modelsWithRepoPath := []types.Model{
+			{BaseModel: types.BaseModel{ID: "associated", Object: "model", OwnedBy: "u1", Metadata: map[string]any{types.MetaKeyRepoPath: "ns/model"}}},
+			{BaseModel: types.BaseModel{ID: "empty", Object: "model", OwnedBy: "u1", Metadata: map[string]any{types.MetaKeyRepoPath: ""}}},
+			{BaseModel: types.BaseModel{ID: "missing", Object: "model", OwnedBy: "u1", Metadata: map[string]any{}}},
+			{BaseModel: types.BaseModel{ID: "nil-metadata", Object: "model", OwnedBy: "u1"}},
+			{BaseModel: types.BaseModel{ID: "non-string", Object: "model", OwnedBy: "u1", Metadata: map[string]any{types.MetaKeyRepoPath: 123}}},
+		}
+		resp := filterAndPaginateModels(modelsWithRepoPath, types.ListModelsReq{HasAssociatedModel: &hasAssociatedModel})
+		assert.Equal(t, 4, resp.TotalCount)
+		require.Len(t, resp.Data, 4)
+		assert.Equal(t, "empty", resp.Data[0].ID)
+		assert.Equal(t, "missing", resp.Data[1].ID)
+		assert.Equal(t, "nil-metadata", resp.Data[2].ID)
+		assert.Equal(t, "non-string", resp.Data[3].ID)
+	})
+
+	t.Run("has_associated_model combines with existing filters and pagination", func(t *testing.T) {
+		hasAssociatedModel := true
+		modelsWithRepoPath := []types.Model{
+			{BaseModel: types.BaseModel{ID: "alpha-gen", Object: "model", OwnedBy: "u1", Task: "text-generation", Metadata: map[string]any{types.MetaKeyLLMType: types.ProviderTypeInference, types.MetaKeyRepoPath: "ns/alpha"}}},
+			{BaseModel: types.BaseModel{ID: "beta-gen", Object: "model", OwnedBy: "u1", Task: "text-generation", Metadata: map[string]any{types.MetaKeyLLMType: types.ProviderTypeInference, types.MetaKeyRepoPath: "ns/beta"}}},
+			{BaseModel: types.BaseModel{ID: "gamma-gen", Object: "model", OwnedBy: "u1", Task: "text-generation", Metadata: map[string]any{types.MetaKeyLLMType: types.ProviderTypeInference}}},
+			{BaseModel: types.BaseModel{ID: "delta-image", Object: "model", OwnedBy: "u1", Task: "text-to-image", Metadata: map[string]any{types.MetaKeyLLMType: types.ProviderTypeInference, types.MetaKeyRepoPath: "ns/delta"}}},
+			{BaseModel: types.BaseModel{ID: "external-gen", Object: "model", OwnedBy: "openai", Task: "text-generation", Metadata: map[string]any{types.MetaKeyLLMType: types.ProviderTypeExternalLLM, types.MetaKeyRepoPath: "ns/external", types.MetaKeyPricingConfigured: true}}},
+		}
+		resp := filterAndPaginateModels(modelsWithRepoPath, types.ListModelsReq{
+			ModelID:            "gen",
+			LLMTypes:           []string{types.ProviderTypeInference},
+			Task:               "text-generation",
+			HasAssociatedModel: &hasAssociatedModel,
+			Per:                "1",
+			Page:               "2",
+		})
+		assert.Equal(t, 2, resp.TotalCount)
+		require.Len(t, resp.Data, 1)
+		assert.Equal(t, "beta-gen", resp.Data[0].ID)
+		assert.False(t, resp.HasMore)
+	})
 }
 
 func TestSanitizeMeteringEventForLog(t *testing.T) {
