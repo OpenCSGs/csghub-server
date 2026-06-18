@@ -47,10 +47,10 @@ var (
 	rk            repoPathKey      = "repoPath"
 	suk           sourceUrlKey     = "sourceUrl"
 	dbk           defaultBranchKey = "defaultBranch"
-	maxRetries    int              = 3
+	maxRetries                     = 3
+	MaxGroupCount                  = 15
+	maxPartNum                     = 1000
 	MaxGroupSize  int64            = 10 * 1024 * 1024 * 1024 // 10GB
-	MaxGroupCount int              = 15
-	maxPartNum    int              = 1000
 )
 
 type LfsSyncWorker struct {
@@ -425,7 +425,24 @@ func (w *LfsSyncWorker) getSyncPointers(
 		return pointers, fmt.Errorf("fail to get lfs meta objects: %w", err)
 	}
 	repo := mt.Mirror.Repository
-	var toBeUpdateLfsMetaObjects []database.LfsMetaObject
+
+	slog.Info(
+		"fetched lfs meta objects",
+		slog.Int("workerID", w.id),
+		slog.Int64("repoID", repo.ID),
+		slog.String("repoPath", repoPath),
+		slog.Int("lfsCount", len(lfsMetaObjects)),
+	)
+
+	if len(lfsMetaObjects) == 0 {
+		slog.Info("no lfs files to sync, finish sync lfs", slog.Int("workerId", w.id), slog.String("repoPath", repoPath))
+		return pointers, nil
+	}
+
+	var (
+		existingOIDs []string
+		missingOIDs  []string
+	)
 	for _, lfsMetaObject := range lfsMetaObjects {
 		objectKey := common.BuildLfsPath(repo.ID, lfsMetaObject.Oid, repo.Migrated)
 		exists, err := w.CheckIfLFSFileExists(ctx, objectKey, lfsMetaObject.Size)
@@ -438,26 +455,37 @@ func (w *LfsSyncWorker) getSyncPointers(
 				slog.Any("repoPath", repo.Path),
 				slog.Any("repoType", repo.RepositoryType),
 			)
+			return pointers, fmt.Errorf("failed to check if lfs file exists: %w", err)
 		}
 		if exists {
-			lfsMetaObject.Existing = true
-			toBeUpdateLfsMetaObjects = append(toBeUpdateLfsMetaObjects, lfsMetaObject)
+			existingOIDs = append(existingOIDs, lfsMetaObject.Oid)
 		} else {
+			missingOIDs = append(missingOIDs, lfsMetaObject.Oid)
 			pointers = append(pointers, &types.Pointer{
 				Oid:  lfsMetaObject.Oid,
 				Size: lfsMetaObject.Size,
 			})
 		}
 	}
-	if len(toBeUpdateLfsMetaObjects) > 0 {
-		err = w.lfsMetaObjectStore.BulkUpdateOrCreate(ctx, repo.ID, toBeUpdateLfsMetaObjects)
-		if err != nil {
-			slog.Error(
-				"failed to update lfs meta objects",
-				slog.Int("workerID", w.id),
-				slog.Any("error", err),
-			)
-		}
+
+	slog.Info(
+		"checked lfs meta objects",
+		slog.Int("workerID", w.id),
+		slog.Int64("repoID", repo.ID),
+		slog.String("repoPath", repoPath),
+		slog.Int("lfsCount", len(lfsMetaObjects)),
+		slog.Int("existingCount", len(existingOIDs)),
+		slog.Int("missingCount", len(missingOIDs)),
+	)
+
+	if err = w.lfsMetaObjectStore.BulkUpdateExistingByOIDs(ctx, repo.ID, existingOIDs, missingOIDs); err != nil {
+		slog.Error(
+			"failed to update lfs meta objects",
+			slog.String("repoPath", repoPath),
+			slog.Int("workerID", w.id),
+			slog.Any("error", err),
+		)
+		return pointers, fmt.Errorf("failed to update lfs meta objects: %w", err)
 	}
 
 	if len(pointers) == 0 {
@@ -512,6 +540,7 @@ func (w *LfsSyncWorker) downloadAndUploadLFSFiles(
 	pointerGroups [][]*types.Pointer,
 	repo *database.Repository,
 ) error {
+	var finalErr error
 	totalPointerCount := 0
 	syncedPointerCount := 0
 
@@ -536,6 +565,7 @@ func (w *LfsSyncWorker) downloadAndUploadLFSFiles(
 		for _, pointer := range pointers {
 			err := w.downloadAndUploadLFSFile(ctx, repo, pointer)
 			if err != nil {
+				finalErr = err
 				slog.Error("failed to download and upload lfs file",
 					slog.Any("error", err),
 					slog.Int("workerID", w.id),
@@ -555,6 +585,9 @@ func (w *LfsSyncWorker) downloadAndUploadLFSFiles(
 				return fmt.Errorf("failed to update mirror task progress: %w", err)
 			}
 		}
+	}
+	if finalErr != nil {
+		return finalErr
 	}
 
 	return nil
@@ -577,6 +610,7 @@ func (w *LfsSyncWorker) downloadAndUploadLFSFile(
 			slog.Any("repoPath", repo.Path),
 			slog.Any("repoType", repo.RepositoryType),
 		)
+		return fmt.Errorf("failed to check if lfs file exists: %w", err)
 	}
 	lmo := database.LfsMetaObject{
 		Size:         pointer.Size,
@@ -1163,7 +1197,7 @@ func (w *LfsSyncWorker) downloadAndUploadPartWithRetry(
 				slog.Any("attempt", attempt),
 				slog.Any("error", err),
 			)
-			if resp.StatusCode == http.StatusForbidden {
+			if resp != nil && resp.StatusCode == http.StatusForbidden {
 				sourceURL := ctx.Value(suk).(string)
 				defaultBranch := ctx.Value(dbk).(string)
 				pointers, err := w.GetLFSDownloadURLs(ctx, sourceURL, defaultBranch, []*types.Pointer{pointer})
@@ -1176,7 +1210,9 @@ func (w *LfsSyncWorker) downloadAndUploadPartWithRetry(
 			return part, fmt.Errorf("failed to download range: %w", err)
 		}
 
-		defer resp.Body.Close()
+		if resp != nil {
+			defer resp.Body.Close()
+		}
 
 		slog.Info(
 			"uploading range",
@@ -1250,11 +1286,11 @@ func (w *LfsSyncWorker) downloadRange(
 
 	resp, err := w.httpClient.Do(req)
 	if err != nil {
-		return nil, err
+		return resp, err
 	}
 
 	if resp.StatusCode != http.StatusPartialContent && resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("unexpected status code %d", resp.StatusCode)
+		return resp, fmt.Errorf("unexpected status code %d", resp.StatusCode)
 	}
 
 	return resp, nil
@@ -1268,7 +1304,7 @@ func (w *LfsSyncWorker) CheckIfLFSFileExists(
 	objInfo, err := w.ossClient.StatObject(ctx, w.config.S3.Bucket, objectKey, minio.StatObjectOptions{})
 	if err != nil {
 		// Check if it's a "not found" error
-		if strings.Contains(err.Error(), "NoSuchKey") || strings.Contains(err.Error(), "not found") {
+		if strings.Contains(err.Error(), "NoSuchKey") || strings.Contains(err.Error(), "not found") || strings.Contains(err.Error(), "key does not exist") {
 			return false, nil
 		}
 		return false, err
@@ -1419,6 +1455,7 @@ func (w *LfsSyncWorker) triggerGitCallback(
 
 	workflowOptions := client.StartWorkflowOptions{
 		TaskQueue: workflow.HandlePushQueueName,
+		ID:        fmt.Sprintf("mirror-lfs-%s-%s-%s-%s", repo.RepositoryType, namespace, name, commit.ID),
 	}
 
 	_, err = w.workflowClient.ExecuteWorkflow(
