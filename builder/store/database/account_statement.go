@@ -196,6 +196,7 @@ func (as *accountStatementStoreImpl) deductFeeStatement(ctx context.Context, inp
 
 		var err error
 		var changed ChangedValue
+		initEventValue := input.Value
 
 		if utils.IsGetTokenID(input.Scene) && len(input.APIKey) > 0 {
 			token, err := findByTokenValue(ctx, tx, input.APIKey)
@@ -217,11 +218,11 @@ func (as *accountStatementStoreImpl) deductFeeStatement(ctx context.Context, inp
 			}
 			return fmt.Errorf("deduct account fee, error: %w", err)
 		}
-		eventValue := input.Value
-		calcValue := eventValue - changed.Voucher
+
+		calcValue := initEventValue - changed.Voucher
 		consumption := 0.0
-		if eventValue != 0 {
-			consumption = math.Abs(calcValue/eventValue) * input.Consumption
+		if initEventValue != 0 {
+			consumption = math.Abs(calcValue/initEventValue) * input.Consumption
 		} else {
 			consumption = input.Consumption
 		}
@@ -255,6 +256,7 @@ func (as *accountStatementStoreImpl) deductFeeStatement(ctx context.Context, inp
 func DeductAccountFee(ctx context.Context, tx bun.Tx, input AccountStatement, checkBalance bool) (ChangedValue, error) {
 	var err error
 	var acctUser AccountUser
+	initEventValue := input.Value
 	changedValue := ChangedValue{
 		Cash:    0.0,
 		Voucher: 0.0,
@@ -282,7 +284,6 @@ func DeductAccountFee(ctx context.Context, tx bun.Tx, input AccountStatement, ch
 		}
 	}
 
-	initValue := input.Value
 	remainValue := input.Value
 	cashChangePart1 := 0.0
 	cashChangePart2 := 0.0
@@ -302,7 +303,7 @@ func DeductAccountFee(ctx context.Context, tx bun.Tx, input AccountStatement, ch
 		if err != nil {
 			return changedValue, fmt.Errorf("deduct voucher, error:%w", err)
 		}
-		changedValue.Voucher = initValue - remainValue
+		changedValue.Voucher = initEventValue - remainValue
 	}
 
 	// 2. check and reduce cash
@@ -561,47 +562,48 @@ func updateFeeBill(ctx context.Context, tx bun.Tx, input AccountStatement, billV
 	if !utils.IsNeedCalculateBill(input.Scene) {
 		return nil
 	}
-	// calculate bill
-	bill := AccountBill{
-		BillDate:        input.EventDate,
-		UserUUID:        input.UserUUID,
-		Scene:           input.Scene,
-		CustomerID:      input.CustomerID,
-		Value:           billValues.TotalValue,
-		Consumption:     billValues.Consumption,
-		PromptToken:     input.PromptToken,
-		CompletionToken: input.CompletionToken,
-		Count:           1,
-		TokenID:         input.TokenID,
-		DataType:        input.DataType,
-		Resolution:      input.Resolution,
-		Duration:        input.Duration,
-		VoucherNo:       input.VoucherNo,
-		VoucherValue:    billValues.VoucherValue,
-		CashValue:       billValues.CashValue,
-	}
-	if input.Scene == types.SceneMultiModalServerless {
-		bill.UnitType = input.SkuUnitType
-	}
+	if billValues.TotalValue != 0 {
+		// calculate bill
+		bill := AccountBill{
+			BillDate:        input.EventDate,
+			UserUUID:        input.UserUUID,
+			Scene:           input.Scene,
+			CustomerID:      input.CustomerID,
+			Value:           billValues.TotalValue,
+			Consumption:     billValues.Consumption,
+			PromptToken:     input.PromptToken,
+			CompletionToken: input.CompletionToken,
+			Count:           1,
+			TokenID:         input.TokenID,
+			DataType:        input.DataType,
+			Resolution:      input.Resolution,
+			Duration:        input.Duration,
+			VoucherNo:       input.VoucherNo,
+			VoucherValue:    billValues.VoucherValue,
+			CashValue:       billValues.CashValue,
+		}
+		if input.Scene == types.SceneMultiModalServerless {
+			bill.UnitType = input.SkuUnitType
+		}
 
-	// depend on unique index for update
-	_, err := tx.NewInsert().Model(&bill).
-		On("CONFLICT (bill_date, user_uuid, scene, customer_id, token_id, data_type, resolution, voucher_no, unit_type) DO UPDATE").
-		Set("value = account_bill.value + ?", input.Value).
-		Set("consumption = account_bill.consumption + ?", billValues.Consumption).
-		Set("prompt_token = account_bill.prompt_token + ?", input.PromptToken).
-		Set("completion_token = account_bill.completion_token + ?", input.CompletionToken).
-		Set("duration = account_bill.duration + ?", input.Duration).
-		Set("count = account_bill.count + ?", 1).
-		Set("voucher_value = account_bill.voucher_value + ?", billValues.VoucherValue).
-		Set("cash_value = account_bill.cash_value + ?", billValues.CashValue).
-		Set("updated_at = current_timestamp").
-		Exec(ctx)
+		// depend on unique index for update
+		_, err := tx.NewInsert().Model(&bill).
+			On("CONFLICT (bill_date, user_uuid, scene, customer_id, token_id, data_type, resolution, voucher_no, unit_type) DO UPDATE").
+			Set("value = account_bill.value + ?", billValues.TotalValue).
+			Set("consumption = account_bill.consumption + ?", billValues.Consumption).
+			Set("prompt_token = account_bill.prompt_token + ?", input.PromptToken).
+			Set("completion_token = account_bill.completion_token + ?", input.CompletionToken).
+			Set("duration = account_bill.duration + ?", input.Duration).
+			Set("count = account_bill.count + ?", 1).
+			Set("voucher_value = account_bill.voucher_value + ?", billValues.VoucherValue).
+			Set("cash_value = account_bill.cash_value + ?", billValues.CashValue).
+			Set("updated_at = current_timestamp").
+			Exec(ctx)
 
-	if err != nil {
-		return fmt.Errorf("update bill for %s user %s, error:%w", input.EventUUID, input.UserUUID, err)
+		if err != nil {
+			return fmt.Errorf("update bill for %s user %s, error:%w", input.EventUUID, input.UserUUID, err)
+		}
 	}
-
 	if len(input.APIKey) > 0 {
 		err := UpdateAPIKeyUsage(ctx, tx, input)
 		if err != nil {
