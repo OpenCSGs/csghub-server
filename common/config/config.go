@@ -683,8 +683,8 @@ type Config struct {
 	}
 
 	AuditLog struct {
-		Enabled      bool     `env:"STARHUB_SERVER_AUDIT_LOG_ENABLE" default:"false"`
-		RecordTables []string `env:"STARHUB_SERVER_AUDIT_LOG_RECORD_TABLES" default:"[model,repository,tag,tag_category]"`
+		Enabled          bool     `env:"STARHUB_SERVER_AUDIT_LOG_ENABLE" default:"false"`
+		SkipRecordTables []string `env:"STARHUB_SERVER_AUDIT_LOG_SKIP_RECORD_TABLES" default:"[]"`
 	}
 
 	Skill struct {
