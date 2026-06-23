@@ -372,6 +372,61 @@ func TestExecuteChatProxyAttempt_ProxiesRequestAfterUsageLimitCheck(t *testing.T
 	require.True(t, retryWriter.StreamStarted())
 }
 
+func TestExecuteChatProxyAttempt_RewritesResponsesURLForChatRequest(t *testing.T) {
+	tester, c, _ := setupTest(t)
+	tester.mocks.openAIComp.ExpectedCalls = nil
+
+	var receivedPath string
+	var receivedBody string
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		receivedPath = r.URL.Path
+		body, err := io.ReadAll(r.Body)
+		require.NoError(t, err)
+		receivedBody = string(body)
+		w.WriteHeader(http.StatusOK)
+		_, err = w.Write([]byte(`{"status":"ok"}`))
+		require.NoError(t, err)
+	}))
+	defer upstream.Close()
+
+	responsesURL := upstream.URL + "/v1/responses"
+	chatURL := upstream.URL + "/v1/chat/completions"
+	modelTarget := &resolvedModelTarget{
+		Model: &types.Model{
+			BaseModel: types.BaseModel{ID: "test-model"},
+			Endpoint:  responsesURL,
+		},
+		Upstream:  commontypes.UpstreamConfig{ID: 1, URL: responsesURL, Enabled: true},
+		ModelName: "provider-model",
+		Target:    responsesURL,
+	}
+	applyChatCompletionsEndpointCompatibility(c.Request.Context(), modelTarget)
+
+	tester.mocks.openAIComp.EXPECT().
+		CheckUsageLimit(mock.Anything, "user-1", modelTarget.Model, chatURL).
+		Return(nil).
+		Once()
+
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewReader([]byte(`{"message":"hello"}`)))
+	writer := newTestCommonResponseWriter()
+	chatReq := &ChatCompletionRequest{
+		Model: "test-model",
+	}
+
+	retryWriter, err := tester.handler.executeChatProxyAttempt(c, writer, modelTarget, "user-1", chatReq)
+
+	require.NoError(t, err)
+	require.NotNil(t, retryWriter)
+	require.Equal(t, chatURL, modelTarget.Target)
+	require.Equal(t, chatURL, modelTarget.Model.Endpoint)
+	require.Equal(t, chatURL, modelTarget.Upstream.URL)
+	require.Equal(t, "/v1/chat/completions", receivedPath)
+	var forwardedBody map[string]any
+	require.NoError(t, json.Unmarshal([]byte(receivedBody), &forwardedBody))
+	require.Equal(t, "provider-model", forwardedBody["model"])
+	require.Equal(t, http.StatusOK, retryWriter.StatusCode())
+}
+
 func TestRetryChatWithFallback_ReturnsNilWithoutFallbackTargets(t *testing.T) {
 	tester, c, _ := setupTest(t)
 	tester.mocks.openAIComp.ExpectedCalls = nil
@@ -490,6 +545,56 @@ func TestRetryChatWithFallback_ContinuesUntilNextFallbackSucceeds(t *testing.T) 
 	require.Equal(t, `ok from second fallback`, writer.body.String())
 	require.Equal(t, secondFallbackURL, modelTarget.Target)
 	require.Equal(t, secondFallbackURL, modelTarget.Model.Endpoint)
+}
+
+func TestRetryChatWithFallback_RewritesResponsesFallbackURLForChatRequest(t *testing.T) {
+	tester, c, _ := setupTest(t)
+	tester.mocks.openAIComp.ExpectedCalls = nil
+
+	var receivedPath string
+	fallback := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		receivedPath = r.URL.Path
+		w.WriteHeader(http.StatusOK)
+		_, err := w.Write([]byte(`ok from fallback`))
+		require.NoError(t, err)
+	}))
+	defer fallback.Close()
+
+	responsesURL := fallback.URL + "/v1/responses"
+	chatURL := fallback.URL + "/v1/chat/completions"
+	modelTarget := &resolvedModelTarget{
+		Model: &types.Model{
+			BaseModel: types.BaseModel{ID: "test-model"},
+			Endpoint:  "https://primary.example.com/v1/chat/completions",
+			Upstreams: []commontypes.UpstreamConfig{
+				{ID: 2, URL: responsesURL, Enabled: true},
+			},
+		},
+		ModelName: "test-model",
+		Target:    "https://primary.example.com/v1/chat/completions",
+		AttemptTargets: []commontypes.UpstreamConfig{
+			{ID: 2, URL: responsesURL, Enabled: true, ModelName: "fallback-model"},
+		},
+	}
+	tester.mocks.openAIComp.EXPECT().
+		CheckUsageLimit(mock.Anything, "user-1", modelTarget.Model, chatURL).
+		Return(nil).
+		Once()
+
+	body := []byte(`{"message":"hello"}`)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewReader(body))
+	writer := newTestCommonResponseWriter()
+
+	_, err := tester.handler.retryChatWithFallback(c, writer, modelTarget, "user-1", &ChatCompletionRequest{Model: "test-model"}, nil, nil)
+
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, writer.statusCode)
+	require.Equal(t, `ok from fallback`, writer.body.String())
+	require.Equal(t, "/v1/chat/completions", receivedPath)
+	require.Equal(t, chatURL, modelTarget.Target)
+	require.Equal(t, chatURL, modelTarget.Model.Endpoint)
+	require.Equal(t, chatURL, modelTarget.Upstream.URL)
+	require.Equal(t, "fallback-model", modelTarget.ModelName)
 }
 
 func TestRetryChatWithFallback_UsesFallbackModelName(t *testing.T) {

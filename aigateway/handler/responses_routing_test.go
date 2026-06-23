@@ -1,0 +1,74 @@
+package handler
+
+import (
+	"testing"
+
+	"github.com/stretchr/testify/require"
+	"opencsg.com/csghub-server/aigateway/types"
+)
+
+func TestResolveResponsesRoutingNativeResponsesURL(t *testing.T) {
+	target := "https://api.openai.com/v1/responses?api-version=preview"
+	decision, err := resolveResponsesRouting(&resolvedModelTarget{
+		Model:  &types.Model{BaseModel: types.BaseModel{ID: "gpt"}},
+		Target: target,
+	})
+	require.NoError(t, err)
+	require.Equal(t, ResponsesModeNative, decision.Mode)
+	require.Equal(t, target, decision.NativeURL)
+	require.Equal(t, "upstream_url_responses", decision.Reason)
+}
+
+func TestResolveResponsesRoutingChatCompletionsURL(t *testing.T) {
+	decision, err := resolveResponsesRouting(&resolvedModelTarget{
+		Model:  &types.Model{BaseModel: types.BaseModel{ID: "chat-model"}},
+		Target: "https://cloud.infini-ai.com/maas/v1/chat/completions",
+	})
+	require.NoError(t, err)
+	require.Equal(t, ResponsesModeChatAdapter, decision.Mode)
+	require.Empty(t, decision.NativeURL)
+	require.Equal(t, "upstream_url_chat_completions", decision.Reason)
+}
+
+func TestResolveResponsesRoutingAzureChatCompletionsURL(t *testing.T) {
+	decision, err := resolveResponsesRouting(&resolvedModelTarget{
+		Model:  &types.Model{BaseModel: types.BaseModel{ID: "azure-gpt"}},
+		Target: "https://opencsg-us.openai.azure.com/openai/deployments/csg-gpt4/chat/completions?api-version=2024-02-15-preview",
+	})
+	require.NoError(t, err)
+	require.Equal(t, ResponsesModeChatAdapter, decision.Mode)
+}
+
+func TestResolveResponsesRoutingUnsupportedURL(t *testing.T) {
+	decision, err := resolveResponsesRouting(&resolvedModelTarget{
+		Model:  &types.Model{BaseModel: types.BaseModel{ID: "embedding-model"}},
+		Target: "https://cloud.infini-ai.com/maas/v1/embeddings",
+	})
+	require.NoError(t, err)
+	require.Equal(t, ResponsesModeDisabled, decision.Mode)
+	require.Equal(t, "unsupported_upstream_url", decision.Reason)
+}
+
+func TestResolveResponsesRoutingRejectsPartialPathSegmentMatches(t *testing.T) {
+	for _, target := range []string{
+		"https://api.example.com/v1/responses-extra",
+		"https://api.example.com/v1/chat/completions-extra",
+	} {
+		decision, err := resolveResponsesRouting(&resolvedModelTarget{
+			Model:  &types.Model{BaseModel: types.BaseModel{ID: "model"}},
+			Target: target,
+		})
+		require.NoError(t, err)
+		require.Equal(t, ResponsesModeDisabled, decision.Mode)
+		require.Equal(t, "unsupported_upstream_url", decision.Reason)
+	}
+}
+
+func TestResolveResponsesRoutingInvalidURL(t *testing.T) {
+	_, err := resolveResponsesRouting(&resolvedModelTarget{
+		Model:  &types.Model{BaseModel: types.BaseModel{ID: "bad-model"}},
+		Target: "not-a-url",
+	})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "cannot resolve responses mode")
+}

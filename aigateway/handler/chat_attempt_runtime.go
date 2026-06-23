@@ -6,6 +6,9 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
+	"strings"
+
 	commonType "opencsg.com/csghub-server/common/types"
 
 	"opencsg.com/csghub-server/aigateway/component"
@@ -50,6 +53,45 @@ func updateChatAttemptRuntime(tokenCounter token.ChatTokenCounter, logCapture co
 	}
 }
 
+// applyChatCompletionsEndpointCompatibility keeps /v1/chat/completions usable
+// when an upstream is configured with a sibling /responses endpoint. This is a
+// URL compatibility shortcut only; it does not adapt Chat payloads to Responses.
+func applyChatCompletionsEndpointCompatibility(ctx context.Context, modelTarget *resolvedModelTarget) {
+	rewritten, ok := rewriteResponsesURLToChatCompletions(modelTarget.Target)
+	if !ok {
+		return
+	}
+	original := modelTarget.Target
+	modelTarget.Target = rewritten
+	modelTarget.Model.Endpoint = rewritten
+	modelTarget.Upstream.URL = rewritten
+	slog.InfoContext(ctx, "rewrite responses upstream url for chat completions request",
+		slog.String("api", "/v1/chat/completions"),
+		slog.String("original_upstream_url", original),
+		slog.String("rewritten_upstream_url", rewritten),
+		slog.String("compatibility", "url_path_shortcut_not_chat_responses_adapter"),
+		slog.String("reason", "upstream_url_responses_to_chat_completions"))
+}
+
+func rewriteResponsesURLToChatCompletions(rawURL string) (string, bool) {
+	rawURL = strings.TrimSpace(rawURL)
+	if rawURL == "" {
+		return "", false
+	}
+	parsed, err := url.Parse(rawURL)
+	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+		return rawURL, false
+	}
+	path := strings.TrimRight(parsed.Path, "/")
+	if !pathEndsWithSegments(path, "responses") {
+		return rawURL, false
+	}
+	parts := strings.Split(path, "/")
+	parts[len(parts)-1] = "chat/completions"
+	parsed.Path = strings.Join(parts, "/")
+	return parsed.String(), true
+}
+
 func applyChatFallbackTarget(ctx context.Context, headers http.Header, modelTarget *resolvedModelTarget, upstream commonType.UpstreamConfig, tokenCounter token.ChatTokenCounter, logCapture component.LLMLogRecorder) {
 	targetURL := upstream.URL
 	modelTarget.Target = targetURL
@@ -61,5 +103,6 @@ func applyChatFallbackTarget(ctx context.Context, headers http.Header, modelTarg
 	if err := applyModelAuthHeaders(headers, modelTarget.Model); err != nil {
 		slog.WarnContext(ctx, "invalid fallback auth head", slog.String("model", modelTarget.ModelName), slog.Any("error", err))
 	}
+	applyChatCompletionsEndpointCompatibility(ctx, modelTarget)
 	updateChatAttemptRuntime(tokenCounter, logCapture, modelTarget)
 }

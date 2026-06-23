@@ -48,6 +48,50 @@ func TestResolveModelTarget_ModelNotFound(t *testing.T) {
 	require.Equal(t, "model_not_found", targetErr.APIError.Code)
 }
 
+func TestResolveModelTargetWithOptionsRequiredUpstreamID(t *testing.T) {
+	tester, _, _ := setupTest(t)
+	model := &types.Model{
+		BaseModel: types.BaseModel{ID: "public-model"},
+		Upstreams: []commontypes.UpstreamConfig{
+			{ID: 1, URL: "https://adapter.example.com/v1/chat/completions", Enabled: true, Provider: "anthropic", ModelName: "claude"},
+			{ID: 2, URL: "https://native.example.com/v1/chat/completions", Enabled: true, Provider: "openai", ModelName: "gpt-4o"},
+		},
+	}
+	tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "public-model").Return(model, nil).Once()
+
+	resolved, err := tester.handler.resolveModelTargetWithOptions(context.Background(), "testuser", "public-model", http.Header{}, modelTargetResolveOptions{
+		RequiredUpstreamID: 2,
+	})
+	require.NoError(t, err)
+	require.Equal(t, int64(2), resolved.Upstream.ID)
+	require.Equal(t, "https://native.example.com/v1/chat/completions", resolved.Target)
+	require.Equal(t, "gpt-4o", resolved.ModelName)
+
+	decision, err := resolveResponsesRouting(resolved)
+	require.NoError(t, err)
+	require.Equal(t, ResponsesModeChatAdapter, decision.Mode)
+	require.Empty(t, decision.NativeURL)
+}
+
+func TestResolveModelTargetWithOptionsRequiredUpstreamIDUnavailable(t *testing.T) {
+	tester, _, _ := setupTest(t)
+	model := &types.Model{
+		BaseModel: types.BaseModel{ID: "public-model"},
+		Upstreams: []commontypes.UpstreamConfig{
+			{ID: 1, URL: "https://adapter.example.com/v1/chat/completions", Enabled: true, Provider: "anthropic", ModelName: "claude"},
+		},
+	}
+	tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "public-model").Return(model, nil).Once()
+
+	_, err := tester.handler.resolveModelTargetWithOptions(context.Background(), "testuser", "public-model", http.Header{}, modelTargetResolveOptions{
+		RequiredUpstreamID: 2,
+	})
+	require.Error(t, err)
+	targetErr, ok := err.(*modelTargetError)
+	require.True(t, ok)
+	require.Equal(t, "required_upstream_unavailable", targetErr.APIError.Code)
+}
+
 func TestResolveModelTarget_ExternalModelSessionHash(t *testing.T) {
 	tester, _, _ := setupTest(t)
 	model := &types.Model{

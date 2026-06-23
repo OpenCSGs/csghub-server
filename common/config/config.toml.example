@@ -13,6 +13,9 @@ port = 8080
 public_domain = "http://localhost:8080"
 ssh_domain = "git@localhost:2222"
 
+[aigateway]
+responses_id_secret = "responses-id-secret"
+
 [mirror]
 url = "http://localhost:8085"
 token = ""

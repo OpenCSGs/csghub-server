@@ -458,6 +458,7 @@ type Config struct {
 		ModerationBypassSensitiveCheck       bool   `env:"OPENCSG_AIGATEWAY_MODERATION_BYPASS_SENSITIVE_CHECK" default:"false"`
 		SensitiveDefaultImg                  string `env:"STARHUB_SERVER_AIGATEWAY_SENSITIVE_DEFAULT_IMG" default:""`
 		PresignExpirySeconds                 int    `env:"OPENCSG_AIGATEWAY_PRESIGN_EXPIRY" default:"86400"`
+		ResponsesIDSecret                    string `env:"OPENCSG_AIGATEWAY_RESPONSES_ID_SECRET" default:"responses-id-secret"`
 		EnableLLMLog                         bool   `env:"OPENCSG_AIGATEWAY_LLMLOG_ENABLE" default:"true"`
 		EnableLLMTrace                       bool   `env:"OPENCSG_AIGATEWAY_LLM_TRACE_ENABLE" default:"true"`
 		LLMTraceContentCapture               string `env:"OPENCSG_AIGATEWAY_LLM_TRACE_CONTENT_CAPTURE" default:"metadata_only"`

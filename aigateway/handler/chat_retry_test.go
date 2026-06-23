@@ -113,6 +113,61 @@ func TestBuildChatAttemptTargets_DisableFallbacks(t *testing.T) {
 	require.Empty(t, targets)
 }
 
+func TestRewriteResponsesURLToChatCompletions(t *testing.T) {
+	tests := []struct {
+		name      string
+		input     string
+		expected  string
+		rewritten bool
+	}{
+		{
+			name:      "openai responses",
+			input:     "https://api.openai.com/v1/responses",
+			expected:  "https://api.openai.com/v1/chat/completions",
+			rewritten: true,
+		},
+		{
+			name:      "azure responses with query",
+			input:     "https://example.openai.azure.com/openai/deployments/gpt/responses?api-version=2026-01-01-preview",
+			expected:  "https://example.openai.azure.com/openai/deployments/gpt/chat/completions?api-version=2026-01-01-preview",
+			rewritten: true,
+		},
+		{
+			name:      "trailing slash",
+			input:     "https://api.openai.com/v1/responses/",
+			expected:  "https://api.openai.com/v1/chat/completions",
+			rewritten: true,
+		},
+		{
+			name:      "chat completions unchanged",
+			input:     "https://api.openai.com/v1/chat/completions",
+			expected:  "https://api.openai.com/v1/chat/completions",
+			rewritten: false,
+		},
+		{
+			name:      "responses extra unchanged",
+			input:     "https://api.openai.com/v1/responses-extra",
+			expected:  "https://api.openai.com/v1/responses-extra",
+			rewritten: false,
+		},
+		{
+			name:      "invalid unchanged",
+			input:     "://bad-url",
+			expected:  "://bad-url",
+			rewritten: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			actual, rewritten := rewriteResponsesURLToChatCompletions(tt.input)
+
+			require.Equal(t, tt.rewritten, rewritten)
+			require.Equal(t, tt.expected, actual)
+		})
+	}
+}
+
 func TestSessionKeyDigest(t *testing.T) {
 	digest1 := sessionKeyDigest("session-1")
 	digest2 := sessionKeyDigest("session-1")
