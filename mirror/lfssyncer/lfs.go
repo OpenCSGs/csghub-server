@@ -1304,6 +1304,10 @@ func (w *LfsSyncWorker) CheckIfLFSFileExists(
 	objInfo, err := w.ossClient.StatObject(ctx, w.config.S3.Bucket, objectKey, minio.StatObjectOptions{})
 	if err != nil {
 		// Check if it's a "not found" error
+		var minioErr minio.ErrorResponse
+		if errors.As(err, &minioErr) && minioErr.StatusCode == http.StatusNotFound && minioErr.Code != "NoSuchBucket" {
+			return false, nil
+		}
 		if strings.Contains(err.Error(), "NoSuchKey") || strings.Contains(err.Error(), "not found") || strings.Contains(err.Error(), "key does not exist") {
 			return false, nil
 		}
