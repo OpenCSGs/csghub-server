@@ -160,7 +160,9 @@ func (w *LfsSyncWorker) Run(mt *database.MirrorTask) {
 		)
 		mt.ErrorMessage = "mirror not found"
 		mt.Status = types.MirrorLfsSyncFailed
-		_, updateErr := w.mirrorTaskStore.Update(w.ctx, *mt)
+		updateCtx, updateCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer updateCancel()
+		_, updateErr := w.mirrorTaskStore.Update(updateCtx, *mt)
 		if updateErr != nil {
 			slog.Error("fail to update mirror task",
 				slog.Int("workerID", w.id),
@@ -176,6 +178,17 @@ func (w *LfsSyncWorker) Run(mt *database.MirrorTask) {
 			slog.Int("workerID", w.id),
 			slog.Any("error", err),
 		)
+		mt.ErrorMessage = err.Error()
+		mt.Status = types.MirrorLfsSyncFailed
+		updateCtx, updateCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer updateCancel()
+		_, updateErr := w.mirrorTaskStore.Update(updateCtx, *mt)
+		if updateErr != nil {
+			slog.Error("fail to update mirror task",
+				slog.Int("workerID", w.id),
+				slog.Any("error", updateErr),
+			)
+		}
 		return
 	}
 
@@ -185,6 +198,17 @@ func (w *LfsSyncWorker) Run(mt *database.MirrorTask) {
 			slog.Int("workerId", w.id),
 			slog.Any("error", err),
 		)
+		mt.ErrorMessage = err.Error()
+		mt.Status = types.MirrorLfsSyncFailed
+		updateCtx, updateCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer updateCancel()
+		_, updateErr := w.mirrorTaskStore.Update(updateCtx, *mt)
+		if updateErr != nil {
+			slog.Error("fail to update mirror task",
+				slog.Int("workerID", w.id),
+				slog.Any("error", updateErr),
+			)
+		}
 		return
 	}
 
@@ -244,41 +268,21 @@ func (w *LfsSyncWorker) Run(mt *database.MirrorTask) {
 		mt.Progress = 100
 	}
 
-	mtFSM := database.NewMirrorTaskWithFSM(mt)
 	// Can not use w.ctx cause it could be canceled
 	ctx := context.Background()
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	canContinue := mtFSM.SubmitEvent(ctx, action)
-	if !canContinue {
-		slog.Error("fail to submit event",
+	updatedMt, err := w.mirrorTaskStore.UpdateStatusAndRepoSyncStatus(ctx, *mt, action)
+	if err != nil {
+		slog.Error("fail to update mirror task status and repository status",
 			slog.Int("workerID", w.id),
 			slog.Any("status", mt.Status),
 			slog.Any("action", action),
-		)
-
-		mt.ErrorMessage = fmt.Sprintf("fail to submit event, status: %s, action: %s", mt.Status, action)
-		mt.Status = types.MirrorLfsSyncFailed
-		repoSyncStatus := common.MirrorTaskStatusToRepoStatus(mt.Status)
-		_, updateErr := w.mirrorTaskStore.UpdateStatusAndRepoSyncStatus(w.ctx, *mt, repoSyncStatus)
-		if updateErr != nil {
-			slog.Error("fail to update mirror task",
-				slog.Int("workerID", w.id),
-				slog.Any("error", updateErr),
-			)
-		}
-		return
-	}
-	mt.Status = types.MirrorTaskStatus(mtFSM.Current())
-	repoSyncStatus := common.MirrorTaskStatusToRepoStatus(mt.Status)
-	_, err = w.mirrorTaskStore.UpdateStatusAndRepoSyncStatus(ctx, *mt, repoSyncStatus)
-	if err != nil {
-		slog.Error("fail to update mirror task",
-			slog.Int("workerID", w.id),
 			slog.Any("error", err),
 		)
 		return
 	}
+	*mt = updatedMt
 
 	err = w.sendMessage(ctx, mirror, mt.Status)
 	if err != nil {
@@ -549,6 +553,12 @@ func (w *LfsSyncWorker) downloadAndUploadLFSFiles(
 	}
 
 	for _, pointers := range pointerGroups {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
 		pointers, err := w.GetLFSDownloadURLs(ctx, mirror.SourceUrl, repo.DefaultBranch, pointers)
 		if err != nil {
 			slog.Error(
@@ -563,11 +573,19 @@ func (w *LfsSyncWorker) downloadAndUploadLFSFiles(
 		}
 
 		for _, pointer := range pointers {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			default:
+			}
+
 			err := w.downloadAndUploadLFSFile(ctx, repo, pointer)
 			if err != nil {
+				if errors.Is(err, context.Canceled) {
+					return err
+				}
 				finalErr = err
 				slog.Error("failed to download and upload lfs file",
-					slog.Any("error", err),
 					slog.Int("workerID", w.id),
 					slog.Any("error", err),
 					slog.Any("sourceURL", mirror.SourceUrl),
@@ -575,12 +593,13 @@ func (w *LfsSyncWorker) downloadAndUploadLFSFiles(
 					slog.Any("repoType", repo.RepositoryType),
 					slog.Any("pointer", pointer),
 				)
+			} else {
+				syncedPointerCount++
 			}
 
-			syncedPointerCount++
 			// Update the progress of the mirror task
 			mt.Progress = int(math.Ceil(float64(syncedPointerCount) / float64(totalPointerCount) * 100))
-			_, err = w.mirrorTaskStore.Update(ctx, *mt)
+			_, err = w.mirrorTaskStore.UpdateProgress(ctx, *mt)
 			if err != nil {
 				return fmt.Errorf("failed to update mirror task progress: %w", err)
 			}
@@ -1110,6 +1129,12 @@ func (w *LfsSyncWorker) downloadAndUploadSmallFile(
 	pointer *types.Pointer,
 	objectKey string,
 ) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+	}
+
 	slog.Info(
 		"downloading small file directly",
 		slog.Int("workerID", w.id),
@@ -1117,7 +1142,7 @@ func (w *LfsSyncWorker) downloadAndUploadSmallFile(
 		slog.Any("size", pointer.Size),
 	)
 
-	resp, err := w.downloadRange(pointer.DownloadURL, 0, pointer.Size-1)
+	resp, err := w.downloadRange(ctx, pointer.DownloadURL, 0, pointer.Size-1)
 	if err != nil {
 		return fmt.Errorf("failed to download small file: %w", err)
 	}
@@ -1185,7 +1210,7 @@ func (w *LfsSyncWorker) downloadAndUploadPartWithRetry(
 			slog.Any("offset", start),
 			slog.Any("end", end),
 		)
-		resp, err := w.downloadRange(downloadURL, start, end)
+		resp, err := w.downloadRange(ctx, downloadURL, start, end)
 		if err != nil {
 			slog.Error(
 				"failed to download range",
@@ -1264,10 +1289,11 @@ func (w *LfsSyncWorker) downloadAndUploadPartWithRetry(
 }
 
 func (w *LfsSyncWorker) downloadRange(
+	ctx context.Context,
 	downloadURL string,
 	start, end int64,
 ) (*http.Response, error) {
-	req, err := http.NewRequest("GET", downloadURL, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", downloadURL, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -1303,12 +1329,7 @@ func (w *LfsSyncWorker) CheckIfLFSFileExists(
 ) (bool, error) {
 	objInfo, err := w.ossClient.StatObject(ctx, w.config.S3.Bucket, objectKey, minio.StatObjectOptions{})
 	if err != nil {
-		// Check if it's a "not found" error
-		var minioErr minio.ErrorResponse
-		if errors.As(err, &minioErr) && minioErr.StatusCode == http.StatusNotFound && minioErr.Code != "NoSuchBucket" {
-			return false, nil
-		}
-		if strings.Contains(err.Error(), "NoSuchKey") || strings.Contains(err.Error(), "not found") || strings.Contains(err.Error(), "key does not exist") {
+		if isLFSObjectNotFound(err) {
 			return false, nil
 		}
 		return false, err
@@ -1324,6 +1345,27 @@ func (w *LfsSyncWorker) CheckIfLFSFileExists(
 	}
 
 	return true, nil
+}
+
+// isLFSObjectNotFound detects missing LFS objects from structured S3 errors first, with message matching as a compatibility fallback.
+func isLFSObjectNotFound(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	minioErr := minio.ToErrorResponse(err)
+	if minioErr.Code == "NoSuchKey" {
+		return true
+	}
+	if minioErr.Code == "" && minioErr.StatusCode == http.StatusNotFound {
+		return true
+	}
+
+	errMsg := strings.ToLower(err.Error())
+	return strings.Contains(errMsg, "nosuchkey") ||
+		strings.Contains(errMsg, "key does not exist") ||
+		strings.Contains(errMsg, "object does not exist") ||
+		strings.Contains(errMsg, "object not found")
 }
 
 func (w *LfsSyncWorker) GetLFSDownloadURLs(

@@ -40,12 +40,12 @@ type StopWorkerByIDReq struct {
 }
 
 type SyncNowReq struct {
-	MirrorID int64 `json:"mirror_id" binding:"required"`
+	TaskID   int64 `json:"task_id" binding:"required"`
 	WorkerID int   `json:"worker_id"`
 }
 
 type CancelReq struct {
-	MirrorID int64 `json:"mirror_id" binding:"required"`
+	TaskID int64 `json:"task_id" binding:"required"`
 }
 
 func (h *ManagerHandler) StopWorkerByID(c *gin.Context) {
@@ -68,7 +68,7 @@ func (h *ManagerHandler) SyncNow(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	err := h.managerComponent.SyncNow(c, req.WorkerID, req.MirrorID)
+	err := h.managerComponent.SyncNow(c, req.WorkerID, req.TaskID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -83,7 +83,7 @@ func (h *ManagerHandler) Cancel(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	found, err := h.managerComponent.Cancel(c, req.MirrorID)
+	found, err := h.managerComponent.Cancel(c, req.TaskID)
 	if err != nil {
 		if found {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})

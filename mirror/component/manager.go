@@ -55,12 +55,19 @@ func (c *managerComponentImpl) SyncNow(ctx context.Context, workerID int, mtID i
 	return nil
 }
 
-func (c *managerComponentImpl) Cancel(ctx context.Context, mirrorID int64) (bool, error) {
-	found, err := c.manager.StopWorkerByMirrorID(mirrorID)
+func (c *managerComponentImpl) Cancel(ctx context.Context, taskID int64) (bool, error) {
+	dbCancelled, err := c.mirrorTaskStore.CancelMirrorTaskByID(ctx, taskID)
 	if err != nil {
-		return found, fmt.Errorf("fail to stop worker: %w", err)
+		return false, fmt.Errorf("fail to cancel mirror task in db: %w", err)
 	}
-	return found, nil
+
+	workerStopped, _ := c.manager.StopWorkerByTaskID(taskID)
+
+	if !dbCancelled && !workerStopped {
+		return false, fmt.Errorf("no task found for mirror %d", taskID)
+	}
+
+	return true, nil
 }
 
 func (c *managerComponentImpl) ListTasks(ctx context.Context, per, page int) (types.MirrorListResp, error) {
@@ -74,6 +81,7 @@ func (c *managerComponentImpl) ListTasks(ctx context.Context, per, page int) (ty
 		if task.Mirror != nil && task.Mirror.Repository != nil {
 			taskResp[id] = types.MirrorTask{
 				MirrorID:  task.MirrorID,
+				TaskID:    task.ID,
 				SourceUrl: task.Mirror.SourceUrl,
 				Priority:  int(task.Priority),
 				RepoPath:  task.Mirror.RepoPath(),
@@ -93,7 +101,8 @@ func (c *managerComponentImpl) ListTasks(ctx context.Context, per, page int) (ty
 	for _, task := range waittingTasks {
 		if task.Mirror != nil && task.Mirror.Repository != nil {
 			lfsTasks = append(lfsTasks, types.MirrorTask{
-				MirrorID:  task.ID,
+				MirrorID:  task.MirrorID,
+				TaskID:    task.ID,
 				SourceUrl: task.Mirror.SourceUrl,
 				Priority:  int(task.Priority),
 				RepoPath:  task.Mirror.RepoPath(),

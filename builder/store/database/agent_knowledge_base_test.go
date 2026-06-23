@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
@@ -411,6 +412,7 @@ func TestAgentKnowledgeBaseStore_List_OrderByUpdatedAt(t *testing.T) {
 
 	// Update first knowledge base to change updated_at
 	createdKB1.Name = "Updated First Knowledge Base"
+	time.Sleep(time.Second)
 	err = store.Update(ctx, createdKB1)
 	require.NoError(t, err)
 

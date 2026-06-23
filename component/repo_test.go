@@ -1026,15 +1026,12 @@ func TestRepoComponent_UpdateMirror(t *testing.T) {
 		AccessToken:     "ak",
 		PushUsername:    "user",
 		PushAccessToken: "foo",
-		LocalRepoPath:   "a_model_ns_n",
+		LocalRepoPath:   "model_ns_n",
 		MirrorSourceID:  111,
 	}
 	mi := m
 	repo.mocks.stores.MirrorMock().EXPECT().FindByRepoID(ctx, int64(123)).Return(&mi, nil)
 	repo.mocks.stores.AccessTokenMock().EXPECT().GetUserGitToken(ctx, "user").Return(&database.AccessToken{Token: "foo"}, nil)
-	repo.mocks.stores.MirrorSourceMock().EXPECT().Get(ctx, int64(111)).Return(&database.MirrorSource{
-		SourceName: "a",
-	}, nil)
 	repo.mocks.stores.MirrorMock().EXPECT().Update(ctx, &m).Return(nil)
 
 	mm, err := repo.UpdateMirror(ctx, types.UpdateMirrorReq{
@@ -1379,7 +1376,7 @@ func TestRepoComponent_DeployDetail(t *testing.T) {
 	mockUserRepoAdminPermission(ctx, repo.mocks.stores, "user")
 
 	repo.mocks.stores.ClusterInfoMock().EXPECT().ByClusterID(ctx, "cluster").Return(database.ClusterInfo{
-		Zone:     "z",
+		Zone: "z",
 	}, nil)
 	repo.mocks.stores.DeployTaskMock().EXPECT().GetDeployByID(ctx, int64(1)).Return(&database.Deploy{
 		RepoID:        1,

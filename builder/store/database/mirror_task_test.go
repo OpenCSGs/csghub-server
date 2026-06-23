@@ -175,3 +175,246 @@ func TestMirrorTaskStore_ResetRunningTasks(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, types.MirrorQueued, queuedTask.Status)
 }
+
+func TestMirrorTaskStore_UpdateStatusAndRepoSyncStatus(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	taskStore := database.NewMirrorTaskStoreWithDB(db)
+	mirrorStore := database.NewMirrorStoreWithDB(db)
+	repoStore := database.NewRepoStoreWithDB(db)
+
+	repo, err := repoStore.CreateRepo(ctx, database.Repository{
+		UserID:        1,
+		Path:          "test/repo",
+		GitPath:       "test/repo.git",
+		Name:          "repo",
+		Nickname:      "Test Repo",
+		DefaultBranch: "main",
+		Private:       false,
+		SyncStatus:    types.SyncStatusPending,
+	})
+	require.Nil(t, err)
+
+	mirror, err := mirrorStore.Create(ctx, &database.Mirror{
+		Interval:       "1h",
+		SourceUrl:      "https://example.com/test/repo.git",
+		RepositoryID:   repo.ID,
+		MirrorSourceID: 1,
+	})
+	require.Nil(t, err)
+
+	task, err := taskStore.Create(ctx, database.MirrorTask{
+		MirrorID: mirror.ID,
+		Status:   types.MirrorRepoSyncStart,
+		Priority: types.LowMirrorPriority,
+		Mirror: &database.Mirror{
+			RepositoryID: repo.ID,
+		},
+	})
+	require.Nil(t, err)
+
+	updatedTask, err := taskStore.UpdateStatusAndRepoSyncStatus(ctx, task, database.MirrorSuccess)
+	require.Nil(t, err)
+	require.Equal(t, types.MirrorRepoSyncFinished, updatedTask.Status)
+
+	var updatedRepo database.Repository
+	err = db.Core.NewSelect().Model(&updatedRepo).Where("id = ?", repo.ID).Scan(ctx)
+	require.Nil(t, err)
+	require.Equal(t, types.SyncStatusInProgress, updatedRepo.SyncStatus)
+
+	var updatedTaskFromDB database.MirrorTask
+	err = db.Core.NewSelect().Model(&updatedTaskFromDB).Where("id = ?", task.ID).Scan(ctx)
+	require.Nil(t, err)
+	require.Equal(t, types.MirrorRepoSyncFinished, updatedTaskFromDB.Status)
+}
+
+func TestMirrorTaskStore_UpdateStatusAndRepoSyncStatus_MultipleSyncStatuses(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	taskStore := database.NewMirrorTaskStoreWithDB(db)
+	mirrorStore := database.NewMirrorStoreWithDB(db)
+	repoStore := database.NewRepoStoreWithDB(db)
+
+	repo, err := repoStore.CreateRepo(ctx, database.Repository{
+		UserID:        1,
+		Path:          "test/repo2",
+		GitPath:       "test/repo2.git",
+		Name:          "repo2",
+		Nickname:      "Test Repo 2",
+		DefaultBranch: "main",
+		Private:       false,
+		SyncStatus:    types.SyncStatusPending,
+	})
+	require.Nil(t, err)
+
+	mirror, err := mirrorStore.Create(ctx, &database.Mirror{
+		Interval:       "1h",
+		SourceUrl:      "https://example.com/test/repo2.git",
+		RepositoryID:   repo.ID,
+		MirrorSourceID: 1,
+	})
+	require.Nil(t, err)
+
+	testCases := []struct {
+		name           string
+		initialStatus  types.MirrorTaskStatus
+		action         string
+		expectedStatus types.MirrorTaskStatus
+		expectedSync   types.RepositorySyncStatus
+	}{
+		{"continue from queued", types.MirrorQueued, database.MirrorContinue, types.MirrorRepoSyncStart, types.SyncStatusInProgress},
+		{"success from repo_sync_start", types.MirrorRepoSyncStart, database.MirrorSuccess, types.MirrorRepoSyncFinished, types.SyncStatusInProgress},
+		{"continue from repo_sync_finished", types.MirrorRepoSyncFinished, database.MirrorContinue, types.MirrorLfsSyncStart, types.SyncStatusInProgress},
+		{"success from lfs_sync_start", types.MirrorLfsSyncStart, database.MirrorSuccess, types.MirrorLfsSyncFinished, types.SyncStatusCompleted},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			task, err := taskStore.Create(ctx, database.MirrorTask{
+				MirrorID: mirror.ID,
+				Status:   tc.initialStatus,
+				Priority: types.HighMirrorPriority,
+				Mirror: &database.Mirror{
+					RepositoryID: repo.ID,
+				},
+			})
+			require.Nil(t, err)
+
+			updatedTask, err := taskStore.UpdateStatusAndRepoSyncStatus(ctx, task, tc.action)
+			require.Nil(t, err)
+			require.Equal(t, tc.expectedStatus, updatedTask.Status)
+
+			var updatedRepo database.Repository
+			err = db.Core.NewSelect().Model(&updatedRepo).Where("id = ?", repo.ID).Scan(ctx)
+			require.Nil(t, err)
+			require.Equal(t, tc.expectedSync, updatedRepo.SyncStatus)
+		})
+	}
+}
+
+func TestMirrorTaskStore_UpdateStatusAndRepoSyncStatus_FailedStatus(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	taskStore := database.NewMirrorTaskStoreWithDB(db)
+	mirrorStore := database.NewMirrorStoreWithDB(db)
+	repoStore := database.NewRepoStoreWithDB(db)
+
+	repo, err := repoStore.CreateRepo(ctx, database.Repository{
+		UserID:        1,
+		Path:          "test/repo3",
+		GitPath:       "test/repo3.git",
+		Name:          "repo3",
+		Nickname:      "Test Repo 3",
+		DefaultBranch: "main",
+		Private:       false,
+		SyncStatus:    types.SyncStatusInProgress,
+	})
+	require.Nil(t, err)
+
+	mirror, err := mirrorStore.Create(ctx, &database.Mirror{
+		Interval:       "1h",
+		SourceUrl:      "https://example.com/test/repo3.git",
+		RepositoryID:   repo.ID,
+		MirrorSourceID: 1,
+	})
+	require.Nil(t, err)
+
+	task, err := taskStore.Create(ctx, database.MirrorTask{
+		MirrorID:     mirror.ID,
+		Status:       types.MirrorRepoSyncStart,
+		Priority:     types.HighMirrorPriority,
+		ErrorMessage: "sync failed",
+		Mirror: &database.Mirror{
+			RepositoryID: repo.ID,
+		},
+	})
+	require.Nil(t, err)
+
+	updatedTask, err := taskStore.UpdateStatusAndRepoSyncStatus(ctx, task, database.MirrorFail)
+	require.Nil(t, err)
+	require.Equal(t, types.MirrorRepoSyncFailed, updatedTask.Status)
+
+	var updatedRepo database.Repository
+	err = db.Core.NewSelect().Model(&updatedRepo).Where("id = ?", repo.ID).Scan(ctx)
+	require.Nil(t, err)
+	require.Equal(t, types.SyncStatusFailed, updatedRepo.SyncStatus)
+}
+
+func TestMirrorTaskStore_UpdateProgress(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewMirrorTaskStoreWithDB(db)
+
+	task, err := store.Create(ctx, database.MirrorTask{
+		MirrorID:     1,
+		Status:       types.MirrorLfsSyncStart,
+		Priority:     types.HighMirrorPriority,
+		Progress:     50,
+		ErrorMessage: "previous error",
+	})
+	require.Nil(t, err)
+	require.Greater(t, task.ID, int64(0))
+
+	// Update progress and error message
+	task.Progress = 80
+	task.ErrorMessage = "new error"
+	updatedTask, err := store.UpdateProgress(ctx, task)
+	require.Nil(t, err)
+	require.Equal(t, 80, updatedTask.Progress)
+	require.Equal(t, "new error", updatedTask.ErrorMessage)
+	require.Equal(t, types.MirrorLfsSyncStart, updatedTask.Status)
+
+	// Verify in DB: progress and error_message updated, status preserved
+	var dbTask database.MirrorTask
+	err = db.Core.NewSelect().Model(&dbTask).Where("id = ?", task.ID).Scan(ctx)
+	require.Nil(t, err)
+	require.Equal(t, 80, dbTask.Progress)
+	require.Equal(t, "new error", dbTask.ErrorMessage)
+	require.Equal(t, types.MirrorLfsSyncStart, dbTask.Status,
+		"UpdateProgress must not change the status field")
+}
+
+func TestMirrorTaskStore_UpdateProgress_DoesNotOverwritePriority(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewMirrorTaskStoreWithDB(db)
+
+	task, err := store.Create(ctx, database.MirrorTask{
+		MirrorID: 1,
+		Status:   types.MirrorLfsSyncStart,
+		Priority: types.ASAPMirrorPriority,
+		Progress: 0,
+	})
+	require.Nil(t, err)
+
+	// Simulate: another process changes priority concurrently
+	_, err = db.Core.NewUpdate().
+		Model(&database.MirrorTask{}).
+		Set("priority = ?", types.LowMirrorPriority).
+		Where("id = ?", task.ID).
+		Exec(ctx)
+	require.Nil(t, err)
+
+	// UpdateProgress should NOT overwrite priority
+	task.Progress = 100
+	task.Priority = types.ASAPMirrorPriority // original value in struct
+	_, err = store.UpdateProgress(ctx, task)
+	require.Nil(t, err)
+
+	var dbTask database.MirrorTask
+	err = db.Core.NewSelect().Model(&dbTask).Where("id = ?", task.ID).Scan(ctx)
+	require.Nil(t, err)
+	require.Equal(t, 100, dbTask.Progress)
+	require.Equal(t, types.LowMirrorPriority, dbTask.Priority,
+		"UpdateProgress must not overwrite priority set by another process")
+}

@@ -10,7 +10,7 @@ import (
 )
 
 type MirrorSvcClient interface {
-	CancelMirror(ctx context.Context, mirrorID int64) error
+	CancelMirror(ctx context.Context, taskID int64) error
 }
 
 type MirrorSvcClientImpl struct {
@@ -23,12 +23,12 @@ func NewMirrorSvcClient(endpoint string, opts ...RequestOption) MirrorSvcClient 
 	}
 }
 
-func (c *MirrorSvcClientImpl) CancelMirror(ctx context.Context, mirrorID int64) error {
+func (c *MirrorSvcClientImpl) CancelMirror(ctx context.Context, taskID int64) error {
 	type CancelReq struct {
-		MirrorID int64 `json:"mirror_id"`
+		TaskID int64 `json:"task_id"`
 	}
 	req := CancelReq{
-		MirrorID: mirrorID,
+		TaskID: taskID,
 	}
 
 	path := "/api/v1/lfs_sync_internal/cancel"

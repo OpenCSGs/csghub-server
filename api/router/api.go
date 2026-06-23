@@ -651,8 +651,6 @@ func createModelRoutes(config *config.Config,
 	// Models repo operation routes
 	{
 		modelsGroup.GET("/:namespace/:name/branches", repoCommonHandler.Branches)
-		modelsGroup.POST("/:namespace/:name/branches", middleware.MustLogin(), repoCommonHandler.CreateBranch)
-		modelsGroup.DELETE("/:namespace/:name/branches/:branch", middleware.MustLogin(), repoCommonHandler.DeleteBranch)
 		modelsGroup.GET("/:namespace/:name/tags", repoCommonHandler.Tags)
 		modelsGroup.POST("/:namespace/:name/preupload/:revision", middlewareCollection.Auth.NeedPhoneVerified, repoCommonHandler.Preupload)
 		// update tags of a certain category
@@ -802,8 +800,6 @@ func createDatasetRoutes(
 		datasetsGroup.GET("/:namespace/:name/relations", middleware.MustLogin(), dsHandler.Relations)
 
 		datasetsGroup.GET("/:namespace/:name/branches", middleware.MustLogin(), repoCommonHandler.Branches)
-		datasetsGroup.POST("/:namespace/:name/branches", middleware.MustLogin(), repoCommonHandler.CreateBranch)
-		datasetsGroup.DELETE("/:namespace/:name/branches/:branch", middleware.MustLogin(), repoCommonHandler.DeleteBranch)
 		datasetsGroup.GET("/:namespace/:name/tags", middleware.MustLogin(), repoCommonHandler.Tags)
 		datasetsGroup.POST("/:namespace/:name/preupload/:revision", middlewareCollection.Auth.NeedPhoneVerified, repoCommonHandler.Preupload)
 		// update tags of a certain category
@@ -857,8 +853,6 @@ func createCodeRoutes(
 		codesGroup.GET("/:namespace/:name", codeHandler.Show)
 		codesGroup.GET("/:namespace/:name/relations", codeHandler.Relations)
 		codesGroup.GET("/:namespace/:name/branches", repoCommonHandler.Branches)
-		codesGroup.POST("/:namespace/:name/branches", middleware.MustLogin(), repoCommonHandler.CreateBranch)
-		codesGroup.DELETE("/:namespace/:name/branches/:branch", middleware.MustLogin(), repoCommonHandler.DeleteBranch)
 		codesGroup.GET("/:namespace/:name/tags", repoCommonHandler.Tags)
 		codesGroup.POST("/:namespace/:name/preupload/:revision", middlewareCollection.Auth.NeedPhoneVerified, repoCommonHandler.Preupload)
 
@@ -953,8 +947,6 @@ func createSpaceRoutes(config *config.Config,
 	}
 	{
 		spaces.GET("/:namespace/:name/branches", repoCommonHandler.Branches)
-		spaces.POST("/:namespace/:name/branches", middleware.MustLogin(), repoCommonHandler.CreateBranch)
-		spaces.DELETE("/:namespace/:name/branches/:branch", middleware.MustLogin(), repoCommonHandler.DeleteBranch)
 		spaces.GET("/:namespace/:name/tags", repoCommonHandler.Tags)
 		spaces.POST("/:namespace/:name/preupload/:revision", middlewareCollection.Auth.NeedPhoneVerified, repoCommonHandler.Preupload)
 		// update tags of a certain category
@@ -1520,8 +1512,6 @@ func createSkillRoutes(
 		skillGroup.GET("/:namespace/:name", skillHandler.Show)
 		skillGroup.POST("/:namespace/:name/publish", middlewareCollection.Auth.NeedPhoneVerified, skillHandler.Publish)
 		skillGroup.GET("/:namespace/:name/branches", repoCommonHandler.Branches)
-		skillGroup.POST("/:namespace/:name/branches", middleware.MustLogin(), repoCommonHandler.CreateBranch)
-		skillGroup.DELETE("/:namespace/:name/branches/:branch", middleware.MustLogin(), repoCommonHandler.DeleteBranch)
 		skillGroup.GET("/:namespace/:name/tags", repoCommonHandler.Tags)
 		skillGroup.POST("/:namespace/:name/preupload/:revision", middlewareCollection.Auth.NeedPhoneVerified, repoCommonHandler.Preupload)
 
