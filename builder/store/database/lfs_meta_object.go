@@ -24,6 +24,7 @@ type LfsMetaObjectStore interface {
 	UpdateXnetUsed(ctx context.Context, repoID int64, oid string, xnetUsed bool) error
 	CheckIfAllMigratedToXnet(ctx context.Context, repoID int64) (bool, error)
 	ExistsByOidExclRepo(ctx context.Context, oid string, repoID int64) (bool, error)
+	BulkUpdateExistingByOIDs(ctx context.Context, repoID int64, existingOIDs []string, missingOIDs []string) error
 }
 
 func NewLfsMetaObjectStore() LfsMetaObjectStore {
@@ -196,4 +197,32 @@ func (s *lfsMetaObjectStoreImpl) ExistsByOidExclRepo(ctx context.Context, oid st
 		return false, err
 	}
 	return exists, nil
+}
+
+func (s *lfsMetaObjectStoreImpl) BulkUpdateExistingByOIDs(ctx context.Context, repoID int64, existingOIDs []string, missingOIDs []string) error {
+	return s.db.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		if len(existingOIDs) > 0 {
+			_, err := tx.NewUpdate().
+				Model(&LfsMetaObject{}).
+				Set("existing = ?", true).
+				Set("updated_at = ?", time.Now()).
+				Where("repository_id = ? AND oid IN (?)", repoID, bun.In(existingOIDs)).
+				Exec(ctx)
+			if err != nil {
+				return err
+			}
+		}
+		if len(missingOIDs) > 0 {
+			_, err := tx.NewUpdate().
+				Model(&LfsMetaObject{}).
+				Set("existing = ?", false).
+				Set("updated_at = ?", time.Now()).
+				Where("repository_id = ? AND oid IN (?)", repoID, bun.In(missingOIDs)).
+				Exec(ctx)
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
