@@ -585,7 +585,6 @@ func (w *LfsSyncWorker) downloadAndUploadLFSFiles(
 					return err
 				}
 				finalErr = err
-				finalErr = err
 				slog.Error("failed to download and upload lfs file",
 					slog.Int("workerID", w.id),
 					slog.Any("error", err),
