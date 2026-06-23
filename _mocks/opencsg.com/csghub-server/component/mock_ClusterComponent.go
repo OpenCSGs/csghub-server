@@ -989,6 +989,100 @@ func (_c *MockClusterComponent_SetClusterNodeAccessMode_Call) RunAndReturn(run f
 	return _c
 }
 
+// StopDeploy provides a mock function with given fields: ctx, stopReq
+func (_m *MockClusterComponent) StopDeploy(ctx context.Context, stopReq types.DeployActReq) error {
+	ret := _m.Called(ctx, stopReq)
+
+	if len(ret) == 0 {
+		panic("no return value specified for StopDeploy")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.DeployActReq) error); ok {
+		r0 = rf(ctx, stopReq)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockClusterComponent_StopDeploy_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'StopDeploy'
+type MockClusterComponent_StopDeploy_Call struct {
+	*mock.Call
+}
+
+// StopDeploy is a helper method to define mock.On call
+//   - ctx context.Context
+//   - stopReq types.DeployActReq
+func (_e *MockClusterComponent_Expecter) StopDeploy(ctx interface{}, stopReq interface{}) *MockClusterComponent_StopDeploy_Call {
+	return &MockClusterComponent_StopDeploy_Call{Call: _e.mock.On("StopDeploy", ctx, stopReq)}
+}
+
+func (_c *MockClusterComponent_StopDeploy_Call) Run(run func(ctx context.Context, stopReq types.DeployActReq)) *MockClusterComponent_StopDeploy_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.DeployActReq))
+	})
+	return _c
+}
+
+func (_c *MockClusterComponent_StopDeploy_Call) Return(_a0 error) *MockClusterComponent_StopDeploy_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockClusterComponent_StopDeploy_Call) RunAndReturn(run func(context.Context, types.DeployActReq) error) *MockClusterComponent_StopDeploy_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// StopWorkflow provides a mock function with given fields: ctx, stopReq
+func (_m *MockClusterComponent) StopWorkflow(ctx context.Context, stopReq types.ArgoWorkFlowDeleteReq) error {
+	ret := _m.Called(ctx, stopReq)
+
+	if len(ret) == 0 {
+		panic("no return value specified for StopWorkflow")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.ArgoWorkFlowDeleteReq) error); ok {
+		r0 = rf(ctx, stopReq)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockClusterComponent_StopWorkflow_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'StopWorkflow'
+type MockClusterComponent_StopWorkflow_Call struct {
+	*mock.Call
+}
+
+// StopWorkflow is a helper method to define mock.On call
+//   - ctx context.Context
+//   - stopReq types.ArgoWorkFlowDeleteReq
+func (_e *MockClusterComponent_Expecter) StopWorkflow(ctx interface{}, stopReq interface{}) *MockClusterComponent_StopWorkflow_Call {
+	return &MockClusterComponent_StopWorkflow_Call{Call: _e.mock.On("StopWorkflow", ctx, stopReq)}
+}
+
+func (_c *MockClusterComponent_StopWorkflow_Call) Run(run func(ctx context.Context, stopReq types.ArgoWorkFlowDeleteReq)) *MockClusterComponent_StopWorkflow_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.ArgoWorkFlowDeleteReq))
+	})
+	return _c
+}
+
+func (_c *MockClusterComponent_StopWorkflow_Call) Return(_a0 error) *MockClusterComponent_StopWorkflow_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockClusterComponent_StopWorkflow_Call) RunAndReturn(run func(context.Context, types.ArgoWorkFlowDeleteReq) error) *MockClusterComponent_StopWorkflow_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Update provides a mock function with given fields: ctx, data
 func (_m *MockClusterComponent) Update(ctx context.Context, data types.ClusterRequest) (*types.ClusterRes, error) {
 	ret := _m.Called(ctx, data)

@@ -68,3 +68,11 @@ func (c *clusterComponentImpl) GetWorkflowsByTimeRangeStream(ctx context.Context
 
 	return workflowCh, errCh
 }
+
+func (c *clusterComponentImpl) StopDeploy(ctx context.Context, stopReq types.DeployActReq) error {
+	return nil
+}
+
+func (c *clusterComponentImpl) StopWorkflow(ctx context.Context, stopReq types.ArgoWorkFlowDeleteReq) error {
+	return nil
+}

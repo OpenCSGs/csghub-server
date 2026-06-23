@@ -10,6 +10,7 @@ import (
 	"strconv"
 
 	"opencsg.com/csghub-server/component/reporter"
+	runnerTypes "opencsg.com/csghub-server/runner/types"
 
 	"github.com/bwmarrin/snowflake"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -227,4 +228,8 @@ func startAcctRequestFeeExtra(deploy database.Deploy, source string) string {
 }
 
 func updateDatabaseDeploy(dp *database.Deploy, dt types.DeployRequest) {
+}
+
+func (d *deployer) DeleteSandbox(ctx context.Context, req *runnerTypes.SandboxDeleteRequest) error {
+	return nil
 }

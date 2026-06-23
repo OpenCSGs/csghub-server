@@ -12,6 +12,8 @@ import (
 
 	mock "github.com/stretchr/testify/mock"
 
+	runnertypes "opencsg.com/csghub-server/runner/types"
+
 	types "opencsg.com/csghub-server/common/types"
 )
 
@@ -349,6 +351,53 @@ func (_c *MockDeployer_DeleteFinetuneJob_Call) Return(_a0 error) *MockDeployer_D
 }
 
 func (_c *MockDeployer_DeleteFinetuneJob_Call) RunAndReturn(run func(context.Context, types.ArgoWorkFlowDeleteReq) error) *MockDeployer_DeleteFinetuneJob_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// DeleteSandbox provides a mock function with given fields: ctx, req
+func (_m *MockDeployer) DeleteSandbox(ctx context.Context, req *runnertypes.SandboxDeleteRequest) error {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteSandbox")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, *runnertypes.SandboxDeleteRequest) error); ok {
+		r0 = rf(ctx, req)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockDeployer_DeleteSandbox_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteSandbox'
+type MockDeployer_DeleteSandbox_Call struct {
+	*mock.Call
+}
+
+// DeleteSandbox is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req *runnertypes.SandboxDeleteRequest
+func (_e *MockDeployer_Expecter) DeleteSandbox(ctx interface{}, req interface{}) *MockDeployer_DeleteSandbox_Call {
+	return &MockDeployer_DeleteSandbox_Call{Call: _e.mock.On("DeleteSandbox", ctx, req)}
+}
+
+func (_c *MockDeployer_DeleteSandbox_Call) Run(run func(ctx context.Context, req *runnertypes.SandboxDeleteRequest)) *MockDeployer_DeleteSandbox_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(*runnertypes.SandboxDeleteRequest))
+	})
+	return _c
+}
+
+func (_c *MockDeployer_DeleteSandbox_Call) Return(_a0 error) *MockDeployer_DeleteSandbox_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockDeployer_DeleteSandbox_Call) RunAndReturn(run func(context.Context, *runnertypes.SandboxDeleteRequest) error) *MockDeployer_DeleteSandbox_Call {
 	_c.Call.Return(run)
 	return _c
 }
