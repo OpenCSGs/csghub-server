@@ -20,6 +20,7 @@ import (
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 	hubcom "opencsg.com/csghub-server/common/utils/common"
+	runnerTypes "opencsg.com/csghub-server/runner/types"
 )
 
 type DeployWorkflowFunc func(buildTask, runTask *database.DeployTask)
@@ -64,6 +65,7 @@ type Deployer interface {
 	LabelNode(ctx context.Context, req *types.NodeLabel) error
 	CreateDataflowJob(ctx context.Context, req *types.DataflowArgoJobReq) (*types.DataflowArgoJobResp, error)
 	DeleteDataflowJob(ctx context.Context, req *types.DataflowArgoReq) error
+	DeleteSandbox(ctx context.Context, req *runnerTypes.SandboxDeleteRequest) error
 }
 
 func (d *deployer) generateUniqueSvcName(dr types.DeployRequest) string {

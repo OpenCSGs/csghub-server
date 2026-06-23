@@ -512,6 +512,130 @@ func TestArgoWorkflowStore_ListWorkflowsByTimeRange(t *testing.T) {
 	require.Equal(t, 4, total) // task-1, task-2, task-3, task-4 (not task-5)
 }
 
+func TestArgoWorkflowStore_DeleteWorkFlow(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewArgoWorkFlowStoreWithDB(db)
+	dt := time.Date(2022, 1, 1, 1, 1, 0, 0, time.UTC)
+
+	// Case 1: Delete a Running workflow — status should be updated to Canceled before soft delete
+	runningWF := database.ArgoWorkflow{
+		Username:   "user-del-1",
+		Namespace:  "ns-del",
+		TaskName:   "task-running",
+		TaskId:     "tid-del-001",
+		TaskType:   types.TaskTypeEvaluation,
+		Status:     "Running",
+		ClusterID:  "cluster-1",
+		SubmitTime: dt,
+	}
+	_, err := store.CreateWorkFlow(ctx, runningWF)
+	require.Nil(t, err)
+
+	runningWFFromDB := &database.ArgoWorkflow{}
+	err = db.Core.NewSelect().Model(runningWFFromDB).Where("task_id=?", "tid-del-001").Scan(ctx)
+	require.Nil(t, err)
+
+	err = store.DeleteWorkFlow(ctx, runningWFFromDB.ID)
+	require.Nil(t, err)
+
+	// FindByID uses WhereAllWithDeleted, so the soft-deleted record is still accessible
+	deletedWF, err := store.FindByID(ctx, runningWFFromDB.ID)
+	require.Nil(t, err)
+	require.Equal(t, "Canceled", string(deletedWF.Status))
+	require.NotZero(t, deletedWF.DeletedAt)
+
+	// Verify the record is not visible in normal queries (without WhereAllWithDeleted)
+	var normalResults []database.ArgoWorkflow
+	err = db.Core.NewSelect().Model(&normalResults).Where("task_id=?", "tid-del-001").Scan(ctx)
+	require.Nil(t, err)
+	require.Equal(t, 0, len(normalResults))
+
+	// Case 2: Delete a Pending workflow — status should be updated to Canceled
+	pendingWF := database.ArgoWorkflow{
+		Username:   "user-del-2",
+		Namespace:  "ns-del",
+		TaskName:   "task-pending",
+		TaskId:     "tid-del-002",
+		TaskType:   types.TaskTypeEvaluation,
+		Status:     "Pending",
+		ClusterID:  "cluster-1",
+		SubmitTime: dt,
+	}
+	_, err = store.CreateWorkFlow(ctx, pendingWF)
+	require.Nil(t, err)
+
+	pendingWFFromDB := &database.ArgoWorkflow{}
+	err = db.Core.NewSelect().Model(pendingWFFromDB).Where("task_id=?", "tid-del-002").Scan(ctx)
+	require.Nil(t, err)
+
+	err = store.DeleteWorkFlow(ctx, pendingWFFromDB.ID)
+	require.Nil(t, err)
+
+	deletedPendingWF, err := store.FindByID(ctx, pendingWFFromDB.ID)
+	require.Nil(t, err)
+	require.Equal(t, "Canceled", string(deletedPendingWF.Status))
+	require.NotZero(t, deletedPendingWF.DeletedAt)
+
+	// Case 3: Delete a Succeeded workflow — status should NOT be changed (not in Unknown/Running/Pending)
+	succeededWF := database.ArgoWorkflow{
+		Username:   "user-del-3",
+		Namespace:  "ns-del",
+		TaskName:   "task-succeeded",
+		TaskId:     "tid-del-003",
+		TaskType:   types.TaskTypeEvaluation,
+		Status:     "Succeeded",
+		ClusterID:  "cluster-1",
+		SubmitTime: dt,
+	}
+	_, err = store.CreateWorkFlow(ctx, succeededWF)
+	require.Nil(t, err)
+
+	succeededWFFromDB := &database.ArgoWorkflow{}
+	err = db.Core.NewSelect().Model(succeededWFFromDB).Where("task_id=?", "tid-del-003").Scan(ctx)
+	require.Nil(t, err)
+
+	err = store.DeleteWorkFlow(ctx, succeededWFFromDB.ID)
+	require.Nil(t, err)
+
+	deletedSucceededWF, err := store.FindByID(ctx, succeededWFFromDB.ID)
+	require.Nil(t, err)
+	require.Equal(t, "Succeeded", string(deletedSucceededWF.Status))
+	require.NotZero(t, deletedSucceededWF.DeletedAt)
+
+	// Case 4: Delete a Failed workflow — status should NOT be changed
+	failedWF := database.ArgoWorkflow{
+		Username:   "user-del-4",
+		Namespace:  "ns-del",
+		TaskName:   "task-failed",
+		TaskId:     "tid-del-004",
+		TaskType:   types.TaskTypeEvaluation,
+		Status:     "Failed",
+		ClusterID:  "cluster-1",
+		SubmitTime: dt,
+	}
+	_, err = store.CreateWorkFlow(ctx, failedWF)
+	require.Nil(t, err)
+
+	failedWFFromDB := &database.ArgoWorkflow{}
+	err = db.Core.NewSelect().Model(failedWFFromDB).Where("task_id=?", "tid-del-004").Scan(ctx)
+	require.Nil(t, err)
+
+	err = store.DeleteWorkFlow(ctx, failedWFFromDB.ID)
+	require.Nil(t, err)
+
+	deletedFailedWF, err := store.FindByID(ctx, failedWFFromDB.ID)
+	require.Nil(t, err)
+	require.Equal(t, "Failed", string(deletedFailedWF.Status))
+	require.NotZero(t, deletedFailedWF.DeletedAt)
+
+	// Case 5: Delete a non-existent workflow ID — should return no error (bun delete with no matching row)
+	err = store.DeleteWorkFlow(ctx, 99999)
+	require.Nil(t, err)
+}
+
 func TestArgoWorkflowStore_ListRunningWorkflowsByUserUUID(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()

@@ -38,6 +38,8 @@ type ClusterComponent interface {
 	GetDeploysByTimeRangeStream(ctx context.Context, req types.DeployTimeRangeReq) (<-chan []string, <-chan error)
 	GetWorkflowsByTimeRange(ctx context.Context, req types.WorkflowTimeRangeReq) ([]database.ArgoWorkflow, int, error)
 	GetWorkflowsByTimeRangeStream(ctx context.Context, req types.WorkflowTimeRangeReq) (<-chan []string, <-chan error)
+	StopDeploy(ctx context.Context, stopReq types.DeployActReq) error
+	StopWorkflow(ctx context.Context, stopReq types.ArgoWorkFlowDeleteReq) error
 }
 
 func NewClusterComponent(config *config.Config) (ClusterComponent, error) {

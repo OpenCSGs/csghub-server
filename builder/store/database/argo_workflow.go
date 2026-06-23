@@ -2,6 +2,7 @@ package database
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"time"
 
@@ -141,7 +142,22 @@ func (s *argoWorkFlowStoreImpl) UpdateWorkFlowByTaskID(ctx context.Context, work
 
 // delete workflow by id
 func (s *argoWorkFlowStoreImpl) DeleteWorkFlow(ctx context.Context, id int64) error {
-	_, err := s.db.Core.NewDelete().Model(&ArgoWorkflow{}).Where("id = ?", id).Exec(ctx)
+	err := s.db.Operator.Core.RunInTx(ctx, &sql.TxOptions{}, func(ctx context.Context, tx bun.Tx) error {
+		runSql := "update argo_workflows set status=? where id=? and status in (?)"
+		_, err := tx.Exec(runSql,
+			string(types.DFCancelled),
+			id,
+			bun.In([]string{
+				string(v1alpha1.WorkflowUnknown),
+				string(v1alpha1.WorkflowRunning),
+				string(v1alpha1.WorkflowPending),
+			}))
+		if err != nil {
+			return err
+		}
+		_, err = tx.NewDelete().Model(&ArgoWorkflow{}).Where("id = ?", id).Exec(ctx)
+		return err
+	})
 	return err
 }
 
@@ -165,7 +181,7 @@ func (s *argoWorkFlowStoreImpl) ListRunningWorkflowsByUserUUID(ctx context.Conte
 
 func (s *argoWorkFlowStoreImpl) GetClusterWorkflows(ctx context.Context, req types.ClusterWFReq) ([]ArgoWorkflow, int, error) {
 	var result []ArgoWorkflow
-	query := s.db.Operator.Core.NewSelect().Model(&result)
+	query := s.db.Operator.Core.NewSelect().Model(&result).WhereAllWithDeleted()
 
 	if req.ClusterID != "" {
 		query = query.Where("cluster_id = ?", req.ClusterID)
@@ -203,7 +219,7 @@ func (s *argoWorkFlowStoreImpl) GetClusterWorkflows(ctx context.Context, req typ
 
 func (s *argoWorkFlowStoreImpl) ListWorkflowsByTimeRange(ctx context.Context, req types.WorkflowTimeRangeReq) ([]ArgoWorkflow, int, error) {
 	var result []ArgoWorkflow
-	query := s.db.Operator.Core.NewSelect().Model(&result)
+	query := s.db.Operator.Core.NewSelect().Model(&result).WhereAllWithDeleted()
 
 	if req.StartTime != nil {
 		query = query.Where("submit_time >= ?", req.StartTime)
