@@ -420,7 +420,7 @@ func (suite *LfsSyncWorkerTestSuite) TestRun_Success_HasLfsFiles() {
 			Size: 1024,
 		},
 	}, nil)
-	suite.mocks.lfsMetaObjectStore.EXPECT().BulkUpdateOrCreate(mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	suite.mocks.lfsMetaObjectStore.EXPECT().BulkUpdateExistingByOIDs(mock.Anything, repo.ID, []string{"oid1"}, []string(nil)).Return(nil)
 	suite.mocks.git.EXPECT().GetDiffBetweenTwoCommits(mock.Anything, mock.Anything).Return(&types.GiteaCallbackPushReq{}, nil)
 	suite.mocks.ossClient.EXPECT().StatObject(mock.Anything, "test-bucket", "lfs/oi/d1", mock.Anything).Return(minio.ObjectInfo{Size: 1024}, nil)
 	suite.mocks.lfsMetaObjectStore.EXPECT().UpdateOrCreate(mock.Anything, mock.Anything).Return(nil, nil)
@@ -473,10 +473,14 @@ func (suite *LfsSyncWorkerTestSuite) TestGetSyncPointers() {
 	ctx := context.WithValue(suite.ctx, rk, "models/test/repo")
 
 	tests := []struct {
-		name          string
-		lfsObjects    []database.LfsMetaObject
-		expectedCount int
-		expectedError bool
+		name             string
+		lfsObjects       []database.LfsMetaObject
+		storageExisting  map[string]bool
+		expectedCount    int
+		findError        error
+		statError        error
+		expectedError    bool
+		expectedErrorMsg string
 	}{
 		{
 			name:          "no lfs objects",
@@ -487,8 +491,12 @@ func (suite *LfsSyncWorkerTestSuite) TestGetSyncPointers() {
 		{
 			name: "all existing objects",
 			lfsObjects: []database.LfsMetaObject{
-				{Oid: "oid1", Size: 100, Existing: true},
-				{Oid: "oid2", Size: 200, Existing: true},
+				{Oid: "oid1", Size: 100, Existing: false},
+				{Oid: "oid2", Size: 200, Existing: false},
+			},
+			storageExisting: map[string]bool{
+				"oid1": true,
+				"oid2": true,
 			},
 			expectedCount: 0,
 			expectedError: false,
@@ -496,18 +504,36 @@ func (suite *LfsSyncWorkerTestSuite) TestGetSyncPointers() {
 		{
 			name: "mixed existing and non-existing objects",
 			lfsObjects: []database.LfsMetaObject{
-				{Oid: "oid1", Size: 100, Existing: true},
-				{Oid: "oid2", Size: 200, Existing: false},
-				{Oid: "oid3", Size: 300, Existing: false},
+				{Oid: "oid1", Size: 100, Existing: false},
+				{Oid: "oid2", Size: 200, Existing: true},
+				{Oid: "oid3", Size: 300, Existing: true},
+			},
+			storageExisting: map[string]bool{
+				"oid1": true,
+				"oid2": false,
+				"oid3": false,
 			},
 			expectedCount: 2,
 			expectedError: false,
 		},
 		{
-			name:          "database error",
-			lfsObjects:    nil,
-			expectedCount: 0,
-			expectedError: true,
+			name:             "database error",
+			lfsObjects:       nil,
+			expectedCount:    0,
+			findError:        errors.New("database error"),
+			expectedError:    true,
+			expectedErrorMsg: "fail to get lfs meta objects",
+		},
+		{
+			name: "object storage check error",
+			lfsObjects: []database.LfsMetaObject{
+				{Oid: "oid1", Size: 100, Existing: false},
+			},
+			storageExisting:  nil,
+			expectedCount:    0,
+			statError:        errors.New("network error"),
+			expectedError:    true,
+			expectedErrorMsg: "failed to check if lfs file exists",
 		},
 	}
 
@@ -516,25 +542,35 @@ func (suite *LfsSyncWorkerTestSuite) TestGetSyncPointers() {
 			// Create a new worker and mocks for each test case
 			worker, mocks := newTestLfsSyncWorker(t, "")
 
-			if tt.expectedError {
-				mocks.lfsMetaObjectStore.EXPECT().FindByRepoID(ctx, repo.ID).Return(nil, errors.New("database error"))
+			if tt.findError != nil {
+				mocks.lfsMetaObjectStore.EXPECT().FindByRepoID(ctx, repo.ID).Return(nil, tt.findError)
 			} else {
 				mocks.lfsMetaObjectStore.EXPECT().FindByRepoID(ctx, repo.ID).Return(tt.lfsObjects, nil)
+				var existingOIDs []string
+				var missingOIDs []string
 				for _, obj := range tt.lfsObjects {
-					if obj.Existing {
+					if tt.statError != nil {
+						mocks.ossClient.EXPECT().StatObject(ctx, "test-bucket", "lfs/"+obj.Oid[:2]+"/"+obj.Oid[2:], mock.Anything).Return(minio.ObjectInfo{}, tt.statError)
+						continue
+					}
+					if tt.storageExisting[obj.Oid] {
 						mocks.ossClient.EXPECT().StatObject(ctx, "test-bucket", "lfs/"+obj.Oid[:2]+"/"+obj.Oid[2:], mock.Anything).Return(minio.ObjectInfo{Size: obj.Size}, nil)
+						existingOIDs = append(existingOIDs, obj.Oid)
 					} else {
 						mocks.ossClient.EXPECT().StatObject(ctx, "test-bucket", "lfs/"+obj.Oid[:2]+"/"+obj.Oid[2:], mock.Anything).Return(minio.ObjectInfo{}, errors.New("NoSuchKey"))
+						missingOIDs = append(missingOIDs, obj.Oid)
 					}
 				}
-				mocks.lfsMetaObjectStore.EXPECT().BulkUpdateOrCreate(mock.Anything, mock.Anything, mock.Anything).Return(nil)
+				if len(tt.lfsObjects) > 0 && !tt.expectedError {
+					mocks.lfsMetaObjectStore.EXPECT().BulkUpdateExistingByOIDs(ctx, repo.ID, existingOIDs, missingOIDs).Return(nil)
+				}
 			}
 
 			pointers, err := worker.getSyncPointers(ctx, task)
 
 			if tt.expectedError {
 				assert.Error(t, err)
-				assert.Contains(t, err.Error(), "fail to get lfs meta objects")
+				assert.Contains(t, err.Error(), tt.expectedErrorMsg)
 			} else {
 				assert.NoError(t, err)
 				assert.Len(t, pointers, tt.expectedCount)
@@ -594,6 +630,30 @@ func (suite *LfsSyncWorkerTestSuite) TestCheckIfLFSFileExists() {
 			expectedError:  false,
 		},
 		{
+			name:           "file not found from minio error code",
+			statError:      minio.ErrorResponse{Code: "NoSuchKey"},
+			expectedSize:   1024,
+			expectDelete:   false,
+			expectedExists: false,
+			expectedError:  false,
+		},
+		{
+			name:           "file not found from empty minio error code",
+			statError:      minio.ErrorResponse{StatusCode: http.StatusNotFound},
+			expectedSize:   1024,
+			expectDelete:   false,
+			expectedExists: false,
+			expectedError:  false,
+		},
+		{
+			name:           "bucket not found is an error",
+			statError:      minio.ErrorResponse{Code: "NoSuchBucket", StatusCode: http.StatusNotFound},
+			expectedSize:   1024,
+			expectDelete:   false,
+			expectedExists: false,
+			expectedError:  true,
+		},
+		{
 			name:           "other error",
 			statError:      errors.New("network error"),
 			expectedSize:   1024,
@@ -646,6 +706,23 @@ func (suite *LfsSyncWorkerTestSuite) TestDownloadAndUploadLFSFile_FileExists() {
 	err := suite.worker.downloadAndUploadLFSFile(ctx, repo, pointer)
 
 	assert.NoError(suite.T(), err)
+}
+
+func (suite *LfsSyncWorkerTestSuite) TestDownloadAndUploadLFSFile_CheckExistsError() {
+	ctx := context.WithValue(suite.ctx, rk, "models/test/repo")
+	repo := createTestRepository()
+	pointer := &types.Pointer{
+		Oid:  "test-oid-123",
+		Size: 1024,
+	}
+
+	// The metadata must not be updated when object storage verification fails.
+	suite.mocks.ossClient.EXPECT().StatObject(ctx, suite.worker.config.S3.Bucket, mock.Anything, mock.Anything).Return(minio.ObjectInfo{}, errors.New("network error"))
+
+	err := suite.worker.downloadAndUploadLFSFile(ctx, repo, pointer)
+
+	assert.Error(suite.T(), err)
+	assert.Contains(suite.T(), err.Error(), "failed to check if lfs file exists")
 }
 
 func (suite *LfsSyncWorkerTestSuite) TestDownloadAndUploadLFSFile_EmptyDownloadURL() {

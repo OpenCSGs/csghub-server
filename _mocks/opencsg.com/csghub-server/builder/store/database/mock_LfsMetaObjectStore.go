@@ -22,6 +22,55 @@ func (_m *MockLfsMetaObjectStore) EXPECT() *MockLfsMetaObjectStore_Expecter {
 	return &MockLfsMetaObjectStore_Expecter{mock: &_m.Mock}
 }
 
+// BulkUpdateExistingByOIDs provides a mock function with given fields: ctx, repoID, existingOIDs, missingOIDs
+func (_m *MockLfsMetaObjectStore) BulkUpdateExistingByOIDs(ctx context.Context, repoID int64, existingOIDs []string, missingOIDs []string) error {
+	ret := _m.Called(ctx, repoID, existingOIDs, missingOIDs)
+
+	if len(ret) == 0 {
+		panic("no return value specified for BulkUpdateExistingByOIDs")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, int64, []string, []string) error); ok {
+		r0 = rf(ctx, repoID, existingOIDs, missingOIDs)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockLfsMetaObjectStore_BulkUpdateExistingByOIDs_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'BulkUpdateExistingByOIDs'
+type MockLfsMetaObjectStore_BulkUpdateExistingByOIDs_Call struct {
+	*mock.Call
+}
+
+// BulkUpdateExistingByOIDs is a helper method to define mock.On call
+//   - ctx context.Context
+//   - repoID int64
+//   - existingOIDs []string
+//   - missingOIDs []string
+func (_e *MockLfsMetaObjectStore_Expecter) BulkUpdateExistingByOIDs(ctx interface{}, repoID interface{}, existingOIDs interface{}, missingOIDs interface{}) *MockLfsMetaObjectStore_BulkUpdateExistingByOIDs_Call {
+	return &MockLfsMetaObjectStore_BulkUpdateExistingByOIDs_Call{Call: _e.mock.On("BulkUpdateExistingByOIDs", ctx, repoID, existingOIDs, missingOIDs)}
+}
+
+func (_c *MockLfsMetaObjectStore_BulkUpdateExistingByOIDs_Call) Run(run func(ctx context.Context, repoID int64, existingOIDs []string, missingOIDs []string)) *MockLfsMetaObjectStore_BulkUpdateExistingByOIDs_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(int64), args[2].([]string), args[3].([]string))
+	})
+	return _c
+}
+
+func (_c *MockLfsMetaObjectStore_BulkUpdateExistingByOIDs_Call) Return(_a0 error) *MockLfsMetaObjectStore_BulkUpdateExistingByOIDs_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockLfsMetaObjectStore_BulkUpdateExistingByOIDs_Call) RunAndReturn(run func(context.Context, int64, []string, []string) error) *MockLfsMetaObjectStore_BulkUpdateExistingByOIDs_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // BulkUpdateOrCreate provides a mock function with given fields: ctx, repoID, input
 func (_m *MockLfsMetaObjectStore) BulkUpdateOrCreate(ctx context.Context, repoID int64, input []database.LfsMetaObject) error {
 	ret := _m.Called(ctx, repoID, input)

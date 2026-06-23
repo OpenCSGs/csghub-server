@@ -130,6 +130,57 @@ func TestLfsMetaStore_UpdateXnetUsed(t *testing.T) {
 	require.Nil(t, err)
 }
 
+func TestLfsMetaStore_BulkUpdateExistingByOIDs(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewLfsMetaObjectStoreWithDB(db)
+
+	// Seed rows with intentionally stale Existing values to verify that the
+	// bulk update writes the checked object-storage state instead of trusting DB.
+	_, err := store.Create(ctx, database.LfsMetaObject{
+		RepositoryID: 123,
+		Oid:          "existing-oid",
+		Size:         1024,
+		Existing:     false,
+	})
+	require.Nil(t, err)
+	_, err = store.Create(ctx, database.LfsMetaObject{
+		RepositoryID: 123,
+		Oid:          "missing-oid",
+		Size:         2048,
+		Existing:     true,
+	})
+	require.Nil(t, err)
+	_, err = store.Create(ctx, database.LfsMetaObject{
+		RepositoryID: 456,
+		Oid:          "missing-oid",
+		Size:         4096,
+		Existing:     true,
+	})
+	require.Nil(t, err)
+
+	err = store.BulkUpdateExistingByOIDs(ctx, 123, []string{"existing-oid"}, []string{"missing-oid"})
+	require.Nil(t, err)
+
+	existingObj, err := store.FindByOID(ctx, 123, "existing-oid")
+	require.Nil(t, err)
+	require.True(t, existingObj.Existing)
+
+	missingObj, err := store.FindByOID(ctx, 123, "missing-oid")
+	require.Nil(t, err)
+	require.False(t, missingObj.Existing)
+
+	otherRepoObj, err := store.FindByOID(ctx, 456, "missing-oid")
+	require.Nil(t, err)
+	require.True(t, otherRepoObj.Existing)
+
+	objs, err := store.FindByRepoID(ctx, 123)
+	require.Nil(t, err)
+	require.Len(t, objs, 2)
+}
+
 func TestLfsMetaStore_CheckIfAllMigratedToXnet(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
