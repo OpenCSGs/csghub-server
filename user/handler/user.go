@@ -157,6 +157,14 @@ func (h *UserHandler) Update(ctx *gin.Context) {
 	err = h.c.UpdateByUUID(ctx.Request.Context(), req)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "Failed to update user by uuid", slog.Any("error", err), slog.String("uuid", *req.UUID), slog.String("current_user", currentUser), slog.Any("req", *req))
+		if err == errorx.ErrForbidden {
+			httpbase.ForbiddenError(ctx, err)
+			return
+		}
+		if err == errorx.ErrUserNotFound {
+			httpbase.NotFoundError(ctx, err)
+			return
+		}
 		httpbase.ServerError(ctx, err)
 		return
 	}
