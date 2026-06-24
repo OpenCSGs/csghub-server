@@ -874,6 +874,7 @@ func createCodeRoutes(
 		codesGroup.GET("/:namespace/:name/blob/*file_path", repoCommonHandler.FileInfo)
 		codesGroup.GET("/:namespace/:name/download/*file_path", repoCommonHandler.DownloadFile)
 		codesGroup.GET("/:namespace/:name/resolve/*file_path", repoCommonHandler.ResolveDownload)
+		codesGroup.GET("/:namespace/:name/download_archive/refs/*ref", repoCommonHandler.DownloadCodeZip)
 		codesGroup.PUT("/:namespace/:name/raw/*file_path", middlewareCollection.Auth.NeedLogin, repoCommonHandler.UpdateFile)
 		codesGroup.DELETE("/:namespace/:name/raw/*file_path", middlewareCollection.Auth.NeedLogin, repoCommonHandler.DeleteFile)
 		codesGroup.POST("/:namespace/:name/update_downloads", middlewareCollection.Auth.NeedAdmin, repoCommonHandler.UpdateDownloads)

@@ -6,6 +6,9 @@ const (
 	codeRepoAlreadyExistErr = iota
 	codeRepoNameInvalidErr
 	codeNamespaceNotFoundErr
+	codeRepoNotFoundErr
+	codeRepoNoDefaultBranchErr
+	codeCodeZipDownloadFailedErr
 )
 
 var (
@@ -41,4 +44,52 @@ var (
 	//
 	// zh-HK: 命名空間不存在
 	ErrNamespaceNotFound error = CustomError{prefix: errRepoPrefix, code: codeNamespaceNotFoundErr}
+
+	// Description: The repository was not found.
+	//
+	// Description_ZH: 仓库未找到
+	//
+	// en-US: Repository not found
+	//
+	// zh-CN: 仓库未找到
+	//
+	// zh-HK: 儲存庫未找到
+	ErrRepoNotFound error = CustomError{prefix: errRepoPrefix, code: codeRepoNotFoundErr}
+
+	// Description: No revision specified and repository has no default branch. Please specify a revision.
+	//
+	// Description_ZH: 用户未指定分支，请指定分支后再试
+	//
+	// en-US: No revision specified. Please specify a revision.
+	//
+	// zh-CN: 用户未指定分支，请指定分支后再试
+	//
+	// zh-HK: 用戶未指定分支，請指定分支後再試
+	ErrRepoNoDefaultBranch error = CustomError{prefix: errRepoPrefix, code: codeRepoNoDefaultBranchErr}
+
+	// Description: Failed to download code repository as zip archive.
+	//
+	// Description_ZH: 下载代码仓库 zip 归档失败
+	//
+	// en-US: Failed to download code zip archive
+	//
+	// zh-CN: 下载代码 zip 归档失败
+	//
+	// zh-HK: 下載代碼 zip 歸檔失敗
+	ErrCodeZipDownloadFailed error = CustomError{prefix: errRepoPrefix, code: codeCodeZipDownloadFailedErr}
 )
+
+// RepoNotFound creates a REPO-ERR-3 error with context.
+func RepoNotFound(err error, ctx context) error {
+	return CustomError{prefix: errRepoPrefix, code: codeRepoNotFoundErr, err: err, context: ctx}
+}
+
+// RepoNoDefaultBranch creates a REPO-ERR-4 error.
+func RepoNoDefaultBranch(ctx context) error {
+	return CustomError{prefix: errRepoPrefix, code: codeRepoNoDefaultBranchErr, context: ctx}
+}
+
+// CodeZipDownloadFailed creates a REPO-ERR-5 error with context.
+func CodeZipDownloadFailed(err error, ctx context) error {
+	return CustomError{prefix: errRepoPrefix, code: codeCodeZipDownloadFailedErr, err: err, context: ctx}
+}

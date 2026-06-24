@@ -108,8 +108,10 @@ func newGitalyTester(t *testing.T) *gitalyTester {
 	tester.mocks.smartHttpClient = gitalypb_mock.NewMockSmartHTTPServiceClient(t)
 	tester.mocks.remoteClient = gitalypb_mock.NewMockRemoteServiceClient(t)
 	tester.mocks.repoStore = database_mock.NewMockRepoStore(t)
+	cfg := &config.Config{}
+	cfg.Git.MaxArchiveSizeMB = 50
 	tester.Client = &Client{
-		config:          &config.Config{},
+		config:          cfg,
 		repoClient:      tester.mocks.repoClient,
 		commitClient:    tester.mocks.commitClient,
 		blobClient:      tester.mocks.blobClient,

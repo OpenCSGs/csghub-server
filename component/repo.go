@@ -197,6 +197,8 @@ type RepoComponent interface {
 	GetRepos(ctx context.Context, search, currentUser string, repoType types.RepositoryType) ([]string, error)
 	// GetRepoSizeByBranch gets the repository size for a specific branch
 	GetRepoSizeByBranch(ctx context.Context, repoType types.RepositoryType, namespace, name, branch, currentUser string) (int64, error)
+	// DownloadCodeZip downloads the code repository as a zip archive
+	DownloadCodeZip(ctx context.Context, req types.DownloadCodeZipReq, currentUser string) ([]byte, error)
 	advancedRepoInterface
 	communityRepoInterface
 }
@@ -3301,4 +3303,39 @@ func (c *repoComponentImpl) GetRepoSizeByBranch(ctx context.Context, repoType ty
 	}
 
 	return stats.TotalSize, nil
+}
+
+func (c *repoComponentImpl) DownloadCodeZip(ctx context.Context, req types.DownloadCodeZipReq, currentUser string) ([]byte, error) {
+	repo, err := c.repoStore.FindByPath(ctx, types.CodeRepo, req.Namespace, req.Name)
+	if err != nil {
+		return nil, errorx.RepoNotFound(err, errorx.Ctx().Set("namespace", req.Namespace).Set("name", req.Name))
+	}
+
+	permission, err := c.GetUserRepoPermission(ctx, currentUser, repo)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get user repo permission, error: %w", err)
+	}
+	if !permission.CanRead {
+		return nil, errorx.ErrForbiddenMsg("users do not have permission to download code zip in this repo")
+	}
+
+	revision := req.Revision
+	if revision == "" {
+		revision = repo.DefaultBranch
+	}
+	if revision == "" {
+		return nil, errorx.RepoNoDefaultBranch(errorx.Ctx().Set("namespace", req.Namespace).Set("name", req.Name))
+	}
+
+	archiveData, err := c.git.GetArchive(ctx, gitserver.GetArchiveReq{
+		Namespace: req.Namespace,
+		Name:      req.Name,
+		Revision:  revision,
+		RepoType:  types.CodeRepo,
+	})
+	if err != nil {
+		return nil, errorx.CodeZipDownloadFailed(err, errorx.Ctx().Set("namespace", req.Namespace).Set("name", req.Name).Set("revision", revision))
+	}
+
+	return archiveData, nil
 }

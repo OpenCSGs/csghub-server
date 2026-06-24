@@ -410,3 +410,9 @@ type CreateForkReq struct {
 	RelatedDatasetID int64          `json:"related_dataset_id"`
 	TaskID           int64          `json:"task_id"`
 }
+
+type DownloadCodeZipReq struct {
+	Namespace string `json:"namespace"`
+	Name      string `json:"name"`
+	Revision  string `json:"revision"`
+}

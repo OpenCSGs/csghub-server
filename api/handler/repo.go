@@ -2045,3 +2045,57 @@ func (h *RepoHandler) GetRepoSizeByBranch(ctx *gin.Context) {
 	slog.Debug("Get repo size succeed", slog.String("repo_type", string(repoType)), slog.String("namespace", namespace), slog.String("name", name), slog.String("branch", branch), slog.Any("size", size))
 	httpbase.OK(ctx, size)
 }
+
+// DownloadCodeZip godoc
+// @Summary      Download code repository as zip archive
+// @Description  Download code repository as zip archive
+// @Tags         Code
+// @Produce      application/zip
+// @Param        namespace path string true "repo owner name"
+// @Param        name path string true "repo name"
+// @Param        ref path string true "branch or tag name"
+// @Success      200  {file}  file "OK"
+// @Router       /codes/{namespace}/{name}/download_archive/refs/{ref}/ [get]
+func (h *RepoHandler) DownloadCodeZip(ctx *gin.Context) {
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	currentUser := httpbase.GetCurrentUser(ctx)
+	ref := strings.TrimPrefix(ctx.Param("ref"), "/")
+
+	zipData, err := h.c.DownloadCodeZip(ctx.Request.Context(), types.DownloadCodeZipReq{
+		Namespace: namespace,
+		Name:      name,
+		Revision:  ref,
+	}, currentUser)
+	if err != nil {
+		slog.ErrorContext(ctx.Request.Context(), "Failed to download code zip", slog.String("namespace", namespace), slog.String("name", name), slog.Any("error", err))
+		if errors.Is(err, errorx.ErrForbidden) {
+			httpbase.ForbiddenError(ctx, err)
+			return
+		}
+		if errors.Is(err, errorx.ErrRepoNotFound) {
+			httpbase.NotFoundError(ctx, err)
+			return
+		}
+		if errors.Is(err, errorx.ErrRepoNoDefaultBranch) {
+			httpbase.BadRequestWithExt(ctx, err)
+			return
+		}
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	safeName := strings.ReplaceAll(name, "/", "-")
+	safeRef := strings.ReplaceAll(ref, "/", "-")
+	filename := fmt.Sprintf("%s-%s.zip", safeName, safeRef)
+	if ref == "" {
+		filename = fmt.Sprintf("%s.zip", safeName)
+	}
+	ctx.Header("Content-Type", "application/zip")
+	ctx.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%s", filename))
+	ctx.Data(http.StatusOK, "application/zip", zipData)
+}
