@@ -34,6 +34,10 @@ func (h *FinetuneHandler) RunFinetuneJob(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
+	if err := validateFinetuneSwiftOptions(&req); err != nil {
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
 	_, err := h.sensitive.CheckRequestV2(ctx.Request.Context(), &req)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "failed to check sensitive request for create finetune", slog.Any("error", err))
@@ -57,6 +61,18 @@ func (h *FinetuneHandler) RunFinetuneJob(ctx *gin.Context) {
 	h.createAgentInstanceTask(ctx.Request.Context(), req.Agent, finetune.TaskId, currentUser)
 
 	httpbase.OK(ctx, finetune)
+}
+
+func validateFinetuneSwiftOptions(req *types.FinetuneReq) error {
+	req.SwiftCommand = strings.ToLower(strings.TrimSpace(req.SwiftCommand))
+
+	switch types.SwiftCommand(req.SwiftCommand) {
+	case "", types.SwiftCommandSFT, types.SwiftCommandRLHF, types.SwiftCommandPT:
+	default:
+		return errors.New("swift_command must be one of sft, rlhf, pt")
+	}
+
+	return nil
 }
 
 // get finetune  godoc

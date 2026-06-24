@@ -875,6 +875,7 @@ func TestDeployer_SubmitFinetune(t *testing.T) {
 				"EPOCHS":                  "0",
 				"REVISION":                "main",
 				"DATASET_REVISION":        "dev",
+				"SWIFT_COMMAND":           "rlhf",
 			}, awfr.Templates[0].Env)
 			return &types.ArgoWorkFlowRes{ID: 1}, nil
 		},
@@ -893,6 +894,7 @@ func TestDeployer_SubmitFinetune(t *testing.T) {
 		DownloadEndpoint: "dl",
 		Revision:         "main",
 		DatasetRevision:  "dev",
+		SwiftCommand:     string(types.SwiftCommandRLHF),
 	})
 	require.NoError(t, err)
 	require.Equal(t, &types.ArgoWorkFlowRes{ID: 1}, resp)
@@ -1089,7 +1091,7 @@ func TestDeployer_GetSharedModeResourceName(t *testing.T) {
 	t.Run("custom scheduler", func(t *testing.T) {
 		d := &deployer{}
 		vxpuConfig := map[string]string{
-			types.ClusterCFGKubeSchedulerKey: types.KubeSchedulerVolcano.ToString(),
+			types.ClusterCFGKubeSchedulerKey:   types.KubeSchedulerVolcano.ToString(),
 			types.ClusterCFGVGPUResourceReqKey: "nvidia.com/vgpu",
 		}
 		if common.GenerateScheduler(vxpuConfig) == nil {

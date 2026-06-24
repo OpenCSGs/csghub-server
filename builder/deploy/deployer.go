@@ -939,6 +939,7 @@ func (d *deployer) SubmitFinetuneJob(ctx context.Context, req types.FinetuneReq)
 	env["CUSTOM_ARGS"] = req.CustomeArgs
 	env["REVISION"] = req.Revision
 	env["DATASET_REVISION"] = req.DatasetRevision
+	env["SWIFT_COMMAND"] = req.SwiftCommand
 	if len(finetunedModelName) > 0 {
 		env["FINETUNED_MODEL_NAME"] = finetunedModelName
 	}

@@ -6,9 +6,9 @@
   "engine_images": [
     {
       "compute_type": "gpu",
-      "image": "opencsghq/ms-swift-job:v4.2.0-cu124",
-      "driver_version": "12.4",
-      "engine_version": "v4.2.0"
+      "image": "opencsghq/ms-swift-job:v4.3.1-cu129",
+      "driver_version": "12.9",
+      "engine_version": "v4.3.1"
     }
   ],
   "supported_models": [

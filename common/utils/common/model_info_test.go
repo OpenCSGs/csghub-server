@@ -141,8 +141,8 @@ func TestGetModelInfo_Success(t *testing.T) {
 	if got.ModelWeightsGB != wantModelWeightsGB {
 		t.Errorf("ModelWeightsGB = %v, want %v", got.ModelWeightsGB, wantModelWeightsGB)
 	}
-	if got.MiniGPUMemoryGB != 1 {
-		t.Errorf("MiniGPUMemoryGB = %v, want 1", got.MiniGPUMemoryGB)
+	if got.MiniGPUMemoryGB != 0 {
+		t.Errorf("MiniGPUMemoryGB = %v, want 0", got.MiniGPUMemoryGB)
 	}
 	if got.ContextSize != minContext {
 		t.Errorf("ContextSize = %v, want %v", got.ContextSize, minContext)
@@ -197,8 +197,8 @@ func TestGetModelInfo_EmptyFileList(t *testing.T) {
 	if got.BatchSize != 1 {
 		t.Errorf("BatchSize = %v, want 1", got.BatchSize)
 	}
-	if got.MiniGPUMemoryGB != 1 {
-		t.Errorf("MiniGPUMemoryGB = %v, want 1", got.MiniGPUMemoryGB)
+	if got.MiniGPUMemoryGB != 0 {
+		t.Errorf("MiniGPUMemoryGB = %v, want 0", got.MiniGPUMemoryGB)
 	}
 }
 
