@@ -16,11 +16,14 @@ type eventStreamDecoder struct {
 	buf bytes.Buffer
 }
 
+func normalizeSSEBytes(data []byte) []byte {
+	return bytes.ReplaceAll(data, []byte("\r\n"), []byte("\n"))
+}
+
 func (d *eventStreamDecoder) Write(p []byte) ([]*Event, error) {
 	d.buf.Write(p)
 
-	// Check if we have a complete event (ends with double newline)
-	data := d.buf.Bytes()
+	data := normalizeSSEBytes(d.buf.Bytes())
 	if len(data) == 0 {
 		return nil, nil
 	}

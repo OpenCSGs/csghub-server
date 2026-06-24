@@ -72,6 +72,7 @@ func NewRouter(config *config.Config) (*gin.Engine, func(), error) {
 
 	v1Group.GET("/models", openAIhandler.ListModels)
 	v1Group.GET("/models/*model", openAIhandler.GetModel)
+	v1Group.POST("/responses", middlewareCollection.Auth.MustUserOrgApiKey, openAIhandler.Responses)
 	v1Group.POST("/chat/completions", middlewareCollection.Auth.MustUserOrgApiKey, openAIhandler.Chat)
 	v1Group.POST("/embeddings", middlewareCollection.Auth.MustUserOrgApiKey, openAIhandler.Embedding)
 	v1Group.POST("/images/generations", middlewareCollection.Auth.MustUserOrgApiKey, modalAPIRateLimiter, openAIhandler.GenerateImage)

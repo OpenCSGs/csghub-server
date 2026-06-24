@@ -98,6 +98,36 @@ func TestEventStreamDecoder_Write(t *testing.T) {
 			wantEvts: []*Event{},
 			wantErr:  false,
 		},
+		{
+			name: "complete event with CRLF boundary",
+			inputs: [][]byte{
+				[]byte("event: test\r\ndata: hello world\r\n\r\n"),
+			},
+			wantEvts: []*Event{
+				{
+					Type: "test",
+					Data: []byte("hello world"),
+					Raw:  []byte("event: test\ndata: hello world\n\n"),
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "CRLF event received in chunks",
+			inputs: [][]byte{
+				[]byte("event: test\r\n"),
+				[]byte("data: hello "),
+				[]byte("world\r\n\r\n"),
+			},
+			wantEvts: []*Event{
+				{
+					Type: "test",
+					Data: []byte("hello world"),
+					Raw:  []byte("event: test\ndata: hello world\n\n"),
+				},
+			},
+			wantErr: false,
+		},
 	}
 
 	for _, tt := range tests {

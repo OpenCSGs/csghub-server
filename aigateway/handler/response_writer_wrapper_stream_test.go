@@ -398,3 +398,19 @@ func TestResponseWriterWrapper_Write_TokenCounterAppendsChunk(t *testing.T) {
 		t.Error("Normal content should be written to response when tokenCounter is set")
 	}
 }
+
+func TestResponseWriterWrapper_Write_PassthroughUpstreamJSONError(t *testing.T) {
+	w := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(w)
+	rw := newStreamResponseWriter(ctx.Writer, nil, nil, nil)
+
+	rw.Header().Set("Content-Type", "application/json")
+	rw.WriteHeader(http.StatusTooManyRequests)
+	errorBody := []byte(`{"error":{"message":"rate limited","type":"rate_limit_error"}}`)
+	_, err := rw.Write(errorBody)
+	require.NoError(t, err)
+
+	require.Equal(t, http.StatusTooManyRequests, w.Code)
+	require.Equal(t, "application/json", w.Header().Get("Content-Type"))
+	require.Equal(t, string(errorBody), w.Body.String())
+}

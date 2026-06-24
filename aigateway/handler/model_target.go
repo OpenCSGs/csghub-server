@@ -52,6 +52,10 @@ type modelTargetErrorOptions struct {
 	Host      string
 }
 
+type modelTargetResolveOptions struct {
+	RequiredUpstreamID int64
+}
+
 type modelTargetErrorParams struct {
 	Status  int
 	Code    string
@@ -61,11 +65,12 @@ type modelTargetErrorParams struct {
 }
 
 type endpointTargetResolveInput struct {
-	Model     *types.Model
-	ModelID   string
-	Username  string
-	Headers   http.Header
-	TargetReq *commonType.EndpointReq
+	Model              *types.Model
+	ModelID            string
+	Username           string
+	Headers            http.Header
+	TargetReq          *commonType.EndpointReq
+	RequiredUpstreamID int64
 }
 
 type endpointTargetResolveResult struct {
@@ -129,6 +134,10 @@ func newServerModelTargetError(code, message string, options modelTargetErrorOpt
 }
 
 func (h *OpenAIHandlerImpl) resolveModelTarget(ctx context.Context, username, modelID string, headers http.Header) (*resolvedModelTarget, error) {
+	return h.resolveModelTargetWithOptions(ctx, username, modelID, headers, modelTargetResolveOptions{})
+}
+
+func (h *OpenAIHandlerImpl) resolveModelTargetWithOptions(ctx context.Context, username, modelID string, headers http.Header, options modelTargetResolveOptions) (*resolvedModelTarget, error) {
 	model, err := h.openaiComponent.GetModelByID(ctx, username, modelID)
 	if err != nil {
 		return nil, newInternalModelTargetError(err)
@@ -166,11 +175,12 @@ func (h *OpenAIHandlerImpl) resolveModelTarget(ctx context.Context, username, mo
 		}
 	} else {
 		result, err := h.resolveEndpointModelTarget(ctx, endpointTargetResolveInput{
-			Model:     model,
-			ModelID:   modelID,
-			Username:  username,
-			Headers:   headers,
-			TargetReq: &targetReq,
+			Model:              model,
+			ModelID:            modelID,
+			Username:           username,
+			Headers:            headers,
+			TargetReq:          &targetReq,
+			RequiredUpstreamID: options.RequiredUpstreamID,
 		})
 		if err != nil {
 			return nil, err
@@ -231,6 +241,34 @@ func (h *OpenAIHandlerImpl) resolveEndpointModelTarget(
 		return nil, availabilityErr
 	}
 	input.Model.Upstreams = availableUpstreams
+
+	if input.RequiredUpstreamID != 0 {
+		for _, upstream := range input.Model.Upstreams {
+			if upstream.ID != input.RequiredUpstreamID {
+				continue
+			}
+			target := upstream.URL
+			input.TargetReq.Target = target
+			input.TargetReq.Endpoint = target
+			input.Model.Endpoint = target
+			applyEndpointOverrides(input.Model, upstream)
+			modelName := resolveEndpointModelName(input.Model.ID, upstream)
+			return &endpointTargetResolveResult{
+				Upstream:       upstream,
+				Target:         target,
+				ModelName:      modelName,
+				AttemptTargets: []commonType.UpstreamConfig{upstream},
+			}, nil
+		}
+		return nil, newInvalidRequestModelTargetError(
+			"required_upstream_unavailable",
+			fmt.Sprintf("required upstream %d for model '%s' is unavailable", input.RequiredUpstreamID, input.ModelID),
+			modelTargetErrorOptions{
+				Model:     input.Model,
+				TargetReq: *input.TargetReq,
+			},
+		)
+	}
 
 	// PickUpstream by router strategy
 	upstream, err := h.sessionRouter.PickUpstream(

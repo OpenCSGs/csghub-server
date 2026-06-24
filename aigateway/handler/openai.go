@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"opencsg.com/csghub-server/aigateway/component/router"
@@ -44,6 +45,8 @@ type OpenAIHandler interface {
 	GetModel(c *gin.Context)
 	// Chat with backend model
 	Chat(c *gin.Context)
+	// Responses runs OpenAI-compatible Responses API requests.
+	Responses(c *gin.Context)
 	// Get embedding for a text
 	Embedding(c *gin.Context)
 	// Generate image from text
@@ -249,6 +252,9 @@ type OpenAIHandlerImpl struct {
 	availabilityManager        availability.AvailabilityManager
 	chatAttemptFailureReporter ChatAttemptFailureReporter
 	llmTracer                  llmtrace.LLMTracer
+	responsesIDMapper          *ResponsesIDMapper
+	responsesIDMapperOnce      sync.Once
+	responsesIDMapperErr       error
 }
 
 // ListModels godoc
@@ -436,6 +442,7 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 		handleModelTargetError(c, ctx, modelID, "failed to get model target address", err)
 		return
 	}
+	applyChatCompletionsEndpointCompatibility(ctx, modelTarget)
 	preflight.SetTargetModel(modelID, modelTarget)
 	chatReq.Model = modelTarget.ModelName
 	if chatReq.Stream {

@@ -38,6 +38,8 @@ type ResponseWriterWrapper struct {
 	tokenCounter        token.ChatTokenCounter
 	recorder            component.LLMLogRecorder
 	id                  string
+	statusCode          int
+	sseStarted          bool
 }
 
 // Hijack allows the HTTP connection upgrading to a different protocol, such as WebSockets or HTTP/2.
@@ -72,6 +74,7 @@ func (rw *ResponseWriterWrapper) Header() http.Header {
 }
 
 func (rw *ResponseWriterWrapper) WriteHeader(statusCode int) {
+	rw.statusCode = statusCode
 	rw.internalWritter.Header().Del("Content-Length")
 	rw.internalWritter.WriteHeader(statusCode)
 }
@@ -81,12 +84,18 @@ func (rw *ResponseWriterWrapper) Write(data []byte) (int, error) {
 }
 
 func (rw *ResponseWriterWrapper) streamWrite(data []byte) (int, error) {
+	if shouldPassthroughUpstreamError(rw.statusCode, rw.sseStarted) {
+		rw.writeInternal(data)
+		return len(data), nil
+	}
+
 	events, _ := rw.eventStreamDecoder.Write(data)
 	// unmarshal event data into ChatCompletionChunk and call moderation service
 	for _, event := range events {
 		if len(event.Data) <= 0 {
 			continue
 		}
+		rw.sseStarted = true
 		if string(event.Data) == "[DONE]" {
 			// trigger async check for sensitive content on remaining buffer
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
