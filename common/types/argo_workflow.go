@@ -139,6 +139,7 @@ type ArgoWorkFlowRes struct {
 	ResultURL    string                 `json:"result_url"`
 	DownloadURL  string                 `json:"download_url"`
 	FailuresURL  string                 `json:"failures_url"`
+	PayMode      PayMode                `json:"pay_mode,omitempty"`
 }
 
 type RepoTags struct {

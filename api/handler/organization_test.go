@@ -214,24 +214,52 @@ func TestOrganizationHandler_MCPServers(t *testing.T) {
 	})
 }
 
-func TestOrganizationHandler_Finetunes(t *testing.T) {
+func TestOrganizationHandler_FinetuneInstances(t *testing.T) {
 	tester := NewOrganizationTester(t).WithHandleFunc(func(h *OrganizationHandler) gin.HandlerFunc {
-		return h.Finetunes
+		return h.FinetuneInstances
 	})
 
-	tester.mocks.finetune.EXPECT().OrgFinetunes(tester.Ctx(), &types.OrgFinetunesReq{
+	tester.mocks.finetune.EXPECT().OrgFinetuneInstances(tester.Ctx(), &types.OrgFinetunesReq{
 		PageOpts: types.PageOpts{
 			Page:     1,
 			PageSize: 10,
 		},
 		Namespace:   "u",
 		CurrentUser: "u",
-	}).Return([]types.ArgoWorkFlowRes{{TaskName: "ft1"}}, 100, nil)
+	}).Return([]types.DeployRequest{{DeployName: "ft1"}}, 100, nil)
 	tester.WithUser().AddPagination(1, 10).Execute()
 	tester.ResponseEq(t, 200, tester.OKText, gin.H{
-		"data":  []types.ArgoWorkFlowRes{{TaskName: "ft1"}},
+		"data":  []types.DeployRequest{{DeployName: "ft1"}},
 		"total": 100,
 	})
+}
+
+func TestOrganizationHandler_FinetuneJobs(t *testing.T) {
+	tester := NewOrganizationTester(t).WithHandleFunc(func(h *OrganizationHandler) gin.HandlerFunc {
+		return h.FinetuneJobs
+	})
+
+	tester.mocks.finetune.EXPECT().OrgFinetuneJobs(tester.Ctx(), &types.OrgFinetunesReq{
+		PageOpts: types.PageOpts{
+			Page:     1,
+			PageSize: 10,
+		},
+		Namespace:   "u",
+		CurrentUser: "u",
+	}).Return([]types.ArgoWorkFlowRes{{TaskName: "ftjob1"}}, 100, nil)
+	tester.WithUser().AddPagination(1, 10).Execute()
+	tester.ResponseEq(t, 200, tester.OKText, gin.H{
+		"data":  []types.ArgoWorkFlowRes{{TaskName: "ftjob1"}},
+		"total": 100,
+	})
+}
+
+func TestOrganizationHandler_FinetuneJobs_BadPagination(t *testing.T) {
+	tester := NewOrganizationTester(t).WithHandleFunc(func(h *OrganizationHandler) gin.HandlerFunc {
+		return h.FinetuneJobs
+	})
+	tester.WithUser().WithQuery("per", "invalid").WithQuery("page", "1").Execute()
+	tester.ResponseEqCode(t, http.StatusBadRequest)
 }
 
 func TestOrganizationHandler_Evaluations(t *testing.T) {
@@ -384,9 +412,9 @@ func TestOrganizationHandler_MCPServers_BadPagination(t *testing.T) {
 	tester.ResponseEqCode(t, http.StatusBadRequest)
 }
 
-func TestOrganizationHandler_Finetunes_BadPagination(t *testing.T) {
+func TestOrganizationHandler_FinetuneInstances_BadPagination(t *testing.T) {
 	tester := NewOrganizationTester(t).WithHandleFunc(func(h *OrganizationHandler) gin.HandlerFunc {
-		return h.Finetunes
+		return h.FinetuneInstances
 	})
 	tester.WithUser().WithQuery("per", "0").WithQuery("page", "1").Execute()
 	tester.ResponseEqCode(t, http.StatusBadRequest)
@@ -501,11 +529,11 @@ func TestOrganizationHandler_Datasets_ComponentError(t *testing.T) {
 	tester.ResponseEqCode(t, http.StatusInternalServerError)
 }
 
-func TestOrganizationHandler_Finetunes_ComponentError(t *testing.T) {
+func TestOrganizationHandler_FinetuneInstances_ComponentError(t *testing.T) {
 	tester := NewOrganizationTester(t).WithHandleFunc(func(h *OrganizationHandler) gin.HandlerFunc {
-		return h.Finetunes
+		return h.FinetuneInstances
 	})
-	tester.mocks.finetune.EXPECT().OrgFinetunes(tester.Ctx(), &types.OrgFinetunesReq{
+	tester.mocks.finetune.EXPECT().OrgFinetuneInstances(tester.Ctx(), &types.OrgFinetunesReq{
 		PageOpts: types.PageOpts{Page: 1, PageSize: 10},
 		Namespace: "u", CurrentUser: "u",
 	}).Return(nil, 0, errors.New("backend error"))

@@ -211,3 +211,8 @@ func (c *userComponentImpl) ListNotebooksByNamespace(ctx context.Context, req *t
 	}
 	return res, total, nil
 }
+
+// get resource price
+func getAccountPrice(resourceId string, skuKind types.SKUKind, prices []database.AccountPrice) *database.AccountPrice {
+	return nil
+}
