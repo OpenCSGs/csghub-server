@@ -5,12 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"strconv"
+	"math"
 	"strings"
 
-	"github.com/argoproj/argo-workflows/v3/pkg/apis/workflow/v1alpha1"
 	"opencsg.com/csghub-server/builder/deploy"
-	deploycommon "opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/builder/git/membership"
 	"opencsg.com/csghub-server/builder/loki"
 	"opencsg.com/csghub-server/builder/rpc"
@@ -43,7 +41,8 @@ type FinetuneComponent interface {
 	CreateFinetuneJob(ctx context.Context, req types.FinetuneReq) (*types.ArgoWorkFlowRes, error)
 	GetFinetuneJob(ctx context.Context, req types.FinetineGetReq) (*types.FinetuneRes, error)
 	DeleteFinetuneJob(ctx context.Context, req types.ArgoWorkFlowDeleteReq) error
-	OrgFinetunes(ctx context.Context, req *types.OrgFinetunesReq) ([]types.ArgoWorkFlowRes, int, error)
+	OrgFinetuneInstances(ctx context.Context, req *types.OrgFinetunesReq) ([]types.DeployRequest, int, error)
+	OrgFinetuneJobs(ctx context.Context, req *types.OrgFinetunesReq) ([]types.ArgoWorkFlowRes, int, error)
 	CheckUserPermission(ctx context.Context, req types.FinetuneLogReq) (bool, *database.ArgoWorkflow, error)
 	ReadJobLogsNonStream(ctx context.Context, req types.FinetuneLogReq) (string, error)
 	ReadJobLogsInStream(ctx context.Context, req types.FinetuneLogReq) (*deploy.MultiLogReader, error)
@@ -231,7 +230,7 @@ func (c *finetuneComponentImpl) GetFinetuneJob(ctx context.Context, req types.Fi
 	return res, nil
 }
 
-func (c *finetuneComponentImpl) OrgFinetunes(ctx context.Context, req *types.OrgFinetunesReq) ([]types.ArgoWorkFlowRes, int, error) {
+func (c *finetuneComponentImpl) OrgFinetuneInstances(ctx context.Context, req *types.OrgFinetunesReq) ([]types.DeployRequest, int, error) {
 	if req.CurrentUser != "" {
 		canRead, err := c.repoComponent.CheckCurrentUserPermission(ctx, req.CurrentUser, req.Namespace, membership.RoleRead)
 		if err != nil {
@@ -240,6 +239,15 @@ func (c *finetuneComponentImpl) OrgFinetunes(ctx context.Context, req *types.Org
 		if !canRead {
 			return nil, 0, errorx.ErrForbiddenMsg("users do not have permission to view finetunes in this namespace")
 		}
+	}
+
+	priceData, err := c.accountingComponent.QueryPricesBySKUType("", types.AcctPriceListReq{
+		SkuType: types.SKUCSGHub,
+		Per:     int(math.MaxInt16),
+		Page:    1,
+	})
+	if err != nil {
+		return nil, 0, fmt.Errorf("get price data with error: %w", err)
 	}
 
 	// List org finetunes from deploys (owner_namespace); model-instance finetunes are stored here.
@@ -253,41 +261,100 @@ func (c *finetuneComponentImpl) OrgFinetunes(ctx context.Context, req *types.Org
 		return nil, 0, fmt.Errorf("failed to get org finetunes, error: %w", err)
 	}
 
-	var res []types.ArgoWorkFlowRes
-	for _, d := range deploys {
-		repoIds := []string{}
-		if d.RepoID > 0 {
-			repoIds = append(repoIds, strconv.FormatInt(d.RepoID, 10))
+	var resDeploys []types.DeployRequest
+	for _, deploy := range deploys {
+		resDeploys = append(resDeploys, types.DeployRequest{
+			DeployID:         deploy.ID,
+			DeployName:       deploy.DeployName,
+			Path:             deploy.GitPath,
+			SpaceID:          deploy.SpaceID,
+			UserID:           deploy.UserID,
+			RepoID:           deploy.RepoID,
+			ModelID:          deploy.ModelID,
+			SvcName:          deploy.SvcName,
+			Status:           deployStatusCodeToString(deploy.Status),
+			Hardware:         deploy.Hardware,
+			Env:              deploy.Env,
+			RuntimeFramework: deploy.RuntimeFramework,
+			ImageID:          deploy.ImageID,
+			MinReplica:       deploy.MinReplica,
+			MaxReplica:       deploy.MaxReplica,
+			GitPath:          deploy.GitPath,
+			GitBranch:        deploy.GitBranch,
+			ClusterID:        deploy.ClusterID,
+			SecureLevel:      deploy.SecureLevel,
+			CreatedAt:        deploy.CreatedAt,
+			UpdatedAt:        deploy.UpdatedAt,
+			Type:             deploy.Type,
+			UserUUID:         deploy.UserUUID,
+			PayMode:          c.getPayMode(deploy.SKU, priceData),
+		})
+	}
+	return resDeploys, total, nil
+}
+
+func (c *finetuneComponentImpl) OrgFinetuneJobs(ctx context.Context, req *types.OrgFinetunesReq) ([]types.ArgoWorkFlowRes, int, error) {
+	if req.CurrentUser != "" {
+		canRead, err := c.repoComponent.CheckCurrentUserPermission(ctx, req.CurrentUser, req.Namespace, membership.RoleRead)
+		if err != nil {
+			return nil, 0, fmt.Errorf("failed to check namespace permission, error: %w", err)
 		}
+		if !canRead {
+			return nil, 0, errorx.ErrForbiddenMsg("users do not have permission to view finetune jobs in this namespace")
+		}
+	}
+
+	priceData, err := c.accountingComponent.QueryPricesBySKUType("", types.AcctPriceListReq{
+		SkuType: types.SKUCSGHub,
+		Per:     int(math.MaxInt16),
+		Page:    1,
+	})
+	if err != nil {
+		return nil, 0, fmt.Errorf("get price data with error: %w", err)
+	}
+
+	workflows, total, err := c.workflowStore.FindByUsername(ctx, req.Namespace, types.TaskTypeFinetune, req.PageSize, req.Page)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to get org finetune jobs, error: %w", err)
+	}
+
+	var res []types.ArgoWorkFlowRes
+	for _, wf := range workflows {
 		res = append(res, types.ArgoWorkFlowRes{
-			ID:         d.ID,
-			RepoIds:    repoIds,
-			RepoType:   string(types.ModelRepo),
-			TaskName:   d.DeployName,
-			Username:   d.OwnerNamespace,
-			TaskId:     d.SvcName,
-			Status:     deployStatusToWorkflowPhase(d.Status),
-			TaskType:   types.TaskTypeFinetune,
-			SubmitTime: d.CreatedAt,
-			Image:      d.ImageID,
+			ID:           wf.ID,
+			RepoIds:      wf.RepoIds,
+			RepoType:     wf.RepoType,
+			TaskName:     wf.TaskName,
+			Username:     wf.Username,
+			TaskId:       wf.TaskId,
+			Status:       wf.Status,
+			TaskType:     wf.TaskType,
+			TaskDesc:     wf.TaskDesc,
+			Datasets:     wf.Datasets,
+			ResourceId:   wf.ResourceId,
+			ResourceName: wf.ResourceName,
+			Reason:       wf.Reason,
+			SubmitTime:   wf.SubmitTime,
+			StartTime:    wf.StartTime,
+			EndTime:      wf.EndTime,
+			DownloadURL:  wf.DownloadURL,
+			ResultURL:    wf.ResultURL,
+			Image:        wf.Image,
+			PayMode:      c.getPayMode(fmt.Sprintf("%d", wf.ResourceId), priceData),
 		})
 	}
 	return res, total, nil
 }
 
-// deployStatusToWorkflowPhase maps deploy status (int) to argo WorkflowPhase for list response.
-func deployStatusToWorkflowPhase(status int) v1alpha1.WorkflowPhase {
-	switch status {
-	case deploycommon.Running, deploycommon.Startup:
-		return v1alpha1.WorkflowRunning
-	case deploycommon.BuildFailed, deploycommon.DeployFailed, deploycommon.RunTimeError, deploycommon.Stopped, deploycommon.Deleted:
-		return v1alpha1.WorkflowFailed
-	case deploycommon.Pending, deploycommon.BuildInQueue, deploycommon.Building, deploycommon.Deploying,
-		deploycommon.BuildSuccess, deploycommon.BuildSkip, deploycommon.Sleeping:
-		return v1alpha1.WorkflowPending
-	default:
-		return v1alpha1.WorkflowPending
+func (c *finetuneComponentImpl) getPayMode(resourceID string, priceData *database.PriceResp) types.PayMode {
+	payMode := types.PayModeFree
+	if priceData != nil {
+		price := getAccountPrice(resourceID, types.SKUPayAsYouGo, priceData.Prices)
+		if price != nil {
+			payMode = types.PayMode(price.SkuUnitType)
+		}
 	}
+	return payMode
 }
 
 func (c *finetuneComponentImpl) CheckUserPermission(ctx context.Context, req types.FinetuneLogReq) (bool, *database.ArgoWorkflow, error) {

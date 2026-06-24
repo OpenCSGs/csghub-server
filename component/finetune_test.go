@@ -529,25 +529,50 @@ func TestFinetuneComponent_ReadJobLogsInStream(t *testing.T) {
 	})
 }
 
-func TestFinetuneComponent_OrgFinetunes(t *testing.T) {
+func TestFinetuneComponent_OrgFinetuneInstances(t *testing.T) {
 	ctx := context.TODO()
 	cfg := &config.Config{}
 	mockDeployTask := mockdb.NewMockDeployTaskStore(t)
 	mockRepoComp := mockComps.NewMockRepoComponent(t)
+	mockAcctComp := mockComps.NewMockAccountingComponent(t)
 	req := &types.OrgFinetunesReq{
 		Namespace:   "org1",
 		CurrentUser: "user1",
 		PageOpts:    types.PageOpts{Page: 1, PageSize: 10},
 	}
 	mockRepoComp.EXPECT().CheckCurrentUserPermission(ctx, "user1", "org1", mock.Anything).Return(true, nil)
+	mockAcctComp.EXPECT().QueryPricesBySKUType("", mock.Anything).Return(nil, nil)
 	mockDeployTask.EXPECT().ListDeployByOwnerNamespace(ctx, "org1", mock.Anything).Return([]database.Deploy{
 		{ID: 1, DeployName: "ft1", OwnerNamespace: "org1", RepoID: 101, Status: 1},
 	}, 1, nil)
-	c := NewTestFinetuneComponent(cfg, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, mockRepoComp, mockDeployTask, nil)
-	res, total, err := c.OrgFinetunes(ctx, req)
+	c := NewTestFinetuneComponent(cfg, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, mockAcctComp, mockRepoComp, mockDeployTask, nil)
+	res, total, err := c.OrgFinetuneInstances(ctx, req)
 	require.Nil(t, err)
 	require.Equal(t, 1, total)
 	require.Len(t, res, 1)
-	require.Equal(t, "ft1", res[0].TaskName)
-	require.Equal(t, "org1", res[0].Username)
+	require.Equal(t, "ft1", res[0].DeployName)
+}
+
+func TestFinetuneComponent_OrgFinetuneJobs(t *testing.T) {
+	ctx := context.TODO()
+	cfg := &config.Config{}
+	mockArgoStore := mockdb.NewMockArgoWorkFlowStore(t)
+	mockRepoComp := mockComps.NewMockRepoComponent(t)
+	mockAcctComp := mockComps.NewMockAccountingComponent(t)
+	req := &types.OrgFinetunesReq{
+		Namespace:   "org1",
+		CurrentUser: "user1",
+		PageOpts:    types.PageOpts{Page: 1, PageSize: 10},
+	}
+	mockRepoComp.EXPECT().CheckCurrentUserPermission(ctx, "user1", "org1", mock.Anything).Return(true, nil)
+	mockAcctComp.EXPECT().QueryPricesBySKUType("", mock.Anything).Return(nil, nil)
+	mockArgoStore.EXPECT().FindByUsername(ctx, "org1", types.TaskTypeFinetune, 10, 1).Return([]database.ArgoWorkflow{
+		{ID: 1, TaskName: "ftjob1", Username: "org1", TaskType: types.TaskTypeFinetune},
+	}, 1, nil)
+	c := NewTestFinetuneComponent(cfg, nil, nil, nil, nil, nil, nil, nil, nil, nil, mockArgoStore, mockAcctComp, mockRepoComp, nil, nil)
+	res, total, err := c.OrgFinetuneJobs(ctx, req)
+	require.Nil(t, err)
+	require.Equal(t, 1, total)
+	require.Len(t, res, 1)
+	require.Equal(t, "ftjob1", res[0].TaskName)
 }

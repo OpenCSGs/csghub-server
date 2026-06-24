@@ -396,8 +396,8 @@ func (h *OrganizationHandler) MCPServers(ctx *gin.Context) {
 
 // GetOrganizationFinetunes godoc
 // @Security     ApiKey
-// @Summary      Get organization finetune jobs
-// @Description  get organization finetune jobs
+// @Summary      Get organization finetune instances
+// @Description  get organization finetune instances
 // @Tags         Organization
 // @Accept       json
 // @Produce      json
@@ -407,8 +407,8 @@ func (h *OrganizationHandler) MCPServers(ctx *gin.Context) {
 // @Success      200  {object}  types.ResponseWithTotal{data=[]types.ArgoWorkFlowRes,total=int} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /organization/{namespace}/finetunes [get]
-func (h *OrganizationHandler) Finetunes(ctx *gin.Context) {
+// @Router       /organization/{namespace}/finetune/instances [get]
+func (h *OrganizationHandler) FinetuneInstances(ctx *gin.Context) {
 	var req types.OrgFinetunesReq
 	req.Namespace = ctx.Param("namespace")
 	req.CurrentUser = httpbase.GetCurrentUser(ctx)
@@ -421,9 +421,50 @@ func (h *OrganizationHandler) Finetunes(ctx *gin.Context) {
 	}
 	req.Page = page
 	req.PageSize = per
-	data, total, err := h.finetune.OrgFinetunes(ctx.Request.Context(), &req)
+	data, total, err := h.finetune.OrgFinetuneInstances(ctx.Request.Context(), &req)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "Failed to get org finetunes", slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	respData := gin.H{
+		"data":  data,
+		"total": total,
+	}
+	httpbase.OK(ctx, respData)
+}
+
+// GetOrganizationFinetuneJobs godoc
+// @Security     ApiKey
+// @Summary      Get organization finetune jobs
+// @Description  get organization finetune jobs
+// @Tags         Organization
+// @Accept       json
+// @Produce      json
+// @Param        namespace path string true "org name"
+// @Param        per query int false "page size"
+// @Param        page query int false "current page number"
+// @Success      200  {object}  types.ResponseWithTotal{data=[]types.ArgoWorkFlowRes,total=int} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /organization/{namespace}/finetune/jobs [get]
+func (h *OrganizationHandler) FinetuneJobs(ctx *gin.Context) {
+	var req types.OrgFinetunesReq
+	req.Namespace = ctx.Param("namespace")
+	req.CurrentUser = httpbase.GetCurrentUser(ctx)
+
+	per, page, err := common.GetPerAndPageFromContext(ctx)
+	if err != nil {
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
+		httpbase.BadRequestWithExt(ctx, err)
+		return
+	}
+	req.Page = page
+	req.PageSize = per
+	data, total, err := h.finetune.OrgFinetuneJobs(ctx.Request.Context(), &req)
+	if err != nil {
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get org finetune jobs", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
