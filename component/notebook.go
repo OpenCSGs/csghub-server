@@ -200,6 +200,8 @@ func (c *notebookComponentImpl) GetNotebook(ctx context.Context, req *types.GetN
 		UpdatedAt:               deploy.UpdatedAt,
 		SecureLevel:             deploy.SecureLevel,
 		RuntimeFrameworkVersion: imageVersion,
+		UserUUID:                deploy.UserUUID,
+		OwnerNamespace:          deploy.OwnerNamespace,
 	}, nil
 }
 

@@ -33,6 +33,8 @@ type NotebookRes struct {
 	Provider                string     `json:"provider,omitempty"`
 	SvcName                 string     `json:"svc_name"`
 	SecureLevel             int        `json:"secure_level"`
+	UserUUID                string     `json:"user_uuid"`
+	OwnerNamespace          string     `json:"owner_namespace"`
 }
 
 type NotebookActionReq struct {
