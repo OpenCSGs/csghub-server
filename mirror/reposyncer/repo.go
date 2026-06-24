@@ -26,6 +26,7 @@ import (
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/utils/common"
+	"opencsg.com/csghub-server/component"
 	"opencsg.com/csghub-server/mirror/hook"
 )
 
@@ -52,6 +53,8 @@ type RepoSyncWorker struct {
 	mirrorTaskStore        database.MirrorTaskStore
 	lfsMetaObjectStore     database.LfsMetaObjectStore
 	repoStore              database.RepoStore
+	promptPrefixStore      database.PromptPrefixStore
+	llmConfigStore         database.LLMConfigStore
 	syncClientSettingStore database.SyncClientSettingStore
 	git                    gitserver.GitServer
 	config                 *config.Config
@@ -72,6 +75,8 @@ func NewRepoSyncWorker(config *config.Config, numWorkers int) (*RepoSyncWorker, 
 	}
 	w.mirrorStore = database.NewMirrorStore()
 	w.repoStore = database.NewRepoStore()
+	w.promptPrefixStore = database.NewPromptPrefixStore(config)
+	w.llmConfigStore = database.NewLLMConfigStore(config)
 	w.lfsMetaObjectStore = database.NewLfsMetaObjectStore()
 	w.syncClientSettingStore = database.NewSyncClientSettingStore()
 	w.mirrorTaskStore = database.NewMirrorTaskStore()
@@ -331,6 +336,8 @@ func (w *RepoSyncWorker) SyncRepo(
 		return mt, fmt.Errorf("failed to get repo last commit: %w", err)
 	}
 
+	w.generateDescriptionFromReadme(ctx, mirror.Repository.RepositoryType, namespace, name, commit.ID)
+
 	if lfsFileCount == 0 {
 		mt.Progress = 100
 	}
@@ -383,6 +390,34 @@ func (w *RepoSyncWorker) SyncRepo(
 	}
 
 	return mt, nil
+}
+
+func (w *RepoSyncWorker) generateDescriptionFromReadme(
+	ctx context.Context,
+	repoType types.RepositoryType,
+	namespace, name, ref string,
+) {
+	err := component.UpdateRepoDescriptionFromReadme(ctx, component.UpdateRepoDescriptionFromReadmeReq{
+		RepoStore:         w.repoStore,
+		GitServer:         w.git,
+		PromptPrefixStore: w.promptPrefixStore,
+		LLMConfigStore:    w.llmConfigStore,
+		RepoType:          repoType,
+		Namespace:         namespace,
+		Name:              name,
+		Ref:               ref,
+	})
+	if err != nil {
+		slog.ErrorContext(
+			ctx,
+			"failed to generate repository description from readme",
+			slog.Any("error", err),
+			slog.Any("repo_type", repoType),
+			slog.String("namespace", namespace),
+			slog.String("name", name),
+			slog.String("ref", ref),
+		)
+	}
 }
 
 func (w *RepoSyncWorker) generateLfsMetaObjects(
