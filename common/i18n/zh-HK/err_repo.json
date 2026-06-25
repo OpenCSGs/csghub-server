@@ -7,5 +7,14 @@
     },
     "error.REPO-ERR-2": {
         "other": "命名空間不存在"
+    },
+    "error.REPO-ERR-3": {
+        "other": "儲存庫未找到"
+    },
+    "error.REPO-ERR-4": {
+        "other": "儲存庫沒有默認分支"
+    },
+    "error.REPO-ERR-5": {
+        "other": "下載代碼 zip 歸檔失敗"
     }
 }

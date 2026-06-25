@@ -7,5 +7,14 @@
     },
     "error.REPO-ERR-2": {
         "other": "命名空间不存在"
+    },
+    "error.REPO-ERR-3": {
+        "other": "仓库未找到"
+    },
+    "error.REPO-ERR-4": {
+        "other": "仓库没有默认分支"
+    },
+    "error.REPO-ERR-5": {
+        "other": "下载代码 zip 归档失败"
     }
 }

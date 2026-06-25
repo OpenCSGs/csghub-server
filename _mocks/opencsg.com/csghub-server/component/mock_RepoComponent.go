@@ -2034,6 +2034,66 @@ func (_c *MockRepoComponent_DiffBetweenTwoCommits_Call) RunAndReturn(run func(co
 	return _c
 }
 
+// DownloadCodeZip provides a mock function with given fields: ctx, req, currentUser
+func (_m *MockRepoComponent) DownloadCodeZip(ctx context.Context, req types.DownloadCodeZipReq, currentUser string) ([]byte, error) {
+	ret := _m.Called(ctx, req, currentUser)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DownloadCodeZip")
+	}
+
+	var r0 []byte
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.DownloadCodeZipReq, string) ([]byte, error)); ok {
+		return rf(ctx, req, currentUser)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.DownloadCodeZipReq, string) []byte); ok {
+		r0 = rf(ctx, req, currentUser)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]byte)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.DownloadCodeZipReq, string) error); ok {
+		r1 = rf(ctx, req, currentUser)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockRepoComponent_DownloadCodeZip_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DownloadCodeZip'
+type MockRepoComponent_DownloadCodeZip_Call struct {
+	*mock.Call
+}
+
+// DownloadCodeZip is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req types.DownloadCodeZipReq
+//   - currentUser string
+func (_e *MockRepoComponent_Expecter) DownloadCodeZip(ctx interface{}, req interface{}, currentUser interface{}) *MockRepoComponent_DownloadCodeZip_Call {
+	return &MockRepoComponent_DownloadCodeZip_Call{Call: _e.mock.On("DownloadCodeZip", ctx, req, currentUser)}
+}
+
+func (_c *MockRepoComponent_DownloadCodeZip_Call) Run(run func(ctx context.Context, req types.DownloadCodeZipReq, currentUser string)) *MockRepoComponent_DownloadCodeZip_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.DownloadCodeZipReq), args[2].(string))
+	})
+	return _c
+}
+
+func (_c *MockRepoComponent_DownloadCodeZip_Call) Return(_a0 []byte, _a1 error) *MockRepoComponent_DownloadCodeZip_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockRepoComponent_DownloadCodeZip_Call) RunAndReturn(run func(context.Context, types.DownloadCodeZipReq, string) ([]byte, error)) *MockRepoComponent_DownloadCodeZip_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // DownloadFile provides a mock function with given fields: ctx, req, userName
 func (_m *MockRepoComponent) DownloadFile(ctx context.Context, req *types.GetFileReq, userName string) (io.ReadCloser, int64, string, error) {
 	ret := _m.Called(ctx, req, userName)

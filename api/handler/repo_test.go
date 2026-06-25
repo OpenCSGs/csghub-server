@@ -597,6 +597,156 @@ func TestRepoHandler_FileInfo(t *testing.T) {
 
 }
 
+func TestRepoHandler_DownloadCodeZip(t *testing.T) {
+	t.Run("success with ref", func(t *testing.T) {
+		tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
+			return rp.DownloadCodeZip
+		})
+		tester.WithUser()
+		tester.WithParam("ref", "feature-branch")
+
+		expectedZip := []byte("zip-data")
+		tester.mocks.repo.EXPECT().DownloadCodeZip(tester.Ctx(), types.DownloadCodeZipReq{
+			Namespace: "u",
+			Name:      "r",
+			Revision:  "feature-branch",
+		}, "u").Return(expectedZip, nil)
+
+		tester.Execute()
+
+		require.Equal(t, http.StatusOK, tester.Response().Code)
+		headers := tester.Response().Header()
+		require.Equal(t, "application/zip", headers.Get("Content-Type"))
+		require.Equal(t, `attachment; filename=r-feature-branch.zip`, headers.Get("Content-Disposition"))
+		require.Equal(t, "zip-data", tester.Response().Body.String())
+	})
+
+	t.Run("success with ref containing slash", func(t *testing.T) {
+		tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
+			return rp.DownloadCodeZip
+		})
+		tester.WithUser()
+		tester.WithParam("ref", "feature/branch")
+
+		expectedZip := []byte("zip-data")
+		tester.mocks.repo.EXPECT().DownloadCodeZip(tester.Ctx(), types.DownloadCodeZipReq{
+			Namespace: "u",
+			Name:      "r",
+			Revision:  "feature/branch",
+		}, "u").Return(expectedZip, nil)
+
+		tester.Execute()
+
+		require.Equal(t, http.StatusOK, tester.Response().Code)
+		headers := tester.Response().Header()
+		require.Equal(t, "application/zip", headers.Get("Content-Type"))
+		require.Equal(t, `attachment; filename=r-feature-branch.zip`, headers.Get("Content-Disposition"))
+		require.Equal(t, "zip-data", tester.Response().Body.String())
+	})
+
+	t.Run("success without ref", func(t *testing.T) {
+		tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
+			return rp.DownloadCodeZip
+		})
+		tester.WithUser()
+
+		expectedZip := []byte("zip-data")
+		tester.mocks.repo.EXPECT().DownloadCodeZip(tester.Ctx(), types.DownloadCodeZipReq{
+			Namespace: "u",
+			Name:      "r",
+			Revision:  "",
+		}, "u").Return(expectedZip, nil)
+
+		tester.Execute()
+
+		require.Equal(t, http.StatusOK, tester.Response().Code)
+		headers := tester.Response().Header()
+		require.Equal(t, "application/zip", headers.Get("Content-Type"))
+		require.Equal(t, `attachment; filename=r.zip`, headers.Get("Content-Disposition"))
+		require.Equal(t, "zip-data", tester.Response().Body.String())
+	})
+
+	t.Run("forbidden error", func(t *testing.T) {
+		tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
+			return rp.DownloadCodeZip
+		})
+		tester.WithUser()
+
+		tester.mocks.repo.EXPECT().DownloadCodeZip(tester.Ctx(), types.DownloadCodeZipReq{
+			Namespace: "u",
+			Name:      "r",
+			Revision:  "",
+		}, "u").Return(nil, errorx.ErrForbiddenMsg("no permission"))
+
+		tester.Execute()
+		tester.ResponseEqCode(t, http.StatusForbidden)
+	})
+
+	t.Run("server error", func(t *testing.T) {
+		tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
+			return rp.DownloadCodeZip
+		})
+		tester.WithUser()
+
+		tester.mocks.repo.EXPECT().DownloadCodeZip(tester.Ctx(), types.DownloadCodeZipReq{
+			Namespace: "u",
+			Name:      "r",
+			Revision:  "",
+		}, "u").Return(nil, errors.New("failed"))
+
+		tester.Execute()
+		tester.ResponseEqCode(t, http.StatusInternalServerError)
+	})
+
+	t.Run("not found error", func(t *testing.T) {
+		tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
+			return rp.DownloadCodeZip
+		})
+		tester.WithUser()
+
+		tester.mocks.repo.EXPECT().DownloadCodeZip(tester.Ctx(), types.DownloadCodeZipReq{
+			Namespace: "u",
+			Name:      "r",
+			Revision:  "",
+		}, "u").Return(nil, errorx.RepoNotFound(errors.New("not found"), errorx.Ctx()))
+
+		tester.Execute()
+		tester.ResponseEqCode(t, http.StatusNotFound)
+	})
+
+	t.Run("no default branch error", func(t *testing.T) {
+		tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
+			return rp.DownloadCodeZip
+		})
+		tester.WithUser()
+
+		tester.mocks.repo.EXPECT().DownloadCodeZip(tester.Ctx(), types.DownloadCodeZipReq{
+			Namespace: "u",
+			Name:      "r",
+			Revision:  "",
+		}, "u").Return(nil, errorx.RepoNoDefaultBranch(errorx.Ctx()))
+
+		tester.Execute()
+		tester.ResponseEqCode(t, http.StatusBadRequest)
+	})
+
+	t.Run("code zip download failed error", func(t *testing.T) {
+		tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
+			return rp.DownloadCodeZip
+		})
+		tester.WithUser()
+
+		tester.mocks.repo.EXPECT().DownloadCodeZip(tester.Ctx(), types.DownloadCodeZipReq{
+			Namespace: "u",
+			Name:      "r",
+			Revision:  "",
+		}, "u").Return(nil, errorx.CodeZipDownloadFailed(errors.New("git error"), errorx.Ctx()))
+
+		tester.Execute()
+		tester.ResponseEqCode(t, http.StatusInternalServerError)
+	})
+}
+
 func TestRepoHandler_DownloadFile(t *testing.T) {
 
 	t.Run("lfs file", func(t *testing.T) {

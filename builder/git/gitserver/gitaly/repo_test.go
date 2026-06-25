@@ -231,4 +231,19 @@ func TestStripZipPrefix(t *testing.T) {
 		names := readZipEntryNames(t, stripped)
 		require.Equal(t, []string{"standalone.txt"}, names)
 	})
+
+	t.Run("all entries filtered returns error", func(t *testing.T) {
+		// Create a zip where all entries are the prefix directory itself
+		// (which gets stripped to empty string and skipped)
+		var buf bytes.Buffer
+		w := zip.NewWriter(&buf)
+		_, err := w.Create("my-repo/")
+		require.NoError(t, err)
+		err = w.Close()
+		require.NoError(t, err)
+
+		_, err = stripZipPrefix(buf.Bytes(), "my-repo")
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "no files matched prefix")
+	})
 }

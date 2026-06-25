@@ -7,5 +7,14 @@
     },
     "error.REPO-ERR-2": {
         "other": "The namespace does not exist."
+    },
+    "error.REPO-ERR-3": {
+        "other": "Repository not found"
+    },
+    "error.REPO-ERR-4": {
+        "other": "Repository has no default branch"
+    },
+    "error.REPO-ERR-5": {
+        "other": "Failed to download code zip archive"
     }
 }

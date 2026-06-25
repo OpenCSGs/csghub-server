@@ -2596,6 +2596,198 @@ func TestRepoComponent_GetRepoSizeByBranch(t *testing.T) {
 	})
 }
 
+func TestRepoComponent_DownloadCodeZip(t *testing.T) {
+	t.Run("should return zip data when user has read permission and ref is provided", func(t *testing.T) {
+		ctx := context.TODO()
+		repoComp := initializeTestRepoComponent(ctx, t)
+
+		user := database.User{}
+		user.Username = "user_name"
+		repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username).Return(user, nil)
+
+		ns := database.Namespace{}
+		ns.NamespaceType = "user"
+		ns.Path = "user_name"
+		repoComp.mocks.stores.NamespaceMock().EXPECT().FindByPath(mock.Anything, ns.Path).Return(ns, nil)
+
+		repo := &database.Repository{
+			ID:           1,
+			Private:      true,
+			User:         user,
+			Path:         fmt.Sprintf("%s/%s", ns.Path, "repo_name"),
+			DefaultBranch: "main",
+		}
+		repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(mock.Anything, types.CodeRepo, ns.Path, repo.Name).Return(repo, nil)
+
+		expectedZip := []byte("zip-data")
+		repoComp.mocks.gitServer.EXPECT().GetArchive(mock.Anything, gitserver.GetArchiveReq{
+			Namespace: ns.Path,
+			Name:      repo.Name,
+			Revision:  "feature-branch",
+			RepoType:  types.CodeRepo,
+		}).Return(expectedZip, nil)
+
+		zipData, err := repoComp.DownloadCodeZip(ctx, types.DownloadCodeZipReq{
+			Namespace: ns.Path,
+			Name:      repo.Name,
+			Revision:  "feature-branch",
+		}, user.Username)
+		require.Nil(t, err)
+		require.Equal(t, expectedZip, zipData)
+	})
+
+	t.Run("should use default branch when ref is empty", func(t *testing.T) {
+		ctx := context.TODO()
+		repoComp := initializeTestRepoComponent(ctx, t)
+
+		user := database.User{}
+		user.Username = "user_name"
+		repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username).Return(user, nil)
+
+		ns := database.Namespace{}
+		ns.NamespaceType = "user"
+		ns.Path = "user_name"
+		repoComp.mocks.stores.NamespaceMock().EXPECT().FindByPath(mock.Anything, ns.Path).Return(ns, nil)
+
+		repo := &database.Repository{
+			ID:            1,
+			Private:       true,
+			User:          user,
+			Path:          fmt.Sprintf("%s/%s", ns.Path, "repo_name"),
+			DefaultBranch: "main",
+		}
+		repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(mock.Anything, types.CodeRepo, ns.Path, repo.Name).Return(repo, nil)
+
+		expectedZip := []byte("zip-data")
+		repoComp.mocks.gitServer.EXPECT().GetArchive(mock.Anything, gitserver.GetArchiveReq{
+			Namespace: ns.Path,
+			Name:      repo.Name,
+			Revision:  "main",
+			RepoType:  types.CodeRepo,
+		}).Return(expectedZip, nil)
+
+		zipData, err := repoComp.DownloadCodeZip(ctx, types.DownloadCodeZipReq{
+			Namespace: ns.Path,
+			Name:      repo.Name,
+			Revision:  "",
+		}, user.Username)
+		require.Nil(t, err)
+		require.Equal(t, expectedZip, zipData)
+	})
+
+	t.Run("should return error when repo not found", func(t *testing.T) {
+		ctx := context.TODO()
+		repoComp := initializeTestRepoComponent(ctx, t)
+
+		repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(mock.Anything, types.CodeRepo, "namespace", "name").Return(nil, errors.New("repo not found"))
+
+		zipData, err := repoComp.DownloadCodeZip(ctx, types.DownloadCodeZipReq{
+			Namespace: "namespace",
+			Name:      "name",
+			Revision:  "main",
+		}, "user_name")
+		require.Error(t, err)
+		require.True(t, errors.Is(err, errorx.ErrRepoNotFound))
+		require.Nil(t, zipData)
+	})
+
+	t.Run("should return error when user has no read permission", func(t *testing.T) {
+		ctx := context.TODO()
+		repoComp := initializeTestRepoComponent(ctx, t)
+
+		user := database.User{}
+		user.Username = "user_name"
+		repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username).Return(user, nil)
+
+		ns := database.Namespace{}
+		ns.NamespaceType = "user"
+		ns.Path = "other_user"
+		repoComp.mocks.stores.NamespaceMock().EXPECT().FindByPath(mock.Anything, ns.Path).Return(ns, nil)
+
+		repo := &database.Repository{
+			ID:      1,
+			Private: true,
+			User:    database.User{Username: "other_user"},
+			Path:    fmt.Sprintf("%s/%s", ns.Path, "repo_name"),
+		}
+		repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(mock.Anything, types.CodeRepo, ns.Path, repo.Name).Return(repo, nil)
+
+		zipData, err := repoComp.DownloadCodeZip(ctx, types.DownloadCodeZipReq{
+			Namespace: ns.Path,
+			Name:      repo.Name,
+			Revision:  "main",
+		}, user.Username)
+		require.Error(t, err)
+		require.Nil(t, zipData)
+	})
+
+	t.Run("should return error when git server fails", func(t *testing.T) {
+		ctx := context.TODO()
+		repoComp := initializeTestRepoComponent(ctx, t)
+
+		user := database.User{}
+		user.Username = "user_name"
+		repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username).Return(user, nil)
+
+		ns := database.Namespace{}
+		ns.NamespaceType = "user"
+		ns.Path = "user_name"
+		repoComp.mocks.stores.NamespaceMock().EXPECT().FindByPath(mock.Anything, ns.Path).Return(ns, nil)
+
+		repo := &database.Repository{
+			ID:            1,
+			Private:       true,
+			User:          user,
+			Path:          fmt.Sprintf("%s/%s", ns.Path, "repo_name"),
+			DefaultBranch: "main",
+		}
+		repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(mock.Anything, types.CodeRepo, ns.Path, repo.Name).Return(repo, nil)
+
+		repoComp.mocks.gitServer.EXPECT().GetArchive(mock.Anything, mock.Anything).Return(nil, errors.New("git server error"))
+
+		zipData, err := repoComp.DownloadCodeZip(ctx, types.DownloadCodeZipReq{
+			Namespace: ns.Path,
+			Name:      repo.Name,
+			Revision:  "",
+		}, user.Username)
+		require.Error(t, err)
+		require.True(t, errors.Is(err, errorx.ErrCodeZipDownloadFailed))
+		require.Nil(t, zipData)
+	})
+
+	t.Run("should return error when ref is empty and repo has no default branch", func(t *testing.T) {
+		ctx := context.TODO()
+		repoComp := initializeTestRepoComponent(ctx, t)
+
+		user := database.User{}
+		user.Username = "user_name"
+		repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username).Return(user, nil)
+
+		ns := database.Namespace{}
+		ns.NamespaceType = "user"
+		ns.Path = "user_name"
+		repoComp.mocks.stores.NamespaceMock().EXPECT().FindByPath(mock.Anything, ns.Path).Return(ns, nil)
+
+		repo := &database.Repository{
+			ID:            1,
+			Private:       true,
+			User:          user,
+			Path:          fmt.Sprintf("%s/%s", ns.Path, "repo_name"),
+			DefaultBranch: "",
+		}
+		repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(mock.Anything, types.CodeRepo, ns.Path, repo.Name).Return(repo, nil)
+
+		zipData, err := repoComp.DownloadCodeZip(ctx, types.DownloadCodeZipReq{
+			Namespace: ns.Path,
+			Name:      repo.Name,
+			Revision:  "",
+		}, user.Username)
+		require.Error(t, err)
+		require.True(t, errors.Is(err, errorx.ErrRepoNoDefaultBranch))
+		require.Nil(t, zipData)
+	})
+}
+
 func TestRepoComponent_DiffBetweenTwoCommits(t *testing.T) {
 	ctx := context.TODO()
 	repoComp := initializeTestRepoComponent(ctx, t)

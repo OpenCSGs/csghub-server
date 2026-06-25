@@ -176,6 +176,11 @@ func (c *Client) GetArchive(ctx context.Context, req gitserver.GetArchiveReq) ([
 		buf.Write(resp.GetData())
 	}
 
+	maxSize := c.config.Git.MaxArchiveSizeMB * 1024 * 1024
+	if int64(buf.Len()) > maxSize {
+		return nil, fmt.Errorf("archive size %d exceeds limit of %d MB", buf.Len(), c.config.Git.MaxArchiveSizeMB)
+	}
+
 	return stripZipPrefix(buf.Bytes(), req.Name)
 }
 
@@ -189,6 +194,8 @@ func stripZipPrefix(zipData []byte, prefix string) ([]byte, error) {
 	zipWriter := zip.NewWriter(&outBuf)
 
 	prefixDir := prefix + "/"
+	totalEntries := len(zipReader.File)
+	fileCount := 0
 
 	for _, file := range zipReader.File {
 		path := strings.TrimPrefix(file.Name, "/")
@@ -219,6 +226,12 @@ func stripZipPrefix(zipData []byte, prefix string) ([]byte, error) {
 			zipWriter.Close()
 			return nil, errorx.GetArchiveFailed(err, errorx.Ctx().Set("prefix", prefix).Set("entry", file.Name))
 		}
+		fileCount++
+	}
+
+	if totalEntries > 0 && fileCount == 0 {
+		zipWriter.Close()
+		return nil, fmt.Errorf("archive is empty: no files matched prefix %q", prefix)
 	}
 
 	err = zipWriter.Close()
