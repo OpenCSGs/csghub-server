@@ -431,6 +431,65 @@ func (_c *MockAccountVoucherStore_List_Call) RunAndReturn(run func(context.Conte
 	return _c
 }
 
+// ListActiveByTargetUUID provides a mock function with given fields: ctx, targetUUID
+func (_m *MockAccountVoucherStore) ListActiveByTargetUUID(ctx context.Context, targetUUID string) ([]database.AccountVoucher, error) {
+	ret := _m.Called(ctx, targetUUID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListActiveByTargetUUID")
+	}
+
+	var r0 []database.AccountVoucher
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) ([]database.AccountVoucher, error)); ok {
+		return rf(ctx, targetUUID)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) []database.AccountVoucher); ok {
+		r0 = rf(ctx, targetUUID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]database.AccountVoucher)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, targetUUID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAccountVoucherStore_ListActiveByTargetUUID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListActiveByTargetUUID'
+type MockAccountVoucherStore_ListActiveByTargetUUID_Call struct {
+	*mock.Call
+}
+
+// ListActiveByTargetUUID is a helper method to define mock.On call
+//   - ctx context.Context
+//   - targetUUID string
+func (_e *MockAccountVoucherStore_Expecter) ListActiveByTargetUUID(ctx interface{}, targetUUID interface{}) *MockAccountVoucherStore_ListActiveByTargetUUID_Call {
+	return &MockAccountVoucherStore_ListActiveByTargetUUID_Call{Call: _e.mock.On("ListActiveByTargetUUID", ctx, targetUUID)}
+}
+
+func (_c *MockAccountVoucherStore_ListActiveByTargetUUID_Call) Run(run func(ctx context.Context, targetUUID string)) *MockAccountVoucherStore_ListActiveByTargetUUID_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockAccountVoucherStore_ListActiveByTargetUUID_Call) Return(_a0 []database.AccountVoucher, _a1 error) *MockAccountVoucherStore_ListActiveByTargetUUID_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAccountVoucherStore_ListActiveByTargetUUID_Call) RunAndReturn(run func(context.Context, string) ([]database.AccountVoucher, error)) *MockAccountVoucherStore_ListActiveByTargetUUID_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ListByTargetUUID provides a mock function with given fields: ctx, filter
 func (_m *MockAccountVoucherStore) ListByTargetUUID(ctx context.Context, filter types.VoucherNamespaceFilter) ([]database.AccountVoucher, int, error) {
 	ret := _m.Called(ctx, filter)

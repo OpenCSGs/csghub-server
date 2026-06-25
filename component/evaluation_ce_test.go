@@ -126,7 +126,7 @@ c.mocks.stores.SpaceResourceMock().EXPECT().FindByID(ctx, int64(1)).Return(&data
 			Resources: string(resource),
 			ClusterID: "c1",
 		}, nil)
-		c.mocks.components.repo.EXPECT().CheckAccountAndResource(ctx, "test", "c1", int64(0), mock.Anything).Return(&types.CheckExclusiveResp{}, nil)
+		c.mocks.components.repo.EXPECT().CheckAccountAndResource(ctx, types.CheckResourceAndAccountReq{UserName: "test", ClusterID: "c1", OrderDetailID: 0, CurrentUser: "test"}, mock.Anything).Return(&types.CheckExclusiveResp{}, nil)
 		c.mocks.stores.ClusterInfoMock().EXPECT().FindNodeByClusterID(ctx, "c1").Return([]database.ClusterNode{
 			{
 				Name: "node1",

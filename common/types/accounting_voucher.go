@@ -13,6 +13,15 @@ const (
 	VoucherStatusRevoked VoucherStatus = "revoked"
 )
 
+type VoucherMatchType string
+
+const (
+	VoucherMatchTypeBoth    VoucherMatchType = "both"
+	VoucherMatchTypeXPU     VoucherMatchType = "xpu"
+	VoucherMatchTypeCluster VoucherMatchType = "cluster"
+	VoucherMatchTypeNone    VoucherMatchType = "none"
+)
+
 type VoucherRules struct {
 	ClusterIDs []string `json:"cluster_ids"`
 	XPUModels  []string `json:"xpu_models"`
@@ -64,6 +73,8 @@ type VoucherBillGroupedRes struct {
 type VoucherDashboardReq struct {
 	CurrentUser string `json:"-"`
 	TargetUUID  string `json:"-"`
+	ClusterID   string `json:"cluster_id" form:"cluster_id"`
+	XPUModel    string `json:"xpu_model" form:"xpu_model"`
 }
 
 type VoucherDashboardStatusItem struct {

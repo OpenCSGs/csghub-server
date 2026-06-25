@@ -144,7 +144,8 @@ func TestEvaluationComponent_CreateFinetune(t *testing.T) {
 		Resources: string(resource),
 	}, nil)
 
-	repoComp.EXPECT().CheckAccountAndResource(ctx, "testuser", "cluster-1", int64(0), mock.Anything).Return(&types.CheckExclusiveResp{}, nil)
+	repoComp.EXPECT().GetNamespaceBillingUUID(ctx, "testuser").Return("testuser", nil)
+	repoComp.EXPECT().CheckAccountAndResource(ctx, types.CheckResourceAndAccountReq{UserName: "testuser", ClusterID: "cluster-1", OrderDetailID: 0, CurrentUser: "testuser"}, mock.Anything).Return(&types.CheckExclusiveResp{}, nil)
 
 	req2.ResourceName = "1 GPU · 4 vCPU · 32Gi"
 	req2.ClusterID = "cluster-1"
@@ -211,6 +212,8 @@ func TestFinetuneComponent_CreateFinetuneJob_UsesRequestedDatasetRevision(t *tes
 		FrameImage:  "lm-finetune:0.4.6",
 		ComputeType: string(types.ResourceTypeCPU),
 	}, nil)
+
+	repoComp.EXPECT().GetNamespaceBillingUUID(ctx, "testuser").Return("testuser", nil)
 
 	e, err := c.CreateFinetuneJob(ctx, req)
 	require.Error(t, err)

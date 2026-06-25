@@ -23,7 +23,7 @@ func TestNotebookComponentImpl_CreateNotebook(t *testing.T) {
 	nc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, username).Return(database.User{ID: 1, Username: username, RoleMask: "admin"}, nil)
 	nc.mocks.stores.RuntimeFrameworkMock().EXPECT().FindEnabledByID(ctx, int64(1)).Return(&database.RuntimeFramework{ID: 1, FrameName: "rf1", FrameImage: "abc/notebook:latest"}, nil)
 	nc.mocks.stores.SpaceResourceMock().EXPECT().FindByID(ctx, int64(1)).Return(&database.SpaceResource{ID: 1, ClusterID: "1", Name: "sr1", Resources: `{"memory": "foo"}`}, nil)
-	nc.mocks.components.repo.EXPECT().CheckAccountAndResource(ctx, username, "1", int64(0), &database.SpaceResource{ID: 1, ClusterID: "1", Name: "sr1", Resources: `{"memory": "foo"}`}).Return(&types.CheckExclusiveResp{
+	nc.mocks.components.repo.EXPECT().CheckAccountAndResource(ctx, types.CheckResourceAndAccountReq{UserName: "testuser", ClusterID: "1", OrderDetailID: 0, CurrentUser: "testuser"}, &database.SpaceResource{ID: 1, ClusterID: "1", Name: "sr1", Resources: `{"memory": "foo"}`}).Return(&types.CheckExclusiveResp{
 		NodeAffinity: &corev1.NodeAffinity{
 			RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
 				NodeSelectorTerms: []corev1.NodeSelectorTerm{
@@ -332,7 +332,7 @@ func TestNotebookComponentImpl_UpdateNotebook_Success(t *testing.T) {
 		Return(resource, nil)
 
 	nc.mocks.components.repo.EXPECT().
-		CheckAccountAndResource(ctx, "testuser", "1", int64(0), resource).
+		CheckAccountAndResource(ctx, types.CheckResourceAndAccountReq{UserName: "testuser", ClusterID: "1", OrderDetailID: 0, CurrentUser: "testuser"}, resource).
 		Return(&types.CheckExclusiveResp{
 			NodeAffinity: &corev1.NodeAffinity{
 				RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
@@ -527,7 +527,7 @@ func TestNotebookComponentImpl_UpdateNotebook_ResourceUnavailable(t *testing.T) 
 		Return(resource, nil)
 
 	nc.mocks.components.repo.EXPECT().
-		CheckAccountAndResource(ctx, "testuser", "1", int64(0), resource).
+		CheckAccountAndResource(ctx, types.CheckResourceAndAccountReq{UserName: "testuser", ClusterID: "1", OrderDetailID: 0, CurrentUser: "testuser"}, resource).
 		Return(nil, errors.New("resource unavailable"))
 
 	err := nc.UpdateNotebook(ctx, &types.UpdateNotebookReq{
@@ -575,7 +575,7 @@ func TestNotebookComponentImpl_UpdateNotebook_MultiHostNotSupported(t *testing.T
 		Return(resource, nil)
 
 	nc.mocks.components.repo.EXPECT().
-		CheckAccountAndResource(ctx, "testuser", "1", int64(0), resource).
+		CheckAccountAndResource(ctx, types.CheckResourceAndAccountReq{UserName: "testuser", ClusterID: "1", OrderDetailID: 0, CurrentUser: "testuser"}, resource).
 		Return(&types.CheckExclusiveResp{}, nil)
 
 	err := nc.UpdateNotebook(ctx, &types.UpdateNotebookReq{
@@ -622,7 +622,7 @@ func TestNotebookComponentImpl_UpdateNotebook_UpdateDeployFails(t *testing.T) {
 		Return(resource, nil)
 
 	nc.mocks.components.repo.EXPECT().
-		CheckAccountAndResource(ctx, "testuser", "1", int64(0), resource).
+		CheckAccountAndResource(ctx, types.CheckResourceAndAccountReq{UserName: "testuser", ClusterID: "1", OrderDetailID: 0, CurrentUser: "testuser"}, resource).
 		Return(&types.CheckExclusiveResp{}, nil)
 
 	nc.mocks.deployer.EXPECT().

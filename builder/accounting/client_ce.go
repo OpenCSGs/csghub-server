@@ -97,3 +97,7 @@ func (ac *accountingClientImpl) ListPresents(req types.PresentsIndexReq) (any, e
 func (ac *accountingClientImpl) GetOrderDetailByID(currentUser string, id int64) (any, error) {
 	return nil, nil
 }
+
+func (ac *accountingClientImpl) GetVoucherDashboard(req types.VoucherDashboardReq) (any, error) {
+	return nil, nil
+}

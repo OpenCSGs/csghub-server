@@ -178,7 +178,7 @@ type RepoComponent interface {
 	GenerateEndpoint(ctx context.Context, deploy *database.Deploy) (string, string)
 	FixRepoSource(ctx context.Context) error
 	IsAdminRole(user database.User) bool
-	CheckAccountAndResource(ctx context.Context, userName string, clusterID string, orderDetailID int64, resource *database.SpaceResource) (*types.CheckExclusiveResp, error)
+	CheckAccountAndResource(ctx context.Context, chkReq types.CheckResourceAndAccountReq, resource *database.SpaceResource) (*types.CheckExclusiveResp, error)
 	DiffBetweenTwoCommits(ctx context.Context, req types.GetDiffBetweenCommitsReq) ([]types.GiteaCallbackPushReq_Commit, error)
 	RemoteDiff(ctx context.Context, req types.GetDiffBetweenCommitsReq) ([]types.RemoteDiffs, error)
 	SendAssetManagementMsg(ctx context.Context, req types.RepoNotificationReq) error

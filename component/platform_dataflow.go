@@ -92,7 +92,14 @@ func (c *platformDataflowComponentImpl) CreateJob(ctx context.Context, req *type
 	}
 
 	// check resource available
-	exclusiveResp, err := c.repoComponent.CheckAccountAndResource(ctx, ns.Path, resource.ClusterID, 0, resource)
+	exclusiveResp, err := c.repoComponent.CheckAccountAndResource(ctx,
+		types.CheckResourceAndAccountReq{
+			UserName:      ns.Path,
+			ClusterID:     resource.ClusterID,
+			OrderDetailID: 0,
+			CurrentUser:   req.Username,
+		},
+		resource)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check account and resource, error: %w", err)
 	}

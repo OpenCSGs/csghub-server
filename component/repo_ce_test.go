@@ -644,22 +644,22 @@ func TestRepoComponent_CheckAccountAndResource(t *testing.T) {
 		Resources: `{"gpu": {"num": "1", "type": "A10"}}`,
 	}
 
-	repo.mocks.deployer.EXPECT().CheckResourceAvailable(ctx, "cluster", int64(0), mock.Anything).Return(true, []types.ResourceAvailableStatus{}, nil).Once()
+	repo.mocks.deployer.EXPECT().CheckResourceAvailable(ctx, "cluster", int64(1), mock.Anything).Return(true, []types.ResourceAvailableStatus{}, nil).Once()
 
-	resp, err := repo.CheckAccountAndResource(ctx, "user", "cluster", 1, resource)
+	resp, err := repo.CheckAccountAndResource(ctx, types.CheckResourceAndAccountReq{UserName: "user", ClusterID: "cluster", OrderDetailID: 1}, resource)
 	require.Nil(t, err)
 	require.NotNil(t, resp)
 
 	// Test error case
-	repo.mocks.deployer.EXPECT().CheckResourceAvailable(ctx, "cluster", int64(0), mock.Anything).Return(false, []types.ResourceAvailableStatus{}, errors.New("error"))
+	repo.mocks.deployer.EXPECT().CheckResourceAvailable(ctx, "cluster", int64(1), mock.Anything).Return(false, []types.ResourceAvailableStatus{}, errors.New("error"))
 
-	resp, err = repo.CheckAccountAndResource(ctx, "user", "cluster", 1, resource)
+	resp, err = repo.CheckAccountAndResource(ctx, types.CheckResourceAndAccountReq{UserName: "user", ClusterID: "cluster", OrderDetailID: 1}, resource)
 	require.NotNil(t, err)
 	require.Nil(t, resp)
 
 	// Test invalid hardware setting
 	resource.Resources = `invalid json`
-	resp, err = repo.CheckAccountAndResource(ctx, "user", "cluster", 1, resource)
+	resp, err = repo.CheckAccountAndResource(ctx, types.CheckResourceAndAccountReq{UserName: "user", ClusterID: "cluster", OrderDetailID: 1}, resource)
 	require.NotNil(t, err)
 	require.Nil(t, resp)
 }

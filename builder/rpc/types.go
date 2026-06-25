@@ -6,6 +6,7 @@ type Namespace struct {
 	UUID   string `json:"uuid,omitempty"`
 	Avatar string `json:"avatar,omitempty"`
 	NSType string `json:"nstype,omitempty"`
+	User   User   `json:"user,omitempty"`
 }
 
 type User struct {

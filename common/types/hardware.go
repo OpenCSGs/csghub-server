@@ -1,5 +1,10 @@
 package types
 
+import (
+	"encoding/json"
+	"strings"
+)
+
 type ResourceReasonType string
 
 const (
@@ -57,3 +62,37 @@ type (
 		Reason    ResourceReasonType `json:"reason"`
 	}
 )
+
+func (h *HardWare) GetResXPUMode() string {
+	var xpuProc Processor
+
+	switch {
+	case strings.TrimSpace(h.Gpu.Num) != "":
+		xpuProc = h.Gpu
+	case strings.TrimSpace(h.Npu.Num) != "":
+		xpuProc = h.Npu
+	case strings.TrimSpace(h.Gcu.Num) != "":
+		xpuProc = h.Gcu
+	case strings.TrimSpace(h.Mlu.Num) != "":
+		xpuProc = h.Mlu
+	case strings.TrimSpace(h.Dcu.Num) != "":
+		xpuProc = h.Dcu
+	case strings.TrimSpace(h.GPGpu.Num) != "":
+		xpuProc = h.GPGpu
+	}
+
+	xpuModel := strings.TrimSpace(xpuProc.Type)
+
+	return xpuModel
+
+}
+
+func GetResXPUMode(res string) (string, error) {
+	var hardware HardWare
+	err := json.Unmarshal([]byte(res), &hardware)
+	if err != nil {
+		return "", err
+	}
+
+	return hardware.GetResXPUMode(), nil
+}

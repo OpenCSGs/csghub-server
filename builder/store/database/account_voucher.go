@@ -28,6 +28,7 @@ type AccountVoucherStore interface {
 	GetLast(ctx context.Context) (*AccountVoucher, error)
 	List(ctx context.Context, filter types.VoucherFilter) ([]AccountVoucher, int, error)
 	ListByTargetUUID(ctx context.Context, filter types.VoucherNamespaceFilter) ([]AccountVoucher, int, error)
+	ListActiveByTargetUUID(ctx context.Context, targetUUID string) ([]AccountVoucher, error)
 	UpdateStatus(ctx context.Context, id int64, status types.VoucherStatus) (*AccountVoucher, error)
 	RefreshStatus(ctx context.Context) error
 	GetDashboard(ctx context.Context, req types.VoucherDashboardReq) ([]VoucherDashboardResult, error)
@@ -305,4 +306,17 @@ func (a *accountVoucherStoreImpl) ListByTargetUUID(ctx context.Context, filter t
 	}
 
 	return vouchers, total, nil
+}
+
+func (a *accountVoucherStoreImpl) ListActiveByTargetUUID(ctx context.Context, targetUUID string) ([]AccountVoucher, error) {
+	var vouchers []AccountVoucher
+	err := a.db.Core.NewSelect().Model(&vouchers).
+		Where("target_uuid = ?", targetUUID).
+		Where("status = ?", types.VoucherStatusActive).
+		Order("id DESC").
+		Scan(ctx)
+	if err != nil {
+		return nil, errorx.HandleDBError(err, errorx.Ctx().Set("target_uuid", targetUUID))
+	}
+	return vouchers, nil
 }

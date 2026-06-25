@@ -732,9 +732,9 @@ func (_c *MockRepoComponent_ChangePath_Call) RunAndReturn(run func(context.Conte
 	return _c
 }
 
-// CheckAccountAndResource provides a mock function with given fields: ctx, userName, clusterID, orderDetailID, resource
-func (_m *MockRepoComponent) CheckAccountAndResource(ctx context.Context, userName string, clusterID string, orderDetailID int64, resource *database.SpaceResource) (*types.CheckExclusiveResp, error) {
-	ret := _m.Called(ctx, userName, clusterID, orderDetailID, resource)
+// CheckAccountAndResource provides a mock function with given fields: ctx, chkReq, resource
+func (_m *MockRepoComponent) CheckAccountAndResource(ctx context.Context, chkReq types.CheckResourceAndAccountReq, resource *database.SpaceResource) (*types.CheckExclusiveResp, error) {
+	ret := _m.Called(ctx, chkReq, resource)
 
 	if len(ret) == 0 {
 		panic("no return value specified for CheckAccountAndResource")
@@ -742,19 +742,19 @@ func (_m *MockRepoComponent) CheckAccountAndResource(ctx context.Context, userNa
 
 	var r0 *types.CheckExclusiveResp
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, int64, *database.SpaceResource) (*types.CheckExclusiveResp, error)); ok {
-		return rf(ctx, userName, clusterID, orderDetailID, resource)
+	if rf, ok := ret.Get(0).(func(context.Context, types.CheckResourceAndAccountReq, *database.SpaceResource) (*types.CheckExclusiveResp, error)); ok {
+		return rf(ctx, chkReq, resource)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, int64, *database.SpaceResource) *types.CheckExclusiveResp); ok {
-		r0 = rf(ctx, userName, clusterID, orderDetailID, resource)
+	if rf, ok := ret.Get(0).(func(context.Context, types.CheckResourceAndAccountReq, *database.SpaceResource) *types.CheckExclusiveResp); ok {
+		r0 = rf(ctx, chkReq, resource)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*types.CheckExclusiveResp)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, string, int64, *database.SpaceResource) error); ok {
-		r1 = rf(ctx, userName, clusterID, orderDetailID, resource)
+	if rf, ok := ret.Get(1).(func(context.Context, types.CheckResourceAndAccountReq, *database.SpaceResource) error); ok {
+		r1 = rf(ctx, chkReq, resource)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -769,17 +769,15 @@ type MockRepoComponent_CheckAccountAndResource_Call struct {
 
 // CheckAccountAndResource is a helper method to define mock.On call
 //   - ctx context.Context
-//   - userName string
-//   - clusterID string
-//   - orderDetailID int64
+//   - chkReq types.CheckResourceAndAccountReq
 //   - resource *database.SpaceResource
-func (_e *MockRepoComponent_Expecter) CheckAccountAndResource(ctx interface{}, userName interface{}, clusterID interface{}, orderDetailID interface{}, resource interface{}) *MockRepoComponent_CheckAccountAndResource_Call {
-	return &MockRepoComponent_CheckAccountAndResource_Call{Call: _e.mock.On("CheckAccountAndResource", ctx, userName, clusterID, orderDetailID, resource)}
+func (_e *MockRepoComponent_Expecter) CheckAccountAndResource(ctx interface{}, chkReq interface{}, resource interface{}) *MockRepoComponent_CheckAccountAndResource_Call {
+	return &MockRepoComponent_CheckAccountAndResource_Call{Call: _e.mock.On("CheckAccountAndResource", ctx, chkReq, resource)}
 }
 
-func (_c *MockRepoComponent_CheckAccountAndResource_Call) Run(run func(ctx context.Context, userName string, clusterID string, orderDetailID int64, resource *database.SpaceResource)) *MockRepoComponent_CheckAccountAndResource_Call {
+func (_c *MockRepoComponent_CheckAccountAndResource_Call) Run(run func(ctx context.Context, chkReq types.CheckResourceAndAccountReq, resource *database.SpaceResource)) *MockRepoComponent_CheckAccountAndResource_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(int64), args[4].(*database.SpaceResource))
+		run(args[0].(context.Context), args[1].(types.CheckResourceAndAccountReq), args[2].(*database.SpaceResource))
 	})
 	return _c
 }
@@ -789,7 +787,7 @@ func (_c *MockRepoComponent_CheckAccountAndResource_Call) Return(_a0 *types.Chec
 	return _c
 }
 
-func (_c *MockRepoComponent_CheckAccountAndResource_Call) RunAndReturn(run func(context.Context, string, string, int64, *database.SpaceResource) (*types.CheckExclusiveResp, error)) *MockRepoComponent_CheckAccountAndResource_Call {
+func (_c *MockRepoComponent_CheckAccountAndResource_Call) RunAndReturn(run func(context.Context, types.CheckResourceAndAccountReq, *database.SpaceResource) (*types.CheckExclusiveResp, error)) *MockRepoComponent_CheckAccountAndResource_Call {
 	_c.Call.Return(run)
 	return _c
 }

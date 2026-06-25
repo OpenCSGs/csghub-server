@@ -128,7 +128,7 @@ func TestPlatformDataflowComponent_CreateJob(t *testing.T) {
 		c.mocks.userSvcClient.EXPECT().GetNameSpaceInfoByUUID(ctx, req.NSUUID).Return(ns, nil)
 		c.mocks.userSvcClient.EXPECT().GetOrCreateFirstAvaiTokens(ctx, req.Username, req.Username, string(types.AccessTokenAppGit), "dataflow").Return("test-token", nil)
 		c.mocks.spaceResourceStore.EXPECT().FindByID(ctx, req.ResourceId).Return(resource, nil)
-		c.mocks.repoComponent.EXPECT().CheckAccountAndResource(ctx, ns.Path, resource.ClusterID, int64(0), resource).Return(&types.CheckExclusiveResp{}, nil)
+		c.mocks.repoComponent.EXPECT().CheckAccountAndResource(ctx, types.CheckResourceAndAccountReq{UserName: "testuser", ClusterID: "cluster-1", OrderDetailID: 0, CurrentUser: "testuser"}, resource).Return(&types.CheckExclusiveResp{}, nil)
 		c.mocks.clusterStore.EXPECT().FindNodeByClusterID(ctx, resource.ClusterID).Return(clusterNodes, nil)
 		c.mocks.workflowStore.EXPECT().CreateWorkFlow(ctx, mock.MatchedBy(func(wf database.ArgoWorkflow) bool {
 			return wf.TaskName == req.JobName &&
@@ -243,7 +243,7 @@ func TestPlatformDataflowComponent_CreateJob(t *testing.T) {
 		c.mocks.userSvcClient.EXPECT().GetNameSpaceInfoByUUID(ctx, req.NSUUID).Return(ns, nil)
 		c.mocks.userSvcClient.EXPECT().GetOrCreateFirstAvaiTokens(ctx, req.Username, req.Username, string(types.AccessTokenAppGit), "dataflow").Return("test-token", nil)
 		c.mocks.spaceResourceStore.EXPECT().FindByID(ctx, req.ResourceId).Return(resource, nil)
-		c.mocks.repoComponent.EXPECT().CheckAccountAndResource(ctx, ns.Path, resource.ClusterID, int64(0), resource).Return(nil, errors.New("resource unavailable"))
+		c.mocks.repoComponent.EXPECT().CheckAccountAndResource(ctx, types.CheckResourceAndAccountReq{UserName: "testuser", ClusterID: "cluster-1", OrderDetailID: 0, CurrentUser: "testuser"}, resource).Return(nil, errors.New("resource unavailable"))
 
 		resp, err := c.CreateJob(ctx, req)
 		require.Error(t, err)
@@ -280,7 +280,7 @@ func TestPlatformDataflowComponent_CreateJob(t *testing.T) {
 		c.mocks.userSvcClient.EXPECT().GetNameSpaceInfoByUUID(ctx, req.NSUUID).Return(ns, nil)
 		c.mocks.userSvcClient.EXPECT().GetOrCreateFirstAvaiTokens(ctx, req.Username, req.Username, string(types.AccessTokenAppGit), "dataflow").Return("test-token", nil)
 		c.mocks.spaceResourceStore.EXPECT().FindByID(ctx, req.ResourceId).Return(resource, nil)
-		c.mocks.repoComponent.EXPECT().CheckAccountAndResource(ctx, ns.Path, resource.ClusterID, int64(0), resource).Return(&types.CheckExclusiveResp{}, nil)
+		c.mocks.repoComponent.EXPECT().CheckAccountAndResource(ctx, types.CheckResourceAndAccountReq{UserName: "testuser", ClusterID: "cluster-1", OrderDetailID: 0, CurrentUser: "testuser"}, resource).Return(&types.CheckExclusiveResp{}, nil)
 		c.mocks.clusterStore.EXPECT().FindNodeByClusterID(ctx, resource.ClusterID).Return(nil, errors.New("cluster not found"))
 
 		resp, err := c.CreateJob(ctx, req)
@@ -319,7 +319,7 @@ func TestPlatformDataflowComponent_CreateJob(t *testing.T) {
 		c.mocks.userSvcClient.EXPECT().GetNameSpaceInfoByUUID(ctx, req.NSUUID).Return(ns, nil)
 		c.mocks.userSvcClient.EXPECT().GetOrCreateFirstAvaiTokens(ctx, req.Username, req.Username, string(types.AccessTokenAppGit), "dataflow").Return("test-token", nil)
 		c.mocks.spaceResourceStore.EXPECT().FindByID(ctx, req.ResourceId).Return(resource, nil)
-		c.mocks.repoComponent.EXPECT().CheckAccountAndResource(ctx, ns.Path, resource.ClusterID, int64(0), resource).Return(&types.CheckExclusiveResp{}, nil)
+		c.mocks.repoComponent.EXPECT().CheckAccountAndResource(ctx, types.CheckResourceAndAccountReq{UserName: "testuser", ClusterID: "cluster-1", OrderDetailID: 0, CurrentUser: "testuser"}, resource).Return(&types.CheckExclusiveResp{}, nil)
 		c.mocks.clusterStore.EXPECT().FindNodeByClusterID(ctx, resource.ClusterID).Return([]database.ClusterNode{}, nil)
 		c.mocks.workflowStore.EXPECT().CreateWorkFlow(ctx, mock.Anything).Return(nil, errors.New("db error"))
 
@@ -365,7 +365,7 @@ func TestPlatformDataflowComponent_CreateJob(t *testing.T) {
 		c.mocks.userSvcClient.EXPECT().GetNameSpaceInfoByUUID(ctx, req.NSUUID).Return(ns, nil)
 		c.mocks.userSvcClient.EXPECT().GetOrCreateFirstAvaiTokens(ctx, req.Username, req.Username, string(types.AccessTokenAppGit), "dataflow").Return("test-token", nil)
 		c.mocks.spaceResourceStore.EXPECT().FindByID(ctx, req.ResourceId).Return(resource, nil)
-		c.mocks.repoComponent.EXPECT().CheckAccountAndResource(ctx, ns.Path, resource.ClusterID, int64(0), resource).Return(&types.CheckExclusiveResp{}, nil)
+		c.mocks.repoComponent.EXPECT().CheckAccountAndResource(ctx, types.CheckResourceAndAccountReq{UserName: "testuser", ClusterID: "cluster-1", OrderDetailID: 0, CurrentUser: "testuser"}, resource).Return(&types.CheckExclusiveResp{}, nil)
 		c.mocks.clusterStore.EXPECT().FindNodeByClusterID(ctx, resource.ClusterID).Return([]database.ClusterNode{}, nil)
 		c.mocks.workflowStore.EXPECT().CreateWorkFlow(ctx, mock.Anything).Return(createdWF, nil)
 		c.mocks.deployer.EXPECT().CreateDataflowJob(ctx, mock.Anything).Return(nil, errors.New("deployer error"))
@@ -419,7 +419,7 @@ func TestPlatformDataflowComponent_CreateJob(t *testing.T) {
 		c.mocks.userSvcClient.EXPECT().GetMemberRoleByUUID(ctx, ns.UUID, req.Username).Return(membership.RoleAdmin, nil)
 		c.mocks.userSvcClient.EXPECT().GetOrCreateFirstAvaiTokens(ctx, req.Username, req.Username, string(types.AccessTokenAppGit), "dataflow").Return("test-token", nil)
 		c.mocks.spaceResourceStore.EXPECT().FindByID(ctx, req.ResourceId).Return(resource, nil)
-		c.mocks.repoComponent.EXPECT().CheckAccountAndResource(ctx, ns.Path, resource.ClusterID, int64(0), resource).Return(&types.CheckExclusiveResp{}, nil)
+		c.mocks.repoComponent.EXPECT().CheckAccountAndResource(ctx, types.CheckResourceAndAccountReq{UserName: "testorg", ClusterID: "cluster-1", OrderDetailID: 0, CurrentUser: "orgmember"}, resource).Return(&types.CheckExclusiveResp{}, nil)
 		c.mocks.clusterStore.EXPECT().FindNodeByClusterID(ctx, resource.ClusterID).Return([]database.ClusterNode{}, nil)
 		c.mocks.workflowStore.EXPECT().CreateWorkFlow(ctx, mock.Anything).Return(createdWF, nil)
 		c.mocks.deployer.EXPECT().CreateDataflowJob(ctx, mock.Anything).Return(deployResp, nil)

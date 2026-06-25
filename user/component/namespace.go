@@ -49,6 +49,9 @@ func (c *namespaceComponentImpl) buildNamespace(ctx context.Context, dbns *datab
 		NSType: string(dbns.NamespaceType),
 		UUID:   dbns.UUID,
 	}
+	ns.User.ID = dbns.User.ID
+	ns.User.Username = dbns.User.Username
+
 	switch dbns.NamespaceType {
 	case database.UserNamespace:
 		ns.Avatar = dbns.User.Avatar

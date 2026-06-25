@@ -1040,7 +1040,7 @@ func TestSpaceComponent_CreateGradio(t *testing.T) {
 		Resources: `{"memory": "foo"}`,
 	}, nil)
 
-	sc.mocks.components.repo.EXPECT().CheckAccountAndResource(ctx, "ns", "cluster", int64(0), mock.Anything).Return(&types.CheckExclusiveResp{}, nil)
+	sc.mocks.components.repo.EXPECT().CheckAccountAndResource(ctx, types.CheckResourceAndAccountReq{UserName: "user", ClusterID: "cluster", OrderDetailID: 0, CurrentUser: "user"}, mock.Anything).Return(&types.CheckExclusiveResp{}, nil)
 
 	sc.mocks.components.repo.EXPECT().CreateRepo(ctx, types.CreateRepoReq{
 		DefaultBranch: "main",

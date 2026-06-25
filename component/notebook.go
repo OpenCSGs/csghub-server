@@ -94,7 +94,14 @@ func (c *notebookComponentImpl) CreateNotebook(ctx context.Context, req *types.C
 
 	// resource available only if err is nil, err message should contain
 	// the reason why resource is unavailable
-	exclusiveResp, err := c.repoComponent.CheckAccountAndResource(ctx, req.OwnerNamespace, resource.ClusterID, req.OrderDetailID, resource)
+	exclusiveResp, err := c.repoComponent.CheckAccountAndResource(ctx,
+		types.CheckResourceAndAccountReq{
+			UserName:      req.OwnerNamespace,
+			ClusterID:     resource.ClusterID,
+			OrderDetailID: req.OrderDetailID,
+			CurrentUser:   req.CurrentUser,
+		},
+		resource)
 	if err != nil {
 		return nil, err
 	}
@@ -298,7 +305,14 @@ func (c *notebookComponentImpl) UpdateNotebook(ctx context.Context, req *types.U
 	if notebookBillingNs == "" {
 		notebookBillingNs = req.CurrentUser
 	}
-	exclusiveResp, err := c.repoComponent.CheckAccountAndResource(ctx, notebookBillingNs, resource.ClusterID, deploy.OrderDetailID, resource)
+	exclusiveResp, err := c.repoComponent.CheckAccountAndResource(ctx,
+		types.CheckResourceAndAccountReq{
+			UserName:      notebookBillingNs,
+			ClusterID:     resource.ClusterID,
+			OrderDetailID: deploy.OrderDetailID,
+			CurrentUser:   req.CurrentUser,
+		},
+		resource)
 	if err != nil {
 		return fmt.Errorf("resource is not available, %w", err)
 	}

@@ -98,7 +98,14 @@ func (c *spaceComponentImpl) Create(ctx context.Context, req types.CreateSpaceRe
 	if err != nil {
 		return nil, errorx.ErrResourceNotFound
 	}
-	_, err = c.repoComponent.CheckAccountAndResource(ctx, req.Namespace, req.ClusterID, req.OrderDetailID, resource)
+	_, err = c.repoComponent.CheckAccountAndResource(ctx,
+		types.CheckResourceAndAccountReq{
+			UserName:      req.Username,
+			ClusterID:     req.ClusterID,
+			OrderDetailID: req.OrderDetailID,
+			CurrentUser:   req.Username,
+		},
+		resource)
 	if err != nil {
 		slog.ErrorContext(ctx, "CheckAccountAndResource failed", slog.Any("error", err))
 		return nil, err
@@ -970,7 +977,14 @@ func (c *spaceComponentImpl) Deploy(ctx context.Context, namespace, name, curren
 
 	slog.Info("deploy space with resource", slog.Any("resource", resource), slog.String("namespace", namespace),
 		slog.String("username", currentUser), slog.Any("cluster_id", resource.ClusterID))
-	exclusiveResp, err := c.repoComponent.CheckAccountAndResource(ctx, namespace, resource.ClusterID, 0, resource)
+	exclusiveResp, err := c.repoComponent.CheckAccountAndResource(ctx,
+		types.CheckResourceAndAccountReq{
+			UserName:      namespace,
+			ClusterID:     resource.ClusterID,
+			OrderDetailID: 0,
+			CurrentUser:   currentUser,
+		},
+		resource)
 	if err != nil {
 		return -1, err
 	}

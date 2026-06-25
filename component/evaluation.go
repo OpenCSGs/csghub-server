@@ -148,7 +148,14 @@ func (c *evaluationComponentImpl) CreateEvaluation(ctx context.Context, req type
 			return nil, fmt.Errorf("evaluation requires graphics card resources")
 		}
 		// check resource available
-		exclusiveResp, err := c.repoComponent.CheckAccountAndResource(ctx, req.OwnerNamespace, resource.ClusterID, 0, resource)
+		exclusiveResp, err := c.repoComponent.CheckAccountAndResource(ctx,
+			types.CheckResourceAndAccountReq{
+				UserName:      req.OwnerNamespace,
+				ClusterID:     resource.ClusterID,
+				OrderDetailID: 0,
+				CurrentUser:   req.Username,
+			},
+			resource)
 		if err != nil {
 			return nil, err
 		}

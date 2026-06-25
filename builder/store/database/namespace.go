@@ -76,8 +76,8 @@ func (s *NamespaceStoreImpl) ExistsByUUID(ctx context.Context, uuid string) (exi
 func (s *NamespaceStoreImpl) FindByUUID(ctx context.Context, uuid string) (namespace Namespace, err error) {
 	err = s.db.Operator.Core.
 		NewSelect().
-		Model(&namespace).
-		Where("uuid =?", uuid).
+		Model(&namespace).Relation("User").
+		Where("namespace.uuid =?", uuid).
 		Scan(ctx, &namespace)
 	if err != nil {
 		return namespace, errorx.HandleDBError(err, errorx.Ctx().Set("uuid", uuid))
