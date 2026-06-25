@@ -14,6 +14,14 @@ import (
 	"opencsg.com/csghub-server/component"
 )
 
+type ForwardType string
+
+const (
+	ForwardTypeDataflow     ForwardType = "dataflow"
+	ForwardTypeAcademy      ForwardType = "academy"
+	ForwardTypeSupplydemand ForwardType = "supplydemand"
+)
+
 type DataflowProxyHandler struct {
 	rp   proxy.ReverseProxy
 	user component.UserComponent
@@ -21,14 +29,38 @@ type DataflowProxyHandler struct {
 }
 
 func NewDataflowProxyHandler(config *config.Config) (*DataflowProxyHandler, error) {
+	return newThirdPartProxyHandler(config, ForwardTypeDataflow)
+}
+
+func NewAcademyProxyHandler(config *config.Config) (*DataflowProxyHandler, error) {
+	return newThirdPartProxyHandler(config, ForwardTypeAcademy)
+}
+
+func NewSupplydemandProxyHandler(config *config.Config) (*DataflowProxyHandler, error) {
+	return newThirdPartProxyHandler(config, ForwardTypeSupplydemand)
+}
+
+func newThirdPartProxyHandler(config *config.Config, forwardType ForwardType) (*DataflowProxyHandler, error) {
 	uc, err := component.NewUserComponent(config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create user component: %w", err)
 	}
-	remoteEndpoint := fmt.Sprintf("%s:%d", config.Dataflow.Host, config.Dataflow.Port)
+
+	var remoteEndpoint string
+	switch forwardType {
+	case ForwardTypeDataflow:
+		remoteEndpoint = fmt.Sprintf("%s:%d", config.Dataflow.Host, config.Dataflow.Port)
+	case ForwardTypeAcademy:
+		remoteEndpoint = fmt.Sprintf("%s:%d", config.Academy.Host, config.Academy.Port)
+	case ForwardTypeSupplydemand:
+		remoteEndpoint = fmt.Sprintf("%s:%d", config.Supplydemand.Host, config.Supplydemand.Port)
+	default:
+		return nil, fmt.Errorf("invalid forward type: %s", forwardType)
+	}
+
 	rp, err := proxy.NewReverseProxy(remoteEndpoint)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create dataflow reverse proxy: %w", err)
+		return nil, fmt.Errorf("failed to create %s reverse proxy: %w", forwardType, err)
 	}
 	usc := rpc.NewUserSvcHttpClient(fmt.Sprintf("%s:%d", config.User.Host, config.User.Port),
 		rpc.AuthWithApiKey(config.APIToken))
@@ -38,30 +70,33 @@ func NewDataflowProxyHandler(config *config.Config) (*DataflowProxyHandler, erro
 // Proxy send request to backend service, without change the request path
 func (h *DataflowProxyHandler) Proxy(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
-	u, err := h.user.GetUserByName(ctx.Request.Context(), currentUser)
-	if err != nil {
-		httpbase.UnauthorizedError(ctx, err)
-		ctx.Abort()
-		return
+	if len(currentUser) > 0 {
+		u, err := h.user.GetUserByName(ctx.Request.Context(), currentUser)
+		if err != nil {
+			httpbase.UnauthorizedError(ctx, err)
+			ctx.Abort()
+			return
+		}
+		token, err := h.usc.GetOrCreateFirstAvaiTokens(ctx.Request.Context(), currentUser, currentUser,
+			string(types.AccessTokenAppGit), "dataflow")
+		if err != nil {
+			httpbase.ServerError(ctx, err)
+			ctx.Abort()
+			return
+		}
+		if len(token) == 0 {
+			slog.ErrorContext(ctx.Request.Context(), "failed to get or create user first git access token",
+				slog.Any("user", currentUser), slog.Any("error", err))
+			httpbase.ServerError(ctx, errors.New("can not get user first available access token"))
+			ctx.Abort()
+			return
+		}
+		ctx.Request.Header.Set("User-Id", fmt.Sprintf("%d", u.ID))
+		ctx.Request.Header.Set("User-Name", u.Username)
+		ctx.Request.Header.Set("User-Token", token)
+		ctx.Request.Header.Set("User-Email", u.Email)
+		ctx.Request.Header.Set("isadmin", fmt.Sprintf("%t", u.CanAdmin()))
 	}
-	token, err := h.usc.GetOrCreateFirstAvaiTokens(ctx.Request.Context(), currentUser, currentUser, string(types.AccessTokenAppGit), "dataflow")
-	if err != nil {
-
-		httpbase.ServerError(ctx, err)
-		ctx.Abort()
-		return
-	}
-	if len(token) == 0 {
-		slog.ErrorContext(ctx.Request.Context(), "fail to get or create user first git access token", slog.Any("user", currentUser), slog.Any("error", err))
-		httpbase.ServerError(ctx, errors.New("can not get user first available access token"))
-		ctx.Abort()
-		return
-	}
-	ctx.Request.Header.Set("User-Id", fmt.Sprintf("%d", u.ID))
-	ctx.Request.Header.Set("User-Name", u.Username)
-	ctx.Request.Header.Set("User-Token", token)
-	ctx.Request.Header.Set("User-Email", u.Email)
-	ctx.Request.Header.Set("isadmin", fmt.Sprintf("%t", u.CanAdmin()))
 	// Log the request URL and header
 	slog.Debug("http request", slog.Any("request", ctx.Request.URL), slog.Any("header", ctx.Request.Header))
 	// Serve the request using the router

@@ -523,17 +523,12 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	memoryHandler := handler.NewMemoryHandler(memoryComp)
 	createMemoryRoutes(apiGroup, middlewareCollection, memoryHandler)
 
-	// dataflow proxy
-	dataflowHandler, err := handler.NewDataflowProxyHandler(config)
-	if err != nil {
-		return nil, fmt.Errorf("error creating data flow proxy handler:%w", err)
-	}
 	// platform dataflow
 	platformDFHandler, err := handler.NewPlatformDataflowHandler(config)
 	if err != nil {
 		return nil, fmt.Errorf("error creating platform dataflow handler:%w", err)
 	}
-	createDataflowRoutes(apiGroup, dataflowHandler, platformDFHandler)
+	createPlatformDataflowRoutes(apiGroup, platformDFHandler)
 
 	// ClawHub Registry
 	err = createClawHubRoutes(r, apiGroup, config)
@@ -588,6 +583,11 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		return nil, fmt.Errorf("error creating finetune job handler: %w", err)
 	}
 	createFinetuneRoutes(apiGroup, middlewareCollection, finetuneJobHandler)
+
+	err = createForwardRoutes(apiGroup, config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating forward routes:%w", err)
+	}
 
 	return r, nil
 }
@@ -1295,11 +1295,7 @@ func createPromptRoutes(
 	promptInfoGrp.GET("/:namespace/:name", promptHandler.PromptDetail)
 }
 
-func createDataflowRoutes(apiGroup *gin.RouterGroup, dataflowHandler *handler.DataflowProxyHandler, platformDFHandler *handler.PlatformDataflowHandler) {
-	dataflowGrp := apiGroup.Group("/dataflow")
-	dataflowGrp.Use(middleware.MustLogin())
-	dataflowGrp.Any("/*any", dataflowHandler.Proxy)
-
+func createPlatformDataflowRoutes(apiGroup *gin.RouterGroup, platformDFHandler *handler.PlatformDataflowHandler) {
 	platformGrp := apiGroup.Group("/platform")
 	platformDFGrp := platformGrp.Group("/dataflow")
 	platformDFGrp.Use(middleware.MustLogin())
