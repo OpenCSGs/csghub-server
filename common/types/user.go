@@ -229,6 +229,7 @@ type UpdateAPIKeyRequest struct {
 type UserDatasetsReq struct {
 	Owner       string `json:"owner"`
 	CurrentUser string `json:"current_user"`
+	Filter      *RepoFilter
 	PageOpts
 }
 
@@ -236,6 +237,7 @@ type UserSpacesReq struct {
 	SDK         string `json:"sdk"`
 	Owner       string `json:"owner"`
 	CurrentUser string `json:"current_user"`
+	Filter      *RepoFilter
 	PageOpts
 }
 

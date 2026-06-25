@@ -37,6 +37,17 @@ var (
 	redisOnce   sync.Once
 )
 
+func escapeLikePattern(value string) string {
+	var builder strings.Builder
+	for _, r := range value {
+		if r == '\\' || r == '%' || r == '_' {
+			builder.WriteRune('\\')
+		}
+		builder.WriteRune(r)
+	}
+	return builder.String()
+}
+
 type repoStoreImpl struct {
 	config              *config.Config
 	db                  *DB
@@ -677,6 +688,9 @@ func (s *repoStoreImpl) PublicToUser(ctx context.Context, repoType types.Reposit
 		Relation("Tags")
 
 	q.Where("repository.repository_type = ?", repoType)
+	if filter.Owner != "" {
+		q.Where("repository.path LIKE ? ESCAPE '\\'", fmt.Sprintf("%s/%%", escapeLikePattern(filter.Owner)))
+	}
 
 	switch repoType {
 	case types.ModelRepo:
@@ -842,6 +856,9 @@ func (s *repoStoreImpl) publicToUserTrending(ctx context.Context, repoType types
 		Join("JOIN repositories AS r ON r.id = rrs.repository_id").
 		Where("rrs.weight_name = ?", RecomWeightTotal).
 		Where("r.repository_type = ?", repoType)
+	if filter.Owner != "" {
+		q.Where("r.path LIKE ? ESCAPE '\\'", fmt.Sprintf("%s/%%", escapeLikePattern(filter.Owner)))
+	}
 
 	// Join with business table
 	q.Join(fmt.Sprintf("INNER JOIN %s ON %s.repository_id = r.id", bizTable, bizTable))

@@ -76,6 +76,55 @@ func TestUserHandler_Models(t *testing.T) {
 	})
 }
 
+func TestUserHandler_Models_WithRepoFilters(t *testing.T) {
+	tester := NewUserTester(t).WithHandleFunc(func(h *UserHandler) gin.HandlerFunc {
+		return h.Models
+	})
+
+	modelParamsMin := 1.5
+	modelParamsMax := 9.5
+	tester.mocks.user.EXPECT().Models(tester.Ctx(), &types.UserDatasetsReq{
+		Owner:       "go",
+		CurrentUser: "u",
+		Filter: &types.RepoFilter{
+			Owner:          "go",
+			Username:       "u",
+			Search:         "hello",
+			Sort:           "trending",
+			Source:         "local",
+			ListServerless: true,
+			Tags: []types.TagReq{{
+				Category: "runtime_framework",
+				Group:    "inference",
+			}},
+			ModelParamsMin: &modelParamsMin,
+			ModelParamsMax: &modelParamsMax,
+		},
+		PageOpts: types.PageOpts{
+			Page:     1,
+			PageSize: 10,
+		},
+	}).Return([]types.Model{{Name: "ds"}}, 100, nil)
+	tester.AddPagination(1, 10).
+		WithUser().
+		WithParam("username", "go").
+		WithQuery("search", "hello").
+		WithQuery("sort", "trending").
+		WithQuery("source", "local").
+		WithQuery("list_serverless", "true").
+		WithQuery("tag_category", "runtime_framework").
+		WithQuery("tag_group", "inference").
+		WithQuery("tag_name", "").
+		WithQuery("model_params_min", "1.5").
+		WithQuery("model_params_max", "9.5").
+		Execute()
+	tester.ResponseEqSimple(t, 200, gin.H{
+		"message": "OK",
+		"data":    []types.Model{{Name: "ds"}},
+		"total":   100,
+	})
+}
+
 func TestUserHandler_Codes(t *testing.T) {
 	tester := NewUserTester(t).WithHandleFunc(func(h *UserHandler) gin.HandlerFunc {
 		return h.Codes
@@ -93,6 +142,32 @@ func TestUserHandler_Codes(t *testing.T) {
 	tester.ResponseEqSimple(t, 200, gin.H{
 		"message": "OK",
 		"data":    []types.Code{{Name: "ds"}},
+		"total":   100,
+	})
+}
+
+func TestUserHandler_Spaces_WithSDKOnlyKeepsLegacyRequest(t *testing.T) {
+	tester := NewUserTester(t).WithHandleFunc(func(h *UserHandler) gin.HandlerFunc {
+		return h.Spaces
+	})
+
+	tester.mocks.user.EXPECT().Spaces(tester.Ctx(), &types.UserSpacesReq{
+		SDK:         "gradio",
+		Owner:       "go",
+		CurrentUser: "u",
+		PageOpts: types.PageOpts{
+			Page:     1,
+			PageSize: 10,
+		},
+	}).Return([]types.Space{{Name: "ds"}}, 100, nil)
+	tester.AddPagination(1, 10).
+		WithUser().
+		WithParam("username", "go").
+		WithQuery("sdk", "gradio").
+		Execute()
+	tester.ResponseEqSimple(t, 200, gin.H{
+		"message": "OK",
+		"data":    []types.Space{{Name: "ds"}},
 		"total":   100,
 	})
 }

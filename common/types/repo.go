@@ -314,6 +314,7 @@ type RepoFilter struct {
 	Sort                string
 	Search              string
 	Source              string
+	Owner               string
 	Username            string
 	Tree                *TreeReq
 	ListServerless      bool
