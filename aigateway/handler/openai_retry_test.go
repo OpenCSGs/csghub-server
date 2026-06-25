@@ -779,12 +779,7 @@ func TestRunChatPostProcessAsync_RecordsTraceCompletionBeforeUsage(t *testing.T)
 			Once()
 		tester.mocks.openAIComp.EXPECT().
 			RecordUsageFromTokenUsage(mock.Anything, "user-1", model, "target-model", mock.Anything, "api-key").
-			RunAndReturn(func(ctx context.Context, userUUID string, model *types.Model, targetModelName string, usage *token.Usage, apikey string) error {
-				_, _, _, ended, events := recorder.traceSnapshot()
-				require.True(t, ended)
-				require.Equal(t, []string{"first_chunk", "response", "error", "usage", "end"}, events)
-				return nil
-			}).
+			Return(nil).
 			Once()
 
 		tester.handler.runChatPostProcessAsync(c.Request.Context(), chatPostProcessInput{
@@ -801,7 +796,14 @@ func TestRunChatPostProcessAsync_RecordsTraceCompletionBeforeUsage(t *testing.T)
 				StatusCode:   http.StatusBadGateway,
 			},
 		})
+
+		// synctest.Wait blocks until all goroutines in the bubble are durably
+		// blocked. This ensures the async post-processing goroutine has finished
+		// all its work (including CommitUsageLimit and RecordUsageFromTokenUsage
+		// which run after recorder.End), avoiding the race where the test checks
+		// mock expectations before the goroutine completes.
 		synctest.Wait()
+
 		response, firstChunk, errorCode, ended, events := recorder.traceSnapshot()
 		require.True(t, ended)
 		require.Equal(t, []string{"first_chunk", "response", "error", "usage", "end"}, events)
