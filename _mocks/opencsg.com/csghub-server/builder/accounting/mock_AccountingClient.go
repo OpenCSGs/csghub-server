@@ -550,6 +550,64 @@ func (_c *MockAccountingClient_GetQuotaStatement_Call) RunAndReturn(run func(str
 	return _c
 }
 
+// GetVoucherDashboard provides a mock function with given fields: req
+func (_m *MockAccountingClient) GetVoucherDashboard(req types.VoucherDashboardReq) (any, error) {
+	ret := _m.Called(req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetVoucherDashboard")
+	}
+
+	var r0 any
+	var r1 error
+	if rf, ok := ret.Get(0).(func(types.VoucherDashboardReq) (any, error)); ok {
+		return rf(req)
+	}
+	if rf, ok := ret.Get(0).(func(types.VoucherDashboardReq) any); ok {
+		r0 = rf(req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(any)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(types.VoucherDashboardReq) error); ok {
+		r1 = rf(req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAccountingClient_GetVoucherDashboard_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetVoucherDashboard'
+type MockAccountingClient_GetVoucherDashboard_Call struct {
+	*mock.Call
+}
+
+// GetVoucherDashboard is a helper method to define mock.On call
+//   - req types.VoucherDashboardReq
+func (_e *MockAccountingClient_Expecter) GetVoucherDashboard(req interface{}) *MockAccountingClient_GetVoucherDashboard_Call {
+	return &MockAccountingClient_GetVoucherDashboard_Call{Call: _e.mock.On("GetVoucherDashboard", req)}
+}
+
+func (_c *MockAccountingClient_GetVoucherDashboard_Call) Run(run func(req types.VoucherDashboardReq)) *MockAccountingClient_GetVoucherDashboard_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(types.VoucherDashboardReq))
+	})
+	return _c
+}
+
+func (_c *MockAccountingClient_GetVoucherDashboard_Call) Return(_a0 any, _a1 error) *MockAccountingClient_GetVoucherDashboard_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAccountingClient_GetVoucherDashboard_Call) RunAndReturn(run func(types.VoucherDashboardReq) (any, error)) *MockAccountingClient_GetVoucherDashboard_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ListBillsByUserIDAndDate provides a mock function with given fields: req
 func (_m *MockAccountingClient) ListBillsByUserIDAndDate(req types.ActStatementsReq) (any, error) {
 	ret := _m.Called(req)

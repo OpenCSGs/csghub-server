@@ -572,6 +572,8 @@ func (c *repoComponentImpl) DeployDetail(ctx context.Context, detailReq types.De
 		Reason:              deploy.Reason,
 		Message:             deploy.Message,
 		SupportFunctionCall: supportFunctionCall,
+		UserUUID:            deploy.UserUUID,
+		OwnerNamespace:      deploy.OwnerNamespace,
 	}
 
 	return &resDeploy, nil
@@ -840,7 +842,14 @@ func (c *repoComponentImpl) DeployUpdate(ctx context.Context, updateReq types.De
 		if billingNamespace == "" {
 			billingNamespace = updateReq.CurrentUser
 		}
-		exclusiveResp, err := c.CheckAccountAndResource(ctx, billingNamespace, resource.ClusterID, deploy.OrderDetailID, resource)
+		exclusiveResp, err := c.CheckAccountAndResource(ctx,
+			types.CheckResourceAndAccountReq{
+				UserName:      billingNamespace,
+				ClusterID:     resource.ClusterID,
+				OrderDetailID: deploy.OrderDetailID,
+				CurrentUser:   updateReq.CurrentUser,
+			},
+			resource)
 		if err != nil {
 			return err
 		}
@@ -935,7 +944,14 @@ func (c *repoComponentImpl) DeployStart(ctx context.Context, startReq types.Depl
 	if billingNamespace == "" {
 		billingNamespace = startReq.CurrentUser
 	}
-	exclusiveResp, err := c.CheckAccountAndResource(ctx, billingNamespace, deploy.ClusterID, deploy.OrderDetailID, resource)
+	exclusiveResp, err := c.CheckAccountAndResource(ctx,
+		types.CheckResourceAndAccountReq{
+			UserName:      billingNamespace,
+			ClusterID:     deploy.ClusterID,
+			OrderDetailID: deploy.OrderDetailID,
+			CurrentUser:   startReq.CurrentUser,
+		},
+		resource)
 	if err != nil {
 		return err
 	}

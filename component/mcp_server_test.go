@@ -543,7 +543,7 @@ func TestMCPServerComponent_CheckDeployBranch(t *testing.T) {
 		ID: 1,
 	}, nil)
 
-	mc.mocks.components.repo.EXPECT().CheckAccountAndResource(ctx, req.MCPRepo.Namespace, req.ClusterID, int64(0), &database.SpaceResource{
+	mc.mocks.components.repo.EXPECT().CheckAccountAndResource(ctx, types.CheckResourceAndAccountReq{UserName: "ns", ClusterID: "cls", OrderDetailID: 0, CurrentUser: "user"}, &database.SpaceResource{
 		ID: 1,
 	}).Return(&types.CheckExclusiveResp{}, nil)
 

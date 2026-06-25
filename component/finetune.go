@@ -133,6 +133,17 @@ func (c *finetuneComponentImpl) CreateFinetuneJob(ctx context.Context, req types
 		return nil, fmt.Errorf("cannot find available runtime framework, %w", err)
 	}
 
+	billingUUID := user.UUID
+	if req.Namespace != "" {
+		// Caller explicitly requested inference to be under this namespace (user or org).
+		ownerNamespace := req.Namespace
+		resolved, err := c.repoComponent.GetNamespaceBillingUUID(ctx, ownerNamespace)
+		if err != nil {
+			return nil, fmt.Errorf("failed to resolve billing UUID for namespace %s, error: %w", ownerNamespace, err)
+		}
+		billingUUID = resolved
+	}
+
 	req.Token = token.Token
 	var hardware types.HardWare
 	if req.ResourceId != 0 {
@@ -146,7 +157,14 @@ func (c *finetuneComponentImpl) CreateFinetuneJob(ctx context.Context, req types
 		}
 
 		// check resource available
-		exclusiveResp, err := c.repoComponent.CheckAccountAndResource(ctx, req.Namespace, resource.ClusterID, 0, resource)
+		exclusiveResp, err := c.repoComponent.CheckAccountAndResource(ctx,
+			types.CheckResourceAndAccountReq{
+				UserName:      req.Namespace,
+				ClusterID:     resource.ClusterID,
+				OrderDetailID: 0,
+				CurrentUser:   req.Username,
+			},
+			resource)
 		if err != nil {
 			return nil, err
 		}
@@ -172,7 +190,7 @@ func (c *finetuneComponentImpl) CreateFinetuneJob(ctx context.Context, req types
 	req.Hardware = hardware
 	// choose image
 	containerImg := frame.FrameImage
-	req.UserUUID = user.UUID
+	req.UserUUID = billingUUID
 	// Persist workflow under owner namespace (user or organization).
 	req.Username = req.Namespace
 	req.Image = containerImg

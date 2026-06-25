@@ -17,7 +17,7 @@ func (ac *accountingComponentImpl) QueryBalanceByUserID(ctx context.Context, cur
 	return nil, nil
 }
 
-func (ac *accountingComponentImpl) QueryBalanceByUserIDInternal(ctx context.Context, currentUser string) (*database.AccountUser, error) {
+func (ac *accountingComponentImpl) QueryBalanceByUserIDInternal(ctx context.Context, currentUser string) (*types.UserBalanceResp, error) {
 	return nil, nil
 }
 
@@ -103,4 +103,8 @@ func (ac *accountingComponentImpl) ListPresents(ctx context.Context, req types.P
 
 func (ac *accountingComponentImpl) WeeklyRecharges(ctx context.Context, emails []string) error {
 	return nil
+}
+
+func (ac *accountingComponentImpl) GetVoucherDashboard(ctx context.Context, req types.VoucherDashboardReq) (*types.VoucherDashboardStatusItem, error) {
+	return nil, nil
 }

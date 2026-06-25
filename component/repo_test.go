@@ -1424,6 +1424,8 @@ func TestRepoComponent_DeployDetail(t *testing.T) {
 		Private:        true,
 		SvcName:        "svc",
 		Endpoint:       "endpoint/svc",
+		UserUUID:       "uuid",
+		OwnerNamespace: "",
 	}, *dp)
 
 }

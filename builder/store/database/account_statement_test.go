@@ -91,11 +91,11 @@ func TestAccountStatementStore_CreateSimple(t *testing.T) {
 			_, err := db.Core.NewInsert().Model(au).Exec(ctx)
 			require.Nil(t, err)
 
-			// SceneSpace triggers voucher deduction which requires a valid ResourceID and SpaceResource
+			// SceneSpace triggers voucher deduction which requires a valid ResourceID and SpaceResource with XPU model
 			if c.scene == types.SceneSpace {
 				sr := &database.SpaceResource{
 					Name:      "test-resource",
-					Resources: "{}",
+					Resources: `{"gpu": {"num": "1", "type": "A10"}}`,
 					ClusterID: "test-cluster",
 				}
 				_, err = db.Core.NewInsert().Model(sr).Exec(ctx, sr)

@@ -1130,7 +1130,14 @@ func (c *modelComponentImpl) Deploy(ctx context.Context, deployReq types.DeployA
 
 	req.ClusterID = resource.ClusterID
 
-	exclusiveResp, err := c.repoComponent.CheckAccountAndResource(ctx, ownerNamespace, req.ClusterID, req.OrderDetailID, resource)
+	exclusiveResp, err := c.repoComponent.CheckAccountAndResource(ctx,
+		types.CheckResourceAndAccountReq{
+			UserName:      ownerNamespace,
+			ClusterID:     req.ClusterID,
+			OrderDetailID: req.OrderDetailID,
+			CurrentUser:   deployReq.CurrentUser,
+		},
+		resource)
 	if err != nil {
 		return -1, err
 	}

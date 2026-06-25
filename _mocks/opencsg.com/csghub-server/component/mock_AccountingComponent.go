@@ -555,6 +555,65 @@ func (_c *MockAccountingComponent_GetQuotaStatement_Call) RunAndReturn(run func(
 	return _c
 }
 
+// GetVoucherDashboard provides a mock function with given fields: ctx, req
+func (_m *MockAccountingComponent) GetVoucherDashboard(ctx context.Context, req types.VoucherDashboardReq) (*types.VoucherDashboardStatusItem, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetVoucherDashboard")
+	}
+
+	var r0 *types.VoucherDashboardStatusItem
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.VoucherDashboardReq) (*types.VoucherDashboardStatusItem, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.VoucherDashboardReq) *types.VoucherDashboardStatusItem); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*types.VoucherDashboardStatusItem)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.VoucherDashboardReq) error); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAccountingComponent_GetVoucherDashboard_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetVoucherDashboard'
+type MockAccountingComponent_GetVoucherDashboard_Call struct {
+	*mock.Call
+}
+
+// GetVoucherDashboard is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req types.VoucherDashboardReq
+func (_e *MockAccountingComponent_Expecter) GetVoucherDashboard(ctx interface{}, req interface{}) *MockAccountingComponent_GetVoucherDashboard_Call {
+	return &MockAccountingComponent_GetVoucherDashboard_Call{Call: _e.mock.On("GetVoucherDashboard", ctx, req)}
+}
+
+func (_c *MockAccountingComponent_GetVoucherDashboard_Call) Run(run func(ctx context.Context, req types.VoucherDashboardReq)) *MockAccountingComponent_GetVoucherDashboard_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.VoucherDashboardReq))
+	})
+	return _c
+}
+
+func (_c *MockAccountingComponent_GetVoucherDashboard_Call) Return(_a0 *types.VoucherDashboardStatusItem, _a1 error) *MockAccountingComponent_GetVoucherDashboard_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAccountingComponent_GetVoucherDashboard_Call) RunAndReturn(run func(context.Context, types.VoucherDashboardReq) (*types.VoucherDashboardStatusItem, error)) *MockAccountingComponent_GetVoucherDashboard_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ListBillsByUserIDAndDate provides a mock function with given fields: ctx, req
 func (_m *MockAccountingComponent) ListBillsByUserIDAndDate(ctx context.Context, req types.ActStatementsReq) (interface{}, error) {
 	ret := _m.Called(ctx, req)
@@ -1037,23 +1096,23 @@ func (_c *MockAccountingComponent_QueryBalanceByUserID_Call) RunAndReturn(run fu
 }
 
 // QueryBalanceByUserIDInternal provides a mock function with given fields: ctx, currentUser
-func (_m *MockAccountingComponent) QueryBalanceByUserIDInternal(ctx context.Context, currentUser string) (*database.AccountUser, error) {
+func (_m *MockAccountingComponent) QueryBalanceByUserIDInternal(ctx context.Context, currentUser string) (*types.UserBalanceResp, error) {
 	ret := _m.Called(ctx, currentUser)
 
 	if len(ret) == 0 {
 		panic("no return value specified for QueryBalanceByUserIDInternal")
 	}
 
-	var r0 *database.AccountUser
+	var r0 *types.UserBalanceResp
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string) (*database.AccountUser, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*types.UserBalanceResp, error)); ok {
 		return rf(ctx, currentUser)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string) *database.AccountUser); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string) *types.UserBalanceResp); ok {
 		r0 = rf(ctx, currentUser)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*database.AccountUser)
+			r0 = ret.Get(0).(*types.UserBalanceResp)
 		}
 	}
 
@@ -1085,12 +1144,12 @@ func (_c *MockAccountingComponent_QueryBalanceByUserIDInternal_Call) Run(run fun
 	return _c
 }
 
-func (_c *MockAccountingComponent_QueryBalanceByUserIDInternal_Call) Return(_a0 *database.AccountUser, _a1 error) *MockAccountingComponent_QueryBalanceByUserIDInternal_Call {
+func (_c *MockAccountingComponent_QueryBalanceByUserIDInternal_Call) Return(_a0 *types.UserBalanceResp, _a1 error) *MockAccountingComponent_QueryBalanceByUserIDInternal_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockAccountingComponent_QueryBalanceByUserIDInternal_Call) RunAndReturn(run func(context.Context, string) (*database.AccountUser, error)) *MockAccountingComponent_QueryBalanceByUserIDInternal_Call {
+func (_c *MockAccountingComponent_QueryBalanceByUserIDInternal_Call) RunAndReturn(run func(context.Context, string) (*types.UserBalanceResp, error)) *MockAccountingComponent_QueryBalanceByUserIDInternal_Call {
 	_c.Call.Return(run)
 	return _c
 }

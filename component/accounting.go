@@ -28,7 +28,7 @@ type accountingComponentImpl struct {
 type AccountingComponent interface {
 	QueryAllUsersBalance(ctx context.Context, per, page int) (interface{}, error)
 	QueryBalanceByUserID(ctx context.Context, currentUser, UUID string) (interface{}, error)
-	QueryBalanceByUserIDInternal(ctx context.Context, currentUser string) (*database.AccountUser, error)
+	QueryBalanceByUserIDInternal(ctx context.Context, currentUser string) (*types.UserBalanceResp, error)
 	ListStatementByUserIDAndTime(ctx context.Context, req types.ActStatementsReq) (interface{}, error)
 	ListBillsByUserIDAndDate(ctx context.Context, req types.ActStatementsReq) (interface{}, error)
 	ListBillsDetailByUserID(ctx context.Context, req types.AcctBillsDetailReq) (interface{}, error)
@@ -51,6 +51,7 @@ type AccountingComponent interface {
 	ListPresents(ctx context.Context, req types.PresentsIndexReq) ([]*types.PresentIndexResp, int, error)
 	WeeklyRecharges(ctx context.Context, emails []string) error
 	GetOrderDetailByID(ctx context.Context, currentUser string, id int64) (*database.AccountOrderDetail, error)
+	GetVoucherDashboard(ctx context.Context, req types.VoucherDashboardReq) (*types.VoucherDashboardStatusItem, error)
 }
 
 func NewAccountingComponent(config *config.Config) (AccountingComponent, error) {

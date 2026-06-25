@@ -301,7 +301,7 @@ func DeductAccountFee(ctx context.Context, tx bun.Tx, input AccountStatement, ch
 	if remainValue < 0 && utils.IsUseVoucher(input.Scene) {
 		remainValue, err = deductFeeToVouchers(ctx, tx, input, remainValue)
 		if err != nil {
-			return changedValue, fmt.Errorf("deduct voucher, error:%w", err)
+			return changedValue, fmt.Errorf("deduct voucher, error: %w", err)
 		}
 		changedValue.Voucher = initEventValue - remainValue
 	}
@@ -436,10 +436,11 @@ func deductFeeToVouchers(ctx context.Context, tx bun.Tx, input AccountStatement,
 	}
 
 	reqClusterID := strings.TrimSpace(res.ClusterID)
-	reqXpuModel, err := utils.GetResXPUMode(res.Resources)
+	reqXpuModel, err := types.GetResXPUMode(res.Resources)
 	if err != nil {
 		return remainValue, fmt.Errorf("get resource xpu model for resource id %s for voucher, error: %w", input.ResourceID, err)
 	}
+
 	reqXpuModel = strings.TrimSpace(reqXpuModel)
 
 	if len(reqClusterID) < 1 {
@@ -458,6 +459,7 @@ func deductFeeToVouchers(ctx context.Context, tx bun.Tx, input AccountStatement,
 		Where("end_date > ?", time.Now()).
 		Where("(total - ABS(used)) > 0").
 		Order("end_date ASC", "created_at ASC").
+		For("UPDATE").
 		Scan(ctx)
 	if err != nil {
 		return remainValue, fmt.Errorf("query active vouchers for target %s: %w", input.UserUUID, err)
@@ -825,11 +827,11 @@ func checkAndSortVouchers(vouchers []AccountVoucher, clusterID, xpuModel string)
 		matchedType := checkVoucherMatchType(voucher, clusterID, xpuModel)
 
 		switch matchedType {
-		case utils.VoucherMatchTypeBoth:
+		case types.VoucherMatchTypeBoth:
 			matchedBoth = append(matchedBoth, voucher)
-		case utils.VoucherMatchTypeXPU:
+		case types.VoucherMatchTypeXPU:
 			matchedOnlyResource = append(matchedOnlyResource, voucher)
-		case utils.VoucherMatchTypeCluster:
+		case types.VoucherMatchTypeCluster:
 			matchedOnlyCluster = append(matchedOnlyCluster, voucher)
 		default:
 			continue
@@ -844,9 +846,9 @@ func checkAndSortVouchers(vouchers []AccountVoucher, clusterID, xpuModel string)
 	return sortedVouchers
 }
 
-func checkVoucherMatchType(voucher AccountVoucher, reqClusterID, reqXpuModel string) utils.VoucherMatchType {
+func checkVoucherMatchType(voucher AccountVoucher, reqClusterID, reqXpuModel string) types.VoucherMatchType {
 	if len(voucher.Rules) < 1 {
-		return utils.VoucherMatchTypeNone
+		return types.VoucherMatchTypeNone
 	}
 
 	voucherMatchResource := false
@@ -877,17 +879,17 @@ func checkVoucherMatchType(voucher AccountVoucher, reqClusterID, reqXpuModel str
 		}
 
 		if singleRuleMatchCluster && singleRuleMatchResource {
-			return utils.VoucherMatchTypeBoth
+			return types.VoucherMatchTypeBoth
 		}
 	}
 
 	if voucherMatchResource {
-		return utils.VoucherMatchTypeXPU
+		return types.VoucherMatchTypeXPU
 	}
 
 	if voucherMatchCluster {
-		return utils.VoucherMatchTypeCluster
+		return types.VoucherMatchTypeCluster
 	}
 
-	return utils.VoucherMatchTypeNone
+	return types.VoucherMatchTypeNone
 }

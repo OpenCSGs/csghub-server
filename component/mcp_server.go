@@ -634,7 +634,14 @@ func (m *mcpServerComponentImpl) Deploy(ctx context.Context, req *types.DeployMC
 		return nil, fmt.Errorf("failed to find space resource by id %d for deploy mcp server %s/%s, error: %w",
 			req.ResourceID, req.MCPRepo.Namespace, req.MCPRepo.Name, err)
 	}
-	_, err = m.repoComponent.CheckAccountAndResource(ctx, req.MCPRepo.Namespace, req.ClusterID, 0, resource)
+	_, err = m.repoComponent.CheckAccountAndResource(ctx,
+		types.CheckResourceAndAccountReq{
+			UserName:      req.MCPRepo.Namespace,
+			ClusterID:     req.ClusterID,
+			OrderDetailID: 0,
+			CurrentUser:   req.CurrentUser,
+		},
+		resource)
 	if err != nil {
 		return nil, fmt.Errorf("failed to verify resource %s is available for deploy mcp server %s/%s, error: %w",
 			resource.Name, req.MCPRepo.Namespace, req.MCPRepo.Name, err)

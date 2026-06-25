@@ -117,13 +117,13 @@ func NewRepoComponent(config *config.Config) (RepoComponent, error) {
 	return c, nil
 }
 
-func (c *repoComponentImpl) CheckAccountAndResource(ctx context.Context, userName string, clusterID string, orderDetailID int64, resource *database.SpaceResource) (*types.CheckExclusiveResp, error) {
+func (c *repoComponentImpl) CheckAccountAndResource(ctx context.Context, chkReq types.CheckResourceAndAccountReq, resource *database.SpaceResource) (*types.CheckExclusiveResp, error) {
 	var hardware types.HardWare
 	err := json.Unmarshal([]byte(resource.Resources), &hardware)
 	if err != nil {
 		return nil, fmt.Errorf("invalid hardware setting, %w", err)
 	}
-	_, _, err = c.deployer.CheckResourceAvailable(ctx, clusterID, 0, &hardware)
+	_, _, err = c.deployer.CheckResourceAvailable(ctx, chkReq.ClusterID, chkReq.OrderDetailID, &hardware)
 	if err != nil {
 		return nil, fmt.Errorf("fail to check resource, %w", err)
 	}

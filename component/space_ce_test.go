@@ -29,7 +29,7 @@ func TestSpaceComponent_Create(t *testing.T) {
 		Resources: `{"memory": "foo"}`,
 	}, nil)
 
-	sc.mocks.components.repo.EXPECT().CheckAccountAndResource(ctx, "ns", "cluster", int64(0), mock.Anything).Return(&types.CheckExclusiveResp{}, nil)
+	sc.mocks.components.repo.EXPECT().CheckAccountAndResource(ctx, types.CheckResourceAndAccountReq{UserName: "user", ClusterID: "cluster", OrderDetailID: 0, CurrentUser: "user"}, mock.Anything).Return(&types.CheckExclusiveResp{}, nil)
 	sc.mocks.components.repo.EXPECT().CreateRepo(ctx, types.CreateRepoReq{
 		DefaultBranch: "main",
 		Readme:        generateReadmeData("MIT"),
@@ -209,7 +209,7 @@ func TestSpaceComponent_Deploy(t *testing.T) {
 		sc.mocks.stores.SpaceResourceMock().EXPECT().FindByID(ctx, int64(1)).Return(&database.SpaceResource{
 			ID: 1,
 		}, nil)
-		sc.mocks.components.repo.EXPECT().CheckAccountAndResource(ctx, "ns1", "", int64(0), &database.SpaceResource{
+		sc.mocks.components.repo.EXPECT().CheckAccountAndResource(ctx, types.CheckResourceAndAccountReq{UserName: "ns1", ClusterID: "", OrderDetailID: 0, CurrentUser: "user"}, &database.SpaceResource{
 			ID: 1,
 		}).Return(&types.CheckExclusiveResp{}, nil)
 		sc.mocks.deployer.EXPECT().Deploy(ctx, types.DeployRequest{

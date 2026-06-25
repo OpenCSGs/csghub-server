@@ -411,6 +411,13 @@ type CreateForkReq struct {
 	TaskID           int64          `json:"task_id"`
 }
 
+type CheckResourceAndAccountReq struct {
+	UserName      string `json:"user_name"`
+	ClusterID     string `json:"cluster_id"`
+	OrderDetailID int64  `json:"order_detail_id"`
+	CurrentUser   string `json:"current_user"`
+}
+
 type DownloadCodeZipReq struct {
 	Namespace string `json:"namespace"`
 	Name      string `json:"name"`
