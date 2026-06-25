@@ -52,7 +52,7 @@ func TestTokenizer_EmbeddingEncode(t *testing.T) {
 
 func TestTiktokenTokenizerImpl(t *testing.T) {
 	t.Run("Encode with content only (GPT model)", func(t *testing.T) {
-		tk := token.NewTokenizerImpl("", "", "gpt-4", "", "openai")
+		tk := token.NewOfflineTiktokenTokenizer()
 		require.NotNil(t, tk)
 
 		msg := types.Message{
@@ -64,7 +64,7 @@ func TestTiktokenTokenizerImpl(t *testing.T) {
 	})
 
 	t.Run("Encode with role and content (GPT model)", func(t *testing.T) {
-		tk := token.NewTokenizerImpl("", "", "gpt-3.5-turbo", "", "openai")
+		tk := token.NewOfflineTiktokenTokenizer()
 		require.NotNil(t, tk)
 
 		msg := types.Message{
@@ -77,7 +77,8 @@ func TestTiktokenTokenizerImpl(t *testing.T) {
 	})
 
 	t.Run("Encode with DeepSeek model", func(t *testing.T) {
-		tk := token.NewTokenizerImpl("", "", "deepseek-chat", "", "deepseek")
+		// DeepSeek also uses the tiktoken tokenizer path
+		tk := token.NewOfflineTiktokenTokenizer()
 		require.NotNil(t, tk)
 
 		msg := types.Message{
@@ -89,7 +90,7 @@ func TestTiktokenTokenizerImpl(t *testing.T) {
 	})
 
 	t.Run("Encode empty content", func(t *testing.T) {
-		tk := token.NewTokenizerImpl("", "", "gpt-4", "", "openai")
+		tk := token.NewOfflineTiktokenTokenizer()
 		require.NotNil(t, tk)
 
 		msg := types.Message{
@@ -101,7 +102,7 @@ func TestTiktokenTokenizerImpl(t *testing.T) {
 	})
 
 	t.Run("EmbeddingEncode", func(t *testing.T) {
-		tk := token.NewTokenizerImpl("", "", "gpt-4", "", "openai")
+		tk := token.NewOfflineTiktokenTokenizer()
 		require.NotNil(t, tk)
 
 		count, err := tk.EmbeddingEncode("Hello, world!")

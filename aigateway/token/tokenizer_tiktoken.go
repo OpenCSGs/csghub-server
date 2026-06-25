@@ -2,6 +2,7 @@ package token
 
 import (
 	"log/slog"
+	"unicode/utf8"
 
 	"github.com/pkoukk/tiktoken-go"
 	"opencsg.com/csghub-server/aigateway/types"
@@ -112,4 +113,19 @@ func (t *tiktokenTokenizerImpl) EmbeddingEncode(content string) (int64, error) {
 	}
 
 	return int64(t.enc.TokenCount(content)), nil
+}
+
+// runeCountPieceEncoder is a deterministic stand-in for cl100k_base in unit tests.
+// It counts Unicode code points so behavior is stable and requires no network or BPE file.
+type runeCountPieceEncoder struct{}
+
+func (runeCountPieceEncoder) TokenCount(s string) int {
+	return utf8.RuneCountInString(s)
+}
+
+// NewOfflineTiktokenTokenizer creates a tiktoken-compatible tokenizer that uses
+// a deterministic rune-count encoder instead of downloading the real cl100k_base
+// BPE file. This is intended for unit tests that need stable, offline token counts.
+func NewOfflineTiktokenTokenizer() Tokenizer {
+	return &tiktokenTokenizerImpl{enc: runeCountPieceEncoder{}}
 }

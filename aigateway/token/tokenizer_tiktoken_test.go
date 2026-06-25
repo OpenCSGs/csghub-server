@@ -2,31 +2,22 @@ package token
 
 import (
 	"testing"
-	"unicode/utf8"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"opencsg.com/csghub-server/aigateway/types"
 )
 
-// runeCountEncoder is a deterministic stand-in for cl100k in unit tests (no network, no BPE file).
-// It counts Unicode code points so behavior stays stable and offline.
-type runeCountEncoder struct{}
-
-func (runeCountEncoder) TokenCount(s string) int {
-	return utf8.RuneCountInString(s)
-}
-
 func testTiktokenTokenizer(t *testing.T) Tokenizer {
 	t.Helper()
-	tk := newTiktokenTokenizerForTest(runeCountEncoder{})
+	tk := newTiktokenTokenizerForTest(runeCountPieceEncoder{})
 	require.NotNil(t, tk)
 	return tk
 }
 
 func TestNewTiktokenTokenizerImpl(t *testing.T) {
 	t.Run("builds tokenizer with local encoder (no network)", func(t *testing.T) {
-		tk := newTiktokenTokenizerForTest(runeCountEncoder{})
+		tk := newTiktokenTokenizerForTest(runeCountPieceEncoder{})
 		require.NotNil(t, tk)
 
 		impl, ok := tk.(*tiktokenTokenizerImpl)
