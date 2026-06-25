@@ -219,8 +219,8 @@ func Test_handleAccelerator(t *testing.T) {
 				affinityType string
 				nodeNames    []string
 			}{
-				hasResources: true,
-				resReqKeys:   []corev1.ResourceName{"nvidia.com/gpu"},
+				hasResources: false,
+				resReqKeys:   []corev1.ResourceName{},
 				affinityType: "none",
 				nodeNames:    []string{},
 			},
@@ -420,6 +420,140 @@ func Test_handleAccelerator(t *testing.T) {
 				require.Equal(t, corev1.NodeSelectorOpNotIn, expr.Operator, "Expected OpNotIn operator for cpu affinity")
 				require.ElementsMatch(t, tt.expected.nodeNames, expr.Values, "Node names don't match for cpu affinity")
 			}
+		})
+	}
+}
+
+func Test_handleAccelerator_AllowCPUResScheduleToGPUNode(t *testing.T) {
+	tests := []struct {
+		name              string
+		hardware          types.HardWare
+		nodes             []types.Node
+		allowCPUToGPUNode bool
+		expectedAffinity  string // "cpu" = buildCPUNodeAffinity, "nil" = nil affinity, "xpu_physical" = physical XPU node affinity, "xpu_vxpu" = vGPU node affinity
+		expectedOperator  corev1.NodeSelectorOperator
+		expectedNodeNames []string
+	}{
+		{
+			name: "CPU workload with AllowCPUResScheduleToGPUNode=false - should get CPU node affinity excluding GPU nodes",
+			hardware: types.HardWare{
+				Cpu:    types.CPU{Num: "2"},
+				Memory: "4Gi",
+			},
+			nodes: []types.Node{
+				{Name: "cpu-node-1"},
+				{Name: "gpu-node-1", HasXPU: true},
+			},
+			allowCPUToGPUNode: false,
+			expectedAffinity:  "cpu",
+			expectedOperator:  corev1.NodeSelectorOpNotIn,
+			expectedNodeNames: []string{"gpu-node-1"},
+		},
+		{
+			name: "CPU workload with AllowCPUResScheduleToGPUNode=true on mixed nodes - falls through to physical XPU node affinity (In disabled-vxpu nodes)",
+			hardware: types.HardWare{
+				Cpu:    types.CPU{Num: "2"},
+				Memory: "4Gi",
+			},
+			nodes: []types.Node{
+				{Name: "cpu-node-1"},
+				{Name: "gpu-node-1", HasXPU: true, EnableVXPU: true},
+			},
+			allowCPUToGPUNode: true,
+			expectedAffinity:  "xpu_physical",
+			expectedOperator:  corev1.NodeSelectorOpIn,
+			expectedNodeNames: []string{"cpu-node-1"},
+		},
+		{
+			name: "CPU workload with AllowCPUResScheduleToGPUNode=true on all-XPU cluster - falls through to physical XPU node affinity (In disabled-vxpu nodes)",
+			hardware: types.HardWare{
+				Cpu:    types.CPU{Num: "2"},
+				Memory: "4Gi",
+			},
+			nodes: []types.Node{
+				{Name: "gpu-node-1", HasXPU: true},
+				{Name: "gpu-node-2", HasXPU: true, EnableVXPU: true},
+			},
+			allowCPUToGPUNode: true,
+			expectedAffinity:  "xpu_physical",
+			expectedOperator:  corev1.NodeSelectorOpIn,
+			expectedNodeNames: []string{"gpu-node-1"},
+		},
+		{
+			name: "CPU workload with AllowCPUResScheduleToGPUNode=false on all-XPU cluster - all nodes excluded",
+			hardware: types.HardWare{
+				Cpu:    types.CPU{Num: "2"},
+				Memory: "4Gi",
+			},
+			nodes: []types.Node{
+				{Name: "gpu-node-1", HasXPU: true},
+				{Name: "gpu-node-2", HasXPU: true, EnableVXPU: true},
+			},
+			allowCPUToGPUNode: false,
+			expectedAffinity:  "cpu",
+			expectedOperator:  corev1.NodeSelectorOpNotIn,
+			expectedNodeNames: []string{"gpu-node-1", "gpu-node-2"},
+		},
+		{
+			name: "XPU workload unaffected by AllowCPUResScheduleToGPUNode=true - still gets XPU node affinity",
+			hardware: types.HardWare{
+				Gpu: types.Processor{
+					Num:          "1",
+					ResourceName: "nvidia.com/gpu",
+				},
+			},
+			nodes: []types.Node{
+				{Name: "node-1", EnableVXPU: false},
+				{Name: "node-2", EnableVXPU: true},
+			},
+			allowCPUToGPUNode: true,
+			expectedAffinity:  "xpu_physical",
+			expectedOperator:  corev1.NodeSelectorOpIn,
+			expectedNodeNames: []string{"node-1"},
+		},
+		{
+			name: "XPU workload unaffected by AllowCPUResScheduleToGPUNode=false - still gets XPU node affinity",
+			hardware: types.HardWare{
+				Gpu: types.Processor{
+					Num:          "1",
+					ResourceName: "nvidia.com/gpu",
+				},
+			},
+			nodes: []types.Node{
+				{Name: "node-1", EnableVXPU: false},
+				{Name: "node-2", EnableVXPU: true},
+			},
+			allowCPUToGPUNode: false,
+			expectedAffinity:  "xpu_physical",
+			expectedOperator:  corev1.NodeSelectorOpIn,
+			expectedNodeNames: []string{"node-1"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := &config.Config{}
+			cfg.Cluster.AllowCPUResScheduleToGPUNode = tt.allowCPUToGPUNode
+
+			resReq := make(map[corev1.ResourceName]resource.Quantity)
+			nodeAffinity := handleAccelerator(tt.hardware, resReq, tt.nodes, cfg)
+
+			if tt.expectedAffinity == "nil" {
+				require.Nil(t, nodeAffinity)
+				return
+			}
+
+			require.NotNil(t, nodeAffinity)
+			require.NotNil(t, nodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution)
+			require.Len(t, nodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms, 1)
+
+			term := nodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0]
+			require.Len(t, term.MatchExpressions, 1)
+
+			expr := term.MatchExpressions[0]
+			require.Equal(t, types.KubernetesNodeName, expr.Key)
+			require.Equal(t, tt.expectedOperator, expr.Operator)
+			require.ElementsMatch(t, tt.expectedNodeNames, expr.Values)
 		})
 	}
 }
