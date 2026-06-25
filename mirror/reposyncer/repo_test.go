@@ -71,6 +71,9 @@ func TestRepoSyncWorker_SyncRepo(t *testing.T) {
 		mockTaskStore := mockdb.NewMockMirrorTaskStore(t)
 		mockMirrorStore := mockdb.NewMockMirrorStore(t)
 		mockLfsMetaObjectStore := mockdb.NewMockLfsMetaObjectStore(t)
+		mockRepoStore := mockdb.NewMockRepoStore(t)
+		mockPromptPrefixStore := mockdb.NewMockPromptPrefixStore(t)
+		mockLLMConfigStore := mockdb.NewMockLLMConfigStore(t)
 
 		// Expectations
 		mockSender.On("Send", mock.Anything, mock.Anything).Return(hook.Response{}, nil)
@@ -100,6 +103,19 @@ func TestRepoSyncWorker_SyncRepo(t *testing.T) {
 		// Second call to GetRepoLastCommit
 		mockGit.EXPECT().GetRepoLastCommit(mock.Anything, mock.Anything).Return(&types.Commit{ID: "new-commit"}, nil).Once()
 
+		expectDescriptionGeneration(
+			t,
+			mockGit,
+			mockRepoStore,
+			mockPromptPrefixStore,
+			mockLLMConfigStore,
+			types.ModelRepo,
+			"namespace",
+			"name",
+			"new-commit",
+			nil,
+		)
+
 		mockGit.EXPECT().UpdateRef(mock.Anything, mock.Anything).Return(nil)
 
 		cfg := &config.Config{}
@@ -112,18 +128,90 @@ func TestRepoSyncWorker_SyncRepo(t *testing.T) {
 			mirrorTaskStore:    mockTaskStore,
 			mirrorStore:        mockMirrorStore,
 			lfsMetaObjectStore: mockLfsMetaObjectStore,
+			repoStore:          mockRepoStore,
+			promptPrefixStore:  mockPromptPrefixStore,
+			llmConfigStore:     mockLLMConfigStore,
 			config:             cfg,
 		}
 
 		mirror := database.Mirror{
 			SourceUrl: server.URL,
 			Repository: &database.Repository{
-				Path: "namespace/name",
+				Path:           "namespace/name",
+				RepositoryType: types.ModelRepo,
 			},
 		}
 		mt := &database.MirrorTask{}
 
 		_, err := worker.SyncRepo(context.Background(), &mirror, mt)
 		assert.Nil(t, err)
+	})
+
+	t.Run("description generation error does not fail sync", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		}))
+		defer server.Close()
+
+		mockGit := mockgit.NewMockGitServer(t)
+		mockSender := new(MockMessageSender)
+		mockTaskStore := mockdb.NewMockMirrorTaskStore(t)
+		mockMirrorStore := mockdb.NewMockMirrorStore(t)
+		mockLfsMetaObjectStore := mockdb.NewMockLfsMetaObjectStore(t)
+		mockRepoStore := mockdb.NewMockRepoStore(t)
+		mockPromptPrefixStore := mockdb.NewMockPromptPrefixStore(t)
+		mockLLMConfigStore := mockdb.NewMockLLMConfigStore(t)
+
+		mockSender.On("Send", mock.Anything, mock.Anything).Return(hook.Response{}, nil)
+		mockGit.EXPECT().RepositoryExists(mock.Anything, mock.Anything).Return(true, nil)
+		mockGit.EXPECT().GetRepoLastCommit(mock.Anything, mock.Anything).Return(&types.Commit{ID: "same-commit"}, nil).Once()
+		mockGit.EXPECT().MirrorSync(mock.Anything, mock.Anything).Return(nil)
+		mockGit.EXPECT().GetRepo(mock.Anything, mock.Anything).Return(&gitserver.CreateRepoResp{DefaultBranch: "main"}, nil)
+		mockGit.EXPECT().GetRepoBranches(mock.Anything, mock.Anything).Return([]types.Branch{{Name: "main"}}, nil)
+		mockGit.EXPECT().GetRepoAllLfsPointers(mock.Anything, mock.Anything).Return([]*types.LFSPointer{}, nil)
+		mockMirrorStore.EXPECT().UpdateMirrorAndRepository(mock.Anything, mock.Anything, mock.Anything).Return(nil)
+		mockGit.EXPECT().GetRepoLastCommit(mock.Anything, mock.Anything).Return(&types.Commit{ID: "same-commit"}, nil).Once()
+
+		expectDescriptionGeneration(
+			t,
+			mockGit,
+			mockRepoStore,
+			mockPromptPrefixStore,
+			mockLLMConfigStore,
+			types.ModelRepo,
+			"namespace",
+			"name",
+			"same-commit",
+			assert.AnError,
+		)
+
+		cfg := &config.Config{}
+		cfg.Frontend.URL = "http://localhost"
+
+		worker := &RepoSyncWorker{
+			httpClient:         server.Client(),
+			git:                mockGit,
+			msgSender:          mockSender,
+			mirrorTaskStore:    mockTaskStore,
+			mirrorStore:        mockMirrorStore,
+			lfsMetaObjectStore: mockLfsMetaObjectStore,
+			repoStore:          mockRepoStore,
+			promptPrefixStore:  mockPromptPrefixStore,
+			llmConfigStore:     mockLLMConfigStore,
+			config:             cfg,
+		}
+
+		mirror := database.Mirror{
+			SourceUrl: server.URL,
+			Repository: &database.Repository{
+				Path:           "namespace/name",
+				RepositoryType: types.ModelRepo,
+			},
+		}
+		mt := &database.MirrorTask{}
+
+		_, err := worker.SyncRepo(context.Background(), &mirror, mt)
+		assert.NoError(t, err)
+		assert.Equal(t, 100, mt.Progress)
 	})
 }
