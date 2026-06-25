@@ -683,7 +683,8 @@ func (s *deployTaskStoreImpl) GetClusterDeploys(ctx context.Context, req types.C
 	}
 	if req.Search != "" {
 		searchPattern := "%" + req.Search + "%"
-		query = query.Where("svc_name LIKE ? OR \"user\".\"username\" LIKE ?", searchPattern, searchPattern)
+		query = query.Where("deploy_name LIKE ? OR svc_name LIKE ? OR \"user\".\"username\" LIKE ?",
+			searchPattern, searchPattern, searchPattern)
 	}
 
 	total, err := query.Count(ctx)
