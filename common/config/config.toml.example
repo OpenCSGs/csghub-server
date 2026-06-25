@@ -204,6 +204,14 @@ allowCreatePublicDataset = true
 host = "http://127.0.0.1"
 port = 8000
 
+[academy]
+host = "http://127.0.0.1"
+port = 8000
+
+[supplydemand]
+host = "http://127.0.0.1"
+port = 8000
+
 [moderation]
 host = "http://localhost"
 port = 8089

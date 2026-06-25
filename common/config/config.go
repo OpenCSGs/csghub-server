@@ -311,6 +311,16 @@ type Config struct {
 		Port int    `env:"OPENCSG_DATAFLOW_SERVER_PORT" default:"8000"`
 	}
 
+	Academy struct {
+		Host string `env:"OPENCSG_ACADEMY_SERVER_HOST" default:"http://127.0.0.1"`
+		Port int    `env:"OPENCSG_ACADEMY_SERVER_PORT" default:"8000"`
+	}
+
+	Supplydemand struct {
+		Host string `env:"OPENCSG_SUPPLYDEMAND_SERVER_HOST" default:"http://127.0.0.1"`
+		Port int    `env:"OPENCSG_SUPPLYDEMAND_SERVER_PORT" default:"8000"`
+	}
+
 	// for csghub agents
 	CSGBot struct {
 		Host string `env:"OPENCSG_CSGBOT_SERVER_HOST" default:"http://127.0.0.1"`
