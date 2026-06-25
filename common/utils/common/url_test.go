@@ -1,6 +1,9 @@
 package common
 
 import (
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -225,125 +228,234 @@ func TestValidateURLFormat(t *testing.T) {
 }
 
 func TestValidateImageURL(t *testing.T) {
-	tests := []struct {
-		name        string
-		urlString   string
-		expectError bool
-		errorMsg    string
-	}{
-		{
-			name:      "valid jpg url",
-			urlString: "https://example.com/avatar.jpg",
-		},
-		{
-			name:      "valid jpeg url",
-			urlString: "https://example.com/avatar.jpeg",
-		},
-		{
-			name:      "valid png url",
-			urlString: "https://example.com/avatar.png",
-		},
-		{
-			name:      "valid uppercase extension",
-			urlString: "https://example.com/avatar.JPG",
-		},
-		{
-			name:      "valid mixed case extension",
-			urlString: "https://example.com/avatar.PnG",
-		},
-		{
-			name:      "valid url with query string",
-			urlString: "https://example.com/avatar.jpg?size=100",
-		},
-		{
-			name:      "valid deep path jpg",
-			urlString: "https://cdn.example.com/images/user/avatar.jpg",
-		},
-		{
-			name:        "empty url",
-			urlString:   "",
-			expectError: true,
-			errorMsg:    "url is empty",
-		},
-		{
-			name:        "non-http scheme",
-			urlString:   "ftp://example.com/avatar.jpg",
-			expectError: true,
-			errorMsg:    "url scheme must be http or https",
-		},
-		{
-			name:        "url without scheme",
-			urlString:   "//example.com/avatar.jpg",
-			expectError: true,
-			errorMsg:    "url scheme must be http or https",
-		},
-		{
-			name:        "relative url - logout attack",
-			urlString:   "/logout",
-			expectError: true,
-			errorMsg:    "url scheme must be http or https",
-		},
-		{
-			name:        "relative path with extension",
-			urlString:   "/images/avatar.jpg",
-			expectError: true,
-			errorMsg:    "url scheme must be http or https",
-		},
-		{
-			name:        "unsupported image extension gif",
-			urlString:   "https://example.com/avatar.gif",
-			expectError: true,
-			errorMsg:    "avatar url must end with .jpg, .jpeg, or .png",
-		},
-		{
-			name:        "unsupported image extension svg",
-			urlString:   "https://example.com/avatar.svg",
-			expectError: true,
-			errorMsg:    "avatar url must end with .jpg, .jpeg, or .png",
-		},
-		{
-			name:        "no image extension",
-			urlString:   "https://example.com/avatar",
-			expectError: true,
-			errorMsg:    "avatar url must end with .jpg, .jpeg, or .png",
-		},
-		{
-			name:        "url without host",
-			urlString:   "https:///avatar.jpg",
-			expectError: true,
-			errorMsg:    "url must have a host",
-		},
-		{
-			name:        "malformed url",
-			urlString:   "https://ex ample.com/avatar.jpg",
-			expectError: true,
-		},
-		{
-			name:        "extension in query string not in path",
-			urlString:   "https://example.com/avatar?ext=.jpg",
-			expectError: true,
-			errorMsg:    "avatar url must end with .jpg, .jpeg, or .png",
-		},
-	}
+	t.Run("format validation without server", func(t *testing.T) {
+		tests := []struct {
+			name        string
+			urlString   string
+			expectError bool
+			errorMsg    string
+		}{
+			{
+				name:        "empty url",
+				urlString:   "",
+				expectError: true,
+				errorMsg:    "url is empty",
+			},
+			{
+				name:        "non-http scheme",
+				urlString:   "ftp://example.com/avatar.jpg",
+				expectError: true,
+				errorMsg:    "url scheme must be http or https",
+			},
+			{
+				name:        "url without scheme",
+				urlString:   "//example.com/avatar.jpg",
+				expectError: true,
+				errorMsg:    "url scheme must be http or https",
+			},
+			{
+				name:        "relative url - logout attack",
+				urlString:   "/logout",
+				expectError: true,
+				errorMsg:    "url scheme must be http or https",
+			},
+			{
+				name:        "relative path with extension",
+				urlString:   "/images/avatar.jpg",
+				expectError: true,
+				errorMsg:    "url scheme must be http or https",
+			},
+			{
+				name:        "url without host",
+				urlString:   "https:///avatar.jpg",
+				expectError: true,
+				errorMsg:    "url must have a host",
+			},
+			{
+				name:        "malformed url",
+				urlString:   "https://ex ample.com/avatar.jpg",
+				expectError: true,
+			},
+			{
+				name:        "private IP - 127.0.0.1",
+				urlString:   "http://127.0.0.1/avatar.jpg",
+				expectError: true,
+				errorMsg:    "image url must not be a private or internal IP address",
+			},
+			{
+				name:        "private IP - 10.0.0.1",
+				urlString:   "https://10.0.0.1/avatar.jpg",
+				expectError: true,
+				errorMsg:    "image url must not be a private or internal IP address",
+			},
+			{
+				name:        "private IP - 192.168.1.1",
+				urlString:   "https://192.168.1.1/avatar.png",
+				expectError: true,
+				errorMsg:    "image url must not be a private or internal IP address",
+			},
+			{
+				name:        "link-local IP - 169.254.169.254",
+				urlString:   "http://169.254.169.254/latest/meta-data/",
+				expectError: true,
+				errorMsg:    "image url must not be a private or internal IP address",
+			},
+			{
+				name:        "loopback IPv6",
+				urlString:   "http://[::1]/avatar.jpg",
+				expectError: true,
+				errorMsg:    "image url must not be a private or internal IP address",
+			},
+			{
+				name:        "blocked port 22",
+				urlString:   "http://203.0.113.1:22/avatar.jpg",
+				expectError: true,
+				errorMsg:    "image url port must be 80 or 443, got 22",
+			},
+			{
+				name:        "blocked port 6379",
+				urlString:   "http://203.0.113.1:6379/avatar.jpg",
+				expectError: true,
+				errorMsg:    "image url port must be 80 or 443, got 6379",
+			},
+			{
+				name:        "blocked port 5432",
+				urlString:   "https://203.0.113.1:5432/avatar.jpg",
+				expectError: true,
+				errorMsg:    "image url port must be 80 or 443, got 5432",
+			},
+		}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := ValidateImageURL(tt.urlString)
-			if tt.expectError {
-				if err == nil {
-					t.Errorf("ValidateImageURL() expected error but got none")
-					return
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				err := ValidateImageURL(tt.urlString)
+				if tt.expectError {
+					if err == nil {
+						t.Errorf("ValidateImageURL() expected error but got none")
+						return
+					}
+					if tt.errorMsg != "" && err.Error() != tt.errorMsg {
+						t.Errorf("ValidateImageURL() error = %v, want error containing %v", err.Error(), tt.errorMsg)
+					}
+				} else {
+					if err != nil {
+						t.Errorf("ValidateImageURL() unexpected error = %v", err)
+					}
 				}
-				if tt.errorMsg != "" && err.Error() != tt.errorMsg {
-					t.Errorf("ValidateImageURL() error = %v, want error containing %v", err.Error(), tt.errorMsg)
+			})
+		}
+	})
+
+	t.Run("content type validation with HTTP server", func(t *testing.T) {
+		tests := []struct {
+			name         string
+			contentType  string
+			statusCode   int
+			expectError  bool
+			errorContain string
+		}{
+			{
+				name:        "valid image/png",
+				contentType: "image/png",
+			},
+			{
+				name:        "valid image/jpeg",
+				contentType: "image/jpeg",
+			},
+			{
+				name:        "valid image/png with charset",
+				contentType: "image/png; charset=utf-8",
+			},
+			{
+				name:         "non-image content type text/html",
+				contentType:  "text/html",
+				expectError:  true,
+				errorContain: "must be image/png or image/jpeg",
+			},
+			{
+				name:         "non-image content type image/gif",
+				contentType:  "image/gif",
+				expectError:  true,
+				errorContain: "must be image/png or image/jpeg",
+			},
+			{
+				name:         "non-image content type image/svg+xml",
+				contentType:  "image/svg+xml",
+				expectError:  true,
+				errorContain: "must be image/png or image/jpeg",
+			},
+			{
+				name:         "server returns 404",
+				statusCode:   404,
+				contentType:  "image/png",
+				expectError:  true,
+				errorContain: "status 404",
+			},
+			{
+				name:         "server returns 500",
+				statusCode:   500,
+				contentType:  "image/png",
+				expectError:  true,
+				errorContain: "status 500",
+			},
+			{
+				name:         "server returns 301 redirect",
+				statusCode:   301,
+				contentType:  "image/png",
+				expectError:  true,
+				errorContain: "redirect status 301",
+			},
+			{
+				name:         "server returns 302 redirect",
+				statusCode:   302,
+				contentType:  "image/png",
+				expectError:  true,
+				errorContain: "redirect status 302",
+			},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					if r.Method != http.MethodHead {
+						t.Errorf("expected HEAD request, got %s", r.Method)
+					}
+					if tt.statusCode > 0 {
+						w.WriteHeader(tt.statusCode)
+					}
+					if tt.contentType != "" {
+						w.Header().Set("Content-Type", tt.contentType)
+					}
+				}))
+				defer server.Close()
+
+				origValidator := imageHostValidator
+				imageHostValidator = func(host string) error { return nil }
+				origPortValidator := imagePortValidator
+				imagePortValidator = func(port string) error { return nil }
+				origClient := imageHTTPClient
+				imageHTTPClient = server.Client()
+				defer func() { imageHTTPClient = origClient }()
+				defer func() { imagePortValidator = origPortValidator }()
+				defer func() { imageHostValidator = origValidator }()
+
+				err := ValidateImageURL(server.URL)
+				if tt.expectError {
+					if err == nil {
+						t.Errorf("ValidateImageURL() expected error but got none")
+						return
+					}
+					if tt.errorContain != "" && !strings.Contains(err.Error(), tt.errorContain) {
+						t.Errorf("ValidateImageURL() error = %v, want error containing %v", err.Error(), tt.errorContain)
+					}
+				} else {
+					if err != nil {
+						t.Errorf("ValidateImageURL() unexpected error = %v", err)
+					}
 				}
-			} else {
-				if err != nil {
-					t.Errorf("ValidateImageURL() unexpected error = %v", err)
-				}
-			}
-		})
-	}
+			})
+		}
+	})
 }
 
 func TestExtractURLPath(t *testing.T) {
