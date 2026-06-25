@@ -103,6 +103,7 @@ func (a *accountInvoiceImpl) GetInvoiceByBillCycle(ctx context.Context, billCycl
 		Model(&invoice).
 		Where("bill_cycle = ?", billCycle).
 		Where("user_uuid =?", userUUID).
+		Where("status != ?", InvoiceStatusFailed).
 		Scan(ctx)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -360,7 +361,7 @@ func (a *accountInvoiceImpl) GetInvoicableList(ctx context.Context, params Paged
 		With("mb", subQuery).
 		Column("mb.bill_cycle", "mb.invoice_amount").
 		Table("mb").
-		Where("NOT EXISTS (SELECT 1 FROM account_invoices AS account_invoice WHERE account_invoice.bill_cycle = mb.bill_cycle AND account_invoice.user_uuid = ?)", params.UserUUID).
+		Where("NOT EXISTS (SELECT 1 FROM account_invoices AS account_invoice WHERE account_invoice.bill_cycle = mb.bill_cycle AND account_invoice.user_uuid = ? AND account_invoice.status != ?)", params.UserUUID, InvoiceStatusFailed).
 		Order("mb.bill_cycle DESC")
 
 	if params.Page > 0 && params.PageSize > 0 {
@@ -438,7 +439,8 @@ func (a *accountInvoiceImpl) GetBillingSummary(ctx context.Context, params Billi
 	invoiceQuery := a.db.Core.NewSelect().
 		Model((*AccountInvoice)(nil)).
 		ColumnExpr("SUM(invoice_amount)").
-		Where("user_uuid = ?", params.UserUUID)
+		Where("user_uuid = ?", params.UserUUID).
+		Where("status != ?", InvoiceStatusFailed)
 
 	if params.StartMonth != "" {
 		invoiceQuery = invoiceQuery.Where("bill_cycle >= ?", params.StartMonth)
@@ -452,8 +454,13 @@ func (a *accountInvoiceImpl) GetBillingSummary(ctx context.Context, params Billi
 		return nil, err
 	}
 
-	// Calculate the uninvoiced amount
+	// Calculate the uninvoiced amount, ensure it never goes negative.
+	// Historical invoices created before the cash_value fix may have larger amounts
+	// than the current cash_value-based calculation, causing a negative result.
 	uninvoicedAmount := totalBillAmount - invoicedAmount
+	if uninvoicedAmount < 0 {
+		uninvoicedAmount = 0
+	}
 
 	return &BillingSummary{
 		CurrentMonthNonInvoicable: currentMonthNonInvoicable,
