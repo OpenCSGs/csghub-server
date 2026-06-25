@@ -494,7 +494,7 @@ func (c *runtimeArchitectureComponentImpl) GetMetadataFromGGUF(ctx context.Conte
 					TYPE:    metadata.FileTypeDescriptor,
 				}
 				if len(emi.VRAMs) > 0 {
-					quantization.MiniGPUMemoryGB = max(float32(emi.VRAMs[0].NonUMA/(1024*1024*1024)), 1)
+					quantization.MiniGPUMemoryGB = max(float32(emi.VRAMs[0].NonUMA/(1024*1024*1024)), 0)
 				}
 				modelInfo.Quantizations = append(modelInfo.Quantizations, quantization)
 			}

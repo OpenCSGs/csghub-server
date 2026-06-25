@@ -3,8 +3,22 @@
 # Set default EPOCHS if not provided
 EPOCHS="${EPOCHS:-3}"
 LEARNING_RATE="${LEARNING_RATE:-0.0001}"
+SWIFT_COMMAND="${SWIFT_COMMAND:-sft}"
 DATASET_ARG="$DATASET_ID"
 CUSTOM_DATASET_INFO_ARG=()
+
+case "$SWIFT_COMMAND" in
+    sft|rlhf|pt)
+        ;;
+    *)
+        echo "Unsupported SWIFT_COMMAND: $SWIFT_COMMAND. Expected one of: sft, rlhf, pt"
+        exit 1
+        ;;
+esac
+
+if [ -z "${NPROC_PER_NODE:-}" ] && [ -n "${GPU_NUM:-}" ] && [ "$GPU_NUM" != "0" ]; then
+    export NPROC_PER_NODE="$GPU_NUM"
+fi
 
 if [ -n "${DATASET_REVISION:-}" ]; then
     CUSTOM_DATASET_NAME="${CUSTOM_DATASET_NAME:-csghub_finetune_dataset}"
@@ -34,8 +48,25 @@ fi
 
 # Run fine-tuning
 echo "Starting fine-tuning process..."
+echo "Using SWIFT_COMMAND: $SWIFT_COMMAND"
 echo "Using EPOCHS: $EPOCHS"
-swift sft --model "$MODEL_ID" "${CUSTOM_DATASET_INFO_ARG[@]}" --dataset "$DATASET_ARG" --num_train_epochs "$EPOCHS" --learning_rate "$LEARNING_RATE" --use_hf true --tuner_type lora $CUSTOM_ARGS
+if [ -n "${NPROC_PER_NODE:-}" ]; then
+    echo "Using NPROC_PER_NODE: $NPROC_PER_NODE"
+fi
+
+CMD=(swift "$SWIFT_COMMAND" --model "$MODEL_ID" "${CUSTOM_DATASET_INFO_ARG[@]}" --dataset "$DATASET_ARG" --use_hf true)
+
+case "$SWIFT_COMMAND" in
+    sft|rlhf)
+        CMD+=(--num_train_epochs "$EPOCHS" --learning_rate "$LEARNING_RATE" --tuner_type lora)
+        ;;
+esac
+
+if [ -n "${CUSTOM_ARGS:-}" ]; then
+    CMD+=($CUSTOM_ARGS)
+fi
+
+"${CMD[@]}"
 
 # Check if fine-tuning was successful
 if [ $? -eq 0 ]; then

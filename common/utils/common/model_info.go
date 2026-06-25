@@ -67,7 +67,7 @@ func GetModelInfo(fileList []string, minContext int) (*types.ModelInfo, error) {
 		modelInfo.ParamsBillions = float32(math.Round(float64(totalParams)/1e9*100) / 100)
 	}
 	modelInfo.ModelWeightsGB = float32(modelSize / (1024 * 1024 * 1024))
-	modelInfo.MiniGPUMemoryGB = max(float32(totalMemoryBytes/(1024*1024*1024)), 1)
+	modelInfo.MiniGPUMemoryGB = max(float32(totalMemoryBytes/(1024*1024*1024)), 0)
 	// min context for min gpu memory
 	modelInfo.ContextSize = minContext
 	modelInfo.BatchSize = 1

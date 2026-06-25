@@ -4,6 +4,14 @@ import (
 	"time"
 )
 
+type SwiftCommand string
+
+const (
+	SwiftCommandSFT  SwiftCommand = "sft"
+	SwiftCommandRLHF SwiftCommand = "rlhf"
+	SwiftCommandPT   SwiftCommand = "pt"
+)
+
 var _ SensitiveRequestV2 = (*FinetuneReq)(nil)
 
 func (c *FinetuneReq) GetSensitiveFields() []SensitiveField {
@@ -50,6 +58,7 @@ type FinetuneReq struct {
 	ShareMode          bool    `json:"share_mode"`
 	LearningRate       float64 `json:"learning_rate"`
 	CustomeArgs        string  `json:"custom_args"`
+	SwiftCommand       string  `json:"swift_command,omitempty"`
 	Agent              string  `json:"agent,omitempty"`
 	Nodes              []Node  `json:"-"`
 
