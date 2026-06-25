@@ -125,6 +125,24 @@ type userComponentImpl struct {
 	skillStore          database.SkillStore
 }
 
+func (c *userComponentImpl) filteredUserRepos(ctx context.Context, repoType types.RepositoryType, owner, currentUser string, filter *types.RepoFilter, per, page int) ([]*database.Repository, int, error) {
+	if filter == nil {
+		return nil, 0, nil
+	}
+	appliedFilter := *filter
+	appliedFilter.Owner = owner
+	appliedFilter.Username = currentUser
+	return c.repoComponent.PublicToUser(ctx, repoType, currentUser, &appliedFilter, per, page)
+}
+
+func repoIDsFromRepositories(repos []*database.Repository) []int64 {
+	repoIDs := make([]int64, 0, len(repos))
+	for _, repo := range repos {
+		repoIDs = append(repoIDs, repo.ID)
+	}
+	return repoIDs
+}
+
 func (c *userComponentImpl) Datasets(ctx context.Context, req *types.UserDatasetsReq) ([]types.Dataset, int, error) {
 	var resDatasets []types.Dataset
 	userExists, err := c.userStore.IsExist(ctx, req.Owner)
@@ -149,6 +167,44 @@ func (c *userComponentImpl) Datasets(ctx context.Context, req *types.UserDataset
 		if !cuserExists {
 			return nil, 0, errors.New("current user not exists")
 		}
+	}
+
+	if req.Filter != nil {
+		repos, total, err := c.filteredUserRepos(ctx, types.DatasetRepo, req.Owner, req.CurrentUser, req.Filter, req.PageSize, req.Page)
+		if err != nil {
+			return nil, 0, fmt.Errorf("failed to get filtered user dataset repos,error:%w", err)
+		}
+		if len(repos) == 0 {
+			return []types.Dataset{}, total, nil
+		}
+		ds, err := c.datasetStore.ByRepoIDs(ctx, repoIDsFromRepositories(repos))
+		if err != nil {
+			return nil, 0, fmt.Errorf("failed to get filtered user datasets,error:%w", err)
+		}
+		datasetByRepoID := make(map[int64]database.Dataset, len(ds))
+		for _, data := range ds {
+			datasetByRepoID[data.RepositoryID] = data
+		}
+		for _, repo := range repos {
+			data, ok := datasetByRepoID[repo.ID]
+			if !ok {
+				continue
+			}
+			resDatasets = append(resDatasets, types.Dataset{
+				ID:           data.ID,
+				Name:         repo.Name,
+				Nickname:     repo.Nickname,
+				Description:  repo.Description,
+				Likes:        repo.Likes,
+				Downloads:    repo.DownloadCount,
+				Path:         repo.Path,
+				RepositoryID: data.RepositoryID,
+				Private:      repo.Private,
+				CreatedAt:    data.CreatedAt,
+				UpdatedAt:    repo.UpdatedAt,
+			})
+		}
+		return resDatasets, total, nil
 	}
 
 	onlyPublic := req.Owner != req.CurrentUser
@@ -204,6 +260,44 @@ func (c *userComponentImpl) Models(ctx context.Context, req *types.UserModelsReq
 		}
 	}
 
+	if req.Filter != nil {
+		repos, total, err := c.filteredUserRepos(ctx, types.ModelRepo, req.Owner, req.CurrentUser, req.Filter, req.PageSize, req.Page)
+		if err != nil {
+			return nil, 0, fmt.Errorf("failed to get filtered user model repos,error:%w", err)
+		}
+		if len(repos) == 0 {
+			return []types.Model{}, total, nil
+		}
+		ms, err := c.modelStore.ByRepoIDs(ctx, repoIDsFromRepositories(repos))
+		if err != nil {
+			return nil, 0, fmt.Errorf("failed to get filtered user models,error:%w", err)
+		}
+		modelByRepoID := make(map[int64]database.Model, len(ms))
+		for _, data := range ms {
+			modelByRepoID[data.RepositoryID] = data
+		}
+		for _, repo := range repos {
+			data, ok := modelByRepoID[repo.ID]
+			if !ok {
+				continue
+			}
+			resModels = append(resModels, types.Model{
+				ID:           data.ID,
+				Name:         repo.Name,
+				Nickname:     repo.Nickname,
+				Description:  repo.Description,
+				Likes:        repo.Likes,
+				Downloads:    repo.DownloadCount,
+				Path:         repo.Path,
+				RepositoryID: data.RepositoryID,
+				Private:      repo.Private,
+				CreatedAt:    data.CreatedAt,
+				UpdatedAt:    repo.UpdatedAt,
+			})
+		}
+		return resModels, total, nil
+	}
+
 	onlyPublic := req.Owner != req.CurrentUser
 	ms, total, err := c.modelStore.ByUsername(ctx, req.Owner, req.PageSize, req.Page, onlyPublic)
 	if err != nil {
@@ -257,6 +351,44 @@ func (c *userComponentImpl) Codes(ctx context.Context, req *types.UserModelsReq)
 		}
 	}
 
+	if req.Filter != nil {
+		repos, total, err := c.filteredUserRepos(ctx, types.CodeRepo, req.Owner, req.CurrentUser, req.Filter, req.PageSize, req.Page)
+		if err != nil {
+			return nil, 0, fmt.Errorf("failed to get filtered user code repos,error:%w", err)
+		}
+		if len(repos) == 0 {
+			return []types.Code{}, total, nil
+		}
+		codes, err := c.codeStore.ByRepoIDs(ctx, repoIDsFromRepositories(repos))
+		if err != nil {
+			return nil, 0, fmt.Errorf("failed to get filtered user codes,error:%w", err)
+		}
+		codeByRepoID := make(map[int64]database.Code, len(codes))
+		for _, data := range codes {
+			codeByRepoID[data.RepositoryID] = data
+		}
+		for _, repo := range repos {
+			data, ok := codeByRepoID[repo.ID]
+			if !ok {
+				continue
+			}
+			resCodes = append(resCodes, types.Code{
+				ID:           data.ID,
+				Name:         repo.Name,
+				Nickname:     repo.Nickname,
+				Description:  repo.Description,
+				Likes:        repo.Likes,
+				Downloads:    repo.DownloadCount,
+				Path:         repo.Path,
+				RepositoryID: data.RepositoryID,
+				Private:      repo.Private,
+				CreatedAt:    data.CreatedAt,
+				UpdatedAt:    repo.UpdatedAt,
+			})
+		}
+		return resCodes, total, nil
+	}
+
 	onlyPublic := req.Owner != req.CurrentUser
 	ms, total, err := c.codeStore.ByUsername(ctx, req.Owner, req.PageSize, req.Page, onlyPublic)
 	if err != nil {
@@ -307,6 +439,27 @@ func (c *userComponentImpl) Spaces(ctx context.Context, req *types.UserSpacesReq
 		if !cuserExists {
 			return nil, 0, errors.New("current user not exists")
 		}
+	}
+
+	if req.Filter != nil {
+		appliedFilter := *req.Filter
+		appliedFilter.Owner = req.Owner
+		appliedFilter.Username = req.CurrentUser
+		if appliedFilter.SpaceSDK == "" {
+			appliedFilter.SpaceSDK = req.SDK
+		}
+		spaces, total, err := c.spaceComponent.Index(ctx, &appliedFilter, req.PageSize, req.Page, false)
+		if err != nil {
+			return nil, 0, fmt.Errorf("failed to get filtered user spaces,error:%w", err)
+		}
+		var resSpaces []types.Space
+		for _, space := range spaces {
+			if space == nil {
+				continue
+			}
+			resSpaces = append(resSpaces, *space)
+		}
+		return resSpaces, total, nil
 	}
 
 	return c.spaceComponent.UserSpaces(ctx, req)
@@ -789,6 +942,51 @@ func (c *userComponentImpl) MCPServers(ctx context.Context, req *types.UserMCPsR
 		}
 	}
 
+	if req.Filter != nil {
+		repos, total, err := c.filteredUserRepos(ctx, types.MCPServerRepo, req.Owner, req.CurrentUser, req.Filter, req.PageSize, req.Page)
+		if err != nil {
+			return nil, 0, fmt.Errorf("failed to get filtered user mcp server repos, error: %w", err)
+		}
+		if len(repos) == 0 {
+			return []types.MCPServer{}, total, nil
+		}
+		mcpServers, err := c.mcpServerStore.ByRepoIDs(ctx, repoIDsFromRepositories(repos))
+		if err != nil {
+			return nil, 0, fmt.Errorf("failed to get filtered user mcp servers, error: %w", err)
+		}
+		mcpByRepoID := make(map[int64]database.MCPServer, len(mcpServers))
+		for _, mcpServer := range mcpServers {
+			mcpByRepoID[mcpServer.RepositoryID] = mcpServer
+		}
+		var resMCPs []types.MCPServer
+		for _, repo := range repos {
+			mcpServer, ok := mcpByRepoID[repo.ID]
+			if !ok {
+				continue
+			}
+			resMCPs = append(resMCPs, types.MCPServer{
+				ID:           mcpServer.ID,
+				Name:         repo.Name,
+				Nickname:     repo.Nickname,
+				Description:  repo.Description,
+				Likes:        repo.Likes,
+				Downloads:    repo.DownloadCount,
+				Path:         repo.Path,
+				RepositoryID: mcpServer.RepositoryID,
+				Private:      repo.Private,
+				CreatedAt:    mcpServer.CreatedAt,
+				UpdatedAt:    repo.UpdatedAt,
+				Source:       repo.Source,
+				SyncStatus:   repo.SyncStatus,
+				License:      repo.License,
+				GithubPath:   repo.GithubPath,
+				ToolsNum:     mcpServer.ToolsNum,
+				StarNum:      repo.StarCount,
+			})
+		}
+		return resMCPs, total, nil
+	}
+
 	onlyPublic := req.Owner != req.CurrentUser
 	mcpServers, total, err := c.mcpServerStore.ByUsername(ctx, req.Owner, req.PageSize, req.Page, onlyPublic)
 	if err != nil {
@@ -837,6 +1035,49 @@ func (c *userComponentImpl) Skills(ctx context.Context, req *types.UserSkillsReq
 		if !currentUserExists {
 			return nil, 0, errors.New("current user does not exist")
 		}
+	}
+
+	if req.Filter != nil {
+		onlyPublic := req.Owner != req.CurrentUser
+		repos, total, err := c.filteredUserRepos(ctx, types.SkillRepo, req.Owner, req.CurrentUser, req.Filter, req.PageSize, req.Page)
+		if err != nil {
+			return nil, 0, fmt.Errorf("failed to get filtered user skill repos, error: %w", err)
+		}
+		if len(repos) == 0 {
+			return []types.Skill{}, total, nil
+		}
+		skills, err := c.skillStore.ByRepoIDs(ctx, repoIDsFromRepositories(repos), onlyPublic)
+		if err != nil {
+			return nil, 0, fmt.Errorf("failed to get filtered user skills, error: %w", err)
+		}
+		skillByRepoID := make(map[int64]database.Skill, len(skills))
+		for _, skill := range skills {
+			skillByRepoID[skill.RepositoryID] = skill
+		}
+		var resSkills []types.Skill
+		for _, repo := range repos {
+			skill, ok := skillByRepoID[repo.ID]
+			if !ok {
+				continue
+			}
+			resSkills = append(resSkills, types.Skill{
+				ID:           skill.ID,
+				Name:         repo.Name,
+				Nickname:     repo.Nickname,
+				Description:  repo.Description,
+				Likes:        repo.Likes,
+				Downloads:    repo.DownloadCount,
+				Path:         repo.Path,
+				RepositoryID: skill.RepositoryID,
+				Private:      repo.Private,
+				CreatedAt:    skill.CreatedAt,
+				UpdatedAt:    repo.UpdatedAt,
+				Source:       repo.Source,
+				SyncStatus:   repo.SyncStatus,
+				License:      repo.License,
+			})
+		}
+		return resSkills, total, nil
 	}
 
 	onlyPublic := req.Owner != req.CurrentUser

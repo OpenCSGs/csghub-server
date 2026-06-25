@@ -2,8 +2,10 @@ package handler
 
 import (
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
+	"slices"
 	"strconv"
 
 	"opencsg.com/csghub-server/common/errorx"
@@ -30,6 +32,69 @@ type UserHandler struct {
 	user component.UserComponent
 }
 
+func hasUserRepoFilterQuery(ctx *gin.Context) bool {
+	filterKeys := []string{
+		"search", "sort", "source", "status", "xnet_migration_status",
+		"dataset_type", "user_purchased", "list_serverless",
+		"tag_category", "tag_name", "tag_group",
+		"model_tree",
+		"model_params_min", "model_params_max",
+		"repo_size_min", "repo_size_max",
+	}
+	for _, key := range filterKeys {
+		if _, ok := ctx.GetQuery(key); ok {
+			return true
+		}
+	}
+	return false
+}
+
+func parseUserRepoFilter(ctx *gin.Context, owner, currentUser string) (*types.RepoFilter, error) {
+	if !hasUserRepoFilterQuery(ctx) {
+		return nil, nil
+	}
+
+	filter := &types.RepoFilter{
+		Tags:     parseTagReqs(ctx),
+		Owner:    owner,
+		Username: currentUser,
+	}
+
+	tree, err := parseTreeReqs(ctx)
+	if err != nil {
+		return nil, err
+	}
+	filter.Tree = tree
+	filter = getFilterFromContext(ctx, filter)
+	filter.SpaceSDK = ctx.Query("sdk")
+
+	if listServerless, err := strconv.ParseBool(ctx.Query("list_serverless")); err == nil {
+		filter.ListServerless = listServerless
+	}
+
+	filter.ModelParamsMin, filter.ModelParamsMax, err = parseFloatRangeFromContext(ctx, "model_params_min", "model_params_max")
+	if err != nil {
+		return nil, errorx.ReqParamInvalid(err, errorx.Ctx().Set("query", "model_params_range"))
+	}
+
+	filter.RepoSizeMin, filter.RepoSizeMax, err = parseInt64RangeFromContext(ctx, "repo_size_min", "repo_size_max")
+	if err != nil {
+		return nil, errorx.ReqParamInvalid(err, errorx.Ctx().Set("query", "repo_size_range"))
+	}
+
+	if !slices.Contains(types.Sorts, filter.Sort) {
+		err := fmt.Errorf("sort parameter must be one of %v", types.Sorts)
+		return nil, errorx.ReqParamInvalid(err, errorx.Ctx().Set("query", "sort_filter"))
+	}
+
+	if filter.Source != "" && !slices.Contains(types.Sources, filter.Source) {
+		err := fmt.Errorf("source parameter must be one of %v", types.Sources)
+		return nil, errorx.ReqParamInvalid(err, errorx.Ctx().Set("query", "source_filter"))
+	}
+
+	return filter, nil
+}
+
 // GetUserDatasets godoc
 // @Security     ApiKey
 // @Summary      Get user datasets
@@ -53,6 +118,12 @@ func (h *UserHandler) Datasets(ctx *gin.Context) {
 
 	req.Owner = ctx.Param("username")
 	req.CurrentUser = httpbase.GetCurrentUser(ctx)
+	req.Filter, err = parseUserRepoFilter(ctx, req.Owner, req.CurrentUser)
+	if err != nil {
+		slog.ErrorContext(ctx.Request.Context(), "Bad user datasets filter request format", "error", err)
+		httpbase.BadRequestWithExt(ctx, err)
+		return
+	}
 	req.Page = page
 	req.PageSize = per
 	ds, total, err := h.user.Datasets(ctx.Request.Context(), &req)
@@ -94,6 +165,12 @@ func (h *UserHandler) Models(ctx *gin.Context) {
 
 	req.Owner = ctx.Param("username")
 	req.CurrentUser = httpbase.GetCurrentUser(ctx)
+	req.Filter, err = parseUserRepoFilter(ctx, req.Owner, req.CurrentUser)
+	if err != nil {
+		slog.ErrorContext(ctx.Request.Context(), "Bad user models filter request format", "error", err)
+		httpbase.BadRequestWithExt(ctx, err)
+		return
+	}
 	req.Page = page
 	req.PageSize = per
 	ms, total, err := h.user.Models(ctx.Request.Context(), &req)
@@ -136,6 +213,12 @@ func (h *UserHandler) Codes(ctx *gin.Context) {
 
 	req.Owner = ctx.Param("username")
 	req.CurrentUser = httpbase.GetCurrentUser(ctx)
+	req.Filter, err = parseUserRepoFilter(ctx, req.Owner, req.CurrentUser)
+	if err != nil {
+		slog.ErrorContext(ctx.Request.Context(), "Bad user codes filter request format", "error", err)
+		httpbase.BadRequestWithExt(ctx, err)
+		return
+	}
 	req.Page = page
 	req.PageSize = per
 	ms, total, err := h.user.Codes(ctx.Request.Context(), &req)
@@ -178,6 +261,12 @@ func (h *UserHandler) Spaces(ctx *gin.Context) {
 	req.SDK = ctx.Query("sdk")
 	req.Owner = ctx.Param("username")
 	req.CurrentUser = httpbase.GetCurrentUser(ctx)
+	req.Filter, err = parseUserRepoFilter(ctx, req.Owner, req.CurrentUser)
+	if err != nil {
+		slog.ErrorContext(ctx.Request.Context(), "Bad user spaces filter request format", "error", err)
+		httpbase.BadRequestWithExt(ctx, err)
+		return
+	}
 	req.Page = page
 	req.PageSize = per
 	ms, total, err := h.user.Spaces(ctx.Request.Context(), &req)
@@ -950,6 +1039,12 @@ func (h *UserHandler) MCPServers(ctx *gin.Context) {
 
 	req.Owner = ctx.Param("username")
 	req.CurrentUser = httpbase.GetCurrentUser(ctx)
+	req.Filter, err = parseUserRepoFilter(ctx, req.Owner, req.CurrentUser)
+	if err != nil {
+		slog.ErrorContext(ctx.Request.Context(), "Bad user mcp servers filter request format", "error", err)
+		httpbase.BadRequestWithExt(ctx, err)
+		return
+	}
 	req.Page = page
 	req.PageSize = per
 	mcps, total, err := h.user.MCPServers(ctx.Request.Context(), &req)
@@ -992,6 +1087,12 @@ func (h *UserHandler) Skills(ctx *gin.Context) {
 
 	req.Owner = ctx.Param("username")
 	req.CurrentUser = httpbase.GetCurrentUser(ctx)
+	req.Filter, err = parseUserRepoFilter(ctx, req.Owner, req.CurrentUser)
+	if err != nil {
+		slog.ErrorContext(ctx.Request.Context(), "Bad user skills filter request format", "error", err)
+		httpbase.BadRequestWithExt(ctx, err)
+		return
+	}
 	req.Page = page
 	req.PageSize = per
 	skills, total, err := h.user.Skills(ctx.Request.Context(), &req)

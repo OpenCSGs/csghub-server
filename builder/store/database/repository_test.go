@@ -798,6 +798,44 @@ func TestRepoStore_PublicToUser(t *testing.T) {
 	}
 }
 
+func TestRepoStore_PublicToUserOwnerFilter(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewRepoStoreWithDB(db)
+	repos := []database.Repository{
+		{Name: "match", Path: "owner/match", GitPath: "owner/match", UserID: 123, RepositoryType: types.CodeRepo},
+		{Name: "other", Path: "other/match", GitPath: "other/match", UserID: 123, RepositoryType: types.CodeRepo},
+		{Name: "underscore-match", Path: "own_er/match", GitPath: "own_er/match", UserID: 123, RepositoryType: types.CodeRepo},
+		{Name: "underscore-other", Path: "ownerX/match", GitPath: "ownerX/match", UserID: 123, RepositoryType: types.CodeRepo},
+	}
+	for _, repo := range repos {
+		created, err := store.CreateRepo(ctx, repo)
+		require.Nil(t, err)
+		_, err = db.Core.NewInsert().Model(&database.Code{RepositoryID: created.ID}).Exec(ctx)
+		require.Nil(t, err)
+	}
+
+	rs, count, err := store.PublicToUser(ctx, types.CodeRepo, []int64{123}, &types.RepoFilter{
+		Owner: "owner",
+		Sort:  "recently_update",
+	}, 10, 1, false)
+	require.Nil(t, err)
+	require.Equal(t, 1, count)
+	require.Len(t, rs, 1)
+	require.Equal(t, "owner/match", rs[0].Path)
+
+	rs, count, err = store.PublicToUser(ctx, types.CodeRepo, []int64{123}, &types.RepoFilter{
+		Owner: "own_er",
+		Sort:  "recently_update",
+	}, 10, 1, false)
+	require.Nil(t, err)
+	require.Equal(t, 1, count)
+	require.Len(t, rs, 1)
+	require.Equal(t, "own_er/match", rs[0].Path)
+}
+
 func TestRepoStore_PublicToUserRangeFilters(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()

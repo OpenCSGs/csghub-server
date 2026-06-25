@@ -61,6 +61,42 @@ func TestUserComponent_Models(t *testing.T) {
 	}, data)
 }
 
+func TestUserComponent_Models_WithRepoFilter(t *testing.T) {
+	ctx := context.TODO()
+	uc := initializeTestUserComponent(ctx, t)
+
+	requestFilter := &types.RepoFilter{Search: "hello", Sort: "trending"}
+	expectedFilter := &types.RepoFilter{
+		Owner:    "owner",
+		Username: "user",
+		Search:   "hello",
+		Sort:     "trending",
+	}
+	uc.mocks.stores.UserMock().EXPECT().IsExist(ctx, "owner").Return(true, nil)
+	uc.mocks.stores.UserMock().EXPECT().IsExist(ctx, "user").Return(true, nil)
+	uc.mocks.components.repo.EXPECT().PublicToUser(ctx, types.ModelRepo, "user", expectedFilter, 10, 1).Return([]*database.Repository{
+		{ID: 11, Name: "foo", Path: "owner/foo"},
+	}, 1, nil)
+	uc.mocks.stores.ModelMock().EXPECT().ByRepoIDs(ctx, []int64{11}).Return([]database.Model{
+		{ID: 1, RepositoryID: 11},
+	}, nil)
+
+	data, total, err := uc.Models(ctx, &types.UserDatasetsReq{
+		Owner:       "owner",
+		CurrentUser: "user",
+		Filter:      requestFilter,
+		PageOpts: types.PageOpts{
+			Page:     1,
+			PageSize: 10,
+		},
+	})
+	require.Nil(t, err)
+	require.Equal(t, 1, total)
+	require.Equal(t, []types.Model{
+		{ID: 1, Name: "foo", Path: "owner/foo", RepositoryID: 11},
+	}, data)
+}
+
 func TestUserComponent_Codes(t *testing.T) {
 	ctx := context.TODO()
 	uc := initializeTestUserComponent(ctx, t)
@@ -117,6 +153,41 @@ func TestUserComponent_Spaces(t *testing.T) {
 		{ID: 1, Name: "foo"},
 	}, data)
 
+}
+
+func TestUserComponent_Spaces_WithRepoFilter(t *testing.T) {
+	ctx := context.TODO()
+	uc := initializeTestUserComponent(ctx, t)
+
+	requestFilter := &types.RepoFilter{Search: "hello", Status: "Running"}
+	expectedFilter := &types.RepoFilter{
+		Owner:    "owner",
+		Username: "user",
+		Search:   "hello",
+		Status:   "Running",
+		SpaceSDK: "gradio",
+	}
+	uc.mocks.stores.UserMock().EXPECT().IsExist(ctx, "owner").Return(true, nil)
+	uc.mocks.stores.UserMock().EXPECT().IsExist(ctx, "user").Return(true, nil)
+	uc.mocks.components.space.EXPECT().Index(ctx, expectedFilter, 10, 1, false).Return([]*types.Space{
+		{ID: 1, Name: "foo", Status: "Running", Sdk: "gradio"},
+	}, 1, nil)
+
+	data, total, err := uc.Spaces(ctx, &types.UserSpacesReq{
+		Owner:       "owner",
+		CurrentUser: "user",
+		SDK:         "gradio",
+		Filter:      requestFilter,
+		PageOpts: types.PageOpts{
+			Page:     1,
+			PageSize: 10,
+		},
+	})
+	require.Nil(t, err)
+	require.Equal(t, 1, total)
+	require.Equal(t, []types.Space{
+		{ID: 1, Name: "foo", Status: "Running", Sdk: "gradio"},
+	}, data)
 }
 
 func TestUserComponent_Skills(t *testing.T) {
@@ -232,11 +303,11 @@ func TestUserComponent_Skills(t *testing.T) {
 			uc := initializeTestUserComponent(ctx, t)
 
 			uc.mocks.stores.UserMock().EXPECT().IsExist(ctx, "owner").Return(tc.ownerExists, tc.ownerError)
-			
+
 			// Only expect current user check if owner exists and has no error
 			if tc.ownerExists && tc.ownerError == nil {
 				uc.mocks.stores.UserMock().EXPECT().IsExist(ctx, "user").Return(tc.userExists, tc.userError)
-				
+
 				// Only expect skill retrieval if both users exist and have no errors
 				if tc.userExists && tc.userError == nil {
 					uc.mocks.stores.SkillMock().EXPECT().ByUsername(ctx, "owner", 10, 1, true).Return(tc.skills, tc.total, tc.skillsError)
