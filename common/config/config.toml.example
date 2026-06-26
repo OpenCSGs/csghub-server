@@ -320,3 +320,4 @@ cpu_limit_metric = "kube_pod_container_resource_limits"
 memory_usage_metric = "container_memory_usage_bytes"
 request_count_metric = "revision_request_count"
 request_latency_metric = "revision_app_request_latencies_bucket"
+metric_keys = ["pod", "service_name", "namespace", "response_code_class", "le"]
