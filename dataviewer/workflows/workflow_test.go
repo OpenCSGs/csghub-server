@@ -229,4 +229,64 @@ func TestWorkflow_DataviewerWorkflow(t *testing.T) {
 		require.NoError(t, tester.env.GetWorkflowError())
 	})
 
+	t.Run("no convertible files/cleanup old data", func(t *testing.T) {
+		tester, err := newWorkflowTester(t)
+		require.NoError(t, err)
+
+		cfg, err := config.LoadConfig()
+		require.Nil(t, err)
+
+		req := types.UpdateViewerReq{
+			Namespace: "test",
+			Name:      "test",
+			Branch:    "test",
+			RepoType:  types.DatasetRepo,
+		}
+
+		tester.mocks.mockact.EXPECT().BeginViewerJob(mock.Anything).Return(nil)
+		tester.mocks.mockact.EXPECT().GetCardFromReadme(mock.Anything, req).Return(&dvCom.CardData{}, nil)
+		tester.mocks.mockact.EXPECT().ScanRepoFiles(mock.Anything,
+			dvCom.ScanRepoFileReq{
+				Req:              req,
+				ConvertLimitSize: cfg.DataViewer.ConvertLimitSize,
+				MaxFileNum:       cfg.DataViewer.ScanFileNumLimit,
+			}).Return(&dvCom.RepoFilesClass{
+			AllFiles:     map[string]*dvCom.RepoFile{},
+			ParquetFiles: map[string]*dvCom.RepoFile{},
+			JsonlFiles:   map[string]*dvCom.RepoFile{},
+			CsvFiles:     map[string]*dvCom.RepoFile{},
+		}, nil)
+
+		// DetermineCardData returns nil card (Configs == nil) when no scope files found
+		tester.mocks.mockact.EXPECT().DetermineCardData(mock.Anything,
+			dvCom.DetermineCardReq{
+				Card: dvCom.CardData{},
+				Class: dvCom.RepoFilesClass{
+					AllFiles:     map[string]*dvCom.RepoFile{},
+					ParquetFiles: map[string]*dvCom.RepoFile{},
+					JsonlFiles:   map[string]*dvCom.RepoFile{},
+					CsvFiles:     map[string]*dvCom.RepoFile{},
+				},
+				RepoDataType: "",
+			},
+		).Return(nil, nil)
+
+		// Activity: cleanup old viewer data
+		tester.mocks.mockact.EXPECT().CleanupOldViewerData(mock.Anything, req).Return(nil)
+
+		// Update workflow status: success, should update viewer
+		tester.mocks.mockact.EXPECT().UpdateWorkflowStatus(mock.Anything, dvCom.UpdateWorkflowStatusReq{
+			Req:                req,
+			WorkflowErrMsg:     "",
+			ShouldUpdateViewer: true,
+		}).Return(nil)
+
+		tester.env.ExecuteWorkflow(DataViewerUpdateWorkflow, dvCom.WorkflowUpdateParams{
+			Req:    req,
+			Config: cfg,
+		})
+
+		require.True(t, tester.env.IsWorkflowCompleted())
+		require.NoError(t, tester.env.GetWorkflowError())
+	})
 }
