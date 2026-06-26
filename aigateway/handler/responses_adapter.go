@@ -1,8 +1,10 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -32,17 +34,6 @@ func validateResponsesAdapterRequest(req *types.ResponsesRequest) error {
 	if req.MaxToolCalls != nil {
 		return unsupportedResponsesFeature("max_tool_calls")
 	}
-	if len(req.Reasoning) > 0 {
-		return unsupportedResponsesFeature("reasoning")
-	}
-	for _, tool := range splitRawJSONArray(req.Tools) {
-		var obj map[string]any
-		if err := json.Unmarshal(tool, &obj); err == nil {
-			if toolType, _ := obj["type"].(string); toolType != "" && toolType != "function" {
-				return unsupportedResponsesFeature("tools." + toolType)
-			}
-		}
-	}
 	return nil
 }
 
@@ -54,7 +45,22 @@ func isTrue(v *bool) bool {
 	return v != nil && *v
 }
 
-func responsesToChatRequest(req *types.ResponsesRequest, modelName string) (*ChatCompletionRequest, error) {
+// normalizeChatRole maps OpenAI Responses-style roles to chat completions roles.
+// The developer role is used by OpenAI Responses-style inputs. Many Chat
+// Completions-compatible upstreams only accept system/user/assistant/tool,
+// so developer is downgraded to system.
+func normalizeChatRole(role string) string {
+	switch role {
+	case "":
+		return "user"
+	case "developer":
+		return "system"
+	default:
+		return role
+	}
+}
+
+func responsesToChatRequest(ctx context.Context, req *types.ResponsesRequest, modelName string) (*ChatCompletionRequest, error) {
 	messages, err := responsesInputToChatMessages(req)
 	if err != nil {
 		return nil, err
@@ -78,18 +84,27 @@ func responsesToChatRequest(req *types.ResponsesRequest, modelName string) (*Cha
 	if req.MaxOutputTokens != nil {
 		chatReq.MaxTokens = *req.MaxOutputTokens
 	}
+	allowedFunctionTools := map[string]struct{}{}
 	if len(req.Tools) > 0 {
-		chatTools, err := responsesToolsToChatTools(req.Tools)
+		chatTools, functionTools, err := responsesToolsToChatTools(ctx, req.Tools, modelName)
 		if err != nil {
 			return nil, err
 		}
+		allowedFunctionTools = functionTools
 		if err := json.Unmarshal(chatTools, &chatReq.Tools); err != nil {
 			return nil, fmt.Errorf("convert responses tools to chat tools: %w", err)
 		}
 	}
 	if len(req.ToolChoice) > 0 {
-		if err := json.Unmarshal(req.ToolChoice, &chatReq.ToolChoice); err != nil {
-			return nil, fmt.Errorf("convert responses tool_choice to chat tool_choice: %w", err)
+		if !json.Valid(req.ToolChoice) {
+			return nil, fmt.Errorf("invalid responses tool_choice")
+		}
+		chatToolChoice := responsesToolChoiceToChatToolChoice(ctx, req.ToolChoice, allowedFunctionTools, modelName)
+		if len(chatToolChoice) > 0 {
+			if err := json.Unmarshal(chatToolChoice, &chatReq.ToolChoice); err != nil {
+				return nil, fmt.Errorf("convert responses tool_choice to chat tool_choice: %w", err)
+			}
+			mergeChatRawJSONRaw(chatReq, "tool_choice", chatToolChoice)
 		}
 	}
 	parallel := true
@@ -128,26 +143,34 @@ func mergeChatRawJSONRaw(chatReq *ChatCompletionRequest, key string, value json.
 	chatReq.RawJSON, _ = json.Marshal(raw)
 }
 
-func responsesToolsToChatTools(raw json.RawMessage) (json.RawMessage, error) {
+func responsesToolsToChatTools(ctx context.Context, raw json.RawMessage, modelName string) (json.RawMessage, map[string]struct{}, error) {
 	tools := splitRawJSONArray(raw)
 	if len(tools) == 0 {
-		return raw, nil
+		return raw, nil, nil
 	}
 	chatTools := make([]map[string]json.RawMessage, 0, len(tools))
+	functionTools := map[string]struct{}{}
 	for _, tool := range tools {
 		var obj map[string]json.RawMessage
 		if err := json.Unmarshal(tool, &obj); err != nil {
-			return nil, fmt.Errorf("convert responses tools to chat tools: %w", err)
+			return nil, nil, fmt.Errorf("convert responses tools to chat tools: %w", err)
 		}
 		var toolType string
 		_ = json.Unmarshal(obj["type"], &toolType)
 		if toolType != "" && toolType != "function" {
-			return nil, unsupportedResponsesFeature("tools." + toolType)
+			// Chat completions APIs only support function tools.
+			// Drop unsupported tool types to avoid upstream errors.
+			slog.InfoContext(ctx, "drop unsupported responses tool for chat adapter",
+				slog.String("api", "/v1/responses"),
+				slog.String("adapter", "chat_completions"),
+				slog.String("model", modelName),
+				slog.String("dropped_tool_type", toolType))
+			continue
 		}
 		function := map[string]json.RawMessage{}
 		if rawFunction, ok := obj["function"]; ok {
 			if err := json.Unmarshal(rawFunction, &function); err != nil || function == nil {
-				return nil, fmt.Errorf("convert responses function tool: function must be an object")
+				return nil, nil, fmt.Errorf("convert responses function tool: function must be an object")
 			}
 		} else {
 			for _, key := range []string{"name", "description", "parameters", "strict"} {
@@ -158,7 +181,12 @@ func responsesToolsToChatTools(raw json.RawMessage) (json.RawMessage, error) {
 		}
 		functionRaw, err := json.Marshal(function)
 		if err != nil {
-			return nil, fmt.Errorf("convert responses function tool: %w", err)
+			return nil, nil, fmt.Errorf("convert responses function tool: %w", err)
+		}
+		var functionName string
+		_ = json.Unmarshal(function["name"], &functionName)
+		if functionName != "" {
+			functionTools[functionName] = struct{}{}
 		}
 		chatTool := map[string]json.RawMessage{
 			"type":     json.RawMessage(`"function"`),
@@ -168,9 +196,42 @@ func responsesToolsToChatTools(raw json.RawMessage) (json.RawMessage, error) {
 	}
 	data, err := json.Marshal(chatTools)
 	if err != nil {
-		return nil, fmt.Errorf("convert responses tools to chat tools: %w", err)
+		return nil, nil, fmt.Errorf("convert responses tools to chat tools: %w", err)
 	}
-	return data, nil
+	return data, functionTools, nil
+}
+
+func responsesToolChoiceToChatToolChoice(ctx context.Context, raw json.RawMessage, functionTools map[string]struct{}, modelName string) json.RawMessage {
+	var choice string
+	if err := json.Unmarshal(raw, &choice); err == nil {
+		if choice == "required" && len(functionTools) == 0 {
+			return nil
+		}
+		return raw
+	}
+
+	var obj map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &obj); err != nil {
+		slog.WarnContext(ctx, "drop unsupported responses tool_choice for chat adapter",
+			slog.String("api", "/v1/responses"),
+			slog.String("adapter", "chat_completions"),
+			slog.String("model", modelName),
+			slog.Any("error", err))
+		return nil
+	}
+	var toolType string
+	_ = json.Unmarshal(obj["type"], &toolType)
+	if toolType != "function" {
+		return nil
+	}
+	var function struct {
+		Name string `json:"name"`
+	}
+	_ = json.Unmarshal(obj["function"], &function)
+	if _, ok := functionTools[function.Name]; !ok {
+		return nil
+	}
+	return raw
 }
 
 func floatPtrValue(v *float64) float64 {
@@ -199,9 +260,7 @@ func responsesInputToChatMessages(req *types.ResponsesRequest) ([]map[string]any
 		switch itemType {
 		case "message", "":
 			role, _ := item["role"].(string)
-			if role == "" {
-				role = "user"
-			}
+			role = normalizeChatRole(role)
 			content, err := normalizeResponsesContent(item["content"])
 			if err != nil {
 				return nil, err
@@ -343,4 +402,3 @@ func chatResponseToResponses(data []byte, publicModel string) (*types.ResponsesR
 	})
 	return resp, nil
 }
-

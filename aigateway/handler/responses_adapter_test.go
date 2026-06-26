@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -39,11 +40,23 @@ func TestValidateResponsesAdapterRequestRejectsStatefulFeatures(t *testing.T) {
 	require.Contains(t, err.Error(), "unsupported_feature:previous_response_id")
 }
 
-func TestValidateResponsesAdapterRequestRejectsReasoning(t *testing.T) {
+func TestValidateResponsesAdapterRequestAllowsReasoning(t *testing.T) {
 	req := &types.ResponsesRequest{Model: "m", Input: json.RawMessage(`"hi"`), Reasoning: json.RawMessage(`{"effort":"high"}`)}
-	err := validateResponsesAdapterRequest(req)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "unsupported_feature:reasoning")
+	require.NoError(t, validateResponsesAdapterRequest(req))
+}
+
+func TestNormalizeChatRole(t *testing.T) {
+	cases := map[string]string{
+		"":          "user",
+		"developer": "system",
+		"system":    "system",
+		"user":      "user",
+		"assistant": "assistant",
+		"tool":      "tool",
+	}
+	for role, want := range cases {
+		require.Equal(t, want, normalizeChatRole(role))
+	}
 }
 
 func TestResponsesMalformedJSONReturnsOpenAIError(t *testing.T) {
@@ -134,7 +147,7 @@ func TestResponsesToChatRequestMapsStringInputAndInstructions(t *testing.T) {
 		Instructions: json.RawMessage(`"be concise"`),
 		Input:        json.RawMessage(`"hello"`),
 	}
-	chatReq, err := responsesToChatRequest(req, "upstream-model")
+	chatReq, err := responsesToChatRequest(context.Background(), req, "upstream-model")
 	require.NoError(t, err)
 	require.Equal(t, "upstream-model", chatReq.Model)
 	require.Len(t, chatReq.Messages, 2)
@@ -145,7 +158,7 @@ func TestResponsesToChatRequestDefaultsParallelToolCalls(t *testing.T) {
 		Model: "public",
 		Input: json.RawMessage(`"hello"`),
 	}
-	chatReq, err := responsesToChatRequest(req, "upstream-model")
+	chatReq, err := responsesToChatRequest(context.Background(), req, "upstream-model")
 	require.NoError(t, err)
 
 	var raw map[string]json.RawMessage
@@ -159,7 +172,7 @@ func TestResponsesAdapterChatRequestIncludesStreamUsage(t *testing.T) {
 		Input:  json.RawMessage(`"hello"`),
 		Stream: true,
 	}
-	chatReq, err := responsesToChatRequest(req, "upstream-model")
+	chatReq, err := responsesToChatRequest(context.Background(), req, "upstream-model")
 	require.NoError(t, err)
 	chatReq.StreamOptions = &StreamOptions{IncludeUsage: true}
 
@@ -181,7 +194,7 @@ func TestResponsesToChatRequestPreservesParallelToolCallsFalse(t *testing.T) {
 		Input:             json.RawMessage(`"hello"`),
 		ParallelToolCalls: &parallel,
 	}
-	chatReq, err := responsesToChatRequest(req, "upstream-model")
+	chatReq, err := responsesToChatRequest(context.Background(), req, "upstream-model")
 	require.NoError(t, err)
 
 	var raw map[string]json.RawMessage
@@ -209,7 +222,7 @@ func TestResponsesToChatRequestMapsFunctionTools(t *testing.T) {
 		]`),
 	}
 
-	chatReq, err := responsesToChatRequest(req, "upstream-model")
+	chatReq, err := responsesToChatRequest(context.Background(), req, "upstream-model")
 	require.NoError(t, err)
 
 	data, err := json.Marshal(chatReq.Tools)
@@ -244,7 +257,7 @@ func TestResponsesToChatRequestMapsFunctionToolWithoutType(t *testing.T) {
 		]`),
 	}
 
-	chatReq, err := responsesToChatRequest(req, "upstream-model")
+	chatReq, err := responsesToChatRequest(context.Background(), req, "upstream-model")
 	require.NoError(t, err)
 
 	data, err := json.Marshal(chatReq.Tools)
@@ -274,7 +287,7 @@ func TestResponsesToChatRequestNormalizesNestedFunctionToolWithoutType(t *testin
 		]`),
 	}
 
-	chatReq, err := responsesToChatRequest(req, "upstream-model")
+	chatReq, err := responsesToChatRequest(context.Background(), req, "upstream-model")
 	require.NoError(t, err)
 
 	data, err := json.Marshal(chatReq.Tools)
@@ -302,7 +315,7 @@ func TestResponsesToChatRequestRejectsInvalidNestedFunctionTool(t *testing.T) {
 		]`),
 	}
 
-	_, err := responsesToChatRequest(req, "upstream-model")
+	_, err := responsesToChatRequest(context.Background(), req, "upstream-model")
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "function must be an object")
 }
@@ -312,7 +325,7 @@ func TestResponsesToChatRequestRejectsUnknownContentPart(t *testing.T) {
 		Model: "public",
 		Input: json.RawMessage(`[{"type":"message","role":"user","content":[{"type":"input_audio","audio":"..."}]}]`),
 	}
-	_, err := responsesToChatRequest(req, "upstream-model")
+	_, err := responsesToChatRequest(context.Background(), req, "upstream-model")
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "unsupported_feature:input.content.input_audio")
 }
@@ -724,4 +737,302 @@ func TestRecordResponsesUsagePrefersResponsesUsage(t *testing.T) {
 
 	tester.handler.recordResponsesUsage(c, counter, "testuuid", modelTarget, "api-key")
 	wg.Wait()
+}
+
+func TestValidateResponsesAdapterRequestAllowsNonFunctionTools(t *testing.T) {
+	req := &types.ResponsesRequest{
+		Model: "m",
+		Input: json.RawMessage(`"hi"`),
+		Tools: json.RawMessage(`[
+			{"type": "web_search_preview"},
+			{"type": "file_search", "vector_store_ids": ["vs_123"]},
+			{"type": "code_interpreter", "container": {"type": "auto"}}
+		]`),
+	}
+	require.NoError(t, validateResponsesAdapterRequest(req))
+}
+
+func TestResponsesToChatRequestDropsNonFunctionTools(t *testing.T) {
+	req := &types.ResponsesRequest{
+		Model: "public",
+		Input: json.RawMessage(`"hello"`),
+		Tools: json.RawMessage(`[
+			{"type": "code_interpreter"},
+			{"type": "file_search", "vector_store_ids": ["vs_1"]}
+		]`),
+	}
+	chatReq, err := responsesToChatRequest(context.Background(), req, "upstream-model")
+	require.NoError(t, err)
+
+	// Non-function tools are dropped; Tools field should be empty
+	data, err := json.Marshal(chatReq.Tools)
+	require.NoError(t, err)
+	require.JSONEq(t, `[]`, string(data))
+}
+
+func TestResponsesToChatRequestDropsRequiredToolChoiceWhenNoFunctionToolsRemain(t *testing.T) {
+	req := &types.ResponsesRequest{
+		Model:      "public",
+		Input:      json.RawMessage(`"hello"`),
+		ToolChoice: json.RawMessage(`"required"`),
+		Tools: json.RawMessage(`[
+			{"type": "code_interpreter"},
+			{"type": "file_search", "vector_store_ids": ["vs_1"]}
+		]`),
+	}
+	chatReq, err := responsesToChatRequest(context.Background(), req, "upstream-model")
+	require.NoError(t, err)
+
+	body, err := marshalChatRequestBody(chatReq, "upstream-model")
+	require.NoError(t, err)
+	var parsed map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(body, &parsed))
+	require.NotContains(t, parsed, "tool_choice")
+}
+
+func TestResponsesToChatRequestDropsHostedToolChoice(t *testing.T) {
+	req := &types.ResponsesRequest{
+		Model:      "public",
+		Input:      json.RawMessage(`"hello"`),
+		ToolChoice: json.RawMessage(`{"type":"code_interpreter"}`),
+		Tools: json.RawMessage(`[
+			{"type": "code_interpreter"}
+		]`),
+	}
+	chatReq, err := responsesToChatRequest(context.Background(), req, "upstream-model")
+	require.NoError(t, err)
+
+	body, err := marshalChatRequestBody(chatReq, "upstream-model")
+	require.NoError(t, err)
+	var parsed map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(body, &parsed))
+	require.NotContains(t, parsed, "tool_choice")
+}
+
+func TestResponsesToChatRequestRejectsInvalidToolChoiceJSON(t *testing.T) {
+	req := &types.ResponsesRequest{
+		Model:      "public",
+		Input:      json.RawMessage(`"hello"`),
+		ToolChoice: json.RawMessage(`{"type":"function"`),
+		Tools: json.RawMessage(`[
+			{"type": "function", "name": "get_weather", "parameters": {"type": "object"}}
+		]`),
+	}
+	_, err := responsesToChatRequest(context.Background(), req, "upstream-model")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "invalid responses tool_choice")
+}
+
+func TestResponsesToChatRequestDropsUnsupportedToolChoiceShapes(t *testing.T) {
+	for _, toolChoice := range []string{`42`, `["required"]`} {
+		t.Run(toolChoice, func(t *testing.T) {
+			req := &types.ResponsesRequest{
+				Model:      "public",
+				Input:      json.RawMessage(`"hello"`),
+				ToolChoice: json.RawMessage(toolChoice),
+				Tools: json.RawMessage(`[
+					{"type": "function", "name": "get_weather", "parameters": {"type": "object"}}
+				]`),
+			}
+			chatReq, err := responsesToChatRequest(context.Background(), req, "upstream-model")
+			require.NoError(t, err)
+
+			body, err := marshalChatRequestBody(chatReq, "upstream-model")
+			require.NoError(t, err)
+			var parsed map[string]json.RawMessage
+			require.NoError(t, json.Unmarshal(body, &parsed))
+			require.NotContains(t, parsed, "tool_choice")
+		})
+	}
+}
+
+func TestResponsesToChatRequestMixedToolsDropsNonFunction(t *testing.T) {
+	req := &types.ResponsesRequest{
+		Model: "public",
+		Input: json.RawMessage(`"hello"`),
+		Tools: json.RawMessage(`[
+			{"type": "function", "name": "get_weather", "parameters": {"type": "object"}},
+			{"type": "code_interpreter"}
+		]`),
+	}
+	chatReq, err := responsesToChatRequest(context.Background(), req, "upstream-model")
+	require.NoError(t, err)
+
+	// Only the function tool should remain in chatReq.Tools
+	require.Len(t, chatReq.Tools, 1)
+	data, err := json.Marshal(chatReq.Tools)
+	require.NoError(t, err)
+	require.JSONEq(t, `[
+		{
+			"type": "function",
+			"function": {
+				"name": "get_weather",
+				"parameters": {"type": "object"}
+			}
+		}
+	]`, string(data))
+}
+
+func TestResponsesToChatRequestKeepsRequiredToolChoiceWhenFunctionToolsRemain(t *testing.T) {
+	req := &types.ResponsesRequest{
+		Model:      "public",
+		Input:      json.RawMessage(`"hello"`),
+		ToolChoice: json.RawMessage(`"required"`),
+		Tools: json.RawMessage(`[
+			{"type": "function", "name": "get_weather", "parameters": {"type": "object"}},
+			{"type": "code_interpreter"}
+		]`),
+	}
+	chatReq, err := responsesToChatRequest(context.Background(), req, "upstream-model")
+	require.NoError(t, err)
+
+	body, err := marshalChatRequestBody(chatReq, "upstream-model")
+	require.NoError(t, err)
+	var parsed map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(body, &parsed))
+	require.JSONEq(t, `"required"`, string(parsed["tool_choice"]))
+}
+
+func TestResponsesToChatRequestKeepsSurvivingFunctionToolChoice(t *testing.T) {
+	req := &types.ResponsesRequest{
+		Model:      "public",
+		Input:      json.RawMessage(`"hello"`),
+		ToolChoice: json.RawMessage(`{"type":"function","function":{"name":"get_weather"}}`),
+		Tools: json.RawMessage(`[
+			{"type": "function", "name": "get_weather", "parameters": {"type": "object"}},
+			{"type": "code_interpreter"}
+		]`),
+	}
+	chatReq, err := responsesToChatRequest(context.Background(), req, "upstream-model")
+	require.NoError(t, err)
+
+	body, err := marshalChatRequestBody(chatReq, "upstream-model")
+	require.NoError(t, err)
+	var parsed map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(body, &parsed))
+	require.JSONEq(t, `{"type":"function","function":{"name":"get_weather"}}`, string(parsed["tool_choice"]))
+}
+
+func TestResponsesToChatRequestDropsMissingFunctionToolChoice(t *testing.T) {
+	req := &types.ResponsesRequest{
+		Model:      "public",
+		Input:      json.RawMessage(`"hello"`),
+		ToolChoice: json.RawMessage(`{"type":"function","function":{"name":"run_code"}}`),
+		Tools: json.RawMessage(`[
+			{"type": "function", "name": "get_weather", "parameters": {"type": "object"}},
+			{"type": "code_interpreter"}
+		]`),
+	}
+	chatReq, err := responsesToChatRequest(context.Background(), req, "upstream-model")
+	require.NoError(t, err)
+
+	body, err := marshalChatRequestBody(chatReq, "upstream-model")
+	require.NoError(t, err)
+	var parsed map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(body, &parsed))
+	require.NotContains(t, parsed, "tool_choice")
+}
+
+func TestResponsesToChatRequestFunctionOnlyPathStillWorks(t *testing.T) {
+	req := &types.ResponsesRequest{
+		Model: "public",
+		Input: json.RawMessage(`"What is the weather in Tokyo?"`),
+		Tools: json.RawMessage(`[
+			{
+				"type": "function",
+				"name": "get_weather",
+				"description": "Get current weather",
+				"parameters": {
+					"type": "object",
+					"properties": {"city": {"type": "string"}},
+					"required": ["city"]
+				}
+			}
+		]`),
+	}
+	chatReq, err := responsesToChatRequest(context.Background(), req, "upstream-model")
+	require.NoError(t, err)
+
+	require.Len(t, chatReq.Tools, 1)
+	data, err := json.Marshal(chatReq.Tools)
+	require.NoError(t, err)
+	require.JSONEq(t, `[
+		{
+			"type": "function",
+			"function": {
+				"name": "get_weather",
+				"description": "Get current weather",
+				"parameters": {
+					"type": "object",
+					"properties": {"city": {"type": "string"}},
+					"required": ["city"]
+				}
+			}
+		}
+	]`, string(data))
+}
+
+func TestResponsesAdapterEndToEndNonFunctionToolsDropped(t *testing.T) {
+	tester, c, w := setupTest(t)
+	tester.mocks.openAIComp.ExpectedCalls = nil
+
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, "/v1/chat/completions", r.URL.Path)
+		body, _ := io.ReadAll(r.Body)
+		var parsed map[string]any
+		require.NoError(t, json.Unmarshal(body, &parsed))
+		tools, ok := parsed["tools"].([]any)
+		require.True(t, ok)
+		// Only function tools reach the upstream; code_interpreter is dropped
+		require.Len(t, tools, 1)
+		tool0 := tools[0].(map[string]any)
+		require.Equal(t, "function", tool0["type"])
+		fn := tool0["function"].(map[string]any)
+		require.Equal(t, "get_weather", fn["name"])
+
+		w.Header().Set("Content-Type", "application/json")
+		_, err := w.Write([]byte(`{
+			"id":"chatcmpl_1","created":123,"model":"upstream-model",
+			"choices":[{"message":{"role":"assistant","content":"ok"}}],
+			"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}
+		}`))
+		require.NoError(t, err)
+	}))
+	defer upstream.Close()
+
+	model := &types.Model{
+		BaseModel: types.BaseModel{ID: "adapter-tools-model", Object: "model", OwnedBy: "testuser"},
+		Upstreams: []commontypes.UpstreamConfig{{
+			ID:        9,
+			URL:       upstream.URL + "/v1/chat/completions",
+			Enabled:   true,
+			ModelName: "upstream-model",
+			Provider:  "openai",
+		}},
+	}
+	tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "adapter-tools-model").Return(model, nil).Once()
+	tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil).Once()
+	tester.mocks.openAIComp.EXPECT().CheckUsageLimit(mock.Anything, "testuuid", model, upstream.URL+"/v1/chat/completions").Return(nil).Once()
+	var wg sync.WaitGroup
+	wg.Add(2)
+	tester.mocks.openAIComp.EXPECT().
+		CommitUsageLimit(mock.Anything, "testuuid", model, mock.Anything).
+		RunAndReturn(func(ctx context.Context, userUUID string, model *types.Model, counter token.Counter) error {
+			wg.Done()
+			return nil
+		}).Once()
+	tester.mocks.openAIComp.EXPECT().
+		RecordUsageFromTokenUsage(mock.Anything, "testuuid", model, "upstream-model", mock.Anything, "").
+		RunAndReturn(func(ctx context.Context, userUUID string, model *types.Model, targetModelName string, usage *token.Usage, apikey string) error {
+			wg.Done()
+			return nil
+		}).Once()
+
+	reqBody := `{"model":"adapter-tools-model","input":"hello","tools":[{"type":"function","name":"get_weather","parameters":{"type":"object"}},{"type":"code_interpreter"}]}`
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", strings.NewReader(reqBody))
+	c.Request.Header.Set("Content-Type", "application/json")
+
+	tester.handler.Responses(c)
+	wg.Wait()
+	require.Equal(t, http.StatusOK, w.Code)
 }
