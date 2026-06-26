@@ -1,0 +1,82 @@
+ARG ROCM_IMAGE_PLATFORM=linux/amd64
+FROM --platform=${ROCM_IMAGE_PLATFORM} docker.m.daocloud.io/rocm/pytorch:rocm7.2.2_ubuntu22.04_py3.10_pytorch_release_2.10.0 AS build
+SHELL ["/bin/bash", "-c"]
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    PATH=/opt/rocm/bin:${PATH} \
+    LD_LIBRARY_PATH=/opt/rocm/lib:${LD_LIBRARY_PATH}
+
+RUN for sourceFile in /etc/apt/sources.list /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources; do \
+        if [ -f "$sourceFile" ]; then \
+            sed -i \
+                -e 's|http://archive.ubuntu.com/ubuntu|http://mirrors.aliyun.com/ubuntu|g' \
+                -e 's|http://security.ubuntu.com/ubuntu|http://mirrors.aliyun.com/ubuntu|g' \
+                -e '/repo.radeon.com\/rocm\/apt/s|^|# |' \
+                "$sourceFile"; \
+        fi; \
+    done && \
+    apt-get update && \
+    apt-get install -y \
+        build-essential \
+        cmake \
+        git \
+        libcurl4-openssl-dev \
+        libgomp1 \
+        libssl-dev \
+        python3 \
+        python3-pip && \
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /workspace/
+RUN git clone --depth 1 -b b9787 https://github.com/ggml-org/llama.cpp.git \
+    && cd llama.cpp \
+    && HIPCXX="$(hipconfig -l)/clang" HIP_PATH="$(hipconfig -R)" \
+        cmake -S . -B build -DGGML_HIP=ON -DAMDGPU_TARGETS=gfx803,gfx900,gfx906,gfx908,gfx90a,gfx942,gfx1010,gfx1030,gfx1032,gfx1100,gfx1101,gfx1102 -DLLAMA_CURL=ON -DBUILD_SHARED_LIBS=off -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+    && cmake --build build --config Release --target llama-cli llama-server -j$(nproc)
+
+FROM --platform=${ROCM_IMAGE_PLATFORM} docker.m.daocloud.io/rocm/pytorch:rocm7.2.2_ubuntu22.04_py3.10_pytorch_release_2.10.0 AS base
+SHELL ["/bin/bash", "-c"]
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    PATH=/opt/rocm/bin:${PATH} \
+    LD_LIBRARY_PATH=/opt/rocm/lib:${LD_LIBRARY_PATH}
+
+RUN for sourceFile in /etc/apt/sources.list /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources; do \
+        if [ -f "$sourceFile" ]; then \
+            sed -i \
+                -e 's|http://archive.ubuntu.com/ubuntu|http://mirrors.aliyun.com/ubuntu|g' \
+                -e 's|http://security.ubuntu.com/ubuntu|http://mirrors.aliyun.com/ubuntu|g' \
+                -e '/repo.radeon.com\/rocm\/apt/s|^|# |' \
+                "$sourceFile"; \
+        fi; \
+    done && \
+    apt-get update && apt-get install -y \
+        apt-utils \
+        curl \
+        dumb-init \
+        git \
+        libcurl4 \
+        libgomp1 \
+        python3-pip \
+        unzip \
+        vim \
+        wget && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN ln -sf /usr/bin/python3 /usr/bin/python
+RUN pip config set global.index-url https://mirrors.aliyun.com/pypi/simple
+
+WORKDIR /workspace/
+COPY --from=build /workspace/llama.cpp/build/bin/llama-cli /usr/local/bin/llama-cli
+COPY --from=build /workspace/llama.cpp/build/bin/llama-server /usr/local/bin/llama-server
+
+RUN pip install --no-cache-dir csghub-sdk
+COPY ./llama.cpp/ /etc/csghub/
+RUN chmod +x /etc/csghub/*.sh
+
+ENV HUGGINGFACE_HUB_CACHE=/workspace/ \
+    HF_HUB_ENABLE_HF_TRANSFER=0
+ENV PORT=8000
+EXPOSE 8000
+ENTRYPOINT ["/usr/bin/dumb-init", "--"]
+CMD ["/etc/csghub/serve.sh"]

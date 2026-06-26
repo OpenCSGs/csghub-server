@@ -12,6 +12,15 @@ fi
 if [[ ! $ENGINE_ARGS == *"-c "* ]]; then
     ENGINE_ARGS="$ENGINE_ARGS -c 8192"
 fi
+# enable embedding mode for embedding-style tasks
+if [[ "$HF_TASK" == "feature-extraction" || "$HF_TASK" == "sentence-similarity" ]]; then
+    if [[ ! $ENGINE_ARGS == *"--embedding"* ]]; then
+        ENGINE_ARGS="$ENGINE_ARGS --embeddings"
+    fi
+    if [[ ! $ENGINE_ARGS == *"--pooling "* ]] && [[ ! $ENGINE_ARGS == *"--pooling_type "* ]]; then
+        ENGINE_ARGS="$ENGINE_ARGS --pooling mean"
+    fi
+fi
 #gguf path
 if [[ ! $ENGINE_ARGS == *"-m "* ]] && [[ -z $GGUF_ENTRY_POINT ]]; then
     echo "model file name is required, ex: -m DeepSeek-R1-UD-IQ1_M/DeepSeek-R1-UD-IQ1_M-00001-of-00004.gguf"

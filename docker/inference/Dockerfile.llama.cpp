@@ -1,13 +1,15 @@
-FROM nvidia/cuda:12.4.1-devel-ubuntu22.04 AS build
+
+ARG CUDA_VERSION=12.4.1
+FROM docker.m.daocloud.io/nvidia/cuda:${CUDA_VERSION}-devel-ubuntu22.04 AS build
 RUN apt-get update && \
     apt-get install -y build-essential cmake python3 python3-pip git libcurl4-openssl-dev libgomp1
 WORKDIR /workspace/
-RUN git clone --depth 1 -b b5215 https://gitee.com/xzgan/llama.cpp.git \
+RUN git clone --depth 1 -b b9787 https://github.com/ggml-org/llama.cpp.git \
     && cd llama.cpp \
     && cmake -B build -DGGML_CUDA=on -DLLAMA_CURL=ON -DBUILD_SHARED_LIBS=off \
-    && cmake --build build --config Release -j$(nproc)
+    && cmake --build build --config Release --target llama-cli llama-server -j$(nproc)
 
-FROM nvidia/cuda:12.4.1-runtime-ubuntu22.04 AS base
+FROM docker.m.daocloud.io/nvidia/cuda:${CUDA_VERSION}-runtime-ubuntu22.04 AS base
 # Set bash as the default shell
 
 # Build with some basic utilities
