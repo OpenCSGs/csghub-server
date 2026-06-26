@@ -36,6 +36,7 @@ func BuildDataViewerRunWorker(tc temporal.Client, cfg *config.Config, act DataVi
 	wr.RegisterActivity(act.UploadParquetFiles)
 	wr.RegisterActivity(act.UpdateCardData)
 	wr.RegisterActivity(act.CleanUp)
+	wr.RegisterActivity(act.CleanupOldViewerData)
 	wr.RegisterActivity(act.UpdateWorkflowStatus)
 
 	wr.RegisterWorkflow(DataViewerUpdateWorkflow)
@@ -129,6 +130,16 @@ func runWorkFlow(sessionCtx workflow.Context, updateWorkflow dvCom.WorkflowUpdat
 	}).Get(sessionCtx, &computedCardData)
 	if err != nil {
 		return false, fmt.Errorf("run data viewer activity DetermineCardData error: %w", err)
+	}
+
+	// cleanup old viewer data if no convertible files found
+	if len(repoDataType) < 1 {
+		slog.Warn("no convertible files found, cleanup old viewer data")
+		err = workflow.ExecuteActivity(sessionCtx, DataViewerActivity.CleanupOldViewerData, updateWorkflow.Req).Get(sessionCtx, nil)
+		if err != nil {
+			return false, fmt.Errorf("run data viewer activity CleanupOldViewerData error: %w", err)
+		}
+		return true, nil
 	}
 
 	var needRebuild bool

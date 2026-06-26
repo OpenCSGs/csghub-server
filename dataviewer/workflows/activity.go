@@ -44,6 +44,7 @@ type DataViewerActivity interface {
 	UploadParquetFiles(ctx context.Context, uploadReq dvCom.UploadParquetReq) (*dvCom.CardData, error)
 	UpdateCardData(ctx context.Context, cardReq dvCom.UpdateCardReq) error
 	CleanUp(ctx context.Context, req types.UpdateViewerReq) error
+	CleanupOldViewerData(ctx context.Context, req types.UpdateViewerReq) error
 	UpdateWorkflowStatus(ctx context.Context, status dvCom.UpdateWorkflowStatusReq) error
 	CalcStatistics(cardReq *dvCom.UpdateCardReq)
 }
@@ -1106,5 +1107,48 @@ func (dva *dataViewerActivityImpl) UpdateWorkflowStatus(ctx context.Context, sta
 	if err != nil {
 		slog.Error("update viewer for workflow ending", slog.Any("status", status), slog.Any("viewer", viewer), slog.Any("error", err))
 	}
+	return nil
+}
+
+func (dva *dataViewerActivityImpl) CleanupOldViewerData(ctx context.Context, req types.UpdateViewerReq) error {
+	// Delete old parquet branch if exists
+	findReq := gitserver.GetBranchReq{
+		Namespace: req.Namespace,
+		Name:      req.Name,
+		Ref:       dvCom.ParquetBranch,
+		RepoType:  req.RepoType,
+	}
+	branch, err := dva.gitServer.GetRepoBranchByName(ctx, findReq)
+	if err != nil {
+		slog.WarnContext(ctx, "get parquet branch for cleanup", slog.Any("req", req), slog.Any("error", err))
+	}
+	if err == nil && branch != nil {
+		deleteReq := gitserver.DeleteBranchReq{
+			Namespace: req.Namespace,
+			Name:      req.Name,
+			Ref:       dvCom.ParquetBranch,
+			RepoType:  req.RepoType,
+			Username:  GitDefaultUserName,
+			Email:     GitDefaultUserEmail,
+		}
+		if err := dva.gitServer.DeleteRepoBranch(ctx, deleteReq); err != nil {
+			return fmt.Errorf("delete old parquet branch %s for cleanup, cause: %w", dvCom.ParquetBranch, err)
+		}
+	}
+
+	// Clear card data in the current job
+	wfCtx := activity.GetInfo(ctx)
+	workflowID := wfCtx.WorkflowExecution.ID
+	job, err := dva.viewerStore.GetJob(ctx, workflowID)
+	if err != nil {
+		return fmt.Errorf("get job by workflow id %s for cleanup, cause: %w", workflowID, err)
+	}
+	job.AutoCard = true
+	job.CardData = ""
+	job.CardMD5 = ""
+	if _, err := dva.viewerStore.UpdateJob(ctx, *job); err != nil {
+		return fmt.Errorf("update job for cleanup, cause: %w", err)
+	}
+
 	return nil
 }
