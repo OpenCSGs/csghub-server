@@ -991,11 +991,12 @@ func TestResponsesAdapterEndToEndNonFunctionToolsDropped(t *testing.T) {
 		require.Equal(t, "get_weather", fn["name"])
 
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{
+		_, err := w.Write([]byte(`{
 			"id":"chatcmpl_1","created":123,"model":"upstream-model",
 			"choices":[{"message":{"role":"assistant","content":"ok"}}],
 			"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}
 		}`))
+		require.NoError(t, err)
 	}))
 	defer upstream.Close()
 
