@@ -24,6 +24,119 @@ var defaultTestMetrics = metricNames{
 	memoryUsage:       "container_memory_usage_bytes",
 	requestCount:      "revision_request_count",
 	requestLatency:    "revision_app_request_latencies_bucket",
+	metricKeys:        []string{"pod", "service_name", "namespace", "response_code_class", "le"},
+}
+
+func TestMonitorComponent_getMetrics(t *testing.T) {
+	m := &monitorComponentImpl{
+		metrics: defaultTestMetrics,
+	}
+
+	tests := []struct {
+		name     string
+		input    map[string]string
+		expected map[string]string
+	}{
+		{
+			name:  "default metric keys - all present",
+			input: map[string]string{
+				"pod":                "my-pod",
+				"service_name":       "my-service",
+				"namespace":          "my-ns",
+				"response_code_class": "2xx",
+				"le":                 "0.5",
+			},
+			expected: map[string]string{
+				"pod":                "my-pod",
+				"instance":           "my-pod",
+				"service_name":       "my-service",
+				"namespace":          "my-ns",
+				"response_code_class": "2xx",
+				"le":                 "0.5",
+			},
+		},
+		{
+			name:  "pod key adds instance alias",
+			input: map[string]string{
+				"pod":       "my-pod",
+				"namespace": "my-ns",
+			},
+			expected: map[string]string{
+				"pod":       "my-pod",
+				"instance":  "my-pod",
+				"namespace": "my-ns",
+			},
+		},
+		{
+			name:  "missing keys are skipped",
+			input: map[string]string{
+				"pod":  "my-pod",
+				"le":   "0.5",
+				"other_key": "other_value",
+			},
+			expected: map[string]string{
+				"pod":      "my-pod",
+				"instance": "my-pod",
+				"le":       "0.5",
+			},
+		},
+		{
+			name:  "empty input returns empty result",
+			input: map[string]string{},
+			expected: map[string]string{},
+		},
+		{
+			name:  "extra keys not in metricKeys are ignored",
+			input: map[string]string{
+				"pod":       "my-pod",
+				"container": "user-container",
+				"unused":    "val",
+			},
+			expected: map[string]string{
+				"pod":      "my-pod",
+				"instance": "my-pod",
+			},
+		},
+		{
+			name:  "no pod key - no instance alias",
+			input: map[string]string{
+				"namespace":  "my-ns",
+				"le":         "0.5",
+			},
+			expected: map[string]string{
+				"namespace": "my-ns",
+				"le":        "0.5",
+			},
+		},
+		{
+			name:  "custom metricKeys - only specified keys extracted",
+			input: map[string]string{
+				"pod":       "my-pod",
+				"namespace": "my-ns",
+				"le":        "0.5",
+			},
+			expected: map[string]string{
+				"pod":       "my-pod",
+				"instance":  "my-pod",
+				"namespace": "my-ns",
+			},
+		},
+	}
+
+	for idx, tc := range tests {
+		if idx == 6 {
+			m2 := &monitorComponentImpl{
+				metrics: metricNames{
+					metricKeys: []string{"pod", "namespace"},
+				},
+			}
+			result := m2.getMetrics(tc.input)
+			require.Equal(t, tc.expected, result, "test case: %s", tc.name)
+			continue
+		}
+		result := m.getMetrics(tc.input)
+		require.Equal(t, tc.expected, result, "test case: %s", tc.name)
+	}
 }
 
 func NewTestMonitorComponent(cfg *config.Config,
@@ -276,6 +389,7 @@ func TestMonitor_MemoryUsage(t *testing.T) {
 		Result: []types.MonitorData{
 			{
 				Metric: map[string]string{
+					"pod":      "test-instance",
 					"instance": "test-instance",
 				},
 				Values: []types.MonitorValue{
@@ -365,6 +479,7 @@ func TestMonitor_MemoryUsage_Evaluation(t *testing.T) {
 		Result: []types.MonitorData{
 			{
 				Metric: map[string]string{
+					"pod":      "test-instance",
 					"instance": "test-instance",
 				},
 				Values: []types.MonitorValue{
@@ -465,6 +580,7 @@ func TestMonitor_CPUUsage(t *testing.T) {
 		Result: []types.MonitorData{
 			{
 				Metric: map[string]string{
+					"pod":      "test-instance",
 					"instance": "test-instance",
 				},
 				Values: []types.MonitorValue{

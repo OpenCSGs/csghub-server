@@ -40,6 +40,7 @@ type metricNames struct {
 	memoryUsage    string
 	requestCount   string
 	requestLatency string
+	metricKeys     []string
 }
 
 func NewMonitorComponent(cfg *config.Config) (MonitorComponent, error) {
@@ -59,6 +60,7 @@ func NewMonitorComponent(cfg *config.Config) (MonitorComponent, error) {
 			memoryUsage:    cfg.Prometheus.MemoryUsageMetric,
 			requestCount:   cfg.Prometheus.RequestCountMetric,
 			requestLatency: cfg.Prometheus.RequestLatencyMetric,
+			metricKeys:     cfg.Prometheus.MetricKeys,
 		},
 	}, nil
 }
@@ -87,7 +89,7 @@ func (m *monitorComponentImpl) CPUUsage(ctx context.Context, req *types.MonitorR
 	pResult := promeResp.Data.Result[0]
 	resp.ResultType = promeResp.Data.ResultType
 	rdata := types.MonitorData{}
-	rdata.Metric = getMetrics(pResult.Metric)
+	rdata.Metric = m.getMetrics(pResult.Metric)
 
 	limit, err := m.CPULimit(ctx, req)
 	if err != nil {
@@ -164,7 +166,7 @@ func (m *monitorComponentImpl) MemoryUsage(ctx context.Context, req *types.Monit
 	pResult := promeResp.Data.Result[0]
 	resp.ResultType = promeResp.Data.ResultType
 	rdata := types.MonitorData{}
-	rdata.Metric = getMetrics(pResult.Metric)
+	rdata.Metric = m.getMetrics(pResult.Metric)
 
 	for _, values := range pResult.Values {
 		valArray, err := convertToArrayFloat64(values)
@@ -211,7 +213,7 @@ func (m *monitorComponentImpl) RequestCount(ctx context.Context, req *types.Moni
 	totalRequestCount := int64(0)
 	for _, pResult := range promeResp.Data.Result {
 		rdata := types.MonitorData{}
-		rdata.Metric = getMetrics(pResult.Metric)
+		rdata.Metric = m.getMetrics(pResult.Metric)
 		initCountVal := float64(0)
 		if len(pResult.Values) > 0 {
 			for idx, pValues := range pResult.Values {
@@ -267,7 +269,7 @@ func (m *monitorComponentImpl) RequestLatency(ctx context.Context, req *types.Mo
 
 	for _, pResult := range promeResp.Data.Result {
 		rdata := types.MonitorData{}
-		rdata.Metric = getMetrics(pResult.Metric)
+		rdata.Metric = m.getMetrics(pResult.Metric)
 		valArray, err := convertToArrayFloat64(pResult.Value)
 		if err != nil {
 			slog.Warn("failed to convert request latency value to float array", slog.Any("value", pResult.Value),
@@ -331,27 +333,17 @@ func convertToFloat64(value any) (float64, error) {
 
 }
 
-func getMetrics(metrics map[string]string) map[string]string {
+func (m *monitorComponentImpl) getMetrics(metrics map[string]string) map[string]string {
 	result := map[string]string{}
-	podName, ok := metrics["pod"]
-	if ok {
-		result["instance"] = podName
-	}
-	serviceName, ok := metrics["service_name"]
-	if ok {
-		result["service_name"] = serviceName
-	}
-	nameSpace, ok := metrics["namespace"]
-	if ok {
-		result["namespace"] = nameSpace
-	}
-	responseCodeClass, ok := metrics["response_code_class"]
-	if ok {
-		result["response_code_class"] = responseCodeClass
-	}
-	le, ok := metrics["le"]
-	if ok {
-		result["le"] = le
+
+	for _, key := range m.metrics.metricKeys {
+		v, ok := metrics[key]
+		if ok {
+			result[key] = v
+			if key == "pod" {
+				result["instance"] = v
+			}
+		}
 	}
 	return result
 }
