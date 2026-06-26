@@ -167,7 +167,11 @@ func (s *llmServiceComponentImpl) UpdateLLMConfig(ctx context.Context, req *type
 		return nil, err
 	}
 	if req.ModelName != nil {
-		llmConfig.ModelName = *req.ModelName
+		modelName, err := normalizeRequiredLLMModelName(*req.ModelName)
+		if err != nil {
+			return nil, err
+		}
+		llmConfig.ModelName = modelName
 	}
 	if req.Type != nil {
 		llmConfig.Type = *req.Type
@@ -252,11 +256,15 @@ func (s *llmServiceComponentImpl) CreateLLMConfig(ctx context.Context, req *type
 	if req.RepoID != nil {
 		repoID = *req.RepoID
 	}
+	modelName, err := normalizeRequiredLLMModelName(req.ModelName)
+	if err != nil {
+		return nil, err
+	}
 	if err := s.validateLLMEndpointConfig(req.Upstreams); err != nil {
 		return nil, err
 	}
 	dbLLMConfig := database.LLMConfig{
-		ModelName:          req.ModelName,
+		ModelName:          modelName,
 		Type:               req.Type,
 		Enabled:            req.Enabled,
 		RoutingPolicy:      req.RoutingPolicy,
@@ -280,9 +288,9 @@ func (s *llmServiceComponentImpl) CreateLLMConfig(ctx context.Context, req *type
 			URL:                   strings.TrimSpace(u.URL),
 			Weight:                u.Weight,
 			Enabled:               u.Enabled,
-			ModelName:             u.ModelName,
+			ModelName:             strings.TrimSpace(u.ModelName),
 			AuthHeader:            u.AuthHeader,
-			Provider:              u.Provider,
+			Provider:              strings.TrimSpace(u.Provider),
 			HealthCheckEnabled:    u.HealthCheckEnabled,
 			CircuitBreakerEnabled: u.CircuitBreakerEnabled,
 			Tags:                  u.Tags,
@@ -316,6 +324,14 @@ func (s *llmServiceComponentImpl) CreateLLMConfig(ctx context.Context, req *type
 	resLLMConfig.IsAvailable = resLLMConfig.Enabled && isAvailable
 	resLLMConfig.AvailabilityReason = reason
 	return resLLMConfig, nil
+}
+
+func normalizeRequiredLLMModelName(modelName string) (string, error) {
+	trimmed := strings.TrimSpace(modelName)
+	if trimmed == "" {
+		return "", fmt.Errorf("%w: model_name cannot be empty", ErrInvalidLLMConfig)
+	}
+	return trimmed, nil
 }
 
 func (s *llmServiceComponentImpl) CreatePromptPrefix(ctx context.Context, req *types.CreatePromptPrefixReq) (*types.PromptPrefix, error) {
@@ -435,9 +451,9 @@ func (s *llmServiceComponentImpl) CreateUpstream(ctx context.Context, req *types
 		URL:                   strings.TrimSpace(req.URL),
 		Weight:                req.Weight,
 		Enabled:               req.Enabled,
-		ModelName:             req.ModelName,
+		ModelName:             strings.TrimSpace(req.ModelName),
 		AuthHeader:            req.AuthHeader,
-		Provider:              req.Provider,
+		Provider:              strings.TrimSpace(req.Provider),
 		HealthCheckEnabled:    req.HealthCheckEnabled,
 		CircuitBreakerEnabled: req.CircuitBreakerEnabled,
 		Tags:                  req.Tags,
@@ -474,13 +490,13 @@ func (s *llmServiceComponentImpl) UpdateUpstream(ctx context.Context, req *types
 		dbUp.Enabled = *req.Enabled
 	}
 	if req.ModelName != nil {
-		dbUp.ModelName = *req.ModelName
+		dbUp.ModelName = strings.TrimSpace(*req.ModelName)
 	}
 	if req.AuthHeader != nil {
 		dbUp.AuthHeader = *req.AuthHeader
 	}
 	if req.Provider != nil {
-		dbUp.Provider = *req.Provider
+		dbUp.Provider = strings.TrimSpace(*req.Provider)
 	}
 	if req.HealthCheckEnabled != nil {
 		dbUp.HealthCheckEnabled = *req.HealthCheckEnabled

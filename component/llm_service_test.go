@@ -73,6 +73,70 @@ func TestLLMServiceComponent_CreateLLMConfig(t *testing.T) {
 	require.Equal(t, 7.5, res.ModelSizeB)
 }
 
+func TestLLMServiceComponent_CreateLLMConfig_TrimsWhitespace(t *testing.T) {
+	ctx := context.TODO()
+	stores := tests.NewMockStores(t)
+	upstreamStore := mockdatabase.NewMockUpstreamStore(t)
+	upstreamStore.EXPECT().Create(ctx, &database.Upstream{
+		LLMConfigID: 123,
+		URL:         "http://upstream.example.com/v1",
+		Weight:      1,
+		Enabled:     true,
+		ModelName:   "upstream-model", // trimmed
+		Provider:    "upstream-prov",  // trimmed
+	}).Return(nil)
+	mc := &llmServiceComponentImpl{
+		llmConfigStore:    stores.LLMConfig,
+		promptPrefixStore: stores.PromptPrefix,
+		upstreamStore:     upstreamStore,
+	}
+	req := &types.CreateLLMConfigReq{
+		ModelName: "  new-model  ",
+		Type:      16,
+		Enabled:   true,
+		Upstreams: []types.UpstreamConfig{
+			{
+				URL:     "http://upstream.example.com/v1",
+				Enabled: true, Weight: 1,
+				ModelName: "  upstream-model  ",
+				Provider:  "  upstream-prov  ",
+			},
+		},
+	}
+	dbLLMConfig := &database.LLMConfig{ID: 123, ModelName: "new-model", Type: 16, Enabled: true}
+	stores.LLMConfigMock().EXPECT().Create(ctx, database.LLMConfig{
+		ModelName: "new-model",
+		Type:      16,
+		Enabled:   true,
+	}).Return(dbLLMConfig, nil)
+	res, err := mc.CreateLLMConfig(ctx, req)
+	require.Nil(t, err)
+	require.NotNil(t, res)
+	require.Equal(t, "new-model", res.ModelName)
+}
+
+func TestLLMServiceComponent_CreateLLMConfig_RejectsBlankModelName(t *testing.T) {
+	ctx := context.TODO()
+	stores := tests.NewMockStores(t)
+	mc := &llmServiceComponentImpl{
+		llmConfigStore:    stores.LLMConfig,
+		promptPrefixStore: stores.PromptPrefix,
+	}
+	req := &types.CreateLLMConfigReq{
+		ModelName: "   ",
+		Type:      16,
+		Enabled:   true,
+		Upstreams: []types.UpstreamConfig{
+			{URL: "http://upstream.example.com/v1", Enabled: true, Weight: 1},
+		},
+	}
+
+	res, err := mc.CreateLLMConfig(ctx, req)
+	require.Nil(t, res)
+	require.ErrorIs(t, err, ErrInvalidLLMConfig)
+	require.Contains(t, err.Error(), "model_name cannot be empty")
+}
+
 func TestLLMServiceComponent_CreatePromptPrefix(t *testing.T) {
 	ctx := context.TODO()
 	stores := tests.NewMockStores(t)
@@ -197,6 +261,56 @@ func TestLLMServiceComponent_UpdateLLMConfig(t *testing.T) {
 	require.Equal(t, 13.0, res.ModelSizeB)
 }
 
+func TestLLMServiceComponent_UpdateLLMConfig_TrimsWhitespace(t *testing.T) {
+	ctx := context.TODO()
+	stores := tests.NewMockStores(t)
+	upstreamStore := mockdatabase.NewMockUpstreamStore(t)
+	upstreamStore.EXPECT().ListByLLMConfigID(ctx, int64(123)).Return([]*database.Upstream{}, nil).Maybe()
+	mc := &llmServiceComponentImpl{
+		llmConfigStore:    stores.LLMConfig,
+		promptPrefixStore: stores.PromptPrefix,
+		upstreamStore:     upstreamStore,
+	}
+	newName := "  new-model  "
+	req := &types.UpdateLLMConfigReq{
+		ID:        123,
+		ModelName: &newName,
+	}
+	dbLLMConfig := &database.LLMConfig{ID: 123, ModelName: "new-model"}
+	stores.LLMConfigMock().EXPECT().GetByID(ctx, int64(123)).Return(dbLLMConfig, nil)
+	stores.LLMConfigMock().EXPECT().Update(ctx, database.LLMConfig{
+		ID:        123,
+		ModelName: "new-model",
+	}).Return(dbLLMConfig, nil)
+	res, err := mc.UpdateLLMConfig(ctx, req)
+	require.Nil(t, err)
+	require.NotNil(t, res)
+	require.Equal(t, "new-model", res.ModelName)
+}
+
+func TestLLMServiceComponent_UpdateLLMConfig_RejectsBlankModelName(t *testing.T) {
+	ctx := context.TODO()
+	stores := tests.NewMockStores(t)
+	mc := &llmServiceComponentImpl{
+		llmConfigStore:    stores.LLMConfig,
+		promptPrefixStore: stores.PromptPrefix,
+	}
+	newName := "   "
+	req := &types.UpdateLLMConfigReq{
+		ID:        123,
+		ModelName: &newName,
+	}
+	stores.LLMConfigMock().EXPECT().GetByID(ctx, int64(123)).Return(&database.LLMConfig{
+		ID:        123,
+		ModelName: "existing-model",
+	}, nil)
+
+	res, err := mc.UpdateLLMConfig(ctx, req)
+	require.Nil(t, res)
+	require.ErrorIs(t, err, ErrInvalidLLMConfig)
+	require.Contains(t, err.Error(), "model_name cannot be empty")
+}
+
 func TestLLMServiceComponent_CreateUpstream(t *testing.T) {
 	ctx := context.TODO()
 	stores := tests.NewMockStores(t)
@@ -220,6 +334,80 @@ func TestLLMServiceComponent_CreateUpstream(t *testing.T) {
 	require.NotNil(t, res)
 	require.Equal(t, "http://upstream.example.com/v1", res.URL)
 	require.Equal(t, 2, res.Weight)
+}
+
+func TestLLMServiceComponent_CreateUpstream_TrimsWhitespace(t *testing.T) {
+	ctx := context.TODO()
+	stores := tests.NewMockStores(t)
+	upstreamStore := mockdatabase.NewMockUpstreamStore(t)
+	stores.LLMConfigMock().EXPECT().GetByID(ctx, int64(100)).Return(&database.LLMConfig{ID: 100}, nil)
+	upstreamStore.EXPECT().Create(ctx, &database.Upstream{
+		LLMConfigID: 100,
+		URL:         "http://upstream.example.com/v1",
+		Weight:      2,
+		Enabled:     true,
+		ModelName:   "upstream-model",
+		Provider:    "test-provider",
+	}).Return(nil)
+	mc := &llmServiceComponentImpl{
+		llmConfigStore:    stores.LLMConfig,
+		promptPrefixStore: stores.PromptPrefix,
+		upstreamStore:     upstreamStore,
+	}
+	req := &types.CreateUpstreamReq{
+		LLMConfigID: 100,
+		URL:         "http://upstream.example.com/v1",
+		Weight:      2,
+		Enabled:     true,
+		ModelName:   "  upstream-model  ",
+		Provider:    "  test-provider  ",
+	}
+	res, err := mc.CreateUpstream(ctx, req)
+	require.Nil(t, err)
+	require.NotNil(t, res)
+	require.Equal(t, "upstream-model", res.ModelName)
+	require.Equal(t, "test-provider", res.Provider)
+}
+
+func TestLLMServiceComponent_UpdateUpstream_TrimsWhitespace(t *testing.T) {
+	ctx := context.TODO()
+	stores := tests.NewMockStores(t)
+	upstreamStore := mockdatabase.NewMockUpstreamStore(t)
+	callCount := 0
+	upstreamStore.EXPECT().GetByID(ctx, int64(10)).RunAndReturn(func(ctx context.Context, id int64) (*database.Upstream, error) {
+		callCount++
+		if callCount == 1 {
+			return &database.Upstream{ID: 10, LLMConfigID: 100, URL: "http://old", Weight: 1, Enabled: true}, nil
+		}
+		return &database.Upstream{ID: 10, LLMConfigID: 100, URL: "http://old", Weight: 1, Enabled: true,
+			ModelName: "new-model", Provider: "new-provider"}, nil
+	}).Times(2)
+	upstreamStore.EXPECT().Update(ctx, &database.Upstream{
+		ID: 10, LLMConfigID: 100, URL: "http://old", Weight: 1, Enabled: true,
+		ModelName: "new-model",
+		Provider:  "new-provider",
+	}).Return(nil)
+	healthStateStore := mockdatabase.NewMockAIGatewayUpstreamHealthStateStore(t)
+	circuitStateStore := mockdatabase.NewMockAIGatewayUpstreamCircuitStateStore(t)
+	mc := &llmServiceComponentImpl{
+		llmConfigStore:    stores.LLMConfig,
+		promptPrefixStore: stores.PromptPrefix,
+		upstreamStore:     upstreamStore,
+		healthStateStore:  healthStateStore,
+		circuitStateStore: circuitStateStore,
+	}
+	newModelName := "  new-model  "
+	newProvider := "  new-provider  "
+	req := &types.UpdateUpstreamReq{
+		ID:        10,
+		ModelName: &newModelName,
+		Provider:  &newProvider,
+	}
+	res, err := mc.UpdateUpstream(ctx, req)
+	require.Nil(t, err)
+	require.NotNil(t, res)
+	require.Equal(t, "new-model", res.ModelName)
+	require.Equal(t, "new-provider", res.Provider)
 }
 
 func TestLLMServiceComponent_UpdateUpstream(t *testing.T) {
@@ -516,10 +704,10 @@ func TestLLMServiceComponent_ListExternalLLMs_Error(t *testing.T) {
 
 func TestComputeUpstreamAvailability(t *testing.T) {
 	testCases := []struct {
-		name              string
-		upstream          types.UpstreamConfig
-		wantAvailable     bool
-		wantReason        string
+		name          string
+		upstream      types.UpstreamConfig
+		wantAvailable bool
+		wantReason    string
 	}{
 		{
 			name: "disabled upstream is unavailable",
@@ -676,9 +864,9 @@ func TestComputeUpstreamAvailability(t *testing.T) {
 
 func TestComputeUpstreamAvailabilityStatus(t *testing.T) {
 	testCases := []struct {
-		name           string
-		upstream       types.UpstreamConfig
-		wantStatus     string
+		name       string
+		upstream   types.UpstreamConfig
+		wantStatus string
 	}{
 		{
 			name: "disabled upstream",
