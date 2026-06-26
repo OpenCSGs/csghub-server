@@ -731,13 +731,16 @@ func (d *deployer) UpdateDeploy(ctx context.Context, dur *types.DeployUpdateReq,
 		deploy.EngineArgs = *dur.EngineArgs
 	}
 
-	if dur.Entrypoint != nil {
-		if deploy.RuntimeFramework == string(types.LlamaCpp) {
-			newVarStr, err := buildVariables(dur)
+	if isGGUFRuntime(deploy.RuntimeFramework) {
+		if dur.Entrypoint != nil {
+			newVarStr, err := buildVariables(deploy.Variables, dur)
 			if err != nil {
 				return fmt.Errorf("build variables for llama cpp error: %w", err)
 			}
 			dur.Variables = &newVarStr
+		}
+		if !hasGGUFEntryPoint(dur.Variables, deploy.Variables) {
+			return fmt.Errorf("entrypoint is required for llama.cpp or ktransformers")
 		}
 	}
 
@@ -761,8 +764,13 @@ func (d *deployer) UpdateDeploy(ctx context.Context, dur *types.DeployUpdateReq,
 	return nil
 }
 
-func buildVariables(dur *types.DeployUpdateReq) (string, error) {
-	varStr := ""
+func isGGUFRuntime(runtimeFramework string) bool {
+	name := strings.ToLower(runtimeFramework)
+	return strings.Contains(name, string(types.LlamaCpp)) || strings.Contains(name, string(types.Ktransformers))
+}
+
+func buildVariables(existingVariables string, dur *types.DeployUpdateReq) (string, error) {
+	varStr := existingVariables
 	if dur.Variables != nil {
 		varStr = *dur.Variables
 	}
@@ -777,6 +785,18 @@ func buildVariables(dur *types.DeployUpdateReq) (string, error) {
 	}
 	varStr = string(varBytes)
 	return varStr, nil
+}
+
+func hasGGUFEntryPoint(variables *string, existingVariables string) bool {
+	varStr := existingVariables
+	if variables != nil {
+		varStr = *variables
+	}
+	varMap, err := hubcom.JsonStrToMap(varStr)
+	if err != nil {
+		return false
+	}
+	return strings.TrimSpace(varMap[types.GGUFEntryPoint]) != ""
 }
 
 func (d *deployer) StartDeploy(ctx context.Context, deploy *database.Deploy) error {

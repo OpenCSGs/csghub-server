@@ -126,6 +126,13 @@ docker buildx build --platform linux/amd64 \
   -t ${OPENCSG_ACR}/opencsghq/llama.cpp:latest \
   -f Dockerfile.llama.cpp \
   --push .
+# For Text Llama.cpp ROCm Inference: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/llama.cpp-rocm:rocm7.2.2-b9787
+export IMAGE_TAG=rocm7.2.2-b9787
+docker buildx build --platform linux/amd64 \
+  -t ${OPENCSG_ACR}/opencsghq/llama.cpp-rocm:${IMAGE_TAG} \
+  -t ${OPENCSG_ACR}/opencsghq/llama.cpp-rocm:latest \
+  -f Dockerfile.llama.cpp-rocm \
+  --push .
 # For Text ktransformers Inference: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/ktransformers:0.2.1.post1  
 export IMAGE_TAG=0.2.3
 docker build --platform linux/amd64 \
@@ -223,6 +230,7 @@ curl --max-time 600 -X POST http://127.0.0.1:8000/v1/images/edits \
 |text generation| sglang | v0.4.6.post1-cu124-srt| 12.4 |- |
 |text generation| mindie | 2.0-csg-1.0.RC2 | 1.0.RC2 |- |
 |text generation| llama.cpp | b5215 | - |- |
+|text generation| llama.cpp-rocm | rocm7.2.2-b9787 | - |ROCm 7.2.2, llama.cpp b9787, official wide range ROCm targets|
 |text generation| tei | 1.6 | - |- |
 
 

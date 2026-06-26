@@ -1216,7 +1216,7 @@ func (c *modelComponentImpl) Wakeup(ctx context.Context, namespace, name string,
 
 func (c *modelComponentImpl) buildVariables(req types.ModelRunReq, frame *database.RuntimeFramework) (string, error) {
 	engineName := strings.ToLower(frame.FrameName)
-	if engineName == string(types.LlamaCpp) || engineName == string(types.Ktransformers) {
+	if strings.Contains(engineName, string(types.LlamaCpp)) || strings.Contains(engineName, string(types.Ktransformers)) {
 		//check entrypoint for llama.cpp
 		if len(req.Entrypoint) < 1 {
 			err := fmt.Errorf("entrypoint is required for llama.cpp or ktransformers")
