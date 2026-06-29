@@ -1,12 +1,15 @@
 package proxy
 
 import (
+	"context"
+	"errors"
 	"log/slog"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
 
 	"github.com/openai/openai-go/v3"
+	commonutils "opencsg.com/csghub-server/common/utils/common"
 	"opencsg.com/csghub-server/common/utils/trace"
 )
 
@@ -54,6 +57,15 @@ func (rp *reverseProxyImpl) ServeHTTP(w http.ResponseWriter, r *http.Request, ap
 		}
 	}()
 	proxy := httputil.NewSingleHostReverseProxy(rp.target)
+	proxy.ErrorHandler = func(rw http.ResponseWriter, req *http.Request, err error) {
+		if errors.Is(err, context.Canceled) {
+			slog.InfoContext(context.WithoutCancel(req.Context()), "http: proxy request canceled", slog.Any("error", err))
+			rw.WriteHeader(commonutils.StatusClientClosedRequest)
+			return
+		}
+		slog.ErrorContext(req.Context(), "http: proxy error", slog.Any("error", err))
+		rw.WriteHeader(http.StatusBadGateway)
+	}
 	proxy.Director = func(req *http.Request) {
 		if len(svcHost) > 0 {
 			slog.Info("update reverse proxy header host", slog.Any("svc-host", svcHost))
