@@ -59,6 +59,7 @@ func NewClusterComponent(config *config.Config) (ClusterComponent, error) {
 	c.resStore = database.NewSpaceResourceStore()
 	c.workflowStore = database.NewArgoWorkFlowStore()
 	c.namespaceStore = database.NewNamespaceStore()
+	c.auditLog = database.NewAuditLogStore()
 	return c, nil
 }
 
@@ -72,6 +73,7 @@ type clusterComponentImpl struct {
 	workflowStore   database.ArgoWorkFlowStore
 	usrClient       rpc.UserSvcClient
 	namespaceStore  database.NamespaceStore
+	auditLog        database.AuditLogStore
 }
 
 func (c *clusterComponentImpl) Index(ctx context.Context) ([]types.ClusterRes, error) {
