@@ -183,6 +183,8 @@ type ArgoWorkFlowDeleteReq struct {
 	ClusterID string `json:"cluster_id"`
 	TaskID    string `json:"task_id"`
 	Namespace string `json:"namespace"`
+	IPAddress string `json:"-"`
+	AuthType  string `json:"-"`
 }
 
 type ClusterWFReq struct {

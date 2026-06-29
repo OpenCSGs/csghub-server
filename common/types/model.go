@@ -374,6 +374,8 @@ type DeployActReq struct {
 	InstanceName string         `json:"instance_name"`
 	Since        string         `json:"since,omitempty"`
 	CommitID     string         `json:"commit_id"`
+	IPAddress    string         `json:"-"`
+	AuthType     string         `json:"-"`
 }
 
 type DeployUpdateReq struct {
