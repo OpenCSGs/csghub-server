@@ -48,17 +48,18 @@ const (
 )
 
 var (
-	KeyDeployID      string = "deploy_id"
-	KeyTaskID        string = "task_id"
-	KeyDeployType    string = "deploy_type"
-	KeyUserID        string = "user_id"
-	KeyDeploySKU     string = "deploy_sku"
-	KeyOrderDetailID string = "order-detail-id"
-	KeyMinScale      string = "autoscaling.knative.dev/min-scale"
-	KeyMaxScale      string = "autoscaling.knative.dev/max-scale"
-	KeyServiceLabel  string = "serving.knative.dev/service"
-	KeyRunModeLabel  string = "run-mode"
-	ValueMultiHost   string = "multi-host"
+	KeyDeployID           string = "deploy_id"
+	KeyTaskID             string = "task_id"
+	KeyDeployType         string = "deploy_type"
+	KeyUserID             string = "user_id"
+	KeyDeploySKU          string = "deploy_sku"
+	KeyOrderDetailID      string = "order-detail-id"
+	KeyMinScale           string = "autoscaling.knative.dev/min-scale"
+	KeyMaxScale           string = "autoscaling.knative.dev/max-scale"
+	KeyServiceLabel       string = "serving.knative.dev/service"
+	KeyRunModeLabel       string = "run-mode"
+	ValueMultiHost        string = "multi-host"
+	ValuePDDisaggregation string = "pd-disaggregation"
 	// CommitId         string = "serving.knative.dev/commit_id"
 	CommitId            = types.StreamKeyDeployCommitID
 	RevisionName string = "serving.knative.dev/revision"
@@ -1062,6 +1063,9 @@ func (s *serviceComponentImpl) GetServiceByName(ctx context.Context, svcName, cl
 }
 
 func (s *serviceComponentImpl) RunService(ctx context.Context, req types.SVCRequest) error {
+	if req.PD != nil && req.PD.Enabled {
+		return s.runServicePD(ctx, req)
+	}
 	if req.Hardware.Replicas > 1 {
 		return s.runServiceMultiHost(ctx, req)
 	} else {

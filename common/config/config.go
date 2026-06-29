@@ -209,6 +209,10 @@ type Config struct {
 		MinContextForEstimation   int    `env:"STARHUB_SERVER_MODEL_MIN_CONTEXT_FOR_ESTIMATION" default:"2048"`
 		MinContextForFinetune     int    `env:"STARHUB_SERVER_MODEL_MIN_CONTEXT_FOR_FINETUNE" default:"512"`
 		DeployStatusCheckInterval int    `env:"STARHUB_SERVER_MODEL_DEPLOY_STATUS_CHECK_INTERVAL" default:"10"` // 10 seconds
+		// PDRecommendParamsThreshold is the minimum model parameter count (in billions)
+		// for which PD disaggregation recommendations are generated. Models with params
+		// below this threshold are skipped. Default is 100B.
+		PDRecommendParamsThreshold float32 `env:"STARHUB_SERVER_MODEL_PD_RECOMMEND_PARAMS_THRESHOLD" default:"100"`
 	}
 
 	Search struct {
@@ -628,6 +632,22 @@ type Config struct {
 		VGPUPodResourceName  string `env:"STARHUB_SERVER_RUNNER_VGPU_POD_RESOURCE_NAME" default:"hami.io/vgpu-devices-allocated"`
 		VGPUResourceReqKey   string `env:"STARHUB_SERVER_RUNNER_VGPU_RESOURCE_REQ_KEY" default:"nvidia.com/vgpu"`
 		VGPUMemoryReqKey     string `env:"STARHUB_SERVER_RUNNER_VGPU_MEMORY_REQ_KEY" default:"nvidia.com/vgpumem"`
+		PD                   struct {
+			// EPPImage is the image ID for the Endpoint Picker deployment. Only the short image ID is configured;
+			// it will be resolved to a full image path via resolveContainerImage at runtime.
+			EPPImage string `env:"STARHUB_SERVER_RUNNER_PD_EPP_IMAGE" default:"opencsghq/llm-d/llm-d-router-endpoint-picker-dev:main"`
+			// RoutingProxyImage is the image ID for the routing-proxy sidecar. Only the short image ID is configured;
+			// it will be resolved to a full image path via resolveContainerImage at runtime.
+			RoutingProxyImage string `env:"STARHUB_SERVER_RUNNER_PD_ROUTING_PROXY_IMAGE" default:"opencsghq/llm-d/llm-d-routing-sidecar:v0.8.0"`
+			// EPPServiceAccountName is the namespace-level SA that EPP pods should use.
+			EPPServiceAccountName string `env:"STARHUB_SERVER_RUNNER_PD_EPP_SERVICE_ACCOUNT_NAME" default:"llm-d-epp"`
+			// EnvoyImage is the Envoy sidecar image for EPP HTTP proxy (port 8081).
+			EnvoyImage string `env:"STARHUB_SERVER_RUNNER_PD_ENVOY_IMAGE" default:"opencsghq/envoyproxy/envoy:distroless-v1.37.2"`
+			// EnvoyConfigMapName is the global ConfigMap name containing envoy.yaml for all PD EPP deployments.
+			EnvoyConfigMapName string `env:"STARHUB_SERVER_RUNNER_PD_ENVOY_CONFIGMAP_NAME" default:"pd-epp-envoy"`
+			// EPPConfigMapName is the global ConfigMap name containing pd-config.yaml for all PD EPP deployments.
+			EPPConfigMapName string `env:"STARHUB_SERVER_RUNNER_PD_EPP_CONFIGMAP_NAME" default:"pd-epp-config"`
+		}
 	}
 
 	LogCollector struct {

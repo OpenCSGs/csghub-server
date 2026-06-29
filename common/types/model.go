@@ -278,6 +278,10 @@ type ModelRunReq struct {
 	Entrypoint         string `json:"entrypoint"` // model file name for gguf model
 	EngineArgs         string `json:"engine_args"`
 	Agent              string `json:"agent"`
+	// EnablePD enables PD (Prefill-Decode) disaggregation inference architecture.
+	// When true, the system checks the model metadata for PD recommendation,
+	// validates hardware resources, and splits resources between prefill and decode.
+	EnablePD bool `json:"enable_pd"`
 	// OwnerNamespace is optional. If set, the inference is created under this namespace (user or org) for billing and listing; path {namespace} remains the model's owner.
 	OwnerNamespace string `json:"owner_namespace,omitempty"`
 }
@@ -438,6 +442,9 @@ type ModelInfo struct {
 	NumHiddenLayers   int            `json:"-"`
 	BytesPerParam     int            `json:"-"`
 	NumAttentionHeads int            `json:"-"`
+	// MoE expert fields parsed from config.json
+	TotalExperts  int `json:"total_experts"`
+	ActiveExperts int `json:"active_experts"`
 }
 type Quantization struct {
 	VERSION         string  `json:"version"`
@@ -452,6 +459,19 @@ type ModelConfig struct {
 	HiddenSize        int      `json:"hidden_size"`
 	NumAttentionHeads int      `json:"num_attention_heads"`
 	TorchDtype        string   `json:"torch_dtype"`
+	// MoE expert fields parsed from config.json.
+	// Different model families use different field names for the same concept,
+	// so we capture all industry-standard variants.
+	// NRoutedExperts is used by DeepSeek-style models for total routed experts.
+	NRoutedExperts int `json:"n_routed_experts,omitempty"`
+	// NumExperts is used by Mixtral/GLM-style models for total experts.
+	NumExperts int `json:"num_experts,omitempty"`
+	// NumLocalExperts is used by Megatron/NeMo-style models for total local experts.
+	NumLocalExperts int `json:"num_local_experts,omitempty"`
+	// NumExpertsPerTok is the number of experts activated per token (active experts).
+	NumExpertsPerTok int `json:"num_experts_per_tok,omitempty"`
+	// NumActivatedExperts is an alternative field name for active experts (used by some models).
+	NumActivatedExperts int `json:"num_activated_experts,omitempty"`
 }
 
 type ModelTextConfig struct {
@@ -541,4 +561,43 @@ type ListInferenceVersionsResp struct {
 type UpdateInferenceVersionTrafficReq struct {
 	CommitID       string `json:"commit_id" binding:"required"`
 	TrafficPercent int64  `json:"traffic_percent"`
+}
+
+// TotalExpertCount returns the total number of routed experts from the config.
+// It checks the industry-standard field names: n_routed_experts, num_experts,
+// num_local_experts. Returns 0 if none are set (dense model).
+func (c *ModelConfig) TotalExpertCount() int {
+	if c == nil {
+		return 0
+	}
+	if c.NRoutedExperts > 0 {
+		return c.NRoutedExperts
+	}
+	if c.NumExperts > 0 {
+		return c.NumExperts
+	}
+	if c.NumLocalExperts > 0 {
+		return c.NumLocalExperts
+	}
+	return 0
+}
+
+// ActiveExpertCount returns the number of experts activated per token.
+// It checks num_experts_per_tok and num_activated_experts. Returns 0 if none are set.
+func (c *ModelConfig) ActiveExpertCount() int {
+	if c == nil {
+		return 0
+	}
+	if c.NumExpertsPerTok > 0 {
+		return c.NumExpertsPerTok
+	}
+	if c.NumActivatedExperts > 0 {
+		return c.NumActivatedExperts
+	}
+	return 0
+}
+
+// IsMoE returns true if the model has routed experts (MoE architecture).
+func (c *ModelConfig) IsMoE() bool {
+	return c.TotalExpertCount() > 0
 }

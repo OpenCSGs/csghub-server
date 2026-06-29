@@ -316,6 +316,10 @@ func (c *runtimeArchitectureComponentImpl) UpdateModelMetadata(ctx context.Conte
 	if err != nil {
 		return nil, fmt.Errorf("fail to update model metadata in db, %w", err)
 	}
+
+	// Generate PD recommendation for >128B MoE models (ee/saas only)
+	c.updatePDRecommendation(ctx, repo, modelInfo)
+
 	slog.Info("updated model metadata successfully", slog.Any("repo path", repo.Path), slog.Any("model info", metadata))
 	return modelInfo, nil
 }
@@ -562,6 +566,8 @@ func (c *runtimeArchitectureComponentImpl) GetMetadataFromSafetensors(ctx contex
 		modelInfo.NumHiddenLayers = config.NumHiddenLayers
 		modelInfo.HiddenSize = config.HiddenSize
 		modelInfo.NumAttentionHeads = config.NumAttentionHeads
+		modelInfo.TotalExperts = config.TotalExpertCount()
+		modelInfo.ActiveExperts = config.ActiveExpertCount()
 		if modelInfo.HiddenSize != 0 {
 			kvcacheSize := common.GetKvCacheSize(modelInfo.ContextSize, modelInfo.BatchSize, modelInfo.HiddenSize, modelInfo.NumHiddenLayers, modelInfo.BytesPerParam)
 			activateMemory := common.GetActivationMemory(modelInfo.BatchSize, modelInfo.ContextSize, modelInfo.NumHiddenLayers, modelInfo.HiddenSize, modelInfo.NumAttentionHeads, modelInfo.BytesPerParam)
@@ -734,6 +740,13 @@ func (c *runtimeArchitectureComponentImpl) InitRuntimeFrameworkAndArchitectures(
 	if err != nil {
 		return fmt.Errorf("failed to update space runtime_framework: %w", err)
 	}
+
+	// Load PD recommendation configs from configs/pd/ directory (ee/saas only)
+	err = c.loadPDRecommendations(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to load PD recommendations: %w", err)
+	}
+
 	return nil
 }
 
@@ -968,3 +981,4 @@ func getJsonfiles(subPath string) (list []string, err error) {
 
 	return list, nil
 }
+

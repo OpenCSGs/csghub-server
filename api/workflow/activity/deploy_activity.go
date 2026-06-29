@@ -653,6 +653,7 @@ func (a *DeployActivity) createDeployRequest(ctx context.Context, task *database
 		DeployExtend: types.DeployExtend{
 			NodeAffinity: deployInfo.NodeAffinity,
 			Tolerations:  deployInfo.Tolerations,
+			PD:           deployInfo.PD,
 		},
 	}, nil
 }
