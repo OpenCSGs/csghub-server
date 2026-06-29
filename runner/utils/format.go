@@ -7,8 +7,9 @@ import (
 )
 
 var (
-	invalidChar = regexp.MustCompile(`[^a-z0-9\-.]+`)
-	trimEdge    = regexp.MustCompile(`^[^a-z0-9]+|[^a-z0-9]+$`)
+	invalidChar         = regexp.MustCompile(`[^a-z0-9\-.]+`)
+	invalidContainerChar = regexp.MustCompile(`[^a-z0-9-]+`)
+	trimEdge            = regexp.MustCompile(`^[^a-z0-9]+|[^a-z0-9]+$`)
 )
 
 func ValidUrl(endpoint string) bool {
@@ -56,6 +57,35 @@ func SafeName(name string) string {
 	// 4. Limit length to 253 characters (K8s RFC1123 max 253)
 	if len(name) > 253 {
 		name = name[:253]
+	}
+
+	// 5. Prevent empty string
+	if name == "" {
+		name = "default"
+	}
+
+	return name
+}
+
+// SafeContainerName sanitizes the input string to be a valid Kubernetes container name.
+// Container names follow DNS label rules (RFC 1123 label):
+// - contain only lowercase alphanumeric characters or '-'
+// - must not contain dots (unlike resource names which allow dots)
+// - start and end with an alphanumeric character
+// - max 63 characters
+func SafeContainerName(name string) string {
+	// 1. Convert to lower case
+	name = strings.ToLower(name)
+
+	// 2. Replace invalid characters (including dots) with '-'
+	name = invalidContainerChar.ReplaceAllString(name, "-")
+
+	// 3. Trim non-alphanumeric characters from start and end
+	name = trimEdge.ReplaceAllString(name, "")
+
+	// 4. Limit length to 63 characters (DNS label max)
+	if len(name) > 63 {
+		name = name[:63]
 	}
 
 	// 5. Prevent empty string

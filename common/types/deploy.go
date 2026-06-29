@@ -1,9 +1,8 @@
 package types
 
 import (
-	"time"
-
 	corev1 "k8s.io/api/core/v1"
+	"time"
 )
 
 const (
@@ -62,6 +61,7 @@ type ClusterDeployReq struct {
 type DeployExtend struct {
 	NodeAffinity *corev1.NodeAffinity `json:"node_affinity,omitempty"`
 	Tolerations  []Toleration         `json:"tolerations,omitempty"`
+	PD           *PDConfig            `json:"pd,omitempty"`
 }
 
 type DeployTimeRangeReq struct {

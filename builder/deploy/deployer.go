@@ -128,6 +128,7 @@ func (d *deployer) serverlessDeploy(ctx context.Context, dr types.DeployRequest)
 	deploy.OwnerNamespace = dr.OwnerNamespace
 	deploy.NodeAffinity = dr.NodeAffinity
 	deploy.Tolerations = dr.Tolerations
+	deploy.PD = dr.PD
 	slog.Debug("do deployer.serverlessDeploy", slog.Any("dr", dr), slog.Any("deploy", deploy))
 	err = d.deployTaskStore.UpdateDeploy(ctx, deploy)
 	if err != nil {
@@ -180,6 +181,7 @@ func (d *deployer) dedicatedDeploy(ctx context.Context, dr types.DeployRequest) 
 		OwnerNamespace:   dr.OwnerNamespace,
 		NodeAffinity:     dr.NodeAffinity,
 		Tolerations:      dr.Tolerations,
+		PD:               dr.PD,
 	}
 	updateDatabaseDeploy(deploy, dr)
 	err := d.deployTaskStore.CreateDeploy(ctx, deploy)
@@ -753,6 +755,9 @@ func (d *deployer) UpdateDeploy(ctx context.Context, dur *types.DeployUpdateReq,
 	}
 	if len(dur.Tolerations) != 0 {
 		deploy.Tolerations = dur.Tolerations
+	}
+	if dur.PD != nil {
+		deploy.PD = dur.PD
 	}
 
 	// update deploy table

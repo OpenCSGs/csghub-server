@@ -272,6 +272,7 @@ func NewTestModelComponent(
 		lfsMetaObjectStore:        stores.LfsMetaObject,
 		clusterComponent:          clusterComponent,
 		inferenceArchStore:        stores.InferenceArch,
+		metadataStore:             stores.Metadata,
 	}
 }
 
@@ -339,6 +340,7 @@ func NewTestRuntimeArchitectureComponent(stores *tests.MockStores, repoComponent
 		runtimeArchStore:          stores.RuntimeArch,
 		resouceModelStore:         stores.ResourceModel,
 		tagStore:                  stores.Tag,
+		metadataStore:             stores.Metadata,
 		gitServer:                 gitServer,
 	}
 }

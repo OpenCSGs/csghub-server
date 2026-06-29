@@ -134,6 +134,7 @@ func NewModelComponent(config *config.Config) (ModelComponent, error) {
 	c.xnetMigrationTaskStore = database.NewXnetMigrationTaskStore()
 	c.lfsMetaObjectStore = database.NewLfsMetaObjectStore()
 	c.inferenceArchStore = database.NewInferenceArchStore()
+	c.metadataStore = database.NewMetadataStore()
 
 	c.clusterComponent, err = NewClusterComponent(config)
 	if err != nil {
@@ -177,6 +178,7 @@ type modelComponentImpl struct {
 	lfsMetaObjectStore        database.LfsMetaObjectStore
 	clusterComponent          ClusterComponent
 	inferenceArchStore        database.InferenceArchStore
+	metadataStore             database.MetadataStore
 }
 
 func (c *modelComponentImpl) Index(ctx context.Context, filter *types.RepoFilter, per, page int, needOpWeight bool) ([]*types.Model, int, error) {
@@ -1190,6 +1192,18 @@ func (c *modelComponentImpl) Deploy(ctx context.Context, deployReq types.DeployA
 		},
 	}
 	dp = modelRunUpdateDeployRepo(dp, req)
+
+	// If PD disaggregation is requested, check the model metadata for a PD
+	// recommendation, validate hardware resources, and build the PD config
+	// with resources split between prefill and decode roles.
+	if req.EnablePD {
+		pdConfig, err := c.checkAndBuildPDConfig(ctx, req, hardware, m.Repository.ID)
+		if err != nil {
+			return -1, errorx.BadRequest(err, nil)
+		}
+		dp.DeployExtend.PD = pdConfig
+	}
+
 	return c.deployer.Deploy(ctx, dp)
 }
 

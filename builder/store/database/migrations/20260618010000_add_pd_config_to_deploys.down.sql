@@ -1,0 +1,2 @@
+ALTER TABLE deploys
+    DROP COLUMN IF EXISTS pd;
