@@ -1,11 +1,13 @@
 package proxy
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	commonutils "opencsg.com/csghub-server/common/utils/common"
 )
 
 func TestReverseProxy_AcceptEncodingDefaultGzip(t *testing.T) {
@@ -45,6 +47,24 @@ func TestReverseProxy_AcceptEncodingDisabled(t *testing.T) {
 
 	require.Equal(t, http.StatusOK, resp.Code)
 	require.Equal(t, "identity", downstreamAcceptEncoding)
+}
+
+func TestReverseProxy_ContextCanceledWritesClientClosed(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	rp, err := NewReverseProxy(server.URL)
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	req := httptest.NewRequest(http.MethodGet, "/", nil).WithContext(ctx)
+	resp := httptest.NewRecorder()
+	rp.ServeHTTP(resp, req, "", "")
+
+	require.Equal(t, commonutils.StatusClientClosedRequest, resp.Code)
 }
 
 // import (

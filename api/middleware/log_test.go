@@ -13,6 +13,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	commonutils "opencsg.com/csghub-server/common/utils/common"
 )
 
 // captureLog is a helper that installs a slog JSON handler writing to a buffer
@@ -82,7 +83,7 @@ func TestLog_ClientCancelBeforeHandler(t *testing.T) {
 
 	logs := readLogs()
 	require.Len(t, logs, 1, "must emit a log even when client canceled")
-	assert.Equal(t, float64(StatusClientClosedRequest), logs[0]["status"], "status should be 499 for client cancel")
+	assert.Equal(t, float64(commonutils.StatusClientClosedRequest), logs[0]["status"], "status should be 499 for client cancel")
 	assert.Equal(t, "/test", logs[0]["url"])
 }
 
@@ -116,7 +117,7 @@ func TestLog_ClientCancelDuringSlowHandler(t *testing.T) {
 
 	logs := readLogs()
 	require.Len(t, logs, 1, "must emit a log when client cancels during slow handler")
-	assert.Equal(t, float64(StatusClientClosedRequest), logs[0]["status"], "status should be 499")
+	assert.Equal(t, float64(commonutils.StatusClientClosedRequest), logs[0]["status"], "status should be 499")
 }
 
 func TestLog_HandlerPanicWithRecovery(t *testing.T) {

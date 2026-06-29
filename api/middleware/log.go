@@ -8,13 +8,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/api/httpbase"
+	commonutils "opencsg.com/csghub-server/common/utils/common"
 	"opencsg.com/csghub-server/common/utils/trace"
 )
-
-// Status 499 is a non-standard code introduced by nginx to indicate
-// "Client Closed Request" — the client disconnected before the server
-// finished processing.
-const StatusClientClosedRequest = 499
 
 func Log() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
@@ -43,7 +39,7 @@ func Log() gin.HandlerFunc {
 			// If the client disconnected (timeout or explicit cancel),
 			// override the logged status to 499.
 			if ctx.Request.Context().Err() == context.Canceled {
-				status = StatusClientClosedRequest
+				status = commonutils.StatusClientClosedRequest
 			}
 
 			// Derive a non-canceled context for the log call.
