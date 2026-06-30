@@ -361,7 +361,7 @@ require (
 	github.com/gorilla/context v1.1.1 // indirect
 	github.com/gorilla/securecookie v1.1.1 // indirect
 	github.com/gorilla/sessions v1.2.1 // indirect
-	github.com/gpustack/gguf-parser-go v0.17.2
+	github.com/gpustack/gguf-parser-go v0.24.1
 	github.com/hashicorp/go-version v1.7.0
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/jellydator/ttlcache/v2 v2.11.1 // indirect

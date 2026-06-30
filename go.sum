@@ -1662,6 +1662,8 @@ github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674 h1:JeSE6pjso5T
 github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674/go.mod h1:r4w70xmWCQKmi1ONH4KIaBptdivuRPyosB9RmPlGEwA=
 github.com/gpustack/gguf-parser-go v0.17.2 h1:/51oABezbPgRT0mPmdO6H8JTaGvXf4yzfJn/IBu0rwY=
 github.com/gpustack/gguf-parser-go v0.17.2/go.mod h1:GvHh1Kvvq5ojCOsJ5UpwiJJmIjFw3Qk5cW7R+CZ3IJo=
+github.com/gpustack/gguf-parser-go v0.24.1 h1:nTYtL8HFK6ZhB90RKBu4oX2b3ZHpJLrMmKRfL9w9Cyc=
+github.com/gpustack/gguf-parser-go v0.24.1/go.mod h1:y4TwTtDqFWTK+xvprOjRUh+dowgU2TKCX37vRKvGiZ0=
 github.com/grafana/sigil-sdk/go v0.5.0 h1:VKOV7cHa6v07bHhU0eApOs/5Nrl6FAgkImr69tw+fQA=
 github.com/grafana/sigil-sdk/go v0.5.0/go.mod h1:SfJ2KDOXMWPfDUGAI6F/WT5lrfinlKLSlUUvHwlp33Q=
 github.com/gregjones/httpcache v0.0.0-20170920190843-316c5e0ff04e/go.mod h1:FecbI9+v66THATjSRHfNgh1IVFe/9kFxbXtjV0ctIMA=
