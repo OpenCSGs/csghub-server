@@ -76,3 +76,7 @@ func (c *clusterComponentImpl) StopDeploy(ctx context.Context, stopReq types.Dep
 func (c *clusterComponentImpl) StopWorkflow(ctx context.Context, stopReq types.ArgoWorkFlowDeleteReq) error {
 	return nil
 }
+
+func (c *clusterComponentImpl) DeleteClusterNode(ctx context.Context, id int64) error {
+	return nil
+}
