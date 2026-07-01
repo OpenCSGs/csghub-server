@@ -88,8 +88,8 @@ func TestAccountBillStore_List(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, 2, len(res.Data))
 	expectedData := []types.ITEM{
-		{Consumption: 31, InstanceName: "c1", Value: 28, PromptToken: 0, CompletionToken: 0},
 		{Consumption: 21, InstanceName: "c2", Value: 20, PromptToken: 0, CompletionToken: 0},
+		{Consumption: 31, InstanceName: "c1", Value: 28, PromptToken: 0, CompletionToken: 0},
 	}
 	require.Equal(t, expectedData, res.Data)
 
