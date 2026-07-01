@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"opencsg.com/csghub-server/common/errorx"
@@ -100,10 +101,16 @@ func (s *accountBillStoreImpl) ListByUserIDAndDate(ctx context.Context, req type
 		ColumnExpr("sum(cash_value) as cash_value").
 		ColumnExpr("sum(duration) as duration").
 		ColumnExpr("sum(count) as count").
+		ColumnExpr("MIN(bill_date) as bill_date").
 		Where("bill_date >= ? and bill_date <= ?", req.StartDate, req.EndDate).
 		Where("user_uuid = ?", req.TargetUUID).
-		Where("scene = ?", req.Scene).
-		Group("customer_id", "data_type", "resolution", "unit_type")
+		Where("scene = ?", req.Scene)
+
+	if len(req.InstanceName) > 0 {
+		q = q.Where("LOWER(customer_id) LIKE ?", "%"+strings.ToLower(req.InstanceName)+"%")
+	}
+
+	q = q.Group("customer_id", "data_type", "resolution", "unit_type")
 
 	count, err := q.Count(ctx)
 	if err != nil {
@@ -126,7 +133,7 @@ func (s *accountBillStoreImpl) ListByUserIDAndDate(ctx context.Context, req type
 		return AccountBillRes{}, errorx.HandleDBError(err, nil)
 	}
 
-	err = q.Order("customer_id").Limit(req.Per).Offset((req.Page-1)*req.Per).Scan(ctx, &res)
+	err = q.Order("bill_date DESC").Order("customer_id").Limit(req.Per).Offset((req.Page-1)*req.Per).Scan(ctx, &res)
 	if err != nil {
 		return AccountBillRes{}, errorx.HandleDBError(err, nil)
 	}
@@ -161,7 +168,7 @@ func (s *accountBillStoreImpl) ListBillsDetailByUserID(ctx context.Context, req 
 		return AccountBillDetailRes{}, errorx.HandleDBError(err, nil)
 	}
 
-	err = q.Order("bill_date ASC").Limit(req.Per).Offset((req.Page-1)*req.Per).Scan(ctx, &bills)
+	err = q.Order("customer_id").Order("bill_date DESC").Limit(req.Per).Offset((req.Page-1)*req.Per).Scan(ctx, &bills)
 	if err != nil {
 		return AccountBillDetailRes{}, errorx.HandleDBError(err, nil)
 	}
