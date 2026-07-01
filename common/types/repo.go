@@ -425,3 +425,12 @@ type DownloadCodeZipReq struct {
 	Name      string `json:"name"`
 	Revision  string `json:"revision"`
 }
+
+type BatchRepoExtraReq struct {
+	RepoIDs []int64 `json:"repo_ids" binding:"required"`
+}
+
+type RepoExtraItem struct {
+	RepoID int64 `json:"repo_id"`
+	Size   int64 `json:"size"`
+}

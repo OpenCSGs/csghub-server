@@ -421,6 +421,9 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	// Admin user get repo path list
 	adminGroup.GET("/repos", repoCommonHandler.GetRepos)
 
+	// Batch get repository extra information for multiple repositories
+	apiGroup.POST("/repos/extra", repoCommonHandler.BatchGetRepoExtra)
+
 	// routes for broadcast
 	broadcastHandler, err := handler.NewBroadcastHandler()
 	if err != nil {

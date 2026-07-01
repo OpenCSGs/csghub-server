@@ -282,6 +282,65 @@ func (_c *MockRepositoryStatisticsStore_FindByRepositoryIDAndBranch_Call) RunAnd
 	return _c
 }
 
+// FindByRepositoryIDs provides a mock function with given fields: ctx, repoIDs
+func (_m *MockRepositoryStatisticsStore) FindByRepositoryIDs(ctx context.Context, repoIDs []int64) ([]*database.RepositoryStatistics, error) {
+	ret := _m.Called(ctx, repoIDs)
+
+	if len(ret) == 0 {
+		panic("no return value specified for FindByRepositoryIDs")
+	}
+
+	var r0 []*database.RepositoryStatistics
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, []int64) ([]*database.RepositoryStatistics, error)); ok {
+		return rf(ctx, repoIDs)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, []int64) []*database.RepositoryStatistics); ok {
+		r0 = rf(ctx, repoIDs)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]*database.RepositoryStatistics)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, []int64) error); ok {
+		r1 = rf(ctx, repoIDs)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockRepositoryStatisticsStore_FindByRepositoryIDs_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FindByRepositoryIDs'
+type MockRepositoryStatisticsStore_FindByRepositoryIDs_Call struct {
+	*mock.Call
+}
+
+// FindByRepositoryIDs is a helper method to define mock.On call
+//   - ctx context.Context
+//   - repoIDs []int64
+func (_e *MockRepositoryStatisticsStore_Expecter) FindByRepositoryIDs(ctx interface{}, repoIDs interface{}) *MockRepositoryStatisticsStore_FindByRepositoryIDs_Call {
+	return &MockRepositoryStatisticsStore_FindByRepositoryIDs_Call{Call: _e.mock.On("FindByRepositoryIDs", ctx, repoIDs)}
+}
+
+func (_c *MockRepositoryStatisticsStore_FindByRepositoryIDs_Call) Run(run func(ctx context.Context, repoIDs []int64)) *MockRepositoryStatisticsStore_FindByRepositoryIDs_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].([]int64))
+	})
+	return _c
+}
+
+func (_c *MockRepositoryStatisticsStore_FindByRepositoryIDs_Call) Return(_a0 []*database.RepositoryStatistics, _a1 error) *MockRepositoryStatisticsStore_FindByRepositoryIDs_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockRepositoryStatisticsStore_FindByRepositoryIDs_Call) RunAndReturn(run func(context.Context, []int64) ([]*database.RepositoryStatistics, error)) *MockRepositoryStatisticsStore_FindByRepositoryIDs_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Update provides a mock function with given fields: ctx, stats
 func (_m *MockRepositoryStatisticsStore) Update(ctx context.Context, stats *database.RepositoryStatistics) error {
 	ret := _m.Called(ctx, stats)

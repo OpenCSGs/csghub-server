@@ -56,7 +56,9 @@ func NewRepoTester(t *testing.T) *RepoTester {
 		m:        tester.mocks.model,
 		d:        tester.mocks.dataset,
 		temporal: tester.mocks.workflow,
-		config:   &config.Config{},
+		config: &config.Config{
+			MaxRepoBatchNum: 500,
+		},
 	}
 	tester.WithParam("name", "r")
 	tester.WithParam("namespace", "u")
@@ -1974,4 +1976,61 @@ func TestRepoHandler_GetRepos(t *testing.T) {
 	tester.ResponseEq(
 		t, 200, tester.OKText, []string{},
 	)
+}
+
+func TestRepoHandler_BatchGetRepoExtra(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
+			return rp.BatchGetRepoExtra
+		})
+		tester.WithBody(t, types.BatchRepoExtraReq{RepoIDs: []int64{1, 2}}).WithUser()
+
+		tester.mocks.repo.EXPECT().BatchGetRepoExtra(tester.Ctx(), []int64{1, 2}, "u").Return([]types.RepoExtraItem{{RepoID: 1, Size: 100}, {RepoID: 2, Size: 200}}, nil)
+
+		tester.Execute()
+
+		tester.ResponseEq(t, http.StatusOK, tester.OKText, []types.RepoExtraItem{
+			{RepoID: 1, Size: 100},
+			{RepoID: 2, Size: 200},
+		})
+	})
+
+	t.Run("too many IDs", func(t *testing.T) {
+		ids := make([]int64, 501)
+		for i := range ids {
+			ids[i] = int64(i + 1)
+		}
+		tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
+			return rp.BatchGetRepoExtra
+		})
+		tester.WithBody(t, types.BatchRepoExtraReq{RepoIDs: ids}).WithUser()
+
+		tester.Execute()
+
+		tester.ResponseEqCode(t, http.StatusBadRequest)
+	})
+
+	t.Run("invalid JSON body", func(t *testing.T) {
+		tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
+			return rp.BatchGetRepoExtra
+		})
+		tester.WithBody(t, "not a valid json").WithUser()
+
+		tester.Execute()
+
+		tester.ResponseEqCode(t, http.StatusBadRequest)
+	})
+
+	t.Run("server error", func(t *testing.T) {
+		tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
+			return rp.BatchGetRepoExtra
+		})
+		tester.WithBody(t, types.BatchRepoExtraReq{RepoIDs: []int64{1}}).WithUser()
+
+		tester.mocks.repo.EXPECT().BatchGetRepoExtra(tester.Ctx(), []int64{1}, "u").Return(nil, errors.New("db error"))
+
+		tester.Execute()
+
+		tester.ResponseEqCode(t, http.StatusInternalServerError)
+	})
 }

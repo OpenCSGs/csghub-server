@@ -16,5 +16,8 @@
     },
     "error.REPO-ERR-5": {
         "other": "Failed to download code zip archive"
+    },
+    "error.REPO-ERR-6": {
+        "other": "Failed to batch get repository extra information"
     }
 }

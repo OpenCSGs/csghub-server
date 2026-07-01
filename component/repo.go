@@ -3,6 +3,7 @@ package component
 import (
 	"bufio"
 	"bytes"
+	"cmp"
 	"context"
 	"crypto/sha256"
 	"database/sql"
@@ -197,6 +198,8 @@ type RepoComponent interface {
 	GetRepos(ctx context.Context, search, currentUser string, repoType types.RepositoryType) ([]string, error)
 	// GetRepoSizeByBranch gets the repository size for a specific branch
 	GetRepoSizeByBranch(ctx context.Context, repoType types.RepositoryType, namespace, name, branch, currentUser string) (int64, error)
+	// BatchGetRepoExtra gets the default branch size for multiple repositories
+	BatchGetRepoExtra(ctx context.Context, repoIDs []int64, currentUser string) ([]types.RepoExtraItem, error)
 	// DownloadCodeZip downloads the code repository as a zip archive
 	DownloadCodeZip(ctx context.Context, req types.DownloadCodeZipReq, currentUser string) ([]byte, error)
 	advancedRepoInterface
@@ -3303,6 +3306,82 @@ func (c *repoComponentImpl) GetRepoSizeByBranch(ctx context.Context, repoType ty
 	}
 
 	return stats.TotalSize, nil
+}
+
+// BatchGetRepoExtra gets the default branch size for multiple repositories by their IDs.
+// Only repositories the current user has read permission for are included in the result.
+func (c *repoComponentImpl) BatchGetRepoExtra(ctx context.Context, repoIDs []int64, currentUser string) ([]types.RepoExtraItem, error) {
+	repos, err := c.repoStore.FindByIds(ctx, repoIDs)
+	if err != nil {
+		return nil, errorx.BatchGetRepoExtraFailed(fmt.Errorf("failed to find repos by ids, error: %w", err))
+	}
+
+	// Determine which repos the user can read — same approach as PublicToUser:
+	// fetch user info once, then check ownership + privacy in-memory.
+	isAdmin := false
+	accessibleIDs := make(map[int64]bool)
+	if currentUser != "" {
+		user, err := c.userSvcClient.GetUserInfo(ctx, currentUser, currentUser)
+		if err != nil {
+			return nil, errorx.BatchGetRepoExtraFailed(fmt.Errorf("failed to get user info, error: %w", err))
+		}
+		dbUser := &database.User{RoleMask: strings.Join(user.Roles, ",")}
+		if dbUser.CanAdmin() {
+			isAdmin = true
+		} else {
+			accessibleIDs[user.ID] = true
+			for _, org := range user.Orgs {
+				accessibleIDs[org.UserID] = true
+			}
+		}
+	}
+
+	// Filter repos to those the user has read permission for
+	readableRepos := make([]*database.Repository, 0, len(repos))
+	for _, repo := range repos {
+		if isAdmin || !repo.Private || accessibleIDs[repo.UserID] {
+			readableRepos = append(readableRepos, repo)
+		}
+	}
+
+	// Collect repos that have a default branch for statistics lookup
+	repoDefaultBranches := make(map[int64]string, len(readableRepos))
+	for _, repo := range readableRepos {
+		if repo.DefaultBranch != "" {
+			repoDefaultBranches[repo.ID] = repo.DefaultBranch
+		}
+	}
+
+	sizeMap := make(map[int64]int64, len(readableRepos))
+
+	if len(repoDefaultBranches) > 0 {
+		repoIDsWithBranch := make([]int64, 0, len(repoDefaultBranches))
+		for repoID := range repoDefaultBranches {
+			repoIDsWithBranch = append(repoIDsWithBranch, repoID)
+		}
+		slices.Sort(repoIDsWithBranch)
+
+		stats, err := c.repoStatisticsStore.FindByRepositoryIDs(ctx, repoIDsWithBranch)
+		if err != nil {
+			return nil, errorx.BatchGetRepoExtraFailed(fmt.Errorf("failed to find repo statistics, error: %w", err))
+		}
+
+		for _, stat := range stats {
+			if defaultBranch, ok := repoDefaultBranches[stat.RepositoryID]; ok && stat.Branch == defaultBranch {
+				sizeMap[stat.RepositoryID] = stat.TotalSize
+			}
+		}
+	}
+
+	result := make([]types.RepoExtraItem, 0, len(readableRepos))
+	for _, repo := range readableRepos {
+		result = append(result, types.RepoExtraItem{RepoID: repo.ID, Size: sizeMap[repo.ID]})
+	}
+	slices.SortFunc(result, func(a, b types.RepoExtraItem) int {
+		return cmp.Compare(a.RepoID, b.RepoID)
+	})
+
+	return result, nil
 }
 
 func (c *repoComponentImpl) DownloadCodeZip(ctx context.Context, req types.DownloadCodeZipReq, currentUser string) ([]byte, error) {

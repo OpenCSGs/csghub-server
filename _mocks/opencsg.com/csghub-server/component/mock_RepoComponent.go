@@ -567,6 +567,66 @@ func (_c *MockRepoComponent_AllowWriteAccess_Call) RunAndReturn(run func(context
 	return _c
 }
 
+// BatchGetRepoExtra provides a mock function with given fields: ctx, repoIDs, currentUser
+func (_m *MockRepoComponent) BatchGetRepoExtra(ctx context.Context, repoIDs []int64, currentUser string) ([]types.RepoExtraItem, error) {
+	ret := _m.Called(ctx, repoIDs, currentUser)
+
+	if len(ret) == 0 {
+		panic("no return value specified for BatchGetRepoExtra")
+	}
+
+	var r0 []types.RepoExtraItem
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, []int64, string) ([]types.RepoExtraItem, error)); ok {
+		return rf(ctx, repoIDs, currentUser)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, []int64, string) []types.RepoExtraItem); ok {
+		r0 = rf(ctx, repoIDs, currentUser)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]types.RepoExtraItem)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, []int64, string) error); ok {
+		r1 = rf(ctx, repoIDs, currentUser)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockRepoComponent_BatchGetRepoExtra_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'BatchGetRepoExtra'
+type MockRepoComponent_BatchGetRepoExtra_Call struct {
+	*mock.Call
+}
+
+// BatchGetRepoExtra is a helper method to define mock.On call
+//   - ctx context.Context
+//   - repoIDs []int64
+//   - currentUser string
+func (_e *MockRepoComponent_Expecter) BatchGetRepoExtra(ctx interface{}, repoIDs interface{}, currentUser interface{}) *MockRepoComponent_BatchGetRepoExtra_Call {
+	return &MockRepoComponent_BatchGetRepoExtra_Call{Call: _e.mock.On("BatchGetRepoExtra", ctx, repoIDs, currentUser)}
+}
+
+func (_c *MockRepoComponent_BatchGetRepoExtra_Call) Run(run func(ctx context.Context, repoIDs []int64, currentUser string)) *MockRepoComponent_BatchGetRepoExtra_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].([]int64), args[2].(string))
+	})
+	return _c
+}
+
+func (_c *MockRepoComponent_BatchGetRepoExtra_Call) Return(_a0 []types.RepoExtraItem, _a1 error) *MockRepoComponent_BatchGetRepoExtra_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockRepoComponent_BatchGetRepoExtra_Call) RunAndReturn(run func(context.Context, []int64, string) ([]types.RepoExtraItem, error)) *MockRepoComponent_BatchGetRepoExtra_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // BatchMigrateRepoToHashedPath provides a mock function with given fields: ctx, auto, batchSize, lastID
 func (_m *MockRepoComponent) BatchMigrateRepoToHashedPath(ctx context.Context, auto bool, batchSize int, lastID int64) (int64, error) {
 	ret := _m.Called(ctx, auto, batchSize, lastID)

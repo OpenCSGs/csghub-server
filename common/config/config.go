@@ -728,6 +728,8 @@ type Config struct {
 	ActivityLog struct {
 		Enabled bool `env:"STARHUB_SERVER_ACTIVITY_LOG_ENABLE" default:"true"`
 	}
+
+	MaxRepoBatchNum int `env:"STARHUB_SERVER_MAX_REPO_SIZE_BATCH_NUM" default:"500"`
 }
 
 type MemoryConfig struct {

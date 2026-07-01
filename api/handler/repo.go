@@ -2046,6 +2046,47 @@ func (h *RepoHandler) GetRepoSizeByBranch(ctx *gin.Context) {
 	httpbase.OK(ctx, size)
 }
 
+// BatchGetRepoExtra godoc
+// @Security     ApiKey
+// @Summary      Batch get extra information for multiple repositories
+// @Tags         Repository
+// @Accept       json
+// @Produce      json
+// @Param        current_user query string false "current user name"
+// @Param        body body types.BatchRepoExtraReq true "request body"
+// @Success      200  {object}  types.Response{data=[]types.RepoExtraItem} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /repos/extra [post]
+func (h *RepoHandler) BatchGetRepoExtra(ctx *gin.Context) {
+	var req types.BatchRepoExtraReq
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
+		httpbase.BadRequestWithExt(ctx, errorx.ReqBodyFormat(err, nil))
+		return
+	}
+
+	if len(req.RepoIDs) > h.config.MaxRepoBatchNum {
+		httpbase.BadRequestWithExt(ctx, errorx.ReqParamInvalid(
+			fmt.Errorf("too many repository ids, max %d, got %d", h.config.MaxRepoBatchNum, len(req.RepoIDs)),
+			errorx.Ctx().Set("max", h.config.MaxRepoBatchNum).Set("got", len(req.RepoIDs)),
+		))
+		return
+	}
+
+	currentUser := httpbase.GetCurrentUser(ctx)
+
+	extras, err := h.c.BatchGetRepoExtra(ctx.Request.Context(), req.RepoIDs, currentUser)
+	if err != nil {
+		slog.ErrorContext(ctx.Request.Context(), "Failed to batch get repo extras", slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	slog.Debug("Batch get repo extras succeed", slog.Int("count", len(extras)))
+	httpbase.OK(ctx, extras)
+}
+
 // DownloadCodeZip godoc
 // @Summary      Download code repository as zip archive
 // @Description  Download code repository as zip archive
