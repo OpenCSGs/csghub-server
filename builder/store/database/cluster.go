@@ -38,6 +38,7 @@ type ClusterInfoStore interface {
 	UpdateClusterNodeByNode(ctx context.Context, node ClusterNode) error
 	AddNodeOwnership(ctx context.Context, ownership ClusterNodeOwnership) error
 	DeleteNodeOwnership(ctx context.Context, clusterNodeID int64) error
+	DeleteClusterNodeByID(ctx context.Context, id int64) error
 	GetNodeOwnership(ctx context.Context, clusterNodeID int64) (*ClusterNodeOwnership, error)
 	GetNodeOwnershipByNameSpace(ctx context.Context, nameSpace string) ([]ClusterNodeOwnership, error)
 	UpdateNodeOwnership(ctx context.Context, ownership ClusterNodeOwnership) error
@@ -506,6 +507,47 @@ func (s *clusterInfoStoreImpl) AddNodeOwnership(ctx context.Context, ownership C
 func (s *clusterInfoStoreImpl) DeleteNodeOwnership(ctx context.Context, clusterNodeID int64) error {
 	_, err := s.db.Operator.Core.NewDelete().Model(&ClusterNodeOwnership{}).Where("cluster_node_id = ?", clusterNodeID).Exec(ctx)
 	return errorx.HandleDBError(err, nil)
+}
+func (s *clusterInfoStoreImpl) DeleteClusterNodeByID(ctx context.Context, id int64) error {
+	err := s.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		var node ClusterNode
+		err := tx.NewSelect().Model(&node).Where("id = ?", id).Scan(ctx)
+		if err != nil {
+			return err
+		}
+		clusterID := node.ClusterID
+		_, err = tx.NewDelete().Model(&ClusterNodeOwnership{}).Where("cluster_node_id = ?", id).Exec(ctx)
+		if err != nil {
+			return err
+		}
+
+		_, err = tx.NewDelete().Model(&ClusterNode{}).Where("id = ?", id).Exec(ctx)
+		if err != nil {
+			return err
+		}
+
+		count, err := tx.NewSelect().Model(&ClusterNode{}).Where("cluster_id = ?", clusterID).Count(ctx)
+		if err != nil {
+			return err
+		}
+		if count < 1 {
+			_, err = tx.NewDelete().Model(&ClusterInfo{}).Where("cluster_id = ?", clusterID).Exec(ctx)
+			if err != nil {
+				return err
+			}
+			_, err = tx.NewDelete().Model(&SpaceResource{}).Where("cluster_id = ?", clusterID).Exec(ctx)
+			if err != nil {
+				return err
+			}
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return errorx.HandleDBError(err, nil)
+	}
+	return nil
 }
 
 func (s *clusterInfoStoreImpl) GetNodeOwnership(ctx context.Context, clusterNodeID int64) (*ClusterNodeOwnership, error) {
