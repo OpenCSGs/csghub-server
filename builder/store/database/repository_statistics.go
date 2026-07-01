@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/uptrace/bun"
 	"opencsg.com/csghub-server/common/errorx"
 )
 
@@ -31,6 +32,9 @@ type RepositoryStatisticsStore interface {
 
 	// FindByRepositoryIDAndBranch finds repository statistics by repository ID and branch
 	FindByRepositoryIDAndBranch(ctx context.Context, repoID int64, branch string) (*RepositoryStatistics, error)
+
+	// FindByRepositoryIDs finds repository statistics for multiple repository IDs
+	FindByRepositoryIDs(ctx context.Context, repoIDs []int64) ([]*RepositoryStatistics, error)
 
 	// Update updates repository statistics
 	Update(ctx context.Context, stats *RepositoryStatistics) error
@@ -85,6 +89,19 @@ func (s *RepositoryStatisticsStoreImpl) FindByRepositoryIDAndBranch(ctx context.
 		return nil, errorx.HandleDBError(err, nil)
 	}
 	return &stats, nil
+}
+
+// FindByRepositoryIDs finds repository statistics for multiple repository IDs
+func (s *RepositoryStatisticsStoreImpl) FindByRepositoryIDs(ctx context.Context, repoIDs []int64) ([]*RepositoryStatistics, error) {
+	if len(repoIDs) == 0 {
+		return nil, nil
+	}
+	var stats []*RepositoryStatistics
+	_, err := s.db.Operator.Core.NewSelect().Model(&stats).Where("repository_id IN (?)", bun.In(repoIDs)).Exec(ctx, &stats)
+	if err != nil {
+		return nil, errorx.HandleDBError(err, nil)
+	}
+	return stats, nil
 }
 
 // Update updates repository statistics
