@@ -75,7 +75,8 @@ func (m *monitorComponentImpl) CPUUsage(ctx context.Context, req *types.MonitorR
 	}
 	query := fmt.Sprintf("avg_over_time(rate(%s{pod='%s',namespace='%s',container='%s'}[1m])[%s:])[%s:%s]",
 		m.metrics.cpuUsage, req.Instance, namespace, container, req.LastDuration, req.LastDuration, req.TimeRange)
-	slog.InfoContext(ctx, "cpu-usage", slog.Any("query", query))
+	slog.InfoContext(ctx, "cpu-usage", slog.Any("query", query),
+		slog.Any("metricKeys", m.metrics.metricKeys), slog.Any("len", len(m.metrics.metricKeys)))
 
 	promeResp, err := m.client.SerialData(query)
 	if err != nil {
@@ -152,7 +153,8 @@ func (m *monitorComponentImpl) MemoryUsage(ctx context.Context, req *types.Monit
 
 	query := fmt.Sprintf("avg_over_time(%s{pod='%s',namespace='%s',container='%s'}[%s:])[%s:%s]",
 		m.metrics.memoryUsage, req.Instance, namespace, container, req.LastDuration, req.LastDuration, req.TimeRange)
-	slog.InfoContext(ctx, "memory-usage", slog.Any("query", query))
+	slog.InfoContext(ctx, "memory-usage", slog.Any("query", query),
+		slog.Any("metricKeys", m.metrics.metricKeys), slog.Any("len", len(m.metrics.metricKeys)))
 
 	promeResp, err := m.client.SerialData(query)
 	if err != nil {
@@ -197,7 +199,8 @@ func (m *monitorComponentImpl) RequestCount(ctx context.Context, req *types.Moni
 	// issue: github.com/knative/serving/issues/14925
 	query := fmt.Sprintf("avg_over_time(%s{pod_name='%s',namespace='%s'}[%s:])[%s:%s]",
 		m.metrics.requestCount, req.Instance, namespace, req.LastDuration, req.LastDuration, req.TimeRange)
-	slog.InfoContext(ctx, "request-count", slog.Any("query", query))
+	slog.InfoContext(ctx, "request-count", slog.Any("query", query),
+		slog.Any("metricKeys", m.metrics.metricKeys), slog.Any("len", len(m.metrics.metricKeys)))
 
 	promeResp, err := m.client.SerialData(query)
 	if err != nil {
@@ -254,11 +257,12 @@ func (m *monitorComponentImpl) RequestLatency(ctx context.Context, req *types.Mo
 
 	query := fmt.Sprintf("sum(increase(%s{pod_name='%s',namespace='%s'}[%s:])) by (le)",
 		m.metrics.requestLatency, req.Instance, namespace, req.LastDuration)
-	slog.Debug("request-latency", slog.Any("query", query))
+	slog.InfoContext(ctx, "request-latency", slog.Any("query", query),
+		slog.Any("metricKeys", m.metrics.metricKeys), slog.Any("len", len(m.metrics.metricKeys)))
 
 	promeResp, err := m.client.SerialData(query)
 	if err != nil {
-		return nil, fmt.Errorf("fail to get cpu memory usage error: %w", err)
+		return nil, fmt.Errorf("failed to get request latency error: %w", err)
 	}
 	slog.Debug("get request latency", slog.Any("promeResp", promeResp))
 	resp := types.MonitorRequestLatencyResp{}
@@ -342,6 +346,9 @@ func (m *monitorComponentImpl) getMetrics(metrics map[string]string) map[string]
 			result[key] = v
 			if key == "pod" {
 				result["instance"] = v
+			}
+			if key == "http_response_status_code" {
+				result["response_code_class"] = v
 			}
 		}
 	}
