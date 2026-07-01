@@ -1430,6 +1430,75 @@ func TestRepoComponent_DeployDetail(t *testing.T) {
 
 }
 
+func TestRepoComponent_DeployDetailWithPD(t *testing.T) {
+	ctx := context.TODO()
+	repo := initializeTestRepoComponent(ctx, t)
+	mockUserRepoAdminPermission(ctx, repo.mocks.stores, "user")
+
+	pdConfig := &types.PDConfig{
+		Enabled:         true,
+		PrefillReplicas: 2,
+		DecodeReplicas:  2,
+		Prefill: &types.PDRoleRuntimeConfig{
+			TP: 2, EP: 1, DP: 1, TotalGPUs: 2,
+		},
+		Decode: &types.PDRoleRuntimeConfig{
+			TP: 2, EP: 1, DP: 1, TotalGPUs: 2,
+		},
+	}
+
+	repo.mocks.stores.ClusterInfoMock().EXPECT().ByClusterID(ctx, "cluster").Return(database.ClusterInfo{
+		Zone: "z",
+	}, nil)
+	repo.mocks.stores.DeployTaskMock().EXPECT().GetDeployByID(ctx, int64(1)).Return(&database.Deploy{
+		RepoID:        1,
+		UserUUID:      "uuid",
+		OrderDetailID: 11,
+		ClusterID:     "cluster",
+		SvcName:       "svc",
+		Status:        deployStatus.Running,
+		PD:            pdConfig,
+	}, nil)
+
+	repo.mocks.deployer.EXPECT().GetReplica(ctx, types.DeployRequest{
+		Namespace: "ns",
+		Name:      "n",
+		ClusterID: "cluster",
+		SvcName:   "svc",
+	}).Return(1, 2, []types.Instance{{Name: "i1"}}, nil)
+
+	repo.mocks.deployer.EXPECT().Status(ctx, types.DeployRequest{
+		DeployID:  0,
+		SpaceID:   0,
+		ModelID:   0,
+		Namespace: "ns",
+		Name:      "n",
+		SvcName:   "svc",
+		ClusterID: "cluster",
+	}, false).Return("svc", 23, nil, nil)
+
+	dp, err := repo.DeployDetail(ctx, types.DeployActReq{
+		RepoType:     types.ModelRepo,
+		Namespace:    "ns",
+		Name:         "n",
+		CurrentUser:  "user",
+		DeployID:     1,
+		DeployType:   2,
+		InstanceName: "i1",
+	})
+	require.Nil(t, err)
+
+	// PD config should be populated in the response
+	require.NotNil(t, dp.PD)
+	require.True(t, dp.PD.Enabled)
+	require.Equal(t, 2, dp.PD.PrefillReplicas)
+	require.Equal(t, 2, dp.PD.DecodeReplicas)
+	require.NotNil(t, dp.PD.Prefill)
+	require.Equal(t, 2, dp.PD.Prefill.TP)
+	require.NotNil(t, dp.PD.Decode)
+	require.Equal(t, 2, dp.PD.Decode.TP)
+}
+
 func TestRepoComponent_DeployInstanceLogs(t *testing.T) {
 	ctx := context.TODO()
 	repo := initializeTestRepoComponent(ctx, t)

@@ -241,3 +241,76 @@ func TestSVCRequest_PDThroughDeployExtend(t *testing.T) {
 	require.Equal(t, 2, req.PD.PrefillReplicas)
 	require.Equal(t, 2, req.PD.DecodeReplicas)
 }
+
+// TestDeployRequest_PDNoShadow verifies that DeployRequest.PD (from embedded
+// DeployExtend) is not shadowed by an explicit PD field. Before the fix,
+// DeployRequest had both an explicit PD field and an embedded DeployExtend.PD,
+// causing field shadowing: setting DeployExtend.PD was invisible when reading
+// DeployRequest.PD. This test ensures they are the same field.
+func TestDeployRequest_PDNoShadow(t *testing.T) {
+	pdConfig := &PDConfig{
+		Enabled:         true,
+		PrefillReplicas: 2,
+		DecodeReplicas:  3,
+		Prefill: &PDRoleRuntimeConfig{
+			TP: 2, EP: 1, DP: 1, TotalGPUs: 2,
+		},
+		Decode: &PDRoleRuntimeConfig{
+			TP: 2, EP: 1, DP: 1, TotalGPUs: 2,
+		},
+	}
+
+	dr := DeployRequest{}
+	// Set PD via DeployExtend (the embedded field)
+	dr.DeployExtend.PD = pdConfig
+
+	// Reading dr.PD should return the same pointer (no shadowing)
+	require.NotNil(t, dr.PD)
+	require.Same(t, pdConfig, dr.PD)
+	require.True(t, dr.PD.Enabled)
+	require.Equal(t, 2, dr.PD.PrefillReplicas)
+	require.Equal(t, 3, dr.PD.DecodeReplicas)
+
+	// Setting dr.PD should also set DeployExtend.PD (same field)
+	dr.PD.Enabled = false
+	require.False(t, dr.DeployExtend.PD.Enabled)
+}
+
+// TestDeployRequest_PDJSONBinding verifies that JSON unmarshaling correctly
+// populates DeployRequest.PD through the embedded DeployExtend field.
+func TestDeployRequest_PDJSONBinding(t *testing.T) {
+	jsonStr := `{
+		"deploy_name": "test-deploy",
+		"pd": {
+			"enabled": true,
+			"prefill_replicas": 2,
+			"decode_replicas": 2,
+			"prefill": {"tp": 2, "ep": 1, "dp": 1, "total_gpus": 2},
+			"decode": {"tp": 2, "ep": 1, "dp": 1, "total_gpus": 2}
+		}
+	}`
+
+	var dr DeployRequest
+	err := json.Unmarshal([]byte(jsonStr), &dr)
+	require.NoError(t, err)
+	require.Equal(t, "test-deploy", dr.DeployName)
+
+	// PD should be populated via embedded DeployExtend
+	require.NotNil(t, dr.PD)
+	require.True(t, dr.PD.Enabled)
+	require.Equal(t, 2, dr.PD.PrefillReplicas)
+	require.Equal(t, 2, dr.PD.DecodeReplicas)
+	require.NotNil(t, dr.PD.Prefill)
+	require.Equal(t, 2, dr.PD.Prefill.TP)
+	require.NotNil(t, dr.PD.Decode)
+	require.Equal(t, 2, dr.PD.Decode.TP)
+
+	// Verify JSON marshaling round-trips correctly
+	out, err := json.Marshal(dr)
+	require.NoError(t, err)
+	var dr2 DeployRequest
+	err = json.Unmarshal(out, &dr2)
+	require.NoError(t, err)
+	require.NotNil(t, dr2.PD)
+	require.True(t, dr2.PD.Enabled)
+}

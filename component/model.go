@@ -569,6 +569,7 @@ func (c *modelComponentImpl) Show(ctx context.Context, namespace, name, currentU
 			ClassName:         model.Repository.Metadata.ClassName,
 			Quantizations:     model.Repository.Metadata.Quantizations,
 			MiniGPUFinetuneGB: model.Repository.Metadata.MiniGPUFinetuneGB,
+			PDRecommendation:  model.Repository.Metadata.PDRecommendation,
 		},
 
 		MultiSource: types.MultiSource{

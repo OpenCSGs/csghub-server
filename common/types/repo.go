@@ -168,14 +168,15 @@ type Repository struct {
 }
 
 type Metadata struct {
-	ModelParams       float32        `json:"model_params"`
-	TensorType        string         `json:"tensor_type"`
-	Architecture      string         `json:"architecture"`
-	MiniGPUMemoryGB   float32        `json:"mini_gpu_memory_gb"`
-	MiniGPUFinetuneGB float32        `json:"mini_gpu_finetune_gb"`
-	ModelType         string         `json:"model_type"`
-	ClassName         string         `json:"class_name"`
-	Quantizations     []Quantization `json:"quantizations,omitempty"`
+	ModelParams       float32           `json:"model_params"`
+	TensorType        string            `json:"tensor_type"`
+	Architecture      string            `json:"architecture"`
+	MiniGPUMemoryGB   float32           `json:"mini_gpu_memory_gb"`
+	MiniGPUFinetuneGB float32           `json:"mini_gpu_finetune_gb"`
+	ModelType         string            `json:"model_type"`
+	ClassName         string            `json:"class_name"`
+	Quantizations     []Quantization    `json:"quantizations,omitempty"`
+	PDRecommendation  *PDRecommendation `json:"pd_recommendation,omitempty"`
 }
 
 type RepoPageOpts struct {
