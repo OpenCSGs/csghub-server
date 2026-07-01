@@ -575,6 +575,7 @@ func (c *repoComponentImpl) DeployDetail(ctx context.Context, detailReq types.De
 		UserUUID:            deploy.UserUUID,
 		OwnerNamespace:      deploy.OwnerNamespace,
 	}
+	resDeploy.PD = deploy.PD
 
 	return &resDeploy, nil
 }

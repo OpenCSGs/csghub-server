@@ -1250,3 +1250,131 @@ func TestDeployer_Wakeup(t *testing.T) {
 		time.Sleep(100 * time.Millisecond)
 	})
 }
+
+// TestDeployer_serverlessDeploy_PD verifies that PD config is correctly
+// propagated from DeployRequest to the database Deploy record in
+// serverlessDeploy. Before the fix, field shadowing caused dr.PD to always
+// be nil even when DeployExtend.PD was set.
+func TestDeployer_serverlessDeploy_PD(t *testing.T) {
+	t.Run("deploy model with PD", func(t *testing.T) {
+		var oldDeploy database.Deploy
+		oldDeploy.ID = 1
+
+		pdConfig := &types.PDConfig{
+			Enabled:         true,
+			PrefillReplicas: 2,
+			DecodeReplicas:  2,
+			Prefill: &types.PDRoleRuntimeConfig{
+				TP: 2, EP: 1, DP: 1, TotalGPUs: 2,
+			},
+			Decode: &types.PDRoleRuntimeConfig{
+				TP: 2, EP: 1, DP: 1, TotalGPUs: 2,
+			},
+		}
+
+		dr := types.DeployRequest{
+			RepoID:           1,
+			Type:             types.InferenceType,
+			UserUUID:         "1",
+			SKU:              "1",
+			DeployExtend: types.DeployExtend{
+				PD: pdConfig,
+			},
+		}
+
+		newDeploy := oldDeploy
+		newDeploy.UserUUID = dr.UserUUID
+		newDeploy.SKU = dr.SKU
+		newDeploy.PD = dr.PD
+
+		mockTaskStore := mockdb.NewMockDeployTaskStore(t)
+		mockTaskStore.EXPECT().GetServerlessDeployByRepID(mock.Anything, dr.RepoID).Return(&oldDeploy, nil)
+		mockTaskStore.EXPECT().UpdateDeploy(mock.Anything, &newDeploy).Return(nil)
+
+		d := &deployer{
+			deployTaskStore: mockTaskStore,
+		}
+		dbdeploy, err := d.serverlessDeploy(context.TODO(), dr)
+		require.Nil(t, err)
+		require.NotNil(t, dbdeploy.PD)
+		require.True(t, dbdeploy.PD.Enabled)
+		require.Equal(t, 2, dbdeploy.PD.PrefillReplicas)
+		require.Equal(t, 2, dbdeploy.PD.DecodeReplicas)
+		require.Same(t, pdConfig, dbdeploy.PD)
+	})
+
+	t.Run("deploy model without PD (nil)", func(t *testing.T) {
+		var oldDeploy database.Deploy
+		oldDeploy.ID = 1
+
+		dr := types.DeployRequest{
+			RepoID:   1,
+			Type:     types.InferenceType,
+			UserUUID: "1",
+			SKU:      "1",
+		}
+
+		newDeploy := oldDeploy
+		newDeploy.UserUUID = dr.UserUUID
+		newDeploy.SKU = dr.SKU
+		newDeploy.PD = nil
+
+		mockTaskStore := mockdb.NewMockDeployTaskStore(t)
+		mockTaskStore.EXPECT().GetServerlessDeployByRepID(mock.Anything, dr.RepoID).Return(&oldDeploy, nil)
+		mockTaskStore.EXPECT().UpdateDeploy(mock.Anything, &newDeploy).Return(nil)
+
+		d := &deployer{
+			deployTaskStore: mockTaskStore,
+		}
+		dbdeploy, err := d.serverlessDeploy(context.TODO(), dr)
+		require.Nil(t, err)
+		require.Nil(t, dbdeploy.PD)
+	})
+}
+
+// TestDeployer_dedicatedDeploy_PD verifies that PD config is correctly
+// propagated from DeployRequest to the database Deploy record in
+// dedicatedDeploy.
+func TestDeployer_dedicatedDeploy_PD(t *testing.T) {
+	pdConfig := &types.PDConfig{
+		Enabled:         true,
+		PrefillReplicas: 1,
+		DecodeReplicas:  1,
+		Prefill: &types.PDRoleRuntimeConfig{
+			TP: 2, EP: 2, DP: 1, TotalGPUs: 2,
+		},
+		Decode: &types.PDRoleRuntimeConfig{
+			TP: 2, EP: 2, DP: 1, TotalGPUs: 2,
+		},
+	}
+
+	dr := types.DeployRequest{
+		Path: "namespace/name",
+		Type: types.InferenceType,
+		DeployExtend: types.DeployExtend{
+			PD: pdConfig,
+		},
+	}
+
+	var capturedDeploy *database.Deploy
+	mockTaskStore := mockdb.NewMockDeployTaskStore(t)
+	mockTaskStore.EXPECT().CreateDeploy(mock.Anything, mock.MatchedBy(func(d *database.Deploy) bool {
+		capturedDeploy = d
+		return true
+	})).Return(nil)
+
+	node, _ := snowflake.NewNode(1)
+	d := &deployer{
+		snowflakeNode:   node,
+		deployTaskStore: mockTaskStore,
+	}
+
+	_, err := d.dedicatedDeploy(context.TODO(), dr)
+	require.Nil(t, err)
+	require.NotNil(t, capturedDeploy)
+	require.NotNil(t, capturedDeploy.PD)
+	require.True(t, capturedDeploy.PD.Enabled)
+	require.Equal(t, 1, capturedDeploy.PD.PrefillReplicas)
+	require.Equal(t, 1, capturedDeploy.PD.DecodeReplicas)
+	require.Same(t, pdConfig, capturedDeploy.PD)
+}

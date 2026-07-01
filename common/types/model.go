@@ -308,6 +308,10 @@ type InstanceRunReq struct {
 	Revision           string `json:"revision"`
 	OrderDetailID      int64  `json:"order_detail_id"`
 	EngineArgs         string `json:"engine_args"`
+	// EnablePD enables PD (Prefill-Decode) disaggregation inference architecture.
+	// When true, the system checks the model metadata for PD recommendation,
+	// validates hardware resources, and splits resources between prefill and decode.
+	EnablePD bool `json:"enable_pd"`
 	// OwnerNamespace is optional. If set, the finetune is created under this namespace (user or org); path {namespace} remains the model's owner.
 	OwnerNamespace string `json:"owner_namespace,omitempty"`
 }
