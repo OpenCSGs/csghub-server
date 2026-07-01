@@ -356,6 +356,53 @@ func (_c *MockClusterInfoStore_ByClusterID_Call) RunAndReturn(run func(context.C
 	return _c
 }
 
+// DeleteClusterNodeByID provides a mock function with given fields: ctx, id
+func (_m *MockClusterInfoStore) DeleteClusterNodeByID(ctx context.Context, id int64) error {
+	ret := _m.Called(ctx, id)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteClusterNodeByID")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, int64) error); ok {
+		r0 = rf(ctx, id)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockClusterInfoStore_DeleteClusterNodeByID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteClusterNodeByID'
+type MockClusterInfoStore_DeleteClusterNodeByID_Call struct {
+	*mock.Call
+}
+
+// DeleteClusterNodeByID is a helper method to define mock.On call
+//   - ctx context.Context
+//   - id int64
+func (_e *MockClusterInfoStore_Expecter) DeleteClusterNodeByID(ctx interface{}, id interface{}) *MockClusterInfoStore_DeleteClusterNodeByID_Call {
+	return &MockClusterInfoStore_DeleteClusterNodeByID_Call{Call: _e.mock.On("DeleteClusterNodeByID", ctx, id)}
+}
+
+func (_c *MockClusterInfoStore_DeleteClusterNodeByID_Call) Run(run func(ctx context.Context, id int64)) *MockClusterInfoStore_DeleteClusterNodeByID_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(int64))
+	})
+	return _c
+}
+
+func (_c *MockClusterInfoStore_DeleteClusterNodeByID_Call) Return(_a0 error) *MockClusterInfoStore_DeleteClusterNodeByID_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockClusterInfoStore_DeleteClusterNodeByID_Call) RunAndReturn(run func(context.Context, int64) error) *MockClusterInfoStore_DeleteClusterNodeByID_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // DeleteNodeOwnership provides a mock function with given fields: ctx, clusterNodeID
 func (_m *MockClusterInfoStore) DeleteNodeOwnership(ctx context.Context, clusterNodeID int64) error {
 	ret := _m.Called(ctx, clusterNodeID)

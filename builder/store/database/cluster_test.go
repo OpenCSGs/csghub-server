@@ -624,3 +624,138 @@ func TestClusterStore_ClusterNodeOperations(t *testing.T) {
 	require.NoError(t, err)
 	require.Nil(t, deletedOwnership)
 }
+
+func TestClusterStore_DeleteClusterNodeByID_NotLastNode(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewClusterInfoStoreWithDB(db)
+
+	cluster, err := store.Add(ctx, "config-delete-not-last", "region-1", types.ConnectModeKubeConfig)
+	require.NoError(t, err)
+
+	node1 := &database.ClusterNode{
+		ClusterID: cluster.ClusterID,
+		Name:      "node-1",
+		Status:    "Ready",
+	}
+	_, err = db.Core.NewInsert().Model(node1).Exec(ctx)
+	require.NoError(t, err)
+
+	node2 := &database.ClusterNode{
+		ClusterID: cluster.ClusterID,
+		Name:      "node-2",
+		Status:    "Ready",
+	}
+	_, err = db.Core.NewInsert().Model(node2).Exec(ctx)
+	require.NoError(t, err)
+
+	ownership := database.ClusterNodeOwnership{
+		ClusterNodeID: node1.ID,
+		ClusterID:     cluster.ClusterID,
+		Namespace:     "ns-1",
+	}
+	err = store.AddNodeOwnership(ctx, ownership)
+	require.NoError(t, err)
+
+	sr := &database.SpaceResource{
+		Name:      "resource-1",
+		Resources: "{}",
+		ClusterID: cluster.ClusterID,
+	}
+	_, err = db.Core.NewInsert().Model(sr).Exec(ctx)
+	require.NoError(t, err)
+
+	err = store.DeleteClusterNodeByID(ctx, node1.ID)
+	require.NoError(t, err)
+
+	_, err = store.GetClusterNodeByID(ctx, node1.ID)
+	require.Error(t, err)
+
+	fetchedOwnership, err := store.GetNodeOwnership(ctx, node1.ID)
+	require.NoError(t, err)
+	require.Nil(t, fetchedOwnership)
+
+	nodes, err := store.FindNodeByClusterID(ctx, cluster.ClusterID)
+	require.NoError(t, err)
+	require.Len(t, nodes, 1)
+	require.Equal(t, node2.ID, nodes[0].ID)
+
+	existingCluster, err := store.ByClusterID(ctx, cluster.ClusterID)
+	require.NoError(t, err)
+	require.Equal(t, cluster.ClusterID, existingCluster.ClusterID)
+
+	var remainingSR []database.SpaceResource
+	err = db.Core.NewSelect().Model(&remainingSR).Where("cluster_id = ?", cluster.ClusterID).Scan(ctx)
+	require.NoError(t, err)
+	require.Len(t, remainingSR, 1)
+}
+
+func TestClusterStore_DeleteClusterNodeByID_LastNode(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewClusterInfoStoreWithDB(db)
+
+	cluster, err := store.Add(ctx, "config-delete-last", "region-1", types.ConnectModeKubeConfig)
+	require.NoError(t, err)
+
+	node := &database.ClusterNode{
+		ClusterID: cluster.ClusterID,
+		Name:      "node-only",
+		Status:    "Ready",
+	}
+	_, err = db.Core.NewInsert().Model(node).Exec(ctx)
+	require.NoError(t, err)
+
+	ownership := database.ClusterNodeOwnership{
+		ClusterNodeID: node.ID,
+		ClusterID:     cluster.ClusterID,
+		Namespace:     "ns-1",
+	}
+	err = store.AddNodeOwnership(ctx, ownership)
+	require.NoError(t, err)
+
+	sr := &database.SpaceResource{
+		Name:      "resource-1",
+		Resources: "{}",
+		ClusterID: cluster.ClusterID,
+	}
+	_, err = db.Core.NewInsert().Model(sr).Exec(ctx)
+	require.NoError(t, err)
+
+	err = store.DeleteClusterNodeByID(ctx, node.ID)
+	require.NoError(t, err)
+
+	_, err = store.GetClusterNodeByID(ctx, node.ID)
+	require.Error(t, err)
+
+	fetchedOwnership, err := store.GetNodeOwnership(ctx, node.ID)
+	require.NoError(t, err)
+	require.Nil(t, fetchedOwnership)
+
+	nodes, err := store.FindNodeByClusterID(ctx, cluster.ClusterID)
+	require.NoError(t, err)
+	require.Len(t, nodes, 0)
+
+	_, err = store.ByClusterID(ctx, cluster.ClusterID)
+	require.Error(t, err)
+
+	var remainingSR []database.SpaceResource
+	err = db.Core.NewSelect().Model(&remainingSR).Where("cluster_id = ?", cluster.ClusterID).Scan(ctx)
+	require.NoError(t, err)
+	require.Len(t, remainingSR, 0)
+}
+
+func TestClusterStore_DeleteClusterNodeByID_NonExistentNode(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewClusterInfoStoreWithDB(db)
+
+	err := store.DeleteClusterNodeByID(ctx, 99999)
+	require.Error(t, err)
+}
