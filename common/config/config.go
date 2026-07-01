@@ -585,7 +585,7 @@ type Config struct {
 		MemoryUsageMetric    string   `env:"STARHUB_SERVER_PROMETHEUS_MEMORY_USAGE_METRIC" default:"container_memory_usage_bytes"`
 		RequestCountMetric   string   `env:"STARHUB_SERVER_PROMETHEUS_REQUEST_COUNT_METRIC" default:"revision_request_count"`
 		RequestLatencyMetric string   `env:"STARHUB_SERVER_PROMETHEUS_REQUEST_LATENCY_METRIC" default:"revision_app_request_latencies_bucket"`
-		MetricKeys           []string `env:"STARHUB_SERVER_PROMETHEUS_METRIC_KEYS" default:"[pod,service_name,namespace,response_code_class,le]"`
+		MetricKeys           []string `env:"STARHUB_SERVER_PROMETHEUS_METRIC_KEYS" default:"[pod,service_name,namespace,http_response_status_code,response_code_class,le]"`
 	}
 
 	Feishu struct {
