@@ -260,13 +260,14 @@ type ActStatementsReq struct {
 }
 
 type AcctBillsReq struct {
-	CurrentUser string    `json:"current_user"`
-	TargetUUID  string    `json:"target_uuid"`
-	Scene       SceneType `json:"scene"`
-	StartDate   string    `json:"start_date"`
-	EndDate     string    `json:"end_date"`
-	Per         int       `json:"per"`
-	Page        int       `json:"page"`
+	CurrentUser  string    `json:"current_user"`
+	TargetUUID   string    `json:"target_uuid"`
+	Scene        SceneType `json:"scene"`
+	StartDate    string    `json:"start_date"`
+	EndDate      string    `json:"end_date"`
+	Per          int       `json:"per"`
+	Page         int       `json:"page"`
+	InstanceName string    `json:"instance_name"`
 }
 
 type AcctBillsDetailReq struct {
