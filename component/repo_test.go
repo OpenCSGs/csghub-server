@@ -2667,6 +2667,198 @@ func TestRepoComponent_GetRepoSizeByBranch(t *testing.T) {
 	})
 }
 
+func TestRepoComponent_BatchGetRepoExtra(t *testing.T) {
+	t.Run("admin user can read all repos", func(t *testing.T) {
+		ctx := context.TODO()
+		repoComp := initializeTestRepoComponent(ctx, t)
+
+		repoComp.mocks.userSvcClient.EXPECT().GetUserInfo(ctx, "admin", "admin").Return(&rpc.User{
+			ID:    1,
+			Roles: []string{"admin"},
+			Orgs:  []rpc.Organization{},
+		}, nil)
+
+		repos := []*database.Repository{
+			{ID: 1, UserID: 10, Private: true, DefaultBranch: "main"},
+			{ID: 2, UserID: 20, Private: true, DefaultBranch: "main"},
+		}
+		repoComp.mocks.stores.RepoMock().EXPECT().FindByIds(ctx, []int64{1, 2}).Return(repos, nil)
+
+		stats := []*database.RepositoryStatistics{
+			{RepositoryID: 1, Branch: "main", TotalSize: 1024},
+			{RepositoryID: 2, Branch: "main", TotalSize: 2048},
+		}
+		repoComp.mocks.stores.RepositoryStatisticsMock().EXPECT().FindByRepositoryIDs(ctx, []int64{1, 2}).Return(stats, nil)
+
+		result, err := repoComp.BatchGetRepoExtra(ctx, []int64{1, 2}, "admin")
+		require.Nil(t, err)
+		require.Equal(t, []types.RepoExtraItem{{RepoID: 1, Size: 1024}, {RepoID: 2, Size: 2048}}, result)
+	})
+
+	t.Run("regular user can read own repos and public repos", func(t *testing.T) {
+		ctx := context.TODO()
+		repoComp := initializeTestRepoComponent(ctx, t)
+
+		repoComp.mocks.userSvcClient.EXPECT().GetUserInfo(ctx, "user1", "user1").Return(&rpc.User{
+			ID:    1,
+			Roles: []string{},
+			Orgs:  []rpc.Organization{{UserID: 3}},
+		}, nil)
+
+		// Own repo (UserID=1), org repo (UserID=3), public repo (UserID=99), private unrelated repo (UserID=99)
+		repos := []*database.Repository{
+			{ID: 1, UserID: 1, Private: true, DefaultBranch: "main"},
+			{ID: 2, UserID: 3, Private: true, DefaultBranch: "main"},
+			{ID: 3, UserID: 99, Private: false, DefaultBranch: "main"},
+			{ID: 4, UserID: 99, Private: true, DefaultBranch: "main"},
+		}
+		repoComp.mocks.stores.RepoMock().EXPECT().FindByIds(ctx, []int64{1, 2, 3, 4}).Return(repos, nil)
+
+		// Only repos 1, 2, 3 are readable
+		stats := []*database.RepositoryStatistics{
+			{RepositoryID: 1, Branch: "main", TotalSize: 100},
+			{RepositoryID: 2, Branch: "main", TotalSize: 200},
+			{RepositoryID: 3, Branch: "main", TotalSize: 300},
+		}
+		repoComp.mocks.stores.RepositoryStatisticsMock().EXPECT().FindByRepositoryIDs(ctx, []int64{1, 2, 3}).Return(stats, nil)
+
+		result, err := repoComp.BatchGetRepoExtra(ctx, []int64{1, 2, 3, 4}, "user1")
+		require.Nil(t, err)
+		require.Equal(t, []types.RepoExtraItem{{RepoID: 1, Size: 100}, {RepoID: 2, Size: 200}, {RepoID: 3, Size: 300}}, result)
+	})
+
+	t.Run("anonymous user can only read public repos", func(t *testing.T) {
+		ctx := context.TODO()
+		repoComp := initializeTestRepoComponent(ctx, t)
+
+		repos := []*database.Repository{
+			{ID: 1, UserID: 1, Private: true, DefaultBranch: "main"},
+			{ID: 2, UserID: 2, Private: false, DefaultBranch: "main"},
+		}
+		repoComp.mocks.stores.RepoMock().EXPECT().FindByIds(ctx, []int64{1, 2}).Return(repos, nil)
+
+		stats := []*database.RepositoryStatistics{
+			{RepositoryID: 2, Branch: "main", TotalSize: 500},
+		}
+		repoComp.mocks.stores.RepositoryStatisticsMock().EXPECT().FindByRepositoryIDs(ctx, []int64{2}).Return(stats, nil)
+
+		result, err := repoComp.BatchGetRepoExtra(ctx, []int64{1, 2}, "")
+		require.Nil(t, err)
+		require.Equal(t, []types.RepoExtraItem{{RepoID: 2, Size: 500}}, result)
+	})
+
+	t.Run("repo without default branch is included with size 0", func(t *testing.T) {
+		ctx := context.TODO()
+		repoComp := initializeTestRepoComponent(ctx, t)
+
+		repoComp.mocks.userSvcClient.EXPECT().GetUserInfo(ctx, "user1", "user1").Return(&rpc.User{
+			ID:    1,
+			Roles: []string{},
+			Orgs:  []rpc.Organization{},
+		}, nil)
+
+		repos := []*database.Repository{
+			{ID: 1, UserID: 1, Private: true, DefaultBranch: ""},
+		}
+		repoComp.mocks.stores.RepoMock().EXPECT().FindByIds(ctx, []int64{1}).Return(repos, nil)
+
+		result, err := repoComp.BatchGetRepoExtra(ctx, []int64{1}, "user1")
+		require.Nil(t, err)
+		require.Equal(t, []types.RepoExtraItem{{RepoID: 1, Size: 0}}, result)
+	})
+
+	t.Run("repo with default branch but no statistics gets size 0", func(t *testing.T) {
+		ctx := context.TODO()
+		repoComp := initializeTestRepoComponent(ctx, t)
+
+		repoComp.mocks.userSvcClient.EXPECT().GetUserInfo(ctx, "user1", "user1").Return(&rpc.User{
+			ID:    1,
+			Roles: []string{},
+			Orgs:  []rpc.Organization{},
+		}, nil)
+
+		repos := []*database.Repository{
+			{ID: 1, UserID: 1, Private: true, DefaultBranch: "main"},
+		}
+		repoComp.mocks.stores.RepoMock().EXPECT().FindByIds(ctx, []int64{1}).Return(repos, nil)
+
+		stats := []*database.RepositoryStatistics{
+			{RepositoryID: 1, Branch: "dev", TotalSize: 100},
+		}
+		repoComp.mocks.stores.RepositoryStatisticsMock().EXPECT().FindByRepositoryIDs(ctx, []int64{1}).Return(stats, nil)
+
+		result, err := repoComp.BatchGetRepoExtra(ctx, []int64{1}, "user1")
+		require.Nil(t, err)
+		require.Equal(t, []types.RepoExtraItem{{RepoID: 1, Size: 0}}, result)
+	})
+
+	t.Run("all repos filtered out returns empty map", func(t *testing.T) {
+		ctx := context.TODO()
+		repoComp := initializeTestRepoComponent(ctx, t)
+
+		repoComp.mocks.userSvcClient.EXPECT().GetUserInfo(ctx, "user1", "user1").Return(&rpc.User{
+			ID:    1,
+			Roles: []string{},
+			Orgs:  []rpc.Organization{},
+		}, nil)
+
+		repos := []*database.Repository{
+			{ID: 1, UserID: 99, Private: true, DefaultBranch: "main"},
+		}
+		repoComp.mocks.stores.RepoMock().EXPECT().FindByIds(ctx, []int64{1}).Return(repos, nil)
+
+		result, err := repoComp.BatchGetRepoExtra(ctx, []int64{1}, "user1")
+		require.Nil(t, err)
+		require.Empty(t, result)
+	})
+
+	t.Run("FindByIds error", func(t *testing.T) {
+		ctx := context.TODO()
+		repoComp := initializeTestRepoComponent(ctx, t)
+
+		repoComp.mocks.stores.RepoMock().EXPECT().FindByIds(ctx, []int64{1}).Return(nil, errors.New("db error"))
+
+		_, err := repoComp.BatchGetRepoExtra(ctx, []int64{1}, "user1")
+		require.Error(t, err)
+		require.True(t, errors.Is(err, errorx.ErrBatchGetRepoExtraFailed))
+	})
+
+	t.Run("GetUserInfo error", func(t *testing.T) {
+		ctx := context.TODO()
+		repoComp := initializeTestRepoComponent(ctx, t)
+
+		repoComp.mocks.stores.RepoMock().EXPECT().FindByIds(ctx, []int64{1}).Return([]*database.Repository{
+			{ID: 1, UserID: 1, Private: true},
+		}, nil)
+		repoComp.mocks.userSvcClient.EXPECT().GetUserInfo(ctx, "user1", "user1").Return(nil, errors.New("rpc error"))
+
+		_, err := repoComp.BatchGetRepoExtra(ctx, []int64{1}, "user1")
+		require.Error(t, err)
+		require.True(t, errors.Is(err, errorx.ErrBatchGetRepoExtraFailed))
+	})
+
+	t.Run("FindByRepositoryIDs error", func(t *testing.T) {
+		ctx := context.TODO()
+		repoComp := initializeTestRepoComponent(ctx, t)
+
+		repoComp.mocks.userSvcClient.EXPECT().GetUserInfo(ctx, "user1", "user1").Return(&rpc.User{
+			ID:    1,
+			Roles: []string{},
+			Orgs:  []rpc.Organization{},
+		}, nil)
+
+		repos := []*database.Repository{
+			{ID: 1, UserID: 1, Private: true, DefaultBranch: "main"},
+		}
+		repoComp.mocks.stores.RepoMock().EXPECT().FindByIds(ctx, []int64{1}).Return(repos, nil)
+		repoComp.mocks.stores.RepositoryStatisticsMock().EXPECT().FindByRepositoryIDs(ctx, []int64{1}).Return(nil, errors.New("db error"))
+
+		_, err := repoComp.BatchGetRepoExtra(ctx, []int64{1}, "user1")
+		require.Error(t, err)
+		require.True(t, errors.Is(err, errorx.ErrBatchGetRepoExtraFailed))
+	})
+}
+
 func TestRepoComponent_DownloadCodeZip(t *testing.T) {
 	t.Run("should return zip data when user has read permission and ref is provided", func(t *testing.T) {
 		ctx := context.TODO()
@@ -2682,10 +2874,10 @@ func TestRepoComponent_DownloadCodeZip(t *testing.T) {
 		repoComp.mocks.stores.NamespaceMock().EXPECT().FindByPath(mock.Anything, ns.Path).Return(ns, nil)
 
 		repo := &database.Repository{
-			ID:           1,
-			Private:      true,
-			User:         user,
-			Path:         fmt.Sprintf("%s/%s", ns.Path, "repo_name"),
+			ID:            1,
+			Private:       true,
+			User:          user,
+			Path:          fmt.Sprintf("%s/%s", ns.Path, "repo_name"),
 			DefaultBranch: "main",
 		}
 		repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(mock.Anything, types.CodeRepo, ns.Path, repo.Name).Return(repo, nil)

@@ -240,3 +240,78 @@ func TestRepositoryStatisticsStore_FindByRepositoryIDAndBranch(t *testing.T) {
 	_, err = store.FindByRepositoryIDAndBranch(ctx, expectedStats.RepositoryID, "non-existent-branch")
 	assert.Error(t, err)
 }
+
+func TestRepositoryStatisticsStore_FindByRepositoryIDs(t *testing.T) {
+	ctx := context.Background()
+	db := tests.InitTestDB()
+	defer db.Close()
+
+	store := database.NewRepositoryStatisticsStoreWithDB(db)
+
+	// Create test statistics for multiple repositories
+	stats1 := &database.RepositoryStatistics{
+		RepositoryID: 8,
+		Branch:       "main",
+		TotalSize:    1024,
+		NonLfsSize:   512,
+		LfsSize:      512,
+		CreatedAt:    time.Now(),
+		UpdatedAt:    time.Now(),
+	}
+	stats2 := &database.RepositoryStatistics{
+		RepositoryID: 9,
+		Branch:       "main",
+		TotalSize:    2048,
+		NonLfsSize:   1024,
+		LfsSize:      1024,
+		CreatedAt:    time.Now(),
+		UpdatedAt:    time.Now(),
+	}
+	stats3 := &database.RepositoryStatistics{
+		RepositoryID: 10,
+		Branch:       "dev",
+		TotalSize:    512,
+		NonLfsSize:   256,
+		LfsSize:      256,
+		CreatedAt:    time.Now(),
+		UpdatedAt:    time.Now(),
+	}
+
+	err := store.Create(ctx, stats1)
+	assert.NoError(t, err)
+	err = store.Create(ctx, stats2)
+	assert.NoError(t, err)
+	err = store.Create(ctx, stats3)
+	assert.NoError(t, err)
+
+	t.Run("find by multiple existing IDs", func(t *testing.T) {
+		result, err := store.FindByRepositoryIDs(ctx, []int64{8, 9})
+		assert.NoError(t, err)
+		assert.Len(t, result, 2)
+	})
+
+	t.Run("find by single ID", func(t *testing.T) {
+		result, err := store.FindByRepositoryIDs(ctx, []int64{8})
+		assert.NoError(t, err)
+		assert.Len(t, result, 1)
+		assert.Equal(t, int64(1024), result[0].TotalSize)
+	})
+
+	t.Run("find by non-existent ID returns empty", func(t *testing.T) {
+		result, err := store.FindByRepositoryIDs(ctx, []int64{999})
+		assert.NoError(t, err)
+		assert.Len(t, result, 0)
+	})
+
+	t.Run("find by empty IDs returns nil", func(t *testing.T) {
+		result, err := store.FindByRepositoryIDs(ctx, []int64{})
+		assert.NoError(t, err)
+		assert.Nil(t, result)
+	})
+
+	t.Run("find by mixed existing and non-existing IDs", func(t *testing.T) {
+		result, err := store.FindByRepositoryIDs(ctx, []int64{8, 999, 10})
+		assert.NoError(t, err)
+		assert.Len(t, result, 2)
+	})
+}

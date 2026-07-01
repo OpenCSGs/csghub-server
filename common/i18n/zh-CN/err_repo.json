@@ -16,5 +16,8 @@
     },
     "error.REPO-ERR-5": {
         "other": "下载代码 zip 归档失败"
+    },
+    "error.REPO-ERR-6": {
+        "other": "批量获取仓库额外信息失败"
     }
 }
