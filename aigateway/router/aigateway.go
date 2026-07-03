@@ -77,7 +77,7 @@ func NewRouter(config *config.Config) (*gin.Engine, func(), error) {
 	v1Group.POST("/embeddings", middlewareCollection.Auth.MustUserOrgApiKey, openAIhandler.Embedding)
 	v1Group.POST("/images/generations", middlewareCollection.Auth.MustUserOrgApiKey, modalAPIRateLimiter, openAIhandler.GenerateImage)
 	v1Group.POST("/images/edits", middlewareCollection.Auth.MustUserOrgApiKey, modalAPIRateLimiter, openAIhandler.EditImage)
-	v1Group.POST("/audio/transcriptions", middlewareCollection.Auth.MustUserOrgApiKey, modalAPIRateLimiter, openAIhandler.Transcription)
+	v1Group.POST("/audio/transcriptions", middlewareCollection.Auth.MustUserOrgApiKey, openAIhandler.Transcription)
 	v1Group.POST("/videos", middlewareCollection.Auth.MustUserOrgApiKey, modalAPIRateLimiter, openAIhandler.CreateVideo)
 	v1Group.GET("/videos/:video_id", middlewareCollection.Auth.MustUserOrgApiKey, openAIhandler.GetVideo)
 	v1Group.GET("/videos/:video_id/content", middlewareCollection.Auth.MustUserOrgApiKey, modalAPIRateLimiter, openAIhandler.GetVideoContent)

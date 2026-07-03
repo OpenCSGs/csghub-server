@@ -14,6 +14,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"opencsg.com/csghub-server/aigateway/component"
+	"opencsg.com/csghub-server/aigateway/handler/streamdecoder"
 	"opencsg.com/csghub-server/aigateway/token"
 	"opencsg.com/csghub-server/aigateway/types"
 	rpc "opencsg.com/csghub-server/builder/rpc"
@@ -34,7 +35,7 @@ var _ http.Hijacker = (*ResponseWriterWrapper)(nil)
 type ResponseWriterWrapper struct {
 	internalWritter     gin.ResponseWriter
 	moderationComponent component.Moderation
-	eventStreamDecoder  *eventStreamDecoder
+	eventStreamDecoder  streamdecoder.Decoder
 	tokenCounter        token.ChatTokenCounter
 	recorder            component.LLMLogRecorder
 	id                  string
@@ -61,7 +62,7 @@ func newStreamResponseWriter(internalWritter gin.ResponseWriter, moderationCompo
 		internalWritter:     internalWritter,
 		moderationComponent: moderationComponent,
 		tokenCounter:        tokenCounter,
-		eventStreamDecoder:  &eventStreamDecoder{},
+		eventStreamDecoder:  streamdecoder.NewSSE(),
 		recorder:            recorder,
 		id:                  fmt.Sprint(id),
 	}

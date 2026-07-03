@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -85,6 +86,8 @@ func (h *OpenAIHandlerImpl) Transcription(c *gin.Context) {
 		return
 	}
 
+	isStream := strings.EqualFold(firstMultipartValue(form, "stream"), "true")
+
 	modelTarget, err := h.resolveModelTarget(ctx, username, modelID, c.Request.Header)
 	if err != nil {
 		preflight.RecordError(err, "model_resolve")
@@ -113,12 +116,20 @@ func (h *OpenAIHandlerImpl) Transcription(c *gin.Context) {
 	if !modelTarget.Model.SkipBalance() {
 		if err := h.openaiComponent.CheckBalance(ctx, nsUUID); err != nil {
 			finishModalGenerationTraceWithError(generationRecorder, err, types.TraceErrInsufficientBalance)
-			h.handleInsufficientBalance(c, false, nsUUID, modelID, err)
+			if isStream {
+				c.Writer.Header().Set("Content-Type", "text/event-stream")
+			}
+			h.handleInsufficientBalance(c, isStream, nsUUID, modelID, err)
 			return
 		}
 	}
 
-	body, contentType := rewriteMultipartModelStream(form, modelTarget.ModelName)
+	options := multipartRewriteOptions{
+		defaultFields: map[string]string{
+			"stream": strconv.FormatBool(isStream),
+		},
+	}
+	body, contentType, _ := rewriteMultipartModelStreamWithOptions(form, modelTarget.ModelName, options)
 	c.Request.Body = body
 	c.Request.ContentLength = -1
 	c.Request.Header.Set("Content-Type", contentType)
@@ -149,7 +160,7 @@ func (h *OpenAIHandlerImpl) Transcription(c *gin.Context) {
 	slog.InfoContext(ctx, "proxy audio transcription request to model endpoint", slog.Any("target", modelTarget.Target), slog.Any("host", modelTarget.Host), slog.Any("user", username), slog.Any("model_id", modelID), slog.Any("model_name", modelTarget.ModelName))
 
 	audioCounter := token.NewAudioUsageCounter(token.NewTokenizerImpl(modelTarget.Target, modelTarget.Host, modelTarget.ModelName, modelTarget.Model.ImageID, modelTarget.Model.Provider))
-	w := NewResponseWriterWrapperAudio(c.Writer, audioCounter)
+	w := NewResponseWriterWrapperAudio(c.Writer, audioCounter, isStream)
 	rp.ServeHTTP(w, c.Request, proxyToApi, modelTarget.Host)
 
 	go func() {

@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"opencsg.com/csghub-server/aigateway/handler/streamdecoder"
 )
 
 type responsesNativeResponseWriter interface {
@@ -22,13 +23,13 @@ func newResponsesNativeResponseWriter(w gin.ResponseWriter, stream bool, transfo
 type responsesNativeStreamWriter struct {
 	ginWriter   gin.ResponseWriter
 	transformer *responsesNativePayloadTransformer
-	decoder     eventStreamDecoder
+	decoder     streamdecoder.Decoder
 	failed      bool
 	passthrough bool
 }
 
 func newResponsesNativeStreamWriter(w gin.ResponseWriter, transformer *responsesNativePayloadTransformer) *responsesNativeStreamWriter {
-	return &responsesNativeStreamWriter{ginWriter: w, transformer: transformer}
+	return &responsesNativeStreamWriter{ginWriter: w, transformer: transformer, decoder: streamdecoder.NewSSE()}
 }
 
 func (w *responsesNativeStreamWriter) Header() http.Header {
@@ -64,9 +65,7 @@ func (w *responsesNativeStreamWriter) Write(data []byte) (int, error) {
 		w.ginWriter.Flush()
 		return n, err
 	}
-	// eventStreamDecoder.Write always returns a nil error today; the second
-	// return is kept for future use (e.g. buffer-overflow detection) so the
-	// call site already handles it without another edit.
+	// Decoder errors are reserved for future checks such as buffer overflow.
 	events, _ := w.decoder.Write(data)
 	for _, event := range events {
 		if event.Type == "error" {
