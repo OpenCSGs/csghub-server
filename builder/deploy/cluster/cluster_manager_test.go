@@ -244,6 +244,15 @@ func TestGetXPULabel(t *testing.T) {
 			wantTypeLabel: "nvidia.com/nvidia_name",
 		},
 		{
+			name: "chipltech TPU label",
+			labels: map[string]string{
+				"chipltech.com/tpu.product": "TPU-X1",
+			},
+			config:        &config.Config{},
+			wantCapacity:  "chipltech.com/dlc-lyp",
+			wantTypeLabel: "chipltech.com/tpu.product",
+		},
+		{
 			name:          "no matching label",
 			labels:        map[string]string{},
 			config:        &config.Config{},
