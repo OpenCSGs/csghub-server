@@ -50,6 +50,7 @@ type (
 		Mlu              Processor `json:"mlu,omitempty"`   // cambricon
 		Dcu              Processor `json:"dcu,omitempty"`   // hygon
 		GPGpu            Processor `json:"gpgpu,omitempty"` // iluvatar,metax
+		Tpu              Processor `json:"tpu,omitempty"`   // chipltech
 		Cpu              CPU       `json:"cpu,omitempty"`
 		Memory           string    `json:"memory,omitempty"`
 		EphemeralStorage string    `json:"ephemeral_storage,omitempty"`
@@ -79,6 +80,8 @@ func (h *HardWare) GetResXPUMode() string {
 		xpuProc = h.Dcu
 	case strings.TrimSpace(h.GPGpu.Num) != "":
 		xpuProc = h.GPGpu
+	case strings.TrimSpace(h.Tpu.Num) != "":
+		xpuProc = h.Tpu
 	}
 
 	xpuModel := strings.TrimSpace(xpuProc.Type)

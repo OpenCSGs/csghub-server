@@ -15,6 +15,7 @@ const (
 	ResourceTypeGPGPU ResourceType = "gpgpu"
 	ResourceTypeMLU   ResourceType = "mlu"
 	ResourceTypeDCU   ResourceType = "dcu"
+	ResourceTypeTPU   ResourceType = "tpu"
 	PayModeFree       PayMode      = "free"
 	PayModeMinute     PayMode      = "minute"
 	PayModeMonth      PayMode      = "month"
@@ -28,7 +29,8 @@ func ResourceTypeValid(resourceType ResourceType) bool {
 		resourceType == ResourceTypeGCU ||
 		resourceType == ResourceTypeGPGPU ||
 		resourceType == ResourceTypeMLU ||
-		resourceType == ResourceTypeDCU
+		resourceType == ResourceTypeDCU ||
+		resourceType == ResourceTypeTPU
 }
 
 var ResourceTypeValidator validator.Func = func(fl validator.FieldLevel) bool {

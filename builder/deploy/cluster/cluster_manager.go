@@ -643,6 +643,10 @@ func getXPULabel(labels map[string]string, config *config.Config) (string, strin
 		//for amd gpu
 		return "amd.com/gpu", "amd.com/gpu.product-name", []string{"amd.com/gpu.vram"}
 	}
+	if _, found := labels["chipltech.com/tpu.product"]; found {
+		//for chipltech tpu
+		return "chipltech.com/dlc-lyp", "chipltech.com/tpu.product", []string{"chipltech.com/tpu.mem"}
+	}
 	//check custom gpu model label
 	if config.Space.GPUModelLabel != "" {
 		var gpuLabels []types.GPUModel

@@ -21,6 +21,7 @@ func handleAccelerator(hardware types.HardWare, resReq map[corev1.ResourceName]r
 		{hardware.Mlu.ResourceName, hardware.Mlu.Num},
 		{hardware.Dcu.ResourceName, hardware.Dcu.Num},
 		{hardware.GPGpu.ResourceName, hardware.GPGpu.Num},
+		{hardware.Tpu.ResourceName, hardware.Tpu.Num},
 	}
 
 	for _, acc := range accelerators {

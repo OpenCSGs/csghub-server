@@ -44,6 +44,18 @@ func Test_handleAccelerator_CE(t *testing.T) {
 			},
 		},
 		{
+			name: "tpu with resource name",
+			hardware: types.HardWare{
+				Tpu: types.Processor{
+					Num:          "1",
+					ResourceName: "chipltech.com/dlc-lyp",
+				},
+			},
+			wantReq: map[corev1.ResourceName]resource.Quantity{
+				"chipltech.com/dlc-lyp": resource.MustParse("1"),
+			},
+		},
+		{
 			name: "no resource name",
 			hardware: types.HardWare{
 				Gpu: types.Processor{
@@ -87,6 +99,26 @@ func Test_GenerateResources_CE(t *testing.T) {
 			want: &rtypes.GeneratedResources{
 				ResourceRequirements: map[corev1.ResourceName]resource.Quantity{
 					"nvidia.com/gpu": resource.MustParse("1"),
+				},
+				NodeSelector: map[string]string{},
+				NodeAffinity: nil,
+				Tolerations:  nil,
+			},
+		},
+		{
+			name: "tpu resources with resource name (CE)",
+			hardware: types.HardWare{
+				Tpu: types.Processor{
+					Num:          "2",
+					ResourceName: "chipltech.com/dlc-lyp",
+				},
+			},
+			nodes:     []types.Node{},
+			deployExt: types.DeployExtend{},
+			config:    &config.Config{},
+			want: &rtypes.GeneratedResources{
+				ResourceRequirements: map[corev1.ResourceName]resource.Quantity{
+					"chipltech.com/dlc-lyp": resource.MustParse("2"),
 				},
 				NodeSelector: map[string]string{},
 				NodeAffinity: nil,

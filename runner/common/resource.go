@@ -38,6 +38,7 @@ func GenerateResources(params rtypes.ResourceGeneratorParams) *rtypes.GeneratedR
 		{hardware.Dcu.Labels},
 		{hardware.GPGpu.Labels},
 		{hardware.Cpu.Labels},
+		{hardware.Tpu.Labels},
 	}
 
 	for _, hw := range hardwareTypes {

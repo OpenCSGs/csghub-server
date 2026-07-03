@@ -174,7 +174,8 @@ func isCPUOnlyWorkload(hardware *types.HardWare) bool {
 		hardware.Gcu.Num == "" &&
 		hardware.Mlu.Num == "" &&
 		hardware.Dcu.Num == "" &&
-		hardware.GPGpu.Num == ""
+		hardware.GPGpu.Num == "" &&
+		hardware.Tpu.Num == ""
 }
 
 func isXPUNode(node types.NodeResourceInfo) bool {

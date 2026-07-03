@@ -101,6 +101,22 @@ func TestUpdateEvaluationEnvHardware(t *testing.T) {
 			},
 		},
 		{
+			name: "TPU set when others are empty",
+			env:  make(map[string]string),
+			hardware: types.HardWare{
+				Gpu: types.Processor{Num: ""},
+				Npu: types.Processor{Num: ""},
+				Gcu: types.Processor{Num: ""},
+				Mlu: types.Processor{Num: ""},
+				Dcu: types.Processor{Num: ""},
+				Tpu: types.Processor{Num: "1"},
+			},
+			expected: map[string]string{
+				"TPU_NUM": "1",
+				"GPU_NUM": "1",
+			},
+		},
+		{
 			name: "No hardware set",
 			env:  make(map[string]string),
 			hardware: types.HardWare{
@@ -208,6 +224,14 @@ func TestGetXPUNumber(t *testing.T) {
 				Mlu: types.Processor{Num: "1"},
 			},
 			want:    1,
+			wantErr: false,
+		},
+		{
+			name: "Only Tpu specified",
+			hardware: types.HardWare{
+				Tpu: types.Processor{Num: "3"},
+			},
+			want:    3,
 			wantErr: false,
 		},
 		{
@@ -434,6 +458,18 @@ func TestResourceType(t *testing.T) {
 			},
 			expected: types.ResourceTypeGPU,
 		},
+		{
+			name: "TPU when TPU Num is not empty and others are empty",
+			hardware: types.HardWare{
+				Gpu: types.Processor{Num: ""},
+				Npu: types.Processor{Num: ""},
+				Mlu: types.Processor{Num: ""},
+				Gcu: types.Processor{Num: ""},
+				Dcu: types.Processor{Num: ""},
+				Tpu: types.Processor{Num: "1"},
+			},
+			expected: types.ResourceTypeTPU,
+		},
 	}
 
 	for _, tt := range tests {
@@ -442,6 +478,33 @@ func TestResourceType(t *testing.T) {
 			if actual != tt.expected {
 				t.Errorf("ResourceType() = %v, want %v", actual, tt.expected)
 			}
+		})
+	}
+}
+
+func TestContainsGraphicResource(t *testing.T) {
+	tests := []struct {
+		name     string
+		hardware types.HardWare
+		want     bool
+	}{
+		{
+			name:     "cpu only",
+			hardware: types.HardWare{Cpu: types.CPU{Num: "2"}, Memory: "4Gi"},
+			want:     false,
+		},
+		{
+			name: "tpu is graphic resource",
+			hardware: types.HardWare{
+				Tpu: types.Processor{Num: "1"},
+			},
+			want: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.want, ContainsGraphicResource(tt.hardware))
 		})
 	}
 }
