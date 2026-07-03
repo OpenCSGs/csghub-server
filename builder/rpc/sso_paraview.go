@@ -192,3 +192,15 @@ func (p *paraviewClientImpl) DeleteUser(ctx context.Context, uuid string) error 
 	// No interface has been provided yet
 	return nil
 }
+
+func (p *paraviewClientImpl) CreateInvitation(ctx context.Context, code string) error {
+	return nil
+}
+
+func (p *paraviewClientImpl) CreateUser(ctx context.Context, userInfo *SSOCreateUserInfo) error {
+	return nil
+}
+
+func (p *paraviewClientImpl) GetInvitationCode(ctx context.Context, userUUID string) (string, error) {
+	return "", nil
+}

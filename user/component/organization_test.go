@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	mockgit "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/git/gitserver"
+	mockrpc "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/rpc"
 	mockdb "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/database"
 	mockusermodule "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/user/component"
 	"opencsg.com/csghub-server/builder/store/database"
@@ -48,12 +49,16 @@ func TestOrganizationComponent_Create(t *testing.T) {
 	mockMemberComponent.EXPECT().InitRoles(mock.Anything, mock.Anything).Return(nil).Once()
 	mockMemberComponent.EXPECT().SetAdmin(mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 
+	mockSSO := mockrpc.NewMockSSOInterface(t)
+	mockSSO.EXPECT().CreateUser(mock.Anything, mock.Anything).Return(nil).Once()
+
 	c := &organizationComponentImpl{
 		userStore: mockUserStore,
 		nsStore:   mockNamespaceStore,
 		gs:        mockGitServer,
 		orgStore:  mockOrgStore,
 		msc:       mockMemberComponent,
+		sso:       mockSSO,
 	}
 	org, err := c.Create(context.Background(), req)
 	require.NoError(t, err)
