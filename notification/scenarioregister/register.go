@@ -5,6 +5,8 @@ import (
 	"opencsg.com/csghub-server/notification/scenariomgr"
 	"opencsg.com/csghub-server/notification/scenariomgr/scenario/emailverifycode"
 	"opencsg.com/csghub-server/notification/scenariomgr/scenario/internalnotification"
+	"opencsg.com/csghub-server/notification/scenariomgr/scenario/resourceapplication"
+	"opencsg.com/csghub-server/notification/scenariomgr/scenario/smsverifycode"
 )
 
 func Register(d *scenariomgr.DataProvider) {
@@ -80,6 +82,18 @@ func Register(d *scenariomgr.DataProvider) {
 		},
 	})
 
+	// register resource application scenario
+	scenariomgr.RegisterScenario(types.MessageScenarioResourceApplication, &scenariomgr.ScenarioDefinition{
+		Channels: []types.MessageChannel{
+			types.MessageChannelInternalMessage,
+			types.MessageChannelEmail,
+		},
+		ChannelGetDataFunc: map[types.MessageChannel]scenariomgr.GetDataFunc{
+			types.MessageChannelInternalMessage: resourceapplication.GetInternalMessageDataFunc(d.GetUserSvcClient()),
+			types.MessageChannelEmail:           resourceapplication.GetEmailDataFunc(d.GetUserSvcClient()),
+		},
+	})
+
 	// register email verify code scenario
 	scenariomgr.RegisterScenario(types.MessageScenarioEmailVerifyCode, &scenariomgr.ScenarioDefinition{
 		Channels: []types.MessageChannel{
@@ -92,6 +106,40 @@ func Register(d *scenariomgr.DataProvider) {
 
 	// register deployment scenario
 	scenariomgr.RegisterScenario(types.MessageScenarioDeployment, &scenariomgr.ScenarioDefinition{
+		Channels: []types.MessageChannel{
+			types.MessageChannelInternalMessage,
+			types.MessageChannelEmail,
+		},
+		ChannelGetDataFunc: map[types.MessageChannel]scenariomgr.GetDataFunc{
+			types.MessageChannelInternalMessage: internalnotification.GetSiteInternalMessageData,
+			types.MessageChannelEmail:           internalnotification.GetEmailDataFunc(d.GetNotificationStorage()),
+		},
+	})
+
+	// register sms verify code scenario
+	scenariomgr.RegisterScenario(types.MessageScenarioSMSVerifyCode, &scenariomgr.ScenarioDefinition{
+		Channels: []types.MessageChannel{
+			types.MessageChannelSMS,
+		},
+		ChannelGetDataFunc: map[types.MessageChannel]scenariomgr.GetDataFunc{
+			types.MessageChannelSMS: smsverifycode.GetSMSData,
+		},
+	})
+
+	// register agent-instance-updated scenario
+	scenariomgr.RegisterScenario(types.MessageScenarioAgentInstanceUpdated, &scenariomgr.ScenarioDefinition{
+		Channels: []types.MessageChannel{
+			types.MessageChannelInternalMessage,
+			types.MessageChannelEmail,
+		},
+		ChannelGetDataFunc: map[types.MessageChannel]scenariomgr.GetDataFunc{
+			types.MessageChannelInternalMessage: internalnotification.GetSiteInternalMessageData,
+			types.MessageChannelEmail:           internalnotification.GetEmailDataFunc(d.GetNotificationStorage()),
+		},
+	})
+
+	// register agent-instance-deleted scenario
+	scenariomgr.RegisterScenario(types.MessageScenarioAgentInstanceDeleted, &scenariomgr.ScenarioDefinition{
 		Channels: []types.MessageChannel{
 			types.MessageChannelInternalMessage,
 			types.MessageChannelEmail,

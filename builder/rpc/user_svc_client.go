@@ -29,6 +29,8 @@ type UserSvcClient interface {
 	GetMemberRoleByUUID(ctx context.Context, orgUUID, userName string) (membership.Role, error)
 	FindByUUIDs(ctx context.Context, uuids []string) (map[string]*types.User, error)
 	GetUserUUIDs(ctx context.Context, per, page int) ([]string, int, error)
+	GetAdminUserUUIDs(ctx context.Context) ([]string, int, error)
+	GetAdminEmails(ctx context.Context) ([]string, int, error)
 	GetEmails(ctx context.Context, per, page int) ([]string, int, error)
 	GetTokenQuotas(ctx context.Context, keyName string) ([]database.AccountAccessTokenQuota, error)
 }
@@ -292,6 +294,44 @@ func (c *UserSvcHttpClient) GetUserUUIDs(ctx context.Context, per, page int) ([]
 				Set("page", page))
 	}
 	return resp.Data.UserUUIDs, resp.Data.Total, nil
+}
+
+func (c *UserSvcHttpClient) GetAdminUserUUIDs(ctx context.Context) ([]string, int, error) {
+	url := "/api/v1/user/admin_uuids"
+	var resp struct {
+		Data struct {
+			UserUUIDs []string `json:"data"`
+			Total     int      `json:"total"`
+		} `json:"data"`
+	}
+	err := c.hc.Get(ctx, url, &resp)
+	if err != nil {
+		slog.ErrorContext(ctx, "call user service failed", slog.String("error", err.Error()))
+		return nil, 0, errorx.RemoteSvcFail(err,
+			errorx.Ctx().
+				Set("service", "user service").
+				Set("action", "get admin user uuids"))
+	}
+	return resp.Data.UserUUIDs, resp.Data.Total, nil
+}
+
+func (c *UserSvcHttpClient) GetAdminEmails(ctx context.Context) ([]string, int, error) {
+	url := "/api/v1/user/admin_emails"
+	var resp struct {
+		Data struct {
+			Emails []string `json:"data"`
+			Total  int      `json:"total"`
+		} `json:"data"`
+	}
+	err := c.hc.Get(ctx, url, &resp)
+	if err != nil {
+		slog.ErrorContext(ctx, "call user service failed", slog.String("error", err.Error()))
+		return nil, 0, errorx.RemoteSvcFail(err,
+			errorx.Ctx().
+				Set("service", "user service").
+				Set("action", "get admin emails"))
+	}
+	return resp.Data.Emails, resp.Data.Total, nil
 }
 
 func (c *UserSvcHttpClient) GetEmails(ctx context.Context, per, page int) ([]string, int, error) {

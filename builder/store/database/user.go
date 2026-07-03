@@ -38,6 +38,8 @@ type UserStore interface {
 	IsExistWithDeleted(ctx context.Context, username string) (bool, error)
 	GetEmails(ctx context.Context, per, page int) ([]string, int, error)
 	GetUserUUIDs(ctx context.Context, per, page int) ([]string, int, error)
+	GetAdminUserUUIDs(ctx context.Context) ([]string, error)
+	GetAdminEmails(ctx context.Context) ([]string, error)
 	UpdatePhone(ctx context.Context, userID int64, phone string, phoneArea string) error
 	IndexWithCursor(ctx context.Context, req types.UserIndexReq) (ch chan Wrapper, err error)
 	FindByID(ctx context.Context, userID int64) (User, error)
@@ -602,6 +604,54 @@ func (s *UserStoreImpl) GetUserUUIDs(ctx context.Context, per, page int) (uuids 
 		return nil, 0, errorx.HandleDBError(err, nil)
 	}
 	return uuids, count, nil
+}
+
+func (s *UserStoreImpl) GetAdminUserUUIDs(ctx context.Context) ([]string, error) {
+	var users []User
+	err := s.db.Operator.Core.NewSelect().
+		Model(&users).
+		Column("uuid", "role_mask").
+		Where("uuid IS NOT NULL AND uuid != ''").
+		Where(
+			"role_mask = ? OR role_mask = ? OR role_mask LIKE ? OR role_mask LIKE ? OR role_mask LIKE ? OR role_mask LIKE ? OR role_mask LIKE ? OR role_mask LIKE ?",
+			"admin", "super_user", "admin,%", "%,admin", "%,admin,%", "super_user,%", "%,super_user", "%,super_user,%",
+		).
+		Scan(ctx)
+	if err != nil {
+		return nil, errorx.HandleDBError(err, nil)
+	}
+
+	adminUUIDs := make([]string, 0)
+	for _, user := range users {
+		if user.CanAdmin() {
+			adminUUIDs = append(adminUUIDs, user.UUID)
+		}
+	}
+	return adminUUIDs, nil
+}
+
+func (s *UserStoreImpl) GetAdminEmails(ctx context.Context) ([]string, error) {
+	var users []User
+	err := s.db.Operator.Core.NewSelect().
+		Model(&users).
+		Column("email", "role_mask").
+		Where("email IS NOT NULL AND email != ''").
+		Where(
+			"role_mask = ? OR role_mask = ? OR role_mask LIKE ? OR role_mask LIKE ? OR role_mask LIKE ? OR role_mask LIKE ? OR role_mask LIKE ? OR role_mask LIKE ?",
+			"admin", "super_user", "admin,%", "%,admin", "%,admin,%", "super_user,%", "%,super_user", "%,super_user,%",
+		).
+		Scan(ctx)
+	if err != nil {
+		return nil, errorx.HandleDBError(err, nil)
+	}
+
+	adminEmails := make([]string, 0)
+	for _, user := range users {
+		if user.CanAdmin() {
+			adminEmails = append(adminEmails, user.Email)
+		}
+	}
+	return adminEmails, nil
 }
 
 func (s *UserStoreImpl) UpdatePhone(ctx context.Context, userID int64, phone string, phoneArea string) error {

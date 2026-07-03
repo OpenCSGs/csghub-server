@@ -43,8 +43,8 @@ type userComponentImpl struct {
 	gs          gitserver.GitServer
 	jwtc        JwtComponent
 	tokenc      AccessTokenComponent
-	userPhonec  UserPhoneComponent
 	invitationc InvitationComponent
+	userPhonec  UserPhoneComponent
 
 	// casc      *casdoorsdk.Client
 	// casConfig *casdoorsdk.AuthConfig
@@ -95,6 +95,10 @@ type UserComponent interface {
 	// should only be called by other *internal* services (no permission check)
 	GetEmailsInternal(ctx context.Context, per, page int) ([]string, int, error)
 	GetUserUUIDs(ctx context.Context, per, page int) ([]string, int, error)
+	// GetAdminUserUUIDs returns the UUIDs of users with administrator permissions.
+	GetAdminUserUUIDs(ctx context.Context) ([]string, error)
+	// GetAdminEmails returns the email addresses of users with administrator permissions.
+	GetAdminEmails(ctx context.Context) ([]string, error)
 	GenerateVerificationCodeAndSendEmail(ctx context.Context, uid, email string) error
 	ResetUserTags(ctx context.Context, uid string, tagIDs []int64) error
 	StreamExportUsers(ctx context.Context, req types.UserIndexReq) (data chan types.UserIndexResp, err error)
@@ -1223,6 +1227,24 @@ func (c *userComponentImpl) GetUserUUIDs(ctx context.Context, per, page int) ([]
 	}
 
 	return userUUIDs, total, nil
+}
+
+// GetAdminUserUUIDs returns the UUIDs of users with administrator permissions.
+func (c *userComponentImpl) GetAdminUserUUIDs(ctx context.Context) ([]string, error) {
+	adminUUIDs, err := c.userStore.GetAdminUserUUIDs(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get admin user uuids,error:%w", err)
+	}
+	return adminUUIDs, nil
+}
+
+// GetAdminEmails returns the email addresses of users with administrator permissions.
+func (c *userComponentImpl) GetAdminEmails(ctx context.Context) ([]string, error) {
+	adminEmails, err := c.userStore.GetAdminEmails(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get admin emails,error:%w", err)
+	}
+	return adminEmails, nil
 }
 
 func (c *userComponentImpl) GenerateVerificationCodeAndSendEmail(ctx context.Context, uid, email string) error {
