@@ -269,6 +269,7 @@ watch_configmap_name = "spaces-runner-config"
 watch_configmap_interval_in_sec = 60
 runner_namespace = "csghub"
 public_docker_reg_base = "opencsg-registry.cn-beijing.cr.aliyuncs.com"
+vgpu_memory_scaling_factor = 10
 
 [cluster]
 cluster_id = ""
