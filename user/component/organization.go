@@ -10,6 +10,7 @@ import (
 	"opencsg.com/csghub-server/builder/git"
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/git/membership"
+	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/errorx"
@@ -44,6 +45,12 @@ func NewOrganizationComponent(config *config.Config) (OrganizationComponent, err
 		slog.Error(newError.Error())
 		return nil, newError
 	}
+	c.sso, err = rpc.NewSSOClient(config)
+	if err != nil {
+		newError := fmt.Errorf("fail to create sso client,error:%w", err)
+		slog.Error(newError.Error())
+		return nil, newError
+	}
 	return c, nil
 }
 
@@ -54,6 +61,7 @@ type organizationComponentImpl struct {
 	gs        gitserver.GitServer
 
 	msc MemberComponent
+	sso rpc.SSOInterface
 }
 
 func (c *organizationComponentImpl) FixOrgData(ctx context.Context, org *database.Organization) (*database.Organization, error) {
@@ -118,6 +126,18 @@ func (c *organizationComponentImpl) Create(ctx context.Context, req *types.Creat
 		UserID: user.ID,
 		UUID:   newNSUUID,
 	}
+
+	// create sso user before db write, so if sso fails db stays clean
+	err = c.sso.CreateUser(ctx, &rpc.SSOCreateUserInfo{
+		Name:     dbOrg.Name,
+		Nickname: dbOrg.Nickname,
+		UUID:     dbOrg.UUID.String(),
+		Password: uuid.New().String(),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed create sso user for organization, error: %w", err)
+	}
+
 	err = c.orgStore.Create(ctx, dbOrg, namespace)
 	if err != nil {
 		return nil, fmt.Errorf("failed create database organization, error: %w", err)
