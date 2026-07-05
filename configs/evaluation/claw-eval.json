@@ -1,0 +1,13 @@
+{
+  "engine_name": "claw-eval",
+  "enabled": 1,
+  "description": "Claw agent evaluation via OpenAI-compatible API",
+  "engine_images": [
+    {
+      "compute_type": "cpu",
+      "image": "opencsghq/claw-eval:1.0.0",
+      "engine_version": "1.0.0"
+    }
+  ],
+  "supported_archs": []
+}

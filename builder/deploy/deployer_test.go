@@ -843,6 +843,67 @@ func TestDeployer_SubmitEvaluation(t *testing.T) {
 	require.Equal(t, &types.ArgoWorkFlowRes{ID: 1}, resp)
 }
 
+func TestDeployer_SubmitClawEvaluation(t *testing.T) {
+	tester := newTestDeployer(t)
+	ctx := context.TODO()
+
+	tester.mocks.stores.ClusterInfoMock().EXPECT().ByClusterID(ctx, "cluster-1").Return(database.ClusterInfo{}, nil)
+	tester.mocks.runner.EXPECT().SubmitWorkFlow(ctx, mock.Anything).RunAndReturn(
+		func(ctx context.Context, awfr *types.ArgoWorkFlowReq) (*types.ArgoWorkFlowRes, error) {
+			require.Equal(t, types.TaskTypeClawEval, awfr.TaskType)
+			require.Equal(t, "claw-eval", awfr.Entrypoint)
+			require.Equal(t, []string{"glm-5.1"}, awfr.RepoIds)
+			env := awfr.Templates[0].Env
+			require.Equal(t, "batch", env["CLAW_EVAL_COMMAND"])
+			require.Equal(t, "glm-5.1", env["CLAW_EVAL_MODEL"])
+			require.Equal(t, "http://localhost:11435/v1", env["CLAW_EVAL_BASE_URL"])
+			require.Equal(t, "sk-test", env["CLAW_EVAL_API_KEY"])
+			require.Equal(t, "http://aigateway.test/v1", env["CLAW_EVAL_JUDGE_BASE_URL"])
+			require.Equal(t, "gk-judge-key", env["CLAW_EVAL_JUDGE_API_KEY"])
+			require.Equal(t, "1-9", env["CLAW_EVAL_TASKS"])
+			require.Equal(t, types.ClawEvalDefaultJudgeModel, env["CLAW_EVAL_JUDGE_MODEL"])
+			return &types.ArgoWorkFlowRes{ID: 2}, nil
+		},
+	)
+	resp, err := tester.SubmitClawEvaluation(ctx, types.ClawEvaluationReq{
+		ClusterID:      "cluster-1",
+		Model:          "glm-5.1",
+		BaseURL:        "http://localhost:11435/v1",
+		ApiKey:         "sk-test",
+		Tasks:          "1-9",
+		JudgeBaseURL:   "http://aigateway.test/v1",
+		JudgeApiKey:    "gk-judge-key",
+		TaskType:       types.TaskTypeClawEval,
+		Image:          "opencsghq/claw-eval:1.0.0",
+	})
+	require.NoError(t, err)
+	require.Equal(t, &types.ArgoWorkFlowRes{ID: 2}, resp)
+}
+
+func TestDeployer_SubmitClawEvaluation_DefaultTasksNormal(t *testing.T) {
+	tester := newTestDeployer(t)
+	ctx := context.TODO()
+
+	tester.mocks.stores.ClusterInfoMock().EXPECT().ByClusterID(ctx, "cluster-1").Return(database.ClusterInfo{}, nil)
+	tester.mocks.runner.EXPECT().SubmitWorkFlow(ctx, mock.Anything).RunAndReturn(
+		func(ctx context.Context, awfr *types.ArgoWorkFlowReq) (*types.ArgoWorkFlowRes, error) {
+			env := awfr.Templates[0].Env
+			require.Equal(t, types.ClawEvalTasksNormal, env["CLAW_EVAL_TASKS"])
+			return &types.ArgoWorkFlowRes{ID: 3}, nil
+		},
+	)
+	resp, err := tester.SubmitClawEvaluation(ctx, types.ClawEvaluationReq{
+		ClusterID: "cluster-1",
+		Model:     "glm-5.1",
+		BaseURL:   "http://localhost:11435/v1",
+		ApiKey:    "sk-test",
+		TaskType:  types.TaskTypeClawEval,
+		Image:     "opencsghq/claw-eval:1.0.0",
+	})
+	require.NoError(t, err)
+	require.Equal(t, &types.ArgoWorkFlowRes{ID: 3}, resp)
+}
+
 func TestDeployer_GetEvaluation(t *testing.T) {
 	tester := newTestDeployer(t)
 	ctx := context.TODO()

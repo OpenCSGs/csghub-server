@@ -354,7 +354,7 @@ func generateWorkflow(req types.ArgoWorkFlowReq, config *config.Config) (*v1alph
 			return nil, fmt.Errorf("failed to apply scheduler to argo template: %v", err)
 		}
 
-		if req.TaskType == types.TaskTypeEvaluation {
+		if req.TaskType == types.TaskTypeEvaluation || req.TaskType == types.TaskTypeClawEval {
 			temp.Outputs = v1alpha1.Outputs{
 				Parameters: []v1alpha1.Parameter{
 					{

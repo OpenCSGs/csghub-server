@@ -53,6 +53,7 @@ type Deployer interface {
 	StartDeploy(ctx context.Context, deploy *database.Deploy) error
 	CheckResourceAvailable(ctx context.Context, clusterId string, orderDetailID int64, hardWare *types.HardWare) (bool, []types.ResourceAvailableStatus, error)
 	SubmitEvaluation(ctx context.Context, req types.EvaluationReq) (*types.ArgoWorkFlowRes, error)
+	SubmitClawEvaluation(ctx context.Context, req types.ClawEvaluationReq) (*types.ArgoWorkFlowRes, error)
 	DeleteEvaluation(ctx context.Context, req types.ArgoWorkFlowDeleteReq) error
 	GetEvaluation(ctx context.Context, req types.EvaluationGetReq) (*types.ArgoWorkFlowRes, error)
 	CheckHeartbeatTimeout(ctx context.Context, clusterId string) (bool, error)
@@ -892,6 +893,95 @@ func (d *deployer) SubmitEvaluation(ctx context.Context, req types.EvaluationReq
 	}
 	if req.ResourceId == 0 {
 		flowReq.ShareMode = true
+	}
+	return d.imageRunner.SubmitWorkFlow(ctx, flowReq)
+}
+
+func (d *deployer) SubmitClawEvaluation(ctx context.Context, req types.ClawEvaluationReq) (*types.ArgoWorkFlowRes, error) {
+	cluster, err := d.clusterStore.ByClusterID(ctx, req.ClusterID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get cluster %s for claw evaluation job, error: %w", req.ClusterID, err)
+	}
+
+	command := req.Command
+	if command == "" {
+		command = "batch"
+	}
+
+	env := make(map[string]string)
+	env["CLAW_EVAL_COMMAND"] = command
+	env["CLAW_EVAL_MODEL"] = req.Model
+	env["CLAW_EVAL_BASE_URL"] = req.BaseURL
+	if req.ApiKey != "" {
+		env["CLAW_EVAL_API_KEY"] = req.ApiKey
+	}
+	if req.JudgeBaseURL != "" {
+		env["CLAW_EVAL_JUDGE_BASE_URL"] = req.JudgeBaseURL
+	}
+	if req.JudgeApiKey != "" {
+		env["CLAW_EVAL_JUDGE_API_KEY"] = req.JudgeApiKey
+	}
+	if req.Config != "" {
+		env["CLAW_EVAL_CONFIG"] = req.Config
+	}
+	if req.Tasks != "" {
+		env["CLAW_EVAL_TASKS"] = req.Tasks
+	} else {
+		env["CLAW_EVAL_TASKS"] = types.ClawEvalTasksNormal
+	}
+	if req.Trials > 0 {
+		env["CLAW_EVAL_TRIALS"] = strconv.Itoa(req.Trials)
+	}
+	if req.Parallel > 0 {
+		env["CLAW_EVAL_PARALLEL"] = strconv.Itoa(req.Parallel)
+	}
+	if req.JudgeModel != "" {
+		env["CLAW_EVAL_JUDGE_MODEL"] = req.JudgeModel
+	} else if !req.NoJudge {
+		env["CLAW_EVAL_JUDGE_MODEL"] = types.ClawEvalDefaultJudgeModel
+	}
+	if req.NoJudge {
+		env["CLAW_EVAL_NO_JUDGE"] = "true"
+	}
+	if req.TraceDir != "" {
+		env["CLAW_EVAL_TRACE_DIR"] = req.TraceDir
+	}
+	if req.Proxy != "" {
+		env["CLAW_EVAL_PROXY"] = req.Proxy
+	}
+
+	common.UpdateEvaluationEnvHardware(env, req.Hardware)
+
+	templates := []types.ArgoFlowTemplate{
+		{
+			Name:     "claw-eval",
+			Env:      env,
+			HardWare: req.Hardware,
+			Image:    req.Image,
+		},
+	}
+	uniqueFlowName := d.snowflakeNode.Generate().Base36()
+	flowReq := &types.ArgoWorkFlowReq{
+		TaskName:     req.TaskName,
+		TaskId:       uniqueFlowName,
+		TaskType:     req.TaskType,
+		TaskDesc:     req.TaskDesc,
+		Image:        req.Image,
+		Username:     req.Username,
+		UserUUID:     req.UserUUID,
+		RepoIds:      []string{req.Model},
+		Entrypoint:   "claw-eval",
+		ClusterID:    req.ClusterID,
+		Templates:    templates,
+		RepoType:     req.RepoType,
+		ResourceId:   req.ResourceId,
+		ResourceName: req.ResourceName,
+		Nodes:        req.Nodes,
+		Scheduler:    common.GenerateScheduler(cluster.VXPUConfig),
+		DeployExtend: types.DeployExtend{
+			NodeAffinity: req.NodeAffinity,
+			Tolerations:  req.Tolerations,
+		},
 	}
 	return d.imageRunner.SubmitWorkFlow(ctx, flowReq)
 }

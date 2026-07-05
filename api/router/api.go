@@ -613,6 +613,7 @@ func createEvaluationRoutes(apiGroup *gin.RouterGroup, middlewareCollection midd
 		evaluationsGroup.POST("", evaluationHandler.RunEvaluation)
 		evaluationsGroup.DELETE("/:id", evaluationHandler.DeleteEvaluation)
 		evaluationsGroup.GET("/:id", evaluationHandler.GetEvaluation)
+		evaluationsGroup.GET("/:id/logs", evaluationHandler.GetLogs)
 	}
 }
 

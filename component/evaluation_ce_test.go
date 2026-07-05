@@ -161,6 +161,9 @@ c.mocks.stores.SpaceResourceMock().EXPECT().FindByID(ctx, int64(1)).Return(&data
 			UUID:     invalidReq.Username,
 			ID:       1,
 		}, nil).Once()
+		c.mocks.stores.RuntimeFrameworkMock().EXPECT().FindEnabledByID(ctx, int64(1)).Return(&database.RuntimeFramework{
+			FrameName: "lm-evaluation-harness",
+		}, nil).Once()
 		_, err := c.CreateEvaluation(ctx, invalidReq)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "invalid model id format: badmodelid")
@@ -181,6 +184,9 @@ c.mocks.stores.SpaceResourceMock().EXPECT().FindByID(ctx, int64(1)).Return(&data
 			Username: invalidReq.Username,
 			UUID:     invalidReq.Username,
 			ID:       1,
+		}, nil).Once()
+		c.mocks.stores.RuntimeFrameworkMock().EXPECT().FindEnabledByID(ctx, int64(1)).Return(&database.RuntimeFramework{
+			FrameName: "lm-evaluation-harness",
 		}, nil).Once()
 		c.mocks.stores.ModelMock().EXPECT().FindByPath(ctx, "opencsg", "wukong").Return(
 			&database.Model{
@@ -211,6 +217,9 @@ c.mocks.stores.SpaceResourceMock().EXPECT().FindByID(ctx, int64(1)).Return(&data
 			Username: invalidReq.Username,
 			UUID:     invalidReq.Username,
 			ID:       1,
+		}, nil).Once()
+		c.mocks.stores.RuntimeFrameworkMock().EXPECT().FindEnabledByID(ctx, int64(1)).Return(&database.RuntimeFramework{
+			FrameName: "lm-evaluation-harness",
 		}, nil).Once()
 		c.mocks.stores.ModelMock().EXPECT().FindByPath(ctx, "opencsg", "wukong").Return(
 			&database.Model{
@@ -636,7 +645,7 @@ func TestEvaluationComponent_OrgEvaluations(t *testing.T) {
 			PageOpts:    types.PageOpts{Page: 1, PageSize: 10},
 		}
 		c.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "user1", "org1", membership.RoleRead).Return(true, nil)
-		c.mocks.stores.WorkflowMock().EXPECT().FindByUsername(ctx, "org1", types.TaskTypeEvaluation, 10, 1).Return([]database.ArgoWorkflow{
+		c.mocks.stores.WorkflowMock().EXPECT().FindByUsernameWithTaskTypes(ctx, "org1", evaluationTaskTypes, 10, 1).Return([]database.ArgoWorkflow{
 			{ID: 1, TaskName: "ev1", Username: "org1", TaskType: "evaluation", Status: "Succeed"},
 		}, 1, nil)
 		res, total, err := c.OrgEvaluations(ctx, req)
@@ -654,7 +663,7 @@ func TestEvaluationComponent_OrgEvaluations(t *testing.T) {
 			CurrentUser: "",
 			PageOpts:    types.PageOpts{Page: 1, PageSize: 10},
 		}
-		c.mocks.stores.WorkflowMock().EXPECT().FindByUsername(ctx, "org1", types.TaskTypeEvaluation, 10, 1).Return([]database.ArgoWorkflow{}, 0, nil)
+		c.mocks.stores.WorkflowMock().EXPECT().FindByUsernameWithTaskTypes(ctx, "org1", evaluationTaskTypes, 10, 1).Return([]database.ArgoWorkflow{}, 0, nil)
 		res, total, err := c.OrgEvaluations(ctx, req)
 		require.Nil(t, err)
 		require.Equal(t, 0, total)

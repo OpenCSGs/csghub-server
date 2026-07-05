@@ -15,6 +15,7 @@ ssh_domain = "git@localhost:2222"
 
 [aigateway]
 responses_id_secret = "responses-id-secret"
+public_aigateway_url = "http://aigateway:8094/v1"
 
 [mirror]
 url = "http://localhost:8085"

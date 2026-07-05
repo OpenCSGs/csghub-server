@@ -19,6 +19,7 @@ type ArgoWorkFlowStore interface {
 	FindByID(ctx context.Context, id int64) (WorkFlow ArgoWorkflow, err error)
 	FindByTaskID(ctx context.Context, id string) (*ArgoWorkflow, error)
 	FindByUsername(ctx context.Context, username string, taskType types.TaskType, per, page int) (WorkFlows []ArgoWorkflow, total int, err error)
+	FindByUsernameWithTaskTypes(ctx context.Context, username string, taskTypes []types.TaskType, per, page int) (WorkFlows []ArgoWorkflow, total int, err error)
 	CreateWorkFlow(ctx context.Context, workFlow ArgoWorkflow) (*ArgoWorkflow, error)
 	UpdateWorkFlowByTaskID(ctx context.Context, workFlow ArgoWorkflow) (*ArgoWorkflow, error)
 	// mainly for update status
@@ -98,6 +99,29 @@ func (s *argoWorkFlowStoreImpl) FindByUsername(ctx context.Context, username str
 		Model(&WorkFlows).
 		ExcludeColumn("reason").
 		Where("username = ?", username).Where("task_type = ?", taskType)
+
+	query = query.Order("submit_time DESC").
+		Limit(per).
+		Offset((page - 1) * per)
+
+	err = query.Scan(ctx)
+	if err != nil {
+		return
+	}
+	total, err = query.Count(ctx)
+	if err != nil {
+		return
+	}
+	return
+}
+
+func (s *argoWorkFlowStoreImpl) FindByUsernameWithTaskTypes(ctx context.Context, username string, taskTypes []types.TaskType, per, page int) (WorkFlows []ArgoWorkflow, total int, err error) {
+	query := s.db.Operator.Core.
+		NewSelect().
+		Model(&WorkFlows).
+		ExcludeColumn("reason").
+		Where("username = ?", username).
+		Where("task_type IN (?)", bun.In(taskTypes))
 
 	query = query.Order("submit_time DESC").
 		Limit(per).

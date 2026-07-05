@@ -315,6 +315,75 @@ func (_c *MockArgoWorkFlowStore_FindByUsername_Call) RunAndReturn(run func(conte
 	return _c
 }
 
+// FindByUsernameWithTaskTypes provides a mock function with given fields: ctx, username, taskTypes, per, page
+func (_m *MockArgoWorkFlowStore) FindByUsernameWithTaskTypes(ctx context.Context, username string, taskTypes []types.TaskType, per int, page int) ([]database.ArgoWorkflow, int, error) {
+	ret := _m.Called(ctx, username, taskTypes, per, page)
+
+	if len(ret) == 0 {
+		panic("no return value specified for FindByUsernameWithTaskTypes")
+	}
+
+	var r0 []database.ArgoWorkflow
+	var r1 int
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, []types.TaskType, int, int) ([]database.ArgoWorkflow, int, error)); ok {
+		return rf(ctx, username, taskTypes, per, page)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, []types.TaskType, int, int) []database.ArgoWorkflow); ok {
+		r0 = rf(ctx, username, taskTypes, per, page)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]database.ArgoWorkflow)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, []types.TaskType, int, int) int); ok {
+		r1 = rf(ctx, username, taskTypes, per, page)
+	} else {
+		r1 = ret.Get(1).(int)
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, string, []types.TaskType, int, int) error); ok {
+		r2 = rf(ctx, username, taskTypes, per, page)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
+// MockArgoWorkFlowStore_FindByUsernameWithTaskTypes_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FindByUsernameWithTaskTypes'
+type MockArgoWorkFlowStore_FindByUsernameWithTaskTypes_Call struct {
+	*mock.Call
+}
+
+// FindByUsernameWithTaskTypes is a helper method to define mock.On call
+//   - ctx context.Context
+//   - username string
+//   - taskTypes []types.TaskType
+//   - per int
+//   - page int
+func (_e *MockArgoWorkFlowStore_Expecter) FindByUsernameWithTaskTypes(ctx interface{}, username interface{}, taskTypes interface{}, per interface{}, page interface{}) *MockArgoWorkFlowStore_FindByUsernameWithTaskTypes_Call {
+	return &MockArgoWorkFlowStore_FindByUsernameWithTaskTypes_Call{Call: _e.mock.On("FindByUsernameWithTaskTypes", ctx, username, taskTypes, per, page)}
+}
+
+func (_c *MockArgoWorkFlowStore_FindByUsernameWithTaskTypes_Call) Run(run func(ctx context.Context, username string, taskTypes []types.TaskType, per int, page int)) *MockArgoWorkFlowStore_FindByUsernameWithTaskTypes_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].([]types.TaskType), args[3].(int), args[4].(int))
+	})
+	return _c
+}
+
+func (_c *MockArgoWorkFlowStore_FindByUsernameWithTaskTypes_Call) Return(WorkFlows []database.ArgoWorkflow, total int, err error) *MockArgoWorkFlowStore_FindByUsernameWithTaskTypes_Call {
+	_c.Call.Return(WorkFlows, total, err)
+	return _c
+}
+
+func (_c *MockArgoWorkFlowStore_FindByUsernameWithTaskTypes_Call) RunAndReturn(run func(context.Context, string, []types.TaskType, int, int) ([]database.ArgoWorkflow, int, error)) *MockArgoWorkFlowStore_FindByUsernameWithTaskTypes_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetClusterWorkflows provides a mock function with given fields: ctx, req
 func (_m *MockArgoWorkFlowStore) GetClusterWorkflows(ctx context.Context, req types.ClusterWFReq) ([]database.ArgoWorkflow, int, error) {
 	ret := _m.Called(ctx, req)

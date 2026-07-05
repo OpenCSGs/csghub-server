@@ -36,7 +36,9 @@ func (c *EvaluationReq) GetSensitiveFields() []SensitiveField {
 type TaskType string
 
 const (
+	ClawEvalFrameName   = "claw-eval"
 	TaskTypeEvaluation  TaskType = "evaluation"
+	TaskTypeClawEval    TaskType = "claw_eval"
 	TaskTypeTraining    TaskType = "training"
 	TaskTypeComparison  TaskType = "comparison"
 	TaskTypeLeaderBoard TaskType = "leaderboard"
@@ -70,6 +72,20 @@ type EvaluationReq struct {
 	UseCustomDataset   bool     `json:"-"`
 	Nodes              []Node   `json:"-"`
 	DeployExtend
+
+	// claw-eval fields
+	Command    string `json:"command,omitempty"`
+	Model      string `json:"model,omitempty"`
+	BaseURL    string `json:"base_url,omitempty"`
+	ApiKey     string `json:"api_key,omitempty"`
+	Config     string `json:"config,omitempty"`
+	Tasks      string `json:"tasks,omitempty"`
+	Trials     int    `json:"trials,omitempty"`
+	Parallel   int    `json:"parallel,omitempty"`
+	JudgeModel string `json:"judge_model,omitempty"`
+	NoJudge    bool   `json:"no_judge,omitempty"`
+	TraceDir   string `json:"trace_dir,omitempty"`
+	Proxy      string `json:"proxy,omitempty"`
 }
 
 type CustomData struct {
@@ -166,14 +182,16 @@ type EvaluationRes struct {
 	SubmitTime   time.Time  `json:"submit_time"`
 	StartTime    time.Time  `json:"start_time,omitempty"`
 	EndTime      time.Time  `json:"end_time,omitempty"`
-	ResultURL    string     `json:"result_url"`
-	DownloadURL  string     `json:"download_url"`
-	FailuresURL  string     `json:"failures_url"`
+	ResultURL    string           `json:"result_url"`
+	DownloadURL  string           `json:"download_url"`
+	FailuresURL  string           `json:"failures_url"`
+	Summary      *ClawEvalSummary `json:"summary,omitempty"`
 }
 
 type (
 	EvaluationDelReq   = ArgoWorkFlowDeleteReq
 	EvaluationGetReq   = ArgoWorkFlowDeleteReq
+	EvaluationLogReq   = WorkflowLogReq
 	ArgoWorkFlowGetReq = ArgoWorkFlowDeleteReq
 )
 

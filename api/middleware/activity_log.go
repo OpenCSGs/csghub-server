@@ -41,6 +41,7 @@ var modelActions = []actionRule{
 	{method: "DELETE", pathContains: []string{"/models/", "/finetune/"}, action: "delete_finetune"},
 	{method: "POST", pathContains: []string{"/models/", "/finetunes"}, action: "run_finetune_job"},
 	{method: "POST", pathContains: []string{"/models/", "/evaluations"}, action: "run_evaluation_job"},
+	{method: "POST", pathContains: []string{"/evaluations"}, action: "run_evaluation_job"},
 	// serverless
 	{method: "POST", pathContains: []string{"/models/", "/serverless"}, action: "deploy_serverless"},
 }
