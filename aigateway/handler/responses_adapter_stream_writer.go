@@ -10,13 +10,14 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"opencsg.com/csghub-server/aigateway/handler/streamdecoder"
 	"opencsg.com/csghub-server/aigateway/token"
 	"opencsg.com/csghub-server/aigateway/types"
 )
 
 type responsesAdapterStreamWriter struct {
 	ginWriter        gin.ResponseWriter
-	decoder          eventStreamDecoder
+	decoder          streamdecoder.Decoder
 	respID           string
 	model            string
 	created          int64
@@ -55,6 +56,7 @@ func newResponsesAdapterStreamWriter(w gin.ResponseWriter, model string, respons
 		respID:           newAdapterResponseID(),
 		model:            model,
 		created:          time.Now().Unix(),
+		decoder:          streamdecoder.NewSSE(),
 		responsesCounter: responsesCounter,
 		toolCallItems:    map[int]*responsesToolCallStreamState{},
 	}
@@ -100,9 +102,7 @@ func (w *responsesAdapterStreamWriter) Write(data []byte) (int, error) {
 		w.ginWriter.Flush()
 		return n, err
 	}
-	// eventStreamDecoder.Write always returns a nil error today; the second
-	// return is kept for future use (e.g. buffer-overflow detection) so the
-	// call site already handles it without another edit.
+	// Decoder errors are reserved for future checks such as buffer overflow.
 	events, _ := w.decoder.Write(data)
 	for _, event := range events {
 		if event.Type == "error" {
@@ -173,7 +173,7 @@ func (w *responsesAdapterStreamWriter) finishResponseStream() {
 	w.writeData("data: [DONE]")
 }
 
-func (w *responsesAdapterStreamWriter) failResponseStream(event *Event) {
+func (w *responsesAdapterStreamWriter) failResponseStream(event *streamdecoder.Event) {
 	if w.completed || w.failed {
 		return
 	}
@@ -574,7 +574,7 @@ func (w *responsesAdapterStreamWriter) writeData(data string) {
 	w.ginWriter.Flush()
 }
 
-func (w *responsesAdapterStreamWriter) writeRawEvent(event *Event) {
+func (w *responsesAdapterStreamWriter) writeRawEvent(event *streamdecoder.Event) {
 	if event == nil || len(event.Raw) == 0 {
 		return
 	}

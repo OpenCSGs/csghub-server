@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strings"
 
+	"opencsg.com/csghub-server/aigateway/handler/streamdecoder"
 	"opencsg.com/csghub-server/aigateway/token"
 	commontypes "opencsg.com/csghub-server/common/types"
 )
@@ -22,7 +23,14 @@ type audioResponseWriter interface {
 	DurationSeconds() (float64, bool)
 }
 
-type ResponseWriterWrapperAudio struct {
+func NewResponseWriterWrapperAudio(internalWritter http.ResponseWriter, tokenCounter *token.AudioUsageCounter, useStream bool) audioResponseWriter {
+	if useStream {
+		return newStreamAudioResponseWriter(internalWritter, tokenCounter)
+	}
+	return newNonStreamAudioResponseWriter(internalWritter, tokenCounter)
+}
+
+type nonStreamAudioResponseWriter struct {
 	internalWritter http.ResponseWriter
 	tokenCounter    *token.AudioUsageCounter
 	buffer          bytes.Buffer
@@ -31,36 +39,36 @@ type ResponseWriterWrapperAudio struct {
 	hasDuration     bool
 }
 
-func NewResponseWriterWrapperAudio(internalWritter http.ResponseWriter, tokenCounter *token.AudioUsageCounter) audioResponseWriter {
-	return &ResponseWriterWrapperAudio{
+func newNonStreamAudioResponseWriter(internalWritter http.ResponseWriter, tokenCounter *token.AudioUsageCounter) *nonStreamAudioResponseWriter {
+	return &nonStreamAudioResponseWriter{
 		internalWritter: internalWritter,
 		tokenCounter:    tokenCounter,
 		statusCode:      http.StatusOK,
 	}
 }
 
-func (rw *ResponseWriterWrapperAudio) Header() http.Header {
+func (rw *nonStreamAudioResponseWriter) Header() http.Header {
 	return rw.internalWritter.Header()
 }
 
-func (rw *ResponseWriterWrapperAudio) WriteHeader(statusCode int) {
+func (rw *nonStreamAudioResponseWriter) WriteHeader(statusCode int) {
 	rw.statusCode = statusCode
 	rw.internalWritter.WriteHeader(statusCode)
 }
 
-func (rw *ResponseWriterWrapperAudio) Write(data []byte) (int, error) {
+func (rw *nonStreamAudioResponseWriter) Write(data []byte) (int, error) {
 	rw.captureText(data)
 	return rw.internalWritter.Write(data)
 }
 
-func (rw *ResponseWriterWrapperAudio) Flush() {
+func (rw *nonStreamAudioResponseWriter) Flush() {
 	if flusher, ok := rw.internalWritter.(http.Flusher); ok {
 		flusher.Flush()
 	}
 }
 
-func (rw *ResponseWriterWrapperAudio) captureText(data []byte) {
-	if rw.tokenCounter == nil || len(data) == 0 {
+func (rw *nonStreamAudioResponseWriter) captureText(data []byte) {
+	if rw == nil || rw.tokenCounter == nil || len(data) == 0 {
 		return
 	}
 
@@ -120,7 +128,7 @@ func (rw *ResponseWriterWrapperAudio) captureText(data []byte) {
 	}
 }
 
-func (rw *ResponseWriterWrapperAudio) captureDuration(candidates ...*float64) {
+func (rw *nonStreamAudioResponseWriter) captureDuration(candidates ...*float64) {
 	for _, candidate := range candidates {
 		if candidate != nil && *candidate > 0 {
 			rw.durationSeconds = *candidate
@@ -133,7 +141,7 @@ func (rw *ResponseWriterWrapperAudio) captureDuration(candidates ...*float64) {
 	}
 }
 
-func (rw *ResponseWriterWrapperAudio) StatusCode() int {
+func (rw *nonStreamAudioResponseWriter) StatusCode() int {
 	// Match net/http behavior: a body write without WriteHeader implies 200 OK.
 	// Audio proxying is synchronous; trace completion reads this only after
 	// ReverseProxy.ServeHTTP returns and wrapper writes have completed.
@@ -143,9 +151,161 @@ func (rw *ResponseWriterWrapperAudio) StatusCode() int {
 	return rw.statusCode
 }
 
-func (rw *ResponseWriterWrapperAudio) DurationSeconds() (float64, bool) {
+func (rw *nonStreamAudioResponseWriter) DurationSeconds() (float64, bool) {
 	if rw == nil || !rw.hasDuration {
 		return 0, false
 	}
 	return rw.durationSeconds, true
+}
+
+type streamAudioResponseWriter struct {
+	internalWritter http.ResponseWriter
+	tokenCounter    *token.AudioUsageCounter
+	decoder         streamdecoder.Decoder
+	statusCode      int
+	durationSeconds float64
+	hasDuration     bool
+	streamStarted   bool
+	accumulatedText string
+}
+
+func newStreamAudioResponseWriter(internalWritter http.ResponseWriter, tokenCounter *token.AudioUsageCounter) *streamAudioResponseWriter {
+	return &streamAudioResponseWriter{
+		internalWritter: internalWritter,
+		tokenCounter:    tokenCounter,
+		statusCode:      http.StatusOK,
+	}
+}
+
+func (rw *streamAudioResponseWriter) Header() http.Header {
+	return rw.internalWritter.Header()
+}
+
+func (rw *streamAudioResponseWriter) WriteHeader(statusCode int) {
+	rw.statusCode = statusCode
+	rw.internalWritter.Header().Del("Content-Length")
+
+	ct := rw.internalWritter.Header().Get("Content-Type")
+	switch {
+	case strings.Contains(ct, "text/event-stream"):
+		rw.decoder = streamdecoder.NewSSE()
+	case strings.Contains(ct, "application/x-ndjson"):
+		rw.decoder = streamdecoder.NewNDJSON()
+	}
+
+	rw.internalWritter.WriteHeader(statusCode)
+}
+
+func (rw *streamAudioResponseWriter) Write(data []byte) (int, error) {
+	originLen := len(data)
+
+	if shouldPassthroughUpstreamError(rw.statusCode, rw.streamStarted) {
+		return rw.internalWritter.Write(data)
+	}
+
+	if rw.decoder == nil {
+		// Unknown stream formats are passed through unchanged; usage can only be
+		// captured for stream formats with a selected decoder.
+		rw.streamStarted = true
+		return rw.internalWritter.Write(data)
+	}
+
+	events, err := rw.decoder.Write(data)
+	if err != nil {
+		return 0, err
+	}
+	for _, event := range events {
+		if err := rw.handleStreamEvent(event); err != nil {
+			return 0, err
+		}
+	}
+	return originLen, nil
+}
+
+func (rw *streamAudioResponseWriter) handleStreamEvent(event *streamdecoder.Event) error {
+	if rw.decoder.Format() == streamdecoder.FormatSSE && string(event.Data) == "[DONE]" {
+		rw.streamStarted = true
+		if _, err := rw.internalWritter.Write(event.Raw); err != nil {
+			return err
+		}
+		if flusher, ok := rw.internalWritter.(http.Flusher); ok {
+			flusher.Flush()
+		}
+		return nil
+	}
+	return rw.handleStreamPayload(event.Data, event.Raw)
+}
+
+func (rw *streamAudioResponseWriter) handleStreamPayload(payload, raw []byte) error {
+	rw.streamStarted = true
+
+	var chunk struct {
+		Text     string   `json:"text"`
+		Duration *float64 `json:"duration"`
+	}
+	if err := json.Unmarshal(payload, &chunk); err != nil {
+		slog.Warn("streamAudioResponseWriter: failed to parse stream payload",
+			slog.Any("error", err),
+			slog.Int("accumulated_text_len", len(rw.accumulatedText)))
+		if _, writeErr := rw.internalWritter.Write(raw); writeErr != nil {
+			return writeErr
+		}
+		if flusher, ok := rw.internalWritter.(http.Flusher); ok {
+			flusher.Flush()
+		}
+		return nil
+	}
+
+	rw.captureDuration(chunk.Duration)
+
+	if chunk.Text != "" {
+		rw.accumulatedText += chunk.Text
+		if rw.tokenCounter != nil {
+			rw.tokenCounter.Text(rw.accumulatedText)
+		}
+	}
+
+	if _, err := rw.internalWritter.Write(raw); err != nil {
+		return err
+	}
+	if flusher, ok := rw.internalWritter.(http.Flusher); ok {
+		flusher.Flush()
+	}
+	return nil
+}
+
+func (rw *streamAudioResponseWriter) captureDuration(candidates ...*float64) {
+	for _, candidate := range candidates {
+		if candidate != nil && *candidate > 0 {
+			rw.durationSeconds = *candidate
+			rw.hasDuration = true
+			if rw.tokenCounter != nil {
+				rw.tokenCounter.Duration(*candidate)
+			}
+			return
+		}
+	}
+}
+
+func (rw *streamAudioResponseWriter) Flush() {
+	if flusher, ok := rw.internalWritter.(http.Flusher); ok {
+		flusher.Flush()
+	}
+}
+
+func (rw *streamAudioResponseWriter) StatusCode() int {
+	if rw == nil || rw.statusCode == 0 {
+		return http.StatusOK
+	}
+	return rw.statusCode
+}
+
+func (rw *streamAudioResponseWriter) DurationSeconds() (float64, bool) {
+	if rw == nil {
+		return 0, false
+	}
+	if rw.hasDuration {
+		return rw.durationSeconds, true
+	}
+	return 0, false
 }

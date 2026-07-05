@@ -1600,6 +1600,37 @@ func TestOpenAIHandler_Transcription(t *testing.T) {
 		require.Contains(t, w.Body.String(), "model_not_found")
 	})
 
+	t.Run("stream insufficient balance uses chat completion stream error", func(t *testing.T) {
+		tester, c, w := setupTest(t)
+		c.Request = newMultipartTranscriptionRequest(t, "model1", "audio-bytes", map[string]string{
+			"stream": "true",
+		})
+		model := &types.Model{
+			BaseModel: types.BaseModel{
+				ID:       "backend-model",
+				Object:   "model",
+				Metadata: map[string]any{},
+				Task:     "audio-transcription",
+			},
+			Endpoint: "https://api.example.com/v1/audio/transcriptions",
+			Upstreams: []commontypes.UpstreamConfig{
+				{URL: "https://api.example.com/v1/audio/transcriptions", Enabled: true, ModelName: "backend-model"},
+			},
+		}
+
+		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "model1").Return(model, nil).Once()
+		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(errorx.ErrInsufficientBalance).Once()
+
+		tester.handler.Transcription(c)
+
+		body := w.Body.String()
+		require.Equal(t, http.StatusOK, w.Code)
+		require.Equal(t, "text/event-stream", w.Header().Get("Content-Type"))
+		require.Contains(t, body, "data: ")
+		require.Contains(t, body, `"finish_reason":"insufficient_balance"`)
+		require.Contains(t, body, "data: [DONE]\n\n")
+	})
+
 	t.Run("upstream error status ends trace without billing", func(t *testing.T) {
 		tester, c, w := setupTest(t)
 		doneCh := make(chan struct{})
