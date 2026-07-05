@@ -75,7 +75,7 @@ type PDRoleConfig struct {
 	// PDConfig.PrefillReplicas/DecodeReplicas (default 1), which HPA scales up/down.
 	Pods int `json:"pods"`
 	// TotalVRAMGB is the total VRAM required for this role, computed as
-	// MinInferenceVRAMGB * TotalGPUs. Used for VRAM validation and hardware splitting ratio.
+	// MinInferenceVRAMGB * Pods. Used for VRAM validation and hardware splitting ratio.
 	TotalVRAMGB float64 `json:"total_vram_gb"`
 }
 
@@ -97,7 +97,7 @@ type PDRecommendation struct {
 	// Precision is the inference precision.
 	Precision string `json:"precision"`
 	// MinInferenceVRAMGB is the minimum VRAM per GPU required to load and run inference.
-	// TotalVRAMGB for each role is computed as MinInferenceVRAMGB * TotalGPUs.
+	// TotalVRAMGB for each role is computed as MinInferenceVRAMGB * Pods.
 	MinInferenceVRAMGB float64 `json:"min_inference_vram_gb"`
 	// Prefill is the recommended prefill configuration.
 	Prefill PDRoleConfig `json:"prefill"`
