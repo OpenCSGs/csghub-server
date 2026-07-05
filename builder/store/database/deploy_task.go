@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -71,6 +72,7 @@ type Deploy struct {
 	Tolerations    []types.Toleration   `json:"tolerations,omitempty"`
 	PD             *types.PDConfig      `bun:"type:jsonb,nullzero" json:"pd,omitempty"`
 	Timeout        int                  `json:"timeout,omitempty"`
+	StatusUpdateAt time.Time            `bun:",nullzero,notnull,default:current_timestamp" json:"status_update_at,omitempty"`
 	times
 }
 
@@ -128,6 +130,7 @@ type DeployTaskStore interface {
 	ListDeploysByTimeRange(ctx context.Context, req types.DeployTimeRangeReq) ([]Deploy, int, error)
 	FindByDeployNameAndType(ctx context.Context, uuid, deployName string, deployType int) (*Deploy, error)
 	CountRunningDeploysByNodeName(ctx context.Context, nodeName string) (int, error)
+	ListDeploysNeedingReconcile(ctx context.Context, statuses []int, timeoutMin int, limit int) ([]Deploy, error)
 }
 
 func NewDeployTaskStore() DeployTaskStore {
@@ -248,6 +251,10 @@ func (s *deployTaskStoreImpl) UpdateInTx(ctx context.Context, deployColumns, dep
 	if deploy != nil {
 		deployColumns = append(deployColumns, "updated_at")
 		deploy.UpdatedAt = time.Now()
+		if slices.Contains(deployColumns, "status") {
+			deployColumns = append(deployColumns, "status_update_at")
+			deploy.StatusUpdateAt = time.Now()
+		}
 		_, err = tx.NewUpdate().Model(deploy).
 			Column(deployColumns...).
 			WherePK().Exec(ctx)
@@ -428,14 +435,14 @@ func (s *deployTaskStoreImpl) GetDeployBySvcName(ctx context.Context, svcName st
 
 func (s *deployTaskStoreImpl) StopDeploy(ctx context.Context, repoType types.RepositoryType, repoID, userID int64, deployID int64) error {
 	// only stop the deploy of specific repo was triggered by current login user
-	res, err := s.db.BunDB.Exec("Update deploys set status=?,updated_at=current_timestamp,instances='[]'::jsonb where id = ? and repo_id = ? and user_id = ?", common.Stopped, deployID, repoID, userID)
+	res, err := s.db.BunDB.Exec("Update deploys set status=?,status_update_at=current_timestamp,updated_at=current_timestamp,instances='[]'::jsonb where id = ? and repo_id = ? and user_id = ?", common.Stopped, deployID, repoID, userID)
 	err = assertAffectedOneRow(res, err)
 	err = errorx.HandleDBError(err, nil)
 	return err
 }
 func (s *deployTaskStoreImpl) StopDeployByID(ctx context.Context, userID int64, deployID int64) error {
 	// only stop the deploy of specific repo was triggered by current login user
-	res, err := s.db.BunDB.Exec("Update deploys set status=?,updated_at=current_timestamp,instances='[]'::jsonb where id = ? and user_id = ?", common.Stopped, deployID, userID)
+	res, err := s.db.BunDB.Exec("Update deploys set status=?,status_update_at=current_timestamp,updated_at=current_timestamp,instances='[]'::jsonb where id = ? and user_id = ?", common.Stopped, deployID, userID)
 	err = assertAffectedOneRow(res, err)
 	err = errorx.HandleDBError(err, nil)
 	return err
@@ -752,4 +759,22 @@ func (s *deployTaskStoreImpl) FindByDeployNameAndType(ctx context.Context, uuid,
 		return nil, err
 	}
 	return &result, nil
+}
+
+func (s *deployTaskStoreImpl) ListDeploysNeedingReconcile(ctx context.Context, statuses []int, timeoutMin int, limit int) ([]Deploy, error) {
+	var result []Deploy
+	timeoutAt := time.Now().Add(-time.Duration(timeoutMin) * time.Minute)
+
+	err := s.db.Operator.Core.NewSelect().
+		Model(&result).
+		Where("status_update_at < ?", timeoutAt).
+		Where("status IN (?)", bun.In(statuses)).
+		Limit(limit).
+		Order("status_update_at ASC").
+		Scan(ctx)
+
+	if err != nil {
+		return nil, errorx.HandleDBError(err, nil)
+	}
+	return result, nil
 }

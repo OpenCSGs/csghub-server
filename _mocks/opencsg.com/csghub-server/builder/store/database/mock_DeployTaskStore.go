@@ -1607,6 +1607,67 @@ func (_c *MockDeployTaskStore_ListDeploysByTimeRange_Call) RunAndReturn(run func
 	return _c
 }
 
+// ListDeploysNeedingReconcile provides a mock function with given fields: ctx, statuses, timeoutMin, limit
+func (_m *MockDeployTaskStore) ListDeploysNeedingReconcile(ctx context.Context, statuses []int, timeoutMin int, limit int) ([]database.Deploy, error) {
+	ret := _m.Called(ctx, statuses, timeoutMin, limit)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListDeploysNeedingReconcile")
+	}
+
+	var r0 []database.Deploy
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, []int, int, int) ([]database.Deploy, error)); ok {
+		return rf(ctx, statuses, timeoutMin, limit)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, []int, int, int) []database.Deploy); ok {
+		r0 = rf(ctx, statuses, timeoutMin, limit)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]database.Deploy)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, []int, int, int) error); ok {
+		r1 = rf(ctx, statuses, timeoutMin, limit)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockDeployTaskStore_ListDeploysNeedingReconcile_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListDeploysNeedingReconcile'
+type MockDeployTaskStore_ListDeploysNeedingReconcile_Call struct {
+	*mock.Call
+}
+
+// ListDeploysNeedingReconcile is a helper method to define mock.On call
+//   - ctx context.Context
+//   - statuses []int
+//   - timeoutMin int
+//   - limit int
+func (_e *MockDeployTaskStore_Expecter) ListDeploysNeedingReconcile(ctx interface{}, statuses interface{}, timeoutMin interface{}, limit interface{}) *MockDeployTaskStore_ListDeploysNeedingReconcile_Call {
+	return &MockDeployTaskStore_ListDeploysNeedingReconcile_Call{Call: _e.mock.On("ListDeploysNeedingReconcile", ctx, statuses, timeoutMin, limit)}
+}
+
+func (_c *MockDeployTaskStore_ListDeploysNeedingReconcile_Call) Run(run func(ctx context.Context, statuses []int, timeoutMin int, limit int)) *MockDeployTaskStore_ListDeploysNeedingReconcile_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].([]int), args[2].(int), args[3].(int))
+	})
+	return _c
+}
+
+func (_c *MockDeployTaskStore_ListDeploysNeedingReconcile_Call) Return(_a0 []database.Deploy, _a1 error) *MockDeployTaskStore_ListDeploysNeedingReconcile_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockDeployTaskStore_ListDeploysNeedingReconcile_Call) RunAndReturn(run func(context.Context, []int, int, int) ([]database.Deploy, error)) *MockDeployTaskStore_ListDeploysNeedingReconcile_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ListFinetunesByOwnerNamespace provides a mock function with given fields: ctx, ownerNamespace, per, page
 func (_m *MockDeployTaskStore) ListFinetunesByOwnerNamespace(ctx context.Context, ownerNamespace string, per int, page int) ([]database.Deploy, int, error) {
 	ret := _m.Called(ctx, ownerNamespace, per, page)

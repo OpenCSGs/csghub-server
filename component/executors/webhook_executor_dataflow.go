@@ -9,6 +9,7 @@ import (
 	"github.com/argoproj/argo-workflows/v3/pkg/apis/workflow/v1alpha1"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
+	"time"
 	"opencsg.com/csghub-server/common/types"
 )
 
@@ -55,6 +56,7 @@ func (h *dataflowExecutorImpl) ProcessEvent(ctx context.Context, event *types.We
 	}
 	if len(newWF.Status) > 0 {
 		oldwf.Status = newWF.Status
+	oldwf.StatusUpdateAt = time.Now()
 	}
 	if len(newWF.Reason) > 0 {
 		oldwf.Reason = newWF.Reason

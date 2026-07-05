@@ -87,6 +87,7 @@ func (h *imagebuilderExecutorImpl) ProcessEvent(ctx context.Context, event *type
 			status = common.TaskStatusBuildInProgress
 			message = "build in progress"
 			task.Deploy.Status = common.Building
+			task.Deploy.StatusUpdateAt = time.Now()
 		case string(v1alpha1.WorkflowSucceeded):
 			if task.Deploy.Status != common.Building {
 				return nil
@@ -95,6 +96,7 @@ func (h *imagebuilderExecutorImpl) ProcessEvent(ctx context.Context, event *type
 			message = fmt.Sprintf("build success, image path: %s", data.ImagetPath)
 			task.Deploy.ImageID = data.ImagetPath
 			task.Deploy.Status = common.BuildSuccess
+			task.Deploy.StatusUpdateAt = time.Now()
 		case string(v1alpha1.WorkflowFailed):
 			if task.Deploy.Status != common.Building {
 				return nil

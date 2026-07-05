@@ -116,6 +116,7 @@ func (k *kserviceExecutorImpl) updateDeployStatus(ctx context.Context, event *ty
 
 	oldStatus := deploy.Status
 	deploy.Status = event.Status
+	deploy.StatusUpdateAt = time.Now()
 	deploy.Message = event.Message
 	deploy.Reason = event.Reason
 	deploy.Endpoint = event.Endpoint

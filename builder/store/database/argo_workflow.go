@@ -29,6 +29,7 @@ type ArgoWorkFlowStore interface {
 	ListRunningWorkflowsByUserUUID(ctx context.Context, userUUID string) (WorkFlows []ArgoWorkflow, err error)
 	GetClusterWorkflows(ctx context.Context, req types.ClusterWFReq) ([]ArgoWorkflow, int, error)
 	ListWorkflowsByTimeRange(ctx context.Context, req types.WorkflowTimeRangeReq) ([]ArgoWorkflow, int, error)
+	ListWorkflowsNeedingReconcile(ctx context.Context, statuses []v1alpha1.WorkflowPhase, timeoutMin int, limit int) ([]ArgoWorkflow, error)
 }
 
 func NewArgoWorkFlowStore() ArgoWorkFlowStore {
@@ -61,7 +62,8 @@ type ArgoWorkflow struct {
 	Datasets     []string               `bun:",notnull,type:jsonb" json:"datasets"`
 	ResourceId   int64                  `bun:",nullzero" json:"resource_id"`
 	ResourceName string                 `bun:"," json:"resource_name"`
-	SubmitTime   time.Time              `bun:",nullzero,notnull,default:current_timestamp" json:"submit_time"`
+	StatusUpdateAt time.Time              `bun:",nullzero,notnull,default:current_timestamp" json:"status_update_at"`
+	SubmitTime      time.Time              `bun:",nullzero,notnull,default:current_timestamp" json:"submit_time"`
 	StartTime    time.Time              `bun:",nullzero" json:"start_time"`
 	EndTime      time.Time              `bun:",nullzero" json:"end_time"`
 	ResultURL    string                 `bun:"," json:"result_url"`
@@ -249,4 +251,25 @@ func (s *argoWorkFlowStoreImpl) ListWorkflowsByTimeRange(ctx context.Context, re
 	}
 
 	return result, total, nil
+}
+
+
+func (s *argoWorkFlowStoreImpl) ListWorkflowsNeedingReconcile(ctx context.Context, statuses []v1alpha1.WorkflowPhase, timeoutMin int, limit int) ([]ArgoWorkflow, error) {
+	var result []ArgoWorkflow
+	timeoutAt := time.Now().Add(-time.Duration(timeoutMin) * time.Minute)
+
+	// bun auto-filters soft-deleted records (WHERE deleted_at IS NULL)
+	// because this query does NOT use WhereAllWithDeleted().
+	err := s.db.Operator.Core.NewSelect().
+		Model(&result).
+		Where("status_update_at < ?", timeoutAt).
+		Where("status IN (?)", bun.In(statuses)).
+		Limit(limit).
+		Order("status_update_at ASC").
+		Scan(ctx)
+
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
 }

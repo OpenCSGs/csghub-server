@@ -139,3 +139,8 @@ func (h *LocalRunner) CreateDataflowWorkflow(ctx context.Context, req *types.Dat
 func (h *LocalRunner) DeleteDataflowWorkflow(ctx context.Context, req *types.DataflowArgoReq) error {
 	return nil
 }
+
+
+func (h *LocalRunner) BatchStatus(ctx context.Context, req *runnerTypes.BatchStatusRequest) (*runnerTypes.BatchStatusResponse, error) {
+	return &runnerTypes.BatchStatusResponse{}, nil
+}

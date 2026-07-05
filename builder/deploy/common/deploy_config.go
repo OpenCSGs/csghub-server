@@ -25,9 +25,11 @@ type DeployConfig struct {
 	S3Internal         bool
 	APIToken           string
 	APIKey             string
-	HeartBeatTimeInSec int
-	PublicDomain       string
-	SSHDomain          string
+	HeartBeatTimeInSec     int
+	PublicDomain           string
+	SSHDomain              string
+		StuckTimeoutMin      int
+		RunningReconcileHour int
 }
 
 func BuildDeployConfig(cfg *config.Config) DeployConfig {
@@ -52,5 +54,7 @@ func BuildDeployConfig(cfg *config.Config) DeployConfig {
 		PublicDomain:            cfg.APIServer.PublicDomain,
 		SSHDomain:               cfg.APIServer.SSHDomain,
 		RedisLocker:             redisLocker,
+		StuckTimeoutMin:      cfg.DeployReconcile.StuckTimeoutMin,
+		RunningReconcileHour: cfg.DeployReconcile.RunningReconcileHour,
 	}
 }

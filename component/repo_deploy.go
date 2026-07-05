@@ -17,6 +17,7 @@ import (
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
+	"time"
 	"opencsg.com/csghub-server/common/utils/common"
 )
 
@@ -517,6 +518,7 @@ func (c *repoComponentImpl) DeployDetail(ctx context.Context, detailReq types.De
 	}
 
 	deploy.Status = code
+	deploy.StatusUpdateAt = time.Now()
 
 	endpoint, _ := c.GenerateEndpoint(ctx, deploy)
 
