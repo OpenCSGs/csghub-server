@@ -187,6 +187,7 @@ func (c *clusterComponentImpl) collectResourceByID(ctx context.Context, clusterI
 		types.ClusterCFGVGPUPodResourceNameKey:  c.cfg.Runner.VGPUPodResourceName,
 		types.ClusterCFGVGPUResourceReqKey:      c.cfg.Runner.VGPUResourceReqKey,
 		types.ClusterCFGVGPUMemoryReqKey:        c.cfg.Runner.VGPUMemoryReqKey,
+		types.ClusterCFGVGPUMemoryScalingFactor: fmt.Sprintf("%d", c.cfg.Runner.VGPUMemoryScalingFactor),
 	}
 	return &clusterInfo, nil
 }

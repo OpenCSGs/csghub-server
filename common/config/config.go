@@ -627,12 +627,13 @@ type Config struct {
 		Volcano                     struct {
 			Queue string `env:"STARHUB_SERVER_RUNNER_VOLCANO_QUEUE" default:"default"`
 		}
-		PublicDockerRegBase  string `env:"STARHUB_SERVER_RUNNER_PUBLIC_DOCKER_REG_BASE" default:"opencsg-registry.cn-beijing.cr.aliyuncs.com"`
-		VGPUNodeResourceName string `env:"STARHUB_SERVER_RUNNER_VGPU_NODE_RESOURCE_NAME" default:"hami.io/node-nvidia-register"`
-		VGPUPodResourceName  string `env:"STARHUB_SERVER_RUNNER_VGPU_POD_RESOURCE_NAME" default:"hami.io/vgpu-devices-allocated"`
-		VGPUResourceReqKey   string `env:"STARHUB_SERVER_RUNNER_VGPU_RESOURCE_REQ_KEY" default:"nvidia.com/vgpu"`
-		VGPUMemoryReqKey     string `env:"STARHUB_SERVER_RUNNER_VGPU_MEMORY_REQ_KEY" default:"nvidia.com/vgpumem"`
-		PD                   struct {
+		PublicDockerRegBase     string `env:"STARHUB_SERVER_RUNNER_PUBLIC_DOCKER_REG_BASE" default:"opencsg-registry.cn-beijing.cr.aliyuncs.com"`
+		VGPUNodeResourceName    string `env:"STARHUB_SERVER_RUNNER_VGPU_NODE_RESOURCE_NAME" default:"hami.io/node-nvidia-register"`
+		VGPUPodResourceName     string `env:"STARHUB_SERVER_RUNNER_VGPU_POD_RESOURCE_NAME" default:"hami.io/vgpu-devices-allocated"`
+		VGPUResourceReqKey      string `env:"STARHUB_SERVER_RUNNER_VGPU_RESOURCE_REQ_KEY" default:"nvidia.com/vgpu"`
+		VGPUMemoryReqKey        string `env:"STARHUB_SERVER_RUNNER_VGPU_MEMORY_REQ_KEY" default:"nvidia.com/vgpumem"`
+		VGPUMemoryScalingFactor int64  `env:"STARHUB_SERVER_RUNNER_VGPU_MEMORY_SCING_FACTOR" default:"10"`
+		PD                      struct {
 			// EPPImage is the image ID for the Endpoint Picker deployment. Only the short image ID is configured;
 			// it will be resolved to a full image path via resolveContainerImage at runtime.
 			EPPImage string `env:"STARHUB_SERVER_RUNNER_PD_EPP_IMAGE" default:"opencsghq/llm-d/llm-d-router-endpoint-picker-dev:main"`
