@@ -405,6 +405,82 @@ func TestGetUserUUIDs_Success(t *testing.T) {
 	assert.Contains(t, uuids, "uuid1")
 }
 
+func TestGetAdminUserUUIDs(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			assert.Equal(t, "/api/v1/user/admin_uuids", r.URL.Path)
+			assert.Equal(t, http.MethodGet, r.Method)
+			err := json.NewEncoder(w).Encode(map[string]any{
+				"data": map[string]any{
+					"data":  []string{"admin-uuid", "super-user-uuid"},
+					"total": 2,
+				},
+			})
+			assert.NoError(t, err)
+		}))
+		defer server.Close()
+
+		client := setupTestClient(server)
+		uuids, total, err := client.GetAdminUserUUIDs(context.Background())
+
+		assert.NoError(t, err)
+		assert.Equal(t, []string{"admin-uuid", "super-user-uuid"}, uuids)
+		assert.Equal(t, 2, total)
+	})
+
+	t.Run("remote error", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			http.Error(w, "user service unavailable", http.StatusInternalServerError)
+		}))
+		defer server.Close()
+
+		client := setupTestClient(server)
+		uuids, total, err := client.GetAdminUserUUIDs(context.Background())
+
+		assert.Error(t, err)
+		assert.Nil(t, uuids)
+		assert.Zero(t, total)
+	})
+}
+
+func TestGetAdminEmails(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			assert.Equal(t, "/api/v1/user/admin_emails", r.URL.Path)
+			assert.Equal(t, http.MethodGet, r.Method)
+			err := json.NewEncoder(w).Encode(map[string]any{
+				"data": map[string]any{
+					"data":  []string{"admin@example.com", "super-user@example.com"},
+					"total": 2,
+				},
+			})
+			assert.NoError(t, err)
+		}))
+		defer server.Close()
+
+		client := setupTestClient(server)
+		emails, total, err := client.GetAdminEmails(context.Background())
+
+		assert.NoError(t, err)
+		assert.Equal(t, []string{"admin@example.com", "super-user@example.com"}, emails)
+		assert.Equal(t, 2, total)
+	})
+
+	t.Run("remote error", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			http.Error(w, "user service unavailable", http.StatusInternalServerError)
+		}))
+		defer server.Close()
+
+		client := setupTestClient(server)
+		emails, total, err := client.GetAdminEmails(context.Background())
+
+		assert.Error(t, err)
+		assert.Nil(t, emails)
+		assert.Zero(t, total)
+	})
+}
+
 func TestGetEmails_Success(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "/api/v1/internal/user/emails", r.URL.Path)

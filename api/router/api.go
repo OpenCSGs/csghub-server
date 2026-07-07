@@ -1429,7 +1429,7 @@ func createNotificationRoutes(config *config.Config, apiGroup *gin.RouterGroup, 
 	{
 		notificationsGroup.GET("/count", notificationProxyHandler.Proxy)
 		notificationsGroup.GET("", notificationProxyHandler.Proxy)
-		notificationsGroup.POST("", notificationProxyHandler.Proxy)
+		notificationsGroup.POST("", middleware.BindResourceApplicationIdentity(), notificationProxyHandler.Proxy)
 		notificationsGroup.DELETE("", notificationProxyHandler.Proxy)
 		notificationsGroup.PUT("/read", notificationProxyHandler.Proxy)
 		notificationsGroup.PUT("/unread", notificationProxyHandler.Proxy)

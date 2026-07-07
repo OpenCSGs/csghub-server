@@ -7,7 +7,6 @@ import (
 
 	mock "github.com/stretchr/testify/mock"
 	database "opencsg.com/csghub-server/builder/store/database"
-
 	types "opencsg.com/csghub-server/common/types"
 )
 
@@ -625,6 +624,122 @@ func (_c *MockUserStore_FindByUsernameWithDeleted_Call) Return(_a0 database.User
 }
 
 func (_c *MockUserStore_FindByUsernameWithDeleted_Call) RunAndReturn(run func(context.Context, string) (database.User, error)) *MockUserStore_FindByUsernameWithDeleted_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetAdminEmails provides a mock function with given fields: ctx
+func (_m *MockUserStore) GetAdminEmails(ctx context.Context) ([]string, error) {
+	ret := _m.Called(ctx)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetAdminEmails")
+	}
+
+	var r0 []string
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context) ([]string, error)); ok {
+		return rf(ctx)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context) []string); ok {
+		r0 = rf(ctx)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]string)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = rf(ctx)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockUserStore_GetAdminEmails_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetAdminEmails'
+type MockUserStore_GetAdminEmails_Call struct {
+	*mock.Call
+}
+
+// GetAdminEmails is a helper method to define mock.On call
+//   - ctx context.Context
+func (_e *MockUserStore_Expecter) GetAdminEmails(ctx interface{}) *MockUserStore_GetAdminEmails_Call {
+	return &MockUserStore_GetAdminEmails_Call{Call: _e.mock.On("GetAdminEmails", ctx)}
+}
+
+func (_c *MockUserStore_GetAdminEmails_Call) Run(run func(ctx context.Context)) *MockUserStore_GetAdminEmails_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context))
+	})
+	return _c
+}
+
+func (_c *MockUserStore_GetAdminEmails_Call) Return(_a0 []string, _a1 error) *MockUserStore_GetAdminEmails_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockUserStore_GetAdminEmails_Call) RunAndReturn(run func(context.Context) ([]string, error)) *MockUserStore_GetAdminEmails_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetAdminUserUUIDs provides a mock function with given fields: ctx
+func (_m *MockUserStore) GetAdminUserUUIDs(ctx context.Context) ([]string, error) {
+	ret := _m.Called(ctx)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetAdminUserUUIDs")
+	}
+
+	var r0 []string
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context) ([]string, error)); ok {
+		return rf(ctx)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context) []string); ok {
+		r0 = rf(ctx)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]string)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = rf(ctx)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockUserStore_GetAdminUserUUIDs_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetAdminUserUUIDs'
+type MockUserStore_GetAdminUserUUIDs_Call struct {
+	*mock.Call
+}
+
+// GetAdminUserUUIDs is a helper method to define mock.On call
+//   - ctx context.Context
+func (_e *MockUserStore_Expecter) GetAdminUserUUIDs(ctx interface{}) *MockUserStore_GetAdminUserUUIDs_Call {
+	return &MockUserStore_GetAdminUserUUIDs_Call{Call: _e.mock.On("GetAdminUserUUIDs", ctx)}
+}
+
+func (_c *MockUserStore_GetAdminUserUUIDs_Call) Run(run func(ctx context.Context)) *MockUserStore_GetAdminUserUUIDs_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context))
+	})
+	return _c
+}
+
+func (_c *MockUserStore_GetAdminUserUUIDs_Call) Return(_a0 []string, _a1 error) *MockUserStore_GetAdminUserUUIDs_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockUserStore_GetAdminUserUUIDs_Call) RunAndReturn(run func(context.Context) ([]string, error)) *MockUserStore_GetAdminUserUUIDs_Call {
 	_c.Call.Return(run)
 	return _c
 }

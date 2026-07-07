@@ -104,6 +104,88 @@ func TestUserHandler_ResetUserTags_UserNotFound(t *testing.T) {
 	assert.Equal(t, http.StatusInternalServerError, w.Code)
 }
 
+func TestUserHandler_GetAdminUserUUIDs(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		gin.SetMode(gin.TestMode)
+		mockUserComponent := component.NewMockUserComponent(t)
+		mockUserComponent.EXPECT().
+			GetAdminUserUUIDs(mock.Anything).
+			Return([]string{"admin-uuid", "super-user-uuid"}, nil)
+		handler := UserHandler{c: mockUserComponent}
+		recorder := httptest.NewRecorder()
+		ctx, _ := gin.CreateTestContext(recorder)
+		ctx.Request = httptest.NewRequest(http.MethodGet, "/user/admin_uuids", nil)
+
+		handler.GetAdminUserUUIDs(ctx)
+
+		assert.Equal(t, http.StatusOK, recorder.Code)
+		assert.JSONEq(t, `{
+			"msg": "OK",
+			"data": {
+				"data": ["admin-uuid", "super-user-uuid"],
+				"total": 2
+			}
+		}`, recorder.Body.String())
+	})
+
+	t.Run("component error", func(t *testing.T) {
+		gin.SetMode(gin.TestMode)
+		mockUserComponent := component.NewMockUserComponent(t)
+		mockUserComponent.EXPECT().
+			GetAdminUserUUIDs(mock.Anything).
+			Return(nil, errors.New("component error"))
+		handler := UserHandler{c: mockUserComponent}
+		recorder := httptest.NewRecorder()
+		ctx, _ := gin.CreateTestContext(recorder)
+		ctx.Request = httptest.NewRequest(http.MethodGet, "/user/admin_uuids", nil)
+
+		handler.GetAdminUserUUIDs(ctx)
+
+		assert.Equal(t, http.StatusInternalServerError, recorder.Code)
+	})
+}
+
+func TestUserHandler_GetAdminEmails(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		gin.SetMode(gin.TestMode)
+		mockUserComponent := component.NewMockUserComponent(t)
+		mockUserComponent.EXPECT().
+			GetAdminEmails(mock.Anything).
+			Return([]string{"admin@example.com", "super-user@example.com"}, nil)
+		handler := UserHandler{c: mockUserComponent}
+		recorder := httptest.NewRecorder()
+		ctx, _ := gin.CreateTestContext(recorder)
+		ctx.Request = httptest.NewRequest(http.MethodGet, "/user/admin_emails", nil)
+
+		handler.GetAdminEmails(ctx)
+
+		assert.Equal(t, http.StatusOK, recorder.Code)
+		assert.JSONEq(t, `{
+			"msg": "OK",
+			"data": {
+				"data": ["admin@example.com", "super-user@example.com"],
+				"total": 2
+			}
+		}`, recorder.Body.String())
+	})
+
+	t.Run("component error", func(t *testing.T) {
+		gin.SetMode(gin.TestMode)
+		mockUserComponent := component.NewMockUserComponent(t)
+		mockUserComponent.EXPECT().
+			GetAdminEmails(mock.Anything).
+			Return(nil, errors.New("component error"))
+		handler := UserHandler{c: mockUserComponent}
+		recorder := httptest.NewRecorder()
+		ctx, _ := gin.CreateTestContext(recorder)
+		ctx.Request = httptest.NewRequest(http.MethodGet, "/user/admin_emails", nil)
+
+		handler.GetAdminEmails(ctx)
+
+		assert.Equal(t, http.StatusInternalServerError, recorder.Code)
+	})
+}
+
 func TestUserHandler_Casdoor(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	const (
