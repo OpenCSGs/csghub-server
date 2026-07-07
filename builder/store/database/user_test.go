@@ -58,6 +58,41 @@ func TestUserStore_Roles(t *testing.T) {
 	}
 }
 
+func TestUserStore_GetAdminRecipients(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.Background()
+	userStore := database.NewUserStoreWithDB(db)
+
+	testUsers := []database.User{
+		{GitID: 99001, Username: "admin-recipient", UUID: "admin-recipient-uuid", Email: "admin@example.com", RoleMask: "admin"},
+		{GitID: 99002, Username: "super-user-recipient", UUID: "super-user-recipient-uuid", Email: "super-user@example.com", RoleMask: "user,super_user"},
+		{GitID: 99003, Username: "ordinary-recipient", UUID: "ordinary-recipient-uuid", Email: "ordinary@example.com", RoleMask: "user"},
+		{GitID: 99004, Username: "admin-without-email", UUID: "admin-without-email-uuid", RoleMask: "admin"},
+	}
+	for i := range testUsers {
+		err := userStore.Create(ctx, &testUsers[i], &database.Namespace{
+			Path: testUsers[i].Username,
+		})
+		require.NoError(t, err)
+	}
+
+	adminUUIDs, err := userStore.GetAdminUserUUIDs(ctx)
+	require.NoError(t, err)
+	require.ElementsMatch(t, []string{
+		"admin-recipient-uuid",
+		"super-user-recipient-uuid",
+		"admin-without-email-uuid",
+	}, adminUUIDs)
+
+	adminEmails, err := userStore.GetAdminEmails(ctx)
+	require.NoError(t, err)
+	require.ElementsMatch(t, []string{
+		"admin@example.com",
+		"super-user@example.com",
+	}, adminEmails)
+}
+
 func TestUserStore_SetRoles(t *testing.T) {
 	type fields struct {
 		RoleMask string

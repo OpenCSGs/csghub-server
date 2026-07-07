@@ -801,6 +801,54 @@ func (h *UserHandler) GetUserUUIDs(ctx *gin.Context) {
 	httpbase.OK(ctx, respData)
 }
 
+// GetAdminUserUUIDs godoc
+// @Security     ApiKey
+// @Summary      Get administrator user UUIDs
+// @Description  Retrieve the UUIDs of users with administrator permissions
+// @Tags         User
+// @Accept       json
+// @Produce      json
+// @Success      200  {object}  types.Response{data=[]string,total=int} "OK"
+// @Failure      401  {object}  types.APIUnauthorized "Unauthorized"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /user/admin_uuids [get]
+func (h *UserHandler) GetAdminUserUUIDs(ctx *gin.Context) {
+	userUUIDs, err := h.c.GetAdminUserUUIDs(ctx)
+	if err != nil {
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	respData := gin.H{
+		"data":  userUUIDs,
+		"total": len(userUUIDs),
+	}
+	httpbase.OK(ctx, respData)
+}
+
+// GetAdminEmails godoc
+// @Security     ApiKey
+// @Summary      Get administrator email addresses
+// @Description  Retrieve the email addresses of users with administrator permissions
+// @Tags         User
+// @Accept       json
+// @Produce      json
+// @Success      200  {object}  types.Response{data=[]string,total=int} "OK"
+// @Failure      401  {object}  types.APIUnauthorized "Unauthorized"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /user/admin_emails [get]
+func (h *UserHandler) GetAdminEmails(ctx *gin.Context) {
+	emails, err := h.c.GetAdminEmails(ctx)
+	if err != nil {
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	respData := gin.H{
+		"data":  emails,
+		"total": len(emails),
+	}
+	httpbase.OK(ctx, respData)
+}
+
 // GenerateVerificationCodeAndSendEmail godoc
 // @Security     ApiKey
 // @Summary      GenerateVerificationCodeAndSendEmail

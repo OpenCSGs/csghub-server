@@ -67,9 +67,65 @@ func TestUserComponent_FindByUUIDs(t *testing.T) {
 
 	require.Equal(t, int64(1), users[0].ID)
 	require.Equal(t, "user1", users[0].Username)
+	require.Empty(t, users[0].Email)
 
 	require.Equal(t, int64(2), users[1].ID)
 	require.Equal(t, "user2", users[1].Username)
+	require.Empty(t, users[1].Email)
+}
+
+func TestUserComponent_GetAdminUserUUIDs(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		ctx := context.Background()
+		expectedUUIDs := []string{"admin-uuid", "super-user-uuid"}
+		mockUserStore := mockdb.NewMockUserStore(t)
+		mockUserStore.EXPECT().GetAdminUserUUIDs(ctx).Return(expectedUUIDs, nil)
+		uc := &userComponentImpl{userStore: mockUserStore}
+
+		adminUUIDs, err := uc.GetAdminUserUUIDs(ctx)
+
+		require.NoError(t, err)
+		require.Equal(t, expectedUUIDs, adminUUIDs)
+	})
+
+	t.Run("store error", func(t *testing.T) {
+		ctx := context.Background()
+		mockUserStore := mockdb.NewMockUserStore(t)
+		mockUserStore.EXPECT().GetAdminUserUUIDs(ctx).Return(nil, errors.New("database error"))
+		uc := &userComponentImpl{userStore: mockUserStore}
+
+		adminUUIDs, err := uc.GetAdminUserUUIDs(ctx)
+
+		require.Nil(t, adminUUIDs)
+		require.ErrorContains(t, err, "failed to get admin user uuids")
+	})
+}
+
+func TestUserComponent_GetAdminEmails(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		ctx := context.Background()
+		expectedEmails := []string{"admin@example.com", "super-user@example.com"}
+		mockUserStore := mockdb.NewMockUserStore(t)
+		mockUserStore.EXPECT().GetAdminEmails(ctx).Return(expectedEmails, nil)
+		uc := &userComponentImpl{userStore: mockUserStore}
+
+		adminEmails, err := uc.GetAdminEmails(ctx)
+
+		require.NoError(t, err)
+		require.Equal(t, expectedEmails, adminEmails)
+	})
+
+	t.Run("store error", func(t *testing.T) {
+		ctx := context.Background()
+		mockUserStore := mockdb.NewMockUserStore(t)
+		mockUserStore.EXPECT().GetAdminEmails(ctx).Return(nil, errors.New("database error"))
+		uc := &userComponentImpl{userStore: mockUserStore}
+
+		adminEmails, err := uc.GetAdminEmails(ctx)
+
+		require.Nil(t, adminEmails)
+		require.ErrorContains(t, err, "failed to get admin emails")
+	})
 }
 
 func TestUserComponent_SoftDelete(t *testing.T) {

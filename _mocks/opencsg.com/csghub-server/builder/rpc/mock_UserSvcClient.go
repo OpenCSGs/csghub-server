@@ -5,13 +5,10 @@ package rpc
 import (
 	context "context"
 
-	membership "opencsg.com/csghub-server/builder/git/membership"
-	database "opencsg.com/csghub-server/builder/store/database"
-
 	mock "github.com/stretchr/testify/mock"
-
+	membership "opencsg.com/csghub-server/builder/git/membership"
 	rpc "opencsg.com/csghub-server/builder/rpc"
-
+	database "opencsg.com/csghub-server/builder/store/database"
 	types "opencsg.com/csghub-server/common/types"
 )
 
@@ -83,6 +80,136 @@ func (_c *MockUserSvcClient_FindByUUIDs_Call) Return(_a0 map[string]*types.User,
 }
 
 func (_c *MockUserSvcClient_FindByUUIDs_Call) RunAndReturn(run func(context.Context, []string) (map[string]*types.User, error)) *MockUserSvcClient_FindByUUIDs_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetAdminEmails provides a mock function with given fields: ctx
+func (_m *MockUserSvcClient) GetAdminEmails(ctx context.Context) ([]string, int, error) {
+	ret := _m.Called(ctx)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetAdminEmails")
+	}
+
+	var r0 []string
+	var r1 int
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context) ([]string, int, error)); ok {
+		return rf(ctx)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context) []string); ok {
+		r0 = rf(ctx)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]string)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context) int); ok {
+		r1 = rf(ctx)
+	} else {
+		r1 = ret.Get(1).(int)
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context) error); ok {
+		r2 = rf(ctx)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
+// MockUserSvcClient_GetAdminEmails_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetAdminEmails'
+type MockUserSvcClient_GetAdminEmails_Call struct {
+	*mock.Call
+}
+
+// GetAdminEmails is a helper method to define mock.On call
+//   - ctx context.Context
+func (_e *MockUserSvcClient_Expecter) GetAdminEmails(ctx interface{}) *MockUserSvcClient_GetAdminEmails_Call {
+	return &MockUserSvcClient_GetAdminEmails_Call{Call: _e.mock.On("GetAdminEmails", ctx)}
+}
+
+func (_c *MockUserSvcClient_GetAdminEmails_Call) Run(run func(ctx context.Context)) *MockUserSvcClient_GetAdminEmails_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context))
+	})
+	return _c
+}
+
+func (_c *MockUserSvcClient_GetAdminEmails_Call) Return(_a0 []string, _a1 int, _a2 error) *MockUserSvcClient_GetAdminEmails_Call {
+	_c.Call.Return(_a0, _a1, _a2)
+	return _c
+}
+
+func (_c *MockUserSvcClient_GetAdminEmails_Call) RunAndReturn(run func(context.Context) ([]string, int, error)) *MockUserSvcClient_GetAdminEmails_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetAdminUserUUIDs provides a mock function with given fields: ctx
+func (_m *MockUserSvcClient) GetAdminUserUUIDs(ctx context.Context) ([]string, int, error) {
+	ret := _m.Called(ctx)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetAdminUserUUIDs")
+	}
+
+	var r0 []string
+	var r1 int
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context) ([]string, int, error)); ok {
+		return rf(ctx)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context) []string); ok {
+		r0 = rf(ctx)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]string)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context) int); ok {
+		r1 = rf(ctx)
+	} else {
+		r1 = ret.Get(1).(int)
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context) error); ok {
+		r2 = rf(ctx)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
+// MockUserSvcClient_GetAdminUserUUIDs_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetAdminUserUUIDs'
+type MockUserSvcClient_GetAdminUserUUIDs_Call struct {
+	*mock.Call
+}
+
+// GetAdminUserUUIDs is a helper method to define mock.On call
+//   - ctx context.Context
+func (_e *MockUserSvcClient_Expecter) GetAdminUserUUIDs(ctx interface{}) *MockUserSvcClient_GetAdminUserUUIDs_Call {
+	return &MockUserSvcClient_GetAdminUserUUIDs_Call{Call: _e.mock.On("GetAdminUserUUIDs", ctx)}
+}
+
+func (_c *MockUserSvcClient_GetAdminUserUUIDs_Call) Run(run func(ctx context.Context)) *MockUserSvcClient_GetAdminUserUUIDs_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context))
+	})
+	return _c
+}
+
+func (_c *MockUserSvcClient_GetAdminUserUUIDs_Call) Return(_a0 []string, _a1 int, _a2 error) *MockUserSvcClient_GetAdminUserUUIDs_Call {
+	_c.Call.Return(_a0, _a1, _a2)
+	return _c
+}
+
+func (_c *MockUserSvcClient_GetAdminUserUUIDs_Call) RunAndReturn(run func(context.Context) ([]string, int, error)) *MockUserSvcClient_GetAdminUserUUIDs_Call {
 	_c.Call.Return(run)
 	return _c
 }
