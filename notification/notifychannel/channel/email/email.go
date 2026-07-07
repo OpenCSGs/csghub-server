@@ -7,19 +7,21 @@ import (
 	"log/slog"
 
 	"go.temporal.io/sdk/client"
+	"opencsg.com/csghub-server/builder/temporal"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
 	notifychannel "opencsg.com/csghub-server/notification/notifychannel"
 	emailclient "opencsg.com/csghub-server/notification/notifychannel/channel/email/client"
 	emailworkflow "opencsg.com/csghub-server/notification/notifychannel/channel/email/workflow"
 	"opencsg.com/csghub-server/notification/utils"
-	"opencsg.com/csghub-server/notification/workflow"
 )
 
 type EmailChannel struct {
 	config       *config.Config
 	emailService emailclient.EmailService
 }
+
+const individualEmailMaxAttempts = 2
 
 func NewChannel(conf *config.Config, emailService emailclient.EmailService) notifychannel.Notifier {
 	return &EmailChannel{
@@ -70,8 +72,9 @@ func (s *EmailChannel) Send(ctx context.Context, req *notifychannel.NotifyReques
 }
 
 func (s *EmailChannel) sendEmailToUsers(msg types.EmailReq) error {
+	slog.Info("sendEmailToUsers: starting", "totalEmails", len(msg.To))
 	if len(msg.To) == 0 {
-		slog.Error("no emails to send", "email", msg)
+		slog.Error("no emails to send", "subject", msg.Subject)
 		return nil
 	}
 
@@ -81,34 +84,41 @@ func (s *EmailChannel) sendEmailToUsers(msg types.EmailReq) error {
 	for i, email := range msg.To {
 		individualReq := msg
 		individualReq.To = []string{email}
-		if err := s.emailService.Send(individualReq); err != nil {
-			slog.Error("failed to send email to user", "error", err, "index", i, "totalEmails", len(msg.To))
+
+		var sendErr error
+		for attempt := 1; attempt <= individualEmailMaxAttempts; attempt++ {
+			slog.Debug("sendEmailToUsers: sending to individual email", "index", i, "totalEmails", len(msg.To), "attempt", attempt)
+			sendErr = s.emailService.Send(individualReq)
+			if sendErr == nil {
+				break
+			}
+			slog.Warn("failed to send email to user", "error", sendErr, "index", i, "totalEmails", len(msg.To), "attempt", attempt)
+		}
+		if sendErr != nil {
 			failedEmails = append(failedEmails, email)
 			continue
 		}
 		successCount++
-		slog.Debug("send email to user successfully", "email", email, "index", i, "totalEmails", len(msg.To))
-	}
-
-	if successCount == 0 && len(failedEmails) > 0 {
-		return utils.NewErrSendMsg(errors.New("failed to send email"), fmt.Sprintf("failed emails: %v", failedEmails))
+		slog.Debug("send email to user successfully", "index", i, "totalEmails", len(msg.To))
 	}
 
 	if len(failedEmails) > 0 {
-		slog.Warn("some emails failed to send", "failedCount", len(failedEmails), "successCount", successCount, "failedEmails", failedEmails)
+		slog.Warn("some emails failed to send", "failedCount", len(failedEmails), "successCount", successCount)
+		if successCount == 0 {
+			return utils.NewErrSendMsg(errors.New("failed to send email"), fmt.Sprintf("failed email count: %d", len(failedEmails)))
+		}
+		return nil
 	}
 
-	slog.Info("send email to users successfully", "successCount", successCount, "failedEmails", failedEmails)
+	slog.Info("send email to users successfully", "successCount", successCount, "failedCount", len(failedEmails))
 	return nil
 }
 
 func (s *EmailChannel) broadcastEmail(ctx context.Context, msg types.EmailReq) error {
-	slog.Info("broadcast email to all users", "subject", msg.Subject)
+	// slog.Info("broadcast email to all users", "subject", msg.Subject)
+	slog.InfoContext(ctx, "broadcast email to all users", "subject", msg.Subject)
 
-	workflowClient := workflow.GetWorkflowClient()
-	if workflowClient == nil {
-		return fmt.Errorf("workflow client is nil")
-	}
+	workflowClient := temporal.GetClient()
 	workflowOptions := client.StartWorkflowOptions{
 		TaskQueue: emailworkflow.WorkflowBroadcastEmailQueueName,
 	}
@@ -116,6 +126,6 @@ func (s *EmailChannel) broadcastEmail(ctx context.Context, msg types.EmailReq) e
 	if err != nil {
 		return utils.NewErrSendMsg(err, "failed to start broadcast email workflow")
 	}
-	slog.Info("start broadcast email workflow", slog.Any("workflow id", we.GetID()))
+	slog.InfoContext(ctx, "start broadcast email workflow", slog.Any("workflow id", we.GetID()))
 	return nil
 }

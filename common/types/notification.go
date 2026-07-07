@@ -62,6 +62,12 @@ type NotificationMessage struct {
 	Payload  map[string]any `json:"payload"`  // used to render the message content in portal
 }
 
+type ResourceApplicationNotificationReq struct {
+	UserUUID    string `json:"user_uuid"`
+	UserName    string `json:"user_name"`
+	ResourceSKU string `json:"resource_sku"`
+}
+
 type NotificationsResp struct {
 	Messages    []Notifications `json:"messages"`
 	UnreadCount int64           `json:"unread_count"`

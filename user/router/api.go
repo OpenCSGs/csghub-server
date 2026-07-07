@@ -90,6 +90,8 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 		tokenGroup.GET("/:token_value", acHandler.Get)
 		tokenGroup.GET("/:token_value/quotas", acHandler.GetAPIKeyQuotas)
 		userGroup.GET("/user_uuids", needAPIKey, userHandler.GetUserUUIDs)
+		userGroup.GET("/admin_uuids", needAPIKey, userHandler.GetAdminUserUUIDs)
+		userGroup.GET("/admin_emails", needAPIKey, userHandler.GetAdminEmails)
 
 		internalUserGroup.GET("/emails", userHandler.GetEmailsInternal)
 	}

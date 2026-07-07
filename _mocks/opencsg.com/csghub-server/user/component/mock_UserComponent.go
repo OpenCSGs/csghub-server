@@ -571,6 +571,122 @@ func (_c *MockUserComponent_Get_Call) RunAndReturn(run func(context.Context, str
 	return _c
 }
 
+// GetAdminEmails provides a mock function with given fields: ctx
+func (_m *MockUserComponent) GetAdminEmails(ctx context.Context) ([]string, error) {
+	ret := _m.Called(ctx)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetAdminEmails")
+	}
+
+	var r0 []string
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context) ([]string, error)); ok {
+		return rf(ctx)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context) []string); ok {
+		r0 = rf(ctx)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]string)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = rf(ctx)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockUserComponent_GetAdminEmails_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetAdminEmails'
+type MockUserComponent_GetAdminEmails_Call struct {
+	*mock.Call
+}
+
+// GetAdminEmails is a helper method to define mock.On call
+//   - ctx context.Context
+func (_e *MockUserComponent_Expecter) GetAdminEmails(ctx interface{}) *MockUserComponent_GetAdminEmails_Call {
+	return &MockUserComponent_GetAdminEmails_Call{Call: _e.mock.On("GetAdminEmails", ctx)}
+}
+
+func (_c *MockUserComponent_GetAdminEmails_Call) Run(run func(ctx context.Context)) *MockUserComponent_GetAdminEmails_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context))
+	})
+	return _c
+}
+
+func (_c *MockUserComponent_GetAdminEmails_Call) Return(_a0 []string, _a1 error) *MockUserComponent_GetAdminEmails_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockUserComponent_GetAdminEmails_Call) RunAndReturn(run func(context.Context) ([]string, error)) *MockUserComponent_GetAdminEmails_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetAdminUserUUIDs provides a mock function with given fields: ctx
+func (_m *MockUserComponent) GetAdminUserUUIDs(ctx context.Context) ([]string, error) {
+	ret := _m.Called(ctx)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetAdminUserUUIDs")
+	}
+
+	var r0 []string
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context) ([]string, error)); ok {
+		return rf(ctx)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context) []string); ok {
+		r0 = rf(ctx)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]string)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = rf(ctx)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockUserComponent_GetAdminUserUUIDs_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetAdminUserUUIDs'
+type MockUserComponent_GetAdminUserUUIDs_Call struct {
+	*mock.Call
+}
+
+// GetAdminUserUUIDs is a helper method to define mock.On call
+//   - ctx context.Context
+func (_e *MockUserComponent_Expecter) GetAdminUserUUIDs(ctx interface{}) *MockUserComponent_GetAdminUserUUIDs_Call {
+	return &MockUserComponent_GetAdminUserUUIDs_Call{Call: _e.mock.On("GetAdminUserUUIDs", ctx)}
+}
+
+func (_c *MockUserComponent_GetAdminUserUUIDs_Call) Run(run func(ctx context.Context)) *MockUserComponent_GetAdminUserUUIDs_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context))
+	})
+	return _c
+}
+
+func (_c *MockUserComponent_GetAdminUserUUIDs_Call) Return(_a0 []string, _a1 error) *MockUserComponent_GetAdminUserUUIDs_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockUserComponent_GetAdminUserUUIDs_Call) RunAndReturn(run func(context.Context) ([]string, error)) *MockUserComponent_GetAdminUserUUIDs_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetEmails provides a mock function with given fields: ctx, visitorName, per, page
 func (_m *MockUserComponent) GetEmails(ctx context.Context, visitorName string, per int, page int) ([]string, int, error) {
 	ret := _m.Called(ctx, visitorName, per, page)
