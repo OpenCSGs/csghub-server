@@ -346,13 +346,15 @@ const DefaultGPUsPerNode = 8
 //   - precision: inference precision (fp8, bf16, etc.)
 //   - hiddenSize: hidden size from config.json (used to estimate NonMoEParamsB)
 //   - numHiddenLayers: number of hidden layers from config.json
+//   - minInferenceVRAMGB: minimum VRAM per GPU to load and run inference, typically
+//     from metadata.mini_gpu_memory_gb. When <= 0, falls back to DefaultGPUUnitGB (80).
 //
 // The function:
 //  1. Estimates NonMoEParamsB from hidden_size and num_hidden_layers when available,
 //     otherwise falls back to the active/total expert ratio heuristic.
 //  2. Plans prefill and decode configurations using PlanPD.
 //  3. Returns a PDRecommendation suitable for storage as JSONB.
-func PlanPDRecommendation(modelName string, totalParamsB float64, totalExperts, activeExperts int, precision string, hiddenSize, numHiddenLayers int) (*PDRecommendation, error) {
+func PlanPDRecommendation(modelName string, totalParamsB float64, totalExperts, activeExperts int, precision string, hiddenSize, numHiddenLayers int, minInferenceVRAMGB float64) (*PDRecommendation, error) {
 	if totalParamsB <= 0 {
 		return nil, fmt.Errorf("total params must be positive, got %f", totalParamsB)
 	}
@@ -396,6 +398,14 @@ func PlanPDRecommendation(modelName string, totalParamsB float64, totalExperts, 
 		return nil, fmt.Errorf("failed to plan PD for model %s: %w", modelName, err)
 	}
 
+	// When minInferenceVRAMGB is 0 (metadata.mini_gpu_memory_gb not populated),
+	// keep it as 0 so the missing value is visible rather than masked by a
+	// default. PD planning checks still pass; only the VRAM fields are
+	// inaccurate until the value is resolved from TOML or metadata.
+	if minInferenceVRAMGB < 0 {
+		minInferenceVRAMGB = 0
+	}
+
 	return &PDRecommendation{
 		ModelName:          modelName,
 		TotalParamsB:       spec.TotalParamsB,
@@ -403,16 +413,15 @@ func PlanPDRecommendation(modelName string, totalParamsB float64, totalExperts, 
 		TotalExperts:       spec.TotalExperts,
 		ActiveExperts:      activeExperts,
 		Precision:          spec.Precision,
-		MinInferenceVRAMGB: DefaultGPUUnitGB,
-		Prefill:            planResultToRoleConfig(prefill),
-		Decode:             planResultToRoleConfig(decode),
+		MinInferenceVRAMGB: minInferenceVRAMGB,
+		Prefill:            planResultToRoleConfig(prefill, minInferenceVRAMGB),
+		Decode:             planResultToRoleConfig(decode, minInferenceVRAMGB),
 	}, nil
 }
 
 // planResultToRoleConfig converts a PDPlanResult into a PDRoleConfig.
-// TotalVRAMGB is computed as MinInferenceVRAMGB * TotalGPUs by the caller
-// (PlanPDRecommendation sets MinInferenceVRAMGB = DefaultGPUUnitGB).
-func planResultToRoleConfig(result PDPlanResult) PDRoleConfig {
+// TotalVRAMGB is computed as minInferenceVRAMGB * Pods.
+func planResultToRoleConfig(result PDPlanResult, minInferenceVRAMGB float64) PDRoleConfig {
 	pods := result.LWSSize
 	if pods < 1 {
 		pods = 1
@@ -423,6 +432,6 @@ func planResultToRoleConfig(result PDPlanResult) PDRoleConfig {
 		DP:          result.DP,
 		TotalGPUs:   result.TotalGPUs,
 		Pods:        pods,
-		TotalVRAMGB: float64(result.TotalGPUs) * DefaultGPUUnitGB,
+		TotalVRAMGB: minInferenceVRAMGB * float64(pods),
 	}
 }

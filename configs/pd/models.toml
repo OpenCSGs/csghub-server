@@ -20,7 +20,7 @@
 #   pods        - number of pods per LWS group (LWS Size)
 #
 # total_vram_gb is NOT stored in TOML — it is computed in code as:
-#   total_vram_gb = min_inference_vram_gb * total_gpus
+#   total_vram_gb = min_inference_vram_gb * pods
 #
 # ─── TP/EP/DP Convention ───
 # models.toml stores TP and EP with the SAME value (n), DP=1.
@@ -36,13 +36,13 @@
 # ─── DeepSeek ───
 
 [[models]]
-model_name = "deepseek-ai/DeepSeek-V3"
-total_params_b = 671.0
-non_moe_params_b = 37.0
+model_name = "deepseek-ai/DeepSeek-V4-Flash-DSpark"
+total_params_b = 284.0
+non_moe_params_b = 13.0
 total_experts = 256
-active_experts = 8
+active_experts = 6
 precision = "fp8"
-min_inference_vram_gb = 772.0
+min_inference_vram_gb = 327.0
 
 [models.prefill]
 tp = 8
@@ -52,11 +52,11 @@ total_gpus = 8
 pods = 1
 
 [models.decode]
-tp = 16
-ep = 16
+tp = 8
+ep = 8
 dp = 1
-total_gpus = 16
-pods = 2
+total_gpus = 8
+pods = 1
 
 [[models]]
 model_name = "deepseek-ai/DeepSeek-V4-Flash"
@@ -80,6 +80,30 @@ ep = 8
 dp = 1
 total_gpus = 8
 pods = 1
+
+[[models]]
+model_name = "deepseek-ai/DeepSeek-V4-Pro-DSpark"
+total_params_b = 1600.0
+non_moe_params_b = 49.0
+total_experts = 384
+active_experts = 6
+precision = "fp8"
+min_inference_vram_gb = 1840.0
+
+[models.prefill]
+tp = 16
+ep = 16
+dp = 1
+total_gpus = 16
+pods = 2
+
+[models.decode]
+tp = 32
+ep = 32
+dp = 1
+total_gpus = 32
+pods = 4
+
 
 [[models]]
 model_name = "deepseek-ai/DeepSeek-V4-Pro"
@@ -233,18 +257,18 @@ precision = "bf16"
 min_inference_vram_gb = 33.0
 
 [models.prefill]
-tp = 2
-ep = 2
+tp = 1
+ep = 1
 dp = 1
-total_gpus = 2
-pods = 2
+total_gpus = 1
+pods = 1
 
 [models.decode]
-tp = 2
-ep = 2
+tp = 1
+ep = 1
 dp = 1
-total_gpus = 2
-pods = 2
+total_gpus = 1
+pods = 1
 
 # ─── Kimi (Moonshot) ───
 

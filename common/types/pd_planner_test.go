@@ -256,27 +256,56 @@ func TestPlanPD_FullMatrix(t *testing.T) {
 }
 
 func TestPlanPDRecommendation_DeepSeekV3(t *testing.T) {
-	rec, err := PlanPDRecommendation("deepseek-v3", 671, 256, 8, "fp8", 7168, 61)
+	// minInferenceVRAMGB=772.0 matches configs/pd/models.toml for DeepSeek-V3.
+	rec, err := PlanPDRecommendation("deepseek-v3", 671, 256, 8, "fp8", 7168, 61, 772.0)
 	require.NoError(t, err)
 	require.NotNil(t, rec)
 	require.Equal(t, 671.0, rec.TotalParamsB)
 	require.Equal(t, 256, rec.TotalExperts)
 	require.Equal(t, 8, rec.ActiveExperts)
 	require.Equal(t, "fp8", rec.Precision)
-	require.Equal(t, 80.0, rec.MinInferenceVRAMGB)
+	require.Equal(t, 772.0, rec.MinInferenceVRAMGB)
 	require.Greater(t, rec.Prefill.TotalGPUs, 0)
 	require.Greater(t, rec.Decode.TotalGPUs, 0)
-	require.Greater(t, rec.Prefill.TotalVRAMGB, 0.0)
+	// TotalVRAMGB = MinInferenceVRAMGB * Pods
+	require.Equal(t, 772.0*float64(rec.Prefill.Pods), rec.Prefill.TotalVRAMGB)
+	require.Equal(t, 772.0*float64(rec.Decode.Pods), rec.Decode.TotalVRAMGB)
 	require.Greater(t, rec.Prefill.Pods, 0)
 	require.Greater(t, rec.Decode.Pods, 0)
 
-	t.Logf("DeepSeek-V3 80G: Prefill TP=%d EP=%d GPUs=%d Pods=%d | Decode TP=%d EP=%d GPUs=%d Pods=%d",
-		rec.Prefill.TP, rec.Prefill.EP, rec.Prefill.TotalGPUs, rec.Prefill.Pods,
-		rec.Decode.TP, rec.Decode.EP, rec.Decode.TotalGPUs, rec.Decode.Pods)
+	t.Logf("DeepSeek-V3 80G: Prefill TP=%d EP=%d GPUs=%d Pods=%d VRAM=%.0f | Decode TP=%d EP=%d GPUs=%d Pods=%d VRAM=%.0f",
+		rec.Prefill.TP, rec.Prefill.EP, rec.Prefill.TotalGPUs, rec.Prefill.Pods, rec.Prefill.TotalVRAMGB,
+		rec.Decode.TP, rec.Decode.EP, rec.Decode.TotalGPUs, rec.Decode.Pods, rec.Decode.TotalVRAMGB)
+}
+
+func TestPlanPDRecommendation_MinInferenceVRAMZero(t *testing.T) {
+	// When minInferenceVRAMGB is 0 (metadata.mini_gpu_memory_gb not populated),
+	// keep it as 0 so the missing value is visible. PD planning still succeeds;
+	// only the VRAM fields are 0 until the value is resolved from TOML/metadata.
+	rec, err := PlanPDRecommendation("deepseek-v3", 671, 256, 8, "fp8", 7168, 61, 0)
+	require.NoError(t, err)
+	require.NotNil(t, rec)
+	require.Equal(t, 0.0, rec.MinInferenceVRAMGB)
+	// TotalVRAMGB = 0 * Pods = 0
+	require.Equal(t, 0.0, rec.Prefill.TotalVRAMGB)
+	require.Equal(t, 0.0, rec.Decode.TotalVRAMGB)
+	// PD planning checks should still pass
+	require.Greater(t, rec.Prefill.TotalGPUs, 0)
+	require.Greater(t, rec.Decode.TotalGPUs, 0)
+}
+
+func TestPlanPDRecommendation_MinInferenceVRAMNegative(t *testing.T) {
+	// Negative values should be clamped to 0.
+	rec, err := PlanPDRecommendation("deepseek-v3", 671, 256, 8, "fp8", 7168, 61, -10)
+	require.NoError(t, err)
+	require.NotNil(t, rec)
+	require.Equal(t, 0.0, rec.MinInferenceVRAMGB)
+	require.Equal(t, 0.0, rec.Prefill.TotalVRAMGB)
+	require.Equal(t, 0.0, rec.Decode.TotalVRAMGB)
 }
 
 func TestPlanPDRecommendation_GLM52(t *testing.T) {
-	rec, err := PlanPDRecommendation("glm-5.2", 1000, 256, 8, "fp8", 8192, 80)
+	rec, err := PlanPDRecommendation("glm-5.2", 1000, 256, 8, "fp8", 8192, 80, 0)
 	require.NoError(t, err)
 	require.NotNil(t, rec)
 	require.Equal(t, 1000.0, rec.TotalParamsB)
@@ -285,7 +314,7 @@ func TestPlanPDRecommendation_GLM52(t *testing.T) {
 }
 
 func TestPlanPDRecommendation_Qwen3_30B_A3B(t *testing.T) {
-	rec, err := PlanPDRecommendation("qwen3-30b-a3b", 30, 128, 8, "bf16", 2048, 48)
+	rec, err := PlanPDRecommendation("qwen3-30b-a3b", 30, 128, 8, "bf16", 2048, 48, 0)
 	require.NoError(t, err)
 	require.NotNil(t, rec)
 	require.Equal(t, 30.0, rec.TotalParamsB)
@@ -294,7 +323,7 @@ func TestPlanPDRecommendation_Qwen3_30B_A3B(t *testing.T) {
 
 func TestPlanPDRecommendation_UnknownModelMoE(t *testing.T) {
 	// Unknown MoE model with expert info from config.json
-	rec, err := PlanPDRecommendation("custom/moe-model", 200, 64, 8, "bf16", 4096, 32)
+	rec, err := PlanPDRecommendation("custom/moe-model", 200, 64, 8, "bf16", 4096, 32, 0)
 	require.NoError(t, err)
 	require.NotNil(t, rec)
 	require.Equal(t, 200.0, rec.TotalParamsB)
@@ -306,7 +335,7 @@ func TestPlanPDRecommendation_UnknownModelMoE(t *testing.T) {
 }
 
 func TestPlanPDRecommendation_DenseModel(t *testing.T) {
-	rec, err := PlanPDRecommendation("custom-dense-70b", 70, 0, 0, "bf16", 0, 0)
+	rec, err := PlanPDRecommendation("custom-dense-70b", 70, 0, 0, "bf16", 0, 0, 0)
 	require.NoError(t, err)
 	require.NotNil(t, rec)
 	require.Equal(t, 70.0, rec.TotalParamsB)
@@ -315,13 +344,13 @@ func TestPlanPDRecommendation_DenseModel(t *testing.T) {
 }
 
 func TestPlanPDRecommendation_ZeroParams(t *testing.T) {
-	_, err := PlanPDRecommendation("test", 0, 256, 8, "fp8", 0, 0)
+	_, err := PlanPDRecommendation("test", 0, 256, 8, "fp8", 0, 0, 0)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "total params must be positive")
 }
 
 func TestPlanPDRecommendation_NegativeParams(t *testing.T) {
-	_, err := PlanPDRecommendation("test", -10, 256, 8, "fp8", 0, 0)
+	_, err := PlanPDRecommendation("test", -10, 256, 8, "fp8", 0, 0, 0)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "total params must be positive")
 }
@@ -329,21 +358,21 @@ func TestPlanPDRecommendation_NegativeParams(t *testing.T) {
 func TestPlanPDRecommendation_PrecisionOverride(t *testing.T) {
 	// Known model with explicit precision override
 	// Use a smaller model that fits in 80GB with bf16
-	rec, err := PlanPDRecommendation("qwen3-30b-a3b", 30, 128, 8, "bf16", 2048, 48)
+	rec, err := PlanPDRecommendation("qwen3-30b-a3b", 30, 128, 8, "bf16", 2048, 48, 0)
 	require.NoError(t, err)
 	require.Equal(t, "bf16", rec.Precision)
 }
 
 func TestPlanPDRecommendation_ExpertOverride(t *testing.T) {
 	// Override expert count from config.json
-	rec, err := PlanPDRecommendation("deepseek-v3", 671, 512, 16, "fp8", 7168, 61)
+	rec, err := PlanPDRecommendation("deepseek-v3", 671, 512, 16, "fp8", 7168, 61, 0)
 	require.NoError(t, err)
 	require.Equal(t, 512, rec.TotalExperts)
 	require.Equal(t, 16, rec.ActiveExperts)
 }
 
 func TestPlanPDRecommendation_DPField(t *testing.T) {
-	rec, err := PlanPDRecommendation("deepseek-v3", 671, 256, 8, "fp8", 7168, 61)
+	rec, err := PlanPDRecommendation("deepseek-v3", 671, 256, 8, "fp8", 7168, 61, 0)
 	require.NoError(t, err)
 	// DP should default to 1 for all recommendations
 	require.Equal(t, 1, rec.Prefill.DP)
