@@ -890,7 +890,7 @@ func (c *userComponentImpl) Evaluations(ctx context.Context, req *types.UserEval
 		return nil, 0, newError
 	}
 
-	evaluations, total, err := c.workflowStore.FindByUsername(ctx, req.CurrentUser, types.TaskTypeEvaluation, req.PageSize, req.Page)
+	evaluations, total, err := c.workflowStore.FindByUsernameWithTaskTypes(ctx, req.CurrentUser, evaluationTaskTypes, req.PageSize, req.Page)
 
 	if err != nil {
 		newError := fmt.Errorf("failed to get user evaluations,error:%w", err)

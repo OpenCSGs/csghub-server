@@ -1,0 +1,52 @@
+ARG PYTHON_IMAGE=docker.m.daocloud.io/python:3.11-slim
+ARG CLAW_EVAL_REPO=https://github.com/claw-eval/claw-eval.git
+ARG CLAW_EVAL_REF=main
+
+FROM ${PYTHON_IMAGE}
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1
+
+WORKDIR /app
+
+RUN sed -i 's|http://deb.debian.org/debian-security|https://mirrors.aliyun.com/debian-security|g' /etc/apt/sources.list.d/* 2>/dev/null || true \
+    && sed -i 's|http://deb.debian.org/debian|https://mirrors.aliyun.com/debian|g' /etc/apt/sources.list.d/* 2>/dev/null || true \
+    && apt-get update && apt-get install -y --no-install-recommends \
+        ca-certificates \
+        curl \
+        dumb-init \
+        ffmpeg \
+        git \
+        poppler-utils \
+    && rm -rf /var/lib/apt/lists/*
+
+ARG CLAW_EVAL_REPO=https://github.com/claw-eval/claw-eval.git
+ARG CLAW_EVAL_REF=main
+
+RUN git clone --depth 1 --branch "${CLAW_EVAL_REF}" "${CLAW_EVAL_REPO}" /tmp/claw-eval-src \
+    && cp /tmp/claw-eval-src/pyproject.toml /tmp/claw-eval-src/requirements.txt /tmp/claw-eval-src/requirements-sandbox-server.txt /app/ \
+    && cp -r /tmp/claw-eval-src/src /app/src \
+    && cp /tmp/claw-eval-src/README.md /app/ \
+    && cp /tmp/claw-eval-src/config*.yaml /app/ \
+    && cp /tmp/claw-eval-src/score_summary.py /app/score_summary.py \
+    && cp -r /tmp/claw-eval-src/mock_services /app/mock_services \
+    && cp -r /tmp/claw-eval-src/tasks /app/tasks \
+    && rm -rf /tmp/claw-eval-src
+
+RUN pip install -e ".[mock,sandbox,web]" \
+        minio oss2 openpyxl pandas \
+        -i https://mirrors.aliyun.com/pypi/simple/ \
+        --trusted-host mirrors.aliyun.com \
+    && pip install -r requirements-sandbox-server.txt \
+        -i https://mirrors.aliyun.com/pypi/simple/ \
+        --trusted-host mirrors.aliyun.com
+
+COPY ./claw-eval/config_csghub.yaml /app/config_csghub.yaml
+COPY ./claw-eval/docker-entrypoint.py /usr/local/bin/claw-eval-docker
+COPY ./claw-eval/ /etc/csghub/
+RUN chmod +x /usr/local/bin/claw-eval-docker /etc/csghub/start.sh \
+    && mkdir -p traces
+
+ENTRYPOINT ["/usr/bin/dumb-init", "--"]
+CMD ["/etc/csghub/start.sh"]

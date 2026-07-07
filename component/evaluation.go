@@ -11,6 +11,7 @@ import (
 	"opencsg.com/csghub-server/builder/deploy"
 	"opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/builder/git/membership"
+	"opencsg.com/csghub-server/builder/loki"
 	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
@@ -41,7 +42,12 @@ type EvaluationComponent interface {
 	GetEvaluation(ctx context.Context, req types.EvaluationGetReq) (*types.EvaluationRes, error)
 	DeleteEvaluation(ctx context.Context, req types.ArgoWorkFlowDeleteReq) error
 	OrgEvaluations(ctx context.Context, req *types.OrgEvaluationsReq) ([]types.ArgoWorkFlowRes, int, error)
+	ReadJobLogsNonStream(ctx context.Context, req types.EvaluationLogReq) (string, error)
+	ReadJobLogsInStream(ctx context.Context, req types.EvaluationLogReq) (*deploy.MultiLogReader, error)
 }
+
+// evaluationTaskTypes limits list queries; log endpoints accept more types via isEvaluationWorkflowTaskType.
+var evaluationTaskTypes = []types.TaskType{types.TaskTypeEvaluation, types.TaskTypeClawEval}
 
 func NewEvaluationComponent(config *config.Config) (EvaluationComponent, error) {
 	c := &evaluationComponentImpl{}
@@ -94,6 +100,14 @@ func (c *evaluationComponentImpl) CreateEvaluation(ctx context.Context, req type
 		}
 	}
 
+	frame, err := c.runtimeFrameworkStore.FindEnabledByID(ctx, req.RuntimeFrameworkId)
+	if err != nil {
+		return nil, fmt.Errorf("cannot find available runtime framework, %w", err)
+	}
+	if frame.FrameName == types.ClawEvalFrameName {
+		return c.createClawEvaluation(ctx, req, user, frame)
+	}
+
 	if req.ModelIds == nil {
 		req.ModelIds = []string{}
 	}
@@ -126,10 +140,6 @@ func (c *evaluationComponentImpl) CreateEvaluation(ctx context.Context, req type
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate mirror repo ids, %w", err)
-	}
-	frame, err := c.runtimeFrameworkStore.FindEnabledByID(ctx, req.RuntimeFrameworkId)
-	if err != nil {
-		return nil, fmt.Errorf("cannot find available runtime framework, %w", err)
 	}
 	req.Datasets = mirrorRepos
 	req.DatasetRevisions = datasetRevisions
@@ -347,6 +357,7 @@ func (c *evaluationComponentImpl) GetEvaluation(ctx context.Context, req types.E
 		DownloadURL:  wf.DownloadURL,
 		FailuresURL:  wf.FailuresURL,
 	}
+	attachClawEvalSummary(ctx, res)
 	return res, nil
 }
 
@@ -361,7 +372,7 @@ func (c *evaluationComponentImpl) OrgEvaluations(ctx context.Context, req *types
 		}
 	}
 
-	workflows, total, err := c.workflowStore.FindByUsername(ctx, req.Namespace, types.TaskTypeEvaluation, req.PageSize, req.Page)
+	workflows, total, err := c.workflowStore.FindByUsernameWithTaskTypes(ctx, req.Namespace, evaluationTaskTypes, req.PageSize, req.Page)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to get org evaluations, error: %w", err)
 	}
@@ -391,4 +402,207 @@ func (c *evaluationComponentImpl) OrgEvaluations(ctx context.Context, req *types
 		})
 	}
 	return res, total, nil
+}
+
+func (c *evaluationComponentImpl) createClawEvaluation(ctx context.Context, req types.EvaluationReq, user database.User, frame *database.RuntimeFramework) (*types.ArgoWorkFlowRes, error) {
+	operatorUsername := req.Username
+	if req.TaskName == "" {
+		return nil, fmt.Errorf("task_name is required")
+	}
+	if req.ResourceId == 0 {
+		return nil, fmt.Errorf("resource_id is required")
+	}
+	if req.Model == "" {
+		return nil, fmt.Errorf("model is required")
+	}
+	if req.BaseURL == "" {
+		return nil, fmt.Errorf("base_url is required")
+	}
+
+	billingUUID := user.UUID
+	if req.OwnerNamespace != operatorUsername {
+		resolved, err := c.repoComponent.GetNamespaceBillingUUID(ctx, req.OwnerNamespace)
+		if err != nil {
+			return nil, fmt.Errorf("failed to resolve billing UUID for namespace %s, error: %w", req.OwnerNamespace, err)
+		}
+		billingUUID = resolved
+	}
+
+	var hardware types.HardWare
+	resource, err := c.spaceResourceStore.FindByID(ctx, req.ResourceId)
+	if err != nil {
+		return nil, fmt.Errorf("cannot find resource, %w", err)
+	}
+	err = json.Unmarshal([]byte(resource.Resources), &hardware)
+	if err != nil {
+		return nil, fmt.Errorf("invalid hardware setting, %w", err)
+	}
+	if frame.ComputeType != string(types.ResourceTypeCPU) && !common.ContainsGraphicResource(hardware) {
+		return nil, fmt.Errorf("claw evaluation requires graphics card resources when runtime framework uses GPU")
+	}
+
+	exclusiveResp, err := c.repoComponent.CheckAccountAndResource(ctx,
+		types.CheckResourceAndAccountReq{
+			UserName:      req.OwnerNamespace,
+			ClusterID:     resource.ClusterID,
+			OrderDetailID: 0,
+			CurrentUser:   req.Username,
+		},
+		resource)
+	if err != nil {
+		return nil, err
+	}
+	req.ClusterID = resource.ClusterID
+	req.ResourceName = resource.Name
+	req.NodeAffinity = exclusiveResp.NodeAffinity
+	req.Tolerations = exclusiveResp.Tolerations
+	req.Hardware = hardware
+
+	clusterNodes, err := c.clusterStore.FindNodeByClusterID(ctx, req.ClusterID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find nodes by cluster id, clusterID: %s, error: %w", req.ClusterID, err)
+	}
+	for _, node := range clusterNodes {
+		req.Nodes = append(req.Nodes, types.Node{
+			Name:       node.Name,
+			EnableVXPU: node.EnableVXPU,
+			HasXPU:     node.Hardware.HasXPU() || node.EnableVXPU,
+		})
+	}
+
+	req.UserUUID = billingUUID
+	req.Username = req.OwnerNamespace
+	req.Image = frame.FrameImage
+	req.RepoType = string(types.ModelRepo)
+	req.TaskType = types.TaskTypeClawEval
+
+	clawReq := req.ToClawEvaluationReq()
+	if !req.NoJudge {
+		judgeAPIKey, err := c.resolveClawEvalJudgeAPIKey(ctx, billingUUID, req.OwnerNamespace, operatorUsername)
+		if err != nil {
+			return nil, err
+		}
+		clawReq.JudgeBaseURL = c.config.PublicAIGatewayURL()
+		clawReq.JudgeApiKey = judgeAPIKey
+	}
+	return c.deployer.SubmitClawEvaluation(ctx, clawReq)
+}
+
+func (c *evaluationComponentImpl) resolveClawEvalJudgeAPIKey(ctx context.Context, billingUUID, ownerNamespace, operatorUsername string) (string, error) {
+	token, err := c.tokenStore.FindBuiltinByNsUUID(ctx, billingUUID, string(types.AccessTokenAppAIGateway))
+	if err == nil && token != nil && token.Token != "" {
+		return token.Token, nil
+	}
+	if err != nil && !errors.Is(err, sql.ErrNoRows) && !errors.Is(err, errorx.ErrDatabaseNoRows) && !errors.Is(err, errorx.ErrNotFound) {
+		return "", fmt.Errorf("failed to find builtin inference api key, %w", err)
+	}
+
+	apiKey, err := c.userSvcClient.GetOrCreateFirstAvaiTokens(
+		ctx,
+		ownerNamespace,
+		operatorUsername,
+		string(types.AccessTokenAppAIGateway),
+		"claw-eval",
+	)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve judge api key, %w", err)
+	}
+	if apiKey == "" {
+		return "", fmt.Errorf("failed to resolve judge api key")
+	}
+	return apiKey, nil
+}
+
+func (c *evaluationComponentImpl) checkEvaluationLogPermission(ctx context.Context, req types.EvaluationLogReq) (bool, *database.ArgoWorkflow, error) {
+	var (
+		err   error
+		wf    *database.ArgoWorkflow
+		wfObj database.ArgoWorkflow
+	)
+
+	if len(req.TaskID) > 0 {
+		wf, err = c.workflowStore.FindByTaskID(ctx, req.TaskID)
+	} else if req.ID > 0 {
+		wfObj, err = c.workflowStore.FindByID(ctx, req.ID)
+		wf = &wfObj
+	} else {
+		return false, nil, nil
+	}
+	if err != nil {
+		return false, nil, fmt.Errorf("failed to find evaluation workflow job by id %d or task id %s error: %w",
+			req.ID, req.TaskID, err)
+	}
+	if !isEvaluationWorkflowTaskType(wf.TaskType) {
+		return false, nil, errorx.ErrForbiddenMsg("workflow is not an evaluation job")
+	}
+
+	_, err = checkOwnerOrOrgMemberPermission(ctx, c.userSvcClient, req.CurrentUser, wf.UserUUID)
+	if err != nil {
+		return false, nil, errorx.ErrForbidden
+	}
+	return true, wf, nil
+}
+
+// isEvaluationWorkflowTaskType covers all workflow kinds that expose evaluation-style logs.
+func isEvaluationWorkflowTaskType(taskType types.TaskType) bool {
+	switch taskType {
+	case types.TaskTypeEvaluation, types.TaskTypeClawEval, types.TaskTypeComparison, types.TaskTypeLeaderBoard:
+		return true
+	default:
+		return false
+	}
+}
+
+func (c *evaluationComponentImpl) ReadJobLogsNonStream(ctx context.Context, req types.EvaluationLogReq) (string, error) {
+	allow, wf, err := c.checkEvaluationLogPermission(ctx, req)
+	if err != nil {
+		return "", err
+	}
+	if !allow {
+		return "", errorx.ErrForbidden
+	}
+
+	req.PodName = wf.TaskId
+	req.SubmitTime = wf.SubmitTime
+	labels := map[string]string{
+		types.StreamKeyInstanceName: req.PodName,
+	}
+	lokiResp, err := c.deployer.GetWorkflowLogsNonStream(ctx, req, labels)
+	if err != nil {
+		return "", fmt.Errorf("failed to read evaluation job logs, error:%w", err)
+	}
+	return c.formatEvaluationLogs(lokiResp), nil
+}
+
+func (c *evaluationComponentImpl) ReadJobLogsInStream(ctx context.Context, req types.EvaluationLogReq) (*deploy.MultiLogReader, error) {
+	allow, wf, err := c.checkEvaluationLogPermission(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	if !allow {
+		return nil, errorx.ErrForbidden
+	}
+
+	req.PodName = wf.TaskId
+	req.SubmitTime = wf.SubmitTime
+	labels := map[string]string{
+		types.StreamKeyInstanceName: req.PodName,
+	}
+	return c.deployer.GetWorkflowLogsInStream(ctx, req, labels)
+}
+
+func (c *evaluationComponentImpl) formatEvaluationLogs(lokiLog *loki.LokiQueryResponse) string {
+	var bulkLog strings.Builder
+	for _, item := range lokiLog.Data.Result {
+		for _, valuePair := range item.Values {
+			for _, log := range strings.Split(valuePair[1], "\n") {
+				if log == "" {
+					continue
+				}
+				bulkLog.WriteString(log)
+				bulkLog.WriteString(c.config.LogCollector.LineSeparator)
+			}
+		}
+	}
+	return strings.TrimSuffix(bulkLog.String(), c.config.LogCollector.LineSeparator)
 }

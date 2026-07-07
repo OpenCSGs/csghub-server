@@ -654,7 +654,7 @@ func TestUserComponent_Evaluations(t *testing.T) {
 	uc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(
 		database.User{ID: 1, UUID: "uuid"}, nil,
 	)
-	uc.mocks.stores.WorkflowMock().EXPECT().FindByUsername(ctx, "user", types.TaskTypeEvaluation, 10, 1).Return([]database.ArgoWorkflow{
+	uc.mocks.stores.WorkflowMock().EXPECT().FindByUsernameWithTaskTypes(ctx, "user", evaluationTaskTypes, 10, 1).Return([]database.ArgoWorkflow{
 		{ID: 1},
 	}, 100, nil)
 	data, total, err := uc.Evaluations(ctx, &types.UserDatasetsReq{

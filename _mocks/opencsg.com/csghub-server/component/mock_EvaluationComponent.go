@@ -6,6 +6,8 @@ import (
 	context "context"
 
 	mock "github.com/stretchr/testify/mock"
+	deploy "opencsg.com/csghub-server/builder/deploy"
+
 	types "opencsg.com/csghub-server/common/types"
 )
 
@@ -249,6 +251,122 @@ func (_c *MockEvaluationComponent_OrgEvaluations_Call) Return(_a0 []types.ArgoWo
 }
 
 func (_c *MockEvaluationComponent_OrgEvaluations_Call) RunAndReturn(run func(context.Context, *types.OrgEvaluationsReq) ([]types.ArgoWorkFlowRes, int, error)) *MockEvaluationComponent_OrgEvaluations_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ReadJobLogsInStream provides a mock function with given fields: ctx, req
+func (_m *MockEvaluationComponent) ReadJobLogsInStream(ctx context.Context, req types.EvaluationLogReq) (*deploy.MultiLogReader, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ReadJobLogsInStream")
+	}
+
+	var r0 *deploy.MultiLogReader
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.EvaluationLogReq) (*deploy.MultiLogReader, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.EvaluationLogReq) *deploy.MultiLogReader); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*deploy.MultiLogReader)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.EvaluationLogReq) error); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockEvaluationComponent_ReadJobLogsInStream_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ReadJobLogsInStream'
+type MockEvaluationComponent_ReadJobLogsInStream_Call struct {
+	*mock.Call
+}
+
+// ReadJobLogsInStream is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req types.EvaluationLogReq
+func (_e *MockEvaluationComponent_Expecter) ReadJobLogsInStream(ctx interface{}, req interface{}) *MockEvaluationComponent_ReadJobLogsInStream_Call {
+	return &MockEvaluationComponent_ReadJobLogsInStream_Call{Call: _e.mock.On("ReadJobLogsInStream", ctx, req)}
+}
+
+func (_c *MockEvaluationComponent_ReadJobLogsInStream_Call) Run(run func(ctx context.Context, req types.EvaluationLogReq)) *MockEvaluationComponent_ReadJobLogsInStream_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.EvaluationLogReq))
+	})
+	return _c
+}
+
+func (_c *MockEvaluationComponent_ReadJobLogsInStream_Call) Return(_a0 *deploy.MultiLogReader, _a1 error) *MockEvaluationComponent_ReadJobLogsInStream_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockEvaluationComponent_ReadJobLogsInStream_Call) RunAndReturn(run func(context.Context, types.EvaluationLogReq) (*deploy.MultiLogReader, error)) *MockEvaluationComponent_ReadJobLogsInStream_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ReadJobLogsNonStream provides a mock function with given fields: ctx, req
+func (_m *MockEvaluationComponent) ReadJobLogsNonStream(ctx context.Context, req types.EvaluationLogReq) (string, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ReadJobLogsNonStream")
+	}
+
+	var r0 string
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.EvaluationLogReq) (string, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.EvaluationLogReq) string); ok {
+		r0 = rf(ctx, req)
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.EvaluationLogReq) error); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockEvaluationComponent_ReadJobLogsNonStream_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ReadJobLogsNonStream'
+type MockEvaluationComponent_ReadJobLogsNonStream_Call struct {
+	*mock.Call
+}
+
+// ReadJobLogsNonStream is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req types.EvaluationLogReq
+func (_e *MockEvaluationComponent_Expecter) ReadJobLogsNonStream(ctx interface{}, req interface{}) *MockEvaluationComponent_ReadJobLogsNonStream_Call {
+	return &MockEvaluationComponent_ReadJobLogsNonStream_Call{Call: _e.mock.On("ReadJobLogsNonStream", ctx, req)}
+}
+
+func (_c *MockEvaluationComponent_ReadJobLogsNonStream_Call) Run(run func(ctx context.Context, req types.EvaluationLogReq)) *MockEvaluationComponent_ReadJobLogsNonStream_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.EvaluationLogReq))
+	})
+	return _c
+}
+
+func (_c *MockEvaluationComponent_ReadJobLogsNonStream_Call) Return(_a0 string, _a1 error) *MockEvaluationComponent_ReadJobLogsNonStream_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockEvaluationComponent_ReadJobLogsNonStream_Call) RunAndReturn(run func(context.Context, types.EvaluationLogReq) (string, error)) *MockEvaluationComponent_ReadJobLogsNonStream_Call {
 	_c.Call.Return(run)
 	return _c
 }

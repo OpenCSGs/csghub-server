@@ -76,6 +76,28 @@ func TestArgoWorkflowStore_CRUD(t *testing.T) {
 	_, err = store.FindByID(ctx, dbflow.ID)
 	require.Nil(t, err)
 
+	_, err = store.CreateWorkFlow(ctx, database.ArgoWorkflow{
+		Username:   "user",
+		Namespace:  "ns",
+		TaskName:   "claw-task",
+		TaskId:     "claw-tid",
+		TaskType:   types.TaskTypeClawEval,
+		SubmitTime: dt.Add(-1 * time.Hour),
+	})
+	require.Nil(t, err)
+
+	flows, total, err = store.FindByUsernameWithTaskTypes(ctx, "user", []types.TaskType{
+		types.TaskTypeEvaluation,
+		types.TaskTypeClawEval,
+	}, 10, 1)
+	require.Nil(t, err)
+	require.Equal(t, 2, total)
+	names = []string{}
+	for _, f := range flows {
+		names = append(names, f.TaskName)
+	}
+	require.Equal(t, []string{"claw-task", "task2"}, names)
+
 }
 
 func TestArgoWorkflowStore_GetClusterWorkflows(t *testing.T) {
