@@ -6,7 +6,6 @@ import (
 	"opencsg.com/csghub-server/notification/scenariomgr/scenario/emailverifycode"
 	"opencsg.com/csghub-server/notification/scenariomgr/scenario/internalnotification"
 	"opencsg.com/csghub-server/notification/scenariomgr/scenario/resourceapplication"
-	"opencsg.com/csghub-server/notification/scenariomgr/scenario/smsverifycode"
 )
 
 func Register(d *scenariomgr.DataProvider) {
