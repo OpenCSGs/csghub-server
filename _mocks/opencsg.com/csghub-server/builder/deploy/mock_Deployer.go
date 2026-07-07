@@ -1584,27 +1584,27 @@ func (_c *MockDeployer_StopBuild_Call) RunAndReturn(run func(context.Context, co
 }
 
 // SubmitClawEvaluation provides a mock function with given fields: ctx, req
-func (_m *MockDeployer) SubmitClawEvaluation(ctx context.Context, req types.ClawEvaluationReq) (*types.ArgoWorkFlowRes, error) {
+func (_m *MockDeployer) SubmitClawEvaluation(ctx context.Context, req commontypes.ClawEvaluationReq) (*commontypes.ArgoWorkFlowRes, error) {
 	ret := _m.Called(ctx, req)
 
 	if len(ret) == 0 {
 		panic("no return value specified for SubmitClawEvaluation")
 	}
 
-	var r0 *types.ArgoWorkFlowRes
+	var r0 *commontypes.ArgoWorkFlowRes
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, types.ClawEvaluationReq) (*types.ArgoWorkFlowRes, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, commontypes.ClawEvaluationReq) (*commontypes.ArgoWorkFlowRes, error)); ok {
 		return rf(ctx, req)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, types.ClawEvaluationReq) *types.ArgoWorkFlowRes); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, commontypes.ClawEvaluationReq) *commontypes.ArgoWorkFlowRes); ok {
 		r0 = rf(ctx, req)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*types.ArgoWorkFlowRes)
+			r0 = ret.Get(0).(*commontypes.ArgoWorkFlowRes)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, types.ClawEvaluationReq) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, commontypes.ClawEvaluationReq) error); ok {
 		r1 = rf(ctx, req)
 	} else {
 		r1 = ret.Error(1)
@@ -1620,24 +1620,24 @@ type MockDeployer_SubmitClawEvaluation_Call struct {
 
 // SubmitClawEvaluation is a helper method to define mock.On call
 //   - ctx context.Context
-//   - req types.ClawEvaluationReq
+//   - req commontypes.ClawEvaluationReq
 func (_e *MockDeployer_Expecter) SubmitClawEvaluation(ctx interface{}, req interface{}) *MockDeployer_SubmitClawEvaluation_Call {
 	return &MockDeployer_SubmitClawEvaluation_Call{Call: _e.mock.On("SubmitClawEvaluation", ctx, req)}
 }
 
-func (_c *MockDeployer_SubmitClawEvaluation_Call) Run(run func(ctx context.Context, req types.ClawEvaluationReq)) *MockDeployer_SubmitClawEvaluation_Call {
+func (_c *MockDeployer_SubmitClawEvaluation_Call) Run(run func(ctx context.Context, req commontypes.ClawEvaluationReq)) *MockDeployer_SubmitClawEvaluation_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(types.ClawEvaluationReq))
+		run(args[0].(context.Context), args[1].(commontypes.ClawEvaluationReq))
 	})
 	return _c
 }
 
-func (_c *MockDeployer_SubmitClawEvaluation_Call) Return(_a0 *types.ArgoWorkFlowRes, _a1 error) *MockDeployer_SubmitClawEvaluation_Call {
+func (_c *MockDeployer_SubmitClawEvaluation_Call) Return(_a0 *commontypes.ArgoWorkFlowRes, _a1 error) *MockDeployer_SubmitClawEvaluation_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockDeployer_SubmitClawEvaluation_Call) RunAndReturn(run func(context.Context, types.ClawEvaluationReq) (*types.ArgoWorkFlowRes, error)) *MockDeployer_SubmitClawEvaluation_Call {
+func (_c *MockDeployer_SubmitClawEvaluation_Call) RunAndReturn(run func(context.Context, commontypes.ClawEvaluationReq) (*commontypes.ArgoWorkFlowRes, error)) *MockDeployer_SubmitClawEvaluation_Call {
 	_c.Call.Return(run)
 	return _c
 }

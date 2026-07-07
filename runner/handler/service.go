@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 
@@ -19,6 +20,7 @@ import (
 	rcommon "opencsg.com/csghub-server/runner/common"
 	"opencsg.com/csghub-server/runner/component"
 	rTypes "opencsg.com/csghub-server/runner/types"
+	"opencsg.com/csghub-server/runner/utils"
 )
 
 type K8sHandler struct {
@@ -229,47 +231,34 @@ func (s *K8sHandler) readPodLogsFromDB(c *gin.Context, cluster *cluster.Cluster,
 func (s *K8sHandler) readPodLogsFromCluster(c *gin.Context, cluster *cluster.Cluster, podName, svcName string) {
 	slog.Debug("read pod logs from cluster", slog.Any("namespace", s.k8sNameSpace), slog.Any("pod-name", podName),
 		slog.Any("svcname", svcName), slog.Any("clusterID", cluster.ID))
-	ch, message, err := rcommon.GetPodLogStream(c, cluster.Client, podName, s.k8sNameSpace, rTypes.UserContainerName)
+
+	stream, message, err := rcommon.GetPodLogStream(c.Request.Context(), cluster.Client, podName, s.k8sNameSpace, rTypes.UserContainerName)
 	if err != nil {
 		slog.ErrorContext(c.Request.Context(), "Failed to open stream", slog.Any("error", err))
 		httpbase.ServerError(c, fmt.Errorf("failed to open stream"))
 		return
 	}
 	defer func() {
-		if ch != nil {
-			select {
-			case _, ok := <-ch:
-				if ok {
-					close(ch)
-				}
-			default:
-				close(ch)
-			}
+		if stream != nil {
+			_ = stream.Close()
 		}
 	}()
 
-	setResponseHeaderForLogs(c)
-
 	if message != "" {
-		_, err = c.Writer.Write([]byte(message))
-		if err != nil {
-			slog.ErrorContext(c.Request.Context(), "write pod message data failed", slog.Any("svcName", svcName),
-				slog.Any("namespace", s.k8sNameSpace), slog.Any("pod-name", podName),
-				slog.Any("clusterID", cluster.ID), slog.Any("error", err))
-		}
-		c.Writer.Flush()
 		httpbase.BadRequest(c, message)
 		return
 	}
 
-	for log := range ch {
-		_, err := c.Writer.Write(log)
-		if err != nil {
-			slog.ErrorContext(c.Request.Context(), "write pod log data failed", slog.Any("svcName", svcName),
-				slog.Any("namespace", s.k8sNameSpace), slog.Any("pod-name", podName),
-				slog.Any("clusterID", cluster.ID), slog.Any("error", err))
-		}
-		c.Writer.Flush()
+	setResponseHeaderForLogs(c)
+
+	// Flush the header by calling http.Flusher if supported.
+	if flusher, ok := c.Writer.(http.Flusher); ok {
+		flusher.Flush()
+	}
+
+	w := utils.Wrap(c.Writer)
+	if _, err := io.Copy(w, stream); err != nil {
+		slog.ErrorContext(c.Request.Context(), "failed to copy stream", slog.Any("error", err))
 	}
 }
 
