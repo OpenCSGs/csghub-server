@@ -257,7 +257,7 @@ type Config struct {
 		Host                         string `env:"OPENCSG_ACCOUNTING_SERVER_HOST" default:"http://localhost"`
 		Port                         int    `env:"OPENCSG_ACCOUNTING_SERVER_PORT" default:"8086"`
 		ChargingEnable               bool   `env:"OPENCSG_ACCOUNTING_CHARGING_ENABLE" default:"false"`
-		SubscriptionCronExpression   string `env:"OPENCSG_ACCOUNTING_SUBSCRIPTION_CRON_EXPRESSION" default:"*/5 * * * *"`
+		SubscriptionCronExpression   string `env:"OPENCSG_ACCOUNTING_SUBSCRIPTION_CRON_EXPRESSION" default:"*/10 * * * *"`
 		ExpiredPresentCronExpression string `env:"OPENCSG_ACCOUNTING_EXPIRED_PRESENT_CRON_EXPRESSION" default:"0 0 * * *"`
 		ThresholdOfStopDeploy        int    `env:"OPENCSG_ACCOUNTING_THRESHOLD_OF_STOP_DEPLOY" default:"5000"`
 		ThresholdOfStopLLMInference  int    `env:"OPENCSG_ACCOUNTING_THRESHOLD_OF_STOP_LLM_INFERENCE" default:"5000"`
@@ -406,9 +406,15 @@ type Config struct {
 		MigrateRepoPathCronExpression            string `env:"STARHUB_SERVER_CRON_JOB_MIGRATE_REPO_PATH_CRON_EXPRESSION" default:"* 16-20 * * *"`
 		DeletePendingDeletionCronExpression      string `env:"STARHUB_SERVER_CRON_JOB_DELETE_PENDING_DELETION_CRON_EXPRESSION" default:"0 16-20 * * *"`
 		ReleaseInvitationCreditCronExpression    string `env:"STARHUB_SERVER_CRON_JOB_RELEASE_INVITATION_CREDIT_CRON_EXPRESSION" default:"0 0 5 * *"`
-		MCPInspectCronExpression                 string `env:"STARHUB_SERVER_CRON_JOB_MCP_INSPECT_CRON_EXPRESSION" default:"*/5 * * * *"`
+		MCPInspectCronExpression                 string `env:"STARHUB_SERVER_CRON_JOB_MCP_INSPECT_CRON_EXPRESSION" default:"*/10 * * * *"`
 		AIGatewayAsyncGenerationCronExpression   string `env:"STARHUB_SERVER_CRON_JOB_AIGATEWAY_ASYNC_GENERATION_CRON_EXPRESSION" default:"*/1 * * * *"`
 		SyncLLMLogsToDatasetCronExpression       string `env:"STARHUB_SERVER_SYNC_LLMLOGS_TO_DATASET_CRON_EXPRESSION" default:"0 1 * * *"`
+	}
+
+	DeployReconcile struct {
+		CronExpression       string `env:"STARHUB_SERVER_DEPLOY_RECONCILE_CRON_EXPRESSION" default:"*/10 * * * *"`
+		StuckTimeoutMin      int    `env:"STARHUB_SERVER_DEPLOY_RECONCILE_STUCK_TIMEOUT_MIN" default:"15"`
+		RunningReconcileHour int    `env:"STARHUB_SERVER_DEPLOY_RECONCILE_RUNNING_HOUR" default:"2"`
 	}
 
 	Agent struct {

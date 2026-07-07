@@ -34,4 +34,5 @@ type Runner interface {
 	GetSandbox(ctx context.Context, clusterID, sandboxName string) (*runnerTypes.SandboxDetail, error)
 	CreateDataflowWorkflow(ctx context.Context, req *types.DataflowArgoJobReq) (*types.DataflowArgoJobResp, error)
 	DeleteDataflowWorkflow(ctx context.Context, req *types.DataflowArgoReq) error
+	BatchStatus(ctx context.Context, req *runnerTypes.BatchStatusRequest) (*runnerTypes.BatchStatusResponse, error)
 }

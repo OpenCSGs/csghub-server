@@ -9,6 +9,7 @@ import (
 	"github.com/argoproj/argo-workflows/v3/pkg/apis/workflow/v1alpha1"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
+	"time"
 	"opencsg.com/csghub-server/common/types"
 )
 
@@ -62,6 +63,7 @@ func (h *argoWorkflowExecutorImpl) ProcessEvent(ctx context.Context, event *type
 		if wf.Status == v1alpha1.WorkflowError {
 			// unify error
 			wf.Status = v1alpha1.WorkflowFailed
+			wf.StatusUpdateAt = time.Now()
 		}
 		_, err := h.store.UpdateWorkFlowByTaskID(ctx, wf)
 		if err != nil {

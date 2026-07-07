@@ -67,7 +67,7 @@ func newDeployer(ib imagebuilder.Builder, ir imagerunner.Runner, c common.Deploy
 		deployConfig:          c,
 		userStore:             database.NewUserStore(),
 		clusterStore:          database.NewClusterInfoStore(),
-		lokiClient:            logReporter.GetSender(),
+		lokiClient:            safeGetSender(logReporter),
 		logReporter:           logReporter,
 		argoWorkflowStore:     database.NewArgoWorkFlowStore(),
 		config:                config,

@@ -72,10 +72,9 @@ func TestDeployer_StartDeploy(t *testing.T) {
 	}
 
 	mockTaskStore := mockdb.NewMockDeployTaskStore(t)
-	//make a copy to compare the status
-	dbdeployUpdate := dbdeploy
-	dbdeployUpdate.Status = common.Pending
-	mockTaskStore.EXPECT().UpdateDeploy(mock.Anything, &dbdeployUpdate).Return(nil)
+	mockTaskStore.EXPECT().UpdateDeploy(mock.Anything, mock.MatchedBy(func(d *database.Deploy) bool {
+		return d.ID == dbdeploy.ID && d.Status == common.Pending
+	})).Return(nil)
 
 	buildTask := database.DeployTask{
 		DeployID: dbdeploy.ID,

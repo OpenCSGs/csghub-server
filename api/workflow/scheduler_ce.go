@@ -87,6 +87,23 @@ func RegisterCronJobs(config *config.Config, temporalClient temporal.Client) err
 		return fmt.Errorf("unable to create aigateway async generation schedule, error:%w", err)
 	}
 
+	_, err = scheduler.Create(context.Background(), client.ScheduleOptions{
+		ID: "deploy-reconcile-schedule",
+		Spec: client.ScheduleSpec{
+			CronExpressions: []string{config.DeployReconcile.CronExpression},
+		},
+		Overlap: enumspb.SCHEDULE_OVERLAP_POLICY_SKIP,
+		Action: &client.ScheduleWorkflowAction{
+			ID:        "deploy-reconcile-workflow",
+			TaskQueue: CronJobQueueName,
+			Workflow:  DeployReconcileWorkflow,
+			Args:      []interface{}{},
+		},
+	})
+	if err != nil && err.Error() != types.AlreadyScheduledMessage {
+		return fmt.Errorf("unable to create deploy reconcile schedule, error:%w", err)
+	}
+
 	return nil
 }
 
@@ -99,4 +116,5 @@ func RegisterCronWorker(config *config.Config, temporalClient temporal.Client, a
 	wfWorker.RegisterWorkflow(CalcRecomScoreWorkflow)
 	wfWorker.RegisterWorkflow(DeletePendingDeletionWorkflow)
 	wfWorker.RegisterWorkflow(ProcessAIGatewayAsyncGenerationsWorkflow)
+	wfWorker.RegisterWorkflow(DeployReconcileWorkflow)
 }

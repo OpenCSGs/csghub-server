@@ -125,7 +125,14 @@ func TestDataflowExecutor_ProcessEvent(t *testing.T) {
 
 		mockStore := mockdb.NewMockArgoWorkFlowStore(t)
 		mockStore.EXPECT().FindByTaskID(ctx, "task-456").Return(oldWF, nil)
-		mockStore.EXPECT().UpdateWorkFlowByTaskID(ctx, *updatedWF).Return(updatedWF, nil)
+		mockStore.EXPECT().UpdateWorkFlowByTaskID(ctx, mock.MatchedBy(func(wf database.ArgoWorkflow) bool {
+			return wf.ID == int64(2) &&
+				wf.TaskId == "task-456" &&
+				wf.Status == v1alpha1.WorkflowRunning &&
+				wf.Reason == "old reason" &&
+				wf.Namespace == "old-namespace" &&
+				!wf.StatusUpdateAt.IsZero()
+		})).Return(updatedWF, nil)
 
 		executor := NewTestDataflowExecutor(mockStore)
 		err = executor.ProcessEvent(ctx, event)
@@ -163,7 +170,12 @@ func TestDataflowExecutor_ProcessEvent(t *testing.T) {
 
 		mockStore := mockdb.NewMockArgoWorkFlowStore(t)
 		mockStore.EXPECT().FindByTaskID(ctx, "task-789").Return(oldWF, nil)
-		mockStore.EXPECT().UpdateWorkFlowByTaskID(ctx, *cancelledWF).Return(cancelledWF, nil)
+		mockStore.EXPECT().UpdateWorkFlowByTaskID(ctx, mock.MatchedBy(func(wf database.ArgoWorkflow) bool {
+			return wf.ID == int64(3) &&
+				wf.TaskId == "task-789" &&
+				wf.Status == types.DFCancelled &&
+				!wf.StatusUpdateAt.IsZero()
+		})).Return(cancelledWF, nil)
 		mockStore.EXPECT().DeleteWorkFlow(ctx, oldWF.ID).Return(nil)
 
 		executor := NewTestDataflowExecutor(mockStore)
@@ -202,7 +214,12 @@ func TestDataflowExecutor_ProcessEvent(t *testing.T) {
 
 		mockStore := mockdb.NewMockArgoWorkFlowStore(t)
 		mockStore.EXPECT().FindByTaskID(ctx, "task-running").Return(oldWF, nil)
-		mockStore.EXPECT().UpdateWorkFlowByTaskID(ctx, *cancelledWF).Return(cancelledWF, nil)
+		mockStore.EXPECT().UpdateWorkFlowByTaskID(ctx, mock.MatchedBy(func(wf database.ArgoWorkflow) bool {
+			return wf.ID == int64(4) &&
+				wf.TaskId == "task-running" &&
+				wf.Status == types.DFCancelled &&
+				!wf.StatusUpdateAt.IsZero()
+		})).Return(cancelledWF, nil)
 		mockStore.EXPECT().DeleteWorkFlow(ctx, oldWF.ID).Return(nil)
 
 		executor := NewTestDataflowExecutor(mockStore)
@@ -336,15 +353,14 @@ func TestDataflowExecutor_ProcessEvent(t *testing.T) {
 			Status: v1alpha1.WorkflowPending,
 		}
 
-		updatedWF := &database.ArgoWorkflow{
-			ID:     7,
-			TaskId: "task-update-error",
-			Status: v1alpha1.WorkflowRunning,
-		}
-
 		mockStore := mockdb.NewMockArgoWorkFlowStore(t)
 		mockStore.EXPECT().FindByTaskID(ctx, "task-update-error").Return(oldWF, nil)
-		mockStore.EXPECT().UpdateWorkFlowByTaskID(ctx, *updatedWF).Return(nil, errors.New("update failed"))
+		mockStore.EXPECT().UpdateWorkFlowByTaskID(ctx, mock.MatchedBy(func(wf database.ArgoWorkflow) bool {
+			return wf.ID == int64(7) &&
+				wf.TaskId == "task-update-error" &&
+				wf.Status == v1alpha1.WorkflowRunning &&
+				!wf.StatusUpdateAt.IsZero()
+		})).Return(nil, errors.New("update failed"))
 
 		executor := NewTestDataflowExecutor(mockStore)
 		err = executor.ProcessEvent(ctx, event)

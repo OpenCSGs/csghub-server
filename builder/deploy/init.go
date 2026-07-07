@@ -6,6 +6,7 @@ import (
 
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/component/reporter"
+	"opencsg.com/csghub-server/component/reporter/sender"
 
 	"opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/builder/deploy/imagebuilder"
@@ -45,4 +46,21 @@ func Init(c common.DeployConfig, config *config.Config, startJobs bool) error {
 
 func NewDeployer() Deployer {
 	return defaultDeployer
+}
+
+// NewDeployerForReconcile creates a lightweight Deployer for reconcile cron jobs.
+// It does NOT start accounting/runtime jobs, and does not require a logReporter or imageBuilder.
+func NewDeployerForReconcile(cfg *config.Config, c common.DeployConfig) (Deployer, error) {
+	ir, err := imagerunner.NewRemoteRunner(c.ImageRunnerURL, c)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create image runner for reconcile deployer: %w", err)
+	}
+	return newDeployer(nil, ir, c, nil, cfg, false)
+}
+
+func safeGetSender(lr reporter.LogCollector) sender.LogSender {
+	if lr == nil {
+		return nil
+	}
+	return lr.GetSender()
 }

@@ -67,6 +67,9 @@ type Deployer interface {
 	CreateDataflowJob(ctx context.Context, req *types.DataflowArgoJobReq) (*types.DataflowArgoJobResp, error)
 	DeleteDataflowJob(ctx context.Context, req *types.DataflowArgoReq) error
 	DeleteSandbox(ctx context.Context, req *runnerTypes.SandboxDeleteRequest) error
+	GetWorkFlow(ctx context.Context, req types.ArgoWorkFlowDeleteReq) (*types.ArgoWorkFlowRes, error)
+	GetSandbox(ctx context.Context, clusterID, sandboxName string) (*runnerTypes.SandboxDetail, error)
+	BatchStatus(ctx context.Context, req *runnerTypes.BatchStatusRequest) (*runnerTypes.BatchStatusResponse, error)
 }
 
 func (d *deployer) generateUniqueSvcName(dr types.DeployRequest) string {
@@ -807,6 +810,7 @@ func hasGGUFEntryPoint(variables *string, existingVariables string) bool {
 
 func (d *deployer) StartDeploy(ctx context.Context, deploy *database.Deploy) error {
 	deploy.Status = common.Pending
+	deploy.StatusUpdateAt = time.Now()
 	// update deploy table
 	err := d.deployTaskStore.UpdateDeploy(ctx, deploy)
 	if err != nil {
@@ -1189,6 +1193,12 @@ func (d *deployer) CheckClusterHealthy(ctx context.Context, deployId string) boo
 func (d *deployer) IsDefaultScheduler(VXPUConfig map[string]string) bool {
 	return common.GenerateScheduler(VXPUConfig) == nil
 }
+func (d *deployer) GetWorkFlow(ctx context.Context, req types.ArgoWorkFlowDeleteReq) (*types.ArgoWorkFlowRes, error) {
+	return d.imageRunner.GetWorkFlow(ctx, req)
+}
+func (d *deployer) GetSandbox(ctx context.Context, clusterID, sandboxName string) (*runnerTypes.SandboxDetail, error) {
+	return d.imageRunner.GetSandbox(ctx, clusterID, sandboxName)
+}
 
 func (d *deployer) GetSharedModeResourceName(VXPUConfig map[string]string) string {
 	resourceName := common.DefaultResourceName
@@ -1196,4 +1206,9 @@ func (d *deployer) GetSharedModeResourceName(VXPUConfig map[string]string) strin
 		resourceName = VXPUConfig[types.ClusterCFGVGPUResourceReqKey]
 	}
 	return resourceName
+}
+
+
+func (d *deployer) BatchStatus(ctx context.Context, req *runnerTypes.BatchStatusRequest) (*runnerTypes.BatchStatusResponse, error) {
+	return d.imageRunner.BatchStatus(ctx, req)
 }

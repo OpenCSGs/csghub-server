@@ -58,15 +58,15 @@ func TestWebHookExecutorKService_ProcessEvent(t *testing.T) {
 		SvcName: event.ServiceName,
 	}, nil)
 
-	dts.EXPECT().UpdateDeploy(ctx, &database.Deploy{
-		ID:          int64(1),
-		Status:      event.Status,
-		SvcName:     event.ServiceName,
-		Message:     event.Message,
-		Reason:      event.Reason,
-		ClusterNode: event.ClusterNode,
-		Instances:   event.Instances,
-	}).Return(nil)
+	dts.EXPECT().UpdateDeploy(ctx, mock.MatchedBy(func(d *database.Deploy) bool {
+		return d.ID == int64(1) &&
+			d.Status == event.Status &&
+			d.SvcName == event.ServiceName &&
+			d.Message == event.Message &&
+			d.Reason == event.Reason &&
+			d.ClusterNode == event.ClusterNode &&
+			!d.StatusUpdateAt.IsZero()
+	})).Return(nil)
 
 	exec := NewTestKServiceExecutor(cfg, dts)
 

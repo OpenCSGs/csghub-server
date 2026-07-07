@@ -3,7 +3,11 @@
 package activity
 
 import (
+	"log/slog"
+
 	aigatewaytask "opencsg.com/csghub-server/aigateway/task"
+	"opencsg.com/csghub-server/builder/deploy"
+	"opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
@@ -13,6 +17,8 @@ import (
 
 type stores struct {
 	syncClientSetting database.SyncClientSettingStore
+	deployTask        database.DeployTaskStore
+	argoWorkFlow      database.ArgoWorkFlowStore
 }
 
 type Activities struct {
@@ -26,6 +32,10 @@ type Activities struct {
 	industryTag            component.IndustryTagComponent
 	asyncGenerationService aigatewaytask.AsyncGenerationService
 	stores                 stores
+
+	// Deploy reconcile
+	deployer     deploy.Deployer
+	deployConfig common.DeployConfig
 }
 
 func NewActivities(
@@ -42,6 +52,8 @@ func NewActivities(
 ) *Activities {
 	stores := stores{
 		syncClientSetting: syncClientSetting,
+		deployTask:        database.NewDeployTaskStore(),
+		argoWorkFlow:      database.NewArgoWorkFlowStore(),
 	}
 
 	return &Activities{
@@ -55,5 +67,17 @@ func NewActivities(
 		repoComponent:          repoComponent,
 		industryTag:            industryTag,
 		asyncGenerationService: asyncGenerationService,
+		deployer:               newDeployerForReconcile(cfg),
+		deployConfig:           common.BuildDeployConfig(cfg),
 	}
+}
+
+func newDeployerForReconcile(cfg *config.Config) deploy.Deployer {
+	dc := common.BuildDeployConfig(cfg)
+	d, err := deploy.NewDeployerForReconcile(cfg, dc)
+	if err != nil {
+		slog.Error("failed to create deployer for reconcile", "error", err)
+		return nil
+	}
+	return d
 }

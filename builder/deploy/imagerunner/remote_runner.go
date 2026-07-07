@@ -644,3 +644,22 @@ func (h *RemoteRunner) DeleteDataflowWorkflow(ctx context.Context, req *types.Da
 	defer response.Body.Close()
 	return nil
 }
+
+
+func (h *RemoteRunner) BatchStatus(ctx context.Context, req *runnerTypes.BatchStatusRequest) (*runnerTypes.BatchStatusResponse, error) {
+	remote, err := h.GetRemoteRunnerHost(ctx, req.ClusterID)
+	if err != nil {
+		return nil, err
+	}
+	url := fmt.Sprintf("%s/api/v1/batch-status", remote)
+	response, err := h.doRequest(ctx, http.MethodPost, url, req)
+	if err != nil {
+		return nil, err
+	}
+	defer response.Body.Close()
+	var res runnerTypes.BatchStatusResponse
+	if err := json.NewDecoder(response.Body).Decode(&res); err != nil {
+		return nil, errorx.InternalServerError(err, nil)
+	}
+	return &res, nil
+}

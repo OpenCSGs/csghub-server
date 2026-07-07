@@ -340,6 +340,7 @@ func (a *DeployActivity) updateDeployTaskStatus(task *database.DeployTask, servi
 	task.Status = DeployStatusDeploying
 	task.Message = "deploy in progress"
 	task.Deploy.Status = common.Deploying
+	task.Deploy.StatusUpdateAt = time.Now()
 
 	if len(serviceName) > 0 {
 		task.Deploy.SvcName = serviceName
@@ -393,6 +394,7 @@ func (a *DeployActivity) handleRepositoryNotFound(task *database.DeployTask) err
 	task.Status = common.TaskStatusBuildFailed
 	task.Message = "repository not found, please check the repository path"
 	task.Deploy.Status = common.BuildFailed
+	task.Deploy.StatusUpdateAt = time.Now()
 	if err := a.updateTaskStatus(task); err != nil {
 		return fmt.Errorf("handleRepositoryNotFound failed to update deploy task %d status: %w", task.ID, err)
 	}

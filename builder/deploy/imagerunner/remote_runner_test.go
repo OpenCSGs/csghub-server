@@ -19,6 +19,7 @@ import (
 	mockdb "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/types"
+	runnerTypes "opencsg.com/csghub-server/runner/types"
 )
 
 // mockHTTPClient for intercepting HTTP requests
@@ -866,4 +867,41 @@ func TestRemoteRunner_DeleteDataflowWorkflow_HTTPError(t *testing.T) {
 	if !strings.Contains(err.Error(), "failed to delete dataflow workflow") {
 		t.Errorf("expected error message to contain 'failed to delete dataflow workflow', got %v", err)
 	}
+}
+
+func TestRemoteRunner_BatchStatus(t *testing.T) {
+	req := &runnerTypes.BatchStatusRequest{
+		ClusterID: "c1",
+		Items: []runnerTypes.BatchStatusItem{
+			{Type: runnerTypes.ResourceTypeKsvc, Name: "svc-1"},
+			{Type: runnerTypes.ResourceTypeSandbox, Name: "sandbox-1"},
+		},
+	}
+
+	expectedResp := &runnerTypes.BatchStatusResponse{
+		Items: []runnerTypes.BatchStatusItemResult{
+			{Type: runnerTypes.ResourceTypeKsvc, Name: "svc-1", Code: 23},
+			{Type: runnerTypes.ResourceTypeSandbox, Name: "sandbox-1", Status: 23},
+		},
+	}
+
+	mockHTTP := &mockHTTPClient{
+		doFunc: func(req *http.Request) (*http.Response, error) {
+			b, _ := json.Marshal(expectedResp)
+			return &http.Response{StatusCode: 200, Body: io.NopCloser(bytes.NewReader(b))}, nil
+		},
+	}
+
+	mockStore := mockdb.NewMockClusterInfoStore(t)
+	mockStore.EXPECT().ByClusterID(context.Background(), "c1").Return(database.ClusterInfo{
+		ClusterID: "c1", RunnerEndpoint: "http://runner:8080", Mode: types.ConnectModeInCluster,
+	}, nil)
+
+	runner := &RemoteRunner{clusterStore: mockStore, client: mockHTTP}
+	got, err := runner.BatchStatus(context.Background(), req)
+
+	require.NoError(t, err)
+	require.Len(t, got.Items, 2)
+	require.Equal(t, "svc-1", got.Items[0].Name)
+	require.Equal(t, 23, got.Items[0].Code)
 }
