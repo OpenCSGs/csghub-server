@@ -190,8 +190,8 @@ type PDConfig struct {
 }
 
 // PDRoleRuntimeConfig holds the runtime parallelism and hardware resource
-// configuration for one PD role (prefill or decode). This is derived from
-// the PDRecommendation and the user's hardware input, split proportionally.
+// configuration for one PD role (prefill or decode). This is provided by the
+// client and validated/supplemented by the server.
 type PDRoleRuntimeConfig struct {
 	// TP is the tensor parallelism degree.
 	TP int `json:"tp"`
@@ -199,8 +199,12 @@ type PDRoleRuntimeConfig struct {
 	EP int `json:"ep"`
 	// DP is the data parallelism degree.
 	DP int `json:"dp"`
-	// TotalGPUs is the total GPUs for this role (TP * EP * DP).
+	// TotalGPUs is the total GPUs for this role (TP * DP). EP does not add extra GPUs.
 	TotalGPUs int `json:"total_gpus"`
+	// PodsSize is the number of pods per LWS group (maps to LWS spec.leaderWorkerTemplate.size).
+	// Each pod runs one vLLM/SGLang instance. GPUs per pod = TotalGPUs / PodsSize.
+	// When PodsSize is 0 or 1, all GPUs are in a single pod.
+	PodsSize int `json:"pods_size,omitempty"`
 	// Hardware is the hardware resource allocated to this role.
 	Hardware HardWare `json:"hardware"`
 }
