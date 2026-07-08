@@ -2027,7 +2027,7 @@ func (h *RepoHandler) GetRepoSizeByBranch(ctx *gin.Context) {
 	branch := ctx.Param("branch")
 	repoType := common.RepoTypeFromContext(ctx)
 
-	size, err := h.c.GetRepoSizeByBranch(ctx.Request.Context(), repoType, namespace, name, branch, currentUser)
+	resp, err := h.c.GetRepoSizeByBranch(ctx.Request.Context(), repoType, namespace, name, branch, currentUser)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "Failed to get repo size", slog.String("repo_type", string(repoType)), slog.Any("error", err), slog.String("namespace", namespace), slog.String("name", name), slog.String("branch", branch))
 		if errors.Is(err, errorx.ErrForbidden) {
@@ -2042,8 +2042,8 @@ func (h *RepoHandler) GetRepoSizeByBranch(ctx *gin.Context) {
 		return
 	}
 
-	slog.Debug("Get repo size succeed", slog.String("repo_type", string(repoType)), slog.String("namespace", namespace), slog.String("name", name), slog.String("branch", branch), slog.Any("size", size))
-	httpbase.OK(ctx, size)
+	slog.Debug("Get repo size succeed", slog.String("repo_type", string(repoType)), slog.String("namespace", namespace), slog.String("name", name), slog.String("branch", branch), slog.Any("total_size", resp.TotalSize), slog.Any("last_commit_size", resp.LastCommitSize))
+	httpbase.OK(ctx, resp)
 }
 
 // BatchGetRepoExtra godoc

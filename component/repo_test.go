@@ -2592,12 +2592,12 @@ func TestRepoComponent_GetRepoSizeByBranch(t *testing.T) {
 		}
 		repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(mock.Anything, types.ModelRepo, ns.Path, repo.Name).Return(repo, nil)
 
-		stats := database.RepositoryStatistics{TotalSize: 1024}
+		stats := database.RepositoryStatistics{TotalSize: 1024, LastCommitSize: 512}
 		repoComp.mocks.stores.RepositoryStatisticsMock().EXPECT().FindByRepositoryIDAndBranch(mock.Anything, repo.ID, "main").Return(&stats, nil)
 
-		size, err := repoComp.GetRepoSizeByBranch(ctx, types.ModelRepo, ns.Path, repo.Name, "main", user.Username)
+		resp, err := repoComp.GetRepoSizeByBranch(ctx, types.ModelRepo, ns.Path, repo.Name, "main", user.Username)
 		require.Nil(t, err)
-		require.Equal(t, int64(1024), size)
+		require.Equal(t, types.RepoSizeResponse{TotalSize: 1024, LastCommitSize: 512}, resp)
 	})
 
 	t.Run("should return error when repo not found", func(t *testing.T) {
@@ -2606,9 +2606,9 @@ func TestRepoComponent_GetRepoSizeByBranch(t *testing.T) {
 
 		repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(mock.Anything, types.ModelRepo, "namespace", "name").Return(nil, errors.New("repo not found"))
 
-		size, err := repoComp.GetRepoSizeByBranch(ctx, types.ModelRepo, "namespace", "name", "main", "user_name")
+		resp, err := repoComp.GetRepoSizeByBranch(ctx, types.ModelRepo, "namespace", "name", "main", "user_name")
 		require.Error(t, err)
-		require.Equal(t, int64(0), size)
+		require.Equal(t, types.RepoSizeResponse{}, resp)
 	})
 
 	t.Run("should return error when user has no read permission", func(t *testing.T) {
@@ -2632,9 +2632,9 @@ func TestRepoComponent_GetRepoSizeByBranch(t *testing.T) {
 		}
 		repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(mock.Anything, types.ModelRepo, ns.Path, repo.Name).Return(repo, nil)
 
-		size, err := repoComp.GetRepoSizeByBranch(ctx, types.ModelRepo, ns.Path, repo.Name, "main", user.Username)
+		resp, err := repoComp.GetRepoSizeByBranch(ctx, types.ModelRepo, ns.Path, repo.Name, "main", user.Username)
 		require.Error(t, err)
-		require.Equal(t, int64(0), size)
+		require.Equal(t, types.RepoSizeResponse{}, resp)
 	})
 
 	t.Run("should return error when repo statistics not found", func(t *testing.T) {
@@ -2660,9 +2660,9 @@ func TestRepoComponent_GetRepoSizeByBranch(t *testing.T) {
 
 		repoComp.mocks.stores.RepositoryStatisticsMock().EXPECT().FindByRepositoryIDAndBranch(mock.Anything, repo.ID, "main").Return(nil, errorx.ErrNotFound)
 
-		size, err := repoComp.GetRepoSizeByBranch(ctx, types.ModelRepo, ns.Path, repo.Name, "main", user.Username)
+		resp, err := repoComp.GetRepoSizeByBranch(ctx, types.ModelRepo, ns.Path, repo.Name, "main", user.Username)
 		require.Error(t, err)
-		require.Equal(t, int64(0), size)
+		require.Equal(t, types.RepoSizeResponse{}, resp)
 		require.True(t, errors.Is(err, errorx.ErrNotFound))
 	})
 }
@@ -2685,14 +2685,14 @@ func TestRepoComponent_BatchGetRepoExtra(t *testing.T) {
 		repoComp.mocks.stores.RepoMock().EXPECT().FindByIds(ctx, []int64{1, 2}).Return(repos, nil)
 
 		stats := []*database.RepositoryStatistics{
-			{RepositoryID: 1, Branch: "main", TotalSize: 1024},
+			{RepositoryID: 1, Branch: "main", TotalSize: 1024, LastCommitSize: 100},
 			{RepositoryID: 2, Branch: "main", TotalSize: 2048},
 		}
 		repoComp.mocks.stores.RepositoryStatisticsMock().EXPECT().FindByRepositoryIDs(ctx, []int64{1, 2}).Return(stats, nil)
 
 		result, err := repoComp.BatchGetRepoExtra(ctx, []int64{1, 2}, "admin")
 		require.Nil(t, err)
-		require.Equal(t, []types.RepoExtraItem{{RepoID: 1, Size: 1024}, {RepoID: 2, Size: 2048}}, result)
+		require.Equal(t, []types.RepoExtraItem{{RepoID: 1, Size: 1024, LastCommitSize: 100}, {RepoID: 2, Size: 2048}}, result)
 	})
 
 	t.Run("regular user can read own repos and public repos", func(t *testing.T) {

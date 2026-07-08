@@ -685,18 +685,26 @@ func (c *gitCallbackComponentImpl) CalculateRepoSize(ctx context.Context, req *t
 	// Calculate total size
 	totalSize := nonLfsSize + lfsSize
 
+	// Calculate last commit size
+	lastCommitSize, err := c.gitServer.GetLastCommitSize(ctx, repoInfoReq)
+	if err != nil {
+		slog.Error("failed to get last commit size", slog.Any("error", err), slog.Any("repo_id", repo.ID), slog.String("branch", branchName))
+		return err
+	}
+
 	// Check if repository statistics already exists for this branch
 	existingStats, err := c.repositoryStatisticsStore.FindByRepositoryIDAndBranch(ctx, repo.ID, branchName)
 	if err != nil || existingStats == nil {
 		// If not found, create a new record
 		stats := &database.RepositoryStatistics{
-			RepositoryID: repo.ID,
-			Branch:       branchName,
-			TotalSize:    totalSize,
-			NonLfsSize:   nonLfsSize,
-			LfsSize:      lfsSize,
-			CreatedAt:    time.Now(),
-			UpdatedAt:    time.Now(),
+			RepositoryID:   repo.ID,
+			Branch:         branchName,
+			TotalSize:      totalSize,
+			NonLfsSize:     nonLfsSize,
+			LfsSize:        lfsSize,
+			LastCommitSize: lastCommitSize,
+			CreatedAt:      time.Now(),
+			UpdatedAt:      time.Now(),
 		}
 		err = c.repositoryStatisticsStore.Create(ctx, stats)
 		if err != nil {
@@ -708,6 +716,7 @@ func (c *gitCallbackComponentImpl) CalculateRepoSize(ctx context.Context, req *t
 		existingStats.TotalSize = totalSize
 		existingStats.NonLfsSize = nonLfsSize
 		existingStats.LfsSize = lfsSize
+		existingStats.LastCommitSize = lastCommitSize
 		existingStats.UpdatedAt = time.Now()
 		err = c.repositoryStatisticsStore.Update(ctx, existingStats)
 		if err != nil {
@@ -716,7 +725,7 @@ func (c *gitCallbackComponentImpl) CalculateRepoSize(ctx context.Context, req *t
 		}
 	}
 
-	slog.Info("calculated repo size for branch", slog.Any("repo_id", repo.ID), slog.String("branch", branchName), slog.Any("total_size", totalSize), slog.Any("non_lfs_size", nonLfsSize), slog.Any("lfs_size", lfsSize))
+	slog.Info("calculated repo size for branch", slog.Any("repo_id", repo.ID), slog.String("branch", branchName), slog.Any("total_size", totalSize), slog.Any("non_lfs_size", nonLfsSize), slog.Any("lfs_size", lfsSize), slog.Any("last_commit_size", lastCommitSize))
 
 	return nil
 }

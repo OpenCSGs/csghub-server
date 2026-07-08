@@ -129,6 +129,10 @@ func (c *Client) GetRepoLfsSize(ctx context.Context, req gitserver.GetRepoInfoBy
 	return 0, nil
 }
 
+func (c *Client) GetLastCommitSize(ctx context.Context, req gitserver.GetRepoInfoByPathReq) (int64, error) {
+	return 0, nil
+}
+
 func (c *Client) CreateFork(ctx context.Context, req gitserver.CreateForkReq) error {
 	return nil
 }

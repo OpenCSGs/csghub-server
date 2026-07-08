@@ -242,6 +242,7 @@ func TestGitCallbackComponentImpl_CalculateRepoSize(t *testing.T) {
 		}
 		gc.mocks.gitServer.EXPECT().GetRepoSize(ctx, repoInfoReq).Return(int64(1024), nil)
 		gc.mocks.gitServer.EXPECT().GetRepoLfsSize(ctx, repoInfoReq).Return(int64(2048), nil)
+		gc.mocks.gitServer.EXPECT().GetLastCommitSize(ctx, repoInfoReq).Return(int64(512), nil)
 
 		// Expectations for repository statistics
 		gc.mocks.stores.RepositoryStatisticsMock().EXPECT().FindByRepositoryIDAndBranch(ctx, repo.ID, branchName).Return(nil, nil)
@@ -274,14 +275,16 @@ func TestGitCallbackComponentImpl_CalculateRepoSize(t *testing.T) {
 		}
 		gc.mocks.gitServer.EXPECT().GetRepoSize(ctx, repoInfoReq).Return(int64(1024), nil)
 		gc.mocks.gitServer.EXPECT().GetRepoLfsSize(ctx, repoInfoReq).Return(int64(2048), nil)
+		gc.mocks.gitServer.EXPECT().GetLastCommitSize(ctx, repoInfoReq).Return(int64(512), nil)
 
 		// Expectations for repository statistics
 		existingStats := &database.RepositoryStatistics{
-			RepositoryID: repo.ID,
-			Branch:       branchName,
-			TotalSize:    1000,
-			NonLfsSize:   500,
-			LfsSize:      500,
+			RepositoryID:   repo.ID,
+			Branch:         branchName,
+			TotalSize:      1000,
+			NonLfsSize:     500,
+			LfsSize:        500,
+			LastCommitSize: 256,
 		}
 		gc.mocks.stores.RepositoryStatisticsMock().EXPECT().FindByRepositoryIDAndBranch(ctx, repo.ID, branchName).Return(existingStats, nil)
 		gc.mocks.stores.RepositoryStatisticsMock().EXPECT().Update(ctx, mock.Anything).Return(nil)

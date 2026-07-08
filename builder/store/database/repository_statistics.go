@@ -15,9 +15,10 @@ type RepositoryStatistics struct {
 	Branch       string    `bun:"branch,notnull"`
 	TotalSize    int64     `bun:"total_size,notnull,default:0"`
 	NonLfsSize   int64     `bun:"non_lfs_size,notnull,default:0"`
-	LfsSize      int64     `bun:"lfs_size,notnull,default:0"`
-	CreatedAt    time.Time `bun:"created_at,notnull,default:current_timestamp"`
-	UpdatedAt    time.Time `bun:"updated_at,notnull,default:current_timestamp"`
+	LfsSize        int64     `bun:"lfs_size,notnull,default:0"`
+	LastCommitSize int64     `bun:"last_commit_size,notnull,default:0"`
+	CreatedAt      time.Time `bun:"created_at,notnull,default:current_timestamp"`
+	UpdatedAt      time.Time `bun:"updated_at,notnull,default:current_timestamp"`
 
 	// Relations
 	Repository *Repository `bun:"rel:belongs-to,join:repository_id=id"`

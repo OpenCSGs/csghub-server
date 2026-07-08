@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/mock"
@@ -245,5 +246,180 @@ func TestStripZipPrefix(t *testing.T) {
 		_, err = stripZipPrefix(buf.Bytes(), "my-repo")
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "no files matched prefix")
+	})
+}
+
+func TestGitalyRepo_GetLastCommitSize(t *testing.T) {
+	repoInfoReq := gitserver.GetRepoInfoByPathReq{
+		Namespace: "ns",
+		Name:      "repo",
+		Ref:       "main",
+		Path:      "",
+		RepoType:  types.ModelRepo,
+		File:      false,
+	}
+
+	t.Run("success", func(t *testing.T) {
+		tester := newGitalyTester(t)
+		ctx := context.TODO()
+
+		tester.mocks.repoStore.EXPECT().FindByPath(mock.Anything, types.ModelRepo, "ns", "repo").Return(&database.Repository{
+			ID:     1,
+			Hashed: false,
+		}, nil)
+
+		// ListFiles returns all file paths at HEAD
+		tester.mocks.commitClient.EXPECT().ListFiles(mock.Anything, &gitalypb.ListFilesRequest{
+			Repository: &gitalypb.Repository{
+				StorageName:  "st",
+				RelativePath: "models_ns/repo.git",
+			},
+			Revision: []byte("main"),
+		}).Return(&MockGrpcStreamClient[*gitalypb.ListFilesResponse]{
+			data: []*gitalypb.ListFilesResponse{
+				{Paths: [][]byte{[]byte("README.md"), []byte("model.pth")}},
+			},
+		}, nil)
+
+		// GetBlobs returns blob sizes for all files
+		tester.mocks.blobClient.EXPECT().GetBlobs(mock.Anything, &gitalypb.GetBlobsRequest{
+			Repository: &gitalypb.Repository{
+				StorageName:  "st",
+				RelativePath: "models_ns/repo.git",
+			},
+			RevisionPaths: []*gitalypb.GetBlobsRequest_RevisionPath{
+				{Revision: "main", Path: []byte("README.md")},
+				{Revision: "main", Path: []byte("model.pth")},
+			},
+			Limit: 0,
+		}).Return(&MockGrpcStreamClient[*gitalypb.GetBlobsResponse]{
+			data: []*gitalypb.GetBlobsResponse{
+				{Size: 1024, Oid: "oid1", Path: []byte("README.md"), Type: gitalypb.ObjectType_BLOB},
+				{Size: 2048, Oid: "oid2", Path: []byte("model.pth"), Type: gitalypb.ObjectType_BLOB},
+			},
+		}, nil)
+
+		// GetLFSPointers returns LFS file sizes
+		tester.mocks.blobClient.EXPECT().GetLFSPointers(mock.Anything, &gitalypb.GetLFSPointersRequest{
+			Repository: &gitalypb.Repository{
+				StorageName:  "st",
+				RelativePath: "models_ns/repo.git",
+			},
+			BlobIds: []string{"oid1", "oid2"},
+		}).Return(&MockGrpcStreamClient[*gitalypb.GetLFSPointersResponse]{
+			data: []*gitalypb.GetLFSPointersResponse{
+				{
+					LfsPointers: []*gitalypb.LFSPointer{
+						{Size: 130, FileSize: 1000000, Oid: "oid2"},
+					},
+				},
+			},
+		}, nil)
+
+		size, err := tester.GetLastCommitSize(ctx, repoInfoReq)
+		require.NoError(t, err)
+		// blob: 1024 + 2048 = 3072, LFS: 1000000, total: 1003072
+		require.Equal(t, int64(1003072), size)
+	})
+
+	t.Run("empty repo", func(t *testing.T) {
+		tester := newGitalyTester(t)
+		ctx := context.TODO()
+
+		tester.mocks.repoStore.EXPECT().FindByPath(mock.Anything, types.ModelRepo, "ns", "repo").Return(&database.Repository{
+			ID:     1,
+			Hashed: false,
+		}, nil)
+
+		tester.mocks.commitClient.EXPECT().ListFiles(mock.Anything, mock.Anything).Return(&MockGrpcStreamClient[*gitalypb.ListFilesResponse]{
+			data: []*gitalypb.ListFilesResponse{},
+		}, nil)
+
+		size, err := tester.GetLastCommitSize(ctx, repoInfoReq)
+		require.NoError(t, err)
+		require.Equal(t, int64(0), size)
+	})
+
+	t.Run("ListFiles error", func(t *testing.T) {
+		tester := newGitalyTester(t)
+		ctx := context.TODO()
+
+		tester.mocks.repoStore.EXPECT().FindByPath(mock.Anything, types.ModelRepo, "ns", "repo").Return(&database.Repository{
+			ID:     1,
+			Hashed: false,
+		}, nil)
+
+		tester.mocks.commitClient.EXPECT().ListFiles(mock.Anything, mock.Anything).Return(nil, fmt.Errorf("list files failed"))
+
+		_, err := tester.GetLastCommitSize(ctx, repoInfoReq)
+		require.Error(t, err)
+	})
+
+	t.Run("batches GetBlobs calls for large file counts", func(t *testing.T) {
+		tester := newGitalyTester(t)
+		ctx := context.TODO()
+
+		tester.mocks.repoStore.EXPECT().FindByPath(mock.Anything, types.ModelRepo, "ns", "repo").Return(&database.Repository{
+			ID:     1,
+			Hashed: false,
+		}, nil)
+
+		// Build 1001 paths to trigger 2 batches (batch size = 1000)
+		var allPaths [][]byte
+		for j := 0; j < 1001; j++ {
+			allPaths = append(allPaths, []byte(fmt.Sprintf("file_%d.txt", j)))
+		}
+		tester.mocks.commitClient.EXPECT().ListFiles(mock.Anything, mock.Anything).Return(&MockGrpcStreamClient[*gitalypb.ListFilesResponse]{
+			data: []*gitalypb.ListFilesResponse{
+				{Paths: allPaths},
+			},
+		}, nil)
+
+		// First batch: 1000 files
+		tester.mocks.blobClient.EXPECT().GetBlobs(mock.Anything, mock.MatchedBy(func(req *gitalypb.GetBlobsRequest) bool {
+			return len(req.RevisionPaths) == 1000
+		})).Return(&MockGrpcStreamClient[*gitalypb.GetBlobsResponse]{
+			data: []*gitalypb.GetBlobsResponse{
+				{Size: 1, Oid: "oid1"},
+			},
+		}, nil)
+
+		// Second batch: 1 file
+		tester.mocks.blobClient.EXPECT().GetBlobs(mock.Anything, mock.MatchedBy(func(req *gitalypb.GetBlobsRequest) bool {
+			return len(req.RevisionPaths) == 1
+		})).Return(&MockGrpcStreamClient[*gitalypb.GetBlobsResponse]{
+			data: []*gitalypb.GetBlobsResponse{
+				{Size: 1, Oid: "oid2"},
+			},
+		}, nil)
+
+		tester.mocks.blobClient.EXPECT().GetLFSPointers(mock.Anything, mock.Anything).Return(&MockGrpcStreamClient[*gitalypb.GetLFSPointersResponse]{
+			data: []*gitalypb.GetLFSPointersResponse{},
+		}, nil)
+
+		size, err := tester.GetLastCommitSize(ctx, repoInfoReq)
+		require.NoError(t, err)
+		require.Equal(t, int64(2), size)
+	})
+
+	t.Run("GetBlobs error", func(t *testing.T) {
+		tester := newGitalyTester(t)
+		ctx := context.TODO()
+
+		tester.mocks.repoStore.EXPECT().FindByPath(mock.Anything, types.ModelRepo, "ns", "repo").Return(&database.Repository{
+			ID:     1,
+			Hashed: false,
+		}, nil)
+
+		tester.mocks.commitClient.EXPECT().ListFiles(mock.Anything, mock.Anything).Return(&MockGrpcStreamClient[*gitalypb.ListFilesResponse]{
+			data: []*gitalypb.ListFilesResponse{
+				{Paths: [][]byte{[]byte("README.md")}},
+			},
+		}, nil)
+
+		tester.mocks.blobClient.EXPECT().GetBlobs(mock.Anything, mock.Anything).Return(nil, fmt.Errorf("get blobs failed"))
+
+		_, err := tester.GetLastCommitSize(ctx, repoInfoReq)
+		require.Error(t, err)
 	})
 }
