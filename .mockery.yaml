@@ -148,6 +148,10 @@ packages:
     config:
     interfaces:
       Deployer:
+        config:
+          replace-type:
+            - opencsg.com/csghub-server/common/types.ClawEvaluationReq=commontypes:opencsg.com/csghub-server/common/types.ClawEvaluationReq
+            - opencsg.com/csghub-server/common/types.ArgoWorkFlowRes=commontypes:opencsg.com/csghub-server/common/types.ArgoWorkFlowRes
   opencsg.com/csghub-server/builder/deploy/cluster:
     config:
     interfaces:

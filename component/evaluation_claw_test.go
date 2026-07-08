@@ -9,9 +9,9 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	mockdeploy "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/deploy"
-	mockComps "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
-	mockdb "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/database"
 	mockrpc "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/rpc"
+	mockdb "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/database"
+	mockComps "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
 	"opencsg.com/csghub-server/builder/deploy"
 	"opencsg.com/csghub-server/builder/git/membership"
 	"opencsg.com/csghub-server/builder/loki"
@@ -113,7 +113,7 @@ func TestEvaluationComponent_CreateClawEvaluation_AutoBuiltinJudgeAPIKey(t *test
 		TaskName:           "claw-job",
 		RuntimeFrameworkId: 1,
 		ResourceId:         2,
-		Model:              "glm-5.1",
+		ModelId:            "glm-5.1",
 		BaseURL:            "http://localhost:11435/v1",
 		Tasks:              "T001",
 	}
@@ -142,7 +142,8 @@ func TestEvaluationComponent_CreateClawEvaluation_AutoBuiltinJudgeAPIKey(t *test
 		Token: "gk-builtin-key",
 	}, nil)
 	mockDeployer.EXPECT().SubmitClawEvaluation(ctx, mock.MatchedBy(func(r types.ClawEvaluationReq) bool {
-		return r.ApiKey == "" &&
+		return r.ApiKey == "gk-builtin-key" &&
+			r.Model == "glm-5.1" &&
 			r.JudgeApiKey == "gk-builtin-key" &&
 			r.JudgeBaseURL == "http://aigateway.test/v1"
 	})).Return(&types.ArgoWorkFlowRes{ID: 2}, nil)
@@ -191,7 +192,7 @@ func TestEvaluationComponent_CreateClawEvaluation_AutoJudgeAPIKeyFallback(t *tes
 		ctx, "user1", "user1", string(types.AccessTokenAppAIGateway), "claw-eval",
 	).Return("gk-fallback-key", nil)
 	mockDeployer.EXPECT().SubmitClawEvaluation(ctx, mock.MatchedBy(func(r types.ClawEvaluationReq) bool {
-		return r.ApiKey == "" &&
+		return r.ApiKey == "gk-fallback-key" &&
 			r.JudgeApiKey == "gk-fallback-key" &&
 			r.JudgeBaseURL == "http://aigateway.test/v1"
 	})).Return(&types.ArgoWorkFlowRes{ID: 3}, nil)

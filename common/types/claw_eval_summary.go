@@ -7,8 +7,10 @@ import (
 )
 
 const (
-	ClawEvalTasksNormal        = "normal"
-	ClawEvalDefaultJudgeModel  = "qwen3.7-max"
+	ClawEvalTasksNormal       = "normal"
+	ClawEvalDefaultJudgeModel = "qwen3.7-max"
+	ClawEvalDefaultTrials     = 3
+	ClawEvalDefaultParallel   = 4
 )
 
 // ClawEvalSummary mirrors claw-eval batch_summary.json.
