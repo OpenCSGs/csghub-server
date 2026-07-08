@@ -26,6 +26,7 @@ type responsesTokenCounterImpl struct {
 	usage          *types.ResponsesUsage
 	outputText     strings.Builder
 	refusalText    strings.Builder
+	reasoningText  strings.Builder
 	toolCallText   strings.Builder
 	tokenizer      Tokenizer
 	promptFallback strings.Builder
@@ -74,7 +75,7 @@ func (c *responsesTokenCounterImpl) AppendEvent(event types.ResponsesStreamEvent
 		if event.Response.Usage != nil {
 			c.usage = event.Response.Usage
 		}
-		if c.outputText.Len() == 0 && c.refusalText.Len() == 0 && c.toolCallText.Len() == 0 {
+		if c.outputText.Len() == 0 && c.refusalText.Len() == 0 && c.reasoningText.Len() == 0 && c.toolCallText.Len() == 0 {
 			c.Response(event.Response)
 		}
 	}
@@ -83,6 +84,10 @@ func (c *responsesTokenCounterImpl) AppendEvent(event types.ResponsesStreamEvent
 		c.outputText.WriteString(event.Delta)
 	case "response.refusal.delta":
 		c.refusalText.WriteString(event.Delta)
+	// The chat adapter emits reasoning_summary_text today; accept
+	// reasoning_text for native/future Responses-compatible streams.
+	case "response.reasoning_summary_text.delta", "response.reasoning_text.delta":
+		c.reasoningText.WriteString(event.Delta)
 	case "response.function_call_arguments.delta":
 		c.toolCallText.WriteString(event.Delta)
 	}
@@ -103,7 +108,7 @@ func (c *responsesTokenCounterImpl) Usage(ctx context.Context) (*Usage, error) {
 	}
 
 	promptText := c.promptFallback.String()
-	outputText := c.outputText.String() + c.refusalText.String() + c.toolCallText.String()
+	outputText := c.outputText.String() + c.refusalText.String() + c.reasoningText.String() + c.toolCallText.String()
 	if strings.TrimSpace(promptText) == "" && strings.TrimSpace(outputText) == "" {
 		return nil, errors.New("no responses usage found and no text available for fallback estimate")
 	}
@@ -145,6 +150,9 @@ func (c *responsesTokenCounterImpl) captureOutputItem(item types.ResponsesOutput
 	}
 	for _, part := range item.Content {
 		c.captureContentPart(part)
+	}
+	for _, part := range item.Summary {
+		c.reasoningText.WriteString(part.Text)
 	}
 }
 

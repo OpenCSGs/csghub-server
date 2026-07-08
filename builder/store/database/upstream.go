@@ -24,6 +24,7 @@ type Upstream struct {
 	HealthCheckEnabled    bool                           `bun:",notnull,default:true" json:"health_check_enabled"`
 	CircuitBreakerEnabled bool                           `bun:",notnull,default:true" json:"circuit_breaker_enabled"`
 	Tags                  map[string]string              `bun:",type:jsonb,nullzero" json:"tags,omitempty"`
+	Metadata              map[string]any                 `bun:",type:jsonb,nullzero" json:"metadata,omitempty"`
 	LimitPolicy           *types.UsageLimitPolicy        `bun:",type:jsonb,nullzero" json:"limit_policy,omitempty"`
 	HealthState           *AIGatewayUpstreamHealthState  `bun:"rel:has-one,join:id=upstream_id" json:"health_state,omitempty"`
 	CircuitState          *AIGatewayUpstreamCircuitState `bun:"rel:has-one,join:id=upstream_id" json:"circuit_state,omitempty"`

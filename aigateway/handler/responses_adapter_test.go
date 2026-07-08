@@ -45,6 +45,158 @@ func TestValidateResponsesAdapterRequestAllowsReasoning(t *testing.T) {
 	require.NoError(t, validateResponsesAdapterRequest(req))
 }
 
+func TestApplyAdapterReasoningRequest(t *testing.T) {
+	ctx := context.Background()
+	deepSeekMetadata := map[string]any{
+		"responses": map[string]any{
+			"chat_adapter": map[string]any{
+				"reasoning_request": map[string]any{
+					"enabled":       true,
+					"effort_field":  "",
+					"enable_extra":  map[string]any{"thinking": map[string]any{"type": "enabled"}},
+					"disable_extra": map[string]any{"thinking": map[string]any{"type": "disabled"}},
+				},
+			},
+		},
+	}
+	glmMetadata := map[string]any{
+		"responses": map[string]any{
+			"chat_adapter": map[string]any{
+				"reasoning_request": map[string]any{
+					"enabled":       true,
+					"effort_field":  "reasoning_effort",
+					"enable_extra":  map[string]any{"enable_thinking": true},
+					"disable_extra": map[string]any{"enable_thinking": false},
+				},
+			},
+		},
+	}
+	disabledMetadata := map[string]any{
+		"responses": map[string]any{
+			"chat_adapter": map[string]any{
+				"reasoning_request": map[string]any{
+					"enabled": false,
+				},
+			},
+		},
+	}
+	genericMetadata := map[string]any{
+		"responses": map[string]any{
+			"chat_adapter": map[string]any{
+				"reasoning_request": map[string]any{
+					"enabled":      true,
+					"effort_field": "reasoning_effort",
+				},
+			},
+		},
+	}
+
+	t.Run("config absent", func(t *testing.T) {
+		chatReq := &ChatCompletionRequest{}
+		err := applyAdapterReasoningRequest(ctx, chatReq, nil, json.RawMessage(`{"effort":"high"}`))
+		require.NoError(t, err)
+		require.Empty(t, chatReq.RawJSON)
+	})
+
+	t.Run("enabled false effort none", func(t *testing.T) {
+		cfg := loadReasoningRequestConfig(disabledMetadata)
+		chatReq := &ChatCompletionRequest{}
+		err := applyAdapterReasoningRequest(ctx, chatReq, cfg, json.RawMessage(`{"effort":"none"}`))
+		require.NoError(t, err)
+		require.Empty(t, chatReq.RawJSON)
+	})
+
+	t.Run("enabled false effort high", func(t *testing.T) {
+		cfg := loadReasoningRequestConfig(disabledMetadata)
+		chatReq := &ChatCompletionRequest{}
+		err := applyAdapterReasoningRequest(ctx, chatReq, cfg, json.RawMessage(`{"effort":"high"}`))
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "unsupported_feature:reasoning")
+	})
+
+	t.Run("enabled true effort none merges disable extra", func(t *testing.T) {
+		cfg := loadReasoningRequestConfig(deepSeekMetadata)
+		chatReq := &ChatCompletionRequest{}
+		err := applyAdapterReasoningRequest(ctx, chatReq, cfg, json.RawMessage(`{"effort":"none"}`))
+		require.NoError(t, err)
+		var raw map[string]json.RawMessage
+		require.NoError(t, json.Unmarshal(chatReq.RawJSON, &raw))
+		require.JSONEq(t, `{"type":"disabled"}`, string(raw["thinking"]))
+		_, hasEffort := raw["reasoning_effort"]
+		require.False(t, hasEffort)
+	})
+
+	t.Run("enabled true effort low", func(t *testing.T) {
+		cfg := loadReasoningRequestConfig(glmMetadata)
+		chatReq := &ChatCompletionRequest{}
+		err := applyAdapterReasoningRequest(ctx, chatReq, cfg, json.RawMessage(`{"effort":"low"}`))
+		require.NoError(t, err)
+		var raw map[string]json.RawMessage
+		require.NoError(t, json.Unmarshal(chatReq.RawJSON, &raw))
+		require.Equal(t, `"low"`, string(raw["reasoning_effort"]))
+		require.Equal(t, `true`, string(raw["enable_thinking"]))
+	})
+
+	t.Run("enabled true effort xhigh maps to max", func(t *testing.T) {
+		cfg := loadReasoningRequestConfig(glmMetadata)
+		chatReq := &ChatCompletionRequest{}
+		err := applyAdapterReasoningRequest(ctx, chatReq, cfg, json.RawMessage(`{"effort":"xhigh"}`))
+		require.NoError(t, err)
+		var raw map[string]json.RawMessage
+		require.NoError(t, json.Unmarshal(chatReq.RawJSON, &raw))
+		require.Equal(t, `"max"`, string(raw["reasoning_effort"]))
+	})
+
+	t.Run("enabled true effort minimal", func(t *testing.T) {
+		cfg := loadReasoningRequestConfig(genericMetadata)
+		chatReq := &ChatCompletionRequest{}
+		err := applyAdapterReasoningRequest(ctx, chatReq, cfg, json.RawMessage(`{"effort":"minimal"}`))
+		require.NoError(t, err)
+		var raw map[string]json.RawMessage
+		require.NoError(t, json.Unmarshal(chatReq.RawJSON, &raw))
+		require.Equal(t, `"minimal"`, string(raw["reasoning_effort"]))
+	})
+
+	t.Run("enabled true unknown effort", func(t *testing.T) {
+		cfg := loadReasoningRequestConfig(genericMetadata)
+		chatReq := &ChatCompletionRequest{}
+		err := applyAdapterReasoningRequest(ctx, chatReq, cfg, json.RawMessage(`{"effort":"foobar"}`))
+		require.Error(t, err)
+		require.Contains(t, err.Error(), `invalid reasoning effort: "foobar"`)
+	})
+
+	t.Run("effort normalized case and whitespace", func(t *testing.T) {
+		cfg := loadReasoningRequestConfig(genericMetadata)
+		chatReq := &ChatCompletionRequest{}
+		err := applyAdapterReasoningRequest(ctx, chatReq, cfg, json.RawMessage(`{"effort":" High "}`))
+		require.NoError(t, err)
+		var raw map[string]json.RawMessage
+		require.NoError(t, json.Unmarshal(chatReq.RawJSON, &raw))
+		require.Equal(t, `"high"`, string(raw["reasoning_effort"]))
+	})
+
+	t.Run("reasoning object without effort", func(t *testing.T) {
+		cfg := loadReasoningRequestConfig(glmMetadata)
+		chatReq := &ChatCompletionRequest{}
+		err := applyAdapterReasoningRequest(ctx, chatReq, cfg, json.RawMessage(`{"summary":"auto"}`))
+		require.NoError(t, err)
+		require.Empty(t, chatReq.RawJSON)
+	})
+
+	t.Run("responsesToChatRequest forwards reasoning with metadata", func(t *testing.T) {
+		req := &types.ResponsesRequest{
+			Model:     "m",
+			Input:     json.RawMessage(`"hi"`),
+			Reasoning: json.RawMessage(`{"effort":"none"}`),
+		}
+		chatReq, err := responsesToChatRequest(ctx, req, "upstream-model", deepSeekMetadata)
+		require.NoError(t, err)
+		var raw map[string]json.RawMessage
+		require.NoError(t, json.Unmarshal(chatReq.RawJSON, &raw))
+		require.JSONEq(t, `{"type":"disabled"}`, string(raw["thinking"]))
+	})
+}
+
 func TestNormalizeChatRole(t *testing.T) {
 	cases := map[string]string{
 		"":          "user",
@@ -147,10 +299,232 @@ func TestResponsesToChatRequestMapsStringInputAndInstructions(t *testing.T) {
 		Instructions: json.RawMessage(`"be concise"`),
 		Input:        json.RawMessage(`"hello"`),
 	}
-	chatReq, err := responsesToChatRequest(context.Background(), req, "upstream-model")
+	chatReq, err := responsesToChatRequest(context.Background(), req, "upstream-model", nil)
 	require.NoError(t, err)
 	require.Equal(t, "upstream-model", chatReq.Model)
 	require.Len(t, chatReq.Messages, 2)
+}
+
+func TestResponsesToChatRequestIgnoresNonStringInstructions(t *testing.T) {
+	req := &types.ResponsesRequest{
+		Model:        "public",
+		Instructions: json.RawMessage(`{"text":"do not stringify me"}`),
+		Input:        json.RawMessage(`"hello"`),
+	}
+	chatReq, err := responsesToChatRequest(context.Background(), req, "upstream-model", nil)
+	require.NoError(t, err)
+
+	body, err := marshalChatRequestBody(chatReq, "upstream-model")
+	require.NoError(t, err)
+	require.JSONEq(t, `{
+		"model": "upstream-model",
+		"messages": [{"role": "user", "content": "hello"}],
+		"parallel_tool_calls": true
+	}`, string(body))
+}
+
+func TestResponsesToChatRequestMapsInputImageStringURL(t *testing.T) {
+	req := &types.ResponsesRequest{
+		Model: "public",
+		Input: json.RawMessage(`[
+			{
+				"type": "message",
+				"role": "user",
+				"content": [
+					{"type": "input_text", "text": "look"},
+					{"type": "input_image", "image_url": "https://example.test/a.png"}
+				]
+			}
+		]`),
+	}
+	chatReq, err := responsesToChatRequest(context.Background(), req, "upstream-model", nil)
+	require.NoError(t, err)
+
+	body, err := marshalChatRequestBody(chatReq, "upstream-model")
+	require.NoError(t, err)
+	require.JSONEq(t, `{
+		"model": "upstream-model",
+		"messages": [{
+			"role": "user",
+			"content": [
+				{"type": "text", "text": "look"},
+				{"type": "image_url", "image_url": {"url": "https://example.test/a.png"}}
+			]
+		}],
+		"parallel_tool_calls": true
+	}`, string(body))
+}
+
+func TestResponsesToChatRequestAttachesReasoningInputToAssistantMessage(t *testing.T) {
+	req := &types.ResponsesRequest{
+		Model: "public",
+		Input: json.RawMessage(`[
+			{"type":"reasoning","summary":[{"type":"summary_text","text":"thinking"}]},
+			{"type":"message","role":"assistant","content":"answer"},
+			{"type":"message","role":"user","content":"continue"}
+		]`),
+	}
+	chatReq, err := responsesToChatRequest(context.Background(), req, "upstream-model", nil)
+	require.NoError(t, err)
+
+	body, err := marshalChatRequestBody(chatReq, "upstream-model")
+	require.NoError(t, err)
+	require.JSONEq(t, `{
+		"model": "upstream-model",
+		"messages": [
+			{"role": "assistant", "content": "answer", "reasoning_content": "thinking"},
+			{"role": "user", "content": "continue"}
+		],
+		"parallel_tool_calls": true
+	}`, string(body))
+}
+
+func TestResponsesToChatRequestAttachesReasoningInputToFunctionCall(t *testing.T) {
+	req := &types.ResponsesRequest{
+		Model: "public",
+		Input: json.RawMessage(`[
+			{"type":"reasoning","content":[{"type":"reasoning_text","text":"plan tool"}]},
+			{"type":"function_call","call_id":"call_1","name":"lookup","arguments":"{\"q\":\"x\"}"},
+			{"type":"function_call_output","call_id":"call_1","output":"ok"}
+		]`),
+	}
+	chatReq, err := responsesToChatRequest(context.Background(), req, "upstream-model", nil)
+	require.NoError(t, err)
+
+	body, err := marshalChatRequestBody(chatReq, "upstream-model")
+	require.NoError(t, err)
+	require.JSONEq(t, `{
+		"model": "upstream-model",
+		"messages": [
+			{
+				"role": "assistant",
+				"content": "",
+				"reasoning_content": "plan tool",
+				"tool_calls": [{
+					"id": "call_1",
+					"type": "function",
+					"function": {"name": "lookup", "arguments": "{\"q\":\"x\"}"}
+				}]
+			},
+			{"role": "tool", "tool_call_id": "call_1", "content": "ok"}
+		],
+		"parallel_tool_calls": true
+	}`, string(body))
+}
+
+func TestResponsesToChatRequestDropsOrphanReasoningWithNoAssistantTarget(t *testing.T) {
+	req := &types.ResponsesRequest{
+		Model: "public",
+		Input: json.RawMessage(`[
+			{"type":"reasoning","summary":[{"type":"summary_text","text":"thinking"}]}
+		]`),
+	}
+	chatReq, err := responsesToChatRequest(context.Background(), req, "upstream-model", nil)
+	require.NoError(t, err)
+
+	body, err := marshalChatRequestBody(chatReq, "upstream-model")
+	require.NoError(t, err)
+	require.JSONEq(t, `{
+		"model": "upstream-model",
+		"messages": [],
+		"parallel_tool_calls": true
+	}`, string(body))
+}
+
+func TestResponsesToChatRequestMergesTrailingReasoningIntoAssistantMessage(t *testing.T) {
+	req := &types.ResponsesRequest{
+		Model: "public",
+		Input: json.RawMessage(`[
+			{"type":"message","role":"assistant","content":"answer"},
+			{"type":"reasoning","summary":[{"type":"summary_text","text":"afterthought"}]}
+		]`),
+	}
+	chatReq, err := responsesToChatRequest(context.Background(), req, "upstream-model", nil)
+	require.NoError(t, err)
+
+	body, err := marshalChatRequestBody(chatReq, "upstream-model")
+	require.NoError(t, err)
+	require.JSONEq(t, `{
+		"model": "upstream-model",
+		"messages": [
+			{"role": "assistant", "content": "answer", "reasoning_content": "afterthought"}
+		],
+		"parallel_tool_calls": true
+	}`, string(body))
+}
+
+func TestResponsesToChatRequestMergesTrailingReasoningIntoMostRecentAssistantThroughTool(t *testing.T) {
+	req := &types.ResponsesRequest{
+		Model: "public",
+		Input: json.RawMessage(`[
+			{"type":"reasoning","summary":[{"type":"summary_text","text":"plan"}]},
+			{"type":"function_call","call_id":"call_1","name":"lookup","arguments":"{\"q\":\"x\"}"},
+			{"type":"function_call_output","call_id":"call_1","output":"ok"},
+			{"type":"reasoning","summary":[{"type":"summary_text","text":"afterthought"}]}
+		]`),
+	}
+	chatReq, err := responsesToChatRequest(context.Background(), req, "upstream-model", nil)
+	require.NoError(t, err)
+
+	body, err := marshalChatRequestBody(chatReq, "upstream-model")
+	require.NoError(t, err)
+	require.JSONEq(t, `{
+		"model": "upstream-model",
+		"messages": [
+			{
+				"role": "assistant",
+				"content": "",
+				"reasoning_content": "plan\nafterthought",
+				"tool_calls": [{
+					"id": "call_1",
+					"type": "function",
+					"function": {"name": "lookup", "arguments": "{\"q\":\"x\"}"}
+				}]
+			},
+			{"role": "tool", "tool_call_id": "call_1", "content": "ok"}
+		],
+		"parallel_tool_calls": true
+	}`, string(body))
+}
+
+func TestResponsesToChatRequestDropsTrailingReasoningAfterUserMessage(t *testing.T) {
+	req := &types.ResponsesRequest{
+		Model: "public",
+		Input: json.RawMessage(`[
+			{"type":"message","role":"user","content":"hi"},
+			{"type":"reasoning","summary":[{"type":"summary_text","text":"orphan"}]}
+		]`),
+	}
+	chatReq, err := responsesToChatRequest(context.Background(), req, "upstream-model", nil)
+	require.NoError(t, err)
+
+	body, err := marshalChatRequestBody(chatReq, "upstream-model")
+	require.NoError(t, err)
+	require.JSONEq(t, `{
+		"model": "upstream-model",
+		"messages": [{"role": "user", "content": "hi"}],
+		"parallel_tool_calls": true
+	}`, string(body))
+}
+
+func TestResponsesToChatRequestIgnoresEncryptedReasoningInput(t *testing.T) {
+	req := &types.ResponsesRequest{
+		Model: "public",
+		Input: json.RawMessage(`[
+			{"type":"reasoning","encrypted_content":"opaque"},
+			{"type":"message","role":"user","content":"hello"}
+		]`),
+	}
+	chatReq, err := responsesToChatRequest(context.Background(), req, "upstream-model", nil)
+	require.NoError(t, err)
+
+	body, err := marshalChatRequestBody(chatReq, "upstream-model")
+	require.NoError(t, err)
+	require.JSONEq(t, `{
+		"model": "upstream-model",
+		"messages": [{"role": "user", "content": "hello"}],
+		"parallel_tool_calls": true
+	}`, string(body))
 }
 
 func TestResponsesToChatRequestDefaultsParallelToolCalls(t *testing.T) {
@@ -158,7 +532,7 @@ func TestResponsesToChatRequestDefaultsParallelToolCalls(t *testing.T) {
 		Model: "public",
 		Input: json.RawMessage(`"hello"`),
 	}
-	chatReq, err := responsesToChatRequest(context.Background(), req, "upstream-model")
+	chatReq, err := responsesToChatRequest(context.Background(), req, "upstream-model", nil)
 	require.NoError(t, err)
 
 	var raw map[string]json.RawMessage
@@ -172,7 +546,7 @@ func TestResponsesAdapterChatRequestIncludesStreamUsage(t *testing.T) {
 		Input:  json.RawMessage(`"hello"`),
 		Stream: true,
 	}
-	chatReq, err := responsesToChatRequest(context.Background(), req, "upstream-model")
+	chatReq, err := responsesToChatRequest(context.Background(), req, "upstream-model", nil)
 	require.NoError(t, err)
 	chatReq.StreamOptions = &StreamOptions{IncludeUsage: true}
 
@@ -194,7 +568,7 @@ func TestResponsesToChatRequestPreservesParallelToolCallsFalse(t *testing.T) {
 		Input:             json.RawMessage(`"hello"`),
 		ParallelToolCalls: &parallel,
 	}
-	chatReq, err := responsesToChatRequest(context.Background(), req, "upstream-model")
+	chatReq, err := responsesToChatRequest(context.Background(), req, "upstream-model", nil)
 	require.NoError(t, err)
 
 	var raw map[string]json.RawMessage
@@ -222,7 +596,7 @@ func TestResponsesToChatRequestMapsFunctionTools(t *testing.T) {
 		]`),
 	}
 
-	chatReq, err := responsesToChatRequest(context.Background(), req, "upstream-model")
+	chatReq, err := responsesToChatRequest(context.Background(), req, "upstream-model", nil)
 	require.NoError(t, err)
 
 	data, err := json.Marshal(chatReq.Tools)
@@ -257,7 +631,7 @@ func TestResponsesToChatRequestMapsFunctionToolWithoutType(t *testing.T) {
 		]`),
 	}
 
-	chatReq, err := responsesToChatRequest(context.Background(), req, "upstream-model")
+	chatReq, err := responsesToChatRequest(context.Background(), req, "upstream-model", nil)
 	require.NoError(t, err)
 
 	data, err := json.Marshal(chatReq.Tools)
@@ -287,7 +661,7 @@ func TestResponsesToChatRequestNormalizesNestedFunctionToolWithoutType(t *testin
 		]`),
 	}
 
-	chatReq, err := responsesToChatRequest(context.Background(), req, "upstream-model")
+	chatReq, err := responsesToChatRequest(context.Background(), req, "upstream-model", nil)
 	require.NoError(t, err)
 
 	data, err := json.Marshal(chatReq.Tools)
@@ -315,19 +689,71 @@ func TestResponsesToChatRequestRejectsInvalidNestedFunctionTool(t *testing.T) {
 		]`),
 	}
 
-	_, err := responsesToChatRequest(context.Background(), req, "upstream-model")
+	_, err := responsesToChatRequest(context.Background(), req, "upstream-model", nil)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "function must be an object")
 }
 
-func TestResponsesToChatRequestRejectsUnknownContentPart(t *testing.T) {
+func TestResponsesToChatRequestMapsInputAudioContentPart(t *testing.T) {
 	req := &types.ResponsesRequest{
 		Model: "public",
-		Input: json.RawMessage(`[{"type":"message","role":"user","content":[{"type":"input_audio","audio":"..."}]}]`),
+		Input: json.RawMessage(`[
+			{
+				"type": "message",
+				"role": "user",
+				"content": [
+					{"type": "input_audio", "input_audio": {"data": "abc", "format": "wav"}}
+				]
+			}
+		]`),
 	}
-	_, err := responsesToChatRequest(context.Background(), req, "upstream-model")
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "unsupported_feature:input.content.input_audio")
+	chatReq, err := responsesToChatRequest(context.Background(), req, "upstream-model", nil)
+	require.NoError(t, err)
+
+	body, err := marshalChatRequestBody(chatReq, "upstream-model")
+	require.NoError(t, err)
+	require.JSONEq(t, `{
+		"model": "upstream-model",
+		"messages": [{
+			"role": "user",
+			"content": [{
+				"type": "input_audio",
+				"input_audio": {"data": "abc", "format": "wav"}
+			}]
+		}],
+		"parallel_tool_calls": true
+	}`, string(body))
+}
+
+func TestResponsesToChatRequestMapsFlatInputAudioContentPart(t *testing.T) {
+	req := &types.ResponsesRequest{
+		Model: "public",
+		Input: json.RawMessage(`[
+			{
+				"type": "message",
+				"role": "user",
+				"content": [
+					{"type": "input_audio", "audio": "abc", "format": "mp3"}
+				]
+			}
+		]`),
+	}
+	chatReq, err := responsesToChatRequest(context.Background(), req, "upstream-model", nil)
+	require.NoError(t, err)
+
+	body, err := marshalChatRequestBody(chatReq, "upstream-model")
+	require.NoError(t, err)
+	require.JSONEq(t, `{
+		"model": "upstream-model",
+		"messages": [{
+			"role": "user",
+			"content": [{
+				"type": "input_audio",
+				"input_audio": {"data": "abc", "format": "mp3"}
+			}]
+		}],
+		"parallel_tool_calls": true
+	}`, string(body))
 }
 
 func TestChatResponseToResponsesMapsUsageAndText(t *testing.T) {
@@ -344,6 +770,68 @@ func TestChatResponseToResponsesMapsUsageAndText(t *testing.T) {
 	require.Equal(t, int64(2), resp.Usage.InputTokens)
 	require.Equal(t, int64(3), resp.Usage.OutputTokens)
 	require.Nil(t, resp.ParallelToolCalls)
+	require.Len(t, resp.Output, 1)
+	require.Empty(t, resp.Output[0].Summary)
+}
+
+func TestChatResponseToResponsesMapsReasoningContent(t *testing.T) {
+	resp, err := chatResponseToResponses([]byte(`{
+		"id":"chatcmpl_1",
+		"created":123,
+		"model":"upstream-model",
+		"choices":[{"message":{"role":"assistant","content":"answer","reasoning_content":"thinking"}}],
+		"usage":{"prompt_tokens":2,"completion_tokens":3,"total_tokens":5}
+	}`), "public-model")
+	require.NoError(t, err)
+	require.Equal(t, "answer", resp.OutputText)
+	require.Len(t, resp.Output, 2)
+	require.Equal(t, "message", resp.Output[0].Type)
+	require.Equal(t, "output_text", resp.Output[0].Content[0].Type)
+	require.Equal(t, "answer", resp.Output[0].Content[0].Text)
+	require.Equal(t, "reasoning", resp.Output[1].Type)
+	require.Len(t, resp.Output[1].Summary, 1)
+	require.Equal(t, "summary_text", resp.Output[1].Summary[0].Type)
+	require.Equal(t, "thinking", resp.Output[1].Summary[0].Text)
+}
+
+func TestChatResponseToResponsesMapsReasoningFallbackField(t *testing.T) {
+	resp, err := chatResponseToResponses([]byte(`{
+		"id":"chatcmpl_1",
+		"created":123,
+		"model":"upstream-model",
+		"choices":[{"message":{"role":"assistant","content":"answer","reasoning":"chain"}}],
+		"usage":{"prompt_tokens":2,"completion_tokens":3,"total_tokens":5}
+	}`), "public-model")
+	require.NoError(t, err)
+	require.Len(t, resp.Output, 2)
+	require.Equal(t, "reasoning", resp.Output[1].Type)
+	require.Equal(t, "chain", resp.Output[1].Summary[0].Text)
+}
+
+func TestChatResponseToResponsesPrefersReasoningContent(t *testing.T) {
+	resp, err := chatResponseToResponses([]byte(`{
+		"id":"chatcmpl_1",
+		"created":123,
+		"model":"upstream-model",
+		"choices":[{"message":{"role":"assistant","content":"answer","reasoning_content":"preferred","reasoning":"fallback"}}],
+		"usage":{"prompt_tokens":2,"completion_tokens":3,"total_tokens":5}
+	}`), "public-model")
+	require.NoError(t, err)
+	require.Len(t, resp.Output, 2)
+	require.Equal(t, "preferred", resp.Output[1].Summary[0].Text)
+}
+
+func TestChatResponseToResponsesTrimsReasoningContent(t *testing.T) {
+	resp, err := chatResponseToResponses([]byte(`{
+		"id":"chatcmpl_1",
+		"created":123,
+		"model":"upstream-model",
+		"choices":[{"message":{"role":"assistant","content":"answer","reasoning_content":"  thinking\n"}}],
+		"usage":{"prompt_tokens":2,"completion_tokens":3,"total_tokens":5}
+	}`), "public-model")
+	require.NoError(t, err)
+	require.Len(t, resp.Output, 2)
+	require.Equal(t, "thinking", resp.Output[1].Summary[0].Text)
 }
 
 func TestDecodeResponsesAdapterChatBodyDecodesGzip(t *testing.T) {
@@ -477,6 +965,67 @@ func TestResponsesAdapterStreamWriterEmitsResponsesEvents(t *testing.T) {
 	require.Contains(t, body, "event: response.completed")
 	require.Contains(t, body, `"type":"response.completed"`)
 	require.Contains(t, body, "data: [DONE]")
+}
+
+func TestResponsesAdapterStreamWriterEmitsReasoningContentEvents(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(w)
+	writer := newResponsesAdapterStreamWriter(ctx.Writer, "public-model", nil)
+	writer.WriteHeader(200)
+	_, err := writer.Write([]byte(`data: {"id":"chatcmpl_1","choices":[{"delta":{"reasoning_content":"think "},"index":0}]}` + "\n\n"))
+	require.NoError(t, err)
+	_, err = writer.Write([]byte(`data: {"id":"chatcmpl_1","choices":[{"delta":{"content":"answer","reasoning_content":"more"},"finish_reason":"stop","index":0}]}` + "\n\n"))
+	require.NoError(t, err)
+	_, err = writer.Write([]byte("data: [DONE]\n\n"))
+	require.NoError(t, err)
+
+	body := w.Body.String()
+	require.Contains(t, body, "event: response.reasoning_summary_text.delta")
+	require.Contains(t, body, `"type":"response.reasoning_summary_text.delta"`)
+	require.Contains(t, body, `"item_id":"rs_0"`)
+	require.Contains(t, body, `"delta":"think "`)
+	require.Contains(t, body, `"delta":"more"`)
+	require.Contains(t, body, "event: response.reasoning_summary_text.done")
+	require.Contains(t, body, `"part":{"type":"summary_text","text":"think more"}`)
+	require.Contains(t, body, `"type":"reasoning"`)
+	require.Contains(t, body, `"summary":[{"type":"summary_text","text":"think more"}]`)
+	require.Contains(t, body, "event: response.output_text.delta")
+	require.Contains(t, body, `"output_text":"answer"`)
+}
+
+func TestResponsesAdapterStreamWriterEmitsReasoningFallbackEvents(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(w)
+	writer := newResponsesAdapterStreamWriter(ctx.Writer, "public-model", nil)
+	writer.WriteHeader(200)
+	_, err := writer.Write([]byte(`data: {"id":"chatcmpl_1","choices":[{"delta":{"reasoning":"chain"},"finish_reason":"stop","index":0}]}` + "\n\n"))
+	require.NoError(t, err)
+	_, err = writer.Write([]byte("data: [DONE]\n\n"))
+	require.NoError(t, err)
+
+	body := w.Body.String()
+	require.Contains(t, body, "event: response.reasoning_summary_text.delta")
+	require.Contains(t, body, `"delta":"chain"`)
+	require.Contains(t, body, `"summary":[{"type":"summary_text","text":"chain"}]`)
+}
+
+func TestResponsesAdapterStreamWriterDoesNotEmitEmptyReasoningItem(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(w)
+	writer := newResponsesAdapterStreamWriter(ctx.Writer, "public-model", nil)
+	writer.WriteHeader(200)
+	_, err := writer.Write([]byte(`data: {"id":"chatcmpl_1","choices":[{"delta":{"content":"hello"},"finish_reason":"stop","index":0}]}` + "\n\n"))
+	require.NoError(t, err)
+	_, err = writer.Write([]byte("data: [DONE]\n\n"))
+	require.NoError(t, err)
+
+	body := w.Body.String()
+	require.NotContains(t, body, "response.reasoning_summary_text")
+	require.NotContains(t, body, `"type":"reasoning"`)
+	require.Contains(t, body, `"output_text":"hello"`)
 }
 
 func TestResponsesAdapterStreamWriterFinishResponseStreamEmitsCompleted(t *testing.T) {
@@ -761,13 +1310,14 @@ func TestResponsesToChatRequestDropsNonFunctionTools(t *testing.T) {
 			{"type": "file_search", "vector_store_ids": ["vs_1"]}
 		]`),
 	}
-	chatReq, err := responsesToChatRequest(context.Background(), req, "upstream-model")
+	chatReq, err := responsesToChatRequest(context.Background(), req, "upstream-model", nil)
 	require.NoError(t, err)
 
-	// Non-function tools are dropped; Tools field should be empty
-	data, err := json.Marshal(chatReq.Tools)
+	body, err := marshalChatRequestBody(chatReq, "upstream-model")
 	require.NoError(t, err)
-	require.JSONEq(t, `[]`, string(data))
+	var parsed map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(body, &parsed))
+	require.NotContains(t, parsed, "tools")
 }
 
 func TestResponsesToChatRequestDropsRequiredToolChoiceWhenNoFunctionToolsRemain(t *testing.T) {
@@ -780,13 +1330,14 @@ func TestResponsesToChatRequestDropsRequiredToolChoiceWhenNoFunctionToolsRemain(
 			{"type": "file_search", "vector_store_ids": ["vs_1"]}
 		]`),
 	}
-	chatReq, err := responsesToChatRequest(context.Background(), req, "upstream-model")
+	chatReq, err := responsesToChatRequest(context.Background(), req, "upstream-model", nil)
 	require.NoError(t, err)
 
 	body, err := marshalChatRequestBody(chatReq, "upstream-model")
 	require.NoError(t, err)
 	var parsed map[string]json.RawMessage
 	require.NoError(t, json.Unmarshal(body, &parsed))
+	require.NotContains(t, parsed, "tools")
 	require.NotContains(t, parsed, "tool_choice")
 }
 
@@ -799,7 +1350,7 @@ func TestResponsesToChatRequestDropsHostedToolChoice(t *testing.T) {
 			{"type": "code_interpreter"}
 		]`),
 	}
-	chatReq, err := responsesToChatRequest(context.Background(), req, "upstream-model")
+	chatReq, err := responsesToChatRequest(context.Background(), req, "upstream-model", nil)
 	require.NoError(t, err)
 
 	body, err := marshalChatRequestBody(chatReq, "upstream-model")
@@ -818,7 +1369,7 @@ func TestResponsesToChatRequestRejectsInvalidToolChoiceJSON(t *testing.T) {
 			{"type": "function", "name": "get_weather", "parameters": {"type": "object"}}
 		]`),
 	}
-	_, err := responsesToChatRequest(context.Background(), req, "upstream-model")
+	_, err := responsesToChatRequest(context.Background(), req, "upstream-model", nil)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "invalid responses tool_choice")
 }
@@ -834,7 +1385,7 @@ func TestResponsesToChatRequestDropsUnsupportedToolChoiceShapes(t *testing.T) {
 					{"type": "function", "name": "get_weather", "parameters": {"type": "object"}}
 				]`),
 			}
-			chatReq, err := responsesToChatRequest(context.Background(), req, "upstream-model")
+			chatReq, err := responsesToChatRequest(context.Background(), req, "upstream-model", nil)
 			require.NoError(t, err)
 
 			body, err := marshalChatRequestBody(chatReq, "upstream-model")
@@ -855,7 +1406,7 @@ func TestResponsesToChatRequestMixedToolsDropsNonFunction(t *testing.T) {
 			{"type": "code_interpreter"}
 		]`),
 	}
-	chatReq, err := responsesToChatRequest(context.Background(), req, "upstream-model")
+	chatReq, err := responsesToChatRequest(context.Background(), req, "upstream-model", nil)
 	require.NoError(t, err)
 
 	// Only the function tool should remain in chatReq.Tools
@@ -883,7 +1434,7 @@ func TestResponsesToChatRequestKeepsRequiredToolChoiceWhenFunctionToolsRemain(t 
 			{"type": "code_interpreter"}
 		]`),
 	}
-	chatReq, err := responsesToChatRequest(context.Background(), req, "upstream-model")
+	chatReq, err := responsesToChatRequest(context.Background(), req, "upstream-model", nil)
 	require.NoError(t, err)
 
 	body, err := marshalChatRequestBody(chatReq, "upstream-model")
@@ -903,7 +1454,7 @@ func TestResponsesToChatRequestKeepsSurvivingFunctionToolChoice(t *testing.T) {
 			{"type": "code_interpreter"}
 		]`),
 	}
-	chatReq, err := responsesToChatRequest(context.Background(), req, "upstream-model")
+	chatReq, err := responsesToChatRequest(context.Background(), req, "upstream-model", nil)
 	require.NoError(t, err)
 
 	body, err := marshalChatRequestBody(chatReq, "upstream-model")
@@ -923,7 +1474,7 @@ func TestResponsesToChatRequestDropsMissingFunctionToolChoice(t *testing.T) {
 			{"type": "code_interpreter"}
 		]`),
 	}
-	chatReq, err := responsesToChatRequest(context.Background(), req, "upstream-model")
+	chatReq, err := responsesToChatRequest(context.Background(), req, "upstream-model", nil)
 	require.NoError(t, err)
 
 	body, err := marshalChatRequestBody(chatReq, "upstream-model")
@@ -950,7 +1501,7 @@ func TestResponsesToChatRequestFunctionOnlyPathStillWorks(t *testing.T) {
 			}
 		]`),
 	}
-	chatReq, err := responsesToChatRequest(context.Background(), req, "upstream-model")
+	chatReq, err := responsesToChatRequest(context.Background(), req, "upstream-model", nil)
 	require.NoError(t, err)
 
 	require.Len(t, chatReq.Tools, 1)

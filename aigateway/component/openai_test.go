@@ -1484,3 +1484,23 @@ func TestOpenAIComponentImpl_RecordUsage_ExternalModel(t *testing.T) {
 		})
 	}
 }
+
+func TestDbUpstreamsToConfigsMetadataPassthrough(t *testing.T) {
+	metadata := map[string]any{
+		"responses": map[string]any{
+			"chat_adapter": map[string]any{
+				"reasoning_request": map[string]any{
+					"enabled": true,
+				},
+			},
+		},
+	}
+	result := dbUpstreamsToConfigs([]database.Upstream{{
+		ID:       1,
+		URL:      "http://upstream.example.com/v1/chat/completions",
+		Enabled:  true,
+		Metadata: metadata,
+	}})
+	require.Len(t, result, 1)
+	require.Equal(t, metadata, result[0].Metadata)
+}

@@ -151,6 +151,7 @@ type ResponsesOutputItem struct {
 	Status    string                 `json:"status,omitempty"`
 	Role      string                 `json:"role,omitempty"`
 	Content   []ResponsesContentPart `json:"content,omitempty"`
+	Summary   []ResponsesSummaryPart `json:"summary,omitempty"`
 	CallID    string                 `json:"call_id,omitempty"`
 	Name      string                 `json:"name,omitempty"`
 	Arguments string                 `json:"arguments,omitempty"`
@@ -183,6 +184,11 @@ type ResponsesContentPart struct {
 	Text        string `json:"text,omitempty"`
 	Refusal     string `json:"refusal,omitempty"`
 	Annotations []any  `json:"annotations,omitempty"`
+}
+
+type ResponsesSummaryPart struct {
+	Type string `json:"type"`
+	Text string `json:"text"`
 }
 
 type ResponsesStreamEvent struct {

@@ -60,8 +60,8 @@ func normalizeChatRole(role string) string {
 	}
 }
 
-func responsesToChatRequest(ctx context.Context, req *types.ResponsesRequest, modelName string) (*ChatCompletionRequest, error) {
-	messages, err := responsesInputToChatMessages(req)
+func responsesToChatRequest(ctx context.Context, req *types.ResponsesRequest, modelName string, upstreamMetadata map[string]any) (*ChatCompletionRequest, error) {
+	messages, err := responsesInputToChatMessages(ctx, req)
 	if err != nil {
 		return nil, err
 	}
@@ -81,6 +81,7 @@ func responsesToChatRequest(ctx context.Context, req *types.ResponsesRequest, mo
 		Temperature: floatPtrValue(req.Temperature),
 		TopP:        floatPtrValue(req.TopP),
 	}
+	mergeChatRawJSONRaw(chatReq, "messages", rawMessages)
 	if req.MaxOutputTokens != nil {
 		chatReq.MaxTokens = *req.MaxOutputTokens
 	}
@@ -91,8 +92,10 @@ func responsesToChatRequest(ctx context.Context, req *types.ResponsesRequest, mo
 			return nil, err
 		}
 		allowedFunctionTools = functionTools
-		if err := json.Unmarshal(chatTools, &chatReq.Tools); err != nil {
-			return nil, fmt.Errorf("convert responses tools to chat tools: %w", err)
+		if len(chatTools) > 0 {
+			if err := json.Unmarshal(chatTools, &chatReq.Tools); err != nil {
+				return nil, fmt.Errorf("convert responses tools to chat tools: %w", err)
+			}
 		}
 	}
 	if len(req.ToolChoice) > 0 {
@@ -120,6 +123,12 @@ func responsesToChatRequest(ctx context.Context, req *types.ResponsesRequest, mo
 			}
 		}
 	}
+	if len(req.Reasoning) > 0 {
+		cfg := loadReasoningRequestConfig(upstreamMetadata)
+		if err := applyAdapterReasoningRequest(ctx, chatReq, cfg, req.Reasoning); err != nil {
+			return nil, err
+		}
+	}
 	return chatReq, nil
 }
 
@@ -141,6 +150,145 @@ func mergeChatRawJSONRaw(chatReq *ChatCompletionRequest, key string, value json.
 	}
 	raw[key] = value
 	chatReq.RawJSON, _ = json.Marshal(raw)
+}
+
+var knownReasoningEfforts = map[string]string{
+	"none":    "none",
+	"low":     "low",
+	"medium":  "medium",
+	"high":    "high",
+	"minimal": "minimal",
+	// xhigh is a Responses API effort value not widely supported by chat upstreams;
+	// normalize to max, the highest effort level those upstreams typically accept.
+	"xhigh": "max",
+	"max":   "max",
+}
+
+type adapterReasoningRequestConfig struct {
+	Enabled      bool            `json:"enabled"`
+	EffortField  string          `json:"effort_field"`
+	EnableExtra  json.RawMessage `json:"enable_extra"`
+	DisableExtra json.RawMessage `json:"disable_extra"`
+}
+
+func loadReasoningRequestConfig(metadata map[string]any) *adapterReasoningRequestConfig {
+	if len(metadata) == 0 {
+		return nil
+	}
+	responses, ok := metadata["responses"].(map[string]any)
+	if !ok {
+		return nil
+	}
+	chatAdapter, ok := responses["chat_adapter"].(map[string]any)
+	if !ok {
+		return nil
+	}
+	reasoningRequest, ok := chatAdapter["reasoning_request"].(map[string]any)
+	if !ok {
+		return nil
+	}
+	raw, err := json.Marshal(reasoningRequest)
+	if err != nil {
+		return nil
+	}
+	cfg := &adapterReasoningRequestConfig{}
+	if err := json.Unmarshal(raw, cfg); err != nil {
+		return nil
+	}
+	return cfg
+}
+
+func applyAdapterReasoningRequest(ctx context.Context, chatReq *ChatCompletionRequest, cfg *adapterReasoningRequestConfig, rawReasoning json.RawMessage) error {
+	if cfg == nil {
+		return nil
+	}
+	effort := parseReasoningEffort(rawReasoning)
+	if effort == "" {
+		return nil
+	}
+	normalized, known := normalizeEffort(effort)
+	if !known {
+		slog.WarnContext(ctx, "reject unknown reasoning effort for chat adapter",
+			slog.String("api", "/v1/responses"),
+			slog.String("adapter", "chat_completions"),
+			slog.String("effort", effort))
+		return fmt.Errorf("invalid reasoning effort: %q", effort)
+	}
+	if !cfg.Enabled {
+		if normalized == "none" {
+			slog.InfoContext(ctx, "drop reasoning request for disabled upstream",
+				slog.String("api", "/v1/responses"),
+				slog.String("adapter", "chat_completions"),
+				slog.String("effort", normalized))
+			return nil
+		}
+		slog.WarnContext(ctx, "reject reasoning request for disabled upstream",
+			slog.String("api", "/v1/responses"),
+			slog.String("adapter", "chat_completions"),
+			slog.String("effort", normalized))
+		return unsupportedResponsesFeature("reasoning")
+	}
+	if normalized == "none" {
+		if err := mergeChatRawJSONObject(chatReq, cfg.DisableExtra); err != nil {
+			return err
+		}
+		slog.InfoContext(ctx, "merge chat adapter reasoning disable_extra",
+			slog.String("api", "/v1/responses"),
+			slog.String("adapter", "chat_completions"),
+			slog.String("effort", normalized))
+		return nil
+	}
+	if cfg.EffortField != "" {
+		mergeChatRawJSON(chatReq, cfg.EffortField, normalized)
+	}
+	if err := mergeChatRawJSONObject(chatReq, cfg.EnableExtra); err != nil {
+		return err
+	}
+	slog.InfoContext(ctx, "merge chat adapter reasoning enable fields",
+		slog.String("api", "/v1/responses"),
+		slog.String("adapter", "chat_completions"),
+		slog.String("effort", normalized),
+		slog.String("effort_field", cfg.EffortField))
+	return nil
+}
+
+func parseReasoningEffort(rawReasoning json.RawMessage) string {
+	if len(rawReasoning) == 0 {
+		return ""
+	}
+	var reasoning struct {
+		Effort string `json:"effort"`
+	}
+	if err := json.Unmarshal(rawReasoning, &reasoning); err != nil {
+		return ""
+	}
+	return strings.TrimSpace(reasoning.Effort)
+}
+
+func normalizeEffort(effort string) (string, bool) {
+	normalized := strings.ToLower(strings.TrimSpace(effort))
+	if normalized == "" {
+		return "", false
+	}
+	mapped, ok := knownReasoningEfforts[normalized]
+	if !ok {
+		return "", false
+	}
+	return mapped, true
+}
+
+func mergeChatRawJSONObject(chatReq *ChatCompletionRequest, extra json.RawMessage) error {
+	if len(extra) == 0 || string(extra) == "null" {
+		return nil
+	}
+	var obj map[string]json.RawMessage
+	if err := json.Unmarshal(extra, &obj); err != nil {
+		return fmt.Errorf("invalid reasoning extra json: %w", err)
+	}
+	for key, value := range obj {
+		mergeChatRawJSONRaw(chatReq, key, value)
+	}
+	return nil
 }
 
 func responsesToolsToChatTools(ctx context.Context, raw json.RawMessage, modelName string) (json.RawMessage, map[string]struct{}, error) {
@@ -194,6 +342,9 @@ func responsesToolsToChatTools(ctx context.Context, raw json.RawMessage, modelNa
 		}
 		chatTools = append(chatTools, chatTool)
 	}
+	if len(chatTools) == 0 {
+		return nil, functionTools, nil
+	}
 	data, err := json.Marshal(chatTools)
 	if err != nil {
 		return nil, nil, fmt.Errorf("convert responses tools to chat tools: %w", err)
@@ -241,7 +392,7 @@ func floatPtrValue(v *float64) float64 {
 	return *v
 }
 
-func responsesInputToChatMessages(req *types.ResponsesRequest) ([]map[string]any, error) {
+func responsesInputToChatMessages(ctx context.Context, req *types.ResponsesRequest) ([]map[string]any, error) {
 	messages := []map[string]any{}
 	if instructionText := responsesInstructionText(req.Instructions); instructionText != "" {
 		messages = append(messages, map[string]any{"role": "system", "content": instructionText})
@@ -255,6 +406,10 @@ func responsesInputToChatMessages(req *types.ResponsesRequest) ([]map[string]any
 	if err := json.Unmarshal(req.Input, &items); err != nil {
 		return nil, fmt.Errorf("unsupported responses input shape")
 	}
+	// Keep pending reasoning until the next assistant message or tool-call turn.
+	// Do not attach it to user/system messages.
+	pendingReasoning := ""
+	lastAssistantIdx := -1
 	for _, item := range items {
 		itemType, _ := item["type"].(string)
 		switch itemType {
@@ -265,10 +420,19 @@ func responsesInputToChatMessages(req *types.ResponsesRequest) ([]map[string]any
 			if err != nil {
 				return nil, err
 			}
-			messages = append(messages, map[string]any{"role": role, "content": content})
+			message := map[string]any{"role": role, "content": content}
+			if pendingReasoning != "" && role == "assistant" {
+				message["reasoning_content"] = pendingReasoning
+				pendingReasoning = ""
+			}
+			messages = append(messages, message)
+			if role == "assistant" {
+				lastAssistantIdx = len(messages) - 1
+			}
 		case "function_call":
-			messages = append(messages, map[string]any{
-				"role": "assistant",
+			message := map[string]any{
+				"role":    "assistant",
+				"content": "",
 				"tool_calls": []map[string]any{{
 					"id":   item["call_id"],
 					"type": "function",
@@ -277,18 +441,78 @@ func responsesInputToChatMessages(req *types.ResponsesRequest) ([]map[string]any
 						"arguments": item["arguments"],
 					},
 				}},
-			})
+			}
+			if pendingReasoning != "" {
+				message["reasoning_content"] = pendingReasoning
+				pendingReasoning = ""
+			}
+			messages = append(messages, message)
+			lastAssistantIdx = len(messages) - 1
 		case "function_call_output":
 			messages = append(messages, map[string]any{
 				"role":         "tool",
 				"tool_call_id": item["call_id"],
 				"content":      item["output"],
 			})
+		case "reasoning":
+			if reasoning := responsesReasoningItemText(item); reasoning != "" {
+				if pendingReasoning == "" {
+					pendingReasoning = reasoning
+				} else {
+					pendingReasoning += "\n" + reasoning
+				}
+			}
 		default:
 			return nil, unsupportedResponsesFeature("input." + itemType)
 		}
 	}
+	if pendingReasoning != "" {
+		if lastAssistantIdx >= 0 {
+			if existing, _ := messages[lastAssistantIdx]["reasoning_content"].(string); existing != "" {
+				messages[lastAssistantIdx]["reasoning_content"] = existing + "\n" + pendingReasoning
+			} else {
+				messages[lastAssistantIdx]["reasoning_content"] = pendingReasoning
+			}
+		} else {
+			slog.DebugContext(ctx, "drop orphan reasoning input with no assistant target",
+				slog.String("api", "/v1/responses"))
+		}
+	}
 	return messages, nil
+}
+
+func responsesReasoningItemText(item map[string]any) string {
+	if text := responsesContentText(item["summary"]); text != "" {
+		return text
+	}
+	return responsesContentText(item["content"])
+}
+
+func responsesContentText(value any) string {
+	switch v := value.(type) {
+	case nil:
+		return ""
+	case string:
+		return strings.TrimSpace(v)
+	case []any:
+		parts := make([]string, 0, len(v))
+		for _, item := range v {
+			if text := responsesContentText(item); text != "" {
+				parts = append(parts, text)
+			}
+		}
+		return strings.Join(parts, "\n")
+	case map[string]any:
+		if text, ok := v["text"]; ok {
+			return responsesContentText(text)
+		}
+		if text, ok := v["content"]; ok {
+			return responsesContentText(text)
+		}
+		return ""
+	default:
+		return ""
+	}
 }
 
 func splitRawJSONArray(raw json.RawMessage) []json.RawMessage {
@@ -308,7 +532,7 @@ func responsesInstructionText(raw json.RawMessage) string {
 	if err := json.Unmarshal(raw, &text); err == nil {
 		return strings.TrimSpace(text)
 	}
-	return strings.TrimSpace(string(raw))
+	return ""
 }
 
 func normalizeResponsesContent(content any) (any, error) {
@@ -326,7 +550,20 @@ func normalizeResponsesContent(content any) (any, error) {
 		case "input_text", "output_text", "text":
 			chatParts = append(chatParts, map[string]any{"type": "text", "text": obj["text"]})
 		case "input_image", "image_url":
-			chatParts = append(chatParts, map[string]any{"type": "image_url", "image_url": obj["image_url"]})
+			imageURL := obj["image_url"]
+			if s, ok := imageURL.(string); ok {
+				imageURL = map[string]any{"url": s}
+			}
+			chatParts = append(chatParts, map[string]any{"type": "image_url", "image_url": imageURL})
+		case "input_audio":
+			inputAudio := obj["input_audio"]
+			if inputAudio == nil {
+				inputAudio = map[string]any{
+					"data":   obj["audio"],
+					"format": obj["format"],
+				}
+			}
+			chatParts = append(chatParts, map[string]any{"type": "input_audio", "input_audio": inputAudio})
 		default:
 			partType, _ := obj["type"].(string)
 			if partType == "" {
@@ -343,6 +580,7 @@ func chatResponseToResponses(data []byte, publicModel string) (*types.ResponsesR
 	if err := json.Unmarshal(data, &chat); err != nil {
 		return nil, err
 	}
+	reasoning := chatResponseReasoning(data)
 	// TODO: If adapter mode later supports previous_response_id, pass the
 	// public previous ID into this conversion and echo it in ResponsesResponse.
 	resp := &types.ResponsesResponse{
@@ -375,6 +613,7 @@ func chatResponseToResponses(data []byte, publicModel string) (*types.ResponsesR
 				Arguments: call.Function.Arguments,
 			})
 		}
+		appendResponsesReasoning(resp, reasoning)
 		return resp, nil
 	}
 	if msg.Refusal != "" {
@@ -387,6 +626,7 @@ func chatResponseToResponses(data []byte, publicModel string) (*types.ResponsesR
 				Refusal: msg.Refusal,
 			}},
 		})
+		appendResponsesReasoning(resp, reasoning)
 		return resp, nil
 	}
 	text := msg.Content
@@ -400,5 +640,52 @@ func chatResponseToResponses(data []byte, publicModel string) (*types.ResponsesR
 			Text: text,
 		}},
 	})
+	appendResponsesReasoning(resp, reasoning)
 	return resp, nil
+}
+
+func chatResponseReasoning(data []byte) string {
+	var raw struct {
+		Choices []struct {
+			Message map[string]json.RawMessage `json:"message"`
+		} `json:"choices"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil || len(raw.Choices) == 0 {
+		return ""
+	}
+	return reasoningFromRawFields(raw.Choices[0].Message)
+}
+
+func reasoningFromRawFields(fields map[string]json.RawMessage) string {
+	if len(fields) == 0 {
+		return ""
+	}
+	for _, key := range []string{"reasoning_content", "reasoning"} {
+		var value string
+		if err := json.Unmarshal(fields[key], &value); err == nil {
+			value = strings.TrimSpace(value)
+			if value != "" {
+				return value
+			}
+		}
+	}
+	return ""
+}
+
+func appendResponsesReasoning(resp *types.ResponsesResponse, reasoning string) {
+	if resp == nil || reasoning == "" {
+		return
+	}
+	resp.Output = append(resp.Output, responsesReasoningOutputItem(reasoning))
+}
+
+func responsesReasoningOutputItem(reasoning string) types.ResponsesOutputItem {
+	return types.ResponsesOutputItem{
+		Type:   "reasoning",
+		Status: "completed",
+		Summary: []types.ResponsesSummaryPart{{
+			Type: "summary_text",
+			Text: reasoning,
+		}},
+	}
 }

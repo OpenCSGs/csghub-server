@@ -294,6 +294,7 @@ func (s *llmServiceComponentImpl) CreateLLMConfig(ctx context.Context, req *type
 			HealthCheckEnabled:    u.HealthCheckEnabled,
 			CircuitBreakerEnabled: u.CircuitBreakerEnabled,
 			Tags:                  u.Tags,
+			Metadata:              u.Metadata,
 			LimitPolicy:           u.LimitPolicy,
 		}
 		if dbUp.Weight <= 0 {
@@ -379,6 +380,9 @@ func (s *llmServiceComponentImpl) validateLLMEndpointConfig(upstreams []types.Up
 		if strings.TrimSpace(upstream.URL) == "" {
 			return fmt.Errorf("%w: upstream url cannot be empty", ErrInvalidLLMConfig)
 		}
+		if err := validateUpstreamMetadata(upstream.Metadata); err != nil {
+			return err
+		}
 		if upstream.Enabled {
 			enabledCount++
 		}
@@ -446,6 +450,9 @@ func (s *llmServiceComponentImpl) CreateUpstream(ctx context.Context, req *types
 	if err != nil {
 		return nil, fmt.Errorf("llm config not found: %w", err)
 	}
+	if err := validateUpstreamMetadata(req.Metadata); err != nil {
+		return nil, err
+	}
 	dbUp := &database.Upstream{
 		LLMConfigID:           req.LLMConfigID,
 		URL:                   strings.TrimSpace(req.URL),
@@ -457,6 +464,7 @@ func (s *llmServiceComponentImpl) CreateUpstream(ctx context.Context, req *types
 		HealthCheckEnabled:    req.HealthCheckEnabled,
 		CircuitBreakerEnabled: req.CircuitBreakerEnabled,
 		Tags:                  req.Tags,
+		Metadata:              req.Metadata,
 		LimitPolicy:           req.LimitPolicy,
 	}
 	if dbUp.Weight <= 0 {
@@ -509,6 +517,12 @@ func (s *llmServiceComponentImpl) UpdateUpstream(ctx context.Context, req *types
 	}
 	if req.Tags != nil {
 		dbUp.Tags = *req.Tags
+	}
+	if req.Metadata != nil {
+		if err := validateUpstreamMetadata(*req.Metadata); err != nil {
+			return nil, err
+		}
+		dbUp.Metadata = *req.Metadata
 	}
 	if dbUp.Weight <= 0 {
 		dbUp.Weight = 1
@@ -592,6 +606,7 @@ func buildUpstreamConfigs(dbUpstreams []database.Upstream) []types.UpstreamConfi
 			HealthCheckEnabled:    u.HealthCheckEnabled,
 			CircuitBreakerEnabled: u.CircuitBreakerEnabled,
 			Tags:                  u.Tags,
+			Metadata:              u.Metadata,
 			LimitPolicy:           u.LimitPolicy,
 		}
 		if u.HealthState != nil {

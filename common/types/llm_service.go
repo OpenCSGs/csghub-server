@@ -38,6 +38,7 @@ type UpstreamConfig struct {
 	// LimitPolicy controls usage-based quota for this specific endpoint.
 	LimitPolicy *UsageLimitPolicy `json:"limit_policy,omitempty"`
 	Tags        map[string]string `json:"tags,omitempty"`
+	Metadata    map[string]any    `json:"metadata,omitempty"`
 }
 
 // RoutingPolicy controls how a request selects one upstream from Upstreams.
@@ -152,6 +153,7 @@ type CreateUpstreamReq struct {
 	CircuitBreakerEnabled bool              `json:"circuit_breaker_enabled"`
 	LimitPolicy           *UsageLimitPolicy `json:"limit_policy,omitempty"`
 	Tags                  map[string]string `json:"tags,omitempty"`
+	Metadata              map[string]any    `json:"metadata,omitempty"`
 }
 
 // UpdateUpstreamReq is the request to update an existing upstream.
@@ -168,4 +170,5 @@ type UpdateUpstreamReq struct {
 	CircuitBreakerEnabled *bool              `json:"circuit_breaker_enabled"`
 	LimitPolicy           **UsageLimitPolicy `json:"limit_policy"`
 	Tags                  *map[string]string `json:"tags"`
+	Metadata              *map[string]any    `json:"metadata"`
 }

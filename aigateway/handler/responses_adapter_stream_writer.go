@@ -16,30 +16,35 @@ import (
 )
 
 type responsesAdapterStreamWriter struct {
-	ginWriter        gin.ResponseWriter
-	decoder          streamdecoder.Decoder
-	respID           string
-	model            string
-	created          int64
-	eventBuf         bytes.Buffer
-	started          bool
-	completed        bool
-	failed           bool
-	passthrough      bool
-	textStarted      bool
-	textDone         bool
-	textOutputIdx    int
-	textItemID       string
-	text             strings.Builder
-	refusalStarted   bool
-	refusalDone      bool
-	refusalOutputIdx int
-	refusalItemID    string
-	refusal          strings.Builder
-	nextOutputIdx    int
-	responsesCounter token.ResponsesTokenCounter
-	usage            *types.ResponsesUsage
-	toolCallItems    map[int]*responsesToolCallStreamState
+	ginWriter          gin.ResponseWriter
+	decoder            streamdecoder.Decoder
+	respID             string
+	model              string
+	created            int64
+	eventBuf           bytes.Buffer
+	started            bool
+	completed          bool
+	failed             bool
+	passthrough        bool
+	textStarted        bool
+	textDone           bool
+	textOutputIdx      int
+	textItemID         string
+	text               strings.Builder
+	refusalStarted     bool
+	refusalDone        bool
+	refusalOutputIdx   int
+	refusalItemID      string
+	refusal            strings.Builder
+	reasoningStarted   bool
+	reasoningDone      bool
+	reasoningOutputIdx int
+	reasoningItemID    string
+	reasoning          strings.Builder
+	nextOutputIdx      int
+	responsesCounter   token.ResponsesTokenCounter
+	usage              *types.ResponsesUsage
+	toolCallItems      map[int]*responsesToolCallStreamState
 }
 
 type responsesToolCallStreamState struct {
@@ -125,6 +130,18 @@ func (w *responsesAdapterStreamWriter) Write(data []byte) (int, error) {
 		w.ensureStarted()
 		w.writeToolCallDeltas(chunk)
 		for _, choice := range chunk.Choices {
+			if reasoning := chatDeltaReasoning(choice.Delta); reasoning != "" {
+				w.ensureReasoningItem()
+				w.reasoning.WriteString(reasoning)
+				w.writeResponsesEvent("response.reasoning_summary_text.delta", responsesStreamReasoningSummaryDeltaEvent{
+					Type:         "response.reasoning_summary_text.delta",
+					ResponseID:   w.respID,
+					ItemID:       w.reasoningItemID,
+					OutputIndex:  w.reasoningOutputIdx,
+					SummaryIndex: 0,
+					Delta:        reasoning,
+				})
+			}
 			if choice.Delta.Refusal != "" {
 				w.ensureRefusalItem()
 				w.refusal.WriteString(choice.Delta.Refusal)
@@ -152,6 +169,7 @@ func (w *responsesAdapterStreamWriter) Write(data []byte) (int, error) {
 				if choice.FinishReason == "tool_calls" {
 					w.finishToolCallItems()
 				} else {
+					w.finishReasoningItem()
 					w.finishTextItem()
 					w.finishRefusalItem()
 				}
@@ -165,6 +183,7 @@ func (w *responsesAdapterStreamWriter) finishResponseStream() {
 	if w.completed || w.failed {
 		return
 	}
+	w.finishReasoningItem()
 	w.completed = true
 	w.writeResponsesEvent("response.completed", responsesStreamResponseEvent{
 		Type:     "response.completed",
@@ -329,6 +348,25 @@ func (w *responsesAdapterStreamWriter) ensureRefusalItem() {
 	})
 }
 
+func (w *responsesAdapterStreamWriter) ensureReasoningItem() {
+	if w.reasoningStarted {
+		return
+	}
+	w.reasoningStarted = true
+	w.reasoningOutputIdx = w.nextOutputIndex()
+	w.reasoningItemID = fmt.Sprintf("rs_%d", w.reasoningOutputIdx)
+	w.writeResponsesEvent("response.output_item.added", responsesStreamOutputItemEvent{
+		Type:        "response.output_item.added",
+		ResponseID:  w.respID,
+		OutputIndex: w.reasoningOutputIdx,
+		Item: responsesStreamReasoningItem{
+			ID:     w.reasoningItemID,
+			Type:   "reasoning",
+			Status: "in_progress",
+		},
+	})
+}
+
 func (w *responsesAdapterStreamWriter) finishTextItem() {
 	if !w.textStarted || w.textDone {
 		return
@@ -367,6 +405,30 @@ func (w *responsesAdapterStreamWriter) finishTextItem() {
 				Text: w.text.String(),
 			}},
 		},
+	})
+}
+
+func (w *responsesAdapterStreamWriter) finishReasoningItem() {
+	if !w.reasoningStarted || w.reasoningDone {
+		return
+	}
+	w.reasoningDone = true
+	w.writeResponsesEvent("response.reasoning_summary_text.done", responsesStreamReasoningSummaryDoneEvent{
+		Type:         "response.reasoning_summary_text.done",
+		ResponseID:   w.respID,
+		ItemID:       w.reasoningItemID,
+		OutputIndex:  w.reasoningOutputIdx,
+		SummaryIndex: 0,
+		Part: responsesStreamReasoningSummaryPart{
+			Type: "summary_text",
+			Text: w.reasoning.String(),
+		},
+	})
+	w.writeResponsesEvent("response.output_item.done", responsesStreamOutputItemEvent{
+		Type:        "response.output_item.done",
+		ResponseID:  w.respID,
+		OutputIndex: w.reasoningOutputIdx,
+		Item:        w.reasoningOutput("completed"),
 	})
 }
 
@@ -492,6 +554,12 @@ func (w *responsesAdapterStreamWriter) completedResponse() responsesStreamRespon
 			}},
 		}})
 	}
+	if w.reasoningStarted {
+		outputItems = append(outputItems, struct {
+			index int
+			item  any
+		}{index: w.reasoningOutputIdx, item: w.reasoningOutput("completed")})
+	}
 	for _, state := range w.orderedToolCallStates() {
 		if state == nil {
 			continue
@@ -522,6 +590,25 @@ func (w *responsesAdapterStreamWriter) completedResponse() responsesStreamRespon
 		response.Usage = w.usage
 	}
 	return response
+}
+
+func (w *responsesAdapterStreamWriter) reasoningOutput(status string) responsesStreamReasoningItem {
+	return responsesStreamReasoningItem{
+		ID:     w.reasoningItemID,
+		Type:   "reasoning",
+		Status: status,
+		Summary: []responsesStreamReasoningSummaryPart{{
+			Type: "summary_text",
+			Text: w.reasoning.String(),
+		}},
+	}
+}
+
+func chatDeltaReasoning(delta types.ChatCompletionChunkChoiceDelta) string {
+	if delta.ReasoningContent != "" {
+		return delta.ReasoningContent
+	}
+	return delta.Reasoning
 }
 
 func (w *responsesAdapterStreamWriter) orderedToolCallStates() []*responsesToolCallStreamState {
