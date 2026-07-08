@@ -169,3 +169,31 @@ type UpdateUpstreamReq struct {
 	LimitPolicy           **UsageLimitPolicy `json:"limit_policy"`
 	Tags                  *map[string]string `json:"tags"`
 }
+
+// TestUpstreamReq is the request to test connectivity to an upstream endpoint.
+// The upstream is identified by its database ID; the backend fetches the
+// upstream's URL, model name and auth header from the database so that the
+// frontend never needs to send credentials or perform cross-origin requests.
+type TestUpstreamReq struct {
+	ID int64 `json:"id" binding:"required"`
+}
+
+// TestUpstreamResult is the result of an upstream connectivity test.
+// The request summary is masked so that sensitive header values (such as
+// API keys) are never leaked to the frontend.
+type TestUpstreamResult struct {
+	// Request is the masked request summary (url, method, headers, body).
+	Request string `json:"request"`
+	// OK indicates whether the upstream returned a 2xx status code.
+	OK bool `json:"ok"`
+	// Status is the HTTP status code returned by the upstream.
+	Status int `json:"status"`
+	// StatusText is the HTTP status text returned by the upstream.
+	StatusText string `json:"status_text"`
+	// Content is the extracted text content from the upstream response.
+	Content string `json:"content"`
+	// ResponseBody is the raw response body from the upstream.
+	ResponseBody string `json:"response_body"`
+	// Error is the error message when the test fails (e.g. timeout, network error).
+	Error string `json:"error,omitempty"`
+}
