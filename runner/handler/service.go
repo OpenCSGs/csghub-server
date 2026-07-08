@@ -3,6 +3,7 @@ package handler
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -46,15 +47,15 @@ func (s *K8sHandler) RunService(c *gin.Context) {
 	err := c.BindJSON(&request)
 	if err != nil {
 		slog.ErrorContext(c.Request.Context(), "runService get bad request", slog.Any("error", err), slog.Any("req", request))
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		httpbase.BadRequest(c, err.Error())
 		return
 	}
 	svcName := s.getServiceNameFromRequest(c)
 	request.SvcName = svcName
 	err = s.serviceComponent.RunService(c.Request.Context(), *request)
 	if err != nil {
-		slog.Error("fail to run service", slog.Any("error", err), slog.Any("req", request))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		slog.ErrorContext(c.Request.Context(), "fail to run service", slog.Any("error", err), slog.Any("req", request))
+		httpbase.ServerError(c, err)
 		return
 	}
 	slog.Info("service created successfully", slog.String("svc_name", svcName), slog.Int64("deploy_id", request.DeployID))
@@ -67,7 +68,7 @@ func (s *K8sHandler) StopService(c *gin.Context) {
 
 	if err != nil {
 		slog.ErrorContext(c.Request.Context(), "stop service get bad request", slog.Any("error", err), slog.Any("req", request))
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		httpbase.BadRequest(c, err.Error())
 		return
 	}
 	svcName := s.getServiceNameFromRequest(c)
@@ -75,7 +76,7 @@ func (s *K8sHandler) StopService(c *gin.Context) {
 	resp, err := s.serviceComponent.StopService(c.Request.Context(), *request)
 	if err != nil {
 		slog.ErrorContext(c.Request.Context(), "failed to stop service", slog.Any("error", err), slog.Any("req", request))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		httpbase.ServerError(c, err)
 		return
 	}
 
@@ -92,7 +93,7 @@ func (s *K8sHandler) UpdateService(c *gin.Context) {
 
 	if err != nil {
 		slog.ErrorContext(c.Request.Context(), "updateService get bad request", slog.Any("error", err), slog.Any("req", request))
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		httpbase.BadRequest(c, err.Error())
 		return
 	}
 	svcName := s.getServiceNameFromRequest(c)
@@ -100,7 +101,7 @@ func (s *K8sHandler) UpdateService(c *gin.Context) {
 	resp, err := s.serviceComponent.UpdateService(c.Request.Context(), *request)
 	if err != nil {
 		slog.ErrorContext(c.Request.Context(), "failed to update service", slog.Any("error", err), slog.Any("req", request))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		httpbase.ServerError(c, err)
 		return
 	}
 	slog.Info("service updated", slog.String("svc_name", svcName))
@@ -114,7 +115,7 @@ func (s *K8sHandler) ServiceStatus(c *gin.Context) {
 	err := c.BindJSON(request)
 	if err != nil {
 		slog.ErrorContext(c.Request.Context(), "serviceStatus get bad request", slog.Any("error", err), slog.Any("req", request))
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		httpbase.BadRequest(c, err.Error())
 		return
 	}
 	svcName := s.getServiceNameFromRequest(c)
@@ -128,7 +129,7 @@ func (s *K8sHandler) ServiceStatus(c *gin.Context) {
 			return
 		}
 		slog.ErrorContext(c.Request.Context(), "failed to get service", slog.Any("error", err), slog.String("svc_name", svcName))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get service"})
+		httpbase.ServerError(c, fmt.Errorf("failed to get service"))
 		return
 	}
 	c.JSON(http.StatusOK, resp)
@@ -140,20 +141,20 @@ func (s *K8sHandler) ServiceLogs(c *gin.Context) {
 
 	if err != nil {
 		slog.ErrorContext(c.Request.Context(), "get bad request", slog.Any("error", err), slog.Any("req", request))
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		httpbase.BadRequest(c, err.Error())
 		return
 	}
 	cluster, err := s.clusterPool.GetClusterByID(c, request.ClusterID)
 	if err != nil {
 		slog.ErrorContext(c.Request.Context(), "fail to get cluster ", slog.Any("error", err))
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		httpbase.BadRequest(c, err.Error())
 		return
 	}
 	svcName := s.getServiceNameFromRequest(c)
 	podNames, err := s.serviceComponent.GetServicePods(c.Request.Context(), cluster, svcName, s.k8sNameSpace, 1)
 	if err != nil {
 		slog.ErrorContext(c.Request.Context(), "failed to read image logs, cannot get pods info", slog.Any("error", err), slog.String("svc_name", svcName))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get pods info"})
+		httpbase.ServerError(c, fmt.Errorf("failed to get pods info"))
 		return
 	}
 	podName := ""
@@ -169,13 +170,13 @@ func (s *K8sHandler) ServiceLogsByPod(c *gin.Context) {
 
 	if err != nil {
 		slog.ErrorContext(c.Request.Context(), "serviceLogs get bad request", slog.Any("error", err), slog.Any("req", request))
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		httpbase.BadRequest(c, err.Error())
 		return
 	}
 	cluster, err := s.clusterPool.GetClusterByID(c, request.ClusterID)
 	if err != nil {
 		slog.ErrorContext(c.Request.Context(), "fail to get cluster ", slog.Any("error", err))
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		httpbase.BadRequest(c, err.Error())
 		return
 	}
 	svcName := s.getServiceNameFromRequest(c)
@@ -193,7 +194,7 @@ func (s *K8sHandler) getLogsByPod(c *gin.Context, cluster *cluster.Cluster, podN
 		if err != nil {
 			slog.ErrorContext(c.Request.Context(), "check pod existence", slog.Any("namespace", s.k8sNameSpace), slog.Any("pod-name", podName),
 				slog.Any("clusterID", cluster.ID), slog.Any("error", err))
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check pod existence"})
+			httpbase.ServerError(c, fmt.Errorf("failed to check pod existence"))
 			return
 		}
 	}
@@ -234,7 +235,7 @@ func (s *K8sHandler) readPodLogsFromCluster(c *gin.Context, cluster *cluster.Clu
 	stream, message, err := rcommon.GetPodLogStream(c.Request.Context(), cluster.Client, podName, s.k8sNameSpace, rTypes.UserContainerName)
 	if err != nil {
 		slog.ErrorContext(c.Request.Context(), "Failed to open stream", slog.Any("error", err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to open stream"})
+		httpbase.ServerError(c, fmt.Errorf("failed to open stream"))
 		return
 	}
 	defer func() {
@@ -244,11 +245,9 @@ func (s *K8sHandler) readPodLogsFromCluster(c *gin.Context, cluster *cluster.Clu
 	}()
 
 	if message != "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": message})
+		httpbase.BadRequest(c, message)
 		return
 	}
-
-	// TODO miss web socket
 
 	setResponseHeaderForLogs(c)
 
@@ -320,20 +319,20 @@ func (s *K8sHandler) GetReplica(c *gin.Context) {
 	err := c.BindJSON(request)
 	if err != nil {
 		slog.ErrorContext(c.Request.Context(), "fail to parse input parameters", slog.Any("error", err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "fail to parse input parameters"})
+		httpbase.ServerError(c, fmt.Errorf("fail to parse input parameters"))
 		return
 	}
 	svcName := s.getServiceNameFromRequest(c)
 	svc, err := s.serviceComponent.GetServiceByName(c.Request.Context(), svcName, request.ClusterID)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		slog.ErrorContext(c.Request.Context(), "fail to get service", slog.Any("error", err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "fail to get service"})
+		httpbase.ServerError(c, fmt.Errorf("fail to get service"))
 		return
 	}
 	if svc == nil {
 		// service not exist
 		slog.ErrorContext(c.Request.Context(), "service not exist")
-		c.JSON(http.StatusNotFound, gin.H{"error": "service not exist"})
+		httpbase.NotFoundError(c, fmt.Errorf("service not exist"))
 		return
 	}
 
@@ -400,7 +399,7 @@ func (s *K8sHandler) GetServiceInfo(c *gin.Context) {
 	err := c.BindJSON(request)
 	if err != nil {
 		slog.ErrorContext(c.Request.Context(), "fail to parse input parameters", slog.Any("error", err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "fail to parse input parameters"})
+		httpbase.ServerError(c, fmt.Errorf("fail to parse input parameters"))
 		return
 	}
 
@@ -409,7 +408,7 @@ func (s *K8sHandler) GetServiceInfo(c *gin.Context) {
 	resp, err := s.serviceComponent.GetServiceInfo(c.Request.Context(), *request)
 	if err != nil {
 		slog.ErrorContext(c.Request.Context(), "fail to get service info", slog.Any("error", err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "fail to get service info"})
+		httpbase.ServerError(c, fmt.Errorf("fail to get service info"))
 		return
 	}
 	c.JSON(http.StatusOK, resp)
