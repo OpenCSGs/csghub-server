@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"fmt"
+	responsespkg "opencsg.com/csghub-server/aigateway/handler/responses"
 	"strings"
 
 	"opencsg.com/csghub-server/aigateway/token"
@@ -10,20 +11,26 @@ import (
 )
 
 type responsesNativePayloadTransformer struct {
-	mapper                   *ResponsesIDMapper
-	claims                   responsesIDClaims
+	mapper                   *responsespkg.IDMapper
+	claims                   responsespkg.IDClaims
 	publicPreviousResponseID string
 	usage                    *types.ResponsesUsage
 	idCache                  map[string]string
 	responsesCounter         token.ResponsesTokenCounter
+	logCapture               *responsespkg.LLMLogRecorder
 }
 
-func newResponsesNativePayloadTransformer(mapper *ResponsesIDMapper, claims responsesIDClaims, publicPreviousResponseID string, responsesCounter token.ResponsesTokenCounter) *responsesNativePayloadTransformer {
+func newResponsesNativePayloadTransformer(mapper *responsespkg.IDMapper, claims responsespkg.IDClaims, publicPreviousResponseID string, responsesCounter token.ResponsesTokenCounter, logCapture ...*responsespkg.LLMLogRecorder) *responsesNativePayloadTransformer {
+	var recorder *responsespkg.LLMLogRecorder
+	if len(logCapture) > 0 {
+		recorder = logCapture[0]
+	}
 	return &responsesNativePayloadTransformer{
 		mapper:                   mapper,
 		claims:                   claims,
 		publicPreviousResponseID: publicPreviousResponseID,
 		responsesCounter:         responsesCounter,
+		logCapture:               recorder,
 	}
 }
 
@@ -106,7 +113,7 @@ func (t *responsesNativePayloadTransformer) wrapUpstreamResponseID(id string) (s
 
 func isRawUpstreamResponseID(raw any) bool {
 	id, ok := raw.(string)
-	return ok && strings.HasPrefix(id, "resp_") && !strings.HasPrefix(id, responsesGatewayIDPrefix) && !strings.HasPrefix(id, responsesAdapterIDPrefix)
+	return ok && strings.HasPrefix(id, "resp_") && !responsespkg.IsGatewayResponseID(id) && !responsespkg.IsAdapterResponseID(id)
 }
 
 func (t *responsesNativePayloadTransformer) captureResponsePayload(obj map[string]any) {
@@ -122,6 +129,9 @@ func (t *responsesNativePayloadTransformer) captureResponsePayload(obj map[strin
 		if usage, ok := parseResponsesUsage(response["usage"]); ok {
 			t.usage = usage
 		}
+	}
+	if t.logCapture != nil {
+		t.logCapture.CapturePayloadMap(obj)
 	}
 	if t.responsesCounter == nil {
 		return

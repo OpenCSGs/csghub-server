@@ -40,6 +40,7 @@ type Moderation interface {
 	CheckChatPrompts(ctx context.Context, messages []openai.ChatCompletionMessageParamUnion, uuid string, isStream bool) (*rpc.CheckResult, error)
 	CheckChatStreamResponse(ctx context.Context, chunk types.ChatCompletionChunk, uuid string) (*rpc.CheckResult, error)
 	CheckChatNonStreamResponse(ctx context.Context, completion types.ChatCompletion) (*rpc.CheckResult, error)
+	CheckText(ctx context.Context, req types.TextModerationRequest) (*rpc.CheckResult, error)
 	CheckImagePrompts(ctx context.Context, prompt string, uuid string) (*rpc.CheckResult, error)
 	CheckImage(ctx context.Context, completion types.ImageGenerationResponse) (*rpc.CheckResult, error)
 	CloseStreamCheck(ctx context.Context, uuid string) (*rpc.CheckResult, error)
@@ -53,8 +54,8 @@ type sessionState struct {
 }
 
 type StreamChecker interface {
-	CheckChatStreamResponse(ctx context.Context, chunk types.ChatCompletionChunk, uuid string) (*rpc.CheckResult, error)
-	CloseStreamCheck(ctx context.Context, uuid string) (*rpc.CheckResult, error)
+	CheckStreamResponseText(ctx context.Context, content string, sessionID string) (*rpc.CheckResult, error)
+	CloseStreamCheck(ctx context.Context, sessionID string) (*rpc.CheckResult, error)
 }
 
 type moderationImpl struct {
@@ -69,16 +70,9 @@ type syncStreamChecker struct {
 	modImpl *moderationImpl
 }
 
-func (s *syncStreamChecker) CheckChatStreamResponse(ctx context.Context, chunk types.ChatCompletionChunk, uuid string) (*rpc.CheckResult, error) {
+func (s *syncStreamChecker) CheckStreamResponseText(ctx context.Context, content string, sessionID string) (*rpc.CheckResult, error) {
 	if s.modImpl.modSvcClient == nil {
 		return &rpc.CheckResult{IsSensitive: false}, nil
-	}
-	if len(chunk.Choices) == 0 {
-		return &rpc.CheckResult{IsSensitive: false}, nil
-	}
-	content := chunk.Choices[0].Delta.Content
-	if strings.TrimSpace(content) == "" {
-		content = chunk.Choices[0].Delta.ReasoningContent
 	}
 	if strings.TrimSpace(content) == "" {
 		return &rpc.CheckResult{IsSensitive: false}, nil
@@ -87,7 +81,7 @@ func (s *syncStreamChecker) CheckChatStreamResponse(ctx context.Context, chunk t
 	req := commontypes.LLMCheckRequest{
 		Scenario:  commontypes.ScenarioLLMResModeration,
 		Text:      content,
-		SessionId: uuid,
+		SessionId: sessionID,
 		Resumable: true,
 		Stream:    true,
 	}
@@ -97,7 +91,7 @@ func (s *syncStreamChecker) CheckChatStreamResponse(ctx context.Context, chunk t
 	return result, err
 }
 
-func (s *syncStreamChecker) CloseStreamCheck(ctx context.Context, uuid string) (*rpc.CheckResult, error) {
+func (s *syncStreamChecker) CloseStreamCheck(ctx context.Context, sessionID string) (*rpc.CheckResult, error) {
 	return &rpc.CheckResult{IsSensitive: false}, nil
 }
 
@@ -107,16 +101,9 @@ type asyncStreamChecker struct {
 	maxChars     int
 }
 
-func (a *asyncStreamChecker) CheckChatStreamResponse(ctx context.Context, chunk types.ChatCompletionChunk, uuid string) (*rpc.CheckResult, error) {
+func (a *asyncStreamChecker) CheckStreamResponseText(ctx context.Context, content string, sessionID string) (*rpc.CheckResult, error) {
 	if a.modImpl.modSvcClient == nil {
 		return &rpc.CheckResult{IsSensitive: false}, nil
-	}
-	if len(chunk.Choices) == 0 {
-		return &rpc.CheckResult{IsSensitive: false}, nil
-	}
-	content := chunk.Choices[0].Delta.Content
-	if strings.TrimSpace(content) == "" {
-		content = chunk.Choices[0].Delta.ReasoningContent
 	}
 	if strings.TrimSpace(content) == "" {
 		return &rpc.CheckResult{IsSensitive: false}, nil
@@ -125,7 +112,7 @@ func (a *asyncStreamChecker) CheckChatStreamResponse(ctx context.Context, chunk 
 	req := commontypes.LLMCheckRequest{
 		Scenario:  commontypes.ScenarioLLMResModeration,
 		Text:      content,
-		SessionId: uuid,
+		SessionId: sessionID,
 		Resumable: true,
 		Stream:    true,
 	}
@@ -136,10 +123,10 @@ func (a *asyncStreamChecker) CheckChatStreamResponse(ctx context.Context, chunk 
 		return result, err
 	}
 
-	state, ok := a.sessionCache.Get(uuid)
+	state, ok := a.sessionCache.Get(sessionID)
 	if !ok {
 		state = &sessionState{}
-		a.sessionCache.Add(uuid, state)
+		a.sessionCache.Add(sessionID, state)
 	}
 
 	state.Lock()
@@ -159,7 +146,7 @@ func (a *asyncStreamChecker) CheckChatStreamResponse(ctx context.Context, chunk 
 	state.Unlock()
 
 	if textToCheck != "" {
-		go a.executeAsyncCheck(textToCheck, uuid)
+		go a.executeAsyncCheck(textToCheck, sessionID)
 	}
 
 	return &rpc.CheckResult{IsSensitive: false}, nil
@@ -198,12 +185,12 @@ func (a *asyncStreamChecker) executeAsyncCheck(text string, sessionId string) {
 	}
 }
 
-func (a *asyncStreamChecker) CloseStreamCheck(ctx context.Context, uuid string) (*rpc.CheckResult, error) {
+func (a *asyncStreamChecker) CloseStreamCheck(ctx context.Context, sessionID string) (*rpc.CheckResult, error) {
 	if a.sessionCache == nil {
 		return &rpc.CheckResult{IsSensitive: false}, nil
 	}
 
-	state, ok := a.sessionCache.Get(uuid)
+	state, ok := a.sessionCache.Get(sessionID)
 	if !ok {
 		return &rpc.CheckResult{IsSensitive: false}, nil
 	}
@@ -211,7 +198,7 @@ func (a *asyncStreamChecker) CloseStreamCheck(ctx context.Context, uuid string) 
 	state.Lock()
 	defer func() {
 		state.Unlock()
-		a.sessionCache.Remove(uuid)
+		a.sessionCache.Remove(sessionID)
 	}()
 
 	if state.sensitive {
@@ -222,7 +209,7 @@ func (a *asyncStreamChecker) CloseStreamCheck(ctx context.Context, uuid string) 
 	req := commontypes.LLMCheckRequest{
 		Scenario:  commontypes.ScenarioLLMResModeration,
 		Text:      textToCheck,
-		SessionId: uuid,
+		SessionId: sessionID,
 		Resumable: false,
 		Stream:    true,
 	}
@@ -414,30 +401,21 @@ func (modImpl *moderationImpl) checkBuffer(
 	return result, nil
 }
 
-// CheckChatPrompts checks if any of the chat messages contain sensitive content.
-// It processes each message, extracts text content, and uses CheckLLMPrompt for validation.
 func (modImpl *moderationImpl) CheckChatPrompts(ctx context.Context, messages []openai.ChatCompletionMessageParamUnion, uuid string, isStream bool) (*rpc.CheckResult, error) {
 	if modImpl.modSvcClient == nil {
 		return &rpc.CheckResult{IsSensitive: false}, nil
 	}
-	// Process each message in the messages array
 	for _, msg := range messages {
-		// Skip system messages as they're typically predefined
 		role := *msg.GetRole()
-
-		// Handle different content types
 		var content string
 		switch rawContent := msg.GetContent().AsAny().(type) {
 		case string:
-			// Direct string content
 			content = rawContent
 		case *string:
 			content = *rawContent
 		case []interface{}:
-			// Array content (e.g., for multi-modal inputs)
 			contentBuilder := strings.Builder{}
 			for _, item := range rawContent {
-				// Try to extract text content from array items
 				if itemMap, ok := item.(map[string]interface{}); ok {
 					if text, exists := itemMap["text"].(string); exists {
 						contentBuilder.WriteString(text)
@@ -447,18 +425,24 @@ func (modImpl *moderationImpl) CheckChatPrompts(ctx context.Context, messages []
 			}
 			content = contentBuilder.String()
 		default:
-			// Convert to string as fallback
 			contentBytes, _ := json.Marshal(rawContent)
 			content = string(contentBytes)
 		}
 
-		// Skip empty content
 		if strings.TrimSpace(content) == "" {
 			continue
 		}
 
-		// Check if content is sensitive using existing method
-		result, err := modImpl.checkLLMPrompt(ctx, content, uuid, isStream)
+		mode := types.TextModerationModeNonStream
+		if isStream {
+			mode = types.TextModerationModeStream
+		}
+		result, err := modImpl.CheckText(ctx, types.TextModerationRequest{
+			Content: content,
+			Key:     uuid,
+			Phase:   types.TextModerationPhasePrompt,
+			Mode:    mode,
+		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to check message content: %w", err)
 		}
@@ -473,8 +457,36 @@ func (modImpl *moderationImpl) CheckChatPrompts(ctx context.Context, messages []
 		}
 	}
 
-	// No sensitive content found in any message
 	return &rpc.CheckResult{IsSensitive: false}, nil
+}
+
+func (modImpl *moderationImpl) CheckText(ctx context.Context, req types.TextModerationRequest) (*rpc.CheckResult, error) {
+	switch req.Phase {
+	case types.TextModerationPhasePrompt:
+		return modImpl.checkPromptText(ctx, req.Content, req.Key, req.Mode == types.TextModerationModeStream)
+	case types.TextModerationPhaseResponse:
+		if req.Mode == types.TextModerationModeStream {
+			return modImpl.checkStreamResponseText(ctx, req.Content, req.Key)
+		}
+		return modImpl.checkResponseText(ctx, req.Content)
+	default:
+		return &rpc.CheckResult{IsSensitive: false}, nil
+	}
+}
+
+func (modImpl *moderationImpl) checkPromptText(ctx context.Context, content string, checkKey string, isStream bool) (*rpc.CheckResult, error) {
+	if modImpl.modSvcClient == nil {
+		return &rpc.CheckResult{IsSensitive: false}, nil
+	}
+	if strings.TrimSpace(content) == "" {
+		return &rpc.CheckResult{IsSensitive: false}, nil
+	}
+	result, err := modImpl.checkLLMPrompt(ctx, content, checkKey, isStream)
+	if err != nil {
+		return nil, err
+	}
+	modImpl.postCheck(ctx, result)
+	return result, nil
 }
 
 // CheckLLMPrompt checks if the prompt is sensitive.
@@ -588,28 +600,68 @@ func (modImpl *moderationImpl) checkLLMPrompt(ctx context.Context, content, key 
 }
 
 func (modImpl *moderationImpl) CheckChatStreamResponse(ctx context.Context, chunk types.ChatCompletionChunk, uuid string) (*rpc.CheckResult, error) {
-	if modImpl.streamChecker != nil {
-		return modImpl.streamChecker.CheckChatStreamResponse(ctx, chunk, uuid)
+	return modImpl.checkStreamResponseText(ctx, chatCompletionChunkModerationText(chunk), uuid)
+}
+
+func (modImpl *moderationImpl) checkStreamResponseText(ctx context.Context, content string, sessionID string) (*rpc.CheckResult, error) {
+	if modImpl.streamChecker == nil {
+		return &rpc.CheckResult{IsSensitive: false}, nil
 	}
-	return &rpc.CheckResult{IsSensitive: false}, nil
+	return modImpl.streamChecker.CheckStreamResponseText(ctx, content, sessionID)
 }
 
 func (modImpl *moderationImpl) CheckChatNonStreamResponse(ctx context.Context, completion types.ChatCompletion) (*rpc.CheckResult, error) {
-	if modImpl.modSvcClient == nil {
-		return &rpc.CheckResult{IsSensitive: false}, nil
-	}
 	if len(completion.Choices) == 0 {
 		return &rpc.CheckResult{IsSensitive: false}, nil
 	}
 	if completion.Choices[0].Message.Content == "" {
 		return &rpc.CheckResult{IsSensitive: false}, nil
 	}
-	result, err := modImpl.modSvcClient.PassTextCheck(ctx, commontypes.ScenarioChatDetection, completion.Choices[0].Message.Content)
+	return modImpl.CheckText(ctx, types.TextModerationRequest{
+		Content: completion.Choices[0].Message.Content,
+		Key:     "",
+		Phase:   types.TextModerationPhaseResponse,
+		Mode:    types.TextModerationModeNonStream,
+	})
+}
+
+func (modImpl *moderationImpl) checkResponseText(ctx context.Context, content string) (*rpc.CheckResult, error) {
+	if modImpl.modSvcClient == nil {
+		return &rpc.CheckResult{IsSensitive: false}, nil
+	}
+	if strings.TrimSpace(content) == "" {
+		return &rpc.CheckResult{IsSensitive: false}, nil
+	}
+	result, err := modImpl.modSvcClient.PassTextCheck(ctx, commontypes.ScenarioChatDetection, content)
 	if err != nil {
 		return nil, err
 	}
 	modImpl.postCheck(ctx, result)
 	return result, nil
+}
+
+func chatCompletionChunkModerationText(chunk types.ChatCompletionChunk) string {
+	var b strings.Builder
+	for _, choice := range chunk.Choices {
+		writeTextModerationPart(&b, choice.Delta.Content)
+		writeTextModerationPart(&b, choice.Delta.ReasoningContent)
+		writeTextModerationPart(&b, choice.Delta.Refusal)
+		for _, call := range choice.Delta.ToolCalls {
+			writeTextModerationPart(&b, call.Function.Name)
+			writeTextModerationPart(&b, call.Function.Arguments)
+		}
+	}
+	return b.String()
+}
+
+func writeTextModerationPart(b *strings.Builder, text string) {
+	if strings.TrimSpace(text) == "" {
+		return
+	}
+	if b.Len() > 0 {
+		b.WriteByte('\n')
+	}
+	b.WriteString(text)
 }
 
 func (modImpl *moderationImpl) postCheck(ctx context.Context, result *rpc.CheckResult) {

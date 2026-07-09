@@ -23,6 +23,7 @@ import (
 	"opencsg.com/csghub-server/aigateway/component/adapter/text2video"
 	"opencsg.com/csghub-server/aigateway/component/availability"
 	llmtrace "opencsg.com/csghub-server/aigateway/component/trace"
+	responsespkg "opencsg.com/csghub-server/aigateway/handler/responses"
 	"opencsg.com/csghub-server/aigateway/token"
 	"opencsg.com/csghub-server/aigateway/types"
 	"opencsg.com/csghub-server/api/httpbase"
@@ -104,6 +105,7 @@ func NewOpenAIHandlerFromConfig(config *config.Config) (OpenAIHandler, error) {
 			ContentCapture:       config.AIGateway.LLMTraceContentCapture,
 			MaxContentLength:     config.AIGateway.LLMTraceMaxContentLength,
 			MaxInputUserMessages: config.AIGateway.LLMTraceMaxInputUserMessages,
+			ToolDefinitionsMode:  config.AIGateway.LLMTraceToolDefinitionsMode,
 		})
 		if traceErr != nil {
 			slog.Warn("failed to create llm tracer", slog.Any("error", traceErr))
@@ -252,7 +254,7 @@ type OpenAIHandlerImpl struct {
 	availabilityManager        availability.AvailabilityManager
 	chatAttemptFailureReporter ChatAttemptFailureReporter
 	llmTracer                  llmtrace.LLMTracer
-	responsesIDMapper          *ResponsesIDMapper
+	responsesIDMapper          *responsespkg.IDMapper
 	responsesIDMapperOnce      sync.Once
 	responsesIDMapperErr       error
 }

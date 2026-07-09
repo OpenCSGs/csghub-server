@@ -279,3 +279,136 @@ func TestSensitivePolicyImpl_CheckChatSensitive(t *testing.T) {
 		assert.Equal(t, expectedResult, result)
 	})
 }
+
+func TestSensitivePolicyImpl_CheckResponsesSensitive(t *testing.T) {
+	ctx := context.Background()
+
+	modelWithCheck := &types.Model{
+		BaseModel: types.BaseModel{ID: "Qwen/Qwen3Guard"},
+		ExternalModelInfo: types.ExternalModelInfo{
+			NeedSensitiveCheck: true,
+		},
+	}
+
+	t.Run("nil model returns false", func(t *testing.T) {
+		mockModeration := mockcomp.NewMockModeration(t)
+		mockWhitelist := mockdatabase.NewMockRepositoryFileCheckRuleStore(t)
+		policy := NewSensitivePolicy(mockModeration, mockWhitelist).(*sensitivePolicyImpl)
+
+		needCheck, result, err := policy.CheckResponsesSensitive(ctx, nil, "prompt text", "uuid", false, "")
+		assert.NoError(t, err)
+		assert.False(t, needCheck)
+		assert.Nil(t, result)
+	})
+
+	t.Run("NeedSensitiveCheck is false returns false", func(t *testing.T) {
+		mockModeration := mockcomp.NewMockModeration(t)
+		mockWhitelist := mockdatabase.NewMockRepositoryFileCheckRuleStore(t)
+		policy := NewSensitivePolicy(mockModeration, mockWhitelist).(*sensitivePolicyImpl)
+
+		needCheck, result, err := policy.CheckResponsesSensitive(ctx, &types.Model{}, "prompt text", "uuid", false, "")
+		assert.NoError(t, err)
+		assert.False(t, needCheck)
+		assert.Nil(t, result)
+	})
+
+	t.Run("moderation is nil returns false", func(t *testing.T) {
+		mockWhitelist := mockdatabase.NewMockRepositoryFileCheckRuleStore(t)
+		policy := NewSensitivePolicy(nil, mockWhitelist).(*sensitivePolicyImpl)
+
+		needCheck, result, err := policy.CheckResponsesSensitive(ctx, modelWithCheck, "prompt text", "uuid", false, "")
+		assert.NoError(t, err)
+		assert.False(t, needCheck)
+		assert.Nil(t, result)
+	})
+
+	t.Run("empty prompt text enables output moderation without RPC", func(t *testing.T) {
+		mockModeration := mockcomp.NewMockModeration(t)
+		mockWhitelist := mockdatabase.NewMockRepositoryFileCheckRuleStore(t)
+		policy := NewSensitivePolicy(mockModeration, mockWhitelist).(*sensitivePolicyImpl)
+
+		mockWhitelist.EXPECT().ListBySensitiveCheckTargets(ctx, []string{"qwen"}, "Qwen/Qwen3Guard").Return(
+			[]database.RepositoryFileCheckRule{}, nil,
+		).Once()
+
+		needCheck, result, err := policy.CheckResponsesSensitive(ctx, modelWithCheck, "  \n ", "uuid", false, "")
+		assert.NoError(t, err)
+		assert.True(t, needCheck)
+		assert.Equal(t, &rpc.CheckResult{IsSensitive: false}, result)
+		mockModeration.AssertNotCalled(t, "CheckText")
+	})
+
+	t.Run("whitelist hit skips moderation", func(t *testing.T) {
+		mockModeration := mockcomp.NewMockModeration(t)
+		mockWhitelist := mockdatabase.NewMockRepositoryFileCheckRuleStore(t)
+		policy := NewSensitivePolicy(mockModeration, mockWhitelist).(*sensitivePolicyImpl)
+
+		mockWhitelist.EXPECT().ListBySensitiveCheckTargets(ctx, []string{"qwen"}, "Qwen/Qwen3Guard").Return(
+			[]database.RepositoryFileCheckRule{{RuleType: database.RuleTypeNamespace, Pattern: "qwen"}}, nil,
+		).Once()
+
+		needCheck, result, err := policy.CheckResponsesSensitive(ctx, modelWithCheck, "prompt text", "uuid", false, "")
+		assert.NoError(t, err)
+		assert.False(t, needCheck)
+		assert.Nil(t, result)
+	})
+
+	t.Run("moderation returns sensitive content", func(t *testing.T) {
+		mockModeration := mockcomp.NewMockModeration(t)
+		mockWhitelist := mockdatabase.NewMockRepositoryFileCheckRuleStore(t)
+		policy := NewSensitivePolicy(mockModeration, mockWhitelist).(*sensitivePolicyImpl)
+
+		expectedResult := &rpc.CheckResult{IsSensitive: true, Reason: "toxic"}
+		mockWhitelist.EXPECT().ListBySensitiveCheckTargets(mock.Anything, mock.Anything, mock.Anything).Return([]database.RepositoryFileCheckRule{}, nil).Once()
+		mockModeration.EXPECT().CheckText(ctx, types.TextModerationRequest{
+			Content: "prompt text",
+			Key:     "uuid:Qwen/Qwen3Guard",
+			Phase:   types.TextModerationPhasePrompt,
+			Mode:    types.TextModerationModeNonStream,
+		}).Return(expectedResult, nil).Once()
+
+		needCheck, result, err := policy.CheckResponsesSensitive(ctx, modelWithCheck, "prompt text", "uuid", false, "")
+		assert.NoError(t, err)
+		assert.True(t, needCheck)
+		assert.Equal(t, expectedResult, result)
+	})
+
+	t.Run("moderation returns clean content", func(t *testing.T) {
+		mockModeration := mockcomp.NewMockModeration(t)
+		mockWhitelist := mockdatabase.NewMockRepositoryFileCheckRuleStore(t)
+		policy := NewSensitivePolicy(mockModeration, mockWhitelist).(*sensitivePolicyImpl)
+
+		expectedResult := &rpc.CheckResult{IsSensitive: false}
+		mockWhitelist.EXPECT().ListBySensitiveCheckTargets(mock.Anything, mock.Anything, mock.Anything).Return([]database.RepositoryFileCheckRule{}, nil).Once()
+		mockModeration.EXPECT().CheckText(ctx, types.TextModerationRequest{
+			Content: "safe prompt",
+			Key:     "uuid:Qwen/Qwen3Guard",
+			Phase:   types.TextModerationPhasePrompt,
+			Mode:    types.TextModerationModeStream,
+		}).Return(expectedResult, nil).Once()
+
+		needCheck, result, err := policy.CheckResponsesSensitive(ctx, modelWithCheck, "safe prompt", "uuid", true, "")
+		assert.NoError(t, err)
+		assert.True(t, needCheck)
+		assert.Equal(t, expectedResult, result)
+	})
+
+	t.Run("moderation error returned", func(t *testing.T) {
+		mockModeration := mockcomp.NewMockModeration(t)
+		mockWhitelist := mockdatabase.NewMockRepositoryFileCheckRuleStore(t)
+		policy := NewSensitivePolicy(mockModeration, mockWhitelist).(*sensitivePolicyImpl)
+
+		mockWhitelist.EXPECT().ListBySensitiveCheckTargets(mock.Anything, mock.Anything, mock.Anything).Return([]database.RepositoryFileCheckRule{}, nil).Once()
+		mockModeration.EXPECT().CheckText(ctx, types.TextModerationRequest{
+			Content: "prompt text",
+			Key:     "uuid:Qwen/Qwen3Guard",
+			Phase:   types.TextModerationPhasePrompt,
+			Mode:    types.TextModerationModeNonStream,
+		}).Return(nil, errors.New("mod api error")).Once()
+
+		needCheck, result, err := policy.CheckResponsesSensitive(ctx, modelWithCheck, "prompt text", "uuid", false, "")
+		assert.ErrorContains(t, err, "failed to call moderation error:mod api error")
+		assert.False(t, needCheck)
+		assert.Nil(t, result)
+	})
+}

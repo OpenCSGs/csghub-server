@@ -262,6 +262,25 @@ func TestSigilTracerRecordsEmbeddingSpan(t *testing.T) {
 	require.True(t, spanHasInt64Attr(spans, "gen_ai.embeddings.dimension.count", 1536))
 }
 
+func TestParseToolDefinitionsMode(t *testing.T) {
+	tests := []struct {
+		input string
+		full  bool
+	}{
+		{"", false},
+		{"name_only", false},
+		{"NAME_ONLY", false},
+		{"full", true},
+		{"FULL", true},
+		{"unknown", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			require.Equal(t, tt.full, parseToolDefinitionsMode(tt.input) == toolDefinitionsModeFull)
+		})
+	}
+}
+
 func TestParseContentCapture(t *testing.T) {
 	tests := []struct {
 		name  string
@@ -621,7 +640,7 @@ func TestSigilTracer_SetsToolDefinitionsAndResponseAttributes(t *testing.T) {
 		_ = provider.Shutdown(context.Background())
 	})
 
-	tracer, err := NewSigilTracer(SigilConfig{ContentCapture: "full"})
+	tracer, err := NewSigilTracer(SigilConfig{ContentCapture: "full", ToolDefinitionsMode: "full"})
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = tracer.Shutdown(context.Background()) })
 
@@ -667,7 +686,7 @@ func TestSigilTracer_TruncatesMessageAndToolDefinitionContent(t *testing.T) {
 		_ = provider.Shutdown(context.Background())
 	})
 
-	tracer, err := NewSigilTracer(SigilConfig{ContentCapture: "full", MaxContentLength: 5, MaxInputUserMessages: 1})
+	tracer, err := NewSigilTracer(SigilConfig{ContentCapture: "full", ToolDefinitionsMode: "full", MaxContentLength: 5, MaxInputUserMessages: 1})
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = tracer.Shutdown(context.Background()) })
 

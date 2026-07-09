@@ -96,6 +96,76 @@ func (_c *MockSensitivePolicy_CheckChatSensitive_Call) RunAndReturn(run func(con
 	return _c
 }
 
+// CheckResponsesSensitive provides a mock function with given fields: ctx, model, promptText, userUUID, stream, provider
+func (_m *MockSensitivePolicy) CheckResponsesSensitive(ctx context.Context, model *types.Model, promptText string, userUUID string, stream bool, provider string) (bool, *rpc.CheckResult, error) {
+	ret := _m.Called(ctx, model, promptText, userUUID, stream, provider)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CheckResponsesSensitive")
+	}
+
+	var r0 bool
+	var r1 *rpc.CheckResult
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, *types.Model, string, string, bool, string) (bool, *rpc.CheckResult, error)); ok {
+		return rf(ctx, model, promptText, userUUID, stream, provider)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *types.Model, string, string, bool, string) bool); ok {
+		r0 = rf(ctx, model, promptText, userUUID, stream, provider)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *types.Model, string, string, bool, string) *rpc.CheckResult); ok {
+		r1 = rf(ctx, model, promptText, userUUID, stream, provider)
+	} else {
+		if ret.Get(1) != nil {
+			r1 = ret.Get(1).(*rpc.CheckResult)
+		}
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, *types.Model, string, string, bool, string) error); ok {
+		r2 = rf(ctx, model, promptText, userUUID, stream, provider)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
+// MockSensitivePolicy_CheckResponsesSensitive_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CheckResponsesSensitive'
+type MockSensitivePolicy_CheckResponsesSensitive_Call struct {
+	*mock.Call
+}
+
+// CheckResponsesSensitive is a helper method to define mock.On call
+//   - ctx context.Context
+//   - model *types.Model
+//   - promptText string
+//   - userUUID string
+//   - stream bool
+//   - provider string
+func (_e *MockSensitivePolicy_Expecter) CheckResponsesSensitive(ctx interface{}, model interface{}, promptText interface{}, userUUID interface{}, stream interface{}, provider interface{}) *MockSensitivePolicy_CheckResponsesSensitive_Call {
+	return &MockSensitivePolicy_CheckResponsesSensitive_Call{Call: _e.mock.On("CheckResponsesSensitive", ctx, model, promptText, userUUID, stream, provider)}
+}
+
+func (_c *MockSensitivePolicy_CheckResponsesSensitive_Call) Run(run func(ctx context.Context, model *types.Model, promptText string, userUUID string, stream bool, provider string)) *MockSensitivePolicy_CheckResponsesSensitive_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(*types.Model), args[2].(string), args[3].(string), args[4].(bool), args[5].(string))
+	})
+	return _c
+}
+
+func (_c *MockSensitivePolicy_CheckResponsesSensitive_Call) Return(_a0 bool, _a1 *rpc.CheckResult, _a2 error) *MockSensitivePolicy_CheckResponsesSensitive_Call {
+	_c.Call.Return(_a0, _a1, _a2)
+	return _c
+}
+
+func (_c *MockSensitivePolicy_CheckResponsesSensitive_Call) RunAndReturn(run func(context.Context, *types.Model, string, string, bool, string) (bool, *rpc.CheckResult, error)) *MockSensitivePolicy_CheckResponsesSensitive_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // NewMockSensitivePolicy creates a new instance of MockSensitivePolicy. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func NewMockSensitivePolicy(t interface {

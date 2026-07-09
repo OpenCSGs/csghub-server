@@ -4,13 +4,18 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	responsespkg "opencsg.com/csghub-server/aigateway/handler/responses"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	mockcomp "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/aigateway/component"
 	"opencsg.com/csghub-server/aigateway/token"
 	"opencsg.com/csghub-server/aigateway/types"
+	"opencsg.com/csghub-server/builder/rpc"
 )
 
 func TestCaptureResponsesCounterEventForwardsStreamEvent(t *testing.T) {
@@ -28,8 +33,8 @@ func TestCaptureResponsesCounterEventForwardsStreamEvent(t *testing.T) {
 		},
 	}
 
-	w := newResponsesAdapterStreamWriter(ctx.Writer, "public-model", counter)
-	w.captureResponsesCounterEvent(responsesStreamOutputTextDeltaEvent{
+	w := newResponsesAdapterStreamWriter(ctx.Writer, "public-model", counter, nil, "")
+	w.captureResponsesCounterEvent(responsespkg.StreamOutputTextDeltaEvent{
 		Type:         "response.output_text.delta",
 		ResponseID:   w.respID,
 		ItemID:       "msg_1",
@@ -59,7 +64,7 @@ func TestCaptureResponsesCounterEventSkipsPayloadsWithoutType(t *testing.T) {
 		},
 	}
 
-	w := newResponsesAdapterStreamWriter(ctx.Writer, "public-model", counter)
+	w := newResponsesAdapterStreamWriter(ctx.Writer, "public-model", counter, nil, "")
 	w.captureResponsesCounterEvent(map[string]any{"not_a_type": true})
 
 	mu.Lock()
@@ -72,9 +77,9 @@ func TestCaptureResponsesCounterEventHandlesNilCounter(t *testing.T) {
 	rec := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(rec)
 
-	w := newResponsesAdapterStreamWriter(ctx.Writer, "public-model", nil)
+	w := newResponsesAdapterStreamWriter(ctx.Writer, "public-model", nil, nil, "")
 	require.NotPanics(t, func() {
-		w.captureResponsesCounterEvent(responsesStreamOutputTextDeltaEvent{Type: "response.output_text.delta"})
+		w.captureResponsesCounterEvent(responsespkg.StreamOutputTextDeltaEvent{Type: "response.output_text.delta"})
 	})
 }
 
@@ -84,7 +89,7 @@ func TestCaptureResponsesCounterEventHandlesNilPayload(t *testing.T) {
 	ctx, _ := gin.CreateTestContext(rec)
 
 	counter := &streamCaptureCounter{}
-	w := newResponsesAdapterStreamWriter(ctx.Writer, "public-model", counter)
+	w := newResponsesAdapterStreamWriter(ctx.Writer, "public-model", counter, nil, "")
 	require.NotPanics(t, func() {
 		w.captureResponsesCounterEvent(nil)
 	})
@@ -122,7 +127,7 @@ func TestResponsesAdapterStreamWriterPassthroughUpstreamJSONError(t *testing.T) 
 	rec := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(rec)
 
-	w := newResponsesAdapterStreamWriter(ctx.Writer, "public-model", nil)
+	w := newResponsesAdapterStreamWriter(ctx.Writer, "public-model", nil, nil, "")
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusTooManyRequests)
 	_, err := w.Write([]byte(`{"error":{"message":"rate limited","type":"rate_limit_error","code":"rate_limit_exceeded"}}`))
@@ -141,9 +146,38 @@ func TestResponsesAdapterStreamWriterFinalizeSkipsCompletionOnErrorStatus(t *tes
 	rec := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(rec)
 
-	w := newResponsesAdapterStreamWriter(ctx.Writer, "public-model", nil)
+	w := newResponsesAdapterStreamWriter(ctx.Writer, "public-model", nil, nil, "")
 	require.NoError(t, w.Finalize(http.StatusBadGateway))
 
 	require.NotContains(t, rec.Body.String(), "response.completed")
 	require.NotContains(t, rec.Body.String(), "[DONE]")
+}
+
+func TestResponsesAdapterStreamWriterModeratesRefusalDelta(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	rec := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(rec)
+
+	moderation := mockcomp.NewMockModeration(t)
+	moderation.EXPECT().CheckText(
+		mock.MatchedBy(func(ctx context.Context) bool {
+			deadline, ok := ctx.Deadline()
+			return ok && time.Until(deadline) <= responsespkg.ModerationTimeout
+		}),
+		types.TextModerationRequest{
+			Content: "blocked refusal",
+			Key:     "session-1",
+			Phase:   types.TextModerationPhaseResponse,
+			Mode:    types.TextModerationModeStream,
+		},
+	).Return(&rpc.CheckResult{IsSensitive: true, Reason: "toxic"}, nil).Once()
+
+	w := newResponsesAdapterStreamWriter(ctx.Writer, "public-model", nil, moderation, "session-1")
+	w.WriteHeader(http.StatusOK)
+	_, err := w.Write([]byte(`data: {"id":"chatcmpl_1","choices":[{"index":0,"delta":{"refusal":"blocked refusal"},"finish_reason":"stop"}]}` + "\n\n"))
+	require.NoError(t, err)
+
+	body := rec.Body.String()
+	require.Contains(t, body, responsespkg.BlockedMessage)
+	require.NotContains(t, body, "blocked refusal")
 }

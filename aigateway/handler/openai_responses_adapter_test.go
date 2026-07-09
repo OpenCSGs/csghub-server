@@ -44,7 +44,7 @@ func TestExecuteAdapterResponsesSetsStreamHeader(t *testing.T) {
 	req := &types.ResponsesRequest{Model: "adapter-model", Input: json.RawMessage(`"hi"`), Stream: true}
 	modelTarget := &resolvedModelTarget{Model: model, ModelName: "upstream-model", Target: upstream.URL + "/v1/chat/completions", Host: upstream.URL}
 
-	tester.handler.executeAdapterResponses(c, req, modelTarget, "testuuid", "apikey", "adapter-model")
+	tester.handler.executeAdapterResponses(c, req, modelTarget, "testuuid", "apikey", "adapter-model", nil, nil, nil)
 
 	require.Equal(t, "text/event-stream", c.Writer.Header().Get("Content-Type"))
 }
@@ -79,7 +79,7 @@ func TestExecuteAdapterResponsesStreamPassthroughUpstreamJSONError(t *testing.T)
 	req := &types.ResponsesRequest{Model: "adapter-model", Input: json.RawMessage(`"hi"`), Stream: true}
 	modelTarget := &resolvedModelTarget{Model: model, ModelName: "upstream-model", Target: upstream.URL + "/v1/chat/completions", Host: upstream.URL}
 
-	tester.handler.executeAdapterResponses(c, req, modelTarget, "testuuid", "apikey", "adapter-model")
+	tester.handler.executeAdapterResponses(c, req, modelTarget, "testuuid", "apikey", "adapter-model", nil, nil, nil)
 
 	require.Equal(t, http.StatusTooManyRequests, w.Code)
 	require.Equal(t, "application/json", w.Header().Get("Content-Type"))

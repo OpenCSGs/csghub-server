@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	responsespkg "opencsg.com/csghub-server/aigateway/handler/responses"
 	"strings"
 	"testing"
 
@@ -67,9 +68,12 @@ func TestResolveModelTargetWithOptionsRequiredUpstreamID(t *testing.T) {
 	require.Equal(t, "https://native.example.com/v1/chat/completions", resolved.Target)
 	require.Equal(t, "gpt-4o", resolved.ModelName)
 
-	decision, err := resolveResponsesRouting(resolved)
+	decision, err := responsespkg.ResolveRouting(responsespkg.RoutingTarget{
+		ModelID: resolved.Model.ID,
+		Target:  resolved.Target,
+	})
 	require.NoError(t, err)
-	require.Equal(t, ResponsesModeChatAdapter, decision.Mode)
+	require.Equal(t, responsespkg.ResponsesModeChatAdapter, decision.Mode)
 	require.Empty(t, decision.NativeURL)
 }
 

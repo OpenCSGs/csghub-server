@@ -325,6 +325,65 @@ func (_c *MockModeration_CheckImagePrompts_Call) RunAndReturn(run func(context.C
 	return _c
 }
 
+// CheckText provides a mock function with given fields: ctx, req
+func (_m *MockModeration) CheckText(ctx context.Context, req types.TextModerationRequest) (*rpc.CheckResult, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CheckText")
+	}
+
+	var r0 *rpc.CheckResult
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.TextModerationRequest) (*rpc.CheckResult, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.TextModerationRequest) *rpc.CheckResult); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*rpc.CheckResult)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.TextModerationRequest) error); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockModeration_CheckText_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CheckText'
+type MockModeration_CheckText_Call struct {
+	*mock.Call
+}
+
+// CheckText is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req types.TextModerationRequest
+func (_e *MockModeration_Expecter) CheckText(ctx interface{}, req interface{}) *MockModeration_CheckText_Call {
+	return &MockModeration_CheckText_Call{Call: _e.mock.On("CheckText", ctx, req)}
+}
+
+func (_c *MockModeration_CheckText_Call) Run(run func(ctx context.Context, req types.TextModerationRequest)) *MockModeration_CheckText_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.TextModerationRequest))
+	})
+	return _c
+}
+
+func (_c *MockModeration_CheckText_Call) Return(_a0 *rpc.CheckResult, _a1 error) *MockModeration_CheckText_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockModeration_CheckText_Call) RunAndReturn(run func(context.Context, types.TextModerationRequest) (*rpc.CheckResult, error)) *MockModeration_CheckText_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // CloseStreamCheck provides a mock function with given fields: ctx, uuid
 func (_m *MockModeration) CloseStreamCheck(ctx context.Context, uuid string) (*rpc.CheckResult, error) {
 	ret := _m.Called(ctx, uuid)

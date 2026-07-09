@@ -1,7 +1,6 @@
-package handler
+package responses
 
 import (
-	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -9,10 +8,10 @@ import (
 )
 
 func TestResponsesIDMapperWrapUnwrap(t *testing.T) {
-	mapper, err := newResponsesIDMapper("test-secret")
+	mapper, err := NewIDMapper("test-secret")
 	require.NoError(t, err)
 
-	id, err := mapper.Wrap(responsesIDClaims{
+	id, err := mapper.Wrap(IDClaims{
 		UpstreamResponseID: "resp_openai_123",
 		UpstreamID:         42,
 		NamespaceUUID:      "namespace-1",
@@ -28,20 +27,20 @@ func TestResponsesIDMapperWrapUnwrap(t *testing.T) {
 }
 
 func TestResponsesIDMapperRejectsOtherOwner(t *testing.T) {
-	mapper, err := newResponsesIDMapper("test-secret")
+	mapper, err := NewIDMapper("test-secret")
 	require.NoError(t, err)
-	id, err := mapper.Wrap(responsesIDClaims{UpstreamResponseID: "resp_1", UpstreamID: 1, NamespaceUUID: "namespace-1"})
+	id, err := mapper.Wrap(IDClaims{UpstreamResponseID: "resp_1", UpstreamID: 1, NamespaceUUID: "namespace-1"})
 	require.NoError(t, err)
 
 	_, err = mapper.Unwrap(id, "namespace-2")
-	require.ErrorIs(t, err, errResponseIDOwner)
+	require.ErrorIs(t, err, ErrResponseIDOwner)
 }
 
 func TestResponsesIDMapperRequiresUpstreamID(t *testing.T) {
-	mapper, err := newResponsesIDMapper("test-secret")
+	mapper, err := NewIDMapper("test-secret")
 	require.NoError(t, err)
 
-	_, err = mapper.Wrap(responsesIDClaims{UpstreamResponseID: "resp_1", NamespaceUUID: "namespace-1"})
+	_, err = mapper.Wrap(IDClaims{UpstreamResponseID: "resp_1", NamespaceUUID: "namespace-1"})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "upstream id is empty")
 }
@@ -49,10 +48,10 @@ func TestResponsesIDMapperRequiresUpstreamID(t *testing.T) {
 func TestResponsesIDMapperFromConfigUsesResponsesSecret(t *testing.T) {
 	cfg := &config.Config{}
 	cfg.AIGateway.ResponsesIDSecret = "responses-secret"
-	mapper, err := newResponsesIDMapperFromConfig(cfg)
+	mapper, err := NewIDMapperFromConfig(cfg)
 	require.NoError(t, err)
 
-	id, err := mapper.Wrap(responsesIDClaims{UpstreamResponseID: "resp_1", UpstreamID: 1, NamespaceUUID: "namespace-1"})
+	id, err := mapper.Wrap(IDClaims{UpstreamResponseID: "resp_1", UpstreamID: 1, NamespaceUUID: "namespace-1"})
 	require.NoError(t, err)
 	claims, err := mapper.Unwrap(id, "namespace-1")
 	require.NoError(t, err)
@@ -64,43 +63,7 @@ func TestResponsesIDMapperFromConfigDoesNotFallbackToSpaceOrJWTSecrets(t *testin
 	cfg.Space.SessionSecretKey = "space-secret"
 	cfg.JWT.SigningKey = "jwt-secret"
 
-	_, err := newResponsesIDMapperFromConfig(cfg)
+	_, err := NewIDMapperFromConfig(cfg)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "responses id mapper secret is empty")
-}
-
-func TestGetResponsesIDMapperConcurrentInit(t *testing.T) {
-	cfg := &config.Config{}
-	cfg.AIGateway.ResponsesIDSecret = "responses-secret"
-	h := &OpenAIHandlerImpl{config: cfg}
-
-	const workers = 20
-	var wg sync.WaitGroup
-	errs := make(chan error, workers)
-	mappers := make(chan *ResponsesIDMapper, workers)
-	for i := 0; i < workers; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			mapper, err := h.getResponsesIDMapper()
-			errs <- err
-			mappers <- mapper
-		}()
-	}
-	wg.Wait()
-	close(errs)
-	close(mappers)
-
-	for err := range errs {
-		require.NoError(t, err)
-	}
-	var first *ResponsesIDMapper
-	for mapper := range mappers {
-		require.NotNil(t, mapper)
-		if first == nil {
-			first = mapper
-			continue
-		}
-		require.Same(t, first, mapper)
-	}
 }

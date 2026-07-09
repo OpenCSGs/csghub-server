@@ -71,8 +71,8 @@ type MockStreamChecker struct {
 	mock.Mock
 }
 
-func (m *MockStreamChecker) CheckChatStreamResponse(ctx context.Context, chunk types.ChatCompletionChunk, uuid string) (*rpc.CheckResult, error) {
-	args := m.Called(ctx, chunk, uuid)
+func (m *MockStreamChecker) CheckStreamResponseText(ctx context.Context, content string, sessionID string) (*rpc.CheckResult, error) {
+	args := m.Called(ctx, content, sessionID)
 	if args.Get(0) != nil {
 		return args.Get(0).(*rpc.CheckResult), args.Error(1)
 	}
@@ -87,7 +87,7 @@ func (m *MockStreamChecker) CloseStreamCheck(ctx context.Context, uuid string) (
 	return nil, args.Error(1)
 }
 
-func TestSyncStreamChecker_CheckChatStreamResponse(t *testing.T) {
+func TestSyncStreamChecker_CheckStreamResponseText(t *testing.T) {
 	ctx := context.Background()
 	mockSvcClient := new(MockModerationSvcClient)
 
@@ -100,18 +100,12 @@ func TestSyncStreamChecker_CheckChatStreamResponse(t *testing.T) {
 	}
 
 	t.Run("empty chunk", func(t *testing.T) {
-		res, err := checker.CheckChatStreamResponse(ctx, types.ChatCompletionChunk{}, "uuid-1")
+		res, err := checker.CheckStreamResponseText(ctx, "", "uuid-1")
 		assert.NoError(t, err)
 		assert.False(t, res.IsSensitive)
 	})
 
 	t.Run("normal text check pass", func(t *testing.T) {
-		chunk := types.ChatCompletionChunk{
-			Choices: []types.ChatCompletionChunkChoice{
-				{Delta: types.ChatCompletionChunkChoiceDelta{Content: "hello"}},
-			},
-		}
-
 		mockSvcClient.On("PassLLMRespCheck", ctx, commontypes.LLMCheckRequest{
 			Scenario:  commontypes.ScenarioLLMResModeration,
 			Text:      "hello",
@@ -119,7 +113,7 @@ func TestSyncStreamChecker_CheckChatStreamResponse(t *testing.T) {
 			Resumable: true,
 			Stream:    true,
 		}).Return(&rpc.CheckResult{IsSensitive: false}, nil).Once()
-		res, err := checker.CheckChatStreamResponse(ctx, chunk, "uuid-2")
+		res, err := checker.CheckStreamResponseText(ctx, "hello", "uuid-2")
 
 		assert.NoError(t, err)
 		assert.False(t, res.IsSensitive)
@@ -127,12 +121,6 @@ func TestSyncStreamChecker_CheckChatStreamResponse(t *testing.T) {
 	})
 
 	t.Run("sensitive text block", func(t *testing.T) {
-		chunk := types.ChatCompletionChunk{
-			Choices: []types.ChatCompletionChunkChoice{
-				{Delta: types.ChatCompletionChunkChoiceDelta{Content: "bad words"}},
-			},
-		}
-
 		mockSvcClient.On("PassLLMRespCheck", ctx, commontypes.LLMCheckRequest{
 			Scenario:  commontypes.ScenarioLLMResModeration,
 			Text:      "bad words",
@@ -140,7 +128,7 @@ func TestSyncStreamChecker_CheckChatStreamResponse(t *testing.T) {
 			Resumable: true,
 			Stream:    true,
 		}).Return(&rpc.CheckResult{IsSensitive: true, Reason: "toxic"}, nil).Once()
-		res, err := checker.CheckChatStreamResponse(ctx, chunk, "uuid-3")
+		res, err := checker.CheckStreamResponseText(ctx, "bad words", "uuid-3")
 
 		assert.NoError(t, err)
 		assert.True(t, res.IsSensitive)
@@ -156,7 +144,7 @@ func TestSyncStreamChecker_CloseStreamCheck(t *testing.T) {
 	assert.False(t, res.IsSensitive)
 }
 
-func TestAsyncStreamChecker_CheckChatStreamResponse(t *testing.T) {
+func TestAsyncStreamChecker_CheckStreamResponseText(t *testing.T) {
 	ctx := context.Background()
 	mockSvcClient := new(MockModerationSvcClient)
 
@@ -173,31 +161,16 @@ func TestAsyncStreamChecker_CheckChatStreamResponse(t *testing.T) {
 	}
 
 	t.Run("empty chunk", func(t *testing.T) {
-		res, err := checker.CheckChatStreamResponse(ctx, types.ChatCompletionChunk{}, "uuid-1")
+		res, err := checker.CheckStreamResponseText(ctx, "", "uuid-1")
 		assert.NoError(t, err)
 		assert.False(t, res.IsSensitive)
 	})
 
 	t.Run("accumulate chunks", func(t *testing.T) {
-		// First chunk - short, should not trigger check
-		chunk1 := types.ChatCompletionChunk{
-			Choices: []types.ChatCompletionChunkChoice{
-				{Delta: types.ChatCompletionChunkChoiceDelta{Content: "hello"}},
-			},
-		}
-
-		res1, err := checker.CheckChatStreamResponse(ctx, chunk1, "uuid-2")
+		res1, err := checker.CheckStreamResponseText(ctx, "hello", "uuid-2")
 		assert.NoError(t, err)
 		assert.False(t, res1.IsSensitive)
 
-		// Second chunk - total length > maxChars, should trigger async check
-		chunk2 := types.ChatCompletionChunk{
-			Choices: []types.ChatCompletionChunkChoice{
-				{Delta: types.ChatCompletionChunkChoiceDelta{Content: " world"}},
-			},
-		}
-
-		// Setup mock for the async call
 		mockSvcClient.On("PassLLMRespCheck", mock.Anything, commontypes.LLMCheckRequest{
 			Scenario:  commontypes.ScenarioLLMResModeration,
 			Text:      "hello world",
@@ -206,7 +179,7 @@ func TestAsyncStreamChecker_CheckChatStreamResponse(t *testing.T) {
 			Stream:    true,
 		}).Return(&rpc.CheckResult{IsSensitive: false}, nil).Once()
 
-		res2, err := checker.CheckChatStreamResponse(ctx, chunk2, "uuid-2")
+		res2, err := checker.CheckStreamResponseText(ctx, " world", "uuid-2")
 		assert.NoError(t, err)
 		assert.False(t, res2.IsSensitive)
 
@@ -216,12 +189,6 @@ func TestAsyncStreamChecker_CheckChatStreamResponse(t *testing.T) {
 	})
 
 	t.Run("sensitive async result updates cache", func(t *testing.T) {
-		chunk1 := types.ChatCompletionChunk{
-			Choices: []types.ChatCompletionChunkChoice{
-				{Delta: types.ChatCompletionChunkChoiceDelta{Content: "very bad word here"}},
-			},
-		}
-
 		mockSvcClient.On("PassLLMRespCheck", mock.Anything, commontypes.LLMCheckRequest{
 			Scenario:  commontypes.ScenarioLLMResModeration,
 			Text:      "very bad word here",
@@ -230,7 +197,7 @@ func TestAsyncStreamChecker_CheckChatStreamResponse(t *testing.T) {
 			Stream:    true,
 		}).Return(&rpc.CheckResult{IsSensitive: true, Reason: "toxic"}, nil).Once()
 
-		res1, err := checker.CheckChatStreamResponse(ctx, chunk1, "uuid-3")
+		res1, err := checker.CheckStreamResponseText(ctx, "very bad word here", "uuid-3")
 		assert.NoError(t, err)
 		assert.False(t, res1.IsSensitive) // Initial response is always non-sensitive while async check runs
 
@@ -238,14 +205,7 @@ func TestAsyncStreamChecker_CheckChatStreamResponse(t *testing.T) {
 		time.Sleep(100 * time.Millisecond)
 		mockSvcClient.AssertExpectations(t)
 
-		// Next chunk should be blocked immediately based on cache
-		chunk2 := types.ChatCompletionChunk{
-			Choices: []types.ChatCompletionChunkChoice{
-				{Delta: types.ChatCompletionChunkChoiceDelta{Content: "more"}},
-			},
-		}
-
-		res2, err := checker.CheckChatStreamResponse(ctx, chunk2, "uuid-3")
+		res2, err := checker.CheckStreamResponseText(ctx, "more", "uuid-3")
 		assert.NoError(t, err)
 		assert.True(t, res2.IsSensitive)
 		assert.Equal(t, "toxic", res2.Reason)
@@ -275,14 +235,7 @@ func TestAsyncStreamChecker_CloseStreamCheck(t *testing.T) {
 	})
 
 	t.Run("check remaining buffer", func(t *testing.T) {
-		// Put something in buffer first
-		chunk := types.ChatCompletionChunk{
-			Choices: []types.ChatCompletionChunkChoice{
-				{Delta: types.ChatCompletionChunkChoiceDelta{Content: "short"}},
-			},
-		}
-
-		res1, err := checker.CheckChatStreamResponse(ctx, chunk, "uuid-4")
+		res1, err := checker.CheckStreamResponseText(ctx, "short", "uuid-4")
 		assert.NoError(t, err)
 		assert.False(t, res1.IsSensitive)
 
@@ -327,11 +280,18 @@ func TestModerationImpl_CheckChatStreamResponse(t *testing.T) {
 		streamChecker: mockChecker,
 	}
 
-	chunk := types.ChatCompletionChunk{ID: "test-id"}
+	chunk := types.ChatCompletionChunk{
+		ID: "test-id",
+		Choices: []types.ChatCompletionChunkChoice{{
+			Delta: types.ChatCompletionChunkChoiceDelta{
+				Content: "hello",
+			},
+		}},
+	}
 	uuid := "uuid-1"
 	expectedResult := &rpc.CheckResult{IsSensitive: true, Reason: "toxic"}
 
-	mockChecker.On("CheckChatStreamResponse", ctx, chunk, uuid).Return(expectedResult, nil).Once()
+	mockChecker.On("CheckStreamResponseText", ctx, "hello", uuid).Return(expectedResult, nil).Once()
 
 	res, err := modImpl.CheckChatStreamResponse(ctx, chunk, uuid)
 
@@ -410,7 +370,7 @@ func TestModerationImpl_checkLLMPrompt(t *testing.T) {
 	t.Run("short content", func(t *testing.T) {
 		mockSvcClient.ExpectedCalls = nil
 		mockSvcClient.On("PassLLMPromptCheck", mock.Anything, mock.Anything).Return(&rpc.CheckResult{IsSensitive: false}, nil).Once()
-		
+
 		res, err := modImpl.checkLLMPrompt(ctx, "short", "test-key", false)
 		assert.NoError(t, err)
 		assert.False(t, res.IsSensitive)
@@ -420,14 +380,14 @@ func TestModerationImpl_checkLLMPrompt(t *testing.T) {
 		mockSvcClient.ExpectedCalls = nil
 		// 20 chars, max length is 10, so it will be chunked
 		// splitContentIntoChunksByWindow logic: if chunk size is maxContentLength (10)?
-		// wait, splitContentIntoChunksByWindow splits by 2000! 
+		// wait, splitContentIntoChunksByWindow splits by 2000!
 		// Actually, splitContentIntoChunksByWindow has slidingWindowSize = 2000 hardcoded in moderation.go
-		
+
 		// If we use 3000 chars, it will be chunked
 		modImpl.maxContentLength = 2000
 		longText := strings.Repeat("a", 3000)
 		mockSvcClient.On("PassLLMPromptCheck", mock.Anything, mock.Anything).Return(&rpc.CheckResult{IsSensitive: false}, nil)
-		
+
 		res, err := modImpl.checkLLMPrompt(ctx, longText, "test-key", false)
 		assert.NoError(t, err)
 		assert.False(t, res.IsSensitive)
@@ -453,11 +413,11 @@ func TestModerationImpl_CheckChatPrompts(t *testing.T) {
 	t.Run("normal message", func(t *testing.T) {
 		mockSvcClient.ExpectedCalls = nil
 		mockSvcClient.On("PassLLMPromptCheck", mock.Anything, mock.Anything).Return(&rpc.CheckResult{IsSensitive: false}, nil).Once()
-		
+
 		messages := []openai.ChatCompletionMessageParamUnion{
 			openai.UserMessage("Hello"),
 		}
-		
+
 		res, err := modImpl.CheckChatPrompts(ctx, messages, "uuid", false)
 		assert.NoError(t, err)
 		assert.False(t, res.IsSensitive)
@@ -466,14 +426,142 @@ func TestModerationImpl_CheckChatPrompts(t *testing.T) {
 	t.Run("sensitive message", func(t *testing.T) {
 		mockSvcClient.ExpectedCalls = nil
 		mockSvcClient.On("PassLLMPromptCheck", mock.Anything, mock.Anything).Return(&rpc.CheckResult{IsSensitive: true, Reason: "toxic"}, nil).Once()
-		
+
 		messages := []openai.ChatCompletionMessageParamUnion{
 			openai.UserMessage("Bad words"),
 		}
-		
+
 		res, err := modImpl.CheckChatPrompts(ctx, messages, "uuid", false)
 		assert.NoError(t, err)
 		assert.True(t, res.IsSensitive)
 		assert.Equal(t, "toxic", res.Reason)
+	})
+}
+
+func TestModerationImpl_CheckTextPrompt(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("nil modSvcClient", func(t *testing.T) {
+		modImpl := &moderationImpl{modSvcClient: nil}
+		res, err := modImpl.CheckText(ctx, types.TextModerationRequest{
+			Content: "anything",
+			Key:     "uuid",
+			Phase:   types.TextModerationPhasePrompt,
+			Mode:    types.TextModerationModeNonStream,
+		})
+		assert.NoError(t, err)
+		assert.False(t, res.IsSensitive)
+	})
+
+	t.Run("empty content short-circuits without RPC", func(t *testing.T) {
+		mockSvcClient := new(MockModerationSvcClient)
+		modImpl := &moderationImpl{modSvcClient: mockSvcClient, maxContentLength: 2000}
+		res, err := modImpl.CheckText(ctx, types.TextModerationRequest{
+			Content: "   \n  ",
+			Key:     "uuid",
+			Phase:   types.TextModerationPhasePrompt,
+			Mode:    types.TextModerationModeNonStream,
+		})
+		assert.NoError(t, err)
+		assert.False(t, res.IsSensitive)
+		mockSvcClient.AssertNotCalled(t, "PassLLMPromptCheck")
+	})
+
+	t.Run("sensitive content", func(t *testing.T) {
+		mockSvcClient := new(MockModerationSvcClient)
+		mockSvcClient.On("PassLLMPromptCheck", mock.Anything, mock.Anything).
+			Return(&rpc.CheckResult{IsSensitive: true, Reason: "toxic"}, nil).Once()
+		modImpl := &moderationImpl{modSvcClient: mockSvcClient, maxContentLength: 2000}
+
+		res, err := modImpl.CheckText(ctx, types.TextModerationRequest{
+			Content: "bad content",
+			Key:     "uuid",
+			Phase:   types.TextModerationPhasePrompt,
+			Mode:    types.TextModerationModeNonStream,
+		})
+		assert.NoError(t, err)
+		assert.True(t, res.IsSensitive)
+		assert.Equal(t, "toxic", res.Reason)
+	})
+}
+
+func TestModerationImpl_CheckTextResponse(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("nil modSvcClient", func(t *testing.T) {
+		modImpl := &moderationImpl{modSvcClient: nil}
+		res, err := modImpl.CheckText(ctx, types.TextModerationRequest{
+			Content: "anything",
+			Key:     "uuid",
+			Phase:   types.TextModerationPhaseResponse,
+			Mode:    types.TextModerationModeNonStream,
+		})
+		assert.NoError(t, err)
+		assert.False(t, res.IsSensitive)
+	})
+
+	t.Run("empty content short-circuits without RPC", func(t *testing.T) {
+		mockSvcClient := new(MockModerationSvcClient)
+		modImpl := &moderationImpl{modSvcClient: mockSvcClient}
+		res, err := modImpl.CheckText(ctx, types.TextModerationRequest{
+			Content: "",
+			Key:     "uuid",
+			Phase:   types.TextModerationPhaseResponse,
+			Mode:    types.TextModerationModeNonStream,
+		})
+		assert.NoError(t, err)
+		assert.False(t, res.IsSensitive)
+		mockSvcClient.AssertNotCalled(t, "PassTextCheck")
+	})
+
+	t.Run("sensitive content", func(t *testing.T) {
+		mockSvcClient := new(MockModerationSvcClient)
+		mockSvcClient.On("PassTextCheck", mock.Anything, commontypes.ScenarioChatDetection, "bad content").
+			Return(&rpc.CheckResult{IsSensitive: true, Reason: "toxic"}, nil).Once()
+		modImpl := &moderationImpl{modSvcClient: mockSvcClient}
+
+		res, err := modImpl.CheckText(ctx, types.TextModerationRequest{
+			Content: "bad content",
+			Key:     "uuid",
+			Phase:   types.TextModerationPhaseResponse,
+			Mode:    types.TextModerationModeNonStream,
+		})
+		assert.NoError(t, err)
+		assert.True(t, res.IsSensitive)
+		assert.Equal(t, "toxic", res.Reason)
+	})
+}
+
+func TestModerationImpl_CheckTextStreamResponse(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("nil streamChecker short-circuits", func(t *testing.T) {
+		modImpl := &moderationImpl{}
+		res, err := modImpl.CheckText(ctx, types.TextModerationRequest{
+			Content: "anything",
+			Key:     "uuid",
+			Phase:   types.TextModerationPhaseResponse,
+			Mode:    types.TextModerationModeStream,
+		})
+		assert.NoError(t, err)
+		assert.False(t, res.IsSensitive)
+	})
+
+	t.Run("delegates to streamChecker with text", func(t *testing.T) {
+		mockChecker := new(MockStreamChecker)
+		modImpl := &moderationImpl{streamChecker: mockChecker}
+		expected := &rpc.CheckResult{IsSensitive: true, Reason: "toxic"}
+
+		mockChecker.On("CheckStreamResponseText", ctx, "chunk text", "uuid").Return(expected, nil).Once()
+
+		res, err := modImpl.CheckText(ctx, types.TextModerationRequest{
+			Content: "chunk text",
+			Key:     "uuid",
+			Phase:   types.TextModerationPhaseResponse,
+			Mode:    types.TextModerationModeStream,
+		})
+		assert.NoError(t, err)
+		assert.Equal(t, expected, res)
+		mockChecker.AssertExpectations(t)
 	})
 }

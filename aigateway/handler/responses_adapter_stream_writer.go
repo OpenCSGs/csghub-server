@@ -2,6 +2,7 @@ package handler
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -9,7 +10,10 @@ import (
 	"strings"
 	"time"
 
+	responsespkg "opencsg.com/csghub-server/aigateway/handler/responses"
+
 	"github.com/gin-gonic/gin"
+	"opencsg.com/csghub-server/aigateway/component"
 	"opencsg.com/csghub-server/aigateway/handler/streamdecoder"
 	"opencsg.com/csghub-server/aigateway/token"
 	"opencsg.com/csghub-server/aigateway/types"
@@ -45,6 +49,9 @@ type responsesAdapterStreamWriter struct {
 	responsesCounter   token.ResponsesTokenCounter
 	usage              *types.ResponsesUsage
 	toolCallItems      map[int]*responsesToolCallStreamState
+	moderation         component.Moderation
+	sessionID          string
+	logCapture         *responsespkg.LLMLogRecorder
 }
 
 type responsesToolCallStreamState struct {
@@ -55,15 +62,22 @@ type responsesToolCallStreamState struct {
 	Done        bool
 }
 
-func newResponsesAdapterStreamWriter(w gin.ResponseWriter, model string, responsesCounter token.ResponsesTokenCounter) *responsesAdapterStreamWriter {
+func newResponsesAdapterStreamWriter(w gin.ResponseWriter, model string, responsesCounter token.ResponsesTokenCounter, moderation component.Moderation, sessionID string, logCapture ...*responsespkg.LLMLogRecorder) *responsesAdapterStreamWriter {
+	var recorder *responsespkg.LLMLogRecorder
+	if len(logCapture) > 0 {
+		recorder = logCapture[0]
+	}
 	return &responsesAdapterStreamWriter{
 		ginWriter:        w,
-		respID:           newAdapterResponseID(),
+		respID:           responsespkg.NewAdapterResponseID(),
 		model:            model,
 		created:          time.Now().Unix(),
 		decoder:          streamdecoder.NewSSE(),
 		responsesCounter: responsesCounter,
 		toolCallItems:    map[int]*responsesToolCallStreamState{},
+		moderation:       moderation,
+		sessionID:        sessionID,
+		logCapture:       recorder,
 	}
 }
 
@@ -89,6 +103,7 @@ func (w *responsesAdapterStreamWriter) Flush() {
 
 func (w *responsesAdapterStreamWriter) Finalize(statusCode int) error {
 	if isUpstreamHTTPError(statusCode) || w.passthrough || w.failed {
+		w.cleanupStreamModeration()
 		return nil
 	}
 	w.finishResponseStream()
@@ -118,6 +133,9 @@ func (w *responsesAdapterStreamWriter) Write(data []byte) (int, error) {
 			continue
 		}
 		if string(event.Data) == "[DONE]" {
+			ctx, cancel := responsespkg.ModerationContext()
+			w.finishStreamChecks(ctx)
+			cancel()
 			w.finishResponseStream()
 			continue
 		}
@@ -127,13 +145,19 @@ func (w *responsesAdapterStreamWriter) Write(data []byte) (int, error) {
 			continue
 		}
 		w.captureChatStreamUsage(chunk)
+		ctx, cancel := responsespkg.ModerationContext()
+		sensitive := w.checkStreamSensitive(ctx, chunk)
+		cancel()
+		if sensitive {
+			return len(data), nil
+		}
 		w.ensureStarted()
 		w.writeToolCallDeltas(chunk)
 		for _, choice := range chunk.Choices {
 			if reasoning := chatDeltaReasoning(choice.Delta); reasoning != "" {
 				w.ensureReasoningItem()
 				w.reasoning.WriteString(reasoning)
-				w.writeResponsesEvent("response.reasoning_summary_text.delta", responsesStreamReasoningSummaryDeltaEvent{
+				w.writeResponsesEvent("response.reasoning_summary_text.delta", responsespkg.StreamReasoningSummaryDeltaEvent{
 					Type:         "response.reasoning_summary_text.delta",
 					ResponseID:   w.respID,
 					ItemID:       w.reasoningItemID,
@@ -145,7 +169,7 @@ func (w *responsesAdapterStreamWriter) Write(data []byte) (int, error) {
 			if choice.Delta.Refusal != "" {
 				w.ensureRefusalItem()
 				w.refusal.WriteString(choice.Delta.Refusal)
-				w.writeResponsesEvent("response.refusal.delta", responsesStreamRefusalDeltaEvent{
+				w.writeResponsesEvent("response.refusal.delta", responsespkg.StreamRefusalDeltaEvent{
 					Type:         "response.refusal.delta",
 					ResponseID:   w.respID,
 					ItemID:       w.refusalItemID,
@@ -156,7 +180,7 @@ func (w *responsesAdapterStreamWriter) Write(data []byte) (int, error) {
 			} else if choice.Delta.Content != "" {
 				w.ensureTextItem()
 				w.text.WriteString(choice.Delta.Content)
-				w.writeResponsesEvent("response.output_text.delta", responsesStreamOutputTextDeltaEvent{
+				w.writeResponsesEvent("response.output_text.delta", responsespkg.StreamOutputTextDeltaEvent{
 					Type:         "response.output_text.delta",
 					ResponseID:   w.respID,
 					ItemID:       w.textItemID,
@@ -166,6 +190,9 @@ func (w *responsesAdapterStreamWriter) Write(data []byte) (int, error) {
 				})
 			}
 			if choice.FinishReason != "" {
+				if w.logCapture != nil {
+					w.logCapture.CaptureFinishReason(choice.FinishReason)
+				}
 				if choice.FinishReason == "tool_calls" {
 					w.finishToolCallItems()
 				} else {
@@ -185,11 +212,31 @@ func (w *responsesAdapterStreamWriter) finishResponseStream() {
 	}
 	w.finishReasoningItem()
 	w.completed = true
-	w.writeResponsesEvent("response.completed", responsesStreamResponseEvent{
+	w.captureCompletedStreamLog()
+	w.writeResponsesEvent("response.completed", responsespkg.StreamResponseEvent{
 		Type:     "response.completed",
 		Response: w.completedResponse(),
 	})
 	w.writeData("data: [DONE]")
+}
+
+func (w *responsesAdapterStreamWriter) captureCompletedStreamLog() {
+	if w.logCapture == nil {
+		return
+	}
+	w.logCapture.CaptureResponseID(w.respID)
+	if w.textStarted && w.text.Len() > 0 {
+		w.logCapture.CaptureOutputTextDone(w.text.String())
+	}
+	if w.refusalStarted && w.refusal.Len() > 0 {
+		w.logCapture.CaptureRefusalDone(w.refusal.String())
+	}
+	for _, state := range w.orderedToolCallStates() {
+		if state == nil {
+			continue
+		}
+		w.logCapture.CaptureToolCallStart(state.CallID, state.Name, state.Arguments.String())
+	}
 }
 
 func (w *responsesAdapterStreamWriter) failResponseStream(event *streamdecoder.Event) {
@@ -221,9 +268,15 @@ func (w *responsesAdapterStreamWriter) writeToolCallDeltas(chunk types.ChatCompl
 			callID := call.ID
 			name := call.Function.Name
 			state := w.ensureToolCallItem(index, callID, name)
+			if w.logCapture != nil {
+				w.logCapture.CaptureToolCallStart(state.CallID, state.Name, "")
+			}
 			if args := call.Function.Arguments; args != "" {
 				state.Arguments.WriteString(args)
-				w.writeResponsesEvent("response.function_call_arguments.delta", responsesStreamFunctionCallArgumentsDeltaEvent{
+				if w.logCapture != nil {
+					w.logCapture.CaptureToolCallArgumentsDelta(state.CallID, args)
+				}
+				w.writeResponsesEvent("response.function_call_arguments.delta", responsespkg.StreamFunctionCallArgumentsDeltaEvent{
 					Type:        "response.function_call_arguments.delta",
 					ResponseID:  w.respID,
 					ItemID:      state.CallID,
@@ -255,11 +308,15 @@ func (w *responsesAdapterStreamWriter) ensureToolCallItem(index int, callID, nam
 		Name:        name,
 	}
 	w.toolCallItems[index] = state
-	w.writeResponsesEvent("response.output_item.added", responsesStreamOutputItemEvent{
+	if w.logCapture != nil {
+		w.logCapture.CaptureResponseID(w.respID)
+		w.logCapture.CaptureToolCallStart(itemID, name, "")
+	}
+	w.writeResponsesEvent("response.output_item.added", responsespkg.StreamOutputItemEvent{
 		Type:        "response.output_item.added",
 		ResponseID:  w.respID,
 		OutputIndex: state.OutputIndex,
-		Item: responsesStreamFunctionCallItem{
+		Item: responsespkg.StreamFunctionCallItem{
 			ID:        itemID,
 			Type:      "function_call",
 			CallID:    itemID,
@@ -276,11 +333,11 @@ func (w *responsesAdapterStreamWriter) ensureStarted() {
 		return
 	}
 	w.started = true
-	w.writeResponsesEvent("response.created", responsesStreamResponseEvent{
+	w.writeResponsesEvent("response.created", responsespkg.StreamResponseEvent{
 		Type:     "response.created",
 		Response: w.responseWithStatus("in_progress"),
 	})
-	w.writeResponsesEvent("response.in_progress", responsesStreamResponseEvent{
+	w.writeResponsesEvent("response.in_progress", responsespkg.StreamResponseEvent{
 		Type:     "response.in_progress",
 		Response: w.responseWithStatus("in_progress"),
 	})
@@ -293,24 +350,24 @@ func (w *responsesAdapterStreamWriter) ensureTextItem() {
 	w.textStarted = true
 	w.textOutputIdx = w.nextOutputIndex()
 	w.textItemID = fmt.Sprintf("msg_%d", w.textOutputIdx)
-	w.writeResponsesEvent("response.output_item.added", responsesStreamOutputItemEvent{
+	w.writeResponsesEvent("response.output_item.added", responsespkg.StreamOutputItemEvent{
 		Type:        "response.output_item.added",
 		ResponseID:  w.respID,
 		OutputIndex: w.textOutputIdx,
-		Item: responsesStreamMessageItem{
+		Item: responsespkg.StreamMessageItem{
 			ID:     w.textItemID,
 			Type:   "message",
 			Role:   "assistant",
 			Status: "in_progress",
 		},
 	})
-	w.writeResponsesEvent("response.content_part.added", responsesStreamContentPartEvent{
+	w.writeResponsesEvent("response.content_part.added", responsespkg.StreamContentPartEvent{
 		Type:         "response.content_part.added",
 		ResponseID:   w.respID,
 		ItemID:       w.textItemID,
 		OutputIndex:  w.textOutputIdx,
 		ContentIndex: 0,
-		Part: responsesStreamContentPart{
+		Part: responsespkg.StreamContentPart{
 			Type: "output_text",
 			Text: "",
 		},
@@ -324,24 +381,24 @@ func (w *responsesAdapterStreamWriter) ensureRefusalItem() {
 	w.refusalStarted = true
 	w.refusalOutputIdx = w.nextOutputIndex()
 	w.refusalItemID = fmt.Sprintf("msg_%d", w.refusalOutputIdx)
-	w.writeResponsesEvent("response.output_item.added", responsesStreamOutputItemEvent{
+	w.writeResponsesEvent("response.output_item.added", responsespkg.StreamOutputItemEvent{
 		Type:        "response.output_item.added",
 		ResponseID:  w.respID,
 		OutputIndex: w.refusalOutputIdx,
-		Item: responsesStreamMessageItem{
+		Item: responsespkg.StreamMessageItem{
 			ID:     w.refusalItemID,
 			Type:   "message",
 			Role:   "assistant",
 			Status: "in_progress",
 		},
 	})
-	w.writeResponsesEvent("response.content_part.added", responsesStreamContentPartEvent{
+	w.writeResponsesEvent("response.content_part.added", responsespkg.StreamContentPartEvent{
 		Type:         "response.content_part.added",
 		ResponseID:   w.respID,
 		ItemID:       w.refusalItemID,
 		OutputIndex:  w.refusalOutputIdx,
 		ContentIndex: 0,
-		Part: responsesStreamContentPart{
+		Part: responsespkg.StreamContentPart{
 			Type:    "refusal",
 			Refusal: "",
 		},
@@ -355,11 +412,11 @@ func (w *responsesAdapterStreamWriter) ensureReasoningItem() {
 	w.reasoningStarted = true
 	w.reasoningOutputIdx = w.nextOutputIndex()
 	w.reasoningItemID = fmt.Sprintf("rs_%d", w.reasoningOutputIdx)
-	w.writeResponsesEvent("response.output_item.added", responsesStreamOutputItemEvent{
+	w.writeResponsesEvent("response.output_item.added", responsespkg.StreamOutputItemEvent{
 		Type:        "response.output_item.added",
 		ResponseID:  w.respID,
 		OutputIndex: w.reasoningOutputIdx,
-		Item: responsesStreamReasoningItem{
+		Item: responsespkg.StreamReasoningItem{
 			ID:     w.reasoningItemID,
 			Type:   "reasoning",
 			Status: "in_progress",
@@ -372,7 +429,11 @@ func (w *responsesAdapterStreamWriter) finishTextItem() {
 		return
 	}
 	w.textDone = true
-	w.writeResponsesEvent("response.output_text.done", responsesStreamOutputTextDoneEvent{
+	if w.logCapture != nil {
+		w.logCapture.CaptureResponseID(w.respID)
+		w.logCapture.CaptureOutputTextDone(w.text.String())
+	}
+	w.writeResponsesEvent("response.output_text.done", responsespkg.StreamOutputTextDoneEvent{
 		Type:         "response.output_text.done",
 		ResponseID:   w.respID,
 		ItemID:       w.textItemID,
@@ -380,27 +441,27 @@ func (w *responsesAdapterStreamWriter) finishTextItem() {
 		ContentIndex: 0,
 		Text:         w.text.String(),
 	})
-	w.writeResponsesEvent("response.content_part.done", responsesStreamContentPartEvent{
+	w.writeResponsesEvent("response.content_part.done", responsespkg.StreamContentPartEvent{
 		Type:         "response.content_part.done",
 		ResponseID:   w.respID,
 		ItemID:       w.textItemID,
 		OutputIndex:  w.textOutputIdx,
 		ContentIndex: 0,
-		Part: responsesStreamContentPart{
+		Part: responsespkg.StreamContentPart{
 			Type: "output_text",
 			Text: w.text.String(),
 		},
 	})
-	w.writeResponsesEvent("response.output_item.done", responsesStreamOutputItemEvent{
+	w.writeResponsesEvent("response.output_item.done", responsespkg.StreamOutputItemEvent{
 		Type:        "response.output_item.done",
 		ResponseID:  w.respID,
 		OutputIndex: w.textOutputIdx,
-		Item: responsesStreamMessageItem{
+		Item: responsespkg.StreamMessageItem{
 			ID:     w.textItemID,
 			Type:   "message",
 			Role:   "assistant",
 			Status: "completed",
-			Content: []responsesStreamContentPart{{
+			Content: []responsespkg.StreamContentPart{{
 				Type: "output_text",
 				Text: w.text.String(),
 			}},
@@ -413,18 +474,18 @@ func (w *responsesAdapterStreamWriter) finishReasoningItem() {
 		return
 	}
 	w.reasoningDone = true
-	w.writeResponsesEvent("response.reasoning_summary_text.done", responsesStreamReasoningSummaryDoneEvent{
+	w.writeResponsesEvent("response.reasoning_summary_text.done", responsespkg.StreamReasoningSummaryDoneEvent{
 		Type:         "response.reasoning_summary_text.done",
 		ResponseID:   w.respID,
 		ItemID:       w.reasoningItemID,
 		OutputIndex:  w.reasoningOutputIdx,
 		SummaryIndex: 0,
-		Part: responsesStreamReasoningSummaryPart{
+		Part: responsespkg.StreamReasoningSummaryPart{
 			Type: "summary_text",
 			Text: w.reasoning.String(),
 		},
 	})
-	w.writeResponsesEvent("response.output_item.done", responsesStreamOutputItemEvent{
+	w.writeResponsesEvent("response.output_item.done", responsespkg.StreamOutputItemEvent{
 		Type:        "response.output_item.done",
 		ResponseID:  w.respID,
 		OutputIndex: w.reasoningOutputIdx,
@@ -437,7 +498,11 @@ func (w *responsesAdapterStreamWriter) finishRefusalItem() {
 		return
 	}
 	w.refusalDone = true
-	w.writeResponsesEvent("response.refusal.done", responsesStreamRefusalDoneEvent{
+	if w.logCapture != nil {
+		w.logCapture.CaptureResponseID(w.respID)
+		w.logCapture.CaptureRefusalDone(w.refusal.String())
+	}
+	w.writeResponsesEvent("response.refusal.done", responsespkg.StreamRefusalDoneEvent{
 		Type:         "response.refusal.done",
 		ResponseID:   w.respID,
 		ItemID:       w.refusalItemID,
@@ -445,27 +510,27 @@ func (w *responsesAdapterStreamWriter) finishRefusalItem() {
 		ContentIndex: 0,
 		Refusal:      w.refusal.String(),
 	})
-	w.writeResponsesEvent("response.content_part.done", responsesStreamContentPartEvent{
+	w.writeResponsesEvent("response.content_part.done", responsespkg.StreamContentPartEvent{
 		Type:         "response.content_part.done",
 		ResponseID:   w.respID,
 		ItemID:       w.refusalItemID,
 		OutputIndex:  w.refusalOutputIdx,
 		ContentIndex: 0,
-		Part: responsesStreamContentPart{
+		Part: responsespkg.StreamContentPart{
 			Type:    "refusal",
 			Refusal: w.refusal.String(),
 		},
 	})
-	w.writeResponsesEvent("response.output_item.done", responsesStreamOutputItemEvent{
+	w.writeResponsesEvent("response.output_item.done", responsespkg.StreamOutputItemEvent{
 		Type:        "response.output_item.done",
 		ResponseID:  w.respID,
 		OutputIndex: w.refusalOutputIdx,
-		Item: responsesStreamMessageItem{
+		Item: responsespkg.StreamMessageItem{
 			ID:     w.refusalItemID,
 			Type:   "message",
 			Role:   "assistant",
 			Status: "completed",
-			Content: []responsesStreamContentPart{{
+			Content: []responsespkg.StreamContentPart{{
 				Type:    "refusal",
 				Refusal: w.refusal.String(),
 			}},
@@ -479,17 +544,21 @@ func (w *responsesAdapterStreamWriter) finishToolCallItems() {
 			continue
 		}
 		state.Done = true
-		w.writeResponsesEvent("response.function_call_arguments.done", responsesStreamFunctionCallArgumentsDoneEvent{
+		if w.logCapture != nil {
+			w.logCapture.CaptureResponseID(w.respID)
+			w.logCapture.CaptureToolCallStart(state.CallID, state.Name, state.Arguments.String())
+		}
+		w.writeResponsesEvent("response.function_call_arguments.done", responsespkg.StreamFunctionCallArgumentsDoneEvent{
 			Type:        "response.function_call_arguments.done",
 			ResponseID:  w.respID,
 			ItemID:      state.CallID,
 			OutputIndex: state.OutputIndex,
 		})
-		w.writeResponsesEvent("response.output_item.done", responsesStreamOutputItemEvent{
+		w.writeResponsesEvent("response.output_item.done", responsespkg.StreamOutputItemEvent{
 			Type:        "response.output_item.done",
 			ResponseID:  w.respID,
 			OutputIndex: state.OutputIndex,
-			Item: responsesStreamFunctionCallItem{
+			Item: responsespkg.StreamFunctionCallItem{
 				ID:        state.CallID,
 				Type:      "function_call",
 				CallID:    state.CallID,
@@ -507,8 +576,8 @@ func (w *responsesAdapterStreamWriter) nextOutputIndex() int {
 	return index
 }
 
-func (w *responsesAdapterStreamWriter) responseWithStatus(status string) responsesStreamResponse {
-	return responsesStreamResponse{
+func (w *responsesAdapterStreamWriter) responseWithStatus(status string) responsespkg.StreamResponse {
+	return responsespkg.StreamResponse{
 		ID:        w.respID,
 		Object:    "response",
 		CreatedAt: w.created,
@@ -517,7 +586,7 @@ func (w *responsesAdapterStreamWriter) responseWithStatus(status string) respons
 	}
 }
 
-func (w *responsesAdapterStreamWriter) completedResponse() responsesStreamResponse {
+func (w *responsesAdapterStreamWriter) completedResponse() responsespkg.StreamResponse {
 	response := w.responseWithStatus("completed")
 	var outputItems []struct {
 		index int
@@ -528,12 +597,12 @@ func (w *responsesAdapterStreamWriter) completedResponse() responsesStreamRespon
 		outputItems = append(outputItems, struct {
 			index int
 			item  any
-		}{index: w.textOutputIdx, item: responsesStreamMessageItem{
+		}{index: w.textOutputIdx, item: responsespkg.StreamMessageItem{
 			ID:     w.textItemID,
 			Type:   "message",
 			Role:   "assistant",
 			Status: "completed",
-			Content: []responsesStreamContentPart{{
+			Content: []responsespkg.StreamContentPart{{
 				Type: "output_text",
 				Text: w.text.String(),
 			}},
@@ -543,12 +612,12 @@ func (w *responsesAdapterStreamWriter) completedResponse() responsesStreamRespon
 		outputItems = append(outputItems, struct {
 			index int
 			item  any
-		}{index: w.refusalOutputIdx, item: responsesStreamMessageItem{
+		}{index: w.refusalOutputIdx, item: responsespkg.StreamMessageItem{
 			ID:     w.refusalItemID,
 			Type:   "message",
 			Role:   "assistant",
 			Status: "completed",
-			Content: []responsesStreamContentPart{{
+			Content: []responsespkg.StreamContentPart{{
 				Type:    "refusal",
 				Refusal: w.refusal.String(),
 			}},
@@ -567,7 +636,7 @@ func (w *responsesAdapterStreamWriter) completedResponse() responsesStreamRespon
 		outputItems = append(outputItems, struct {
 			index int
 			item  any
-		}{index: state.OutputIndex, item: responsesStreamFunctionCallItem{
+		}{index: state.OutputIndex, item: responsespkg.StreamFunctionCallItem{
 			ID:        state.CallID,
 			Type:      "function_call",
 			CallID:    state.CallID,
@@ -592,12 +661,12 @@ func (w *responsesAdapterStreamWriter) completedResponse() responsesStreamRespon
 	return response
 }
 
-func (w *responsesAdapterStreamWriter) reasoningOutput(status string) responsesStreamReasoningItem {
-	return responsesStreamReasoningItem{
+func (w *responsesAdapterStreamWriter) reasoningOutput(status string) responsespkg.StreamReasoningItem {
+	return responsespkg.StreamReasoningItem{
 		ID:     w.reasoningItemID,
 		Type:   "reasoning",
 		Status: status,
-		Summary: []responsesStreamReasoningSummaryPart{{
+		Summary: []responsespkg.StreamReasoningSummaryPart{{
 			Type: "summary_text",
 			Text: w.reasoning.String(),
 		}},
@@ -667,4 +736,100 @@ func (w *responsesAdapterStreamWriter) writeRawEvent(event *streamdecoder.Event)
 	}
 	_, _ = w.ginWriter.Write(event.Raw)
 	w.ginWriter.Flush()
+}
+
+// checkStreamSensitive runs the per-chunk sensitive-content check on the
+// delta content of the upstream chat chunk. Returns true if the writer should
+// stop forwarding the rest of the stream (sensitive content detected) and
+// false otherwise. Nil-safe — returns false when no moderation component is
+// wired (NeedSensitiveCheck == false path).
+func (w *responsesAdapterStreamWriter) checkStreamSensitive(ctx context.Context, chunk types.ChatCompletionChunk) bool {
+	if w.moderation == nil || len(chunk.Choices) == 0 {
+		return false
+	}
+	content := chatChunkModerationText(chunk)
+	if strings.TrimSpace(content) == "" {
+		return false
+	}
+	result, err := w.moderation.CheckText(ctx, types.TextModerationRequest{
+		Content: content,
+		Key:     w.sessionID,
+		Phase:   types.TextModerationPhaseResponse,
+		Mode:    types.TextModerationModeStream,
+	})
+	if err != nil || result == nil {
+		return false
+	}
+	if result.IsSensitive {
+		w.failStreamSensitive()
+		return true
+	}
+	return false
+}
+
+func chatChunkModerationText(chunk types.ChatCompletionChunk) string {
+	var b strings.Builder
+	for _, choice := range chunk.Choices {
+		writeModerationText(&b, choice.Delta.Content)
+		writeModerationText(&b, choice.Delta.ReasoningContent)
+		writeModerationText(&b, choice.Delta.Refusal)
+		for _, call := range choice.Delta.ToolCalls {
+			writeModerationText(&b, call.Function.Name)
+			writeModerationText(&b, call.Function.Arguments)
+		}
+	}
+	return b.String()
+}
+
+func writeModerationText(b *strings.Builder, text string) {
+	if strings.TrimSpace(text) == "" {
+		return
+	}
+	if b.Len() > 0 {
+		b.WriteByte('\n')
+	}
+	b.WriteString(text)
+}
+
+// finishStreamChecks flushes the async per-session sensitive-content check
+// buffer at stream end. The async checker (when configured) may surface a
+// sensitive verdict on the buffered text; if so we transition the writer to
+// the failed state so the final response is the canned blocked message.
+func (w *responsesAdapterStreamWriter) finishStreamChecks(ctx context.Context) {
+	if w.moderation == nil {
+		return
+	}
+	result, err := w.moderation.CloseStreamCheck(ctx, w.sessionID)
+	if err != nil || result == nil {
+		return
+	}
+	if result.IsSensitive {
+		w.failStreamSensitive()
+	}
+}
+
+// failStreamSensitive terminates the stream in the failed state so the next
+// event emitted is the canned blocked Responses response instead of further
+// chat-shaped content. Mirrors failResponseStream but uses the canned
+// response for Responses shape.
+func (w *responsesAdapterStreamWriter) failStreamSensitive() {
+	if w.completed || w.failed {
+		return
+	}
+	w.failed = true
+	responsespkg.WriteSensitiveStreamEvent(w.ginWriter)
+}
+
+// cleanupStreamModeration removes the async moderation session from the LRU
+// cache on abnormal stream termination. This must be called whenever the
+// stream ends without going through the normal [DONE] path (e.g. upstream
+// error, passthrough, or mid-stream sensitive detection). Without this call
+// the session state accumulates in the async checker's cache indefinitely.
+func (w *responsesAdapterStreamWriter) cleanupStreamModeration() {
+	if w.moderation == nil {
+		return
+	}
+	ctx, cancel := responsespkg.ModerationContext()
+	defer cancel()
+	_, _ = w.moderation.CloseStreamCheck(ctx, w.sessionID)
 }

@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"opencsg.com/csghub-server/aigateway/token"
 )
@@ -48,7 +49,7 @@ func TestNewResponsesAdapterResponseWriterStream(t *testing.T) {
 	rec := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(rec)
 
-	w := newResponsesAdapterResponseWriter(ctx.Writer, true, "public-model", token.NewResponsesTokenCounter(nil))
+	w := newResponsesAdapterResponseWriter(ctx.Writer, true, "public-model", token.NewResponsesTokenCounter(nil), nil, "")
 	_, ok := w.(*responsesAdapterStreamWriter)
 	require.True(t, ok)
 }
@@ -58,7 +59,16 @@ func TestNewResponsesAdapterResponseWriterNonStream(t *testing.T) {
 	rec := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(rec)
 
-	w := newResponsesAdapterResponseWriter(ctx.Writer, false, "public-model", token.NewResponsesTokenCounter(nil))
+	w := newResponsesAdapterResponseWriter(ctx.Writer, false, "public-model", token.NewResponsesTokenCounter(nil), nil, "")
 	_, ok := w.(*responsesAdapterNonStreamWriter)
 	require.True(t, ok)
+}
+
+func TestNewResponsesModerationSessionIDUsesFullUUID(t *testing.T) {
+	sessionID := newResponsesModerationSessionID()
+
+	parsed, err := uuid.Parse(sessionID)
+	require.NoError(t, err)
+	require.Equal(t, sessionID, parsed.String())
+	require.Len(t, sessionID, 36)
 }
