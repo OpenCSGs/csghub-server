@@ -3,6 +3,7 @@ package component
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -869,6 +870,27 @@ func (c *repoComponentImpl) DeployUpdate(ctx context.Context, updateReq types.De
 			}
 			// update runtime image once user changed cpu to gpu
 			req.RuntimeFrameworkID = &frame.ID
+		}
+		// When resource changes and PD is enabled, rebuild PD config hardware
+		// so that per-role hardware (resource_name, labels, mem_size, etc.)
+		// matches the new resource instead of retaining stale values.
+		//
+		// Both DeployUpdate and ServerlessUpdate API paths flow through this
+		// function (ServerlessUpdate handler calls DeployUpdate), so a single
+		// rebuild here covers both code paths.
+		//
+		// deploy is a local variable fetched from DB in this request. Mutating
+		// deploy.PD in-place is safe: if UpdateDeploy fails, the request ends
+		// and deploy is GC'd — no global state or subsequent logic reads it.
+		if deploy.PD != nil && deploy.PD.Enabled {
+			var newHardware types.HardWare
+			if err := json.Unmarshal([]byte(resource.Resources), &newHardware); err != nil {
+				return fmt.Errorf("invalid resource hardware setting, %w", err)
+			}
+			if err := rebuildPDConfigForHardware(deploy.PD, newHardware); err != nil {
+				return fmt.Errorf("failed to rebuild PD config for new hardware, %w", err)
+			}
+			req.PD = deploy.PD
 		}
 	}
 
