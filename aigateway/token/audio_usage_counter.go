@@ -2,7 +2,7 @@ package token
 
 import (
 	"context"
-	"errors"
+	"log/slog"
 	"unicode/utf8"
 
 	commontypes "opencsg.com/csghub-server/common/types"
@@ -44,15 +44,14 @@ func (c *AudioUsageCounter) Usage(ctx context.Context) (*Usage, error) {
 	if c.usage != nil {
 		return c.usage, nil
 	}
-	if c.text == "" {
-		return nil, errors.New("no transcription text found")
-	}
+	// Audio billing can fall back to completion count when text and duration are unavailable.
 	tokenCount := int64(utf8.RuneCountInString(c.text))
-	if c.tokenizer != nil {
-		var err error
-		tokenCount, err = c.tokenizer.EmbeddingEncode(c.text)
-		if err != nil {
-			return nil, err
+	if c.text != "" && c.tokenizer != nil {
+		if count, err := c.tokenizer.EmbeddingEncode(c.text); err != nil {
+			// Tokenizer failures should not block audio billing; keep the rune-count fallback.
+			slog.WarnContext(ctx, "failed to encode audio transcription text, using rune count", slog.Any("error", err))
+		} else {
+			tokenCount = count
 		}
 	}
 	return &Usage{
