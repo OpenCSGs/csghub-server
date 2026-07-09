@@ -12,6 +12,7 @@ import (
 func TestMirrorNamespaceMappingComponent_Create(t *testing.T) {
 	ctx := context.TODO()
 	mc := initializeTestMirrorNamespaceMappingComponent(ctx, t)
+	mc.mocks.stores.NamespaceMock().EXPECT().Exists(ctx, "u").Return(true, nil)
 	mc.mocks.stores.MirrorNamespaceMappingMock().EXPECT().Create(ctx, &database.MirrorNamespaceMapping{
 		SourceNamespace: "sn",
 		TargetNamespace: "u",
@@ -52,6 +53,7 @@ func TestMirrorNamespaceMappingComponent_Index(t *testing.T) {
 func TestMirrorNamespaceMappingComponent_Update(t *testing.T) {
 	ctx := context.TODO()
 	mc := initializeTestMirrorNamespaceMappingComponent(ctx, t)
+	mc.mocks.stores.NamespaceMock().EXPECT().Exists(ctx, "u").Return(true, nil)
 	mc.mocks.stores.MirrorNamespaceMappingMock().EXPECT().Update(ctx, &database.MirrorNamespaceMapping{
 		ID:              1,
 		SourceNamespace: "sn",

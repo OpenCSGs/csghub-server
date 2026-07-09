@@ -102,6 +102,7 @@ func NewTestSpaceResourceComponent(config *config.Config, stores *tests.MockStor
 func NewTestMirrorNamespaceMappingComponent(config *config.Config, stores *tests.MockStores) *mirrorNamespaceMappingComponentImpl {
 	return &mirrorNamespaceMappingComponentImpl{
 		mirrorNamespaceMappingStore: stores.MirrorNamespaceMapping,
+		namespaceStore:              stores.Namespace,
 	}
 }
 
