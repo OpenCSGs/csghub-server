@@ -51,7 +51,7 @@ func (mh *MeteringHandler) QueryMeteringStatementByUserID(ctx *gin.Context) {
 
 	req := types.ActStatementsReq{
 		UserUUID:     userID,
-		Scene:        scene,
+		Scene:        types.SceneType(scene),
 		InstanceName: instance_name,
 		StartTime:    startTime,
 		EndTime:      endTime,
@@ -89,7 +89,7 @@ func (mh *MeteringHandler) QueryMeteringStatByDate(ctx *gin.Context) {
 	}
 
 	req := types.ActStatementsReq{
-		Scene:     scene,
+		Scene:     types.SceneType(scene),
 		StartTime: startDate + " 00:00:00",
 		EndTime:   endDate + " 23:59:59",
 	}

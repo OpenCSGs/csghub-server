@@ -64,7 +64,7 @@ func TestMeteringComponent_ListMeteringByUserIDAndDate(t *testing.T) {
 
 	req := types.ActStatementsReq{
 		UserUUID:  "test-user-uuid",
-		Scene:     int(types.SceneModelInference),
+		Scene:     types.SceneModelInference,
 		StartTime: "2024-01-01",
 		EndTime:   "2024-12-31",
 		Per:       10,

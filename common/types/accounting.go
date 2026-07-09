@@ -248,15 +248,15 @@ type AcctSubscriptionNotify struct {
 }
 
 type ActStatementsReq struct {
-	CurrentUser  string `json:"current_user"`
-	UserUUID     string `json:"user_uuid"`
-	Scene        int    `json:"scene"`
-	InstanceName string `json:"instance_name"`
-	StartTime    string `json:"start_time"`
-	EndTime      string `json:"end_time"`
-	Per          int    `json:"per"`
-	Page         int    `json:"page"`
-	UserName     string `json:"user_name"`
+	CurrentUser  string    `json:"current_user"`
+	UserUUID     string    `json:"user_uuid"`
+	Scene        SceneType `json:"scene"`
+	InstanceName string    `json:"instance_name"`
+	StartTime    string    `json:"start_time"`
+	EndTime      string    `json:"end_time"`
+	Per          int       `json:"per"`
+	Page         int       `json:"page"`
+	UserName     string    `json:"user_name"`
 }
 
 type AcctBillsReq struct {

@@ -180,7 +180,7 @@ func (c *clusterComponentImpl) GetDeploys(ctx context.Context, req types.DeployR
 			continue
 		}
 		req2 := types.ActStatementsReq{
-			Scene:        int(scene),
+			Scene:        scene,
 			UserUUID:     deploy.UserUUID,
 			StartTime:    deploy.CreatedAt.Format(time.DateTime),
 			EndTime:      time.Now().Format(time.DateTime),
