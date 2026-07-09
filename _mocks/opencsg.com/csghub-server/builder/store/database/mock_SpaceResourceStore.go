@@ -424,6 +424,65 @@ func (_c *MockSpaceResourceStore_FindByName_Call) RunAndReturn(run func(context.
 	return _c
 }
 
+// FindByScenarios provides a mock function with given fields: ctx, scenarios
+func (_m *MockSpaceResourceStore) FindByScenarios(ctx context.Context, scenarios []string) ([]database.SpaceResource, error) {
+	ret := _m.Called(ctx, scenarios)
+
+	if len(ret) == 0 {
+		panic("no return value specified for FindByScenarios")
+	}
+
+	var r0 []database.SpaceResource
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, []string) ([]database.SpaceResource, error)); ok {
+		return rf(ctx, scenarios)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, []string) []database.SpaceResource); ok {
+		r0 = rf(ctx, scenarios)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]database.SpaceResource)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, []string) error); ok {
+		r1 = rf(ctx, scenarios)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockSpaceResourceStore_FindByScenarios_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FindByScenarios'
+type MockSpaceResourceStore_FindByScenarios_Call struct {
+	*mock.Call
+}
+
+// FindByScenarios is a helper method to define mock.On call
+//   - ctx context.Context
+//   - scenarios []string
+func (_e *MockSpaceResourceStore_Expecter) FindByScenarios(ctx interface{}, scenarios interface{}) *MockSpaceResourceStore_FindByScenarios_Call {
+	return &MockSpaceResourceStore_FindByScenarios_Call{Call: _e.mock.On("FindByScenarios", ctx, scenarios)}
+}
+
+func (_c *MockSpaceResourceStore_FindByScenarios_Call) Run(run func(ctx context.Context, scenarios []string)) *MockSpaceResourceStore_FindByScenarios_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].([]string))
+	})
+	return _c
+}
+
+func (_c *MockSpaceResourceStore_FindByScenarios_Call) Return(_a0 []database.SpaceResource, _a1 error) *MockSpaceResourceStore_FindByScenarios_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockSpaceResourceStore_FindByScenarios_Call) RunAndReturn(run func(context.Context, []string) ([]database.SpaceResource, error)) *MockSpaceResourceStore_FindByScenarios_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Index provides a mock function with given fields: ctx, filter, per, page
 func (_m *MockSpaceResourceStore) Index(ctx context.Context, filter types.SpaceResourceFilter, per int, page int) ([]database.SpaceResource, int, error) {
 	ret := _m.Called(ctx, filter, per, page)

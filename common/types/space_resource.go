@@ -6,6 +6,7 @@ import (
 
 type ResourceType string
 type PayMode string
+type ScenarioType string
 
 const (
 	ResourceTypeCPU   ResourceType = "cpu"
@@ -20,6 +21,8 @@ const (
 	PayModeMinute     PayMode      = "minute"
 	PayModeMonth      PayMode      = "month"
 	PayModeYear       PayMode      = "year"
+
+	ScenarioSandbox ScenarioType = "sandbox"
 )
 
 func ResourceTypeValid(resourceType ResourceType) bool {
@@ -53,18 +56,21 @@ type SpaceResource struct {
 	OrderDetailId       int64                     `json:"order_detail_id"`
 	AvailableStatusList []ResourceAvailableStatus `json:"available_status_list"`
 	PriceUndefined      bool                      `json:"price_undefined"`
+	Scenarios           []string                  `json:"scenarios"`
 }
 
 type CreateSpaceResourceReq struct {
-	Name      string `json:"name" binding:"required"`
-	Resources string `json:"resources" binding:"required"`
-	ClusterID string `json:"cluster_id" binding:"required"`
+	Name      string   `json:"name" binding:"required"`
+	Resources string   `json:"resources" binding:"required"`
+	ClusterID string   `json:"cluster_id" binding:"required"`
+	Scenarios []string `json:"scenarios"`
 }
 
 type UpdateSpaceResourceReq struct {
-	ID        int64  `json:"-"`
-	Name      string `json:"name"`
-	Resources string `json:"resources"`
+	ID        int64    `json:"-"`
+	Name      string   `json:"name"`
+	Resources string   `json:"resources"`
+	Scenarios []string `json:"scenarios"`
 }
 
 type SpaceResourceIndexReq struct {

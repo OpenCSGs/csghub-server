@@ -146,11 +146,12 @@ func TestEvaluationComponent_CreateClawEvaluation_AutoBuiltinJudgeAPIKey(t *test
 			r.Model == "glm-5.1" &&
 			r.JudgeApiKey == "gk-builtin-key" &&
 			r.JudgeBaseURL == "http://aigateway.test/v1"
-	})).Return(&types.ArgoWorkFlowRes{ID: 2}, nil)
+	})).Return(&types.ArgoWorkFlowRes{ID: 4, TaskId: "task-123"}, nil)
 
 	resp, err := c.CreateEvaluation(ctx, req)
 	require.NoError(t, err)
-	require.Equal(t, int64(2), resp.ID)
+	require.Equal(t, int64(4), resp.ID)
+	require.Equal(t, "task-123", resp.TaskId)
 }
 
 func TestEvaluationComponent_CreateClawEvaluation_AutoJudgeAPIKeyFallback(t *testing.T) {
@@ -314,6 +315,42 @@ func TestEvaluationComponent_GetClawEvaluation(t *testing.T) {
 	}, nil)
 	mockRepo.EXPECT().CheckCurrentUserPermission(ctx, "other", "user1", membership.RoleRead).Return(false, nil)
 	_, err = c.GetEvaluation(ctx, types.EvaluationGetReq{ID: 2, Username: "other"})
+	require.ErrorIs(t, err, errorx.ErrForbidden)
+}
+
+func TestEvaluationComponent_GetClawEvaluationByTaskID(t *testing.T) {
+	ctx := context.Background()
+	c, _, _, mockWorkflow := newTestEvaluationComponentForClaw(t)
+
+	mockWorkflow.EXPECT().FindByTaskID(ctx, "task-1").Return(&database.ArgoWorkflow{
+		ID:       123,
+		RepoIds:  []string{"glm-5.1"},
+		TaskType: types.TaskTypeClawEval,
+		Username: "user1",
+		TaskName: "claw-job",
+		TaskId:   "task-1",
+		Status:   "Succeeded",
+	}, nil)
+
+	res, err := c.GetEvaluation(ctx, types.EvaluationGetReq{TaskID: "task-1", Username: "user1"})
+	require.NoError(t, err)
+	require.Equal(t, int64(123), res.ID)
+	require.Equal(t, "task-1", res.TaskId)
+	require.Equal(t, types.TaskTypeClawEval, res.TaskType)
+}
+
+func TestEvaluationComponent_GetEvaluationByTaskIDRejectsNonEvaluation(t *testing.T) {
+	ctx := context.Background()
+	c, _, _, mockWorkflow := newTestEvaluationComponentForClaw(t)
+
+	mockWorkflow.EXPECT().FindByTaskID(ctx, "finetune-task").Return(&database.ArgoWorkflow{
+		ID:       123,
+		TaskType: types.TaskTypeFinetune,
+		Username: "user1",
+		TaskId:   "finetune-task",
+	}, nil)
+
+	_, err := c.GetEvaluation(ctx, types.EvaluationGetReq{TaskID: "finetune-task", Username: "user1"})
 	require.ErrorIs(t, err, errorx.ErrForbidden)
 }
 
