@@ -60,7 +60,7 @@ func (s *NamespaceStoreImpl) Exists(ctx context.Context, path string) (exists bo
 	return s.db.Operator.Core.
 		NewSelect().
 		Model(&namespace).
-		Where("path =?", path).
+		Where("LOWER(path) = LOWER(?)", path).
 		Exists(ctx)
 }
 
