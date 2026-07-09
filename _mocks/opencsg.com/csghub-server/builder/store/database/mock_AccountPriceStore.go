@@ -24,6 +24,65 @@ func (_m *MockAccountPriceStore) EXPECT() *MockAccountPriceStore_Expecter {
 	return &MockAccountPriceStore_Expecter{mock: &_m.Mock}
 }
 
+// BatchCreate provides a mock function with given fields: ctx, prices
+func (_m *MockAccountPriceStore) BatchCreate(ctx context.Context, prices []database.AccountPrice) ([]database.AccountPrice, error) {
+	ret := _m.Called(ctx, prices)
+
+	if len(ret) == 0 {
+		panic("no return value specified for BatchCreate")
+	}
+
+	var r0 []database.AccountPrice
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, []database.AccountPrice) ([]database.AccountPrice, error)); ok {
+		return rf(ctx, prices)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, []database.AccountPrice) []database.AccountPrice); ok {
+		r0 = rf(ctx, prices)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]database.AccountPrice)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, []database.AccountPrice) error); ok {
+		r1 = rf(ctx, prices)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAccountPriceStore_BatchCreate_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'BatchCreate'
+type MockAccountPriceStore_BatchCreate_Call struct {
+	*mock.Call
+}
+
+// BatchCreate is a helper method to define mock.On call
+//   - ctx context.Context
+//   - prices []database.AccountPrice
+func (_e *MockAccountPriceStore_Expecter) BatchCreate(ctx interface{}, prices interface{}) *MockAccountPriceStore_BatchCreate_Call {
+	return &MockAccountPriceStore_BatchCreate_Call{Call: _e.mock.On("BatchCreate", ctx, prices)}
+}
+
+func (_c *MockAccountPriceStore_BatchCreate_Call) Run(run func(ctx context.Context, prices []database.AccountPrice)) *MockAccountPriceStore_BatchCreate_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].([]database.AccountPrice))
+	})
+	return _c
+}
+
+func (_c *MockAccountPriceStore_BatchCreate_Call) Return(_a0 []database.AccountPrice, _a1 error) *MockAccountPriceStore_BatchCreate_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAccountPriceStore_BatchCreate_Call) RunAndReturn(run func(context.Context, []database.AccountPrice) ([]database.AccountPrice, error)) *MockAccountPriceStore_BatchCreate_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Create provides a mock function with given fields: ctx, input
 func (_m *MockAccountPriceStore) Create(ctx context.Context, input database.AccountPrice) (*database.AccountPrice, error) {
 	ret := _m.Called(ctx, input)
@@ -428,6 +487,131 @@ func (_c *MockAccountPriceStore_ListBySkuTypeAndKinds_Call) Return(_a0 []databas
 }
 
 func (_c *MockAccountPriceStore_ListBySkuTypeAndKinds_Call) RunAndReturn(run func(context.Context, types.AcctPriceListByKindsReq) ([]database.AccountPrice, error)) *MockAccountPriceStore_ListBySkuTypeAndKinds_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ListDistinctGroupKeys provides a mock function with given fields: ctx, req
+func (_m *MockAccountPriceStore) ListDistinctGroupKeys(ctx context.Context, req types.AcctPriceDistinctListReq) ([]database.AcctPriceGroupKey, int, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListDistinctGroupKeys")
+	}
+
+	var r0 []database.AcctPriceGroupKey
+	var r1 int
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.AcctPriceDistinctListReq) ([]database.AcctPriceGroupKey, int, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.AcctPriceDistinctListReq) []database.AcctPriceGroupKey); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]database.AcctPriceGroupKey)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.AcctPriceDistinctListReq) int); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Get(1).(int)
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, types.AcctPriceDistinctListReq) error); ok {
+		r2 = rf(ctx, req)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
+// MockAccountPriceStore_ListDistinctGroupKeys_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListDistinctGroupKeys'
+type MockAccountPriceStore_ListDistinctGroupKeys_Call struct {
+	*mock.Call
+}
+
+// ListDistinctGroupKeys is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req types.AcctPriceDistinctListReq
+func (_e *MockAccountPriceStore_Expecter) ListDistinctGroupKeys(ctx interface{}, req interface{}) *MockAccountPriceStore_ListDistinctGroupKeys_Call {
+	return &MockAccountPriceStore_ListDistinctGroupKeys_Call{Call: _e.mock.On("ListDistinctGroupKeys", ctx, req)}
+}
+
+func (_c *MockAccountPriceStore_ListDistinctGroupKeys_Call) Run(run func(ctx context.Context, req types.AcctPriceDistinctListReq)) *MockAccountPriceStore_ListDistinctGroupKeys_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.AcctPriceDistinctListReq))
+	})
+	return _c
+}
+
+func (_c *MockAccountPriceStore_ListDistinctGroupKeys_Call) Return(_a0 []database.AcctPriceGroupKey, _a1 int, _a2 error) *MockAccountPriceStore_ListDistinctGroupKeys_Call {
+	_c.Call.Return(_a0, _a1, _a2)
+	return _c
+}
+
+func (_c *MockAccountPriceStore_ListDistinctGroupKeys_Call) RunAndReturn(run func(context.Context, types.AcctPriceDistinctListReq) ([]database.AcctPriceGroupKey, int, error)) *MockAccountPriceStore_ListDistinctGroupKeys_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ListPricesByGroupKey provides a mock function with given fields: ctx, req
+func (_m *MockAccountPriceStore) ListPricesByGroupKey(ctx context.Context, req types.AcctPriceGroupKeyReq) ([]database.AccountPrice, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListPricesByGroupKey")
+	}
+
+	var r0 []database.AccountPrice
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.AcctPriceGroupKeyReq) ([]database.AccountPrice, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.AcctPriceGroupKeyReq) []database.AccountPrice); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]database.AccountPrice)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.AcctPriceGroupKeyReq) error); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAccountPriceStore_ListPricesByGroupKey_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListPricesByGroupKey'
+type MockAccountPriceStore_ListPricesByGroupKey_Call struct {
+	*mock.Call
+}
+
+// ListPricesByGroupKey is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req types.AcctPriceGroupKeyReq
+func (_e *MockAccountPriceStore_Expecter) ListPricesByGroupKey(ctx interface{}, req interface{}) *MockAccountPriceStore_ListPricesByGroupKey_Call {
+	return &MockAccountPriceStore_ListPricesByGroupKey_Call{Call: _e.mock.On("ListPricesByGroupKey", ctx, req)}
+}
+
+func (_c *MockAccountPriceStore_ListPricesByGroupKey_Call) Run(run func(ctx context.Context, req types.AcctPriceGroupKeyReq)) *MockAccountPriceStore_ListPricesByGroupKey_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.AcctPriceGroupKeyReq))
+	})
+	return _c
+}
+
+func (_c *MockAccountPriceStore_ListPricesByGroupKey_Call) Return(_a0 []database.AccountPrice, _a1 error) *MockAccountPriceStore_ListPricesByGroupKey_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAccountPriceStore_ListPricesByGroupKey_Call) RunAndReturn(run func(context.Context, types.AcctPriceGroupKeyReq) ([]database.AccountPrice, error)) *MockAccountPriceStore_ListPricesByGroupKey_Call {
 	_c.Call.Return(run)
 	return _c
 }
