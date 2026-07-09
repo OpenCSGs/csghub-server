@@ -73,6 +73,12 @@ func (h *OpenAIHandlerImpl) CreateVideo(c *gin.Context) {
 		return
 	}
 	preflight.SetTargetModel(input.modelID, modelTarget)
+
+	if guardErr := checkModalRequestAllowed(modelTarget.Model, input.adapterReq.Size); guardErr != nil {
+		preflight.RecordError(guardErr, "modal_price_guard")
+		handleModelTargetError(c, ctx, input.modelID, "modal price guard rejected request", guardErr)
+		return
+	}
 	preflight.End()
 
 	traceCtx, generationRecorder := h.startModalGenerationTrace(ctx, modalTraceStartInput{

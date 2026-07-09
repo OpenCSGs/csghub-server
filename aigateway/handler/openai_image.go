@@ -70,6 +70,12 @@ func (h *OpenAIHandlerImpl) GenerateImage(c *gin.Context) {
 		return
 	}
 	preflight.SetTargetModel(modelID, modelTarget)
+
+	if guardErr := checkModalRequestAllowed(modelTarget.Model, string(req.Size)); guardErr != nil {
+		preflight.RecordError(guardErr, "modal_price_guard")
+		handleModelTargetError(c, ctx, modelID, "modal price guard rejected request", guardErr)
+		return
+	}
 	preflight.End()
 
 	traceCtx, generationRecorder := h.startModalGenerationTrace(ctx, modalTraceStartInput{

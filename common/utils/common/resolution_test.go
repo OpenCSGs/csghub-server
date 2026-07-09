@@ -116,3 +116,39 @@ func TestExtractEventResolutionMaxSide(t *testing.T) {
 		}
 	}
 }
+
+func TestParseResolutionMaxSide(t *testing.T) {
+	tests := []struct {
+		name     string
+		size     string
+		wantSide int64
+		wantOK   bool
+	}{
+		{"square", "1024x1024", 1024, true},
+		{"landscape", "1280x720", 1280, true},
+		{"portrait", "720x1280", 1280, true},
+		{"whitespace wxh", "  1024  x  1536  ", 1536, true},
+		{"uppercase wxh", "1024X1024", 1024, true},
+		{"preset uppercase", "1080P", 1080, true},
+		{"preset lowercase", "720p", 720, true},
+		{"whitespace preset", "  1080p  ", 1080, true},
+		{"pure integer", "1024", 1024, true},
+		{"whitespace integer", "  2048  ", 2048, true},
+		{"empty", "", 0, false},
+		{"degenerate wxh one side zero", "0x1024", 1024, true}, // matches ExtractEventResolutionMaxSide leniency for a single zero dimension
+		{"wxh both sides zero", "0x0", 0, false},
+		{"negative wxh", "-1024x1024", 0, false},
+		{"zero preset", "0p", 0, false},
+		{"zero integer", "0", 0, false},
+		{"negative integer", "-1024", 0, false},
+		{"non numeric", "abcxdef", 0, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			side, ok := ParseResolutionMaxSide(tt.size)
+			require.Equal(t, tt.wantOK, ok)
+			require.Equal(t, tt.wantSide, side)
+		})
+	}
+}
