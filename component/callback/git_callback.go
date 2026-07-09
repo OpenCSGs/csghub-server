@@ -565,13 +565,13 @@ func (c *gitCallbackComponentImpl) updateModelMetadata(ctx context.Context, file
 	modelInfo, err := c.runtimeArchComponent.UpdateModelMetadata(ctx, repo)
 	if err != nil {
 		slog.Warn("fail to update model metadata", slog.Any("error", err), slog.Any("repo path", repo.Path))
-		return err
+		return nil
 	}
 	err = c.runtimeArchComponent.UpdateRuntimeFrameworkTag(ctx, modelInfo, repo)
 	if err != nil {
 		slog.Warn("fail to update runtime framework tag", slog.Any("error", err), slog.Any("repo path", repo.Path))
 	}
-	return err
+	return nil
 }
 
 // check if the repo is valid for runtime framework
