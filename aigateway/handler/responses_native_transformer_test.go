@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	responsespkg "opencsg.com/csghub-server/aigateway/handler/responses"
 	"strings"
 	"sync"
 	"testing"
@@ -13,12 +14,12 @@ import (
 )
 
 func TestResponsesNativePayloadTransformerWrapsUpstreamIDsRecursively(t *testing.T) {
-	mapper, err := newResponsesIDMapper("test-secret")
+	mapper, err := responsespkg.NewIDMapper("test-secret")
 	require.NoError(t, err)
 
 	tr := newResponsesNativePayloadTransformer(
 		mapper,
-		responsesIDClaims{NamespaceUUID: "ns-1", UpstreamID: 7},
+		responsespkg.IDClaims{NamespaceUUID: "ns-1", UpstreamID: 7},
 		"",
 		nil,
 	)
@@ -49,12 +50,12 @@ func TestResponsesNativePayloadTransformerWrapsUpstreamIDsRecursively(t *testing
 }
 
 func TestResponsesNativePayloadTransformerCachesWrappedIDs(t *testing.T) {
-	mapper, err := newResponsesIDMapper("test-secret")
+	mapper, err := responsespkg.NewIDMapper("test-secret")
 	require.NoError(t, err)
 
 	tr := newResponsesNativePayloadTransformer(
 		mapper,
-		responsesIDClaims{NamespaceUUID: "ns-1", UpstreamID: 7},
+		responsespkg.IDClaims{NamespaceUUID: "ns-1", UpstreamID: 7},
 		"",
 		nil,
 	)
@@ -66,12 +67,12 @@ func TestResponsesNativePayloadTransformerCachesWrappedIDs(t *testing.T) {
 }
 
 func TestResponsesNativePayloadTransformerDoesNotRewrapExistingWrappedIDs(t *testing.T) {
-	mapper, err := newResponsesIDMapper("test-secret")
+	mapper, err := responsespkg.NewIDMapper("test-secret")
 	require.NoError(t, err)
 
 	tr := newResponsesNativePayloadTransformer(
 		mapper,
-		responsesIDClaims{NamespaceUUID: "ns-1", UpstreamID: 7},
+		responsespkg.IDClaims{NamespaceUUID: "ns-1", UpstreamID: 7},
 		"",
 		nil,
 	)
@@ -87,12 +88,12 @@ func TestResponsesNativePayloadTransformerDoesNotRewrapExistingWrappedIDs(t *tes
 }
 
 func TestResponsesNativePayloadTransformerEchoesPreviousResponseID(t *testing.T) {
-	mapper, err := newResponsesIDMapper("test-secret")
+	mapper, err := responsespkg.NewIDMapper("test-secret")
 	require.NoError(t, err)
 
 	tr := newResponsesNativePayloadTransformer(
 		mapper,
-		responsesIDClaims{NamespaceUUID: "ns-1", UpstreamID: 7},
+		responsespkg.IDClaims{NamespaceUUID: "ns-1", UpstreamID: 7},
 		"resp_agw_v1.public_previous",
 		nil,
 	)
@@ -107,7 +108,7 @@ func TestResponsesNativePayloadTransformerEchoesPreviousResponseID(t *testing.T)
 }
 
 func TestResponsesNativePayloadTransformerForwardsEventsToCounter(t *testing.T) {
-	mapper, err := newResponsesIDMapper("test-secret")
+	mapper, err := responsespkg.NewIDMapper("test-secret")
 	require.NoError(t, err)
 
 	var mu sync.Mutex
@@ -123,7 +124,7 @@ func TestResponsesNativePayloadTransformerForwardsEventsToCounter(t *testing.T) 
 
 	tr := newResponsesNativePayloadTransformer(
 		mapper,
-		responsesIDClaims{NamespaceUUID: "ns-1", UpstreamID: 7},
+		responsespkg.IDClaims{NamespaceUUID: "ns-1", UpstreamID: 7},
 		"",
 		counter,
 	)
@@ -140,13 +141,13 @@ func TestResponsesNativePayloadTransformerForwardsEventsToCounter(t *testing.T) 
 }
 
 func TestResponsesNativePayloadTransformerRecordsUsage(t *testing.T) {
-	mapper, err := newResponsesIDMapper("test-secret")
+	mapper, err := responsespkg.NewIDMapper("test-secret")
 	require.NoError(t, err)
 
 	counter := token.NewResponsesTokenCounter(nil)
 	tr := newResponsesNativePayloadTransformer(
 		mapper,
-		responsesIDClaims{NamespaceUUID: "ns-1", UpstreamID: 7},
+		responsespkg.IDClaims{NamespaceUUID: "ns-1", UpstreamID: 7},
 		"",
 		counter,
 	)

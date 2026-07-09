@@ -860,7 +860,7 @@ func TestResponsesAdapterNonStreamWriterFinalizesResponse(t *testing.T) {
 	w := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(w)
 	counter := token.NewResponsesTokenCounter(&token.DumyTokenizer{})
-	writer := newResponsesAdapterNonStreamWriter(ctx.Writer, "public-model", counter)
+	writer := newResponsesAdapterNonStreamWriter(ctx.Writer, "public-model", counter, nil, "")
 	writer.WriteHeader(http.StatusOK)
 	_, err := writer.Write([]byte(`{
 		"id":"chatcmpl_1",
@@ -886,7 +886,7 @@ func TestResponsesAdapterNonStreamWriterForwardsUpstreamError(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	w := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(w)
-	writer := newResponsesAdapterNonStreamWriter(ctx.Writer, "public-model", nil)
+	writer := newResponsesAdapterNonStreamWriter(ctx.Writer, "public-model", nil, nil, "")
 	writer.Header().Set("Content-Type", "application/json")
 	writer.WriteHeader(http.StatusBadRequest)
 	errorBody := []byte(`{"error":{"message":"invalid request"}}`)
@@ -943,7 +943,7 @@ func TestResponsesAdapterStreamWriterEmitsResponsesEvents(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	w := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(w)
-	writer := newResponsesAdapterStreamWriter(ctx.Writer, "public-model", nil)
+	writer := newResponsesAdapterStreamWriter(ctx.Writer, "public-model", nil, nil, "")
 	writer.WriteHeader(200)
 	_, err := writer.Write([]byte(`data: {"id":"chatcmpl_1","choices":[{"delta":{"content":"he"},"index":0}]}` + "\n\n"))
 	require.NoError(t, err)
@@ -971,7 +971,7 @@ func TestResponsesAdapterStreamWriterEmitsReasoningContentEvents(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	w := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(w)
-	writer := newResponsesAdapterStreamWriter(ctx.Writer, "public-model", nil)
+	writer := newResponsesAdapterStreamWriter(ctx.Writer, "public-model", nil, nil, "")
 	writer.WriteHeader(200)
 	_, err := writer.Write([]byte(`data: {"id":"chatcmpl_1","choices":[{"delta":{"reasoning_content":"think "},"index":0}]}` + "\n\n"))
 	require.NoError(t, err)
@@ -998,7 +998,7 @@ func TestResponsesAdapterStreamWriterEmitsReasoningFallbackEvents(t *testing.T) 
 	gin.SetMode(gin.TestMode)
 	w := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(w)
-	writer := newResponsesAdapterStreamWriter(ctx.Writer, "public-model", nil)
+	writer := newResponsesAdapterStreamWriter(ctx.Writer, "public-model", nil, nil, "")
 	writer.WriteHeader(200)
 	_, err := writer.Write([]byte(`data: {"id":"chatcmpl_1","choices":[{"delta":{"reasoning":"chain"},"finish_reason":"stop","index":0}]}` + "\n\n"))
 	require.NoError(t, err)
@@ -1015,7 +1015,7 @@ func TestResponsesAdapterStreamWriterDoesNotEmitEmptyReasoningItem(t *testing.T)
 	gin.SetMode(gin.TestMode)
 	w := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(w)
-	writer := newResponsesAdapterStreamWriter(ctx.Writer, "public-model", nil)
+	writer := newResponsesAdapterStreamWriter(ctx.Writer, "public-model", nil, nil, "")
 	writer.WriteHeader(200)
 	_, err := writer.Write([]byte(`data: {"id":"chatcmpl_1","choices":[{"delta":{"content":"hello"},"finish_reason":"stop","index":0}]}` + "\n\n"))
 	require.NoError(t, err)
@@ -1032,7 +1032,7 @@ func TestResponsesAdapterStreamWriterFinishResponseStreamEmitsCompleted(t *testi
 	gin.SetMode(gin.TestMode)
 	w := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(w)
-	writer := newResponsesAdapterStreamWriter(ctx.Writer, "public-model", nil)
+	writer := newResponsesAdapterStreamWriter(ctx.Writer, "public-model", nil, nil, "")
 	writer.WriteHeader(200)
 
 	_, err := writer.Write([]byte(`data: {"id":"chatcmpl_1","choices":[{"delta":{"content":"hello"},"finish_reason":"stop","index":0}]}` + "\n\n"))
@@ -1050,7 +1050,7 @@ func TestResponsesAdapterStreamWriterCapturesUsage(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	w := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(w)
-	writer := newResponsesAdapterStreamWriter(ctx.Writer, "public-model", nil)
+	writer := newResponsesAdapterStreamWriter(ctx.Writer, "public-model", nil, nil, "")
 	writer.WriteHeader(200)
 	_, err := writer.Write([]byte(`data: {"id":"chatcmpl_1","choices":[],"usage":{"prompt_tokens":4,"completion_tokens":5,"total_tokens":9}}` + "\n\n"))
 	require.NoError(t, err)
@@ -1066,7 +1066,7 @@ func TestResponsesAdapterStreamWriterAppendsResponsesEventsToCounter(t *testing.
 	ctx, _ := gin.CreateTestContext(w)
 	counter := token.NewResponsesTokenCounter(&token.DumyTokenizer{})
 	counter.Request(&types.ResponsesRequest{Model: "m", Input: json.RawMessage(`"hi"`)})
-	writer := newResponsesAdapterStreamWriter(ctx.Writer, "public-model", counter)
+	writer := newResponsesAdapterStreamWriter(ctx.Writer, "public-model", counter, nil, "")
 	writer.WriteHeader(200)
 
 	_, err := writer.Write([]byte(`data: {"id":"chatcmpl_1","choices":[{"index":0,"delta":{"content":"hello"}}]}` + "\n\n"))
@@ -1081,7 +1081,7 @@ func TestResponsesAdapterStreamWriterCompletedResponseIncludesUsage(t *testing.T
 	gin.SetMode(gin.TestMode)
 	w := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(w)
-	writer := newResponsesAdapterStreamWriter(ctx.Writer, "public-model", nil)
+	writer := newResponsesAdapterStreamWriter(ctx.Writer, "public-model", nil, nil, "")
 	writer.WriteHeader(200)
 
 	_, err := writer.Write([]byte(`data: {"id":"chatcmpl_1","choices":[{"delta":{"content":"hello"},"finish_reason":"stop","index":0}]}` + "\n\n"))
@@ -1098,7 +1098,7 @@ func TestResponsesAdapterStreamWriterEmitsToolCallItemBeforeArguments(t *testing
 	gin.SetMode(gin.TestMode)
 	w := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(w)
-	writer := newResponsesAdapterStreamWriter(ctx.Writer, "public-model", nil)
+	writer := newResponsesAdapterStreamWriter(ctx.Writer, "public-model", nil, nil, "")
 	writer.WriteHeader(200)
 	_, err := writer.Write([]byte(`data: {"id":"chatcmpl_1","choices":[{"index":0,"delta":{"tool_calls":[{"index":1,"id":"call_1","type":"function","function":{"name":"lookup","arguments":"{\"q\""}}]}}]}` + "\n\n"))
 	require.NoError(t, err)
@@ -1120,7 +1120,7 @@ func TestResponsesAdapterStreamWriterToolOnlyStreamDoesNotEmitTextItem(t *testin
 	gin.SetMode(gin.TestMode)
 	w := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(w)
-	writer := newResponsesAdapterStreamWriter(ctx.Writer, "public-model", nil)
+	writer := newResponsesAdapterStreamWriter(ctx.Writer, "public-model", nil, nil, "")
 	writer.WriteHeader(200)
 
 	_, err := writer.Write([]byte(`data: {"id":"chatcmpl_1","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"id":"call_1","type":"function","function":{"name":"get_weather","arguments":"{\"city\":\"Tokyo\"}"}}]}}]}` + "\n\n"))
@@ -1151,7 +1151,7 @@ func TestResponsesAdapterStreamWriterEmitsRefusalEvents(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	w := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(w)
-	writer := newResponsesAdapterStreamWriter(ctx.Writer, "public-model", nil)
+	writer := newResponsesAdapterStreamWriter(ctx.Writer, "public-model", nil, nil, "")
 	writer.WriteHeader(200)
 
 	_, err := writer.Write([]byte(`data: {"id":"chatcmpl_1","choices":[{"index":0,"delta":{"refusal":"blocked"},"finish_reason":"stop"}]}` + "\n\n"))
@@ -1176,7 +1176,7 @@ func TestResponsesAdapterStreamWriterRefusalTakesPrecedenceOverContent(t *testin
 	gin.SetMode(gin.TestMode)
 	w := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(w)
-	writer := newResponsesAdapterStreamWriter(ctx.Writer, "public-model", nil)
+	writer := newResponsesAdapterStreamWriter(ctx.Writer, "public-model", nil, nil, "")
 	writer.WriteHeader(200)
 
 	_, err := writer.Write([]byte(`data: {"id":"chatcmpl_1","choices":[{"index":0,"delta":{"content":"text","refusal":"blocked"},"finish_reason":"stop"}]}` + "\n\n"))
@@ -1191,7 +1191,7 @@ func TestResponsesAdapterStreamWriterEmitsErrorAndStopsStream(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	w := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(w)
-	writer := newResponsesAdapterStreamWriter(ctx.Writer, "public-model", nil)
+	writer := newResponsesAdapterStreamWriter(ctx.Writer, "public-model", nil, nil, "")
 	writer.WriteHeader(200)
 
 	_, err := writer.Write([]byte(`data: {"id":"chatcmpl_1","choices":[{"delta":{"content":"partial"},"index":0}]}` + "\n\n"))
@@ -1248,7 +1248,7 @@ func TestRecordResponsesUsageFallsBackToTokenCounter(t *testing.T) {
 		}).
 		Once()
 
-	tester.handler.recordResponsesUsage(c, counter, "testuuid", modelTarget, "api-key")
+	tester.handler.recordResponsesUsageWithTrace(c, counter, "testuuid", modelTarget, "api-key", nil, responsesTracePostProcessInput{})
 	wg.Wait()
 }
 
@@ -1284,7 +1284,7 @@ func TestRecordResponsesUsagePrefersResponsesUsage(t *testing.T) {
 		}).
 		Once()
 
-	tester.handler.recordResponsesUsage(c, counter, "testuuid", modelTarget, "api-key")
+	tester.handler.recordResponsesUsageWithTrace(c, counter, "testuuid", modelTarget, "api-key", nil, responsesTracePostProcessInput{})
 	wg.Wait()
 }
 

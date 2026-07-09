@@ -486,6 +486,7 @@ type Config struct {
 		LLMTraceContentCapture               string `env:"OPENCSG_AIGATEWAY_LLM_TRACE_CONTENT_CAPTURE" default:"metadata_only"`
 		LLMTraceMaxContentLength             int    `env:"OPENCSG_AIGATEWAY_LLM_TRACE_MAX_CONTENT_LENGTH" default:"256"`
 		LLMTraceMaxInputUserMessages         int    `env:"OPENCSG_AIGATEWAY_LLM_TRACE_MAX_INPUT_USER_MESSAGES" default:"1"`
+		LLMTraceToolDefinitionsMode          string `env:"OPENCSG_AIGATEWAY_LLM_TRACE_TOOL_DEFINITIONS_MODE" default:"name_only"`
 		ChatMaxFallbackAttempts              int    `env:"OPENCSG_AIGATEWAY_CHAT_MAX_FALLBACK_ATTEMPTS" default:"2"`
 		HealthCheckEnabled                   bool   `env:"OPENCSG_AIGATEWAY_HEALTH_CHECK_ENABLED" default:"true"`
 		HealthCheckL7APIEnabled              bool   `env:"OPENCSG_AIGATEWAY_HEALTH_CHECK_L7_API_ENABLED" default:"true"`

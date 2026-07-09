@@ -1,4 +1,4 @@
-package handler
+package responses
 
 import (
 	"crypto/aes"
@@ -22,21 +22,21 @@ const (
 )
 
 var (
-	errInvalidResponseID = errors.New("invalid response id")
-	errResponseIDOwner   = errors.New("response id owner mismatch")
+	ErrInvalidResponseID = errors.New("invalid response id")
+	ErrResponseIDOwner   = errors.New("response id owner mismatch")
 )
 
-type responsesIDClaims struct {
+type IDClaims struct {
 	NamespaceUUID      string `json:"namespace_uuid"`
 	UpstreamID         int64  `json:"upstream_id"`
 	UpstreamResponseID string `json:"upstream_response_id"`
 }
 
-type ResponsesIDMapper struct {
+type IDMapper struct {
 	aead cipher.AEAD
 }
 
-func newResponsesIDMapper(secret string) (*ResponsesIDMapper, error) {
+func NewIDMapper(secret string) (*IDMapper, error) {
 	secret = strings.TrimSpace(secret)
 	if secret == "" {
 		return nil, fmt.Errorf("responses id mapper secret is empty")
@@ -50,17 +50,17 @@ func newResponsesIDMapper(secret string) (*ResponsesIDMapper, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &ResponsesIDMapper{aead: aead}, nil
+	return &IDMapper{aead: aead}, nil
 }
 
-func newResponsesIDMapperFromConfig(cfg *config.Config) (*ResponsesIDMapper, error) {
+func NewIDMapperFromConfig(cfg *config.Config) (*IDMapper, error) {
 	if cfg == nil {
 		return nil, fmt.Errorf("config is nil")
 	}
-	return newResponsesIDMapper(cfg.AIGateway.ResponsesIDSecret)
+	return NewIDMapper(cfg.AIGateway.ResponsesIDSecret)
 }
 
-func (m *ResponsesIDMapper) Wrap(claims responsesIDClaims) (string, error) {
+func (m *IDMapper) Wrap(claims IDClaims) (string, error) {
 	if m == nil || m.aead == nil {
 		return "", fmt.Errorf("responses id mapper is not configured")
 	}
@@ -89,40 +89,44 @@ func (m *ResponsesIDMapper) Wrap(claims responsesIDClaims) (string, error) {
 	return responsesGatewayIDPrefix + "." + base64.RawURLEncoding.EncodeToString(token), nil
 }
 
-func (m *ResponsesIDMapper) Unwrap(id, owner string) (responsesIDClaims, error) {
-	var claims responsesIDClaims
+func (m *IDMapper) Unwrap(id, owner string) (IDClaims, error) {
+	var claims IDClaims
 	if m == nil || m.aead == nil {
 		return claims, fmt.Errorf("responses id mapper is not configured")
 	}
 	parts := strings.Split(id, ".")
 	if len(parts) != 2 || parts[0] != responsesGatewayIDPrefix {
-		return claims, errInvalidResponseID
+		return claims, ErrInvalidResponseID
 	}
 	token, err := base64.RawURLEncoding.DecodeString(parts[1])
 	if err != nil {
-		return claims, errInvalidResponseID
+		return claims, ErrInvalidResponseID
 	}
 	nonceSize := m.aead.NonceSize()
 	if len(token) <= nonceSize {
-		return claims, errInvalidResponseID
+		return claims, ErrInvalidResponseID
 	}
 	payload, err := m.aead.Open(nil, token[:nonceSize], token[nonceSize:], []byte(responsesGatewayIDPrefix))
 	if err != nil {
-		return claims, errInvalidResponseID
+		return claims, ErrInvalidResponseID
 	}
 	if err := json.Unmarshal(payload, &claims); err != nil {
-		return claims, errInvalidResponseID
+		return claims, ErrInvalidResponseID
 	}
 	if claims.NamespaceUUID != owner {
-		return claims, errResponseIDOwner
+		return claims, ErrResponseIDOwner
 	}
 	return claims, nil
 }
 
-func isAdapterResponseID(id string) bool {
+func IsAdapterResponseID(id string) bool {
 	return strings.HasPrefix(id, responsesAdapterIDPrefix+"_")
 }
 
-func newAdapterResponseID() string {
+func IsGatewayResponseID(id string) bool {
+	return strings.HasPrefix(id, responsesGatewayIDPrefix+".")
+}
+
+func NewAdapterResponseID() string {
 	return responsesAdapterIDPrefix + "_" + strings.ReplaceAll(uuid.NewString(), "-", "")
 }

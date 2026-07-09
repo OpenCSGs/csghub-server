@@ -18,6 +18,7 @@ type SigilConfig struct {
 	ContentCapture       string
 	MaxContentLength     int
 	MaxInputUserMessages int
+	ToolDefinitionsMode  string
 }
 
 type sigilTracer struct {
@@ -25,6 +26,21 @@ type sigilTracer struct {
 	contentCapture       sigil.ContentCaptureMode
 	maxContentLength     int
 	maxInputUserMessages int
+	toolDefinitionsMode  toolDefinitionsMode
+}
+
+type toolDefinitionsMode int
+
+const (
+	toolDefinitionsModeNameOnly toolDefinitionsMode = iota
+	toolDefinitionsModeFull
+)
+
+func parseToolDefinitionsMode(value string) toolDefinitionsMode {
+	if strings.EqualFold(value, "full") {
+		return toolDefinitionsModeFull
+	}
+	return toolDefinitionsModeNameOnly
 }
 
 func NewSigilTracer(config SigilConfig) (LLMTracer, error) {
@@ -38,6 +54,7 @@ func NewSigilTracer(config SigilConfig) (LLMTracer, error) {
 		contentCapture:       contentCapture,
 		maxContentLength:     config.MaxContentLength,
 		maxInputUserMessages: config.MaxInputUserMessages,
+		toolDefinitionsMode:  parseToolDefinitionsMode(config.ToolDefinitionsMode),
 	}, nil
 }
 
@@ -50,7 +67,7 @@ func (t *sigilTracer) StartGeneration(ctx context.Context, input aigatewaytypes.
 	ctx, recorder := t.client.StartGeneration(ctx, toSigilGenerationStart(input, sigil.GenerationModeSync, t.contentCapture))
 	span := oteltrace.SpanFromContext(ctx)
 	setTraceMetadataAttributes(span, input.Metadata)
-	return ctx, &sigilGenerationRecorder{recorder: recorder, span: span, contentCapture: t.contentCapture, maxContentLength: t.maxContentLength, maxInputUserMessages: t.maxInputUserMessages, mode: sigil.GenerationModeSync, startedAt: startedAt, tools: input.Tools}
+	return ctx, &sigilGenerationRecorder{recorder: recorder, span: span, contentCapture: t.contentCapture, maxContentLength: t.maxContentLength, maxInputUserMessages: t.maxInputUserMessages, mode: sigil.GenerationModeSync, startedAt: startedAt, tools: input.Tools, toolDefinitionsMode: t.toolDefinitionsMode}
 }
 
 func (t *sigilTracer) StartStreamingGeneration(ctx context.Context, input aigatewaytypes.GenerationStart) (context.Context, GenerationRecorder) {
@@ -62,7 +79,7 @@ func (t *sigilTracer) StartStreamingGeneration(ctx context.Context, input aigate
 	ctx, recorder := t.client.StartStreamingGeneration(ctx, toSigilGenerationStart(input, sigil.GenerationModeStream, t.contentCapture))
 	span := oteltrace.SpanFromContext(ctx)
 	setTraceMetadataAttributes(span, input.Metadata)
-	return ctx, &sigilGenerationRecorder{recorder: recorder, span: span, contentCapture: t.contentCapture, maxContentLength: t.maxContentLength, maxInputUserMessages: t.maxInputUserMessages, mode: sigil.GenerationModeStream, startedAt: startedAt, tools: input.Tools}
+	return ctx, &sigilGenerationRecorder{recorder: recorder, span: span, contentCapture: t.contentCapture, maxContentLength: t.maxContentLength, maxInputUserMessages: t.maxInputUserMessages, mode: sigil.GenerationModeStream, startedAt: startedAt, tools: input.Tools, toolDefinitionsMode: t.toolDefinitionsMode}
 }
 
 func (t *sigilTracer) StartEmbedding(ctx context.Context, input aigatewaytypes.EmbeddingStart) (context.Context, EmbeddingRecorder) {
@@ -92,6 +109,7 @@ type sigilGenerationRecorder struct {
 	startedAt            time.Time
 	firstChunkAt         time.Time
 	tools                []aigatewaytypes.GenerationToolDefinition
+	toolDefinitionsMode  toolDefinitionsMode
 	ended                bool
 }
 
@@ -174,7 +192,7 @@ func (r *sigilGenerationRecorder) End() {
 	if outputJSON := marshalMessagesToCompactJSON(outputMessages, r.maxContentLength); outputJSON != "" {
 		r.span.SetAttributes(attribute.String("gen_ai.output.messages", outputJSON))
 	}
-	if toolsJSON := marshalToolDefinitionsToCompactJSON(firstNonEmptyTools(r.response.Tools, r.tools), r.contentCapture, r.maxContentLength); toolsJSON != "" {
+	if toolsJSON := marshalToolDefinitionsToCompactJSON(firstNonEmptyTools(r.response.Tools, r.tools), r.toolDefinitionsMode, r.maxContentLength); toolsJSON != "" {
 		r.span.SetAttributes(attribute.String("gen_ai.tool.definitions", toolsJSON))
 	}
 	if len(r.response.FinishReasons) > 0 {
@@ -277,36 +295,38 @@ func toSigilEmbeddingStart(input aigatewaytypes.EmbeddingStart) sigil.EmbeddingS
 }
 
 const (
-	TraceMetadataKeyAIGatewayAPI         = "aigateway.api"
-	TraceMetadataKeyAIGatewayModelID     = "aigateway.model.id"
-	TraceMetadataKeyGenAIOutputType      = "gen_ai.output.type"
-	TraceMetadataKeyImageSize            = "aigateway.image.size"
-	TraceMetadataKeyImageQuality         = "aigateway.image.quality"
-	TraceMetadataKeyImageResponseFormat  = "aigateway.image.response_format"
-	TraceMetadataKeyImageOutputFormat    = "aigateway.image.output_format"
-	TraceMetadataKeyImageN               = "aigateway.image.n"
-	TraceMetadataKeyImageOutputCount     = "aigateway.image.output_count"
-	TraceMetadataKeyAudioDurationSeconds = "aigateway.audio.duration_seconds"
-	TraceMetadataKeyVideoID              = "aigateway.video.id"
-	TraceMetadataKeyVideoStatus          = "aigateway.video.status"
-	TraceMetadataKeyVideoSize            = "aigateway.video.size"
-	TraceMetadataKeyVideoSeconds         = "aigateway.video.seconds"
+	TraceMetadataKeyAIGatewayAPI           = "aigateway.api"
+	TraceMetadataKeyAIGatewayModelID       = "aigateway.model.id"
+	TraceMetadataKeyGenAIOutputType        = "gen_ai.output.type"
+	TraceMetadataKeyImageSize              = "aigateway.image.size"
+	TraceMetadataKeyImageQuality           = "aigateway.image.quality"
+	TraceMetadataKeyImageResponseFormat    = "aigateway.image.response_format"
+	TraceMetadataKeyImageOutputFormat      = "aigateway.image.output_format"
+	TraceMetadataKeyImageN                 = "aigateway.image.n"
+	TraceMetadataKeyImageOutputCount       = "aigateway.image.output_count"
+	TraceMetadataKeyAudioDurationSeconds   = "aigateway.audio.duration_seconds"
+	TraceMetadataKeyVideoID                = "aigateway.video.id"
+	TraceMetadataKeyVideoStatus            = "aigateway.video.status"
+	TraceMetadataKeyVideoSize              = "aigateway.video.size"
+	TraceMetadataKeyVideoSeconds           = "aigateway.video.seconds"
+	TraceMetadataKeyResponsesExecutionMode = "aigateway.responses.execution_mode"
 )
 
 var traceMetadataAttributeKeys = map[string]struct{}{
-	TraceMetadataKeyAIGatewayAPI:         {},
-	TraceMetadataKeyAIGatewayModelID:     {},
-	TraceMetadataKeyGenAIOutputType:      {},
-	TraceMetadataKeyImageSize:            {},
-	TraceMetadataKeyImageQuality:         {},
-	TraceMetadataKeyImageResponseFormat:  {},
-	TraceMetadataKeyImageOutputFormat:    {},
-	TraceMetadataKeyImageN:               {},
-	TraceMetadataKeyImageOutputCount:     {},
-	TraceMetadataKeyAudioDurationSeconds: {},
-	TraceMetadataKeyVideoStatus:          {},
-	TraceMetadataKeyVideoSize:            {},
-	TraceMetadataKeyVideoSeconds:         {},
+	TraceMetadataKeyAIGatewayAPI:           {},
+	TraceMetadataKeyAIGatewayModelID:       {},
+	TraceMetadataKeyGenAIOutputType:        {},
+	TraceMetadataKeyImageSize:              {},
+	TraceMetadataKeyImageQuality:           {},
+	TraceMetadataKeyImageResponseFormat:    {},
+	TraceMetadataKeyImageOutputFormat:      {},
+	TraceMetadataKeyImageN:                 {},
+	TraceMetadataKeyImageOutputCount:       {},
+	TraceMetadataKeyAudioDurationSeconds:   {},
+	TraceMetadataKeyVideoStatus:            {},
+	TraceMetadataKeyVideoSize:              {},
+	TraceMetadataKeyVideoSeconds:           {},
+	TraceMetadataKeyResponsesExecutionMode: {},
 }
 
 func setTraceMetadataAttributes(span oteltrace.Span, metadata map[string]any) {
@@ -521,8 +541,8 @@ func limitInputMessages(messages []aigatewaytypes.GenerationMessage, maxInputUse
 	return result
 }
 
-func marshalToolDefinitionsToCompactJSON(tools []aigatewaytypes.GenerationToolDefinition, mode sigil.ContentCaptureMode, maxContentLength int) string {
-	if len(tools) == 0 || (mode != sigil.ContentCaptureModeFull && mode != sigil.ContentCaptureModeNoToolContent) {
+func marshalToolDefinitionsToCompactJSON(tools []aigatewaytypes.GenerationToolDefinition, mode toolDefinitionsMode, maxContentLength int) string {
+	if len(tools) == 0 {
 		return ""
 	}
 	definitions := make([]map[string]any, 0, len(tools))
@@ -533,7 +553,7 @@ func marshalToolDefinitionsToCompactJSON(tools []aigatewaytypes.GenerationToolDe
 		if tool.Type != "" {
 			definition["type"] = tool.Type
 		}
-		if len(tool.InputSchema) > 0 {
+		if mode == toolDefinitionsModeFull && len(tool.InputSchema) > 0 {
 			if parameters, ok := compactToolParameters(tool.InputSchema, maxContentLength); ok {
 				definition["parameters"] = parameters
 			}

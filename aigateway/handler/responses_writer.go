@@ -3,8 +3,11 @@ package handler
 import (
 	"bytes"
 	"net/http"
+	responsespkg "opencsg.com/csghub-server/aigateway/handler/responses"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+	"opencsg.com/csghub-server/aigateway/component"
 	"opencsg.com/csghub-server/aigateway/token"
 )
 
@@ -48,9 +51,17 @@ type responsesAdapterResponseWriter interface {
 	Finalize(statusCode int) error
 }
 
-func newResponsesAdapterResponseWriter(w gin.ResponseWriter, stream bool, model string, responsesCounter token.ResponsesTokenCounter) responsesAdapterResponseWriter {
-	if stream {
-		return newResponsesAdapterStreamWriter(w, model, responsesCounter)
+func newResponsesAdapterResponseWriter(w gin.ResponseWriter, stream bool, model string, responsesCounter token.ResponsesTokenCounter, moderation component.Moderation, sessionID string, logCapture ...*responsespkg.LLMLogRecorder) responsesAdapterResponseWriter {
+	var recorder *responsespkg.LLMLogRecorder
+	if len(logCapture) > 0 {
+		recorder = logCapture[0]
 	}
-	return newResponsesAdapterNonStreamWriter(w, model, responsesCounter)
+	if stream {
+		return newResponsesAdapterStreamWriter(w, model, responsesCounter, moderation, sessionID, recorder)
+	}
+	return newResponsesAdapterNonStreamWriter(w, model, responsesCounter, moderation, sessionID, recorder)
+}
+
+func newResponsesModerationSessionID() string {
+	return uuid.New().String()
 }

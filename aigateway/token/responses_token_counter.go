@@ -1,7 +1,6 @@
 package token
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -43,11 +42,7 @@ func (c *responsesTokenCounterImpl) Request(req *types.ResponsesRequest) {
 	cp := *req
 	c.request = &cp
 	c.promptFallback.Reset()
-	if text := responsesInstructionText(req.Instructions); text != "" {
-		c.promptFallback.WriteString(text)
-		c.promptFallback.WriteByte('\n')
-	}
-	c.promptFallback.WriteString(responsesInputText(req.Input))
+	c.promptFallback.WriteString(types.ResponsesPromptText(req))
 }
 
 func (c *responsesTokenCounterImpl) Response(resp *types.ResponsesResponse) {
@@ -222,82 +217,4 @@ func responsesOutputTokenCount(usage *types.ResponsesUsage) int64 {
 		usage.OutputTokensDetails.AudioTokens +
 		usage.OutputTokensDetails.ImageTokens +
 		usage.OutputTokensDetails.ReasoningTokens
-}
-
-func responsesInstructionText(raw json.RawMessage) string {
-	if len(raw) == 0 {
-		return ""
-	}
-	var text string
-	if err := json.Unmarshal(raw, &text); err == nil {
-		return strings.TrimSpace(text)
-	}
-	return strings.TrimSpace(string(raw))
-}
-
-func responsesInputText(raw json.RawMessage) string {
-	if len(raw) == 0 {
-		return ""
-	}
-	var text string
-	if err := json.Unmarshal(raw, &text); err == nil {
-		return text
-	}
-	var items []map[string]any
-	if err := json.Unmarshal(raw, &items); err != nil {
-		return strings.TrimSpace(string(raw))
-	}
-	var b strings.Builder
-	for _, item := range items {
-		b.WriteString(responsesItemText(item))
-		if b.Len() > 0 {
-			b.WriteByte('\n')
-		}
-	}
-	return b.String()
-}
-
-func responsesItemText(item map[string]any) string {
-	var b strings.Builder
-	switch item["type"] {
-	case "function_call":
-		writeAnyText(&b, item["name"])
-		writeAnyText(&b, item["arguments"])
-	case "function_call_output":
-		writeAnyText(&b, item["output"])
-	default:
-		writeAnyText(&b, item["content"])
-	}
-	return b.String()
-}
-
-func writeAnyText(b *strings.Builder, value any) {
-	switch v := value.(type) {
-	case nil:
-		return
-	case string:
-		b.WriteString(v)
-	case []any:
-		for _, item := range v {
-			writeAnyText(b, item)
-		}
-	case map[string]any:
-		if text, _ := v["text"].(string); text != "" {
-			b.WriteString(text)
-			return
-		}
-		for _, key := range []string{"output", "arguments", "content"} {
-			if child, ok := v[key]; ok {
-				writeAnyText(b, child)
-			}
-		}
-	default:
-		data, err := json.Marshal(v)
-		if err == nil {
-			var compact bytes.Buffer
-			if json.Compact(&compact, data) == nil {
-				b.Write(compact.Bytes())
-			}
-		}
-	}
 }

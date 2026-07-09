@@ -1,13 +1,13 @@
-package handler
+package responses
 
 import "opencsg.com/csghub-server/aigateway/types"
 
-type responsesStreamResponseEvent struct {
-	Type     string                  `json:"type"`
-	Response responsesStreamResponse `json:"response"`
+type StreamResponseEvent struct {
+	Type     string         `json:"type"`
+	Response StreamResponse `json:"response"`
 }
 
-type responsesStreamResponse struct {
+type StreamResponse struct {
 	ID         string                `json:"id"`
 	Object     string                `json:"object"`
 	CreatedAt  int64                 `json:"created_at"`
@@ -18,23 +18,23 @@ type responsesStreamResponse struct {
 	Usage      *types.ResponsesUsage `json:"usage,omitempty"`
 }
 
-type responsesStreamOutputItemEvent struct {
+type StreamOutputItemEvent struct {
 	Type        string `json:"type"`
 	ResponseID  string `json:"response_id"`
 	OutputIndex int    `json:"output_index"`
 	Item        any    `json:"item"`
 }
 
-type responsesStreamContentPartEvent struct {
-	Type         string                     `json:"type"`
-	ResponseID   string                     `json:"response_id"`
-	ItemID       string                     `json:"item_id,omitempty"`
-	OutputIndex  int                        `json:"output_index"`
-	ContentIndex int                        `json:"content_index"`
-	Part         responsesStreamContentPart `json:"part"`
+type StreamContentPartEvent struct {
+	Type         string            `json:"type"`
+	ResponseID   string            `json:"response_id"`
+	ItemID       string            `json:"item_id,omitempty"`
+	OutputIndex  int               `json:"output_index"`
+	ContentIndex int               `json:"content_index"`
+	Part         StreamContentPart `json:"part"`
 }
 
-type responsesStreamOutputTextDeltaEvent struct {
+type StreamOutputTextDeltaEvent struct {
 	Type         string `json:"type"`
 	ResponseID   string `json:"response_id"`
 	ItemID       string `json:"item_id"`
@@ -43,7 +43,7 @@ type responsesStreamOutputTextDeltaEvent struct {
 	Delta        string `json:"delta"`
 }
 
-type responsesStreamOutputTextDoneEvent struct {
+type StreamOutputTextDoneEvent struct {
 	Type         string `json:"type"`
 	ResponseID   string `json:"response_id"`
 	ItemID       string `json:"item_id"`
@@ -52,7 +52,7 @@ type responsesStreamOutputTextDoneEvent struct {
 	Text         string `json:"text"`
 }
 
-type responsesStreamRefusalDeltaEvent struct {
+type StreamRefusalDeltaEvent struct {
 	Type         string `json:"type"`
 	ResponseID   string `json:"response_id"`
 	ItemID       string `json:"item_id"`
@@ -61,7 +61,7 @@ type responsesStreamRefusalDeltaEvent struct {
 	Delta        string `json:"delta"`
 }
 
-type responsesStreamRefusalDoneEvent struct {
+type StreamRefusalDoneEvent struct {
 	Type         string `json:"type"`
 	ResponseID   string `json:"response_id"`
 	ItemID       string `json:"item_id"`
@@ -70,7 +70,7 @@ type responsesStreamRefusalDoneEvent struct {
 	Refusal      string `json:"refusal"`
 }
 
-type responsesStreamReasoningSummaryDeltaEvent struct {
+type StreamReasoningSummaryDeltaEvent struct {
 	Type         string `json:"type"`
 	ResponseID   string `json:"response_id"`
 	ItemID       string `json:"item_id"`
@@ -79,16 +79,16 @@ type responsesStreamReasoningSummaryDeltaEvent struct {
 	Delta        string `json:"delta"`
 }
 
-type responsesStreamReasoningSummaryDoneEvent struct {
-	Type         string                              `json:"type"`
-	ResponseID   string                              `json:"response_id"`
-	ItemID       string                              `json:"item_id"`
-	OutputIndex  int                                 `json:"output_index"`
-	SummaryIndex int                                 `json:"summary_index"`
-	Part         responsesStreamReasoningSummaryPart `json:"part"`
+type StreamReasoningSummaryDoneEvent struct {
+	Type         string                     `json:"type"`
+	ResponseID   string                     `json:"response_id"`
+	ItemID       string                     `json:"item_id"`
+	OutputIndex  int                        `json:"output_index"`
+	SummaryIndex int                        `json:"summary_index"`
+	Part         StreamReasoningSummaryPart `json:"part"`
 }
 
-type responsesStreamFunctionCallArgumentsDeltaEvent struct {
+type StreamFunctionCallArgumentsDeltaEvent struct {
 	Type        string `json:"type"`
 	ResponseID  string `json:"response_id"`
 	ItemID      string `json:"item_id"`
@@ -96,22 +96,22 @@ type responsesStreamFunctionCallArgumentsDeltaEvent struct {
 	Delta       string `json:"delta"`
 }
 
-type responsesStreamFunctionCallArgumentsDoneEvent struct {
+type StreamFunctionCallArgumentsDoneEvent struct {
 	Type        string `json:"type"`
 	ResponseID  string `json:"response_id"`
 	ItemID      string `json:"item_id"`
 	OutputIndex int    `json:"output_index"`
 }
 
-type responsesStreamMessageItem struct {
-	ID      string                       `json:"id,omitempty"`
-	Type    string                       `json:"type"`
-	Role    string                       `json:"role"`
-	Status  string                       `json:"status"`
-	Content []responsesStreamContentPart `json:"content,omitempty"`
+type StreamMessageItem struct {
+	ID      string              `json:"id,omitempty"`
+	Type    string              `json:"type"`
+	Role    string              `json:"role"`
+	Status  string              `json:"status"`
+	Content []StreamContentPart `json:"content,omitempty"`
 }
 
-type responsesStreamFunctionCallItem struct {
+type StreamFunctionCallItem struct {
 	ID        string `json:"id"`
 	Type      string `json:"type"`
 	CallID    string `json:"call_id"`
@@ -120,19 +120,19 @@ type responsesStreamFunctionCallItem struct {
 	Status    string `json:"status"`
 }
 
-type responsesStreamReasoningItem struct {
-	ID      string                                `json:"id,omitempty"`
-	Type    string                                `json:"type"`
-	Status  string                                `json:"status,omitempty"`
-	Summary []responsesStreamReasoningSummaryPart `json:"summary,omitempty"`
+type StreamReasoningItem struct {
+	ID      string                       `json:"id,omitempty"`
+	Type    string                       `json:"type"`
+	Status  string                       `json:"status,omitempty"`
+	Summary []StreamReasoningSummaryPart `json:"summary,omitempty"`
 }
 
-type responsesStreamReasoningSummaryPart struct {
+type StreamReasoningSummaryPart struct {
 	Type string `json:"type"`
 	Text string `json:"text"`
 }
 
-type responsesStreamContentPart struct {
+type StreamContentPart struct {
 	Type    string `json:"type"`
 	Text    string `json:"text,omitempty"`
 	Refusal string `json:"refusal,omitempty"`

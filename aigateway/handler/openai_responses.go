@@ -3,12 +3,16 @@ package handler
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"opencsg.com/csghub-server/aigateway/component"
+	responsespkg "opencsg.com/csghub-server/aigateway/handler/responses"
 	"opencsg.com/csghub-server/aigateway/types"
 	"opencsg.com/csghub-server/api/httpbase"
+	"opencsg.com/csghub-server/common/utils/trace"
 )
 
 // Responses godoc
@@ -59,31 +63,84 @@ func (h *OpenAIHandlerImpl) Responses(c *gin.Context) {
 		return
 	}
 
-	decision, err := resolveResponsesRouting(modelTarget)
+	decision, err := responsespkg.ResolveRouting(responsespkg.RoutingTarget{
+		ModelID: modelTarget.Model.ID,
+		Target:  modelTarget.Target,
+	})
 	if err != nil {
 		writeResponsesError(c, http.StatusBadRequest, "unsupported_feature", "invalid_request_error", err.Error())
 		return
 	}
-	if decision.Mode == ResponsesModeDisabled {
+	if decision.Mode == responsespkg.ResponsesModeDisabled {
 		writeResponsesError(c, http.StatusBadRequest, "unsupported_feature", "invalid_request_error", "/v1/responses is disabled for this model")
 		return
 	}
+	requestID := trace.GetTraceIDInGinContext(c)
+	traceCtx, generationRecorder := h.startResponsesTrace(
+		ctx,
+		c.Request.Header,
+		publicModelID,
+		modelTarget,
+		req,
+		decision,
+		requestID,
+		nsUUID,
+	)
+	ctx = traceCtx
+	c.Request = c.Request.WithContext(traceCtx)
+	responseCapture := h.setupResponsesCapture(c, req, modelTarget, decision, nsUUID)
 
 	if !modelTarget.Model.SkipBalance() {
 		if err := h.openaiComponent.CheckBalance(ctx, nsUUID); err != nil {
+			finishLLMTraceWithError(generationRecorder, err, types.TraceErrInsufficientBalance)
 			h.handleInsufficientBalance(c, req.Stream, nsUUID, publicModelID, err)
 			return
 		}
 	}
 
+	var responsesModeration component.Moderation
+	if isCheck, result, err := h.sensitivePolicy.CheckResponsesSensitive(ctx, modelTarget.Model, types.ResponsesPromptText(req), nsUUID, req.Stream, modelTarget.Upstream.Provider); err != nil {
+		slog.WarnContext(ctx, "responses sensitive policy check error", slog.Any("error", err))
+	} else if isCheck && result != nil && result.IsSensitive {
+		finishLLMTraceWithError(generationRecorder, ErrSensitiveContent, types.TraceErrSensitivePrompt)
+		responsespkg.HandleSensitiveResponse(c, req.Stream, result)
+		return
+	} else if isCheck {
+		responsesModeration = h.modComponent
+	}
+
 	switch decision.Mode {
-	case ResponsesModeNative:
-		h.executeNativeResponses(c, req, modelTarget, decision, owner, nsUUID, apikey, publicModelID, publicPreviousResponseID)
-	case ResponsesModeChatAdapter:
-		h.executeAdapterResponses(c, req, modelTarget, nsUUID, apikey, publicModelID)
+	case responsespkg.ResponsesModeNative:
+		h.executeNativeResponses(c, req, modelTarget, decision, owner, nsUUID, apikey, publicModelID, publicPreviousResponseID, responsesModeration, responseCapture, generationRecorder)
+	case responsespkg.ResponsesModeChatAdapter:
+		h.executeAdapterResponses(c, req, modelTarget, nsUUID, apikey, publicModelID, responsesModeration, responseCapture, generationRecorder)
 	default:
 		writeResponsesError(c, http.StatusBadRequest, "unsupported_feature", "invalid_request_error", "unsupported responses execution mode")
 	}
+}
+
+func (h *OpenAIHandlerImpl) setupResponsesCapture(c *gin.Context, req *types.ResponsesRequest, modelTarget *resolvedModelTarget, decision responsespkg.RoutingDecision, nsUUID string) *responsespkg.LLMLogRecorder {
+	needsLogCapture := h.config != nil && h.config.AIGateway.EnableLLMLog && h.llmLogPublisher != nil
+	if !needsLogCapture && h.llmTracer == nil {
+		return nil
+	}
+	if modelTarget == nil || modelTarget.Model == nil {
+		return nil
+	}
+	metadata := map[string]any{
+		"source":                   "aigateway",
+		"api":                      "/v1/responses",
+		"stream":                   req.Stream,
+		"provider":                 modelTarget.Model.Provider,
+		"svc_name":                 modelTarget.Model.SvcName,
+		"responses_execution_mode": string(decision.Mode),
+	}
+	capture, err := responsespkg.NewLLMLogRecorder(trace.GetTraceIDInGinContext(c), modelTarget.ModelName, nsUUID, req, metadata)
+	if err != nil {
+		slog.WarnContext(c.Request.Context(), "failed to initialize responses capture", slog.Any("error", err))
+		return nil
+	}
+	return capture
 }
 
 type previousResponseRoute struct {
@@ -96,7 +153,7 @@ func (h *OpenAIHandlerImpl) resolvePreviousResponseRoute(c *gin.Context, previou
 	if previousResponseID == "" {
 		return route, true
 	}
-	if isAdapterResponseID(previousResponseID) {
+	if responsespkg.IsAdapterResponseID(previousResponseID) {
 		writeResponsesError(c, http.StatusBadRequest, "unsupported_feature", "invalid_request_error", "adapter response ids cannot be used as previous_response_id")
 		return route, false
 	}
@@ -108,7 +165,7 @@ func (h *OpenAIHandlerImpl) resolvePreviousResponseRoute(c *gin.Context, previou
 	claims, err := mapper.Unwrap(previousResponseID, owner)
 	if err != nil {
 		code := "invalid_response_id"
-		if errors.Is(err, errResponseIDOwner) {
+		if errors.Is(err, responsespkg.ErrResponseIDOwner) {
 			code = "response_id_forbidden"
 		}
 		writeResponsesError(c, http.StatusBadRequest, code, "invalid_request_error", err.Error())
@@ -138,9 +195,9 @@ func (h *OpenAIHandlerImpl) resolveResponsesModelTarget(c *gin.Context, username
 	return nil, false
 }
 
-func (h *OpenAIHandlerImpl) getResponsesIDMapper() (*ResponsesIDMapper, error) {
+func (h *OpenAIHandlerImpl) getResponsesIDMapper() (*responsespkg.IDMapper, error) {
 	h.responsesIDMapperOnce.Do(func() {
-		h.responsesIDMapper, h.responsesIDMapperErr = newResponsesIDMapperFromConfig(h.config)
+		h.responsesIDMapper, h.responsesIDMapperErr = responsespkg.NewIDMapperFromConfig(h.config)
 	})
 	return h.responsesIDMapper, h.responsesIDMapperErr
 }

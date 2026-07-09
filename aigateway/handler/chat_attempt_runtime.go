@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"strings"
 
+	responsespkg "opencsg.com/csghub-server/aigateway/handler/responses"
 	commonType "opencsg.com/csghub-server/common/types"
 
 	"opencsg.com/csghub-server/aigateway/component"
@@ -83,7 +84,7 @@ func rewriteResponsesURLToChatCompletions(rawURL string) (string, bool) {
 		return rawURL, false
 	}
 	path := strings.TrimRight(parsed.Path, "/")
-	if !pathEndsWithSegments(path, "responses") {
+	if !responsespkg.PathEndsWithSegments(path, "responses") {
 		return rawURL, false
 	}
 	parts := strings.Split(path, "/")

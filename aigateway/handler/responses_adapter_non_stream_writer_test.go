@@ -6,13 +6,19 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	responsespkg "opencsg.com/csghub-server/aigateway/handler/responses"
+	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	mockcomp "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/aigateway/component"
 	"opencsg.com/csghub-server/aigateway/token"
 	"opencsg.com/csghub-server/aigateway/types"
+	"opencsg.com/csghub-server/builder/rpc"
 )
 
 func TestResponsesAdapterNonStreamWriterFinalizeOK(t *testing.T) {
@@ -30,7 +36,7 @@ func TestResponsesAdapterNonStreamWriterFinalizeOK(t *testing.T) {
 		},
 	}
 
-	w := newResponsesAdapterNonStreamWriter(ctx.Writer, "public-model", counter)
+	w := newResponsesAdapterNonStreamWriter(ctx.Writer, "public-model", counter, nil, "")
 	w.Header().Set("Content-Encoding", "identity")
 	chatBody := []byte(`{
 		"id":"chat-1",
@@ -66,7 +72,7 @@ func TestResponsesAdapterNonStreamWriterFinalizePassesThroughErrorStatus(t *test
 	ctx, _ := gin.CreateTestContext(rec)
 
 	counter := &captureCounter{}
-	w := newResponsesAdapterNonStreamWriter(ctx.Writer, "public-model", counter)
+	w := newResponsesAdapterNonStreamWriter(ctx.Writer, "public-model", counter, nil, "")
 	w.Header().Set("X-Trace", "abc")
 	_, _ = w.Write([]byte(`{"error":"boom"}`))
 
@@ -83,12 +89,63 @@ func TestResponsesAdapterNonStreamWriterFinalizePassesThroughErrorStatus(t *test
 	require.Nil(t, counter.lastResp, "Response() should not be invoked on error passthrough")
 }
 
+func TestResponsesAdapterNonStreamWriterModeratesRefusalAndToolCalls(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	rec := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(rec)
+
+	moderation := mockcomp.NewMockModeration(t)
+	moderation.EXPECT().CheckText(
+		mock.MatchedBy(func(ctx context.Context) bool {
+			deadline, ok := ctx.Deadline()
+			return ok && time.Until(deadline) <= responsespkg.ModerationTimeout
+		}),
+		mock.MatchedBy(func(req types.TextModerationRequest) bool {
+			return req.Key == "session-1" &&
+				req.Phase == types.TextModerationPhaseResponse &&
+				req.Mode == types.TextModerationModeNonStream &&
+				strings.Contains(req.Content, "blocked refusal") &&
+				strings.Contains(req.Content, "delete_file") &&
+				strings.Contains(req.Content, `{"path":"/tmp/a"}`)
+		}),
+	).Return(&rpc.CheckResult{IsSensitive: true, Reason: "toxic"}, nil).Once()
+
+	w := newResponsesAdapterNonStreamWriter(ctx.Writer, "public-model", nil, moderation, "session-1")
+	chatBody := []byte(`{
+		"id":"chat-1",
+		"object":"chat.completion",
+		"created":1700000000,
+		"model":"upstream-model",
+		"choices":[{
+			"index":0,
+			"message":{
+				"role":"assistant",
+				"content":"",
+				"refusal":"blocked refusal",
+				"tool_calls":[{
+					"id":"call_1",
+					"type":"function",
+					"function":{"name":"delete_file","arguments":"{\"path\":\"/tmp/a\"}"}
+				}]
+			},
+			"finish_reason":"stop"
+		}]
+	}`)
+	_, err := w.Write(chatBody)
+	require.NoError(t, err)
+	require.NoError(t, w.Finalize(http.StatusOK))
+
+	body := rec.Body.String()
+	require.Contains(t, body, responsespkg.BlockedMessage)
+	require.NotContains(t, body, "blocked refusal")
+}
+
 func TestResponsesAdapterNonStreamWriterFinalizeSurfacesMalformedChatBody(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	rec := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(rec)
 
-	w := newResponsesAdapterNonStreamWriter(ctx.Writer, "public-model", &captureCounter{})
+	w := newResponsesAdapterNonStreamWriter(ctx.Writer, "public-model", &captureCounter{}, nil, "")
 	_, _ = w.Write([]byte(`not-json`))
 
 	err := w.Finalize(http.StatusOK)

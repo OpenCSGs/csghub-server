@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	responsespkg "opencsg.com/csghub-server/aigateway/handler/responses"
+
 	"github.com/openai/openai-go/v3"
 	"opencsg.com/csghub-server/aigateway/types"
 )
@@ -394,7 +396,7 @@ func floatPtrValue(v *float64) float64 {
 
 func responsesInputToChatMessages(ctx context.Context, req *types.ResponsesRequest) ([]map[string]any, error) {
 	messages := []map[string]any{}
-	if instructionText := responsesInstructionText(req.Instructions); instructionText != "" {
+	if instructionText := types.ResponsesInstructionText(req.Instructions); instructionText != "" {
 		messages = append(messages, map[string]any{"role": "system", "content": instructionText})
 	}
 	var asString string
@@ -524,17 +526,6 @@ func splitRawJSONArray(raw json.RawMessage) []json.RawMessage {
 	return items
 }
 
-func responsesInstructionText(raw json.RawMessage) string {
-	if len(raw) == 0 {
-		return ""
-	}
-	var text string
-	if err := json.Unmarshal(raw, &text); err == nil {
-		return strings.TrimSpace(text)
-	}
-	return ""
-}
-
 func normalizeResponsesContent(content any) (any, error) {
 	parts, ok := content.([]any)
 	if !ok {
@@ -584,7 +575,7 @@ func chatResponseToResponses(data []byte, publicModel string) (*types.ResponsesR
 	// TODO: If adapter mode later supports previous_response_id, pass the
 	// public previous ID into this conversion and echo it in ResponsesResponse.
 	resp := &types.ResponsesResponse{
-		ID:        newAdapterResponseID(),
+		ID:        responsespkg.NewAdapterResponseID(),
 		Object:    "response",
 		CreatedAt: chat.Created,
 		Status:    "completed",
