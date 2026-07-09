@@ -2,6 +2,7 @@ package callback
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"testing"
 	"time"
@@ -207,6 +208,30 @@ func TestGitCallbackComponentImpl_UpdateRepoInfos(t *testing.T) {
 		gc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "namespace", "repo").Return(repo, nil)
 		gc.mocks.runtimeArchComponent.EXPECT().UpdateModelMetadata(ctx, repo).Return(modelInfo, nil)
 		gc.mocks.runtimeArchComponent.EXPECT().UpdateRuntimeFrameworkTag(ctx, modelInfo, repo).Return(nil)
+
+		err := gc.UpdateRepoInfos(context.Background(), req)
+		assert.NoError(t, err)
+	})
+
+	t.Run("should skip model metadata update failure", func(t *testing.T) {
+		gc := initializeTestGitCallbackComponent(context.Background(), t)
+		req := &types.GiteaCallbackPushReq{
+			Ref: "refs/heads/main",
+			Repository: types.GiteaCallbackPushReq_Repository{
+				FullName: "models_namespace/repo",
+			},
+			Commits: []types.GiteaCallbackPushReq_Commit{
+				{
+					Modified: []string{"config.json"},
+					Removed:  []string{"old_file.txt"},
+				},
+			},
+		}
+
+		gc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "namespace", "repo").Return(repo, nil)
+		gc.mocks.runtimeArchComponent.EXPECT().UpdateModelMetadata(ctx, repo).Return(nil, errors.New("unsupported model format unknown"))
+		gc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "namespace", "repo").Return(repo, nil)
+		gc.mocks.tagComponent.EXPECT().UpdateLibraryTags(ctx, types.ModelTagScope, "namespace", "repo", "old_file.txt", "").Return(nil)
 
 		err := gc.UpdateRepoInfos(context.Background(), req)
 		assert.NoError(t, err)
