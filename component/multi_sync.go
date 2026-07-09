@@ -36,6 +36,7 @@ type multiSyncComponentImpl struct {
 	tagStore         database.TagStore
 	fileStore        database.FileStore
 	skillStore       database.SkillStore
+	metadataStore    database.MetadataStore
 	gitServer        gitserver.GitServer
 }
 
@@ -64,6 +65,7 @@ func NewMultiSyncComponent(config *config.Config) (MultiSyncComponent, error) {
 		promptStore:      database.NewPromptStore(),
 		mcpStore:         database.NewMCPServerStore(),
 		skillStore:       database.NewSkillStore(),
+		metadataStore:    database.NewMetadataStore(),
 		gitServer:        git,
 	}, nil
 }
@@ -557,6 +559,23 @@ func (c *multiSyncComponentImpl) createLocalModel(ctx context.Context, m *types.
 	_, err = c.modelStore.CreateIfNotExist(ctx, dbModel)
 	if err != nil {
 		return fmt.Errorf("failed to create database model, cause: %w", err)
+	}
+
+	// sync metadata
+	err = c.metadataStore.Upsert(ctx, &database.Metadata{
+		RepositoryID:      newDBRepo.ID,
+		ModelParams:       m.Metadata.ModelParams,
+		TensorType:        m.Metadata.TensorType,
+		MiniGPUMemoryGB:   m.Metadata.MiniGPUMemoryGB,
+		MiniGPUFinetuneGB: m.Metadata.MiniGPUFinetuneGB,
+		Architecture:      m.Metadata.Architecture,
+		ModelType:         m.Metadata.ModelType,
+		ClassName:         m.Metadata.ClassName,
+		Quantizations:     m.Metadata.Quantizations,
+		PDRecommendation:  m.Metadata.PDRecommendation,
+	})
+	if err != nil {
+		slog.Error("failed to sync metadata", slog.Any("error", err), slog.Int64("repo_id", newDBRepo.ID))
 	}
 
 	// create new trending scores related to repo

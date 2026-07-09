@@ -163,6 +163,9 @@ func TestMultiSyncComponent_SyncAsClient(t *testing.T) {
 		RepositoryID: 1,
 		Repository:   dbrepo,
 	}).Return(nil, nil)
+	mc.mocks.stores.MetadataMock().EXPECT().Upsert(ctx, &database.Metadata{
+		RepositoryID: 1,
+	}).Return(nil)
 	mc.mocks.stores.RecomMock().EXPECT().UpsertScore(ctx, []*database.RecomRepoScore{
 		{RepositoryID: 1, WeightName: database.RecomWeightOp, Score: 40},
 		{RepositoryID: 1, WeightName: database.RecomWeightQuality, Score: 50},
