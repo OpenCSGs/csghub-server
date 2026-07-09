@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"strings"
 
+	v1alpha1 "github.com/argoproj/argo-workflows/v3/pkg/apis/workflow/v1alpha1"
 	"opencsg.com/csghub-server/builder/deploy"
 	"opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/builder/git/membership"
@@ -531,7 +532,38 @@ func (c *evaluationComponentImpl) createClawEvaluation(ctx context.Context, req 
 		clawReq.JudgeBaseURL = c.config.PublicAIGatewayURL()
 		clawReq.JudgeApiKey = judgeAPIKey
 	}
-	return c.deployer.SubmitClawEvaluation(ctx, clawReq)
+	res, err := c.deployer.SubmitClawEvaluation(ctx, clawReq)
+	if err != nil {
+		return nil, err
+	}
+	if res == nil || res.TaskId == "" {
+		return nil, fmt.Errorf("runner returned empty claw evaluation task id")
+	}
+	wf, err := c.workflowStore.CreateWorkFlow(ctx, database.ArgoWorkflow{
+		Username:     req.Username,
+		UserUUID:     req.UserUUID,
+		TaskName:     req.TaskName,
+		TaskId:       res.TaskId,
+		TaskType:     req.TaskType,
+		RepoIds:      []string{req.Model},
+		TaskDesc:     req.TaskDesc,
+		Image:        req.Image,
+		ResourceId:   req.ResourceId,
+		ResourceName: req.ResourceName,
+		ClusterID:    req.ClusterID,
+		RepoType:     req.RepoType,
+		Namespace:    c.config.Cluster.SpaceNamespace,
+		Status:       v1alpha1.WorkflowPending,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create claw evaluation placeholder workflow: %w", err)
+	}
+	res.ID = wf.ID
+	res.ResourceId = wf.ResourceId
+	res.ResourceName = wf.ResourceName
+	res.Image = wf.Image
+	res.Status = wf.Status
+	return res, nil
 }
 
 func (c *evaluationComponentImpl) resolveClawEvalAIGatewayAPIKey(ctx context.Context, billingUUID, ownerNamespace, operatorUsername string) (string, error) {

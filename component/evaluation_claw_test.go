@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	v1alpha1 "github.com/argoproj/argo-workflows/v3/pkg/apis/workflow/v1alpha1"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	mockdeploy "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/deploy"
@@ -66,7 +67,7 @@ func TestEvaluationComponent_CreateClawEvaluation(t *testing.T) {
 		Parallel:           2,
 	}
 
-	c, mockDeployer, mockRepo, _ := newTestEvaluationComponentForClaw(t)
+	c, mockDeployer, mockRepo, mockWorkflow := newTestEvaluationComponentForClaw(t)
 	mockUser := c.userStore.(*mockdb.MockUserStore)
 	mockSpaceRes := c.spaceResourceStore.(*mockdb.MockSpaceResourceStore)
 	mockFrame := c.runtimeFrameworkStore.(*mockdb.MockRuntimeFrameworksStore)
@@ -98,11 +99,24 @@ func TestEvaluationComponent_CreateClawEvaluation(t *testing.T) {
 			r.ApiKey == "sk-test" &&
 			r.JudgeBaseURL == "http://aigateway.test/v1" &&
 			r.JudgeApiKey == "gk-builtin-key"
-	})).Return(&types.ArgoWorkFlowRes{ID: 1}, nil)
+	})).Return(&types.ArgoWorkFlowRes{ID: 1, TaskId: "task-1"}, nil)
+	mockWorkflow.EXPECT().CreateWorkFlow(ctx, mock.MatchedBy(func(wf database.ArgoWorkflow) bool {
+		return wf.Username == "user1" &&
+			wf.UserUUID == "uuid1" &&
+			wf.TaskName == "claw-job" &&
+			wf.TaskId == "task-1" &&
+			wf.TaskType == types.TaskTypeClawEval &&
+			wf.RepoIds[0] == "glm-5.1" &&
+			wf.ClusterID == "cluster1" &&
+			wf.ResourceId == 2 &&
+			wf.ResourceName == "cpu-small" &&
+			wf.Status == v1alpha1.WorkflowPending
+	})).Return(&database.ArgoWorkflow{ID: 101, TaskId: "task-1", ResourceId: 2, ResourceName: "cpu-small", Image: "opencsghq/claw-eval:1.0.0", Status: v1alpha1.WorkflowPending}, nil)
 
 	resp, err := c.CreateEvaluation(ctx, req)
 	require.NoError(t, err)
-	require.Equal(t, int64(1), resp.ID)
+	require.Equal(t, int64(101), resp.ID)
+	require.Equal(t, "task-1", resp.TaskId)
 }
 
 func TestEvaluationComponent_CreateClawEvaluation_AutoBuiltinJudgeAPIKey(t *testing.T) {
@@ -118,7 +132,7 @@ func TestEvaluationComponent_CreateClawEvaluation_AutoBuiltinJudgeAPIKey(t *test
 		Tasks:              "T001",
 	}
 
-	c, mockDeployer, mockRepo, _ := newTestEvaluationComponentForClaw(t)
+	c, mockDeployer, mockRepo, mockWorkflow := newTestEvaluationComponentForClaw(t)
 	mockUser := c.userStore.(*mockdb.MockUserStore)
 	mockSpaceRes := c.spaceResourceStore.(*mockdb.MockSpaceResourceStore)
 	mockFrame := c.runtimeFrameworkStore.(*mockdb.MockRuntimeFrameworksStore)
@@ -147,10 +161,18 @@ func TestEvaluationComponent_CreateClawEvaluation_AutoBuiltinJudgeAPIKey(t *test
 			r.JudgeApiKey == "gk-builtin-key" &&
 			r.JudgeBaseURL == "http://aigateway.test/v1"
 	})).Return(&types.ArgoWorkFlowRes{ID: 4, TaskId: "task-123"}, nil)
+	mockWorkflow.EXPECT().CreateWorkFlow(ctx, mock.MatchedBy(func(wf database.ArgoWorkflow) bool {
+		return wf.Username == "user1" &&
+			wf.UserUUID == "uuid1" &&
+			wf.TaskId == "task-123" &&
+			wf.TaskType == types.TaskTypeClawEval &&
+			wf.RepoIds[0] == "glm-5.1" &&
+			wf.Status == v1alpha1.WorkflowPending
+	})).Return(&database.ArgoWorkflow{ID: 123, TaskId: "task-123", ResourceId: 2, ResourceName: "cpu-small", Image: "opencsghq/claw-eval:1.0.0", Status: v1alpha1.WorkflowPending}, nil)
 
 	resp, err := c.CreateEvaluation(ctx, req)
 	require.NoError(t, err)
-	require.Equal(t, int64(4), resp.ID)
+	require.Equal(t, int64(123), resp.ID)
 	require.Equal(t, "task-123", resp.TaskId)
 }
 
@@ -167,7 +189,7 @@ func TestEvaluationComponent_CreateClawEvaluation_AutoJudgeAPIKeyFallback(t *tes
 		Tasks:              "T001",
 	}
 
-	c, mockDeployer, mockRepo, _ := newTestEvaluationComponentForClaw(t)
+	c, mockDeployer, mockRepo, mockWorkflow := newTestEvaluationComponentForClaw(t)
 	mockUser := c.userStore.(*mockdb.MockUserStore)
 	mockSpaceRes := c.spaceResourceStore.(*mockdb.MockSpaceResourceStore)
 	mockFrame := c.runtimeFrameworkStore.(*mockdb.MockRuntimeFrameworksStore)
@@ -196,11 +218,19 @@ func TestEvaluationComponent_CreateClawEvaluation_AutoJudgeAPIKeyFallback(t *tes
 		return r.ApiKey == "gk-fallback-key" &&
 			r.JudgeApiKey == "gk-fallback-key" &&
 			r.JudgeBaseURL == "http://aigateway.test/v1"
-	})).Return(&types.ArgoWorkFlowRes{ID: 3}, nil)
+	})).Return(&types.ArgoWorkFlowRes{ID: 3, TaskId: "task-3"}, nil)
+	mockWorkflow.EXPECT().CreateWorkFlow(ctx, mock.MatchedBy(func(wf database.ArgoWorkflow) bool {
+		return wf.Username == "user1" &&
+			wf.UserUUID == "uuid1" &&
+			wf.TaskId == "task-3" &&
+			wf.TaskType == types.TaskTypeClawEval &&
+			wf.RepoIds[0] == "glm-5.1" &&
+			wf.Status == v1alpha1.WorkflowPending
+	})).Return(&database.ArgoWorkflow{ID: 103, TaskId: "task-3", ResourceId: 2, ResourceName: "cpu-small", Image: "opencsghq/claw-eval:1.0.0", Status: v1alpha1.WorkflowPending}, nil)
 
 	resp, err := c.CreateEvaluation(ctx, req)
 	require.NoError(t, err)
-	require.Equal(t, int64(3), resp.ID)
+	require.Equal(t, int64(103), resp.ID)
 }
 
 func TestEvaluationComponent_CheckEvaluationLogPermission(t *testing.T) {
