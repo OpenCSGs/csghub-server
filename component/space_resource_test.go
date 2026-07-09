@@ -70,6 +70,7 @@ func TestSpaceResourceComponent_Update(t *testing.T) {
 		ID:        1,
 		Name:      "n",
 		Resources: validResourcesJSON,
+		Scenarios: []string{},
 	}, data)
 }
 
@@ -93,7 +94,8 @@ func TestSpaceResourceComponent_Create(t *testing.T) {
 		Name:      "n",
 		Resources: validResourcesJSON,
 		ClusterID: "c",
-	}).Return(&database.SpaceResource{ID: 1, Name: "n", Resources: validResourcesJSON}, nil)
+		Scenarios: []string{},
+	}).Return(&database.SpaceResource{ID: 1, Name: "n", Resources: validResourcesJSON, Scenarios: []string{}}, nil)
 
 	data, err := sc.Create(ctx, &types.CreateSpaceResourceReq{
 		Name:      "n",
@@ -105,6 +107,7 @@ func TestSpaceResourceComponent_Create(t *testing.T) {
 		ID:        1,
 		Name:      "n",
 		Resources: validResourcesJSON,
+		Scenarios: []string{},
 	}, data)
 }
 
@@ -187,8 +190,8 @@ func TestSpaceResourceComponent_ListAll(t *testing.T) {
 		resources, err := sc.ListAll(ctx)
 		require.Nil(t, err)
 		require.Equal(t, []types.SpaceResource{
-			{ID: 1, Name: "resource1", ClusterID: "c1", Resources: "{}"},
-			{ID: 2, Name: "resource2", ClusterID: "c2", Resources: "{}"},
+			{ID: 1, Name: "resource1", ClusterID: "c1", Resources: "{}", Scenarios: []string{}},
+			{ID: 2, Name: "resource2", ClusterID: "c2", Resources: "{}", Scenarios: []string{}},
 		}, resources)
 	})
 	t.Run("error listing all resources", func(t *testing.T) {

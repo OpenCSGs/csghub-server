@@ -35,7 +35,7 @@ func TestSpaceResourceComponent_Index(t *testing.T) {
 	require.Equal(t, []types.SpaceResource{
 		{
 			ID: 1, Name: "sr", Resources: `{"memory": "1000", "gpu": {"num": "5"}}`,
-			IsAvailable: false, Type: "gpu",
+			IsAvailable: false, Type: "gpu", Scenarios: []string{},
 		},
 	}, data)
 
