@@ -140,9 +140,21 @@ func processBatchResult(ctx context.Context, a *Activities, deploy *database.Dep
 				return
 			}
 		case common.Running:
+			// For Deploying/Startup, the informer handles normal flow
+			// with more accurate status mapping (Deploying/Sleeping/Running).
+			// Reconcile should only fix anomalies, not interfere.
+			if currentStatus == common.Deploying || currentStatus == common.Startup {
+				return
+			}
 			newStatus = common.Running
 			instances = r.Instances
 		default:
+			// Service exists but not fully ready (Startup from batch API).
+			// Deploying/Startup: let informer handle the normal transition.
+			// Running: don't downgrade (scale-to-zero is normal).
+			if currentStatus == common.Deploying || currentStatus == common.Startup || currentStatus == common.Running {
+				return
+			}
 			newStatus = common.Startup
 			instances = r.Instances
 		}
@@ -212,7 +224,21 @@ func reconcileWorkflowCluster(ctx context.Context, a *Activities, cid string, wf
 		func(wf *database.ArgoWorkflow) (string, runnerTypes.BatchStatusItem) {
 			return wf.TaskId, runnerTypes.BatchStatusItem{Type: runnerTypes.ResourceTypeWorkflow, Name: wf.TaskId}
 		},
-		nil, // onBatchError: nil means no error handling (skip)
+		func(wf *database.ArgoWorkflow) {
+			lastUpdate := wf.StatusUpdateAt
+			if lastUpdate.IsZero() {
+				lastUpdate = wf.SubmitTime
+			}
+			if time.Since(lastUpdate) > hardTimeout {
+				a.getLogger(ctx).Warn("reconcile(wf): batch error timeout, marking failed",
+					"wf_id", wf.ID, "hard_timeout", hardTimeout)
+				wf.Status = v1alpha1.WorkflowFailed
+				wf.StatusUpdateAt = time.Now()
+				if _, err := a.stores.argoWorkFlow.UpdateWorkFlow(ctx, *wf); err != nil {
+					a.getLogger(ctx).Error("reconcile(wf): mark failed error", "wf_id", wf.ID, "error", err)
+				}
+			}
+		},
 		func(wf *database.ArgoWorkflow, r *runnerTypes.BatchStatusItemResult) {
 			if string(wf.Status) != r.Phase && len(r.Phase) > 0 {
 				wf.Status = v1alpha1.WorkflowPhase(r.Phase)
@@ -274,7 +300,7 @@ func clusterBatchDo[T any](
 
 	resp, err := a.deployer.BatchStatus(ctx, &runnerTypes.BatchStatusRequest{ClusterID: cid, Items: batchItems})
 	if err != nil {
-		logger.Error("reconcile: BatchStatus failed",
+		logger.Warn("reconcile: BatchStatus failed",
 			"cluster_id", cid, "count", len(items), "error", err)
 		if onBatchError != nil {
 			for i := range items {
@@ -293,6 +319,11 @@ func clusterBatchDo[T any](
 			if r.Error != "" {
 				logger.Warn("reconcile: batch item error",
 					"name", r.Name, "error", r.Error)
+			}
+			// Apply timeout fallback for individual errors,
+			// same as the whole-batch-failure path.
+			if ok && onBatchError != nil {
+				onBatchError(&items[idx])
 			}
 			continue
 		}
