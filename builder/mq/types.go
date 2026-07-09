@@ -1,5 +1,7 @@
 package mq
 
+import "time"
+
 const (
 	NotifySubChangeSubject  string = "accounting.notify.subscription"
 	NotifyStopDeploySubject string = "accounting.notify.stopdeploy"
@@ -129,4 +131,10 @@ type SubscribeParams struct {
 	AutoACK                bool // auto acknowledge message after callback success
 	IsRedeliverForCBFailed bool // whether or not redeliver message for callback return error
 	Callback               MessageCallback
+	// MaxBytes sets the stream's maximum size in bytes.
+	// Non-positive values are handled by the message queue implementation.
+	MaxBytes int64
+	// MaxAge sets the stream's maximum message age.
+	// Zero value is handled by the message queue implementation.
+	MaxAge time.Duration
 }

@@ -103,7 +103,13 @@ func (n *Nats) getOrCreateStreamConsumer(params SubscribeParams) (jetstream.Cons
 			Subjects:     params.Topics,
 			MaxConsumers: -1,
 			MaxMsgs:      -1,
-			MaxBytes:     -1,
+			// NATS JetStream's unlimited sentinel for byte limit is -1.
+			// Values <= 0 from SubscribeParams are mapped to -1.
+			// See https://nats-io.github.io/nats.net/api/NATS.Client.JetStream.Models.StreamConfig.html
+			MaxBytes: maxBytesOrDefault(params.MaxBytes),
+			// NATS JetStream treats MaxAge 0 as unlimited (no age-based expiry).
+			// See https://nats-io.github.io/nats.net/api/NATS.Client.JetStream.Models.StreamConfig.MaxAge.html
+			MaxAge: params.MaxAge,
 		})
 	if err != nil {
 		return nil, fmt.Errorf("[nats] failed to create or update stream %s error: %w", params.Group.StreamName, err)
@@ -210,4 +216,11 @@ func (n *Nats) DeleteMessagesByFilter(streamName string, filter func(data []byte
 		slog.String("stream", streamName),
 		slog.Int("deleted_count", deletedCount))
 	return nil
+}
+
+func maxBytesOrDefault(v int64) int64 {
+	if v <= 0 {
+		return -1
+	}
+	return v
 }
