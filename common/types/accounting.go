@@ -413,6 +413,10 @@ type AcctPriceCreateReq struct {
 	SkuStatus        SkuStatus   `json:"sku_status" binding:"required,oneof=1 9"`
 }
 
+type AcctPriceBatchCreateReq struct {
+	Prices []AcctPriceCreateReq `json:"prices" binding:"required,dive"`
+}
+
 type AcctPriceUpdateReq struct {
 	SkuType          *SKUType     `json:"sku_type"`
 	SkuPrice         *int64       `json:"sku_price"`
@@ -451,7 +455,6 @@ type AcctPriceQueryReq struct {
 	PriceTime   time.Time `json:"price_time"`
 	SkuKind     SKUKind   `json:"sku_kind"`
 	SkuUnitType []string  `json:"sku_unit_type"`
-	Resolution  string    `json:"resolution"`
 }
 
 type AcctOrderDetailReq struct {
@@ -483,7 +486,7 @@ type AcctOrderExpiredEvent struct {
 // in accounting price DB
 type AcctPriceListDBReq struct {
 	SkuType    SKUType   `json:"sku_type"`
-	SkuKind    string    `json:"sku_kind"`
+	SkuKind    SKUKind   `json:"sku_kind"`
 	ResourceID []string  `json:"resource_id"`
 	SkuStatus  SkuStatus `json:"sku_status"`
 	SortBy     string    `json:"sort_by"`
@@ -500,7 +503,7 @@ type AcctPriceListByKindsReq struct {
 
 type AcctPriceListReq struct {
 	SkuType    SKUType             `json:"sku_type" form:"sku_type"`
-	SkuKind    string              `json:"sku_kind" form:"sku_kind"`
+	SkuKind    SKUKind             `json:"sku_kind" form:"sku_kind"`
 	ResourceID []string            `json:"resource_id" form:"resource_id"`
 	SkuStatus  SkuStatus           `json:"sku_status" form:"sku_status,default=1"`
 	Filter     AcctPriceListFilter `json:"-"`
@@ -512,6 +515,45 @@ type AcctPriceListReq struct {
 
 type AcctPriceListFilter struct {
 	HardwareType string `json:"hardware_type" form:"hardware_type"`
+}
+
+type AcctPriceDistinctListReq struct {
+	SkuType    SKUType   `json:"sku_type" form:"sku_type" binding:"required"`
+	SkuKind    SKUKind   `json:"sku_kind" form:"sku_kind"`
+	ResourceID []string  `json:"resource_id" form:"resource_id"`
+	SkuStatus  SkuStatus `json:"sku_status" form:"sku_status"`
+	Per        int       `json:"per" form:"per,default=50" binding:"min=1"`
+	Page       int       `json:"page" form:"page,default=1" binding:"min=1"`
+}
+
+type AcctPriceDistinctItem struct {
+	SkuType    SKUType           `json:"sku_type"`
+	SkuKind    SKUKind           `json:"sku_kind"`
+	ResourceID string            `json:"resource_id"`
+	SkuStatus  SkuStatus         `json:"sku_status"`
+	Details    []AcctPriceDetail `json:"details"`
+}
+
+type AcctPriceGroupKeyReq struct {
+	SkuType    SKUType   `json:"sku_type"`
+	SkuKind    SKUKind   `json:"sku_kind"`
+	ResourceID string    `json:"resource_id"`
+	SkuStatus  SkuStatus `json:"sku_status"`
+}
+
+type AcctPriceDetail struct {
+	Id               int64       `json:"id"`
+	SkuPrice         int64       `json:"sku_price"`
+	SkuUnit          int64       `json:"sku_unit"`
+	SkuDesc          string      `json:"sku_desc"`
+	SkuUnitType      SkuUnitType `json:"sku_unit_type"`
+	SkuPriceCurrency string      `json:"sku_price_currency"`
+	Quota            string      `json:"quota"`
+	SkuPriceID       int64       `json:"sku_price_id"`
+	Discount         float64     `json:"discount"`
+	UseLimitPrice    int64       `json:"use_limit_price"`
+	Resolution       string      `json:"resolution"`
+	CreatedAt        time.Time   `json:"created_at"`
 }
 
 type AcctRechargeReq struct {

@@ -61,11 +61,19 @@ func (ac *accountingComponentImpl) QueryPricesBySkuTypeAndKinds(currentUser stri
 	return nil, nil
 }
 
+func (ac *accountingComponentImpl) QueryDistinctPrices(currentUser string, req types.AcctPriceDistinctListReq) (any, error) {
+	return nil, nil
+}
+
 func (ac *accountingComponentImpl) GetPriceByID(currentUser string, id int64) (interface{}, error) {
 	return nil, nil
 }
 
 func (ac *accountingComponentImpl) CreatePrice(currentUser string, req types.AcctPriceCreateReq) (interface{}, error) {
+	return nil, nil
+}
+
+func (ac *accountingComponentImpl) BatchCreatePrice(currentUser string, req types.AcctPriceBatchCreateReq) (interface{}, error) {
 	return nil, nil
 }
 

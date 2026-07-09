@@ -20,6 +20,65 @@ func (_m *MockAccountingClient) EXPECT() *MockAccountingClient_Expecter {
 	return &MockAccountingClient_Expecter{mock: &_m.Mock}
 }
 
+// BatchCreatePrice provides a mock function with given fields: currentUser, req
+func (_m *MockAccountingClient) BatchCreatePrice(currentUser string, req types.AcctPriceBatchCreateReq) (any, error) {
+	ret := _m.Called(currentUser, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for BatchCreatePrice")
+	}
+
+	var r0 any
+	var r1 error
+	if rf, ok := ret.Get(0).(func(string, types.AcctPriceBatchCreateReq) (any, error)); ok {
+		return rf(currentUser, req)
+	}
+	if rf, ok := ret.Get(0).(func(string, types.AcctPriceBatchCreateReq) any); ok {
+		r0 = rf(currentUser, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(any)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(string, types.AcctPriceBatchCreateReq) error); ok {
+		r1 = rf(currentUser, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAccountingClient_BatchCreatePrice_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'BatchCreatePrice'
+type MockAccountingClient_BatchCreatePrice_Call struct {
+	*mock.Call
+}
+
+// BatchCreatePrice is a helper method to define mock.On call
+//   - currentUser string
+//   - req types.AcctPriceBatchCreateReq
+func (_e *MockAccountingClient_Expecter) BatchCreatePrice(currentUser interface{}, req interface{}) *MockAccountingClient_BatchCreatePrice_Call {
+	return &MockAccountingClient_BatchCreatePrice_Call{Call: _e.mock.On("BatchCreatePrice", currentUser, req)}
+}
+
+func (_c *MockAccountingClient_BatchCreatePrice_Call) Run(run func(currentUser string, req types.AcctPriceBatchCreateReq)) *MockAccountingClient_BatchCreatePrice_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(string), args[1].(types.AcctPriceBatchCreateReq))
+	})
+	return _c
+}
+
+func (_c *MockAccountingClient_BatchCreatePrice_Call) Return(_a0 any, _a1 error) *MockAccountingClient_BatchCreatePrice_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAccountingClient_BatchCreatePrice_Call) RunAndReturn(run func(string, types.AcctPriceBatchCreateReq) (any, error)) *MockAccountingClient_BatchCreatePrice_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // CreateOrUpdateQuota provides a mock function with given fields: currentUser, req
 func (_m *MockAccountingClient) CreateOrUpdateQuota(currentUser string, req types.AcctQuotaReq) (any, error) {
 	ret := _m.Called(currentUser, req)
@@ -1186,6 +1245,65 @@ func (_c *MockAccountingClient_QueryBalanceByUserID_Call) Return(_a0 any, _a1 er
 }
 
 func (_c *MockAccountingClient_QueryBalanceByUserID_Call) RunAndReturn(run func(string) (any, error)) *MockAccountingClient_QueryBalanceByUserID_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// QueryDistinctPrices provides a mock function with given fields: currentUser, req
+func (_m *MockAccountingClient) QueryDistinctPrices(currentUser string, req types.AcctPriceDistinctListReq) (any, error) {
+	ret := _m.Called(currentUser, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for QueryDistinctPrices")
+	}
+
+	var r0 any
+	var r1 error
+	if rf, ok := ret.Get(0).(func(string, types.AcctPriceDistinctListReq) (any, error)); ok {
+		return rf(currentUser, req)
+	}
+	if rf, ok := ret.Get(0).(func(string, types.AcctPriceDistinctListReq) any); ok {
+		r0 = rf(currentUser, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(any)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(string, types.AcctPriceDistinctListReq) error); ok {
+		r1 = rf(currentUser, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAccountingClient_QueryDistinctPrices_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'QueryDistinctPrices'
+type MockAccountingClient_QueryDistinctPrices_Call struct {
+	*mock.Call
+}
+
+// QueryDistinctPrices is a helper method to define mock.On call
+//   - currentUser string
+//   - req types.AcctPriceDistinctListReq
+func (_e *MockAccountingClient_Expecter) QueryDistinctPrices(currentUser interface{}, req interface{}) *MockAccountingClient_QueryDistinctPrices_Call {
+	return &MockAccountingClient_QueryDistinctPrices_Call{Call: _e.mock.On("QueryDistinctPrices", currentUser, req)}
+}
+
+func (_c *MockAccountingClient_QueryDistinctPrices_Call) Run(run func(currentUser string, req types.AcctPriceDistinctListReq)) *MockAccountingClient_QueryDistinctPrices_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(string), args[1].(types.AcctPriceDistinctListReq))
+	})
+	return _c
+}
+
+func (_c *MockAccountingClient_QueryDistinctPrices_Call) Return(_a0 any, _a1 error) *MockAccountingClient_QueryDistinctPrices_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAccountingClient_QueryDistinctPrices_Call) RunAndReturn(run func(string, types.AcctPriceDistinctListReq) (any, error)) *MockAccountingClient_QueryDistinctPrices_Call {
 	_c.Call.Return(run)
 	return _c
 }

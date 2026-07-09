@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/spf13/cast"
 	"github.com/stretchr/testify/require"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/tests"
@@ -100,23 +99,23 @@ func TestAccountPriceStore_GetLatestByTime(t *testing.T) {
 	prices := []*database.AccountPrice{
 		{
 			SkuType: types.SKUCSGHub, SkuKind: types.SKUPackageAddon, ResourceID: "r",
-			SkuUnitType: "u", SkuDesc: "a", SkuStatus: types.SkuStatusEnabled,
+			SkuUnitType: "u", SkuDesc: "a", SkuStatus: types.SkuStatusEnabled, Resolution: "low",
 		},
 		{
 			SkuType: types.SKUReserve, SkuKind: types.SKUPackageAddon, ResourceID: "r",
-			SkuUnitType: "u", SkuDesc: "b", SkuStatus: types.SkuStatusEnabled,
+			SkuUnitType: "u", SkuDesc: "b", SkuStatus: types.SkuStatusEnabled, Resolution: "low",
 		},
 		{
 			SkuType: types.SKUCSGHub, SkuKind: types.SKUPackageAddon, ResourceID: "r",
-			SkuUnitType: "u", SkuDesc: "c", SkuStatus: types.SkuStatusEnabled,
+			SkuUnitType: "u", SkuDesc: "c", SkuStatus: types.SkuStatusEnabled, Resolution: "low",
 		},
 		{
 			SkuType: types.SKUCSGHub, SkuKind: types.SKUTimeSpan, ResourceID: "r",
-			SkuUnitType: "u", SkuDesc: "d", SkuStatus: types.SkuStatusEnabled,
+			SkuUnitType: "u", SkuDesc: "d", SkuStatus: types.SkuStatusEnabled, Resolution: "low",
 		},
 		{
 			SkuType: types.SKUCSGHub, SkuKind: types.SKUPackageAddon, ResourceID: "r",
-			SkuUnitType: "u", SkuDesc: "e", SkuStatus: types.SkuStatusEnabled,
+			SkuUnitType: "u", SkuDesc: "e", SkuStatus: types.SkuStatusEnabled, Resolution: "low",
 		},
 	}
 
@@ -132,7 +131,7 @@ func TestAccountPriceStore_GetLatestByTime(t *testing.T) {
 	}
 
 	for _, p := range prices {
-		_, err := store.Create(ctx, *p)
+		_, err := db.Core.NewInsert().Model(p).Exec(ctx)
 		require.Nil(t, err)
 	}
 
@@ -191,7 +190,7 @@ func TestAccountPriceStore_ListBySkuType(t *testing.T) {
 	}
 
 	for _, p := range prices {
-		_, err := store.Create(ctx, *p)
+		_, err := db.Core.NewInsert().Model(p).Exec(ctx)
 		require.Nil(t, err)
 	}
 
@@ -208,7 +207,7 @@ func TestAccountPriceStore_ListBySkuType(t *testing.T) {
 
 	data, count, err = store.ListBySkuType(ctx, types.AcctPriceListDBReq{
 		SkuType:   types.SKUCSGHub,
-		SkuKind:   cast.ToString(int(types.SKUPackageAddon)),
+		SkuKind:   types.SKUPackageAddon,
 		SkuStatus: types.SkuStatusEnabled,
 		Page:      1,
 		Per:       10,
@@ -220,7 +219,7 @@ func TestAccountPriceStore_ListBySkuType(t *testing.T) {
 
 	data, count, err = store.ListBySkuType(ctx, types.AcctPriceListDBReq{
 		SkuType:    types.SKUCSGHub,
-		SkuKind:    cast.ToString(int(types.SKUPackageAddon)),
+		SkuKind:    types.SKUPackageAddon,
 		ResourceID: []string{"r"},
 		SkuStatus:  types.SkuStatusEnabled,
 		Page:       1,
@@ -331,6 +330,92 @@ func TestAccountPriceStore_ListByIds(t *testing.T) {
 			require.Equal(t, price2.SkuKind, price.SkuKind)
 		}
 	}
+}
+
+func TestAccountPriceStore_BatchCreate(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewAccountPriceStoreWithDB(db)
+
+	t.Run("disable old enabled prices and keep latest", func(t *testing.T) {
+		old1, err := store.Create(ctx, database.AccountPrice{
+			SkuType: types.SKUCSGHub, SkuKind: types.SKUPackageAddon, ResourceID: "r1",
+			SkuDesc: "old_1", SkuStatus: types.SkuStatusEnabled,
+		})
+		require.Nil(t, err)
+
+		old2, err := store.Create(ctx, database.AccountPrice{
+			SkuType: types.SKUCSGHub, SkuKind: types.SKUPackageAddon, ResourceID: "r1",
+			SkuDesc: "old_2", SkuStatus: types.SkuStatusEnabled,
+		})
+		require.Nil(t, err)
+
+		old3, err := store.Create(ctx, database.AccountPrice{
+			SkuType: types.SKUCSGHub, SkuKind: types.SKUPackageAddon, ResourceID: "r2",
+			SkuDesc: "old_3", SkuStatus: types.SkuStatusEnabled,
+		})
+		require.Nil(t, err)
+
+		prices := []database.AccountPrice{
+			{
+				SkuType: types.SKUCSGHub, SkuKind: types.SKUPackageAddon, ResourceID: "r1",
+				SkuDesc: "new_1", SkuStatus: types.SkuStatusEnabled,
+			},
+			{
+				SkuType: types.SKUCSGHub, SkuKind: types.SKUPackageAddon, ResourceID: "r2",
+				SkuDesc: "new_2", SkuStatus: types.SkuStatusEnabled,
+			},
+		}
+
+		result, err := store.BatchCreate(ctx, prices)
+		require.Nil(t, err)
+		require.Equal(t, 2, len(result))
+		require.Equal(t, "new_1", result[0].SkuDesc)
+		require.Equal(t, "new_2", result[1].SkuDesc)
+
+		r1 := &database.AccountPrice{}
+		err = db.Core.NewSelect().Model(r1).Where("id=?", old1.ID).Scan(ctx)
+		require.Nil(t, err)
+		require.Equal(t, types.SkuStatusDisabled, r1.SkuStatus)
+
+		r2 := &database.AccountPrice{}
+		err = db.Core.NewSelect().Model(r2).Where("id=?", old2.ID).Scan(ctx)
+		require.Nil(t, err)
+		require.Equal(t, types.SkuStatusDisabled, r2.SkuStatus)
+
+		r3 := &database.AccountPrice{}
+		err = db.Core.NewSelect().Model(r3).Where("id=?", old3.ID).Scan(ctx)
+		require.Nil(t, err)
+		require.Equal(t, types.SkuStatusDisabled, r3.SkuStatus)
+	})
+
+	t.Run("no existing enabled prices", func(t *testing.T) {
+		prices := []database.AccountPrice{
+			{
+				SkuType: types.SKUReserve, SkuKind: types.SKUPayAsYouGo, ResourceID: "r3",
+				SkuDesc: "fresh_1", SkuStatus: types.SkuStatusEnabled,
+			},
+		}
+
+		result, err := store.BatchCreate(ctx, prices)
+		require.Nil(t, err)
+		require.Equal(t, 1, len(result))
+		require.Equal(t, "fresh_1", result[0].SkuDesc)
+	})
+}
+
+func TestAccountPriceStore_BatchCreate_Empty(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewAccountPriceStoreWithDB(db)
+
+	result, err := store.BatchCreate(ctx, nil)
+	require.Nil(t, err)
+	require.Nil(t, result)
 }
 
 func TestAccountPriceStore_ListBySkuTypeAndKinds(t *testing.T) {
