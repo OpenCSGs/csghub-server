@@ -95,7 +95,7 @@ func (ah *AccountingHandler) QueryMeteringStatementByUserID(ctx *gin.Context) {
 	req := types.ActStatementsReq{
 		CurrentUser:  currentUser,
 		UserUUID:     userUUID,
-		Scene:        scene,
+		Scene:        types.SceneType(scene),
 		InstanceName: instance_name,
 		StartTime:    startTime,
 		EndTime:      endTime,
