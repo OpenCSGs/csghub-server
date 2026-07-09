@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 	audioadapter "opencsg.com/csghub-server/aigateway/component/adapter/audio"
 	"opencsg.com/csghub-server/aigateway/token"
+	commontypes "opencsg.com/csghub-server/common/types"
 )
 
 type failingAudioResponseWriter struct {
@@ -301,6 +302,47 @@ func TestStreamAudioResponseWriter_DurationFromChunk(t *testing.T) {
 	require.Equal(t, 12.5, usage.Duration)
 }
 
+func TestStreamAudioResponseWriter_DurationOnlyChunk(t *testing.T) {
+	counter, recorder, w := newTestNDJSONWriter(t)
+
+	_, err := w.Write([]byte(`{"text":"","duration":12.5}` + "\n"))
+	require.NoError(t, err)
+
+	require.Equal(t, `{"text":"","duration":12.5}`+"\n", recorder.Body.String())
+	duration, ok := w.DurationSeconds()
+	require.True(t, ok)
+	require.Equal(t, 12.5, duration)
+
+	usage, err := counter.Usage(context.Background())
+	require.NoError(t, err)
+	require.Zero(t, usage.TotalTokens)
+	require.Zero(t, usage.CompletionTokens)
+	require.Equal(t, string(commontypes.DataTypeAudio), usage.DataType)
+	require.Equal(t, 12.5, usage.Duration)
+	require.Equal(t, int64(1), usage.CompletionRC)
+	require.Empty(t, usage.CompletionDesc)
+}
+
+func TestStreamAudioResponseWriter_CountOnlyChunk(t *testing.T) {
+	counter, recorder, w := newTestNDJSONWriter(t)
+
+	_, err := w.Write([]byte(`{"text":""}` + "\n"))
+	require.NoError(t, err)
+
+	require.Equal(t, `{"text":""}`+"\n", recorder.Body.String())
+	_, ok := w.DurationSeconds()
+	require.False(t, ok)
+
+	usage, err := counter.Usage(context.Background())
+	require.NoError(t, err)
+	require.Zero(t, usage.TotalTokens)
+	require.Zero(t, usage.CompletionTokens)
+	require.Equal(t, string(commontypes.DataTypeAudio), usage.DataType)
+	require.Zero(t, usage.Duration)
+	require.Equal(t, int64(1), usage.CompletionRC)
+	require.Empty(t, usage.CompletionDesc)
+}
+
 func TestStreamAudioResponseWriter_CapturesDurationFromHeader(t *testing.T) {
 	counter := token.NewAudioUsageCounter(nil)
 	recorder := httptest.NewRecorder()
@@ -469,7 +511,12 @@ func TestStreamAudioResponseWriter_UnknownContentTypePassthrough(t *testing.T) {
 	// Raw bytes forwarded as-is.
 	require.Equal(t, "{\"text\":\"not-parsed\"}\n", recorder.Body.String())
 
-	// No usage captured since decoder was nil.
-	_, err = counter.Usage(context.Background())
-	require.Error(t, err)
+	usage, err := counter.Usage(context.Background())
+	require.NoError(t, err)
+	require.Zero(t, usage.TotalTokens)
+	require.Zero(t, usage.CompletionTokens)
+	require.Equal(t, string(commontypes.DataTypeAudio), usage.DataType)
+	require.Zero(t, usage.Duration)
+	require.Equal(t, int64(1), usage.CompletionRC)
+	require.Empty(t, usage.CompletionDesc)
 }
