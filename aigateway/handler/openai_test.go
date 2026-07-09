@@ -181,8 +181,8 @@ func TestOpenAIHandler_ListModels(t *testing.T) {
 		tester.mocks.openAIComp.EXPECT().
 			ListModels(mock.Anything, "testuser", types.ListModelsReq{
 				ModelID: "gpt",
-				Per:     "2",
-				Page:    "3",
+				Per:     2,
+				Page:    3,
 			}).
 			Return(types.ModelList{Object: "list", Data: []types.Model{}, HasMore: false, TotalCount: 0}, nil).Once()
 
@@ -201,8 +201,8 @@ func TestOpenAIHandler_ListModels(t *testing.T) {
 		tester.mocks.openAIComp.EXPECT().
 			ListModels(mock.Anything, "testuser", types.ListModelsReq{
 				Task: "text-generation",
-				Per:  "10",
-				Page: "1",
+				Per:  10,
+				Page: 1,
 			}).
 			Return(types.ModelList{
 				Object:     "list",
@@ -316,6 +316,68 @@ func TestOpenAIHandler_ListModels(t *testing.T) {
 			assert.True(t, ok)
 			assert.Equal(t, "invalid_request_error", errObj["code"])
 			assert.Contains(t, errObj["message"], "Invalid has_associated_model parameter")
+		})
+	}
+
+	t.Run("only per returns bad request", func(t *testing.T) {
+		tester, c, w := setupTest(t)
+		tester.WithQuery("per", "20")
+
+		tester.handler.ListModels(c)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+		var response map[string]interface{}
+		err := json.Unmarshal(w.Body.Bytes(), &response)
+		assert.NoError(t, err)
+		errObj, ok := response["error"].(map[string]interface{})
+		assert.True(t, ok)
+		assert.Equal(t, "invalid_request_error", errObj["code"])
+		assert.Contains(t, errObj["message"], "per and page must be provided together")
+	})
+
+	t.Run("only page returns bad request", func(t *testing.T) {
+		tester, c, w := setupTest(t)
+		tester.WithQuery("page", "1")
+
+		tester.handler.ListModels(c)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+		var response map[string]interface{}
+		err := json.Unmarshal(w.Body.Bytes(), &response)
+		assert.NoError(t, err)
+		errObj, ok := response["error"].(map[string]interface{})
+		assert.True(t, ok)
+		assert.Equal(t, "invalid_request_error", errObj["code"])
+		assert.Contains(t, errObj["message"], "per and page must be provided together")
+	})
+
+	for _, tc := range []struct {
+		name string
+		per  string
+		page string
+	}{
+		{name: "non-integer per", per: "abc", page: "1"},
+		{name: "non-integer page", per: "20", page: "abc"},
+		{name: "zero per", per: "0", page: "1"},
+		{name: "zero page", per: "20", page: "0"},
+		{name: "negative per", per: "-1", page: "1"},
+		{name: "negative page", per: "20", page: "-1"},
+	} {
+		t.Run("invalid pagination parameter "+tc.name, func(t *testing.T) {
+			tester, c, w := setupTest(t)
+			tester.WithQuery("per", tc.per)
+			tester.WithQuery("page", tc.page)
+
+			tester.handler.ListModels(c)
+
+			assert.Equal(t, http.StatusBadRequest, w.Code)
+			var response map[string]interface{}
+			err := json.Unmarshal(w.Body.Bytes(), &response)
+			assert.NoError(t, err)
+			errObj, ok := response["error"].(map[string]interface{})
+			assert.True(t, ok)
+			assert.Equal(t, "invalid_request_error", errObj["code"])
+			assert.Contains(t, errObj["message"], "Invalid pagination parameter")
 		})
 	}
 

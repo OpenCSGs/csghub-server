@@ -9,7 +9,6 @@ import (
 	"maps"
 	"regexp"
 	"slices"
-	"strconv"
 	"strings"
 	"time"
 
@@ -274,33 +273,28 @@ func filterAndPaginateModels(models []types.Model, req types.ListModelsReq) type
 
 	models = applyFilters(models, filters)
 
-	per := 20
-	page := 1
-	if req.Per != "" {
-		if parsedPer, err := strconv.Atoi(req.Per); err == nil && parsedPer > 0 {
-			per = parsedPer
-			if per > 100 {
-				per = 100
-			}
-		}
-	}
-	if req.Page != "" {
-		if parsedPage, err := strconv.Atoi(req.Page); err == nil && parsedPage > 0 {
-			page = parsedPage
-		}
-	}
-
 	totalCount := len(models)
-	startIndex := (page - 1) * per
-	if startIndex > totalCount {
-		startIndex = totalCount
-	}
-	endIndex := startIndex + per
-	if endIndex > totalCount {
-		endIndex = totalCount
-	}
+	paginated := models
+	hasMore := false
 
-	paginated := models[startIndex:endIndex]
+	if req.Per > 0 && req.Page > 0 {
+		per := req.Per
+		if per > 100 {
+			per = 100
+		}
+
+		startIndex := (req.Page - 1) * per
+		if startIndex > totalCount {
+			startIndex = totalCount
+		}
+		endIndex := startIndex + per
+		if endIndex > totalCount {
+			endIndex = totalCount
+		}
+
+		paginated = models[startIndex:endIndex]
+		hasMore = endIndex < totalCount
+	}
 
 	var firstID, lastID *string
 	if len(paginated) > 0 {
@@ -313,7 +307,7 @@ func filterAndPaginateModels(models []types.Model, req types.ListModelsReq) type
 		Data:       paginated,
 		FirstID:    firstID,
 		LastID:     lastID,
-		HasMore:    endIndex < totalCount,
+		HasMore:    hasMore,
 		TotalCount: totalCount,
 	}
 }
