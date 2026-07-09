@@ -105,3 +105,30 @@ func TestResponsesTokenCounterEstimatesStreamEventsWithoutDoubleCountingDonePayl
 	require.Equal(t, int64(5), usage.CompletionTokens)
 	require.Equal(t, int64(7), usage.TotalTokens)
 }
+
+func TestResponsesTokenCounterEstimatesReasoningStreamEventsWithoutDoubleCountingCompletedPayload(t *testing.T) {
+	counter := NewResponsesTokenCounter(&DumyTokenizer{})
+	counter.Request(&types.ResponsesRequest{Model: "m", Input: json.RawMessage(`"hi"`)})
+	counter.AppendEvent(types.ResponsesStreamEvent{
+		Type:  "response.reasoning_summary_text.delta",
+		Delta: "think",
+	})
+	counter.AppendEvent(types.ResponsesStreamEvent{
+		Type: "response.completed",
+		Response: &types.ResponsesResponse{
+			Output: []types.ResponsesOutputItem{{
+				Type: "reasoning",
+				Summary: []types.ResponsesSummaryPart{{
+					Type: "summary_text",
+					Text: "think",
+				}},
+			}},
+		},
+	})
+
+	usage, err := counter.Usage(context.Background())
+	require.NoError(t, err)
+	require.Equal(t, int64(2), usage.PromptTokens)
+	require.Equal(t, int64(5), usage.CompletionTokens)
+	require.Equal(t, int64(7), usage.TotalTokens)
+}

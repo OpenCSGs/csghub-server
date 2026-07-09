@@ -813,6 +813,7 @@ func dbUpstreamsToConfigs(dbUpstreams []database.Upstream) []commontypes.Upstrea
 			HealthCheckEnabled:    u.HealthCheckEnabled,
 			CircuitBreakerEnabled: u.CircuitBreakerEnabled,
 			Tags:                  u.Tags,
+			Metadata:              u.Metadata,
 			LimitPolicy:           u.LimitPolicy,
 		}
 		// Carry health/circuit state from DB so the proxy path can use

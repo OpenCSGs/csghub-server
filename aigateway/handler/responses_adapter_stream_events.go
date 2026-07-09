@@ -70,6 +70,24 @@ type responsesStreamRefusalDoneEvent struct {
 	Refusal      string `json:"refusal"`
 }
 
+type responsesStreamReasoningSummaryDeltaEvent struct {
+	Type         string `json:"type"`
+	ResponseID   string `json:"response_id"`
+	ItemID       string `json:"item_id"`
+	OutputIndex  int    `json:"output_index"`
+	SummaryIndex int    `json:"summary_index"`
+	Delta        string `json:"delta"`
+}
+
+type responsesStreamReasoningSummaryDoneEvent struct {
+	Type         string                              `json:"type"`
+	ResponseID   string                              `json:"response_id"`
+	ItemID       string                              `json:"item_id"`
+	OutputIndex  int                                 `json:"output_index"`
+	SummaryIndex int                                 `json:"summary_index"`
+	Part         responsesStreamReasoningSummaryPart `json:"part"`
+}
+
 type responsesStreamFunctionCallArgumentsDeltaEvent struct {
 	Type        string `json:"type"`
 	ResponseID  string `json:"response_id"`
@@ -100,6 +118,18 @@ type responsesStreamFunctionCallItem struct {
 	Name      string `json:"name,omitempty"`
 	Arguments string `json:"arguments"`
 	Status    string `json:"status"`
+}
+
+type responsesStreamReasoningItem struct {
+	ID      string                                `json:"id,omitempty"`
+	Type    string                                `json:"type"`
+	Status  string                                `json:"status,omitempty"`
+	Summary []responsesStreamReasoningSummaryPart `json:"summary,omitempty"`
+}
+
+type responsesStreamReasoningSummaryPart struct {
+	Type string `json:"type"`
+	Text string `json:"text"`
 }
 
 type responsesStreamContentPart struct {

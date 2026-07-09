@@ -16,7 +16,7 @@ func (h *OpenAIHandlerImpl) executeAdapterResponses(c *gin.Context, req *types.R
 		writeResponsesError(c, http.StatusBadRequest, adapterErrorCode(err), "invalid_request_error", err.Error())
 		return
 	}
-	chatReq, err := responsesToChatRequest(c.Request.Context(), req, modelTarget.ModelName)
+	chatReq, err := responsesToChatRequest(c.Request.Context(), req, modelTarget.ModelName, modelTarget.Upstream.Metadata)
 	if err != nil {
 		writeResponsesError(c, http.StatusBadRequest, adapterErrorCode(err), "invalid_request_error", err.Error())
 		return
