@@ -121,6 +121,21 @@ func TestEvaluationHandler_GetClawEvaluation(t *testing.T) {
 	tester.ResponseEq(t, 200, tester.OKText, &types.EvaluationRes{ID: 1, TaskType: types.TaskTypeClawEval})
 }
 
+func TestEvaluationHandler_GetClawEvaluationByTaskID(t *testing.T) {
+	tester := NewEvaluationTester(t).WithHandleFunc(func(h *EvaluationHandler) gin.HandlerFunc {
+		return h.GetEvaluationByTaskID
+	})
+	tester.WithUser()
+
+	tester.mocks.evaluation.EXPECT().GetEvaluation(tester.Ctx(), types.EvaluationGetReq{
+		Username: "u",
+		TaskID:   "task-123",
+	}).Return(&types.EvaluationRes{ID: 123, TaskId: "task-123", TaskType: types.TaskTypeClawEval}, nil)
+	tester.WithParam("task_id", "task-123").Execute()
+
+	tester.ResponseEq(t, 200, tester.OKText, &types.EvaluationRes{ID: 123, TaskId: "task-123", TaskType: types.TaskTypeClawEval})
+}
+
 func TestEvaluationHandler_GetForbidden(t *testing.T) {
 	tester := NewEvaluationTester(t).WithHandleFunc(func(h *EvaluationHandler) gin.HandlerFunc {
 		return h.GetEvaluation
