@@ -583,3 +583,28 @@ func TestDeploy(t *testing.T) {
 	require.NoError(t, err)
 
 }
+
+func TestVLLMEnforceEagerEnabled(t *testing.T) {
+	tests := []struct {
+		name       string
+		engineArgs string
+		want       bool
+	}{
+		{name: "empty engine args defaults to disabled", engineArgs: "", want: false},
+		{name: "missing enforce-eager key defaults to disabled", engineArgs: `{"max-model-len":"8192"}`, want: false},
+		{name: "disable turns off enforce-eager", engineArgs: `{"enforce-eager":"disable"}`, want: false},
+		{name: "false turns off enforce-eager", engineArgs: `{"enforce-eager":"false"}`, want: false},
+		{name: "zero turns off enforce-eager", engineArgs: `{"enforce-eager":"0"}`, want: false},
+		{name: "empty value turns off enforce-eager", engineArgs: `{"enforce-eager":""}`, want: false},
+		{name: "enable keeps enforce-eager on", engineArgs: `{"enforce-eager":"enable"}`, want: true},
+		{name: "true keeps enforce-eager on", engineArgs: `{"enforce-eager":"true"}`, want: true},
+		{name: "one keeps enforce-eager on", engineArgs: `{"enforce-eager":"1"}`, want: true},
+		{name: "invalid json defaults to disabled", engineArgs: "not-json", want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.want, vllmEnforceEagerEnabled(tt.engineArgs))
+		})
+	}
+}

@@ -53,6 +53,11 @@
       "format": "--cpu-offload-gb %s"
     },
     {
+      "name": "data-parallel-size",
+      "value": "1",
+      "format": "--data-parallel-size %s"
+    },
+    {
       "name": "pipeline-parallel-size",
       "value": "1",
       "format": "--pipeline-parallel-size %s"
@@ -89,7 +94,7 @@
     },
     {
       "name": "enforce-eager",
-      "value": "enable",
+      "value": "disable",
       "format": "--enforce-eager"
     },
     {
@@ -101,6 +106,11 @@
       "name": "enable-tool-calling",
       "value": "disable",
       "format": "--enable-auto-tool-choice"
+    },
+    {
+      "name": "enable-expert-parallel",
+      "value": "disable",
+      "format": "--enable-expert-parallel"
     },
     {
       "name": "limit-mm-per-prompt",
@@ -214,6 +224,7 @@
     "DeepseekV3ForCausalLM": "deepseek_v3",
     "DeepseekV31ForCausalLM": "deepseek_v31",
     "DeepseekR1ForCausalLM": "deepseek_r1",
+    "GlmMoeDsaForCausalLM": "glm47",
     "GraniteForCausalLM": "granite",
     "HermesForCausalLM": "hermes",
     "InternLMForCausalLM": "internlm",
