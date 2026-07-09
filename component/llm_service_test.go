@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	mockdatabase "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/database"
+	mockComps "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
 	aigatewaytypes "opencsg.com/csghub-server/aigateway/types"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/tests"
@@ -561,13 +562,20 @@ func TestLLMServiceComponent_DeleteLLMConfig(t *testing.T) {
 	ctx := context.TODO()
 	stores := tests.NewMockStores(t)
 	upstreamStore := mockdatabase.NewMockUpstreamStore(t)
+	mockAcct := mockComps.NewMockAccountingComponent(t)
 	upstreamStore.EXPECT().DeleteByLLMConfigID(ctx, int64(123)).Return(nil)
 	mc := &llmServiceComponentImpl{
 		llmConfigStore:    stores.LLMConfig,
 		promptPrefixStore: stores.PromptPrefix,
 		upstreamStore:     upstreamStore,
+		accountComponent:  mockAcct,
 	}
+	stores.LLMConfigMock().EXPECT().GetByID(ctx, int64(123)).Return(&database.LLMConfig{ModelName: "test-model"}, nil)
 	stores.LLMConfigMock().EXPECT().Delete(ctx, int64(123)).Return(nil)
+	mockAcct.EXPECT().OffLinePrice(ctx, types.AcctPriceOffLineReq{
+		SkuType:    types.SKUCSGHub,
+		ResourceID: fmt.Sprintf(types.ExternalLLMResourceFmt, "test-model"),
+	}).Return(nil, nil)
 	err := mc.DeleteLLMConfig(ctx, int64(123))
 	require.Nil(t, err)
 }

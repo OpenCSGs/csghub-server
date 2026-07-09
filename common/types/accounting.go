@@ -888,3 +888,9 @@ const (
 	AccountPresentStatusUsed     AccountPresentStatus = 1
 	AccountPresentStatusCanceled AccountPresentStatus = 2
 )
+
+type AcctPriceOffLineReq struct {
+	CurrentUser string  `json:"-"`
+	SkuType     SKUType `json:"sku_type" binding:"required"`
+	ResourceID  string  `json:"resource_id" binding:"required"`
+}

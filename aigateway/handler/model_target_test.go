@@ -5,9 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
-	responsespkg "opencsg.com/csghub-server/aigateway/handler/responses"
 	"strings"
 	"testing"
+
+	responsespkg "opencsg.com/csghub-server/aigateway/handler/responses"
 
 	"opencsg.com/csghub-server/aigateway/component/router"
 
@@ -414,7 +415,7 @@ func TestResolveModelTarget_PricedExternalLLM(t *testing.T) {
 		BaseModel: types.BaseModel{
 			ID: "external-model",
 			Metadata: map[string]any{
-				types.MetaKeyLLMType:           types.ProviderTypeExternalLLM,
+				types.MetaKeyLLMType:           commontypes.ProviderTypeExternalLLM,
 				types.MetaKeyPricingConfigured: true,
 			},
 		},
@@ -436,7 +437,7 @@ func TestResolveModelTarget_InferenceWithoutPricingFlag(t *testing.T) {
 		BaseModel: types.BaseModel{
 			ID: "inference-model",
 			Metadata: map[string]any{
-				types.MetaKeyLLMType: types.ProviderTypeInference,
+				types.MetaKeyLLMType: commontypes.ProviderTypeInference,
 			},
 		},
 		InternalModelInfo: types.InternalModelInfo{

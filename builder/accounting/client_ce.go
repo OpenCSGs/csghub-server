@@ -109,3 +109,7 @@ func (ac *accountingClientImpl) GetOrderDetailByID(currentUser string, id int64)
 func (ac *accountingClientImpl) GetVoucherDashboard(req types.VoucherDashboardReq) (any, error) {
 	return nil, nil
 }
+
+func (ac *accountingClientImpl) OffLinePrice(req types.AcctPriceOffLineReq) (any, error) {
+	return nil, nil
+}

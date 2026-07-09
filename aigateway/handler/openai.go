@@ -338,7 +338,7 @@ func (h *OpenAIHandlerImpl) ListModels(c *gin.Context) {
 
 func isValidListModelsLLMType(llmType string) bool {
 	switch strings.ToLower(strings.TrimSpace(llmType)) {
-	case types.ProviderTypeExternalLLM, types.ProviderTypeServerless, types.ProviderTypeInference:
+	case commonType.ProviderTypeExternalLLM, commonType.ProviderTypeServerless, commonType.ProviderTypeInference:
 		return true
 	default:
 		return false
@@ -346,7 +346,7 @@ func isValidListModelsLLMType(llmType string) bool {
 }
 
 func invalidLLMTypesErrorMessage() string {
-	return fmt.Sprintf("Invalid llm_types parameter. Allowed values: %s, %s, %s", types.ProviderTypeExternalLLM, types.ProviderTypeServerless, types.ProviderTypeInference)
+	return fmt.Sprintf("Invalid llm_types parameter. Allowed values: %s, %s, %s", commonType.ProviderTypeExternalLLM, commonType.ProviderTypeServerless, commonType.ProviderTypeInference)
 }
 
 func invalidHasAssociatedModelErrorMessage() string {

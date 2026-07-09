@@ -2,6 +2,19 @@ package types
 
 import "time"
 
+// Resource ID format strings for external LLM (model ID) and CSGHub internal (path segment, repo path).
+const (
+	ExternalLLMResourceFmt = "thirdparty://%s"
+	CSGHubResourceFmt      = "csghub://%s/%s"
+)
+
+// Provider type values for Metadata[MetaKeyLLMType].
+const (
+	ProviderTypeServerless  = "serverless"
+	ProviderTypeInference   = "inference"
+	ProviderTypeExternalLLM = "external_llm"
+)
+
 type RepositoryLite struct {
 	ID          int64     `json:"id"`
 	Path        string    `json:"path"`
