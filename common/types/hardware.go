@@ -90,12 +90,34 @@ func (h *HardWare) GetResXPUMode() string {
 
 }
 
-func GetResXPUMode(res string) (string, error) {
+func parseHardWare(res string) (HardWare, error) {
 	var hardware HardWare
 	err := json.Unmarshal([]byte(res), &hardware)
+	if err != nil {
+		return HardWare{}, err
+	}
+
+	return hardware, nil
+}
+
+func GetResXPUMode(res string) (string, error) {
+	hardware, err := parseHardWare(res)
 	if err != nil {
 		return "", err
 	}
 
 	return hardware.GetResXPUMode(), nil
+}
+
+func GetHardwareType(res string) (string, error) {
+	hardware, err := parseHardWare(res)
+	if err != nil {
+		return "", err
+	}
+	xpuType := hardware.GetResXPUMode()
+	if len(xpuType) > 0 {
+		return xpuType, nil
+	}
+	cpuType := hardware.Cpu.Type
+	return cpuType, nil
 }

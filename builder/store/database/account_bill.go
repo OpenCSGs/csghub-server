@@ -54,6 +54,8 @@ type AccountBill struct {
 	VoucherValue    float64           `bun:",notnull,default:0" json:"voucher_value"`
 	CashValue       float64           `bun:",notnull,default:0" json:"cash_value"`
 	UnitType        types.SkuUnitType `bun:",notnull,default:''" json:"unit_type"`
+	ClusterID       string            `bun:",notnull,default:''" json:"cluster_id"`
+	HardwareType    string            `bun:",notnull,default:''" json:"hardware_type"`
 	times
 }
 
@@ -62,6 +64,11 @@ type BillValues struct {
 	VoucherValue float64 `bun:"voucher_value"`
 	CashValue    float64 `bun:"cash_value"`
 	Consumption  float64 `bun:"consumption"`
+}
+
+type BillResource struct {
+	ClusterID    string `bun:"cluster_id"`
+	HardwareType string `bun:"hardware_type"`
 }
 
 type TotalResult struct {

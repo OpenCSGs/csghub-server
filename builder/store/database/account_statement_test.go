@@ -456,3 +456,111 @@ func TestAccountStatementStore_ListGroupedByUserAndSku(t *testing.T) {
 	require.Equal(t, float64(30), groupMap[1002].TotalValue)
 	require.Equal(t, float64(-4), groupMap[1002].TotalConsumption)
 }
+
+func TestGetConsumeResource(t *testing.T) {
+	cases := []struct {
+		name              string
+		scene             types.SceneType
+		spaceResource     *database.SpaceResource
+		expectClusterID   string
+		expectHardwareTyp string
+		expectErr         bool
+	}{
+		{
+			name:              "scene not need extract hardware",
+			scene:             types.SceneCashCharge,
+			spaceResource:     nil,
+			expectClusterID:   "",
+			expectHardwareTyp: "",
+			expectErr:         false,
+		},
+		{
+			name:  "scene need extract hardware with valid resource",
+			scene: types.SceneSpace,
+			spaceResource: &database.SpaceResource{
+				Name:      "test-resource",
+				Resources: `{"gpu": {"num": "1", "type": "A10"}}`,
+				ClusterID: "test-cluster",
+			},
+			expectClusterID:   "test-cluster",
+			expectHardwareTyp: "A10",
+			expectErr:         false,
+		},
+		{
+			name:  "scene need extract hardware with invalid resource id",
+			scene: types.SceneModelInference,
+			spaceResource: &database.SpaceResource{
+				Name:      "test-resource",
+				Resources: `{"gpu": {"num": "1", "type": "A10"}}`,
+				ClusterID: "test-cluster",
+			},
+			expectClusterID:   "",
+			expectHardwareTyp: "",
+			expectErr:         true,
+		},
+		{
+			name:  "scene need extract hardware with missing resource record",
+			scene: types.SceneEvaluation,
+			spaceResource: &database.SpaceResource{
+				Name:      "other-resource",
+				Resources: `{"gpu": {"num": "1", "type": "A10"}}`,
+				ClusterID: "other-cluster",
+			},
+			expectClusterID:   "",
+			expectHardwareTyp: "",
+			expectErr:         true,
+		},
+		{
+			name:  "scene need extract hardware with cpu only resource",
+			scene: types.SceneModelFinetune,
+			spaceResource: &database.SpaceResource{
+				Name:      "cpu-resource",
+				Resources: `{"cpu": {"num": "2", "type": "Intel"}}`,
+				ClusterID: "cpu-cluster",
+			},
+			expectClusterID:   "cpu-cluster",
+			expectHardwareTyp: "Intel",
+			expectErr:         false,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			db := tests.InitTestDB()
+			defer db.Close()
+			ctx := context.TODO()
+
+			resourceID := "not-a-number"
+			if c.spaceResource != nil {
+				_, err := db.Core.NewInsert().Model(c.spaceResource).Exec(ctx, c.spaceResource)
+				require.Nil(t, err)
+				resourceID = fmt.Sprintf("%d", c.spaceResource.ID)
+			}
+
+			err := db.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+				input := database.AccountStatement{
+					Scene:      c.scene,
+					ResourceID: resourceID,
+				}
+
+				if c.name == "scene need extract hardware with invalid resource id" {
+					input.ResourceID = "not-a-number"
+				}
+				if c.name == "scene need extract hardware with missing resource record" {
+					input.ResourceID = "99999"
+				}
+
+				result, err := database.GetConsumeResource(ctx, tx, input)
+				if c.expectErr {
+					require.Error(t, err)
+				} else {
+					require.NoError(t, err)
+					require.Equal(t, c.expectClusterID, result.ClusterID)
+					require.Equal(t, c.expectHardwareTyp, result.HardwareType)
+				}
+				return nil
+			})
+			require.Nil(t, err)
+		})
+	}
+}
