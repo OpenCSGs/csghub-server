@@ -514,6 +514,8 @@ type Config struct {
 		WorkerNum            int    `env:"OPENCSG_LLMLOG_WORKER_NUM" default:"10"`
 		BatchSize            int    `env:"OPENCSG_LLMLOG_BATCH_SIZE" default:"1000"`
 		FlushIntervalSeconds int    `env:"OPENCSG_LLMLOG_FLUSH_INTERVAL_SECONDS" default:"300"`
+		StreamMaxBytes       int64  `env:"OPENCSG_LLMLOG_STREAM_MAX_BYTES" default:"8589934592"`    // 8 GiB
+		StreamMaxAgeSeconds  int    `env:"OPENCSG_LLMLOG_STREAM_MAX_AGE_SECONDS" default:"1209600"` // 14 days
 		Sync                 struct {
 			Enable            bool   `env:"STARHUB_SERVER_LLMLOG_SYNC_ENABLE" default:"false"`
 			Username          string `env:"STARHUB_SERVER_LLMLOG_SYNC_USERNAME" default:""`
