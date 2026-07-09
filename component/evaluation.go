@@ -289,9 +289,24 @@ func (c *evaluationComponentImpl) DeleteEvaluation(ctx context.Context, req type
 
 // get evaluation result
 func (c *evaluationComponentImpl) GetEvaluation(ctx context.Context, req types.EvaluationGetReq) (*types.EvaluationRes, error) {
-	wf, err := c.workflowStore.FindByID(ctx, req.ID)
+	var (
+		wf  database.ArgoWorkflow
+		err error
+	)
+	if req.TaskID != "" {
+		wfObj, findErr := c.workflowStore.FindByTaskID(ctx, req.TaskID)
+		if findErr != nil {
+			return nil, fmt.Errorf("fail to get evaluation result, %w", findErr)
+		}
+		wf = *wfObj
+	} else {
+		wf, err = c.workflowStore.FindByID(ctx, req.ID)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("fail to get evaluation result, %w", err)
+	}
+	if !isEvaluationResultTaskType(wf.TaskType) {
+		return nil, errorx.ErrForbiddenMsg("workflow is not an evaluation job")
 	}
 	if wf.Username != req.Username {
 		canRead, err := c.repoComponent.CheckCurrentUserPermission(ctx, req.Username, wf.Username, membership.RoleRead)
@@ -359,6 +374,15 @@ func (c *evaluationComponentImpl) GetEvaluation(ctx context.Context, req types.E
 	}
 	attachClawEvalSummary(ctx, res)
 	return res, nil
+}
+
+func isEvaluationResultTaskType(taskType types.TaskType) bool {
+	switch taskType {
+	case types.TaskTypeEvaluation, types.TaskTypeClawEval:
+		return true
+	default:
+		return false
+	}
 }
 
 func (c *evaluationComponentImpl) OrgEvaluations(ctx context.Context, req *types.OrgEvaluationsReq) ([]types.ArgoWorkFlowRes, int, error) {

@@ -114,6 +114,29 @@ func (h *EvaluationHandler) GetEvaluation(ctx *gin.Context) {
 
 }
 
+func (h *EvaluationHandler) GetEvaluationByTaskID(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+	taskID := ctx.Param("task_id")
+	if taskID == "" {
+		httpbase.BadRequest(ctx, "task_id is required")
+		return
+	}
+	var req = &types.EvaluationGetReq{}
+	req.TaskID = taskID
+	req.Username = currentUser
+	evaluation, err := h.evaluation.GetEvaluation(ctx.Request.Context(), *req)
+	if err != nil {
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get evaluation job by task id", slog.Any("error", err))
+		if errors.Is(err, errorx.ErrForbidden) {
+			httpbase.ForbiddenError(ctx, err)
+			return
+		}
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	httpbase.OK(ctx, evaluation)
+}
+
 // deleteEvaluation  godoc
 // @Security     ApiKey
 // @Summary      delete model evaluation
