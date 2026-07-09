@@ -18,7 +18,8 @@ import (
 type UnkownFileChecker struct {
 }
 
-func (c *UnkownFileChecker) Run(ctx context.Context, reader io.Reader) (types.SensitiveCheckStatus, string) {
+func (c *UnkownFileChecker) Run(ctx context.Context, fctx FileCheckContext) (types.SensitiveCheckStatus, string) {
+	reader := fctx.Reader
 	// read the first 512 bytes and detect the content type
 	buffer := make([]byte, 512)
 	n, err := reader.Read(buffer)
@@ -36,12 +37,12 @@ func (c *UnkownFileChecker) Run(ctx context.Context, reader io.Reader) (types.Se
 		slog.Debug("use text file checker for unknown file", slog.String("content_type", detectedType))
 		tc := NewTextFileChecker()
 		mreader := io.MultiReader(bytes.NewReader(buffer), reader)
-		return tc.Run(ctx, mreader)
+		return tc.Run(ctx, FileCheckContext{Reader: mreader})
 	case strings.HasPrefix(detectedType, "image"):
 		slog.Debug("use image file checker for unknown file", slog.String("content_type", detectedType))
 		ic := NewImageFileChecker()
 		mreader := io.MultiReader(bytes.NewReader(buffer), reader)
-		return ic.Run(ctx, mreader)
+		return ic.Run(ctx, FileCheckContext{Reader: mreader, ImageURL: fctx.ImageURL})
 	case strings.HasPrefix(detectedType, "audio"):
 		slog.Debug("skip audio checker for unknown file", slog.String("content_type", detectedType))
 		return types.SensitiveCheckSkip, "skip binary audio file"

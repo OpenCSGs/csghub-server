@@ -22,7 +22,8 @@ func NewTextFileChecker() *TextFileChecker {
 	}
 }
 
-func (c *TextFileChecker) Run(ctx context.Context, reader io.Reader) (types.SensitiveCheckStatus, string) {
+func (c *TextFileChecker) Run(ctx context.Context, fctx FileCheckContext) (types.SensitiveCheckStatus, string) {
+	reader := fctx.Reader
 	type result struct {
 		status  types.SensitiveCheckStatus
 		message string
