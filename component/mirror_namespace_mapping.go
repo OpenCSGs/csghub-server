@@ -6,12 +6,14 @@ import (
 
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
 
 type mirrorNamespaceMappingComponentImpl struct {
 	mirrorNamespaceMappingStore database.MirrorNamespaceMappingStore
 	userStore                   database.UserStore
+	namespaceStore              database.NamespaceStore
 }
 
 type MirrorNamespaceMappingComponent interface {
@@ -26,10 +28,19 @@ func NewMirrorNamespaceMappingComponent(config *config.Config) (MirrorNamespaceM
 	return &mirrorNamespaceMappingComponentImpl{
 		mirrorNamespaceMappingStore: database.NewMirrorNamespaceMappingStore(),
 		userStore:                   database.NewUserStore(),
+		namespaceStore:              database.NewNamespaceStore(),
 	}, nil
 }
 
 func (c *mirrorNamespaceMappingComponentImpl) Create(ctx context.Context, req types.CreateMirrorNamespaceMappingReq) (*database.MirrorNamespaceMapping, error) {
+	exists, err := c.namespaceStore.Exists(ctx, req.TargetNamespace)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check target namespace existence, error: %w", err)
+	}
+	if !exists {
+		return nil, errorx.TargetNamespaceNotFound(req.TargetNamespace)
+	}
+
 	var mnm database.MirrorNamespaceMapping
 	mnm.SourceNamespace = req.SourceNamespace
 	mnm.TargetNamespace = req.TargetNamespace
@@ -59,6 +70,16 @@ func (c *mirrorNamespaceMappingComponentImpl) Index(ctx context.Context) ([]data
 	return mnm, nil
 }
 func (c *mirrorNamespaceMappingComponentImpl) Update(ctx context.Context, req types.UpdateMirrorNamespaceMappingReq) (*database.MirrorNamespaceMapping, error) {
+	if req.TargetNamespace != nil {
+		exists, err := c.namespaceStore.Exists(ctx, *req.TargetNamespace)
+		if err != nil {
+			return nil, fmt.Errorf("failed to check target namespace existence, error: %w", err)
+		}
+		if !exists {
+			return nil, errorx.TargetNamespaceNotFound(*req.TargetNamespace)
+		}
+	}
+
 	var mnm database.MirrorNamespaceMapping
 	mnm.ID = req.ID
 	if req.SourceNamespace != nil {

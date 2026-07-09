@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"strconv"
@@ -8,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/component"
 )
@@ -48,7 +50,11 @@ func (h *MirrorNamespaceMappingHandler) Create(ctx *gin.Context) {
 	ms, err := h.mirrorNamespaceMapping.Create(ctx.Request.Context(), msReq)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "Failed to create mirror namespace mapping", "error", err)
-		httpbase.ServerError(ctx, err)
+		if errors.Is(err, errorx.ErrTargetNamespaceNotFound) {
+			httpbase.BadRequestWithExt(ctx, err)
+		} else {
+			httpbase.ServerError(ctx, err)
+		}
 		return
 	}
 	httpbase.OK(ctx, ms)
@@ -110,8 +116,12 @@ func (h *MirrorNamespaceMappingHandler) Update(ctx *gin.Context) {
 	msReq.ID = msId
 	ms, err := h.mirrorNamespaceMapping.Update(ctx.Request.Context(), msReq)
 	if err != nil {
-		slog.ErrorContext(ctx.Request.Context(), "Failed to get mirror namespace mappings", "error", err)
-		httpbase.ServerError(ctx, err)
+		slog.ErrorContext(ctx.Request.Context(), "Failed to update mirror namespace mapping", "error", err)
+		if errors.Is(err, errorx.ErrTargetNamespaceNotFound) {
+			httpbase.BadRequestWithExt(ctx, err)
+		} else {
+			httpbase.ServerError(ctx, err)
+		}
 		return
 	}
 	httpbase.OK(ctx, ms)
