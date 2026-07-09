@@ -479,6 +479,7 @@ func TestUserComponent_UpdateByUUID_NoSyncWhenOnlyOtherFieldsChanged(t *testing.
 		Username:    "user1",
 		Email:       "user1@example.com",
 		RegProvider: "casdoor",
+		Avatar:      "https://example.com/avatar.jpg",
 	}
 	mockUserStore.EXPECT().FindByUUID(mock.Anything, "user1").Return(user, nil)
 	mockUserStore.EXPECT().Update(mock.Anything, mock.Anything, mock.Anything).Return(nil)
@@ -591,6 +592,7 @@ func TestUserComponent_UpdateByUUID_NoRollbackWhenNoSync(t *testing.T) {
 		Username:    "user1",
 		Email:       "user1@example.com",
 		RegProvider: "casdoor",
+		Avatar:      "https://example.com/avatar.jpg",
 	}
 	mockUserStore.EXPECT().FindByUUID(mock.Anything, "user1").Return(user, nil)
 	mockUserStore.EXPECT().Update(mock.Anything, mock.Anything, mock.Anything).Return(errors.New("database error"))

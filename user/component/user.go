@@ -308,6 +308,13 @@ func (c *userComponentImpl) UpdateByUUID(ctx context.Context, req *types.UpdateU
 		return errorx.ErrUserNotFound
 	}
 	var oldUser = *user
+
+	if req.Avatar != nil && *req.Avatar != "" && *req.Avatar != user.Avatar {
+		if err := common.ValidateImageURL(*req.Avatar); err != nil {
+			return errorx.ReqParamInvalid(err, errorx.Ctx().Set("param", "avatar"))
+		}
+	}
+
 	opUserName := req.OpUser
 	var opUser database.User
 	if user.Username != opUserName {
