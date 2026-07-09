@@ -22,8 +22,22 @@ func IsNeedCalculateBill(scene types.SceneType) bool {
 		types.SceneEvaluation,
 		types.SceneModelServerless,
 		types.SceneMultiModalServerless,
-		types.SceneStarship,
-		types.SceneGuiAgent:
+		// types.SceneStarship, deprecated
+		// types.SceneGuiAgent, deprecated
+		types.ScenePortalCharge,
+		types.SceneCashCharge:
+		return true
+	default:
+		return false
+	}
+}
+
+func IsNeedExtractHardware(scene types.SceneType) bool {
+	switch scene {
+	case types.SceneModelInference,
+		types.SceneSpace,
+		types.SceneModelFinetune,
+		types.SceneEvaluation:
 		return true
 	default:
 		return false
