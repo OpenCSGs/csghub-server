@@ -49,6 +49,23 @@ func validateResources(resources string) error {
 	return nil
 }
 
+func sanitizeScenarios(scenarios []string) []string {
+	if scenarios == nil {
+		return []string{}
+	}
+	seen := make(map[string]bool)
+	result := make([]string, 0, len(scenarios))
+	for _, s := range scenarios {
+		s = strings.TrimSpace(s)
+		if s == "" || seen[s] {
+			continue
+		}
+		seen[s] = true
+		result = append(result, s)
+	}
+	return result
+}
+
 func (c *spaceResourceComponentImpl) Index(ctx context.Context, req *types.SpaceResourceIndexReq) ([]types.SpaceResource, int, error) {
 	var result []types.SpaceResource
 	var total int
@@ -100,6 +117,10 @@ func (c *spaceResourceComponentImpl) Index(ctx context.Context, req *types.Space
 				}
 			}
 			resourceType := common.ResourceType(hardware)
+			scenarios := r.Scenarios
+			if scenarios == nil {
+				scenarios = []string{}
+			}
 			singleClusterResult = append(singleClusterResult, types.SpaceResource{
 				ID:                  r.ID,
 				ClusterID:           r.ClusterID,
@@ -108,6 +129,7 @@ func (c *spaceResourceComponentImpl) Index(ctx context.Context, req *types.Space
 				Resources:           r.Resources,
 				IsAvailable:         isAvailable,
 				Type:                resourceType,
+				Scenarios:           scenarios,
 				AvailableStatusList: availableStatusList,
 			})
 			resourceCount++
@@ -144,16 +166,25 @@ func (c *spaceResourceComponentImpl) Update(ctx context.Context, req *types.Upda
 	sr.Name = req.Name
 	sr.Resources = req.Resources
 
+	if req.Scenarios != nil {
+		sr.Scenarios = sanitizeScenarios(req.Scenarios)
+	}
+
 	sr, err = c.spaceResourceStore.Update(ctx, *sr)
 	if err != nil {
 		slog.Error("error updating space resource", slog.Any("error", err))
 		return nil, err
 	}
 
+	scenarios := sr.Scenarios
+	if scenarios == nil {
+		scenarios = []string{}
+	}
 	result := &types.SpaceResource{
 		ID:        sr.ID,
 		Name:      sr.Name,
 		Resources: sr.Resources,
+		Scenarios: scenarios,
 	}
 
 	return result, nil
@@ -167,6 +198,7 @@ func (c *spaceResourceComponentImpl) Create(ctx context.Context, req *types.Crea
 		Name:      req.Name,
 		Resources: req.Resources,
 		ClusterID: req.ClusterID,
+		Scenarios: sanitizeScenarios(req.Scenarios),
 	}
 	res, err := c.spaceResourceStore.Create(ctx, sr)
 	if err != nil {
@@ -174,10 +206,15 @@ func (c *spaceResourceComponentImpl) Create(ctx context.Context, req *types.Crea
 		return nil, err
 	}
 
+	scenariosResult := res.Scenarios
+	if scenariosResult == nil {
+		scenariosResult = []string{}
+	}
 	result := &types.SpaceResource{
 		ID:        res.ID,
 		Name:      res.Name,
 		Resources: res.Resources,
+		Scenarios: scenariosResult,
 	}
 
 	return result, nil
@@ -216,11 +253,16 @@ func (c *spaceResourceComponentImpl) ListAll(ctx context.Context) ([]types.Space
 
 	result := make([]types.SpaceResource, 0, len(dbResources))
 	for _, r := range dbResources {
+		scenarios := r.Scenarios
+		if scenarios == nil {
+			scenarios = []string{}
+		}
 		result = append(result, types.SpaceResource{
 			ID:        r.ID,
 			Name:      r.Name,
 			ClusterID: r.ClusterID,
 			Resources: r.Resources,
+			Scenarios: scenarios,
 		})
 	}
 
