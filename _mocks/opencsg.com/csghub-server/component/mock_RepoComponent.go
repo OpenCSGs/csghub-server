@@ -2785,22 +2785,22 @@ func (_c *MockRepoComponent_GetNamespaceBillingUUID_Call) RunAndReturn(run func(
 }
 
 // GetRepoSizeByBranch provides a mock function with given fields: ctx, repoType, namespace, name, branch, currentUser
-func (_m *MockRepoComponent) GetRepoSizeByBranch(ctx context.Context, repoType types.RepositoryType, namespace string, name string, branch string, currentUser string) (int64, error) {
+func (_m *MockRepoComponent) GetRepoSizeByBranch(ctx context.Context, repoType types.RepositoryType, namespace string, name string, branch string, currentUser string) (types.RepoSizeResponse, error) {
 	ret := _m.Called(ctx, repoType, namespace, name, branch, currentUser)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetRepoSizeByBranch")
 	}
 
-	var r0 int64
+	var r0 types.RepoSizeResponse
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, types.RepositoryType, string, string, string, string) (int64, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, types.RepositoryType, string, string, string, string) (types.RepoSizeResponse, error)); ok {
 		return rf(ctx, repoType, namespace, name, branch, currentUser)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, types.RepositoryType, string, string, string, string) int64); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, types.RepositoryType, string, string, string, string) types.RepoSizeResponse); ok {
 		r0 = rf(ctx, repoType, namespace, name, branch, currentUser)
 	} else {
-		r0 = ret.Get(0).(int64)
+		r0 = ret.Get(0).(types.RepoSizeResponse)
 	}
 
 	if rf, ok := ret.Get(1).(func(context.Context, types.RepositoryType, string, string, string, string) error); ok {
@@ -2835,12 +2835,12 @@ func (_c *MockRepoComponent_GetRepoSizeByBranch_Call) Run(run func(ctx context.C
 	return _c
 }
 
-func (_c *MockRepoComponent_GetRepoSizeByBranch_Call) Return(_a0 int64, _a1 error) *MockRepoComponent_GetRepoSizeByBranch_Call {
+func (_c *MockRepoComponent_GetRepoSizeByBranch_Call) Return(_a0 types.RepoSizeResponse, _a1 error) *MockRepoComponent_GetRepoSizeByBranch_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockRepoComponent_GetRepoSizeByBranch_Call) RunAndReturn(run func(context.Context, types.RepositoryType, string, string, string, string) (int64, error)) *MockRepoComponent_GetRepoSizeByBranch_Call {
+func (_c *MockRepoComponent_GetRepoSizeByBranch_Call) RunAndReturn(run func(context.Context, types.RepositoryType, string, string, string, string) (types.RepoSizeResponse, error)) *MockRepoComponent_GetRepoSizeByBranch_Call {
 	_c.Call.Return(run)
 	return _c
 }

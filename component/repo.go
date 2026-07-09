@@ -197,7 +197,7 @@ type RepoComponent interface {
 	DeletePendingDeletion(ctx context.Context) error
 	GetRepos(ctx context.Context, search, currentUser string, repoType types.RepositoryType) ([]string, error)
 	// GetRepoSizeByBranch gets the repository size for a specific branch
-	GetRepoSizeByBranch(ctx context.Context, repoType types.RepositoryType, namespace, name, branch, currentUser string) (int64, error)
+	GetRepoSizeByBranch(ctx context.Context, repoType types.RepositoryType, namespace, name, branch, currentUser string) (types.RepoSizeResponse, error)
 	// BatchGetRepoExtra gets the default branch size for multiple repositories
 	BatchGetRepoExtra(ctx context.Context, repoIDs []int64, currentUser string) ([]types.RepoExtraItem, error)
 	// DownloadCodeZip downloads the code repository as a zip archive
@@ -3282,30 +3282,33 @@ func (c *repoComponentImpl) GetRepos(ctx context.Context, search, currentUser st
 }
 
 // GetRepoSizeByBranch gets the repository size for a specific branch
-func (c *repoComponentImpl) GetRepoSizeByBranch(ctx context.Context, repoType types.RepositoryType, namespace, name, branch, currentUser string) (int64, error) {
+func (c *repoComponentImpl) GetRepoSizeByBranch(ctx context.Context, repoType types.RepositoryType, namespace, name, branch, currentUser string) (types.RepoSizeResponse, error) {
 	repo, err := c.repoStore.FindByPath(ctx, repoType, namespace, name)
 	if err != nil {
-		return 0, fmt.Errorf("failed to find repo, error: %w", err)
+		return types.RepoSizeResponse{}, fmt.Errorf("failed to find repo, error: %w", err)
 	}
 
 	permission, err := c.GetUserRepoPermission(ctx, currentUser, repo)
 	if err != nil {
-		return 0, fmt.Errorf("failed to get user repo permission, error: %w", err)
+		return types.RepoSizeResponse{}, fmt.Errorf("failed to get user repo permission, error: %w", err)
 	}
 	if !permission.CanRead {
-		return 0, errorx.ErrForbiddenMsg("users do not have permission to get repo size in this repo")
+		return types.RepoSizeResponse{}, errorx.ErrForbiddenMsg("users do not have permission to get repo size in this repo")
 	}
 
 	// Get repository statistics from database
 	stats, err := c.repoStatisticsStore.FindByRepositoryIDAndBranch(ctx, repo.ID, branch)
 	if err != nil {
 		if errors.Is(err, errorx.ErrNotFound) {
-			return 0, errorx.ErrNotFound
+			return types.RepoSizeResponse{}, errorx.ErrNotFound
 		}
-		return 0, fmt.Errorf("failed to get repo statistics, error: %w", err)
+		return types.RepoSizeResponse{}, fmt.Errorf("failed to get repo statistics, error: %w", err)
 	}
 
-	return stats.TotalSize, nil
+	return types.RepoSizeResponse{
+		TotalSize:      stats.TotalSize,
+		LastCommitSize: stats.LastCommitSize,
+	}, nil
 }
 
 // BatchGetRepoExtra gets the default branch size for multiple repositories by their IDs.
@@ -3353,6 +3356,7 @@ func (c *repoComponentImpl) BatchGetRepoExtra(ctx context.Context, repoIDs []int
 	}
 
 	sizeMap := make(map[int64]int64, len(readableRepos))
+	lastCommitSizeMap := make(map[int64]int64, len(readableRepos))
 
 	if len(repoDefaultBranches) > 0 {
 		repoIDsWithBranch := make([]int64, 0, len(repoDefaultBranches))
@@ -3369,13 +3373,18 @@ func (c *repoComponentImpl) BatchGetRepoExtra(ctx context.Context, repoIDs []int
 		for _, stat := range stats {
 			if defaultBranch, ok := repoDefaultBranches[stat.RepositoryID]; ok && stat.Branch == defaultBranch {
 				sizeMap[stat.RepositoryID] = stat.TotalSize
+				lastCommitSizeMap[stat.RepositoryID] = stat.LastCommitSize
 			}
 		}
 	}
 
 	result := make([]types.RepoExtraItem, 0, len(readableRepos))
 	for _, repo := range readableRepos {
-		result = append(result, types.RepoExtraItem{RepoID: repo.ID, Size: sizeMap[repo.ID]})
+		result = append(result, types.RepoExtraItem{
+			RepoID:         repo.ID,
+			Size:           sizeMap[repo.ID],
+			LastCommitSize: lastCommitSizeMap[repo.ID],
+		})
 	}
 	slices.SortFunc(result, func(a, b types.RepoExtraItem) int {
 		return cmp.Compare(a.RepoID, b.RepoID)

@@ -82,14 +82,14 @@ func TestRepoHandler_GetRepoSizeByBranch(t *testing.T) {
 	tester.WithKV("repo_type", types.ModelRepo)
 
 	// Set mock expectation
-	expectedSize := int64(1024)
-	tester.mocks.repo.EXPECT().GetRepoSizeByBranch(tester.Ctx(), types.ModelRepo, "u", "r", "main", "u").Return(expectedSize, nil)
+	expectedResp := types.RepoSizeResponse{TotalSize: 1024, LastCommitSize: 512}
+	tester.mocks.repo.EXPECT().GetRepoSizeByBranch(tester.Ctx(), types.ModelRepo, "u", "r", "main", "u").Return(expectedResp, nil)
 
 	// Execute request
 	tester.Execute()
 
 	// Verify response
-	tester.ResponseEq(t, http.StatusOK, tester.OKText, expectedSize)
+	tester.ResponseEq(t, http.StatusOK, tester.OKText, expectedResp)
 }
 
 func TestRepoHandler_ScanIndustryTags(t *testing.T) {
@@ -186,7 +186,7 @@ func TestRepoHandler_GetRepoSizeByBranch_Error(t *testing.T) {
 	tester.WithKV("repo_type", types.ModelRepo)
 
 	// Set mock expectation with error
-	tester.mocks.repo.EXPECT().GetRepoSizeByBranch(tester.Ctx(), types.ModelRepo, "u", "r", "main", "u").Return(int64(0), errors.New("failed to get repo size"))
+	tester.mocks.repo.EXPECT().GetRepoSizeByBranch(tester.Ctx(), types.ModelRepo, "u", "r", "main", "u").Return(types.RepoSizeResponse{}, errors.New("failed to get repo size"))
 
 	// Execute request
 	tester.Execute()
@@ -1985,13 +1985,16 @@ func TestRepoHandler_BatchGetRepoExtra(t *testing.T) {
 		})
 		tester.WithBody(t, types.BatchRepoExtraReq{RepoIDs: []int64{1, 2}}).WithUser()
 
-		tester.mocks.repo.EXPECT().BatchGetRepoExtra(tester.Ctx(), []int64{1, 2}, "u").Return([]types.RepoExtraItem{{RepoID: 1, Size: 100}, {RepoID: 2, Size: 200}}, nil)
+		tester.mocks.repo.EXPECT().BatchGetRepoExtra(tester.Ctx(), []int64{1, 2}, "u").Return([]types.RepoExtraItem{
+			{RepoID: 1, Size: 100, LastCommitSize: 50},
+			{RepoID: 2, Size: 200, LastCommitSize: 80},
+		}, nil)
 
 		tester.Execute()
 
 		tester.ResponseEq(t, http.StatusOK, tester.OKText, []types.RepoExtraItem{
-			{RepoID: 1, Size: 100},
-			{RepoID: 2, Size: 200},
+			{RepoID: 1, Size: 100, LastCommitSize: 50},
+			{RepoID: 2, Size: 200, LastCommitSize: 80},
 		})
 	})
 

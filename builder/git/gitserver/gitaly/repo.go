@@ -387,6 +387,139 @@ func (c *Client) GetRepoLfsSize(ctx context.Context, req gitserver.GetRepoInfoBy
 	return totalSize, nil
 }
 
+const getBlobsBatchSize = 1000
+
+func (c *Client) GetLastCommitSize(ctx context.Context, req gitserver.GetRepoInfoByPathReq) (int64, error) {
+	ctx, cancel := context.WithTimeout(ctx, c.timeout)
+	defer cancel()
+
+	errCtx := errorx.Ctx().
+		Set("repo_type", req.RepoType).
+		Set("namespace", req.Namespace).
+		Set("name", req.Name).
+		Set("ref", req.Ref)
+
+	relativePath, err := c.BuildRelativePath(ctx, req.RepoType, req.Namespace, req.Name)
+	if err != nil {
+		return 0, err
+	}
+
+	repository := &gitalypb.Repository{
+		StorageName:  c.config.GitalyServer.Storage,
+		RelativePath: relativePath,
+	}
+
+	// Get all file paths at HEAD
+	listFilesReq := &gitalypb.ListFilesRequest{
+		Repository: repository,
+		Revision:   []byte(req.Ref),
+	}
+	filesStream, err := c.commitClient.ListFiles(ctx, listFilesReq)
+	if err != nil {
+		return 0, errorx.ErrGitListFilesFailed(err, errCtx)
+	}
+
+	var allPaths []string
+	for {
+		filesResp, err := filesStream.Recv()
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			return 0, errorx.ErrGitListFilesFailed(err, errCtx)
+		}
+		if filesResp != nil {
+			for _, path := range filesResp.Paths {
+				allPaths = append(allPaths, string(path))
+			}
+		}
+	}
+
+	if len(allPaths) == 0 {
+		return 0, nil
+	}
+
+	// Get blob sizes in batches to avoid exceeding gRPC message limits
+	var (
+		lastCommitSize int64
+		blobIDs        []string
+	)
+	for i := 0; i < len(allPaths); i += getBlobsBatchSize {
+		end := i + getBlobsBatchSize
+		if end > len(allPaths) {
+			end = len(allPaths)
+		}
+		batch := allPaths[i:end]
+
+		var revisionPaths []*gitalypb.GetBlobsRequest_RevisionPath
+		for _, path := range batch {
+			revisionPaths = append(revisionPaths, &gitalypb.GetBlobsRequest_RevisionPath{
+				Revision: req.Ref,
+				Path:     []byte(path),
+			})
+		}
+
+		blobsStream, err := c.blobClient.GetBlobs(ctx, &gitalypb.GetBlobsRequest{
+			Repository:    repository,
+			RevisionPaths: revisionPaths,
+			Limit:         0,
+		})
+		if err != nil {
+			return 0, errorx.ErrGitGetBlobsFailed(err, errCtx)
+		}
+
+		for {
+			blobResp, err := blobsStream.Recv()
+			if err != nil {
+				if err == io.EOF {
+					break
+				}
+				return 0, errorx.ErrGitGetBlobsFailed(err, errCtx)
+			}
+			if blobResp != nil {
+				lastCommitSize += blobResp.Size
+				if blobResp.Oid != "" {
+					blobIDs = append(blobIDs, blobResp.Oid)
+				}
+			}
+		}
+	}
+
+	// Get LFS file sizes in batches
+	for i := 0; i < len(blobIDs); i += getBlobsBatchSize {
+		end := i + getBlobsBatchSize
+		if end > len(blobIDs) {
+			end = len(blobIDs)
+		}
+		batch := blobIDs[i:end]
+
+		pointersStream, err := c.blobClient.GetLFSPointers(ctx, &gitalypb.GetLFSPointersRequest{
+			Repository: repository,
+			BlobIds:    batch,
+		})
+		if err != nil {
+			return 0, errorx.ErrGitGetLfsPointersFailed(err, errCtx)
+		}
+
+		for {
+			pointerResp, err := pointersStream.Recv()
+			if err != nil {
+				if err == io.EOF {
+					break
+				}
+				return 0, errorx.ErrGitGetLfsPointersFailed(err, errCtx)
+			}
+			if pointerResp != nil {
+				for _, pointer := range pointerResp.LfsPointers {
+					lastCommitSize += pointer.FileSize
+				}
+			}
+		}
+	}
+
+	return lastCommitSize, nil
+}
+
 func (c *Client) CreateFork(ctx context.Context, req gitserver.CreateForkReq) error {
 	ctx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()

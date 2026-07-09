@@ -1278,6 +1278,63 @@ func (_c *MockGitServer_GetFilesByRevisionAndPaths_Call) RunAndReturn(run func(c
 	return _c
 }
 
+// GetLastCommitSize provides a mock function with given fields: ctx, req
+func (_m *MockGitServer) GetLastCommitSize(ctx context.Context, req gitserver.GetRepoInfoByPathReq) (int64, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetLastCommitSize")
+	}
+
+	var r0 int64
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, gitserver.GetRepoInfoByPathReq) (int64, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, gitserver.GetRepoInfoByPathReq) int64); ok {
+		r0 = rf(ctx, req)
+	} else {
+		r0 = ret.Get(0).(int64)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, gitserver.GetRepoInfoByPathReq) error); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockGitServer_GetLastCommitSize_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetLastCommitSize'
+type MockGitServer_GetLastCommitSize_Call struct {
+	*mock.Call
+}
+
+// GetLastCommitSize is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req gitserver.GetRepoInfoByPathReq
+func (_e *MockGitServer_Expecter) GetLastCommitSize(ctx interface{}, req interface{}) *MockGitServer_GetLastCommitSize_Call {
+	return &MockGitServer_GetLastCommitSize_Call{Call: _e.mock.On("GetLastCommitSize", ctx, req)}
+}
+
+func (_c *MockGitServer_GetLastCommitSize_Call) Run(run func(ctx context.Context, req gitserver.GetRepoInfoByPathReq)) *MockGitServer_GetLastCommitSize_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(gitserver.GetRepoInfoByPathReq))
+	})
+	return _c
+}
+
+func (_c *MockGitServer_GetLastCommitSize_Call) Return(_a0 int64, _a1 error) *MockGitServer_GetLastCommitSize_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockGitServer_GetLastCommitSize_Call) RunAndReturn(run func(context.Context, gitserver.GetRepoInfoByPathReq) (int64, error)) *MockGitServer_GetLastCommitSize_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetLogsTree provides a mock function with given fields: ctx, req
 func (_m *MockGitServer) GetLogsTree(ctx context.Context, req types.GetLogsTreeRequest) (*types.LogsTreeResp, error) {
 	ret := _m.Called(ctx, req)

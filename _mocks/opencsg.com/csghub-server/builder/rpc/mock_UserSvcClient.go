@@ -5,10 +5,13 @@ package rpc
 import (
 	context "context"
 
-	mock "github.com/stretchr/testify/mock"
 	membership "opencsg.com/csghub-server/builder/git/membership"
-	rpc "opencsg.com/csghub-server/builder/rpc"
 	database "opencsg.com/csghub-server/builder/store/database"
+
+	mock "github.com/stretchr/testify/mock"
+
+	rpc "opencsg.com/csghub-server/builder/rpc"
+
 	types "opencsg.com/csghub-server/common/types"
 )
 

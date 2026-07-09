@@ -431,6 +431,12 @@ type BatchRepoExtraReq struct {
 }
 
 type RepoExtraItem struct {
-	RepoID int64 `json:"repo_id"`
-	Size   int64 `json:"size"`
+	RepoID         int64 `json:"repo_id"`
+	Size           int64 `json:"size"`
+	LastCommitSize int64 `json:"last_commit_size"`
+}
+
+type RepoSizeResponse struct {
+	TotalSize      int64 `json:"total_size"`
+	LastCommitSize int64 `json:"last_commit_size"`
 }
