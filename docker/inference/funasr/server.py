@@ -30,6 +30,8 @@ BATCH_SIZE = 1
 BATCH_SIZE_S = 60.0
 BATCH_SIZE_THRESHOLD_S = 30.0
 STREAM_CHUNK_SECONDS = 30.0
+FFPROBE_TIMEOUT_SECONDS = 10
+AUDIO_DURATION_HEADER = "Audio-Duration-Seconds"
 
 
 def env_bool(name: str, default: bool = False) -> bool:
@@ -115,6 +117,45 @@ def transcribe_files(input_paths: list[str], language: Optional[str], hotwords: 
     return ASR_MODEL.generate(**generate_kwargs)
 
 
+def audio_duration_headers(audio_duration: float) -> dict[str, str]:
+    return {AUDIO_DURATION_HEADER: f"{audio_duration:.3f}"}
+
+
+def probe_audio_duration(input_path: str) -> float:
+    command = [
+        "ffprobe",
+        "-v",
+        "error",
+        "-show_entries",
+        "format=duration",
+        "-of",
+        "json",
+        input_path,
+    ]
+    try:
+        result = subprocess.run(
+            command,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=FFPROBE_TIMEOUT_SECONDS,
+        )
+        payload = json.loads(result.stdout)
+        duration = float(payload.get("format", {}).get("duration", 0))
+        if duration <= 0:
+            raise ValueError(f"invalid audio duration: {duration}")
+        return duration
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError(f"ffprobe timed out after {FFPROBE_TIMEOUT_SECONDS}s") from exc
+    except subprocess.CalledProcessError as exc:
+        stderr = (exc.stderr or "").strip()
+        if stderr:
+            raise RuntimeError(f"ffprobe failed: {stderr}") from exc
+        raise RuntimeError("ffprobe failed") from exc
+    except (json.JSONDecodeError, TypeError, ValueError) as exc:
+        raise RuntimeError("ffprobe returned invalid audio duration") from exc
+
+
 def split_audio(input_path: str, output_dir: str) -> list[str]:
     chunk_seconds = max(STREAM_CHUNK_SECONDS, 1.0)
     output_pattern = os.path.join(output_dir, "chunk_%05d.wav")
@@ -144,9 +185,12 @@ def split_audio(input_path: str, output_dir: str) -> list[str]:
     return chunks or [input_path]
 
 
-def format_stream_chunk(text: str, response_format: Optional[str]) -> str:
+def format_stream_chunk(text: str, response_format: Optional[str], duration: Optional[float] = None) -> str:
     if response_format in {"json", "verbose_json"}:
-        return json.dumps({"text": text}, ensure_ascii=False) + "\n"
+        payload = {"text": text}
+        if duration is not None:
+            payload["duration"] = round(duration, 3)
+        return json.dumps(payload, ensure_ascii=False) + "\n"
     return text + "\n"
 
 
@@ -155,6 +199,7 @@ def stream_transcription(
     language: Optional[str],
     hotwords: Optional[str],
     response_format: Optional[str],
+    audio_duration: float,
 ):
     try:
         with tempfile.TemporaryDirectory(prefix="funasr-stream-") as chunk_dir:
@@ -166,9 +211,17 @@ def stream_transcription(
                 elapsed = time.time() - start
                 first_result = result[0] if result else {}
                 text = clean_text(first_result.get("text", ""))
-                logger.info("Streamed FunASR chunk %s/%s in %.1fs", index, total_chunks, elapsed)
-                if text:
-                    yield format_stream_chunk(text, response_format)
+                is_final = index == total_chunks
+                logger.info(
+                    "Streamed FunASR chunk %s/%s in %.1fs; audio_duration=%.3fs",
+                    index,
+                    total_chunks,
+                    elapsed,
+                    audio_duration,
+                )
+                if text or (is_final and response_format in {"json", "verbose_json"}):
+                    duration = audio_duration if is_final and response_format in {"json", "verbose_json"} else None
+                    yield format_stream_chunk(text, response_format, duration)
     except Exception as exc:
         logger.exception("Streaming transcription error")
         yield format_stream_chunk(f"[ERROR] {exc}", response_format)
@@ -197,23 +250,27 @@ async def transcribe(
             tmp.write(content)
             tmp_path = tmp.name
 
+        audio_duration = probe_audio_duration(tmp_path)
+
         if stream:
             tmp_path_for_stream = tmp_path
             tmp_path = ""
             media_type = "application/x-ndjson" if response_format in {"json", "verbose_json"} else "text/plain"
             return StreamingResponse(
-                stream_transcription(tmp_path_for_stream, language, hotwords, response_format),
+                stream_transcription(tmp_path_for_stream, language, hotwords, response_format, audio_duration),
                 media_type=media_type,
+                headers=audio_duration_headers(audio_duration),
             )
 
         start = time.time()
         result = transcribe_files([tmp_path], language, hotwords)
         elapsed = time.time() - start
+        logger.info("Transcribed FunASR request in %.1fs; audio_duration=%.3fs", elapsed, audio_duration)
 
         first_result = result[0] if result else {}
         text = clean_text(first_result.get("text", ""))
         if response_format == "text":
-            return PlainTextResponse(text)
+            return PlainTextResponse(text, headers=audio_duration_headers(audio_duration))
 
         if response_format == "verbose_json":
             segments = []
@@ -231,12 +288,13 @@ async def transcribe(
                     "text": text,
                     "segments": segments,
                     "language": language or "auto",
-                    "duration": round(elapsed, 3),
+                    "duration": round(audio_duration, 3),
                     "model": model or MODEL_ID,
-                }
+                },
+                headers=audio_duration_headers(audio_duration),
             )
 
-        return JSONResponse({"text": text})
+        return JSONResponse({"text": text}, headers=audio_duration_headers(audio_duration))
     except Exception as exc:
         logger.exception("Transcription error")
         raise HTTPException(status_code=500, detail=str(exc)) from exc

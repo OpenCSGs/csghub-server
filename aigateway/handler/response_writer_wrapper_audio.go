@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strings"
 
+	audioadapter "opencsg.com/csghub-server/aigateway/component/adapter/audio"
 	"opencsg.com/csghub-server/aigateway/handler/streamdecoder"
 	"opencsg.com/csghub-server/aigateway/token"
 	commontypes "opencsg.com/csghub-server/common/types"
@@ -23,11 +24,11 @@ type audioResponseWriter interface {
 	DurationSeconds() (float64, bool)
 }
 
-func NewResponseWriterWrapperAudio(internalWritter http.ResponseWriter, tokenCounter *token.AudioUsageCounter, useStream bool) audioResponseWriter {
+func NewResponseWriterWrapperAudio(internalWritter http.ResponseWriter, tokenCounter *token.AudioUsageCounter, useStream bool, adapter audioadapter.Adapter) audioResponseWriter {
 	if useStream {
-		return newStreamAudioResponseWriter(internalWritter, tokenCounter)
+		return newStreamAudioResponseWriter(internalWritter, tokenCounter, adapter)
 	}
-	return newNonStreamAudioResponseWriter(internalWritter, tokenCounter)
+	return newNonStreamAudioResponseWriter(internalWritter, tokenCounter, adapter)
 }
 
 type nonStreamAudioResponseWriter struct {
@@ -37,13 +38,15 @@ type nonStreamAudioResponseWriter struct {
 	statusCode      int
 	durationSeconds float64
 	hasDuration     bool
+	adapter         audioadapter.Adapter
 }
 
-func newNonStreamAudioResponseWriter(internalWritter http.ResponseWriter, tokenCounter *token.AudioUsageCounter) *nonStreamAudioResponseWriter {
+func newNonStreamAudioResponseWriter(internalWritter http.ResponseWriter, tokenCounter *token.AudioUsageCounter, adapter audioadapter.Adapter) *nonStreamAudioResponseWriter {
 	return &nonStreamAudioResponseWriter{
 		internalWritter: internalWritter,
 		tokenCounter:    tokenCounter,
 		statusCode:      http.StatusOK,
+		adapter:         adapter,
 	}
 }
 
@@ -53,6 +56,7 @@ func (rw *nonStreamAudioResponseWriter) Header() http.Header {
 
 func (rw *nonStreamAudioResponseWriter) WriteHeader(statusCode int) {
 	rw.statusCode = statusCode
+	rw.captureDurationFromHeader()
 	rw.internalWritter.WriteHeader(statusCode)
 }
 
@@ -129,6 +133,9 @@ func (rw *nonStreamAudioResponseWriter) captureText(data []byte) {
 }
 
 func (rw *nonStreamAudioResponseWriter) captureDuration(candidates ...*float64) {
+	if rw == nil || rw.hasDuration {
+		return
+	}
 	for _, candidate := range candidates {
 		if candidate != nil && *candidate > 0 {
 			rw.durationSeconds = *candidate
@@ -138,6 +145,15 @@ func (rw *nonStreamAudioResponseWriter) captureDuration(candidates ...*float64) 
 			}
 			return
 		}
+	}
+}
+
+func (rw *nonStreamAudioResponseWriter) captureDurationFromHeader() {
+	if rw == nil || rw.adapter == nil || rw.hasDuration {
+		return
+	}
+	if duration, ok := rw.adapter.DurationFromHeader(rw.Header()); ok {
+		rw.captureDuration(&duration)
 	}
 }
 
@@ -167,13 +183,15 @@ type streamAudioResponseWriter struct {
 	hasDuration     bool
 	streamStarted   bool
 	accumulatedText string
+	adapter         audioadapter.Adapter
 }
 
-func newStreamAudioResponseWriter(internalWritter http.ResponseWriter, tokenCounter *token.AudioUsageCounter) *streamAudioResponseWriter {
+func newStreamAudioResponseWriter(internalWritter http.ResponseWriter, tokenCounter *token.AudioUsageCounter, adapter audioadapter.Adapter) *streamAudioResponseWriter {
 	return &streamAudioResponseWriter{
 		internalWritter: internalWritter,
 		tokenCounter:    tokenCounter,
 		statusCode:      http.StatusOK,
+		adapter:         adapter,
 	}
 }
 
@@ -183,6 +201,7 @@ func (rw *streamAudioResponseWriter) Header() http.Header {
 
 func (rw *streamAudioResponseWriter) WriteHeader(statusCode int) {
 	rw.statusCode = statusCode
+	rw.captureDurationFromHeader()
 	rw.internalWritter.Header().Del("Content-Length")
 
 	ct := rw.internalWritter.Header().Get("Content-Type")
@@ -275,6 +294,9 @@ func (rw *streamAudioResponseWriter) handleStreamPayload(payload, raw []byte) er
 }
 
 func (rw *streamAudioResponseWriter) captureDuration(candidates ...*float64) {
+	if rw == nil || rw.hasDuration {
+		return
+	}
 	for _, candidate := range candidates {
 		if candidate != nil && *candidate > 0 {
 			rw.durationSeconds = *candidate
@@ -284,6 +306,15 @@ func (rw *streamAudioResponseWriter) captureDuration(candidates ...*float64) {
 			}
 			return
 		}
+	}
+}
+
+func (rw *streamAudioResponseWriter) captureDurationFromHeader() {
+	if rw == nil || rw.adapter == nil || rw.hasDuration {
+		return
+	}
+	if duration, ok := rw.adapter.DurationFromHeader(rw.Header()); ok {
+		rw.captureDuration(&duration)
 	}
 }
 

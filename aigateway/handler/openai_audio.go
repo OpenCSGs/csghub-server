@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	audioadapter "opencsg.com/csghub-server/aigateway/component/adapter/audio"
 	llmtrace "opencsg.com/csghub-server/aigateway/component/trace"
 	"opencsg.com/csghub-server/aigateway/token"
 	"opencsg.com/csghub-server/aigateway/types"
@@ -129,6 +130,7 @@ func (h *OpenAIHandlerImpl) Transcription(c *gin.Context) {
 			"stream": strconv.FormatBool(isStream),
 		},
 	}
+	adapter := h.audioAdapter(modelTarget.Model)
 	body, contentType, _ := rewriteMultipartModelStreamWithOptions(form, modelTarget.ModelName, options)
 	c.Request.Body = body
 	c.Request.ContentLength = -1
@@ -160,7 +162,7 @@ func (h *OpenAIHandlerImpl) Transcription(c *gin.Context) {
 	slog.InfoContext(ctx, "proxy audio transcription request to model endpoint", slog.Any("target", modelTarget.Target), slog.Any("host", modelTarget.Host), slog.Any("user", username), slog.Any("model_id", modelID), slog.Any("model_name", modelTarget.ModelName))
 
 	audioCounter := token.NewAudioUsageCounter(token.NewTokenizerImpl(modelTarget.Target, modelTarget.Host, modelTarget.ModelName, modelTarget.Model.ImageID, modelTarget.Model.Provider))
-	w := NewResponseWriterWrapperAudio(c.Writer, audioCounter, isStream)
+	w := NewResponseWriterWrapperAudio(c.Writer, audioCounter, isStream, adapter)
 	rp.ServeHTTP(w, c.Request, proxyToApi, modelTarget.Host)
 
 	go func() {
@@ -197,4 +199,13 @@ func (h *OpenAIHandlerImpl) Transcription(c *gin.Context) {
 			}
 		}
 	}()
+}
+
+func (h *OpenAIHandlerImpl) audioAdapter(model *types.Model) audioadapter.Adapter {
+	if h != nil && h.audioRegistry != nil {
+		if adapter := h.audioRegistry.GetAdapter(model); adapter != nil {
+			return adapter
+		}
+	}
+	return audioadapter.NewOpenAICompatibleAdapter()
 }
