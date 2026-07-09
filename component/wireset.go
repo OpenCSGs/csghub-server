@@ -459,6 +459,7 @@ func NewTestMultiSyncComponent(config *config.Config, stores *tests.MockStores, 
 		promptStore:      stores.Prompt,
 		mcpStore:         stores.MCPServerStore,
 		skillStore:       stores.Skill,
+		metadataStore:    stores.Metadata,
 		gitServer:        gitServer,
 	}
 }
