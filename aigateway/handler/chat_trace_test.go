@@ -118,6 +118,38 @@ func TestPreflightTraceRecordsEarlyError(t *testing.T) {
 	requireSpanAttrValue(t, spans[0].Attributes, "error.category", "gateway_error")
 }
 
+func TestPreflightTraceRecordsModalPriceGuardError(t *testing.T) {
+	exporter := tracetest.NewInMemoryExporter()
+	provider := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exporter))
+	oldProvider := otel.GetTracerProvider()
+	otel.SetTracerProvider(provider)
+	t.Cleanup(func() {
+		otel.SetTracerProvider(oldProvider)
+		_ = provider.Shutdown(context.Background())
+	})
+
+	_, preflight := startPreflightTrace(context.Background(), preflightTraceStart{
+		API:       "/v1/images/generations",
+		RequestID: "req-1",
+		UserID:    "user-1",
+	})
+	preflight.SetTargetModel("model1", &resolvedModelTarget{
+		Model:     &types.Model{BaseModel: types.BaseModel{ID: "internal-model"}},
+		ModelName: "resolved-model",
+	})
+	preflight.RecordError(newInvalidRequestModelTargetError(
+		"invalid_request_error",
+		"resolution exceeds the maximum supported resolution",
+		modelTargetErrorOptions{},
+	), "modal_price_guard")
+
+	spans := exporter.GetSpans()
+	require.Len(t, spans, 1)
+	require.Equal(t, "Error", spans[0].Status.Code.String())
+	requireSpanAttrValue(t, spans[0].Attributes, "error.type", "modal_price_guard")
+	requireSpanAttrValue(t, spans[0].Attributes, "aigateway.request.model", "model1")
+}
+
 func TestPreflightTraceRecordsResolvedTargetModel(t *testing.T) {
 	exporter := tracetest.NewInMemoryExporter()
 	provider := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exporter))

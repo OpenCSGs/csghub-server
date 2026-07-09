@@ -313,6 +313,7 @@ type ModelModalPrice struct {
 	SkuUnit      int64   `json:"sku_unit,omitempty"`
 	SkuUnitType  string  `json:"sku_unit_type,omitempty"`
 	Resolution   string  `json:"resolution,omitempty"`
+	SkuDesc      string  `json:"sku_desc,omitempty"`
 }
 
 // ModelScenePrice is Metadata["pricing"]: serverless and external_llm use token and modal generation prices.
