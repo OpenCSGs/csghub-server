@@ -172,8 +172,10 @@ func (as *accountStatementStoreImpl) chargeFeeStatement(ctx context.Context, inp
 			}
 		}
 
+		cashValue := 0.0
 		if input.Scene == types.SceneCashCharge {
 			input.BalanceValue = acctUser.CashBalance
+			cashValue = input.Value
 		} else {
 			input.BalanceValue = acctUser.Balance
 		}
@@ -181,6 +183,17 @@ func (as *accountStatementStoreImpl) chargeFeeStatement(ctx context.Context, inp
 		err = assertAffectedOneRow(tx.NewInsert().Model(&input).Exec(ctx))
 		if err != nil {
 			return fmt.Errorf("insert statement, error:%w", err)
+		}
+
+		err = updateFeeBill(ctx, tx, input, BillValues{
+			TotalValue:   input.Value,
+			VoucherValue: 0,
+			CashValue:    cashValue,
+			Consumption:  input.Consumption,
+		})
+
+		if err != nil {
+			return fmt.Errorf("update account bill for charge, error: %w", err)
 		}
 		return nil
 	})
@@ -235,7 +248,7 @@ func (as *accountStatementStoreImpl) deductFeeStatement(ctx context.Context, inp
 		})
 
 		if err != nil {
-			return fmt.Errorf("update account bill, error: %w", err)
+			return fmt.Errorf("update account bill for consume, error: %w", err)
 		}
 
 		isCSGUsage := utils.IsNeedCheckUserSubscription(input.Scene)
@@ -564,6 +577,10 @@ func updateFeeBill(ctx context.Context, tx bun.Tx, input AccountStatement, billV
 	if !utils.IsNeedCalculateBill(input.Scene) {
 		return nil
 	}
+	billRes, err := GetConsumeResource(ctx, tx, input)
+	if err != nil {
+		return fmt.Errorf("get consume resource for %s user %s, error:%w", input.EventUUID, input.UserUUID, err)
+	}
 	if billValues.TotalValue != 0 {
 		// calculate bill
 		bill := AccountBill{
@@ -583,6 +600,8 @@ func updateFeeBill(ctx context.Context, tx bun.Tx, input AccountStatement, billV
 			VoucherNo:       input.VoucherNo,
 			VoucherValue:    billValues.VoucherValue,
 			CashValue:       billValues.CashValue,
+			ClusterID:       billRes.ClusterID,
+			HardwareType:    billRes.HardwareType,
 		}
 		if input.Scene == types.SceneMultiModalServerless {
 			bill.UnitType = input.SkuUnitType
@@ -590,7 +609,7 @@ func updateFeeBill(ctx context.Context, tx bun.Tx, input AccountStatement, billV
 
 		// depend on unique index for update
 		_, err := tx.NewInsert().Model(&bill).
-			On("CONFLICT (bill_date, user_uuid, scene, customer_id, token_id, data_type, resolution, voucher_no, unit_type) DO UPDATE").
+			On("CONFLICT (bill_date, user_uuid, scene, customer_id, token_id, data_type, resolution, voucher_no, unit_type, cluster_id, hardware_type) DO UPDATE").
 			Set("value = account_bill.value + ?", billValues.TotalValue).
 			Set("consumption = account_bill.consumption + ?", billValues.Consumption).
 			Set("prompt_token = account_bill.prompt_token + ?", input.PromptToken).
@@ -614,6 +633,33 @@ func updateFeeBill(ctx context.Context, tx bun.Tx, input AccountStatement, billV
 	}
 
 	return nil
+}
+
+func GetConsumeResource(ctx context.Context, tx bun.Tx, input AccountStatement) (BillResource, error) {
+	var err error
+	var res SpaceResource
+	billResource := BillResource{}
+
+	if !utils.IsNeedExtractHardware(input.Scene) {
+		// skip extract hardware type for scene that not need it
+		return billResource, nil
+	}
+
+	res.ID, err = strconv.ParseInt(input.ResourceID, 10, 64)
+	if err != nil {
+		return billResource, fmt.Errorf("parse resource id %s to int64 for bill, error:%w", input.ResourceID, err)
+	}
+	_, err = tx.NewSelect().Model(&res).WherePK().Exec(ctx, &res)
+	if err != nil {
+		return billResource, fmt.Errorf("query space resource id %d for bill, error:%w", res.ID, err)
+	}
+	hwType, err := types.GetHardwareType(res.Resources)
+	if err != nil {
+		return billResource, fmt.Errorf("extract hardware type from resource id %d for bill, error:%w", res.ID, err)
+	}
+	billResource.ClusterID = res.ClusterID
+	billResource.HardwareType = hwType
+	return billResource, nil
 }
 
 func (as *accountStatementStoreImpl) ListByUserIDAndTime(ctx context.Context, req types.ActStatementsReq) (AccountStatementRes, error) {

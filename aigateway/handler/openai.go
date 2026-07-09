@@ -19,6 +19,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/openai/openai-go/v3"
 	"opencsg.com/csghub-server/aigateway/component"
+	audioadapter "opencsg.com/csghub-server/aigateway/component/adapter/audio"
 	"opencsg.com/csghub-server/aigateway/component/adapter/text2image"
 	"opencsg.com/csghub-server/aigateway/component/adapter/text2video"
 	"opencsg.com/csghub-server/aigateway/component/availability"
@@ -98,7 +99,7 @@ func NewOpenAIHandlerFromConfig(config *config.Config) (OpenAIHandler, error) {
 	storage, _ := component.NewStorage(config)
 	whitelistRule := database.NewRepositoryFileCheckRuleStore()
 	aiGenerationStore := database.NewAIGenerationStore()
-	handler := newOpenAIHandler(modelService, repoComp, modComponent, clusterComp, token.NewCounterFactory(), text2image.NewRegistry(), text2video.NewRegistry(), config, storage, whitelistRule, aiGenerationStore)
+	handler := newOpenAIHandler(modelService, repoComp, modComponent, clusterComp, token.NewCounterFactory(), text2image.NewRegistry(), text2video.NewRegistry(), audioadapter.NewRegistry(), config, storage, whitelistRule, aiGenerationStore)
 
 	if config.AIGateway.EnableLLMTrace && config.Instrumentation.OTLPEndpoint != "" {
 		llmTracer, traceErr := llmtrace.NewSigilTracer(llmtrace.SigilConfig{
@@ -135,6 +136,7 @@ func newOpenAIHandler(
 	tokenCounterFactory token.CounterFactory,
 	t2iRegistry *text2image.Registry,
 	t2vRegistry *text2video.Registry,
+	audioRegistry *audioadapter.Registry,
 	config *config.Config,
 	storage types.Storage,
 	whitelistRule database.RepositoryFileCheckRuleStore,
@@ -148,6 +150,7 @@ func newOpenAIHandler(
 		tokenCounterFactory:        tokenCounterFactory,
 		t2iRegistry:                t2iRegistry,
 		t2vRegistry:                t2vRegistry,
+		audioRegistry:              audioRegistry,
 		config:                     config,
 		storage:                    storage,
 		whitelistRule:              whitelistRule,
@@ -244,6 +247,7 @@ type OpenAIHandlerImpl struct {
 	tokenCounterFactory        token.CounterFactory
 	t2iRegistry                *text2image.Registry
 	t2vRegistry                *text2video.Registry
+	audioRegistry              *audioadapter.Registry
 	config                     *config.Config
 	storage                    types.Storage
 	whitelistRule              database.RepositoryFileCheckRuleStore

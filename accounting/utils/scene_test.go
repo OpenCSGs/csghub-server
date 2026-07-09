@@ -15,9 +15,9 @@ func TestScene_IsNeedCalculateBill(t *testing.T) {
 		types.SceneModelFinetune,
 		types.SceneEvaluation,
 		types.SceneModelServerless,
-		types.SceneStarship,
-		types.SceneGuiAgent,
-		// types.SceneAgenticHub,
+		types.SceneMultiModalServerless,
+		types.ScenePortalCharge,
+		types.SceneCashCharge,
 	}
 
 	for _, scene := range scenes {
@@ -27,10 +27,10 @@ func TestScene_IsNeedCalculateBill(t *testing.T) {
 
 	scenes = []types.SceneType{
 		types.SceneReserve,
-		types.ScenePortalCharge,
 		types.ScenePayOrder,
-		types.SceneCashCharge,
 		types.SceneMultiSync,
+		types.SceneStarship,
+		types.SceneGuiAgent,
 		types.SceneUnknow,
 	}
 

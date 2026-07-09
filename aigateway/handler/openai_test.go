@@ -30,6 +30,7 @@ import (
 	mockdatabase "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/database"
 	apicomp "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
 	comp "opencsg.com/csghub-server/aigateway/component"
+	audioadapter "opencsg.com/csghub-server/aigateway/component/adapter/audio"
 	"opencsg.com/csghub-server/aigateway/component/adapter/text2image"
 	"opencsg.com/csghub-server/aigateway/component/adapter/text2video"
 	llmtrace "opencsg.com/csghub-server/aigateway/component/trace"
@@ -95,7 +96,7 @@ func setupTest(t *testing.T) (*testerOpenAIHandler, *gin.Context, *httptest.Resp
 	cfg := &config.Config{}
 	mockWhitelistRule := mockdatabase.NewMockRepositoryFileCheckRuleStore(t)
 	mockAIGenerationStore := mockdatabase.NewMockAIGenerationStore(t)
-	handler := newOpenAIHandler(mockOpenAI, mockRepo, mockModeration, mockClsComp, mockTokenCounterFactory, text2image.NewRegistry(), text2video.NewRegistry(), cfg, nil, mockWhitelistRule, mockAIGenerationStore)
+	handler := newOpenAIHandler(mockOpenAI, mockRepo, mockModeration, mockClsComp, mockTokenCounterFactory, text2image.NewRegistry(), text2video.NewRegistry(), audioadapter.NewRegistry(), cfg, nil, mockWhitelistRule, mockAIGenerationStore)
 
 	// Set test user
 	tester := &testerOpenAIHandler{
@@ -1561,6 +1562,60 @@ func TestOpenAIHandler_Transcription(t *testing.T) {
 		require.Equal(t, int64(423), usage.TotalTokens)
 		require.Empty(t, errorCode)
 		require.Equal(t, []string{"response", "usage", "end"}, events)
+	})
+
+	t.Run("funasr text response uses duration header for billing", func(t *testing.T) {
+		tester, c, w := setupTest(t)
+
+		var downstreamResponseFormat string
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			require.Equal(t, "/v1/audio/transcriptions", r.URL.Path)
+			require.NoError(t, r.ParseMultipartForm(32<<20))
+			downstreamResponseFormat = r.FormValue("response_format")
+			require.Equal(t, "backend-model", r.FormValue("model"))
+			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+			w.Header().Set("Audio-Duration-Seconds", "9.2")
+			_, _ = w.Write([]byte("hello world"))
+		}))
+		defer server.Close()
+
+		c.Request = newMultipartTranscriptionRequest(t, "model1", "audio-bytes", map[string]string{
+			"response_format": "text",
+		})
+		model := &types.Model{
+			BaseModel: types.BaseModel{
+				ID:       "backend-model",
+				Object:   "model",
+				Metadata: map[string]any{},
+				Task:     "audio-transcription",
+			},
+			InternalModelInfo: types.InternalModelInfo{
+				RuntimeFramework: "funasr",
+			},
+			Endpoint: server.URL + "/v1/audio/transcriptions",
+			Upstreams: []commontypes.UpstreamConfig{
+				{URL: server.URL + "/v1/audio/transcriptions", Enabled: true, ModelName: "backend-model"},
+			},
+		}
+
+		var wg sync.WaitGroup
+		wg.Add(1)
+		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "model1").Return(model, nil).Once()
+		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil).Once()
+		tester.mocks.openAIComp.EXPECT().RecordUsageFromTokenUsage(mock.Anything, "testuuid", model, mock.Anything, mock.MatchedBy(func(usage *token.Usage) bool {
+			return usage != nil && usage.Duration == 9.2 && usage.CompletionDesc == "hello world"
+		}), "").RunAndReturn(
+			func(ctx context.Context, userUUID string, model *types.Model, targetModelName string, usage *token.Usage, apikey string) error {
+				wg.Done()
+				return nil
+			}).Once()
+
+		tester.handler.Transcription(c)
+		wg.Wait()
+
+		require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+		require.Equal(t, "hello world", w.Body.String())
+		require.Equal(t, "text", downstreamResponseFormat)
 	})
 
 	t.Run("missing model", func(t *testing.T) {
