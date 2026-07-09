@@ -933,12 +933,16 @@ func (d *deployer) SubmitClawEvaluation(ctx context.Context, req types.ClawEvalu
 	} else {
 		env["CLAW_EVAL_TASKS"] = types.ClawEvalTasksNormal
 	}
-	if req.Trials > 0 {
-		env["CLAW_EVAL_TRIALS"] = strconv.Itoa(req.Trials)
+	trials := req.Trials
+	if trials <= 0 {
+		trials = types.ClawEvalDefaultTrials
 	}
-	if req.Parallel > 0 {
-		env["CLAW_EVAL_PARALLEL"] = strconv.Itoa(req.Parallel)
+	env["CLAW_EVAL_TRIALS"] = strconv.Itoa(trials)
+	parallel := req.Parallel
+	if parallel <= 0 {
+		parallel = types.ClawEvalDefaultParallel
 	}
+	env["CLAW_EVAL_PARALLEL"] = strconv.Itoa(parallel)
 	if req.JudgeModel != "" {
 		env["CLAW_EVAL_JUDGE_MODEL"] = req.JudgeModel
 	} else if !req.NoJudge {

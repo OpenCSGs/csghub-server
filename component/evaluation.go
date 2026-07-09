@@ -406,6 +406,9 @@ func (c *evaluationComponentImpl) OrgEvaluations(ctx context.Context, req *types
 
 func (c *evaluationComponentImpl) createClawEvaluation(ctx context.Context, req types.EvaluationReq, user database.User, frame *database.RuntimeFramework) (*types.ArgoWorkFlowRes, error) {
 	operatorUsername := req.Username
+	if req.Model == "" {
+		req.Model = req.ModelId
+	}
 	if req.TaskName == "" {
 		return nil, fmt.Errorf("task_name is required")
 	}
@@ -477,8 +480,27 @@ func (c *evaluationComponentImpl) createClawEvaluation(ctx context.Context, req 
 	req.TaskType = types.TaskTypeClawEval
 
 	clawReq := req.ToClawEvaluationReq()
+	var defaultAPIKey string
+	resolveDefaultAPIKey := func() (string, error) {
+		if defaultAPIKey != "" {
+			return defaultAPIKey, nil
+		}
+		apiKey, err := c.resolveClawEvalAIGatewayAPIKey(ctx, billingUUID, req.OwnerNamespace, operatorUsername)
+		if err != nil {
+			return "", err
+		}
+		defaultAPIKey = apiKey
+		return defaultAPIKey, nil
+	}
+	if clawReq.ApiKey == "" {
+		apiKey, err := resolveDefaultAPIKey()
+		if err != nil {
+			return nil, err
+		}
+		clawReq.ApiKey = apiKey
+	}
 	if !req.NoJudge {
-		judgeAPIKey, err := c.resolveClawEvalJudgeAPIKey(ctx, billingUUID, req.OwnerNamespace, operatorUsername)
+		judgeAPIKey, err := resolveDefaultAPIKey()
 		if err != nil {
 			return nil, err
 		}
@@ -488,7 +510,7 @@ func (c *evaluationComponentImpl) createClawEvaluation(ctx context.Context, req 
 	return c.deployer.SubmitClawEvaluation(ctx, clawReq)
 }
 
-func (c *evaluationComponentImpl) resolveClawEvalJudgeAPIKey(ctx context.Context, billingUUID, ownerNamespace, operatorUsername string) (string, error) {
+func (c *evaluationComponentImpl) resolveClawEvalAIGatewayAPIKey(ctx context.Context, billingUUID, ownerNamespace, operatorUsername string) (string, error) {
 	token, err := c.tokenStore.FindBuiltinByNsUUID(ctx, billingUUID, string(types.AccessTokenAppAIGateway))
 	if err == nil && token != nil && token.Token != "" {
 		return token.Token, nil
@@ -505,10 +527,10 @@ func (c *evaluationComponentImpl) resolveClawEvalJudgeAPIKey(ctx context.Context
 		"claw-eval",
 	)
 	if err != nil {
-		return "", fmt.Errorf("failed to resolve judge api key, %w", err)
+		return "", fmt.Errorf("failed to resolve claw-eval api key, %w", err)
 	}
 	if apiKey == "" {
-		return "", fmt.Errorf("failed to resolve judge api key")
+		return "", fmt.Errorf("failed to resolve claw-eval api key")
 	}
 	return apiKey, nil
 }

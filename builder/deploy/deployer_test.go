@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -861,20 +862,24 @@ func TestDeployer_SubmitClawEvaluation(t *testing.T) {
 			require.Equal(t, "http://aigateway.test/v1", env["CLAW_EVAL_JUDGE_BASE_URL"])
 			require.Equal(t, "gk-judge-key", env["CLAW_EVAL_JUDGE_API_KEY"])
 			require.Equal(t, "1-9", env["CLAW_EVAL_TASKS"])
+			require.Equal(t, "2", env["CLAW_EVAL_TRIALS"])
+			require.Equal(t, "3", env["CLAW_EVAL_PARALLEL"])
 			require.Equal(t, types.ClawEvalDefaultJudgeModel, env["CLAW_EVAL_JUDGE_MODEL"])
 			return &types.ArgoWorkFlowRes{ID: 2}, nil
 		},
 	)
 	resp, err := tester.SubmitClawEvaluation(ctx, types.ClawEvaluationReq{
-		ClusterID:      "cluster-1",
-		Model:          "glm-5.1",
-		BaseURL:        "http://localhost:11435/v1",
-		ApiKey:         "sk-test",
-		Tasks:          "1-9",
-		JudgeBaseURL:   "http://aigateway.test/v1",
-		JudgeApiKey:    "gk-judge-key",
-		TaskType:       types.TaskTypeClawEval,
-		Image:          "opencsghq/claw-eval:1.0.0",
+		ClusterID:    "cluster-1",
+		Model:        "glm-5.1",
+		BaseURL:      "http://localhost:11435/v1",
+		ApiKey:       "sk-test",
+		Tasks:        "1-9",
+		Trials:       2,
+		Parallel:     3,
+		JudgeBaseURL: "http://aigateway.test/v1",
+		JudgeApiKey:  "gk-judge-key",
+		TaskType:     types.TaskTypeClawEval,
+		Image:        "opencsghq/claw-eval:1.0.0",
 	})
 	require.NoError(t, err)
 	require.Equal(t, &types.ArgoWorkFlowRes{ID: 2}, resp)
@@ -889,6 +894,8 @@ func TestDeployer_SubmitClawEvaluation_DefaultTasksNormal(t *testing.T) {
 		func(ctx context.Context, awfr *types.ArgoWorkFlowReq) (*types.ArgoWorkFlowRes, error) {
 			env := awfr.Templates[0].Env
 			require.Equal(t, types.ClawEvalTasksNormal, env["CLAW_EVAL_TASKS"])
+			require.Equal(t, strconv.Itoa(types.ClawEvalDefaultTrials), env["CLAW_EVAL_TRIALS"])
+			require.Equal(t, strconv.Itoa(types.ClawEvalDefaultParallel), env["CLAW_EVAL_PARALLEL"])
 			return &types.ArgoWorkFlowRes{ID: 3}, nil
 		},
 	)
