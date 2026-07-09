@@ -819,7 +819,9 @@ func (a *DeployActivity) makeDeployEnv(ctx context.Context, hardware types.HardW
 		envMap["HF_ENDPOINT"] = a.cfg.ModelDownloadEndpoint // "https://hub.opencsg-stg.com/"
 		envMap["HF_HUB_OFFLINE"] = "1"
 		envMap["HF_TASK"] = string(deployInfo.Task)
-		envMap["VLLM_ENFORCE_EAGER"] = "1"
+		if vllmEnforceEagerEnabled(deployInfo.EngineArgs) {
+			envMap["VLLM_ENFORCE_EAGER"] = "1"
+		}
 	}
 
 	if deployInfo.Type == types.FinetuneType {
@@ -847,6 +849,28 @@ func (a *DeployActivity) makeDeployEnv(ctx context.Context, hardware types.HardW
 	}
 
 	return envMap, nil
+}
+
+// vllmEnforceEagerEnabled reports whether single-node vLLM should run with --enforce-eager.
+// Disabled by default; set engine_args "enforce-eager" to enable/true/1 to turn it on.
+func vllmEnforceEagerEnabled(engineArgs string) bool {
+	if engineArgs == "" {
+		return false
+	}
+	argValuesMap, err := utilcommon.JsonStrToMap(engineArgs)
+	if err != nil {
+		return false
+	}
+	value, ok := argValuesMap["enforce-eager"]
+	if !ok {
+		return false
+	}
+	switch value {
+	case "enable", "true", "1":
+		return true
+	default:
+		return false
+	}
 }
 
 // getModelArchitecture reads the model architecture from metadata

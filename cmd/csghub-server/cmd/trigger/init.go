@@ -14,6 +14,7 @@ func init() {
 	Cmd.AddCommand(
 		gitCallbackCmd,
 		fixOrgDataCmd,
+		fixOrgCasdoorUserCmd,
 		fixUserDataCmd,
 		updateRepoCmd,
 		fixRepoSourceCmd,

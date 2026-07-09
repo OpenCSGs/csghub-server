@@ -42,6 +42,10 @@ func parseResolutionWxHPair(s string) (width, height int64, ok bool) {
 	matches := resolutionWxHFormat.FindStringSubmatch(s)
 	if matches == nil {
 		return 0, 0, false
+func parseResolutionWxHFormat(s string) (int64, bool) {
+	matches := resolutionWxHFormat.FindStringSubmatch(s)
+	if matches == nil {
+		return 0, false
 	}
 	w, err1 := strconv.ParseInt(matches[1], 10, 64)
 	h, err2 := strconv.ParseInt(matches[2], 10, 64)
@@ -57,6 +61,12 @@ func parseResolutionWxHFormat(s string) (int64, bool) {
 		return 0, false
 	}
 	return longEdge(w, h), true
+		return 0, false
+	}
+	if w > h {
+		return w, true
+	}
+	return h, true
 }
 
 func parseResolutionPureFormat(s string) (int64, bool) {

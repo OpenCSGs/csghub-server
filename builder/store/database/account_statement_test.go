@@ -426,7 +426,7 @@ func TestAccountStatementStore_ListGroupedByUserAndSku(t *testing.T) {
 
 	res, total, err := store.ListStatementByUserAndSku(ctx, types.ActStatementsReq{
 		UserUUID:     "user1",
-		Scene:        int(types.SceneCashCharge),
+		Scene:        types.SceneCashCharge,
 		InstanceName: "cust1",
 		StartTime:    dt.Add(-time.Hour).Format(time.RFC3339),
 		EndTime:      dt.Add(time.Hour).Format(time.RFC3339),

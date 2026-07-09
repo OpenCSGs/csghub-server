@@ -94,7 +94,7 @@
     },
     {
       "name": "enforce-eager",
-      "value": "enable",
+      "value": "disable",
       "format": "--enforce-eager"
     },
     {
@@ -382,6 +382,7 @@
     "DeepseekV32ForCausalLM": "deepseek_v32",
     "DeepseekV4ForCausalLM": "deepseek_v4",
     "Ernie4_5ForCausalLM": "ernie45",
+    "GlmMoeDsaForCausalLM": "glm47",
     "Glm4ForCausalLM": "glm47",
     "Glm4MoeForCausalLM": "glm45",
     "GptOssForCausalLM": "openai",

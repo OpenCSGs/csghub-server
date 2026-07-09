@@ -100,17 +100,32 @@ func (s *accountBillStoreImpl) ListByUserIDAndDate(ctx context.Context, req type
 		ColumnExpr("sum(voucher_value) as voucher_value").
 		ColumnExpr("sum(cash_value) as cash_value").
 		ColumnExpr("sum(duration) as duration").
-		ColumnExpr("sum(count) as count").
-		ColumnExpr("MIN(bill_date) as bill_date").
-		Where("bill_date >= ? and bill_date <= ?", req.StartDate, req.EndDate).
-		Where("user_uuid = ?", req.TargetUUID).
-		Where("scene = ?", req.Scene)
+		ColumnExpr("sum(count) as count")
+
+	switch req.Scene {
+	case types.SceneEvaluation:
+		q = q.ColumnExpr("d.submit_time as created_at")
+		q = q.Join("LEFT JOIN argo_workflows d ON customer_id = d.task_id")
+	case types.SceneSpace, types.SceneModelInference, types.SceneModelFinetune:
+		q = q.ColumnExpr("d.created_at as created_at")
+		q = q.Join("LEFT JOIN deploys d ON customer_id = d.svc_name")
+	}
+
+	q = q.Where("account_bill.bill_date >= ? and account_bill.bill_date <= ?", req.StartDate, req.EndDate).
+		Where("account_bill.user_uuid = ?", req.TargetUUID).
+		Where("account_bill.scene = ?", req.Scene)
 
 	if len(req.InstanceName) > 0 {
 		q = q.Where("LOWER(customer_id) LIKE ?", "%"+strings.ToLower(req.InstanceName)+"%")
 	}
-
-	q = q.Group("customer_id", "data_type", "resolution", "unit_type")
+	switch req.Scene {
+	case types.SceneEvaluation:
+		q = q.Group("customer_id", "data_type", "resolution", "unit_type", "d.submit_time")
+	case types.SceneSpace, types.SceneModelInference, types.SceneModelFinetune:
+		q = q.Group("customer_id", "data_type", "resolution", "unit_type", "d.created_at")
+	default:
+		q = q.Group("customer_id", "data_type", "resolution", "unit_type")
+	}
 
 	count, err := q.Count(ctx)
 	if err != nil {
@@ -132,8 +147,14 @@ func (s *accountBillStoreImpl) ListByUserIDAndDate(ctx context.Context, req type
 	if err != nil {
 		return AccountBillRes{}, errorx.HandleDBError(err, nil)
 	}
-
-	err = q.Order("bill_date DESC").Order("customer_id").Limit(req.Per).Offset((req.Page-1)*req.Per).Scan(ctx, &res)
+	switch req.Scene {
+	case types.SceneEvaluation:
+		q = q.Order("d.submit_time DESC NULLS LAST")
+	case types.SceneSpace, types.SceneModelInference, types.SceneModelFinetune:
+		q = q.Order("d.created_at DESC NULLS LAST")
+	}
+	q = q.Order("customer_id")
+	err = q.Limit(req.Per).Offset((req.Page-1)*req.Per).Scan(ctx, &res)
 	if err != nil {
 		return AccountBillRes{}, errorx.HandleDBError(err, nil)
 	}
