@@ -12,6 +12,9 @@ type CreateCodeReq struct {
 	CreateRepoReq
 	// Code package SHA256 hash
 	CodePackageSHA256 string `json:"code_file"`
+	GitURL             string `json:"git_url"`
+	GitUsername        string `json:"git_username"`
+	GitPassword        string `json:"git_password"`
 }
 
 type UpdateCodeReq struct {
