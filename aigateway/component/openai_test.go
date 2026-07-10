@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -64,7 +65,7 @@ func TestFilterAndPaginateModels(t *testing.T) {
 		{BaseModel: types.BaseModel{ID: "gpt-4o:svc4", Object: "model", OwnedBy: "u3"}},
 	}
 
-	t.Run("no filters default pagination", func(t *testing.T) {
+	t.Run("no filters returns all models without pagination params", func(t *testing.T) {
 		resp := filterAndPaginateModels(models, types.ListModelsReq{})
 		assert.Equal(t, "list", resp.Object)
 		assert.Equal(t, 4, resp.TotalCount)
@@ -83,12 +84,33 @@ func TestFilterAndPaginateModels(t *testing.T) {
 	})
 
 	t.Run("pagination per/page applied after filters", func(t *testing.T) {
-		resp := filterAndPaginateModels(models, types.ListModelsReq{ModelID: "gpt", Per: "2", Page: "2"})
+		resp := filterAndPaginateModels(models, types.ListModelsReq{ModelID: "gpt", Per: 2, Page: 2})
 		// gpt matches 3 models; page=2 per=2 yields 1 item
 		assert.Equal(t, 3, resp.TotalCount)
 		assert.Len(t, resp.Data, 1)
 		assert.Equal(t, "gpt-4o:svc4", resp.Data[0].ID)
 		assert.False(t, resp.HasMore)
+	})
+
+	t.Run("pagination has more when more filtered models remain", func(t *testing.T) {
+		resp := filterAndPaginateModels(models, types.ListModelsReq{ModelID: "gpt", Per: 2, Page: 1})
+		assert.Equal(t, 3, resp.TotalCount)
+		require.Len(t, resp.Data, 2)
+		assert.Equal(t, "gpt-4:svc1", resp.Data[0].ID)
+		assert.Equal(t, "gpt-3.5:svc2", resp.Data[1].ID)
+		assert.True(t, resp.HasMore)
+	})
+
+	t.Run("per is capped at 100 when pagination is requested", func(t *testing.T) {
+		manyModels := make([]types.Model, 105)
+		for i := range manyModels {
+			manyModels[i] = types.Model{BaseModel: types.BaseModel{ID: fmt.Sprintf("model-%03d", i), Object: "model", OwnedBy: "u1"}}
+		}
+
+		resp := filterAndPaginateModels(manyModels, types.ListModelsReq{Per: 101, Page: 1})
+		assert.Equal(t, 105, resp.TotalCount)
+		assert.Len(t, resp.Data, 100)
+		assert.True(t, resp.HasMore)
 	})
 
 	t.Run("llm_types filter external_llm", func(t *testing.T) {
@@ -281,8 +303,8 @@ func TestFilterAndPaginateModels(t *testing.T) {
 			LLMTypes:           []string{types.ProviderTypeInference},
 			Task:               "text-generation",
 			HasAssociatedModel: &hasAssociatedModel,
-			Per:                "1",
-			Page:               "2",
+			Per:                1,
+			Page:               2,
 		})
 		assert.Equal(t, 2, resp.TotalCount)
 		require.Len(t, resp.Data, 1)
