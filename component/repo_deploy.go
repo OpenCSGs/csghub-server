@@ -12,13 +12,14 @@ import (
 	"strconv"
 	"strings"
 
+	"time"
+
 	"github.com/hashicorp/go-version"
 	"opencsg.com/csghub-server/builder/deploy"
 	deployStatus "opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
-	"time"
 	"opencsg.com/csghub-server/common/utils/common"
 )
 
@@ -403,14 +404,16 @@ func (c *repoComponentImpl) ListDeploy(ctx context.Context, repoType types.Repos
 }
 
 func (c *repoComponentImpl) DeleteDeploy(ctx context.Context, delReq types.DeployActReq) error {
+	repoPath := ""
 	if delReq.DeployType == types.ServerlessType {
 		repo, err := c.repoStore.FindByPath(ctx, delReq.RepoType, delReq.Namespace, delReq.Name)
 		if err != nil {
-			return fmt.Errorf("fail to find repo for serverless, %w", err)
+			return fmt.Errorf("failed to find repo for serverless, %w", err)
 		}
+		repoPath = repo.Path
 		d, err := c.deployTaskStore.GetServerlessDeployByRepID(ctx, repo.ID)
 		if err != nil {
-			return fmt.Errorf("fail to get deploy for serverless, %w", err)
+			return fmt.Errorf("failed to get deploy for serverless, %w", err)
 		}
 		if d != nil {
 			delReq.DeployID = d.ID
@@ -442,12 +445,12 @@ func (c *repoComponentImpl) DeleteDeploy(ctx context.Context, delReq types.Deplo
 	exist, err := c.deployer.Exist(ctx, deployRepo)
 	if err != nil {
 		//add deploy id and repo in the log
-		slog.Warn("fail to check deploy instance exist in remote cluster, will delete deploy instance in database", slog.Any("deploy id", delReq.DeployID), slog.Any("repo", deployRepo.Name))
+		slog.Warn("failed to check deploy instance exist in remote cluster, will delete deploy instance in database", slog.Any("deploy id", delReq.DeployID), slog.Any("repo", deployRepo.Name))
 	}
 
 	if exist && err == nil {
 		// fail to delete service
-		return errors.New("fail to delete service")
+		return errors.New("failed to delete service")
 	}
 
 	// update database deploy
@@ -458,18 +461,33 @@ func (c *repoComponentImpl) DeleteDeploy(ctx context.Context, delReq types.Deplo
 	}
 
 	if err != nil {
-		return fmt.Errorf("fail to remove deploy instance, %w", err)
+		return fmt.Errorf("failed to remove deploy instance %d error: %w", delReq.DeployID, err)
 	}
+
+	if delReq.DeployType == types.ServerlessType {
+		llmID := fmt.Sprintf(types.CSGHubResourceFmt, types.ProviderTypeServerless, repoPath)
+		// Off-line the corresponding price info
+		pDelReq := types.AcctPriceOffLineReq{
+			SkuType:    types.SKUCSGHub,
+			ResourceID: llmID,
+		}
+		_, err = c.accountingComponent.OffLinePrice(ctx, pDelReq)
+		if err != nil {
+			slog.WarnContext(ctx, "off-line price failed for delete serverless",
+				slog.Any("err", err), slog.Any("deployid", delReq.DeployID), slog.Any("delReq", pDelReq))
+		}
+	}
+
 	// release resource if it's a order case
 	if deploy.OrderDetailID != 0 {
 		ur, err := c.userResourcesStore.FindUserResourcesByOrderDetailId(ctx, deploy.UserUUID, deploy.OrderDetailID)
 		if err != nil {
-			return fmt.Errorf("fail to find user resource, %w", err)
+			return fmt.Errorf("failed to find user resource, %w", err)
 		}
 		ur.DeployId = 0
 		err = c.userResourcesStore.UpdateDeployId(ctx, ur)
 		if err != nil {
-			return fmt.Errorf("fail to release resource, %w", err)
+			return fmt.Errorf("failed to release resource, %w", err)
 		}
 
 	}

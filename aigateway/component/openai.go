@@ -316,11 +316,11 @@ func filterAndPaginateModels(models []types.Model, req types.ListModelsReq) type
 func providerTypeFromDeployType(t int) string {
 	switch t {
 	case commontypes.ServerlessType:
-		return types.ProviderTypeServerless
+		return commontypes.ProviderTypeServerless
 	case commontypes.InferenceType:
-		return types.ProviderTypeInference
+		return commontypes.ProviderTypeInference
 	default:
-		return types.ProviderTypeInference
+		return commontypes.ProviderTypeInference
 	}
 }
 
@@ -425,7 +425,7 @@ func (m *openaiComponentImpl) getExternalModels(c context.Context) []types.Model
 					slog.WarnContext(c, "llm config repo relation unavailable", "llm_config_id", extModel.ID, "repo_id", extModel.RepoID)
 				}
 			}
-			metadata[types.MetaKeyLLMType] = types.ProviderTypeExternalLLM
+			metadata[types.MetaKeyLLMType] = commontypes.ProviderTypeExternalLLM
 			// Convert relational upstreams to types.UpstreamConfig for routing
 			upstreams := dbUpstreamsToConfigs(extModel.Upstreams)
 			provider := extModel.PrimaryProvider()
@@ -584,11 +584,11 @@ func (m *openaiComponentImpl) resolveUsageMeteringInfo(c context.Context, nsUUID
 		return usageMeteringInfo{}, err
 	}
 	switch llmType {
-	case types.ProviderTypeServerless, types.ProviderTypeInference:
+	case commontypes.ProviderTypeServerless, commontypes.ProviderTypeInference:
 		if model.CSGHubModelID == "" {
 			return usageMeteringInfo{}, fmt.Errorf("model metadata %s=%s requires csghub model id", types.MetaKeyLLMType, llmType)
 		}
-		id := fmt.Sprintf(types.CSGHubResourceFmt, llmType, model.CSGHubModelID)
+		id := fmt.Sprintf(commontypes.CSGHubResourceFmt, llmType, model.CSGHubModelID)
 		meteringInfo := usageMeteringInfo{
 			Resource: types.MeteringResource{
 				ResourceID:   id,
@@ -597,7 +597,7 @@ func (m *openaiComponentImpl) resolveUsageMeteringInfo(c context.Context, nsUUID
 			},
 			Scene: commontypes.SceneModelServerless,
 		}
-		if llmType == types.ProviderTypeInference {
+		if llmType == commontypes.ProviderTypeInference {
 			meteringInfo.Scene = commontypes.SceneModelInference
 			ownerType, err := m.resolveUsageOwnerType(c, nsUUID, model)
 			if err != nil {
@@ -608,11 +608,11 @@ func (m *openaiComponentImpl) resolveUsageMeteringInfo(c context.Context, nsUUID
 			meteringInfo.OwnerType = commontypes.CSGHubServerlessInference
 		}
 		return meteringInfo, nil
-	case types.ProviderTypeExternalLLM:
+	case commontypes.ProviderTypeExternalLLM:
 		if model.ID == "" {
 			return usageMeteringInfo{}, fmt.Errorf("model metadata %s=%s requires model id", types.MetaKeyLLMType, llmType)
 		}
-		id := fmt.Sprintf(types.ExternalLLMResourceFmt, model.ID)
+		id := fmt.Sprintf(commontypes.ExternalLLMResourceFmt, model.ID)
 		return usageMeteringInfo{
 			Resource: types.MeteringResource{
 				ResourceID:   id,

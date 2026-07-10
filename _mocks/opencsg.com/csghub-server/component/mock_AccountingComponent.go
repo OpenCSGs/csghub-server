@@ -1034,6 +1034,65 @@ func (_c *MockAccountingComponent_ListStatementByUserIDAndTime_Call) RunAndRetur
 	return _c
 }
 
+// OffLinePrice provides a mock function with given fields: ctx, req
+func (_m *MockAccountingComponent) OffLinePrice(ctx context.Context, req types.AcctPriceOffLineReq) (any, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for OffLinePrice")
+	}
+
+	var r0 any
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.AcctPriceOffLineReq) (any, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.AcctPriceOffLineReq) any); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(any)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.AcctPriceOffLineReq) error); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAccountingComponent_OffLinePrice_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'OffLinePrice'
+type MockAccountingComponent_OffLinePrice_Call struct {
+	*mock.Call
+}
+
+// OffLinePrice is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req types.AcctPriceOffLineReq
+func (_e *MockAccountingComponent_Expecter) OffLinePrice(ctx interface{}, req interface{}) *MockAccountingComponent_OffLinePrice_Call {
+	return &MockAccountingComponent_OffLinePrice_Call{Call: _e.mock.On("OffLinePrice", ctx, req)}
+}
+
+func (_c *MockAccountingComponent_OffLinePrice_Call) Run(run func(ctx context.Context, req types.AcctPriceOffLineReq)) *MockAccountingComponent_OffLinePrice_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.AcctPriceOffLineReq))
+	})
+	return _c
+}
+
+func (_c *MockAccountingComponent_OffLinePrice_Call) Return(_a0 any, _a1 error) *MockAccountingComponent_OffLinePrice_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAccountingComponent_OffLinePrice_Call) RunAndReturn(run func(context.Context, types.AcctPriceOffLineReq) (any, error)) *MockAccountingComponent_OffLinePrice_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // QueryAllUsersBalance provides a mock function with given fields: ctx, per, page
 func (_m *MockAccountingComponent) QueryAllUsersBalance(ctx context.Context, per int, page int) (interface{}, error) {
 	ret := _m.Called(ctx, per, page)

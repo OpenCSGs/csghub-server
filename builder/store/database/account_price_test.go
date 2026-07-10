@@ -512,3 +512,141 @@ func TestAccountPriceStore_ListBySkuTypeAndKinds(t *testing.T) {
 		require.Equal(t, 0, len(result))
 	})
 }
+
+func TestAccountPriceStore_OffLineBySkuTypeAndResourceID(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewAccountPriceStoreWithDB(db)
+
+	t.Run("disable enabled prices matching sku_type and resource_id", func(t *testing.T) {
+		p1, err := store.Create(ctx, database.AccountPrice{
+			SkuType: types.SKUCSGHub, SkuKind: types.SKUPayAsYouGo, ResourceID: "r1",
+			SkuDesc: "price_1", SkuStatus: types.SkuStatusEnabled,
+		})
+		require.Nil(t, err)
+
+		p2, err := store.Create(ctx, database.AccountPrice{
+			SkuType: types.SKUCSGHub, SkuKind: types.SKUPromptToken, ResourceID: "r1",
+			SkuDesc: "price_2", SkuStatus: types.SkuStatusEnabled,
+		})
+		require.Nil(t, err)
+
+		err = store.OffLineBySkuTypeAndResourceID(ctx, types.AcctPriceOffLineReq{
+			SkuType:    types.SKUCSGHub,
+			ResourceID: "r1",
+		})
+		require.Nil(t, err)
+
+		r1 := &database.AccountPrice{}
+		err = db.Core.NewSelect().Model(r1).Where("id=?", p1.ID).Scan(ctx)
+		require.Nil(t, err)
+		require.Equal(t, types.SkuStatusDisabled, r1.SkuStatus)
+
+		r2 := &database.AccountPrice{}
+		err = db.Core.NewSelect().Model(r2).Where("id=?", p2.ID).Scan(ctx)
+		require.Nil(t, err)
+		require.Equal(t, types.SkuStatusDisabled, r2.SkuStatus)
+	})
+
+	t.Run("do not affect prices with different sku_type", func(t *testing.T) {
+		p1, err := store.Create(ctx, database.AccountPrice{
+			SkuType: types.SKUCSGHub, SkuKind: types.SKUPayAsYouGo, ResourceID: "r2",
+			SkuDesc: "csghub_price", SkuStatus: types.SkuStatusEnabled,
+		})
+		require.Nil(t, err)
+
+		p2, err := store.Create(ctx, database.AccountPrice{
+			SkuType: types.SKUReserve, SkuKind: types.SKUPayAsYouGo, ResourceID: "r2",
+			SkuDesc: "reserve_price", SkuStatus: types.SkuStatusEnabled,
+		})
+		require.Nil(t, err)
+
+		err = store.OffLineBySkuTypeAndResourceID(ctx, types.AcctPriceOffLineReq{
+			SkuType:    types.SKUCSGHub,
+			ResourceID: "r2",
+		})
+		require.Nil(t, err)
+
+		r1 := &database.AccountPrice{}
+		err = db.Core.NewSelect().Model(r1).Where("id=?", p1.ID).Scan(ctx)
+		require.Nil(t, err)
+		require.Equal(t, types.SkuStatusDisabled, r1.SkuStatus)
+
+		r2 := &database.AccountPrice{}
+		err = db.Core.NewSelect().Model(r2).Where("id=?", p2.ID).Scan(ctx)
+		require.Nil(t, err)
+		require.Equal(t, types.SkuStatusEnabled, r2.SkuStatus)
+	})
+
+	t.Run("do not affect prices with different resource_id", func(t *testing.T) {
+		p1, err := store.Create(ctx, database.AccountPrice{
+			SkuType: types.SKUCSGHub, SkuKind: types.SKUPayAsYouGo, ResourceID: "r3",
+			SkuDesc: "target_price", SkuStatus: types.SkuStatusEnabled,
+		})
+		require.Nil(t, err)
+
+		p2, err := store.Create(ctx, database.AccountPrice{
+			SkuType: types.SKUCSGHub, SkuKind: types.SKUPayAsYouGo, ResourceID: "r4",
+			SkuDesc: "other_price", SkuStatus: types.SkuStatusEnabled,
+		})
+		require.Nil(t, err)
+
+		err = store.OffLineBySkuTypeAndResourceID(ctx, types.AcctPriceOffLineReq{
+			SkuType:    types.SKUCSGHub,
+			ResourceID: "r3",
+		})
+		require.Nil(t, err)
+
+		r1 := &database.AccountPrice{}
+		err = db.Core.NewSelect().Model(r1).Where("id=?", p1.ID).Scan(ctx)
+		require.Nil(t, err)
+		require.Equal(t, types.SkuStatusDisabled, r1.SkuStatus)
+
+		r2 := &database.AccountPrice{}
+		err = db.Core.NewSelect().Model(r2).Where("id=?", p2.ID).Scan(ctx)
+		require.Nil(t, err)
+		require.Equal(t, types.SkuStatusEnabled, r2.SkuStatus)
+	})
+
+	t.Run("do not affect already disabled prices", func(t *testing.T) {
+		p1, err := store.Create(ctx, database.AccountPrice{
+			SkuType: types.SKUCSGHub, SkuKind: types.SKUPayAsYouGo, ResourceID: "r5",
+			SkuDesc: "enabled_price", SkuStatus: types.SkuStatusEnabled,
+		})
+		require.Nil(t, err)
+
+		// Manually insert a disabled price (bypassing Create's auto-disable logic)
+		p2 := &database.AccountPrice{
+			SkuType: types.SKUCSGHub, SkuKind: types.SKUPayAsYouGo, ResourceID: "r5",
+			SkuDesc: "already_disabled", SkuStatus: types.SkuStatusDisabled,
+		}
+		_, err = db.Core.NewInsert().Model(p2).Exec(ctx)
+		require.Nil(t, err)
+
+		err = store.OffLineBySkuTypeAndResourceID(ctx, types.AcctPriceOffLineReq{
+			SkuType:    types.SKUCSGHub,
+			ResourceID: "r5",
+		})
+		require.Nil(t, err)
+
+		r1 := &database.AccountPrice{}
+		err = db.Core.NewSelect().Model(r1).Where("id=?", p1.ID).Scan(ctx)
+		require.Nil(t, err)
+		require.Equal(t, types.SkuStatusDisabled, r1.SkuStatus)
+
+		r2 := &database.AccountPrice{}
+		err = db.Core.NewSelect().Model(r2).Where("id=?", p2.ID).Scan(ctx)
+		require.Nil(t, err)
+		require.Equal(t, types.SkuStatusDisabled, r2.SkuStatus)
+	})
+
+	t.Run("no matching enabled prices does not return error", func(t *testing.T) {
+		err := store.OffLineBySkuTypeAndResourceID(ctx, types.AcctPriceOffLineReq{
+			SkuType:    types.SKUReserve,
+			ResourceID: "nonexistent",
+		})
+		require.Nil(t, err)
+	})
+}

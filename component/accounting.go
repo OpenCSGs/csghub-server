@@ -54,6 +54,7 @@ type AccountingComponent interface {
 	WeeklyRecharges(ctx context.Context, emails []string) error
 	GetOrderDetailByID(ctx context.Context, currentUser string, id int64) (*database.AccountOrderDetail, error)
 	GetVoucherDashboard(ctx context.Context, req types.VoucherDashboardReq) (*types.VoucherDashboardStatusItem, error)
+	OffLinePrice(ctx context.Context, req types.AcctPriceOffLineReq) (any, error)
 }
 
 func NewAccountingComponent(config *config.Config) (AccountingComponent, error) {

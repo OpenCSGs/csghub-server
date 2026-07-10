@@ -41,6 +41,7 @@ type AccountingClient interface {
 	ListPresents(req types.PresentsIndexReq) (any, error)
 	GetOrderDetailByID(currentUser string, id int64) (any, error)
 	GetVoucherDashboard(req types.VoucherDashboardReq) (any, error)
+	OffLinePrice(req types.AcctPriceOffLineReq) (any, error)
 }
 type accountingClientImpl struct {
 	remote    *url.URL

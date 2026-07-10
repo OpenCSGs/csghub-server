@@ -321,7 +321,7 @@ func TestOpenAIComponent_GetAvailableModels_CacheUsesModelSnapshot(t *testing.T)
 			var cachedModel types.Model
 			require.NoError(t, json.Unmarshal([]byte(valueString), &cachedModel))
 			assert.Equal(t, "hf-model2:svc2", cachedModel.ID)
-			assert.Equal(t, types.ProviderTypeServerless, cachedModel.Metadata[types.MetaKeyLLMType])
+			assert.Equal(t, commontypes.ProviderTypeServerless, cachedModel.Metadata[types.MetaKeyLLMType])
 			return nil
 		}).Once()
 	mockCache.EXPECT().Expire(mock.Anything, modelCacheKey, modelCacheTTL).
@@ -417,7 +417,7 @@ func TestOpenAIComponent_ListModels_CacheUsesOriginalID(t *testing.T) {
 			require.NoError(t, json.Unmarshal([]byte(valueString), &cachedModel))
 			assert.Equal(t, "test-model-2", cachedModel.ID)
 			assert.Equal(t, "Anthropic", cachedModel.Provider)
-			assert.Equal(t, types.ProviderTypeExternalLLM, cachedModel.Metadata[types.MetaKeyLLMType])
+			assert.Equal(t, commontypes.ProviderTypeExternalLLM, cachedModel.Metadata[types.MetaKeyLLMType])
 			return nil
 		}).Once()
 	mockCache.EXPECT().Expire(mock.Anything, modelCacheKey, modelCacheTTL).
@@ -608,7 +608,7 @@ func TestOpenAIComponent_GetModelByID(t *testing.T) {
 				Created: deploys[0].CreatedAt.Unix(),
 				Task:    "text-generation",
 				Metadata: map[string]any{
-					types.MetaKeyLLMType: types.ProviderTypeInference,
+					types.MetaKeyLLMType: commontypes.ProviderTypeInference,
 				},
 			},
 			Endpoint: "endpoint1",
@@ -686,7 +686,7 @@ func TestOpenAIComponent_saveModelsToCache(t *testing.T) {
 					Object:  "model",
 					OwnedBy: "openai",
 					Metadata: map[string]any{
-						types.MetaKeyLLMType: types.ProviderTypeExternalLLM,
+						types.MetaKeyLLMType: commontypes.ProviderTypeExternalLLM,
 					},
 				},
 				Endpoint: "http://test-endpoint",
@@ -740,7 +740,7 @@ func TestOpenAIComponent_loadModelFromCache(t *testing.T) {
 				Object:  "model",
 				OwnedBy: "OpenAI",
 				Metadata: map[string]any{
-					types.MetaKeyLLMType: types.ProviderTypeExternalLLM,
+					types.MetaKeyLLMType: commontypes.ProviderTypeExternalLLM,
 				},
 			},
 			Endpoint: "http://test-endpoint",
@@ -881,7 +881,7 @@ func TestOpenAIComponent_ExtGetAvailableModels_SinglePage(t *testing.T) {
 	require.Equal(t, "test-model-1", models[0].ID)
 	require.Equal(t, "text-generation,text-to-image", models[0].Task)
 	require.Equal(t, "test-ns/test-model-1", models[0].Metadata[types.MetaKeyRepoPath])
-	require.Equal(t, types.ProviderTypeExternalLLM, models[0].Metadata[types.MetaKeyLLMType])
+	require.Equal(t, commontypes.ProviderTypeExternalLLM, models[0].Metadata[types.MetaKeyLLMType])
 	require.NotContains(t, originalMetadata, types.MetaKeyRepoPath)
 	require.NotContains(t, originalMetadata, types.MetaKeyLLMType)
 	wg.Wait()
@@ -917,6 +917,6 @@ func TestOpenAIComponent_GetExternalModelsWithoutRepoOmitsRepoPath(t *testing.T)
 	require.Len(t, models, 1)
 	require.Equal(t, "model-without-repo", models[0].ID)
 	require.Equal(t, "value", models[0].Metadata["existing"])
-	require.Equal(t, types.ProviderTypeExternalLLM, models[0].Metadata[types.MetaKeyLLMType])
+	require.Equal(t, commontypes.ProviderTypeExternalLLM, models[0].Metadata[types.MetaKeyLLMType])
 	require.NotContains(t, models[0].Metadata, types.MetaKeyRepoPath)
 }

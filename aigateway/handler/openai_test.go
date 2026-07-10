@@ -296,9 +296,9 @@ func TestOpenAIHandler_ListModels(t *testing.T) {
 		assert.True(t, ok)
 		assert.Equal(t, "invalid_request_error", errObj["code"])
 		assert.Contains(t, errObj["message"], "Invalid llm_types parameter")
-		assert.Contains(t, errObj["message"], types.ProviderTypeExternalLLM)
-		assert.Contains(t, errObj["message"], types.ProviderTypeServerless)
-		assert.Contains(t, errObj["message"], types.ProviderTypeInference)
+		assert.Contains(t, errObj["message"], commontypes.ProviderTypeExternalLLM)
+		assert.Contains(t, errObj["message"], commontypes.ProviderTypeServerless)
+		assert.Contains(t, errObj["message"], commontypes.ProviderTypeInference)
 	})
 
 	for _, value := range []string{"yes", "not-a-bool"} {
@@ -383,10 +383,10 @@ func TestOpenAIHandler_ListModels(t *testing.T) {
 
 	t.Run("valid llm_types parameter external_llm", func(t *testing.T) {
 		tester, c, w := setupTest(t)
-		tester.WithQuery("llm_types", types.ProviderTypeExternalLLM)
+		tester.WithQuery("llm_types", commontypes.ProviderTypeExternalLLM)
 
 		tester.mocks.openAIComp.EXPECT().
-			ListModels(mock.Anything, "testuser", types.ListModelsReq{LLMTypes: []string{types.ProviderTypeExternalLLM}}).
+			ListModels(mock.Anything, "testuser", types.ListModelsReq{LLMTypes: []string{commontypes.ProviderTypeExternalLLM}}).
 			Return(types.ModelList{Object: "list", Data: []types.Model{}, HasMore: false, TotalCount: 0}, nil).Once()
 
 		tester.handler.ListModels(c)
@@ -396,11 +396,11 @@ func TestOpenAIHandler_ListModels(t *testing.T) {
 
 	t.Run("valid llm_types parameter multiple values", func(t *testing.T) {
 		tester, c, w := setupTest(t)
-		tester.WithQuery("llm_types", types.ProviderTypeServerless)
-		tester.WithQuery("llm_types", types.ProviderTypeInference)
+		tester.WithQuery("llm_types", commontypes.ProviderTypeServerless)
+		tester.WithQuery("llm_types", commontypes.ProviderTypeInference)
 
 		tester.mocks.openAIComp.EXPECT().
-			ListModels(mock.Anything, "testuser", types.ListModelsReq{LLMTypes: []string{types.ProviderTypeServerless, types.ProviderTypeInference}}).
+			ListModels(mock.Anything, "testuser", types.ListModelsReq{LLMTypes: []string{commontypes.ProviderTypeServerless, commontypes.ProviderTypeInference}}).
 			Return(types.ModelList{Object: "list", Data: []types.Model{}, HasMore: false, TotalCount: 0}, nil).Once()
 
 		tester.handler.ListModels(c)
@@ -2112,7 +2112,7 @@ func TestOpenAIHandler_CreateVideo(t *testing.T) {
 				ID:   "video-model",
 				Task: "text-to-video",
 				Metadata: map[string]any{
-					types.MetaKeyLLMType:           types.ProviderTypeExternalLLM,
+					types.MetaKeyLLMType:           commontypes.ProviderTypeExternalLLM,
 					types.MetaKeyPricingConfigured: true,
 				},
 			},

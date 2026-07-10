@@ -6,13 +6,6 @@ import (
 	commontypes "opencsg.com/csghub-server/common/types"
 )
 
-// Provider type values for Metadata[MetaKeyLLMType].
-const (
-	ProviderTypeServerless  = "serverless"
-	ProviderTypeInference   = "inference"
-	ProviderTypeExternalLLM = "external_llm"
-)
-
 // Metadata key constants used when enriching model metadata.
 const (
 	MetaKeyLLMType           = "llm_type"
@@ -20,12 +13,6 @@ const (
 	MetaKeyPricingConfigured = "pricing_configured"
 	MetaKeyRepoPath          = "repo_path"
 	MetaKeyTasks             = "tasks"
-)
-
-// Resource ID format strings for external LLM (model ID) and CSGHub internal (path segment, repo path).
-const (
-	ExternalLLMResourceFmt = "thirdparty://%s"
-	CSGHubResourceFmt      = "csghub://%s/%s"
 )
 
 // MeteringResource holds ResourceID, ResourceName, and CustomerID for metering events.

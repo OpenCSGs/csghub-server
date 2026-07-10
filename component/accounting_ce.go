@@ -116,3 +116,7 @@ func (ac *accountingComponentImpl) WeeklyRecharges(ctx context.Context, emails [
 func (ac *accountingComponentImpl) GetVoucherDashboard(ctx context.Context, req types.VoucherDashboardReq) (*types.VoucherDashboardStatusItem, error) {
 	return nil, nil
 }
+
+func (ac *accountingComponentImpl) OffLinePrice(ctx context.Context, req types.AcctPriceOffLineReq) (any, error) {
+	return nil, nil
+}

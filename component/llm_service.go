@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"math"
 	"strings"
 
@@ -50,6 +51,7 @@ type llmServiceComponentImpl struct {
 	repoStore         database.RepoStore
 	healthStateStore  database.AIGatewayUpstreamHealthStateStore
 	circuitStateStore database.AIGatewayUpstreamCircuitStateStore
+	accountComponent  AccountingComponent
 }
 
 var ErrInvalidLLMConfig = errors.New("invalid llm config")
@@ -61,6 +63,10 @@ func NewLLMServiceComponent(config *config.Config) (LLMServiceComponent, error) 
 	upstreamStore := database.NewUpstreamStore(config)
 	healthStateStore := database.NewAIGatewayUpstreamHealthStateStore()
 	circuitStateStore := database.NewAIGatewayUpstreamCircuitStateStore()
+	ac, err := NewAccountingComponent(config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create accounting component: %w", err)
+	}
 	llmServiceComp := &llmServiceComponentImpl{
 		llmConfigStore:    llmConfigStore,
 		upstreamStore:     upstreamStore,
@@ -68,6 +74,7 @@ func NewLLMServiceComponent(config *config.Config) (LLMServiceComponent, error) 
 		repoStore:         repoStore,
 		healthStateStore:  healthStateStore,
 		circuitStateStore: circuitStateStore,
+		accountComponent:  ac,
 	}
 	return llmServiceComp, nil
 }
@@ -360,14 +367,32 @@ func (s *llmServiceComponentImpl) CreatePromptPrefix(ctx context.Context, req *t
 }
 
 func (s *llmServiceComponentImpl) DeleteLLMConfig(ctx context.Context, id int64) error {
-	// Clean up relational upstreams
-	_ = s.upstreamStore.DeleteByLLMConfigID(ctx, id)
-	err := s.llmConfigStore.Delete(ctx, id)
+	llmConfig, err := s.llmConfigStore.GetByID(ctx, id)
 	if err != nil {
 		return err
 	}
+	llmName := llmConfig.ModelName
+	// Clean up relational upstreams
+	_ = s.upstreamStore.DeleteByLLMConfigID(ctx, id)
+	err = s.llmConfigStore.Delete(ctx, id)
+	if err != nil {
+		return err
+	}
+
+	// Off-line the corresponding price info
+	delReq := types.AcctPriceOffLineReq{
+		SkuType:    types.SKUCSGHub,
+		ResourceID: fmt.Sprintf(types.ExternalLLMResourceFmt, llmName),
+	}
+	_, err = s.accountComponent.OffLinePrice(ctx, delReq)
+	if err != nil {
+		slog.WarnContext(ctx, "off-line price failed for delete llm config",
+			slog.Any("err", err), slog.Any("llmConfig", llmConfig), slog.Any("delReq", delReq))
+	}
+
 	return nil
 }
+
 func (s *llmServiceComponentImpl) DeletePromptPrefix(ctx context.Context, id int64) error {
 	err := s.promptPrefixStore.Delete(ctx, id)
 	if err != nil {
