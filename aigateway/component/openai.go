@@ -340,6 +340,11 @@ func (c *openaiComponentImpl) getCSGHubModels(ctx context.Context, userID int64)
 			slog.WarnContext(ctx, "skip deploy with nil user", "deploy_id", deploy.ID, "svc_name", deploy.SvcName, "user_id", deploy.UserID)
 			continue
 		}
+		modelID := modelIDBuilder.To(deploy)
+		if modelID == "" {
+			slog.WarnContext(ctx, "skip deploy with empty model id", "deploy_id", deploy.ID, "svc_name", deploy.SvcName, "deploy_type", deploy.Type)
+			continue
+		}
 		// Check if engine_args contains tool-call-parser parameter
 		supportFunctionCall := strings.Contains(deploy.EngineArgs, "tool-call-parser")
 		m := types.Model{
@@ -355,6 +360,7 @@ func (c *openaiComponentImpl) getCSGHubModels(ctx context.Context, userID int64)
 			},
 			InternalModelInfo: types.InternalModelInfo{
 				CSGHubModelID:    deploy.Repository.Path,
+				LegacyModelID:    modelIDBuilder.ToLegacyCSGHubModelID(deploy.Repository, deploy.SvcName),
 				OwnerUUID:        deploy.User.UUID,
 				ClusterID:        deploy.ClusterID,
 				SvcName:          deploy.SvcName,
@@ -368,15 +374,7 @@ func (c *openaiComponentImpl) getCSGHubModels(ctx context.Context, userID int64)
 		}
 		m.BaseModel.OwnedBy = modelIDBuilder.GetModelOwner(deploy.Type, deploy.User.Username)
 
-		modelName := ""
-		if deploy.Repository.HFPath != "" {
-			modelName = deploy.Repository.HFPath
-		} else {
-			modelName = deploy.Repository.Path
-		}
-
-		baseModelID := modelIDBuilder.To(modelName, deploy.SvcName)
-		m.ID = baseModelID
+		m.ID = modelID
 		m.Endpoint = deploy.Endpoint
 		slog.Debug("running model", slog.Any("model", m), slog.Any("deploy", deploy))
 		models = append(models, m)
@@ -535,12 +533,16 @@ func (m *openaiComponentImpl) GetModelByID(c context.Context, username, modelID 
 	}
 
 	for _, model := range models {
-		if model.ID == modelID {
+		if model.ID == modelID || m.isLegacyCSGHubModelID(model, modelID) {
 			return &model, nil
 		}
 	}
 
 	return nil, nil
+}
+
+func (m *openaiComponentImpl) isLegacyCSGHubModelID(model types.Model, modelID string) bool {
+	return model.LegacyModelID != "" && model.LegacyModelID == modelID
 }
 
 func getSceneFromSvcType(svcType int) int {

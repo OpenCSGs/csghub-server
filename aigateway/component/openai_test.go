@@ -355,6 +355,19 @@ func TestOpenAIComponentImpl_getCSGHubModels_SkipsDeploysWithMissingRelations(t 
 		},
 		{
 			ID:      3,
+			SvcName: "unknown-type",
+			Type:    999,
+			Repository: &database.Repository{
+				Name: "unknown-model",
+				Path: "namespace/unknown-model",
+			},
+			User: &database.User{
+				Username: "unknown-owner",
+				UUID:     "unknown-owner-uuid",
+			},
+		},
+		{
+			ID:      4,
 			SvcName: "valid-svc",
 			Type:    commontypes.InferenceType,
 			Repository: &database.Repository{
@@ -378,7 +391,7 @@ func TestOpenAIComponentImpl_getCSGHubModels_SkipsDeploysWithMissingRelations(t 
 	models, err := comp.getCSGHubModels(context.Background(), 1)
 	require.NoError(t, err)
 	require.Len(t, models, 1)
-	assert.Equal(t, "namespace/valid-model:valid-svc", models[0].ID)
+	assert.Equal(t, "valid-model:4", models[0].ID)
 	assert.Equal(t, "valid-owner", models[0].OwnedBy)
 	assert.Equal(t, "valid-owner-uuid", models[0].OwnerUUID)
 	assert.Equal(t, "valid-endpoint", models[0].Endpoint)
