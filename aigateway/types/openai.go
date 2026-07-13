@@ -37,6 +37,7 @@ type BaseModel struct {
 // InternalModelInfo represents the internal model fields
 type InternalModelInfo struct {
 	CSGHubModelID    string               `json:"-"` // the internal model id (repo path) in CSGHub
+	LegacyModelID    string               `json:"-"` // the previous public model id, used for backward-compatible lookup
 	OwnerUUID        string               `json:"-"` // the uuid of deploy owner
 	ClusterID        string               `json:"-"` // the deployed cluster id in CSGHub
 	SvcName          string               `json:"-"` // the internal service name in CSGHub
