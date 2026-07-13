@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net/url"
 	"path"
 	"path/filepath"
 	"slices"
@@ -182,6 +183,10 @@ func (c *codeComponentImpl) Create(ctx context.Context, req *types.CreateCodeReq
 
 	if commitFilesReq != nil {
 		_ = c.gitServer.CommitFiles(ctx, *commitFilesReq)
+	}
+
+	if err := c.createMirrorIfNeeded(ctx, req); err != nil {
+		return nil, err
 	}
 
 	for _, tag := range code.Repository.Tags {
@@ -747,4 +752,39 @@ func decompressTarGzForCode(reader io.Reader) ([]types.CommitFile, error) {
 	}
 
 	return commitFiles, nil
+}
+
+func (c *codeComponentImpl) createMirrorIfNeeded(ctx context.Context, req *types.CreateCodeReq) error {
+	if req.GitURL == "" {
+		return nil
+	}
+
+	gitUrl := req.GitURL
+	if req.GitUsername != "" && req.GitPassword != "" {
+		parsedUrl, err := url.Parse(gitUrl)
+		if err != nil {
+			return errorx.GitInvalidURL(err)
+		}
+		parsedUrl.User = url.UserPassword(req.GitUsername, req.GitPassword)
+		gitUrl = parsedUrl.String()
+	}
+
+	mirrorReq := types.CreateMirrorReq{
+		Namespace:   req.Namespace,
+		Name:        req.Name,
+		SourceUrl:   gitUrl,
+		Username:    req.GitUsername,
+		AccessToken: req.GitPassword,
+		CurrentUser: req.Username,
+		RepoType:    types.CodeRepo,
+		Interval:    "24h",
+		SyncLfs:     true,
+	}
+
+	_, err := c.repoComponent.CreateMirror(ctx, mirrorReq)
+	if err != nil {
+		return fmt.Errorf("failed to create mirror: %w", err)
+	}
+
+	return nil
 }

@@ -112,5 +112,8 @@
     },
     "error.GIT-ERR-9": {
         "other": "仓库未找到"
+    },
+    "error.GIT-ERR-41": {
+        "other": "Git URL 无效"
     }
 }

@@ -304,3 +304,93 @@ func TestCodeComponent_OrgCodes(t *testing.T) {
 	}, data)
 
 }
+
+func TestCodeComponent_CreateWithGitURL(t *testing.T) {
+	ctx := context.TODO()
+	cc := initializeTestCodeComponent(ctx, t)
+
+	req := &types.CreateCodeReq{
+		CreateRepoReq: types.CreateRepoReq{
+			Username:  "user",
+			Namespace: "ns",
+			Name:      "n",
+			License:   "l",
+			Readme:    "r",
+		},
+		GitURL:      "https://github.com/test/test.git",
+		GitUsername: "testuser",
+		GitPassword: "testpass",
+	}
+	dbrepo := &database.Repository{
+		ID:   1,
+		Path: "ns/n",
+		User: database.User{Username: "user", UUID: "user-uuid"},
+		Tags: []database.Tag{{Name: "t1"}},
+	}
+	crq := req.CreateRepoReq
+	crq.Nickname = "n"
+	crq.Readme = generateReadmeData(req.License)
+	crq.RepoType = types.CodeRepo
+	crq.DefaultBranch = "main"
+	crq.CommitFiles = []types.CommitFile{
+		{
+			Content: crq.Readme,
+			Path:    types.ReadmeFileName,
+		},
+		{
+			Content: codeGitattributesContent,
+			Path:    types.GitattributesFileName,
+		},
+	}
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	cc.mocks.components.repo.EXPECT().
+		SendAssetManagementMsg(mock.Anything, mock.MatchedBy(func(req types.RepoNotificationReq) bool {
+			return req.RepoType == types.CodeRepo &&
+				req.Operation == types.OperationCreate &&
+				req.RepoPath == "ns/n" &&
+				req.UserUUID == "user-uuid"
+		})).
+		RunAndReturn(func(ctx context.Context, req types.RepoNotificationReq) error {
+			wg.Done()
+			return nil
+		}).Once()
+	cc.mocks.components.repo.EXPECT().CreateRepo(ctx, crq).Return(
+		nil, dbrepo, &gitserver.CommitFilesReq{}, nil,
+	)
+
+	cc.mocks.components.repo.EXPECT().CreateMirror(ctx, mock.MatchedBy(func(req types.CreateMirrorReq) bool {
+		return req.Namespace == "ns" &&
+			req.Name == "n" &&
+			req.SourceUrl == "https://testuser:testpass@github.com/test/test.git" &&
+			req.Username == "testuser" &&
+			req.AccessToken == "testpass" &&
+			req.RepoType == types.CodeRepo
+	})).Return(&database.Mirror{}, nil)
+
+	cc.mocks.gitServer.EXPECT().CommitFiles(ctx, gitserver.CommitFilesReq{}).Return(nil)
+	cc.mocks.stores.CodeMock().EXPECT().CreateAndUpdateRepoPath(ctx, database.Code{
+		Repository:   dbrepo,
+		RepositoryID: 1,
+	}, "ns/n").Return(&database.Code{
+		RepositoryID: 1,
+		Repository:   dbrepo,
+	}, nil)
+
+	resp, err := cc.Create(ctx, req)
+	require.Nil(t, err)
+	require.Equal(t, &types.Code{
+		RepositoryID: 1,
+		User: types.User{
+			Username: "user",
+		},
+		Path: "ns/n",
+		Repository: types.Repository{
+			HTTPCloneURL: "/s/ns/n.git",
+			SSHCloneURL:  ":s/ns/n.git",
+		},
+		Tags: []types.RepoTag{{Name: "t1"}},
+	}, resp)
+	wg.Wait()
+}

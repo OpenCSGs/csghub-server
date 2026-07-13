@@ -383,10 +383,11 @@ func (c *skillComponentImpl) createMirrorIfNeeded(ctx context.Context, req *type
 	if req.GitUsername != "" && req.GitPassword != "" {
 		// Parse the URL to add authentication
 		parsedUrl, err := url.Parse(gitUrl)
-		if err == nil {
-			parsedUrl.User = url.UserPassword(req.GitUsername, req.GitPassword)
-			gitUrl = parsedUrl.String()
+		if err != nil {
+			return errorx.GitInvalidURL(err)
 		}
+		parsedUrl.User = url.UserPassword(req.GitUsername, req.GitPassword)
+		gitUrl = parsedUrl.String()
 	}
 
 	mirrorReq := types.CreateMirrorReq{

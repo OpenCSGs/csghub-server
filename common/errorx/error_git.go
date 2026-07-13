@@ -47,6 +47,7 @@ const (
 	gitGetRepositorySizeFailed
 	gitCreateForkFailed
 	gitGetArchiveFailed
+	gitInvalidURL
 )
 
 var (
@@ -498,6 +499,18 @@ var (
 	//
 	// zh-HK: 獲取 git 歸檔文件失敗
 	ErrGitGetArchiveFailed error = CustomError{prefix: errGitPrefix, code: gitGetArchiveFailed}
+	// the git url is invalid or malformed
+	//
+	// Description: The provided git URL is invalid or malformed. Please check the URL format and try again.
+	//
+	// Description_ZH: 提供的 Git URL 无效或格式错误。请检查 URL 格式并重试。
+	//
+	// en-US: Invalid git URL
+	//
+	// zh-CN: Git URL 无效
+	//
+	// zh-HK: Git URL 無效
+	ErrGitInvalidURL error = CustomError{prefix: errGitPrefix, code: gitInvalidURL}
 	// --- GIT-ERR-xxx: Git/Upload, Download, Resource Synchronization ---
 	// using git in xnet-enabled repository error
 	//
@@ -762,5 +775,13 @@ func GetArchiveFailed(err error, ctx context) error {
 		code:    gitGetArchiveFailed,
 		err:     err,
 		context: ctx,
+	}
+}
+
+func GitInvalidURL(err error) error {
+	return CustomError{
+		prefix: errGitPrefix,
+		code:   gitInvalidURL,
+		err:    err,
 	}
 }
