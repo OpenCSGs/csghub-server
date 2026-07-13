@@ -49,7 +49,8 @@ func TestUnkownFileChecker_Run(t *testing.T) {
 
 		// Build a minimal PNG so http.DetectContentType returns "image/png"
 		var pngBuf bytes.Buffer
-		png.Encode(&pngBuf, image.NewRGBA(image.Rect(0, 0, 1, 1)))
+		err := png.Encode(&pngBuf, image.NewRGBA(image.Rect(0, 0, 1, 1)))
+		require.NoError(t, err)
 
 		const testURL = "http://example.com/image.png"
 		mockChecker.EXPECT().PassImageURLCheck(mock.Anything, types.ScenarioImageBaseLineCheck, testURL).
@@ -69,7 +70,8 @@ func TestUnkownFileChecker_Run(t *testing.T) {
 		InitWithContentChecker(cfg, mockChecker)
 
 		var pngBuf bytes.Buffer
-		png.Encode(&pngBuf, image.NewRGBA(image.Rect(0, 0, 1, 1)))
+		err := png.Encode(&pngBuf, image.NewRGBA(image.Rect(0, 0, 1, 1)))
+		require.NoError(t, err)
 
 		mockChecker.EXPECT().PassImageStreamCheck(mock.Anything, types.ScenarioImageBaseLineCheck, mock.Anything).
 			Return(&sensitive.CheckResult{IsSensitive: false}, nil)
@@ -88,7 +90,8 @@ func TestUnkownFileChecker_Run(t *testing.T) {
 		InitWithContentChecker(cfg, mockChecker)
 
 		var pngBuf bytes.Buffer
-		png.Encode(&pngBuf, image.NewRGBA(image.Rect(0, 0, 1, 1)))
+		err := png.Encode(&pngBuf, image.NewRGBA(image.Rect(0, 0, 1, 1)))
+		require.NoError(t, err)
 
 		mockChecker.EXPECT().PassImageStreamCheck(mock.Anything, types.ScenarioImageBaseLineCheck, mock.Anything).
 			Return(&sensitive.CheckResult{IsSensitive: true, Reason: "label:porn"}, nil)
