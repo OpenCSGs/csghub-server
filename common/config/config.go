@@ -139,18 +139,33 @@ type Config struct {
 	}
 
 	SensitiveCheck struct {
-		Enable              bool     `env:"STARHUB_SERVER_SENSITIVE_CHECK_ENABLE" default:"false"`
-		AccessKeyID         string   `env:"STARHUB_SERVER_SENSITIVE_CHECK_ACCESS_KEY_ID"`
-		AccessKeySecret     string   `env:"STARHUB_SERVER_SENSITIVE_CHECK_ACCESS_KEY_SECRET"`
-		Region              string   `env:"STARHUB_SERVER_SENSITIVE_CHECK_REGION"`
-		Endpoint            string   `env:"STARHUB_SERVER_SENSITIVE_CHECK_ENDPOINT" default:"oss-cn-beijing.aliyuncs.com"`
-		EnableSSL           bool     `env:"STARHUB_SERVER_SENSITIVE_CHECK_ENABLE_SSL" default:"true"`
+		Enable          bool   `env:"STARHUB_SERVER_SENSITIVE_CHECK_ENABLE" default:"false"`
+		AccessKeyID     string `env:"STARHUB_SERVER_SENSITIVE_CHECK_ACCESS_KEY_ID"`
+		AccessKeySecret string `env:"STARHUB_SERVER_SENSITIVE_CHECK_ACCESS_KEY_SECRET"`
+		Region          string `env:"STARHUB_SERVER_SENSITIVE_CHECK_REGION"`
+		Endpoint        string `env:"STARHUB_SERVER_SENSITIVE_CHECK_ENDPOINT" default:"oss-cn-beijing.aliyuncs.com"`
+		EnableSSL       bool   `env:"STARHUB_SERVER_SENSITIVE_CHECK_ENABLE_SSL" default:"true"`
+		// OSSBucket is the Aliyun OSS bucket used for temporary image uploads
+		// when checking images from private repos (where no public URL is
+		// available). The bucket must be in the same Aliyun account as
+		// AccessKeyID/AccessKeySecret so that Aliyun Green can read it directly.
+		// Required only when ImageCheckEnable is true and private repos need
+		// image moderation.
+		OSSBucket string `env:"STARHUB_SERVER_SENSITIVE_CHECK_OSS_BUCKET" default:"sensitive-check"`
+
 		DictDir             string   `env:"STARHUB_SERVER_SENSITIVE_CHECK_DICT_DIR" default:"/starhub-bin/vocabulary"`
 		CheckChain          []string `env:"STARHUB_SERVER_SENSITIVE_CHECK_CHECK_CHAIN" default:"[ac_automaton,mutable_ac_automaton,aliyun_green]"`
 		StreamCheckMode     string   `env:"STARHUB_SERVER_SENSITIVE_CHECK_STREAM_CHECK_MODE" default:"async"` // sync | async
 		AsyncBufferMaxChars int      `env:"STARHUB_SERVER_SENSITIVE_CHECK_ASYNC_BUFFER_MAX_CHARS" default:"50"`
 		// aliyun green max content length: 2000 | qwen guard max content length: 7000
 		MaxContentLength int `env:"STARHUB_SERVER_SENSITIVE_CHECK_MAX_CONTENT_LENGTH" default:"2000"`
+		// ImageCheckEnable controls whether image files are sent to the remote
+		// moderation service for content safety checking. Disabled by default
+		// because image moderation incurs extra API costs.
+		ImageCheckEnable bool `env:"STARHUB_SERVER_SENSITIVE_CHECK_IMAGE_ENABLE" default:"false"`
+		// ImageCheckScenario is the Aliyun Green scenario used for image moderation.
+		// Defaults to "baselineCheck" (ScenarioImageBaseLineCheck).
+		ImageCheckScenario string `env:"STARHUB_SERVER_SENSITIVE_CHECK_IMAGE_SCENARIO" default:"baselineCheck"`
 
 		LLM struct {
 			Enable       bool    `env:"STARHUB_SERVER_SENSITIVE_CHECK_LLM_ENABLE" default:"false"`

@@ -3,6 +3,7 @@ package activity
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"testing"
 	"time"
 
@@ -582,6 +583,71 @@ func TestDeploy(t *testing.T) {
 
 	require.NoError(t, err)
 
+}
+
+func TestApplyToolCallParser(t *testing.T) {
+	parsers := map[string]string{
+		"Qwen3ForCausalLM":      "qwen",
+		"LlamaForCausalLM":      "llama3",
+		"DeepseekV3ForCausalLM": "deepseekv3",
+	}
+
+	tests := []struct {
+		name       string
+		engineArgs string
+		modelArch  string
+		want       string
+	}{
+		{
+			name:       "vllm arch with mapped parser",
+			engineArgs: "--max-model-len 8192 --enable-auto-tool-choice",
+			modelArch:  "Qwen3ForCausalLM",
+			want:       "--max-model-len 8192 --enable-auto-tool-choice --tool-call-parser qwen",
+		},
+		{
+			name:       "vllm arch without mapping falls back to openai",
+			engineArgs: "--enable-auto-tool-choice",
+			modelArch:  "UnknownForCausalLM",
+			want:       "--enable-auto-tool-choice --tool-call-parser openai",
+		},
+		{
+			name:       "vllm unknown arch removes flag",
+			engineArgs: "--foo --enable-auto-tool-choice --bar",
+			modelArch:  "",
+			want:       "--foo  --bar",
+		},
+		{
+			name:       "sglang arch with mapped parser replaces auto",
+			engineArgs: "--context-length 8192 --tool-call-parser auto",
+			modelArch:  "DeepseekV3ForCausalLM",
+			want:       "--context-length 8192 --tool-call-parser deepseekv3",
+		},
+		{
+			name:       "sglang arch without mapping keeps auto",
+			engineArgs: "--tool-call-parser auto",
+			modelArch:  "UnknownForCausalLM",
+			want:       "--tool-call-parser auto",
+		},
+		{
+			name:       "sglang unknown arch keeps auto",
+			engineArgs: "--tool-call-parser auto",
+			modelArch:  "",
+			want:       "--tool-call-parser auto",
+		},
+		{
+			name:       "no tool call flags unchanged",
+			engineArgs: "--max-model-len 8192",
+			modelArch:  "Qwen3ForCausalLM",
+			want:       "--max-model-len 8192",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := applyToolCallParser(slog.Default(), tt.engineArgs, tt.modelArch, parsers)
+			require.Equal(t, tt.want, got)
+		})
+	}
 }
 
 func TestVLLMEnforceEagerEnabled(t *testing.T) {

@@ -14,6 +14,7 @@ import (
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/types"
 	runnerTypes "opencsg.com/csghub-server/runner/types"
+	corev1 "k8s.io/api/core/v1"
 )
 
 func newTestActivities(t *testing.T) *Activities {
@@ -291,4 +292,71 @@ func TestProcessBatchResult_DeployingStillStartup(t *testing.T) {
 	// No DB calls expected — informer handles normal Deploying→Startup flow
 	processBatchResult(context.WithValue(context.Background(), "test", "test"), a, deploy,
 		&runnerTypes.BatchStatusItemResult{Code: common.Startup}, common.Deploying)
+}
+
+func TestHasPendingInstance(t *testing.T) {
+	// No instances → not pending
+	assert.False(t, hasPendingInstance(&database.Deploy{}))
+	// Only Running pod → not pending
+	assert.False(t, hasPendingInstance(&database.Deploy{
+		Instances: []types.Instance{{Name: "p1", Status: "Running"}},
+	}))
+	// Contains a Pending pod → pending
+	assert.True(t, hasPendingInstance(&database.Deploy{
+		Instances: []types.Instance{
+			{Name: "p1", Status: "Running"},
+			{Name: "p2", Status: string(corev1.PodPending)},
+		},
+	}))
+	// Pending string literal also matches
+	assert.True(t, hasPendingInstance(&database.Deploy{
+		Instances: []types.Instance{{Name: "p1", Status: "Pending"}},
+	}))
+}
+
+func TestReconcileDeployCluster_BatchItemError_PendingSkipsFallback(t *testing.T) {
+	// When a Deploying deploy has a Pending pod, "service not found" is a
+	// transient scheduling state. onBatchError must NOT mark it DeployFailed,
+	// even when past hardTimeout. This is the 7/9 false-positive scenario.
+	a := newTestActivities(t)
+	md := a.deployer.(*mock_deploy.MockDeployer)
+
+	md.EXPECT().CheckHeartbeatTimeout(mock.Anything, "c1").Return(false, nil).Once()
+	md.EXPECT().BatchStatus(mock.Anything, mock.MatchedBy(func(req *runnerTypes.BatchStatusRequest) bool {
+		return req.ClusterID == "c1" && len(req.Items) == 1
+	})).Return(&runnerTypes.BatchStatusResponse{
+		Items: []runnerTypes.BatchStatusItemResult{
+			{Type: runnerTypes.ResourceTypeKsvc, Name: "s1", Error: "service not found in cluster"},
+		},
+	}, nil).Once()
+
+	// No GetDeployByID/UpdateDeploy expected — Pending guard skips the fallback.
+	pastTime := time.Now().Add(-2 * time.Hour) // well past hardTimeout
+	deploys := []database.Deploy{
+		{ID: 1, Type: types.SpaceType, SvcName: "s1", ClusterID: "c1",
+			Status: common.Deploying, StatusUpdateAt: pastTime,
+			Instances: []types.Instance{{Name: "s1-00001-pod", Status: string(corev1.PodPending)}}},
+	}
+	reconcileDeployCluster(context.WithValue(context.Background(), "test", "test"), a, "c1", deploys, common.Deploying, 30*time.Minute)
+}
+
+func TestReconcileDeployCluster_HeartbeatTimeout_PendingSkipsFallback(t *testing.T) {
+	// When the cluster heartbeat times out (markFailed path), a deploy with a
+	// Pending pod must still be skipped — the pod may schedule once the cluster
+	// recovers.
+	a := newTestActivities(t)
+	md := a.deployer.(*mock_deploy.MockDeployer)
+
+	// Heartbeat timed out → clusterBatchDo takes the markFailed path and returns
+	// before calling BatchStatus.
+	md.EXPECT().CheckHeartbeatTimeout(mock.Anything, "c1").Return(true, nil).Once()
+
+	// No GetDeployByID/UpdateDeploy expected — Pending guard skips the fallback.
+	pastTime := time.Now().Add(-2 * time.Hour)
+	deploys := []database.Deploy{
+		{ID: 1, Type: types.SpaceType, SvcName: "s1", ClusterID: "c1",
+			Status: common.Deploying, StatusUpdateAt: pastTime,
+			Instances: []types.Instance{{Name: "s1-00001-pod", Status: "Pending"}}},
+	}
+	reconcileDeployCluster(context.WithValue(context.Background(), "test", "test"), a, "c1", deploys, common.Deploying, 30*time.Minute)
 }

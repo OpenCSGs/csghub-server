@@ -2,6 +2,7 @@ package sensitive
 
 import (
 	"context"
+	"io"
 	"log/slog"
 	"strings"
 
@@ -32,6 +33,7 @@ func WithAliYunChecker() ChainOption {
 			config.SensitiveCheck.AccessKeySecret != "" &&
 			config.SensitiveCheck.Region != "" {
 			checker := NewAliyunGreenCheckerFromConfig(config)
+			checker.initS3Client(config)
 			c.checkers = append(c.checkers, checker)
 		} else {
 			slog.Warn("sensitive config for AliYun modereation service not set")
@@ -109,6 +111,20 @@ func (c *chainImpl) PassImageCheck(ctx context.Context, scenario types.Sensitive
 func (c *chainImpl) PassImageURLCheck(ctx context.Context, scenario types.SensitiveScenario, imageURL string) (*CheckResult, error) {
 	for _, checker := range c.checkers {
 		res, err := checker.PassImageURLCheck(ctx, scenario, imageURL)
+		if err != nil {
+			return nil, err
+		}
+		if res.IsSensitive {
+			// If any checker detects sensitivity, return immediately
+			return res, nil
+		}
+	}
+	return &CheckResult{IsSensitive: false}, nil
+}
+
+func (c *chainImpl) PassImageStreamCheck(ctx context.Context, scenario types.SensitiveScenario, reader io.Reader) (*CheckResult, error) {
+	for _, checker := range c.checkers {
+		res, err := checker.PassImageStreamCheck(ctx, scenario, reader)
 		if err != nil {
 			return nil, err
 		}

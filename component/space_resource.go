@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"math"
+	"strconv"
 	"strings"
 
 	"opencsg.com/csghub-server/builder/deploy"
@@ -223,15 +225,25 @@ func (c *spaceResourceComponentImpl) Create(ctx context.Context, req *types.Crea
 func (c *spaceResourceComponentImpl) Delete(ctx context.Context, id int64) error {
 	sr, err := c.spaceResourceStore.FindByID(ctx, id)
 	if err != nil {
-		slog.Error("error finding space resource", slog.Any("error", err))
-		return err
+		return fmt.Errorf("error finding space resource %d failed: %w", id, err)
 	}
 
 	err = c.spaceResourceStore.Delete(ctx, *sr)
 	if err != nil {
-		slog.Error("error deleting space resource", slog.Any("error", err))
-		return err
+		return fmt.Errorf("error deleting space resource %d failed: %w", id, err)
 	}
+
+	// Off-line the corresponding price info
+	delReq := types.AcctPriceOffLineReq{
+		SkuType:    types.SKUCSGHub,
+		ResourceID: strconv.FormatInt(id, 10),
+	}
+	_, err = c.accountComponent.OffLinePrice(ctx, delReq)
+	if err != nil {
+		slog.WarnContext(ctx, "off-line price failed for delete space resource",
+			slog.Any("err", err), slog.Any("spaceResource", sr), slog.Any("delReq", delReq))
+	}
+
 	return nil
 }
 

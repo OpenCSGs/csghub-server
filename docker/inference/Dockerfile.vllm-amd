@@ -1,4 +1,4 @@
-FROM docker.m.daocloud.io/vllm/vllm-openai-rocm:v0.20.1
+FROM vllm/vllm-openai-rocm:v0.24.0
 RUN pip config set global.index-url https://mirrors.aliyun.com/pypi/simple
 RUN pip install --no-cache-dir csghub-sdk==0.7.3 ray supervisor
 RUN sed -i 's|http://archive.ubuntu.com/ubuntu|http://mirrors.aliyun.com/ubuntu|g' /etc/apt/sources.list && \
@@ -8,7 +8,7 @@ RUN mkdir -p /var/log/supervisord
 COPY ./supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 COPY ./vllm/ /etc/csghub/
 RUN chmod +x /etc/csghub/*.sh
-RUN chmod +x /app/vllm/examples/online_serving/*.sh
+RUN chmod +x /app/vllm/examples/ray_serving/*.sh
 
 WORKDIR /workspace/
 ENV HUGGINGFACE_HUB_CACHE=/workspace/ \

@@ -12,15 +12,15 @@ echo "$OPENCSG_ACR_PASSWORD" | docker login $OPENCSG_ACR -u $OPENCSG_ACR_USERNAM
 ```bash
 export BUILDX_NO_DEFAULT_ATTESTATIONS=1
 
-# For vllm: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/vllm:v0.20.1
-export IMAGE_TAG=v0.20.1
+# For vllm: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/vllm:v0.24.0
+export IMAGE_TAG=v0.24.0
 docker buildx build --platform linux/amd64,linux/arm64 \
   -t ${OPENCSG_ACR}/opencsghq/vllm:${IMAGE_TAG} \
   -f Dockerfile.vllm \
   --push .
 
-# For amd-vllm: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/amd-vllm:rocm7.2.1_vllm_0.20.1
-export IMAGE_TAG=rocm7.2.1_vllm_0.20.1
+# For amd-vllm: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/amd-vllm:rocm7.2.1_vllm_0.24.0
+export IMAGE_TAG=rocm7.2.1_vllm_0.24.0
 docker buildx build --platform linux/amd64 \
   -t ${OPENCSG_ACR}/opencsghq/amd-vllm:${IMAGE_TAG} \
   -f Dockerfile.vllm-amd \
@@ -42,8 +42,8 @@ docker buildx build --platform linux/amd64 \
   -f Dockerfile.tgi \
   --push .
 
-# For sglang: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/sglang:v0.5.0rc2-cu126
-export IMAGE_TAG=v0.5.9-cu130
+# For sglang: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/sglang:v0.5.14-cu130
+export IMAGE_TAG=v0.5.14-cu130
 docker buildx build --platform linux/amd64,linux/arm64 \
   -t ${OPENCSG_ACR}/opencsghq/sglang:${IMAGE_TAG} \
   -f Dockerfile.sglang \
@@ -91,15 +91,15 @@ docker buildx build --platform linux/amd64,linux/arm64 \
   -t ${OPENCSG_ACR}/opencsghq/funasr-cpu:${IMAGE_TAG} \
   -f Dockerfile.funasr-cpu \
   --push .
-# For Diffusers image editing: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/diffusers:0.38.0
-export IMAGE_TAG=0.38.0
+# For Diffusers image generation and editing: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/diffusers:0.39.0
+export IMAGE_TAG=0.39.0
 docker buildx build --platform linux/amd64 \
   -t ${OPENCSG_ACR}/opencsghq/diffusers:${IMAGE_TAG} \
   -t ${OPENCSG_ACR}/opencsghq/diffusers:latest \
   -f Dockerfile.diffusers \
   --push .
-# For Diffusers image editing ROCm: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/diffusers-rocm:0.38.0
-export IMAGE_TAG=0.38.0
+# For Diffusers image generation and editing ROCm: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/diffusers-rocm:0.39.0
+export IMAGE_TAG=0.39.0
 docker buildx build --platform linux/amd64 \
   -t ${OPENCSG_ACR}/opencsghq/diffusers-rocm:${IMAGE_TAG} \
   -t ${OPENCSG_ACR}/opencsghq/diffusers-rocm:latest \
@@ -152,7 +152,7 @@ docker run -d \
   -e HF_ENDPOINT=https://hub.opencsg.com \
   --gpus device=1 \
   -p 8000:8000 \
-  ${OPENCSG_ACR}/opencsghq/vllm-local:2.8
+  ${OPENCSG_ACR}/opencsghq/vllm:v0.24.0
 
 # Run TGI
 docker run -d \
@@ -199,7 +199,7 @@ docker run -d \
   -e REVISION="main" \
   -e ACCESS_TOKEN="xxx" \
   -e HF_ENDPOINT="https://hub.opencsg.com" \
-  opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/diffusers:0.38.0
+  opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/diffusers:0.39.0
 
 # Call OpenAI-compatible image edit API
 curl --max-time 600 -X POST http://127.0.0.1:8000/v1/images/edits \
@@ -211,12 +211,13 @@ curl --max-time 600 -X POST http://127.0.0.1:8000/v1/images/edits \
 *Note: HF_ENDPOINT should be use the real csghub address.*
 *Note: FunASR downloads `REPO_ID` to `/workspace/${REPO_ID}` and preloads that local model at startup. The OpenAI-compatible `model` field can use `local`, the repo id, or the repo name.*
 *Note: FunASR enables VAD chunking by default for long audio with `FUNASR_VAD_MODEL=fsmn-vad`, `FUNASR_VAD_MAX_SINGLE_SEGMENT_TIME=30000`, `FUNASR_BATCH_SIZE_S=60`, and `FUNASR_BATCH_SIZE_THRESHOLD_S=30`. Set `FUNASR_VAD_MODEL=none` to disable VAD.*
-*Note: Diffusers image editing uses the same PyTorch CUDA 12.8 base image as FunASR and downloads `REPO_ID` to `/workspace/${REPO_ID}` before loading the local Diffusers pipeline. The image pins `diffusers==0.38.0` with `transformers==4.57.6` for Qwen Image and other recent pipelines.*
+*Note: Diffusers image generation and editing uses a PyTorch CUDA 12.8 base image and downloads `REPO_ID` to `/workspace/${REPO_ID}` before loading the local Diffusers pipeline. The 0.39.0 image pins `diffusers==0.39.0` with `transformers==5.13.0`; the 0.38.0 runtime remains registered for models that do not require the new pipelines.*
 
 ## inference image name, version and cuda version
 | Task| Image Name | Version | CUDA Version | Fix
 | --- | --- | --- | --- |--- |
-|text generation| vllm | 2.8 | 12.1 | - |
+|text generation / embedding / reranking| vllm | v0.24.0 | 13.0 |pooling runner support for embedding and reranking|
+|text generation / embedding / reranking| amd-vllm | rocm7.2.1_vllm_0.24.0 | - |ROCm 7.2.1, vLLM 0.24.0|
 |text generation| vllm | v0.8.5 | 12.4 |fix hf hub timestamp|
 |text generation| vllm-cpu | 2.4 | -|fix hf hub timestamp |
 |text generation| tgi | 2.2 | 12.1 |- |
@@ -225,9 +226,11 @@ curl --max-time 600 -X POST http://127.0.0.1:8000/v1/images/edits \
 |speech recognition| funasr | cuda12.8 | 12.8 |-|
 |speech recognition| funasr-rocm | rocm7.2.2 | - |-|
 |speech recognition| funasr-cpu | latest | - |-|
-|image editing| diffusers | 0.38.0 | 12.8 |diffusers 0.38.0, transformers 4.57.6|
-|image editing| diffusers-rocm | 0.38.0 | - |diffusers 0.38.0, transformers 4.57.6, ROCm 7.2.2|
-|text generation| sglang | v0.4.6.post1-cu124-srt| 12.4 |- |
+|image generation / editing| diffusers | 0.39.0 | 12.8 |diffusers 0.39.0, transformers 5.13.0|
+|image generation / editing| diffusers | 0.38.0 | 12.8 |legacy runtime retained for existing pipelines|
+|image generation / editing| diffusers-rocm | 0.39.0 | - |diffusers 0.39.0, transformers 5.13.0, ROCm 7.2.2|
+|image generation / editing| diffusers-rocm | 0.38.0 | - |legacy runtime retained, ROCm 7.2.2|
+|text generation| sglang | v0.5.14-cu130 | 13.0 |tool calling enabled by default|
 |text generation| mindie | 2.0-csg-1.0.RC2 | 1.0.RC2 |- |
 |text generation| llama.cpp | b5215 | - |- |
 |text generation| llama.cpp-rocm | rocm7.2.2-b9787 | - |ROCm 7.2.2, llama.cpp b9787, official wide range ROCm targets|

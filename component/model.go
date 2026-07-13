@@ -1486,6 +1486,9 @@ func GetBuiltInTaskFromTags(tags []database.Tag) string {
 		if tag.Name == string(types.FeatureExtraction) || tag.Name == string(types.SentenceSimilarity) {
 			return string(types.FeatureExtraction)
 		}
+		if tag.Name == string(types.TextRanking) {
+			return tag.Name
+		}
 		if tag.Name == string(types.ImageText2Text) {
 			return tag.Name
 		}

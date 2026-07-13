@@ -6,13 +6,6 @@ import (
 	commontypes "opencsg.com/csghub-server/common/types"
 )
 
-// Provider type values for Metadata[MetaKeyLLMType].
-const (
-	ProviderTypeServerless  = "serverless"
-	ProviderTypeInference   = "inference"
-	ProviderTypeExternalLLM = "external_llm"
-)
-
 // Metadata key constants used when enriching model metadata.
 const (
 	MetaKeyLLMType           = "llm_type"
@@ -20,12 +13,6 @@ const (
 	MetaKeyPricingConfigured = "pricing_configured"
 	MetaKeyRepoPath          = "repo_path"
 	MetaKeyTasks             = "tasks"
-)
-
-// Resource ID format strings for external LLM (model ID) and CSGHub internal (path segment, repo path).
-const (
-	ExternalLLMResourceFmt = "thirdparty://%s"
-	CSGHubResourceFmt      = "csghub://%s/%s"
 )
 
 // MeteringResource holds ResourceID, ResourceName, and CustomerID for metering events.
@@ -50,6 +37,7 @@ type BaseModel struct {
 // InternalModelInfo represents the internal model fields
 type InternalModelInfo struct {
 	CSGHubModelID    string               `json:"-"` // the internal model id (repo path) in CSGHub
+	LegacyModelID    string               `json:"-"` // the previous public model id, used for backward-compatible lookup
 	OwnerUUID        string               `json:"-"` // the uuid of deploy owner
 	ClusterID        string               `json:"-"` // the deployed cluster id in CSGHub
 	SvcName          string               `json:"-"` // the internal service name in CSGHub
@@ -274,12 +262,10 @@ type ModelList struct {
 }
 
 // ListModelsReq defines query-like parameters for listing models.
-// Fields are passed as strings so the component layer can own parsing,
-// filtering, and pagination behavior consistently.
 type ListModelsReq struct {
 	ModelID            string   `json:"model_id"`
-	Per                string   `json:"per"`
-	Page               string   `json:"page"`
+	Per                int      `json:"per"`
+	Page               int      `json:"page"`
 	LLMTypes           []string `json:"llm_types"` // filter by llm_type
 	Task               string   `json:"task"`      // filter by task
 	HasAssociatedModel *bool    `json:"has_associated_model"`

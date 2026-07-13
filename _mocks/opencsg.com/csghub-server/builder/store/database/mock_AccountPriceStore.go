@@ -616,6 +616,53 @@ func (_c *MockAccountPriceStore_ListPricesByGroupKey_Call) RunAndReturn(run func
 	return _c
 }
 
+// OffLineBySkuTypeAndResourceID provides a mock function with given fields: ctx, req
+func (_m *MockAccountPriceStore) OffLineBySkuTypeAndResourceID(ctx context.Context, req types.AcctPriceOffLineReq) error {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for OffLineBySkuTypeAndResourceID")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.AcctPriceOffLineReq) error); ok {
+		r0 = rf(ctx, req)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockAccountPriceStore_OffLineBySkuTypeAndResourceID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'OffLineBySkuTypeAndResourceID'
+type MockAccountPriceStore_OffLineBySkuTypeAndResourceID_Call struct {
+	*mock.Call
+}
+
+// OffLineBySkuTypeAndResourceID is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req types.AcctPriceOffLineReq
+func (_e *MockAccountPriceStore_Expecter) OffLineBySkuTypeAndResourceID(ctx interface{}, req interface{}) *MockAccountPriceStore_OffLineBySkuTypeAndResourceID_Call {
+	return &MockAccountPriceStore_OffLineBySkuTypeAndResourceID_Call{Call: _e.mock.On("OffLineBySkuTypeAndResourceID", ctx, req)}
+}
+
+func (_c *MockAccountPriceStore_OffLineBySkuTypeAndResourceID_Call) Run(run func(ctx context.Context, req types.AcctPriceOffLineReq)) *MockAccountPriceStore_OffLineBySkuTypeAndResourceID_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.AcctPriceOffLineReq))
+	})
+	return _c
+}
+
+func (_c *MockAccountPriceStore_OffLineBySkuTypeAndResourceID_Call) Return(_a0 error) *MockAccountPriceStore_OffLineBySkuTypeAndResourceID_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockAccountPriceStore_OffLineBySkuTypeAndResourceID_Call) RunAndReturn(run func(context.Context, types.AcctPriceOffLineReq) error) *MockAccountPriceStore_OffLineBySkuTypeAndResourceID_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Update provides a mock function with given fields: ctx, input
 func (_m *MockAccountPriceStore) Update(ctx context.Context, input database.AccountPrice) (*database.AccountPrice, error) {
 	ret := _m.Called(ctx, input)

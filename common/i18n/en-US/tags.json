@@ -83,6 +83,9 @@
   "Tag.I18nKey.feature-extraction": {
     "other": "feature extraction"
   },
+  "Tag.I18nKey.text-ranking": {
+    "other": "text ranking"
+  },
   "Tag.I18nKey.relation-extraction": {
     "other": "relation extraction"
   },

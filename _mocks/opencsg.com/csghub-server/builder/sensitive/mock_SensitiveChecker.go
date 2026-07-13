@@ -4,6 +4,7 @@ package sensitive
 
 import (
 	context "context"
+	io "io"
 
 	mock "github.com/stretchr/testify/mock"
 	sensitive "opencsg.com/csghub-server/builder/sensitive"
@@ -141,6 +142,66 @@ func (_c *MockSensitiveChecker_PassImageURLCheck_Call) Return(_a0 *sensitive.Che
 }
 
 func (_c *MockSensitiveChecker_PassImageURLCheck_Call) RunAndReturn(run func(context.Context, types.SensitiveScenario, string) (*sensitive.CheckResult, error)) *MockSensitiveChecker_PassImageURLCheck_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// PassImageStreamCheck provides a mock function with given fields: ctx, scenario, reader
+func (_m *MockSensitiveChecker) PassImageStreamCheck(ctx context.Context, scenario types.SensitiveScenario, reader io.Reader) (*sensitive.CheckResult, error) {
+	ret := _m.Called(ctx, scenario, reader)
+
+	if len(ret) == 0 {
+		panic("no return value specified for PassImageStreamCheck")
+	}
+
+	var r0 *sensitive.CheckResult
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.SensitiveScenario, io.Reader) (*sensitive.CheckResult, error)); ok {
+		return rf(ctx, scenario, reader)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.SensitiveScenario, io.Reader) *sensitive.CheckResult); ok {
+		r0 = rf(ctx, scenario, reader)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*sensitive.CheckResult)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.SensitiveScenario, io.Reader) error); ok {
+		r1 = rf(ctx, scenario, reader)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockSensitiveChecker_PassImageStreamCheck_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PassImageStreamCheck'
+type MockSensitiveChecker_PassImageStreamCheck_Call struct {
+	*mock.Call
+}
+
+// PassImageStreamCheck is a helper method to define mock.On call
+//   - ctx context.Context
+//   - scenario types.SensitiveScenario
+//   - reader io.Reader
+func (_e *MockSensitiveChecker_Expecter) PassImageStreamCheck(ctx interface{}, scenario interface{}, reader interface{}) *MockSensitiveChecker_PassImageStreamCheck_Call {
+	return &MockSensitiveChecker_PassImageStreamCheck_Call{Call: _e.mock.On("PassImageStreamCheck", ctx, scenario, reader)}
+}
+
+func (_c *MockSensitiveChecker_PassImageStreamCheck_Call) Run(run func(ctx context.Context, scenario types.SensitiveScenario, reader io.Reader)) *MockSensitiveChecker_PassImageStreamCheck_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.SensitiveScenario), args[2].(io.Reader))
+	})
+	return _c
+}
+
+func (_c *MockSensitiveChecker_PassImageStreamCheck_Call) Return(_a0 *sensitive.CheckResult, _a1 error) *MockSensitiveChecker_PassImageStreamCheck_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockSensitiveChecker_PassImageStreamCheck_Call) RunAndReturn(run func(context.Context, types.SensitiveScenario, io.Reader) (*sensitive.CheckResult, error)) *MockSensitiveChecker_PassImageStreamCheck_Call {
 	_c.Call.Return(run)
 	return _c
 }

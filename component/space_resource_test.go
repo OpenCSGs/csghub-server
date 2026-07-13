@@ -143,6 +143,10 @@ func TestSpaceResourceComponent_Delete(t *testing.T) {
 		&database.SpaceResource{}, nil,
 	)
 	sc.mocks.stores.SpaceResourceMock().EXPECT().Delete(ctx, database.SpaceResource{}).Return(nil)
+	sc.mocks.components.accounting.EXPECT().OffLinePrice(ctx, types.AcctPriceOffLineReq{
+		SkuType:    types.SKUCSGHub,
+		ResourceID: "1",
+	}).Return(nil, nil)
 
 	err := sc.Delete(ctx, 1)
 	require.Nil(t, err)

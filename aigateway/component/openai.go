@@ -9,7 +9,6 @@ import (
 	"maps"
 	"regexp"
 	"slices"
-	"strconv"
 	"strings"
 	"time"
 
@@ -274,33 +273,28 @@ func filterAndPaginateModels(models []types.Model, req types.ListModelsReq) type
 
 	models = applyFilters(models, filters)
 
-	per := 20
-	page := 1
-	if req.Per != "" {
-		if parsedPer, err := strconv.Atoi(req.Per); err == nil && parsedPer > 0 {
-			per = parsedPer
-			if per > 100 {
-				per = 100
-			}
-		}
-	}
-	if req.Page != "" {
-		if parsedPage, err := strconv.Atoi(req.Page); err == nil && parsedPage > 0 {
-			page = parsedPage
-		}
-	}
-
 	totalCount := len(models)
-	startIndex := (page - 1) * per
-	if startIndex > totalCount {
-		startIndex = totalCount
-	}
-	endIndex := startIndex + per
-	if endIndex > totalCount {
-		endIndex = totalCount
-	}
+	paginated := models
+	hasMore := false
 
-	paginated := models[startIndex:endIndex]
+	if req.Per > 0 && req.Page > 0 {
+		per := req.Per
+		if per > 100 {
+			per = 100
+		}
+
+		startIndex := (req.Page - 1) * per
+		if startIndex > totalCount {
+			startIndex = totalCount
+		}
+		endIndex := startIndex + per
+		if endIndex > totalCount {
+			endIndex = totalCount
+		}
+
+		paginated = models[startIndex:endIndex]
+		hasMore = endIndex < totalCount
+	}
 
 	var firstID, lastID *string
 	if len(paginated) > 0 {
@@ -313,7 +307,7 @@ func filterAndPaginateModels(models []types.Model, req types.ListModelsReq) type
 		Data:       paginated,
 		FirstID:    firstID,
 		LastID:     lastID,
-		HasMore:    endIndex < totalCount,
+		HasMore:    hasMore,
 		TotalCount: totalCount,
 	}
 }
@@ -322,11 +316,11 @@ func filterAndPaginateModels(models []types.Model, req types.ListModelsReq) type
 func providerTypeFromDeployType(t int) string {
 	switch t {
 	case commontypes.ServerlessType:
-		return types.ProviderTypeServerless
+		return commontypes.ProviderTypeServerless
 	case commontypes.InferenceType:
-		return types.ProviderTypeInference
+		return commontypes.ProviderTypeInference
 	default:
-		return types.ProviderTypeInference
+		return commontypes.ProviderTypeInference
 	}
 }
 
@@ -346,6 +340,11 @@ func (c *openaiComponentImpl) getCSGHubModels(ctx context.Context, userID int64)
 			slog.WarnContext(ctx, "skip deploy with nil user", "deploy_id", deploy.ID, "svc_name", deploy.SvcName, "user_id", deploy.UserID)
 			continue
 		}
+		modelID := modelIDBuilder.To(deploy)
+		if modelID == "" {
+			slog.WarnContext(ctx, "skip deploy with empty model id", "deploy_id", deploy.ID, "svc_name", deploy.SvcName, "deploy_type", deploy.Type)
+			continue
+		}
 		// Check if engine_args contains tool-call-parser parameter
 		supportFunctionCall := strings.Contains(deploy.EngineArgs, "tool-call-parser")
 		m := types.Model{
@@ -361,6 +360,7 @@ func (c *openaiComponentImpl) getCSGHubModels(ctx context.Context, userID int64)
 			},
 			InternalModelInfo: types.InternalModelInfo{
 				CSGHubModelID:    deploy.Repository.Path,
+				LegacyModelID:    modelIDBuilder.ToLegacyCSGHubModelID(deploy.Repository, deploy.SvcName),
 				OwnerUUID:        deploy.User.UUID,
 				ClusterID:        deploy.ClusterID,
 				SvcName:          deploy.SvcName,
@@ -374,15 +374,7 @@ func (c *openaiComponentImpl) getCSGHubModels(ctx context.Context, userID int64)
 		}
 		m.BaseModel.OwnedBy = modelIDBuilder.GetModelOwner(deploy.Type, deploy.User.Username)
 
-		modelName := ""
-		if deploy.Repository.HFPath != "" {
-			modelName = deploy.Repository.HFPath
-		} else {
-			modelName = deploy.Repository.Path
-		}
-
-		baseModelID := modelIDBuilder.To(modelName, deploy.SvcName)
-		m.ID = baseModelID
+		m.ID = modelID
 		m.Endpoint = deploy.Endpoint
 		slog.Debug("running model", slog.Any("model", m), slog.Any("deploy", deploy))
 		models = append(models, m)
@@ -431,7 +423,7 @@ func (m *openaiComponentImpl) getExternalModels(c context.Context) []types.Model
 					slog.WarnContext(c, "llm config repo relation unavailable", "llm_config_id", extModel.ID, "repo_id", extModel.RepoID)
 				}
 			}
-			metadata[types.MetaKeyLLMType] = types.ProviderTypeExternalLLM
+			metadata[types.MetaKeyLLMType] = commontypes.ProviderTypeExternalLLM
 			// Convert relational upstreams to types.UpstreamConfig for routing
 			upstreams := dbUpstreamsToConfigs(extModel.Upstreams)
 			provider := extModel.PrimaryProvider()
@@ -541,12 +533,16 @@ func (m *openaiComponentImpl) GetModelByID(c context.Context, username, modelID 
 	}
 
 	for _, model := range models {
-		if model.ID == modelID {
+		if model.ID == modelID || m.isLegacyCSGHubModelID(model, modelID) {
 			return &model, nil
 		}
 	}
 
 	return nil, nil
+}
+
+func (m *openaiComponentImpl) isLegacyCSGHubModelID(model types.Model, modelID string) bool {
+	return model.LegacyModelID != "" && model.LegacyModelID == modelID
 }
 
 func getSceneFromSvcType(svcType int) int {
@@ -590,11 +586,11 @@ func (m *openaiComponentImpl) resolveUsageMeteringInfo(c context.Context, nsUUID
 		return usageMeteringInfo{}, err
 	}
 	switch llmType {
-	case types.ProviderTypeServerless, types.ProviderTypeInference:
+	case commontypes.ProviderTypeServerless, commontypes.ProviderTypeInference:
 		if model.CSGHubModelID == "" {
 			return usageMeteringInfo{}, fmt.Errorf("model metadata %s=%s requires csghub model id", types.MetaKeyLLMType, llmType)
 		}
-		id := fmt.Sprintf(types.CSGHubResourceFmt, llmType, model.CSGHubModelID)
+		id := fmt.Sprintf(commontypes.CSGHubResourceFmt, llmType, model.CSGHubModelID)
 		meteringInfo := usageMeteringInfo{
 			Resource: types.MeteringResource{
 				ResourceID:   id,
@@ -603,7 +599,7 @@ func (m *openaiComponentImpl) resolveUsageMeteringInfo(c context.Context, nsUUID
 			},
 			Scene: commontypes.SceneModelServerless,
 		}
-		if llmType == types.ProviderTypeInference {
+		if llmType == commontypes.ProviderTypeInference {
 			meteringInfo.Scene = commontypes.SceneModelInference
 			ownerType, err := m.resolveUsageOwnerType(c, nsUUID, model)
 			if err != nil {
@@ -614,11 +610,11 @@ func (m *openaiComponentImpl) resolveUsageMeteringInfo(c context.Context, nsUUID
 			meteringInfo.OwnerType = commontypes.CSGHubServerlessInference
 		}
 		return meteringInfo, nil
-	case types.ProviderTypeExternalLLM:
+	case commontypes.ProviderTypeExternalLLM:
 		if model.ID == "" {
 			return usageMeteringInfo{}, fmt.Errorf("model metadata %s=%s requires model id", types.MetaKeyLLMType, llmType)
 		}
-		id := fmt.Sprintf(types.ExternalLLMResourceFmt, model.ID)
+		id := fmt.Sprintf(commontypes.ExternalLLMResourceFmt, model.ID)
 		return usageMeteringInfo{
 			Resource: types.MeteringResource{
 				ResourceID:   id,

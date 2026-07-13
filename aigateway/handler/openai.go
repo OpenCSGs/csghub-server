@@ -51,6 +51,8 @@ type OpenAIHandler interface {
 	Responses(c *gin.Context)
 	// Get embedding for a text
 	Embedding(c *gin.Context)
+	// Rerank documents against a query for a text-ranking model
+	Rerank(c *gin.Context)
 	// Generate image from text
 	GenerateImage(c *gin.Context)
 	// Edit image from prompt and input image
@@ -273,10 +275,10 @@ type OpenAIHandlerImpl struct {
 // @Param        llm_types query []string false "Filter by LLM types" Enums(external_llm, serverless, inference)
 // @Param        task query string false "Filter by task (e.g., text-generation, text-to-image, image-to-image)"
 // @Param        has_associated_model query bool false "Filter by whether models are linked to a CSGHub model repository"
-// @Param        per query int false "Models per page (default 20, max 100)"
-// @Param        page query int false "Page number (1-based, default 1)"
+// @Param        per query int false "Models per page, must be provided with page (max 100)"
+// @Param        page query int false "Page number, must be provided with per (1-based)"
 // @Success      200  {object}  types.ModelList "OK"
-// @Failure      400  {object}  error "Invalid llm_types or has_associated_model parameter"
+// @Failure      400  {object}  error "Invalid llm_types, has_associated_model, or pagination parameter"
 // @Failure      500  {object}  error "Internal server error"
 // @Router       /v1/models [get]
 func (h *OpenAIHandlerImpl) ListModels(c *gin.Context) {
@@ -314,13 +316,21 @@ func (h *OpenAIHandlerImpl) ListModels(c *gin.Context) {
 		hasAssociatedModel = &parsed
 	}
 
+	per, page, paginationErr := parseListModelsPagination(c)
+	if paginationErr != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": *paginationErr,
+		})
+		return
+	}
+
 	resp, err := h.openaiComponent.ListModels(c.Request.Context(), currentUser, types.ListModelsReq{
 		ModelID:            c.Query("model_id"),
 		LLMTypes:           llmTypes,
 		Task:               c.Query("task"),
 		HasAssociatedModel: hasAssociatedModel,
-		Per:                c.Query("per"),
-		Page:               c.Query("page"),
+		Per:                per,
+		Page:               page,
 	})
 	if err != nil {
 		slog.ErrorContext(c.Request.Context(), "failed to get available models", "error", err.Error(), "current_user", currentUser)
@@ -338,7 +348,7 @@ func (h *OpenAIHandlerImpl) ListModels(c *gin.Context) {
 
 func isValidListModelsLLMType(llmType string) bool {
 	switch strings.ToLower(strings.TrimSpace(llmType)) {
-	case types.ProviderTypeExternalLLM, types.ProviderTypeServerless, types.ProviderTypeInference:
+	case commonType.ProviderTypeExternalLLM, commonType.ProviderTypeServerless, commonType.ProviderTypeInference:
 		return true
 	default:
 		return false
@@ -346,11 +356,37 @@ func isValidListModelsLLMType(llmType string) bool {
 }
 
 func invalidLLMTypesErrorMessage() string {
-	return fmt.Sprintf("Invalid llm_types parameter. Allowed values: %s, %s, %s", types.ProviderTypeExternalLLM, types.ProviderTypeServerless, types.ProviderTypeInference)
+	return fmt.Sprintf("Invalid llm_types parameter. Allowed values: %s, %s, %s", commonType.ProviderTypeExternalLLM, commonType.ProviderTypeServerless, commonType.ProviderTypeInference)
 }
 
 func invalidHasAssociatedModelErrorMessage() string {
 	return "Invalid has_associated_model parameter. Allowed values: true, false"
+}
+
+func parseListModelsPagination(c *gin.Context) (int, int, *types.Error) {
+	perValue, hasPer := c.GetQuery("per")
+	pageValue, hasPage := c.GetQuery("page")
+	if hasPer != hasPage {
+		return 0, 0, &types.Error{
+			Code:    "invalid_request_error",
+			Message: "per and page must be provided together",
+			Type:    "invalid_request_error",
+		}
+	}
+	if !hasPer {
+		return 0, 0, nil
+	}
+
+	per, perErr := strconv.Atoi(perValue)
+	page, pageErr := strconv.Atoi(pageValue)
+	if perErr != nil || pageErr != nil || per <= 0 || page <= 0 {
+		return 0, 0, &types.Error{
+			Code:    "invalid_request_error",
+			Message: "Invalid pagination parameter. per and page must be positive integers",
+			Type:    "invalid_request_error",
+		}
+	}
+	return per, page, nil
 }
 
 // GetModel godoc

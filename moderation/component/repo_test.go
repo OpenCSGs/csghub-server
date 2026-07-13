@@ -398,3 +398,144 @@ func TestRepoComponent_GetNamespaceWhiteList(t *testing.T) {
 		require.Nil(t, patterns)
 	})
 }
+
+func TestRepoComponent_buildImageURL(t *testing.T) {
+	cfg := &config.Config{}
+	cfg.APIServer.PublicDomain = "https://hub.opencsg.com"
+
+	tests := []struct {
+		name     string
+		file     *database.RepositoryFile
+		wantURL  string
+		wantEmpty bool
+	}{
+		{
+			name: "model repo image file",
+			file: &database.RepositoryFile{
+				Path: "images/banner.png",
+				Repository: &database.Repository{
+					Path:           "alice/my-model",
+					RepositoryType: types.ModelRepo,
+					DefaultBranch:  "main",
+				},
+			},
+			wantURL: "https://hub.opencsg.com/api/v1/models/alice/my-model/download/images/banner.png?ref=main",
+		},
+		{
+			name: "dataset repo image file",
+			file: &database.RepositoryFile{
+				Path: "preview/img.jpg",
+				Repository: &database.Repository{
+					Path:           "bob/my-dataset",
+					RepositoryType: types.DatasetRepo,
+					DefaultBranch:  "dev",
+				},
+			},
+			wantURL: "https://hub.opencsg.com/api/v1/datasets/bob/my-dataset/download/preview/img.jpg?ref=dev",
+		},
+		{
+			name: "mcpserver repo image file",
+			file: &database.RepositoryFile{
+				Path: "logo.png",
+				Repository: &database.Repository{
+					Path:           "carol/my-mcp",
+					RepositoryType: types.MCPServerRepo,
+					DefaultBranch:  "main",
+				},
+			},
+			wantURL: "https://hub.opencsg.com/api/v1/mcps/carol/my-mcp/download/logo.png?ref=main",
+		},
+		{
+			name: "code repo image with special chars in ref",
+			file: &database.RepositoryFile{
+				Path: "docs/arch.png",
+				Repository: &database.Repository{
+					Path:           "dave/my-code",
+					RepositoryType: types.CodeRepo,
+					DefaultBranch:  "feature/branch",
+				},
+			},
+			wantURL: "https://hub.opencsg.com/api/v1/codes/dave/my-code/download/docs/arch.png?ref=feature%2Fbranch",
+		},
+		{
+			name: "private repo returns empty",
+			file: &database.RepositoryFile{
+				Path: "images/banner.png",
+				Repository: &database.Repository{
+					Path:           "alice/private-model",
+					RepositoryType: types.ModelRepo,
+					DefaultBranch:  "main",
+					Private:        true,
+				},
+			},
+			wantEmpty: true,
+		},
+		{
+			name: "non-image file returns empty",
+			file: &database.RepositoryFile{
+				Path: "readme.txt",
+				Repository: &database.Repository{
+					Path:           "alice/my-model",
+					RepositoryType: types.ModelRepo,
+					DefaultBranch:  "main",
+				},
+			},
+			wantEmpty: true,
+		},
+		{
+			name:      "nil file returns empty",
+			file:      nil,
+			wantEmpty: true,
+		},
+		{
+			name: "nil repository returns empty",
+			file: &database.RepositoryFile{
+				Path:       "image.png",
+				Repository: nil,
+			},
+			wantEmpty: true,
+		},
+		{
+			name: "empty default branch falls back to main",
+			file: &database.RepositoryFile{
+				Path: "img.png",
+				Repository: &database.Repository{
+					Path:           "eve/repo",
+					RepositoryType: types.SpaceRepo,
+					DefaultBranch:  "",
+				},
+			},
+			wantURL: "https://hub.opencsg.com/api/v1/spaces/eve/repo/download/img.png?ref=main",
+		},
+		{
+			name: "public domain with trailing slash is trimmed",
+			file: &database.RepositoryFile{
+				Path: "img.png",
+				Repository: &database.Repository{
+					Path:           "eve/repo",
+					RepositoryType: types.SpaceRepo,
+					DefaultBranch:  "main",
+				},
+			},
+			wantURL: "https://hub.opencsg.com/api/v1/spaces/eve/repo/download/img.png?ref=main",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			comp := &repoComponentImpl{config: cfg}
+			// for the trailing-slash test, use a dedicated config
+			if tt.name == "public domain with trailing slash is trimmed" {
+				slashCfg := &config.Config{}
+				slashCfg.APIServer.PublicDomain = "https://hub.opencsg.com/"
+				comp.config = slashCfg
+			}
+			got := comp.buildImageURL(tt.file)
+			if tt.wantEmpty {
+				require.Empty(t, got)
+			} else {
+				require.Equal(t, tt.wantURL, got)
+			}
+		})
+	}
+}

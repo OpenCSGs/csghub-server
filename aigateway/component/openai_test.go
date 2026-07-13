@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -64,7 +65,7 @@ func TestFilterAndPaginateModels(t *testing.T) {
 		{BaseModel: types.BaseModel{ID: "gpt-4o:svc4", Object: "model", OwnedBy: "u3"}},
 	}
 
-	t.Run("no filters default pagination", func(t *testing.T) {
+	t.Run("no filters returns all models without pagination params", func(t *testing.T) {
 		resp := filterAndPaginateModels(models, types.ListModelsReq{})
 		assert.Equal(t, "list", resp.Object)
 		assert.Equal(t, 4, resp.TotalCount)
@@ -83,7 +84,7 @@ func TestFilterAndPaginateModels(t *testing.T) {
 	})
 
 	t.Run("pagination per/page applied after filters", func(t *testing.T) {
-		resp := filterAndPaginateModels(models, types.ListModelsReq{ModelID: "gpt", Per: "2", Page: "2"})
+		resp := filterAndPaginateModels(models, types.ListModelsReq{ModelID: "gpt", Per: 2, Page: 2})
 		// gpt matches 3 models; page=2 per=2 yields 1 item
 		assert.Equal(t, 3, resp.TotalCount)
 		assert.Len(t, resp.Data, 1)
@@ -91,13 +92,34 @@ func TestFilterAndPaginateModels(t *testing.T) {
 		assert.False(t, resp.HasMore)
 	})
 
+	t.Run("pagination has more when more filtered models remain", func(t *testing.T) {
+		resp := filterAndPaginateModels(models, types.ListModelsReq{ModelID: "gpt", Per: 2, Page: 1})
+		assert.Equal(t, 3, resp.TotalCount)
+		require.Len(t, resp.Data, 2)
+		assert.Equal(t, "gpt-4:svc1", resp.Data[0].ID)
+		assert.Equal(t, "gpt-3.5:svc2", resp.Data[1].ID)
+		assert.True(t, resp.HasMore)
+	})
+
+	t.Run("per is capped at 100 when pagination is requested", func(t *testing.T) {
+		manyModels := make([]types.Model, 105)
+		for i := range manyModels {
+			manyModels[i] = types.Model{BaseModel: types.BaseModel{ID: fmt.Sprintf("model-%03d", i), Object: "model", OwnedBy: "u1"}}
+		}
+
+		resp := filterAndPaginateModels(manyModels, types.ListModelsReq{Per: 101, Page: 1})
+		assert.Equal(t, 105, resp.TotalCount)
+		assert.Len(t, resp.Data, 100)
+		assert.True(t, resp.HasMore)
+	})
+
 	t.Run("llm_types filter external_llm", func(t *testing.T) {
 		modelsWithLLMTypes := []types.Model{
-			{BaseModel: types.BaseModel{ID: "inference-model", Object: "model", OwnedBy: "u1", Metadata: map[string]any{types.MetaKeyLLMType: types.ProviderTypeInference}}},
-			{BaseModel: types.BaseModel{ID: "external-model", Object: "model", OwnedBy: "openai", Metadata: map[string]any{types.MetaKeyLLMType: types.ProviderTypeExternalLLM, types.MetaKeyPricingConfigured: true}}},
-			{BaseModel: types.BaseModel{ID: "serverless-model", Object: "model", OwnedBy: "u2", Metadata: map[string]any{types.MetaKeyLLMType: types.ProviderTypeServerless, types.MetaKeyPricingConfigured: true}}},
+			{BaseModel: types.BaseModel{ID: "inference-model", Object: "model", OwnedBy: "u1", Metadata: map[string]any{types.MetaKeyLLMType: commontypes.ProviderTypeInference}}},
+			{BaseModel: types.BaseModel{ID: "external-model", Object: "model", OwnedBy: "openai", Metadata: map[string]any{types.MetaKeyLLMType: commontypes.ProviderTypeExternalLLM, types.MetaKeyPricingConfigured: true}}},
+			{BaseModel: types.BaseModel{ID: "serverless-model", Object: "model", OwnedBy: "u2", Metadata: map[string]any{types.MetaKeyLLMType: commontypes.ProviderTypeServerless, types.MetaKeyPricingConfigured: true}}},
 		}
-		resp := filterAndPaginateModels(modelsWithLLMTypes, types.ListModelsReq{LLMTypes: []string{types.ProviderTypeExternalLLM}})
+		resp := filterAndPaginateModels(modelsWithLLMTypes, types.ListModelsReq{LLMTypes: []string{commontypes.ProviderTypeExternalLLM}})
 		assert.Equal(t, 1, resp.TotalCount)
 		require.Len(t, resp.Data, 1)
 		assert.Equal(t, "external-model", resp.Data[0].ID)
@@ -105,11 +127,11 @@ func TestFilterAndPaginateModels(t *testing.T) {
 
 	t.Run("llm_types filter supports multiple values", func(t *testing.T) {
 		modelsWithLLMTypes := []types.Model{
-			{BaseModel: types.BaseModel{ID: "inference-model", Object: "model", OwnedBy: "u1", Metadata: map[string]any{types.MetaKeyLLMType: types.ProviderTypeInference}}},
-			{BaseModel: types.BaseModel{ID: "external-model", Object: "model", OwnedBy: "openai", Metadata: map[string]any{types.MetaKeyLLMType: types.ProviderTypeExternalLLM, types.MetaKeyPricingConfigured: true}}},
-			{BaseModel: types.BaseModel{ID: "serverless-model", Object: "model", OwnedBy: "u2", Metadata: map[string]any{types.MetaKeyLLMType: types.ProviderTypeServerless, types.MetaKeyPricingConfigured: true}}},
+			{BaseModel: types.BaseModel{ID: "inference-model", Object: "model", OwnedBy: "u1", Metadata: map[string]any{types.MetaKeyLLMType: commontypes.ProviderTypeInference}}},
+			{BaseModel: types.BaseModel{ID: "external-model", Object: "model", OwnedBy: "openai", Metadata: map[string]any{types.MetaKeyLLMType: commontypes.ProviderTypeExternalLLM, types.MetaKeyPricingConfigured: true}}},
+			{BaseModel: types.BaseModel{ID: "serverless-model", Object: "model", OwnedBy: "u2", Metadata: map[string]any{types.MetaKeyLLMType: commontypes.ProviderTypeServerless, types.MetaKeyPricingConfigured: true}}},
 		}
-		resp := filterAndPaginateModels(modelsWithLLMTypes, types.ListModelsReq{LLMTypes: []string{types.ProviderTypeServerless, types.ProviderTypeInference}})
+		resp := filterAndPaginateModels(modelsWithLLMTypes, types.ListModelsReq{LLMTypes: []string{commontypes.ProviderTypeServerless, commontypes.ProviderTypeInference}})
 		assert.Equal(t, 2, resp.TotalCount)
 		require.Len(t, resp.Data, 2)
 		assert.Equal(t, "inference-model", resp.Data[0].ID)
@@ -118,8 +140,8 @@ func TestFilterAndPaginateModels(t *testing.T) {
 
 	t.Run("llm_types filter is case-insensitive and trims spaces", func(t *testing.T) {
 		modelsWithLLMTypes := []types.Model{
-			{BaseModel: types.BaseModel{ID: "serverless-model", Object: "model", OwnedBy: "u1", Metadata: map[string]any{types.MetaKeyLLMType: types.ProviderTypeServerless, types.MetaKeyPricingConfigured: true}}},
-			{BaseModel: types.BaseModel{ID: "external-model", Object: "model", OwnedBy: "openai", Metadata: map[string]any{types.MetaKeyLLMType: types.ProviderTypeExternalLLM, types.MetaKeyPricingConfigured: true}}},
+			{BaseModel: types.BaseModel{ID: "serverless-model", Object: "model", OwnedBy: "u1", Metadata: map[string]any{types.MetaKeyLLMType: commontypes.ProviderTypeServerless, types.MetaKeyPricingConfigured: true}}},
+			{BaseModel: types.BaseModel{ID: "external-model", Object: "model", OwnedBy: "openai", Metadata: map[string]any{types.MetaKeyLLMType: commontypes.ProviderTypeExternalLLM, types.MetaKeyPricingConfigured: true}}},
 		}
 		resp := filterAndPaginateModels(modelsWithLLMTypes, types.ListModelsReq{LLMTypes: []string{" SERVERLESS "}})
 		assert.Equal(t, 1, resp.TotalCount)
@@ -130,9 +152,9 @@ func TestFilterAndPaginateModels(t *testing.T) {
 	t.Run("llm_types filter excludes models without llm_type", func(t *testing.T) {
 		modelsWithLLMTypes := []types.Model{
 			{BaseModel: types.BaseModel{ID: "missing-llm-type", Object: "model", OwnedBy: "u1"}},
-			{BaseModel: types.BaseModel{ID: "external-model", Object: "model", OwnedBy: "openai", Metadata: map[string]any{types.MetaKeyLLMType: types.ProviderTypeExternalLLM, types.MetaKeyPricingConfigured: true}}},
+			{BaseModel: types.BaseModel{ID: "external-model", Object: "model", OwnedBy: "openai", Metadata: map[string]any{types.MetaKeyLLMType: commontypes.ProviderTypeExternalLLM, types.MetaKeyPricingConfigured: true}}},
 		}
-		resp := filterAndPaginateModels(modelsWithLLMTypes, types.ListModelsReq{LLMTypes: []string{types.ProviderTypeExternalLLM}})
+		resp := filterAndPaginateModels(modelsWithLLMTypes, types.ListModelsReq{LLMTypes: []string{commontypes.ProviderTypeExternalLLM}})
 		assert.Equal(t, 1, resp.TotalCount)
 		require.Len(t, resp.Data, 1)
 		assert.Equal(t, "external-model", resp.Data[0].ID)
@@ -224,11 +246,11 @@ func TestFilterAndPaginateModels(t *testing.T) {
 
 	t.Run("task filter combined with llm_types filter", func(t *testing.T) {
 		modelsWithTask := []types.Model{
-			{BaseModel: types.BaseModel{ID: "inference-gen", Object: "model", OwnedBy: "u1", Task: "text-generation", Metadata: map[string]any{types.MetaKeyLLMType: types.ProviderTypeInference}}},
-			{BaseModel: types.BaseModel{ID: "inference-image", Object: "model", OwnedBy: "u1", Task: "text-to-image", Metadata: map[string]any{types.MetaKeyLLMType: types.ProviderTypeInference}}},
-			{BaseModel: types.BaseModel{ID: "external-gen", Object: "model", OwnedBy: "openai", Task: "text-generation", Metadata: map[string]any{types.MetaKeyLLMType: types.ProviderTypeExternalLLM, types.MetaKeyPricingConfigured: true}}},
+			{BaseModel: types.BaseModel{ID: "inference-gen", Object: "model", OwnedBy: "u1", Task: "text-generation", Metadata: map[string]any{types.MetaKeyLLMType: commontypes.ProviderTypeInference}}},
+			{BaseModel: types.BaseModel{ID: "inference-image", Object: "model", OwnedBy: "u1", Task: "text-to-image", Metadata: map[string]any{types.MetaKeyLLMType: commontypes.ProviderTypeInference}}},
+			{BaseModel: types.BaseModel{ID: "external-gen", Object: "model", OwnedBy: "openai", Task: "text-generation", Metadata: map[string]any{types.MetaKeyLLMType: commontypes.ProviderTypeExternalLLM, types.MetaKeyPricingConfigured: true}}},
 		}
-		resp := filterAndPaginateModels(modelsWithTask, types.ListModelsReq{LLMTypes: []string{types.ProviderTypeInference}, Task: "text-generation"})
+		resp := filterAndPaginateModels(modelsWithTask, types.ListModelsReq{LLMTypes: []string{commontypes.ProviderTypeInference}, Task: "text-generation"})
 		assert.Equal(t, 1, resp.TotalCount)
 		assert.Len(t, resp.Data, 1)
 		assert.Equal(t, "inference-gen", resp.Data[0].ID)
@@ -270,19 +292,19 @@ func TestFilterAndPaginateModels(t *testing.T) {
 	t.Run("has_associated_model combines with existing filters and pagination", func(t *testing.T) {
 		hasAssociatedModel := true
 		modelsWithRepoPath := []types.Model{
-			{BaseModel: types.BaseModel{ID: "alpha-gen", Object: "model", OwnedBy: "u1", Task: "text-generation", Metadata: map[string]any{types.MetaKeyLLMType: types.ProviderTypeInference, types.MetaKeyRepoPath: "ns/alpha"}}},
-			{BaseModel: types.BaseModel{ID: "beta-gen", Object: "model", OwnedBy: "u1", Task: "text-generation", Metadata: map[string]any{types.MetaKeyLLMType: types.ProviderTypeInference, types.MetaKeyRepoPath: "ns/beta"}}},
-			{BaseModel: types.BaseModel{ID: "gamma-gen", Object: "model", OwnedBy: "u1", Task: "text-generation", Metadata: map[string]any{types.MetaKeyLLMType: types.ProviderTypeInference}}},
-			{BaseModel: types.BaseModel{ID: "delta-image", Object: "model", OwnedBy: "u1", Task: "text-to-image", Metadata: map[string]any{types.MetaKeyLLMType: types.ProviderTypeInference, types.MetaKeyRepoPath: "ns/delta"}}},
-			{BaseModel: types.BaseModel{ID: "external-gen", Object: "model", OwnedBy: "openai", Task: "text-generation", Metadata: map[string]any{types.MetaKeyLLMType: types.ProviderTypeExternalLLM, types.MetaKeyRepoPath: "ns/external", types.MetaKeyPricingConfigured: true}}},
+			{BaseModel: types.BaseModel{ID: "alpha-gen", Object: "model", OwnedBy: "u1", Task: "text-generation", Metadata: map[string]any{types.MetaKeyLLMType: commontypes.ProviderTypeInference, types.MetaKeyRepoPath: "ns/alpha"}}},
+			{BaseModel: types.BaseModel{ID: "beta-gen", Object: "model", OwnedBy: "u1", Task: "text-generation", Metadata: map[string]any{types.MetaKeyLLMType: commontypes.ProviderTypeInference, types.MetaKeyRepoPath: "ns/beta"}}},
+			{BaseModel: types.BaseModel{ID: "gamma-gen", Object: "model", OwnedBy: "u1", Task: "text-generation", Metadata: map[string]any{types.MetaKeyLLMType: commontypes.ProviderTypeInference}}},
+			{BaseModel: types.BaseModel{ID: "delta-image", Object: "model", OwnedBy: "u1", Task: "text-to-image", Metadata: map[string]any{types.MetaKeyLLMType: commontypes.ProviderTypeInference, types.MetaKeyRepoPath: "ns/delta"}}},
+			{BaseModel: types.BaseModel{ID: "external-gen", Object: "model", OwnedBy: "openai", Task: "text-generation", Metadata: map[string]any{types.MetaKeyLLMType: commontypes.ProviderTypeExternalLLM, types.MetaKeyRepoPath: "ns/external", types.MetaKeyPricingConfigured: true}}},
 		}
 		resp := filterAndPaginateModels(modelsWithRepoPath, types.ListModelsReq{
 			ModelID:            "gen",
-			LLMTypes:           []string{types.ProviderTypeInference},
+			LLMTypes:           []string{commontypes.ProviderTypeInference},
 			Task:               "text-generation",
 			HasAssociatedModel: &hasAssociatedModel,
-			Per:                "1",
-			Page:               "2",
+			Per:                1,
+			Page:               2,
 		})
 		assert.Equal(t, 2, resp.TotalCount)
 		require.Len(t, resp.Data, 1)
@@ -333,6 +355,19 @@ func TestOpenAIComponentImpl_getCSGHubModels_SkipsDeploysWithMissingRelations(t 
 		},
 		{
 			ID:      3,
+			SvcName: "unknown-type",
+			Type:    999,
+			Repository: &database.Repository{
+				Name: "unknown-model",
+				Path: "namespace/unknown-model",
+			},
+			User: &database.User{
+				Username: "unknown-owner",
+				UUID:     "unknown-owner-uuid",
+			},
+		},
+		{
+			ID:      4,
 			SvcName: "valid-svc",
 			Type:    commontypes.InferenceType,
 			Repository: &database.Repository{
@@ -356,7 +391,7 @@ func TestOpenAIComponentImpl_getCSGHubModels_SkipsDeploysWithMissingRelations(t 
 	models, err := comp.getCSGHubModels(context.Background(), 1)
 	require.NoError(t, err)
 	require.Len(t, models, 1)
-	assert.Equal(t, "namespace/valid-model:valid-svc", models[0].ID)
+	assert.Equal(t, "valid-model:4", models[0].ID)
 	assert.Equal(t, "valid-owner", models[0].OwnedBy)
 	assert.Equal(t, "valid-owner-uuid", models[0].OwnerUUID)
 	assert.Equal(t, "valid-endpoint", models[0].Endpoint)
@@ -606,7 +641,7 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 			model: &types.Model{
 				BaseModel: types.BaseModel{
 					Metadata: map[string]any{
-						types.MetaKeyLLMType: types.ProviderTypeInference,
+						types.MetaKeyLLMType: commontypes.ProviderTypeInference,
 					},
 				},
 				InternalModelInfo: types.InternalModelInfo{
@@ -688,7 +723,7 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 			model: &types.Model{
 				BaseModel: types.BaseModel{
 					Metadata: map[string]any{
-						types.MetaKeyLLMType: types.ProviderTypeInference,
+						types.MetaKeyLLMType: commontypes.ProviderTypeInference,
 					},
 				},
 				InternalModelInfo: types.InternalModelInfo{
@@ -760,7 +795,7 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 			model: &types.Model{
 				BaseModel: types.BaseModel{
 					Metadata: map[string]any{
-						types.MetaKeyLLMType: types.ProviderTypeInference,
+						types.MetaKeyLLMType: commontypes.ProviderTypeInference,
 					},
 				},
 				InternalModelInfo: types.InternalModelInfo{
@@ -832,7 +867,7 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 			model: &types.Model{
 				BaseModel: types.BaseModel{
 					Metadata: map[string]any{
-						types.MetaKeyLLMType: types.ProviderTypeServerless,
+						types.MetaKeyLLMType: commontypes.ProviderTypeServerless,
 					},
 				},
 				InternalModelInfo: types.InternalModelInfo{
@@ -1000,7 +1035,7 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 			model: &types.Model{
 				BaseModel: types.BaseModel{
 					Metadata: map[string]any{
-						types.MetaKeyLLMType: types.ProviderTypeInference,
+						types.MetaKeyLLMType: commontypes.ProviderTypeInference,
 					},
 				},
 				InternalModelInfo: types.InternalModelInfo{
@@ -1032,7 +1067,7 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 			model: &types.Model{
 				BaseModel: types.BaseModel{
 					Metadata: map[string]any{
-						types.MetaKeyLLMType: types.ProviderTypeInference,
+						types.MetaKeyLLMType: commontypes.ProviderTypeInference,
 					},
 				},
 				InternalModelInfo: types.InternalModelInfo{
@@ -1100,7 +1135,7 @@ func TestOpenAIComponentImpl_RecordUsage_MultiModalImage(t *testing.T) {
 		BaseModel: types.BaseModel{
 			ID: "test-image-model",
 			Metadata: map[string]any{
-				types.MetaKeyLLMType: string(types.ProviderTypeServerless),
+				types.MetaKeyLLMType: string(commontypes.ProviderTypeServerless),
 			},
 		},
 		InternalModelInfo: types.InternalModelInfo{
@@ -1162,7 +1197,7 @@ func TestOpenAIComponentImpl_RecordUsage_MultiModalVideo(t *testing.T) {
 		BaseModel: types.BaseModel{
 			ID: "test-video-model",
 			Metadata: map[string]any{
-				types.MetaKeyLLMType: string(types.ProviderTypeServerless),
+				types.MetaKeyLLMType: string(commontypes.ProviderTypeServerless),
 			},
 		},
 		InternalModelInfo: types.InternalModelInfo{
@@ -1221,7 +1256,7 @@ func TestOpenAIComponentImpl_RecordUsage_MultiModalAudio(t *testing.T) {
 		BaseModel: types.BaseModel{
 			ID: "test-audio-model",
 			Metadata: map[string]any{
-				types.MetaKeyLLMType: string(types.ProviderTypeServerless),
+				types.MetaKeyLLMType: string(commontypes.ProviderTypeServerless),
 			},
 		},
 		InternalModelInfo: types.InternalModelInfo{
@@ -1280,7 +1315,7 @@ func TestOpenAIComponentImpl_RecordUsage_ExternalModel(t *testing.T) {
 					ID:      "gpt-4(openai)",
 					OwnedBy: "openai",
 					Metadata: map[string]any{
-						types.MetaKeyLLMType: types.ProviderTypeExternalLLM,
+						types.MetaKeyLLMType: commontypes.ProviderTypeExternalLLM,
 					},
 				},
 				ExternalModelInfo: types.ExternalModelInfo{
@@ -1346,7 +1381,7 @@ func TestOpenAIComponentImpl_RecordUsage_ExternalModel(t *testing.T) {
 					ID:      "gpt-3.5-turbo",
 					OwnedBy: "openai",
 					Metadata: map[string]any{
-						types.MetaKeyLLMType: types.ProviderTypeExternalLLM,
+						types.MetaKeyLLMType: commontypes.ProviderTypeExternalLLM,
 					},
 				},
 				ExternalModelInfo: types.ExternalModelInfo{
@@ -1378,7 +1413,7 @@ func TestOpenAIComponentImpl_RecordUsage_ExternalModel(t *testing.T) {
 					ID:      "gemini-pro",
 					OwnedBy: "google",
 					Metadata: map[string]any{
-						types.MetaKeyLLMType: types.ProviderTypeExternalLLM,
+						types.MetaKeyLLMType: commontypes.ProviderTypeExternalLLM,
 					},
 				},
 				ExternalModelInfo: types.ExternalModelInfo{
@@ -1414,7 +1449,7 @@ func TestOpenAIComponentImpl_RecordUsage_ExternalModel(t *testing.T) {
 					ID:      "test-model(test-provider)",
 					OwnedBy: "test-provider",
 					Metadata: map[string]any{
-						types.MetaKeyLLMType: types.ProviderTypeExternalLLM,
+						types.MetaKeyLLMType: commontypes.ProviderTypeExternalLLM,
 					},
 				},
 				ExternalModelInfo: types.ExternalModelInfo{

@@ -1,6 +1,8 @@
 package types
 
 import (
+	"path"
+	"strings"
 	"time"
 )
 
@@ -8,6 +10,24 @@ var (
 	REPOCARD_FILENAME = "README.md"
 	HUGGINGFACE_HOST  = "huggingface.co"
 )
+
+// KnownImageFileExts lists file extensions recognised as image files.
+// Keep this as the single source of truth — do not duplicate elsewhere.
+var KnownImageFileExts = []string{".png", ".jpg", ".jpeg", ".gif", ".tif", ".tiff", ".svg", ".bmp", ".webp"}
+
+// IsImageFile returns true if the file path has a known image extension.
+func IsImageFile(filePath string) bool {
+	ext := path.Ext(filePath)
+	if len(ext) == 0 {
+		return false
+	}
+	for _, imageExt := range KnownImageFileExts {
+		if strings.EqualFold(ext, imageExt) {
+			return true
+		}
+	}
+	return false
+}
 
 type (
 	RepositoryType       string
@@ -95,6 +115,7 @@ const (
 	ImageText2Text     PipelineTask = "image-text-to-text"
 	FeatureExtraction  PipelineTask = "feature-extraction"
 	SentenceSimilarity PipelineTask = "sentence-similarity"
+	TextRanking        PipelineTask = "text-ranking"
 	TaskAutoDetection  PipelineTask = "task-auto-detection"
 	VideoText2Text     PipelineTask = "video-text-to-text"
 	TextToSpeech       PipelineTask = "text-to-speech"

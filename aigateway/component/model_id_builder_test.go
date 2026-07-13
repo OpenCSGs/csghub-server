@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"opencsg.com/csghub-server/builder/store/database"
 	commontypes "opencsg.com/csghub-server/common/types"
 )
 
@@ -11,98 +12,92 @@ func TestModelIDBuilder_To(t *testing.T) {
 	builder := NewModelIDBuilder()
 
 	tests := []struct {
-		name      string
-		modelName string
-		svcName   string
-		want      string
+		name   string
+		deploy database.Deploy
+		want   string
 	}{
 		{
-			name:      "normal case",
-			modelName: "gpt-4",
-			svcName:   "openai",
-			want:      "gpt-4:openai",
+			name: "serverless uses hf path first",
+			deploy: database.Deploy{
+				ID:   8765,
+				Type: commontypes.ServerlessType,
+				Repository: &database.Repository{
+					HFPath: "hf-org/GLM-5.1-FP8",
+					Path:   "zai-org/GLM-5.1-FP8",
+					Name:   "GLM-5.1-FP8",
+				},
+			},
+			want: "hf-org/GLM-5.1-FP8",
 		},
 		{
-			name:      "empty service name",
-			modelName: "gpt-4",
-			svcName:   "",
-			want:      "gpt-4:",
+			name: "serverless falls back to repo path",
+			deploy: database.Deploy{
+				ID:   8765,
+				Type: commontypes.ServerlessType,
+				Repository: &database.Repository{
+					Path: "zai-org/GLM-5.1-FP8",
+					Name: "GLM-5.1-FP8",
+				},
+			},
+			want: "zai-org/GLM-5.1-FP8",
 		},
 		{
-			name:      "empty model name",
-			modelName: "",
-			svcName:   "openai",
-			want:      ":openai",
+			name: "inference uses repo name and base36 deploy id",
+			deploy: database.Deploy{
+				ID:   8765,
+				Type: commontypes.InferenceType,
+				Repository: &database.Repository{
+					HFPath: "hf-user/Qwen3-0.6B",
+					Path:   "JasonChiang1916/Qwen3-0.6B",
+					Name:   "Qwen3-0.6B",
+				},
+			},
+			want: "Qwen3-0.6B:6rh",
+		},
+		{
+			name: "inference uses repo name as-is",
+			deploy: database.Deploy{
+				ID:   35,
+				Type: commontypes.InferenceType,
+				Repository: &database.Repository{
+					Path: "namespace/model-from-path",
+					Name: " model-from-name ",
+				},
+			},
+			want: " model-from-name :z",
+		},
+		{
+			name: "unknown type returns empty",
+			deploy: database.Deploy{
+				ID:   36,
+				Type: 999,
+				Repository: &database.Repository{
+					Path: "namespace/model",
+					Name: "model",
+				},
+			},
+			want: "",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := builder.To(tt.modelName, tt.svcName)
+			got := builder.To(tt.deploy)
 			assert.Equal(t, tt.want, got)
 		})
 	}
 }
 
-func TestModelIDBuilder_From(t *testing.T) {
+func TestModelIDBuilder_ToLegacyCSGHubModelID(t *testing.T) {
 	builder := NewModelIDBuilder()
 
-	tests := []struct {
-		name          string
-		modelID       string
-		wantModelName string
-		wantSvcName   string
-		wantErr       bool
-	}{
-		{
-			name:          "normal case",
-			modelID:       "gpt-4:openai",
-			wantModelName: "gpt-4",
-			wantSvcName:   "openai",
-			wantErr:       false,
-		},
-		{
-			name:          "empty service name",
-			modelID:       "gpt-4:",
-			wantModelName: "gpt-4",
-			wantSvcName:   "",
-			wantErr:       false,
-		},
-		{
-			name:          "empty model name",
-			modelID:       ":openai",
-			wantModelName: "",
-			wantSvcName:   "openai",
-			wantErr:       false,
-		},
-		{
-			name:          "invalid format - no colon",
-			modelID:       "invalid-format",
-			wantModelName: "invalid-format",
-			wantSvcName:   "",
-			wantErr:       false,
-		},
-		{
-			name:          "invalid format - multiple colons",
-			modelID:       "gpt-4:openai:extra",
-			wantModelName: "",
-			wantSvcName:   "",
-			wantErr:       true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			gotModelName, gotSvcName, err := builder.From(tt.modelID)
-			if tt.wantErr {
-				assert.Error(t, err)
-				return
-			}
-			assert.NoError(t, err)
-			assert.Equal(t, tt.wantModelName, gotModelName)
-			assert.Equal(t, tt.wantSvcName, gotSvcName)
-		})
-	}
+	assert.Equal(t, "hf/model:svc-name", builder.ToLegacyCSGHubModelID(&database.Repository{
+		HFPath: "hf/model",
+		Path:   "namespace/model",
+	}, "svc-name"))
+	assert.Equal(t, "namespace/model:svc-name", builder.ToLegacyCSGHubModelID(&database.Repository{
+		Path: "namespace/model",
+	}, "svc-name"))
 }
 
 func TestModelIDBuilder_GetModelOwner(t *testing.T) {
@@ -137,83 +132,6 @@ func TestModelIDBuilder_GetModelOwner(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := builder.GetModelOwner(tt.deployType, tt.username)
-			assert.Equal(t, tt.want, got)
-		})
-	}
-}
-
-func TestModelIDBuilder_BuildCompositeModelID(t *testing.T) {
-	builder := NewModelIDBuilder()
-
-	tests := []struct {
-		name        string
-		baseModelID string
-		provider    string
-		format      string
-		want        string
-	}{
-		{
-			name:        "default format",
-			baseModelID: "gpt-4o",
-			provider:    "openai",
-			format:      "%s(%s)",
-			want:        "gpt-4o(openai)",
-		},
-		{
-			name:        "custom format",
-			baseModelID: "claude-3",
-			provider:    "anthropic",
-			format:      "%s::%s",
-			want:        "claude-3::anthropic",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := builder.BuildCompositeModelID(tt.baseModelID, tt.provider, tt.format)
-			assert.Equal(t, tt.want, got)
-		})
-	}
-}
-
-func TestModelIDBuilder_ParseCompositeModelID(t *testing.T) {
-	builder := NewModelIDBuilder()
-
-	tests := []struct {
-		name    string
-		modelID string
-		format  string
-		want    string
-	}{
-		{
-			name:    "default format parse",
-			modelID: "gpt-4o(openai)",
-			format:  "%s(%s)",
-			want:    "gpt-4o",
-		},
-		{
-			name:    "base model id contains middle token",
-			modelID: "a::b::provider",
-			format:  "%s::%s",
-			want:    "a::b",
-		},
-		{
-			name:    "format not matched fallback default parser",
-			modelID: "llama3(meta)",
-			format:  "%s::%s",
-			want:    "llama3",
-		},
-		{
-			name:    "format and fallback both not matched",
-			modelID: "plain-model-id",
-			format:  "%s::%s",
-			want:    "plain-model-id",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := builder.ParseCompositeModelID(tt.modelID, tt.format)
 			assert.Equal(t, tt.want, got)
 		})
 	}
