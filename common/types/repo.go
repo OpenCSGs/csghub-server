@@ -95,6 +95,7 @@ const (
 	ImageText2Text     PipelineTask = "image-text-to-text"
 	FeatureExtraction  PipelineTask = "feature-extraction"
 	SentenceSimilarity PipelineTask = "sentence-similarity"
+	TextRanking        PipelineTask = "text-ranking"
 	TaskAutoDetection  PipelineTask = "task-auto-detection"
 	VideoText2Text     PipelineTask = "video-text-to-text"
 	TextToSpeech       PipelineTask = "text-to-speech"

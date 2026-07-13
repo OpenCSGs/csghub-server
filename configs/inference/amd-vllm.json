@@ -6,9 +6,9 @@
   "engine_images": [
     {
       "compute_type": "gpu",
-      "image": "opencsghq/amd-vllm:rocm7.2.1_vllm_0.20.1",
+      "image": "opencsghq/amd-vllm:rocm7.2.1_vllm_0.24.0",
       "driver_version": "7.2.1",
-      "engine_version": "0.20.1"
+      "engine_version": "0.24.0"
     }
   ],
   "engine_args": [
@@ -373,7 +373,42 @@
     "DeepseekV4ForCausalLM",
     "Rnj1ForCausalLM",
     "HYV3ForCausalLM",
-    "Ministral3ForCausalLM"
+    "Ministral3ForCausalLM",
+    "Cohere2MoeForCausalLM",
+    "HrmTextForCausalLM",
+    "LagunaForCausalLM",
+    "MellumForCausalLM",
+    "MiMoV2ForCausalLM",
+    "MiniMaxM3SparseForCausalLM",
+    "Cosmos3ForConditionalGeneration",
+    "DiffusionGemmaForBlockDiffusion",
+    "Gemma4UnifiedForConditionalGeneration",
+    "Granite4VisionForConditionalGeneration",
+    "GraniteSpeechPlusForConditionalGeneration",
+    "HfMoondream",
+    "InternS2PreviewForConditionalGeneration",
+    "MiMoV2OmniForCausalLM",
+    "MiniCPMV4_6ForConditionalGeneration",
+    "MiniMaxM3SparseForConditionalGeneration",
+    "Moondream3ForCausalLM",
+    "MossAudioModel",
+    "NemotronH_Nano_Omni_Reasoning_V3",
+    "NemotronH_Super_Omni_Reasoning_V3",
+    "OpenVLAForActionPrediction",
+    "QianfanOCRForConditionalGeneration",
+    "Step3p7ForConditionalGeneration",
+    "BertForSequenceClassification",
+    "GPT2ForSequenceClassification",
+    "GteNewForSequenceClassification",
+    "JambaForSequenceClassification",
+    "JinaVLForRanking",
+    "LlamaBidirectionalForSequenceClassification",
+    "LlamaNemotronVLForSequenceClassification",
+    "ModernBertForSequenceClassification",
+    "Qwen2ForSequenceClassification",
+    "Qwen3ForSequenceClassification",
+    "RobertaForSequenceClassification",
+    "XLMRobertaForSequenceClassification"
   ],
   "tool_call_parsers": {
     "DeepseekR1ForCausalLM": "deepseek_r1",

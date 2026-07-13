@@ -7,6 +7,20 @@
   "engine_images": [
     {
       "compute_type": "gpu",
+      "image": "opencsghq/diffusers:0.39.0",
+      "driver_version": "12.8",
+      "engine_version": "0.39.0",
+      "extra_archs": [
+        "DreamLiteMobilePipeline",
+        "DreamLitePipeline",
+        "Ideogram4Pipeline",
+        "JoyImageEditPipeline",
+        "Krea2Pipeline",
+        "PRXPixelPipeline"
+      ]
+    },
+    {
+      "compute_type": "gpu",
       "image": "opencsghq/diffusers:0.38.0",
       "driver_version": "12.8",
       "engine_version": "0.38.0"

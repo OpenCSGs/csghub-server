@@ -197,6 +197,91 @@ func (r EmbeddingRequest) MarshalJSON() ([]byte, error) {
 	return json.Marshal(knownFields)
 }
 
+// RerankRequest represents a rerank request (Jina/Cohere compatible API,
+// served by vllm, TEI and llama.cpp for text-ranking models)
+type RerankRequest struct {
+	Model           string   `json:"model"`
+	Query           string   `json:"query"`
+	Documents       []string `json:"documents"`
+	TopN            int64    `json:"top_n,omitempty"`
+	ReturnDocuments *bool    `json:"return_documents,omitempty"`
+	// RawJSON stores all unknown fields during unmarshaling
+	RawJSON json.RawMessage `json:"-"`
+}
+
+func (r *RerankRequest) UnmarshalJSON(data []byte) error {
+	// Create a temporary struct to hold the known fields
+	type TempRerankRequest RerankRequest
+
+	// First, unmarshal into the temporary struct
+	var temp TempRerankRequest
+	if err := json.Unmarshal(data, &temp); err != nil {
+		return err
+	}
+
+	// Then, unmarshal into a map to get all fields
+	var allFields map[string]json.RawMessage
+	if err := json.Unmarshal(data, &allFields); err != nil {
+		return err
+	}
+
+	// Remove known fields from the map
+	delete(allFields, "model")
+	delete(allFields, "query")
+	delete(allFields, "documents")
+	delete(allFields, "top_n")
+	delete(allFields, "return_documents")
+
+	// If there are any unknown fields left, marshal them into RawJSON
+	var rawJSON []byte
+	var err error
+	if len(allFields) > 0 {
+		rawJSON, err = json.Marshal(allFields)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Assign the temporary struct to the original and set RawJSON
+	*r = RerankRequest(temp)
+	r.RawJSON = rawJSON
+	return nil
+}
+
+func (r RerankRequest) MarshalJSON() ([]byte, error) {
+	// First, marshal the known fields
+	type TempRerankRequest RerankRequest
+	data, err := json.Marshal(TempRerankRequest(r))
+	if err != nil {
+		return nil, err
+	}
+
+	// If there are no raw JSON fields, just return the known fields
+	if len(r.RawJSON) == 0 {
+		return data, nil
+	}
+
+	// Parse the known fields back into a map
+	var knownFields map[string]json.RawMessage
+	if err := json.Unmarshal(data, &knownFields); err != nil {
+		return nil, err
+	}
+
+	// Parse the raw JSON fields into a map
+	var rawFields map[string]json.RawMessage
+	if err := json.Unmarshal(r.RawJSON, &rawFields); err != nil {
+		return nil, err
+	}
+
+	// Merge the raw fields into the known fields
+	for k, v := range rawFields {
+		knownFields[k] = v
+	}
+
+	// Marshal the merged map back into JSON
+	return json.Marshal(knownFields)
+}
+
 // ImageGenerationRequest represents an image generation request structure
 type ImageGenerationRequest struct {
 	openai.ImageGenerateParams

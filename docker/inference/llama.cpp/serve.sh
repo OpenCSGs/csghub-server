@@ -21,6 +21,12 @@ if [[ "$HF_TASK" == "feature-extraction" || "$HF_TASK" == "sentence-similarity" 
         ENGINE_ARGS="$ENGINE_ARGS --pooling mean"
     fi
 fi
+# enable reranking endpoint for text-ranking task
+if [[ "$HF_TASK" == "text-ranking" ]]; then
+    if [[ ! $ENGINE_ARGS == *"--rerank"* ]]; then
+        ENGINE_ARGS="$ENGINE_ARGS --reranking"
+    fi
+fi
 #gguf path
 if [[ ! $ENGINE_ARGS == *"-m "* ]] && [[ -z $GGUF_ENTRY_POINT ]]; then
     echo "model file name is required, ex: -m DeepSeek-R1-UD-IQ1_M/DeepSeek-R1-UD-IQ1_M-00001-of-00004.gguf"

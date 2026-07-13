@@ -35,3 +35,9 @@ func TestGetBuiltInTaskFromTags_Image2Image(t *testing.T) {
 
 	require.Equal(t, string(types.Image2Image), task)
 }
+
+func TestGetBuiltInTaskFromTags_TextRanking(t *testing.T) {
+	task := GetBuiltInTaskFromTags([]database.Tag{{Name: string(types.TextRanking)}})
+
+	require.Equal(t, string(types.TextRanking), task)
+}

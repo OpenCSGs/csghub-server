@@ -37,8 +37,8 @@ RUN pip config set global.index-url https://mirrors.aliyun.com/pypi/simple && \
     fastapi \
     uvicorn \
     python-multipart \
-    diffusers==0.38.0 \
-    transformers==4.57.6 \
+    diffusers==0.39.0 \
+    transformers==5.13.0 \
     accelerate \
     safetensors \
     sentencepiece \

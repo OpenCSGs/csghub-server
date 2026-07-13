@@ -29,8 +29,8 @@ if [ "${VLLM_ENFORCE_EAGER}" = "true" ] || [ "${VLLM_ENFORCE_EAGER}" = "1" ]; th
 fi
 echo "ENGINE_ARGS: $ENGINE_ARGS"
 if [ "$LWS_WORKER_INDEX" == "0" ]; then
-    /vllm-workspace/examples/online_serving/multi-node-serving.sh leader --ray_cluster_size=$LWS_GROUP_SIZE;python3 -m vllm.entrypoints.openai.api_server $ENGINE_ARGS
+    /vllm-workspace/examples/ray_serving/multi-node-serving.sh leader --ray_cluster_size=$LWS_GROUP_SIZE;python3 -m vllm.entrypoints.openai.api_server $ENGINE_ARGS
 else
-    /vllm-workspace/examples/online_serving/multi-node-serving.sh worker --ray_address=$LWS_LEADER_ADDRESS
+    /vllm-workspace/examples/ray_serving/multi-node-serving.sh worker --ray_address=$LWS_LEADER_ADDRESS
 fi
 

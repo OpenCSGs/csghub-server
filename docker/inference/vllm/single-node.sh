@@ -30,12 +30,38 @@ if [[ -f "$configfile" ]] && [[ ! $ENGINE_ARGS == *"--max-model-len"* ]]; then
         ENGINE_ARGS="$ENGINE_ARGS --max-model-len $MAX_TOKENS"
     fi
 fi
-tokenizer_config="/workspace/$REPO_ID/tokenizer_config.json"
-if ! grep -q "chat_template" "$tokenizer_config"; then
-    if [ -f "/workspace/$REPO_ID/chat_template.jinja" ]; then
-        ENGINE_ARGS="$ENGINE_ARGS --chat_template /workspace/$REPO_ID/chat_template.jinja"
-    else
-        ENGINE_ARGS="$ENGINE_ARGS --chat_template /etc/csghub/chat_template.jinja"
+# rerank models serve pooling endpoints (/v1/rerank, /score) and have no chat template
+if [ "$HF_TASK" == "text-ranking" ]; then
+    # The original Qwen3-Reranker ships as Qwen3ForCausalLM and must be manually
+    # routed to sequence classification, see vllm examples/pooling/score.
+    # Keep the overrides JSON free of spaces: ENGINE_ARGS is expanded unquoted.
+    if [[ -f "$configfile" ]] && grep -q '"Qwen3ForCausalLM"' "$configfile" \
+        && [[ ! $ENGINE_ARGS == *"--hf-overrides"* ]] && [[ ! $ENGINE_ARGS == *"--hf_overrides"* ]]; then
+        ENGINE_ARGS="$ENGINE_ARGS --hf-overrides {\"architectures\":[\"Qwen3ForSequenceClassification\"],\"classifier_from_token\":[\"no\",\"yes\"],\"is_original_qwen3_reranker\":true}"
+        if [[ ! $ENGINE_ARGS == *"--chat-template"* ]] && [[ ! $ENGINE_ARGS == *"--chat_template"* ]]; then
+            ENGINE_ARGS="$ENGINE_ARGS --chat-template /etc/csghub/qwen3_reranker.jinja"
+        fi
+    fi
+    if [[ ! $ENGINE_ARGS == *"--runner"* ]] && [[ ! $ENGINE_ARGS == *"--task"* ]]; then
+        ENGINE_ARGS="$ENGINE_ARGS --runner pooling"
+    fi
+elif [[ "$HF_TASK" == "feature-extraction" || "$HF_TASK" == "sentence-similarity" ]]; then
+    # Embedding models use vLLM's pooling runner and expose /v1/embeddings.
+    # Set the task explicitly because some architectures also support generation.
+    if [[ ! $ENGINE_ARGS == *"--runner"* ]] && [[ ! $ENGINE_ARGS == *"--task"* ]]; then
+        ENGINE_ARGS="$ENGINE_ARGS --runner pooling"
+    fi
+    if [[ ! $ENGINE_ARGS == *"--pooler-config"* ]]; then
+        ENGINE_ARGS="$ENGINE_ARGS --pooler-config.task embed"
+    fi
+else
+    tokenizer_config="/workspace/$REPO_ID/tokenizer_config.json"
+    if ! grep -q "chat_template" "$tokenizer_config"; then
+        if [ -f "/workspace/$REPO_ID/chat_template.jinja" ]; then
+            ENGINE_ARGS="$ENGINE_ARGS --chat_template /workspace/$REPO_ID/chat_template.jinja"
+        else
+            ENGINE_ARGS="$ENGINE_ARGS --chat_template /etc/csghub/chat_template.jinja"
+        fi
     fi
 fi
 

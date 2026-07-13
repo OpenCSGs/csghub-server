@@ -1,4 +1,4 @@
-FROM docker.m.daocloud.io/pytorch/pytorch:2.9.1-cuda12.8-cudnn9-devel
+FROM pytorch/pytorch:2.9.1-cuda12.8-cudnn9-devel
 SHELL ["/bin/bash", "-c"]
 
 LABEL maintainer="opencsg"
@@ -38,8 +38,8 @@ RUN pip config set global.index-url https://mirrors.aliyun.com/pypi/simple && \
     fastapi \
     uvicorn \
     python-multipart \
-    diffusers==0.38.0 \
-    transformers==4.57.6 \
+    diffusers==0.39.0 \
+    transformers==5.13.0 \
     accelerate \
     safetensors \
     sentencepiece \
