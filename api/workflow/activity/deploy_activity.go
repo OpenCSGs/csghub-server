@@ -762,20 +762,10 @@ func (a *DeployActivity) makeDeployEnv(ctx context.Context, hardware types.HardW
 
 		// Process tool-calling arguments
 		engineArgsStr := engineArgs.String()
-		if strings.Contains(engineArgsStr, "--enable-auto-tool-choice") && len(toolCallParsers) > 0 {
+		if len(toolCallParsers) > 0 &&
+			(strings.Contains(engineArgsStr, vllmToolChoiceFlag) || strings.Contains(engineArgsStr, sglangToolParserAuto)) {
 			modelArch := a.getModelArchitecture(ctx, deployInfo.RepoID)
-			if modelArch != "" {
-				if parser, ok := toolCallParsers[modelArch]; ok {
-					engineArgsStr = strings.Replace(engineArgsStr, "--enable-auto-tool-choice", "--enable-auto-tool-choice --tool-call-parser "+parser, 1)
-					logger.Info("Added tool-call-parser", "architecture", modelArch, "parser", parser)
-				} else {
-					logger.Warn("No tool-call-parser found for architecture, using default openai parser", "architecture", modelArch)
-					engineArgsStr = strings.Replace(engineArgsStr, "--enable-auto-tool-choice", "--enable-auto-tool-choice --tool-call-parser openai", 1)
-				}
-			} else {
-				logger.Warn("Model architecture not found, removing --enable-auto-tool-choice")
-				engineArgsStr = strings.ReplaceAll(engineArgsStr, "--enable-auto-tool-choice", "")
-			}
+			engineArgsStr = applyToolCallParser(logger, engineArgsStr, modelArch, toolCallParsers)
 		}
 
 		logger.Debug("makeDeployEnv", "ENGINE_ARGS", engineArgsStr)
@@ -871,6 +861,43 @@ func vllmEnforceEagerEnabled(engineArgs string) bool {
 	default:
 		return false
 	}
+}
+
+const (
+	// vLLM enables tool calling with --enable-auto-tool-choice plus a companion --tool-call-parser.
+	vllmToolChoiceFlag = "--enable-auto-tool-choice"
+	// SGLang enables tool calling with --tool-call-parser alone; "auto" lets the
+	// engine detect the parser from the model's chat template.
+	sglangToolParserAuto = "--tool-call-parser auto"
+)
+
+// applyToolCallParser rewrites tool-calling flags in engine args based on the model architecture.
+func applyToolCallParser(logger log.Logger, engineArgsStr, modelArch string, toolCallParsers map[string]string) string {
+	switch {
+	case strings.Contains(engineArgsStr, vllmToolChoiceFlag):
+		if modelArch == "" {
+			logger.Warn("Model architecture not found, removing --enable-auto-tool-choice")
+			return strings.ReplaceAll(engineArgsStr, vllmToolChoiceFlag, "")
+		}
+		parser, ok := toolCallParsers[modelArch]
+		if !ok {
+			logger.Warn("No tool-call-parser found for architecture, using default openai parser", "architecture", modelArch)
+			parser = "openai"
+		} else {
+			logger.Info("Added tool-call-parser", "architecture", modelArch, "parser", parser)
+		}
+		return strings.Replace(engineArgsStr, vllmToolChoiceFlag, vllmToolChoiceFlag+" --tool-call-parser "+parser, 1)
+	case strings.Contains(engineArgsStr, sglangToolParserAuto):
+		if parser, ok := toolCallParsers[modelArch]; ok && modelArch != "" {
+			logger.Info("Added tool-call-parser", "architecture", modelArch, "parser", parser)
+			return strings.Replace(engineArgsStr, sglangToolParserAuto, "--tool-call-parser "+parser, 1)
+		}
+		// Keep "auto": the engine detects the parser from the chat template and
+		// gracefully disables tool calling when detection fails.
+		logger.Info("No tool-call-parser mapping for architecture, keeping auto detection", "architecture", modelArch)
+		return engineArgsStr
+	}
+	return engineArgsStr
 }
 
 // getModelArchitecture reads the model architecture from metadata

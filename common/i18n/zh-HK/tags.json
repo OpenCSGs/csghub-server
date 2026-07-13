@@ -83,6 +83,9 @@
     "Tag.I18nKey.feature-extraction": {
         "other": "特徵提取"
     },
+    "Tag.I18nKey.text-ranking": {
+        "other": "文本排序"
+    },
     "Tag.I18nKey.relation-extraction": {
         "other": "關係抽取"
     },

@@ -51,6 +51,8 @@ type OpenAIHandler interface {
 	Responses(c *gin.Context)
 	// Get embedding for a text
 	Embedding(c *gin.Context)
+	// Rerank documents against a query for a text-ranking model
+	Rerank(c *gin.Context)
 	// Generate image from text
 	GenerateImage(c *gin.Context)
 	// Edit image from prompt and input image

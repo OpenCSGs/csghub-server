@@ -15,9 +15,9 @@ RUN pip install --no-cache-dir csghub-sdk==0.7.6 supervisor
 RUN mkdir -p /var/log/supervisord
 COPY ./supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 COPY ./vllm/ /etc/csghub/
-COPY ./vllm/multi-node-serving.sh /vllm-workspace/examples/online_serving/multi-node-serving.sh
+COPY ./vllm/multi-node-serving.sh /vllm-workspace/examples/ray_serving/multi-node-serving.sh
 RUN chmod +x /etc/csghub/*.sh
-RUN chmod +x /vllm-workspace/examples/online_serving/*.sh
+RUN chmod +x /vllm-workspace/examples/ray_serving/*.sh
 
 WORKDIR /workspace/
 ENV HUGGINGFACE_HUB_CACHE=/workspace/ \

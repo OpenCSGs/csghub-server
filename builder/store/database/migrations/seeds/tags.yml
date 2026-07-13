@@ -169,6 +169,12 @@ tags:
   built_in: true
 - category: task
   group: natural_language_processing
+  name: text-ranking
+  scope: model
+  show_name: 文本排序
+  built_in: true
+- category: task
+  group: natural_language_processing
   name: relation-extraction
   scope: model
   show_name: 关系抽取
