@@ -9,6 +9,7 @@ import (
 	"github.com/argoproj/argo-workflows/v3/pkg/apis/workflow/v1alpha1"
 	"go.temporal.io/sdk/activity"
 	"go.temporal.io/sdk/log"
+	v1 "k8s.io/api/core/v1"
 	"opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/types"
@@ -93,6 +94,11 @@ func reconcileDeployCluster(ctx context.Context, a *Activities, cid string, depl
 		func(d *database.Deploy) time.Time { return d.StatusUpdateAt },
 		// markFailed
 		func(d *database.Deploy) {
+			if hasPendingInstance(d) {
+				a.getLogger(ctx).Info("reconcile: skip fallback, pod still pending",
+					"deploy_id", d.ID, "svc_name", d.SvcName)
+				return
+			}
 			applyStatusUpdate(ctx, a, d, currentStatus, common.DeployFailed,
 				nil, "runner_unreachable")
 		},
@@ -110,6 +116,11 @@ func reconcileDeployCluster(ctx context.Context, a *Activities, cid string, depl
 		},
 		// onBatchError
 		func(d *database.Deploy) {
+			if hasPendingInstance(d) {
+				a.getLogger(ctx).Info("reconcile: skip fallback, pod still pending",
+					"deploy_id", d.ID, "svc_name", d.SvcName)
+				return
+			}
 			if time.Since(d.StatusUpdateAt) > hardTimeout {
 				applyStatusUpdate(ctx, a, d, currentStatus, common.DeployFailed,
 					nil, "runner_unreachable")
@@ -345,6 +356,20 @@ func runClusterParallel[T any](ctx context.Context, clusters map[string][]T, fn 
 }
 
 // ==================== Helpers ====================
+
+// hasPendingInstance reports whether the deploy has any Pod still in Pending phase.
+// Reconcile must not fall back to DeployFailed while a Pod is still scheduling,
+// since "service not found" during Pending is a transient state, not a permanent
+// runner-unreachable condition. The webhook writes Pending instances into
+// deploy.Instances on runner.service.create/change events.
+func hasPendingInstance(d *database.Deploy) bool {
+	for _, ins := range d.Instances {
+		if ins.Status == string(v1.PodPending) {
+			return true
+		}
+	}
+	return false
+}
 
 func groupByCluster(deploys []database.Deploy) map[string][]database.Deploy {
 	clusters := make(map[string][]database.Deploy)
