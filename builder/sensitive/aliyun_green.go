@@ -5,15 +5,19 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"log/slog"
 	"net/http"
 	"strings"
+	"time"
 
 	openapi "github.com/alibabacloud-go/darabonba-openapi/v2/client"
 	green20220302 "github.com/alibabacloud-go/green-20220302/v2/client"
 	util "github.com/alibabacloud-go/tea-utils/v2/service"
 	"github.com/google/uuid"
+	"github.com/minio/minio-go/v7"
+	"github.com/minio/minio-go/v7/pkg/credentials"
 
 	"github.com/alibabacloud-go/tea/tea"
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/green"
@@ -92,12 +96,36 @@ type AliyunGreenChecker struct {
 	green2022 Green2022Client
 	//normal client
 	green GreenClient
+	//s3Client is a minio client pointing at Aliyun OSS, used for temporary
+	//image uploads when checking images from private repos. nil if OSS is
+	//not configured.
+	s3Client s3Client
+	//s3BucketName is the name of the Aliyun OSS bucket used for temp uploads.
+	s3BucketName string
+}
+
+// s3Client is the subset of minio.Client methods used by AliyunGreenChecker
+// for temporary image uploads. It allows mocking in tests.
+type s3Client interface {
+	PutObject(ctx context.Context, bucketName, objectName string, reader io.Reader, objectSize int64, opts minio.PutObjectOptions) (minio.UploadInfo, error)
+	RemoveObject(ctx context.Context, bucketName, objectName string, opts minio.RemoveObjectOptions) error
 }
 
 func NewAliyunChecker(green GreenClient, green2022 Green2022Client) *AliyunGreenChecker {
 	return &AliyunGreenChecker{
 		green:     green,
 		green2022: green2022,
+	}
+}
+
+// NewAliyunCheckerWithS3 creates an AliyunGreenChecker with an OSS client for
+// image stream checks. Used in tests; production code uses initS3Client.
+func NewAliyunCheckerWithS3(green GreenClient, green2022 Green2022Client, s3Cli s3Client, bucketName string) *AliyunGreenChecker {
+	return &AliyunGreenChecker{
+		green:        green,
+		green2022:    green2022,
+		s3Client:     s3Cli,
+		s3BucketName: bucketName,
 	}
 }
 
@@ -112,7 +140,6 @@ func NewAliyunGreenCheckerFromConfig(config *config.Config) *AliyunGreenChecker 
 	accessKeySecret := config.SensitiveCheck.AccessKeySecret
 	region := config.SensitiveCheck.Region
 	slog.Debug("Aliyun client init", slog.String("accessKeyID", accessKeyID),
-		slog.String("accessKeySecret", accessKeySecret),
 		slog.String("region", region))
 
 	aliyunConfig := &openapi.Config{
@@ -135,7 +162,45 @@ func NewAliyunGreenCheckerFromConfig(config *config.Config) *AliyunGreenChecker 
 	return &AliyunGreenChecker{
 		&green2022ClientImpl{green: cip},
 		&greenClientImpl{green: c},
+		nil,
+		"",
 	}
+}
+
+// initS3Client initializes a minio client pointing at Aliyun OSS using the
+// SensitiveCheck credentials (same AK/SK as Aliyun Green). This ensures the
+// temporary uploaded objects are in the same Aliyun OSS account, so Aliyun
+// Green can read them directly via PassImageCheck (ossBucketName + ossObjectName).
+//
+// Called separately to allow the checker to function without OSS (URL-based
+// checks still work). If OSSBucket is empty, s3Client stays nil.
+func (c *AliyunGreenChecker) initS3Client(config *config.Config) {
+	bucketName := config.SensitiveCheck.OSSBucket
+	if bucketName == "" {
+		slog.Warn("sensitive check OSS bucket not configured, image stream check will be unavailable for private repos")
+		return
+	}
+
+	endpoint := config.SensitiveCheck.Endpoint
+	accessKeyID := config.SensitiveCheck.AccessKeyID
+	accessKeySecret := config.SensitiveCheck.AccessKeySecret
+	region := config.SensitiveCheck.Region
+	enableSSL := config.SensitiveCheck.EnableSSL
+
+	client, err := minio.New(endpoint, &minio.Options{
+		Creds:        credentials.NewStaticV4(accessKeyID, accessKeySecret, ""),
+		Secure:       enableSSL,
+		BucketLookup: minio.BucketLookupAuto,
+		Region:       region,
+	})
+	if err != nil {
+		slog.Error("failed to create OSS client for sensitive check", slog.Any("error", err))
+		return
+	}
+
+	c.s3Client = client
+	c.s3BucketName = bucketName
+	slog.Info("sensitive check OSS client initialized", slog.String("bucket", bucketName), slog.String("endpoint", endpoint))
 }
 
 // passLargeTextCheck splits large text into smaller `largeTextSize` bytes chunks and check them in batch
@@ -384,4 +449,37 @@ func (c *AliyunGreenChecker) PassImageCheck(ctx context.Context, scenario types.
 	}
 	labelStr := strings.Join(labels, ",")
 	return &CheckResult{IsSensitive: true, Reason: labelStr}, nil
+}
+
+// PassImageStreamCheck uploads an image stream to a temporary Aliyun OSS object,
+// then calls PassImageCheck for moderation. Aliyun Green reads the object
+// directly from OSS using the bucket name and object key (no presigned URL needed).
+// The temporary object is always deleted after the check completes.
+func (c *AliyunGreenChecker) PassImageStreamCheck(ctx context.Context, scenario types.SensitiveScenario, reader io.Reader) (*CheckResult, error) {
+	if c.s3Client == nil {
+		return nil, errors.New("OSS client is not initialized, image stream check is unavailable")
+	}
+
+	// Generate a unique object key for the temporary upload
+	objectKey := fmt.Sprintf("moderation/temp/%s", uuid.New().String())
+
+	// Upload the image stream to OSS. Set Expires to 30 minutes from now as a
+	// safety net — even if the defer delete fails, the object auto-expires.
+	_, err := c.s3Client.PutObject(ctx, c.s3BucketName, objectKey, reader, -1, minio.PutObjectOptions{
+		ContentType: "application/octet-stream",
+		Expires:     time.Now().Add(30 * time.Minute),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to upload image stream to OSS: %w", err)
+	}
+
+	// Always clean up the temporary object
+	defer func() {
+		if delErr := c.s3Client.RemoveObject(ctx, c.s3BucketName, objectKey, minio.RemoveObjectOptions{}); delErr != nil {
+			slog.ErrorContext(ctx, "failed to delete temporary image from OSS", slog.String("objectKey", objectKey), slog.Any("error", delErr))
+		}
+	}()
+
+	// Aliyun Green reads the object directly from OSS via bucket name + object key
+	return c.PassImageCheck(ctx, scenario, c.s3BucketName, objectKey)
 }

@@ -2,6 +2,7 @@ package sensitive
 
 import (
 	"context"
+	"io"
 	"log/slog"
 	"strings"
 
@@ -71,6 +72,14 @@ func (iac *ACAutomation) PassImageCheck(ctx context.Context, scenario types.Sens
 // PassImageURLCheck implements the SensitiveChecker interface for ImmutableAC
 func (iac *ACAutomation) PassImageURLCheck(ctx context.Context, scenario types.SensitiveScenario, imageURL string) (*CheckResult, error) {
 	slog.WarnContext(ctx, "PassImageURLCheck not implemented in Immutable AC checker")
+	return &CheckResult{
+		IsSensitive: false,
+	}, nil
+}
+
+// PassImageStreamCheck implements the SensitiveChecker interface for ImmutableAC
+func (iac *ACAutomation) PassImageStreamCheck(ctx context.Context, scenario types.SensitiveScenario, reader io.Reader) (*CheckResult, error) {
+	slog.WarnContext(ctx, "PassImageStreamCheck not implemented in Immutable AC checker")
 	return &CheckResult{
 		IsSensitive: false,
 	}, nil

@@ -80,11 +80,14 @@ public_bucket = "opencsg-public-resource"
 
 [sensitive_check]
 enable = false
+image_check_enable = false
 access_key_id = ""
 access_key_secret = ""
 region = ""
 endpoint = "oss-cn-beijing.aliyuncs.com"
 enable_ssl = true
+oss_bucket = "sensitive-check"
+image_check_scenario = "baselineCheck"
 # "ac_automaton", "mutable_ac_automaton", "aliyun_green", "guard_llm"]
 check_chain = ["ac_automaton", "mutable_ac_automaton", "aliyun_green"]
 stream_check_mode = "async"
