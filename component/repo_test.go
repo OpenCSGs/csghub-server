@@ -3787,7 +3787,9 @@ func TestRepoComponent_UpdateRepo_PermissionChecks(t *testing.T) {
 				Private:   tea.Bool(false),
 			},
 			setupMocks: func(repo *testRepoWithMocks, req types.UpdateRepoReq) {
-				repo.mocks.stores.RepoMock().EXPECT().Find(ctx, req.Namespace, string(req.RepoType), req.Name).Return(&database.Repository{}, nil)
+				repo.mocks.stores.RepoMock().EXPECT().Find(ctx, req.Namespace, string(req.RepoType), req.Name).Return(&database.Repository{
+					SensitiveCheckStatus: types.SensitiveCheckPass,
+				}, nil)
 				repo.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, req.Namespace).Return(database.Namespace{Path: "test-user", NamespaceType: database.UserNamespace}, nil)
 				repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, req.Username).Return(database.User{Username: "test-user"}, nil)
 				// Mock allowPublic to return true
