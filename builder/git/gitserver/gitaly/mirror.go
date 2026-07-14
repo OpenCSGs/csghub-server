@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"strings"
-	"time"
 
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
 	"opencsg.com/csghub-server/builder/git/gitserver"
@@ -111,7 +110,7 @@ func (c *Client) GetMirrorTaskInfo(ctx context.Context, taskId int64) (*gitserve
 
 func (c *Client) MirrorSync(ctx context.Context, req gitserver.MirrorSyncReq) error {
 	stagingPrefix := "refs/staging"
-	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, c.gitFetchTimeout)
 	defer cancel()
 
 	relativePath, err := c.BuildRelativePath(ctx, req.RepoType, req.Namespace, req.Name)

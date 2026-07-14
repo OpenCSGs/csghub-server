@@ -35,6 +35,7 @@ type Client struct {
 	timeout             time.Duration
 	treeTimeout         time.Duration
 	repoStore           database.RepoStore
+	gitFetchTimeout     time.Duration
 }
 
 func NewClient(config *config.Config) (*Client, error) {
@@ -93,6 +94,7 @@ func NewClient(config *config.Config) (*Client, error) {
 
 	timeoutTime := time.Duration(config.Git.OperationTimeout) * time.Second
 	treeTimeoutTime := time.Duration(config.Git.TreeOperationTimeout) * time.Second
+	gitFetchTimeout := time.Duration(config.Git.FetchTimeout) * time.Second
 	return &Client{
 		config:              config,
 		sidechannelRegistry: sidechannelRegistry,
@@ -107,5 +109,6 @@ func NewClient(config *config.Config) (*Client, error) {
 		timeout:             timeoutTime,
 		repoStore:           database.NewRepoStore(),
 		treeTimeout:         treeTimeoutTime,
+		gitFetchTimeout:     gitFetchTimeout,
 	}, nil
 }
