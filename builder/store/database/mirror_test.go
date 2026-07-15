@@ -342,16 +342,50 @@ func TestMirrorStore_IndexWithPagination(t *testing.T) {
 		require.Nil(t, err)
 	}
 
-	ms, count, err := store.IndexWithPagination(ctx, 10, 1, "foo", false)
+	ms, count, err := store.IndexWithPagination(ctx, 10, 1, types.MirrorFilter{Search: "foo"}, false)
 	require.Nil(t, err)
 	require.Equal(t, 2, count)
 	// make sure in "DESC" order
 	require.Equal(t, "m2", ms[0].Interval)
 	require.Equal(t, "m1", ms[1].Interval)
 
-	_, count, err = store.IndexWithPagination(ctx, 10, 1, "foo", true)
+	_, count, err = store.IndexWithPagination(ctx, 10, 1, types.MirrorFilter{Search: "foo"}, true)
 	require.Nil(t, err)
 	require.Equal(t, 0, count)
+}
+
+// TestMirrorStore_IndexWithPaginationStatusFilter verifies current task status filtering and mirror status fallback.
+func TestMirrorStore_IndexWithPaginationStatusFilter(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewMirrorStoreWithDB(db)
+	mirrors := []*database.Mirror{
+		{Interval: "mirror-status", Status: types.MirrorRepoSyncFailed},
+		{Interval: "current-task-status", Status: types.MirrorQueued},
+		{Interval: "current-task-overrides-mirror-status", Status: types.MirrorRepoSyncFailed},
+	}
+	for _, mirror := range mirrors {
+		_, err := store.Create(ctx, mirror)
+		require.NoError(t, err)
+	}
+
+	tasks := []*database.MirrorTask{
+		{MirrorID: mirrors[1].ID, Status: types.MirrorRepoSyncFailed},
+		{MirrorID: mirrors[2].ID, Status: types.MirrorQueued},
+	}
+	for i, task := range tasks {
+		require.NoError(t, db.Core.NewInsert().Model(task).Scan(ctx, task))
+		_, err := db.Core.NewUpdate().Model(mirrors[i+1]).Set("current_task_id = ?", task.ID).WherePK().Exec(ctx)
+		require.NoError(t, err)
+	}
+
+	status := types.MirrorRepoSyncFailed
+	result, count, err := store.IndexWithPagination(ctx, 10, 1, types.MirrorFilter{Status: &status}, false)
+	require.NoError(t, err)
+	require.Equal(t, 2, count)
+	require.ElementsMatch(t, []string{"mirror-status", "current-task-status"}, []string{result[0].Interval, result[1].Interval})
 }
 
 func TestMirrorStore_StatusCount(t *testing.T) {
@@ -452,7 +486,7 @@ func TestMirrorStore_BatchCreate(t *testing.T) {
 	}
 	err := store.BatchCreate(ctx, mirrors)
 	require.Nil(t, err)
-	ms, count, err := store.IndexWithPagination(ctx, 10, 1, "", false)
+	ms, count, err := store.IndexWithPagination(ctx, 10, 1, types.MirrorFilter{}, false)
 	require.Nil(t, err)
 	require.Equal(t, 3, len(ms))
 	require.Equal(t, 3, count)

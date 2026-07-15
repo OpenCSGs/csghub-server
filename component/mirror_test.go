@@ -28,11 +28,12 @@ func TestMirrorComponentDeleteClearsRepoSyncCache(t *testing.T) {
 	require.NoError(t, err)
 }
 
+// TestMirrorComponent_Repos verifies mirror repositories are returned with their current task state.
 func TestMirrorComponent_Repos(t *testing.T) {
 	ctx := context.TODO()
 	mc := initializeTestMirrorComponent(ctx, t)
 
-	mc.mocks.stores.MirrorMock().EXPECT().IndexWithPagination(ctx, 10, 1, "", true).Return([]database.Mirror{
+	mc.mocks.stores.MirrorMock().EXPECT().IndexWithPagination(ctx, 10, 1, types.MirrorFilter{}, true).Return([]database.Mirror{
 		{
 			CurrentTask: &database.MirrorTask{Progress: 100, Status: types.MirrorLfsSyncFinished},
 			Progress:    100,
@@ -48,19 +49,27 @@ func TestMirrorComponent_Repos(t *testing.T) {
 	}, data)
 }
 
+// TestMirrorComponent_Index verifies filters and effective mirror statuses are returned.
 func TestMirrorComponent_Index(t *testing.T) {
 	ctx := context.TODO()
 	mc := initializeTestMirrorComponent(ctx, t)
+	filter := types.MirrorFilter{Search: "foo"}
 
-	mc.mocks.stores.MirrorMock().EXPECT().IndexWithPagination(ctx, 10, 1, "foo", false).Return(
-		[]database.Mirror{{CurrentTask: &database.MirrorTask{Status: types.MirrorLfsSyncFinished}, Username: "user", LastMessage: "msg", Repository: &database.Repository{}}}, 100, nil,
+	mc.mocks.stores.MirrorMock().EXPECT().IndexWithPagination(ctx, 10, 1, filter, false).Return(
+		[]database.Mirror{
+			{CurrentTask: &database.MirrorTask{Status: types.MirrorLfsSyncFinished}, Username: "user", LastMessage: "msg", Repository: &database.Repository{}},
+			{Status: types.MirrorRepoSyncFailed, Username: "fallback"},
+			{Username: "default"},
+		}, 100, nil,
 	)
 
-	data, total, err := mc.Index(ctx, 10, 1, "foo")
+	data, total, err := mc.Index(ctx, 10, 1, filter)
 	require.Nil(t, err)
 	require.Equal(t, 100, total)
 	require.Equal(t, []types.Mirror{
 		{Username: "user", LastMessage: "msg", LocalRepoPath: "s/", Status: types.MirrorLfsSyncFinished},
+		{Username: "fallback", Status: types.MirrorRepoSyncFailed},
+		{Username: "default", Status: types.MirrorQueued},
 	}, data)
 }
 

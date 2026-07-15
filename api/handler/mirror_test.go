@@ -131,16 +131,22 @@ func TestMirrorHandler_Repos(t *testing.T) {
 	})
 }
 
+// TestMirrorHandler_Index verifies mirror list filters are forwarded to the component.
 func TestMirrorHandler_Index(t *testing.T) {
 	tester := NewMirrorTester(t).WithHandleFunc(func(h *MirrorHandler) gin.HandlerFunc {
 		return h.Index
 	})
 	tester.WithUser()
+	status := types.MirrorRepoSyncFailed
+	filter := types.MirrorFilter{Search: "foo", Status: &status}
 
-	tester.mocks.mirror.EXPECT().Index(tester.Ctx(), 10, 1, "foo").Return(
+	tester.mocks.mirror.EXPECT().Index(tester.Ctx(), 10, 1, filter).Return(
 		[]types.Mirror{{SourceUrl: "p"}}, 100, nil,
 	)
-	tester.AddPagination(1, 10).WithQuery("search", "foo").Execute()
+	tester.AddPagination(1, 10).
+		WithQuery("search", "foo").
+		WithQuery("status", string(status)).
+		Execute()
 
 	tester.ResponseEq(t, 200, tester.OKText, gin.H{
 		"data":  []types.Mirror{{SourceUrl: "p"}},

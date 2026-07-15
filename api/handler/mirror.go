@@ -109,6 +109,8 @@ func (h *MirrorHandler) Repos(ctx *gin.Context) {
 // @Produce      json
 // @Param        per query int false "per" default(20)
 // @Param        page query int false "page" default(1)
+// @Param        search query string false "search"
+// @Param        status query string false "status"
 // @Success      200  {object}  types.Response{data=[]types.Mirror,total=int} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
@@ -121,8 +123,12 @@ func (h *MirrorHandler) Index(ctx *gin.Context) {
 		return
 	}
 
-	search := ctx.Query("search")
-	repos, total, err := h.mirror.Index(ctx.Request.Context(), per, page, search)
+	filter := types.MirrorFilter{Search: ctx.Query("search")}
+	if status := ctx.Query("status"); status != "" {
+		mirrorStatus := types.MirrorTaskStatus(status)
+		filter.Status = &mirrorStatus
+	}
+	repos, total, err := h.mirror.Index(ctx.Request.Context(), per, page, filter)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "failed to get mirror repos", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
