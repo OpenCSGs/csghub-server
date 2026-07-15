@@ -7,7 +7,6 @@ import (
 
 	mock "github.com/stretchr/testify/mock"
 	database "opencsg.com/csghub-server/builder/store/database"
-
 	types "opencsg.com/csghub-server/common/types"
 )
 
@@ -220,6 +219,54 @@ func (_c *MockMirrorStore_Delete_Call) Return(_a0 error) *MockMirrorStore_Delete
 }
 
 func (_c *MockMirrorStore_Delete_Call) RunAndReturn(run func(context.Context, *database.Mirror) error) *MockMirrorStore_Delete_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// DeleteWithTaskCancelTx provides a mock function with given fields: ctx, mirrorID, jobCancelClient
+func (_m *MockMirrorStore) DeleteWithTaskCancelTx(ctx context.Context, mirrorID int64, jobCancelClient database.MirrorJobCancelClient) error {
+	ret := _m.Called(ctx, mirrorID, jobCancelClient)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteWithTaskCancelTx")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, int64, database.MirrorJobCancelClient) error); ok {
+		r0 = rf(ctx, mirrorID, jobCancelClient)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockMirrorStore_DeleteWithTaskCancelTx_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteWithTaskCancelTx'
+type MockMirrorStore_DeleteWithTaskCancelTx_Call struct {
+	*mock.Call
+}
+
+// DeleteWithTaskCancelTx is a helper method to define mock.On call
+//   - ctx context.Context
+//   - mirrorID int64
+//   - jobCancelClient database.MirrorJobCancelClient
+func (_e *MockMirrorStore_Expecter) DeleteWithTaskCancelTx(ctx interface{}, mirrorID interface{}, jobCancelClient interface{}) *MockMirrorStore_DeleteWithTaskCancelTx_Call {
+	return &MockMirrorStore_DeleteWithTaskCancelTx_Call{Call: _e.mock.On("DeleteWithTaskCancelTx", ctx, mirrorID, jobCancelClient)}
+}
+
+func (_c *MockMirrorStore_DeleteWithTaskCancelTx_Call) Run(run func(ctx context.Context, mirrorID int64, jobCancelClient database.MirrorJobCancelClient)) *MockMirrorStore_DeleteWithTaskCancelTx_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(int64), args[2].(database.MirrorJobCancelClient))
+	})
+	return _c
+}
+
+func (_c *MockMirrorStore_DeleteWithTaskCancelTx_Call) Return(_a0 error) *MockMirrorStore_DeleteWithTaskCancelTx_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockMirrorStore_DeleteWithTaskCancelTx_Call) RunAndReturn(run func(context.Context, int64, database.MirrorJobCancelClient) error) *MockMirrorStore_DeleteWithTaskCancelTx_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -953,52 +1000,6 @@ func (_c *MockMirrorStore_PushedMirror_Call) Return(_a0 []database.Mirror, _a1 e
 }
 
 func (_c *MockMirrorStore_PushedMirror_Call) RunAndReturn(run func(context.Context) ([]database.Mirror, error)) *MockMirrorStore_PushedMirror_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// Recover provides a mock function with given fields: ctx
-func (_m *MockMirrorStore) Recover(ctx context.Context) error {
-	ret := _m.Called(ctx)
-
-	if len(ret) == 0 {
-		panic("no return value specified for Recover")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context) error); ok {
-		r0 = rf(ctx)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// MockMirrorStore_Recover_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Recover'
-type MockMirrorStore_Recover_Call struct {
-	*mock.Call
-}
-
-// Recover is a helper method to define mock.On call
-//   - ctx context.Context
-func (_e *MockMirrorStore_Expecter) Recover(ctx interface{}) *MockMirrorStore_Recover_Call {
-	return &MockMirrorStore_Recover_Call{Call: _e.mock.On("Recover", ctx)}
-}
-
-func (_c *MockMirrorStore_Recover_Call) Run(run func(ctx context.Context)) *MockMirrorStore_Recover_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context))
-	})
-	return _c
-}
-
-func (_c *MockMirrorStore_Recover_Call) Return(_a0 error) *MockMirrorStore_Recover_Call {
-	_c.Call.Return(_a0)
-	return _c
-}
-
-func (_c *MockMirrorStore_Recover_Call) RunAndReturn(run func(context.Context) error) *MockMirrorStore_Recover_Call {
 	_c.Call.Return(run)
 	return _c
 }

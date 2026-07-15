@@ -4,14 +4,19 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"time"
+
+	"opencsg.com/csghub-server/builder/instrumentation"
 
 	"github.com/spf13/cobra"
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/api/workflow"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/temporal"
+	"opencsg.com/csghub-server/builder/workhub"
 	"opencsg.com/csghub-server/common/config"
-	"opencsg.com/csghub-server/mirror"
+	mirrorcomponent "opencsg.com/csghub-server/mirror/component"
+	"opencsg.com/csghub-server/mirror/reposyncer"
 	"opencsg.com/csghub-server/mirror/router"
 )
 
@@ -24,7 +29,15 @@ var repoSyncCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-
+		stopOtel, err := instrumentation.SetupOTelSDK(context.Background(), cfg, instrumentation.Mirror)
+		if err != nil {
+			panic(err)
+		}
+		defer func() {
+			if err := stopOtel(context.Background()); err != nil {
+				slog.Error("failed to stop otel", slog.Any("error", err))
+			}
+		}()
 		dbConfig := database.DBConfig{
 			Dialect: database.DatabaseDialect(cfg.Database.Driver),
 			DSN:     cfg.Database.DSN,
@@ -45,29 +58,44 @@ var repoSyncCmd = &cobra.Command{
 			},
 			r,
 		)
-		go server.Run()
-
-		// Exception recovery for mirrors.
-		mirrorStore := database.NewMirrorStore()
-		err = mirrorStore.Recover(context.Background())
-		if err != nil {
-			return fmt.Errorf("failed to recover mirrors: %w", err)
-		}
 
 		err = workflow.StartWorkflow(cfg, false)
 		if err != nil {
 			return err
 		}
+		defer temporal.Stop()
 
-		repoSyncer, err := mirror.NewRepoSyncWorker(cfg, cfg.Mirror.WorkerNumber)
+		repoSyncer, err := reposyncer.NewRepoSyncWorker(cfg)
 		if err != nil {
 			return err
 		}
 
-		repoSyncer.Run()
+		jobClient, err := workhub.NewJobClient(context.Background(), database.GetDB().BunDB)
+		if err != nil {
+			return fmt.Errorf("failed to create workhub job client: %w", err)
+		}
 
-		temporal.Stop()
+		repoWorkClient, err := mirrorcomponent.NewRepoWorkClient(context.Background(), cfg.Database.DSN, mirrorcomponent.RepoWorkDeps{
+			MirrorTaskStore: database.NewMirrorTaskJobStore(),
+			Syncer:          repoSyncer,
+			LFSJobClient:    workhub.NewMirrorLFSJobClient(jobClient),
+			MaxWorkers:      cfg.Mirror.WorkerNumber,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to create repo workhub client: %w", err)
+		}
+		if err := repoWorkClient.Start(context.Background()); err != nil {
+			return fmt.Errorf("failed to start repo workhub client: %w", err)
+		}
+		defer func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			if err := repoWorkClient.Stop(ctx); err != nil {
+				slog.Error("failed to stop repo workhub client", slog.Any("error", err))
+			}
+		}()
 
+		server.Run()
 		return nil
 	},
 }

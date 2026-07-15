@@ -3,6 +3,7 @@ package handler
 import (
 	"log/slog"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/api/httpbase"
@@ -45,6 +46,10 @@ func (h *MirrorHandler) CreateMirrorRepo(ctx *gin.Context) {
 	err := ctx.ShouldBindJSON(&req)
 	if err != nil {
 		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	if strings.TrimSpace(req.ForkNamespace) == "" || strings.TrimSpace(req.ForkName) == "" {
+		httpbase.BadRequest(ctx, "fork_namespace and fork_name are required")
 		return
 	}
 
@@ -179,37 +184,6 @@ func (h *MirrorHandler) BatchCreate(ctx *gin.Context) {
 	}
 
 	httpbase.OK(ctx, nil)
-}
-
-// GetMirrorTasks godoc
-// @Security     ApiKey
-// @Summary      Batch create mirrors
-// @Tags         Mirror
-// @Accept       json
-// @Produce      json
-// @Param        count query int false "count" default(10)
-// @Success      200  {object}  types.Response{data=[]types.MirrorListResp} "OK"
-// @Failure      400  {object}  types.APIBadRequest "Bad request"
-// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /mirror/tasks [get]
-func (h *MirrorHandler) Tasks(ctx *gin.Context) {
-	count := ctx.Query("count")
-	if count == "" {
-		count = "10"
-	}
-
-	countInt, err := strconv.ParseInt(count, 10, 64)
-	if err != nil {
-		return
-	}
-	resp, err := h.mirror.ListQueue(ctx.Request.Context(), countInt)
-	if err != nil {
-		slog.ErrorContext(ctx.Request.Context(), "failed to get mirror tasks", slog.Any("error", err))
-		httpbase.ServerError(ctx, err)
-		return
-	}
-
-	httpbase.OK(ctx, resp)
 }
 
 // DeleteMirrorTasks godoc

@@ -51,6 +51,10 @@ func NewSkillComponent(config *config.Config) (SkillComponent, error) {
 	if err != nil {
 		return nil, err
 	}
+	c.mirrorComponent, err = NewMirrorComponent(config)
+	if err != nil {
+		return nil, err
+	}
 	c.skillStore = database.NewSkillStore()
 	c.repoStore = database.NewRepoStore()
 	c.recomStore = database.NewRecomStore()
@@ -76,6 +80,7 @@ func NewSkillComponent(config *config.Config) (SkillComponent, error) {
 type skillComponentImpl struct {
 	config            *config.Config
 	repoComponent     RepoComponent
+	mirrorComponent   MirrorComponent
 	skillStore        database.SkillStore
 	repoStore         database.RepoStore
 	userLikesStore    database.UserLikesStore
@@ -402,7 +407,7 @@ func (c *skillComponentImpl) createMirrorIfNeeded(ctx context.Context, req *type
 		SyncLfs:     true,
 	}
 
-	_, err := c.repoComponent.CreateMirror(ctx, mirrorReq)
+	_, err := c.mirrorComponent.CreateMirror(ctx, mirrorReq)
 	if err != nil {
 		return fmt.Errorf("failed to create mirror: %w", err)
 	}

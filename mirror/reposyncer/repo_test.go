@@ -69,8 +69,6 @@ func TestRepoSyncWorker_SyncRepo(t *testing.T) {
 		mockGit := mockgit.NewMockGitServer(t)
 		mockSender := new(MockMessageSender)
 		mockTaskStore := mockdb.NewMockMirrorTaskStore(t)
-		mockMirrorStore := mockdb.NewMockMirrorStore(t)
-		mockLfsMetaObjectStore := mockdb.NewMockLfsMetaObjectStore(t)
 		mockRepoStore := mockdb.NewMockRepoStore(t)
 		mockPromptPrefixStore := mockdb.NewMockPromptPrefixStore(t)
 		mockLLMConfigStore := mockdb.NewMockLLMConfigStore(t)
@@ -87,18 +85,6 @@ func TestRepoSyncWorker_SyncRepo(t *testing.T) {
 		mockGit.EXPECT().GetRepo(mock.Anything, mock.Anything).Return(&gitserver.CreateRepoResp{
 			DefaultBranch: "main",
 		}, nil)
-
-		mockGit.EXPECT().GetRepoBranches(mock.Anything, mock.Anything).Return([]types.Branch{
-			{Name: "main"},
-		}, nil)
-
-		mockGit.EXPECT().GetRepoAllLfsPointers(mock.Anything, mock.Anything).Return([]*types.LFSPointer{
-			{FileSize: 100, FileOid: "oid"},
-		}, nil)
-
-		mockLfsMetaObjectStore.EXPECT().BulkUpdateOrCreate(mock.Anything, mock.Anything, mock.Anything).Return(nil)
-
-		mockMirrorStore.EXPECT().UpdateMirrorAndRepository(mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 		// Second call to GetRepoLastCommit
 		mockGit.EXPECT().GetRepoLastCommit(mock.Anything, mock.Anything).Return(&types.Commit{ID: "new-commit"}, nil).Once()
@@ -122,16 +108,14 @@ func TestRepoSyncWorker_SyncRepo(t *testing.T) {
 		cfg.Frontend.URL = "http://localhost"
 
 		worker := &RepoSyncWorker{
-			httpClient:         server.Client(),
-			git:                mockGit,
-			msgSender:          mockSender,
-			mirrorTaskStore:    mockTaskStore,
-			mirrorStore:        mockMirrorStore,
-			lfsMetaObjectStore: mockLfsMetaObjectStore,
-			repoStore:          mockRepoStore,
-			promptPrefixStore:  mockPromptPrefixStore,
-			llmConfigStore:     mockLLMConfigStore,
-			config:             cfg,
+			httpClient:        server.Client(),
+			git:               mockGit,
+			msgSender:         mockSender,
+			mirrorTaskStore:   mockTaskStore,
+			repoStore:         mockRepoStore,
+			promptPrefixStore: mockPromptPrefixStore,
+			llmConfigStore:    mockLLMConfigStore,
+			config:            cfg,
 		}
 
 		mirror := database.Mirror{
@@ -143,8 +127,11 @@ func TestRepoSyncWorker_SyncRepo(t *testing.T) {
 		}
 		mt := &database.MirrorTask{}
 
-		_, err := worker.SyncRepo(context.Background(), &mirror, mt)
+		result, err := worker.SyncRepo(context.Background(), &mirror, mt)
 		assert.Nil(t, err)
+		assert.Equal(t, "main", result.Mirror.Repository.DefaultBranch)
+		assert.Equal(t, "old-commit", result.BeforeLastCommitID)
+		assert.Equal(t, "new-commit", result.AfterLastCommitID)
 	})
 
 	t.Run("description generation error does not fail sync", func(t *testing.T) {
@@ -156,8 +143,6 @@ func TestRepoSyncWorker_SyncRepo(t *testing.T) {
 		mockGit := mockgit.NewMockGitServer(t)
 		mockSender := new(MockMessageSender)
 		mockTaskStore := mockdb.NewMockMirrorTaskStore(t)
-		mockMirrorStore := mockdb.NewMockMirrorStore(t)
-		mockLfsMetaObjectStore := mockdb.NewMockLfsMetaObjectStore(t)
 		mockRepoStore := mockdb.NewMockRepoStore(t)
 		mockPromptPrefixStore := mockdb.NewMockPromptPrefixStore(t)
 		mockLLMConfigStore := mockdb.NewMockLLMConfigStore(t)
@@ -167,9 +152,6 @@ func TestRepoSyncWorker_SyncRepo(t *testing.T) {
 		mockGit.EXPECT().GetRepoLastCommit(mock.Anything, mock.Anything).Return(&types.Commit{ID: "same-commit"}, nil).Once()
 		mockGit.EXPECT().MirrorSync(mock.Anything, mock.Anything).Return(nil)
 		mockGit.EXPECT().GetRepo(mock.Anything, mock.Anything).Return(&gitserver.CreateRepoResp{DefaultBranch: "main"}, nil)
-		mockGit.EXPECT().GetRepoBranches(mock.Anything, mock.Anything).Return([]types.Branch{{Name: "main"}}, nil)
-		mockGit.EXPECT().GetRepoAllLfsPointers(mock.Anything, mock.Anything).Return([]*types.LFSPointer{}, nil)
-		mockMirrorStore.EXPECT().UpdateMirrorAndRepository(mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		mockGit.EXPECT().GetRepoLastCommit(mock.Anything, mock.Anything).Return(&types.Commit{ID: "same-commit"}, nil).Once()
 
 		expectDescriptionGeneration(
@@ -189,16 +171,14 @@ func TestRepoSyncWorker_SyncRepo(t *testing.T) {
 		cfg.Frontend.URL = "http://localhost"
 
 		worker := &RepoSyncWorker{
-			httpClient:         server.Client(),
-			git:                mockGit,
-			msgSender:          mockSender,
-			mirrorTaskStore:    mockTaskStore,
-			mirrorStore:        mockMirrorStore,
-			lfsMetaObjectStore: mockLfsMetaObjectStore,
-			repoStore:          mockRepoStore,
-			promptPrefixStore:  mockPromptPrefixStore,
-			llmConfigStore:     mockLLMConfigStore,
-			config:             cfg,
+			httpClient:        server.Client(),
+			git:               mockGit,
+			msgSender:         mockSender,
+			mirrorTaskStore:   mockTaskStore,
+			repoStore:         mockRepoStore,
+			promptPrefixStore: mockPromptPrefixStore,
+			llmConfigStore:    mockLLMConfigStore,
+			config:            cfg,
 		}
 
 		mirror := database.Mirror{
@@ -210,8 +190,73 @@ func TestRepoSyncWorker_SyncRepo(t *testing.T) {
 		}
 		mt := &database.MirrorTask{}
 
-		_, err := worker.SyncRepo(context.Background(), &mirror, mt)
+		result, err := worker.SyncRepo(context.Background(), &mirror, mt)
 		assert.NoError(t, err)
-		assert.Equal(t, 100, mt.Progress)
+		assert.Equal(t, "same-commit", result.BeforeLastCommitID)
+		assert.Equal(t, "same-commit", result.AfterLastCommitID)
+		assert.Equal(t, 0, mt.Progress)
+	})
+
+	t.Run("does not recalculate before commit after after checkpoint exists", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		}))
+		defer server.Close()
+
+		mockGit := mockgit.NewMockGitServer(t)
+		mockSender := new(MockMessageSender)
+		mockTaskStore := mockdb.NewMockMirrorTaskStore(t)
+		mockRepoStore := mockdb.NewMockRepoStore(t)
+		mockPromptPrefixStore := mockdb.NewMockPromptPrefixStore(t)
+		mockLLMConfigStore := mockdb.NewMockLLMConfigStore(t)
+
+		mockSender.On("Send", mock.Anything, mock.Anything).Return(hook.Response{}, nil)
+		mockGit.EXPECT().RepositoryExists(mock.Anything, mock.Anything).Return(true, nil)
+		mockGit.EXPECT().MirrorSync(mock.Anything, mock.Anything).Return(nil)
+		mockGit.EXPECT().GetRepo(mock.Anything, mock.Anything).Return(&gitserver.CreateRepoResp{DefaultBranch: "main"}, nil)
+		mockGit.EXPECT().GetRepoLastCommit(mock.Anything, mock.Anything).Return(&types.Commit{ID: "after"}, nil).Once()
+
+		expectDescriptionGeneration(
+			t,
+			mockGit,
+			mockRepoStore,
+			mockPromptPrefixStore,
+			mockLLMConfigStore,
+			types.ModelRepo,
+			"namespace",
+			"name",
+			"after",
+			nil,
+		)
+
+		cfg := &config.Config{}
+		cfg.Frontend.URL = "http://localhost"
+
+		worker := &RepoSyncWorker{
+			httpClient:        server.Client(),
+			git:               mockGit,
+			msgSender:         mockSender,
+			mirrorTaskStore:   mockTaskStore,
+			repoStore:         mockRepoStore,
+			promptPrefixStore: mockPromptPrefixStore,
+			llmConfigStore:    mockLLMConfigStore,
+			config:            cfg,
+		}
+
+		mirror := database.Mirror{
+			SourceUrl: server.URL,
+			Repository: &database.Repository{
+				Path:           "namespace/name",
+				RepositoryType: types.ModelRepo,
+			},
+		}
+		mt := &database.MirrorTask{
+			AfterLastCommitID: "after",
+		}
+
+		result, err := worker.SyncRepo(context.Background(), &mirror, mt)
+		assert.NoError(t, err)
+		assert.Empty(t, result.BeforeLastCommitID)
+		assert.Equal(t, "after", result.AfterLastCommitID)
 	})
 }

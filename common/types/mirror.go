@@ -62,7 +62,9 @@ type CreateMirrorRepoReq struct {
 	MirrorSourceID int64 `json:"mirror_source_id"`
 
 	// repo basic info
-	RepoType RepositoryType `json:"repo_type" binding:"required"`
+	RepoType           RepositoryType `json:"repo_type" binding:"required"`
+	Private            *bool          `json:"private,omitempty"`
+	RejectExistingRepo bool           `json:"reject_existing_repo,omitempty"`
 
 	DefaultBranch string `json:"branch"`
 
@@ -70,7 +72,6 @@ type CreateMirrorRepoReq struct {
 	SourceGitCloneUrl string `json:"source_url" binding:"required"`
 	Description       string `json:"description"`
 	License           string `json:"license"`
-	SyncLfs           bool   `json:"sync_lfs"`
 	CurrentUser       string `json:"current_user"`
 
 	//MCP only
@@ -145,18 +146,23 @@ const (
 type MirrorPriority int
 
 const (
-	ASAPMirrorPriority   MirrorPriority = 12
-	P11MirrorPriority    MirrorPriority = 11
-	HighMirrorPriority   MirrorPriority = 10
-	P9MirrorPriority     MirrorPriority = 9
-	P8MirrorPriority     MirrorPriority = 8
-	P7MirrorPriority     MirrorPriority = 7
-	MediumMirrorPriority MirrorPriority = 6
-	P5MirrorPriority     MirrorPriority = 5
-	P4MirrorPriority     MirrorPriority = 4
-	P3MirrorPriority     MirrorPriority = 3
-	P2MirrorPriority     MirrorPriority = 2
-	LowMirrorPriority    MirrorPriority = 1
+	ASAPMirrorPriority MirrorPriority = 1
+	HighMirrorPriority MirrorPriority = 2
+	P3MirrorPriority   MirrorPriority = 3
+	LowMirrorPriority  MirrorPriority = 4
+
+	//ASAPMirrorPriority   MirrorPriority = 12
+	//P11MirrorPriority    MirrorPriority = 11
+	//HighMirrorPriority   MirrorPriority = 10
+	//P9MirrorPriority     MirrorPriority = 9
+	//P8MirrorPriority     MirrorPriority = 8
+	//P7MirrorPriority     MirrorPriority = 7
+	//MediumMirrorPriority MirrorPriority = 6
+	//P5MirrorPriority     MirrorPriority = 5
+	//P4MirrorPriority     MirrorPriority = 4
+	//P3MirrorPriority     MirrorPriority = 3
+	//P2MirrorPriority     MirrorPriority = 2
+	//LowMirrorPriority    MirrorPriority = 1
 )
 
 type Mirror struct {
@@ -190,10 +196,12 @@ type MirrorStatusCount struct {
 	Count  int
 }
 
+// MirrorListResp groups mirror tasks by execution state.
 type MirrorListResp struct {
-	RunningTasks    map[int]MirrorTask `json:"running_tasks"`
-	RepoMirrorTasks []MirrorTask       `json:"repo_mirror_tasks"`
-	LfsMirrorTasks  []MirrorTask       `json:"lfs_mirror_tasks"`
+	// RunningTasks are tasks currently executing repo or LFS sync.
+	RunningTasks []MirrorTask `json:"running_tasks"`
+	// WaitingTasks are queued or retryable tasks waiting for worker execution.
+	WaitingTasks []MirrorTask `json:"waiting_tasks"`
 }
 
 type MirrorTask struct {

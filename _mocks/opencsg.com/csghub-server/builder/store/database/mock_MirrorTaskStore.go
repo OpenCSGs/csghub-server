@@ -7,7 +7,6 @@ import (
 
 	mock "github.com/stretchr/testify/mock"
 	database "opencsg.com/csghub-server/builder/store/database"
-
 	types "opencsg.com/csghub-server/common/types"
 )
 
@@ -22,120 +21,6 @@ type MockMirrorTaskStore_Expecter struct {
 
 func (_m *MockMirrorTaskStore) EXPECT() *MockMirrorTaskStore_Expecter {
 	return &MockMirrorTaskStore_Expecter{mock: &_m.Mock}
-}
-
-// CancelMirrorTaskByID provides a mock function with given fields: ctx, taskID
-func (_m *MockMirrorTaskStore) CancelMirrorTaskByID(ctx context.Context, taskID int64) (bool, error) {
-	ret := _m.Called(ctx, taskID)
-
-	if len(ret) == 0 {
-		panic("no return value specified for CancelMirrorTaskByID")
-	}
-
-	var r0 bool
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, int64) (bool, error)); ok {
-		return rf(ctx, taskID)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, int64) bool); ok {
-		r0 = rf(ctx, taskID)
-	} else {
-		r0 = ret.Get(0).(bool)
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, int64) error); ok {
-		r1 = rf(ctx, taskID)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// MockMirrorTaskStore_CancelMirrorTaskByID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CancelMirrorTaskByID'
-type MockMirrorTaskStore_CancelMirrorTaskByID_Call struct {
-	*mock.Call
-}
-
-// CancelMirrorTaskByID is a helper method to define mock.On call
-//   - ctx context.Context
-//   - taskID int64
-func (_e *MockMirrorTaskStore_Expecter) CancelMirrorTaskByID(ctx interface{}, taskID interface{}) *MockMirrorTaskStore_CancelMirrorTaskByID_Call {
-	return &MockMirrorTaskStore_CancelMirrorTaskByID_Call{Call: _e.mock.On("CancelMirrorTaskByID", ctx, taskID)}
-}
-
-func (_c *MockMirrorTaskStore_CancelMirrorTaskByID_Call) Run(run func(ctx context.Context, taskID int64)) *MockMirrorTaskStore_CancelMirrorTaskByID_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(int64))
-	})
-	return _c
-}
-
-func (_c *MockMirrorTaskStore_CancelMirrorTaskByID_Call) Return(_a0 bool, _a1 error) *MockMirrorTaskStore_CancelMirrorTaskByID_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *MockMirrorTaskStore_CancelMirrorTaskByID_Call) RunAndReturn(run func(context.Context, int64) (bool, error)) *MockMirrorTaskStore_CancelMirrorTaskByID_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// CancelOtherTasksAndCreate provides a mock function with given fields: ctx, task
-func (_m *MockMirrorTaskStore) CancelOtherTasksAndCreate(ctx context.Context, task database.MirrorTask) (database.MirrorTask, error) {
-	ret := _m.Called(ctx, task)
-
-	if len(ret) == 0 {
-		panic("no return value specified for CancelOtherTasksAndCreate")
-	}
-
-	var r0 database.MirrorTask
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, database.MirrorTask) (database.MirrorTask, error)); ok {
-		return rf(ctx, task)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, database.MirrorTask) database.MirrorTask); ok {
-		r0 = rf(ctx, task)
-	} else {
-		r0 = ret.Get(0).(database.MirrorTask)
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, database.MirrorTask) error); ok {
-		r1 = rf(ctx, task)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// MockMirrorTaskStore_CancelOtherTasksAndCreate_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CancelOtherTasksAndCreate'
-type MockMirrorTaskStore_CancelOtherTasksAndCreate_Call struct {
-	*mock.Call
-}
-
-// CancelOtherTasksAndCreate is a helper method to define mock.On call
-//   - ctx context.Context
-//   - task database.MirrorTask
-func (_e *MockMirrorTaskStore_Expecter) CancelOtherTasksAndCreate(ctx interface{}, task interface{}) *MockMirrorTaskStore_CancelOtherTasksAndCreate_Call {
-	return &MockMirrorTaskStore_CancelOtherTasksAndCreate_Call{Call: _e.mock.On("CancelOtherTasksAndCreate", ctx, task)}
-}
-
-func (_c *MockMirrorTaskStore_CancelOtherTasksAndCreate_Call) Run(run func(ctx context.Context, task database.MirrorTask)) *MockMirrorTaskStore_CancelOtherTasksAndCreate_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(database.MirrorTask))
-	})
-	return _c
-}
-
-func (_c *MockMirrorTaskStore_CancelOtherTasksAndCreate_Call) Return(_a0 database.MirrorTask, _a1 error) *MockMirrorTaskStore_CancelOtherTasksAndCreate_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *MockMirrorTaskStore_CancelOtherTasksAndCreate_Call) RunAndReturn(run func(context.Context, database.MirrorTask) (database.MirrorTask, error)) *MockMirrorTaskStore_CancelOtherTasksAndCreate_Call {
-	_c.Call.Return(run)
-	return _c
 }
 
 // Create provides a mock function with given fields: ctx, task
@@ -360,63 +245,6 @@ func (_c *MockMirrorTaskStore_FindByMirrorID_Call) RunAndReturn(run func(context
 	return _c
 }
 
-// GetHighestPriorityByTaskStatus provides a mock function with given fields: ctx, status
-func (_m *MockMirrorTaskStore) GetHighestPriorityByTaskStatus(ctx context.Context, status []types.MirrorTaskStatus) (database.MirrorTask, error) {
-	ret := _m.Called(ctx, status)
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetHighestPriorityByTaskStatus")
-	}
-
-	var r0 database.MirrorTask
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, []types.MirrorTaskStatus) (database.MirrorTask, error)); ok {
-		return rf(ctx, status)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, []types.MirrorTaskStatus) database.MirrorTask); ok {
-		r0 = rf(ctx, status)
-	} else {
-		r0 = ret.Get(0).(database.MirrorTask)
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, []types.MirrorTaskStatus) error); ok {
-		r1 = rf(ctx, status)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// MockMirrorTaskStore_GetHighestPriorityByTaskStatus_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetHighestPriorityByTaskStatus'
-type MockMirrorTaskStore_GetHighestPriorityByTaskStatus_Call struct {
-	*mock.Call
-}
-
-// GetHighestPriorityByTaskStatus is a helper method to define mock.On call
-//   - ctx context.Context
-//   - status []types.MirrorTaskStatus
-func (_e *MockMirrorTaskStore_Expecter) GetHighestPriorityByTaskStatus(ctx interface{}, status interface{}) *MockMirrorTaskStore_GetHighestPriorityByTaskStatus_Call {
-	return &MockMirrorTaskStore_GetHighestPriorityByTaskStatus_Call{Call: _e.mock.On("GetHighestPriorityByTaskStatus", ctx, status)}
-}
-
-func (_c *MockMirrorTaskStore_GetHighestPriorityByTaskStatus_Call) Run(run func(ctx context.Context, status []types.MirrorTaskStatus)) *MockMirrorTaskStore_GetHighestPriorityByTaskStatus_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].([]types.MirrorTaskStatus))
-	})
-	return _c
-}
-
-func (_c *MockMirrorTaskStore_GetHighestPriorityByTaskStatus_Call) Return(_a0 database.MirrorTask, _a1 error) *MockMirrorTaskStore_GetHighestPriorityByTaskStatus_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *MockMirrorTaskStore_GetHighestPriorityByTaskStatus_Call) RunAndReturn(run func(context.Context, []types.MirrorTaskStatus) (database.MirrorTask, error)) *MockMirrorTaskStore_GetHighestPriorityByTaskStatus_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // ListByStatusWithPriority provides a mock function with given fields: ctx, status, per, page
 func (_m *MockMirrorTaskStore) ListByStatusWithPriority(ctx context.Context, status []types.MirrorTaskStatus, per int, page int) ([]database.MirrorTask, error) {
 	ret := _m.Called(ctx, status, per, page)
@@ -474,64 +302,6 @@ func (_c *MockMirrorTaskStore_ListByStatusWithPriority_Call) Return(_a0 []databa
 }
 
 func (_c *MockMirrorTaskStore_ListByStatusWithPriority_Call) RunAndReturn(run func(context.Context, []types.MirrorTaskStatus, int, int) ([]database.MirrorTask, error)) *MockMirrorTaskStore_ListByStatusWithPriority_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// ResetRunningTasks provides a mock function with given fields: ctx, fromStatus, toStatus
-func (_m *MockMirrorTaskStore) ResetRunningTasks(ctx context.Context, fromStatus types.MirrorTaskStatus, toStatus types.MirrorTaskStatus) (int, error) {
-	ret := _m.Called(ctx, fromStatus, toStatus)
-
-	if len(ret) == 0 {
-		panic("no return value specified for ResetRunningTasks")
-	}
-
-	var r0 int
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, types.MirrorTaskStatus, types.MirrorTaskStatus) (int, error)); ok {
-		return rf(ctx, fromStatus, toStatus)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, types.MirrorTaskStatus, types.MirrorTaskStatus) int); ok {
-		r0 = rf(ctx, fromStatus, toStatus)
-	} else {
-		r0 = ret.Get(0).(int)
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, types.MirrorTaskStatus, types.MirrorTaskStatus) error); ok {
-		r1 = rf(ctx, fromStatus, toStatus)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// MockMirrorTaskStore_ResetRunningTasks_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ResetRunningTasks'
-type MockMirrorTaskStore_ResetRunningTasks_Call struct {
-	*mock.Call
-}
-
-// ResetRunningTasks is a helper method to define mock.On call
-//   - ctx context.Context
-//   - fromStatus types.MirrorTaskStatus
-//   - toStatus types.MirrorTaskStatus
-func (_e *MockMirrorTaskStore_Expecter) ResetRunningTasks(ctx interface{}, fromStatus interface{}, toStatus interface{}) *MockMirrorTaskStore_ResetRunningTasks_Call {
-	return &MockMirrorTaskStore_ResetRunningTasks_Call{Call: _e.mock.On("ResetRunningTasks", ctx, fromStatus, toStatus)}
-}
-
-func (_c *MockMirrorTaskStore_ResetRunningTasks_Call) Run(run func(ctx context.Context, fromStatus types.MirrorTaskStatus, toStatus types.MirrorTaskStatus)) *MockMirrorTaskStore_ResetRunningTasks_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(types.MirrorTaskStatus), args[2].(types.MirrorTaskStatus))
-	})
-	return _c
-}
-
-func (_c *MockMirrorTaskStore_ResetRunningTasks_Call) Return(_a0 int, _a1 error) *MockMirrorTaskStore_ResetRunningTasks_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *MockMirrorTaskStore_ResetRunningTasks_Call) RunAndReturn(run func(context.Context, types.MirrorTaskStatus, types.MirrorTaskStatus) (int, error)) *MockMirrorTaskStore_ResetRunningTasks_Call {
 	_c.Call.Return(run)
 	return _c
 }

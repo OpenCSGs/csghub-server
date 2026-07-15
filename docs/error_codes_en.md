@@ -875,6 +875,14 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Name:** `gatewayMCPServerInvalidName`
 - **Description:** The MCP server name does not meet naming requirements.
 
+## Mirror Errors
+
+### `MIRROR-ERR-0`
+
+- **Error Code:** `MIRROR-ERR-0`
+- **Error Name:** `mirrorSourceConflict`
+- **Description:** The target repository already has another mirror source.
+
 ## Moderation Errors
 
 ### `MOD-ERR-0`

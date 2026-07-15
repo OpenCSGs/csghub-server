@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/minio/minio-go/v7"
+	"github.com/redis/go-redis/v9"
 	"go.temporal.io/sdk/client"
 	"golang.org/x/sync/errgroup"
 	"opencsg.com/csghub-server/api/workflow"
@@ -30,9 +31,7 @@ import (
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/utils/common"
-	"opencsg.com/csghub-server/component"
 	"opencsg.com/csghub-server/mirror/cache"
-	"opencsg.com/csghub-server/mirror/filter"
 	"opencsg.com/csghub-server/mirror/hook"
 	"opencsg.com/csghub-server/mirror/reposyncer"
 )
@@ -41,6 +40,7 @@ type (
 	repoPathKey      string
 	sourceUrlKey     string
 	defaultBranchKey string
+	lfsLoggerKey     struct{}
 )
 
 var (
@@ -48,18 +48,15 @@ var (
 	suk           sourceUrlKey     = "sourceUrl"
 	dbk           defaultBranchKey = "defaultBranch"
 	maxRetries                     = 3
-	MaxGroupCount                  = 15
+	maxGroupCount                  = 15
 	maxPartNum                     = 1000
-	MaxGroupSize  int64            = 10 * 1024 * 1024 * 1024 // 10GB
+	maxGroupSize  int64            = 10 * 1024 * 1024 * 1024 // 10GB
 )
 
+// LfsSyncWorker synchronizes Git LFS objects for mirror tasks.
 type LfsSyncWorker struct {
-	id                 int
-	wg                 *sync.WaitGroup
-	mirrorStore        database.MirrorStore
 	mirrorTaskStore    database.MirrorTaskStore
 	lfsMetaObjectStore database.LfsMetaObjectStore
-	repoStore          database.RepoStore
 	ossClient          s3.Client
 	ossCore            s3.Core
 	config             *config.Config
@@ -67,25 +64,17 @@ type LfsSyncWorker struct {
 	mu                 sync.Mutex
 	httpClient         *http.Client
 	msgSender          hook.MessageSender
-	recomComponent     component.RecomComponent
-	ctx                context.Context
-	repoFilter         filter.Filter
 	git                gitserver.GitServer
 	workflowClient     temporal.Client
 }
 
-func NewLfsSyncWorker(config *config.Config, id int) (*LfsSyncWorker, error) {
+// NewLfsSyncWorker creates an LFS synchronization worker.
+func NewLfsSyncWorker(config *config.Config) (*LfsSyncWorker, error) {
 	var err error
-	w := &LfsSyncWorker{
-		id: id,
-		wg: &sync.WaitGroup{},
-	}
+	w := &LfsSyncWorker{}
 	w.config = config
-	w.repoFilter = filter.NewRepoFilter(config)
-	w.mirrorStore = database.NewMirrorStore()
 	w.mirrorTaskStore = database.NewMirrorTaskStore()
 	w.lfsMetaObjectStore = database.NewLfsMetaObjectStore()
-	w.repoStore = database.NewRepoStore()
 	w.config = config
 	w.ossClient, err = s3.NewMinio(config)
 	if err != nil {
@@ -124,12 +113,6 @@ func NewLfsSyncWorker(config *config.Config, id int) (*LfsSyncWorker, error) {
 	)
 	w.msgSender = msgSender
 
-	recomComponent, err := component.NewRecomComponent(config)
-	if err != nil {
-		return nil, fmt.Errorf("fail to create recom component")
-	}
-	w.recomComponent = recomComponent
-
 	w.git, err = git.NewGitServer(config)
 	if err != nil {
 		newError := fmt.Errorf("fail to create git server,error:%w", err)
@@ -141,167 +124,115 @@ func NewLfsSyncWorker(config *config.Config, id int) (*LfsSyncWorker, error) {
 	return w, nil
 }
 
-func (w *LfsSyncWorker) SetContext(ctx context.Context) {
-	w.ctx = ctx
+// SyncLFS refreshes LFS metadata for the synced commit, then downloads missing
+// objects and publishes the repository head.
+func (w *LfsSyncWorker) SyncLFS(ctx context.Context, mt *database.MirrorTask) error {
+	ctx = w.withLFSContext(ctx, mt)
+	if err := w.refreshLfsMetaObjects(ctx, mt); err != nil {
+		return err
+	}
+	return w.SyncLfs(ctx, mt)
 }
 
-func (w *LfsSyncWorker) ID() int {
-	return w.id
+// refreshLfsMetaObjects scans the repository at the repo-sync result commit and
+// atomically replaces local LFS metadata for this repository.
+func (w *LfsSyncWorker) refreshLfsMetaObjects(ctx context.Context, mt *database.MirrorTask) error {
+	if mt == nil || mt.Mirror == nil || mt.Mirror.Repository == nil {
+		return fmt.Errorf("invalid mirror task")
+	}
+	if mt.AfterLastCommitID == "" {
+		return fmt.Errorf("mirror task %d has empty after commit id", mt.ID)
+	}
+
+	repo := mt.Mirror.Repository
+	namespace, name, err := common.GetNamespaceAndNameFromPath(repo.Path)
+	if err != nil {
+		return fmt.Errorf("failed to get namespace and name from mirror repository path: %w", err)
+	}
+	lfsPointers, err := w.git.GetRepoAllLfsPointers(ctx, gitserver.GetRepoAllFilesReq{
+		Namespace: namespace,
+		Name:      name,
+		Ref:       mt.AfterLastCommitID,
+		RepoType:  repo.RepositoryType,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to get all lfs pointers: %w", err)
+	}
+
+	lfsMetaObjects, totalSize := lfsPointersToMetaObjects(repo.ID, lfsPointers)
+	repo.LFSObjectsSize = totalSize
+	if err := w.lfsMetaObjectStore.BulkUpdateOrCreate(ctx, repo.ID, lfsMetaObjects); err != nil {
+		return fmt.Errorf("failed to bulk update or create lfs meta objects: %w", err)
+	}
+
+	loggerFromLFSContext(ctx).InfoContext(ctx, "refreshed lfs meta objects",
+		slog.String("afterCommitID", mt.AfterLastCommitID),
+		slog.Int("lfsCount", len(lfsMetaObjects)),
+		slog.Int64("lfsObjectsSize", totalSize),
+	)
+	return nil
 }
 
-func (w *LfsSyncWorker) Run(mt *database.MirrorTask) {
-	var action string
-	mirror, err := w.mirrorStore.FindByID(w.ctx, mt.MirrorID)
-	if err != nil {
-		slog.Error(
-			"fail to get mirror",
-			slog.Int("workerID", w.id),
-			slog.Any("error", err),
-		)
-		mt.ErrorMessage = "mirror not found"
-		mt.Status = types.MirrorLfsSyncFailed
-		updateCtx, updateCancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer updateCancel()
-		_, updateErr := w.mirrorTaskStore.Update(updateCtx, *mt)
-		if updateErr != nil {
-			slog.Error("fail to update mirror task",
-				slog.Int("workerID", w.id),
-				slog.Any("error", updateErr),
-			)
+// withLFSContext attaches task logging fields and legacy values required by the LFS sync code.
+func (w *LfsSyncWorker) withLFSContext(ctx context.Context, mt *database.MirrorTask) context.Context {
+	if mt == nil || mt.Mirror == nil || mt.Mirror.Repository == nil {
+		return ctx
+	}
+	repo := mt.Mirror.Repository
+	logger := slog.Default().With(
+		slog.Int64("mirror_id", mt.Mirror.ID),
+		slog.Int64("mirror_task_id", mt.ID),
+		slog.Int64("repository_id", repo.ID),
+		slog.String("repo_path", fmt.Sprintf("%ss/%s", repo.RepositoryType, repo.Path)),
+	)
+	ctx = context.WithValue(ctx, lfsLoggerKey{}, logger)
+	ctx = context.WithValue(ctx, rk, fmt.Sprintf("%ss/%s", repo.RepositoryType, repo.Path))
+	ctx = context.WithValue(ctx, suk, mt.Mirror.SourceUrl)
+	return context.WithValue(ctx, dbk, repo.DefaultBranch)
+}
+
+// loggerFromLFSContext returns the task-aware logger attached by SyncLFS.
+func loggerFromLFSContext(ctx context.Context) *slog.Logger {
+	if logger, ok := ctx.Value(lfsLoggerKey{}).(*slog.Logger); ok {
+		return logger
+	}
+	return slog.Default()
+}
+
+// lfsPointersToMetaObjects converts Git LFS pointers to de-duplicated database rows.
+func lfsPointersToMetaObjects(repoID int64, lfsPointers []*types.LFSPointer) ([]database.LfsMetaObject, int64) {
+	seen := make(map[string]struct{}, len(lfsPointers))
+	lfsMetaObjects := make([]database.LfsMetaObject, 0, len(lfsPointers))
+	var totalSize int64
+
+	for _, lfsPointer := range lfsPointers {
+		if lfsPointer == nil {
+			continue
 		}
-		return
-	}
-
-	_, err = w.repoStore.FindById(w.ctx, mirror.RepositoryID)
-	if err != nil {
-		slog.Error("fail to get repo",
-			slog.Int("workerID", w.id),
-			slog.Any("error", err),
-		)
-		mt.ErrorMessage = err.Error()
-		mt.Status = types.MirrorLfsSyncFailed
-		updateCtx, updateCancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer updateCancel()
-		_, updateErr := w.mirrorTaskStore.Update(updateCtx, *mt)
-		if updateErr != nil {
-			slog.Error("fail to update mirror task",
-				slog.Int("workerID", w.id),
-				slog.Any("error", updateErr),
-			)
+		oid := lfsPointer.FileOid
+		size := lfsPointer.FileSize
+		if oid == "" {
+			oid = lfsPointer.Oid
+			size = lfsPointer.Size
 		}
-		return
-	}
-
-	shouldSync, message, err := w.repoFilter.ShouldSync(w.ctx, mirror.RepositoryID)
-	if err != nil {
-		slog.Error("fail to check if repo should sync",
-			slog.Int("workerId", w.id),
-			slog.Any("error", err),
-		)
-		mt.ErrorMessage = err.Error()
-		mt.Status = types.MirrorLfsSyncFailed
-		updateCtx, updateCancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer updateCancel()
-		_, updateErr := w.mirrorTaskStore.Update(updateCtx, *mt)
-		if updateErr != nil {
-			slog.Error("fail to update mirror task",
-				slog.Int("workerID", w.id),
-				slog.Any("error", updateErr),
-			)
+		if oid == "" {
+			continue
 		}
-		return
-	}
-
-	if !shouldSync {
-		err := w.sendMessage(w.ctx, mirror, types.MirrorRepoTooLarge)
-		if err != nil {
-			slog.Info("fail to send notice message",
-				slog.Int("workerID", w.id),
-				slog.Any("error", err),
-			)
+		key := fmt.Sprintf("%d:%s", repoID, oid)
+		if _, ok := seen[key]; ok {
+			continue
 		}
-		slog.Info("repo should not sync, lower the priority",
-			slog.Any("message", message),
-			slog.Int("workerID", w.id),
-			slog.Any("repoID", mirror.RepositoryID),
-		)
-
-		mt.Priority = types.LowMirrorPriority
-		mt.Mirror.Priority = types.LowMirrorPriority
-		_, err = w.mirrorTaskStore.Update(w.ctx, *mt)
-		if err != nil {
-			slog.Error("fail to update mirror task",
-				slog.Int("workerID", w.id),
-				slog.Any("error", err),
-			)
-		}
-
-		err = w.mirrorStore.Update(w.ctx, mt.Mirror)
-		if err != nil {
-			slog.Error("fail to update mirror",
-				slog.Int("workerID", w.id),
-				slog.Any("error", err),
-			)
-		}
-		return
+		seen[key] = struct{}{}
+		lfsMetaObjects = append(lfsMetaObjects, database.LfsMetaObject{
+			Size:         size,
+			Oid:          oid,
+			RepositoryID: repoID,
+			Existing:     false,
+		})
+		totalSize += size
 	}
 
-	repoPath := fmt.Sprintf("%ss/%s", mirror.Repository.RepositoryType, mirror.Repository.Path)
-	w.ctx = context.WithValue(w.ctx, rk, repoPath)
-	w.ctx = context.WithValue(w.ctx, suk, mirror.SourceUrl)
-	w.ctx = context.WithValue(w.ctx, dbk, mirror.Repository.DefaultBranch)
-
-	err = w.SyncLfs(w.ctx, mt)
-	if err != nil {
-		slog.Error("fail to sync lfs",
-			slog.Int("workerID", w.id),
-			slog.Any("error", err),
-		)
-		if errors.Is(err, context.Canceled) {
-			action = database.MirrorCancel
-		} else {
-			action = database.MirrorFail
-		}
-		mt.ErrorMessage = err.Error()
-	} else {
-		action = database.MirrorSuccess
-		mt.Progress = 100
-	}
-
-	// Can not use w.ctx cause it could be canceled
-	ctx := context.Background()
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-	updatedMt, err := w.mirrorTaskStore.UpdateStatusAndRepoSyncStatus(ctx, *mt, action)
-	if err != nil {
-		slog.Error("fail to update mirror task status and repository status",
-			slog.Int("workerID", w.id),
-			slog.Any("status", mt.Status),
-			slog.Any("action", action),
-			slog.Any("error", err),
-		)
-		return
-	}
-	*mt = updatedMt
-
-	err = w.sendMessage(ctx, mirror, mt.Status)
-	if err != nil {
-		slog.Error("fail to send message",
-			slog.Int("workerID", w.id),
-			slog.Any("error", err),
-			slog.Any("repoPath", repoPath),
-		)
-	}
-
-	err = w.recomComponent.SetOpWeight(w.ctx, mirror.RepositoryID, int64(100*mt.Priority))
-	if err != nil {
-		slog.Error("fail to set op weight",
-			slog.Int("workerID", w.id),
-			slog.Any("error", err),
-			slog.Any("repoID", mt.Mirror.RepositoryID),
-			slog.Any("repoPath", repoPath),
-		)
-	}
+	return lfsMetaObjects, totalSize
 }
 
 func (w *LfsSyncWorker) SyncLfs(ctx context.Context, mt *database.MirrorTask) error {
@@ -314,28 +245,19 @@ func (w *LfsSyncWorker) SyncLfs(ctx context.Context, mt *database.MirrorTask) er
 	mirror := mt.Mirror
 	repo := mt.Mirror.Repository
 
-	repoPath := ctx.Value(rk).(string)
-
-	slog.Info("start to sync lfs",
-		slog.Int("workerID", w.id),
-		slog.Any("mirrorTaskID", mt.ID),
-		slog.Any("repoPath", repoPath),
-	)
+	loggerFromLFSContext(ctx).InfoContext(ctx, "start to sync lfs")
 
 	// Send message
 	err := w.sendMessage(ctx, mt.Mirror, types.MirrorLfsSyncStart)
 	if err != nil {
-		slog.Error("failed to send notice message",
-			slog.Int("workerID", w.id),
+		loggerFromLFSContext(ctx).ErrorContext(ctx, "failed to send notice message",
 			slog.Any("error", err),
-			slog.Any("repo_path", repoPath),
 		)
 	}
 
 	pointers, err = w.getSyncPointers(ctx, mt)
 	if err != nil {
-		slog.Error("fail to get sync pointers",
-			slog.Int("workerID", w.id),
+		loggerFromLFSContext(ctx).ErrorContext(ctx, "fail to get sync pointers",
 			slog.Any("error", err),
 		)
 		return err
@@ -345,8 +267,7 @@ func (w *LfsSyncWorker) SyncLfs(ctx context.Context, mt *database.MirrorTask) er
 		pointerGroups := SplitPointersBySizeAndCount(pointers)
 		err = w.downloadAndUploadLFSFiles(ctx, mt, mirror, pointerGroups, repo)
 		if err != nil {
-			slog.Error("fail to download and upload lfs files",
-				slog.Int("workerID", w.id),
+			loggerFromLFSContext(ctx).ErrorContext(ctx, "fail to download and upload lfs files",
 				slog.Any("error", err),
 			)
 
@@ -369,7 +290,7 @@ func (w *LfsSyncWorker) SyncLfs(ctx context.Context, mt *database.MirrorTask) er
 
 	if commit.ID != mt.AfterLastCommitID {
 		// Point HEAD to new commit, so the uesrs can clone the changes
-		slog.Info(
+		loggerFromLFSContext(ctx).InfoContext(ctx,
 			"Point HEAD to new commit",
 			slog.Any("repo_type", mirror.Repository.RepositoryType),
 			slog.Any("namespace", namespace),
@@ -387,7 +308,7 @@ func (w *LfsSyncWorker) SyncLfs(ctx context.Context, mt *database.MirrorTask) er
 		if err != nil {
 			return fmt.Errorf("failed to point HEAD to new commit: %w", err)
 		}
-		slog.Info(
+		loggerFromLFSContext(ctx).InfoContext(ctx,
 			"Point HEAD to new commit successfully",
 			slog.Any("repo_type", mirror.Repository.RepositoryType),
 			slog.Any("namespace", namespace),
@@ -417,29 +338,24 @@ func (w *LfsSyncWorker) getSyncPointers(
 	mt *database.MirrorTask,
 ) ([]*types.Pointer, error) {
 	var pointers []*types.Pointer
-	repoPath := ctx.Value(rk).(string)
 	// Query all lfsMetaObjects to generate the &types.Pointer slice
 	lfsMetaObjects, err := w.lfsMetaObjectStore.FindByRepoID(ctx, mt.Mirror.Repository.ID)
 	if err != nil {
-		slog.Error(
+		loggerFromLFSContext(ctx).ErrorContext(ctx,
 			"fail to get lfs meta objects",
-			slog.Int("workerID", w.id),
 			slog.Any("error", err),
 		)
 		return pointers, fmt.Errorf("fail to get lfs meta objects: %w", err)
 	}
 	repo := mt.Mirror.Repository
 
-	slog.Info(
+	loggerFromLFSContext(ctx).InfoContext(ctx,
 		"fetched lfs meta objects",
-		slog.Int("workerID", w.id),
-		slog.Int64("repoID", repo.ID),
-		slog.String("repoPath", repoPath),
 		slog.Int("lfsCount", len(lfsMetaObjects)),
 	)
 
 	if len(lfsMetaObjects) == 0 {
-		slog.Info("no lfs files to sync, finish sync lfs", slog.Int("workerId", w.id), slog.String("repoPath", repoPath))
+		loggerFromLFSContext(ctx).InfoContext(ctx, "no lfs files to sync, finish sync lfs")
 		return pointers, nil
 	}
 
@@ -451,12 +367,10 @@ func (w *LfsSyncWorker) getSyncPointers(
 		objectKey := common.BuildLfsPath(repo.ID, lfsMetaObject.Oid, repo.Migrated)
 		exists, err := w.CheckIfLFSFileExists(ctx, objectKey, lfsMetaObject.Size)
 		if err != nil {
-			slog.Error(
+			loggerFromLFSContext(ctx).ErrorContext(ctx,
 				"failed to check if lfs file exists",
-				slog.Int("workerID", w.id),
 				slog.Any("error", err),
 				slog.Any("objectKey", objectKey),
-				slog.Any("repoPath", repo.Path),
 				slog.Any("repoType", repo.RepositoryType),
 			)
 			return pointers, fmt.Errorf("failed to check if lfs file exists: %w", err)
@@ -472,28 +386,23 @@ func (w *LfsSyncWorker) getSyncPointers(
 		}
 	}
 
-	slog.Info(
+	loggerFromLFSContext(ctx).InfoContext(ctx,
 		"checked lfs meta objects",
-		slog.Int("workerID", w.id),
-		slog.Int64("repoID", repo.ID),
-		slog.String("repoPath", repoPath),
 		slog.Int("lfsCount", len(lfsMetaObjects)),
 		slog.Int("existingCount", len(existingOIDs)),
 		slog.Int("missingCount", len(missingOIDs)),
 	)
 
 	if err = w.lfsMetaObjectStore.BulkUpdateExistingByOIDs(ctx, repo.ID, existingOIDs, missingOIDs); err != nil {
-		slog.Error(
+		loggerFromLFSContext(ctx).ErrorContext(ctx,
 			"failed to update lfs meta objects",
-			slog.String("repoPath", repoPath),
-			slog.Int("workerID", w.id),
 			slog.Any("error", err),
 		)
 		return pointers, fmt.Errorf("failed to update lfs meta objects: %w", err)
 	}
 
 	if len(pointers) == 0 {
-		slog.Info("no lfs files to sync, finish sync lfs", slog.Int("workerId", w.id), slog.String("repoPath", repoPath))
+		loggerFromLFSContext(ctx).InfoContext(ctx, "no lfs files to sync, finish sync lfs")
 	}
 
 	return pointers, nil
@@ -528,9 +437,8 @@ func (w *LfsSyncWorker) sendMessage(ctx context.Context, mirror *database.Mirror
 	if err != nil {
 		return err
 	}
-	slog.Info(
+	loggerFromLFSContext(ctx).InfoContext(ctx,
 		"send message",
-		slog.Int("workerID", w.id),
 		slog.Any("response", resp),
 		slog.Any("syncInfo", syncInfo),
 	)
@@ -561,12 +469,10 @@ func (w *LfsSyncWorker) downloadAndUploadLFSFiles(
 
 		pointers, err := w.GetLFSDownloadURLs(ctx, mirror.SourceUrl, repo.DefaultBranch, pointers)
 		if err != nil {
-			slog.Error(
+			loggerFromLFSContext(ctx).ErrorContext(ctx,
 				"failed to get lfs download urls",
-				slog.Int("workerID", w.id),
 				slog.Any("error", err),
 				slog.Any("sourceURL", mirror.SourceUrl),
-				slog.Any("repoPath", repo.Path),
 				slog.Any("repoType", repo.RepositoryType),
 			)
 			return fmt.Errorf("failed to get lfs download urls: %w", err)
@@ -585,11 +491,9 @@ func (w *LfsSyncWorker) downloadAndUploadLFSFiles(
 					return err
 				}
 				finalErr = err
-				slog.Error("failed to download and upload lfs file",
-					slog.Int("workerID", w.id),
+				loggerFromLFSContext(ctx).ErrorContext(ctx, "failed to download and upload lfs file",
 					slog.Any("error", err),
 					slog.Any("sourceURL", mirror.SourceUrl),
-					slog.Any("repoPath", repo.Path),
 					slog.Any("repoType", repo.RepositoryType),
 					slog.Any("pointer", pointer),
 				)
@@ -621,12 +525,10 @@ func (w *LfsSyncWorker) downloadAndUploadLFSFile(
 	objectKey := common.BuildLfsPath(repo.ID, pointer.Oid, repo.Migrated)
 	exists, err := w.CheckIfLFSFileExists(ctx, objectKey, pointer.Size)
 	if err != nil {
-		slog.Error(
+		loggerFromLFSContext(ctx).ErrorContext(ctx,
 			"failed to check if lfs file exists",
-			slog.Int("workerID", w.id),
 			slog.Any("error", err),
 			slog.Any("objectKey", objectKey),
-			slog.Any("repoPath", repo.Path),
 			slog.Any("repoType", repo.RepositoryType),
 		)
 		return fmt.Errorf("failed to check if lfs file exists: %w", err)
@@ -640,12 +542,10 @@ func (w *LfsSyncWorker) downloadAndUploadLFSFile(
 
 	_, err = w.lfsMetaObjectStore.UpdateOrCreate(ctx, lmo)
 	if err != nil {
-		slog.Error(
+		loggerFromLFSContext(ctx).ErrorContext(ctx,
 			"failed to update lfs meta object",
-			slog.Int("workerID", w.id),
 			slog.Any("error", err),
 			slog.Any("lfsMetaObject", lmo),
-			slog.Any("repoPath", repo.Path),
 			slog.Any("repoType", repo.RepositoryType),
 		)
 		return fmt.Errorf("failed to update lfs meta object: %w", err)
@@ -656,8 +556,7 @@ func (w *LfsSyncWorker) downloadAndUploadLFSFile(
 	}
 
 	if pointer.DownloadURL == "" {
-		slog.Info("pointer download url is empty",
-			slog.Any("repoPath", repo.Path),
+		loggerFromLFSContext(ctx).InfoContext(ctx, "pointer download url is empty",
 			slog.Any("repoType", repo.RepositoryType),
 		)
 		return nil
@@ -673,44 +572,41 @@ func (w *LfsSyncWorker) downloadAndUploadLFSFile(
 		return w.downloadAndUploadSmallFile(ctx, repo, pointer, objectKey)
 	}
 
-	uploadID, err = w.syncCache.GetUploadID(ctx, repoPath, pointer.Oid, strconv.Itoa(w.config.Mirror.PartSize))
+	uploadID, err = w.syncCache.GetUploadID(ctx, repo.ID, pointer.Oid, strconv.Itoa(w.config.Mirror.PartSize))
 	if err != nil {
-		slog.Error(
-			"failed to get upload id from cache",
-			slog.Int("workerID", w.id),
-			slog.Any("error", err),
-			slog.Any("repoPath", repoPath),
-			slog.Any("repoType", repo.RepositoryType),
-		)
+		if errors.Is(err, redis.Nil) {
+			loggerFromLFSContext(ctx).InfoContext(ctx, "upload lfs cache miss",
+				slog.Any("repoType", repo.RepositoryType),
+			)
+		} else {
+			loggerFromLFSContext(ctx).ErrorContext(ctx,
+				"failed to get upload id from cache",
+				slog.Any("error", err),
+				slog.Any("repoType", repo.RepositoryType),
+			)
+		}
+		uploadID = ""
 	}
 
 	if uploadID == "" {
-		slog.Info(
-			"no upload id found in cache, creating new one",
-			slog.Int("workerID", w.id),
-			slog.Any("repoPath", repoPath),
-		)
+		loggerFromLFSContext(ctx).InfoContext(ctx, "no upload id found in cache, creating new one")
 
 		uploadID, err = w.ossCore.NewMultipartUpload(ctx, w.config.S3.Bucket, objectKey, minio.PutObjectOptions{
 			PartSize: uint64(partSize),
 		})
 		if err != nil {
-			slog.Error(
+			loggerFromLFSContext(ctx).ErrorContext(ctx,
 				"failed to create new multipart upload",
-				slog.Int("workerID", w.id),
 				slog.Any("error", err),
-				slog.Any("repoPath", repoPath),
 			)
 			return fmt.Errorf("failed to create new multipart upload: %w", err)
 		}
 
-		err = w.syncCache.CacheUploadID(ctx, repoPath, pointer.Oid, strconv.Itoa(w.config.Mirror.PartSize), uploadID)
+		err = w.syncCache.CacheUploadID(ctx, repo.ID, pointer.Oid, strconv.Itoa(w.config.Mirror.PartSize), uploadID)
 		if err != nil {
-			slog.Error(
+			loggerFromLFSContext(ctx).ErrorContext(ctx,
 				"failed to cache upload id",
-				slog.Int("workerID", w.id),
 				slog.Any("error", err),
-				slog.Any("repoPath", repoPath),
 			)
 		}
 	}
@@ -721,16 +617,15 @@ func (w *LfsSyncWorker) downloadAndUploadLFSFile(
 		uploadID,
 		objectKey,
 		w.config.Mirror.LfsConcurrency,
+		repo.ID,
 		pointer,
 	)
 	if err != nil {
-		slog.Error(
+		loggerFromLFSContext(ctx).ErrorContext(ctx,
 			"failed to upload object",
-			slog.Int("workerID", w.id),
 			slog.Any("uploadID", uploadID),
 			slog.Any("objectKey", objectKey),
 			slog.Any("error", err),
-			slog.Any("repoPath", repoPath),
 		)
 		return fmt.Errorf("failed to upload object: %w", err)
 	}
@@ -741,46 +636,38 @@ func (w *LfsSyncWorker) downloadAndUploadLFSFile(
 	}
 
 	if info.Size != pointer.Size {
-		slog.Error(
+		loggerFromLFSContext(ctx).ErrorContext(ctx,
 			"object size mismatch",
-			slog.Int("workerID", w.id),
 			slog.Any("objectKey", objectKey),
 			slog.Any("expectedSize", pointer.Size),
 			slog.Any("actualSize", info.Size),
-			slog.Any("repoPath", repoPath),
 		)
-		err := w.syncCache.DeleteUploadID(ctx, repoPath, pointer.Oid, strconv.Itoa(w.config.Mirror.PartSize))
+		err := w.syncCache.DeleteUploadID(ctx, repo.ID, pointer.Oid, strconv.Itoa(w.config.Mirror.PartSize))
 		if err != nil {
-			slog.Error(
+			loggerFromLFSContext(ctx).ErrorContext(ctx,
 				"failed to delete upload id",
-				slog.Int("workerID", w.id),
 				slog.Any("error", err),
-				slog.Any("repoPath", repoPath),
 				slog.Any("uploadID", uploadID),
 				slog.Any("oid", pointer.Oid),
 			)
 		}
 
 		// delete the object if upload failed
-		err = w.syncCache.DeleteLfsPartCache(ctx, repoPath, pointer.Oid, strconv.Itoa(w.config.Mirror.PartSize))
+		err = w.syncCache.DeleteLfsPartCache(ctx, repo.ID, pointer.Oid, strconv.Itoa(w.config.Mirror.PartSize))
 		if err != nil {
-			slog.Error(
+			loggerFromLFSContext(ctx).ErrorContext(ctx,
 				"failed to delete lfs part cache",
-				slog.Int("workerID", w.id),
 				slog.Any("error", err),
-				slog.Any("repoPath", repoPath),
 				slog.Any("oid", pointer.Oid),
 			)
 		}
 
 		// Reset lfs upload progress
-		err = w.syncCache.CacheLfsSyncFileProgress(ctx, repoPath, pointer.Oid, strconv.Itoa(w.config.Mirror.PartSize), 0)
+		err = w.syncCache.CacheLfsSyncFileProgress(ctx, repo.ID, pointer.Oid, strconv.Itoa(w.config.Mirror.PartSize), 0)
 		if err != nil {
-			slog.Error(
+			loggerFromLFSContext(ctx).ErrorContext(ctx,
 				"failed to reset lfs upload progress",
-				slog.Int("workerID", w.id),
 				slog.Any("error", err),
-				slog.Any("repoPath", repoPath),
 				slog.Any("oid", pointer.Oid),
 			)
 		}
@@ -788,11 +675,9 @@ func (w *LfsSyncWorker) downloadAndUploadLFSFile(
 		// delete the object if upload failed
 		err = w.ossClient.RemoveObject(ctx, w.config.S3.Bucket, objectKey, minio.RemoveObjectOptions{})
 		if err != nil {
-			slog.Error(
+			loggerFromLFSContext(ctx).ErrorContext(ctx,
 				"failed to remove object",
-				slog.Int("workerID", w.id),
 				slog.Any("error", err),
-				slog.Any("repoPath", repoPath),
 				slog.Any("objectKey", objectKey),
 			)
 		}
@@ -805,25 +690,21 @@ func (w *LfsSyncWorker) downloadAndUploadLFSFile(
 	lmo.Existing = true
 	_, err = w.lfsMetaObjectStore.UpdateOrCreate(ctx, lmo)
 	if err != nil {
-		slog.Error(
+		loggerFromLFSContext(ctx).ErrorContext(ctx,
 			"failed to update lfs meta object existing",
-			slog.Int("workerID", w.id),
 			slog.Any("error", err),
 			slog.Any("lfsMetaObject", lmo),
-			slog.Any("repoPath", repo.Path),
 			slog.Any("repoType", repo.RepositoryType),
 		)
 		return fmt.Errorf("failed to update lfs meta object existing: %w", err)
 	}
 
 	// delete all cache if upload success
-	err = w.syncCache.DeleteAllCache(ctx, repoPath, pointer.Oid, strconv.Itoa(w.config.Mirror.PartSize))
+	err = w.syncCache.DeleteLfsSyncFileCache(ctx, repo.ID, pointer.Oid, strconv.Itoa(w.config.Mirror.PartSize))
 	if err != nil {
-		slog.Error(
+		loggerFromLFSContext(ctx).ErrorContext(ctx,
 			"failed to delete all cache",
-			slog.Int("workerID", w.id),
 			slog.Any("error", err),
-			slog.Any("repoPath", repoPath),
 			slog.Any("oid", pointer.Oid),
 		)
 	}
@@ -836,10 +717,10 @@ func (w *LfsSyncWorker) multipartUploadWithRetry(
 	partSize int64,
 	uploadID, objectKey string,
 	concurrency int,
+	repoID int64,
 	pointer *types.Pointer,
 ) error {
 	var parts []minio.CompletePart
-	repoPath := ctx.Value(rk).(string)
 	eg := new(errgroup.Group)
 	// Use a channel to limit the number of concurrent uploads
 	concurrencyChan := make(chan struct{}, concurrency)
@@ -859,10 +740,8 @@ func (w *LfsSyncWorker) multipartUploadWithRetry(
 
 	uploadedParts, err := w.ossCore.ListObjectParts(ctx, w.config.S3.Bucket, objectKey, uploadID, 0, 0)
 	if err != nil {
-		slog.Error(
+		loggerFromLFSContext(ctx).ErrorContext(ctx,
 			"failed to list object parts",
-			slog.Int("workerID", w.id),
-			slog.Any("repoPath", repoPath),
 			slog.Any("objectKey", objectKey),
 			slog.Any("uploadID", uploadID),
 			slog.Any("oid", pointer.Oid),
@@ -876,10 +755,8 @@ func (w *LfsSyncWorker) multipartUploadWithRetry(
 	if len(uploadedParts.ObjectParts) > totalParts {
 		err := w.ossCore.AbortMultipartUpload(ctx, w.config.S3.Bucket, objectKey, uploadID)
 		if err != nil {
-			slog.Error(
+			loggerFromLFSContext(ctx).ErrorContext(ctx,
 				"failed to abort multipart upload",
-				slog.Int("workerID", w.id),
-				slog.Any("repoPath", repoPath),
 				slog.Any("objectKey", objectKey),
 				slog.Any("uploadID", uploadID),
 				slog.Any("oid", pointer.Oid),
@@ -891,12 +768,10 @@ func (w *LfsSyncWorker) multipartUploadWithRetry(
 
 	// Refresh cache progress
 	progress := float64(len(uploadedParts.ObjectParts)) / float64(totalParts) * 100
-	err = w.syncCache.CacheLfsSyncFileProgress(ctx, repoPath, pointer.Oid, strconv.Itoa(w.config.Mirror.PartSize), int(progress))
+	err = w.syncCache.CacheLfsSyncFileProgress(ctx, repoID, pointer.Oid, strconv.Itoa(w.config.Mirror.PartSize), int(progress))
 	if err != nil {
-		slog.Error(
+		loggerFromLFSContext(ctx).ErrorContext(ctx,
 			"failed to cache progress",
-			slog.Int("workerID", w.id),
-			slog.Any("repoPath", repoPath),
 			slog.Any("objectKey", objectKey),
 			slog.Any("oid", pointer.Oid),
 			slog.Any("err", err),
@@ -923,16 +798,14 @@ func (w *LfsSyncWorker) multipartUploadWithRetry(
 				}
 
 				synced, _ := w.syncCache.IsLfsPartSynced(
-					ctx, repoPath, pointer.Oid, strconv.Itoa(w.config.Mirror.PartSize), partNumber,
+					ctx, repoID, pointer.Oid, strconv.Itoa(w.config.Mirror.PartSize), partNumber,
 				)
 				if synced {
 					return nil
 				}
 
-				slog.Info(
+				loggerFromLFSContext(ctx).InfoContext(ctx,
 					"uploading part",
-					slog.Int("workerID", w.id),
-					slog.Any("repoPath", repoPath),
 					slog.Any("objectKey", objectKey),
 					slog.Any("partNumber", partNumber),
 					slog.Any("offset", offset),
@@ -943,10 +816,8 @@ func (w *LfsSyncWorker) multipartUploadWithRetry(
 				part, err := w.downloadAndUploadPartWithRetry(
 					ctx, uploadID, objectKey, partNumber, offset, end, pointer)
 				if err != nil {
-					slog.Error(
+					loggerFromLFSContext(ctx).ErrorContext(ctx,
 						"failed to upload part",
-						slog.Int("workerID", w.id),
-						slog.Any("repoPath", repoPath),
 						slog.Any("objectKey", objectKey),
 						slog.Any("partNumber", partNumber),
 						slog.Any("offset", offset),
@@ -964,21 +835,17 @@ func (w *LfsSyncWorker) multipartUploadWithRetry(
 				})
 				w.mu.Unlock()
 
-				slog.Info(
+				loggerFromLFSContext(ctx).InfoContext(ctx,
 					"caching part",
-					slog.Int("workerID", w.id),
-					slog.Any("repoPath", repoPath),
 					slog.Any("objectKey", objectKey),
 					slog.Any("partNumber", partNumber),
 				)
 
 				// Cache the part uploaded
-				err = w.syncCache.CacheLfsSyncAddPart(ctx, repoPath, pointer.Oid, strconv.Itoa(w.config.Mirror.PartSize), partNumber)
+				err = w.syncCache.CacheLfsSyncAddPart(ctx, repoID, pointer.Oid, strconv.Itoa(w.config.Mirror.PartSize), partNumber)
 				if err != nil {
-					slog.Error(
+					loggerFromLFSContext(ctx).ErrorContext(ctx,
 						"failed to add part to cache",
-						slog.Int("workerID", w.id),
-						slog.Any("repoPath", repoPath),
 						slog.Any("objectKey", objectKey),
 						slog.Any("partNumber", partNumber),
 						slog.Any("oid", pointer.Oid),
@@ -987,24 +854,20 @@ func (w *LfsSyncWorker) multipartUploadWithRetry(
 				}
 
 				// Count progress
-				uploadedPartCount, err := w.syncCache.LfsPartSyncedCount(ctx, repoPath, pointer.Oid, strconv.Itoa(w.config.Mirror.PartSize))
+				uploadedPartCount, err := w.syncCache.LfsPartSyncedCount(ctx, repoID, pointer.Oid, strconv.Itoa(w.config.Mirror.PartSize))
 				if err != nil {
-					slog.Error(
+					loggerFromLFSContext(ctx).ErrorContext(ctx,
 						"failed to count uploaded parts",
-						slog.Int("workerID", w.id),
-						slog.Any("repoPath", repoPath),
 						slog.Any("objectKey", objectKey),
 						slog.Any("oid", pointer.Oid),
 						slog.Any("err", err),
 					)
 				}
 				progress := float64(uploadedPartCount) / float64(totalParts) * 100
-				err = w.syncCache.CacheLfsSyncFileProgress(ctx, repoPath, pointer.Oid, strconv.Itoa(w.config.Mirror.PartSize), int(progress))
+				err = w.syncCache.CacheLfsSyncFileProgress(ctx, repoID, pointer.Oid, strconv.Itoa(w.config.Mirror.PartSize), int(progress))
 				if err != nil {
-					slog.Error(
+					loggerFromLFSContext(ctx).ErrorContext(ctx,
 						"failed to cache progress",
-						slog.Int("workerID", w.id),
-						slog.Any("repoPath", repoPath),
 						slog.Any("objectKey", objectKey),
 						slog.Any("oid", pointer.Oid),
 						slog.Any("err", err),
@@ -1018,10 +881,8 @@ func (w *LfsSyncWorker) multipartUploadWithRetry(
 	}
 	err = eg.Wait()
 	if err != nil {
-		slog.Error(
+		loggerFromLFSContext(ctx).ErrorContext(ctx,
 			"failed to download and upload lfs file",
-			slog.Int("workerID", w.id),
-			slog.Any("repoPath", repoPath),
 			slog.Any("objectKey", objectKey),
 			slog.Any("oid", pointer.Oid),
 			slog.Any("err", err),
@@ -1031,10 +892,8 @@ func (w *LfsSyncWorker) multipartUploadWithRetry(
 
 	result, err := w.ossCore.ListObjectParts(ctx, w.config.S3.Bucket, objectKey, uploadID, 0, 0)
 	if err != nil {
-		slog.Error(
+		loggerFromLFSContext(ctx).ErrorContext(ctx,
 			"failed to list object parts",
-			slog.Int("workerID", w.id),
-			slog.Any("repoPath", repoPath),
 			slog.Any("objectKey", objectKey),
 			slog.Any("oid", pointer.Oid),
 			slog.Any("err", err),
@@ -1045,13 +904,11 @@ func (w *LfsSyncWorker) multipartUploadWithRetry(
 	if len(result.ObjectParts) != totalParts {
 		// If the number of parts in OSS is more than the parts we caculated, should delete the uploadID and retry the upload
 		if len(result.ObjectParts) > totalParts {
-			err := w.syncCache.DeleteUploadID(ctx, repoPath, pointer.Oid, strconv.Itoa(w.config.Mirror.PartSize))
+			err := w.syncCache.DeleteUploadID(ctx, repoID, pointer.Oid, strconv.Itoa(w.config.Mirror.PartSize))
 			if err != nil {
-				slog.Error(
+				loggerFromLFSContext(ctx).ErrorContext(ctx,
 					"failed to delete upload id",
-					slog.Int("workerID", w.id),
 					slog.Any("error", err),
-					slog.Any("repoPath", repoPath),
 					slog.Any("uploadID", uploadID),
 					slog.Any("oid", pointer.Oid),
 				)
@@ -1066,12 +923,11 @@ func (w *LfsSyncWorker) multipartUploadWithRetry(
 		for partNumber := 1; partNumber <= int(totalParts); partNumber++ {
 			_, ok := partNumberMapping[partNumber]
 			if !ok {
-				slog.Error("part number missing", slog.Any("partNumber", partNumber), slog.Any("oid", pointer.Oid))
-				err := w.syncCache.DeleteSpecificLfsPartCache(ctx, repoPath, pointer.Oid, strconv.Itoa(w.config.Mirror.PartSize), partNumber)
+				loggerFromLFSContext(ctx).ErrorContext(ctx, "part number missing", slog.Any("partNumber", partNumber), slog.Any("oid", pointer.Oid))
+				err := w.syncCache.DeleteSpecificLfsPartCache(ctx, repoID, pointer.Oid, strconv.Itoa(w.config.Mirror.PartSize), partNumber)
 				if err != nil {
-					slog.Error(
+					loggerFromLFSContext(ctx).ErrorContext(ctx,
 						"failed to delete specific lfs part cache",
-						slog.Int("workerID", w.id),
 						slog.Any("error", err),
 						slog.Any("partNumber", partNumber),
 						slog.Any("oid", pointer.Oid),
@@ -1101,24 +957,20 @@ func (w *LfsSyncWorker) multipartUploadWithRetry(
 		},
 	)
 	if err != nil {
-		slog.Error(
+		loggerFromLFSContext(ctx).ErrorContext(ctx,
 			"failed to complete multipart upload",
-			slog.Any("workerID", w.id),
 			slog.Any("error", err),
 			slog.Any("uploadID", uploadID),
 			slog.Any("objectKey", objectKey),
-			slog.Any("repoPath", repoPath),
 		)
 		return fmt.Errorf("failed to complete multipart upload, %w", err)
 	}
 
-	slog.Info(
+	loggerFromLFSContext(ctx).InfoContext(ctx,
 		"complete multipart upload",
-		slog.Any("workerID", w.id),
 		slog.Any("error", err),
 		slog.Any("uploadID", uploadID),
 		slog.Any("objectKey", objectKey),
-		slog.Any("repoPath", repoPath),
 	)
 	return nil
 }
@@ -1135,9 +987,8 @@ func (w *LfsSyncWorker) downloadAndUploadSmallFile(
 	default:
 	}
 
-	slog.Info(
+	loggerFromLFSContext(ctx).InfoContext(ctx,
 		"downloading small file directly",
-		slog.Int("workerID", w.id),
 		slog.Any("oid", pointer.Oid),
 		slog.Any("size", pointer.Size),
 	)
@@ -1161,7 +1012,7 @@ func (w *LfsSyncWorker) downloadAndUploadSmallFile(
 	if info.Size != pointer.Size {
 		err := w.ossClient.RemoveObject(ctx, w.config.S3.Bucket, objectKey, minio.RemoveObjectOptions{})
 		if err != nil {
-			slog.Warn("failed to remove mismatched object", slog.Int("workerID", w.id), slog.Any("error", err))
+			loggerFromLFSContext(ctx).WarnContext(ctx, "failed to remove mismatched object", slog.Any("error", err))
 		}
 		return fmt.Errorf(
 			"object size mismatch, oid: %s actually size %d, expect size %d",
@@ -1194,16 +1045,13 @@ func (w *LfsSyncWorker) downloadAndUploadPartWithRetry(
 		part    minio.ObjectPart
 		lastErr error
 	)
-	repoPath := ctx.Value(rk).(string)
 	for attempt := 1; attempt <= maxRetries; attempt++ {
 		downloadURL := pointer.DownloadURL
 		if downloadURL == "" {
 			return part, fmt.Errorf("downloadURL is empty")
 		}
-		slog.Info(
+		loggerFromLFSContext(ctx).InfoContext(ctx,
 			"downloading range",
-			slog.Int("workerID", w.id),
-			slog.Any("repoPath", repoPath),
 			slog.Any("objectKey", objectKey),
 			slog.Any("downloadURL", downloadURL),
 			slog.Any("partNumber", partNumber),
@@ -1212,9 +1060,8 @@ func (w *LfsSyncWorker) downloadAndUploadPartWithRetry(
 		)
 		resp, err := w.downloadRange(ctx, downloadURL, start, end)
 		if err != nil {
-			slog.Error(
+			loggerFromLFSContext(ctx).ErrorContext(ctx,
 				"failed to download range",
-				slog.Int("workerID", w.id),
 				slog.Any("downloadURL", downloadURL),
 				slog.Any("partNumber", partNumber),
 				slog.Any("start", start),
@@ -1239,10 +1086,8 @@ func (w *LfsSyncWorker) downloadAndUploadPartWithRetry(
 			defer resp.Body.Close()
 		}
 
-		slog.Info(
+		loggerFromLFSContext(ctx).InfoContext(ctx,
 			"uploading range",
-			slog.Any("workerID", w.id),
-			slog.Any("repoPath", repoPath),
 			slog.Any("objectKey", objectKey),
 			slog.Any("partNumber", partNumber),
 			slog.Any("offset", start),
@@ -1262,10 +1107,8 @@ func (w *LfsSyncWorker) downloadAndUploadPartWithRetry(
 		)
 		if err != nil {
 			lastErr = err
-			slog.Error(
+			loggerFromLFSContext(ctx).ErrorContext(ctx,
 				"failed to upload range",
-				slog.Any("workerID", w.id),
-				slog.Any("repoPath", repoPath),
 				slog.Any("objectKey", objectKey),
 				slog.Any("partNumber", partNumber),
 				slog.Any("offset", start),
@@ -1445,7 +1288,7 @@ func (w *LfsSyncWorker) GetLFSDownloadURLs(
 		var downloadURL string
 		// Some objects may be unreachable or been removed
 		if obj.Actions.Download == nil {
-			slog.Warn("download URL not found for object", slog.Any("obj", obj.Oid))
+			loggerFromLFSContext(ctx).WarnContext(ctx, "download URL not found for object", slog.Any("obj", obj.Oid))
 			downloadURL = ""
 		} else {
 			downloadURL = obj.Actions.Download.Href
@@ -1511,13 +1354,11 @@ func (w *LfsSyncWorker) triggerGitCallback(
 		return fmt.Errorf("failed to handle git push callback: %w", err)
 	}
 
-	slog.Info(
+	loggerFromLFSContext(ctx).InfoContext(ctx,
 		"start handle push workflow",
-		slog.Any("workerID", w.id),
 		// slog.String("workflowID", we.GetID()),
 		slog.Any("req", callback),
-		slog.Any("repoType", repo.RepositoryType),
-		slog.Any("repoPath", repo.Path))
+		slog.Any("repoType", repo.RepositoryType))
 
 	return nil
 }
@@ -1528,7 +1369,7 @@ func SplitPointersBySizeAndCount(pointers []*types.Pointer) [][]*types.Pointer {
 	var currentSize int64 = 0
 
 	for _, p := range pointers {
-		if currentSize+p.Size > MaxGroupSize || len(currentGroup) >= MaxGroupCount {
+		if currentSize+p.Size > maxGroupSize || len(currentGroup) >= maxGroupCount {
 			if len(currentGroup) > 0 {
 				groups = append(groups, currentGroup)
 			}

@@ -2,6 +2,8 @@ package database_test
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"testing"
 	"time"
 
@@ -10,6 +12,16 @@ import (
 	"opencsg.com/csghub-server/common/tests"
 	"opencsg.com/csghub-server/common/types"
 )
+
+type fakeMirrorDeleteJobCancelClient struct {
+	cancelled []int64
+	err       error
+}
+
+func (c *fakeMirrorDeleteJobCancelClient) JobCancelTx(ctx context.Context, tx *sql.Tx, jobID int64) error {
+	c.cancelled = append(c.cancelled, jobID)
+	return c.err
+}
 
 func TestMirrorStore_CRUD(t *testing.T) {
 	db := tests.InitTestDB()
@@ -109,6 +121,130 @@ func TestMirrorStore_CRUD(t *testing.T) {
 	_, err = store.FindByID(ctx, mi.ID)
 	require.NotNil(t, err)
 
+}
+
+func TestMirrorStore_DeleteWithTaskCancelTxCancelsJobsAndDeletesMirror(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewMirrorStoreWithDB(db)
+	repo := &database.Repository{
+		RepositoryType: types.ModelRepo,
+		GitPath:        "models_ns/repo",
+		Name:           "repo",
+		Path:           "ns/repo",
+		SyncStatus:     types.SyncStatusInProgress,
+	}
+	require.NoError(t, db.Core.NewInsert().Model(repo).Scan(ctx, repo))
+
+	mirror, err := store.Create(ctx, &database.Mirror{
+		Interval:     "m1",
+		SourceUrl:    "https://github.com/a/repo.git",
+		RepositoryID: repo.ID,
+		Status:       types.MirrorRepoSyncStart,
+		Priority:     types.ASAPMirrorPriority,
+	})
+	require.NoError(t, err)
+	tasks := []database.MirrorTask{
+		{MirrorID: mirror.ID, Status: types.MirrorRepoSyncStart, Priority: types.ASAPMirrorPriority, RepoJobID: 11, LFSJobID: 12},
+		{MirrorID: mirror.ID, Status: types.MirrorQueued, Priority: types.HighMirrorPriority, RepoJobID: 21},
+	}
+	for i := range tasks {
+		require.NoError(t, db.Core.NewInsert().Model(&tasks[i]).Scan(ctx, &tasks[i]))
+	}
+
+	cancelClient := &fakeMirrorDeleteJobCancelClient{}
+	err = store.DeleteWithTaskCancelTx(ctx, mirror.ID, cancelClient)
+	require.NoError(t, err)
+	require.ElementsMatch(t, []int64{int64(11), int64(12), int64(21)}, cancelClient.cancelled)
+
+	_, err = store.FindByID(ctx, mirror.ID)
+	require.Error(t, err)
+	count, err := db.Core.NewSelect().Model((*database.MirrorTask)(nil)).Where("mirror_id = ?", mirror.ID).Count(ctx)
+	require.NoError(t, err)
+	require.Zero(t, count)
+
+	var storedRepo database.Repository
+	require.NoError(t, db.Core.NewSelect().Model(&storedRepo).Where("id = ?", repo.ID).Scan(ctx))
+	require.Equal(t, types.SyncStatusCanceled, storedRepo.SyncStatus)
+}
+
+func TestMirrorStore_DeleteWithTaskCancelTxRollsBackWhenJobCancelFails(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewMirrorStoreWithDB(db)
+	repo := &database.Repository{
+		RepositoryType: types.ModelRepo,
+		GitPath:        "models_ns/repo",
+		Name:           "repo",
+		Path:           "ns/repo",
+	}
+	require.NoError(t, db.Core.NewInsert().Model(repo).Scan(ctx, repo))
+	mirror, err := store.Create(ctx, &database.Mirror{
+		Interval:     "m1",
+		SourceUrl:    "https://github.com/a/repo.git",
+		RepositoryID: repo.ID,
+		Status:       types.MirrorRepoSyncStart,
+		Priority:     types.ASAPMirrorPriority,
+	})
+	require.NoError(t, err)
+	task := &database.MirrorTask{
+		MirrorID:  mirror.ID,
+		Status:    types.MirrorRepoSyncStart,
+		Priority:  types.ASAPMirrorPriority,
+		RepoJobID: 11,
+	}
+	require.NoError(t, db.Core.NewInsert().Model(task).Scan(ctx, task))
+
+	cancelClient := &fakeMirrorDeleteJobCancelClient{err: errors.New("cancel failed")}
+	err = store.DeleteWithTaskCancelTx(ctx, mirror.ID, cancelClient)
+	require.Error(t, err)
+
+	_, err = store.FindByID(ctx, mirror.ID)
+	require.NoError(t, err)
+	count, err := db.Core.NewSelect().Model((*database.MirrorTask)(nil)).Where("mirror_id = ?", mirror.ID).Count(ctx)
+	require.NoError(t, err)
+	require.Equal(t, 1, count)
+}
+
+func TestMirrorStore_DeleteWithTaskCancelTxKeepsCompletedRepoStatus(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewMirrorStoreWithDB(db)
+	repo := &database.Repository{
+		RepositoryType: types.ModelRepo,
+		GitPath:        "models_ns/repo",
+		Name:           "repo",
+		Path:           "ns/repo",
+		SyncStatus:     types.SyncStatusCompleted,
+	}
+	require.NoError(t, db.Core.NewInsert().Model(repo).Scan(ctx, repo))
+	mirror, err := store.Create(ctx, &database.Mirror{
+		Interval:     "m1",
+		SourceUrl:    "https://github.com/a/repo.git",
+		RepositoryID: repo.ID,
+		Status:       types.MirrorLfsSyncFinished,
+		Priority:     types.ASAPMirrorPriority,
+	})
+	require.NoError(t, err)
+	task := &database.MirrorTask{
+		MirrorID: mirror.ID,
+		Status:   types.MirrorLfsSyncFinished,
+		Priority: types.ASAPMirrorPriority,
+	}
+	require.NoError(t, db.Core.NewInsert().Model(task).Scan(ctx, task))
+
+	err = store.DeleteWithTaskCancelTx(ctx, mirror.ID, &fakeMirrorDeleteJobCancelClient{})
+	require.NoError(t, err)
+
+	var storedRepo database.Repository
+	require.NoError(t, db.Core.NewSelect().Model(&storedRepo).Where("id = ?", repo.ID).Scan(ctx))
+	require.Equal(t, types.SyncStatusCompleted, storedRepo.SyncStatus)
 }
 
 func TestMirrorStore_FindWithMapping(t *testing.T) {
@@ -361,35 +497,3 @@ func TestMirrorStore_BatchCreate(t *testing.T) {
 // 	require.Equal(t, 1, len(ms))
 // 	require.Equal(t, ms[0].SourceUrl, "https://opencsg.com/models/repo1")
 // }
-
-func TestMirrorStore_Recover(t *testing.T) {
-	db := tests.InitTestDB()
-	defer db.Close()
-	ctx := context.TODO()
-
-	store := database.NewMirrorStoreWithDB(db)
-
-	mirrors := []database.Mirror{
-		{ID: 1, SourceUrl: "https://opencsg.com/models/repo1", Status: types.MirrorRepoSyncFailed, Priority: 1},
-		{ID: 2, SourceUrl: "https://opencsg.com/models/repo2", Status: types.MirrorRepoSyncStart, Priority: 1},
-		{ID: 3, SourceUrl: "https://opencsg.com/models/repo3", Status: types.MirrorLfsSyncStart, Priority: 1},
-		{ID: 4, SourceUrl: "https://opencsg.com/models/repo4", Status: types.MirrorLfsSyncFailed, Priority: 1},
-	}
-	_, err := db.Operator.Core.NewInsert().Model(&mirrors).Exec(ctx)
-	require.Nil(t, err)
-	err = store.Recover(ctx)
-	require.Nil(t, err)
-	err = db.Operator.Core.NewSelect().Model(&mirrors).Scan(ctx, &mirrors)
-	require.Nil(t, err)
-	for _, m := range mirrors {
-		if m.ID == 2 || m.ID == 3 {
-			require.Equal(t, types.MirrorQueued, m.Status)
-		}
-		if m.ID == 1 {
-			require.Equal(t, types.MirrorRepoSyncFailed, m.Status)
-		}
-		if m.ID == 4 {
-			require.Equal(t, types.MirrorLfsSyncFailed, m.Status)
-		}
-	}
-}

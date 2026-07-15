@@ -874,6 +874,14 @@
 - **错误名:** `gatewayMCPServerInvalidName`
 - **描述:** MCP服务器名称不符合命名规范。
 
+## Mirror 错误
+
+### `MIRROR-ERR-0`
+
+- **错误代码:** `MIRROR-ERR-0`
+- **错误名:** `mirrorSourceConflict`
+- **描述:** 目标仓库已绑定其他镜像源。
+
 ## Moderation 错误
 
 ### `MOD-ERR-0`

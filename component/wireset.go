@@ -31,6 +31,7 @@ import (
 	"opencsg.com/csghub-server/builder/dataviewer"
 	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/rsa"
+	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/store/s3"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/tests"
@@ -347,23 +348,21 @@ func NewTestRuntimeArchitectureComponent(stores *tests.MockStores, repoComponent
 
 var RuntimeArchComponentSet = wire.NewSet(NewTestRuntimeArchitectureComponent)
 
-func NewTestMirrorComponent(config *config.Config, stores *tests.MockStores, mirrorServer mirrorserver.MirrorServer, repoComponent RepoComponent, gitServer gitserver.GitServer, s3Client s3.Client) *mirrorComponentImpl {
+func NewTestMirrorComponent(config *config.Config, stores *tests.MockStores, _ mirrorserver.MirrorServer, repoComponent RepoComponent, _ gitserver.GitServer, _ s3.Client) *mirrorComponentImpl {
 	return &mirrorComponentImpl{
-		tokenStore:                  stores.GitServerAccessToken,
-		mirrorServer:                mirrorServer,
 		repoComp:                    repoComponent,
-		git:                         gitServer,
-		s3Client:                    s3Client,
+		accessTokenStore:            stores.AccessToken,
 		modelStore:                  stores.Model,
 		datasetStore:                stores.Dataset,
 		codeStore:                   stores.Code,
 		repoStore:                   stores.Repo,
 		mirrorStore:                 stores.Mirror,
+		mirrorRepoStore:             database.NewMirrorRepoStore(nil),
 		mirrorSourceStore:           stores.MirrorSource,
+		syncVersionStore:            stores.SyncVersion,
 		namespaceStore:              stores.Namespace,
 		userStore:                   stores.User,
 		config:                      config,
-		mirrorTaskStore:             stores.MirrorTaskStore,
 		mirrorNamespaceMappingStore: stores.MirrorNamespaceMapping,
 	}
 }
@@ -655,16 +654,12 @@ func NewTestLicenseComponent(config *config.Config, stores *tests.MockStores, ke
 
 var LicenseComponentSet = wire.NewSet(NewTestLicenseComponent)
 
-func NewTestImportComponent(config *config.Config, stores *tests.MockStores, repoComponent RepoComponent, importer importer.Importer) *importComponentImpl {
+func NewTestImportComponent(config *config.Config, stores *tests.MockStores, importer importer.Importer) *importComponentImpl {
 	return &importComponentImpl{
 		userStore:         stores.User,
-		mirrorStore:       stores.Mirror,
 		repoStore:         stores.Repo,
-		codeStore:         stores.Code,
 		importer:          importer,
 		mirrorSourceStore: stores.MirrorSource,
-		repoComponent:     repoComponent,
-		mirrorTaskStore:   stores.MirrorTaskStore,
 	}
 }
 

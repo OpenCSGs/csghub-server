@@ -1,10 +1,13 @@
 package lfssyncer
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -23,9 +26,7 @@ import (
 	mock_database "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/database"
 	mock_s3 "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/s3"
 	mock_workflow "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/temporal"
-	mock_component "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
 	mock_cache "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/mirror/cache"
-	mock_filter "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/mirror/filter"
 	mock_hook "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/mirror/hook"
 
 	"opencsg.com/csghub-server/builder/git/gitserver"
@@ -44,16 +45,12 @@ type LfsSyncWorkerTestSuite struct {
 }
 
 type testLfsSyncWorkerMocks struct {
-	mirrorStore        *mock_database.MockMirrorStore
 	mirrorTaskStore    *mock_database.MockMirrorTaskStore
 	lfsMetaObjectStore *mock_database.MockLfsMetaObjectStore
-	repoStore          *mock_database.MockRepoStore
 	ossClient          *mock_s3.MockClient
 	ossCore            *mock_s3.MockCore
 	syncCache          *mock_cache.MockCache
 	msgSender          *mock_hook.MockMessageSender
-	recomComponent     *mock_component.MockRecomComponent
-	filter             *mock_filter.MockFilter
 	git                *mock_gitserver.MockGitServer
 	workflowClient     *mock_workflow.MockClient
 }
@@ -118,16 +115,12 @@ func newTestLfsSyncWorker(t *testing.T, serverURL string) (*LfsSyncWorker, *test
 	cfg := createTestConfig()
 
 	mocks := &testLfsSyncWorkerMocks{
-		mirrorStore:        new(mock_database.MockMirrorStore),
 		mirrorTaskStore:    new(mock_database.MockMirrorTaskStore),
 		lfsMetaObjectStore: new(mock_database.MockLfsMetaObjectStore),
-		repoStore:          new(mock_database.MockRepoStore),
 		ossClient:          new(mock_s3.MockClient),
 		ossCore:            new(mock_s3.MockCore),
 		syncCache:          new(mock_cache.MockCache),
 		msgSender:          new(mock_hook.MockMessageSender),
-		recomComponent:     new(mock_component.MockRecomComponent),
-		filter:             new(mock_filter.MockFilter),
 		git:                new(mock_gitserver.MockGitServer),
 		workflowClient:     new(mock_workflow.MockClient),
 	}
@@ -145,19 +138,13 @@ func newTestLfsSyncWorker(t *testing.T, serverURL string) (*LfsSyncWorker, *test
 	}
 
 	worker := &LfsSyncWorker{
-		id:                 1,
-		wg:                 &sync.WaitGroup{},
-		mirrorStore:        mocks.mirrorStore,
 		mirrorTaskStore:    mocks.mirrorTaskStore,
 		lfsMetaObjectStore: mocks.lfsMetaObjectStore,
-		repoStore:          mocks.repoStore,
 		ossClient:          mocks.ossClient,
 		ossCore:            mocks.ossCore,
 		config:             cfg,
 		syncCache:          mocks.syncCache,
 		msgSender:          mocks.msgSender,
-		recomComponent:     mocks.recomComponent,
-		repoFilter:         mocks.filter,
 		git:                mocks.git,
 		httpClient:         httpClient,
 		workflowClient:     mocks.workflowClient,
@@ -167,317 +154,70 @@ func newTestLfsSyncWorker(t *testing.T, serverURL string) (*LfsSyncWorker, *test
 	return worker, mocks
 }
 
+// TestLoggerFromLFSContextIncludesTaskFields verifies every task-aware log can be attributed to one mirror execution.
+func TestLoggerFromLFSContextIncludesTaskFields(t *testing.T) {
+	var output bytes.Buffer
+	originalLogger := slog.Default()
+	slog.SetDefault(slog.New(slog.NewJSONHandler(&output, nil)))
+	t.Cleanup(func() { slog.SetDefault(originalLogger) })
+
+	repo := createTestRepository()
+	mirror := createTestMirror(repo, "http://example.com/test/repo.git")
+	task := createTestMirrorTask(mirror, types.MirrorLfsSyncStart)
+	worker := &LfsSyncWorker{}
+	ctx := worker.withLFSContext(context.Background(), task)
+
+	loggerFromLFSContext(ctx).InfoContext(ctx, "test lfs log")
+
+	var entry map[string]any
+	require.NoError(t, json.Unmarshal(output.Bytes(), &entry))
+	require.Equal(t, float64(mirror.ID), entry["mirror_id"])
+	require.Equal(t, float64(task.ID), entry["mirror_task_id"])
+	require.Equal(t, float64(repo.ID), entry["repository_id"])
+	require.Equal(t, fmt.Sprintf("%ss/%s", repo.RepositoryType, repo.Path), entry["repo_path"])
+	require.NotContains(t, entry, "workerID")
+	require.NotContains(t, entry, "mirrorTaskID")
+	require.NotContains(t, entry, "repoID")
+	require.NotContains(t, entry, "repoPath")
+}
+
 // SetupTest initializes test suite
 func (suite *LfsSyncWorkerTestSuite) SetupTest() {
 	suite.ctx = context.Background()
 	suite.worker, suite.mocks = newTestLfsSyncWorker(suite.T(), "")
-	suite.worker.SetContext(suite.ctx)
 }
 
-// Test basic worker functionality
-func (suite *LfsSyncWorkerTestSuite) TestID() {
-	assert.Equal(suite.T(), 1, suite.worker.ID())
-}
-
-func (suite *LfsSyncWorkerTestSuite) TestSetContext() {
-	newCtx := context.WithValue(context.Background(), "test", "value")
-	suite.worker.SetContext(newCtx)
-	assert.Equal(suite.T(), newCtx, suite.worker.ctx)
-}
-
-// Test Run method scenarios
-func (suite *LfsSyncWorkerTestSuite) TestRun_MirrorNotFound() {
-	task := createTestMirrorTask(&database.Mirror{ID: 999}, types.MirrorQueued)
-	task.MirrorID = 999 // Non-existent mirror
-
-	suite.mocks.mirrorStore.EXPECT().FindByID(suite.ctx, task.MirrorID).
-		Return(nil, errors.New("mirror not found"))
-	suite.mocks.mirrorTaskStore.EXPECT().Update(mock.Anything, mock.MatchedBy(func(mt database.MirrorTask) bool {
-		return mt.Status == types.MirrorLfsSyncFailed && mt.ErrorMessage == "mirror not found"
-	})).Return(*task, nil)
-
-	suite.worker.Run(task)
-
-	assert.Equal(suite.T(), types.MirrorLfsSyncFailed, task.Status)
-	assert.Equal(suite.T(), "mirror not found", task.ErrorMessage)
-}
-
-func (suite *LfsSyncWorkerTestSuite) TestRun_RepoNotFound() {
-	repo := createTestRepository()
-	mirror := createTestMirror(repo, "http://example.com/test/repo.git")
-	task := createTestMirrorTask(mirror, types.MirrorQueued)
-
-	suite.mocks.mirrorStore.EXPECT().FindByID(suite.ctx, task.MirrorID).Return(mirror, nil)
-	suite.mocks.repoStore.EXPECT().FindById(suite.ctx, mirror.RepositoryID).
-		Return(nil, errors.New("repo not found"))
-
-	suite.mocks.mirrorTaskStore.EXPECT().Update(mock.Anything, mock.MatchedBy(func(mt database.MirrorTask) bool {
-		return mt.Status == types.MirrorLfsSyncFailed
-	})).Return(*task, nil)
-
-	suite.worker.Run(task)
-	// Should return early but updates DB with failed status
-}
-
-func (suite *LfsSyncWorkerTestSuite) TestRun_ShouldNotSync() {
-	repo := createTestRepository()
-	mirror := createTestMirror(repo, "http://example.com/test/repo.git")
-	task := createTestMirrorTask(mirror, types.MirrorQueued)
-
-	suite.mocks.mirrorStore.EXPECT().FindByID(suite.ctx, task.MirrorID).Return(mirror, nil)
-	suite.mocks.repoStore.EXPECT().FindById(suite.ctx, mirror.RepositoryID).Return(repo, nil)
-	suite.mocks.filter.EXPECT().ShouldSync(suite.ctx, mirror.RepositoryID).
-		Return(false, "repo too large", nil)
-
-	// Expect priority to be lowered
-	suite.mocks.mirrorTaskStore.EXPECT().Update(suite.ctx, mock.MatchedBy(func(mt database.MirrorTask) bool {
-		return mt.Priority == types.LowMirrorPriority
-	})).Return(*task, nil)
-
-	suite.mocks.mirrorStore.EXPECT().Update(suite.ctx, mock.MatchedBy(func(m *database.Mirror) bool {
-		return m.Priority == types.LowMirrorPriority
-	})).Return(nil)
-
-	suite.mocks.msgSender.EXPECT().Send(suite.ctx, mock.MatchedBy(func(req types.MessageRequest) bool {
-		return req.Scenario == types.MessageScenarioRepoSync
-	})).Return(hook.Response{}, nil)
-
-	suite.worker.Run(task)
-
-	assert.Equal(suite.T(), types.LowMirrorPriority, task.Priority)
-}
-
-func (suite *LfsSyncWorkerTestSuite) TestRun_ContextCanceled() {
-	ctx, cancel := context.WithCancel(suite.ctx)
-	defer cancel()
-	suite.worker.SetContext(ctx)
-
+func (suite *LfsSyncWorkerTestSuite) TestRefreshLfsMetaObjectsUsesAfterCommit() {
 	repo := createTestRepository()
 	mirror := createTestMirror(repo, "http://example.com/test/repo.git")
 	task := createTestMirrorTask(mirror, types.MirrorLfsSyncStart)
 
-	suite.mocks.mirrorStore.EXPECT().FindByID(ctx, task.MirrorID).Return(mirror, nil)
-	suite.mocks.repoStore.EXPECT().FindById(ctx, mirror.RepositoryID).Return(repo, nil)
-	suite.mocks.filter.EXPECT().ShouldSync(ctx, mirror.RepositoryID).Return(true, "", nil)
-	suite.mocks.msgSender.EXPECT().Send(mock.Anything, mock.Anything).Return(hook.Response{}, nil)
-	suite.mocks.lfsMetaObjectStore.EXPECT().FindByRepoID(mock.Anything, repo.ID).Return(nil, context.Canceled)
-
-	suite.mocks.mirrorTaskStore.EXPECT().UpdateStatusAndRepoSyncStatus(mock.Anything, mock.MatchedBy(func(mt database.MirrorTask) bool {
-		return strings.Contains(mt.ErrorMessage, "canceled")
-	}), database.MirrorCancel).RunAndReturn(func(ctx context.Context, mt database.MirrorTask, action string) (database.MirrorTask, error) {
-		mt.Status = types.MirrorCanceled
-		return mt, nil
-	})
-
-	suite.mocks.msgSender.EXPECT().Send(mock.Anything, mock.Anything).Return(hook.Response{}, nil)
-	suite.mocks.recomComponent.EXPECT().SetOpWeight(mock.Anything, mock.Anything, mock.Anything).Return(nil)
-
-	suite.worker.Run(task)
-
-	assert.Equal(suite.T(), types.MirrorCanceled, task.Status)
-}
-
-func (suite *LfsSyncWorkerTestSuite) TestRun_Success_NoLfsFiles() {
-	repo := createTestRepository()
-	mirror := createTestMirror(repo, "http://example.com/test/repo.git")
-	task := createTestMirrorTask(mirror, types.MirrorRepoSyncStart)
-
-	commit := &types.Commit{
-		ID: "abc123",
-	}
-
-	// Setup expectations
-	suite.mocks.mirrorStore.EXPECT().FindByID(suite.ctx, task.MirrorID).Return(mirror, nil)
-	suite.mocks.repoStore.EXPECT().FindById(suite.ctx, mirror.RepositoryID).Return(repo, nil)
-	suite.mocks.filter.EXPECT().ShouldSync(suite.ctx, mirror.RepositoryID).Return(true, "", nil)
-	suite.mocks.lfsMetaObjectStore.EXPECT().FindByRepoID(mock.Anything, repo.ID).Return([]database.LfsMetaObject{}, nil)
-	suite.mocks.git.EXPECT().GetDiffBetweenTwoCommits(mock.Anything, mock.Anything).Return(&types.GiteaCallbackPushReq{}, nil)
-
-	// Message sending expectations
-	suite.mocks.msgSender.EXPECT().Send(mock.Anything, mock.MatchedBy(func(req types.MessageRequest) bool {
-		return strings.Contains(req.Parameters, "start")
-	})).Return(hook.Response{}, nil)
-
-	// Git operations
-	suite.mocks.git.EXPECT().GetRepoLastCommit(mock.Anything, mock.MatchedBy(func(req gitserver.GetRepoLastCommitReq) bool {
-		return req.Namespace == "test" && req.Name == "repo" && req.Ref == "main"
-	})).Return(commit, nil).Times(2)
-
-	suite.mocks.git.EXPECT().UpdateRef(mock.Anything, mock.MatchedBy(func(req gitserver.UpdateRefReq) bool {
-		return req.Namespace == "test" && req.Name == "repo" && req.NewObjectId == "abc123"
-	})).Return(nil)
-
-	// Workflow execution
-	suite.mocks.workflowClient.EXPECT().ExecuteWorkflow(mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
-
-	// Final updates
-	suite.mocks.mirrorTaskStore.EXPECT().UpdateStatusAndRepoSyncStatus(mock.Anything, mock.MatchedBy(func(mt database.MirrorTask) bool {
-		return mt.Progress == 100
-	}), database.MirrorSuccess).RunAndReturn(func(ctx context.Context, mt database.MirrorTask, action string) (database.MirrorTask, error) {
-		mt.Status = types.MirrorRepoSyncFinished
-		return mt, nil
-	})
-
-	suite.mocks.msgSender.EXPECT().Send(mock.Anything, mock.MatchedBy(func(req types.MessageRequest) bool {
-		return strings.Contains(req.Parameters, "finished")
-	})).Return(hook.Response{}, nil)
-
-	suite.mocks.recomComponent.EXPECT().SetOpWeight(mock.Anything, mirror.RepositoryID, mock.Anything).Return(nil)
-
-	// Execute
-	suite.worker.Run(task)
-
-	// Verify
-	assert.Equal(suite.T(), types.MirrorRepoSyncFinished, task.Status)
-	assert.Equal(suite.T(), 100, task.Progress)
-}
-
-func (suite *LfsSyncWorkerTestSuite) TestRun_SyncLfsError() {
-	repo := createTestRepository()
-	mirror := createTestMirror(repo, "http://example.com/test/repo.git")
-	task := createTestMirrorTask(mirror, types.MirrorLfsSyncStart)
-
-	expectedError := errors.New("database connection failed")
-
-	// Setup expectations
-	suite.mocks.mirrorStore.EXPECT().FindByID(suite.ctx, task.MirrorID).Return(mirror, nil)
-	suite.mocks.repoStore.EXPECT().FindById(suite.ctx, mirror.RepositoryID).Return(repo, nil)
-	suite.mocks.filter.EXPECT().ShouldSync(suite.ctx, mirror.RepositoryID).Return(true, "", nil)
-
-	// Start message
-	suite.mocks.msgSender.EXPECT().Send(mock.Anything, mock.MatchedBy(func(req types.MessageRequest) bool {
-		return strings.Contains(req.Parameters, "start")
-	})).Return(hook.Response{}, nil)
-
-	// Simulate error in getting LFS meta objects
-	suite.mocks.lfsMetaObjectStore.EXPECT().FindByRepoID(mock.Anything, repo.ID).Return(nil, expectedError)
-
-	// Expect failure status update
-	suite.mocks.mirrorTaskStore.EXPECT().UpdateStatusAndRepoSyncStatus(mock.Anything, mock.MatchedBy(func(mt database.MirrorTask) bool {
-		return strings.Contains(mt.ErrorMessage, expectedError.Error())
-	}), database.MirrorFail).RunAndReturn(func(ctx context.Context, mt database.MirrorTask, action string) (database.MirrorTask, error) {
-		mt.Status = types.MirrorLfsSyncFailed
-		return mt, nil
-	})
-
-	// Failure message
-	suite.mocks.msgSender.EXPECT().Send(mock.Anything, mock.MatchedBy(func(req types.MessageRequest) bool {
-		return strings.Contains(req.Parameters, "failed")
-	})).Return(hook.Response{}, nil)
-
-	suite.mocks.recomComponent.EXPECT().SetOpWeight(mock.Anything, mirror.RepositoryID, mock.Anything).Return(nil)
-
-	// Execute
-	suite.worker.Run(task)
-
-	// Verify
-	assert.Equal(suite.T(), types.MirrorLfsSyncFailed, task.Status)
-	assert.Contains(suite.T(), task.ErrorMessage, expectedError.Error())
-}
-
-func (suite *LfsSyncWorkerTestSuite) TestRun_Success_HasLfsFiles() {
-	repo := createTestRepository()
-
-	var server *httptest.Server
-	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if strings.Contains(r.URL.Path, "objects/batch") {
-			resp := types.LFSBatchResponse{
-				Objects: []struct {
-					Oid     string `json:"oid"`
-					Size    int64  `json:"size"`
-					Actions struct {
-						Download *struct {
-							Href string `json:"href"`
-						} `json:"download"`
-					} `json:"actions"`
-				}{
-					{
-						Oid:  "oid1",
-						Size: 1024,
-						Actions: struct {
-							Download *struct {
-								Href string `json:"href"`
-							} `json:"download"`
-						}{
-							Download: &struct {
-								Href string `json:"href"`
-							}{
-								Href: server.URL + "/download/oid1",
-							},
-						},
-					},
-				},
-			}
-			w.WriteHeader(http.StatusOK)
-			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode(resp)
-		}
-	}))
-	defer server.Close()
-
-	mirror := createTestMirror(repo, server.URL+"/test/repo.git")
-	task := createTestMirrorTask(mirror, types.MirrorRepoSyncStart)
-
-	commit := &types.Commit{
-		ID: "abc123",
-	}
-
-	// Setup expectations
-	suite.mocks.mirrorStore.EXPECT().FindByID(suite.ctx, task.MirrorID).Return(mirror, nil)
-	suite.mocks.repoStore.EXPECT().FindById(suite.ctx, mirror.RepositoryID).Return(repo, nil)
-	suite.mocks.filter.EXPECT().ShouldSync(suite.ctx, mirror.RepositoryID).Return(true, "", nil)
-	suite.mocks.lfsMetaObjectStore.EXPECT().FindByRepoID(mock.Anything, repo.ID).Return([]database.LfsMetaObject{
-		{
-			Oid:  "oid1",
-			Size: 1024,
-		},
+	suite.mocks.git.EXPECT().GetRepoAllLfsPointers(suite.ctx, mock.MatchedBy(func(req gitserver.GetRepoAllFilesReq) bool {
+		return req.Namespace == "test" &&
+			req.Name == "repo" &&
+			req.Ref == task.AfterLastCommitID &&
+			req.RepoType == repo.RepositoryType
+	})).Return([]*types.LFSPointer{
+		{FileOid: "oid1", FileSize: 100},
+		{FileOid: "oid1", FileSize: 100},
+		{FileOid: "oid2", FileSize: 200},
 	}, nil)
-	suite.mocks.lfsMetaObjectStore.EXPECT().BulkUpdateExistingByOIDs(mock.Anything, repo.ID, []string{"oid1"}, []string(nil)).Return(nil)
-	suite.mocks.git.EXPECT().GetDiffBetweenTwoCommits(mock.Anything, mock.Anything).Return(&types.GiteaCallbackPushReq{}, nil)
-	suite.mocks.ossClient.EXPECT().StatObject(mock.Anything, "test-bucket", "lfs/oi/d1", mock.Anything).Return(minio.ObjectInfo{Size: 1024}, nil)
-	suite.mocks.lfsMetaObjectStore.EXPECT().UpdateOrCreate(mock.Anything, mock.Anything).Return(nil, nil)
-
-	suite.mocks.mirrorTaskStore.EXPECT().Update(mock.Anything, mock.MatchedBy(func(mt database.MirrorTask) bool {
-		return mt.AfterLastCommitID == "abc123"
-	})).Return(*task, nil)
-
-	// Message sending expectations
-	suite.mocks.msgSender.EXPECT().Send(mock.Anything, mock.MatchedBy(func(req types.MessageRequest) bool {
-		return strings.Contains(req.Parameters, "start")
-	})).Return(hook.Response{}, nil)
-
-	// Git operations
-	suite.mocks.git.EXPECT().GetRepoLastCommit(mock.Anything, mock.MatchedBy(func(req gitserver.GetRepoLastCommitReq) bool {
-		return req.Namespace == "test" && req.Name == "repo" && req.Ref == "main"
-	})).Return(commit, nil).Times(2)
-
-	suite.mocks.git.EXPECT().UpdateRef(mock.Anything, mock.MatchedBy(func(req gitserver.UpdateRefReq) bool {
-		return req.Namespace == "test" && req.Name == "repo" && req.NewObjectId == "abc123"
+	suite.mocks.lfsMetaObjectStore.EXPECT().BulkUpdateOrCreate(suite.ctx, repo.ID, mock.MatchedBy(func(input []database.LfsMetaObject) bool {
+		return len(input) == 2 &&
+			input[0].RepositoryID == repo.ID &&
+			input[0].Oid == "oid1" &&
+			input[0].Size == 100 &&
+			!input[0].Existing &&
+			input[1].RepositoryID == repo.ID &&
+			input[1].Oid == "oid2" &&
+			input[1].Size == 200 &&
+			!input[1].Existing
 	})).Return(nil)
 
-	// Workflow execution
-	suite.mocks.workflowClient.EXPECT().ExecuteWorkflow(mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
+	err := suite.worker.refreshLfsMetaObjects(suite.ctx, task)
 
-	// Final updates
-	suite.mocks.mirrorTaskStore.EXPECT().UpdateStatusAndRepoSyncStatus(mock.Anything, mock.MatchedBy(func(mt database.MirrorTask) bool {
-		return mt.Progress == 100
-	}), database.MirrorSuccess).RunAndReturn(func(ctx context.Context, mt database.MirrorTask, action string) (database.MirrorTask, error) {
-		mt.Status = types.MirrorRepoSyncFinished
-		return mt, nil
-	})
-
-	suite.mocks.msgSender.EXPECT().Send(mock.Anything, mock.MatchedBy(func(req types.MessageRequest) bool {
-		return strings.Contains(req.Parameters, "finished")
-	})).Return(hook.Response{}, nil)
-
-	suite.mocks.recomComponent.EXPECT().SetOpWeight(mock.Anything, mirror.RepositoryID, mock.Anything).Return(nil)
-
-	// Execute
-	suite.worker.Run(task)
-
-	// Verify
-	assert.Equal(suite.T(), types.MirrorRepoSyncFinished, task.Status)
-	assert.Equal(suite.T(), 100, task.Progress)
+	require.NoError(suite.T(), err)
+	require.Equal(suite.T(), int64(300), repo.LFSObjectsSize)
 }
 
 // Test individual methods
@@ -935,7 +675,7 @@ func TestSplitPointersBySizeAndCount(t *testing.T) {
 		{
 			name: "pointers exceeding count limit",
 			pointers: func() []*types.Pointer {
-				pointers := make([]*types.Pointer, 20) // Exceeds MaxGroupCount (15)
+				pointers := make([]*types.Pointer, 20) // Exceeds maxGroupCount (15)
 				for i := 0; i < 20; i++ {
 					pointers[i] = &types.Pointer{
 						Oid:  string(rune('a' + i)),
@@ -994,21 +734,6 @@ func TestLfsSyncWorkerTestSuite(t *testing.T) {
 	suite.Run(t, new(LfsSyncWorkerTestSuite))
 }
 
-// Individual test functions for backward compatibility
-func TestLfsSyncWorker_ID(t *testing.T) {
-	worker, _ := newTestLfsSyncWorker(t, "")
-	assert.Equal(t, 1, worker.ID())
-}
-
-func TestLfsSyncWorker_SetContext(t *testing.T) {
-	worker, _ := newTestLfsSyncWorker(t, "")
-	ctx := context.WithValue(context.Background(), "test", "value")
-
-	worker.SetContext(ctx)
-
-	assert.Equal(t, ctx, worker.ctx)
-}
-
 // Test error scenarios
 func TestLfsSyncWorker_DownloadRange_InvalidURL(t *testing.T) {
 	worker, _ := newTestLfsSyncWorker(t, "")
@@ -1035,26 +760,6 @@ func TestLfsSyncWorker_DownloadRange_ServerError(t *testing.T) {
 	}
 
 	assert.Error(t, err)
-}
-
-// Test concurrent operations
-func TestLfsSyncWorker_ConcurrentOperations(t *testing.T) {
-	worker, _ := newTestLfsSyncWorker(t, "")
-
-	// Test that worker can handle concurrent context setting
-	var wg sync.WaitGroup
-	for i := 0; i < 10; i++ {
-		wg.Add(1)
-		go func(i int) {
-			defer wg.Done()
-			ctx := context.WithValue(context.Background(), "test", i)
-			worker.SetContext(ctx)
-		}(i)
-	}
-	wg.Wait()
-
-	// Worker should still be functional
-	assert.Equal(t, 1, worker.ID())
 }
 
 func TestLfsSyncWorker_DownloadRange_NotFoundError(t *testing.T) {

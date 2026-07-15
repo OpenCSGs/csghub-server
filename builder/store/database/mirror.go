@@ -39,7 +39,7 @@ type MirrorStore interface {
 	BatchCreate(ctx context.Context, mirrors []Mirror) error
 	ToBeScheduled(ctx context.Context) ([]Mirror, error)
 	Delete(ctx context.Context, mirror *Mirror) error
-	Recover(ctx context.Context) error
+	DeleteWithTaskCancelTx(ctx context.Context, mirrorID int64, jobCancelClient MirrorJobCancelClient) error
 }
 
 func NewMirrorStore() MirrorStore {
@@ -255,7 +255,7 @@ func (s *mirrorStoreImpl) Update(ctx context.Context, mirror *Mirror) (err error
 
 func (s *mirrorStoreImpl) Delete(ctx context.Context, mirror *Mirror) (err error) {
 	err = s.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		_, err = s.db.Operator.Core.
+		_, err = tx.
 			NewDelete().
 			Model(mirror).
 			WherePK().
@@ -264,7 +264,7 @@ func (s *mirrorStoreImpl) Delete(ctx context.Context, mirror *Mirror) (err error
 			return err
 		}
 
-		_, err = s.db.Operator.Core.
+		_, err = tx.
 			NewDelete().
 			Model(&MirrorTask{}).
 			Where("mirror_id = ?", mirror.ID).
@@ -279,6 +279,68 @@ func (s *mirrorStoreImpl) Delete(ctx context.Context, mirror *Mirror) (err error
 	}
 
 	return nil
+}
+
+// DeleteWithTaskCancelTx cancels all workhub jobs for a mirror and deletes its mirror data atomically.
+func (s *mirrorStoreImpl) DeleteWithTaskCancelTx(ctx context.Context, mirrorID int64, jobCancelClient MirrorJobCancelClient) (err error) {
+	err = s.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		var mirror Mirror
+		if err := tx.NewSelect().
+			Model(&mirror).
+			Where("id = ?", mirrorID).
+			For("UPDATE").
+			Scan(ctx); err != nil {
+			return err
+		}
+
+		var tasks []MirrorTask
+		if err := tx.NewSelect().
+			Model(&tasks).
+			Where("mirror_id = ?", mirror.ID).
+			For("UPDATE").
+			Scan(ctx); err != nil {
+			return err
+		}
+
+		for _, task := range tasks {
+			if err := cancelMirrorTaskJobsTx(ctx, tx.Tx, task, jobCancelClient); err != nil {
+				return err
+			}
+		}
+
+		if mirror.RepositoryID != 0 && shouldCancelRepoSyncOnMirrorDelete(mirror, tasks) {
+			if err := updateRepoSyncStatus(ctx, tx, mirror.RepositoryID, types.SyncStatusCanceled); err != nil {
+				return err
+			}
+		}
+
+		if _, err := tx.NewDelete().
+			Model(&MirrorTask{}).
+			Where("mirror_id = ?", mirror.ID).
+			Exec(ctx); err != nil {
+			return err
+		}
+
+		_, err := tx.NewDelete().
+			Model(&mirror).
+			WherePK().
+			Exec(ctx)
+		return err
+	})
+	if err != nil {
+		return errorx.HandleDBError(err, nil)
+	}
+
+	return nil
+}
+
+func shouldCancelRepoSyncOnMirrorDelete(mirror Mirror, tasks []MirrorTask) bool {
+	for _, task := range tasks {
+		if task.Status != "" && !isMirrorTaskTerminalStatus(task.Status) {
+			return true
+		}
+	}
+	return mirror.Status != "" && !isMirrorTaskTerminalStatus(mirror.Status)
 }
 
 func (s *mirrorStoreImpl) Unfinished(ctx context.Context) ([]Mirror, error) {
@@ -437,14 +499,4 @@ func (s *mirrorStoreImpl) ToBeScheduled(ctx context.Context) ([]Mirror, error) {
 		Limit(100).
 		Scan(ctx)
 	return mirrors, err
-}
-
-func (s *mirrorStoreImpl) Recover(ctx context.Context) error {
-	_, err := s.db.Operator.Core.NewUpdate().
-		Model((*Mirror)(nil)).
-		Set("status = ?", types.MirrorQueued).
-		Set("updated_at = ?", time.Now()).
-		Where("status in (?)", bun.In([]types.MirrorTaskStatus{types.MirrorLfsSyncStart, types.MirrorRepoSyncStart})).
-		Exec(ctx)
-	return err
 }
