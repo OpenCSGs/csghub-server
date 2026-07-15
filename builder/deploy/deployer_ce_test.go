@@ -140,7 +140,6 @@ func TestDeployer_updateEvaluationEnvHardware(t *testing.T) {
 }
 
 func Test_CheckNodeResource(t *testing.T) {
-	config := &config.Config{}
 
 	baseNode := types.NodeResourceInfo{
 		NodeHardware: types.NodeHardware{
@@ -225,7 +224,7 @@ func Test_CheckNodeResource(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := checkNodeResource(tc.node, tc.hardware, config, map[string]string{})
+			got := checkNodeResource(tc.node, tc.hardware, map[string]string{})
 			if got.Available != tc.want {
 				t.Errorf("checkNodeResource() = %v, want %v", got.Available, tc.want)
 			}
@@ -249,28 +248,25 @@ func Test_CheckNodeResource_AllowCPUScheduleToGPUNode(t *testing.T) {
 	}
 
 	t.Run("AllowCPUScheduleToGPUNode=true allows CPU-only workload on GPU node", func(t *testing.T) {
-		config := &config.Config{}
-		config.Cluster.AllowCPUResScheduleToGPUNode = true
 
 		hardware := &types.HardWare{
 			Cpu:    types.CPU{Num: "8"},
 			Memory: "4Gi",
 		}
 
-		got := checkNodeResource(baseNode, hardware, config, map[string]string{})
+		vxpuConfig := map[string]string{types.ClusterCFGAllowCPUResScheduleToGPUNode: "true"}
+		got := checkNodeResource(baseNode, hardware, vxpuConfig)
 		require.True(t, got.Available, "Expected CPU-only workload to be allowed on GPU node when flag is enabled")
 	})
 
 	t.Run("AllowCPUScheduleToGPUNode=false (default) blocks CPU-only workload on GPU node", func(t *testing.T) {
-		config := &config.Config{}
-		config.Cluster.AllowCPUResScheduleToGPUNode = false
 
 		hardware := &types.HardWare{
 			Cpu:    types.CPU{Num: "8"},
 			Memory: "4Gi",
 		}
 
-		got := checkNodeResource(baseNode, hardware, config, map[string]string{})
+		got := checkNodeResource(baseNode, hardware, map[string]string{})
 		require.False(t, got.Available, "Expected CPU-only workload to be blocked on GPU node when flag is disabled")
 	})
 }

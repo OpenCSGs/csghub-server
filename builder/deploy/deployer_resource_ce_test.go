@@ -548,7 +548,6 @@ func TestCheckResourceAvailable(t *testing.T) {
 }
 
 func TestCheckSingleNodeResource(t *testing.T) {
-	cfg := &config.Config{}
 
 	testCases := []struct {
 		name           string
@@ -666,14 +665,13 @@ func TestCheckSingleNodeResource(t *testing.T) {
 				ClusterID: "c1",
 				Resources: tc.resources,
 			}
-			result, _ := checkSingleNodeResource(clusterRes, tc.hardware, cfg)
+			result, _ := checkSingleNodeResource(clusterRes, tc.hardware)
 			require.Equal(t, tc.expectedResult, result)
 		})
 	}
 }
 
 func TestCheckMultiNodeResource(t *testing.T) {
-	cfg := &config.Config{}
 
 	testCases := []struct {
 		name           string
@@ -801,7 +799,7 @@ func TestCheckMultiNodeResource(t *testing.T) {
 				ClusterID: "c1",
 				Resources: tc.resources,
 			}
-			result, _ := checkMultiNodeResource(clusterRes, tc.hardware, cfg)
+			result, _ := checkMultiNodeResource(clusterRes, tc.hardware)
 			require.Equal(t, tc.expectedResult, result)
 		})
 	}

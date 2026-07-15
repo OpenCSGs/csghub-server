@@ -13,7 +13,8 @@ const (
 	ClusterCFGVGPUPodResourceNameKey  = "vgpu_pod_resource_name"
 	ClusterCFGVGPUResourceReqKey      = "vgpu_resource_req"
 	ClusterCFGVGPUMemoryReqKey        = "vgpu_memory_req"
-	ClusterCFGVGPUMemoryScalingFactor = "vgpu_memory_scaling_factor"
+	ClusterCFGVGPUMemoryScalingFactor     = "vgpu_memory_scaling_factor"
+	ClusterCFGAllowCPUResScheduleToGPUNode = "allow_cpu_res_schedule_to_gpu_node"
 )
 
 type ClusterRequest struct {
