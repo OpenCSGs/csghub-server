@@ -8,11 +8,9 @@ import (
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/utils/common"
 	"opencsg.com/csghub-server/mirror/component"
-	"opencsg.com/csghub-server/mirror/manager"
 )
 
 type ManagerHandler struct {
-	manager          *manager.Manager
 	managerComponent component.ManagerComponent
 }
 
@@ -21,27 +19,9 @@ func NewManagerHandler(cfg *config.Config) (*ManagerHandler, error) {
 	if err != nil {
 		return nil, err
 	}
-	m, err := manager.GetManager(cfg)
-	if err != nil {
-		return nil, err
-	}
 	return &ManagerHandler{
-		manager:          m,
 		managerComponent: c,
 	}, nil
-}
-
-type StopWorkerReq struct {
-	Percent int `json:"percent"`
-}
-
-type StopWorkerByIDReq struct {
-	ID int `json:"id"`
-}
-
-type SyncNowReq struct {
-	TaskID   int64 `json:"task_id" binding:"required"`
-	WorkerID int   `json:"worker_id"`
 }
 
 type CancelReq struct {
@@ -49,32 +29,11 @@ type CancelReq struct {
 }
 
 func (h *ManagerHandler) StopWorkerByID(c *gin.Context) {
-	var req StopWorkerByIDReq
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-	err := h.manager.StopWorker(req.ID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	httpbase.OK(c, nil)
+	c.JSON(http.StatusGone, gin.H{"error": "LFS worker manager has been replaced by workhub jobs"})
 }
 
 func (h *ManagerHandler) SyncNow(c *gin.Context) {
-	var req SyncNowReq
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-	err := h.managerComponent.SyncNow(c, req.WorkerID, req.TaskID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	httpbase.OK(c, nil)
+	c.JSON(http.StatusGone, gin.H{"error": "manual LFS worker rerun has been replaced by workhub jobs"})
 }
 
 func (h *ManagerHandler) Cancel(c *gin.Context) {

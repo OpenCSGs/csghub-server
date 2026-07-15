@@ -36,6 +36,7 @@ require (
 	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/hashicorp/vault/api v1.23.0
 	github.com/huaweicloud/huaweicloud-sdk-go-v3 v0.1.190
+	github.com/jackc/pgx/v5 v5.10.0
 	github.com/jarcoal/httpmock v1.3.1
 	github.com/larksuite/oapi-sdk-go/v3 v3.4.18
 	github.com/looplab/fsm v1.0.3
@@ -57,6 +58,8 @@ require (
 	github.com/prometheus/client_golang v1.23.2
 	github.com/prometheus/client_model v0.6.2
 	github.com/redis/go-redis/v9 v9.5.5
+	github.com/riverqueue/river v0.40.0
+	github.com/riverqueue/river/riverdriver/riverpgxv5 v0.40.0
 	github.com/sabhiram/go-gitignore v0.0.0-20210923224102-525f6e181f06
 	github.com/samber/slog-multi v1.3.3
 	github.com/sethvargo/go-envconfig v1.1.0
@@ -65,7 +68,7 @@ require (
 	github.com/stretchr/testify v1.11.1
 	github.com/swaggo/files v1.0.1
 	github.com/swaggo/gin-swagger v1.6.0
-	github.com/swaggo/swag v1.16.2
+	github.com/swaggo/swag v1.16.6
 	github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/common v1.3.69
 	github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/sms v1.3.57
 	github.com/testcontainers/testcontainers-go v0.40.0
@@ -98,7 +101,7 @@ require (
 	go.temporal.io/sdk v1.34.0
 	go.temporal.io/sdk/contrib/opentelemetry v0.5.0
 	go.temporal.io/server v1.27.3
-	golang.org/x/mod v0.34.0
+	golang.org/x/mod v0.37.0
 	google.golang.org/grpc v1.80.0
 	gopkg.in/gomail.v2 v2.0.0-20160411212932-81ebce5c23df
 	gopkg.in/yaml.v2 v2.4.0
@@ -148,6 +151,7 @@ require (
 	github.com/containerd/log v0.1.0 // indirect
 	github.com/containerd/platforms v0.2.1 // indirect
 	github.com/cpuguy83/dockercfg v0.3.2 // indirect
+	github.com/cpuguy83/go-md2man/v2 v2.0.7 // indirect
 	github.com/dgryski/go-farm v0.0.0-20240924180020-3414d57e47da // indirect
 	github.com/distribution/reference v0.6.0 // indirect
 	github.com/dlclark/regexp2 v1.10.0 // indirect
@@ -209,10 +213,9 @@ require (
 	github.com/iancoleman/strcase v0.3.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
-	github.com/jackc/pgx/v5 v5.9.0 // indirect
 	github.com/jackc/puddle/v2 v2.2.2 // indirect
 	github.com/jmoiron/sqlx v1.4.0 // indirect
-	github.com/lib/pq v1.10.9 // indirect
+	github.com/lib/pq v1.12.3 // indirect
 	github.com/lightstep/lightstep-tracer-common/golang/gogo v0.0.0-20210210170715-a8dfcb80d3a7 // indirect
 	github.com/lightstep/lightstep-tracer-go v0.25.0 // indirect
 	github.com/lufia/plan9stats v0.0.0-20211012122336-39d0f177ccd0 // indirect
@@ -249,9 +252,15 @@ require (
 	github.com/prometheus/prometheus v0.49.1 // indirect
 	github.com/puzpuzpuz/xsync/v3 v3.5.1 // indirect
 	github.com/rcrowley/go-metrics v0.0.0-20201227073835-cf1acfcdf475 // indirect
+	github.com/riverqueue/river/riverdriver v0.40.0 // indirect
+	github.com/riverqueue/river/riverdriver/riverdatabasesql v0.40.0 // indirect
+	github.com/riverqueue/river/rivershared v0.40.0 // indirect
+	github.com/riverqueue/river/rivertype v0.40.0 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/robfig/cron v1.2.0 // indirect
 	github.com/robfig/cron/v3 v3.0.1 // indirect
+	github.com/rs/dnscache v0.0.0-20230804202142-fc85eb664529 // indirect
+	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/ryanuber/go-glob v1.0.0 // indirect
 	github.com/samber/lo v1.47.0 // indirect
 	github.com/sebest/xff v0.0.0-20210106013422-671bd2870b3a // indirect
@@ -265,8 +274,8 @@ require (
 	github.com/temporalio/ringpop-go v0.0.0-20250130211428-b97329e994f7 // indirect
 	github.com/temporalio/sqlparser v0.0.0-20231115171017-f4060bcfa6cb // indirect
 	github.com/temporalio/tchannel-go v1.22.1-0.20240528171429-1db37fdea938 // indirect
-	github.com/tidwall/gjson v1.18.0 // indirect
-	github.com/tidwall/match v1.1.1 // indirect
+	github.com/tidwall/gjson v1.19.0 // indirect
+	github.com/tidwall/match v1.2.0 // indirect
 	github.com/tidwall/pretty v1.2.1 // indirect
 	github.com/tinylib/msgp v1.3.0 // indirect
 	github.com/tklauser/go-sysconf v0.3.12 // indirect
@@ -277,7 +286,9 @@ require (
 	github.com/uber/jaeger-client-go v2.30.0+incompatible // indirect
 	github.com/uber/jaeger-lib v2.4.1+incompatible // indirect
 	github.com/uptrace/opentelemetry-go-extra/otelsql v0.3.2 // indirect
+	github.com/urfave/cli/v2 v2.27.6 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
+	github.com/xrash/smetrics v0.0.0-20240521201337-686a1a2994c1 // indirect
 	github.com/yosida95/uritemplate/v3 v3.0.2 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 	gitlab.com/gitlab-org/go/reopen v1.0.0 // indirect
@@ -292,6 +303,7 @@ require (
 	go.temporal.io/version v0.3.0 // indirect
 	go.uber.org/dig v1.18.1 // indirect
 	go.uber.org/fx v1.23.0 // indirect
+	go.uber.org/goleak v1.3.0 // indirect
 	go.uber.org/mock v0.5.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.3 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
@@ -400,15 +412,15 @@ require (
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.27.0 // indirect
 	golang.org/x/arch v0.12.0 // indirect
-	golang.org/x/crypto v0.50.0
-	golang.org/x/net v0.53.0
+	golang.org/x/crypto v0.51.0
+	golang.org/x/net v0.54.0
 	golang.org/x/oauth2 v0.35.0
-	golang.org/x/sync v0.20.0
-	golang.org/x/sys v0.43.0 // indirect
-	golang.org/x/term v0.42.0 // indirect
-	golang.org/x/text v0.36.0
+	golang.org/x/sync v0.21.0
+	golang.org/x/sys v0.44.0 // indirect
+	golang.org/x/term v0.43.0 // indirect
+	golang.org/x/text v0.38.0
 	golang.org/x/time v0.13.0
-	golang.org/x/tools v0.43.0
+	golang.org/x/tools v0.45.0
 	gomodules.xyz/jsonpatch/v2 v2.5.0 // indirect
 	google.golang.org/protobuf v1.36.11
 	gopkg.in/inf.v0 v0.9.1 // indirect

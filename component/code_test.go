@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/mock"
 
 	"github.com/stretchr/testify/require"
+	mock_component "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/git/membership"
 	"opencsg.com/csghub-server/builder/store/database"
@@ -360,7 +361,9 @@ func TestCodeComponent_CreateWithGitURL(t *testing.T) {
 		nil, dbrepo, &gitserver.CommitFilesReq{}, nil,
 	)
 
-	cc.mocks.components.repo.EXPECT().CreateMirror(ctx, mock.MatchedBy(func(req types.CreateMirrorReq) bool {
+	mirrorComponent := mock_component.NewMockMirrorComponent(t)
+	cc.mirrorComponent = mirrorComponent
+	mirrorComponent.EXPECT().CreateMirror(ctx, mock.MatchedBy(func(req types.CreateMirrorReq) bool {
 		return req.Namespace == "ns" &&
 			req.Name == "n" &&
 			req.SourceUrl == "https://testuser:testpass@github.com/test/test.git" &&

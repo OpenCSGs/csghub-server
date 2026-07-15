@@ -30,7 +30,6 @@ import (
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /{repo_type}/{namespace}/{name}/mirror_from_saas [post]
 func (h *RepoHandler) MirrorFromSaas(ctx *gin.Context) {
-	currentUser := httpbase.GetCurrentUser(ctx)
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
@@ -42,7 +41,7 @@ func (h *RepoHandler) MirrorFromSaas(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, "Repo could not be mirrored")
 		return
 	}
-	err = h.c.MirrorFromSaas(ctx.Request.Context(), namespace, name, currentUser, repoType)
+	err = h.mirror.MirrorFromSaas(ctx.Request.Context(), namespace, name, repoType)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "Failed to create mirror for", slog.String("repo_type", string(repoType)), slog.String("path", fmt.Sprintf("%s/%s", namespace, name)), "error", err)
 		httpbase.ServerError(ctx, err)

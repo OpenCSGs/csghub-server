@@ -6,10 +6,10 @@ import (
 	"context"
 )
 
-func (c *mirrorComponentImpl) Schedule(ctx context.Context) error {
+func (m *mirrorComponentImpl) Schedule(ctx context.Context) error {
 	return nil
 }
 
-func (c *mirrorComponentImpl) PublicModelRepo(ctx context.Context) error {
+func (m *mirrorComponentImpl) PublicModelRepo(ctx context.Context) error {
 	return nil
 }

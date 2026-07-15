@@ -7,7 +7,6 @@ import (
 
 	mock "github.com/stretchr/testify/mock"
 	database "opencsg.com/csghub-server/builder/store/database"
-
 	types "opencsg.com/csghub-server/common/types"
 )
 
@@ -220,6 +219,54 @@ func (_c *MockMirrorStore_Delete_Call) Return(_a0 error) *MockMirrorStore_Delete
 }
 
 func (_c *MockMirrorStore_Delete_Call) RunAndReturn(run func(context.Context, *database.Mirror) error) *MockMirrorStore_Delete_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// DeleteWithTaskCancelTx provides a mock function with given fields: ctx, mirrorID, jobCancelClient
+func (_m *MockMirrorStore) DeleteWithTaskCancelTx(ctx context.Context, mirrorID int64, jobCancelClient database.MirrorJobCancelClient) error {
+	ret := _m.Called(ctx, mirrorID, jobCancelClient)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteWithTaskCancelTx")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, int64, database.MirrorJobCancelClient) error); ok {
+		r0 = rf(ctx, mirrorID, jobCancelClient)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockMirrorStore_DeleteWithTaskCancelTx_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteWithTaskCancelTx'
+type MockMirrorStore_DeleteWithTaskCancelTx_Call struct {
+	*mock.Call
+}
+
+// DeleteWithTaskCancelTx is a helper method to define mock.On call
+//   - ctx context.Context
+//   - mirrorID int64
+//   - jobCancelClient database.MirrorJobCancelClient
+func (_e *MockMirrorStore_Expecter) DeleteWithTaskCancelTx(ctx interface{}, mirrorID interface{}, jobCancelClient interface{}) *MockMirrorStore_DeleteWithTaskCancelTx_Call {
+	return &MockMirrorStore_DeleteWithTaskCancelTx_Call{Call: _e.mock.On("DeleteWithTaskCancelTx", ctx, mirrorID, jobCancelClient)}
+}
+
+func (_c *MockMirrorStore_DeleteWithTaskCancelTx_Call) Run(run func(ctx context.Context, mirrorID int64, jobCancelClient database.MirrorJobCancelClient)) *MockMirrorStore_DeleteWithTaskCancelTx_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(int64), args[2].(database.MirrorJobCancelClient))
+	})
+	return _c
+}
+
+func (_c *MockMirrorStore_DeleteWithTaskCancelTx_Call) Return(_a0 error) *MockMirrorStore_DeleteWithTaskCancelTx_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockMirrorStore_DeleteWithTaskCancelTx_Call) RunAndReturn(run func(context.Context, int64, database.MirrorJobCancelClient) error) *MockMirrorStore_DeleteWithTaskCancelTx_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -656,9 +703,9 @@ func (_c *MockMirrorStore_Finished_Call) RunAndReturn(run func(context.Context) 
 	return _c
 }
 
-// IndexWithPagination provides a mock function with given fields: ctx, per, page, search, hasRepo
-func (_m *MockMirrorStore) IndexWithPagination(ctx context.Context, per int, page int, search string, hasRepo bool) ([]database.Mirror, int, error) {
-	ret := _m.Called(ctx, per, page, search, hasRepo)
+// IndexWithPagination provides a mock function with given fields: ctx, per, page, filter, hasRepo
+func (_m *MockMirrorStore) IndexWithPagination(ctx context.Context, per int, page int, filter types.MirrorFilter, hasRepo bool) ([]database.Mirror, int, error) {
+	ret := _m.Called(ctx, per, page, filter, hasRepo)
 
 	if len(ret) == 0 {
 		panic("no return value specified for IndexWithPagination")
@@ -667,25 +714,25 @@ func (_m *MockMirrorStore) IndexWithPagination(ctx context.Context, per int, pag
 	var r0 []database.Mirror
 	var r1 int
 	var r2 error
-	if rf, ok := ret.Get(0).(func(context.Context, int, int, string, bool) ([]database.Mirror, int, error)); ok {
-		return rf(ctx, per, page, search, hasRepo)
+	if rf, ok := ret.Get(0).(func(context.Context, int, int, types.MirrorFilter, bool) ([]database.Mirror, int, error)); ok {
+		return rf(ctx, per, page, filter, hasRepo)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, int, int, string, bool) []database.Mirror); ok {
-		r0 = rf(ctx, per, page, search, hasRepo)
+	if rf, ok := ret.Get(0).(func(context.Context, int, int, types.MirrorFilter, bool) []database.Mirror); ok {
+		r0 = rf(ctx, per, page, filter, hasRepo)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]database.Mirror)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, int, int, string, bool) int); ok {
-		r1 = rf(ctx, per, page, search, hasRepo)
+	if rf, ok := ret.Get(1).(func(context.Context, int, int, types.MirrorFilter, bool) int); ok {
+		r1 = rf(ctx, per, page, filter, hasRepo)
 	} else {
 		r1 = ret.Get(1).(int)
 	}
 
-	if rf, ok := ret.Get(2).(func(context.Context, int, int, string, bool) error); ok {
-		r2 = rf(ctx, per, page, search, hasRepo)
+	if rf, ok := ret.Get(2).(func(context.Context, int, int, types.MirrorFilter, bool) error); ok {
+		r2 = rf(ctx, per, page, filter, hasRepo)
 	} else {
 		r2 = ret.Error(2)
 	}
@@ -702,15 +749,15 @@ type MockMirrorStore_IndexWithPagination_Call struct {
 //   - ctx context.Context
 //   - per int
 //   - page int
-//   - search string
+//   - filter types.MirrorFilter
 //   - hasRepo bool
-func (_e *MockMirrorStore_Expecter) IndexWithPagination(ctx interface{}, per interface{}, page interface{}, search interface{}, hasRepo interface{}) *MockMirrorStore_IndexWithPagination_Call {
-	return &MockMirrorStore_IndexWithPagination_Call{Call: _e.mock.On("IndexWithPagination", ctx, per, page, search, hasRepo)}
+func (_e *MockMirrorStore_Expecter) IndexWithPagination(ctx interface{}, per interface{}, page interface{}, filter interface{}, hasRepo interface{}) *MockMirrorStore_IndexWithPagination_Call {
+	return &MockMirrorStore_IndexWithPagination_Call{Call: _e.mock.On("IndexWithPagination", ctx, per, page, filter, hasRepo)}
 }
 
-func (_c *MockMirrorStore_IndexWithPagination_Call) Run(run func(ctx context.Context, per int, page int, search string, hasRepo bool)) *MockMirrorStore_IndexWithPagination_Call {
+func (_c *MockMirrorStore_IndexWithPagination_Call) Run(run func(ctx context.Context, per int, page int, filter types.MirrorFilter, hasRepo bool)) *MockMirrorStore_IndexWithPagination_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(int), args[2].(int), args[3].(string), args[4].(bool))
+		run(args[0].(context.Context), args[1].(int), args[2].(int), args[3].(types.MirrorFilter), args[4].(bool))
 	})
 	return _c
 }
@@ -720,7 +767,7 @@ func (_c *MockMirrorStore_IndexWithPagination_Call) Return(mirrors []database.Mi
 	return _c
 }
 
-func (_c *MockMirrorStore_IndexWithPagination_Call) RunAndReturn(run func(context.Context, int, int, string, bool) ([]database.Mirror, int, error)) *MockMirrorStore_IndexWithPagination_Call {
+func (_c *MockMirrorStore_IndexWithPagination_Call) RunAndReturn(run func(context.Context, int, int, types.MirrorFilter, bool) ([]database.Mirror, int, error)) *MockMirrorStore_IndexWithPagination_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -953,52 +1000,6 @@ func (_c *MockMirrorStore_PushedMirror_Call) Return(_a0 []database.Mirror, _a1 e
 }
 
 func (_c *MockMirrorStore_PushedMirror_Call) RunAndReturn(run func(context.Context) ([]database.Mirror, error)) *MockMirrorStore_PushedMirror_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// Recover provides a mock function with given fields: ctx
-func (_m *MockMirrorStore) Recover(ctx context.Context) error {
-	ret := _m.Called(ctx)
-
-	if len(ret) == 0 {
-		panic("no return value specified for Recover")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context) error); ok {
-		r0 = rf(ctx)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// MockMirrorStore_Recover_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Recover'
-type MockMirrorStore_Recover_Call struct {
-	*mock.Call
-}
-
-// Recover is a helper method to define mock.On call
-//   - ctx context.Context
-func (_e *MockMirrorStore_Expecter) Recover(ctx interface{}) *MockMirrorStore_Recover_Call {
-	return &MockMirrorStore_Recover_Call{Call: _e.mock.On("Recover", ctx)}
-}
-
-func (_c *MockMirrorStore_Recover_Call) Run(run func(ctx context.Context)) *MockMirrorStore_Recover_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context))
-	})
-	return _c
-}
-
-func (_c *MockMirrorStore_Recover_Call) Return(_a0 error) *MockMirrorStore_Recover_Call {
-	_c.Call.Return(_a0)
-	return _c
-}
-
-func (_c *MockMirrorStore_Recover_Call) RunAndReturn(run func(context.Context) error) *MockMirrorStore_Recover_Call {
 	_c.Call.Return(run)
 	return _c
 }

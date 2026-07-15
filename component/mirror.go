@@ -3,62 +3,66 @@ package component
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
-	"path"
 	"slices"
+	"strconv"
+	"sync"
 
-	"opencsg.com/csghub-server/builder/git"
-	"opencsg.com/csghub-server/builder/git/gitserver"
-	"opencsg.com/csghub-server/builder/git/mirrorserver"
+	"opencsg.com/csghub-server/builder/git/membership"
 	"opencsg.com/csghub-server/builder/store/database"
-	"opencsg.com/csghub-server/builder/store/s3"
+	"opencsg.com/csghub-server/builder/workhub"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
-	"opencsg.com/csghub-server/common/types/enum"
 	"opencsg.com/csghub-server/common/utils/common"
-	"opencsg.com/csghub-server/mirror/cache"
+	mirrorcache "opencsg.com/csghub-server/mirror/cache"
 )
 
 type mirrorComponentImpl struct {
-	tokenStore                  database.GitServerAccessTokenStore
-	mirrorServer                mirrorserver.MirrorServer
-	saas                        bool
-	repoComp                    RepoComponent
-	git                         gitserver.GitServer
-	s3Client                    s3.Client
-	lfsBucket                   string
-	modelStore                  database.ModelStore
-	datasetStore                database.DatasetStore
-	codeStore                   database.CodeStore
-	repoStore                   database.RepoStore
-	mirrorStore                 database.MirrorStore
-	mirrorSourceStore           database.MirrorSourceStore
-	namespaceStore              database.NamespaceStore
-	lfsMetaObjectStore          database.LfsMetaObjectStore
-	mcpServerStore              database.MCPServerStore
-	userStore                   database.UserStore
-	config                      *config.Config
-	syncCache                   cache.Cache
-	mirrorTaskStore             database.MirrorTaskStore
+	repoComp            RepoComponent
+	accessTokenStore    database.AccessTokenStore
+	modelStore          database.ModelStore
+	datasetStore        database.DatasetStore
+	codeStore           database.CodeStore
+	repoStore           database.RepoStore
+	mirrorStore         database.MirrorStore
+	mirrorRepoStore     database.MirrorRepoStore
+	mirrorSourceStore   database.MirrorSourceStore
+	syncVersionStore    database.SyncVersionStore
+	mirrorTaskJobStore  database.MirrorTaskJobStore
+	mirrorJobClient     workhub.JobClient
+	mirrorRepoJobClient database.MirrorJobClient
+	namespaceStore      database.NamespaceStore
+	userStore           database.UserStore
+	config              *config.Config
+	// syncCache removes LFS sync cache after mirror deletion.
+	syncCacheMu                 sync.Mutex
+	syncCache                   mirrorcache.Cache
 	mirrorNamespaceMappingStore database.MirrorNamespaceMappingStore
-	skillStore                  database.SkillStore
 }
 
 type MirrorComponent interface {
+	// CreateMirror creates a mirror configuration for an existing repository.
+	CreateMirror(ctx context.Context, req types.CreateMirrorReq) (*database.Mirror, error)
 	// CreateMirrorRepo often called by the crawler server to create new repo which will then be mirrored from other sources
 	CreateMirrorRepo(ctx context.Context, req types.CreateMirrorRepoReq) (*database.Mirror, error)
-	// CreateMirrorForkRepo creates a mirror-backed repository at a requested local fork namespace/name.
-	CreateMirrorForkRepo(ctx context.Context, req types.CreateMirrorRepoReq) (*database.Mirror, error)
+	// MirrorFromSaas enqueues a mirror sync from the configured OpenCSG SaaS Git source.
+	MirrorFromSaas(ctx context.Context, namespace, name string, repoType types.RepositoryType) error
+	// GetMirror returns mirror configuration and current task status for an existing repository.
+	GetMirror(ctx context.Context, req types.GetMirrorReq) (*types.Mirror, error)
+	// UpdateMirror updates mirror configuration for an existing repository.
+	UpdateMirror(ctx context.Context, req types.UpdateMirrorReq) (*database.Mirror, error)
+	// SyncMirror enqueues a new repo sync task for an existing mirror repository.
+	SyncMirror(ctx context.Context, repoType types.RepositoryType, namespace, name, currentUser string) error
+	// DeleteMirror deletes an existing mirror after cancelling its workhub jobs.
+	DeleteMirror(ctx context.Context, req types.DeleteMirrorReq) error
 	Repos(ctx context.Context, per, page int) ([]types.MirrorRepo, int, error)
-	Index(ctx context.Context, per, page int, search string) ([]types.Mirror, int, error)
+	Index(ctx context.Context, per, page int, filter types.MirrorFilter) ([]types.Mirror, int, error)
 	Statistics(ctx context.Context) ([]types.MirrorStatusCount, error)
 	BatchCreate(ctx context.Context, req types.BatchCreateMirrorReq) error
 	Schedule(ctx context.Context) error
-	ListQueue(ctx context.Context, count int64) (types.MirrorListResp, error)
 	PublicModelRepo(ctx context.Context) error
 	Delete(ctx context.Context, id int64) error
 }
@@ -66,451 +70,33 @@ type MirrorComponent interface {
 func NewMirrorComponent(config *config.Config) (MirrorComponent, error) {
 	var err error
 	c := &mirrorComponentImpl{}
-	if config.GitServer.Type == types.GitServerTypeGitea {
-		c.mirrorServer, err = git.NewMirrorServer(config)
-		if err != nil {
-			newError := fmt.Errorf("fail to create git mirror server,error:%w", err)
-			slog.Error(newError.Error())
-			return nil, newError
-		}
-	}
 
 	c.repoComp, err = NewRepoComponentImpl(config)
 	if err != nil {
 		return nil, fmt.Errorf("fail to create repo component,error:%w", err)
 	}
-	c.git, err = git.NewGitServer(config)
-	if err != nil {
-		newError := fmt.Errorf("fail to create git server,error:%w", err)
-		slog.Error(newError.Error())
-		return nil, newError
-	}
-	c.s3Client, err = s3.NewMinio(config)
-	if err != nil {
-		newError := fmt.Errorf("fail to init s3 client for code,error:%w", err)
-		slog.Error(newError.Error())
-		return nil, newError
-	}
-	c.lfsBucket = config.S3.Bucket
+	c.accessTokenStore = database.NewAccessTokenStore()
 	c.modelStore = database.NewModelStore()
 	c.datasetStore = database.NewDatasetStore()
 	c.codeStore = database.NewCodeStore()
 	c.repoStore = database.NewRepoStore()
 	c.mirrorStore = database.NewMirrorStore()
-	c.tokenStore = database.NewGitServerAccessTokenStore()
+	jobClient, err := workhub.NewJobClient(context.Background(), database.GetDB().BunDB)
+	if err != nil {
+		return nil, fmt.Errorf("fail to create mirror repo job client,error:%w", err)
+	}
+	mirrorRepoJobClient := workhub.NewMirrorRepoJobClient(jobClient)
+	c.mirrorJobClient = jobClient
+	c.mirrorRepoJobClient = mirrorRepoJobClient
+	c.mirrorTaskJobStore = database.NewMirrorTaskJobStore()
+	c.mirrorRepoStore = database.NewMirrorRepoStore(mirrorRepoJobClient)
 	c.mirrorSourceStore = database.NewMirrorSourceStore()
+	c.syncVersionStore = database.NewSyncVersionStore()
 	c.namespaceStore = database.NewNamespaceStore()
-	c.lfsMetaObjectStore = database.NewLfsMetaObjectStore()
 	c.userStore = database.NewUserStore()
-	c.mcpServerStore = database.NewMCPServerStore()
-	c.mirrorTaskStore = database.NewMirrorTaskStore()
-	c.skillStore = database.NewSkillStore()
-	c.saas = config.Saas
 	c.config = config
 	c.mirrorNamespaceMappingStore = database.NewMirrorNamespaceMappingStore()
-	syncCache, err := cache.NewCache(context.Background(), config)
-	if err != nil {
-		return nil, fmt.Errorf("initializing redis: %w", err)
-	}
-	c.syncCache = syncCache
 	return c, nil
-}
-
-// CreateMirrorRepo often called by the crawler server to create new repo which will then be mirrored from other sources
-func (c *mirrorComponentImpl) CreateMirrorRepo(ctx context.Context, req types.CreateMirrorRepoReq) (*database.Mirror, error) {
-	var (
-		username string
-		err      error
-	)
-	namespace := c.mapNamespaceAndName(req.SourceNamespace)
-	name := req.SourceName
-	repo, err := c.repoStore.FindByMirrorSourceURL(ctx, req.SourceGitCloneUrl)
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return nil, fmt.Errorf("failed to find repo by source url, error: %w", err)
-	}
-
-	if repo != nil && repo.ID != 0 {
-		namespace, name, err := common.GetNamespaceAndNameFromPath(repo.Path)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get namespace and name: %w", err)
-		}
-		err = c.repoComp.SyncMirror(ctx, req.RepoType, namespace, name, req.CurrentUser)
-		if err != nil {
-			return nil, fmt.Errorf("failed to sync mirror repo, error: %w", err)
-		}
-		return &database.Mirror{RepositoryID: repo.ID}, nil
-	}
-	repo, err = c.repoStore.FindByPath(ctx, req.RepoType, namespace, name)
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return nil, fmt.Errorf("failed to check repo existence, error: %w", err)
-	}
-	if repo != nil && repo.ID != 0 {
-		name = fmt.Sprintf("%s_%s", req.SourceNamespace, req.SourceName)
-		repo, err = c.repoStore.FindByPath(ctx, req.RepoType, namespace, name)
-		if err != nil && !errors.Is(err, sql.ErrNoRows) {
-			return nil, fmt.Errorf("failed to check repo existence, error: %w", err)
-		}
-		if repo != nil && repo.ID != 0 {
-			err := fmt.Errorf(
-				"repo already exists, repo type: %s, source namespace: %s, source name: %s, target namespace: %s, target name: %s",
-				req.RepoType, req.SourceNamespace, req.SourceName, namespace, name)
-			return &database.Mirror{RepositoryID: repo.ID}, errorx.DuplicateKey(err,
-				errorx.Ctx().
-					Set("repo type", req.RepoType).
-					Set("source namespace", req.SourceNamespace).
-					Set("source name", req.SourceName).
-					Set("target namespace", namespace).
-					Set("target name", name),
-			)
-		}
-	}
-
-	dbNamespace, err := c.namespaceStore.FindByPath(ctx, namespace)
-	if err != nil {
-		return nil, fmt.Errorf("namespace does not exist, namespace: %s", namespace)
-	}
-	username = dbNamespace.User.Username
-
-	// create repo, create mirror repo
-	_, repo, _, err = c.repoComp.CreateRepo(ctx, types.CreateRepoReq{
-		Username:  username,
-		Namespace: namespace,
-		Name:      name,
-		Nickname:  name,
-		//TODO: tranlate description automatically
-		Description: req.Description,
-		//only mirror public repository
-		Private:       true,
-		License:       req.License,
-		DefaultBranch: req.DefaultBranch,
-		RepoType:      req.RepoType,
-		ToolCount:     len(req.MCPServerAttributes.Tools),
-		StarCount:     req.MCPServerAttributes.StarCount,
-	})
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to create OpenCSG repo, error: %w", err)
-	}
-	repoPath := path.Join(namespace, name)
-
-	switch req.RepoType {
-	case types.ModelRepo:
-		dbModel := database.Model{
-			Repository:   repo,
-			RepositoryID: repo.ID,
-		}
-
-		_, err := c.modelStore.CreateAndUpdateRepoPath(ctx, dbModel, repoPath)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create model, error: %w", err)
-		}
-	case types.DatasetRepo:
-		dbDataset := database.Dataset{
-			Repository:   repo,
-			RepositoryID: repo.ID,
-		}
-
-		_, err := c.datasetStore.CreateAndUpdateRepoPath(ctx, dbDataset, repoPath)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create dataset, error: %w", err)
-		}
-	case types.CodeRepo:
-		dbCode := database.Code{
-			Repository:   repo,
-			RepositoryID: repo.ID,
-		}
-
-		_, err := c.codeStore.CreateAndUpdateRepoPath(ctx, dbCode, repoPath)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create code, error: %w", err)
-		}
-	case types.MCPServerRepo:
-		configuration, err := json.Marshal(req.MCPServerAttributes.Configuration)
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal mcp configuration: %w", err)
-		}
-
-		tools, err := json.Marshal(struct {
-			Tools []types.MCPTool `json:"tools"`
-		}{
-			Tools: req.MCPServerAttributes.Tools,
-		})
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal mcp tools: %w", err)
-		}
-		dbMCPServer := database.MCPServer{
-			Repository:    repo,
-			RepositoryID:  repo.ID,
-			ToolsNum:      len(req.MCPServerAttributes.Tools),
-			Configuration: string(configuration),
-			Schema:        string(tools),
-			AvatarURL:     req.MCPServerAttributes.AvatarURL,
-		}
-
-		mcpServer, err := c.mcpServerStore.CreateAndUpdateRepoPath(ctx, dbMCPServer, repoPath)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create mcp server, error: %w", err)
-		}
-
-		for _, tool := range req.MCPServerAttributes.Tools {
-			schema, err := json.Marshal(tool.InputSchema)
-			if err != nil {
-				return nil, fmt.Errorf("failed to marshal tool input schema: %w", err)
-			}
-			mcpServerProperty := database.MCPServerProperty{
-				MCPServerID: mcpServer.ID,
-				Kind:        types.MCPPropTool,
-				Name:        tool.Name,
-				Description: tool.Description,
-				Schema:      string(schema),
-			}
-			_, err = c.mcpServerStore.AddProperty(ctx, mcpServerProperty)
-			if err != nil {
-				return nil, fmt.Errorf("failed to add property to mcp server: %w", err)
-			}
-		}
-	case types.SkillRepo:
-		dbSkill := database.Skill{
-			Repository:   repo,
-			RepositoryID: repo.ID,
-		}
-
-		_, err := c.skillStore.CreateAndUpdateRepoPath(ctx, dbSkill, repoPath)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create skill, error: %w", err)
-		}
-	}
-
-	var mirror database.Mirror
-
-	if req.MirrorSourceID != 0 {
-		mirrorSource, err := c.mirrorSourceStore.Get(ctx, req.MirrorSourceID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to find mirror source, error: %w", err)
-		}
-		mirror.LocalRepoPath = fmt.Sprintf("%s_%s_%s_%s", mirrorSource.SourceName, req.RepoType, req.SourceNamespace, req.SourceName)
-	}
-	// mirror.Interval = req.Interval
-	mirror.SourceUrl = req.SourceGitCloneUrl
-	mirror.MirrorSourceID = req.MirrorSourceID
-	mirror.Username = req.SourceNamespace
-	mirror.RepositoryID = repo.ID
-	mirror.Repository = repo
-	mirror.SourceRepoPath = fmt.Sprintf("%s/%s", req.SourceNamespace, req.SourceName)
-	mirror.Priority = types.ASAPMirrorPriority
-
-	sourceType, sourcePath, err := common.GetSourceTypeAndPathFromURL(req.SourceGitCloneUrl)
-	if err == nil {
-		err = c.repoStore.UpdateSourcePath(ctx, repo.ID, sourcePath, sourceType)
-		if err != nil {
-			return nil, fmt.Errorf("failed to update source path in repo: %v", err)
-		}
-	}
-
-	reqMirror, err := c.mirrorStore.Create(ctx, &mirror)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create mirror")
-	}
-
-	reqMirror.Status = types.MirrorQueued
-	err = c.mirrorStore.Update(ctx, reqMirror)
-	if err != nil {
-		return nil, fmt.Errorf("failed to update mirror status: %v", err)
-	}
-	mt := database.MirrorTask{
-		MirrorID: reqMirror.ID,
-		Status:   types.MirrorQueued,
-		Priority: mirror.Priority,
-	}
-	_, err = c.mirrorTaskStore.Create(ctx, mt)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create mirror task: %v", err)
-	}
-
-	return reqMirror, nil
-
-}
-
-// CreateMirrorForkRepo creates a mirror-backed local repository at the requested fork namespace/name.
-// Unlike CreateMirrorRepo, which mirrors a remote source into the mapped source namespace/name and
-// effectively treats source_url as globally unique, this mirror fork variant allows the same remote
-// source to be synchronized into different local target repositories. The local target path is the
-// uniqueness boundary for the fork repository, while mirror.SourceUrl keeps the remote source used
-// by the sync task.
-func (c *mirrorComponentImpl) CreateMirrorForkRepo(ctx context.Context, req types.CreateMirrorRepoReq) (*database.Mirror, error) {
-	var (
-		err error
-	)
-
-	// In this fork flow, one remote source can be synchronized into multiple local target repos.
-	// Therefore, this method does not globally deduplicate by source_url like CreateMirrorRepo;
-	// the target local path is the value that must stay unique.
-	namespace := req.ForkNamespace
-	name := req.ForkName
-	if namespace == "" || name == "" {
-		err := fmt.Errorf("fork namespace and fork name are required")
-		return nil, errorx.BadRequest(err,
-			errorx.Ctx().
-				Set("fork namespace", namespace).
-				Set("fork name", name),
-		)
-	}
-
-	// Validate the repository type before creating any local repository records.
-	switch req.RepoType {
-	case types.ModelRepo, types.DatasetRepo:
-	default:
-		err := fmt.Errorf("unsupported repo type for mirror fork: %s", req.RepoType)
-		return nil, errorx.BadRequest(err,
-			errorx.Ctx().
-				Set("repo type", req.RepoType).
-				Set("target namespace", namespace).
-				Set("target name", name),
-		)
-	}
-
-	// Check whether the target local repository already exists.
-	// If the target exists and already mirrors the same source_url, treat this as an idempotent resync request.
-	// If the target exists but is not the same mirror, do not overwrite it with a new mirror.
-	repo, err := c.repoStore.FindByPath(ctx, req.RepoType, namespace, name)
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return nil, fmt.Errorf("failed to check target repo existence, error: %w", err)
-	}
-	if repo != nil && repo.ID != 0 {
-		mirror, err := c.mirrorStore.FindByRepoID(ctx, repo.ID)
-		if err != nil && !errors.Is(err, sql.ErrNoRows) {
-			return nil, fmt.Errorf("failed to find mirror by target repo, error: %w", err)
-		}
-
-		if mirror != nil && mirror.ID != 0 && mirror.SourceUrl == req.SourceGitCloneUrl {
-			// Same remote source and same local target: do not create duplicate repo/mirror records.
-			// Instead, enqueue a new sync task for the existing mirror.
-			err = c.repoComp.SyncMirror(ctx, req.RepoType, namespace, name, req.CurrentUser)
-			if err != nil {
-				return nil, fmt.Errorf("failed to sync mirror repo, error: %w", err)
-			}
-			return mirror, nil
-		}
-
-		{
-			err := fmt.Errorf(
-				"target repo already exists, repo type: %s, source namespace: %s, source name: %s, target namespace: %s, target name: %s",
-				req.RepoType, req.SourceNamespace, req.SourceName, namespace, name)
-			return &database.Mirror{RepositoryID: repo.ID}, errorx.DuplicateKey(err,
-				errorx.Ctx().
-					Set("repo type", req.RepoType).
-					Set("source namespace", req.SourceNamespace).
-					Set("source name", req.SourceName).
-					Set("target namespace", namespace).
-					Set("target name", name),
-			)
-		}
-	}
-
-	// Create the local target repository. Username uses CurrentUser so repoComp.CreateRepo can
-	// validate whether the current user may create a repository under fork_namespace. Do not use
-	// the source namespace here, and do not map the source namespace into a target namespace.
-	_, repo, _, err = c.repoComp.CreateRepo(ctx, types.CreateRepoReq{
-		Username:  req.CurrentUser,
-		Namespace: namespace,
-		Name:      name,
-		Nickname:  name,
-		// TODO: Translate the description automatically.
-		Description: req.Description,
-		// Mirror fork repositories are created as private by default.
-		Private:       true,
-		License:       req.License,
-		DefaultBranch: req.DefaultBranch,
-		RepoType:      req.RepoType,
-		ToolCount:     len(req.MCPServerAttributes.Tools),
-		StarCount:     req.MCPServerAttributes.StarCount,
-	})
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to create OpenCSG repo, error: %w", err)
-	}
-	repoPath := path.Join(namespace, name)
-
-	// repoComp.CreateRepo first creates the repository and git repo with a temporary UUID path.
-	// This step creates the type-specific business row and updates repositories.path / git_path
-	// to the requested local target path.
-	switch req.RepoType {
-	case types.ModelRepo:
-		dbModel := database.Model{
-			Repository:   repo,
-			RepositoryID: repo.ID,
-		}
-
-		_, err := c.modelStore.CreateAndUpdateRepoPath(ctx, dbModel, repoPath)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create model, error: %w", err)
-		}
-	case types.DatasetRepo:
-		dbDataset := database.Dataset{
-			Repository:   repo,
-			RepositoryID: repo.ID,
-		}
-
-		_, err := c.datasetStore.CreateAndUpdateRepoPath(ctx, dbDataset, repoPath)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create dataset, error: %w", err)
-		}
-	}
-
-	// Parse known source URLs to populate repository source-path columns used by search.
-	// Mirror forks can point at unsupported Git hosts, so those hosts are classified as "other"
-	// and skip repository source-path column updates.
-	sourceType, sourcePath, err := common.GetSourceTypeAndPathFromURL(req.SourceGitCloneUrl)
-	if err == nil {
-		// Update the repository external source path field, such as github_path / hf_path / ms_path / csg_path.
-		// This does not update repositories.path, which was already updated by CreateAndUpdateRepoPath.
-		err = c.repoStore.UpdateSourcePath(ctx, repo.ID, sourcePath, sourceType)
-		if err != nil {
-			return nil, fmt.Errorf("failed to update source path in repo: %v", err)
-		}
-	} else {
-		sourceType = enum.OtherSource
-	}
-
-	var mirror database.Mirror
-
-	// Mirror fork does not depend on mirror_sources to derive the source name.
-	// LocalRepoPath keeps the historical sourceName_repoType_namespace_name format,
-	// where namespace/name point to the local fork target repository.
-	mirror.LocalRepoPath = fmt.Sprintf("%s_%s_%s_%s", sourceType, req.RepoType, namespace, name)
-
-	// The mirror record describes which remote source_url this local repository syncs from.
-	mirror.SourceUrl = req.SourceGitCloneUrl
-	mirror.MirrorSourceID = req.MirrorSourceID
-	mirror.Username = req.SourceNamespace
-	mirror.RepositoryID = repo.ID
-	mirror.Repository = repo
-
-	mirror.SourceRepoPath = fmt.Sprintf("%s/%s", req.SourceNamespace, req.SourceName)
-	mirror.Priority = types.ASAPMirrorPriority
-
-	reqMirror, err := c.mirrorStore.Create(ctx, &mirror)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create mirror")
-	}
-
-	reqMirror.Status = types.MirrorQueued
-	err = c.mirrorStore.Update(ctx, reqMirror)
-	if err != nil {
-		return nil, fmt.Errorf("failed to update mirror status: %v", err)
-	}
-	mt := database.MirrorTask{
-		MirrorID: reqMirror.ID,
-		Status:   types.MirrorQueued,
-		Priority: mirror.Priority,
-	}
-	_, err = c.mirrorTaskStore.Create(ctx, mt)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create mirror task: %v", err)
-	}
-
-	return reqMirror, nil
-
 }
 
 func (m *mirrorComponentImpl) mapNamespaceAndName(sourceNamespace string) string {
@@ -535,6 +121,241 @@ func (m *mirrorComponentImpl) mapNamespaceAndName(sourceNamespace string) string
 // 	types.MirrorLfsSyncFailed:    types.SyncStatusFailed,
 // 	types.MirrorLfsSyncFatal:     types.SyncStatusFailed,
 // }
+
+// CreateMirror creates a mirror configuration for an existing repository.
+func (m *mirrorComponentImpl) CreateMirror(ctx context.Context, req types.CreateMirrorReq) (*database.Mirror, error) {
+	var mirror database.Mirror
+	admin, err := m.repoComp.CheckCurrentUserPermission(ctx, req.CurrentUser, req.Namespace, membership.RoleAdmin)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check permission to create mirror, error: %w", err)
+	}
+
+	if !admin {
+		return nil, fmt.Errorf("users do not have permission to create mirror for this repo")
+	}
+
+	repo, err := m.repoStore.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find repo, error: %w", err)
+	}
+	if req.MirrorSourceID != 0 {
+		mirrorSource, err := m.mirrorSourceStore.Get(ctx, req.MirrorSourceID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get mirror source, err: %w, id: %d", err, req.MirrorSourceID)
+		}
+		mirror.LocalRepoPath = fmt.Sprintf("%s_%s_%s_%s", mirrorSource.SourceName, req.RepoType, req.Namespace, req.Name)
+	}
+
+	mirror.Interval = req.Interval
+	mirror.SourceUrl = req.SourceUrl
+	mirror.MirrorSourceID = req.MirrorSourceID
+	mirror.Username = req.Username
+	mirror.PushUrl = repo.HTTPCloneURL
+	mirror.AccessToken = req.AccessToken
+	mirror.SourceRepoPath = req.SourceRepoPath
+
+	mirror.RepositoryID = repo.ID
+	mirror.Repository = repo
+
+	mirror.Priority = types.ASAPMirrorPriority
+
+	sourceType, sourcePath, _ := common.GetSourceTypeAndPathFromURL(req.SourceUrl)
+	applyMirrorRepositorySourcePath(repo, sourceType, sourcePath)
+	reqMirror, err := m.mirrorRepoStore.CreateMirrorRepoRecords(ctx, database.CreateMirrorRepoRecordsInput{
+		Repository:       repo,
+		CreateRepository: false,
+		Mirror:           mirror,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create mirror repo records: %w", err)
+	}
+
+	return reqMirror, nil
+}
+
+// MirrorFromSaas enqueues one workhub sync for an existing on-prem repository backed by a SaaS Git source.
+func (m *mirrorComponentImpl) MirrorFromSaas(ctx context.Context, namespace, name string, repoType types.RepositoryType) error {
+	repo, err := m.repoStore.FindByPath(ctx, repoType, namespace, name)
+	if err != nil {
+		return fmt.Errorf("failed to find repo, error: %w", err)
+	}
+
+	mirror, err := m.mirrorStore.FindByRepoID(ctx, repo.ID)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return fmt.Errorf("failed to find mirror, error: %w", err)
+	}
+	if mirror != nil {
+		return m.requeueMirrorFromSaas(ctx, repo, mirror)
+	}
+
+	syncVersion, err := m.syncVersionStore.FindByRepoTypeAndPath(ctx, repo.PathWithOutPrefix(), repoType)
+	if err != nil {
+		return fmt.Errorf("failed to find sync version, error: %w", err)
+	}
+	sourceURL := common.TrimPrefixCloneURLBySourceID(m.config.MultiSync.SaasSyncDomain, string(repoType), namespace, name, syncVersion.SourceID)
+	sourceType, sourcePath, _ := common.GetSourceTypeAndPathFromURL(sourceURL)
+	applyMirrorRepositorySourcePath(repo, sourceType, sourcePath)
+	reqMirror := database.Mirror{
+		SourceUrl:      sourceURL,
+		RepositoryID:   repo.ID,
+		Repository:     repo,
+		SourceRepoPath: fmt.Sprintf("%s/%s", namespace, name),
+		Priority:       types.ASAPMirrorPriority,
+	}
+	if _, err := m.mirrorRepoStore.CreateMirrorRepoRecords(ctx, database.CreateMirrorRepoRecordsInput{
+		Repository:       repo,
+		CreateRepository: false,
+		Mirror:           reqMirror,
+	}); err != nil {
+		return fmt.Errorf("failed to create mirror repo records: %w", err)
+	}
+	return nil
+}
+
+// GetMirror returns mirror configuration and current task status for an existing repository.
+func (m *mirrorComponentImpl) GetMirror(ctx context.Context, req types.GetMirrorReq) (*types.Mirror, error) {
+	var (
+		status      types.MirrorTaskStatus
+		progress    int8
+		lastMessage string
+	)
+	admin, err := m.repoComp.CheckCurrentUserPermission(ctx, req.CurrentUser, req.Namespace, membership.RoleAdmin)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check permission to create mirror, error: %w", err)
+	}
+
+	if !admin {
+		return nil, fmt.Errorf("users do not have permission to get mirror for this repo")
+	}
+	repo, err := m.repoStore.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find repo, error: %w", err)
+	}
+	mirror, err := m.mirrorStore.FindByRepoID(ctx, repo.ID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find mirror, error: %w", err)
+	}
+	if mirror.CurrentTask != nil {
+		status = mirror.CurrentTask.Status
+		progress = int8(mirror.CurrentTask.Progress)
+		lastMessage = mirror.CurrentTask.ErrorMessage
+	}
+	resMirror := &types.Mirror{
+		ID:        mirror.ID,
+		SourceUrl: mirror.SourceUrl,
+		MirrorSource: types.MirrorSource{
+			SourceName: mirror.MirrorSource.SourceName,
+		},
+		Username:        mirror.Username,
+		AccessToken:     mirror.AccessToken,
+		PushUrl:         mirror.PushUrl,
+		PushUsername:    mirror.PushUsername,
+		PushAccessToken: mirror.PushAccessToken,
+		LastUpdatedAt:   mirror.LastUpdatedAt,
+		SourceRepoPath:  mirror.SourceRepoPath,
+		LocalRepoPath:   fmt.Sprintf("%ss/%s", mirror.Repository.RepositoryType, mirror.Repository.Path),
+		LastMessage:     lastMessage,
+		Status:          status,
+		Progress:        progress,
+		CreatedAt:       mirror.CreatedAt,
+		UpdatedAt:       mirror.UpdatedAt,
+	}
+	return resMirror, nil
+}
+
+// UpdateMirror updates mirror configuration for an existing repository.
+func (m *mirrorComponentImpl) UpdateMirror(ctx context.Context, req types.UpdateMirrorReq) (*database.Mirror, error) {
+	admin, err := m.repoComp.CheckCurrentUserPermission(ctx, req.CurrentUser, req.Namespace, membership.RoleAdmin)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check permission to create mirror, error: %w", err)
+	}
+
+	if !admin {
+		return nil, fmt.Errorf("users do not have permission to update mirror for this repo")
+	}
+	repo, err := m.repoStore.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find repo, error: %w", err)
+	}
+	mirror, err := m.mirrorStore.FindByRepoID(ctx, repo.ID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find mirror, error: %w", err)
+	}
+
+	pushAccessToken, err := m.accessTokenStore.GetUserGitToken(ctx, req.CurrentUser)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find access token, error: %w", err)
+	}
+
+	mirror.Interval = req.Interval
+	mirror.SourceUrl = req.SourceUrl
+	mirror.MirrorSourceID = req.MirrorSourceID
+	mirror.Username = req.Username
+	mirror.PushUrl = req.PushUrl
+	mirror.AccessToken = req.AccessToken
+	mirror.PushUsername = req.CurrentUser
+	mirror.PushAccessToken = pushAccessToken.Token
+	mirror.SourceRepoPath = req.SourceRepoPath
+	mirror.LocalRepoPath = fmt.Sprintf("%s_%s_%s", req.RepoType, req.Namespace, req.Name)
+	err = m.mirrorStore.Update(ctx, mirror)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update mirror, error: %w", err)
+	}
+	return mirror, nil
+}
+
+// SyncMirror validates access to an existing mirror repository and enqueues a new repo sync task.
+func (m *mirrorComponentImpl) SyncMirror(ctx context.Context, repoType types.RepositoryType, namespace, name, currentUser string) error {
+	user, err := m.userStore.FindByUsername(ctx, currentUser)
+	if err != nil {
+		return errors.New("user does not exist")
+	}
+	if !user.CanAdmin() {
+		admin, err := m.repoComp.CheckCurrentUserPermission(ctx, currentUser, namespace, membership.RoleAdmin)
+		if err != nil {
+			return fmt.Errorf("failed to check permission to create mirror, error: %w", err)
+		}
+
+		if !admin {
+			return errorx.ErrForbiddenMsg("need be owner or admin role to sync mirror for this repo")
+		}
+	}
+	repo, err := m.repoStore.FindByPath(ctx, repoType, namespace, name)
+	if err != nil {
+		return fmt.Errorf("failed to find repo, error: %w", err)
+	}
+	mirror, err := m.mirrorStore.FindByRepoID(ctx, repo.ID)
+	if err != nil {
+		return fmt.Errorf("failed to find mirror, error: %w", err)
+	}
+	return requeueMirrorRepoTask(ctx, m.mirrorTaskJobStore, m.mirrorRepoJobClient, m.mirrorJobClient, repo, mirror)
+}
+
+// DeleteMirror validates access to an existing mirror repository and deletes it transactionally.
+func (m *mirrorComponentImpl) DeleteMirror(ctx context.Context, req types.DeleteMirrorReq) error {
+	admin, err := m.repoComp.CheckCurrentUserPermission(ctx, req.CurrentUser, req.Namespace, membership.RoleAdmin)
+	if err != nil {
+		return fmt.Errorf("failed to check permission to create mirror, error: %w", err)
+	}
+
+	if !admin {
+		return fmt.Errorf("users do not have permission to delete mirror for this repo")
+	}
+	repo, err := m.repoStore.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
+	if err != nil {
+		return fmt.Errorf("failed to find repo, error: %w", err)
+	}
+	mirror, err := m.mirrorStore.FindByRepoID(ctx, repo.ID)
+	if err != nil {
+		return fmt.Errorf("failed to find mirror, error: %w", err)
+	}
+	if err := m.mirrorStore.DeleteWithTaskCancelTx(ctx, mirror.ID, m.mirrorJobClient); err != nil {
+		return fmt.Errorf("failed to delete mirror, error: %w", err)
+	}
+	syncCache := ensureRepoSyncCache(ctx, &m.syncCacheMu, &m.syncCache, m.config)
+	deleteRepoSyncCache(ctx, syncCache, repo.ID, strconv.Itoa(m.config.Mirror.PartSize))
+	return nil
+}
 
 func getAllFiles(ctx context.Context, namespace, repoName, folder string, repoType types.RepositoryType, ref string, gsTree func(ctx context.Context, req types.GetTreeRequest) (*types.GetRepoFileTreeResp, error)) ([]*types.File, error) {
 	var (
@@ -577,9 +398,9 @@ func getAllFiles(ctx context.Context, namespace, repoName, folder string, repoTy
 	return files, nil
 }
 
-func (c *mirrorComponentImpl) Repos(ctx context.Context, per, page int) ([]types.MirrorRepo, int, error) {
+func (m *mirrorComponentImpl) Repos(ctx context.Context, per, page int) ([]types.MirrorRepo, int, error) {
 	var mirrorRepos []types.MirrorRepo
-	mirros, total, err := c.mirrorStore.IndexWithPagination(ctx, per, page, "", true)
+	mirros, total, err := m.mirrorStore.IndexWithPagination(ctx, per, page, types.MirrorFilter{}, true)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to get mirror repositories: %v", err)
 	}
@@ -598,9 +419,9 @@ func (c *mirrorComponentImpl) Repos(ctx context.Context, per, page int) ([]types
 	return mirrorRepos, total, nil
 }
 
-func (c *mirrorComponentImpl) Index(ctx context.Context, per, page int, search string) ([]types.Mirror, int, error) {
+func (m *mirrorComponentImpl) Index(ctx context.Context, per, page int, filter types.MirrorFilter) ([]types.Mirror, int, error) {
 	var mirrorsResp []types.Mirror
-	mirrors, total, err := c.mirrorStore.IndexWithPagination(ctx, per, page, search, false)
+	mirrors, total, err := m.mirrorStore.IndexWithPagination(ctx, per, page, filter, false)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to get mirror mirrors: %v", err)
 	}
@@ -635,9 +456,9 @@ func (c *mirrorComponentImpl) Index(ctx context.Context, per, page int, search s
 	return mirrorsResp, total, nil
 }
 
-func (c *mirrorComponentImpl) Statistics(ctx context.Context) ([]types.MirrorStatusCount, error) {
+func (m *mirrorComponentImpl) Statistics(ctx context.Context) ([]types.MirrorStatusCount, error) {
 	var scs []types.MirrorStatusCount
-	statusCounts, err := c.mirrorStore.StatusCount(ctx)
+	statusCounts, err := m.mirrorStore.StatusCount(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get mirror statistics: %v", err)
 	}
@@ -652,7 +473,7 @@ func (c *mirrorComponentImpl) Statistics(ctx context.Context) ([]types.MirrorSta
 	return scs, nil
 }
 
-func (c *mirrorComponentImpl) BatchCreate(ctx context.Context, req types.BatchCreateMirrorReq) error {
+func (m *mirrorComponentImpl) BatchCreate(ctx context.Context, req types.BatchCreateMirrorReq) error {
 	var (
 		toBeUpdatedMirrors []database.Mirror
 		toBeCreatedMirrors []database.Mirror
@@ -664,7 +485,7 @@ func (c *mirrorComponentImpl) BatchCreate(ctx context.Context, req types.BatchCr
 		sourceURLMirrorMapping[mirror.SourceURL] = mirror
 		sourceURLs = append(sourceURLs, mirror.SourceURL)
 	}
-	existingMirrors, err := c.mirrorStore.FindBySourceURLs(ctx, sourceURLs)
+	existingMirrors, err := m.mirrorStore.FindBySourceURLs(ctx, sourceURLs)
 	if err != nil {
 		return fmt.Errorf("failed to get mirrors: %v", err)
 	}
@@ -697,14 +518,14 @@ func (c *mirrorComponentImpl) BatchCreate(ctx context.Context, req types.BatchCr
 	}
 
 	if len(toBeUpdatedMirrors) > 0 {
-		err = c.mirrorStore.BatchUpdate(ctx, toBeUpdatedMirrors)
+		err = m.mirrorStore.BatchUpdate(ctx, toBeUpdatedMirrors)
 		if err != nil {
 			return fmt.Errorf("failed to batch update mirrors: %v", err)
 		}
 	}
 
 	if len(toBeCreatedMirrors) > 0 {
-		err = c.mirrorStore.BatchCreate(ctx, toBeCreatedMirrors)
+		err = m.mirrorStore.BatchCreate(ctx, toBeCreatedMirrors)
 		if err != nil {
 			return fmt.Errorf("failed to batch create mirrors: %v", err)
 		}
@@ -713,80 +534,50 @@ func (c *mirrorComponentImpl) BatchCreate(ctx context.Context, req types.BatchCr
 	return nil
 }
 
-func (c *mirrorComponentImpl) ListQueue(ctx context.Context, count int64) (types.MirrorListResp, error) {
-	var (
-		resp      types.MirrorListResp
-		mirrorIDs []int64
-	)
-	mirrorMap := make(map[int64]database.Mirror)
-	// lfsmirrorIDs := c.mq.ListLfsMirrorTasks(count)
-	// repoMirrorIDs := c.mq.ListRepoMirrorTasks(count)
-
-	runningTasks, err := c.syncCache.GetRunningTask(ctx)
+func (m *mirrorComponentImpl) Delete(ctx context.Context, id int64) error {
+	mirror, err := m.mirrorStore.FindByID(ctx, id)
 	if err != nil {
-		return resp, fmt.Errorf("failed to get running tasks: %w", err)
+		return fmt.Errorf("failed to find mirror: %w", err)
 	}
-	for _, id := range runningTasks {
-		mirrorIDs = append(mirrorIDs, id)
-	}
-
-	// mirrorIDs = append(mirrorIDs, lfsmirrorIDs...)
-	// mirrorIDs = append(mirrorIDs, repoMirrorIDs...)
-	mirrors, err := c.mirrorStore.FindByIDs(ctx, mirrorIDs)
-	if err != nil {
-		return resp, fmt.Errorf("failed to find mirror by ids: %w", err)
-	}
-	for _, mirror := range mirrors {
-		mirrorMap[mirror.ID] = mirror
-	}
-	// for _, id := range lfsmirrorIDs {
-	// 	if mirror, ok := mirrorMap[id]; ok {
-	// 		resp.LfsMirrorTasks = append(resp.LfsMirrorTasks, types.MirrorTask{
-	// 			MirrorID:  mirror.ID,
-	// 			SourceUrl: mirror.SourceUrl,
-	// 			RepoPath:  mirror.RepoPath(),
-	// 			Priority:  int(mirror.Priority),
-	// 		})
-	// 	}
-	// }
-
-	// for _, id := range repoMirrorIDs {
-	// 	if mirror, ok := mirrorMap[id]; ok {
-	// 		resp.RepoMirrorTasks = append(resp.RepoMirrorTasks, types.MirrorTask{
-	// 			MirrorID:  mirror.ID,
-	// 			SourceUrl: mirror.SourceUrl,
-	// 			RepoPath:  mirror.RepoPath(),
-	// 			Priority:  int(mirror.Priority),
-	// 		})
-	// 	}
-	// }
-
-	resp.RunningTasks = make(map[int]types.MirrorTask)
-
-	for k, mirrorID := range runningTasks {
-		if mirror, ok := mirrorMap[mirrorID]; ok {
-			resp.RunningTasks[k] = types.MirrorTask{
-				MirrorID:  mirror.ID,
-				SourceUrl: mirror.SourceUrl,
-				RepoPath:  mirror.RepoPath(),
-				Priority:  int(mirror.Priority),
-			}
-		}
-	}
-
-	return resp, nil
-}
-
-func (c *mirrorComponentImpl) Delete(ctx context.Context, id int64) error {
-	m, err := c.mirrorStore.FindByID(ctx, id)
-	if err != nil {
-		return fmt.Errorf("failed to find mirror by id: %w", err)
-	}
-
-	err = c.mirrorStore.Delete(ctx, m)
-	if err != nil {
+	if err := m.mirrorStore.DeleteWithTaskCancelTx(ctx, id, m.mirrorJobClient); err != nil {
 		return fmt.Errorf("failed to delete mirror: %w", err)
 	}
-
+	syncCache := ensureRepoSyncCache(ctx, &m.syncCacheMu, &m.syncCache, m.config)
+	deleteRepoSyncCache(ctx, syncCache, mirror.RepositoryID, strconv.Itoa(m.config.Mirror.PartSize))
 	return nil
+}
+
+// ensureRepoSyncCache lazily creates the Redis cache used by mirror cleanup paths.
+func ensureRepoSyncCache(ctx context.Context, mu *sync.Mutex, syncCache *mirrorcache.Cache, cfg *config.Config) mirrorcache.Cache {
+	if syncCache == nil || *syncCache != nil {
+		if syncCache == nil {
+			return nil
+		}
+		return *syncCache
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if *syncCache != nil {
+		return *syncCache
+	}
+	if cfg == nil {
+		return nil
+	}
+	cache, err := mirrorcache.NewCache(context.Background(), cfg)
+	if err != nil {
+		slog.WarnContext(ctx, "failed to create mirror sync cache for cleanup", slog.Any("error", err))
+		return nil
+	}
+	*syncCache = cache
+	return cache
+}
+
+// deleteRepoSyncCache removes LFS cache for a repository after its mirror task is stopped or deleted.
+func deleteRepoSyncCache(ctx context.Context, syncCache mirrorcache.Cache, repoID int64, partSize string) {
+	if syncCache == nil || repoID == 0 {
+		return
+	}
+	if err := syncCache.DeleteRepoSyncCache(ctx, repoID, partSize); err != nil {
+		slog.WarnContext(ctx, "failed to delete mirror repo sync cache", slog.Any("error", err), slog.Int64("repo_id", repoID))
+	}
 }

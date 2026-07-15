@@ -29,6 +29,8 @@ type RedisClient interface {
 	HSet(ctx context.Context, key string, field string, value interface{}) error
 	HMSet(ctx context.Context, key string, vals ...interface{}) error
 	HGet(ctx context.Context, key string, field string) (string, error)
+	HExists(ctx context.Context, key string, field string) (bool, error)
+	HLen(ctx context.Context, key string) (int64, error)
 	HGetAll(ctx context.Context, key string) (map[string]string, error)
 	HDel(ctx context.Context, key string, fields ...string) error
 	ZRem(ctx context.Context, key string, value string) error
@@ -170,6 +172,14 @@ func (c *Cache) HMSet(ctx context.Context, key string, values ...interface{}) er
 
 func (c *Cache) HGet(ctx context.Context, key string, field string) (string, error) {
 	return c.core.HGet(ctx, key, field).Result()
+}
+
+func (c *Cache) HExists(ctx context.Context, key string, field string) (bool, error) {
+	return c.core.HExists(ctx, key, field).Result()
+}
+
+func (c *Cache) HLen(ctx context.Context, key string) (int64, error) {
+	return c.core.HLen(ctx, key).Result()
 }
 
 func (c *Cache) HGetAll(ctx context.Context, key string) (map[string]string, error) {

@@ -245,3 +245,12 @@ func Test_Err_FEDAP_RepositoryAlreadyExists(t *testing.T) {
 	assert.True(t, errors.Is(err, ErrFederationAdapterRepositoryAlreadyExists))
 	assert.False(t, errors.Is(err, ErrDatabaseDuplicateKey))
 }
+
+func Test_Err_MirrorSourceConflict(t *testing.T) {
+	// The mirror source conflict is a mirror business error, not a database duplicate-key error.
+	err := MirrorSourceConflict(errors.New("mirror source conflict"), Ctx().Set("repository_id", int64(1)))
+
+	assert.Equal(t, "MIRROR-ERR-0", ErrMirrorSourceConflict.(CustomError).Code())
+	assert.True(t, errors.Is(err, ErrMirrorSourceConflict))
+	assert.False(t, errors.Is(err, ErrDatabaseDuplicateKey))
+}

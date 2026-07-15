@@ -40,6 +40,7 @@ type RepoTester struct {
 		repo     *mockcomponent.MockRepoComponent
 		model    *mockcomponent.MockModelComponent
 		dataset  *mockcomponent.MockDatasetComponent
+		mirror   *mockcomponent.MockMirrorComponent
 		workflow *workflow_mock.MockClient
 	}
 }
@@ -49,12 +50,14 @@ func NewRepoTester(t *testing.T) *RepoTester {
 	tester.mocks.repo = mockcomponent.NewMockRepoComponent(t)
 	tester.mocks.model = mockcomponent.NewMockModelComponent(t)
 	tester.mocks.dataset = mockcomponent.NewMockDatasetComponent(t)
+	tester.mocks.mirror = mockcomponent.NewMockMirrorComponent(t)
 	tester.mocks.workflow = workflow_mock.NewMockClient(t)
 	temporal.Assign(tester.mocks.workflow)
 	tester.handler = &RepoHandler{
 		c:        tester.mocks.repo,
 		m:        tester.mocks.model,
 		d:        tester.mocks.dataset,
+		mirror:   tester.mocks.mirror,
 		temporal: tester.mocks.workflow,
 		config: &config.Config{
 			MaxRepoBatchNum: 500,
@@ -1149,7 +1152,7 @@ func TestRepoHandler_CreateMirror(t *testing.T) {
 		SourceUrl:      "https://foo.com",
 		MirrorSourceID: 12,
 	})
-	tester.mocks.repo.EXPECT().CreateMirror(
+	tester.mocks.mirror.EXPECT().CreateMirror(
 		tester.Ctx(), types.CreateMirrorReq{
 			Namespace:      "u",
 			Name:           "r",
@@ -1171,7 +1174,7 @@ func TestRepoHandler_GetMirror(t *testing.T) {
 	tester.WithUser()
 
 	tester.WithKV("repo_type", types.ModelRepo)
-	tester.mocks.repo.EXPECT().GetMirror(
+	tester.mocks.mirror.EXPECT().GetMirror(
 		tester.Ctx(), types.GetMirrorReq{
 			Namespace:   "u",
 			Name:        "r",
@@ -1195,7 +1198,7 @@ func TestRepoHandler_UpdateMirror(t *testing.T) {
 		MirrorSourceID: 123,
 		SourceUrl:      "foo",
 	})
-	tester.mocks.repo.EXPECT().UpdateMirror(
+	tester.mocks.mirror.EXPECT().UpdateMirror(
 		tester.Ctx(), types.UpdateMirrorReq{
 			Namespace:      "u",
 			Name:           "r",
@@ -1219,7 +1222,7 @@ func TestRepoHandler_DeleteMirror(t *testing.T) {
 	tester.WithUser()
 
 	tester.WithKV("repo_type", types.ModelRepo)
-	tester.mocks.repo.EXPECT().DeleteMirror(
+	tester.mocks.mirror.EXPECT().DeleteMirror(
 		tester.Ctx(), types.DeleteMirrorReq{
 			Namespace:   "u",
 			Name:        "r",
@@ -1433,9 +1436,7 @@ func TestRepoHandler_SyncMirror(t *testing.T) {
 
 	tester.WithKV("repo_type", types.ModelRepo)
 	tester.WithParam("id", "1")
-	tester.mocks.repo.EXPECT().SyncMirror(
-		tester.Ctx(), types.ModelRepo, "u", "r", "u",
-	).Return(nil)
+	tester.mocks.mirror.EXPECT().SyncMirror(tester.Ctx(), types.ModelRepo, "u", "r", "u").Return(nil).Once()
 
 	tester.Execute()
 	tester.ResponseEq(t, 200, tester.OKText, nil)

@@ -62,10 +62,15 @@ func NewRepoHandler(config *config.Config) (*RepoHandler, error) {
 	if err != nil {
 		return nil, err
 	}
+	mirror, err := component.NewMirrorComponent(config)
+	if err != nil {
+		return nil, err
+	}
 	return &RepoHandler{
 		c:                         uc,
 		m:                         m,
 		d:                         d,
+		mirror:                    mirror,
 		temporal:                  temporal.GetClient(),
 		deployStatusCheckInterval: time.Duration(config.Model.DeployStatusCheckInterval) * time.Second,
 		config:                    config,
@@ -76,6 +81,7 @@ type RepoHandler struct {
 	c                         component.RepoComponent
 	m                         component.ModelComponent
 	d                         component.DatasetComponent
+	mirror                    component.MirrorComponent
 	temporal                  temporal.Client
 	deployStatusCheckInterval time.Duration
 	config                    *config.Config
@@ -1360,7 +1366,7 @@ func (h *RepoHandler) CreateMirror(ctx *gin.Context) {
 	mirrorReq.RepoType = common.RepoTypeFromContext(ctx)
 	mirrorReq.CurrentUser = currentUser
 	mirrorReq.SourceRepoPath = sourceRepoPath
-	mirror, err := h.c.CreateMirror(ctx.Request.Context(), mirrorReq)
+	mirror, err := h.mirror.CreateMirror(ctx.Request.Context(), mirrorReq)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "Failed to create mirror for", slog.String("repo_type", string(mirrorReq.RepoType)), slog.String("path", fmt.Sprintf("%s/%s", mirrorReq.Namespace, mirrorReq.Name)), "error", err)
 		httpbase.ServerError(ctx, err)
@@ -1396,7 +1402,7 @@ func (h *RepoHandler) GetMirror(ctx *gin.Context) {
 	mirrorReq.Name = name
 	mirrorReq.RepoType = common.RepoTypeFromContext(ctx)
 	mirrorReq.CurrentUser = currentUser
-	mirror, err := h.c.GetMirror(ctx.Request.Context(), mirrorReq)
+	mirror, err := h.mirror.GetMirror(ctx.Request.Context(), mirrorReq)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "Failed to get mirror of", slog.String("repo_type", string(mirrorReq.RepoType)), slog.String("path", fmt.Sprintf("%s/%s", mirrorReq.Namespace, mirrorReq.Name)), "error", err)
 		httpbase.ServerError(ctx, err)
@@ -1444,7 +1450,7 @@ func (h *RepoHandler) UpdateMirror(ctx *gin.Context) {
 	mirrorReq.Name = name
 	mirrorReq.RepoType = common.RepoTypeFromContext(ctx)
 	mirrorReq.CurrentUser = currentUser
-	mirror, err := h.c.UpdateMirror(ctx.Request.Context(), mirrorReq)
+	mirror, err := h.mirror.UpdateMirror(ctx.Request.Context(), mirrorReq)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "Failed to update mirror for", slog.String("repo_type", string(mirrorReq.RepoType)), slog.String("path", fmt.Sprintf("%s/%s", mirrorReq.Namespace, mirrorReq.Name)), "error", err)
 		httpbase.ServerError(ctx, err)
@@ -1479,7 +1485,7 @@ func (h *RepoHandler) DeleteMirror(ctx *gin.Context) {
 	mirrorReq.Name = name
 	mirrorReq.RepoType = common.RepoTypeFromContext(ctx)
 	mirrorReq.CurrentUser = currentUser
-	err = h.c.DeleteMirror(ctx.Request.Context(), mirrorReq)
+	err = h.mirror.DeleteMirror(ctx.Request.Context(), mirrorReq)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "Failed to delete mirror of", slog.String("repo_type", string(mirrorReq.RepoType)), slog.String("path", fmt.Sprintf("%s/%s", mirrorReq.Namespace, mirrorReq.Name)), "error", err)
 		httpbase.ServerError(ctx, err)
@@ -1525,7 +1531,7 @@ func (h *RepoHandler) SyncMirror(ctx *gin.Context) {
 		return
 	}
 	currentUser := httpbase.GetCurrentUser(ctx)
-	err = h.c.SyncMirror(ctx.Request.Context(), repoType, namespace, name, currentUser)
+	err = h.mirror.SyncMirror(ctx.Request.Context(), repoType, namespace, name, currentUser)
 	if err != nil {
 		if errors.Is(err, errorx.ErrForbidden) {
 			slog.ErrorContext(ctx.Request.Context(), "not allowed to sync mirror", slog.Any("error", err), slog.String("repo_type", string(repoType)), slog.String("path", fmt.Sprintf("%s/%s", namespace, name)))

@@ -1,0 +1,5 @@
+{
+    "error.MIRROR-ERR-0": {
+        "other": "The target repository already has another mirror source."
+    }
+}

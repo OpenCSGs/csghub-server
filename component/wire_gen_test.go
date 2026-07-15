@@ -2021,7 +2021,7 @@ func initializeTestImportComponent(ctx context.Context, t interface {
 	mockStores := tests.NewMockStores(t)
 	mockRepoComponent := component.NewMockRepoComponent(t)
 	mockImporter := importer.NewMockImporter(t)
-	componentImportComponentImpl := NewTestImportComponent(config, mockStores, mockRepoComponent, mockImporter)
+	componentImportComponentImpl := NewTestImportComponent(config, mockStores, mockImporter)
 	mockAccountingComponent := component.NewMockAccountingComponent(t)
 	mockTagComponent := component.NewMockTagComponent(t)
 	mockSpaceComponent := component.NewMockSpaceComponent(t)

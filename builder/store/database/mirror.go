@@ -31,7 +31,7 @@ type MirrorStore interface {
 	Finished(ctx context.Context) ([]Mirror, error)
 	ToSyncRepo(ctx context.Context) ([]Mirror, error)
 	ToSyncLfs(ctx context.Context) ([]Mirror, error)
-	IndexWithPagination(ctx context.Context, per, page int, search string, hasRepo bool) (mirrors []Mirror, count int, err error)
+	IndexWithPagination(ctx context.Context, per, page int, filter types.MirrorFilter, hasRepo bool) (mirrors []Mirror, count int, err error)
 	StatusCount(ctx context.Context) ([]MirrorStatusCount, error)
 	UpdateMirrorAndRepository(ctx context.Context, mirror *Mirror, repo *Repository) error
 	FindBySourceURLs(ctx context.Context, sourceURLs []string) ([]Mirror, error)
@@ -39,7 +39,7 @@ type MirrorStore interface {
 	BatchCreate(ctx context.Context, mirrors []Mirror) error
 	ToBeScheduled(ctx context.Context) ([]Mirror, error)
 	Delete(ctx context.Context, mirror *Mirror) error
-	Recover(ctx context.Context) error
+	DeleteWithTaskCancelTx(ctx context.Context, mirrorID int64, jobCancelClient MirrorJobCancelClient) error
 }
 
 func NewMirrorStore() MirrorStore {
@@ -255,7 +255,7 @@ func (s *mirrorStoreImpl) Update(ctx context.Context, mirror *Mirror) (err error
 
 func (s *mirrorStoreImpl) Delete(ctx context.Context, mirror *Mirror) (err error) {
 	err = s.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		_, err = s.db.Operator.Core.
+		_, err = tx.
 			NewDelete().
 			Model(mirror).
 			WherePK().
@@ -264,7 +264,7 @@ func (s *mirrorStoreImpl) Delete(ctx context.Context, mirror *Mirror) (err error
 			return err
 		}
 
-		_, err = s.db.Operator.Core.
+		_, err = tx.
 			NewDelete().
 			Model(&MirrorTask{}).
 			Where("mirror_id = ?", mirror.ID).
@@ -279,6 +279,68 @@ func (s *mirrorStoreImpl) Delete(ctx context.Context, mirror *Mirror) (err error
 	}
 
 	return nil
+}
+
+// DeleteWithTaskCancelTx cancels all workhub jobs for a mirror and deletes its mirror data atomically.
+func (s *mirrorStoreImpl) DeleteWithTaskCancelTx(ctx context.Context, mirrorID int64, jobCancelClient MirrorJobCancelClient) (err error) {
+	err = s.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		var mirror Mirror
+		if err := tx.NewSelect().
+			Model(&mirror).
+			Where("id = ?", mirrorID).
+			For("UPDATE").
+			Scan(ctx); err != nil {
+			return err
+		}
+
+		var tasks []MirrorTask
+		if err := tx.NewSelect().
+			Model(&tasks).
+			Where("mirror_id = ?", mirror.ID).
+			For("UPDATE").
+			Scan(ctx); err != nil {
+			return err
+		}
+
+		for _, task := range tasks {
+			if err := cancelMirrorTaskJobsTx(ctx, tx.Tx, task, jobCancelClient); err != nil {
+				return err
+			}
+		}
+
+		if mirror.RepositoryID != 0 && shouldCancelRepoSyncOnMirrorDelete(mirror, tasks) {
+			if err := updateRepoSyncStatus(ctx, tx, mirror.RepositoryID, types.SyncStatusCanceled); err != nil {
+				return err
+			}
+		}
+
+		if _, err := tx.NewDelete().
+			Model(&MirrorTask{}).
+			Where("mirror_id = ?", mirror.ID).
+			Exec(ctx); err != nil {
+			return err
+		}
+
+		_, err := tx.NewDelete().
+			Model(&mirror).
+			WherePK().
+			Exec(ctx)
+		return err
+	})
+	if err != nil {
+		return errorx.HandleDBError(err, nil)
+	}
+
+	return nil
+}
+
+func shouldCancelRepoSyncOnMirrorDelete(mirror Mirror, tasks []MirrorTask) bool {
+	for _, task := range tasks {
+		if task.Status != "" && !isMirrorTaskTerminalStatus(task.Status) {
+			return true
+		}
+	}
+	return mirror.Status != "" && !isMirrorTaskTerminalStatus(mirror.Status)
 }
 
 func (s *mirrorStoreImpl) Unfinished(ctx context.Context) ([]Mirror, error) {
@@ -339,7 +401,7 @@ func (s *mirrorStoreImpl) ToSyncLfs(ctx context.Context) ([]Mirror, error) {
 	return mirrors, nil
 }
 
-func (s *mirrorStoreImpl) IndexWithPagination(ctx context.Context, per, page int, search string, hasRepo bool) (mirrors []Mirror, count int, err error) {
+func (s *mirrorStoreImpl) IndexWithPagination(ctx context.Context, per, page int, filter types.MirrorFilter, hasRepo bool) (mirrors []Mirror, count int, err error) {
 	q := s.db.Operator.Core.NewSelect().
 		Model(&mirrors).
 		Relation("Repository").
@@ -350,12 +412,15 @@ func (s *mirrorStoreImpl) IndexWithPagination(ctx context.Context, per, page int
 	if hasRepo {
 		q = q.Where("repository.id is not null")
 	}
-	if search != "" {
+	if filter.Search != "" {
 		q = q.Where("LOWER(repository.path) like ? or LOWER(mirror.source_url) like ? or LOWER(mirror.local_repo_path) like ?",
-			fmt.Sprintf("%%%s%%", strings.ToLower(search)),
-			fmt.Sprintf("%%%s%%", strings.ToLower(search)),
-			fmt.Sprintf("%%%s%%", strings.ToLower(search)),
+			fmt.Sprintf("%%%s%%", strings.ToLower(filter.Search)),
+			fmt.Sprintf("%%%s%%", strings.ToLower(filter.Search)),
+			fmt.Sprintf("%%%s%%", strings.ToLower(filter.Search)),
 		)
+	}
+	if filter.Status != nil {
+		q = q.Where("current_task.status = ? or (current_task.status IS NULL and mirror.status = ?)", *filter.Status, *filter.Status)
 	}
 	count, err = q.Count(ctx)
 	if err != nil {
@@ -437,14 +502,4 @@ func (s *mirrorStoreImpl) ToBeScheduled(ctx context.Context) ([]Mirror, error) {
 		Limit(100).
 		Scan(ctx)
 	return mirrors, err
-}
-
-func (s *mirrorStoreImpl) Recover(ctx context.Context) error {
-	_, err := s.db.Operator.Core.NewUpdate().
-		Model((*Mirror)(nil)).
-		Set("status = ?", types.MirrorQueued).
-		Set("updated_at = ?", time.Now()).
-		Where("status in (?)", bun.In([]types.MirrorTaskStatus{types.MirrorLfsSyncStart, types.MirrorRepoSyncStart})).
-		Exec(ctx)
-	return err
 }

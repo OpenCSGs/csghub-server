@@ -51,6 +51,10 @@ func NewCodeComponent(config *config.Config) (CodeComponent, error) {
 	if err != nil {
 		return nil, err
 	}
+	c.mirrorComponent, err = NewMirrorComponent(config)
+	if err != nil {
+		return nil, err
+	}
 	c.codeStore = database.NewCodeStore()
 	c.repoStore = database.NewRepoStore()
 	c.recomStore = database.NewRecomStore()
@@ -72,15 +76,17 @@ func NewCodeComponent(config *config.Config) (CodeComponent, error) {
 }
 
 type codeComponentImpl struct {
-	config         *config.Config
-	repoComponent  RepoComponent
-	codeStore      database.CodeStore
-	repoStore      database.RepoStore
-	userLikesStore database.UserLikesStore
-	gitServer      gitserver.GitServer
-	userSvcClient  rpc.UserSvcClient
-	recomStore     database.RecomStore
-	s3Client       s3.Client
+	config        *config.Config
+	repoComponent RepoComponent
+	// mirrorComponent creates mirror records and workhub jobs for Git URL imports.
+	mirrorComponent MirrorComponent
+	codeStore       database.CodeStore
+	repoStore       database.RepoStore
+	userLikesStore  database.UserLikesStore
+	gitServer       gitserver.GitServer
+	userSvcClient   rpc.UserSvcClient
+	recomStore      database.RecomStore
+	s3Client        s3.Client
 }
 
 func (c *codeComponentImpl) GetUploadUrl(ctx context.Context) (string, string, map[string]string, error) {
@@ -781,7 +787,7 @@ func (c *codeComponentImpl) createMirrorIfNeeded(ctx context.Context, req *types
 		SyncLfs:     true,
 	}
 
-	_, err := c.repoComponent.CreateMirror(ctx, mirrorReq)
+	_, err := c.mirrorComponent.CreateMirror(ctx, mirrorReq)
 	if err != nil {
 		return fmt.Errorf("failed to create mirror: %w", err)
 	}

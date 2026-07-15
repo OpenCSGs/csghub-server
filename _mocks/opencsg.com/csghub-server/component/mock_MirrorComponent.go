@@ -7,7 +7,6 @@ import (
 
 	mock "github.com/stretchr/testify/mock"
 	database "opencsg.com/csghub-server/builder/store/database"
-
 	types "opencsg.com/csghub-server/common/types"
 )
 
@@ -71,20 +70,20 @@ func (_c *MockMirrorComponent_BatchCreate_Call) RunAndReturn(run func(context.Co
 	return _c
 }
 
-// CreateMirrorForkRepo provides a mock function with given fields: ctx, req
-func (_m *MockMirrorComponent) CreateMirrorForkRepo(ctx context.Context, req types.CreateMirrorRepoReq) (*database.Mirror, error) {
+// CreateMirror provides a mock function with given fields: ctx, req
+func (_m *MockMirrorComponent) CreateMirror(ctx context.Context, req types.CreateMirrorReq) (*database.Mirror, error) {
 	ret := _m.Called(ctx, req)
 
 	if len(ret) == 0 {
-		panic("no return value specified for CreateMirrorForkRepo")
+		panic("no return value specified for CreateMirror")
 	}
 
 	var r0 *database.Mirror
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, types.CreateMirrorRepoReq) (*database.Mirror, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, types.CreateMirrorReq) (*database.Mirror, error)); ok {
 		return rf(ctx, req)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, types.CreateMirrorRepoReq) *database.Mirror); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, types.CreateMirrorReq) *database.Mirror); ok {
 		r0 = rf(ctx, req)
 	} else {
 		if ret.Get(0) != nil {
@@ -92,7 +91,7 @@ func (_m *MockMirrorComponent) CreateMirrorForkRepo(ctx context.Context, req typ
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, types.CreateMirrorRepoReq) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, types.CreateMirrorReq) error); ok {
 		r1 = rf(ctx, req)
 	} else {
 		r1 = ret.Error(1)
@@ -101,31 +100,31 @@ func (_m *MockMirrorComponent) CreateMirrorForkRepo(ctx context.Context, req typ
 	return r0, r1
 }
 
-// MockMirrorComponent_CreateMirrorForkRepo_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateMirrorForkRepo'
-type MockMirrorComponent_CreateMirrorForkRepo_Call struct {
+// MockMirrorComponent_CreateMirror_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateMirror'
+type MockMirrorComponent_CreateMirror_Call struct {
 	*mock.Call
 }
 
-// CreateMirrorForkRepo is a helper method to define mock.On call
+// CreateMirror is a helper method to define mock.On call
 //   - ctx context.Context
-//   - req types.CreateMirrorRepoReq
-func (_e *MockMirrorComponent_Expecter) CreateMirrorForkRepo(ctx interface{}, req interface{}) *MockMirrorComponent_CreateMirrorForkRepo_Call {
-	return &MockMirrorComponent_CreateMirrorForkRepo_Call{Call: _e.mock.On("CreateMirrorForkRepo", ctx, req)}
+//   - req types.CreateMirrorReq
+func (_e *MockMirrorComponent_Expecter) CreateMirror(ctx interface{}, req interface{}) *MockMirrorComponent_CreateMirror_Call {
+	return &MockMirrorComponent_CreateMirror_Call{Call: _e.mock.On("CreateMirror", ctx, req)}
 }
 
-func (_c *MockMirrorComponent_CreateMirrorForkRepo_Call) Run(run func(ctx context.Context, req types.CreateMirrorRepoReq)) *MockMirrorComponent_CreateMirrorForkRepo_Call {
+func (_c *MockMirrorComponent_CreateMirror_Call) Run(run func(ctx context.Context, req types.CreateMirrorReq)) *MockMirrorComponent_CreateMirror_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(types.CreateMirrorRepoReq))
+		run(args[0].(context.Context), args[1].(types.CreateMirrorReq))
 	})
 	return _c
 }
 
-func (_c *MockMirrorComponent_CreateMirrorForkRepo_Call) Return(_a0 *database.Mirror, _a1 error) *MockMirrorComponent_CreateMirrorForkRepo_Call {
+func (_c *MockMirrorComponent_CreateMirror_Call) Return(_a0 *database.Mirror, _a1 error) *MockMirrorComponent_CreateMirror_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockMirrorComponent_CreateMirrorForkRepo_Call) RunAndReturn(run func(context.Context, types.CreateMirrorRepoReq) (*database.Mirror, error)) *MockMirrorComponent_CreateMirrorForkRepo_Call {
+func (_c *MockMirrorComponent_CreateMirror_Call) RunAndReturn(run func(context.Context, types.CreateMirrorReq) (*database.Mirror, error)) *MockMirrorComponent_CreateMirror_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -236,9 +235,115 @@ func (_c *MockMirrorComponent_Delete_Call) RunAndReturn(run func(context.Context
 	return _c
 }
 
-// Index provides a mock function with given fields: ctx, per, page, search
-func (_m *MockMirrorComponent) Index(ctx context.Context, per int, page int, search string) ([]types.Mirror, int, error) {
-	ret := _m.Called(ctx, per, page, search)
+// DeleteMirror provides a mock function with given fields: ctx, req
+func (_m *MockMirrorComponent) DeleteMirror(ctx context.Context, req types.DeleteMirrorReq) error {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteMirror")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.DeleteMirrorReq) error); ok {
+		r0 = rf(ctx, req)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockMirrorComponent_DeleteMirror_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteMirror'
+type MockMirrorComponent_DeleteMirror_Call struct {
+	*mock.Call
+}
+
+// DeleteMirror is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req types.DeleteMirrorReq
+func (_e *MockMirrorComponent_Expecter) DeleteMirror(ctx interface{}, req interface{}) *MockMirrorComponent_DeleteMirror_Call {
+	return &MockMirrorComponent_DeleteMirror_Call{Call: _e.mock.On("DeleteMirror", ctx, req)}
+}
+
+func (_c *MockMirrorComponent_DeleteMirror_Call) Run(run func(ctx context.Context, req types.DeleteMirrorReq)) *MockMirrorComponent_DeleteMirror_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.DeleteMirrorReq))
+	})
+	return _c
+}
+
+func (_c *MockMirrorComponent_DeleteMirror_Call) Return(_a0 error) *MockMirrorComponent_DeleteMirror_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockMirrorComponent_DeleteMirror_Call) RunAndReturn(run func(context.Context, types.DeleteMirrorReq) error) *MockMirrorComponent_DeleteMirror_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetMirror provides a mock function with given fields: ctx, req
+func (_m *MockMirrorComponent) GetMirror(ctx context.Context, req types.GetMirrorReq) (*types.Mirror, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetMirror")
+	}
+
+	var r0 *types.Mirror
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.GetMirrorReq) (*types.Mirror, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.GetMirrorReq) *types.Mirror); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*types.Mirror)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.GetMirrorReq) error); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockMirrorComponent_GetMirror_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetMirror'
+type MockMirrorComponent_GetMirror_Call struct {
+	*mock.Call
+}
+
+// GetMirror is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req types.GetMirrorReq
+func (_e *MockMirrorComponent_Expecter) GetMirror(ctx interface{}, req interface{}) *MockMirrorComponent_GetMirror_Call {
+	return &MockMirrorComponent_GetMirror_Call{Call: _e.mock.On("GetMirror", ctx, req)}
+}
+
+func (_c *MockMirrorComponent_GetMirror_Call) Run(run func(ctx context.Context, req types.GetMirrorReq)) *MockMirrorComponent_GetMirror_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.GetMirrorReq))
+	})
+	return _c
+}
+
+func (_c *MockMirrorComponent_GetMirror_Call) Return(_a0 *types.Mirror, _a1 error) *MockMirrorComponent_GetMirror_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockMirrorComponent_GetMirror_Call) RunAndReturn(run func(context.Context, types.GetMirrorReq) (*types.Mirror, error)) *MockMirrorComponent_GetMirror_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// Index provides a mock function with given fields: ctx, per, page, filter
+func (_m *MockMirrorComponent) Index(ctx context.Context, per int, page int, filter types.MirrorFilter) ([]types.Mirror, int, error) {
+	ret := _m.Called(ctx, per, page, filter)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Index")
@@ -247,25 +352,25 @@ func (_m *MockMirrorComponent) Index(ctx context.Context, per int, page int, sea
 	var r0 []types.Mirror
 	var r1 int
 	var r2 error
-	if rf, ok := ret.Get(0).(func(context.Context, int, int, string) ([]types.Mirror, int, error)); ok {
-		return rf(ctx, per, page, search)
+	if rf, ok := ret.Get(0).(func(context.Context, int, int, types.MirrorFilter) ([]types.Mirror, int, error)); ok {
+		return rf(ctx, per, page, filter)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, int, int, string) []types.Mirror); ok {
-		r0 = rf(ctx, per, page, search)
+	if rf, ok := ret.Get(0).(func(context.Context, int, int, types.MirrorFilter) []types.Mirror); ok {
+		r0 = rf(ctx, per, page, filter)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]types.Mirror)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, int, int, string) int); ok {
-		r1 = rf(ctx, per, page, search)
+	if rf, ok := ret.Get(1).(func(context.Context, int, int, types.MirrorFilter) int); ok {
+		r1 = rf(ctx, per, page, filter)
 	} else {
 		r1 = ret.Get(1).(int)
 	}
 
-	if rf, ok := ret.Get(2).(func(context.Context, int, int, string) error); ok {
-		r2 = rf(ctx, per, page, search)
+	if rf, ok := ret.Get(2).(func(context.Context, int, int, types.MirrorFilter) error); ok {
+		r2 = rf(ctx, per, page, filter)
 	} else {
 		r2 = ret.Error(2)
 	}
@@ -282,14 +387,14 @@ type MockMirrorComponent_Index_Call struct {
 //   - ctx context.Context
 //   - per int
 //   - page int
-//   - search string
-func (_e *MockMirrorComponent_Expecter) Index(ctx interface{}, per interface{}, page interface{}, search interface{}) *MockMirrorComponent_Index_Call {
-	return &MockMirrorComponent_Index_Call{Call: _e.mock.On("Index", ctx, per, page, search)}
+//   - filter types.MirrorFilter
+func (_e *MockMirrorComponent_Expecter) Index(ctx interface{}, per interface{}, page interface{}, filter interface{}) *MockMirrorComponent_Index_Call {
+	return &MockMirrorComponent_Index_Call{Call: _e.mock.On("Index", ctx, per, page, filter)}
 }
 
-func (_c *MockMirrorComponent_Index_Call) Run(run func(ctx context.Context, per int, page int, search string)) *MockMirrorComponent_Index_Call {
+func (_c *MockMirrorComponent_Index_Call) Run(run func(ctx context.Context, per int, page int, filter types.MirrorFilter)) *MockMirrorComponent_Index_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(int), args[2].(int), args[3].(string))
+		run(args[0].(context.Context), args[1].(int), args[2].(int), args[3].(types.MirrorFilter))
 	})
 	return _c
 }
@@ -299,64 +404,56 @@ func (_c *MockMirrorComponent_Index_Call) Return(_a0 []types.Mirror, _a1 int, _a
 	return _c
 }
 
-func (_c *MockMirrorComponent_Index_Call) RunAndReturn(run func(context.Context, int, int, string) ([]types.Mirror, int, error)) *MockMirrorComponent_Index_Call {
+func (_c *MockMirrorComponent_Index_Call) RunAndReturn(run func(context.Context, int, int, types.MirrorFilter) ([]types.Mirror, int, error)) *MockMirrorComponent_Index_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// ListQueue provides a mock function with given fields: ctx, count
-func (_m *MockMirrorComponent) ListQueue(ctx context.Context, count int64) (types.MirrorListResp, error) {
-	ret := _m.Called(ctx, count)
+// MirrorFromSaas provides a mock function with given fields: ctx, namespace, name, repoType
+func (_m *MockMirrorComponent) MirrorFromSaas(ctx context.Context, namespace string, name string, repoType types.RepositoryType) error {
+	ret := _m.Called(ctx, namespace, name, repoType)
 
 	if len(ret) == 0 {
-		panic("no return value specified for ListQueue")
+		panic("no return value specified for MirrorFromSaas")
 	}
 
-	var r0 types.MirrorListResp
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, int64) (types.MirrorListResp, error)); ok {
-		return rf(ctx, count)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, int64) types.MirrorListResp); ok {
-		r0 = rf(ctx, count)
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, types.RepositoryType) error); ok {
+		r0 = rf(ctx, namespace, name, repoType)
 	} else {
-		r0 = ret.Get(0).(types.MirrorListResp)
+		r0 = ret.Error(0)
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, int64) error); ok {
-		r1 = rf(ctx, count)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
+	return r0
 }
 
-// MockMirrorComponent_ListQueue_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListQueue'
-type MockMirrorComponent_ListQueue_Call struct {
+// MockMirrorComponent_MirrorFromSaas_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'MirrorFromSaas'
+type MockMirrorComponent_MirrorFromSaas_Call struct {
 	*mock.Call
 }
 
-// ListQueue is a helper method to define mock.On call
+// MirrorFromSaas is a helper method to define mock.On call
 //   - ctx context.Context
-//   - count int64
-func (_e *MockMirrorComponent_Expecter) ListQueue(ctx interface{}, count interface{}) *MockMirrorComponent_ListQueue_Call {
-	return &MockMirrorComponent_ListQueue_Call{Call: _e.mock.On("ListQueue", ctx, count)}
+//   - namespace string
+//   - name string
+//   - repoType types.RepositoryType
+func (_e *MockMirrorComponent_Expecter) MirrorFromSaas(ctx interface{}, namespace interface{}, name interface{}, repoType interface{}) *MockMirrorComponent_MirrorFromSaas_Call {
+	return &MockMirrorComponent_MirrorFromSaas_Call{Call: _e.mock.On("MirrorFromSaas", ctx, namespace, name, repoType)}
 }
 
-func (_c *MockMirrorComponent_ListQueue_Call) Run(run func(ctx context.Context, count int64)) *MockMirrorComponent_ListQueue_Call {
+func (_c *MockMirrorComponent_MirrorFromSaas_Call) Run(run func(ctx context.Context, namespace string, name string, repoType types.RepositoryType)) *MockMirrorComponent_MirrorFromSaas_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(int64))
+		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(types.RepositoryType))
 	})
 	return _c
 }
 
-func (_c *MockMirrorComponent_ListQueue_Call) Return(_a0 types.MirrorListResp, _a1 error) *MockMirrorComponent_ListQueue_Call {
-	_c.Call.Return(_a0, _a1)
+func (_c *MockMirrorComponent_MirrorFromSaas_Call) Return(_a0 error) *MockMirrorComponent_MirrorFromSaas_Call {
+	_c.Call.Return(_a0)
 	return _c
 }
 
-func (_c *MockMirrorComponent_ListQueue_Call) RunAndReturn(run func(context.Context, int64) (types.MirrorListResp, error)) *MockMirrorComponent_ListQueue_Call {
+func (_c *MockMirrorComponent_MirrorFromSaas_Call) RunAndReturn(run func(context.Context, string, string, types.RepositoryType) error) *MockMirrorComponent_MirrorFromSaas_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -574,6 +671,115 @@ func (_c *MockMirrorComponent_Statistics_Call) Return(_a0 []types.MirrorStatusCo
 }
 
 func (_c *MockMirrorComponent_Statistics_Call) RunAndReturn(run func(context.Context) ([]types.MirrorStatusCount, error)) *MockMirrorComponent_Statistics_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// SyncMirror provides a mock function with given fields: ctx, repoType, namespace, name, currentUser
+func (_m *MockMirrorComponent) SyncMirror(ctx context.Context, repoType types.RepositoryType, namespace string, name string, currentUser string) error {
+	ret := _m.Called(ctx, repoType, namespace, name, currentUser)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SyncMirror")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.RepositoryType, string, string, string) error); ok {
+		r0 = rf(ctx, repoType, namespace, name, currentUser)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockMirrorComponent_SyncMirror_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SyncMirror'
+type MockMirrorComponent_SyncMirror_Call struct {
+	*mock.Call
+}
+
+// SyncMirror is a helper method to define mock.On call
+//   - ctx context.Context
+//   - repoType types.RepositoryType
+//   - namespace string
+//   - name string
+//   - currentUser string
+func (_e *MockMirrorComponent_Expecter) SyncMirror(ctx interface{}, repoType interface{}, namespace interface{}, name interface{}, currentUser interface{}) *MockMirrorComponent_SyncMirror_Call {
+	return &MockMirrorComponent_SyncMirror_Call{Call: _e.mock.On("SyncMirror", ctx, repoType, namespace, name, currentUser)}
+}
+
+func (_c *MockMirrorComponent_SyncMirror_Call) Run(run func(ctx context.Context, repoType types.RepositoryType, namespace string, name string, currentUser string)) *MockMirrorComponent_SyncMirror_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.RepositoryType), args[2].(string), args[3].(string), args[4].(string))
+	})
+	return _c
+}
+
+func (_c *MockMirrorComponent_SyncMirror_Call) Return(_a0 error) *MockMirrorComponent_SyncMirror_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockMirrorComponent_SyncMirror_Call) RunAndReturn(run func(context.Context, types.RepositoryType, string, string, string) error) *MockMirrorComponent_SyncMirror_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// UpdateMirror provides a mock function with given fields: ctx, req
+func (_m *MockMirrorComponent) UpdateMirror(ctx context.Context, req types.UpdateMirrorReq) (*database.Mirror, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdateMirror")
+	}
+
+	var r0 *database.Mirror
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.UpdateMirrorReq) (*database.Mirror, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.UpdateMirrorReq) *database.Mirror); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*database.Mirror)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.UpdateMirrorReq) error); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockMirrorComponent_UpdateMirror_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdateMirror'
+type MockMirrorComponent_UpdateMirror_Call struct {
+	*mock.Call
+}
+
+// UpdateMirror is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req types.UpdateMirrorReq
+func (_e *MockMirrorComponent_Expecter) UpdateMirror(ctx interface{}, req interface{}) *MockMirrorComponent_UpdateMirror_Call {
+	return &MockMirrorComponent_UpdateMirror_Call{Call: _e.mock.On("UpdateMirror", ctx, req)}
+}
+
+func (_c *MockMirrorComponent_UpdateMirror_Call) Run(run func(ctx context.Context, req types.UpdateMirrorReq)) *MockMirrorComponent_UpdateMirror_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.UpdateMirrorReq))
+	})
+	return _c
+}
+
+func (_c *MockMirrorComponent_UpdateMirror_Call) Return(_a0 *database.Mirror, _a1 error) *MockMirrorComponent_UpdateMirror_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockMirrorComponent_UpdateMirror_Call) RunAndReturn(run func(context.Context, types.UpdateMirrorReq) (*database.Mirror, error)) *MockMirrorComponent_UpdateMirror_Call {
 	_c.Call.Return(run)
 	return _c
 }

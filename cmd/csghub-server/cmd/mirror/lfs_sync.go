@@ -1,15 +1,20 @@
 package mirror
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/spf13/cobra"
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/api/workflow"
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/builder/temporal"
 	"opencsg.com/csghub-server/common/config"
-	"opencsg.com/csghub-server/mirror/manager"
+	mirrorcomponent "opencsg.com/csghub-server/mirror/component"
+	"opencsg.com/csghub-server/mirror/filter"
+	"opencsg.com/csghub-server/mirror/lfssyncer"
 	"opencsg.com/csghub-server/mirror/router"
 )
 
@@ -42,20 +47,40 @@ var lfsSyncCmd = &cobra.Command{
 			},
 			r,
 		)
-		go server.Run()
 
 		slog.Info("start temporal workflow")
 		err = workflow.StartWorkflow(cfg, false)
 		if err != nil {
 			return err
 		}
+		defer temporal.Stop()
 
-		m, err := manager.GetManager(cfg)
+		lfsSyncer, err := lfssyncer.NewLfsSyncWorker(cfg)
 		if err != nil {
-			return fmt.Errorf("failed to get manager")
+			return err
 		}
-		m.Start()
 
+		lfsWorkClient, err := mirrorcomponent.NewLFSWorkClient(context.Background(), cfg.Database.DSN, mirrorcomponent.LFSWorkDeps{
+			MirrorTaskStore: database.NewMirrorTaskJobStore(),
+			Syncer:          lfsSyncer,
+			RepoFilter:      filter.NewRepoFilter(cfg),
+			MaxWorkers:      cfg.Mirror.WorkerNumber,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to create LFS workhub client: %w", err)
+		}
+		if err := lfsWorkClient.Start(context.Background()); err != nil {
+			return fmt.Errorf("failed to start LFS workhub client: %w", err)
+		}
+		defer func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			if err := lfsWorkClient.Stop(ctx); err != nil {
+				slog.Error("failed to stop LFS workhub client", slog.Any("error", err))
+			}
+		}()
+
+		server.Run()
 		return nil
 	},
 }

@@ -21,17 +21,17 @@ func (_m *MockCache) EXPECT() *MockCache_Expecter {
 	return &MockCache_Expecter{mock: &_m.Mock}
 }
 
-// CacheLfsSyncAddPart provides a mock function with given fields: ctx, repoPath, oid, partSize, partNumber
-func (_m *MockCache) CacheLfsSyncAddPart(ctx context.Context, repoPath string, oid string, partSize string, partNumber int) error {
-	ret := _m.Called(ctx, repoPath, oid, partSize, partNumber)
+// CacheLfsSyncAddPart provides a mock function with given fields: ctx, repoID, oid, partSize, partNumber
+func (_m *MockCache) CacheLfsSyncAddPart(ctx context.Context, repoID int64, oid string, partSize string, partNumber int) error {
+	ret := _m.Called(ctx, repoID, oid, partSize, partNumber)
 
 	if len(ret) == 0 {
 		panic("no return value specified for CacheLfsSyncAddPart")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, int) error); ok {
-		r0 = rf(ctx, repoPath, oid, partSize, partNumber)
+	if rf, ok := ret.Get(0).(func(context.Context, int64, string, string, int) error); ok {
+		r0 = rf(ctx, repoID, oid, partSize, partNumber)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -46,17 +46,17 @@ type MockCache_CacheLfsSyncAddPart_Call struct {
 
 // CacheLfsSyncAddPart is a helper method to define mock.On call
 //   - ctx context.Context
-//   - repoPath string
+//   - repoID int64
 //   - oid string
 //   - partSize string
 //   - partNumber int
-func (_e *MockCache_Expecter) CacheLfsSyncAddPart(ctx interface{}, repoPath interface{}, oid interface{}, partSize interface{}, partNumber interface{}) *MockCache_CacheLfsSyncAddPart_Call {
-	return &MockCache_CacheLfsSyncAddPart_Call{Call: _e.mock.On("CacheLfsSyncAddPart", ctx, repoPath, oid, partSize, partNumber)}
+func (_e *MockCache_Expecter) CacheLfsSyncAddPart(ctx interface{}, repoID interface{}, oid interface{}, partSize interface{}, partNumber interface{}) *MockCache_CacheLfsSyncAddPart_Call {
+	return &MockCache_CacheLfsSyncAddPart_Call{Call: _e.mock.On("CacheLfsSyncAddPart", ctx, repoID, oid, partSize, partNumber)}
 }
 
-func (_c *MockCache_CacheLfsSyncAddPart_Call) Run(run func(ctx context.Context, repoPath string, oid string, partSize string, partNumber int)) *MockCache_CacheLfsSyncAddPart_Call {
+func (_c *MockCache_CacheLfsSyncAddPart_Call) Run(run func(ctx context.Context, repoID int64, oid string, partSize string, partNumber int)) *MockCache_CacheLfsSyncAddPart_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(string), args[4].(int))
+		run(args[0].(context.Context), args[1].(int64), args[2].(string), args[3].(string), args[4].(int))
 	})
 	return _c
 }
@@ -66,22 +66,22 @@ func (_c *MockCache_CacheLfsSyncAddPart_Call) Return(_a0 error) *MockCache_Cache
 	return _c
 }
 
-func (_c *MockCache_CacheLfsSyncAddPart_Call) RunAndReturn(run func(context.Context, string, string, string, int) error) *MockCache_CacheLfsSyncAddPart_Call {
+func (_c *MockCache_CacheLfsSyncAddPart_Call) RunAndReturn(run func(context.Context, int64, string, string, int) error) *MockCache_CacheLfsSyncAddPart_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// CacheLfsSyncFileProgress provides a mock function with given fields: ctx, repoPath, oid, partSize, progress
-func (_m *MockCache) CacheLfsSyncFileProgress(ctx context.Context, repoPath string, oid string, partSize string, progress int) error {
-	ret := _m.Called(ctx, repoPath, oid, partSize, progress)
+// CacheLfsSyncFileProgress provides a mock function with given fields: ctx, repoID, oid, partSize, progress
+func (_m *MockCache) CacheLfsSyncFileProgress(ctx context.Context, repoID int64, oid string, partSize string, progress int) error {
+	ret := _m.Called(ctx, repoID, oid, partSize, progress)
 
 	if len(ret) == 0 {
 		panic("no return value specified for CacheLfsSyncFileProgress")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, int) error); ok {
-		r0 = rf(ctx, repoPath, oid, partSize, progress)
+	if rf, ok := ret.Get(0).(func(context.Context, int64, string, string, int) error); ok {
+		r0 = rf(ctx, repoID, oid, partSize, progress)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -96,17 +96,17 @@ type MockCache_CacheLfsSyncFileProgress_Call struct {
 
 // CacheLfsSyncFileProgress is a helper method to define mock.On call
 //   - ctx context.Context
-//   - repoPath string
+//   - repoID int64
 //   - oid string
 //   - partSize string
 //   - progress int
-func (_e *MockCache_Expecter) CacheLfsSyncFileProgress(ctx interface{}, repoPath interface{}, oid interface{}, partSize interface{}, progress interface{}) *MockCache_CacheLfsSyncFileProgress_Call {
-	return &MockCache_CacheLfsSyncFileProgress_Call{Call: _e.mock.On("CacheLfsSyncFileProgress", ctx, repoPath, oid, partSize, progress)}
+func (_e *MockCache_Expecter) CacheLfsSyncFileProgress(ctx interface{}, repoID interface{}, oid interface{}, partSize interface{}, progress interface{}) *MockCache_CacheLfsSyncFileProgress_Call {
+	return &MockCache_CacheLfsSyncFileProgress_Call{Call: _e.mock.On("CacheLfsSyncFileProgress", ctx, repoID, oid, partSize, progress)}
 }
 
-func (_c *MockCache_CacheLfsSyncFileProgress_Call) Run(run func(ctx context.Context, repoPath string, oid string, partSize string, progress int)) *MockCache_CacheLfsSyncFileProgress_Call {
+func (_c *MockCache_CacheLfsSyncFileProgress_Call) Run(run func(ctx context.Context, repoID int64, oid string, partSize string, progress int)) *MockCache_CacheLfsSyncFileProgress_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(string), args[4].(int))
+		run(args[0].(context.Context), args[1].(int64), args[2].(string), args[3].(string), args[4].(int))
 	})
 	return _c
 }
@@ -116,7 +116,7 @@ func (_c *MockCache_CacheLfsSyncFileProgress_Call) Return(_a0 error) *MockCache_
 	return _c
 }
 
-func (_c *MockCache_CacheLfsSyncFileProgress_Call) RunAndReturn(run func(context.Context, string, string, string, int) error) *MockCache_CacheLfsSyncFileProgress_Call {
+func (_c *MockCache_CacheLfsSyncFileProgress_Call) RunAndReturn(run func(context.Context, int64, string, string, int) error) *MockCache_CacheLfsSyncFileProgress_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -169,17 +169,17 @@ func (_c *MockCache_CacheRunningTask_Call) RunAndReturn(run func(context.Context
 	return _c
 }
 
-// CacheUploadID provides a mock function with given fields: ctx, repoPath, oid, partSize, uploadID
-func (_m *MockCache) CacheUploadID(ctx context.Context, repoPath string, oid string, partSize string, uploadID string) error {
-	ret := _m.Called(ctx, repoPath, oid, partSize, uploadID)
+// CacheUploadID provides a mock function with given fields: ctx, repoID, oid, partSize, uploadID
+func (_m *MockCache) CacheUploadID(ctx context.Context, repoID int64, oid string, partSize string, uploadID string) error {
+	ret := _m.Called(ctx, repoID, oid, partSize, uploadID)
 
 	if len(ret) == 0 {
 		panic("no return value specified for CacheUploadID")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, string) error); ok {
-		r0 = rf(ctx, repoPath, oid, partSize, uploadID)
+	if rf, ok := ret.Get(0).(func(context.Context, int64, string, string, string) error); ok {
+		r0 = rf(ctx, repoID, oid, partSize, uploadID)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -194,17 +194,17 @@ type MockCache_CacheUploadID_Call struct {
 
 // CacheUploadID is a helper method to define mock.On call
 //   - ctx context.Context
-//   - repoPath string
+//   - repoID int64
 //   - oid string
 //   - partSize string
 //   - uploadID string
-func (_e *MockCache_Expecter) CacheUploadID(ctx interface{}, repoPath interface{}, oid interface{}, partSize interface{}, uploadID interface{}) *MockCache_CacheUploadID_Call {
-	return &MockCache_CacheUploadID_Call{Call: _e.mock.On("CacheUploadID", ctx, repoPath, oid, partSize, uploadID)}
+func (_e *MockCache_Expecter) CacheUploadID(ctx interface{}, repoID interface{}, oid interface{}, partSize interface{}, uploadID interface{}) *MockCache_CacheUploadID_Call {
+	return &MockCache_CacheUploadID_Call{Call: _e.mock.On("CacheUploadID", ctx, repoID, oid, partSize, uploadID)}
 }
 
-func (_c *MockCache_CacheUploadID_Call) Run(run func(ctx context.Context, repoPath string, oid string, partSize string, uploadID string)) *MockCache_CacheUploadID_Call {
+func (_c *MockCache_CacheUploadID_Call) Run(run func(ctx context.Context, repoID int64, oid string, partSize string, uploadID string)) *MockCache_CacheUploadID_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(string), args[4].(string))
+		run(args[0].(context.Context), args[1].(int64), args[2].(string), args[3].(string), args[4].(string))
 	})
 	return _c
 }
@@ -214,71 +214,22 @@ func (_c *MockCache_CacheUploadID_Call) Return(_a0 error) *MockCache_CacheUpload
 	return _c
 }
 
-func (_c *MockCache_CacheUploadID_Call) RunAndReturn(run func(context.Context, string, string, string, string) error) *MockCache_CacheUploadID_Call {
+func (_c *MockCache_CacheUploadID_Call) RunAndReturn(run func(context.Context, int64, string, string, string) error) *MockCache_CacheUploadID_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// DeleteAllCache provides a mock function with given fields: ctx, repoPath, oid, partSize
-func (_m *MockCache) DeleteAllCache(ctx context.Context, repoPath string, oid string, partSize string) error {
-	ret := _m.Called(ctx, repoPath, oid, partSize)
-
-	if len(ret) == 0 {
-		panic("no return value specified for DeleteAllCache")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, string) error); ok {
-		r0 = rf(ctx, repoPath, oid, partSize)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// MockCache_DeleteAllCache_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteAllCache'
-type MockCache_DeleteAllCache_Call struct {
-	*mock.Call
-}
-
-// DeleteAllCache is a helper method to define mock.On call
-//   - ctx context.Context
-//   - repoPath string
-//   - oid string
-//   - partSize string
-func (_e *MockCache_Expecter) DeleteAllCache(ctx interface{}, repoPath interface{}, oid interface{}, partSize interface{}) *MockCache_DeleteAllCache_Call {
-	return &MockCache_DeleteAllCache_Call{Call: _e.mock.On("DeleteAllCache", ctx, repoPath, oid, partSize)}
-}
-
-func (_c *MockCache_DeleteAllCache_Call) Run(run func(ctx context.Context, repoPath string, oid string, partSize string)) *MockCache_DeleteAllCache_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(string))
-	})
-	return _c
-}
-
-func (_c *MockCache_DeleteAllCache_Call) Return(_a0 error) *MockCache_DeleteAllCache_Call {
-	_c.Call.Return(_a0)
-	return _c
-}
-
-func (_c *MockCache_DeleteAllCache_Call) RunAndReturn(run func(context.Context, string, string, string) error) *MockCache_DeleteAllCache_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// DeleteLfsPartCache provides a mock function with given fields: ctx, repoPath, oid, partSize
-func (_m *MockCache) DeleteLfsPartCache(ctx context.Context, repoPath string, oid string, partSize string) error {
-	ret := _m.Called(ctx, repoPath, oid, partSize)
+// DeleteLfsPartCache provides a mock function with given fields: ctx, repoID, oid, partSize
+func (_m *MockCache) DeleteLfsPartCache(ctx context.Context, repoID int64, oid string, partSize string) error {
+	ret := _m.Called(ctx, repoID, oid, partSize)
 
 	if len(ret) == 0 {
 		panic("no return value specified for DeleteLfsPartCache")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, string) error); ok {
-		r0 = rf(ctx, repoPath, oid, partSize)
+	if rf, ok := ret.Get(0).(func(context.Context, int64, string, string) error); ok {
+		r0 = rf(ctx, repoID, oid, partSize)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -293,16 +244,16 @@ type MockCache_DeleteLfsPartCache_Call struct {
 
 // DeleteLfsPartCache is a helper method to define mock.On call
 //   - ctx context.Context
-//   - repoPath string
+//   - repoID int64
 //   - oid string
 //   - partSize string
-func (_e *MockCache_Expecter) DeleteLfsPartCache(ctx interface{}, repoPath interface{}, oid interface{}, partSize interface{}) *MockCache_DeleteLfsPartCache_Call {
-	return &MockCache_DeleteLfsPartCache_Call{Call: _e.mock.On("DeleteLfsPartCache", ctx, repoPath, oid, partSize)}
+func (_e *MockCache_Expecter) DeleteLfsPartCache(ctx interface{}, repoID interface{}, oid interface{}, partSize interface{}) *MockCache_DeleteLfsPartCache_Call {
+	return &MockCache_DeleteLfsPartCache_Call{Call: _e.mock.On("DeleteLfsPartCache", ctx, repoID, oid, partSize)}
 }
 
-func (_c *MockCache_DeleteLfsPartCache_Call) Run(run func(ctx context.Context, repoPath string, oid string, partSize string)) *MockCache_DeleteLfsPartCache_Call {
+func (_c *MockCache_DeleteLfsPartCache_Call) Run(run func(ctx context.Context, repoID int64, oid string, partSize string)) *MockCache_DeleteLfsPartCache_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(string))
+		run(args[0].(context.Context), args[1].(int64), args[2].(string), args[3].(string))
 	})
 	return _c
 }
@@ -312,22 +263,22 @@ func (_c *MockCache_DeleteLfsPartCache_Call) Return(_a0 error) *MockCache_Delete
 	return _c
 }
 
-func (_c *MockCache_DeleteLfsPartCache_Call) RunAndReturn(run func(context.Context, string, string, string) error) *MockCache_DeleteLfsPartCache_Call {
+func (_c *MockCache_DeleteLfsPartCache_Call) RunAndReturn(run func(context.Context, int64, string, string) error) *MockCache_DeleteLfsPartCache_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// DeleteLfsSyncFileProgress provides a mock function with given fields: ctx, repoPath, oid, partSize
-func (_m *MockCache) DeleteLfsSyncFileProgress(ctx context.Context, repoPath string, oid string, partSize string) error {
-	ret := _m.Called(ctx, repoPath, oid, partSize)
+// DeleteLfsSyncFileCache provides a mock function with given fields: ctx, repoID, oid, partSize
+func (_m *MockCache) DeleteLfsSyncFileCache(ctx context.Context, repoID int64, oid string, partSize string) error {
+	ret := _m.Called(ctx, repoID, oid, partSize)
 
 	if len(ret) == 0 {
-		panic("no return value specified for DeleteLfsSyncFileProgress")
+		panic("no return value specified for DeleteLfsSyncFileCache")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, string) error); ok {
-		r0 = rf(ctx, repoPath, oid, partSize)
+	if rf, ok := ret.Get(0).(func(context.Context, int64, string, string) error); ok {
+		r0 = rf(ctx, repoID, oid, partSize)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -335,48 +286,96 @@ func (_m *MockCache) DeleteLfsSyncFileProgress(ctx context.Context, repoPath str
 	return r0
 }
 
-// MockCache_DeleteLfsSyncFileProgress_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteLfsSyncFileProgress'
-type MockCache_DeleteLfsSyncFileProgress_Call struct {
+// MockCache_DeleteLfsSyncFileCache_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteLfsSyncFileCache'
+type MockCache_DeleteLfsSyncFileCache_Call struct {
 	*mock.Call
 }
 
-// DeleteLfsSyncFileProgress is a helper method to define mock.On call
+// DeleteLfsSyncFileCache is a helper method to define mock.On call
 //   - ctx context.Context
-//   - repoPath string
+//   - repoID int64
 //   - oid string
 //   - partSize string
-func (_e *MockCache_Expecter) DeleteLfsSyncFileProgress(ctx interface{}, repoPath interface{}, oid interface{}, partSize interface{}) *MockCache_DeleteLfsSyncFileProgress_Call {
-	return &MockCache_DeleteLfsSyncFileProgress_Call{Call: _e.mock.On("DeleteLfsSyncFileProgress", ctx, repoPath, oid, partSize)}
+func (_e *MockCache_Expecter) DeleteLfsSyncFileCache(ctx interface{}, repoID interface{}, oid interface{}, partSize interface{}) *MockCache_DeleteLfsSyncFileCache_Call {
+	return &MockCache_DeleteLfsSyncFileCache_Call{Call: _e.mock.On("DeleteLfsSyncFileCache", ctx, repoID, oid, partSize)}
 }
 
-func (_c *MockCache_DeleteLfsSyncFileProgress_Call) Run(run func(ctx context.Context, repoPath string, oid string, partSize string)) *MockCache_DeleteLfsSyncFileProgress_Call {
+func (_c *MockCache_DeleteLfsSyncFileCache_Call) Run(run func(ctx context.Context, repoID int64, oid string, partSize string)) *MockCache_DeleteLfsSyncFileCache_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(string))
+		run(args[0].(context.Context), args[1].(int64), args[2].(string), args[3].(string))
 	})
 	return _c
 }
 
-func (_c *MockCache_DeleteLfsSyncFileProgress_Call) Return(_a0 error) *MockCache_DeleteLfsSyncFileProgress_Call {
+func (_c *MockCache_DeleteLfsSyncFileCache_Call) Return(_a0 error) *MockCache_DeleteLfsSyncFileCache_Call {
 	_c.Call.Return(_a0)
 	return _c
 }
 
-func (_c *MockCache_DeleteLfsSyncFileProgress_Call) RunAndReturn(run func(context.Context, string, string, string) error) *MockCache_DeleteLfsSyncFileProgress_Call {
+func (_c *MockCache_DeleteLfsSyncFileCache_Call) RunAndReturn(run func(context.Context, int64, string, string) error) *MockCache_DeleteLfsSyncFileCache_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// DeleteSpecificLfsPartCache provides a mock function with given fields: ctx, repoPath, oid, partSize, partNumber
-func (_m *MockCache) DeleteSpecificLfsPartCache(ctx context.Context, repoPath string, oid string, partSize string, partNumber int) error {
-	ret := _m.Called(ctx, repoPath, oid, partSize, partNumber)
+// DeleteRepoSyncCache provides a mock function with given fields: ctx, repoID, partSize
+func (_m *MockCache) DeleteRepoSyncCache(ctx context.Context, repoID int64, partSize string) error {
+	ret := _m.Called(ctx, repoID, partSize)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteRepoSyncCache")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, int64, string) error); ok {
+		r0 = rf(ctx, repoID, partSize)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockCache_DeleteRepoSyncCache_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteRepoSyncCache'
+type MockCache_DeleteRepoSyncCache_Call struct {
+	*mock.Call
+}
+
+// DeleteRepoSyncCache is a helper method to define mock.On call
+//   - ctx context.Context
+//   - repoID int64
+//   - partSize string
+func (_e *MockCache_Expecter) DeleteRepoSyncCache(ctx interface{}, repoID interface{}, partSize interface{}) *MockCache_DeleteRepoSyncCache_Call {
+	return &MockCache_DeleteRepoSyncCache_Call{Call: _e.mock.On("DeleteRepoSyncCache", ctx, repoID, partSize)}
+}
+
+func (_c *MockCache_DeleteRepoSyncCache_Call) Run(run func(ctx context.Context, repoID int64, partSize string)) *MockCache_DeleteRepoSyncCache_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(int64), args[2].(string))
+	})
+	return _c
+}
+
+func (_c *MockCache_DeleteRepoSyncCache_Call) Return(_a0 error) *MockCache_DeleteRepoSyncCache_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockCache_DeleteRepoSyncCache_Call) RunAndReturn(run func(context.Context, int64, string) error) *MockCache_DeleteRepoSyncCache_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// DeleteSpecificLfsPartCache provides a mock function with given fields: ctx, repoID, oid, partSize, partNumber
+func (_m *MockCache) DeleteSpecificLfsPartCache(ctx context.Context, repoID int64, oid string, partSize string, partNumber int) error {
+	ret := _m.Called(ctx, repoID, oid, partSize, partNumber)
 
 	if len(ret) == 0 {
 		panic("no return value specified for DeleteSpecificLfsPartCache")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, int) error); ok {
-		r0 = rf(ctx, repoPath, oid, partSize, partNumber)
+	if rf, ok := ret.Get(0).(func(context.Context, int64, string, string, int) error); ok {
+		r0 = rf(ctx, repoID, oid, partSize, partNumber)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -391,17 +390,17 @@ type MockCache_DeleteSpecificLfsPartCache_Call struct {
 
 // DeleteSpecificLfsPartCache is a helper method to define mock.On call
 //   - ctx context.Context
-//   - repoPath string
+//   - repoID int64
 //   - oid string
 //   - partSize string
 //   - partNumber int
-func (_e *MockCache_Expecter) DeleteSpecificLfsPartCache(ctx interface{}, repoPath interface{}, oid interface{}, partSize interface{}, partNumber interface{}) *MockCache_DeleteSpecificLfsPartCache_Call {
-	return &MockCache_DeleteSpecificLfsPartCache_Call{Call: _e.mock.On("DeleteSpecificLfsPartCache", ctx, repoPath, oid, partSize, partNumber)}
+func (_e *MockCache_Expecter) DeleteSpecificLfsPartCache(ctx interface{}, repoID interface{}, oid interface{}, partSize interface{}, partNumber interface{}) *MockCache_DeleteSpecificLfsPartCache_Call {
+	return &MockCache_DeleteSpecificLfsPartCache_Call{Call: _e.mock.On("DeleteSpecificLfsPartCache", ctx, repoID, oid, partSize, partNumber)}
 }
 
-func (_c *MockCache_DeleteSpecificLfsPartCache_Call) Run(run func(ctx context.Context, repoPath string, oid string, partSize string, partNumber int)) *MockCache_DeleteSpecificLfsPartCache_Call {
+func (_c *MockCache_DeleteSpecificLfsPartCache_Call) Run(run func(ctx context.Context, repoID int64, oid string, partSize string, partNumber int)) *MockCache_DeleteSpecificLfsPartCache_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(string), args[4].(int))
+		run(args[0].(context.Context), args[1].(int64), args[2].(string), args[3].(string), args[4].(int))
 	})
 	return _c
 }
@@ -411,22 +410,22 @@ func (_c *MockCache_DeleteSpecificLfsPartCache_Call) Return(_a0 error) *MockCach
 	return _c
 }
 
-func (_c *MockCache_DeleteSpecificLfsPartCache_Call) RunAndReturn(run func(context.Context, string, string, string, int) error) *MockCache_DeleteSpecificLfsPartCache_Call {
+func (_c *MockCache_DeleteSpecificLfsPartCache_Call) RunAndReturn(run func(context.Context, int64, string, string, int) error) *MockCache_DeleteSpecificLfsPartCache_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// DeleteUploadID provides a mock function with given fields: ctx, repoPath, oid, partSize
-func (_m *MockCache) DeleteUploadID(ctx context.Context, repoPath string, oid string, partSize string) error {
-	ret := _m.Called(ctx, repoPath, oid, partSize)
+// DeleteUploadID provides a mock function with given fields: ctx, repoID, oid, partSize
+func (_m *MockCache) DeleteUploadID(ctx context.Context, repoID int64, oid string, partSize string) error {
+	ret := _m.Called(ctx, repoID, oid, partSize)
 
 	if len(ret) == 0 {
 		panic("no return value specified for DeleteUploadID")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, string) error); ok {
-		r0 = rf(ctx, repoPath, oid, partSize)
+	if rf, ok := ret.Get(0).(func(context.Context, int64, string, string) error); ok {
+		r0 = rf(ctx, repoID, oid, partSize)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -441,16 +440,16 @@ type MockCache_DeleteUploadID_Call struct {
 
 // DeleteUploadID is a helper method to define mock.On call
 //   - ctx context.Context
-//   - repoPath string
+//   - repoID int64
 //   - oid string
 //   - partSize string
-func (_e *MockCache_Expecter) DeleteUploadID(ctx interface{}, repoPath interface{}, oid interface{}, partSize interface{}) *MockCache_DeleteUploadID_Call {
-	return &MockCache_DeleteUploadID_Call{Call: _e.mock.On("DeleteUploadID", ctx, repoPath, oid, partSize)}
+func (_e *MockCache_Expecter) DeleteUploadID(ctx interface{}, repoID interface{}, oid interface{}, partSize interface{}) *MockCache_DeleteUploadID_Call {
+	return &MockCache_DeleteUploadID_Call{Call: _e.mock.On("DeleteUploadID", ctx, repoID, oid, partSize)}
 }
 
-func (_c *MockCache_DeleteUploadID_Call) Run(run func(ctx context.Context, repoPath string, oid string, partSize string)) *MockCache_DeleteUploadID_Call {
+func (_c *MockCache_DeleteUploadID_Call) Run(run func(ctx context.Context, repoID int64, oid string, partSize string)) *MockCache_DeleteUploadID_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(string))
+		run(args[0].(context.Context), args[1].(int64), args[2].(string), args[3].(string))
 	})
 	return _c
 }
@@ -460,14 +459,14 @@ func (_c *MockCache_DeleteUploadID_Call) Return(_a0 error) *MockCache_DeleteUplo
 	return _c
 }
 
-func (_c *MockCache_DeleteUploadID_Call) RunAndReturn(run func(context.Context, string, string, string) error) *MockCache_DeleteUploadID_Call {
+func (_c *MockCache_DeleteUploadID_Call) RunAndReturn(run func(context.Context, int64, string, string) error) *MockCache_DeleteUploadID_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// GetLfsSyncFileProgress provides a mock function with given fields: ctx, repoPath, oid, partSize
-func (_m *MockCache) GetLfsSyncFileProgress(ctx context.Context, repoPath string, oid string, partSize string) (int, error) {
-	ret := _m.Called(ctx, repoPath, oid, partSize)
+// GetLfsSyncFileProgress provides a mock function with given fields: ctx, repoID, oid, partSize
+func (_m *MockCache) GetLfsSyncFileProgress(ctx context.Context, repoID int64, oid string, partSize string) (int, error) {
+	ret := _m.Called(ctx, repoID, oid, partSize)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetLfsSyncFileProgress")
@@ -475,17 +474,17 @@ func (_m *MockCache) GetLfsSyncFileProgress(ctx context.Context, repoPath string
 
 	var r0 int
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, string) (int, error)); ok {
-		return rf(ctx, repoPath, oid, partSize)
+	if rf, ok := ret.Get(0).(func(context.Context, int64, string, string) (int, error)); ok {
+		return rf(ctx, repoID, oid, partSize)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, string) int); ok {
-		r0 = rf(ctx, repoPath, oid, partSize)
+	if rf, ok := ret.Get(0).(func(context.Context, int64, string, string) int); ok {
+		r0 = rf(ctx, repoID, oid, partSize)
 	} else {
 		r0 = ret.Get(0).(int)
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, string, string) error); ok {
-		r1 = rf(ctx, repoPath, oid, partSize)
+	if rf, ok := ret.Get(1).(func(context.Context, int64, string, string) error); ok {
+		r1 = rf(ctx, repoID, oid, partSize)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -500,16 +499,16 @@ type MockCache_GetLfsSyncFileProgress_Call struct {
 
 // GetLfsSyncFileProgress is a helper method to define mock.On call
 //   - ctx context.Context
-//   - repoPath string
+//   - repoID int64
 //   - oid string
 //   - partSize string
-func (_e *MockCache_Expecter) GetLfsSyncFileProgress(ctx interface{}, repoPath interface{}, oid interface{}, partSize interface{}) *MockCache_GetLfsSyncFileProgress_Call {
-	return &MockCache_GetLfsSyncFileProgress_Call{Call: _e.mock.On("GetLfsSyncFileProgress", ctx, repoPath, oid, partSize)}
+func (_e *MockCache_Expecter) GetLfsSyncFileProgress(ctx interface{}, repoID interface{}, oid interface{}, partSize interface{}) *MockCache_GetLfsSyncFileProgress_Call {
+	return &MockCache_GetLfsSyncFileProgress_Call{Call: _e.mock.On("GetLfsSyncFileProgress", ctx, repoID, oid, partSize)}
 }
 
-func (_c *MockCache_GetLfsSyncFileProgress_Call) Run(run func(ctx context.Context, repoPath string, oid string, partSize string)) *MockCache_GetLfsSyncFileProgress_Call {
+func (_c *MockCache_GetLfsSyncFileProgress_Call) Run(run func(ctx context.Context, repoID int64, oid string, partSize string)) *MockCache_GetLfsSyncFileProgress_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(string))
+		run(args[0].(context.Context), args[1].(int64), args[2].(string), args[3].(string))
 	})
 	return _c
 }
@@ -519,72 +518,14 @@ func (_c *MockCache_GetLfsSyncFileProgress_Call) Return(_a0 int, _a1 error) *Moc
 	return _c
 }
 
-func (_c *MockCache_GetLfsSyncFileProgress_Call) RunAndReturn(run func(context.Context, string, string, string) (int, error)) *MockCache_GetLfsSyncFileProgress_Call {
+func (_c *MockCache_GetLfsSyncFileProgress_Call) RunAndReturn(run func(context.Context, int64, string, string) (int, error)) *MockCache_GetLfsSyncFileProgress_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// GetRunningTask provides a mock function with given fields: ctx
-func (_m *MockCache) GetRunningTask(ctx context.Context) (map[int]int64, error) {
-	ret := _m.Called(ctx)
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetRunningTask")
-	}
-
-	var r0 map[int]int64
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context) (map[int]int64, error)); ok {
-		return rf(ctx)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context) map[int]int64); ok {
-		r0 = rf(ctx)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(map[int]int64)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
-		r1 = rf(ctx)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// MockCache_GetRunningTask_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetRunningTask'
-type MockCache_GetRunningTask_Call struct {
-	*mock.Call
-}
-
-// GetRunningTask is a helper method to define mock.On call
-//   - ctx context.Context
-func (_e *MockCache_Expecter) GetRunningTask(ctx interface{}) *MockCache_GetRunningTask_Call {
-	return &MockCache_GetRunningTask_Call{Call: _e.mock.On("GetRunningTask", ctx)}
-}
-
-func (_c *MockCache_GetRunningTask_Call) Run(run func(ctx context.Context)) *MockCache_GetRunningTask_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context))
-	})
-	return _c
-}
-
-func (_c *MockCache_GetRunningTask_Call) Return(_a0 map[int]int64, _a1 error) *MockCache_GetRunningTask_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *MockCache_GetRunningTask_Call) RunAndReturn(run func(context.Context) (map[int]int64, error)) *MockCache_GetRunningTask_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// GetUploadID provides a mock function with given fields: ctx, repoPath, oid, partSize
-func (_m *MockCache) GetUploadID(ctx context.Context, repoPath string, oid string, partSize string) (string, error) {
-	ret := _m.Called(ctx, repoPath, oid, partSize)
+// GetUploadID provides a mock function with given fields: ctx, repoID, oid, partSize
+func (_m *MockCache) GetUploadID(ctx context.Context, repoID int64, oid string, partSize string) (string, error) {
+	ret := _m.Called(ctx, repoID, oid, partSize)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetUploadID")
@@ -592,17 +533,17 @@ func (_m *MockCache) GetUploadID(ctx context.Context, repoPath string, oid strin
 
 	var r0 string
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, string) (string, error)); ok {
-		return rf(ctx, repoPath, oid, partSize)
+	if rf, ok := ret.Get(0).(func(context.Context, int64, string, string) (string, error)); ok {
+		return rf(ctx, repoID, oid, partSize)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, string) string); ok {
-		r0 = rf(ctx, repoPath, oid, partSize)
+	if rf, ok := ret.Get(0).(func(context.Context, int64, string, string) string); ok {
+		r0 = rf(ctx, repoID, oid, partSize)
 	} else {
 		r0 = ret.Get(0).(string)
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, string, string) error); ok {
-		r1 = rf(ctx, repoPath, oid, partSize)
+	if rf, ok := ret.Get(1).(func(context.Context, int64, string, string) error); ok {
+		r1 = rf(ctx, repoID, oid, partSize)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -617,16 +558,16 @@ type MockCache_GetUploadID_Call struct {
 
 // GetUploadID is a helper method to define mock.On call
 //   - ctx context.Context
-//   - repoPath string
+//   - repoID int64
 //   - oid string
 //   - partSize string
-func (_e *MockCache_Expecter) GetUploadID(ctx interface{}, repoPath interface{}, oid interface{}, partSize interface{}) *MockCache_GetUploadID_Call {
-	return &MockCache_GetUploadID_Call{Call: _e.mock.On("GetUploadID", ctx, repoPath, oid, partSize)}
+func (_e *MockCache_Expecter) GetUploadID(ctx interface{}, repoID interface{}, oid interface{}, partSize interface{}) *MockCache_GetUploadID_Call {
+	return &MockCache_GetUploadID_Call{Call: _e.mock.On("GetUploadID", ctx, repoID, oid, partSize)}
 }
 
-func (_c *MockCache_GetUploadID_Call) Run(run func(ctx context.Context, repoPath string, oid string, partSize string)) *MockCache_GetUploadID_Call {
+func (_c *MockCache_GetUploadID_Call) Run(run func(ctx context.Context, repoID int64, oid string, partSize string)) *MockCache_GetUploadID_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(string))
+		run(args[0].(context.Context), args[1].(int64), args[2].(string), args[3].(string))
 	})
 	return _c
 }
@@ -636,14 +577,14 @@ func (_c *MockCache_GetUploadID_Call) Return(_a0 string, _a1 error) *MockCache_G
 	return _c
 }
 
-func (_c *MockCache_GetUploadID_Call) RunAndReturn(run func(context.Context, string, string, string) (string, error)) *MockCache_GetUploadID_Call {
+func (_c *MockCache_GetUploadID_Call) RunAndReturn(run func(context.Context, int64, string, string) (string, error)) *MockCache_GetUploadID_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// IsLfsPartSynced provides a mock function with given fields: ctx, repoPath, oid, partSize, partNumber
-func (_m *MockCache) IsLfsPartSynced(ctx context.Context, repoPath string, oid string, partSize string, partNumber int) (bool, error) {
-	ret := _m.Called(ctx, repoPath, oid, partSize, partNumber)
+// IsLfsPartSynced provides a mock function with given fields: ctx, repoID, oid, partSize, partNumber
+func (_m *MockCache) IsLfsPartSynced(ctx context.Context, repoID int64, oid string, partSize string, partNumber int) (bool, error) {
+	ret := _m.Called(ctx, repoID, oid, partSize, partNumber)
 
 	if len(ret) == 0 {
 		panic("no return value specified for IsLfsPartSynced")
@@ -651,17 +592,17 @@ func (_m *MockCache) IsLfsPartSynced(ctx context.Context, repoPath string, oid s
 
 	var r0 bool
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, int) (bool, error)); ok {
-		return rf(ctx, repoPath, oid, partSize, partNumber)
+	if rf, ok := ret.Get(0).(func(context.Context, int64, string, string, int) (bool, error)); ok {
+		return rf(ctx, repoID, oid, partSize, partNumber)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, int) bool); ok {
-		r0 = rf(ctx, repoPath, oid, partSize, partNumber)
+	if rf, ok := ret.Get(0).(func(context.Context, int64, string, string, int) bool); ok {
+		r0 = rf(ctx, repoID, oid, partSize, partNumber)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, string, string, int) error); ok {
-		r1 = rf(ctx, repoPath, oid, partSize, partNumber)
+	if rf, ok := ret.Get(1).(func(context.Context, int64, string, string, int) error); ok {
+		r1 = rf(ctx, repoID, oid, partSize, partNumber)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -676,17 +617,17 @@ type MockCache_IsLfsPartSynced_Call struct {
 
 // IsLfsPartSynced is a helper method to define mock.On call
 //   - ctx context.Context
-//   - repoPath string
+//   - repoID int64
 //   - oid string
 //   - partSize string
 //   - partNumber int
-func (_e *MockCache_Expecter) IsLfsPartSynced(ctx interface{}, repoPath interface{}, oid interface{}, partSize interface{}, partNumber interface{}) *MockCache_IsLfsPartSynced_Call {
-	return &MockCache_IsLfsPartSynced_Call{Call: _e.mock.On("IsLfsPartSynced", ctx, repoPath, oid, partSize, partNumber)}
+func (_e *MockCache_Expecter) IsLfsPartSynced(ctx interface{}, repoID interface{}, oid interface{}, partSize interface{}, partNumber interface{}) *MockCache_IsLfsPartSynced_Call {
+	return &MockCache_IsLfsPartSynced_Call{Call: _e.mock.On("IsLfsPartSynced", ctx, repoID, oid, partSize, partNumber)}
 }
 
-func (_c *MockCache_IsLfsPartSynced_Call) Run(run func(ctx context.Context, repoPath string, oid string, partSize string, partNumber int)) *MockCache_IsLfsPartSynced_Call {
+func (_c *MockCache_IsLfsPartSynced_Call) Run(run func(ctx context.Context, repoID int64, oid string, partSize string, partNumber int)) *MockCache_IsLfsPartSynced_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(string), args[4].(int))
+		run(args[0].(context.Context), args[1].(int64), args[2].(string), args[3].(string), args[4].(int))
 	})
 	return _c
 }
@@ -696,14 +637,14 @@ func (_c *MockCache_IsLfsPartSynced_Call) Return(_a0 bool, _a1 error) *MockCache
 	return _c
 }
 
-func (_c *MockCache_IsLfsPartSynced_Call) RunAndReturn(run func(context.Context, string, string, string, int) (bool, error)) *MockCache_IsLfsPartSynced_Call {
+func (_c *MockCache_IsLfsPartSynced_Call) RunAndReturn(run func(context.Context, int64, string, string, int) (bool, error)) *MockCache_IsLfsPartSynced_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// LfsPartSyncedCount provides a mock function with given fields: ctx, repoPath, oid, partSize
-func (_m *MockCache) LfsPartSyncedCount(ctx context.Context, repoPath string, oid string, partSize string) (int64, error) {
-	ret := _m.Called(ctx, repoPath, oid, partSize)
+// LfsPartSyncedCount provides a mock function with given fields: ctx, repoID, oid, partSize
+func (_m *MockCache) LfsPartSyncedCount(ctx context.Context, repoID int64, oid string, partSize string) (int64, error) {
+	ret := _m.Called(ctx, repoID, oid, partSize)
 
 	if len(ret) == 0 {
 		panic("no return value specified for LfsPartSyncedCount")
@@ -711,17 +652,17 @@ func (_m *MockCache) LfsPartSyncedCount(ctx context.Context, repoPath string, oi
 
 	var r0 int64
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, string) (int64, error)); ok {
-		return rf(ctx, repoPath, oid, partSize)
+	if rf, ok := ret.Get(0).(func(context.Context, int64, string, string) (int64, error)); ok {
+		return rf(ctx, repoID, oid, partSize)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, string) int64); ok {
-		r0 = rf(ctx, repoPath, oid, partSize)
+	if rf, ok := ret.Get(0).(func(context.Context, int64, string, string) int64); ok {
+		r0 = rf(ctx, repoID, oid, partSize)
 	} else {
 		r0 = ret.Get(0).(int64)
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, string, string) error); ok {
-		r1 = rf(ctx, repoPath, oid, partSize)
+	if rf, ok := ret.Get(1).(func(context.Context, int64, string, string) error); ok {
+		r1 = rf(ctx, repoID, oid, partSize)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -736,16 +677,16 @@ type MockCache_LfsPartSyncedCount_Call struct {
 
 // LfsPartSyncedCount is a helper method to define mock.On call
 //   - ctx context.Context
-//   - repoPath string
+//   - repoID int64
 //   - oid string
 //   - partSize string
-func (_e *MockCache_Expecter) LfsPartSyncedCount(ctx interface{}, repoPath interface{}, oid interface{}, partSize interface{}) *MockCache_LfsPartSyncedCount_Call {
-	return &MockCache_LfsPartSyncedCount_Call{Call: _e.mock.On("LfsPartSyncedCount", ctx, repoPath, oid, partSize)}
+func (_e *MockCache_Expecter) LfsPartSyncedCount(ctx interface{}, repoID interface{}, oid interface{}, partSize interface{}) *MockCache_LfsPartSyncedCount_Call {
+	return &MockCache_LfsPartSyncedCount_Call{Call: _e.mock.On("LfsPartSyncedCount", ctx, repoID, oid, partSize)}
 }
 
-func (_c *MockCache_LfsPartSyncedCount_Call) Run(run func(ctx context.Context, repoPath string, oid string, partSize string)) *MockCache_LfsPartSyncedCount_Call {
+func (_c *MockCache_LfsPartSyncedCount_Call) Run(run func(ctx context.Context, repoID int64, oid string, partSize string)) *MockCache_LfsPartSyncedCount_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(string))
+		run(args[0].(context.Context), args[1].(int64), args[2].(string), args[3].(string))
 	})
 	return _c
 }
@@ -755,7 +696,7 @@ func (_c *MockCache_LfsPartSyncedCount_Call) Return(_a0 int64, _a1 error) *MockC
 	return _c
 }
 
-func (_c *MockCache_LfsPartSyncedCount_Call) RunAndReturn(run func(context.Context, string, string, string) (int64, error)) *MockCache_LfsPartSyncedCount_Call {
+func (_c *MockCache_LfsPartSyncedCount_Call) RunAndReturn(run func(context.Context, int64, string, string) (int64, error)) *MockCache_LfsPartSyncedCount_Call {
 	_c.Call.Return(run)
 	return _c
 }

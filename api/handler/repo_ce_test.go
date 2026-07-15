@@ -18,8 +18,8 @@ func TestRepoHandler_MirrorFromSaas(t *testing.T) {
 
 		tester.WithParam("namespace", types.OpenCSGPrefix+"repo")
 		tester.WithKV("repo_type", types.ModelRepo)
-		tester.mocks.repo.EXPECT().MirrorFromSaas(
-			tester.Ctx(), "CSG_repo", "r", "u", types.ModelRepo,
+		tester.mocks.mirror.EXPECT().MirrorFromSaas(
+			tester.Ctx(), "CSG_repo", "r", types.ModelRepo,
 		).Return(nil)
 
 		tester.Execute()

@@ -41061,6 +41061,12 @@ const docTemplate = `{
                     "description": "source id for HF,github etc",
                     "type": "integer"
                 },
+                "private": {
+                    "type": "boolean"
+                },
+                "reject_existing_repo": {
+                    "type": "boolean"
+                },
                 "repo_type": {
                     "description": "repo basic info",
                     "allOf": [
@@ -41078,9 +41084,6 @@ const docTemplate = `{
                 "source_url": {
                     "description": "mirror source info",
                     "type": "string"
-                },
-                "sync_lfs": {
-                    "type": "boolean"
                 }
             }
         },
