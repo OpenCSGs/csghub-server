@@ -219,7 +219,14 @@
         "Qwen2ForSequenceClassification",
         "Qwen3ForSequenceClassification",
         "RobertaForSequenceClassification",
-        "XLMRobertaForSequenceClassification"
+        "XLMRobertaForSequenceClassification",
+        "Qwen3TTSForConditionalGeneration",
+        "FishSpeechSlowARForConditionalGeneration",
+        "VoxtralTTSForConditionalGeneration",
+        "CosyVoice3Model",
+        "OmniVoiceModel",
+        "VoxCPM2TalkerForConditionalGeneration",
+        "MossTTSNanoForCausalLM"
       ]
     },
     {

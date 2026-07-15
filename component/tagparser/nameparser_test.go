@@ -17,6 +17,7 @@ func TestLibraryTag(t *testing.T) {
 		{name: "pytorch", args: args{filePath: "pytorch_model_001.bin"}, want: "pytorch"},
 		{name: "pytorch", args: args{filePath: "model.pt"}, want: "pytorch"},
 		{name: "pytorch", args: args{filePath: "model.pth"}, want: "pytorch"},
+		{name: "pytorch checkpoint", args: args{filePath: "models/ldm/model.ckpt"}, want: "pytorch"},
 		{name: "not pytorch", args: args{filePath: "1-pytorch_model_001.bin"}, want: ""},
 		{name: "not pytorch", args: args{filePath: "pytorch_model-bin"}, want: ""},
 

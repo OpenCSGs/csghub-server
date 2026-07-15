@@ -98,6 +98,9 @@
   "Tag.I18nKey.text-to-speech": {
     "other": "文本转语音"
   },
+  "Tag.I18nKey.text-to-audio": {
+    "other": "文本转音频"
+  },
   "Tag.I18nKey.audio-classification": {
     "other": "音频分类"
   },

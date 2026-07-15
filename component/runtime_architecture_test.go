@@ -28,6 +28,37 @@ func TestRuntimeArchComponent_ListByRuntimeFrameworkID(t *testing.T) {
 
 }
 
+func TestRuntimeArchComponent_GetRuntimeFrameworks_AudioFlyModel(t *testing.T) {
+	ctx := context.TODO()
+	rc := initializeTestRuntimeArchComponent(ctx, t)
+	archs := []string{"AudioFlyModel"}
+	repo := database.Repository{
+		Name:   "AudioFly",
+		Path:   "iflytek/AudioFly",
+		MSPath: "iflytek/AudioFly",
+	}
+	expected := []database.RuntimeFramework{{
+		ID:          7,
+		FrameName:   "audiofly",
+		ModelFormat: "pytorch",
+	}}
+
+	rc.mocks.stores.RuntimeArchMock().EXPECT().
+		ListByArchNameAndModel(ctx, archs, "AudioFly").
+		Return([]database.RuntimeArchitecture{{
+			RuntimeFrameworkID: 7,
+			ModelName:          "AudioFly",
+		}}, nil)
+	rc.mocks.stores.RuntimeFrameworkMock().EXPECT().
+		ListByIDs(ctx, []int64{7}).
+		Return(expected, nil)
+
+	frames, err := rc.getRuntimeFrameworks(ctx, archs, repo, types.ModelType("pytorch"))
+
+	require.NoError(t, err)
+	require.Equal(t, expected, frames)
+}
+
 func TestRuntimeArchComponent_SetArchitectures(t *testing.T) {
 	ctx := context.TODO()
 	rc := initializeTestRuntimeArchComponent(ctx, t)

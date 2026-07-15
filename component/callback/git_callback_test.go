@@ -52,6 +52,12 @@ func TestGetPipelineTaskFromTags_Image2Image(t *testing.T) {
 	require.Equal(t, types.Image2Image, task)
 }
 
+func TestGetPipelineTaskFromTags_TextToAudio(t *testing.T) {
+	task := GetPipelineTaskFromTags([]database.Tag{{Name: string(types.TextToAudio)}})
+
+	require.Equal(t, types.TextToAudio, task)
+}
+
 func TestGitCallbackComponent_WatchSpaceChange(t *testing.T) {
 	ctx := mock.Anything
 	gc := initializeTestGitCallbackComponent(context.TODO(), t)

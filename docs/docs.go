@@ -44284,26 +44284,36 @@ const docTemplate = `{
             "enum": [
                 "text-generation",
                 "text-to-image",
+                "image-to-image",
                 "text-to-video",
                 "image-to-video",
                 "image-text-to-text",
                 "feature-extraction",
                 "sentence-similarity",
+                "text-ranking",
                 "task-auto-detection",
                 "video-text-to-text",
-                "text-to-speech"
+                "text-to-speech",
+                "text-to-audio",
+                "automatic-speech-recognition",
+                "auto-speech-recognition"
             ],
             "x-enum-varnames": [
                 "TextGeneration",
                 "Text2Image",
+                "Image2Image",
                 "Text2Video",
                 "Image2Video",
                 "ImageText2Text",
                 "FeatureExtraction",
                 "SentenceSimilarity",
+                "TextRanking",
                 "TaskAutoDetection",
                 "VideoText2Text",
-                "TextToSpeech"
+                "TextToSpeech",
+                "TextToAudio",
+                "AutomaticSpeechRecognition",
+                "AutoSpeechRecognition"
             ]
         },
         "types.Pointer": {

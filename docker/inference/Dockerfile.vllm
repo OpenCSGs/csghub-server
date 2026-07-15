@@ -1,6 +1,9 @@
 FROM vllm/vllm-openai:v0.24.0
 RUN pip config set global.index-url https://mirrors.aliyun.com/pypi/simple
 RUN pip install --no-cache-dir csghub-sdk==0.7.3 ray supervisor
+# vLLM-Omni adds text-to-speech serving (vllm serve --omni, /v1/audio/speech).
+# Its version must pair with the base vLLM version (v0.24.0).
+RUN pip install --no-cache-dir vllm-omni==0.24.0
 RUN sed -i 's|http://archive.ubuntu.com/ubuntu|http://mirrors.aliyun.com/ubuntu|g' /etc/apt/sources.list && \
     sed -i 's|http://security.ubuntu.com/ubuntu|http://mirrors.aliyun.com/ubuntu|g' /etc/apt/sources.list && \
     sed -i 's|http://ports.ubuntu.com/ubuntu-ports|http://mirrors.aliyun.com/ubuntu-ports|g' /etc/apt/sources.list && \

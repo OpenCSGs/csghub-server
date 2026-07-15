@@ -199,6 +199,12 @@ tags:
   built_in: true
 - category: task
   group: audio_processing
+  name: text-to-audio
+  scope: model
+  show_name: 文本转音频
+  built_in: true
+- category: task
+  group: audio_processing
   name: audio-classification
   scope: model
   show_name: 音频分类

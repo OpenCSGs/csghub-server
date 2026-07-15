@@ -40,6 +40,10 @@ type OpenAIComponent interface {
 	CheckBalance(ctx context.Context, nsUUID string) error
 	CheckUsageLimit(ctx context.Context, userUUID string, model *types.Model, endpoint string) error
 	CommitUsageLimit(ctx context.Context, userUUID string, model *types.Model, tokenCounter token.Counter) error
+	// CanManageModel reports whether the user can manage the given model
+	// (e.g. upload or delete voices of a TTS deployment): only the deploy
+	// owner and platform admins are allowed.
+	CanManageModel(ctx context.Context, username, nsUUID string, model *types.Model) (bool, error)
 }
 
 type openaiComponentImpl struct {
@@ -627,6 +631,26 @@ func (m *openaiComponentImpl) resolveUsageMeteringInfo(c context.Context, nsUUID
 	default:
 		return usageMeteringInfo{}, fmt.Errorf("model metadata %s has unsupported value %s", types.MetaKeyLLMType, llmType)
 	}
+}
+
+func (m *openaiComponentImpl) CanManageModel(ctx context.Context, username, nsUUID string, model *types.Model) (bool, error) {
+	// A nil model indicates a caller bug (target resolution failed upstream),
+	// not a permission decision; surface it as an error instead of a 403.
+	if model == nil {
+		return false, fmt.Errorf("model is nil")
+	}
+	user, err := m.userStore.FindByUsername(ctx, username)
+	if err != nil {
+		return false, fmt.Errorf("failed to find user by username in db, error: %w", err)
+	}
+	if user.CanAdmin() {
+		return true, nil
+	}
+	if model.OwnerUUID == "" {
+		// External models have no deploy owner; only admins can manage them.
+		return false, nil
+	}
+	return model.OwnerUUID == nsUUID || model.OwnerUUID == user.UUID, nil
 }
 
 func (m *openaiComponentImpl) resolveUsageOwnerType(c context.Context, nsUUID string, model *types.Model) (commontypes.TokenUsageType, error) {

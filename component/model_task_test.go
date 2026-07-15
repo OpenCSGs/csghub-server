@@ -41,3 +41,9 @@ func TestGetBuiltInTaskFromTags_TextRanking(t *testing.T) {
 
 	require.Equal(t, string(types.TextRanking), task)
 }
+
+func TestGetBuiltInTaskFromTags_TextToAudio(t *testing.T) {
+	task := GetBuiltInTaskFromTags([]database.Tag{{Name: string(types.TextToAudio)}})
+
+	require.Equal(t, string(types.TextToAudio), task)
+}

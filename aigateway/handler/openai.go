@@ -65,6 +65,18 @@ type OpenAIHandler interface {
 	GetVideoContent(c *gin.Context)
 	// Transcribe audio to text
 	Transcription(c *gin.Context)
+	// Generate speech audio from text
+	Speech(c *gin.Context)
+	// Generate speech audio for multiple texts in a single request
+	SpeechBatch(c *gin.Context)
+	// List available voices of a text-to-speech model
+	ListVoices(c *gin.Context)
+	// Upload a voice sample for voice cloning
+	UploadVoice(c *gin.Context)
+	// Update an uploaded voice sample by name
+	UpdateVoice(c *gin.Context)
+	// Delete an uploaded voice sample by name
+	DeleteVoice(c *gin.Context)
 	// Set chat attempt failure reporter
 	SetChatAttemptFailureReporter(reporter ChatAttemptFailureReporter)
 	// Shutdown releases handler-owned resources.

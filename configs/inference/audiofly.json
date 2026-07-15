@@ -1,0 +1,15 @@
+{
+  "engine_name": "audiofly",
+  "enabled": 1,
+  "container_port": 8000,
+  "model_format": "pytorch",
+  "engine_images": [
+    {
+      "compute_type": "gpu",
+      "image": "opencsghq/audiofly:1.0",
+      "driver_version": "12.1",
+      "engine_version": "1.0"
+    }
+  ],
+  "supported_models": ["AudioFly"]
+}

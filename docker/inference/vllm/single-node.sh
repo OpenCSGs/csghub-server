@@ -9,6 +9,24 @@ fi
 #LimitedMaxToken is gpu_num multiplied by 4096
 LimitedMaxToken=$(($GPU_NUM * 5120))
 GPU_MEMORY_UTILIZATION=0.9
+
+# text-to-speech models are served by vLLM-Omni (vllm serve --omni), which
+# exposes the OpenAI-compatible speech API at /v1/audio/speech.
+if [ "$HF_TASK" == "text-to-speech" ]; then
+    OMNI_ARGS="--trust-remote-code"
+    if [[ ! $ENGINE_ARGS == *"--tensor-parallel-size"* ]]; then
+        OMNI_ARGS="$OMNI_ARGS --tensor-parallel-size $GPU_NUM"
+    fi
+    if [ "${VLLM_ENFORCE_EAGER}" = "true" ] || [ "${VLLM_ENFORCE_EAGER}" = "1" ]; then
+        OMNI_ARGS="$OMNI_ARGS --enforce-eager"
+        echo "Enabled --enforce-eager via env var."
+    fi
+    # Do not force --gpu-memory-utilization or --max-model-len here: omni
+    # pipelines are multi-stage and manage per-stage memory themselves
+    # (tunable via --stage-overrides in custom engine args).
+    exec vllm serve "$REPO_ID" --omni $ENGINE_ARGS $OMNI_ARGS
+fi
+
 ENGINE_ARGS="$ENGINE_ARGS --trust-remote-code --model $REPO_ID"
 if [[ ! $ENGINE_ARGS == *"--tensor-parallel-size"* ]]; then
     ENGINE_ARGS="$ENGINE_ARGS --tensor-parallel-size $GPU_NUM"
