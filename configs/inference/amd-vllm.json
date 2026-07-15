@@ -408,7 +408,14 @@
     "Qwen2ForSequenceClassification",
     "Qwen3ForSequenceClassification",
     "RobertaForSequenceClassification",
-    "XLMRobertaForSequenceClassification"
+    "XLMRobertaForSequenceClassification",
+    "Qwen3TTSForConditionalGeneration",
+    "FishSpeechSlowARForConditionalGeneration",
+    "VoxtralTTSForConditionalGeneration",
+    "CosyVoice3Model",
+    "OmniVoiceModel",
+    "VoxCPM2TalkerForConditionalGeneration",
+    "MossTTSNanoForCausalLM"
   ],
   "tool_call_parsers": {
     "DeepseekR1ForCausalLM": "deepseek_r1",

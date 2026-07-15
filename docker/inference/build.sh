@@ -50,6 +50,14 @@ case "${IMAGE%:*}" in
     PLATFORMS="linux/amd64"
     DOCKERFILE="Dockerfile.tgi"
     ;;
+  audiofly)
+    PLATFORMS="linux/amd64"
+    DOCKERFILE="Dockerfile.audiofly"
+    ;;
+  audiofly-rocm)
+    PLATFORMS="linux/amd64"
+    DOCKERFILE="Dockerfile.audiofly-rocm"
+    ;;
 esac
 
 docker buildx build --platform ${PLATFORMS} \

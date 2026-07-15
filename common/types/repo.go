@@ -119,6 +119,7 @@ const (
 	TaskAutoDetection  PipelineTask = "task-auto-detection"
 	VideoText2Text     PipelineTask = "video-text-to-text"
 	TextToSpeech       PipelineTask = "text-to-speech"
+	TextToAudio        PipelineTask = "text-to-audio"
 	// AutomaticSpeechRecognition is the Hugging Face pipeline task name. Keep
 	// AutoSpeechRecognition as a legacy tag alias for existing seeded data.
 	AutomaticSpeechRecognition PipelineTask    = "automatic-speech-recognition"

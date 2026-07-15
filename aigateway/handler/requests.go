@@ -282,6 +282,195 @@ func (r RerankRequest) MarshalJSON() ([]byte, error) {
 	return json.Marshal(knownFields)
 }
 
+// SpeechRequest represents an OpenAI-compatible text-to-speech request
+// (POST /v1/audio/speech, served by vLLM-Omni and other TTS backends).
+// Backend-specific extension fields (task_type, language, instructions,
+// ref_audio, ref_text, ...) are preserved in RawJSON and passed through.
+type SpeechRequest struct {
+	Model          string  `json:"model"`
+	Input          string  `json:"input"`
+	Voice          string  `json:"voice,omitempty"`
+	ResponseFormat string  `json:"response_format,omitempty"`
+	Speed          float64 `json:"speed,omitempty"`
+	Stream         bool    `json:"stream,omitempty"`
+	StreamFormat   string  `json:"stream_format,omitempty"`
+	// RawJSON stores all unknown fields during unmarshaling
+	RawJSON json.RawMessage `json:"-"`
+}
+
+func (r *SpeechRequest) UnmarshalJSON(data []byte) error {
+	// Create a temporary struct to hold the known fields
+	type TempSpeechRequest SpeechRequest
+
+	// First, unmarshal into the temporary struct
+	var temp TempSpeechRequest
+	if err := json.Unmarshal(data, &temp); err != nil {
+		return err
+	}
+
+	// Then, unmarshal into a map to get all fields
+	var allFields map[string]json.RawMessage
+	if err := json.Unmarshal(data, &allFields); err != nil {
+		return err
+	}
+
+	// Remove known fields from the map
+	delete(allFields, "model")
+	delete(allFields, "input")
+	delete(allFields, "voice")
+	delete(allFields, "response_format")
+	delete(allFields, "speed")
+	delete(allFields, "stream")
+	delete(allFields, "stream_format")
+
+	// If there are any unknown fields left, marshal them into RawJSON
+	var rawJSON []byte
+	var err error
+	if len(allFields) > 0 {
+		rawJSON, err = json.Marshal(allFields)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Assign the temporary struct to the original and set RawJSON
+	*r = SpeechRequest(temp)
+	r.RawJSON = rawJSON
+	return nil
+}
+
+func (r SpeechRequest) MarshalJSON() ([]byte, error) {
+	// First, marshal the known fields
+	type TempSpeechRequest SpeechRequest
+	data, err := json.Marshal(TempSpeechRequest(r))
+	if err != nil {
+		return nil, err
+	}
+
+	// If there are no raw JSON fields, just return the known fields
+	if len(r.RawJSON) == 0 {
+		return data, nil
+	}
+
+	// Parse the known fields back into a map
+	var knownFields map[string]json.RawMessage
+	if err := json.Unmarshal(data, &knownFields); err != nil {
+		return nil, err
+	}
+
+	// Parse the raw JSON fields into a map
+	var rawFields map[string]json.RawMessage
+	if err := json.Unmarshal(r.RawJSON, &rawFields); err != nil {
+		return nil, err
+	}
+
+	// Merge the raw fields into the known fields
+	for k, v := range rawFields {
+		knownFields[k] = v
+	}
+
+	// Marshal the merged map back into JSON
+	return json.Marshal(knownFields)
+}
+
+// BatchSpeechRequest represents an OpenAI-compatible batch text-to-speech
+// request (POST /v1/audio/speech/batch). Items and batch-level defaults are
+// passed through unchanged; only the model field is rewritten.
+type BatchSpeechRequest struct {
+	Model string            `json:"model"`
+	Items []json.RawMessage `json:"items"`
+	// RawJSON stores all unknown fields during unmarshaling
+	RawJSON json.RawMessage `json:"-"`
+}
+
+// InputTexts extracts the text of every item for moderation and fallback
+// billing purposes.
+func (r *BatchSpeechRequest) InputTexts() []string {
+	texts := make([]string, 0, len(r.Items))
+	for _, item := range r.Items {
+		var parsed struct {
+			Input string `json:"input"`
+		}
+		if err := json.Unmarshal(item, &parsed); err != nil {
+			continue
+		}
+		if parsed.Input != "" {
+			texts = append(texts, parsed.Input)
+		}
+	}
+	return texts
+}
+
+func (r *BatchSpeechRequest) UnmarshalJSON(data []byte) error {
+	// Create a temporary struct to hold the known fields
+	type TempBatchSpeechRequest BatchSpeechRequest
+
+	// First, unmarshal into the temporary struct
+	var temp TempBatchSpeechRequest
+	if err := json.Unmarshal(data, &temp); err != nil {
+		return err
+	}
+
+	// Then, unmarshal into a map to get all fields
+	var allFields map[string]json.RawMessage
+	if err := json.Unmarshal(data, &allFields); err != nil {
+		return err
+	}
+
+	// Remove known fields from the map
+	delete(allFields, "model")
+	delete(allFields, "items")
+
+	// If there are any unknown fields left, marshal them into RawJSON
+	var rawJSON []byte
+	var err error
+	if len(allFields) > 0 {
+		rawJSON, err = json.Marshal(allFields)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Assign the temporary struct to the original and set RawJSON
+	*r = BatchSpeechRequest(temp)
+	r.RawJSON = rawJSON
+	return nil
+}
+
+func (r BatchSpeechRequest) MarshalJSON() ([]byte, error) {
+	// First, marshal the known fields
+	type TempBatchSpeechRequest BatchSpeechRequest
+	data, err := json.Marshal(TempBatchSpeechRequest(r))
+	if err != nil {
+		return nil, err
+	}
+
+	// If there are no raw JSON fields, just return the known fields
+	if len(r.RawJSON) == 0 {
+		return data, nil
+	}
+
+	// Parse the known fields back into a map
+	var knownFields map[string]json.RawMessage
+	if err := json.Unmarshal(data, &knownFields); err != nil {
+		return nil, err
+	}
+
+	// Parse the raw JSON fields into a map
+	var rawFields map[string]json.RawMessage
+	if err := json.Unmarshal(r.RawJSON, &rawFields); err != nil {
+		return nil, err
+	}
+
+	// Merge the raw fields into the known fields
+	for k, v := range rawFields {
+		knownFields[k] = v
+	}
+
+	// Marshal the merged map back into JSON
+	return json.Marshal(knownFields)
+}
+
 // ImageGenerationRequest represents an image generation request structure
 type ImageGenerationRequest struct {
 	openai.ImageGenerateParams

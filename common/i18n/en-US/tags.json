@@ -98,6 +98,9 @@
   "Tag.I18nKey.text-to-speech": {
     "other": "text to speech"
   },
+  "Tag.I18nKey.text-to-audio": {
+    "other": "text to audio"
+  },
   "Tag.I18nKey.audio-classification": {
     "other": "audio classification"
   },

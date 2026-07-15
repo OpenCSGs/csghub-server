@@ -8,9 +8,7 @@ import (
 	context "context"
 
 	mock "github.com/stretchr/testify/mock"
-
 	token "opencsg.com/csghub-server/aigateway/token"
-
 	types "opencsg.com/csghub-server/aigateway/types"
 )
 
@@ -86,6 +84,65 @@ func (_c *MockOpenAIComponent_BuildUsageMeteringEvent_Call) Return(_a0 *commonty
 }
 
 func (_c *MockOpenAIComponent_BuildUsageMeteringEvent_Call) RunAndReturn(run func(context.Context, string, *types.Model, string, *token.Usage, string) (*commontypes.MeteringEvent, error)) *MockOpenAIComponent_BuildUsageMeteringEvent_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// CanManageModel provides a mock function with given fields: ctx, username, nsUUID, model
+func (_m *MockOpenAIComponent) CanManageModel(ctx context.Context, username string, nsUUID string, model *types.Model) (bool, error) {
+	ret := _m.Called(ctx, username, nsUUID, model)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CanManageModel")
+	}
+
+	var r0 bool
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, *types.Model) (bool, error)); ok {
+		return rf(ctx, username, nsUUID, model)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, *types.Model) bool); ok {
+		r0 = rf(ctx, username, nsUUID, model)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, *types.Model) error); ok {
+		r1 = rf(ctx, username, nsUUID, model)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockOpenAIComponent_CanManageModel_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CanManageModel'
+type MockOpenAIComponent_CanManageModel_Call struct {
+	*mock.Call
+}
+
+// CanManageModel is a helper method to define mock.On call
+//   - ctx context.Context
+//   - username string
+//   - nsUUID string
+//   - model *types.Model
+func (_e *MockOpenAIComponent_Expecter) CanManageModel(ctx interface{}, username interface{}, nsUUID interface{}, model interface{}) *MockOpenAIComponent_CanManageModel_Call {
+	return &MockOpenAIComponent_CanManageModel_Call{Call: _e.mock.On("CanManageModel", ctx, username, nsUUID, model)}
+}
+
+func (_c *MockOpenAIComponent_CanManageModel_Call) Run(run func(ctx context.Context, username string, nsUUID string, model *types.Model)) *MockOpenAIComponent_CanManageModel_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(*types.Model))
+	})
+	return _c
+}
+
+func (_c *MockOpenAIComponent_CanManageModel_Call) Return(_a0 bool, _a1 error) *MockOpenAIComponent_CanManageModel_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockOpenAIComponent_CanManageModel_Call) RunAndReturn(run func(context.Context, string, string, *types.Model) (bool, error)) *MockOpenAIComponent_CanManageModel_Call {
 	_c.Call.Return(run)
 	return _c
 }

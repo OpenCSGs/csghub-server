@@ -14,6 +14,7 @@ const (
 	modalTraceOutputImage              = "image"
 	modalTraceOutputText               = "text"
 	modalTraceOutputVideo              = "video"
+	modalTraceOutputAudio              = "audio"
 )
 
 type modalTraceStartInput struct {

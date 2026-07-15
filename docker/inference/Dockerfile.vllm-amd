@@ -4,6 +4,9 @@ RUN pip install --no-cache-dir csghub-sdk==0.7.3 ray supervisor
 RUN sed -i 's|http://archive.ubuntu.com/ubuntu|http://mirrors.aliyun.com/ubuntu|g' /etc/apt/sources.list && \
     sed -i 's|http://security.ubuntu.com/ubuntu|http://mirrors.aliyun.com/ubuntu|g' /etc/apt/sources.list && \
     apt-get update && apt-get install -y supervisor
+# vLLM-Omni adds text-to-speech serving (vllm serve --omni, /v1/audio/speech).
+# Its version must pair with the base vLLM version (v0.24.0).
+RUN pip install --no-cache-dir vllm-omni==0.24.0
 RUN mkdir -p /var/log/supervisord
 COPY ./supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 COPY ./vllm/ /etc/csghub/

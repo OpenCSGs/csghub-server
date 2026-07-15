@@ -397,6 +397,63 @@ func TestOpenAIComponentImpl_getCSGHubModels_SkipsDeploysWithMissingRelations(t 
 	assert.Equal(t, "valid-endpoint", models[0].Endpoint)
 }
 
+func TestOpenAIComponent_CanManageModel(t *testing.T) {
+	ctx := context.Background()
+	model := &types.Model{
+		InternalModelInfo: types.InternalModelInfo{
+			OwnerUUID: "owner-uuid",
+		},
+	}
+
+	t.Run("admin can manage any model", func(t *testing.T) {
+		mockUserStore := mockdb.NewMockUserStore(t)
+		comp := &openaiComponentImpl{userStore: mockUserStore}
+		mockUserStore.EXPECT().FindByUsername(ctx, "adminuser").Return(database.User{UUID: "admin-uuid", RoleMask: "admin"}, nil).Once()
+
+		allowed, err := comp.CanManageModel(ctx, "adminuser", "admin-uuid", model)
+		require.NoError(t, err)
+		assert.True(t, allowed)
+	})
+
+	t.Run("deploy owner can manage", func(t *testing.T) {
+		mockUserStore := mockdb.NewMockUserStore(t)
+		comp := &openaiComponentImpl{userStore: mockUserStore}
+		mockUserStore.EXPECT().FindByUsername(ctx, "owner").Return(database.User{UUID: "owner-uuid"}, nil).Once()
+
+		allowed, err := comp.CanManageModel(ctx, "owner", "owner-uuid", model)
+		require.NoError(t, err)
+		assert.True(t, allowed)
+	})
+
+	t.Run("other user is denied", func(t *testing.T) {
+		mockUserStore := mockdb.NewMockUserStore(t)
+		comp := &openaiComponentImpl{userStore: mockUserStore}
+		mockUserStore.EXPECT().FindByUsername(ctx, "other").Return(database.User{UUID: "other-uuid"}, nil).Once()
+
+		allowed, err := comp.CanManageModel(ctx, "other", "other-uuid", model)
+		require.NoError(t, err)
+		assert.False(t, allowed)
+	})
+
+	t.Run("external model without owner denies non-admin", func(t *testing.T) {
+		mockUserStore := mockdb.NewMockUserStore(t)
+		comp := &openaiComponentImpl{userStore: mockUserStore}
+		mockUserStore.EXPECT().FindByUsername(ctx, "someone").Return(database.User{UUID: "someone-uuid"}, nil).Once()
+
+		allowed, err := comp.CanManageModel(ctx, "someone", "someone-uuid", &types.Model{})
+		require.NoError(t, err)
+		assert.False(t, allowed)
+	})
+
+	t.Run("nil model returns error instead of permission decision", func(t *testing.T) {
+		comp := &openaiComponentImpl{}
+
+		allowed, err := comp.CanManageModel(ctx, "someone", "someone-uuid", nil)
+		require.Error(t, err)
+		assert.False(t, allowed)
+	})
+}
+
 func TestOpenAIComponent_checkOrganization(t *testing.T) {
 	mockUserStore := mockdb.NewMockUserStore(t)
 	mockOrgStore := mockdb.NewMockOrgStore(t)

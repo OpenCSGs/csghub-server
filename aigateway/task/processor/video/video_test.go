@@ -51,6 +51,10 @@ func (c *fakeOpenAIComponent) CheckUsageLimit(ctx context.Context, userUUID stri
 	return nil
 }
 
+func (c *fakeOpenAIComponent) CanManageModel(ctx context.Context, username, nsUUID string, model *aigwtypes.Model) (bool, error) {
+	return false, nil
+}
+
 func (c *fakeOpenAIComponent) CommitUsageLimit(ctx context.Context, userUUID string, model *aigwtypes.Model, tokenCounter token.Counter) error {
 	return nil
 }
