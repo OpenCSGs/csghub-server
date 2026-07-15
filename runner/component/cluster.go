@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"math"
+	"strconv"
 	"time"
 
 	"opencsg.com/csghub-server/builder/deploy/cluster"
@@ -181,13 +182,14 @@ func (c *clusterComponentImpl) collectResourceByID(ctx context.Context, clusterI
 	}
 	clusterInfo.ResourceStatus = availabilityStatus
 	clusterInfo.VXPUConfig = map[string]string{
-		types.ClusterCFGKubeSchedulerKey:        c.cfg.Runner.KubeScheduler,
-		types.ClusterCFGVolcanoQueueKey:         c.cfg.Runner.Volcano.Queue,
-		types.ClusterCFGVGPUNodeResourceNameKey: c.cfg.Runner.VGPUNodeResourceName,
-		types.ClusterCFGVGPUPodResourceNameKey:  c.cfg.Runner.VGPUPodResourceName,
-		types.ClusterCFGVGPUResourceReqKey:      c.cfg.Runner.VGPUResourceReqKey,
-		types.ClusterCFGVGPUMemoryReqKey:        c.cfg.Runner.VGPUMemoryReqKey,
-		types.ClusterCFGVGPUMemoryScalingFactor: fmt.Sprintf("%d", c.cfg.Runner.VGPUMemoryScalingFactor),
+		types.ClusterCFGKubeSchedulerKey:            c.cfg.Runner.KubeScheduler,
+		types.ClusterCFGVolcanoQueueKey:             c.cfg.Runner.Volcano.Queue,
+		types.ClusterCFGVGPUNodeResourceNameKey:     c.cfg.Runner.VGPUNodeResourceName,
+		types.ClusterCFGVGPUPodResourceNameKey:      c.cfg.Runner.VGPUPodResourceName,
+		types.ClusterCFGVGPUResourceReqKey:          c.cfg.Runner.VGPUResourceReqKey,
+		types.ClusterCFGVGPUMemoryReqKey:            c.cfg.Runner.VGPUMemoryReqKey,
+		types.ClusterCFGVGPUMemoryScalingFactor:     fmt.Sprintf("%d", c.cfg.Runner.VGPUMemoryScalingFactor),
+		types.ClusterCFGAllowCPUResScheduleToGPUNode: strconv.FormatBool(c.cfg.Cluster.AllowCPUResScheduleToGPUNode),
 	}
 	return &clusterInfo, nil
 }

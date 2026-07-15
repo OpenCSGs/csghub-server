@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strconv"
 
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/errorx"
@@ -128,17 +129,17 @@ func CheckResource(clusterResources *types.ClusterRes, hardware *types.HardWare,
 		}
 	}
 	if hardware.Replicas > 1 {
-		return checkMultiNodeResource(clusterResources, hardware, config)
+		return checkMultiNodeResource(clusterResources, hardware)
 	} else {
-		return checkSingleNodeResource(clusterResources, hardware, config)
+		return checkSingleNodeResource(clusterResources, hardware)
 	}
 }
 
 // check resource for sigle node
-func checkSingleNodeResource(clusterResources *types.ClusterRes, hardware *types.HardWare, config *config.Config) (bool, []types.ResourceAvailableStatus) {
+func checkSingleNodeResource(clusterResources *types.ClusterRes, hardware *types.HardWare) (bool, []types.ResourceAvailableStatus) {
 	var availableStatusList []types.ResourceAvailableStatus
 	for _, node := range clusterResources.Resources {
-		availableStatus := checkNodeResource(node, hardware, config, clusterResources.VXPUConfig)
+		availableStatus := checkNodeResource(node, hardware, clusterResources.VXPUConfig)
 		availableStatusList = append(availableStatusList, availableStatus)
 		if availableStatus.Available {
 			// if true return, otherwise continue check next node
@@ -148,11 +149,11 @@ func checkSingleNodeResource(clusterResources *types.ClusterRes, hardware *types
 	return false, availableStatusList
 }
 
-func checkMultiNodeResource(clusterResources *types.ClusterRes, hardware *types.HardWare, config *config.Config) (bool, []types.ResourceAvailableStatus) {
+func checkMultiNodeResource(clusterResources *types.ClusterRes, hardware *types.HardWare) (bool, []types.ResourceAvailableStatus) {
 	var availableStatusList []types.ResourceAvailableStatus
 	ready := 0
 	for _, node := range clusterResources.Resources {
-		availableStatus := checkNodeResource(node, hardware, config, clusterResources.VXPUConfig)
+		availableStatus := checkNodeResource(node, hardware, clusterResources.VXPUConfig)
 		availableStatusList = append(availableStatusList, availableStatus)
 		if availableStatus.Available {
 			ready++
@@ -180,4 +181,13 @@ func isCPUOnlyWorkload(hardware *types.HardWare) bool {
 
 func isXPUNode(node types.NodeResourceInfo) bool {
 	return node.HasXPU()
+}
+
+func isAllowCPUResScheduleToGPUNode(vxpuConfig map[string]string) bool {
+	val, ok := vxpuConfig[types.ClusterCFGAllowCPUResScheduleToGPUNode]
+	if !ok {
+		return false
+	}
+	b, _ := strconv.ParseBool(val)
+	return b
 }
