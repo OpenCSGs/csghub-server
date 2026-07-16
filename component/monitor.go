@@ -13,6 +13,7 @@ import (
 	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 	rtypes "opencsg.com/csghub-server/runner/types"
 )
@@ -29,6 +30,7 @@ type monitorComponentImpl struct {
 	userSvcClient   rpc.UserSvcClient
 	deployTaskStore database.DeployTaskStore
 	repoStore       database.RepoStore
+	workflowStore   database.ArgoWorkFlowStore
 	k8sNameSpace    string
 	deployer        deploy.Deployer
 	metrics         metricNames
@@ -53,6 +55,7 @@ func NewMonitorComponent(cfg *config.Config) (MonitorComponent, error) {
 		userSvcClient:   usc,
 		deployTaskStore: database.NewDeployTaskStore(),
 		repoStore:       database.NewRepoStore(),
+		workflowStore:   database.NewArgoWorkFlowStore(),
 		deployer:        deploy.NewDeployer(),
 		metrics: metricNames{
 			cpuUsage:       cfg.Prometheus.CPUUsageMetric,
@@ -356,7 +359,7 @@ func (m *monitorComponentImpl) getMetrics(metrics map[string]string) map[string]
 }
 
 func (m *monitorComponentImpl) hasPermission(ctx context.Context, req *types.MonitorReq) (bool, error, string, string) {
-	if req.DeployType == "evaluation" {
+	if req.DeployType == string(types.TaskTypeEvaluation) {
 		return m.hasPermissionForEval(ctx, req)
 	} else {
 		return m.hasPermissionForDeploy(ctx, req)
@@ -404,30 +407,15 @@ func (m *monitorComponentImpl) hasPermissionForDeploy(ctx context.Context, req *
 }
 
 func (m *monitorComponentImpl) hasPermissionForEval(ctx context.Context, req *types.MonitorReq) (bool, error, string, string) {
-	user, err := m.userSvcClient.GetUserInfo(ctx, req.CurrentUser, req.CurrentUser)
+	wf, err := m.workflowStore.FindByID(ctx, req.DeployID)
 	if err != nil {
-		return false, fmt.Errorf("failed to get user %s info error: %w", req.CurrentUser, err), "", ""
+		return false, fmt.Errorf("failed to get argo workflow by id %d, error: %w", req.DeployID, err), "", ""
 	}
-	if user == nil {
-		return false, fmt.Errorf("user %s not found", req.CurrentUser), "", ""
-	}
-	dbUser := &database.User{
-		RoleMask: strings.Join(user.Roles, ","),
-	}
-	isAdmin := dbUser.CanAdmin()
-	req2 := types.EvaluationGetReq{
-		ID:       req.DeployID,
-		Username: req.CurrentUser,
-	}
-	wf, err := m.deployer.GetEvaluation(ctx, req2)
+
+	_, err = checkOwnerOrOrgMemberPermission(ctx, m.userSvcClient, req.CurrentUser, wf.UserUUID)
 	if err != nil {
-		return false, fmt.Errorf("fail to get evaluation result, %w", err), "", ""
+		return false, errorx.ErrForbidden, "", ""
 	}
-	if isAdmin {
-		return true, nil, wf.Namespace, "main"
-	}
-	if wf.Username != user.Username {
-		return false, nil, "", ""
-	}
-	return true, nil, wf.Namespace, "main"
+
+	return true, nil, wf.Namespace, rtypes.MainContainerName
 }

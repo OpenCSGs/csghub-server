@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/deploy"
 	prometheus_mock "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/prometheus"
 	mock_rpc "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/rpc"
 	mockdb "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/database"
@@ -144,6 +143,7 @@ func NewTestMonitorComponent(cfg *config.Config,
 	usc rpc.UserSvcClient,
 	deployTaskStore database.DeployTaskStore,
 	repoStore database.RepoStore,
+	workflowStore database.ArgoWorkFlowStore,
 	deployer deployer.Deployer,
 	metrics metricNames,
 ) (MonitorComponent, error) {
@@ -153,6 +153,7 @@ func NewTestMonitorComponent(cfg *config.Config,
 		userSvcClient:   usc,
 		deployTaskStore: deployTaskStore,
 		repoStore:       repoStore,
+		workflowStore:   workflowStore,
 		deployer:        deployer,
 		metrics:         metrics,
 	}, nil
@@ -215,7 +216,7 @@ func TestMonitor_RequestLatency(t *testing.T) {
 		},
 	}, nil)
 
-	mon, err := NewTestMonitorComponent(cfg, client, usc, deployTaskStore, repoStore, nil, defaultTestMetrics)
+	mon, err := NewTestMonitorComponent(cfg, client, usc, deployTaskStore, repoStore, nil, nil, defaultTestMetrics)
 	require.Nil(t, err)
 
 	resp, err := mon.RequestLatency(ctx, req)
@@ -295,7 +296,7 @@ func TestMonitor_RequestCount(t *testing.T) {
 		},
 	}, nil)
 
-	mon, err := NewTestMonitorComponent(cfg, client, usc, deployTaskStore, repoStore, nil, defaultTestMetrics)
+	mon, err := NewTestMonitorComponent(cfg, client, usc, deployTaskStore, repoStore, nil, nil, defaultTestMetrics)
 	require.Nil(t, err)
 
 	resp, err := mon.RequestCount(ctx, req)
@@ -379,7 +380,7 @@ func TestMonitor_MemoryUsage(t *testing.T) {
 		},
 	}, nil)
 
-	mon, err := NewTestMonitorComponent(cfg, client, usc, deployTaskStore, repoStore, nil, defaultTestMetrics)
+	mon, err := NewTestMonitorComponent(cfg, client, usc, deployTaskStore, repoStore, nil, nil, defaultTestMetrics)
 	require.Nil(t, err)
 
 	resp, err := mon.MemoryUsage(ctx, req)
@@ -423,28 +424,23 @@ func TestMonitor_MemoryUsage_Evaluation(t *testing.T) {
 	client := prometheus_mock.NewMockPrometheusClient(t)
 	deployTaskStore := mockdb.NewMockDeployTaskStore(t)
 	repoStore := mockdb.NewMockRepoStore(t)
-	mockDeployer := deploy.NewMockDeployer(t)
+	mockWorkflowStore := mockdb.NewMockArgoWorkFlowStore(t)
 
-	usc.EXPECT().GetUserInfo(ctx, req.CurrentUser, req.CurrentUser).Return(&rpc.User{
+	usc.EXPECT().GetUserByName(ctx, req.CurrentUser).Return(&types.User{
 		ID:       1,
 		Username: req.CurrentUser,
+		UUID:     "user-uuid-1",
 		Roles:    []string{"person"},
 	}, nil)
-	req2 := types.EvaluationGetReq{
-		ID:       1,
-		Username: "user",
-	}
-	mockDeployer.EXPECT().GetEvaluation(ctx, req2).Return(&types.ArgoWorkFlowRes{
+	mockWorkflowStore.EXPECT().FindByID(ctx, req.DeployID).Return(database.ArgoWorkflow{
 		ID:        1,
-		RepoIds:   []string{"Rowan/hellaswag"},
-		Datasets:  []string{"Rowan/hellaswag"},
-		RepoType:  "model",
 		Username:  "user",
-		TaskName:  "test",
-		TaskId:    "test",
-		TaskType:  "evaluation",
-		Status:    "Succeed",
+		UserUUID:  "user-uuid-1",
 		Namespace: "",
+	}, nil)
+	usc.EXPECT().GetNameSpaceInfoByUUID(ctx, "user-uuid-1").Return(&rpc.Namespace{
+		Path:   "user",
+		NSType: "user",
 	}, nil)
 
 	query := fmt.Sprintf("avg_over_time(container_memory_usage_bytes{pod='%s',namespace='%s',container='main'}[%s:])[%s:%s]",
@@ -469,7 +465,7 @@ func TestMonitor_MemoryUsage_Evaluation(t *testing.T) {
 		},
 	}, nil)
 
-	mon, err := NewTestMonitorComponent(cfg, client, usc, deployTaskStore, repoStore, mockDeployer, defaultTestMetrics)
+	mon, err := NewTestMonitorComponent(cfg, client, usc, deployTaskStore, repoStore, mockWorkflowStore, nil, defaultTestMetrics)
 	require.Nil(t, err)
 
 	resp, err := mon.MemoryUsage(ctx, req)
@@ -570,7 +566,7 @@ func TestMonitor_CPUUsage(t *testing.T) {
 		},
 	}, nil)
 
-	mon, err := NewTestMonitorComponent(cfg, client, usc, deployTaskStore, repoStore, nil, defaultTestMetrics)
+	mon, err := NewTestMonitorComponent(cfg, client, usc, deployTaskStore, repoStore, nil, nil, defaultTestMetrics)
 	require.Nil(t, err)
 
 	resp, err := mon.CPUUsage(ctx, req)

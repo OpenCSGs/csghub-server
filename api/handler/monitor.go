@@ -248,7 +248,7 @@ func getEvaluationParameters(ctx *gin.Context) (*types.MonitorReq, error) {
 		CurrentUser:  currentUser,
 		RepoType:     repoType,
 		DeployID:     deployID,
-		DeployType:   "evaluation",
+		DeployType:   string(types.TaskTypeEvaluation),
 		Instance:     instance,
 		LastDuration: lastDuration,
 		TimeRange:    timeRange,
