@@ -165,7 +165,7 @@ func Test_GetClusterPublic(t *testing.T) {
 		}
 
 		tester.mocks.clusterComponent.EXPECT().
-			IndexPublic(context.Background()).
+			IndexPublic(context.Background(), types.ClusterIndexReq{}).
 			Once().
 			Return(expectedResult, nil)
 
@@ -182,7 +182,7 @@ func Test_GetClusterPublic(t *testing.T) {
 		})
 
 		tester.mocks.clusterComponent.EXPECT().
-			IndexPublic(context.Background()).
+			IndexPublic(context.Background(), types.ClusterIndexReq{}).
 			Once().
 			Return(types.PublicClusterRes{}, errorx.ErrInternalServerError)
 

@@ -26,7 +26,7 @@ func TestClusterComponent_Index(t *testing.T) {
 		{ClusterID: "c2", Status: "error", Enable: true},
 	}, nil)
 
-	data, err := cc.Index(ctx)
+	data, err := cc.Index(ctx, types.ClusterIndexReq{Scope: types.ClusterScopeALL})
 	require.Nil(t, err)
 	require.Len(t, data, 2)
 }
@@ -320,7 +320,7 @@ func TestClusterComponent_IndexPublic(t *testing.T) {
 	}, nil)
 
 	// Test the method
-	result, err := cc.IndexPublic(ctx)
+	result, err := cc.IndexPublic(ctx, types.ClusterIndexReq{Scope: types.ClusterScopeALL})
 	require.Nil(t, err)
 
 	// Verify results
@@ -346,7 +346,7 @@ func TestClusterComponent_IndexPublic_DeployerError(t *testing.T) {
 	cc.mocks.deployer.EXPECT().GetClusterById(ctx, "c1").Return(nil, fmt.Errorf("deployer error"))
 
 	// Test the method
-	result, err := cc.IndexPublic(ctx)
+	result, err := cc.IndexPublic(ctx, types.ClusterIndexReq{Scope: types.ClusterScopeALL})
 	require.Nil(t, err)
 
 	// Verify results - should include cluster but no hardware info
@@ -364,7 +364,7 @@ func TestClusterComponent_IndexPublic_ClusterStoreError(t *testing.T) {
 	cc.mocks.stores.ClusterInfoMock().EXPECT().List(ctx).Return(nil, fmt.Errorf("store error"))
 
 	// Test the method
-	result, err := cc.IndexPublic(ctx)
+	result, err := cc.IndexPublic(ctx, types.ClusterIndexReq{Scope: types.ClusterScopeALL})
 	require.NotNil(t, err)
 	require.Equal(t, types.PublicClusterRes{}, result)
 }
@@ -391,7 +391,7 @@ func TestClusterComponent_IndexPublic_GPUMemParseError(t *testing.T) {
 	}, nil)
 
 	// Test the method
-	result, err := cc.IndexPublic(ctx)
+	result, err := cc.IndexPublic(ctx, types.ClusterIndexReq{Scope: types.ClusterScopeALL})
 	require.Nil(t, err)
 
 	// Verify results - should include cluster with 0 memory

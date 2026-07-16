@@ -20,8 +20,8 @@ import (
 )
 
 type ClusterComponent interface {
-	Index(ctx context.Context) ([]types.ClusterRes, error)
-	IndexPublic(ctx context.Context) (types.PublicClusterRes, error)
+	Index(ctx context.Context, req types.ClusterIndexReq) ([]types.ClusterRes, error)
+	IndexPublic(ctx context.Context, req types.ClusterIndexReq) (types.PublicClusterRes, error)
 	GetClusterWithResourceByID(ctx context.Context, clusterId string) (*types.ClusterRes, error)
 	Update(ctx context.Context, data types.ClusterRequest) (*types.ClusterRes, error)
 	GetClusterUsages(ctx context.Context) ([]types.ClusterRes, error)
@@ -77,7 +77,7 @@ type clusterComponentImpl struct {
 	auditLog        database.AuditLogStore
 }
 
-func (c *clusterComponentImpl) Index(ctx context.Context) ([]types.ClusterRes, error) {
+func (c *clusterComponentImpl) Index(ctx context.Context, req types.ClusterIndexReq) ([]types.ClusterRes, error) {
 	clusterInos, err := c.clusterStore.List(ctx)
 	if err != nil {
 		return nil, err
@@ -90,21 +90,25 @@ func (c *clusterComponentImpl) Index(ctx context.Context) ([]types.ClusterRes, e
 		if !clusterInfo.Enable {
 			continue
 		}
+		if req.Scope != types.ClusterScopeALL && clusterInfo.SpaceResourceCount < 1 {
+			continue
+		}
 		cluster := &types.ClusterRes{
-			ClusterID:    clusterInfo.ClusterID,
-			Region:       clusterInfo.Region,
-			Zone:         clusterInfo.Zone,
-			Provider:     clusterInfo.Provider,
-			StorageClass: clusterInfo.StorageClass,
-			Status:       clusterInfo.Status,
-			Endpoint:     clusterInfo.RunnerEndpoint,
+			ClusterID:          clusterInfo.ClusterID,
+			Region:             clusterInfo.Region,
+			Zone:               clusterInfo.Zone,
+			Provider:           clusterInfo.Provider,
+			StorageClass:       clusterInfo.StorageClass,
+			Status:             clusterInfo.Status,
+			Endpoint:           clusterInfo.RunnerEndpoint,
+			SpaceResourceCount: clusterInfo.SpaceResourceCount,
 		}
 		clusters = append(clusters, *cluster)
 	}
 	return clusters, nil
 }
 
-func (c *clusterComponentImpl) IndexPublic(ctx context.Context) (types.PublicClusterRes, error) {
+func (c *clusterComponentImpl) IndexPublic(ctx context.Context, req types.ClusterIndexReq) (types.PublicClusterRes, error) {
 	clusterInos, err := c.clusterStore.List(ctx)
 	if err != nil {
 		return types.PublicClusterRes{}, err
@@ -116,6 +120,9 @@ func (c *clusterComponentImpl) IndexPublic(ctx context.Context) (types.PublicClu
 			continue
 		}
 		if !clusterInfo.Enable {
+			continue
+		}
+		if req.Scope != types.ClusterScopeALL && clusterInfo.SpaceResourceCount < 1 {
 			continue
 		}
 		// Get cluster details to include GPU information

@@ -7,13 +7,13 @@ import (
 )
 
 const (
-	ClusterCFGKubeSchedulerKey        = "kube_scheduler"
-	ClusterCFGVolcanoQueueKey         = "volcano_queue"
-	ClusterCFGVGPUNodeResourceNameKey = "vgpu_node_resource_name"
-	ClusterCFGVGPUPodResourceNameKey  = "vgpu_pod_resource_name"
-	ClusterCFGVGPUResourceReqKey      = "vgpu_resource_req"
-	ClusterCFGVGPUMemoryReqKey        = "vgpu_memory_req"
-	ClusterCFGVGPUMemoryScalingFactor     = "vgpu_memory_scaling_factor"
+	ClusterCFGKubeSchedulerKey             = "kube_scheduler"
+	ClusterCFGVolcanoQueueKey              = "volcano_queue"
+	ClusterCFGVGPUNodeResourceNameKey      = "vgpu_node_resource_name"
+	ClusterCFGVGPUPodResourceNameKey       = "vgpu_pod_resource_name"
+	ClusterCFGVGPUResourceReqKey           = "vgpu_resource_req"
+	ClusterCFGVGPUMemoryReqKey             = "vgpu_memory_req"
+	ClusterCFGVGPUMemoryScalingFactor      = "vgpu_memory_scaling_factor"
 	ClusterCFGAllowCPUResScheduleToGPUNode = "allow_cpu_res_schedule_to_gpu_node"
 )
 
@@ -28,6 +28,17 @@ type ClusterRequest struct {
 	Status        string `json:"status"`
 	Endpoint      string `json:"endpoint"`
 }
+
+type ClusterScope string
+
+const (
+	ClusterScopeALL ClusterScope = "all"
+)
+
+type ClusterIndexReq struct {
+	Scope ClusterScope `form:"scope" json:"scope"`
+}
+
 type ClusterEvent struct {
 	ClusterID        string        `json:"cluster_id"`
 	ClusterConfig    string        `json:"cluster_config"`
@@ -88,9 +99,11 @@ type ClusterRes struct {
 	XPUVendors     string `json:"xpu_vendors"` // NVIDIA, AMD
 	XPUModels      string `json:"xpu_models"`  // A10(32 GB),H100(80 GB)
 
-	Enable     bool              `json:"enable"`
-	VXPUConfig map[string]string `json:"vxpu_config"`
+	Enable             bool              `json:"enable"`
+	VXPUConfig         map[string]string `json:"vxpu_config"`
+	SpaceResourceCount int               `json:"space_resource_count"`
 }
+
 type DeployRes struct {
 	ClusterID       string    `json:"cluster_id"`
 	ClusterRegion   string    `json:"cluster_region"`

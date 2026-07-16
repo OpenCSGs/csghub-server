@@ -65,7 +65,7 @@ func (h *SpaceResourceHandler) Index(ctx *gin.Context) {
 	req.ClusterIDs = clusters
 
 	if len(req.ClusterIDs) == 0 {
-		clusters, err := h.cluster.Index(ctx.Request.Context())
+		clusters, err := h.cluster.Index(ctx.Request.Context(), types.ClusterIndexReq{})
 		if err != nil {
 			httpbase.ServerError(ctx, err)
 			return
