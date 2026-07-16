@@ -5,6 +5,18 @@
     "error.FEDAP-ERR-1": {
         "other": "令牌兑换失败"
     },
+    "error.FEDAP-ERR-10": {
+        "other": "需要完成联邦适配器授权"
+    },
+    "error.FEDAP-ERR-11": {
+        "other": "同步仓库失败"
+    },
+    "error.FEDAP-ERR-12": {
+        "other": "获取应用权限范围失败"
+    },
+    "error.FEDAP-ERR-13": {
+        "other": "仓库已存在"
+    },
     "error.FEDAP-ERR-2": {
         "other": "获取联邦对端失败"
     },
@@ -28,17 +40,5 @@
     },
     "error.FEDAP-ERR-9": {
         "other": "OAuth 凭证处理失败"
-    },
-    "error.FEDAP-ERR-10": {
-        "other": "需要完成联邦适配器授权"
-    },
-    "error.FEDAP-ERR-11": {
-        "other": "同步仓库失败"
-    },
-    "error.FEDAP-ERR-12": {
-        "other": "获取应用权限范围失败"
-    },
-    "error.FEDAP-ERR-13": {
-        "other": "仓库已存在"
     }
 }

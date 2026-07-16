@@ -10,6 +10,7 @@ const (
 	codeRepoNoDefaultBranchErr
 	codeCodeZipDownloadFailedErr
 	codeBatchGetRepoExtraFailedErr
+	codeChangePathBlockedErr
 )
 
 var (
@@ -89,6 +90,17 @@ var (
 	//
 	// zh-HK: 批量獲取倉庫額外資訊失敗
 	ErrBatchGetRepoExtraFailed error = CustomError{prefix: errRepoPrefix, code: codeBatchGetRepoExtraFailedErr}
+
+	// Description: Cannot change repository path because dependent entities exist. Please remove them first.
+	//
+	// Description_ZH: 无法更改仓库路径，存在依赖实体。请先移除它们。
+	//
+	// en-US: Cannot change repository path because the following dependent entities exist: {{.entity}}. Please remove them first.
+	//
+	// zh-CN: 无法更改仓库路径，以下依赖实体存在：{{.entity}}。请先移除它们。
+	//
+	// zh-HK: 無法更改倉庫路徑，以下依賴實體存在：{{.entity}}。請先移除它們。
+	ErrChangePathBlocked error = CustomError{prefix: errRepoPrefix, code: codeChangePathBlockedErr}
 )
 
 // RepoNotFound creates a REPO-ERR-3 error with context.
@@ -109,4 +121,9 @@ func CodeZipDownloadFailed(err error, ctx context) error {
 // BatchGetRepoExtraFailed creates a REPO-ERR-6 error.
 func BatchGetRepoExtraFailed(err error) error {
 	return CustomError{prefix: errRepoPrefix, code: codeBatchGetRepoExtraFailedErr, err: err}
+}
+
+// ChangePathBlocked creates a REPO-ERR-7 error with context.
+func ChangePathBlocked(err error, ctx context) error {
+	return CustomError{prefix: errRepoPrefix, code: codeChangePathBlockedErr, err: err, context: ctx}
 }

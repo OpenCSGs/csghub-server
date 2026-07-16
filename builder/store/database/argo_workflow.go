@@ -8,6 +8,7 @@ import (
 
 	"github.com/argoproj/argo-workflows/v3/pkg/apis/workflow/v1alpha1"
 	"github.com/uptrace/bun"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
 
@@ -31,6 +32,7 @@ type ArgoWorkFlowStore interface {
 	GetClusterWorkflows(ctx context.Context, req types.ClusterWFReq) ([]ArgoWorkflow, int, error)
 	ListWorkflowsByTimeRange(ctx context.Context, req types.WorkflowTimeRangeReq) ([]ArgoWorkflow, int, error)
 	ListWorkflowsNeedingReconcile(ctx context.Context, statuses []v1alpha1.WorkflowPhase, timeoutMin int, limit int) ([]ArgoWorkflow, error)
+	CountByRepoPath(ctx context.Context, repoPath string) (int, error)
 }
 
 func NewArgoWorkFlowStore() ArgoWorkFlowStore {
@@ -296,4 +298,12 @@ func (s *argoWorkFlowStoreImpl) ListWorkflowsNeedingReconcile(ctx context.Contex
 		return nil, err
 	}
 	return result, nil
+}
+
+func (s *argoWorkFlowStoreImpl) CountByRepoPath(ctx context.Context, repoPath string) (int, error) {
+	count, err := s.db.Operator.Core.NewSelect().
+		Model((*ArgoWorkflow)(nil)).
+		Where("repo_ids @> jsonb_build_array(?)", repoPath).
+		Count(ctx)
+	return count, errorx.HandleDBError(err, nil)
 }

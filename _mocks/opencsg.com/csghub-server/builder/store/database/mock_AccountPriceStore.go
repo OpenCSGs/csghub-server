@@ -83,6 +83,63 @@ func (_c *MockAccountPriceStore_BatchCreate_Call) RunAndReturn(run func(context.
 	return _c
 }
 
+// CountByResourceIDs provides a mock function with given fields: ctx, resourceIDs
+func (_m *MockAccountPriceStore) CountByResourceIDs(ctx context.Context, resourceIDs []string) (int, error) {
+	ret := _m.Called(ctx, resourceIDs)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CountByResourceIDs")
+	}
+
+	var r0 int
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, []string) (int, error)); ok {
+		return rf(ctx, resourceIDs)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, []string) int); ok {
+		r0 = rf(ctx, resourceIDs)
+	} else {
+		r0 = ret.Get(0).(int)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, []string) error); ok {
+		r1 = rf(ctx, resourceIDs)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAccountPriceStore_CountByResourceIDs_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CountByResourceIDs'
+type MockAccountPriceStore_CountByResourceIDs_Call struct {
+	*mock.Call
+}
+
+// CountByResourceIDs is a helper method to define mock.On call
+//   - ctx context.Context
+//   - resourceIDs []string
+func (_e *MockAccountPriceStore_Expecter) CountByResourceIDs(ctx interface{}, resourceIDs interface{}) *MockAccountPriceStore_CountByResourceIDs_Call {
+	return &MockAccountPriceStore_CountByResourceIDs_Call{Call: _e.mock.On("CountByResourceIDs", ctx, resourceIDs)}
+}
+
+func (_c *MockAccountPriceStore_CountByResourceIDs_Call) Run(run func(ctx context.Context, resourceIDs []string)) *MockAccountPriceStore_CountByResourceIDs_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].([]string))
+	})
+	return _c
+}
+
+func (_c *MockAccountPriceStore_CountByResourceIDs_Call) Return(_a0 int, _a1 error) *MockAccountPriceStore_CountByResourceIDs_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAccountPriceStore_CountByResourceIDs_Call) RunAndReturn(run func(context.Context, []string) (int, error)) *MockAccountPriceStore_CountByResourceIDs_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Create provides a mock function with given fields: ctx, input
 func (_m *MockAccountPriceStore) Create(ctx context.Context, input database.AccountPrice) (*database.AccountPrice, error) {
 	ret := _m.Called(ctx, input)

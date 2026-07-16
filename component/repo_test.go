@@ -3366,19 +3366,19 @@ func TestRepoComponent_ChangePath(t *testing.T) {
 	repoComp := initializeTestRepoComponent(ctx, t)
 
 	repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "namespace", "name").
-		Return(&database.Repository{ID: 1}, nil)
+		Return(&database.Repository{ID: 1, Path: "namespace/name", RepositoryType: types.ModelRepo}, nil)
 
 	repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "new", "path").
 		Return(nil, sql.ErrNoRows)
 
-	// repoComp.mocks.gitServer.EXPECT().CopyRepository(
-	// 	ctx,
-	// 	gitserver.CopyRepositoryReq{
-	// 		RepoType:  types.ModelRepo,
-	// 		Namespace: "namespace",
-	// 		Name:      "name",
-	// 		NewPath:   "@hashed_repos/6b/86/6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b.git",
-	// 	}).Return(nil)
+	// Dependency checks
+	repoComp.mocks.stores.DeployTaskMock().EXPECT().CountByRepoID(ctx, int64(1)).Return(0, nil)
+	repoComp.mocks.stores.SyncVersionMock().EXPECT().FindByRepoTypeAndPath(ctx, "namespace/name", types.ModelRepo).
+		Return(nil, sql.ErrNoRows)
+	repoComp.mocks.stores.WorkflowMock().EXPECT().CountByRepoPath(ctx, "namespace/name").Return(0, nil)
+	repoComp.mocks.stores.ViewerMock().EXPECT().GetViewerByRepoID(ctx, int64(1)).Return(nil, sql.ErrNoRows)
+	repoComp.mocks.stores.AccountSyncQuotaStatementMock().EXPECT().CountByRepoPath(ctx, "namespace/name").Return(0, nil)
+	repoComp.mocks.stores.AccountPriceMock().EXPECT().CountByResourceIDs(ctx, mock.Anything).Return(0, nil)
 
 	err := repoComp.ChangePath(ctx, types.ChangePathReq{
 		RepoType:  types.ModelRepo,
@@ -3396,16 +3396,26 @@ func TestRepoComponent_ChangePath_RepoHashed(t *testing.T) {
 	repoComp := initializeTestRepoComponent(ctx, t)
 
 	repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "namespace", "name").
-		Return(&database.Repository{ID: 1, Hashed: true}, nil)
+		Return(&database.Repository{ID: 1, Hashed: true, Path: "namespace/name", RepositoryType: types.ModelRepo}, nil)
 
 	repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "new", "path").
 		Return(nil, sql.ErrNoRows)
 
+	// Dependency checks - no blocking entities
+	repoComp.mocks.stores.DeployTaskMock().EXPECT().CountByRepoID(ctx, int64(1)).Return(0, nil)
+	repoComp.mocks.stores.SyncVersionMock().EXPECT().FindByRepoTypeAndPath(ctx, "namespace/name", types.ModelRepo).
+		Return(nil, sql.ErrNoRows)
+	repoComp.mocks.stores.WorkflowMock().EXPECT().CountByRepoPath(ctx, "namespace/name").Return(0, nil)
+	repoComp.mocks.stores.ViewerMock().EXPECT().GetViewerByRepoID(ctx, int64(1)).Return(nil, sql.ErrNoRows)
+	repoComp.mocks.stores.AccountSyncQuotaStatementMock().EXPECT().CountByRepoPath(ctx, "namespace/name").Return(0, nil)
+	repoComp.mocks.stores.AccountPriceMock().EXPECT().CountByResourceIDs(ctx, mock.Anything).Return(0, nil)
+
 	repoComp.mocks.stores.RepoMock().EXPECT().UpdateRepo(ctx, database.Repository{
-		ID:      1,
-		Path:    "new/path",
-		GitPath: "models_new/path",
-		Hashed:  true,
+		ID:             1,
+		Path:           "new/path",
+		GitPath:        "models_new/path",
+		Hashed:         true,
+		RepositoryType: types.ModelRepo,
 	}).Return(nil, nil)
 
 	err := repoComp.ChangePath(ctx, types.ChangePathReq{
@@ -3437,6 +3447,88 @@ func TestRepoComponent_ChangePath_NewNamespaceExists(t *testing.T) {
 	})
 
 	require.NotNil(t, err)
+}
+
+func TestRepoComponent_ChangePath_DependencyExists(t *testing.T) {
+	ctx := context.Background()
+
+	repoComp := initializeTestRepoComponent(ctx, t)
+
+	repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "namespace", "name").
+		Return(&database.Repository{ID: 1, Hashed: true, Path: "namespace/name", RepositoryType: types.ModelRepo}, nil)
+
+	repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "new", "path").
+		Return(nil, sql.ErrNoRows)
+
+	// Has deploy tasks - short-circuits immediately
+	repoComp.mocks.stores.DeployTaskMock().EXPECT().CountByRepoID(ctx, int64(1)).Return(5, nil)
+
+	err := repoComp.ChangePath(ctx, types.ChangePathReq{
+		RepoType:  types.ModelRepo,
+		Namespace: "namespace",
+		Name:      "name",
+		NewPath:   "new/path",
+	})
+
+	require.NotNil(t, err)
+	require.Contains(t, err.Error(), "cannot change path")
+	require.Contains(t, err.Error(), "the following dependent entities exist: deploy tasks")
+	require.True(t, errors.Is(err, errorx.ErrChangePathBlocked))
+}
+
+func TestRepoComponent_ChangePath_DependencyShortCircuits(t *testing.T) {
+	ctx := context.Background()
+
+	repoComp := initializeTestRepoComponent(ctx, t)
+
+	repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "namespace", "name").
+		Return(&database.Repository{ID: 1, Hashed: true, Path: "namespace/name", RepositoryType: types.ModelRepo}, nil)
+
+	repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "new", "path").
+		Return(nil, sql.ErrNoRows)
+
+	// Deploy passes
+	repoComp.mocks.stores.DeployTaskMock().EXPECT().CountByRepoID(ctx, int64(1)).Return(0, nil)
+	// Sync blocks - should return immediately, skipping remaining checks
+	repoComp.mocks.stores.SyncVersionMock().EXPECT().FindByRepoTypeAndPath(ctx, "namespace/name", types.ModelRepo).
+		Return(&database.SyncVersion{}, nil)
+
+	err := repoComp.ChangePath(ctx, types.ChangePathReq{
+		RepoType:  types.ModelRepo,
+		Namespace: "namespace",
+		Name:      "name",
+		NewPath:   "new/path",
+	})
+
+	require.NotNil(t, err)
+	require.Contains(t, err.Error(), "cannot change path")
+	require.Contains(t, err.Error(), "the following dependent entities exist: sync versions")
+	require.True(t, errors.Is(err, errorx.ErrChangePathBlocked))
+}
+
+func TestRepoComponent_ChangePath_DependencyCheckError(t *testing.T) {
+	ctx := context.Background()
+
+	repoComp := initializeTestRepoComponent(ctx, t)
+
+	repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "namespace", "name").
+		Return(&database.Repository{ID: 1, Hashed: true, Path: "namespace/name", RepositoryType: types.ModelRepo}, nil)
+
+	repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "new", "path").
+		Return(nil, sql.ErrNoRows)
+
+	// Deploy task check fails - first check, so it returns immediately
+	repoComp.mocks.stores.DeployTaskMock().EXPECT().CountByRepoID(ctx, int64(1)).Return(0, errors.New("db error"))
+
+	err := repoComp.ChangePath(ctx, types.ChangePathReq{
+		RepoType:  types.ModelRepo,
+		Namespace: "namespace",
+		Name:      "name",
+		NewPath:   "new/path",
+	})
+
+	require.NotNil(t, err)
+	require.Contains(t, err.Error(), "failed to check deploy tasks")
 }
 
 func TestRepoComponent_BatchMigrateRepoToHashedPath_AutoFalse(t *testing.T) {

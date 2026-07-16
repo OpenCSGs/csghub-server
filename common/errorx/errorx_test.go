@@ -254,3 +254,15 @@ func Test_Err_MirrorSourceConflict(t *testing.T) {
 	assert.True(t, errors.Is(err, ErrMirrorSourceConflict))
 	assert.False(t, errors.Is(err, ErrDatabaseDuplicateKey))
 }
+
+func Test_Err_ChangePathBlocked(t *testing.T) {
+	err := ChangePathBlocked(
+		errors.New("cannot change path: the following dependent entities exist: deploy tasks, mirrors. Please remove them first"),
+		Ctx().Set("repo_path", "ns1/repo-a").Set("blocking_entities", []string{"deploy tasks", "mirrors"}),
+	)
+
+	assert.Equal(t, "REPO-ERR-7", ErrChangePathBlocked.(CustomError).Code())
+	assert.True(t, errors.Is(err, ErrChangePathBlocked))
+	assert.Contains(t, err.Error(), "deploy tasks")
+	assert.Contains(t, err.Error(), "REPO-ERR-7")
+}

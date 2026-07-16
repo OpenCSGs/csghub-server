@@ -7,6 +7,7 @@ import (
 	io "io"
 
 	mock "github.com/stretchr/testify/mock"
+
 	sensitive "opencsg.com/csghub-server/builder/sensitive"
 
 	types "opencsg.com/csghub-server/common/types"
@@ -86,66 +87,6 @@ func (_c *MockSensitiveChecker_PassImageCheck_Call) RunAndReturn(run func(contex
 	return _c
 }
 
-// PassImageURLCheck provides a mock function with given fields: ctx, scenario, imageURL
-func (_m *MockSensitiveChecker) PassImageURLCheck(ctx context.Context, scenario types.SensitiveScenario, imageURL string) (*sensitive.CheckResult, error) {
-	ret := _m.Called(ctx, scenario, imageURL)
-
-	if len(ret) == 0 {
-		panic("no return value specified for PassImageURLCheck")
-	}
-
-	var r0 *sensitive.CheckResult
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, types.SensitiveScenario, string) (*sensitive.CheckResult, error)); ok {
-		return rf(ctx, scenario, imageURL)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, types.SensitiveScenario, string) *sensitive.CheckResult); ok {
-		r0 = rf(ctx, scenario, imageURL)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*sensitive.CheckResult)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, types.SensitiveScenario, string) error); ok {
-		r1 = rf(ctx, scenario, imageURL)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// MockSensitiveChecker_PassImageURLCheck_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PassImageURLCheck'
-type MockSensitiveChecker_PassImageURLCheck_Call struct {
-	*mock.Call
-}
-
-// PassImageURLCheck is a helper method to define mock.On call
-//   - ctx context.Context
-//   - scenario types.SensitiveScenario
-//   - imageURL string
-func (_e *MockSensitiveChecker_Expecter) PassImageURLCheck(ctx interface{}, scenario interface{}, imageURL interface{}) *MockSensitiveChecker_PassImageURLCheck_Call {
-	return &MockSensitiveChecker_PassImageURLCheck_Call{Call: _e.mock.On("PassImageURLCheck", ctx, scenario, imageURL)}
-}
-
-func (_c *MockSensitiveChecker_PassImageURLCheck_Call) Run(run func(ctx context.Context, scenario types.SensitiveScenario, imageURL string)) *MockSensitiveChecker_PassImageURLCheck_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(types.SensitiveScenario), args[2].(string))
-	})
-	return _c
-}
-
-func (_c *MockSensitiveChecker_PassImageURLCheck_Call) Return(_a0 *sensitive.CheckResult, _a1 error) *MockSensitiveChecker_PassImageURLCheck_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *MockSensitiveChecker_PassImageURLCheck_Call) RunAndReturn(run func(context.Context, types.SensitiveScenario, string) (*sensitive.CheckResult, error)) *MockSensitiveChecker_PassImageURLCheck_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // PassImageStreamCheck provides a mock function with given fields: ctx, scenario, reader
 func (_m *MockSensitiveChecker) PassImageStreamCheck(ctx context.Context, scenario types.SensitiveScenario, reader io.Reader) (*sensitive.CheckResult, error) {
 	ret := _m.Called(ctx, scenario, reader)
@@ -202,6 +143,66 @@ func (_c *MockSensitiveChecker_PassImageStreamCheck_Call) Return(_a0 *sensitive.
 }
 
 func (_c *MockSensitiveChecker_PassImageStreamCheck_Call) RunAndReturn(run func(context.Context, types.SensitiveScenario, io.Reader) (*sensitive.CheckResult, error)) *MockSensitiveChecker_PassImageStreamCheck_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// PassImageURLCheck provides a mock function with given fields: ctx, scenario, imageURL
+func (_m *MockSensitiveChecker) PassImageURLCheck(ctx context.Context, scenario types.SensitiveScenario, imageURL string) (*sensitive.CheckResult, error) {
+	ret := _m.Called(ctx, scenario, imageURL)
+
+	if len(ret) == 0 {
+		panic("no return value specified for PassImageURLCheck")
+	}
+
+	var r0 *sensitive.CheckResult
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.SensitiveScenario, string) (*sensitive.CheckResult, error)); ok {
+		return rf(ctx, scenario, imageURL)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.SensitiveScenario, string) *sensitive.CheckResult); ok {
+		r0 = rf(ctx, scenario, imageURL)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*sensitive.CheckResult)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.SensitiveScenario, string) error); ok {
+		r1 = rf(ctx, scenario, imageURL)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockSensitiveChecker_PassImageURLCheck_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PassImageURLCheck'
+type MockSensitiveChecker_PassImageURLCheck_Call struct {
+	*mock.Call
+}
+
+// PassImageURLCheck is a helper method to define mock.On call
+//   - ctx context.Context
+//   - scenario types.SensitiveScenario
+//   - imageURL string
+func (_e *MockSensitiveChecker_Expecter) PassImageURLCheck(ctx interface{}, scenario interface{}, imageURL interface{}) *MockSensitiveChecker_PassImageURLCheck_Call {
+	return &MockSensitiveChecker_PassImageURLCheck_Call{Call: _e.mock.On("PassImageURLCheck", ctx, scenario, imageURL)}
+}
+
+func (_c *MockSensitiveChecker_PassImageURLCheck_Call) Run(run func(ctx context.Context, scenario types.SensitiveScenario, imageURL string)) *MockSensitiveChecker_PassImageURLCheck_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.SensitiveScenario), args[2].(string))
+	})
+	return _c
+}
+
+func (_c *MockSensitiveChecker_PassImageURLCheck_Call) Return(_a0 *sensitive.CheckResult, _a1 error) *MockSensitiveChecker_PassImageURLCheck_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockSensitiveChecker_PassImageURLCheck_Call) RunAndReturn(run func(context.Context, types.SensitiveScenario, string) (*sensitive.CheckResult, error)) *MockSensitiveChecker_PassImageURLCheck_Call {
 	_c.Call.Return(run)
 	return _c
 }

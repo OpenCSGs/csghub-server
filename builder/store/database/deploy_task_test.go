@@ -1522,3 +1522,34 @@ func TestDeployTaskStore_ListDeploysByTimeRange(t *testing.T) {
 		require.NotNil(t, dp.User, "User relation should be loaded")
 	}
 }
+
+func TestDeployTaskStore_CountByRepoID(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewDeployTaskStoreWithDB(db)
+
+	err := store.CreateDeploy(ctx, &database.Deploy{
+		DeployName: "dp-cnt1", SvcName: "s-cnt1",
+		RepoID:  101,
+		UserID:  456,
+		SpaceID: 321,
+	})
+	require.Nil(t, err)
+	err = store.CreateDeploy(ctx, &database.Deploy{
+		DeployName: "dp-cnt2", SvcName: "s-cnt2",
+		RepoID:  101,
+		UserID:  456,
+		SpaceID: 322,
+	})
+	require.Nil(t, err)
+
+	count, err := store.CountByRepoID(ctx, 101)
+	require.Nil(t, err)
+	require.Equal(t, 2, count)
+
+	count, err = store.CountByRepoID(ctx, 404)
+	require.Nil(t, err)
+	require.Equal(t, 0, count)
+}

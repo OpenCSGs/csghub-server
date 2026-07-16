@@ -12,12 +12,15 @@
         "other": "Repository not found"
     },
     "error.REPO-ERR-4": {
-        "other": "Repository has no default branch"
+        "other": "No revision specified. Please specify a revision."
     },
     "error.REPO-ERR-5": {
         "other": "Failed to download code zip archive"
     },
     "error.REPO-ERR-6": {
         "other": "Failed to batch get repository extra information"
+    },
+    "error.REPO-ERR-7": {
+        "other": "Cannot change repository path because the following dependent entities exist: {{.entity}}. Please remove them first."
     }
 }

@@ -6,14 +6,20 @@ package component
 
 import (
 	context "context"
-	io "io"
+
+	deploy "opencsg.com/csghub-server/builder/deploy"
+	database "opencsg.com/csghub-server/builder/store/database"
 
 	gin "github.com/gin-gonic/gin"
-	mock "github.com/stretchr/testify/mock"
-	deploy "opencsg.com/csghub-server/builder/deploy"
+
 	gitserver "opencsg.com/csghub-server/builder/git/gitserver"
+
+	io "io"
+
 	membership "opencsg.com/csghub-server/builder/git/membership"
-	database "opencsg.com/csghub-server/builder/store/database"
+
+	mock "github.com/stretchr/testify/mock"
+
 	types "opencsg.com/csghub-server/common/types"
 )
 

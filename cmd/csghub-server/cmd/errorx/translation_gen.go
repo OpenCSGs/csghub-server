@@ -252,22 +252,43 @@ func extractComment(doc *ast.CommentGroup) (string, string, map[string]string) {
 	}
 	var description, description_zh = "", ""
 	var translations = make(map[string]string)
+	var lastKey string
 	for _, commentLine := range doc.List {
 		line := strings.TrimSpace(strings.TrimPrefix(commentLine.Text, "//"))
 
+		// skip empty lines (// with nothing after)
+		if line == "" {
+			lastKey = ""
+			continue
+		}
+
 		parts := strings.SplitN(line, ":", 2)
-		if len(parts) == 2 {
+		if len(parts) == 2 && !strings.HasPrefix(parts[0], " ") && !strings.HasPrefix(parts[0], "\t") {
 			key := strings.TrimSpace(parts[0])
 			value := strings.TrimSpace(parts[1])
 			if langCodeRegex.MatchString(key) {
 				translations[key] = value
+				lastKey = key
 			} else if key == descriptionPrefix {
 				description = value
+				lastKey = descriptionPrefix
 			} else if key == descriptionZHPrefix {
 				description_zh = value
+				lastKey = descriptionZHPrefix
+			}
+		} else if lastKey != "" {
+			// continuation line: append to last captured field
+			switch lastKey {
+			case descriptionPrefix:
+				description += " " + line
+			case descriptionZHPrefix:
+				description_zh += " " + line
+			default:
+				if _, ok := translations[lastKey]; ok {
+					translations[lastKey] += " " + line
+				}
 			}
 		}
-
 	}
 	return description, description_zh, translations
 }
