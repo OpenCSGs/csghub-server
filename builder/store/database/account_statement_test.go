@@ -321,6 +321,35 @@ func TestAccountStatementStore_GetByEventID(t *testing.T) {
 	require.Equal(t, "foo", ev.OpUID)
 }
 
+func TestAccountStatementStore_MinCreatedAt(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewAccountStatementStoreWithDB(db)
+
+	// empty table -> zero time
+	minTime, err := store.MinCreatedAt(ctx)
+	require.Nil(t, err)
+	require.True(t, minTime.IsZero())
+
+	// insert two statements with different created_at
+	earliest := time.Date(2024, 6, 18, 10, 0, 0, 0, time.UTC)
+	later := time.Date(2025, 1, 2, 3, 4, 5, 0, time.UTC)
+	_, err = db.Core.NewInsert().Model(&database.AccountStatement{
+		EventUUID: uuid.New(), UserUUID: "u1", CreatedAt: later,
+	}).Exec(ctx)
+	require.Nil(t, err)
+	_, err = db.Core.NewInsert().Model(&database.AccountStatement{
+		EventUUID: uuid.New(), UserUUID: "u2", CreatedAt: earliest,
+	}).Exec(ctx)
+	require.Nil(t, err)
+
+	minTime, err = store.MinCreatedAt(ctx)
+	require.Nil(t, err)
+	require.Equal(t, earliest.UTC(), minTime.UTC())
+}
+
 func TestAccountStatementStore_ListRechargeByUserIDAndTime(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()

@@ -8,6 +8,8 @@ import (
 	mock "github.com/stretchr/testify/mock"
 	database "opencsg.com/csghub-server/builder/store/database"
 
+	time "time"
+
 	types "opencsg.com/csghub-server/common/types"
 
 	uuid "github.com/google/uuid"
@@ -452,6 +454,62 @@ func (_c *MockAccountStatementStore_ListStatementByUserAndSku_Call) Return(_a0 [
 }
 
 func (_c *MockAccountStatementStore_ListStatementByUserAndSku_Call) RunAndReturn(run func(context.Context, types.ActStatementsReq) ([]database.UserSkuStatement, int, error)) *MockAccountStatementStore_ListStatementByUserAndSku_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// MinCreatedAt provides a mock function with given fields: ctx
+func (_m *MockAccountStatementStore) MinCreatedAt(ctx context.Context) (time.Time, error) {
+	ret := _m.Called(ctx)
+
+	if len(ret) == 0 {
+		panic("no return value specified for MinCreatedAt")
+	}
+
+	var r0 time.Time
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context) (time.Time, error)); ok {
+		return rf(ctx)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context) time.Time); ok {
+		r0 = rf(ctx)
+	} else {
+		r0 = ret.Get(0).(time.Time)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = rf(ctx)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAccountStatementStore_MinCreatedAt_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'MinCreatedAt'
+type MockAccountStatementStore_MinCreatedAt_Call struct {
+	*mock.Call
+}
+
+// MinCreatedAt is a helper method to define mock.On call
+//   - ctx context.Context
+func (_e *MockAccountStatementStore_Expecter) MinCreatedAt(ctx interface{}) *MockAccountStatementStore_MinCreatedAt_Call {
+	return &MockAccountStatementStore_MinCreatedAt_Call{Call: _e.mock.On("MinCreatedAt", ctx)}
+}
+
+func (_c *MockAccountStatementStore_MinCreatedAt_Call) Run(run func(ctx context.Context)) *MockAccountStatementStore_MinCreatedAt_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context))
+	})
+	return _c
+}
+
+func (_c *MockAccountStatementStore_MinCreatedAt_Call) Return(_a0 time.Time, _a1 error) *MockAccountStatementStore_MinCreatedAt_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAccountStatementStore_MinCreatedAt_Call) RunAndReturn(run func(context.Context) (time.Time, error)) *MockAccountStatementStore_MinCreatedAt_Call {
 	_c.Call.Return(run)
 	return _c
 }
