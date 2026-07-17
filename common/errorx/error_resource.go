@@ -30,3 +30,12 @@ var (
 	// zh-HK: 資源暫不可用
 	ErrResourceUnavailable error = CustomError{prefix: errResourcePrefix, code: codeResourceUnavailableErr}
 )
+
+func ResourceUnavailable(originErr error, ext context) error {
+	return CustomError{
+		prefix:  errResourcePrefix,
+		code:    codeResourceUnavailableErr,
+		err:     originErr,
+		context: ext,
+	}
+}
