@@ -424,6 +424,7 @@ type Config struct {
 		MCPInspectCronExpression                 string `env:"STARHUB_SERVER_CRON_JOB_MCP_INSPECT_CRON_EXPRESSION" default:"*/10 * * * *"`
 		AIGatewayAsyncGenerationCronExpression   string `env:"STARHUB_SERVER_CRON_JOB_AIGATEWAY_ASYNC_GENERATION_CRON_EXPRESSION" default:"*/1 * * * *"`
 		SyncLLMLogsToDatasetCronExpression       string `env:"STARHUB_SERVER_SYNC_LLMLOGS_TO_DATASET_CRON_EXPRESSION" default:"0 1 * * *"`
+		StatementDailySummaryCronExpression      string `env:"STARHUB_SERVER_CRON_JOB_STATEMENT_DAILY_SUMMARY_CRON_EXPRESSION" default:"17 2 * * *"` // 02:17 daily
 	}
 
 	DeployReconcile struct {

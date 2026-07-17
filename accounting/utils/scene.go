@@ -131,3 +131,23 @@ func IsGetTokenID(scene types.SceneType) bool {
 	}
 	return false
 }
+
+// IsChargeScene reports whether the scene is a recharge (balance-increasing)
+// event rather than a consumption event. Recharge scenes have positive value
+// (money added to the balance); consumption scenes have negative value. The
+// daily summary rollup excludes recharge scenes so the consumption report only
+// reflects actual usage.
+func IsChargeScene(scene types.SceneType) bool {
+	switch scene {
+	case types.ScenePortalCharge, types.SceneCashCharge:
+		return true
+	default:
+		return false
+	}
+}
+
+// ChargeSceneValues returns the scene values that are recharges, for use in
+// SQL "scene NOT IN (...)" filters during rollup.
+func ChargeSceneValues() []int {
+	return []int{int(types.ScenePortalCharge), int(types.SceneCashCharge)}
+}

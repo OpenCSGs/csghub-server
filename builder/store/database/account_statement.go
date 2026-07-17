@@ -30,6 +30,10 @@ type AccountStatementStore interface {
 	ListStatementByUserAndSku(ctx context.Context, req types.ActStatementsReq) ([]UserSkuStatement, int, error)
 	ListPortalRecharges(ctx context.Context, req types.AcctRechargeListReq) ([]AccountStatement, int, float64, error)
 	HasUserPurchasedDataset(ctx context.Context, userUUID string, datasetID int64) (bool, error)
+	// MinCreatedAt returns the earliest created_at in account_statements, used as
+	// the backfill origin when no checkpoint exists yet. Returns zero time if the
+	// table is empty.
+	MinCreatedAt(ctx context.Context) (time.Time, error)
 }
 
 func NewAccountStatementStore() AccountStatementStore {
@@ -860,6 +864,24 @@ func (as *accountStatementStoreImpl) HasUserPurchasedDataset(ctx context.Context
 	}
 
 	return count > 0, nil
+}
+
+func (as *accountStatementStoreImpl) MinCreatedAt(ctx context.Context) (time.Time, error) {
+	// MIN(created_at) returns NULL on an empty table; scan into sql.NullTime so
+	// the empty-table case returns a zero time (and the caller can skip) rather
+	// than a NULL-scan error.
+	var nullTime sql.NullTime
+	err := as.db.Operator.Core.NewSelect().
+		Model((*AccountStatement)(nil)).
+		ColumnExpr("MIN(created_at)").
+		Scan(ctx, &nullTime)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("get min created_at from account_statements, error: %w", err)
+	}
+	if !nullTime.Valid {
+		return time.Time{}, nil
+	}
+	return nullTime.Time, nil
 }
 
 func checkAndSortVouchers(vouchers []AccountVoucher, clusterID, xpuModel string) []AccountVoucher {
