@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"opencsg.com/csghub-server/aigateway/types"
+	commonTypes "opencsg.com/csghub-server/common/types"
 )
 
 // mockStorage implements types.Storage for tests
@@ -22,6 +23,68 @@ func (m *mockStorage) PutAndPresignGet(ctx context.Context, bucket, key string, 
 		return m.putAndPresignGet(ctx, bucket, key, data, contentType)
 	}
 	return "https://example.com/presigned/" + key, nil
+}
+
+func TestHFInferenceToolkitAdapter_CanHandle(t *testing.T) {
+	adapter := NewHFInferenceToolkitAdapter()
+
+	tests := []struct {
+		name  string
+		model *types.Model
+		want  bool
+	}{
+		{
+			name: "hf inference toolkit self-hosted text to image",
+			model: &types.Model{
+				BaseModel:         types.BaseModel{Task: string(commonTypes.Text2Image)},
+				InternalModelInfo: types.InternalModelInfo{CSGHubModelID: "namespace/model", RuntimeFramework: frameworkHFInferenceToolkit},
+			},
+			want: true,
+		},
+		{
+			name: "amd hf inference toolkit self-hosted text to image",
+			model: &types.Model{
+				BaseModel:         types.BaseModel{Task: string(commonTypes.Text2Image)},
+				InternalModelInfo: types.InternalModelInfo{CSGHubModelID: "namespace/model", RuntimeFramework: frameworkAMDHfInferenceToolkit},
+			},
+			want: true,
+		},
+		{
+			name: "runtime framework matching is normalized",
+			model: &types.Model{
+				BaseModel:         types.BaseModel{Task: string(commonTypes.Text2Image)},
+				InternalModelInfo: types.InternalModelInfo{CSGHubModelID: "namespace/model", RuntimeFramework: " AMD-HF-Inference-Toolkit "},
+			},
+			want: true,
+		},
+		{
+			name: "reject non text to image task",
+			model: &types.Model{
+				BaseModel:         types.BaseModel{Task: string(commonTypes.TextGeneration)},
+				InternalModelInfo: types.InternalModelInfo{CSGHubModelID: "namespace/model", RuntimeFramework: frameworkAMDHfInferenceToolkit},
+			},
+			want: false,
+		},
+		{
+			name: "reject missing csghub model id",
+			model: &types.Model{
+				BaseModel:         types.BaseModel{Task: string(commonTypes.Text2Image)},
+				InternalModelInfo: types.InternalModelInfo{RuntimeFramework: frameworkAMDHfInferenceToolkit},
+			},
+			want: false,
+		},
+		{
+			name:  "reject nil model",
+			model: nil,
+			want:  false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, adapter.CanHandle(tt.model))
+		})
+	}
 }
 
 func TestHFInferenceToolkitAdapter_TransformResponse_responseFormatURL(t *testing.T) {
