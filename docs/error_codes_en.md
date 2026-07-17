@@ -314,7 +314,6 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Name:** `noValidParquetFile`
 - **Description:** The dataset does not contain any valid Parquet files, which are required for this operation.
 
-
 ---
 
 ### `DAT-ERR-3`
@@ -819,6 +818,14 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Name:** `gitGetArchiveFailed`
 - **Description:** Failed to get archive from git repository.
 
+---
+
+### `GIT-ERR-41`
+
+- **Error Code:** `GIT-ERR-41`
+- **Error Name:** `gitInvalidURL`
+- **Description:** The provided git URL is invalid or malformed. Please check the URL format and try again.
+
 ## Invitation Errors
 
 ### `INVITATION-ERR-0`
@@ -923,6 +930,46 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Name:** `codeNamespaceNotFoundErr`
 - **Description:** The namespace does not exist.
 
+---
+
+### `REPO-ERR-3`
+
+- **Error Code:** `REPO-ERR-3`
+- **Error Name:** `codeRepoNotFoundErr`
+- **Description:** The repository was not found.
+
+---
+
+### `REPO-ERR-4`
+
+- **Error Code:** `REPO-ERR-4`
+- **Error Name:** `codeRepoNoDefaultBranchErr`
+- **Description:** No revision specified and repository has no default branch. Please specify a revision.
+
+---
+
+### `REPO-ERR-5`
+
+- **Error Code:** `REPO-ERR-5`
+- **Error Name:** `codeCodeZipDownloadFailedErr`
+- **Description:** Failed to download code repository as zip archive.
+
+---
+
+### `REPO-ERR-6`
+
+- **Error Code:** `REPO-ERR-6`
+- **Error Name:** `codeBatchGetRepoExtraFailedErr`
+- **Description:** Failed to batch get repository extra information.
+
+---
+
+### `REPO-ERR-7`
+
+- **Error Code:** `REPO-ERR-7`
+- **Error Name:** `codeChangePathBlockedErr`
+- **Description:** Cannot change repository path because dependent entities exist. Please remove them first.
+
 ## Req Errors
 
 ### `REQ-ERR-0`
@@ -1026,6 +1073,14 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Code:** `REQ-ERR-12`
 - **Error Name:** `errCaptchaIncorrect`
 - **Description:** The provided captcha verification failed. Please try again with a valid captcha.
+
+---
+
+### `REQ-ERR-13`
+
+- **Error Code:** `REQ-ERR-13`
+- **Error Name:** `errTargetNamespaceNotFound`
+- **Description:** The specified target namespace was not found in the system. Please verify the namespace exists before creating or updating the mapping.
 
 ## Resource Errors
 
@@ -1401,7 +1456,7 @@ This document lists all the custom error codes defined in the project, categoriz
 
 - **Error Code:** `TASK-ERR-3`
 - **Error Name:** `multiHostNotebookNotSupported`
-- **Description:** The multi-host notebook feature (running notebook tasks across multiple hosts) is not supported.
+- **Description:** The multi-host notebook feature (running notebook tasks across multiple hosts) is not supported. Use single-host notebook execution instead. This limitation applies to distributed notebook sessions which require synchronized kernel/state across hosts and is currently not implemented.
 
 ---
 
@@ -1586,3 +1641,4 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Code:** `USER-ERR-19`
 - **Error Name:** `uuidConflict`
 - **Description:** The UUID generated for the organization already exists in the system.
+

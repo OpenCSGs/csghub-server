@@ -12,12 +12,15 @@
         "other": "儲存庫未找到"
     },
     "error.REPO-ERR-4": {
-        "other": "儲存庫沒有默認分支"
+        "other": "用戶未指定分支，請指定分支後再試"
     },
     "error.REPO-ERR-5": {
         "other": "下載代碼 zip 歸檔失敗"
     },
     "error.REPO-ERR-6": {
         "other": "批量獲取倉庫額外資訊失敗"
+    },
+    "error.REPO-ERR-7": {
+        "other": "無法更改倉庫路徑，以下依賴實體存在：{{.entity}}。請先移除它們。"
     }
 }

@@ -131,6 +131,7 @@ type DeployTaskStore interface {
 	FindByDeployNameAndType(ctx context.Context, uuid, deployName string, deployType int) (*Deploy, error)
 	CountRunningDeploysByNodeName(ctx context.Context, nodeName string) (int, error)
 	ListDeploysNeedingReconcile(ctx context.Context, statuses []int, timeoutMin int, limit int) ([]Deploy, error)
+	CountByRepoID(ctx context.Context, repoID int64) (int, error)
 }
 
 func NewDeployTaskStore() DeployTaskStore {
@@ -459,6 +460,14 @@ func (s *deployTaskStoreImpl) GetServerlessDeployByRepID(ctx context.Context, re
 		return nil, fmt.Errorf("select serverless deploy error, %w", err)
 	}
 	return deploy, nil
+}
+
+func (s *deployTaskStoreImpl) CountByRepoID(ctx context.Context, repoID int64) (int, error) {
+	count, err := s.db.Operator.Core.NewSelect().
+		Model((*Deploy)(nil)).
+		Where("repo_id = ?", repoID).
+		Count(ctx)
+	return count, errorx.HandleDBError(err, nil)
 }
 
 func (s *deployTaskStoreImpl) ListServerless(ctx context.Context, req types.DeployReq) ([]Deploy, int, error) {

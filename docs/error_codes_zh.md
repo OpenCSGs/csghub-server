@@ -416,7 +416,7 @@
 
 - **错误代码:** `FEDAP-ERR-7`
 - **错误名:** `proxyRequestProcessFailed`
-- **描述:** 处理 fedap 代理请求失败。包括代理 URL 构建失败、外发请求构建或执行失败、上游响应处理失败，以及响应头处理失败等通用代理处理错误。
+- **描述:** 处理 fedap 代理请求失败。包括代理 URL 构建失败、外发请求构建或执行失败、 上游响应处理失败，以及响应头处理失败等通用代理处理错误。
 
 ---
 
@@ -818,6 +818,14 @@
 - **错误名:** `gitGetArchiveFailed`
 - **描述:** 从 git 仓库获取归档文件失败。
 
+---
+
+### `GIT-ERR-41`
+
+- **错误代码:** `GIT-ERR-41`
+- **错误名:** `gitInvalidURL`
+- **描述:** 提供的 Git URL 无效或格式错误。请检查 URL 格式并重试。
+
 ## Invitation 错误
 
 ### `INVITATION-ERR-0`
@@ -922,6 +930,46 @@
 - **错误名:** `codeNamespaceNotFoundErr`
 - **描述:** 命名空间不存在
 
+---
+
+### `REPO-ERR-3`
+
+- **错误代码:** `REPO-ERR-3`
+- **错误名:** `codeRepoNotFoundErr`
+- **描述:** 仓库未找到
+
+---
+
+### `REPO-ERR-4`
+
+- **错误代码:** `REPO-ERR-4`
+- **错误名:** `codeRepoNoDefaultBranchErr`
+- **描述:** 用户未指定分支，请指定分支后再试
+
+---
+
+### `REPO-ERR-5`
+
+- **错误代码:** `REPO-ERR-5`
+- **错误名:** `codeCodeZipDownloadFailedErr`
+- **描述:** 下载代码仓库 zip 归档失败
+
+---
+
+### `REPO-ERR-6`
+
+- **错误代码:** `REPO-ERR-6`
+- **错误名:** `codeBatchGetRepoExtraFailedErr`
+- **描述:** 批量获取仓库额外信息失败
+
+---
+
+### `REPO-ERR-7`
+
+- **错误代码:** `REPO-ERR-7`
+- **错误名:** `codeChangePathBlockedErr`
+- **描述:** 无法更改仓库路径，存在依赖实体。请先移除它们。
+
 ## Req 错误
 
 ### `REQ-ERR-0`
@@ -1025,6 +1073,14 @@
 - **错误代码:** `REQ-ERR-12`
 - **错误名:** `errCaptchaIncorrect`
 - **描述:** 提供的验证码验证失败。请使用有效的验证码重试。
+
+---
+
+### `REQ-ERR-13`
+
+- **错误代码:** `REQ-ERR-13`
+- **错误名:** `errTargetNamespaceNotFound`
+- **描述:** 指定的目标命名空间在系统中不存在。请在创建或更新映射之前确认命名空间存在。
 
 ## Resource 错误
 
@@ -1400,7 +1456,7 @@
 
 - **错误代码:** `TASK-ERR-3`
 - **错误名:** `multiHostNotebookNotSupported`
-- **描述:** 多主机 Notebook 功能（在多个主机上运行 Notebook 任务）不被支持。请改用单主机 Notebook 执行。
+- **描述:** 多主机 Notebook 功能（在多个主机上运行 Notebook 任务）不被支持。请改用单主机 Notebook 执行。 该限制适用于需要在主机间同步内核/状态的分布式 Notebook 会话，目前尚未实现。
 
 ---
 
@@ -1585,3 +1641,4 @@
 - **错误代码:** `USER-ERR-19`
 - **错误名:** `uuidConflict`
 - **描述:** 组织生成的UUID已存在于系统中
+

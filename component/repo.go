@@ -59,47 +59,51 @@ const (
 )
 
 type repoComponentImpl struct {
-	tagComponent           TagComponent
-	industryTagComponent   IndustryTagComponent
-	userStore              database.UserStore
-	orgStore               database.OrgStore
-	namespaceStore         database.NamespaceStore
-	repoStore              database.RepoStore
-	repoFileStore          database.RepoFileStore
-	repoRelationsStore     database.RepoRelationsStore
-	repoStatisticsStore    database.RepositoryStatisticsStore
-	mirrorStore            database.MirrorStore
-	git                    gitserver.GitServer
-	s3Client               s3.Client
-	userSvcClient          rpc.UserSvcClient
-	lfsBucket              string
-	userLikesStore         database.UserLikesStore
-	mirrorServer           mirrorserver.MirrorServer
-	runtimeFrameworksStore database.RuntimeFrameworksStore
-	deployTaskStore        database.DeployTaskStore
-	deployer               deploy.Deployer
-	publicRootDomain       string
-	serverBaseUrl          string
-	clusterInfoStore       database.ClusterInfoStore
-	mirrorSourceStore      database.MirrorSourceStore
-	tokenStore             database.AccessTokenStore
-	syncVersionStore       database.SyncVersionStore
-	syncClientSettingStore database.SyncClientSettingStore
-	fileStore              database.FileStore
-	config                 *config.Config
-	accountingComponent    AccountingComponent
-	spaceResourceStore     database.SpaceResourceStore
-	lfsMetaObjectStore     database.LfsMetaObjectStore
-	userResourcesStore     database.UserResourcesStore
-	recomStore             database.RecomStore
-	multiSyncClient        multisync.Client
-	sysMQ                  mq.MessageQueue
-	mirrorTaskStore        database.MirrorTaskStore
-	notificationSvcClient  rpc.NotificationSvcClient
-	mirrorSvcClient        rpc.MirrorSvcClient
-	pendingDeletion        database.PendingDeletionStore
-	xnetClient             rpc.XnetSvcClient
-	clusterComponent       ClusterComponent
+	tagComponent                   TagComponent
+	industryTagComponent           IndustryTagComponent
+	userStore                      database.UserStore
+	orgStore                       database.OrgStore
+	namespaceStore                 database.NamespaceStore
+	repoStore                      database.RepoStore
+	repoFileStore                  database.RepoFileStore
+	repoRelationsStore             database.RepoRelationsStore
+	repoStatisticsStore            database.RepositoryStatisticsStore
+	mirrorStore                    database.MirrorStore
+	git                            gitserver.GitServer
+	s3Client                       s3.Client
+	userSvcClient                  rpc.UserSvcClient
+	lfsBucket                      string
+	userLikesStore                 database.UserLikesStore
+	mirrorServer                   mirrorserver.MirrorServer
+	runtimeFrameworksStore         database.RuntimeFrameworksStore
+	deployTaskStore                database.DeployTaskStore
+	deployer                       deploy.Deployer
+	publicRootDomain               string
+	serverBaseUrl                  string
+	clusterInfoStore               database.ClusterInfoStore
+	mirrorSourceStore              database.MirrorSourceStore
+	tokenStore                     database.AccessTokenStore
+	syncVersionStore               database.SyncVersionStore
+	syncClientSettingStore         database.SyncClientSettingStore
+	fileStore                      database.FileStore
+	config                         *config.Config
+	accountingComponent            AccountingComponent
+	spaceResourceStore             database.SpaceResourceStore
+	lfsMetaObjectStore             database.LfsMetaObjectStore
+	userResourcesStore             database.UserResourcesStore
+	recomStore                     database.RecomStore
+	multiSyncClient                multisync.Client
+	sysMQ                          mq.MessageQueue
+	mirrorTaskStore                database.MirrorTaskStore
+	argoWorkFlowStore              database.ArgoWorkFlowStore
+	dataviewerStore                database.DataviewerStore
+	accountSyncQuotaStatementStore database.AccountSyncQuotaStatementStore
+	accountPriceStore              database.AccountPriceStore
+	notificationSvcClient          rpc.NotificationSvcClient
+	mirrorSvcClient                rpc.MirrorSvcClient
+	pendingDeletion                database.PendingDeletionStore
+	xnetClient                     rpc.XnetSvcClient
+	clusterComponent               ClusterComponent
 	extendRepoImpl
 }
 
@@ -2932,6 +2936,11 @@ func (c *repoComponentImpl) ChangePath(ctx context.Context, req types.ChangePath
 		return errorx.BadRequest(errors.New("new path already exists"), errorx.Ctx().Set("new_path", req.NewPath))
 	}
 
+	// Check for dependent entities that would be affected by path change
+	if err := c.checkChangePathDependencies(ctx, repo); err != nil {
+		return err
+	}
+
 	if !repo.Hashed {
 		// Migrate repo to hashed path
 		// newPath := common.BuildHashedRelativePath(repo.ID)
@@ -2955,6 +2964,76 @@ func (c *repoComponentImpl) ChangePath(ctx context.Context, req types.ChangePath
 		return fmt.Errorf("failed to update repo, error: %w", err)
 	}
 
+	return nil
+}
+
+func (c *repoComponentImpl) checkChangePathDependencies(ctx context.Context, repo *database.Repository) error {
+	blocker := checkOne(func() (bool, error) {
+		cnt, err := c.deployTaskStore.CountByRepoID(ctx, repo.ID)
+		return cnt > 0, err
+	}, "deploy tasks", repo)
+	if blocker != nil {
+		return blocker
+	}
+	blocker = checkOne(func() (bool, error) {
+		_, err := c.syncVersionStore.FindByRepoTypeAndPath(ctx, repo.Path, repo.RepositoryType)
+		if errors.Is(err, sql.ErrNoRows) {
+			return false, nil
+		}
+		return err == nil, err
+	}, "sync versions", repo)
+	if blocker != nil {
+		return blocker
+	}
+	blocker = checkOne(func() (bool, error) {
+		cnt, err := c.argoWorkFlowStore.CountByRepoPath(ctx, repo.Path)
+		return cnt > 0, err
+	}, "argo workflows", repo)
+	if blocker != nil {
+		return blocker
+	}
+	blocker = checkOne(func() (bool, error) {
+		v, err := c.dataviewerStore.GetViewerByRepoID(ctx, repo.ID)
+		if errors.Is(err, sql.ErrNoRows) {
+			return false, nil
+		}
+		return v != nil, err
+	}, "dataviewers", repo)
+	if blocker != nil {
+		return blocker
+	}
+	blocker = checkOne(func() (bool, error) {
+		cnt, err := c.accountSyncQuotaStatementStore.CountByRepoPath(ctx, repo.Path)
+		return cnt > 0, err
+	}, "account sync quota statements", repo)
+	if blocker != nil {
+		return blocker
+	}
+	blocker = checkOne(func() (bool, error) {
+		resourceIDs := []string{
+			fmt.Sprintf(types.CSGHubResourceFmt, types.ProviderTypeServerless, repo.Path),
+			fmt.Sprintf(types.CSGHubResourceFmt, types.ProviderTypeInference, repo.Path),
+		}
+		cnt, err := c.accountPriceStore.CountByResourceIDs(ctx, resourceIDs)
+		return cnt > 0, err
+	}, "account prices", repo)
+	if blocker != nil {
+		return blocker
+	}
+	return nil
+}
+
+func checkOne(check func() (bool, error), entity string, repo *database.Repository) error {
+	blocked, err := check()
+	if err != nil {
+		return fmt.Errorf("failed to check %s for repo %s: %w", entity, repo.Path, err)
+	}
+	if blocked {
+		return errorx.ChangePathBlocked(
+			fmt.Errorf("cannot change path: the following dependent entities exist: %s. Please remove them first", entity),
+			errorx.Ctx().Set("repo_path", repo.Path).Set("entity", entity),
+		)
+	}
 	return nil
 }
 

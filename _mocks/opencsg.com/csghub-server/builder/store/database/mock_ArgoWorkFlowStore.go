@@ -26,6 +26,63 @@ func (_m *MockArgoWorkFlowStore) EXPECT() *MockArgoWorkFlowStore_Expecter {
 	return &MockArgoWorkFlowStore_Expecter{mock: &_m.Mock}
 }
 
+// CountByRepoPath provides a mock function with given fields: ctx, repoPath
+func (_m *MockArgoWorkFlowStore) CountByRepoPath(ctx context.Context, repoPath string) (int, error) {
+	ret := _m.Called(ctx, repoPath)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CountByRepoPath")
+	}
+
+	var r0 int
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (int, error)); ok {
+		return rf(ctx, repoPath)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) int); ok {
+		r0 = rf(ctx, repoPath)
+	} else {
+		r0 = ret.Get(0).(int)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, repoPath)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockArgoWorkFlowStore_CountByRepoPath_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CountByRepoPath'
+type MockArgoWorkFlowStore_CountByRepoPath_Call struct {
+	*mock.Call
+}
+
+// CountByRepoPath is a helper method to define mock.On call
+//   - ctx context.Context
+//   - repoPath string
+func (_e *MockArgoWorkFlowStore_Expecter) CountByRepoPath(ctx interface{}, repoPath interface{}) *MockArgoWorkFlowStore_CountByRepoPath_Call {
+	return &MockArgoWorkFlowStore_CountByRepoPath_Call{Call: _e.mock.On("CountByRepoPath", ctx, repoPath)}
+}
+
+func (_c *MockArgoWorkFlowStore_CountByRepoPath_Call) Run(run func(ctx context.Context, repoPath string)) *MockArgoWorkFlowStore_CountByRepoPath_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockArgoWorkFlowStore_CountByRepoPath_Call) Return(_a0 int, _a1 error) *MockArgoWorkFlowStore_CountByRepoPath_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockArgoWorkFlowStore_CountByRepoPath_Call) RunAndReturn(run func(context.Context, string) (int, error)) *MockArgoWorkFlowStore_CountByRepoPath_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // CreateWorkFlow provides a mock function with given fields: ctx, workFlow
 func (_m *MockArgoWorkFlowStore) CreateWorkFlow(ctx context.Context, workFlow database.ArgoWorkflow) (*database.ArgoWorkflow, error) {
 	ret := _m.Called(ctx, workFlow)

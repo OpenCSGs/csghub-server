@@ -103,6 +103,10 @@ func NewRepoComponent(config *config.Config) (RepoComponent, error) {
 	c.mirrorSvcClient = rpc.NewMirrorSvcClient(fmt.Sprintf("%s:%d", config.LfsSync.Host, config.LfsSync.Port),
 		rpc.AuthWithApiKey(config.APIToken))
 	c.pendingDeletion = database.NewPendingDeletionStore()
+	c.argoWorkFlowStore = database.NewArgoWorkFlowStore()
+	c.dataviewerStore = database.NewDataviewerStore()
+	c.accountSyncQuotaStatementStore = database.NewAccountSyncQuotaStatementStore()
+	c.accountPriceStore = database.NewAccountPriceStore()
 	c.clusterComponent, err = NewClusterComponent(config)
 	if err != nil {
 		return nil, err

@@ -34,6 +34,7 @@ type AccountPriceStore interface {
 	ListDistinctGroupKeys(ctx context.Context, req types.AcctPriceDistinctListReq) ([]AcctPriceGroupKey, int, error)
 	ListPricesByGroupKey(ctx context.Context, req types.AcctPriceGroupKeyReq) ([]AccountPrice, error)
 	OffLineBySkuTypeAndResourceID(ctx context.Context, req types.AcctPriceOffLineReq) error
+	CountByResourceIDs(ctx context.Context, resourceIDs []string) (int, error)
 }
 
 func NewAccountPriceStore() AccountPriceStore {
@@ -335,4 +336,12 @@ func (a *accountPriceStoreImpl) OffLineBySkuTypeAndResourceID(ctx context.Contex
 		return errorx.HandleDBError(err, nil)
 	}
 	return nil
+}
+
+func (a *accountPriceStoreImpl) CountByResourceIDs(ctx context.Context, resourceIDs []string) (int, error) {
+	count, err := a.db.Core.NewSelect().
+		Model((*AccountPrice)(nil)).
+		Where("resource_id IN (?)", bun.In(resourceIDs)).
+		Count(ctx)
+	return count, errorx.HandleDBError(err, nil)
 }

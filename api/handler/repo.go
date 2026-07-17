@@ -1958,12 +1958,12 @@ func (h *RepoHandler) ChangePath(ctx *gin.Context) {
 
 	err = h.c.ChangePath(ctx.Request.Context(), req)
 	if err != nil {
-		if errors.Is(err, errorx.ErrBadRequest) {
+		if errors.Is(err, errorx.ErrBadRequest) || errors.Is(err, errorx.ErrChangePathBlocked) {
 			slog.ErrorContext(ctx.Request.Context(), "invalid request", slog.Any("error", err))
-			httpbase.BadRequest(ctx, err.Error())
+			httpbase.BadRequestWithExt(ctx, err)
 			return
 		}
-		slog.ErrorContext(ctx.Request.Context(), "failed to commit files", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "failed to change path", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}

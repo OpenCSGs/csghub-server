@@ -66,8 +66,10 @@ type MockStores struct {
 	RepositoryStatistics   database.RepositoryStatisticsStore
 	InferenceArch          database.InferenceArchStore
 	Upstream               database.UpstreamStore
-	DatasetApplication     database.DatasetApplicationStore
-	Metadata               database.MetadataStore
+	DatasetApplication              database.DatasetApplicationStore
+	Metadata                        database.MetadataStore
+	AccountSyncQuotaStatement       database.AccountSyncQuotaStatementStore
+	AccountPrice                    database.AccountPriceStore
 }
 
 func NewMockStores(t interface {
@@ -134,8 +136,10 @@ func NewMockStores(t interface {
 		RepositoryStatistics:   mockdb.NewMockRepositoryStatisticsStore(t),
 		InferenceArch:          mockdb.NewMockInferenceArchStore(t),
 		Upstream:               mockdb.NewMockUpstreamStore(t),
-		DatasetApplication:     mockdb.NewMockDatasetApplicationStore(t),
-		Metadata:               mockdb.NewMockMetadataStore(t),
+		DatasetApplication:              mockdb.NewMockDatasetApplicationStore(t),
+		Metadata:                        mockdb.NewMockMetadataStore(t),
+		AccountSyncQuotaStatement:       mockdb.NewMockAccountSyncQuotaStatementStore(t),
+		AccountPrice:                    mockdb.NewMockAccountPriceStore(t),
 	}
 }
 
@@ -381,4 +385,12 @@ func (s *MockStores) DatasetApplicationMock() *mockdb.MockDatasetApplicationStor
 
 func (s *MockStores) MetadataMock() *mockdb.MockMetadataStore {
 	return s.Metadata.(*mockdb.MockMetadataStore)
+}
+
+func (s *MockStores) AccountSyncQuotaStatementMock() *mockdb.MockAccountSyncQuotaStatementStore {
+	return s.AccountSyncQuotaStatement.(*mockdb.MockAccountSyncQuotaStatementStore)
+}
+
+func (s *MockStores) AccountPriceMock() *mockdb.MockAccountPriceStore {
+	return s.AccountPrice.(*mockdb.MockAccountPriceStore)
 }

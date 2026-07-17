@@ -763,3 +763,73 @@ func TestArgoWorkflowStore_ListRunningWorkflowsByUserUUID(t *testing.T) {
 		require.Equal(t, "Running", string(wf.Status))
 	}
 }
+
+func TestArgoWorkflowStore_CountByRepoPath(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewArgoWorkFlowStoreWithDB(db)
+
+	_, err := store.CreateWorkFlow(ctx, database.ArgoWorkflow{
+		Username:   "user",
+		UserUUID:   "uuid-1",
+		Namespace:  "ns",
+		TaskName:   "task1",
+		TaskId:     "tid-1",
+		TaskType:   types.TaskTypeEvaluation,
+		RepoIds:    []string{"models_ns/model1", "models_ns/model2"},
+		RepoType:   "model",
+		Image:      "img",
+		SubmitTime: time.Now(),
+	})
+	require.Nil(t, err)
+
+	_, err = store.CreateWorkFlow(ctx, database.ArgoWorkflow{
+		Username:   "user",
+		UserUUID:   "uuid-1",
+		Namespace:  "ns",
+		TaskName:   "task2",
+		TaskId:     "tid-2",
+		TaskType:   types.TaskTypeEvaluation,
+		RepoIds:    []string{"models_ns/model1"},
+		RepoType:   "model",
+		Image:      "img",
+		SubmitTime: time.Now(),
+	})
+	require.Nil(t, err)
+
+	_, err = store.CreateWorkFlow(ctx, database.ArgoWorkflow{
+		Username:   "user",
+		UserUUID:   "uuid-1",
+		Namespace:  "ns",
+		TaskName:   "task3",
+		TaskId:     "tid-3",
+		TaskType:   types.TaskTypeEvaluation,
+		RepoIds:    []string{"datasets_ns/ds1"},
+		RepoType:   "dataset",
+		Image:      "img",
+		SubmitTime: time.Now(),
+	})
+	require.Nil(t, err)
+
+	// model1 appears in 2 workflows
+	count, err := store.CountByRepoPath(ctx, "models_ns/model1")
+	require.Nil(t, err)
+	require.Equal(t, 2, count)
+
+	// model2 appears in 1 workflow
+	count, err = store.CountByRepoPath(ctx, "models_ns/model2")
+	require.Nil(t, err)
+	require.Equal(t, 1, count)
+
+	// ds1 appears in 1 workflow
+	count, err = store.CountByRepoPath(ctx, "datasets_ns/ds1")
+	require.Nil(t, err)
+	require.Equal(t, 1, count)
+
+	// non-existent path
+	count, err = store.CountByRepoPath(ctx, "nonexistent/path")
+	require.Nil(t, err)
+	require.Equal(t, 0, count)
+}

@@ -2,6 +2,7 @@ package database_test
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -649,4 +650,64 @@ func TestAccountPriceStore_OffLineBySkuTypeAndResourceID(t *testing.T) {
 		})
 		require.Nil(t, err)
 	})
+}
+
+func TestAccountPriceStore_CountByResourceIDs(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewAccountPriceStoreWithDB(db)
+
+	_, err := store.Create(ctx, database.AccountPrice{
+		SkuType:    types.SKUReserve,
+		SkuPrice:   100,
+		SkuUnit:    1,
+		SkuDesc:    "test1",
+		ResourceID: fmt.Sprintf(types.CSGHubResourceFmt, types.ProviderTypeServerless, "ns1/model-a"),
+		SkuKind:    types.SKUPayAsYouGo,
+	})
+	require.Nil(t, err)
+
+	_, err = store.Create(ctx, database.AccountPrice{
+		SkuType:    types.SKUReserve,
+		SkuPrice:   200,
+		SkuUnit:    1,
+		SkuDesc:    "test2",
+		ResourceID: fmt.Sprintf(types.CSGHubResourceFmt, types.ProviderTypeInference, "ns1/model-a"),
+		SkuKind:    types.SKUPayAsYouGo,
+	})
+	require.Nil(t, err)
+
+	_, err = store.Create(ctx, database.AccountPrice{
+		SkuType:    types.SKUReserve,
+		SkuPrice:   300,
+		SkuUnit:    1,
+		SkuDesc:    "test3",
+		ResourceID: fmt.Sprintf(types.CSGHubResourceFmt, types.ProviderTypeServerless, "ns2/other"),
+		SkuKind:    types.SKUPayAsYouGo,
+	})
+	require.Nil(t, err)
+
+	// Match both serverless and inference for model-a: 2 prices
+	count, err := store.CountByResourceIDs(ctx, []string{
+		fmt.Sprintf(types.CSGHubResourceFmt, types.ProviderTypeServerless, "ns1/model-a"),
+		fmt.Sprintf(types.CSGHubResourceFmt, types.ProviderTypeInference, "ns1/model-a"),
+	})
+	require.Nil(t, err)
+	require.Equal(t, 2, count)
+
+	// Only serverless for other: 1 price
+	count, err = store.CountByResourceIDs(ctx, []string{
+		fmt.Sprintf(types.CSGHubResourceFmt, types.ProviderTypeServerless, "ns2/other"),
+	})
+	require.Nil(t, err)
+	require.Equal(t, 1, count)
+
+	// No match
+	count, err = store.CountByResourceIDs(ctx, []string{
+		fmt.Sprintf(types.CSGHubResourceFmt, types.ProviderTypeServerless, "ns1/nonexistent"),
+	})
+	require.Nil(t, err)
+	require.Equal(t, 0, count)
 }
