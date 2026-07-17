@@ -23,15 +23,14 @@
 #   total_vram_gb = min_inference_vram_gb * pods
 #
 # ─── TP/EP/DP Convention ───
-# models.toml stores TP and EP with the SAME value (n), DP=1.
-# The actual engine-specific mapping happens in pd-disaggregation.sh:
+# Both vLLM and SGLang use TP=n, EP=n, DP=1 by default.
+# Users can customize DP via the frontend PD config.
 #
-#   SGLang:  TP=n  EP=n  DP=1   (TP==EP is the recommended setting for SGLang PD)
-#   vLLM:    TP=1  DP=n  EP=enabled (--enable-expert-parallel, no number)
+#   SGLang:  TP=n  EP=n  DP=1   (TP==EP recommended, TP can span pods via --nnodes)
+#   vLLM:    TP=n  EP=n  DP=1   (TP must fit within a single pod)
 #
-# This means: set tp=ep=n in both [models.prefill] and [models.decode].
-# The scripts read PD_TP/PD_EP env vars (set by Go code from these values)
-# and remap them according to the engine type.
+# The scripts read PD_TP/PD_EP/PD_DP env vars (set by Go code).
+# --enable-expert-parallel is added when EP > 1.
 
 # ─── DeepSeek ───
 

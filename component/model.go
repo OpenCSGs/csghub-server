@@ -1200,7 +1200,7 @@ func (c *modelComponentImpl) Deploy(ctx context.Context, deployReq types.DeployA
 	if req.EnablePD {
 		pdConfig, err := c.checkAndBuildPDConfig(ctx, req, hardware, m.Repository.ID)
 		if err != nil {
-			return -1, errorx.BadRequest(err, nil)
+			return -1, errorx.PDConfigInvalid(err, nil)
 		}
 		dp.DeployExtend.PD = pdConfig
 	}

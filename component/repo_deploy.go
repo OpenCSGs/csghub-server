@@ -889,26 +889,61 @@ func (c *repoComponentImpl) DeployUpdate(ctx context.Context, updateReq types.De
 			// update runtime image once user changed cpu to gpu
 			req.RuntimeFrameworkID = &frame.ID
 		}
-		// When resource changes and PD is enabled, rebuild PD config hardware
-		// so that per-role hardware (resource_name, labels, mem_size, etc.)
-		// matches the new resource instead of retaining stale values.
-		//
-		// Both DeployUpdate and ServerlessUpdate API paths flow through this
-		// function (ServerlessUpdate handler calls DeployUpdate), so a single
-		// rebuild here covers both code paths.
-		//
-		// deploy is a local variable fetched from DB in this request. Mutating
-		// deploy.PD in-place is safe: if UpdateDeploy fails, the request ends
-		// and deploy is GC'd — no global state or subsequent logic reads it.
-		if deploy.PD != nil && deploy.PD.Enabled {
+		// When resource changes, rebuild PD config with the new hardware.
+		// If the client sent a new PD config in the request body, use that;
+		// otherwise fall back to the existing DB config.
+		var pdConfigToBuild *types.PDConfig
+		if req.PD != nil {
+			pdConfigToBuild = req.PD
+		} else if deploy.PD != nil && deploy.PD.Enabled {
+			pdConfigToBuild = deploy.PD
+		}
+		if pdConfigToBuild != nil && pdConfigToBuild.Enabled {
 			var newHardware types.HardWare
 			if err := json.Unmarshal([]byte(resource.Resources), &newHardware); err != nil {
 				return fmt.Errorf("invalid resource hardware setting, %w", err)
 			}
-			if err := rebuildPDConfigForHardware(deploy.PD, newHardware); err != nil {
-				return fmt.Errorf("failed to rebuild PD config for new hardware, %w", err)
+			minReplica, maxReplica := extractReplicaBounds(req, deploy)
+			if err := buildPDConfig(pdConfigToBuild, newHardware, minReplica, maxReplica); err != nil {
+				return errorx.PDConfigInvalid(err, nil)
 			}
-			req.PD = deploy.PD
+			req.PD = pdConfigToBuild
+		}
+	}
+
+	// Validate and process PD config from the request body, even if resource
+	// didn't change. This ensures client-provided TP/DP/EP/PodsSize values
+	// are validated and persisted to the database.
+	if req.PD != nil && req.PD.Enabled {
+		if req.PD.Prefill == nil || req.PD.Decode == nil {
+			return errorx.PDConfigInvalid(fmt.Errorf("PD config must include both prefill and decode role configs"), nil)
+		}
+		// When resource didn't change, always rebuild PD config with the
+		// existing deploy's hardware so GPU capacity is validated and
+		// CPU/memory/GPU are all recalculated — same logic as initial deploy.
+		// This covers both first-time PD enable and PD config updates.
+		if req.ResourceID == nil {
+			var existingHardware types.HardWare
+			if err := json.Unmarshal([]byte(deploy.Hardware), &existingHardware); err != nil {
+				return fmt.Errorf("invalid existing hardware setting, %w", err)
+			}
+			// Preserve existing replica/HPA settings when the request doesn't
+			// specify MinReplica/MaxReplica.
+			minReplica, maxReplica := extractReplicaBounds(req, deploy)
+			// Also preserve existing HPA config if the request's PD config
+			// doesn't include one.
+			if req.PD.HPA == nil && deploy.PD != nil && deploy.PD.HPA != nil {
+				req.PD.HPA = deploy.PD.HPA
+			}
+			if err := buildPDConfig(req.PD, existingHardware, minReplica, maxReplica); err != nil {
+				return errorx.PDConfigInvalid(err, nil)
+			}
+		} else {
+			if err := validateAndFillPDRoleConfigs(req.PD); err != nil {
+				return errorx.PDConfigInvalid(err, nil)
+			}
+			minReplica, maxReplica := extractReplicaBounds(req, deploy)
+			req.PD.ApplyDefaults(minReplica, maxReplica)
 		}
 	}
 
@@ -951,10 +986,29 @@ func (c *repoComponentImpl) DeployUpdate(ctx context.Context, updateReq types.De
 	return err
 }
 
+// extractReplicaBounds extracts minReplica and maxReplica from the DeployUpdateReq
+// pointer fields, falling back to the existing deploy's values when the request
+// doesn't specify them. This prevents accidentally resetting HPA configuration
+// when the client only updates PD parallelism (TP/DP/EP/PodsSize).
+func extractReplicaBounds(req *types.DeployUpdateReq, deploy *database.Deploy) (minReplica, maxReplica int) {
+	if req.MinReplica != nil {
+		minReplica = *req.MinReplica
+	} else if deploy != nil {
+		minReplica = deploy.MinReplica
+	}
+	if req.MaxReplica != nil {
+		maxReplica = *req.MaxReplica
+	} else if deploy != nil {
+		maxReplica = deploy.MaxReplica
+	}
+	return
+}
+
 func needRestartDeploy(req *types.DeployUpdateReq) bool {
 	if req.ClusterID != nil || req.RuntimeFrameworkID != nil || req.ResourceID != nil ||
 		req.MaxReplica != nil || req.MinReplica != nil || req.Env != nil ||
-		req.EngineArgs != nil || req.Variables != nil || req.Entrypoint != nil {
+		req.EngineArgs != nil || req.Variables != nil || req.Entrypoint != nil ||
+		req.PD != nil {
 		return true
 	}
 	return false

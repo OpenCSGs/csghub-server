@@ -13,7 +13,12 @@ func (c *modelComponentImpl) checkAndBuildPDConfig(ctx context.Context, req type
 	return nil, nil
 }
 
-// rebuildPDConfigForHardware is a no-op for CE builds that do not support PD disaggregation.
-func rebuildPDConfigForHardware(pdConfig *types.PDConfig, hardware types.HardWare) error {
+// buildPDConfig is a no-op for CE builds that do not support PD disaggregation.
+func buildPDConfig(pdConfig *types.PDConfig, hardware types.HardWare, minReplica, maxReplica int) error {
+	return nil
+}
+
+// validateAndFillPDRoleConfigs is a no-op for CE builds that do not support PD disaggregation.
+func validateAndFillPDRoleConfigs(pdConfig *types.PDConfig) error {
 	return nil
 }
