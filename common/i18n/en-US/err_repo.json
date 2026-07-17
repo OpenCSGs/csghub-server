@@ -22,5 +22,8 @@
     },
     "error.REPO-ERR-7": {
         "other": "Cannot change repository path because the following dependent entities exist: {{.entity}}. Please remove them first."
+    },
+    "error.REPO-ERR-8": {
+        "other": "Compliance scan not passed, cannot make repository public."
     }
 }

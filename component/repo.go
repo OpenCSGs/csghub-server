@@ -379,11 +379,9 @@ func (c *repoComponentImpl) UpdateRepo(ctx context.Context, req types.UpdateRepo
 			if req.Private != nil {
 				// Additional check if making the repository public.
 				if !*req.Private {
-					allow, reason := c.allowPublic(repo)
-					if !allow {
-						err := errors.New("cannot change repo to public: " + reason)
-						return nil, errorx.CannotSetRepoVisibility(err, nil)
-					}
+					if err := c.allowPublic(repo); err != nil {
+					return nil, err
+				}
 				}
 				repo.Private = *req.Private
 			}
