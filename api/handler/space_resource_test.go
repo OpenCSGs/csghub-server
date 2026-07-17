@@ -85,7 +85,7 @@ func TestSpaceResourceHandler_Index(t *testing.T) {
 			Per:          100,
 			Page:         1,
 		}
-		tester.mocks.cluster.EXPECT().Index(mock.Anything).
+		tester.mocks.cluster.EXPECT().Index(mock.Anything, types.ClusterIndexReq{}).
 			Return([]types.ClusterRes{
 				{ClusterID: "c1"},
 			}, nil)

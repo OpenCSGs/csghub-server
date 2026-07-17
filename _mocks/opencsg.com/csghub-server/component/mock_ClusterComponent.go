@@ -743,9 +743,9 @@ func (_c *MockClusterComponent_GetWorkflowsByTimeRangeStream_Call) RunAndReturn(
 	return _c
 }
 
-// Index provides a mock function with given fields: ctx
-func (_m *MockClusterComponent) Index(ctx context.Context) ([]types.ClusterRes, error) {
-	ret := _m.Called(ctx)
+// Index provides a mock function with given fields: ctx, req
+func (_m *MockClusterComponent) Index(ctx context.Context, req types.ClusterIndexReq) ([]types.ClusterRes, error) {
+	ret := _m.Called(ctx, req)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Index")
@@ -753,19 +753,19 @@ func (_m *MockClusterComponent) Index(ctx context.Context) ([]types.ClusterRes, 
 
 	var r0 []types.ClusterRes
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context) ([]types.ClusterRes, error)); ok {
-		return rf(ctx)
+	if rf, ok := ret.Get(0).(func(context.Context, types.ClusterIndexReq) ([]types.ClusterRes, error)); ok {
+		return rf(ctx, req)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context) []types.ClusterRes); ok {
-		r0 = rf(ctx)
+	if rf, ok := ret.Get(0).(func(context.Context, types.ClusterIndexReq) []types.ClusterRes); ok {
+		r0 = rf(ctx, req)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]types.ClusterRes)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
-		r1 = rf(ctx)
+	if rf, ok := ret.Get(1).(func(context.Context, types.ClusterIndexReq) error); ok {
+		r1 = rf(ctx, req)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -780,13 +780,14 @@ type MockClusterComponent_Index_Call struct {
 
 // Index is a helper method to define mock.On call
 //   - ctx context.Context
-func (_e *MockClusterComponent_Expecter) Index(ctx interface{}) *MockClusterComponent_Index_Call {
-	return &MockClusterComponent_Index_Call{Call: _e.mock.On("Index", ctx)}
+//   - req types.ClusterIndexReq
+func (_e *MockClusterComponent_Expecter) Index(ctx interface{}, req interface{}) *MockClusterComponent_Index_Call {
+	return &MockClusterComponent_Index_Call{Call: _e.mock.On("Index", ctx, req)}
 }
 
-func (_c *MockClusterComponent_Index_Call) Run(run func(ctx context.Context)) *MockClusterComponent_Index_Call {
+func (_c *MockClusterComponent_Index_Call) Run(run func(ctx context.Context, req types.ClusterIndexReq)) *MockClusterComponent_Index_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context))
+		run(args[0].(context.Context), args[1].(types.ClusterIndexReq))
 	})
 	return _c
 }
@@ -796,14 +797,14 @@ func (_c *MockClusterComponent_Index_Call) Return(_a0 []types.ClusterRes, _a1 er
 	return _c
 }
 
-func (_c *MockClusterComponent_Index_Call) RunAndReturn(run func(context.Context) ([]types.ClusterRes, error)) *MockClusterComponent_Index_Call {
+func (_c *MockClusterComponent_Index_Call) RunAndReturn(run func(context.Context, types.ClusterIndexReq) ([]types.ClusterRes, error)) *MockClusterComponent_Index_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// IndexPublic provides a mock function with given fields: ctx
-func (_m *MockClusterComponent) IndexPublic(ctx context.Context) (types.PublicClusterRes, error) {
-	ret := _m.Called(ctx)
+// IndexPublic provides a mock function with given fields: ctx, req
+func (_m *MockClusterComponent) IndexPublic(ctx context.Context, req types.ClusterIndexReq) (types.PublicClusterRes, error) {
+	ret := _m.Called(ctx, req)
 
 	if len(ret) == 0 {
 		panic("no return value specified for IndexPublic")
@@ -811,17 +812,17 @@ func (_m *MockClusterComponent) IndexPublic(ctx context.Context) (types.PublicCl
 
 	var r0 types.PublicClusterRes
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context) (types.PublicClusterRes, error)); ok {
-		return rf(ctx)
+	if rf, ok := ret.Get(0).(func(context.Context, types.ClusterIndexReq) (types.PublicClusterRes, error)); ok {
+		return rf(ctx, req)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context) types.PublicClusterRes); ok {
-		r0 = rf(ctx)
+	if rf, ok := ret.Get(0).(func(context.Context, types.ClusterIndexReq) types.PublicClusterRes); ok {
+		r0 = rf(ctx, req)
 	} else {
 		r0 = ret.Get(0).(types.PublicClusterRes)
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
-		r1 = rf(ctx)
+	if rf, ok := ret.Get(1).(func(context.Context, types.ClusterIndexReq) error); ok {
+		r1 = rf(ctx, req)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -836,13 +837,14 @@ type MockClusterComponent_IndexPublic_Call struct {
 
 // IndexPublic is a helper method to define mock.On call
 //   - ctx context.Context
-func (_e *MockClusterComponent_Expecter) IndexPublic(ctx interface{}) *MockClusterComponent_IndexPublic_Call {
-	return &MockClusterComponent_IndexPublic_Call{Call: _e.mock.On("IndexPublic", ctx)}
+//   - req types.ClusterIndexReq
+func (_e *MockClusterComponent_Expecter) IndexPublic(ctx interface{}, req interface{}) *MockClusterComponent_IndexPublic_Call {
+	return &MockClusterComponent_IndexPublic_Call{Call: _e.mock.On("IndexPublic", ctx, req)}
 }
 
-func (_c *MockClusterComponent_IndexPublic_Call) Run(run func(ctx context.Context)) *MockClusterComponent_IndexPublic_Call {
+func (_c *MockClusterComponent_IndexPublic_Call) Run(run func(ctx context.Context, req types.ClusterIndexReq)) *MockClusterComponent_IndexPublic_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context))
+		run(args[0].(context.Context), args[1].(types.ClusterIndexReq))
 	})
 	return _c
 }
@@ -852,7 +854,7 @@ func (_c *MockClusterComponent_IndexPublic_Call) Return(_a0 types.PublicClusterR
 	return _c
 }
 
-func (_c *MockClusterComponent_IndexPublic_Call) RunAndReturn(run func(context.Context) (types.PublicClusterRes, error)) *MockClusterComponent_IndexPublic_Call {
+func (_c *MockClusterComponent_IndexPublic_Call) RunAndReturn(run func(context.Context, types.ClusterIndexReq) (types.PublicClusterRes, error)) *MockClusterComponent_IndexPublic_Call {
 	_c.Call.Return(run)
 	return _c
 }

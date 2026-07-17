@@ -43,12 +43,19 @@ const (
 // @Tags         Cluster
 // @Accept       json
 // @Produce      json
+// @Param        scope  query  types.ClusterScope  false  "Scope of cluster"
 // @Success      200  {object}  types.Response{} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /cluster [get]
 func (h *ClusterHandler) Index(ctx *gin.Context) {
-	clusters, err := h.c.Index(ctx.Request.Context())
+	var req types.ClusterIndexReq
+	if err := ctx.ShouldBindQuery(&req); err != nil {
+		slog.ErrorContext(ctx.Request.Context(), "Failed to parse cluster index request", slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	clusters, err := h.c.Index(ctx.Request.Context(), req)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "Failed to get cluster list", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -151,12 +158,19 @@ func (h *ClusterHandler) GetDeploys(ctx *gin.Context) {
 // @Tags         Cluster
 // @Accept       json
 // @Produce      json
+// @Param        scope  query  types.ClusterScope  false  "Scope of cluster"
 // @Success      200  {object}  types.Response{} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /cluster/public [get]
 func (h *ClusterHandler) GetClusterPublic(ctx *gin.Context) {
-	clusters, err := h.c.IndexPublic(ctx.Request.Context())
+	var req types.ClusterIndexReq
+	if err := ctx.ShouldBindQuery(&req); err != nil {
+		slog.ErrorContext(ctx.Request.Context(), "Failed to parse cluster index request", slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	clusters, err := h.c.IndexPublic(ctx.Request.Context(), req)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "Failed to get cluster list", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)

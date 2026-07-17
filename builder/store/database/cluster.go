@@ -59,20 +59,21 @@ func NewClusterInfoStoreWithDB(db *DB) ClusterInfoStore {
 }
 
 type ClusterInfo struct {
-	ClusterID        string               `bun:",pk" json:"cluster_id"`
-	ClusterConfig    string               `bun:",notnull" json:"cluster_config"`
-	StorageClass     string               `bun:"," json:"storage_class"`
-	Region           string               `bun:"," json:"region"`
-	Zone             string               `bun:"," json:"zone"`     //cn-beijing
-	Provider         string               `bun:"," json:"provider"` //ali
-	Enable           bool                 `bun:",notnull" json:"enable"`
-	Status           types.ClusterStatus  `bun:"," json:"status"`                  //running, unavailable
-	RunnerEndpoint   string               `bun:"endpoint," json:"runner_endpoint"` //runner in k8s api endpoint
-	NetworkInterface string               `bun:"," json:"network_interface"`       //used for multi-host, e.g., eth0
-	Mode             types.ClusterMode    `bun:"," json:"mode"`                    //used for multi-host, e.g., host, bridge
-	AppEndpoint      string               `bun:"," json:"app_endpoint"`            //runner app endpoint
-	ResourceStatus   types.ResourceStatus `bun:"," json:"resource_status"`
-	VXPUConfig       map[string]string    `bun:",type:jsonb,nullzero" json:"vxpu_config"`
+	ClusterID          string               `bun:",pk" json:"cluster_id"`
+	ClusterConfig      string               `bun:",notnull" json:"cluster_config"`
+	StorageClass       string               `bun:"," json:"storage_class"`
+	Region             string               `bun:"," json:"region"`
+	Zone               string               `bun:"," json:"zone"`     //cn-beijing
+	Provider           string               `bun:"," json:"provider"` //ali
+	Enable             bool                 `bun:",notnull" json:"enable"`
+	Status             types.ClusterStatus  `bun:"," json:"status"`                  //running, unavailable
+	RunnerEndpoint     string               `bun:"endpoint," json:"runner_endpoint"` //runner in k8s api endpoint
+	NetworkInterface   string               `bun:"," json:"network_interface"`       //used for multi-host, e.g., eth0
+	Mode               types.ClusterMode    `bun:"," json:"mode"`                    //used for multi-host, e.g., host, bridge
+	AppEndpoint        string               `bun:"," json:"app_endpoint"`            //runner app endpoint
+	ResourceStatus     types.ResourceStatus `bun:"," json:"resource_status"`
+	VXPUConfig         map[string]string    `bun:",type:jsonb,nullzero" json:"vxpu_config"`
+	SpaceResourceCount int                  `bun:",scanonly" json:"space_resource_count"`
 	times
 }
 
@@ -218,7 +219,13 @@ func (s *clusterInfoStoreImpl) ByClusterConfig(ctx context.Context, clusterConfi
 
 func (s *clusterInfoStoreImpl) List(ctx context.Context) ([]ClusterInfo, error) {
 	var result []ClusterInfo
-	_, err := s.db.Operator.Core.NewSelect().Model(&result).Order("region").Exec(ctx, &result)
+	err := s.db.Operator.Core.NewSelect().
+		ColumnExpr("ci.*, COUNT(sr.id) AS space_resource_count").
+		TableExpr("cluster_infos AS ci").
+		Join("LEFT JOIN space_resources sr ON sr.cluster_id = ci.cluster_id").
+		Group("ci.cluster_id").
+		Order("ci.region").
+		Scan(ctx, &result)
 	if err != nil {
 		return nil, err
 	}
