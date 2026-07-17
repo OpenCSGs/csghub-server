@@ -18,7 +18,10 @@ import (
 	"opencsg.com/csghub-server/common/utils/common"
 )
 
-const frameworkHFInferenceToolkit = "hf-inference-toolkit"
+const (
+	frameworkHFInferenceToolkit    = "hf-inference-toolkit"
+	frameworkAMDHfInferenceToolkit = "amd-hf-inference-toolkit"
+)
 
 var hfProviders = []string{"opencsg"}
 
@@ -43,7 +46,16 @@ func (a *HFInferenceToolkitAdapter) CanHandle(model *types.Model) bool {
 	if model.CSGHubModelID == "" {
 		return false
 	}
-	return model.Task == string(commonTypes.Text2Image) && model.RuntimeFramework == frameworkHFInferenceToolkit
+	return model.Task == string(commonTypes.Text2Image) && isHFInferenceToolkitFramework(model.RuntimeFramework)
+}
+
+func isHFInferenceToolkitFramework(runtimeFramework string) bool {
+	switch strings.ToLower(strings.TrimSpace(runtimeFramework)) {
+	case frameworkHFInferenceToolkit, frameworkAMDHfInferenceToolkit:
+		return true
+	default:
+		return false
+	}
 }
 
 func (a *HFInferenceToolkitAdapter) TransformRequest(ctx context.Context, openaiReq types.ImageGenerationRequest) ([]byte, error) {
