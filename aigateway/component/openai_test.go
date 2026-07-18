@@ -326,6 +326,78 @@ func TestSanitizeMeteringEventForLog(t *testing.T) {
 	require.True(t, strings.Contains(sanitized.Extra, `"completion_token_num":"8"`))
 }
 
+func TestOpenAIComponentImpl_getCSGHubModels_SetsSupportFunctionCallFromEngineArgs(t *testing.T) {
+	mockDeployStore := mockdb.NewMockDeployTaskStore(t)
+	comp := &openaiComponentImpl{
+		deployStore: mockDeployStore,
+	}
+
+	now := time.Now()
+	deploys := []database.Deploy{
+		{
+			ID:               1,
+			SvcName:          "vllm-svc",
+			Type:             commontypes.InferenceType,
+			RuntimeFramework: "vllm",
+			EngineArgs:       `{"enable-tool-calling":"enable"}`,
+			Repository: &database.Repository{
+				Name: "tool-model",
+				Path: "namespace/tool-model",
+			},
+			User: &database.User{
+				Username: "owner",
+				UUID:     "owner-uuid",
+			},
+			Endpoint: "vllm-endpoint",
+		},
+		{
+			ID:               2,
+			SvcName:          "plain-svc",
+			Type:             commontypes.InferenceType,
+			RuntimeFramework: "vllm",
+			EngineArgs:       `{"max-model-len":"8192"}`,
+			Repository: &database.Repository{
+				Name: "plain-model",
+				Path: "namespace/plain-model",
+			},
+			User: &database.User{
+				Username: "owner",
+				UUID:     "owner-uuid",
+			},
+			Endpoint: "plain-endpoint",
+		},
+		{
+			ID:               3,
+			SvcName:          "custom-options-svc",
+			Type:             commontypes.InferenceType,
+			RuntimeFramework: "vllm",
+			EngineArgs:       `{"max-model-len":"160000","custom-options":"--enable-auto-tool-choice --tool-call-parser deepseek_v31"}`,
+			Repository: &database.Repository{
+				Name: "custom-options-model",
+				Path: "namespace/custom-options-model",
+			},
+			User: &database.User{
+				Username: "owner",
+				UUID:     "owner-uuid",
+			},
+			Endpoint: "custom-options-endpoint",
+		},
+	}
+	for i := range deploys {
+		deploys[i].CreatedAt = now
+	}
+
+	mockDeployStore.EXPECT().RunningVisibleToUser(mock.Anything, int64(1)).
+		Return(deploys, nil).Once()
+
+	models, err := comp.getCSGHubModels(context.Background(), 1)
+	require.NoError(t, err)
+	require.Len(t, models, 3)
+	assert.True(t, models[0].SupportFunctionCall)
+	assert.False(t, models[1].SupportFunctionCall)
+	assert.True(t, models[2].SupportFunctionCall)
+}
+
 func TestOpenAIComponentImpl_getCSGHubModels_SkipsDeploysWithMissingRelations(t *testing.T) {
 	mockDeployStore := mockdb.NewMockDeployTaskStore(t)
 	comp := &openaiComponentImpl{

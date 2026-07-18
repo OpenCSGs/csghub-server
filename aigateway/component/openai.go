@@ -349,8 +349,7 @@ func (c *openaiComponentImpl) getCSGHubModels(ctx context.Context, userID int64)
 			slog.WarnContext(ctx, "skip deploy with empty model id", "deploy_id", deploy.ID, "svc_name", deploy.SvcName, "deploy_type", deploy.Type)
 			continue
 		}
-		// Check if engine_args contains tool-call-parser parameter
-		supportFunctionCall := strings.Contains(deploy.EngineArgs, "tool-call-parser")
+		supportFunctionCall := commontypes.EngineArgToolCallingEnabled(deploy.EngineArgs, deploy.RuntimeFramework)
 		m := types.Model{
 			BaseModel: types.BaseModel{
 				Object:              "model",

@@ -1,14 +1,59 @@
 package types
 
 import (
-	corev1 "k8s.io/api/core/v1"
+	"encoding/json"
+	"strings"
 	"time"
+
+	corev1 "k8s.io/api/core/v1"
 )
 
 const (
-	// EngineArgEnableToolCalling is the engine argument for enabling tool calling
-	EngineArgEnableToolCalling = "--enable-tool-calling"
+	// EngineArgEnableToolCalling is the JSON key for enabling tool calling in engine_args.
+	EngineArgEnableToolCalling = "enable-tool-calling"
+	// EngineArgCustomOptions is the JSON key for extra CLI flags in engine_args.
+	EngineArgCustomOptions = "custom-options"
 )
+
+func engineArgCLIIndicatesToolCalling(engineArgs string) bool {
+	return strings.Contains(engineArgs, "--enable-auto-tool-choice") ||
+		strings.Contains(engineArgs, "tool-call-parser")
+}
+
+// EngineArgToolCallingEnabled reports whether tool calling is enabled in deploy engine_args.
+// engine_args are stored as JSON; vLLM uses "disable" as the default sentinel while
+// SGLang uses "enable" as the default sentinel.
+func EngineArgToolCallingEnabled(engineArgs, runtimeFramework string) bool {
+	engineArgs = strings.TrimSpace(engineArgs)
+	if engineArgs == "" {
+		return false
+	}
+
+	var argValuesMap map[string]string
+	if err := json.Unmarshal([]byte(engineArgs), &argValuesMap); err != nil {
+		// Legacy CLI-style engine args.
+		return engineArgCLIIndicatesToolCalling(engineArgs)
+	}
+
+	if value, ok := argValuesMap[EngineArgEnableToolCalling]; ok {
+		switch value {
+		case "false", "0", "", "disable":
+			return false
+		}
+
+		defaultSentinel := "disable"
+		if strings.Contains(strings.ToLower(runtimeFramework), "sglang") {
+			defaultSentinel = "enable"
+		}
+		return value != defaultSentinel
+	}
+
+	if customOptions, ok := argValuesMap[EngineArgCustomOptions]; ok {
+		return engineArgCLIIndicatesToolCalling(customOptions)
+	}
+
+	return false
+}
 
 type DeployReq struct {
 	CurrentUser string `json:"current_user"`
