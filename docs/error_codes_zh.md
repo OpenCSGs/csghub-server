@@ -970,6 +970,14 @@
 - **错误名:** `codeChangePathBlockedErr`
 - **描述:** 无法更改仓库路径，存在依赖实体。请先移除它们。
 
+---
+
+### `REPO-ERR-8`
+
+- **错误代码:** `REPO-ERR-8`
+- **错误名:** `codeSensitiveCheckNotPassedErr`
+- **描述:** 合规扫描未通过，无法将仓库设置为公开。
+
 ## Req 错误
 
 ### `REQ-ERR-0`

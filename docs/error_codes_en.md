@@ -970,6 +970,14 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Name:** `codeChangePathBlockedErr`
 - **Description:** Cannot change repository path because dependent entities exist. Please remove them first.
 
+---
+
+### `REPO-ERR-8`
+
+- **Error Code:** `REPO-ERR-8`
+- **Error Name:** `codeSensitiveCheckNotPassedErr`
+- **Description:** The repository cannot be made public because the compliance scan has not passed.
+
 ## Req Errors
 
 ### `REQ-ERR-0`

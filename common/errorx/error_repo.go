@@ -11,6 +11,7 @@ const (
 	codeCodeZipDownloadFailedErr
 	codeBatchGetRepoExtraFailedErr
 	codeChangePathBlockedErr
+	codeSensitiveCheckNotPassedErr
 )
 
 var (
@@ -101,6 +102,17 @@ var (
 	//
 	// zh-HK: 無法更改倉庫路徑，以下依賴實體存在：{{.entity}}。請先移除它們。
 	ErrChangePathBlocked error = CustomError{prefix: errRepoPrefix, code: codeChangePathBlockedErr}
+
+	// Description: The repository cannot be made public because the compliance scan has not passed.
+	//
+	// Description_ZH: 合规扫描未通过，无法将仓库设置为公开。
+	//
+	// en-US: Compliance scan not passed, cannot make repository public.
+	//
+	// zh-CN: 合规扫描未通过，无法将仓库设置为公开。
+	//
+	// zh-HK: 合規掃描未通過，無法將倉庫設置為公開。
+	ErrSensitiveCheckNotPassed error = CustomError{prefix: errRepoPrefix, code: codeSensitiveCheckNotPassedErr}
 )
 
 // RepoNotFound creates a REPO-ERR-3 error with context.
@@ -126,4 +138,9 @@ func BatchGetRepoExtraFailed(err error) error {
 // ChangePathBlocked creates a REPO-ERR-7 error with context.
 func ChangePathBlocked(err error, ctx context) error {
 	return CustomError{prefix: errRepoPrefix, code: codeChangePathBlockedErr, err: err, context: ctx}
+}
+
+// SensitiveCheckNotPassed creates a REPO-ERR-7 error with context.
+func SensitiveCheckNotPassed(err error, ctx context) error {
+	return CustomError{prefix: errRepoPrefix, code: codeSensitiveCheckNotPassedErr, err: err, context: ctx}
 }

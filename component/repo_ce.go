@@ -127,9 +127,8 @@ func (c *repoComponentImpl) CheckAccountAndResource(ctx context.Context, chkReq 
 	return &types.CheckExclusiveResp{}, nil
 }
 
-func (c *repoComponentImpl) allowPublic(repo *database.Repository) (allow bool, reason string) {
-	//always allow public repo in on-premises deployment
-	return true, ""
+func (c *repoComponentImpl) allowPublic(repo *database.Repository) error {
+	return nil
 }
 
 func (c *repoComponentImpl) RemoteDiff(ctx context.Context, req types.GetDiffBetweenCommitsReq) ([]types.RemoteDiffs, error) {
