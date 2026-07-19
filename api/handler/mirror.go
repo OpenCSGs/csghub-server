@@ -220,3 +220,34 @@ func (h *MirrorHandler) Delete(ctx *gin.Context) {
 
 	httpbase.OK(ctx, nil)
 }
+
+// ResolveNamespace godoc
+// @Security     ApiKey
+// @Summary      Resolve target namespace and name from source
+// @Tags         Mirror
+// @Accept       json
+// @Produce      json
+// @Param        source_namespace query string true "source namespace"
+// @Param        source_name query string true "source name"
+// @Param        repo_type query string true "repo type (model, dataset, code)"
+// @Success      200  {object}  types.Response{data=types.ResolveNamespaceResp} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /mirror/namespace/resolve [get]
+func (h *MirrorHandler) ResolveNamespace(ctx *gin.Context) {
+	var req types.ResolveNamespaceReq
+	err := ctx.ShouldBindQuery(&req)
+	if err != nil {
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	resp, err := h.mirror.ResolveNamespace(ctx.Request.Context(), req)
+	if err != nil {
+		slog.ErrorContext(ctx.Request.Context(), "failed to resolve namespace", slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	httpbase.OK(ctx, resp)
+}
