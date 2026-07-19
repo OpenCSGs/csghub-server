@@ -75,6 +75,10 @@ func (h *OrganizationHandler) Create(ctx *gin.Context) {
 	org, err := h.c.Create(ctx, &req)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "Failed to create organization", slog.Any("error", err))
+		if errors.Is(err, errorx.ErrNamespaceAlreadyExists) {
+			httpbase.BadRequestWithExt(ctx, err)
+			return
+		}
 		httpbase.ServerError(ctx, err)
 		return
 	}

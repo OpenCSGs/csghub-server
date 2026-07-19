@@ -906,6 +906,14 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Name:** `codeWordRequire`
 - **Description:** The request parameter does not match the server requirements, and the server cannot process the request.
 
+## Pd Errors
+
+### `PD-ERR-0`
+
+- **Error Code:** `PD-ERR-0`
+- **Error Name:** `codePDConfigInvalid`
+- **Description:** The PD disaggregation configuration provided in the request is invalid. This includes missing PD config, missing prefill or decode role, invalid TP/DP/EP/PodsSize values, or GPU count mismatch.
+
 ## Repo Errors
 
 ### `REPO-ERR-0`
@@ -1649,4 +1657,12 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Code:** `USER-ERR-19`
 - **Error Name:** `uuidConflict`
 - **Description:** The UUID generated for the organization already exists in the system.
+
+---
+
+### `USER-ERR-20`
+
+- **Error Code:** `USER-ERR-20`
+- **Error Name:** `namespaceAlreadyExists`
+- **Description:** The namespace already exists in the system.
 

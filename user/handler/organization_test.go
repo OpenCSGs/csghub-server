@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"net/http/httptest"
@@ -9,11 +10,78 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	mockapicomp "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
 	mockcomp "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/user/component"
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
+
+func TestOrganizationHandler_Create(t *testing.T) {
+	newCreateTestCtx := func(t *testing.T) (*httptest.ResponseRecorder, *gin.Context) {
+		t.Helper()
+		gin.SetMode(gin.TestMode)
+		response := httptest.NewRecorder()
+		ginc, _ := gin.CreateTestContext(response)
+		httpbase.SetCurrentUser(ginc, "user1")
+		reqBody, err := json.Marshal(types.CreateOrgReq{Name: "org1"})
+		require.Nil(t, err)
+		ginc.Request = httptest.NewRequest("POST", "/api/v1/organizations", bytes.NewBuffer(reqBody))
+		ginc.Request.Header.Set("Content-Type", "application/json")
+		return response, ginc
+	}
+
+	t.Run("create organization successfully", func(t *testing.T) {
+		response, ginc := newCreateTestCtx(t)
+
+		mockSensitiveComp := mockapicomp.NewMockSensitiveComponent(t)
+		mockSensitiveComp.EXPECT().CheckRequestV2(mock.Anything, mock.Anything).Return(true, nil)
+		mockOrgComp := mockcomp.NewMockOrganizationComponent(t)
+		mockOrgComp.EXPECT().Create(mock.Anything, mock.Anything).Return(&types.Organization{
+			Name: "org1",
+		}, nil)
+		h := &OrganizationHandler{
+			c:  mockOrgComp,
+			sc: mockSensitiveComp,
+		}
+		h.Create(ginc)
+		require.Equal(t, 200, response.Code)
+	})
+
+	t.Run("create organization with existing namespace", func(t *testing.T) {
+		response, ginc := newCreateTestCtx(t)
+
+		mockSensitiveComp := mockapicomp.NewMockSensitiveComponent(t)
+		mockSensitiveComp.EXPECT().CheckRequestV2(mock.Anything, mock.Anything).Return(true, nil)
+		mockOrgComp := mockcomp.NewMockOrganizationComponent(t)
+		mockOrgComp.EXPECT().Create(mock.Anything, mock.Anything).Return(nil, errorx.NamespaceAlreadyExists("org1"))
+		h := &OrganizationHandler{
+			c:  mockOrgComp,
+			sc: mockSensitiveComp,
+		}
+		h.Create(ginc)
+		require.Equal(t, 400, response.Code)
+		var r httpbase.R
+		err := json.Unmarshal(response.Body.Bytes(), &r)
+		require.Nil(t, err)
+		require.Equal(t, "USER-ERR-20", r.Code)
+	})
+
+	t.Run("create organization with server error", func(t *testing.T) {
+		response, ginc := newCreateTestCtx(t)
+
+		mockSensitiveComp := mockapicomp.NewMockSensitiveComponent(t)
+		mockSensitiveComp.EXPECT().CheckRequestV2(mock.Anything, mock.Anything).Return(true, nil)
+		mockOrgComp := mockcomp.NewMockOrganizationComponent(t)
+		mockOrgComp.EXPECT().Create(mock.Anything, mock.Anything).Return(nil, errors.New("internal error"))
+		h := &OrganizationHandler{
+			c:  mockOrgComp,
+			sc: mockSensitiveComp,
+		}
+		h.Create(ginc)
+		require.Equal(t, 500, response.Code)
+	})
+}
 
 func TestOrganizationHandler_Index(t *testing.T) {
 	response := httptest.NewRecorder()
