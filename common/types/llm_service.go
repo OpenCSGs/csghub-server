@@ -79,7 +79,8 @@ type LLMConfig struct {
 	OfficialName       string           `json:"-"`    // deprecated: derived from upstream
 	ApiEndpoint        string           `json:"-"`    // deprecated: derived from upstream
 	AuthHeader         string           `json:"-"`    // deprecated: moved to upstream
-	Type               int              `json:"type"` // 1: optimization, 2: comparison, 4: summary readme
+	Type               int              `json:"-"`    // internal bitmask, use Types for the API
+	Types              []int            `json:"types"` // individual type flags derived from Type
 	Enabled            bool             `json:"enabled"`
 	Provider           string           `json:"-"` // deprecated: moved to upstream
 	Upstreams          []UpstreamConfig `json:"upstreams"`
@@ -104,7 +105,7 @@ type PromptPrefix struct {
 
 type SearchLLMConfig struct {
 	Keyword   string `json:"keyword"`    // Search keyword
-	Type      *int   `json:"type"`       // Type of search
+	Types     []int  `json:"types"`      // Type flags to match (configs that include any of these flags are returned)
 	Enabled   *bool  `json:"enabled"`    // Enabled filter
 	SortBy    string `json:"sort_by"`    // Sortable field: model_size_b | updated_at
 	SortOrder string `json:"sort_order"` // ASC | DESC
@@ -119,7 +120,7 @@ type UpdateLLMConfigReq struct {
 	ID                 int64             `json:"id"`
 	ModelName          *string           `json:"model_name"`
 	Upstreams          *[]UpstreamConfig `json:"upstreams"`
-	Type               *int              `json:"type"` // 1: optimization, 2: comparison, 4: summary readme
+	Types              *[]int            `json:"types"` // individual type flags, combined into a bitmask on update
 	Enabled            *bool             `json:"enabled"`
 	RoutingPolicy      *RoutingPolicy    `json:"routing_policy"`
 	Metadata           *map[string]any   `json:"metadata"` // tasks stored as: {"tasks": ["text-generation", "text-to-image"]}
@@ -138,7 +139,7 @@ type UpdatePromptPrefixReq struct {
 type CreateLLMConfigReq struct {
 	ModelName          string           `json:"model_name" binding:"required"`
 	Upstreams          []UpstreamConfig `json:"upstreams,omitempty"`
-	Type               int              `json:"type" binding:"required,oneof=1 2 4 8 16"` // 1: optimization, 2: comparison, 4: summary readme, 8: mcp scan, 16: for aigateway call external llm
+	Types              []int            `json:"types" binding:"required,min=1,dive,oneof=1 2 4 8 16"` // individual type flags, combined into a bitmask on create
 	Enabled            bool             `json:"enabled"`
 	RoutingPolicy      RoutingPolicy    `json:"routing_policy"`
 	Metadata           map[string]any   `json:"metadata"` // tasks stored as: {"tasks": ["text-generation", "text-to-image"]}

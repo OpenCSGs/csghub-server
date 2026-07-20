@@ -80,6 +80,11 @@ func NewLLMServiceComponent(config *config.Config) (LLMServiceComponent, error) 
 }
 
 func (s *llmServiceComponentImpl) IndexLLMConfig(ctx context.Context, per, page int, search *types.SearchLLMConfig) ([]*types.LLMConfig, int, error) {
+	if search != nil {
+		if err := validateOptionalLLMTypes(search.Types); err != nil {
+			return nil, 0, err
+		}
+	}
 	dbLLMConfigs, total, err := s.llmConfigStore.Index(ctx, per, page, search)
 	if err != nil {
 		return nil, 0, err
@@ -95,6 +100,7 @@ func (s *llmServiceComponentImpl) IndexLLMConfig(ctx context.Context, per, page 
 			OfficialName:       cfg.PrimaryOfficialName(),
 			Upstreams:          upstreams,
 			Type:               cfg.Type,
+			Types:              database.SplitLLMType(cfg.Type),
 			Enabled:            cfg.Enabled,
 			RoutingPolicy:      cfg.RoutingPolicy,
 			Metadata:           cfg.Metadata,
@@ -132,6 +138,7 @@ func (s *llmServiceComponentImpl) ShowLLMConfig(ctx context.Context, id int64) (
 		ModelName:          dbLlmConfig.ModelName,
 		Upstreams:          upstreams,
 		Type:               dbLlmConfig.Type,
+		Types:              database.SplitLLMType(dbLlmConfig.Type),
 		Enabled:            dbLlmConfig.Enabled,
 		RoutingPolicy:      dbLlmConfig.RoutingPolicy,
 		Metadata:           dbLlmConfig.Metadata,
@@ -185,8 +192,11 @@ func (s *llmServiceComponentImpl) UpdateLLMConfig(ctx context.Context, req *type
 		}
 		llmConfig.ModelName = modelName
 	}
-	if req.Type != nil {
-		llmConfig.Type = *req.Type
+	if req.Types != nil {
+		if err := validateLLMTypes(*req.Types); err != nil {
+			return nil, err
+		}
+		llmConfig.Type = database.CombineLLMTypes(*req.Types)
 	}
 	if req.Enabled != nil {
 		llmConfig.Enabled = *req.Enabled
@@ -221,6 +231,7 @@ func (s *llmServiceComponentImpl) UpdateLLMConfig(ctx context.Context, req *type
 		ModelName:          updatedConfig.ModelName,
 		Upstreams:          upstreams,
 		Type:               updatedConfig.Type,
+		Types:              database.SplitLLMType(updatedConfig.Type),
 		Enabled:            updatedConfig.Enabled,
 		RoutingPolicy:      updatedConfig.RoutingPolicy,
 		Metadata:           updatedConfig.Metadata,
@@ -275,9 +286,12 @@ func (s *llmServiceComponentImpl) CreateLLMConfig(ctx context.Context, req *type
 	if err := s.validateLLMEndpointConfig(req.Upstreams); err != nil {
 		return nil, err
 	}
+	if err := validateLLMTypes(req.Types); err != nil {
+		return nil, err
+	}
 	dbLLMConfig := database.LLMConfig{
 		ModelName:          modelName,
-		Type:               req.Type,
+		Type:               database.CombineLLMTypes(req.Types),
 		Enabled:            req.Enabled,
 		RoutingPolicy:      req.RoutingPolicy,
 		Metadata:           req.Metadata,
@@ -324,6 +338,7 @@ func (s *llmServiceComponentImpl) CreateLLMConfig(ctx context.Context, req *type
 		ModelName:          dbRes.ModelName,
 		Upstreams:          upstreams,
 		Type:               dbRes.Type,
+		Types:              database.SplitLLMType(dbRes.Type),
 		Enabled:            dbRes.Enabled,
 		RoutingPolicy:      dbRes.RoutingPolicy,
 		Metadata:           dbRes.Metadata,
@@ -345,6 +360,22 @@ func normalizeRequiredLLMModelName(modelName string) (string, error) {
 		return "", fmt.Errorf("%w: model_name cannot be empty", ErrInvalidLLMConfig)
 	}
 	return trimmed, nil
+}
+
+func validateLLMTypes(types []int) error {
+	if len(types) == 0 {
+		return fmt.Errorf("%w: types cannot be empty", ErrInvalidLLMConfig)
+	}
+	return validateOptionalLLMTypes(types)
+}
+
+func validateOptionalLLMTypes(types []int) error {
+	for _, typ := range types {
+		if !database.IsValidLLMType(typ) {
+			return fmt.Errorf("%w: invalid llm type %d", ErrInvalidLLMConfig, typ)
+		}
+	}
+	return nil
 }
 
 func (s *llmServiceComponentImpl) CreatePromptPrefix(ctx context.Context, req *types.CreatePromptPrefixReq) (*types.PromptPrefix, error) {
@@ -424,10 +455,9 @@ func (s *llmServiceComponentImpl) validateLLMEndpointConfig(upstreams []types.Up
 }
 
 func (s *llmServiceComponentImpl) ListExternalLLMs(ctx context.Context) ([]*types.LLMConfig, error) {
-	typeVal := database.LLMTypeAigatewayExternal
 	enabled := true
 	search := &types.SearchLLMConfig{
-		Type:    &typeVal,
+		Types:   []int{database.LLMTypeAigatewayExternal},
 		Enabled: &enabled,
 	}
 	configs, _, err := s.llmConfigStore.IndexWithRepo(ctx, math.MaxInt, 1, search)
@@ -441,6 +471,7 @@ func (s *llmServiceComponentImpl) ListExternalLLMs(ctx context.Context) ([]*type
 			ModelName:    cfg.ModelName,
 			OfficialName: cfg.PrimaryOfficialName(),
 			Type:         cfg.Type,
+			Types:        database.SplitLLMType(cfg.Type),
 			Enabled:      cfg.Enabled,
 			Provider:     cfg.Provider,
 			RepoID:       cfg.RepoID,

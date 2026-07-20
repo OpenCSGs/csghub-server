@@ -386,13 +386,13 @@ func (c *openaiComponentImpl) getCSGHubModels(ctx context.Context, userID int64)
 }
 
 func (m *openaiComponentImpl) getExternalModels(c context.Context) []types.Model {
-	search := &commontypes.SearchLLMConfig{}
-	searchType := 16
-	search.Type = &searchType
 	enabled := true
-	search.Enabled = &enabled
-	search.SortBy = "model_size_b"
-	search.SortOrder = "desc"
+	search := &commontypes.SearchLLMConfig{
+		Types:     []int{database.LLMTypeAigatewayExternal},
+		Enabled:   &enabled,
+		SortBy:    "model_size_b",
+		SortOrder: "desc",
+	}
 
 	per := 50
 	page := 1
