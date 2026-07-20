@@ -77,7 +77,7 @@ type RepoStore interface {
 	// TagIDs get tag ids by repo id, if category is not empty, return only tags of the category
 	TagIDs(ctx context.Context, repoID int64, category string) (tagIDs []int64, err error)
 	SetUpdateTimeByPath(ctx context.Context, repoType types.RepositoryType, namespace, name string, update time.Time) error
-	PublicToUser(ctx context.Context, repoType types.RepositoryType, userIDs []int64, filter *types.RepoFilter, per, page int, isAdmin bool) (repos []*Repository, count int, err error)
+	PublicToUser(ctx context.Context, repoType types.RepositoryType, ownerNamespaces []string, filter *types.RepoFilter, per, page int, isAdmin bool) (repos []*Repository, count int, err error)
 	IsMirrorRepo(ctx context.Context, repoType types.RepositoryType, namespace, name string) (bool, error)
 	ListRepoByDeployType(ctx context.Context, repoType types.RepositoryType, userID int64, search, sort string, deployType, per, page int) (repos []*Repository, count int, err error)
 	WithMirror(ctx context.Context, per, page int) (repos []Repository, count int, err error)
@@ -730,9 +730,9 @@ func (s *repoStoreImpl) SetUpdateTimeByPath(ctx context.Context, repoType types.
 	return err
 }
 
-func (s *repoStoreImpl) PublicToUser(ctx context.Context, repoType types.RepositoryType, userIDs []int64, filter *types.RepoFilter, per, page int, isAdmin bool) (repos []*Repository, count int, err error) {
+func (s *repoStoreImpl) PublicToUser(ctx context.Context, repoType types.RepositoryType, ownerNamespaces []string, filter *types.RepoFilter, per, page int, isAdmin bool) (repos []*Repository, count int, err error) {
 	if filter.Sort == "trending" && strings.TrimSpace(filter.Search) == "" {
-		return s.publicToUserTrending(ctx, repoType, userIDs, filter, per, page, isAdmin)
+		return s.publicToUserTrending(ctx, repoType, ownerNamespaces, filter, per, page, isAdmin)
 	}
 
 	q := s.db.Operator.Core.
@@ -764,8 +764,16 @@ func (s *repoStoreImpl) PublicToUser(ctx context.Context, repoType types.Reposit
 	}
 
 	if !isAdmin {
-		if len(userIDs) > 0 {
-			q.Where("repository.private = ? or repository.user_id in (?)", false, bun.In(userIDs))
+		if len(ownerNamespaces) > 0 {
+			// public repos, or private repos under the user's own namespace
+			// and the namespaces of orgs the user belongs to
+			q.WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
+				q = q.Where("repository.private = ?", false)
+				for _, namespace := range ownerNamespaces {
+					q = q.WhereOr("repository.path LIKE ? ESCAPE '\\'", fmt.Sprintf("%s/%%", escapeLikePattern(namespace)))
+				}
+				return q
+			})
 		} else {
 			q.Where("repository.private = ?", false)
 		}
@@ -888,7 +896,7 @@ func (s *repoStoreImpl) PublicToUser(ctx context.Context, repoType types.Reposit
 	return
 }
 
-func (s *repoStoreImpl) publicToUserTrending(ctx context.Context, repoType types.RepositoryType, userIDs []int64, filter *types.RepoFilter, per, page int, isAdmin bool) (repos []*Repository, count int, err error) {
+func (s *repoStoreImpl) publicToUserTrending(ctx context.Context, repoType types.RepositoryType, ownerNamespaces []string, filter *types.RepoFilter, per, page int, isAdmin bool) (repos []*Repository, count int, err error) {
 	repoTypeTable := map[types.RepositoryType]string{
 		types.ModelRepo:     "models",
 		types.DatasetRepo:   "datasets",
@@ -953,8 +961,16 @@ func (s *repoStoreImpl) publicToUserTrending(ctx context.Context, repoType types
 		Where(fmt.Sprintf("EXISTS (SELECT 1 FROM %s m WHERE m.repository_id = r.id)", bizTable))
 
 	if !isAdmin {
-		if len(userIDs) > 0 {
-			q.Where("r.private = ? OR r.user_id IN (?)", false, bun.In(userIDs))
+		if len(ownerNamespaces) > 0 {
+			// public repos, or private repos under the user's own namespace
+			// and the namespaces of orgs the user belongs to
+			q.WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
+				q = q.Where("r.private = ?", false)
+				for _, namespace := range ownerNamespaces {
+					q = q.WhereOr("r.path LIKE ? ESCAPE '\\'", fmt.Sprintf("%s/%%", escapeLikePattern(namespace)))
+				}
+				return q
+			})
 		} else {
 			q.Where("r.private = ?", false)
 		}

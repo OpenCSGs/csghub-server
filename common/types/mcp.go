@@ -77,13 +77,13 @@ type MCPServer struct {
 }
 
 type MCPPropertyFilter struct {
-	CurrentUser string          `json:"-"`
-	Kind        MCPPropertyKind `json:"kind"`
-	Search      string          `json:"search"`
-	Per         int             `json:"per"`
-	Page        int             `json:"page"`
-	IsAdmin     bool            `json:"-"`
-	UserIDs     []int64         `json:"-"`
+	CurrentUser      string          `json:"-"`
+	Kind             MCPPropertyKind `json:"kind"`
+	Search           string          `json:"search"`
+	Per              int             `json:"per"`
+	Page             int             `json:"page"`
+	IsAdmin          bool            `json:"-"`
+	OwnerNamespaces  []string        `json:"-"`
 }
 
 type MCPServerProperties struct {
