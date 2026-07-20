@@ -12,7 +12,6 @@ import (
 	"slices"
 	"sort"
 	"strconv"
-	"strings"
 	"time"
 
 	"opencsg.com/csghub-server/builder/git"
@@ -482,35 +481,21 @@ func (m *mcpServerComponentImpl) Index(ctx context.Context, filter *types.RepoFi
 
 func (m *mcpServerComponentImpl) Properties(ctx context.Context, req *types.MCPPropertyFilter) ([]types.MCPServerProperties, int, error) {
 	var (
-		isAdmin      bool
-		repoOwnerIDs []int64
+		isAdmin          bool
+		ownerNamespaces []string
 	)
 	if len(req.CurrentUser) > 0 {
-		// get user orgs from user service
 		user, err := m.userSvcClient.GetUserInfo(ctx, req.CurrentUser, req.CurrentUser)
 		if err != nil {
 			return nil, 0, fmt.Errorf("failed to get user info for list mcp tools, error: %w", err)
 		}
-
-		dbUser := &database.User{
-			RoleMask: strings.Join(user.Roles, ","),
-		}
-
-		isAdmin = dbUser.CanAdmin()
-
-		if !isAdmin {
-			repoOwnerIDs = append(repoOwnerIDs, user.ID)
-			//get user's orgs
-			for _, org := range user.Orgs {
-				repoOwnerIDs = append(repoOwnerIDs, org.UserID)
-			}
-		}
+		ownerNamespaces, isAdmin = buildAccessibleNamespaces(user)
 	}
 
 	req.IsAdmin = isAdmin
-	req.UserIDs = repoOwnerIDs
+	req.OwnerNamespaces = ownerNamespaces
 
-	slog.Debug("get user info to list tools", slog.Any("req", req), slog.Any("isadmin", req.IsAdmin), slog.Any("userids", req.UserIDs))
+	slog.Debug("get user info to list tools", slog.Any("req", req), slog.Any("isadmin", req.IsAdmin), slog.Any("ownerNamespaces", req.OwnerNamespaces))
 	res, total, err := m.mcpServerStore.ListProperties(ctx, req)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to list mcp tools, error: %w", err)

@@ -666,33 +666,35 @@ func (c *repoComponentImpl) copyLfsObjects(ctx context.Context, sourceRepoID, ta
 	return nil
 }
 
+// buildAccessibleNamespaces returns the namespace paths a user can read
+// private repos from, and whether the user is an admin (who can read all repos).
+func buildAccessibleNamespaces(u *rpc.User) (namespaces []string, isAdmin bool) {
+	dbUser := &database.User{RoleMask: strings.Join(u.Roles, ",")}
+	if dbUser.CanAdmin() {
+		return nil, true
+	}
+	// private repos under the user's own namespace and the namespaces
+	// of orgs the user belongs to are visible
+	namespaces = append(namespaces, u.Username)
+	for _, org := range u.Orgs {
+		namespaces = append(namespaces, org.Name)
+	}
+	return namespaces, false
+}
+
 // PublicToUser gets visible repos of the given user and user's orgs
 func (c *repoComponentImpl) PublicToUser(ctx context.Context, repoType types.RepositoryType, userName string, filter *types.RepoFilter, per, page int) (repos []*database.Repository, count int, err error) {
-	var repoOwnerIDs []int64
+	var ownerNamespaces []string
 	var isAdmin bool
 
 	if len(userName) > 0 {
-		// get user orgs from user service
 		user, err := c.userSvcClient.GetUserInfo(ctx, userName, userName)
 		if err != nil {
 			return nil, 0, fmt.Errorf("failed to get user info, error: %w", err)
 		}
-
-		dbUser := &database.User{
-			RoleMask: strings.Join(user.Roles, ","),
-		}
-
-		isAdmin = dbUser.CanAdmin()
-
-		if !isAdmin {
-			repoOwnerIDs = append(repoOwnerIDs, user.ID)
-			// get user's orgs
-			for _, org := range user.Orgs {
-				repoOwnerIDs = append(repoOwnerIDs, org.UserID)
-			}
-		}
+		ownerNamespaces, isAdmin = buildAccessibleNamespaces(user)
 	}
-	repos, count, err = c.repoStore.PublicToUser(ctx, repoType, repoOwnerIDs, filter, per, page, isAdmin)
+	repos, count, err = c.repoStore.PublicToUser(ctx, repoType, ownerNamespaces, filter, per, page, isAdmin)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to get user public repos, error: %w", err)
 	}
@@ -3149,20 +3151,19 @@ func (c *repoComponentImpl) BatchGetRepoExtra(ctx context.Context, repoIDs []int
 
 	// Determine which repos the user can read — same approach as PublicToUser:
 	// fetch user info once, then check ownership + privacy in-memory.
-	isAdmin := false
-	accessibleIDs := make(map[int64]bool)
+	var isAdmin bool
+	var accessibleNamespaces map[string]bool
 	if currentUser != "" {
 		user, err := c.userSvcClient.GetUserInfo(ctx, currentUser, currentUser)
 		if err != nil {
 			return nil, errorx.BatchGetRepoExtraFailed(fmt.Errorf("failed to get user info, error: %w", err))
 		}
-		dbUser := &database.User{RoleMask: strings.Join(user.Roles, ",")}
-		if dbUser.CanAdmin() {
-			isAdmin = true
-		} else {
-			accessibleIDs[user.ID] = true
-			for _, org := range user.Orgs {
-				accessibleIDs[org.UserID] = true
+		ns, admin := buildAccessibleNamespaces(user)
+		isAdmin = admin
+		if !isAdmin {
+			accessibleNamespaces = make(map[string]bool, len(ns))
+			for _, n := range ns {
+				accessibleNamespaces[n] = true
 			}
 		}
 	}
@@ -3170,7 +3171,9 @@ func (c *repoComponentImpl) BatchGetRepoExtra(ctx context.Context, repoIDs []int
 	// Filter repos to those the user has read permission for
 	readableRepos := make([]*database.Repository, 0, len(repos))
 	for _, repo := range repos {
-		if isAdmin || !repo.Private || accessibleIDs[repo.UserID] {
+		if isAdmin || !repo.Private {
+			readableRepos = append(readableRepos, repo)
+		} else if namespace, _, ok := strings.Cut(repo.Path, "/"); ok && accessibleNamespaces[namespace] {
 			readableRepos = append(readableRepos, repo)
 		}
 	}

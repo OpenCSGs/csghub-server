@@ -201,11 +201,12 @@ func TestRepoComponent_PublicToUser(t *testing.T) {
 	repo := initializeTestRepoComponent(ctx, t)
 
 	repo.mocks.userSvcClient.EXPECT().GetUserInfo(ctx, "user", "user").Return(&rpc.User{
-		ID:    1,
-		Roles: []string{"a", "b"},
+		ID:       1,
+		Username: "user",
+		Roles:    []string{"a", "b"},
 		Orgs: []rpc.Organization{
-			{UserID: 2},
-			{UserID: 3},
+			{Name: "org1", UserID: 2},
+			{Name: "org2", UserID: 3},
 		},
 	}, nil)
 
@@ -213,7 +214,7 @@ func TestRepoComponent_PublicToUser(t *testing.T) {
 	mrepos := []*database.Repository{
 		{Name: "foo"},
 	}
-	repo.mocks.stores.RepoMock().EXPECT().PublicToUser(ctx, types.ModelRepo, []int64{1, 2, 3}, filter, 10, 1, false).Return(mrepos, 100, nil)
+	repo.mocks.stores.RepoMock().EXPECT().PublicToUser(ctx, types.ModelRepo, []string{"user", "org1", "org2"}, filter, 10, 1, false).Return(mrepos, 100, nil)
 
 	repos, count, err := repo.PublicToUser(ctx, types.ModelRepo, "user", &types.RepoFilter{}, 10, 1)
 	require.Equal(t, mrepos, repos)
@@ -2539,21 +2540,60 @@ func TestRepoComponent_BatchGetRepoExtra(t *testing.T) {
 		repoComp := initializeTestRepoComponent(ctx, t)
 
 		repoComp.mocks.userSvcClient.EXPECT().GetUserInfo(ctx, "user1", "user1").Return(&rpc.User{
-			ID:    1,
-			Roles: []string{},
-			Orgs:  []rpc.Organization{{UserID: 3}},
+			ID:       1,
+			Username: "user1",
+			Roles:    []string{},
+			Orgs:     []rpc.Organization{{Name: "org1", UserID: 3}},
 		}, nil)
 
-		// Own repo (UserID=1), org repo (UserID=3), public repo (UserID=99), private unrelated repo (UserID=99)
+		// Own repo, org repo, public repo, private unrelated repo
 		repos := []*database.Repository{
-			{ID: 1, UserID: 1, Private: true, DefaultBranch: "main"},
-			{ID: 2, UserID: 3, Private: true, DefaultBranch: "main"},
-			{ID: 3, UserID: 99, Private: false, DefaultBranch: "main"},
-			{ID: 4, UserID: 99, Private: true, DefaultBranch: "main"},
+			{ID: 1, UserID: 1, Path: "user1/repo1", Private: true, DefaultBranch: "main"},
+			{ID: 2, UserID: 3, Path: "org1/repo2", Private: true, DefaultBranch: "main"},
+			{ID: 3, UserID: 99, Path: "other/repo3", Private: false, DefaultBranch: "main"},
+			{ID: 4, UserID: 99, Path: "other/repo4", Private: true, DefaultBranch: "main"},
 		}
 		repoComp.mocks.stores.RepoMock().EXPECT().FindByIds(ctx, []int64{1, 2, 3, 4}).Return(repos, nil)
 
 		// Only repos 1, 2, 3 are readable
+		stats := []*database.RepositoryStatistics{
+			{RepositoryID: 1, Branch: "main", TotalSize: 100},
+			{RepositoryID: 2, Branch: "main", TotalSize: 200},
+			{RepositoryID: 3, Branch: "main", TotalSize: 300},
+		}
+		repoComp.mocks.stores.RepositoryStatisticsMock().EXPECT().FindByRepositoryIDs(ctx, []int64{1, 2, 3}).Return(stats, nil)
+
+		result, err := repoComp.BatchGetRepoExtra(ctx, []int64{1, 2, 3, 4}, "user1")
+		require.Nil(t, err)
+		require.Equal(t, []types.RepoExtraItem{{RepoID: 1, Size: 100}, {RepoID: 2, Size: 200}, {RepoID: 3, Size: 300}}, result)
+	})
+
+	t.Run("org member cannot read org creator personal private repos", func(t *testing.T) {
+		ctx := context.TODO()
+		repoComp := initializeTestRepoComponent(ctx, t)
+
+		// User "user1" belongs to org "org1" whose creator has UserID=3.
+		// A private repo under the creator's personal namespace "creator"
+		// (UserID=3, Path="creator/personal") must NOT be visible to the
+		// org member, even though its UserID matches the org's UserID.
+		repoComp.mocks.userSvcClient.EXPECT().GetUserInfo(ctx, "user1", "user1").Return(&rpc.User{
+			ID:       1,
+			Username: "user1",
+			Roles:    []string{},
+			Orgs:     []rpc.Organization{{Name: "org1", UserID: 3}},
+		}, nil)
+
+		repos := []*database.Repository{
+			{ID: 1, UserID: 1, Path: "user1/repo1", Private: true, DefaultBranch: "main"},
+			{ID: 2, UserID: 3, Path: "org1/repo2", Private: true, DefaultBranch: "main"},
+			{ID: 3, UserID: 99, Path: "other/repo3", Private: false, DefaultBranch: "main"},
+			{ID: 4, UserID: 3, Path: "creator/personal", Private: true, DefaultBranch: "main"},
+		}
+		repoComp.mocks.stores.RepoMock().EXPECT().FindByIds(ctx, []int64{1, 2, 3, 4}).Return(repos, nil)
+
+		// Only repos 1, 2, 3 are readable. Repo 4 has UserID=3 (matches
+		// org's UserID) but lives under namespace "creator", which is NOT
+		// in the user's accessible namespaces {"user1", "org1"}.
 		stats := []*database.RepositoryStatistics{
 			{RepositoryID: 1, Branch: "main", TotalSize: 100},
 			{RepositoryID: 2, Branch: "main", TotalSize: 200},
@@ -2591,13 +2631,14 @@ func TestRepoComponent_BatchGetRepoExtra(t *testing.T) {
 		repoComp := initializeTestRepoComponent(ctx, t)
 
 		repoComp.mocks.userSvcClient.EXPECT().GetUserInfo(ctx, "user1", "user1").Return(&rpc.User{
-			ID:    1,
-			Roles: []string{},
-			Orgs:  []rpc.Organization{},
+			ID:       1,
+			Username: "user1",
+			Roles:    []string{},
+			Orgs:     []rpc.Organization{},
 		}, nil)
 
 		repos := []*database.Repository{
-			{ID: 1, UserID: 1, Private: true, DefaultBranch: ""},
+			{ID: 1, UserID: 1, Path: "user1/repo1", Private: true, DefaultBranch: ""},
 		}
 		repoComp.mocks.stores.RepoMock().EXPECT().FindByIds(ctx, []int64{1}).Return(repos, nil)
 
@@ -2611,13 +2652,14 @@ func TestRepoComponent_BatchGetRepoExtra(t *testing.T) {
 		repoComp := initializeTestRepoComponent(ctx, t)
 
 		repoComp.mocks.userSvcClient.EXPECT().GetUserInfo(ctx, "user1", "user1").Return(&rpc.User{
-			ID:    1,
-			Roles: []string{},
-			Orgs:  []rpc.Organization{},
+			ID:       1,
+			Username: "user1",
+			Roles:    []string{},
+			Orgs:     []rpc.Organization{},
 		}, nil)
 
 		repos := []*database.Repository{
-			{ID: 1, UserID: 1, Private: true, DefaultBranch: "main"},
+			{ID: 1, UserID: 1, Path: "user1/repo1", Private: true, DefaultBranch: "main"},
 		}
 		repoComp.mocks.stores.RepoMock().EXPECT().FindByIds(ctx, []int64{1}).Return(repos, nil)
 
@@ -2636,13 +2678,14 @@ func TestRepoComponent_BatchGetRepoExtra(t *testing.T) {
 		repoComp := initializeTestRepoComponent(ctx, t)
 
 		repoComp.mocks.userSvcClient.EXPECT().GetUserInfo(ctx, "user1", "user1").Return(&rpc.User{
-			ID:    1,
-			Roles: []string{},
-			Orgs:  []rpc.Organization{},
+			ID:       1,
+			Username: "user1",
+			Roles:    []string{},
+			Orgs:     []rpc.Organization{},
 		}, nil)
 
 		repos := []*database.Repository{
-			{ID: 1, UserID: 99, Private: true, DefaultBranch: "main"},
+			{ID: 1, UserID: 99, Path: "other/repo1", Private: true, DefaultBranch: "main"},
 		}
 		repoComp.mocks.stores.RepoMock().EXPECT().FindByIds(ctx, []int64{1}).Return(repos, nil)
 
@@ -2681,13 +2724,14 @@ func TestRepoComponent_BatchGetRepoExtra(t *testing.T) {
 		repoComp := initializeTestRepoComponent(ctx, t)
 
 		repoComp.mocks.userSvcClient.EXPECT().GetUserInfo(ctx, "user1", "user1").Return(&rpc.User{
-			ID:    1,
-			Roles: []string{},
-			Orgs:  []rpc.Organization{},
+			ID:       1,
+			Username: "user1",
+			Roles:    []string{},
+			Orgs:     []rpc.Organization{},
 		}, nil)
 
 		repos := []*database.Repository{
-			{ID: 1, UserID: 1, Private: true, DefaultBranch: "main"},
+			{ID: 1, UserID: 1, Path: "user1/repo1", Private: true, DefaultBranch: "main"},
 		}
 		repoComp.mocks.stores.RepoMock().EXPECT().FindByIds(ctx, []int64{1}).Return(repos, nil)
 		repoComp.mocks.stores.RepositoryStatisticsMock().EXPECT().FindByRepositoryIDs(ctx, []int64{1}).Return(nil, errors.New("db error"))

@@ -167,8 +167,16 @@ func (m *mcpServerStoreImpl) ListProperties(ctx context.Context, req *types.MCPP
 	q := m.db.Operator.Core.NewSelect().Model(&mcpProps).Relation("MCPServer").Relation("MCPServer.Repository").Where("kind = ?", req.Kind)
 
 	if !req.IsAdmin {
-		if len(req.UserIDs) > 0 {
-			q.Where("mcp_server__repository.private = ? or mcp_server__repository.user_id in (?)", false, bun.In(req.UserIDs))
+		if len(req.OwnerNamespaces) > 0 {
+			// public repos, or private repos under the user's own namespace
+			// and the namespaces of orgs the user belongs to
+			q.WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
+				q = q.Where("mcp_server__repository.private = ?", false)
+				for _, namespace := range req.OwnerNamespaces {
+					q = q.WhereOr("mcp_server__repository.path LIKE ? ESCAPE '\\'", fmt.Sprintf("%s/%%", escapeLikePattern(namespace)))
+				}
+				return q
+			})
 		} else {
 			q.Where("mcp_server__repository.private = ?", false)
 		}

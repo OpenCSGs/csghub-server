@@ -347,7 +347,7 @@ func TestRepoStore_PublicToUserSimple(t *testing.T) {
 		Sort: "recently_update",
 	}
 	// case 1: one tag
-	repos, _, err := rs.PublicToUser(ctx, repo.RepositoryType, []int64{1}, filter, 20, 1, true)
+	repos, _, err := rs.PublicToUser(ctx, repo.RepositoryType, []string{"user1"}, filter, 20, 1, true)
 	require.Nil(t, err)
 	require.NotNil(t, repos)
 
@@ -360,7 +360,7 @@ func TestRepoStore_PublicToUserSimple(t *testing.T) {
 		Sort: "recently_update",
 	}
 	// case 2: two tag
-	repos, _, err = rs.PublicToUser(ctx, repo.RepositoryType, []int64{1}, filter, 20, 1, true)
+	repos, _, err = rs.PublicToUser(ctx, repo.RepositoryType, []string{"user1"}, filter, 20, 1, true)
 	require.Nil(t, err)
 	require.NotNil(t, repos)
 }
@@ -587,7 +587,7 @@ func TestRepoStore_PublicToUserSearch_Sqlite(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(fmt.Sprintf("%+v", c), func(t *testing.T) {
-			rs, count, err := store.PublicToUser(ctx, c.repoType, []int64{123}, &types.RepoFilter{
+			rs, count, err := store.PublicToUser(ctx, c.repoType, []string{"user123"}, &types.RepoFilter{
 				Tags:   c.tags,
 				Sort:   c.sort,
 				Search: c.search,
@@ -627,7 +627,7 @@ func TestRepoStore_PublicToUserSearch(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(fmt.Sprintf("%+v", c), func(t *testing.T) {
-			rs, count, err := store.PublicToUser(ctx, c.repoType, []int64{123}, &types.RepoFilter{
+			rs, count, err := store.PublicToUser(ctx, c.repoType, []string{"user123"}, &types.RepoFilter{
 				Tags:   c.tags,
 				Sort:   c.sort,
 				Search: c.search,
@@ -706,31 +706,31 @@ func TestRepoStore_PublicToUser(t *testing.T) {
 
 			repos := []*database.Repository{
 				{
-					Name: "rp1", Path: "rp1", UserID: 123, RepositoryType: types.CodeRepo,
+					Name: "rp1", Path: "user123/rp1", UserID: 123, RepositoryType: types.CodeRepo,
 					DownloadCount: 11,
 				},
 				{
-					Name: "rp2", Path: "rp2", UserID: 123, RepositoryType: types.CodeRepo,
+					Name: "rp2", Path: "user123/rp2", UserID: 123, RepositoryType: types.CodeRepo,
 					Private: true, Source: types.HuggingfaceSource,
 					DownloadCount: 12,
 				},
 				{
-					Name: "rp3", Path: "rp3", UserID: 456, RepositoryType: types.CodeRepo,
+					Name: "rp3", Path: "user456/rp3", UserID: 456, RepositoryType: types.CodeRepo,
 					Private:       true,
 					DownloadCount: 15,
 				},
 				{
-					Name: "rp4", Path: "rp4", UserID: 456, RepositoryType: types.CodeRepo,
+					Name: "rp4", Path: "user456/rp4", UserID: 456, RepositoryType: types.CodeRepo,
 					Private: false, Tags: []database.Tag{{Name: "foo"}},
 					DownloadCount: 13,
 				},
 				{
-					Name: "rp5", Path: "rp5", UserID: 789, RepositoryType: types.CodeRepo,
+					Name: "rp5", Path: "user789/rp5", UserID: 789, RepositoryType: types.CodeRepo,
 					Private: false, Tags: []database.Tag{{Name: "bar"}},
 					DownloadCount: 14,
 				},
 				{
-					Name: "rp6", Path: "rp6", UserID: 789, RepositoryType: types.CodeRepo,
+					Name: "rp6", Path: "user789/rp6", UserID: 789, RepositoryType: types.CodeRepo,
 					Private: false, Description: "rp4desc",
 					DownloadCount: 16,
 				},
@@ -763,8 +763,8 @@ func TestRepoStore_PublicToUser(t *testing.T) {
 				}
 
 				// Extract number from repo name (e.g., "rp4" -> 4) and multiply by 100
-				if strings.HasPrefix(repo.Path, "rp") {
-					if numStr := strings.TrimPrefix(repo.Path, "rp"); numStr != "" {
+				if strings.HasPrefix(repo.Name, "rp") {
+					if numStr := strings.TrimPrefix(repo.Name, "rp"); numStr != "" {
 						if num, err := strconv.Atoi(numStr); err == nil {
 							// insert recom repo score
 							err := recomStore.UpsertScore(ctx, []*database.RecomRepoScore{
@@ -780,7 +780,7 @@ func TestRepoStore_PublicToUser(t *testing.T) {
 				}
 			}
 
-			rs, count, err := store.PublicToUser(ctx, c.repoType, []int64{123}, &types.RepoFilter{
+			rs, count, err := store.PublicToUser(ctx, c.repoType, []string{"user123"}, &types.RepoFilter{
 				Tags:   c.tags,
 				Sort:   c.sort,
 				Search: c.search,
@@ -817,7 +817,7 @@ func TestRepoStore_PublicToUserOwnerFilter(t *testing.T) {
 		require.Nil(t, err)
 	}
 
-	rs, count, err := store.PublicToUser(ctx, types.CodeRepo, []int64{123}, &types.RepoFilter{
+	rs, count, err := store.PublicToUser(ctx, types.CodeRepo, []string{"user123"}, &types.RepoFilter{
 		Owner: "owner",
 		Sort:  "recently_update",
 	}, 10, 1, false)
@@ -826,7 +826,7 @@ func TestRepoStore_PublicToUserOwnerFilter(t *testing.T) {
 	require.Len(t, rs, 1)
 	require.Equal(t, "owner/match", rs[0].Path)
 
-	rs, count, err = store.PublicToUser(ctx, types.CodeRepo, []int64{123}, &types.RepoFilter{
+	rs, count, err = store.PublicToUser(ctx, types.CodeRepo, []string{"user123"}, &types.RepoFilter{
 		Owner: "own_er",
 		Sort:  "recently_update",
 	}, 10, 1, false)
@@ -879,7 +879,7 @@ func TestRepoStore_PublicToUserRangeFilters(t *testing.T) {
 
 	modelParamsMin := 2.0
 	modelParamsMax := 8.0
-	repos, count, err := store.PublicToUser(ctx, types.ModelRepo, []int64{123}, &types.RepoFilter{
+	repos, count, err := store.PublicToUser(ctx, types.ModelRepo, []string{"user123"}, &types.RepoFilter{
 		Sort:           "recently_update",
 		ModelParamsMin: &modelParamsMin,
 		ModelParamsMax: &modelParamsMax,
@@ -944,7 +944,7 @@ func TestRepoStore_PublicToUserRangeFilters(t *testing.T) {
 
 	repoSizeMin := int64(1000)
 	repoSizeMax := int64(20000)
-	repos, count, err = store.PublicToUser(ctx, types.DatasetRepo, []int64{123}, &types.RepoFilter{
+	repos, count, err = store.PublicToUser(ctx, types.DatasetRepo, []string{"user123"}, &types.RepoFilter{
 		Sort:        "recently_update",
 		RepoSizeMin: &repoSizeMin,
 		RepoSizeMax: &repoSizeMax,
@@ -1899,7 +1899,7 @@ func TestRepoStore_PublicToUserMirror(t *testing.T) {
 		Source: "local",
 	}
 	// case 1: one tag
-	repos, _, err := rs.PublicToUser(ctx, repo.RepositoryType, []int64{1}, filter, 20, 1, true)
+	repos, _, err := rs.PublicToUser(ctx, repo.RepositoryType, []string{"user1"}, filter, 20, 1, true)
 	require.Nil(t, err)
 	require.NotNil(t, repos)
 	require.Equal(t, 2, len(repos))
@@ -1981,7 +1981,7 @@ func TestRepoStore_PublicToUserWithCacheFailed(t *testing.T) {
 		search:   "billionaire",
 		expected: []string{"ChineseBlue", "ChineseMedicalBooksCollection"},
 	}
-	rs, count, err := store.PublicToUser(ctx, c.repoType, []int64{123}, &types.RepoFilter{
+	rs, count, err := store.PublicToUser(ctx, c.repoType, []string{"user123"}, &types.RepoFilter{
 		Tags:   c.tags,
 		Sort:   c.sort,
 		Search: c.search,
