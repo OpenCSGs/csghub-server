@@ -491,7 +491,7 @@ func collectNodeResource(node v1.Node, config *config.Config) types.NodeResource
 	allocatableCPU := node.Status.Allocatable.Cpu().DeepCopy()
 	totalXPU := resource.Quantity{}
 	allocatableXPU := resource.Quantity{}
-	xpuCapacityLabel, xpuTypeLabel, xpuMemLabel := getXPULabel(node.Labels, config)
+	xpuCapacityLabel, xpuTypeLabel, xpuMemLabel := getXPULabel(node.Labels, config, node.Name)
 	if xpuCapacityLabel != "" {
 		totalXPU = node.Status.Capacity[v1.ResourceName(xpuCapacityLabel)]
 		allocatableXPU = node.Status.Allocatable[v1.ResourceName(xpuCapacityLabel)]
@@ -594,7 +594,26 @@ func getGpuTypeAndVendor(vendorType string, label string) (string, string) {
 }
 
 // the first label is the xpu capacity label, the second is the gpu model label
-func getXPULabel(labels map[string]string, config *config.Config) (string, string, []string) {
+func getXPULabel(labels map[string]string, config *config.Config, nodeName string) (string, string, []string) {
+	//check custom gpu model labels first
+	if len(config.Runner.GPUModelLabel) > 0 {
+		var gpuLabels []types.GPUModel
+		err := json.Unmarshal([]byte(config.Runner.GPUModelLabel), &gpuLabels)
+		if err == nil {
+			for _, gpuModel := range gpuLabels {
+				if _, found := labels[gpuModel.TypeLabel]; found {
+					slog.Info("use custom GPUModelLabel", slog.Any("nodeName", nodeName), slog.Any("GPUModelLabel", gpuModel.TypeLabel))
+					return gpuModel.CapacityLabel, gpuModel.TypeLabel, []string{gpuModel.MemLabel}
+				}
+			}
+			slog.Warn("no gpu model label found in custom GPUModelLabel and fallback to default GPUModelLabel",
+				slog.Any("nodeName", nodeName), slog.Any("GPUModelLabel", config.Runner.GPUModelLabel))
+		} else {
+			slog.Warn("failed to parse custom GPUModelLabel from config and fallback to default GPUModelLabel",
+				slog.Any("error", err), slog.Any("GPUModelLabel", config.Runner.GPUModelLabel))
+		}
+	}
+
 	if _, found := labels["aliyun.accelerator/nvidia_name"]; found {
 		//for default cluster
 		return "nvidia.com/gpu", "aliyun.accelerator/nvidia_name", []string{"aliyun.accelerator/nvidia_mem"}
@@ -646,20 +665,6 @@ func getXPULabel(labels map[string]string, config *config.Config) (string, strin
 	if _, found := labels["chipltech.com/tpu.product"]; found {
 		//for chipltech tpu
 		return "chipltech.com/dlc-lyp", "chipltech.com/tpu.product", []string{"chipltech.com/tpu.mem"}
-	}
-	//check custom gpu model label
-	if config.Space.GPUModelLabel != "" {
-		var gpuLabels []types.GPUModel
-		err := json.Unmarshal([]byte(config.Space.GPUModelLabel), &gpuLabels)
-		if err != nil {
-			slog.Warn("failed to parse custom GPUModelLabel from config", slog.Any("error", err))
-			return "", "", []string{}
-		}
-		for _, gpuModel := range gpuLabels {
-			if _, found := labels[gpuModel.TypeLabel]; found {
-				return gpuModel.CapacityLabel, gpuModel.TypeLabel, []string{gpuModel.MemLabel}
-			}
-		}
 	}
 	return "", "", []string{}
 }
