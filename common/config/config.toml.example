@@ -141,7 +141,6 @@ image_pull_secret = "opencsg-pull-secret"
 rproxy_server_port = 8083
 session_secret_key = "secret"
 deploy_timeout_in_min = 30
-gpu_model_label = "aliyun.accelerator/nvidia_name"
 readiness_delay_seconds = 120
 readiness_period_seconds = 10
 readiness_failure_threshold = 3
@@ -266,7 +265,6 @@ image_builder_status_ttl = 300
 # --skip-tls-verify : Disable TLS certificate validation for registries.
 # Uncomment the following line to enable pull images from a private registry without https
 # image_builder_kaniko_args = ["--insecure", "--skip-tls-verify"]
-STARHUB_SERVER_GPU_MODEL_LABEL = '[{"type_label": "aliyun.accelerator/nvidia_name", "capacity_label": "nvidia.com/gpu"}]'
 system_cuda_version = ""
 webhook_endpoint = "http://localhost:8080"
 watch_configmap_name = "spaces-runner-config"
@@ -274,6 +272,7 @@ watch_configmap_interval_in_sec = 60
 runner_namespace = "csghub"
 public_docker_reg_base = "opencsg-registry.cn-beijing.cr.aliyuncs.com"
 vgpu_memory_scaling_factor = 10
+gpu_model_label = '[{"type_label":"aliyun.accelerator/nvidia_name","capacity_label":"nvidia.com/gpu","mem_label":"aliyun.accelerator/nvidia_mem"}]'
 
 [cluster]
 cluster_id = ""

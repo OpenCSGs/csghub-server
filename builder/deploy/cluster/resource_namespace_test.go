@@ -20,7 +20,7 @@ func TestGetNameSpaceResourcesQuota(t *testing.T) {
 	testQuotaName := "compute-quota"
 	customGPUConfigJSON := `[{"type_label": "my-custom.com/gpu-model", "capacity_label": "my-custom.com/gpu-count"}]`
 	cfg := &config.Config{}
-	cfg.Space.GPUModelLabel = customGPUConfigJSON
+	cfg.Runner.GPUModelLabel = customGPUConfigJSON
 	testCases := []struct {
 		name           string
 		namespace      string

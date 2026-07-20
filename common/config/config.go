@@ -202,11 +202,9 @@ type Config struct {
 		// reverse proxy listening port
 		RProxyServerPort int `env:"STARHUB_SERVER_SPACE_RPROXY_SERVER_PORT" default:"8083"`
 		// secret key for session encryption
-		SessionSecretKey   string `env:"STARHUB_SERVER_SPACE_SESSION_SECRET_KEY" default:"secret"`
-		DeployTimeoutInMin int    `env:"STARHUB_SERVER_SPACE_DEPLOY_TIMEOUT_IN_MINUTES" default:"30"`
-		BuildTimeoutInMin  int    `env:"STARHUB_SERVER_SPACE_BUILD_TIMEOUT_IN_MINUTES" default:"30"`
-		// gpu model label
-		GPUModelLabel             string `env:"STARHUB_SERVER_GPU_MODEL_LABEL"`
+		SessionSecretKey          string `env:"STARHUB_SERVER_SPACE_SESSION_SECRET_KEY" default:"secret"`
+		DeployTimeoutInMin        int    `env:"STARHUB_SERVER_SPACE_DEPLOY_TIMEOUT_IN_MINUTES" default:"30"`
+		BuildTimeoutInMin         int    `env:"STARHUB_SERVER_SPACE_BUILD_TIMEOUT_IN_MINUTES" default:"30"`
 		ReadinessDelaySeconds     int    `env:"STARHUB_SERVER_READINESS_DELAY_SECONDS" default:"120"`
 		ReadinessPeriodSeconds    int    `env:"STARHUB_SERVER_READINESS_PERIOD_SECONDS" default:"10"`
 		ReadinessFailureThreshold int    `env:"STARHUB_SERVER_READINESS_FAILURE_THRESHOLD" default:"3"`
@@ -660,6 +658,7 @@ type Config struct {
 		VGPUResourceReqKey      string `env:"STARHUB_SERVER_RUNNER_VGPU_RESOURCE_REQ_KEY" default:"nvidia.com/vgpu"`
 		VGPUMemoryReqKey        string `env:"STARHUB_SERVER_RUNNER_VGPU_MEMORY_REQ_KEY" default:"nvidia.com/vgpumem"`
 		VGPUMemoryScalingFactor int64  `env:"STARHUB_SERVER_RUNNER_VGPU_MEMORY_SCING_FACTOR" default:"10"`
+		GPUModelLabel           string `env:"STARHUB_SERVER_RUNNER_GPU_MODEL_LABEL" default:""`
 		PD                      struct {
 			// EPPImage is the image ID for the Endpoint Picker deployment. Only the short image ID is configured;
 			// it will be resolved to a full image path via resolveContainerImage at runtime.
