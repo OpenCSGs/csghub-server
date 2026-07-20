@@ -906,6 +906,14 @@
 - **错误名:** `codeWordRequire`
 - **描述:** 请求参数不匹配, 服务器无法处理该请求。
 
+## Pd 错误
+
+### `PD-ERR-0`
+
+- **错误代码:** `PD-ERR-0`
+- **错误名:** `codePDConfigInvalid`
+- **描述:** 请求中提供的PD分离部署配置无效。包括缺少PD配置、缺少prefill或decode角色、TP/DP/EP/PodsSize值无效，或GPU数量不匹配。
+
 ## Repo 错误
 
 ### `REPO-ERR-0`
@@ -1649,4 +1657,12 @@
 - **错误代码:** `USER-ERR-19`
 - **错误名:** `uuidConflict`
 - **描述:** 组织生成的UUID已存在于系统中
+
+---
+
+### `USER-ERR-20`
+
+- **错误代码:** `USER-ERR-20`
+- **错误名:** `namespaceAlreadyExists`
+- **描述:** 命名空间已存在于系统中。
 

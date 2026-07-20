@@ -23,6 +23,7 @@ const (
 	userHasBills
 	userEmailEmpty
 	uuidConflict
+	namespaceAlreadyExists
 )
 
 var (
@@ -268,6 +269,19 @@ var (
 	//
 	// zh-HK: UUID與現有用戶衝突
 	ErrUUIDConflict error = CustomError{prefix: errUserPrefix, code: uuidConflict}
+
+	// namespace already exists
+	//
+	// Description: The namespace already exists in the system.
+	//
+	// Description_ZH: 命名空间已存在于系统中。
+	//
+	// en-US: Namespace already exists
+	//
+	// zh-CN: 命名空间已存在
+	//
+	// zh-HK: 命名空間已存在
+	ErrNamespaceAlreadyExists error = CustomError{prefix: errUserPrefix, code: namespaceAlreadyExists}
 )
 
 // UsernameExists creates a specific error for username conflicts with the conflicting username
@@ -294,5 +308,14 @@ func UUIDConflict(uuid string) error {
 		prefix:  errUserPrefix,
 		code:    uuidConflict,
 		context: map[string]interface{}{"uuid": uuid},
+	}
+}
+
+// NamespaceAlreadyExists creates a specific error for namespace conflicts with the conflicting namespace
+func NamespaceAlreadyExists(namespace string) error {
+	return CustomError{
+		prefix:  errUserPrefix,
+		code:    namespaceAlreadyExists,
+		context: map[string]interface{}{"namespace": namespace},
 	}
 }

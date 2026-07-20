@@ -38,6 +38,9 @@
     "error.USER-ERR-2": {
         "other": "New phone number already exists in sso service"
     },
+    "error.USER-ERR-20": {
+        "other": "Namespace already exists"
+    },
     "error.USER-ERR-3": {
         "other": "Forbid change phone number"
     },

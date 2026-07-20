@@ -12,6 +12,7 @@ import (
 	mockdb "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/database"
 	mockusermodule "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/user/component"
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
 
@@ -50,6 +51,7 @@ func TestOrganizationComponent_Create(t *testing.T) {
 	mockMemberComponent.EXPECT().SetAdmin(mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 
 	mockSSO := mockrpc.NewMockSSOInterface(t)
+	mockSSO.EXPECT().IsExistByName(mock.Anything, req.Name).Return(false, nil).Once()
 	mockSSO.EXPECT().CreateUser(mock.Anything, mock.Anything).Return(nil).Once()
 
 	c := &organizationComponentImpl{
@@ -69,6 +71,54 @@ func TestOrganizationComponent_Create(t *testing.T) {
 	require.Equal(t, req.OrgType, org.OrgType)
 	require.Equal(t, req.Verified, org.Verified)
 	require.NotEqual(t, uuid.Nil, org.UUID)
+}
+
+func TestOrganizationComponent_Create_NamespaceExists(t *testing.T) {
+	req := &types.CreateOrgReq{
+		Name:     "org1",
+		Username: "user1",
+	}
+	mockUserStore := mockdb.NewMockUserStore(t)
+	mockUserStore.EXPECT().FindByUsername(mock.Anything, req.Username).Return(database.User{
+		Username: "user1",
+	}, nil).Once()
+
+	mockNamespaceStore := mockdb.NewMockNamespaceStore(t)
+	mockNamespaceStore.EXPECT().Exists(mock.Anything, req.Name).Return(true, nil).Once()
+
+	c := &organizationComponentImpl{
+		userStore: mockUserStore,
+		nsStore:   mockNamespaceStore,
+	}
+	org, err := c.Create(context.Background(), req)
+	require.Nil(t, org)
+	require.ErrorIs(t, err, errorx.ErrNamespaceAlreadyExists)
+}
+
+func TestOrganizationComponent_Create_SSOUserExists(t *testing.T) {
+	req := &types.CreateOrgReq{
+		Name:     "org1",
+		Username: "user1",
+	}
+	mockUserStore := mockdb.NewMockUserStore(t)
+	mockUserStore.EXPECT().FindByUsername(mock.Anything, req.Username).Return(database.User{
+		Username: "user1",
+	}, nil).Once()
+
+	mockNamespaceStore := mockdb.NewMockNamespaceStore(t)
+	mockNamespaceStore.EXPECT().Exists(mock.Anything, req.Name).Return(false, nil).Once()
+
+	mockSSO := mockrpc.NewMockSSOInterface(t)
+	mockSSO.EXPECT().IsExistByName(mock.Anything, req.Name).Return(true, nil).Once()
+
+	c := &organizationComponentImpl{
+		userStore: mockUserStore,
+		nsStore:   mockNamespaceStore,
+		sso:       mockSSO,
+	}
+	org, err := c.Create(context.Background(), req)
+	require.Nil(t, org)
+	require.ErrorIs(t, err, errorx.ErrNamespaceAlreadyExists)
 }
 
 func TestOrganizationComponent_Index(t *testing.T) {

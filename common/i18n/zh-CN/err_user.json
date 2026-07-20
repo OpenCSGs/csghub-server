@@ -38,6 +38,9 @@
     "error.USER-ERR-2": {
         "other": "新电话号码已经存在于sso服务中"
     },
+    "error.USER-ERR-20": {
+        "other": "命名空间已存在"
+    },
     "error.USER-ERR-3": {
         "other": "禁止更改电话号码"
     },

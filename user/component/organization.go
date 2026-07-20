@@ -2,7 +2,6 @@ package component
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
 
@@ -96,7 +95,16 @@ func (c *organizationComponentImpl) Create(ctx context.Context, req *types.Creat
 		return nil, err
 	}
 	if es {
-		return nil, errors.New("the name already exists")
+		return nil, errorx.NamespaceAlreadyExists(req.Name)
+	}
+
+	// check sso user existence, org will be created as a user in sso service
+	exists, err := c.sso.IsExistByName(ctx, req.Name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check organization name existence in sso service, error: %w", err)
+	}
+	if exists {
+		return nil, errorx.NamespaceAlreadyExists(req.Name)
 	}
 
 	dbOrg, err := c.gs.CreateOrganization(req, user)
