@@ -572,6 +572,65 @@ func (_c *MockMirrorComponent_Repos_Call) RunAndReturn(run func(context.Context,
 	return _c
 }
 
+// ResolveNamespace provides a mock function with given fields: ctx, req
+func (_m *MockMirrorComponent) ResolveNamespace(ctx context.Context, req types.ResolveNamespaceReq) (*types.ResolveNamespaceResp, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ResolveNamespace")
+	}
+
+	var r0 *types.ResolveNamespaceResp
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.ResolveNamespaceReq) (*types.ResolveNamespaceResp, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.ResolveNamespaceReq) *types.ResolveNamespaceResp); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*types.ResolveNamespaceResp)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.ResolveNamespaceReq) error); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockMirrorComponent_ResolveNamespace_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ResolveNamespace'
+type MockMirrorComponent_ResolveNamespace_Call struct {
+	*mock.Call
+}
+
+// ResolveNamespace is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req types.ResolveNamespaceReq
+func (_e *MockMirrorComponent_Expecter) ResolveNamespace(ctx interface{}, req interface{}) *MockMirrorComponent_ResolveNamespace_Call {
+	return &MockMirrorComponent_ResolveNamespace_Call{Call: _e.mock.On("ResolveNamespace", ctx, req)}
+}
+
+func (_c *MockMirrorComponent_ResolveNamespace_Call) Run(run func(ctx context.Context, req types.ResolveNamespaceReq)) *MockMirrorComponent_ResolveNamespace_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.ResolveNamespaceReq))
+	})
+	return _c
+}
+
+func (_c *MockMirrorComponent_ResolveNamespace_Call) Return(_a0 *types.ResolveNamespaceResp, _a1 error) *MockMirrorComponent_ResolveNamespace_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockMirrorComponent_ResolveNamespace_Call) RunAndReturn(run func(context.Context, types.ResolveNamespaceReq) (*types.ResolveNamespaceResp, error)) *MockMirrorComponent_ResolveNamespace_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Schedule provides a mock function with given fields: ctx
 func (_m *MockMirrorComponent) Schedule(ctx context.Context) error {
 	ret := _m.Called(ctx)

@@ -65,6 +65,7 @@ type MirrorComponent interface {
 	Schedule(ctx context.Context) error
 	PublicModelRepo(ctx context.Context) error
 	Delete(ctx context.Context, id int64) error
+	ResolveNamespace(ctx context.Context, req types.ResolveNamespaceReq) (*types.ResolveNamespaceResp, error)
 }
 
 func NewMirrorComponent(config *config.Config) (MirrorComponent, error) {

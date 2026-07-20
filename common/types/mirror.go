@@ -82,6 +82,18 @@ type CreateMirrorRepoReq struct {
 	ForkName      string `json:"fork_name"`
 }
 
+type ResolveNamespaceReq struct {
+	SourceNamespace string         `json:"source_namespace" form:"source_namespace" binding:"required"`
+	SourceName      string         `json:"source_name" form:"source_name" binding:"required"`
+	RepoType        RepositoryType `json:"repo_type" form:"repo_type" binding:"required"`
+}
+
+type ResolveNamespaceResp struct {
+	TargetNamespace string `json:"target_namespace"`
+	TargetName      string `json:"target_name"`
+	Exists          bool   `json:"exists"`
+}
+
 type MCPServerAttributes struct {
 	StarCount     int       `json:"star_count"`
 	Tools         []MCPTool `json:"tools"`
