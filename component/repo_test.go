@@ -3373,8 +3373,6 @@ func TestRepoComponent_ChangePath(t *testing.T) {
 
 	// Dependency checks
 	repoComp.mocks.stores.DeployTaskMock().EXPECT().CountByRepoID(ctx, int64(1)).Return(0, nil)
-	repoComp.mocks.stores.SyncVersionMock().EXPECT().FindByRepoTypeAndPath(ctx, "namespace/name", types.ModelRepo).
-		Return(nil, sql.ErrNoRows)
 	repoComp.mocks.stores.WorkflowMock().EXPECT().CountByRepoPath(ctx, "namespace/name").Return(0, nil)
 	repoComp.mocks.stores.ViewerMock().EXPECT().GetViewerByRepoID(ctx, int64(1)).Return(nil, sql.ErrNoRows)
 	repoComp.mocks.stores.AccountSyncQuotaStatementMock().EXPECT().CountByRepoPath(ctx, "namespace/name").Return(0, nil)
@@ -3403,8 +3401,6 @@ func TestRepoComponent_ChangePath_RepoHashed(t *testing.T) {
 
 	// Dependency checks - no blocking entities
 	repoComp.mocks.stores.DeployTaskMock().EXPECT().CountByRepoID(ctx, int64(1)).Return(0, nil)
-	repoComp.mocks.stores.SyncVersionMock().EXPECT().FindByRepoTypeAndPath(ctx, "namespace/name", types.ModelRepo).
-		Return(nil, sql.ErrNoRows)
 	repoComp.mocks.stores.WorkflowMock().EXPECT().CountByRepoPath(ctx, "namespace/name").Return(0, nil)
 	repoComp.mocks.stores.ViewerMock().EXPECT().GetViewerByRepoID(ctx, int64(1)).Return(nil, sql.ErrNoRows)
 	repoComp.mocks.stores.AccountSyncQuotaStatementMock().EXPECT().CountByRepoPath(ctx, "namespace/name").Return(0, nil)
@@ -3416,7 +3412,13 @@ func TestRepoComponent_ChangePath_RepoHashed(t *testing.T) {
 		GitPath:        "models_new/path",
 		Hashed:         true,
 		RepositoryType: types.ModelRepo,
-	}).Return(nil, nil)
+	}).Return(&database.Repository{
+		ID:             1,
+		Path:           "new/path",
+		GitPath:        "models_new/path",
+		Hashed:         true,
+		RepositoryType: types.ModelRepo,
+	}, nil)
 
 	err := repoComp.ChangePath(ctx, types.ChangePathReq{
 		RepoType:  types.ModelRepo,
@@ -3489,9 +3491,8 @@ func TestRepoComponent_ChangePath_DependencyShortCircuits(t *testing.T) {
 
 	// Deploy passes
 	repoComp.mocks.stores.DeployTaskMock().EXPECT().CountByRepoID(ctx, int64(1)).Return(0, nil)
-	// Sync blocks - should return immediately, skipping remaining checks
-	repoComp.mocks.stores.SyncVersionMock().EXPECT().FindByRepoTypeAndPath(ctx, "namespace/name", types.ModelRepo).
-		Return(&database.SyncVersion{}, nil)
+		// Argo workflows block - should return immediately, skipping remaining checks
+		repoComp.mocks.stores.WorkflowMock().EXPECT().CountByRepoPath(ctx, "namespace/name").Return(5, nil)
 
 	err := repoComp.ChangePath(ctx, types.ChangePathReq{
 		RepoType:  types.ModelRepo,
@@ -3502,7 +3503,7 @@ func TestRepoComponent_ChangePath_DependencyShortCircuits(t *testing.T) {
 
 	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "cannot change path")
-	require.Contains(t, err.Error(), "the following dependent entities exist: sync versions")
+	require.Contains(t, err.Error(), "the following dependent entities exist: argo workflows")
 	require.True(t, errors.Is(err, errorx.ErrChangePathBlocked))
 }
 

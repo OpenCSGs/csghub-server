@@ -2595,6 +2595,7 @@ func (_c *MockRepoStore_UpdateRepo_Call) RunAndReturn(run func(context.Context, 
 	return _c
 }
 
+
 // UpdateRepoCloneDownloads provides a mock function with given fields: ctx, repo, date, cloneCount
 func (_m *MockRepoStore) UpdateRepoCloneDownloads(ctx context.Context, repo *database.Repository, date time.Time, cloneCount int64) error {
 	ret := _m.Called(ctx, repo, date, cloneCount)

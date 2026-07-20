@@ -2974,16 +2974,6 @@ func (c *repoComponentImpl) checkChangePathDependencies(ctx context.Context, rep
 		return blocker
 	}
 	blocker = checkOne(func() (bool, error) {
-		_, err := c.syncVersionStore.FindByRepoTypeAndPath(ctx, repo.Path, repo.RepositoryType)
-		if errors.Is(err, sql.ErrNoRows) {
-			return false, nil
-		}
-		return err == nil, err
-	}, "sync versions", repo)
-	if blocker != nil {
-		return blocker
-	}
-	blocker = checkOne(func() (bool, error) {
 		cnt, err := c.argoWorkFlowStore.CountByRepoPath(ctx, repo.Path)
 		return cnt > 0, err
 	}, "argo workflows", repo)
