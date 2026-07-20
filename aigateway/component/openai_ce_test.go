@@ -369,7 +369,7 @@ func TestOpenAIComponent_ListModels_CacheUsesOriginalID(t *testing.T) {
 	searchType := 16
 	enabled := true
 	search := &commontypes.SearchLLMConfig{
-		Type:      &searchType,
+		Types:     []int{searchType},
 		Enabled:   &enabled,
 		SortBy:    "model_size_b",
 		SortOrder: "desc",
@@ -542,7 +542,7 @@ func TestOpenAIComponent_GetModelByID(t *testing.T) {
 		searchType := 16
 		enabled := true
 		search := &commontypes.SearchLLMConfig{
-			Type:      &searchType,
+			Types:     []int{searchType},
 			Enabled:   &enabled,
 			SortBy:    "model_size_b",
 			SortOrder: "desc",
@@ -693,7 +693,7 @@ func TestOpenAIComponent_GetModelByID(t *testing.T) {
 		searchType := 16
 		enabled := true
 		search := &commontypes.SearchLLMConfig{
-			Type:      &searchType,
+			Types:     []int{searchType},
 			Enabled:   &enabled,
 			SortBy:    "model_size_b",
 			SortOrder: "desc",
@@ -848,7 +848,7 @@ func TestOpenAIComponent_ExtGetAvailableModels_Error(t *testing.T) {
 	searchType := 16
 	enabled := true
 	search := &commontypes.SearchLLMConfig{
-		Type:      &searchType,
+		Types:     []int{searchType},
 		Enabled:   &enabled,
 		SortBy:    "model_size_b",
 		SortOrder: "desc",
@@ -912,7 +912,7 @@ func TestOpenAIComponent_ExtGetAvailableModels_SinglePage(t *testing.T) {
 	searchType := 16
 	enabled := true
 	search := &commontypes.SearchLLMConfig{
-		Type:      &searchType,
+		Types:     []int{searchType},
 		Enabled:   &enabled,
 		SortBy:    "model_size_b",
 		SortOrder: "desc",
@@ -949,7 +949,7 @@ func TestOpenAIComponent_GetExternalModelsWithoutRepoOmitsRepoPath(t *testing.T)
 	searchType := 16
 	enabled := true
 	search := &commontypes.SearchLLMConfig{
-		Type:      &searchType,
+		Types:     []int{searchType},
 		Enabled:   &enabled,
 		SortBy:    "model_size_b",
 		SortOrder: "desc",

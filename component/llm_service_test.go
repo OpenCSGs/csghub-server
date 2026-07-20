@@ -28,7 +28,7 @@ func TestLLMServiceComponent_CreateLLMConfig(t *testing.T) {
 	}
 	req := &types.CreateLLMConfigReq{
 		ModelName: "new-model",
-		Type:      16,
+		Types:     []int{16},
 		Enabled:   true,
 		Upstreams: []types.UpstreamConfig{
 			{URL: "http://upstream.example.com/v1", Enabled: true, Weight: 1},
@@ -93,7 +93,7 @@ func TestLLMServiceComponent_CreateLLMConfig_TrimsWhitespace(t *testing.T) {
 	}
 	req := &types.CreateLLMConfigReq{
 		ModelName: "  new-model  ",
-		Type:      16,
+		Types:     []int{16},
 		Enabled:   true,
 		Upstreams: []types.UpstreamConfig{
 			{
@@ -125,7 +125,7 @@ func TestLLMServiceComponent_CreateLLMConfig_RejectsBlankModelName(t *testing.T)
 	}
 	req := &types.CreateLLMConfigReq{
 		ModelName: "   ",
-		Type:      16,
+		Types:     []int{16},
 		Enabled:   true,
 		Upstreams: []types.UpstreamConfig{
 			{URL: "http://upstream.example.com/v1", Enabled: true, Weight: 1},
@@ -136,6 +136,84 @@ func TestLLMServiceComponent_CreateLLMConfig_RejectsBlankModelName(t *testing.T)
 	require.Nil(t, res)
 	require.ErrorIs(t, err, ErrInvalidLLMConfig)
 	require.Contains(t, err.Error(), "model_name cannot be empty")
+}
+
+func TestLLMServiceComponent_CreateLLMConfig_MultiType(t *testing.T) {
+	ctx := context.TODO()
+	stores := tests.NewMockStores(t)
+	upstreamStore := mockdatabase.NewMockUpstreamStore(t)
+	upstreamStore.EXPECT().Create(ctx, mock.Anything).Return(nil).Maybe()
+	mc := &llmServiceComponentImpl{
+		llmConfigStore:    stores.LLMConfig,
+		promptPrefixStore: stores.PromptPrefix,
+		upstreamStore:     upstreamStore,
+	}
+	req := &types.CreateLLMConfigReq{
+		ModelName: "multi-type-model",
+		Types:     []int{database.LLMTypeSummaryReadme, database.LLMTypeAigatewayExternal},
+		Enabled:   true,
+		Upstreams: []types.UpstreamConfig{
+			{URL: "http://upstream.example.com/v1", Enabled: true, Weight: 1},
+		},
+	}
+	dbLLMConfig := &database.LLMConfig{
+		ID:        123,
+		ModelName: "multi-type-model",
+		Type:      database.LLMTypeSummaryReadme | database.LLMTypeAigatewayExternal,
+		Enabled:   true,
+	}
+	stores.LLMConfigMock().EXPECT().Create(ctx, database.LLMConfig{
+		ModelName: "multi-type-model",
+		Type:      database.LLMTypeSummaryReadme | database.LLMTypeAigatewayExternal,
+		Enabled:   true,
+	}).Return(dbLLMConfig, nil)
+	res, err := mc.CreateLLMConfig(ctx, req)
+	require.Nil(t, err)
+	require.NotNil(t, res)
+	require.Equal(t, int64(123), res.ID)
+	require.Equal(t, []int{database.LLMTypeSummaryReadme, database.LLMTypeAigatewayExternal}, res.Types)
+}
+
+func TestLLMServiceComponent_CreateLLMConfig_RejectsInvalidTypes(t *testing.T) {
+	ctx := context.TODO()
+	stores := tests.NewMockStores(t)
+	mc := &llmServiceComponentImpl{
+		llmConfigStore:    stores.LLMConfig,
+		promptPrefixStore: stores.PromptPrefix,
+	}
+	req := &types.CreateLLMConfigReq{
+		ModelName: "bad-types-model",
+		Types:     []int{32},
+		Enabled:   true,
+		Upstreams: []types.UpstreamConfig{
+			{URL: "http://upstream.example.com/v1", Enabled: true, Weight: 1},
+		},
+	}
+	res, err := mc.CreateLLMConfig(ctx, req)
+	require.Nil(t, res)
+	require.ErrorIs(t, err, ErrInvalidLLMConfig)
+	require.Contains(t, err.Error(), "invalid llm type")
+}
+
+func TestLLMServiceComponent_CreateLLMConfig_RejectsEmptyTypes(t *testing.T) {
+	ctx := context.TODO()
+	stores := tests.NewMockStores(t)
+	mc := &llmServiceComponentImpl{
+		llmConfigStore:    stores.LLMConfig,
+		promptPrefixStore: stores.PromptPrefix,
+	}
+	req := &types.CreateLLMConfigReq{
+		ModelName: "no-types-model",
+		Types:     []int{},
+		Enabled:   true,
+		Upstreams: []types.UpstreamConfig{
+			{URL: "http://upstream.example.com/v1", Enabled: true, Weight: 1},
+		},
+	}
+	res, err := mc.CreateLLMConfig(ctx, req)
+	require.Nil(t, res)
+	require.ErrorIs(t, err, ErrInvalidLLMConfig)
+	require.Contains(t, err.Error(), "types cannot be empty")
 }
 
 func TestLLMServiceComponent_CreatePromptPrefix(t *testing.T) {
@@ -188,8 +266,26 @@ func TestLLMServiceComponent_IndexLLMConfig(t *testing.T) {
 	res, total, err := mc.IndexLLMConfig(ctx, per, page, search)
 	require.Nil(t, err)
 	require.NotNil(t, res)
-	require.Equal(t, []*types.LLMConfig{{ID: 123, ModelName: "new-model", OfficialName: "new-model", Type: 666, Enabled: true, IsAvailable: true, Upstreams: []types.UpstreamConfig{}}}, res)
+	require.Equal(t, []*types.LLMConfig{{ID: 123, ModelName: "new-model", OfficialName: "new-model", Type: 666, Types: []int{2, 8, 16}, Enabled: true, IsAvailable: true, Upstreams: []types.UpstreamConfig{}}}, res)
 	require.Equal(t, total, 1)
+}
+
+func TestLLMServiceComponent_IndexLLMConfig_RejectsInvalidTypes(t *testing.T) {
+	ctx := context.TODO()
+	stores := tests.NewMockStores(t)
+	mc := &llmServiceComponentImpl{
+		llmConfigStore:    stores.LLMConfig,
+		promptPrefixStore: stores.PromptPrefix,
+	}
+	search := &types.SearchLLMConfig{
+		Types: []int{0},
+	}
+
+	res, total, err := mc.IndexLLMConfig(ctx, 1, 1, search)
+	require.Nil(t, res)
+	require.Zero(t, total)
+	require.ErrorIs(t, err, ErrInvalidLLMConfig)
+	require.Contains(t, err.Error(), "invalid llm type 0")
 }
 
 func TestLLMServiceComponent_IndexPromptPrefix(t *testing.T) {
@@ -260,6 +356,43 @@ func TestLLMServiceComponent_UpdateLLMConfig(t *testing.T) {
 	require.Equal(t, res.ID, int64(123))
 	require.Equal(t, res.ModelName, "new-model")
 	require.Equal(t, 13.0, res.ModelSizeB)
+}
+
+func TestLLMServiceComponent_UpdateLLMConfig_Types(t *testing.T) {
+	ctx := context.TODO()
+	stores := tests.NewMockStores(t)
+	upstreamStore := mockdatabase.NewMockUpstreamStore(t)
+	upstreamStore.EXPECT().ListByLLMConfigID(ctx, int64(123)).Return([]*database.Upstream{}, nil).Maybe()
+	mc := &llmServiceComponentImpl{
+		llmConfigStore:    stores.LLMConfig,
+		promptPrefixStore: stores.PromptPrefix,
+		upstreamStore:     upstreamStore,
+	}
+	newTypes := []int{database.LLMTypeOptimization, database.LLMTypeAigatewayExternal}
+	req := &types.UpdateLLMConfigReq{
+		ID:    123,
+		Types: &newTypes,
+	}
+	dbLLMConfig := &database.LLMConfig{
+		ID:        123,
+		ModelName: "existing-model",
+		Type:      database.LLMTypeComparison,
+	}
+	updatedLLMConfig := &database.LLMConfig{
+		ID:        123,
+		ModelName: "existing-model",
+		Type:      database.LLMTypeOptimization | database.LLMTypeAigatewayExternal,
+	}
+	stores.LLMConfigMock().EXPECT().GetByID(ctx, int64(123)).Return(dbLLMConfig, nil)
+	stores.LLMConfigMock().EXPECT().Update(ctx, database.LLMConfig{
+		ID:        123,
+		ModelName: "existing-model",
+		Type:      database.LLMTypeOptimization | database.LLMTypeAigatewayExternal,
+	}).Return(updatedLLMConfig, nil)
+	res, err := mc.UpdateLLMConfig(ctx, req)
+	require.Nil(t, err)
+	require.NotNil(t, res)
+	require.Equal(t, []int{database.LLMTypeOptimization, database.LLMTypeAigatewayExternal}, res.Types)
 }
 
 func TestLLMServiceComponent_UpdateLLMConfig_TrimsWhitespace(t *testing.T) {
@@ -624,7 +757,7 @@ func TestLLMServiceComponent_ListExternalLLMs(t *testing.T) {
 
 	// Mock search params
 	search := &types.SearchLLMConfig{
-		Type:    &typeVal,
+		Types:   []int{typeVal},
 		Enabled: &enabled,
 	}
 
@@ -673,7 +806,7 @@ func TestLLMServiceComponent_ListExternalLLMs_NoRepo(t *testing.T) {
 	}
 
 	search := &types.SearchLLMConfig{
-		Type:    &typeVal,
+		Types:   []int{typeVal},
 		Enabled: &enabled,
 	}
 
@@ -699,7 +832,7 @@ func TestLLMServiceComponent_ListExternalLLMs_Error(t *testing.T) {
 	typeVal := database.LLMTypeAigatewayExternal
 	enabled := true
 	search := &types.SearchLLMConfig{
-		Type:    &typeVal,
+		Types:   []int{typeVal},
 		Enabled: &enabled,
 	}
 

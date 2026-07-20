@@ -131,7 +131,7 @@ func TestLLMConfigStore_CRUD(t *testing.T) {
 
 	searchType := 5
 	search := &types.SearchLLMConfig{
-		Type: &searchType,
+		Types: []int{searchType},
 	}
 	cfgs, total, err := store.Index(ctx, 1, 1, search)
 	require.Nil(t, err)
@@ -141,6 +141,57 @@ func TestLLMConfigStore_CRUD(t *testing.T) {
 
 	err = store.Delete(ctx, res.ID)
 	require.Nil(t, err)
+}
+
+func TestLLMConfigStore_Index_MultiType(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+	config, err := config.LoadConfig()
+	require.Nil(t, err)
+	store := database.NewLLMConfigStoreWithDB(db, config)
+
+	// Create a config that supports both optimization (1) and summary readme (4)
+	_, err = store.Create(ctx, database.LLMConfig{
+		Type:      database.LLMTypeOptimization | database.LLMTypeSummaryReadme,
+		Enabled:   true,
+		ModelName: "multi-type-model",
+	})
+	require.Nil(t, err)
+
+	// Create a config that supports only comparison (2)
+	_, err = store.Create(ctx, database.LLMConfig{
+		Type:      database.LLMTypeComparison,
+		Enabled:   true,
+		ModelName: "comparison-only-model",
+	})
+	require.Nil(t, err)
+
+	// Searching by optimization should find the multi-type config
+	cfgs, total, err := store.Index(ctx, 10, 1, &types.SearchLLMConfig{
+		Types: []int{database.LLMTypeOptimization},
+	})
+	require.Nil(t, err)
+	require.Equal(t, 1, total)
+	require.Len(t, cfgs, 1)
+	require.Equal(t, "multi-type-model", cfgs[0].ModelName)
+
+	// Searching by summary readme should also find the multi-type config
+	cfgs, total, err = store.Index(ctx, 10, 1, &types.SearchLLMConfig{
+		Types: []int{database.LLMTypeSummaryReadme},
+	})
+	require.Nil(t, err)
+	require.Equal(t, 1, total)
+	require.Len(t, cfgs, 1)
+	require.Equal(t, "multi-type-model", cfgs[0].ModelName)
+
+	// Searching by both optimization and comparison should find both configs
+	cfgs, total, err = store.Index(ctx, 10, 1, &types.SearchLLMConfig{
+		Types: []int{database.LLMTypeOptimization, database.LLMTypeComparison},
+	})
+	require.Nil(t, err)
+	require.Equal(t, 2, total)
+	require.Len(t, cfgs, 2)
 }
 
 func TestLLMConfigStore_Search(t *testing.T) {
@@ -259,7 +310,7 @@ func TestLLMConfigStore_Index_EnabledFilter(t *testing.T) {
 	enabledFalse := false
 
 	cfgsOn, totalOn, err := store.Index(ctx, 20, 1, &types.SearchLLMConfig{
-		Type:    &searchType,
+		Types:   []int{searchType},
 		Enabled: &enabledTrue,
 	})
 	require.Nil(t, err)
@@ -269,7 +320,7 @@ func TestLLMConfigStore_Index_EnabledFilter(t *testing.T) {
 	require.True(t, cfgsOn[0].Enabled)
 
 	cfgsOff, totalOff, err := store.Index(ctx, 20, 1, &types.SearchLLMConfig{
-		Type:    &searchType,
+		Types:   []int{searchType},
 		Enabled: &enabledFalse,
 	})
 	require.Nil(t, err)
@@ -279,7 +330,7 @@ func TestLLMConfigStore_Index_EnabledFilter(t *testing.T) {
 	require.False(t, cfgsOff[0].Enabled)
 
 	cfgsBoth, totalBoth, err := store.Index(ctx, 20, 1, &types.SearchLLMConfig{
-		Type: &searchType,
+		Types: []int{searchType},
 	})
 	require.Nil(t, err)
 	require.Equal(t, 2, totalBoth)
@@ -352,7 +403,7 @@ func TestLLMConfigStore_IndexWithRepo(t *testing.T) {
 
 	// Test IndexWithRepo
 	search := &types.SearchLLMConfig{
-		Type:    &llmType,
+		Types:   []int{llmType},
 		Enabled: &enabled,
 	}
 	cfgs, total, err := store.IndexWithRepo(ctx, 10, 1, search)
@@ -392,7 +443,7 @@ func TestLLMConfigStore_IndexWithRepo_Empty(t *testing.T) {
 
 	llmType := 16
 	search := &types.SearchLLMConfig{
-		Type: &llmType,
+		Types: []int{llmType},
 	}
 	cfgs, total, err := store.IndexWithRepo(ctx, 10, 1, search)
 	require.Nil(t, err)
@@ -432,7 +483,7 @@ func TestLLMConfigStore_Index_SortByModelSizeB(t *testing.T) {
 	require.Nil(t, err)
 
 	cfgsAsc, _, err := store.Index(ctx, 10, 1, &types.SearchLLMConfig{
-		Type:      &llmType,
+		Types:     []int{llmType},
 		SortBy:    "model_size_b",
 		SortOrder: "ASC",
 	})
@@ -443,7 +494,7 @@ func TestLLMConfigStore_Index_SortByModelSizeB(t *testing.T) {
 	require.Equal(t, "size-large", cfgsAsc[2].ModelName)
 
 	cfgsDesc, _, err := store.Index(ctx, 10, 1, &types.SearchLLMConfig{
-		Type:      &llmType,
+		Types:     []int{llmType},
 		SortBy:    "model_size_b",
 		SortOrder: "DESC",
 	})

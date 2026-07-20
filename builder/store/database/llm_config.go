@@ -51,6 +51,46 @@ const (
 	LLMTypeAigatewayExternal = 16
 )
 
+// LLMTypeFlags is the canonical list of single-bit LLM type flags.
+// When adding a new LLM type, add its power-of-two constant here so validation and response splitting stay in sync.
+var LLMTypeFlags = []int{
+	LLMTypeOptimization,
+	LLMTypeComparison,
+	LLMTypeSummaryReadme,
+	LLMTypeMCPScanner,
+	LLMTypeAigatewayExternal,
+}
+
+var llmTypeMask = CombineLLMTypes(LLMTypeFlags)
+
+// IsValidLLMType reports whether t is a non-empty bitmask composed only of known LLM type flags.
+func IsValidLLMType(t int) bool {
+	return t > 0 && t&^llmTypeMask == 0
+}
+
+// CombineLLMTypes folds a slice of individual LLM type flags into a single bitmask.
+func CombineLLMTypes(types []int) int {
+	mask := 0
+	for _, typ := range types {
+		mask |= typ
+	}
+	return mask
+}
+
+// SplitLLMType expands a type bitmask into the individual flags it contains.
+func SplitLLMType(t int) []int {
+	if t <= 0 {
+		return nil
+	}
+	var result []int
+	for _, bit := range LLMTypeFlags {
+		if t&bit == bit {
+			result = append(result, bit)
+		}
+	}
+	return result
+}
+
 type LLMConfigStore interface {
 	GetOptimization(ctx context.Context) (*LLMConfig, error)
 	GetModelForSummaryReadme(ctx context.Context) (*LLMConfig, error)
@@ -210,9 +250,12 @@ func buildSearchLLMConfigQuery(
 	if search.Keyword != "" {
 		q.Where("LOWER(llm_config.model_name) LIKE LOWER(?)", "%"+search.Keyword+"%")
 	}
-	// Filter by Type if provided
-	if search.Type != nil {
-		q.Where("llm_config.type = ?", *search.Type)
+	// Filter by Types if provided
+	if len(search.Types) > 0 {
+		mask := CombineLLMTypes(search.Types)
+		if mask > 0 {
+			q.Where("(llm_config.type & ?) > 0", mask)
+		}
 	}
 	// Filter by Enabled if provided
 	if search.Enabled != nil {
