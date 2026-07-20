@@ -229,6 +229,25 @@ func (h *SpaceResourceHandler) ListHardwareTypes(ctx *gin.Context) {
 	httpbase.OK(ctx, types)
 }
 
+// ListScenarios godoc
+// @Security     ApiKey
+// @Summary      List all deploy/workflow scenarios
+// @Description  list every known scenario with its code (bit position, passed as deploy_type to the space resources index API) and name
+// @Tags         SpaceReource
+// @Produce      json
+// @Success      200  {object}  types.Response{data=[]types.ScenarioInfo} "OK"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /space_resources/scenarios [get]
+func (h *SpaceResourceHandler) ListScenarios(ctx *gin.Context) {
+	scenarios, err := h.spaceResource.ListScenarios(ctx.Request.Context())
+	if err != nil {
+		slog.ErrorContext(ctx.Request.Context(), "failed to list scenarios", slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	httpbase.OK(ctx, scenarios)
+}
+
 // ListAllSpaceResources godoc
 // @Security     ApiKey
 // @Summary      List all space resources for admin

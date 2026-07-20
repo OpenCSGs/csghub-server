@@ -13,6 +13,7 @@ type MockStores struct {
 	RepoRelation           database.RepoRelationsStore
 	Model                  database.ModelStore
 	SpaceResource          database.SpaceResourceStore
+	ScenarioConstraint     database.ScenarioConstraintStore
 	Tag                    database.TagStore
 	TagRule                database.TagRuleStore
 	Dataset                database.DatasetStore
@@ -83,6 +84,7 @@ func NewMockStores(t interface {
 		RepoRelation:           mockdb.NewMockRepoRelationsStore(t),
 		Model:                  mockdb.NewMockModelStore(t),
 		SpaceResource:          mockdb.NewMockSpaceResourceStore(t),
+		ScenarioConstraint:     mockdb.NewMockScenarioConstraintStore(t),
 		Tag:                    mockdb.NewMockTagStore(t),
 		Dataset:                mockdb.NewMockDatasetStore(t),
 		PromptConversation:     mockdb.NewMockPromptConversationStore(t),
@@ -169,6 +171,10 @@ func (s *MockStores) ModelMock() *mockdb.MockModelStore {
 
 func (s *MockStores) SpaceResourceMock() *mockdb.MockSpaceResourceStore {
 	return s.SpaceResource.(*mockdb.MockSpaceResourceStore)
+}
+
+func (s *MockStores) ScenarioConstraintMock() *mockdb.MockScenarioConstraintStore {
+	return s.ScenarioConstraint.(*mockdb.MockScenarioConstraintStore)
 }
 
 func (s *MockStores) TagMock() *mockdb.MockTagStore {

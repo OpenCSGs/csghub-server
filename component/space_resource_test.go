@@ -59,6 +59,10 @@ func TestSpaceResourceComponent_Update(t *testing.T) {
 		Name:      "n",
 		Resources: validResourcesJSON,
 	}).Return(&database.SpaceResource{ID: 1, Name: "n", Resources: validResourcesJSON}, nil)
+	// Update loads the scenario catalog once (FindAllOrdered) for the
+	// mask<->name conversion when building the response.
+	sc.mocks.stores.ScenarioConstraintMock().EXPECT().FindAllOrdered(ctx).Return(
+		[]database.ScenarioConstraint{}, nil)
 
 	data, err := sc.Update(ctx, &types.UpdateSpaceResourceReq{
 		ID:        1,
@@ -90,12 +94,16 @@ func TestSpaceResourceComponent_Create(t *testing.T) {
 	ctx := context.TODO()
 	sc := initializeTestSpaceResourceComponent(ctx, t)
 
+	// Create loads the scenario catalog once (FindAllOrdered) for the
+	// names<->mask conversion; an empty catalog is fine for an empty scenarios list.
+	sc.mocks.stores.ScenarioConstraintMock().EXPECT().FindAllOrdered(ctx).Return(
+		[]database.ScenarioConstraint{}, nil)
 	sc.mocks.stores.SpaceResourceMock().EXPECT().Create(ctx, database.SpaceResource{
 		Name:      "n",
 		Resources: validResourcesJSON,
 		ClusterID: "c",
-		Scenarios: []string{},
-	}).Return(&database.SpaceResource{ID: 1, Name: "n", Resources: validResourcesJSON, Scenarios: []string{}}, nil)
+		Scenarios: 0,
+	}).Return(&database.SpaceResource{ID: 1, Name: "n", Resources: validResourcesJSON, Scenarios: 0}, nil)
 
 	data, err := sc.Create(ctx, &types.CreateSpaceResourceReq{
 		Name:      "n",
@@ -132,6 +140,28 @@ func TestSpaceResourceComponent_Create_InvalidResources(t *testing.T) {
 		Resources: "not-json",
 		ClusterID: "c",
 	})
+	require.True(t, errors.Is(err, errorx.ErrBadRequest))
+}
+
+// TestSpaceResourceComponent_Create_UnknownScenario verifies that an unknown
+// scenario name (not in the catalog) is rejected with BadRequest instead of
+// being silently dropped to a 0 mask (which would make the resource vanish from
+// scenario-filtered queries).
+func TestSpaceResourceComponent_Create_UnknownScenario(t *testing.T) {
+	ctx := context.TODO()
+	sc := initializeTestSpaceResourceComponent(ctx, t)
+
+	// catalog only knows "finetune"; "bogus" is unknown
+	sc.mocks.stores.ScenarioConstraintMock().EXPECT().FindAllOrdered(ctx).Return(
+		[]database.ScenarioConstraint{{Scenario: "finetune", Code: types.FinetuneType}}, nil)
+
+	_, err := sc.Create(ctx, &types.CreateSpaceResourceReq{
+		Name:      "n",
+		Resources: validResourcesJSON,
+		ClusterID: "c",
+		Scenarios: []string{"finetune", "bogus"},
+	})
+	require.Error(t, err)
 	require.True(t, errors.Is(err, errorx.ErrBadRequest))
 }
 
@@ -190,6 +220,10 @@ func TestSpaceResourceComponent_ListAll(t *testing.T) {
 				{ID: 2, Name: "resource2", ClusterID: "c2", Resources: "{}"},
 			}, nil,
 		)
+		// ListAll loads the scenario catalog once (FindAllOrdered) for the
+		// per-resource mask<->name conversion.
+		sc.mocks.stores.ScenarioConstraintMock().EXPECT().FindAllOrdered(ctx).Return(
+			[]database.ScenarioConstraint{}, nil)
 
 		resources, err := sc.ListAll(ctx)
 		require.Nil(t, err)

@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/uptrace/bun/dialect/pgdialect"
-
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
@@ -25,7 +23,7 @@ type SpaceResourceStore interface {
 	FindAll(ctx context.Context) ([]SpaceResource, error)
 	FindAllResourceTypes(ctx context.Context, clusterId string) ([]string, error)
 	FindByHardwareType(ctx context.Context, hardwareType string) ([]SpaceResource, error)
-	FindByScenarios(ctx context.Context, scenarios []string) ([]SpaceResource, error)
+	FindByScenarios(ctx context.Context, scenarioMask int64) ([]SpaceResource, error)
 }
 
 func NewSpaceResourceStore() SpaceResourceStore {
@@ -37,11 +35,11 @@ func NewSpaceResourceStoreWithDB(db *DB) SpaceResourceStore {
 }
 
 type SpaceResource struct {
-	ID        int64    `bun:",pk,autoincrement" json:"id"`
-	Name      string   `bun:",notnull" json:"name"`
-	Resources string   `bun:",notnull" json:"resources"`
-	ClusterID string   `bun:",notnull" json:"cluster_id"`
-	Scenarios []string `bun:",array" json:"scenarios"`
+	ID        int64  `bun:",pk,autoincrement" json:"id"`
+	Name      string `bun:",notnull" json:"name"`
+	Resources string `bun:",notnull" json:"resources"`
+	ClusterID string `bun:",notnull" json:"cluster_id"`
+	Scenarios int64  `bun:",notnull,default:0" json:"scenarios"`
 	times
 }
 
@@ -71,9 +69,6 @@ func (s *spaceResourceStoreImpl) Index(ctx context.Context, filter types.SpaceRe
 }
 
 func (s *spaceResourceStoreImpl) Create(ctx context.Context, input SpaceResource) (*SpaceResource, error) {
-	if input.Scenarios == nil {
-		input.Scenarios = []string{}
-	}
 	res, err := s.db.Core.NewInsert().Model(&input).Exec(ctx, &input)
 	if err := assertAffectedOneRow(res, err); err != nil {
 		err = errorx.HandleDBError(err, errorx.Ctx().
@@ -188,10 +183,10 @@ func (s *spaceResourceStoreImpl) FindByHardwareType(ctx context.Context, hardwar
 	return result, nil
 }
 
-func (s *spaceResourceStoreImpl) FindByScenarios(ctx context.Context, scenarios []string) ([]SpaceResource, error) {
+func (s *spaceResourceStoreImpl) FindByScenarios(ctx context.Context, scenarioMask int64) ([]SpaceResource, error) {
 	var result []SpaceResource
 	err := s.db.Operator.Core.NewSelect().Model(&result).
-		Where("scenarios && ?", pgdialect.Array(scenarios)).
+		Where("scenarios & ? <> 0", scenarioMask).
 		Scan(ctx)
 	if err != nil {
 		return nil, errorx.HandleDBError(err, nil)

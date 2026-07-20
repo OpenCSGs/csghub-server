@@ -31,6 +31,11 @@ type SpaceResourceComponent interface {
 	Delete(ctx context.Context, id int64) error
 	ListHardwareTypes(ctx context.Context, clusterId string) ([]string, error)
 	ListAll(ctx context.Context) ([]types.SpaceResource, error)
+	// ListScenarios returns every known deploy/workflow scenario with its code
+	// (bit position, passed as deploy_type to Index), name and display name, read
+	// from the space_resource_scenario_constraints table. Lets callers discover
+	// scenario codes dynamically instead of hardcoding them.
+	ListScenarios(ctx context.Context) ([]types.ScenarioInfo, error)
 }
 
 // validateResources checks that the Resources string is non-empty and valid
@@ -71,6 +76,37 @@ func sanitizeScenarios(scenarios []string) []string {
 func (c *spaceResourceComponentImpl) Index(ctx context.Context, req *types.SpaceResourceIndexReq) ([]types.SpaceResource, int, error) {
 	var result []types.SpaceResource
 	var total int
+	// req.DeployType is a scenario code (bit position): 0-7 deploy scenarios,
+	// 32-38 workflow scenarios (see space_resource_scenario_constraints table).
+	// scenarioMask is used to filter resources by their scenarios bitmask (a
+	// resource is included only if it supports the requested scenario). A zero
+	// scenarioMask means the caller did not pass a known scenario code, so no
+	// scenario filtering is applied.
+	// FindByCode resolves the code into the scenario row in one query: the row
+	// carries both the scenario name (for the bitmask) and the constraint
+	// (required_hardware / max_replica) that drives the filtering below. A nil
+	// row means the code is not a known scenario => no scenario filtering and no
+	// constraint (replaces the previously hardcoded deployAvailable / replica
+	// checks).
+	scenarioRow, err := c.scenarioConstraintStore.FindByCode(ctx, req.DeployType)
+	if err != nil {
+		slog.ErrorContext(ctx, "failed to load scenario by code",
+			slog.Int("code", req.DeployType), slog.Any("error", err))
+		return nil, 0, fmt.Errorf("load scenario by code failed: %w", err)
+	}
+	var scenarioMask int64
+	var constraint *database.ScenarioConstraint
+	if scenarioRow != nil {
+		scenarioMask = int64(1) << uint(scenarioRow.Code)
+		constraint = scenarioRow
+	}
+	// Load the full scenario catalog once so the per-resource mask<->name
+	// conversion below stays in memory instead of hitting the DB per resource.
+	catalog, err := c.scenarioConstraintStore.FindAllOrdered(ctx)
+	if err != nil {
+		slog.ErrorContext(ctx, "failed to load scenario catalog", slog.Any("error", err))
+		return nil, 0, fmt.Errorf("load scenario catalog failed: %w", err)
+	}
 	for _, clusterID := range req.ClusterIDs {
 		resourceCount := 0
 		var singleClusterResult []types.SpaceResource
@@ -92,6 +128,12 @@ func (c *spaceResourceComponentImpl) Index(ctx context.Context, req *types.Space
 		}
 		slog.InfoContext(ctx, "get space cluster resource", slog.Any("clusterResources", clusterResources))
 		for _, r := range databaseSpaceResources {
+			// Filter by the resource's scenarios bitmask: skip resources that do
+			// not support the requested scenario. scenarioMask == 0 (no known
+			// scenario code passed) disables this filter.
+			if scenarioMask != 0 && r.Scenarios&scenarioMask == 0 {
+				continue
+			}
 			var isAvailable bool
 			var hardware types.HardWare
 			var availableStatusList []types.ResourceAvailableStatus
@@ -104,12 +146,12 @@ func (c *spaceResourceComponentImpl) Index(ctx context.Context, req *types.Space
 					availableStatusList[i].NodeName = maskNodeName(availableStatusList[i].NodeName)
 				}
 			}
-			if !c.deployAvailable(req.DeployType, hardware) {
-				// must have gpu for finetune
+			if !c.hardwareSatisfiesConstraint(constraint, hardware) {
+				// resource hardware does not meet the scenario's required_hardware bitmask
 				continue
 			}
-			if req.DeployType != types.InferenceType && hardware.Replicas > 1 {
-				// only inference can have multi-node resources
+			if !c.replicaSatisfiesConstraint(constraint, hardware.Replicas) {
+				// resource replicas exceed the scenario's max_replica (0 = unlimited)
 				continue
 			}
 			if req.IsAvailable != nil {
@@ -119,10 +161,7 @@ func (c *spaceResourceComponentImpl) Index(ctx context.Context, req *types.Space
 				}
 			}
 			resourceType := common.ResourceType(hardware)
-			scenarios := r.Scenarios
-			if scenarios == nil {
-				scenarios = []string{}
-			}
+			scenarios := maskToScenarioNames(catalog, r.Scenarios)
 			singleClusterResult = append(singleClusterResult, types.SpaceResource{
 				ID:                  r.ID,
 				ClusterID:           r.ClusterID,
@@ -156,6 +195,29 @@ func (c *spaceResourceComponentImpl) Index(ctx context.Context, req *types.Space
 	return result, total, nil
 }
 
+// hardwareSatisfiesConstraint reports whether the resource hardware meets the
+// scenario's hardware constraints. Delegates to the shared
+// types.HardwareSatisfiesConstraint so the Index query and the sandbox
+// auto-allocator apply identical rules. A nil constraint means no rule
+// configured => always satisfied.
+func (c *spaceResourceComponentImpl) hardwareSatisfiesConstraint(constraint *database.ScenarioConstraint, hardware types.HardWare) bool {
+	if constraint == nil {
+		return true
+	}
+	return types.HardwareSatisfiesConstraint(constraint.RequiredHardware, constraint.ExcludeHardware, hardware)
+}
+
+// replicaSatisfiesConstraint reports whether the resource replica count is within
+// the scenario's max_replica. Delegates to the shared types.ReplicaSatisfiesConstraint
+// so the Index query and the sandbox auto-allocator apply identical rules. A nil
+// constraint or a zero max_replica means "unlimited" (always satisfied).
+func (c *spaceResourceComponentImpl) replicaSatisfiesConstraint(constraint *database.ScenarioConstraint, replicas int) bool {
+	if constraint == nil {
+		return true
+	}
+	return types.ReplicaSatisfiesConstraint(constraint.MaxReplica, replicas)
+}
+
 func (c *spaceResourceComponentImpl) Update(ctx context.Context, req *types.UpdateSpaceResourceReq) (*types.SpaceResource, error) {
 	if err := validateResources(req.Resources); err != nil {
 		return nil, err
@@ -169,7 +231,16 @@ func (c *spaceResourceComponentImpl) Update(ctx context.Context, req *types.Upda
 	sr.Resources = req.Resources
 
 	if req.Scenarios != nil {
-		sr.Scenarios = sanitizeScenarios(req.Scenarios)
+		catalog, err := c.scenarioConstraintStore.FindAllOrdered(ctx)
+		if err != nil {
+			slog.ErrorContext(ctx, "failed to load scenario catalog", slog.Any("error", err))
+			return nil, fmt.Errorf("load scenario catalog failed: %w", err)
+		}
+		mask, err := scenarioNamesToMask(catalog, sanitizeScenarios(req.Scenarios))
+		if err != nil {
+			return nil, err
+		}
+		sr.Scenarios = mask
 	}
 
 	sr, err = c.spaceResourceStore.Update(ctx, *sr)
@@ -178,10 +249,12 @@ func (c *spaceResourceComponentImpl) Update(ctx context.Context, req *types.Upda
 		return nil, err
 	}
 
-	scenarios := sr.Scenarios
-	if scenarios == nil {
-		scenarios = []string{}
+	catalog, err := c.scenarioConstraintStore.FindAllOrdered(ctx)
+	if err != nil {
+		slog.ErrorContext(ctx, "failed to load scenario catalog", slog.Any("error", err))
+		return nil, fmt.Errorf("load scenario catalog failed: %w", err)
 	}
+	scenarios := maskToScenarioNames(catalog, sr.Scenarios)
 	result := &types.SpaceResource{
 		ID:        sr.ID,
 		Name:      sr.Name,
@@ -196,22 +269,28 @@ func (c *spaceResourceComponentImpl) Create(ctx context.Context, req *types.Crea
 	if err := validateResources(req.Resources); err != nil {
 		return nil, err
 	}
+	catalog, err := c.scenarioConstraintStore.FindAllOrdered(ctx)
+	if err != nil {
+		slog.ErrorContext(ctx, "failed to load scenario catalog", slog.Any("error", err))
+		return nil, fmt.Errorf("load scenario catalog failed: %w", err)
+	}
 	sr := database.SpaceResource{
 		Name:      req.Name,
 		Resources: req.Resources,
 		ClusterID: req.ClusterID,
-		Scenarios: sanitizeScenarios(req.Scenarios),
 	}
+	mask, err := scenarioNamesToMask(catalog, sanitizeScenarios(req.Scenarios))
+	if err != nil {
+		return nil, err
+	}
+	sr.Scenarios = mask
 	res, err := c.spaceResourceStore.Create(ctx, sr)
 	if err != nil {
 		slog.Error("error creating space resource", slog.Any("error", err))
 		return nil, err
 	}
 
-	scenariosResult := res.Scenarios
-	if scenariosResult == nil {
-		scenariosResult = []string{}
-	}
+	scenariosResult := maskToScenarioNames(catalog, res.Scenarios)
 	result := &types.SpaceResource{
 		ID:        res.ID,
 		Name:      res.Name,
@@ -263,12 +342,15 @@ func (c *spaceResourceComponentImpl) ListAll(ctx context.Context) ([]types.Space
 		return nil, err
 	}
 
+	catalog, err := c.scenarioConstraintStore.FindAllOrdered(ctx)
+	if err != nil {
+		slog.ErrorContext(ctx, "failed to load scenario catalog", slog.Any("error", err))
+		return nil, fmt.Errorf("load scenario catalog failed: %w", err)
+	}
+
 	result := make([]types.SpaceResource, 0, len(dbResources))
 	for _, r := range dbResources {
-		scenarios := r.Scenarios
-		if scenarios == nil {
-			scenarios = []string{}
-		}
+		scenarios := maskToScenarioNames(catalog, r.Scenarios)
 		result = append(result, types.SpaceResource{
 			ID:        r.ID,
 			Name:      r.Name,
@@ -279,4 +361,69 @@ func (c *spaceResourceComponentImpl) ListAll(ctx context.Context) ([]types.Space
 	}
 
 	return result, nil
+}
+
+// ListScenarios returns every known scenario (deploy + workflow) with its code
+// (bit position), name and display name, read from the
+// space_resource_scenario_constraints table ordered by code.
+func (c *spaceResourceComponentImpl) ListScenarios(ctx context.Context) ([]types.ScenarioInfo, error) {
+	rows, err := c.scenarioConstraintStore.FindAllOrdered(ctx)
+	if err != nil {
+		slog.ErrorContext(ctx, "failed to load scenario catalog", slog.Any("error", err))
+		return nil, fmt.Errorf("load scenario catalog failed: %w", err)
+	}
+	result := make([]types.ScenarioInfo, 0, len(rows))
+	for _, r := range rows {
+		result = append(result, types.ScenarioInfo{
+			Code:     r.Code,
+			Name:     r.Scenario,
+			I18nKey:  r.I18nKey,
+			Category: types.ScenarioCategory(r.Category),
+		})
+	}
+	return result, nil
+}
+
+// maskToScenarioNames converts a scenarios bitmask into a list of scenario names
+// using the in-memory catalog (loaded once via FindAllOrdered). A mask of -1
+// (all bits set) returns every known scenario name. Unknown set bits are
+// skipped. A zero mask returns an empty (non-nil) slice.
+func maskToScenarioNames(catalog []database.ScenarioConstraint, mask int64) []string {
+	if mask == int64(types.ScenarioAll) {
+		result := make([]string, 0, len(catalog))
+		for _, s := range catalog {
+			result = append(result, s.Scenario)
+		}
+		return result
+	}
+	result := make([]string, 0, len(catalog))
+	for _, s := range catalog {
+		if mask&(int64(1)<<uint(s.Code)) != 0 {
+			result = append(result, s.Scenario)
+		}
+	}
+	return result
+}
+
+// scenarioNamesToMask converts a list of scenario names into a bitmask using the
+// in-memory catalog (loaded once via FindAllOrdered). Every requested name must
+// exist in the catalog; any unknown name (stale caller, typo, or a scenario not
+// yet present in the DB) returns a BadRequest error so the request is rejected
+// instead of silently storing 0 (which would make the resource vanish from all
+// scenario-filtered queries). An empty list yields 0 (supports nothing) and is
+// allowed — it means the caller explicitly bound no scenarios.
+func scenarioNamesToMask(catalog []database.ScenarioConstraint, scenarios []string) (int64, error) {
+	known := make(map[string]int, len(catalog))
+	for _, s := range catalog {
+		known[s.Scenario] = s.Code
+	}
+	var mask int64
+	for _, name := range scenarios {
+		code, ok := known[name]
+		if !ok {
+			return 0, errorx.BadRequest(fmt.Errorf("unknown scenario name %q", name), errorx.Ctx().Set("field", "scenarios").Set("scenario", name))
+		}
+		mask |= int64(1) << uint(code)
+	}
+	return mask, nil
 }
