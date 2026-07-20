@@ -370,9 +370,63 @@ func (s *repoStoreImpl) CreateRepo(ctx context.Context, input Repository) (*Repo
 }
 
 func (s *repoStoreImpl) UpdateRepo(ctx context.Context, input Repository) (*Repository, error) {
-	_, err := s.db.Core.NewUpdate().Model(&input).WherePK().Exec(ctx)
-	err = errorx.HandleDBError(err, errorx.Ctx().Set("path", input.Path))
-	return &input, err
+	err := s.db.RunInTx(ctx, func(ctx context.Context, tx Operator) error {
+		// Fetch the existing repo within the tx to detect path changes
+		var existing Repository
+		err := tx.Core.NewSelect().Model(&existing).Where("id = ?", input.ID).For("UPDATE").Scan(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to find existing repo: %w", err)
+		}
+
+		// If path changed and new path is not empty, migrate sync version records
+		if existing.Path != input.Path && input.Path != "" {
+			if err := s.migrateSyncVersion(ctx, tx, existing.Path, input); err != nil {
+				return err
+			}
+		}
+
+		// Update the repository
+		_, err = tx.Core.NewUpdate().Model(&input).WherePK().Exec(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to update repo: %w", err)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, errorx.HandleDBError(err, errorx.Ctx().Set("path", input.Path))
+	}
+	return &input, nil
+}
+
+// migrateSyncVersion copies the latest sync_version record from oldPath to newPath
+// within an existing transaction.
+func (s *repoStoreImpl) migrateSyncVersion(ctx context.Context, tx Operator, oldPath string, input Repository) error {
+	var latest SyncVersion
+	err := tx.Core.NewSelect().
+		Model(&latest).
+		Where("repo_path = ? AND repo_type = ?", oldPath, input.RepositoryType).
+		Order("version DESC").
+		Limit(1).
+		Scan(ctx)
+	if err != nil && err != sql.ErrNoRows {
+		return fmt.Errorf("failed to find sync_version for old path: %w", err)
+	}
+
+	if err != sql.ErrNoRows {
+		newSyncVersion := SyncVersion{
+			SourceID:       latest.SourceID,
+			RepoPath:       input.Path,
+			RepoType:       input.RepositoryType,
+			LastModifiedAt: latest.LastModifiedAt,
+			ChangeLog:      latest.ChangeLog,
+			Completed:      latest.Completed,
+		}
+		_, err = tx.Core.NewInsert().Model(&newSyncVersion).Exec(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to insert sync_version for new path: %w", err)
+		}
+	}
+	return nil
 }
 
 func (s *repoStoreImpl) DeleteRepo(ctx context.Context, input Repository) error {
