@@ -281,6 +281,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		spaceResource.PUT("/:id", middlewareCollection.License.Check, middlewareCollection.Auth.NeedAdmin, spaceResourceHandler.Update)
 		spaceResource.DELETE("/:id", middlewareCollection.License.Check, middlewareCollection.Auth.NeedAdmin, spaceResourceHandler.Delete)
 		spaceResource.GET("/hardware_types", spaceResourceHandler.ListHardwareTypes)
+		spaceResource.GET("/scenarios", spaceResourceHandler.ListScenarios)
 	}
 	adminGrp.GET("/space_resources", spaceResourceHandler.ListAll)
 

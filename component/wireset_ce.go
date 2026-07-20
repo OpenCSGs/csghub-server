@@ -91,7 +91,8 @@ func NewTestSpaceComponent(
 
 func NewTestSpaceResourceComponent(config *config.Config, stores *tests.MockStores, deployer deploy.Deployer, accountComponent AccountingComponent) *spaceResourceComponentImpl {
 	return &spaceResourceComponentImpl{
-		spaceResourceStore: stores.SpaceResource,
+		spaceResourceStore:      stores.SpaceResource,
+		scenarioConstraintStore: stores.ScenarioConstraint,
 		deployer:           deployer,
 		userStore:          stores.User,
 		accountComponent:   accountComponent,

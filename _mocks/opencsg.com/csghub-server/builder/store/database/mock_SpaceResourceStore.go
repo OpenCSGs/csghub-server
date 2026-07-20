@@ -424,9 +424,9 @@ func (_c *MockSpaceResourceStore_FindByName_Call) RunAndReturn(run func(context.
 	return _c
 }
 
-// FindByScenarios provides a mock function with given fields: ctx, scenarios
-func (_m *MockSpaceResourceStore) FindByScenarios(ctx context.Context, scenarios []string) ([]database.SpaceResource, error) {
-	ret := _m.Called(ctx, scenarios)
+// FindByScenarios provides a mock function with given fields: ctx, scenarioMask
+func (_m *MockSpaceResourceStore) FindByScenarios(ctx context.Context, scenarioMask int64) ([]database.SpaceResource, error) {
+	ret := _m.Called(ctx, scenarioMask)
 
 	if len(ret) == 0 {
 		panic("no return value specified for FindByScenarios")
@@ -434,19 +434,19 @@ func (_m *MockSpaceResourceStore) FindByScenarios(ctx context.Context, scenarios
 
 	var r0 []database.SpaceResource
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, []string) ([]database.SpaceResource, error)); ok {
-		return rf(ctx, scenarios)
+	if rf, ok := ret.Get(0).(func(context.Context, int64) ([]database.SpaceResource, error)); ok {
+		return rf(ctx, scenarioMask)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, []string) []database.SpaceResource); ok {
-		r0 = rf(ctx, scenarios)
+	if rf, ok := ret.Get(0).(func(context.Context, int64) []database.SpaceResource); ok {
+		r0 = rf(ctx, scenarioMask)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]database.SpaceResource)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, []string) error); ok {
-		r1 = rf(ctx, scenarios)
+	if rf, ok := ret.Get(1).(func(context.Context, int64) error); ok {
+		r1 = rf(ctx, scenarioMask)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -461,14 +461,14 @@ type MockSpaceResourceStore_FindByScenarios_Call struct {
 
 // FindByScenarios is a helper method to define mock.On call
 //   - ctx context.Context
-//   - scenarios []string
-func (_e *MockSpaceResourceStore_Expecter) FindByScenarios(ctx interface{}, scenarios interface{}) *MockSpaceResourceStore_FindByScenarios_Call {
-	return &MockSpaceResourceStore_FindByScenarios_Call{Call: _e.mock.On("FindByScenarios", ctx, scenarios)}
+//   - scenarioMask int64
+func (_e *MockSpaceResourceStore_Expecter) FindByScenarios(ctx interface{}, scenarioMask interface{}) *MockSpaceResourceStore_FindByScenarios_Call {
+	return &MockSpaceResourceStore_FindByScenarios_Call{Call: _e.mock.On("FindByScenarios", ctx, scenarioMask)}
 }
 
-func (_c *MockSpaceResourceStore_FindByScenarios_Call) Run(run func(ctx context.Context, scenarios []string)) *MockSpaceResourceStore_FindByScenarios_Call {
+func (_c *MockSpaceResourceStore_FindByScenarios_Call) Run(run func(ctx context.Context, scenarioMask int64)) *MockSpaceResourceStore_FindByScenarios_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].([]string))
+		run(args[0].(context.Context), args[1].(int64))
 	})
 	return _c
 }
@@ -478,7 +478,7 @@ func (_c *MockSpaceResourceStore_FindByScenarios_Call) Return(_a0 []database.Spa
 	return _c
 }
 
-func (_c *MockSpaceResourceStore_FindByScenarios_Call) RunAndReturn(run func(context.Context, []string) ([]database.SpaceResource, error)) *MockSpaceResourceStore_FindByScenarios_Call {
+func (_c *MockSpaceResourceStore_FindByScenarios_Call) RunAndReturn(run func(context.Context, int64) ([]database.SpaceResource, error)) *MockSpaceResourceStore_FindByScenarios_Call {
 	_c.Call.Return(run)
 	return _c
 }

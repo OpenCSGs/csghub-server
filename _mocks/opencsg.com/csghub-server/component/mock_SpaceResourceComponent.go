@@ -311,6 +311,64 @@ func (_c *MockSpaceResourceComponent_ListHardwareTypes_Call) RunAndReturn(run fu
 	return _c
 }
 
+// ListScenarios provides a mock function with given fields: ctx
+func (_m *MockSpaceResourceComponent) ListScenarios(ctx context.Context) ([]types.ScenarioInfo, error) {
+	ret := _m.Called(ctx)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListScenarios")
+	}
+
+	var r0 []types.ScenarioInfo
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context) ([]types.ScenarioInfo, error)); ok {
+		return rf(ctx)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context) []types.ScenarioInfo); ok {
+		r0 = rf(ctx)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]types.ScenarioInfo)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = rf(ctx)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockSpaceResourceComponent_ListScenarios_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListScenarios'
+type MockSpaceResourceComponent_ListScenarios_Call struct {
+	*mock.Call
+}
+
+// ListScenarios is a helper method to define mock.On call
+//   - ctx context.Context
+func (_e *MockSpaceResourceComponent_Expecter) ListScenarios(ctx interface{}) *MockSpaceResourceComponent_ListScenarios_Call {
+	return &MockSpaceResourceComponent_ListScenarios_Call{Call: _e.mock.On("ListScenarios", ctx)}
+}
+
+func (_c *MockSpaceResourceComponent_ListScenarios_Call) Run(run func(ctx context.Context)) *MockSpaceResourceComponent_ListScenarios_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context))
+	})
+	return _c
+}
+
+func (_c *MockSpaceResourceComponent_ListScenarios_Call) Return(_a0 []types.ScenarioInfo, _a1 error) *MockSpaceResourceComponent_ListScenarios_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockSpaceResourceComponent_ListScenarios_Call) RunAndReturn(run func(context.Context) ([]types.ScenarioInfo, error)) *MockSpaceResourceComponent_ListScenarios_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Update provides a mock function with given fields: ctx, req
 func (_m *MockSpaceResourceComponent) Update(ctx context.Context, req *types.UpdateSpaceResourceReq) (*types.SpaceResource, error) {
 	ret := _m.Called(ctx, req)

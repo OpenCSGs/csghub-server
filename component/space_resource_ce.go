@@ -12,6 +12,7 @@ import (
 func NewSpaceResourceComponent(config *config.Config) (SpaceResourceComponent, error) {
 	c := &spaceResourceComponentImpl{}
 	c.spaceResourceStore = database.NewSpaceResourceStore()
+	c.scenarioConstraintStore = database.NewScenarioConstraintStore()
 	c.deployer = deploy.NewDeployer()
 	c.userStore = database.NewUserStore()
 	ac, err := NewAccountingComponent(config)
@@ -24,11 +25,12 @@ func NewSpaceResourceComponent(config *config.Config) (SpaceResourceComponent, e
 }
 
 type spaceResourceComponentImpl struct {
-	spaceResourceStore database.SpaceResourceStore
-	deployer           deploy.Deployer
-	userStore          database.UserStore
-	accountComponent   AccountingComponent
-	config             *config.Config
+	spaceResourceStore        database.SpaceResourceStore
+	scenarioConstraintStore   database.ScenarioConstraintStore
+	deployer                  deploy.Deployer
+	userStore                 database.UserStore
+	accountComponent          AccountingComponent
+	config                    *config.Config
 }
 
 func (c *spaceResourceComponentImpl) updatePriceInfo(req *types.SpaceResourceIndexReq, resources []types.SpaceResource) error {
@@ -39,12 +41,3 @@ func (c *spaceResourceComponentImpl) updatePriceInfo(req *types.SpaceResourceInd
 // func (c *spaceResourceComponentImpl) appendUserResources(ctx context.Context, currentUser string, clusterID string, resources []types.SpaceResource) ([]types.SpaceResource, error) {
 // 	return resources, nil
 // }
-
-func (c *spaceResourceComponentImpl) deployAvailable(deployType int, hardware types.HardWare) bool {
-	if deployType == types.FinetuneType {
-		if hardware.Gpu.Num == "" {
-			return false
-		}
-	}
-	return true
-}
