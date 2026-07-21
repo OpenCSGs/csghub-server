@@ -108,7 +108,6 @@ func (c *spaceResourceComponentImpl) Index(ctx context.Context, req *types.Space
 		return nil, 0, fmt.Errorf("load scenario catalog failed: %w", err)
 	}
 	for _, clusterID := range req.ClusterIDs {
-		resourceCount := 0
 		var singleClusterResult []types.SpaceResource
 		dbReq := types.SpaceResourceFilter{
 			ClusterID:    clusterID,
@@ -154,12 +153,6 @@ func (c *spaceResourceComponentImpl) Index(ctx context.Context, req *types.Space
 				// resource replicas exceed the scenario's max_replica (0 = unlimited)
 				continue
 			}
-			if req.IsAvailable != nil {
-				// filter by request status
-				if *req.IsAvailable != isAvailable {
-					continue
-				}
-			}
 			resourceType := common.ResourceType(hardware)
 			scenarios := maskToScenarioNames(catalog, r.Scenarios)
 			singleClusterResult = append(singleClusterResult, types.SpaceResource{
@@ -173,7 +166,6 @@ func (c *spaceResourceComponentImpl) Index(ctx context.Context, req *types.Space
 				Scenarios:           scenarios,
 				AvailableStatusList: availableStatusList,
 			})
-			resourceCount++
 		}
 
 		err = c.updatePriceInfo(req, singleClusterResult)
@@ -182,16 +174,19 @@ func (c *spaceResourceComponentImpl) Index(ctx context.Context, req *types.Space
 			return nil, 0, err
 		}
 
-		// comment user reserved resource will update later
-		// singleClusterResult, err = c.appendUserResources(ctx, req.CurrentUser, clusterID, singleClusterResult)
-		// if err != nil {
-		// 	slog.Error("failed to append user resources", slog.String("clusterID", clusterID), slog.Any("error", err))
-		// 	continue
-		// }
-		result = append(result, singleClusterResult...)
-		total += resourceCount
+		// Filter by IsAvailable AFTER updatePriceInfo, because updatePriceInfo
+		// may change IsAvailable (e.g. marking resources without price as
+		// unavailable). Filtering before updatePriceInfo would pass resources
+		// that later become unavailable, or miss resources that are
+		// unavailable due to price but pass the cluster resource check.
+		for i := range singleClusterResult {
+			if req.IsAvailable != nil && *req.IsAvailable != singleClusterResult[i].IsAvailable {
+				continue
+			}
+			result = append(result, singleClusterResult[i])
+		}
 	}
-
+	total = len(result)
 	return result, total, nil
 }
 
