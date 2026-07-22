@@ -1970,6 +1970,68 @@ func (h *RepoHandler) ChangePath(ctx *gin.Context) {
 	httpbase.OK(ctx, nil)
 }
 
+// TransferOwnership godoc
+// @Security     ApiKey
+// @Summary      Transfer repository ownership to another namespace
+// @Tags         Repository
+// @Accept       json
+// @Produce      json
+// @Param        namespace path string true "current namespace"
+// @Param        name path string true "repository name"
+// @Param        body body types.TransferRepoReq true "transfer request"
+// @Success      200  {object}  types.Response{} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      403  {object}  types.APIForbidden "Forbidden"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /{repo_type}/{namespace}/{name}/transfer [post]
+func (h *RepoHandler) TransferOwnership(ctx *gin.Context) {
+	var req types.TransferRepoReq
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		slog.ErrorContext(ctx.Request.Context(), "invalid request body", slog.Any("error", err))
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.ErrorContext(ctx.Request.Context(), "invalid request body", slog.Any("error", err))
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	req.Namespace = namespace
+	req.Name = name
+	req.CurrentUser = httpbase.GetCurrentUser(ctx)
+	req.RepoType = common.RepoTypeFromContext(ctx)
+
+	err = h.c.TransferOwnership(ctx.Request.Context(), req)
+	if err != nil {
+		if errors.Is(err, errorx.ErrNoSourceTransferPermission) ||
+			errors.Is(err, errorx.ErrNoTargetTransferPermission) {
+			slog.ErrorContext(ctx.Request.Context(), "forbidden to transfer ownership", slog.Any("error", err))
+			httpbase.ForbiddenError(ctx, err)
+			return
+		}
+		if errors.Is(err, errorx.ErrTransferSameNamespace) ||
+			errors.Is(err, errorx.ErrTransferTargetExists) ||
+			errors.Is(err, errorx.ErrTransferNotSupported) ||
+			errors.Is(err, errorx.ErrBadRequest) ||
+			errors.Is(err, errorx.ErrChangePathBlocked) {
+			slog.ErrorContext(ctx.Request.Context(), "bad request for transfer ownership", slog.Any("error", err))
+			httpbase.BadRequestWithExt(ctx, err)
+			return
+		}
+		if errors.Is(err, errorx.ErrForbidden) {
+			slog.ErrorContext(ctx.Request.Context(), "forbidden to transfer ownership", slog.Any("error", err))
+			httpbase.ForbiddenError(ctx, err)
+			return
+		}
+		slog.ErrorContext(ctx.Request.Context(), "failed to transfer ownership", slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	httpbase.OK(ctx, nil)
+}
+
 // GetRepos godoc
 // @Security     ApiKey
 // @Summary      Get repo paths with search query

@@ -17,6 +17,15 @@
     "error.REQ-ERR-13": {
         "other": "目標命名空間不存在"
     },
+    "error.REQ-ERR-14": {
+        "other": "新命名空間必須與當前命名空間不同"
+    },
+    "error.REQ-ERR-15": {
+        "other": "目標命名空間中已存在同名倉庫"
+    },
+    "error.REQ-ERR-16": {
+        "other": "該倉庫不支持轉移所有權"
+    },
     "error.REQ-ERR-2": {
         "other": "請求體不能為空"
     },

@@ -17,6 +17,12 @@
     "error.AUTH-ERR-13": {
         "other": "old token is required to refresh token"
     },
+    "error.AUTH-ERR-14": {
+        "other": "Users do not have permission to transfer repo from this namespace"
+    },
+    "error.AUTH-ERR-15": {
+        "other": "Users do not have permission to transfer repo to this namespace"
+    },
     "error.AUTH-ERR-2": {
         "other": "Access forbidden, insufficient permissions"
     },

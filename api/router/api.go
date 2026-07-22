@@ -658,6 +658,7 @@ func createModelRoutes(config *config.Config,
 	{
 		modelsGroup.GET("/:namespace/:name/branches", repoCommonHandler.Branches)
 		modelsGroup.GET("/:namespace/:name/tags", repoCommonHandler.Tags)
+		modelsGroup.POST("/:namespace/:name/transfer", middlewareCollection.Auth.NeedLogin, repoCommonHandler.TransferOwnership)
 		modelsGroup.POST("/:namespace/:name/preupload/:revision", middlewareCollection.Auth.NeedPhoneVerified, repoCommonHandler.Preupload)
 		// update tags of a certain category
 		modelsGroup.GET("/:namespace/:name/all_files", cache.Cache(memoryStore, time.Minute*2, middleware.CacheRepoInfo()), repoCommonHandler.AllFiles)
@@ -807,6 +808,7 @@ func createDatasetRoutes(
 
 		datasetsGroup.GET("/:namespace/:name/branches", middleware.MustLogin(), repoCommonHandler.Branches)
 		datasetsGroup.GET("/:namespace/:name/tags", middleware.MustLogin(), repoCommonHandler.Tags)
+		datasetsGroup.POST("/:namespace/:name/transfer", middleware.MustLogin(), repoCommonHandler.TransferOwnership)
 		datasetsGroup.POST("/:namespace/:name/preupload/:revision", middlewareCollection.Auth.NeedPhoneVerified, repoCommonHandler.Preupload)
 		// update tags of a certain category
 		datasetsGroup.GET("/:namespace/:name/all_files", middleware.MustLogin(), cache.Cache(memoryStore, time.Minute*2, middleware.CacheRepoInfo()), repoCommonHandler.AllFiles)
@@ -860,6 +862,7 @@ func createCodeRoutes(
 		codesGroup.GET("/:namespace/:name/relations", codeHandler.Relations)
 		codesGroup.GET("/:namespace/:name/branches", repoCommonHandler.Branches)
 		codesGroup.GET("/:namespace/:name/tags", repoCommonHandler.Tags)
+		codesGroup.POST("/:namespace/:name/transfer", middlewareCollection.Auth.NeedLogin, repoCommonHandler.TransferOwnership)
 		codesGroup.POST("/:namespace/:name/preupload/:revision", middlewareCollection.Auth.NeedPhoneVerified, repoCommonHandler.Preupload)
 
 		// update tags of a certain category

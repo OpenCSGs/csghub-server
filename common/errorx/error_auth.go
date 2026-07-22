@@ -22,6 +22,8 @@ const (
 	quotaExceeded
 	//need old token, often reported when user refresh token
 	needOldToken
+	noSourceTransferPermission
+	noTargetTransferPermission
 )
 
 var (
@@ -206,6 +208,30 @@ var (
 	//
 	// zh-HK: 必須攜帶舊Token
 	ErrNeedOldToken error = CustomError{prefix: errAuthPrefix, code: needOldToken}
+	// users do not have permission to transfer repo from the source namespace
+	//
+	// Description: The user does not have write permission on the source namespace and cannot transfer the repository away from it.
+	//
+	// Description_ZH: 用户对源命名空间没有写权限，无法将仓库从该命名空间转出。
+	//
+	// en-US: Users do not have permission to transfer repo from this namespace
+	//
+	// zh-CN: 用户没有权限从此命名空间转移仓库
+	//
+	// zh-HK: 用戶沒有權限從此命名空間轉移倉庫
+	ErrNoSourceTransferPermission = CustomError{prefix: errAuthPrefix, code: noSourceTransferPermission}
+	// users do not have permission to transfer repo to the target namespace
+	//
+	// Description: The user does not have write permission on the target namespace and cannot transfer the repository to it.
+	//
+	// Description_ZH: 用户对目标命名空间没有写权限，无法将仓库转移到该命名空间。
+	//
+	// en-US: Users do not have permission to transfer repo to this namespace
+	//
+	// zh-CN: 用户没有权限将仓库转移到此命名空间
+	//
+	// zh-HK: 用戶沒有權限將倉庫轉移到此命名空間
+	ErrNoTargetTransferPermission = CustomError{prefix: errAuthPrefix, code: noTargetTransferPermission}
 )
 
 /*

@@ -17,6 +17,12 @@
     "error.AUTH-ERR-13": {
         "other": "必須攜帶舊Token"
     },
+    "error.AUTH-ERR-14": {
+        "other": "用戶沒有權限從此命名空間轉移倉庫"
+    },
+    "error.AUTH-ERR-15": {
+        "other": "用戶沒有權限將倉庫轉移到此命名空間"
+    },
     "error.AUTH-ERR-2": {
         "other": "權限被拒絕"
     },

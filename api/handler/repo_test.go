@@ -2038,3 +2038,144 @@ func TestRepoHandler_BatchGetRepoExtra(t *testing.T) {
 		tester.ResponseEqCode(t, http.StatusInternalServerError)
 	})
 }
+
+func TestRepoHandler_TransferOwnership_Success(t *testing.T) {
+	tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
+		return rp.TransferOwnership
+	})
+
+	tester.WithUser()
+	tester.WithKV("repo_type", types.ModelRepo)
+	tester.WithBody(t, types.TransferRepoReq{NewNamespace: "targetns"})
+
+	tester.mocks.repo.EXPECT().TransferOwnership(tester.Ctx(), types.TransferRepoReq{
+		RepoType:     types.ModelRepo,
+		Namespace:    "u",
+		Name:         "r",
+		NewNamespace: "targetns",
+		CurrentUser:  "u",
+	}).Return(nil)
+
+	tester.Execute()
+
+	tester.ResponseEqCode(t, http.StatusOK)
+}
+
+func TestRepoHandler_TransferOwnership_BadRequest(t *testing.T) {
+	tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
+		return rp.TransferOwnership
+	})
+
+	tester.WithUser()
+	tester.WithKV("repo_type", types.ModelRepo)
+	tester.WithBody(t, types.TransferRepoReq{NewNamespace: "targetns"})
+
+	tester.mocks.repo.EXPECT().TransferOwnership(tester.Ctx(), mock.Anything).
+		Return(errorx.ErrBadRequest)
+
+	tester.Execute()
+
+	tester.ResponseEqCode(t, http.StatusBadRequest)
+}
+
+func TestRepoHandler_TransferOwnership_Forbidden(t *testing.T) {
+	tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
+		return rp.TransferOwnership
+	})
+
+	tester.WithUser()
+	tester.WithKV("repo_type", types.ModelRepo)
+	tester.WithBody(t, types.TransferRepoReq{NewNamespace: "targetns"})
+
+	tester.mocks.repo.EXPECT().TransferOwnership(tester.Ctx(), mock.Anything).
+		Return(errorx.ErrForbiddenMsg("users do not have permission"))
+
+	tester.Execute()
+
+	tester.ResponseEqCode(t, http.StatusForbidden)
+}
+
+func TestRepoHandler_TransferOwnership_ServerError(t *testing.T) {
+	tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
+		return rp.TransferOwnership
+	})
+
+	tester.WithUser()
+	tester.WithKV("repo_type", types.ModelRepo)
+	tester.WithBody(t, types.TransferRepoReq{NewNamespace: "targetns"})
+
+	tester.mocks.repo.EXPECT().TransferOwnership(tester.Ctx(), mock.Anything).
+		Return(errors.New("internal error"))
+
+	tester.Execute()
+
+	tester.ResponseEqCode(t, http.StatusInternalServerError)
+}
+
+func TestRepoHandler_TransferOwnership_NoSourcePermission(t *testing.T) {
+	tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
+		return rp.TransferOwnership
+	})
+
+	tester.WithUser()
+	tester.WithKV("repo_type", types.ModelRepo)
+	tester.WithBody(t, types.TransferRepoReq{NewNamespace: "targetns"})
+
+	tester.mocks.repo.EXPECT().TransferOwnership(tester.Ctx(), mock.Anything).
+		Return(errorx.ErrNoSourceTransferPermission)
+
+	tester.Execute()
+
+	tester.ResponseEqCode(t, http.StatusForbidden)
+}
+
+func TestRepoHandler_TransferOwnership_SameNamespace(t *testing.T) {
+	tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
+		return rp.TransferOwnership
+	})
+
+	tester.WithUser()
+	tester.WithKV("repo_type", types.ModelRepo)
+	tester.WithBody(t, types.TransferRepoReq{NewNamespace: "same"})
+
+	tester.mocks.repo.EXPECT().TransferOwnership(tester.Ctx(), mock.Anything).
+		Return(errorx.ErrTransferSameNamespace)
+
+	tester.Execute()
+
+	tester.ResponseEqCode(t, http.StatusBadRequest)
+}
+
+func TestRepoHandler_TransferOwnership_TargetExists(t *testing.T) {
+	tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
+		return rp.TransferOwnership
+	})
+
+	tester.WithUser()
+	tester.WithKV("repo_type", types.ModelRepo)
+	tester.WithBody(t, types.TransferRepoReq{NewNamespace: "targetns"})
+
+	tester.mocks.repo.EXPECT().TransferOwnership(tester.Ctx(), mock.Anything).
+		Return(errorx.ErrTransferTargetExists)
+
+	tester.Execute()
+
+	tester.ResponseEqCode(t, http.StatusBadRequest)
+}
+
+func TestRepoHandler_TransferOwnership_NotSupported(t *testing.T) {
+	tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
+		return rp.TransferOwnership
+	})
+
+	tester.WithUser()
+	tester.WithKV("repo_type", types.ModelRepo)
+	tester.WithBody(t, types.TransferRepoReq{NewNamespace: "targetns"})
+
+	tester.mocks.repo.EXPECT().TransferOwnership(tester.Ctx(), mock.Anything).
+		Return(errorx.ErrTransferNotSupported)
+
+	tester.Execute()
+
+	tester.ResponseEqCode(t, http.StatusBadRequest)
+}
