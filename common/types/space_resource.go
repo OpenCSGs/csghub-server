@@ -233,11 +233,19 @@ const (
 //   - I18nKey: i18n key (e.g. "scenario.finetune") resolved by the frontend
 //     via $t; the localized text lives in the frontend locale files.
 //   - Category: "deploy" or "workflow".
+//   - RequiredHardware/ExcludeHardware/MaxReplica: the scenario's hardware
+//     constraints, exposed so the frontend can pre-validate a resource's
+//     hardware against the scenario (e.g. grey out sandbox for a CPU+GPU
+//     resource) before submitting. Semantics match HardwareSatisfiesConstraint
+//     and ReplicaSatisfiesConstraint.
 type ScenarioInfo struct {
-	Code     int             `json:"code"`
-	Name     string          `json:"name"`
-	I18nKey  string          `json:"i18n_key"`
-	Category ScenarioCategory `json:"category"`
+	Code             int              `json:"code"`
+	Name             string           `json:"name"`
+	I18nKey          string           `json:"i18n_key"`
+	Category         ScenarioCategory `json:"category"`
+	RequiredHardware int64            `json:"required_hardware"`
+	ExcludeHardware  int64            `json:"exclude_hardware"`
+	MaxReplica       int              `json:"max_replica"`
 }
 
 func ResourceTypeValid(resourceType ResourceType) bool {
