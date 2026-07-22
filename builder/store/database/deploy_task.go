@@ -704,6 +704,13 @@ func (s *deployTaskStoreImpl) GetClusterDeploys(ctx context.Context, req types.C
 			searchPattern, searchPattern, searchPattern)
 	}
 
+	if req.StartTime != nil {
+		query = query.Where("deploy.created_at >= ?", req.StartTime)
+	}
+	if req.EndTime != nil {
+		query = query.Where("deploy.created_at <= ?", req.EndTime)
+	}
+
 	total, err := query.Count(ctx)
 	if err != nil {
 		err = errorx.HandleDBError(err, nil)

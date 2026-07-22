@@ -91,14 +91,16 @@ type StatRunningDeploy struct {
 }
 
 type ClusterDeployReq struct {
-	ClusterID    string `json:"cluster_id"`
-	ClusterNode  string `json:"cluster_node"`
-	Status       int    `json:"status"`
-	ResourceID   int    `json:"resource_id"`
-	ResourceName string `json:"resource_name"`
-	Search       string `json:"search"`
-	Per          int    `json:"per"`
-	Page         int    `json:"page"`
+	ClusterID    string     `json:"cluster_id"`
+	ClusterNode  string     `json:"cluster_node"`
+	Status       int        `json:"status"`
+	ResourceID   int        `json:"resource_id"`
+	ResourceName string     `json:"resource_name"`
+	Search       string     `json:"search"`
+	Per          int        `json:"per"`
+	Page         int        `json:"page"`
+	StartTime    *time.Time `json:"start_time,omitempty"`
+	EndTime      *time.Time `json:"end_time,omitempty"`
 }
 
 // DeployExtend Use common fields for storage deployment to simplify the process of adding a large number

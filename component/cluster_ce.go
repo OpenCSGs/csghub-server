@@ -37,11 +37,7 @@ func (c *clusterComponentImpl) CheckExclusiveResource(ctx context.Context, req t
 	return &types.CheckExclusiveResp{UsedExclusive: false}, nil
 }
 
-func (c *clusterComponentImpl) GetDeploysByTimeRange(ctx context.Context, req types.DeployTimeRangeReq) ([]database.Deploy, int, error) {
-	return nil, 0, nil
-}
-
-func (c *clusterComponentImpl) GetDeploysByTimeRangeStream(ctx context.Context, req types.DeployTimeRangeReq) (<-chan []string, <-chan error) {
+func (c *clusterComponentImpl) GetDeploysByTimeRangeStream(ctx context.Context, req types.ClusterDeployReq) (<-chan []string, <-chan error) {
 	deployCh := make(chan []string)
 	errCh := make(chan error, 1)
 
@@ -53,11 +49,7 @@ func (c *clusterComponentImpl) GetDeploysByTimeRangeStream(ctx context.Context, 
 	return deployCh, errCh
 }
 
-func (c *clusterComponentImpl) GetWorkflowsByTimeRange(ctx context.Context, req types.WorkflowTimeRangeReq) ([]database.ArgoWorkflow, int, error) {
-	return nil, 0, nil
-}
-
-func (c *clusterComponentImpl) GetWorkflowsByTimeRangeStream(ctx context.Context, req types.WorkflowTimeRangeReq) (<-chan []string, <-chan error) {
+func (c *clusterComponentImpl) GetWorkflowsByTimeRangeStream(ctx context.Context, req types.ClusterWFReq) (<-chan []string, <-chan error) {
 	workflowCh := make(chan []string)
 	errCh := make(chan error, 1)
 
