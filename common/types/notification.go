@@ -345,6 +345,37 @@ type EmailWeeklyRechargesNotification struct {
 	EndDate   string   `json:"end_date"`
 }
 
+type EmailLLMLogSyncNotification struct {
+	Emails          []string `json:"emails"`
+	Date            string   `json:"date"`
+	Status          string   `json:"status"`
+	FileCount       int      `json:"file_count"`
+	DataflowStarted bool     `json:"dataflow_started"`
+	DataflowJobID   string   `json:"dataflow_job_id"`
+	ArgoTaskID      string   `json:"argo_task_id"`
+	JobName         string   `json:"job_name"`
+	DataflowStatus  string   `json:"dataflow_status"`
+	Message         string   `json:"message"`
+	ErrorMessage    string   `json:"error_message"`
+	StartedAt       string   `json:"started_at"`
+	FinishedAt      string   `json:"finished_at"`
+}
+
+type SendLLMLogSyncMailInput struct {
+	Date            string
+	Status          string
+	FileCount       int
+	DataflowStarted bool
+	DataflowJobID   string
+	ArgoTaskID      string
+	JobName         string
+	DataflowStatus  string
+	Message         string
+	ErrorMessage    string
+	StartedAt       string
+	FinishedAt      string
+}
+
 type SMSReq struct {
 	PhoneNumbers []string `json:"phone_numbers"`
 	SignName     string   `json:"sign_name"`
