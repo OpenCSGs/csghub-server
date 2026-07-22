@@ -23,7 +23,7 @@ type RepoFileComponent interface {
 }
 
 type SensitiveWordSetComponent interface {
-	Index(ctx context.Context, search string) ([]types.SensitiveWordSet, error)
+	Index(ctx context.Context, req types.SensitiveWordSetListReq) ([]types.SensitiveWordSet, int, error)
 	Get(ctx context.Context, id int64) (*types.SensitiveWordSet, error)
 	Create(ctx context.Context, input types.CreateSensitiveWordSetReq) error
 	Update(ctx context.Context, input types.UpdateSensitiveWordSetReq) error

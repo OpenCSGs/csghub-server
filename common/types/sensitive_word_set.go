@@ -35,3 +35,11 @@ type UpdateSensitiveWordSetReq struct {
 	Enabled    *bool    `json:"enabled"`
 	CategoryID *int64   `json:"category_id"`
 }
+
+// SensitiveWordSetListReq is the request payload for listing sensitive word
+// sets with pagination and an optional search keyword.
+type SensitiveWordSetListReq struct {
+	Search string `json:"search" form:"search"`
+	Per    int    `json:"per" form:"per"`
+	Page   int    `json:"page" form:"page"`
+}
