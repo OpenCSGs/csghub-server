@@ -28,7 +28,14 @@ type SensitiveWordSetStore interface {
 	Get(ctx context.Context, id int64) (*SensitiveWordSet, error)
 	Update(ctx context.Context, input SensitiveWordSet) error
 	Delete(ctx context.Context, id int64) error
-	List(ctx context.Context, filter *SensitiveWordSetFilter) ([]SensitiveWordSet, error)
+	// List returns sensitive word sets matching the filter.
+	// When per > 0 and page > 0, results are paginated by limit=per and
+	// offset=(page-1)*per. total always reflects the count of all matching
+	// rows (via SELECT count(*)), regardless of whether pagination is applied.
+	// When per <= 0 or page <= 0, all matching rows are returned without
+	// pagination.
+	List(ctx context.Context, filter *SensitiveWordSetFilter, per, page int) ([]SensitiveWordSet, int, error)
+	GetByName(ctx context.Context, name string) (*SensitiveWordSet, error)
 }
 
 type SensitiveWordSetFilter struct {

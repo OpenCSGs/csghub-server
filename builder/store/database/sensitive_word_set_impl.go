@@ -2,7 +2,12 @@ package database
 
 import (
 	"context"
+	"database/sql"
+	"errors"
+	"log/slog"
 	"time"
+
+	"opencsg.com/csghub-server/common/errorx"
 )
 
 // implement SensitiveWordSetStore
@@ -28,7 +33,23 @@ func (s *sensitiveWordSetStoreImpl) Get(ctx context.Context, id int64) (*Sensiti
 	return ws, err
 }
 
-func (s *sensitiveWordSetStoreImpl) List(ctx context.Context, filter *SensitiveWordSetFilter) ([]SensitiveWordSet, error) {
+func (s *sensitiveWordSetStoreImpl) GetByName(ctx context.Context, name string) (*SensitiveWordSet, error) {
+	ws := &SensitiveWordSet{}
+	err := s.db.Core.NewSelect().Model(ws).
+		Relation("Category").
+		Where("sensitive_word_set.name = ?", name).Scan(ctx)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+
+		slog.ErrorContext(ctx, "get sensitive word set by name failed", "error", err)
+		return nil, errorx.HandleDBError(err, nil)
+	}
+	return ws, nil
+}
+
+func (s *sensitiveWordSetStoreImpl) List(ctx context.Context, filter *SensitiveWordSetFilter, per, page int) ([]SensitiveWordSet, int, error) {
 	var res []SensitiveWordSet
 	q := s.db.Core.NewSelect().Model(&res).
 		Relation("Category")
@@ -40,8 +61,21 @@ func (s *sensitiveWordSetStoreImpl) List(ctx context.Context, filter *SensitiveW
 			q.Where("enabled = ?", enabled)
 		}
 	}
-	err := q.Scan(ctx)
-	return res, err
+
+	total, err := q.Count(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	if per > 0 && page > 0 {
+		q = q.Limit(per).Offset((page - 1) * per)
+	}
+
+	err = q.Order("id DESC").Scan(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	return res, total, nil
 }
 
 func (s *sensitiveWordSetStoreImpl) Update(ctx context.Context, input SensitiveWordSet) error {

@@ -128,34 +128,41 @@ func (_c *MockSensitiveWordSetComponent_Get_Call) RunAndReturn(run func(context.
 	return _c
 }
 
-// Index provides a mock function with given fields: ctx, search
-func (_m *MockSensitiveWordSetComponent) Index(ctx context.Context, search string) ([]types.SensitiveWordSet, error) {
-	ret := _m.Called(ctx, search)
+// Index provides a mock function with given fields: ctx, req
+func (_m *MockSensitiveWordSetComponent) Index(ctx context.Context, req types.SensitiveWordSetListReq) ([]types.SensitiveWordSet, int, error) {
+	ret := _m.Called(ctx, req)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Index")
 	}
 
 	var r0 []types.SensitiveWordSet
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string) ([]types.SensitiveWordSet, error)); ok {
-		return rf(ctx, search)
+	var r1 int
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.SensitiveWordSetListReq) ([]types.SensitiveWordSet, int, error)); ok {
+		return rf(ctx, req)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string) []types.SensitiveWordSet); ok {
-		r0 = rf(ctx, search)
+	if rf, ok := ret.Get(0).(func(context.Context, types.SensitiveWordSetListReq) []types.SensitiveWordSet); ok {
+		r0 = rf(ctx, req)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]types.SensitiveWordSet)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
-		r1 = rf(ctx, search)
+	if rf, ok := ret.Get(1).(func(context.Context, types.SensitiveWordSetListReq) int); ok {
+		r1 = rf(ctx, req)
 	} else {
-		r1 = ret.Error(1)
+		r1 = ret.Get(1).(int)
 	}
 
-	return r0, r1
+	if rf, ok := ret.Get(2).(func(context.Context, types.SensitiveWordSetListReq) error); ok {
+		r2 = rf(ctx, req)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
 }
 
 // MockSensitiveWordSetComponent_Index_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Index'
@@ -165,24 +172,24 @@ type MockSensitiveWordSetComponent_Index_Call struct {
 
 // Index is a helper method to define mock.On call
 //   - ctx context.Context
-//   - search string
-func (_e *MockSensitiveWordSetComponent_Expecter) Index(ctx interface{}, search interface{}) *MockSensitiveWordSetComponent_Index_Call {
-	return &MockSensitiveWordSetComponent_Index_Call{Call: _e.mock.On("Index", ctx, search)}
+//   - req types.SensitiveWordSetListReq
+func (_e *MockSensitiveWordSetComponent_Expecter) Index(ctx interface{}, req interface{}) *MockSensitiveWordSetComponent_Index_Call {
+	return &MockSensitiveWordSetComponent_Index_Call{Call: _e.mock.On("Index", ctx, req)}
 }
 
-func (_c *MockSensitiveWordSetComponent_Index_Call) Run(run func(ctx context.Context, search string)) *MockSensitiveWordSetComponent_Index_Call {
+func (_c *MockSensitiveWordSetComponent_Index_Call) Run(run func(ctx context.Context, req types.SensitiveWordSetListReq)) *MockSensitiveWordSetComponent_Index_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string))
+		run(args[0].(context.Context), args[1].(types.SensitiveWordSetListReq))
 	})
 	return _c
 }
 
-func (_c *MockSensitiveWordSetComponent_Index_Call) Return(_a0 []types.SensitiveWordSet, _a1 error) *MockSensitiveWordSetComponent_Index_Call {
-	_c.Call.Return(_a0, _a1)
+func (_c *MockSensitiveWordSetComponent_Index_Call) Return(_a0 []types.SensitiveWordSet, _a1 int, _a2 error) *MockSensitiveWordSetComponent_Index_Call {
+	_c.Call.Return(_a0, _a1, _a2)
 	return _c
 }
 
-func (_c *MockSensitiveWordSetComponent_Index_Call) RunAndReturn(run func(context.Context, string) ([]types.SensitiveWordSet, error)) *MockSensitiveWordSetComponent_Index_Call {
+func (_c *MockSensitiveWordSetComponent_Index_Call) RunAndReturn(run func(context.Context, types.SensitiveWordSetListReq) ([]types.SensitiveWordSet, int, error)) *MockSensitiveWordSetComponent_Index_Call {
 	_c.Call.Return(run)
 	return _c
 }
