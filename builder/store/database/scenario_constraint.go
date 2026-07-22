@@ -49,7 +49,7 @@ func NewScenarioConstraintStoreWithDB(db *DB) ScenarioConstraintStore {
 //   - Scenario: scenario name (e.g. "finetune", "sandbox", "wf_evaluation").
 //   - Code: bit position. Deploy scenarios use the DeployType int values 0-7 so
 //     the deploy_type passed to Index doubles as a scenario code; workflow
-//     scenarios use 32-38. The bitmask is `1 << Code`. Unique.
+//     scenarios use 32-39. The bitmask is `1 << Code`. Unique.
 //   - Category: "deploy" or "workflow".
 //   - DisplayName: i18n key (e.g. "scenario.finetune") resolved by the frontend
 //   - I18nKey: i18n key (e.g. "scenario.finetune") resolved by the frontend

@@ -77,7 +77,7 @@ func (c *spaceResourceComponentImpl) Index(ctx context.Context, req *types.Space
 	var result []types.SpaceResource
 	var total int
 	// req.DeployType is a scenario code (bit position): 0-7 deploy scenarios,
-	// 32-38 workflow scenarios (see space_resource_scenario_constraints table).
+	// 32-39 workflow scenarios (see space_resource_scenario_constraints table).
 	// scenarioMask is used to filter resources by their scenarios bitmask (a
 	// resource is included only if it supports the requested scenario). A zero
 	// scenarioMask means the caller did not pass a known scenario code, so no

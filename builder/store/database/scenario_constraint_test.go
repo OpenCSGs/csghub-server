@@ -39,6 +39,12 @@ func TestScenarioConstraintStore_CRUD(t *testing.T) {
 	require.Equal(t, "scenario.finetune", gotByCode.I18nKey)
 	require.Equal(t, string(types.ScenarioCategoryDeploy), gotByCode.Category)
 
+	llmLogDataflow, err := store.FindByScenario(ctx, types.ScenarioNameWfDataflowLLMLog)
+	require.Nil(t, err)
+	require.Equal(t, 39, llmLogDataflow.Code)
+	require.Equal(t, "scenario.wf_dataflow_llmlog", llmLogDataflow.I18nKey)
+	require.Equal(t, string(types.ScenarioCategoryWorkflow), llmLogDataflow.Category)
+
 	// FindByCode on an unknown code returns (nil, nil) — no row, not an error.
 	unknown, err := store.FindByCode(ctx, 999)
 	require.Nil(t, err)
@@ -77,11 +83,11 @@ func TestScenarioConstraintStore_CRUD(t *testing.T) {
 	require.Equal(t, "custom_scenario", got3.Scenario)
 	require.Equal(t, 10, got3.Code)
 
-	// FindAllOrdered returns every row ordered by code; the 10 seeded rows
-	// (6 deploy + 4 workflow, finetune updated in place) plus the 1 inserted = 11.
+	// FindAllOrdered returns every row ordered by code; the 11 seeded rows
+	// (6 deploy + 5 workflow, finetune updated in place) plus the 1 inserted = 12.
 	all, err := store.FindAllOrdered(ctx)
 	require.Nil(t, err)
-	require.Equal(t, 11, len(all))
+	require.Equal(t, 12, len(all))
 	// ordered by code ascending: space(0), inference(1), finetune(2), ...
 	require.Equal(t, 0, all[0].Code)
 	require.Equal(t, 1, all[1].Code)
