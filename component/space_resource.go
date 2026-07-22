@@ -225,13 +225,38 @@ func (c *spaceResourceComponentImpl) Update(ctx context.Context, req *types.Upda
 	sr.Name = req.Name
 	sr.Resources = req.Resources
 
+	// Determine the scenarios that will be in effect after this update:
+	//   - req.Scenarios != nil: the caller is setting a new scenario list.
+	//   - req.Scenarios == nil: keep the existing DB scenarios (but the hardware
+	//     may have changed via req.Resources, so we still must validate the
+	//     existing scenarios against the new hardware — otherwise a resource
+	//     tagged "sandbox" (excludes accelerators) could be silently turned
+	//     into an inconsistent GPU+sandbox state by a Resources-only update).
+	catalog, err := c.scenarioConstraintStore.FindAllOrdered(ctx)
+	if err != nil {
+		slog.ErrorContext(ctx, "failed to load scenario catalog", slog.Any("error", err))
+		return nil, fmt.Errorf("load scenario catalog failed: %w", err)
+	}
+	var effectiveScenarios []string
 	if req.Scenarios != nil {
-		catalog, err := c.scenarioConstraintStore.FindAllOrdered(ctx)
-		if err != nil {
-			slog.ErrorContext(ctx, "failed to load scenario catalog", slog.Any("error", err))
-			return nil, fmt.Errorf("load scenario catalog failed: %w", err)
-		}
-		mask, err := scenarioNamesToMask(catalog, sanitizeScenarios(req.Scenarios))
+		effectiveScenarios = sanitizeScenarios(req.Scenarios)
+	} else {
+		effectiveScenarios = maskToScenarioNames(catalog, sr.Scenarios)
+	}
+	// Parse the (possibly updated) Resources so the check reflects the hardware
+	// being saved, not the old one.
+	var hardware types.HardWare
+	if err := json.Unmarshal([]byte(req.Resources), &hardware); err != nil {
+		return nil, errorx.BadRequest(err, errorx.Ctx().Set("field", "resources"))
+	}
+	// Reject if any in-effect scenario's hardware/replica constraints are not
+	// satisfied by the new hardware (server-side enforcement of the frontend
+	// grey-out rule, covering both "new scenarios" and "kept scenarios" cases).
+	if err := validateScenariosAgainstHardware(catalog, effectiveScenarios, hardware); err != nil {
+		return nil, err
+	}
+	if req.Scenarios != nil {
+		mask, err := scenarioNamesToMask(catalog, effectiveScenarios)
 		if err != nil {
 			return nil, err
 		}
@@ -244,11 +269,6 @@ func (c *spaceResourceComponentImpl) Update(ctx context.Context, req *types.Upda
 		return nil, err
 	}
 
-	catalog, err := c.scenarioConstraintStore.FindAllOrdered(ctx)
-	if err != nil {
-		slog.ErrorContext(ctx, "failed to load scenario catalog", slog.Any("error", err))
-		return nil, fmt.Errorf("load scenario catalog failed: %w", err)
-	}
 	scenarios := maskToScenarioNames(catalog, sr.Scenarios)
 	result := &types.SpaceResource{
 		ID:        sr.ID,
@@ -264,17 +284,27 @@ func (c *spaceResourceComponentImpl) Create(ctx context.Context, req *types.Crea
 	if err := validateResources(req.Resources); err != nil {
 		return nil, err
 	}
+	var hardware types.HardWare
+	if err := json.Unmarshal([]byte(req.Resources), &hardware); err != nil {
+		return nil, errorx.BadRequest(err, errorx.Ctx().Set("field", "resources"))
+	}
 	catalog, err := c.scenarioConstraintStore.FindAllOrdered(ctx)
 	if err != nil {
 		slog.ErrorContext(ctx, "failed to load scenario catalog", slog.Any("error", err))
 		return nil, fmt.Errorf("load scenario catalog failed: %w", err)
+	}
+	scenarios := sanitizeScenarios(req.Scenarios)
+	// Reject scenarios whose hardware/replica constraints the resource does not
+	// satisfy (server-side enforcement of the frontend grey-out rule).
+	if err := validateScenariosAgainstHardware(catalog, scenarios, hardware); err != nil {
+		return nil, err
 	}
 	sr := database.SpaceResource{
 		Name:      req.Name,
 		Resources: req.Resources,
 		ClusterID: req.ClusterID,
 	}
-	mask, err := scenarioNamesToMask(catalog, sanitizeScenarios(req.Scenarios))
+	mask, err := scenarioNamesToMask(catalog, scenarios)
 	if err != nil {
 		return nil, err
 	}
@@ -370,10 +400,13 @@ func (c *spaceResourceComponentImpl) ListScenarios(ctx context.Context) ([]types
 	result := make([]types.ScenarioInfo, 0, len(rows))
 	for _, r := range rows {
 		result = append(result, types.ScenarioInfo{
-			Code:     r.Code,
-			Name:     r.Scenario,
-			I18nKey:  r.I18nKey,
-			Category: types.ScenarioCategory(r.Category),
+			Code:             r.Code,
+			Name:             r.Scenario,
+			I18nKey:          r.I18nKey,
+			Category:         types.ScenarioCategory(r.Category),
+			RequiredHardware: r.RequiredHardware,
+			ExcludeHardware:  r.ExcludeHardware,
+			MaxReplica:       r.MaxReplica,
 		})
 	}
 	return result, nil
@@ -421,4 +454,36 @@ func scenarioNamesToMask(catalog []database.ScenarioConstraint, scenarios []stri
 		mask |= int64(1) << uint(code)
 	}
 	return mask, nil
+}
+
+// validateScenariosAgainstHardware checks that every selected scenario's
+// hardware/replica constraints are satisfied by the resource's hardware spec.
+// This is the server-side enforcement of the same rule the frontend greys out
+// (so a caller that bypasses the UI is still rejected). A scenario failing its
+// required_hardware / exclude_hardware / max_replica returns a BadRequest naming
+// the offending scenario. Uses the shared HardwareSatisfiesConstraint /
+// ReplicaSatisfiesConstraint so the rule stays identical to the Index query.
+//
+// `scenarios` is the list of scenario machine names the caller wants to bind;
+// `catalog` is the full scenario catalog (loaded once via FindAllOrdered).
+func validateScenariosAgainstHardware(catalog []database.ScenarioConstraint, scenarios []string, hardware types.HardWare) error {
+	byName := make(map[string]*database.ScenarioConstraint, len(catalog))
+	for i := range catalog {
+		byName[catalog[i].Scenario] = &catalog[i]
+	}
+	for _, name := range scenarios {
+		c, ok := byName[name]
+		if !ok {
+			// unknown names are reported by scenarioNamesToMask; skip here to
+			// avoid a duplicate, less-specific error.
+			continue
+		}
+		if !types.HardwareSatisfiesConstraint(c.RequiredHardware, c.ExcludeHardware, hardware) {
+			return errorx.BadRequest(fmt.Errorf("scenario %q is not compatible with the resource hardware", name), errorx.Ctx().Set("field", "scenarios").Set("scenario", name))
+		}
+		if !types.ReplicaSatisfiesConstraint(c.MaxReplica, hardware.Replicas) {
+			return errorx.BadRequest(fmt.Errorf("scenario %q exceeds max_replica (%d) with replicas %d", name, c.MaxReplica, hardware.Replicas), errorx.Ctx().Set("field", "scenarios").Set("scenario", name))
+		}
+	}
+	return nil
 }
