@@ -244,6 +244,14 @@ func TestSpaceResourceStore_Filter(t *testing.T) {
 		Name:      "r1",
 		ClusterID: "c1",
 		Resources: `{"cpu": { "type": "Intel","num": "200m"}}`,
+		Scenarios: int64(types.ScenarioWfDataflow),
+	})
+	require.Nil(t, err)
+	_, err = store.Create(ctx, database.SpaceResource{
+		Name:      "r2",
+		ClusterID: "c1",
+		Resources: `{"cpu": { "type": "Intel","num": "200m"}}`,
+		Scenarios: int64(types.ScenarioFinetune),
 	})
 	require.Nil(t, err)
 	sr := &database.SpaceResource{}
@@ -255,7 +263,12 @@ func TestSpaceResourceStore_Filter(t *testing.T) {
 		ResourceType: types.ResourceTypeCPU,
 	}, 50, 1)
 	require.Nil(t, err)
-	require.Equal(t, 1, len(srs))
-	require.Equal(t, 1, total)
+	require.Equal(t, 2, len(srs))
+	require.Equal(t, 2, total)
 	require.Equal(t, "c1", srs[0].ClusterID)
+
+	srs, err = store.FindByScenarios(ctx, int64(types.ScenarioWfDataflow))
+	require.Nil(t, err)
+	require.Equal(t, 1, len(srs))
+	require.Equal(t, "r1", srs[0].Name)
 }

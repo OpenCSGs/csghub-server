@@ -537,6 +537,18 @@ type Config struct {
 			DatasetNamespace  string `env:"STARHUB_SERVER_LLMLOG_SYNC_DATASET_NAMESPACE" default:""`
 			DatasetName       string `env:"STARHUB_SERVER_LLMLOG_SYNC_DATASET_NAME" default:""`
 			MaxShardSizeBytes int64  `env:"STARHUB_SERVER_LLMLOG_SYNC_MAX_SHARD_SIZE_BYTES" default:"67108864"` // 64 MiB
+			Dataflow          struct {
+				Enable           bool   `env:"STARHUB_SERVER_LLMLOG_SYNC_DATAFLOW_ENABLE" default:"false"`
+				ResourceScenario string `env:"STARHUB_SERVER_LLMLOG_SYNC_DATAFLOW_RESOURCE_SCENARIO" default:"wf_dataflow"`
+				DatasetNamespace string `env:"STARHUB_SERVER_LLMLOG_SYNC_DATAFLOW_DATASET_NAMESPACE" default:""`
+				DatasetName      string `env:"STARHUB_SERVER_LLMLOG_SYNC_DATAFLOW_DATASET_NAME" default:"Runtime_data_curated"`
+				StorageSize      string `env:"STARHUB_SERVER_LLMLOG_SYNC_DATAFLOW_STORAGE_SIZE" default:"1Gi"`
+				Image            string `env:"STARHUB_SERVER_LLMLOG_SYNC_DATAFLOW_IMAGE" default:"opencsghq/runtime-data-curated:latest"`
+				OpenAIAPIKey     string `env:"STARHUB_SERVER_LLMLOG_SYNC_DATAFLOW_OPENAI_API_KEY" default:""`
+				OpenAIBaseURL    string `env:"STARHUB_SERVER_LLMLOG_SYNC_DATAFLOW_OPENAI_BASE_URL" default:""`
+				OpenAIModel      string `env:"STARHUB_SERVER_LLMLOG_SYNC_DATAFLOW_OPENAI_MODEL" default:""`
+				LLMConcurrency   int    `env:"STARHUB_SERVER_LLMLOG_SYNC_DATAFLOW_LLM_CONCURRENCY" default:"5"`
+			}
 		}
 	}
 
