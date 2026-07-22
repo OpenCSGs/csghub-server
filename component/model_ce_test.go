@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
 
@@ -102,4 +103,96 @@ func TestModelComponent_Deploy_OwnerNamespace_BillingUUIDError(t *testing.T) {
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "failed to resolve billing UUID for namespace")
 	require.Equal(t, int64(-1), id)
+}
+
+func TestModelComponent_Deploy_InferenceType_DuplicateName(t *testing.T) {
+	ctx := context.TODO()
+	mc := initializeTestModelComponent(ctx, t)
+
+	mc.mocks.stores.ModelMock().EXPECT().FindByPath(ctx, "ns", "n").Return(&database.Model{
+		RepositoryID: int64(123),
+		Repository: &database.Repository{
+			ID:   1,
+			Path: "foo",
+		},
+	}, nil)
+	mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{
+		RoleMask: "admin",
+		UUID:     "user-uuid",
+	}, nil)
+	mc.mocks.stores.RuntimeFrameworkMock().EXPECT().FindEnabledByID(ctx, int64(11)).Return(
+		&database.RuntimeFramework{}, nil,
+	)
+	mc.mocks.components.repo.EXPECT().GetNamespaceBillingUUID(ctx, "ns").Return("ns-billing-uuid", nil)
+	mc.mocks.stores.DeployTaskMock().EXPECT().FindActiveDeployByNameAndType(ctx, "ns-billing-uuid", "my-deploy", types.InferenceType).Return(
+		&database.Deploy{ID: 999, DeployName: "my-deploy"}, nil,
+	)
+
+	id, err := mc.Deploy(ctx, types.DeployActReq{
+		Namespace:   "ns",
+		Name:        "n",
+		CurrentUser: "user",
+		DeployType:  types.InferenceType,
+	}, types.ModelRunReq{
+		RuntimeFrameworkID: 11,
+		ResourceID:         123,
+		ClusterID:          "cluster",
+		DeployName:         "my-deploy",
+		OwnerNamespace:     "ns",
+	})
+	require.Error(t, err)
+	require.True(t, errors.Is(err, errorx.ErrDeployNameAlreadyExists))
+	require.Equal(t, int64(-1), id)
+}
+
+func TestModelComponent_Deploy_InferenceType_NoDuplicate(t *testing.T) {
+	ctx := context.TODO()
+	mc := initializeTestModelComponent(ctx, t)
+
+	mc.mocks.stores.ModelMock().EXPECT().FindByPath(ctx, "ns", "n").Return(&database.Model{
+		RepositoryID: int64(123),
+		Repository: &database.Repository{
+			ID:   1,
+			Path: "foo",
+		},
+	}, nil)
+	mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{
+		RoleMask: "admin",
+		UUID:     "user-uuid",
+	}, nil)
+	mc.mocks.stores.RuntimeFrameworkMock().EXPECT().FindEnabledByID(ctx, int64(11)).Return(
+		&database.RuntimeFramework{}, nil,
+	)
+	mc.mocks.stores.SpaceResourceMock().EXPECT().FindByID(ctx, int64(123)).Return(
+		&database.SpaceResource{
+			ID:        123,
+			Resources: `{"memory": "foo"}`,
+			ClusterID: "cluster",
+		}, nil,
+	)
+	mc.mocks.components.repo.EXPECT().GetNamespaceBillingUUID(ctx, "ns").Return("ns-billing-uuid", nil)
+	mc.mocks.components.repo.EXPECT().CheckAccountAndResource(ctx, types.CheckResourceAndAccountReq{UserName: "ns", ClusterID: "cluster", OrderDetailID: 0, CurrentUser: "user"}, mock.Anything).Return(&types.CheckExclusiveResp{}, nil)
+	// No duplicate found
+	mc.mocks.stores.DeployTaskMock().EXPECT().FindActiveDeployByNameAndType(ctx, "ns-billing-uuid", "my-deploy", types.InferenceType).Return(
+		nil, nil,
+	)
+
+	mc.mocks.deployer.EXPECT().Deploy(ctx, mock.MatchedBy(func(dp types.DeployRequest) bool {
+		return dp.DeployName == "my-deploy" && dp.Type == types.InferenceType
+	})).Return(222, nil)
+
+	id, err := mc.Deploy(ctx, types.DeployActReq{
+		Namespace:   "ns",
+		Name:        "n",
+		CurrentUser: "user",
+		DeployType:  types.InferenceType,
+	}, types.ModelRunReq{
+		RuntimeFrameworkID: 11,
+		ResourceID:         123,
+		ClusterID:          "cluster",
+		DeployName:         "my-deploy",
+		OwnerNamespace:     "ns",
+	})
+	require.Nil(t, err)
+	require.Equal(t, int64(222), id)
 }

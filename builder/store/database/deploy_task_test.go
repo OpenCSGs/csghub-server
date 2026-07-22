@@ -1553,3 +1553,61 @@ func TestDeployTaskStore_CountByRepoID(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, 0, count)
 }
+
+func TestDeployTaskStore_FindActiveDeployByNameAndType(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewDeployTaskStoreWithDB(db)
+
+	// Create deploys with different names, types, user_uuids and statuses
+	deploys := []database.Deploy{
+		{UserID: 1, Type: types.InferenceType, Status: common.Running, DeployName: "my-inference", UserUUID: "uuid-1", RepoID: 1},
+		{UserID: 1, Type: types.InferenceType, Status: common.Stopped, DeployName: "my-inference-stopped", UserUUID: "uuid-1", RepoID: 2},
+		{UserID: 1, Type: types.InferenceType, Status: common.Deleted, DeployName: "my-inference-deleted", UserUUID: "uuid-1", RepoID: 3},
+		{UserID: 2, Type: types.InferenceType, Status: common.Running, DeployName: "my-inference", UserUUID: "uuid-2", RepoID: 4},
+		{UserID: 1, Type: types.FinetuneType, Status: common.Running, DeployName: "my-inference", UserUUID: "uuid-1", RepoID: 5},
+	}
+	for i := range deploys {
+		err := store.CreateDeploy(ctx, &deploys[i])
+		require.Nil(t, err)
+	}
+
+	// Found: matching user_uuid, deploy_name, type, and not deleted
+	dp, err := store.FindActiveDeployByNameAndType(ctx, "uuid-1", "my-inference", types.InferenceType)
+	require.Nil(t, err)
+	require.NotNil(t, dp)
+	require.Equal(t, "my-inference", dp.DeployName)
+	require.Equal(t, "uuid-1", dp.UserUUID)
+	require.Equal(t, types.InferenceType, dp.Type)
+	require.NotEqual(t, common.Deleted, dp.Status)
+
+	// Found: different user_uuid with same deploy_name but different suffix
+	dp, err = store.FindActiveDeployByNameAndType(ctx, "uuid-2", "my-inference", types.InferenceType)
+	require.Nil(t, err)
+	require.NotNil(t, dp)
+	require.Equal(t, "uuid-2", dp.UserUUID)
+	require.Equal(t, "my-inference", dp.DeployName)
+
+	// Not found: deploy is deleted (should be excluded)
+	dp, err = store.FindActiveDeployByNameAndType(ctx, "uuid-1", "my-inference-deleted", types.InferenceType)
+	require.Nil(t, err)
+	require.Nil(t, dp)
+
+	// Not found: same name and user_uuid but different type
+	dp, err = store.FindActiveDeployByNameAndType(ctx, "uuid-1", "my-inference", types.FinetuneType)
+	require.Nil(t, err)
+	require.NotNil(t, dp)
+	require.Equal(t, types.FinetuneType, dp.Type)
+
+	// Not found: non-existent deploy name
+	dp, err = store.FindActiveDeployByNameAndType(ctx, "uuid-1", "nonexistent", types.InferenceType)
+	require.Nil(t, err)
+	require.Nil(t, dp)
+
+	// Not found: non-existent user_uuid
+	dp, err = store.FindActiveDeployByNameAndType(ctx, "uuid-999", "my-inference", types.InferenceType)
+	require.Nil(t, err)
+	require.Nil(t, dp)
+}

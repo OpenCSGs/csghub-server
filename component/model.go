@@ -1126,6 +1126,16 @@ func (c *modelComponentImpl) Deploy(ctx context.Context, deployReq types.DeployA
 		billingUUID = resolved
 	}
 
+	if deployReq.DeployType == types.InferenceType {
+		existing, err := c.deployTaskStore.FindActiveDeployByNameAndType(ctx, billingUUID, req.DeployName, types.InferenceType)
+		if err != nil {
+			return -1, fmt.Errorf("failed to check deploy name, %w", err)
+		}
+		if existing != nil {
+			return -1, errorx.ErrDeployNameAlreadyExists
+		}
+	}
+
 	resource, err := c.spaceResourceStore.FindByID(ctx, req.ResourceID)
 	if err != nil {
 		return -1, fmt.Errorf("cannot find resource, %w", err)

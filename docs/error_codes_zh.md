@@ -354,6 +354,14 @@
 - **错误名:** `pendingApplicationExists`
 - **描述:** 该数据集已有一个待审核的申请。每个数据集同时只允许一个待审核的申请。
 
+## Deploy 错误
+
+### `DEPLOY-ERR-0`
+
+- **错误代码:** `DEPLOY-ERR-0`
+- **错误名:** `codeDeployNameAlreadyExistsErr`
+- **描述:** 同类型下已存在同名部署
+
 ## Federation_adapter 错误
 
 ### `FEDAP-ERR-0`
