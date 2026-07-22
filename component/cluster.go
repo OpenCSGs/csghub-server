@@ -34,10 +34,8 @@ type ClusterComponent interface {
 	UpdateClusterNodeVXPU(ctx context.Context, req types.UpdateClusterNodeReq) (*database.ClusterNodeWithRegion, error)
 	SetClusterNodeAccessMode(ctx context.Context, req types.SetNodeAccessModeReq) error
 	CheckExclusiveResource(ctx context.Context, req types.CheckExclusiveReq) (*types.CheckExclusiveResp, error)
-	GetDeploysByTimeRange(ctx context.Context, req types.DeployTimeRangeReq) ([]database.Deploy, int, error)
-	GetDeploysByTimeRangeStream(ctx context.Context, req types.DeployTimeRangeReq) (<-chan []string, <-chan error)
-	GetWorkflowsByTimeRange(ctx context.Context, req types.WorkflowTimeRangeReq) ([]database.ArgoWorkflow, int, error)
-	GetWorkflowsByTimeRangeStream(ctx context.Context, req types.WorkflowTimeRangeReq) (<-chan []string, <-chan error)
+	GetDeploysByTimeRangeStream(ctx context.Context, req types.ClusterDeployReq) (<-chan []string, <-chan error)
+	GetWorkflowsByTimeRangeStream(ctx context.Context, req types.ClusterWFReq) (<-chan []string, <-chan error)
 	StopDeploy(ctx context.Context, stopReq types.DeployActReq) error
 	StopWorkflow(ctx context.Context, stopReq types.ArgoWorkFlowDeleteReq) error
 	DeleteClusterNode(ctx context.Context, id int64) error

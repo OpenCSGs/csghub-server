@@ -48,34 +48,34 @@ func NewArgoWorkFlowStoreWithDB(db *DB) ArgoWorkFlowStore {
 }
 
 type ArgoWorkflow struct {
-	ID           int64                  `bun:",pk,autoincrement" json:"id"`
-	Username     string                 `bun:",notnull" json:"username"`
-	UserUUID     string                 `bun:",notnull" json:"user_uuid"`
-	TaskName     string                 `bun:",notnull" json:"task_name"` // user input name
-	TaskId       string                 `bun:",notnull" json:"task_id"`   // generated task id
-	TaskType     types.TaskType         `bun:",notnull" json:"task_type"`
-	ClusterID    string                 `bun:",notnull" json:"cluster_id"`
-	Namespace    string                 `bun:",notnull" json:"namespace"`
-	RepoIds      []string               `bun:",notnull,type:jsonb" json:"repo_ids"`
-	RepoType     string                 `bun:",notnull" json:"repo_type"`
-	TaskDesc     string                 `bun:"," json:"task_desc"`
-	Status       v1alpha1.WorkflowPhase `bun:"," json:"status"`
-	Reason       string                 `bun:"," json:"reason"`       // reason for status
-	Image        string                 `bun:",notnull" json:"image"` // ArgoWorkFlow framework
-	Datasets     []string               `bun:",notnull,type:jsonb" json:"datasets"`
-	ResourceId   int64                  `bun:",nullzero" json:"resource_id"`
-	ResourceName string                 `bun:"," json:"resource_name"`
+	ID             int64                  `bun:",pk,autoincrement" json:"id"`
+	Username       string                 `bun:",notnull" json:"username"`
+	UserUUID       string                 `bun:",notnull" json:"user_uuid"`
+	TaskName       string                 `bun:",notnull" json:"task_name"` // user input name
+	TaskId         string                 `bun:",notnull" json:"task_id"`   // generated task id
+	TaskType       types.TaskType         `bun:",notnull" json:"task_type"`
+	ClusterID      string                 `bun:",notnull" json:"cluster_id"`
+	Namespace      string                 `bun:",notnull" json:"namespace"`
+	RepoIds        []string               `bun:",notnull,type:jsonb" json:"repo_ids"`
+	RepoType       string                 `bun:",notnull" json:"repo_type"`
+	TaskDesc       string                 `bun:"," json:"task_desc"`
+	Status         v1alpha1.WorkflowPhase `bun:"," json:"status"`
+	Reason         string                 `bun:"," json:"reason"`       // reason for status
+	Image          string                 `bun:",notnull" json:"image"` // ArgoWorkFlow framework
+	Datasets       []string               `bun:",notnull,type:jsonb" json:"datasets"`
+	ResourceId     int64                  `bun:",nullzero" json:"resource_id"`
+	ResourceName   string                 `bun:"," json:"resource_name"`
 	StatusUpdateAt time.Time              `bun:",nullzero,notnull,default:current_timestamp" json:"status_update_at"`
-	SubmitTime      time.Time              `bun:",nullzero,notnull,default:current_timestamp" json:"submit_time"`
-	StartTime    time.Time              `bun:",nullzero" json:"start_time"`
-	EndTime      time.Time              `bun:",nullzero" json:"end_time"`
-	ResultURL    string                 `bun:"," json:"result_url"`
-	DownloadURL  string                 `bun:"," json:"download_url"`
-	FailuresURL  string                 `bun:"," json:"failures_url"`
-	ClusterNode  string                 `bun:"," json:"cluster_node"`
-	QueueName    string                 `bun:"," json:"queue_name"`
-	DagTasks     string                 `bun:"," json:"dag_tasks"`
-	DeletedAt    time.Time              `bun:",soft_delete,nullzero" json:"deleted_at"`
+	SubmitTime     time.Time              `bun:",nullzero,notnull,default:current_timestamp" json:"submit_time"`
+	StartTime      time.Time              `bun:",nullzero" json:"start_time"`
+	EndTime        time.Time              `bun:",nullzero" json:"end_time"`
+	ResultURL      string                 `bun:"," json:"result_url"`
+	DownloadURL    string                 `bun:"," json:"download_url"`
+	FailuresURL    string                 `bun:"," json:"failures_url"`
+	ClusterNode    string                 `bun:"," json:"cluster_node"`
+	QueueName      string                 `bun:"," json:"queue_name"`
+	DagTasks       string                 `bun:"," json:"dag_tasks"`
+	DeletedAt      time.Time              `bun:",soft_delete,nullzero" json:"deleted_at"`
 }
 
 func (s *argoWorkFlowStoreImpl) FindByID(ctx context.Context, id int64) (WorkFlow ArgoWorkflow, err error) {
@@ -223,12 +223,19 @@ func (s *argoWorkFlowStoreImpl) GetClusterWorkflows(ctx context.Context, req typ
 	if req.Status != "" {
 		query = query.Where("status = ?", req.Status)
 	}
-	if req.ResourceName != "" {
-		query = query.Where("resource_name = ?", req.ResourceName)
+	if req.ResourceID > 0 {
+		query = query.Where("resource_id = ?", req.ResourceID)
 	}
 	if req.Search != "" {
 		searchPattern := "%" + req.Search + "%"
 		query = query.Where("task_name LIKE ? OR username LIKE ?", searchPattern, searchPattern)
+	}
+
+	if req.StartTime != nil {
+		query = query.Where("submit_time >= ?", req.StartTime)
+	}
+	if req.EndTime != nil {
+		query = query.Where("submit_time <= ?", req.EndTime)
 	}
 
 	total, err := query.Count(ctx)
@@ -278,7 +285,6 @@ func (s *argoWorkFlowStoreImpl) ListWorkflowsByTimeRange(ctx context.Context, re
 
 	return result, total, nil
 }
-
 
 func (s *argoWorkFlowStoreImpl) ListWorkflowsNeedingReconcile(ctx context.Context, statuses []v1alpha1.WorkflowPhase, timeoutMin int, limit int) ([]ArgoWorkflow, error) {
 	var result []ArgoWorkflow
