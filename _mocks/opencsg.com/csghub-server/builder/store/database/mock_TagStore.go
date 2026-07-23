@@ -780,6 +780,74 @@ func (_c *MockTagStore_AllTags_Call) RunAndReturn(run func(context.Context, *typ
 	return _c
 }
 
+// AllTagsWithPagination provides a mock function with given fields: ctx, filter, per, page
+func (_m *MockTagStore) AllTagsWithPagination(ctx context.Context, filter *types.TagFilter, per int, page int) ([]*database.Tag, int, error) {
+	ret := _m.Called(ctx, filter, per, page)
+
+	if len(ret) == 0 {
+		panic("no return value specified for AllTagsWithPagination")
+	}
+
+	var r0 []*database.Tag
+	var r1 int
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, *types.TagFilter, int, int) ([]*database.Tag, int, error)); ok {
+		return rf(ctx, filter, per, page)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *types.TagFilter, int, int) []*database.Tag); ok {
+		r0 = rf(ctx, filter, per, page)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]*database.Tag)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *types.TagFilter, int, int) int); ok {
+		r1 = rf(ctx, filter, per, page)
+	} else {
+		r1 = ret.Get(1).(int)
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, *types.TagFilter, int, int) error); ok {
+		r2 = rf(ctx, filter, per, page)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
+// MockTagStore_AllTagsWithPagination_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'AllTagsWithPagination'
+type MockTagStore_AllTagsWithPagination_Call struct {
+	*mock.Call
+}
+
+// AllTagsWithPagination is a helper method to define mock.On call
+//   - ctx context.Context
+//   - filter *types.TagFilter
+//   - per int
+//   - page int
+func (_e *MockTagStore_Expecter) AllTagsWithPagination(ctx interface{}, filter interface{}, per interface{}, page interface{}) *MockTagStore_AllTagsWithPagination_Call {
+	return &MockTagStore_AllTagsWithPagination_Call{Call: _e.mock.On("AllTagsWithPagination", ctx, filter, per, page)}
+}
+
+func (_c *MockTagStore_AllTagsWithPagination_Call) Run(run func(ctx context.Context, filter *types.TagFilter, per int, page int)) *MockTagStore_AllTagsWithPagination_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(*types.TagFilter), args[2].(int), args[3].(int))
+	})
+	return _c
+}
+
+func (_c *MockTagStore_AllTagsWithPagination_Call) Return(_a0 []*database.Tag, _a1 int, _a2 error) *MockTagStore_AllTagsWithPagination_Call {
+	_c.Call.Return(_a0, _a1, _a2)
+	return _c
+}
+
+func (_c *MockTagStore_AllTagsWithPagination_Call) RunAndReturn(run func(context.Context, *types.TagFilter, int, int) ([]*database.Tag, int, error)) *MockTagStore_AllTagsWithPagination_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // CheckTagIDsExist provides a mock function with given fields: ctx, ids
 func (_m *MockTagStore) CheckTagIDsExist(ctx context.Context, ids []int64) error {
 	ret := _m.Called(ctx, ids)

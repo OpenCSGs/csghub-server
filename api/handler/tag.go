@@ -40,6 +40,8 @@ type TagsHandler struct {
 // @Param		 scope query string false "scope name" Enums(model, dataset, code, space, prompt, skill)
 // @Param		 built_in query bool false "built_in"
 // @Param		 search query string false "search on name and show_name fields"
+// @Param		 per query int false "Page size, default 50, max 100" default(50)
+// @Param		 page query int false "Page number, default 1" default(1)
 // @Success      200  {object}  types.Response{data=[]types.RepoTag} "tags"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
@@ -51,13 +53,19 @@ func (t *TagsHandler) AllTags(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	tags, err := t.tag.AllTags(ctx.Request.Context(), filter)
+	per, page, err := common.GetPerAndPageFromContext(ctx)
+	if err != nil {
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	tags, total, err := t.tag.AllTagsWithPagination(ctx.Request.Context(), filter, per, page)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "Failed to load tags", slog.Any("filter", filter), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
-	httpbase.OK(ctx, tags)
+	httpbase.OKWithTotal(ctx, tags, total)
 }
 
 // CreateTag     godoc

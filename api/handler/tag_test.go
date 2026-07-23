@@ -3,6 +3,7 @@ package handler
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -41,11 +42,11 @@ func TestTagHandler_AllTags(t *testing.T) {
 		ginContext.Request = req
 
 		tagComp := mockcom.NewMockTagComponent(t)
-		tagComp.EXPECT().AllTags(ginContext.Request.Context(), &types.TagFilter{
+		tagComp.EXPECT().AllTagsWithPagination(ginContext.Request.Context(), &types.TagFilter{
 			Scopes:     []types.TagScope{types.TagScope("model")},
 			Categories: []string{"task"},
 			BuiltIn:    nil,
-		}).Return(tags, nil)
+		}, 50, 1).Return(tags, 1, nil)
 
 		tagHandler, err := NewTestTagHandler(tagComp)
 		require.Nil(t, err)
@@ -62,6 +63,7 @@ func TestTagHandler_AllTags(t *testing.T) {
 		require.Equal(t, "", resp.Code)
 		require.Equal(t, "OK", resp.Msg)
 		require.NotNil(t, resp.Data)
+		require.Equal(t, 1, resp.Total)
 	})
 
 	t.Run("with builtin", func(t *testing.T) {
@@ -72,6 +74,8 @@ func TestTagHandler_AllTags(t *testing.T) {
 		values.Add("category", "task")
 		values.Add("scope", "model")
 		values.Add("built_in", "true")
+		values.Add("per", "10")
+		values.Add("page", "2")
 		req := httptest.NewRequest("get", "/api/v1/tags?"+values.Encode(), nil)
 
 		hr := httptest.NewRecorder()
@@ -80,11 +84,11 @@ func TestTagHandler_AllTags(t *testing.T) {
 
 		tagComp := mockcom.NewMockTagComponent(t)
 		builtin := true
-		tagComp.EXPECT().AllTags(ginContext.Request.Context(), &types.TagFilter{
+		tagComp.EXPECT().AllTagsWithPagination(ginContext.Request.Context(), &types.TagFilter{
 			Scopes:     []types.TagScope{types.TagScope("model")},
 			Categories: []string{"task"},
 			BuiltIn:    &builtin,
-		}).Return(tags, nil)
+		}, 10, 2).Return(tags, 15, nil)
 
 		tagHandler, err := NewTestTagHandler(tagComp)
 		require.Nil(t, err)
@@ -101,6 +105,91 @@ func TestTagHandler_AllTags(t *testing.T) {
 		require.Equal(t, "", resp.Code)
 		require.Equal(t, "OK", resp.Msg)
 		require.NotNil(t, resp.Data)
+		require.Equal(t, 15, resp.Total)
+	})
+
+	t.Run("invalid per", func(t *testing.T) {
+		req := httptest.NewRequest("get", "/api/v1/tags?per=101", nil)
+
+		hr := httptest.NewRecorder()
+		ginContext, _ := gin.CreateTestContext(hr)
+		ginContext.Request = req
+
+		tagComp := mockcom.NewMockTagComponent(t)
+		tagHandler, err := NewTestTagHandler(tagComp)
+		require.Nil(t, err)
+
+		tagHandler.AllTags(ginContext)
+		require.Equal(t, http.StatusBadRequest, hr.Code)
+	})
+
+	t.Run("invalid page", func(t *testing.T) {
+		req := httptest.NewRequest("get", "/api/v1/tags?page=0", nil)
+
+		hr := httptest.NewRecorder()
+		ginContext, _ := gin.CreateTestContext(hr)
+		ginContext.Request = req
+
+		tagComp := mockcom.NewMockTagComponent(t)
+		tagHandler, err := NewTestTagHandler(tagComp)
+		require.Nil(t, err)
+
+		tagHandler.AllTags(ginContext)
+		require.Equal(t, http.StatusBadRequest, hr.Code)
+	})
+
+	t.Run("non-numeric per", func(t *testing.T) {
+		req := httptest.NewRequest("get", "/api/v1/tags?per=abc", nil)
+
+		hr := httptest.NewRecorder()
+		ginContext, _ := gin.CreateTestContext(hr)
+		ginContext.Request = req
+
+		tagComp := mockcom.NewMockTagComponent(t)
+		tagHandler, err := NewTestTagHandler(tagComp)
+		require.Nil(t, err)
+
+		tagHandler.AllTags(ginContext)
+		require.Equal(t, http.StatusBadRequest, hr.Code)
+	})
+
+	t.Run("server error", func(t *testing.T) {
+		req := httptest.NewRequest("get", "/api/v1/tags?per=10&page=1", nil)
+
+		hr := httptest.NewRecorder()
+		ginContext, _ := gin.CreateTestContext(hr)
+		ginContext.Request = req
+
+		tagComp := mockcom.NewMockTagComponent(t)
+		tagComp.EXPECT().AllTagsWithPagination(ginContext.Request.Context(), mock.Anything, 10, 1).Return(nil, 0, fmt.Errorf("db error"))
+
+		tagHandler, err := NewTestTagHandler(tagComp)
+		require.Nil(t, err)
+
+		tagHandler.AllTags(ginContext)
+		require.Equal(t, http.StatusInternalServerError, hr.Code)
+	})
+
+	t.Run("empty result", func(t *testing.T) {
+		req := httptest.NewRequest("get", "/api/v1/tags?search=none", nil)
+
+		hr := httptest.NewRecorder()
+		ginContext, _ := gin.CreateTestContext(hr)
+		ginContext.Request = req
+
+		tagComp := mockcom.NewMockTagComponent(t)
+		tagComp.EXPECT().AllTagsWithPagination(ginContext.Request.Context(), mock.Anything, 50, 1).Return(nil, 0, nil)
+
+		tagHandler, err := NewTestTagHandler(tagComp)
+		require.Nil(t, err)
+
+		tagHandler.AllTags(ginContext)
+		require.Equal(t, http.StatusOK, hr.Code)
+
+		var resp httpbase.R
+		err = json.Unmarshal(hr.Body.Bytes(), &resp)
+		require.Nil(t, err)
+		require.Equal(t, 0, resp.Total)
 	})
 }
 

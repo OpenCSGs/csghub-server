@@ -15,6 +15,7 @@ import (
 
 type TagComponent interface {
 	AllTags(ctx context.Context, filter *types.TagFilter) ([]*types.RepoTag, error)
+	AllTagsWithPagination(ctx context.Context, filter *types.TagFilter, per, page int) ([]*types.RepoTag, int, error)
 	ClearMetaTags(ctx context.Context, repoType types.RepositoryType, namespace, name string) error
 	UpdateMetaTags(ctx context.Context, tagScope types.TagScope, namespace, name, content string) ([]*database.RepositoryTag, error)
 	UpdateLibraryTags(ctx context.Context, tagScope types.TagScope, namespace, name, oldFilePath, newFilePath string) error
@@ -70,6 +71,29 @@ func (tc *tagComponentImpl) AllTags(ctx context.Context, filter *types.TagFilter
 		}
 	}
 	return resTags, nil
+}
+
+func (tc *tagComponentImpl) AllTagsWithPagination(ctx context.Context, filter *types.TagFilter, per, page int) ([]*types.RepoTag, int, error) {
+	tags, total, err := tc.tagStore.AllTagsWithPagination(ctx, filter, per, page)
+	if err != nil {
+		return nil, 0, err
+	}
+	resTags := make([]*types.RepoTag, len(tags))
+	for i, tag := range tags {
+		resTags[i] = &types.RepoTag{
+			ID:        tag.ID,
+			Name:      tag.Name,
+			Category:  tag.Category,
+			Group:     tag.Group,
+			Scope:     tag.Scope,
+			BuiltIn:   tag.BuiltIn,
+			ShowName:  tag.I18nKey,
+			I18nKey:   tag.I18nKey,
+			CreatedAt: tag.CreatedAt,
+			UpdatedAt: tag.UpdatedAt,
+		}
+	}
+	return resTags, total, nil
 }
 
 func (c *tagComponentImpl) ClearMetaTags(ctx context.Context, repoType types.RepositoryType, namespace, name string) error {

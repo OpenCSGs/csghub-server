@@ -2,6 +2,7 @@ package component
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/mock"
@@ -261,6 +262,57 @@ func TestTagComponent_UpdateCategory(t *testing.T) {
 		}, int64(1))
 		require.Nil(t, err)
 		require.NotNil(t, category)
+	})
+}
+
+func TestTagComponent_AllTagsWithPagination(t *testing.T) {
+	ctx := context.TODO()
+
+	t.Run("success with tags", func(t *testing.T) {
+		tc := initializeTestTagComponent(ctx, t)
+		filter := &types.TagFilter{
+			Scopes:     []types.TagScope{types.ModelTagScope},
+			Categories: []string{"task"},
+		}
+		dbTags := []*database.Tag{
+			{ID: 1, Name: "tag1", Category: "task", Scope: types.ModelTagScope, BuiltIn: true, I18nKey: "tag1_key"},
+			{ID: 2, Name: "tag2", Category: "task", Scope: types.ModelTagScope, BuiltIn: false, I18nKey: "tag2_key"},
+		}
+		tc.mocks.stores.TagMock().EXPECT().AllTagsWithPagination(ctx, filter, 10, 2).Return(dbTags, 15, nil)
+
+		tags, total, err := tc.AllTagsWithPagination(ctx, filter, 10, 2)
+		require.Nil(t, err)
+		require.Equal(t, 15, total)
+		require.Len(t, tags, 2)
+		require.Equal(t, int64(1), tags[0].ID)
+		require.Equal(t, "tag1", tags[0].Name)
+		require.Equal(t, "task", tags[0].Category)
+		require.Equal(t, types.ModelTagScope, tags[0].Scope)
+		require.Equal(t, true, tags[0].BuiltIn)
+		require.Equal(t, "tag1_key", tags[0].ShowName)
+		require.Equal(t, "tag1_key", tags[0].I18nKey)
+	})
+
+	t.Run("empty result", func(t *testing.T) {
+		tc := initializeTestTagComponent(ctx, t)
+		filter := &types.TagFilter{Search: "nonexistent"}
+		tc.mocks.stores.TagMock().EXPECT().AllTagsWithPagination(ctx, filter, 50, 1).Return([]*database.Tag{}, 0, nil)
+
+		tags, total, err := tc.AllTagsWithPagination(ctx, filter, 50, 1)
+		require.Nil(t, err)
+		require.Equal(t, 0, total)
+		require.Len(t, tags, 0)
+	})
+
+	t.Run("store error", func(t *testing.T) {
+		tc := initializeTestTagComponent(ctx, t)
+		filter := &types.TagFilter{}
+		tc.mocks.stores.TagMock().EXPECT().AllTagsWithPagination(ctx, filter, 10, 1).Return(nil, 0, fmt.Errorf("db error"))
+
+		tags, total, err := tc.AllTagsWithPagination(ctx, filter, 10, 1)
+		require.NotNil(t, err)
+		require.Equal(t, 0, total)
+		require.Nil(t, tags)
 	})
 }
 
