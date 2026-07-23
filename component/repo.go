@@ -381,8 +381,8 @@ func (c *repoComponentImpl) UpdateRepo(ctx context.Context, req types.UpdateRepo
 				// Additional check if making the repository public.
 				if !*req.Private {
 					if err := c.allowPublic(repo); err != nil {
-					return nil, err
-				}
+						return nil, err
+					}
 				}
 				repo.Private = *req.Private
 			}
@@ -2927,6 +2927,15 @@ func (c *repoComponentImpl) ChangePath(ctx context.Context, req types.ChangePath
 		return fmt.Errorf("failed to get namespace and name from new path, error: %w", err)
 	}
 
+	// Check new namespace exists
+	nsExists, err := c.namespaceStore.Exists(ctx, newNamespace)
+	if err != nil {
+		return fmt.Errorf("failed to check if new namespace exists, error: %w", err)
+	}
+	if !nsExists {
+		return errorx.TargetNamespaceNotFound(newNamespace)
+	}
+
 	// Check new path exists
 	_, err = c.repoStore.FindByPath(ctx, req.RepoType, newNamespace, newName)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
@@ -3043,11 +3052,11 @@ func (c *repoComponentImpl) checkChangePathDependencies(ctx context.Context, rep
 		return blocker
 	}
 	blocker = checkOne(func() (bool, error) {
-		v, err := c.dataviewerStore.GetViewerByRepoID(ctx, repo.ID)
-		if errors.Is(err, sql.ErrNoRows) {
-			return false, nil
+		job, err := c.dataviewerStore.GetLastSuccessfulJobByRepoID(ctx, repo.ID)
+		if err != nil || job == nil {
+			return false, err
 		}
-		return v != nil, err
+		return job.CardData != "", nil
 	}, "dataviewers", repo)
 	if blocker != nil {
 		return blocker

@@ -1958,7 +1958,7 @@ func (h *RepoHandler) ChangePath(ctx *gin.Context) {
 
 	err = h.c.ChangePath(ctx.Request.Context(), req)
 	if err != nil {
-		if errors.Is(err, errorx.ErrBadRequest) || errors.Is(err, errorx.ErrChangePathBlocked) {
+		if errors.Is(err, errorx.ErrBadRequest) || errors.Is(err, errorx.ErrChangePathBlocked) || errors.Is(err, errorx.ErrTargetNamespaceNotFound) {
 			slog.ErrorContext(ctx.Request.Context(), "invalid request", slog.Any("error", err))
 			httpbase.BadRequestWithExt(ctx, err)
 			return
