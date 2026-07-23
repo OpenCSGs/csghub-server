@@ -34,11 +34,12 @@ const (
 	DataTypeImage DataType = "image"
 	DataTypeAudio DataType = "audio"
 	DataTypeVideo DataType = "video"
+	DataTypeOCR   DataType = "ocr"
 )
 
 func (d DataType) IsMultiModal() bool {
 	switch d {
-	case DataTypeImage, DataTypeAudio, DataTypeVideo:
+	case DataTypeImage, DataTypeAudio, DataTypeVideo, DataTypeOCR:
 		return true
 	default:
 		return false
@@ -131,7 +132,7 @@ var (
 	SceneMultiSync            SceneType = 13 // multi source sync
 	SceneEvaluation           SceneType = 14 // model evaluation
 	SceneModelServerless      SceneType = 15 // serverless and external model from aigateway
-	SceneMultiModalServerless SceneType = 16 // Multi modal model from aigateway for image/audio/video
+	SceneMultiModalServerless SceneType = 16 // Multi modal model from aigateway for image/audio/video/ocr
 	// starship
 	SceneStarship SceneType = 20 // starship is deprecated
 	SceneGuiAgent SceneType = 22 // gui agent is deprecated

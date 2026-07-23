@@ -95,6 +95,9 @@
   "Tag.I18nKey.automatic-speech-recognition": {
     "other": "自动语音识别"
   },
+  "Tag.I18nKey.optical-character-recognition": {
+    "other": "光学字符识别"
+  },
   "Tag.I18nKey.text-to-speech": {
     "other": "文本转语音"
   },

@@ -19,6 +19,12 @@ tags:
   built_in: true
 - category: task
   group: computer_vision
+  name: optical-character-recognition
+  scope: model
+  show_name: 光学字符识别
+  built_in: true
+- category: task
+  group: computer_vision
   name: skin-retouching
   scope: model
   show_name: 人像美肤
