@@ -179,6 +179,80 @@ func TestTagStore_AllTags(t *testing.T) {
 	require.Equal(t, mcpTag.Name, mcpTags[0].Name)
 }
 
+func TestTagStore_AllTagsWithPagination(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	var err error
+	// clear all existing data
+	_, err = db.Core.NewDelete().Model(&database.Tag{}).Where("1=1").Exec(ctx)
+	require.Empty(t, err)
+
+	ts := database.NewTagStoreWithDB(db)
+
+	// insert 5 tags
+	for i := 0; i < 5; i++ {
+		_, err = ts.CreateTag(ctx, database.Tag{
+			Category: "task",
+			Name:     fmt.Sprintf("tag_%s_%d", uuid.NewString(), i),
+			Group:    "Group One",
+			Scope:    types.ModelTagScope,
+		})
+		require.Empty(t, err)
+	}
+
+	// no pagination (per=0, page=0) returns all
+	tags, total, err := ts.AllTagsWithPagination(ctx, nil, 0, 0)
+	require.Empty(t, err)
+	require.Equal(t, 5, total)
+	require.Equal(t, 5, len(tags))
+
+	// page 1 with per=2
+	tags, total, err = ts.AllTagsWithPagination(ctx, nil, 2, 1)
+	require.Empty(t, err)
+	require.Equal(t, 5, total)
+	require.Equal(t, 2, len(tags))
+
+	// page 2 with per=2
+	tags, total, err = ts.AllTagsWithPagination(ctx, nil, 2, 2)
+	require.Empty(t, err)
+	require.Equal(t, 5, total)
+	require.Equal(t, 2, len(tags))
+
+	// page 3 with per=2 (last page, only 1 tag)
+	tags, total, err = ts.AllTagsWithPagination(ctx, nil, 2, 3)
+	require.Empty(t, err)
+	require.Equal(t, 5, total)
+	require.Equal(t, 1, len(tags))
+
+	// with filter
+	builtIn := false
+	filter := &types.TagFilter{
+		Scopes:     []types.TagScope{types.ModelTagScope},
+		Categories: []string{"task"},
+		BuiltIn:    &builtIn,
+	}
+	tags, total, err = ts.AllTagsWithPagination(ctx, filter, 3, 1)
+	require.Empty(t, err)
+	require.Equal(t, 5, total)
+	require.Equal(t, 3, len(tags))
+
+	// filter with no results
+	filterSearchNoResult := &types.TagFilter{
+		Scopes:     []types.TagScope{types.ModelTagScope},
+		Categories: []string{"task"},
+		BuiltIn:    &builtIn,
+		Search:     "noResult",
+	}
+	tags, total, err = ts.AllTagsWithPagination(ctx, filterSearchNoResult, 10, 1)
+	require.Empty(t, err)
+	require.Equal(t, 0, total)
+	require.Equal(t, 0, len(tags))
+}
+
 // TestAllModelCategories tests the AllModelCategories method
 func TestTagStore_AllModelCategories(t *testing.T) {
 	db := tests.InitTestDB()

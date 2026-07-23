@@ -70,6 +70,8 @@ func GetPerAndPageFromContext(ctx *gin.Context) (perInt int, pageInt int, err er
 	}
 	pageInt, err = strconv.Atoi(page)
 	if err != nil {
+		ext := errorx.Ctx().Set("query", "page")
+		err = errorx.ReqParamInvalid(err, ext)
 		return
 	}
 	if pageInt <= 0 {

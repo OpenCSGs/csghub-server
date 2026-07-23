@@ -18,6 +18,11 @@ type tagStoreImpl struct {
 type TagStore interface {
 	// Alltags returns all tags in the database
 	AllTags(ctx context.Context, filter *types.TagFilter) ([]*Tag, error)
+	// AllTagsWithPagination returns tags matching the filter with pagination.
+	// When per > 0 and page > 0, results are paginated by limit=per and
+	// offset=(page-1)*per. total always reflects the count of all matching
+	// rows (via SELECT count(*)), regardless of whether pagination is applied.
+	AllTagsWithPagination(ctx context.Context, filter *types.TagFilter, per, page int) ([]*Tag, int, error)
 	AllModelTags(ctx context.Context) ([]*Tag, error)
 	AllPromptTags(ctx context.Context) ([]*Tag, error)
 	AllMCPTags(ctx context.Context) ([]*Tag, error)
@@ -86,9 +91,8 @@ type TagCategory struct {
 	AutoDetected bool           `bun:"default:false" json:"auto_detected" yaml:"auto_detected"`
 }
 
-// Alltags returns all tags in the database
-func (ts *tagStoreImpl) AllTags(ctx context.Context, filter *types.TagFilter) ([]*Tag, error) {
-	var tags []*Tag
+// buildTagQuery builds the base select query for tag filtering
+func (ts *tagStoreImpl) buildTagQuery(filter *types.TagFilter) *bun.SelectQuery {
 	q := ts.db.Operator.Core.NewSelect().Model(&Tag{})
 
 	if filter != nil {
@@ -107,11 +111,42 @@ func (ts *tagStoreImpl) AllTags(ctx context.Context, filter *types.TagFilter) ([
 		}
 	}
 
-	err := q.Scan(ctx, &tags)
+	return q
+}
+
+// AllTags returns all tags in the database
+func (ts *tagStoreImpl) AllTags(ctx context.Context, filter *types.TagFilter) ([]*Tag, error) {
+	var tags []*Tag
+	q := ts.buildTagQuery(filter)
+
+	err := q.Order("id DESC").Scan(ctx, &tags)
 	if err != nil {
 		return nil, fmt.Errorf("failed to select tags,cause: %w", err)
 	}
 	return tags, nil
+}
+
+// AllTagsWithPagination returns tags matching the filter with optional pagination
+func (ts *tagStoreImpl) AllTagsWithPagination(ctx context.Context, filter *types.TagFilter, per, page int) ([]*Tag, int, error) {
+	var tags []*Tag
+	q := ts.buildTagQuery(filter)
+
+	// First query: get total count
+	total, err := q.Count(ctx)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to count tags,cause: %w", err)
+	}
+
+	// Second query: get paginated tags
+	if per > 0 && page > 0 {
+		q = q.Limit(per).Offset((page - 1) * per)
+	}
+
+	err = q.Order("id DESC").Scan(ctx, &tags)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to select tags,cause: %w", err)
+	}
+	return tags, total, nil
 }
 
 func (ts *tagStoreImpl) AllTagsByScope(ctx context.Context, scope types.TagScope) ([]*Tag, error) {
