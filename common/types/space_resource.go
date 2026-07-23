@@ -135,16 +135,17 @@ const ScenarioAll ScenarioType = -1
 // Defining them as constants (instead of string literals) keeps the seed, the
 // scenarioBit table, and any caller that needs a name in sync.
 const (
-	ScenarioNameSpace      = "space"
-	ScenarioNameInference  = "inference"
-	ScenarioNameFinetune   = "finetune"
-	ScenarioNameServerless = "serverless"
-	ScenarioNameNotebook   = "notebook"
-	ScenarioNameSandbox    = "sandbox"
-	ScenarioNameWfEvaluation = "wf_evaluation"
-	ScenarioNameWfClawEval  = "wf_claw_eval"
-	ScenarioNameWfFinetune  = "wf_finetune"
-	ScenarioNameWfDataflow = "wf_dataflow"
+	ScenarioNameSpace            = "space"
+	ScenarioNameInference        = "inference"
+	ScenarioNameFinetune         = "finetune"
+	ScenarioNameServerless       = "serverless"
+	ScenarioNameNotebook         = "notebook"
+	ScenarioNameSandbox          = "sandbox"
+	ScenarioNameWfEvaluation     = "wf_evaluation"
+	ScenarioNameWfClawEval       = "wf_claw_eval"
+	ScenarioNameWfFinetune       = "wf_finetune"
+	ScenarioNameWfDataflow       = "wf_dataflow"
+	ScenarioNameWfDataflowLLMLog = "wf_dataflow_llmlog"
 )
 
 // scenarioBit maps each scenario bit constant to its name. These bit numbers
@@ -173,16 +174,17 @@ var scenarioBit = []struct {
 	name string
 	bit  ScenarioType
 }{
-	{ScenarioNameSpace, 1 << 0},      // bit0  deploy Space
-	{ScenarioNameInference, 1 << 1},  // bit1  deploy Inference
-	{ScenarioNameFinetune, 1 << 2},   // bit2  deploy Finetune
-	{ScenarioNameServerless, 1 << 3}, // bit3  deploy Serverless
-	{ScenarioNameNotebook, 1 << 5},   // bit5  deploy Notebook
-	{ScenarioNameSandbox, 1 << 7},    // bit7  deploy Sandbox
-	{ScenarioNameWfEvaluation, 1 << 32}, // bit32 workflow Evaluation
-	{ScenarioNameWfClawEval, 1 << 33},    // bit33 workflow ClawEval
-	{ScenarioNameWfFinetune, 1 << 37},    // bit37 workflow Finetune
-	{ScenarioNameWfDataflow, 1 << 38},    // bit38 workflow Dataflow
+	{ScenarioNameSpace, 1 << 0},             // bit0  deploy Space
+	{ScenarioNameInference, 1 << 1},         // bit1  deploy Inference
+	{ScenarioNameFinetune, 1 << 2},          // bit2  deploy Finetune
+	{ScenarioNameServerless, 1 << 3},        // bit3  deploy Serverless
+	{ScenarioNameNotebook, 1 << 5},          // bit5  deploy Notebook
+	{ScenarioNameSandbox, 1 << 7},           // bit7  deploy Sandbox
+	{ScenarioNameWfEvaluation, 1 << 32},     // bit32 workflow Evaluation
+	{ScenarioNameWfClawEval, 1 << 33},       // bit33 workflow ClawEval
+	{ScenarioNameWfFinetune, 1 << 37},       // bit37 workflow Finetune
+	{ScenarioNameWfDataflow, 1 << 38},       // bit38 workflow Dataflow
+	{ScenarioNameWfDataflowLLMLog, 1 << 39}, // bit39 workflow LLM Log Dataflow
 }
 
 const (
@@ -194,10 +196,11 @@ const (
 	ScenarioNotebook   ScenarioType = 1 << 5
 	ScenarioSandbox    ScenarioType = 1 << 7
 	// workflow scenarios (bits 32-63)
-	ScenarioWfEvaluation ScenarioType = 1 << 32
-	ScenarioWfClawEval   ScenarioType = 1 << 33
-	ScenarioWfFinetune   ScenarioType = 1 << 37
-	ScenarioWfDataflow   ScenarioType = 1 << 38
+	ScenarioWfEvaluation     ScenarioType = 1 << 32
+	ScenarioWfClawEval       ScenarioType = 1 << 33
+	ScenarioWfFinetune       ScenarioType = 1 << 37
+	ScenarioWfDataflow       ScenarioType = 1 << 38
+	ScenarioWfDataflowLLMLog ScenarioType = 1 << 39
 )
 
 // ScenarioName returns the name of the scenario identified by the given single-bit
@@ -226,7 +229,7 @@ const (
 // (GET /space_resources/scenarios). The data is read from the
 // space_resource_scenario_constraints table at runtime.
 //
-//   - Code: bit position (0-7 for deploy, 32-38 for workflow); it doubles as the
+//   - Code: bit position (0-7 for deploy, 32-39 for workflow); it doubles as the
 //     value callers pass to the space resource Index API as deploy_type. The
 //     bitmask is `1 << Code`. Deploy codes equal the DeployType int values.
 //   - Name: scenario name (machine name, e.g. "finetune").

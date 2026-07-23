@@ -539,7 +539,7 @@ type Config struct {
 			MaxShardSizeBytes int64  `env:"STARHUB_SERVER_LLMLOG_SYNC_MAX_SHARD_SIZE_BYTES" default:"67108864"` // 64 MiB
 			Dataflow          struct {
 				Enable           bool   `env:"STARHUB_SERVER_LLMLOG_SYNC_DATAFLOW_ENABLE" default:"false"`
-				ResourceScenario string `env:"STARHUB_SERVER_LLMLOG_SYNC_DATAFLOW_RESOURCE_SCENARIO" default:"wf_dataflow"`
+				ResourceScenario string `env:"STARHUB_SERVER_LLMLOG_SYNC_DATAFLOW_RESOURCE_SCENARIO" default:"wf_dataflow_llmlog"`
 				DatasetNamespace string `env:"STARHUB_SERVER_LLMLOG_SYNC_DATAFLOW_DATASET_NAMESPACE" default:""`
 				DatasetName      string `env:"STARHUB_SERVER_LLMLOG_SYNC_DATAFLOW_DATASET_NAME" default:"Runtime_data_curated"`
 				StorageSize      string `env:"STARHUB_SERVER_LLMLOG_SYNC_DATAFLOW_STORAGE_SIZE" default:"1Gi"`

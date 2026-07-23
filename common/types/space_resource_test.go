@@ -18,6 +18,7 @@ func TestScenarioName(t *testing.T) {
 		{"deploy sandbox", ScenarioSandbox, "sandbox"},
 		{"workflow evaluation", ScenarioWfEvaluation, "wf_evaluation"},
 		{"workflow dataflow", ScenarioWfDataflow, "wf_dataflow"},
+		{"workflow llm log dataflow", ScenarioWfDataflowLLMLog, "wf_dataflow_llmlog"},
 		{"zero value", 0, ""},
 		{"all scenarios", ScenarioAll, ""},
 		{"multi-bit mask", ScenarioSpace | ScenarioInference, ""},
