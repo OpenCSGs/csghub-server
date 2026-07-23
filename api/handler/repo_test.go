@@ -22,6 +22,7 @@ import (
 	temporal_mock "go.temporal.io/sdk/mocks"
 	workflow_mock "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/temporal"
 	mockcomponent "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
+	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/api/workflow"
 	"opencsg.com/csghub-server/builder/deploy"
 	"opencsg.com/csghub-server/builder/store/database"
@@ -1214,6 +1215,73 @@ func TestRepoHandler_UpdateMirror(t *testing.T) {
 	tester.ResponseEq(t, 200, tester.OKText, &database.Mirror{ID: 11})
 }
 
+func TestRepoHandler_MirrorSourceRepoAuthInvalid(t *testing.T) {
+	authErr := errorx.MirrorSourceRepoAuthInvalid(errors.New("credentials are incomplete"), errorx.Ctx())
+	want := httpbase.R{Code: "MIRROR-ERR-5", Msg: "MIRROR-ERR-5: credentials are incomplete"}
+
+	t.Run("CreateMirror", func(t *testing.T) {
+		tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
+			return rp.CreateMirror
+		})
+		tester.WithUser().WithKV("repo_type", types.ModelRepo).WithBody(t, &types.CreateMirrorReq{
+			SourceUrl: "https://example.com/source/repo.git",
+		})
+		tester.mocks.mirror.EXPECT().CreateMirror(tester.Ctx(), mock.Anything).Return(nil, authErr)
+
+		tester.Execute()
+
+		tester.ResponseEqSimple(t, 400, want)
+	})
+
+	t.Run("UpdateMirror", func(t *testing.T) {
+		tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
+			return rp.UpdateMirror
+		})
+		tester.WithUser().WithKV("repo_type", types.ModelRepo).WithBody(t, &types.UpdateMirrorReq{
+			SourceUrl: "https://example.com/source/repo.git",
+		})
+		tester.mocks.mirror.EXPECT().UpdateMirror(tester.Ctx(), mock.Anything).Return(nil, authErr)
+
+		tester.Execute()
+
+		tester.ResponseEqSimple(t, 400, want)
+	})
+}
+
+// TestRepoHandler_MirrorSourceBadRequest verifies malformed mirror source URLs return a bad request.
+func TestRepoHandler_MirrorSourceBadRequest(t *testing.T) {
+	badRequestErr := errorx.BadRequest(errors.New("invalid source git clone url"), errorx.Ctx())
+	want := httpbase.R{Code: "REQ-ERR-0", Msg: "REQ-ERR-0: invalid source git clone url"}
+
+	t.Run("CreateMirror", func(t *testing.T) {
+		tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
+			return rp.CreateMirror
+		})
+		tester.WithUser().WithKV("repo_type", types.ModelRepo).WithBody(t, &types.CreateMirrorReq{
+			SourceUrl: "https://example.com/source/repo.git",
+		})
+		tester.mocks.mirror.EXPECT().CreateMirror(tester.Ctx(), mock.Anything).Return(nil, badRequestErr)
+
+		tester.Execute()
+
+		tester.ResponseEqSimple(t, http.StatusBadRequest, want)
+	})
+
+	t.Run("UpdateMirror", func(t *testing.T) {
+		tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
+			return rp.UpdateMirror
+		})
+		tester.WithUser().WithKV("repo_type", types.ModelRepo).WithBody(t, &types.UpdateMirrorReq{
+			SourceUrl: "https://example.com/source/repo.git",
+		})
+		tester.mocks.mirror.EXPECT().UpdateMirror(tester.Ctx(), mock.Anything).Return(nil, badRequestErr)
+
+		tester.Execute()
+
+		tester.ResponseEqSimple(t, http.StatusBadRequest, want)
+	})
+}
+
 func TestRepoHandler_DeleteMirror(t *testing.T) {
 	tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
 		return rp.DeleteMirror
@@ -1429,17 +1497,43 @@ func TestRepoHandler_DeployStatus(t *testing.T) {
 }
 
 func TestRepoHandler_SyncMirror(t *testing.T) {
-	tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
-		return rp.SyncMirror
+	for _, tc := range []struct {
+		name   string
+		urgent bool
+		body   bool
+	}{
+		{name: "defaults to normal"},
+		{name: "requests urgent", urgent: true, body: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
+				return rp.SyncMirror
+			})
+			tester.WithUser()
+			tester.WithKV("repo_type", types.ModelRepo)
+			tester.WithParam("id", "1")
+			if tc.body {
+				tester.WithBody(t, &types.SyncMirrorParams{Urgent: tc.urgent})
+			}
+			tester.mocks.mirror.EXPECT().SyncMirror(tester.Ctx(), types.SyncMirrorReq{
+				RepoType: types.ModelRepo, Namespace: "u", Name: "r", CurrentUser: "u", Urgent: tc.urgent,
+			}).Return(nil).Once()
+
+			tester.Execute()
+			tester.ResponseEq(t, 200, tester.OKText, nil)
+		})
+	}
+
+	t.Run("rejects invalid body", func(t *testing.T) {
+		tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
+			return rp.SyncMirror
+		})
+		tester.WithBody(t, "invalid")
+
+		tester.Execute()
+
+		require.Equal(t, http.StatusBadRequest, tester.Response().Code)
 	})
-	tester.WithUser()
-
-	tester.WithKV("repo_type", types.ModelRepo)
-	tester.WithParam("id", "1")
-	tester.mocks.mirror.EXPECT().SyncMirror(tester.Ctx(), types.ModelRepo, "u", "r", "u").Return(nil).Once()
-
-	tester.Execute()
-	tester.ResponseEq(t, 200, tester.OKText, nil)
 }
 
 func TestRepoHandler_CreateRepo(t *testing.T) {
@@ -1787,28 +1881,115 @@ func TestRepoHandler_ServelessUpdate(t *testing.T) {
 }
 
 func TestRepoHandler_TreeV2(t *testing.T) {
+	t.Run("returns tree without checking mirror status", func(t *testing.T) {
+		tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
+			return rp.TreeV2
+		})
+		tester.mocks.repo.EXPECT().TreeV2(mock.Anything, &types.GetTreeRequest{
+			Namespace:   "u",
+			Name:        "r",
+			Path:        "foo",
+			Ref:         "main",
+			RepoType:    types.ModelRepo,
+			CurrentUser: "u",
+			Limit:       5,
+			Cursor:      "cc",
+		}).Return(
+			&types.GetRepoFileTreeResp{Files: []*types.File{{Name: "f1"}}}, nil,
+		).Once()
+		tester.WithParam("path", "foo").WithParam("ref", "main").WithQuery("limit", "5")
+		tester.WithKV("repo_type", types.ModelRepo).WithUser().WithQuery("cursor", "cc").Execute()
 
-	tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
-		return rp.TreeV2
+		tester.ResponseEq(
+			t, 200, tester.OKText, &types.GetRepoFileTreeResp{Files: []*types.File{{Name: "f1"}}},
+		)
 	})
-	tester.mocks.repo.EXPECT().TreeV2(mock.Anything, &types.GetTreeRequest{
-		Namespace:   "u",
-		Name:        "r",
-		Path:        "foo",
-		Ref:         "main",
-		RepoType:    types.ModelRepo,
-		CurrentUser: "u",
-		Limit:       5,
-		Cursor:      "cc",
-	}).Return(
-		&types.GetRepoFileTreeResp{Files: []*types.File{{Name: "f1"}}}, nil,
-	).Once()
-	tester.WithParam("path", "foo").WithParam("ref", "main").WithQuery("limit", "5")
-	tester.WithKV("repo_type", types.ModelRepo).WithUser().WithQuery("cursor", "cc").Execute()
 
-	tester.ResponseEq(
-		t, 200, tester.OKText, &types.GetRepoFileTreeResp{Files: []*types.File{{Name: "f1"}}},
-	)
+	t.Run("returns accepted while root repository data is syncing", func(t *testing.T) {
+		tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
+			return rp.TreeV2
+		})
+		tester.mocks.repo.EXPECT().TreeV2(mock.Anything, mock.Anything).Return(nil, errorx.ErrGitFileNotFound)
+		tester.mocks.mirror.EXPECT().MirrorFromSaasStatus(tester.Ctx(), types.MirrorFromSaasStatusReq{
+			Namespace: "u", Name: "r", RepoType: types.ModelRepo, CurrentUser: "u",
+		}).Return(&types.MirrorSyncStatusResponse{
+			TaskID: 30, Status: types.MirrorRepoSyncStart, Phase: types.MirrorSyncPhaseRepo,
+		}, nil)
+		remoteTree := &types.GetRepoFileTreeResp{
+			Files:  []*types.File{{Name: "config.json", Path: "config.json", Size: 42}},
+			Cursor: "next",
+		}
+		tester.mocks.repo.EXPECT().RemoteTree(tester.Ctx(), mock.Anything).Return(remoteTree, nil)
+
+		tester.WithParam("ref", "main").WithKV("repo_type", types.ModelRepo).WithUser().Execute()
+
+		tester.ResponseEqSimple(t, http.StatusAccepted, httpbase.R{
+			Code: "MIRROR-ERR-1",
+			Msg:  "MIRROR-ERR-1: repository synchronization is in progress",
+			Data: remoteTree,
+			Context: map[string]interface{}{
+				"task_id": int64(30), "status": types.MirrorRepoSyncStart,
+			},
+		})
+	})
+
+	t.Run("returns conflict after root repository sync terminates", func(t *testing.T) {
+		tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
+			return rp.TreeV2
+		})
+		tester.mocks.repo.EXPECT().TreeV2(mock.Anything, mock.Anything).Return(nil, errorx.ErrGitCommitNotFound)
+		tester.mocks.mirror.EXPECT().MirrorFromSaasStatus(tester.Ctx(), types.MirrorFromSaasStatusReq{
+			Namespace: "u", Name: "r", RepoType: types.ModelRepo, CurrentUser: "u",
+		}).Return(&types.MirrorSyncStatusResponse{
+			TaskID: 30, Status: types.MirrorRepoSyncFailed, Phase: types.MirrorSyncPhaseRepo,
+			Terminal: true, FailureReason: types.MirrorSyncFailureRepoRetryExhausted,
+		}, nil)
+
+		tester.WithParam("ref", "main").WithKV("repo_type", types.ModelRepo).WithUser().Execute()
+
+		tester.ResponseEqSimple(t, http.StatusConflict, httpbase.R{
+			Code: "MIRROR-ERR-2",
+			Msg:  "MIRROR-ERR-2: repository synchronization failed",
+			Context: map[string]interface{}{
+				"task_id": int64(30), "status": types.MirrorRepoSyncFailed,
+			},
+		})
+	})
+
+	t.Run("reports cancellation when root repository sync is cancelled", func(t *testing.T) {
+		tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
+			return rp.TreeV2
+		})
+		tester.mocks.repo.EXPECT().TreeV2(mock.Anything, mock.Anything).Return(nil, errorx.ErrGitCommitNotFound)
+		tester.mocks.mirror.EXPECT().MirrorFromSaasStatus(tester.Ctx(), types.MirrorFromSaasStatusReq{
+			Namespace: "u", Name: "r", RepoType: types.ModelRepo, CurrentUser: "u",
+		}).Return(&types.MirrorSyncStatusResponse{
+			TaskID: 31, Status: types.MirrorCanceled, Phase: types.MirrorSyncPhaseDone,
+			Terminal: true, FailureReason: types.MirrorSyncFailureCanceled,
+		}, nil)
+
+		tester.WithParam("ref", "main").WithKV("repo_type", types.ModelRepo).WithUser().Execute()
+
+		tester.ResponseEqSimple(t, http.StatusConflict, httpbase.R{
+			Code: "MIRROR-ERR-4",
+			Msg:  "MIRROR-ERR-4: repository synchronization was canceled",
+			Context: map[string]interface{}{
+				"task_id": int64(31), "status": types.MirrorCanceled,
+				"failure_reason": types.MirrorSyncFailureCanceled,
+			},
+		})
+	})
+
+	t.Run("preserves nested file not found behavior", func(t *testing.T) {
+		tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
+			return rp.TreeV2
+		})
+		tester.mocks.repo.EXPECT().TreeV2(mock.Anything, mock.Anything).Return(nil, errorx.ErrGitFileNotFound)
+
+		tester.WithParam("path", "missing").WithParam("ref", "main").WithKV("repo_type", types.ModelRepo).WithUser().Execute()
+
+		tester.ResponseEqCode(t, http.StatusOK)
+	})
 }
 
 func TestRepoHandler_LogsTree(t *testing.T) {

@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"math/rand/v2"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -22,10 +23,18 @@ import (
 // considers a job eligible for stuck-job rescue.
 const workClientRescueStuckJobsAfter = MirrorLFSJobTimeout + (5 * time.Minute)
 
-// JobClient enqueues workhub jobs from services that already own their database
-// connection. It is intended for transactional job creation and cancellation;
-// use a worker client created by NewWorkClient when a process needs to start or
-// stop workers.
+const (
+	// defaultJobMaxAttempts allows one initial execution and three retries.
+	defaultJobMaxAttempts = 4
+	// workClientRetryStep is added for each failed execution.
+	workClientRetryStep = 5 * time.Minute
+	// workClientRetryJitter spreads retries by ten percent around their base delay.
+	workClientRetryJitter = 0.1
+)
+
+// JobClient creates and cancels workhub jobs through the application's database
+// connection. Use a worker client created by NewWorkClient when a process needs
+// to start or stop workers.
 type JobClient interface {
 	// Insert enqueues a job outside an existing database transaction.
 	Insert(ctx context.Context, args JobArgs, opts *InsertOpts) (int64, error)
@@ -41,8 +50,10 @@ type JobClient interface {
 type WorkClient interface {
 	// Start begins polling queues and executing registered workers.
 	Start(ctx context.Context) error
-	// Stop drains the River client and releases owned database resources.
+	// Stop cancels in-progress work, stops the River client, and releases owned database resources.
 	Stop(ctx context.Context) error
+	// ConfigureUrgentManager creates and binds a process-local urgent manager.
+	ConfigureUrgentManager(config UrgentManagerConfig) *UrgentManager
 }
 
 // JobArgs is the River job payload contract accepted by workhub queue clients.
@@ -51,7 +62,7 @@ type JobArgs = river.JobArgs
 // InsertOpts mirrors river.InsertOpts so callers do not need to import River
 // when they only enqueue workhub jobs.
 type InsertOpts struct {
-	// MaxAttempts limits how many times River retries a failed job.
+	// MaxAttempts limits total executions, including the initial attempt.
 	MaxAttempts int
 	// Metadata stores caller-defined JSON metadata alongside the job.
 	Metadata []byte
@@ -75,12 +86,12 @@ func (opts *InsertOpts) riverInsertOpts() *river.InsertOpts {
 		return nil
 	}
 	if opts.MaxAttempts <= 0 {
-		opts.MaxAttempts = 12
+		opts.MaxAttempts = defaultJobMaxAttempts
 	}
 	// River only accepts priorities from 1 to 4. Legacy mirror rows may still
 	// contain the old priority scale, so fall back to a valid normal priority.
 	if opts.Priority < 1 || opts.Priority > 4 {
-		opts.Priority = 3
+		opts.Priority = 4
 	}
 	return &river.InsertOpts{
 		MaxAttempts: opts.MaxAttempts,
@@ -93,9 +104,19 @@ func (opts *InsertOpts) riverInsertOpts() *river.InsertOpts {
 	}
 }
 
-// jobClient adapts a database/sql River client to the workhub JobClient API. It
-// is only intended for transactional job operations and does not start worker
-// processing; use a work client when a process needs to run workers.
+// linearJitterRetryPolicy schedules retries in five-minute linear steps with ten-percent jitter.
+type linearJitterRetryPolicy struct{}
+
+// NextRetry returns the next retry time using River's persisted error count.
+func (*linearJitterRetryPolicy) NextRetry(job *rivertype.JobRow) time.Time {
+	retry := len(job.Errors) + 1
+	baseDelay := time.Duration(retry) * workClientRetryStep
+	jitter := rand.Float64()*2*workClientRetryJitter - workClientRetryJitter
+	return time.Now().UTC().Add(time.Duration(float64(baseDelay) * (1 + jitter)))
+}
+
+// jobClient adapts a database/sql River client to transactional job operations.
+// It does not start worker processing.
 type jobClient struct {
 	client *river.Client[*sql.Tx]
 }
@@ -104,14 +125,14 @@ type jobClient struct {
 // is only intended for worker Start and Stop operations and does not support
 // Insert or InsertTx; use NewJobClient when a caller needs to enqueue jobs.
 type workClient struct {
-	client *river.Client[pgx.Tx]
-	pool   *pgxpool.Pool
+	client        *river.Client[pgx.Tx]
+	pool          *pgxpool.Pool
+	urgentManager *UrgentManager
 }
 
 // NewJobClient creates a queue client backed by the application's existing Bun
-// database handle. The returned client is only intended for job creation and
-// cancellation; use a work client constructor when a process needs to start or
-// stop workers.
+// database handle. It supports job creation and cancellation; use a work client
+// constructor when a process needs to start or stop workers.
 func NewJobClient(_ context.Context, db *bun.DB) (JobClient, error) {
 	client, err := river.NewClient(riverdatabasesql.New(db.DB), &river.Config{
 		SkipUnknownJobCheck: true,
@@ -120,9 +141,7 @@ func NewJobClient(_ context.Context, db *bun.DB) (JobClient, error) {
 		return nil, fmt.Errorf("create workhub client: %w", err)
 	}
 
-	return &jobClient{
-		client: client,
-	}, nil
+	return &jobClient{client: client}, nil
 }
 
 // NewWorkClient creates a worker client for a specific River configuration and
@@ -137,6 +156,8 @@ func NewWorkClient(ctx context.Context, dsn string, config *river.Config) (WorkC
 
 	config.SkipUnknownJobCheck = true
 	config.RescueStuckJobsAfter = workClientRescueStuckJobsAfter
+	config.DiscardedJobRetentionPeriod = -1
+	config.RetryPolicy = &linearJitterRetryPolicy{}
 	client, err := river.NewClient(riverpgxv5.New(dbPool), config)
 	if err != nil {
 		dbPool.Close()
@@ -178,6 +199,24 @@ func (c *jobClient) JobCancelTx(ctx context.Context, tx *sql.Tx, jobID int64) er
 	return nil
 }
 
+// RemoveQueue stops one queue producer on this client and waits for claimed work to exit.
+func (c *workClient) RemoveQueue(ctx context.Context, queue string) error {
+	return c.client.Queues().Remove(ctx, queue)
+}
+
+// AddQueue starts one queue producer on this client.
+func (c *workClient) AddQueue(queue string, config river.QueueConfig) error {
+	return c.client.Queues().Add(queue, config)
+}
+
+// ConfigureUrgentManager creates an urgent manager controlled by this River client.
+func (c *workClient) ConfigureUrgentManager(config UrgentManagerConfig) *UrgentManager {
+	config.QueueController = c
+	manager := NewUrgentManager(config)
+	c.urgentManager = manager
+	return manager
+}
+
 // Start starts the River client.
 func (c *workClient) Start(ctx context.Context) error {
 	if err := c.client.Start(ctx); err != nil {
@@ -186,11 +225,19 @@ func (c *workClient) Start(ctx context.Context) error {
 	return nil
 }
 
-// Stop stops the River client and closes its database pool.
-func (c *workClient) Stop(ctx context.Context) error {
-	if err := c.client.Stop(ctx); err != nil {
+// stopWorkClient closes the owned pool only after River has stopped successfully.
+func stopWorkClient(ctx context.Context, stopAndCancel func(context.Context) error, closePool func()) error {
+	if err := stopAndCancel(ctx); err != nil {
 		return fmt.Errorf("stop workhub work client: %w", err)
 	}
-	c.pool.Close()
+	closePool()
 	return nil
+}
+
+// Stop cancels in-progress work, stops the River client, and closes its database pool.
+func (c *workClient) Stop(ctx context.Context) error {
+	if c.urgentManager != nil {
+		c.urgentManager.Close(ErrWorkerShutdown)
+	}
+	return stopWorkClient(ctx, c.client.StopAndCancel, c.pool.Close)
 }

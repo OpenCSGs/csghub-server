@@ -157,7 +157,7 @@ func TestManagerComponentListTasksGroupsRunningAndWaitingTasks(t *testing.T) {
 		Return([]database.MirrorTask{{
 			ID:       3,
 			MirrorID: 4,
-			Priority: types.P3MirrorPriority,
+			Priority: types.MediumMirrorPriority,
 			Mirror: &database.Mirror{
 				SourceUrl:  "https://example.com/b.git",
 				Repository: repo,

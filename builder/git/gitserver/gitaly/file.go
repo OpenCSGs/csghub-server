@@ -962,12 +962,13 @@ func (c *Client) GetRepoAllFiles(ctx context.Context, req gitserver.GetRepoAllFi
 	return files, nil
 }
 
+// GetRepoAllLfsPointers returns every LFS pointer reachable in the requested repository revision.
 func (c *Client) GetRepoAllLfsPointers(ctx context.Context, req gitserver.GetRepoAllFilesReq) ([]*types.LFSPointer, error) {
 	var pointers []*types.LFSPointer
 	ctx, cancel := context.WithTimeout(ctx, c.treeTimeout)
 	defer cancel()
 
-	relativePath, err := c.BuildRelativePath(ctx, req.RepoType, req.Namespace, req.Name)
+	relativePath, err := c.resolveRelativePath(ctx, req.RelativePath, req.RepoType, req.Namespace, req.Name)
 	if err != nil {
 		return nil, err
 	}

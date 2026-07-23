@@ -94,11 +94,12 @@ func (c *Client) GetRepoCommits(ctx context.Context, req gitserver.GetRepoCommit
 	return commits, repoPageOpts, nil
 }
 
+// GetRepoLastCommit returns the commit at the requested repository revision.
 func (c *Client) GetRepoLastCommit(ctx context.Context, req gitserver.GetRepoLastCommitReq) (*types.Commit, error) {
 	var commit types.Commit
 	ctx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
-	relativePath, err := c.BuildRelativePath(ctx, req.RepoType, req.Namespace, req.Name)
+	relativePath, err := c.resolveRelativePath(ctx, req.RelativePath, req.RepoType, req.Namespace, req.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -293,11 +294,12 @@ func (c *Client) GetSingleCommit(ctx context.Context, req gitserver.GetRepoLastC
 	return &result, nil
 }
 
+// GetDiffBetweenTwoCommits builds callback metadata for changes between two revisions.
 func (c *Client) GetDiffBetweenTwoCommits(ctx context.Context, req gitserver.GetDiffBetweenTwoCommitsReq) (*types.GiteaCallbackPushReq, error) {
 	repoType := fmt.Sprintf("%ss", string(req.RepoType))
 	ctx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
-	relativePath, err := c.BuildRelativePath(ctx, req.RepoType, req.Namespace, req.Name)
+	relativePath, err := c.resolveRelativePath(ctx, req.RelativePath, req.RepoType, req.Namespace, req.Name)
 	if err != nil {
 		return nil, err
 	}

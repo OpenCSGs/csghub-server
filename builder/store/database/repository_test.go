@@ -20,6 +20,34 @@ import (
 	"opencsg.com/csghub-server/common/types"
 )
 
+// TestRepositoryGitalyPath verifies mirror workers derive both legacy and hashed storage paths from loaded metadata.
+func TestRepositoryGitalyPath(t *testing.T) {
+	t.Run("legacy path", func(t *testing.T) {
+		repo := database.Repository{
+			RepositoryType: types.ModelRepo,
+			Path:           "NameSpace/RepoName",
+		}
+
+		require.Equal(t, "models_namespace/reponame.git", repo.GitalyPath())
+	})
+
+	t.Run("hashed path", func(t *testing.T) {
+		repo := database.Repository{
+			ID:             123,
+			RepositoryType: types.ModelRepo,
+			Path:           "namespace/repo",
+			Hashed:         true,
+		}
+		digest := database.SHA256("123")
+
+		require.Equal(
+			t,
+			fmt.Sprintf("%s/%s/%s/%s.git", database.HashedRepoPathPrefix, digest[:2], digest[2:4], digest),
+			repo.GitalyPath(),
+		)
+	})
+}
+
 func TestRepoStore_CRUD(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()

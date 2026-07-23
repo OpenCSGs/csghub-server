@@ -12,6 +12,7 @@ import (
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/git/membership"
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
 
@@ -66,6 +67,7 @@ func TestCodeComponent_Create(t *testing.T) {
 	cc.mocks.components.repo.EXPECT().CreateRepo(ctx, crq).Return(
 		nil, dbrepo, &gitserver.CommitFilesReq{}, nil,
 	)
+
 	cc.mocks.gitServer.EXPECT().CommitFiles(ctx, gitserver.CommitFilesReq{}).Return(nil)
 	cc.mocks.stores.CodeMock().EXPECT().CreateAndUpdateRepoPath(ctx, database.Code{
 		Repository:   dbrepo,
@@ -100,13 +102,15 @@ func TestCodeComponent_Index(t *testing.T) {
 	repos := []*database.Repository{
 		{ID: 1, Name: "r1", Tags: []database.Tag{{Name: "t1"}}},
 		{ID: 2, Name: "r2"},
+		{ID: 5, Name: "r2"},
 	}
 	cc.mocks.components.repo.EXPECT().PublicToUser(ctx, types.CodeRepo, "user", filter, 10, 1).Return(
 		repos, 100, nil,
 	)
-	cc.mocks.stores.CodeMock().EXPECT().ByRepoIDs(ctx, []int64{1, 2}).Return([]database.Code{
+	cc.mocks.stores.CodeMock().EXPECT().ByRepoIDs(ctx, []int64{1, 2, 5}).Return([]database.Code{
 		{ID: 11, RepositoryID: 2, Repository: &database.Repository{ID: 2, Name: "r2", Mirror: database.Mirror{}}},
 		{ID: 12, RepositoryID: 1, Repository: &database.Repository{ID: 2, Name: "r2", Mirror: database.Mirror{}}},
+		{ID: 13, RepositoryID: 6},
 	}, nil)
 
 	data, total, err := cc.Index(ctx, filter, 10, 1, false)
@@ -306,6 +310,7 @@ func TestCodeComponent_OrgCodes(t *testing.T) {
 
 }
 
+// TestCodeComponent_CreateWithGitURL verifies embedded source credentials are normalized before mirror creation.
 func TestCodeComponent_CreateWithGitURL(t *testing.T) {
 	ctx := context.TODO()
 	cc := initializeTestCodeComponent(ctx, t)
@@ -318,9 +323,7 @@ func TestCodeComponent_CreateWithGitURL(t *testing.T) {
 			License:   "l",
 			Readme:    "r",
 		},
-		GitURL:      "https://github.com/test/test.git",
-		GitUsername: "testuser",
-		GitPassword: "testpass",
+		GitURL: "https://testuser:testpass@github.com/test/test",
 	}
 	dbrepo := &database.Repository{
 		ID:   1,
@@ -366,7 +369,7 @@ func TestCodeComponent_CreateWithGitURL(t *testing.T) {
 	mirrorComponent.EXPECT().CreateMirror(ctx, mock.MatchedBy(func(req types.CreateMirrorReq) bool {
 		return req.Namespace == "ns" &&
 			req.Name == "n" &&
-			req.SourceUrl == "https://testuser:testpass@github.com/test/test.git" &&
+			req.SourceUrl == "https://github.com/test/test.git" &&
 			req.Username == "testuser" &&
 			req.AccessToken == "testpass" &&
 			req.RepoType == types.CodeRepo
@@ -396,4 +399,18 @@ func TestCodeComponent_CreateWithGitURL(t *testing.T) {
 		Tags: []types.RepoTag{{Name: "t1"}},
 	}, resp)
 	wg.Wait()
+}
+
+// TestCodeComponent_CreateRejectsIncompleteMirrorCredentials verifies validation happens before repository creation.
+func TestCodeComponent_CreateRejectsIncompleteMirrorCredentials(t *testing.T) {
+	ctx := context.TODO()
+	cc := initializeTestCodeComponent(ctx, t)
+
+	_, err := cc.Create(ctx, &types.CreateCodeReq{
+		CreateRepoReq: types.CreateRepoReq{Username: "user", Namespace: "ns", Name: "repo"},
+		GitURL:        "https://example.com/source.git",
+		GitUsername:   "source-user",
+	})
+
+	require.ErrorIs(t, err, errorx.ErrMirrorSourceRepoAuthInvalid)
 }

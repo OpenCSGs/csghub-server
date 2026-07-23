@@ -1,5 +1,20 @@
 {
     "error.MIRROR-ERR-0": {
         "other": "目标仓库已绑定其他镜像源。"
+    },
+    "error.MIRROR-ERR-1": {
+        "other": "仓库正在同步中。"
+    },
+    "error.MIRROR-ERR-2": {
+        "other": "仓库同步失败。"
+    },
+    "error.MIRROR-ERR-3": {
+        "other": "镜像任务状态异常。"
+    },
+    "error.MIRROR-ERR-4": {
+        "other": "仓库同步已取消。"
+    },
+    "error.MIRROR-ERR-5": {
+        "other": "源仓库鉴权信息错误。"
     }
 }

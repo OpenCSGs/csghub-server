@@ -1,5 +1,20 @@
 {
     "error.MIRROR-ERR-0": {
         "other": "目標倉庫已綁定其他鏡像源。"
+    },
+    "error.MIRROR-ERR-1": {
+        "other": "倉庫正在同步中。"
+    },
+    "error.MIRROR-ERR-2": {
+        "other": "倉庫同步失敗。"
+    },
+    "error.MIRROR-ERR-3": {
+        "other": "鏡像任務狀態異常。"
+    },
+    "error.MIRROR-ERR-4": {
+        "other": "倉庫同步已取消。"
+    },
+    "error.MIRROR-ERR-5": {
+        "other": "源倉庫鑒權信息錯誤。"
     }
 }

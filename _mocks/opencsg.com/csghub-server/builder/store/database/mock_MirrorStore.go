@@ -7,7 +7,6 @@ import (
 
 	mock "github.com/stretchr/testify/mock"
 	database "opencsg.com/csghub-server/builder/store/database"
-
 	types "opencsg.com/csghub-server/common/types"
 )
 
@@ -700,6 +699,72 @@ func (_c *MockMirrorStore_Finished_Call) Return(_a0 []database.Mirror, _a1 error
 }
 
 func (_c *MockMirrorStore_Finished_Call) RunAndReturn(run func(context.Context) ([]database.Mirror, error)) *MockMirrorStore_Finished_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// IndexSyncWithPagination provides a mock function with given fields: ctx, query
+func (_m *MockMirrorStore) IndexSyncWithPagination(ctx context.Context, query database.MirrorSyncListQuery) ([]database.Mirror, int, error) {
+	ret := _m.Called(ctx, query)
+
+	if len(ret) == 0 {
+		panic("no return value specified for IndexSyncWithPagination")
+	}
+
+	var r0 []database.Mirror
+	var r1 int
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, database.MirrorSyncListQuery) ([]database.Mirror, int, error)); ok {
+		return rf(ctx, query)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, database.MirrorSyncListQuery) []database.Mirror); ok {
+		r0 = rf(ctx, query)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]database.Mirror)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, database.MirrorSyncListQuery) int); ok {
+		r1 = rf(ctx, query)
+	} else {
+		r1 = ret.Get(1).(int)
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, database.MirrorSyncListQuery) error); ok {
+		r2 = rf(ctx, query)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
+// MockMirrorStore_IndexSyncWithPagination_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'IndexSyncWithPagination'
+type MockMirrorStore_IndexSyncWithPagination_Call struct {
+	*mock.Call
+}
+
+// IndexSyncWithPagination is a helper method to define mock.On call
+//   - ctx context.Context
+//   - query database.MirrorSyncListQuery
+func (_e *MockMirrorStore_Expecter) IndexSyncWithPagination(ctx interface{}, query interface{}) *MockMirrorStore_IndexSyncWithPagination_Call {
+	return &MockMirrorStore_IndexSyncWithPagination_Call{Call: _e.mock.On("IndexSyncWithPagination", ctx, query)}
+}
+
+func (_c *MockMirrorStore_IndexSyncWithPagination_Call) Run(run func(ctx context.Context, query database.MirrorSyncListQuery)) *MockMirrorStore_IndexSyncWithPagination_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(database.MirrorSyncListQuery))
+	})
+	return _c
+}
+
+func (_c *MockMirrorStore_IndexSyncWithPagination_Call) Return(_a0 []database.Mirror, _a1 int, _a2 error) *MockMirrorStore_IndexSyncWithPagination_Call {
+	_c.Call.Return(_a0, _a1, _a2)
+	return _c
+}
+
+func (_c *MockMirrorStore_IndexSyncWithPagination_Call) RunAndReturn(run func(context.Context, database.MirrorSyncListQuery) ([]database.Mirror, int, error)) *MockMirrorStore_IndexSyncWithPagination_Call {
 	_c.Call.Return(run)
 	return _c
 }

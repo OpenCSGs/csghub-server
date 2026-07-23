@@ -50,7 +50,7 @@ func (c *Client) CreateMirrorRepo(ctx context.Context, req gitserver.CreateMirro
 	}
 
 	if req.Username != "" && req.AccessToken != "" {
-		authorHeader = base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", req.Username, req.AccessToken)))
+		authorHeader = "Basic " + base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", req.Username, req.AccessToken)))
 	}
 
 	if req.MirrorToken != "" {
@@ -90,7 +90,7 @@ func (c *Client) CreateMirrorForExistsRepo(ctx context.Context, req gitserver.Cr
 	}
 
 	if req.Username != "" && req.AccessToken != "" {
-		authorHeader = base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", req.Username, req.AccessToken)))
+		authorHeader = "Basic " + base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", req.Username, req.AccessToken)))
 	}
 
 	if authorHeader != "" {
@@ -104,16 +104,13 @@ func (c *Client) CreateMirrorForExistsRepo(ctx context.Context, req gitserver.Cr
 	return nil
 }
 
-func (c *Client) GetMirrorTaskInfo(ctx context.Context, taskId int64) (*gitserver.MirrorTaskInfo, error) {
-	return nil, nil
-}
-
+// MirrorSync fetches remote refs into staging before publishing them to the local repository.
 func (c *Client) MirrorSync(ctx context.Context, req gitserver.MirrorSyncReq) error {
 	stagingPrefix := "refs/staging"
 	ctx, cancel := context.WithTimeout(ctx, c.gitFetchTimeout)
 	defer cancel()
 
-	relativePath, err := c.BuildRelativePath(ctx, req.RepoType, req.Namespace, req.Name)
+	relativePath, err := c.resolveRelativePath(ctx, req.RelativePath, req.RepoType, req.Namespace, req.Name)
 	if err != nil {
 		return err
 	}
@@ -136,6 +133,10 @@ func (c *Client) MirrorSync(ctx context.Context, req gitserver.MirrorSyncReq) er
 
 	if req.MirrorToken != "" {
 		fetchRemoteReq.RemoteParams.HttpAuthorizationHeader = fmt.Sprintf("X-OPENCSG-Sync-Token%s", req.MirrorToken)
+	} else if req.Username != "" && req.AccessToken != "" {
+		fetchRemoteReq.RemoteParams.HttpAuthorizationHeader = "Basic " + base64.StdEncoding.EncodeToString(
+			[]byte(fmt.Sprintf("%s:%s", req.Username, req.AccessToken)),
+		)
 	} else {
 		fetchRemoteReq.RemoteParams.HttpAuthorizationHeader = ""
 	}
