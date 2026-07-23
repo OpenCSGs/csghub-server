@@ -282,6 +282,22 @@
 - **错误名:** `needOldToken`
 - **描述:** 必须携带旧Token。
 
+---
+
+### `AUTH-ERR-14`
+
+- **错误代码:** `AUTH-ERR-14`
+- **错误名:** `noSourceTransferPermission`
+- **描述:** 用户对源命名空间没有写权限，无法将仓库从该命名空间转出。
+
+---
+
+### `AUTH-ERR-15`
+
+- **错误代码:** `AUTH-ERR-15`
+- **错误名:** `noTargetTransferPermission`
+- **描述:** 用户对目标命名空间没有写权限，无法将仓库转移到该命名空间。
+
 ## Collection 错误
 
 ### `COLL-ERR-0`
@@ -1105,6 +1121,30 @@
 - **错误代码:** `REQ-ERR-13`
 - **错误名:** `errTargetNamespaceNotFound`
 - **描述:** 指定的目标命名空间在系统中不存在。请在创建或更新映射之前确认命名空间存在。
+
+---
+
+### `REQ-ERR-14`
+
+- **错误代码:** `REQ-ERR-14`
+- **错误名:** `errTransferSameNamespace`
+- **描述:** 转移目标命名空间与当前命名空间相同，所有权转移需要不同的命名空间。
+
+---
+
+### `REQ-ERR-15`
+
+- **错误代码:** `REQ-ERR-15`
+- **错误名:** `errTransferTargetExists`
+- **描述:** 目标命名空间中已存在同名的仓库，由于命名冲突，无法进行转移。
+
+---
+
+### `REQ-ERR-16`
+
+- **错误代码:** `REQ-ERR-16`
+- **错误名:** `errTransferNotSupported`
+- **描述:** 该仓库不支持所有权转移，因为它没有哈希路径。只有具有哈希路径的仓库才支持所有权转移。
 
 ## Resource 错误
 

@@ -4191,6 +4191,53 @@ func (_c *MockRepoComponent_Tags_Call) RunAndReturn(run func(context.Context, *t
 	return _c
 }
 
+// TransferOwnership provides a mock function with given fields: ctx, req
+func (_m *MockRepoComponent) TransferOwnership(ctx context.Context, req types.TransferRepoReq) error {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for TransferOwnership")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.TransferRepoReq) error); ok {
+		r0 = rf(ctx, req)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockRepoComponent_TransferOwnership_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'TransferOwnership'
+type MockRepoComponent_TransferOwnership_Call struct {
+	*mock.Call
+}
+
+// TransferOwnership is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req types.TransferRepoReq
+func (_e *MockRepoComponent_Expecter) TransferOwnership(ctx interface{}, req interface{}) *MockRepoComponent_TransferOwnership_Call {
+	return &MockRepoComponent_TransferOwnership_Call{Call: _e.mock.On("TransferOwnership", ctx, req)}
+}
+
+func (_c *MockRepoComponent_TransferOwnership_Call) Run(run func(ctx context.Context, req types.TransferRepoReq)) *MockRepoComponent_TransferOwnership_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.TransferRepoReq))
+	})
+	return _c
+}
+
+func (_c *MockRepoComponent_TransferOwnership_Call) Return(_a0 error) *MockRepoComponent_TransferOwnership_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockRepoComponent_TransferOwnership_Call) RunAndReturn(run func(context.Context, types.TransferRepoReq) error) *MockRepoComponent_TransferOwnership_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Tree provides a mock function with given fields: ctx, req
 func (_m *MockRepoComponent) Tree(ctx context.Context, req *types.GetFileReq) ([]*types.File, error) {
 	ret := _m.Called(ctx, req)

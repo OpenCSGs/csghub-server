@@ -189,6 +189,7 @@ type RepoComponent interface {
 	ParseNDJson(ctx *gin.Context) (*types.CommitFilesReq, error)
 	IsSyncing(ctx context.Context, repoType types.RepositoryType, namespace, name string) (bool, error)
 	ChangePath(ctx context.Context, req types.ChangePathReq) error
+	TransferOwnership(ctx context.Context, req types.TransferRepoReq) error
 	BatchMigrateRepoToHashedPath(ctx context.Context, auto bool, batchSize int, lastID int64) (int64, error)
 	GetMirrorTaskStatus(repo *database.Repository) types.MirrorTaskStatus
 	CheckDeployPermissionForUser(ctx context.Context, deployReq types.DeployActReq) (*database.User, *database.Deploy, error)
@@ -2958,6 +2959,65 @@ func (c *repoComponentImpl) ChangePath(ctx context.Context, req types.ChangePath
 
 	repo.Path = req.NewPath
 	repo.GitPath = fmt.Sprintf("%ss_%s/%s", req.RepoType, newNamespace, newName)
+	repo.Hashed = true
+	_, err = c.repoStore.UpdateRepo(ctx, *repo)
+	if err != nil {
+		return fmt.Errorf("failed to update repo, error: %w", err)
+	}
+
+	return nil
+}
+
+func (c *repoComponentImpl) TransferOwnership(ctx context.Context, req types.TransferRepoReq) error {
+	repo, err := c.repoStore.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
+	if err != nil {
+		return fmt.Errorf("failed to find repo, error: %w", err)
+	}
+
+	// Check write permission on source namespace
+	canWriteSource, err := c.CheckCurrentUserPermission(ctx, req.CurrentUser, req.Namespace, membership.RoleWrite)
+	if err != nil {
+		return fmt.Errorf("failed to check source namespace permission, error: %w", err)
+	}
+	if !canWriteSource {
+		return errorx.ErrNoSourceTransferPermission
+	}
+
+	// Check write permission on target namespace
+	canWriteTarget, err := c.CheckCurrentUserPermission(ctx, req.CurrentUser, req.NewNamespace, membership.RoleWrite)
+	if err != nil {
+		return fmt.Errorf("failed to check target namespace permission, error: %w", err)
+	}
+	if !canWriteTarget {
+		return errorx.ErrNoTargetTransferPermission
+	}
+
+	// Prevent transfer to self
+	if req.NewNamespace == req.Namespace {
+		return errorx.ErrTransferSameNamespace
+	}
+
+	// Check new path doesn't already exist
+	_, err = c.repoStore.FindByPath(ctx, req.RepoType, req.NewNamespace, req.Name)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return fmt.Errorf("failed to check if new path exists, error: %w", err)
+	}
+	if err == nil {
+		return errorx.ErrTransferTargetExists
+	}
+
+	if !repo.Hashed {
+		return errorx.ErrTransferNotSupported
+	}
+
+	// Check for dependent entities that would be affected by path change
+	if err := c.checkChangePathDependencies(ctx, repo); err != nil {
+		return err
+	}
+
+	newPath := fmt.Sprintf("%s/%s", req.NewNamespace, req.Name)
+	repo.Path = newPath
+	repo.GitPath = fmt.Sprintf("%ss_%s/%s", req.RepoType, req.NewNamespace, req.Name)
 	repo.Hashed = true
 	_, err = c.repoStore.UpdateRepo(ctx, *repo)
 	if err != nil {

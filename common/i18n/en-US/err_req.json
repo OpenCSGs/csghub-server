@@ -17,6 +17,15 @@
     "error.REQ-ERR-13": {
         "other": "Target namespace not found"
     },
+    "error.REQ-ERR-14": {
+        "other": "New namespace must be different from current namespace"
+    },
+    "error.REQ-ERR-15": {
+        "other": "A repository with the same name already exists in the target namespace"
+    },
+    "error.REQ-ERR-16": {
+        "other": "Repository not supported to transfer ownership"
+    },
     "error.REQ-ERR-2": {
         "other": "Request body cannot be empty"
     },

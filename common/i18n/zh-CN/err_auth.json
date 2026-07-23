@@ -17,6 +17,12 @@
     "error.AUTH-ERR-13": {
         "other": "必须携带旧Token"
     },
+    "error.AUTH-ERR-14": {
+        "other": "用户没有权限从此命名空间转移仓库"
+    },
+    "error.AUTH-ERR-15": {
+        "other": "用户没有权限将仓库转移到此命名空间"
+    },
     "error.AUTH-ERR-2": {
         "other": "访问被禁止，权限不足"
     },

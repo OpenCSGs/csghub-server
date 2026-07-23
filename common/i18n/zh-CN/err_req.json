@@ -17,6 +17,15 @@
     "error.REQ-ERR-13": {
         "other": "目标命名空间不存在"
     },
+    "error.REQ-ERR-14": {
+        "other": "新命名空间必须与当前命名空间不同"
+    },
+    "error.REQ-ERR-15": {
+        "other": "目标命名空间中已存在同名仓库"
+    },
+    "error.REQ-ERR-16": {
+        "other": "该仓库不支持转移所有权"
+    },
     "error.REQ-ERR-2": {
         "other": "请求体不能为空"
     },

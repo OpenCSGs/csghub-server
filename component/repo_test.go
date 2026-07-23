@@ -3495,6 +3495,254 @@ func TestRepoComponent_ChangePath_NewNamespaceExists(t *testing.T) {
 	require.NotNil(t, err)
 }
 
+func TestRepoComponent_TransferOwnership_Success(t *testing.T) {
+	ctx := context.Background()
+	repoComp := initializeTestRepoComponent(ctx, t)
+
+	// Mock source namespace (user type)
+	repoComp.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "sourceuser").
+		Return(database.Namespace{NamespaceType: database.UserNamespace}, nil)
+	// Mock target namespace (org type, user has write role via membership)
+	repoComp.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "targetorg").
+		Return(database.Namespace{NamespaceType: database.OrgNamespace}, nil)
+	// Mock current user (non-admin, username matches source = write permission on source)
+	repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "sourceuser").
+		Return(database.User{RoleMask: ""}, nil)
+	// Mock user has write role in target org
+	repoComp.mocks.userSvcClient.EXPECT().GetMemberRole(ctx, "targetorg", "sourceuser").
+		Return(membership.RoleWrite, nil)
+
+	// Mock source repo exists and is hashed
+	repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "sourceuser", "reponame").
+		Return(&database.Repository{ID: 1, Hashed: true, Path: "sourceuser/reponame", RepositoryType: types.ModelRepo}, nil)
+	// Mock target path does not exist
+	repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "targetorg", "reponame").
+		Return(nil, sql.ErrNoRows)
+
+	// Dependency checks - no blocking entities
+	repoComp.mocks.stores.DeployTaskMock().EXPECT().CountByRepoID(ctx, int64(1)).Return(0, nil)
+	repoComp.mocks.stores.WorkflowMock().EXPECT().CountByRepoPath(ctx, "sourceuser/reponame").Return(0, nil)
+	repoComp.mocks.stores.ViewerMock().EXPECT().GetViewerByRepoID(ctx, int64(1)).Return(nil, sql.ErrNoRows)
+	repoComp.mocks.stores.AccountSyncQuotaStatementMock().EXPECT().CountByRepoPath(ctx, "sourceuser/reponame").Return(0, nil)
+	repoComp.mocks.stores.AccountPriceMock().EXPECT().CountByResourceIDs(ctx, mock.Anything).Return(0, nil)
+
+	// Mock UpdateRepo
+	repoComp.mocks.stores.RepoMock().EXPECT().UpdateRepo(ctx, database.Repository{
+		ID:             1,
+		Path:           "targetorg/reponame",
+		GitPath:        "models_targetorg/reponame",
+		Hashed:         true,
+		RepositoryType: types.ModelRepo,
+	}).Return(nil, nil)
+
+	err := repoComp.TransferOwnership(ctx, types.TransferRepoReq{
+		RepoType:     types.ModelRepo,
+		Namespace:    "sourceuser",
+		Name:         "reponame",
+		NewNamespace: "targetorg",
+		CurrentUser:  "sourceuser",
+	})
+
+	require.Nil(t, err)
+}
+
+func TestRepoComponent_TransferOwnership_NoSourcePermission(t *testing.T) {
+	ctx := context.Background()
+	repoComp := initializeTestRepoComponent(ctx, t)
+
+	// Mock source namespace (user type, different from current user)
+	repoComp.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "otheruser").
+		Return(database.Namespace{NamespaceType: database.UserNamespace}, nil)
+	// Mock current user (non-admin, different from source namespace)
+	repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "currentuser").
+		Return(database.User{RoleMask: ""}, nil)
+
+	// Mock source repo exists
+	repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "otheruser", "reponame").
+		Return(&database.Repository{ID: 1}, nil)
+
+	err := repoComp.TransferOwnership(ctx, types.TransferRepoReq{
+		RepoType:     types.ModelRepo,
+		Namespace:    "otheruser",
+		Name:         "reponame",
+		NewNamespace: "targetuser",
+		CurrentUser:  "currentuser",
+	})
+
+	require.NotNil(t, err)
+	assert.True(t, errors.Is(err, errorx.ErrNoSourceTransferPermission))
+}
+
+func TestRepoComponent_TransferOwnership_NoTargetPermission(t *testing.T) {
+	ctx := context.Background()
+	repoComp := initializeTestRepoComponent(ctx, t)
+
+	// Mock source namespace (user type, current user matches = has permission)
+	repoComp.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "currentuser").
+		Return(database.Namespace{NamespaceType: database.UserNamespace}, nil)
+	// Mock target namespace (user type, different from current user = no permission)
+	repoComp.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "targetuser").
+		Return(database.Namespace{NamespaceType: database.UserNamespace}, nil)
+	// Mock current user
+	repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "currentuser").
+		Return(database.User{RoleMask: ""}, nil)
+
+	// Mock source repo exists
+	repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "currentuser", "reponame").
+		Return(&database.Repository{ID: 1}, nil)
+
+	err := repoComp.TransferOwnership(ctx, types.TransferRepoReq{
+		RepoType:     types.ModelRepo,
+		Namespace:    "currentuser",
+		Name:         "reponame",
+		NewNamespace: "targetuser",
+		CurrentUser:  "currentuser",
+	})
+
+	require.NotNil(t, err)
+	assert.True(t, errors.Is(err, errorx.ErrNoTargetTransferPermission))
+}
+
+func TestRepoComponent_TransferOwnership_SameNamespace(t *testing.T) {
+	ctx := context.Background()
+	repoComp := initializeTestRepoComponent(ctx, t)
+
+	// Mock source namespace (user type)
+	repoComp.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "sameuser").
+		Return(database.Namespace{NamespaceType: database.UserNamespace}, nil)
+	// Mock current user
+	repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "sameuser").
+		Return(database.User{RoleMask: ""}, nil)
+
+	// Mock source repo exists
+	repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "sameuser", "reponame").
+		Return(&database.Repository{ID: 1}, nil)
+
+	err := repoComp.TransferOwnership(ctx, types.TransferRepoReq{
+		RepoType:     types.ModelRepo,
+		Namespace:    "sameuser",
+		Name:         "reponame",
+		NewNamespace: "sameuser",
+		CurrentUser:  "sameuser",
+	})
+
+	require.NotNil(t, err)
+	assert.True(t, errors.Is(err, errorx.ErrTransferSameNamespace))
+}
+
+func TestRepoComponent_TransferOwnership_TargetExists(t *testing.T) {
+	ctx := context.Background()
+	repoComp := initializeTestRepoComponent(ctx, t)
+
+	// Mock source namespace
+	repoComp.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "sourceuser").
+		Return(database.Namespace{NamespaceType: database.UserNamespace}, nil)
+	// Mock target namespace (org type)
+	repoComp.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "targetorg").
+		Return(database.Namespace{NamespaceType: database.OrgNamespace}, nil)
+	// Mock current user
+	repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "sourceuser").
+		Return(database.User{RoleMask: ""}, nil)
+	// Mock user has write role in target org
+	repoComp.mocks.userSvcClient.EXPECT().GetMemberRole(ctx, "targetorg", "sourceuser").
+		Return(membership.RoleWrite, nil)
+
+	// Mock source repo exists and is hashed
+	repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "sourceuser", "reponame").
+		Return(&database.Repository{ID: 1, Hashed: true}, nil)
+	// Mock target path already exists
+	repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "targetorg", "reponame").
+		Return(&database.Repository{ID: 2}, nil)
+
+	err := repoComp.TransferOwnership(ctx, types.TransferRepoReq{
+		RepoType:     types.ModelRepo,
+		Namespace:    "sourceuser",
+		Name:         "reponame",
+		NewNamespace: "targetorg",
+		CurrentUser:  "sourceuser",
+	})
+
+	require.NotNil(t, err)
+	assert.True(t, errors.Is(err, errorx.ErrTransferTargetExists))
+}
+
+func TestRepoComponent_TransferOwnership_NotHashed(t *testing.T) {
+	ctx := context.Background()
+	repoComp := initializeTestRepoComponent(ctx, t)
+
+	// Mock source namespace
+	repoComp.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "sourceuser").
+		Return(database.Namespace{NamespaceType: database.UserNamespace}, nil)
+	// Mock target namespace (org type)
+	repoComp.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "targetorg").
+		Return(database.Namespace{NamespaceType: database.OrgNamespace}, nil)
+	// Mock current user
+	repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "sourceuser").
+		Return(database.User{RoleMask: ""}, nil)
+	// Mock user has write role in target org
+	repoComp.mocks.userSvcClient.EXPECT().GetMemberRole(ctx, "targetorg", "sourceuser").
+		Return(membership.RoleWrite, nil)
+
+	// Mock source repo exists but NOT hashed
+	repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "sourceuser", "reponame").
+		Return(&database.Repository{ID: 1, Hashed: false}, nil)
+	// Mock target path does not exist
+	repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "targetorg", "reponame").
+		Return(nil, sql.ErrNoRows)
+
+	err := repoComp.TransferOwnership(ctx, types.TransferRepoReq{
+		RepoType:     types.ModelRepo,
+		Namespace:    "sourceuser",
+		Name:         "reponame",
+		NewNamespace: "targetorg",
+		CurrentUser:  "sourceuser",
+	})
+
+	require.NotNil(t, err)
+	assert.True(t, errors.Is(err, errorx.ErrTransferNotSupported))
+}
+
+func TestRepoComponent_TransferOwnership_DependencyExists(t *testing.T) {
+	ctx := context.Background()
+	repoComp := initializeTestRepoComponent(ctx, t)
+
+	// Mock source namespace
+	repoComp.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "sourceuser").
+		Return(database.Namespace{NamespaceType: database.UserNamespace}, nil)
+	// Mock target namespace (org type)
+	repoComp.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "targetorg").
+		Return(database.Namespace{NamespaceType: database.OrgNamespace}, nil)
+	// Mock current user
+	repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "sourceuser").
+		Return(database.User{RoleMask: ""}, nil)
+	// Mock user has write role in target org
+	repoComp.mocks.userSvcClient.EXPECT().GetMemberRole(ctx, "targetorg", "sourceuser").
+		Return(membership.RoleWrite, nil)
+
+	// Mock source repo exists and is hashed
+	repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "sourceuser", "reponame").
+		Return(&database.Repository{ID: 1, Hashed: true, Path: "sourceuser/reponame", RepositoryType: types.ModelRepo}, nil)
+	// Mock target path does not exist
+	repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "targetorg", "reponame").
+		Return(nil, sql.ErrNoRows)
+
+	// Has deploy tasks - blocks the transfer and short-circuits remaining checks
+	repoComp.mocks.stores.DeployTaskMock().EXPECT().CountByRepoID(ctx, int64(1)).Return(5, nil)
+
+	err := repoComp.TransferOwnership(ctx, types.TransferRepoReq{
+		RepoType:     types.ModelRepo,
+		Namespace:    "sourceuser",
+		Name:         "reponame",
+		NewNamespace: "targetorg",
+		CurrentUser:  "sourceuser",
+	})
+
+	require.NotNil(t, err)
+	require.Contains(t, err.Error(), "cannot change path")
+	require.Contains(t, err.Error(), "the following dependent entities exist: deploy tasks")
+	require.True(t, errors.Is(err, errorx.ErrChangePathBlocked))
+}
+
 func TestRepoComponent_ChangePath_DependencyExists(t *testing.T) {
 	ctx := context.Background()
 

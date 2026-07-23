@@ -22,6 +22,9 @@ const (
 	errLimitedIPLocation
 	errCaptchaIncorrect
 	errTargetNamespaceNotFound
+	errTransferSameNamespace
+	errTransferTargetExists
+	errTransferNotSupported
 )
 
 var (
@@ -162,6 +165,42 @@ var (
 	//
 	// zh-HK: 目標命名空間不存在
 	ErrTargetNamespaceNotFound = CustomError{prefix: errReqPrefix, code: errTargetNamespaceNotFound}
+	// the transfer target namespace is the same as the source namespace
+	//
+	// Description: The target namespace for transfer is the same as the current namespace. Ownership transfer requires a different namespace.
+	//
+	// Description_ZH: 转移目标命名空间与当前命名空间相同，所有权转移需要不同的命名空间。
+	//
+	// en-US: New namespace must be different from current namespace
+	//
+	// zh-CN: 新命名空间必须与当前命名空间不同
+	//
+	// zh-HK: 新命名空間必須與當前命名空間不同
+	ErrTransferSameNamespace = CustomError{prefix: errReqPrefix, code: errTransferSameNamespace}
+	// a repository with the same name already exists in the target namespace
+	//
+	// Description: A repository with the same name already exists in the target namespace. The transfer cannot proceed because of the naming conflict.
+	//
+	// Description_ZH: 目标命名空间中已存在同名的仓库，由于命名冲突，无法进行转移。
+	//
+	// en-US: A repository with the same name already exists in the target namespace
+	//
+	// zh-CN: 目标命名空间中已存在同名仓库
+	//
+	// zh-HK: 目標命名空間中已存在同名倉庫
+	ErrTransferTargetExists = CustomError{prefix: errReqPrefix, code: errTransferTargetExists}
+	// the repository is not supported for ownership transfer
+	//
+	// Description: The repository cannot be transferred because it does not have a hashed path. Only repositories with hashed paths support ownership transfer.
+	//
+	// Description_ZH: 该仓库不支持所有权转移，因为它没有哈希路径。只有具有哈希路径的仓库才支持所有权转移。
+	//
+	// en-US: Repository not supported to transfer ownership
+	//
+	// zh-CN: 该仓库不支持转移所有权
+	//
+	// zh-HK: 該倉庫不支持轉移所有權
+	ErrTransferNotSupported = CustomError{prefix: errReqPrefix, code: errTransferNotSupported}
 )
 
 func BadRequest(originErr error, ext context) error {

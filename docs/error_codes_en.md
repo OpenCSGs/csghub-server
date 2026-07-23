@@ -282,6 +282,22 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Name:** `needOldToken`
 - **Description:** Refreshing a token requires the old token.
 
+---
+
+### `AUTH-ERR-14`
+
+- **Error Code:** `AUTH-ERR-14`
+- **Error Name:** `noSourceTransferPermission`
+- **Description:** The user does not have write permission on the source namespace and cannot transfer the repository away from it.
+
+---
+
+### `AUTH-ERR-15`
+
+- **Error Code:** `AUTH-ERR-15`
+- **Error Name:** `noTargetTransferPermission`
+- **Description:** The user does not have write permission on the target namespace and cannot transfer the repository to it.
+
 ## Collection Errors
 
 ### `COLL-ERR-0`
@@ -1105,6 +1121,30 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Code:** `REQ-ERR-13`
 - **Error Name:** `errTargetNamespaceNotFound`
 - **Description:** The specified target namespace was not found in the system. Please verify the namespace exists before creating or updating the mapping.
+
+---
+
+### `REQ-ERR-14`
+
+- **Error Code:** `REQ-ERR-14`
+- **Error Name:** `errTransferSameNamespace`
+- **Description:** The target namespace for transfer is the same as the current namespace. Ownership transfer requires a different namespace.
+
+---
+
+### `REQ-ERR-15`
+
+- **Error Code:** `REQ-ERR-15`
+- **Error Name:** `errTransferTargetExists`
+- **Description:** A repository with the same name already exists in the target namespace. The transfer cannot proceed because of the naming conflict.
+
+---
+
+### `REQ-ERR-16`
+
+- **Error Code:** `REQ-ERR-16`
+- **Error Name:** `errTransferNotSupported`
+- **Description:** The repository cannot be transferred because it does not have a hashed path. Only repositories with hashed paths support ownership transfer.
 
 ## Resource Errors
 

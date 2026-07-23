@@ -397,6 +397,14 @@ type ChangePathReq struct {
 	CurrentUser string
 }
 
+type TransferRepoReq struct {
+	RepoType     RepositoryType `json:"-"`
+	Namespace    string         `json:"-"`
+	Name         string         `json:"-"`
+	NewNamespace string         `json:"new_namespace"`
+	CurrentUser  string         `json:"-"`
+}
+
 var validRepositoryTypes = map[RepositoryType]struct{}{
 	ModelRepo:     {},
 	DatasetRepo:   {},
