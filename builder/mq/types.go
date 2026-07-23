@@ -121,6 +121,13 @@ var (
 
 type MessageMeta struct {
 	Topic string
+	Acker MessageAcker
+}
+
+type MessageAcker interface {
+	Ack() error
+	Nak() error
+	InProgress() error
 }
 
 type MessageCallback func(raw []byte, meta MessageMeta) error
@@ -137,4 +144,8 @@ type SubscribeParams struct {
 	// MaxAge sets the stream's maximum message age.
 	// Zero value is handled by the message queue implementation.
 	MaxAge time.Duration
+	// AckWait configures how long JetStream waits for an explicit ACK.
+	AckWait time.Duration
+	// MaxDeliver configures how many times JetStream redelivers a message before stopping.
+	MaxDeliver int
 }

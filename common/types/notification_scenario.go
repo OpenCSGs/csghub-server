@@ -16,6 +16,7 @@ const (
 	MessageScenarioLowBalance           MessageScenario = "low-balance"
 	MessageScenarioRechargeSuccess      MessageScenario = "recharge-success"
 	MessageScenarioWeeklyRecharges      MessageScenario = "weekly-recharges"
+	MessageScenarioLLMLogSync           MessageScenario = "llmlog-sync"
 	MessageScenarioDeployment           MessageScenario = "deployment"
 	MessageScenarioNegativeBalance      MessageScenario = "negative-balance"
 	MessageScenarioResourceApplication  MessageScenario = "resource-application"

@@ -60,6 +60,7 @@ func (n *Nats) Subscribe(params SubscribeParams) error {
 			msg.Data(),
 			MessageMeta{
 				Topic: msg.Subject(),
+				Acker: msg,
 			},
 		)
 
@@ -70,7 +71,7 @@ func (n *Nats) Subscribe(params SubscribeParams) error {
 		if params.AutoACK {
 			action := ""
 			if err != nil && params.IsRedeliverForCBFailed {
-				err = msg.Ack()
+				err = msg.Nak()
 				action = "nak"
 			} else {
 				err = msg.Ack()
@@ -122,6 +123,8 @@ func (n *Nats) getOrCreateStreamConsumer(params SubscribeParams) (jetstream.Cons
 			FilterSubjects: params.Topics,
 			AckPolicy:      jetstream.AckExplicitPolicy,
 			DeliverPolicy:  jetstream.DeliverAllPolicy,
+			AckWait:        ackWaitOrDefault(params.AckWait),
+			MaxDeliver:     maxDeliverOrDefault(params.MaxDeliver),
 		})
 	if err != nil {
 		return nil, fmt.Errorf("[nats] failed to create or update consumer %s error: %w", params.Group.ConsumerName, err)
@@ -219,6 +222,20 @@ func (n *Nats) DeleteMessagesByFilter(streamName string, filter func(data []byte
 }
 
 func maxBytesOrDefault(v int64) int64 {
+	if v <= 0 {
+		return -1
+	}
+	return v
+}
+
+func ackWaitOrDefault(d time.Duration) time.Duration {
+	if d <= 0 {
+		return 30 * time.Second
+	}
+	return d
+}
+
+func maxDeliverOrDefault(v int) int {
 	if v <= 0 {
 		return -1
 	}
