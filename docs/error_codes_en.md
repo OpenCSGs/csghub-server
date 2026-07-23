@@ -354,6 +354,14 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Name:** `pendingApplicationExists`
 - **Description:** There is already a pending application for this dataset. Only one pending application is allowed per dataset at a time.
 
+## Deploy Errors
+
+### `DEPLOY-ERR-0`
+
+- **Error Code:** `DEPLOY-ERR-0`
+- **Error Name:** `codeDeployNameAlreadyExistsErr`
+- **Description:** A deploy with the same name already exists for this deploy type.
+
 ## Federation_adapter Errors
 
 ### `FEDAP-ERR-0`
