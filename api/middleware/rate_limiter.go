@@ -19,7 +19,6 @@ type rateLimitConfig struct {
 
 type rateLimiterOption struct {
 	alg             limiterAlgorithm
-	defaultLimit    int64
 	checkIP         bool
 	onLimitExceeded func(*gin.Context)
 	rateLimitConfig *rateLimitConfig
@@ -45,3 +44,11 @@ func WithRateLimitConfig(enable bool, limit, window int64) RateLimiterOption {
 		}
 	}
 }
+
+// WithLimiterAlgorithm allows injecting a custom rate limiting algorithm.
+func WithLimiterAlgorithm(alg limiterAlgorithm) RateLimiterOption {
+	return func(o *rateLimiterOption) {
+		o.alg = alg
+	}
+}
+
