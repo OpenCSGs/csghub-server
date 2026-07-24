@@ -861,7 +861,9 @@ func (h *RepoHandler) Tree(ctx *gin.Context) {
 // @Param        limit query int false "limit of records return"
 // @Param        cursor query string false "pagination cursor"
 // @Success      200  {object}  types.ResponseWithTotal{data=types.GetRepoFileTreeResp} "OK"
+// @Success      202  {object}  httpbase.R{data=types.GetRepoFileTreeResp} "Repository synchronization is in progress; data may be omitted when remote file metadata is unavailable"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      409  {object}  httpbase.R "Repository synchronization failed (MIRROR-ERR-2) or was canceled (MIRROR-ERR-4)"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /{repo_type}/{namespace}/{name}/refs/{ref}/tree/{path} [get]
 func (h *RepoHandler) TreeV2(ctx *gin.Context) {
@@ -884,6 +886,9 @@ func (h *RepoHandler) TreeV2(ctx *gin.Context) {
 	}
 	tree, err := h.c.TreeV2(ctx.Request.Context(), req)
 	if err != nil {
+		if isRootTreeGitNotFound(req, err) && h.respondMirrorTreeStatus(ctx, req) {
+			return
+		}
 		if errors.Is(err, errorx.ErrForbidden) {
 			httpbase.ForbiddenError(ctx, err)
 			return
@@ -902,6 +907,52 @@ func (h *RepoHandler) TreeV2(ctx *gin.Context) {
 	}
 
 	httpbase.OK(ctx, tree)
+}
+
+// isRootTreeGitNotFound identifies an unavailable root tree without changing nested-path errors.
+func isRootTreeGitNotFound(req *types.GetTreeRequest, err error) bool {
+	return strings.Trim(req.Path, "/") == "" &&
+		(errors.Is(err, errorx.ErrGitFileNotFound) || errors.Is(err, errorx.ErrGitCommitNotFound))
+}
+
+// respondMirrorTreeStatus translates an unavailable root tree only when the current repo phase explains it.
+func (h *RepoHandler) respondMirrorTreeStatus(ctx *gin.Context, req *types.GetTreeRequest) bool {
+	status, err := h.mirror.MirrorFromSaasStatus(ctx.Request.Context(), types.MirrorFromSaasStatusReq{
+		Namespace:   req.Namespace,
+		Name:        req.Name,
+		RepoType:    req.RepoType,
+		CurrentUser: req.CurrentUser,
+	})
+	if err != nil {
+		slog.DebugContext(ctx.Request.Context(), "Mirror status does not explain unavailable root tree", "error", err)
+		return false
+	}
+	errContext := errorx.Ctx().Set("task_id", status.TaskID).Set("status", status.Status)
+	if !status.RepoReady && !status.Terminal {
+		remoteTree, remoteErr := h.c.RemoteTree(ctx.Request.Context(), req)
+		if remoteErr != nil {
+			slog.DebugContext(ctx.Request.Context(), "Failed to get remote tree while repository is syncing", "error", remoteErr)
+		}
+		ctx.Header("Retry-After", "2")
+		httpbase.AcceptedWithExt(ctx, errorx.MirrorRepoSyncing(
+			errors.New("repository synchronization is in progress"), errContext,
+		), remoteTree)
+		return true
+	}
+	if !status.RepoReady && status.Terminal {
+		if status.FailureReason == types.MirrorSyncFailureCanceled {
+			errContext.Set("failure_reason", status.FailureReason)
+			httpbase.ConflictError(ctx, errorx.MirrorRepoSyncCanceled(
+				errors.New("repository synchronization was canceled"), errContext,
+			))
+			return true
+		}
+		httpbase.ConflictError(ctx, errorx.MirrorRepoSyncFailed(
+			errors.New("repository synchronization failed"), errContext,
+		))
+		return true
+	}
+	return false
 }
 
 // Get Logs Tree godoc
@@ -1339,6 +1390,7 @@ func (h *RepoHandler) CommitWithDiff(ctx *gin.Context) {
 // @Param        body body types.CreateMirrorParams true "body"
 // @Success      200  {object}  types.Response{data=database.Mirror} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      409  {object}  httpbase.R "Target repository already has a different mirror source (MIRROR-ERR-0)"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /{repo_type}/{namespace}/{name}/mirror [post]
 func (h *RepoHandler) CreateMirror(ctx *gin.Context) {
@@ -1369,6 +1421,14 @@ func (h *RepoHandler) CreateMirror(ctx *gin.Context) {
 	mirror, err := h.mirror.CreateMirror(ctx.Request.Context(), mirrorReq)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "Failed to create mirror for", slog.String("repo_type", string(mirrorReq.RepoType)), slog.String("path", fmt.Sprintf("%s/%s", mirrorReq.Namespace, mirrorReq.Name)), "error", err)
+		if errors.Is(err, errorx.ErrMirrorSourceRepoAuthInvalid) || errors.Is(err, errorx.ErrBadRequest) {
+			httpbase.BadRequestWithExt(ctx, err)
+			return
+		}
+		if errors.Is(err, errorx.ErrMirrorSourceConflict) {
+			httpbase.ConflictError(ctx, err)
+			return
+		}
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -1453,6 +1513,10 @@ func (h *RepoHandler) UpdateMirror(ctx *gin.Context) {
 	mirror, err := h.mirror.UpdateMirror(ctx.Request.Context(), mirrorReq)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "Failed to update mirror for", slog.String("repo_type", string(mirrorReq.RepoType)), slog.String("path", fmt.Sprintf("%s/%s", mirrorReq.Namespace, mirrorReq.Name)), "error", err)
+		if errors.Is(err, errorx.ErrMirrorSourceRepoAuthInvalid) || errors.Is(err, errorx.ErrBadRequest) {
+			httpbase.BadRequestWithExt(ctx, err)
+			return
+		}
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -1518,11 +1582,21 @@ func getSourceRepoPathFromSourceUrl(sourceUrl string) (string, error) {
 // @Param        repo_type path string true "models,datasets,codes or spaces" Enums(models,datasets,codes,spaces)
 // @Param        namespace path string true "repo owner name"
 // @Param        name path string true "repo name"
+// @Param        body body types.SyncMirrorParams false "scheduling options"
 // @Success      200  {object}  types.Response{} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      403  {object}  types.APIForbidden "Forbidden"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /{repo_type}/{namespace}/{name}/mirror/sync [post]
 func (h *RepoHandler) SyncMirror(ctx *gin.Context) {
+	var params types.SyncMirrorParams
+	if ctx.Request.Body != nil && ctx.Request.Body != http.NoBody {
+		if err := ctx.ShouldBindJSON(&params); err != nil && !errors.Is(err, io.EOF) {
+			slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
+			httpbase.BadRequest(ctx, err.Error())
+			return
+		}
+	}
 	repoType := common.RepoTypeFromContext(ctx)
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
@@ -1531,7 +1605,13 @@ func (h *RepoHandler) SyncMirror(ctx *gin.Context) {
 		return
 	}
 	currentUser := httpbase.GetCurrentUser(ctx)
-	err = h.mirror.SyncMirror(ctx.Request.Context(), repoType, namespace, name, currentUser)
+	err = h.mirror.SyncMirror(ctx.Request.Context(), types.SyncMirrorReq{
+		RepoType:    repoType,
+		Namespace:   namespace,
+		Name:        name,
+		CurrentUser: currentUser,
+		Urgent:      params.Urgent,
+	})
 	if err != nil {
 		if errors.Is(err, errorx.ErrForbidden) {
 			slog.ErrorContext(ctx.Request.Context(), "not allowed to sync mirror", slog.Any("error", err), slog.String("repo_type", string(repoType)), slog.String("path", fmt.Sprintf("%s/%s", namespace, name)))

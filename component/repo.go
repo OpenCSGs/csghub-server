@@ -2051,6 +2051,7 @@ func (c *repoComponentImpl) GetUserRepoPermission(ctx context.Context, userName 
 	}
 }
 
+// CheckCurrentUserPermission checks access against the namespace path stored in the database.
 func (c *repoComponentImpl) CheckCurrentUserPermission(ctx context.Context, userName string, namespace string, role membership.Role) (bool, error) {
 	ns, err := c.namespaceStore.FindByPath(ctx, namespace)
 	if err != nil {
@@ -2066,10 +2067,10 @@ func (c *repoComponentImpl) CheckCurrentUserPermission(ctx context.Context, user
 	}
 
 	if ns.NamespaceType == "user" {
-		return userName == namespace, nil
+		return userName == ns.Path, nil
 	}
 
-	r, err := c.userSvcClient.GetMemberRole(ctx, namespace, userName)
+	r, err := c.userSvcClient.GetMemberRole(ctx, ns.Path, userName)
 	if err != nil {
 		return false, err
 	}

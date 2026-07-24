@@ -70,6 +70,9 @@ func TestMirrorStore_CRUD(t *testing.T) {
 	exist, err = store.IsRepoExist(ctx, types.ModelRepo, "ns", "n")
 	require.Nil(t, err)
 	require.True(t, exist)
+	exist, err = store.IsRepoExist(ctx, types.ModelRepo, "NS", "N")
+	require.Nil(t, err)
+	require.True(t, exist)
 
 	exist, err = store.IsRepoExist(ctx, types.ModelRepo, "ns", "n2")
 	require.Nil(t, err)
@@ -270,17 +273,21 @@ func TestMirrorStore_FindWithMapping(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, "repo1", mi.Name)
 
-	_, err = store.FindWithMapping(ctx, types.ModelRepo, "hf", "repo1", types.HFMapping)
+	_, err = store.FindWithMapping(ctx, types.ModelRepo, "HF", "REPO1", types.HFMapping)
 	require.Nil(t, err)
 
 	_, err = store.FindWithMapping(ctx, types.ModelRepo, "aaa", "repo1", types.HFMapping)
 	require.NotNil(t, err)
 
-	mi, err = store.FindWithMapping(ctx, types.DatasetRepo, "ms", "repo2", types.ModelScopeMapping)
+	mi, err = store.FindWithMapping(ctx, types.DatasetRepo, "MS", "REPO2", types.ModelScopeMapping)
 	require.Nil(t, err)
 	require.Equal(t, "repo2", mi.Name)
 
-	mi, err = store.FindWithMapping(ctx, types.PromptRepo, "ns", "repo3", types.CSGHubMapping)
+	mi, err = store.FindWithMapping(ctx, types.ModelRepo, "HF", "REPO1", types.AutoMapping)
+	require.Nil(t, err)
+	require.Equal(t, "repo1", mi.Name)
+
+	mi, err = store.FindWithMapping(ctx, types.PromptRepo, "NS", "REPO3", types.CSGHubMapping)
 	require.Nil(t, err)
 	require.Equal(t, "repo3", mi.Name)
 }

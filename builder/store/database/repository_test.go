@@ -100,28 +100,32 @@ func TestRepoStore_CRUD(t *testing.T) {
 	require.NotNil(t, err)
 
 	_, err = store.UpdateOrCreateRepo(ctx, database.Repository{
-		Name:           "repo3",
+		Name:           "MyName",
+		Nickname:       "Original Name",
 		UserID:         231,
-		Path:           "bars_u/bar",
+		Path:           "bars_u/MyName",
+		GitPath:        "codes_bars_u/MyName",
 		RepositoryType: types.CodeRepo,
 	})
 	require.Nil(t, err)
 	rp = &database.Repository{}
 	err = db.Core.NewSelect().Model(rp).Where("user_id=?", 231).Scan(ctx)
 	require.Nil(t, err)
-	require.Equal(t, "repo3", rp.Name)
+	require.Equal(t, "MyName", rp.Name)
 
-	_, err = store.UpdateOrCreateRepo(ctx, database.Repository{
-		Name:           "repo3n",
+	rp, err = store.UpdateOrCreateRepo(ctx, database.Repository{
+		Name:           "myname",
+		Nickname:       "Updated Name",
 		UserID:         231,
-		Path:           "bars_u/bar",
+		Path:           "BARS_U/myname",
+		GitPath:        "codes_BARS_U/myname",
 		RepositoryType: types.CodeRepo,
 	})
 	require.Nil(t, err)
-	rp = &database.Repository{}
-	err = db.Core.NewSelect().Model(rp).Where("user_id=?", 231).Scan(ctx)
-	require.Nil(t, err)
-	require.Equal(t, "repo3n", rp.Name)
+	require.Equal(t, "BARS_U/myname", rp.Path)
+	require.Equal(t, "myname", rp.Name)
+	require.Equal(t, "codes_BARS_U/myname", rp.GitPath)
+	require.Equal(t, "Updated Name", rp.Nickname)
 
 	cnt, err := store.CountByRepoType(ctx, types.CodeRepo)
 	require.Nil(t, err)

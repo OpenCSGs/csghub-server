@@ -217,6 +217,9 @@ type Repository struct {
 // NamespaceAndName returns namespace and name by parsing repository path
 func (r Repository) NamespaceAndName() (namespace string, name string) {
 	fields := strings.Split(r.Path, "/")
+	if len(fields) == 1 {
+		return r.Path, ""
+	}
 	return fields[0], fields[1]
 }
 
@@ -1476,11 +1479,12 @@ func (s *repoStoreImpl) DeleteAllTags(ctx context.Context, repoID int64) error {
 	return nil
 }
 
+// UpdateOrCreateRepo updates or creates a repository by its case-insensitive path.
 func (s *repoStoreImpl) UpdateOrCreateRepo(ctx context.Context, input Repository) (*Repository, error) {
 	input.UpdatedAt = time.Now()
 	_, err := s.db.Core.NewUpdate().
 		Model(&input).
-		Where("path = ? and repository_type = ?", input.Path, input.RepositoryType).
+		Where("LOWER(path) = LOWER(?) and repository_type = ?", input.Path, input.RepositoryType).
 		Returning("*").
 		Exec(ctx, &input)
 	if err == nil {

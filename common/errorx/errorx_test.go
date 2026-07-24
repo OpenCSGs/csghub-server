@@ -255,6 +255,41 @@ func Test_Err_MirrorSourceConflict(t *testing.T) {
 	assert.False(t, errors.Is(err, ErrDatabaseDuplicateKey))
 }
 
+func Test_Err_MirrorSyncStates(t *testing.T) {
+	assert.Equal(t, "MIRROR-ERR-1", ErrMirrorRepoSyncing.(CustomError).Code())
+	assert.Equal(t, "MIRROR-ERR-2", ErrMirrorRepoSyncFailed.(CustomError).Code())
+	assert.Equal(t, "MIRROR-ERR-3", ErrMirrorTaskStateInvalid.(CustomError).Code())
+	assert.Equal(t, "MIRROR-ERR-4", ErrMirrorRepoSyncCanceled.(CustomError).Code())
+}
+
+func Test_Err_MirrorSourceRepoAuthInvalid(t *testing.T) {
+	err := MirrorSourceRepoAuthInvalid(errors.New("credentials are incomplete"), Ctx())
+
+	assert.Equal(t, "MIRROR-ERR-5", ErrMirrorSourceRepoAuthInvalid.(CustomError).Code())
+	assert.True(t, errors.Is(err, ErrMirrorSourceRepoAuthInvalid))
+}
+
+func Test_Err_SourceNamespaceMappingExists(t *testing.T) {
+	err := SourceNamespaceMappingExists(
+		errors.New("source namespace mapping exists"),
+		Ctx().Set("source_namespace", "SourceTeam"),
+	)
+
+	assert.Equal(t, "MIRROR-ERR-6", ErrSourceNamespaceMappingExists.(CustomError).Code())
+	assert.True(t, errors.Is(err, ErrSourceNamespaceMappingExists))
+	assert.False(t, errors.Is(err, ErrDatabaseDuplicateKey))
+}
+
+func Test_Err_SourceNamespaceMappingNotFound(t *testing.T) {
+	err := SourceNamespaceMappingNotFound(
+		errors.New("source namespace mapping does not exist"),
+		Ctx().Set("source_namespace", "SourceTeam"),
+	)
+
+	assert.Equal(t, "MIRROR-ERR-7", ErrSourceNamespaceMappingNotFound.(CustomError).Code())
+	assert.True(t, errors.Is(err, ErrSourceNamespaceMappingNotFound))
+}
+
 func Test_Err_ChangePathBlocked(t *testing.T) {
 	err := ChangePathBlocked(
 		errors.New("cannot change path: the following dependent entities exist: deploy tasks, mirrors. Please remove them first"),
