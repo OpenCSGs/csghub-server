@@ -37,20 +37,34 @@ import (
 )
 
 type (
-	repoPathKey      string
-	sourceUrlKey     string
-	defaultBranchKey string
-	lfsLoggerKey     struct{}
+	repoPathKey          string
+	sourceUrlKey         string
+	defaultBranchKey     string
+	sourceUsernameKey    string
+	sourceAccessTokenKey string
+	lfsLoggerKey         struct{}
 )
 
+// unexpectedHTTPStatusError preserves a rejected response status after its body is closed.
+type unexpectedHTTPStatusError struct {
+	statusCode int
+}
+
+// Error returns the rejected HTTP status.
+func (e *unexpectedHTTPStatusError) Error() string {
+	return fmt.Sprintf("unexpected status code %d", e.statusCode)
+}
+
 var (
-	rk            repoPathKey      = "repoPath"
-	suk           sourceUrlKey     = "sourceUrl"
-	dbk           defaultBranchKey = "defaultBranch"
-	maxRetries                     = 3
-	maxGroupCount                  = 15
-	maxPartNum                     = 1000
-	maxGroupSize  int64            = 10 * 1024 * 1024 * 1024 // 10GB
+	rk            repoPathKey          = "repoPath"
+	suk           sourceUrlKey         = "sourceUrl"
+	dbk           defaultBranchKey     = "defaultBranch"
+	sunk          sourceUsernameKey    = "sourceUsername"
+	satk          sourceAccessTokenKey = "sourceAccessToken"
+	maxRetries                         = 3
+	maxGroupCount                      = 15
+	maxPartNum                         = 1000
+	maxGroupSize  int64                = 10 * 1024 * 1024 * 1024 // 10GB
 )
 
 // LfsSyncWorker synchronizes Git LFS objects for mirror tasks.
@@ -68,8 +82,126 @@ type LfsSyncWorker struct {
 	workflowClient     temporal.Client
 }
 
+// mirrorTaskByteProgress persists one task's LFS completion by uploaded bytes.
+// Object-level accounting prevents resumed or re-uploaded parts from being counted twice.
+type mirrorTaskByteProgress struct {
+	mu                sync.Mutex
+	task              *database.MirrorTask
+	store             database.MirrorTaskStore
+	totalBytes        int64
+	uploadedBytes     int64
+	objectBytes       map[string]int64
+	lastPersistedRate int
+}
+
+// newMirrorTaskByteProgress initializes task progress from objects that already exist in storage.
+func newMirrorTaskByteProgress(
+	task *database.MirrorTask,
+	store database.MirrorTaskStore,
+	totalBytes, uploadedBytes int64,
+) *mirrorTaskByteProgress {
+	if totalBytes < 0 {
+		totalBytes = 0
+	}
+	if uploadedBytes < 0 {
+		uploadedBytes = 0
+	}
+	if uploadedBytes > totalBytes {
+		uploadedBytes = totalBytes
+	}
+	lastPersistedRate := 0
+	if task != nil {
+		lastPersistedRate = task.Progress
+	}
+	return &mirrorTaskByteProgress{
+		task:              task,
+		store:             store,
+		totalBytes:        totalBytes,
+		uploadedBytes:     uploadedBytes,
+		objectBytes:       make(map[string]int64),
+		lastPersistedRate: lastPersistedRate,
+	}
+}
+
+// persistInitial records progress contributed by complete objects found before transfer starts.
+func (p *mirrorTaskByteProgress) persistInitial(ctx context.Context) error {
+	if p == nil {
+		return nil
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.persistLocked(ctx)
+}
+
+// addObjectBytes credits newly uploaded bytes for one incomplete LFS object.
+func (p *mirrorTaskByteProgress) addObjectBytes(ctx context.Context, oid string, objectSize, uploadedBytes int64) error {
+	if p == nil || uploadedBytes <= 0 || objectSize <= 0 {
+		return nil
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	credited := p.objectBytes[oid]
+	remaining := objectSize - credited
+	if remaining <= 0 {
+		return nil
+	}
+	if uploadedBytes > remaining {
+		uploadedBytes = remaining
+	}
+	p.objectBytes[oid] = credited + uploadedBytes
+	p.uploadedBytes += uploadedBytes
+	if p.uploadedBytes > p.totalBytes {
+		p.uploadedBytes = p.totalBytes
+	}
+	return p.persistLocked(ctx)
+}
+
+// completeObject credits any bytes not observed through multipart callbacks after object verification succeeds.
+func (p *mirrorTaskByteProgress) completeObject(ctx context.Context, oid string, objectSize int64) error {
+	if p == nil || objectSize <= 0 {
+		return nil
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	remaining := objectSize - p.objectBytes[oid]
+	if remaining <= 0 {
+		return nil
+	}
+	p.objectBytes[oid] = objectSize
+	p.uploadedBytes += remaining
+	if p.uploadedBytes > p.totalBytes {
+		p.uploadedBytes = p.totalBytes
+	}
+	return p.persistLocked(ctx)
+}
+
+// persistLocked stores only increasing integer percentages and reserves 100 for final task success.
+func (p *mirrorTaskByteProgress) persistLocked(ctx context.Context) error {
+	if p.task == nil || p.store == nil || p.totalBytes <= 0 {
+		return nil
+	}
+	rate := int(math.Floor(float64(p.uploadedBytes) / float64(p.totalBytes) * 100))
+	if rate >= 100 {
+		rate = 99
+	}
+	if rate <= p.lastPersistedRate {
+		return nil
+	}
+	p.task.Progress = rate
+	if _, err := p.store.UpdateProgress(ctx, *p.task); err != nil {
+		return fmt.Errorf("failed to update mirror task progress: %w", err)
+	}
+	p.lastPersistedRate = rate
+	return nil
+}
+
 // NewLfsSyncWorker creates an LFS synchronization worker.
 func NewLfsSyncWorker(config *config.Config) (*LfsSyncWorker, error) {
+	if config.Mirror.PartSize <= 0 {
+		return nil, fmt.Errorf("LFS multipart part size must be positive: %d", config.Mirror.PartSize)
+	}
 	var err error
 	w := &LfsSyncWorker{}
 	w.config = config
@@ -149,11 +281,13 @@ func (w *LfsSyncWorker) refreshLfsMetaObjects(ctx context.Context, mt *database.
 	if err != nil {
 		return fmt.Errorf("failed to get namespace and name from mirror repository path: %w", err)
 	}
+	relativePath := repo.GitalyPath()
 	lfsPointers, err := w.git.GetRepoAllLfsPointers(ctx, gitserver.GetRepoAllFilesReq{
-		Namespace: namespace,
-		Name:      name,
-		Ref:       mt.AfterLastCommitID,
-		RepoType:  repo.RepositoryType,
+		Namespace:    namespace,
+		Name:         name,
+		Ref:          mt.AfterLastCommitID,
+		RepoType:     repo.RepositoryType,
+		RelativePath: relativePath,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to get all lfs pointers: %w", err)
@@ -188,6 +322,8 @@ func (w *LfsSyncWorker) withLFSContext(ctx context.Context, mt *database.MirrorT
 	ctx = context.WithValue(ctx, lfsLoggerKey{}, logger)
 	ctx = context.WithValue(ctx, rk, fmt.Sprintf("%ss/%s", repo.RepositoryType, repo.Path))
 	ctx = context.WithValue(ctx, suk, mt.Mirror.SourceUrl)
+	ctx = context.WithValue(ctx, sunk, mt.Mirror.Username)
+	ctx = context.WithValue(ctx, satk, mt.Mirror.AccessToken)
 	return context.WithValue(ctx, dbk, repo.DefaultBranch)
 }
 
@@ -235,6 +371,7 @@ func lfsPointersToMetaObjects(repoID int64, lfsPointers []*types.LFSPointer) ([]
 	return lfsMetaObjects, totalSize
 }
 
+// SyncLfs transfers missing LFS objects and publishes the commit produced by the Repo stage.
 func (w *LfsSyncWorker) SyncLfs(ctx context.Context, mt *database.MirrorTask) error {
 	var pointers []*types.Pointer
 
@@ -280,9 +417,10 @@ func (w *LfsSyncWorker) SyncLfs(ctx context.Context, mt *database.MirrorTask) er
 	if err != nil {
 		return fmt.Errorf("failed to get namespace and name from mirror repository path: %w", err)
 	}
+	relativePath := repo.GitalyPath()
 
 	commit, err := w.getRepoLastCommit(
-		ctx, namespace, name, repo.DefaultBranch, repo.RepositoryType,
+		ctx, namespace, name, repo.DefaultBranch, repo.RepositoryType, relativePath,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to get repo last commit: %w", err)
@@ -299,11 +437,12 @@ func (w *LfsSyncWorker) SyncLfs(ctx context.Context, mt *database.MirrorTask) er
 		)
 
 		err = w.git.UpdateRef(ctx, gitserver.UpdateRefReq{
-			Namespace:   namespace,
-			Name:        name,
-			Ref:         fmt.Sprintf("refs/heads/%s", repo.DefaultBranch),
-			RepoType:    mirror.Repository.RepositoryType,
-			NewObjectId: mt.AfterLastCommitID,
+			Namespace:    namespace,
+			Name:         name,
+			Ref:          fmt.Sprintf("refs/heads/%s", repo.DefaultBranch),
+			RepoType:     mirror.Repository.RepositoryType,
+			NewObjectId:  mt.AfterLastCommitID,
+			RelativePath: relativePath,
 		})
 		if err != nil {
 			return fmt.Errorf("failed to point HEAD to new commit: %w", err)
@@ -318,14 +457,14 @@ func (w *LfsSyncWorker) SyncLfs(ctx context.Context, mt *database.MirrorTask) er
 	}
 
 	lastCommit, err := w.getRepoLastCommit(
-		ctx, namespace, name, repo.DefaultBranch, repo.RepositoryType,
+		ctx, namespace, name, repo.DefaultBranch, repo.RepositoryType, relativePath,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to get repo last commit: %w", err)
 	}
 
 	// Trigger git callback
-	err = w.triggerGitCallback(ctx, namespace, name, repo.DefaultBranch, lastCommit, repo)
+	err = w.triggerGitCallback(ctx, namespace, name, repo.DefaultBranch, lastCommit, repo, relativePath)
 	if err != nil {
 		return fmt.Errorf("failed to trigger git callback: %w", err)
 	}
@@ -453,11 +592,21 @@ func (w *LfsSyncWorker) downloadAndUploadLFSFiles(
 	repo *database.Repository,
 ) error {
 	var finalErr error
-	totalPointerCount := 0
-	syncedPointerCount := 0
-
+	var pendingBytes int64
 	for _, pointers := range pointerGroups {
-		totalPointerCount += len(pointers)
+		for _, pointer := range pointers {
+			if pointer != nil && pointer.Size > 0 {
+				pendingBytes += pointer.Size
+			}
+		}
+	}
+	totalBytes := repo.LFSObjectsSize
+	if totalBytes < pendingBytes {
+		totalBytes = pendingBytes
+	}
+	progress := newMirrorTaskByteProgress(mt, w.mirrorTaskStore, totalBytes, totalBytes-pendingBytes)
+	if err := progress.persistInitial(ctx); err != nil {
+		return err
 	}
 
 	for _, pointers := range pointerGroups {
@@ -467,7 +616,9 @@ func (w *LfsSyncWorker) downloadAndUploadLFSFiles(
 		default:
 		}
 
-		pointers, err := w.GetLFSDownloadURLs(ctx, mirror.SourceUrl, repo.DefaultBranch, pointers)
+		pointers, err := w.GetLFSDownloadURLs(
+			ctx, mirror.SourceUrl, repo.DefaultBranch, mirror.Username, mirror.AccessToken, pointers,
+		)
 		if err != nil {
 			loggerFromLFSContext(ctx).ErrorContext(ctx,
 				"failed to get lfs download urls",
@@ -485,7 +636,7 @@ func (w *LfsSyncWorker) downloadAndUploadLFSFiles(
 			default:
 			}
 
-			err := w.downloadAndUploadLFSFile(ctx, repo, pointer)
+			err := w.downloadAndUploadLFSFile(ctx, repo, pointer, progress)
 			if err != nil {
 				if errors.Is(err, context.Canceled) {
 					return err
@@ -497,15 +648,10 @@ func (w *LfsSyncWorker) downloadAndUploadLFSFiles(
 					slog.Any("repoType", repo.RepositoryType),
 					slog.Any("pointer", pointer),
 				)
-			} else {
-				syncedPointerCount++
+				continue
 			}
-
-			// Update the progress of the mirror task
-			mt.Progress = int(math.Ceil(float64(syncedPointerCount) / float64(totalPointerCount) * 100))
-			_, err = w.mirrorTaskStore.UpdateProgress(ctx, *mt)
-			if err != nil {
-				return fmt.Errorf("failed to update mirror task progress: %w", err)
+			if err := progress.completeObject(ctx, pointer.Oid, pointer.Size); err != nil {
+				return err
 			}
 		}
 	}
@@ -520,6 +666,7 @@ func (w *LfsSyncWorker) downloadAndUploadLFSFile(
 	ctx context.Context,
 	repo *database.Repository,
 	pointer *types.Pointer,
+	progress *mirrorTaskByteProgress,
 ) error {
 	var uploadID string
 	objectKey := common.BuildLfsPath(repo.ID, pointer.Oid, repo.Migrated)
@@ -562,7 +709,10 @@ func (w *LfsSyncWorker) downloadAndUploadLFSFile(
 		return nil
 	}
 
-	partSize := int64(w.config.Mirror.PartSize * 1024 * 1024)
+	if w.config.Mirror.PartSize <= 0 {
+		return fmt.Errorf("LFS multipart part size must be positive: %d", w.config.Mirror.PartSize)
+	}
+	partSize := int64(w.config.Mirror.PartSize) * 1024 * 1024
 	if pointer.Size/partSize > int64(maxPartNum) {
 		partSize = pointer.Size / int64(maxPartNum)
 	}
@@ -619,6 +769,7 @@ func (w *LfsSyncWorker) downloadAndUploadLFSFile(
 		w.config.Mirror.LfsConcurrency,
 		repo.ID,
 		pointer,
+		progress,
 	)
 	if err != nil {
 		loggerFromLFSContext(ctx).ErrorContext(ctx,
@@ -712,6 +863,16 @@ func (w *LfsSyncWorker) downloadAndUploadLFSFile(
 	return nil
 }
 
+// acquireUploadSlot waits for multipart upload capacity or context cancellation.
+func acquireUploadSlot(ctx context.Context, slots <-chan struct{}) error {
+	select {
+	case <-ctx.Done():
+		return context.Cause(ctx)
+	case <-slots:
+		return nil
+	}
+}
+
 func (w *LfsSyncWorker) multipartUploadWithRetry(
 	ctx context.Context,
 	partSize int64,
@@ -719,9 +880,17 @@ func (w *LfsSyncWorker) multipartUploadWithRetry(
 	concurrency int,
 	repoID int64,
 	pointer *types.Pointer,
+	taskProgress *mirrorTaskByteProgress,
 ) error {
+	if concurrency <= 0 {
+		return fmt.Errorf("LFS multipart concurrency must be positive: %d", concurrency)
+	}
+	if partSize <= 0 {
+		return fmt.Errorf("LFS multipart part size must be positive: %d", partSize)
+	}
+
 	var parts []minio.CompletePart
-	eg := new(errgroup.Group)
+	eg, egCtx := errgroup.WithContext(ctx)
 	// Use a channel to limit the number of concurrent uploads
 	concurrencyChan := make(chan struct{}, concurrency)
 
@@ -749,7 +918,6 @@ func (w *LfsSyncWorker) multipartUploadWithRetry(
 		)
 		return fmt.Errorf("failed to list object parts: %w", err)
 	}
-
 	// If the length of uploadedParts is more than totalParts, it means that the upload went wrong
 	// and we need to abort the upload
 	if len(uploadedParts.ObjectParts) > totalParts {
@@ -764,6 +932,17 @@ func (w *LfsSyncWorker) multipartUploadWithRetry(
 			)
 			return fmt.Errorf("failed to abort multipart upload: %w", err)
 		}
+		return fmt.Errorf("uploaded part count exceeds expected total: %d/%d", len(uploadedParts.ObjectParts), totalParts)
+	}
+
+	existingPartNumbers := make(map[int]struct{}, len(uploadedParts.ObjectParts))
+	var existingPartBytes int64
+	for _, part := range uploadedParts.ObjectParts {
+		existingPartNumbers[part.PartNumber] = struct{}{}
+		existingPartBytes += part.Size
+	}
+	if err := taskProgress.addObjectBytes(ctx, pointer.Oid, pointer.Size, existingPartBytes); err != nil {
+		return err
 	}
 
 	// Refresh cache progress
@@ -778,16 +957,23 @@ func (w *LfsSyncWorker) multipartUploadWithRetry(
 		)
 	}
 
+	var scheduleErr error
+scheduleParts:
 	for offset0 := int64(0); offset0 < totalSize; offset0 += partSize {
 		select {
-		case <-ctx.Done():
-			return ctx.Err()
+		case <-egCtx.Done():
+			scheduleErr = context.Cause(egCtx)
+			break scheduleParts
 		default:
 			offset := offset0
 			partNumber := partNumber0
-			// Use errgroup.Group to get the first error of the goroutines
-			<-concurrencyChan
+			// Acquire one upload slot while still allowing urgent preemption.
+			if err := acquireUploadSlot(egCtx, concurrencyChan); err != nil {
+				scheduleErr = err
+				break scheduleParts
+			}
 			eg.Go(func() error {
+				ctx := egCtx
 				defer func() {
 					concurrencyChan <- struct{}{}
 				}()
@@ -826,6 +1012,11 @@ func (w *LfsSyncWorker) multipartUploadWithRetry(
 						slog.Any("err", err),
 					)
 					return fmt.Errorf("failed to upload part %d: %w", partNumber, err)
+				}
+				if _, alreadyUploaded := existingPartNumbers[partNumber]; !alreadyUploaded {
+					if err := taskProgress.addObjectBytes(ctx, pointer.Oid, pointer.Size, end-offset+1); err != nil {
+						return err
+					}
 				}
 
 				w.mu.Lock()
@@ -880,6 +1071,9 @@ func (w *LfsSyncWorker) multipartUploadWithRetry(
 		}
 	}
 	err = eg.Wait()
+	if err == nil {
+		err = scheduleErr
+	}
 	if err != nil {
 		loggerFromLFSContext(ctx).ErrorContext(ctx,
 			"failed to download and upload lfs file",
@@ -993,7 +1187,7 @@ func (w *LfsSyncWorker) downloadAndUploadSmallFile(
 		slog.Any("size", pointer.Size),
 	)
 
-	resp, err := w.downloadRange(ctx, pointer.DownloadURL, 0, pointer.Size-1)
+	resp, err := w.downloadRange(ctx, pointer.DownloadURL, pointer.DownloadHeaders, 0, pointer.Size-1)
 	if err != nil {
 		return fmt.Errorf("failed to download small file: %w", err)
 	}
@@ -1058,8 +1252,11 @@ func (w *LfsSyncWorker) downloadAndUploadPartWithRetry(
 			slog.Any("offset", start),
 			slog.Any("end", end),
 		)
-		resp, err := w.downloadRange(ctx, downloadURL, start, end)
+		resp, err := w.downloadRange(ctx, downloadURL, pointer.DownloadHeaders, start, end)
 		if err != nil {
+			if ctx.Err() != nil {
+				return part, context.Cause(ctx)
+			}
 			loggerFromLFSContext(ctx).ErrorContext(ctx,
 				"failed to download range",
 				slog.Any("downloadURL", downloadURL),
@@ -1069,10 +1266,15 @@ func (w *LfsSyncWorker) downloadAndUploadPartWithRetry(
 				slog.Any("attempt", attempt),
 				slog.Any("error", err),
 			)
-			if resp != nil && resp.StatusCode == http.StatusForbidden {
+			var statusErr *unexpectedHTTPStatusError
+			if errors.As(err, &statusErr) && statusErr.statusCode == http.StatusForbidden {
 				sourceURL := ctx.Value(suk).(string)
 				defaultBranch := ctx.Value(dbk).(string)
-				pointers, err := w.GetLFSDownloadURLs(ctx, sourceURL, defaultBranch, []*types.Pointer{pointer})
+				username, _ := ctx.Value(sunk).(string)
+				accessToken, _ := ctx.Value(satk).(string)
+				pointers, err := w.GetLFSDownloadURLs(
+					ctx, sourceURL, defaultBranch, username, accessToken, []*types.Pointer{pointer},
+				)
 				if err != nil {
 					return part, fmt.Errorf("failed to get download URLs: %w", err)
 				}
@@ -1082,9 +1284,7 @@ func (w *LfsSyncWorker) downloadAndUploadPartWithRetry(
 			return part, fmt.Errorf("failed to download range: %w", err)
 		}
 
-		if resp != nil {
-			defer resp.Body.Close()
-		}
+		defer resp.Body.Close()
 
 		loggerFromLFSContext(ctx).InfoContext(ctx,
 			"uploading range",
@@ -1107,6 +1307,9 @@ func (w *LfsSyncWorker) downloadAndUploadPartWithRetry(
 		)
 		if err != nil {
 			lastErr = err
+			if ctx.Err() != nil {
+				return part, context.Cause(ctx)
+			}
 			loggerFromLFSContext(ctx).ErrorContext(ctx,
 				"failed to upload range",
 				slog.Any("objectKey", objectKey),
@@ -1117,7 +1320,18 @@ func (w *LfsSyncWorker) downloadAndUploadPartWithRetry(
 				slog.Any("error", err),
 			)
 
-			time.Sleep(3 * time.Second)
+			if attempt == maxRetries {
+				break
+			}
+			timer := time.NewTimer(3 * time.Second)
+			select {
+			case <-ctx.Done():
+				if !timer.Stop() {
+					<-timer.C
+				}
+				return part, context.Cause(ctx)
+			case <-timer.C:
+			}
 			continue
 		}
 		return part, nil
@@ -1131,9 +1345,11 @@ func (w *LfsSyncWorker) downloadAndUploadPartWithRetry(
 	)
 }
 
+// downloadRange downloads one byte range with the headers supplied by the LFS download action.
 func (w *LfsSyncWorker) downloadRange(
 	ctx context.Context,
 	downloadURL string,
+	downloadHeaders http.Header,
 	start, end int64,
 ) (*http.Response, error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", downloadURL, nil)
@@ -1149,17 +1365,27 @@ func (w *LfsSyncWorker) downloadRange(
 	req.Header.Set("Accept", "application/vnd.git-lfs+json")
 	req.Header.Set("Content-Type", "application/vnd.git-lfs+json; charset=utf-8")
 	req.Header.Set("User-Agent", "git-lfs/3.5.1")
+	for name, values := range downloadHeaders {
+		req.Header.Del(name)
+		for _, value := range values {
+			req.Header.Add(name, value)
+		}
+	}
 
 	rangeHeader := fmt.Sprintf("bytes=%d-%d", start, end)
 	req.Header.Set("Range", rangeHeader)
 
 	resp, err := w.httpClient.Do(req)
 	if err != nil {
-		return resp, err
+		if resp != nil && resp.Body != nil {
+			_ = resp.Body.Close()
+		}
+		return nil, err
 	}
 
 	if resp.StatusCode != http.StatusPartialContent && resp.StatusCode != http.StatusOK {
-		return resp, fmt.Errorf("unexpected status code %d", resp.StatusCode)
+		_ = resp.Body.Close()
+		return nil, &unexpectedHTTPStatusError{statusCode: resp.StatusCode}
 	}
 
 	return resp, nil
@@ -1211,9 +1437,9 @@ func isLFSObjectNotFound(err error) bool {
 		strings.Contains(errMsg, "object not found")
 }
 
+// GetLFSDownloadURLs requests download actions from the source repository LFS Batch API.
 func (w *LfsSyncWorker) GetLFSDownloadURLs(
-	ctx context.Context,
-	repoCloneURL, branch string,
+	ctx context.Context, repoCloneURL, branch, username, accessToken string,
 	pointers []*types.Pointer,
 ) ([]*types.Pointer, error) {
 	var (
@@ -1248,7 +1474,7 @@ func (w *LfsSyncWorker) GetLFSDownloadURLs(
 		return nil, fmt.Errorf("failed to marshal request payload: %w", err)
 	}
 
-	req, err := http.NewRequest("POST", lfsAPIURL, bytes.NewReader(payload))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, lfsAPIURL, bytes.NewReader(payload))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -1262,6 +1488,9 @@ func (w *LfsSyncWorker) GetLFSDownloadURLs(
 	req.Header.Set("Accept", "application/vnd.git-lfs+json")
 	req.Header.Set("Content-Type", "application/vnd.git-lfs+json; charset=utf-8")
 	req.Header.Set("User-Agent", "git-lfs/3.5.1")
+	if username != "" && accessToken != "" {
+		req.SetBasicAuth(username, accessToken)
+	}
 
 	resp, err := w.httpClient.Do(req)
 	if err != nil {
@@ -1274,7 +1503,7 @@ func (w *LfsSyncWorker) GetLFSDownloadURLs(
 		return nil, fmt.Errorf("get lfs download url, unexpected status code: %d", resp.StatusCode)
 	}
 
-	var batchResp types.LFSBatchResponse
+	var batchResp types.BatchResponse
 	err = json.NewDecoder(resp.Body).Decode(&batchResp)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode response body: %w", err)
@@ -1285,34 +1514,50 @@ func (w *LfsSyncWorker) GetLFSDownloadURLs(
 	}
 
 	for _, obj := range batchResp.Objects {
-		var downloadURL string
+		var (
+			downloadURL     string
+			downloadHeaders http.Header
+		)
 		// Some objects may be unreachable or been removed
-		if obj.Actions.Download == nil {
+		downloadAction := obj.Actions["download"]
+		if downloadAction == nil {
 			loggerFromLFSContext(ctx).WarnContext(ctx, "download URL not found for object", slog.Any("obj", obj.Oid))
 			downloadURL = ""
 		} else {
-			downloadURL = obj.Actions.Download.Href
+			downloadURL = downloadAction.Href
+			downloadHeaders = make(http.Header, len(downloadAction.Header))
+			for name, value := range downloadAction.Header {
+				headerValue, ok := value.(string)
+				if !ok {
+					return nil, fmt.Errorf("invalid LFS download header %q for object %s", name, obj.Oid)
+				}
+				downloadHeaders.Set(name, headerValue)
+			}
 		}
 		resPointers = append(resPointers, &types.Pointer{
-			Oid:         obj.Oid,
-			Size:        obj.Size,
-			DownloadURL: downloadURL,
+			Oid:             obj.Oid,
+			Size:            obj.Size,
+			DownloadURL:     downloadURL,
+			DownloadHeaders: downloadHeaders,
 		})
 	}
 
 	return resPointers, nil
 }
 
+// getRepoLastCommit resolves a commit without requiring Gitaly to query repository metadata.
 func (w *LfsSyncWorker) getRepoLastCommit(
 	ctx context.Context,
 	namespace, name, branch string,
 	repoType types.RepositoryType,
+	relativePath string,
 ) (*types.Commit, error) {
 	commit, err := w.git.GetRepoLastCommit(ctx, gitserver.GetRepoLastCommitReq{
-		Namespace: namespace,
-		Name:      name,
-		RepoType:  repoType,
-		Ref:       branch,
+		Namespace:    namespace,
+		Name:         name,
+		RepoType:     repoType,
+		Ref:          branch,
+		RelativePath: relativePath,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get repo last commit: %w", err)
@@ -1320,11 +1565,13 @@ func (w *LfsSyncWorker) getRepoLastCommit(
 	return commit, nil
 }
 
+// triggerGitCallback submits the synchronized Git diff to the repository callback workflow.
 func (w *LfsSyncWorker) triggerGitCallback(
 	ctx context.Context,
 	namespace, name, branch string,
 	commit *types.Commit,
 	repo *database.Repository,
+	relativePath string,
 ) error {
 	callback, err := w.git.GetDiffBetweenTwoCommits(ctx, gitserver.GetDiffBetweenTwoCommitsReq{
 		Namespace:     namespace,
@@ -1334,6 +1581,7 @@ func (w *LfsSyncWorker) triggerGitCallback(
 		LeftCommitId:  gitaly.SHA1EmptyTreeID,
 		RightCommitId: commit.ID,
 		Private:       repo.Private,
+		RelativePath:  relativePath,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to get diff between two commits: %w", err)

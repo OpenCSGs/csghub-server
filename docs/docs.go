@@ -35306,6 +35306,9 @@ const docTemplate = `{
                 "order_detail_id": {
                     "type": "integer"
                 },
+                "owner_namespace": {
+                    "type": "string"
+                },
                 "queue_name": {
                     "type": "string"
                 },
@@ -42607,6 +42610,9 @@ const docTemplate = `{
                     "type": "number"
                 },
                 "model_id": {
+                    "type": "string"
+                },
+                "namespace": {
                     "type": "string"
                 },
                 "resource_id": {

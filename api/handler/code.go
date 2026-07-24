@@ -89,7 +89,9 @@ func (h *CodeHandler) Create(ctx *gin.Context) {
 		if errors.Is(err, errorx.ErrForbidden) {
 			httpbase.ForbiddenError(ctx, err)
 			return
-		} else if errors.Is(err, errorx.ErrDatabaseDuplicateKey) {
+		} else if errors.Is(err, errorx.ErrDatabaseDuplicateKey) ||
+			errors.Is(err, errorx.ErrMirrorSourceRepoAuthInvalid) ||
+			errors.Is(err, errorx.ErrBadRequest) {
 			httpbase.BadRequestWithExt(ctx, err)
 		} else {
 			slog.ErrorContext(ctx.Request.Context(), "Failed to create code", slog.Any("error", err))

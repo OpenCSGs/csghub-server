@@ -13,8 +13,10 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	mockcomponent "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
+	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/builder/testutil"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
 
@@ -87,6 +89,44 @@ func TestSkillHandler_Create(t *testing.T) {
 		tester.WithBody(t, req).Execute()
 
 		tester.ResponseEq(t, 200, tester.OKText, &types.Skill{Name: "s"})
+	})
+}
+
+// TestSkillHandler_CreateMirrorAuthInvalid verifies invalid mirror credentials return a bad request.
+func TestSkillHandler_CreateMirrorAuthInvalid(t *testing.T) {
+	tester := NewSkillTester(t).WithHandleFunc(func(h *SkillHandler) gin.HandlerFunc {
+		return h.Create
+	})
+	tester.WithUser()
+
+	req := &types.CreateSkillReq{CreateRepoReq: types.CreateRepoReq{Username: "u", Namespace: "u"}}
+	authErr := errorx.MirrorSourceRepoAuthInvalid(fmt.Errorf("credentials are incomplete"), errorx.Ctx())
+	tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.Ctx(), req).Return(true, nil)
+	tester.mocks.skill.EXPECT().Create(tester.Ctx(), req).Return(nil, authErr)
+	tester.WithBody(t, req).Execute()
+
+	tester.ResponseEqSimple(t, http.StatusBadRequest, httpbase.R{
+		Code: "MIRROR-ERR-5",
+		Msg:  "MIRROR-ERR-5: credentials are incomplete",
+	})
+}
+
+// TestSkillHandler_CreateMirrorSourceBadRequest verifies malformed mirror source URLs return a bad request.
+func TestSkillHandler_CreateMirrorSourceBadRequest(t *testing.T) {
+	tester := NewSkillTester(t).WithHandleFunc(func(h *SkillHandler) gin.HandlerFunc {
+		return h.Create
+	})
+	tester.WithUser()
+
+	req := &types.CreateSkillReq{CreateRepoReq: types.CreateRepoReq{Username: "u", Namespace: "u"}}
+	badRequestErr := errorx.BadRequest(fmt.Errorf("invalid source git clone url"), errorx.Ctx())
+	tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.Ctx(), req).Return(true, nil)
+	tester.mocks.skill.EXPECT().Create(tester.Ctx(), req).Return(nil, badRequestErr)
+	tester.WithBody(t, req).Execute()
+
+	tester.ResponseEqSimple(t, http.StatusBadRequest, httpbase.R{
+		Code: "REQ-ERR-0",
+		Msg:  "REQ-ERR-0: invalid source git clone url",
 	})
 }
 

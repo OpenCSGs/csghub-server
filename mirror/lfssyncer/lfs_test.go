@@ -55,6 +55,48 @@ type testLfsSyncWorkerMocks struct {
 	workflowClient     *mock_workflow.MockClient
 }
 
+// recordingMirrorTaskProgressStore captures task progress without requiring database setup.
+type recordingMirrorTaskProgressStore struct {
+	database.MirrorTaskStore
+	mu       sync.Mutex
+	progress []int
+}
+
+// UpdateProgress records one persisted task percentage.
+func (s *recordingMirrorTaskProgressStore) UpdateProgress(_ context.Context, task database.MirrorTask) (database.MirrorTask, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.progress = append(s.progress, task.Progress)
+	return task, nil
+}
+
+// values returns a stable copy of recorded progress percentages.
+func (s *recordingMirrorTaskProgressStore) values() []int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return append([]int(nil), s.progress...)
+}
+
+// roundTripFunc adapts a function into an HTTP round tripper for tests.
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+// RoundTrip executes the adapted function.
+func (f roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return f(req)
+}
+
+// trackingReadCloser records whether an HTTP response body was closed.
+type trackingReadCloser struct {
+	io.Reader
+	closed bool
+}
+
+// Close records that the response body was closed.
+func (b *trackingReadCloser) Close() error {
+	b.closed = true
+	return nil
+}
+
 // Test data factories
 func createTestConfig() *config.Config {
 	// Initialize empty config
@@ -111,6 +153,67 @@ func createTestMirrorTask(mirror *database.Mirror, status types.MirrorTaskStatus
 	}
 }
 
+// TestMirrorTaskByteProgressWeightsObjectSizes verifies file count does not influence task progress.
+func TestMirrorTaskByteProgressWeightsObjectSizes(t *testing.T) {
+	store := &recordingMirrorTaskProgressStore{}
+	task := &database.MirrorTask{ID: 1}
+	progress := newMirrorTaskByteProgress(task, store, 1_000, 0)
+
+	require.NoError(t, progress.completeObject(context.Background(), "small", 100))
+	require.NoError(t, progress.addObjectBytes(context.Background(), "large", 900, 450))
+	require.NoError(t, progress.completeObject(context.Background(), "large", 900))
+
+	require.Equal(t, []int{10, 55, 99}, store.values())
+	require.Equal(t, 99, task.Progress)
+}
+
+// TestMirrorTaskByteProgressConcurrentCredits verifies concurrent parts stay monotonic and object bytes are capped.
+func TestMirrorTaskByteProgressConcurrentCredits(t *testing.T) {
+	store := &recordingMirrorTaskProgressStore{}
+	task := &database.MirrorTask{ID: 1}
+	progress := newMirrorTaskByteProgress(task, store, 1_000, 0)
+
+	var group sync.WaitGroup
+	errors := make(chan error, 12)
+	for range 12 {
+		group.Add(1)
+		go func() {
+			defer group.Done()
+			errors <- progress.addObjectBytes(context.Background(), "large", 600, 100)
+		}()
+	}
+	group.Wait()
+	close(errors)
+	for err := range errors {
+		require.NoError(t, err)
+	}
+	require.NoError(t, progress.completeObject(context.Background(), "small", 400))
+
+	values := store.values()
+	require.NotEmpty(t, values)
+	for index := 1; index < len(values); index++ {
+		require.Greater(t, values[index], values[index-1])
+	}
+	require.Equal(t, 99, values[len(values)-1])
+	require.Equal(t, int64(600), progress.objectBytes["large"])
+	require.Equal(t, int64(1_000), progress.uploadedBytes)
+}
+
+// TestMirrorTaskByteProgressDoesNotRegress verifies reconstructed retry progress cannot overwrite a higher persisted value.
+func TestMirrorTaskByteProgressDoesNotRegress(t *testing.T) {
+	store := &recordingMirrorTaskProgressStore{}
+	task := &database.MirrorTask{ID: 1, Progress: 60}
+	progress := newMirrorTaskByteProgress(task, store, 1_000, 500)
+
+	require.NoError(t, progress.persistInitial(context.Background()))
+	require.NoError(t, progress.addObjectBytes(context.Background(), "remaining", 500, 100))
+	require.Empty(t, store.values())
+	require.NoError(t, progress.addObjectBytes(context.Background(), "remaining", 500, 100))
+
+	require.Equal(t, []int{70}, store.values())
+	require.Equal(t, 70, task.Progress)
+}
+
 func newTestLfsSyncWorker(t *testing.T, serverURL string) (*LfsSyncWorker, *testLfsSyncWorkerMocks) {
 	cfg := createTestConfig()
 
@@ -152,6 +255,19 @@ func newTestLfsSyncWorker(t *testing.T, serverURL string) (*LfsSyncWorker, *test
 	}
 
 	return worker, mocks
+}
+
+// TestNewLfsSyncWorkerRejectsNonPositivePartSize verifies invalid multipart sizing fails before dependency initialization.
+func TestNewLfsSyncWorkerRejectsNonPositivePartSize(t *testing.T) {
+	for _, partSize := range []int{0, -1} {
+		cfg := createTestConfig()
+		cfg.Mirror.PartSize = partSize
+
+		worker, err := NewLfsSyncWorker(cfg)
+
+		require.Nil(t, worker)
+		require.EqualError(t, err, fmt.Sprintf("LFS multipart part size must be positive: %d", partSize))
+	}
 }
 
 // TestLoggerFromLFSContextIncludesTaskFields verifies every task-aware log can be attributed to one mirror execution.
@@ -196,7 +312,8 @@ func (suite *LfsSyncWorkerTestSuite) TestRefreshLfsMetaObjectsUsesAfterCommit() 
 		return req.Namespace == "test" &&
 			req.Name == "repo" &&
 			req.Ref == task.AfterLastCommitID &&
-			req.RepoType == repo.RepositoryType
+			req.RepoType == repo.RepositoryType &&
+			req.RelativePath == repo.GitalyPath()
 	})).Return([]*types.LFSPointer{
 		{FileOid: "oid1", FileSize: 100},
 		{FileOid: "oid1", FileSize: 100},
@@ -218,6 +335,37 @@ func (suite *LfsSyncWorkerTestSuite) TestRefreshLfsMetaObjectsUsesAfterCommit() 
 
 	require.NoError(suite.T(), err)
 	require.Equal(suite.T(), int64(300), repo.LFSObjectsSize)
+}
+
+// TestSyncLfsUsesRepositoryRelativePath verifies commit publication and callback Git calls avoid path lookup.
+func (suite *LfsSyncWorkerTestSuite) TestSyncLfsUsesRepositoryRelativePath() {
+	repo := createTestRepository()
+	mirror := createTestMirror(repo, "http://example.com/test/repo.git")
+	task := createTestMirrorTask(mirror, types.MirrorLfsSyncStart)
+	expectedRelativePath := repo.GitalyPath()
+
+	suite.mocks.msgSender.EXPECT().Send(suite.ctx, mock.Anything).Return(hook.Response{}, nil)
+	suite.mocks.lfsMetaObjectStore.EXPECT().FindByRepoID(suite.ctx, repo.ID).
+		Return([]database.LfsMetaObject{}, nil)
+	suite.mocks.git.EXPECT().GetRepoLastCommit(suite.ctx, mock.MatchedBy(func(req gitserver.GetRepoLastCommitReq) bool {
+		return req.RelativePath == expectedRelativePath
+	})).Return(&types.Commit{ID: "old-commit"}, nil).Once()
+	suite.mocks.git.EXPECT().UpdateRef(suite.ctx, mock.MatchedBy(func(req gitserver.UpdateRefReq) bool {
+		return req.RelativePath == expectedRelativePath
+	})).Return(nil)
+	suite.mocks.git.EXPECT().GetRepoLastCommit(suite.ctx, mock.MatchedBy(func(req gitserver.GetRepoLastCommitReq) bool {
+		return req.RelativePath == expectedRelativePath
+	})).Return(&types.Commit{ID: task.AfterLastCommitID}, nil).Once()
+	suite.mocks.git.EXPECT().GetDiffBetweenTwoCommits(suite.ctx, mock.MatchedBy(func(req gitserver.GetDiffBetweenTwoCommitsReq) bool {
+		return req.RelativePath == expectedRelativePath
+	})).Return(&types.GiteaCallbackPushReq{}, nil)
+	suite.mocks.workflowClient.EXPECT().ExecuteWorkflow(
+		suite.ctx, mock.Anything, mock.Anything, mock.Anything,
+	).Return(nil, nil)
+
+	err := suite.worker.SyncLfs(suite.ctx, task)
+
+	require.NoError(suite.T(), err)
 }
 
 // Test individual methods
@@ -458,7 +606,7 @@ func (suite *LfsSyncWorkerTestSuite) TestDownloadAndUploadLFSFile_FileExists() {
 		return lmo.Oid == pointer.Oid && lmo.Existing == true
 	})).Return(&database.LfsMetaObject{}, nil)
 
-	err := suite.worker.downloadAndUploadLFSFile(ctx, repo, pointer)
+	err := suite.worker.downloadAndUploadLFSFile(ctx, repo, pointer, nil)
 
 	assert.NoError(suite.T(), err)
 }
@@ -474,7 +622,7 @@ func (suite *LfsSyncWorkerTestSuite) TestDownloadAndUploadLFSFile_CheckExistsErr
 	// The metadata must not be updated when object storage verification fails.
 	suite.mocks.ossClient.EXPECT().StatObject(ctx, suite.worker.config.S3.Bucket, mock.Anything, mock.Anything).Return(minio.ObjectInfo{}, errors.New("network error"))
 
-	err := suite.worker.downloadAndUploadLFSFile(ctx, repo, pointer)
+	err := suite.worker.downloadAndUploadLFSFile(ctx, repo, pointer, nil)
 
 	assert.Error(suite.T(), err)
 	assert.Contains(suite.T(), err.Error(), "failed to check if lfs file exists")
@@ -495,9 +643,30 @@ func (suite *LfsSyncWorkerTestSuite) TestDownloadAndUploadLFSFile_EmptyDownloadU
 		return lmo.Oid == pointer.Oid && lmo.Existing == false
 	})).Return(&database.LfsMetaObject{}, nil)
 
-	err := suite.worker.downloadAndUploadLFSFile(ctx, repo, pointer)
+	err := suite.worker.downloadAndUploadLFSFile(ctx, repo, pointer, nil)
 
 	assert.Nil(suite.T(), err)
+}
+
+// TestDownloadAndUploadLFSFileRejectsNonPositivePartSize verifies invalid sizing returns an error before division.
+func (suite *LfsSyncWorkerTestSuite) TestDownloadAndUploadLFSFileRejectsNonPositivePartSize() {
+	ctx := context.WithValue(suite.ctx, rk, "models/test/repo")
+	repo := createTestRepository()
+	pointer := &types.Pointer{
+		Oid:         "test-oid-123",
+		Size:        1024,
+		DownloadURL: "https://example.com/object",
+	}
+	suite.worker.config.Mirror.PartSize = 0
+
+	suite.mocks.ossClient.EXPECT().StatObject(ctx, suite.worker.config.S3.Bucket, mock.Anything, mock.Anything).Return(minio.ObjectInfo{}, errors.New("NoSuchKey"))
+	suite.mocks.lfsMetaObjectStore.EXPECT().UpdateOrCreate(ctx, mock.MatchedBy(func(lmo database.LfsMetaObject) bool {
+		return lmo.Oid == pointer.Oid && !lmo.Existing
+	})).Return(&database.LfsMetaObject{}, nil)
+
+	err := suite.worker.downloadAndUploadLFSFile(ctx, repo, pointer, nil)
+
+	require.EqualError(suite.T(), err, "LFS multipart part size must be positive: 0")
 }
 
 func (suite *LfsSyncWorkerTestSuite) TestSendMessage() {
@@ -574,7 +743,7 @@ func (suite *LfsSyncWorkerTestSuite) TestDownloadRange() {
 	}))
 	defer server.Close()
 
-	resp, err := suite.worker.downloadRange(suite.ctx, server.URL, 0, 9)
+	resp, err := suite.worker.downloadRange(suite.ctx, server.URL, nil, 0, 9)
 
 	assert.NoError(suite.T(), err)
 	assert.NotNil(suite.T(), resp)
@@ -590,36 +759,35 @@ func (suite *LfsSyncWorkerTestSuite) TestGetLFSDownloadURLs() {
 	var server *httptest.Server
 	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.Contains(r.URL.Path, "objects/batch") {
-			resp := types.LFSBatchResponse{
-				Objects: []struct {
-					Oid     string `json:"oid"`
-					Size    int64  `json:"size"`
-					Actions struct {
-						Download *struct {
-							Href string `json:"href"`
-						} `json:"download"`
-					} `json:"actions"`
-				}{
-					{
-						Oid:  "test-oid-123",
-						Size: 100,
-						Actions: struct {
-							Download *struct {
-								Href string `json:"href"`
-							} `json:"download"`
-						}{
-							Download: &struct {
-								Href string `json:"href"`
-							}{
-								Href: server.URL + "/download/test-oid-123",
+			username, accessToken, ok := r.BasicAuth()
+			if !ok || username != "source-user" || accessToken != "source-token" {
+				w.WriteHeader(http.StatusUnauthorized)
+				return
+			}
+			resp := types.BatchResponse{
+				Objects: []*types.ObjectResponse{{
+					Pointer: types.Pointer{Oid: "test-oid-123", Size: 100},
+					Actions: map[string]*types.Link{
+						"download": {
+							Href: server.URL + "/download/test-oid-123",
+							Header: map[string]any{
+								"Authorization": "Bearer download-token",
 							},
 						},
 					},
-				},
+				}},
 			}
 			w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode(resp)
+			return
 		}
+
+		if r.Header.Get("Authorization") != "Bearer download-token" {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		w.WriteHeader(http.StatusPartialContent)
+		_, _ = w.Write([]byte("data"))
 	}))
 	defer server.Close()
 
@@ -627,11 +795,22 @@ func (suite *LfsSyncWorkerTestSuite) TestGetLFSDownloadURLs() {
 		{Oid: "test-oid-123", Size: 100},
 	}
 
-	result, err := suite.worker.GetLFSDownloadURLs(suite.ctx, server.URL+"/test/repo.git", "main", pointers)
+	result, err := suite.worker.GetLFSDownloadURLs(
+		suite.ctx, server.URL+"/test/repo.git", "main", "source-user", "source-token", pointers,
+	)
 
 	assert.NoError(suite.T(), err)
 	assert.Len(suite.T(), result, 1)
 	assert.Equal(suite.T(), server.URL+"/download/test-oid-123", result[0].DownloadURL)
+	assert.Equal(suite.T(), "Bearer download-token", result[0].DownloadHeaders.Get("Authorization"))
+
+	downloadResp, err := suite.worker.downloadRange(
+		suite.ctx, result[0].DownloadURL, result[0].DownloadHeaders, 0, 3,
+	)
+	require.NoError(suite.T(), err)
+	require.NotNil(suite.T(), downloadResp)
+	defer downloadResp.Body.Close()
+	assert.Equal(suite.T(), http.StatusPartialContent, downloadResp.StatusCode)
 }
 
 // Test utility functions
@@ -738,7 +917,7 @@ func TestLfsSyncWorkerTestSuite(t *testing.T) {
 func TestLfsSyncWorker_DownloadRange_InvalidURL(t *testing.T) {
 	worker, _ := newTestLfsSyncWorker(t, "")
 
-	resp, err := worker.downloadRange(context.Background(), "invalid-url", 0, 10)
+	resp, err := worker.downloadRange(context.Background(), "invalid-url", nil, 0, 10)
 	if resp != nil {
 		resp.Body.Close()
 	}
@@ -746,20 +925,166 @@ func TestLfsSyncWorker_DownloadRange_InvalidURL(t *testing.T) {
 	assert.Error(t, err)
 }
 
+// TestLfsSyncWorker_DownloadRange_ServerError verifies rejected responses are closed and not returned.
 func TestLfsSyncWorker_DownloadRange_ServerError(t *testing.T) {
 	worker, _ := newTestLfsSyncWorker(t, "")
+	body := &trackingReadCloser{Reader: strings.NewReader("server error")}
+	worker.httpClient.Transport = roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		return &http.Response{
+			StatusCode: http.StatusInternalServerError,
+			Body:       body,
+			Header:     make(http.Header),
+			Request:    req,
+		}, nil
+	})
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusInternalServerError)
-	}))
-	defer server.Close()
-
-	resp, err := worker.downloadRange(context.Background(), server.URL, 0, 10)
+	resp, err := worker.downloadRange(context.Background(), "https://example.com/object", nil, 0, 10)
 	if resp != nil {
-		resp.Body.Close()
+		defer resp.Body.Close()
 	}
 
 	assert.Error(t, err)
+	assert.Nil(t, resp)
+	assert.True(t, body.closed)
+}
+
+// TestLfsSyncWorker_DownloadPartRefreshesForbiddenURL verifies closed error responses still trigger URL refresh.
+func TestLfsSyncWorker_DownloadPartRefreshesForbiddenURL(t *testing.T) {
+	worker, mocks := newTestLfsSyncWorker(t, "")
+	var server *httptest.Server
+	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/expired":
+			w.WriteHeader(http.StatusForbidden)
+		case strings.HasSuffix(r.URL.Path, "/objects/batch"):
+			_ = json.NewEncoder(w).Encode(types.BatchResponse{Objects: []*types.ObjectResponse{{
+				Pointer: types.Pointer{Oid: "oid", Size: 4},
+				Actions: map[string]*types.Link{"download": {Href: server.URL + "/fresh"}},
+			}}})
+		case r.URL.Path == "/fresh":
+			w.Header().Set("Content-Length", "4")
+			w.WriteHeader(http.StatusPartialContent)
+			_, _ = w.Write([]byte("data"))
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+
+	ctx := context.WithValue(context.Background(), suk, server.URL+"/repo.git")
+	ctx = context.WithValue(ctx, dbk, "main")
+	mocks.ossCore.EXPECT().PutObjectPart(
+		ctx, "test-bucket", "object", "upload", 1, mock.Anything, int64(4), mock.Anything,
+	).Return(minio.ObjectPart{PartNumber: 1}, nil).Once()
+
+	part, err := worker.downloadAndUploadPartWithRetry(ctx, "upload", "object", 1, 0, 3, &types.Pointer{
+		Oid: "oid", Size: 4, DownloadURL: server.URL + "/expired",
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, 1, part.PartNumber)
+}
+
+func TestAcquireUploadSlotStopsWhenContextCanceled(t *testing.T) {
+	slots := make(chan struct{}, 1)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	err := acquireUploadSlot(ctx, slots)
+
+	require.ErrorIs(t, err, context.Canceled)
+}
+
+func TestLfsSyncWorker_MultipartUploadRejectsNonPositiveConcurrency(t *testing.T) {
+	worker, _ := newTestLfsSyncWorker(t, "")
+
+	err := worker.multipartUploadWithRetry(
+		context.Background(), 4, "upload", "object", 0, 1,
+		&types.Pointer{Oid: "oid", Size: 4, DownloadURL: "https://example.com/object"},
+		nil,
+	)
+
+	require.ErrorContains(t, err, "concurrency must be positive")
+}
+
+// TestLfsSyncWorker_MultipartResumeUsesPersistedPartBytes verifies resumed progress uses actual part sizes.
+func TestLfsSyncWorker_MultipartResumeUsesPersistedPartBytes(t *testing.T) {
+	worker, mocks := newTestLfsSyncWorker(t, "")
+	store := &recordingMirrorTaskProgressStore{}
+	task := &database.MirrorTask{ID: 1}
+	progress := newMirrorTaskByteProgress(task, store, 10, 0)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	uploadedParts := minio.ListObjectPartsResult{ObjectParts: []minio.ObjectPart{{
+		PartNumber: 3,
+		Size:       2,
+	}}}
+	mocks.ossCore.EXPECT().ListObjectParts(ctx, "test-bucket", "object", "upload", 0, 0).
+		Return(uploadedParts, nil).Once()
+	mocks.syncCache.EXPECT().CacheLfsSyncFileProgress(ctx, int64(1), "oid", "5", 33).
+		Return(nil).Once()
+
+	err := worker.multipartUploadWithRetry(
+		ctx, 4, "upload", "object", 2, 1,
+		&types.Pointer{Oid: "oid", Size: 10, DownloadURL: "https://example.com/object"},
+		progress,
+	)
+
+	require.ErrorIs(t, err, context.Canceled)
+	require.Equal(t, []int{20}, store.values())
+	require.Equal(t, int64(2), progress.uploadedBytes)
+}
+
+// TestLfsSyncWorker_MultipartRejectsExcessPartsWithoutProgress verifies invalid resumed parts are never credited.
+func TestLfsSyncWorker_MultipartRejectsExcessPartsWithoutProgress(t *testing.T) {
+	worker, mocks := newTestLfsSyncWorker(t, "")
+	store := &recordingMirrorTaskProgressStore{}
+	progress := newMirrorTaskByteProgress(&database.MirrorTask{ID: 1}, store, 10, 0)
+	uploadedParts := minio.ListObjectPartsResult{ObjectParts: []minio.ObjectPart{
+		{PartNumber: 1, Size: 4},
+		{PartNumber: 2, Size: 4},
+		{PartNumber: 3, Size: 2},
+		{PartNumber: 4, Size: 1},
+	}}
+	mocks.ossCore.EXPECT().ListObjectParts(mock.Anything, "test-bucket", "object", "upload", 0, 0).
+		Return(uploadedParts, nil).Once()
+	mocks.ossCore.EXPECT().AbortMultipartUpload(mock.Anything, "test-bucket", "object", "upload").
+		Return(nil).Once()
+
+	err := worker.multipartUploadWithRetry(
+		context.Background(), 4, "upload", "object", 2, 1,
+		&types.Pointer{Oid: "oid", Size: 10, DownloadURL: "https://example.com/object"},
+		progress,
+	)
+
+	require.ErrorContains(t, err, "uploaded part count exceeds expected total")
+	require.Empty(t, store.values())
+	require.Zero(t, progress.uploadedBytes)
+}
+
+func TestLfsSyncWorker_DownloadPartStopsRetryWhenContextCanceled(t *testing.T) {
+	worker, mocks := newTestLfsSyncWorker(t, "")
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Length", "4")
+		w.WriteHeader(http.StatusPartialContent)
+		_, _ = w.Write([]byte("data"))
+	}))
+	defer server.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	mocks.ossCore.EXPECT().PutObjectPart(
+		mock.Anything, "test-bucket", "object", "upload", 1, mock.Anything, int64(4), mock.Anything,
+	).Run(func(ctx context.Context, bucket, object, uploadID string, partID int, data io.Reader, size int64, opts minio.PutObjectPartOptions) {
+		cancel()
+	}).Return(minio.ObjectPart{}, context.Canceled).Once()
+
+	start := time.Now()
+	_, err := worker.downloadAndUploadPartWithRetry(ctx, "upload", "object", 1, 0, 3, &types.Pointer{
+		Oid: "oid", Size: 4, DownloadURL: server.URL,
+	})
+
+	require.ErrorIs(t, err, context.Canceled)
+	require.Less(t, time.Since(start), time.Second)
 }
 
 func TestLfsSyncWorker_DownloadRange_NotFoundError(t *testing.T) {
@@ -770,7 +1095,7 @@ func TestLfsSyncWorker_DownloadRange_NotFoundError(t *testing.T) {
 	}))
 	defer server.Close()
 
-	resp, err := worker.downloadRange(context.Background(), server.URL, 0, 10)
+	resp, err := worker.downloadRange(context.Background(), server.URL, nil, 0, 10)
 	if resp != nil {
 		resp.Body.Close()
 	}
@@ -792,7 +1117,7 @@ func TestLfsSyncWorker_DownloadRange_ContextCanceled(t *testing.T) {
 	cancel()
 
 	start := time.Now()
-	resp, err := worker.downloadRange(ctx, server.URL, 0, 10)
+	resp, err := worker.downloadRange(ctx, server.URL, nil, 0, 10)
 	elapsed := time.Since(start)
 
 	if resp != nil {
@@ -814,7 +1139,7 @@ func TestLfsSyncWorker_DownloadRange_Success(t *testing.T) {
 	}))
 	defer server.Close()
 
-	resp, err := worker.downloadRange(context.Background(), server.URL, 0, 3)
+	resp, err := worker.downloadRange(context.Background(), server.URL, nil, 0, 3)
 	require.NoError(t, err)
 	require.NotNil(t, resp)
 	defer resp.Body.Close()

@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -137,6 +138,137 @@ func TestGitalyRepo_GetArchiveUsesRelativePrefix(t *testing.T) {
 	// Verify the zip has been stripped of the prefix directory
 	stripped := readZipEntryNames(t, content)
 	require.Equal(t, []string{"README.md", "SKILL.md"}, stripped)
+}
+
+// TestResolveRelativePath verifies explicit paths bypass metadata lookup while legacy requests retain the fallback.
+func TestResolveRelativePath(t *testing.T) {
+	t.Run("explicit path", func(t *testing.T) {
+		tester := newGitalyTester(t)
+
+		path, err := tester.resolveRelativePath(
+			context.Background(), "@hashed/ab/cd/repository.git", types.ModelRepo, "ns", "repo",
+		)
+
+		require.NoError(t, err)
+		require.Equal(t, "@hashed/ab/cd/repository.git", path)
+	})
+
+	t.Run("repository metadata fallback", func(t *testing.T) {
+		tester := newGitalyTester(t)
+		tester.mocks.repoStore.EXPECT().FindByPath(
+			mock.Anything, types.ModelRepo, "ns", "repo",
+		).Return(&database.Repository{Hashed: false}, nil)
+
+		path, err := tester.resolveRelativePath(
+			context.Background(), "", types.ModelRepo, "ns", "repo",
+		)
+
+		require.NoError(t, err)
+		require.Equal(t, "models_ns/repo.git", path)
+	})
+}
+
+// TestGitalyMirrorOperationsUseExplicitRelativePath verifies mirror Git operations bypass repository lookup.
+func TestGitalyMirrorOperationsUseExplicitRelativePath(t *testing.T) {
+	const relativePath = "@hashed_repos/ab/cd/repository.git"
+
+	t.Run("repository exists", func(t *testing.T) {
+		tester := newGitalyTester(t)
+		tester.mocks.repoClient.EXPECT().RepositoryExists(mock.Anything, &gitalypb.RepositoryExistsRequest{
+			Repository: &gitalypb.Repository{StorageName: "st", RelativePath: relativePath},
+		}).Return(&gitalypb.RepositoryExistsResponse{Exists: true}, nil)
+
+		exists, err := tester.RepositoryExists(context.Background(), gitserver.CheckRepoReq{
+			RepoType: types.ModelRepo, RelativePath: relativePath,
+		})
+
+		require.NoError(t, err)
+		require.True(t, exists)
+	})
+
+	t.Run("create repository", func(t *testing.T) {
+		tester := newGitalyTester(t)
+		tester.timeout = time.Second
+		tester.mocks.repoClient.EXPECT().CreateRepository(mock.Anything, &gitalypb.CreateRepositoryRequest{
+			Repository:    &gitalypb.Repository{StorageName: "st", RelativePath: relativePath},
+			DefaultBranch: []byte("main"),
+		}).Return(&gitalypb.CreateRepositoryResponse{}, nil)
+
+		_, err := tester.CreateRepo(context.Background(), gitserver.CreateRepoReq{
+			RepoType: types.ModelRepo, DefaultBranch: "main", RelativePath: relativePath,
+		})
+
+		require.NoError(t, err)
+	})
+
+	t.Run("get repository", func(t *testing.T) {
+		tester := newGitalyTester(t)
+		tester.timeout = time.Second
+		tester.mocks.refClient.EXPECT().FindDefaultBranchName(mock.Anything, &gitalypb.FindDefaultBranchNameRequest{
+			Repository: &gitalypb.Repository{StorageName: "st", RelativePath: relativePath},
+		}).Return(&gitalypb.FindDefaultBranchNameResponse{Name: []byte("main")}, nil)
+
+		repo, err := tester.GetRepo(context.Background(), gitserver.GetRepoReq{
+			RepoType: types.ModelRepo, RelativePath: relativePath,
+		})
+
+		require.NoError(t, err)
+		require.Equal(t, "main", repo.DefaultBranch)
+	})
+
+	t.Run("get last commit", func(t *testing.T) {
+		tester := newGitalyTester(t)
+		tester.timeout = time.Second
+		tester.mocks.commitClient.EXPECT().FindCommit(mock.Anything, &gitalypb.FindCommitRequest{
+			Repository: &gitalypb.Repository{StorageName: "st", RelativePath: relativePath},
+			Revision:   []byte("main"),
+		}).Return(&gitalypb.FindCommitResponse{}, nil)
+
+		_, err := tester.GetRepoLastCommit(context.Background(), gitserver.GetRepoLastCommitReq{
+			RepoType: types.ModelRepo, Ref: "main", RelativePath: relativePath,
+		})
+
+		require.NoError(t, err)
+	})
+
+	t.Run("get commit diff", func(t *testing.T) {
+		tester := newGitalyTester(t)
+		tester.timeout = time.Second
+		tester.mocks.diffClient.EXPECT().FindChangedPaths(mock.Anything, mock.MatchedBy(
+			func(req *gitalypb.FindChangedPathsRequest) bool {
+				return req.Repository.RelativePath == relativePath
+			},
+		)).Return(&MockGrpcStreamClient[*gitalypb.FindChangedPathsResponse]{}, nil)
+		tester.mocks.commitClient.EXPECT().FindCommit(mock.Anything, mock.MatchedBy(
+			func(req *gitalypb.FindCommitRequest) bool {
+				return req.Repository.RelativePath == relativePath
+			},
+		)).Return(nil, nil)
+
+		_, err := tester.GetDiffBetweenTwoCommits(context.Background(), gitserver.GetDiffBetweenTwoCommitsReq{
+			RepoType: types.ModelRepo, LeftCommitId: "left", RightCommitId: "right", RelativePath: relativePath,
+		})
+
+		require.NoError(t, err)
+	})
+
+	t.Run("update ref", func(t *testing.T) {
+		tester := newGitalyTester(t)
+		tester.timeout = time.Second
+		stream := &MockGrpcStreamClientFull[
+			*gitalypb.UpdateReferencesRequest,
+			*gitalypb.UpdateReferencesResponse,
+		]{data: []*gitalypb.UpdateReferencesResponse{{}}}
+		tester.mocks.refClient.EXPECT().UpdateReferences(mock.Anything).Return(stream, nil)
+
+		err := tester.UpdateRef(context.Background(), gitserver.UpdateRefReq{
+			RepoType: types.ModelRepo, Ref: "refs/heads/main", NewObjectId: "commit", RelativePath: relativePath,
+		})
+
+		require.NoError(t, err)
+		require.Len(t, stream.sends, 1)
+		require.Equal(t, relativePath, stream.sends[0].Repository.RelativePath)
+	})
 }
 
 type testZipEntry struct {

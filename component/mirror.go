@@ -49,15 +49,19 @@ type MirrorComponent interface {
 	// CreateMirrorRepo often called by the crawler server to create new repo which will then be mirrored from other sources
 	CreateMirrorRepo(ctx context.Context, req types.CreateMirrorRepoReq) (*database.Mirror, error)
 	// MirrorFromSaas enqueues a mirror sync from the configured OpenCSG SaaS Git source.
-	MirrorFromSaas(ctx context.Context, namespace, name string, repoType types.RepositoryType) error
+	MirrorFromSaas(ctx context.Context, req types.MirrorFromSaasReq) (*types.MirrorFromSaasResponse, error)
+	// MirrorFromSaasStatus returns public progress for the current SaaS mirror task.
+	MirrorFromSaasStatus(ctx context.Context, req types.MirrorFromSaasStatusReq) (*types.MirrorSyncStatusResponse, error)
 	// GetMirror returns mirror configuration and current task status for an existing repository.
 	GetMirror(ctx context.Context, req types.GetMirrorReq) (*types.Mirror, error)
 	// UpdateMirror updates mirror configuration for an existing repository.
 	UpdateMirror(ctx context.Context, req types.UpdateMirrorReq) (*database.Mirror, error)
 	// SyncMirror enqueues a new repo sync task for an existing mirror repository.
-	SyncMirror(ctx context.Context, repoType types.RepositoryType, namespace, name, currentUser string) error
+	SyncMirror(ctx context.Context, req types.SyncMirrorReq) error
 	// DeleteMirror deletes an existing mirror after cancelling its workhub jobs.
 	DeleteMirror(ctx context.Context, req types.DeleteMirrorReq) error
+	// ListMirrorSyncs returns mirror synchronization summaries from persisted task state.
+	ListMirrorSyncs(ctx context.Context, req types.MirrorSyncListReq) (*types.MirrorSyncListResponse, error)
 	Repos(ctx context.Context, per, page int) ([]types.MirrorRepo, int, error)
 	Index(ctx context.Context, per, page int, filter types.MirrorFilter) ([]types.Mirror, int, error)
 	Statistics(ctx context.Context) ([]types.MirrorStatusCount, error)
@@ -66,6 +70,245 @@ type MirrorComponent interface {
 	PublicModelRepo(ctx context.Context) error
 	Delete(ctx context.Context, id int64) error
 	ResolveNamespace(ctx context.Context, req types.ResolveNamespaceReq) (*types.ResolveNamespaceResp, error)
+}
+
+// mirrorSyncResolution is the internal effective state used to build synchronization list rows.
+type mirrorSyncResolution struct {
+	Phase     types.MirrorSyncPhase
+	Status    types.MirrorSyncOverallStatus
+	Result    types.MirrorSyncResult
+	Retrying  bool
+	RepoStage types.MirrorSyncStageSummary
+	LFSStage  types.MirrorSyncStageSummary
+}
+
+// resolveMirrorSyncStatus maps the persisted mirror task state to the public lifecycle.
+func resolveMirrorSyncStatus(mirror database.Mirror) mirrorSyncResolution {
+	task := mirror.CurrentTask
+	if task == nil {
+		return noTaskMirrorSyncResolution()
+	}
+	if mirror.CurrentTaskID == 0 || task.ID != mirror.CurrentTaskID || task.MirrorID != mirror.ID {
+		return invalidMirrorSyncResolution()
+	}
+
+	switch task.Status {
+	case types.MirrorQueued:
+		return mirrorSyncResolution{
+			Phase: types.MirrorSyncPhaseRepo, Status: types.MirrorSyncOverallWaiting,
+			RepoStage: notStartedMirrorSyncStage(), LFSStage: notStartedMirrorSyncStage(),
+		}
+	case types.MirrorRepoSyncStart:
+		return mirrorSyncResolution{
+			Phase: types.MirrorSyncPhaseRepo, Status: types.MirrorSyncOverallRunning,
+			RepoStage: runningMirrorSyncStage(), LFSStage: notStartedMirrorSyncStage(),
+		}
+	case types.MirrorRepoSyncFailed:
+		return mirrorSyncResolution{
+			Phase: types.MirrorSyncPhaseRepo, Status: types.MirrorSyncOverallRunning, Retrying: true,
+			RepoStage: runningMirrorSyncStage(), LFSStage: notStartedMirrorSyncStage(),
+		}
+	case types.MirrorRepoSyncFatal:
+		return finishedMirrorSyncResolution(
+			types.MirrorSyncResultFailed,
+			finishedMirrorSyncStage(types.MirrorSyncResultFailed),
+			notStartedMirrorSyncStage(),
+		)
+	case types.MirrorRepoSyncFinished:
+		return mirrorSyncResolution{
+			Phase: types.MirrorSyncPhaseLFS, Status: types.MirrorSyncOverallWaiting,
+			RepoStage: finishedMirrorSyncStage(types.MirrorSyncResultSuccess), LFSStage: notStartedMirrorSyncStage(),
+		}
+	case types.MirrorLfsSyncStart:
+		return mirrorSyncResolution{
+			Phase: types.MirrorSyncPhaseLFS, Status: types.MirrorSyncOverallRunning,
+			RepoStage: finishedMirrorSyncStage(types.MirrorSyncResultSuccess), LFSStage: runningMirrorSyncStage(),
+		}
+	case types.MirrorLfsSyncFailed:
+		return mirrorSyncResolution{
+			Phase: types.MirrorSyncPhaseLFS, Status: types.MirrorSyncOverallRunning, Retrying: true,
+			RepoStage: finishedMirrorSyncStage(types.MirrorSyncResultSuccess), LFSStage: runningMirrorSyncStage(),
+		}
+	case types.MirrorLfsSyncFinished:
+		return finishedMirrorSyncResolution(
+			types.MirrorSyncResultSuccess,
+			finishedMirrorSyncStage(types.MirrorSyncResultSuccess),
+			finishedMirrorSyncStage(types.MirrorSyncResultSuccess),
+		)
+	case types.MirrorLfsSyncFatal:
+		return finishedMirrorSyncResolution(
+			types.MirrorSyncResultFailed,
+			finishedMirrorSyncStage(types.MirrorSyncResultSuccess),
+			finishedMirrorSyncStage(types.MirrorSyncResultFailed),
+		)
+	case types.MirrorLfsIncomplete:
+		return finishedMirrorSyncResolution(
+			types.MirrorSyncResultIncomplete,
+			finishedMirrorSyncStage(types.MirrorSyncResultSuccess),
+			finishedMirrorSyncStage(types.MirrorSyncResultIncomplete),
+		)
+	case types.MirrorRepoTooLarge:
+		return finishedMirrorSyncResolution(
+			types.MirrorSyncResultTooLarge,
+			finishedMirrorSyncStage(types.MirrorSyncResultSuccess),
+			finishedMirrorSyncStage(types.MirrorSyncResultTooLarge),
+		)
+	case types.MirrorCanceled:
+		if task.LFSJobID == 0 {
+			return finishedMirrorSyncResolution(
+				types.MirrorSyncResultCancelled,
+				finishedMirrorSyncStage(types.MirrorSyncResultCancelled),
+				notStartedMirrorSyncStage(),
+			)
+		}
+		return finishedMirrorSyncResolution(
+			types.MirrorSyncResultCancelled,
+			finishedMirrorSyncStage(types.MirrorSyncResultSuccess),
+			finishedMirrorSyncStage(types.MirrorSyncResultCancelled),
+		)
+	default:
+		return invalidMirrorSyncResolution()
+	}
+}
+
+// noTaskMirrorSyncResolution returns a nonterminal-free state for a mirror without a current task.
+func noTaskMirrorSyncResolution() mirrorSyncResolution {
+	return mirrorSyncResolution{
+		Status:    types.MirrorSyncOverallNoTask,
+		RepoStage: notStartedMirrorSyncStage(),
+		LFSStage:  notStartedMirrorSyncStage(),
+	}
+}
+
+// invalidMirrorSyncResolution returns a terminal diagnostic result instead of waiting forever.
+func invalidMirrorSyncResolution() mirrorSyncResolution {
+	return mirrorSyncResolution{
+		Phase: types.MirrorSyncPhaseDone, Status: types.MirrorSyncOverallFinished, Result: types.MirrorSyncResultStateInvalid,
+		RepoStage: finishedMirrorSyncStage(types.MirrorSyncResultStateInvalid),
+		LFSStage:  notStartedMirrorSyncStage(),
+	}
+}
+
+// finishedMirrorSyncResolution creates one terminal overall result.
+func finishedMirrorSyncResolution(result types.MirrorSyncResult, repoStage, lfsStage types.MirrorSyncStageSummary) mirrorSyncResolution {
+	return mirrorSyncResolution{
+		Phase: types.MirrorSyncPhaseDone, Status: types.MirrorSyncOverallFinished, Result: result,
+		RepoStage: repoStage, LFSStage: lfsStage,
+	}
+}
+
+// notStartedMirrorSyncStage creates a stage that has not run yet.
+func notStartedMirrorSyncStage() types.MirrorSyncStageSummary {
+	return types.MirrorSyncStageSummary{State: types.MirrorSyncStageNotStarted}
+}
+
+// runningMirrorSyncStage creates an active or retrying stage.
+func runningMirrorSyncStage() types.MirrorSyncStageSummary {
+	return types.MirrorSyncStageSummary{State: types.MirrorSyncStageRunning}
+}
+
+// finishedMirrorSyncStage creates a terminal stage with its final result.
+func finishedMirrorSyncStage(result types.MirrorSyncResult) types.MirrorSyncStageSummary {
+	return types.MirrorSyncStageSummary{State: types.MirrorSyncStageFinished, Result: result}
+}
+
+// buildMirrorSyncSummary creates one public synchronization list row.
+func buildMirrorSyncSummary(mirror database.Mirror, status mirrorSyncResolution, configuredMaxRetryCount int) types.MirrorSyncSummary {
+	var (
+		taskID     int64
+		priority   types.MirrorPriority
+		isUrgent   bool
+		progress   int
+		retryCount int
+	)
+	if mirror.CurrentTask != nil {
+		taskID = mirror.CurrentTask.ID
+		priority = mirror.CurrentTask.Priority
+		isUrgent = mirror.CurrentTask.IsUrgent
+		progress = mirror.CurrentTask.Progress
+		retryCount = mirror.CurrentTask.RetryCount
+	}
+
+	var repoPath string
+	if mirror.Repository != nil {
+		repoPath = mirror.RepoPath()
+	}
+	return types.MirrorSyncSummary{
+		MirrorID: mirror.ID, RepositoryID: mirror.RepositoryID, TaskID: taskID,
+		SourceURL: mirror.SourceUrl, Username: mirror.Username,
+		AccessToken: maskMirrorSyncToken(mirror.AccessToken), RepoPath: repoPath,
+		Priority: priority, IsUrgent: isUrgent, Progress: progress,
+		RetryCount: retryCount, MaxRetryCount: configuredMaxRetryCount,
+		Status: status.Status, Result: status.Result, Retrying: status.Retrying,
+		RepoStage: status.RepoStage, LFSStage: status.LFSStage,
+	}
+}
+
+// maskMirrorSyncToken returns a stable prefix without exposing a complete source token.
+func maskMirrorSyncToken(token string) string {
+	if token == "" {
+		return ""
+	}
+	visible := 4
+	if len(token) < visible {
+		visible = len(token)
+	}
+	return token[:visible] + "********"
+}
+
+// ListMirrorSyncs returns one page of mirror synchronization summaries.
+func (m *mirrorComponentImpl) ListMirrorSyncs(ctx context.Context, req types.MirrorSyncListReq) (*types.MirrorSyncListResponse, error) {
+	const defaultMirrorSyncPageSize = 10
+	if req.Page <= 0 {
+		req.Page = 1
+	}
+	if req.Per <= 0 {
+		req.Per = defaultMirrorSyncPageSize
+	}
+	var statuses []types.MirrorTaskStatus
+	switch req.Status {
+	case "":
+	case types.MirrorSyncOverallWaiting:
+		statuses = []types.MirrorTaskStatus{
+			types.MirrorQueued,
+			types.MirrorRepoSyncFinished,
+		}
+	case types.MirrorSyncOverallRunning:
+		statuses = []types.MirrorTaskStatus{
+			types.MirrorRepoSyncStart,
+			types.MirrorRepoSyncFailed,
+			types.MirrorLfsSyncStart,
+			types.MirrorLfsSyncFailed,
+		}
+	case types.MirrorSyncOverallFinished:
+		statuses = []types.MirrorTaskStatus{
+			types.MirrorRepoSyncFatal,
+			types.MirrorLfsSyncFinished,
+			types.MirrorLfsSyncFatal,
+			types.MirrorLfsIncomplete,
+			types.MirrorCanceled,
+			types.MirrorRepoTooLarge,
+		}
+	default:
+		return nil, errorx.BadRequest(errors.New("unsupported mirror sync status"), nil)
+	}
+
+	query := database.MirrorSyncListQuery{Page: req.Page, Per: req.Per, Search: req.Search, Statuses: statuses}
+	mirrors, total, err := m.mirrorStore.IndexSyncWithPagination(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list mirror syncs: %w", err)
+	}
+	items := m.buildMirrorSyncSummaries(mirrors)
+	return &types.MirrorSyncListResponse{Items: items, Total: total, Page: req.Page, Per: req.Per}, nil
+}
+
+// buildMirrorSyncSummaries builds list rows from persisted mirror task state.
+func (m *mirrorComponentImpl) buildMirrorSyncSummaries(mirrors []database.Mirror) []types.MirrorSyncSummary {
+	items := make([]types.MirrorSyncSummary, 0, len(mirrors))
+	for _, mirror := range mirrors {
+		items = append(items, buildMirrorSyncSummary(mirror, resolveMirrorSyncStatus(mirror), m.config.Mirror.MaxRetryCount))
+	}
+	return items
 }
 
 func NewMirrorComponent(config *config.Config) (MirrorComponent, error) {
@@ -86,7 +329,7 @@ func NewMirrorComponent(config *config.Config) (MirrorComponent, error) {
 	if err != nil {
 		return nil, fmt.Errorf("fail to create mirror repo job client,error:%w", err)
 	}
-	mirrorRepoJobClient := workhub.NewMirrorRepoJobClient(jobClient)
+	mirrorRepoJobClient := workhub.NewMirrorRepoJobClient(jobClient, workhub.MirrorJobClientConfig{MaxRetryCount: config.Mirror.MaxRetryCount})
 	c.mirrorJobClient = jobClient
 	c.mirrorRepoJobClient = mirrorRepoJobClient
 	c.mirrorTaskJobStore = database.NewMirrorTaskJobStore()
@@ -111,20 +354,15 @@ func (m *mirrorComponentImpl) mapNamespaceAndName(sourceNamespace string) string
 	return n.TargetNamespace
 }
 
-// var mirrorStatusAndRepoSyncStatusMapping = map[types.MirrorTaskStatus]types.RepositorySyncStatus{
-// 	types.MirrorQueued:           types.SyncStatusPending,
-// 	types.MirrorRepoSyncStart:    types.SyncStatusInProgress,
-// 	types.MirrorRepoSyncFinished: types.SyncStatusInProgress,
-// 	types.MirrorRepoSyncFailed:   types.SyncStatusFailed,
-// 	types.MirrorRepoSyncFatal:    types.SyncStatusFailed,
-// 	types.MirrorLfsSyncStart:     types.SyncStatusInProgress,
-// 	types.MirrorLfsSyncFinished:  types.SyncStatusInProgress,
-// 	types.MirrorLfsSyncFailed:    types.SyncStatusFailed,
-// 	types.MirrorLfsSyncFatal:     types.SyncStatusFailed,
-// }
-
 // CreateMirror creates a mirror configuration for an existing repository.
 func (m *mirrorComponentImpl) CreateMirror(ctx context.Context, req types.CreateMirrorReq) (*database.Mirror, error) {
+	sourceURL, username, accessToken, err := normalizeMirrorSource(req.SourceUrl, req.Username, req.AccessToken)
+	if err != nil {
+		return nil, err
+	}
+	req.SourceUrl = sourceURL
+	req.Username = username
+	req.AccessToken = accessToken
 	var mirror database.Mirror
 	admin, err := m.repoComp.CheckCurrentUserPermission(ctx, req.CurrentUser, req.Namespace, membership.RoleAdmin)
 	if err != nil {
@@ -147,7 +385,6 @@ func (m *mirrorComponentImpl) CreateMirror(ctx context.Context, req types.Create
 		mirror.LocalRepoPath = fmt.Sprintf("%s_%s_%s_%s", mirrorSource.SourceName, req.RepoType, req.Namespace, req.Name)
 	}
 
-	mirror.Interval = req.Interval
 	mirror.SourceUrl = req.SourceUrl
 	mirror.MirrorSourceID = req.MirrorSourceID
 	mirror.Username = req.Username
@@ -158,7 +395,7 @@ func (m *mirrorComponentImpl) CreateMirror(ctx context.Context, req types.Create
 	mirror.RepositoryID = repo.ID
 	mirror.Repository = repo
 
-	mirror.Priority = types.ASAPMirrorPriority
+	mirror.Priority = types.LowMirrorPriority
 
 	sourceType, sourcePath, _ := common.GetSourceTypeAndPathFromURL(req.SourceUrl)
 	applyMirrorRepositorySourcePath(repo, sourceType, sourcePath)
@@ -166,6 +403,7 @@ func (m *mirrorComponentImpl) CreateMirror(ctx context.Context, req types.Create
 		Repository:       repo,
 		CreateRepository: false,
 		Mirror:           mirror,
+		Urgent:           req.Urgent,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create mirror repo records: %w", err)
@@ -175,42 +413,165 @@ func (m *mirrorComponentImpl) CreateMirror(ctx context.Context, req types.Create
 }
 
 // MirrorFromSaas enqueues one workhub sync for an existing on-prem repository backed by a SaaS Git source.
-func (m *mirrorComponentImpl) MirrorFromSaas(ctx context.Context, namespace, name string, repoType types.RepositoryType) error {
-	repo, err := m.repoStore.FindByPath(ctx, repoType, namespace, name)
+func (m *mirrorComponentImpl) MirrorFromSaas(ctx context.Context, req types.MirrorFromSaasReq) (*types.MirrorFromSaasResponse, error) {
+	repo, err := m.repoStore.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
 	if err != nil {
-		return fmt.Errorf("failed to find repo, error: %w", err)
+		return nil, fmt.Errorf("failed to find repo, error: %w", err)
+	}
+	permission, err := m.repoComp.GetUserRepoPermission(ctx, req.CurrentUser, repo)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check mirror sync permission: %w", err)
+	}
+	if !permission.CanWrite {
+		return nil, errorx.ErrForbiddenMsg("users do not have permission to sync this repository")
 	}
 
 	mirror, err := m.mirrorStore.FindByRepoID(ctx, repo.ID)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return fmt.Errorf("failed to find mirror, error: %w", err)
+		return nil, fmt.Errorf("failed to find mirror, error: %w", err)
 	}
 	if mirror != nil {
-		return m.requeueMirrorFromSaas(ctx, repo, mirror)
+		task, err := m.requeueMirrorFromSaas(ctx, repo, mirror)
+		if err != nil {
+			return nil, err
+		}
+		return &types.MirrorFromSaasResponse{
+			RepositoryID: repo.ID,
+			MirrorID:     mirror.ID,
+			TaskID:       task.ID,
+			Status:       types.MirrorQueued,
+		}, nil
 	}
 
-	syncVersion, err := m.syncVersionStore.FindByRepoTypeAndPath(ctx, repo.PathWithOutPrefix(), repoType)
+	syncVersion, err := m.syncVersionStore.FindByRepoTypeAndPath(ctx, repo.PathWithOutPrefix(), req.RepoType)
 	if err != nil {
-		return fmt.Errorf("failed to find sync version, error: %w", err)
+		return nil, fmt.Errorf("failed to find sync version, error: %w", err)
 	}
-	sourceURL := common.TrimPrefixCloneURLBySourceID(m.config.MultiSync.SaasSyncDomain, string(repoType), namespace, name, syncVersion.SourceID)
+	sourceURL := common.TrimPrefixCloneURLBySourceID(m.config.MultiSync.SaasSyncDomain, string(req.RepoType), req.Namespace, req.Name, syncVersion.SourceID)
 	sourceType, sourcePath, _ := common.GetSourceTypeAndPathFromURL(sourceURL)
 	applyMirrorRepositorySourcePath(repo, sourceType, sourcePath)
 	reqMirror := database.Mirror{
 		SourceUrl:      sourceURL,
 		RepositoryID:   repo.ID,
 		Repository:     repo,
-		SourceRepoPath: fmt.Sprintf("%s/%s", namespace, name),
-		Priority:       types.ASAPMirrorPriority,
+		SourceRepoPath: fmt.Sprintf("%s/%s", req.Namespace, req.Name),
+		Priority:       types.MediumMirrorPriority,
 	}
-	if _, err := m.mirrorRepoStore.CreateMirrorRepoRecords(ctx, database.CreateMirrorRepoRecordsInput{
+	createdMirror, err := m.mirrorRepoStore.CreateMirrorRepoRecords(ctx, database.CreateMirrorRepoRecordsInput{
 		Repository:       repo,
 		CreateRepository: false,
 		Mirror:           reqMirror,
-	}); err != nil {
-		return fmt.Errorf("failed to create mirror repo records: %w", err)
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create mirror repo records: %w", err)
 	}
-	return nil
+	return &types.MirrorFromSaasResponse{
+		RepositoryID: repo.ID,
+		MirrorID:     createdMirror.ID,
+		TaskID:       createdMirror.CurrentTaskID,
+		Status:       types.MirrorQueued,
+	}, nil
+}
+
+// MirrorFromSaasStatus returns public progress for the current SaaS mirror task.
+func (m *mirrorComponentImpl) MirrorFromSaasStatus(ctx context.Context, req types.MirrorFromSaasStatusReq) (*types.MirrorSyncStatusResponse, error) {
+	repo, err := m.repoStore.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find repo, error: %w", err)
+	}
+	permission, err := m.repoComp.GetUserRepoPermission(ctx, req.CurrentUser, repo)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check mirror status permission: %w", err)
+	}
+	if !permission.CanRead {
+		return nil, errorx.ErrForbiddenMsg("users do not have permission to read this repository")
+	}
+
+	mirror, err := m.mirrorStore.FindByRepoID(ctx, repo.ID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find mirror, error: %w", err)
+	}
+	if mirror.CurrentTaskID == 0 || mirror.CurrentTask == nil ||
+		mirror.CurrentTask.ID != mirror.CurrentTaskID || mirror.CurrentTask.MirrorID != mirror.ID {
+		return nil, invalidMirrorTaskState(mirror, "current mirror task is missing or inconsistent")
+	}
+
+	result, jobID, err := classifyMirrorTask(repo.ID, mirror, req.RequestedTaskID)
+	if err != nil {
+		return nil, err
+	}
+	if result.Terminal {
+		return result, nil
+	}
+	if jobID == 0 {
+		return nil, invalidMirrorTaskState(mirror, "current mirror task job is missing")
+	}
+	return result, nil
+}
+
+// classifyMirrorTask maps persisted business status and returns the active workhub job ID.
+func classifyMirrorTask(repositoryID int64, mirror *database.Mirror, requestedTaskID int64) (*types.MirrorSyncStatusResponse, int64, error) {
+	task := mirror.CurrentTask
+	result := &types.MirrorSyncStatusResponse{
+		RepositoryID: repositoryID,
+		MirrorID:     mirror.ID,
+		TaskID:       task.ID,
+		Status:       task.Status,
+		Superseded:   requestedTaskID != 0 && requestedTaskID != task.ID,
+		Progress:     task.Progress,
+		UpdatedAt:    task.UpdatedAt,
+	}
+
+	switch task.Status {
+	case types.MirrorQueued, types.MirrorRepoSyncStart, types.MirrorRepoSyncFailed:
+		result.Phase = types.MirrorSyncPhaseRepo
+		result.Retrying = task.Status == types.MirrorRepoSyncFailed
+		return result, task.RepoJobID, nil
+	case types.MirrorRepoSyncFatal:
+		result.Phase = types.MirrorSyncPhaseRepo
+		result.Terminal = true
+		result.FailureReason = types.MirrorSyncFailureRepoSyncFailed
+	case types.MirrorRepoSyncFinished, types.MirrorLfsSyncStart, types.MirrorLfsSyncFailed:
+		result.Phase = types.MirrorSyncPhaseLFS
+		result.RepoReady = true
+		result.Retrying = task.Status == types.MirrorLfsSyncFailed
+		return result, task.LFSJobID, nil
+	case types.MirrorLfsSyncFinished:
+		result.Phase = types.MirrorSyncPhaseDone
+		result.RepoReady = true
+		result.Terminal = true
+	case types.MirrorLfsSyncFatal:
+		result.Phase = types.MirrorSyncPhaseDone
+		result.RepoReady = true
+		result.Terminal = true
+		result.FailureReason = types.MirrorSyncFailureLFSSyncFailed
+	case types.MirrorLfsIncomplete:
+		result.Phase = types.MirrorSyncPhaseDone
+		result.RepoReady = true
+		result.Terminal = true
+		result.FailureReason = types.MirrorSyncFailureLFSIncomplete
+	case types.MirrorRepoTooLarge:
+		result.Phase = types.MirrorSyncPhaseDone
+		result.RepoReady = true
+		result.Terminal = true
+		result.FailureReason = types.MirrorSyncFailureLFSTooLarge
+	case types.MirrorCanceled:
+		result.Phase = types.MirrorSyncPhaseDone
+		result.RepoReady = task.AfterLastCommitID != ""
+		result.Terminal = true
+		result.FailureReason = types.MirrorSyncFailureCanceled
+	default:
+		return nil, 0, invalidMirrorTaskState(mirror, fmt.Sprintf("unsupported mirror task status %q", task.Status))
+	}
+	return result, 0, nil
+}
+
+// invalidMirrorTaskState returns a stable API error without exposing task error messages.
+func invalidMirrorTaskState(mirror *database.Mirror, message string) error {
+	publicErr := errorx.MirrorTaskStateInvalid(errors.New("mirror task state is invalid"), errorx.Ctx().
+		Set("mirror_id", mirror.ID).
+		Set("task_id", mirror.CurrentTaskID))
+	return fmt.Errorf("%s: %w", message, publicErr)
 }
 
 // GetMirror returns mirror configuration and current task status for an existing repository.
@@ -266,6 +627,13 @@ func (m *mirrorComponentImpl) GetMirror(ctx context.Context, req types.GetMirror
 
 // UpdateMirror updates mirror configuration for an existing repository.
 func (m *mirrorComponentImpl) UpdateMirror(ctx context.Context, req types.UpdateMirrorReq) (*database.Mirror, error) {
+	sourceURL, username, accessToken, err := normalizeMirrorSource(req.SourceUrl, req.Username, req.AccessToken)
+	if err != nil {
+		return nil, err
+	}
+	req.SourceUrl = sourceURL
+	req.Username = username
+	req.AccessToken = accessToken
 	admin, err := m.repoComp.CheckCurrentUserPermission(ctx, req.CurrentUser, req.Namespace, membership.RoleAdmin)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check permission to create mirror, error: %w", err)
@@ -288,12 +656,11 @@ func (m *mirrorComponentImpl) UpdateMirror(ctx context.Context, req types.Update
 		return nil, fmt.Errorf("failed to find access token, error: %w", err)
 	}
 
-	mirror.Interval = req.Interval
 	mirror.SourceUrl = req.SourceUrl
 	mirror.MirrorSourceID = req.MirrorSourceID
 	mirror.Username = req.Username
-	mirror.PushUrl = req.PushUrl
 	mirror.AccessToken = req.AccessToken
+	mirror.PushUrl = req.PushUrl
 	mirror.PushUsername = req.CurrentUser
 	mirror.PushAccessToken = pushAccessToken.Token
 	mirror.SourceRepoPath = req.SourceRepoPath
@@ -306,22 +673,22 @@ func (m *mirrorComponentImpl) UpdateMirror(ctx context.Context, req types.Update
 }
 
 // SyncMirror validates access to an existing mirror repository and enqueues a new repo sync task.
-func (m *mirrorComponentImpl) SyncMirror(ctx context.Context, repoType types.RepositoryType, namespace, name, currentUser string) error {
-	user, err := m.userStore.FindByUsername(ctx, currentUser)
+func (m *mirrorComponentImpl) SyncMirror(ctx context.Context, req types.SyncMirrorReq) error {
+	user, err := m.userStore.FindByUsername(ctx, req.CurrentUser)
 	if err != nil {
 		return errors.New("user does not exist")
 	}
 	if !user.CanAdmin() {
-		admin, err := m.repoComp.CheckCurrentUserPermission(ctx, currentUser, namespace, membership.RoleAdmin)
+		canWrite, err := m.repoComp.CheckCurrentUserPermission(ctx, req.CurrentUser, req.Namespace, membership.RoleWrite)
 		if err != nil {
-			return fmt.Errorf("failed to check permission to create mirror, error: %w", err)
+			return fmt.Errorf("failed to check permission to sync mirror: %w", err)
 		}
 
-		if !admin {
-			return errorx.ErrForbiddenMsg("need be owner or admin role to sync mirror for this repo")
+		if !canWrite {
+			return errorx.ErrForbiddenMsg("write permission is required to sync mirror for this repo")
 		}
 	}
-	repo, err := m.repoStore.FindByPath(ctx, repoType, namespace, name)
+	repo, err := m.repoStore.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
 	if err != nil {
 		return fmt.Errorf("failed to find repo, error: %w", err)
 	}
@@ -329,7 +696,8 @@ func (m *mirrorComponentImpl) SyncMirror(ctx context.Context, repoType types.Rep
 	if err != nil {
 		return fmt.Errorf("failed to find mirror, error: %w", err)
 	}
-	return requeueMirrorRepoTask(ctx, m.mirrorTaskJobStore, m.mirrorRepoJobClient, m.mirrorJobClient, repo, mirror)
+	_, err = m.requeueMirrorRepoTask(ctx, repo, mirror, nil, nil, mirror.Priority, req.Urgent)
+	return err
 }
 
 // DeleteMirror validates access to an existing mirror repository and deletes it transactionally.
@@ -410,6 +778,7 @@ func (m *mirrorComponentImpl) Repos(ctx context.Context, per, page int) ([]types
 			RepoSyncStatus := common.MirrorTaskStatusToRepoStatus(m.CurrentTask.Status)
 			mirrorRepos = append(mirrorRepos, types.MirrorRepo{
 				ID:         m.ID,
+				TaskID:     m.CurrentTask.ID,
 				Path:       m.Repository.Path,
 				SyncStatus: RepoSyncStatus,
 				RepoType:   m.Repository.RepositoryType,
@@ -436,22 +805,15 @@ func (m *mirrorComponentImpl) Index(ctx context.Context, per, page int, filter t
 			status = mirror.Status
 		}
 		mirrorsResp = append(mirrorsResp, types.Mirror{
-			ID:        mirror.ID,
-			SourceUrl: mirror.SourceUrl,
-			MirrorSource: types.MirrorSource{
-				SourceName: mirror.MirrorSource.SourceName,
-			},
-			Username:        mirror.Username,
-			AccessToken:     mirror.AccessToken,
-			PushUrl:         mirror.PushUrl,
-			PushUsername:    mirror.PushUsername,
-			PushAccessToken: mirror.PushAccessToken,
-			LastUpdatedAt:   mirror.LastUpdatedAt,
-			SourceRepoPath:  mirror.SourceRepoPath,
-			LocalRepoPath:   mirror.RepoPath(),
-			LastMessage:     mirror.LastMessage,
-			Status:          status,
-			Progress:        mirror.Progress,
+			ID:            mirror.ID,
+			SourceUrl:     mirror.SourceUrl,
+			Username:      mirror.Username,
+			AccessToken:   mirror.AccessToken,
+			LastUpdatedAt: mirror.LastUpdatedAt,
+			LocalRepoPath: mirror.RepoPath(),
+			LastMessage:   mirror.LastMessage,
+			Status:        status,
+			Progress:      mirror.Progress,
 		})
 	}
 	return mirrorsResp, total, nil
@@ -474,6 +836,7 @@ func (m *mirrorComponentImpl) Statistics(ctx context.Context) ([]types.MirrorSta
 	return scs, nil
 }
 
+// BatchCreate normalizes mirror sources and updates existing mirrors with provided credentials.
 func (m *mirrorComponentImpl) BatchCreate(ctx context.Context, req types.BatchCreateMirrorReq) error {
 	var (
 		toBeUpdatedMirrors []database.Mirror
@@ -482,7 +845,17 @@ func (m *mirrorComponentImpl) BatchCreate(ctx context.Context, req types.BatchCr
 		existingSourceURLs []string
 	)
 	sourceURLMirrorMapping := make(map[string]types.MirrorReq)
-	for _, mirror := range req.Mirrors {
+	for i, mirror := range req.Mirrors {
+		sourceURL, username, accessToken, err := normalizeMirrorSource(
+			mirror.SourceURL, mirror.Username, mirror.AccessToken,
+		)
+		if err != nil {
+			return fmt.Errorf("mirror index %d: %w", i, err)
+		}
+		mirror.SourceURL = sourceURL
+		mirror.Username = username
+		mirror.AccessToken = accessToken
+		req.Mirrors[i] = mirror
 		sourceURLMirrorMapping[mirror.SourceURL] = mirror
 		sourceURLs = append(sourceURLs, mirror.SourceURL)
 	}
@@ -493,21 +866,27 @@ func (m *mirrorComponentImpl) BatchCreate(ctx context.Context, req types.BatchCr
 	for _, eMirror := range existingMirrors {
 		if mirror, ok := sourceURLMirrorMapping[eMirror.SourceUrl]; ok {
 			if mirror.Priority == 0 {
-				mirror.Priority = 1
+				mirror.Priority = int8(types.LowMirrorPriority)
 			}
 			eMirror.Priority = types.MirrorPriority(mirror.Priority)
 			eMirror.RemoteUpdatedAt = mirror.UpdatedAt
+			if mirror.Username != "" {
+				eMirror.Username = mirror.Username
+				eMirror.AccessToken = mirror.AccessToken
+			}
 			toBeUpdatedMirrors = append(toBeUpdatedMirrors, eMirror)
 		}
 		existingSourceURLs = append(existingSourceURLs, eMirror.SourceUrl)
 	}
 	for _, mirror := range req.Mirrors {
 		if mirror.Priority == 0 {
-			mirror.Priority = 1
+			mirror.Priority = int8(types.LowMirrorPriority)
 		}
 		if !slices.Contains(existingSourceURLs, mirror.SourceURL) {
 			dbMirror := database.Mirror{
 				SourceUrl:       mirror.SourceURL,
+				Username:        mirror.Username,
+				AccessToken:     mirror.AccessToken,
 				Priority:        types.MirrorPriority(mirror.Priority),
 				RemoteUpdatedAt: mirror.UpdatedAt,
 				RepositoryID:    0,

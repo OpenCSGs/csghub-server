@@ -29,11 +29,12 @@ import (
 
 const timeoutTime = 10 * time.Second
 
+// RepositoryExists reports whether the requested repository exists in Gitaly storage.
 func (c *Client) RepositoryExists(ctx context.Context, req gitserver.CheckRepoReq) (bool, error) {
 	ctx, cancel := context.WithTimeout(ctx, timeoutTime)
 	defer cancel()
 
-	relativePath, err := c.BuildRelativePath(ctx, req.RepoType, req.Namespace, req.Name)
+	relativePath, err := c.resolveRelativePath(ctx, req.RelativePath, req.RepoType, req.Namespace, req.Name)
 	if err != nil {
 		return false, err
 	}
@@ -53,11 +54,12 @@ func (c *Client) RepositoryExists(ctx context.Context, req gitserver.CheckRepoRe
 	return r.Exists, nil
 }
 
+// CreateRepo creates an empty repository at the resolved Gitaly storage path.
 func (c *Client) CreateRepo(ctx context.Context, req gitserver.CreateRepoReq) (*gitserver.CreateRepoResp, error) {
 	ctx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
 
-	relativePath, err := c.BuildRelativePath(ctx, req.RepoType, req.Namespace, req.Name)
+	relativePath, err := c.resolveRelativePath(ctx, req.RelativePath, req.RepoType, req.Namespace, req.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -119,10 +121,11 @@ func (c *Client) DeleteRepo(ctx context.Context, relativePath string) error {
 	return nil
 }
 
+// GetRepo returns Git metadata for the repository at the resolved Gitaly storage path.
 func (c *Client) GetRepo(ctx context.Context, req gitserver.GetRepoReq) (*gitserver.CreateRepoResp, error) {
 	ctx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
-	relativePath, err := c.BuildRelativePath(ctx, req.RepoType, req.Namespace, req.Name)
+	relativePath, err := c.resolveRelativePath(ctx, req.RelativePath, req.RepoType, req.Namespace, req.Name)
 	if err != nil {
 		return nil, err
 	}

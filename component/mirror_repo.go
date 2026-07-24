@@ -13,43 +13,33 @@ import (
 
 	"opencsg.com/csghub-server/builder/git/membership"
 	"opencsg.com/csghub-server/builder/store/database"
-	"opencsg.com/csghub-server/builder/workhub"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/types/enum"
 	"opencsg.com/csghub-server/common/utils/common"
 )
 
-// requeueMirrorRepoTask atomically replaces pending/running mirror work with one new repo sync job.
-func requeueMirrorRepoTask(
-	ctx context.Context,
-	mirrorTaskJobStore database.MirrorTaskJobStore,
-	mirrorRepoJobClient database.MirrorJobClient,
-	mirrorJobClient workhub.JobClient,
-	repo *database.Repository,
-	mirror *database.Mirror,
-) error {
-	_, err := mirrorTaskJobStore.RequeueMirrorRepoTask(ctx, database.RequeueMirrorRepoTaskInput{
+// requeueMirrorRepoTask atomically schedules a new sync for an existing mirror target.
+func (m *mirrorComponentImpl) requeueMirrorRepoTask(ctx context.Context, repo *database.Repository, mirror *database.Mirror, username, accessToken *string, priority types.MirrorPriority, urgent bool) (database.MirrorTask, error) {
+	task, err := m.mirrorTaskJobStore.RequeueMirrorRepoTask(ctx, database.RequeueMirrorRepoTaskInput{
 		MirrorID:        mirror.ID,
 		RepositoryID:    repo.ID,
-		Priority:        types.ASAPMirrorPriority,
-		JobClient:       mirrorRepoJobClient,
-		JobCancelClient: mirrorJobClient,
+		Username:        username,
+		AccessToken:     accessToken,
+		Priority:        priority,
+		Urgent:          urgent,
+		JobClient:       m.mirrorRepoJobClient,
+		JobCancelClient: m.mirrorJobClient,
 	})
 	if err != nil {
-		return fmt.Errorf("failed to create mirror task: %w", err)
+		return database.MirrorTask{}, fmt.Errorf("failed to create mirror task: %w", err)
 	}
-	return nil
-}
-
-// requeueMirrorRepoTask atomically schedules a new sync for an existing mirror target.
-func (m *mirrorComponentImpl) requeueMirrorRepoTask(ctx context.Context, repo *database.Repository, mirror *database.Mirror) error {
-	return requeueMirrorRepoTask(ctx, m.mirrorTaskJobStore, m.mirrorRepoJobClient, m.mirrorJobClient, repo, mirror)
+	return task, nil
 }
 
 // requeueMirrorFromSaas atomically replaces existing mirror work with a new workhub repo job.
-func (m *mirrorComponentImpl) requeueMirrorFromSaas(ctx context.Context, repo *database.Repository, mirror *database.Mirror) error {
-	return requeueMirrorRepoTask(ctx, m.mirrorTaskJobStore, m.mirrorRepoJobClient, m.mirrorJobClient, repo, mirror)
+func (m *mirrorComponentImpl) requeueMirrorFromSaas(ctx context.Context, repo *database.Repository, mirror *database.Mirror) (database.MirrorTask, error) {
+	return m.requeueMirrorRepoTask(ctx, repo, mirror, nil, nil, types.LowMirrorPriority, false)
 }
 
 // CreateMirrorRepo creates or binds one mirror source to one target repository.
@@ -58,11 +48,20 @@ func (m *mirrorComponentImpl) CreateMirrorRepo(ctx context.Context, req types.Cr
 		err := fmt.Errorf("current user is required")
 		return nil, errorx.BadRequest(err, errorx.Ctx().Set("current user", req.CurrentUser))
 	}
-	sourceURL, err := normalizeGitCloneURL(req.SourceGitCloneUrl)
+	priority, err := normalizeMirrorPriority(req.Priority)
 	if err != nil {
-		return nil, errorx.BadRequest(err, errorx.Ctx().Set("source url", req.SourceGitCloneUrl))
+		return nil, err
+	}
+	req.Priority = priority
+	sourceURL, username, accessToken, err := normalizeMirrorSource(
+		req.SourceGitCloneUrl, req.Username, req.AccessToken,
+	)
+	if err != nil {
+		return nil, err
 	}
 	req.SourceGitCloneUrl = sourceURL
+	req.Username = username
+	req.AccessToken = accessToken
 
 	namespace, name := m.resolveMirrorRepoTarget(req)
 	if namespace == "" || name == "" {
@@ -89,7 +88,7 @@ func (m *mirrorComponentImpl) CreateMirrorRepo(ctx context.Context, req types.Cr
 
 	// repo exists
 	if repo != nil && repo.ID != 0 {
-		if req.RejectExistingRepo {
+		if req.CreateTargetRepo != nil && *req.CreateTargetRepo {
 			return nil, errorx.ErrRepoAlreadyExist
 		}
 
@@ -101,8 +100,17 @@ func (m *mirrorComponentImpl) CreateMirrorRepo(ctx context.Context, req types.Cr
 		// mirror exists
 		if mirror != nil && mirror.ID != 0 {
 			if mirror.SourceUrl == req.SourceGitCloneUrl {
-				if err := m.requeueMirrorRepoTask(ctx, repo, mirror); err != nil {
+				var usernamePtr, accessTokenPtr *string
+				if req.Username != "" {
+					usernamePtr = &req.Username
+					accessTokenPtr = &req.AccessToken
+				}
+				if _, err := m.requeueMirrorRepoTask(ctx, repo, mirror, usernamePtr, accessTokenPtr, req.Priority, req.Urgent); err != nil {
 					return nil, fmt.Errorf("failed to sync mirror repo, error: %w", err)
+				}
+				if req.Username != "" {
+					mirror.Username = req.Username
+					mirror.AccessToken = req.AccessToken
 				}
 				return mirror, nil
 			}
@@ -117,6 +125,15 @@ func (m *mirrorComponentImpl) CreateMirrorRepo(ctx context.Context, req types.Cr
 		}
 
 		return m.createMirrorRepoRecords(ctx, req, repo, namespace, name, false)
+	}
+	if req.CreateTargetRepo != nil && !*req.CreateTargetRepo {
+		return nil, errorx.RepoNotFound(
+			errors.New("target repository does not exist"),
+			errorx.Ctx().
+				Set("repo type", req.RepoType).
+				Set("target namespace", namespace).
+				Set("target name", name),
+		)
 	}
 
 	private := true
@@ -147,29 +164,75 @@ func (m *mirrorComponentImpl) CreateMirrorRepo(ctx context.Context, req types.Cr
 	return m.createMirrorRepoRecords(ctx, req, dbRepo, namespace, name, true)
 }
 
-// normalizeGitCloneURL validates HTTP(S) Git clone URLs and stores them with a .git suffix.
-func normalizeGitCloneURL(sourceURL string) (string, error) {
+// normalizeMirrorPriority defaults an omitted priority and rejects values unsupported by workhub.
+func normalizeMirrorPriority(priority types.MirrorPriority) (types.MirrorPriority, error) {
+	if priority == 0 {
+		return types.LowMirrorPriority, nil
+	}
+	if priority < types.ASAPMirrorPriority || priority > types.LowMirrorPriority {
+		err := fmt.Errorf("priority must be between %d and %d", types.ASAPMirrorPriority, types.LowMirrorPriority)
+		return 0, errorx.BadRequest(err, errorx.Ctx().Set("priority", priority))
+	}
+	return priority, nil
+}
+
+// normalizeMirrorSource validates and canonicalizes an HTTP(S) mirror source and its credentials.
+func normalizeMirrorSource(sourceURL, username, accessToken string) (string, string, string, error) {
+	hasUsername := username != ""
+	hasAccessToken := accessToken != ""
+	if hasUsername != hasAccessToken {
+		return "", "", "", errorx.MirrorSourceRepoAuthInvalid(
+			errors.New("username and access token must be provided together"), errorx.Ctx(),
+		)
+	}
+
 	sourceURL = strings.TrimRight(strings.TrimSpace(sourceURL), "/")
 	parsedURL, err := url.Parse(sourceURL)
 	if err != nil {
-		return "", fmt.Errorf("invalid source git clone url: %w", err)
+		return "", "", "", errorx.BadRequest(
+			fmt.Errorf("invalid source git clone url: %w", err), errorx.Ctx(),
+		)
 	}
 	if parsedURL.Scheme != "http" && parsedURL.Scheme != "https" {
-		return "", fmt.Errorf("source git clone url scheme must be http or https")
+		return "", "", "", errorx.BadRequest(
+			errors.New("source git clone url scheme must be http or https"), errorx.Ctx(),
+		)
 	}
 	if parsedURL.Host == "" || parsedURL.Hostname() == "" {
-		return "", fmt.Errorf("source git clone url must have a host")
+		return "", "", "", errorx.BadRequest(
+			errors.New("source git clone url must have a host"), errorx.Ctx(),
+		)
 	}
 	if parsedURL.Path == "" || parsedURL.Path == "/" {
-		return "", fmt.Errorf("source git clone url must have a repository path")
+		return "", "", "", errorx.BadRequest(
+			errors.New("source git clone url must have a repository path"), errorx.Ctx(),
+		)
 	}
 	if parsedURL.RawQuery != "" || parsedURL.Fragment != "" {
-		return "", fmt.Errorf("source git clone url must not contain query or fragment")
+		return "", "", "", errorx.BadRequest(
+			errors.New("source git clone url must not contain query or fragment"), errorx.Ctx(),
+		)
+	}
+	if parsedURL.User != nil {
+		if hasUsername {
+			return "", "", "", errorx.MirrorSourceRepoAuthInvalid(
+				errors.New("source URL and explicit credentials must not both contain authentication"), errorx.Ctx(),
+			)
+		}
+		urlAccessToken, hasURLAccessToken := parsedURL.User.Password()
+		if parsedURL.User.Username() == "" || !hasURLAccessToken || urlAccessToken == "" {
+			return "", "", "", errorx.MirrorSourceRepoAuthInvalid(
+				errors.New("source URL username and access token must be provided together"), errorx.Ctx(),
+			)
+		}
+		username = parsedURL.User.Username()
+		accessToken = urlAccessToken
+		parsedURL.User = nil
 	}
 	if !strings.HasSuffix(parsedURL.Path, ".git") {
 		parsedURL.Path += ".git"
 	}
-	return parsedURL.String(), nil
+	return parsedURL.String(), username, accessToken, nil
 }
 
 // resolveMirrorRepoTarget chooses the local mirror target path from fork fields or namespace mapping.
@@ -203,6 +266,7 @@ func (m *mirrorComponentImpl) createMirrorRepoRecords(ctx context.Context, req t
 		MCPServer:           mcpServer,
 		MCPServerProperties: mcpServerProperties,
 		Mirror:              mirror,
+		Urgent:              req.Urgent,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create mirror repo records: %w", err)
@@ -316,9 +380,11 @@ func buildMirrorRepoRecord(req types.CreateMirrorRepoReq, repo *database.Reposit
 	mirror := database.Mirror{
 		SourceUrl:      req.SourceGitCloneUrl,
 		MirrorSourceID: req.MirrorSourceID,
+		Username:       req.Username,
+		AccessToken:    req.AccessToken,
 		Repository:     repo,
 		SourceRepoPath: fmt.Sprintf("%s/%s", req.SourceNamespace, req.SourceName),
-		Priority:       types.ASAPMirrorPriority,
+		Priority:       req.Priority,
 	}
 
 	sourceType, _, err := common.GetSourceTypeAndPathFromURL(req.SourceGitCloneUrl)

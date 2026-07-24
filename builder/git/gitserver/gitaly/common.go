@@ -8,6 +8,19 @@ import (
 	"opencsg.com/csghub-server/common/utils/common"
 )
 
+// resolveRelativePath uses a caller-provided Gitaly path and falls back to repository metadata lookup.
+func (c *Client) resolveRelativePath(
+	ctx context.Context,
+	relativePath string,
+	repoType types.RepositoryType,
+	namespace, name string,
+) (string, error) {
+	if relativePath != "" {
+		return relativePath, nil
+	}
+	return c.BuildRelativePath(ctx, repoType, namespace, name)
+}
+
 func (c *Client) BuildRelativePath(ctx context.Context, repoType types.RepositoryType, namespace, name string) (string, error) {
 	if repoType != types.RepositoryType(c.config.RepoTemplate.EmptyRepoType) {
 		repo, err := c.repoStore.FindByPath(ctx, repoType, namespace, name)

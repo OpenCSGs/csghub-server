@@ -35,23 +35,6 @@ func (c *Client) CreateMirrorRepo(ctx context.Context, req gitserver.CreateMirro
 	return task.ID, nil
 }
 
-func (c *Client) GetMirrorTaskInfo(ctx context.Context, taskId int64) (*gitserver.MirrorTaskInfo, error) {
-	ts, _, err := c.giteaClient.GetUserTaskInfo(taskId)
-	if err != nil {
-		return nil, err
-	}
-
-	mti := &gitserver.MirrorTaskInfo{
-		Status:    gitserver.TaskStatus(ts.Status),
-		Message:   ts.Message,
-		RepoID:    ts.RepoID,
-		RepoName:  ts.RepoName,
-		StartedAt: ts.StartedAt,
-		EndedAt:   ts.EndedAt,
-	}
-	return mti, nil
-}
-
 func (c *Client) MirrorSync(ctx context.Context, req gitserver.MirrorSyncReq) error {
 	namespace := common.WithPrefix(req.Namespace, repoPrefixByType(req.RepoType))
 	_, err := c.giteaClient.MirrorSync(namespace, req.Name)

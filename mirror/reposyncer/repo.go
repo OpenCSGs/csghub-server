@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -76,6 +77,7 @@ func NewRepoSyncWorker(config *config.Config) (*RepoSyncWorker, error) {
 	return w, nil
 }
 
+// SyncRepo fetches remote Git data and records commit checkpoints for the following LFS stage.
 func (w *RepoSyncWorker) SyncRepo(
 	ctx context.Context,
 	mirror *database.Mirror,
@@ -97,9 +99,17 @@ func (w *RepoSyncWorker) SyncRepo(
 	if err != nil {
 		return mt, fmt.Errorf("failed to get namespace and name from mirror repository path: %w", err)
 	}
+	relativePath := mirror.Repository.GitalyPath()
 
 	// Check if the repository already exists, if not, create it
-	err = w.ensureRepoExists(ctx, namespace, name, mirror.Repository.DefaultBranch, mirror.Repository.RepositoryType)
+	err = w.ensureRepoExists(
+		ctx,
+		namespace,
+		name,
+		mirror.Repository.DefaultBranch,
+		mirror.Repository.RepositoryType,
+		relativePath,
+	)
 	if err != nil {
 		return mt, fmt.Errorf("failed to ensure repository exists: %w", err)
 	}
@@ -113,6 +123,7 @@ func (w *RepoSyncWorker) SyncRepo(
 			name,
 			mirror.Repository.DefaultBranch,
 			mirror.Repository.RepositoryType,
+			relativePath,
 		)
 		if err == nil && commitBefore != nil {
 			beforeCommitID = commitBefore.ID
@@ -139,12 +150,13 @@ func (w *RepoSyncWorker) SyncRepo(
 	)
 
 	req := gitserver.MirrorSyncReq{
-		Namespace:   namespace,
-		Name:        name,
-		CloneUrl:    mirror.SourceUrl,
-		Username:    mirror.Username,
-		AccessToken: mirror.AccessToken,
-		RepoType:    mirror.Repository.RepositoryType,
+		Namespace:    namespace,
+		Name:         name,
+		CloneUrl:     mirror.SourceUrl,
+		Username:     mirror.Username,
+		AccessToken:  mirror.AccessToken,
+		RepoType:     mirror.Repository.RepositoryType,
+		RelativePath: relativePath,
 	}
 	if mirror.Repository.IsOpenCSGRepo() && !w.config.Saas {
 		syncClientSetting, err := w.syncClientSettingStore.First(ctx)
@@ -154,7 +166,7 @@ func (w *RepoSyncWorker) SyncRepo(
 		req.MirrorToken = syncClientSetting.Token
 	}
 
-	if err := w.checkSourceURL(ctx, mirror.SourceUrl); err != nil {
+	if err := w.checkSourceURL(ctx, mirror.SourceUrl, mirror.Username, mirror.AccessToken); err != nil {
 		return mt, err
 	}
 
@@ -171,9 +183,10 @@ func (w *RepoSyncWorker) SyncRepo(
 	)
 
 	resp, err := w.git.GetRepo(ctx, gitserver.GetRepoReq{
-		Namespace: namespace,
-		Name:      name,
-		RepoType:  mirror.Repository.RepositoryType,
+		Namespace:    namespace,
+		Name:         name,
+		RepoType:     mirror.Repository.RepositoryType,
+		RelativePath: relativePath,
 	})
 	if err != nil {
 		return mt, fmt.Errorf("failed to get repo, error: %w", err)
@@ -191,7 +204,14 @@ func (w *RepoSyncWorker) SyncRepo(
 	)
 
 	// Get repo last commit
-	commit, err := w.getRepoLastCommit(ctx, namespace, name, branch, mirror.Repository.RepositoryType)
+	commit, err := w.getRepoLastCommit(
+		ctx,
+		namespace,
+		name,
+		branch,
+		mirror.Repository.RepositoryType,
+		relativePath,
+	)
 	if err != nil {
 		return mt, fmt.Errorf("failed to get repo last commit: %w", err)
 	}
@@ -214,11 +234,12 @@ func (w *RepoSyncWorker) SyncRepo(
 		)
 
 		err = w.git.UpdateRef(ctx, gitserver.UpdateRefReq{
-			Namespace:   namespace,
-			Name:        name,
-			Ref:         fmt.Sprintf("refs/heads/%s", branch),
-			RepoType:    mirror.Repository.RepositoryType,
-			NewObjectId: beforeCommitID,
+			Namespace:    namespace,
+			Name:         name,
+			Ref:          fmt.Sprintf("refs/heads/%s", branch),
+			RepoType:     mirror.Repository.RepositoryType,
+			NewObjectId:  beforeCommitID,
+			RelativePath: relativePath,
 		})
 		if err != nil {
 			return mt, fmt.Errorf("failed to point HEAD to old commit: %w", err)
@@ -289,14 +310,17 @@ func (w *RepoSyncWorker) generateDescriptionFromReadme(
 	}
 }
 
+// ensureRepoExists creates missing Git storage at the path loaded with the mirror repository.
 func (w *RepoSyncWorker) ensureRepoExists(
 	ctx context.Context, namespace, name, branch string,
 	repoType types.RepositoryType,
+	relativePath string,
 ) error {
 	exists, err := w.git.RepositoryExists(ctx, gitserver.CheckRepoReq{
-		Namespace: namespace,
-		Name:      name,
-		RepoType:  repoType,
+		Namespace:    namespace,
+		Name:         name,
+		RepoType:     repoType,
+		RelativePath: relativePath,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to check repo existence: %w", err)
@@ -307,6 +331,7 @@ func (w *RepoSyncWorker) ensureRepoExists(
 			Name:          name,
 			RepoType:      repoType,
 			DefaultBranch: branch,
+			RelativePath:  relativePath,
 		})
 		if err != nil {
 			return fmt.Errorf("failed to create repo: %w", err)
@@ -315,15 +340,18 @@ func (w *RepoSyncWorker) ensureRepoExists(
 	return nil
 }
 
+// getRepoLastCommit resolves a commit without requiring Gitaly to query repository metadata.
 func (w *RepoSyncWorker) getRepoLastCommit(
 	ctx context.Context, namespace, name, branch string,
 	repoType types.RepositoryType,
+	relativePath string,
 ) (*types.Commit, error) {
 	commit, err := w.git.GetRepoLastCommit(ctx, gitserver.GetRepoLastCommitReq{
-		Namespace: namespace,
-		Name:      name,
-		RepoType:  repoType,
-		Ref:       branch,
+		Namespace:    namespace,
+		Name:         name,
+		RepoType:     repoType,
+		Ref:          branch,
+		RelativePath: relativePath,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get repo last commit: %w", err)
@@ -368,15 +396,19 @@ func (w *RepoSyncWorker) sendMessage(
 	return nil
 }
 
-func (w *RepoSyncWorker) checkSourceURL(ctx context.Context, sourceURL string) error {
-	// Only check huggingface.co URLs
-	if !strings.Contains(sourceURL, types.HUGGINGFACE_HOST) {
+// checkSourceURL verifies the Hugging Face Git endpoint with source credentials when provided.
+func (w *RepoSyncWorker) checkSourceURL(ctx context.Context, sourceURL, username, accessToken string) error {
+	parsedURL, err := url.Parse(sourceURL)
+	if err != nil || !strings.EqualFold(parsedURL.Hostname(), types.HUGGINGFACE_HOST) {
 		return nil
 	}
 	checkURL := sourceURL + "/info/refs?service=git-upload-pack"
 	checkReq, err := http.NewRequestWithContext(ctx, http.MethodGet, checkURL, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create check request: %w", err)
+	}
+	if username != "" && accessToken != "" {
+		checkReq.SetBasicAuth(username, accessToken)
 	}
 	checkResp, err := w.httpClient.Do(checkReq)
 	if err != nil {

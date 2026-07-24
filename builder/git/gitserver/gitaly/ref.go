@@ -8,10 +8,11 @@ import (
 	"opencsg.com/csghub-server/builder/git/gitserver"
 )
 
+// UpdateRef atomically updates one repository reference in Gitaly.
 func (c *Client) UpdateRef(ctx context.Context, req gitserver.UpdateRefReq) error {
 	ctx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
-	relativePath, err := c.BuildRelativePath(ctx, req.RepoType, req.Namespace, req.Name)
+	relativePath, err := c.resolveRelativePath(ctx, req.RelativePath, req.RepoType, req.Namespace, req.Name)
 	if err != nil {
 		return err
 	}

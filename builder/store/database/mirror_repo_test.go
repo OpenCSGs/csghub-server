@@ -28,7 +28,7 @@ func (c *fakeMirrorJobClient) InsertMirrorRepoJobTx(ctx context.Context, tx *sql
 }
 
 // assertQueuedMirrorTask verifies the task created for a mirror repo transaction.
-func assertQueuedMirrorTask(t *testing.T, ctx context.Context, db *database.DB, mirror *database.Mirror) {
+func assertQueuedMirrorTask(t *testing.T, ctx context.Context, db *database.DB, mirror *database.Mirror, urgent bool) {
 	t.Helper()
 
 	require.NotZero(t, mirror.CurrentTaskID)
@@ -38,6 +38,7 @@ func assertQueuedMirrorTask(t *testing.T, ctx context.Context, db *database.DB, 
 	require.Equal(t, types.MirrorQueued, task.Status)
 	require.Equal(t, mirror.Priority, task.Priority)
 	require.Equal(t, int64(123), task.RepoJobID)
+	require.Equal(t, urgent, task.IsUrgent)
 }
 
 // TestMirrorRepoStore_CreateMirrorRepoRecordsForExistingRepo verifies existing repos can be bound to one mirror transactionally.
@@ -62,6 +63,7 @@ func TestMirrorRepoStore_CreateMirrorRepoRecordsForExistingRepo(t *testing.T) {
 	store := database.NewMirrorRepoStoreWithDB(db, jobClient)
 	mirror, err := store.CreateMirrorRepoRecords(ctx, database.CreateMirrorRepoRecordsInput{
 		Repository: repo,
+		Urgent:     true,
 		Mirror: database.Mirror{
 			SourceUrl:      "https://github.com/upstream/name.git",
 			SourceRepoPath: "upstream/name",
@@ -79,7 +81,8 @@ func TestMirrorRepoStore_CreateMirrorRepoRecordsForExistingRepo(t *testing.T) {
 	require.Equal(t, "https://github.com/upstream/name.git", jobClient.inputs[0].SourceURL)
 	require.Equal(t, "ns/name", jobClient.inputs[0].RepoPath)
 	require.Equal(t, types.ASAPMirrorPriority, jobClient.inputs[0].Priority)
-	assertQueuedMirrorTask(t, ctx, db, mirror)
+	require.True(t, jobClient.inputs[0].Urgent)
+	assertQueuedMirrorTask(t, ctx, db, mirror, true)
 
 	reloadedRepo, err := database.NewRepoStoreWithDB(db).FindByPath(ctx, types.ModelRepo, "ns", "name")
 	require.NoError(t, err)
@@ -168,7 +171,7 @@ func TestMirrorRepoStore_CreateMirrorRepoRecordsForNewRepo(t *testing.T) {
 	require.Equal(t, mirror.CurrentTaskID, jobClient.inputs[0].MirrorTaskID)
 	require.Equal(t, types.ModelRepo, jobClient.inputs[0].RepoType)
 	require.Equal(t, "ns/new", jobClient.inputs[0].RepoPath)
-	assertQueuedMirrorTask(t, ctx, db, mirror)
+	assertQueuedMirrorTask(t, ctx, db, mirror, false)
 
 	repo, err := database.NewRepoStoreWithDB(db).FindByPath(ctx, types.ModelRepo, "ns", "new")
 	require.NoError(t, err)
