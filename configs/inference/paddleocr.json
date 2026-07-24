@@ -17,10 +17,6 @@
       "engine_version": "3.7.0"
     }
   ],
-  "supported_archs": [
-    "PaddleOCRPipeline",
-    "OCR"
-  ],
   "supported_models": [
     "PP-OCRv6_tiny_rec",
     "PP-OCRv6_small_rec",
