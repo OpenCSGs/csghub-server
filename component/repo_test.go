@@ -3412,13 +3412,15 @@ func TestRepoComponent_ChangePath(t *testing.T) {
 	repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "namespace", "name").
 		Return(&database.Repository{ID: 1, Path: "namespace/name", RepositoryType: types.ModelRepo}, nil)
 
+	repoComp.mocks.stores.NamespaceMock().EXPECT().Exists(ctx, "new").Return(true, nil)
+
 	repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "new", "path").
 		Return(nil, sql.ErrNoRows)
 
 	// Dependency checks
 	repoComp.mocks.stores.DeployTaskMock().EXPECT().CountByRepoID(ctx, int64(1)).Return(0, nil)
 	repoComp.mocks.stores.WorkflowMock().EXPECT().CountByRepoPath(ctx, "namespace/name").Return(0, nil)
-	repoComp.mocks.stores.ViewerMock().EXPECT().GetViewerByRepoID(ctx, int64(1)).Return(nil, sql.ErrNoRows)
+	repoComp.mocks.stores.ViewerMock().EXPECT().GetLastSuccessfulJobByRepoID(ctx, int64(1)).Return(nil, nil)
 	repoComp.mocks.stores.AccountSyncQuotaStatementMock().EXPECT().CountByRepoPath(ctx, "namespace/name").Return(0, nil)
 	repoComp.mocks.stores.AccountPriceMock().EXPECT().CountByResourceIDs(ctx, mock.Anything).Return(0, nil)
 
@@ -3440,13 +3442,15 @@ func TestRepoComponent_ChangePath_RepoHashed(t *testing.T) {
 	repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "namespace", "name").
 		Return(&database.Repository{ID: 1, Hashed: true, Path: "namespace/name", RepositoryType: types.ModelRepo}, nil)
 
+	repoComp.mocks.stores.NamespaceMock().EXPECT().Exists(ctx, "new").Return(true, nil)
+
 	repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "new", "path").
 		Return(nil, sql.ErrNoRows)
 
 	// Dependency checks - no blocking entities
 	repoComp.mocks.stores.DeployTaskMock().EXPECT().CountByRepoID(ctx, int64(1)).Return(0, nil)
 	repoComp.mocks.stores.WorkflowMock().EXPECT().CountByRepoPath(ctx, "namespace/name").Return(0, nil)
-	repoComp.mocks.stores.ViewerMock().EXPECT().GetViewerByRepoID(ctx, int64(1)).Return(nil, sql.ErrNoRows)
+	repoComp.mocks.stores.ViewerMock().EXPECT().GetLastSuccessfulJobByRepoID(ctx, int64(1)).Return(nil, nil)
 	repoComp.mocks.stores.AccountSyncQuotaStatementMock().EXPECT().CountByRepoPath(ctx, "namespace/name").Return(0, nil)
 	repoComp.mocks.stores.AccountPriceMock().EXPECT().CountByResourceIDs(ctx, mock.Anything).Return(0, nil)
 
@@ -3482,6 +3486,8 @@ func TestRepoComponent_ChangePath_NewNamespaceExists(t *testing.T) {
 	repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "namespace", "name").
 		Return(&database.Repository{ID: 1}, nil)
 
+	repoComp.mocks.stores.NamespaceMock().EXPECT().Exists(ctx, "new").Return(true, nil)
+
 	repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "new", "path").
 		Return(&database.Repository{ID: 2}, nil)
 
@@ -3493,6 +3499,27 @@ func TestRepoComponent_ChangePath_NewNamespaceExists(t *testing.T) {
 	})
 
 	require.NotNil(t, err)
+}
+
+func TestRepoComponent_ChangePath_NamespaceNotExist(t *testing.T) {
+	ctx := context.Background()
+
+	repoComp := initializeTestRepoComponent(ctx, t)
+
+	repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "namespace", "name").
+		Return(&database.Repository{ID: 1}, nil)
+
+	repoComp.mocks.stores.NamespaceMock().EXPECT().Exists(ctx, "newns").Return(false, nil)
+
+	err := repoComp.ChangePath(ctx, types.ChangePathReq{
+		RepoType:  types.ModelRepo,
+		Namespace: "namespace",
+		Name:      "name",
+		NewPath:   "newns/path",
+	})
+
+	require.NotNil(t, err)
+	require.True(t, errors.Is(err, errorx.ErrTargetNamespaceNotFound))
 }
 
 func TestRepoComponent_TransferOwnership_Success(t *testing.T) {
@@ -3522,7 +3549,7 @@ func TestRepoComponent_TransferOwnership_Success(t *testing.T) {
 	// Dependency checks - no blocking entities
 	repoComp.mocks.stores.DeployTaskMock().EXPECT().CountByRepoID(ctx, int64(1)).Return(0, nil)
 	repoComp.mocks.stores.WorkflowMock().EXPECT().CountByRepoPath(ctx, "sourceuser/reponame").Return(0, nil)
-	repoComp.mocks.stores.ViewerMock().EXPECT().GetViewerByRepoID(ctx, int64(1)).Return(nil, sql.ErrNoRows)
+	repoComp.mocks.stores.ViewerMock().EXPECT().GetLastSuccessfulJobByRepoID(ctx, int64(1)).Return(nil, nil)
 	repoComp.mocks.stores.AccountSyncQuotaStatementMock().EXPECT().CountByRepoPath(ctx, "sourceuser/reponame").Return(0, nil)
 	repoComp.mocks.stores.AccountPriceMock().EXPECT().CountByResourceIDs(ctx, mock.Anything).Return(0, nil)
 
@@ -3751,6 +3778,8 @@ func TestRepoComponent_ChangePath_DependencyExists(t *testing.T) {
 	repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "namespace", "name").
 		Return(&database.Repository{ID: 1, Hashed: true, Path: "namespace/name", RepositoryType: types.ModelRepo}, nil)
 
+	repoComp.mocks.stores.NamespaceMock().EXPECT().Exists(ctx, "new").Return(true, nil)
+
 	repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "new", "path").
 		Return(nil, sql.ErrNoRows)
 
@@ -3778,13 +3807,15 @@ func TestRepoComponent_ChangePath_DependencyShortCircuits(t *testing.T) {
 	repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "namespace", "name").
 		Return(&database.Repository{ID: 1, Hashed: true, Path: "namespace/name", RepositoryType: types.ModelRepo}, nil)
 
+	repoComp.mocks.stores.NamespaceMock().EXPECT().Exists(ctx, "new").Return(true, nil)
+
 	repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "new", "path").
 		Return(nil, sql.ErrNoRows)
 
 	// Deploy passes
 	repoComp.mocks.stores.DeployTaskMock().EXPECT().CountByRepoID(ctx, int64(1)).Return(0, nil)
-		// Argo workflows block - should return immediately, skipping remaining checks
-		repoComp.mocks.stores.WorkflowMock().EXPECT().CountByRepoPath(ctx, "namespace/name").Return(5, nil)
+	// Argo workflows block - should return immediately, skipping remaining checks
+	repoComp.mocks.stores.WorkflowMock().EXPECT().CountByRepoPath(ctx, "namespace/name").Return(5, nil)
 
 	err := repoComp.ChangePath(ctx, types.ChangePathReq{
 		RepoType:  types.ModelRepo,
@@ -3807,6 +3838,8 @@ func TestRepoComponent_ChangePath_DependencyCheckError(t *testing.T) {
 	repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "namespace", "name").
 		Return(&database.Repository{ID: 1, Hashed: true, Path: "namespace/name", RepositoryType: types.ModelRepo}, nil)
 
+	repoComp.mocks.stores.NamespaceMock().EXPECT().Exists(ctx, "new").Return(true, nil)
+
 	repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "new", "path").
 		Return(nil, sql.ErrNoRows)
 
@@ -3822,6 +3855,78 @@ func TestRepoComponent_ChangePath_DependencyCheckError(t *testing.T) {
 
 	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "failed to check deploy tasks")
+}
+
+func TestRepoComponent_ChangePath_DataviewerJobBlocked(t *testing.T) {
+	ctx := context.Background()
+
+	repoComp := initializeTestRepoComponent(ctx, t)
+
+	repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "namespace", "name").
+		Return(&database.Repository{ID: 1, Hashed: true, Path: "namespace/name", RepositoryType: types.ModelRepo}, nil)
+
+	repoComp.mocks.stores.NamespaceMock().EXPECT().Exists(ctx, "new").Return(true, nil)
+
+	repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "new", "path").
+		Return(nil, sql.ErrNoRows)
+
+	// Deploy tasks - not blocked
+	repoComp.mocks.stores.DeployTaskMock().EXPECT().CountByRepoID(ctx, int64(1)).Return(0, nil)
+	// Argo workflows - not blocked
+	repoComp.mocks.stores.WorkflowMock().EXPECT().CountByRepoPath(ctx, "namespace/name").Return(0, nil)
+	// Dataviewer job - last successful job has non-empty card_data, blocks path change
+	repoComp.mocks.stores.ViewerMock().EXPECT().GetLastSuccessfulJobByRepoID(ctx, int64(1)).
+		Return(&database.DataviewerJob{ID: 1, RepoID: 1, Status: 2, CardData: "has-data"}, nil)
+
+	err := repoComp.ChangePath(ctx, types.ChangePathReq{
+		RepoType:  types.ModelRepo,
+		Namespace: "namespace",
+		Name:      "name",
+		NewPath:   "new/path",
+	})
+
+	require.NotNil(t, err)
+	require.Contains(t, err.Error(), "cannot change path")
+	require.Contains(t, err.Error(), "the following dependent entities exist: dataviewers")
+	require.True(t, errors.Is(err, errorx.ErrChangePathBlocked))
+}
+
+func TestRepoComponent_ChangePath_DataviewerJobEmptyCardData(t *testing.T) {
+	ctx := context.Background()
+
+	repoComp := initializeTestRepoComponent(ctx, t)
+
+	repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "namespace", "name").
+		Return(&database.Repository{ID: 1, Hashed: true, Path: "namespace/name", RepositoryType: types.ModelRepo}, nil)
+
+	repoComp.mocks.stores.NamespaceMock().EXPECT().Exists(ctx, "new").Return(true, nil)
+
+	repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "new", "path").
+		Return(nil, sql.ErrNoRows)
+
+	// Deploy tasks - not blocked
+	repoComp.mocks.stores.DeployTaskMock().EXPECT().CountByRepoID(ctx, int64(1)).Return(0, nil)
+	// Argo workflows - not blocked
+	repoComp.mocks.stores.WorkflowMock().EXPECT().CountByRepoPath(ctx, "namespace/name").Return(0, nil)
+	// Dataviewer job - last successful job has empty card_data, path change allowed
+	repoComp.mocks.stores.ViewerMock().EXPECT().GetLastSuccessfulJobByRepoID(ctx, int64(1)).
+		Return(&database.DataviewerJob{ID: 1, RepoID: 1, Status: 2, CardData: ""}, nil)
+	// Still passes dataviewer check, running remaining checks
+	repoComp.mocks.stores.AccountSyncQuotaStatementMock().EXPECT().CountByRepoPath(ctx, "namespace/name").Return(0, nil)
+	repoComp.mocks.stores.AccountPriceMock().EXPECT().CountByResourceIDs(ctx, mock.Anything).Return(0, nil)
+
+	repoComp.mocks.stores.RepoMock().EXPECT().UpdateRepo(ctx, mock.Anything).Return(&database.Repository{
+		ID: 1, Path: "new/path", GitPath: "models_new/path", Hashed: true, RepositoryType: types.ModelRepo,
+	}, nil)
+
+	err := repoComp.ChangePath(ctx, types.ChangePathReq{
+		RepoType:  types.ModelRepo,
+		Namespace: "namespace",
+		Name:      "name",
+		NewPath:   "new/path",
+	})
+
+	require.Nil(t, err)
 }
 
 func TestRepoComponent_BatchMigrateRepoToHashedPath_AutoFalse(t *testing.T) {

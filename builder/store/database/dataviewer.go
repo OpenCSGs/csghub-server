@@ -44,6 +44,7 @@ type DataviewerStore interface {
 	GetJob(ctx context.Context, workflowID string) (*DataviewerJob, error)
 	UpdateJob(ctx context.Context, job DataviewerJob) (*DataviewerJob, error)
 	GetRunningJobsByRepoID(ctx context.Context, repoID int64) ([]DataviewerJob, error)
+	GetLastSuccessfulJobByRepoID(ctx context.Context, repoID int64) (*DataviewerJob, error)
 }
 
 type dataviewerStoreImpl struct {
@@ -140,4 +141,21 @@ func (s *dataviewerStoreImpl) GetRunningJobsByRepoID(ctx context.Context, repoID
 		return nil, fmt.Errorf("select running viewer jobs by repo_id %d, error: %w", repoID, err)
 	}
 	return jobs, nil
+}
+
+func (s *dataviewerStoreImpl) GetLastSuccessfulJobByRepoID(ctx context.Context, repoID int64) (*DataviewerJob, error) {
+	var job DataviewerJob
+	err := s.db.Operator.Core.NewSelect().Model(&job).
+		Where("repo_id = ?", repoID).
+		Where("status = ?", types.WorkflowDone).
+		Order("id DESC").
+		Limit(1).
+		Scan(ctx)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("select last successful viewer job by repo_id %d, error: %w", repoID, err)
+	}
+	return &job, nil
 }
