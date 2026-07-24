@@ -1,0 +1,34 @@
+{
+  "engine_name": "paddleocr",
+  "enabled": 1,
+  "container_port": 8000,
+  "model_format": "paddle_static",
+  "description": "PaddleOCR/PaddleX self-hosted OCR serving runtime",
+  "engine_images": [
+    {
+      "compute_type": "gpu",
+      "image": "opencsghq/paddleocr:3.7.0",
+      "driver_version": "12.8",
+      "engine_version": "3.7.0"
+    },
+    {
+      "compute_type": "cpu",
+      "image": "opencsghq/paddleocr-cpu:3.7.0",
+      "engine_version": "3.7.0"
+    }
+  ],
+  "supported_archs": [
+    "PaddleOCRPipeline",
+    "OCR"
+  ],
+  "supported_models": [
+    "PP-OCRv6_tiny_rec",
+    "PP-OCRv6_small_rec",
+    "PP-OCRv6_medium_rec",
+    "PP-OCRv5_server_rec",
+    "PP-OCRv5_mobile_rec",
+    "latin_PP-OCRv5_mobile_rec",
+    "korean_PP-OCRv5_mobile_rec",
+    "eslav_PP-OCRv5_mobile_rec"
+  ]
+}

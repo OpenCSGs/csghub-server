@@ -58,6 +58,13 @@ case "${IMAGE%:*}" in
     PLATFORMS="linux/amd64"
     DOCKERFILE="Dockerfile.audiofly-rocm"
     ;;
+  paddleocr)
+    PLATFORMS="linux/amd64"
+    DOCKERFILE="Dockerfile.paddleocr"
+    ;;
+  paddleocr-cpu)
+    DOCKERFILE="Dockerfile.paddleocr-cpu"
+    ;;
 esac
 
 docker buildx build --platform ${PLATFORMS} \

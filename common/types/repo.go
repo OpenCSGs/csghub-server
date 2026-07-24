@@ -122,11 +122,12 @@ const (
 	TextToAudio        PipelineTask = "text-to-audio"
 	// AutomaticSpeechRecognition is the Hugging Face pipeline task name. Keep
 	// AutoSpeechRecognition as a legacy tag alias for existing seeded data.
-	AutomaticSpeechRecognition PipelineTask    = "automatic-speech-recognition"
-	AutoSpeechRecognition      PipelineTask    = "auto-speech-recognition"
-	LlamaCpp                   InferenceEngine = "llama.cpp"
-	TEI                        InferenceEngine = "tei"
-	Ktransformers              InferenceEngine = "ktransformers"
+	AutomaticSpeechRecognition  PipelineTask    = "automatic-speech-recognition"
+	AutoSpeechRecognition       PipelineTask    = "auto-speech-recognition"
+	OpticalCharacterRecognition PipelineTask    = "optical-character-recognition"
+	LlamaCpp                    InferenceEngine = "llama.cpp"
+	TEI                         InferenceEngine = "tei"
+	Ktransformers               InferenceEngine = "ktransformers"
 
 	MaxFileTreeSize int = 500
 )

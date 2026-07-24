@@ -91,6 +91,19 @@ docker buildx build --platform linux/amd64,linux/arm64 \
   -t ${OPENCSG_ACR}/opencsghq/funasr-cpu:${IMAGE_TAG} \
   -f Dockerfile.funasr-cpu \
   --push .
+# For PaddleOCR CUDA: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/paddleocr:3.7.0
+export IMAGE_TAG=3.7.0
+docker buildx build --platform linux/amd64 \
+  -t ${OPENCSG_ACR}/opencsghq/paddleocr:${IMAGE_TAG} \
+  -f Dockerfile.paddleocr \
+  --push .
+# For PaddleOCR CPU: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/paddleocr-cpu:3.7.0
+# (paddlepaddle pinned to 3.2.2: 3.3.1 crashes on CPU in the oneDNN path, PaddleOCR issue #18162)
+export IMAGE_TAG=3.7.0
+docker buildx build --platform linux/amd64,linux/arm64 \
+  -t ${OPENCSG_ACR}/opencsghq/paddleocr-cpu:${IMAGE_TAG} \
+  -f Dockerfile.paddleocr-cpu \
+  --push .
 # For Diffusers image generation and editing: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/diffusers:0.39.0
 export IMAGE_TAG=0.39.0
 docker buildx build --platform linux/amd64 \

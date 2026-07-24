@@ -20,6 +20,7 @@ import (
 	"github.com/openai/openai-go/v3"
 	"opencsg.com/csghub-server/aigateway/component"
 	audioadapter "opencsg.com/csghub-server/aigateway/component/adapter/audio"
+	ocradapter "opencsg.com/csghub-server/aigateway/component/adapter/ocr"
 	"opencsg.com/csghub-server/aigateway/component/adapter/text2image"
 	"opencsg.com/csghub-server/aigateway/component/adapter/text2video"
 	"opencsg.com/csghub-server/aigateway/component/availability"
@@ -65,6 +66,8 @@ type OpenAIHandler interface {
 	GetVideoContent(c *gin.Context)
 	// Transcribe audio to text
 	Transcription(c *gin.Context)
+	// Extract text from an image with OCR
+	OCR(c *gin.Context)
 	// Generate speech audio from text
 	Speech(c *gin.Context)
 	// Generate speech audio for multiple texts in a single request
@@ -170,6 +173,7 @@ func newOpenAIHandler(
 		whitelistRule:              whitelistRule,
 		aiGenerationStore:          aiGenerationStore,
 		sensitivePolicy:            component.NewSensitivePolicy(modComponent, whitelistRule),
+		ocrRegistry:                ocradapter.NewRegistry(),
 		llmLogPublisher:            component.NewLLMLogPublisher(),
 		sessionRouter:              router.NewSessionRouter(),
 		chatAttemptFailureReporter: noopChatAttemptFailureReporter{},
@@ -262,6 +266,7 @@ type OpenAIHandlerImpl struct {
 	t2iRegistry                *text2image.Registry
 	t2vRegistry                *text2video.Registry
 	audioRegistry              *audioadapter.Registry
+	ocrRegistry                *ocradapter.Registry
 	config                     *config.Config
 	storage                    types.Storage
 	whitelistRule              database.RepositoryFileCheckRuleStore

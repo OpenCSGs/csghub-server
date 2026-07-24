@@ -1,0 +1,44 @@
+FROM docker.m.daocloud.io/python:3.10-slim
+SHELL ["/bin/bash", "-c"]
+
+LABEL maintainer="opencsg"
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN sed -i \
+        -e 's|http://deb.debian.org/debian|http://mirrors.aliyun.com/debian|g' \
+        -e 's|http://security.debian.org/debian-security|http://mirrors.aliyun.com/debian-security|g' \
+        /etc/apt/sources.list.d/debian.sources && \
+    apt-get update && \
+    apt-get install -y \
+    build-essential \
+    curl \
+    git \
+    git-lfs \
+    libgl1 \
+    libglib2.0-0 \
+    dumb-init && \
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /etc/csghub
+# paddlepaddle pinned to 3.2.2: 3.3.1 crashes on CPU in the PIR executor + oneDNN
+# path (PaddleOCR issue #18162, official workaround until PaddlePaddle fixes it)
+# huggingface-hub pinned <1.0: hf_hub 1.x snapshot_download lists files via the
+# /tree API, which CSGHub's /hf endpoint does not implement (0.x uses
+# model_info + siblings, which works).
+RUN pip config set global.index-url https://mirrors.aliyun.com/pypi/simple && \
+    pip install --no-cache-dir paddlepaddle==3.2.2 && \
+    pip install --no-cache-dir paddleocr==3.7.0 "paddlex[serving]==3.7.2" csghub-sdk==0.7.10 \
+        huggingface-hub==0.36.2
+
+COPY ./paddleocr/ /etc/csghub/
+RUN chmod +x /etc/csghub/*.sh
+
+WORKDIR /workspace/
+ENV HUGGINGFACE_HUB_CACHE=/workspace/ \
+    HF_HUB_ENABLE_HF_TRANSFER=0 \
+    PADDLEOCR_DEVICE=cpu
+
+EXPOSE 8000
+ENTRYPOINT ["/usr/bin/dumb-init", "--"]
+CMD ["/etc/csghub/serve.sh"]
