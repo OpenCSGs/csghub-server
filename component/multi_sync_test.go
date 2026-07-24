@@ -41,7 +41,7 @@ func TestMultiSyncComponent_SyncAsClient(t *testing.T) {
 			HasMore  bool                "json:\"has_more\""
 		}{
 			Versions: []types.SyncVersion{
-				{Version: 2},
+				{Version: 2, RepoPath: " Team/Repo "},
 			},
 			HasMore: true,
 		},
@@ -69,7 +69,8 @@ func TestMultiSyncComponent_SyncAsClient(t *testing.T) {
 		},
 	}, nil)
 	mc.mocks.stores.SyncVersionMock().EXPECT().Create(ctx, &database.SyncVersion{
-		Version: 2,
+		Version:  2,
+		RepoPath: "team/repo",
 	}).Return(nil)
 	mc.mocks.stores.SyncVersionMock().EXPECT().Create(ctx, &database.SyncVersion{
 		Version: 3,
@@ -94,7 +95,7 @@ func TestMultiSyncComponent_SyncAsClient(t *testing.T) {
 	// new model mock
 	mockedClient.EXPECT().ModelInfo(ctx, svs[0]).Return(&types.Model{
 		User: &types.User{Nickname: "nn"},
-		Path: "ns/user",
+		Path: "Ns/User",
 		Tags: []types.RepoTag{{Name: "t1"}},
 		Scores: []types.WeightScore{{
 			WeightName: string(database.RecomWeightOp),
@@ -114,26 +115,26 @@ func TestMultiSyncComponent_SyncAsClient(t *testing.T) {
 		}},
 	}, nil)
 	mockedClient.EXPECT().ReadMeData(ctx, svs[0]).Return("readme", nil)
-	mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "CSG_ns").Return(database.User{}, sql.ErrNoRows)
+	mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "csg_ns").Return(database.User{}, sql.ErrNoRows)
 	mc.mocks.gitServer.EXPECT().CreateUser(gitserver.CreateUserRequest{
-		Nickname: "CSG_ns",
-		Username: "CSG_ns",
-		Email:    "ba63d40b48ed06ce1fba4f23c65c058c",
+		Nickname: "csg_ns",
+		Username: "csg_ns",
+		Email:    "3073880722f93f34064c9adea9cbeea2",
 	}).Return(&gitserver.CreateUserResponse{GitID: 123}, nil)
 	mc.mocks.stores.UserMock().EXPECT().Create(ctx, mock.Anything, mock.Anything).RunAndReturn(
 		func(ctx context.Context, u *database.User, n *database.Namespace) error {
-			require.Equal(t, u.NickName, "CSG_ns")
-			require.Equal(t, u.Username, "CSG_ns")
-			require.Equal(t, u.Email, "ba63d40b48ed06ce1fba4f23c65c058c")
+			require.Equal(t, u.NickName, "csg_ns")
+			require.Equal(t, u.Username, "csg_ns")
+			require.Equal(t, u.Email, "3073880722f93f34064c9adea9cbeea2")
 			require.Equal(t, u.GitID, int64(123))
-			require.Equal(t, n.Path, "CSG_ns")
+			require.Equal(t, n.Path, "csg_ns")
 			require.Equal(t, n.Mirrored, true)
 			return nil
 		},
 	)
 	dbrepo := &database.Repository{
-		Path:           "CSG_ns/user",
-		GitPath:        "models_CSG_ns/user",
+		Path:           "csg_ns/user",
+		GitPath:        "models_csg_ns/user",
 		Name:           "user",
 		Readme:         "readme",
 		Source:         types.OpenCSGSource,
@@ -176,8 +177,8 @@ func TestMultiSyncComponent_SyncAsClient(t *testing.T) {
 
 	// new dataset mock
 	dbrepo = &database.Repository{
-		Path:           "CSG_ns/user",
-		GitPath:        "datasets_CSG_ns/user",
+		Path:           "csg_ns/user",
+		GitPath:        "datasets_csg_ns/user",
 		Name:           "user",
 		Readme:         "readme",
 		Source:         types.OpenCSGSource,
@@ -239,8 +240,8 @@ func TestMultiSyncComponent_SyncAsClient(t *testing.T) {
 
 	// new skill mock
 	dbrepo = &database.Repository{
-		Path:           "CSG_ns/user",
-		GitPath:        "skills_CSG_ns/user",
+		Path:           "csg_ns/user",
+		GitPath:        "skills_csg_ns/user",
 		Name:           "user",
 		Readme:         "readme",
 		Source:         types.OpenCSGSource,

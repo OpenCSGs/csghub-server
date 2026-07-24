@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -11,6 +12,7 @@ import (
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/i18n"
+	"opencsg.com/csghub-server/common/types"
 )
 
 func TestLocalizedErrorMiddleware(t *testing.T) {
@@ -64,6 +66,31 @@ func TestLocalizedErrorMiddleware(t *testing.T) {
 		c.Header("Content-Range", "bytes 0-7/1503300328")
 		c.Header("Content-Length", "8")
 		c.Data(http.StatusPartialContent, "application/octet-stream", body)
+	})
+
+	router.GET("/mirror-sync-cancelled", func(c *gin.Context) {
+		httpbase.ConflictError(c, errorx.MirrorRepoSyncCanceled(
+			errors.New("repository synchronization was canceled"),
+			errorx.Ctx().Set("failure_reason", types.MirrorSyncFailureCanceled),
+		))
+	})
+	router.GET("/mirror-sync-failed", func(c *gin.Context) {
+		httpbase.ConflictError(c, errorx.MirrorRepoSyncFailed(
+			errors.New("repository synchronization failed"),
+			errorx.Ctx().Set("failure_reason", types.MirrorSyncFailureRepoSyncFailed),
+		))
+	})
+	router.GET("/source-namespace-mapping-exists", func(c *gin.Context) {
+		httpbase.ConflictError(c, errorx.SourceNamespaceMappingExists(
+			errors.New("source namespace mapping exists"),
+			errorx.Ctx().Set("source_namespace", "SourceTeam"),
+		))
+	})
+	router.GET("/source-namespace-mapping-not-found", func(c *gin.Context) {
+		httpbase.NotFoundError(c, errorx.SourceNamespaceMappingNotFound(
+			errors.New("source namespace mapping does not exist"),
+			errorx.Ctx().Set("source_namespace", "SourceTeam"),
+		))
 	})
 
 	// Run tests
@@ -151,6 +178,54 @@ func TestLocalizedErrorMiddleware(t *testing.T) {
 		// Body must be delivered intact — not silently discarded by the middleware
 		expected := []byte{0xe0, 0x8a, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
 		assert.Equal(t, expected, w.Body.Bytes())
+	})
+
+	t.Run("LocalizedCancelledMirrorSync", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", "/mirror-sync-cancelled", nil)
+		req.Header.Set("Accept-Language", "zh-CN")
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusConflict, w.Code)
+		var resp httpbase.R
+		_ = json.Unmarshal(w.Body.Bytes(), &resp)
+		assert.Equal(t, "MIRROR-ERR-4: 仓库同步已取消。", resp.Msg)
+	})
+
+	t.Run("LocalizedFailedMirrorSync", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", "/mirror-sync-failed", nil)
+		req.Header.Set("Accept-Language", "zh-CN")
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusConflict, w.Code)
+		var resp httpbase.R
+		_ = json.Unmarshal(w.Body.Bytes(), &resp)
+		assert.Equal(t, "MIRROR-ERR-2: 仓库同步失败。", resp.Msg)
+	})
+
+	t.Run("LocalizedSourceNamespaceMappingExists", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", "/source-namespace-mapping-exists", nil)
+		req.Header.Set("Accept-Language", "zh-CN")
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusConflict, w.Code)
+		var resp httpbase.R
+		_ = json.Unmarshal(w.Body.Bytes(), &resp)
+		assert.Equal(t, "MIRROR-ERR-6: 源命名空间已存在映射关系。", resp.Msg)
+	})
+
+	t.Run("LocalizedSourceNamespaceMappingNotFound", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", "/source-namespace-mapping-not-found", nil)
+		req.Header.Set("Accept-Language", "zh-CN")
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusNotFound, w.Code)
+		var resp httpbase.R
+		_ = json.Unmarshal(w.Body.Bytes(), &resp)
+		assert.Equal(t, "MIRROR-ERR-7: 源命名空间映射关系不存在。", resp.Msg)
 	})
 }
 

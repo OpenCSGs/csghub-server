@@ -12,15 +12,15 @@ import (
 func TestMirrorNamespaceMappingComponent_Create(t *testing.T) {
 	ctx := context.TODO()
 	mc := initializeTestMirrorNamespaceMappingComponent(ctx, t)
-	mc.mocks.stores.NamespaceMock().EXPECT().Exists(ctx, "u").Return(true, nil)
+	mc.mocks.stores.NamespaceMock().EXPECT().Exists(ctx, "target-team").Return(true, nil)
 	mc.mocks.stores.MirrorNamespaceMappingMock().EXPECT().Create(ctx, &database.MirrorNamespaceMapping{
-		SourceNamespace: "sn",
-		TargetNamespace: "u",
+		SourceNamespace: "SourceTeam",
+		TargetNamespace: "target-team",
 	}).Return(&database.MirrorNamespaceMapping{ID: 1}, nil)
 
 	data, err := mc.Create(ctx, types.CreateMirrorNamespaceMappingReq{
-		SourceNamespace: "sn",
-		TargetNamespace: "u",
+		SourceNamespace: "SourceTeam",
+		TargetNamespace: " Target-Team ",
 	})
 	require.Nil(t, err)
 	require.Equal(t, &database.MirrorNamespaceMapping{ID: 1}, data)
@@ -39,11 +39,11 @@ func TestMirrorNamespaceMappingComponent_Get(t *testing.T) {
 func TestMirrorNamespaceMappingComponent_Index(t *testing.T) {
 	ctx := context.TODO()
 	mc := initializeTestMirrorNamespaceMappingComponent(ctx, t)
-	mc.mocks.stores.MirrorNamespaceMappingMock().EXPECT().Index(ctx).Return([]database.MirrorNamespaceMapping{
+	mc.mocks.stores.MirrorNamespaceMappingMock().EXPECT().Index(ctx, "").Return([]database.MirrorNamespaceMapping{
 		{ID: 1},
 	}, nil)
 
-	data, err := mc.Index(ctx)
+	data, err := mc.Index(ctx, "")
 	require.Nil(t, err)
 	require.Equal(t, []database.MirrorNamespaceMapping{
 		{ID: 1},
@@ -53,19 +53,19 @@ func TestMirrorNamespaceMappingComponent_Index(t *testing.T) {
 func TestMirrorNamespaceMappingComponent_Update(t *testing.T) {
 	ctx := context.TODO()
 	mc := initializeTestMirrorNamespaceMappingComponent(ctx, t)
-	mc.mocks.stores.NamespaceMock().EXPECT().Exists(ctx, "u").Return(true, nil)
+	mc.mocks.stores.NamespaceMock().EXPECT().Exists(ctx, "target-team").Return(true, nil)
 	mc.mocks.stores.MirrorNamespaceMappingMock().EXPECT().Update(ctx, &database.MirrorNamespaceMapping{
 		ID:              1,
-		SourceNamespace: "sn",
-		TargetNamespace: "u",
+		SourceNamespace: "SourceTeam",
+		TargetNamespace: "target-team",
 	}).Return(database.MirrorNamespaceMapping{
 		ID:              1,
-		SourceNamespace: "sn",
-		TargetNamespace: "u",
+		SourceNamespace: "SourceTeam",
+		TargetNamespace: "target-team",
 	}, nil)
 	var (
-		sn = "sn"
-		u  = "u"
+		sn = "SourceTeam"
+		u  = " Target-Team "
 	)
 
 	data, err := mc.Update(ctx, types.UpdateMirrorNamespaceMappingReq{
@@ -76,8 +76,8 @@ func TestMirrorNamespaceMappingComponent_Update(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, &database.MirrorNamespaceMapping{
 		ID:              1,
-		SourceNamespace: "sn",
-		TargetNamespace: "u",
+		SourceNamespace: "SourceTeam",
+		TargetNamespace: "target-team",
 	}, data)
 }
 

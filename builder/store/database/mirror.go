@@ -113,12 +113,14 @@ func (s *mirrorStoreImpl) IsExist(ctx context.Context, repoID int64) (exists boo
 		Exists(ctx)
 	return
 }
+
+// IsRepoExist checks repository identity without treating path casing as distinct.
 func (s *mirrorStoreImpl) IsRepoExist(ctx context.Context, repoType types.RepositoryType, namespace, name string) (exists bool, err error) {
 	var repo Repository
 	exists, err = s.db.Operator.Core.
 		NewSelect().
 		Model(&repo).
-		Where("path=?", fmt.Sprintf("%s/%s", namespace, name)).
+		Where("LOWER(path) = LOWER(?)", fmt.Sprintf("%s/%s", namespace, name)).
 		Where("repository_type=?", repoType).
 		Exists(ctx)
 	return
@@ -184,6 +186,7 @@ func (s *mirrorStoreImpl) FindByRepoPath(ctx context.Context, repoType types.Rep
 	return &mirror, nil
 }
 
+// FindWithMapping resolves source and local repository paths without treating casing as distinct.
 func (s *mirrorStoreImpl) FindWithMapping(ctx context.Context, repoType types.RepositoryType, namespace, name string, mapping types.Mapping) (*Repository, error) {
 	resRepo := new(Repository)
 	query := s.db.Operator.Core.
@@ -193,16 +196,16 @@ func (s *mirrorStoreImpl) FindWithMapping(ctx context.Context, repoType types.Re
 	query.Where("repository_type = ?", repoType)
 	switch mapping {
 	case types.HFMapping:
-		//compatiebility with old data
-		//TODO: remove path after sdk 0.4.6
-		query.Where("hf_path = ? or path = ?", path, path)
+		// Compatibility with old data.
+		// TODO: Remove path after SDK 0.4.6.
+		query.Where("LOWER(hf_path) = LOWER(?) or LOWER(path) = LOWER(?)", path, path)
 	case types.ModelScopeMapping:
-		query.Where("ms_path = ?", path, path)
+		query.Where("LOWER(ms_path) = LOWER(?)", path)
 	case types.AutoMapping:
-		query.Where("hf_path = ? or ms_path = ? or path = ?", path, path, path)
+		query.Where("LOWER(hf_path) = LOWER(?) or LOWER(ms_path) = LOWER(?) or LOWER(path) = LOWER(?)", path, path, path)
 	default:
 		// for csg path
-		query.Where("path = ?", path)
+		query.Where("LOWER(path) = LOWER(?)", path)
 	}
 	err := query.Order("created_at desc").Limit(1).Scan(ctx)
 	return resRepo, err

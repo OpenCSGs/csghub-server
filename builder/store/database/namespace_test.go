@@ -29,7 +29,7 @@ func TestNamespaceStore_All(t *testing.T) {
 	require.Nil(t, err)
 	require.False(t, exist)
 
-	ns, err := store.FindByPath(ctx, "foo/bar")
+	ns, err := store.FindByPath(ctx, "FOO/BAR")
 	require.Nil(t, err)
 	require.Equal(t, "foo/bar", ns.Path)
 	_, err = store.FindByPath(ctx, "foo/bar2")

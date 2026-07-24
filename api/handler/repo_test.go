@@ -1167,6 +1167,29 @@ func TestRepoHandler_CreateMirror(t *testing.T) {
 	tester.ResponseEq(t, 200, tester.OKText, &database.Mirror{ID: 123})
 }
 
+// TestRepoHandler_CreateMirrorSourceConflict verifies replacing an existing mirror source returns HTTP 409.
+func TestRepoHandler_CreateMirrorSourceConflict(t *testing.T) {
+	tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
+		return rp.CreateMirror
+	})
+	tester.WithUser().WithKV("repo_type", types.ModelRepo).WithBody(t, &types.CreateMirrorReq{
+		SourceUrl: "https://github.com/new/repo.git",
+	})
+	conflictErr := errorx.MirrorSourceConflict(
+		errors.New("target repo already has another mirror source"),
+		errorx.Ctx().Set("repository_id", int64(123)),
+	)
+	tester.mocks.mirror.EXPECT().CreateMirror(tester.Ctx(), mock.Anything).Return(nil, conflictErr)
+
+	tester.Execute()
+
+	tester.ResponseEqSimple(t, http.StatusConflict, httpbase.R{
+		Code:    "MIRROR-ERR-0",
+		Msg:     "MIRROR-ERR-0: target repo already has another mirror source",
+		Context: errorx.Ctx().Set("repository_id", int64(123)),
+	})
+}
+
 func TestRepoHandler_GetMirror(t *testing.T) {
 	tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
 		return rp.GetMirror

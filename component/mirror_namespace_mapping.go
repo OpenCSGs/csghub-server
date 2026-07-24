@@ -3,6 +3,7 @@ package component
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
@@ -19,7 +20,7 @@ type mirrorNamespaceMappingComponentImpl struct {
 type MirrorNamespaceMappingComponent interface {
 	Create(ctx context.Context, req types.CreateMirrorNamespaceMappingReq) (*database.MirrorNamespaceMapping, error)
 	Get(ctx context.Context, id int64) (*database.MirrorNamespaceMapping, error)
-	Index(ctx context.Context) ([]database.MirrorNamespaceMapping, error)
+	Index(ctx context.Context, search string) ([]database.MirrorNamespaceMapping, error)
 	Update(ctx context.Context, req types.UpdateMirrorNamespaceMappingReq) (*database.MirrorNamespaceMapping, error)
 	Delete(ctx context.Context, id int64) error
 }
@@ -32,18 +33,20 @@ func NewMirrorNamespaceMappingComponent(config *config.Config) (MirrorNamespaceM
 	}, nil
 }
 
+// Create validates and persists a namespace mapping with a canonical local target.
 func (c *mirrorNamespaceMappingComponentImpl) Create(ctx context.Context, req types.CreateMirrorNamespaceMappingReq) (*database.MirrorNamespaceMapping, error) {
-	exists, err := c.namespaceStore.Exists(ctx, req.TargetNamespace)
+	targetNamespace := strings.ToLower(strings.TrimSpace(req.TargetNamespace))
+	exists, err := c.namespaceStore.Exists(ctx, targetNamespace)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check target namespace existence, error: %w", err)
 	}
 	if !exists {
-		return nil, errorx.TargetNamespaceNotFound(req.TargetNamespace)
+		return nil, errorx.TargetNamespaceNotFound(targetNamespace)
 	}
 
 	var mnm database.MirrorNamespaceMapping
 	mnm.SourceNamespace = req.SourceNamespace
-	mnm.TargetNamespace = req.TargetNamespace
+	mnm.TargetNamespace = targetNamespace
 	if req.Enabled != nil {
 		mnm.Enabled = req.Enabled
 	}
@@ -62,21 +65,25 @@ func (c *mirrorNamespaceMappingComponentImpl) Get(ctx context.Context, id int64)
 	return mnm, nil
 }
 
-func (c *mirrorNamespaceMappingComponentImpl) Index(ctx context.Context) ([]database.MirrorNamespaceMapping, error) {
-	mnm, err := c.mirrorNamespaceMappingStore.Index(ctx)
+func (c *mirrorNamespaceMappingComponentImpl) Index(ctx context.Context, search string) ([]database.MirrorNamespaceMapping, error) {
+	mnm, err := c.mirrorNamespaceMappingStore.Index(ctx, search)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get mirror namespace mapping, error: %w", err)
 	}
 	return mnm, nil
 }
+
+// Update validates and persists changes to an existing namespace mapping.
 func (c *mirrorNamespaceMappingComponentImpl) Update(ctx context.Context, req types.UpdateMirrorNamespaceMappingReq) (*database.MirrorNamespaceMapping, error) {
+	var targetNamespace string
 	if req.TargetNamespace != nil {
-		exists, err := c.namespaceStore.Exists(ctx, *req.TargetNamespace)
+		targetNamespace = strings.ToLower(strings.TrimSpace(*req.TargetNamespace))
+		exists, err := c.namespaceStore.Exists(ctx, targetNamespace)
 		if err != nil {
 			return nil, fmt.Errorf("failed to check target namespace existence, error: %w", err)
 		}
 		if !exists {
-			return nil, errorx.TargetNamespaceNotFound(*req.TargetNamespace)
+			return nil, errorx.TargetNamespaceNotFound(targetNamespace)
 		}
 	}
 
@@ -86,7 +93,7 @@ func (c *mirrorNamespaceMappingComponentImpl) Update(ctx context.Context, req ty
 		mnm.SourceNamespace = *req.SourceNamespace
 	}
 	if req.TargetNamespace != nil {
-		mnm.TargetNamespace = *req.TargetNamespace
+		mnm.TargetNamespace = targetNamespace
 	}
 	if req.Enabled != nil {
 		mnm.Enabled = req.Enabled

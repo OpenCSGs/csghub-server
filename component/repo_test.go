@@ -227,7 +227,7 @@ func mockUserRepoAdminPermission(ctx context.Context, stores *tests.MockStores, 
 		RoleMask: "admin",
 	}, nil).Once()
 	stores.NamespaceMock().EXPECT().FindByPath(ctx, "ns").Return(
-		database.Namespace{NamespaceType: "user"}, nil,
+		database.Namespace{Path: "ns", NamespaceType: "user"}, nil,
 	).Maybe()
 
 }
@@ -254,9 +254,11 @@ func TestRepoComponent_RelatedRepos(t *testing.T) {
 	repo.mocks.stores.RepoMock().EXPECT().FindByIds(ctx, []int64{1, 2, 3, 4}, opts...).Return(repos, nil)
 
 	repo.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "b").Return(database.Namespace{
+		Path:          "b",
 		NamespaceType: "user",
 	}, nil)
 	repo.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "user").Return(database.Namespace{
+		Path:          "user",
 		NamespaceType: "user",
 	}, nil)
 	repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{RoleMask: "foo"}, nil)
@@ -1717,6 +1719,41 @@ func TestRepoComponent_checkCurrentUserPermission(t *testing.T) {
 		yes, err = repoComp.CheckCurrentUserPermission(context.Background(), user.Username, ns.Path, membership.RoleAdmin)
 		require.True(t, yes)
 		require.NoError(t, err)
+	})
+
+	t.Run("uses stored user namespace casing", func(t *testing.T) {
+		ctx := context.Background()
+		repoComp := initializeTestRepoComponent(ctx, t)
+		repoComp.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "USER_NAME").Return(database.Namespace{
+			NamespaceType: database.UserNamespace,
+			Path:          "user_name",
+		}, nil)
+		repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user_name").Return(database.User{
+			Username: "user_name",
+		}, nil)
+
+		allowed, err := repoComp.CheckCurrentUserPermission(ctx, "user_name", "USER_NAME", membership.RoleWrite)
+
+		require.NoError(t, err)
+		require.True(t, allowed)
+	})
+
+	t.Run("uses stored organization namespace casing", func(t *testing.T) {
+		ctx := context.Background()
+		repoComp := initializeTestRepoComponent(ctx, t)
+		repoComp.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "ORG_NAME").Return(database.Namespace{
+			NamespaceType: database.OrgNamespace,
+			Path:          "Org_Name",
+		}, nil)
+		repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "member").Return(database.User{
+			Username: "member",
+		}, nil)
+		repoComp.mocks.userSvcClient.EXPECT().GetMemberRole(ctx, "Org_Name", "member").Return(membership.RoleWrite, nil)
+
+		allowed, err := repoComp.CheckCurrentUserPermission(ctx, "member", "ORG_NAME", membership.RoleWrite)
+
+		require.NoError(t, err)
+		require.True(t, allowed)
 	})
 
 	t.Run("can not read other's", func(t *testing.T) {
@@ -3528,10 +3565,10 @@ func TestRepoComponent_TransferOwnership_Success(t *testing.T) {
 
 	// Mock source namespace (user type)
 	repoComp.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "sourceuser").
-		Return(database.Namespace{NamespaceType: database.UserNamespace}, nil)
+		Return(database.Namespace{Path: "sourceuser", NamespaceType: database.UserNamespace}, nil)
 	// Mock target namespace (org type, user has write role via membership)
 	repoComp.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "targetorg").
-		Return(database.Namespace{NamespaceType: database.OrgNamespace}, nil)
+		Return(database.Namespace{Path: "targetorg", NamespaceType: database.OrgNamespace}, nil)
 	// Mock current user (non-admin, username matches source = write permission on source)
 	repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "sourceuser").
 		Return(database.User{RoleMask: ""}, nil)
@@ -3579,7 +3616,7 @@ func TestRepoComponent_TransferOwnership_NoSourcePermission(t *testing.T) {
 
 	// Mock source namespace (user type, different from current user)
 	repoComp.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "otheruser").
-		Return(database.Namespace{NamespaceType: database.UserNamespace}, nil)
+		Return(database.Namespace{Path: "otheruser", NamespaceType: database.UserNamespace}, nil)
 	// Mock current user (non-admin, different from source namespace)
 	repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "currentuser").
 		Return(database.User{RoleMask: ""}, nil)
@@ -3606,10 +3643,10 @@ func TestRepoComponent_TransferOwnership_NoTargetPermission(t *testing.T) {
 
 	// Mock source namespace (user type, current user matches = has permission)
 	repoComp.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "currentuser").
-		Return(database.Namespace{NamespaceType: database.UserNamespace}, nil)
+		Return(database.Namespace{Path: "currentuser", NamespaceType: database.UserNamespace}, nil)
 	// Mock target namespace (user type, different from current user = no permission)
 	repoComp.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "targetuser").
-		Return(database.Namespace{NamespaceType: database.UserNamespace}, nil)
+		Return(database.Namespace{Path: "targetuser", NamespaceType: database.UserNamespace}, nil)
 	// Mock current user
 	repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "currentuser").
 		Return(database.User{RoleMask: ""}, nil)
@@ -3636,7 +3673,7 @@ func TestRepoComponent_TransferOwnership_SameNamespace(t *testing.T) {
 
 	// Mock source namespace (user type)
 	repoComp.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "sameuser").
-		Return(database.Namespace{NamespaceType: database.UserNamespace}, nil)
+		Return(database.Namespace{Path: "sameuser", NamespaceType: database.UserNamespace}, nil)
 	// Mock current user
 	repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "sameuser").
 		Return(database.User{RoleMask: ""}, nil)
@@ -3663,10 +3700,10 @@ func TestRepoComponent_TransferOwnership_TargetExists(t *testing.T) {
 
 	// Mock source namespace
 	repoComp.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "sourceuser").
-		Return(database.Namespace{NamespaceType: database.UserNamespace}, nil)
+		Return(database.Namespace{Path: "sourceuser", NamespaceType: database.UserNamespace}, nil)
 	// Mock target namespace (org type)
 	repoComp.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "targetorg").
-		Return(database.Namespace{NamespaceType: database.OrgNamespace}, nil)
+		Return(database.Namespace{Path: "targetorg", NamespaceType: database.OrgNamespace}, nil)
 	// Mock current user
 	repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "sourceuser").
 		Return(database.User{RoleMask: ""}, nil)
@@ -3699,10 +3736,10 @@ func TestRepoComponent_TransferOwnership_NotHashed(t *testing.T) {
 
 	// Mock source namespace
 	repoComp.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "sourceuser").
-		Return(database.Namespace{NamespaceType: database.UserNamespace}, nil)
+		Return(database.Namespace{Path: "sourceuser", NamespaceType: database.UserNamespace}, nil)
 	// Mock target namespace (org type)
 	repoComp.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "targetorg").
-		Return(database.Namespace{NamespaceType: database.OrgNamespace}, nil)
+		Return(database.Namespace{Path: "targetorg", NamespaceType: database.OrgNamespace}, nil)
 	// Mock current user
 	repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "sourceuser").
 		Return(database.User{RoleMask: ""}, nil)
@@ -3735,10 +3772,10 @@ func TestRepoComponent_TransferOwnership_DependencyExists(t *testing.T) {
 
 	// Mock source namespace
 	repoComp.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "sourceuser").
-		Return(database.Namespace{NamespaceType: database.UserNamespace}, nil)
+		Return(database.Namespace{Path: "sourceuser", NamespaceType: database.UserNamespace}, nil)
 	// Mock target namespace (org type)
 	repoComp.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "targetorg").
-		Return(database.Namespace{NamespaceType: database.OrgNamespace}, nil)
+		Return(database.Namespace{Path: "targetorg", NamespaceType: database.OrgNamespace}, nil)
 	// Mock current user
 	repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "sourceuser").
 		Return(database.User{RoleMask: ""}, nil)
@@ -4046,7 +4083,7 @@ func TestRepoComponent_UpdateRepo_PermissionChecks(t *testing.T) {
 			},
 			setupMocks: func(repo *testRepoWithMocks, req types.UpdateRepoReq) {
 				repo.mocks.stores.RepoMock().EXPECT().Find(ctx, req.Namespace, string(req.RepoType), req.Name).Return(&database.Repository{}, nil)
-				repo.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, req.Namespace).Return(database.Namespace{NamespaceType: database.OrgNamespace}, nil)
+				repo.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, req.Namespace).Return(database.Namespace{Path: req.Namespace, NamespaceType: database.OrgNamespace}, nil)
 				repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, req.Username).Return(database.User{Username: "test-user"}, nil)
 				repo.mocks.userSvcClient.EXPECT().GetMemberRole(ctx, req.Namespace, req.Username).Return(membership.RoleWrite, nil)
 			},
@@ -4065,7 +4102,7 @@ func TestRepoComponent_UpdateRepo_PermissionChecks(t *testing.T) {
 			},
 			setupMocks: func(repo *testRepoWithMocks, req types.UpdateRepoReq) {
 				repo.mocks.stores.RepoMock().EXPECT().Find(ctx, req.Namespace, string(req.RepoType), req.Name).Return(&database.Repository{}, nil)
-				repo.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, req.Namespace).Return(database.Namespace{NamespaceType: database.OrgNamespace}, nil)
+				repo.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, req.Namespace).Return(database.Namespace{Path: req.Namespace, NamespaceType: database.OrgNamespace}, nil)
 				repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, req.Username).Return(database.User{Username: "test-user"}, nil)
 				repo.mocks.userSvcClient.EXPECT().GetMemberRole(ctx, req.Namespace, req.Username).Return(membership.RoleWrite, nil)
 				repo.mocks.gitServer.EXPECT().UpdateRepo(ctx, mock.Anything).Return(&gitserver.CreateRepoResp{}, nil)
@@ -4083,7 +4120,7 @@ func TestRepoComponent_UpdateRepo_PermissionChecks(t *testing.T) {
 			},
 			setupMocks: func(repo *testRepoWithMocks, req types.UpdateRepoReq) {
 				repo.mocks.stores.RepoMock().EXPECT().Find(ctx, req.Namespace, string(req.RepoType), req.Name).Return(&database.Repository{}, nil)
-				repo.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, req.Namespace).Return(database.Namespace{NamespaceType: database.OrgNamespace}, nil)
+				repo.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, req.Namespace).Return(database.Namespace{Path: req.Namespace, NamespaceType: database.OrgNamespace}, nil)
 				repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, req.Username).Return(database.User{Username: "test-user"}, nil)
 				repo.mocks.userSvcClient.EXPECT().GetMemberRole(ctx, req.Namespace, req.Username).Return(membership.RoleRead, nil)
 			},

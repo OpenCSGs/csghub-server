@@ -914,6 +914,62 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Name:** `mirrorSourceConflict`
 - **Description:** The target repository already has another mirror source.
 
+---
+
+### `MIRROR-ERR-1`
+
+- **Error Code:** `MIRROR-ERR-1`
+- **Error Name:** `mirrorRepoSyncing`
+- **Description:** Repository synchronization is in progress.
+
+---
+
+### `MIRROR-ERR-2`
+
+- **Error Code:** `MIRROR-ERR-2`
+- **Error Name:** `mirrorRepoSyncFailed`
+- **Description:** Repository synchronization failed and Git data could not be retrieved.
+
+---
+
+### `MIRROR-ERR-3`
+
+- **Error Code:** `MIRROR-ERR-3`
+- **Error Name:** `mirrorTaskStateInvalid`
+- **Description:** The current mirror task state is inconsistent with its execution status and cannot be determined reliably.
+
+---
+
+### `MIRROR-ERR-4`
+
+- **Error Code:** `MIRROR-ERR-4`
+- **Error Name:** `mirrorRepoSyncCanceled`
+- **Description:** Repository synchronization was canceled before Git data became available.
+
+---
+
+### `MIRROR-ERR-5`
+
+- **Error Code:** `MIRROR-ERR-5`
+- **Error Name:** `mirrorSourceRepoAuthInvalid`
+- **Description:** Source repository authentication information is invalid.
+
+---
+
+### `MIRROR-ERR-6`
+
+- **Error Code:** `MIRROR-ERR-6`
+- **Error Name:** `sourceNamespaceMappingExists`
+- **Description:** The source namespace already has a mapping.
+
+---
+
+### `MIRROR-ERR-7`
+
+- **Error Code:** `MIRROR-ERR-7`
+- **Error Name:** `sourceNamespaceMappingNotFound`
+- **Description:** The source namespace mapping does not exist.
+
 ## Moderation Errors
 
 ### `MOD-ERR-0`
@@ -1713,4 +1769,3 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Code:** `USER-ERR-20`
 - **Error Name:** `namespaceAlreadyExists`
 - **Description:** The namespace already exists in the system.
-
