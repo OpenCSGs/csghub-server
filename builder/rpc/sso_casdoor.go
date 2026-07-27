@@ -68,7 +68,7 @@ func (c *casdoorClientImpl) UpdateUserInfo(ctx context.Context, userInfo *SSOUpd
 	}
 
 	if userInfo.Name != "" {
-		casu.DisplayName = userInfo.Name
+		casu.Name = userInfo.Name
 	}
 	_, err = c.casClient.UpdateUserByUserId(casu.Owner, casu.Id, casu)
 	if err != nil {

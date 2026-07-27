@@ -227,19 +227,6 @@ func (c *userComponentImpl) createFromSSOUser(ctx context.Context, cu *rpc.SSOUs
 	if err := c.checkUserConflictsInDB(ctx, userName, email); err != nil {
 		return nil, err
 	}
-	//skip creating git user if email is empty, it will be created later when user set email
-	if email != "" {
-		gsUserReq := gitserver.CreateUserRequest{
-			Nickname: userName,
-			Username: userName,
-			Email:    email,
-		}
-		gsUserResp, err = c.gs.CreateUser(gsUserReq)
-		if err != nil {
-			newError := fmt.Errorf("failed to create gitserver user '%s',error:%w", cu.Name, err)
-			return nil, newError
-		}
-	}
 
 	exist, err := c.nsStore.ExistsByUUID(ctx, cu.UUID)
 	if err != nil {
