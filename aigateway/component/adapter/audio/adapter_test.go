@@ -14,11 +14,63 @@ func TestRegistryGetAdapter(t *testing.T) {
 	funasr := registry.GetAdapter(&types.Model{InternalModelInfo: types.InternalModelInfo{RuntimeFramework: "FunASR"}})
 	require.Equal(t, "funasr", funasr.Name())
 
+	amdFunasr := registry.GetAdapter(&types.Model{InternalModelInfo: types.InternalModelInfo{RuntimeFramework: frameworkAMDFunASR}})
+	require.Equal(t, "funasr", amdFunasr.Name())
+
+	normalizedAMDFunasr := registry.GetAdapter(&types.Model{InternalModelInfo: types.InternalModelInfo{RuntimeFramework: " AMD-FunASR "}})
+	require.Equal(t, "funasr", normalizedAMDFunasr.Name())
+
 	opencsg := registry.GetAdapter(&types.Model{ExternalModelInfo: types.ExternalModelInfo{Provider: " OpenCSG "}})
 	require.Equal(t, "funasr", opencsg.Name())
 
 	openaiCompatible := registry.GetAdapter(&types.Model{})
 	require.Equal(t, "openai-compatible", openaiCompatible.Name())
+}
+
+func TestFunASRAdapter_CanHandle(t *testing.T) {
+	adapter := NewFunASRAdapter()
+
+	tests := []struct {
+		name  string
+		model *types.Model
+		want  bool
+	}{
+		{
+			name:  "funasr runtime framework",
+			model: &types.Model{InternalModelInfo: types.InternalModelInfo{RuntimeFramework: frameworkFunASR}},
+			want:  true,
+		},
+		{
+			name:  "amd-funasr runtime framework",
+			model: &types.Model{InternalModelInfo: types.InternalModelInfo{RuntimeFramework: frameworkAMDFunASR}},
+			want:  true,
+		},
+		{
+			name:  "runtime framework matching is normalized",
+			model: &types.Model{InternalModelInfo: types.InternalModelInfo{RuntimeFramework: " AMD-FunASR "}},
+			want:  true,
+		},
+		{
+			name:  "opencsg provider",
+			model: &types.Model{ExternalModelInfo: types.ExternalModelInfo{Provider: "opencsg"}},
+			want:  true,
+		},
+		{
+			name:  "reject nil model",
+			model: nil,
+			want:  false,
+		},
+		{
+			name:  "reject unknown runtime framework",
+			model: &types.Model{InternalModelInfo: types.InternalModelInfo{RuntimeFramework: "whisper"}},
+			want:  false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.want, adapter.CanHandle(tt.model))
+		})
+	}
 }
 
 func TestFunASRAdapterDurationFromHeader(t *testing.T) {

@@ -8,7 +8,11 @@ import (
 	"opencsg.com/csghub-server/aigateway/types"
 )
 
-const audioDurationHeader = "Audio-Duration-Seconds"
+const (
+	audioDurationHeader = "Audio-Duration-Seconds"
+	frameworkFunASR     = "funasr"
+	frameworkAMDFunASR  = "amd-funasr"
+)
 
 type FunASRAdapter struct{}
 
@@ -21,7 +25,16 @@ func (a *FunASRAdapter) Name() string {
 }
 
 func (a *FunASRAdapter) CanHandle(model *types.Model) bool {
-	return model != nil && (isValue(model.RuntimeFramework, "funasr") || isValue(model.Provider, "opencsg"))
+	return model != nil && (isFunASRFramework(model.RuntimeFramework) || isValue(model.Provider, "opencsg"))
+}
+
+func isFunASRFramework(runtimeFramework string) bool {
+	switch strings.ToLower(strings.TrimSpace(runtimeFramework)) {
+	case frameworkFunASR, frameworkAMDFunASR:
+		return true
+	default:
+		return false
+	}
 }
 
 func (a *FunASRAdapter) DurationFromHeader(header http.Header) (float64, bool) {
