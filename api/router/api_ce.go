@@ -45,28 +45,35 @@ func createRepoRoutes(apiGroup *gin.RouterGroup, middlewareCollection middleware
 	modelsGroup := apiGroup.Group("/models")
 	modelsGroup.Use(middleware.RepoType(types.ModelRepo), middlewareCollection.Repo.RepoExists)
 	modelsGroup.POST("/:namespace/:name/mirror_from_saas", middlewareCollection.Auth.NeedLogin, repoHandler.MirrorFromSaas)
+	modelsGroup.GET("/:namespace/:name/mirror_from_saas/status", middlewareCollection.Auth.NeedLogin, repoHandler.MirrorFromSaasStatus)
 
 	datasetsGroup := apiGroup.Group("/datasets")
 	datasetsGroup.Use(middleware.RepoType(types.DatasetRepo), middlewareCollection.Repo.RepoExists)
 	datasetsGroup.POST("/:namespace/:name/mirror_from_saas", middlewareCollection.Auth.NeedLogin, repoHandler.MirrorFromSaas)
+	datasetsGroup.GET("/:namespace/:name/mirror_from_saas/status", middlewareCollection.Auth.NeedLogin, repoHandler.MirrorFromSaasStatus)
 
 	codesGroup := apiGroup.Group("/codes")
 	codesGroup.Use(middleware.RepoType(types.CodeRepo), middlewareCollection.Repo.RepoExists)
 	codesGroup.POST("/:namespace/:name/mirror_from_saas", middlewareCollection.Auth.NeedLogin, repoHandler.MirrorFromSaas)
+	codesGroup.GET("/:namespace/:name/mirror_from_saas/status", middlewareCollection.Auth.NeedLogin, repoHandler.MirrorFromSaasStatus)
 
 	spacesGroup := apiGroup.Group("/spaces")
 	spacesGroup.Use(middleware.RepoType(types.SpaceRepo), middlewareCollection.Repo.RepoExists)
 	spacesGroup.POST("/:namespace/:name/mirror_from_saas", middlewareCollection.Auth.NeedLogin, repoHandler.MirrorFromSaas)
+	spacesGroup.GET("/:namespace/:name/mirror_from_saas/status", middlewareCollection.Auth.NeedLogin, repoHandler.MirrorFromSaasStatus)
 
 	promptGroup := apiGroup.Group("/prompts")
 	promptGroup.Use(middleware.RepoType(types.PromptRepo), middlewareCollection.Repo.RepoExists)
 	promptGroup.POST("/:namespace/:name/mirror_from_saas", middlewareCollection.Auth.NeedLogin, repoHandler.MirrorFromSaas)
+	promptGroup.GET("/:namespace/:name/mirror_from_saas/status", middlewareCollection.Auth.NeedLogin, repoHandler.MirrorFromSaasStatus)
 
 	mcpGroup := apiGroup.Group("/mcps")
 	mcpGroup.Use(middleware.RepoType(types.MCPServerRepo), middlewareCollection.Repo.RepoExists)
 	mcpGroup.POST("/:namespace/:name/mirror_from_saas", middlewareCollection.Auth.NeedLogin, repoHandler.MirrorFromSaas)
+	mcpGroup.GET("/:namespace/:name/mirror_from_saas/status", middlewareCollection.Auth.NeedLogin, repoHandler.MirrorFromSaasStatus)
 
 	skillGroup := apiGroup.Group("/skills")
 	skillGroup.Use(middleware.RepoType(types.SkillRepo), middlewareCollection.Repo.RepoExists)
 	skillGroup.POST("/:namespace/:name/mirror_from_saas", middlewareCollection.Auth.NeedLogin, repoHandler.MirrorFromSaas)
+	skillGroup.GET("/:namespace/:name/mirror_from_saas/status", middlewareCollection.Auth.NeedLogin, repoHandler.MirrorFromSaasStatus)
 }

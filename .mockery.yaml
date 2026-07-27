@@ -127,10 +127,6 @@ packages:
     config:
     interfaces:
       MessageSender:
-  opencsg.com/csghub-server/mirror/filter:
-    config:
-    interfaces:
-      Filter:
   opencsg.com/csghub-server/common/types:
     config:
     interfaces:

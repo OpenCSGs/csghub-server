@@ -221,8 +221,9 @@ type LFSPointer struct {
 }
 
 type GetRepoFileTreeResp struct {
-	Files  []*File
-	Cursor string
+	// Files and Cursor retain capitalized JSON names for forward compatibility with existing API clients.
+	Files  []*File `json:"Files"`
+	Cursor string  `json:"Cursor"`
 }
 
 type FilePreviewCode int

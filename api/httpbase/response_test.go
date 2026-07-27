@@ -1,9 +1,39 @@
 package httpbase
 
 import (
+	"errors"
+	"net/http"
+	"net/http/httptest"
 	"reflect"
 	"testing"
+
+	"github.com/gin-gonic/gin"
+	"github.com/stretchr/testify/require"
+	"opencsg.com/csghub-server/common/errorx"
 )
+
+// TestAccepted verifies asynchronous APIs use the standard response envelope.
+func TestAccepted(t *testing.T) {
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	ctx.Request = &http.Request{}
+
+	Accepted(ctx, map[string]int{"task_id": 42})
+
+	require.Equal(t, http.StatusAccepted, recorder.Code)
+	require.JSONEq(t, `{"msg":"Accepted","data":{"task_id":42}}`, recorder.Body.String())
+}
+
+// TestAcceptedWithExt verifies temporary asynchronous errors can include result data.
+func TestAcceptedWithExt(t *testing.T) {
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+
+	AcceptedWithExt(ctx, errorx.NewCustomError("TEST", 1, errors.New("pending"), nil), map[string]int{"task_id": 42})
+
+	require.Equal(t, http.StatusAccepted, recorder.Code)
+	require.JSONEq(t, `{"code":"TEST-1","msg":"TEST-1: pending","data":{"task_id":42}}`, recorder.Body.String())
+}
 
 func TestNormalizeEmptySlice(t *testing.T) {
 	tests := []struct {
