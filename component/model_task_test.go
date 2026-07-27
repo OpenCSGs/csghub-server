@@ -47,3 +47,9 @@ func TestGetBuiltInTaskFromTags_TextToAudio(t *testing.T) {
 
 	require.Equal(t, string(types.TextToAudio), task)
 }
+
+func TestGetBuiltInTaskFromTags_OpticalCharacterRecognition(t *testing.T) {
+	task := GetBuiltInTaskFromTags([]database.Tag{{Name: string(types.OpticalCharacterRecognition)}})
+
+	require.Equal(t, string(types.OpticalCharacterRecognition), task)
+}

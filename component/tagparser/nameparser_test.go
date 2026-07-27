@@ -41,6 +41,7 @@ func TestLibraryTag(t *testing.T) {
 		{name: "not onnx", args: args{filePath: "flax_model-onnx"}, want: ""},
 
 		{name: "paddlepaddle", args: args{filePath: "flax_model.pdparams"}, want: "paddlepaddle"},
+		{name: "paddlepaddle inference", args: args{filePath: "inference.pdiparams"}, want: "paddlepaddle"},
 		{name: "joblib", args: args{filePath: "flax_model.joblib"}, want: "joblib"},
 		{name: "gguf", args: args{filePath: "flax_model.gguf"}, want: "gguf"},
 	}

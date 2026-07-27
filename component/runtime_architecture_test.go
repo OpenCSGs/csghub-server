@@ -247,6 +247,117 @@ func TestGetMetadataFromSafetensors_className(t *testing.T) {
 	require.NotNil(t, modelInfo)
 }
 
+const paddleInferTestConfig = `Global:
+  model_name: PP-OCRv6_medium_rec
+PreProcess:
+  transform_ops:
+  - DecodeImage:
+      channel_first: false
+PostProcess:
+  name: CTCLabelDecode
+  character_dict:
+  - a
+  - b
+`
+
+func TestParsePaddleInferModelName(t *testing.T) {
+	name, err := parsePaddleInferModelName(paddleInferTestConfig)
+	require.NoError(t, err)
+	require.Equal(t, "PP-OCRv6_medium_rec", name)
+
+	// trailing spaces/comment after the Global key
+	name, err = parsePaddleInferModelName("Global:  # OCR model\n  model_name: PP-OCRv6_medium_rec\nPostProcess:\n")
+	require.NoError(t, err)
+	require.Equal(t, "PP-OCRv6_medium_rec", name)
+
+	// top-level comment inside the Global block must not end it
+	name, err = parsePaddleInferModelName("Global:\n# exported by paddlex\n  model_name: PP-OCRv6_medium_rec\nPostProcess:\n")
+	require.NoError(t, err)
+	require.Equal(t, "PP-OCRv6_medium_rec", name)
+
+	// a nested Global key must not be picked up
+	_, err = parsePaddleInferModelName("PreProcess:\n  Global:\n    model_name: fake\n")
+	require.ErrorContains(t, err, "no Global section")
+
+	_, err = parsePaddleInferModelName("PreProcess:\n  transform_ops: []\n")
+	require.ErrorContains(t, err, "no Global section")
+
+	_, err = parsePaddleInferModelName("Global:\n  other_key: 1\n")
+	require.ErrorContains(t, err, "no model_name")
+}
+
+func TestRuntimeArchComponent_GetMetadataFromPaddleStatic(t *testing.T) {
+	ctx := context.TODO()
+	rc := initializeTestRuntimeArchComponent(ctx, t)
+	repo := &database.Repository{
+		Name: "PP-OCRv6_medium_rec",
+		Path: "PaddlePaddle/PP-OCRv6_medium_rec",
+	}
+	rc.mocks.gitServer.EXPECT().GetRepoFileRaw(ctx, mock.Anything).Return(paddleInferTestConfig, nil).Once()
+
+	modelInfo, err := rc.GetMetadataFromPaddleStatic(ctx, repo)
+
+	require.NoError(t, err)
+	require.Equal(t, "PP-OCRv6_medium_rec", modelInfo.ModelName)
+}
+
+func TestRuntimeArchComponent_UpdateModelMetadata_PaddleStatic(t *testing.T) {
+	ctx := context.TODO()
+	rc := initializeTestRuntimeArchComponent(ctx, t)
+
+	repo := &database.Repository{
+		ID:   1,
+		Name: "PP-OCRv6_medium_rec",
+		Path: "PaddlePaddle/PP-OCRv6_medium_rec",
+		Tags: []database.Tag{{Name: "paddlepaddle", Category: "framework"}},
+	}
+	rc.mocks.gitServer.EXPECT().GetRepoFileRaw(ctx, mock.Anything).Return(paddleInferTestConfig, nil).Once()
+	rc.mocks.stores.MetadataMock().EXPECT().Upsert(ctx, mock.MatchedBy(func(m *database.Metadata) bool {
+		return m.RepositoryID == 1 && m.ModelType == ""
+	})).Return(nil).Once()
+	expectUpdateModelArchType(ctx, rc)
+
+	modelInfo, err := rc.UpdateModelMetadata(ctx, repo)
+
+	require.NoError(t, err)
+	require.Equal(t, "PP-OCRv6_medium_rec", modelInfo.ModelName)
+}
+
+func TestRuntimeArchComponent_UpdateRuntimeFrameworkTag_PaddleStatic(t *testing.T) {
+	ctx := context.TODO()
+	rc := initializeTestRuntimeArchComponent(ctx, t)
+
+	repo := &database.Repository{
+		ID:   1,
+		Name: "PP-OCRv6_medium_rec",
+		Path: "PaddlePaddle/PP-OCRv6_medium_rec",
+		Tags: []database.Tag{{Name: "paddlepaddle", Category: "framework"}},
+	}
+	frame := database.RuntimeFramework{
+		ID:          7,
+		FrameName:   "paddleocr",
+		FrameImage:  "opencsghq/paddleocr:3.7.0",
+		ModelFormat: "paddle_static",
+	}
+
+	rc.mocks.stores.TagMock().EXPECT().AllTags(ctx, mock.Anything).Return(
+		[]*database.Tag{{Name: "paddleocr", ID: 1}}, nil)
+	// ModelName stays out of archs; supported_models matching relies on the repo name
+	rc.mocks.stores.RuntimeArchMock().EXPECT().
+		ListByArchNameAndModel(ctx, []string(nil), "PP-OCRv6_medium_rec").
+		Return([]database.RuntimeArchitecture{{RuntimeFrameworkID: 7}}, nil)
+	rc.mocks.stores.RuntimeFrameworkMock().EXPECT().ListByIDs(ctx, []int64{7}).Return(
+		[]database.RuntimeFramework{frame}, nil)
+	rc.mocks.stores.TagMock().EXPECT().
+		RemoveRepoTagsByCategory(ctx, int64(1), []string{"runtime_framework", "resource"}).Return(nil)
+	rc.mocks.stores.RuntimeFrameworkMock().EXPECT().FindByID(ctx, int64(7)).Return(&frame, nil)
+	rc.mocks.stores.TagMock().EXPECT().UpsertRepoTags(ctx, int64(1), []int64{}, []int64{1}).Return(nil)
+
+	err := rc.UpdateRuntimeFrameworkTag(ctx, &types.ModelInfo{ModelName: "PP-OCRv6_medium_rec"}, repo)
+
+	require.NoError(t, err)
+}
+
 func TestRuntimeArchComponent_ScanModel_Success(t *testing.T) {
 	ctx := context.TODO()
 	rc := initializeTestRuntimeArchComponent(ctx, t)

@@ -255,9 +255,10 @@ const (
 type ModelType string
 
 const (
-	GGUF        ModelType = "gguf"
-	Safetensors ModelType = "safetensors"
-	Unknown     ModelType = "unknown"
+	GGUF         ModelType = "gguf"
+	Safetensors  ModelType = "safetensors"
+	PaddleStatic ModelType = "paddle_static"
+	Unknown      ModelType = "unknown"
 )
 
 const (
@@ -448,6 +449,8 @@ type ModelInfo struct {
 	ModelWeightsGB    float32 `json:"model_weights_gb"`
 	//qwen2
 	ModelType string `json:"model_type"`
+	//the model's self-declared name from its native config, e.g. PP-OCRv6_medium_rec
+	ModelName string `json:"model_name"`
 	//Qwen2ForCausalLM
 	Architecture      string         `json:"architecture"`
 	ClassName         string         `json:"class_name"`

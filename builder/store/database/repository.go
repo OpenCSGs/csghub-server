@@ -274,6 +274,11 @@ func (r Repository) Format() string {
 	}
 	for _, tag := range r.Tags {
 		if tag.Category == "framework" {
+			// Paddle inference weights are served in the paddle_static format
+			// declared by the paddleocr runtime framework config.
+			if tag.Name == "paddlepaddle" {
+				return string(types.PaddleStatic)
+			}
 			return tag.Name
 		}
 	}
