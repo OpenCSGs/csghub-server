@@ -15,6 +15,7 @@ func init() {
 		gitCallbackCmd,
 		fixOrgDataCmd,
 		fixOrgCasdoorUserCmd,
+		fixCasdoorUsernameCmd,
 		fixUserDataCmd,
 		updateRepoCmd,
 		fixRepoSourceCmd,
