@@ -4,11 +4,14 @@ package gitserver
 
 import (
 	context "context"
+
+	gitserver "opencsg.com/csghub-server/builder/git/gitserver"
+	database "opencsg.com/csghub-server/builder/store/database"
+
 	io "io"
 
 	mock "github.com/stretchr/testify/mock"
-	gitserver "opencsg.com/csghub-server/builder/git/gitserver"
-	database "opencsg.com/csghub-server/builder/store/database"
+
 	types "opencsg.com/csghub-server/common/types"
 )
 

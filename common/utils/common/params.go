@@ -160,3 +160,40 @@ func RepoTypeFromString(path string) (types.RepositoryType, error) {
 func ParseDate(dateStr string) (time.Time, error) {
 	return time.Parse("2006-01-02", dateStr)
 }
+
+// ParseTimeRange calculates the start and end time for a given time range string
+// in RFC3339 format (UTC)
+func ParseTimeRange(rangeStr string) (start, end string) {
+	now := time.Now().UTC()
+
+	var duration time.Duration
+	switch rangeStr {
+	case "30m":
+		duration = 30 * time.Minute
+	case "1h":
+		duration = 1 * time.Hour
+	case "3h":
+		duration = 3 * time.Hour
+	case "6h":
+		duration = 6 * time.Hour
+	case "12h":
+		duration = 12 * time.Hour
+	case "1d":
+		duration = 24 * time.Hour
+	case "3d":
+		duration = 3 * 24 * time.Hour
+	case "1w":
+		duration = 7 * 24 * time.Hour
+	default:
+		duration = 30 * time.Minute
+	}
+
+	startTime := now.Add(-duration)
+	endTime := now
+
+	// Format the time range in RFC3339 format
+	start = startTime.Format("2006-01-02T15:04:05Z")
+	end = endTime.Format("2006-01-02T15:04:05Z")
+
+	return start, end
+}

@@ -21,9 +21,9 @@ func (_m *MockPrometheusClient) EXPECT() *MockPrometheusClient_Expecter {
 	return &MockPrometheusClient_Expecter{mock: &_m.Mock}
 }
 
-// SerialData provides a mock function with given fields: query
-func (_m *MockPrometheusClient) SerialData(query string) (*types.PrometheusResponse, error) {
-	ret := _m.Called(query)
+// SerialData provides a mock function with given fields: query, apiSuffix
+func (_m *MockPrometheusClient) SerialData(query string, apiSuffix string) (*types.PrometheusResponse, error) {
+	ret := _m.Called(query, apiSuffix)
 
 	if len(ret) == 0 {
 		panic("no return value specified for SerialData")
@@ -31,19 +31,19 @@ func (_m *MockPrometheusClient) SerialData(query string) (*types.PrometheusRespo
 
 	var r0 *types.PrometheusResponse
 	var r1 error
-	if rf, ok := ret.Get(0).(func(string) (*types.PrometheusResponse, error)); ok {
-		return rf(query)
+	if rf, ok := ret.Get(0).(func(string, string) (*types.PrometheusResponse, error)); ok {
+		return rf(query, apiSuffix)
 	}
-	if rf, ok := ret.Get(0).(func(string) *types.PrometheusResponse); ok {
-		r0 = rf(query)
+	if rf, ok := ret.Get(0).(func(string, string) *types.PrometheusResponse); ok {
+		r0 = rf(query, apiSuffix)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*types.PrometheusResponse)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(string) error); ok {
-		r1 = rf(query)
+	if rf, ok := ret.Get(1).(func(string, string) error); ok {
+		r1 = rf(query, apiSuffix)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -58,13 +58,14 @@ type MockPrometheusClient_SerialData_Call struct {
 
 // SerialData is a helper method to define mock.On call
 //   - query string
-func (_e *MockPrometheusClient_Expecter) SerialData(query interface{}) *MockPrometheusClient_SerialData_Call {
-	return &MockPrometheusClient_SerialData_Call{Call: _e.mock.On("SerialData", query)}
+//   - apiSuffix string
+func (_e *MockPrometheusClient_Expecter) SerialData(query interface{}, apiSuffix interface{}) *MockPrometheusClient_SerialData_Call {
+	return &MockPrometheusClient_SerialData_Call{Call: _e.mock.On("SerialData", query, apiSuffix)}
 }
 
-func (_c *MockPrometheusClient_SerialData_Call) Run(run func(query string)) *MockPrometheusClient_SerialData_Call {
+func (_c *MockPrometheusClient_SerialData_Call) Run(run func(query string, apiSuffix string)) *MockPrometheusClient_SerialData_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string))
+		run(args[0].(string), args[1].(string))
 	})
 	return _c
 }
@@ -74,7 +75,7 @@ func (_c *MockPrometheusClient_SerialData_Call) Return(_a0 *types.PrometheusResp
 	return _c
 }
 
-func (_c *MockPrometheusClient_SerialData_Call) RunAndReturn(run func(string) (*types.PrometheusResponse, error)) *MockPrometheusClient_SerialData_Call {
+func (_c *MockPrometheusClient_SerialData_Call) RunAndReturn(run func(string, string) (*types.PrometheusResponse, error)) *MockPrometheusClient_SerialData_Call {
 	_c.Call.Return(run)
 	return _c
 }
