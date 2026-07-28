@@ -58,6 +58,21 @@ func TestGetPipelineTaskFromTags_TextToAudio(t *testing.T) {
 	require.Equal(t, types.TextToAudio, task)
 }
 
+func TestGetPipelineTaskFromTags_AudioDrivenVideo(t *testing.T) {
+	tasks := []types.PipelineTask{
+		types.AudioText2Video,
+		types.AudioImageText2Video,
+		types.AudioDrivenVideoContinuation,
+	}
+	for _, task := range tasks {
+		t.Run(string(task), func(t *testing.T) {
+			tags := []database.Tag{{Name: string(task)}}
+
+			require.Equal(t, task, GetPipelineTaskFromTags(tags))
+		})
+	}
+}
+
 func TestGetPipelineTaskFromTags_OCR(t *testing.T) {
 	task := GetPipelineTaskFromTags([]database.Tag{{Name: string(types.OpticalCharacterRecognition)}})
 

@@ -58,6 +58,14 @@ case "${IMAGE%:*}" in
     PLATFORMS="linux/amd64"
     DOCKERFILE="Dockerfile.audiofly-rocm"
     ;;
+  longcat-video)
+    PLATFORMS="linux/amd64"
+    DOCKERFILE="Dockerfile.longcat-video"
+    ;;
+  longcat-video-rocm)
+    PLATFORMS="linux/amd64"
+    DOCKERFILE="Dockerfile.longcat-video-rocm"
+    ;;
   paddleocr)
     PLATFORMS="linux/amd64"
     DOCKERFILE="Dockerfile.paddleocr"

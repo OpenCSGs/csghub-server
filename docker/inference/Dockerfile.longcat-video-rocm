@@ -1,0 +1,68 @@
+FROM rocm/pytorch:rocm7.2.2_ubuntu22.04_py3.10_pytorch_release_2.10.0
+
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+LABEL maintainer="opencsg"
+
+ARG LONGCAT_COMMIT=6b3f4b8582a8bc3f20f795735f5383716c4ba794
+ARG FLASH_ATTN_COMMIT=b02b07e1a10238fe12831b80a8937ed59b1353a5
+ENV DEBIAN_FRONTEND=noninteractive \
+    PIP_NO_CACHE_DIR=1 \
+    MAX_JOBS=8 \
+    FLASH_ATTENTION_TRITON_AMD_ENABLE=TRUE \
+    AITER_TRITON_ONLY=1
+
+RUN for sourceFile in /etc/apt/sources.list /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources; do \
+      if [ -f "$sourceFile" ]; then \
+        sed -i \
+          -e 's|http://archive.ubuntu.com/ubuntu|http://mirrors.aliyun.com/ubuntu|g' \
+          -e 's|http://security.ubuntu.com/ubuntu|http://mirrors.aliyun.com/ubuntu|g' \
+          -e '/repo.radeon.com\/rocm\/apt/s|^|# |' \
+          "$sourceFile"; \
+      fi; \
+    done && \
+    apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    dumb-init \
+    ffmpeg \
+    git \
+    libgl1 \
+    libglib2.0-0 \
+    libsndfile1 \
+    ninja-build && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN git clone https://github.com/meituan-longcat/LongCat-Video.git /opt/LongCat-Video && \
+    cd /opt/LongCat-Video && \
+    git checkout "${LONGCAT_COMMIT}" && \
+    test "$(git rev-parse HEAD)" = "${LONGCAT_COMMIT}"
+
+# Build the upstream ROCm Triton backend from a pinned source revision. This
+# avoids CUDA-only flash-attn wheels and does not replace the base image torch.
+RUN pip install packaging psutil && \
+    git clone https://github.com/Dao-AILab/flash-attention.git /tmp/flash-attention && \
+    cd /tmp/flash-attention && \
+    git checkout "${FLASH_ATTN_COMMIT}" && \
+    git submodule update --init --recursive && \
+    FLASH_ATTENTION_TRITON_AMD_ENABLE=TRUE AITER_TRITON_ONLY=1 \
+      pip install --no-build-isolation --no-deps . && \
+    rm -rf /tmp/flash-attention
+
+RUN cd /opt/LongCat-Video && \
+    sed -e '/^torch==/d' -e '/^flash-attn==/d' requirements.txt > /tmp/requirements.txt && \
+    sed -e '/^sympy==/d' -e '/^nvidia-ml-py==/d' -e '/^libsndfile1==/d' -e '/^tritonserverclient==/d' requirements_avatar.txt > /tmp/requirements-avatar.txt && \
+    python -c "import torch; print('torch==' + torch.__version__.split('+', 1)[0])" > /tmp/torch-constraints.txt && \
+    pip install --constraint /tmp/torch-constraints.txt -r /tmp/requirements.txt -r /tmp/requirements-avatar.txt \
+      "tritonclient[all]==2.64.0" fastapi "uvicorn[standard]" python-multipart csghub-sdk==0.7.10 minio oss2 && \
+    python -c "import flash_attn, torch; assert torch.version.hip; assert torch.__version__.startswith('2.10.0')"
+
+COPY ./longcat-video/ /etc/csghub/
+RUN chmod +x /etc/csghub/serve.sh
+
+WORKDIR /workspace
+ENV PORT=8000 \
+    GPU_NUM=1 \
+    HF_HUB_ENABLE_HF_TRANSFER=0
+
+EXPOSE 8000
+ENTRYPOINT ["/usr/bin/dumb-init", "--"]
+CMD ["/etc/csghub/serve.sh"]

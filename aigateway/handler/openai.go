@@ -60,10 +60,16 @@ type OpenAIHandler interface {
 	EditImage(c *gin.Context)
 	// Create a video generation
 	CreateVideo(c *gin.Context)
+	// Create a video generation through the deprecated endpoint
+	CreateVideoDeprecated(c *gin.Context)
 	// Get a video generation
 	GetVideo(c *gin.Context)
+	// Get a video generation through the deprecated endpoint
+	GetVideoDeprecated(c *gin.Context)
 	// Download generated video content
 	GetVideoContent(c *gin.Context)
+	// Download generated video content through the deprecated endpoint
+	GetVideoContentDeprecated(c *gin.Context)
 	// Transcribe audio to text
 	Transcription(c *gin.Context)
 	// Extract text from an image with OCR

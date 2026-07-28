@@ -2668,6 +2668,51 @@ func TestOpenAIHandler_CreateVideo(t *testing.T) {
 		require.Equal(t, float64(5), gotBody["video_duration"])
 	})
 
+	t.Run("create video with longcat multi-speaker multipart request", func(t *testing.T) {
+		tester, c, w := setupTest(t)
+		var createdGeneration database.AIGeneration
+		downstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			require.Equal(t, "/v1/tasks/video/form", r.URL.Path)
+			require.NoError(t, r.ParseMultipartForm(2<<20))
+			require.Equal(t, "two presenters talking", r.FormValue("prompt"))
+			require.Equal(t, "720p", r.FormValue("resolution"))
+			require.Equal(t, "para", r.FormValue("audio_type"))
+			require.Equal(t, "2", r.FormValue("num_segments"))
+			require.Len(t, r.MultipartForm.File["audio"], 2)
+			require.Len(t, r.MultipartForm.File["image_file"], 1)
+			_, _ = w.Write([]byte(`{"task_id":"task_longcat","status":"submitted"}`))
+		}))
+		defer downstream.Close()
+
+		model := &types.Model{
+			BaseModel:         types.BaseModel{ID: "longcat-model", Task: "image-to-video"},
+			ExternalModelInfo: types.ExternalModelInfo{Provider: "opencsg"},
+			InternalModelInfo: types.InternalModelInfo{
+				RuntimeFramework: "longcat-video",
+				CSGHubModelID:    "meituan-longcat/LongCat-Video-Avatar-1.5",
+			},
+			Endpoint: downstream.URL,
+			Upstreams: []commontypes.UpstreamConfig{
+				{URL: downstream.URL, Enabled: true, ModelName: "longcat-model"},
+			},
+		}
+		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "longcat-model").Return(model, nil).Once()
+		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil).Once()
+		tester.mocks.openAIComp.EXPECT().RecordUsage(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
+		tester.mocks.moderationComp.EXPECT().CheckImagePrompts(mock.Anything, "two presenters talking", "testuuid").Return(&rpc.CheckResult{IsSensitive: false}, nil).Once()
+		expectBuildVideoMeteringEvent(t, tester)
+		tester.mocks.aiGenerationStore.EXPECT().Create(mock.Anything, mock.MatchedBy(func(generation database.AIGeneration) bool {
+			createdGeneration = generation
+			return generation.ModelID == "longcat-model" && generation.ProviderResourceID == "task_longcat"
+		})).Return(&database.AIGeneration{}, nil).Once()
+
+		c.Request = newLongCatMultipartVideoRequest(t)
+		tester.handler.CreateVideo(c)
+
+		require.Equal(t, http.StatusOK, w.Code)
+		require.Equal(t, "task_longcat", createdGeneration.ProviderResourceID)
+	})
+
 	t.Run("reject multipart input_reference with unsupported content type", func(t *testing.T) {
 		tester, c, w := setupTest(t)
 		c.Request = newMultipartVideoRequest(t, "video-model", "make a boat", "text/plain")
@@ -2721,6 +2766,52 @@ func TestOpenAIHandler_GetVideo(t *testing.T) {
 	require.Equal(t, http.StatusOK, w.Code)
 	require.JSONEq(t, `{"id":"video_gateway","object":"video","status":"completed","created_at":123}`, w.Body.String())
 	require.Equal(t, "completed", generation.Status)
+}
+
+func TestOpenAIHandler_GetVideo_PersistsLongCatDownloadURL(t *testing.T) {
+	tester, c, w := setupTest(t)
+	generation := database.AIGeneration{
+		ID:                 1,
+		ResourceType:       database.AIGenerationResourceTypeVideo,
+		ResourceID:         "video_gateway",
+		ProviderResourceID: "0123456789abcdef0123456789abcdef",
+		OwnerUUID:          "testuuid",
+		ModelID:            "longcat-model",
+		Status:             "queued",
+	}
+	downloadURL := "https://video-bucket.oss.example.com/aigateway/generated/videos/task.mp4"
+	downstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, "/v1/tasks/0123456789abcdef0123456789abcdef/status", r.URL.Path)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = fmt.Fprintf(w, `{"task_id":"0123456789abcdef0123456789abcdef","status":"succeed","download_url":%q}`, downloadURL)
+	}))
+	defer downstream.Close()
+
+	model := &types.Model{
+		BaseModel:         types.BaseModel{ID: "longcat-model", Task: "audio-text-to-video"},
+		ExternalModelInfo: types.ExternalModelInfo{Provider: "opencsg"},
+		InternalModelInfo: types.InternalModelInfo{
+			RuntimeFramework: "longcat-video",
+			CSGHubModelID:    "meituan-longcat/LongCat-Video-Avatar-1.5",
+		},
+		Endpoint: downstream.URL,
+		Upstreams: []commontypes.UpstreamConfig{
+			{URL: downstream.URL, Enabled: true, ModelName: "longcat-model"},
+		},
+	}
+	tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "longcat-model").Return(model, nil).Once()
+	tester.mocks.aiGenerationStore.EXPECT().FindByResourceID(mock.Anything, database.AIGenerationResourceTypeVideo, "video_gateway").Return(&generation, nil).Once()
+	tester.mocks.aiGenerationStore.EXPECT().UpdateWithStatus(mock.Anything, mock.MatchedBy(func(input database.AIGeneration) bool {
+		generation = input
+		return input.Status == "completed" && input.ProviderMetadata["download_url"] == downloadURL
+	}), "queued").Return(true, nil).Once()
+
+	c.Request = httptest.NewRequest(http.MethodGet, "/v1/videos/video_gateway", nil)
+	c.Params = gin.Params{{Key: "video_id", Value: "video_gateway"}}
+	tester.handler.GetVideo(c)
+
+	require.Equal(t, http.StatusOK, w.Code)
+	require.Equal(t, downloadURL, generation.ProviderMetadata["download_url"])
 }
 
 func TestOpenAIHandler_GetVideo_ReturnsTerminalRowWithoutUpstreamFetch(t *testing.T) {
@@ -2808,6 +2899,56 @@ func TestOpenAIHandler_GetVideoContent(t *testing.T) {
 
 	require.Equal(t, http.StatusOK, w.Code)
 	require.Equal(t, "video-bytes", w.Body.String())
+}
+
+func TestOpenAIHandler_GetVideoContent_UsesPersistedDownloadURL(t *testing.T) {
+	tester, _, _ := setupTest(t)
+	download := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, "/aigateway/generated/videos/task_123.mp4", r.URL.Path)
+		require.Empty(t, r.Header.Get("Authorization"))
+		require.Equal(t, "bytes=0-1023", r.Header.Get("Range"))
+		w.Header().Set("Content-Type", "video/mp4")
+		_, _ = w.Write([]byte("oss-video-bytes"))
+	}))
+	defer download.Close()
+
+	generation := database.AIGeneration{
+		ID:                 1,
+		ResourceType:       database.AIGenerationResourceTypeVideo,
+		ResourceID:         "video_gateway",
+		ProviderResourceID: "task_123",
+		ProviderMetadata:   map[string]any{"download_url": download.URL + "/aigateway/generated/videos/task_123.mp4"},
+		OwnerUUID:          "testuuid",
+		ModelID:            "video-model",
+		Status:             "completed",
+	}
+	model := &types.Model{
+		BaseModel:         types.BaseModel{ID: "video-model", Task: "text-to-video"},
+		ExternalModelInfo: types.ExternalModelInfo{Provider: "opencsg"},
+		Endpoint:          "http://provider.invalid",
+		Upstreams: []commontypes.UpstreamConfig{
+			{URL: "http://provider.invalid", Enabled: true, ModelName: "video-model"},
+		},
+	}
+	tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "video-model").Return(model, nil).Once()
+	tester.mocks.aiGenerationStore.EXPECT().FindByResourceID(mock.Anything, database.AIGenerationResourceTypeVideo, "video_gateway").Return(&generation, nil).Once()
+
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		httpbase.SetCurrentUser(c, "testuser")
+		httpbase.SetCurrentNamespaceUUID(c, "testuuid")
+		c.Next()
+	})
+	router.GET("/v1/videos/:video_id/content", tester.handler.GetVideoContent)
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/v1/videos/video_gateway/content", nil)
+	req.Header.Set("Authorization", "Bearer user-api-key")
+	req.Header.Set("Range", "bytes=0-1023")
+	router.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code)
+	require.Equal(t, "oss-video-bytes", w.Body.String())
 }
 
 func TestOpenAIHandler_GetVideoContent_NotReadyDoesNotCallUpstream(t *testing.T) {
@@ -2972,6 +3113,99 @@ func TestOpenAIHandler_GetVideoContent_LightX2VStreamsDirectly(t *testing.T) {
 
 	require.Equal(t, http.StatusOK, w.Code)
 	require.Equal(t, "lightx2v-video-bytes", w.Body.String())
+}
+
+func TestMarkDeprecatedVideoAPI(t *testing.T) {
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+
+	markDeprecatedVideoAPI(ctx, "/v1/video/generations/video_123")
+	copyProxyResponse(ctx, http.Header{"Content-Type": []string{"application/json"}}, http.StatusOK, []byte(`{}`))
+
+	require.Equal(t, "@1784851200", recorder.Header().Get("Deprecation"))
+	require.Equal(t, `</v1/video/generations/video_123>; rel="successor-version"`, recorder.Header().Get("Link"))
+	require.Equal(t, "application/json", recorder.Header().Get("Content-Type"))
+}
+
+func TestValidateVideoMultipartAudio(t *testing.T) {
+	require.NoError(t, validateVideoMultipartAudio(buildVideoAudioForm(t, 2, "audio/wav", []byte("RIFF1234WAVE"))))
+
+	err := validateVideoMultipartAudio(buildVideoAudioForm(t, 3, "audio/wav", []byte("RIFF1234WAVE")))
+	require.ErrorContains(t, err, "at most two")
+
+	err = validateVideoMultipartAudio(buildVideoAudioForm(t, 1, "text/plain", []byte("not audio")))
+	require.ErrorContains(t, err, "unsupported audio content type")
+}
+
+func TestValidateVideoAdapterCompatibilityAudio(t *testing.T) {
+	longCatCaps := text2video.Capabilities{
+		SupportsCreate:         true,
+		SupportsAudioReference: true,
+		RequiresAudioReference: true,
+		MaxAudioReferences:     2,
+	}
+	err := validateVideoAdapterCompatibility(types.VideoGenerationRequest{}, true, false, 0, longCatCaps)
+	require.ErrorContains(t, err, "requires at least one audio")
+	require.NoError(t, validateVideoAdapterCompatibility(types.VideoGenerationRequest{}, true, false, 2, longCatCaps))
+
+	err = validateVideoAdapterCompatibility(types.VideoGenerationRequest{}, true, false, 1, text2video.Capabilities{SupportsCreate: true})
+	require.ErrorContains(t, err, "does not support audio-guided")
+}
+
+func buildVideoAudioForm(t *testing.T, count int, contentType string, content []byte) *multipart.Form {
+	t.Helper()
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	for index := 0; index < count; index++ {
+		header := make(textproto.MIMEHeader)
+		header.Set("Content-Disposition", fmt.Sprintf(`form-data; name="audio"; filename="speaker-%d.wav"`, index))
+		header.Set("Content-Type", contentType)
+		part, err := writer.CreatePart(header)
+		require.NoError(t, err)
+		_, err = part.Write(content)
+		require.NoError(t, err)
+	}
+	require.NoError(t, writer.Close())
+	req := httptest.NewRequest(http.MethodPost, "/v1/videos", bytes.NewReader(body.Bytes()))
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	require.NoError(t, req.ParseMultipartForm(int64(body.Len()+1024)))
+	return req.MultipartForm
+}
+
+func newLongCatMultipartVideoRequest(t *testing.T) *http.Request {
+	t.Helper()
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	for key, value := range map[string]string{
+		"model":        "longcat-model",
+		"prompt":       "two presenters talking",
+		"size":         "1280x768",
+		"audio_type":   "para",
+		"num_segments": "2",
+	} {
+		require.NoError(t, writer.WriteField(key, value))
+	}
+	for index := 0; index < 2; index++ {
+		header := make(textproto.MIMEHeader)
+		header.Set("Content-Disposition", fmt.Sprintf(`form-data; name="audio"; filename="speaker-%d.wav"`, index))
+		header.Set("Content-Type", "audio/wav")
+		part, err := writer.CreatePart(header)
+		require.NoError(t, err)
+		_, err = part.Write([]byte("RIFF1234WAVE"))
+		require.NoError(t, err)
+	}
+	imageHeader := make(textproto.MIMEHeader)
+	imageHeader.Set("Content-Disposition", `form-data; name="input_reference"; filename="frame.png"`)
+	imageHeader.Set("Content-Type", "image/png")
+	imagePart, err := writer.CreatePart(imageHeader)
+	require.NoError(t, err)
+	_, err = imagePart.Write([]byte{0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n'})
+	require.NoError(t, err)
+	require.NoError(t, writer.Close())
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/video/generations", bytes.NewReader(body.Bytes()))
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	return req
 }
 
 func newMultipartVideoRequest(t *testing.T, model, prompt, fileContentType string) *http.Request {
