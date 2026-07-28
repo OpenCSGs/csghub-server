@@ -6,9 +6,9 @@
   "engine_images": [
     {
       "compute_type": "gpu",
-      "image": "opencsghq/llama-factory:0.9.4",
+      "image": "opencsghq/llama-factory:0.9.5",
       "driver_version": "12.4",
-      "engine_version": "0.9.4"
+      "engine_version": "0.9.5"
     },
     {
       "compute_type": "dcu",
@@ -18,6 +18,11 @@
     }
   ],
   "supported_models": [
+    "Aeva",
+    "Aeva-Air",
+    "Aeva-Flash",
+    "Aeva-Max",
+    "Aeva-Pro",
     "Baichuan-13B-Base",
     "Baichuan-13B-Chat",
     "Baichuan-7B",
@@ -102,6 +107,7 @@
     "Hunyuan-7B-Instruct",
     "Hunyuan-A13B-Instruct",
     "Hunyuan-MT-7B",
+    "Hy3-preview",
     "Index-1.9B",
     "Index-1.9B-32K",
     "Index-1.9B-Character",
@@ -187,6 +193,7 @@
     "MiniCPM-V-2_6",
     "MiniCPM-V-4",
     "MiniCPM-V-4_5",
+    "MiniCPM-V-4_6",
     "MiniCPM-o-2_6",
     "MiniCPM-o-4_5",
     "MiniCPM3-4B",
@@ -474,6 +481,8 @@
     "Qwen3.5-4B-Base",
     "Qwen3.5-9B",
     "Qwen3.5-9B-Base",
+    "Qwen3.6-27B",
+    "Qwen3.6-35B-A3B",
     "SOLAR-10.7B-Instruct-v1.0",
     "SOLAR-10.7B-v1.0",
     "Seed-Coder-8B-Base",
@@ -631,6 +640,10 @@
     "gemma-3n-E2B-it",
     "gemma-3n-E4B",
     "gemma-3n-E4B-it",
+    "gemma-4-26B-A4B-it",
+    "gemma-4-31B-it",
+    "gemma-4-E2B-it",
+    "gemma-4-E4B-it",
     "gemma-7b",
     "gemma-7b-it",
     "glm-4-9b",

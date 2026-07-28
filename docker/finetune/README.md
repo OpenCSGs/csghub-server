@@ -17,9 +17,9 @@ echo "$OPENCSG_ACR_PASSWORD" | docker login $OPENCSG_ACR -u $OPENCSG_ACR_USERNAM
 ## Build Multi-Platform Images
 
 ```bash
-#opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/llama-factory:0.9.4
+#opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/llama-factory:0.9.5
 export BUILDX_NO_DEFAULT_ATTESTATIONS=1
-export IMAGE_TAG=0.9.4
+export IMAGE_TAG=0.9.5
 docker buildx build --platform linux/amd64,linux/arm64 \
   -t ${OPENCSG_ACR}/opencsghq/llama-factory:${IMAGE_TAG} \
   -t ${OPENCSG_ACR}/opencsghq/llama-factory:latest \
@@ -51,7 +51,7 @@ docker buildx build --platform linux/amd64,linux/arm64 \
   -f Dockerfile.ms-swift \
   --push .
 export BUILDX_NO_DEFAULT_ATTESTATIONS=1
-export IMAGE_TAG=v0.9.4
+export IMAGE_TAG=0.9.5
 docker buildx build --platform linux/amd64 \
   -t ${OPENCSG_ACR}/opencsghq/llama-factory-amd:${IMAGE_TAG} \
   -t ${OPENCSG_ACR}/opencsghq/llama-factory-amd:latest \
@@ -76,7 +76,7 @@ _Note: The above command will create `linux/amd64` and `linux/arm64` images with
 
 | Image Name    | Version | CUDA Version | Fix |
 | ------------- | ------- | ------------ | --- |
-| llama-factory | 0.9.3   | 12.1         | -   |
+| llama-factory | 0.9.5   | 12.6         | -   |
 | ms-swift      | v3.5.2  | 12.1         | -   |
 
 ## Run Finetune Image Locally

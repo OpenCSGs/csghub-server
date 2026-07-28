@@ -1,4 +1,4 @@
-FROM rocm/pytorch:rocm7.1_ubuntu22.04_py3.11_pytorch_release_2.9.1
+FROM rocm/pytorch:rocm7.2.2_ubuntu22.04_py3.10_pytorch_release_2.10.0
 
 # Set the working directory
 WORKDIR /app
@@ -38,7 +38,7 @@ RUN pip install --no-cache-dir jupyterlab jupyter-server-proxy==4.4.0 \
 
 RUN pip install pip packaging wheel setuptools Cython --no-cache-dir
 
-RUN git clone --depth 1 https://gitee.com/xzgan/LLaMA-Factory.git --branch v0.9.4   --single-branch /app && cd /app && \
+RUN git clone --depth 1 https://github.com/hiyouga/LlamaFactory.git --branch v0.9.5 --single-branch /app && cd /app && \
     pip install --no-cache-dir -e ".[metrics,deepspeed]"
 
 RUN pip install --no-cache-dir --force-reinstall --no-deps \
