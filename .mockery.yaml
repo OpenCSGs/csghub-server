@@ -23,6 +23,10 @@ packages:
     config:
     interfaces:
       LogSender:
+  opencsg.com/csghub-server/builder/loki:
+    config:
+    interfaces:
+      Client:
   opencsg.com/csghub-server/aigateway/task:
     config:
     interfaces:
