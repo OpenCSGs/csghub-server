@@ -157,11 +157,16 @@ func (c *lokiClient) SendLogs(ctx context.Context, entries []types.LogEntry) err
 
 // GetLastReportedTimestamp queries Loki for the last timestamp for this client
 func (c *lokiClient) GetLastReportedTimestamp(ctx context.Context) (time.Time, error) {
-	ctx, cancel := context.WithTimeout(ctx, time.Duration(c.queryLastReportTimeout)*time.Second)
-	defer cancel()
 	if c.clientID == "" {
 		return time.Time{}, fmt.Errorf("no client ID provided") // No client ID, nothing to query
 	}
+
+	// Temporarily extend the HTTP client timeout for this long-running query,
+	// then restore the default timeout when done so that other requests
+	// (Push, Query, Ready, etc.) are not affected.
+	queryTimeout := time.Duration(c.queryLastReportTimeout) * time.Second
+	c.lokiClient.SetTimeout(queryTimeout)
+	defer c.lokiClient.SetTimeout(loki.DefaultTimeout)
 
 	query := fmt.Sprintf(`{client_id="%s"}`, c.clientID)
 

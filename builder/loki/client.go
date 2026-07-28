@@ -21,14 +21,21 @@ type Client interface {
 	QueryRange(ctx context.Context, params QueryRangeParams) (*LokiQueryResponse, error)
 	Tail(ctx context.Context, query string, start time.Time, limit int) (<-chan *LokiPushRequest, error)
 	Ready(ctx context.Context) error
+	// SetTimeout dynamically adjusts the HTTP client timeout for all subsequent
+	// requests. A timeout of 0 means no timeout. Callers should restore the
+	// default timeout via SetTimeout(DefaultTimeout) when done.
+	SetTimeout(timeout time.Duration)
 }
+
+// DefaultTimeout is the default HTTP client timeout for Loki requests.
+const DefaultTimeout = 10 * time.Second
 
 func NewClient(rawURL string) (Client, error) {
 	_, err := url.Parse(rawURL)
 	return &client{
 		url: rawURL,
 		httpClient: &http.Client{
-			Timeout: 10 * time.Second,
+			Timeout: DefaultTimeout,
 		},
 	}, err
 }
@@ -36,6 +43,11 @@ func NewClient(rawURL string) (Client, error) {
 type client struct {
 	url        string
 	httpClient *http.Client
+}
+
+// SetTimeout dynamically adjusts the HTTP client timeout.
+func (c *client) SetTimeout(timeout time.Duration) {
+	c.httpClient.Timeout = timeout
 }
 
 func (c *client) Push(ctx context.Context, pushRequest *LokiPushRequest) error {

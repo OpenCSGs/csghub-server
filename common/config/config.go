@@ -710,7 +710,7 @@ type Config struct {
 		// the separator of log lines, default is "\\n" by client formats, "\n" sse auto newline
 		LineSeparator          string `env:"STARHUB_SERVER_LOGCOLLECTOR_LINE_SEPARATOR" default:"\\n"`
 		MaxStoreTimeDay        int    `env:"STARHUB_SERVER_LOGCOLLECTOR_MAX_STORE_TIME_DAY" default:"7"`
-		QueryLastReportTimeout int    `env:"STARHUB_SERVER_LOGCOLLECTOR_QUERY_LAST_REPORT_TIMEOUT" default:"10"`
+		QueryLastReportTimeout int    `env:"STARHUB_SERVER_LOGCOLLECTOR_QUERY_LAST_REPORT_TIMEOUT" default:"300"`
 	}
 
 	FederationAdapter struct {

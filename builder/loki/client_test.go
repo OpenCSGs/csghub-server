@@ -194,3 +194,91 @@ func TestClient_Tail(t *testing.T) {
 		t.Fatal("timed out waiting for log message")
 	}
 }
+
+// newDelayedReadyServer creates an httptest server whose /ready endpoint
+// sleeps for the given delay before responding. This is used to test
+// HTTP client timeout behavior.
+func newDelayedReadyServer(delay time.Duration) *httptest.Server {
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(delay)
+		w.WriteHeader(http.StatusOK)
+	}))
+}
+
+func TestNewClient_DefaultTimeout(t *testing.T) {
+	// Server delays 12s, which exceeds the default 10s HTTP client timeout.
+	// The request should fail with a timeout error.
+	server := newDelayedReadyServer(12 * time.Second)
+	defer server.Close()
+
+	client, err := NewClient(server.URL)
+	require.NoError(t, err)
+
+	err = client.Ready(context.Background())
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "deadline exceeded")
+}
+
+func TestClient_SetTimeout_LargerThanDefault(t *testing.T) {
+	// Server delays 12s, which exceeds the default 10s but is within the
+	// dynamically set 30s timeout. The request should succeed.
+	server := newDelayedReadyServer(12 * time.Second)
+	defer server.Close()
+
+	client, err := NewClient(server.URL)
+	require.NoError(t, err)
+	client.SetTimeout(30 * time.Second)
+
+	err = client.Ready(context.Background())
+	require.NoError(t, err)
+}
+
+func TestClient_SetTimeout_SmallerThanDefault(t *testing.T) {
+	// Server delays 3s, which exceeds the dynamically set 1s timeout.
+	// The request should fail with a timeout error.
+	server := newDelayedReadyServer(3 * time.Second)
+	defer server.Close()
+
+	client, err := NewClient(server.URL)
+	require.NoError(t, err)
+	client.SetTimeout(1 * time.Second)
+
+	err = client.Ready(context.Background())
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "deadline exceeded")
+}
+
+func TestClient_SetTimeout_Zero(t *testing.T) {
+	// A timeout of 0 means no timeout. The server delays 3s, which should
+	// succeed because there is no HTTP client timeout.
+	server := newDelayedReadyServer(3 * time.Second)
+	defer server.Close()
+
+	client, err := NewClient(server.URL)
+	require.NoError(t, err)
+	client.SetTimeout(0)
+
+	err = client.Ready(context.Background())
+	require.NoError(t, err)
+}
+
+func TestClient_SetTimeout_RestoreDefault(t *testing.T) {
+	// After extending the timeout and restoring the default, subsequent
+	// requests should be governed by the default 10s timeout again.
+	server := newDelayedReadyServer(12 * time.Second)
+	defer server.Close()
+
+	client, err := NewClient(server.URL)
+	require.NoError(t, err)
+
+	// Extend timeout — 12s delay should succeed
+	client.SetTimeout(30 * time.Second)
+	err = client.Ready(context.Background())
+	require.NoError(t, err)
+
+	// Restore default — 12s delay should now fail
+	client.SetTimeout(DefaultTimeout)
+	err = client.Ready(context.Background())
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "deadline exceeded")
+}
