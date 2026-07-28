@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"net/url"
 	"strings"
 
 	"opencsg.com/csghub-server/common/config"
@@ -13,7 +12,7 @@ import (
 )
 
 type PrometheusClient interface {
-	SerialData(query string) (*types.PrometheusResponse, error)
+	SerialData(query string, apiSuffix string) (*types.PrometheusResponse, error)
 }
 
 type prometheusClientImpl struct {
@@ -37,11 +36,11 @@ func NewPrometheusClient(cfg *config.Config) PrometheusClient {
 	}
 }
 
-func (p *prometheusClientImpl) SerialData(query string) (*types.PrometheusResponse, error) {
+func (p *prometheusClientImpl) SerialData(query string, apiSuffix string) (*types.PrometheusResponse, error) {
 	if len(p.apiURL) < 1 {
 		return nil, fmt.Errorf("prometheus api address is not configured")
 	}
-	url := fmt.Sprintf("%s?query=%s", p.apiURL, url.QueryEscape(query))
+	url := fmt.Sprintf("%s%s?query=%s", p.apiURL, apiSuffix, query)
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err

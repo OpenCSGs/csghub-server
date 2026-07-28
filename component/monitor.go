@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"math"
+	"net/url"
 	"strconv"
 	"strings"
 
@@ -15,6 +16,7 @@ import (
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
+	"opencsg.com/csghub-server/common/utils/common"
 	rtypes "opencsg.com/csghub-server/runner/types"
 )
 
@@ -81,7 +83,7 @@ func (m *monitorComponentImpl) CPUUsage(ctx context.Context, req *types.MonitorR
 	slog.InfoContext(ctx, "cpu-usage", slog.Any("query", query),
 		slog.Any("metricKeys", m.metrics.metricKeys), slog.Any("len", len(m.metrics.metricKeys)))
 
-	promeResp, err := m.client.SerialData(query)
+	promeResp, err := m.client.SerialData(url.QueryEscape(query), "")
 	if err != nil {
 		return nil, fmt.Errorf("failed to get cpu usage error: %w", err)
 	}
@@ -122,7 +124,7 @@ func (m *monitorComponentImpl) CPULimit(ctx context.Context, req *types.MonitorR
 	query := fmt.Sprintf("%s{pod='%s',namespace='%s',resource='cpu'}", m.metrics.cpuLimit, req.Instance, m.k8sNameSpace)
 	slog.InfoContext(ctx, "cpu-limit", slog.Any("query", query))
 
-	promeResp, err := m.client.SerialData(query)
+	promeResp, err := m.client.SerialData(url.QueryEscape(query), "")
 	if err != nil {
 		return 0, fmt.Errorf("failed to get cpu limit error: %w", err)
 	}
@@ -159,7 +161,7 @@ func (m *monitorComponentImpl) MemoryUsage(ctx context.Context, req *types.Monit
 	slog.InfoContext(ctx, "memory-usage", slog.Any("query", query),
 		slog.Any("metricKeys", m.metrics.metricKeys), slog.Any("len", len(m.metrics.metricKeys)))
 
-	promeResp, err := m.client.SerialData(query)
+	promeResp, err := m.client.SerialData(url.QueryEscape(query), "")
 	if err != nil {
 		return nil, fmt.Errorf("fail to get memory usage error: %w", err)
 	}
@@ -199,15 +201,28 @@ func (m *monitorComponentImpl) RequestCount(ctx context.Context, req *types.Moni
 		return nil, fmt.Errorf("user %s has no permission to access request count", req.CurrentUser)
 	}
 
-	// issue: github.com/knative/serving/issues/14925
-	query := fmt.Sprintf("avg_over_time(%s{pod_name='%s',namespace='%s'}[%s:])[%s:%s]",
-		m.metrics.requestCount, req.Instance, namespace, req.LastDuration, req.LastDuration, req.TimeRange)
+	query := ""
+	apiSuffix := ""
+	if m.metrics.requestCount == "revision_request_count" {
+		// back compatibility
+		query = fmt.Sprintf("avg_over_time(%s{pod_name='%s',namespace='%s'}[%s:])[%s:%s]",
+			m.metrics.requestCount, req.Instance, namespace, req.LastDuration, req.LastDuration, req.TimeRange)
+		query = url.QueryEscape(query)
+	} else {
+		apiSuffix = "_range"
+		query = fmt.Sprintf("%s{pod_name='%s',namespace='%s',le='+Inf'}",
+			m.metrics.requestCount, req.Instance, namespace)
+		start, end := common.ParseTimeRange(req.LastDuration)
+		step := req.TimeRange
+		query = fmt.Sprintf("%s&start=%s&end=%s&step=%s", url.QueryEscape(query), start, end, step)
+	}
+
 	slog.InfoContext(ctx, "request-count", slog.Any("query", query),
 		slog.Any("metricKeys", m.metrics.metricKeys), slog.Any("len", len(m.metrics.metricKeys)))
+	promeResp, err := m.client.SerialData(query, apiSuffix)
 
-	promeResp, err := m.client.SerialData(query)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get memory limit error: %w", err)
+		return nil, fmt.Errorf("failed to get request count error: %w", err)
 	}
 	slog.Debug("get request count", slog.Any("promeResp", promeResp))
 	resp := types.MonitorRequestCountResp{}
@@ -258,12 +273,12 @@ func (m *monitorComponentImpl) RequestLatency(ctx context.Context, req *types.Mo
 		return nil, fmt.Errorf("user %s has no permission to access request latency", req.CurrentUser)
 	}
 
-	query := fmt.Sprintf("sum(increase(%s{pod_name='%s',namespace='%s'}[%s:])) by (le)",
+	query := fmt.Sprintf("sum by (le) (increase(%s{pod_name='%s',namespace='%s'}[%s]))",
 		m.metrics.requestLatency, req.Instance, namespace, req.LastDuration)
 	slog.InfoContext(ctx, "request-latency", slog.Any("query", query),
 		slog.Any("metricKeys", m.metrics.metricKeys), slog.Any("len", len(m.metrics.metricKeys)))
 
-	promeResp, err := m.client.SerialData(query)
+	promeResp, err := m.client.SerialData(url.QueryEscape(query), "")
 	if err != nil {
 		return nil, fmt.Errorf("failed to get request latency error: %w", err)
 	}
