@@ -13,7 +13,6 @@ import (
 	"opencsg.com/csghub-server/builder/temporal"
 	"opencsg.com/csghub-server/common/config"
 	mirrorcomponent "opencsg.com/csghub-server/mirror/component"
-	"opencsg.com/csghub-server/mirror/filter"
 	"opencsg.com/csghub-server/mirror/lfssyncer"
 	"opencsg.com/csghub-server/mirror/router"
 )
@@ -63,7 +62,6 @@ var lfsSyncCmd = &cobra.Command{
 		lfsWorkClient, err := mirrorcomponent.NewLFSWorkClient(context.Background(), cfg.Database.DSN, mirrorcomponent.LFSWorkDeps{
 			MirrorTaskStore: database.NewMirrorTaskJobStore(),
 			Syncer:          lfsSyncer,
-			RepoFilter:      filter.NewRepoFilter(cfg),
 			MaxWorkers:      cfg.Mirror.WorkerNumber,
 		})
 		if err != nil {

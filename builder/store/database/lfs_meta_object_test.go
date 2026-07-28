@@ -85,6 +85,33 @@ func TestLfsMetaStore_CRUD(t *testing.T) {
 
 }
 
+// TestLfsMetaStoreBulkUpdateOrCreateUpdatesRepositorySize verifies LFS metadata and its repository total stay consistent.
+func TestLfsMetaStoreBulkUpdateOrCreateUpdatesRepositorySize(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+	repoStore := database.NewRepoStoreWithDB(db)
+	lfsStore := database.NewLfsMetaObjectStoreWithDB(db)
+
+	repo, err := repoStore.CreateRepo(ctx, database.Repository{GitPath: "models_ns/repo"})
+	require.NoError(t, err)
+
+	err = lfsStore.BulkUpdateOrCreate(ctx, repo.ID, []database.LfsMetaObject{
+		{RepositoryID: repo.ID, Oid: "one", Size: 10},
+		{RepositoryID: repo.ID, Oid: "two", Size: 20},
+	})
+	require.NoError(t, err)
+	repo, err = repoStore.FindById(ctx, repo.ID)
+	require.NoError(t, err)
+	require.Equal(t, int64(30), repo.LFSObjectsSize)
+
+	err = lfsStore.BulkUpdateOrCreate(ctx, repo.ID, nil)
+	require.NoError(t, err)
+	repo, err = repoStore.FindById(ctx, repo.ID)
+	require.NoError(t, err)
+	require.Zero(t, repo.LFSObjectsSize)
+}
+
 func TestLfsMetaStore_UpdateXnetUsed(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()

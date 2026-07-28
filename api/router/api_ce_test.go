@@ -19,5 +19,6 @@ func TestCreateRepoRoutes_AdminIndustryScanNotRegistered_CE(t *testing.T) {
 	createRepoRoutes(apiGroup, middleware.MiddlewareCollection{}, &handler.RepoHandler{})
 
 	requireRoute(t, engine.Routes(), http.MethodPost, "/api/v1/models/:namespace/:name/mirror_from_saas")
+	requireRoute(t, engine.Routes(), http.MethodGet, "/api/v1/models/:namespace/:name/mirror_from_saas/status")
 	assertNoRoute(t, engine.Routes(), http.MethodPost, "/api/v1/admin/:repo_type/:namespace/:name/industry_tags/scan")
 }

@@ -18,6 +18,7 @@ type LfsMetaObjectStore interface {
 	Create(ctx context.Context, lfsObj LfsMetaObject) (*LfsMetaObject, error)
 	RemoveByOid(ctx context.Context, oid string, repoID int64) error
 	UpdateOrCreate(ctx context.Context, input LfsMetaObject) (*LfsMetaObject, error)
+	// BulkUpdateOrCreate replaces repository LFS metadata and updates its total size atomically.
 	BulkUpdateOrCreate(ctx context.Context, repoID int64, input []LfsMetaObject) error
 	// BulkUpdateExistingByOIDs persists checked LFS object existence states without replacing metadata rows.
 	BulkUpdateExistingByOIDs(ctx context.Context, repoID int64, existingOIDs, missingOIDs []string) error
@@ -111,7 +112,13 @@ func (s *lfsMetaObjectStoreImpl) UpdateOrCreate(ctx context.Context, input LfsMe
 	return &input, nil
 }
 
+// BulkUpdateOrCreate replaces repository LFS metadata and updates its total size atomically.
 func (s *lfsMetaObjectStoreImpl) BulkUpdateOrCreate(ctx context.Context, repoID int64, input []LfsMetaObject) error {
+	var totalSize int64
+	for _, object := range input {
+		totalSize += object.Size
+	}
+
 	return s.db.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		// Delete all existing records
 		_, err := tx.NewDelete().
@@ -122,12 +129,19 @@ func (s *lfsMetaObjectStoreImpl) BulkUpdateOrCreate(ctx context.Context, repoID 
 			return err
 		}
 
-		if len(input) == 0 {
-			return nil
+		if len(input) > 0 {
+			// Insert new records
+			if _, err = tx.NewInsert().
+				Model(&input).
+				Exec(ctx); err != nil {
+				return err
+			}
 		}
-		// Insert new records
-		_, err = tx.NewInsert().
-			Model(&input).
+
+		_, err = tx.NewUpdate().
+			Model((*Repository)(nil)).
+			Set("lfs_objects_size = ?", totalSize).
+			Where("id = ?", repoID).
 			Exec(ctx)
 		return err
 	})

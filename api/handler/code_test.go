@@ -8,7 +8,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
 	mockcomponent "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
+	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/builder/testutil"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
 
@@ -70,6 +72,44 @@ func TestCodeHandler_Create(t *testing.T) {
 		tester.WithBody(t, req).Execute()
 
 		tester.ResponseEq(t, 200, tester.OKText, &types.Code{Name: "c"})
+	})
+}
+
+// TestCodeHandler_CreateMirrorAuthInvalid verifies invalid mirror credentials return a bad request.
+func TestCodeHandler_CreateMirrorAuthInvalid(t *testing.T) {
+	tester := NewCodeTester(t).WithHandleFunc(func(h *CodeHandler) gin.HandlerFunc {
+		return h.Create
+	})
+	tester.WithUser()
+
+	req := &types.CreateCodeReq{CreateRepoReq: types.CreateRepoReq{Username: "u", Namespace: "u"}}
+	authErr := errorx.MirrorSourceRepoAuthInvalid(fmt.Errorf("credentials are incomplete"), errorx.Ctx())
+	tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.Ctx(), req).Return(true, nil)
+	tester.mocks.code.EXPECT().Create(tester.Ctx(), req).Return(nil, authErr)
+	tester.WithBody(t, req).Execute()
+
+	tester.ResponseEqSimple(t, 400, httpbase.R{
+		Code: "MIRROR-ERR-5",
+		Msg:  "MIRROR-ERR-5: credentials are incomplete",
+	})
+}
+
+// TestCodeHandler_CreateMirrorSourceBadRequest verifies malformed mirror source URLs return a bad request.
+func TestCodeHandler_CreateMirrorSourceBadRequest(t *testing.T) {
+	tester := NewCodeTester(t).WithHandleFunc(func(h *CodeHandler) gin.HandlerFunc {
+		return h.Create
+	})
+	tester.WithUser()
+
+	req := &types.CreateCodeReq{CreateRepoReq: types.CreateRepoReq{Username: "u", Namespace: "u"}}
+	badRequestErr := errorx.BadRequest(fmt.Errorf("invalid source git clone url"), errorx.Ctx())
+	tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.Ctx(), req).Return(true, nil)
+	tester.mocks.code.EXPECT().Create(tester.Ctx(), req).Return(nil, badRequestErr)
+	tester.WithBody(t, req).Execute()
+
+	tester.ResponseEqSimple(t, 400, httpbase.R{
+		Code: "REQ-ERR-0",
+		Msg:  "REQ-ERR-0: invalid source git clone url",
 	})
 }
 

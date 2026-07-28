@@ -78,7 +78,7 @@ var repoSyncCmd = &cobra.Command{
 		repoWorkClient, err := mirrorcomponent.NewRepoWorkClient(context.Background(), cfg.Database.DSN, mirrorcomponent.RepoWorkDeps{
 			MirrorTaskStore: database.NewMirrorTaskJobStore(),
 			Syncer:          repoSyncer,
-			LFSJobClient:    workhub.NewMirrorLFSJobClient(jobClient),
+			LFSJobClient:    workhub.NewMirrorLFSJobClient(jobClient, workhub.MirrorJobClientConfig{MaxRetryCount: cfg.Mirror.MaxRetryCount}),
 			MaxWorkers:      cfg.Mirror.WorkerNumber,
 		})
 		if err != nil {

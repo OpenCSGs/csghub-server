@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"net/url"
 	"path"
 	"path/filepath"
 	"slices"
@@ -130,7 +129,20 @@ func (c *skillComponentImpl) GetUploadUrl(ctx context.Context) (string, string, 
 	return url.String(), uuid, formData, nil
 }
 
+// Create creates a skill repository after normalizing any upstream mirror source and credentials.
 func (c *skillComponentImpl) Create(ctx context.Context, req *types.CreateSkillReq) (*types.Skill, error) {
+	if req.GitURL != "" || req.GitUsername != "" || req.GitPassword != "" {
+		sourceURL, username, accessToken, err := normalizeMirrorSource(
+			req.GitURL, req.GitUsername, req.GitPassword,
+		)
+		if err != nil {
+			return nil, err
+		}
+		req.GitURL = sourceURL
+		req.GitUsername = username
+		req.GitPassword = accessToken
+	}
+
 	// Setup request with default values
 	c.setupCreateRequest(req)
 
@@ -382,28 +394,14 @@ func (c *skillComponentImpl) createMirrorIfNeeded(ctx context.Context, req *type
 		return nil
 	}
 
-	// Create mirror task for the existing repo
-	gitUrl := req.GitURL
-	// Add username and password to git url if provided
-	if req.GitUsername != "" && req.GitPassword != "" {
-		// Parse the URL to add authentication
-		parsedUrl, err := url.Parse(gitUrl)
-		if err != nil {
-			return errorx.GitInvalidURL(err)
-		}
-		parsedUrl.User = url.UserPassword(req.GitUsername, req.GitPassword)
-		gitUrl = parsedUrl.String()
-	}
-
 	mirrorReq := types.CreateMirrorReq{
 		Namespace:   req.Namespace,
 		Name:        req.Name,
-		SourceUrl:   gitUrl,
+		SourceUrl:   req.GitURL,
 		Username:    req.GitUsername,
 		AccessToken: req.GitPassword,
 		CurrentUser: req.Username,
 		RepoType:    types.SkillRepo,
-		Interval:    "24h",
 		SyncLfs:     true,
 	}
 

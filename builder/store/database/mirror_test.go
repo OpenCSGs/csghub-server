@@ -3,6 +3,7 @@ package database_test
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"testing"
 	"time"
@@ -50,6 +51,9 @@ func TestMirrorStore_CRUD(t *testing.T) {
 	mi, err = store.FindByRepoID(ctx, 123)
 	require.Nil(t, err)
 	require.Equal(t, "foo", mi.Interval)
+	payload, err := json.Marshal(mi)
+	require.NoError(t, err)
+	require.NotContains(t, string(payload), `"interval"`)
 
 	exist, err := store.IsExist(ctx, 123)
 	require.Nil(t, err)
@@ -139,7 +143,6 @@ func TestMirrorStore_DeleteWithTaskCancelTxCancelsJobsAndDeletesMirror(t *testin
 	require.NoError(t, db.Core.NewInsert().Model(repo).Scan(ctx, repo))
 
 	mirror, err := store.Create(ctx, &database.Mirror{
-		Interval:     "m1",
 		SourceUrl:    "https://github.com/a/repo.git",
 		RepositoryID: repo.ID,
 		Status:       types.MirrorRepoSyncStart,
@@ -184,7 +187,6 @@ func TestMirrorStore_DeleteWithTaskCancelTxRollsBackWhenJobCancelFails(t *testin
 	}
 	require.NoError(t, db.Core.NewInsert().Model(repo).Scan(ctx, repo))
 	mirror, err := store.Create(ctx, &database.Mirror{
-		Interval:     "m1",
 		SourceUrl:    "https://github.com/a/repo.git",
 		RepositoryID: repo.ID,
 		Status:       types.MirrorRepoSyncStart,
@@ -225,7 +227,6 @@ func TestMirrorStore_DeleteWithTaskCancelTxKeepsCompletedRepoStatus(t *testing.T
 	}
 	require.NoError(t, db.Core.NewInsert().Model(repo).Scan(ctx, repo))
 	mirror, err := store.Create(ctx, &database.Mirror{
-		Interval:     "m1",
 		SourceUrl:    "https://github.com/a/repo.git",
 		RepositoryID: repo.ID,
 		Status:       types.MirrorLfsSyncFinished,
@@ -294,14 +295,14 @@ func TestMirrorStore_ToSync(t *testing.T) {
 
 	dt := time.Now().Add(1 * time.Hour)
 	mirrors := []*database.Mirror{
-		{NextExecutionTimestamp: dt, Status: types.MirrorRepoSyncFailed, Interval: "m1"},
-		{NextExecutionTimestamp: dt, Status: types.MirrorLfsSyncFinished, Interval: "m2"},
-		{NextExecutionTimestamp: dt, Status: types.MirrorLfsSyncFailed, Interval: "m3"},
-		{NextExecutionTimestamp: dt, Status: types.MirrorRepoSyncFinished, Interval: "m4"},
-		{NextExecutionTimestamp: dt, Status: types.MirrorRepoSyncStart, Interval: "m5"},
-		{NextExecutionTimestamp: dt.Add(-5 * time.Hour), Status: types.MirrorLfsSyncFinished, Interval: "m7"},
-		{NextExecutionTimestamp: dt, Status: types.MirrorRepoSyncFatal, Interval: "m8"},
-		{NextExecutionTimestamp: dt, Status: types.MirrorLfsSyncStart, Interval: "m9"},
+		{NextExecutionTimestamp: dt, Status: types.MirrorRepoSyncFailed, SourceUrl: "m1"},
+		{NextExecutionTimestamp: dt, Status: types.MirrorLfsSyncFinished, SourceUrl: "m2"},
+		{NextExecutionTimestamp: dt, Status: types.MirrorLfsSyncFailed, SourceUrl: "m3"},
+		{NextExecutionTimestamp: dt, Status: types.MirrorRepoSyncFinished, SourceUrl: "m4"},
+		{NextExecutionTimestamp: dt, Status: types.MirrorRepoSyncStart, SourceUrl: "m5"},
+		{NextExecutionTimestamp: dt.Add(-5 * time.Hour), Status: types.MirrorLfsSyncFinished, SourceUrl: "m7"},
+		{NextExecutionTimestamp: dt, Status: types.MirrorRepoSyncFatal, SourceUrl: "m8"},
+		{NextExecutionTimestamp: dt, Status: types.MirrorLfsSyncStart, SourceUrl: "m9"},
 	}
 	for _, m := range mirrors {
 		_, err := store.Create(ctx, m)
@@ -312,7 +313,7 @@ func TestMirrorStore_ToSync(t *testing.T) {
 	require.Nil(t, err)
 	names := []string{}
 	for _, m := range ms {
-		names = append(names, m.Interval)
+		names = append(names, m.SourceUrl)
 	}
 	require.ElementsMatch(t, []string{"m1", "m3", "m7"}, names)
 
@@ -320,7 +321,7 @@ func TestMirrorStore_ToSync(t *testing.T) {
 	require.Nil(t, err)
 	names = []string{}
 	for _, m := range ms {
-		names = append(names, m.Interval)
+		names = append(names, m.SourceUrl)
 	}
 	require.ElementsMatch(t, []string{"m4", "m7"}, names)
 
@@ -332,13 +333,28 @@ func TestMirrorStore_IndexWithPagination(t *testing.T) {
 	ctx := context.TODO()
 
 	store := database.NewMirrorStoreWithDB(db)
+	msStore := database.NewMirrorTaskStoreWithDB(db)
 
 	mirrors := []*database.Mirror{
-		{Interval: "m1", LocalRepoPath: "foo", SourceUrl: "bar"},
-		{Interval: "m2", LocalRepoPath: "bar", SourceUrl: "foo"},
+		{LocalRepoPath: "foo", SourceUrl: "bar"},
+		{LocalRepoPath: "bar", SourceUrl: "foo"},
 	}
-	for _, m := range mirrors {
-		_, err := store.Create(ctx, m)
+	var mStatus types.MirrorTaskStatus
+	for i, m := range mirrors {
+		mr, err := store.Create(ctx, m)
+		require.Nil(t, err)
+		if i == 0 {
+			mStatus = types.MirrorRepoSyncStart
+		} else {
+			mStatus = types.MirrorLfsSyncFailed
+		}
+		ct, err := msStore.Create(ctx, database.MirrorTask{
+			MirrorID: mr.ID,
+			Status:   mStatus,
+		})
+		require.Nil(t, err)
+		m.CurrentTaskID = ct.ID
+		err = store.Update(ctx, m)
 		require.Nil(t, err)
 	}
 
@@ -346,46 +362,157 @@ func TestMirrorStore_IndexWithPagination(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, 2, count)
 	// make sure in "DESC" order
-	require.Equal(t, "m2", ms[0].Interval)
-	require.Equal(t, "m1", ms[1].Interval)
+	require.Equal(t, "bar", ms[0].LocalRepoPath)
+	require.Equal(t, "foo", ms[1].LocalRepoPath)
 
 	_, count, err = store.IndexWithPagination(ctx, 10, 1, types.MirrorFilter{Search: "foo"}, true)
 	require.Nil(t, err)
 	require.Equal(t, 0, count)
+
+	status := types.MirrorRepoSyncStart
+	ms, count, err = store.IndexWithPagination(ctx, 10, 1, types.MirrorFilter{Status: &status}, false)
+	require.Nil(t, err)
+	require.Equal(t, 1, count)
+	require.Equal(t, "foo", ms[0].LocalRepoPath)
 }
 
-// TestMirrorStore_IndexWithPaginationStatusFilter verifies current task status filtering and mirror status fallback.
-func TestMirrorStore_IndexWithPaginationStatusFilter(t *testing.T) {
+// TestMirrorStore_IndexSyncWithPagination verifies static search includes usernames.
+func TestMirrorStore_IndexSyncWithPagination(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
 	ctx := context.TODO()
 
 	store := database.NewMirrorStoreWithDB(db)
-	mirrors := []*database.Mirror{
-		{Interval: "mirror-status", Status: types.MirrorRepoSyncFailed},
-		{Interval: "current-task-status", Status: types.MirrorQueued},
-		{Interval: "current-task-overrides-mirror-status", Status: types.MirrorRepoSyncFailed},
-	}
-	for _, mirror := range mirrors {
-		_, err := store.Create(ctx, mirror)
-		require.NoError(t, err)
-	}
-
-	tasks := []*database.MirrorTask{
-		{MirrorID: mirrors[1].ID, Status: types.MirrorRepoSyncFailed},
-		{MirrorID: mirrors[2].ID, Status: types.MirrorQueued},
-	}
-	for i, task := range tasks {
-		require.NoError(t, db.Core.NewInsert().Model(task).Scan(ctx, task))
-		_, err := db.Core.NewUpdate().Model(mirrors[i+1]).Set("current_task_id = ?", task.ID).WherePK().Exec(ctx)
-		require.NoError(t, err)
-	}
-
-	status := types.MirrorRepoSyncFailed
-	result, count, err := store.IndexWithPagination(ctx, 10, 1, types.MirrorFilter{Status: &status}, false)
+	_, err := store.Create(ctx, &database.Mirror{SourceUrl: "https://example.com/other.git", Username: "other-user"})
 	require.NoError(t, err)
-	require.Equal(t, 2, count)
-	require.ElementsMatch(t, []string{"mirror-status", "current-task-status"}, []string{result[0].Interval, result[1].Interval})
+	wanted, err := store.Create(ctx, &database.Mirror{SourceUrl: "https://example.com/repo.git", Username: "target-user"})
+	require.NoError(t, err)
+
+	mirrors, total, err := store.IndexSyncWithPagination(ctx, database.MirrorSyncListQuery{
+		Page: 1, Per: 1, Search: "TARGET-USER",
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, 1, total)
+	require.Len(t, mirrors, 1)
+	require.Equal(t, wanted.ID, mirrors[0].ID)
+}
+
+// TestMirrorStore_IndexSyncWithPaginationOrdersByCurrentTaskUpdatedAt verifies recent current tasks sort first and taskless mirrors last.
+func TestMirrorStore_IndexSyncWithPaginationOrdersByCurrentTaskUpdatedAt(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewMirrorStoreWithDB(db)
+	taskStore := database.NewMirrorTaskStoreWithDB(db)
+	createMirrorWithTask := func(updatedAt time.Time) *database.Mirror {
+		mirror, err := store.Create(ctx, &database.Mirror{SourceUrl: "https://example.com/repo.git"})
+		require.NoError(t, err)
+		task, err := taskStore.Create(ctx, database.MirrorTask{MirrorID: mirror.ID, Status: types.MirrorQueued})
+		require.NoError(t, err)
+		_, err = db.Core.NewUpdate().
+			Model((*database.MirrorTask)(nil)).
+			Set("updated_at = ?", updatedAt).
+			Where("id = ?", task.ID).
+			Exec(ctx)
+		require.NoError(t, err)
+		mirror.CurrentTaskID = task.ID
+		require.NoError(t, store.Update(ctx, mirror))
+		return mirror
+	}
+
+	now := time.Now()
+	newest := createMirrorWithTask(now)
+	tiedUpdatedAt := now.Add(-time.Hour)
+	tiedLowerID := createMirrorWithTask(tiedUpdatedAt)
+	tiedHigherID := createMirrorWithTask(tiedUpdatedAt)
+	taskless, err := store.Create(ctx, &database.Mirror{SourceUrl: "https://example.com/taskless.git"})
+	require.NoError(t, err)
+
+	mirrors, total, err := store.IndexSyncWithPagination(ctx, database.MirrorSyncListQuery{Page: 1, Per: 10})
+
+	require.NoError(t, err)
+	require.Equal(t, 4, total)
+	require.Equal(t, []int64{newest.ID, tiedHigherID.ID, tiedLowerID.ID, taskless.ID}, mirrorIDs(mirrors))
+}
+
+// TestMirrorStore_IndexSyncWithPaginationFiltersTaskStatus verifies status conditions apply only to current tasks before pagination.
+func TestMirrorStore_IndexSyncWithPaginationFiltersTaskStatus(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewMirrorStoreWithDB(db)
+	taskStore := database.NewMirrorTaskStoreWithDB(db)
+	var wanted *database.Mirror
+	for _, status := range []types.MirrorTaskStatus{types.MirrorQueued, types.MirrorRepoSyncFatal} {
+		mirror, err := store.Create(ctx, &database.Mirror{SourceUrl: "https://example.com/repo.git"})
+		require.NoError(t, err)
+		task, err := taskStore.Create(ctx, database.MirrorTask{MirrorID: mirror.ID, Status: status})
+		require.NoError(t, err)
+		mirror.CurrentTaskID = task.ID
+		require.NoError(t, store.Update(ctx, mirror))
+		if status == types.MirrorRepoSyncFatal {
+			wanted = mirror
+		}
+	}
+
+	tasklessWaiting, err := store.Create(ctx, &database.Mirror{
+		SourceUrl: "https://example.com/taskless-waiting.git",
+		Status:    types.MirrorQueued,
+	})
+	require.NoError(t, err)
+	tasklessRunning, err := store.Create(ctx, &database.Mirror{
+		SourceUrl: "https://example.com/taskless-running.git",
+		Status:    types.MirrorRepoSyncStart,
+	})
+	require.NoError(t, err)
+
+	allMirrors, allTotal, err := store.IndexSyncWithPagination(ctx, database.MirrorSyncListQuery{Page: 1, Per: 10})
+	require.NoError(t, err)
+	require.Equal(t, 4, allTotal)
+	require.Contains(t, mirrorIDs(allMirrors), tasklessWaiting.ID)
+	require.Contains(t, mirrorIDs(allMirrors), tasklessRunning.ID)
+
+	waiting, waitingTotal, err := store.IndexSyncWithPagination(ctx, database.MirrorSyncListQuery{
+		Page: 1, Per: 10, Statuses: []types.MirrorTaskStatus{types.MirrorQueued, types.MirrorRepoSyncFinished},
+	})
+	require.NoError(t, err)
+	require.Equal(t, 1, waitingTotal)
+	require.NotContains(t, mirrorIDs(waiting), tasklessWaiting.ID)
+	require.NotContains(t, mirrorIDs(waiting), tasklessRunning.ID)
+
+	running, runningTotal, err := store.IndexSyncWithPagination(ctx, database.MirrorSyncListQuery{
+		Page: 1, Per: 10, Statuses: []types.MirrorTaskStatus{
+			types.MirrorRepoSyncStart,
+			types.MirrorRepoSyncFailed,
+			types.MirrorLfsSyncStart,
+			types.MirrorLfsSyncFailed,
+		},
+	})
+	require.NoError(t, err)
+	require.Zero(t, runningTotal)
+	require.NotContains(t, mirrorIDs(running), tasklessWaiting.ID)
+	require.NotContains(t, mirrorIDs(running), tasklessRunning.ID)
+
+	mirrors, total, err := store.IndexSyncWithPagination(ctx, database.MirrorSyncListQuery{
+		Page: 1, Per: 10, Statuses: []types.MirrorTaskStatus{types.MirrorRepoSyncFatal},
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, 1, total)
+	require.Len(t, mirrors, 1)
+	require.Equal(t, wanted.ID, mirrors[0].ID)
+}
+
+// mirrorIDs returns mirror identifiers for list result assertions.
+func mirrorIDs(mirrors []database.Mirror) []int64 {
+	ids := make([]int64, 0, len(mirrors))
+	for _, mirror := range mirrors {
+		ids = append(ids, mirror.ID)
+	}
+	return ids
 }
 
 func TestMirrorStore_StatusCount(t *testing.T) {
@@ -396,9 +523,9 @@ func TestMirrorStore_StatusCount(t *testing.T) {
 	store := database.NewMirrorStoreWithDB(db)
 
 	mirrors := []*database.Mirror{
-		{Interval: "m1", Status: types.MirrorRepoSyncFailed},
-		{Interval: "m2", Status: types.MirrorRepoSyncFailed},
-		{Interval: "m3", Status: types.MirrorRepoSyncFinished},
+		{Status: types.MirrorRepoSyncFailed},
+		{Status: types.MirrorRepoSyncFailed},
+		{Status: types.MirrorRepoSyncFinished},
 	}
 	for _, m := range mirrors {
 		_, err := store.Create(ctx, m)
@@ -446,9 +573,9 @@ func TestMirrorStore_BatchUpdate(t *testing.T) {
 	store := database.NewMirrorStoreWithDB(db)
 
 	mirrors := []*database.Mirror{
-		{SourceUrl: "https://opencsg.com/models/repo1", Status: types.MirrorRepoSyncFailed, Priority: 1},
-		{SourceUrl: "https://opencsg.com/models/repo2", Status: types.MirrorRepoSyncFailed, Priority: 1},
-		{SourceUrl: "https://opencsg.com/models/repo3", Status: types.MirrorRepoSyncFailed, Priority: 1},
+		{SourceUrl: "https://opencsg.com/models/repo1", Username: "old-user-1", AccessToken: "old-token-1", Status: types.MirrorRepoSyncFailed, Priority: 1},
+		{SourceUrl: "https://opencsg.com/models/repo2", Username: "old-user-2", AccessToken: "old-token-2", Status: types.MirrorRepoSyncFailed, Priority: 1},
+		{SourceUrl: "https://opencsg.com/models/repo3", Username: "old-user-3", AccessToken: "old-token-3", Status: types.MirrorRepoSyncFailed, Priority: 1},
 	}
 	createdMirrors := []database.Mirror{}
 	date := time.Now()
@@ -459,17 +586,27 @@ func TestMirrorStore_BatchUpdate(t *testing.T) {
 		m.RemoteUpdatedAt = date
 		createdMirrors = append(createdMirrors, *m)
 	}
+	createdMirrors[0].Username = "new-user"
+	createdMirrors[0].AccessToken = "new-token"
+	createdMirrors[1].Username = ""
+	createdMirrors[1].AccessToken = ""
 	err := store.BatchUpdate(ctx, createdMirrors)
 	require.Nil(t, err)
 	m1, err := store.FindByID(ctx, createdMirrors[0].ID)
 	require.Nil(t, err)
 	require.Equal(t, createdMirrors[0].Priority, m1.Priority)
+	require.Equal(t, "new-user", m1.Username)
+	require.Equal(t, "new-token", m1.AccessToken)
 	m2, err := store.FindByID(ctx, createdMirrors[1].ID)
 	require.Nil(t, err)
 	require.Equal(t, createdMirrors[1].Priority, m2.Priority)
+	require.Empty(t, m2.Username)
+	require.Empty(t, m2.AccessToken)
 	m3, err := store.FindByID(ctx, createdMirrors[2].ID)
 	require.Nil(t, err)
 	require.Equal(t, createdMirrors[2].Priority, m3.Priority)
+	require.Equal(t, "old-user-3", m3.Username)
+	require.Equal(t, "old-token-3", m3.AccessToken)
 }
 
 func TestMirrorStore_BatchCreate(t *testing.T) {
@@ -486,10 +623,34 @@ func TestMirrorStore_BatchCreate(t *testing.T) {
 	}
 	err := store.BatchCreate(ctx, mirrors)
 	require.Nil(t, err)
-	ms, count, err := store.IndexWithPagination(ctx, 10, 1, types.MirrorFilter{}, false)
+	ms, count, err := store.IndexWithPagination(ctx, 10, 1, types.MirrorFilter{Search: ""}, false)
 	require.Nil(t, err)
 	require.Equal(t, 3, len(ms))
 	require.Equal(t, 3, count)
+}
+
+// TestMirrorStoreToBeScheduledOrdersByPriority verifies lower numeric priority values are scheduled first.
+func TestMirrorStoreToBeScheduledOrdersByPriority(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+	store := database.NewMirrorStoreWithDB(db)
+
+	err := store.BatchCreate(ctx, []database.Mirror{
+		{SourceUrl: "https://example.com/low.git", Status: types.MirrorQueued, Priority: types.LowMirrorPriority},
+		{SourceUrl: "https://example.com/asap.git", Status: types.MirrorQueued, Priority: types.ASAPMirrorPriority},
+		{SourceUrl: "https://example.com/medium.git", Status: types.MirrorQueued, Priority: types.MediumMirrorPriority},
+	})
+	require.NoError(t, err)
+
+	mirrors, err := store.ToBeScheduled(ctx)
+	require.NoError(t, err)
+	require.Len(t, mirrors, 3)
+	require.Equal(t, []types.MirrorPriority{
+		types.ASAPMirrorPriority,
+		types.MediumMirrorPriority,
+		types.LowMirrorPriority,
+	}, []types.MirrorPriority{mirrors[0].Priority, mirrors[1].Priority, mirrors[2].Priority})
 }
 
 // func TestMirrorStore_ToBeScheduled_Status(t *testing.T) {

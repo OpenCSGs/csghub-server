@@ -22,6 +22,7 @@ type MirrorStore interface {
 	FindByID(ctx context.Context, ID int64, forUpdate ...bool) (*Mirror, error)
 	FindByIDs(ctx context.Context, IDs []int64) ([]Mirror, error)
 	FindByRepoPath(ctx context.Context, repoType types.RepositoryType, namespace, name string) (*Mirror, error)
+	IndexSyncWithPagination(ctx context.Context, query MirrorSyncListQuery) ([]Mirror, int, error)
 	FindWithMapping(ctx context.Context, repoType types.RepositoryType, namespace, name string, mapping types.Mapping) (*Repository, error)
 	Create(ctx context.Context, mirror *Mirror) (*Mirror, error)
 	NoPushMirror(ctx context.Context) ([]Mirror, error)
@@ -42,6 +43,14 @@ type MirrorStore interface {
 	DeleteWithTaskCancelTx(ctx context.Context, mirrorID int64, jobCancelClient MirrorJobCancelClient) error
 }
 
+// MirrorSyncListQuery contains database-level mirror sync filters and pagination.
+type MirrorSyncListQuery struct {
+	Page     int
+	Per      int
+	Search   string
+	Statuses []types.MirrorTaskStatus
+}
+
 func NewMirrorStore() MirrorStore {
 	return &mirrorStoreImpl{
 		db: defaultDB,
@@ -55,8 +64,9 @@ func NewMirrorStoreWithDB(db *DB) MirrorStore {
 }
 
 type Mirror struct {
-	ID             int64        `bun:",pk,autoincrement" json:"id"`
-	Interval       string       `bun:",notnull" json:"interval"`
+	ID int64 `bun:",pk,autoincrement" json:"id"`
+	// Interval is retained only for database schema compatibility.
+	Interval       string       `bun:",notnull" json:"-"`
 	SourceUrl      string       `bun:",notnull" json:"source_url"`
 	MirrorSourceID int64        `bun:",notnull" json:"mirror_source_id"`
 	MirrorSource   MirrorSource `bun:"rel:belongs-to,join:mirror_source_id=id" json:"mirror_source"`
@@ -156,6 +166,40 @@ func (s *mirrorStoreImpl) FindByID(ctx context.Context, ID int64, forUpdate ...b
 		return nil, err
 	}
 	return &mirror, nil
+}
+
+// IndexSyncWithPagination applies database filters and orders current tasks by latest update before loading one page.
+func (s *mirrorStoreImpl) IndexSyncWithPagination(ctx context.Context, query MirrorSyncListQuery) ([]Mirror, int, error) {
+	var mirrors []Mirror
+	q := s.newMirrorSyncSelect(&mirrors, query.Search).
+		OrderExpr("current_task.updated_at DESC NULLS LAST, mirror.id DESC")
+	if len(query.Statuses) > 0 {
+		q = q.Where("current_task.status IN (?)", bun.In(query.Statuses))
+	}
+	count, err := q.Count(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	if err := q.Limit(query.Per).Offset((query.Page - 1) * query.Per).Scan(ctx); err != nil {
+		return nil, 0, err
+	}
+	return mirrors, count, nil
+}
+
+// newMirrorSyncSelect applies relations and static search shared by mirror sync queries.
+func (s *mirrorStoreImpl) newMirrorSyncSelect(mirrors *[]Mirror, search string) *bun.SelectQuery {
+	q := s.db.Operator.Core.NewSelect().
+		Model(mirrors).
+		Relation("Repository").
+		Relation("CurrentTask")
+	if search == "" {
+		return q
+	}
+	pattern := fmt.Sprintf("%%%s%%", strings.ToLower(search))
+	return q.Where(
+		"LOWER(mirror.source_url) LIKE ? OR LOWER(mirror.username) LIKE ? OR LOWER(repository.path) LIKE ? OR LOWER(mirror.local_repo_path) LIKE ?",
+		pattern, pattern, pattern, pattern,
+	)
 }
 
 func (s *mirrorStoreImpl) FindByIDs(ctx context.Context, IDs []int64) ([]Mirror, error) {
@@ -405,7 +449,6 @@ func (s *mirrorStoreImpl) IndexWithPagination(ctx context.Context, per, page int
 	q := s.db.Operator.Core.NewSelect().
 		Model(&mirrors).
 		Relation("Repository").
-		Relation("MirrorSource").
 		Relation("CurrentTask").
 		Order("id desc")
 
@@ -475,7 +518,7 @@ func (s *mirrorStoreImpl) FindBySourceURLs(ctx context.Context, sourceURLs []str
 func (s *mirrorStoreImpl) BatchUpdate(ctx context.Context, mirrors []Mirror) error {
 	_, err := s.db.Operator.Core.NewUpdate().
 		Model(&mirrors).
-		Column("remote_updated_at", "mirror_priority").
+		Column("remote_updated_at", "mirror_priority", "username", "access_token").
 		Bulk().
 		Exec(ctx)
 	return err
@@ -498,7 +541,7 @@ func (s *mirrorStoreImpl) ToBeScheduled(ctx context.Context) ([]Mirror, error) {
 			types.MirrorQueued,
 		).
 		Distinct().
-		Order("mirror_priority desc").
+		Order("mirror_priority asc").
 		Limit(100).
 		Scan(ctx)
 	return mirrors, err

@@ -80,7 +80,6 @@ func TestMirrorTaskStore_RequeueMirrorRepoTaskCreatesRepoJobInTx(t *testing.T) {
 	require.Nil(t, err)
 
 	mirror, err := mirrorStore.Create(ctx, &database.Mirror{
-		Interval:       "1h",
 		SourceUrl:      "https://example.com/test/requeue.git",
 		RepositoryID:   repo.ID,
 		MirrorSourceID: 1,
@@ -110,11 +109,16 @@ func TestMirrorTaskStore_RequeueMirrorRepoTaskCreatesRepoJobInTx(t *testing.T) {
 		Where("id = ?", mirror.ID).
 		Exec(ctx)
 	require.Nil(t, err)
+	username := "new-user"
+	accessToken := "new-token"
 
 	task, err := taskStore.RequeueMirrorRepoTask(ctx, database.RequeueMirrorRepoTaskInput{
 		MirrorID:        mirror.ID,
 		RepositoryID:    repo.ID,
+		Username:        &username,
+		AccessToken:     &accessToken,
 		Priority:        types.ASAPMirrorPriority,
+		Urgent:          true,
 		JobClient:       jobClient,
 		JobCancelClient: cancelClient,
 	})
@@ -123,6 +127,7 @@ func TestMirrorTaskStore_RequeueMirrorRepoTaskCreatesRepoJobInTx(t *testing.T) {
 	require.Equal(t, types.MirrorQueued, task.Status)
 	require.Equal(t, types.ASAPMirrorPriority, task.Priority)
 	require.Equal(t, int64(789), task.RepoJobID)
+	require.True(t, task.IsUrgent)
 	require.Equal(t, []int64{int64(101), int64(202)}, cancelClient.jobIDs)
 	require.Len(t, jobClient.inputs, 1)
 	require.Equal(t, database.MirrorJobInput{
@@ -133,6 +138,7 @@ func TestMirrorTaskStore_RequeueMirrorRepoTaskCreatesRepoJobInTx(t *testing.T) {
 		SourceURL:    "https://example.com/test/requeue.git",
 		RepoPath:     "test/requeue",
 		Priority:     types.ASAPMirrorPriority,
+		Urgent:       true,
 	}, jobClient.inputs[0])
 
 	var storedOldTask database.MirrorTask
@@ -140,12 +146,19 @@ func TestMirrorTaskStore_RequeueMirrorRepoTaskCreatesRepoJobInTx(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, types.MirrorCanceled, storedOldTask.Status)
 
+	var storedNewTask database.MirrorTask
+	err = db.Core.NewSelect().Model(&storedNewTask).Where("id = ?", task.ID).Scan(ctx)
+	require.Nil(t, err)
+	require.True(t, storedNewTask.IsUrgent)
+
 	var storedMirror database.Mirror
 	err = db.Core.NewSelect().Model(&storedMirror).Where("id = ?", mirror.ID).Scan(ctx)
 	require.Nil(t, err)
 	require.Equal(t, types.MirrorQueued, storedMirror.Status)
 	require.Equal(t, task.ID, storedMirror.CurrentTaskID)
 	require.Equal(t, types.ASAPMirrorPriority, storedMirror.Priority)
+	require.Equal(t, username, storedMirror.Username)
+	require.Equal(t, accessToken, storedMirror.AccessToken)
 	require.True(t, storedMirror.UpdatedAt.After(oldUpdatedAt))
 
 	var storedRepo database.Repository
@@ -178,18 +191,23 @@ func TestMirrorTaskStore_RequeueMirrorRepoTaskRollsBackWhenJobInsertFails(t *tes
 	require.Nil(t, err)
 
 	mirror, err := mirrorStore.Create(ctx, &database.Mirror{
-		Interval:       "1h",
 		SourceUrl:      "https://example.com/test/requeue-rollback.git",
+		Username:       "old-user",
+		AccessToken:    "old-token",
 		RepositoryID:   repo.ID,
 		MirrorSourceID: 1,
 		Status:         types.MirrorLfsSyncFinished,
 		Priority:       types.LowMirrorPriority,
 	})
 	require.Nil(t, err)
+	username := "new-user"
+	accessToken := "new-token"
 
 	_, err = taskStore.RequeueMirrorRepoTask(ctx, database.RequeueMirrorRepoTaskInput{
 		MirrorID:     mirror.ID,
 		RepositoryID: repo.ID,
+		Username:     &username,
+		AccessToken:  &accessToken,
 		Priority:     types.ASAPMirrorPriority,
 		JobClient:    jobClient,
 	})
@@ -200,6 +218,8 @@ func TestMirrorTaskStore_RequeueMirrorRepoTaskRollsBackWhenJobInsertFails(t *tes
 	require.Nil(t, err)
 	require.Equal(t, types.MirrorLfsSyncFinished, storedMirror.Status)
 	require.Equal(t, types.LowMirrorPriority, storedMirror.Priority)
+	require.Equal(t, "old-user", storedMirror.Username)
+	require.Equal(t, "old-token", storedMirror.AccessToken)
 
 	var taskCount int
 	taskCount, err = db.Core.NewSelect().
@@ -274,7 +294,6 @@ func TestMirrorTaskStore_SetMirrorCurrentTaskID(t *testing.T) {
 	mstore := database.NewMirrorStoreWithDB(db)
 
 	mirror, err := mstore.Create(ctx, &database.Mirror{
-		Interval:       "1",
 		SourceUrl:      "test",
 		RepositoryID:   1,
 		MirrorSourceID: 1,
@@ -320,7 +339,6 @@ func TestMirrorTaskStore_UpdateStatusAndRepoSyncStatus(t *testing.T) {
 	require.Nil(t, err)
 
 	mirror, err := mirrorStore.Create(ctx, &database.Mirror{
-		Interval:       "1h",
 		SourceUrl:      "https://example.com/test/repo.git",
 		RepositoryID:   repo.ID,
 		MirrorSourceID: 1,
@@ -374,7 +392,6 @@ func TestMirrorTaskStore_UpdateStatusAndRepoSyncStatus_MultipleSyncStatuses(t *t
 	require.Nil(t, err)
 
 	mirror, err := mirrorStore.Create(ctx, &database.Mirror{
-		Interval:       "1h",
 		SourceUrl:      "https://example.com/test/repo2.git",
 		RepositoryID:   repo.ID,
 		MirrorSourceID: 1,
@@ -449,7 +466,6 @@ func TestMirrorTaskStore_UpdateStatusAndRepoSyncStatus_FailedStatus(t *testing.T
 	require.Nil(t, err)
 
 	mirror, err := mirrorStore.Create(ctx, &database.Mirror{
-		Interval:       "1h",
 		SourceUrl:      "https://example.com/test/repo3.git",
 		RepositoryID:   repo.ID,
 		MirrorSourceID: 1,
@@ -499,7 +515,6 @@ func TestMirrorTaskStore_UpdateStatusAndRepoSyncStatusRejectsStaleCurrentTask(t 
 	require.Nil(t, err)
 
 	mirror, err := mirrorStore.Create(ctx, &database.Mirror{
-		Interval:       "1h",
 		SourceUrl:      "https://example.com/test/stale-current.git",
 		RepositoryID:   repo.ID,
 		MirrorSourceID: 1,
@@ -564,7 +579,6 @@ func TestMirrorTaskStore_UpdateStatusAndRepoSyncStatusRejectsCanceledTask(t *tes
 	require.Nil(t, err)
 
 	mirror, err := mirrorStore.Create(ctx, &database.Mirror{
-		Interval:       "1h",
 		SourceUrl:      "https://example.com/test/canceled-race.git",
 		RepositoryID:   repo.ID,
 		MirrorSourceID: 1,
@@ -632,7 +646,6 @@ func TestMirrorTaskStore_CancelMirrorTaskByIDWithJobCancelSynchronizesMirrorAndR
 	require.Nil(t, err)
 
 	mirror, err := mirrorStore.Create(ctx, &database.Mirror{
-		Interval:       "1h",
 		SourceUrl:      "https://example.com/test/cancel-sync.git",
 		RepositoryID:   repo.ID,
 		MirrorSourceID: 1,
@@ -698,7 +711,6 @@ func TestMirrorTaskStore_CancelMirrorTaskByIDWithJobCancelKeepsFinishedTask(t *t
 	require.Nil(t, err)
 
 	mirror, err := mirrorStore.Create(ctx, &database.Mirror{
-		Interval:       "1h",
 		SourceUrl:      "https://example.com/test/cancel-finished.git",
 		RepositoryID:   repo.ID,
 		MirrorSourceID: 1,
@@ -764,7 +776,6 @@ func TestMirrorTaskStore_CancelMirrorTaskByIDCancelsRiverJobsInTx(t *testing.T) 
 	require.Nil(t, err)
 
 	mirror, err := mirrorStore.Create(ctx, &database.Mirror{
-		Interval:       "1h",
 		SourceUrl:      "https://example.com/test/cancel-jobs.git",
 		RepositoryID:   repo.ID,
 		MirrorSourceID: 1,
@@ -817,7 +828,6 @@ func TestMirrorTaskStore_CancelMirrorTaskByIDRollsBackWhenRiverCancelFails(t *te
 	require.Nil(t, err)
 
 	mirror, err := mirrorStore.Create(ctx, &database.Mirror{
-		Interval:       "1h",
 		SourceUrl:      "https://example.com/test/cancel-rollback.git",
 		RepositoryID:   repo.ID,
 		MirrorSourceID: 1,
@@ -871,7 +881,6 @@ func TestMirrorTaskStore_UpdateStatusAndRepoSyncStatus_UpdatesMirrorAndRepoFromS
 	require.Nil(t, err)
 
 	mirror, err := mirrorStore.Create(ctx, &database.Mirror{
-		Interval:       "1h",
 		SourceUrl:      "https://example.com/test/repo4.git",
 		RepositoryID:   repo.ID,
 		MirrorSourceID: 1,
@@ -923,7 +932,6 @@ func TestMirrorTaskStore_UpdateStatusAndRepoSyncStatusReturnsMirrorRepository(t 
 	require.Nil(t, err)
 
 	mirror, err := mirrorStore.Create(ctx, &database.Mirror{
-		Interval:       "1h",
 		SourceUrl:      "https://example.com/test/repo-relation.git",
 		RepositoryID:   repo.ID,
 		MirrorSourceID: 1,
@@ -975,7 +983,6 @@ func TestMirrorTaskStore_UpdateStatusAndRepoSyncStatusClearsErrorOnSuccess(t *te
 	require.Nil(t, err)
 
 	mirror, err := mirrorStore.Create(ctx, &database.Mirror{
-		Interval:       "1h",
 		SourceUrl:      "https://example.com/test/repo-clear-error.git",
 		RepositoryID:   repo.ID,
 		MirrorSourceID: 1,
@@ -1036,7 +1043,6 @@ func TestMirrorTaskStore_CompleteRepoSyncAndInsertLFSJobCommitsRepoResultAndJob(
 	require.Nil(t, err)
 
 	mirror, err := mirrorStore.Create(ctx, &database.Mirror{
-		Interval:       "1h",
 		SourceUrl:      "https://example.com/test/repo7.git",
 		RepositoryID:   repo.ID,
 		MirrorSourceID: 1,
@@ -1112,7 +1118,6 @@ func TestMirrorTaskStore_CompleteRepoSyncAndInsertLFSJobRollsBackRepoResultOnJob
 	require.Nil(t, err)
 
 	mirror, err := mirrorStore.Create(ctx, &database.Mirror{
-		Interval:       "1h",
 		SourceUrl:      "https://example.com/test/repo8.git",
 		RepositoryID:   repo.ID,
 		MirrorSourceID: 1,

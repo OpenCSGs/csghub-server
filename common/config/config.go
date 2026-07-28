@@ -67,10 +67,8 @@ type Config struct {
 		// The token number to add to bucket each second
 		RateLimit float64 `env:"STARHUB_SERVER_MIRROR_RATE_LIMIT" default:"0.2"`
 		// The capacity of token bucket
-		RateBucketCapacity int   `env:"STARHUB_SERVER_MIRROR_RATE_BUCKET_CAPACITY" default:"1"`
-		MaxRetryCount      int   `env:"STARHUB_SERVER_MIRROR_MAX_RETRY_COUNT" default:"3"`
-		MaxDatasetRepoSize int64 `env:"STARHUB_SERVER_MIRROR_MAX_DATASET_REPO_SIZE" default:"53687091200"` // 50GB
-		MaxModelRepoSize   int64 `env:"STARHUB_SERVER_MIRROR_MAX_MODEL_REPO_SIZE" default:"53687091200"`   // 50GB
+		RateBucketCapacity int `env:"STARHUB_SERVER_MIRROR_RATE_BUCKET_CAPACITY" default:"1"`
+		MaxRetryCount      int `env:"STARHUB_SERVER_MIRROR_MAX_RETRY_COUNT" default:"3"`
 	}
 
 	DocsHost string `env:"STARHUB_SERVER_SERVER_DOCS_HOST" default:"http://localhost:6636"`

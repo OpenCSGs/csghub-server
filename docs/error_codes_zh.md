@@ -914,6 +914,46 @@
 - **错误名:** `mirrorSourceConflict`
 - **描述:** 目标仓库已绑定其他镜像源。
 
+---
+
+### `MIRROR-ERR-1`
+
+- **错误代码:** `MIRROR-ERR-1`
+- **错误名:** `mirrorRepoSyncing`
+- **描述:** 仓库正在同步中。
+
+---
+
+### `MIRROR-ERR-2`
+
+- **错误代码:** `MIRROR-ERR-2`
+- **错误名:** `mirrorRepoSyncFailed`
+- **描述:** 仓库同步失败，未能获取 Git 数据。
+
+---
+
+### `MIRROR-ERR-3`
+
+- **错误代码:** `MIRROR-ERR-3`
+- **错误名:** `mirrorTaskStateInvalid`
+- **描述:** 当前镜像任务状态与执行状态不一致，无法可靠确定任务状态。
+
+---
+
+### `MIRROR-ERR-4`
+
+- **错误代码:** `MIRROR-ERR-4`
+- **错误名:** `mirrorRepoSyncCanceled`
+- **描述:** 仓库 Git 数据可用前同步任务已取消。
+
+---
+
+### `MIRROR-ERR-5`
+
+- **错误代码:** `MIRROR-ERR-5`
+- **错误名:** `mirrorSourceRepoAuthInvalid`
+- **描述:** 源仓库鉴权信息错误。
+
 ## Moderation 错误
 
 ### `MOD-ERR-0`
@@ -1713,4 +1753,3 @@
 - **错误代码:** `USER-ERR-20`
 - **错误名:** `namespaceAlreadyExists`
 - **描述:** 命名空间已存在于系统中。
-

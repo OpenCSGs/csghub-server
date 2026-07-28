@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"net/url"
 	"path"
 	"path/filepath"
 	"slices"
@@ -128,7 +127,20 @@ func (c *codeComponentImpl) GetUploadUrl(ctx context.Context) (string, string, m
 	return url.String(), uuid, formData, nil
 }
 
+// Create creates a code repository after normalizing any upstream mirror source and credentials.
 func (c *codeComponentImpl) Create(ctx context.Context, req *types.CreateCodeReq) (*types.Code, error) {
+	if req.GitURL != "" || req.GitUsername != "" || req.GitPassword != "" {
+		sourceURL, username, accessToken, err := normalizeMirrorSource(
+			req.GitURL, req.GitUsername, req.GitPassword,
+		)
+		if err != nil {
+			return nil, err
+		}
+		req.GitURL = sourceURL
+		req.GitUsername = username
+		req.GitPassword = accessToken
+	}
+
 	var (
 		nickname string
 		tags     []types.RepoTag
@@ -765,25 +777,14 @@ func (c *codeComponentImpl) createMirrorIfNeeded(ctx context.Context, req *types
 		return nil
 	}
 
-	gitUrl := req.GitURL
-	if req.GitUsername != "" && req.GitPassword != "" {
-		parsedUrl, err := url.Parse(gitUrl)
-		if err != nil {
-			return errorx.GitInvalidURL(err)
-		}
-		parsedUrl.User = url.UserPassword(req.GitUsername, req.GitPassword)
-		gitUrl = parsedUrl.String()
-	}
-
 	mirrorReq := types.CreateMirrorReq{
 		Namespace:   req.Namespace,
 		Name:        req.Name,
-		SourceUrl:   gitUrl,
+		SourceUrl:   req.GitURL,
 		Username:    req.GitUsername,
 		AccessToken: req.GitPassword,
 		CurrentUser: req.Username,
 		RepoType:    types.CodeRepo,
-		Interval:    "24h",
 		SyncLfs:     true,
 	}
 

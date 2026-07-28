@@ -1,5 +1,20 @@
 {
     "error.MIRROR-ERR-0": {
         "other": "The target repository already has another mirror source."
+    },
+    "error.MIRROR-ERR-1": {
+        "other": "Repository synchronization is in progress."
+    },
+    "error.MIRROR-ERR-2": {
+        "other": "Repository synchronization failed."
+    },
+    "error.MIRROR-ERR-3": {
+        "other": "The mirror task state is invalid."
+    },
+    "error.MIRROR-ERR-4": {
+        "other": "Repository synchronization was canceled."
+    },
+    "error.MIRROR-ERR-5": {
+        "other": "Source repository authentication information is invalid."
     }
 }

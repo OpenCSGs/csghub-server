@@ -830,10 +830,6 @@ func TestGitalyFile_GetRepoAllLfsPointers(t *testing.T) {
 	tester := newGitalyTester(t)
 	ctx := context.TODO()
 
-	tester.mocks.repoStore.EXPECT().FindByPath(mock.Anything, types.ModelRepo, "ns", "n").Return(&database.Repository{
-		ID:     1,
-		Hashed: false,
-	}, nil)
 	tester.mocks.blobClient.EXPECT().ListAllLFSPointers(mock.Anything, &gitalypb.ListAllLFSPointersRequest{
 		Repository: &gitalypb.Repository{
 			StorageName:  "st",
@@ -847,10 +843,11 @@ func TestGitalyFile_GetRepoAllLfsPointers(t *testing.T) {
 		},
 	}, nil)
 	data, err := tester.GetRepoAllLfsPointers(ctx, gitserver.GetRepoAllFilesReq{
-		Namespace: "ns",
-		Name:      "n",
-		Ref:       "main",
-		RepoType:  types.ModelRepo,
+		Namespace:    "ns",
+		Name:         "n",
+		Ref:          "main",
+		RepoType:     types.ModelRepo,
+		RelativePath: "models_ns/n.git",
 	})
 	require.NoError(t, err)
 	require.Equal(t, []*types.LFSPointer{

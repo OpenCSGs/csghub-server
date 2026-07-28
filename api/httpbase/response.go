@@ -1,6 +1,7 @@
 package httpbase
 
 import (
+	"errors"
 	"net/http"
 	"reflect"
 
@@ -69,6 +70,36 @@ func Created(c *gin.Context, data interface{}) {
 	modifiedData := i18n.TranslateInterface(data, lang)
 	respData.Data = modifiedData
 	c.PureJSON(http.StatusCreated, respData)
+}
+
+// Accepted responds with standard JSON for work accepted for asynchronous processing.
+func Accepted(c *gin.Context, data any) {
+	respData := R{
+		Msg:  "Accepted",
+		Data: data,
+	}
+	if c.Request == nil || c.Request.Header == nil {
+		c.PureJSON(http.StatusAccepted, respData)
+		return
+	}
+	lang := c.GetHeader("Accept-Language")
+	respData.Data = i18n.TranslateInterface(data, lang)
+	c.PureJSON(http.StatusAccepted, respData)
+}
+
+// AcceptedWithExt responds with an HTTP 202 custom error envelope and optional asynchronous result data.
+func AcceptedWithExt(c *gin.Context, err error, data any) {
+	resp := R{Data: data}
+	if custom, ok := errorx.GetFirstCustomError(err); ok {
+		var customErr errorx.CustomError
+		errors.As(custom, &customErr)
+		resp.Code = customErr.Code()
+		resp.Msg = customErr.Error()
+		resp.Context = customErr.Context()
+	} else {
+		resp.Msg = err.Error()
+	}
+	c.PureJSON(http.StatusAccepted, resp)
 }
 
 // OK responds the client with standard JSON.
@@ -258,6 +289,44 @@ func ConflictError(c *gin.Context, err error) {
 		resp.Msg = err.Error()
 	}
 	c.PureJSON(http.StatusConflict, resp)
+}
+
+func TooManyReqError(c *gin.Context, err error) {
+	err, ok := errorx.GetFirstCustomError(err)
+	if ok {
+		customErr := err.(errorx.CustomError)
+		c.PureJSON(http.StatusTooManyRequests, R{
+			Code:    customErr.Code(),
+			Msg:     customErr.Error(),
+			Context: customErr.Context(),
+		})
+		return
+	}
+	c.PureJSON(http.StatusTooManyRequests, R{
+		Msg: err.Error(),
+	})
+}
+
+// 410 GoneError responds with a JSON-formatted error message.
+// Used when the requested resource is no longer available.
+//
+// Example:
+//
+//	GoneError(c, errors.New("token expired"))
+func GoneError(c *gin.Context, err error) {
+	err, ok := errorx.GetFirstCustomError(err)
+	if ok {
+		customErr := err.(errorx.CustomError)
+		c.PureJSON(http.StatusGone, R{
+			Code:    customErr.Code(),
+			Msg:     customErr.Error(),
+			Context: customErr.Context(),
+		})
+		return
+	}
+	c.PureJSON(http.StatusGone, R{
+		Msg: err.Error(),
+	})
 }
 
 // R is the response envelope

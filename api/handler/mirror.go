@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"log/slog"
 	"strconv"
 	"strings"
@@ -8,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/utils/common"
 	"opencsg.com/csghub-server/component"
@@ -37,6 +39,7 @@ type MirrorHandler struct {
 // @Param        body body types.CreateMirrorRepoReq true "body"
 // @Success      200  {object}  types.Response{} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      404  {object}  types.APINotFound "Not found"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /mirror/repo [post]
 func (h *MirrorHandler) CreateMirrorRepo(ctx *gin.Context) {
@@ -57,6 +60,14 @@ func (h *MirrorHandler) CreateMirrorRepo(ctx *gin.Context) {
 	m, err := h.mirror.CreateMirrorRepo(ctx.Request.Context(), req)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "failed to create mirror repo", slog.Any("error", err))
+		if errors.Is(err, errorx.ErrMirrorSourceRepoAuthInvalid) || errors.Is(err, errorx.ErrBadRequest) {
+			httpbase.BadRequestWithExt(ctx, err)
+			return
+		}
+		if errors.Is(err, errorx.ErrRepoNotFound) {
+			httpbase.NotFoundError(ctx, err)
+			return
+		}
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -101,7 +112,7 @@ func (h *MirrorHandler) Repos(ctx *gin.Context) {
 	httpbase.OK(ctx, respData)
 }
 
-// GetMirrors godoc
+// Index godoc
 // @Security     ApiKey
 // @Summary      Get mirrors, used for admin
 // @Tags         Mirror
@@ -110,8 +121,8 @@ func (h *MirrorHandler) Repos(ctx *gin.Context) {
 // @Param        per query int false "per" default(20)
 // @Param        page query int false "page" default(1)
 // @Param        search query string false "search"
-// @Param        status query string false "status"
-// @Success      200  {object}  types.Response{data=[]types.Mirror,total=int} "OK"
+// @Param        status query string false "status" Enums(all, waiting, running)
+// @Success      200  {object}  types.Response{data=[]types.MirrorSyncSummary,total=int} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /mirrors [get]
@@ -123,20 +134,26 @@ func (h *MirrorHandler) Index(ctx *gin.Context) {
 		return
 	}
 
-	filter := types.MirrorFilter{Search: ctx.Query("search")}
-	if status := ctx.Query("status"); status != "" {
-		mirrorStatus := types.MirrorTaskStatus(status)
-		filter.Status = &mirrorStatus
+	req := types.MirrorSyncListReq{Page: page, Per: per, Search: ctx.Query("search")}
+	switch status := strings.TrimSpace(ctx.Query("status")); status {
+	case "", "all":
+	case string(types.MirrorSyncOverallWaiting):
+		req.Status = types.MirrorSyncOverallWaiting
+	case string(types.MirrorSyncOverallRunning):
+		req.Status = types.MirrorSyncOverallRunning
+	default:
+		httpbase.BadRequest(ctx, "status must be one of all, waiting, or running")
+		return
 	}
-	repos, total, err := h.mirror.Index(ctx.Request.Context(), per, page, filter)
+	result, err := h.mirror.ListMirrorSyncs(ctx.Request.Context(), req)
 	if err != nil {
-		slog.ErrorContext(ctx.Request.Context(), "failed to get mirror repos", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "failed to list mirror syncs", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
 	respData := gin.H{
-		"data":  repos,
-		"total": total,
+		"data":  result.Items,
+		"total": result.Total,
 	}
 
 	httpbase.OK(ctx, respData)
@@ -185,6 +202,10 @@ func (h *MirrorHandler) BatchCreate(ctx *gin.Context) {
 	err = h.mirror.BatchCreate(ctx.Request.Context(), req)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "failed to bluk create mirrors", slog.Any("error", err))
+		if errors.Is(err, errorx.ErrMirrorSourceRepoAuthInvalid) || errors.Is(err, errorx.ErrBadRequest) {
+			httpbase.BadRequestWithExt(ctx, err)
+			return
+		}
 		httpbase.ServerError(ctx, err)
 		return
 	}

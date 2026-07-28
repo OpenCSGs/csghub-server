@@ -21,7 +21,6 @@ type CreateMirrorRepoReq struct {
 	AccessToken string `json:"access_token"`
 	Private     bool   `json:"private"`
 	Description string `json:"description"`
-	Interval    string `json:"interval"`
 	SyncLfs     bool   `json:"sync_lfs"`
 }
 
@@ -30,7 +29,6 @@ type CreatePushMirrorReq struct {
 	PushUrl     string `json:"push_url"`
 	Username    string `json:"username"`
 	AccessToken string `json:"access_token"`
-	Interval    string `json:"interval"`
 }
 
 type MirrorSyncReq struct {
