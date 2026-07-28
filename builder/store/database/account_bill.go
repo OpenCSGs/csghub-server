@@ -191,6 +191,8 @@ func (s *accountBillStoreImpl) ListBillsDetailByUserID(ctx context.Context, req 
 		q = q.Where("customer_id = ?", req.InstanceName)
 	}
 
+	q = q.Where("unit_type = ?", req.UnitType)
+
 	count, err := q.Count(ctx)
 	if err != nil {
 		return AccountBillDetailRes{}, errorx.HandleDBError(err, nil)
