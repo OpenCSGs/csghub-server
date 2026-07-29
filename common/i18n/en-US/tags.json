@@ -556,5 +556,65 @@
   },
   "Tag.I18nKey.agentichub-skills": {
     "other": "agentichub skills"
+  },
+  "Tag.I18nKey.org_industry_internet": {
+    "other": "Internet"
+  },
+  "Tag.I18nKey.org_industry_finance": {
+    "other": "Finance"
+  },
+  "Tag.I18nKey.org_industry_healthcare": {
+    "other": "Healthcare"
+  },
+  "Tag.I18nKey.org_industry_education": {
+    "other": "Education"
+  },
+  "Tag.I18nKey.org_industry_manufacturing": {
+    "other": "Manufacturing"
+  },
+  "Tag.I18nKey.org_industry_transportation": {
+    "other": "Transportation"
+  },
+  "Tag.I18nKey.org_industry_energy": {
+    "other": "Energy"
+  },
+  "Tag.I18nKey.org_industry_agriculture": {
+    "other": "Agriculture"
+  },
+  "Tag.I18nKey.org_industry_retail": {
+    "other": "Retail"
+  },
+  "Tag.I18nKey.org_industry_media": {
+    "other": "Media"
+  },
+  "Tag.I18nKey.org_industry_telecom": {
+    "other": "Telecom"
+  },
+  "Tag.I18nKey.org_industry_legal": {
+    "other": "Legal"
+  },
+  "Tag.I18nKey.org_industry_government": {
+    "other": "Government"
+  },
+  "Tag.I18nKey.org_industry_real_estate": {
+    "other": "Real Estate"
+  },
+  "Tag.I18nKey.org_industry_biotech": {
+    "other": "Biotech"
+  },
+  "Tag.I18nKey.org_industry_semiconductor": {
+    "other": "Semiconductor"
+  },
+  "Tag.I18nKey.org_industry_automotive": {
+    "other": "Automotive"
+  },
+  "Tag.I18nKey.org_industry_game": {
+    "other": "Gaming"
+  },
+  "Tag.I18nKey.org_industry_cybersecurity": {
+    "other": "Cybersecurity"
+  },
+  "Tag.I18nKey.org_industry_other": {
+    "other": "Other"
   }
 }

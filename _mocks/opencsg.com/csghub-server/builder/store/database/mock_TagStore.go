@@ -895,6 +895,55 @@ func (_c *MockTagStore_CheckTagIDsExist_Call) RunAndReturn(run func(context.Cont
 	return _c
 }
 
+// CheckTagIDsExistInScope provides a mock function with given fields: ctx, ids, scope, category
+func (_m *MockTagStore) CheckTagIDsExistInScope(ctx context.Context, ids []int64, scope types.TagScope, category string) error {
+	ret := _m.Called(ctx, ids, scope, category)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CheckTagIDsExistInScope")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, []int64, types.TagScope, string) error); ok {
+		r0 = rf(ctx, ids, scope, category)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockTagStore_CheckTagIDsExistInScope_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CheckTagIDsExistInScope'
+type MockTagStore_CheckTagIDsExistInScope_Call struct {
+	*mock.Call
+}
+
+// CheckTagIDsExistInScope is a helper method to define mock.On call
+//   - ctx context.Context
+//   - ids []int64
+//   - scope types.TagScope
+//   - category string
+func (_e *MockTagStore_Expecter) CheckTagIDsExistInScope(ctx interface{}, ids interface{}, scope interface{}, category interface{}) *MockTagStore_CheckTagIDsExistInScope_Call {
+	return &MockTagStore_CheckTagIDsExistInScope_Call{Call: _e.mock.On("CheckTagIDsExistInScope", ctx, ids, scope, category)}
+}
+
+func (_c *MockTagStore_CheckTagIDsExistInScope_Call) Run(run func(ctx context.Context, ids []int64, scope types.TagScope, category string)) *MockTagStore_CheckTagIDsExistInScope_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].([]int64), args[2].(types.TagScope), args[3].(string))
+	})
+	return _c
+}
+
+func (_c *MockTagStore_CheckTagIDsExistInScope_Call) Return(_a0 error) *MockTagStore_CheckTagIDsExistInScope_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockTagStore_CheckTagIDsExistInScope_Call) RunAndReturn(run func(context.Context, []int64, types.TagScope, string) error) *MockTagStore_CheckTagIDsExistInScope_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // CreateCategory provides a mock function with given fields: ctx, category
 func (_m *MockTagStore) CreateCategory(ctx context.Context, category database.TagCategory) (*database.TagCategory, error) {
 	ret := _m.Called(ctx, category)

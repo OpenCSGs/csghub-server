@@ -70,6 +70,8 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 		// find user by uuids
 		apiV1Group.GET("/users/by-uuids", userHandler.FindByUUIDs)
 		userGroup.DELETE("/:username/close_account", userHandler.CloseAccount)
+		// user's organizations
+		userGroup.GET("/:username/organizations", orgHandler.ListUserOrgs)
 		// org and members
 		apiV1Group.GET("/organizations", orgHandler.Index)
 		apiV1Group.GET("/organization/:namespace", orgHandler.Get)

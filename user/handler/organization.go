@@ -75,7 +75,7 @@ func (h *OrganizationHandler) Create(ctx *gin.Context) {
 	org, err := h.c.Create(ctx, &req)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "Failed to create organization", slog.Any("error", err))
-		if errors.Is(err, errorx.ErrNamespaceAlreadyExists) {
+		if errors.Is(err, errorx.ErrNamespaceAlreadyExists) || errors.Is(err, errorx.ErrTagIDsNotExist) {
 			httpbase.BadRequestWithExt(ctx, err)
 			return
 		}
@@ -154,17 +154,20 @@ func (h *OrganizationHandler) GetByUUID(ctx *gin.Context) {
 }
 
 // GetOrganizations godoc
-// @Security     ApiKey
-// @Summary      Get organizations
-// @Description  get organizations
+// @Summary      Get all organizations
+// @Description  get all organizations, no authentication required
 // @Tags         Organization
 // @Accept       json
 // @Produce      json
+// @Param        search query string false "search keyword"
+// @Param        org_type query string false "org type filter"
+// @Param        verify_status query string false "verify status filter"
+// @Param        per query int false "page size"
+// @Param        page query int false "page number"
 // @Success      200  {object}  types.Response{data=[]types.Organization} "OK"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /organizations [get]
 func (h *OrganizationHandler) Index(ctx *gin.Context) {
-	username := httpbase.GetCurrentUser(ctx)
 	search := ctx.Query("search")
 	orgType := ctx.Query("org_type")
 	verifyStatus := ctx.Query("verify_status")
@@ -174,7 +177,7 @@ func (h *OrganizationHandler) Index(ctx *gin.Context) {
 		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
-	orgs, total, err := h.c.Index(ctx, username, search, per, page, orgType, verifyStatus)
+	orgs, total, err := h.c.Index(ctx, search, per, page, orgType, verifyStatus)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "Failed to get organizations", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -186,7 +189,56 @@ func (h *OrganizationHandler) Index(ctx *gin.Context) {
 		"total": total,
 	}
 
-	slog.InfoContext(ctx.Request.Context(), "Get organizations succeed", slog.String("username", username), slog.String("search", search), slog.Int("per", per), slog.Int("page", page))
+	slog.InfoContext(ctx.Request.Context(), "Get all organizations succeed", slog.String("search", search), slog.Int("per", per), slog.Int("page", page))
+	httpbase.OK(ctx, respData)
+}
+
+// ListUserOrganizations godoc
+// @Security     ApiKey
+// @Summary      Get organizations the user belongs to
+// @Description  get organizations the specified user belongs to, with optional role filter (all, owner, write, admin)
+// @Tags         Organization
+// @Accept       json
+// @Produce      json
+// @Param        username path string true "username"
+// @Param        search query string false "search keyword"
+// @Param        org_type query string false "org type filter"
+// @Param        verify_status query string false "verify status filter"
+// @Param        role query string false "role filter: all (any member), owner, write, admin"
+// @Param        per query int false "page size"
+// @Param        page query int false "page number"
+// @Success      200  {object}  types.Response{data=[]types.Organization} "OK"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /user/{username}/organizations [get]
+func (h *OrganizationHandler) ListUserOrgs(ctx *gin.Context) {
+	per, page, err := common.GetPerAndPageFromContext(ctx)
+	if err != nil {
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get per and page", slog.Any("error", err))
+		httpbase.BadRequestWithExt(ctx, err)
+		return
+	}
+	req := &types.ListUserOrgsReq{
+		Username:     ctx.Param("username"),
+		Search:       ctx.Query("search"),
+		OrgType:      ctx.Query("org_type"),
+		VerifyStatus: ctx.Query("verify_status"),
+		Role:         ctx.Query("role"),
+		Per:          per,
+		Page:         page,
+	}
+	orgs, total, err := h.c.ListUserOrgs(ctx, req)
+	if err != nil {
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get user organizations", slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	respData := gin.H{
+		"data":  orgs,
+		"total": total,
+	}
+
+	slog.InfoContext(ctx.Request.Context(), "Get user organizations succeed", slog.String("username", req.Username))
 	httpbase.OK(ctx, respData)
 }
 
@@ -263,6 +315,10 @@ func (h *OrganizationHandler) Update(ctx *gin.Context) {
 	if err != nil {
 		if errors.Is(err, errorx.ErrForbidden) {
 			httpbase.ForbiddenError(ctx, err)
+			return
+		}
+		if errors.Is(err, errorx.ErrTagIDsNotExist) {
+			httpbase.BadRequestWithExt(ctx, err)
 			return
 		}
 		slog.ErrorContext(ctx.Request.Context(), "Failed to update organizations", slog.Any("error", err))

@@ -2,6 +2,7 @@ package component
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 
@@ -19,7 +20,8 @@ import (
 type OrganizationComponent interface {
 	FixOrgData(ctx context.Context, org *database.Organization) (*database.Organization, error)
 	Create(ctx context.Context, req *types.CreateOrgReq) (*types.Organization, error)
-	Index(ctx context.Context, username, search string, per, page int, orgType, verifyStatus string) ([]types.Organization, int, error)
+	Index(ctx context.Context, search string, per, page int, orgType, verifyStatus string) ([]types.Organization, int, error)
+	ListUserOrgs(ctx context.Context, req *types.ListUserOrgsReq) ([]types.Organization, int, error)
 	Get(ctx context.Context, orgName string) (*types.Organization, error)
 	GetByUUID(ctx context.Context, uuid string) (*types.Organization, error)
 	Delete(ctx context.Context, req *types.DeleteOrgReq) error
@@ -31,6 +33,7 @@ func NewOrganizationComponent(config *config.Config) (OrganizationComponent, err
 	c.orgStore = database.NewOrgStore()
 	c.nsStore = database.NewNamespaceStore()
 	c.userStore = database.NewUserStore()
+	c.tagStore = database.NewTagStore()
 	var err error
 	c.gs, err = git.NewGitServer(config)
 	if err != nil {
@@ -57,6 +60,7 @@ type organizationComponentImpl struct {
 	orgStore  database.OrgStore
 	nsStore   database.NamespaceStore
 	userStore database.UserStore
+	tagStore  database.TagStore
 	gs        gitserver.GitServer
 
 	msc MemberComponent
@@ -107,6 +111,18 @@ func (c *organizationComponentImpl) Create(ctx context.Context, req *types.Creat
 		return nil, errorx.NamespaceAlreadyExists(req.Name)
 	}
 
+	// validate tags before any side-effectful operations (Git, SSO, DB)
+	// tags must belong to organization scope and industry category
+	if len(req.TagIDs) > 0 {
+		err = c.tagStore.CheckTagIDsExistInScope(ctx, req.TagIDs, types.OrganizationTagScope, string(types.IndustryCategory))
+		if err != nil {
+			if errors.Is(err, database.ErrTagIDsNotFoundInScope) {
+				return nil, errorx.TagIDsNotFound(req.TagIDs)
+			}
+			return nil, fmt.Errorf("failed to check tag IDs, error: %w", err)
+		}
+	}
+
 	dbOrg, err := c.gs.CreateOrganization(req, user)
 	if err != nil {
 		return nil, fmt.Errorf("failed create git organization, error: %w", err)
@@ -150,6 +166,15 @@ func (c *organizationComponentImpl) Create(ctx context.Context, req *types.Creat
 	if err != nil {
 		return nil, fmt.Errorf("failed create database organization, error: %w", err)
 	}
+
+	// Set organization tags if provided (validation already done before side-effectful operations)
+	if len(req.TagIDs) > 0 {
+		err = c.orgStore.SetOrganizationTags(ctx, dbOrg.ID, req.TagIDs)
+		if err != nil {
+			return nil, fmt.Errorf("failed set organization tags, error: %w", err)
+		}
+	}
+
 	// need to create roles for a new org before adding members
 	err = c.msc.InitRoles(ctx, dbOrg)
 	if err != nil {
@@ -162,49 +187,90 @@ func (c *organizationComponentImpl) Create(ctx context.Context, req *types.Creat
 	}
 
 	org := &types.Organization{
-		Name:     dbOrg.Name,
-		Nickname: dbOrg.Nickname,
-		Homepage: dbOrg.Homepage,
-		Logo:     dbOrg.Logo,
-		OrgType:  dbOrg.OrgType,
-		Verified: dbOrg.Verified,
-		UUID:     dbOrg.UUID,
+		Name:        dbOrg.Name,
+		Nickname:    dbOrg.Nickname,
+		Description: dbOrg.Description,
+		Homepage:    dbOrg.Homepage,
+		Logo:        dbOrg.Logo,
+		OrgType:     dbOrg.OrgType,
+		Verified:    dbOrg.Verified,
+		UUID:        dbOrg.UUID,
 		Namespace: &types.Namespace{
 			Path: dbOrg.Name,
 			Type: string(namespace.NamespaceType),
 			UUID: namespace.UUID,
 		},
 	}
-	return org, err
+	// Load tags for response — use separate variable to avoid shadowing.
+	if loadTags, loadErr := c.orgStore.GetOrganizationTags(ctx, dbOrg.ID); loadErr != nil {
+		slog.WarnContext(ctx, "failed to get organization tags", slog.String("error", loadErr.Error()))
+	} else {
+		c.appendTags(&org.Tags, loadTags)
+	}
+	return org, nil
 }
 
-func (c *organizationComponentImpl) Index(ctx context.Context, username, search string, per, page int, orgType, verifyStatus string) ([]types.Organization, int, error) {
+func (c *organizationComponentImpl) Index(ctx context.Context, search string, per, page int, orgType, verifyStatus string) ([]types.Organization, int, error) {
+	dborgs, total, err := c.orgStore.Search(ctx, search, per, page, orgType, verifyStatus)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to list all organizations, error: %w", err)
+	}
+	orgs, err := c.toOrgList(ctx, dborgs)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to load organization tags, error: %w", err)
+	}
+	return orgs, total, nil
+}
+
+func (c *organizationComponentImpl) ListUserOrgs(ctx context.Context, req *types.ListUserOrgsReq) ([]types.Organization, int, error) {
 	var (
 		err    error
 		total  int
-		u      database.User
 		dborgs []database.Organization
 	)
-	u, err = c.userStore.FindByUsername(ctx, username)
+
+	if req.Username == "" {
+		return nil, 0, fmt.Errorf("username is required")
+	}
+
+	u, err := c.userStore.FindByUsername(ctx, req.Username)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to find user, error: %w", err)
 	}
-	if u.CanAdmin() {
-		dborgs, total, err = c.orgStore.Search(ctx, search, per, page, orgType, verifyStatus)
-		if err != nil {
-			return nil, 0, fmt.Errorf("failed to get organizations for admin user, error: %w", err)
-		}
-	} else {
-		dborgs, total, err = c.orgStore.GetUserOwnOrgs(ctx, username)
-		if err != nil {
-			return nil, 0, fmt.Errorf("failed to get organizations for owner, error: %w", err)
-		}
+
+	dborgs, total, err = c.orgStore.SearchUserBelongOrgs(ctx, u.ID, req.Search, req.Per, req.Page, req.OrgType, req.VerifyStatus, req.Role)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to get user organizations, error: %w", err)
 	}
+
+	orgs, err := c.toOrgList(ctx, dborgs)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to load organization tags, error: %w", err)
+	}
+	return orgs, total, nil
+}
+
+func (c *organizationComponentImpl) toOrgList(ctx context.Context, dborgs []database.Organization) ([]types.Organization, error) {
+	// Collect org IDs and batch load tags
+	orgIDs := make([]int64, len(dborgs))
+	for i, dborg := range dborgs {
+		orgIDs[i] = dborg.ID
+	}
+	tagMap, err := c.orgStore.GetOrganizationTagsByOrgIDs(ctx, orgIDs)
+	if err != nil {
+		slog.WarnContext(ctx, "failed to batch load organization tags", slog.String("error", err.Error()))
+	}
+	// fallback to empty map if batch load fails
+	if tagMap == nil {
+		tagMap = make(map[int64][]database.Tag)
+	}
+
 	var orgs []types.Organization
 	for _, dborg := range dborgs {
 		org := types.Organization{
 			Name:         dborg.Name,
 			Nickname:     dborg.Nickname,
+			Description:  dborg.Description,
 			Homepage:     dborg.Homepage,
 			Logo:         dborg.Logo,
 			OrgType:      dborg.OrgType,
@@ -219,9 +285,12 @@ func (c *organizationComponentImpl) Index(ctx context.Context, username, search 
 				UUID: dborg.Namespace.UUID,
 			}
 		}
+		if tags, ok := tagMap[dborg.ID]; ok {
+			c.appendTags(&org.Tags, tags)
+		}
 		orgs = append(orgs, org)
 	}
-	return orgs, total, nil
+	return orgs, nil
 }
 
 func (c *organizationComponentImpl) Get(ctx context.Context, orgName string) (*types.Organization, error) {
@@ -230,20 +299,27 @@ func (c *organizationComponentImpl) Get(ctx context.Context, orgName string) (*t
 		return nil, fmt.Errorf("failed to get organizations by name, error: %w", err)
 	}
 	org := &types.Organization{
-		Name:     dborg.Name,
-		Nickname: dborg.Nickname,
-		Homepage: dborg.Homepage,
-		Logo:     dborg.Logo,
-		OrgType:  dborg.OrgType,
-		Verified: dborg.Verified,
-		UUID:     dborg.UUID,
+		Name:        dborg.Name,
+		Nickname:    dborg.Nickname,
+		Description: dborg.Description,
+		Homepage:    dborg.Homepage,
+		Logo:        dborg.Logo,
+		OrgType:     dborg.OrgType,
+		Verified:    dborg.Verified,
+		UUID:        dborg.UUID,
 	}
 	if dborg.Namespace != nil {
 		org.Namespace = &types.Namespace{
-			Path: dborg.Nickname,
+			Path: dborg.Namespace.Path,
 			Type: string(dborg.Namespace.NamespaceType),
 			UUID: dborg.Namespace.UUID,
 		}
+	}
+	// Load tags
+	if tags, err := c.orgStore.GetOrganizationTags(ctx, dborg.ID); err != nil {
+		slog.WarnContext(ctx, "failed to get organization tags", slog.String("error", err.Error()))
+	} else {
+		c.appendTags(&org.Tags, tags)
 	}
 	return org, nil
 }
@@ -253,21 +329,31 @@ func (c *organizationComponentImpl) GetByUUID(ctx context.Context, uuid string) 
 	if err != nil {
 		return nil, fmt.Errorf("failed to get organization by uuid, error: %w", err)
 	}
+	if dborg == nil {
+		return nil, errorx.ErrDatabaseNoRows
+	}
 	org := &types.Organization{
-		Name:     dborg.Name,
-		Nickname: dborg.Nickname,
-		Homepage: dborg.Homepage,
-		Logo:     dborg.Logo,
-		OrgType:  dborg.OrgType,
-		Verified: dborg.Verified,
-		UUID:     dborg.UUID,
+		Name:        dborg.Name,
+		Nickname:    dborg.Nickname,
+		Description: dborg.Description,
+		Homepage:    dborg.Homepage,
+		Logo:        dborg.Logo,
+		OrgType:     dborg.OrgType,
+		Verified:    dborg.Verified,
+		UUID:        dborg.UUID,
 	}
 	if dborg.Namespace != nil {
 		org.Namespace = &types.Namespace{
-			Path: dborg.Nickname,
+			Path: dborg.Namespace.Path,
 			Type: string(dborg.Namespace.NamespaceType),
 			UUID: dborg.Namespace.UUID,
 		}
+	}
+	// Load tags
+	if tags, err := c.orgStore.GetOrganizationTags(ctx, dborg.ID); err != nil {
+		slog.WarnContext(ctx, "failed to get organization tags", slog.String("error", err.Error()))
+	} else {
+		c.appendTags(&org.Tags, tags)
 	}
 	return org, nil
 }
@@ -327,6 +413,16 @@ func (c *organizationComponentImpl) Update(ctx context.Context, req *types.EditO
 		org.Description = *req.Description
 	}
 
+	if len(req.TagIDs) > 0 {
+		err = c.tagStore.CheckTagIDsExistInScope(ctx, req.TagIDs, types.OrganizationTagScope, string(types.IndustryCategory))
+		if err != nil {
+			if errors.Is(err, database.ErrTagIDsNotFoundInScope) {
+				return nil, errorx.TagIDsNotFound(req.TagIDs)
+			}
+			return nil, fmt.Errorf("failed to check tag IDs, error: %w", err)
+		}
+	}
+
 	if req.NewOwner != nil {
 		operator, err := c.userStore.FindByUsername(ctx, req.CurrentUser)
 		if err != nil {
@@ -362,6 +458,14 @@ func (c *organizationComponentImpl) Update(ctx context.Context, req *types.EditO
 		return nil, fmt.Errorf("failed to update database organization, error: %w", err)
 	}
 
+	// Update organization tags if provided
+	if req.TagIDs != nil {
+		err = c.orgStore.SetOrganizationTags(ctx, org.ID, req.TagIDs)
+		if err != nil {
+			return nil, fmt.Errorf("failed to set organization tags, error: %w", err)
+		}
+	}
+
 	//skip update git server
 	if req.Nickname == nil && req.Description == nil {
 		return &org, nil
@@ -375,4 +479,22 @@ func (c *organizationComponentImpl) Update(ctx context.Context, req *types.EditO
 		return nil, fmt.Errorf("failed to update git organization, error: %w", err)
 	}
 	return &org, err
+}
+
+// appendTags converts database.Tag slice to types.RepoTag and appends to dst.
+func (c *organizationComponentImpl) appendTags(dst *[]types.RepoTag, tags []database.Tag) {
+	for _, t := range tags {
+		*dst = append(*dst, types.RepoTag{
+			ID:        t.ID,
+			Name:      t.Name,
+			Category:  t.Category,
+			Group:     t.Group,
+			BuiltIn:   t.BuiltIn,
+			Scope:     t.Scope,
+			ShowName:  t.I18nKey,
+			I18nKey:   t.I18nKey,
+			CreatedAt: t.CreatedAt,
+			UpdatedAt: t.UpdatedAt,
+		})
+	}
 }

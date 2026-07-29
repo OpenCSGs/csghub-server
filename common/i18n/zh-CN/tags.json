@@ -556,5 +556,65 @@
   },
   "Tag.I18nKey.agentichub-skills": {
     "other": "AgenticHub 技能"
+  },
+  "Tag.I18nKey.org_industry_internet": {
+    "other": "互联网"
+  },
+  "Tag.I18nKey.org_industry_finance": {
+    "other": "金融"
+  },
+  "Tag.I18nKey.org_industry_healthcare": {
+    "other": "医疗健康"
+  },
+  "Tag.I18nKey.org_industry_education": {
+    "other": "教育"
+  },
+  "Tag.I18nKey.org_industry_manufacturing": {
+    "other": "制造业"
+  },
+  "Tag.I18nKey.org_industry_transportation": {
+    "other": "交通运输"
+  },
+  "Tag.I18nKey.org_industry_energy": {
+    "other": "能源"
+  },
+  "Tag.I18nKey.org_industry_agriculture": {
+    "other": "农业"
+  },
+  "Tag.I18nKey.org_industry_retail": {
+    "other": "零售"
+  },
+  "Tag.I18nKey.org_industry_media": {
+    "other": "媒体"
+  },
+  "Tag.I18nKey.org_industry_telecom": {
+    "other": "电信"
+  },
+  "Tag.I18nKey.org_industry_legal": {
+    "other": "法律"
+  },
+  "Tag.I18nKey.org_industry_government": {
+    "other": "政府"
+  },
+  "Tag.I18nKey.org_industry_real_estate": {
+    "other": "房地产"
+  },
+  "Tag.I18nKey.org_industry_biotech": {
+    "other": "生物技术"
+  },
+  "Tag.I18nKey.org_industry_semiconductor": {
+    "other": "半导体"
+  },
+  "Tag.I18nKey.org_industry_automotive": {
+    "other": "汽车"
+  },
+  "Tag.I18nKey.org_industry_game": {
+    "other": "游戏"
+  },
+  "Tag.I18nKey.org_industry_cybersecurity": {
+    "other": "网络安全"
+  },
+  "Tag.I18nKey.org_industry_other": {
+    "other": "其他"
   }
 }

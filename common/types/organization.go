@@ -13,6 +13,7 @@ type CreateOrgReq struct {
 	Logo        string `json:"logo,omitempty" example:"https://www.example.com/logo.png"`
 	Verified    bool   `json:"verified" example:"false"`
 	OrgType     string `json:"org_type" example:"company or school etc"`
+	TagIDs      []int64 `json:"tag_ids,omitempty"`
 }
 
 // CreateOrgReq implements SensitiveRequestV2
@@ -56,6 +57,7 @@ type EditOrgReq struct {
 	OrgType     *string `json:"org_type" example:"company or school etc"`
 	NewOwner    *string `json:"owner" example:"username"`
 	CurrentUser string  `json:"-"`
+	TagIDs      []int64 `json:"tag_ids,omitempty"`
 }
 
 // EditOrgReq implements SensitiveRequestV2
@@ -91,6 +93,16 @@ func (e *EditOrgReq) GetSensitiveFields() []SensitiveField {
 		})
 	}
 	return fields
+}
+
+type ListUserOrgsReq struct {
+	Username     string `json:"-"`
+	Search       string `form:"search" json:"search,omitempty"`
+	OrgType      string `form:"org_type" json:"org_type,omitempty"`
+	VerifyStatus string `form:"verify_status" json:"verify_status,omitempty"`
+	Role         string `form:"role" json:"role,omitempty"`
+	Per          int    `form:"per" json:"per,omitempty"`
+	Page         int    `form:"page" json:"page,omitempty"`
 }
 
 type DeleteOrgReq struct {
@@ -130,6 +142,7 @@ type Organization struct {
 	// unique name of the organization
 	Name         string     `json:"path"`
 	Nickname     string     `json:"name,omitempty"`
+	Description  string     `json:"description,omitempty"`
 	Homepage     string     `json:"homepage,omitempty"`
 	Logo         string     `json:"logo,omitempty"`
 	OrgType      string     `json:"org_type,omitempty"`
@@ -139,6 +152,7 @@ type Organization struct {
 	UUID         uuid.UUID  `json:"uuid,omitempty"`
 	Namespace    *Namespace `json:"namespace,omitempty"`
 	Role         string     `json:"role,omitempty"`
+	Tags         []RepoTag  `json:"tags,omitempty"`
 }
 
 type Member struct {
