@@ -1,4 +1,4 @@
-# CSGHUB Nginx Images Building
+# CSGHub Notebook Images Building
 
 ## Login Container Registry
 
@@ -12,64 +12,70 @@ echo "$OPENCSG_ACR_PASSWORD" | docker login $OPENCSG_ACR -u $OPENCSG_ACR_USERNAM
 ## Build Multi-Platform Images
 
 ```bash
-#opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/notebook:ubuntu-22.04-py311-torch2.3.1
 export BUILDX_NO_DEFAULT_ATTESTATIONS=1
-export IMAGE_TAG=0.4.2
+```
+
+### PyTorch CPU
+
+```bash
 docker buildx build --platform linux/amd64,linux/arm64 \
-  -t ${OPENCSG_ACR}/public/notebook:${IMAGE_TAG} \
-  -t ${OPENCSG_ACR}/public/notebook:latest \
+  -t ${OPENCSG_ACR}/opencsghq/notebook:ubuntu-22.04-py311-torch2.3.1 \
   -f Dockerfile.pytorch-cpu \
   --push .
-#opencsg-registry.cn-beijing.cr.aliyuncs.com/public/lm-evaluation-harness:0.4.9
-export IMAGE_TAG=0.4.9
+```
+
+### PyTorch CUDA 11.8
+
+```bash
 docker buildx build --platform linux/amd64,linux/arm64 \
-  -t ${OPENCSG_ACR}/public/lm-evaluation-harness:${IMAGE_TAG} \
-  -t ${OPENCSG_ACR}/public/lm-evaluation-harness:latest \
-  -f Dockerfile.lm-evaluation-harness \
+  -t ${OPENCSG_ACR}/opencsghq/notebook:ubuntu-24.04-cuda11.8-py313-torch2.7.1 \
+  -f Dockerfile.pytorch-cu118 \
   --push .
 ```
 
-_The above command will create `linux/amd64` and `linux/arm64` images with the tags `${IMAGE_TAG}` and `latest` at the same time._
-
-## Test the opencompass Image
+### PyTorch CUDA 12
 
 ```bash
-docker run \
-  -e ACCESS_TOKEN=xxxx  \
-  -e MODEL_ID="OpenCSG/csg-wukong-1B" \
-  -e DATASET_IDS="xzgan/hellaswag" \
-  -e HF_ENDPOINT=https://hub.opencsg.com \
-  -e ASCEND_VISIBLE_DEVICES=7 \
-  -e S3_ACCESS_ID="xxxx" \
-  -e S3_ACCESS_SECRET="xxxx" \
-  -e S3_BUCKET="xxxxx" \
-  -e S3_ENDPOINT="xxxxx" \
-  -e S3_SSL_ENABLED="true" \
-  ${OPENCSG_ACR}/public/opencompass:${IMAGE_TAG}
+docker buildx build --platform linux/amd64,linux/arm64 \
+  -t ${OPENCSG_ACR}/opencsghq/notebook:ubuntu-24.04-cuda12.8-py313-torch2.8.0 \
+  -f Dockerfile.pytorch-cu12 \
+  --push .
 ```
 
-## Test the lm-evaluation-harness Image
+### PyTorch AMD ROCm
 
 ```bash
-export IMAGE_TAG=0.4.6
-docker run \
-  --gpus device=1 \
-  -e ACCESS_TOKEN=xxxx  \
-  -e MODEL_ID="OpenCSG/csg-wukong-1B" \
-  -e DATASET_IDS="Rowan/hellaswag" \
-  -e HF_ENDPOINT=https://hub.opencsg.com\
-  -e ASCEND_VISIBLE_DEVICES=7 \
-  -e S3_ACCESS_ID="xxx" \
-  -e S3_ACCESS_SECRET="xxx" \
-  -e S3_BUCKET="xxx" \
-  -e S3_ENDPOINT="xxx" \
-  -e S3_SSL_ENABLED="true" \
-  ${OPENCSG_ACR}/public/lm-evaluation-harness:${IMAGE_TAG}
+docker buildx build --platform linux/amd64 \
+  -t ${OPENCSG_ACR}/opencsghq/notebook:rocm7.1_ubuntu22.04_py3.11_pytorch_release_2.9.1 \
+  -f Dockerfile.pytorch-amd \
+  --push .
 ```
 
-## inference image name, version and cuda version
+### TensorFlow GPU
 
-| Latest Image          | Version | CUDA Version |
-| --------------------- | ------- | ------------ |
-| opencompass           | 0.4.2   | 12.1         |
-| lm-evaluation-harness | 0.4.9   | 12.1         |
+```bash
+docker buildx build --platform linux/amd64,linux/arm64 \
+  -t ${OPENCSG_ACR}/opencsghq/notebook:ubuntu-22.04-cuda12.3-py311-tensorflow2.20.0 \
+  -f Dockerfile.tensorflow \
+  --push .
+```
+
+### Unsloth
+
+```bash
+docker buildx build --platform linux/amd64,linux/arm64 \
+  -t ${OPENCSG_ACR}/opencsghq/notebook:ubuntu-22.04-cuda12.6-py311-unsloth2025.8.10 \
+  -f Dockerfile.unsloth \
+  --push .
+```
+
+## Notebook Images
+
+| Dockerfile | Image Tag | Framework | CUDA/ROCm | Python | OS |
+|---|---|---|---|---|---|
+| Dockerfile.pytorch-cpu | `ubuntu-22.04-py311-torch2.3.1` | PyTorch 2.3.1 | CPU only | 3.11 | Ubuntu 22.04 |
+| Dockerfile.pytorch-cu118 | `ubuntu-24.04-cuda11.8-py313-torch2.7.1` | PyTorch 2.7.1 | CUDA 11.8 | 3.13 | Ubuntu 24.04 |
+| Dockerfile.pytorch-cu12 | `ubuntu-24.04-cuda12.8-py313-torch2.8.0` | PyTorch 2.8.0 | CUDA 12.8 | 3.13 | Ubuntu 24.04 |
+| Dockerfile.pytorch-amd | `rocm7.1_ubuntu22.04_py3.11_pytorch_release_2.9.1` | PyTorch 2.9.1 | ROCm 7.1 | 3.11 | Ubuntu 22.04 |
+| Dockerfile.tensorflow | `ubuntu-22.04-cuda12.3-py311-tensorflow2.20.0` | TensorFlow 2.20.0 | CUDA 12.3 | 3.11 | Ubuntu 22.04 |
+| Dockerfile.unsloth | `ubuntu-22.04-cuda12.6-py311-unsloth2025.8.10` | Unsloth 2025.8.10 | CUDA 12.6 | 3.11 | Ubuntu 22.04 |
