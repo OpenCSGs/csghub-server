@@ -579,6 +579,31 @@ func TestMirrorComponent_CreateMirrorRepoNormalizesForkTarget(t *testing.T) {
 	require.Equal(t, "github_model_alice-team_qwen-model", fakeStore.inputs[0].Mirror.LocalRepoPath)
 }
 
+// TestMirrorComponent_CreateMirrorRepoRejectsCaseVariantExistingTarget verifies repository identity remains case-insensitive.
+func TestMirrorComponent_CreateMirrorRepoRejectsCaseVariantExistingTarget(t *testing.T) {
+	ctx := context.TODO()
+	mc := initializeTestMirrorComponent(ctx, t)
+	createTargetRepo := true
+	repo := &database.Repository{ID: 11, Path: "alice/MyName", Name: "MyName", RepositoryType: types.ModelRepo}
+
+	mc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "admin", "alice", membership.RoleWrite).Return(true, nil)
+	mc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "alice", "myname").Return(repo, nil)
+
+	got, err := mc.CreateMirrorRepo(ctx, types.CreateMirrorRepoReq{
+		SourceNamespace:   "upstream",
+		SourceName:        "repo",
+		RepoType:          types.ModelRepo,
+		CurrentUser:       "admin",
+		SourceGitCloneUrl: "https://github.com/upstream/repo.git",
+		ForkNamespace:     "alice",
+		ForkName:          "myname",
+		CreateTargetRepo:  &createTargetRepo,
+	})
+
+	require.ErrorIs(t, err, errorx.ErrRepoAlreadyExist)
+	require.Nil(t, got)
+}
+
 // TestMirrorComponent_CreateMirrorRepoPersistsNormalizedSourceAndCredentials verifies normalized source data reaches the mirror record.
 func TestMirrorComponent_CreateMirrorRepoPersistsNormalizedSourceAndCredentials(t *testing.T) {
 	ctx := context.TODO()

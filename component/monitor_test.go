@@ -3,6 +3,7 @@ package component
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -18,12 +19,12 @@ import (
 )
 
 var defaultTestMetrics = metricNames{
-	cpuUsage:          "container_cpu_usage_seconds_total",
-	cpuLimit:          "kube_pod_container_resource_limits",
-	memoryUsage:       "container_memory_usage_bytes",
-	requestCount:      "revision_request_count",
-	requestLatency:    "revision_app_request_latencies_bucket",
-	metricKeys:        []string{"pod", "service_name", "namespace", "response_code_class", "le"},
+	cpuUsage:       "container_cpu_usage_seconds_total",
+	cpuLimit:       "kube_pod_container_resource_limits",
+	memoryUsage:    "container_memory_usage_bytes",
+	requestCount:   "revision_request_count",
+	requestLatency: "revision_app_request_latencies_bucket",
+	metricKeys:     []string{"pod", "service_name", "namespace", "response_code_class", "le"},
 }
 
 func TestMonitorComponent_getMetrics(t *testing.T) {
@@ -37,25 +38,25 @@ func TestMonitorComponent_getMetrics(t *testing.T) {
 		expected map[string]string
 	}{
 		{
-			name:  "default metric keys - all present",
+			name: "default metric keys - all present",
 			input: map[string]string{
-				"pod":                "my-pod",
-				"service_name":       "my-service",
-				"namespace":          "my-ns",
+				"pod":                 "my-pod",
+				"service_name":        "my-service",
+				"namespace":           "my-ns",
 				"response_code_class": "2xx",
-				"le":                 "0.5",
+				"le":                  "0.5",
 			},
 			expected: map[string]string{
-				"pod":                "my-pod",
-				"instance":           "my-pod",
-				"service_name":       "my-service",
-				"namespace":          "my-ns",
+				"pod":                 "my-pod",
+				"instance":            "my-pod",
+				"service_name":        "my-service",
+				"namespace":           "my-ns",
 				"response_code_class": "2xx",
-				"le":                 "0.5",
+				"le":                  "0.5",
 			},
 		},
 		{
-			name:  "pod key adds instance alias",
+			name: "pod key adds instance alias",
 			input: map[string]string{
 				"pod":       "my-pod",
 				"namespace": "my-ns",
@@ -67,10 +68,10 @@ func TestMonitorComponent_getMetrics(t *testing.T) {
 			},
 		},
 		{
-			name:  "missing keys are skipped",
+			name: "missing keys are skipped",
 			input: map[string]string{
-				"pod":  "my-pod",
-				"le":   "0.5",
+				"pod":       "my-pod",
+				"le":        "0.5",
 				"other_key": "other_value",
 			},
 			expected: map[string]string{
@@ -80,12 +81,12 @@ func TestMonitorComponent_getMetrics(t *testing.T) {
 			},
 		},
 		{
-			name:  "empty input returns empty result",
-			input: map[string]string{},
+			name:     "empty input returns empty result",
+			input:    map[string]string{},
 			expected: map[string]string{},
 		},
 		{
-			name:  "extra keys not in metricKeys are ignored",
+			name: "extra keys not in metricKeys are ignored",
 			input: map[string]string{
 				"pod":       "my-pod",
 				"container": "user-container",
@@ -97,10 +98,10 @@ func TestMonitorComponent_getMetrics(t *testing.T) {
 			},
 		},
 		{
-			name:  "no pod key - no instance alias",
+			name: "no pod key - no instance alias",
 			input: map[string]string{
-				"namespace":  "my-ns",
-				"le":         "0.5",
+				"namespace": "my-ns",
+				"le":        "0.5",
 			},
 			expected: map[string]string{
 				"namespace": "my-ns",
@@ -108,7 +109,7 @@ func TestMonitorComponent_getMetrics(t *testing.T) {
 			},
 		},
 		{
-			name:  "custom metricKeys - only specified keys extracted",
+			name: "custom metricKeys - only specified keys extracted",
 			input: map[string]string{
 				"pod":       "my-pod",
 				"namespace": "my-ns",
@@ -196,10 +197,10 @@ func TestMonitor_RequestLatency(t *testing.T) {
 		UserID:  1,
 	}, nil)
 
-	query := fmt.Sprintf("sum(increase(revision_app_request_latencies_bucket{pod_name='%s',namespace='%s'}[%s:])) by (le)",
-		req.Instance, "", req.LastDuration)
+	query := fmt.Sprintf("sum by (le) (increase(%s{pod_name='%s',namespace='%s'}[%s]))",
+		"revision_app_request_latencies_bucket", req.Instance, "", req.LastDuration)
 
-	client.EXPECT().SerialData(query).Return(&types.PrometheusResponse{
+	client.EXPECT().SerialData(url.QueryEscape(query), "").Return(&types.PrometheusResponse{
 		Data: types.PrometheusData{
 			ResultType: "vector",
 			Result: []types.PrometheusResult{
@@ -277,7 +278,7 @@ func TestMonitor_RequestCount(t *testing.T) {
 	query := fmt.Sprintf("avg_over_time(revision_request_count{pod_name='%s',namespace='%s'}[%s:])[%s:%s]",
 		req.Instance, "", req.LastDuration, req.LastDuration, req.TimeRange)
 
-	client.EXPECT().SerialData(query).Return(&types.PrometheusResponse{
+	client.EXPECT().SerialData(url.QueryEscape(query), "").Return(&types.PrometheusResponse{
 		Data: types.PrometheusData{
 			ResultType: "vector",
 			Result: []types.PrometheusResult{
@@ -361,7 +362,7 @@ func TestMonitor_MemoryUsage(t *testing.T) {
 	query := fmt.Sprintf("avg_over_time(container_memory_usage_bytes{pod='%s',namespace='%s',container='user-container'}[%s:])[%s:%s]",
 		req.Instance, "", req.LastDuration, req.LastDuration, req.TimeRange)
 
-	client.EXPECT().SerialData(query).Return(&types.PrometheusResponse{
+	client.EXPECT().SerialData(url.QueryEscape(query), "").Return(&types.PrometheusResponse{
 		Data: types.PrometheusData{
 			ResultType: "vector",
 			Result: []types.PrometheusResult{
@@ -446,7 +447,7 @@ func TestMonitor_MemoryUsage_Evaluation(t *testing.T) {
 	query := fmt.Sprintf("avg_over_time(container_memory_usage_bytes{pod='%s',namespace='%s',container='main'}[%s:])[%s:%s]",
 		req.Instance, "", req.LastDuration, req.LastDuration, req.TimeRange)
 
-	client.EXPECT().SerialData(query).Return(&types.PrometheusResponse{
+	client.EXPECT().SerialData(url.QueryEscape(query), "").Return(&types.PrometheusResponse{
 		Data: types.PrometheusData{
 			ResultType: "vector",
 			Result: []types.PrometheusResult{
@@ -528,7 +529,7 @@ func TestMonitor_CPUUsage(t *testing.T) {
 
 	query := fmt.Sprintf("kube_pod_container_resource_limits{pod='%s',namespace='%s',resource='cpu'}", req.Instance, "")
 
-	client.EXPECT().SerialData(query).Return(&types.PrometheusResponse{
+	client.EXPECT().SerialData(url.QueryEscape(query), "").Return(&types.PrometheusResponse{
 		Data: types.PrometheusData{
 			ResultType: "vector",
 			Result: []types.PrometheusResult{
@@ -547,7 +548,7 @@ func TestMonitor_CPUUsage(t *testing.T) {
 
 	query = fmt.Sprintf("avg_over_time(rate(container_cpu_usage_seconds_total{pod='%s',namespace='%s',container='user-container'}[1m])[%s:])[%s:%s]", req.Instance, "", req.LastDuration, req.LastDuration, req.TimeRange)
 
-	client.EXPECT().SerialData(query).Return(&types.PrometheusResponse{
+	client.EXPECT().SerialData(url.QueryEscape(query), "").Return(&types.PrometheusResponse{
 		Data: types.PrometheusData{
 			ResultType: "vector",
 			Result: []types.PrometheusResult{

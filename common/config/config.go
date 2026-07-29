@@ -67,10 +67,8 @@ type Config struct {
 		// The token number to add to bucket each second
 		RateLimit float64 `env:"STARHUB_SERVER_MIRROR_RATE_LIMIT" default:"0.2"`
 		// The capacity of token bucket
-		RateBucketCapacity int   `env:"STARHUB_SERVER_MIRROR_RATE_BUCKET_CAPACITY" default:"1"`
-		MaxRetryCount      int   `env:"STARHUB_SERVER_MIRROR_MAX_RETRY_COUNT" default:"3"`
-		MaxDatasetRepoSize int64 `env:"STARHUB_SERVER_MIRROR_MAX_DATASET_REPO_SIZE" default:"53687091200"` // 50GB
-		MaxModelRepoSize   int64 `env:"STARHUB_SERVER_MIRROR_MAX_MODEL_REPO_SIZE" default:"53687091200"`   // 50GB
+		RateBucketCapacity int `env:"STARHUB_SERVER_MIRROR_RATE_BUCKET_CAPACITY" default:"1"`
+		MaxRetryCount      int `env:"STARHUB_SERVER_MIRROR_MAX_RETRY_COUNT" default:"3"`
 	}
 
 	DocsHost string `env:"STARHUB_SERVER_SERVER_DOCS_HOST" default:"http://localhost:6636"`
@@ -712,7 +710,7 @@ type Config struct {
 		// the separator of log lines, default is "\\n" by client formats, "\n" sse auto newline
 		LineSeparator          string `env:"STARHUB_SERVER_LOGCOLLECTOR_LINE_SEPARATOR" default:"\\n"`
 		MaxStoreTimeDay        int    `env:"STARHUB_SERVER_LOGCOLLECTOR_MAX_STORE_TIME_DAY" default:"7"`
-		QueryLastReportTimeout int    `env:"STARHUB_SERVER_LOGCOLLECTOR_QUERY_LAST_REPORT_TIMEOUT" default:"10"`
+		QueryLastReportTimeout int    `env:"STARHUB_SERVER_LOGCOLLECTOR_QUERY_LAST_REPORT_TIMEOUT" default:"300"`
 	}
 
 	FederationAdapter struct {

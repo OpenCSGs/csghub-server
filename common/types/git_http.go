@@ -91,10 +91,12 @@ type Reference struct {
 	Name string `json:"name"`
 }
 
+// Pointer identifies an LFS object and carries transient download information when needed.
 type Pointer struct {
-	Oid         string `json:"oid"`
-	Size        int64  `json:"size"`
-	DownloadURL string `json:"download_url,omitempty"`
+	Oid             string      `json:"oid"`
+	Size            int64       `json:"size"`
+	DownloadURL     string      `json:"download_url,omitempty"`
+	DownloadHeaders http.Header `json:"-"`
 }
 
 type BatchResponse struct {

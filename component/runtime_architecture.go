@@ -16,6 +16,7 @@ import (
 
 	"github.com/blang/semver/v4"
 	gguf "github.com/gpustack/gguf-parser-go"
+	"gopkg.in/yaml.v3"
 	"opencsg.com/csghub-server/builder/git"
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/store/cache"
@@ -31,6 +32,7 @@ var (
 	MasterBranch          string = "master"
 	ConfigFileName        string = "config.json"
 	ModelIndexFileName    string = "model_index.json"
+	PaddleInferConfigName string = "inference.yml"
 	ModelSafetensorsIndex string = "model.safetensors.index.json"
 	ScanLock              sync.Mutex
 )
@@ -295,6 +297,8 @@ func (c *runtimeArchitectureComponentImpl) UpdateModelMetadata(ctx context.Conte
 		modelInfo, err = c.GetMetadataFromSafetensors(ctx, repo)
 	case string(types.GGUF):
 		modelInfo, err = c.GetMetadataFromGGUF(ctx, repo)
+	case string(types.PaddleStatic):
+		modelInfo, err = c.GetMetadataFromPaddleStatic(ctx, repo)
 	default:
 		return nil, fmt.Errorf("unsupported model format %s", modelFormat)
 	}
@@ -341,7 +345,7 @@ func (c *runtimeArchitectureComponentImpl) UpdateRuntimeFrameworkTag(ctx context
 	if modelInfo.ModelType != "" {
 		archs = append(archs, modelInfo.ModelType)
 	}
-	if len(archs) == 0 {
+	if len(archs) == 0 && modelInfo.ModelName == "" {
 		return fmt.Errorf("fail to get architecture from model info")
 	}
 	modelFormat := repo.Format()
@@ -600,6 +604,67 @@ func (c *runtimeArchitectureComponentImpl) GetMetadataFromSafetensors(ctx contex
 	}
 
 	return nil, fmt.Errorf("no model_index.json or config.json found, repo: %v", repo.Path)
+}
+
+// GetMetadataFromPaddleStatic extracts metadata from a Paddle static
+// inference model repo. The weights carry no config.json/gguf-style header,
+// but every PaddleX-exported model ships inference.yml declaring its name:
+//
+//	Global:
+//	  model_name: PP-OCRv6_medium_rec
+//
+// The declared name feeds framework matching, which for such repos relies on
+// the exact model_name rows seeded from engine configs.
+func (c *runtimeArchitectureComponentImpl) GetMetadataFromPaddleStatic(ctx context.Context, repo *database.Repository) (*types.ModelInfo, error) {
+	content, err := c.getConfigContent(ctx, PaddleInferConfigName, repo)
+	if err != nil {
+		return nil, fmt.Errorf("fail to get %s, %w", PaddleInferConfigName, err)
+	}
+	modelName, err := parsePaddleInferModelName(content)
+	if err != nil {
+		return nil, fmt.Errorf("fail to parse %s, %w", PaddleInferConfigName, err)
+	}
+	return &types.ModelInfo{ModelName: modelName}, nil
+}
+
+// parsePaddleInferModelName reads only the Global block of inference.yml,
+// skipping the rest of the file (PostProcess holds a character_dict with
+// thousands of lines that a full unmarshal would needlessly parse).
+func parsePaddleInferModelName(content string) (string, error) {
+	var block strings.Builder
+	block.Grow(1024)
+	inGlobal := false
+	for line := range strings.Lines(content) {
+		line = strings.TrimRight(line, "\r\n")
+		if !inGlobal {
+			// anchored at the line start to skip nested keys named Global
+			if strings.HasPrefix(line, "Global:") {
+				inGlobal = true
+				block.WriteString(line + "\n")
+			}
+			continue
+		}
+		trimmed := strings.TrimSpace(line)
+		if trimmed != "" && line[0] != ' ' && line[0] != '\t' && trimmed[0] != '#' {
+			break
+		}
+		block.WriteString(line + "\n")
+	}
+	if !inGlobal {
+		return "", fmt.Errorf("no Global section found")
+	}
+	var cfg struct {
+		Global struct {
+			ModelName string `yaml:"model_name"`
+		} `yaml:"Global"`
+	}
+	if err := yaml.Unmarshal([]byte(block.String()), &cfg); err != nil {
+		return "", err
+	}
+	if cfg.Global.ModelName == "" {
+		return "", fmt.Errorf("no model_name found in Global section")
+	}
+	return cfg.Global.ModelName, nil
 }
 
 func (c *runtimeArchitectureComponentImpl) getConfigContent(ctx context.Context, configFileName string, repo *database.Repository) (string, error) {

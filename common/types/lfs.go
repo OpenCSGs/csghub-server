@@ -77,18 +77,6 @@ type LFSDownload struct {
 	DownloadURL string `json:"download_url"`
 }
 
-type LFSBatchResponse struct {
-	Objects []struct {
-		Oid     string `json:"oid"`
-		Size    int64  `json:"size"`
-		Actions struct {
-			Download *struct {
-				Href string `json:"href"`
-			} `json:"download"`
-		} `json:"actions"`
-	} `json:"objects"`
-}
-
 type LFSBatchRequest struct {
 	Operation string            `json:"operation"`
 	Objects   []LFSBatchObject  `json:"objects"`

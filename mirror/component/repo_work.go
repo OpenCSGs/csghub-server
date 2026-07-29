@@ -19,6 +19,7 @@ type repoWorker struct {
 	mirrorTaskStore repoTaskStore
 	syncer          repoSyncer
 	lfsJobClient    database.MirrorLFSJobClient
+	urgentManager   *workhub.UrgentManager
 }
 
 // Timeout returns the per-job timeout for repository mirror jobs.
@@ -28,9 +29,8 @@ func (w *repoWorker) Timeout(*river.Job[workhub.RepoArgs]) time.Duration {
 
 // repoTaskStore is the task state API needed by repository workhub jobs.
 type repoTaskStore interface {
-	FindByID(ctx context.Context, ID int64) (*database.MirrorTask, error)
+	mirrorTaskStore
 	CompleteRepoSyncAndInsertLFSJob(ctx context.Context, input database.CompleteRepoSyncInput) (database.MirrorTask, error)
-	UpdateStatusAndRepoSyncStatus(ctx context.Context, task database.MirrorTask, statusAction string) (database.MirrorTask, error)
 }
 
 // repoSyncer performs the external Git repository mirror operation.
@@ -71,45 +71,27 @@ func repoSlogArgs(args workhub.RepoArgs, task *database.MirrorTask, attrs ...any
 }
 
 // Work runs the repository mirror task.
-func (w *repoWorker) Work(ctx context.Context, job *river.Job[workhub.RepoArgs]) (workErr error) {
-	args := job.Args
-	var task *database.MirrorTask
-	slog.InfoContext(ctx, "working on repo job", repoSlogArgs(args, task,
-		slog.Int("attempts", job.Attempt),
-		slog.Int("max_attempts", job.MaxAttempts),
-		slog.Int("priority", job.Priority),
-		slog.Int64("job_id", job.ID),
-	)...)
+func (w *repoWorker) Work(ctx context.Context, job *river.Job[workhub.RepoArgs]) error {
+	return runMirrorWork(ctx, job, mirrorWorkConfig[workhub.RepoArgs]{
+		name:             "repo",
+		manager:          w.urgentManager,
+		preemptionDelay:  urgentJobDelay,
+		isUrgent:         func(args workhub.RepoArgs) bool { return args.Urgent },
+		expectedQueue:    workhub.RepoQueue,
+		validateQueue:    workhub.ValidateRepoQueue,
+		logArgs:          repoSlogArgs,
+		work:             w.work,
+		failureTarget:    mirrorRepoJobFailureTarget,
+		failureFinalizer: newMirrorJobFailureFinalizer(w.mirrorTaskStore),
+	})
+}
 
-	defer func() {
-		if workErr != nil {
-			originalErr := workErr
-			snooze := errors.Is(ctx.Err(), context.DeadlineExceeded) && errors.Is(originalErr, context.DeadlineExceeded)
-			if snooze {
-				workErr = river.JobSnooze(0)
-			}
-			slog.ErrorContext(ctx, "repo job work exited", repoSlogArgs(args, task,
-				slog.Bool("success", false),
-				slog.String("error", originalErr.Error()),
-				slog.Any("context", ctx.Err()),
-				slog.Int64("job_id", job.ID),
-				slog.Bool("snooze", snooze),
-			)...)
-			return
-		}
-
-		slog.InfoContext(ctx, "repo job work exited", repoSlogArgs(args, task,
-			slog.Bool("success", true),
-			slog.Int64("job_id", job.ID),
-		)...)
-	}()
-
-	var err error
-	task, err = w.mirrorTaskStore.FindByID(ctx, args.MirrorTaskID)
+// work executes the repository mirror business flow and returns the latest task for lifecycle logging.
+func (w *repoWorker) work(ctx context.Context, args workhub.RepoArgs, retryCount int) (*database.MirrorTask, error) {
+	task, err := w.mirrorTaskStore.FindByID(ctx, args.MirrorTaskID)
 	if err != nil {
 		slog.ErrorContext(ctx, "failed to find mirror task", repoSlogArgs(args, task, slog.String("error", err.Error()))...)
-		workErr = fmt.Errorf("find mirror task: %w", err)
-		return
+		return task, fmt.Errorf("find mirror task: %w", err)
 	}
 	slog.InfoContext(ctx, "loaded mirror repo task", repoSlogArgs(args, task, slog.String("task_status", string(task.Status)))...)
 	if skip, reason := shouldSkipRepoJob(task, args); skip {
@@ -117,14 +99,21 @@ func (w *repoWorker) Work(ctx context.Context, job *river.Job[workhub.RepoArgs])
 			slog.String("reason", reason),
 			slog.String("task_status", string(task.Status)),
 		)...)
-		return
+		return task, nil
 	}
+	if args.Urgent && w.urgentManager != nil {
+		done, err := beginUrgentWork(w.urgentManager, ctx)
+		if err != nil {
+			return task, err
+		}
+		defer done()
+	}
+	task.RetryCount = retryCount
 
 	beforeStatus := task.Status
 	task, err = w.prepareRepoTask(ctx, *task)
 	if err != nil {
-		workErr = err
-		return
+		return task, err
 	}
 	slog.InfoContext(ctx, "prepared mirror repo task", repoSlogArgs(args, task,
 		slog.String("before_status", string(beforeStatus)),
@@ -134,29 +123,28 @@ func (w *repoWorker) Work(ctx context.Context, job *river.Job[workhub.RepoArgs])
 		slog.ErrorContext(ctx, "skip mirror repo job after prepare", repoSlogArgs(args, task,
 			slog.String("task_status", string(task.Status)),
 		)...)
-		return
+		return task, nil
 	}
 
 	syncedTask, err := w.syncer.SyncRepo(ctx, task.Mirror, task)
 	if err != nil {
-		if errors.Is(err, context.Canceled) {
+		if isUrgentWorkCancellation(ctx, err) || errors.Is(err, context.Canceled) {
 			slog.InfoContext(ctx, "mirror repo sync canceled", repoSlogArgs(args, task, slog.String("error", err.Error()))...)
-			workErr = err
-			return
+			return task, err
 		}
 		slog.ErrorContext(ctx, "failed to sync mirror repo task", repoSlogArgs(args, task, slog.String("error", err.Error()))...)
 		task.ErrorMessage = err.Error()
 		if _, updateErr := w.mirrorTaskStore.UpdateStatusAndRepoSyncStatus(ctx, *task, database.MirrorFail); updateErr != nil {
 			slog.ErrorContext(ctx, "failed to update status of mirror repo task", repoSlogArgs(args, task, slog.String("error", updateErr.Error()))...)
-			workErr = fmt.Errorf("mark repo sync failed: %w", updateErr)
-			return
+			return task, fmt.Errorf("mark repo sync failed: %w", updateErr)
 		}
-		workErr = err
-		return
+		return task, err
+	}
+	if err := contextCauseError(ctx); err != nil {
+		return task, err
 	}
 	if syncedTask == nil || syncedTask.Mirror == nil || syncedTask.Mirror.Repository == nil {
-		workErr = fmt.Errorf("synced mirror repo task has no mirror repository")
-		return
+		return task, fmt.Errorf("synced mirror repo task has no mirror repository")
 	}
 
 	if _, err := w.mirrorTaskStore.CompleteRepoSyncAndInsertLFSJob(ctx, database.CompleteRepoSyncInput{
@@ -169,12 +157,12 @@ func (w *repoWorker) Work(ctx context.Context, job *river.Job[workhub.RepoArgs])
 			MirrorTaskID: syncedTask.ID,
 			SourceURL:    syncedTask.Mirror.SourceUrl,
 			Priority:     syncedTask.Priority,
+			Urgent:       args.Urgent,
 		},
 	}); err != nil {
-		workErr = fmt.Errorf("enqueue mirror LFS job: %w", err)
-		return
+		return syncedTask, fmt.Errorf("enqueue mirror LFS job: %w", err)
 	}
-	return
+	return syncedTask, nil
 }
 
 // NewRepoWorkClient creates a workhub worker client configured for repository
@@ -189,28 +177,50 @@ func NewRepoWorkClient(ctx context.Context, databaseDSN string, deps RepoWorkDep
 	if deps.LFSJobClient == nil {
 		return nil, fmt.Errorf("LFS job client is required")
 	}
-	config := newRepoRiverConfig(deps)
+	worker := newRepoWorker(deps)
+	config := newRepoRiverConfigForWorker(deps, worker)
+	client, err := workhub.NewWorkClient(ctx, databaseDSN, config)
+	if err != nil {
+		return nil, err
+	}
+	manager := client.ConfigureUrgentManager(workhub.UrgentManagerConfig{
+		NormalQueue:       workhub.MirrorRepoQueue,
+		NormalQueueConfig: config.Queues[workhub.MirrorRepoQueue],
+		UrgentIdleDelay:   urgentIdleDelay,
+	})
+	worker.urgentManager = manager
+	return client, nil
+}
 
-	return workhub.NewWorkClient(ctx, databaseDSN, config)
+// newRepoWorker builds the repository worker shared by normal and urgent queues.
+func newRepoWorker(deps RepoWorkDeps) *repoWorker {
+	return &repoWorker{
+		mirrorTaskStore: deps.MirrorTaskStore,
+		syncer:          deps.Syncer,
+		lfsJobClient:    deps.LFSJobClient,
+	}
 }
 
 // newRepoRiverConfig builds the River config for repository mirror workers.
 func newRepoRiverConfig(deps RepoWorkDeps) *river.Config {
+	return newRepoRiverConfigForWorker(deps, newRepoWorker(deps))
+}
+
+// newRepoRiverConfigForWorker registers one worker instance for normal and urgent repository queues.
+func newRepoRiverConfigForWorker(deps RepoWorkDeps, worker *repoWorker) *river.Config {
 	maxWorkers := deps.MaxWorkers
 	if maxWorkers <= 0 {
 		maxWorkers = 1
 	}
 	workers := workhub.NewWorkerRegistry(workhub.WorkerOverrides{
-		MirrorRepo: &repoWorker{
-			mirrorTaskStore: deps.MirrorTaskStore,
-			syncer:          deps.Syncer,
-			lfsJobClient:    deps.LFSJobClient,
-		},
+		MirrorRepo: worker,
 	})
 
 	return &river.Config{
+		ErrorHandler: newMirrorJobErrorHandler(deps.MirrorTaskStore),
 		Queues: map[string]river.QueueConfig{
-			workhub.MirrorRepoQueue: {MaxWorkers: maxWorkers},
+			workhub.MirrorRepoQueue:       {MaxWorkers: maxWorkers},
+			workhub.MirrorRepoUrgentQueue: {MaxWorkers: workhub.UrgentMaxWorkers(maxWorkers)},
 		},
 		Workers: workers,
 	}

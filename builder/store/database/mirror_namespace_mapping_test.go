@@ -79,7 +79,7 @@ func TestMirrorNamespaceMappingStore_CRUD(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, "Foo", mnm.SourceNamespace)
 
-	mnms, err := store.Index(ctx)
+	mnms, err := store.Index(ctx, "")
 	require.Nil(t, err)
 	require.Equal(t, 29, len(mnms))
 

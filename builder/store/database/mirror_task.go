@@ -62,6 +62,8 @@ type MirrorLFSJobInput struct {
 	SourceURL string
 	// Priority controls LFS job scheduling order.
 	Priority types.MirrorPriority
+	// Urgent routes the job to the urgent LFS queue.
+	Urgent bool
 }
 
 // CompleteRepoSyncInput carries the database updates that make repo sync completion atomic with LFS job creation.
@@ -82,8 +84,14 @@ type RequeueMirrorRepoTaskInput struct {
 	MirrorID int64
 	// RepositoryID identifies the local repository bound to the mirror.
 	RepositoryID int64
+	// Username updates the source Git username when provided; nil preserves the stored value.
+	Username *string
+	// AccessToken updates the source Git access token when provided; nil preserves the stored value.
+	AccessToken *string
 	// Priority controls the new repo job scheduling order.
 	Priority types.MirrorPriority
+	// Urgent routes the new repo job to the urgent queue.
+	Urgent bool
 	// JobClient inserts the repo workhub job inside the same transaction.
 	JobClient MirrorJobClient
 	// JobCancelClient cancels replaced workhub jobs inside the same transaction.
@@ -147,6 +155,8 @@ type MirrorTask struct {
 	// LFSJobID stores the River job ID for the Git LFS sync phase.
 	LFSJobID int64 `bun:",nullzero" json:"lfs_job_id"`
 	Progress int   `bun:"" json:"progress"`
+	// IsUrgent reports whether this task was submitted through the urgent queues.
+	IsUrgent bool `bun:",notnull,default:false" json:"is_urgent"`
 
 	StartedAt  time.Time `bun:",nullzero"`
 	FinishedAt time.Time `bun:",nullzero"`
@@ -367,8 +377,11 @@ func (m *mirrorTaskStoreImpl) RequeueMirrorRepoTask(ctx context.Context, input R
 	if input.JobClient == nil {
 		return MirrorTask{}, fmt.Errorf("mirror repo job client is required")
 	}
+	if (input.Username == nil) != (input.AccessToken == nil) {
+		return MirrorTask{}, fmt.Errorf("mirror username and access token must be updated together")
+	}
 	if input.Priority == 0 {
-		input.Priority = types.P3MirrorPriority
+		input.Priority = types.MediumMirrorPriority
 	}
 
 	var task MirrorTask
@@ -383,6 +396,10 @@ func (m *mirrorTaskStoreImpl) RequeueMirrorRepoTask(ctx context.Context, input R
 		}
 		if input.RepositoryID != 0 && mirror.RepositoryID != input.RepositoryID {
 			return fmt.Errorf("mirror repository mismatch, mirror repository id: %d, input repository id: %d", mirror.RepositoryID, input.RepositoryID)
+		}
+		if input.Username != nil {
+			mirror.Username = *input.Username
+			mirror.AccessToken = *input.AccessToken
 		}
 
 		var repo Repository
@@ -429,6 +446,7 @@ func (m *mirrorTaskStoreImpl) RequeueMirrorRepoTask(ctx context.Context, input R
 			Mirror:   &mirror,
 			Priority: input.Priority,
 			Status:   types.MirrorQueued,
+			IsUrgent: input.Urgent,
 		}
 		if err := tx.NewInsert().Model(&task).Scan(ctx, &task); err != nil {
 			return fmt.Errorf("failed to create mirror task: %w", err)
@@ -437,14 +455,19 @@ func (m *mirrorTaskStoreImpl) RequeueMirrorRepoTask(ctx context.Context, input R
 		if err := updateRepoSyncStatus(ctx, tx, repo.ID, types.SyncStatusPending); err != nil {
 			return fmt.Errorf("failed to update repository sync status: %w", err)
 		}
-		if _, err := tx.NewUpdate().
+		mirrorUpdate := tx.NewUpdate().
 			Model((*Mirror)(nil)).
 			Set("status = ?", types.MirrorQueued).
 			Set("mirror_priority = ?", input.Priority).
 			Set("current_task_id = ?", task.ID).
 			Set("updated_at = ?", now).
-			Where("id = ?", mirror.ID).
-			Exec(ctx); err != nil {
+			Where("id = ?", mirror.ID)
+		if input.Username != nil {
+			mirrorUpdate = mirrorUpdate.
+				Set("username = ?", mirror.Username).
+				Set("access_token = ?", mirror.AccessToken)
+		}
+		if _, err := mirrorUpdate.Exec(ctx); err != nil {
 			return fmt.Errorf("failed to update mirror status: %w", err)
 		}
 
@@ -456,6 +479,7 @@ func (m *mirrorTaskStoreImpl) RequeueMirrorRepoTask(ctx context.Context, input R
 			SourceURL:    mirror.SourceUrl,
 			RepoPath:     repo.Path,
 			Priority:     input.Priority,
+			Urgent:       input.Urgent,
 		})
 		if err != nil {
 			return fmt.Errorf("failed to insert mirror repo job: %w", err)

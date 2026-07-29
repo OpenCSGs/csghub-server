@@ -23,6 +23,7 @@ import (
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/git/membership"
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
 
@@ -398,45 +399,6 @@ func TestSkillComponent_Show(t *testing.T) {
 	}, data)
 }
 
-func TestSkillComponent_ShowWithStatistics(t *testing.T) {
-	ctx := context.TODO()
-	cc := initializeTestSkillComponent(ctx, t)
-
-	skill := &database.Skill{ID: 1, Repository: &database.Repository{
-		ID: 11, Name: "name", User: database.User{Username: "user"}, SyncStatus: types.SyncStatusInProgress,
-		Statistics: []database.RepositoryStatistics{{TotalSize: 1024}},
-	}}
-	cc.mocks.stores.SkillMock().EXPECT().FindByPath(ctx, "ns", "n").Return(skill, nil)
-	cc.mocks.components.repo.EXPECT().GetUserRepoPermission(ctx, "user", skill.Repository).Return(
-		&types.UserRepoPermission{CanRead: true, CanAdmin: true}, nil,
-	)
-	cc.mocks.stores.UserLikesMock().EXPECT().IsExist(ctx, "user", int64(11)).Return(true, nil)
-	cc.mocks.components.repo.EXPECT().GetNameSpaceInfo(ctx, "ns").Return(&types.Namespace{}, nil)
-
-	cc.mocks.components.repo.EXPECT().GetMirrorTaskStatus(skill.Repository).Return(
-		types.MirrorRepoSyncStart,
-	)
-	cc.mocks.stores.SkillVersionMock().EXPECT().BySkillID(ctx, int64(1)).Return(nil, nil)
-	data, err := cc.Show(ctx, "ns", "n", "user", false, false)
-	require.Nil(t, err)
-	require.Equal(t, &types.Skill{
-		ID: 1,
-		Repository: types.Repository{
-			HTTPCloneURL: "/s/.git",
-			SSHCloneURL:  ":s/.git",
-		},
-		RepositoryID:         11,
-		Namespace:            &types.Namespace{},
-		Name:                 "name",
-		User:                 types.User{Username: "user"},
-		CanManage:            true,
-		UserLikes:            true,
-		SensitiveCheckStatus: "Pending",
-		MirrorTaskStatus:     types.MirrorRepoSyncStart,
-		SyncStatus:           types.SyncStatusInProgress,
-	}, data)
-}
-
 func TestSkillComponent_Relations(t *testing.T) {
 	ctx := context.TODO()
 	cc := initializeTestSkillComponent(ctx, t)
@@ -486,6 +448,7 @@ func TestSkillComponent_OrgSkills(t *testing.T) {
 
 }
 
+// TestSkillComponent_CreateWithGitURL verifies embedded source credentials are normalized before mirror creation.
 func TestSkillComponent_CreateWithGitURL(t *testing.T) {
 	ctx := context.TODO()
 	cc := initializeTestSkillComponent(ctx, t)
@@ -498,9 +461,7 @@ func TestSkillComponent_CreateWithGitURL(t *testing.T) {
 			License:   "l",
 			Readme:    "r",
 		},
-		GitURL:      "https://github.com/test/test.git",
-		GitUsername: "testuser",
-		GitPassword: "testpass",
+		GitURL: "https://testuser:testpass@github.com/test/test",
 	}
 	dbrepo := &database.Repository{
 		ID:   1,
@@ -554,7 +515,7 @@ description: %s
 	mirrorComponent.EXPECT().CreateMirror(ctx, mock.MatchedBy(func(req types.CreateMirrorReq) bool {
 		return req.Namespace == "ns" &&
 			req.Name == "n" &&
-			req.SourceUrl == "https://testuser:testpass@github.com/test/test.git" &&
+			req.SourceUrl == "https://github.com/test/test.git" &&
 			req.Username == "testuser" &&
 			req.AccessToken == "testpass" &&
 			req.RepoType == types.SkillRepo
@@ -582,6 +543,20 @@ description: %s
 		Tags: []types.RepoTag{{Name: "t1"}},
 	}, resp)
 	wg.Wait()
+}
+
+// TestSkillComponent_CreateRejectsIncompleteMirrorCredentials verifies validation happens before repository creation.
+func TestSkillComponent_CreateRejectsIncompleteMirrorCredentials(t *testing.T) {
+	ctx := context.TODO()
+	cc := initializeTestSkillComponent(ctx, t)
+
+	_, err := cc.Create(ctx, &types.CreateSkillReq{
+		CreateRepoReq: types.CreateRepoReq{Username: "user", Namespace: "ns", Name: "repo"},
+		GitURL:        "https://example.com/source.git",
+		GitUsername:   "source-user",
+	})
+
+	require.ErrorIs(t, err, errorx.ErrMirrorSourceRepoAuthInvalid)
 }
 
 func TestSkillComponent_CreateWithBatchCommit(t *testing.T) {

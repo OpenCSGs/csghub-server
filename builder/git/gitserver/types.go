@@ -32,12 +32,16 @@ type UpdateUserRequest struct {
 	Email    *string `json:"email"`
 }
 
+// CheckRepoReq identifies a repository whose storage existence should be checked.
 type CheckRepoReq struct {
 	RepoType  types.RepositoryType `json:"type"`
 	Namespace string               `json:"namespace" example:"user_or_org_name"`
 	Name      string               `json:"name" example:"model_name_1"`
+	// RelativePath bypasses repository metadata lookup when the caller already knows the Gitaly path.
+	RelativePath string `json:"-"`
 }
 
+// CreateRepoReq contains repository metadata required to create Git storage.
 type CreateRepoReq struct {
 	Username      string               `json:"username" example:"creator_user_name"`
 	Namespace     string               `json:"namespace" example:"user_or_org_name"`
@@ -50,6 +54,8 @@ type CreateRepoReq struct {
 	DefaultBranch string               `json:"default_branch" example:"main"`
 	RepoType      types.RepositoryType `json:"type"`
 	Private       bool                 `json:"private"`
+	// RelativePath bypasses repository metadata lookup when the caller already knows the Gitaly path.
+	RelativePath string `json:"-"`
 }
 
 type CreateRepoResp struct {
@@ -84,10 +90,13 @@ type UpdateRepoReq struct {
 	Private       bool                 `json:"private"`
 }
 
+// DeleteRepoReq identifies a repository for lookup or deletion operations.
 type DeleteRepoReq struct {
 	Namespace string               `json:"namespace"`
 	Name      string               `json:"name"`
 	RepoType  types.RepositoryType `json:"repo_type"`
+	// RelativePath bypasses repository metadata lookup when the caller already knows the Gitaly path.
+	RelativePath string `json:"-"`
 }
 
 type GetRepoReq = DeleteRepoReq
@@ -139,11 +148,15 @@ type GetRepoCommitsReq struct {
 	Ref       string               `json:"ref"`
 	RepoType  types.RepositoryType `json:"repo_type"`
 }
+
+// GetRepoLastCommitReq identifies a repository revision whose latest commit is requested.
 type GetRepoLastCommitReq struct {
 	Namespace string               `json:"namespace"`
 	Name      string               `json:"name"`
 	Ref       string               `json:"ref"`
 	RepoType  types.RepositoryType `json:"repo_type"`
+	// RelativePath bypasses repository metadata lookup when the caller already knows the Gitaly path.
+	RelativePath string `json:"-"`
 }
 
 type GetArchiveReq struct {
@@ -153,6 +166,7 @@ type GetArchiveReq struct {
 	RepoType  types.RepositoryType `json:"repo_type"`
 }
 
+// GetDiffBetweenTwoCommitsReq identifies the repository and revisions used to build a push callback.
 type GetDiffBetweenTwoCommitsReq struct {
 	Namespace     string               `json:"namespace"`
 	Name          string               `json:"name"`
@@ -161,6 +175,8 @@ type GetDiffBetweenTwoCommitsReq struct {
 	LeftCommitId  string               `json:"left_commit_id"`
 	RightCommitId string               `json:"right_commit_id"`
 	Private       bool                 `json:"private"`
+	// RelativePath bypasses repository metadata lookup when the caller already knows the Gitaly path.
+	RelativePath string `json:"-"`
 }
 
 type RepoBasicReq struct {
@@ -182,22 +198,17 @@ type GetRepoInfoByPathReq struct {
 	GitAlternateObjectDirectoriesRelative []string `json:"git_alternate_object_directories_relative"`
 }
 
+// GetRepoAllFilesReq identifies a repository revision for full file or LFS pointer scans.
 type GetRepoAllFilesReq struct {
 	Namespace string               `json:"namespace"`
 	Name      string               `json:"name"`
 	Ref       string               `json:"ref"`
 	RepoType  types.RepositoryType `json:"repo_type"`
+	// RelativePath bypasses repository metadata lookup when the caller already knows the Gitaly path.
+	RelativePath string `json:"-"`
 }
 
 type GetRepoTagsReq = GetBranchesReq
-
-const (
-	TaskStatusQueued   TaskStatus = iota // 0 task is queued
-	TaskStatusRunning                    // 1 task is running
-	TaskStatusStopped                    // 2 task is stopped (never used)
-	TaskStatusFailed                     // 3 task is failed
-	TaskStatusFinished                   // 4 task is finished
-)
 
 type CreateMirrorRepoReq struct {
 	Namespace   string `json:"namespace"`
@@ -207,11 +218,11 @@ type CreateMirrorRepoReq struct {
 	AccessToken string `json:"access_token"`
 	Private     bool   `json:"private"`
 	Description string `json:"description"`
-	Interval    string `json:"interval"`
 	MirrorToken string `json:"mirror_token"`
 	RepoType    types.RepositoryType
 }
 
+// MirrorSyncReq contains the local repository path and remote credentials for a mirror fetch.
 type MirrorSyncReq struct {
 	Namespace   string `json:"namespace"`
 	Name        string `json:"name"`
@@ -220,18 +231,9 @@ type MirrorSyncReq struct {
 	Username    string `json:"username"`
 	AccessToken string `json:"access_token"`
 	MirrorToken string `json:"mirror_token"`
+	// RelativePath bypasses repository metadata lookup when the caller already knows the Gitaly path.
+	RelativePath string `json:"-"`
 }
-
-type MirrorTaskInfo struct {
-	Status    TaskStatus `json:"status"`
-	Message   string     `json:"message"`
-	RepoID    int64      `json:"repo_id"`
-	RepoName  string     `json:"repo_name"`
-	StartedAt int64      `json:"start"`
-	EndedAt   int64      `json:"end"`
-}
-
-type TaskStatus int
 
 type InfoRefsReq struct {
 	Namespace   string               `json:"namespace"`
@@ -289,6 +291,7 @@ const (
 	CommitActionDelete CommitAction = "delete"
 )
 
+// UpdateRefReq describes one repository reference update.
 type UpdateRefReq struct {
 	Namespace   string               `json:"namespace"`
 	Name        string               `json:"name"`
@@ -296,6 +299,8 @@ type UpdateRefReq struct {
 	Ref         string               `json:"ref"`
 	OldObjectId string               `json:"old_object_id"`
 	NewObjectId string               `json:"new_object_id"`
+	// RelativePath bypasses repository metadata lookup when the caller already knows the Gitaly path.
+	RelativePath string `json:"-"`
 }
 
 type CopyRepositoryReq struct {

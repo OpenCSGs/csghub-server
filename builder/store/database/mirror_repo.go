@@ -38,6 +38,8 @@ type MirrorJobInput struct {
 	RepoPath string
 	// Priority controls mirror job scheduling order.
 	Priority types.MirrorPriority
+	// Urgent routes the job to the urgent repository queue.
+	Urgent bool
 }
 
 // CreateMirrorRepoRecordsInput contains the database rows needed to create a mirror repo.
@@ -52,6 +54,8 @@ type CreateMirrorRepoRecordsInput struct {
 	// MCPServerProperties are inserted after the MCP server row is created.
 	MCPServerProperties []MCPServerProperty
 	Mirror              Mirror
+	// Urgent routes the initial repository job to the urgent queue.
+	Urgent bool
 }
 
 type mirrorRepoStoreImpl struct {
@@ -117,7 +121,7 @@ func (s *mirrorRepoStoreImpl) CreateMirrorRepoRecords(ctx context.Context, input
 			return fmt.Errorf("failed to create mirror: %w", err)
 		}
 
-		task, err := createMirrorTask(ctx, tx, mirror)
+		task, err := createMirrorTask(ctx, tx, mirror, input.Urgent)
 		if err != nil {
 			return err
 		}
@@ -135,6 +139,7 @@ func (s *mirrorRepoStoreImpl) CreateMirrorRepoRecords(ctx context.Context, input
 				SourceURL:    mirror.SourceUrl,
 				RepoPath:     input.Repository.Path,
 				Priority:     mirror.Priority,
+				Urgent:       input.Urgent,
 			})
 			if err != nil {
 				return fmt.Errorf("failed to insert mirror repo job: %w", err)
@@ -189,11 +194,12 @@ func createRepository(ctx context.Context, tx bun.Tx, input Repository) (Reposit
 }
 
 // createMirrorTask inserts the initial queued task for a newly created mirror.
-func createMirrorTask(ctx context.Context, tx bun.Tx, mirror Mirror) (MirrorTask, error) {
+func createMirrorTask(ctx context.Context, tx bun.Tx, mirror Mirror, urgent bool) (MirrorTask, error) {
 	task := MirrorTask{
 		MirrorID: mirror.ID,
 		Priority: mirror.Priority,
 		Status:   types.MirrorQueued,
+		IsUrgent: urgent,
 	}
 	if err := tx.NewInsert().Model(&task).Scan(ctx, &task); err != nil {
 		return MirrorTask{}, fmt.Errorf("failed to create mirror task: %w", err)

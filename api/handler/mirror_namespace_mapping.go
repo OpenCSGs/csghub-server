@@ -38,6 +38,7 @@ type MirrorNamespaceMappingHandler struct {
 // @Param        body body types.CreateMirrorNamespaceMappingReq true "body"
 // @Success      200  {object}  types.Response{data=database.MirrorNamespaceMapping} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      409  {object}  types.Response "Conflict"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /mirror_namespace_mappings [post]
 func (h *MirrorNamespaceMappingHandler) Create(ctx *gin.Context) {
@@ -55,6 +56,8 @@ func (h *MirrorNamespaceMappingHandler) Create(ctx *gin.Context) {
 		slog.ErrorContext(ctx.Request.Context(), "Failed to create mirror namespace mapping", "error", err)
 		if errors.Is(err, errorx.ErrTargetNamespaceNotFound) {
 			httpbase.BadRequestWithExt(ctx, err)
+		} else if errors.Is(err, errorx.ErrSourceNamespaceMappingExists) {
+			httpbase.ConflictError(ctx, err)
 		} else {
 			httpbase.ServerError(ctx, err)
 		}
@@ -94,6 +97,7 @@ func (h *MirrorNamespaceMappingHandler) Index(ctx *gin.Context) {
 // @Param        body body types.UpdateMirrorNamespaceMappingReq true "body"
 // @Success      200  {object}  types.Response{data=database.MirrorNamespaceMapping} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      404  {object}  types.Response "Not found"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /mirror_namespace_mappings/{id} [put]
 func (h *MirrorNamespaceMappingHandler) Update(ctx *gin.Context) {
@@ -123,6 +127,8 @@ func (h *MirrorNamespaceMappingHandler) Update(ctx *gin.Context) {
 		slog.ErrorContext(ctx.Request.Context(), "Failed to update mirror namespace mapping", "error", err)
 		if errors.Is(err, errorx.ErrTargetNamespaceNotFound) {
 			httpbase.BadRequestWithExt(ctx, err)
+		} else if errors.Is(err, errorx.ErrSourceNamespaceMappingNotFound) {
+			httpbase.NotFoundError(ctx, err)
 		} else {
 			httpbase.ServerError(ctx, err)
 		}

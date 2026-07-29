@@ -25,6 +25,10 @@ RUN pip config set global.index-url https://mirrors.aliyun.com/pypi/simple && \
         --extra-index-url https://mirrors.aliyun.com/pypi/simple && \
     pip install --no-cache-dir paddleocr==3.7.0 "paddlex[serving]==3.7.2" csghub-sdk==0.7.10 \
         huggingface-hub==0.36.2
+# paddlepaddle-gpu==3.3.1 downgrades nvidia-nccl-cu12 to 2.25.1, but torch 2.9.1
+# in the base image needs 2.27.5 (ncclCommWindowRegister); restore it (NCCL 2.x
+# is backward-compatible, so paddle runs fine on 2.27.5).
+RUN pip install --no-cache-dir nvidia-nccl-cu12==2.27.5
 
 COPY ./paddleocr/ /etc/csghub/
 RUN chmod +x /etc/csghub/*.sh

@@ -1394,65 +1394,6 @@ func (_c *MockGitServer_GetLogsTree_Call) RunAndReturn(run func(context.Context,
 	return _c
 }
 
-// GetMirrorTaskInfo provides a mock function with given fields: ctx, taskId
-func (_m *MockGitServer) GetMirrorTaskInfo(ctx context.Context, taskId int64) (*gitserver.MirrorTaskInfo, error) {
-	ret := _m.Called(ctx, taskId)
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetMirrorTaskInfo")
-	}
-
-	var r0 *gitserver.MirrorTaskInfo
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, int64) (*gitserver.MirrorTaskInfo, error)); ok {
-		return rf(ctx, taskId)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, int64) *gitserver.MirrorTaskInfo); ok {
-		r0 = rf(ctx, taskId)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*gitserver.MirrorTaskInfo)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, int64) error); ok {
-		r1 = rf(ctx, taskId)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// MockGitServer_GetMirrorTaskInfo_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetMirrorTaskInfo'
-type MockGitServer_GetMirrorTaskInfo_Call struct {
-	*mock.Call
-}
-
-// GetMirrorTaskInfo is a helper method to define mock.On call
-//   - ctx context.Context
-//   - taskId int64
-func (_e *MockGitServer_Expecter) GetMirrorTaskInfo(ctx interface{}, taskId interface{}) *MockGitServer_GetMirrorTaskInfo_Call {
-	return &MockGitServer_GetMirrorTaskInfo_Call{Call: _e.mock.On("GetMirrorTaskInfo", ctx, taskId)}
-}
-
-func (_c *MockGitServer_GetMirrorTaskInfo_Call) Run(run func(ctx context.Context, taskId int64)) *MockGitServer_GetMirrorTaskInfo_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(int64))
-	})
-	return _c
-}
-
-func (_c *MockGitServer_GetMirrorTaskInfo_Call) Return(_a0 *gitserver.MirrorTaskInfo, _a1 error) *MockGitServer_GetMirrorTaskInfo_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *MockGitServer_GetMirrorTaskInfo_Call) RunAndReturn(run func(context.Context, int64) (*gitserver.MirrorTaskInfo, error)) *MockGitServer_GetMirrorTaskInfo_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // GetRepo provides a mock function with given fields: ctx, req
 func (_m *MockGitServer) GetRepo(ctx context.Context, req gitserver.GetRepoReq) (*gitserver.CreateRepoResp, error) {
 	ret := _m.Called(ctx, req)

@@ -40,7 +40,7 @@ type TagsHandler struct {
 // @Param		 scope query string false "scope name" Enums(model, dataset, code, space, prompt, skill)
 // @Param		 built_in query bool false "built_in"
 // @Param		 search query string false "search on name and show_name fields"
-// @Param		 per query int false "Page size, default 50, max 100" default(50)
+// @Param		 per query int false "Page size, default 50, max 100. When omitted and scope is set, all tags are returned without pagination" default(50)
 // @Param		 page query int false "Page number, default 1" default(1)
 // @Success      200  {object}  types.Response{data=[]types.RepoTag} "tags"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
@@ -53,7 +53,8 @@ func (t *TagsHandler) AllTags(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	per, page, err := common.GetPerAndPageFromContext(ctx)
+
+	per, page, err := resolveTagPerPage(ctx, filter)
 	if err != nil {
 		httpbase.BadRequest(ctx, err.Error())
 		return
@@ -66,6 +67,21 @@ func (t *TagsHandler) AllTags(ctx *gin.Context) {
 		return
 	}
 	httpbase.OKWithTotal(ctx, tags, total)
+}
+
+// resolveTagPerPage resolves the per/page values for AllTags.
+//
+// A homepage request is identified by having a scope filter set. The homepage
+// needs all tags in a single request to avoid multiple round trips, so when the
+// caller does not send a "per" query parameter and the request filters by scope,
+// per and page are both set to 0 which makes AllTagsWithPagination return all
+// tags without pagination. In all other cases the standard pagination rules
+// (default 50, max 100) from common.GetPerAndPageFromContext apply.
+func resolveTagPerPage(ctx *gin.Context, filter *types.TagFilter) (per, page int, err error) {
+	if len(filter.Scopes) != 0 && ctx.Query("per") == "" {
+		return 0, 0, nil
+	}
+	return common.GetPerAndPageFromContext(ctx)
 }
 
 // CreateTag     godoc

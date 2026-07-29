@@ -21,6 +21,12 @@ elif [ "${MODEL_SOURCE}" = "hub" ]; then
   # PaddleX's HF hoster must use ${HF_ENDPOINT}/hf, not ${HF_ENDPOINT}.
   export PADDLE_PDX_HUGGING_FACE_ENDPOINT="${PADDLE_PDX_HUGGING_FACE_ENDPOINT:-${HF_ENDPOINT%/}/hf}"
   export PADDLE_PDX_MODEL_SOURCE=huggingface
+  # PaddleX health-checks the HF hoster with HEAD on the endpoint root, which
+  # 404s for the /hf subpath and would silently drop the hoster; skip it.
+  export PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK=True
+  # The platform sets HF_HUB_OFFLINE=1, which makes hf_hub refuse all HTTP;
+  # re-enable it here since the endpoint is our own hub, not huggingface.co.
+  export HF_HUB_OFFLINE=0
   export HF_TOKEN="${HF_TOKEN:-${ACCESS_TOKEN}}"
 else
   echo "ERROR: unknown PADDLEOCR_MODEL_SOURCE '${MODEL_SOURCE}' (expected hub|local-only)" >&2
@@ -44,8 +50,15 @@ if [ -z "${PIPELINE}" ]; then
       # config and point TextRecognition at the local weights (det/cls
       # sub-models are still resolved by name from the model sources).
       GEN_DIR="${MODEL_DIR}/.csghub"
+      PIPELINE="${GEN_DIR}/OCR.yaml"
+      # /workspace persists across restarts; remove the stale copy or paddlex
+      # prompts to overwrite and crashes on EOF (no TTY in the pod).
+      rm -f "${PIPELINE}"
       paddlex --get_pipeline_config OCR --save_path "${GEN_DIR}"
-      PIPELINE="$(find "${GEN_DIR}" -name '*.yaml' | head -1)"
+      [ -f "${PIPELINE}" ] || {
+        echo "ERROR: failed to generate PaddleX pipeline config at ${PIPELINE}" >&2
+        exit 1
+      }
       python /etc/csghub/gen_pipeline.py --config "${PIPELINE}" --rec-name "${REC_NAME}" --rec-dir "${MODEL_DIR}"
     else
       # Sub-models are resolved by name from the configured model sources.

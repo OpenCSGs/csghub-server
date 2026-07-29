@@ -24,7 +24,8 @@ func LibraryTag(filePath string) string {
 		return "jax"
 	case strings.HasSuffix(filename, ".onnx"):
 		return "onnx"
-	case strings.HasSuffix(filename, ".pdparams"):
+	case strings.HasSuffix(filename, ".pdparams"),
+		strings.HasSuffix(filename, ".pdiparams"):
 		return "paddlepaddle"
 	case strings.HasSuffix(filename, ".joblib"):
 		return "joblib"

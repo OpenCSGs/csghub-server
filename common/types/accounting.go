@@ -272,14 +272,15 @@ type AcctBillsReq struct {
 }
 
 type AcctBillsDetailReq struct {
-	CurrentUser  string `json:"current_user"`
-	TargetUUID   string `json:"target_uuid"`
-	Scene        int    `json:"scene"`
-	StartDate    string `json:"start_date"`
-	EndDate      string `json:"end_date"`
-	InstanceName string `json:"instance_name"`
-	Per          int    `json:"per"`
-	Page         int    `json:"page"`
+	CurrentUser  string      `json:"current_user"`
+	TargetUUID   string      `json:"target_uuid"`
+	Scene        int         `json:"scene"`
+	StartDate    string      `json:"start_date"`
+	EndDate      string      `json:"end_date"`
+	InstanceName string      `json:"instance_name"`
+	Per          int         `json:"per"`
+	Page         int         `json:"page"`
+	UnitType     SkuUnitType `json:"unit_type"`
 }
 
 type AcctStatementsRes struct {
