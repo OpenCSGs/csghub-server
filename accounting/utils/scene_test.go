@@ -18,6 +18,8 @@ func TestScene_IsNeedCalculateBill(t *testing.T) {
 		types.SceneMultiModalServerless,
 		types.ScenePortalCharge,
 		types.SceneCashCharge,
+		types.SceneDatasetPurchase,
+		types.SceneDatasetSaleIncome,
 	}
 
 	for _, scene := range scenes {

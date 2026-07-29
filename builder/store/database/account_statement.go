@@ -24,6 +24,7 @@ type accountStatementStoreImpl struct {
 
 type AccountStatementStore interface {
 	Create(ctx context.Context, input AccountStatement, checkBalance ...bool) error
+	CreateTradeStatements(ctx context.Context, buyerStmt, sellerStmt AccountStatement) error
 	ListByUserIDAndTime(ctx context.Context, req types.ActStatementsReq) (AccountStatementRes, error)
 	GetByEventID(ctx context.Context, eventID uuid.UUID) (AccountStatement, error)
 	ListRechargeByUserIDAndTime(ctx context.Context, req types.AcctRechargeListReq) (AccountStatementRes, error)
@@ -102,100 +103,115 @@ type ChangedValue struct {
 
 func (as *accountStatementStoreImpl) Create(ctx context.Context, input AccountStatement, checkBalance ...bool) error {
 	check := len(checkBalance) > 0 && checkBalance[0]
-	if input.Scene == types.ScenePortalCharge || input.Scene == types.SceneCashCharge {
+	if input.Scene == types.ScenePortalCharge || input.Scene == types.SceneCashCharge ||
+		input.Scene == types.SceneDatasetSaleIncome {
 		return as.chargeFeeStatement(ctx, input)
 	} else {
 		return as.deductFeeStatement(ctx, input, check)
 	}
 }
 
+// ChargeAccountFee handles the core logic for charging (adding) funds to an account.
+// It performs: upsert account_user → lock account → check duplicate → update balance → insert statement.
+// It does NOT call updateFeeBill — the caller is responsible for that (same pattern as DeductAccountFee).
+// The input.AccountStatement is modified in-place: BalanceType and BalanceValue are set.
+func ChargeAccountFee(ctx context.Context, tx bun.Tx, input *AccountStatement) error {
+	if input.Value <= 0 {
+		return fmt.Errorf("charge fee statement value must be positive, got: %f", input.Value)
+	}
+	var err error
+	var acctUser AccountUser
+
+	err = tx.NewSelect().Model(&acctUser).Where("user_uuid = ?", input.UserUUID).Scan(ctx, &acctUser)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			newAcctUser := AccountUser{
+				UserUUID:    input.UserUUID,
+				Balance:     0,
+				CashBalance: 0,
+			}
+			res, err := tx.NewInsert().Model(&newAcctUser).Exec(ctx, &newAcctUser)
+			if err := assertAffectedOneRow(res, err); err != nil {
+				return fmt.Errorf("insert user account failed, error:%w", err)
+			}
+		} else {
+			return fmt.Errorf("failed to get account user %s, err: %w", input.UserUUID, err)
+		}
+	}
+
+	err = tx.NewSelect().Model(&acctUser).Where("user_uuid = ?", input.UserUUID).For("UPDATE").Scan(ctx, &acctUser)
+	if err != nil {
+		return fmt.Errorf("failed to get account user %s for lock: %w", input.UserUUID, err)
+	}
+
+	err = CheckDuplicatedEvent(ctx, tx, *input)
+	if err != nil {
+		if errors.Is(err, types.ErrDuplicatedEvent) {
+			slog.Warn("skip duplicated charge fee by event uuid", slog.Any("input", input))
+			return nil
+		}
+		return fmt.Errorf("check duplicated charge event failed, error: %w", err)
+	}
+
+	runSql := ""
+	if input.Scene == types.SceneCashCharge {
+		input.BalanceType = types.ChargeCashBalance
+		runSql = "update account_users set cash_balance=cash_balance + ? where user_uuid=?"
+	} else {
+		input.BalanceType = types.ChargeBalance
+		runSql = "update account_users set balance=balance + ? where user_uuid=?"
+	}
+
+	err = assertAffectedOneRow(tx.Exec(runSql, input.Value, input.UserUUID))
+	if err != nil {
+		return fmt.Errorf("update %s, error:%w", input.BalanceType, err)
+	}
+
+	acctUser = AccountUser{}
+	err = tx.NewSelect().Model(&acctUser).Where("user_uuid = ?", input.UserUUID).Scan(ctx, &acctUser)
+	if err != nil {
+		return fmt.Errorf("failed to get account user: %w", err)
+	}
+
+	if acctUser.Balance+acctUser.CashBalance >= 0 {
+		runSql := "update account_users set negative_balance_warn_at=null where user_uuid=?"
+		err = assertAffectedOneRow(tx.Exec(runSql, input.UserUUID))
+		if err != nil {
+			return fmt.Errorf("update account user %s negative balance warn at to null, error: %w", input.UserUUID, err)
+		}
+	}
+
+	if input.Scene == types.SceneCashCharge {
+		input.BalanceValue = acctUser.CashBalance
+	} else {
+		input.BalanceValue = acctUser.Balance
+	}
+
+	err = assertAffectedOneRow(tx.NewInsert().Model(input).Exec(ctx))
+	if err != nil {
+		return fmt.Errorf("insert statement, error:%w", err)
+	}
+
+	return nil
+}
+
 func (as *accountStatementStoreImpl) chargeFeeStatement(ctx context.Context, input AccountStatement) error {
 	err := as.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		if input.Value <= 0 {
-			return fmt.Errorf("charge fee statement value must be positive, got: %f", input.Value)
-		}
-		var err error
-		var acctUser AccountUser
-
-		err = tx.NewSelect().Model(&acctUser).Where("user_uuid = ?", input.UserUUID).Scan(ctx, &acctUser)
-		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				newAcctUser := AccountUser{
-					UserUUID:    input.UserUUID,
-					Balance:     0,
-					CashBalance: 0,
-				}
-				res, err := tx.NewInsert().Model(&newAcctUser).Exec(ctx, &newAcctUser)
-				if err := assertAffectedOneRow(res, err); err != nil {
-					return fmt.Errorf("insert user account failed, error:%w", err)
-				}
-			} else {
-				return fmt.Errorf("failed to get account user %s, err: %w", input.UserUUID, err)
-			}
-		}
-
-		err = tx.NewSelect().Model(&acctUser).Where("user_uuid = ?", input.UserUUID).For("UPDATE").Scan(ctx, &acctUser)
-		if err != nil {
-			return fmt.Errorf("failed to get account user %s for lock: %w", input.UserUUID, err)
-		}
-
-		err = CheckDuplicatedEvent(ctx, tx, input)
-		if err != nil {
-			if errors.Is(err, types.ErrDuplicatedEvent) {
-				slog.Warn("skip duplicated charge fee by event uuid", slog.Any("input", input))
-				return nil
-			}
-			return fmt.Errorf("check duplicated charge event failed, error: %w", err)
-		}
-
-		runSql := ""
-		if input.Scene == types.SceneCashCharge {
-			input.BalanceType = types.ChargeCashBalance
-			runSql = "update account_users set cash_balance=cash_balance + ? where user_uuid=?"
-		} else {
-			input.BalanceType = types.ChargeBalance
-			runSql = "update account_users set balance=balance + ? where user_uuid=?"
-		}
-
-		err = assertAffectedOneRow(tx.Exec(runSql, input.Value, input.UserUUID))
-		if err != nil {
-			return fmt.Errorf("update %s, error:%w", input.BalanceType, err)
-		}
-
-		acctUser = AccountUser{}
-		err = tx.NewSelect().Model(&acctUser).Where("user_uuid = ?", input.UserUUID).Scan(ctx, &acctUser)
-		if err != nil {
-			return fmt.Errorf("failed to get account user: %w", err)
-		}
-
-		if acctUser.Balance+acctUser.CashBalance >= 0 {
-			runSql := "update account_users set negative_balance_warn_at=null where user_uuid=?"
-			err = assertAffectedOneRow(tx.Exec(runSql, input.UserUUID))
-			if err != nil {
-				return fmt.Errorf("update account user %s negative balance warn at to null, error: %w", input.UserUUID, err)
-			}
+		if err := ChargeAccountFee(ctx, tx, &input); err != nil {
+			return err
 		}
 
 		cashValue := 0.0
 		if input.Scene == types.SceneCashCharge {
-			input.BalanceValue = acctUser.CashBalance
 			cashValue = input.Value
-		} else {
-			input.BalanceValue = acctUser.Balance
 		}
 
-		err = assertAffectedOneRow(tx.NewInsert().Model(&input).Exec(ctx))
-		if err != nil {
-			return fmt.Errorf("insert statement, error:%w", err)
-		}
-
-		err = updateFeeBill(ctx, tx, input, BillValues{
+		err := updateFeeBill(ctx, tx, input, BillValues{
 			TotalValue:   input.Value,
 			VoucherValue: 0,
 			CashValue:    cashValue,
 			Consumption:  input.Consumption,
 		})
-
 		if err != nil {
 			return fmt.Errorf("update account bill for charge, error: %w", err)
 		}
@@ -268,6 +284,57 @@ func (as *accountStatementStoreImpl) deductFeeStatement(ctx context.Context, inp
 	})
 
 	return err
+}
+
+// CreateTradeStatements creates both a buyer deduction statement and a seller income statement
+// in a single database transaction, ensuring atomicity for dataset trade operations.
+func (as *accountStatementStoreImpl) CreateTradeStatements(ctx context.Context, buyerStmt, sellerStmt AccountStatement) error {
+	return as.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		// 1. Deduct from buyer
+		initEventValue := buyerStmt.Value
+		changed, err := DeductAccountFee(ctx, tx, buyerStmt, true)
+		if err != nil {
+			return fmt.Errorf("deduct buyer fee, error: %w", err)
+		}
+
+		calcValue := initEventValue - changed.Voucher
+		consumption := 0.0
+		if initEventValue != 0 {
+			consumption = math.Abs(calcValue/initEventValue) * buyerStmt.Consumption
+		}
+
+		err = updateFeeBill(ctx, tx, buyerStmt, BillValues{
+			TotalValue:   calcValue,
+			VoucherValue: 0,
+			CashValue:    changed.Cash,
+			Consumption:  consumption,
+		})
+		if err != nil {
+			return fmt.Errorf("update buyer bill, error: %w", err)
+		}
+
+		// 2. Credit to seller
+		if err := ChargeAccountFee(ctx, tx, &sellerStmt); err != nil {
+			return fmt.Errorf("credit seller fee, error: %w", err)
+		}
+
+		cashValue := 0.0
+		if sellerStmt.Scene == types.SceneCashCharge {
+			cashValue = sellerStmt.Value
+		}
+
+		err = updateFeeBill(ctx, tx, sellerStmt, BillValues{
+			TotalValue:   sellerStmt.Value,
+			VoucherValue: 0,
+			CashValue:    cashValue,
+			Consumption:  sellerStmt.Consumption,
+		})
+		if err != nil {
+			return fmt.Errorf("update seller bill, error: %w", err)
+		}
+
+		return nil
+	})
 }
 
 func DeductAccountFee(ctx context.Context, tx bun.Tx, input AccountStatement, checkBalance bool) (ChangedValue, error) {

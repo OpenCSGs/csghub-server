@@ -25,7 +25,9 @@ func IsNeedCalculateBill(scene types.SceneType) bool {
 		// types.SceneStarship, deprecated
 		// types.SceneGuiAgent, deprecated
 		types.ScenePortalCharge,
-		types.SceneCashCharge:
+		types.SceneCashCharge,
+		types.SceneDatasetPurchase,
+		types.SceneDatasetSaleIncome:
 		return true
 	default:
 		return false
