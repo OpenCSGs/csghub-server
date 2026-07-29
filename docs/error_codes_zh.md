@@ -954,6 +954,22 @@
 - **错误名:** `mirrorSourceRepoAuthInvalid`
 - **描述:** 源仓库鉴权信息错误。
 
+---
+
+### `MIRROR-ERR-6`
+
+- **错误代码:** `MIRROR-ERR-6`
+- **错误名:** `sourceNamespaceMappingExists`
+- **描述:** 源命名空间已存在映射关系。
+
+---
+
+### `MIRROR-ERR-7`
+
+- **错误代码:** `MIRROR-ERR-7`
+- **错误名:** `sourceNamespaceMappingNotFound`
+- **描述:** 源命名空间映射关系不存在。
+
 ## Moderation 错误
 
 ### `MOD-ERR-0`

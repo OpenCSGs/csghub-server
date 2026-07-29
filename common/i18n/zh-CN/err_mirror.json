@@ -16,5 +16,11 @@
     },
     "error.MIRROR-ERR-5": {
         "other": "源仓库鉴权信息错误。"
+    },
+    "error.MIRROR-ERR-6": {
+        "other": "源命名空间已存在映射关系。"
+    },
+    "error.MIRROR-ERR-7": {
+        "other": "源命名空间映射关系不存在。"
     }
 }

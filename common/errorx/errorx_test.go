@@ -269,6 +269,27 @@ func Test_Err_MirrorSourceRepoAuthInvalid(t *testing.T) {
 	assert.True(t, errors.Is(err, ErrMirrorSourceRepoAuthInvalid))
 }
 
+func Test_Err_SourceNamespaceMappingExists(t *testing.T) {
+	err := SourceNamespaceMappingExists(
+		errors.New("source namespace mapping exists"),
+		Ctx().Set("source_namespace", "SourceTeam"),
+	)
+
+	assert.Equal(t, "MIRROR-ERR-6", ErrSourceNamespaceMappingExists.(CustomError).Code())
+	assert.True(t, errors.Is(err, ErrSourceNamespaceMappingExists))
+	assert.False(t, errors.Is(err, ErrDatabaseDuplicateKey))
+}
+
+func Test_Err_SourceNamespaceMappingNotFound(t *testing.T) {
+	err := SourceNamespaceMappingNotFound(
+		errors.New("source namespace mapping does not exist"),
+		Ctx().Set("source_namespace", "SourceTeam"),
+	)
+
+	assert.Equal(t, "MIRROR-ERR-7", ErrSourceNamespaceMappingNotFound.(CustomError).Code())
+	assert.True(t, errors.Is(err, ErrSourceNamespaceMappingNotFound))
+}
+
 func Test_Err_ChangePathBlocked(t *testing.T) {
 	err := ChangePathBlocked(
 		errors.New("cannot change path: the following dependent entities exist: deploy tasks, mirrors. Please remove them first"),

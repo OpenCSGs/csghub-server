@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/api/httpbase"
@@ -37,8 +38,9 @@ type MirrorNamespaceMappingHandler struct {
 // @Param        body body types.CreateMirrorNamespaceMappingReq true "body"
 // @Success      200  {object}  types.Response{data=database.MirrorNamespaceMapping} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      409  {object}  types.Response "Conflict"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /mirror/sources [post]
+// @Router       /mirror_namespace_mappings [post]
 func (h *MirrorNamespaceMappingHandler) Create(ctx *gin.Context) {
 	var msReq types.CreateMirrorNamespaceMappingReq
 	if err := ctx.ShouldBindJSON(&msReq); err != nil {
@@ -46,12 +48,16 @@ func (h *MirrorNamespaceMappingHandler) Create(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
+	msReq.SourceNamespace = strings.ToLower(msReq.SourceNamespace)
+	msReq.TargetNamespace = strings.ToLower(msReq.TargetNamespace)
 
 	ms, err := h.mirrorNamespaceMapping.Create(ctx.Request.Context(), msReq)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "Failed to create mirror namespace mapping", "error", err)
 		if errors.Is(err, errorx.ErrTargetNamespaceNotFound) {
 			httpbase.BadRequestWithExt(ctx, err)
+		} else if errors.Is(err, errorx.ErrSourceNamespaceMappingExists) {
+			httpbase.ConflictError(ctx, err)
 		} else {
 			httpbase.ServerError(ctx, err)
 		}
@@ -69,9 +75,10 @@ func (h *MirrorNamespaceMappingHandler) Create(ctx *gin.Context) {
 // @Success      200  {object}  types.Response{data=[]database.MirrorNamespaceMapping} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /mirror/sources [get]
+// @Router       /mirror_namespace_mappings [get]
 func (h *MirrorNamespaceMappingHandler) Index(ctx *gin.Context) {
-	ms, err := h.mirrorNamespaceMapping.Index(ctx.Request.Context())
+	search := ctx.Query("search")
+	ms, err := h.mirrorNamespaceMapping.Index(ctx.Request.Context(), search)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "Failed to get mirror namespace mappings", "error", err)
 		httpbase.ServerError(ctx, err)
@@ -90,8 +97,9 @@ func (h *MirrorNamespaceMappingHandler) Index(ctx *gin.Context) {
 // @Param        body body types.UpdateMirrorNamespaceMappingReq true "body"
 // @Success      200  {object}  types.Response{data=database.MirrorNamespaceMapping} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      404  {object}  types.Response "Not found"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /mirror/sources/{id} [put]
+// @Router       /mirror_namespace_mappings/{id} [put]
 func (h *MirrorNamespaceMappingHandler) Update(ctx *gin.Context) {
 	var msReq types.UpdateMirrorNamespaceMappingReq
 	var msId int64
@@ -119,6 +127,8 @@ func (h *MirrorNamespaceMappingHandler) Update(ctx *gin.Context) {
 		slog.ErrorContext(ctx.Request.Context(), "Failed to update mirror namespace mapping", "error", err)
 		if errors.Is(err, errorx.ErrTargetNamespaceNotFound) {
 			httpbase.BadRequestWithExt(ctx, err)
+		} else if errors.Is(err, errorx.ErrSourceNamespaceMappingNotFound) {
+			httpbase.NotFoundError(ctx, err)
 		} else {
 			httpbase.ServerError(ctx, err)
 		}
@@ -137,7 +147,7 @@ func (h *MirrorNamespaceMappingHandler) Update(ctx *gin.Context) {
 // @Success      200  {object}  types.Response{data=database.MirrorNamespaceMapping} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /mirror/sources/{id} [get]
+// @Router       /mirror_namespace_mappings/{id} [get]
 func (h *MirrorNamespaceMappingHandler) Get(ctx *gin.Context) {
 	var msId int64
 	id := ctx.Param("id")
@@ -173,7 +183,7 @@ func (h *MirrorNamespaceMappingHandler) Get(ctx *gin.Context) {
 // @Success      200  {object}  types.Response{} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /mirror/sources/{id} [delete]
+// @Router       /mirror_namespace_mappings/{id} [delete]
 func (h *MirrorNamespaceMappingHandler) Delete(ctx *gin.Context) {
 	var msId int64
 	id := ctx.Param("id")

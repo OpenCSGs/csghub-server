@@ -489,6 +489,7 @@ func TestMirrorComponent_CreateMirror(t *testing.T) {
 
 	mc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "user", "ns", membership.RoleAdmin).Return(true, nil)
 	mc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "ns", "n").Return(repo, nil)
+	mc.mocks.stores.MirrorMock().EXPECT().FindByRepoID(ctx, repo.ID).Return(nil, sql.ErrNoRows)
 	mc.mocks.stores.MirrorSourceMock().EXPECT().Get(ctx, int64(321)).Return(&database.MirrorSource{
 		SourceName: "github",
 	}, nil)
@@ -537,6 +538,70 @@ func TestMirrorComponent_CreateMirrorRepoRejectsEmptyCurrentUser(t *testing.T) {
 		ForkName:          "forked",
 	})
 	require.Error(t, err)
+	require.Nil(t, got)
+}
+
+// TestMirrorComponent_CreateMirrorRepoNormalizesForkTarget verifies local mirror target identifiers are trimmed and lowercased.
+func TestMirrorComponent_CreateMirrorRepoNormalizesForkTarget(t *testing.T) {
+	ctx := context.TODO()
+	mc := initializeTestMirrorComponent(ctx, t)
+	fakeStore := &fakeMirrorRepoStore{}
+	mc.mirrorRepoStore = fakeStore
+
+	req := types.CreateMirrorRepoReq{
+		SourceNamespace:   "upstream",
+		SourceName:        "repo",
+		RepoType:          types.ModelRepo,
+		CurrentUser:       "admin",
+		SourceGitCloneUrl: "https://github.com/upstream/repo.git",
+		ForkNamespace:     "  Alice-Team ",
+		ForkName:          " Qwen-Model  ",
+	}
+
+	mc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "admin", "alice-team", membership.RoleWrite).Return(true, nil)
+	mc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, req.RepoType, "alice-team", "qwen-model").Return(nil, sql.ErrNoRows)
+	mc.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "alice-team").Return(database.Namespace{
+		Path: "alice-team",
+	}, nil)
+	mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "admin").Return(database.User{
+		ID:       1,
+		Username: "admin",
+		Email:    "admin@example.com",
+		RoleMask: "admin",
+	}, nil)
+
+	got, err := mc.CreateMirrorRepo(ctx, req)
+	require.NoError(t, err)
+	require.NotNil(t, got)
+	require.Len(t, fakeStore.inputs, 1)
+	require.Equal(t, "alice-team/qwen-model", fakeStore.inputs[0].Repository.Path)
+	require.Equal(t, "qwen-model", fakeStore.inputs[0].Repository.Name)
+	require.Equal(t, "models_alice-team/qwen-model", fakeStore.inputs[0].Repository.GitPath)
+	require.Equal(t, "github_model_alice-team_qwen-model", fakeStore.inputs[0].Mirror.LocalRepoPath)
+}
+
+// TestMirrorComponent_CreateMirrorRepoRejectsCaseVariantExistingTarget verifies repository identity remains case-insensitive.
+func TestMirrorComponent_CreateMirrorRepoRejectsCaseVariantExistingTarget(t *testing.T) {
+	ctx := context.TODO()
+	mc := initializeTestMirrorComponent(ctx, t)
+	createTargetRepo := true
+	repo := &database.Repository{ID: 11, Path: "alice/MyName", Name: "MyName", RepositoryType: types.ModelRepo}
+
+	mc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "admin", "alice", membership.RoleWrite).Return(true, nil)
+	mc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "alice", "myname").Return(repo, nil)
+
+	got, err := mc.CreateMirrorRepo(ctx, types.CreateMirrorRepoReq{
+		SourceNamespace:   "upstream",
+		SourceName:        "repo",
+		RepoType:          types.ModelRepo,
+		CurrentUser:       "admin",
+		SourceGitCloneUrl: "https://github.com/upstream/repo.git",
+		ForkNamespace:     "alice",
+		ForkName:          "myname",
+		CreateTargetRepo:  &createTargetRepo,
+	})
+
+	require.ErrorIs(t, err, errorx.ErrRepoAlreadyExist)
 	require.Nil(t, got)
 }
 

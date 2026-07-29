@@ -80,6 +80,18 @@ func TestLocalizedErrorMiddleware(t *testing.T) {
 			errorx.Ctx().Set("failure_reason", types.MirrorSyncFailureRepoSyncFailed),
 		))
 	})
+	router.GET("/source-namespace-mapping-exists", func(c *gin.Context) {
+		httpbase.ConflictError(c, errorx.SourceNamespaceMappingExists(
+			errors.New("source namespace mapping exists"),
+			errorx.Ctx().Set("source_namespace", "SourceTeam"),
+		))
+	})
+	router.GET("/source-namespace-mapping-not-found", func(c *gin.Context) {
+		httpbase.NotFoundError(c, errorx.SourceNamespaceMappingNotFound(
+			errors.New("source namespace mapping does not exist"),
+			errorx.Ctx().Set("source_namespace", "SourceTeam"),
+		))
+	})
 
 	// Run tests
 	t.Run("SkipRoute", func(t *testing.T) {
@@ -190,6 +202,30 @@ func TestLocalizedErrorMiddleware(t *testing.T) {
 		var resp httpbase.R
 		_ = json.Unmarshal(w.Body.Bytes(), &resp)
 		assert.Equal(t, "MIRROR-ERR-2: 仓库同步失败。", resp.Msg)
+	})
+
+	t.Run("LocalizedSourceNamespaceMappingExists", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", "/source-namespace-mapping-exists", nil)
+		req.Header.Set("Accept-Language", "zh-CN")
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusConflict, w.Code)
+		var resp httpbase.R
+		_ = json.Unmarshal(w.Body.Bytes(), &resp)
+		assert.Equal(t, "MIRROR-ERR-6: 源命名空间已存在映射关系。", resp.Msg)
+	})
+
+	t.Run("LocalizedSourceNamespaceMappingNotFound", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", "/source-namespace-mapping-not-found", nil)
+		req.Header.Set("Accept-Language", "zh-CN")
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusNotFound, w.Code)
+		var resp httpbase.R
+		_ = json.Unmarshal(w.Body.Bytes(), &resp)
+		assert.Equal(t, "MIRROR-ERR-7: 源命名空间映射关系不存在。", resp.Msg)
 	})
 }
 

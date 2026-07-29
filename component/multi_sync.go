@@ -293,10 +293,12 @@ func (c *multiSyncComponentImpl) SyncAsClient(ctx context.Context, sc multisync.
 	return nil
 }
 
+// createLocalDataset creates or updates a dataset under a canonical local path.
 func (c *multiSyncComponentImpl) createLocalDataset(ctx context.Context, m *types.Dataset, s types.SyncVersion, sc multisync.Client) error {
 	namespace, name, _ := strings.Cut(m.Path, "/")
 	//add prefix to avoid namespace conflict
-	namespace = common.AddPrefixBySourceID(s.SourceID, namespace)
+	namespace = strings.ToLower(strings.TrimSpace(common.AddPrefixBySourceID(s.SourceID, namespace)))
+	name = strings.ToLower(strings.TrimSpace(name))
 
 	//use namespace as the user login name
 	userName := namespace
@@ -432,10 +434,13 @@ func (c *multiSyncComponentImpl) createLocalDataset(ctx context.Context, m *type
 	return nil
 
 }
+
+// createLocalModel creates or updates a model under a canonical local path.
 func (c *multiSyncComponentImpl) createLocalModel(ctx context.Context, m *types.Model, s types.SyncVersion, sc multisync.Client) error {
 	namespace, name, _ := strings.Cut(m.Path, "/")
 	//add prefix to avoid namespace conflict
-	namespace = common.AddPrefixBySourceID(s.SourceID, namespace)
+	namespace = strings.ToLower(strings.TrimSpace(common.AddPrefixBySourceID(s.SourceID, namespace)))
+	name = strings.ToLower(strings.TrimSpace(name))
 
 	//use namespace as the user login name
 	userName := namespace
@@ -589,10 +594,12 @@ func (c *multiSyncComponentImpl) createLocalModel(ctx context.Context, m *types.
 	return nil
 }
 
+// createLocalCode creates or updates a code repository under a canonical local path.
 func (c *multiSyncComponentImpl) createLocalCode(ctx context.Context, m *types.Code, s types.SyncVersion, sc multisync.Client) error {
 	namespace, name, _ := strings.Cut(m.Path, "/")
 	//add prefix to avoid namespace conflict
-	namespace = common.AddPrefixBySourceID(s.SourceID, namespace)
+	namespace = strings.ToLower(strings.TrimSpace(common.AddPrefixBySourceID(s.SourceID, namespace)))
+	name = strings.ToLower(strings.TrimSpace(name))
 
 	//use namespace as the user login name
 	userName := namespace
@@ -727,10 +734,12 @@ func (c *multiSyncComponentImpl) createLocalCode(ctx context.Context, m *types.C
 	return nil
 }
 
+// createLocalPrompt creates or updates a prompt repository under a canonical local path.
 func (c *multiSyncComponentImpl) createLocalPrompt(ctx context.Context, m *types.PromptRes, s types.SyncVersion, sc multisync.Client) error {
 	namespace, name, _ := strings.Cut(m.Path, "/")
 	//add prefix to avoid namespace conflict
-	namespace = common.AddPrefixBySourceID(s.SourceID, namespace)
+	namespace = strings.ToLower(strings.TrimSpace(common.AddPrefixBySourceID(s.SourceID, namespace)))
+	name = strings.ToLower(strings.TrimSpace(name))
 
 	//use namespace as the user login name
 	userName := namespace
@@ -865,10 +874,12 @@ func (c *multiSyncComponentImpl) createLocalPrompt(ctx context.Context, m *types
 	return nil
 }
 
+// createLocalMCPServer creates or updates an MCP server under a canonical local path.
 func (c *multiSyncComponentImpl) createLocalMCPServer(ctx context.Context, m *types.MCPServer, s types.SyncVersion, sc multisync.Client) error {
 	namespace, name, _ := strings.Cut(m.Path, "/")
 	//add prefix to avoid namespace conflict
-	namespace = common.AddPrefixBySourceID(s.SourceID, namespace)
+	namespace = strings.ToLower(strings.TrimSpace(common.AddPrefixBySourceID(s.SourceID, namespace)))
+	name = strings.ToLower(strings.TrimSpace(name))
 
 	//use namespace as the user login name
 	userName := namespace
@@ -1011,10 +1022,12 @@ func (c *multiSyncComponentImpl) createLocalMCPServer(ctx context.Context, m *ty
 	return nil
 }
 
+// createLocalSkill creates or updates a skill repository under a canonical local path.
 func (c *multiSyncComponentImpl) createLocalSkill(ctx context.Context, m *types.Skill, s types.SyncVersion, sc multisync.Client) error {
 	namespace, name, _ := strings.Cut(m.Path, "/")
 	//add prefix to avoid namespace conflict
-	namespace = common.AddPrefixBySourceID(s.SourceID, namespace)
+	namespace = strings.ToLower(strings.TrimSpace(common.AddPrefixBySourceID(s.SourceID, namespace)))
+	name = strings.ToLower(strings.TrimSpace(name))
 
 	//use namespace as the user login name
 	userName := namespace
@@ -1186,11 +1199,12 @@ func (c *multiSyncComponentImpl) getUser(ctx context.Context, userName string) (
 	return c.userStore.FindByUsername(ctx, userName)
 }
 
+// createLocalSyncVersion persists a remote version with a canonical repository path.
 func (c *multiSyncComponentImpl) createLocalSyncVersion(ctx context.Context, v types.SyncVersion) error {
 	syncVersion := database.SyncVersion{
 		Version:        v.Version,
 		SourceID:       v.SourceID,
-		RepoPath:       v.RepoPath,
+		RepoPath:       strings.ToLower(strings.TrimSpace(v.RepoPath)),
 		RepoType:       v.RepoType,
 		LastModifiedAt: v.LastModifyTime,
 		ChangeLog:      v.ChangeLog,

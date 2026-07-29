@@ -1390,6 +1390,7 @@ func (h *RepoHandler) CommitWithDiff(ctx *gin.Context) {
 // @Param        body body types.CreateMirrorParams true "body"
 // @Success      200  {object}  types.Response{data=database.Mirror} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      409  {object}  httpbase.R "Target repository already has a different mirror source (MIRROR-ERR-0)"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /{repo_type}/{namespace}/{name}/mirror [post]
 func (h *RepoHandler) CreateMirror(ctx *gin.Context) {
@@ -1422,6 +1423,10 @@ func (h *RepoHandler) CreateMirror(ctx *gin.Context) {
 		slog.ErrorContext(ctx.Request.Context(), "Failed to create mirror for", slog.String("repo_type", string(mirrorReq.RepoType)), slog.String("path", fmt.Sprintf("%s/%s", mirrorReq.Namespace, mirrorReq.Name)), "error", err)
 		if errors.Is(err, errorx.ErrMirrorSourceRepoAuthInvalid) || errors.Is(err, errorx.ErrBadRequest) {
 			httpbase.BadRequestWithExt(ctx, err)
+			return
+		}
+		if errors.Is(err, errorx.ErrMirrorSourceConflict) {
+			httpbase.ConflictError(ctx, err)
 			return
 		}
 		httpbase.ServerError(ctx, err)

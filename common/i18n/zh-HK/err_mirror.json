@@ -16,5 +16,11 @@
     },
     "error.MIRROR-ERR-5": {
         "other": "源倉庫鑒權信息錯誤。"
+    },
+    "error.MIRROR-ERR-6": {
+        "other": "源命名空間已存在映射關係。"
+    },
+    "error.MIRROR-ERR-7": {
+        "other": "源命名空間映射關係不存在。"
     }
 }

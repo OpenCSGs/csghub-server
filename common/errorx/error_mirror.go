@@ -9,6 +9,8 @@ const (
 	mirrorTaskStateInvalid
 	mirrorRepoSyncCanceled
 	mirrorSourceRepoAuthInvalid
+	sourceNamespaceMappingExists
+	sourceNamespaceMappingNotFound
 )
 
 var (
@@ -89,6 +91,32 @@ var (
 	//
 	// zh-HK: 源倉庫鑒權信息錯誤。
 	ErrMirrorSourceRepoAuthInvalid error = CustomError{prefix: errMirrorPrefix, code: mirrorSourceRepoAuthInvalid}
+
+	// ErrSourceNamespaceMappingExists indicates that the source namespace already has a mapping.
+	//
+	// Description: The source namespace already has a mapping.
+	//
+	// Description_ZH: 源命名空间已存在映射关系。
+	//
+	// en-US: The source namespace already has a mapping.
+	//
+	// zh-CN: 源命名空间已存在映射关系。
+	//
+	// zh-HK: 源命名空間已存在映射關係。
+	ErrSourceNamespaceMappingExists error = CustomError{prefix: errMirrorPrefix, code: sourceNamespaceMappingExists}
+
+	// ErrSourceNamespaceMappingNotFound indicates that the source namespace mapping does not exist.
+	//
+	// Description: The source namespace mapping does not exist.
+	//
+	// Description_ZH: 源命名空间映射关系不存在。
+	//
+	// en-US: The source namespace mapping does not exist.
+	//
+	// zh-CN: 源命名空间映射关系不存在。
+	//
+	// zh-HK: 源命名空間映射關係不存在。
+	ErrSourceNamespaceMappingNotFound error = CustomError{prefix: errMirrorPrefix, code: sourceNamespaceMappingNotFound}
 )
 
 // MirrorSourceConflict wraps a mirror source conflict with optional context.
@@ -124,4 +152,14 @@ func MirrorRepoSyncCanceled(err error, ctx context) error {
 // MirrorSourceRepoAuthInvalid wraps invalid source repository authentication information with optional context.
 func MirrorSourceRepoAuthInvalid(err error, ctx context) error {
 	return CustomError{prefix: errMirrorPrefix, context: ctx, err: err, code: int(mirrorSourceRepoAuthInvalid)}
+}
+
+// SourceNamespaceMappingExists wraps an existing source namespace mapping with optional context.
+func SourceNamespaceMappingExists(err error, ctx context) error {
+	return CustomError{prefix: errMirrorPrefix, context: ctx, err: err, code: int(sourceNamespaceMappingExists)}
+}
+
+// SourceNamespaceMappingNotFound wraps a missing source namespace mapping with optional context.
+func SourceNamespaceMappingNotFound(err error, ctx context) error {
+	return CustomError{prefix: errMirrorPrefix, context: ctx, err: err, code: int(sourceNamespaceMappingNotFound)}
 }

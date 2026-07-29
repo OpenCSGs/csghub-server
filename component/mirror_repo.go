@@ -235,7 +235,7 @@ func normalizeMirrorSource(sourceURL, username, accessToken string) (string, str
 	return parsedURL.String(), username, accessToken, nil
 }
 
-// resolveMirrorRepoTarget chooses the local mirror target path from fork fields or namespace mapping.
+// resolveMirrorRepoTarget chooses and lowercases the local mirror target path from fork fields or namespace mapping.
 func (m *mirrorComponentImpl) resolveMirrorRepoTarget(req types.CreateMirrorRepoReq) (string, string) {
 	namespace := req.ForkNamespace
 	if namespace == "" {
@@ -245,7 +245,7 @@ func (m *mirrorComponentImpl) resolveMirrorRepoTarget(req types.CreateMirrorRepo
 	if name == "" {
 		name = req.SourceName
 	}
-	return strings.TrimSpace(namespace), strings.TrimSpace(name)
+	return strings.ToLower(strings.TrimSpace(namespace)), strings.ToLower(strings.TrimSpace(name))
 }
 
 // createMirrorRepoRecords creates mirror rows transactionally, and optionally the target repo rows too.

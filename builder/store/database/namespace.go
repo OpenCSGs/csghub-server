@@ -48,9 +48,10 @@ type Namespace struct {
 	times
 }
 
+// FindByPath returns a namespace by case-insensitive path while preserving its stored path.
 func (s *NamespaceStoreImpl) FindByPath(ctx context.Context, path string) (namespace Namespace, err error) {
 	namespace.Path = path
-	err = s.db.Operator.Core.NewSelect().Model(&namespace).Relation("User").Where("path = ?", path).Scan(ctx)
+	err = s.db.Operator.Core.NewSelect().Model(&namespace).Relation("User").Where("LOWER(path) = LOWER(?)", path).Scan(ctx)
 	err = errorx.HandleDBError(err, errorx.Ctx().Set("namespace", path))
 	return
 }

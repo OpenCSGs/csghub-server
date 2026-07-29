@@ -954,6 +954,22 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Name:** `mirrorSourceRepoAuthInvalid`
 - **Description:** Source repository authentication information is invalid.
 
+---
+
+### `MIRROR-ERR-6`
+
+- **Error Code:** `MIRROR-ERR-6`
+- **Error Name:** `sourceNamespaceMappingExists`
+- **Description:** The source namespace already has a mapping.
+
+---
+
+### `MIRROR-ERR-7`
+
+- **Error Code:** `MIRROR-ERR-7`
+- **Error Name:** `sourceNamespaceMappingNotFound`
+- **Description:** The source namespace mapping does not exist.
+
 ## Moderation Errors
 
 ### `MOD-ERR-0`
