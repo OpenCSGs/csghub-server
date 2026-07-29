@@ -379,6 +379,36 @@ func (m *mirrorComponentImpl) CreateMirror(ctx context.Context, req types.Create
 	if err != nil {
 		return nil, fmt.Errorf("failed to find repo, error: %w", err)
 	}
+	existingMirror, err := m.mirrorStore.FindByRepoID(ctx, repo.ID)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return nil, fmt.Errorf("failed to find mirror by target repo, error: %w", err)
+	}
+	// Repeated creation requeues the existing source but rejects replacing it implicitly.
+	if existingMirror != nil && existingMirror.ID != 0 {
+		if existingMirror.SourceUrl != req.SourceUrl {
+			return &database.Mirror{RepositoryID: repo.ID}, errorx.MirrorSourceConflict(
+				fmt.Errorf("target repo already has mirror source url: %s", existingMirror.SourceUrl),
+				errorx.Ctx().
+					Set("repo type", req.RepoType).
+					Set("target namespace", req.Namespace).
+					Set("target name", req.Name).
+					Set("source url", req.SourceUrl),
+			)
+		}
+		var usernamePtr, accessTokenPtr *string
+		if req.Username != "" {
+			usernamePtr = &req.Username
+			accessTokenPtr = &req.AccessToken
+		}
+		if _, err := m.requeueMirrorRepoTask(ctx, repo, existingMirror, usernamePtr, accessTokenPtr, types.LowMirrorPriority, req.Urgent); err != nil {
+			return nil, fmt.Errorf("failed to sync mirror repo, error: %w", err)
+		}
+		if req.Username != "" {
+			existingMirror.Username = req.Username
+			existingMirror.AccessToken = req.AccessToken
+		}
+		return existingMirror, nil
+	}
 	if req.MirrorSourceID != 0 {
 		mirrorSource, err := m.mirrorSourceStore.Get(ctx, req.MirrorSourceID)
 		if err != nil {
