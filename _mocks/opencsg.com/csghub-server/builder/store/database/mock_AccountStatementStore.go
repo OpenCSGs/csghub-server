@@ -90,6 +90,54 @@ func (_c *MockAccountStatementStore_Create_Call) RunAndReturn(run func(context.C
 	return _c
 }
 
+// CreateTradeStatements provides a mock function with given fields: ctx, buyerStmt, sellerStmt
+func (_m *MockAccountStatementStore) CreateTradeStatements(ctx context.Context, buyerStmt database.AccountStatement, sellerStmt database.AccountStatement) error {
+	ret := _m.Called(ctx, buyerStmt, sellerStmt)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CreateTradeStatements")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, database.AccountStatement, database.AccountStatement) error); ok {
+		r0 = rf(ctx, buyerStmt, sellerStmt)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockAccountStatementStore_CreateTradeStatements_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateTradeStatements'
+type MockAccountStatementStore_CreateTradeStatements_Call struct {
+	*mock.Call
+}
+
+// CreateTradeStatements is a helper method to define mock.On call
+//   - ctx context.Context
+//   - buyerStmt database.AccountStatement
+//   - sellerStmt database.AccountStatement
+func (_e *MockAccountStatementStore_Expecter) CreateTradeStatements(ctx interface{}, buyerStmt interface{}, sellerStmt interface{}) *MockAccountStatementStore_CreateTradeStatements_Call {
+	return &MockAccountStatementStore_CreateTradeStatements_Call{Call: _e.mock.On("CreateTradeStatements", ctx, buyerStmt, sellerStmt)}
+}
+
+func (_c *MockAccountStatementStore_CreateTradeStatements_Call) Run(run func(ctx context.Context, buyerStmt database.AccountStatement, sellerStmt database.AccountStatement)) *MockAccountStatementStore_CreateTradeStatements_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(database.AccountStatement), args[2].(database.AccountStatement))
+	})
+	return _c
+}
+
+func (_c *MockAccountStatementStore_CreateTradeStatements_Call) Return(_a0 error) *MockAccountStatementStore_CreateTradeStatements_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockAccountStatementStore_CreateTradeStatements_Call) RunAndReturn(run func(context.Context, database.AccountStatement, database.AccountStatement) error) *MockAccountStatementStore_CreateTradeStatements_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetByEventID provides a mock function with given fields: ctx, eventID
 func (_m *MockAccountStatementStore) GetByEventID(ctx context.Context, eventID uuid.UUID) (database.AccountStatement, error) {
 	ret := _m.Called(ctx, eventID)

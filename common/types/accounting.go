@@ -137,7 +137,8 @@ var (
 	SceneStarship SceneType = 20 // starship is deprecated
 	SceneGuiAgent SceneType = 22 // gui agent is deprecated
 	// dataset
-	SceneDatasetPurchase SceneType = 40 // dataset purchase
+	SceneDatasetPurchase   SceneType = 40 // dataset purchase
+	SceneDatasetSaleIncome SceneType = 41 // dataset sale income for seller
 	// unknow
 	SceneUnknow SceneType = 99 // unknow
 )
