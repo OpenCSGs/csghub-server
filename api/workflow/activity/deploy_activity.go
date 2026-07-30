@@ -830,7 +830,7 @@ func (a *DeployActivity) makeDeployEnv(ctx context.Context, hardware types.HardW
 	}
 
 	if a.cfg.PublicRootDomain == "" {
-		if deployInfo.Type == types.FinetuneType {
+		if deployInfo.Type == types.FinetuneType || deployInfo.Type == types.NotebookType {
 			envMap["CONTEXT_PATH"] = "/endpoint/" + deployInfo.SvcName
 		}
 		if deployInfo.Type == types.SpaceType {
