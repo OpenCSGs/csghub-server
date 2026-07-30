@@ -42,11 +42,17 @@ import (
 // @Param        size formData string false "Video size for multipart requests"
 // @Param        seconds formData int false "Video duration in seconds for multipart requests"
 // @Param        input_reference formData file false "Image input reference for multipart image-to-video requests"
+// @Param        audio formData file false "Audio reference; repeat once per speaker (maximum two)"
+// @Param        audio_type formData string false "Multi-speaker audio mode: para or add"
+// @Param        num_segments formData int false "Number of generated continuation segments"
+// @Param        ref_img_index formData int false "Reference image frame index for continuation"
+// @Param        mask_frame_range formData int false "Reference mask frame range for continuation"
+// @Param        bbox formData string false "Speaker bounding boxes as JSON using [ymin,xmin,ymax,xmax]"
 // @Success      200 {object} types.VideoObject "OK"
 // @Failure      400 {object} types.Error "Bad request"
 // @Failure      404 {object} types.Error "Model not found"
 // @Failure      500 {object} types.Error "Internal server error"
-// @Router       /v1/videos [post]
+// @Router       /v1/video/generations [post]
 func (h *OpenAIHandlerImpl) CreateVideo(c *gin.Context) {
 	username := httpbase.GetCurrentUser(c)
 	nsUUID := httpbase.GetCurrentNamespaceUUID(c)
@@ -149,12 +155,33 @@ func (h *OpenAIHandlerImpl) CreateVideo(c *gin.Context) {
 	copyProxyResponse(c, capture.Header(), capture.StatusCode(), body)
 }
 
+// CreateVideoDeprecated godoc
+// @Security     ApiKey
+// @Summary      Create a video generation (deprecated)
+// @Description  Deprecated: use POST /v1/video/generations instead.
+// @Deprecated
+// @Tags         AIGateway
+// @Accept       json
+// @Accept       multipart/form-data
+// @Produce      json
+// @Param        request body types.VideoGenerationRequest true "Video generation request"
+// @Success      200 {object} types.VideoObject "OK"
+// @Failure      400 {object} types.Error "Bad request"
+// @Failure      404 {object} types.Error "Model not found"
+// @Failure      500 {object} types.Error "Internal server error"
+// @Router       /v1/videos [post]
+func (h *OpenAIHandlerImpl) CreateVideoDeprecated(c *gin.Context) {
+	markDeprecatedVideoAPI(c, "/v1/video/generations")
+	h.CreateVideo(c)
+}
+
 type createVideoInput struct {
 	adapterReq                 types.VideoGenerationRequest
 	form                       *multipart.Form
 	modelID                    string
 	isMultipart                bool
 	hasMultipartInputReference bool
+	multipartAudioCount        int
 }
 
 func parseCreateVideoInput(c *gin.Context) (*createVideoInput, error, bool) {
@@ -184,20 +211,28 @@ func parseCreateVideoMultipartInput(c *gin.Context, input *createVideoInput) (*c
 		writeVideoAPIError(c, http.StatusBadRequest, "invalid_request_error", err.Error(), "invalid_request_error")
 		return nil, err, false
 	}
+	if err := validateVideoMultipartAudio(form); err != nil {
+		writeVideoAPIError(c, http.StatusBadRequest, "invalid_request_error", err.Error(), "invalid_request_error")
+		return nil, err, false
+	}
 
 	input.form = form
 	input.modelID = modelID
 	input.hasMultipartInputReference = len(form.File["input_reference"]) > 0
+	input.multipartAudioCount = len(form.File["audio"])
 	input.adapterReq = types.VideoGenerationRequest{
 		Model:  modelID,
 		Prompt: prompt,
 		Size:   firstMultipartValue(form, "size"),
 	}
 	if seconds := strings.TrimSpace(firstMultipartValue(form, "seconds")); seconds != "" {
-		var parsed int64
-		if _, err := fmt.Sscanf(seconds, "%d", &parsed); err == nil {
-			input.adapterReq.Seconds = parsed
+		parsed, err := strconv.ParseInt(seconds, 10, 64)
+		if err != nil || parsed <= 0 {
+			err := fmt.Errorf("seconds must be a positive integer")
+			writeVideoAPIError(c, http.StatusBadRequest, "invalid_request_error", err.Error(), "invalid_request_error")
+			return nil, err, false
 		}
+		input.adapterReq.Seconds = parsed
 	}
 	return input, nil, true
 }
@@ -230,7 +265,7 @@ func validateCreateVideoAdapter(c *gin.Context, input *createVideoInput, adapter
 		writeVideoAPIError(c, http.StatusBadRequest, "unsupported_model", fmt.Sprintf("model '%s' does not support video generation", input.modelID), "invalid_request_error")
 		return false
 	}
-	if err := validateVideoAdapterCompatibility(input.adapterReq, input.isMultipart, input.hasMultipartInputReference, caps); err != nil {
+	if err := validateVideoAdapterCompatibility(input.adapterReq, input.isMultipart, input.hasMultipartInputReference, input.multipartAudioCount, caps); err != nil {
 		writeVideoAPIError(c, http.StatusBadRequest, "invalid_request_error", err.Error(), "invalid_request_error")
 		return false
 	}
@@ -405,7 +440,7 @@ func downstreamErrorPayload(body []byte) string {
 // @Failure      400 {object} types.Error "Bad request"
 // @Failure      404 {object} types.Error "Video not found"
 // @Failure      500 {object} types.Error "Internal server error"
-// @Router       /v1/videos/{video_id} [get]
+// @Router       /v1/video/generations/{video_id} [get]
 func (h *OpenAIHandlerImpl) GetVideo(c *gin.Context) {
 	username := httpbase.GetCurrentUser(c)
 	nsUUID := httpbase.GetCurrentNamespaceUUID(c)
@@ -442,6 +477,24 @@ func (h *OpenAIHandlerImpl) GetVideo(c *gin.Context) {
 		videoResp = videoProviderResp.Video
 	}
 	copyProxyResponse(c, capture.Header(), capture.StatusCode(), normalizeVideoResponseBody(adapter, body, videoResp, target.generation.ResourceID))
+}
+
+// GetVideoDeprecated godoc
+// @Security     ApiKey
+// @Summary      Get a video generation (deprecated)
+// @Description  Deprecated: use GET /v1/video/generations/{video_id} instead.
+// @Deprecated
+// @Tags         AIGateway
+// @Produce      json
+// @Param        video_id path string true "Gateway video ID"
+// @Success      200 {object} types.VideoObject "OK"
+// @Failure      400 {object} types.Error "Bad request"
+// @Failure      404 {object} types.Error "Video not found"
+// @Failure      500 {object} types.Error "Internal server error"
+// @Router       /v1/videos/{video_id} [get]
+func (h *OpenAIHandlerImpl) GetVideoDeprecated(c *gin.Context) {
+	markDeprecatedVideoAPI(c, "/v1/video/generations/"+c.Param("video_id"))
+	h.GetVideo(c)
 }
 
 func (h *OpenAIHandlerImpl) asyncGenerationStatusRefreshInterval() time.Duration {
@@ -496,7 +549,7 @@ func videoObjectFromGeneration(generation *database.AIGeneration) types.VideoObj
 // @Failure      400 {object} types.Error "Bad request"
 // @Failure      404 {object} types.Error "Video not found"
 // @Failure      500 {object} types.Error "Internal server error"
-// @Router       /v1/videos/{video_id}/content [get]
+// @Router       /v1/video/generations/{video_id}/content [get]
 func (h *OpenAIHandlerImpl) GetVideoContent(c *gin.Context) {
 	username := httpbase.GetCurrentUser(c)
 	nsUUID := httpbase.GetCurrentNamespaceUUID(c)
@@ -508,6 +561,10 @@ func (h *OpenAIHandlerImpl) GetVideoContent(c *gin.Context) {
 		return
 	}
 	if !ensureVideoContentReady(c, target.generation) {
+		return
+	}
+	if downloadURL := videoDownloadURL(target.generation.ProviderMetadata); downloadURL != "" {
+		streamVideoDownloadURL(c, downloadURL)
 		return
 	}
 	adapter, ok := h.videoAdapterForGeneration(c, target)
@@ -535,6 +592,30 @@ func (h *OpenAIHandlerImpl) GetVideoContent(c *gin.Context) {
 	streamVideoDownloadURL(c, contentResp.DownloadURL)
 }
 
+// GetVideoContentDeprecated godoc
+// @Security     ApiKey
+// @Summary      Download generated video content (deprecated)
+// @Description  Deprecated: use GET /v1/video/generations/{video_id}/content instead.
+// @Deprecated
+// @Tags         AIGateway
+// @Produce      application/octet-stream
+// @Produce      video/mp4
+// @Param        video_id path string true "Gateway video ID"
+// @Success      200 {file} binary "Generated video content"
+// @Failure      400 {object} types.Error "Bad request"
+// @Failure      404 {object} types.Error "Video not found"
+// @Failure      500 {object} types.Error "Internal server error"
+// @Router       /v1/videos/{video_id}/content [get]
+func (h *OpenAIHandlerImpl) GetVideoContentDeprecated(c *gin.Context) {
+	markDeprecatedVideoAPI(c, "/v1/video/generations/"+c.Param("video_id")+"/content")
+	h.GetVideoContent(c)
+}
+
+func markDeprecatedVideoAPI(c *gin.Context, successorPath string) {
+	c.Header("Deprecation", "@1784851200")
+	c.Header("Link", fmt.Sprintf("<%s>; rel=\"successor-version\"", successorPath))
+}
+
 func ensureVideoContentReady(c *gin.Context, generation *database.AIGeneration) bool {
 	if generation == nil {
 		writeVideoAPIError(c, http.StatusInternalServerError, "internal_error", "ai generation not found", "internal_error")
@@ -560,6 +641,11 @@ func ensureVideoContentReady(c *gin.Context, generation *database.AIGeneration) 
 		writeVideoAPIError(c, http.StatusBadRequest, videoErrorNotReady, message, "invalid_request_error")
 	}
 	return false
+}
+
+func videoDownloadURL(providerMetadata map[string]any) string {
+	downloadURL, _ := providerMetadata["download_url"].(string)
+	return strings.TrimSpace(downloadURL)
 }
 
 type videoGenerationTarget struct {
@@ -776,6 +862,39 @@ func validateVideoMultipartInputReference(form *multipart.Form) error {
 	}
 }
 
+const maxVideoAudioReferenceBytes int64 = 100 << 20
+
+func validateVideoMultipartAudio(form *multipart.Form) error {
+	if form == nil {
+		return nil
+	}
+	files := form.File["audio"]
+	if len(files) > 2 {
+		return fmt.Errorf("audio supports at most two uploaded files")
+	}
+	for _, file := range files {
+		if file == nil {
+			return fmt.Errorf("audio file header is nil")
+		}
+		if file.Size <= 0 {
+			return fmt.Errorf("audio file cannot be empty")
+		}
+		if file.Size > maxVideoAudioReferenceBytes {
+			return fmt.Errorf("audio file exceeds %d bytes", maxVideoAudioReferenceBytes)
+		}
+		contentType, err := sniffMultipartFileContentType(file)
+		if err != nil {
+			return fmt.Errorf("read audio: %w", err)
+		}
+		switch contentType {
+		case "audio/mpeg", "audio/mp3", "audio/wav", "audio/x-wav", "audio/wave", "audio/vnd.wave":
+		default:
+			return fmt.Errorf("unsupported audio content type %q", contentType)
+		}
+	}
+	return nil
+}
+
 func sniffMultipartFileContentType(fileHeader *multipart.FileHeader) (string, error) {
 	if fileHeader == nil {
 		return "", fmt.Errorf("file header is nil")
@@ -800,7 +919,16 @@ func sniffMultipartFileContentType(fileHeader *multipart.FileHeader) (string, er
 	return strings.ToLower(http.DetectContentType(buf[:n])), nil
 }
 
-func validateVideoAdapterCompatibility(req types.VideoGenerationRequest, isMultipart bool, hasMultipartInputReference bool, caps text2video.Capabilities) error {
+func validateVideoAdapterCompatibility(req types.VideoGenerationRequest, isMultipart bool, hasMultipartInputReference bool, multipartAudioCount int, caps text2video.Capabilities) error {
+	if multipartAudioCount > 0 && !caps.SupportsAudioReference {
+		return fmt.Errorf("selected model does not support audio-guided video generation")
+	}
+	if caps.RequiresAudioReference && multipartAudioCount == 0 {
+		return fmt.Errorf("selected model requires at least one audio file")
+	}
+	if caps.MaxAudioReferences > 0 && multipartAudioCount > caps.MaxAudioReferences {
+		return fmt.Errorf("selected model supports at most %d audio files", caps.MaxAudioReferences)
+	}
 	if req.InputReference == nil && !isMultipart {
 		return nil
 	}
@@ -953,6 +1081,13 @@ func streamVideoDownloadURL(c *gin.Context, downloadURL string) {
 	req.URL.RawQuery = parsed.RawQuery
 	req.Body = nil
 	req.ContentLength = 0
+	downloadHeaders := make(http.Header)
+	for _, name := range []string{"Accept", "Range", "If-Range", "If-None-Match", "If-Modified-Since", "User-Agent"} {
+		if values := req.Header.Values(name); len(values) > 0 {
+			downloadHeaders[name] = append([]string(nil), values...)
+		}
+	}
+	req.Header = downloadHeaders
 
 	rp.ServeHTTP(videoStreamingWriter{w: c.Writer}, req, parsed.Path, parsed.Host)
 }
@@ -1053,6 +1188,8 @@ func (w videoStreamingWriter) Flush() {
 }
 
 func copyProxyResponse(c *gin.Context, header http.Header, statusCode int, body []byte) {
+	deprecation := c.Writer.Header().Get("Deprecation")
+	successorLink := c.Writer.Header().Get("Link")
 	for key := range c.Writer.Header() {
 		c.Writer.Header().Del(key)
 	}
@@ -1060,6 +1197,12 @@ func copyProxyResponse(c *gin.Context, header http.Header, statusCode int, body 
 		for _, value := range values {
 			c.Writer.Header().Add(key, value)
 		}
+	}
+	if deprecation != "" {
+		c.Writer.Header().Set("Deprecation", deprecation)
+	}
+	if successorLink != "" {
+		c.Writer.Header().Set("Link", successorLink)
 	}
 	c.Writer.Header().Del("Content-Length")
 	c.Status(statusCode)

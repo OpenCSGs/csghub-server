@@ -705,6 +705,7 @@ func (a *DeployActivity) makeDeployEnv(ctx context.Context, hardware types.HardW
 
 	envMap["S3_INTERNAL"] = fmt.Sprintf("%v", a.cfg.S3Internal)
 	envMap["ACCESS_TOKEN"] = accessToken.Token
+	addLongCatVideoRuntimeEnv(envMap, deployInfo.RuntimeFramework, deployInfo.SvcName, a.cfg)
 
 	// Notebook has no git repo; skip GetRepoLastCommit and use empty git-related env
 	if deployInfo.Type != types.NotebookType {
@@ -839,6 +840,32 @@ func (a *DeployActivity) makeDeployEnv(ctx context.Context, hardware types.HardW
 	}
 
 	return envMap, nil
+}
+
+func isLongCatVideoRuntime(runtimeFramework string) bool {
+	switch strings.ToLower(strings.TrimSpace(runtimeFramework)) {
+	case "longcat-video", "amd-longcat-video":
+		return true
+	default:
+		return false
+	}
+}
+
+func addLongCatVideoRuntimeEnv(envMap map[string]string, runtimeFramework, taskNamespace string, cfg common.DeployConfig) {
+	if !isLongCatVideoRuntime(runtimeFramework) {
+		return
+	}
+	if taskNamespace != "" {
+		envMap["LONGCAT_TASK_NAMESPACE"] = taskNamespace
+	}
+	if cfg.S3PublicBucket == "" {
+		return
+	}
+	envMap["S3_ACCESS_ID"] = cfg.S3AccessID
+	envMap["S3_ACCESS_SECRET"] = cfg.S3AccessSecret
+	envMap["S3_BUCKET"] = cfg.S3PublicBucket
+	envMap["S3_ENDPOINT"] = cfg.S3Endpoint
+	envMap["S3_SSL_ENABLED"] = strconv.FormatBool(cfg.S3SSLEnabled)
 }
 
 // vllmEnforceEagerEnabled reports whether single-node vLLM should run with --enforce-eager.

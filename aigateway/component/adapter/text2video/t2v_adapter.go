@@ -12,6 +12,9 @@ type Capabilities struct {
 	SupportsCreate                  bool
 	SupportsImageReference          bool
 	SupportsMultipartInputReference bool
+	SupportsAudioReference          bool
+	RequiresAudioReference          bool
+	MaxAudioReferences              int
 	SupportsJSONFileID              bool
 	SupportsJSONImageURL            bool
 	SupportsDirectContentStreaming  bool
@@ -62,6 +65,7 @@ func NewRegistry() *Registry {
 		adapters: []T2VAdapter{
 			NewMiniMaxAdapter(),
 			NewSeedanceAdapter(),
+			NewLongCatAdapter(),
 			NewLightX2VAdapter(),
 			NewOpenAICompatibleAdapter(),
 		},

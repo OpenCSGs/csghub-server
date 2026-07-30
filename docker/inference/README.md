@@ -166,6 +166,14 @@ docker buildx build --platform linux/amd64 \
   -t ${OPENCSG_ACR}/opencsghq/audiofly-rocm:latest \
   -f Dockerfile.audiofly-rocm \
   --push .
+
+# LongCat Video Avatar models (CUDA 12.4 and ROCm 7.2.2)
+docker buildx build --platform linux/amd64 \
+  -t ${OPENCSG_ACR}/opencsghq/longcat-video:1.5-cu124 \
+  -f Dockerfile.longcat-video --push .
+docker buildx build --platform linux/amd64 \
+  -t ${OPENCSG_ACR}/opencsghq/longcat-video-rocm:1.5-rocm7.2.2 \
+  -f Dockerfile.longcat-video-rocm --push .
 ```
 *Note: The above command will create `linux/amd64` and `linux/arm64` images with the tags `${IMAGE_TAG}` and `latest` at the same time.*
 
@@ -266,6 +274,36 @@ curl --max-time 600 -X POST http://127.0.0.1:8000/v1/audio/speech \
   -H "Content-Type: application/json" \
   -d '{"input": "Fierce winds howl through the valley", "cfg": 3.5, "ddim_steps": 200}' \
   --output output.wav
+
+# Run a LongCat Video Avatar model. BASE_MODEL_ID and REPO_ID are downloaded
+# separately because Avatar inference consumes both checkpoint repositories.
+# BASE_MODEL_ID is inferred from the REPO_ID namespace unless overridden.
+docker run --rm --gpus all -p 8000:8000 \
+  -e HF_ENDPOINT=https://hub.opencsg.com \
+  -e ACCESS_TOKEN=xxx \
+  -e REPO_ID=meituan-longcat/LongCat-Video-Avatar-1.5 \
+  -e GPU_NUM=1 \
+  -v longcat-models:/workspace \
+  ${OPENCSG_ACR}/opencsghq/longcat-video:1.5-cu124
+
+# ROCm uses the same API and environment variables.
+docker run --rm --device=/dev/kfd --device=/dev/dri \
+  --group-add video --ipc=host -p 8000:8000 \
+  -e HF_ENDPOINT=https://hub.opencsg.com \
+  -e ACCESS_TOKEN=xxx \
+  -e GPU_NUM=1 \
+  -v longcat-models-rocm:/workspace \
+  ${OPENCSG_ACR}/opencsghq/longcat-video-rocm:1.5-rocm7.2.2
+
+# Submit an asynchronous single-audio AT2V task. Add image_file for AI2V;
+# repeat audio twice (and require image_file) for multi-person generation.
+curl -X POST http://127.0.0.1:8000/v1/tasks/video/form \
+  -F 'prompt=A presenter speaks naturally on a stage' \
+  -F 'audio=@speech.wav;type=audio/wav' \
+  -F 'resolution=480p'
+curl http://127.0.0.1:8000/v1/tasks/TASK_ID/status
+curl -o result.mp4 \
+  http://127.0.0.1:8000/v1/files/download/outputs/videos/TASK_ID.mp4
 ```
 *Note: HF_ENDPOINT should be use the real csghub address.*
 *Note: FunASR downloads `REPO_ID` to `/workspace/${REPO_ID}` and preloads that local model at startup. The OpenAI-compatible `model` field can use `local`, the repo id, or the repo name.*
@@ -298,6 +336,8 @@ curl --max-time 600 -X POST http://127.0.0.1:8000/v1/audio/speech \
 |text generation| tei | 1.6 | - |- |
 |text to audio| audiofly | 1.0 | 12.1 |iFLYTEK AudioFly LDM model with OpenAI speech API wrapper|
 |text to audio| audiofly-rocm | 1.0 | - |iFLYTEK AudioFly LDM model, ROCm 7.2.2|
+|audio-driven video| longcat-video | 1.5-cu124 | 12.4 |LongCat-Video-Avatar and 1.5 asynchronous runtime|
+|audio-driven video| longcat-video-rocm | 1.5-rocm7.2.2 | - |LongCat-Video-Avatar and 1.5, experimental ROCm 7.2.2 port|
 
 
 ## API to Call Inference

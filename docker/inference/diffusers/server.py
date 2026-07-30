@@ -2,6 +2,7 @@ import argparse
 import base64
 import inspect
 import io
+import json
 import logging
 import os
 import time
@@ -10,9 +11,11 @@ from typing import Any, Dict, List, Optional
 import torch
 import uvicorn
 from diffusers import DiffusionPipeline
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 from PIL import Image
+from pydantic import BaseModel, Field
+from starlette.datastructures import UploadFile
 
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -24,6 +27,23 @@ PIPELINE = None
 MODEL_ID = "local"
 MODEL_PATH = ""
 DEVICE = "cuda"
+
+
+class ImageGenerationRequest(BaseModel):
+    model: str = "local"
+    prompt: Optional[str] = None
+    inputs: Optional[str] = None
+    parameters: Dict[str, Any] = Field(default_factory=dict)
+    size: Optional[str] = None
+    n: Optional[int] = 1
+    negative_prompt: Optional[str] = None
+    num_inference_steps: Optional[int] = None
+    guidance_scale: Optional[float] = None
+    steps: Optional[int] = None
+    cfg_scale: Optional[float] = None
+    seed: Optional[int] = None
+    output_format: Optional[str] = None
+    response_format: Optional[str] = "b64_json"
 
 
 def resolve_dtype(device: str) -> torch.dtype:
@@ -66,6 +86,75 @@ async def read_image(file: UploadFile) -> Image.Image:
     except Exception as exc:
         raise HTTPException(status_code=400, detail=f"{file.filename or 'image'} is not a valid image") from exc
     return image.convert("RGB")
+
+
+def parse_int(value: Any, field: str, default: Optional[int] = None) -> Optional[int]:
+    if value is None or value == "":
+        return default
+    try:
+        return int(value)
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=f"{field} must be an integer") from exc
+
+
+def parse_float(value: Any, field: str, default: Optional[float] = None) -> Optional[float]:
+    if value is None or value == "":
+        return default
+    try:
+        return float(value)
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=f"{field} must be a number") from exc
+
+
+def first_present(data: Dict[str, Any], *keys: str) -> Any:
+    for key in keys:
+        value = data.get(key)
+        if value is not None and value != "":
+            return value
+    return None
+
+
+async def parse_image_api_request(request: Request) -> Dict[str, Any]:
+    content_type = request.headers.get("content-type", "").lower()
+    if "application/json" in content_type:
+        try:
+            payload = await request.json()
+        except json.JSONDecodeError as exc:
+            raise HTTPException(status_code=400, detail="invalid JSON body") from exc
+        if not isinstance(payload, dict):
+            raise HTTPException(status_code=400, detail="JSON body must be an object")
+        return {
+            "prompt": payload.get("prompt"),
+            "images": [],
+            "mask": None,
+            "size": payload.get("size"),
+            "n": parse_int(payload.get("n"), "n", 1),
+            "negative_prompt": payload.get("negative_prompt"),
+            "steps": parse_int(first_present(payload, "steps", "num_inference_steps"), "steps"),
+            "cfg_scale": parse_float(first_present(payload, "cfg_scale", "guidance_scale"), "cfg_scale"),
+            "seed": parse_int(payload.get("seed"), "seed"),
+            "output_format": payload.get("output_format"),
+        }
+
+    form = await request.form()
+    images: List[UploadFile] = []
+    for value in form.getlist("image"):
+        if isinstance(value, UploadFile):
+            images.append(value)
+    mask_value = form.get("mask")
+    mask = mask_value if isinstance(mask_value, UploadFile) else None
+    return {
+        "prompt": form.get("prompt"),
+        "images": images,
+        "mask": mask,
+        "size": form.get("size"),
+        "n": parse_int(form.get("n"), "n", 1),
+        "negative_prompt": form.get("negative_prompt"),
+        "steps": parse_int(first_present(form, "steps", "num_inference_steps"), "steps"),
+        "cfg_scale": parse_float(first_present(form, "cfg_scale", "guidance_scale"), "cfg_scale"),
+        "seed": parse_int(form.get("seed"), "seed"),
+        "output_format": form.get("output_format"),
+    }
 
 
 def load_pipeline(model_path: str, device: str):
@@ -192,43 +281,109 @@ async def run_image_request(
     return encode_response(result.images, size, output_format)
 
 
-@app.post("/")
 @app.post("/v1/images/edits")
-async def edit_image(
-    image: List[UploadFile] = File(...),
-    mask: Optional[UploadFile] = File(default=None),
-    model: str = Form(default="local"),
-    prompt: str = Form(...),
-    size: Optional[str] = Form(default=None),
-    n: Optional[int] = Form(default=1),
-    negative_prompt: Optional[str] = Form(default=None),
-    steps: Optional[int] = Form(default=None),
-    cfg_scale: Optional[float] = Form(default=None),
-    seed: Optional[int] = Form(default=None),
-    output_format: Optional[str] = Form(default=None),
-    response_format: Optional[str] = Form(default="b64_json"),
-):
-    _ = model
-    _ = response_format
-    return await run_image_request(prompt, image, mask, size, n, negative_prompt, steps, cfg_scale, seed, output_format)
+async def edit_image(request: Request):
+    input_req = await parse_image_api_request(request)
+    if request.url.path != "/" and not input_req["images"]:
+        raise HTTPException(status_code=400, detail="image is required")
+    return await run_image_request(
+        input_req["prompt"],
+        input_req["images"],
+        input_req["mask"],
+        input_req["size"],
+        input_req["n"],
+        input_req["negative_prompt"],
+        input_req["steps"],
+        input_req["cfg_scale"],
+        input_req["seed"],
+        input_req["output_format"],
+    )
+
+
+async def run_generation_request(request: ImageGenerationRequest) -> JSONResponse:
+    _ = request.model
+    _ = request.response_format
+    prompt = request.prompt or request.inputs
+    if not prompt:
+        raise HTTPException(status_code=400, detail="prompt is required")
+
+    def resolve_parameter(*names: str, explicit: Any = None) -> Any:
+        if explicit is not None:
+            return explicit
+        for name in names:
+            value = request.parameters.get(name)
+            if value is not None:
+                return value
+        return None
+
+    steps = resolve_parameter(
+        "num_inference_steps",
+        "steps",
+        explicit=request.num_inference_steps if request.num_inference_steps is not None else request.steps,
+    )
+    cfg_scale = resolve_parameter(
+        "guidance_scale",
+        "cfg_scale",
+        explicit=request.guidance_scale if request.guidance_scale is not None else request.cfg_scale,
+    )
+    return await run_image_request(
+        prompt,
+        [],
+        None,
+        resolve_parameter("size", explicit=request.size),
+        resolve_parameter("n", explicit=request.n),
+        resolve_parameter("negative_prompt", explicit=request.negative_prompt),
+        steps,
+        cfg_scale,
+        resolve_parameter("seed", explicit=request.seed),
+        resolve_parameter("output_format", explicit=request.output_format),
+    )
+
+
+@app.post("/")
+async def root(request: Request):
+    content_type = request.headers.get("content-type", "").lower()
+    if content_type.startswith("application/json"):
+        payload = await request.json()
+        return await run_generation_request(ImageGenerationRequest(**payload))
+
+    input_req = await parse_image_api_request(request)
+    if not input_req["images"] or not input_req["prompt"]:
+        raise HTTPException(status_code=400, detail="image and prompt are required for multipart requests")
+    return await run_image_request(
+        input_req["prompt"],
+        input_req["images"],
+        input_req["mask"],
+        input_req["size"],
+        input_req["n"],
+        input_req["negative_prompt"],
+        input_req["steps"],
+        input_req["cfg_scale"],
+        input_req["seed"],
+        input_req["output_format"],
+    )
 
 
 @app.post("/v1/images/generations")
-async def generate_image(
-    model: str = Form(default="local"),
-    prompt: str = Form(...),
-    size: Optional[str] = Form(default=None),
-    n: Optional[int] = Form(default=1),
-    negative_prompt: Optional[str] = Form(default=None),
-    steps: Optional[int] = Form(default=None),
-    cfg_scale: Optional[float] = Form(default=None),
-    seed: Optional[int] = Form(default=None),
-    output_format: Optional[str] = Form(default=None),
-    response_format: Optional[str] = Form(default="b64_json"),
-):
-    _ = model
-    _ = response_format
-    return await run_image_request(prompt, [], None, size, n, negative_prompt, steps, cfg_scale, seed, output_format)
+async def generate_image(request: Request):
+    content_type = request.headers.get("content-type", "").lower()
+    if content_type.startswith("application/json"):
+        payload = await request.json()
+        return await run_generation_request(ImageGenerationRequest(**payload))
+
+    input_req = await parse_image_api_request(request)
+    return await run_image_request(
+        input_req["prompt"],
+        [],
+        None,
+        input_req["size"],
+        input_req["n"],
+        input_req["negative_prompt"],
+        input_req["steps"],
+        input_req["cfg_scale"],
+        input_req["seed"],
+        input_req["output_format"],
+    )
 
 
 @app.get("/v1/models")

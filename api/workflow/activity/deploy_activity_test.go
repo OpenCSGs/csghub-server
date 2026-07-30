@@ -674,3 +674,41 @@ func TestVLLMEnforceEagerEnabled(t *testing.T) {
 		})
 	}
 }
+
+func TestAddLongCatVideoRuntimeEnv(t *testing.T) {
+	cfg := common.DeployConfig{
+		S3AccessID:     "access-id",
+		S3AccessSecret: "access-secret",
+		S3Endpoint:     "oss.example.com",
+		S3PublicBucket: "video-bucket",
+		S3SSLEnabled:   true,
+	}
+
+	for _, runtimeFramework := range []string{"longcat-video", "amd-longcat-video"} {
+		t.Run(runtimeFramework, func(t *testing.T) {
+			envMap := map[string]string{}
+			addLongCatVideoRuntimeEnv(envMap, runtimeFramework, "longcat-service", cfg)
+
+			require.Equal(t, "longcat-service", envMap["LONGCAT_TASK_NAMESPACE"])
+			require.Equal(t, "access-id", envMap["S3_ACCESS_ID"])
+			require.Equal(t, "access-secret", envMap["S3_ACCESS_SECRET"])
+			require.Equal(t, "video-bucket", envMap["S3_BUCKET"])
+			require.Equal(t, "oss.example.com", envMap["S3_ENDPOINT"])
+			require.Equal(t, "true", envMap["S3_SSL_ENABLED"])
+		})
+	}
+
+	t.Run("empty bucket leaves storage disabled", func(t *testing.T) {
+		envMap := map[string]string{}
+		disabled := cfg
+		disabled.S3PublicBucket = ""
+		addLongCatVideoRuntimeEnv(envMap, "longcat-video", "longcat-service", disabled)
+		require.Equal(t, map[string]string{"LONGCAT_TASK_NAMESPACE": "longcat-service"}, envMap)
+	})
+
+	t.Run("other runtime does not receive credentials", func(t *testing.T) {
+		envMap := map[string]string{}
+		addLongCatVideoRuntimeEnv(envMap, "vllm", "vllm-service", cfg)
+		require.Empty(t, envMap)
+	})
+}

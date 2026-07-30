@@ -1508,6 +1508,15 @@ func GetBuiltInTaskFromTags(tags []database.Tag) string {
 		if tag.Name == string(types.Image2Video) {
 			return tag.Name
 		}
+		if tag.Name == string(types.AudioText2Video) {
+			return tag.Name
+		}
+		if tag.Name == string(types.AudioImageText2Video) {
+			return tag.Name
+		}
+		if tag.Name == string(types.AudioDrivenVideoContinuation) {
+			return tag.Name
+		}
 		if tag.Name == string(types.TextToSpeech) {
 			return tag.Name
 		}
