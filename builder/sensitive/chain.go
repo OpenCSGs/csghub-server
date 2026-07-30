@@ -2,6 +2,7 @@ package sensitive
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"log/slog"
 	"strings"
@@ -123,7 +124,17 @@ func (c *chainImpl) PassImageURLCheck(ctx context.Context, scenario types.Sensit
 }
 
 func (c *chainImpl) PassImageStreamCheck(ctx context.Context, scenario types.SensitiveScenario, reader io.Reader) (*CheckResult, error) {
+	// If the reader is seekable, rewind it before each checker so every
+	// checker receives the full, identical content. Without this, the first
+	// checker consumes the stream and subsequent checkers read empty content.
+	seeker, canSeek := reader.(io.Seeker)
+
 	for _, checker := range c.checkers {
+		if canSeek {
+			if _, err := seeker.Seek(0, io.SeekStart); err != nil {
+				return nil, fmt.Errorf("failed to seek image reader before checker: %w", err)
+			}
+		}
 		res, err := checker.PassImageStreamCheck(ctx, scenario, reader)
 		if err != nil {
 			return nil, err

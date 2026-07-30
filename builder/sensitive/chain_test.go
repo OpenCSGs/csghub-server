@@ -4,6 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"strings"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -11,6 +14,7 @@ import (
 	green20220302 "github.com/alibabacloud-go/green-20220302/v2/client"
 	util "github.com/alibabacloud-go/tea-utils/v2/service"
 	"github.com/alibabacloud-go/tea/tea"
+	"github.com/stretchr/testify/mock"
 	mockgreen "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/sensitive"
 	"opencsg.com/csghub-server/builder/sensitive"
 	"opencsg.com/csghub-server/common/config"
@@ -431,5 +435,183 @@ func TestNewChainCheckerFromConfig_WithAdvanceOptions(t *testing.T) {
 	}
 	if calledProviders[1] != "another_custom" {
 		t.Fatalf("expected second provider 'another_custom', got '%s'", calledProviders[1])
+	}
+}
+
+// TestChainImpl_PassImageStreamCheck_SeekableReader verifies that when the
+// chain has multiple checkers, each checker receives the full image content.
+// The reader is seekable (strings.NewReader), so the chain rewinds it before
+// each checker. Both checkers read the stream and must see identical content.
+func TestChainImpl_PassImageStreamCheck_SeekableReader(t *testing.T) {
+	imageContent := "fake-image-bytes"
+
+	checker1 := mockgreen.NewMockSensitiveChecker(t)
+	checker2 := mockgreen.NewMockSensitiveChecker(t)
+	chain := sensitive.NewChainCheckerWithCheckers(checker1, checker2)
+
+	ctx := context.Background()
+	scenario := types.ScenarioImageBaseLineCheck
+
+	var mu sync.Mutex
+	var contents []string
+
+	checker1.EXPECT().PassImageStreamCheck(mock.Anything, scenario, mock.Anything).
+		RunAndReturn(func(ctx context.Context, s types.SensitiveScenario, r io.Reader) (*sensitive.CheckResult, error) {
+			b, _ := io.ReadAll(r)
+			mu.Lock()
+			contents = append(contents, string(b))
+			mu.Unlock()
+			return &sensitive.CheckResult{IsSensitive: false}, nil
+		}).Once()
+
+	checker2.EXPECT().PassImageStreamCheck(mock.Anything, scenario, mock.Anything).
+		RunAndReturn(func(ctx context.Context, s types.SensitiveScenario, r io.Reader) (*sensitive.CheckResult, error) {
+			b, _ := io.ReadAll(r)
+			mu.Lock()
+			contents = append(contents, string(b))
+			mu.Unlock()
+			return &sensitive.CheckResult{IsSensitive: false}, nil
+		}).Once()
+
+	result, err := chain.PassImageStreamCheck(ctx, scenario, strings.NewReader(imageContent))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result == nil || result.IsSensitive {
+		t.Fatalf("expected non-sensitive result, got %+v", result)
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+	if len(contents) != 2 {
+		t.Fatalf("expected 2 checker calls, got %d", len(contents))
+	}
+	for i, got := range contents {
+		if got != imageContent {
+			t.Fatalf("checker %d: expected content %q, got %q", i, imageContent, got)
+		}
+	}
+}
+
+// TestChainImpl_PassImageStreamCheck_SeekableReader_ShortCircuit verifies that
+// when the first checker detects sensitive content, the chain returns
+// immediately and does not call the second checker.
+func TestChainImpl_PassImageStreamCheck_SeekableReader_ShortCircuit(t *testing.T) {
+	imageContent := "sensitive-image-bytes"
+
+	checker1 := mockgreen.NewMockSensitiveChecker(t)
+	checker2 := mockgreen.NewMockSensitiveChecker(t)
+	chain := sensitive.NewChainCheckerWithCheckers(checker1, checker2)
+
+	ctx := context.Background()
+	scenario := types.ScenarioImageBaseLineCheck
+
+	checker1.EXPECT().PassImageStreamCheck(mock.Anything, scenario, mock.Anything).
+		RunAndReturn(func(ctx context.Context, s types.SensitiveScenario, r io.Reader) (*sensitive.CheckResult, error) {
+			_, _ = io.ReadAll(r) // consume the stream
+			return &sensitive.CheckResult{IsSensitive: true, Reason: "porn"}, nil
+		}).Once()
+	// checker2 must NOT be called
+	checker2.AssertNotCalled(t, "PassImageStreamCheck", mock.Anything, mock.Anything, mock.Anything)
+
+	result, err := chain.PassImageStreamCheck(ctx, scenario, strings.NewReader(imageContent))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result == nil || !result.IsSensitive {
+		t.Fatalf("expected sensitive result, got %+v", result)
+	}
+	if result.Reason != "porn" {
+		t.Fatalf("expected reason 'porn', got '%s'", result.Reason)
+	}
+}
+
+// TestChainImpl_PassImageStreamCheck_NonSeekableReader verifies the behavior
+// when the reader does not implement io.Seeker. The first checker consumes the
+// stream; the second checker reads empty content. This is the known limitation
+// — the test documents the boundary behavior.
+func TestChainImpl_PassImageStreamCheck_NonSeekableReader(t *testing.T) {
+	imageContent := "fake-image-bytes"
+
+	checker1 := mockgreen.NewMockSensitiveChecker(t)
+	checker2 := mockgreen.NewMockSensitiveChecker(t)
+	chain := sensitive.NewChainCheckerWithCheckers(checker1, checker2)
+
+	ctx := context.Background()
+	scenario := types.ScenarioImageBaseLineCheck
+
+	var mu sync.Mutex
+	var contents []string
+
+	checker1.EXPECT().PassImageStreamCheck(mock.Anything, scenario, mock.Anything).
+		RunAndReturn(func(ctx context.Context, s types.SensitiveScenario, r io.Reader) (*sensitive.CheckResult, error) {
+			b, _ := io.ReadAll(r)
+			mu.Lock()
+			contents = append(contents, string(b))
+			mu.Unlock()
+			return &sensitive.CheckResult{IsSensitive: false}, nil
+		}).Once()
+
+	checker2.EXPECT().PassImageStreamCheck(mock.Anything, scenario, mock.Anything).
+		RunAndReturn(func(ctx context.Context, s types.SensitiveScenario, r io.Reader) (*sensitive.CheckResult, error) {
+			b, _ := io.ReadAll(r)
+			mu.Lock()
+			contents = append(contents, string(b))
+			mu.Unlock()
+			return &sensitive.CheckResult{IsSensitive: false}, nil
+		}).Once()
+
+	// Wrap in a struct that only exposes Read, hiding Seek.
+	nonSeekable := struct{ io.Reader }{strings.NewReader(imageContent)}
+
+	result, err := chain.PassImageStreamCheck(ctx, scenario, nonSeekable)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result == nil || result.IsSensitive {
+		t.Fatalf("expected non-sensitive result, got %+v", result)
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+	if len(contents) != 2 {
+		t.Fatalf("expected 2 checker calls, got %d", len(contents))
+	}
+	// First checker gets full content
+	if contents[0] != imageContent {
+		t.Fatalf("checker 0: expected %q, got %q", imageContent, contents[0])
+	}
+	// Second checker gets empty content (non-seekable, stream consumed)
+	if contents[1] != "" {
+		t.Fatalf("checker 1: expected empty (non-seekable stream consumed), got %q", contents[1])
+	}
+}
+
+// TestChainImpl_PassImageStreamCheck_SingleChecker verifies that a single
+// checker works correctly with a seekable reader (no unnecessary seek issues).
+func TestChainImpl_PassImageStreamCheck_SingleChecker(t *testing.T) {
+	imageContent := "single-checker-bytes"
+
+	checker1 := mockgreen.NewMockSensitiveChecker(t)
+	chain := sensitive.NewChainCheckerWithCheckers(checker1)
+
+	ctx := context.Background()
+	scenario := types.ScenarioImageBaseLineCheck
+
+	checker1.EXPECT().PassImageStreamCheck(mock.Anything, scenario, mock.Anything).
+		RunAndReturn(func(ctx context.Context, s types.SensitiveScenario, r io.Reader) (*sensitive.CheckResult, error) {
+			b, _ := io.ReadAll(r)
+			if string(b) != imageContent {
+				t.Fatalf("expected %q, got %q", imageContent, string(b))
+			}
+			return &sensitive.CheckResult{IsSensitive: false}, nil
+		}).Once()
+
+	result, err := chain.PassImageStreamCheck(ctx, scenario, strings.NewReader(imageContent))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result == nil || result.IsSensitive {
+		t.Fatalf("expected non-sensitive result, got %+v", result)
 	}
 }

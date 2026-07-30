@@ -32,6 +32,7 @@ func (c *UnkownFileChecker) Run(ctx context.Context, fctx FileCheckContext) (typ
 	buffer = buffer[:n]
 	// Detect the file content type like text/plain, image/jpeg, etc
 	detectedType := http.DetectContentType(buffer)
+
 	switch {
 	case strings.HasPrefix(detectedType, "text"):
 		slog.Debug("use text file checker for unknown file", slog.String("content_type", detectedType))
@@ -41,8 +42,19 @@ func (c *UnkownFileChecker) Run(ctx context.Context, fctx FileCheckContext) (typ
 	case strings.HasPrefix(detectedType, "image"):
 		slog.Debug("use image file checker for unknown file", slog.String("content_type", detectedType))
 		ic := NewImageFileChecker()
-		mreader := io.MultiReader(bytes.NewReader(buffer), reader)
-		return ic.Run(ctx, FileCheckContext{Reader: mreader, ImageURL: fctx.ImageURL})
+		// When a URL is available, the Aliyun service fetches the image directly,
+		// so the reader is not needed. Only rewind the reader for stream-based
+		// checks (no URL). If the reader is not seekable, rewindReader returns
+		// nil — short-circuit with an exception instead of passing an
+		// un-rewindable reader downstream.
+		if fctx.ImageURL != "" {
+			return ic.Run(ctx, FileCheckContext{ImageURL: fctx.ImageURL})
+		}
+		rewoundReader := rewindReader(reader, buffer)
+		if rewoundReader == nil {
+			return types.SensitiveCheckException, "image stream reader is not seekable, cannot retry on failure"
+		}
+		return ic.Run(ctx, FileCheckContext{Reader: rewoundReader})
 	case strings.HasPrefix(detectedType, "audio"):
 		slog.Debug("skip audio checker for unknown file", slog.String("content_type", detectedType))
 		return types.SensitiveCheckSkip, "skip binary audio file"
@@ -54,4 +66,21 @@ func (c *UnkownFileChecker) Run(ctx context.Context, fctx FileCheckContext) (typ
 		return types.SensitiveCheckSkip, "skip binary file"
 	}
 
+}
+
+// rewindReader resets the reader to the beginning after 512 bytes have been
+// consumed for content-type detection. If the reader implements io.Seeker,
+// it is seeked back to position 0 and returned directly — this preserves
+// seekability for downstream retry/chain logic. If the reader is not seekable,
+// nil is returned so the caller can short-circuit instead of passing an
+// un-rewindable reader downstream.
+func rewindReader(reader io.Reader, consumed []byte) io.Reader {
+	if seeker, ok := reader.(io.Seeker); ok {
+		if _, err := seeker.Seek(0, io.SeekStart); err != nil {
+			slog.Error("failed to seek reader back to start", slog.Any("error", err))
+			return nil
+		}
+		return reader
+	}
+	return nil
 }

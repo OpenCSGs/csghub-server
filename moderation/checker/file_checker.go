@@ -96,10 +96,15 @@ func (c *ImageFileChecker) Run(ctx context.Context, fctx FileCheckContext) (type
 	if fctx.ImageURL != "" {
 		return c.checkByURL(ctx, fctx.ImageURL)
 	}
-	if fctx.Reader != nil {
-		return c.checkByStream(ctx, fctx.Reader)
+	if fctx.Reader == nil {
+		return types.SensitiveCheckException, "image url is empty and no stream available"
 	}
-	return types.SensitiveCheckException, "image url is empty and no stream available"
+	// The stream-based check uploads the image to OSS and retries on failure.
+	// Retries require rewinding the reader, so only seekable readers are accepted.
+	if _, seekable := fctx.Reader.(io.ReadSeeker); !seekable {
+		return types.SensitiveCheckException, "image stream reader is not seekable, cannot retry on failure"
+	}
+	return c.checkByStream(ctx, fctx.Reader)
 }
 
 // checkByURL checks an image via its publicly-accessible URL.
@@ -137,7 +142,15 @@ func (c *ImageFileChecker) checkByURL(ctx context.Context, imageURL string) (typ
 
 // checkByStream checks an image by uploading its stream to S3 and generating
 // a presigned URL. Used for private repos where no public URL is available.
+//
+// Retries are only enabled when the reader is seekable (io.ReadSeeker), because
+// the first attempt consumes the stream and retries need a rewind to upload the
+// full content again. The actual rewind before each attempt is handled by
+// chainImpl.PassImageStreamCheck, which seeks the reader to the start before
+// every checker call.
 func (c *ImageFileChecker) checkByStream(ctx context.Context, reader io.Reader) (types.SensitiveCheckStatus, string) {
+	_, seekable := reader.(io.ReadSeeker)
+
 	res, err := retry.DoWithData(
 		func() (*sensitive.CheckResult, error) {
 			reqCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
@@ -145,7 +158,9 @@ func (c *ImageFileChecker) checkByStream(ctx context.Context, reader io.Reader) 
 			return c.checker.PassImageStreamCheck(reqCtx, c.scenario, reader)
 		}, retry.Attempts(3), retry.DelayType(retry.BackOffDelay), retry.LastErrorOnly(true),
 		retry.RetryIf(func(error) bool {
-			return ctx.Err() == nil
+			// Only retry when the reader is seekable; otherwise the stream
+			// has been consumed and retries would upload empty content.
+			return seekable && ctx.Err() == nil
 		}))
 
 	if err != nil {
