@@ -86,7 +86,6 @@ func TestOrganizationHandler_Create(t *testing.T) {
 func TestOrganizationHandler_Index(t *testing.T) {
 	response := httptest.NewRecorder()
 	ginc, _ := gin.CreateTestContext(response)
-	httpbase.SetCurrentUser(ginc, "user1")
 	ginc.Request = httptest.NewRequest("GET", "/api/v1/organizations?search=org1&per=10&page=1", nil)
 
 	dborgs := []types.Organization{
@@ -95,7 +94,7 @@ func TestOrganizationHandler_Index(t *testing.T) {
 		},
 	}
 	mockOrgComp := mockcomp.NewMockOrganizationComponent(t)
-	mockOrgComp.EXPECT().Index(mock.Anything, "user1", "org1", 10, 1, "", "").Return(dborgs, 1, nil)
+	mockOrgComp.EXPECT().Index(mock.Anything, "org1", 10, 1, "", "").Return(dborgs, 1, nil)
 	h := &OrganizationHandler{
 		c: mockOrgComp,
 	}
@@ -107,6 +106,53 @@ func TestOrganizationHandler_Index(t *testing.T) {
 	require.NotEmpty(t, r.Data)
 	require.Equal(t, 1, len(r.Data.Orgs))
 	require.Equal(t, 1, r.Data.Total)
+}
+
+func TestOrganizationHandler_ListUserOrgs(t *testing.T) {
+	t.Run("list user orgs successfully", func(t *testing.T) {
+		gin.SetMode(gin.TestMode)
+		response := httptest.NewRecorder()
+		ginc, _ := gin.CreateTestContext(response)
+		ginc.Request = httptest.NewRequest("GET", "/api/v1/user/user1/organizations?search=org&per=10&page=1", nil)
+		ginc.Params = gin.Params{{Key: "username", Value: "user1"}}
+
+		dborgs := []types.Organization{
+			{Name: "org1"},
+			{Name: "org2"},
+		}
+		mockOrgComp := mockcomp.NewMockOrganizationComponent(t)
+		mockOrgComp.EXPECT().ListUserOrgs(mock.Anything, &types.ListUserOrgsReq{
+					Username: "user1", Search: "org", Per: 10, Page: 1,
+				}).Return(dborgs, 2, nil)
+		h := &OrganizationHandler{
+			c: mockOrgComp,
+		}
+		h.ListUserOrgs(ginc)
+		require.Equal(t, 200, response.Code)
+		var r orgsResponse
+		err := json.Unmarshal(response.Body.Bytes(), &r)
+		require.Nil(t, err)
+		require.Equal(t, 2, len(r.Data.Orgs))
+		require.Equal(t, 2, r.Data.Total)
+	})
+
+	t.Run("list user orgs with server error", func(t *testing.T) {
+		gin.SetMode(gin.TestMode)
+		response := httptest.NewRecorder()
+		ginc, _ := gin.CreateTestContext(response)
+		ginc.Request = httptest.NewRequest("GET", "/api/v1/user/user1/organizations", nil)
+		ginc.Params = gin.Params{{Key: "username", Value: "user1"}}
+
+		mockOrgComp := mockcomp.NewMockOrganizationComponent(t)
+		mockOrgComp.EXPECT().ListUserOrgs(mock.Anything, &types.ListUserOrgsReq{
+					Username: "user1", Per: 50, Page: 1,
+				}).Return(nil, 0, errors.New("internal error"))
+		h := &OrganizationHandler{
+			c: mockOrgComp,
+		}
+		h.ListUserOrgs(ginc)
+		require.Equal(t, 500, response.Code)
+	})
 }
 
 type orgsResponse struct {

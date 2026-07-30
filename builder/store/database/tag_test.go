@@ -1030,3 +1030,45 @@ func TestTagStore_CheckTagIDsExist(t *testing.T) {
 	err := ts.CheckTagIDsExist(ctx, tagIDs)
 	require.Empty(t, err)
 }
+
+func TestTagStore_CheckTagIDsExistInScope(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	ts := database.NewTagStoreWithDB(db)
+
+	// Look up seeded organization industry tags
+	var tagInternet, tagFinance database.Tag
+	err := db.Core.NewSelect().Model(&tagInternet).
+		Where("name = ? AND category = ? AND scope = ?", "internet", "industry", "organization").
+		Scan(ctx)
+	require.Nil(t, err)
+	err = db.Core.NewSelect().Model(&tagFinance).
+		Where("name = ? AND category = ? AND scope = ?", "finance", "industry", "organization").
+		Scan(ctx)
+	require.Nil(t, err)
+
+	// Valid: org-scoped tags exist
+	err = ts.CheckTagIDsExistInScope(ctx, []int64{tagInternet.ID, tagFinance.ID}, types.OrganizationTagScope, string(types.IndustryCategory))
+	require.Nil(t, err)
+
+	// Invalid: non-existent ID
+	err = ts.CheckTagIDsExistInScope(ctx, []int64{99999}, types.OrganizationTagScope, "")
+	require.NotNil(t, err)
+	require.Contains(t, err.Error(), "some tag IDs do not belong to the expected scope or do not exist")
+
+	// Invalid: wrong scope (org tags queried as model scope)
+	err = ts.CheckTagIDsExistInScope(ctx, []int64{tagInternet.ID}, types.ModelTagScope, "")
+	require.NotNil(t, err)
+
+	// Valid: correct scope without category filter
+	err = ts.CheckTagIDsExistInScope(ctx, []int64{tagInternet.ID}, types.OrganizationTagScope, "")
+	require.Nil(t, err)
+
+	// Valid: empty IDs always pass
+	err = ts.CheckTagIDsExistInScope(ctx, []int64{}, types.OrganizationTagScope, "")
+	require.Nil(t, err)
+}

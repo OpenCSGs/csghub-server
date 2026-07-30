@@ -26,6 +26,7 @@ const (
 	SizeCategory       TagCategory = "size"
 	LanguageCategory   TagCategory = "language"
 	EvaluationCategory TagCategory = "evaluation"
+	IndustryCategory   TagCategory = "industry"
 )
 
 type RepoTagCategory struct {
@@ -64,14 +65,15 @@ type TagScope string
 type TagSource string
 
 const (
-	ModelTagScope   TagScope = "model"
-	DatasetTagScope TagScope = "dataset"
-	CodeTagScope    TagScope = "code"
-	SpaceTagScope   TagScope = "space"
-	PromptTagScope  TagScope = "prompt"
-	MCPTagScope     TagScope = "mcp"
-	SkillTagScope   TagScope = "skill"
-	UnknownScope    TagScope = "unknown"
+	ModelTagScope        TagScope = "model"
+	DatasetTagScope      TagScope = "dataset"
+	CodeTagScope         TagScope = "code"
+	SpaceTagScope        TagScope = "space"
+	PromptTagScope       TagScope = "prompt"
+	MCPTagScope          TagScope = "mcp"
+	SkillTagScope        TagScope = "skill"
+	OrganizationTagScope TagScope = "organization"
+	UnknownScope         TagScope = "unknown"
 )
 
 const (
@@ -80,7 +82,7 @@ const (
 )
 
 type TagFilter struct {
-	Scopes     []TagScope `form:"scope" binding:"omitempty,dive,eq=model|eq=dataset|eq=code|eq=space|eq=prompt|eq=mcp|eq=skill"`
+	Scopes     []TagScope `form:"scope" binding:"omitempty,dive,eq=model|eq=dataset|eq=code|eq=space|eq=prompt|eq=mcp|eq=skill|eq=organization"`
 	Categories []string   `form:"category" binding:"omitempty,dive"`
 	BuiltIn    *bool      `form:"built_in" binding:"omitnil"`
 	Search     string     `form:"search" binding:"omitempty"`

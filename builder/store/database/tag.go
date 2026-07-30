@@ -54,6 +54,7 @@ type TagStore interface {
 	UpdateCategory(ctx context.Context, category TagCategory) (*TagCategory, error)
 	DeleteCategory(ctx context.Context, id int64) error
 	CheckTagIDsExist(ctx context.Context, ids []int64) error
+	CheckTagIDsExistInScope(ctx context.Context, ids []int64, scope types.TagScope, category string) error
 }
 
 func NewTagStore() TagStore {
@@ -640,3 +641,29 @@ func (ts *tagStoreImpl) CheckTagIDsExist(ctx context.Context, ids []int64) error
 	}
 	return nil
 }
+
+func (ts *tagStoreImpl) CheckTagIDsExistInScope(ctx context.Context, ids []int64, scope types.TagScope, category string) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	var existingTags []*Tag
+	q := ts.db.Operator.Core.NewSelect().
+		Model(&existingTags).
+		Where("id IN (?)", bun.In(ids)).
+		Where("scope = ?", scope)
+	if category != "" {
+		q = q.Where("category = ?", category)
+	}
+	err := q.Scan(ctx, &existingTags)
+	if err != nil {
+		return fmt.Errorf("failed to check tag IDs existence: %w", err)
+	}
+
+	if len(existingTags) != len(ids) {
+		return ErrTagIDsNotFoundInScope
+	}
+	return nil
+}
+
+// ErrTagIDsNotFoundInScope is returned when some tag IDs do not exist or belong to the wrong scope/category.
+var ErrTagIDsNotFoundInScope = errors.New("some tag IDs do not belong to the expected scope or do not exist")

@@ -54,11 +54,17 @@ func TestOrganizationComponent_Create(t *testing.T) {
 	mockSSO.EXPECT().IsExistByName(mock.Anything, req.Name).Return(false, nil).Once()
 	mockSSO.EXPECT().CreateUser(mock.Anything, mock.Anything).Return(nil).Once()
 
+	mockTagStore := mockdb.NewMockTagStore(t)
+
+	// GetOrganizationTags is called to return tags in the response
+	mockOrgStore.EXPECT().GetOrganizationTags(mock.Anything, mock.Anything).Return([]database.Tag{}, nil).Once()
+
 	c := &organizationComponentImpl{
 		userStore: mockUserStore,
 		nsStore:   mockNamespaceStore,
 		gs:        mockGitServer,
 		orgStore:  mockOrgStore,
+		tagStore:  mockTagStore,
 		msc:       mockMemberComponent,
 		sso:       mockSSO,
 	}
@@ -121,6 +127,38 @@ func TestOrganizationComponent_Create_SSOUserExists(t *testing.T) {
 	require.ErrorIs(t, err, errorx.ErrNamespaceAlreadyExists)
 }
 
+func TestOrganizationComponent_Create_InvalidTagIDs(t *testing.T) {
+	req := &types.CreateOrgReq{
+		Name:     "org1",
+		Username: "user1",
+		TagIDs:   []int64{999},
+	}
+	mockUserStore := mockdb.NewMockUserStore(t)
+	mockUserStore.EXPECT().FindByUsername(mock.Anything, req.Username).Return(database.User{
+		Username: "user1",
+	}, nil).Once()
+
+	mockNamespaceStore := mockdb.NewMockNamespaceStore(t)
+	mockNamespaceStore.EXPECT().Exists(mock.Anything, req.Name).Return(false, nil).Once()
+
+	mockSSO := mockrpc.NewMockSSOInterface(t)
+	mockSSO.EXPECT().IsExistByName(mock.Anything, req.Name).Return(false, nil).Once()
+
+	mockTagStore := mockdb.NewMockTagStore(t)
+	mockTagStore.EXPECT().CheckTagIDsExistInScope(mock.Anything, []int64{999}, types.OrganizationTagScope, string(types.IndustryCategory)).Return(database.ErrTagIDsNotFoundInScope).Once()
+
+	// No mocks for Git, SSO CreateUser, or DB Create — tag validation fails first
+	c := &organizationComponentImpl{
+		userStore: mockUserStore,
+		nsStore:   mockNamespaceStore,
+		sso:       mockSSO,
+		tagStore:  mockTagStore,
+	}
+	org, err := c.Create(context.Background(), req)
+	require.Nil(t, org)
+	require.ErrorIs(t, err, errorx.ErrTagIDsNotExist)
+}
+
 func TestOrganizationComponent_Index(t *testing.T) {
 	var dbOrgs []database.Organization
 	dbOrgs = append(dbOrgs, database.Organization{
@@ -150,19 +188,13 @@ func TestOrganizationComponent_Index(t *testing.T) {
 		},
 	})
 	mockOrgStore := mockdb.NewMockOrgStore(t)
-	mockOrgStore.EXPECT().GetUserOwnOrgs(mock.Anything, "user1").Return(dbOrgs, len(dbOrgs), nil).Once()
-
-	mockUserStore := mockdb.NewMockUserStore(t)
-	mockUserStore.EXPECT().FindByUsername(mock.Anything, "user1").Return(database.User{
-		Username: "user1",
-		RoleMask: "",
-	}, nil)
+	mockOrgStore.EXPECT().Search(mock.Anything, "", 10, 0, "", "").Return(dbOrgs, len(dbOrgs), nil).Once()
+	mockOrgStore.EXPECT().GetOrganizationTagsByOrgIDs(mock.Anything, []int64{1, 2}).Return(map[int64][]database.Tag{}, nil).Once()
 
 	c := &organizationComponentImpl{
-		orgStore:  mockOrgStore,
-		userStore: mockUserStore,
+		orgStore: mockOrgStore,
 	}
-	expectedOrgs, total, err := c.Index(context.Background(), "user1", "", 10, 0, "", "")
+	expectedOrgs, total, err := c.Index(context.Background(), "", 10, 0, "", "")
 
 	require.NoError(t, err)
 	require.Len(t, expectedOrgs, 2)
@@ -197,6 +229,288 @@ func TestOrganizationComponent_Index(t *testing.T) {
 		}
 		return true
 	})
+}
+
+func TestOrganizationComponent_ListUserOrgs_Admin(t *testing.T) {
+	var dbOrgs []database.Organization
+	dbOrgs = append(dbOrgs, database.Organization{
+		ID:    1,
+		Name:  "org1",
+		OrgType: "school",
+		Namespace: &database.Namespace{
+			Path:          "org1",
+			NamespaceType: database.OrgNamespace,
+		},
+	})
+
+	mockOrgStore := mockdb.NewMockOrgStore(t)
+	mockOrgStore.EXPECT().SearchUserBelongOrgs(mock.Anything, int64(1), "", 10, 1, "", "", "").Return(dbOrgs, len(dbOrgs), nil).Once()
+	mockOrgStore.EXPECT().GetOrganizationTagsByOrgIDs(mock.Anything, []int64{1}).Return(map[int64][]database.Tag{}, nil).Once()
+
+	mockUserStore := mockdb.NewMockUserStore(t)
+	mockUserStore.EXPECT().FindByUsername(mock.Anything, "admin1").Return(database.User{
+		ID:       1,
+		Username: "admin1",
+		RoleMask: "admin",
+	}, nil)
+
+	c := &organizationComponentImpl{
+		orgStore:  mockOrgStore,
+		userStore: mockUserStore,
+	}
+	orgs, total, err := c.ListUserOrgs(context.Background(), &types.ListUserOrgsReq{
+		Username: "admin1", Per: 10, Page: 1,
+	})
+
+	require.NoError(t, err)
+	require.Len(t, orgs, 1)
+	require.Equal(t, 1, total)
+	require.Equal(t, "org1", orgs[0].Name)
+}
+
+func TestOrganizationComponent_ListUserOrgs_RegularUser(t *testing.T) {
+	var dbOrgs []database.Organization
+	dbOrgs = append(dbOrgs, database.Organization{
+		ID:    1,
+		Name:  "org1",
+		OrgType: "school",
+		Namespace: &database.Namespace{
+			Path:          "org1",
+			NamespaceType: database.OrgNamespace,
+		},
+	})
+
+	mockOrgStore := mockdb.NewMockOrgStore(t)
+	mockOrgStore.EXPECT().SearchUserBelongOrgs(mock.Anything, int64(2), "", 10, 1, "", "", "").Return(dbOrgs, len(dbOrgs), nil).Once()
+	mockOrgStore.EXPECT().GetOrganizationTagsByOrgIDs(mock.Anything, []int64{1}).Return(map[int64][]database.Tag{}, nil).Once()
+
+	mockUserStore := mockdb.NewMockUserStore(t)
+	mockUserStore.EXPECT().FindByUsername(mock.Anything, "user1").Return(database.User{
+		ID:       2,
+		Username: "user1",
+		RoleMask: "",
+	}, nil)
+
+	c := &organizationComponentImpl{
+		orgStore:  mockOrgStore,
+		userStore: mockUserStore,
+	}
+	orgs, total, err := c.ListUserOrgs(context.Background(), &types.ListUserOrgsReq{
+		Username: "user1", Per: 10, Page: 1,
+	})
+
+	require.NoError(t, err)
+	require.Len(t, orgs, 1)
+	require.Equal(t, 1, total)
+	require.Equal(t, "org1", orgs[0].Name)
+}
+
+func TestOrganizationComponent_ListUserOrgs_RegularUserWithFilters(t *testing.T) {
+	var dbOrgs []database.Organization
+	dbOrgs = append(dbOrgs, database.Organization{
+		ID:       1,
+		Name:     "org1",
+		OrgType:  "school",
+		Namespace: &database.Namespace{
+			Path:          "org1",
+			NamespaceType: database.OrgNamespace,
+		},
+	})
+
+	mockOrgStore := mockdb.NewMockOrgStore(t)
+	mockOrgStore.EXPECT().SearchUserBelongOrgs(mock.Anything, int64(2), "search", 5, 2, "school", "approved", "").Return(dbOrgs, len(dbOrgs), nil).Once()
+	mockOrgStore.EXPECT().GetOrganizationTagsByOrgIDs(mock.Anything, []int64{1}).Return(map[int64][]database.Tag{}, nil).Once()
+
+	mockUserStore := mockdb.NewMockUserStore(t)
+	mockUserStore.EXPECT().FindByUsername(mock.Anything, "user1").Return(database.User{
+		ID:       2,
+		Username: "user1",
+		RoleMask: "",
+	}, nil)
+
+	c := &organizationComponentImpl{
+		orgStore:  mockOrgStore,
+		userStore: mockUserStore,
+	}
+	orgs, total, err := c.ListUserOrgs(context.Background(), &types.ListUserOrgsReq{
+		Username: "user1", Search: "search", Per: 5, Page: 2, OrgType: "school", VerifyStatus: "approved",
+	})
+
+	require.NoError(t, err)
+	require.Len(t, orgs, 1)
+	require.Equal(t, 1, total)
+	require.Equal(t, "org1", orgs[0].Name)
+}
+
+func TestOrganizationComponent_ListUserOrgs_EmptyUsername(t *testing.T) {
+	c := &organizationComponentImpl{}
+	orgs, total, err := c.ListUserOrgs(context.Background(), &types.ListUserOrgsReq{})
+
+	require.Error(t, err)
+	require.Nil(t, orgs)
+	require.Equal(t, 0, total)
+	require.Contains(t, err.Error(), "username is required")
+}
+
+func TestOrganizationComponent_ListUserOrgs_OwnerRole(t *testing.T) {
+	var dbOrgs []database.Organization
+	dbOrgs = append(dbOrgs, database.Organization{
+		ID:    1,
+		Name:  "org1",
+		OrgType: "school",
+		Namespace: &database.Namespace{
+			Path:          "org1",
+			NamespaceType: database.OrgNamespace,
+		},
+	})
+
+	mockOrgStore := mockdb.NewMockOrgStore(t)
+	mockOrgStore.EXPECT().SearchUserBelongOrgs(mock.Anything, int64(2), "", 10, 1, "", "", "owner").Return(dbOrgs, len(dbOrgs), nil).Once()
+	mockOrgStore.EXPECT().GetOrganizationTagsByOrgIDs(mock.Anything, []int64{1}).Return(map[int64][]database.Tag{}, nil).Once()
+
+	mockUserStore := mockdb.NewMockUserStore(t)
+	mockUserStore.EXPECT().FindByUsername(mock.Anything, "user1").Return(database.User{
+		ID:       2,
+		Username: "user1",
+		RoleMask: "",
+	}, nil)
+
+	c := &organizationComponentImpl{
+		orgStore:  mockOrgStore,
+		userStore: mockUserStore,
+	}
+	orgs, total, err := c.ListUserOrgs(context.Background(), &types.ListUserOrgsReq{
+		Username: "user1", Per: 10, Page: 1, Role: "owner",
+	})
+
+	require.NoError(t, err)
+	require.Len(t, orgs, 1)
+	require.Equal(t, 1, total)
+	require.Equal(t, "org1", orgs[0].Name)
+}
+
+func TestOrganizationComponent_ListUserOrgs_WriteRole(t *testing.T) {
+	var dbOrgs []database.Organization
+	dbOrgs = append(dbOrgs, database.Organization{
+		ID:    1,
+		Name:  "org1",
+		OrgType: "school",
+		Namespace: &database.Namespace{
+			Path:          "org1",
+			NamespaceType: database.OrgNamespace,
+		},
+	})
+
+	mockOrgStore := mockdb.NewMockOrgStore(t)
+	mockOrgStore.EXPECT().SearchUserBelongOrgs(mock.Anything, int64(2), "", 10, 1, "", "", "write").Return(dbOrgs, len(dbOrgs), nil).Once()
+	mockOrgStore.EXPECT().GetOrganizationTagsByOrgIDs(mock.Anything, []int64{1}).Return(map[int64][]database.Tag{}, nil).Once()
+
+	mockUserStore := mockdb.NewMockUserStore(t)
+	mockUserStore.EXPECT().FindByUsername(mock.Anything, "user1").Return(database.User{
+		ID:       2,
+		Username: "user1",
+		RoleMask: "",
+	}, nil)
+
+	c := &organizationComponentImpl{
+		orgStore:  mockOrgStore,
+		userStore: mockUserStore,
+	}
+	orgs, total, err := c.ListUserOrgs(context.Background(), &types.ListUserOrgsReq{
+		Username: "user1", Per: 10, Page: 1, Role: "write",
+	})
+
+	require.NoError(t, err)
+	require.Len(t, orgs, 1)
+	require.Equal(t, 1, total)
+	require.Equal(t, "org1", orgs[0].Name)
+}
+
+func TestOrganizationComponent_ListUserOrgs_AdminRole(t *testing.T) {
+	var dbOrgs []database.Organization
+	dbOrgs = append(dbOrgs, database.Organization{
+		ID:    1,
+		Name:  "org1",
+		OrgType: "school",
+		Namespace: &database.Namespace{
+			Path:          "org1",
+			NamespaceType: database.OrgNamespace,
+		},
+	})
+
+	mockOrgStore := mockdb.NewMockOrgStore(t)
+	mockOrgStore.EXPECT().SearchUserBelongOrgs(mock.Anything, int64(2), "", 10, 1, "", "", "admin").Return(dbOrgs, len(dbOrgs), nil).Once()
+	mockOrgStore.EXPECT().GetOrganizationTagsByOrgIDs(mock.Anything, []int64{1}).Return(map[int64][]database.Tag{}, nil).Once()
+
+	mockUserStore := mockdb.NewMockUserStore(t)
+	mockUserStore.EXPECT().FindByUsername(mock.Anything, "user1").Return(database.User{
+		ID:       2,
+		Username: "user1",
+		RoleMask: "",
+	}, nil)
+
+	c := &organizationComponentImpl{
+		orgStore:  mockOrgStore,
+		userStore: mockUserStore,
+	}
+	orgs, total, err := c.ListUserOrgs(context.Background(), &types.ListUserOrgsReq{
+		Username: "user1", Per: 10, Page: 1, Role: "admin",
+	})
+
+	require.NoError(t, err)
+	require.Len(t, orgs, 1)
+	require.Equal(t, 1, total)
+	require.Equal(t, "org1", orgs[0].Name)
+}
+
+func TestOrganizationComponent_toOrgList(t *testing.T) {
+	dbOrgs := []database.Organization{
+		{
+			ID:           1,
+			Name:         "org1",
+			Nickname:     "nick1",
+			Description:  "desc1",
+			Homepage:     "https://org1.com",
+			Logo:         "logo1.png",
+			OrgType:      "school",
+			Verified:     true,
+			VerifyStatus: "approved",
+			UUID:         uuid.New(),
+			Namespace: &database.Namespace{
+				Path:          "org1",
+				NamespaceType: database.OrgNamespace,
+			},
+		},
+		{
+			ID:    2,
+			Name:  "org2",
+			OrgType: "company",
+		},
+	}
+
+	mockOrgStore := mockdb.NewMockOrgStore(t)
+	mockOrgStore.EXPECT().GetOrganizationTagsByOrgIDs(mock.Anything, []int64{1, 2}).Return(map[int64][]database.Tag{}, nil).Once()
+
+	c := &organizationComponentImpl{
+		orgStore: mockOrgStore,
+	}
+	orgs, err := c.toOrgList(context.Background(), dbOrgs)
+	require.NoError(t, err)
+
+	require.Len(t, orgs, 2)
+	require.Equal(t, "org1", orgs[0].Name)
+	require.Equal(t, "nick1", orgs[0].Nickname)
+	require.Equal(t, "desc1", orgs[0].Description)
+	require.Equal(t, "https://org1.com", orgs[0].Homepage)
+	require.Equal(t, "logo1.png", orgs[0].Logo)
+	require.Equal(t, "school", orgs[0].OrgType)
+	require.True(t, orgs[0].Verified)
+	require.Equal(t, "approved", orgs[0].VerifyStatus)
+	require.NotNil(t, orgs[0].Namespace)
+	require.Equal(t, "org1", orgs[0].Namespace.Path)
+
+	require.Equal(t, "org2", orgs[1].Name)
+	require.Nil(t, orgs[1].Namespace)
 }
 
 func TestOrganizationComponent_Update(t *testing.T) {
@@ -300,6 +614,7 @@ func TestOrganizationComponent_Get(t *testing.T) {
 	}
 	mockOrgStore := mockdb.NewMockOrgStore(t)
 	mockOrgStore.EXPECT().FindByPath(mock.Anything, "org_path").Return(dbOrg, nil)
+	mockOrgStore.EXPECT().GetOrganizationTags(mock.Anything, dbOrg.ID).Return([]database.Tag{}, nil)
 
 	c := &organizationComponentImpl{
 		orgStore: mockOrgStore,
@@ -310,7 +625,7 @@ func TestOrganizationComponent_Get(t *testing.T) {
 	require.Equal(t, "org1", org.Nickname)
 	require.Equal(t, "https://org1.com", org.Homepage)
 	require.NotNil(t, org.Namespace)
-	require.Equal(t, "org1", org.Namespace.Path)
+	require.Equal(t, "org_path", org.Namespace.Path)
 }
 
 func TestOrganizationComponent_GetByUUID(t *testing.T) {
@@ -331,6 +646,7 @@ func TestOrganizationComponent_GetByUUID(t *testing.T) {
 	}
 	mockOrgStore := mockdb.NewMockOrgStore(t)
 	mockOrgStore.EXPECT().FindByUUID(mock.Anything, "org-uuid-123").Return(dbOrg, nil)
+	mockOrgStore.EXPECT().GetOrganizationTags(mock.Anything, dbOrg.ID).Return([]database.Tag{}, nil)
 
 	c := &organizationComponentImpl{
 		orgStore: mockOrgStore,
@@ -341,5 +657,5 @@ func TestOrganizationComponent_GetByUUID(t *testing.T) {
 	require.Equal(t, "org1", org.Nickname)
 	require.Equal(t, "https://org1.com", org.Homepage)
 	require.NotNil(t, org.Namespace)
-	require.Equal(t, "org1", org.Namespace.Path)
+	require.Equal(t, "org_path", org.Namespace.Path)
 }

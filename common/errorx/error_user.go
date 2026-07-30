@@ -1,5 +1,7 @@
 package errorx
 
+import "fmt"
+
 const errUserPrefix = "USER-ERR"
 
 const (
@@ -24,6 +26,7 @@ const (
 	userEmailEmpty
 	uuidConflict
 	namespaceAlreadyExists
+	tagIDsNotExist
 )
 
 var (
@@ -282,6 +285,18 @@ var (
 	//
 	// zh-HK: 命名空間已存在
 	ErrNamespaceAlreadyExists error = CustomError{prefix: errUserPrefix, code: namespaceAlreadyExists}
+	// some of the provided tag IDs do not exist in the system
+	//
+	// Description: One or more of the provided tag IDs do not exist in the system. Please verify all tag IDs are valid.
+	//
+	// Description_ZH: 提供的一个或多个标签ID不存在，请确认所有标签ID均有效。
+	//
+	// en-US: Some tag IDs do not exist
+	//
+	// zh-CN: 部分标签ID不存在
+	//
+	// zh-HK: 部分標籤ID不存在
+	ErrTagIDsNotExist error = CustomError{prefix: errUserPrefix, code: tagIDsNotExist}
 )
 
 // UsernameExists creates a specific error for username conflicts with the conflicting username
@@ -317,5 +332,15 @@ func NamespaceAlreadyExists(namespace string) error {
 		prefix:  errUserPrefix,
 		code:    namespaceAlreadyExists,
 		context: map[string]interface{}{"namespace": namespace},
+	}
+}
+
+// TagIDsNotFound creates a specific error for invalid tag IDs with the IDs that do not exist
+func TagIDsNotFound(ids []int64) error {
+	return CustomError{
+		prefix:  errUserPrefix,
+		code:    tagIDsNotExist,
+		err:     fmt.Errorf("some tag IDs do not exist: %v", ids),
+		context: map[string]interface{}{"tag_ids": ids},
 	}
 }

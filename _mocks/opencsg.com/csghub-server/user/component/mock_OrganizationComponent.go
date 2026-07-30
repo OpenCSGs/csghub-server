@@ -307,9 +307,9 @@ func (_c *MockOrganizationComponent_GetByUUID_Call) RunAndReturn(run func(contex
 	return _c
 }
 
-// Index provides a mock function with given fields: ctx, username, search, per, page, orgType, verifyStatus
-func (_m *MockOrganizationComponent) Index(ctx context.Context, username string, search string, per int, page int, orgType string, verifyStatus string) ([]types.Organization, int, error) {
-	ret := _m.Called(ctx, username, search, per, page, orgType, verifyStatus)
+// Index provides a mock function with given fields: ctx, search, per, page, orgType, verifyStatus
+func (_m *MockOrganizationComponent) Index(ctx context.Context, search string, per int, page int, orgType string, verifyStatus string) ([]types.Organization, int, error) {
+	ret := _m.Called(ctx, search, per, page, orgType, verifyStatus)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Index")
@@ -318,25 +318,25 @@ func (_m *MockOrganizationComponent) Index(ctx context.Context, username string,
 	var r0 []types.Organization
 	var r1 int
 	var r2 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, int, int, string, string) ([]types.Organization, int, error)); ok {
-		return rf(ctx, username, search, per, page, orgType, verifyStatus)
+	if rf, ok := ret.Get(0).(func(context.Context, string, int, int, string, string) ([]types.Organization, int, error)); ok {
+		return rf(ctx, search, per, page, orgType, verifyStatus)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, int, int, string, string) []types.Organization); ok {
-		r0 = rf(ctx, username, search, per, page, orgType, verifyStatus)
+	if rf, ok := ret.Get(0).(func(context.Context, string, int, int, string, string) []types.Organization); ok {
+		r0 = rf(ctx, search, per, page, orgType, verifyStatus)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]types.Organization)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, string, int, int, string, string) int); ok {
-		r1 = rf(ctx, username, search, per, page, orgType, verifyStatus)
+	if rf, ok := ret.Get(1).(func(context.Context, string, int, int, string, string) int); ok {
+		r1 = rf(ctx, search, per, page, orgType, verifyStatus)
 	} else {
 		r1 = ret.Get(1).(int)
 	}
 
-	if rf, ok := ret.Get(2).(func(context.Context, string, string, int, int, string, string) error); ok {
-		r2 = rf(ctx, username, search, per, page, orgType, verifyStatus)
+	if rf, ok := ret.Get(2).(func(context.Context, string, int, int, string, string) error); ok {
+		r2 = rf(ctx, search, per, page, orgType, verifyStatus)
 	} else {
 		r2 = ret.Error(2)
 	}
@@ -351,19 +351,18 @@ type MockOrganizationComponent_Index_Call struct {
 
 // Index is a helper method to define mock.On call
 //   - ctx context.Context
-//   - username string
 //   - search string
 //   - per int
 //   - page int
 //   - orgType string
 //   - verifyStatus string
-func (_e *MockOrganizationComponent_Expecter) Index(ctx interface{}, username interface{}, search interface{}, per interface{}, page interface{}, orgType interface{}, verifyStatus interface{}) *MockOrganizationComponent_Index_Call {
-	return &MockOrganizationComponent_Index_Call{Call: _e.mock.On("Index", ctx, username, search, per, page, orgType, verifyStatus)}
+func (_e *MockOrganizationComponent_Expecter) Index(ctx interface{}, search interface{}, per interface{}, page interface{}, orgType interface{}, verifyStatus interface{}) *MockOrganizationComponent_Index_Call {
+	return &MockOrganizationComponent_Index_Call{Call: _e.mock.On("Index", ctx, search, per, page, orgType, verifyStatus)}
 }
 
-func (_c *MockOrganizationComponent_Index_Call) Run(run func(ctx context.Context, username string, search string, per int, page int, orgType string, verifyStatus string)) *MockOrganizationComponent_Index_Call {
+func (_c *MockOrganizationComponent_Index_Call) Run(run func(ctx context.Context, search string, per int, page int, orgType string, verifyStatus string)) *MockOrganizationComponent_Index_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(int), args[4].(int), args[5].(string), args[6].(string))
+		run(args[0].(context.Context), args[1].(string), args[2].(int), args[3].(int), args[4].(string), args[5].(string))
 	})
 	return _c
 }
@@ -373,7 +372,73 @@ func (_c *MockOrganizationComponent_Index_Call) Return(_a0 []types.Organization,
 	return _c
 }
 
-func (_c *MockOrganizationComponent_Index_Call) RunAndReturn(run func(context.Context, string, string, int, int, string, string) ([]types.Organization, int, error)) *MockOrganizationComponent_Index_Call {
+func (_c *MockOrganizationComponent_Index_Call) RunAndReturn(run func(context.Context, string, int, int, string, string) ([]types.Organization, int, error)) *MockOrganizationComponent_Index_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ListUserOrgs provides a mock function with given fields: ctx, req
+func (_m *MockOrganizationComponent) ListUserOrgs(ctx context.Context, req *types.ListUserOrgsReq) ([]types.Organization, int, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListUserOrgs")
+	}
+
+	var r0 []types.Organization
+	var r1 int
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, *types.ListUserOrgsReq) ([]types.Organization, int, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *types.ListUserOrgsReq) []types.Organization); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]types.Organization)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *types.ListUserOrgsReq) int); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Get(1).(int)
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, *types.ListUserOrgsReq) error); ok {
+		r2 = rf(ctx, req)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
+// MockOrganizationComponent_ListUserOrgs_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListUserOrgs'
+type MockOrganizationComponent_ListUserOrgs_Call struct {
+	*mock.Call
+}
+
+// ListUserOrgs is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req *types.ListUserOrgsReq
+func (_e *MockOrganizationComponent_Expecter) ListUserOrgs(ctx interface{}, req interface{}) *MockOrganizationComponent_ListUserOrgs_Call {
+	return &MockOrganizationComponent_ListUserOrgs_Call{Call: _e.mock.On("ListUserOrgs", ctx, req)}
+}
+
+func (_c *MockOrganizationComponent_ListUserOrgs_Call) Run(run func(ctx context.Context, req *types.ListUserOrgsReq)) *MockOrganizationComponent_ListUserOrgs_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(*types.ListUserOrgsReq))
+	})
+	return _c
+}
+
+func (_c *MockOrganizationComponent_ListUserOrgs_Call) Return(_a0 []types.Organization, _a1 int, _a2 error) *MockOrganizationComponent_ListUserOrgs_Call {
+	_c.Call.Return(_a0, _a1, _a2)
+	return _c
+}
+
+func (_c *MockOrganizationComponent_ListUserOrgs_Call) RunAndReturn(run func(context.Context, *types.ListUserOrgsReq) ([]types.Organization, int, error)) *MockOrganizationComponent_ListUserOrgs_Call {
 	_c.Call.Return(run)
 	return _c
 }

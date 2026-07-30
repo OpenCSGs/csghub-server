@@ -292,6 +292,124 @@ func (_c *MockOrgStore_FindByUUID_Call) RunAndReturn(run func(context.Context, s
 	return _c
 }
 
+// GetOrganizationTags provides a mock function with given fields: ctx, orgID
+func (_m *MockOrgStore) GetOrganizationTags(ctx context.Context, orgID int64) ([]database.Tag, error) {
+	ret := _m.Called(ctx, orgID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetOrganizationTags")
+	}
+
+	var r0 []database.Tag
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, int64) ([]database.Tag, error)); ok {
+		return rf(ctx, orgID)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, int64) []database.Tag); ok {
+		r0 = rf(ctx, orgID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]database.Tag)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, int64) error); ok {
+		r1 = rf(ctx, orgID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockOrgStore_GetOrganizationTags_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetOrganizationTags'
+type MockOrgStore_GetOrganizationTags_Call struct {
+	*mock.Call
+}
+
+// GetOrganizationTags is a helper method to define mock.On call
+//   - ctx context.Context
+//   - orgID int64
+func (_e *MockOrgStore_Expecter) GetOrganizationTags(ctx interface{}, orgID interface{}) *MockOrgStore_GetOrganizationTags_Call {
+	return &MockOrgStore_GetOrganizationTags_Call{Call: _e.mock.On("GetOrganizationTags", ctx, orgID)}
+}
+
+func (_c *MockOrgStore_GetOrganizationTags_Call) Run(run func(ctx context.Context, orgID int64)) *MockOrgStore_GetOrganizationTags_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(int64))
+	})
+	return _c
+}
+
+func (_c *MockOrgStore_GetOrganizationTags_Call) Return(_a0 []database.Tag, _a1 error) *MockOrgStore_GetOrganizationTags_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockOrgStore_GetOrganizationTags_Call) RunAndReturn(run func(context.Context, int64) ([]database.Tag, error)) *MockOrgStore_GetOrganizationTags_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetOrganizationTagsByOrgIDs provides a mock function with given fields: ctx, orgIDs
+func (_m *MockOrgStore) GetOrganizationTagsByOrgIDs(ctx context.Context, orgIDs []int64) (map[int64][]database.Tag, error) {
+	ret := _m.Called(ctx, orgIDs)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetOrganizationTagsByOrgIDs")
+	}
+
+	var r0 map[int64][]database.Tag
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, []int64) (map[int64][]database.Tag, error)); ok {
+		return rf(ctx, orgIDs)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, []int64) map[int64][]database.Tag); ok {
+		r0 = rf(ctx, orgIDs)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(map[int64][]database.Tag)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, []int64) error); ok {
+		r1 = rf(ctx, orgIDs)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockOrgStore_GetOrganizationTagsByOrgIDs_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetOrganizationTagsByOrgIDs'
+type MockOrgStore_GetOrganizationTagsByOrgIDs_Call struct {
+	*mock.Call
+}
+
+// GetOrganizationTagsByOrgIDs is a helper method to define mock.On call
+//   - ctx context.Context
+//   - orgIDs []int64
+func (_e *MockOrgStore_Expecter) GetOrganizationTagsByOrgIDs(ctx interface{}, orgIDs interface{}) *MockOrgStore_GetOrganizationTagsByOrgIDs_Call {
+	return &MockOrgStore_GetOrganizationTagsByOrgIDs_Call{Call: _e.mock.On("GetOrganizationTagsByOrgIDs", ctx, orgIDs)}
+}
+
+func (_c *MockOrgStore_GetOrganizationTagsByOrgIDs_Call) Run(run func(ctx context.Context, orgIDs []int64)) *MockOrgStore_GetOrganizationTagsByOrgIDs_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].([]int64))
+	})
+	return _c
+}
+
+func (_c *MockOrgStore_GetOrganizationTagsByOrgIDs_Call) Return(_a0 map[int64][]database.Tag, _a1 error) *MockOrgStore_GetOrganizationTagsByOrgIDs_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockOrgStore_GetOrganizationTagsByOrgIDs_Call) RunAndReturn(run func(context.Context, []int64) (map[int64][]database.Tag, error)) *MockOrgStore_GetOrganizationTagsByOrgIDs_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetSharedOrgIDs provides a mock function with given fields: ctx, userIDs
 func (_m *MockOrgStore) GetSharedOrgIDs(ctx context.Context, userIDs []int64) ([]int64, error) {
 	ret := _m.Called(ctx, userIDs)
@@ -542,6 +660,126 @@ func (_c *MockOrgStore_Search_Call) Return(orgs []database.Organization, total i
 }
 
 func (_c *MockOrgStore_Search_Call) RunAndReturn(run func(context.Context, string, int, int, string, string) ([]database.Organization, int, error)) *MockOrgStore_Search_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// SearchUserBelongOrgs provides a mock function with given fields: ctx, userID, search, per, page, orgType, verifyStatus, role
+func (_m *MockOrgStore) SearchUserBelongOrgs(ctx context.Context, userID int64, search string, per int, page int, orgType string, verifyStatus string, role string) ([]database.Organization, int, error) {
+	ret := _m.Called(ctx, userID, search, per, page, orgType, verifyStatus, role)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SearchUserBelongOrgs")
+	}
+
+	var r0 []database.Organization
+	var r1 int
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, int64, string, int, int, string, string, string) ([]database.Organization, int, error)); ok {
+		return rf(ctx, userID, search, per, page, orgType, verifyStatus, role)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, int64, string, int, int, string, string, string) []database.Organization); ok {
+		r0 = rf(ctx, userID, search, per, page, orgType, verifyStatus, role)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]database.Organization)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, int64, string, int, int, string, string, string) int); ok {
+		r1 = rf(ctx, userID, search, per, page, orgType, verifyStatus, role)
+	} else {
+		r1 = ret.Get(1).(int)
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, int64, string, int, int, string, string, string) error); ok {
+		r2 = rf(ctx, userID, search, per, page, orgType, verifyStatus, role)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
+// MockOrgStore_SearchUserBelongOrgs_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SearchUserBelongOrgs'
+type MockOrgStore_SearchUserBelongOrgs_Call struct {
+	*mock.Call
+}
+
+// SearchUserBelongOrgs is a helper method to define mock.On call
+//   - ctx context.Context
+//   - userID int64
+//   - search string
+//   - per int
+//   - page int
+//   - orgType string
+//   - verifyStatus string
+//   - role string
+func (_e *MockOrgStore_Expecter) SearchUserBelongOrgs(ctx interface{}, userID interface{}, search interface{}, per interface{}, page interface{}, orgType interface{}, verifyStatus interface{}, role interface{}) *MockOrgStore_SearchUserBelongOrgs_Call {
+	return &MockOrgStore_SearchUserBelongOrgs_Call{Call: _e.mock.On("SearchUserBelongOrgs", ctx, userID, search, per, page, orgType, verifyStatus, role)}
+}
+
+func (_c *MockOrgStore_SearchUserBelongOrgs_Call) Run(run func(ctx context.Context, userID int64, search string, per int, page int, orgType string, verifyStatus string, role string)) *MockOrgStore_SearchUserBelongOrgs_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(int64), args[2].(string), args[3].(int), args[4].(int), args[5].(string), args[6].(string), args[7].(string))
+	})
+	return _c
+}
+
+func (_c *MockOrgStore_SearchUserBelongOrgs_Call) Return(orgs []database.Organization, total int, err error) *MockOrgStore_SearchUserBelongOrgs_Call {
+	_c.Call.Return(orgs, total, err)
+	return _c
+}
+
+func (_c *MockOrgStore_SearchUserBelongOrgs_Call) RunAndReturn(run func(context.Context, int64, string, int, int, string, string, string) ([]database.Organization, int, error)) *MockOrgStore_SearchUserBelongOrgs_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// SetOrganizationTags provides a mock function with given fields: ctx, orgID, tagIDs
+func (_m *MockOrgStore) SetOrganizationTags(ctx context.Context, orgID int64, tagIDs []int64) error {
+	ret := _m.Called(ctx, orgID, tagIDs)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SetOrganizationTags")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, int64, []int64) error); ok {
+		r0 = rf(ctx, orgID, tagIDs)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockOrgStore_SetOrganizationTags_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SetOrganizationTags'
+type MockOrgStore_SetOrganizationTags_Call struct {
+	*mock.Call
+}
+
+// SetOrganizationTags is a helper method to define mock.On call
+//   - ctx context.Context
+//   - orgID int64
+//   - tagIDs []int64
+func (_e *MockOrgStore_Expecter) SetOrganizationTags(ctx interface{}, orgID interface{}, tagIDs interface{}) *MockOrgStore_SetOrganizationTags_Call {
+	return &MockOrgStore_SetOrganizationTags_Call{Call: _e.mock.On("SetOrganizationTags", ctx, orgID, tagIDs)}
+}
+
+func (_c *MockOrgStore_SetOrganizationTags_Call) Run(run func(ctx context.Context, orgID int64, tagIDs []int64)) *MockOrgStore_SetOrganizationTags_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(int64), args[2].([]int64))
+	})
+	return _c
+}
+
+func (_c *MockOrgStore_SetOrganizationTags_Call) Return(_a0 error) *MockOrgStore_SetOrganizationTags_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockOrgStore_SetOrganizationTags_Call) RunAndReturn(run func(context.Context, int64, []int64) error) *MockOrgStore_SetOrganizationTags_Call {
 	_c.Call.Return(run)
 	return _c
 }
