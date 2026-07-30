@@ -1253,6 +1253,7 @@ func TestRepoComponent_DeployDetail(t *testing.T) {
 		ClusterID:     "cluster",
 		SvcName:       "svc",
 		Status:        deployStatus.Running,
+		Type:          types.InferenceType,
 	}, nil)
 
 	repo.mocks.deployer.EXPECT().GetReplica(ctx, types.DeployRequest{
@@ -1292,6 +1293,7 @@ func TestRepoComponent_DeployDetail(t *testing.T) {
 		Private:        true,
 		SvcName:        "svc",
 		Endpoint:       "endpoint/svc",
+		Type:           types.InferenceType,
 		UserUUID:       "uuid",
 		OwnerNamespace: "",
 	}, *dp)

@@ -794,9 +794,13 @@ func TestModelHandler_GetDeployServerless(t *testing.T) {
 	})
 
 	tester.mocks.model.EXPECT().GetServerless(tester.Ctx(), "u", "r", "u").Return(&types.DeployRequest{
-		DeployID: 1,
+		DeployID:      1,
+		Endpoint:      "https://endpoint.example.com",
+		ProxyEndpoint: "https://proxy.example.com",
 	}, nil)
 	tester.WithUser().Execute()
 
 	tester.ResponseEq(t, 200, tester.OKText, &types.DeployRequest{DeployID: 1})
+	require.NotContains(t, tester.Response().Body.String(), "endpoint")
+	require.NotContains(t, tester.Response().Body.String(), "proxy_endpoint")
 }

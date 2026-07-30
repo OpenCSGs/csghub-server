@@ -1823,8 +1823,18 @@ func (h *ModelHandler) GetDeployServerless(ctx *gin.Context) {
 		httpbase.ServerError(ctx, err)
 		return
 	}
+	if response != nil {
+		response = hideDeployEndpoint(response)
+	}
 
 	httpbase.OK(ctx, response)
+}
+
+func hideDeployEndpoint(deploy *types.DeployRequest) *types.DeployRequest {
+	response := *deploy
+	response.Endpoint = ""
+	response.ProxyEndpoint = ""
+	return &response
 }
 
 // ListQuantization      godoc
