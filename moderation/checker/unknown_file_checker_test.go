@@ -6,6 +6,7 @@ import (
 	"errors"
 	"image"
 	"image/png"
+	"io"
 	"testing"
 
 	"github.com/stretchr/testify/mock"
@@ -76,8 +77,9 @@ func TestUnkownFileChecker_Run(t *testing.T) {
 		mockChecker.EXPECT().PassImageStreamCheck(mock.Anything, types.ScenarioImageBaseLineCheck, mock.Anything).
 			Return(&sensitive.CheckResult{IsSensitive: false}, nil)
 
+		// bytes.Reader implements io.ReadSeeker so rewindReader can seek it back.
 		c := &UnkownFileChecker{}
-		status, msg := c.Run(context.Background(), FileCheckContext{Reader: &pngBuf})
+		status, msg := c.Run(context.Background(), FileCheckContext{Reader: bytes.NewReader(pngBuf.Bytes())})
 		require.Equal(t, types.SensitiveCheckPass, status)
 		require.Empty(t, msg)
 	})
@@ -97,8 +99,72 @@ func TestUnkownFileChecker_Run(t *testing.T) {
 			Return(&sensitive.CheckResult{IsSensitive: true, Reason: "label:porn"}, nil)
 
 		c := &UnkownFileChecker{}
-		status, msg := c.Run(context.Background(), FileCheckContext{Reader: &pngBuf})
+		status, msg := c.Run(context.Background(), FileCheckContext{Reader: bytes.NewReader(pngBuf.Bytes())})
 		require.Equal(t, types.SensitiveCheckFail, status)
 		require.Equal(t, "label:porn", msg)
+	})
+
+	// "image detected with seekable reader rewinds and passes full content"
+	// verifies that when the reader is seekable (e.g. RepoFileContentReader),
+	// UnkownFileChecker seeks it back to the start after detecting content type,
+	// so the downstream ImageFileChecker receives the full file content from
+	// the beginning. The mock reads the stream and verifies it starts with the
+	// PNG magic header (proving the reader was rewound past the 512-byte
+	// detection read).
+	t.Run("image detected with seekable reader rewinds and passes full content", func(t *testing.T) {
+		mockChecker := mocksens.NewMockSensitiveChecker(t)
+		cfg := &config.Config{}
+		cfg.SensitiveCheck.Enable = true
+		cfg.SensitiveCheck.ImageCheckEnable = true
+		InitWithContentChecker(cfg, mockChecker)
+
+		var pngBuf bytes.Buffer
+		err := png.Encode(&pngBuf, image.NewRGBA(image.Rect(0, 0, 1, 1)))
+		require.NoError(t, err)
+		pngData := pngBuf.Bytes()
+
+		var readContent []byte
+		mockChecker.EXPECT().PassImageStreamCheck(mock.Anything, types.ScenarioImageBaseLineCheck, mock.Anything).
+			RunAndReturn(func(ctx context.Context, scenario types.SensitiveScenario, r io.Reader) (*sensitive.CheckResult, error) {
+				readContent, _ = io.ReadAll(r)
+				return &sensitive.CheckResult{IsSensitive: false}, nil
+			}).Once()
+
+		// bytes.Reader implements io.ReadSeeker
+		c := &UnkownFileChecker{}
+		status, msg := c.Run(context.Background(), FileCheckContext{Reader: bytes.NewReader(pngData)})
+		require.Equal(t, types.SensitiveCheckPass, status)
+		require.Empty(t, msg)
+
+		// The content read by the checker must be the full PNG data, including
+		// the magic header that was consumed during detection.
+		require.Equal(t, pngData, readContent, "downstream checker should receive full content from start")
+	})
+
+	// "image detected with non-seekable reader returns exception"
+	// verifies that when the reader is NOT seekable, rewindReader returns nil
+	// and ImageFileChecker.Run returns an exception instead of passing an
+	// un-rewindable reader downstream.
+	t.Run("image detected with non-seekable reader returns exception", func(t *testing.T) {
+		mockChecker := mocksens.NewMockSensitiveChecker(t)
+		cfg := &config.Config{}
+		cfg.SensitiveCheck.Enable = true
+		cfg.SensitiveCheck.ImageCheckEnable = true
+		InitWithContentChecker(cfg, mockChecker)
+
+		var pngBuf bytes.Buffer
+		err := png.Encode(&pngBuf, image.NewRGBA(image.Rect(0, 0, 1, 1)))
+		require.NoError(t, err)
+		pngData := pngBuf.Bytes()
+
+		// Wrap in a struct that only exposes Read (not Seek)
+		nonSeekable := struct{ io.Reader }{bytes.NewReader(pngData)}
+		c := &UnkownFileChecker{}
+		status, msg := c.Run(context.Background(), FileCheckContext{Reader: nonSeekable})
+		require.Equal(t, types.SensitiveCheckException, status)
+		require.Equal(t, "image stream reader is not seekable, cannot retry on failure", msg)
+
+		// The sensitive checker should never be called.
+		mockChecker.AssertNotCalled(t, "PassImageStreamCheck")
 	})
 }

@@ -25,7 +25,7 @@ func GenRepoFileList(ctx context.Context, repo *database.Repository, config *con
 
 func CheckRepoFiles(ctx context.Context, repo *database.Repository, config *config.Config) error {
 	logger := activity.GetLogger(ctx)
-	logger.Info("check repo files start", "repo_path", repo.Path)
+	logger.Info("check repo files start", "repo_path", repo.Path, "is_private", repo.Private)
 
 	rc, err := component.NewRepoComponent(config)
 	if err != nil {

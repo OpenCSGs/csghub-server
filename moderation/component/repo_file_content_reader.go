@@ -12,25 +12,32 @@ import (
 )
 
 type RepoFileContentReader struct {
+	initCtx     context.Context
 	file        *database.RepositoryFile
 	git         gitserver.GitServer
 	innerReader io.ReadCloser
 	once        *sync.Once
+	closeOnce   *sync.Once
+	closeErr    error
 }
 
-var _ io.ReadCloser = (*RepoFileContentReader)(nil)
+var _ io.ReadSeekCloser = (*RepoFileContentReader)(nil)
 
-func NewRepoFileContentReader(file *database.RepositoryFile, git gitserver.GitServer) *RepoFileContentReader {
+func NewRepoFileContentReader(ctx context.Context, file *database.RepositoryFile, git gitserver.GitServer) *RepoFileContentReader {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	return &RepoFileContentReader{
-		file: file,
-		git:  git,
-		once: &sync.Once{},
+		initCtx:   ctx,
+		file:      file,
+		git:       git,
+		once:      &sync.Once{},
+		closeOnce: &sync.Once{},
 	}
 }
 
 func (c *RepoFileContentReader) Read(p []byte) (n int, err error) {
 	c.lazyInit()
-
 	if c.innerReader == nil {
 		return 0, errors.New("failed to read file content as git file reader not initialized")
 	}
@@ -38,10 +45,40 @@ func (c *RepoFileContentReader) Read(p []byte) (n int, err error) {
 }
 
 func (c *RepoFileContentReader) Close() error {
-	if c.innerReader == nil {
-		return errors.New("failed to close reader as git file reader not initialized")
+	c.closeOnce.Do(func() {
+		if c.innerReader != nil {
+			c.closeErr = c.innerReader.Close()
+		}
+	})
+	return c.closeErr
+}
+
+// Seek implements io.ReadSeeker. Only Seek(0, io.SeekStart) is supported — it
+// closes the current underlying stream and resets the reader so that the next
+// Read re-opens the file from the git server. This allows retry logic (e.g. in
+// ImageFileChecker.checkByStream) to rewind and re-read the full content after
+// a transient failure. Any other offset returns an error.
+func (c *RepoFileContentReader) Seek(offset int64, whence int) (int64, error) {
+	if offset != 0 || whence != io.SeekStart {
+		return 0, errors.New("only Seek(0, io.SeekStart) is supported")
 	}
-	return c.innerReader.Close()
+
+	// Close the current inner reader if it was opened. A close failure (e.g.
+	// RST, broken pipe) can signal a git-server issue relevant to diagnosing
+	// 401 or transient failures, so log it instead of silently discarding.
+	if c.innerReader != nil {
+		if err := c.innerReader.Close(); err != nil {
+			slog.ErrorContext(context.Background(), "failed to close inner reader during seek",
+				slog.Any("error", err), slog.String("path", c.file.Path))
+		}
+		c.innerReader = nil
+	}
+
+	// Reset so lazyInit re-opens the stream on the next Read.
+	c.once = &sync.Once{}
+	c.closeOnce = &sync.Once{}
+	c.closeErr = nil
+	return 0, nil
 }
 
 func (c *RepoFileContentReader) lazyInit() {
@@ -54,12 +91,10 @@ func (c *RepoFileContentReader) lazyInit() {
 			RepoType:  c.file.Repository.RepositoryType,
 			Ref:       c.file.Repository.DefaultBranch,
 		}
-
-		ctx := context.Background()
 		var err error
-		c.innerReader, _, err = c.git.GetRepoFileReader(ctx, req)
+		c.innerReader, _, err = c.git.GetRepoFileReader(c.initCtx, req)
 		if err != nil {
-			slog.ErrorContext(ctx, "failed to create git file reader", slog.Any("error", err), slog.String("path", c.file.Path), slog.Int64("repository_file_id", c.file.ID))
+			slog.ErrorContext(c.initCtx, "failed to create git file reader", slog.Any("error", err), slog.String("path", c.file.Path), slog.Int64("repository_file_id", c.file.ID))
 		}
 	})
 }

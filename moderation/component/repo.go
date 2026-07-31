@@ -5,8 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"net/url"
-	"strings"
 	"sync"
 	"time"
 
@@ -177,11 +175,15 @@ func (c *repoComponentImpl) CheckRepoFiles(ctx context.Context, repoID int64, op
 }
 
 func (c *repoComponentImpl) processFile(ctx context.Context, file *database.RepositoryFile) {
-	reader := NewRepoFileContentReader(file, c.git)
+	reader := NewRepoFileContentReader(ctx, file, c.git)
 	defer reader.Close()
-	imageURL := c.buildImageURL(file)
 	fc := checker.GetFileChecker(file.FileType, file.Path, file.LfsRelativePath)
-	status, msg := fc.Run(ctx, checker.FileCheckContext{Reader: reader, ImageURL: imageURL})
+	// Datasets (even public ones) require authentication to access their files,
+	// so the Aliyun moderation service cannot fetch them via the download URL
+	// (it gets a 401). Therefore we only pass the Reader so that
+	// ImageFileChecker checks image content by stream (upload to S3 +
+	// presigned URL).
+	status, msg := fc.Run(ctx, checker.FileCheckContext{Reader: reader})
 	if status == types.SensitiveCheckException {
 		slog.ErrorContext(ctx, "failed to check repo file content", slog.Int64("repo_id", file.RepositoryID), slog.Int64("repo_file_id", file.ID), slog.String("file", file.Path),
 			slog.String("err", msg))
@@ -191,61 +193,6 @@ func (c *repoComponentImpl) processFile(ctx context.Context, file *database.Repo
 	if err != nil {
 		slog.ErrorContext(ctx, "save check result failed", slog.Any("error", err))
 	}
-}
-
-// repoTypeURLPath maps a repository type to the URL path segment used by the
-// public API routes (e.g. "model" -> "models", "mcpserver" -> "mcps").
-func repoTypeURLPath(repoType types.RepositoryType) string {
-	if repoType == types.MCPServerRepo {
-		return "mcps"
-	}
-	return string(repoType) + "s"
-}
-
-// buildImageURL constructs a publicly-accessible URL for an image file so that
-// the remote moderation service (e.g. Aliyun Green) can fetch it. The URL uses
-// the download endpoint which streams raw bytes.
-//
-// Returns an empty string for non-image files, private repos (the URL would not
-// be accessible without auth), or when repository metadata is missing.
-func (c *repoComponentImpl) buildImageURL(file *database.RepositoryFile) string {
-	if file == nil || file.Repository == nil {
-		return ""
-	}
-
-	if !types.IsImageFile(file.Path) {
-		return ""
-	}
-
-	// For private repos, the download URL requires authentication and cannot
-	// be fetched by the remote moderation service. Return empty so that
-	// ImageFileChecker falls back to checkByStream (upload to S3 + presigned URL).
-	if file.Repository.Private {
-		return ""
-	}
-
-	namespace, name := file.Repository.NamespaceAndName()
-	if namespace == "" || name == "" {
-		slog.Warn("failed to build image url, invalid repository path", slog.String("path", file.Repository.Path))
-		return ""
-	}
-
-	ref := file.Repository.DefaultBranch
-	if ref == "" {
-		ref = "main"
-	}
-
-	domain := strings.TrimSuffix(c.config.APIServer.PublicDomain, "/")
-	// e.g. https://opencsg.com/api/v1/codes/cemeng/sensitive-test/download/example.jpg
-	imageURL := fmt.Sprintf("%s/api/v1/%s/%s/%s/download/%s?ref=%s",
-		domain,
-		repoTypeURLPath(file.Repository.RepositoryType),
-		namespace,
-		name,
-		file.Path,
-		url.QueryEscape(ref),
-	)
-	return imageURL
 }
 
 func (c *repoComponentImpl) saveCheckResult(ctx context.Context, file *database.RepositoryFile, status types.SensitiveCheckStatus, msg string) error {

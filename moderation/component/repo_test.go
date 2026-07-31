@@ -363,6 +363,294 @@ func TestRepoComponent_CheckRepoFiles(t *testing.T) {
 	require.True(t, failFound, "Check for failed file not found")
 }
 
+// TestRepoComponent_CheckRepoFiles_ImageByStream is a regression test for the
+// 401 issue when the Aliyun moderation service fetches image files via the
+// public download URL. Datasets require login to access file downloads even
+// when public, so the remote checker gets a 401.
+//
+// processFile must NOT pass ImageURL to the file checker; image files must be
+// checked by stream (upload to S3 + presigned URL) instead, regardless of
+// whether the repo is public or private, or whether it is a dataset or not.
+// Each subtest asserts that PassImageStreamCheck is called and
+// PassImageURLCheck is never called.
+func TestRepoComponent_CheckRepoFiles_ImageByStream(t *testing.T) {
+	ctx := context.Background()
+
+	tests := []struct {
+		name     string
+		repo     *database.Repository
+		imageExt string
+	}{
+		{
+			name: "public dataset image checked by stream",
+			repo: &database.Repository{
+				ID:                   1,
+				Name:                 "test-dataset",
+				Path:                 "root/test-dataset",
+				DefaultBranch:        "main",
+				SensitiveCheckStatus: types.SensitiveCheckPass,
+				RepositoryType:       types.DatasetRepo,
+				Private:              false,
+			},
+			imageExt: "png",
+		},
+		{
+			name: "private dataset image checked by stream",
+			repo: &database.Repository{
+				ID:                   2,
+				Name:                 "private-dataset",
+				Path:                 "root/private-dataset",
+				DefaultBranch:        "main",
+				SensitiveCheckStatus: types.SensitiveCheckPass,
+				RepositoryType:       types.DatasetRepo,
+				Private:              true,
+			},
+			imageExt: "jpg",
+		},
+		{
+			name: "public model image checked by stream",
+			repo: &database.Repository{
+				ID:                   3,
+				Name:                 "test-model",
+				Path:                 "root/test-model",
+				DefaultBranch:        "main",
+				SensitiveCheckStatus: types.SensitiveCheckPass,
+				RepositoryType:       types.ModelRepo,
+				Private:              false,
+			},
+			imageExt: "jpeg",
+		},
+		{
+			name: "private model image checked by stream",
+			repo: &database.Repository{
+				ID:                   4,
+				Name:                 "private-model",
+				Path:                 "root/private-model",
+				DefaultBranch:        "main",
+				SensitiveCheckStatus: types.SensitiveCheckPass,
+				RepositoryType:       types.ModelRepo,
+				Private:              true,
+			},
+			imageExt: "gif",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockRepoStore := mockdb.NewMockRepoStore(t)
+			mockRepoFileStore := mockdb.NewMockRepoFileStore(t)
+			mockRepoFileCheckStore := mockdb.NewMockRepoFileCheckStore(t)
+			mockGitServer := mockgit.NewMockGitServer(t)
+			repoComp := &repoComponentImpl{
+				rs:               mockRepoStore,
+				rfs:              mockRepoFileStore,
+				rfcs:             mockRepoFileCheckStore,
+				git:              mockGitServer,
+				concurrencyLimit: 10,
+			}
+			repoComp.config = &config.Config{}
+			repoComp.config.APIServer.PublicDomain = "https://hub.opencsg.com"
+
+			imageFile := &database.RepositoryFile{
+				ID:           1,
+				RepositoryID: tt.repo.ID,
+				Path:         "screenshot." + tt.imageExt,
+				FileType:     "file",
+				Repository:   tt.repo,
+			}
+
+			// One batch returning the image file. Since count(1) < BatchSize(10),
+			// the loop breaks after the first batch — no second batch call.
+			mockRepoFileStore.EXPECT().BatchGetUnchcked(mock.Anything, tt.repo.ID, int64(0), int64(10)).Once().
+				Return([]*database.RepositoryFile{imageFile}, nil)
+
+			cfg := &config.Config{}
+			cfg.SensitiveCheck.Enable = true
+			cfg.SensitiveCheck.ImageCheckEnable = true
+			mockSensitiveChecker := mockSensit.NewMockSensitiveChecker(t)
+			// Stream check should be invoked (path that uploads to S3 +
+			// presigned URL). The mock does not read from the reader, so the
+			// lazy git reader (GetRepoFileReader) is never opened.
+			mockSensitiveChecker.EXPECT().PassImageStreamCheck(mock.Anything, types.ScenarioImageBaseLineCheck, mock.Anything).
+				Return(&sensitive.CheckResult{IsSensitive: false}, nil).Once()
+			// URL check must never be called — this is the core of the
+			// regression, for both public and private repos.
+			mockSensitiveChecker.AssertNotCalled(t, "PassImageURLCheck", mock.Anything, mock.Anything, mock.Anything)
+			checker.InitWithContentChecker(cfg, mockSensitiveChecker)
+
+			mockRepoFileCheckStore.EXPECT().Upsert(mock.Anything, mock.Anything).Return(nil).Once()
+
+			err := repoComp.CheckRepoFiles(ctx, tt.repo.ID, CheckOption{
+				BatchSize: 10,
+			})
+			require.Nil(t, err)
+		})
+	}
+
+	// "stream check reads actual content from git reader" verifies the
+	// end-to-end path where the sensitive checker actually reads the image
+	// stream from the git reader (GetRepoFileReader). This covers the review
+	// feedback that the mock should read the stream instead of ignoring it.
+	t.Run("stream check reads actual content from git reader", func(t *testing.T) {
+		mockRepoStore := mockdb.NewMockRepoStore(t)
+		mockRepoFileStore := mockdb.NewMockRepoFileStore(t)
+		mockRepoFileCheckStore := mockdb.NewMockRepoFileCheckStore(t)
+		mockGitServer := mockgit.NewMockGitServer(t)
+		repoComp := &repoComponentImpl{
+			rs:               mockRepoStore,
+			rfs:              mockRepoFileStore,
+			rfcs:             mockRepoFileCheckStore,
+			git:              mockGitServer,
+			concurrencyLimit: 10,
+		}
+		repoComp.config = &config.Config{}
+		repoComp.config.APIServer.PublicDomain = "https://hub.opencsg.com"
+
+		repo := &database.Repository{
+			ID:                   1,
+			Name:                 "test-dataset",
+			Path:                 "root/test-dataset",
+			DefaultBranch:        "main",
+			SensitiveCheckStatus: types.SensitiveCheckPass,
+			RepositoryType:       types.DatasetRepo,
+			Private:              false,
+		}
+		imageFile := &database.RepositoryFile{
+			ID:           1,
+			RepositoryID: 1,
+			Path:         "screenshot.png",
+			FileType:     "file",
+			Repository:   repo,
+		}
+
+		mockRepoFileStore.EXPECT().BatchGetUnchcked(mock.Anything, repo.ID, int64(0), int64(10)).Once().
+			Return([]*database.RepositoryFile{imageFile}, nil)
+
+		// Provide real image bytes via the git reader.
+		imageContent := "png-image-bytes"
+		mockGitServer.EXPECT().GetRepoFileReader(mock.Anything, mock.MatchedBy(func(req gitserver.GetRepoInfoByPathReq) bool {
+			return req.Path == imageFile.Path
+		})).Return(io.NopCloser(strings.NewReader(imageContent)), int64(len(imageContent)), nil).Once()
+
+		cfg := &config.Config{}
+		cfg.SensitiveCheck.Enable = true
+		cfg.SensitiveCheck.ImageCheckEnable = true
+		mockSensitiveChecker := mockSensit.NewMockSensitiveChecker(t)
+		// The mock actually reads the stream and verifies the content matches
+		// what GetRepoFileReader returned.
+		mockSensitiveChecker.EXPECT().PassImageStreamCheck(mock.Anything, types.ScenarioImageBaseLineCheck, mock.Anything).
+			RunAndReturn(func(ctx context.Context, scenario types.SensitiveScenario, r io.Reader) (*sensitive.CheckResult, error) {
+				b, err := io.ReadAll(r)
+				require.NoError(t, err)
+				require.Equal(t, imageContent, string(b))
+				return &sensitive.CheckResult{IsSensitive: false}, nil
+			}).Once()
+		mockSensitiveChecker.AssertNotCalled(t, "PassImageURLCheck", mock.Anything, mock.Anything, mock.Anything)
+		checker.InitWithContentChecker(cfg, mockSensitiveChecker)
+
+		mockRepoFileCheckStore.EXPECT().Upsert(mock.Anything, mock.Anything).Return(nil).Once()
+
+		err := repoComp.CheckRepoFiles(ctx, repo.ID, CheckOption{
+			BatchSize: 10,
+		})
+		require.Nil(t, err)
+	})
+
+	// "stream check retry reopens git reader with identical content" verifies
+	// the full retry path: the first PassImageStreamCheck fails, checkByStream
+	// retries by calling Seek(0) on RepoFileContentReader (which reopens the
+	// git stream), and the second attempt succeeds. Both attempts must receive
+	// the exact same image bytes. GetRepoFileReader is called twice (once per
+	// open). This directly addresses the review feedback.
+	t.Run("stream check retry reopens git reader with identical content", func(t *testing.T) {
+		mockRepoStore := mockdb.NewMockRepoStore(t)
+		mockRepoFileStore := mockdb.NewMockRepoFileStore(t)
+		mockRepoFileCheckStore := mockdb.NewMockRepoFileCheckStore(t)
+		mockGitServer := mockgit.NewMockGitServer(t)
+		repoComp := &repoComponentImpl{
+			rs:               mockRepoStore,
+			rfs:              mockRepoFileStore,
+			rfcs:             mockRepoFileCheckStore,
+			git:              mockGitServer,
+			concurrencyLimit: 10,
+		}
+		repoComp.config = &config.Config{}
+		repoComp.config.APIServer.PublicDomain = "https://hub.opencsg.com"
+
+		repo := &database.Repository{
+			ID:                   1,
+			Name:                 "test-dataset",
+			Path:                 "root/test-dataset",
+			DefaultBranch:        "main",
+			SensitiveCheckStatus: types.SensitiveCheckPass,
+			RepositoryType:       types.DatasetRepo,
+			Private:              false,
+		}
+		imageFile := &database.RepositoryFile{
+			ID:           1,
+			RepositoryID: 1,
+			Path:         "screenshot.png",
+			FileType:     "file",
+			Repository:   repo,
+		}
+
+		mockRepoFileStore.EXPECT().BatchGetUnchcked(mock.Anything, repo.ID, int64(0), int64(10)).Once().
+			Return([]*database.RepositoryFile{imageFile}, nil)
+
+		imageContent := "png-image-bytes-for-retry"
+		// GetRepoFileReader called twice: initial open + reopen after Seek.
+		// Use RunAndReturn so each call returns a fresh reader (the previous
+		// one is consumed/closed by the first attempt).
+		mockGitServer.EXPECT().GetRepoFileReader(mock.Anything, mock.MatchedBy(func(req gitserver.GetRepoInfoByPathReq) bool {
+			return req.Path == imageFile.Path
+		})).RunAndReturn(func(ctx context.Context, req gitserver.GetRepoInfoByPathReq) (io.ReadCloser, int64, error) {
+			return io.NopCloser(strings.NewReader(imageContent)), int64(len(imageContent)), nil
+		}).Twice()
+
+		cfg := &config.Config{}
+		cfg.SensitiveCheck.Enable = true
+		cfg.SensitiveCheck.ImageCheckEnable = true
+		mockSensitiveChecker := mockSensit.NewMockSensitiveChecker(t)
+
+		var contents []string
+		var mu sync.Mutex
+		mockSensitiveChecker.EXPECT().PassImageStreamCheck(mock.Anything, types.ScenarioImageBaseLineCheck, mock.Anything).
+			RunAndReturn(func(ctx context.Context, scenario types.SensitiveScenario, r io.Reader) (*sensitive.CheckResult, error) {
+				// Simulate chain layer: seek to start before reading. This
+				// triggers RepoFileContentReader.Seek(0) which reopens the
+				// git stream, so the retry gets full content.
+				if seeker, ok := r.(io.Seeker); ok {
+					_, _ = seeker.Seek(0, io.SeekStart)
+				}
+				b, _ := io.ReadAll(r)
+				mu.Lock()
+				contents = append(contents, string(b))
+				mu.Unlock()
+				// First attempt fails, forcing a retry.
+				if len(contents) == 1 {
+					return nil, errors.New("transient upload error")
+				}
+				return &sensitive.CheckResult{IsSensitive: false}, nil
+			}).Twice()
+		mockSensitiveChecker.AssertNotCalled(t, "PassImageURLCheck", mock.Anything, mock.Anything, mock.Anything)
+		checker.InitWithContentChecker(cfg, mockSensitiveChecker)
+
+		mockRepoFileCheckStore.EXPECT().Upsert(mock.Anything, mock.Anything).Return(nil).Once()
+
+		err := repoComp.CheckRepoFiles(ctx, repo.ID, CheckOption{
+			BatchSize: 10,
+		})
+		require.Nil(t, err)
+
+		mu.Lock()
+		defer mu.Unlock()
+		require.Len(t, contents, 2, "expected 2 stream check attempts")
+		for i, got := range contents {
+			require.Equal(t, imageContent, got, "attempt %d: expected identical content", i)
+		}
+	})
+}
+
 func TestRepoComponent_GetNamespaceWhiteList(t *testing.T) {
 	ctx := context.Background()
 
@@ -397,145 +685,4 @@ func TestRepoComponent_GetNamespaceWhiteList(t *testing.T) {
 		require.ErrorIs(t, err, expectedErr)
 		require.Nil(t, patterns)
 	})
-}
-
-func TestRepoComponent_buildImageURL(t *testing.T) {
-	cfg := &config.Config{}
-	cfg.APIServer.PublicDomain = "https://hub.opencsg.com"
-
-	tests := []struct {
-		name     string
-		file     *database.RepositoryFile
-		wantURL  string
-		wantEmpty bool
-	}{
-		{
-			name: "model repo image file",
-			file: &database.RepositoryFile{
-				Path: "images/banner.png",
-				Repository: &database.Repository{
-					Path:           "alice/my-model",
-					RepositoryType: types.ModelRepo,
-					DefaultBranch:  "main",
-				},
-			},
-			wantURL: "https://hub.opencsg.com/api/v1/models/alice/my-model/download/images/banner.png?ref=main",
-		},
-		{
-			name: "dataset repo image file",
-			file: &database.RepositoryFile{
-				Path: "preview/img.jpg",
-				Repository: &database.Repository{
-					Path:           "bob/my-dataset",
-					RepositoryType: types.DatasetRepo,
-					DefaultBranch:  "dev",
-				},
-			},
-			wantURL: "https://hub.opencsg.com/api/v1/datasets/bob/my-dataset/download/preview/img.jpg?ref=dev",
-		},
-		{
-			name: "mcpserver repo image file",
-			file: &database.RepositoryFile{
-				Path: "logo.png",
-				Repository: &database.Repository{
-					Path:           "carol/my-mcp",
-					RepositoryType: types.MCPServerRepo,
-					DefaultBranch:  "main",
-				},
-			},
-			wantURL: "https://hub.opencsg.com/api/v1/mcps/carol/my-mcp/download/logo.png?ref=main",
-		},
-		{
-			name: "code repo image with special chars in ref",
-			file: &database.RepositoryFile{
-				Path: "docs/arch.png",
-				Repository: &database.Repository{
-					Path:           "dave/my-code",
-					RepositoryType: types.CodeRepo,
-					DefaultBranch:  "feature/branch",
-				},
-			},
-			wantURL: "https://hub.opencsg.com/api/v1/codes/dave/my-code/download/docs/arch.png?ref=feature%2Fbranch",
-		},
-		{
-			name: "private repo returns empty",
-			file: &database.RepositoryFile{
-				Path: "images/banner.png",
-				Repository: &database.Repository{
-					Path:           "alice/private-model",
-					RepositoryType: types.ModelRepo,
-					DefaultBranch:  "main",
-					Private:        true,
-				},
-			},
-			wantEmpty: true,
-		},
-		{
-			name: "non-image file returns empty",
-			file: &database.RepositoryFile{
-				Path: "readme.txt",
-				Repository: &database.Repository{
-					Path:           "alice/my-model",
-					RepositoryType: types.ModelRepo,
-					DefaultBranch:  "main",
-				},
-			},
-			wantEmpty: true,
-		},
-		{
-			name:      "nil file returns empty",
-			file:      nil,
-			wantEmpty: true,
-		},
-		{
-			name: "nil repository returns empty",
-			file: &database.RepositoryFile{
-				Path:       "image.png",
-				Repository: nil,
-			},
-			wantEmpty: true,
-		},
-		{
-			name: "empty default branch falls back to main",
-			file: &database.RepositoryFile{
-				Path: "img.png",
-				Repository: &database.Repository{
-					Path:           "eve/repo",
-					RepositoryType: types.SpaceRepo,
-					DefaultBranch:  "",
-				},
-			},
-			wantURL: "https://hub.opencsg.com/api/v1/spaces/eve/repo/download/img.png?ref=main",
-		},
-		{
-			name: "public domain with trailing slash is trimmed",
-			file: &database.RepositoryFile{
-				Path: "img.png",
-				Repository: &database.Repository{
-					Path:           "eve/repo",
-					RepositoryType: types.SpaceRepo,
-					DefaultBranch:  "main",
-				},
-			},
-			wantURL: "https://hub.opencsg.com/api/v1/spaces/eve/repo/download/img.png?ref=main",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			comp := &repoComponentImpl{config: cfg}
-			// for the trailing-slash test, use a dedicated config
-			if tt.name == "public domain with trailing slash is trimmed" {
-				slashCfg := &config.Config{}
-				slashCfg.APIServer.PublicDomain = "https://hub.opencsg.com/"
-				comp.config = slashCfg
-			}
-			got := comp.buildImageURL(tt.file)
-			if tt.wantEmpty {
-				require.Empty(t, got)
-			} else {
-				require.Equal(t, tt.wantURL, got)
-			}
-		})
-	}
 }

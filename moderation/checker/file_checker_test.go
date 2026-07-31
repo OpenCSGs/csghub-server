@@ -3,7 +3,9 @@ package checker
 import (
 	"context"
 	"errors"
+	"io"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -228,6 +230,79 @@ func TestImageFileChecker_Run(t *testing.T) {
 		if message != "call sensitive image stream checker api failed" {
 			t.Errorf("Expected message '%s', got '%s'", "call sensitive image stream checker api failed", message)
 		}
+	})
+
+	// "stream check retry receives identical content" verifies that retries
+	// work correctly when the reader is seekable. checkByStream only retries
+	// when the reader implements io.ReadSeeker; the actual rewind before each
+	// attempt is handled by chainImpl.PassImageStreamCheck (which seeks before
+	// each checker). This mock simulates that behavior by seeking the reader
+	// to the start before reading on each attempt. The first attempt fails and
+	// the second succeeds; both must receive the exact same bytes.
+	t.Run("stream check retry receives identical content", func(t *testing.T) {
+		imageContent := "the-quick-brown-fox"
+		mockChecker := mocksens.NewMockSensitiveChecker(t)
+
+		// Track the content read on each call.
+		var contents []string
+		var mu sync.Mutex
+		mockChecker.EXPECT().PassImageStreamCheck(mock.Anything, types.ScenarioImageBaseLineCheck, mock.Anything).
+			RunAndReturn(func(ctx context.Context, scenario types.SensitiveScenario, r io.Reader) (*sensitive.CheckResult, error) {
+				// Simulate chain layer: seek to start before reading.
+				if seeker, ok := r.(io.Seeker); ok {
+					_, _ = seeker.Seek(0, io.SeekStart)
+				}
+				b, _ := io.ReadAll(r)
+				mu.Lock()
+				contents = append(contents, string(b))
+				mu.Unlock()
+				// First attempt fails, forcing a retry.
+				if len(contents) == 1 {
+					return nil, errors.New("transient upload error")
+				}
+				return &sensitive.CheckResult{IsSensitive: false}, nil
+			}).Twice()
+
+		c := newEnabledChecker(true, mockChecker)
+		status, message := c.Run(context.Background(), FileCheckContext{Reader: strings.NewReader(imageContent)})
+		if status != types.SensitiveCheckPass {
+			t.Errorf("Expected status %v, got %v", types.SensitiveCheckPass, status)
+		}
+		if message != "" {
+			t.Errorf("Expected empty message, got '%s'", message)
+		}
+
+		mu.Lock()
+		defer mu.Unlock()
+		if len(contents) != 2 {
+			t.Fatalf("expected 2 stream check attempts, got %d", len(contents))
+		}
+		for i, got := range contents {
+			if got != imageContent {
+				t.Errorf("attempt %d: expected content %q, got %q", i, imageContent, got)
+			}
+		}
+	})
+
+	// "stream check non-seekable reader returns exception" verifies that
+	// when the reader does not implement io.ReadSeeker, Run rejects it
+	// immediately without calling the sensitive checker, because retries
+	// require a seekable reader to rewind the stream.
+	t.Run("stream check non-seekable reader returns exception", func(t *testing.T) {
+		mockChecker := mocksens.NewMockSensitiveChecker(t)
+
+		c := newEnabledChecker(true, mockChecker)
+		// Wrap a seekable reader to hide Seek, making it non-seekable.
+		nonSeekable := struct{ io.Reader }{strings.NewReader("image-bytes")}
+		status, message := c.Run(context.Background(), FileCheckContext{Reader: nonSeekable})
+		if status != types.SensitiveCheckException {
+			t.Errorf("Expected status %v, got %v", types.SensitiveCheckException, status)
+		}
+		if message != "image stream reader is not seekable, cannot retry on failure" {
+			t.Errorf("Expected message '%s', got '%s'", "image stream reader is not seekable, cannot retry on failure", message)
+		}
+		// The sensitive checker should never be called.
+		mockChecker.AssertNotCalled(t, "PassImageStreamCheck")
 	})
 }
 
