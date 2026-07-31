@@ -548,17 +548,6 @@ func (m *openaiComponentImpl) isLegacyCSGHubModelID(model types.Model, modelID s
 	return model.LegacyModelID != "" && model.LegacyModelID == modelID
 }
 
-func getSceneFromSvcType(svcType int) int {
-	switch svcType {
-	case commontypes.InferenceType:
-		return int(commontypes.SceneModelInference)
-	case commontypes.ServerlessType:
-		return int(commontypes.SceneModelServerless)
-	default:
-		return int(commontypes.SceneUnknow)
-	}
-}
-
 // llmTypeFromModel returns metadata llm_type used to classify usage metering records.
 func llmTypeFromModel(m *types.Model) (string, error) {
 	if m == nil {
@@ -603,7 +592,7 @@ func (m *openaiComponentImpl) resolveUsageMeteringInfo(c context.Context, nsUUID
 			Scene: commontypes.SceneModelServerless,
 		}
 		if llmType == commontypes.ProviderTypeInference {
-			meteringInfo.Scene = commontypes.SceneModelInference
+			meteringInfo.Scene = commontypes.SceneModelServerless
 			ownerType, err := m.resolveUsageOwnerType(c, nsUUID, model)
 			if err != nil {
 				return usageMeteringInfo{}, err
