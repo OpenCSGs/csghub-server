@@ -43,6 +43,7 @@ type Mocks struct {
 	multiSyncClient  *mock_multisync.MockClient
 	s3Core           *mock_s3.MockCore
 	checker          *mock_checker.MockGitCallbackChecker
+	xnetClient       *mock_rpc.MockXnetSvcClient
 }
 
 var AllMockSet = wire.NewSet(

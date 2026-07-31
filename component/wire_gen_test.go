@@ -8,6 +8,7 @@ package component
 
 import (
 	"context"
+
 	"github.com/google/wire"
 	"github.com/stretchr/testify/mock"
 	"opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/accounting"
@@ -24,9 +25,7 @@ import (
 	"opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component/checker"
 	"opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/mirror/cache"
 	"opencsg.com/csghub-server/common/tests"
-)
 
-import (
 	_ "opencsg.com/csghub-server/builder/memory/memmachine"
 )
 

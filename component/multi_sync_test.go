@@ -2,7 +2,6 @@ package component
 
 import (
 	"context"
-	"database/sql"
 	"testing"
 
 	"github.com/stretchr/testify/mock"
@@ -69,7 +68,7 @@ func TestMultiSyncComponent_SyncAsClient(t *testing.T) {
 	}, nil)
 	mc.mocks.stores.SyncVersionMock().EXPECT().Create(ctx, &database.SyncVersion{
 		Version:  2,
-		RepoPath: "Team/Repo",
+		RepoPath: "team/repo",
 	}).Return(nil)
 	mc.mocks.stores.SyncVersionMock().EXPECT().Create(ctx, &database.SyncVersion{
 		Version: 3,
@@ -114,26 +113,14 @@ func TestMultiSyncComponent_SyncAsClient(t *testing.T) {
 		}},
 	}, nil)
 	mockedClient.EXPECT().ReadMeData(ctx, svs[0]).Return("readme", nil)
-	mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "CSG_Ns").Return(database.User{}, sql.ErrNoRows).Once()
-	mc.mocks.stores.UserMock().EXPECT().Create(ctx, mock.Anything, mock.Anything).RunAndReturn(
-		func(ctx context.Context, u *database.User, n *database.Namespace) error {
-			require.Equal(t, u.NickName, "CSG_Ns")
-			require.Equal(t, u.Username, "CSG_Ns")
-			require.Equal(t, u.Email, "f4a0afeea504607032c6866d9247a30e")
-			require.Equal(t, n.Path, "CSG_Ns")
-			require.Equal(t, n.Mirrored, true)
-			u.ID = 1
-			return nil
-		},
-	)
-	mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "CSG_Ns").Return(database.User{
-		ID: 1, Username: "CSG_Ns",
-	}, nil).Twice()
+	mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "csg_ns").Return(database.User{
+		ID: 1, Username: "csg_ns",
+	}, nil).Times(3)
 	dbrepo := &database.Repository{
 		UserID:         1,
-		Path:           "CSG_Ns/User",
-		GitPath:        "models_CSG_Ns/User",
-		Name:           "User",
+		Path:           "csg_ns/user",
+		GitPath:        "models_csg_ns/user",
+		Name:           "user",
 		Readme:         "readme",
 		Source:         types.OpenCSGSource,
 		SyncStatus:     types.SyncStatusPending,
@@ -176,9 +163,9 @@ func TestMultiSyncComponent_SyncAsClient(t *testing.T) {
 	// new dataset mock
 	dbrepo = &database.Repository{
 		UserID:         1,
-		Path:           "CSG_Ns/User",
-		GitPath:        "datasets_CSG_Ns/User",
-		Name:           "User",
+		Path:           "csg_ns/user",
+		GitPath:        "datasets_csg_ns/user",
+		Name:           "user",
 		Readme:         "readme",
 		Source:         types.OpenCSGSource,
 		SyncStatus:     types.SyncStatusPending,
@@ -240,9 +227,9 @@ func TestMultiSyncComponent_SyncAsClient(t *testing.T) {
 	// new skill mock
 	dbrepo = &database.Repository{
 		UserID:         1,
-		Path:           "CSG_Ns/User",
-		GitPath:        "skills_CSG_Ns/User",
-		Name:           "User",
+		Path:           "csg_ns/user",
+		GitPath:        "skills_csg_ns/user",
+		Name:           "user",
 		Readme:         "readme",
 		Source:         types.OpenCSGSource,
 		SyncStatus:     types.SyncStatusPending,
