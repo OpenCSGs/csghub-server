@@ -1554,5 +1554,6 @@ func createSkillRoutes(
 		skillGroup.DELETE("/:namespace/:name/mirror", middlewareCollection.Auth.NeedLogin, repoCommonHandler.DeleteMirror)
 		skillGroup.POST("/:namespace/:name/mirror/sync", middlewareCollection.Auth.NeedLogin, repoCommonHandler.SyncMirror)
 		skillGroup.GET("/:namespace/:name/size/:branch", repoCommonHandler.GetRepoSizeByBranch)
+		skillGroup.POST("/:namespace/:name/transfer", middlewareCollection.Auth.NeedLogin, repoCommonHandler.TransferOwnership)
 	}
 }
