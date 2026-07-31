@@ -170,10 +170,6 @@ func (c *Client) GetRepoFileReader(ctx context.Context, req gitserver.GetRepoInf
 	return pr, size, nil
 }
 
-func (c *Client) GetRepoLfsFileRaw(ctx context.Context, req gitserver.GetRepoInfoByPathReq) (io.ReadCloser, error) {
-	return nil, nil
-}
-
 // GetRepoFileContents returns the file basic info and content of a file in a repository.
 //
 // If the file is larger than the maximum allowed size, it will return the

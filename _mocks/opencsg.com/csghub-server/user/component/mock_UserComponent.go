@@ -415,53 +415,6 @@ func (_c *MockUserComponent_FindByUUIDs_Call) RunAndReturn(run func(context.Cont
 	return _c
 }
 
-// FixUserData provides a mock function with given fields: ctx, userName
-func (_m *MockUserComponent) FixUserData(ctx context.Context, userName string) error {
-	ret := _m.Called(ctx, userName)
-
-	if len(ret) == 0 {
-		panic("no return value specified for FixUserData")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string) error); ok {
-		r0 = rf(ctx, userName)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// MockUserComponent_FixUserData_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FixUserData'
-type MockUserComponent_FixUserData_Call struct {
-	*mock.Call
-}
-
-// FixUserData is a helper method to define mock.On call
-//   - ctx context.Context
-//   - userName string
-func (_e *MockUserComponent_Expecter) FixUserData(ctx interface{}, userName interface{}) *MockUserComponent_FixUserData_Call {
-	return &MockUserComponent_FixUserData_Call{Call: _e.mock.On("FixUserData", ctx, userName)}
-}
-
-func (_c *MockUserComponent_FixUserData_Call) Run(run func(ctx context.Context, userName string)) *MockUserComponent_FixUserData_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string))
-	})
-	return _c
-}
-
-func (_c *MockUserComponent_FixUserData_Call) Return(_a0 error) *MockUserComponent_FixUserData_Call {
-	_c.Call.Return(_a0)
-	return _c
-}
-
-func (_c *MockUserComponent_FixUserData_Call) RunAndReturn(run func(context.Context, string) error) *MockUserComponent_FixUserData_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // GenerateVerificationCodeAndSendEmail provides a mock function with given fields: ctx, uid, email
 func (_m *MockUserComponent) GenerateVerificationCodeAndSendEmail(ctx context.Context, uid string, email string) error {
 	ret := _m.Called(ctx, uid, email)

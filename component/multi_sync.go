@@ -1163,17 +1163,6 @@ func (c *multiSyncComponentImpl) createLocalSkill(ctx context.Context, m *types.
 }
 
 func (c *multiSyncComponentImpl) createUser(ctx context.Context, req types.CreateUserRequest) (database.User, error) {
-	gsUserReq := gitserver.CreateUserRequest{
-		Nickname: req.Name,
-		Username: req.Username,
-		Email:    req.Email,
-	}
-	gsUserResp, err := c.gitServer.CreateUser(gsUserReq)
-	if err != nil {
-		newError := fmt.Errorf("failed to create gitserver user,error:%w", err)
-		return database.User{}, newError
-	}
-
 	namespace := &database.Namespace{
 		Path:     req.Username,
 		Mirrored: true,
@@ -1182,11 +1171,9 @@ func (c *multiSyncComponentImpl) createUser(ctx context.Context, req types.Creat
 		NickName: req.Name,
 		Username: req.Username,
 		Email:    req.Email,
-		GitID:    gsUserResp.GitID,
-		Password: gsUserResp.Password,
 		UUID:     req.UUID,
 	}
-	err = c.userStore.Create(ctx, user, namespace)
+	err := c.userStore.Create(ctx, user, namespace)
 	if err != nil {
 		newError := fmt.Errorf("failed to create user,error:%w", err)
 		return database.User{}, newError

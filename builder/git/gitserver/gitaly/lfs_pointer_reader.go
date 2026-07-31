@@ -1,10 +1,14 @@
 package gitaly
 
 import (
+	"encoding/hex"
 	"errors"
+	"io"
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/minio/sha256-simd"
 
 	"opencsg.com/csghub-server/common/types"
 )
@@ -58,4 +62,29 @@ func ReadPointerFromBuffer(buf []byte) (types.Pointer, error) {
 	p.Size = size
 
 	return p, nil
+}
+
+const blobSizeCutoff = 1024
+
+// ReadPointer tries to read LFS pointer data from the reader.
+func ReadPointer(reader io.Reader) (types.Pointer, error) {
+	buf := make([]byte, blobSizeCutoff)
+	n, err := io.ReadFull(reader, buf)
+	if err != nil && err != io.ErrUnexpectedEOF {
+		return types.Pointer{}, err
+	}
+	buf = buf[:n]
+
+	return ReadPointerFromBuffer(buf)
+}
+
+// GeneratePointer generates an LFS pointer for arbitrary content.
+func GeneratePointer(content io.Reader) (types.Pointer, error) {
+	h := sha256.New()
+	c, err := io.Copy(h, content)
+	if err != nil {
+		return types.Pointer{}, err
+	}
+	sum := h.Sum(nil)
+	return types.Pointer{Oid: hex.EncodeToString(sum), Size: c}, nil
 }

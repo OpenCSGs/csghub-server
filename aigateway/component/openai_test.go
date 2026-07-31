@@ -26,37 +26,6 @@ import (
 	commontypes "opencsg.com/csghub-server/common/types"
 )
 
-func TestGetSceneFromSvcType(t *testing.T) {
-	tests := []struct {
-		name     string
-		svcType  int
-		expected int
-	}{
-		{
-			name:     "inference type",
-			svcType:  commontypes.InferenceType,
-			expected: int(commontypes.SceneModelInference),
-		},
-		{
-			name:     "serverless type",
-			svcType:  commontypes.ServerlessType,
-			expected: int(commontypes.SceneModelServerless),
-		},
-		{
-			name:     "unknown type",
-			svcType:  999, // Some arbitrary value not defined in commontypes
-			expected: int(commontypes.SceneUnknow),
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := getSceneFromSvcType(tt.svcType)
-			assert.Equal(t, tt.expected, result)
-		})
-	}
-}
-
 func TestFilterAndPaginateModels(t *testing.T) {
 	models := []types.Model{
 		{BaseModel: types.BaseModel{ID: "gpt-4:svc1", Object: "model", OwnedBy: "u1"}},
@@ -824,7 +793,7 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 					require.Equal(t, "csghub://inference/test-model", evt.ResourceID)
 					require.Equal(t, "csghub://inference/test-model", evt.ResourceName)
 					require.Equal(t, "test-service", evt.CustomerID)
-					require.Equal(t, int(commontypes.SceneModelInference), evt.Scene)
+					require.Equal(t, int(commontypes.SceneModelServerless), evt.Scene)
 					require.Equal(t, "test-user-uuid", evt.UserUUID)
 					require.Equal(t, commontypes.TokenNumberType, evt.ValueType)
 					require.Equal(t, int64(150), evt.Value)
@@ -906,7 +875,7 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 					err := json.Unmarshal(data, &evt)
 					require.NoError(t, err)
 					require.Equal(t, "csghub://inference/test-model", evt.ResourceID)
-					require.Equal(t, int(commontypes.SceneModelInference), evt.Scene)
+					require.Equal(t, int(commontypes.SceneModelServerless), evt.Scene)
 
 					var tokenUsageExtra struct {
 						OwnerType commontypes.TokenUsageType `json:"owner_type"`
@@ -968,7 +937,7 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 					require.Equal(t, "csghub://inference/test-model", evt.ResourceID)
 					require.Equal(t, "csghub://inference/test-model", evt.ResourceName)
 					require.Equal(t, "test-service", evt.CustomerID)
-					require.Equal(t, int(commontypes.SceneModelInference), evt.Scene)
+					require.Equal(t, int(commontypes.SceneModelServerless), evt.Scene)
 					require.Equal(t, "test-user-uuid", evt.UserUUID)
 					require.Equal(t, commontypes.TokenNumberType, evt.ValueType)
 					require.Equal(t, int64(150), evt.Value)

@@ -205,7 +205,6 @@ func TestUserComponent_Delete(t *testing.T) {
 		pdStore:   mockPendingDeletionStore,
 		config:    &config.Config{},
 	}
-	uc.config.GitServer.Type = types.GitServerTypeGitaly
 
 	err := uc.Delete(context.TODO(), "user1", "user2")
 	require.Nil(t, err)

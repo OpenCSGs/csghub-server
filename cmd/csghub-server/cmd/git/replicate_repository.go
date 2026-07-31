@@ -60,10 +60,6 @@ var replicateRepositoryCmd = &cobra.Command{
 			return
 		}
 
-		if config.GitServer.Type == types.GitServerTypeGitea {
-			return
-		}
-
 		helper, err := gitaly.NewCloneStorageHelper(replicateReq)
 		if err != nil {
 			slog.Error("create helper failed", slog.Any("err", err))

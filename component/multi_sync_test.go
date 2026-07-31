@@ -2,13 +2,11 @@ package component
 
 import (
 	"context"
-	"database/sql"
 	"testing"
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	multisync_mock "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/multisync"
-	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/types"
 )
@@ -115,24 +113,11 @@ func TestMultiSyncComponent_SyncAsClient(t *testing.T) {
 		}},
 	}, nil)
 	mockedClient.EXPECT().ReadMeData(ctx, svs[0]).Return("readme", nil)
-	mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "csg_ns").Return(database.User{}, sql.ErrNoRows)
-	mc.mocks.gitServer.EXPECT().CreateUser(gitserver.CreateUserRequest{
-		Nickname: "csg_ns",
-		Username: "csg_ns",
-		Email:    "3073880722f93f34064c9adea9cbeea2",
-	}).Return(&gitserver.CreateUserResponse{GitID: 123}, nil)
-	mc.mocks.stores.UserMock().EXPECT().Create(ctx, mock.Anything, mock.Anything).RunAndReturn(
-		func(ctx context.Context, u *database.User, n *database.Namespace) error {
-			require.Equal(t, u.NickName, "csg_ns")
-			require.Equal(t, u.Username, "csg_ns")
-			require.Equal(t, u.Email, "3073880722f93f34064c9adea9cbeea2")
-			require.Equal(t, u.GitID, int64(123))
-			require.Equal(t, n.Path, "csg_ns")
-			require.Equal(t, n.Mirrored, true)
-			return nil
-		},
-	)
+	mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "csg_ns").Return(database.User{
+		ID: 1, Username: "csg_ns",
+	}, nil).Times(3)
 	dbrepo := &database.Repository{
+		UserID:         1,
 		Path:           "csg_ns/user",
 		GitPath:        "models_csg_ns/user",
 		Name:           "user",
@@ -177,6 +162,7 @@ func TestMultiSyncComponent_SyncAsClient(t *testing.T) {
 
 	// new dataset mock
 	dbrepo = &database.Repository{
+		UserID:         1,
 		Path:           "csg_ns/user",
 		GitPath:        "datasets_csg_ns/user",
 		Name:           "user",
@@ -188,7 +174,7 @@ func TestMultiSyncComponent_SyncAsClient(t *testing.T) {
 	}
 	mockedClient.EXPECT().DatasetInfo(ctx, svs[1]).Return(&types.Dataset{
 		User: types.User{Nickname: "nn"},
-		Path: "ns/user",
+		Path: "Ns/User",
 		Tags: []types.RepoTag{{Name: "t2"}},
 		Scores: []types.WeightScore{{
 			WeightName: string(database.RecomWeightOp),
@@ -240,6 +226,7 @@ func TestMultiSyncComponent_SyncAsClient(t *testing.T) {
 
 	// new skill mock
 	dbrepo = &database.Repository{
+		UserID:         1,
 		Path:           "csg_ns/user",
 		GitPath:        "skills_csg_ns/user",
 		Name:           "user",
@@ -251,7 +238,7 @@ func TestMultiSyncComponent_SyncAsClient(t *testing.T) {
 	}
 	mockedClient.EXPECT().SkillInfo(ctx, svs[2]).Return(&types.Skill{
 		User: types.User{Nickname: "nn"},
-		Path: "ns/user",
+		Path: "Ns/User",
 		Tags: []types.RepoTag{{Name: "t3"}},
 		Scores: []types.WeightScore{{
 			WeightName: string(database.RecomWeightOp),

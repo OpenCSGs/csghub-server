@@ -21,7 +21,7 @@ import (
 	"go.temporal.io/sdk/activity"
 	"gopkg.in/yaml.v2"
 	"opencsg.com/csghub-server/builder/git/gitserver"
-	"opencsg.com/csghub-server/builder/git/gitserver/gitea"
+	gitaly "opencsg.com/csghub-server/builder/git/gitserver/gitaly"
 	"opencsg.com/csghub-server/builder/parquet"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/store/s3"
@@ -924,7 +924,7 @@ func (dva *dataViewerActivityImpl) uploadToRepo(ctx context.Context, req types.U
 	}
 	defer f.Close()
 
-	pointer, err := gitea.GeneratePointer(f)
+	pointer, err := gitaly.GeneratePointer(f)
 	if err != nil {
 		return "", fmt.Errorf("fail to get lfs file %s point, cause: %w", uploadFile.ConvertPath, err)
 	}

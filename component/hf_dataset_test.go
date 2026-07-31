@@ -24,7 +24,7 @@ func TestHFDataset_GetPathsInfo(t *testing.T) {
 		Ref:       "main",
 		RepoType:  types.DatasetRepo,
 	}).Return(&types.File{
-		Type: "go", LastCommitSHA: "sha", Size: 5, Path: "foo",
+		Type: "go", SHA: "sha", Size: 5, Path: "foo",
 	}, nil)
 
 	data, err := hc.GetPathsInfo(ctx, types.PathReq{
@@ -55,7 +55,7 @@ func TestHFDataset_GetDatasetTree(t *testing.T) {
 		RepoType:  types.DatasetRepo,
 		Ref:       "main",
 	}).Return([]*types.File{
-		{Type: "go", LastCommitSHA: "sha", Size: 5, Path: "foo"},
+		{Type: "go", SHA: "sha", Size: 5, Path: "foo"},
 	}, nil)
 
 	data, err := hc.GetDatasetTree(ctx, types.PathReq{

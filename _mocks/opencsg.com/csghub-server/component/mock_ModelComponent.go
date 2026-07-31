@@ -1080,6 +1080,70 @@ func (_c *MockModelComponent_SDKModelInfo_Call) RunAndReturn(run func(context.Co
 	return _c
 }
 
+// SDKModelTree provides a mock function with given fields: ctx, namespace, name, ref, currentUser, path, recursive
+func (_m *MockModelComponent) SDKModelTree(ctx context.Context, namespace string, name string, ref string, currentUser string, path string, recursive bool) ([]types.HFDSPathInfo, error) {
+	ret := _m.Called(ctx, namespace, name, ref, currentUser, path, recursive)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SDKModelTree")
+	}
+
+	var r0 []types.HFDSPathInfo
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, string, string, bool) ([]types.HFDSPathInfo, error)); ok {
+		return rf(ctx, namespace, name, ref, currentUser, path, recursive)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, string, string, bool) []types.HFDSPathInfo); ok {
+		r0 = rf(ctx, namespace, name, ref, currentUser, path, recursive)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]types.HFDSPathInfo)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, string, string, string, bool) error); ok {
+		r1 = rf(ctx, namespace, name, ref, currentUser, path, recursive)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockModelComponent_SDKModelTree_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SDKModelTree'
+type MockModelComponent_SDKModelTree_Call struct {
+	*mock.Call
+}
+
+// SDKModelTree is a helper method to define mock.On call
+//   - ctx context.Context
+//   - namespace string
+//   - name string
+//   - ref string
+//   - currentUser string
+//   - path string
+//   - recursive bool
+func (_e *MockModelComponent_Expecter) SDKModelTree(ctx interface{}, namespace interface{}, name interface{}, ref interface{}, currentUser interface{}, path interface{}, recursive interface{}) *MockModelComponent_SDKModelTree_Call {
+	return &MockModelComponent_SDKModelTree_Call{Call: _e.mock.On("SDKModelTree", ctx, namespace, name, ref, currentUser, path, recursive)}
+}
+
+func (_c *MockModelComponent_SDKModelTree_Call) Run(run func(ctx context.Context, namespace string, name string, ref string, currentUser string, path string, recursive bool)) *MockModelComponent_SDKModelTree_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(string), args[4].(string), args[5].(string), args[6].(bool))
+	})
+	return _c
+}
+
+func (_c *MockModelComponent_SDKModelTree_Call) Return(_a0 []types.HFDSPathInfo, _a1 error) *MockModelComponent_SDKModelTree_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockModelComponent_SDKModelTree_Call) RunAndReturn(run func(context.Context, string, string, string, string, string, bool) ([]types.HFDSPathInfo, error)) *MockModelComponent_SDKModelTree_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // SetRelationDatasets provides a mock function with given fields: ctx, req
 func (_m *MockModelComponent) SetRelationDatasets(ctx context.Context, req types.RelationDatasets) error {
 	ret := _m.Called(ctx, req)

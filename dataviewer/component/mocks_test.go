@@ -5,7 +5,6 @@ import (
 	mock_accounting "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/accounting"
 	mock_deploy "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/deploy"
 	mock_git "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/git/gitserver"
-	mock_mirror "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/git/mirrorserver"
 	mock_importer "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/importer"
 	mock_preader "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/parquet"
 	mock_rpc "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/rpc"
@@ -36,7 +35,6 @@ type Mocks struct {
 	gitServer         *mock_git.MockGitServer
 	userSvcClient     *mock_rpc.MockUserSvcClient
 	s3Client          *mock_s3.MockClient
-	mirrorServer      *mock_mirror.MockMirrorServer
 	deployer          *mock_deploy.MockDeployer
 	cache             *mock_cache.MockCache
 	accountingClient  *mock_accounting.MockAccountingClient

@@ -54,8 +54,8 @@ var Cmd = &cobra.Command{
 }
 
 var initCmd = &cobra.Command{
-	Use:   "gitea",
-	Short: "scan gitea log to count the models and datasets downloads",
+	Use:   "scan",
+	Short: "scan git server log to count the models and datasets downloads",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		fmt.Println(logPath)
 		// Open log file

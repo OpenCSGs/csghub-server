@@ -210,8 +210,6 @@ type GetRepoAllFilesReq struct {
 	RelativePath string `json:"-"`
 }
 
-type GetRepoTagsReq = GetBranchesReq
-
 type CreateMirrorRepoReq struct {
 	Namespace   string `json:"namespace"`
 	Name        string `json:"name"`

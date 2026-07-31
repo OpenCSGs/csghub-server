@@ -48,10 +48,6 @@ var generateLfsMetaObjectsCmd = &cobra.Command{
 			return
 		}
 
-		if config.GitServer.Type == types.GitServerTypeGitea {
-			return
-		}
-
 		s3Client, err := s3.NewMinio(config)
 		if err != nil {
 			newError := fmt.Errorf("fail to init s3 client for code,error:%w", err)
