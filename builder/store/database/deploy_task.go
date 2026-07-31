@@ -690,8 +690,8 @@ func (s *deployTaskStoreImpl) GetClusterDeploys(ctx context.Context, req types.C
 		)
 	}
 	query = query.Where("status != ?", common.Deleted)
-	if req.Status != 0 {
-		query = query.Where("status = ?", req.Status)
+	if req.Status != nil {
+		query = query.Where("status = ?", *req.Status)
 	}
 	if req.ResourceName != "" {
 		query = query.Where("hardware = ?", req.ResourceName)

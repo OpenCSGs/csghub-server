@@ -1027,6 +1027,7 @@ func TestDeployTaskStore_GetClusterDeploys(t *testing.T) {
 	store := database.NewDeployTaskStoreWithDB(db)
 
 	runningStatus := common.Running
+	runningStatusPtr := &runningStatus
 
 	// Create test users first (since we need to join with users table)
 	user1 := &database.User{Username: "user1", NickName: "User One", Email: "user1@test.com", UUID: "uuid-user-1"}
@@ -1162,7 +1163,7 @@ func TestDeployTaskStore_GetClusterDeploys(t *testing.T) {
 
 	// Test 3: Filter by Status
 	result, total, err = store.GetClusterDeploys(ctx, types.ClusterDeployReq{
-		Status: runningStatus,
+		Status: runningStatusPtr,
 		Per:    10,
 		Page:   1,
 	})
@@ -1222,7 +1223,7 @@ func TestDeployTaskStore_GetClusterDeploys(t *testing.T) {
 	// Test 7: Combined filters
 	result, total, err = store.GetClusterDeploys(ctx, types.ClusterDeployReq{
 		ClusterID:    "cluster-1",
-		Status:       runningStatus,
+		Status:       runningStatusPtr,
 		ResourceName: "nvidia-a100",
 		Per:          10,
 		Page:         1,
