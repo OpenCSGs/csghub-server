@@ -20,6 +20,18 @@ type DatasetViewerHandler struct {
 	viewer component.DatasetViewerComponent
 }
 
+var (
+	queryInvalidSymbols = []string{
+		`'`, `"`, ";", "--", `/\*`, `\*/`,
+		`\bUNION\b`, `\bSELECT\b`, `\bINSERT\b`, `\bUPDATE\b`,
+		`\bDELETE\b`, `\bDROP\b`, `\bEXEC\b`, `\bCREATE\b`,
+		`\bALTER\b`, `\bTRUNCATE\b`,
+	}
+	sqlInvalidSymbolsPattern = regexp.MustCompile(fmt.Sprintf("(?:%s)", strings.Join(queryInvalidSymbols, "|")))
+
+	orderByPattern = regexp.MustCompile(`^[a-zA-Z0-9_\s]+(ASC|DESC)?(\s*,\s*[a-zA-Z0-9_\s]+(ASC|DESC)?)*$`)
+)
+
 func NewDatasetViewerHandler(cfg *config.Config, gs gitserver.GitServer) (*DatasetViewerHandler, error) {
 	dvc, err := component.NewDatasetViewerComponent(cfg, gs)
 	if err != nil {
@@ -214,15 +226,7 @@ func (h *DatasetViewerHandler) Rows(ctx *gin.Context) {
 }
 
 func validateQueryParameter(parameterValue string, parameterName string) error {
-	SQLInvalidSymbols := []string{
-		`'`, `"`, ";", "--", `/\*`, `\*/`,
-		`\bUNION\b`, `\bSELECT\b`, `\bINSERT\b`, `\bUPDATE\b`,
-		`\bDELETE\b`, `\bDROP\b`, `\bEXEC\b`, `\bCREATE\b`,
-		`\bALTER\b`, `\bTRUNCATE\b`,
-	}
-	SQLInvalidSymbolsPattern := regexp.MustCompile(fmt.Sprintf("(?:%s)", strings.Join(SQLInvalidSymbols, "|")))
-
-	if SQLInvalidSymbolsPattern.MatchString(parameterValue) {
+	if sqlInvalidSymbolsPattern.MatchString(parameterValue) {
 		return fmt.Errorf("invalid character in %s", parameterName)
 	}
 	return nil
@@ -232,9 +236,8 @@ func validateOrderBy(parameterValue string, parameterName string) error {
 	if parameterValue == "" {
 		return nil
 	}
-	pattern := regexp.MustCompile(`^[a-zA-Z0-9_\s]+(ASC|DESC)?(\s*,\s*[a-zA-Z0-9_\s]+(ASC|DESC)?)*$`)
 
-	if !pattern.MatchString(parameterValue) {
+	if !orderByPattern.MatchString(parameterValue) {
 		return fmt.Errorf("invalid %s format", parameterName)
 	}
 	return nil
