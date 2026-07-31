@@ -101,6 +101,7 @@ type ListUserOrgsReq struct {
 	OrgType      string `form:"org_type" json:"org_type,omitempty"`
 	VerifyStatus string `form:"verify_status" json:"verify_status,omitempty"`
 	Role         string `form:"role" json:"role,omitempty"`
+	Tag          string `form:"tag" json:"tag,omitempty"`
 	Per          int    `form:"per" json:"per,omitempty"`
 	Page         int    `form:"page" json:"page,omitempty"`
 }

@@ -162,6 +162,7 @@ func (h *OrganizationHandler) GetByUUID(ctx *gin.Context) {
 // @Param        search query string false "search keyword"
 // @Param        org_type query string false "org type filter"
 // @Param        verify_status query string false "verify status filter"
+// @Param        tag query string false "filter by tag name"
 // @Param        per query int false "page size"
 // @Param        page query int false "page number"
 // @Success      200  {object}  types.Response{data=[]types.Organization} "OK"
@@ -171,13 +172,14 @@ func (h *OrganizationHandler) Index(ctx *gin.Context) {
 	search := ctx.Query("search")
 	orgType := ctx.Query("org_type")
 	verifyStatus := ctx.Query("verify_status")
+	tag := ctx.Query("tag")
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "Failed to get per and page", slog.Any("error", err))
 		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
-	orgs, total, err := h.c.Index(ctx, search, per, page, orgType, verifyStatus)
+	orgs, total, err := h.c.Index(ctx, search, per, page, orgType, verifyStatus, tag)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "Failed to get organizations", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -205,6 +207,7 @@ func (h *OrganizationHandler) Index(ctx *gin.Context) {
 // @Param        org_type query string false "org type filter"
 // @Param        verify_status query string false "verify status filter"
 // @Param        role query string false "role filter: all (any member), owner, write, admin"
+// @Param        tag query string false "filter by tag name"
 // @Param        per query int false "page size"
 // @Param        page query int false "page number"
 // @Success      200  {object}  types.Response{data=[]types.Organization} "OK"
@@ -223,6 +226,7 @@ func (h *OrganizationHandler) ListUserOrgs(ctx *gin.Context) {
 		OrgType:      ctx.Query("org_type"),
 		VerifyStatus: ctx.Query("verify_status"),
 		Role:         ctx.Query("role"),
+		Tag:          ctx.Query("tag"),
 		Per:          per,
 		Page:         page,
 	}

@@ -307,9 +307,9 @@ func (_c *MockOrganizationComponent_GetByUUID_Call) RunAndReturn(run func(contex
 	return _c
 }
 
-// Index provides a mock function with given fields: ctx, search, per, page, orgType, verifyStatus
-func (_m *MockOrganizationComponent) Index(ctx context.Context, search string, per int, page int, orgType string, verifyStatus string) ([]types.Organization, int, error) {
-	ret := _m.Called(ctx, search, per, page, orgType, verifyStatus)
+// Index provides a mock function with given fields: ctx, search, per, page, orgType, verifyStatus, tag
+func (_m *MockOrganizationComponent) Index(ctx context.Context, search string, per int, page int, orgType string, verifyStatus string, tag string) ([]types.Organization, int, error) {
+	ret := _m.Called(ctx, search, per, page, orgType, verifyStatus, tag)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Index")
@@ -318,25 +318,25 @@ func (_m *MockOrganizationComponent) Index(ctx context.Context, search string, p
 	var r0 []types.Organization
 	var r1 int
 	var r2 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, int, int, string, string) ([]types.Organization, int, error)); ok {
-		return rf(ctx, search, per, page, orgType, verifyStatus)
+	if rf, ok := ret.Get(0).(func(context.Context, string, int, int, string, string, string) ([]types.Organization, int, error)); ok {
+		return rf(ctx, search, per, page, orgType, verifyStatus, tag)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, int, int, string, string) []types.Organization); ok {
-		r0 = rf(ctx, search, per, page, orgType, verifyStatus)
+	if rf, ok := ret.Get(0).(func(context.Context, string, int, int, string, string, string) []types.Organization); ok {
+		r0 = rf(ctx, search, per, page, orgType, verifyStatus, tag)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]types.Organization)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, int, int, string, string) int); ok {
-		r1 = rf(ctx, search, per, page, orgType, verifyStatus)
+	if rf, ok := ret.Get(1).(func(context.Context, string, int, int, string, string, string) int); ok {
+		r1 = rf(ctx, search, per, page, orgType, verifyStatus, tag)
 	} else {
 		r1 = ret.Get(1).(int)
 	}
 
-	if rf, ok := ret.Get(2).(func(context.Context, string, int, int, string, string) error); ok {
-		r2 = rf(ctx, search, per, page, orgType, verifyStatus)
+	if rf, ok := ret.Get(2).(func(context.Context, string, int, int, string, string, string) error); ok {
+		r2 = rf(ctx, search, per, page, orgType, verifyStatus, tag)
 	} else {
 		r2 = ret.Error(2)
 	}
@@ -356,13 +356,14 @@ type MockOrganizationComponent_Index_Call struct {
 //   - page int
 //   - orgType string
 //   - verifyStatus string
-func (_e *MockOrganizationComponent_Expecter) Index(ctx interface{}, search interface{}, per interface{}, page interface{}, orgType interface{}, verifyStatus interface{}) *MockOrganizationComponent_Index_Call {
-	return &MockOrganizationComponent_Index_Call{Call: _e.mock.On("Index", ctx, search, per, page, orgType, verifyStatus)}
+//   - tag string
+func (_e *MockOrganizationComponent_Expecter) Index(ctx interface{}, search interface{}, per interface{}, page interface{}, orgType interface{}, verifyStatus interface{}, tag interface{}) *MockOrganizationComponent_Index_Call {
+	return &MockOrganizationComponent_Index_Call{Call: _e.mock.On("Index", ctx, search, per, page, orgType, verifyStatus, tag)}
 }
 
-func (_c *MockOrganizationComponent_Index_Call) Run(run func(ctx context.Context, search string, per int, page int, orgType string, verifyStatus string)) *MockOrganizationComponent_Index_Call {
+func (_c *MockOrganizationComponent_Index_Call) Run(run func(ctx context.Context, search string, per int, page int, orgType string, verifyStatus string, tag string)) *MockOrganizationComponent_Index_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(int), args[3].(int), args[4].(string), args[5].(string))
+		run(args[0].(context.Context), args[1].(string), args[2].(int), args[3].(int), args[4].(string), args[5].(string), args[6].(string))
 	})
 	return _c
 }
@@ -372,7 +373,7 @@ func (_c *MockOrganizationComponent_Index_Call) Return(_a0 []types.Organization,
 	return _c
 }
 
-func (_c *MockOrganizationComponent_Index_Call) RunAndReturn(run func(context.Context, string, int, int, string, string) ([]types.Organization, int, error)) *MockOrganizationComponent_Index_Call {
+func (_c *MockOrganizationComponent_Index_Call) RunAndReturn(run func(context.Context, string, int, int, string, string, string) ([]types.Organization, int, error)) *MockOrganizationComponent_Index_Call {
 	_c.Call.Return(run)
 	return _c
 }

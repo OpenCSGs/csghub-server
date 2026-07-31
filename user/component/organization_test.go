@@ -180,13 +180,13 @@ func TestOrganizationComponent_Index(t *testing.T) {
 		},
 	})
 	mockOrgStore := mockdb.NewMockOrgStore(t)
-	mockOrgStore.EXPECT().Search(mock.Anything, "", 10, 0, "", "").Return(dbOrgs, len(dbOrgs), nil).Once()
+	mockOrgStore.EXPECT().Search(mock.Anything, "", 10, 0, "", "", "").Return(dbOrgs, len(dbOrgs), nil).Once()
 	mockOrgStore.EXPECT().GetOrganizationTagsByOrgIDs(mock.Anything, []int64{1, 2}).Return(map[int64][]database.Tag{}, nil).Once()
 
 	c := &organizationComponentImpl{
 		orgStore: mockOrgStore,
 	}
-	expectedOrgs, total, err := c.Index(context.Background(), "", 10, 0, "", "")
+	expectedOrgs, total, err := c.Index(context.Background(), "", 10, 0, "", "", "")
 
 	require.NoError(t, err)
 	require.Len(t, expectedOrgs, 2)
@@ -236,7 +236,7 @@ func TestOrganizationComponent_ListUserOrgs_Admin(t *testing.T) {
 	})
 
 	mockOrgStore := mockdb.NewMockOrgStore(t)
-	mockOrgStore.EXPECT().SearchUserBelongOrgs(mock.Anything, int64(1), "", 10, 1, "", "", "").Return(dbOrgs, len(dbOrgs), nil).Once()
+	mockOrgStore.EXPECT().SearchUserBelongOrgs(mock.Anything, int64(1), "", 10, 1, "", "", "", "").Return(dbOrgs, len(dbOrgs), nil).Once()
 	mockOrgStore.EXPECT().GetOrganizationTagsByOrgIDs(mock.Anything, []int64{1}).Return(map[int64][]database.Tag{}, nil).Once()
 
 	mockUserStore := mockdb.NewMockUserStore(t)
@@ -273,7 +273,7 @@ func TestOrganizationComponent_ListUserOrgs_RegularUser(t *testing.T) {
 	})
 
 	mockOrgStore := mockdb.NewMockOrgStore(t)
-	mockOrgStore.EXPECT().SearchUserBelongOrgs(mock.Anything, int64(2), "", 10, 1, "", "", "").Return(dbOrgs, len(dbOrgs), nil).Once()
+	mockOrgStore.EXPECT().SearchUserBelongOrgs(mock.Anything, int64(2), "", 10, 1, "", "", "", "").Return(dbOrgs, len(dbOrgs), nil).Once()
 	mockOrgStore.EXPECT().GetOrganizationTagsByOrgIDs(mock.Anything, []int64{1}).Return(map[int64][]database.Tag{}, nil).Once()
 
 	mockUserStore := mockdb.NewMockUserStore(t)
@@ -310,7 +310,7 @@ func TestOrganizationComponent_ListUserOrgs_RegularUserWithFilters(t *testing.T)
 	})
 
 	mockOrgStore := mockdb.NewMockOrgStore(t)
-	mockOrgStore.EXPECT().SearchUserBelongOrgs(mock.Anything, int64(2), "search", 5, 2, "school", "approved", "").Return(dbOrgs, len(dbOrgs), nil).Once()
+	mockOrgStore.EXPECT().SearchUserBelongOrgs(mock.Anything, int64(2), "search", 5, 2, "school", "approved", "", "").Return(dbOrgs, len(dbOrgs), nil).Once()
 	mockOrgStore.EXPECT().GetOrganizationTagsByOrgIDs(mock.Anything, []int64{1}).Return(map[int64][]database.Tag{}, nil).Once()
 
 	mockUserStore := mockdb.NewMockUserStore(t)
@@ -357,7 +357,7 @@ func TestOrganizationComponent_ListUserOrgs_OwnerRole(t *testing.T) {
 	})
 
 	mockOrgStore := mockdb.NewMockOrgStore(t)
-	mockOrgStore.EXPECT().SearchUserBelongOrgs(mock.Anything, int64(2), "", 10, 1, "", "", "owner").Return(dbOrgs, len(dbOrgs), nil).Once()
+	mockOrgStore.EXPECT().SearchUserBelongOrgs(mock.Anything, int64(2), "", 10, 1, "", "", "owner", "").Return(dbOrgs, len(dbOrgs), nil).Once()
 	mockOrgStore.EXPECT().GetOrganizationTagsByOrgIDs(mock.Anything, []int64{1}).Return(map[int64][]database.Tag{}, nil).Once()
 
 	mockUserStore := mockdb.NewMockUserStore(t)
@@ -394,7 +394,7 @@ func TestOrganizationComponent_ListUserOrgs_WriteRole(t *testing.T) {
 	})
 
 	mockOrgStore := mockdb.NewMockOrgStore(t)
-	mockOrgStore.EXPECT().SearchUserBelongOrgs(mock.Anything, int64(2), "", 10, 1, "", "", "write").Return(dbOrgs, len(dbOrgs), nil).Once()
+	mockOrgStore.EXPECT().SearchUserBelongOrgs(mock.Anything, int64(2), "", 10, 1, "", "", "write", "").Return(dbOrgs, len(dbOrgs), nil).Once()
 	mockOrgStore.EXPECT().GetOrganizationTagsByOrgIDs(mock.Anything, []int64{1}).Return(map[int64][]database.Tag{}, nil).Once()
 
 	mockUserStore := mockdb.NewMockUserStore(t)
@@ -431,7 +431,7 @@ func TestOrganizationComponent_ListUserOrgs_AdminRole(t *testing.T) {
 	})
 
 	mockOrgStore := mockdb.NewMockOrgStore(t)
-	mockOrgStore.EXPECT().SearchUserBelongOrgs(mock.Anything, int64(2), "", 10, 1, "", "", "admin").Return(dbOrgs, len(dbOrgs), nil).Once()
+	mockOrgStore.EXPECT().SearchUserBelongOrgs(mock.Anything, int64(2), "", 10, 1, "", "", "admin", "").Return(dbOrgs, len(dbOrgs), nil).Once()
 	mockOrgStore.EXPECT().GetOrganizationTagsByOrgIDs(mock.Anything, []int64{1}).Return(map[int64][]database.Tag{}, nil).Once()
 
 	mockUserStore := mockdb.NewMockUserStore(t)

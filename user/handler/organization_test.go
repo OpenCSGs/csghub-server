@@ -94,7 +94,7 @@ func TestOrganizationHandler_Index(t *testing.T) {
 		},
 	}
 	mockOrgComp := mockcomp.NewMockOrganizationComponent(t)
-	mockOrgComp.EXPECT().Index(mock.Anything, "org1", 10, 1, "", "").Return(dborgs, 1, nil)
+	mockOrgComp.EXPECT().Index(mock.Anything, "org1", 10, 1, "", "", "").Return(dborgs, 1, nil)
 	h := &OrganizationHandler{
 		c: mockOrgComp,
 	}
