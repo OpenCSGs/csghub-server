@@ -121,6 +121,10 @@ type GetFileReq struct {
 	CurrentUser string `json:"current_user"`
 	// limit file size, don't return file content if file size is greater than MaxFileSize
 	MaxFileSize int64 `json:"max_file_size"`
+	// Limit is the maximum number of bytes read from the beginning of the file; zero means unlimited.
+	Limit int64 `json:"-"`
+	// CountDownload indicates whether this request should increment repository download statistics.
+	CountDownload bool `json:"-"`
 }
 
 type GetTreeRequest struct {

@@ -134,6 +134,7 @@ type RepoComponent interface {
 	SDKListFiles(ctx context.Context, repoType types.RepositoryType, namespace, name, ref, userName string) (*types.SDKFiles, error)
 	IsLfs(ctx context.Context, req *types.GetFileReq) (bool, int64, error)
 	HeadDownloadFile(ctx context.Context, req *types.GetFileReq, userName string) (*types.File, *types.Commit, error)
+	// SDKDownloadFile prepares a download and records it when req.CountDownload is true.
 	SDKDownloadFile(ctx context.Context, req *types.GetFileReq, userName string) (io.ReadCloser, int64, string, error)
 	// UpdateDownloads increase clone download count for repo by given count
 	UpdateDownloads(ctx context.Context, req *types.UpdateDownloadsReq) error
@@ -1635,6 +1636,7 @@ func (c *repoComponentImpl) SDKListFiles(ctx context.Context, repoType types.Rep
 	}, nil
 }
 
+// IsLfs reports whether a repository file is an LFS pointer and returns its downloadable content size.
 func (c *repoComponentImpl) IsLfs(ctx context.Context, req *types.GetFileReq) (bool, int64, error) {
 	getFileRawReq := gitserver.GetRepoInfoByPathReq{
 		Namespace: req.Namespace,
@@ -1645,19 +1647,30 @@ func (c *repoComponentImpl) IsLfs(ctx context.Context, req *types.GetFileReq) (b
 	}
 	content, err := c.git.GetRepoFileRaw(ctx, getFileRawReq)
 	if err != nil {
-		if e, ok := err.(errorx.CustomError); ok && e.Is(errorx.ErrGitFileNotFound) {
+		if isRepositoryContentNotFound(err) {
 			return false, -1, errorx.ErrNotFound
 		}
 		slog.Error("failed to get %s file raw", string(req.RepoType), slog.String("namespace", req.Namespace), slog.String("name", req.Name), slog.String("path", req.Path))
 		return false, -1, err
 	}
 
-	return strings.HasPrefix(content, types.LFSPrefix), int64(len(content)), nil
+	if !strings.HasPrefix(content, types.LFSPrefix) {
+		return false, int64(len(content)), nil
+	}
+	pointer, err := gitaly.ReadPointerFromBuffer([]byte(content))
+	if err != nil {
+		return false, -1, fmt.Errorf("failed to parse LFS pointer: %w", err)
+	}
+	return true, pointer.Size, nil
 }
 
+// HeadDownloadFile returns repository file metadata and its latest commit.
 func (c *repoComponentImpl) HeadDownloadFile(ctx context.Context, req *types.GetFileReq, userName string) (*types.File, *types.Commit, error) {
 	repo, err := c.repoStore.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
 	if err != nil {
+		if isRepositoryContentNotFound(err) {
+			return nil, nil, errorx.ErrNotFound
+		}
 		return nil, nil, fmt.Errorf("failed to find repo, error: %w", err)
 	}
 	canRead, err := c.AllowReadAccessRepo(ctx, repo, userName)
@@ -1680,7 +1693,7 @@ func (c *repoComponentImpl) HeadDownloadFile(ctx context.Context, req *types.Get
 	file, err := c.git.GetRepoFileContents(ctx, getFileContentReq)
 	if err != nil {
 		slog.Error("err.Error()", slog.Any("err.Error()", err.Error()))
-		if err.Error() == ErrNotFoundMessage || err.Error() == ErrGetContentsOrList {
+		if isRepositoryContentNotFound(err) || err.Error() == ErrNotFoundMessage || err.Error() == ErrGetContentsOrList {
 			return nil, nil, errorx.ErrNotFound
 		}
 		return nil, nil, fmt.Errorf("failed to download git %s repository file, error: %w", req.RepoType, err)
@@ -1704,6 +1717,15 @@ func (c *repoComponentImpl) HeadDownloadFile(ctx context.Context, req *types.Get
 	return file, lastCommit, nil
 }
 
+// isRepositoryContentNotFound identifies lower-layer errors that mean a repository or file does not exist.
+func isRepositoryContentNotFound(err error) bool {
+	return errors.Is(err, errorx.ErrNotFound) ||
+		errors.Is(err, errorx.ErrDatabaseNoRows) ||
+		errors.Is(err, errorx.ErrGitRepoNotFound) ||
+		errors.Is(err, errorx.ErrGitFileNotFound)
+}
+
+// SDKDownloadFile authorizes and prepares a download, recording it when req.CountDownload is true.
 func (c *repoComponentImpl) SDKDownloadFile(ctx context.Context, req *types.GetFileReq, userName string) (io.ReadCloser, int64, string, error) {
 	var downloadUrl string
 	repo, err := c.repoStore.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
@@ -1719,9 +1741,11 @@ func (c *repoComponentImpl) SDKDownloadFile(ctx context.Context, req *types.GetF
 		return nil, 0, "", errorx.ErrForbiddenMsg("users do not have permission to download file in this repo")
 	}
 
-	err = c.repoStore.UpdateRepoFileDownloads(ctx, repo, time.Now(), 1)
-	if err != nil {
-		return nil, 0, "", fmt.Errorf("failed to update %s file download count, error: %w", fmt.Sprintf("%s/%s/%s", req.RepoType, req.Namespace, req.Name), err)
+	if req.CountDownload {
+		err = c.repoStore.UpdateRepoFileDownloads(ctx, repo, time.Now(), 1)
+		if err != nil {
+			return nil, 0, "", fmt.Errorf("failed to update %s file download count, error: %w", fmt.Sprintf("%s/%s/%s", req.RepoType, req.Namespace, req.Name), err)
+		}
 	}
 
 	if req.Ref == "" {
@@ -1766,6 +1790,7 @@ func (c *repoComponentImpl) SDKDownloadFile(ctx context.Context, req *types.GetF
 			Ref:       req.Ref,
 			Path:      req.Path,
 			RepoType:  req.RepoType,
+			Limit:     req.Limit,
 		}
 		reader, size, err := c.git.GetRepoFileReader(ctx, getFileReaderReq)
 		if err != nil {

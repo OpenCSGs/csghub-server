@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"mime/multipart"
 	"net/http"
@@ -1018,44 +1019,69 @@ func TestRepoHandler_SDKListFiles(t *testing.T) {
 	tester.ResponseEqSimple(t, http.StatusOK, &types.SDKFiles{ID: "f1"})
 }
 
+// TestRepoHandler_HandleDownload verifies full, partial, and redirected repository downloads.
 func TestRepoHandler_HandleDownload(t *testing.T) {
+	lfsTests := []struct {
+		name              string
+		rangeHeader       string
+		ifRangeHeader     string
+		wantLimit         int64
+		wantDownloadCount bool
+	}{
+		{name: "full download", wantDownloadCount: true},
+		{name: "initial range", rangeHeader: "bytes=0-9", wantLimit: 10, wantDownloadCount: true},
+		{name: "subsequent range", rangeHeader: "bytes=10-19", wantLimit: 20},
+		{name: "invalid range", rangeHeader: "bytes=invalid", ifRangeHeader: `"old-sha"`},
+	}
+	for _, test := range lfsTests {
+		t.Run("lfs file "+test.name, func(t *testing.T) {
+			tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
+				return rp.SDKDownload
+			})
 
-	t.Run("lfs file", func(t *testing.T) {
-		tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
-			return rp.SDKDownload
+			tester.WithUser()
+			tester.WithParam("ref", "main")
+			tester.WithParam("branch_mapped", "main_main")
+			tester.WithParam("file_path", "foo")
+			tester.WithKV("repo_type", types.ModelRepo)
+			tester.Gctx().Request.Method = http.MethodGet
+			if test.rangeHeader != "" {
+				tester.WithHeader("Range", test.rangeHeader)
+			}
+			if test.ifRangeHeader != "" {
+				tester.WithHeader("If-Range", test.ifRangeHeader)
+			}
+			req := &types.GetFileReq{
+				Namespace:     "u",
+				Name:          "r",
+				Path:          "foo",
+				Ref:           "main_main",
+				Lfs:           false,
+				SaveAs:        "foo",
+				RepoType:      types.ModelRepo,
+				CountDownload: true,
+			}
+			tester.mocks.repo.EXPECT().IsLfs(tester.Ctx(), req).Return(true, 100, nil)
+			downloadReq := *req
+			downloadReq.Lfs = true
+			downloadReq.Limit = test.wantLimit
+			downloadReq.CountDownload = test.wantDownloadCount
+			tester.mocks.repo.EXPECT().SDKDownloadFile(tester.Ctx(), &downloadReq, "u").Return(
+				nil, 100, "url", nil,
+			)
+
+			tester.Execute()
+
+			require.Equal(t, http.StatusFound, tester.Response().Code)
+			resp := tester.Response().Result()
+			defer resp.Body.Close()
+			location, err := resp.Location()
+			require.NoError(t, err)
+			require.Equal(t, "/url", location.String())
+			require.Equal(t, "bytes", tester.Response().Header().Get("Accept-Ranges"))
+			require.Empty(t, tester.Response().Header().Get("Content-Range"))
 		})
-
-		tester.WithUser()
-		tester.WithParam("ref", "main")
-		tester.WithParam("branch_mapped", "main_main")
-		tester.WithParam("file_path", "foo")
-		tester.WithKV("repo_type", types.ModelRepo)
-		req := &types.GetFileReq{
-			Namespace: "u",
-			Name:      "r",
-			Path:      "foo",
-			Ref:       "main_main",
-			Lfs:       false,
-			SaveAs:    "foo",
-			RepoType:  types.ModelRepo,
-		}
-		tester.mocks.repo.EXPECT().IsLfs(tester.Ctx(), req).Return(true, 100, nil)
-		reqnew := *req
-		reqnew.Lfs = true
-		tester.mocks.repo.EXPECT().SDKDownloadFile(tester.Ctx(), &reqnew, "u").Return(
-			nil, 100, "url", nil,
-		)
-
-		tester.Execute()
-
-		// redirected
-		require.Equal(t, http.StatusOK, tester.Response().Code)
-		resp := tester.Response().Result()
-		defer resp.Body.Close()
-		lc, err := resp.Location()
-		require.NoError(t, err)
-		require.Equal(t, "/url", lc.String())
-	})
+	}
 
 	t.Run("normal file", func(t *testing.T) {
 		tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
@@ -1068,16 +1094,18 @@ func TestRepoHandler_HandleDownload(t *testing.T) {
 		tester.WithParam("file_path", "foo")
 		tester.WithKV("repo_type", types.ModelRepo)
 		req := &types.GetFileReq{
-			Namespace: "u",
-			Name:      "r",
-			Path:      "foo",
-			Ref:       "main_main",
-			Lfs:       false,
-			SaveAs:    "foo",
-			RepoType:  types.ModelRepo,
+			Namespace:     "u",
+			Name:          "r",
+			Path:          "foo",
+			Ref:           "main_main",
+			Lfs:           false,
+			SaveAs:        "foo",
+			RepoType:      types.ModelRepo,
+			CountDownload: true,
 		}
 		tester.mocks.repo.EXPECT().IsLfs(tester.Ctx(), req).Return(false, 100, nil)
-		tester.mocks.repo.EXPECT().SDKDownloadFile(tester.Ctx(), req, "u").Return(
+		downloadReq := *req
+		tester.mocks.repo.EXPECT().SDKDownloadFile(tester.Ctx(), &downloadReq, "u").Return(
 			io.NopCloser(bytes.NewBuffer([]byte("bar"))), 100, "url", nil,
 		)
 
@@ -1087,8 +1115,307 @@ func TestRepoHandler_HandleDownload(t *testing.T) {
 		require.Equal(t, "application/octet-stream", headers.Get("Content-Type"))
 		require.Equal(t, `attachment; filename="foo"`, headers.Get("Content-Disposition"))
 		require.Equal(t, "100", headers.Get("Content-Length"))
+		require.Equal(t, "bytes", headers.Get("Accept-Ranges"))
 		r := tester.Response().Body.String()
 		require.Equal(t, "bar", r)
+	})
+
+	t.Run("repository not found", func(t *testing.T) {
+		tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
+			return rp.SDKDownload
+		})
+
+		tester.WithUser()
+		tester.WithParam("branch", "main")
+		tester.WithParam("file_path", "missing")
+		tester.WithKV("repo_type", types.ModelRepo)
+		req := &types.GetFileReq{
+			Namespace:     "u",
+			Name:          "r",
+			Path:          "missing",
+			Ref:           "main",
+			Lfs:           false,
+			SaveAs:        "missing",
+			RepoType:      types.ModelRepo,
+			CountDownload: true,
+		}
+		tester.mocks.repo.EXPECT().IsLfs(tester.Ctx(), req).Return(
+			false, int64(-1), fmt.Errorf("component not-found error: %w", errorx.ErrNotFound),
+		)
+
+		tester.Execute()
+
+		require.Equal(t, http.StatusNotFound, tester.Response().Code)
+	})
+
+	t.Run("forbidden file", func(t *testing.T) {
+		tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
+			return rp.SDKDownload
+		})
+
+		tester.WithUser()
+		tester.WithParam("branch", "main")
+		tester.WithParam("file_path", "private")
+		tester.WithKV("repo_type", types.ModelRepo)
+		tester.WithHeader("Range", "bytes=0-0")
+		req := &types.GetFileReq{
+			Namespace:     "u",
+			Name:          "r",
+			Path:          "private",
+			Ref:           "main",
+			Lfs:           false,
+			SaveAs:        "private",
+			RepoType:      types.ModelRepo,
+			CountDownload: true,
+		}
+		tester.mocks.repo.EXPECT().IsLfs(tester.Ctx(), req).Return(false, int64(100), nil)
+		downloadReq := *req
+		downloadReq.Limit = 1
+		tester.mocks.repo.EXPECT().SDKDownloadFile(tester.Ctx(), &downloadReq, "u").Return(
+			nil, int64(0), "", errorx.ErrForbiddenMsg("access denied"),
+		)
+
+		tester.Execute()
+
+		require.Equal(t, http.StatusForbidden, tester.Response().Code)
+		require.Empty(t, tester.Response().Header().Get("Content-Range"))
+	})
+
+	t.Run("user not found during download", func(t *testing.T) {
+		tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
+			return rp.SDKDownload
+		})
+
+		tester.WithUser()
+		tester.WithParam("branch", "main")
+		tester.WithParam("file_path", "private")
+		tester.WithKV("repo_type", types.ModelRepo)
+		req := &types.GetFileReq{
+			Namespace:     "u",
+			Name:          "r",
+			Path:          "private",
+			Ref:           "main",
+			Lfs:           false,
+			SaveAs:        "private",
+			RepoType:      types.ModelRepo,
+			CountDownload: true,
+		}
+		tester.mocks.repo.EXPECT().IsLfs(tester.Ctx(), req).Return(false, int64(10), nil)
+		downloadReq := *req
+		tester.mocks.repo.EXPECT().SDKDownloadFile(tester.Ctx(), &downloadReq, "u").Return(
+			nil, int64(0), "", errorx.ErrUserNotFound,
+		)
+
+		tester.Execute()
+
+		require.Equal(t, http.StatusUnauthorized, tester.Response().Code)
+	})
+
+	t.Run("user not found during if-range validation", func(t *testing.T) {
+		tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
+			return rp.SDKDownload
+		})
+
+		tester.WithUser()
+		tester.WithParam("branch", "main")
+		tester.WithParam("file_path", "private")
+		tester.WithKV("repo_type", types.ModelRepo)
+		tester.WithHeader("Range", "bytes=0-0")
+		tester.WithHeader("If-Range", `"sha"`)
+		req := &types.GetFileReq{
+			Namespace:     "u",
+			Name:          "r",
+			Path:          "private",
+			Ref:           "main",
+			Lfs:           false,
+			SaveAs:        "private",
+			RepoType:      types.ModelRepo,
+			CountDownload: true,
+		}
+		tester.mocks.repo.EXPECT().IsLfs(tester.Ctx(), req).Return(false, int64(10), nil)
+		tester.mocks.repo.EXPECT().HeadDownloadFile(tester.Ctx(), req, "u").Return(
+			nil, nil, errorx.ErrUserNotFound,
+		)
+
+		tester.Execute()
+
+		require.Equal(t, http.StatusUnauthorized, tester.Response().Code)
+	})
+
+	rangeTests := []struct {
+		name              string
+		rangeHeader       string
+		ifRangeHeader     string
+		wantStatus        int
+		wantBody          string
+		wantContentRange  string
+		wantLength        string
+		wantETag          string
+		wantLimit         int64
+		wantDownloadCount bool
+	}{
+		{name: "initial range", rangeHeader: "bytes=0-3", wantStatus: http.StatusPartialContent, wantBody: "0123", wantContentRange: "bytes 0-3/10", wantLength: "4", wantLimit: 4, wantDownloadCount: true},
+		{name: "closed range", rangeHeader: "bytes=2-5", wantStatus: http.StatusPartialContent, wantBody: "2345", wantContentRange: "bytes 2-5/10", wantLength: "4", wantLimit: 6},
+		{name: "matching if-range", rangeHeader: "bytes=2-5", ifRangeHeader: `"sha"`, wantStatus: http.StatusPartialContent, wantBody: "2345", wantContentRange: "bytes 2-5/10", wantLength: "4", wantETag: `"sha"`, wantLimit: 6},
+		{name: "mismatched if-range", rangeHeader: "bytes=2-5", ifRangeHeader: `"old-sha"`, wantStatus: http.StatusOK, wantBody: "0123456789", wantLength: "10", wantETag: `"sha"`, wantDownloadCount: true},
+		{name: "weak if-range", rangeHeader: "bytes=2-5", ifRangeHeader: `W/"sha"`, wantStatus: http.StatusOK, wantBody: "0123456789", wantLength: "10", wantETag: `"sha"`, wantDownloadCount: true},
+		{name: "date if-range", rangeHeader: "bytes=2-5", ifRangeHeader: "Wed, 21 Oct 2015 07:28:00 GMT", wantStatus: http.StatusOK, wantBody: "0123456789", wantLength: "10", wantETag: `"sha"`, wantDownloadCount: true},
+		{name: "open ended range", rangeHeader: "bytes=7-", wantStatus: http.StatusPartialContent, wantBody: "789", wantContentRange: "bytes 7-9/10", wantLength: "3"},
+		{name: "suffix range", rangeHeader: "bytes=-3", wantStatus: http.StatusPartialContent, wantBody: "789", wantContentRange: "bytes 7-9/10", wantLength: "3"},
+		{name: "end is clamped", rangeHeader: "bytes=8-99", wantStatus: http.StatusPartialContent, wantBody: "89", wantContentRange: "bytes 8-9/10", wantLength: "2"},
+		{name: "unsatisfiable range", rangeHeader: "bytes=10-", wantStatus: http.StatusRequestedRangeNotSatisfiable, wantContentRange: "bytes */10"},
+		{name: "invalid range", rangeHeader: "bytes=invalid", wantStatus: http.StatusRequestedRangeNotSatisfiable, wantContentRange: "bytes */10"},
+		{name: "unsupported unit", rangeHeader: "items=0-1", wantStatus: http.StatusRequestedRangeNotSatisfiable, wantContentRange: "bytes */10"},
+		{name: "multiple ranges", rangeHeader: "bytes=0-1,4-5", wantStatus: http.StatusOK, wantBody: "0123456789", wantLength: "10", wantDownloadCount: true},
+	}
+
+	for _, test := range rangeTests {
+		t.Run(test.name, func(t *testing.T) {
+			tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
+				return rp.SDKDownload
+			})
+
+			tester.WithUser()
+			tester.WithParam("branch", "main")
+			tester.WithParam("file_path", "foo")
+			tester.WithKV("repo_type", types.ModelRepo)
+			tester.WithHeader("Range", test.rangeHeader)
+			if test.ifRangeHeader != "" {
+				tester.WithHeader("If-Range", test.ifRangeHeader)
+			}
+			req := &types.GetFileReq{
+				Namespace:     "u",
+				Name:          "r",
+				Path:          "foo",
+				Ref:           "main",
+				Lfs:           false,
+				SaveAs:        "foo",
+				RepoType:      types.ModelRepo,
+				CountDownload: true,
+			}
+			tester.mocks.repo.EXPECT().IsLfs(tester.Ctx(), req).Return(false, int64(10), nil)
+			if test.ifRangeHeader != "" {
+				tester.mocks.repo.EXPECT().HeadDownloadFile(tester.Ctx(), req, "u").Return(
+					&types.File{SHA: "sha", Size: 10}, &types.Commit{ID: "commit"}, nil,
+				)
+			}
+			downloadReq := *req
+			downloadReq.Limit = test.wantLimit
+			downloadReq.CountDownload = test.wantDownloadCount
+			tester.mocks.repo.EXPECT().SDKDownloadFile(tester.Ctx(), &downloadReq, "u").Return(
+				io.NopCloser(strings.NewReader("0123456789")), int64(10), "", nil,
+			)
+
+			tester.Execute()
+
+			require.Equal(t, test.wantStatus, tester.Response().Code)
+			require.Equal(t, test.wantBody, tester.Response().Body.String())
+			headers := tester.Response().Header()
+			require.Equal(t, "bytes", headers.Get("Accept-Ranges"))
+			require.Equal(t, test.wantContentRange, headers.Get("Content-Range"))
+			require.Equal(t, test.wantLength, headers.Get("Content-Length"))
+			require.Equal(t, test.wantETag, headers.Get("ETag"))
+		})
+	}
+
+	t.Run("download size changed", func(t *testing.T) {
+		tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
+			return rp.SDKDownload
+		})
+
+		tester.WithUser()
+		tester.WithParam("branch", "main")
+		tester.WithParam("file_path", "foo")
+		tester.WithKV("repo_type", types.ModelRepo)
+		tester.WithHeader("Range", "bytes=8-9")
+		req := &types.GetFileReq{
+			Namespace:     "u",
+			Name:          "r",
+			Path:          "foo",
+			Ref:           "main",
+			Lfs:           false,
+			SaveAs:        "foo",
+			RepoType:      types.ModelRepo,
+			CountDownload: true,
+		}
+		tester.mocks.repo.EXPECT().IsLfs(tester.Ctx(), req).Return(false, int64(10), nil)
+		downloadReq := *req
+		downloadReq.CountDownload = false
+		tester.mocks.repo.EXPECT().SDKDownloadFile(tester.Ctx(), &downloadReq, "u").Return(
+			io.NopCloser(strings.NewReader("01234567")), int64(8), "", nil,
+		)
+
+		tester.Execute()
+
+		require.Equal(t, http.StatusRequestedRangeNotSatisfiable, tester.Response().Code)
+		require.Equal(t, "bytes */8", tester.Response().Header().Get("Content-Range"))
+	})
+
+	t.Run("empty file range", func(t *testing.T) {
+		tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
+			return rp.SDKDownload
+		})
+
+		tester.WithUser()
+		tester.WithParam("branch", "main")
+		tester.WithParam("file_path", "empty")
+		tester.WithKV("repo_type", types.ModelRepo)
+		tester.WithHeader("Range", "bytes=0-0")
+		req := &types.GetFileReq{
+			Namespace:     "u",
+			Name:          "r",
+			Path:          "empty",
+			Ref:           "main",
+			Lfs:           false,
+			SaveAs:        "empty",
+			RepoType:      types.ModelRepo,
+			CountDownload: true,
+		}
+		tester.mocks.repo.EXPECT().IsLfs(tester.Ctx(), req).Return(false, int64(0), nil)
+		downloadReq := *req
+		downloadReq.CountDownload = false
+		tester.mocks.repo.EXPECT().SDKDownloadFile(tester.Ctx(), &downloadReq, "u").Return(
+			io.NopCloser(strings.NewReader("")), int64(0), "", nil,
+		)
+
+		tester.Execute()
+
+		require.Equal(t, http.StatusRequestedRangeNotSatisfiable, tester.Response().Code)
+		require.Equal(t, "bytes", tester.Response().Header().Get("Accept-Ranges"))
+		require.Equal(t, "bytes */0", tester.Response().Header().Get("Content-Range"))
+	})
+
+	t.Run("empty file", func(t *testing.T) {
+		tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
+			return rp.SDKDownload
+		})
+
+		tester.WithUser()
+		tester.WithParam("branch", "main")
+		tester.WithParam("file_path", "empty")
+		tester.WithKV("repo_type", types.ModelRepo)
+		req := &types.GetFileReq{
+			Namespace:     "u",
+			Name:          "r",
+			Path:          "empty",
+			Ref:           "main",
+			Lfs:           false,
+			SaveAs:        "empty",
+			RepoType:      types.ModelRepo,
+			CountDownload: true,
+		}
+		tester.mocks.repo.EXPECT().IsLfs(tester.Ctx(), req).Return(false, int64(0), nil)
+		downloadReq := *req
+		tester.mocks.repo.EXPECT().SDKDownloadFile(tester.Ctx(), &downloadReq, "u").Return(
+			io.NopCloser(strings.NewReader("")), int64(0), "", nil,
+		)
+
+		tester.Execute()
+
+		require.Equal(t, http.StatusOK, tester.Response().Code)
+		require.Equal(t, "0", tester.Response().Header().Get("Content-Length"))
+		require.Equal(t, "bytes", tester.Response().Header().Get("Accept-Ranges"))
+		require.Empty(t, tester.Response().Body.String())
 	})
 }
 
@@ -1117,7 +1444,113 @@ func TestRepoHandler_HeadSDKDownload(t *testing.T) {
 	headers := tester.Response().Header()
 	require.Equal(t, "100", headers.Get("Content-Length"))
 	require.Equal(t, "abc", headers.Get("X-Repo-Commit"))
-	require.Equal(t, "def", headers.Get("ETag"))
+	require.Equal(t, `"def"`, headers.Get("ETag"))
+	require.Equal(t, "bytes", headers.Get("Accept-Ranges"))
+}
+
+// TestRepoHandler_HeadSDKDownloadLFS verifies LFS metadata advertises byte-range support.
+func TestRepoHandler_HeadSDKDownloadLFS(t *testing.T) {
+	tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
+		return rp.HeadSDKDownload
+	})
+
+	tester.WithUser()
+	tester.WithParam("file_path", "model.bin")
+	tester.WithParam("branch", "main")
+	tester.WithKV("repo_type", types.ModelRepo)
+	tester.mocks.repo.EXPECT().HeadDownloadFile(
+		tester.Ctx(), &types.GetFileReq{
+			Namespace: "u",
+			Name:      "r",
+			Path:      "model.bin",
+			Ref:       "main",
+			SaveAs:    "model.bin",
+			RepoType:  types.ModelRepo,
+		}, "u",
+	).Return(&types.File{Lfs: true, Size: 100, SHA: "def"}, &types.Commit{ID: "abc"}, nil)
+
+	tester.Execute()
+
+	require.Equal(t, http.StatusOK, tester.Response().Code)
+	require.Equal(t, "bytes", tester.Response().Header().Get("Accept-Ranges"))
+}
+
+// TestRepoHandler_HeadSDKDownloadNotFound verifies missing repositories receive HTTP 404.
+func TestRepoHandler_HeadSDKDownloadNotFound(t *testing.T) {
+	tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
+		return rp.HeadSDKDownload
+	})
+
+	tester.WithUser()
+	tester.WithParam("file_path", "missing")
+	tester.WithParam("branch", "main")
+	tester.WithKV("repo_type", types.ModelRepo)
+	tester.mocks.repo.EXPECT().HeadDownloadFile(
+		tester.Ctx(), &types.GetFileReq{
+			Namespace: "u",
+			Name:      "r",
+			Path:      "missing",
+			Ref:       "main",
+			SaveAs:    "missing",
+			RepoType:  types.ModelRepo,
+		}, "u",
+	).Return(nil, nil, fmt.Errorf("component not-found error: %w", errorx.ErrNotFound))
+
+	tester.Execute()
+
+	require.Equal(t, http.StatusNotFound, tester.Response().Code)
+}
+
+// TestRepoHandler_HeadSDKDownloadForbidden verifies forbidden HEAD requests return HTTP 403.
+func TestRepoHandler_HeadSDKDownloadForbidden(t *testing.T) {
+	tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
+		return rp.HeadSDKDownload
+	})
+
+	tester.WithUser()
+	tester.WithParam("file_path", "private")
+	tester.WithParam("branch", "main")
+	tester.WithKV("repo_type", types.ModelRepo)
+	tester.mocks.repo.EXPECT().HeadDownloadFile(
+		tester.Ctx(), &types.GetFileReq{
+			Namespace: "u",
+			Name:      "r",
+			Path:      "private",
+			Ref:       "main",
+			SaveAs:    "private",
+			RepoType:  types.ModelRepo,
+		}, "u",
+	).Return(nil, nil, errorx.ErrForbiddenMsg("access denied"))
+
+	tester.Execute()
+
+	require.Equal(t, http.StatusForbidden, tester.Response().Code)
+}
+
+// TestRepoHandler_HeadSDKDownloadUserNotFound verifies missing users receive HTTP 401.
+func TestRepoHandler_HeadSDKDownloadUserNotFound(t *testing.T) {
+	tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
+		return rp.HeadSDKDownload
+	})
+
+	tester.WithUser()
+	tester.WithParam("file_path", "private")
+	tester.WithParam("branch", "main")
+	tester.WithKV("repo_type", types.ModelRepo)
+	tester.mocks.repo.EXPECT().HeadDownloadFile(
+		tester.Ctx(), &types.GetFileReq{
+			Namespace: "u",
+			Name:      "r",
+			Path:      "private",
+			Ref:       "main",
+			SaveAs:    "private",
+			RepoType:  types.ModelRepo,
+		}, "u",
+	).Return(nil, nil, errorx.ErrUserNotFound)
+
+	tester.Execute()
+
+	require.Equal(t, http.StatusUnauthorized, tester.Response().Code)
 }
 
 func TestRepoHandler_CommitWithDiff(t *testing.T) {
