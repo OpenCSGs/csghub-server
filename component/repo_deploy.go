@@ -584,6 +584,7 @@ func (c *repoComponentImpl) DeployDetail(ctx context.Context, detailReq types.De
 		Instances:           instList,
 		Private:             endpointPrivate,
 		Path:                repoPath,
+		Type:                deploy.Type,
 		ProxyEndpoint:       proxyEndPoint,
 		SKU:                 deploy.SKU,
 		Task:                string(deploy.Task),
