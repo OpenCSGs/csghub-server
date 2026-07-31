@@ -101,11 +101,29 @@ func TestFunASRAdapterDurationFromHeader(t *testing.T) {
 	}
 }
 
-func TestOpenAICompatibleAdapterIgnoresDurationHeader(t *testing.T) {
-	header := http.Header{}
-	header.Set(audioDurationHeader, "9.2")
+func TestOpenAICompatibleAdapterDurationFromHeader(t *testing.T) {
+	adapter := NewOpenAICompatibleAdapter()
 
-	got, ok := NewOpenAICompatibleAdapter().DurationFromHeader(header)
-	require.False(t, ok)
-	require.Zero(t, got)
+	tests := []struct {
+		name string
+		val  string
+		want float64
+		ok   bool
+	}{
+		{name: "valid", val: "9.2", want: 9.2, ok: true},
+		{name: "invalid", val: "nope"},
+		{name: "missing"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			header := http.Header{}
+			if tt.val != "" {
+				header.Set(audioDurationHeader, tt.val)
+			}
+
+			got, ok := adapter.DurationFromHeader(header)
+			require.Equal(t, tt.ok, ok)
+			require.Equal(t, tt.want, got)
+		})
+	}
 }
