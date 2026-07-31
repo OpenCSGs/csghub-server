@@ -86,7 +86,6 @@ type UserComponent interface {
 	CheckIfUserHasBills(ctx context.Context, userName string) (bool, error)
 	Index(ctx context.Context, req types.UserListReq) ([]*types.User, int, error)
 	Signin(ctx context.Context, code, state string) (*types.JWTClaims, string, error)
-	FixUserData(ctx context.Context, userName string) error
 	UpdateUserLabels(ctx context.Context, req *types.UserLabelsRequest) error
 	FindByUUIDs(ctx context.Context, uuids []string) ([]*types.User, error)
 	SoftDelete(ctx context.Context, operator, username string, req types.CloseAccountReq) error
@@ -502,7 +501,7 @@ func (c *userComponentImpl) canChangeEmail(ctx context.Context, user, opuser dat
 	return true, ""
 }
 
-// Depricated: only useful for gitea, will be removed in the future
+// Deprecated: will be removed in the future
 // user registry with wechat does not have email, so git user is not created after signin
 // when user set email, a git user needs to be created
 // func (c *userComponentImpl) upsertGitUser(username string, nickname *string, oldEmail, newEmail string) error {
@@ -589,10 +588,6 @@ func (c *userComponentImpl) Delete(ctx context.Context, operator, username strin
 	// TODO:delete user from git server
 	slog.DebugContext(ctx, "delete user from git server", slog.String("operator", operator), slog.String("username", user.Username))
 
-	// if c.config.GitServer.Type == types.GitServerTypeGitea {
-	// 	// gitea gitserver does not support delete user, you could create a pr to our repo to fix it
-	// }
-
 	if user.RetainData != "" {
 		err = json.Unmarshal([]byte(user.RetainData), &retainData)
 		if err != nil {
@@ -600,7 +595,7 @@ func (c *userComponentImpl) Delete(ctx context.Context, operator, username strin
 		}
 	}
 
-	if !retainData.Repository && c.config.GitServer.Type == types.GitServerTypeGitaly {
+	if !retainData.Repository {
 		var (
 			batchSize = 1000
 			batch     = 0
@@ -1088,15 +1083,6 @@ func (c *userComponentImpl) lazyInit() {
 			slog.Error("failed to create snowflake node", "error", err)
 		}
 	})
-}
-
-func (c *userComponentImpl) FixUserData(ctx context.Context, userName string) error {
-	err := c.gs.FixUserData(ctx, userName)
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
 
 func (c *userComponentImpl) UpdateUserLabels(ctx context.Context, req *types.UserLabelsRequest) error {

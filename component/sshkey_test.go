@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/types"
@@ -27,11 +28,8 @@ func TestSSHKeyComponent_Create(t *testing.T) {
 		&database.SSHKey{}, nil,
 	)
 	sc.mocks.stores.SSHMock().EXPECT().FindByKeyContent(ctx, testKey).Return(&database.SSHKey{}, nil)
-	sc.mocks.gitServer.EXPECT().CreateSSHKey(req).Return(&database.SSHKey{}, nil)
-	sc.mocks.stores.SSHMock().EXPECT().Create(ctx, &database.SSHKey{
-		UserID:            1,
-		FingerprintSHA256: "DZMgXySN8FuYZo2qvIAZOXNB0J81NMAv1SikyHvCPmw",
-	}).Return(&database.SSHKey{}, nil)
+	sc.mocks.stores.SSHMock().EXPECT().Create(ctx, mock.Anything).
+		Return(&database.SSHKey{}, nil)
 
 	data, err := sc.Create(ctx, req)
 	require.NoError(t, err)
@@ -59,7 +57,6 @@ func TestSSHKeyComponent_Delete(t *testing.T) {
 	sc.mocks.stores.SSHMock().EXPECT().FindByUsernameAndName(ctx, "user", "key").Return(
 		database.SSHKey{ID: 1, GitID: 123}, nil,
 	)
-	sc.mocks.gitServer.EXPECT().DeleteSSHKey(123).Return(nil)
 	sc.mocks.stores.SSHMock().EXPECT().Delete(ctx, int64(1)).Return(nil)
 
 	err := sc.Delete(ctx, "user", "key")

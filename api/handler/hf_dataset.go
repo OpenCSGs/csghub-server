@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -8,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/utils/common"
 	"opencsg.com/csghub-server/component"
@@ -90,20 +92,27 @@ func (h *HFDatasetHandler) DatasetTree(ctx *gin.Context) {
 
 	currentUser := httpbase.GetCurrentUser(ctx)
 	pathInRepo := ctx.Param("path_in_repo")
-	slog.Debug("get path_in_repo in repo", slog.Any("pathInRepo", pathInRepo))
+	recursive := ctx.Query("recursive") == "true"
+	slog.Debug("get path_in_repo in repo", slog.Any("pathInRepo", pathInRepo), slog.Bool("recursive", recursive))
 
 	var req types.PathReq
 	req.Namespace = namespace
 	req.Name = name
 	req.Ref = ref
 	req.Path = pathInRepo
+	req.Recursive = recursive
 	req.CurrentUser = currentUser
 	slog.Debug("received req for tree", slog.Any("req", req))
 
 	tree, err := h.dc.GetDatasetTree(ctx.Request.Context(), req)
 	if err != nil {
+		if errors.Is(err, errorx.ErrUnauthorized) {
+			httpbase.ForbiddenError(ctx, err)
+			return
+		}
 		slog.ErrorContext(ctx.Request.Context(), "fail to get dataset tree", slog.Any("req", req), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
+		return
 	}
 	ctx.PureJSON(http.StatusOK, tree)
 }

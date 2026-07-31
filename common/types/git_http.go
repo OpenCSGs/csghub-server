@@ -2,6 +2,7 @@ package types
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"path"
 	"regexp"
@@ -97,6 +98,19 @@ type Pointer struct {
 	Size            int64       `json:"size"`
 	DownloadURL     string      `json:"download_url,omitempty"`
 	DownloadHeaders http.Header `json:"-"`
+}
+
+// MetaFileIdentifier is the string appearing at the first line of LFS pointer files.
+// https://github.com/git-lfs/git-lfs/blob/master/docs/spec.md
+const MetaFileIdentifier = "version https://git-lfs.github.com/spec/v1"
+
+// MetaFileOidPrefix appears in LFS pointer files on a line before the sha256 hash.
+const MetaFileOidPrefix = "oid sha256:"
+
+// StringContent returns the string representation of the pointer
+// https://github.com/git-lfs/git-lfs/blob/main/docs/spec.md#the-pointer
+func (p Pointer) StringContent() string {
+	return fmt.Sprintf("%s\n%s%s\nsize %d\n", MetaFileIdentifier, MetaFileOidPrefix, p.Oid, p.Size)
 }
 
 type BatchResponse struct {

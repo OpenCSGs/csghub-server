@@ -78,3 +78,37 @@ func (h *ModelHandler) SDKModelInfo(ctx *gin.Context) {
 
 	ctx.JSON(http.StatusOK, modelInfo)
 }
+
+func (h *ModelHandler) SDKModelTree(ctx *gin.Context) {
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format for model tree", "error", err)
+		httpbase.BadRequestWithExt(ctx, err)
+		return
+	}
+	ref := ctx.Param("ref")
+
+	mappedBranch := ctx.Param("branch_mapped")
+	if mappedBranch != "" {
+		ref = mappedBranch
+	}
+
+	currentUser := httpbase.GetCurrentUser(ctx)
+	pathInRepo := ctx.Param("path_in_repo")
+	recursive := ctx.Query("recursive") == "true"
+	slog.Debug("get path_in_repo in model repo", slog.Any("pathInRepo", pathInRepo), slog.Bool("recursive", recursive))
+
+	tree, err := h.model.SDKModelTree(ctx.Request.Context(), namespace, name, ref, currentUser, pathInRepo, recursive)
+	if err != nil {
+		if errors.Is(err, errorx.ErrForbidden) || errors.Is(err, errorx.ErrUnauthorized) {
+			httpbase.ForbiddenError(ctx, err)
+			return
+		}
+		slog.ErrorContext(ctx.Request.Context(), "fail to get model tree", slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	ctx.PureJSON(http.StatusOK, tree)
+}
+
+

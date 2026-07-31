@@ -8,7 +8,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	mockgit "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/git/gitserver"
 	mockdb "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/database"
 	mockusermodule "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/user/component"
 	"opencsg.com/csghub-server/builder/git/membership"
@@ -65,22 +64,12 @@ func TestAccessComponent_Create(t *testing.T) {
 			Permission:  "",
 			ExpiredAt:   time.Now().Add(time.Hour),
 		}
-		mockTokenStore.EXPECT().Create(mock.Anything, token, mock.Anything).
+		mockTokenStore.EXPECT().Create(mock.Anything, mock.Anything, mock.Anything).
 			Return(nil).Once()
-
-		mockGitServer := mockgit.NewMockGitServer(t)
-		mockGitServer.EXPECT().CreateUserToken(&types.CreateUserTokenRequest{
-			Username:    "user1",
-			TokenName:   token.Name,
-			Application: token.Application,
-			Permission:  token.Permission,
-			ExpiredAt:   token.ExpiredAt,
-		}).Return(token, nil)
 
 		ac := &accessTokenComponentImpl{
 			us: mockUserStore,
 			ts: mockTokenStore,
-			gs: mockGitServer,
 		}
 		dbtoken, err := ac.Create(context.Background(), &types.CreateUserTokenRequest{
 			Username:    "user1",
@@ -149,13 +138,9 @@ func TestAccessTokenComponentImpl_Delete(t *testing.T) {
 		mockTokenStore.EXPECT().Delete(mock.Anything, "user1", "test_token_name", "git").
 			Return(nil).Once()
 
-		mockGitServer := mockgit.NewMockGitServer(t)
-		mockGitServer.EXPECT().DeleteUserToken(mock.Anything).Return(nil).Once()
-
 		ac := &accessTokenComponentImpl{
 			us: mockUserStore,
 			ts: mockTokenStore,
-			gs: mockGitServer,
 		}
 
 		err := ac.Delete(context.Background(), &types.DeleteUserTokenRequest{
@@ -329,26 +314,11 @@ func TestAccessTokenComponentImpl_RefreshToken(t *testing.T) {
 		*newToken = *mockToken
 		newToken.Token = newTokenValue
 		newToken.ExpiredAt = time.Now().Add(time.Hour)
-		mockTokenStore.EXPECT().Refresh(mock.Anything, mockToken, newTokenValue, newToken.ExpiredAt).
+		mockTokenStore.EXPECT().Refresh(mock.Anything, mockToken, mock.Anything, newToken.ExpiredAt).
 			Return(newToken, nil).Once()
-
-		mockGitServer := mockgit.NewMockGitServer(t)
-		mockGitServer.EXPECT().DeleteUserToken(&types.DeleteUserTokenRequest{
-			Username:  "user1",
-			TokenName: "test_token_name",
-		}).Return(nil).Once()
-		mockGitServer.EXPECT().CreateUserToken(&types.CreateUserTokenRequest{
-			Username:    "user1",
-			TokenName:   "test_token_name",
-			Application: types.AccessTokenAppCSGHub,
-			Permission:  "read",
-		}).Return(&database.AccessToken{
-			Token: newTokenValue,
-		}, nil)
 
 		ac := &accessTokenComponentImpl{
 			ts: mockTokenStore,
-			gs: mockGitServer,
 		}
 
 		req := &types.RefreshTokenReq{

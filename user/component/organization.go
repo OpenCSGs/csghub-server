@@ -74,12 +74,8 @@ func (c *organizationComponentImpl) FixOrgData(ctx context.Context, org *databas
 	req.Nickname = org.Nickname
 	req.Username = org.User.Username
 	req.Description = org.Description
-	err := c.gs.FixOrganization(req, *user)
-	if err != nil {
-		slog.ErrorContext(ctx, "fix git org data has error", slog.Any("error", err))
-	}
 	// need to create roles for a new org before adding members
-	err = c.msc.InitRoles(ctx, org)
+	err := c.msc.InitRoles(ctx, org)
 	if err != nil {
 		slog.ErrorContext(ctx, "fix organization role has error", slog.String("error", err.Error()))
 	}
@@ -123,15 +119,18 @@ func (c *organizationComponentImpl) Create(ctx context.Context, req *types.Creat
 		}
 	}
 
-	dbOrg, err := c.gs.CreateOrganization(req, user)
-	if err != nil {
-		return nil, fmt.Errorf("failed create git organization, error: %w", err)
+	dbOrg := &database.Organization{
+		Name:        req.Name,
+		Nickname:    req.Nickname,
+		Description: req.Description,
+		Homepage:    req.Homepage,
+		Logo:        req.Logo,
+		OrgType:     req.OrgType,
+		Verified:    req.Verified,
+		User:        &user,
+		UserID:      user.ID,
+		UUID:        uuid.New(),
 	}
-	dbOrg.Homepage = req.Homepage
-	dbOrg.Logo = req.Logo
-	dbOrg.OrgType = req.OrgType
-	dbOrg.Verified = req.Verified
-	dbOrg.UUID = uuid.New()
 
 	exist, err := c.nsStore.ExistsByUUID(ctx, dbOrg.UUID.String())
 	if err != nil {
@@ -368,10 +367,6 @@ func (c *organizationComponentImpl) Delete(ctx context.Context, req *types.Delet
 	if !r.CanAdmin() {
 		return fmt.Errorf("current user does not have permission to edit the organization, current user: %s", req.CurrentUser)
 	}
-	err = c.gs.DeleteOrganization(req.Name)
-	if err != nil {
-		return fmt.Errorf("failed to delete git organizations, error: %w", err)
-	}
 	err = c.orgStore.Delete(ctx, req.Name)
 	if err != nil {
 		return fmt.Errorf("failed to delete database organizations, error: %w", err)
@@ -474,10 +469,6 @@ func (c *organizationComponentImpl) Update(ctx context.Context, req *types.EditO
 	gitEditReq.Name = org.Name
 	gitEditReq.Nickname = &org.Nickname
 	gitEditReq.Description = &org.Description
-	_, err = c.gs.UpdateOrganization(&gitEditReq, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to update git organization, error: %w", err)
-	}
 	return &org, err
 }
 

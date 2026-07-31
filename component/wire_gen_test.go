@@ -14,7 +14,6 @@ import (
 	"opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/dataviewer"
 	"opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/deploy"
 	"opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/git/gitserver"
-	"opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/git/mirrorserver"
 	"opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/importer"
 	"opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/multisync"
 	"opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/parquet"
@@ -46,11 +45,10 @@ func initializeTestRepoComponent(ctx context.Context, t interface {
 	mockDeployer := deploy.NewMockDeployer(t)
 	mockCache := cache.NewMockCache(t)
 	mockAccountingComponent := component.NewMockAccountingComponent(t)
-	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
 	multisyncMockClient := multisync.NewMockClient(t)
 	mockXnetSvcClient := rpc.NewMockXnetSvcClient(t)
 	mockClusterComponent := component.NewMockClusterComponent(t)
-	componentRepoComponentImpl := NewTestRepoComponent(config, mockStores, mockUserSvcClient, mockGitServer, mockTagComponent, mockClient, mockDeployer, mockCache, mockAccountingComponent, mockMirrorServer, multisyncMockClient, mockXnetSvcClient, mockClusterComponent)
+	componentRepoComponentImpl := NewTestRepoComponent(config, mockStores, mockUserSvcClient, mockGitServer, mockTagComponent, mockClient, mockDeployer, mockCache, mockAccountingComponent, multisyncMockClient, mockXnetSvcClient, mockClusterComponent)
 	mockRepoComponent := component.NewMockRepoComponent(t)
 	mockSpaceComponent := component.NewMockSpaceComponent(t)
 	mockRuntimeArchitectureComponent := component.NewMockRuntimeArchitectureComponent(t)
@@ -77,8 +75,8 @@ func initializeTestRepoComponent(ctx context.Context, t interface {
 		components:       componentMockedComponents,
 		gitServer:        mockGitServer,
 		userSvcClient:    mockUserSvcClient,
+		xnetClient:       mockXnetSvcClient,
 		s3Client:         mockClient,
-		mirrorServer:     mockMirrorServer,
 		deployer:         mockDeployer,
 		cache:            mockCache,
 		accountingClient: mockAccountingClient,
@@ -123,8 +121,8 @@ func initializeTestPromptComponent(ctx context.Context, t interface {
 		sensitive:           mockSensitiveComponent,
 		cluster:             mockClusterComponent,
 	}
+	mockXnetSvcClient := rpc.NewMockXnetSvcClient(t)
 	mockClient := s3.NewMockClient(t)
-	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
 	mockDeployer := deploy.NewMockDeployer(t)
 	mockCache := cache.NewMockCache(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
@@ -141,8 +139,8 @@ func initializeTestPromptComponent(ctx context.Context, t interface {
 		components:       componentMockedComponents,
 		gitServer:        mockGitServer,
 		userSvcClient:    mockUserSvcClient,
+		xnetClient:       mockXnetSvcClient,
 		s3Client:         mockClient,
-		mirrorServer:     mockMirrorServer,
 		deployer:         mockDeployer,
 		cache:            mockCache,
 		accountingClient: mockAccountingClient,
@@ -187,8 +185,8 @@ func initializeTestUserComponent(ctx context.Context, t interface {
 		cluster:             mockClusterComponent,
 	}
 	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
+	mockXnetSvcClient := rpc.NewMockXnetSvcClient(t)
 	mockClient := s3.NewMockClient(t)
-	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
 	mockCache := cache.NewMockCache(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
 	mockReader := parquet.NewMockReader(t)
@@ -204,8 +202,8 @@ func initializeTestUserComponent(ctx context.Context, t interface {
 		components:       componentMockedComponents,
 		gitServer:        mockGitServer,
 		userSvcClient:    mockUserSvcClient,
+		xnetClient:       mockXnetSvcClient,
 		s3Client:         mockClient,
-		mirrorServer:     mockMirrorServer,
 		deployer:         mockDeployer,
 		cache:            mockCache,
 		accountingClient: mockAccountingClient,
@@ -251,8 +249,8 @@ func initializeTestSpaceComponent(ctx context.Context, t interface {
 		sensitive:           mockSensitiveComponent,
 		cluster:             mockClusterComponent,
 	}
+	mockXnetSvcClient := rpc.NewMockXnetSvcClient(t)
 	mockClient := s3.NewMockClient(t)
-	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
 	mockCache := cache.NewMockCache(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
 	mockReader := parquet.NewMockReader(t)
@@ -268,8 +266,8 @@ func initializeTestSpaceComponent(ctx context.Context, t interface {
 		components:       componentMockedComponents,
 		gitServer:        mockGitServer,
 		userSvcClient:    mockUserSvcClient,
+		xnetClient:       mockXnetSvcClient,
 		s3Client:         mockClient,
-		mirrorServer:     mockMirrorServer,
 		deployer:         mockDeployer,
 		cache:            mockCache,
 		accountingClient: mockAccountingClient,
@@ -315,8 +313,8 @@ func initializeTestModelComponent(ctx context.Context, t interface {
 		sensitive:           mockSensitiveComponent,
 		cluster:             mockClusterComponent,
 	}
+	mockXnetSvcClient := rpc.NewMockXnetSvcClient(t)
 	mockClient := s3.NewMockClient(t)
-	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
 	mockCache := cache.NewMockCache(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
 	mockReader := parquet.NewMockReader(t)
@@ -332,8 +330,8 @@ func initializeTestModelComponent(ctx context.Context, t interface {
 		components:       componentMockedComponents,
 		gitServer:        mockGitServer,
 		userSvcClient:    mockUserSvcClient,
+		xnetClient:       mockXnetSvcClient,
 		s3Client:         mockClient,
-		mirrorServer:     mockMirrorServer,
 		deployer:         mockDeployer,
 		cache:            mockCache,
 		accountingClient: mockAccountingClient,
@@ -378,8 +376,8 @@ func initializeTestAccountingComponent(ctx context.Context, t interface {
 	}
 	mockGitServer := gitserver.NewMockGitServer(t)
 	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
+	mockXnetSvcClient := rpc.NewMockXnetSvcClient(t)
 	mockClient := s3.NewMockClient(t)
-	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
 	mockDeployer := deploy.NewMockDeployer(t)
 	mockCache := cache.NewMockCache(t)
 	mockReader := parquet.NewMockReader(t)
@@ -395,8 +393,8 @@ func initializeTestAccountingComponent(ctx context.Context, t interface {
 		components:       componentMockedComponents,
 		gitServer:        mockGitServer,
 		userSvcClient:    mockUserSvcClient,
+		xnetClient:       mockXnetSvcClient,
 		s3Client:         mockClient,
-		mirrorServer:     mockMirrorServer,
 		deployer:         mockDeployer,
 		cache:            mockCache,
 		accountingClient: mockAccountingClient,
@@ -444,7 +442,6 @@ func initializeTestGitHTTPComponent(ctx context.Context, t interface {
 		cluster:             mockClusterComponent,
 	}
 	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
-	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
 	mockDeployer := deploy.NewMockDeployer(t)
 	mockCache := cache.NewMockCache(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
@@ -460,8 +457,8 @@ func initializeTestGitHTTPComponent(ctx context.Context, t interface {
 		components:       componentMockedComponents,
 		gitServer:        mockGitServer,
 		userSvcClient:    mockUserSvcClient,
+		xnetClient:       mockXnetSvcClient,
 		s3Client:         mockClient,
-		mirrorServer:     mockMirrorServer,
 		deployer:         mockDeployer,
 		cache:            mockCache,
 		accountingClient: mockAccountingClient,
@@ -505,8 +502,8 @@ func initializeTestDiscussionComponent(ctx context.Context, t interface {
 	}
 	mockGitServer := gitserver.NewMockGitServer(t)
 	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
+	mockXnetSvcClient := rpc.NewMockXnetSvcClient(t)
 	mockClient := s3.NewMockClient(t)
-	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
 	mockDeployer := deploy.NewMockDeployer(t)
 	mockCache := cache.NewMockCache(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
@@ -523,8 +520,8 @@ func initializeTestDiscussionComponent(ctx context.Context, t interface {
 		components:       componentMockedComponents,
 		gitServer:        mockGitServer,
 		userSvcClient:    mockUserSvcClient,
+		xnetClient:       mockXnetSvcClient,
 		s3Client:         mockClient,
-		mirrorServer:     mockMirrorServer,
 		deployer:         mockDeployer,
 		cache:            mockCache,
 		accountingClient: mockAccountingClient,
@@ -568,8 +565,8 @@ func initializeTestRuntimeArchComponent(ctx context.Context, t interface {
 		cluster:             mockClusterComponent,
 	}
 	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
+	mockXnetSvcClient := rpc.NewMockXnetSvcClient(t)
 	mockClient := s3.NewMockClient(t)
-	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
 	mockDeployer := deploy.NewMockDeployer(t)
 	mockCache := cache.NewMockCache(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
@@ -586,8 +583,8 @@ func initializeTestRuntimeArchComponent(ctx context.Context, t interface {
 		components:       componentMockedComponents,
 		gitServer:        mockGitServer,
 		userSvcClient:    mockUserSvcClient,
+		xnetClient:       mockXnetSvcClient,
 		s3Client:         mockClient,
-		mirrorServer:     mockMirrorServer,
 		deployer:         mockDeployer,
 		cache:            mockCache,
 		accountingClient: mockAccountingClient,
@@ -613,11 +610,10 @@ func initializeTestMirrorComponent(ctx context.Context, t interface {
 }) *testMirrorWithMocks {
 	config := ProvideTestConfig()
 	mockStores := tests.NewMockStores(t)
-	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
 	mockRepoComponent := component.NewMockRepoComponent(t)
 	mockGitServer := gitserver.NewMockGitServer(t)
 	mockClient := s3.NewMockClient(t)
-	componentMirrorComponentImpl := NewTestMirrorComponent(config, mockStores, mockMirrorServer, mockRepoComponent, mockGitServer, mockClient)
+	componentMirrorComponentImpl := NewTestMirrorComponent(config, mockStores, mockRepoComponent, mockGitServer, mockClient)
 	mockAccountingComponent := component.NewMockAccountingComponent(t)
 	mockTagComponent := component.NewMockTagComponent(t)
 	mockSpaceComponent := component.NewMockSpaceComponent(t)
@@ -634,6 +630,7 @@ func initializeTestMirrorComponent(ctx context.Context, t interface {
 		cluster:             mockClusterComponent,
 	}
 	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
+	mockXnetSvcClient := rpc.NewMockXnetSvcClient(t)
 	mockDeployer := deploy.NewMockDeployer(t)
 	mockCache := cache.NewMockCache(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
@@ -650,8 +647,8 @@ func initializeTestMirrorComponent(ctx context.Context, t interface {
 		components:       componentMockedComponents,
 		gitServer:        mockGitServer,
 		userSvcClient:    mockUserSvcClient,
+		xnetClient:       mockXnetSvcClient,
 		s3Client:         mockClient,
-		mirrorServer:     mockMirrorServer,
 		deployer:         mockDeployer,
 		cache:            mockCache,
 		accountingClient: mockAccountingClient,
@@ -695,8 +692,8 @@ func initializeTestCollectionComponent(ctx context.Context, t interface {
 		cluster:             mockClusterComponent,
 	}
 	mockGitServer := gitserver.NewMockGitServer(t)
+	mockXnetSvcClient := rpc.NewMockXnetSvcClient(t)
 	mockClient := s3.NewMockClient(t)
-	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
 	mockDeployer := deploy.NewMockDeployer(t)
 	mockCache := cache.NewMockCache(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
@@ -713,8 +710,8 @@ func initializeTestCollectionComponent(ctx context.Context, t interface {
 		components:       componentMockedComponents,
 		gitServer:        mockGitServer,
 		userSvcClient:    mockUserSvcClient,
+		xnetClient:       mockXnetSvcClient,
 		s3Client:         mockClient,
-		mirrorServer:     mockMirrorServer,
 		deployer:         mockDeployer,
 		cache:            mockCache,
 		accountingClient: mockAccountingClient,
@@ -758,8 +755,8 @@ func initializeTestBroadcastComponent(ctx context.Context, t interface {
 	}
 	mockGitServer := gitserver.NewMockGitServer(t)
 	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
+	mockXnetSvcClient := rpc.NewMockXnetSvcClient(t)
 	mockClient := s3.NewMockClient(t)
-	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
 	mockDeployer := deploy.NewMockDeployer(t)
 	mockCache := cache.NewMockCache(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
@@ -776,8 +773,8 @@ func initializeTestBroadcastComponent(ctx context.Context, t interface {
 		components:       componentMockedComponents,
 		gitServer:        mockGitServer,
 		userSvcClient:    mockUserSvcClient,
+		xnetClient:       mockXnetSvcClient,
 		s3Client:         mockClient,
-		mirrorServer:     mockMirrorServer,
 		deployer:         mockDeployer,
 		cache:            mockCache,
 		accountingClient: mockAccountingClient,
@@ -822,8 +819,8 @@ func initializeTestCodeComponent(ctx context.Context, t interface {
 		sensitive:           mockSensitiveComponent,
 		cluster:             mockClusterComponent,
 	}
+	mockXnetSvcClient := rpc.NewMockXnetSvcClient(t)
 	mockClient := s3.NewMockClient(t)
-	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
 	mockDeployer := deploy.NewMockDeployer(t)
 	mockCache := cache.NewMockCache(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
@@ -840,8 +837,8 @@ func initializeTestCodeComponent(ctx context.Context, t interface {
 		components:       componentMockedComponents,
 		gitServer:        mockGitServer,
 		userSvcClient:    mockUserSvcClient,
+		xnetClient:       mockXnetSvcClient,
 		s3Client:         mockClient,
-		mirrorServer:     mockMirrorServer,
 		deployer:         mockDeployer,
 		cache:            mockCache,
 		accountingClient: mockAccountingClient,
@@ -886,8 +883,8 @@ func initializeTestMultiSyncComponent(ctx context.Context, t interface {
 		cluster:             mockClusterComponent,
 	}
 	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
+	mockXnetSvcClient := rpc.NewMockXnetSvcClient(t)
 	mockClient := s3.NewMockClient(t)
-	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
 	mockDeployer := deploy.NewMockDeployer(t)
 	mockCache := cache.NewMockCache(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
@@ -904,8 +901,8 @@ func initializeTestMultiSyncComponent(ctx context.Context, t interface {
 		components:       componentMockedComponents,
 		gitServer:        mockGitServer,
 		userSvcClient:    mockUserSvcClient,
+		xnetClient:       mockXnetSvcClient,
 		s3Client:         mockClient,
-		mirrorServer:     mockMirrorServer,
 		deployer:         mockDeployer,
 		cache:            mockCache,
 		accountingClient: mockAccountingClient,
@@ -952,8 +949,8 @@ func initializeTestInternalComponent(ctx context.Context, t interface {
 		cluster:             mockClusterComponent,
 	}
 	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
+	mockXnetSvcClient := rpc.NewMockXnetSvcClient(t)
 	mockClient := s3.NewMockClient(t)
-	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
 	mockDeployer := deploy.NewMockDeployer(t)
 	mockCache := cache.NewMockCache(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
@@ -968,8 +965,8 @@ func initializeTestInternalComponent(ctx context.Context, t interface {
 		components:       componentMockedComponents,
 		gitServer:        mockGitServer,
 		userSvcClient:    mockUserSvcClient,
+		xnetClient:       mockXnetSvcClient,
 		s3Client:         mockClient,
-		mirrorServer:     mockMirrorServer,
 		deployer:         mockDeployer,
 		cache:            mockCache,
 		accountingClient: mockAccountingClient,
@@ -1014,8 +1011,8 @@ func initializeTestMirrorSourceComponent(ctx context.Context, t interface {
 	}
 	mockGitServer := gitserver.NewMockGitServer(t)
 	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
+	mockXnetSvcClient := rpc.NewMockXnetSvcClient(t)
 	mockClient := s3.NewMockClient(t)
-	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
 	mockDeployer := deploy.NewMockDeployer(t)
 	mockCache := cache.NewMockCache(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
@@ -1032,8 +1029,8 @@ func initializeTestMirrorSourceComponent(ctx context.Context, t interface {
 		components:       componentMockedComponents,
 		gitServer:        mockGitServer,
 		userSvcClient:    mockUserSvcClient,
+		xnetClient:       mockXnetSvcClient,
 		s3Client:         mockClient,
-		mirrorServer:     mockMirrorServer,
 		deployer:         mockDeployer,
 		cache:            mockCache,
 		accountingClient: mockAccountingClient,
@@ -1079,8 +1076,8 @@ func initializeTestSpaceResourceComponent(ctx context.Context, t interface {
 	}
 	mockGitServer := gitserver.NewMockGitServer(t)
 	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
+	mockXnetSvcClient := rpc.NewMockXnetSvcClient(t)
 	mockClient := s3.NewMockClient(t)
-	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
 	mockCache := cache.NewMockCache(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
 	mockReader := parquet.NewMockReader(t)
@@ -1096,8 +1093,8 @@ func initializeTestSpaceResourceComponent(ctx context.Context, t interface {
 		components:       componentMockedComponents,
 		gitServer:        mockGitServer,
 		userSvcClient:    mockUserSvcClient,
+		xnetClient:       mockXnetSvcClient,
 		s3Client:         mockClient,
-		mirrorServer:     mockMirrorServer,
 		deployer:         mockDeployer,
 		cache:            mockCache,
 		accountingClient: mockAccountingClient,
@@ -1143,8 +1140,8 @@ func initializeTestTagComponent(ctx context.Context, t interface {
 	}
 	mockGitServer := gitserver.NewMockGitServer(t)
 	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
+	mockXnetSvcClient := rpc.NewMockXnetSvcClient(t)
 	mockClient := s3.NewMockClient(t)
-	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
 	mockDeployer := deploy.NewMockDeployer(t)
 	mockCache := cache.NewMockCache(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
@@ -1160,8 +1157,8 @@ func initializeTestTagComponent(ctx context.Context, t interface {
 		components:       componentMockedComponents,
 		gitServer:        mockGitServer,
 		userSvcClient:    mockUserSvcClient,
+		xnetClient:       mockXnetSvcClient,
 		s3Client:         mockClient,
-		mirrorServer:     mockMirrorServer,
 		deployer:         mockDeployer,
 		cache:            mockCache,
 		accountingClient: mockAccountingClient,
@@ -1206,8 +1203,8 @@ func initializeTestRecomComponent(ctx context.Context, t interface {
 		cluster:             mockClusterComponent,
 	}
 	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
+	mockXnetSvcClient := rpc.NewMockXnetSvcClient(t)
 	mockClient := s3.NewMockClient(t)
-	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
 	mockDeployer := deploy.NewMockDeployer(t)
 	mockCache := cache.NewMockCache(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
@@ -1224,8 +1221,8 @@ func initializeTestRecomComponent(ctx context.Context, t interface {
 		components:       componentMockedComponents,
 		gitServer:        mockGitServer,
 		userSvcClient:    mockUserSvcClient,
+		xnetClient:       mockXnetSvcClient,
 		s3Client:         mockClient,
-		mirrorServer:     mockMirrorServer,
 		deployer:         mockDeployer,
 		cache:            mockCache,
 		accountingClient: mockAccountingClient,
@@ -1270,8 +1267,8 @@ func initializeTestSpaceSdkComponent(ctx context.Context, t interface {
 	}
 	mockGitServer := gitserver.NewMockGitServer(t)
 	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
+	mockXnetSvcClient := rpc.NewMockXnetSvcClient(t)
 	mockClient := s3.NewMockClient(t)
-	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
 	mockDeployer := deploy.NewMockDeployer(t)
 	mockCache := cache.NewMockCache(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
@@ -1288,8 +1285,8 @@ func initializeTestSpaceSdkComponent(ctx context.Context, t interface {
 		components:       componentMockedComponents,
 		gitServer:        mockGitServer,
 		userSvcClient:    mockUserSvcClient,
+		xnetClient:       mockXnetSvcClient,
 		s3Client:         mockClient,
-		mirrorServer:     mockMirrorServer,
 		deployer:         mockDeployer,
 		cache:            mockCache,
 		accountingClient: mockAccountingClient,
@@ -1334,8 +1331,8 @@ func initializeTestTelemetryComponent(ctx context.Context, t interface {
 	}
 	mockGitServer := gitserver.NewMockGitServer(t)
 	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
+	mockXnetSvcClient := rpc.NewMockXnetSvcClient(t)
 	mockClient := s3.NewMockClient(t)
-	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
 	mockDeployer := deploy.NewMockDeployer(t)
 	mockCache := cache.NewMockCache(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
@@ -1352,8 +1349,8 @@ func initializeTestTelemetryComponent(ctx context.Context, t interface {
 		components:       componentMockedComponents,
 		gitServer:        mockGitServer,
 		userSvcClient:    mockUserSvcClient,
+		xnetClient:       mockXnetSvcClient,
 		s3Client:         mockClient,
-		mirrorServer:     mockMirrorServer,
 		deployer:         mockDeployer,
 		cache:            mockCache,
 		accountingClient: mockAccountingClient,
@@ -1399,8 +1396,8 @@ func initializeTestClusterComponent(ctx context.Context, t interface {
 	}
 	mockGitServer := gitserver.NewMockGitServer(t)
 	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
+	mockXnetSvcClient := rpc.NewMockXnetSvcClient(t)
 	mockClient := s3.NewMockClient(t)
-	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
 	mockCache := cache.NewMockCache(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
 	mockReader := parquet.NewMockReader(t)
@@ -1416,8 +1413,8 @@ func initializeTestClusterComponent(ctx context.Context, t interface {
 		components:       componentMockedComponents,
 		gitServer:        mockGitServer,
 		userSvcClient:    mockUserSvcClient,
+		xnetClient:       mockXnetSvcClient,
 		s3Client:         mockClient,
-		mirrorServer:     mockMirrorServer,
 		deployer:         mockDeployer,
 		cache:            mockCache,
 		accountingClient: mockAccountingClient,
@@ -1463,8 +1460,8 @@ func initializeTestEvaluationComponent(ctx context.Context, t interface {
 		cluster:             mockClusterComponent,
 	}
 	mockGitServer := gitserver.NewMockGitServer(t)
+	mockXnetSvcClient := rpc.NewMockXnetSvcClient(t)
 	mockClient := s3.NewMockClient(t)
-	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
 	mockCache := cache.NewMockCache(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
 	mockReader := parquet.NewMockReader(t)
@@ -1480,8 +1477,8 @@ func initializeTestEvaluationComponent(ctx context.Context, t interface {
 		components:       componentMockedComponents,
 		gitServer:        mockGitServer,
 		userSvcClient:    mockUserSvcClient,
+		xnetClient:       mockXnetSvcClient,
 		s3Client:         mockClient,
-		mirrorServer:     mockMirrorServer,
 		deployer:         mockDeployer,
 		cache:            mockCache,
 		accountingClient: mockAccountingClient,
@@ -1526,8 +1523,8 @@ func initializeTestHFDatasetComponent(ctx context.Context, t interface {
 		cluster:             mockClusterComponent,
 	}
 	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
+	mockXnetSvcClient := rpc.NewMockXnetSvcClient(t)
 	mockClient := s3.NewMockClient(t)
-	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
 	mockDeployer := deploy.NewMockDeployer(t)
 	mockCache := cache.NewMockCache(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
@@ -1544,8 +1541,8 @@ func initializeTestHFDatasetComponent(ctx context.Context, t interface {
 		components:       componentMockedComponents,
 		gitServer:        mockGitServer,
 		userSvcClient:    mockUserSvcClient,
+		xnetClient:       mockXnetSvcClient,
 		s3Client:         mockClient,
-		mirrorServer:     mockMirrorServer,
 		deployer:         mockDeployer,
 		cache:            mockCache,
 		accountingClient: mockAccountingClient,
@@ -1590,8 +1587,8 @@ func initializeTestRepoFileComponent(ctx context.Context, t interface {
 		cluster:             mockClusterComponent,
 	}
 	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
+	mockXnetSvcClient := rpc.NewMockXnetSvcClient(t)
 	mockClient := s3.NewMockClient(t)
-	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
 	mockDeployer := deploy.NewMockDeployer(t)
 	mockCache := cache.NewMockCache(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
@@ -1608,8 +1605,8 @@ func initializeTestRepoFileComponent(ctx context.Context, t interface {
 		components:       componentMockedComponents,
 		gitServer:        mockGitServer,
 		userSvcClient:    mockUserSvcClient,
+		xnetClient:       mockXnetSvcClient,
 		s3Client:         mockClient,
-		mirrorServer:     mockMirrorServer,
 		deployer:         mockDeployer,
 		cache:            mockCache,
 		accountingClient: mockAccountingClient,
@@ -1655,8 +1652,8 @@ func initializeTestSensitiveComponent(ctx context.Context, t interface {
 	}
 	mockGitServer := gitserver.NewMockGitServer(t)
 	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
+	mockXnetSvcClient := rpc.NewMockXnetSvcClient(t)
 	mockClient := s3.NewMockClient(t)
-	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
 	mockDeployer := deploy.NewMockDeployer(t)
 	mockCache := cache.NewMockCache(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
@@ -1672,8 +1669,8 @@ func initializeTestSensitiveComponent(ctx context.Context, t interface {
 		components:       componentMockedComponents,
 		gitServer:        mockGitServer,
 		userSvcClient:    mockUserSvcClient,
+		xnetClient:       mockXnetSvcClient,
 		s3Client:         mockClient,
-		mirrorServer:     mockMirrorServer,
 		deployer:         mockDeployer,
 		cache:            mockCache,
 		accountingClient: mockAccountingClient,
@@ -1718,8 +1715,8 @@ func initializeTestSSHKeyComponent(ctx context.Context, t interface {
 		cluster:             mockClusterComponent,
 	}
 	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
+	mockXnetSvcClient := rpc.NewMockXnetSvcClient(t)
 	mockClient := s3.NewMockClient(t)
-	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
 	mockDeployer := deploy.NewMockDeployer(t)
 	mockCache := cache.NewMockCache(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
@@ -1736,8 +1733,8 @@ func initializeTestSSHKeyComponent(ctx context.Context, t interface {
 		components:       componentMockedComponents,
 		gitServer:        mockGitServer,
 		userSvcClient:    mockUserSvcClient,
+		xnetClient:       mockXnetSvcClient,
 		s3Client:         mockClient,
-		mirrorServer:     mockMirrorServer,
 		deployer:         mockDeployer,
 		cache:            mockCache,
 		accountingClient: mockAccountingClient,
@@ -1782,8 +1779,8 @@ func initializeTestListComponent(ctx context.Context, t interface {
 	}
 	mockGitServer := gitserver.NewMockGitServer(t)
 	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
+	mockXnetSvcClient := rpc.NewMockXnetSvcClient(t)
 	mockClient := s3.NewMockClient(t)
-	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
 	mockDeployer := deploy.NewMockDeployer(t)
 	mockCache := cache.NewMockCache(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
@@ -1800,8 +1797,8 @@ func initializeTestListComponent(ctx context.Context, t interface {
 		components:       componentMockedComponents,
 		gitServer:        mockGitServer,
 		userSvcClient:    mockUserSvcClient,
+		xnetClient:       mockXnetSvcClient,
 		s3Client:         mockClient,
-		mirrorServer:     mockMirrorServer,
 		deployer:         mockDeployer,
 		cache:            mockCache,
 		accountingClient: mockAccountingClient,
@@ -1846,8 +1843,8 @@ func initializeTestSyncClientSettingComponent(ctx context.Context, t interface {
 	}
 	mockGitServer := gitserver.NewMockGitServer(t)
 	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
+	mockXnetSvcClient := rpc.NewMockXnetSvcClient(t)
 	mockClient := s3.NewMockClient(t)
-	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
 	mockDeployer := deploy.NewMockDeployer(t)
 	mockCache := cache.NewMockCache(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
@@ -1864,8 +1861,8 @@ func initializeTestSyncClientSettingComponent(ctx context.Context, t interface {
 		components:       componentMockedComponents,
 		gitServer:        mockGitServer,
 		userSvcClient:    mockUserSvcClient,
+		xnetClient:       mockXnetSvcClient,
 		s3Client:         mockClient,
-		mirrorServer:     mockMirrorServer,
 		deployer:         mockDeployer,
 		cache:            mockCache,
 		accountingClient: mockAccountingClient,
@@ -1910,8 +1907,8 @@ func initializeTestEventComponent(ctx context.Context, t interface {
 	}
 	mockGitServer := gitserver.NewMockGitServer(t)
 	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
+	mockXnetSvcClient := rpc.NewMockXnetSvcClient(t)
 	mockClient := s3.NewMockClient(t)
-	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
 	mockDeployer := deploy.NewMockDeployer(t)
 	mockCache := cache.NewMockCache(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
@@ -1928,8 +1925,8 @@ func initializeTestEventComponent(ctx context.Context, t interface {
 		components:       componentMockedComponents,
 		gitServer:        mockGitServer,
 		userSvcClient:    mockUserSvcClient,
+		xnetClient:       mockXnetSvcClient,
 		s3Client:         mockClient,
-		mirrorServer:     mockMirrorServer,
 		deployer:         mockDeployer,
 		cache:            mockCache,
 		accountingClient: mockAccountingClient,
@@ -1975,8 +1972,8 @@ func initializeTestLicenseComponent(ctx context.Context, t interface {
 	}
 	mockGitServer := gitserver.NewMockGitServer(t)
 	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
+	mockXnetSvcClient := rpc.NewMockXnetSvcClient(t)
 	mockClient := s3.NewMockClient(t)
-	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
 	mockDeployer := deploy.NewMockDeployer(t)
 	mockCache := cache.NewMockCache(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
@@ -1992,8 +1989,8 @@ func initializeTestLicenseComponent(ctx context.Context, t interface {
 		components:       componentMockedComponents,
 		gitServer:        mockGitServer,
 		userSvcClient:    mockUserSvcClient,
+		xnetClient:       mockXnetSvcClient,
 		s3Client:         mockClient,
-		mirrorServer:     mockMirrorServer,
 		deployer:         mockDeployer,
 		cache:            mockCache,
 		accountingClient: mockAccountingClient,
@@ -2019,10 +2016,10 @@ func initializeTestImportComponent(ctx context.Context, t interface {
 }) *testImportWithMocks {
 	config := ProvideTestConfig()
 	mockStores := tests.NewMockStores(t)
-	mockRepoComponent := component.NewMockRepoComponent(t)
 	mockImporter := importer.NewMockImporter(t)
 	componentImportComponentImpl := NewTestImportComponent(config, mockStores, mockImporter)
 	mockAccountingComponent := component.NewMockAccountingComponent(t)
+	mockRepoComponent := component.NewMockRepoComponent(t)
 	mockTagComponent := component.NewMockTagComponent(t)
 	mockSpaceComponent := component.NewMockSpaceComponent(t)
 	mockRuntimeArchitectureComponent := component.NewMockRuntimeArchitectureComponent(t)
@@ -2039,8 +2036,8 @@ func initializeTestImportComponent(ctx context.Context, t interface {
 	}
 	mockGitServer := gitserver.NewMockGitServer(t)
 	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
+	mockXnetSvcClient := rpc.NewMockXnetSvcClient(t)
 	mockClient := s3.NewMockClient(t)
-	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
 	mockDeployer := deploy.NewMockDeployer(t)
 	mockCache := cache.NewMockCache(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
@@ -2056,8 +2053,8 @@ func initializeTestImportComponent(ctx context.Context, t interface {
 		components:       componentMockedComponents,
 		gitServer:        mockGitServer,
 		userSvcClient:    mockUserSvcClient,
+		xnetClient:       mockXnetSvcClient,
 		s3Client:         mockClient,
-		mirrorServer:     mockMirrorServer,
 		deployer:         mockDeployer,
 		cache:            mockCache,
 		accountingClient: mockAccountingClient,
@@ -2102,8 +2099,8 @@ func initializeTestSpaceTemplateComponent(ctx context.Context, t interface {
 	}
 	mockGitServer := gitserver.NewMockGitServer(t)
 	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
+	mockXnetSvcClient := rpc.NewMockXnetSvcClient(t)
 	mockClient := s3.NewMockClient(t)
-	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
 	mockDeployer := deploy.NewMockDeployer(t)
 	mockCache := cache.NewMockCache(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
@@ -2120,8 +2117,8 @@ func initializeTestSpaceTemplateComponent(ctx context.Context, t interface {
 		components:       componentMockedComponents,
 		gitServer:        mockGitServer,
 		userSvcClient:    mockUserSvcClient,
+		xnetClient:       mockXnetSvcClient,
 		s3Client:         mockClient,
-		mirrorServer:     mockMirrorServer,
 		deployer:         mockDeployer,
 		cache:            mockCache,
 		accountingClient: mockAccountingClient,
@@ -2166,8 +2163,8 @@ func initializeTestRuleComponent(ctx context.Context, t interface {
 	}
 	mockGitServer := gitserver.NewMockGitServer(t)
 	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
+	mockXnetSvcClient := rpc.NewMockXnetSvcClient(t)
 	mockClient := s3.NewMockClient(t)
-	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
 	mockDeployer := deploy.NewMockDeployer(t)
 	mockCache := cache.NewMockCache(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
@@ -2184,8 +2181,8 @@ func initializeTestRuleComponent(ctx context.Context, t interface {
 		components:       componentMockedComponents,
 		gitServer:        mockGitServer,
 		userSvcClient:    mockUserSvcClient,
+		xnetClient:       mockXnetSvcClient,
 		s3Client:         mockClient,
-		mirrorServer:     mockMirrorServer,
 		deployer:         mockDeployer,
 		cache:            mockCache,
 		accountingClient: mockAccountingClient,
@@ -2230,8 +2227,8 @@ func initializeTestMCPServerComponent(ctx context.Context, t interface {
 		sensitive:           mockSensitiveComponent,
 		cluster:             mockClusterComponent,
 	}
+	mockXnetSvcClient := rpc.NewMockXnetSvcClient(t)
 	mockClient := s3.NewMockClient(t)
-	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
 	mockDeployer := deploy.NewMockDeployer(t)
 	mockCache := cache.NewMockCache(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
@@ -2248,8 +2245,8 @@ func initializeTestMCPServerComponent(ctx context.Context, t interface {
 		components:       componentMockedComponents,
 		gitServer:        mockGitServer,
 		userSvcClient:    mockUserSvcClient,
+		xnetClient:       mockXnetSvcClient,
 		s3Client:         mockClient,
-		mirrorServer:     mockMirrorServer,
 		deployer:         mockDeployer,
 		cache:            mockCache,
 		accountingClient: mockAccountingClient,
@@ -2294,8 +2291,8 @@ func initializeTestMCPScannerComponent(ctx context.Context, t interface {
 		cluster:             mockClusterComponent,
 	}
 	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
+	mockXnetSvcClient := rpc.NewMockXnetSvcClient(t)
 	mockClient := s3.NewMockClient(t)
-	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
 	mockDeployer := deploy.NewMockDeployer(t)
 	mockCache := cache.NewMockCache(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
@@ -2312,8 +2309,8 @@ func initializeTestMCPScannerComponent(ctx context.Context, t interface {
 		components:       componentMockedComponents,
 		gitServer:        mockGitServer,
 		userSvcClient:    mockUserSvcClient,
+		xnetClient:       mockXnetSvcClient,
 		s3Client:         mockClient,
-		mirrorServer:     mockMirrorServer,
 		deployer:         mockDeployer,
 		cache:            mockCache,
 		accountingClient: mockAccountingClient,
@@ -2358,8 +2355,8 @@ func initializeTestStatComponent(ctx context.Context, t interface {
 		sensitive:           mockSensitiveComponent,
 		cluster:             mockClusterComponent,
 	}
+	mockXnetSvcClient := rpc.NewMockXnetSvcClient(t)
 	mockClient := s3.NewMockClient(t)
-	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
 	mockDeployer := deploy.NewMockDeployer(t)
 	mockCache := cache.NewMockCache(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
@@ -2376,8 +2373,8 @@ func initializeTestStatComponent(ctx context.Context, t interface {
 		components:       componentMockedComponents,
 		gitServer:        mockGitServer,
 		userSvcClient:    mockUserSvcClient,
+		xnetClient:       mockXnetSvcClient,
 		s3Client:         mockClient,
-		mirrorServer:     mockMirrorServer,
 		deployer:         mockDeployer,
 		cache:            mockCache,
 		accountingClient: mockAccountingClient,
@@ -2422,8 +2419,8 @@ func initializeTestLLMServiceComponent(ctx context.Context, t interface {
 	}
 	mockGitServer := gitserver.NewMockGitServer(t)
 	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
+	mockXnetSvcClient := rpc.NewMockXnetSvcClient(t)
 	mockClient := s3.NewMockClient(t)
-	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
 	mockDeployer := deploy.NewMockDeployer(t)
 	mockCache := cache.NewMockCache(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
@@ -2440,8 +2437,8 @@ func initializeTestLLMServiceComponent(ctx context.Context, t interface {
 		components:       componentMockedComponents,
 		gitServer:        mockGitServer,
 		userSvcClient:    mockUserSvcClient,
+		xnetClient:       mockXnetSvcClient,
 		s3Client:         mockClient,
-		mirrorServer:     mockMirrorServer,
 		deployer:         mockDeployer,
 		cache:            mockCache,
 		accountingClient: mockAccountingClient,
@@ -2486,8 +2483,8 @@ func initializeTestNotebookComponent(ctx context.Context, t interface {
 	}
 	mockGitServer := gitserver.NewMockGitServer(t)
 	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
+	mockXnetSvcClient := rpc.NewMockXnetSvcClient(t)
 	mockClient := s3.NewMockClient(t)
-	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
 	mockCache := cache.NewMockCache(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
 	mockReader := parquet.NewMockReader(t)
@@ -2503,8 +2500,8 @@ func initializeTestNotebookComponent(ctx context.Context, t interface {
 		components:       componentMockedComponents,
 		gitServer:        mockGitServer,
 		userSvcClient:    mockUserSvcClient,
+		xnetClient:       mockXnetSvcClient,
 		s3Client:         mockClient,
-		mirrorServer:     mockMirrorServer,
 		deployer:         mockDeployer,
 		cache:            mockCache,
 		accountingClient: mockAccountingClient,
@@ -2549,8 +2546,8 @@ func initializeTestMirrorNamespaceMappingComponent(ctx context.Context, t interf
 	}
 	mockGitServer := gitserver.NewMockGitServer(t)
 	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
+	mockXnetSvcClient := rpc.NewMockXnetSvcClient(t)
 	mockClient := s3.NewMockClient(t)
-	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
 	mockDeployer := deploy.NewMockDeployer(t)
 	mockCache := cache.NewMockCache(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
@@ -2567,8 +2564,8 @@ func initializeTestMirrorNamespaceMappingComponent(ctx context.Context, t interf
 		components:       componentMockedComponents,
 		gitServer:        mockGitServer,
 		userSvcClient:    mockUserSvcClient,
+		xnetClient:       mockXnetSvcClient,
 		s3Client:         mockClient,
-		mirrorServer:     mockMirrorServer,
 		deployer:         mockDeployer,
 		cache:            mockCache,
 		accountingClient: mockAccountingClient,
@@ -2614,7 +2611,6 @@ func initializeTestXnetComponent(ctx context.Context, t interface {
 	mockGitServer := gitserver.NewMockGitServer(t)
 	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
 	mockClient := s3.NewMockClient(t)
-	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
 	mockDeployer := deploy.NewMockDeployer(t)
 	mockCache := cache.NewMockCache(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
@@ -2631,8 +2627,8 @@ func initializeTestXnetComponent(ctx context.Context, t interface {
 		components:       componentMockedComponents,
 		gitServer:        mockGitServer,
 		userSvcClient:    mockUserSvcClient,
+		xnetClient:       mockXnetSvcClient,
 		s3Client:         mockClient,
-		mirrorServer:     mockMirrorServer,
 		deployer:         mockDeployer,
 		cache:            mockCache,
 		accountingClient: mockAccountingClient,
@@ -2678,7 +2674,7 @@ func initializeTestSkillComponent(ctx context.Context, t interface {
 		sensitive:           mockSensitiveComponent,
 		cluster:             mockClusterComponent,
 	}
-	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
+	mockXnetSvcClient := rpc.NewMockXnetSvcClient(t)
 	mockDeployer := deploy.NewMockDeployer(t)
 	mockCache := cache.NewMockCache(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
@@ -2695,8 +2691,8 @@ func initializeTestSkillComponent(ctx context.Context, t interface {
 		components:       componentMockedComponents,
 		gitServer:        mockGitServer,
 		userSvcClient:    mockUserSvcClient,
+		xnetClient:       mockXnetSvcClient,
 		s3Client:         mockClient,
-		mirrorServer:     mockMirrorServer,
 		deployer:         mockDeployer,
 		cache:            mockCache,
 		accountingClient: mockAccountingClient,
@@ -2743,8 +2739,8 @@ func initializeTestDatasetComponent(ctx context.Context, t interface {
 		sensitive:           mockSensitiveComponent,
 		cluster:             mockClusterComponent,
 	}
+	mockXnetSvcClient := rpc.NewMockXnetSvcClient(t)
 	mockClient := s3.NewMockClient(t)
-	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
 	mockDeployer := deploy.NewMockDeployer(t)
 	mockCache := cache.NewMockCache(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
@@ -2761,8 +2757,8 @@ func initializeTestDatasetComponent(ctx context.Context, t interface {
 		components:       componentMockedComponents,
 		gitServer:        mockGitServer,
 		userSvcClient:    mockUserSvcClient,
+		xnetClient:       mockXnetSvcClient,
 		s3Client:         mockClient,
-		mirrorServer:     mockMirrorServer,
 		deployer:         mockDeployer,
 		cache:            mockCache,
 		accountingClient: mockAccountingClient,

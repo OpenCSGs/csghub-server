@@ -36,7 +36,6 @@ func TestConfig_loadConfig(t *testing.T) {
 		require.Equal(t, "foobar", cfg.InstanceID)
 		require.Equal(t, 4321, cfg.APIServer.Port)
 		require.Equal(t, "ssh://git@localhost:2222", cfg.APIServer.SSHDomain)
-		require.Equal(t, false, cfg.MirrorServer.Enable)
 		require.Equal(t, true, cfg.SensitiveCheck.EnableSSL)
 	})
 

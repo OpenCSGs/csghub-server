@@ -297,20 +297,22 @@ func TestRepoComponent_CreateFile(t *testing.T) {
 				Email: "foo@bar.com",
 			}, nil)
 			repo.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "ns").Return(database.Namespace{}, nil)
+			gitAttrContent := ""
 			if c.useLFS {
-				repo.config.GitServer.Type = types.GitServerTypeGitaly
-				ct := base64.RawStdEncoding.EncodeToString(
+				gitAttrContent = base64.RawStdEncoding.EncodeToString(
 					[]byte(c.path + " filter=lfs diff=lfs merge=lfs -text"),
 				)
-				repo.mocks.gitServer.EXPECT().GetRepoFileContents(mock.Anything, gitserver.GetRepoInfoByPathReq{
-					RepoType:  types.ModelRepo,
-					Namespace: "ns",
-					Name:      "n",
-					Ref:       "main",
-					Path:      GitAttributesFileName,
-				}).Return(&types.File{
-					Content: ct,
-				}, nil)
+			}
+			repo.mocks.gitServer.EXPECT().GetRepoFileContents(mock.Anything, gitserver.GetRepoInfoByPathReq{
+				RepoType:  types.ModelRepo,
+				Namespace: "ns",
+				Name:      "n",
+				Ref:       "main",
+				Path:      GitAttributesFileName,
+			}).Return(&types.File{
+				Content: gitAttrContent,
+			}, nil)
+			if c.useLFS {
 				repo.mocks.s3Client.EXPECT().PutObject(
 					mock.Anything, repo.config.S3.Bucket,
 					"lfs/e3/b0/c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", mock.Anything, int64(0), minio.PutObjectOptions{}).Return(minio.UploadInfo{
@@ -388,20 +390,22 @@ func TestRepoComponent_UpdateFile(t *testing.T) {
 				Email: "foo@bar.com",
 			}, nil)
 			repo.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "ns").Return(database.Namespace{}, nil)
+			gitAttrContent := ""
 			if c.useLFS {
-				repo.config.GitServer.Type = types.GitServerTypeGitaly
-				ct := base64.RawStdEncoding.EncodeToString(
+				gitAttrContent = base64.RawStdEncoding.EncodeToString(
 					[]byte(c.path + " filter=lfs diff=lfs merge=lfs -text"),
 				)
-				repo.mocks.gitServer.EXPECT().GetRepoFileContents(mock.Anything, gitserver.GetRepoInfoByPathReq{
-					RepoType:  types.ModelRepo,
-					Namespace: "ns",
-					Name:      "n",
-					Ref:       "main",
-					Path:      GitAttributesFileName,
-				}).Return(&types.File{
-					Content: ct,
-				}, nil)
+			}
+			repo.mocks.gitServer.EXPECT().GetRepoFileContents(mock.Anything, gitserver.GetRepoInfoByPathReq{
+				RepoType:  types.ModelRepo,
+				Namespace: "ns",
+				Name:      "n",
+				Ref:       "main",
+				Path:      GitAttributesFileName,
+			}).Return(&types.File{
+				Content: gitAttrContent,
+			}, nil)
+			if c.useLFS {
 				repo.mocks.s3Client.EXPECT().PutObject(
 					mock.Anything, repo.config.S3.Bucket,
 					"lfs/af/a7/518106309c22d325df6d2663249d158d2f36f1976269d6d4104d9198a108", mock.Anything, int64(4), minio.PutObjectOptions{}).Return(minio.UploadInfo{

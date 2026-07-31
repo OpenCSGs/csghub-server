@@ -48,14 +48,6 @@ func NewRepoComponent(config *config.Config) (RepoComponent, error) {
 		slog.Error(newError.Error())
 		return nil, newError
 	}
-	if config.GitServer.Type == types.GitServerTypeGitea {
-		c.mirrorServer, err = git.NewMirrorServer(config)
-		if err != nil {
-			newError := fmt.Errorf("fail to create git mirror server,error:%w", err)
-			slog.Error(newError.Error())
-			return nil, newError
-		}
-	}
 	c.tagComponent, err = NewTagComponent(config)
 	if err != nil {
 		newError := fmt.Errorf("fail to create tag component,error:%w", err)

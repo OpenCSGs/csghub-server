@@ -30,6 +30,7 @@ type PathReq struct {
 	Ref         string `json:"ref"`
 	Path        string `json:"path"`
 	Expand      bool   `json:"expand"`
+	Recursive   bool   `json:"recursive"`
 	CurrentUser string `json:"current_user"`
 }
 

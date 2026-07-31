@@ -111,21 +111,14 @@ func (c *accessTokenComponentImpl) Create(ctx context.Context, req *types.Create
 	// csghub token is shared with git server
 	switch req.Application {
 	case types.AccessTokenAppGit:
-		if c.gs != nil {
-			token, err = c.gs.CreateUserToken(req)
-			if err != nil {
-				return nil, fmt.Errorf("fail to create git user access token,error:%w", err)
-			}
-		} else {
-			tokenContent := c.genUnique()
-			token = &database.AccessToken{
-				Name:        req.TokenName,
-				Token:       tokenContent,
-				UserID:      user.ID,
-				Application: req.Application,
-				Permission:  req.Permission,
-				IsActive:    true,
-			}
+		tokenContent := c.genUnique()
+		token = &database.AccessToken{
+			Name:        req.TokenName,
+			Token:       tokenContent,
+			UserID:      user.ID,
+			Application: req.Application,
+			Permission:  req.Permission,
+			IsActive:    true,
 		}
 		token.UserID = user.ID
 		token.Application = req.Application
@@ -235,13 +228,6 @@ func (c *accessTokenComponentImpl) Delete(ctx context.Context, req *types.Delete
 
 	if !exist {
 		return errorx.ErrNotFound
-	}
-
-	if req.Application == types.AccessTokenAppGit {
-		err = c.gs.DeleteUserToken(req)
-		if err != nil {
-			return fmt.Errorf("failed to delete git user access token,error:%w", err)
-		}
 	}
 
 	if len(req.NSUUID) > 0 {
@@ -397,19 +383,14 @@ func (c *accessTokenComponentImpl) RefreshToken(ctx context.Context, refreshReq 
 	}
 	// csghub token is shared with git server
 	if req.Application == "" || req.Application == types.AccessTokenAppCSGHub {
-		// TODO:allow git client to refresh token
-		// git server cannot create tokens with the same nanme
-		err := c.gs.DeleteUserToken(&types.DeleteUserTokenRequest{
-			Username:  refreshReq.Username,
-			TokenName: t.Name,
-		})
-		if err != nil {
-			return resp, fmt.Errorf("fail to delete old git user access token,error:%w", err)
+		newToken := &database.AccessToken{
+			Name:        req.TokenName,
+			Permission:  req.Permission,
+			Application: req.Application,
+			ExpiredAt:   req.ExpiredAt,
+			Token:       strings.ReplaceAll(uuid.NewString(), "-", ""),
 		}
-		newToken, err := c.gs.CreateUserToken(req)
-		if err != nil {
-			return resp, fmt.Errorf("fail to create git user access token,error:%w", err)
-		}
+
 		newTokenValue = newToken.Token
 	} else if req.Application == types.AccessTokenAppAIGateway {
 		keyValue, err := generateOrgAPIKey("gk", 32)

@@ -34,7 +34,6 @@ import (
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/git/gitserver/gitaly"
 	"opencsg.com/csghub-server/builder/git/membership"
-	"opencsg.com/csghub-server/builder/git/mirrorserver"
 	"opencsg.com/csghub-server/builder/multisync"
 	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
@@ -74,7 +73,6 @@ type repoComponentImpl struct {
 	userSvcClient                  rpc.UserSvcClient
 	lfsBucket                      string
 	userLikesStore                 database.UserLikesStore
-	mirrorServer                   mirrorserver.MirrorServer
 	runtimeFrameworksStore         database.RuntimeFrameworksStore
 	deployTaskStore                database.DeployTaskStore
 	deployer                       deploy.Deployer
@@ -807,9 +805,7 @@ func (c *repoComponentImpl) CreateFile(ctx context.Context, req *types.CreateFil
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	if c.config.GitServer.Type == types.GitServerTypeGitaly {
-		useLfs, req = c.checkIfShouldUseLfs(ctx, req)
-	}
+	useLfs, req = c.checkIfShouldUseLfs(ctx, req)
 
 	if useLfs {
 		objectKey := common.BuildLfsPath(repo.ID, req.Pointer.Oid, repo.Migrated)
@@ -923,9 +919,7 @@ func (c *repoComponentImpl) UpdateFile(ctx context.Context, req *types.UpdateFil
 		return nil, fmt.Errorf("fail to check namespace, cause: %w", err)
 	}
 
-	if c.config.GitServer.Type == types.GitServerTypeGitaly {
-		useLfs, req = c.checkIfShouldUseLfsUpdate(ctx, req)
-	}
+	useLfs, req = c.checkIfShouldUseLfsUpdate(ctx, req)
 
 	if useLfs {
 		objectKey := common.BuildLfsPath(repo.ID, req.Pointer.Oid, repo.Migrated)
