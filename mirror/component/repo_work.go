@@ -2,7 +2,6 @@ package component
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
 	"time"
@@ -50,97 +49,77 @@ type RepoWorkDeps struct {
 	MaxWorkers int
 }
 
-// repoSlogArgs appends repo job fields and latest mirror information to slog args.
-func repoSlogArgs(args workhub.RepoArgs, task *database.MirrorTask, attrs ...any) []any {
-	attrs = append(attrs,
-		slog.Int64("mirror_id", args.MirrorID),
-		slog.Int64("repository_id", args.RepositoryID),
-		slog.Int64("mirror_task_id", args.MirrorTaskID),
-	)
-	if task == nil || task.Mirror == nil {
-		return attrs
-	}
-	attrs = append(attrs, slog.String("source_url", task.Mirror.SourceUrl))
-	if task.Mirror.Repository != nil {
-		attrs = append(attrs,
-			slog.String("repo_type", string(task.Mirror.Repository.RepositoryType)),
-			slog.String("repo_path", task.Mirror.Repository.Path),
-		)
-	}
-	return attrs
-}
-
 // Work runs the repository mirror task.
 func (w *repoWorker) Work(ctx context.Context, job *river.Job[workhub.RepoArgs]) error {
-	return runMirrorWork(ctx, job, mirrorWorkConfig[workhub.RepoArgs]{
-		name:             "repo",
-		manager:          w.urgentManager,
-		preemptionDelay:  urgentJobDelay,
-		isUrgent:         func(args workhub.RepoArgs) bool { return args.Urgent },
-		expectedQueue:    workhub.RepoQueue,
-		validateQueue:    workhub.ValidateRepoQueue,
-		logArgs:          repoSlogArgs,
-		work:             w.work,
-		failureTarget:    mirrorRepoJobFailureTarget,
-		failureFinalizer: newMirrorJobFailureFinalizer(w.mirrorTaskStore),
+	return runWorkWithLog(ctx, job, mirrorWorkConfig[workhub.RepoArgs]{
+		manager:   w.urgentManager,
+		urgent:    job.Args.Urgent,
+		args:      job.Args.MirrorArgs,
+		stage:     "repo",
+		taskStore: w.mirrorTaskStore,
+		work: func(ctx context.Context, args workhub.RepoArgs, retryCount int) (*database.MirrorTask, error) {
+			return w.work(ctx, args, retryCount, job.ID)
+		},
 	})
 }
 
 // work executes the repository mirror business flow and returns the latest task for lifecycle logging.
-func (w *repoWorker) work(ctx context.Context, args workhub.RepoArgs, retryCount int) (*database.MirrorTask, error) {
+func (w *repoWorker) work(ctx context.Context, args workhub.RepoArgs, retryCount int, jobID int64) (*database.MirrorTask, error) {
 	task, err := w.mirrorTaskStore.FindByID(ctx, args.MirrorTaskID)
 	if err != nil {
-		slog.ErrorContext(ctx, "failed to find mirror task", repoSlogArgs(args, task, slog.String("error", err.Error()))...)
+		slog.ErrorContext(ctx, "failed to find mirror task",
+			mirrorTaskSlogArgs(args.MirrorArgs, task,
+				slog.String("error", err.Error()),
+			)...)
 		return task, fmt.Errorf("find mirror task: %w", err)
 	}
-	slog.InfoContext(ctx, "loaded mirror repo task", repoSlogArgs(args, task, slog.String("task_status", string(task.Status)))...)
-	if skip, reason := shouldSkipRepoJob(task, args); skip {
-		slog.InfoContext(ctx, "skip stale mirror repo job", repoSlogArgs(args, task,
-			slog.String("reason", reason),
-			slog.String("task_status", string(task.Status)),
-		)...)
-		return task, nil
+	slog.InfoContext(ctx, "loaded mirror repo task", mirrorTaskSlogArgs(args.MirrorArgs, task)...)
+	skip, err := checkRepoTaskInfo(task, args, jobID)
+	if err != nil {
+		slog.ErrorContext(ctx, "invalid mirror repo task information",
+			mirrorTaskSlogArgs(args.MirrorArgs, task,
+				slog.Int64("job_id", jobID),
+				slog.String("error", err.Error()),
+			)...)
+		return task, fmt.Errorf("check mirror repo task information: %w", err)
 	}
-	if args.Urgent && w.urgentManager != nil {
-		done, err := beginUrgentWork(w.urgentManager, ctx)
-		if err != nil {
-			return task, err
-		}
-		defer done()
+	if skip {
+		slog.InfoContext(ctx, "skip mirror repo task",
+			mirrorTaskSlogArgs(args.MirrorArgs, task, slog.Int64("job_id", jobID))...)
+		return task, nil
 	}
 	task.RetryCount = retryCount
 
 	beforeStatus := task.Status
 	task, err = w.prepareRepoTask(ctx, *task)
 	if err != nil {
+		slog.ErrorContext(ctx, "failed to prepare mirror repo task", mirrorTaskSlogArgs(args.MirrorArgs, task,
+			slog.String("before_status", string(beforeStatus)),
+			slog.String("error", err.Error()),
+		)...)
 		return task, err
 	}
-	slog.InfoContext(ctx, "prepared mirror repo task", repoSlogArgs(args, task,
+	slog.InfoContext(ctx, "prepared mirror repo task", mirrorTaskSlogArgs(args.MirrorArgs, task,
 		slog.String("before_status", string(beforeStatus)),
 		slog.String("after_status", string(task.Status)),
 	)...)
-	if task.Status != types.MirrorRepoSyncStart {
-		slog.ErrorContext(ctx, "skip mirror repo job after prepare", repoSlogArgs(args, task,
-			slog.String("task_status", string(task.Status)),
-		)...)
-		return task, nil
-	}
 
 	syncedTask, err := w.syncer.SyncRepo(ctx, task.Mirror, task)
 	if err != nil {
-		if isUrgentWorkCancellation(ctx, err) || errors.Is(err, context.Canceled) {
-			slog.InfoContext(ctx, "mirror repo sync canceled", repoSlogArgs(args, task, slog.String("error", err.Error()))...)
+		if isWorkContextTermination(ctx, err) {
+			slog.InfoContext(ctx, "mirror repo sync stopped by execution context",
+				mirrorTaskSlogArgs(args.MirrorArgs, task, slog.String("error", err.Error()))...)
 			return task, err
 		}
-		slog.ErrorContext(ctx, "failed to sync mirror repo task", repoSlogArgs(args, task, slog.String("error", err.Error()))...)
+		slog.ErrorContext(ctx, "failed to sync mirror repo task", mirrorTaskSlogArgs(args.MirrorArgs, task, slog.String("error", err.Error()))...)
 		task.ErrorMessage = err.Error()
 		if _, updateErr := w.mirrorTaskStore.UpdateStatusAndRepoSyncStatus(ctx, *task, database.MirrorFail); updateErr != nil {
-			slog.ErrorContext(ctx, "failed to update status of mirror repo task", repoSlogArgs(args, task, slog.String("error", updateErr.Error()))...)
+			slog.ErrorContext(ctx, "failed to update status of mirror repo task", mirrorTaskSlogArgs(args.MirrorArgs, task, slog.String("error", updateErr.Error()))...)
 			return task, fmt.Errorf("mark repo sync failed: %w", updateErr)
 		}
 		return task, err
 	}
-	if err := contextCauseError(ctx); err != nil {
+	if err := ctx.Err(); err != nil {
 		return task, err
 	}
 	if syncedTask == nil || syncedTask.Mirror == nil || syncedTask.Mirror.Repository == nil {
@@ -229,58 +208,44 @@ func newRepoRiverConfigForWorker(deps RepoWorkDeps, worker *repoWorker) *river.C
 // prepareRepoTask moves a queued or retryable repo task into the running state.
 func (w *repoWorker) prepareRepoTask(ctx context.Context, task database.MirrorTask) (*database.MirrorTask, error) {
 	switch task.Status {
+	case types.MirrorRepoSyncStart:
+		return &task, nil
 	case types.MirrorRepoSyncFailed:
 		retried, err := w.mirrorTaskStore.UpdateStatusAndRepoSyncStatus(ctx, task, database.MirrorRetry)
 		if err != nil {
-			return nil, fmt.Errorf("retry mirror repo task: %w", err)
+			return &task, fmt.Errorf("retry mirror repo task: %w", err)
+		}
+		if retried.Status != types.MirrorQueued {
+			return &retried, fmt.Errorf("retried mirror repo task has unexpected status %s", retried.Status)
 		}
 		task = retried
 	case types.MirrorQueued:
 	default:
-		return &task, nil
+		return &task, fmt.Errorf("cannot prepare mirror repo task with status %s", task.Status)
 	}
 
 	started, err := w.mirrorTaskStore.UpdateStatusAndRepoSyncStatus(ctx, task, database.MirrorContinue)
 	if err != nil {
-		return nil, fmt.Errorf("start mirror repo task: %w", err)
+		return &task, fmt.Errorf("start mirror repo task: %w", err)
+	}
+	if started.Status != types.MirrorRepoSyncStart {
+		return &started, fmt.Errorf("started mirror repo task has unexpected status %s", started.Status)
 	}
 	return &started, nil
 }
 
-// shouldSkipRepoJob reports whether a repo job no longer owns the current task and why.
-func shouldSkipRepoJob(task *database.MirrorTask, args workhub.RepoArgs) (bool, string) {
-	if task == nil || task.Mirror == nil {
-		return false, ""
+// checkRepoTaskInfo validates repo job ownership and reports tasks whose repo phase no longer needs work.
+func checkRepoTaskInfo(task *database.MirrorTask, args workhub.RepoArgs, jobID int64) (bool, error) {
+	if err := checkMirrorTaskInfo(task, args.MirrorArgs); err != nil {
+		return false, err
 	}
-	if args.MirrorID != 0 && task.MirrorID != args.MirrorID {
-		return true, "mirror_id_mismatch"
+	if task.RepoJobID != jobID {
+		return false, fmt.Errorf("repo job ID mismatch: task=%d job=%d", task.RepoJobID, jobID)
 	}
-	if args.RepositoryID != 0 && task.Mirror.RepositoryID != args.RepositoryID {
-		return true, "repository_id_mismatch"
-	}
-	if task.Mirror.CurrentTaskID != 0 && task.Mirror.CurrentTaskID != task.ID {
-		return true, "stale_current_task"
-	}
-	if isRepoJobTerminalStatus(task.Status) {
-		return true, "terminal_status"
-	}
-	return false, ""
-}
-
-// isRepoJobTerminalStatus reports whether a repo workhub job has nothing left to do.
-func isRepoJobTerminalStatus(status types.MirrorTaskStatus) bool {
-	switch status {
-	case types.MirrorRepoSyncFinished,
-		types.MirrorRepoSyncFatal,
-		types.MirrorLfsSyncStart,
-		types.MirrorLfsSyncFinished,
-		types.MirrorLfsSyncFailed,
-		types.MirrorLfsSyncFatal,
-		types.MirrorLfsIncomplete,
-		types.MirrorCanceled,
-		types.MirrorRepoTooLarge:
-		return true
+	switch task.Status {
+	case types.MirrorQueued, types.MirrorRepoSyncStart, types.MirrorRepoSyncFailed:
+		return false, nil
 	default:
-		return false
+		return true, nil
 	}
 }

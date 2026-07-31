@@ -44,19 +44,23 @@ func (c *fakeJobClient) JobCancelTx(ctx context.Context, tx *sql.Tx, jobID int64
 // TestMirrorJobArgsJSONOnlyCarriesStableIDs verifies River payloads keep only stable database identifiers.
 func TestMirrorJobArgsJSONOnlyCarriesStableIDs(t *testing.T) {
 	repoPayload, err := json.Marshal(RepoArgs{
-		MirrorID:     7,
-		RepositoryID: 11,
-		MirrorTaskID: 3,
-		Urgent:       true,
+		MirrorArgs: MirrorArgs{
+			MirrorID:     7,
+			RepositoryID: 11,
+			MirrorTaskID: 3,
+			Urgent:       true,
+		},
 	})
 	require.NoError(t, err)
 	require.JSONEq(t, `{"mirror_id":7,"repository_id":11,"mirror_task_id":3,"urgent":true}`, string(repoPayload))
 
 	lfsPayload, err := json.Marshal(LFSArgs{
-		MirrorID:     7,
-		RepositoryID: 11,
-		MirrorTaskID: 3,
-		Urgent:       true,
+		MirrorArgs: MirrorArgs{
+			MirrorID:     7,
+			RepositoryID: 11,
+			MirrorTaskID: 3,
+			Urgent:       true,
+		},
 	})
 	require.NoError(t, err)
 	require.JSONEq(t, `{"mirror_id":7,"repository_id":11,"mirror_task_id":3,"urgent":true}`, string(lfsPayload))
@@ -66,10 +70,10 @@ func TestMirrorJobArgsJSONOnlyCarriesStableIDs(t *testing.T) {
 func TestMirrorJobArgsUseMirrorQueues(t *testing.T) {
 	require.Equal(t, MirrorRepoQueue, RepoArgs{}.Kind())
 	require.Equal(t, MirrorRepoQueue, RepoArgs{}.InsertOpts().Queue)
-	require.Equal(t, MirrorRepoUrgentQueue, RepoArgs{Urgent: true}.InsertOpts().Queue)
+	require.Equal(t, MirrorRepoUrgentQueue, RepoArgs{MirrorArgs: MirrorArgs{Urgent: true}}.InsertOpts().Queue)
 	require.Equal(t, MirrorLFSQueue, LFSArgs{}.Kind())
 	require.Equal(t, MirrorLFSQueue, LFSArgs{}.InsertOpts().Queue)
-	require.Equal(t, MirrorLFSUrgentQueue, LFSArgs{Urgent: true}.InsertOpts().Queue)
+	require.Equal(t, MirrorLFSUrgentQueue, LFSArgs{MirrorArgs: MirrorArgs{Urgent: true}}.InsertOpts().Queue)
 }
 
 func TestUrgentMaxWorkers(t *testing.T) {
@@ -89,13 +93,11 @@ func TestUrgentMaxWorkers(t *testing.T) {
 	}
 }
 
-func TestValidateMirrorJobQueue(t *testing.T) {
-	require.NoError(t, ValidateRepoQueue(RepoArgs{}, MirrorRepoQueue))
-	require.NoError(t, ValidateRepoQueue(RepoArgs{Urgent: true}, MirrorRepoUrgentQueue))
-	require.Error(t, ValidateRepoQueue(RepoArgs{Urgent: true}, MirrorRepoQueue))
+// TestValidateLFSQueue verifies normal and urgent LFS queue selection.
+func TestValidateLFSQueue(t *testing.T) {
 	require.NoError(t, ValidateLFSQueue(LFSArgs{}, MirrorLFSQueue))
-	require.NoError(t, ValidateLFSQueue(LFSArgs{Urgent: true}, MirrorLFSUrgentQueue))
-	require.Error(t, ValidateLFSQueue(LFSArgs{Urgent: true}, MirrorLFSQueue))
+	require.NoError(t, ValidateLFSQueue(LFSArgs{MirrorArgs: MirrorArgs{Urgent: true}}, MirrorLFSUrgentQueue))
+	require.Error(t, ValidateLFSQueue(LFSArgs{MirrorArgs: MirrorArgs{Urgent: true}}, MirrorLFSQueue))
 }
 
 // TestInsertOptsRiverInsertOptsDefaultsInvalidPriority verifies legacy priorities cannot break River inserts.
@@ -123,10 +125,12 @@ func TestMirrorRepoJobClientInsertMirrorRepoJobTx(t *testing.T) {
 	require.True(t, jobClient.called)
 	require.IsType(t, RepoArgs{}, jobClient.args)
 	require.Equal(t, RepoArgs{
-		MirrorID:     42,
-		RepositoryID: 11,
-		MirrorTaskID: 7,
-		Urgent:       true,
+		MirrorArgs: MirrorArgs{
+			MirrorID:     42,
+			RepositoryID: 11,
+			MirrorTaskID: 7,
+			Urgent:       true,
+		},
 	}, jobClient.args)
 	require.NotNil(t, jobClient.opts)
 	require.Equal(t, 4, jobClient.opts.MaxAttempts)
@@ -153,10 +157,12 @@ func TestMirrorLFSJobClientInsertMirrorLFSJobTx(t *testing.T) {
 	require.True(t, jobClient.called)
 	require.IsType(t, LFSArgs{}, jobClient.args)
 	require.Equal(t, LFSArgs{
-		MirrorID:     42,
-		RepositoryID: 11,
-		MirrorTaskID: 7,
-		Urgent:       true,
+		MirrorArgs: MirrorArgs{
+			MirrorID:     42,
+			RepositoryID: 11,
+			MirrorTaskID: 7,
+			Urgent:       true,
+		},
 	}, jobClient.args)
 	require.NotNil(t, jobClient.opts)
 	require.Equal(t, 1, jobClient.opts.MaxAttempts)

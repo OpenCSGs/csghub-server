@@ -13,22 +13,19 @@ import (
 	"opencsg.com/csghub-server/common/types"
 )
 
-// TestRunMirrorWorkExecutesBusinessWork verifies the shared lifecycle delegates typed business work.
-func TestRunMirrorWorkExecutesBusinessWork(t *testing.T) {
-	output := captureMirrorWorkerLogs(t)
-	task := repoWorkerTask(types.MirrorCanceled)
+// TestRunWorkExecutesBusinessWork verifies the shared lifecycle delegates typed business work.
+func TestRunWorkExecutesBusinessWork(t *testing.T) {
+	task := repoWorkerTask(types.MirrorQueued)
 	args := repoArgsFromTask(task)
 	job := riverJob(args)
 	job.Queue = workhub.MirrorRepoQueue
 	called := false
 
-	err := runMirrorWork(context.Background(), job, mirrorWorkConfig[workhub.RepoArgs]{
-		name:            "repo",
-		preemptionDelay: time.Minute,
-		isUrgent:        func(args workhub.RepoArgs) bool { return args.Urgent },
-		expectedQueue:   workhub.RepoQueue,
-		validateQueue:   workhub.ValidateRepoQueue,
-		logArgs:         repoSlogArgs,
+	err := runWorkWithLog(context.Background(), job, mirrorWorkConfig[workhub.RepoArgs]{
+		args:    args.MirrorArgs,
+		urgent:  args.Urgent,
+		stage:   "repo",
+		manager: newWorkerTestManager(t),
 		work: func(context.Context, workhub.RepoArgs, int) (*database.MirrorTask, error) {
 			called = true
 			return task, nil
@@ -37,283 +34,150 @@ func TestRunMirrorWorkExecutesBusinessWork(t *testing.T) {
 
 	require.NoError(t, err)
 	require.True(t, called)
-	logs := output.String()
-	requireWorkerJobLogPair(t, logs, "working on repo job", "repo job work exited")
-	requireSingleWorkerExitLog(t, logs, "repo job work exited", "INFO")
 }
 
-// TestRunMirrorWorkLogsPanicAsFailure verifies lifecycle logging preserves panic semantics.
-func TestRunMirrorWorkLogsPanicAsFailure(t *testing.T) {
-	output := captureMirrorWorkerLogs(t)
-	task := repoWorkerTask(types.MirrorCanceled)
+// TestRunWorkPreservesExplicitSnooze verifies business work controls its own River delay.
+func TestRunWorkPreservesExplicitSnooze(t *testing.T) {
+	task := repoWorkerTask(types.MirrorQueued)
 	args := repoArgsFromTask(task)
 	job := riverJob(args)
-	job.Queue = workhub.MirrorRepoQueue
+	wantDelay := 2 * time.Minute
 
-	require.PanicsWithValue(t, "sync panic", func() {
-		_ = runMirrorWork(context.Background(), job, mirrorWorkConfig[workhub.RepoArgs]{
-			name:            "repo",
-			preemptionDelay: time.Minute,
-			isUrgent:        func(args workhub.RepoArgs) bool { return args.Urgent },
-			expectedQueue:   workhub.RepoQueue,
-			validateQueue:   workhub.ValidateRepoQueue,
-			logArgs:         repoSlogArgs,
-			work: func(context.Context, workhub.RepoArgs, int) (*database.MirrorTask, error) {
-				panic("sync panic")
-			},
-		})
-	})
-
-	logs := output.String()
-	requireWorkerJobLogPair(t, logs, "working on repo job", "repo job work exited")
-	exitLog := requireSingleWorkerExitLog(t, logs, "repo job work exited", "ERROR")
-	require.Contains(t, exitLog, `"panic":"sync panic"`)
-	require.Contains(t, exitLog, `"success":false`)
-	require.Contains(t, exitLog, `"snooze":false`)
-}
-
-// TestRunMirrorWorkFinalAttemptSnoozesWhenFatalStateCannotPersist verifies River cannot discard before task finalization succeeds.
-func TestRunMirrorWorkFinalAttemptSnoozesWhenFatalStateCannotPersist(t *testing.T) {
-	output := captureMirrorWorkerLogs(t)
-	task := repoWorkerTask(types.MirrorRepoSyncFailed)
-	task.RepoJobID = 1
-	store := &fakeMirrorJobErrorTaskStore{task: task, updateErr: errors.New("database unavailable")}
-	args := repoArgsFromTask(task)
-	job := riverJob(args)
-	job.Queue = workhub.MirrorRepoQueue
-	job.Attempt = job.MaxAttempts
-	workErr := errors.New("sync failed")
-
-	err := runMirrorWork(context.Background(), job, mirrorWorkConfig[workhub.RepoArgs]{
-		name:            "repo",
-		preemptionDelay: time.Minute,
-		isUrgent:        func(args workhub.RepoArgs) bool { return args.Urgent },
-		expectedQueue:   workhub.RepoQueue,
-		validateQueue:   workhub.ValidateRepoQueue,
-		logArgs:         repoSlogArgs,
+	err := runWorkWithLog(context.Background(), job, mirrorWorkConfig[workhub.RepoArgs]{
+		args:      args.MirrorArgs,
+		stage:     "repo",
+		manager:   newWorkerTestManager(t),
+		taskStore: &fakeRepoTaskStore{task: task},
 		work: func(context.Context, workhub.RepoArgs, int) (*database.MirrorTask, error) {
-			return task, workErr
+			return task, river.JobSnooze(wantDelay)
 		},
-		failureTarget:    mirrorRepoJobFailureTarget,
-		failureFinalizer: newMirrorJobFailureFinalizer(store),
 	})
 
 	var snoozeErr *river.JobSnoozeError
 	require.ErrorAs(t, err, &snoozeErr)
-	require.Equal(t, time.Minute, snoozeErr.Duration)
-	require.Equal(t, 2, store.findCalls)
-	require.Equal(t, []string{database.MirrorFatal}, store.actions)
-	require.Contains(t, output.String(), `"reason":"terminal_state_persistence"`)
+	require.Equal(t, wantDelay, snoozeErr.Duration)
 }
 
-// TestRunMirrorWorkFinalAttemptReturnsOriginalErrorAfterFatalStatePersists verifies River may discard after task finalization.
-func TestRunMirrorWorkFinalAttemptReturnsOriginalErrorAfterFatalStatePersists(t *testing.T) {
-	task := repoWorkerTask(types.MirrorRepoSyncFailed)
-	task.RepoJobID = 1
-	store := &fakeMirrorJobErrorTaskStore{task: task}
-	args := repoArgsFromTask(task)
-	job := riverJob(args)
-	job.Queue = workhub.MirrorRepoQueue
-	job.Attempt = job.MaxAttempts
-	workErr := errors.New("sync failed")
-
-	err := runMirrorWork(context.Background(), job, mirrorWorkConfig[workhub.RepoArgs]{
-		name:            "repo",
-		preemptionDelay: time.Minute,
-		isUrgent:        func(args workhub.RepoArgs) bool { return args.Urgent },
-		expectedQueue:   workhub.RepoQueue,
-		validateQueue:   workhub.ValidateRepoQueue,
-		logArgs:         repoSlogArgs,
-		work: func(context.Context, workhub.RepoArgs, int) (*database.MirrorTask, error) {
-			return task, workErr
-		},
-		failureTarget:    mirrorRepoJobFailureTarget,
-		failureFinalizer: newMirrorJobFailureFinalizer(store),
-	})
-
-	require.ErrorIs(t, err, workErr)
-	require.Equal(t, types.MirrorRepoSyncFatal, store.task.Status)
-	require.Equal(t, job.MaxAttempts-1, store.task.RetryCount)
-}
-
-// TestRunMirrorWorkRetryableAttemptSkipsFatalState verifies ordinary River retries retain their business state.
-func TestRunMirrorWorkRetryableAttemptSkipsFatalState(t *testing.T) {
-	task := repoWorkerTask(types.MirrorRepoSyncFailed)
-	task.RepoJobID = 1
-	store := &fakeMirrorJobErrorTaskStore{task: task}
-	args := repoArgsFromTask(task)
-	job := riverJob(args)
-	job.Queue = workhub.MirrorRepoQueue
-	job.Attempt = job.MaxAttempts - 1
-	workErr := errors.New("sync failed")
-
-	err := runMirrorWork(context.Background(), job, mirrorWorkConfig[workhub.RepoArgs]{
-		name:            "repo",
-		preemptionDelay: time.Minute,
-		isUrgent:        func(args workhub.RepoArgs) bool { return args.Urgent },
-		expectedQueue:   workhub.RepoQueue,
-		validateQueue:   workhub.ValidateRepoQueue,
-		logArgs:         repoSlogArgs,
-		work: func(context.Context, workhub.RepoArgs, int) (*database.MirrorTask, error) {
-			return task, workErr
-		},
-		failureTarget:    mirrorRepoJobFailureTarget,
-		failureFinalizer: newMirrorJobFailureFinalizer(store),
-	})
-
-	require.ErrorIs(t, err, workErr)
-	require.Zero(t, store.findCalls)
-	require.Empty(t, store.actions)
-}
-
-// TestRunMirrorWorkFinalPanicSnoozesWhenFatalStateCannotPersist verifies recoverable panics retain a River execution opportunity.
-func TestRunMirrorWorkFinalPanicSnoozesWhenFatalStateCannotPersist(t *testing.T) {
+// TestRunWorkSnoozesTimedOutWorkImmediately verifies timeout recovery retains the current business status.
+func TestRunWorkSnoozesTimedOutWorkImmediately(t *testing.T) {
+	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(-time.Second))
+	defer cancel()
 	task := repoWorkerTask(types.MirrorRepoSyncStart)
-	task.RepoJobID = 1
-	store := &fakeMirrorJobErrorTaskStore{task: task, updateErr: errors.New("database unavailable")}
 	args := repoArgsFromTask(task)
 	job := riverJob(args)
-	job.Queue = workhub.MirrorRepoQueue
-	job.Attempt = job.MaxAttempts
 
-	err := runMirrorWork(context.Background(), job, mirrorWorkConfig[workhub.RepoArgs]{
-		name:            "repo",
-		preemptionDelay: time.Minute,
-		isUrgent:        func(args workhub.RepoArgs) bool { return args.Urgent },
-		expectedQueue:   workhub.RepoQueue,
-		validateQueue:   workhub.ValidateRepoQueue,
-		logArgs:         repoSlogArgs,
-		work: func(context.Context, workhub.RepoArgs, int) (*database.MirrorTask, error) {
-			panic("sync panic")
+	err := runWorkWithLog(ctx, job, mirrorWorkConfig[workhub.RepoArgs]{
+		args:    args.MirrorArgs,
+		stage:   "repo",
+		manager: newWorkerTestManager(t),
+		work: func(ctx context.Context, args workhub.RepoArgs, retryCount int) (*database.MirrorTask, error) {
+			return task, ctx.Err()
 		},
-		failureTarget:    mirrorRepoJobFailureTarget,
-		failureFinalizer: newMirrorJobFailureFinalizer(store),
 	})
 
 	var snoozeErr *river.JobSnoozeError
 	require.ErrorAs(t, err, &snoozeErr)
-	require.Equal(t, []string{database.MirrorFail}, store.actions)
+	require.Zero(t, snoozeErr.Duration)
 }
 
-// TestRunMirrorWorkFinalPanicRepanicsAfterFatalStatePersists verifies River records panic exhaustion after business finalization.
-func TestRunMirrorWorkFinalPanicRepanicsAfterFatalStatePersists(t *testing.T) {
-	task := repoWorkerTask(types.MirrorRepoSyncStart)
-	task.RepoJobID = 1
-	store := &fakeMirrorJobErrorTaskStore{task: task}
-	args := repoArgsFromTask(task)
-	job := riverJob(args)
-	job.Queue = workhub.MirrorRepoQueue
-	job.Attempt = job.MaxAttempts
-
-	require.PanicsWithValue(t, "sync panic", func() {
-		_ = runMirrorWork(context.Background(), job, mirrorWorkConfig[workhub.RepoArgs]{
-			name:            "repo",
-			preemptionDelay: time.Minute,
-			isUrgent:        func(args workhub.RepoArgs) bool { return args.Urgent },
-			expectedQueue:   workhub.RepoQueue,
-			validateQueue:   workhub.ValidateRepoQueue,
-			logArgs:         repoSlogArgs,
-			work: func(context.Context, workhub.RepoArgs, int) (*database.MirrorTask, error) {
-				panic("sync panic")
-			},
-			failureTarget:    mirrorRepoJobFailureTarget,
-			failureFinalizer: newMirrorJobFailureFinalizer(store),
-		})
-	})
-
-	require.Equal(t, types.MirrorRepoSyncFatal, store.task.Status)
-	require.Equal(t, []string{database.MirrorFail, database.MirrorFatal}, store.actions)
-}
-
-// TestRunMirrorWorkFinalAttemptDoesNotFinalizeJobCancel verifies explicit cancellation remains outside retry exhaustion handling.
-func TestRunMirrorWorkFinalAttemptDoesNotFinalizeJobCancel(t *testing.T) {
-	task := repoWorkerTask(types.MirrorRepoSyncStart)
-	task.RepoJobID = 1
-	store := &fakeMirrorJobErrorTaskStore{task: task}
-	args := repoArgsFromTask(task)
-	job := riverJob(args)
-	job.Queue = workhub.MirrorRepoQueue
-	job.Attempt = job.MaxAttempts
-	cancelCause := errors.New("queue mismatch")
-
-	err := runMirrorWork(context.Background(), job, mirrorWorkConfig[workhub.RepoArgs]{
-		name:            "repo",
-		preemptionDelay: time.Minute,
-		isUrgent:        func(args workhub.RepoArgs) bool { return args.Urgent },
-		expectedQueue:   workhub.RepoQueue,
-		validateQueue:   workhub.ValidateRepoQueue,
-		logArgs:         repoSlogArgs,
-		work: func(context.Context, workhub.RepoArgs, int) (*database.MirrorTask, error) {
-			return task, river.JobCancel(cancelCause)
-		},
-		failureTarget:    mirrorRepoJobFailureTarget,
-		failureFinalizer: newMirrorJobFailureFinalizer(store),
-	})
-
-	var cancelErr *river.JobCancelError
-	require.ErrorAs(t, err, &cancelErr)
-	require.Zero(t, store.findCalls)
-	require.Empty(t, store.actions)
-}
-
-// TestRunMirrorWorkFinalAttemptSnoozesWhenTaskCannotLoad verifies finalization read failures also retain a River execution opportunity.
-func TestRunMirrorWorkFinalAttemptSnoozesWhenTaskCannotLoad(t *testing.T) {
-	task := repoWorkerTask(types.MirrorRepoSyncFailed)
-	task.RepoJobID = 1
-	store := &fakeMirrorJobErrorTaskStore{findErr: errors.New("database unavailable")}
-	args := repoArgsFromTask(task)
-	job := riverJob(args)
-	job.Queue = workhub.MirrorRepoQueue
-	job.Attempt = job.MaxAttempts
-
-	err := runMirrorWork(context.Background(), job, mirrorWorkConfig[workhub.RepoArgs]{
-		name:            "repo",
-		preemptionDelay: time.Minute,
-		isUrgent:        func(args workhub.RepoArgs) bool { return args.Urgent },
-		expectedQueue:   workhub.RepoQueue,
-		validateQueue:   workhub.ValidateRepoQueue,
-		logArgs:         repoSlogArgs,
-		work: func(context.Context, workhub.RepoArgs, int) (*database.MirrorTask, error) {
-			return task, errors.New("sync failed")
-		},
-		failureTarget:    mirrorRepoJobFailureTarget,
-		failureFinalizer: newMirrorJobFailureFinalizer(store),
-	})
-
-	var snoozeErr *river.JobSnoozeError
-	require.ErrorAs(t, err, &snoozeErr)
-	require.Equal(t, 1, store.findCalls)
-}
-
-// TestRunMirrorWorkFinalAttemptSnoozesRiverCancellationWithoutFinalizing verifies worker shutdown cannot become a permanent task failure.
-func TestRunMirrorWorkFinalAttemptSnoozesRiverCancellationWithoutFinalizing(t *testing.T) {
+// TestRunWorkSnoozesCancelledWork verifies worker shutdown retains the job for another worker.
+func TestRunWorkSnoozesCancelledWork(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	task := repoWorkerTask(types.MirrorRepoSyncStart)
-	task.RepoJobID = 1
-	store := &fakeMirrorJobErrorTaskStore{task: task}
 	args := repoArgsFromTask(task)
 	job := riverJob(args)
-	job.Queue = workhub.MirrorRepoQueue
-	job.Attempt = job.MaxAttempts
 
-	err := runMirrorWork(ctx, job, mirrorWorkConfig[workhub.RepoArgs]{
-		name:            "repo",
-		preemptionDelay: time.Minute,
-		isUrgent:        func(args workhub.RepoArgs) bool { return args.Urgent },
-		expectedQueue:   workhub.RepoQueue,
-		validateQueue:   workhub.ValidateRepoQueue,
-		logArgs:         repoSlogArgs,
-		work: func(context.Context, workhub.RepoArgs, int) (*database.MirrorTask, error) {
-			return task, context.Canceled
+	err := runWorkWithLog(ctx, job, mirrorWorkConfig[workhub.RepoArgs]{
+		args:    args.MirrorArgs,
+		stage:   "repo",
+		manager: newWorkerTestManager(t),
+		work: func(ctx context.Context, args workhub.RepoArgs, retryCount int) (*database.MirrorTask, error) {
+			return task, ctx.Err()
 		},
-		failureTarget:    mirrorRepoJobFailureTarget,
-		failureFinalizer: newMirrorJobFailureFinalizer(store),
 	})
 
 	var snoozeErr *river.JobSnoozeError
 	require.ErrorAs(t, err, &snoozeErr)
 	require.Equal(t, workerShutdownSnoozeDelay, snoozeErr.Duration)
-	require.Zero(t, store.findCalls)
-	require.Empty(t, store.actions)
+}
+
+// TestRunWorkLogsAndPropagatesPanic verifies lifecycle logging does not swallow worker panics.
+func TestRunWorkLogsAndPropagatesPanic(t *testing.T) {
+	output := captureMirrorWorkerLogs(t)
+	task := repoWorkerTask(types.MirrorRepoSyncStart)
+	args := repoArgsFromTask(task)
+	job := riverJob(args)
+
+	require.PanicsWithValue(t, "sync panic", func() {
+		_ = runWorkWithLog(context.Background(), job, mirrorWorkConfig[workhub.RepoArgs]{
+			args:    args.MirrorArgs,
+			stage:   "repo",
+			manager: newWorkerTestManager(t),
+			work: func(context.Context, workhub.RepoArgs, int) (*database.MirrorTask, error) {
+				panic("sync panic")
+			},
+		})
+	})
+
+	require.Contains(t, output.String(), `"msg":"[repo] work panic"`)
+}
+
+// TestRunWorkReturnsOrdinaryErrors verifies retryable business failures remain ordinary River errors.
+func TestRunWorkReturnsOrdinaryErrors(t *testing.T) {
+	task := repoWorkerTask(types.MirrorRepoSyncStart)
+	args := repoArgsFromTask(task)
+	job := riverJob(args)
+	wantErr := errors.New("sync failed")
+
+	err := runWorkWithLog(context.Background(), job, mirrorWorkConfig[workhub.RepoArgs]{
+		args:    args.MirrorArgs,
+		stage:   "repo",
+		manager: newWorkerTestManager(t),
+		work: func(context.Context, workhub.RepoArgs, int) (*database.MirrorTask, error) {
+			return task, wantErr
+		},
+	})
+
+	require.ErrorIs(t, err, wantErr)
+}
+
+// TestIsWorkContextTermination distinguishes lifecycle termination from sync errors with similar values.
+func TestIsWorkContextTermination(t *testing.T) {
+	t.Run("active context", func(t *testing.T) {
+		require.False(t, isWorkContextTermination(context.Background(), context.Canceled))
+	})
+
+	t.Run("worker cancellation", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		require.True(t, isWorkContextTermination(ctx, context.Canceled))
+	})
+
+	t.Run("remote job cancellation", func(t *testing.T) {
+		ctx, cancel := context.WithCancelCause(context.Background())
+		cancel(river.ErrJobCancelledRemotely)
+		require.True(t, isWorkContextTermination(ctx, context.Canceled))
+		require.True(t, isWorkContextTermination(ctx, river.ErrJobCancelledRemotely))
+	})
+
+	t.Run("worker timeout", func(t *testing.T) {
+		ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(-time.Second))
+		defer cancel()
+		require.True(t, isWorkContextTermination(ctx, context.DeadlineExceeded))
+	})
+
+	t.Run("urgent preemption", func(t *testing.T) {
+		ctx, cancel := context.WithCancelCause(context.Background())
+		cancel(workhub.ErrUrgentPreempt)
+		require.True(t, isWorkContextTermination(ctx, context.Canceled))
+		require.True(t, isWorkContextTermination(ctx, context.DeadlineExceeded))
+		require.True(t, isWorkContextTermination(ctx, workhub.ErrUrgentPreempt))
+	})
+
+	t.Run("unrelated error after cancellation", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		require.False(t, isWorkContextTermination(ctx, errors.New("sync failed")))
+	})
 }

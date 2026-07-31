@@ -6,6 +6,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/riverqueue/river"
 	"github.com/riverqueue/river/rivertype"
 	"github.com/stretchr/testify/require"
 	"opencsg.com/csghub-server/builder/store/database"
@@ -13,41 +14,39 @@ import (
 	"opencsg.com/csghub-server/common/types"
 )
 
-// fakeMirrorJobErrorTaskStore records final retry task transitions.
+// fakeMirrorJobErrorTaskStore records exhausted-job task transitions.
 type fakeMirrorJobErrorTaskStore struct {
-	task         *database.MirrorTask
-	findErr      error
-	updateResult *database.MirrorTask
-	updateErr    error
-	findCalls    int
-	updateCalls  int
-	actions      []string
+	task        *database.MirrorTask
+	findErr     error
+	updateErr   error
+	findCalls   int
+	findIDs     []int64
+	updateCalls int
+	actions     []string
 }
 
-// FindByID returns the configured mirror task.
-func (s *fakeMirrorJobErrorTaskStore) FindByID(ctx context.Context, ID int64) (*database.MirrorTask, error) {
+// FindByID returns the configured task.
+func (s *fakeMirrorJobErrorTaskStore) FindByID(_ context.Context, ID int64) (*database.MirrorTask, error) {
 	s.findCalls++
+	s.findIDs = append(s.findIDs, ID)
 	if s.findErr != nil {
 		return nil, s.findErr
 	}
 	return s.task, nil
 }
 
-// UpdateStatusAndRepoSyncStatus records the fatal transition.
+// UpdateStatusAndRepoSyncStatus records and applies supported FSM transitions.
 func (s *fakeMirrorJobErrorTaskStore) UpdateStatusAndRepoSyncStatus(
-	ctx context.Context,
+	_ context.Context,
 	task database.MirrorTask,
-	statusAction string,
+	action string,
 ) (database.MirrorTask, error) {
 	s.updateCalls++
-	s.actions = append(s.actions, statusAction)
+	s.actions = append(s.actions, action)
 	if s.updateErr != nil {
-		if s.updateResult != nil {
-			return *s.updateResult, s.updateErr
-		}
 		return task, s.updateErr
 	}
-	switch statusAction {
+	switch action {
 	case database.MirrorContinue:
 		switch task.Status {
 		case types.MirrorQueued:
@@ -64,9 +63,9 @@ func (s *fakeMirrorJobErrorTaskStore) UpdateStatusAndRepoSyncStatus(
 		}
 	case database.MirrorFatal:
 		switch task.Status {
-		case types.MirrorRepoSyncFailed:
+		case types.MirrorQueued, types.MirrorRepoSyncStart, types.MirrorRepoSyncFailed:
 			task.Status = types.MirrorRepoSyncFatal
-		case types.MirrorLfsSyncFailed:
+		case types.MirrorRepoSyncFinished, types.MirrorLfsSyncStart, types.MirrorLfsSyncFailed:
 			task.Status = types.MirrorLfsSyncFatal
 		}
 	}
@@ -74,110 +73,67 @@ func (s *fakeMirrorJobErrorTaskStore) UpdateStatusAndRepoSyncStatus(
 	return task, nil
 }
 
-// TestMirrorJobErrorHandlerLogsTrustedStatusOnUpdateError verifies failed updates ignore their task result.
-func TestMirrorJobErrorHandlerLogsTrustedStatusOnUpdateError(t *testing.T) {
+// TestMirrorJobErrorHandlerWaitsForLastAttempt verifies retryable errors remain nonfatal.
+func TestMirrorJobErrorHandlerWaitsForLastAttempt(t *testing.T) {
 	output := captureMirrorWorkerLogs(t)
-	store := &fakeMirrorJobErrorTaskStore{
-		task: &database.MirrorTask{
-			ID:        11,
-			RepoJobID: 101,
-			Status:    types.MirrorRepoSyncFailed,
-		},
-		updateResult: &database.MirrorTask{Status: types.MirrorRepoSyncFatal},
-		updateErr:    errors.New("update failed"),
-	}
-	handler := newMirrorJobErrorHandler(store)
-
-	handler.HandleError(
-		context.Background(),
-		mirrorErrorHandlerJob(t, 101, workhub.RepoArgs{MirrorTaskID: 11}),
-		errors.New("sync failed"),
-	)
-
-	require.Contains(t, output.String(), `"task_status":"repo_failed"`)
-	require.NotContains(t, output.String(), `"task_status":"repo_fatal"`)
-}
-
-// TestMirrorJobFailureFinalizerTreatsMissingTaskAsFinished verifies deleted tasks cannot create an infinite snooze loop.
-func TestMirrorJobFailureFinalizerTreatsMissingTaskAsFinished(t *testing.T) {
 	store := &fakeMirrorJobErrorTaskStore{}
-	finalizer := newMirrorJobFailureFinalizer(store)
-	target := mirrorRepoJobFailureTarget(workhub.RepoArgs{MirrorTaskID: 11})
+	job := mirrorErrorHandlerJob(t, 101, repoErrorHandlerArgs(11))
+	job.Attempt = job.MaxAttempts - 1
 
-	err := finalizer.finalize(context.Background(), 101, workhub.MirrorRepoQueue, 4, target, "sync failed")
+	result := newMirrorJobErrorHandler(store).HandleError(context.Background(), job, errors.New("sync failed"))
 
-	require.NoError(t, err)
-	require.Equal(t, 1, store.findCalls)
+	require.Nil(t, result)
+	require.Zero(t, store.findCalls)
 	require.Zero(t, store.updateCalls)
+	require.Contains(t, output.String(), `"msg":"mirror job error"`)
 }
 
-// TestMirrorJobErrorHandlerMarksFailedTaskFatal verifies both mirror stages finalize after their last attempt.
+// TestMirrorJobErrorHandlerMarksFailedTaskFatal verifies exhausted Repo and LFS errors submit MirrorFatal.
 func TestMirrorJobErrorHandlerMarksFailedTaskFatal(t *testing.T) {
 	tests := []struct {
-		name        string
-		job         *rivertype.JobRow
-		task        *database.MirrorTask
-		fatalStatus types.MirrorTaskStatus
+		name       string
+		job        *rivertype.JobRow
+		task       *database.MirrorTask
+		wantStatus types.MirrorTaskStatus
 	}{
 		{
 			name: "repo",
-			job: mirrorErrorHandlerJob(t, 101, workhub.RepoArgs{
-				MirrorTaskID: 11,
-			}),
+			job:  mirrorErrorHandlerJob(t, 101, repoErrorHandlerArgs(11)),
 			task: &database.MirrorTask{
-				ID:        11,
-				RepoJobID: 101,
-				Status:    types.MirrorRepoSyncFailed,
+				ID: 11, RepoJobID: 101, Status: types.MirrorRepoSyncFailed,
 			},
-			fatalStatus: types.MirrorRepoSyncFatal,
+			wantStatus: types.MirrorRepoSyncFatal,
 		},
 		{
 			name: "lfs",
-			job: mirrorErrorHandlerJob(t, 202, workhub.LFSArgs{
-				MirrorTaskID: 22,
-			}),
+			job:  mirrorErrorHandlerJob(t, 202, lfsErrorHandlerArgs(22)),
 			task: &database.MirrorTask{
-				ID:       22,
-				LFSJobID: 202,
-				Status:   types.MirrorLfsSyncFailed,
+				ID: 22, LFSJobID: 202, Status: types.MirrorLfsSyncFailed,
 			},
-			fatalStatus: types.MirrorLfsSyncFatal,
+			wantStatus: types.MirrorLfsSyncFatal,
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			store := &fakeMirrorJobErrorTaskStore{task: test.task}
-			handler := newMirrorJobErrorHandler(store)
 
-			result := handler.HandleError(context.Background(), test.job, errors.New("sync failed"))
+			result := newMirrorJobErrorHandler(store).HandleError(
+				context.Background(), test.job, errors.New("sync failed"),
+			)
 
 			require.Nil(t, result)
-			require.Equal(t, 1, store.findCalls)
-			require.Equal(t, 1, store.updateCalls)
 			require.Equal(t, []string{database.MirrorFatal}, store.actions)
-			require.Equal(t, test.fatalStatus, store.task.Status)
-			require.Equal(t, test.job.MaxAttempts-1, store.task.RetryCount)
+			require.Equal(t, test.wantStatus, store.task.Status)
+			require.Equal(t, "sync failed", store.task.ErrorMessage)
+			require.Equal(t, test.job.Attempt, store.task.RetryCount)
+			require.Equal(t, []int64{test.task.ID}, store.findIDs)
 		})
 	}
 }
 
-// TestMirrorJobErrorHandlerWaitsForLastAttempt verifies retryable failures stay nonfatal.
-func TestMirrorJobErrorHandlerWaitsForLastAttempt(t *testing.T) {
-	job := mirrorErrorHandlerJob(t, 101, workhub.RepoArgs{MirrorTaskID: 11})
-	job.Attempt = job.MaxAttempts - 1
-	store := &fakeMirrorJobErrorTaskStore{}
-	handler := newMirrorJobErrorHandler(store)
-
-	result := handler.HandleError(context.Background(), job, errors.New("sync failed"))
-
-	require.Nil(t, result)
-	require.Zero(t, store.findCalls)
-	require.Zero(t, store.updateCalls)
-}
-
-// TestMirrorJobErrorHandlerFinalizesActiveStageStatuses verifies infrastructure failures cannot strand nonterminal tasks.
-func TestMirrorJobErrorHandlerFinalizesActiveStageStatuses(t *testing.T) {
+// TestMirrorJobErrorHandlerFinalizesActiveStatuses verifies infrastructure errors cannot strand active stages.
+func TestMirrorJobErrorHandlerFinalizesActiveStatuses(t *testing.T) {
 	tests := []struct {
 		name        string
 		job         *rivertype.JobRow
@@ -187,30 +143,30 @@ func TestMirrorJobErrorHandlerFinalizesActiveStageStatuses(t *testing.T) {
 	}{
 		{
 			name:        "queued repo",
-			job:         mirrorErrorHandlerJob(t, 101, workhub.RepoArgs{MirrorTaskID: 11}),
+			job:         mirrorErrorHandlerJob(t, 101, repoErrorHandlerArgs(11)),
 			task:        &database.MirrorTask{ID: 11, RepoJobID: 101, Status: types.MirrorQueued},
-			wantActions: []string{database.MirrorContinue, database.MirrorFail, database.MirrorFatal},
+			wantActions: []string{database.MirrorFatal},
 			wantStatus:  types.MirrorRepoSyncFatal,
 		},
 		{
 			name:        "running repo",
-			job:         mirrorErrorHandlerJob(t, 101, workhub.RepoArgs{MirrorTaskID: 11}),
+			job:         mirrorErrorHandlerJob(t, 101, repoErrorHandlerArgs(11)),
 			task:        &database.MirrorTask{ID: 11, RepoJobID: 101, Status: types.MirrorRepoSyncStart},
-			wantActions: []string{database.MirrorFail, database.MirrorFatal},
+			wantActions: []string{database.MirrorFatal},
 			wantStatus:  types.MirrorRepoSyncFatal,
 		},
 		{
-			name:        "waiting LFS",
-			job:         mirrorErrorHandlerJob(t, 202, workhub.LFSArgs{MirrorTaskID: 22}),
+			name:        "waiting lfs",
+			job:         mirrorErrorHandlerJob(t, 202, lfsErrorHandlerArgs(22)),
 			task:        &database.MirrorTask{ID: 22, LFSJobID: 202, Status: types.MirrorRepoSyncFinished},
-			wantActions: []string{database.MirrorContinue, database.MirrorFail, database.MirrorFatal},
+			wantActions: []string{database.MirrorFatal},
 			wantStatus:  types.MirrorLfsSyncFatal,
 		},
 		{
-			name:        "running LFS",
-			job:         mirrorErrorHandlerJob(t, 202, workhub.LFSArgs{MirrorTaskID: 22}),
+			name:        "running lfs",
+			job:         mirrorErrorHandlerJob(t, 202, lfsErrorHandlerArgs(22)),
 			task:        &database.MirrorTask{ID: 22, LFSJobID: 202, Status: types.MirrorLfsSyncStart},
-			wantActions: []string{database.MirrorFail, database.MirrorFatal},
+			wantActions: []string{database.MirrorFatal},
 			wantStatus:  types.MirrorLfsSyncFatal,
 		},
 	}
@@ -218,9 +174,10 @@ func TestMirrorJobErrorHandlerFinalizesActiveStageStatuses(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			store := &fakeMirrorJobErrorTaskStore{task: test.task}
-			handler := newMirrorJobErrorHandler(store)
 
-			handler.HandleError(context.Background(), test.job, errors.New("infrastructure failure"))
+			newMirrorJobErrorHandler(store).HandleError(
+				context.Background(), test.job, errors.New("infrastructure failure"),
+			)
 
 			require.Equal(t, test.wantActions, store.actions)
 			require.Equal(t, test.wantStatus, store.task.Status)
@@ -229,31 +186,52 @@ func TestMirrorJobErrorHandlerFinalizesActiveStageStatuses(t *testing.T) {
 	}
 }
 
-// TestMirrorJobErrorHandlerRejectsStaleAndUnexpectedTasks verifies finalization only affects its active stage.
-func TestMirrorJobErrorHandlerRejectsStaleAndUnexpectedTasks(t *testing.T) {
+// TestMirrorJobErrorHandlerHandlesFinalPanic verifies panic exhaustion uses the same fatal transition.
+func TestMirrorJobErrorHandlerHandlesFinalPanic(t *testing.T) {
+	output := captureMirrorWorkerLogs(t)
+	store := &fakeMirrorJobErrorTaskStore{task: &database.MirrorTask{
+		ID: 22, LFSJobID: 202, Status: types.MirrorLfsSyncStart,
+	}}
+	job := mirrorErrorHandlerJob(t, 202, lfsErrorHandlerArgs(22))
+
+	result := newMirrorJobErrorHandler(store).HandlePanic(
+		context.Background(), job, "sync panic", "panic trace",
+	)
+
+	require.Nil(t, result)
+	require.Equal(t, []string{database.MirrorFatal}, store.actions)
+	require.Equal(t, types.MirrorLfsSyncFatal, store.task.Status)
+	require.Equal(t, "work panic", store.task.ErrorMessage)
+	require.Equal(t, job.Attempt, store.task.RetryCount)
+	require.Contains(t, output.String(), `"msg":"mirror job panic"`)
+	require.Contains(t, output.String(), `"panic_trace":"panic trace"`)
+}
+
+// TestMirrorJobErrorHandlerSkipsStaleJob verifies exhausted old Repo and LFS jobs cannot finalize replacements.
+func TestMirrorJobErrorHandlerSkipsStaleJob(t *testing.T) {
 	tests := []struct {
 		name string
+		job  *rivertype.JobRow
 		task *database.MirrorTask
 	}{
 		{
-			name: "stale job",
-			task: &database.MirrorTask{ID: 11, RepoJobID: 102, Status: types.MirrorRepoSyncFailed},
+			name: "repo",
+			job:  mirrorErrorHandlerJob(t, 101, repoErrorHandlerArgs(11)),
+			task: &database.MirrorTask{ID: 11, RepoJobID: 999, Status: types.MirrorRepoSyncFailed},
 		},
 		{
-			name: "unexpected task status",
-			task: &database.MirrorTask{ID: 11, RepoJobID: 101, Status: types.MirrorLfsSyncStart},
+			name: "lfs",
+			job:  mirrorErrorHandlerJob(t, 202, lfsErrorHandlerArgs(22)),
+			task: &database.MirrorTask{ID: 22, LFSJobID: 999, Status: types.MirrorLfsSyncFailed},
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			store := &fakeMirrorJobErrorTaskStore{task: test.task}
-			handler := newMirrorJobErrorHandler(store)
 
-			handler.HandleError(
-				context.Background(),
-				mirrorErrorHandlerJob(t, 101, workhub.RepoArgs{MirrorTaskID: 11}),
-				errors.New("sync failed"),
+			newMirrorJobErrorHandler(store).HandleError(
+				context.Background(), test.job, errors.New("sync failed"),
 			)
 
 			require.Equal(t, 1, store.findCalls)
@@ -262,68 +240,77 @@ func TestMirrorJobErrorHandlerRejectsStaleAndUnexpectedTasks(t *testing.T) {
 	}
 }
 
-// TestMirrorJobErrorHandlerHandlesFinalPanic verifies panic exhaustion finalizes a running task.
-func TestMirrorJobErrorHandlerHandlesFinalPanic(t *testing.T) {
-	store := &fakeMirrorJobErrorTaskStore{task: &database.MirrorTask{
-		ID:       22,
-		LFSJobID: 202,
-		Status:   types.MirrorLfsSyncStart,
-	}}
-	handler := newMirrorJobErrorHandler(store)
+// TestMirrorJobErrorHandlerLogsFatalPersistenceFailure verifies handler failures remain observable.
+func TestMirrorJobErrorHandlerLogsFatalPersistenceFailure(t *testing.T) {
+	output := captureMirrorWorkerLogs(t)
+	store := &fakeMirrorJobErrorTaskStore{
+		task: &database.MirrorTask{
+			ID: 11, RepoJobID: 101, Status: types.MirrorRepoSyncFailed,
+		},
+		updateErr: errors.New("database unavailable"),
+	}
 
-	result := handler.HandlePanic(
+	newMirrorJobErrorHandler(store).HandleError(
 		context.Background(),
-		mirrorErrorHandlerJob(t, 202, workhub.LFSArgs{MirrorTaskID: 22}),
-		"sync panic",
-		"trace",
+		mirrorErrorHandlerJob(t, 101, repoErrorHandlerArgs(11)),
+		errors.New("sync failed"),
 	)
 
-	require.Nil(t, result)
-	require.Equal(t, []string{database.MirrorFail, database.MirrorFatal}, store.actions)
-	require.Equal(t, types.MirrorLfsSyncFatal, store.task.Status)
-	require.Equal(t, "worker panic: sync panic", store.task.ErrorMessage)
+	require.Contains(t, output.String(), `"msg":"mirror job error"`)
+	require.Contains(t, output.String(), `"handle_error":"update mirror job error: database unavailable"`)
+	require.Contains(t, output.String(), "database unavailable")
 }
 
-// TestMirrorJobErrorHandlerIgnoresCancellation verifies worker shutdown does not create a permanent failure.
+// TestMirrorJobErrorHandlerIgnoresCancellation verifies shutdown and remote cancellation do not finalize tasks.
 func TestMirrorJobErrorHandlerIgnoresCancellation(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-	store := &fakeMirrorJobErrorTaskStore{task: &database.MirrorTask{
-		ID:        11,
-		RepoJobID: 101,
-		Status:    types.MirrorRepoSyncStart,
-	}}
-	handler := newMirrorJobErrorHandler(store)
+	tests := []struct {
+		name      string
+		ctx       context.Context
+		workError error
+	}{
+		{
+			name: "worker shutdown",
+			ctx: func() context.Context {
+				ctx, cancel := context.WithCancel(context.Background())
+				cancel()
+				return ctx
+			}(),
+			workError: context.Canceled,
+		},
+		{
+			name:      "remote cancellation",
+			ctx:       context.Background(),
+			workError: river.ErrJobCancelledRemotely,
+		},
+	}
 
-	result := handler.HandleError(
-		ctx,
-		mirrorErrorHandlerJob(t, 101, workhub.RepoArgs{MirrorTaskID: 11}),
-		context.Canceled,
-	)
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			store := &fakeMirrorJobErrorTaskStore{task: &database.MirrorTask{
+				ID: 11, RepoJobID: 101, Status: types.MirrorRepoSyncStart,
+			}}
 
-	require.Nil(t, result)
-	require.Zero(t, store.findCalls)
-	require.Empty(t, store.actions)
+			result := newMirrorJobErrorHandler(store).HandleError(
+				test.ctx,
+				mirrorErrorHandlerJob(t, 101, repoErrorHandlerArgs(11)),
+				test.workError,
+			)
+
+			require.Nil(t, result)
+			require.Zero(t, store.findCalls)
+			require.Zero(t, store.updateCalls)
+		})
+	}
 }
 
-// TestMirrorJobErrorHandlerFinalizesCancellationWithActiveContext verifies unexpected cancellation can still terminate.
-func TestMirrorJobErrorHandlerFinalizesCancellationWithActiveContext(t *testing.T) {
-	store := &fakeMirrorJobErrorTaskStore{task: &database.MirrorTask{
-		ID:        11,
-		RepoJobID: 101,
-		Status:    types.MirrorRepoSyncStart,
-	}}
-	handler := newMirrorJobErrorHandler(store)
+// repoErrorHandlerArgs creates Repo job arguments for error-handler tests.
+func repoErrorHandlerArgs(taskID int64) workhub.RepoArgs {
+	return workhub.RepoArgs{MirrorArgs: workhub.MirrorArgs{MirrorTaskID: taskID}}
+}
 
-	result := handler.HandleError(
-		context.Background(),
-		mirrorErrorHandlerJob(t, 101, workhub.RepoArgs{MirrorTaskID: 11}),
-		context.Canceled,
-	)
-
-	require.Nil(t, result)
-	require.Equal(t, []string{database.MirrorFail, database.MirrorFatal}, store.actions)
-	require.Equal(t, types.MirrorRepoSyncFatal, store.task.Status)
+// lfsErrorHandlerArgs creates LFS job arguments for error-handler tests.
+func lfsErrorHandlerArgs(taskID int64) workhub.LFSArgs {
+	return workhub.LFSArgs{MirrorArgs: workhub.MirrorArgs{MirrorTaskID: taskID}}
 }
 
 // mirrorErrorHandlerJob creates a final-attempt River row for one mirror job payload.

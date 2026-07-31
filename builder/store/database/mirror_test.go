@@ -130,6 +130,7 @@ func TestMirrorStore_CRUD(t *testing.T) {
 
 }
 
+// TestMirrorStore_DeleteWithTaskCancelTxCancelsJobsAndDeletesMirror verifies only the current task job is cancelled.
 func TestMirrorStore_DeleteWithTaskCancelTxCancelsJobsAndDeletesMirror(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
@@ -153,17 +154,26 @@ func TestMirrorStore_DeleteWithTaskCancelTxCancelsJobsAndDeletesMirror(t *testin
 	})
 	require.NoError(t, err)
 	tasks := []database.MirrorTask{
-		{MirrorID: mirror.ID, Status: types.MirrorRepoSyncStart, Priority: types.ASAPMirrorPriority, RepoJobID: 11, LFSJobID: 12},
-		{MirrorID: mirror.ID, Status: types.MirrorQueued, Priority: types.HighMirrorPriority, RepoJobID: 21},
+		{MirrorID: mirror.ID, Status: types.MirrorCanceled, Priority: types.ASAPMirrorPriority, RepoJobID: 11, LFSJobID: 12},
+		{MirrorID: mirror.ID, Status: types.MirrorRepoSyncStart, Priority: types.HighMirrorPriority, RepoJobID: 21},
 	}
 	for i := range tasks {
 		require.NoError(t, db.Core.NewInsert().Model(&tasks[i]).Scan(ctx, &tasks[i]))
 	}
+	_, err = db.Core.NewUpdate().
+		Model((*database.Mirror)(nil)).
+		Set("current_task_id = ?", tasks[1].ID).
+		Where("id = ?", mirror.ID).
+		Exec(ctx)
+	require.NoError(t, err)
 
 	cancelClient := &fakeMirrorDeleteJobCancelClient{}
+	lockHook := &mirrorLockOrderHook{}
+	db.BunDB.AddQueryHook(lockHook)
 	err = store.DeleteWithTaskCancelTx(ctx, mirror.ID, cancelClient)
 	require.NoError(t, err)
-	require.ElementsMatch(t, []int64{int64(11), int64(12), int64(21)}, cancelClient.cancelled)
+	require.Equal(t, []string{"mirror", "repository", "mirror_task"}, lockHook.tables)
+	require.Equal(t, []int64{21}, cancelClient.cancelled)
 
 	_, err = store.FindByID(ctx, mirror.ID)
 	require.Error(t, err)
@@ -176,6 +186,7 @@ func TestMirrorStore_DeleteWithTaskCancelTxCancelsJobsAndDeletesMirror(t *testin
 	require.Equal(t, types.SyncStatusCanceled, storedRepo.SyncStatus)
 }
 
+// TestMirrorStore_DeleteWithTaskCancelTxRollsBackWhenJobCancelFails verifies current-job cancellation remains atomic.
 func TestMirrorStore_DeleteWithTaskCancelTxRollsBackWhenJobCancelFails(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
@@ -203,6 +214,12 @@ func TestMirrorStore_DeleteWithTaskCancelTxRollsBackWhenJobCancelFails(t *testin
 		RepoJobID: 11,
 	}
 	require.NoError(t, db.Core.NewInsert().Model(task).Scan(ctx, task))
+	_, err = db.Core.NewUpdate().
+		Model((*database.Mirror)(nil)).
+		Set("current_task_id = ?", task.ID).
+		Where("id = ?", mirror.ID).
+		Exec(ctx)
+	require.NoError(t, err)
 
 	cancelClient := &fakeMirrorDeleteJobCancelClient{err: errors.New("cancel failed")}
 	err = store.DeleteWithTaskCancelTx(ctx, mirror.ID, cancelClient)
@@ -215,6 +232,7 @@ func TestMirrorStore_DeleteWithTaskCancelTxRollsBackWhenJobCancelFails(t *testin
 	require.Equal(t, 1, count)
 }
 
+// TestMirrorStore_DeleteWithTaskCancelTxKeepsCompletedRepoStatus verifies completed synchronization remains completed.
 func TestMirrorStore_DeleteWithTaskCancelTxKeepsCompletedRepoStatus(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
@@ -242,6 +260,12 @@ func TestMirrorStore_DeleteWithTaskCancelTxKeepsCompletedRepoStatus(t *testing.T
 		Priority: types.ASAPMirrorPriority,
 	}
 	require.NoError(t, db.Core.NewInsert().Model(task).Scan(ctx, task))
+	_, err = db.Core.NewUpdate().
+		Model((*database.Mirror)(nil)).
+		Set("current_task_id = ?", task.ID).
+		Where("id = ?", mirror.ID).
+		Exec(ctx)
+	require.NoError(t, err)
 
 	err = store.DeleteWithTaskCancelTx(ctx, mirror.ID, &fakeMirrorDeleteJobCancelClient{})
 	require.NoError(t, err)

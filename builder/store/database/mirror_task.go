@@ -170,12 +170,14 @@ type MirrorTaskWithFSM struct {
 }
 
 const (
-	MirrorContinue    = "continue"
-	MirrorFail        = "fail"
-	MirrorSuccess     = "success"
-	MirrorRetry       = "retry"
-	MirrorCancel      = "cancel"
-	MirrorFatal       = "fatal"
+	MirrorContinue = "continue"
+	MirrorFail     = "fail"
+	MirrorSuccess  = "success"
+	MirrorRetry    = "retry"
+	MirrorCancel   = "cancel"
+	MirrorFatal    = "fatal"
+	// MirrorPause moves active work back to the waiting status for its current phase.
+	MirrorPause       = "pause"
 	MirrorNoLfsToSync = "no_lfs_to_sync"
 	MirrorTooLarge    = "too_large"
 )
@@ -205,6 +207,20 @@ func NewMirrorTaskWithFSM(mt *MirrorTask) MirrorTaskWithFSM {
 					Name: MirrorRetry,
 					Src: []string{
 						string(types.MirrorLfsSyncFailed),
+					},
+					Dst: string(types.MirrorRepoSyncFinished),
+				},
+				{
+					Name: MirrorPause,
+					Src: []string{
+						string(types.MirrorRepoSyncStart),
+					},
+					Dst: string(types.MirrorQueued),
+				},
+				{
+					Name: MirrorPause,
+					Src: []string{
+						string(types.MirrorLfsSyncStart),
 					},
 					Dst: string(types.MirrorRepoSyncFinished),
 				},
@@ -239,6 +255,8 @@ func NewMirrorTaskWithFSM(mt *MirrorTask) MirrorTaskWithFSM {
 				{
 					Name: MirrorFatal,
 					Src: []string{
+						string(types.MirrorQueued),
+						string(types.MirrorRepoSyncStart),
 						string(types.MirrorRepoSyncFailed),
 					},
 					Dst: string(types.MirrorRepoSyncFatal),
@@ -246,6 +264,8 @@ func NewMirrorTaskWithFSM(mt *MirrorTask) MirrorTaskWithFSM {
 				{
 					Name: MirrorFatal,
 					Src: []string{
+						string(types.MirrorRepoSyncFinished),
+						string(types.MirrorLfsSyncStart),
 						string(types.MirrorLfsSyncFailed),
 					},
 					Dst: string(types.MirrorLfsSyncFatal),
@@ -369,7 +389,7 @@ func (m *mirrorTaskStoreImpl) ListByStatusWithPriority(ctx context.Context, stat
 	return tasks, errorx.HandleDBError(err, nil)
 }
 
-// RequeueMirrorRepoTask cancels active work for one mirror and enqueues a fresh repo sync job atomically.
+// RequeueMirrorRepoTask cancels the current active work and enqueues a fresh repo sync job atomically.
 func (m *mirrorTaskStoreImpl) RequeueMirrorRepoTask(ctx context.Context, input RequeueMirrorRepoTaskInput) (MirrorTask, error) {
 	if input.MirrorID == 0 {
 		return MirrorTask{}, fmt.Errorf("mirror id is required")
@@ -412,32 +432,33 @@ func (m *mirrorTaskStoreImpl) RequeueMirrorRepoTask(ctx context.Context, input R
 		}
 		mirror.Repository = &repo
 
-		var oldTasks []MirrorTask
-		cancelStatuses := requeueCancelableMirrorTaskStatuses()
-		if err := tx.NewSelect().
-			Model(&oldTasks).
-			Where("mirror_id = ?", mirror.ID).
-			Where("status IN (?)", bun.In(cancelStatuses)).
-			For("UPDATE OF mirror_task").
-			Scan(ctx); err != nil {
-			return fmt.Errorf("failed to lock old mirror tasks: %w", err)
+		var currentTask *MirrorTask
+		if mirror.CurrentTaskID != 0 {
+			var oldTask MirrorTask
+			if err := tx.NewSelect().
+				Model(&oldTask).
+				Where("mirror_task.id = ?", mirror.CurrentTaskID).
+				Where("mirror_task.mirror_id = ?", mirror.ID).
+				For("UPDATE OF mirror_task").
+				Scan(ctx); err != nil {
+				return fmt.Errorf("failed to lock current mirror task: %w", err)
+			}
+			currentTask = &oldTask
 		}
 		now := time.Now()
-		for _, oldTask := range oldTasks {
-			if err := cancelMirrorTaskJobsTx(ctx, tx.Tx, oldTask, input.JobCancelClient); err != nil {
-				return err
-			}
-		}
-		if len(oldTasks) > 0 {
+		if currentTask != nil && isRequeueCancelableMirrorTaskStatus(currentTask.Status) {
+			currentTask.Status = types.MirrorCanceled
+			currentTask.UpdatedAt = now
+			currentTask.FinishedAt = now
 			if _, err := tx.NewUpdate().
-				Model((*MirrorTask)(nil)).
-				Set("status = ?", types.MirrorCanceled).
-				Set("updated_at = ?", now).
-				Set("finished_at = ?", now).
-				Where("mirror_id = ?", mirror.ID).
-				Where("status IN (?)", bun.In(cancelStatuses)).
+				Model(currentTask).
+				Column("status", "updated_at", "finished_at").
+				WherePK().
 				Exec(ctx); err != nil {
-				return fmt.Errorf("failed to cancel old mirror tasks: %w", err)
+				return fmt.Errorf("failed to cancel current mirror task: %w", err)
+			}
+			if err := cancelMirrorTaskJobsTx(ctx, tx.Tx, *currentTask, input.JobCancelClient); err != nil {
+				return err
 			}
 		}
 
@@ -502,15 +523,18 @@ func (m *mirrorTaskStoreImpl) RequeueMirrorRepoTask(ctx context.Context, input R
 	return task, errorx.HandleDBError(err, nil)
 }
 
-// requeueCancelableMirrorTaskStatuses returns task states replaced by a manual re-sync.
-func requeueCancelableMirrorTaskStatuses() []types.MirrorTaskStatus {
-	return []types.MirrorTaskStatus{
-		types.MirrorQueued,
+// isRequeueCancelableMirrorTaskStatus reports whether a current task is replaced by a manual re-sync.
+func isRequeueCancelableMirrorTaskStatus(status types.MirrorTaskStatus) bool {
+	switch status {
+	case types.MirrorQueued,
 		types.MirrorRepoSyncStart,
 		types.MirrorRepoSyncFailed,
 		types.MirrorRepoSyncFinished,
 		types.MirrorLfsSyncStart,
-		types.MirrorLfsSyncFailed,
+		types.MirrorLfsSyncFailed:
+		return true
+	default:
+		return false
 	}
 }
 
@@ -518,12 +542,7 @@ func requeueCancelableMirrorTaskStatuses() []types.MirrorTaskStatus {
 func (m *mirrorTaskStoreImpl) CancelMirrorTaskByIDWithJobCancel(ctx context.Context, ID int64, jobCancelClient MirrorJobCancelClient) (bool, error) {
 	var cancelled bool
 	err := m.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		var task MirrorTask
-		err := tx.NewSelect().
-			Model(&task).
-			Where("id = ?", ID).
-			For("UPDATE OF mirror_task").
-			Scan(ctx)
+		task, err := lockMirrorTaskAggregateTx(ctx, tx, ID)
 		if err != nil {
 			return err
 		}
@@ -542,22 +561,15 @@ func (m *mirrorTaskStoreImpl) CancelMirrorTaskByIDWithJobCancel(ctx context.Cont
 				return err
 			}
 
-			if err := cancelMirrorTaskJobsTx(ctx, tx.Tx, task, jobCancelClient); err != nil {
-				return err
-			}
-
-			var mirror Mirror
-			if err := tx.NewSelect().
-				Model(&mirror).
-				Where("id = ?", task.MirrorID).
-				For("UPDATE").
-				Scan(ctx); err != nil {
-				return err
-			}
+			mirror := *task.Mirror
 			if mirror.CurrentTaskID == 0 || mirror.CurrentTaskID == task.ID {
 				if err := updateMirrorAndRepoStateTx(ctx, tx, mirror, task.ID, task.Status); err != nil {
 					return err
 				}
+			}
+
+			if err := cancelMirrorTaskJobsTx(ctx, tx.Tx, task, jobCancelClient); err != nil {
+				return err
 			}
 			cancelled = true
 		}
@@ -691,41 +703,72 @@ func (m *mirrorTaskStoreImpl) UpdateCommitCheckpoint(ctx context.Context, taskID
 	return task, errorx.HandleDBError(err, nil)
 }
 
-// updateMirrorTaskStateTx applies one FSM transition and keeps task, mirror, and repository status consistent.
-func updateMirrorTaskStateTx(ctx context.Context, tx bun.Tx, task MirrorTask, statusAction string) (MirrorTask, error) {
-	var current MirrorTask
+// lockMirrorTaskAggregateTx locks one mirror aggregate in Mirror, Repository, and MirrorTask order.
+func lockMirrorTaskAggregateTx(ctx context.Context, tx bun.Tx, taskID int64) (MirrorTask, error) {
+	var identity MirrorTask
 	if err := tx.NewSelect().
-		Model(&current).
-		Where("mirror_task.id = ?", task.ID).
-		For("UPDATE OF mirror_task").
+		Model(&identity).
+		Column("id", "mirror_id").
+		Where("mirror_task.id = ?", taskID).
 		Scan(ctx); err != nil {
-		return task, err
+		return MirrorTask{}, err
 	}
 
 	var mirror Mirror
 	if err := tx.NewSelect().
 		Model(&mirror).
-		Where("mirror.id = ?", current.MirrorID).
+		Where("mirror.id = ?", identity.MirrorID).
 		For("UPDATE").
 		Scan(ctx); err != nil {
+		return MirrorTask{}, err
+	}
+
+	var repo Repository
+	if err := tx.NewSelect().
+		Model(&repo).
+		Where("repository.id = ?", mirror.RepositoryID).
+		For("UPDATE").
+		Scan(ctx); err != nil {
+		return MirrorTask{}, err
+	}
+
+	var task MirrorTask
+	if err := tx.NewSelect().
+		Model(&task).
+		Where("mirror_task.id = ?", taskID).
+		For("UPDATE OF mirror_task").
+		Scan(ctx); err != nil {
+		return MirrorTask{}, err
+	}
+	if task.MirrorID != mirror.ID {
+		return MirrorTask{}, fmt.Errorf(
+			"mirror task relation changed, task mirror_id: %d, locked mirror_id: %d",
+			task.MirrorID,
+			mirror.ID,
+		)
+	}
+
+	mirror.Repository = &repo
+	task.Mirror = &mirror
+	return task, nil
+}
+
+// updateMirrorTaskStateTx applies one FSM transition and keeps task, mirror, and repository status consistent.
+func updateMirrorTaskStateTx(ctx context.Context, tx bun.Tx, task MirrorTask, statusAction string) (MirrorTask, error) {
+	current, err := lockMirrorTaskAggregateTx(ctx, tx, task.ID)
+	if err != nil {
 		return task, err
 	}
-	if task.Mirror != nil && task.Mirror.Repository != nil && task.Mirror.Repository.ID == mirror.RepositoryID {
-		mirror.Repository = task.Mirror.Repository
-	} else {
-		var repo Repository
-		if err := tx.NewSelect().
-			Model(&repo).
-			Where("id = ?", mirror.RepositoryID).
-			Scan(ctx); err != nil {
-			return task, err
-		}
-		mirror.Repository = &repo
-	}
+
+	mirror := current.Mirror
 	if mirror.CurrentTaskID != 0 && mirror.CurrentTaskID != current.ID {
 		return task, fmt.Errorf("mirror current task changed, current_task_id: %d, task_id: %d", mirror.CurrentTaskID, current.ID)
 	}
-	current.Mirror = &mirror
+
+	// Pause is idempotent when the current task is no longer running.
+	if statusAction == MirrorPause && !isMirrorTaskRunningStatus(current.Status) {
+		return current, nil
+	}
 
 	tFSM := NewMirrorTaskWithFSM(&current)
 	if !tFSM.SubmitEvent(ctx, statusAction) {
@@ -758,9 +801,6 @@ func updateMirrorTaskStateTx(ctx context.Context, tx bun.Tx, task MirrorTask, st
 		return task, err
 	}
 
-	if current.Mirror == nil {
-		return task, fmt.Errorf("mirror task %d has no mirror relation", current.ID)
-	}
 	if err := updateMirrorAndRepoStateTx(ctx, tx, *current.Mirror, current.ID, current.Status); err != nil {
 		return task, err
 	}
@@ -773,7 +813,7 @@ func updateMirrorTaskStateTx(ctx context.Context, tx bun.Tx, task MirrorTask, st
 // shouldClearMirrorTaskError reports whether a non-error transition should drop stale errors.
 func shouldClearMirrorTaskError(statusAction string) bool {
 	switch statusAction {
-	case MirrorContinue, MirrorRetry, MirrorSuccess, MirrorNoLfsToSync:
+	case MirrorContinue, MirrorRetry, MirrorPause, MirrorSuccess, MirrorNoLfsToSync:
 		return true
 	default:
 		return false
@@ -786,19 +826,19 @@ func updateMirrorAndRepoStateTx(ctx context.Context, tx bun.Tx, mirror Mirror, t
 	if !ok {
 		return fmt.Errorf("mirror task status %s has no repository sync status", status)
 	}
-	if _, err := tx.NewUpdate().
-		Model(&Repository{}).
-		Set("sync_status = ?", syncStatus).
-		Where("id = ?", mirror.RepositoryID).
-		Exec(ctx); err != nil {
-		return err
-	}
 
 	if _, err := tx.NewUpdate().
 		Model(&Mirror{}).
 		Set("status = ?", status).
 		Set("current_task_id = ?", taskID).
 		Where("id = ?", mirror.ID).
+		Exec(ctx); err != nil {
+		return err
+	}
+	if _, err := tx.NewUpdate().
+		Model(&Repository{}).
+		Set("sync_status = ?", syncStatus).
+		Where("id = ?", mirror.RepositoryID).
 		Exec(ctx); err != nil {
 		return err
 	}

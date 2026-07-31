@@ -328,7 +328,7 @@ func (s *mirrorStoreImpl) Delete(ctx context.Context, mirror *Mirror) (err error
 	return nil
 }
 
-// DeleteWithTaskCancelTx cancels all workhub jobs for a mirror and deletes its mirror data atomically.
+// DeleteWithTaskCancelTx cancels the current workhub job and deletes the mirror and its task history atomically.
 func (s *mirrorStoreImpl) DeleteWithTaskCancelTx(ctx context.Context, mirrorID int64, jobCancelClient MirrorJobCancelClient) (err error) {
 	err = s.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		var mirror Mirror
@@ -340,22 +340,33 @@ func (s *mirrorStoreImpl) DeleteWithTaskCancelTx(ctx context.Context, mirrorID i
 			return err
 		}
 
-		var tasks []MirrorTask
-		if err := tx.NewSelect().
-			Model(&tasks).
-			Where("mirror_id = ?", mirror.ID).
-			For("UPDATE").
-			Scan(ctx); err != nil {
-			return err
-		}
-
-		for _, task := range tasks {
-			if err := cancelMirrorTaskJobsTx(ctx, tx.Tx, task, jobCancelClient); err != nil {
+		if mirror.RepositoryID != 0 {
+			var repo Repository
+			if err := tx.NewSelect().
+				Model(&repo).
+				Where("id = ?", mirror.RepositoryID).
+				For("UPDATE").
+				Scan(ctx); err != nil {
 				return err
 			}
+			mirror.Repository = &repo
 		}
 
-		if mirror.RepositoryID != 0 && shouldCancelRepoSyncOnMirrorDelete(mirror, tasks) {
+		var currentTask *MirrorTask
+		if mirror.CurrentTaskID != 0 {
+			var task MirrorTask
+			if err := tx.NewSelect().
+				Model(&task).
+				Where("mirror_task.id = ?", mirror.CurrentTaskID).
+				Where("mirror_task.mirror_id = ?", mirror.ID).
+				For("UPDATE OF mirror_task").
+				Scan(ctx); err != nil {
+				return err
+			}
+			currentTask = &task
+		}
+
+		if mirror.RepositoryID != 0 && shouldCancelRepoSyncOnMirrorDelete(mirror, currentTask) {
 			if err := updateRepoSyncStatus(ctx, tx, mirror.RepositoryID, types.SyncStatusCanceled); err != nil {
 				return err
 			}
@@ -366,6 +377,12 @@ func (s *mirrorStoreImpl) DeleteWithTaskCancelTx(ctx context.Context, mirrorID i
 			Where("mirror_id = ?", mirror.ID).
 			Exec(ctx); err != nil {
 			return err
+		}
+
+		if currentTask != nil {
+			if err := cancelMirrorTaskJobsTx(ctx, tx.Tx, *currentTask, jobCancelClient); err != nil {
+				return err
+			}
 		}
 
 		_, err := tx.NewDelete().
@@ -381,11 +398,10 @@ func (s *mirrorStoreImpl) DeleteWithTaskCancelTx(ctx context.Context, mirrorID i
 	return nil
 }
 
-func shouldCancelRepoSyncOnMirrorDelete(mirror Mirror, tasks []MirrorTask) bool {
-	for _, task := range tasks {
-		if task.Status != "" && !isMirrorTaskTerminalStatus(task.Status) {
-			return true
-		}
+// shouldCancelRepoSyncOnMirrorDelete reports whether deleting a mirror interrupts active synchronization.
+func shouldCancelRepoSyncOnMirrorDelete(mirror Mirror, currentTask *MirrorTask) bool {
+	if currentTask != nil && currentTask.Status != "" && !isMirrorTaskTerminalStatus(currentTask.Status) {
+		return true
 	}
 	return mirror.Status != "" && !isMirrorTaskTerminalStatus(mirror.Status)
 }
