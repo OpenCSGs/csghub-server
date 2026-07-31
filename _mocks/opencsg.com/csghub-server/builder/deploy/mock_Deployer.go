@@ -1052,6 +1052,65 @@ func (_c *MockDeployer_GetWorkflowLogsNonStream_Call) RunAndReturn(run func(cont
 	return _c
 }
 
+// InstanceLastLogs provides a mock function with given fields: ctx, dr
+func (_m *MockDeployer) InstanceLastLogs(ctx context.Context, dr commontypes.DeployRequest) (*loki.LokiQueryResponse, error) {
+	ret := _m.Called(ctx, dr)
+
+	if len(ret) == 0 {
+		panic("no return value specified for InstanceLastLogs")
+	}
+
+	var r0 *loki.LokiQueryResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, commontypes.DeployRequest) (*loki.LokiQueryResponse, error)); ok {
+		return rf(ctx, dr)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, commontypes.DeployRequest) *loki.LokiQueryResponse); ok {
+		r0 = rf(ctx, dr)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*loki.LokiQueryResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, commontypes.DeployRequest) error); ok {
+		r1 = rf(ctx, dr)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockDeployer_InstanceLastLogs_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'InstanceLastLogs'
+type MockDeployer_InstanceLastLogs_Call struct {
+	*mock.Call
+}
+
+// InstanceLastLogs is a helper method to define mock.On call
+//   - ctx context.Context
+//   - dr commontypes.DeployRequest
+func (_e *MockDeployer_Expecter) InstanceLastLogs(ctx interface{}, dr interface{}) *MockDeployer_InstanceLastLogs_Call {
+	return &MockDeployer_InstanceLastLogs_Call{Call: _e.mock.On("InstanceLastLogs", ctx, dr)}
+}
+
+func (_c *MockDeployer_InstanceLastLogs_Call) Run(run func(ctx context.Context, dr commontypes.DeployRequest)) *MockDeployer_InstanceLastLogs_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(commontypes.DeployRequest))
+	})
+	return _c
+}
+
+func (_c *MockDeployer_InstanceLastLogs_Call) Return(_a0 *loki.LokiQueryResponse, _a1 error) *MockDeployer_InstanceLastLogs_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockDeployer_InstanceLastLogs_Call) RunAndReturn(run func(context.Context, commontypes.DeployRequest) (*loki.LokiQueryResponse, error)) *MockDeployer_InstanceLastLogs_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // InstanceLogs provides a mock function with given fields: ctx, dr
 func (_m *MockDeployer) InstanceLogs(ctx context.Context, dr commontypes.DeployRequest) (*deploy.MultiLogReader, error) {
 	ret := _m.Called(ctx, dr)

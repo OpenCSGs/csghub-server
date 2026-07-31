@@ -133,6 +133,65 @@ func (_c *MockClient_Query_Call) RunAndReturn(run func(context.Context, string, 
 	return _c
 }
 
+// QueryLast provides a mock function with given fields: ctx, params
+func (_m *MockClient) QueryLast(ctx context.Context, params loki.QueryLastParams) (*loki.LokiQueryResponse, error) {
+	ret := _m.Called(ctx, params)
+
+	if len(ret) == 0 {
+		panic("no return value specified for QueryLast")
+	}
+
+	var r0 *loki.LokiQueryResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, loki.QueryLastParams) (*loki.LokiQueryResponse, error)); ok {
+		return rf(ctx, params)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, loki.QueryLastParams) *loki.LokiQueryResponse); ok {
+		r0 = rf(ctx, params)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*loki.LokiQueryResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, loki.QueryLastParams) error); ok {
+		r1 = rf(ctx, params)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockClient_QueryLast_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'QueryLast'
+type MockClient_QueryLast_Call struct {
+	*mock.Call
+}
+
+// QueryLast is a helper method to define mock.On call
+//   - ctx context.Context
+//   - params loki.QueryLastParams
+func (_e *MockClient_Expecter) QueryLast(ctx interface{}, params interface{}) *MockClient_QueryLast_Call {
+	return &MockClient_QueryLast_Call{Call: _e.mock.On("QueryLast", ctx, params)}
+}
+
+func (_c *MockClient_QueryLast_Call) Run(run func(ctx context.Context, params loki.QueryLastParams)) *MockClient_QueryLast_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(loki.QueryLastParams))
+	})
+	return _c
+}
+
+func (_c *MockClient_QueryLast_Call) Return(_a0 *loki.LokiQueryResponse, _a1 error) *MockClient_QueryLast_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockClient_QueryLast_Call) RunAndReturn(run func(context.Context, loki.QueryLastParams) (*loki.LokiQueryResponse, error)) *MockClient_QueryLast_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // QueryRange provides a mock function with given fields: ctx, params
 func (_m *MockClient) QueryRange(ctx context.Context, params loki.QueryRangeParams) (*loki.LokiQueryResponse, error) {
 	ret := _m.Called(ctx, params)

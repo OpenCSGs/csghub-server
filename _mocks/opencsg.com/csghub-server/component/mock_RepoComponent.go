@@ -16,6 +16,8 @@ import (
 
 	io "io"
 
+	loki "opencsg.com/csghub-server/builder/loki"
+
 	membership "opencsg.com/csghub-server/builder/git/membership"
 
 	mock "github.com/stretchr/testify/mock"
@@ -1662,6 +1664,65 @@ func (_c *MockRepoComponent_DeployDetail_Call) Return(_a0 *types.DeployRequest, 
 }
 
 func (_c *MockRepoComponent_DeployDetail_Call) RunAndReturn(run func(context.Context, types.DeployActReq) (*types.DeployRequest, error)) *MockRepoComponent_DeployDetail_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// DeployInstanceLastLogs provides a mock function with given fields: ctx, logReq
+func (_m *MockRepoComponent) DeployInstanceLastLogs(ctx context.Context, logReq types.DeployActReq) (*loki.LokiStream, error) {
+	ret := _m.Called(ctx, logReq)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeployInstanceLastLogs")
+	}
+
+	var r0 *loki.LokiStream
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.DeployActReq) (*loki.LokiStream, error)); ok {
+		return rf(ctx, logReq)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.DeployActReq) *loki.LokiStream); ok {
+		r0 = rf(ctx, logReq)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*loki.LokiStream)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.DeployActReq) error); ok {
+		r1 = rf(ctx, logReq)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockRepoComponent_DeployInstanceLastLogs_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeployInstanceLastLogs'
+type MockRepoComponent_DeployInstanceLastLogs_Call struct {
+	*mock.Call
+}
+
+// DeployInstanceLastLogs is a helper method to define mock.On call
+//   - ctx context.Context
+//   - logReq types.DeployActReq
+func (_e *MockRepoComponent_Expecter) DeployInstanceLastLogs(ctx interface{}, logReq interface{}) *MockRepoComponent_DeployInstanceLastLogs_Call {
+	return &MockRepoComponent_DeployInstanceLastLogs_Call{Call: _e.mock.On("DeployInstanceLastLogs", ctx, logReq)}
+}
+
+func (_c *MockRepoComponent_DeployInstanceLastLogs_Call) Run(run func(ctx context.Context, logReq types.DeployActReq)) *MockRepoComponent_DeployInstanceLastLogs_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.DeployActReq))
+	})
+	return _c
+}
+
+func (_c *MockRepoComponent_DeployInstanceLastLogs_Call) Return(_a0 *loki.LokiStream, _a1 error) *MockRepoComponent_DeployInstanceLastLogs_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockRepoComponent_DeployInstanceLastLogs_Call) RunAndReturn(run func(context.Context, types.DeployActReq) (*loki.LokiStream, error)) *MockRepoComponent_DeployInstanceLastLogs_Call {
 	_c.Call.Return(run)
 	return _c
 }

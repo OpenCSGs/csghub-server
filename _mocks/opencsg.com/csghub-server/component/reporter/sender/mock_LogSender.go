@@ -174,6 +174,65 @@ func (_c *MockLogSender_Health_Call) RunAndReturn(run func(context.Context) erro
 	return _c
 }
 
+// QueryLast provides a mock function with given fields: ctx, params
+func (_m *MockLogSender) QueryLast(ctx context.Context, params loki.QueryLastParams) (*loki.LokiQueryResponse, error) {
+	ret := _m.Called(ctx, params)
+
+	if len(ret) == 0 {
+		panic("no return value specified for QueryLast")
+	}
+
+	var r0 *loki.LokiQueryResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, loki.QueryLastParams) (*loki.LokiQueryResponse, error)); ok {
+		return rf(ctx, params)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, loki.QueryLastParams) *loki.LokiQueryResponse); ok {
+		r0 = rf(ctx, params)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*loki.LokiQueryResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, loki.QueryLastParams) error); ok {
+		r1 = rf(ctx, params)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockLogSender_QueryLast_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'QueryLast'
+type MockLogSender_QueryLast_Call struct {
+	*mock.Call
+}
+
+// QueryLast is a helper method to define mock.On call
+//   - ctx context.Context
+//   - params loki.QueryLastParams
+func (_e *MockLogSender_Expecter) QueryLast(ctx interface{}, params interface{}) *MockLogSender_QueryLast_Call {
+	return &MockLogSender_QueryLast_Call{Call: _e.mock.On("QueryLast", ctx, params)}
+}
+
+func (_c *MockLogSender_QueryLast_Call) Run(run func(ctx context.Context, params loki.QueryLastParams)) *MockLogSender_QueryLast_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(loki.QueryLastParams))
+	})
+	return _c
+}
+
+func (_c *MockLogSender_QueryLast_Call) Return(_a0 *loki.LokiQueryResponse, _a1 error) *MockLogSender_QueryLast_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockLogSender_QueryLast_Call) RunAndReturn(run func(context.Context, loki.QueryLastParams) (*loki.LokiQueryResponse, error)) *MockLogSender_QueryLast_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // QueryRange provides a mock function with given fields: ctx, params
 func (_m *MockLogSender) QueryRange(ctx context.Context, params loki.QueryRangeParams) (*loki.LokiQueryResponse, error) {
 	ret := _m.Called(ctx, params)
@@ -280,9 +339,9 @@ func (_c *MockLogSender_SendLogs_Call) RunAndReturn(run func(context.Context, []
 	return _c
 }
 
-// StreamAllLogs provides a mock function with given fields: ctx, id, start, lables, timeLoc
-func (_m *MockLogSender) StreamAllLogs(ctx context.Context, id string, start time.Time, lables map[string]string, timeLoc *time.Location) (chan string, error) {
-	ret := _m.Called(ctx, id, start, lables, timeLoc)
+// StreamAllLogs provides a mock function with given fields: ctx, id, start, lables, timeLoc, limit
+func (_m *MockLogSender) StreamAllLogs(ctx context.Context, id string, start time.Time, lables map[string]string, timeLoc *time.Location, limit int) (chan string, error) {
+	ret := _m.Called(ctx, id, start, lables, timeLoc, limit)
 
 	if len(ret) == 0 {
 		panic("no return value specified for StreamAllLogs")
@@ -290,19 +349,19 @@ func (_m *MockLogSender) StreamAllLogs(ctx context.Context, id string, start tim
 
 	var r0 chan string
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, time.Time, map[string]string, *time.Location) (chan string, error)); ok {
-		return rf(ctx, id, start, lables, timeLoc)
+	if rf, ok := ret.Get(0).(func(context.Context, string, time.Time, map[string]string, *time.Location, int) (chan string, error)); ok {
+		return rf(ctx, id, start, lables, timeLoc, limit)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, time.Time, map[string]string, *time.Location) chan string); ok {
-		r0 = rf(ctx, id, start, lables, timeLoc)
+	if rf, ok := ret.Get(0).(func(context.Context, string, time.Time, map[string]string, *time.Location, int) chan string); ok {
+		r0 = rf(ctx, id, start, lables, timeLoc, limit)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(chan string)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, time.Time, map[string]string, *time.Location) error); ok {
-		r1 = rf(ctx, id, start, lables, timeLoc)
+	if rf, ok := ret.Get(1).(func(context.Context, string, time.Time, map[string]string, *time.Location, int) error); ok {
+		r1 = rf(ctx, id, start, lables, timeLoc, limit)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -321,13 +380,14 @@ type MockLogSender_StreamAllLogs_Call struct {
 //   - start time.Time
 //   - lables map[string]string
 //   - timeLoc *time.Location
-func (_e *MockLogSender_Expecter) StreamAllLogs(ctx interface{}, id interface{}, start interface{}, lables interface{}, timeLoc interface{}) *MockLogSender_StreamAllLogs_Call {
-	return &MockLogSender_StreamAllLogs_Call{Call: _e.mock.On("StreamAllLogs", ctx, id, start, lables, timeLoc)}
+//   - limit int
+func (_e *MockLogSender_Expecter) StreamAllLogs(ctx interface{}, id interface{}, start interface{}, lables interface{}, timeLoc interface{}, limit interface{}) *MockLogSender_StreamAllLogs_Call {
+	return &MockLogSender_StreamAllLogs_Call{Call: _e.mock.On("StreamAllLogs", ctx, id, start, lables, timeLoc, limit)}
 }
 
-func (_c *MockLogSender_StreamAllLogs_Call) Run(run func(ctx context.Context, id string, start time.Time, lables map[string]string, timeLoc *time.Location)) *MockLogSender_StreamAllLogs_Call {
+func (_c *MockLogSender_StreamAllLogs_Call) Run(run func(ctx context.Context, id string, start time.Time, lables map[string]string, timeLoc *time.Location, limit int)) *MockLogSender_StreamAllLogs_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(time.Time), args[3].(map[string]string), args[4].(*time.Location))
+		run(args[0].(context.Context), args[1].(string), args[2].(time.Time), args[3].(map[string]string), args[4].(*time.Location), args[5].(int))
 	})
 	return _c
 }
@@ -337,7 +397,7 @@ func (_c *MockLogSender_StreamAllLogs_Call) Return(_a0 chan string, _a1 error) *
 	return _c
 }
 
-func (_c *MockLogSender_StreamAllLogs_Call) RunAndReturn(run func(context.Context, string, time.Time, map[string]string, *time.Location) (chan string, error)) *MockLogSender_StreamAllLogs_Call {
+func (_c *MockLogSender_StreamAllLogs_Call) RunAndReturn(run func(context.Context, string, time.Time, map[string]string, *time.Location, int) (chan string, error)) *MockLogSender_StreamAllLogs_Call {
 	_c.Call.Return(run)
 	return _c
 }

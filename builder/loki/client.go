@@ -19,6 +19,7 @@ type Client interface {
 	Push(ctx context.Context, req *LokiPushRequest) error
 	Query(ctx context.Context, query string, limit int, start time.Time, direction string) (*LokiQueryResponse, error)
 	QueryRange(ctx context.Context, params QueryRangeParams) (*LokiQueryResponse, error)
+	QueryLast(ctx context.Context, params QueryLastParams) (*LokiQueryResponse, error)
 	Tail(ctx context.Context, query string, start time.Time, limit int) (<-chan *LokiPushRequest, error)
 	Ready(ctx context.Context) error
 	// SetTimeout dynamically adjusts the HTTP client timeout for all subsequent
@@ -109,6 +110,44 @@ func (c *client) Query(ctx context.Context, query string, limit int, start time.
 	var queryResponse LokiQueryResponse
 	if err := json.NewDecoder(resp.Body).Decode(&queryResponse); err != nil {
 		return nil, fmt.Errorf("failed to decode Loki query response: %w", err)
+	}
+
+	return &queryResponse, nil
+}
+
+func (c *client) QueryLast(ctx context.Context, params QueryLastParams) (*LokiQueryResponse, error) {
+	urlParams := url.Values{}
+	urlParams.Add("query", params.Query)
+	if params.Limit > 0 {
+		urlParams.Add("limit", fmt.Sprintf("%d", params.Limit))
+	}
+	if params.Since > 0 {
+		urlParams.Add("since", params.Since.String())
+	}
+	if params.Direction != "" {
+		urlParams.Add("direction", params.Direction)
+	}
+	slog.Info("query_range_last", slog.Any("params", params))
+	queryURL := fmt.Sprintf("%s/loki/api/v1/query_range?%s", c.url, urlParams.Encode())
+	req, err := http.NewRequestWithContext(ctx, "GET", queryURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create query_last request: %w", err)
+	}
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send query_last to Loki: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("loki query_last failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var queryResponse LokiQueryResponse
+	if err := json.NewDecoder(resp.Body).Decode(&queryResponse); err != nil {
+		return nil, fmt.Errorf("failed to decode Loki query_last response: %w", err)
 	}
 
 	return &queryResponse, nil

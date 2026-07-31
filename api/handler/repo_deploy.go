@@ -8,7 +8,6 @@ import (
 	"strconv"
 	"time"
 
-
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/common/errorx"
@@ -861,7 +860,7 @@ func (h *RepoHandler) ServerlessDetail(ctx *gin.Context) {
 
 // GetServerlessLogs   godoc
 // @Security     ApiKey
-// @Summary      get serverless logs
+// @Summary      get serverless stream logs
 // @Tags         Model
 // @Accept       json
 // @Produce      json
@@ -869,12 +868,12 @@ func (h *RepoHandler) ServerlessDetail(ctx *gin.Context) {
 // @Param        namespace path string true "namespace"
 // @Param        name path string true "name"
 // @Param        id path string true "id"
-// @Param        instance path string true "instance"
 // @Param        current_user query string true "current_user"
+// @Param        limit query int false "max number of log lines to return" default(50)
 // @Param        since query string false "since time. Optional values: 10mins, 30mins, 1hour, 6hours, 1day, 2days, 1week"
 // @Failure      400  {object}  types.APIBadRequest "Bad request. May occur when the since time format is unsupported"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /models/{namespace}/{name}/serverless/{id}/logs/{instance} [get]
+// @Router       /models/{namespace}/{name}/serverless/{id}/logs [get]
 func (h *RepoHandler) ServerlessLogs(ctx *gin.Context) {
 	if ctx.Query("test") == "true" {
 		h.testLogs(ctx)
@@ -896,6 +895,16 @@ func (h *RepoHandler) ServerlessLogs(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
+
+	limit := 0
+	if limitStr := ctx.Query("limit"); limitStr != "" {
+		limit, err = strconv.Atoi(limitStr)
+		if err != nil || limit <= 0 {
+			httpbase.BadRequest(ctx, "limit must be a positive integer")
+			return
+		}
+	}
+
 	instance := ctx.Query("instance")
 	ctx.Writer.Header().Set("Content-Type", "text/event-stream")
 	ctx.Writer.Header().Set("Cache-Control", "no-cache")
@@ -911,6 +920,7 @@ func (h *RepoHandler) ServerlessLogs(ctx *gin.Context) {
 		DeployType:   types.ServerlessType,
 		InstanceName: instance,
 		Since:        ctx.Query("since"),
+		Limit:        limit,
 	}
 
 	// user http request context instead of gin context, so that server knows the life cycle of the request
@@ -957,6 +967,85 @@ func (h *RepoHandler) ServerlessLogs(ctx *gin.Context) {
 			time.Sleep(time.Second * 1)
 		}
 	}
+}
+
+// GetServerlessLastLogs   godoc
+// @Security     ApiKey
+// @Summary      get serverless last logs in number of lines
+// @Tags         Model
+// @Accept       json
+// @Produce      json
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Param        id path string true "id"
+// @Param        instance query string true "instance"
+// @Param        limit query int false "max number of log lines to return" default(50)
+// @Param        since query string false "since time. Optional values: 1hour, 1day, 1week"
+// @Success      200  {object}  loki.LokiQueryResponse
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      401  {object}  types.APIUnauthorized "Permission denied"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /models/{namespace}/{name}/serverless/{id}/logs/last [get]
+func (h *RepoHandler) ServerlessLastLogs(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.ErrorContext(ctx.Request.Context(), "failed to get namespace and name from context", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	deployID, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
+	if err != nil {
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	instance := ctx.Query("instance")
+
+	limit := 50
+	if limitStr := ctx.Query("limit"); limitStr != "" {
+		limit, err = strconv.Atoi(limitStr)
+		if err != nil || limit <= 0 {
+			httpbase.BadRequest(ctx, "limit must be a positive integer")
+			return
+		}
+	}
+
+	since := ctx.Query("since")
+	if len(since) < 1 {
+		since = "1day"
+	}
+
+	logReq := types.DeployActReq{
+		RepoType:     types.ModelRepo,
+		Namespace:    namespace,
+		Name:         name,
+		CurrentUser:  currentUser,
+		DeployID:     deployID,
+		DeployType:   types.ServerlessType,
+		InstanceName: instance,
+		Since:        since,
+		Limit:        limit,
+	}
+
+	resp, err := h.c.DeployInstanceLastLogs(ctx.Request.Context(), logReq)
+	if err != nil {
+		if errors.Is(err, errorx.ErrForbidden) {
+			slog.ErrorContext(ctx.Request.Context(), "user not allowed to get serverless deploy last logs",
+				slog.Any("logReq", logReq), slog.Any("error", err))
+			httpbase.ForbiddenError(ctx, err)
+			return
+		}
+
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get serverless deploy last logs",
+			slog.Any("logReq", logReq), slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	httpbase.OK(ctx, resp)
 }
 
 // GetServerlessStatus   godoc
