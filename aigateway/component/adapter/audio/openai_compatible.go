@@ -21,5 +21,5 @@ func (a *OpenAICompatibleAdapter) CanHandle(model *types.Model) bool {
 }
 
 func (a *OpenAICompatibleAdapter) DurationFromHeader(header http.Header) (float64, bool) {
-	return 0, false
+	return parseDurationHeader(header)
 }

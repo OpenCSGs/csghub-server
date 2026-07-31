@@ -11,6 +11,8 @@ RUN sed -i 's|http://archive.ubuntu.com/ubuntu|http://mirrors.aliyun.com/ubuntu|
 RUN mkdir -p /var/log/supervisord
 COPY ./supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 COPY ./vllm/ /etc/csghub/
+# Add Audio-Duration-Seconds to successful /v1/audio/transcriptions responses.
+RUN python3 /etc/csghub/patch_audio_duration_header.py
 RUN chmod +x /etc/csghub/*.sh
 RUN chmod +x /vllm-workspace/examples/ray_serving/*.sh
 
