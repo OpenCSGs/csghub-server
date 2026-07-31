@@ -280,6 +280,7 @@ type DeployRequest struct {
 	OwnerNamespace      string     `json:"owner_namespace,omitempty"`
 
 	Since    string `json:"since,omitempty"`
+	Limit    int    `json:"limit,omitempty"`
 	CommitID string `json:"commit_id,omitempty"`
 	Instance string `json:"instance,omitempty"`
 
@@ -432,6 +433,7 @@ type ReadLogRequest struct {
 	EndTime      time.Time         `json:"end_time"`
 	Labels       map[string]string `json:"labels"`
 	InstanceName string            `json:"instance_name"`
+	Limit        int               `json:"limit"`
 }
 
 type CreateForkReq struct {

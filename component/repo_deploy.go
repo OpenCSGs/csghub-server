@@ -17,6 +17,7 @@ import (
 	"github.com/hashicorp/go-version"
 	"opencsg.com/csghub-server/builder/deploy"
 	deployStatus "opencsg.com/csghub-server/builder/deploy/common"
+	"opencsg.com/csghub-server/builder/loki"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
@@ -679,7 +680,63 @@ func (c *repoComponentImpl) DeployInstanceLogs(ctx context.Context, logReq types
 		InstanceName: logReq.InstanceName,
 		Since:        logReq.Since,
 		CommitID:     logReq.CommitID,
+		Limit:        logReq.Limit,
 	})
+}
+
+func (c *repoComponentImpl) DeployInstanceLastLogs(ctx context.Context, logReq types.DeployActReq) (*loki.LokiStream, error) {
+	var (
+		deploy *database.Deploy
+		err    error
+	)
+	if logReq.DeployType == types.ServerlessType {
+		_, deploy, err = c.checkDeployPermissionForServerless(ctx, logReq)
+	} else {
+		_, deploy, err = c.CheckDeployPermissionForUser(ctx, logReq)
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	lokiResp, err := c.deployer.InstanceLastLogs(ctx, types.DeployRequest{
+		DeployID:     deploy.ID,
+		SpaceID:      deploy.SpaceID,
+		ModelID:      deploy.ModelID,
+		Namespace:    logReq.Namespace,
+		Name:         logReq.Name,
+		ClusterID:    deploy.ClusterID,
+		SvcName:      deploy.SvcName,
+		InstanceName: logReq.InstanceName,
+		Since:        logReq.Since,
+		Limit:        logReq.Limit,
+		CommitID:     logReq.CommitID,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	var mergedValues [][]string
+	for _, stream := range lokiResp.Data.Result {
+		mergedValues = append(mergedValues, stream.Values...)
+	}
+
+	slices.SortFunc(mergedValues, func(a, b []string) int {
+		aTs, err1 := strconv.ParseInt(a[0], 10, 64)
+		bTs, err2 := strconv.ParseInt(b[0], 10, 64)
+		if err1 != nil || err2 != nil {
+			slog.WarnContext(ctx, "parse timestamp failed in query instance log",
+				slog.Any("err", err1), slog.Any("err2", err2))
+		}
+		return int(aTs - bTs)
+	})
+
+	return &loki.LokiStream{
+		Stream: map[string]string{
+			"count": fmt.Sprintf("%d", len(mergedValues)),
+		},
+		Values: mergedValues,
+	}, nil
 }
 
 // common check function for apiserver and rproxy

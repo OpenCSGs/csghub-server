@@ -298,10 +298,11 @@ func (c *lokiClient) StreamAllLogs(
 	id string,
 	start time.Time,
 	labels map[string]string,
-	timeLoc *time.Location) (chan string, error) {
+	timeLoc *time.Location,
+	limit int) (chan string, error) {
 	labels[types.StreamKeyDeployID] = id
 	query := c.GenerateLabelQuery(labels)
-	lokiCh, err := c.lokiClient.Tail(ctx, query, start, loki.MaxLimit)
+	lokiCh, err := c.lokiClient.Tail(ctx, query, start, limit)
 	if err != nil {
 		return nil, fmt.Errorf("failed to tail logs from loki: %w", err)
 	}
@@ -350,4 +351,12 @@ func (c *lokiClient) GenerateLabelQuery(labels map[string]string) string {
 	queryBuilder.WriteString("}")
 	query := queryBuilder.String()
 	return query
+}
+
+func (c *lokiClient) QueryLast(ctx context.Context, params loki.QueryLastParams) (*loki.LokiQueryResponse, error) {
+	queryTimeout := time.Duration(c.queryLastReportTimeout) * time.Second
+	c.lokiClient.SetTimeout(queryTimeout)
+	defer c.lokiClient.SetTimeout(loki.DefaultTimeout)
+
+	return c.lokiClient.QueryLast(ctx, params)
 }

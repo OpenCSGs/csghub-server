@@ -73,6 +73,8 @@ const (
 
 	StreamKeyInstanceName   = "pod_name"
 	StreamKeyDeployCommitID = "csghub_deploy_commit_id"
+
+	LogLabelCategoryKey = "category"
 )
 
 // MaxLabelCount is the maximum number of labels allowed in Loki.

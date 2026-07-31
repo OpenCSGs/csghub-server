@@ -132,6 +132,52 @@ func TestClient_QueryRange(t *testing.T) {
 	assert.Len(t, resp.Data.Result, 1)
 }
 
+func TestClient_QueryLast(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/loki/api/v1/query_range", r.URL.Path)
+		assert.Equal(t, "GET", r.Method)
+		assert.Equal(t, `{app="test-app"}`, r.URL.Query().Get("query"))
+		assert.Equal(t, "50", r.URL.Query().Get("limit"))
+		assert.Equal(t, "168h0m0s", r.URL.Query().Get("since"))
+		assert.Equal(t, "backward", r.URL.Query().Get("direction"))
+
+		resp := &LokiQueryResponse{
+			Status: "success",
+			Data: struct {
+				ResultType string       `json:"resultType"`
+				Result     []LokiStream `json:"result"`
+			}{
+				ResultType: "streams",
+				Result: []LokiStream{
+					{
+						Stream: map[string]string{"app": "test-app"},
+						Values: [][]string{{fmt.Sprintf("%d", time.Now().UnixNano()), "log message"}},
+					},
+				},
+			},
+		}
+		err := json.NewEncoder(w).Encode(resp)
+		require.NoError(t, err)
+	}))
+	defer server.Close()
+
+	client, err := NewClient(server.URL)
+	require.NoError(t, err)
+
+	params := QueryLastParams{
+		Query:     `{app="test-app"}`,
+		Limit:     50,
+		Since:     7 * 24 * time.Hour,
+		Direction: "backward",
+	}
+
+	resp, err := client.QueryLast(context.Background(), params)
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	assert.Equal(t, "success", resp.Status)
+	assert.Len(t, resp.Data.Result, 1)
+}
+
 func TestClient_Ready(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "/ready", r.URL.Path)

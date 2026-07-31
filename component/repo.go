@@ -34,6 +34,7 @@ import (
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/git/gitserver/gitaly"
 	"opencsg.com/csghub-server/builder/git/membership"
+	"opencsg.com/csghub-server/builder/loki"
 	"opencsg.com/csghub-server/builder/multisync"
 	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
@@ -156,6 +157,7 @@ type RepoComponent interface {
 	DeleteDeploy(ctx context.Context, delReq types.DeployActReq) error
 	DeployDetail(ctx context.Context, detailReq types.DeployActReq) (*types.DeployRequest, error)
 	DeployInstanceLogs(ctx context.Context, logReq types.DeployActReq) (*deploy.MultiLogReader, error)
+	DeployInstanceLastLogs(ctx context.Context, logReq types.DeployActReq) (*loki.LokiStream, error)
 	// check access repo permission by repo id
 	AllowAccessByRepoID(ctx context.Context, repoID int64, username string) (bool, error)
 	// check access endpoint for rproxy

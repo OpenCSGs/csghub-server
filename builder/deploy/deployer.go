@@ -46,6 +46,7 @@ type Deployer interface {
 	Exist(ctx context.Context, dr types.DeployRequest) (bool, error)
 	GetReplica(ctx context.Context, dr types.DeployRequest) (int, int, []types.Instance, error)
 	InstanceLogs(ctx context.Context, dr types.DeployRequest) (*MultiLogReader, error)
+	InstanceLastLogs(ctx context.Context, dr types.DeployRequest) (*loki.LokiQueryResponse, error)
 	ListCluster(ctx context.Context) ([]types.ClusterRes, error)
 	GetClusterById(ctx context.Context, clusterId string) (*types.ClusterRes, error)
 	UpdateCluster(ctx context.Context, data types.ClusterRequest) (*types.UpdateClusterResponse, error)
@@ -363,7 +364,10 @@ func (d *deployer) Logs(ctx context.Context, dr types.DeployRequest) (*MultiLogR
 }
 
 func (d *deployer) readLogsFromLoki(ctx context.Context, params types.ReadLogRequest) (<-chan string, error) {
-	log, err := d.lokiClient.StreamAllLogs(ctx, params.DeployID, params.StartTime, params.Labels, params.TimeLoc)
+	if params.Limit < 1 {
+		params.Limit = loki.MaxLimit
+	}
+	log, err := d.lokiClient.StreamAllLogs(ctx, params.DeployID, params.StartTime, params.Labels, params.TimeLoc, params.Limit)
 	if err != nil {
 		return nil, err
 	}
@@ -577,32 +581,34 @@ func (d *deployer) GetReplica(ctx context.Context, dr types.DeployRequest) (int,
 }
 
 func parseSinceTime(since string) time.Time {
+	return time.Now().Add(-parseSinceDuration(since))
+}
+
+func parseSinceDuration(since string) time.Duration {
 	switch since {
 	case "10mins":
-		return time.Now().Add(-10 * time.Minute)
+		return 10 * time.Minute
 	case "30mins":
-		return time.Now().Add(-30 * time.Minute)
+		return 30 * time.Minute
 	case "1hour":
-		return time.Now().Add(-1 * time.Hour)
+		return 1 * time.Hour
 	case "6hours":
-		return time.Now().Add(-6 * time.Hour)
+		return 6 * time.Hour
 	case "1day":
-		return time.Now().Add(-24 * time.Hour)
+		return 24 * time.Hour
 	case "2days":
-		return time.Now().Add(-48 * time.Hour)
+		return 48 * time.Hour
 	case "1week":
-		return time.Now().Add(-7 * 24 * time.Hour)
+		return 7 * 24 * time.Hour
 	default:
-		return time.Now().Add(-10 * time.Minute)
+		return 10 * time.Minute
 	}
 }
 
 func (d *deployer) InstanceLogs(ctx context.Context, dr types.DeployRequest) (*MultiLogReader, error) {
-	slog.Debug("get logs for deploy", slog.Any("deploy", dr))
-
 	deploy, err := d.deployTaskStore.GetDeployByID(ctx, dr.DeployID)
 	if err != nil {
-		return nil, fmt.Errorf("can't get space delopyment,%w", err)
+		return nil, fmt.Errorf("can't get deployment %d error: %w", dr.DeployID, err)
 	}
 
 	labels := map[string]string{
@@ -628,13 +634,46 @@ func (d *deployer) InstanceLogs(ctx context.Context, dr types.DeployRequest) (*M
 		DeployID:  deployId,
 		StartTime: startTime,
 		Labels:    labels,
+		Limit:     dr.Limit,
 	})
 	if err != nil {
-		slog.Error("fail to get deploy logs", slog.Any("deploy", deploy), slog.Any("error", err))
+		slog.Error("failed to read deploy logs", slog.Any("deploy", deploy), slog.Any("error", err))
 		return nil, err
 	}
 
 	return NewMultiLogReader(nil, runLog), nil
+}
+
+func (d *deployer) InstanceLastLogs(ctx context.Context, dr types.DeployRequest) (*loki.LokiQueryResponse, error) {
+	deploy, err := d.deployTaskStore.GetDeployByID(ctx, dr.DeployID)
+	if err != nil {
+		return nil, fmt.Errorf("can't get deployment %d error: %w", dr.DeployID, err)
+	}
+
+	labels := map[string]string{
+		types.LogLabelTypeKey:   types.LogLabelDeploy,
+		types.StreamKeyDeployID: fmt.Sprintf("%d", deploy.ID),
+	}
+	if len(dr.CommitID) > 0 {
+		labels[types.StreamKeyDeployCommitID] = dr.CommitID
+	}
+	if len(dr.InstanceName) > 0 {
+		labels[types.StreamKeyInstanceName] = dr.InstanceName
+	}
+
+	labels[types.LogLabelCategoryKey] = string(types.LogCategoryContainer.String())
+
+	query := d.lokiClient.GenerateLabelQuery(labels)
+	limit := dr.Limit
+
+	params := loki.QueryLastParams{
+		Query:     query,
+		Limit:     limit,
+		Since:     parseSinceDuration(dr.Since),
+		Direction: "backward",
+	}
+
+	return d.lokiClient.QueryLast(ctx, params)
 }
 
 func (d *deployer) ListCluster(ctx context.Context) ([]types.ClusterRes, error) {
@@ -1211,7 +1250,6 @@ func (d *deployer) GetSharedModeResourceName(VXPUConfig map[string]string) strin
 	}
 	return resourceName
 }
-
 
 func (d *deployer) BatchStatus(ctx context.Context, req *runnerTypes.BatchStatusRequest) (*runnerTypes.BatchStatusResponse, error) {
 	return d.imageRunner.BatchStatus(ctx, req)

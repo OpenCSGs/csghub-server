@@ -498,7 +498,7 @@ func TestDeployer_Logs(t *testing.T) {
 			Return(tasks, nil)
 
 		ch := make(chan string)
-		sender.EXPECT().StreamAllLogs(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(ch, nil)
+		sender.EXPECT().StreamAllLogs(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, loki.MaxLimit).Return(ch, nil)
 		d := &deployer{
 			deployTaskStore: mockDeployTaskStore,
 			imageBuilder:    mockBuilder,
@@ -660,7 +660,7 @@ func TestDeployer_InstanceLogs(t *testing.T) {
 	sender := mockSender.NewMockLogSender(t)
 
 	ch := make(chan string)
-	sender.EXPECT().StreamAllLogs(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(ch, nil)
+	sender.EXPECT().StreamAllLogs(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, loki.MaxLimit).Return(ch, nil)
 	d := &deployer{
 		deployTaskStore: mockDeployTaskStore,
 		lokiClient:      sender,
@@ -1024,7 +1024,7 @@ func TestDeployer_GetWorkflowLogsInStream(t *testing.T) {
 	sender := mockSender.NewMockLogSender(t)
 
 	ch := make(chan string)
-	sender.EXPECT().StreamAllLogs(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(ch, nil)
+	sender.EXPECT().StreamAllLogs(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, loki.MaxLimit).Return(ch, nil)
 	d := &deployer{
 		deployTaskStore: mockDeployTaskStore,
 		lokiClient:      sender,
@@ -1341,10 +1341,10 @@ func TestDeployer_serverlessDeploy_PD(t *testing.T) {
 		}
 
 		dr := types.DeployRequest{
-			RepoID:           1,
-			Type:             types.InferenceType,
-			UserUUID:         "1",
-			SKU:              "1",
+			RepoID:   1,
+			Type:     types.InferenceType,
+			UserUUID: "1",
+			SKU:      "1",
 			DeployExtend: types.DeployExtend{
 				PD: pdConfig,
 			},

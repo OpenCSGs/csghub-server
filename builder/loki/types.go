@@ -20,7 +20,7 @@ type DroppedEntry struct {
 // LokiPushRequest represents the request body for Loki push API
 // Also used for tail API response which may include dropped_entries
 type LokiPushRequest struct {
-	Streams       []LokiStream    `json:"streams"`
+	Streams        []LokiStream   `json:"streams"`
 	DroppedEntries []DroppedEntry `json:"dropped_entries,omitempty"`
 }
 
@@ -42,5 +42,13 @@ type QueryRangeParams struct {
 	Since     time.Duration
 	Step      time.Duration
 	Interval  time.Duration
+	Direction string
+}
+
+// QueryLastParams holds the parameters for querying the last N log entries.
+type QueryLastParams struct {
+	Query     string
+	Limit     int
+	Since     time.Duration
 	Direction string
 }

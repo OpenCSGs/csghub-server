@@ -17,7 +17,8 @@ type LogSender interface {
 	// GetLastReportedTimestamp gets the timestamp of the last successfully sent log
 	GetLastReportedTimestamp(ctx context.Context) (time.Time, error)
 	// StreamAllLogs streams all logs from the backend
-	StreamAllLogs(ctx context.Context, id string, start time.Time, lables map[string]string, timeLoc *time.Location) (chan string, error)
+	StreamAllLogs(ctx context.Context, id string, start time.Time, lables map[string]string, timeLoc *time.Location, limit int) (chan string, error)
 	QueryRange(ctx context.Context, params loki.QueryRangeParams) (*loki.LokiQueryResponse, error)
 	GenerateLabelQuery(labels map[string]string) string
+	QueryLast(ctx context.Context, params loki.QueryLastParams) (*loki.LokiQueryResponse, error)
 }
