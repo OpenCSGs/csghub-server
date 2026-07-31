@@ -4,10 +4,12 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"github.com/uptrace/bun"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/tests"
 	"opencsg.com/csghub-server/common/types"
@@ -55,6 +57,33 @@ func (c *fakeMirrorJobCancelClient) JobCancelTx(ctx context.Context, tx *sql.Tx,
 	return c.err
 }
 
+// mirrorLockOrderHook records business rows locked with SELECT FOR UPDATE.
+type mirrorLockOrderHook struct {
+	tables []string
+}
+
+// BeforeQuery leaves the query context unchanged.
+func (h *mirrorLockOrderHook) BeforeQuery(ctx context.Context, _ *bun.QueryEvent) context.Context {
+	return ctx
+}
+
+// AfterQuery records the aggregate table locked by a SELECT FOR UPDATE statement.
+func (h *mirrorLockOrderHook) AfterQuery(_ context.Context, event *bun.QueryEvent) {
+	query := strings.ToLower(event.Query)
+	if !strings.Contains(query, "for update") {
+		return
+	}
+	switch {
+	case strings.Contains(query, `from "mirrors"`):
+		h.tables = append(h.tables, "mirror")
+	case strings.Contains(query, `from "repositories"`):
+		h.tables = append(h.tables, "repository")
+	case strings.Contains(query, `from "mirror_tasks"`):
+		h.tables = append(h.tables, "mirror_task")
+	}
+}
+
+// TestMirrorTaskStore_RequeueMirrorRepoTaskCreatesRepoJobInTx verifies requeue only cancels the current task job.
 func TestMirrorTaskStore_RequeueMirrorRepoTaskCreatesRepoJobInTx(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
@@ -95,7 +124,15 @@ func TestMirrorTaskStore_RequeueMirrorRepoTaskCreatesRepoJobInTx(t *testing.T) {
 		Exec(ctx)
 	require.Nil(t, err)
 
-	oldTask, err := taskStore.Create(ctx, database.MirrorTask{
+	historicalTask, err := taskStore.Create(ctx, database.MirrorTask{
+		MirrorID:  mirror.ID,
+		Status:    types.MirrorCanceled,
+		Priority:  types.LowMirrorPriority,
+		RepoJobID: 303,
+		LFSJobID:  404,
+	})
+	require.Nil(t, err)
+	currentTask, err := taskStore.Create(ctx, database.MirrorTask{
 		MirrorID:  mirror.ID,
 		Status:    types.MirrorLfsSyncStart,
 		Priority:  types.LowMirrorPriority,
@@ -105,12 +142,14 @@ func TestMirrorTaskStore_RequeueMirrorRepoTaskCreatesRepoJobInTx(t *testing.T) {
 	require.Nil(t, err)
 	_, err = db.Core.NewUpdate().
 		Model(&database.Mirror{}).
-		Set("current_task_id = ?", oldTask.ID).
+		Set("current_task_id = ?", currentTask.ID).
 		Where("id = ?", mirror.ID).
 		Exec(ctx)
 	require.Nil(t, err)
 	username := "new-user"
 	accessToken := "new-token"
+	lockHook := &mirrorLockOrderHook{}
+	db.BunDB.AddQueryHook(lockHook)
 
 	task, err := taskStore.RequeueMirrorRepoTask(ctx, database.RequeueMirrorRepoTaskInput{
 		MirrorID:        mirror.ID,
@@ -124,6 +163,7 @@ func TestMirrorTaskStore_RequeueMirrorRepoTaskCreatesRepoJobInTx(t *testing.T) {
 	})
 
 	require.Nil(t, err)
+	require.Equal(t, []string{"mirror", "repository", "mirror_task"}, lockHook.tables)
 	require.Equal(t, types.MirrorQueued, task.Status)
 	require.Equal(t, types.ASAPMirrorPriority, task.Priority)
 	require.Equal(t, int64(789), task.RepoJobID)
@@ -141,10 +181,15 @@ func TestMirrorTaskStore_RequeueMirrorRepoTaskCreatesRepoJobInTx(t *testing.T) {
 		Urgent:       true,
 	}, jobClient.inputs[0])
 
-	var storedOldTask database.MirrorTask
-	err = db.Core.NewSelect().Model(&storedOldTask).Where("id = ?", oldTask.ID).Scan(ctx)
+	var storedCurrentTask database.MirrorTask
+	err = db.Core.NewSelect().Model(&storedCurrentTask).Where("id = ?", currentTask.ID).Scan(ctx)
 	require.Nil(t, err)
-	require.Equal(t, types.MirrorCanceled, storedOldTask.Status)
+	require.Equal(t, types.MirrorCanceled, storedCurrentTask.Status)
+
+	var storedHistoricalTask database.MirrorTask
+	err = db.Core.NewSelect().Model(&storedHistoricalTask).Where("id = ?", historicalTask.ID).Scan(ctx)
+	require.Nil(t, err)
+	require.Equal(t, types.MirrorCanceled, storedHistoricalTask.Status)
 
 	var storedNewTask database.MirrorTask
 	err = db.Core.NewSelect().Model(&storedNewTask).Where("id = ?", task.ID).Scan(ctx)
@@ -317,6 +362,7 @@ func TestMirrorTaskStore_SetMirrorCurrentTaskID(t *testing.T) {
 	require.Equal(t, mt.ID, m.CurrentTaskID)
 }
 
+// TestMirrorTaskStore_UpdateStatusAndRepoSyncStatus verifies worker updates use the canonical aggregate lock order.
 func TestMirrorTaskStore_UpdateStatusAndRepoSyncStatus(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
@@ -355,8 +401,11 @@ func TestMirrorTaskStore_UpdateStatusAndRepoSyncStatus(t *testing.T) {
 	})
 	require.Nil(t, err)
 
+	lockHook := &mirrorLockOrderHook{}
+	db.BunDB.AddQueryHook(lockHook)
 	updatedTask, err := taskStore.UpdateStatusAndRepoSyncStatus(ctx, task, database.MirrorSuccess)
 	require.Nil(t, err)
+	require.Equal(t, []string{"mirror", "repository", "mirror_task"}, lockHook.tables)
 	require.Equal(t, types.MirrorRepoSyncFinished, updatedTask.Status)
 
 	var updatedRepo database.Repository
@@ -406,8 +455,10 @@ func TestMirrorTaskStore_UpdateStatusAndRepoSyncStatus_MultipleSyncStatuses(t *t
 		expectedSync   types.RepositorySyncStatus
 	}{
 		{"continue from queued", types.MirrorQueued, database.MirrorContinue, types.MirrorRepoSyncStart, types.SyncStatusInProgress},
+		{"pause from repo_sync_start", types.MirrorRepoSyncStart, database.MirrorPause, types.MirrorQueued, types.SyncStatusPending},
 		{"success from repo_sync_start", types.MirrorRepoSyncStart, database.MirrorSuccess, types.MirrorRepoSyncFinished, types.SyncStatusInProgress},
 		{"continue from repo_sync_finished", types.MirrorRepoSyncFinished, database.MirrorContinue, types.MirrorLfsSyncStart, types.SyncStatusInProgress},
+		{"pause from lfs_sync_start", types.MirrorLfsSyncStart, database.MirrorPause, types.MirrorRepoSyncFinished, types.SyncStatusInProgress},
 		{"retry from lfs_sync_failed", types.MirrorLfsSyncFailed, database.MirrorRetry, types.MirrorRepoSyncFinished, types.SyncStatusInProgress},
 		{"success from lfs_sync_start", types.MirrorLfsSyncStart, database.MirrorSuccess, types.MirrorLfsSyncFinished, types.SyncStatusCompleted},
 		{"too large from lfs_sync_start", types.MirrorLfsSyncStart, database.MirrorTooLarge, types.MirrorRepoTooLarge, types.SyncStatusFailed},
@@ -440,6 +491,95 @@ func TestMirrorTaskStore_UpdateStatusAndRepoSyncStatus_MultipleSyncStatuses(t *t
 			err = db.Core.NewSelect().Model(&updatedRepo).Where("id = ?", repo.ID).Scan(ctx)
 			require.Nil(t, err)
 			require.Equal(t, tc.expectedSync, updatedRepo.SyncStatus)
+		})
+	}
+}
+
+// TestMirrorTaskStore_PauseIsIdempotentForNonRunningStatuses verifies pause leaves inactive tasks unchanged.
+func TestMirrorTaskStore_PauseIsIdempotentForNonRunningStatuses(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	taskStore := database.NewMirrorTaskJobStoreWithDB(db)
+	mirrorStore := database.NewMirrorStoreWithDB(db)
+	repoStore := database.NewRepoStoreWithDB(db)
+
+	repo, err := repoStore.CreateRepo(ctx, database.Repository{
+		UserID:         1,
+		Path:           "test/pause-idempotent",
+		GitPath:        "test/pause-idempotent.git",
+		Name:           "pause-idempotent",
+		Nickname:       "Pause Idempotent",
+		DefaultBranch:  "main",
+		RepositoryType: types.ModelRepo,
+		SyncStatus:     types.SyncStatusPending,
+	})
+	require.NoError(t, err)
+
+	mirror, err := mirrorStore.Create(ctx, &database.Mirror{
+		SourceUrl:      "https://example.com/test/pause-idempotent.git",
+		RepositoryID:   repo.ID,
+		MirrorSourceID: 1,
+		Status:         types.MirrorQueued,
+	})
+	require.NoError(t, err)
+
+	tests := []struct {
+		status     types.MirrorTaskStatus
+		syncStatus types.RepositorySyncStatus
+	}{
+		{status: types.MirrorQueued, syncStatus: types.SyncStatusPending},
+		{status: types.MirrorRepoSyncFailed, syncStatus: types.SyncStatusFailed},
+		{status: types.MirrorRepoSyncFinished, syncStatus: types.SyncStatusInProgress},
+		{status: types.MirrorRepoSyncFatal, syncStatus: types.SyncStatusFailed},
+		{status: types.MirrorLfsSyncFailed, syncStatus: types.SyncStatusFailed},
+		{status: types.MirrorLfsSyncFinished, syncStatus: types.SyncStatusCompleted},
+		{status: types.MirrorLfsSyncFatal, syncStatus: types.SyncStatusFailed},
+		{status: types.MirrorLfsIncomplete, syncStatus: types.SyncStatusFailed},
+		{status: types.MirrorCanceled, syncStatus: types.SyncStatusCanceled},
+		{status: types.MirrorRepoTooLarge, syncStatus: types.SyncStatusFailed},
+	}
+
+	for _, test := range tests {
+		t.Run(string(test.status), func(t *testing.T) {
+			task, err := taskStore.Create(ctx, database.MirrorTask{
+				MirrorID:     mirror.ID,
+				Status:       test.status,
+				Priority:     types.HighMirrorPriority,
+				ErrorMessage: "existing error",
+			})
+			require.NoError(t, err)
+
+			_, err = db.Core.NewUpdate().
+				Model(&database.Mirror{}).
+				Set("current_task_id = ?", task.ID).
+				Set("status = ?", test.status).
+				Where("id = ?", mirror.ID).
+				Exec(ctx)
+			require.NoError(t, err)
+			_, err = db.Core.NewUpdate().
+				Model(&database.Repository{}).
+				Set("sync_status = ?", test.syncStatus).
+				Where("id = ?", repo.ID).
+				Exec(ctx)
+			require.NoError(t, err)
+
+			updatedTask, err := taskStore.UpdateStatusAndRepoSyncStatus(ctx, task, database.MirrorPause)
+			require.NoError(t, err)
+			require.Equal(t, test.status, updatedTask.Status)
+			require.Equal(t, "existing error", updatedTask.ErrorMessage)
+
+			var storedMirror database.Mirror
+			err = db.Core.NewSelect().Model(&storedMirror).Where("id = ?", mirror.ID).Scan(ctx)
+			require.NoError(t, err)
+			require.Equal(t, test.status, storedMirror.Status)
+			require.Equal(t, task.ID, storedMirror.CurrentTaskID)
+
+			var storedRepo database.Repository
+			err = db.Core.NewSelect().Model(&storedRepo).Where("id = ?", repo.ID).Scan(ctx)
+			require.NoError(t, err)
+			require.Equal(t, test.syncStatus, storedRepo.SyncStatus)
 		})
 	}
 }
@@ -624,6 +764,7 @@ func TestMirrorTaskStore_UpdateStatusAndRepoSyncStatusRejectsCanceledTask(t *tes
 	require.Equal(t, types.SyncStatusCanceled, storedRepo.SyncStatus)
 }
 
+// TestMirrorTaskStore_CancelMirrorTaskByIDWithJobCancelSynchronizesMirrorAndRepo verifies cancellation uses the canonical aggregate lock order.
 func TestMirrorTaskStore_CancelMirrorTaskByIDWithJobCancelSynchronizesMirrorAndRepo(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
@@ -667,9 +808,12 @@ func TestMirrorTaskStore_CancelMirrorTaskByIDWithJobCancelSynchronizesMirrorAndR
 		Exec(ctx)
 	require.Nil(t, err)
 
+	lockHook := &mirrorLockOrderHook{}
+	db.BunDB.AddQueryHook(lockHook)
 	cancelled, err := taskStore.CancelMirrorTaskByIDWithJobCancel(ctx, task.ID, nil)
 	require.Nil(t, err)
 	require.True(t, cancelled)
+	require.Equal(t, []string{"mirror", "repository", "mirror_task"}, lockHook.tables)
 
 	var storedTask database.MirrorTask
 	err = db.Core.NewSelect().Model(&storedTask).Where("id = ?", task.ID).Scan(ctx)
@@ -958,6 +1102,74 @@ func TestMirrorTaskStore_UpdateStatusAndRepoSyncStatusReturnsMirrorRepository(t 
 	require.NotNil(t, startedTask.Mirror)
 	require.NotNil(t, startedTask.Mirror.Repository)
 	require.Equal(t, repo.ID, startedTask.Mirror.Repository.ID)
+}
+
+// TestMirrorTaskFSM_PauseTransitions verifies pause only moves active Repo and LFS work back to waiting.
+func TestMirrorTaskFSM_PauseTransitions(t *testing.T) {
+	tests := []struct {
+		status     types.MirrorTaskStatus
+		allowed    bool
+		wantStatus types.MirrorTaskStatus
+	}{
+		{status: types.MirrorRepoSyncStart, allowed: true, wantStatus: types.MirrorQueued},
+		{status: types.MirrorLfsSyncStart, allowed: true, wantStatus: types.MirrorRepoSyncFinished},
+		{status: types.MirrorQueued, wantStatus: types.MirrorQueued},
+		{status: types.MirrorRepoSyncFailed, wantStatus: types.MirrorRepoSyncFailed},
+		{status: types.MirrorRepoSyncFinished, wantStatus: types.MirrorRepoSyncFinished},
+		{status: types.MirrorRepoSyncFatal, wantStatus: types.MirrorRepoSyncFatal},
+		{status: types.MirrorLfsSyncFailed, wantStatus: types.MirrorLfsSyncFailed},
+		{status: types.MirrorLfsSyncFinished, wantStatus: types.MirrorLfsSyncFinished},
+		{status: types.MirrorLfsSyncFatal, wantStatus: types.MirrorLfsSyncFatal},
+		{status: types.MirrorLfsIncomplete, wantStatus: types.MirrorLfsIncomplete},
+		{status: types.MirrorRepoTooLarge, wantStatus: types.MirrorRepoTooLarge},
+		{status: types.MirrorCanceled, wantStatus: types.MirrorCanceled},
+	}
+
+	for _, test := range tests {
+		t.Run(string(test.status), func(t *testing.T) {
+			task := database.MirrorTask{Status: test.status}
+			taskFSM := database.NewMirrorTaskWithFSM(&task)
+
+			allowed := taskFSM.SubmitEvent(context.Background(), database.MirrorPause)
+
+			require.Equal(t, test.allowed, allowed)
+			require.Equal(t, string(test.wantStatus), taskFSM.Current())
+		})
+	}
+}
+
+// TestMirrorTaskFSM_FatalTransitions verifies active Repo and LFS states can become permanently failed.
+func TestMirrorTaskFSM_FatalTransitions(t *testing.T) {
+	tests := []struct {
+		status     types.MirrorTaskStatus
+		allowed    bool
+		wantStatus types.MirrorTaskStatus
+	}{
+		{status: types.MirrorQueued, allowed: true, wantStatus: types.MirrorRepoSyncFatal},
+		{status: types.MirrorRepoSyncStart, allowed: true, wantStatus: types.MirrorRepoSyncFatal},
+		{status: types.MirrorRepoSyncFailed, allowed: true, wantStatus: types.MirrorRepoSyncFatal},
+		{status: types.MirrorRepoSyncFinished, allowed: true, wantStatus: types.MirrorLfsSyncFatal},
+		{status: types.MirrorLfsSyncStart, allowed: true, wantStatus: types.MirrorLfsSyncFatal},
+		{status: types.MirrorLfsSyncFailed, allowed: true, wantStatus: types.MirrorLfsSyncFatal},
+		{status: types.MirrorRepoSyncFatal, wantStatus: types.MirrorRepoSyncFatal},
+		{status: types.MirrorLfsSyncFinished, wantStatus: types.MirrorLfsSyncFinished},
+		{status: types.MirrorLfsSyncFatal, wantStatus: types.MirrorLfsSyncFatal},
+		{status: types.MirrorLfsIncomplete, wantStatus: types.MirrorLfsIncomplete},
+		{status: types.MirrorRepoTooLarge, wantStatus: types.MirrorRepoTooLarge},
+		{status: types.MirrorCanceled, wantStatus: types.MirrorCanceled},
+	}
+
+	for _, test := range tests {
+		t.Run(string(test.status), func(t *testing.T) {
+			task := database.MirrorTask{Status: test.status}
+			taskFSM := database.NewMirrorTaskWithFSM(&task)
+
+			allowed := taskFSM.SubmitEvent(context.Background(), database.MirrorFatal)
+
+			require.Equal(t, test.allowed, allowed)
+			require.Equal(t, string(test.wantStatus), taskFSM.Current())
+		})
+	}
 }
 
 func TestMirrorTaskStore_UpdateStatusAndRepoSyncStatusClearsErrorOnSuccess(t *testing.T) {

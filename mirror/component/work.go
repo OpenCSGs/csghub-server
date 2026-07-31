@@ -17,24 +17,18 @@ const (
 	urgentJobDelay = time.Minute
 	// urgentIdleDelay is the quiet period before normal queue restoration.
 	urgentIdleDelay = 10 * time.Second
-	// terminalStateSnoozeDelay controls retries when an exhausted job cannot persist its terminal task state.
-	terminalStateSnoozeDelay = time.Minute
 	// workerShutdownSnoozeDelay prevents immediate reacquisition while a worker client stops.
-	workerShutdownSnoozeDelay = 5 * time.Second
+	workerShutdownSnoozeDelay = 30 * time.Second
 )
 
-// mirrorWorkConfig supplies the typed differences between repo and LFS lifecycle execution.
-type mirrorWorkConfig[A river.JobArgs] struct {
-	name             string
-	manager          *workhub.UrgentManager
-	preemptionDelay  time.Duration
-	isUrgent         func(A) bool
-	expectedQueue    func(bool) string
-	validateQueue    func(A, string) error
-	logArgs          func(A, *database.MirrorTask, ...any) []any
-	work             func(context.Context, A, int) (*database.MirrorTask, error)
-	failureTarget    func(A) mirrorJobFailureTarget
-	failureFinalizer *mirrorJobFailureFinalizer
+// mirrorWorkConfig contains immutable job metadata, lifecycle dependencies, and typed business work.
+type mirrorWorkConfig[T river.JobArgs] struct {
+	args      workhub.MirrorArgs
+	urgent    bool
+	stage     string // repo/lfs
+	manager   *workhub.UrgentManager
+	taskStore mirrorTaskStore
+	work      func(context.Context, T, int) (*database.MirrorTask, error)
 }
 
 // mirrorTaskStore provides task state operations shared by repo, LFS, and final error handling.
@@ -43,163 +37,155 @@ type mirrorTaskStore interface {
 	UpdateStatusAndRepoSyncStatus(ctx context.Context, task database.MirrorTask, statusAction string) (database.MirrorTask, error)
 }
 
-// runMirrorWork applies the shared River lifecycle around typed mirror business work.
-func runMirrorWork[A river.JobArgs](ctx context.Context, job *river.Job[A], config mirrorWorkConfig[A]) (workErr error) {
-	riverCtx := ctx
-	args := job.Args
-	urgent := config.isUrgent(args)
-	var task *database.MirrorTask
-	exitAttrs := []any{
+func runWorkWithLog[T river.JobArgs](ctx context.Context, job *river.Job[T], cfg mirrorWorkConfig[T]) error {
+	workLogs := []any{
 		slog.Int64("job_id", job.ID),
-		slog.Bool("urgent", urgent),
-		slog.String("expected_queue", config.expectedQueue(urgent)),
-		slog.String("actual_queue", job.Queue),
+		slog.String("stage", cfg.stage),
+		slog.Int("attempt", job.Attempt),
+		slog.Int("max_attempt", job.MaxAttempts),
+		slog.Int("priority", job.Priority),
+		slog.String("kind", job.Kind),
+		slog.String("queue", job.Queue),
+		slog.Bool("urgent", cfg.urgent),
+		slog.Int64("mirror_id", cfg.args.MirrorID),
+		slog.Int64("repo_id", cfg.args.RepositoryID),
+		slog.Int64("mirror_task_id", cfg.args.MirrorTaskID),
 	}
-	defer func() {
-		var (
-			snooze     = false
-			panicValue = recover()
-			level      = slog.LevelInfo
-			success    = workErr == nil && panicValue == nil
-		)
-		if panicValue != nil {
-			level = slog.LevelError
-			exitAttrs = append(exitAttrs, slog.Any("panic", panicValue))
-			if job.Attempt >= job.MaxAttempts && config.failureFinalizer != nil && config.failureTarget != nil {
-				panicMessage := fmt.Sprintf("worker panic: %v", panicValue)
-				if err := config.failureFinalizer.finalize(
-					riverCtx, job.ID, job.Kind, job.Attempt, config.failureTarget(args), panicMessage,
-					slog.Any("panic", panicValue),
-				); err != nil {
-					workErr = river.JobSnooze(terminalStateSnoozeDelay)
-					snooze = true
-					exitAttrs = append(exitAttrs,
-						slog.String("reason", "terminal_state_persistence"),
-						slog.String("finalizer_error", err.Error()),
-						slog.Duration("snooze_delay", terminalStateSnoozeDelay),
-					)
-					panicValue = nil
-				}
-			}
-		} else if workErr != nil {
-			originalErr := workErr
-			var (
-				cancelErr *river.JobCancelError
-				snoozeErr *river.JobSnoozeError
-			)
-			snooze = true
+	slog.InfoContext(ctx, fmt.Sprintf("[%s] work start", cfg.stage), workLogs...)
 
-			switch {
-			case isUrgentPreemption(riverCtx, ctx, originalErr):
-				workErr = river.JobSnooze(config.preemptionDelay)
-				exitAttrs = append(exitAttrs,
-					slog.String("reason", "urgent_preemption"),
-					slog.String("state", string(config.manager.State())),
-					slog.Duration("snooze_delay", config.preemptionDelay),
-				)
-			case errors.Is(riverCtx.Err(), context.DeadlineExceeded) &&
-				errors.Is(originalErr, context.DeadlineExceeded):
-				workErr = river.JobSnooze(0)
-				exitAttrs = append(exitAttrs,
-					slog.String("reason", "worker_timeout"),
-					slog.Duration("snooze_delay", 0),
-				)
-			case errors.Is(riverCtx.Err(), context.Canceled) && errors.Is(originalErr, context.Canceled):
-				workErr = river.JobSnooze(workerShutdownSnoozeDelay)
-				exitAttrs = append(exitAttrs,
-					slog.String("reason", "worker_shutdown"),
-					slog.Duration("snooze_delay", workerShutdownSnoozeDelay),
-				)
-			case errors.As(originalErr, &snoozeErr):
-				exitAttrs = append(exitAttrs, slog.Duration("snooze_delay", snoozeErr.Duration))
-				if config.manager != nil && config.manager.State() == workhub.UrgentStateClosed {
-					exitAttrs = append(exitAttrs,
-						slog.String("reason", "worker_shutdown"),
-						slog.String("state", string(workhub.UrgentStateClosed)),
-					)
-				}
-			case errors.As(originalErr, &cancelErr):
-				snooze = false
-				level = slog.LevelError
-			default:
-				snooze = false
-				level = slog.LevelError
-				if job.Attempt >= job.MaxAttempts && config.failureFinalizer != nil && config.failureTarget != nil {
-					if err := config.failureFinalizer.finalize(
-						riverCtx, job.ID, job.Kind, job.Attempt, config.failureTarget(args), originalErr.Error(),
-						slog.String("error", originalErr.Error()),
-					); err != nil {
-						workErr = river.JobSnooze(terminalStateSnoozeDelay)
-						snooze = true
-						exitAttrs = append(exitAttrs,
-							slog.String("reason", "terminal_state_persistence"),
-							slog.String("finalizer_error", err.Error()),
-							slog.Duration("snooze_delay", terminalStateSnoozeDelay),
-						)
-					}
-				}
-			}
-			exitAttrs = append(exitAttrs,
-				slog.String("error", originalErr.Error()),
-				slog.Any("context", riverCtx.Err()),
-			)
-		}
-		exitAttrs = append(exitAttrs,
-			slog.Bool("success", success),
-			slog.Bool("snooze", snooze),
+	var execError error
+	defer func() {
+		panicValue := recover()
+		slog.InfoContext(ctx, fmt.Sprintf("[%s] work exit", cfg.stage),
+			append(workLogs,
+				slog.Bool("success", execError == nil && panicValue == nil),
+				slog.Any("error", execError),
+			)...,
 		)
-		slog.Log(riverCtx, level, config.name+" job work exited", config.logArgs(args, task, exitAttrs...)...)
 		if panicValue != nil {
+			slog.ErrorContext(ctx, fmt.Sprintf("[%s] work panic", cfg.stage),
+				append(workLogs, slog.Any("panic", panicValue))...,
+			)
+
+			_ = workErrorHandle(ctx, cfg.taskStore, job.JobRow, "work panic")
 			panic(panicValue)
 		}
 	}()
-	slog.InfoContext(ctx, "working on "+config.name+" job", config.logArgs(args, task,
-		slog.Int("attempts", job.Attempt),
-		slog.Int("max_attempts", job.MaxAttempts),
-		slog.Int("priority", job.Priority),
-		slog.Int64("job_id", job.ID),
-	)...)
-	if job.JobRow != nil && job.Queue != "" {
-		if err := config.validateQueue(args, job.Queue); err != nil {
-			slog.ErrorContext(ctx, "canceling "+config.name+" job with queue mismatch", config.logArgs(args, task,
-				slog.Int64("job_id", job.ID),
-				slog.String("expected_queue", config.expectedQueue(urgent)),
-				slog.String("actual_queue", job.Queue),
-				slog.String("error", err.Error()),
-			)...)
-			return river.JobCancel(err)
+
+	execError = runWork(ctx, job, cfg)
+	return execError
+}
+
+func runWork[T river.JobArgs](ctx context.Context, job *river.Job[T], cfg mirrorWorkConfig[T]) error {
+	workCtx := ctx
+
+	if !cfg.urgent {
+		// Register normal work with the urgent-work manager.
+		normalCtx, normalDone, allowed := cfg.manager.BeginNormal(ctx)
+		if !allowed {
+			// Snooze rejected work and retry the pause transition in case an earlier update failed.
+			_ = pauseTaskWork(workCtx, cfg)
+			return river.JobSnooze(urgentJobDelay)
 		}
+		defer normalDone()
+
+		// Pass the manager-derived context to the business work.
+		ctx = normalCtx
+	} else {
+		// Reserve urgent execution and preempt normal work.
+		urgentDone, err := beginUrgentWork(cfg.manager, ctx)
+		if err != nil {
+			// Reservation usually fails during worker shutdown or context cancellation.
+			return err
+		}
+
+		// Release the urgent reservation when the work finishes.
+		defer urgentDone()
 	}
 
-	var done func()
-	if config.manager != nil && !urgent {
-		normalCtx, normalDone, allowed := config.manager.BeginNormal(riverCtx)
-		if !allowed {
-			state := config.manager.State()
-			if state == workhub.UrgentStateClosed {
-				workErr = river.JobSnooze(workerShutdownSnoozeDelay)
-				return workErr
-			}
-			exitAttrs = append(exitAttrs,
-				slog.String("reason", "urgent_work_blocks_execution"),
-				slog.String("state", string(state)),
-			)
-			workErr = river.JobSnooze(config.preemptionDelay)
-			return workErr
-		}
-		ctx, done = normalCtx, normalDone
-		defer done()
+	_, workErr := cfg.work(ctx, job.Args, job.Attempt)
+	if workErr == nil {
+		return nil
 	}
-	task, workErr = config.work(ctx, args, mirrorJobRetryCount(job.Attempt))
+
+	var (
+		cancelErr *river.JobCancelError
+		snoozeErr *river.JobSnoozeError
+	)
+	switch {
+	// Resume locally preempted work after the urgent-job delay.
+	case isUrgentPreemption(workCtx, ctx, workErr):
+		workErr = river.JobSnooze(urgentJobDelay)
+		if err := pauseTaskWork(workCtx, cfg); err != nil {
+			workErr = errors.Join(workErr, fmt.Errorf("pause preempted mirror task: %w", err))
+		}
+	// Retry timed-out work immediately without changing its business status.
+	case errors.Is(workCtx.Err(), context.DeadlineExceeded) && errors.Is(workErr, context.DeadlineExceeded):
+		workErr = river.JobSnooze(0)
+	// Worker shutdown and Job.Cancel both cancel the River context.
+	// The Job.Cancel caller owns the task status update, so this path leaves it unchanged.
+	case errors.Is(workCtx.Err(), context.Canceled) && errors.Is(workErr, context.Canceled):
+		return river.JobSnooze(workerShutdownSnoozeDelay)
+	// Honor a JobSnooze returned explicitly by business work.
+	case errors.As(workErr, &snoozeErr):
+		if snoozeErr.Duration > time.Second {
+			// Attempt to pause the task; the upcoming retry can recover from an update failure.
+			_ = pauseTaskWork(workCtx, cfg)
+		}
+	// JobCancel stops retries for invalid job metadata and leaves the task status unchanged.
+	// Business errors that cannot be retried must use the task state machine instead.
+	case errors.As(workErr, &cancelErr):
+	// Treat every remaining error as a business-work failure.
+	default:
+		// Promote the task to fatal when the business error exhausts all attempts.
+		workErr = errors.Join(workErr, workErrorHandle(ctx, cfg.taskStore, job.JobRow, workErr.Error()))
+	}
 	return workErr
 }
 
-// mirrorJobRetryCount converts River's one-based attempt number to completed retry count.
-func mirrorJobRetryCount(attempt int) int {
-	if attempt <= 1 {
-		return 0
+// mirrorTaskSlogArgs appends job identity and available task details to shared lifecycle logs.
+func mirrorTaskSlogArgs(args workhub.MirrorArgs, task *database.MirrorTask, attrs ...any) []any {
+	attrs = append(attrs,
+		slog.Int64("mirror_id", args.MirrorID),
+		slog.Int64("repository_id", args.RepositoryID),
+		slog.Int64("mirror_task_id", args.MirrorTaskID),
+		slog.Bool("urgent", args.Urgent),
+	)
+	if task == nil {
+		return append(attrs, slog.Any("task_status", nil))
 	}
-	return attempt - 1
+	attrs = append(attrs, slog.String("task_status", string(task.Status)))
+	if task.Mirror == nil {
+		return attrs
+	}
+	attrs = append(attrs, slog.String("source_url", task.Mirror.SourceUrl))
+	if task.Mirror.Repository != nil {
+		attrs = append(attrs,
+			slog.String("repo_type", string(task.Mirror.Repository.RepositoryType)),
+			slog.String("repo_path", task.Mirror.Repository.Path),
+		)
+	}
+	return attrs
+}
+
+// checkMirrorTaskInfo validates the task identity shared by repo and LFS jobs.
+func checkMirrorTaskInfo(task *database.MirrorTask, args workhub.MirrorArgs) error {
+	if task == nil {
+		return fmt.Errorf("mirror task is nil")
+	}
+	if task.Mirror == nil {
+		return fmt.Errorf("mirror task %d has no mirror", task.ID)
+	}
+	if args.MirrorID != 0 && task.MirrorID != args.MirrorID {
+		return fmt.Errorf("mirror ID mismatch: task=%d job=%d", task.MirrorID, args.MirrorID)
+	}
+	if args.RepositoryID != 0 && task.Mirror.RepositoryID != args.RepositoryID {
+		return fmt.Errorf("repository ID mismatch: task=%d job=%d", task.Mirror.RepositoryID, args.RepositoryID)
+	}
+	if task.Mirror.CurrentTaskID != 0 && task.Mirror.CurrentTaskID != task.ID {
+		return fmt.Errorf("mirror current task mismatch: current=%d job_task=%d", task.Mirror.CurrentTaskID, task.ID)
+	}
+	return nil
 }
 
 // beginUrgentWork reserves urgent execution and converts worker shutdown into a short River snooze.
@@ -211,9 +197,13 @@ func beginUrgentWork(manager *workhub.UrgentManager, riverCtx context.Context) (
 	return done, err
 }
 
-// contextCauseError returns the standard context cancellation or deadline error.
-func contextCauseError(ctx context.Context) error {
-	return ctx.Err()
+func pauseTaskWork[T river.JobArgs](ctx context.Context, cfg mirrorWorkConfig[T]) error {
+	task, err := cfg.taskStore.FindByID(ctx, cfg.args.MirrorTaskID)
+	if err != nil {
+		return fmt.Errorf("find mirror job error: %w", err)
+	}
+	_, err = cfg.taskStore.UpdateStatusAndRepoSyncStatus(ctx, *task, database.MirrorPause)
+	return err
 }
 
 // isUrgentPreemption identifies local urgent cancellation without treating River cancellation as preemption.
@@ -222,9 +212,19 @@ func isUrgentPreemption(riverCtx, ctx context.Context, workErr error) bool {
 }
 
 // isUrgentWorkCancellation reports whether urgent preemption stopped business work.
-func isUrgentWorkCancellation(ctx context.Context, workErr error) bool {
+func isUrgentWorkCancellation(ctx context.Context, err error) bool {
 	return errors.Is(context.Cause(ctx), workhub.ErrUrgentPreempt) &&
-		(errors.Is(workErr, context.Canceled) ||
-			errors.Is(workErr, context.DeadlineExceeded) ||
-			errors.Is(workErr, workhub.ErrUrgentPreempt))
+		(errors.Is(err, context.Canceled) ||
+			errors.Is(err, context.DeadlineExceeded) ||
+			errors.Is(err, workhub.ErrUrgentPreempt))
+}
+
+// isWorkContextTermination reports whether work stopped because its execution context ended.
+func isWorkContextTermination(ctx context.Context, err error) bool {
+	if ctx.Err() == nil {
+		return false
+	}
+	return isUrgentWorkCancellation(ctx, err) ||
+		errors.Is(err, ctx.Err()) ||
+		errors.Is(err, context.Cause(ctx))
 }

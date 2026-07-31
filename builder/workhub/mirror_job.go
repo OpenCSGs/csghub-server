@@ -25,8 +25,7 @@ const (
 	MirrorLFSJobTimeout = 2 * time.Hour
 )
 
-// RepoArgs describes a repository sync task submitted by a workhub caller.
-type RepoArgs struct {
+type MirrorArgs struct {
 	// MirrorID identifies the mirror record to synchronize.
 	MirrorID int64 `json:"mirror_id"`
 	// RepositoryID identifies the local repository being synchronized.
@@ -35,6 +34,11 @@ type RepoArgs struct {
 	MirrorTaskID int64 `json:"mirror_task_id"`
 	// Urgent routes this job through the urgent repository queue and execution mode.
 	Urgent bool `json:"urgent"`
+}
+
+// RepoArgs describes a repository sync task submitted by a workhub caller.
+type RepoArgs struct {
+	MirrorArgs
 }
 
 // Kind returns the internal task kind for repo sync tasks.
@@ -51,14 +55,7 @@ func (args RepoArgs) InsertOpts() river.InsertOpts {
 
 // LFSArgs describes a Git LFS sync task submitted by a workhub caller.
 type LFSArgs struct {
-	// MirrorID identifies the mirror record to synchronize.
-	MirrorID int64 `json:"mirror_id"`
-	// RepositoryID identifies the local repository being synchronized.
-	RepositoryID int64 `json:"repository_id"`
-	// MirrorTaskID identifies the database task that tracks this LFS job.
-	MirrorTaskID int64 `json:"mirror_task_id"`
-	// Urgent routes this job through the urgent LFS queue and execution mode.
-	Urgent bool `json:"urgent"`
+	MirrorArgs
 }
 
 // Kind returns the internal task kind for LFS sync tasks.
@@ -87,15 +84,6 @@ func LFSQueue(urgent bool) string {
 		return MirrorLFSUrgentQueue
 	}
 	return MirrorLFSQueue
-}
-
-// ValidateRepoQueue verifies that a repository job was claimed from its selected queue.
-func ValidateRepoQueue(args RepoArgs, actualQueue string) error {
-	expectedQueue := RepoQueue(args.Urgent)
-	if actualQueue != expectedQueue {
-		return fmt.Errorf("mirror repo queue mismatch: urgent=%t expected=%s actual=%s", args.Urgent, expectedQueue, actualQueue)
-	}
-	return nil
 }
 
 // ValidateLFSQueue verifies that an LFS job was claimed from its selected queue.
@@ -147,10 +135,12 @@ func (c mirrorRepoJobClient) InsertMirrorRepoJobTx(ctx context.Context, tx *sql.
 		return 0, fmt.Errorf("workhub job client is required")
 	}
 	args := RepoArgs{
-		MirrorID:     input.MirrorID,
-		RepositoryID: input.RepositoryID,
-		MirrorTaskID: input.MirrorTaskID,
-		Urgent:       input.Urgent,
+		MirrorArgs: MirrorArgs{
+			MirrorID:     input.MirrorID,
+			RepositoryID: input.RepositoryID,
+			MirrorTaskID: input.MirrorTaskID,
+			Urgent:       input.Urgent,
+		},
 	}
 	return c.jobClient.InsertTx(ctx, tx, args, &InsertOpts{
 		MaxAttempts: mirrorMaxAttempts(c.config.MaxRetryCount),
@@ -176,10 +166,12 @@ func (c mirrorLFSJobClient) InsertMirrorLFSJobTx(ctx context.Context, tx *sql.Tx
 		return 0, fmt.Errorf("workhub job client is required")
 	}
 	args := LFSArgs{
-		MirrorID:     input.MirrorID,
-		RepositoryID: input.RepositoryID,
-		MirrorTaskID: input.MirrorTaskID,
-		Urgent:       input.Urgent,
+		MirrorArgs: MirrorArgs{
+			MirrorID:     input.MirrorID,
+			RepositoryID: input.RepositoryID,
+			MirrorTaskID: input.MirrorTaskID,
+			Urgent:       input.Urgent,
+		},
 	}
 	return c.jobClient.InsertTx(ctx, tx, args, &InsertOpts{
 		MaxAttempts: mirrorMaxAttempts(c.config.MaxRetryCount),

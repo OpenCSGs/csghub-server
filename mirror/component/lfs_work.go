@@ -2,7 +2,6 @@ package component
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
 	"time"
@@ -41,108 +40,96 @@ type LFSWorkDeps struct {
 	MaxWorkers int
 }
 
-// lfsSlogArgs appends LFS job fields and latest mirror information to slog args.
-func lfsSlogArgs(args workhub.LFSArgs, task *database.MirrorTask, attrs ...any) []any {
-	attrs = append(attrs,
-		slog.Int64("mirror_id", args.MirrorID),
-		slog.Int64("repository_id", args.RepositoryID),
-		slog.Int64("mirror_task_id", args.MirrorTaskID),
-	)
-	if task != nil && task.Mirror != nil {
-		attrs = append(attrs, slog.String("source_url", task.Mirror.SourceUrl))
-	}
-	return attrs
-}
-
 // Work runs the LFS sync task.
 func (w *lfsWorker) Work(ctx context.Context, job *river.Job[workhub.LFSArgs]) error {
-	return runMirrorWork(ctx, job, mirrorWorkConfig[workhub.LFSArgs]{
-		name:             "LFS",
-		manager:          w.urgentManager,
-		preemptionDelay:  urgentJobDelay,
-		isUrgent:         func(args workhub.LFSArgs) bool { return args.Urgent },
-		expectedQueue:    workhub.LFSQueue,
-		validateQueue:    workhub.ValidateLFSQueue,
-		logArgs:          lfsSlogArgs,
-		work:             w.work,
-		failureTarget:    mirrorLFSJobFailureTarget,
-		failureFinalizer: newMirrorJobFailureFinalizer(w.mirrorTaskStore),
+	return runWorkWithLog(ctx, job, mirrorWorkConfig[workhub.LFSArgs]{
+		manager:   w.urgentManager,
+		urgent:    job.Args.Urgent,
+		args:      job.Args.MirrorArgs,
+		stage:     "lfs",
+		taskStore: w.mirrorTaskStore,
+		work: func(ctx context.Context, args workhub.LFSArgs, retryCount int) (*database.MirrorTask, error) {
+			return w.work(ctx, args, retryCount, job.ID)
+		},
 	})
 }
 
 // work executes the LFS mirror business flow and returns the latest task for lifecycle logging.
-func (w *lfsWorker) work(ctx context.Context, args workhub.LFSArgs, retryCount int) (*database.MirrorTask, error) {
+func (w *lfsWorker) work(ctx context.Context, args workhub.LFSArgs, retryCount int, jobID int64) (*database.MirrorTask, error) {
 	task, err := w.mirrorTaskStore.FindByID(ctx, args.MirrorTaskID)
 	if err != nil {
-		slog.ErrorContext(ctx, "failed to find mirror LFS task", lfsSlogArgs(args, task, slog.String("error", err.Error()))...)
+		slog.ErrorContext(ctx, "failed to find mirror LFS task",
+			mirrorTaskSlogArgs(args.MirrorArgs, task, slog.String("error", err.Error()))...)
 		return task, fmt.Errorf("find mirror task: %w", err)
 	}
-	slog.InfoContext(ctx, "loaded mirror LFS task", lfsSlogArgs(args, task, slog.String("task_status", string(task.Status)))...)
-	if skip, reason := shouldSkipLFSJob(task, args); skip {
-		slog.InfoContext(ctx, "skip stale mirror LFS job", lfsSlogArgs(args, task,
-			slog.String("reason", reason),
-			slog.String("task_status", string(task.Status)),
-		)...)
-		return task, nil
+	slog.InfoContext(ctx, "loaded mirror LFS task", mirrorTaskSlogArgs(args.MirrorArgs, task)...)
+	skip, err := checkLFSTaskInfo(task, args, jobID)
+	if err != nil {
+		slog.ErrorContext(ctx, "invalid mirror LFS task information",
+			mirrorTaskSlogArgs(args.MirrorArgs, task,
+				slog.Int64("job_id", jobID),
+				slog.String("error", err.Error()),
+			)...)
+		return task, fmt.Errorf("check mirror LFS task information: %w", err)
 	}
-	if args.Urgent && w.urgentManager != nil {
-		done, err := beginUrgentWork(w.urgentManager, ctx)
-		if err != nil {
-			return task, err
-		}
-		defer done()
+	if skip {
+		slog.InfoContext(ctx, "skip mirror LFS task",
+			mirrorTaskSlogArgs(args.MirrorArgs, task,
+				slog.Int64("job_id", jobID),
+			)...)
+		return task, nil
 	}
 	task.RetryCount = retryCount
 
 	beforeStatus := task.Status
 	task, err = w.prepareLFSTask(ctx, *task)
 	if err != nil {
-		slog.ErrorContext(ctx, "failed to prepare mirror LFS task", lfsSlogArgs(args, task,
-			slog.String("before_status", string(beforeStatus)),
-			slog.String("error", err.Error()),
-		)...)
+		slog.ErrorContext(ctx, "failed to prepare mirror LFS task",
+			mirrorTaskSlogArgs(args.MirrorArgs, task,
+				slog.String("before_status", string(beforeStatus)),
+				slog.String("error", err.Error()),
+			)...)
 		return task, err
 	}
-	slog.InfoContext(ctx, "prepared mirror LFS task", lfsSlogArgs(args, task,
-		slog.String("before_status", string(beforeStatus)),
-		slog.String("after_status", string(task.Status)),
-	)...)
-	if task.Status != types.MirrorLfsSyncStart {
-		slog.ErrorContext(ctx, "skip mirror LFS job after prepare", lfsSlogArgs(args, task,
-			slog.String("task_status", string(task.Status)),
+	slog.InfoContext(ctx, "prepared mirror LFS task",
+		mirrorTaskSlogArgs(args.MirrorArgs, task,
+			slog.String("before_status", string(beforeStatus)),
+			slog.String("after_status", string(task.Status)),
 		)...)
-		return task, nil
-	}
 
-	slog.InfoContext(ctx, "start mirror LFS sync", lfsSlogArgs(args, task)...)
+	slog.InfoContext(ctx, "start mirror LFS sync", mirrorTaskSlogArgs(args.MirrorArgs, task)...)
 
 	if err := w.syncer.SyncLFS(ctx, task); err != nil {
-		if isUrgentWorkCancellation(ctx, err) || errors.Is(err, context.Canceled) {
-			slog.InfoContext(ctx, "mirror LFS sync canceled", lfsSlogArgs(args, task, slog.String("error", err.Error()))...)
+		if isWorkContextTermination(ctx, err) {
+			slog.InfoContext(ctx, "mirror LFS sync stopped by execution context",
+				mirrorTaskSlogArgs(args.MirrorArgs, task, slog.String("error", err.Error()))...)
 			return task, err
 		}
 		action := database.MirrorFail
-		slog.ErrorContext(ctx, "failed to sync mirror LFS task", lfsSlogArgs(args, task,
+		slog.ErrorContext(ctx, "failed to sync mirror LFS task", mirrorTaskSlogArgs(args.MirrorArgs, task,
 			slog.String("action", action),
 			slog.String("error", err.Error()),
 		)...)
 		task.ErrorMessage = err.Error()
 		if _, updateErr := w.mirrorTaskStore.UpdateStatusAndRepoSyncStatus(ctx, *task, action); updateErr != nil {
-			slog.ErrorContext(ctx, "failed to update status of mirror LFS task", lfsSlogArgs(args, task, slog.String("error", updateErr.Error()))...)
+			slog.ErrorContext(ctx, "failed to update status of mirror LFS task",
+				mirrorTaskSlogArgs(args.MirrorArgs, task, slog.String("error", updateErr.Error()))...)
 			return task, fmt.Errorf("mark LFS sync failed: %w", updateErr)
 		}
 		return task, err
 	}
 
-	if err := contextCauseError(ctx); err != nil {
+	if err := ctx.Err(); err != nil {
 		return task, err
 	}
 	task.Progress = 100
 	if _, err := w.mirrorTaskStore.UpdateStatusAndRepoSyncStatus(ctx, *task, database.MirrorSuccess); err != nil {
-		slog.ErrorContext(ctx, "failed to finish mirror LFS task", lfsSlogArgs(args, task, slog.String("error", err.Error()))...)
+		slog.ErrorContext(ctx, "failed to finish mirror LFS task",
+			mirrorTaskSlogArgs(args.MirrorArgs, task, slog.String("error", err.Error()))...)
 		return task, fmt.Errorf("finish LFS mirror task: %w", err)
 	}
-	slog.InfoContext(ctx, "finished mirror LFS task", lfsSlogArgs(args, task, slog.Int("progress", task.Progress))...)
+	slog.InfoContext(ctx, "finished mirror LFS task",
+		mirrorTaskSlogArgs(args.MirrorArgs, task, slog.Int("progress", task.Progress))...)
 	return task, nil
 }
 
@@ -206,54 +193,49 @@ func newLFSRiverConfigForWorker(deps LFSWorkDeps, worker *lfsWorker) *river.Conf
 // prepareLFSTask moves a repo-synced task into the LFS running state.
 func (w *lfsWorker) prepareLFSTask(ctx context.Context, task database.MirrorTask) (*database.MirrorTask, error) {
 	switch task.Status {
+	case types.MirrorLfsSyncStart:
+		return &task, nil
 	case types.MirrorLfsSyncFailed:
 		retried, err := w.mirrorTaskStore.UpdateStatusAndRepoSyncStatus(ctx, task, database.MirrorRetry)
 		if err != nil {
-			return nil, fmt.Errorf("retry mirror LFS task: %w", err)
+			return &task, fmt.Errorf("retry mirror LFS task: %w", err)
+		}
+		if retried.Status != types.MirrorRepoSyncFinished {
+			return &retried, fmt.Errorf("retried mirror LFS task has unexpected status %s", retried.Status)
 		}
 		task = retried
 	case types.MirrorRepoSyncFinished:
 	default:
-		return &task, nil
+		return &task, fmt.Errorf("cannot prepare mirror LFS task with status %s", task.Status)
 	}
 	started, err := w.mirrorTaskStore.UpdateStatusAndRepoSyncStatus(ctx, task, database.MirrorContinue)
 	if err != nil {
-		return nil, fmt.Errorf("start mirror LFS task: %w", err)
+		return &task, fmt.Errorf("start mirror LFS task: %w", err)
+	}
+	if started.Status != types.MirrorLfsSyncStart {
+		return &started, fmt.Errorf("started mirror LFS task has unexpected status %s", started.Status)
 	}
 	return &started, nil
 }
 
-// shouldSkipLFSJob reports whether an LFS job no longer owns the current task and why.
-func shouldSkipLFSJob(task *database.MirrorTask, args workhub.LFSArgs) (bool, string) {
-	if task == nil || task.Mirror == nil {
-		return false, ""
+// checkLFSTaskInfo validates LFS job ownership and reports terminal tasks that no longer need work.
+func checkLFSTaskInfo(task *database.MirrorTask, args workhub.LFSArgs, jobID int64) (bool, error) {
+	if err := checkMirrorTaskInfo(task, args.MirrorArgs); err != nil {
+		return false, err
 	}
-	if args.MirrorID != 0 && task.MirrorID != args.MirrorID {
-		return true, "mirror_id_mismatch"
+	if task.LFSJobID != jobID {
+		return false, fmt.Errorf("LFS job ID mismatch: task=%d job=%d", task.LFSJobID, jobID)
 	}
-	if args.RepositoryID != 0 && task.Mirror.RepositoryID != args.RepositoryID {
-		return true, "repository_id_mismatch"
-	}
-	if task.Mirror.CurrentTaskID != 0 && task.Mirror.CurrentTaskID != task.ID {
-		return true, "stale_current_task"
-	}
-	if isLFSJobTerminalStatus(task.Status) {
-		return true, "terminal_status"
-	}
-	return false, ""
-}
-
-// isLFSJobTerminalStatus reports whether a Git LFS workhub job has nothing left to do.
-func isLFSJobTerminalStatus(status types.MirrorTaskStatus) bool {
-	switch status {
-	case types.MirrorLfsSyncFinished,
-		types.MirrorLfsSyncFatal,
-		types.MirrorLfsIncomplete,
-		types.MirrorCanceled,
+	switch task.Status {
+	case types.MirrorRepoSyncFinished, types.MirrorLfsSyncStart, types.MirrorLfsSyncFailed:
+		return false, nil
+	case types.MirrorCanceled,
 		types.MirrorRepoTooLarge,
-		types.MirrorRepoSyncFatal:
-		return true
+		types.MirrorLfsIncomplete,
+		types.MirrorLfsSyncFatal,
+		types.MirrorLfsSyncFinished:
+		return true, nil
 	default:
-		return false
+		return false, fmt.Errorf("mirror LFS task status %s is not executable", task.Status)
 	}
 }
