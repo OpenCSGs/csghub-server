@@ -127,6 +127,7 @@ func (c *Client) GetRepoFileReader(ctx context.Context, req gitserver.GetRepoInf
 		Repository: repository,
 		Revision:   []byte(req.Ref),
 		Path:       []byte(req.Path),
+		Limit:      req.Limit,
 	}
 
 	treeEntriesStream, err := c.commitClient.TreeEntry(ctx, treeEntriesReq)

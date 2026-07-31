@@ -1145,6 +1145,7 @@ func (h *RepoHandler) UploadFile(ctx *gin.Context) {
 	httpbase.OK(ctx, nil)
 }
 
+// SDKDownload serves a repository file through SDK-compatible routes.
 func (h *RepoHandler) SDKDownload(ctx *gin.Context) {
 	h.handleDownload(ctx, false)
 }
@@ -1154,21 +1155,26 @@ func (h *RepoHandler) SDKDownload(ctx *gin.Context) {
 // @Summary      Download a rep file
 // @Tags         Repository
 // @Accept       json
-// @Produce      json
+// @Produce      application/octet-stream
 // @Param		 repo_type path string true "models,dataset,codes or spaces" Enums(models,datasets,codes,spaces)
 // @Param		 namespace path string true "repo owner name"
 // @Param		 name path string true "repo name"
 // @Param		 file_path path string true "file path"
 // @Param		 ref query string true "branch or tag"
 // @Param		 current_user query string false "current user name"
-// @Success      200  {object}  types.ResponseWithTotal{data=string} "OK"
+// @Param        Range header string false "single byte range, for example bytes=0-1023"
+// @Param        If-Range header string false "strong ETag used to validate a range request"
+// @Success      200  {file}    file "OK"
+// @Success      206  {file}    file "Partial Content"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      416  {string}  string "Range Not Satisfiable"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /{repo_type}/{namespace}/{name}/resolve/{file_path} [get]
 func (h *RepoHandler) ResolveDownload(ctx *gin.Context) {
 	h.handleDownload(ctx, true)
 }
 
+// HeadSDKDownload returns SDK-compatible metadata for a repository file.
 func (h *RepoHandler) HeadSDKDownload(ctx *gin.Context) {
 	var repoCommit string
 	currentUser := httpbase.GetCurrentUser(ctx)
@@ -1197,7 +1203,17 @@ func (h *RepoHandler) HeadSDKDownload(ctx *gin.Context) {
 
 	file, commit, err := h.c.HeadDownloadFile(ctx.Request.Context(), req, currentUser)
 	if err != nil {
-		if errors.Is(err, errorx.ErrUnauthorized) {
+		if errors.Is(err, errorx.ErrForbidden) {
+			slog.ErrorContext(
+				ctx.Request.Context(),
+				"permission denied when accessing repo head",
+				slog.String("repo_type", string(req.RepoType)),
+				slog.Any("path", fmt.Sprintf("%s/%s", namespace, name)),
+			)
+			httpbase.ForbiddenError(ctx, err)
+			return
+		}
+		if errors.Is(err, errorx.ErrUnauthorized) || errors.Is(err, errorx.ErrUserNotFound) {
 			slog.ErrorContext(ctx.Request.Context(), "permission denied when accessing repo head", slog.String("repo_type", string(req.RepoType)), slog.Any("path", fmt.Sprintf("%s/%s", namespace, name)))
 			httpbase.UnauthorizedError(ctx, err)
 			return
@@ -1223,9 +1239,11 @@ func (h *RepoHandler) HeadSDKDownload(ctx *gin.Context) {
 		ctx.Header("X-Xet-Hash", file.LfsSHA256)
 		ctx.Header("X-Xet-Refresh-Route", h.xetRefreshRoute(req.RepoType, namespace, name, branch, action))
 	}
-	ctx.Header("Content-Length", strconv.Itoa(int(file.Size)))
+	ctx.Header("Content-Length", strconv.FormatInt(file.Size, 10))
 	ctx.Header("X-Repo-Commit", repoCommit)
-	ctx.Header("ETag", file.SHA)
+	// RFC 9110 requires entity-tags to use quoted-string syntax.
+	ctx.Header("ETag", strconv.Quote(file.SHA))
+	ctx.Header("Accept-Ranges", "bytes")
 	ctx.Status(http.StatusOK)
 }
 
@@ -1236,19 +1254,10 @@ func (h *RepoHandler) xetRefreshRoute(repoType types.RepositoryType, namespace, 
 	return fmt.Sprintf("%s/hf/%ss/%s/%s/xet-%s-token/%s", h.config.Model.DownloadEndpoint, repoType, namespace, name, action, ref)
 }
 
+// handleDownload serves full or single-range content for non-LFS files and redirects LFS files.
 func (h *RepoHandler) handleDownload(ctx *gin.Context, isResolve bool) {
 	currentUser := httpbase.GetCurrentUser(ctx)
-	var (
-		namespace     string
-		name          string
-		branch        string
-		reader        io.ReadCloser
-		size          int64
-		url           string
-		contentLength int64
-		err           error
-	)
-	namespace, name, err = common.GetNamespaceAndNameFromContext(ctx)
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
@@ -1257,26 +1266,26 @@ func (h *RepoHandler) handleDownload(ctx *gin.Context, isResolve bool) {
 
 	filePath := ctx.Param("file_path")
 	filePath = convertFilePathFromRoute(filePath)
+	var branch string
 	if isResolve {
 		branch = ctx.Query("ref")
 	} else {
 		branch = ctx.Param("branch")
 	}
-	mappedBranch := ctx.Param("branch_mapped")
-	if mappedBranch != "" {
+	if mappedBranch := ctx.Param("branch_mapped"); mappedBranch != "" {
 		branch = mappedBranch
 	}
 
 	req := &types.GetFileReq{
-		Namespace: namespace,
-		Name:      name,
-		Path:      filePath,
-		Ref:       branch,
-		Lfs:       false,
-		SaveAs:    filepath.Base(filePath),
-		RepoType:  common.RepoTypeFromContext(ctx),
+		Namespace:     namespace,
+		Name:          name,
+		Path:          filePath,
+		Ref:           branch,
+		Lfs:           false,
+		SaveAs:        filepath.Base(filePath),
+		RepoType:      common.RepoTypeFromContext(ctx),
+		CountDownload: true,
 	}
-	// TODO:move the check into SDKDownloadFile, and can return the file content as we get all the content before check lfs pointer
 	lfs, contentLength, err := h.c.IsLfs(ctx.Request.Context(), req)
 	if err != nil {
 		if errors.Is(err, errorx.ErrNotFound) {
@@ -1285,50 +1294,128 @@ func (h *RepoHandler) handleDownload(ctx *gin.Context, isResolve bool) {
 			return
 		}
 
-		slog.ErrorContext(ctx.Request.Context(), "Filed to lfs information", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get LFS information", "error", err)
 		httpbase.ServerError(ctx, err)
 		return
 	}
 	req.Lfs = lfs
-
-	if contentLength > 0 {
-		// file content is not empty, download it directly
-		reader, size, url, err = h.c.SDKDownloadFile(ctx.Request.Context(), req, currentUser)
+	rangeHeader := ctx.GetHeader("Range")
+	ifRangeHeader := ctx.GetHeader("If-Range")
+	if !req.Lfs && rangeHeader != "" && ifRangeHeader != "" {
+		file, _, err := h.c.HeadDownloadFile(ctx.Request.Context(), req, currentUser)
 		if err != nil {
-			if errors.Is(err, errorx.ErrUnauthorized) {
-				slog.ErrorContext(ctx.Request.Context(), "permission denied when accessing repo", slog.String("repo_type", string(req.RepoType)), slog.Any("path", fmt.Sprintf("%s/%s", namespace, name)))
+			switch {
+			case errors.Is(err, errorx.ErrForbidden):
+				slog.ErrorContext(ctx.Request.Context(), "permission denied when accessing repo head", slog.String("repo_type", string(req.RepoType)), slog.Any("path", fmt.Sprintf("%s/%s", namespace, name)))
+				httpbase.ForbiddenError(ctx, err)
+			case errors.Is(err, errorx.ErrUnauthorized), errors.Is(err, errorx.ErrUserNotFound):
+				slog.ErrorContext(ctx.Request.Context(), "permission denied when accessing repo head", slog.String("repo_type", string(req.RepoType)), slog.Any("path", fmt.Sprintf("%s/%s", namespace, name)))
 				httpbase.UnauthorizedError(ctx, err)
-				return
-			}
-
-			if errors.Is(err, errorx.ErrNotFound) {
-				slog.ErrorContext(ctx.Request.Context(), "repo not found", slog.String("repo_type", string(common.RepoTypeFromContext(ctx))), slog.Any("path", fmt.Sprintf("%s/%s", namespace, name)))
+			case errors.Is(err, errorx.ErrNotFound):
+				slog.ErrorContext(ctx.Request.Context(), "repo not found head", slog.String("repo_type", string(req.RepoType)), slog.Any("path", fmt.Sprintf("%s/%s", namespace, name)))
 				httpbase.NotFoundError(ctx, err)
-				return
+			default:
+				slog.ErrorContext(ctx.Request.Context(), "Failed to get repo file metadata for If-Range", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err))
+				httpbase.ServerError(ctx, err)
 			}
-
-			slog.ErrorContext(ctx.Request.Context(), "Failed to download repo file", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err))
-			httpbase.ServerError(ctx, err)
 			return
+		}
+
+		etag := strconv.Quote(file.SHA)
+		ctx.Header("ETag", etag)
+		if ifRangeHeader != etag {
+			rangeHeader = ""
 		}
 	}
 
-	if req.Lfs {
-		ctx.Redirect(http.StatusMovedPermanently, url)
-	} else {
-		slog.Debug("Download repo file succeed", slog.String("repo_type", string(req.RepoType)), slog.String("name", name), slog.String("path", req.Path), slog.String("ref", req.Ref), slog.Any("Content-Length", size))
-		fileName := path.Base(req.Path)
-		ctx.Header("Content-Type", "application/octet-stream")
-		ctx.Header("Content-Disposition", `attachment; filename="`+fileName+`"`)
-		ctx.Header("Content-Length", strconv.FormatInt(size, 10))
-		if contentLength > 0 {
-			_, err = io.Copy(ctx.Writer, reader)
+	ranges, rangeErr := parseRange(rangeHeader, contentLength)
+	// Full responses, multiple ranges served as a full response, and ranges starting at byte zero count once.
+	req.CountDownload = rangeErr == nil && (len(ranges) != 1 || (ranges[0].length > 0 && ranges[0].start == 0))
+	if rangeErr == nil && len(ranges) == 1 && ranges[0].length > 0 {
+		limit := ranges[0].start + ranges[0].length
+		if limit < contentLength {
+			req.Limit = limit
 		}
-		if err != nil {
-			slog.ErrorContext(ctx.Request.Context(), "Failed to download repo file", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err))
-			httpbase.ServerError(ctx, err)
+	}
+
+	reader, size, downloadURL, err := h.c.SDKDownloadFile(ctx.Request.Context(), req, currentUser)
+	if err != nil {
+		if errors.Is(err, errorx.ErrForbidden) {
+			slog.ErrorContext(ctx.Request.Context(), "permission denied when accessing repo", slog.String("repo_type", string(req.RepoType)), slog.Any("path", fmt.Sprintf("%s/%s", namespace, name)))
+			httpbase.ForbiddenError(ctx, err)
 			return
 		}
+		if errors.Is(err, errorx.ErrUnauthorized) || errors.Is(err, errorx.ErrUserNotFound) {
+			slog.ErrorContext(ctx.Request.Context(), "permission denied when accessing repo", slog.String("repo_type", string(req.RepoType)), slog.Any("path", fmt.Sprintf("%s/%s", namespace, name)))
+			httpbase.UnauthorizedError(ctx, err)
+			return
+		}
+
+		if errors.Is(err, errorx.ErrNotFound) {
+			slog.ErrorContext(ctx.Request.Context(), "repo not found", slog.String("repo_type", string(common.RepoTypeFromContext(ctx))), slog.Any("path", fmt.Sprintf("%s/%s", namespace, name)))
+			httpbase.NotFoundError(ctx, err)
+			return
+		}
+
+		slog.ErrorContext(ctx.Request.Context(), "Failed to download repo file", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	ctx.Header("Accept-Ranges", "bytes")
+	if lfs {
+		ctx.Redirect(http.StatusFound, downloadURL)
+		return
+	}
+	defer reader.Close()
+
+	if size != contentLength {
+		ranges, rangeErr = parseRange(rangeHeader, size)
+	}
+	var (
+		requestedRange httpRange
+		rangeRequested bool
+	)
+	if rangeErr != nil {
+		ctx.Header("Content-Range", fmt.Sprintf("bytes */%d", size))
+		ctx.AbortWithStatus(http.StatusRequestedRangeNotSatisfiable)
+		return
+	}
+	// Only a single range is supported; multiple ranges are ignored and served as a full 200 response.
+	if len(ranges) == 1 {
+		if ranges[0].length == 0 {
+			ctx.Header("Content-Range", fmt.Sprintf("bytes */%d", size))
+			ctx.AbortWithStatus(http.StatusRequestedRangeNotSatisfiable)
+			return
+		}
+		requestedRange = ranges[0]
+		rangeRequested = true
+	}
+
+	slog.Debug("Download repo file succeed", slog.String("repo_type", string(req.RepoType)), slog.String("name", name), slog.String("path", req.Path), slog.String("ref", req.Ref), slog.Any("Content-Length", size))
+	fileName := path.Base(req.Path)
+	ctx.Header("Content-Type", "application/octet-stream")
+	ctx.Header("Content-Disposition", `attachment; filename="`+fileName+`"`)
+	if rangeRequested {
+		if requestedRange.start > 0 {
+			_, err = io.CopyN(io.Discard, reader, requestedRange.start)
+			if err != nil {
+				slog.ErrorContext(ctx.Request.Context(), "Failed to seek repository file range", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err))
+				httpbase.ServerError(ctx, err)
+				return
+			}
+		}
+		ctx.Header("Content-Range", requestedRange.contentRange(size))
+		ctx.Header("Content-Length", strconv.FormatInt(requestedRange.length, 10))
+		ctx.Status(http.StatusPartialContent)
+		_, err = io.CopyN(ctx.Writer, reader, requestedRange.length)
+	} else {
+		ctx.Header("Content-Length", strconv.FormatInt(size, 10))
+		ctx.Status(http.StatusOK)
+		_, err = io.Copy(ctx.Writer, reader)
+	}
+	if err != nil {
+		slog.ErrorContext(ctx.Request.Context(), "Failed to stream repository file", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err))
+		return
 	}
 }
 

@@ -810,28 +810,94 @@ func TestRepoComponent_SDKListFiles(t *testing.T) {
 }
 
 func TestRepoComponent_IsLFS(t *testing.T) {
-	ctx := context.TODO()
-	repo := initializeTestRepoComponent(ctx, t)
+	tests := []struct {
+		name     string
+		content  string
+		wantLFS  bool
+		wantSize int64
+		wantErr  bool
+	}{
+		{name: "regular file", content: "readme", wantSize: 6},
+		{
+			name: "LFS pointer",
+			content: "version https://git-lfs.github.com/spec/v1\n" +
+				"oid sha256:" + strings.Repeat("a", 64) + "\n" +
+				"size 10737418240\n",
+			wantLFS:  true,
+			wantSize: 10737418240,
+		},
+		{name: "invalid LFS pointer", content: types.LFSPrefix, wantSize: -1, wantErr: true},
+	}
 
-	repo.mocks.gitServer.EXPECT().GetRepoFileRaw(ctx, gitserver.GetRepoInfoByPathReq{
-		Namespace: "ns",
-		Name:      "n",
-		Ref:       "main",
-		Path:      "p",
-		RepoType:  types.ModelRepo,
-	}).Return("readme", nil)
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := context.TODO()
+			repo := initializeTestRepoComponent(ctx, t)
+			req := &types.GetFileReq{
+				Namespace: "ns",
+				Name:      "n",
+				Ref:       "main",
+				Path:      "p",
+				RepoType:  types.ModelRepo,
+			}
+			repo.mocks.gitServer.EXPECT().GetRepoFileRaw(ctx, gitserver.GetRepoInfoByPathReq{
+				Namespace: req.Namespace,
+				Name:      req.Name,
+				Ref:       req.Ref,
+				Path:      req.Path,
+				RepoType:  req.RepoType,
+			}).Return(test.content, nil)
 
-	a, b, err := repo.IsLfs(ctx, &types.GetFileReq{
-		Namespace: "ns",
-		Name:      "n",
-		Ref:       "main",
-		Path:      "p",
-		RepoType:  types.ModelRepo,
-	})
-	require.Nil(t, err)
-	require.Equal(t, false, a)
-	require.Equal(t, int64(6), b)
+			lfs, size, err := repo.IsLfs(ctx, req)
 
+			require.Equal(t, test.wantLFS, lfs)
+			require.Equal(t, test.wantSize, size)
+			if test.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
+// TestRepoComponent_IsLFSNotFound verifies wrapped lower-layer not-found errors are normalized.
+func TestRepoComponent_IsLFSNotFound(t *testing.T) {
+	testCases := []struct {
+		name string
+		err  error
+	}{
+		{name: "database repository not found", err: errorx.ErrDatabaseNoRows},
+		{name: "git repository not found", err: errorx.ErrGitRepoNotFound},
+		{name: "git file not found", err: errorx.ErrGitFileNotFound},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			ctx := context.TODO()
+			repo := initializeTestRepoComponent(ctx, t)
+			req := &types.GetFileReq{
+				Namespace: "ns",
+				Name:      "n",
+				Ref:       "main",
+				Path:      "p",
+				RepoType:  types.ModelRepo,
+			}
+			repo.mocks.gitServer.EXPECT().GetRepoFileRaw(ctx, gitserver.GetRepoInfoByPathReq{
+				Namespace: req.Namespace,
+				Name:      req.Name,
+				Ref:       req.Ref,
+				Path:      req.Path,
+				RepoType:  req.RepoType,
+			}).Return("", fmt.Errorf("wrapped not-found error: %w", testCase.err))
+
+			lfs, size, err := repo.IsLfs(ctx, req)
+
+			require.False(t, lfs)
+			require.Equal(t, int64(-1), size)
+			require.ErrorIs(t, err, errorx.ErrNotFound)
+		})
+	}
 }
 
 func TestRepoComponent_HeadDownloadFile(t *testing.T) {
@@ -873,17 +939,42 @@ func TestRepoComponent_HeadDownloadFile(t *testing.T) {
 
 }
 
+// TestRepoComponent_HeadDownloadFileNotFound verifies a missing database repository is normalized.
+func TestRepoComponent_HeadDownloadFileNotFound(t *testing.T) {
+	ctx := context.TODO()
+	repo := initializeTestRepoComponent(ctx, t)
+	repo.mocks.stores.RepoMock().EXPECT().FindByPath(
+		ctx, types.ModelRepo, "ns", "n",
+	).Return(nil, fmt.Errorf("wrapped database error: %w", errorx.ErrDatabaseNoRows))
+
+	file, commit, err := repo.HeadDownloadFile(ctx, &types.GetFileReq{
+		Namespace: "ns",
+		Name:      "n",
+		Ref:       "main",
+		Path:      "path",
+		RepoType:  types.ModelRepo,
+	}, "user")
+
+	require.Nil(t, file)
+	require.Nil(t, commit)
+	require.ErrorIs(t, err, errorx.ErrNotFound)
+}
+
+// TestRepoComponent_SDKDownloadFile verifies SDK downloads honor the explicit statistics flag.
 func TestRepoComponent_SDKDownloadFile(t *testing.T) {
 	for _, lfs := range []bool{false, true} {
 		t.Run(fmt.Sprintf("is lfs: %v", lfs), func(t *testing.T) {
 			ctx := context.TODO()
 			repo := initializeTestRepoComponent(ctx, t)
+			var limit int64
+			if !lfs {
+				limit = 6
+			}
 
 			mockedRepo := &database.Repository{}
 			repo.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "ns", "n").Return(
 				mockedRepo, nil,
 			)
-			repo.mocks.stores.RepoMock().EXPECT().UpdateRepoFileDownloads(ctx, mockedRepo, mock.Anything, int64(1)).Return(nil)
 
 			if lfs {
 
@@ -907,6 +998,7 @@ func TestRepoComponent_SDKDownloadFile(t *testing.T) {
 					Ref:       "main",
 					Path:      "path",
 					RepoType:  types.ModelRepo,
+					Limit:     limit,
 				}).Return(nil, 100, nil)
 			}
 
@@ -919,6 +1011,7 @@ func TestRepoComponent_SDKDownloadFile(t *testing.T) {
 				Lfs:         lfs,
 				SaveAs:      "zzz",
 				CurrentUser: "user",
+				Limit:       limit,
 			}, "user")
 			require.Nil(t, err)
 			if lfs {
@@ -933,6 +1026,32 @@ func TestRepoComponent_SDKDownloadFile(t *testing.T) {
 		})
 	}
 
+	t.Run("count download", func(t *testing.T) {
+		ctx := context.TODO()
+		repo := initializeTestRepoComponent(ctx, t)
+		mockedRepo := &database.Repository{}
+		repo.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "ns", "n").Return(mockedRepo, nil)
+		repo.mocks.gitServer.EXPECT().GetRepoFileReader(ctx, gitserver.GetRepoInfoByPathReq{
+			Namespace: "ns",
+			Name:      "n",
+			Ref:       "main",
+			Path:      "path",
+			RepoType:  types.ModelRepo,
+		}).Return(nil, 100, nil)
+		repo.mocks.stores.RepoMock().EXPECT().UpdateRepoFileDownloads(ctx, mockedRepo, mock.Anything, int64(1)).Return(nil)
+
+		_, _, _, err := repo.SDKDownloadFile(ctx, &types.GetFileReq{
+			Namespace:     "ns",
+			Name:          "n",
+			Ref:           "main",
+			Path:          "path",
+			RepoType:      types.ModelRepo,
+			CurrentUser:   "user",
+			CountDownload: true,
+		}, "user")
+
+		require.NoError(t, err)
+	})
 }
 
 func TestRepoComponent_ListRuntimeFrameworkWithType(t *testing.T) {

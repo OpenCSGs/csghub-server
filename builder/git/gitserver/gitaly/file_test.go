@@ -178,6 +178,7 @@ func TestGitalyFile_GetRepoFileReader(t *testing.T) {
 		},
 		Revision: []byte("main"),
 		Path:     []byte("foo"),
+		Limit:    6,
 	}).Return(mockedStream, nil)
 	r, size, err := tester.GetRepoFileReader(ctx, gitserver.GetRepoInfoByPathReq{
 		Namespace: "ns",
@@ -185,6 +186,7 @@ func TestGitalyFile_GetRepoFileReader(t *testing.T) {
 		Ref:       "main",
 		Path:      "foo",
 		RepoType:  types.ModelRepo,
+		Limit:     6,
 	})
 	require.NoError(t, err)
 	require.Equal(t, int64(2), size)
