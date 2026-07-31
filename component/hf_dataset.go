@@ -81,7 +81,7 @@ func (h *hFDatasetComponentImpl) GetPathsInfo(ctx context.Context, req types.Pat
 			Type: "file",
 			Path: file.Path,
 			Size: file.Size,
-			OID:  file.LastCommitSHA,
+			OID:  file.SHA,
 		},
 	}
 
@@ -102,6 +102,10 @@ func (h *hFDatasetComponentImpl) GetDatasetTree(ctx context.Context, req types.P
 		return nil, errorx.ErrUnauthorized
 	}
 
+	if req.Recursive {
+		return h.getRecursiveDatasetTree(ctx, req)
+	}
+
 	var treeFiles []types.HFDSPathInfo
 
 	getRepoFileTree := gitserver.GetRepoInfoByPathReq{
@@ -113,13 +117,52 @@ func (h *hFDatasetComponentImpl) GetDatasetTree(ctx context.Context, req types.P
 	}
 	tree, err := h.gitServer.GetRepoFileTree(ctx, getRepoFileTree)
 	if err != nil {
-		slog.Warn("failed to get repo file tree", slog.Any("getRepoFileTree", getRepoFileTree), slog.String("error", err.Error()))
-		return []types.HFDSPathInfo{}, nil
+		return nil, fmt.Errorf("failed to get dataset repo file tree, error: %w", err)
 	}
-	slog.Debug("get tree", slog.Any("tree", tree))
 
 	for _, item := range tree {
-		treeFiles = append(treeFiles, types.HFDSPathInfo{Type: item.Type, OID: item.LastCommitSHA, Size: item.Size, Path: item.Path})
+		treeFiles = append(treeFiles, types.HFDSPathInfo{Type: item.Type, OID: item.SHA, Size: item.Size, Path: item.Path})
+	}
+	return treeFiles, nil
+}
+
+
+// getRecursiveDatasetTree returns all files in the dataset repo recursively using cursor-based pagination.
+func (h *hFDatasetComponentImpl) getRecursiveDatasetTree(ctx context.Context, req types.PathReq) ([]types.HFDSPathInfo, error) {
+	var treeFiles []types.HFDSPathInfo
+	var cursor string
+	for {
+		resp, err := h.gitServer.GetTree(ctx, types.GetTreeRequest{
+			Namespace: req.Namespace,
+			Name:      req.Name,
+			Ref:       req.Ref,
+			Path:      req.Path,
+			RepoType:  types.DatasetRepo,
+			Recursive: true,
+			Limit:     types.MaxFileTreeSize,
+			Cursor:    cursor,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to get recursive dataset tree, error: %w", err)
+		}
+		if resp == nil {
+			break
+		}
+		for _, item := range resp.Files {
+			if item.Type == "dir" {
+				continue
+			}
+			treeFiles = append(treeFiles, types.HFDSPathInfo{
+				Type: item.Type,
+				OID:  item.SHA,
+				Size: item.Size,
+				Path: item.Path,
+			})
+		}
+		cursor = resp.Cursor
+		if cursor == "" {
+			break
+		}
 	}
 	return treeFiles, nil
 }

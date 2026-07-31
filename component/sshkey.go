@@ -62,21 +62,15 @@ func (c *sSHKeyComponentImpl) Create(ctx context.Context, req *types.CreateSSHKe
 	if contentExistsKey.ID != 0 {
 		return nil, fmt.Errorf("ssh key already exists")
 	}
-	sk, err := c.gitServer.CreateSSHKey(req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create git SSH key,error:%w", err)
-	}
 	fingerprint, err := common.CalculateSSHKeyFingerprint(req.Content)
 	if err != nil {
 		return nil, fmt.Errorf("failed to calculate ssh key fingerprint,error:%w", err)
 	}
-	if sk == nil {
-		sk = &database.SSHKey{
-			GitID:   0,
-			Name:    req.Name,
-			Content: req.Content,
-			UserID:  user.ID,
-		}
+	sk := &database.SSHKey{
+		GitID:   0,
+		Name:    req.Name,
+		Content: req.Content,
+		UserID:  user.ID,
 	}
 	sk.UserID = user.ID
 	sk.FingerprintSHA256 = fingerprint
@@ -99,10 +93,6 @@ func (c *sSHKeyComponentImpl) Delete(ctx context.Context, username, name string)
 	sshKey, err := c.sshKeyStore.FindByUsernameAndName(ctx, username, name)
 	if err != nil {
 		return fmt.Errorf("failed to get database SSH keys,error:%w", err)
-	}
-	err = c.gitServer.DeleteSSHKey(int(sshKey.GitID))
-	if err != nil {
-		return fmt.Errorf("failed to delete git SSH keys,error:%w", err)
 	}
 	// Delete API will force delete the key, not soft delete
 	err = c.sshKeyStore.Delete(ctx, sshKey.ID)

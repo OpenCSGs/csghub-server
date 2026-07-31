@@ -4,7 +4,6 @@ import (
 	"context"
 	"io"
 
-	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/types"
 )
 
@@ -14,13 +13,6 @@ const (
 )
 
 type GitServer interface {
-	CreateUser(CreateUserRequest) (*CreateUserResponse, error)
-	// Depricated, will be removed in next version
-	UpdateUser(*types.UpdateUserRequest, *database.User) (*database.User, error)
-	UpdateUserV2(UpdateUserRequest) error
-	CreateUserToken(*types.CreateUserTokenRequest) (*database.AccessToken, error)
-	DeleteUserToken(*types.DeleteUserTokenRequest) error
-
 	RepositoryExists(ctx context.Context, req CheckRepoReq) (bool, error)
 	GetRepo(ctx context.Context, req GetRepoReq) (*CreateRepoResp, error)
 	CreateRepo(ctx context.Context, req CreateRepoReq) (*CreateRepoResp, error)
@@ -41,7 +33,6 @@ type GitServer interface {
 	GetLogsTree(ctx context.Context, req types.GetLogsTreeRequest) (*types.LogsTreeResp, error)
 	GetRepoFileRaw(ctx context.Context, req GetRepoInfoByPathReq) (string, error)
 	GetRepoFileReader(ctx context.Context, req GetRepoInfoByPathReq) (io.ReadCloser, int64, error)
-	GetRepoLfsFileRaw(ctx context.Context, req GetRepoInfoByPathReq) (io.ReadCloser, error)
 	GetRepoFileContents(ctx context.Context, req GetRepoInfoByPathReq) (*types.File, error)
 	CreateRepoFile(req *types.CreateFileReq) (err error)
 	UpdateRepoFile(req *types.UpdateFileReq) (err error)
@@ -51,21 +42,10 @@ type GitServer interface {
 	GetDiffBetweenTwoCommits(ctx context.Context, req GetDiffBetweenTwoCommitsReq) (*types.GiteaCallbackPushReq, error)
 	GetRepoFiles(ctx context.Context, req GetRepoFilesReq) ([]*types.File, error)
 
-	CreateSSHKey(*types.CreateSSHKeyRequest) (*database.SSHKey, error)
-	// ListSSHKeys(string, int, int) ([]*database.SSHKey, error)
-	DeleteSSHKey(int) error
-
-	CreateOrganization(req *types.CreateOrgReq, orgOwner database.User) (*database.Organization, error)
-	DeleteOrganization(string) error
-	UpdateOrganization(*types.EditOrgReq, *database.Organization) (*database.Organization, error)
-
-	FixOrganization(req *types.CreateOrgReq, orgOwner database.User) error
-	FixUserData(ctx context.Context, userName string) error
-
 	// Mirror
-	// CreateMirrorRepo creates a mirror repository and returns a gitea task id
+	// CreateMirrorRepo creates a mirror repository and returns a task id
 	CreateMirrorRepo(ctx context.Context, req CreateMirrorRepoReq) (int64, error)
-	// MirrorSync requests the Gitea to start mirror synchronization
+	// MirrorSync requests to start mirror synchronization
 	MirrorSync(ctx context.Context, req MirrorSyncReq) error
 
 	// For gitaly smart http methods

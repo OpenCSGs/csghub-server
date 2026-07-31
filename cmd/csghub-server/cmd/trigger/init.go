@@ -13,10 +13,8 @@ import (
 func init() {
 	Cmd.AddCommand(
 		gitCallbackCmd,
-		fixOrgDataCmd,
 		fixOrgCasdoorUserCmd,
 		fixCasdoorUsernameCmd,
-		fixUserDataCmd,
 		updateRepoCmd,
 		fixRepoSourceCmd,
 		migrateRepoPathCmd,

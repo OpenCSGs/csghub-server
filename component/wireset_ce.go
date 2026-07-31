@@ -8,7 +8,6 @@ import (
 	mock_dataviewer_client "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/dataviewer"
 	mock_deploy "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/deploy"
 	mock_git "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/git/gitserver"
-	mock_mirror "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/git/mirrorserver"
 	mock_importer "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/importer"
 	mock_multisync "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/multisync"
 	mock_preader "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/parquet"
@@ -19,7 +18,6 @@ import (
 	mock_cache "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/mirror/cache"
 	"opencsg.com/csghub-server/builder/deploy"
 	"opencsg.com/csghub-server/builder/git/gitserver"
-	"opencsg.com/csghub-server/builder/git/mirrorserver"
 	"opencsg.com/csghub-server/builder/multisync"
 	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/s3"
@@ -34,7 +32,6 @@ type Mocks struct {
 	gitServer        *mock_git.MockGitServer
 	userSvcClient    *mock_rpc.MockUserSvcClient
 	s3Client         *mock_s3.MockClient
-	mirrorServer     *mock_mirror.MockMirrorServer
 	deployer         *mock_deploy.MockDeployer
 	cache            *mock_cache.MockCache
 	accountingClient *mock_accounting.MockAccountingClient
@@ -46,6 +43,7 @@ type Mocks struct {
 	multiSyncClient  *mock_multisync.MockClient
 	s3Core           *mock_s3.MockCore
 	checker          *mock_checker.MockGitCallbackChecker
+	xnetClient       *mock_rpc.MockXnetSvcClient
 }
 
 var AllMockSet = wire.NewSet(
@@ -55,7 +53,7 @@ var AllMockSet = wire.NewSet(
 
 var MockSuperSet = wire.NewSet(
 	MockedComponentSet, AllMockSet, MockedStoreSet, MockedGitServerSet, MockedUserSvcSet,
-	MockedXnetSvcClientSet, MockedS3Set, MockedS3CoreSet, MockedMultiSyncClientSet, MockedDeployerSet, MockedCacheSet, ProvideTestConfig, MockedMirrorServerSet,
+	MockedXnetSvcClientSet, MockedS3Set, MockedS3CoreSet, MockedMultiSyncClientSet, MockedDeployerSet, MockedCacheSet, ProvideTestConfig,
 	MockedAccountingClientSet, MockedParquetReaderSet, MockedCheckerSet,
 	MockedModerationSvcClientSet, MockedRsaReader, MockedImporterSet, MockedDataviewerClientSet,
 )
@@ -93,10 +91,10 @@ func NewTestSpaceResourceComponent(config *config.Config, stores *tests.MockStor
 	return &spaceResourceComponentImpl{
 		spaceResourceStore:      stores.SpaceResource,
 		scenarioConstraintStore: stores.ScenarioConstraint,
-		deployer:           deployer,
-		userStore:          stores.User,
-		accountComponent:   accountComponent,
-		config:             config,
+		deployer:                deployer,
+		userStore:               stores.User,
+		accountComponent:        accountComponent,
+		config:                  config,
 	}
 }
 
@@ -107,7 +105,7 @@ func NewTestMirrorNamespaceMappingComponent(config *config.Config, stores *tests
 	}
 }
 
-func NewTestRepoComponent(config *config.Config, stores *tests.MockStores, rpcUser rpc.UserSvcClient, gitServer gitserver.GitServer, tagComponent TagComponent, s3Client s3.Client, deployer deploy.Deployer, cache cache.Cache, accountingComponent AccountingComponent, mirrorServer mirrorserver.MirrorServer, multiSyncClient multisync.Client, xnetClient rpc.XnetSvcClient, clusterComponent ClusterComponent) *repoComponentImpl {
+func NewTestRepoComponent(config *config.Config, stores *tests.MockStores, rpcUser rpc.UserSvcClient, gitServer gitserver.GitServer, tagComponent TagComponent, s3Client s3.Client, deployer deploy.Deployer, cache cache.Cache, accountingComponent AccountingComponent, multiSyncClient multisync.Client, xnetClient rpc.XnetSvcClient, clusterComponent ClusterComponent) *repoComponentImpl {
 	return &repoComponentImpl{
 		userStore:                      stores.User,
 		repoStore:                      stores.Repo,
@@ -131,7 +129,6 @@ func NewTestRepoComponent(config *config.Config, stores *tests.MockStores, rpcUs
 		clusterInfoStore:               stores.ClusterInfo,
 		accountingComponent:            accountingComponent,
 		spaceResourceStore:             stores.SpaceResource,
-		mirrorServer:                   mirrorServer,
 		fileStore:                      stores.File,
 		multiSyncClient:                multiSyncClient,
 		mirrorTaskStore:                stores.MirrorTaskStore,

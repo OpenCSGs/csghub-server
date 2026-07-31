@@ -36,13 +36,6 @@ func TestOrganizationComponent_Create(t *testing.T) {
 	mockNamespaceStore.EXPECT().Exists(mock.Anything, req.Name).Return(false, nil).Once()
 	mockNamespaceStore.EXPECT().ExistsByUUID(mock.Anything, mock.Anything).Return(false, nil).Once()
 
-	mockGitServer := mockgit.NewMockGitServer(t)
-	mockGitServer.EXPECT().CreateOrganization(mock.Anything, mock.Anything).Return(&database.Organization{
-		ID:       1,
-		Name:     req.Name,
-		Nickname: req.Nickname,
-	}, nil).Once()
-
 	mockOrgStore := mockdb.NewMockOrgStore(t)
 	mockOrgStore.EXPECT().Create(mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 
@@ -62,7 +55,6 @@ func TestOrganizationComponent_Create(t *testing.T) {
 	c := &organizationComponentImpl{
 		userStore: mockUserStore,
 		nsStore:   mockNamespaceStore,
-		gs:        mockGitServer,
 		orgStore:  mockOrgStore,
 		tagStore:  mockTagStore,
 		msc:       mockMemberComponent,
@@ -575,7 +567,7 @@ func TestOrganizationComponent_Update(t *testing.T) {
 	}
 
 	mockGitServer := mockgit.NewMockGitServer(t)
-	mockGitServer.EXPECT().UpdateOrganization(mock.Anything, mock.Anything).Return(nil, nil).Once()
+
 
 	c := &organizationComponentImpl{
 		orgStore:  mockOrgStore,

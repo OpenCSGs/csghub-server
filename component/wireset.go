@@ -6,7 +6,6 @@ import (
 	mock_dataviewer_client "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/dataviewer"
 	mock_deploy "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/deploy"
 	mock_git "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/git/gitserver"
-	mock_mirror "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/git/mirrorserver"
 	mock_importer "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/importer"
 	mock_multisync "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/multisync"
 	mock_preader "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/parquet"
@@ -21,7 +20,6 @@ import (
 	"opencsg.com/csghub-server/builder/accounting"
 	"opencsg.com/csghub-server/builder/deploy"
 	"opencsg.com/csghub-server/builder/git/gitserver"
-	"opencsg.com/csghub-server/builder/git/mirrorserver"
 	"opencsg.com/csghub-server/builder/importer"
 	"opencsg.com/csghub-server/builder/llm"
 	"opencsg.com/csghub-server/builder/multisync"
@@ -108,11 +106,6 @@ var MockedDeployerSet = wire.NewSet(
 var MockedCacheSet = wire.NewSet(
 	mock_cache.NewMockCache,
 	wire.Bind(new(cache.Cache), new(*mock_cache.MockCache)),
-)
-
-var MockedMirrorServerSet = wire.NewSet(
-	mock_mirror.NewMockMirrorServer,
-	wire.Bind(new(mirrorserver.MirrorServer), new(*mock_mirror.MockMirrorServer)),
 )
 
 var MockedAccountingClientSet = wire.NewSet(
@@ -348,7 +341,7 @@ func NewTestRuntimeArchitectureComponent(stores *tests.MockStores, repoComponent
 
 var RuntimeArchComponentSet = wire.NewSet(NewTestRuntimeArchitectureComponent)
 
-func NewTestMirrorComponent(config *config.Config, stores *tests.MockStores, _ mirrorserver.MirrorServer, repoComponent RepoComponent, _ gitserver.GitServer, _ s3.Client) *mirrorComponentImpl {
+func NewTestMirrorComponent(config *config.Config, stores *tests.MockStores, repoComponent RepoComponent, _ gitserver.GitServer, _ s3.Client) *mirrorComponentImpl {
 	return &mirrorComponentImpl{
 		repoComp:                    repoComponent,
 		accessTokenStore:            stores.AccessToken,

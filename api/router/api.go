@@ -1194,6 +1194,8 @@ func createMappingRoutes(
 				hfModelAPIGroup.GET("/:namespace/:name", middleware.RepoMapping(types.ModelRepo), modelHandler.SDKModelInfo)
 				hfModelAPIGroup.POST("/:namespace/:name/preupload/:revision", middleware.RepoMapping(types.ModelRepo), repoCommonHandler.PreuploadHF)
 				hfModelAPIGroup.POST("/:namespace/:name/commit/:revision", middleware.RepoMapping(types.ModelRepo), repoCommonHandler.CommitFilesHF)
+				hfModelAPIGroup.GET("/:namespace/:name/tree/:ref/*path_in_repo", middleware.RepoMapping(types.ModelRepo), modelHandler.SDKModelTree)
+
 			}
 			hfDSAPIGroup := hfAPIGroup.Group("/datasets")
 			{

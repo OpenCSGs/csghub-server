@@ -102,10 +102,6 @@ packages:
     config:
     interfaces:
       GitServer:
-  opencsg.com/csghub-server/builder/git/mirrorserver:
-    config:
-    interfaces:
-      MirrorServer:
   opencsg.com/csghub-server/builder/git/membership:
     config:
     interfaces:

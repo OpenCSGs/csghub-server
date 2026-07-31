@@ -75,6 +75,7 @@ type ModelComponent interface {
 	Show(ctx context.Context, namespace, name, currentUser string, needOpWeight, needMultiSync bool) (*types.Model, error)
 	GetServerless(ctx context.Context, namespace, name, currentUser string) (*types.DeployRequest, error)
 	SDKModelInfo(ctx context.Context, namespace, name, ref, currentUser string, blobs bool) (*types.SDKModelInfo, error)
+	SDKModelTree(ctx context.Context, namespace, name, ref, currentUser, path string, recursive bool) ([]types.HFDSPathInfo, error)
 	Relations(ctx context.Context, namespace, name, currentUser string) (*types.Relations, error)
 	SetRelationDatasets(ctx context.Context, req types.RelationDatasets) error
 	AddRelationDataset(ctx context.Context, req types.RelationDataset) error
@@ -816,6 +817,83 @@ func (c *modelComponentImpl) SDKModelInfo(ctx context.Context, namespace, name, 
 	}
 
 	return resModel, nil
+}
+
+func (c *modelComponentImpl) SDKModelTree(ctx context.Context, namespace, name, ref, currentUser, path string, recursive bool) ([]types.HFDSPathInfo, error) {
+	model, err := c.modelStore.FindByPath(ctx, namespace, name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find model for tree, error: %w", err)
+	}
+
+	allow, err := c.repoComponent.AllowReadAccessRepo(ctx, model.Repository, currentUser)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check model permission, error: %w", err)
+	}
+	if !allow {
+		return nil, errorx.ErrUnauthorized
+	}
+
+	if recursive {
+		return c.getRecursiveModelTree(ctx, namespace, name, ref, path)
+	}
+
+	getRepoFileTree := gitserver.GetRepoInfoByPathReq{
+		Namespace: namespace,
+		Name:      name,
+		Path:      path,
+		RepoType:  types.ModelRepo,
+		Ref:       ref,
+	}
+	tree, err := c.gitServer.GetRepoFileTree(ctx, getRepoFileTree)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get repo file tree, error: %w", err)
+	}
+
+	treeFiles := make([]types.HFDSPathInfo, 0, len(tree))
+	for _, item := range tree {
+		treeFiles = append(treeFiles, types.HFDSPathInfo{Type: item.Type, OID: item.SHA, Size: item.Size, Path: item.Path})
+	}
+	return treeFiles, nil
+}
+
+// getRecursiveModelTree returns all files in the model repo recursively using cursor-based pagination.
+func (c *modelComponentImpl) getRecursiveModelTree(ctx context.Context, namespace, name, ref, path string) ([]types.HFDSPathInfo, error) {
+	var treeFiles []types.HFDSPathInfo
+	var cursor string
+	for {
+		resp, err := c.gitServer.GetTree(ctx, types.GetTreeRequest{
+			Namespace: namespace,
+			Name:      name,
+			Ref:       ref,
+			Path:      path,
+			RepoType:  types.ModelRepo,
+			Recursive: true,
+			Limit:     types.MaxFileTreeSize,
+			Cursor:    cursor,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to get recursive model tree, error: %w", err)
+		}
+		if resp == nil {
+			break
+		}
+		for _, item := range resp.Files {
+			if item.Type == "dir" {
+				continue
+			}
+			treeFiles = append(treeFiles, types.HFDSPathInfo{
+				Type: item.Type,
+				OID:  item.SHA,
+				Size: item.Size,
+				Path: item.Path,
+			})
+		}
+		cursor = resp.Cursor
+		if cursor == "" {
+			break
+		}
+	}
+	return treeFiles, nil
 }
 
 func (c *modelComponentImpl) Relations(ctx context.Context, namespace, name, currentUser string) (*types.Relations, error) {
