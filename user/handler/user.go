@@ -43,6 +43,7 @@ const (
 	VSCODE    = "vscode"
 	JETBRAINS = "jetbrains"
 	CASDOOR   = "casdoor"
+	MASKSTR   = "xxx"
 )
 
 func NewUserHandler(config *config.Config) (*UserHandler, error) {
@@ -391,8 +392,9 @@ func (h *UserHandler) Casdoor(ctx *gin.Context) {
 	}
 
 	var (
-		targetUrl      string
-		starshipApiKey string
+		targetUrl       string
+		targetUrlMasked string
+		starshipApiKey  string
 	)
 
 	if state == VSCODE || state == JETBRAINS {
@@ -411,8 +413,10 @@ func (h *UserHandler) Casdoor(ctx *gin.Context) {
 			codeSoulerEndpoint = h.codeSoulerJetbrainsRedirectURL
 		}
 		targetUrl = fmt.Sprintf("%s?apikey=%s&portal_url=%s&jwt=%s", codeSoulerEndpoint, starshipApiKey, h.signinSuccessRedirectURL, signed)
+		targetUrlMasked = fmt.Sprintf("%s?apikey=%s&portal_url=%s&jwt=%s", codeSoulerEndpoint, MASKSTR, h.signinSuccessRedirectURL, MASKSTR)
 	} else if state == CASDOOR {
 		targetUrl = fmt.Sprintf("%s?jwt=%s", h.signinSuccessRedirectURL, signed)
+		targetUrlMasked = fmt.Sprintf("%s?jwt=%s", h.signinSuccessRedirectURL, MASKSTR)
 	} else {
 		// parse state as url and get host
 		var flowURL *url.URL
@@ -433,9 +437,10 @@ func (h *UserHandler) Casdoor(ctx *gin.Context) {
 		query.Set("jwt_token", signed)
 		flowURL.RawQuery = query.Encode()
 		targetUrl = flowURL.String()
+		targetUrlMasked = flowURL.String()
 	}
 
-	slog.InfoContext(ctx.Request.Context(), "generate login redirect url", slog.Any("targetUrl", targetUrl))
+	slog.InfoContext(ctx.Request.Context(), "generate login redirect url", slog.String("targetUrl", targetUrlMasked))
 	redirectWithoutBody(ctx, http.StatusFound, targetUrl)
 }
 
@@ -508,12 +513,13 @@ func (h *UserHandler) UpdateVerify(ctx *gin.Context) {
 	if req.Status != types.VerifyStatusRejected && req.Status != types.VerifyStatusApproved {
 		slog.ErrorContext(ctx.Request.Context(), "Bad request format", slog.String("err", "Not allowed status"))
 		httpbase.BadRequestWithExt(ctx, errorx.ReqParamInvalid(errors.New("not allowed status"), nil))
+		return
 	}
 
 	if req.Status == types.VerifyStatusRejected && req.Reason == "" {
 		slog.ErrorContext(ctx.Request.Context(), "Bad request format", slog.String("err", "rejected need reason"))
 		httpbase.BadRequestWithExt(ctx, errorx.ReqParamInvalid(errors.New("rejected need reason"), nil))
-
+		return
 	}
 
 	orgVerify, err := h.uv.Update(ctx, vID, req.Status, req.Reason)
