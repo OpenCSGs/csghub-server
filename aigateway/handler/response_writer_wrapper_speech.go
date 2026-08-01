@@ -25,8 +25,8 @@ type speechResponseWriter interface {
 // NewResponseWriterWrapperSpeech wraps the response of an OpenAI-compatible
 // text-to-speech request (POST /v1/audio/speech). Binary audio responses and
 // raw audio streams pass through unchanged; SSE responses (stream=true or
-// stream_format="sse") are decoded to capture token usage from the terminal
-// speech.audio.done event.
+// stream_format="sse") are decoded to capture token usage and generated
+// duration from the terminal speech.audio.done event.
 func NewResponseWriterWrapperSpeech(internalWriter http.ResponseWriter, tokenCounter *token.AudioUsageCounter) speechResponseWriter {
 	return &speechAudioResponseWriter{
 		internalWriter: internalWriter,
@@ -89,8 +89,9 @@ func (rw *speechAudioResponseWriter) captureUsage(payload []byte) {
 		return
 	}
 	var event struct {
-		Type  string `json:"type"`
-		Usage struct {
+		Type     string  `json:"type"`
+		Duration float64 `json:"duration"`
+		Usage    struct {
 			InputTokens  int64 `json:"input_tokens"`
 			OutputTokens int64 `json:"output_tokens"`
 			TotalTokens  int64 `json:"total_tokens"`
@@ -101,6 +102,9 @@ func (rw *speechAudioResponseWriter) captureUsage(payload []byte) {
 	}
 	if event.Type != "speech.audio.done" {
 		return
+	}
+	if event.Duration > 0 {
+		rw.tokenCounter.Duration(event.Duration)
 	}
 	if event.Usage.TotalTokens == 0 && event.Usage.InputTokens == 0 && event.Usage.OutputTokens == 0 {
 		return
