@@ -29,18 +29,18 @@ func TestOrganizationStore_CRUD(t *testing.T) {
 	require.Nil(t, err)
 
 	//search with name
-	orgs, total, err := store.Search(ctx, "o1", 10, 1, "", "")
+	orgs, total, err := store.Search(ctx, "o1", 10, 1, "", "", "")
 	require.Nil(t, err)
 	require.Equal(t, 1, total)
 	require.Equal(t, "o1", orgs[0].Name)
 	require.Equal(t, uuid, orgs[0].UUID)
 	//search with nickname
-	orgs, total, err = store.Search(ctx, "nickname", 10, 1, "", "")
+	orgs, total, err = store.Search(ctx, "nickname", 10, 1, "", "", "")
 	require.Nil(t, err)
 	require.Equal(t, 1, total)
 	require.Equal(t, "o1_nickname", orgs[0].Nickname)
 	//empty search second page
-	orgs, total, err = store.Search(ctx, "nickname", 10, 2, "", "")
+	orgs, total, err = store.Search(ctx, "nickname", 10, 2, "", "", "")
 	require.Nil(t, err)
 	require.Equal(t, 1, total)
 	require.Empty(t, orgs)
@@ -142,7 +142,7 @@ func TestOrganization_CreateWithForceDelete(t *testing.T) {
 	err = orgStore.Delete(ctx, "o1")
 	require.Nil(t, err)
 
-	orgs, total, err := orgStore.Search(ctx, "o1", 10, 1, "", "")
+	orgs, total, err := orgStore.Search(ctx, "o1", 10, 1, "", "", "")
 	require.Nil(t, err)
 	require.Equal(t, 0, total)
 	require.Empty(t, orgs)
@@ -300,7 +300,7 @@ func TestOrganizationStore_SearchOrder(t *testing.T) {
 		require.Nil(t, err)
 	}
 
-	orgs, total, err := store.Search(ctx, "sss", 10, 1, "", "")
+	orgs, total, err := store.Search(ctx, "sss", 10, 1, "", "", "")
 	require.Nil(t, err)
 	require.Equal(t, 5, total)
 
@@ -398,13 +398,13 @@ func TestOrganizationStore_SearchOrderCaseInsensitive(t *testing.T) {
 	}, &database.Namespace{Path: "other"})
 	require.Nil(t, err)
 
-	orgs, total, err := store.Search(ctx, "sss-exact", 10, 1, "", "")
+	orgs, total, err := store.Search(ctx, "sss-exact", 10, 1, "", "", "")
 	require.Nil(t, err)
 	require.Equal(t, 1, total)
 	require.Len(t, orgs, 1)
 	require.Equal(t, "SSS-Exact", orgs[0].Name)
 
-	orgs, total, err = store.Search(ctx, "SSS", 10, 1, "", "")
+	orgs, total, err = store.Search(ctx, "SSS", 10, 1, "", "", "")
 	require.Nil(t, err)
 	require.Equal(t, 2, total)
 	require.True(t, slices.Equal([]string{"SSS-Exact", "other"}, []string{orgs[0].Name, orgs[1].Name}))
@@ -454,7 +454,7 @@ func TestOrganizationStore_SearchUserBelongOrgs(t *testing.T) {
 	}
 
 	// user1: all member orgs
-	orgs, total, err := store.SearchUserBelongOrgs(ctx, user1.ID, "", 10, 1, "", "", "")
+	orgs, total, err := store.SearchUserBelongOrgs(ctx, user1.ID, "", 10, 1, "", "", "", "")
 	require.Nil(t, err)
 	require.Equal(t, 2, total)
 	names := make(map[string]bool, len(orgs))
@@ -465,43 +465,43 @@ func TestOrganizationStore_SearchUserBelongOrgs(t *testing.T) {
 	require.True(t, names["belong_org2"])
 
 	// user1: admin role only
-	orgs, total, err = store.SearchUserBelongOrgs(ctx, user1.ID, "", 10, 1, "", "", "admin")
+	orgs, total, err = store.SearchUserBelongOrgs(ctx, user1.ID, "", 10, 1, "", "", "admin", "")
 	require.Nil(t, err)
 	require.Equal(t, 1, total)
 	require.Equal(t, "belong_org1", orgs[0].Name)
 
 	// user1: write role only
-	orgs, total, err = store.SearchUserBelongOrgs(ctx, user1.ID, "", 10, 1, "", "", "write")
+	orgs, total, err = store.SearchUserBelongOrgs(ctx, user1.ID, "", 10, 1, "", "", "write", "")
 	require.Nil(t, err)
 	require.Equal(t, 1, total)
 	require.Equal(t, "belong_org2", orgs[0].Name)
 
 	// user1: owner role — only belong_org3 (user_id = user1.ID)
-	orgs, total, err = store.SearchUserBelongOrgs(ctx, user1.ID, "", 10, 1, "", "", "owner")
+	orgs, total, err = store.SearchUserBelongOrgs(ctx, user1.ID, "", 10, 1, "", "", "owner", "")
 	require.Nil(t, err)
 	require.Equal(t, 1, total)
 	require.Equal(t, "belong_org3", orgs[0].Name)
 
 	// user2: all member orgs (only read on org1)
-	orgs, total, err = store.SearchUserBelongOrgs(ctx, user2.ID, "", 10, 1, "", "", "")
+	orgs, total, err = store.SearchUserBelongOrgs(ctx, user2.ID, "", 10, 1, "", "", "", "")
 	require.Nil(t, err)
 	require.Equal(t, 1, total)
 	require.Equal(t, "belong_org1", orgs[0].Name)
 
 	// user2: admin role — none
-	orgs, total, err = store.SearchUserBelongOrgs(ctx, user2.ID, "", 10, 1, "", "", "admin")
+	orgs, total, err = store.SearchUserBelongOrgs(ctx, user2.ID, "", 10, 1, "", "", "admin", "")
 	require.Nil(t, err)
 	require.Equal(t, 0, total)
 	require.Empty(t, orgs)
 
 	// Filter by org type
-	orgs, total, err = store.SearchUserBelongOrgs(ctx, user1.ID, "", 10, 1, "school", "", "")
+	orgs, total, err = store.SearchUserBelongOrgs(ctx, user1.ID, "", 10, 1, "school", "", "", "")
 	require.Nil(t, err)
 	require.Equal(t, 1, total)
 	require.Equal(t, "belong_org2", orgs[0].Name)
 
 	// Filter by search
-	orgs, total, err = store.SearchUserBelongOrgs(ctx, user1.ID, "org1", 10, 1, "", "", "")
+	orgs, total, err = store.SearchUserBelongOrgs(ctx, user1.ID, "org1", 10, 1, "", "", "", "")
 	require.Nil(t, err)
 	require.Equal(t, 1, total)
 	require.Equal(t, "belong_org1", orgs[0].Name)

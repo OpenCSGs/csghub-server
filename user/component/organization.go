@@ -20,7 +20,7 @@ import (
 type OrganizationComponent interface {
 	FixOrgData(ctx context.Context, org *database.Organization) (*database.Organization, error)
 	Create(ctx context.Context, req *types.CreateOrgReq) (*types.Organization, error)
-	Index(ctx context.Context, search string, per, page int, orgType, verifyStatus string) ([]types.Organization, int, error)
+	Index(ctx context.Context, search string, per, page int, orgType, verifyStatus, tag string) ([]types.Organization, int, error)
 	ListUserOrgs(ctx context.Context, req *types.ListUserOrgsReq) ([]types.Organization, int, error)
 	Get(ctx context.Context, orgName string) (*types.Organization, error)
 	GetByUUID(ctx context.Context, uuid string) (*types.Organization, error)
@@ -209,8 +209,8 @@ func (c *organizationComponentImpl) Create(ctx context.Context, req *types.Creat
 	return org, nil
 }
 
-func (c *organizationComponentImpl) Index(ctx context.Context, search string, per, page int, orgType, verifyStatus string) ([]types.Organization, int, error) {
-	dborgs, total, err := c.orgStore.Search(ctx, search, per, page, orgType, verifyStatus)
+func (c *organizationComponentImpl) Index(ctx context.Context, search string, per, page int, orgType, verifyStatus, tag string) ([]types.Organization, int, error) {
+	dborgs, total, err := c.orgStore.Search(ctx, search, per, page, orgType, verifyStatus, tag)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to list all organizations, error: %w", err)
 	}
@@ -237,7 +237,7 @@ func (c *organizationComponentImpl) ListUserOrgs(ctx context.Context, req *types
 		return nil, 0, fmt.Errorf("failed to find user, error: %w", err)
 	}
 
-	dborgs, total, err = c.orgStore.SearchUserBelongOrgs(ctx, u.ID, req.Search, req.Per, req.Page, req.OrgType, req.VerifyStatus, req.Role)
+	dborgs, total, err = c.orgStore.SearchUserBelongOrgs(ctx, u.ID, req.Search, req.Per, req.Page, req.OrgType, req.VerifyStatus, req.Role, req.Tag)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to get user organizations, error: %w", err)
 	}

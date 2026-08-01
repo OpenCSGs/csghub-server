@@ -26,8 +26,8 @@ type OrgStore interface {
 	FindByPath(ctx context.Context, path string) (org Organization, err error)
 	Exists(ctx context.Context, path string) (exists bool, err error)
 	GetUserBelongOrgs(ctx context.Context, userID int64) (orgs []Organization, err error)
-	SearchUserBelongOrgs(ctx context.Context, userID int64, search string, per int, page int, orgType string, verifyStatus string, role string) (orgs []Organization, total int, err error)
-	Search(ctx context.Context, search string, per, page int, orgType, verifyStatus string) (orgs []Organization, total int, err error)
+	SearchUserBelongOrgs(ctx context.Context, userID int64, search string, per int, page int, orgType string, verifyStatus string, role string, tag string) (orgs []Organization, total int, err error)
+	Search(ctx context.Context, search string, per, page int, orgType, verifyStatus, tag string) (orgs []Organization, total int, err error)
 	UpdateVerifyStatus(ctx context.Context, path string, status types.VerifyStatus) error
 	GetSharedOrgIDs(ctx context.Context, userIDs []int64) ([]int64, error)
 	FindByUUID(ctx context.Context, uuid string) (*Organization, error)
@@ -201,7 +201,7 @@ func (s *orgStoreImpl) GetUserBelongOrgs(ctx context.Context, userID int64) (org
 	return orgs, errorx.HandleDBError(err, nil)
 }
 
-func (s *orgStoreImpl) SearchUserBelongOrgs(ctx context.Context, userID int64, search string, per int, page int, orgType string, verifyStatus string, role string) (orgs []Organization, total int, err error) {
+func (s *orgStoreImpl) SearchUserBelongOrgs(ctx context.Context, userID int64, search string, per int, page int, orgType string, verifyStatus string, role string, tag string) (orgs []Organization, total int, err error) {
 	search = strings.ToLower(search)
 	query := s.db.Operator.Core.NewSelect().
 		Model(&orgs).Relation("Namespace")
@@ -243,6 +243,13 @@ func (s *orgStoreImpl) SearchUserBelongOrgs(ctx context.Context, userID int64, s
 	if verifyStatus != "" {
 		query.Where("verify_status = ?", verifyStatus)
 	}
+	if tag != "" {
+		query.Where(`EXISTS (
+			SELECT 1 FROM organization_tags ot
+			JOIN tags t ON t.id = ot.tag_id
+			WHERE ot.organization_id = organization.id AND LOWER(t.name) = ?
+		)`, strings.ToLower(tag))
+	}
 	total, err = query.Count(ctx)
 	if err != nil {
 		return orgs, total, errorx.HandleDBError(err, nil)
@@ -255,7 +262,7 @@ func (s *orgStoreImpl) SearchUserBelongOrgs(ctx context.Context, userID int64, s
 	return orgs, total, nil
 }
 
-func (s *orgStoreImpl) Search(ctx context.Context, search string, per int, page int, orgType, verifyStatus string) (orgs []Organization, total int, err error) {
+func (s *orgStoreImpl) Search(ctx context.Context, search string, per int, page int, orgType, verifyStatus, tag string) (orgs []Organization, total int, err error) {
 	search = strings.ToLower(search)
 	query := s.db.Operator.Core.NewSelect().
 		Model(&orgs).Relation("Namespace")
@@ -276,6 +283,13 @@ func (s *orgStoreImpl) Search(ctx context.Context, search string, per int, page 
 	}
 	if verifyStatus != "" {
 		query.Where("verify_status = ?", verifyStatus)
+	}
+	if tag != "" {
+		query.Where(`EXISTS (
+			SELECT 1 FROM organization_tags ot
+			JOIN tags t ON t.id = ot.tag_id
+			WHERE ot.organization_id = organization.id AND LOWER(t.name) = ?
+		)`, strings.ToLower(tag))
 	}
 	total, err = query.Count(ctx)
 	if err != nil {
