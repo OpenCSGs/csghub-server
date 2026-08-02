@@ -412,7 +412,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		return nil, fmt.Errorf("error creating event handler:%w", err)
 	}
 	event := apiGroup.Group("/events")
-	event.POST("", eventHandler.Create)
+	event.POST("", middlewareCollection.Auth.NeedLogin, eventHandler.Create)
 
 	adminGroup := apiGroup.Group("/admin")
 	adminGroup.Use(middleware.NeedAdmin(config))
