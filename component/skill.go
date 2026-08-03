@@ -395,14 +395,15 @@ func (c *skillComponentImpl) createMirrorIfNeeded(ctx context.Context, req *type
 	}
 
 	mirrorReq := types.CreateMirrorReq{
-		Namespace:   req.Namespace,
-		Name:        req.Name,
-		SourceUrl:   req.GitURL,
-		Username:    req.GitUsername,
-		AccessToken: req.GitPassword,
-		CurrentUser: req.Username,
-		RepoType:    types.SkillRepo,
-		SyncLfs:     true,
+		Namespace:      req.Namespace,
+		Name:           req.Name,
+		SourceUrl:      req.GitURL,
+		Username:       req.GitUsername,
+		AccessToken:    req.GitPassword,
+		CurrentUser:    req.Username,
+		RepoType:       types.SkillRepo,
+		SyncLfs:        true,
+		SkipSourcePath: true, // user-created skill repos should not set source paths
 	}
 
 	_, err := c.mirrorComponent.CreateMirror(ctx, mirrorReq)

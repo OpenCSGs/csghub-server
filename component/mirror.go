@@ -344,16 +344,16 @@ func NewMirrorComponent(config *config.Config) (MirrorComponent, error) {
 	return c, nil
 }
 
-// mapNamespaceAndName resolves a remote namespace to a lowercase local namespace.
+// mapNamespaceAndName resolves a remote namespace while preserving the mapped target casing.
 func (m *mirrorComponentImpl) mapNamespaceAndName(sourceNamespace string) string {
 	n, err := m.mirrorNamespaceMappingStore.FindBySourceNamespace(context.Background(), sourceNamespace)
 	if err != nil {
-		return "aiwizards"
+		return "Aiwizards"
 	}
 	if n.TargetNamespace == "" {
-		return "aiwizards"
+		return "Aiwizards"
 	}
-	return strings.ToLower(strings.TrimSpace(n.TargetNamespace))
+	return strings.TrimSpace(n.TargetNamespace)
 }
 
 // CreateMirror creates a mirror configuration for an existing repository.
@@ -429,8 +429,10 @@ func (m *mirrorComponentImpl) CreateMirror(ctx context.Context, req types.Create
 
 	mirror.Priority = types.LowMirrorPriority
 
-	sourceType, sourcePath, _ := common.GetSourceTypeAndPathFromURL(req.SourceUrl)
-	applyMirrorRepositorySourcePath(repo, sourceType, sourcePath)
+	if !req.SkipSourcePath {
+		sourceType, sourcePath, _ := common.GetSourceTypeAndPathFromURL(req.SourceUrl)
+		applyMirrorRepositorySourcePath(repo, sourceType, sourcePath)
+	}
 	reqMirror, err := m.mirrorRepoStore.CreateMirrorRepoRecords(ctx, database.CreateMirrorRepoRecordsInput{
 		Repository:       repo,
 		CreateRepository: false,
