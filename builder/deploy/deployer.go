@@ -71,6 +71,7 @@ type Deployer interface {
 	GetWorkFlow(ctx context.Context, req types.ArgoWorkFlowDeleteReq) (*types.ArgoWorkFlowRes, error)
 	GetSandbox(ctx context.Context, clusterID, sandboxName string) (*runnerTypes.SandboxDetail, error)
 	BatchStatus(ctx context.Context, req *runnerTypes.BatchStatusRequest) (*runnerTypes.BatchStatusResponse, error)
+	CheckClusterHealthy(ctx context.Context, clusterId string) (bool, error)
 }
 
 func (d *deployer) generateUniqueSvcName(dr types.DeployRequest) string {
@@ -284,13 +285,13 @@ func (d *deployer) Deploy(ctx context.Context, dr types.DeployRequest) (int64, e
 func (d *deployer) Status(ctx context.Context, dr types.DeployRequest, needDetails bool) (string, int, []types.Instance, error) {
 	deploy, err := d.deployTaskStore.GetDeployByID(ctx, dr.DeployID)
 	if err != nil || deploy == nil {
-		slog.Error("fail to get deploy by deploy id", slog.Any("DeployID", dr.DeployID), slog.Any("error", err))
+		slog.ErrorContext(ctx, "failed to get deploy by deploy id", slog.Any("DeployID", dr.DeployID), slog.Any("error", err))
 		return "", common.Stopped, nil, fmt.Errorf("can't get deploy, %w", err)
 	}
 
-	healthy := d.CheckClusterHealthy(ctx, deploy.ClusterID)
+	healthy, err := d.CheckClusterHealthy(ctx, deploy.ClusterID)
 	if !healthy {
-		slog.WarnContext(ctx, "cluster resources unhealthy")
+		slog.WarnContext(ctx, "cluster resources unhealthy", slog.Any("error", err), slog.Any("clusterID", deploy.ClusterID))
 		return "", common.ResourceUnhealthy, nil, nil
 	}
 	// deploy status and instances reported from runner
@@ -380,7 +381,11 @@ func (d *deployer) Stop(ctx context.Context, dr types.DeployRequest) error {
 	if dr.SpaceID == 0 {
 		targetID = dr.DeployID // support model deploy with multi-instance
 	}
-	resp, err := d.imageRunner.Stop(ctx, &types.StopRequest{
+	// set independent timeout for remote runner call to prevent blocking when cluster is unreachable
+	stopCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	resp, err := d.imageRunner.Stop(stopCtx, &types.StopRequest{
 		ID:        targetID,
 		OrgName:   dr.Namespace,
 		RepoName:  dr.Name,
@@ -390,7 +395,7 @@ func (d *deployer) Stop(ctx context.Context, dr types.DeployRequest) error {
 	if err != nil {
 		slog.Error("deployer stop deploy", slog.Any("runner_resp", resp), slog.Int64("space_id", dr.SpaceID), slog.Any("deploy_id", dr.DeployID), slog.Any("error", err))
 	}
-	// release resource if it's a order case
+	// release resource if it's a order case, use original ctx to not be affected by stop timeout
 	err = d.releaseUserResourceByOrder(ctx, dr)
 	if err != nil {
 		return err
@@ -1208,29 +1213,26 @@ func (d *deployer) GetWorkflowLogsNonStream(ctx context.Context, req types.Workf
 	return d.lokiClient.QueryRange(ctx, params)
 }
 
-func (d *deployer) CheckClusterHealthy(ctx context.Context, deployId string) bool {
-	clusterRes, err := d.clusterStore.GetClusterResources(ctx, deployId)
+func (d *deployer) CheckClusterHealthy(ctx context.Context, clusterId string) (bool, error) {
+	clusterRes, err := d.clusterStore.GetClusterResources(ctx, clusterId)
 	if err != nil {
-		slog.ErrorContext(ctx, "failed to get cluster resources", slog.Any("error", err))
-		return false
+		return false, fmt.Errorf("failed to get cluster resources, clusterID: %s, error: %w", clusterId, err)
 	}
 
 	if !clusterRes.Enable {
-		slog.WarnContext(ctx, "cluster resources unhealthy, cluster is disabled")
-		return false
+		return false, fmt.Errorf("cluster resources unhealthy, cluster is disabled")
 	}
 
-	if clusterRes.Status == types.ClusterStatusUnavailable {
-		slog.WarnContext(ctx, "cluster resources unhealthy, cluster status is unavailable")
-		return false
+	if clusterRes.Status != types.ClusterStatusRunning {
+		return false, fmt.Errorf("cluster resources unhealthy, cluster status is not running")
 	}
 
 	timePassed := time.Since(time.Unix(clusterRes.LastUpdateTime, 0))
-	if timePassed > time.Duration(d.config.Runner.HearBeatIntervalInSec*2*int(time.Second)) {
-		slog.WarnContext(ctx, "cluster resources unhealthy, last update time", slog.Any("last_update_time", clusterRes.LastUpdateTime))
-		return false
+	maxDuration := time.Duration(d.config.Runner.HearBeatIntervalInSec * 2 * int(time.Second))
+	if timePassed > maxDuration {
+		return false, fmt.Errorf("cluster resources unhealthy, last update duration is greater than %s", maxDuration.String())
 	}
-	return true
+	return true, nil
 }
 
 func (d *deployer) IsDefaultScheduler(VXPUConfig map[string]string) bool {

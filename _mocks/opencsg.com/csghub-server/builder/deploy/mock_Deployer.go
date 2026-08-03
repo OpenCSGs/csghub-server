@@ -90,6 +90,63 @@ func (_c *MockDeployer_BatchStatus_Call) RunAndReturn(run func(context.Context, 
 	return _c
 }
 
+// CheckClusterHealthy provides a mock function with given fields: ctx, clusterId
+func (_m *MockDeployer) CheckClusterHealthy(ctx context.Context, clusterId string) (bool, error) {
+	ret := _m.Called(ctx, clusterId)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CheckClusterHealthy")
+	}
+
+	var r0 bool
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (bool, error)); ok {
+		return rf(ctx, clusterId)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) bool); ok {
+		r0 = rf(ctx, clusterId)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, clusterId)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockDeployer_CheckClusterHealthy_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CheckClusterHealthy'
+type MockDeployer_CheckClusterHealthy_Call struct {
+	*mock.Call
+}
+
+// CheckClusterHealthy is a helper method to define mock.On call
+//   - ctx context.Context
+//   - clusterId string
+func (_e *MockDeployer_Expecter) CheckClusterHealthy(ctx interface{}, clusterId interface{}) *MockDeployer_CheckClusterHealthy_Call {
+	return &MockDeployer_CheckClusterHealthy_Call{Call: _e.mock.On("CheckClusterHealthy", ctx, clusterId)}
+}
+
+func (_c *MockDeployer_CheckClusterHealthy_Call) Run(run func(ctx context.Context, clusterId string)) *MockDeployer_CheckClusterHealthy_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockDeployer_CheckClusterHealthy_Call) Return(_a0 bool, _a1 error) *MockDeployer_CheckClusterHealthy_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockDeployer_CheckClusterHealthy_Call) RunAndReturn(run func(context.Context, string) (bool, error)) *MockDeployer_CheckClusterHealthy_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // CheckHeartbeatTimeout provides a mock function with given fields: ctx, clusterId
 func (_m *MockDeployer) CheckHeartbeatTimeout(ctx context.Context, clusterId string) (bool, error) {
 	ret := _m.Called(ctx, clusterId)

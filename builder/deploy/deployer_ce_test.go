@@ -64,6 +64,31 @@ func TestDeployer_Stop(t *testing.T) {
 	require.Nil(t, err)
 }
 
+func TestDeployer_Stop_UsesTimeoutContext(t *testing.T) {
+	dr := types.DeployRequest{
+		SpaceID:  0,
+		DeployID: 1,
+		UserUUID: "1",
+		Path:     "namespace/name",
+		Type:     types.InferenceType,
+	}
+
+	mockRunner := mockrunner.NewMockRunner(t)
+	mockRunner.EXPECT().Stop(
+		mock.MatchedBy(func(ctx context.Context) bool {
+			_, ok := ctx.Deadline()
+			return ok
+		}),
+		mock.Anything,
+	).Return(&types.StopResponse{}, nil)
+
+	d := &deployer{
+		imageRunner: mockRunner,
+	}
+	err := d.Stop(context.TODO(), dr)
+	require.Nil(t, err)
+}
+
 func TestDeployer_StartDeploy(t *testing.T) {
 	DeployWorkflow = func(buildTask, runTask *database.DeployTask) {}
 	dbdeploy := database.Deploy{

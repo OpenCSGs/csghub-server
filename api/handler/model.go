@@ -1752,6 +1752,7 @@ func (h *ModelHandler) ServerlessStart(ctx *gin.Context) {
 // @Param        namespace path string true "namespace"
 // @Param        name path string true "name"
 // @Param        id path int true "id"
+// @Param        force query bool false "force stop when cluster is unavailable" default(false)
 // @Param        current_user query string false "current user"
 // @Success      200  {object}  types.Response{} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
@@ -1777,6 +1778,8 @@ func (h *ModelHandler) ServerlessStop(ctx *gin.Context) {
 		return
 	}
 
+	force := strings.ToLower(ctx.Query("force")) == "true"
+
 	stopReq := types.DeployActReq{
 		RepoType:    types.ModelRepo,
 		Namespace:   namespace,
@@ -1784,6 +1787,7 @@ func (h *ModelHandler) ServerlessStop(ctx *gin.Context) {
 		CurrentUser: currentUser,
 		DeployID:    id,
 		DeployType:  types.ServerlessType,
+		Force:       force,
 	}
 
 	err = h.repo.DeployStop(ctx.Request.Context(), stopReq)
