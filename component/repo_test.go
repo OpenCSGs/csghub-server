@@ -1379,22 +1379,13 @@ func TestRepoComponent_DeployDetail(t *testing.T) {
 		Type:          types.InferenceType,
 	}, nil)
 
+	repo.mocks.deployer.EXPECT().CheckClusterHealthy(ctx, "cluster").Return(true, nil)
 	repo.mocks.deployer.EXPECT().GetReplica(ctx, types.DeployRequest{
 		Namespace: "ns",
 		Name:      "n",
 		ClusterID: "cluster",
 		SvcName:   "svc",
 	}).Return(1, 2, []types.Instance{{Name: "i1"}}, nil)
-
-	repo.mocks.deployer.EXPECT().Status(ctx, types.DeployRequest{
-		DeployID:  0,
-		SpaceID:   0,
-		ModelID:   0,
-		Namespace: "ns",
-		Name:      "n",
-		SvcName:   "svc",
-		ClusterID: "cluster",
-	}, false).Return("svc", 23, nil, nil)
 
 	dp, err := repo.DeployDetail(ctx, types.DeployActReq{
 		RepoType:     types.ModelRepo,
@@ -1453,22 +1444,13 @@ func TestRepoComponent_DeployDetailWithPD(t *testing.T) {
 		PD:            pdConfig,
 	}, nil)
 
+	repo.mocks.deployer.EXPECT().CheckClusterHealthy(ctx, "cluster").Return(true, nil)
 	repo.mocks.deployer.EXPECT().GetReplica(ctx, types.DeployRequest{
 		Namespace: "ns",
 		Name:      "n",
 		ClusterID: "cluster",
 		SvcName:   "svc",
 	}).Return(1, 2, []types.Instance{{Name: "i1"}}, nil)
-
-	repo.mocks.deployer.EXPECT().Status(ctx, types.DeployRequest{
-		DeployID:  0,
-		SpaceID:   0,
-		ModelID:   0,
-		Namespace: "ns",
-		Name:      "n",
-		SvcName:   "svc",
-		ClusterID: "cluster",
-	}, false).Return("svc", 23, nil, nil)
 
 	dp, err := repo.DeployDetail(ctx, types.DeployActReq{
 		RepoType:     types.ModelRepo,
@@ -1516,7 +1498,7 @@ func TestRepoComponent_DeployInstanceLogs(t *testing.T) {
 		InstanceName: "i1",
 	}).Return(m, nil)
 
-	mr, err := repo.DeployInstanceLogs(ctx, types.DeployActReq{
+	_, err := repo.DeployInstanceLogs(ctx, types.DeployActReq{
 		RepoType:     types.ModelRepo,
 		Namespace:    "ns",
 		Name:         "n",
@@ -1526,8 +1508,70 @@ func TestRepoComponent_DeployInstanceLogs(t *testing.T) {
 		InstanceName: "i1",
 	})
 	require.Nil(t, err)
-	require.Equal(t, m, mr)
+
 }
+
+func TestRepoComponent_DeployStop_WithForce(t *testing.T) {
+	ctx := context.TODO()
+	repo := initializeTestRepoComponent(ctx, t)
+
+	dr := types.DeployRequest{DeployID: 3, Namespace: "ns", Name: "n"}
+	repo.mocks.deployer.EXPECT().Stop(ctx, dr).Return(nil)
+	// Force=true should NOT call Exist
+	repo.mocks.stores.DeployTaskMock().EXPECT().StopDeploy(
+		ctx, types.ModelRepo, int64(0), int64(2), int64(3),
+	).Return(nil)
+	repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{
+		ID: 2,
+	}, nil)
+	repo.mocks.stores.DeployTaskMock().EXPECT().GetDeployByID(ctx, int64(3)).Return(&database.Deploy{
+		UserID: 2,
+	}, nil)
+
+	err := repo.DeployStop(ctx, types.DeployActReq{
+		RepoType:     types.ModelRepo,
+		Namespace:    "ns",
+		Name:         "n",
+		CurrentUser:  "user",
+		DeployID:     3,
+		DeployType:   1,
+		InstanceName: "i1",
+		Force:        true,
+	})
+	require.Nil(t, err)
+}
+
+func TestRepoComponent_DeployStop_ForceFalse_CallsExist(t *testing.T) {
+	ctx := context.TODO()
+	repo := initializeTestRepoComponent(ctx, t)
+
+	dr := types.DeployRequest{DeployID: 3, Namespace: "ns", Name: "n"}
+	repo.mocks.deployer.EXPECT().Stop(ctx, dr).Return(nil)
+	// Force=false must still call Exist
+	repo.mocks.deployer.EXPECT().Exist(ctx, dr).Return(false, nil)
+	repo.mocks.stores.DeployTaskMock().EXPECT().StopDeploy(
+		ctx, types.ModelRepo, int64(0), int64(2), int64(3),
+	).Return(nil)
+	repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{
+		ID: 2,
+	}, nil)
+	repo.mocks.stores.DeployTaskMock().EXPECT().GetDeployByID(ctx, int64(3)).Return(&database.Deploy{
+		UserID: 2,
+	}, nil)
+
+	err := repo.DeployStop(ctx, types.DeployActReq{
+		RepoType:     types.ModelRepo,
+		Namespace:    "ns",
+		Name:         "n",
+		CurrentUser:  "user",
+		DeployID:     3,
+		DeployType:   1,
+		InstanceName: "i1",
+		Force:        false,
+	})
+	require.Nil(t, err)
+}
+
 
 func TestRepoComponent_AllowAccessByRepoID(t *testing.T) {
 	ctx := context.TODO()

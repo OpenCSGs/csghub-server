@@ -392,6 +392,7 @@ type DeployActReq struct {
 	CommitID     string         `json:"commit_id"`
 	IPAddress    string         `json:"-"`
 	AuthType     string         `json:"-"`
+	Force        bool           `json:"-"`
 }
 
 type DeployUpdateReq struct {

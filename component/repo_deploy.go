@@ -510,34 +510,8 @@ func (c *repoComponentImpl) DeployDetail(ctx context.Context, detailReq types.De
 		return nil, err
 	}
 
-	req := types.DeployRequest{
-		DeployID:  deploy.ID,
-		SpaceID:   deploy.SpaceID,
-		ModelID:   deploy.ModelID,
-		Namespace: detailReq.Namespace,
-		Name:      detailReq.Name,
-		SvcName:   deploy.SvcName,
-		ClusterID: deploy.ClusterID,
-	}
-	actualReplica, desiredReplica, instList, err := c.deployer.GetReplica(ctx, req)
-	if err != nil {
-		slog.Warn("fail to get deploy replica", slog.Any("repotype", detailReq.RepoType), slog.Any("req", req), slog.Any("error", err))
-	}
+	actualReplica, desiredReplica, instList := c.queryDeployReplica(ctx, detailReq, deploy)
 
-	_, code, _, err := c.deployer.Status(ctx, types.DeployRequest{
-		DeployID:  deploy.ID,
-		SpaceID:   deploy.SpaceID,
-		ModelID:   deploy.ModelID,
-		Namespace: detailReq.Namespace,
-		Name:      detailReq.Name,
-		SvcName:   deploy.SvcName,
-		ClusterID: deploy.ClusterID,
-	}, false)
-	if err != nil {
-		slog.Warn("fail to get deploy status", slog.Any("repo type", detailReq.RepoType), slog.Any("svc name", deploy.SvcName), slog.Any("error", err))
-	}
-
-	deploy.Status = code
 	deploy.StatusUpdateAt = time.Now()
 
 	endpoint, _ := c.GenerateEndpoint(ctx, deploy)
@@ -567,7 +541,7 @@ func (c *repoComponentImpl) DeployDetail(ctx context.Context, detailReq types.De
 		DeployName:          deploy.DeployName,
 		RepoID:              deploy.RepoID,
 		SvcName:             deploy.SvcName,
-		Status:              deployStatusCodeToString(code),
+		Status:              deployStatusCodeToString(deploy.Status),
 		Hardware:            deploy.Hardware,
 		Env:                 deploy.Env,
 		RuntimeFramework:    deploy.RuntimeFramework,
@@ -601,6 +575,30 @@ func (c *repoComponentImpl) DeployDetail(ctx context.Context, detailReq types.De
 	resDeploy.PD = deploy.PD
 
 	return &resDeploy, nil
+}
+
+func (c *repoComponentImpl) queryDeployReplica(ctx context.Context, detailReq types.DeployActReq, deploy *database.Deploy) (int, int, []types.Instance) {
+	ok, err := c.deployer.CheckClusterHealthy(ctx, deploy.ClusterID)
+	if !ok || err != nil {
+		slog.WarnContext(ctx, "failed to check cluster healthy", slog.Any("cluster id", deploy.ClusterID), slog.Any("error", err))
+		return 0, 0, []types.Instance{}
+	}
+
+	req := types.DeployRequest{
+		DeployID:  deploy.ID,
+		SpaceID:   deploy.SpaceID,
+		ModelID:   deploy.ModelID,
+		Namespace: detailReq.Namespace,
+		Name:      detailReq.Name,
+		SvcName:   deploy.SvcName,
+		ClusterID: deploy.ClusterID,
+	}
+	actualReplica, desiredReplica, instList, err := c.deployer.GetReplica(ctx, req)
+	if err != nil {
+		slog.WarnContext(ctx, "failed to get deploy replica from runner", slog.Any("req", req), slog.Any("error", err))
+	}
+
+	return actualReplica, desiredReplica, instList
 }
 
 func deployStatusCodeToString(code int) string {
@@ -782,7 +780,7 @@ func (c *repoComponentImpl) DeployStop(ctx context.Context, stopReq types.Deploy
 		user, deploy, err = c.CheckDeployPermissionForUser(ctx, stopReq)
 	}
 	if err != nil {
-		return fmt.Errorf("fail to check permission for stop deploy, %w", err)
+		return fmt.Errorf("failed to check permission for stop deploy, %w", err)
 	}
 
 	// delete service
@@ -803,19 +801,21 @@ func (c *repoComponentImpl) DeployStop(ctx context.Context, stopReq types.Deploy
 		slog.Warn("stop deploy instance with error", slog.Any("error", err), slog.Any("stopReq", stopReq))
 	}
 
-	exist, err := c.deployer.Exist(ctx, deployRepo)
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		// failed to check service in cluster
-		return err
-	}
+	if !stopReq.Force {
+		exist, err := c.deployer.Exist(ctx, deployRepo)
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			// failed to check service in cluster
+			return err
+		}
 
-	if errors.Is(err, sql.ErrNoRows) {
-		exist = false
-	}
+		if errors.Is(err, sql.ErrNoRows) {
+			exist = false
+		}
 
-	if exist {
-		// failed to delete service in cluster
-		return errors.New("failed to stop deploy instance")
+		if exist {
+			// failed to delete service in cluster
+			return errors.New("failed to stop deploy instance")
+		}
 	}
 
 	// update database deploy to stopped
