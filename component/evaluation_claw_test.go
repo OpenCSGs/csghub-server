@@ -393,7 +393,10 @@ func TestEvaluationComponent_GetClawEvaluationSummary(t *testing.T) {
 			"errored": 3,
 			"avg_score": 0.72,
 			"pass_hat_3": 40,
-			"pass_at_3": 55
+			"pass_at_3": 55,
+			"total_input_tokens": 12000,
+			"total_output_tokens": 3400,
+			"total_tokens": 15400
 		}`))
 	}))
 	defer summaryServer.Close()
@@ -421,6 +424,9 @@ func TestEvaluationComponent_GetClawEvaluationSummary(t *testing.T) {
 	require.InDelta(t, 0.72, res.Summary.AvgScore, 0.0001)
 	require.Equal(t, 40, res.Summary.PassHatK)
 	require.Equal(t, 55, res.Summary.PassAtK)
+	require.Equal(t, 12000, res.Summary.InputTokens)
+	require.Equal(t, 3400, res.Summary.OutputTokens)
+	require.Equal(t, 15400, res.Summary.TotalTokens)
 }
 
 func TestEvaluationComponent_DeleteClawEvaluation(t *testing.T) {
