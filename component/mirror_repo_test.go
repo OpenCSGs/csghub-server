@@ -524,6 +524,103 @@ func TestMirrorComponent_CreateMirror(t *testing.T) {
 	}, fakeStore.inputs[0].Mirror)
 }
 
+// TestMirrorComponent_CreateMirrorRequeuesSameSource verifies repeated creation starts a fresh sync for the existing source.
+func TestMirrorComponent_CreateMirrorRequeuesSameSource(t *testing.T) {
+	ctx := context.TODO()
+	mc := initializeTestMirrorComponent(ctx, t)
+	fakeStore := &fakeMirrorRepoStore{}
+	mc.mirrorRepoStore = fakeStore
+
+	repo := &database.Repository{ID: 123, Path: "ns/n", RepositoryType: types.ModelRepo}
+	mirror := &database.Mirror{
+		ID: 456, RepositoryID: repo.ID, SourceUrl: "https://github.com/upstream/repo.git",
+	}
+	mc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "user", "ns", membership.RoleAdmin).Return(true, nil)
+	mc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "ns", "n").Return(repo, nil)
+	mc.mocks.stores.MirrorMock().EXPECT().FindByRepoID(ctx, repo.ID).Return(mirror, nil)
+	username, accessToken := "source-user", "source-token"
+	expectMirrorRepoRequeue(ctx, t, mc, repo, mirror, &username, &accessToken, types.LowMirrorPriority, true)
+
+	got, err := mc.CreateMirror(ctx, types.CreateMirrorReq{
+		SourceUrl:   "https://source-user:source-token@github.com/upstream/repo",
+		CurrentUser: "user",
+		Namespace:   "ns",
+		Name:        "n",
+		RepoType:    types.ModelRepo,
+		Urgent:      true,
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, mirror.ID, got.ID)
+	require.Equal(t, username, got.Username)
+	require.Equal(t, accessToken, got.AccessToken)
+	require.Empty(t, fakeStore.inputs)
+}
+
+// TestMirrorComponent_CreateMirrorSkipsSourcePathForCodeAndSkill verifies that CreateMirror
+// does not set source path fields for code and skill repos, since these are user-imported types.
+func TestMirrorComponent_CreateMirrorSkipsSourcePathForCodeAndSkill(t *testing.T) {
+	for _, repoType := range []types.RepositoryType{types.CodeRepo, types.SkillRepo} {
+		t.Run(string(repoType), func(t *testing.T) {
+			ctx := context.TODO()
+			mc := initializeTestMirrorComponent(ctx, t)
+			fakeStore := &fakeMirrorRepoStore{}
+			mc.mirrorRepoStore = fakeStore
+
+			repo := &database.Repository{
+				ID:             123,
+				Path:           "ns/n",
+				HTTPCloneURL:   "https://opencsg.com/repos/ns/n.git",
+				RepositoryType: repoType,
+			}
+
+			mc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "user", "ns", membership.RoleAdmin).Return(true, nil)
+			mc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, repoType, "ns", "n").Return(repo, nil)
+			mc.mocks.stores.MirrorMock().EXPECT().FindByRepoID(ctx, repo.ID).Return(nil, sql.ErrNoRows)
+
+			got, err := mc.CreateMirror(ctx, types.CreateMirrorReq{
+				SourceUrl:      "https://github.com/upstream/repo",
+				CurrentUser:    "user",
+				Namespace:      "ns",
+				Name:           "n",
+				RepoType:       repoType,
+				SkipSourcePath: true,
+			})
+			require.NoError(t, err)
+			require.Equal(t, repo.ID, got.RepositoryID)
+			require.Len(t, fakeStore.inputs, 1)
+			require.Empty(t, fakeStore.inputs[0].Repository.GithubPath)
+			require.Empty(t, fakeStore.inputs[0].Repository.HFPath)
+			require.Empty(t, fakeStore.inputs[0].Repository.MSPath)
+		})
+	}
+}
+
+// TestMirrorComponent_CreateMirrorRejectsDifferentSource verifies creation cannot replace an existing mirror source.
+func TestMirrorComponent_CreateMirrorRejectsDifferentSource(t *testing.T) {
+	ctx := context.TODO()
+	mc := initializeTestMirrorComponent(ctx, t)
+
+	repo := &database.Repository{ID: 123, Path: "ns/n", RepositoryType: types.ModelRepo}
+	mirror := &database.Mirror{
+		ID: 456, RepositoryID: repo.ID, SourceUrl: "https://github.com/existing/repo.git",
+	}
+	mc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "user", "ns", membership.RoleAdmin).Return(true, nil)
+	mc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "ns", "n").Return(repo, nil)
+	mc.mocks.stores.MirrorMock().EXPECT().FindByRepoID(ctx, repo.ID).Return(mirror, nil)
+
+	got, err := mc.CreateMirror(ctx, types.CreateMirrorReq{
+		SourceUrl:   "https://github.com/new/repo",
+		CurrentUser: "user",
+		Namespace:   "ns",
+		Name:        "n",
+		RepoType:    types.ModelRepo,
+	})
+
+	require.ErrorIs(t, err, errorx.ErrMirrorSourceConflict)
+	require.Equal(t, repo.ID, got.RepositoryID)
+}
+
 // TestMirrorComponent_CreateMirrorRepoRejectsEmptyCurrentUser verifies mirror creation requires an explicit current user.
 func TestMirrorComponent_CreateMirrorRepoRejectsEmptyCurrentUser(t *testing.T) {
 	ctx := context.TODO()
@@ -541,8 +638,8 @@ func TestMirrorComponent_CreateMirrorRepoRejectsEmptyCurrentUser(t *testing.T) {
 	require.Nil(t, got)
 }
 
-// TestMirrorComponent_CreateMirrorRepoNormalizesForkTarget verifies local mirror target identifiers are trimmed and lowercased.
-func TestMirrorComponent_CreateMirrorRepoNormalizesForkTarget(t *testing.T) {
+// TestMirrorComponent_CreateMirrorRepoPreservesForkTargetCase verifies local mirror target identifiers are trimmed without changing case.
+func TestMirrorComponent_CreateMirrorRepoPreservesForkTargetCase(t *testing.T) {
 	ctx := context.TODO()
 	mc := initializeTestMirrorComponent(ctx, t)
 	fakeStore := &fakeMirrorRepoStore{}
@@ -554,14 +651,14 @@ func TestMirrorComponent_CreateMirrorRepoNormalizesForkTarget(t *testing.T) {
 		RepoType:          types.ModelRepo,
 		CurrentUser:       "admin",
 		SourceGitCloneUrl: "https://github.com/upstream/repo.git",
-		ForkNamespace:     "  Alice-Team ",
+		ForkNamespace:     "  ALICE-TEAM ",
 		ForkName:          " Qwen-Model  ",
 	}
 
-	mc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "admin", "alice-team", membership.RoleWrite).Return(true, nil)
-	mc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, req.RepoType, "alice-team", "qwen-model").Return(nil, sql.ErrNoRows)
-	mc.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "alice-team").Return(database.Namespace{
-		Path: "alice-team",
+	mc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "admin", "ALICE-TEAM", membership.RoleWrite).Return(true, nil)
+	mc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, req.RepoType, "ALICE-TEAM", "Qwen-Model").Return(nil, sql.ErrNoRows)
+	mc.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "ALICE-TEAM").Return(database.Namespace{
+		Path: "Alice-Team",
 	}, nil)
 	mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "admin").Return(database.User{
 		ID:       1,
@@ -574,10 +671,10 @@ func TestMirrorComponent_CreateMirrorRepoNormalizesForkTarget(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, got)
 	require.Len(t, fakeStore.inputs, 1)
-	require.Equal(t, "alice-team/qwen-model", fakeStore.inputs[0].Repository.Path)
-	require.Equal(t, "qwen-model", fakeStore.inputs[0].Repository.Name)
-	require.Equal(t, "models_alice-team/qwen-model", fakeStore.inputs[0].Repository.GitPath)
-	require.Equal(t, "github_model_alice-team_qwen-model", fakeStore.inputs[0].Mirror.LocalRepoPath)
+	require.Equal(t, "Alice-Team/Qwen-Model", fakeStore.inputs[0].Repository.Path)
+	require.Equal(t, "Qwen-Model", fakeStore.inputs[0].Repository.Name)
+	require.Equal(t, "models_Alice-Team/Qwen-Model", fakeStore.inputs[0].Repository.GitPath)
+	require.Equal(t, "github_model_Alice-Team_Qwen-Model", fakeStore.inputs[0].Mirror.LocalRepoPath)
 }
 
 // TestMirrorComponent_CreateMirrorRepoRejectsCaseVariantExistingTarget verifies repository identity remains case-insensitive.
@@ -922,15 +1019,15 @@ func TestMirrorComponent_CreateMirrorRepoAddsSourceToExistingTargetWithoutMirror
 		RepoType:          types.DatasetRepo,
 		CurrentUser:       "admin",
 		SourceGitCloneUrl: "https://github.com/upstream/repo.git",
-		ForkNamespace:     "alice",
-		ForkName:          "forked",
+		ForkNamespace:     "ALICE",
+		ForkName:          "FORKED",
 		CreateTargetRepo:  &createTargetRepo,
 	}
-	repo := &database.Repository{ID: 11, Path: "alice/forked", RepositoryType: types.DatasetRepo}
+	repo := &database.Repository{ID: 11, Path: "alice/Forked", Name: "Forked", RepositoryType: types.DatasetRepo}
 
-	mc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, req.RepoType, "alice", "forked").Return(repo, nil)
+	mc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, req.RepoType, "ALICE", "FORKED").Return(repo, nil)
 	mc.mocks.stores.MirrorMock().EXPECT().FindByRepoID(ctx, repo.ID).Return(nil, sql.ErrNoRows)
-	mc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "admin", "alice", membership.RoleWrite).Return(true, nil)
+	mc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "admin", "ALICE", membership.RoleWrite).Return(true, nil)
 
 	got, err := mc.CreateMirrorRepo(ctx, req)
 	require.NoError(t, err)
@@ -939,7 +1036,7 @@ func TestMirrorComponent_CreateMirrorRepoAddsSourceToExistingTargetWithoutMirror
 	require.Equal(t, repo, fakeStore.inputs[0].Repository)
 	require.Equal(t, "upstream/repo", fakeStore.inputs[0].Repository.GithubPath)
 	require.Empty(t, fakeStore.inputs[0].Mirror.Username)
-	require.Equal(t, "github_dataset_alice_forked", fakeStore.inputs[0].Mirror.LocalRepoPath)
+	require.Equal(t, "github_dataset_alice_Forked", fakeStore.inputs[0].Mirror.LocalRepoPath)
 }
 
 // TestMirrorComponent_CreateMirrorRepoRejectsExistingTargetWhenRequested verifies callers can keep import-style no-overwrite semantics.
@@ -1124,4 +1221,44 @@ func TestMirrorComponent_CreateMirrorRepoCreatesAllMirrorRepoTypes(t *testing.T)
 			}
 		})
 	}
+}
+
+// TestMirrorComponent_CreateMirrorRepoSkipSourcePath verifies that when SkipSourcePath is true,
+// the source path fields (HFPath/MSPath/GithubPath) are not set on the repository.
+func TestMirrorComponent_CreateMirrorRepoSkipSourcePath(t *testing.T) {
+	ctx := context.TODO()
+	mc := initializeTestMirrorComponent(ctx, t)
+	fakeStore := &fakeMirrorRepoStore{}
+	mc.mirrorRepoStore = fakeStore
+
+	req := types.CreateMirrorRepoReq{
+		SourceNamespace:   "upstream",
+		SourceName:        "repo",
+		RepoType:          types.CodeRepo,
+		CurrentUser:       "admin",
+		SourceGitCloneUrl: "https://github.com/upstream/repo.git",
+		ForkNamespace:     "alice",
+		ForkName:          "forked",
+		SkipSourcePath:    true,
+	}
+
+	mc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "admin", "alice", membership.RoleWrite).Return(true, nil)
+	mc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, req.RepoType, "alice", "forked").Return(nil, sql.ErrNoRows)
+	mc.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "alice").Return(database.Namespace{
+		Path: "alice",
+	}, nil)
+	mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "admin").Return(database.User{
+		ID:       1,
+		Username: "admin",
+		Email:    "admin@example.com",
+		RoleMask: "admin",
+	}, nil)
+
+	got, err := mc.CreateMirrorRepo(ctx, req)
+	require.NoError(t, err)
+	require.NotNil(t, got)
+	require.Len(t, fakeStore.inputs, 1)
+	require.Empty(t, fakeStore.inputs[0].Repository.GithubPath)
+	require.Empty(t, fakeStore.inputs[0].Repository.HFPath)
+	require.Empty(t, fakeStore.inputs[0].Repository.MSPath)
 }
