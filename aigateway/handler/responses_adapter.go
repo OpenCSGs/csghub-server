@@ -300,6 +300,7 @@ func responsesToolsToChatTools(ctx context.Context, raw json.RawMessage, modelNa
 	}
 	chatTools := make([]map[string]json.RawMessage, 0, len(tools))
 	functionTools := map[string]struct{}{}
+	namespaceByFunctionName := map[string]string{}
 	for _, tool := range tools {
 		var obj map[string]json.RawMessage
 		if err := json.Unmarshal(tool, &obj); err != nil {
@@ -307,6 +308,32 @@ func responsesToolsToChatTools(ctx context.Context, raw json.RawMessage, modelNa
 		}
 		var toolType string
 		_ = json.Unmarshal(obj["type"], &toolType)
+		if toolType == "namespace" {
+			namespaceTools, namespaceFunctionTools, err := responsesNamespaceToolToChatTools(ctx, obj, modelName)
+			if err != nil {
+				return nil, nil, err
+			}
+			namespaceName := responsesNamespaceName(obj)
+			for name := range namespaceFunctionTools {
+				if err := responsesRecordToolNamespace(namespaceByFunctionName, name, namespaceName); err != nil {
+					return nil, nil, err
+				}
+			}
+			for _, chatTool := range namespaceTools {
+				chatTools = append(chatTools, chatTool)
+			}
+			for name := range namespaceFunctionTools {
+				functionTools[name] = struct{}{}
+			}
+			if len(namespaceTools) == 0 {
+				slog.InfoContext(ctx, "drop empty responses namespace tool for chat adapter",
+					slog.String("api", "/v1/responses"),
+					slog.String("adapter", "chat_completions"),
+					slog.String("model", modelName),
+					slog.String("dropped_tool_type", toolType))
+			}
+			continue
+		}
 		if toolType != "" && toolType != "function" {
 			// Chat completions APIs only support function tools.
 			// Drop unsupported tool types to avoid upstream errors.
@@ -317,30 +344,12 @@ func responsesToolsToChatTools(ctx context.Context, raw json.RawMessage, modelNa
 				slog.String("dropped_tool_type", toolType))
 			continue
 		}
-		function := map[string]json.RawMessage{}
-		if rawFunction, ok := obj["function"]; ok {
-			if err := json.Unmarshal(rawFunction, &function); err != nil || function == nil {
-				return nil, nil, fmt.Errorf("convert responses function tool: function must be an object")
-			}
-		} else {
-			for _, key := range []string{"name", "description", "parameters", "strict"} {
-				if value, ok := obj[key]; ok {
-					function[key] = value
-				}
-			}
-		}
-		functionRaw, err := json.Marshal(function)
+		chatTool, functionName, err := responsesFunctionToolToChatTool(obj)
 		if err != nil {
-			return nil, nil, fmt.Errorf("convert responses function tool: %w", err)
+			return nil, nil, err
 		}
-		var functionName string
-		_ = json.Unmarshal(function["name"], &functionName)
 		if functionName != "" {
 			functionTools[functionName] = struct{}{}
-		}
-		chatTool := map[string]json.RawMessage{
-			"type":     json.RawMessage(`"function"`),
-			"function": functionRaw,
 		}
 		chatTools = append(chatTools, chatTool)
 	}
@@ -352,6 +361,183 @@ func responsesToolsToChatTools(ctx context.Context, raw json.RawMessage, modelNa
 		return nil, nil, fmt.Errorf("convert responses tools to chat tools: %w", err)
 	}
 	return data, functionTools, nil
+}
+
+func responsesNamespaceToolToChatTools(ctx context.Context, obj map[string]json.RawMessage, modelName string) ([]map[string]json.RawMessage, map[string]struct{}, error) {
+	rawChildren := responsesNamespaceToolChildren(obj)
+	chatTools := make([]map[string]json.RawMessage, 0, len(rawChildren)+1)
+	functionTools := map[string]struct{}{}
+	if len(rawChildren) == 0 && responsesLooksLikeFunctionTool(obj) {
+		chatTool, functionName, err := responsesFunctionToolToChatTool(obj)
+		if err != nil {
+			return nil, nil, err
+		}
+		if functionName != "" {
+			functionTools[functionName] = struct{}{}
+		}
+		chatTools = append(chatTools, chatTool)
+	}
+	for _, rawChild := range rawChildren {
+		var child map[string]json.RawMessage
+		if err := json.Unmarshal(rawChild, &child); err != nil {
+			return nil, nil, fmt.Errorf("convert responses namespace tool: %w", err)
+		}
+		var childType string
+		_ = json.Unmarshal(child["type"], &childType)
+		if childType != "" && childType != "function" {
+			slog.InfoContext(ctx, "drop unsupported responses namespace child tool for chat adapter",
+				slog.String("api", "/v1/responses"),
+				slog.String("adapter", "chat_completions"),
+				slog.String("model", modelName),
+				slog.String("dropped_tool_type", childType))
+			continue
+		}
+		chatTool, functionName, err := responsesFunctionToolToChatTool(child)
+		if err != nil {
+			return nil, nil, err
+		}
+		if functionName != "" {
+			functionTools[functionName] = struct{}{}
+		}
+		chatTools = append(chatTools, chatTool)
+	}
+	return chatTools, functionTools, nil
+}
+
+func responsesNamespaceByFunctionName(raw json.RawMessage) (map[string]string, error) {
+	result := map[string]string{}
+	for _, tool := range splitRawJSONArray(raw) {
+		var obj map[string]json.RawMessage
+		if err := json.Unmarshal(tool, &obj); err != nil {
+			continue
+		}
+		var toolType string
+		_ = json.Unmarshal(obj["type"], &toolType)
+		if toolType != "namespace" {
+			continue
+		}
+		namespaceName := responsesNamespaceName(obj)
+		if namespaceName == "" {
+			continue
+		}
+		children := responsesNamespaceToolChildren(obj)
+		if len(children) == 0 && responsesLooksLikeFunctionTool(obj) {
+			if err := responsesRecordToolNamespace(result, responsesFunctionToolName(obj), namespaceName); err != nil {
+				return nil, err
+			}
+			continue
+		}
+		for _, rawChild := range children {
+			var child map[string]json.RawMessage
+			if err := json.Unmarshal(rawChild, &child); err != nil {
+				continue
+			}
+			var childType string
+			_ = json.Unmarshal(child["type"], &childType)
+			if childType != "" && childType != "function" {
+				continue
+			}
+			functionName := responsesFunctionToolName(child)
+			if err := responsesRecordToolNamespace(result, functionName, namespaceName); err != nil {
+				return nil, err
+			}
+		}
+	}
+	if len(result) == 0 {
+		return nil, nil
+	}
+	return result, nil
+}
+
+func responsesRecordToolNamespace(result map[string]string, functionName, namespaceName string) error {
+	if functionName == "" || namespaceName == "" {
+		return nil
+	}
+	if existing, ok := result[functionName]; ok && existing != namespaceName {
+		return fmt.Errorf("duplicated tool name across namespaces: %s", functionName)
+	}
+	result[functionName] = namespaceName
+	return nil
+}
+
+func responsesNamespaceName(obj map[string]json.RawMessage) string {
+	var name string
+	_ = json.Unmarshal(obj["name"], &name)
+	if name != "" {
+		return name
+	}
+	var namespace map[string]json.RawMessage
+	if err := json.Unmarshal(obj["namespace"], &namespace); err != nil {
+		return ""
+	}
+	_ = json.Unmarshal(namespace["name"], &name)
+	return name
+}
+
+func responsesNamespaceToolChildren(obj map[string]json.RawMessage) []json.RawMessage {
+	var children []json.RawMessage
+	for _, key := range []string{"tools", "functions"} {
+		children = append(children, splitRawJSONArray(obj[key])...)
+	}
+	var namespace map[string]json.RawMessage
+	if err := json.Unmarshal(obj["namespace"], &namespace); err == nil {
+		for _, key := range []string{"tools", "functions"} {
+			children = append(children, splitRawJSONArray(namespace[key])...)
+		}
+	}
+	return children
+}
+
+func responsesLooksLikeFunctionTool(obj map[string]json.RawMessage) bool {
+	if _, ok := obj["function"]; ok {
+		return true
+	}
+	if _, ok := obj["name"]; !ok {
+		return false
+	}
+	for _, key := range []string{"parameters", "description", "strict"} {
+		if _, ok := obj[key]; ok {
+			return true
+		}
+	}
+	return false
+}
+
+func responsesFunctionToolName(obj map[string]json.RawMessage) string {
+	function := map[string]json.RawMessage{}
+	if rawFunction, ok := obj["function"]; ok {
+		_ = json.Unmarshal(rawFunction, &function)
+	} else {
+		function = obj
+	}
+	var functionName string
+	_ = json.Unmarshal(function["name"], &functionName)
+	return functionName
+}
+
+func responsesFunctionToolToChatTool(obj map[string]json.RawMessage) (map[string]json.RawMessage, string, error) {
+	function := map[string]json.RawMessage{}
+	if rawFunction, ok := obj["function"]; ok {
+		if err := json.Unmarshal(rawFunction, &function); err != nil || function == nil {
+			return nil, "", fmt.Errorf("convert responses function tool: function must be an object")
+		}
+	} else {
+		for _, key := range []string{"name", "description", "parameters", "strict"} {
+			if value, ok := obj[key]; ok {
+				function[key] = value
+			}
+		}
+	}
+	functionRaw, err := json.Marshal(function)
+	if err != nil {
+		return nil, "", fmt.Errorf("convert responses function tool: %w", err)
+	}
+	functionName := responsesFunctionToolName(obj)
+	chatTool := map[string]json.RawMessage{
+		"type":     json.RawMessage(`"function"`),
+		"function": functionRaw,
+	}
+	return chatTool, functionName, nil
 }
 
 func responsesToolChoiceToChatToolChoice(ctx context.Context, raw json.RawMessage, functionTools map[string]struct{}, modelName string) json.RawMessage {
@@ -451,10 +637,14 @@ func responsesInputToChatMessages(ctx context.Context, req *types.ResponsesReque
 			messages = append(messages, message)
 			lastAssistantIdx = len(messages) - 1
 		case "function_call_output":
+			content, err := normalizeResponsesContent(item["output"])
+			if err != nil {
+				return nil, err
+			}
 			messages = append(messages, map[string]any{
 				"role":         "tool",
 				"tool_call_id": item["call_id"],
-				"content":      item["output"],
+				"content":      content,
 			})
 		case "reasoning":
 			if reasoning := responsesReasoningItemText(item); reasoning != "" {
@@ -541,10 +731,7 @@ func normalizeResponsesContent(content any) (any, error) {
 		case "input_text", "output_text", "text":
 			chatParts = append(chatParts, map[string]any{"type": "text", "text": obj["text"]})
 		case "input_image", "image_url":
-			imageURL := obj["image_url"]
-			if s, ok := imageURL.(string); ok {
-				imageURL = map[string]any{"url": s}
-			}
+			imageURL := normalizeResponsesImageURL(obj)
 			chatParts = append(chatParts, map[string]any{"type": "image_url", "image_url": imageURL})
 		case "input_audio":
 			inputAudio := obj["input_audio"]
@@ -566,7 +753,34 @@ func normalizeResponsesContent(content any) (any, error) {
 	return chatParts, nil
 }
 
+func normalizeResponsesImageURL(obj map[string]any) any {
+	imageURL := obj["image_url"]
+	detail, hasDetail := obj["detail"]
+	if s, ok := imageURL.(string); ok {
+		normalized := map[string]any{"url": s}
+		if hasDetail {
+			normalized["detail"] = detail
+		}
+		return normalized
+	}
+	if imageURLObj, ok := imageURL.(map[string]any); ok && hasDetail {
+		if _, exists := imageURLObj["detail"]; !exists {
+			normalized := make(map[string]any, len(imageURLObj)+1)
+			for key, value := range imageURLObj {
+				normalized[key] = value
+			}
+			normalized["detail"] = detail
+			return normalized
+		}
+	}
+	return imageURL
+}
+
 func chatResponseToResponses(data []byte, publicModel string) (*types.ResponsesResponse, error) {
+	return chatResponseToResponsesWithToolNamespaces(data, publicModel, nil)
+}
+
+func chatResponseToResponsesWithToolNamespaces(data []byte, publicModel string, toolNamespaces map[string]string) (*types.ResponsesResponse, error) {
 	var chat types.ChatCompletion
 	if err := json.Unmarshal(data, &chat); err != nil {
 		return nil, err
@@ -595,14 +809,18 @@ func chatResponseToResponses(data []byte, publicModel string) (*types.ResponsesR
 	msg := chat.Choices[0].Message
 	if len(msg.ToolCalls) > 0 {
 		for _, call := range msg.ToolCalls {
-			resp.Output = append(resp.Output, types.ResponsesOutputItem{
+			item := types.ResponsesOutputItem{
 				ID:        call.ID,
 				Type:      "function_call",
 				Status:    "completed",
 				CallID:    call.ID,
 				Name:      call.Function.Name,
 				Arguments: call.Function.Arguments,
-			})
+			}
+			if namespace := toolNamespaces[call.Function.Name]; namespace != "" {
+				item.Extra = map[string]any{"namespace": namespace}
+			}
+			resp.Output = append(resp.Output, item)
 		}
 		appendResponsesReasoning(resp, reasoning)
 		return resp, nil
