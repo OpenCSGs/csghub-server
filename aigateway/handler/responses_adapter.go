@@ -319,9 +319,7 @@ func responsesToolsToChatTools(ctx context.Context, raw json.RawMessage, modelNa
 					return nil, nil, err
 				}
 			}
-			for _, chatTool := range namespaceTools {
-				chatTools = append(chatTools, chatTool)
-			}
+			chatTools = append(chatTools, namespaceTools...)
 			for name := range namespaceFunctionTools {
 				functionTools[name] = struct{}{}
 			}
