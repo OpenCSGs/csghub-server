@@ -1794,7 +1794,143 @@ func TestOpenAIHandler_Transcription(t *testing.T) {
 	})
 }
 
+func TestOpenAIHandler_Translation(t *testing.T) {
+	t.Run("rewrites transcriptions endpoint to translations and records usage", func(t *testing.T) {
+		tester, c, w := setupTest(t)
+
+		var downstreamModel string
+		var downstreamPrompt string
+		var downstreamFile string
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			require.Equal(t, "/v1/audio/translations", r.URL.Path)
+			require.NoError(t, r.ParseMultipartForm(32<<20))
+			downstreamModel = r.FormValue("model")
+			downstreamPrompt = r.FormValue("prompt")
+			file, _, err := r.FormFile("file")
+			require.NoError(t, err)
+			defer file.Close()
+			data, err := io.ReadAll(file)
+			require.NoError(t, err)
+			downstreamFile = string(data)
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"text":"hello world","usage":{"prompt_tokens":100,"completion_tokens":20,"total_tokens":120,"seconds":3.5}}`))
+		}))
+		defer server.Close()
+
+		c.Request = newMultipartAudioSTTRequest(t, "/v1/audio/translations", "model1", "audio-bytes", map[string]string{
+			"prompt": "meeting",
+		})
+		c.Set(trace.HeaderRequestID, "req-audio-translate-ok")
+		recorder := &testGenerationRecorderWithMutex{}
+		tracer := &testLLMTracerWithMutex{recorder: recorder}
+		tester.handler.llmTracer = tracer
+		// Endpoint still points at transcriptions (common Whisper deploy); gateway must rewrite.
+		model := &types.Model{
+			BaseModel: types.BaseModel{
+				ID:       "backend-model",
+				Object:   "model",
+				Metadata: map[string]any{},
+				Task:     "audio-transcription",
+			},
+			Endpoint: server.URL + "/v1/audio/transcriptions",
+			Upstreams: []commontypes.UpstreamConfig{
+				{URL: server.URL + "/v1/audio/transcriptions", Enabled: true, ModelName: "backend-model"},
+			},
+		}
+
+		var wg sync.WaitGroup
+		wg.Add(1)
+		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "model1").Return(model, nil).Once()
+		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil).Once()
+		tester.mocks.openAIComp.EXPECT().RecordUsageFromTokenUsage(mock.Anything, "testuuid", model, mock.Anything, mock.MatchedBy(func(usage *token.Usage) bool {
+			return usage != nil &&
+				usage.TotalTokens == 120 &&
+				usage.PromptTokens == 100 &&
+				usage.CompletionTokens == 20 &&
+				usage.Duration == 3.5
+		}), "").RunAndReturn(
+			func(ctx context.Context, userUUID string, model *types.Model, targetModelName string, usage *token.Usage, apikey string) error {
+				wg.Done()
+				return nil
+			}).Once()
+
+		tester.handler.Translation(c)
+		wg.Wait()
+
+		require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+		require.JSONEq(t, `{"text":"hello world","usage":{"prompt_tokens":100,"completion_tokens":20,"total_tokens":120,"seconds":3.5}}`, w.Body.String())
+		require.Equal(t, "backend-model", downstreamModel)
+		require.Equal(t, "meeting", downstreamPrompt)
+		require.Equal(t, "audio-bytes", downstreamFile)
+		starts := tracer.Starts()
+		require.Len(t, starts, 1)
+		require.Equal(t, "translation", starts[0].Metadata["aigateway.audio.kind"])
+		require.Equal(t, "english", starts[0].Metadata["aigateway.audio.language"])
+		usage, response, errorCode, ended, events := generationTraceSnapshot(recorder)
+		require.True(t, ended)
+		require.NotNil(t, response)
+		require.Equal(t, "backend-model", response.Model)
+		require.Equal(t, 3.5, response.Metadata[llmtrace.TraceMetadataKeyAudioDurationSeconds])
+		require.NotNil(t, usage)
+		require.Equal(t, int64(120), usage.TotalTokens)
+		require.Empty(t, errorCode)
+		require.Equal(t, []string{"response", "usage", "end"}, events)
+	})
+
+	t.Run("missing model", func(t *testing.T) {
+		tester, c, w := setupTest(t)
+		c.Request = newMultipartAudioSTTRequest(t, "/v1/audio/translations", "", "audio-bytes", nil)
+
+		tester.handler.Translation(c)
+
+		require.Equal(t, http.StatusBadRequest, w.Code)
+		require.Contains(t, w.Body.String(), "Model cannot be empty")
+	})
+
+	t.Run("missing file", func(t *testing.T) {
+		tester, c, w := setupTest(t)
+		var body bytes.Buffer
+		writer := multipart.NewWriter(&body)
+		require.NoError(t, writer.WriteField("model", "model1"))
+		require.NoError(t, writer.Close())
+		c.Request = httptest.NewRequest(http.MethodPost, "/v1/audio/translations", &body)
+		c.Request.Header.Set("Content-Type", writer.FormDataContentType())
+
+		tester.handler.Translation(c)
+
+		require.Equal(t, http.StatusBadRequest, w.Code)
+		require.Contains(t, w.Body.String(), "File cannot be empty")
+	})
+}
+
+func TestAudioTranslationProxyPath(t *testing.T) {
+	tests := []struct {
+		name     string
+		endpoint string
+		want     string
+	}{
+		{name: "empty endpoint", endpoint: "", want: "/v1/audio/translations"},
+		{name: "host only", endpoint: "http://whisper:8000", want: "/v1/audio/translations"},
+		{name: "root path", endpoint: "http://whisper:8000/", want: "/v1/audio/translations"},
+		{name: "rewrites transcriptions", endpoint: "http://whisper:8000/v1/audio/transcriptions", want: "/v1/audio/translations"},
+		{name: "keeps translations", endpoint: "http://whisper:8000/v1/audio/translations", want: "/v1/audio/translations"},
+		{name: "preserves path prefix", endpoint: "http://gateway/maas/whisper/v1/audio/transcriptions", want: "/maas/whisper/v1/audio/translations"},
+		{name: "unknown path unchanged", endpoint: "http://whisper:8000/custom/asr", want: "/custom/asr"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := audioTranslationProxyPath(tt.endpoint)
+			require.NoError(t, err)
+			require.Equal(t, tt.want, got)
+		})
+	}
+}
+
 func newMultipartTranscriptionRequest(t *testing.T, model, fileContent string, fields map[string]string) *http.Request {
+	return newMultipartAudioSTTRequest(t, "/v1/audio/transcriptions", model, fileContent, fields)
+}
+
+func newMultipartAudioSTTRequest(t *testing.T, path, model, fileContent string, fields map[string]string) *http.Request {
 	t.Helper()
 
 	var body bytes.Buffer
@@ -1813,7 +1949,7 @@ func newMultipartTranscriptionRequest(t *testing.T, model, fileContent string, f
 	}
 	require.NoError(t, writer.Close())
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/audio/transcriptions", &body)
+	req := httptest.NewRequest(http.MethodPost, path, &body)
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 	return req
 }
