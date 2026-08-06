@@ -103,17 +103,18 @@ docker run \
 
 ## Test the claw-eval Image
 
-Claw-eval currently does not support passing multiple discrete task IDs directly. Task selection is controlled via `CLAW_EVAL_TASKS`:
+Task selection is controlled via `CLAW_EVAL_TASKS`:
 
 | Value | Description |
 | ----- | ----------- |
 | `all` | Run all 300 tasks (not recommended on current platform) |
-| `normal` | **Recommended.** Run the 129 platform-runnable tasks (excludes web search, multimodal, multi-turn, sandbox-dependent tasks) |
+| `normal` | **Recommended.** Run the 119 platform-runnable tasks (also temporarily excludes OfficeQA tasks T076-T085) |
 | `general` | Run tasks tagged `general` |
 | `multimodal` | Run tasks tagged `multimodal` |
 | `multi_turn` | Run tasks tagged `multi_turn` |
 | `1-9` | Run tasks in numeric ID range |
 | `T009` | Filter match by task id/name |
+| `T001-T002,T005-T006` | Run multiple task IDs/ranges (ASCII hyphen, en dash, and em dash are supported) |
 
 If `CLAW_EVAL_JUDGE_MODEL` / API `judge_model` is not set, the container defaults to `qwen3.7-max`. Judge traffic uses platform AIGateway credentials injected as `CLAW_EVAL_JUDGE_BASE_URL` and `CLAW_EVAL_JUDGE_API_KEY` (not user-provided). Set `CLAW_EVAL_NO_JUDGE=true` only when you explicitly want to skip grading.
 

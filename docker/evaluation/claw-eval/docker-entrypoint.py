@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import os
+import re
 import sys
 from urllib.parse import urlsplit, urlunsplit
 
@@ -122,8 +123,6 @@ def _append_default_judge_model(args: list[str]) -> None:
 
 def _prepare_normal_tasks_dir() -> str:
     import json
-    import tempfile
-    from pathlib import Path
 
     tasks_file = os.environ.get("CLAW_EVAL_NORMAL_TASKS_FILE", DEFAULT_NORMAL_TASKS_FILE)
     with open(tasks_file, encoding="utf-8") as handle:
@@ -132,25 +131,62 @@ def _prepare_normal_tasks_dir() -> str:
     if not task_names:
         raise SystemExit(f"No tasks listed in {tasks_file}")
 
+    return _prepare_tasks_dir(set(task_names), "normal")
+
+
+def _prepare_tasks_dir(task_names: set[str], label: str) -> str:
+    import tempfile
+    from pathlib import Path
+
     src_root = Path(os.environ.get("CLAW_EVAL_SOURCE_TASKS_DIR", DEFAULT_SOURCE_TASKS_DIR))
     app_root = src_root.parent
-    work_root = Path(tempfile.mkdtemp(prefix="claw-normal-tasks-"))
+    work_root = Path(tempfile.mkdtemp(prefix=f"claw-{label}-tasks-"))
     tasks_dir = work_root / "tasks"
     tasks_dir.mkdir()
     mock_services = app_root / "mock_services"
     if mock_services.is_dir():
         os.symlink(mock_services, work_root / "mock_services")
     linked = 0
-    for name in task_names:
-        src = src_root / name
-        dst = tasks_dir / name
+    for src in sorted(src_root.iterdir()):
+        if src.name not in task_names:
+            continue
+        dst = tasks_dir / src.name
         if src.is_dir():
             os.symlink(src, dst)
             linked += 1
     if linked == 0:
-        raise SystemExit(f"No normal tasks found under {src_root}")
-    print(f"info: prepared {linked} normal tasks in {tasks_dir}", file=sys.stderr)
+        raise SystemExit(f"No {label} tasks found under {src_root}")
+    print(f"info: prepared {linked} {label} tasks in {tasks_dir}", file=sys.stderr)
     return str(tasks_dir)
+
+
+def _prepare_task_id_list_dir(selector: str) -> str:
+    from pathlib import Path
+
+    task_ids: set[int] = set()
+    for raw_part in selector.split(","):
+        part = raw_part.strip()
+        match = re.fullmatch(r"T?(\d+)(?:\s*[-–—]\s*T?(\d+))?", part, re.IGNORECASE)
+        if not match:
+            raise SystemExit(
+                f"Invalid task selector {part!r}; expected task IDs or ranges "
+                "(for example T001-T002,T005-T006)"
+            )
+        start = int(match.group(1))
+        end = int(match.group(2) or match.group(1))
+        if start > end:
+            raise SystemExit(f"Invalid descending task range {part!r}")
+        task_ids.update(range(start, end + 1))
+
+    src_root = Path(os.environ.get("CLAW_EVAL_SOURCE_TASKS_DIR", DEFAULT_SOURCE_TASKS_DIR))
+    task_names = {
+        path.name
+        for path in src_root.iterdir()
+        if path.is_dir()
+        and (match := re.match(r"T(\d+)", path.name, re.IGNORECASE))
+        and int(match.group(1)) in task_ids
+    }
+    return _prepare_tasks_dir(task_names, "selected")
 
 
 def _append_task_selector(args: list[str]) -> None:
@@ -167,6 +203,16 @@ def _append_task_selector(args: list[str]) -> None:
     if selector_tags and selector_tags.issubset(TASK_TAGS):
         if not _has_arg(args, "--tag"):
             args.extend(["--tag", selector])
+        return
+
+    task_id_range = re.fullmatch(
+        r"T\d+\s*[-–—]\s*T?\d+",
+        selector,
+        re.IGNORECASE,
+    )
+    if "," in selector or task_id_range:
+        if not _has_arg(args, "--tasks-dir"):
+            args.extend(["--tasks-dir", _prepare_task_id_list_dir(selector)])
         return
 
     if "-" in selector and all(part.isdigit() for part in selector.split("-", 1)):
