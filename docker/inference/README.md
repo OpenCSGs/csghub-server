@@ -225,10 +225,10 @@ curl --max-time 600 -X POST http://127.0.0.1:8000/v1/audio/transcriptions \
   -F "response_format=text"
 
 # Call FunASR OpenAI-compatible translation API (any language -> English).
-# Only works when REPO_ID is a multilingual Whisper model (e.g. openai/Whisper-large-v3);
-# Whisper-large-v3-turbo and non-Whisper models (Fun-ASR, SenseVoice, Paraformer, Qwen3-ASR)
-# return 501. Translation is passed to the underlying Whisper model via
-# FunASR's DecodingOptions (task=translate).
+# Only works when REPO_ID is a multilingual Whisper model (e.g. openai/whisper-large-v3);
+# turbo, English-only (.en) checkpoints (e.g. openai/whisper-small.en), and non-Whisper
+# models (Fun-ASR, SenseVoice, Paraformer, Qwen3-ASR) return 501. Translation is passed
+# to the underlying Whisper model via FunASR's DecodingOptions (task=translate).
 curl --max-time 600 -X POST http://127.0.0.1:8000/v1/audio/translations \
   -F "file=@/path/to/audio.mp3" \
   -F "model=local" \

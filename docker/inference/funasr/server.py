@@ -114,12 +114,23 @@ def detect_architecture(model_path: str) -> str:
     return str(model_type) if model_type else ""
 
 
+def is_english_only_whisper(model_id: str) -> bool:
+    """OpenAI English-only Whisper checkpoints use a ".en" name suffix."""
+    name = model_id.strip().lower().rsplit("/", 1)[-1]
+    return name.endswith(".en")
+
+
 def supports_translation(arch: str, model_id: str = "") -> bool:
     if not arch or "whisper" not in arch.lower():
         return False
+    mid = model_id.lower()
     # Whisper turbo variants do not support translation (task=translate is a
     # no-op and returns the source language); exclude them explicitly.
-    if "turbo" in model_id.lower():
+    if "turbo" in mid:
+        return False
+    # English-only checkpoints (e.g. whisper-small.en) cannot translate
+    # arbitrary source languages into English.
+    if is_english_only_whisper(model_id):
         return False
     return True
 
@@ -296,12 +307,16 @@ async def translate(
     response_format: Optional[str] = Form(default="json"),
     stream: bool = Form(default=True),
 ):
+    # Prefer 503 while the model is still loading: MODEL_ARCH is empty until load
+    # finishes, so supports_translation() would otherwise look like a permanent 501.
+    if ASR_MODEL is None:
+        raise HTTPException(status_code=503, detail="model is not loaded")
     if not supports_translation(MODEL_ARCH, MODEL_ID):
         raise HTTPException(
             status_code=501,
             detail=f"audio translation is not supported by model '{MODEL_ID or 'unknown'}' "
             f"(architecture '{MODEL_ARCH or 'unknown'}'); "
-            "only multilingual Whisper models (non-turbo) support translation",
+            "only multilingual Whisper models (non-turbo, non-.en) support translation",
         )
     return await run_audio_stt(file, model, language, hotwords, response_format, stream, task="translate")
 
