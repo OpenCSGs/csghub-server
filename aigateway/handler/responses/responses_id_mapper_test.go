@@ -36,13 +36,16 @@ func TestResponsesIDMapperRejectsOtherOwner(t *testing.T) {
 	require.ErrorIs(t, err, ErrResponseIDOwner)
 }
 
-func TestResponsesIDMapperRequiresUpstreamID(t *testing.T) {
+func TestResponsesIDMapperAllowsEmptyUpstreamID(t *testing.T) {
 	mapper, err := NewIDMapper("test-secret")
 	require.NoError(t, err)
 
-	_, err = mapper.Wrap(IDClaims{UpstreamResponseID: "resp_1", NamespaceUUID: "namespace-1"})
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "upstream id is empty")
+	id, err := mapper.Wrap(IDClaims{UpstreamResponseID: "resp_1", NamespaceUUID: "namespace-1"})
+	require.NoError(t, err)
+	claims, err := mapper.Unwrap(id, "namespace-1")
+	require.NoError(t, err)
+	require.Equal(t, "resp_1", claims.UpstreamResponseID)
+	require.Zero(t, claims.UpstreamID)
 }
 
 func TestResponsesIDMapperFromConfigUsesResponsesSecret(t *testing.T) {

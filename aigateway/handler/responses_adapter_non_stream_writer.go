@@ -21,6 +21,7 @@ type responsesAdapterNonStreamWriter struct {
 	moderation       component.Moderation
 	sessionID        string
 	logCapture       *responsespkg.LLMLogRecorder
+	toolNamespaces   map[string]string
 }
 
 func newResponsesAdapterNonStreamWriter(w gin.ResponseWriter, model string, responsesCounter token.ResponsesTokenCounter, moderation component.Moderation, sessionID string, logCapture ...*responsespkg.LLMLogRecorder) *responsesAdapterNonStreamWriter {
@@ -57,7 +58,7 @@ func (w *responsesAdapterNonStreamWriter) Finalize(statusCode int) error {
 	if sensitive {
 		return nil
 	}
-	resp, err := chatResponseToResponses(chatBody, w.model)
+	resp, err := chatResponseToResponsesWithToolNamespaces(chatBody, w.model, w.toolNamespaces)
 	if err != nil {
 		return err
 	}

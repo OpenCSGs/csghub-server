@@ -16,7 +16,8 @@ import (
 )
 
 func (h *OpenAIHandlerImpl) executeNativeResponses(c *gin.Context, req *types.ResponsesRequest, modelTarget *resolvedModelTarget, decision responsespkg.RoutingDecision, owner, nsUUID, apikey, publicModelID, publicPreviousResponseID string, moderation component.Moderation, logCapture *responsespkg.LLMLogRecorder, generationRecorder llmtrace.GenerationRecorder) {
-	if err := h.openaiComponent.CheckUsageLimit(c.Request.Context(), nsUUID, modelTarget.Model, decision.NativeURL); err != nil {
+	backendURL := decision.BackendURL
+	if err := h.openaiComponent.CheckUsageLimit(c.Request.Context(), nsUUID, modelTarget.Model, backendURL); err != nil {
 		finishLLMTraceWithError(generationRecorder, err, types.TraceErrInsufficientBalance)
 		h.handleUsageLimitExceeded(c, req.Stream, nsUUID, publicModelID, err)
 		return
@@ -40,7 +41,7 @@ func (h *OpenAIHandlerImpl) executeNativeResponses(c *gin.Context, req *types.Re
 	if err := applyModelAuthHeaders(c.Request.Header, modelTarget.Model); err != nil {
 		slog.WarnContext(c.Request.Context(), "invalid auth header", slog.String("model", modelTarget.ModelName), slog.Any("error", err))
 	}
-	rp, err := proxy.NewReverseProxy(decision.NativeURL, proxy.WithoutAcceptEncoding())
+	rp, err := proxy.NewReverseProxy(backendURL, proxy.WithoutAcceptEncoding())
 	if err != nil {
 		finishLLMTraceWithError(generationRecorder, err, types.TraceErrUpstreamUnavailable)
 		h.handleProxyError(c, req.Stream, nsUUID, publicModelID, err)
@@ -66,7 +67,7 @@ func (h *OpenAIHandlerImpl) executeNativeResponses(c *gin.Context, req *types.Re
 		slog.String("responses_route_provider", modelTarget.Model.Provider),
 		slog.String("responses_route_model", modelTarget.ModelName),
 	)
-	proxyPath := resolveProxyPathFromModelEndpoint(decision.NativeURL, modelTarget.ModelName)
+	proxyPath := resolveProxyPathFromModelEndpoint(backendURL, modelTarget.ModelName)
 	writer := newResponsesNativeResponseWriter(c.Writer, req.Stream, transformer, moderation, newResponsesModerationSessionID())
 	rp.ServeHTTP(writer, c.Request, proxyPath, modelTarget.Host)
 	if err := writer.Finalize(); err != nil {

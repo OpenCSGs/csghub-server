@@ -18,8 +18,12 @@ func (h *OpenAIHandlerImpl) newResponsesTokenCounter(modelTarget *resolvedModelT
 	if modelTarget == nil || modelTarget.Model == nil {
 		return token.NewResponsesTokenCounter(nil)
 	}
+	tokenizerTarget := modelTarget.TokenizerTarget
+	if tokenizerTarget == "" {
+		tokenizerTarget = modelTarget.Target
+	}
 	tokenizer := token.NewTokenizerImpl(
-		modelTarget.Target,
+		tokenizerTarget,
 		modelTarget.Host,
 		modelTarget.ModelName,
 		modelTarget.Model.ImageID,
@@ -42,15 +46,29 @@ func (h *OpenAIHandlerImpl) recordResponsesUsageWithTrace(c *gin.Context, counte
 				}
 			}
 		}()
-		usageCtx, cancel := context.WithTimeout(baseCtx, 3*time.Second)
-		defer cancel()
-
 		var tokenUsage *token.Usage
 		if counter != nil {
 			var err error
+			usageCtx, cancel := context.WithTimeout(baseCtx, 2*time.Second)
 			tokenUsage, err = counter.Usage(usageCtx)
+			cancel()
 			if err != nil {
-				slog.ErrorContext(usageCtx, "failed to get responses token usage", slog.Any("error", err))
+				slog.ErrorContext(baseCtx, "failed to get responses token usage",
+					slog.String("step", "token_usage"),
+					slog.String("model", modelTarget.ModelName),
+					slog.String("provider", modelTarget.Model.Provider),
+					slog.Any("error", err))
+			}
+			if tokenUsage != nil && tokenUsage.Source != "" {
+				slog.WarnContext(baseCtx, "responses usage fallback",
+					slog.String("step", "token_usage"),
+					slog.String("usage_source", tokenUsage.Source),
+					slog.String("usage_reason", tokenUsage.SourceReason),
+					slog.String("model", modelTarget.ModelName),
+					slog.String("provider", modelTarget.Model.Provider),
+					slog.Int64("prompt_tokens", tokenUsage.PromptTokens),
+					slog.Int64("completion_tokens", tokenUsage.CompletionTokens),
+					slog.Int64("total_tokens", tokenUsage.TotalTokens))
 			}
 		}
 		if traceInput.Recorder != nil {
@@ -64,28 +82,52 @@ func (h *OpenAIHandlerImpl) recordResponsesUsageWithTrace(c *gin.Context, counte
 			traceInput.Recorder.End()
 		}
 		if counter != nil {
-			if err := h.openaiComponent.CommitUsageLimit(usageCtx, nsUUID, modelTarget.Model, counter); err != nil {
-				slog.ErrorContext(usageCtx, "failed to commit responses usage limit", slog.Any("error", err))
+			commitCtx, cancel := context.WithTimeout(baseCtx, time.Second)
+			if err := h.openaiComponent.CommitUsageLimit(commitCtx, nsUUID, modelTarget.Model, counter); err != nil {
+				slog.ErrorContext(baseCtx, "failed to commit responses usage limit",
+					slog.String("step", "commit_usage_limit"),
+					slog.String("model", modelTarget.ModelName),
+					slog.String("provider", modelTarget.Model.Provider),
+					slog.Any("error", err))
 			}
+			cancel()
 		}
 		if tokenUsage != nil {
-			if err := h.openaiComponent.RecordUsageFromTokenUsage(usageCtx, nsUUID, modelTarget.Model, modelTarget.ModelName, tokenUsage, apikey); err != nil {
-				slog.ErrorContext(usageCtx, "failed to record responses usage", slog.Any("error", err))
+			recordCtx, cancel := context.WithTimeout(baseCtx, time.Second)
+			if err := h.openaiComponent.RecordUsageFromTokenUsage(recordCtx, nsUUID, modelTarget.Model, modelTarget.ModelName, tokenUsage, apikey); err != nil {
+				slog.ErrorContext(baseCtx, "failed to record responses usage",
+					slog.String("step", "record_usage"),
+					slog.String("model", modelTarget.ModelName),
+					slog.String("provider", modelTarget.Model.Provider),
+					slog.Any("error", err))
 			}
+			cancel()
 		}
 		if h.config != nil && h.config.AIGateway.EnableLLMLog && recorder != nil && h.llmLogPublisher != nil {
 			record, recordErr := recorder.Record(tokenUsage)
 			if recordErr != nil {
-				slog.ErrorContext(usageCtx, "failed to build responses llmlog training record", slog.Any("error", recordErr))
+				slog.ErrorContext(baseCtx, "failed to build responses llmlog training record",
+					slog.String("step", "build_llmlog_record"),
+					slog.String("model", modelTarget.ModelName),
+					slog.String("provider", modelTarget.Model.Provider),
+					slog.Any("error", recordErr))
 				return
 			}
 			payload, marshalErr := json.Marshal(record)
 			if marshalErr != nil {
-				slog.ErrorContext(usageCtx, "failed to marshal responses llmlog training record", slog.Any("error", marshalErr))
+				slog.ErrorContext(baseCtx, "failed to marshal responses llmlog training record",
+					slog.String("step", "marshal_llmlog_record"),
+					slog.String("model", modelTarget.ModelName),
+					slog.String("provider", modelTarget.Model.Provider),
+					slog.Any("error", marshalErr))
 				return
 			}
 			if publishErr := h.llmLogPublisher.PublishTrainingLog(payload); publishErr != nil {
-				slog.ErrorContext(usageCtx, "failed to publish responses llmlog training record", slog.Any("error", publishErr))
+				slog.ErrorContext(baseCtx, "failed to publish responses llmlog training record",
+					slog.String("step", "publish_llmlog_record"),
+					slog.String("model", modelTarget.ModelName),
+					slog.String("provider", modelTarget.Model.Provider),
+					slog.Any("error", publishErr))
 			}
 		}
 	}()

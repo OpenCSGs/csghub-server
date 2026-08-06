@@ -55,6 +55,42 @@ func TestNewResponsesTokenCounterBuildsTokenizer(t *testing.T) {
 	require.NotNil(t, usage)
 }
 
+func TestNewResponsesTokenCounterUsesTokenizerTarget(t *testing.T) {
+	tester, _, _ := setupTest(t)
+	var tokenizePaths []string
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		tokenizePaths = append(tokenizePaths, r.URL.Path)
+		require.Equal(t, "/tokenize", r.URL.Path)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"count":3}`))
+	}))
+	defer upstream.Close()
+
+	model := &types.Model{
+		BaseModel: types.BaseModel{ID: "m"},
+		InternalModelInfo: types.InternalModelInfo{
+			ImageID: "vllm-local:latest",
+		},
+	}
+	modelTarget := &resolvedModelTarget{
+		Model:           model,
+		Target:          upstream.URL + "/v1/responses",
+		TokenizerTarget: upstream.URL,
+		ModelName:       "upstream-model",
+	}
+
+	counter := tester.handler.newResponsesTokenCounter(modelTarget)
+	counter.Request(&types.ResponsesRequest{Model: "m", Input: json.RawMessage(`"hi"`)})
+	counter.Response(&types.ResponsesResponse{OutputText: "ok"})
+
+	usage, err := counter.Usage(context.Background())
+	require.NoError(t, err)
+	require.Equal(t, int64(3), usage.PromptTokens)
+	require.Equal(t, int64(3), usage.CompletionTokens)
+	require.Equal(t, int64(6), usage.TotalTokens)
+	require.Equal(t, []string{"/tokenize", "/tokenize"}, tokenizePaths)
+}
+
 func TestRecordResponsesUsageHappyPathCallsComponent(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		tester, c, _ := setupTest(t)

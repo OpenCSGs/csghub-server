@@ -27,7 +27,8 @@ var (
 )
 
 type IDClaims struct {
-	NamespaceUUID      string `json:"namespace_uuid"`
+	NamespaceUUID string `json:"namespace_uuid"`
+	// UpstreamID is zero for CSGHub-hosted models that do not have an upstream row.
 	UpstreamID         int64  `json:"upstream_id"`
 	UpstreamResponseID string `json:"upstream_response_id"`
 }
@@ -69,9 +70,6 @@ func (m *IDMapper) Wrap(claims IDClaims) (string, error) {
 	}
 	if claims.NamespaceUUID == "" {
 		return "", fmt.Errorf("namespace uuid is empty")
-	}
-	if claims.UpstreamID == 0 {
-		return "", fmt.Errorf("upstream id is empty")
 	}
 	payload, err := json.Marshal(claims)
 	if err != nil {

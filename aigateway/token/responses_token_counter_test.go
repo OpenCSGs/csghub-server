@@ -3,6 +3,7 @@ package token
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -70,6 +71,48 @@ func TestResponsesTokenCounterEstimatesNonStreamResponse(t *testing.T) {
 	require.Equal(t, usage.PromptTokens+usage.CompletionTokens, usage.TotalTokens)
 }
 
+func TestResponsesTokenCounterApproximatesUnsupportedTokenizer(t *testing.T) {
+	counter := NewResponsesTokenCounter(NewTokenizerImpl("http://example.com", "", "m", "sglang", ""))
+	counter.Request(&types.ResponsesRequest{
+		Model:        "m",
+		Instructions: json.RawMessage(`"sys"`),
+		Input:        json.RawMessage(`"hello"`),
+	})
+	counter.Response(&types.ResponsesResponse{OutputText: "world"})
+
+	usage, err := counter.Usage(context.Background())
+	require.NoError(t, err)
+	require.Equal(t, approxTokensByText("sys\nhello"), usage.PromptTokens)
+	require.Equal(t, approxTokensByText("world"), usage.CompletionTokens)
+	require.Equal(t, usage.PromptTokens+usage.CompletionTokens, usage.TotalTokens)
+	require.Equal(t, "approx_chars_div_4", usage.Source)
+	require.Equal(t, "unsupported_tokenizer", usage.SourceReason)
+}
+
+func TestResponsesTokenCounterApproximatesTokenizerError(t *testing.T) {
+	counter := NewResponsesTokenCounter(responsesFailingTokenizer{err: errors.New("tokenize failed")})
+	counter.Request(&types.ResponsesRequest{Model: "m", Input: json.RawMessage(`"hello"`)})
+	counter.Response(&types.ResponsesResponse{OutputText: "world"})
+
+	usage, err := counter.Usage(context.Background())
+	require.NoError(t, err)
+	require.Equal(t, "approx_chars_div_4", usage.Source)
+	require.Equal(t, "tokenizer_error", usage.SourceReason)
+}
+
+func TestResponsesTokenCounterApproximatesCanceledTokenizer(t *testing.T) {
+	counter := NewResponsesTokenCounter(responsesBlockingTokenizer{})
+	counter.Request(&types.ResponsesRequest{Model: "m", Input: json.RawMessage(`"hello"`)})
+	counter.Response(&types.ResponsesResponse{OutputText: "world"})
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	usage, err := counter.Usage(ctx)
+	require.NoError(t, err)
+	require.Equal(t, "approx_chars_div_4", usage.Source)
+	require.Equal(t, "tokenizer_canceled", usage.SourceReason)
+}
+
 func TestResponsesTokenCounterEstimatesStreamEventsWithoutDoubleCountingDonePayloads(t *testing.T) {
 	counter := NewResponsesTokenCounter(&DumyTokenizer{})
 	counter.Request(&types.ResponsesRequest{Model: "m", Input: json.RawMessage(`"hi"`)})
@@ -131,4 +174,26 @@ func TestResponsesTokenCounterEstimatesReasoningStreamEventsWithoutDoubleCountin
 	require.Equal(t, int64(2), usage.PromptTokens)
 	require.Equal(t, int64(5), usage.CompletionTokens)
 	require.Equal(t, int64(7), usage.TotalTokens)
+}
+
+type responsesFailingTokenizer struct {
+	err error
+}
+
+func (t responsesFailingTokenizer) Encode(types.Message) (int64, error) {
+	return 0, t.err
+}
+
+func (t responsesFailingTokenizer) EmbeddingEncode(string) (int64, error) {
+	return 0, t.err
+}
+
+type responsesBlockingTokenizer struct{}
+
+func (responsesBlockingTokenizer) Encode(types.Message) (int64, error) {
+	select {}
+}
+
+func (responsesBlockingTokenizer) EmbeddingEncode(string) (int64, error) {
+	select {}
 }
