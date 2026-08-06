@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"math"
 	"net/http"
 	"net/url"
 	"os"
@@ -151,13 +150,11 @@ func (dva *dataViewerActivityImpl) ScanRepoFiles(ctx context.Context, scanParam 
 			Limit:     types.MaxFileTreeSize,
 			Cursor:    cursor,
 		})
-		if resp == nil {
-			break
-		}
-
-		cursor = resp.Cursor
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan repo %s/%s branch %s files error: %w", scanParam.Req.Namespace, scanParam.Req.Name, scanParam.Req.Branch, err)
+		}
+		if resp == nil {
+			break
 		}
 
 		for _, file := range resp.Files {
@@ -170,6 +167,7 @@ func (dva *dataViewerActivityImpl) ScanRepoFiles(ctx context.Context, scanParam 
 		if resp.Cursor == "" {
 			break
 		}
+		cursor = resp.Cursor
 	}
 
 	return &fileClass, nil
@@ -561,23 +559,34 @@ func (dva *dataViewerActivityImpl) CopyParquetFiles(ctx context.Context, copyReq
 }
 
 func (dva *dataViewerActivityImpl) getRepoFiles(ctx context.Context, req types.UpdateViewerReq) (map[string]string, error) {
-	resp, err := dva.gitServer.GetTree(ctx, types.GetTreeRequest{
-		Namespace: req.Namespace,
-		Name:      req.Name,
-		RepoType:  req.RepoType,
-		Ref:       req.Branch,
-		Recursive: true,
-		Limit:     math.MaxInt,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("fail to get repo %s/%s branch %s all files error: %w", req.Namespace, req.Name, req.Branch, err)
-	}
 	allFiles := make(map[string]string)
-	for _, file := range resp.Files {
-		if file.Type == "dir" {
-			continue
+	var cursor string
+	for {
+		resp, err := dva.gitServer.GetTree(ctx, types.GetTreeRequest{
+			Namespace: req.Namespace,
+			Name:      req.Name,
+			RepoType:  req.RepoType,
+			Ref:       req.Branch,
+			Recursive: true,
+			Limit:     types.MaxFileTreeSize,
+			Cursor:    cursor,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("fail to get repo %s/%s branch %s all files error: %w", req.Namespace, req.Name, req.Branch, err)
 		}
-		allFiles[file.Path] = file.Path
+		if resp == nil {
+			break
+		}
+		for _, file := range resp.Files {
+			if file.Type == "dir" {
+				continue
+			}
+			allFiles[file.Path] = file.Path
+		}
+		if resp.Cursor == "" {
+			break
+		}
+		cursor = resp.Cursor
 	}
 	return allFiles, nil
 }
