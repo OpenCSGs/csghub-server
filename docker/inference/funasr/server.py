@@ -23,6 +23,7 @@ app = FastAPI(title="FunASR OpenAI-Compatible API", version="1.0.0")
 ASR_MODEL = None
 MODEL_ID = "local"
 MODEL_PATH = ""
+MODEL_ARCH = ""
 DEVICE = "cpu"
 VAD_MODEL = ""
 VAD_MAX_SINGLE_SEGMENT_TIME = 30000
@@ -95,7 +96,51 @@ def load_local_model(model_path: str, device: str, vad_model: str, vad_max_singl
     return model
 
 
-def build_generate_kwargs(input_paths: list[str], language: Optional[str], hotwords: Optional[str]) -> dict:
+def detect_architecture(model_path: str) -> str:
+    config_file = Path(model_path) / "config.json"
+    if not config_file.exists():
+        return ""
+    try:
+        with open(config_file, "r", encoding="utf-8") as handle:
+            config = json.load(handle)
+    except (OSError, json.JSONDecodeError):
+        return ""
+    architectures = config.get("architectures")
+    if isinstance(architectures, list) and architectures:
+        return str(architectures[0])
+    if isinstance(architectures, str) and architectures:
+        return architectures
+    model_type = config.get("model_type")
+    return str(model_type) if model_type else ""
+
+
+def is_english_only_whisper(model_id: str) -> bool:
+    """OpenAI English-only Whisper checkpoints use a ".en" name suffix."""
+    name = model_id.strip().lower().rsplit("/", 1)[-1]
+    return name.endswith(".en")
+
+
+def supports_translation(arch: str, model_id: str = "") -> bool:
+    if not arch or "whisper" not in arch.lower():
+        return False
+    mid = model_id.lower()
+    # Whisper turbo variants do not support translation (task=translate is a
+    # no-op and returns the source language); exclude them explicitly.
+    if "turbo" in mid:
+        return False
+    # English-only checkpoints (e.g. whisper-small.en) cannot translate
+    # arbitrary source languages into English.
+    if is_english_only_whisper(model_id):
+        return False
+    return True
+
+
+def build_generate_kwargs(
+    input_paths: list[str],
+    language: Optional[str],
+    hotwords: Optional[str],
+    task: str = "transcribe",
+) -> dict:
     generate_kwargs = {
         "input": input_paths,
         "cache": {},
@@ -109,11 +154,21 @@ def build_generate_kwargs(input_paths: list[str], language: Optional[str], hotwo
         generate_kwargs["language"] = language
     if hotwords:
         generate_kwargs["hotwords"] = [word.strip() for word in hotwords.split(",") if word.strip()]
+    if task == "translate":
+        # FunASR's AutoModel.generate does not accept a top-level `task` kwarg;
+        # its Whisper wrapper reads `DecodingOptions` from kwargs and builds a
+        # whisper.DecodingOptions from it, which is where `task` must go.
+        generate_kwargs["DecodingOptions"] = {"task": "translate"}
     return generate_kwargs
 
 
-def transcribe_files(input_paths: list[str], language: Optional[str], hotwords: Optional[str]):
-    generate_kwargs = build_generate_kwargs(input_paths, language, hotwords)
+def transcribe_files(
+    input_paths: list[str],
+    language: Optional[str],
+    hotwords: Optional[str],
+    task: str = "transcribe",
+):
+    generate_kwargs = build_generate_kwargs(input_paths, language, hotwords, task)
     return ASR_MODEL.generate(**generate_kwargs)
 
 
@@ -200,6 +255,7 @@ def stream_transcription(
     hotwords: Optional[str],
     response_format: Optional[str],
     audio_duration: float,
+    task: str = "transcribe",
 ):
     try:
         with tempfile.TemporaryDirectory(prefix="funasr-stream-") as chunk_dir:
@@ -207,7 +263,7 @@ def stream_transcription(
             total_chunks = len(chunks)
             for index, chunk_path in enumerate(chunks, start=1):
                 start = time.time()
-                result = transcribe_files([chunk_path], language, hotwords)
+                result = transcribe_files([chunk_path], language, hotwords, task)
                 elapsed = time.time() - start
                 first_result = result[0] if result else {}
                 text = clean_text(first_result.get("text", ""))
@@ -239,6 +295,41 @@ async def transcribe(
     response_format: Optional[str] = Form(default="json"),
     stream: bool = Form(default=True),
 ):
+    return await run_audio_stt(file, model, language, hotwords, response_format, stream, task="transcribe")
+
+
+@app.post("/v1/audio/translations")
+async def translate(
+    file: UploadFile = File(...),
+    model: str = Form(default="local"),
+    language: Optional[str] = Form(default=None),
+    hotwords: Optional[str] = Form(default=None),
+    response_format: Optional[str] = Form(default="json"),
+    stream: bool = Form(default=True),
+):
+    # Prefer 503 while the model is still loading: MODEL_ARCH is empty until load
+    # finishes, so supports_translation() would otherwise look like a permanent 501.
+    if ASR_MODEL is None:
+        raise HTTPException(status_code=503, detail="model is not loaded")
+    if not supports_translation(MODEL_ARCH, MODEL_ID):
+        raise HTTPException(
+            status_code=501,
+            detail=f"audio translation is not supported by model '{MODEL_ID or 'unknown'}' "
+            f"(architecture '{MODEL_ARCH or 'unknown'}'); "
+            "only multilingual Whisper models (non-turbo, non-.en) support translation",
+        )
+    return await run_audio_stt(file, model, language, hotwords, response_format, stream, task="translate")
+
+
+async def run_audio_stt(
+    file: UploadFile,
+    model: str,
+    language: Optional[str],
+    hotwords: Optional[str],
+    response_format: Optional[str],
+    stream: bool,
+    task: str,
+):
     if ASR_MODEL is None:
         raise HTTPException(status_code=503, detail="model is not loaded")
 
@@ -257,15 +348,20 @@ async def transcribe(
             tmp_path = ""
             media_type = "application/x-ndjson" if response_format in {"json", "verbose_json"} else "text/plain"
             return StreamingResponse(
-                stream_transcription(tmp_path_for_stream, language, hotwords, response_format, audio_duration),
+                stream_transcription(tmp_path_for_stream, language, hotwords, response_format, audio_duration, task),
                 media_type=media_type,
                 headers=audio_duration_headers(audio_duration),
             )
 
         start = time.time()
-        result = transcribe_files([tmp_path], language, hotwords)
+        result = transcribe_files([tmp_path], language, hotwords, task)
         elapsed = time.time() - start
-        logger.info("Transcribed FunASR request in %.1fs; audio_duration=%.3fs", elapsed, audio_duration)
+        logger.info(
+            "Processed FunASR %s request in %.1fs; audio_duration=%.3fs",
+            task,
+            elapsed,
+            audio_duration,
+        )
 
         first_result = result[0] if result else {}
         text = clean_text(first_result.get("text", ""))
@@ -287,7 +383,7 @@ async def transcribe(
                 {
                     "text": text,
                     "segments": segments,
-                    "language": language or "auto",
+                    "language": "english" if task == "translate" else (language or "auto"),
                     "duration": round(audio_duration, 3),
                     "model": model or MODEL_ID,
                 },
@@ -296,7 +392,7 @@ async def transcribe(
 
         return JSONResponse({"text": text}, headers=audio_duration_headers(audio_duration))
     except Exception as exc:
-        logger.exception("Transcription error")
+        logger.exception("%s error", task)
         raise HTTPException(status_code=500, detail=str(exc)) from exc
     finally:
         if tmp_path and os.path.exists(tmp_path):
@@ -334,6 +430,8 @@ async def health():
         "device": DEVICE,
         "model_id": MODEL_ID,
         "model_path": MODEL_PATH,
+        "model_arch": MODEL_ARCH or None,
+        "supports_translation": supports_translation(MODEL_ARCH, MODEL_ID),
         "vad_model": VAD_MODEL or None,
         "vad_max_single_segment_time": VAD_MAX_SINGLE_SEGMENT_TIME,
         "batch_size": BATCH_SIZE,
@@ -384,7 +482,7 @@ def main():
     if unknown_args:
         logger.warning("Ignoring unsupported server args: %s", unknown_args)
 
-    global ASR_MODEL, DEVICE, MODEL_ID, MODEL_PATH
+    global ASR_MODEL, DEVICE, MODEL_ID, MODEL_PATH, MODEL_ARCH
     global VAD_MODEL, VAD_MAX_SINGLE_SEGMENT_TIME, BATCH_SIZE
     global BATCH_SIZE_S, BATCH_SIZE_THRESHOLD_S, STREAM_CHUNK_SECONDS
     DEVICE = args.device
@@ -402,6 +500,16 @@ def main():
         VAD_MODEL,
         VAD_MAX_SINGLE_SEGMENT_TIME,
     )
+    MODEL_ARCH = detect_architecture(args.model_path)
+    if supports_translation(MODEL_ARCH, MODEL_ID):
+        logger.info("Loaded model '%s' (architecture '%s') supports audio translation", MODEL_ID, MODEL_ARCH)
+    else:
+        logger.info(
+            "Loaded model '%s' (architecture '%s') does not support audio translation; "
+            "/v1/audio/translations will return 501",
+            MODEL_ID,
+            MODEL_ARCH or "unknown",
+        )
 
     logger.info("FunASR API server starting on http://%s:%s", args.host, args.port)
     uvicorn.run(app, host=args.host, port=args.port)

@@ -72,6 +72,8 @@ type OpenAIHandler interface {
 	GetVideoContentDeprecated(c *gin.Context)
 	// Transcribe audio to text
 	Transcription(c *gin.Context)
+	// Translate audio to English text
+	Translation(c *gin.Context)
 	// Extract text from an image with OCR
 	OCR(c *gin.Context)
 	// Generate speech audio from text
