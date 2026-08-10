@@ -1046,4 +1046,3 @@ func getJsonfiles(subPath string) (list []string, err error) {
 
 	return list, nil
 }
-
