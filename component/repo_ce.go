@@ -29,6 +29,8 @@ func NewRepoComponent(config *config.Config) (RepoComponent, error) {
 	c.namespaceStore = database.NewNamespaceStore()
 	c.userStore = database.NewUserStore()
 	c.orgStore = database.NewOrgStore()
+	c.modelStore = database.NewModelStore()
+	c.tagStore = database.NewTagStore()
 	c.repoStore = database.NewRepoStore()
 	c.repoFileStore = database.NewRepoFileStore()
 	c.repoRelationsStore = database.NewRepoRelationsStore()

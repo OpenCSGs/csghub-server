@@ -2107,6 +2107,77 @@ func (_c *MockRepoStore_PublicToUser_Call) RunAndReturn(run func(context.Context
 	return _c
 }
 
+// PublicToUserV2 provides a mock function with given fields: ctx, repoType, ownerNamespaces, filter, per, page, isAdmin
+func (_m *MockRepoStore) PublicToUserV2(ctx context.Context, repoType types.RepositoryType, ownerNamespaces []string, filter *types.RepoFilter, per int, page int, isAdmin bool) ([]*database.Repository, int, error) {
+	ret := _m.Called(ctx, repoType, ownerNamespaces, filter, per, page, isAdmin)
+
+	if len(ret) == 0 {
+		panic("no return value specified for PublicToUserV2")
+	}
+
+	var r0 []*database.Repository
+	var r1 int
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.RepositoryType, []string, *types.RepoFilter, int, int, bool) ([]*database.Repository, int, error)); ok {
+		return rf(ctx, repoType, ownerNamespaces, filter, per, page, isAdmin)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.RepositoryType, []string, *types.RepoFilter, int, int, bool) []*database.Repository); ok {
+		r0 = rf(ctx, repoType, ownerNamespaces, filter, per, page, isAdmin)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]*database.Repository)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.RepositoryType, []string, *types.RepoFilter, int, int, bool) int); ok {
+		r1 = rf(ctx, repoType, ownerNamespaces, filter, per, page, isAdmin)
+	} else {
+		r1 = ret.Get(1).(int)
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, types.RepositoryType, []string, *types.RepoFilter, int, int, bool) error); ok {
+		r2 = rf(ctx, repoType, ownerNamespaces, filter, per, page, isAdmin)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
+// MockRepoStore_PublicToUserV2_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PublicToUserV2'
+type MockRepoStore_PublicToUserV2_Call struct {
+	*mock.Call
+}
+
+// PublicToUserV2 is a helper method to define mock.On call
+//   - ctx context.Context
+//   - repoType types.RepositoryType
+//   - ownerNamespaces []string
+//   - filter *types.RepoFilter
+//   - per int
+//   - page int
+//   - isAdmin bool
+func (_e *MockRepoStore_Expecter) PublicToUserV2(ctx interface{}, repoType interface{}, ownerNamespaces interface{}, filter interface{}, per interface{}, page interface{}, isAdmin interface{}) *MockRepoStore_PublicToUserV2_Call {
+	return &MockRepoStore_PublicToUserV2_Call{Call: _e.mock.On("PublicToUserV2", ctx, repoType, ownerNamespaces, filter, per, page, isAdmin)}
+}
+
+func (_c *MockRepoStore_PublicToUserV2_Call) Run(run func(ctx context.Context, repoType types.RepositoryType, ownerNamespaces []string, filter *types.RepoFilter, per int, page int, isAdmin bool)) *MockRepoStore_PublicToUserV2_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.RepositoryType), args[2].([]string), args[3].(*types.RepoFilter), args[4].(int), args[5].(int), args[6].(bool))
+	})
+	return _c
+}
+
+func (_c *MockRepoStore_PublicToUserV2_Call) Return(repos []*database.Repository, count int, err error) *MockRepoStore_PublicToUserV2_Call {
+	_c.Call.Return(repos, count, err)
+	return _c
+}
+
+func (_c *MockRepoStore_PublicToUserV2_Call) RunAndReturn(run func(context.Context, types.RepositoryType, []string, *types.RepoFilter, int, int, bool) ([]*database.Repository, int, error)) *MockRepoStore_PublicToUserV2_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // RefreshLFSObjectsSize provides a mock function with given fields: ctx, id
 func (_m *MockRepoStore) RefreshLFSObjectsSize(ctx context.Context, id int64) error {
 	ret := _m.Called(ctx, id)

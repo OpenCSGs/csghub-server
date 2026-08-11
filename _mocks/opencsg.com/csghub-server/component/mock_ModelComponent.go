@@ -570,6 +570,75 @@ func (_c *MockModelComponent_Index_Call) RunAndReturn(run func(context.Context, 
 	return _c
 }
 
+// IndexV2 provides a mock function with given fields: ctx, filter, per, page, needOpWeight
+func (_m *MockModelComponent) IndexV2(ctx context.Context, filter *types.RepoFilter, per int, page int, needOpWeight bool) ([]*types.Model, int, error) {
+	ret := _m.Called(ctx, filter, per, page, needOpWeight)
+
+	if len(ret) == 0 {
+		panic("no return value specified for IndexV2")
+	}
+
+	var r0 []*types.Model
+	var r1 int
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, *types.RepoFilter, int, int, bool) ([]*types.Model, int, error)); ok {
+		return rf(ctx, filter, per, page, needOpWeight)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *types.RepoFilter, int, int, bool) []*types.Model); ok {
+		r0 = rf(ctx, filter, per, page, needOpWeight)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]*types.Model)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *types.RepoFilter, int, int, bool) int); ok {
+		r1 = rf(ctx, filter, per, page, needOpWeight)
+	} else {
+		r1 = ret.Get(1).(int)
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, *types.RepoFilter, int, int, bool) error); ok {
+		r2 = rf(ctx, filter, per, page, needOpWeight)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
+// MockModelComponent_IndexV2_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'IndexV2'
+type MockModelComponent_IndexV2_Call struct {
+	*mock.Call
+}
+
+// IndexV2 is a helper method to define mock.On call
+//   - ctx context.Context
+//   - filter *types.RepoFilter
+//   - per int
+//   - page int
+//   - needOpWeight bool
+func (_e *MockModelComponent_Expecter) IndexV2(ctx interface{}, filter interface{}, per interface{}, page interface{}, needOpWeight interface{}) *MockModelComponent_IndexV2_Call {
+	return &MockModelComponent_IndexV2_Call{Call: _e.mock.On("IndexV2", ctx, filter, per, page, needOpWeight)}
+}
+
+func (_c *MockModelComponent_IndexV2_Call) Run(run func(ctx context.Context, filter *types.RepoFilter, per int, page int, needOpWeight bool)) *MockModelComponent_IndexV2_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(*types.RepoFilter), args[2].(int), args[3].(int), args[4].(bool))
+	})
+	return _c
+}
+
+func (_c *MockModelComponent_IndexV2_Call) Return(_a0 []*types.Model, _a1 int, _a2 error) *MockModelComponent_IndexV2_Call {
+	_c.Call.Return(_a0, _a1, _a2)
+	return _c
+}
+
+func (_c *MockModelComponent_IndexV2_Call) RunAndReturn(run func(context.Context, *types.RepoFilter, int, int, bool) ([]*types.Model, int, error)) *MockModelComponent_IndexV2_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ListAllByRuntimeFramework provides a mock function with given fields: ctx, currentUser, deployType
 func (_m *MockModelComponent) ListAllByRuntimeFramework(ctx context.Context, currentUser string, deployType int) ([]database.RuntimeFramework, error) {
 	ret := _m.Called(ctx, currentUser, deployType)
