@@ -23,6 +23,14 @@ LLM log sync {{.status}} for {{.date}}
                             <td style="padding:8px 12px;border-bottom:1px solid #d8dee4;">{{.file_count}}</td>
                         </tr>
                         <tr>
+                            <td style="width:220px;padding:8px 12px;border-bottom:1px solid #d8dee4;color:#57606a;">Source log lines</td>
+                            <td style="padding:8px 12px;border-bottom:1px solid #d8dee4;">{{.source_line_count}}</td>
+                        </tr>
+                        <tr>
+                            <td style="width:220px;padding:8px 12px;border-bottom:1px solid #d8dee4;color:#57606a;">Dataset rows</td>
+                            <td style="padding:8px 12px;border-bottom:1px solid #d8dee4;">{{.dataset_row_count}}</td>
+                        </tr>
+                        <tr>
                             <td style="width:220px;padding:8px 12px;border-bottom:1px solid #d8dee4;color:#57606a;">Started at</td>
                             <td style="padding:8px 12px;border-bottom:1px solid #d8dee4;">{{.started_at}}</td>
                         </tr>
