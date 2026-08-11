@@ -50,45 +50,46 @@ func NewAccountStatementStoreWithDB(db *DB) AccountStatementStore {
 }
 
 type AccountStatement struct {
-	ID               int64                 `bun:",pk,autoincrement" json:"id"`
-	EventUUID        uuid.UUID             `bun:"type:uuid,notnull" json:"event_uuid"`
-	UserUUID         string                `bun:",notnull" json:"user_uuid"`
-	Value            float64               `bun:",notnull" json:"value"`
-	Scene            types.SceneType       `bun:",notnull" json:"scene"`
-	OpUID            string                `bun:",nullzero" json:"op_uid"`
-	CreatedAt        time.Time             `bun:",notnull,skipupdate,default:current_timestamp" json:"created_at"`
-	CustomerID       string                `json:"customer_id"`
-	EventDate        time.Time             `bun:"type:date" json:"event_date"`
-	Price            float64               `json:"price"`
-	PriceUnit        string                `json:"price_unit"`
-	Consumption      float64               `json:"consumption"`
-	ValueType        types.ChargeValueType `json:"value_type"`
-	ResourceID       string                `json:"resource_id"`
-	ResourceName     string                `json:"resource_name"`
-	SkuID            int64                 `json:"sku_id"`
-	RecordedAt       time.Time             `json:"recorded_at"`
-	SkuUnit          int64                 `json:"sku_unit"`
-	SkuUnitType      types.SkuUnitType     `json:"sku_unit_type"`
-	SkuPriceCurrency string                `json:"sku_price_currency"`
-	BalanceType      string                `json:"balance_type"`
-	BalanceValue     float64               `json:"balance_value"`
-	IsCancel         bool                  `json:"is_cancel"`
-	EventValue       float64               `json:"event_value"`
-	Present          *AccountPresent       `bun:"rel:has-one,join:event_uuid=event_uuid"`
-	Quota            float64               `bun:",nullzero" json:"quota"`
-	SubBillID        int64                 `bun:",nullzero" json:"sub_bill_id"`
-	Discount         float64               `json:"discount"`
-	RegularValue     float64               `json:"regular_value"`
-	PromptToken      float64               `json:"prompt_token"`
-	CompletionToken  float64               `json:"completion_token"`
-	APIKey           string                `bun:",notnull,default:''" json:"api_key"`
-	TokenID          int64                 `bun:",notnull,default:0" json:"token_id"`
-	Purpose          types.RechargePurpose `bun:",nullzero" json:"purpose"`
-	PurposeDesc      string                `bun:",nullzero" json:"purpose_desc"`
-	DataType         string                `bun:",notnull,default:''" json:"data_type"`
-	Resolution       string                `bun:",notnull,default:''" json:"resolution"`
-	Duration         float64               `bun:",notnull,default:0" json:"duration"`
-	VoucherNo        string                `bun:",nullzero" json:"voucher_no"`
+	ID                int64                 `bun:",pk,autoincrement" json:"id"`
+	EventUUID         uuid.UUID             `bun:"type:uuid,notnull" json:"event_uuid"`
+	UserUUID          string                `bun:",notnull" json:"user_uuid"`
+	Value             float64               `bun:",notnull" json:"value"`
+	Scene             types.SceneType       `bun:",notnull" json:"scene"`
+	OpUID             string                `bun:",nullzero" json:"op_uid"`
+	CreatedAt         time.Time             `bun:",notnull,skipupdate,default:current_timestamp" json:"created_at"`
+	CustomerID        string                `json:"customer_id"`
+	EventDate         time.Time             `bun:"type:date" json:"event_date"`
+	Price             float64               `json:"price"`
+	PriceUnit         string                `json:"price_unit"`
+	Consumption       float64               `json:"consumption"`
+	ValueType         types.ChargeValueType `json:"value_type"`
+	ResourceID        string                `json:"resource_id"`
+	ResourceName      string                `json:"resource_name"`
+	SkuID             int64                 `json:"sku_id"`
+	RecordedAt        time.Time             `json:"recorded_at"`
+	SkuUnit           int64                 `json:"sku_unit"`
+	SkuUnitType       types.SkuUnitType     `json:"sku_unit_type"`
+	SkuPriceCurrency  string                `json:"sku_price_currency"`
+	BalanceType       string                `json:"balance_type"`
+	BalanceValue      float64               `json:"balance_value"`
+	IsCancel          bool                  `json:"is_cancel"`
+	EventValue        float64               `json:"event_value"`
+	Present           *AccountPresent       `bun:"rel:has-one,join:event_uuid=event_uuid"`
+	Quota             float64               `bun:",nullzero" json:"quota"`
+	SubBillID         int64                 `bun:",nullzero" json:"sub_bill_id"`
+	Discount          float64               `json:"discount"`
+	RegularValue      float64               `json:"regular_value"`
+	PromptToken       float64               `json:"prompt_token"`
+	PromptCachedToken float64               `json:"prompt_cached_token"`
+	CompletionToken   float64               `json:"completion_token"`
+	APIKey            string                `bun:",notnull,default:''" json:"api_key"`
+	TokenID           int64                 `bun:",notnull,default:0" json:"token_id"`
+	Purpose           types.RechargePurpose `bun:",nullzero" json:"purpose"`
+	PurposeDesc       string                `bun:",nullzero" json:"purpose_desc"`
+	DataType          string                `bun:",notnull,default:''" json:"data_type"`
+	Resolution        string                `bun:",notnull,default:''" json:"resolution"`
+	Duration          float64               `bun:",notnull,default:0" json:"duration"`
+	VoucherNo         string                `bun:",nullzero" json:"voucher_no"`
 }
 
 type AccountStatementRes struct {
@@ -655,24 +656,25 @@ func updateFeeBill(ctx context.Context, tx bun.Tx, input AccountStatement, billV
 	if billValues.TotalValue != 0 {
 		// calculate bill
 		bill := AccountBill{
-			BillDate:        input.EventDate,
-			UserUUID:        input.UserUUID,
-			Scene:           input.Scene,
-			CustomerID:      input.CustomerID,
-			Value:           billValues.TotalValue,
-			Consumption:     billValues.Consumption,
-			PromptToken:     input.PromptToken,
-			CompletionToken: input.CompletionToken,
-			Count:           1,
-			TokenID:         input.TokenID,
-			DataType:        input.DataType,
-			Resolution:      input.Resolution,
-			Duration:        input.Duration,
-			VoucherNo:       input.VoucherNo,
-			VoucherValue:    billValues.VoucherValue,
-			CashValue:       billValues.CashValue,
-			ClusterID:       billRes.ClusterID,
-			HardwareType:    billRes.HardwareType,
+			BillDate:          input.EventDate,
+			UserUUID:          input.UserUUID,
+			Scene:             input.Scene,
+			CustomerID:        input.CustomerID,
+			Value:             billValues.TotalValue,
+			Consumption:       billValues.Consumption,
+			PromptToken:       input.PromptToken,
+			PromptCachedToken: input.PromptCachedToken,
+			CompletionToken:   input.CompletionToken,
+			Count:             1,
+			TokenID:           input.TokenID,
+			DataType:          input.DataType,
+			Resolution:        input.Resolution,
+			Duration:          input.Duration,
+			VoucherNo:         input.VoucherNo,
+			VoucherValue:      billValues.VoucherValue,
+			CashValue:         billValues.CashValue,
+			ClusterID:         billRes.ClusterID,
+			HardwareType:      billRes.HardwareType,
 		}
 		if input.Scene == types.SceneMultiModalServerless {
 			bill.UnitType = input.SkuUnitType
@@ -684,6 +686,7 @@ func updateFeeBill(ctx context.Context, tx bun.Tx, input AccountStatement, billV
 			Set("value = account_bill.value + ?", billValues.TotalValue).
 			Set("consumption = account_bill.consumption + ?", billValues.Consumption).
 			Set("prompt_token = account_bill.prompt_token + ?", input.PromptToken).
+			Set("prompt_cached_token = account_bill.prompt_cached_token + ?", input.PromptCachedToken).
 			Set("completion_token = account_bill.completion_token + ?", input.CompletionToken).
 			Set("duration = account_bill.duration + ?", input.Duration).
 			Set("count = account_bill.count + ?", 1).

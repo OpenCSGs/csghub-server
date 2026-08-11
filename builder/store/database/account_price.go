@@ -65,6 +65,7 @@ type AccountPrice struct {
 	UseLimitPrice    int64             `json:"use_limit_price"`
 	Resolution       string            `json:"resolution"`
 	SkuStatus        types.SkuStatus   `bun:",default:1" json:"sku_status"`
+	SkuCachedPrice   int64             `json:"sku_cached_price"`
 	times
 }
 
@@ -238,12 +239,13 @@ func (a *accountPriceStoreImpl) ListByIds(ctx context.Context, ids []int64) ([]*
 	res := make([]*types.AcctPriceResp, len(result))
 	for index, price := range result {
 		res[index] = &types.AcctPriceResp{
-			Id:        price.ID,
-			SkuType:   price.SkuType,
-			SkuPrice:  price.SkuPrice,
-			SkuKind:   price.SkuKind,
-			SkuDesc:   price.SkuDesc,
-			SkuStatus: price.SkuStatus,
+			Id:             price.ID,
+			SkuType:        price.SkuType,
+			SkuPrice:       price.SkuPrice,
+			SkuKind:        price.SkuKind,
+			SkuDesc:        price.SkuDesc,
+			SkuStatus:      price.SkuStatus,
+			SkuCachedPrice: price.SkuCachedPrice,
 		}
 	}
 
