@@ -105,7 +105,7 @@ func (c *evaluationComponentImpl) CreateEvaluation(ctx context.Context, req type
 	if err != nil {
 		return nil, fmt.Errorf("cannot find available runtime framework, %w", err)
 	}
-	if frame.FrameName == types.ClawEvalFrameName {
+	if strings.Contains(frame.FrameName, types.ClawEvalFrameName) {
 		return c.createClawEvaluation(ctx, req, user, frame)
 	}
 
