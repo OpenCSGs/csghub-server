@@ -20,6 +20,7 @@ const (
 	OrderDetailID        = "order_detail_id"
 	MeterFromSource      = "from_source"
 	PromptTokenNum       = "prompt_token_num"
+	PromptTokenCacheNum  = "prompt_token_cache_num"
 	CompletionTokenNum   = "completion_token_num"
 	OwnerType            = "owner_type"
 	ConsumeApiKey        = "api_key"
@@ -131,7 +132,7 @@ var (
 	SceneModelFinetune        SceneType = 12 // model finetune
 	SceneMultiSync            SceneType = 13 // multi source sync
 	SceneEvaluation           SceneType = 14 // model evaluation
-	SceneModelServerless      SceneType = 15 // serverless and external model from aigateway
+	SceneModelServerless      SceneType = 15 // serverless and external model text from aigateway
 	SceneMultiModalServerless SceneType = 16 // Multi modal model from aigateway for image/audio/video/ocr
 	// starship
 	SceneStarship SceneType = 20 // starship is deprecated
@@ -181,36 +182,37 @@ var (
 )
 
 type AcctEventReq struct {
-	EventUUID        uuid.UUID       `json:"event_uuid"`
-	UserUUID         string          `json:"user_uuid"`
-	Value            float64         `json:"value"`
-	Scene            SceneType       `json:"scene"`
-	OpUID            string          `json:"op_uid"`
-	CustomerID       string          `json:"customer_id"`
-	EventDate        time.Time       `json:"event_date"`
-	Price            float64         `json:"price"`
-	PriceUnit        string          `json:"price_unit"`
-	Consumption      float64         `json:"consumption"`
-	ValueType        ChargeValueType `json:"value_type"`
-	ResourceID       string          `json:"resource_id"`
-	ResourceName     string          `json:"resource_name"`
-	SkuID            int64           `json:"sku_id"`
-	RecordedAt       time.Time       `json:"recorded_at"`
-	SkuUnit          int64           `json:"sku_unit"`
-	SkuUnitType      SkuUnitType     `json:"sku_unit_type"`
-	SkuPriceCurrency string          `json:"sku_price_currency"`
-	Quota            float64         `json:"quota"`
-	SubBillID        int64           `json:"sub_bill_id"`
-	Discount         float64         `json:"discount"`
-	RegularValue     float64         `json:"regular_value"`
-	PromptToken      float64         `json:"prompt_token"`
-	CompletionToken  float64         `json:"completion_token"`
-	ApiKey           string          `json:"api_key"`
-	Purpose          RechargePurpose `json:"purpose"`
-	PurposeDesc      string          `json:"purpose_desc"`
-	DataType         string          `json:"data_type"`
-	Resolution       string          `json:"resolution"`
-	Duration         float64         `json:"duration"`
+	EventUUID         uuid.UUID       `json:"event_uuid"`
+	UserUUID          string          `json:"user_uuid"`
+	Value             float64         `json:"value"`
+	Scene             SceneType       `json:"scene"`
+	OpUID             string          `json:"op_uid"`
+	CustomerID        string          `json:"customer_id"`
+	EventDate         time.Time       `json:"event_date"`
+	Price             float64         `json:"price"`
+	PriceUnit         string          `json:"price_unit"`
+	Consumption       float64         `json:"consumption"`
+	ValueType         ChargeValueType `json:"value_type"`
+	ResourceID        string          `json:"resource_id"`
+	ResourceName      string          `json:"resource_name"`
+	SkuID             int64           `json:"sku_id"`
+	RecordedAt        time.Time       `json:"recorded_at"`
+	SkuUnit           int64           `json:"sku_unit"`
+	SkuUnitType       SkuUnitType     `json:"sku_unit_type"`
+	SkuPriceCurrency  string          `json:"sku_price_currency"`
+	Quota             float64         `json:"quota"`
+	SubBillID         int64           `json:"sub_bill_id"`
+	Discount          float64         `json:"discount"`
+	RegularValue      float64         `json:"regular_value"`
+	PromptToken       float64         `json:"prompt_token"`
+	PromptCachedToken float64         `json:"prompt_cached_token"`
+	CompletionToken   float64         `json:"completion_token"`
+	ApiKey            string          `json:"api_key"`
+	Purpose           RechargePurpose `json:"purpose"`
+	PurposeDesc       string          `json:"purpose_desc"`
+	DataType          string          `json:"data_type"`
+	Resolution        string          `json:"resolution"`
+	Duration          float64         `json:"duration"`
 }
 
 // generate charge event from client
@@ -343,36 +345,38 @@ type AcctQuotaStatementReq struct {
 }
 
 type AcctSummary struct {
-	Total                int     `json:"total"`
-	TotalValue           float64 `json:"total_value"`
-	TotalConsumption     float64 `json:"total_consumption"`
-	TotalPromptToken     float64 `json:"total_prompt_token"`
-	TotalCompletionToken float64 `json:"total_completion_token"`
-	TotalVoucherValue    float64 `json:"total_voucher_value"`
-	TotalCashValue       float64 `json:"total_cash_value"`
-	TotalDuration        float64 `json:"total_duration"`
-	TotalCount           float64 `json:"total_count"`
+	Total                  int     `json:"total"`
+	TotalValue             float64 `json:"total_value"`
+	TotalConsumption       float64 `json:"total_consumption"`
+	TotalPromptToken       float64 `json:"total_prompt_token"`
+	TotalPromptCachedToken float64 `json:"total_prompt_cached_token"`
+	TotalCompletionToken   float64 `json:"total_completion_token"`
+	TotalVoucherValue      float64 `json:"total_voucher_value"`
+	TotalCashValue         float64 `json:"total_cash_value"`
+	TotalDuration          float64 `json:"total_duration"`
+	TotalCount             float64 `json:"total_count"`
 }
 
 type ITEM struct {
-	Consumption     float64     `json:"consumption"`
-	InstanceName    string      `json:"instance_name"`
-	Value           float64     `json:"value"`
-	CreatedAt       time.Time   `json:"created_at"`
-	Status          string      `json:"status"`
-	RepoPath        string      `json:"repo_path"`
-	DeployID        int64       `json:"deploy_id"`
-	DeployName      string      `json:"deploy_name"`
-	DeployUser      string      `json:"deploy_user"`
-	PromptToken     float64     `json:"prompt_token"`
-	CompletionToken float64     `json:"completion_token"`
-	VoucherValue    float64     `json:"voucher_value"`
-	CashValue       float64     `json:"cash_value"`
-	Duration        float64     `json:"duration"`
-	Count           float64     `json:"count"`
-	DataType        string      `json:"data_type"`
-	Resolution      string      `json:"resolution"`
-	UnitType        SkuUnitType `json:"unit_type"`
+	Consumption       float64     `json:"consumption"`
+	InstanceName      string      `json:"instance_name"`
+	Value             float64     `json:"value"`
+	CreatedAt         time.Time   `json:"created_at"`
+	Status            string      `json:"status"`
+	RepoPath          string      `json:"repo_path"`
+	DeployID          int64       `json:"deploy_id"`
+	DeployName        string      `json:"deploy_name"`
+	DeployUser        string      `json:"deploy_user"`
+	PromptToken       float64     `json:"prompt_token"`
+	PromptCachedToken float64     `json:"prompt_cached_token"`
+	CompletionToken   float64     `json:"completion_token"`
+	VoucherValue      float64     `json:"voucher_value"`
+	CashValue         float64     `json:"cash_value"`
+	Duration          float64     `json:"duration"`
+	Count             float64     `json:"count"`
+	DataType          string      `json:"data_type"`
+	Resolution        string      `json:"resolution"`
+	UnitType          SkuUnitType `json:"unit_type"`
 }
 
 type BILLS struct {
@@ -414,6 +418,7 @@ type AcctPriceCreateReq struct {
 	UseLimitPrice    int64       `json:"use_limit_price"`
 	Resolution       string      `json:"resolution"`
 	SkuStatus        SkuStatus   `json:"sku_status" binding:"required,oneof=1 9"`
+	SkuCachedPrice   *int64      `json:"sku_cached_price"`
 }
 
 type AcctPriceBatchCreateReq struct {
@@ -435,6 +440,7 @@ type AcctPriceUpdateReq struct {
 	UseLimitPrice    *int64       `json:"use_limit_price"`
 	Resolution       *string      `json:"resolution"`
 	SkuStatus        *SkuStatus   `json:"sku_status"`
+	SkuCachedPrice   *int64       `json:"sku_cached_price"`
 }
 
 type AcctPriceResp struct {
@@ -450,6 +456,7 @@ type AcctPriceResp struct {
 	Quota            string    `json:"quota"`
 	SkuPriceID       int64     `json:"sku_price_id"`
 	SkuStatus        SkuStatus `json:"sku_status"`
+	SkuCachedPrice   int64     `json:"sku_cached_price"`
 }
 
 type AcctPriceQueryReq struct {
@@ -557,6 +564,7 @@ type AcctPriceDetail struct {
 	UseLimitPrice    int64       `json:"use_limit_price"`
 	Resolution       string      `json:"resolution"`
 	CreatedAt        time.Time   `json:"created_at"`
+	SkuCachedPrice   int64       `json:"sku_cached_price"`
 }
 
 type AcctRechargeReq struct {
