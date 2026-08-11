@@ -14,12 +14,9 @@ type metadataStoreImpl struct {
 type MetadataStore interface {
 	FindByRepoID(ctx context.Context, repoID int64) (*Metadata, error)
 	Upsert(ctx context.Context, metadata *Metadata) error
-	// UpdatePDRecommendation sets the PD recommendation for a repository's metadata.
-	// When allowOverwrite is false (auto-scan from config.json), it only updates if
-	// the existing PDRecommendation is nil/empty, preserving manually adjusted values.
-	// When allowOverwrite is true (loaded from local config files), it overwrites
-	// the existing value to ensure file-based configs take precedence.
-	UpdatePDRecommendation(ctx context.Context, repoID int64, rec *types.PDRecommendation, allowOverwrite bool) error
+	// UpdatePDRecommendation sets the PD recommendation for a repository's metadata,
+	// overwriting any existing value.
+	UpdatePDRecommendation(ctx context.Context, repoID int64, rec *types.PDRecommendation) error
 	// UpdateModelArchType updates the model architecture type (dense/moe/hybrid)
 	// for a repository's metadata.
 	UpdateModelArchType(ctx context.Context, repoID int64, archType types.ModelArchType) error
@@ -74,23 +71,9 @@ func (m *metadataStoreImpl) Upsert(ctx context.Context, metadata *Metadata) erro
 	return err
 }
 
-// UpdatePDRecommendation updates the pd_recommendation column. When allowOverwrite
-// is false (auto-scan from config.json), it only updates if the existing value is
-// nil/empty, preserving manually adjusted values. When allowOverwrite is true
-// (loaded from local config files), it overwrites unconditionally.
-func (m *metadataStoreImpl) UpdatePDRecommendation(ctx context.Context, repoID int64, rec *types.PDRecommendation, allowOverwrite bool) error {
-	if !allowOverwrite {
-		// Check if the existing recommendation is already set
-		existing, err := m.FindByRepoID(ctx, repoID)
-		if err != nil {
-			return fmt.Errorf("fail to find metadata for pd recommendation update, %w", err)
-		}
-		if existing != nil && !existing.PDRecommendation.IsEmpty() {
-			// Already set, skip to preserve manual adjustments
-			return nil
-		}
-	}
-
+// UpdatePDRecommendation updates the pd_recommendation column, overwriting any
+// existing value.
+func (m *metadataStoreImpl) UpdatePDRecommendation(ctx context.Context, repoID int64, rec *types.PDRecommendation) error {
 	_, err := m.db.Operator.Core.NewUpdate().
 		Model((*Metadata)(nil)).
 		Set("pd_recommendation = ?", rec).

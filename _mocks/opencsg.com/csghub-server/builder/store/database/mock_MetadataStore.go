@@ -131,17 +131,17 @@ func (_c *MockMetadataStore_UpdateModelArchType_Call) RunAndReturn(run func(cont
 	return _c
 }
 
-// UpdatePDRecommendation provides a mock function with given fields: ctx, repoID, rec, allowOverwrite
-func (_m *MockMetadataStore) UpdatePDRecommendation(ctx context.Context, repoID int64, rec *types.PDRecommendation, allowOverwrite bool) error {
-	ret := _m.Called(ctx, repoID, rec, allowOverwrite)
+// UpdatePDRecommendation provides a mock function with given fields: ctx, repoID, rec
+func (_m *MockMetadataStore) UpdatePDRecommendation(ctx context.Context, repoID int64, rec *types.PDRecommendation) error {
+	ret := _m.Called(ctx, repoID, rec)
 
 	if len(ret) == 0 {
 		panic("no return value specified for UpdatePDRecommendation")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, int64, *types.PDRecommendation, bool) error); ok {
-		r0 = rf(ctx, repoID, rec, allowOverwrite)
+	if rf, ok := ret.Get(0).(func(context.Context, int64, *types.PDRecommendation) error); ok {
+		r0 = rf(ctx, repoID, rec)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -158,14 +158,13 @@ type MockMetadataStore_UpdatePDRecommendation_Call struct {
 //   - ctx context.Context
 //   - repoID int64
 //   - rec *types.PDRecommendation
-//   - allowOverwrite bool
-func (_e *MockMetadataStore_Expecter) UpdatePDRecommendation(ctx interface{}, repoID interface{}, rec interface{}, allowOverwrite interface{}) *MockMetadataStore_UpdatePDRecommendation_Call {
-	return &MockMetadataStore_UpdatePDRecommendation_Call{Call: _e.mock.On("UpdatePDRecommendation", ctx, repoID, rec, allowOverwrite)}
+func (_e *MockMetadataStore_Expecter) UpdatePDRecommendation(ctx interface{}, repoID interface{}, rec interface{}) *MockMetadataStore_UpdatePDRecommendation_Call {
+	return &MockMetadataStore_UpdatePDRecommendation_Call{Call: _e.mock.On("UpdatePDRecommendation", ctx, repoID, rec)}
 }
 
-func (_c *MockMetadataStore_UpdatePDRecommendation_Call) Run(run func(ctx context.Context, repoID int64, rec *types.PDRecommendation, allowOverwrite bool)) *MockMetadataStore_UpdatePDRecommendation_Call {
+func (_c *MockMetadataStore_UpdatePDRecommendation_Call) Run(run func(ctx context.Context, repoID int64, rec *types.PDRecommendation)) *MockMetadataStore_UpdatePDRecommendation_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(int64), args[2].(*types.PDRecommendation), args[3].(bool))
+		run(args[0].(context.Context), args[1].(int64), args[2].(*types.PDRecommendation))
 	})
 	return _c
 }
@@ -175,7 +174,7 @@ func (_c *MockMetadataStore_UpdatePDRecommendation_Call) Return(_a0 error) *Mock
 	return _c
 }
 
-func (_c *MockMetadataStore_UpdatePDRecommendation_Call) RunAndReturn(run func(context.Context, int64, *types.PDRecommendation, bool) error) *MockMetadataStore_UpdatePDRecommendation_Call {
+func (_c *MockMetadataStore_UpdatePDRecommendation_Call) RunAndReturn(run func(context.Context, int64, *types.PDRecommendation) error) *MockMetadataStore_UpdatePDRecommendation_Call {
 	_c.Call.Return(run)
 	return _c
 }
