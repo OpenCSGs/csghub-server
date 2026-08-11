@@ -26,8 +26,8 @@ docker buildx build --platform linux/amd64 \
   -f Dockerfile.vllm-amd \
   --push .
   
-# For vllm cpu only: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/vllm-cpu:2.3
-export IMAGE_TAG=2.4
+# For vllm cpu only: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/vllm-cpu:v0.24.0
+export IMAGE_TAG=v0.24.0
 docker buildx build --platform linux/amd64,linux/arm64 \
   -t ${OPENCSG_ACR}/opencsghq/vllm-cpu:${IMAGE_TAG} \
   -t ${OPENCSG_ACR}/opencsghq/vllm-cpu:latest \
@@ -328,7 +328,7 @@ curl -o result.mp4 \
 |text generation / embedding / reranking / text to speech| vllm | v0.24.0 | 13.0 |pooling runner support for embedding and reranking; vllm-omni 0.24.0 for text-to-speech (/v1/audio/speech)|
 |text generation / embedding / reranking| amd-vllm | rocm7.2.1_vllm_0.24.0 | - |ROCm 7.2.1, vLLM 0.24.0|
 |text generation| vllm | v0.8.5 | 12.4 |fix hf hub timestamp|
-|text generation| vllm-cpu | 2.4 | -|fix hf hub timestamp |
+|text generation| vllm-cpu | v0.24.0 | - |vLLM 0.24.0, supports --enable-prompt-tokens-details|
 |text generation| tgi | 2.2 | 12.1 |- |
 |text generation| tgi | 3.2 | 12.4 |fix hf hub timestamp|
 |image generation| hf-inference-toolkit | 0.5.3 | 12.1 |-|
