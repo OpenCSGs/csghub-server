@@ -329,15 +329,33 @@ func (c *repoComponentImpl) CheckDeployPermissionForUser(ctx context.Context, de
 	}
 	deploy, err := c.deployTaskStore.GetDeployByID(ctx, deployReq.DeployID)
 	if err != nil {
-		return nil, nil, fmt.Errorf("fail to get user deploy %v, %w", deployReq.DeployID, err)
+		return nil, nil, fmt.Errorf("failed to get user deploy %v, %w", deployReq.DeployID, err)
 	}
 	if deploy == nil {
 		return nil, nil, fmt.Errorf("do not found user deploy %v", deployReq.DeployID)
 	}
 
-	if deploy.UserID == user.ID || c.IsAdminRole(user) || c.IsInSameOrg(ctx, user.ID, deploy.UserID) {
+	// Creator is always allowed, regardless of SecureLevel for backward compatibility.
+	if deploy.UserID == user.ID {
 		return &user, deploy, nil
 	}
+
+	switch deploy.SecureLevel {
+	case types.EndpointPublic:
+		if c.IsAdminRole(user) || c.IsInSameOrg(ctx, user.ID, deploy.UserID) {
+			return &user, deploy, nil
+		}
+	case types.EndpointPrivate:
+		// Only creator is allowed for private endpoints;
+		// fall through to forbidden below
+	default:
+		// Default to public behavior for backward compatibility
+		// with existing deployments that have SecureLevel = 0 (unset)
+		if c.IsAdminRole(user) || c.IsInSameOrg(ctx, user.ID, deploy.UserID) {
+			return &user, deploy, nil
+		}
+	}
+
 	return nil, nil, errorx.ErrForbiddenMsg("deploy was not created by user")
 }
 

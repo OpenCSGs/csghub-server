@@ -563,8 +563,9 @@ type Image struct {
 }
 
 type CreateInferenceVersionReq struct {
-	DeployId int64  `json:"-"`
-	CommitID string `json:"commit_id"`
+	CurrentUser string `json:"-"`
+	DeployId    int64  `json:"-"`
+	CommitID    string `json:"commit_id"`
 
 	TrafficPercent int `json:"traffic_percent"`
 }

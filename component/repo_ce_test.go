@@ -33,6 +33,7 @@ func TestRepoComponent_DeployUpdate(t *testing.T) {
 		SvcName:          "svc",
 		ClusterID:        "cluster",
 		RuntimeFramework: "fm",
+		SecureLevel:      types.EndpointPublic,
 	}
 	repo.mocks.stores.DeployTaskMock().EXPECT().GetDeployByID(ctx, int64(1)).Return(deploy, nil)
 	repo.mocks.stores.SpaceResourceMock().EXPECT().FindByID(ctx, int64(111)).Return(&database.SpaceResource{
@@ -84,6 +85,7 @@ func TestRepoComponent_DeployStart(t *testing.T) {
 		ClusterID:        "cluster",
 		RuntimeFramework: "fm",
 		SKU:              "111",
+		SecureLevel:      types.EndpointPublic,
 	}
 	repo.mocks.stores.DeployTaskMock().EXPECT().GetDeployByID(ctx, int64(1)).Return(deploy, nil)
 
@@ -131,6 +133,7 @@ func TestRepoComponent_DeployStart_ExistAndRunning(t *testing.T) {
 		ClusterID:        "cluster",
 		RuntimeFramework: "fm",
 		SKU:              "111",
+		SecureLevel:      types.EndpointPublic,
 	}
 	repo.mocks.stores.DeployTaskMock().EXPECT().GetDeployByID(ctx, int64(1)).Return(deploy, nil)
 
@@ -181,6 +184,7 @@ func TestRepoComponent_DeployStart_ExistButNotRunning(t *testing.T) {
 		ClusterID:        "cluster",
 		RuntimeFramework: "fm",
 		SKU:              "111",
+		SecureLevel:      types.EndpointPublic,
 	}
 	repo.mocks.stores.DeployTaskMock().EXPECT().GetDeployByID(ctx, int64(1)).Return(deploy, nil)
 

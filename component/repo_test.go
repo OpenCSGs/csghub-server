@@ -1342,6 +1342,7 @@ func TestRepoComponent_DeleteDeploy(t *testing.T) {
 		UserUUID:      "uuid",
 		OrderDetailID: 11,
 		ClusterID:     "cluster",
+		SecureLevel:   types.EndpointPublic,
 	}, nil)
 	repo.mocks.stores.DeployTaskMock().EXPECT().DeleteDeploy(
 		ctx, types.ModelRepo, int64(1), int64(0), int64(3),
@@ -1377,6 +1378,7 @@ func TestRepoComponent_DeployDetail(t *testing.T) {
 		SvcName:       "svc",
 		Status:        deployStatus.Running,
 		Type:          types.InferenceType,
+		SecureLevel:   types.EndpointPublic,
 	}, nil)
 
 	repo.mocks.deployer.EXPECT().CheckClusterHealthy(ctx, "cluster").Return(true, nil)
@@ -1404,7 +1406,8 @@ func TestRepoComponent_DeployDetail(t *testing.T) {
 		Status:         "Running",
 		ClusterID:      "cluster",
 		Instances:      []types.Instance{{Name: "i1"}},
-		Private:        true,
+		Private:        false,
+		SecureLevel:    types.EndpointPublic,
 		SvcName:        "svc",
 		Endpoint:       "endpoint/svc",
 		Type:           types.InferenceType,
@@ -1442,6 +1445,7 @@ func TestRepoComponent_DeployDetailWithPD(t *testing.T) {
 		SvcName:       "svc",
 		Status:        deployStatus.Running,
 		PD:            pdConfig,
+		SecureLevel:   types.EndpointPublic,
 	}, nil)
 
 	repo.mocks.deployer.EXPECT().CheckClusterHealthy(ctx, "cluster").Return(true, nil)
@@ -1486,6 +1490,7 @@ func TestRepoComponent_DeployInstanceLogs(t *testing.T) {
 		ClusterID:     "cluster",
 		SvcName:       "svc",
 		Status:        deployStatus.Running,
+		SecureLevel:   types.EndpointPublic,
 	}, nil)
 
 	m := &deploy.MultiLogReader{}
@@ -1525,7 +1530,8 @@ func TestRepoComponent_DeployStop_WithForce(t *testing.T) {
 		ID: 2,
 	}, nil)
 	repo.mocks.stores.DeployTaskMock().EXPECT().GetDeployByID(ctx, int64(3)).Return(&database.Deploy{
-		UserID: 2,
+		UserID:      2,
+		SecureLevel: types.EndpointPublic,
 	}, nil)
 
 	err := repo.DeployStop(ctx, types.DeployActReq{
@@ -1556,7 +1562,8 @@ func TestRepoComponent_DeployStop_ForceFalse_CallsExist(t *testing.T) {
 		ID: 2,
 	}, nil)
 	repo.mocks.stores.DeployTaskMock().EXPECT().GetDeployByID(ctx, int64(3)).Return(&database.Deploy{
-		UserID: 2,
+		UserID:      2,
+		SecureLevel: types.EndpointPublic,
 	}, nil)
 
 	err := repo.DeployStop(ctx, types.DeployActReq{
@@ -1648,7 +1655,8 @@ func TestRepoComponent_DeployStop(t *testing.T) {
 		ID: 2,
 	}, nil)
 	repo.mocks.stores.DeployTaskMock().EXPECT().GetDeployByID(ctx, int64(3)).Return(&database.Deploy{
-		UserID: 2,
+		UserID:      2,
+		SecureLevel: types.EndpointPublic,
 	}, nil)
 
 	err := repo.DeployStop(ctx, types.DeployActReq{
@@ -1678,7 +1686,8 @@ func TestRepoComponent_DeployStop_ErrNoRows(t *testing.T) {
 		ID: 2,
 	}, nil)
 	repo.mocks.stores.DeployTaskMock().EXPECT().GetDeployByID(ctx, int64(3)).Return(&database.Deploy{
-		UserID: 2,
+		UserID:      2,
+		SecureLevel: types.EndpointPublic,
 	}, nil)
 
 	err := repo.DeployStop(ctx, types.DeployActReq{
