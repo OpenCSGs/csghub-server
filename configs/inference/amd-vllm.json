@@ -88,6 +88,11 @@
       "format": "--enable-prefix-caching"
     },
     {
+      "name": "enable-prompt-tokens-details",
+      "value": "disable",
+      "format": "--enable-prompt-tokens-details"
+    },
+    {
       "name": "enable-chunked-prefill",
       "value": "enable",
       "format": "--enable-chunked-prefill"
