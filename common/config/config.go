@@ -418,6 +418,7 @@ type Config struct {
 		ReleaseInvitationCreditCronExpression    string `env:"STARHUB_SERVER_CRON_JOB_RELEASE_INVITATION_CREDIT_CRON_EXPRESSION" default:"0 0 5 * *"`
 		MCPInspectCronExpression                 string `env:"STARHUB_SERVER_CRON_JOB_MCP_INSPECT_CRON_EXPRESSION" default:"*/10 * * * *"`
 		AIGatewayAsyncGenerationCronExpression   string `env:"STARHUB_SERVER_CRON_JOB_AIGATEWAY_ASYNC_GENERATION_CRON_EXPRESSION" default:"*/1 * * * *"`
+		AIGatewayMetricsCollectorCronExpression  string `env:"STARHUB_SERVER_CRON_JOB_AIGATEWAY_METRICS_COLLECTOR_CRON_EXPRESSION" default:"* * * * *"` // every minute
 		SyncLLMLogsToDatasetCronExpression       string `env:"STARHUB_SERVER_SYNC_LLMLOGS_TO_DATASET_CRON_EXPRESSION" default:"0 1 * * *"`
 		StatementDailySummaryCronExpression      string `env:"STARHUB_SERVER_CRON_JOB_STATEMENT_DAILY_SUMMARY_CRON_EXPRESSION" default:"17 2 * * *"` // 02:17 daily
 	}
@@ -517,6 +518,25 @@ type Config struct {
 			Enable bool  `env:"OPENCSG_AIGATEWAY_MODAL_API_RATE_LIMITER_ENABLE" default:"true"`
 			Limit  int64 `env:"OPENCSG_AIGATEWAY_MODAL_API_RATE_LIMITER_LIMIT" default:"2"`
 			Window int64 `env:"OPENCSG_AIGATEWAY_MODAL_API_RATE_LIMITER_WINDOW" default:"60"`
+		}
+		MetricsCollectorLookbackMinutes int `env:"OPENCSG_AIGATEWAY_METRICS_COLLECTOR_LOOKBACK_MINUTES" default:"60"`
+
+		Metrics struct {
+			// DBSinkBufferSize is the buffered channel capacity used by the
+			// AIGateway metrics DBSink (EE/SaaS).  When the channel is
+			// full, new events are dropped with a WARN log to avoid
+			// blocking request goroutines under load.
+			DBSinkBufferSize int `env:"OPENCSG_AIGATEWAY_METRICS_DBSINK_BUFFER_SIZE" default:"4096"`
+			// DBSinkFlushBatchSize is the maximum number of metric events
+			// batched together before being flushed to TimescaleDB by the
+			// DBSink background goroutine.  Also acts as upper bound on
+			// slice pre-allocation in the flush loop.
+			DBSinkFlushBatchSize int `env:"OPENCSG_AIGATEWAY_METRICS_DBSINK_FLUSH_BATCH_SIZE" default:"100"`
+			// DBSinkFlushIntervalSeconds is the longest time (wall-clock
+			// seconds) the DBSink background goroutine waits between
+			// flushes, even when the current batch has fewer events than
+			// DBSinkFlushBatchSize.
+			DBSinkFlushIntervalSeconds int `env:"OPENCSG_AIGATEWAY_METRICS_DBSINK_FLUSH_INTERVAL_SECONDS" default:"5"`
 		}
 	}
 
@@ -621,6 +641,7 @@ type Config struct {
 	Prometheus struct {
 		ApiAddress           string   `env:"STARHUB_SERVER_PROMETHEUS_API_ADDRESS" default:""`
 		BasicAuth            string   `env:"STARHUB_SERVER_PROMETHEUS_BASIC_AUTH" default:""`
+		InsecureSkipVerify   bool     `env:"STARHUB_SERVER_PROMETHEUS_INSECURE_SKIP_VERIFY" default:"false"`
 		CPUUsageMetric       string   `env:"STARHUB_SERVER_PROMETHEUS_CPU_USAGE_METRIC" default:"container_cpu_usage_seconds_total"`
 		CPULimitMetric       string   `env:"STARHUB_SERVER_PROMETHEUS_CPU_LIMIT_METRIC" default:"kube_pod_container_resource_limits"`
 		MemoryUsageMetric    string   `env:"STARHUB_SERVER_PROMETHEUS_MEMORY_USAGE_METRIC" default:"container_memory_usage_bytes"`

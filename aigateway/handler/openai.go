@@ -506,12 +506,19 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 	modelTarget, err := h.resolveModelTarget(ctx, username, modelID, c.Request.Header)
 	if err != nil {
 		preflight.RecordError(err, "model_resolve")
+		// Record the requested model name even when resolution fails so
+		// the metrics middleware can attribute the error to the right model.
+		SetMetricsModelTarget(c, modelID, "", 0, chatReq.Stream)
 		handleModelTargetError(c, ctx, modelID, "failed to get model target address", err)
 		return
 	}
 	applyChatCompletionsEndpointCompatibility(ctx, modelTarget)
 	preflight.SetTargetModel(modelID, modelTarget)
 	chatReq.Model = modelTarget.ModelName
+
+	// Metrics key point 1: enrich business data on the RequestMetrics object.
+	SetMetricsModelTarget(c, modelTarget.ModelName, modelTarget.Upstream.Provider, modelTarget.Upstream.ID, chatReq.Stream)
+
 	if chatReq.Stream {
 		c.Writer.Header().Set("Content-Type", "text/event-stream")
 		if !strings.Contains(modelTarget.Model.ImageID, "vllm-cpu") {
@@ -604,6 +611,18 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 		return
 	}
 	log.InfoContext(ctx, "fallback chat request to model target", slog.Int("status", retryWriterStatusCode(finalWriter)), slog.Int64("proxy_latency(ms)", time.Since(proxyStartTime).Milliseconds()), slog.Int64("ttft(ms)", retryWriterTTFTMs(finalWriter, proxyStartTime)))
+
+	// Synchronously record proxy-level metrics before c.Next() returns.
+	// Metrics middleware Finalize()es RequestMetrics as soon as the handler
+	// returns, so this MUST stay on the hot path — never move it to the
+	// async post-process goroutine or the write will race Finalize().
+	RecordMetrics(RecordMetricsParams{
+		C:              c,
+		Ctx:            ctx,
+		FinalWrite:     finalWriter,
+		Counter:        chatCtx.tokenCounter,
+		ProxyStartTime: proxyStartTime,
+	})
 
 	h.runChatPostProcessAsync(ctx, chatPostProcessInput{
 		NSUUID:          nsUUID,
@@ -923,6 +942,7 @@ func (h *OpenAIHandlerImpl) Embedding(c *gin.Context) {
 	modelTarget, err := h.resolveModelTarget(ctx, username, modelID, c.Request.Header)
 	if err != nil {
 		preflight.RecordError(err, "model_resolve")
+		SetMetricsModelTarget(c, modelID, "", 0, false)
 		handleModelTargetError(c, ctx, modelID, "failed to get embedding target address", err)
 		return
 	}

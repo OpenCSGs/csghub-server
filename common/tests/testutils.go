@@ -87,7 +87,7 @@ func dbSuffix() string {
 }
 
 const (
-	pgImage = "opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/csghub/postgres:15.10"
+	pgImage = "opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/postgres:15.18"
 )
 
 // Init a test db, must call `defer db.Close()` in the test
