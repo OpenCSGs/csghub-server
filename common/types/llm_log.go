@@ -42,3 +42,8 @@ type LLMLogRequest struct {
 	Tools    []openai.ChatCompletionToolUnionParam
 	Stream   bool
 }
+
+type LLMLogSyncFilesResult struct {
+	SourceLineCount int64
+	DatasetRowCount int64
+}
