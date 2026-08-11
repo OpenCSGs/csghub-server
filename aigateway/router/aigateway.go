@@ -79,6 +79,7 @@ func NewRouter(config *config.Config) (*gin.Engine, func(), error) {
 	v1Group.POST("/images/generations", middlewareCollection.Auth.MustUserOrgApiKey, modalAPIRateLimiter, openAIhandler.GenerateImage)
 	v1Group.POST("/images/edits", middlewareCollection.Auth.MustUserOrgApiKey, modalAPIRateLimiter, openAIhandler.EditImage)
 	v1Group.POST("/audio/transcriptions", middlewareCollection.Auth.MustUserOrgApiKey, openAIhandler.Transcription)
+	v1Group.POST("/audio/translations", middlewareCollection.Auth.MustUserOrgApiKey, openAIhandler.Translation)
 	v1Group.POST("/audio/speech", middlewareCollection.Auth.MustUserOrgApiKey, modalAPIRateLimiter, openAIhandler.Speech)
 	v1Group.POST("/audio/speech/batch", middlewareCollection.Auth.MustUserOrgApiKey, modalAPIRateLimiter, openAIhandler.SpeechBatch)
 	v1Group.GET("/audio/voices", middlewareCollection.Auth.MustUserOrgApiKey, modalAPIRateLimiter, openAIhandler.ListVoices)

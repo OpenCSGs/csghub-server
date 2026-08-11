@@ -16,13 +16,14 @@ import (
 )
 
 type resolvedModelTarget struct {
-	Model          *types.Model
-	Upstream       commonType.UpstreamConfig
-	TargetReq      commonType.EndpointReq
-	Target         string
-	Host           string
-	ModelName      string
-	AttemptTargets []commonType.UpstreamConfig
+	Model           *types.Model
+	Upstream        commonType.UpstreamConfig
+	TargetReq       commonType.EndpointReq
+	Target          string
+	TokenizerTarget string
+	Host            string
+	ModelName       string
+	AttemptTargets  []commonType.UpstreamConfig
 }
 
 const maxSessionKeyLength = 256
@@ -203,6 +204,7 @@ func (h *OpenAIHandlerImpl) resolveModelTargetWithOptions(ctx context.Context, u
 			},
 		)
 	}
+	resolved.TokenizerTarget = resolved.Target
 
 	return resolved, nil
 }

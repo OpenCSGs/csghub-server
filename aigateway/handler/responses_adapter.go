@@ -402,6 +402,51 @@ func responsesNamespaceToolToChatTools(ctx context.Context, obj map[string]json.
 	return chatTools, functionTools, nil
 }
 
+func responsesNamespaceByFunctionName(raw json.RawMessage) (map[string]string, error) {
+	result := map[string]string{}
+	for _, tool := range splitRawJSONArray(raw) {
+		var obj map[string]json.RawMessage
+		if err := json.Unmarshal(tool, &obj); err != nil {
+			continue
+		}
+		var toolType string
+		_ = json.Unmarshal(obj["type"], &toolType)
+		if toolType != "namespace" {
+			continue
+		}
+		namespaceName := responsesNamespaceName(obj)
+		if namespaceName == "" {
+			continue
+		}
+		children := responsesNamespaceToolChildren(obj)
+		if len(children) == 0 && responsesLooksLikeFunctionTool(obj) {
+			if err := responsesRecordToolNamespace(result, responsesFunctionToolName(obj), namespaceName); err != nil {
+				return nil, err
+			}
+			continue
+		}
+		for _, rawChild := range children {
+			var child map[string]json.RawMessage
+			if err := json.Unmarshal(rawChild, &child); err != nil {
+				continue
+			}
+			var childType string
+			_ = json.Unmarshal(child["type"], &childType)
+			if childType != "" && childType != "function" {
+				continue
+			}
+			functionName := responsesFunctionToolName(child)
+			if err := responsesRecordToolNamespace(result, functionName, namespaceName); err != nil {
+				return nil, err
+			}
+		}
+	}
+	if len(result) == 0 {
+		return nil, nil
+	}
+	return result, nil
+}
+
 func responsesRecordToolNamespace(result map[string]string, functionName, namespaceName string) error {
 	if functionName == "" || namespaceName == "" {
 		return nil

@@ -52,14 +52,18 @@ type responsesAdapterStreamWriter struct {
 	moderation         component.Moderation
 	sessionID          string
 	logCapture         *responsespkg.LLMLogRecorder
+	toolNamespaces     map[string]string
 }
 
 type responsesToolCallStreamState struct {
-	OutputIndex int
-	CallID      string
-	Name        string
-	Arguments   strings.Builder
-	Done        bool
+	OutputIndex           int
+	CallID                string
+	Name                  string
+	Namespace             string
+	Arguments             strings.Builder
+	pendingArgumentDeltas []string
+	Added                 bool
+	Done                  bool
 }
 
 func newResponsesAdapterStreamWriter(w gin.ResponseWriter, model string, responsesCounter token.ResponsesTokenCounter, moderation component.Moderation, sessionID string, logCapture ...*responsespkg.LLMLogRecorder) *responsesAdapterStreamWriter {
@@ -272,17 +276,7 @@ func (w *responsesAdapterStreamWriter) writeToolCallDeltas(chunk types.ChatCompl
 				w.logCapture.CaptureToolCallStart(state.CallID, state.Name, "")
 			}
 			if args := call.Function.Arguments; args != "" {
-				state.Arguments.WriteString(args)
-				if w.logCapture != nil {
-					w.logCapture.CaptureToolCallArgumentsDelta(state.CallID, args)
-				}
-				w.writeResponsesEvent("response.function_call_arguments.delta", responsespkg.StreamFunctionCallArgumentsDeltaEvent{
-					Type:        "response.function_call_arguments.delta",
-					ResponseID:  w.respID,
-					ItemID:      state.CallID,
-					OutputIndex: state.OutputIndex,
-					Delta:       args,
-				})
+				w.captureToolCallArguments(state, args)
 			}
 		}
 	}
@@ -295,6 +289,9 @@ func (w *responsesAdapterStreamWriter) ensureToolCallItem(index int, callID, nam
 		}
 		if state.Name == "" && name != "" {
 			state.Name = name
+			state.Namespace = w.toolNamespaces[name]
+			w.ensureToolCallItemAdded(state)
+			w.flushPendingToolCallArguments(state)
 		}
 		return state
 	}
@@ -306,26 +303,71 @@ func (w *responsesAdapterStreamWriter) ensureToolCallItem(index int, callID, nam
 		OutputIndex: w.nextOutputIndex(),
 		CallID:      itemID,
 		Name:        name,
+		Namespace:   w.toolNamespaces[name],
 	}
 	w.toolCallItems[index] = state
 	if w.logCapture != nil {
 		w.logCapture.CaptureResponseID(w.respID)
 		w.logCapture.CaptureToolCallStart(itemID, name, "")
 	}
+	if name == "" {
+		return state
+	}
+	w.ensureToolCallItemAdded(state)
+	return state
+}
+
+func (w *responsesAdapterStreamWriter) ensureToolCallItemAdded(state *responsesToolCallStreamState) {
+	if state == nil || state.Added || state.Name == "" {
+		return
+	}
+	state.Added = true
 	w.writeResponsesEvent("response.output_item.added", responsespkg.StreamOutputItemEvent{
 		Type:        "response.output_item.added",
 		ResponseID:  w.respID,
 		OutputIndex: state.OutputIndex,
 		Item: responsespkg.StreamFunctionCallItem{
-			ID:        itemID,
+			ID:        state.CallID,
 			Type:      "function_call",
-			CallID:    itemID,
-			Name:      name,
+			CallID:    state.CallID,
+			Name:      state.Name,
+			Namespace: state.Namespace,
 			Arguments: "",
 			Status:    "in_progress",
 		},
 	})
-	return state
+}
+
+func (w *responsesAdapterStreamWriter) captureToolCallArguments(state *responsesToolCallStreamState, args string) {
+	state.Arguments.WriteString(args)
+	if state.Name == "" {
+		state.pendingArgumentDeltas = append(state.pendingArgumentDeltas, args)
+		return
+	}
+	w.writeToolCallArgumentsDelta(state, args)
+}
+
+func (w *responsesAdapterStreamWriter) flushPendingToolCallArguments(state *responsesToolCallStreamState) {
+	if state == nil || state.Name == "" {
+		return
+	}
+	for _, args := range state.pendingArgumentDeltas {
+		w.writeToolCallArgumentsDelta(state, args)
+	}
+	state.pendingArgumentDeltas = nil
+}
+
+func (w *responsesAdapterStreamWriter) writeToolCallArgumentsDelta(state *responsesToolCallStreamState, args string) {
+	if w.logCapture != nil {
+		w.logCapture.CaptureToolCallArgumentsDelta(state.CallID, args)
+	}
+	w.writeResponsesEvent("response.function_call_arguments.delta", responsespkg.StreamFunctionCallArgumentsDeltaEvent{
+		Type:        "response.function_call_arguments.delta",
+		ResponseID:  w.respID,
+		ItemID:      state.CallID,
+		OutputIndex: state.OutputIndex,
+		Delta:       args,
+	})
 }
 
 func (w *responsesAdapterStreamWriter) ensureStarted() {
@@ -540,10 +582,12 @@ func (w *responsesAdapterStreamWriter) finishRefusalItem() {
 
 func (w *responsesAdapterStreamWriter) finishToolCallItems() {
 	for _, state := range w.orderedToolCallStates() {
-		if state == nil || state.Done {
+		if state == nil || state.Done || state.Name == "" {
 			continue
 		}
 		state.Done = true
+		w.ensureToolCallItemAdded(state)
+		w.flushPendingToolCallArguments(state)
 		if w.logCapture != nil {
 			w.logCapture.CaptureResponseID(w.respID)
 			w.logCapture.CaptureToolCallStart(state.CallID, state.Name, state.Arguments.String())
@@ -563,6 +607,7 @@ func (w *responsesAdapterStreamWriter) finishToolCallItems() {
 				Type:      "function_call",
 				CallID:    state.CallID,
 				Name:      state.Name,
+				Namespace: state.Namespace,
 				Arguments: state.Arguments.String(),
 				Status:    "completed",
 			},
@@ -630,7 +675,7 @@ func (w *responsesAdapterStreamWriter) completedResponse() responsespkg.StreamRe
 		}{index: w.reasoningOutputIdx, item: w.reasoningOutput("completed")})
 	}
 	for _, state := range w.orderedToolCallStates() {
-		if state == nil {
+		if state == nil || state.Name == "" {
 			continue
 		}
 		outputItems = append(outputItems, struct {
@@ -641,6 +686,7 @@ func (w *responsesAdapterStreamWriter) completedResponse() responsespkg.StreamRe
 			Type:      "function_call",
 			CallID:    state.CallID,
 			Name:      state.Name,
+			Namespace: state.Namespace,
 			Arguments: state.Arguments.String(),
 			Status:    "completed",
 		}})

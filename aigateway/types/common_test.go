@@ -35,3 +35,19 @@ func TestApplyRequestAuthHeaders_Empty(t *testing.T) {
 	require.NoError(t, err)
 	require.Empty(t, header.Get("Authorization"))
 }
+
+func TestApplyRequestAuthHeaders_EmptyStripsCallerAuthorization(t *testing.T) {
+	header := http.Header{}
+	header.Set("Authorization", "Bearer user-api-key")
+	err := ApplyRequestAuthHeaders(header, "")
+	require.NoError(t, err)
+	require.Empty(t, header.Get("Authorization"))
+}
+
+func TestApplyRequestAuthHeaders_ReplacesCallerAuthorization(t *testing.T) {
+	header := http.Header{}
+	header.Set("Authorization", "Bearer user-api-key")
+	err := ApplyRequestAuthHeaders(header, "Bearer provider-token")
+	require.NoError(t, err)
+	require.Equal(t, "Bearer provider-token", header.Get("Authorization"))
+}

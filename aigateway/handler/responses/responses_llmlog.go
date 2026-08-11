@@ -254,6 +254,15 @@ func (r *LLMLogRecorder) Record(usage *token.Usage) (*commontypes.LLMLogRecord, 
 		}
 		metadata["response_id"] = r.responseID
 	}
+	if usage != nil && usage.Source != "" {
+		if metadata == nil {
+			metadata = map[string]any{}
+		}
+		metadata["usage_source"] = usage.Source
+		if usage.SourceReason != "" {
+			metadata["usage_reason"] = usage.SourceReason
+		}
+	}
 	return &commontypes.LLMLogRecord{
 		RequestID:  r.requestID,
 		EventTime:  time.Now().Format(time.RFC3339Nano),

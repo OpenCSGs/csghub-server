@@ -93,7 +93,7 @@ def main() -> None:
     base_model_id = os.getenv("BASE_MODEL_ID", inferred_base_model_id)
     download_model(
         base_model_id,
-        os.getenv("BASE_MODEL_REVISION", "main"),
+        os.getenv("REVISION", "main"),
         workspace / base_model_id,
         allow_patterns=base_allow_patterns(model_type),
     )

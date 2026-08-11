@@ -51,6 +51,18 @@ type responsesAdapterResponseWriter interface {
 	Finalize(statusCode int) error
 }
 
+func setResponsesAdapterToolNamespaces(w responsesAdapterResponseWriter, toolNamespaces map[string]string) {
+	if len(toolNamespaces) == 0 {
+		return
+	}
+	switch writer := w.(type) {
+	case *responsesAdapterStreamWriter:
+		writer.toolNamespaces = toolNamespaces
+	case *responsesAdapterNonStreamWriter:
+		writer.toolNamespaces = toolNamespaces
+	}
+}
+
 func newResponsesAdapterResponseWriter(w gin.ResponseWriter, stream bool, model string, responsesCounter token.ResponsesTokenCounter, moderation component.Moderation, sessionID string, logCapture ...*responsespkg.LLMLogRecorder) responsesAdapterResponseWriter {
 	var recorder *responsespkg.LLMLogRecorder
 	if len(logCapture) > 0 {
