@@ -12,6 +12,8 @@ COPY ./supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 COPY ./vllm/ /etc/csghub/
 # Add Audio-Duration-Seconds to successful /v1/audio/transcriptions responses.
 RUN python3 /etc/csghub/patch_audio_duration_header.py
+# Add generated TTS duration to speech responses.
+RUN python3 /etc/csghub/patch_tts_duration.py
 RUN chmod +x /etc/csghub/*.sh
 RUN chmod +x /app/vllm/examples/ray_serving/*.sh
 

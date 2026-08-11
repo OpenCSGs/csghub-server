@@ -282,10 +282,11 @@ func (s *serviceComponentImpl) generateService(ctx context.Context, cluster *clu
 						PodSpec: corev1.PodSpec{
 							NodeSelector: nodeSelector,
 							Containers: []corev1.Container{{
-								Image:     containerImg,
-								Ports:     exposePorts,
-								Resources: resources,
-								Env:       environments,
+								Image:           containerImg,
+								ImagePullPolicy: corev1.PullAlways,
+								Ports:           exposePorts,
+								Resources:       resources,
+								Env:             environments,
 								ReadinessProbe: &corev1.Probe{
 									InitialDelaySeconds: int32(initialDelaySeconds),
 									PeriodSeconds:       int32(periodSeconds),
