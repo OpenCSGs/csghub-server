@@ -1030,7 +1030,6 @@ func createUserRoutes(apiGroup *gin.RouterGroup, middlewareCollection middleware
 	}
 
 	{
-		apiGroup.POST("/user", userProxyHandler.Proxy)
 		apiGroup.GET("/user/:username", userProxyHandler.Proxy)
 		apiGroup.PUT("/user/:username", userProxyHandler.Proxy)
 		apiGroup.DELETE("/user/:username", userProxyHandler.Proxy)
