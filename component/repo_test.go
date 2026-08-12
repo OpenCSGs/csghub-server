@@ -2736,6 +2736,10 @@ func TestRepoComponent_BatchGetRepoExtra(t *testing.T) {
 		}
 		repoComp.mocks.stores.RepositoryStatisticsMock().EXPECT().FindByRepositoryIDs(ctx, []int64{1, 2}).Return(stats, nil)
 
+
+				repoComp.mocks.stores.TagMock().EXPECT().ByRepoIDs(ctx, []int64{1, 2}).Return(nil, nil)
+		repoComp.mocks.stores.ModelMock().EXPECT().ByRepoIDs(ctx, []int64{1, 2}).Return(nil, nil)
+
 		result, err := repoComp.BatchGetRepoExtra(ctx, []int64{1, 2}, "admin")
 		require.Nil(t, err)
 		require.Equal(t, []types.RepoExtraItem{{RepoID: 1, Size: 1024, LastCommitSize: 100}, {RepoID: 2, Size: 2048}}, result)
@@ -2768,6 +2772,9 @@ func TestRepoComponent_BatchGetRepoExtra(t *testing.T) {
 			{RepositoryID: 3, Branch: "main", TotalSize: 300},
 		}
 		repoComp.mocks.stores.RepositoryStatisticsMock().EXPECT().FindByRepositoryIDs(ctx, []int64{1, 2, 3}).Return(stats, nil)
+
+				repoComp.mocks.stores.TagMock().EXPECT().ByRepoIDs(ctx, []int64{1, 2, 3}).Return(nil, nil)
+		repoComp.mocks.stores.ModelMock().EXPECT().ByRepoIDs(ctx, []int64{1, 2, 3}).Return(nil, nil)
 
 		result, err := repoComp.BatchGetRepoExtra(ctx, []int64{1, 2, 3, 4}, "user1")
 		require.Nil(t, err)
@@ -2807,6 +2814,9 @@ func TestRepoComponent_BatchGetRepoExtra(t *testing.T) {
 		}
 		repoComp.mocks.stores.RepositoryStatisticsMock().EXPECT().FindByRepositoryIDs(ctx, []int64{1, 2, 3}).Return(stats, nil)
 
+				repoComp.mocks.stores.TagMock().EXPECT().ByRepoIDs(ctx, []int64{1, 2, 3}).Return(nil, nil)
+		repoComp.mocks.stores.ModelMock().EXPECT().ByRepoIDs(ctx, []int64{1, 2, 3}).Return(nil, nil)
+
 		result, err := repoComp.BatchGetRepoExtra(ctx, []int64{1, 2, 3, 4}, "user1")
 		require.Nil(t, err)
 		require.Equal(t, []types.RepoExtraItem{{RepoID: 1, Size: 100}, {RepoID: 2, Size: 200}, {RepoID: 3, Size: 300}}, result)
@@ -2826,6 +2836,9 @@ func TestRepoComponent_BatchGetRepoExtra(t *testing.T) {
 			{RepositoryID: 2, Branch: "main", TotalSize: 500},
 		}
 		repoComp.mocks.stores.RepositoryStatisticsMock().EXPECT().FindByRepositoryIDs(ctx, []int64{2}).Return(stats, nil)
+
+				repoComp.mocks.stores.TagMock().EXPECT().ByRepoIDs(ctx, []int64{2}).Return(nil, nil)
+		repoComp.mocks.stores.ModelMock().EXPECT().ByRepoIDs(ctx, []int64{2}).Return(nil, nil)
 
 		result, err := repoComp.BatchGetRepoExtra(ctx, []int64{1, 2}, "")
 		require.Nil(t, err)
@@ -2847,6 +2860,10 @@ func TestRepoComponent_BatchGetRepoExtra(t *testing.T) {
 			{ID: 1, UserID: 1, Path: "user1/repo1", Private: true, DefaultBranch: ""},
 		}
 		repoComp.mocks.stores.RepoMock().EXPECT().FindByIds(ctx, []int64{1}).Return(repos, nil)
+
+
+				repoComp.mocks.stores.TagMock().EXPECT().ByRepoIDs(ctx, []int64{1}).Return(nil, nil)
+		repoComp.mocks.stores.ModelMock().EXPECT().ByRepoIDs(ctx, []int64{1}).Return(nil, nil)
 
 		result, err := repoComp.BatchGetRepoExtra(ctx, []int64{1}, "user1")
 		require.Nil(t, err)
@@ -2873,6 +2890,9 @@ func TestRepoComponent_BatchGetRepoExtra(t *testing.T) {
 			{RepositoryID: 1, Branch: "dev", TotalSize: 100},
 		}
 		repoComp.mocks.stores.RepositoryStatisticsMock().EXPECT().FindByRepositoryIDs(ctx, []int64{1}).Return(stats, nil)
+
+				repoComp.mocks.stores.TagMock().EXPECT().ByRepoIDs(ctx, []int64{1}).Return(nil, nil)
+		repoComp.mocks.stores.ModelMock().EXPECT().ByRepoIDs(ctx, []int64{1}).Return(nil, nil)
 
 		result, err := repoComp.BatchGetRepoExtra(ctx, []int64{1}, "user1")
 		require.Nil(t, err)

@@ -3831,6 +3831,76 @@ func (_c *MockRepoComponent_PublicToUser_Call) RunAndReturn(run func(context.Con
 	return _c
 }
 
+// PublicToUserV2 provides a mock function with given fields: ctx, repoType, userName, filter, per, page
+func (_m *MockRepoComponent) PublicToUserV2(ctx context.Context, repoType types.RepositoryType, userName string, filter *types.RepoFilter, per int, page int) ([]*database.Repository, int, error) {
+	ret := _m.Called(ctx, repoType, userName, filter, per, page)
+
+	if len(ret) == 0 {
+		panic("no return value specified for PublicToUserV2")
+	}
+
+	var r0 []*database.Repository
+	var r1 int
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.RepositoryType, string, *types.RepoFilter, int, int) ([]*database.Repository, int, error)); ok {
+		return rf(ctx, repoType, userName, filter, per, page)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.RepositoryType, string, *types.RepoFilter, int, int) []*database.Repository); ok {
+		r0 = rf(ctx, repoType, userName, filter, per, page)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]*database.Repository)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.RepositoryType, string, *types.RepoFilter, int, int) int); ok {
+		r1 = rf(ctx, repoType, userName, filter, per, page)
+	} else {
+		r1 = ret.Get(1).(int)
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, types.RepositoryType, string, *types.RepoFilter, int, int) error); ok {
+		r2 = rf(ctx, repoType, userName, filter, per, page)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
+// MockRepoComponent_PublicToUserV2_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PublicToUserV2'
+type MockRepoComponent_PublicToUserV2_Call struct {
+	*mock.Call
+}
+
+// PublicToUserV2 is a helper method to define mock.On call
+//   - ctx context.Context
+//   - repoType types.RepositoryType
+//   - userName string
+//   - filter *types.RepoFilter
+//   - per int
+//   - page int
+func (_e *MockRepoComponent_Expecter) PublicToUserV2(ctx interface{}, repoType interface{}, userName interface{}, filter interface{}, per interface{}, page interface{}) *MockRepoComponent_PublicToUserV2_Call {
+	return &MockRepoComponent_PublicToUserV2_Call{Call: _e.mock.On("PublicToUserV2", ctx, repoType, userName, filter, per, page)}
+}
+
+func (_c *MockRepoComponent_PublicToUserV2_Call) Run(run func(ctx context.Context, repoType types.RepositoryType, userName string, filter *types.RepoFilter, per int, page int)) *MockRepoComponent_PublicToUserV2_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.RepositoryType), args[2].(string), args[3].(*types.RepoFilter), args[4].(int), args[5].(int))
+	})
+	return _c
+}
+
+func (_c *MockRepoComponent_PublicToUserV2_Call) Return(repos []*database.Repository, count int, err error) *MockRepoComponent_PublicToUserV2_Call {
+	_c.Call.Return(repos, count, err)
+	return _c
+}
+
+func (_c *MockRepoComponent_PublicToUserV2_Call) RunAndReturn(run func(context.Context, types.RepositoryType, string, *types.RepoFilter, int, int) ([]*database.Repository, int, error)) *MockRepoComponent_PublicToUserV2_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // RelatedRepos provides a mock function with given fields: ctx, repoID, currentUser
 func (_m *MockRepoComponent) RelatedRepos(ctx context.Context, repoID int64, currentUser string) (map[types.RepositoryType][]*database.Repository, error) {
 	ret := _m.Called(ctx, repoID, currentUser)

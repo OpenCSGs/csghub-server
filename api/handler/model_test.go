@@ -329,3 +329,74 @@ func TestModelHandler_DeleteInferenceVersion_ServiceError(t *testing.T) {
 
 	assert.Equal(t, http.StatusInternalServerError, w.Code)
 }
+
+func TestModelHandler_IndexV2_Success(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := gin.Default()
+	mc := mockcomponent.NewMockModelComponent(t)
+	mc.EXPECT().IndexV2(mock.Anything, mock.Anything, 10, 2, false).Return([]*types.Model{
+		{ID: 1, Name: "model1", Path: "u/model1"},
+		{ID: 2, Name: "model2", Path: "u/model2"},
+	}, 100, nil)
+
+	handler := &ModelHandler{model: mc}
+	router.GET("/api/v1/models/v2", handler.IndexV2)
+
+	w := httptest.NewRecorder()
+	request, _ := http.NewRequest("GET", "/api/v1/models/v2?per=10&page=2&sort=trending", nil)
+
+	router.ServeHTTP(w, request)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+}
+
+func TestModelHandler_IndexV2_InvalidSort(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := gin.Default()
+	mc := mockcomponent.NewMockModelComponent(t)
+
+	handler := &ModelHandler{model: mc}
+	router.GET("/api/v1/models/v2", handler.IndexV2)
+
+	w := httptest.NewRecorder()
+	request, _ := http.NewRequest("GET", "/api/v1/models/v2?sort=invalid_sort", nil)
+
+	router.ServeHTTP(w, request)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+func TestModelHandler_IndexV2_InvalidSource(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := gin.Default()
+	mc := mockcomponent.NewMockModelComponent(t)
+
+	handler := &ModelHandler{model: mc}
+	router.GET("/api/v1/models/v2", handler.IndexV2)
+
+	w := httptest.NewRecorder()
+	request, _ := http.NewRequest("GET", "/api/v1/models/v2?source=invalid", nil)
+
+	router.ServeHTTP(w, request)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+func TestModelHandler_IndexV2_ServiceError(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := gin.Default()
+	mc := mockcomponent.NewMockModelComponent(t)
+	mc.EXPECT().IndexV2(mock.Anything, mock.Anything, 10, 1, false).Return(nil, 0, errors.New("db error"))
+
+	handler := &ModelHandler{model: mc}
+	router.GET("/api/v1/models/v2", handler.IndexV2)
+
+	w := httptest.NewRecorder()
+	request, _ := http.NewRequest("GET", "/api/v1/models/v2?per=10&page=1", nil)
+
+	router.ServeHTTP(w, request)
+
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
+}
+
+

@@ -140,5 +140,7 @@ func NewTestRepoComponent(config *config.Config, stores *tests.MockStores, rpcUs
 		xnetClient:                     xnetClient,
 		clusterComponent:               clusterComponent,
 		repoStatisticsStore:            stores.RepositoryStatistics,
+		modelStore:                     stores.Model,
+		tagStore:                       stores.Tag,
 	}
 }

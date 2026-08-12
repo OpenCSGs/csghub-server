@@ -1191,5 +1191,56 @@ func TestModelComponent_ListALLRuntimeFramework(t *testing.T) {
 	runs, err := mc.ListAllByRuntimeFramework(ctx, "", 0)
 	require.Nil(t, err)
 	require.Equal(t, 2, len(runs))
+}
 
+func TestModelComponent_IndexV2(t *testing.T) {
+	ctx := context.TODO()
+	mc := initializeTestModelComponent(ctx, t)
+
+	filter := &types.RepoFilter{Username: "user"}
+	mc.mocks.components.repo.EXPECT().PublicToUserV2(ctx, types.ModelRepo, "user", filter, 10, 1).Return(
+		[]*database.Repository{
+			{ID: 10, Name: "model1", Nickname: "Model 1", Description: "desc1", Likes: 10, DownloadCount: 100, Path: "u/model1", Private: false, Source: "local", SyncStatus: "completed", License: "MIT"},
+			{ID: 20, Name: "model2", Nickname: "Model 2", Description: "desc2", Likes: 20, DownloadCount: 200, Path: "u/model2", Private: true, Source: "opencsg", SyncStatus: "completed", License: "Apache-2.0"},
+		}, 200, nil,
+	)
+
+	// model.ID ≠ repo.ID to lock contract
+	mc.mocks.stores.ModelMock().EXPECT().ByRepoIDsBasic(ctx, []int64{10, 20}).Return([]database.Model{
+		{ID: 110, RepositoryID: 10},
+		{ID: 220, RepositoryID: 20},
+	}, nil)
+
+	data, total, err := mc.IndexV2(ctx, filter, 10, 1, false)
+	require.Nil(t, err)
+	require.Equal(t, 200, total)
+	require.Len(t, data, 2)
+
+	require.Equal(t, []*types.Model{
+		{
+			ID: 110, Name: "model1", Nickname: "Model 1", Description: "desc1",
+			Likes: 10, Downloads: 100, Path: "u/model1", RepositoryID: 10,
+			Private: false, Source: "local", SyncStatus: "completed", License: "MIT",
+		},
+		{
+			ID: 220, Name: "model2", Nickname: "Model 2", Description: "desc2",
+			Likes: 20, Downloads: 200, Path: "u/model2", RepositoryID: 20,
+			Private: true, Source: "opencsg", SyncStatus: "completed", License: "Apache-2.0",
+		},
+	}, data)
+}
+
+func TestModelComponent_IndexV2_Empty(t *testing.T) {
+	ctx := context.TODO()
+	mc := initializeTestModelComponent(ctx, t)
+
+	filter := &types.RepoFilter{Username: "user", Sort: "trending"}
+	mc.mocks.components.repo.EXPECT().PublicToUserV2(ctx, types.ModelRepo, "user", filter, 10, 1).Return(
+		[]*database.Repository{}, 0, nil,
+	)
+
+	data, total, err := mc.IndexV2(ctx, filter, 10, 1, false)
+	require.Nil(t, err)
+	require.Equal(t, 0, total)
+	require.Len(t, data, 0)
 }
