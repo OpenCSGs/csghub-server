@@ -305,14 +305,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 
 	createUserRoutes(apiGroup, middlewareCollection, userProxyHandler, userHandler)
 
-	tokenGroup := apiGroup.Group("token")
-	{
-		tokenGroup.POST("/:app/:token_name", userProxyHandler.ProxyToApi("/api/v1/token/%s/%s", "app", "token_name"))
-		tokenGroup.PUT("/:app/:token_name", userProxyHandler.ProxyToApi("/api/v1/token/%s/%s", "app", "token_name"))
-		tokenGroup.DELETE("/:app/:token_name", userProxyHandler.ProxyToApi("/api/v1/token/%s/%s", "app", "token_name"))
-		// check token info
-		tokenGroup.GET("/:token_value", userProxyHandler.ProxyToApi("/api/v1/token/%s", "token_value"))
-	}
+	createTokenRoutes(apiGroup, middlewareCollection, userProxyHandler)
 
 	sshKeyHandler, err := handler.NewSSHKeyHandler(config)
 	if err != nil {
@@ -337,7 +330,6 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	// JWT token
 	apiGroup.POST("/jwt/token", middlewareCollection.Auth.NeedAPIKey, userProxyHandler.Proxy)
 	apiGroup.GET("/jwt/:token", middlewareCollection.Auth.NeedAPIKey, userProxyHandler.ProxyToApi("/api/v1/jwt/%s", "token"))
-	apiGroup.GET("/users", userProxyHandler.Proxy)
 	apiGroup.GET("/users/stream-export", middlewareCollection.Auth.NeedAdmin, userProxyHandler.Proxy)
 
 	// callback
@@ -1023,17 +1015,12 @@ func createUserRoutes(apiGroup *gin.RouterGroup, middlewareCollection middleware
 		keysGroup.DELETE("/:uuid/apikeys/:id", userProxyHandler.Proxy)
 		keysGroup.PUT("/:uuid/apikeys/builtin/refresh", userProxyHandler.Proxy)
 	}
-	// deprecated
-	{
-		apiGroup.POST("/users", userProxyHandler.ProxyToApi("/api/v1/user"))
-		apiGroup.PUT("/users/:username", userProxyHandler.ProxyToApi("/api/v1/user/%v", "username"))
-	}
 
 	{
 		apiGroup.POST("/user", userProxyHandler.Proxy)
 		apiGroup.GET("/user/:username", userProxyHandler.Proxy)
-		apiGroup.PUT("/user/:username", userProxyHandler.Proxy)
-		apiGroup.DELETE("/user/:username", userProxyHandler.Proxy)
+		apiGroup.PUT("/user/:username", middlewareCollection.Auth.NeedLogin, userProxyHandler.Proxy)
+		apiGroup.DELETE("/user/:username", middlewareCollection.Auth.NeedAdmin, userProxyHandler.Proxy)
 		apiGroup.PUT("/user/labels", middlewareCollection.Auth.NeedAdmin, userProxyHandler.Proxy)
 		apiGroup.GET("/user/:username/organizations", userProxyHandler.Proxy)
 	}
@@ -1042,7 +1029,7 @@ func createUserRoutes(apiGroup *gin.RouterGroup, middlewareCollection middleware
 		apiGroup.POST("/user/verify", middlewareCollection.Auth.NeedLogin, userProxyHandler.Proxy)
 		apiGroup.PUT("/user/verify/:id", middlewareCollection.Auth.NeedAdmin, userProxyHandler.ProxyToApi("/api/v1/user/verify/%s", "id"))
 		apiGroup.GET("/user/verify/:id", middlewareCollection.Auth.NeedLogin, userProxyHandler.ProxyToApi("/api/v1/user/verify/%s", "id"))
-		apiGroup.DELETE("/user/:username/close_account", userProxyHandler.Proxy)
+		apiGroup.DELETE("/user/:username/close_account", middlewareCollection.Auth.NeedLogin, userProxyHandler.Proxy)
 		apiGroup.POST("/user/email-verification-code/:email", middlewareCollection.Auth.NeedLogin, userProxyHandler.Proxy)
 	}
 
@@ -1086,7 +1073,7 @@ func createUserRoutes(apiGroup *gin.RouterGroup, middlewareCollection middleware
 	apiGroup.PUT("/user/:username/likes/collections/:id", middlewareCollection.Auth.NeedLogin, userHandler.LikeCollection)
 	apiGroup.DELETE("/user/:username/likes/collections/:id", middlewareCollection.Auth.NeedLogin, userHandler.UnLikeCollection)
 	// user owned tokens
-	apiGroup.GET("/user/:username/tokens", userProxyHandler.ProxyToApi("/api/v1/user/%s/tokens", "username"))
+	apiGroup.GET("/user/:username/tokens", middlewareCollection.Auth.NeedLogin, userProxyHandler.ProxyToApi("/api/v1/user/%s/tokens", "username"))
 
 	// serverless list
 	apiGroup.GET("/user/:username/run/serverless", middlewareCollection.License.Check, middlewareCollection.Auth.NeedAdmin, userHandler.GetRunServerless)
@@ -1101,6 +1088,11 @@ func createUserRoutes(apiGroup *gin.RouterGroup, middlewareCollection middleware
 
 	// Inference Arch
 	createInferenceArchRoutes(apiGroup, middlewareCollection)
+
+	// GET /users returns a paginated user list. Non-admin users receive a
+	// limited response; the admin-only stream-export variant is registered
+	// directly in NewRouter.
+	apiGroup.GET("/users", middlewareCollection.Auth.NeedLogin, userProxyHandler.Proxy)
 
 	createExtendedUserRoutes(apiGroup, middlewareCollection, userProxyHandler)
 }
@@ -1392,13 +1384,24 @@ func createLfsSyncRoutes(apiGroup *gin.RouterGroup, middlewareCollection middlew
 	}
 }
 
+func createTokenRoutes(apiGroup *gin.RouterGroup, middlewareCollection middleware.MiddlewareCollection, userProxyHandler *handler.InternalServiceProxyHandler) {
+	tokenGroup := apiGroup.Group("/token")
+	{
+		tokenGroup.POST("/:app/:token_name", middlewareCollection.Auth.NeedLogin, userProxyHandler.ProxyToApi("/api/v1/token/%s/%s", "app", "token_name"))
+		tokenGroup.PUT("/:app/:token_name", middlewareCollection.Auth.NeedLogin, userProxyHandler.ProxyToApi("/api/v1/token/%s/%s", "app", "token_name"))
+		tokenGroup.DELETE("/:app/:token_name", middlewareCollection.Auth.NeedLogin, userProxyHandler.ProxyToApi("/api/v1/token/%s/%s", "app", "token_name"))
+		// check token info
+		tokenGroup.GET("/:token_value", userProxyHandler.ProxyToApi("/api/v1/token/%s", "token_value"))
+	}
+}
+
 func createOrgRoutes(apiGroup *gin.RouterGroup, middlewareCollection middleware.MiddlewareCollection, userProxyHandler *handler.InternalServiceProxyHandler, orgHandler *handler.OrganizationHandler) {
 	{
 		apiGroup.GET("/organizations", middlewareCollection.License.Check, userProxyHandler.Proxy)
-		apiGroup.POST("/organizations", userProxyHandler.Proxy)
+		apiGroup.POST("/organizations", middlewareCollection.Auth.NeedLogin, userProxyHandler.Proxy)
 		apiGroup.GET("/organization/:namespace", userProxyHandler.ProxyToApi("/api/v1/organization/%s", "namespace"))
-		apiGroup.PUT("/organization/:namespace", userProxyHandler.ProxyToApi("/api/v1/organization/%s", "namespace"))
-		apiGroup.DELETE("/organization/:namespace", userProxyHandler.ProxyToApi("/api/v1/organization/%s", "namespace"))
+		apiGroup.PUT("/organization/:namespace", middlewareCollection.Auth.NeedLogin, userProxyHandler.ProxyToApi("/api/v1/organization/%s", "namespace"))
+		apiGroup.DELETE("/organization/:namespace", middlewareCollection.Auth.NeedLogin, userProxyHandler.ProxyToApi("/api/v1/organization/%s", "namespace"))
 		// Organization assets
 		apiGroup.GET("/organization/:namespace/models", orgHandler.Models)
 		apiGroup.GET("/organization/:namespace/datasets", orgHandler.Datasets)
@@ -1417,10 +1420,10 @@ func createOrgRoutes(apiGroup *gin.RouterGroup, middlewareCollection middleware.
 
 	{
 		apiGroup.GET("/organization/:namespace/members", userProxyHandler.ProxyToApi("/api/v1/organization/%s/members", "namespace"))
-		apiGroup.POST("/organization/:namespace/members", userProxyHandler.ProxyToApi("/api/v1/organization/%s/members", "namespace"))
+		apiGroup.POST("/organization/:namespace/members", middlewareCollection.Auth.NeedLogin, userProxyHandler.ProxyToApi("/api/v1/organization/%s/members", "namespace"))
 		apiGroup.GET("/organization/:namespace/members/:username", userProxyHandler.ProxyToApi("/api/v1/organization/%s/members/%s", "namespace", "username"))
-		apiGroup.PUT("/organization/:namespace/members/:username", userProxyHandler.ProxyToApi("/api/v1/organization/%s/members/%s", "namespace", "username"))
-		apiGroup.DELETE("/organization/:namespace/members/:username", userProxyHandler.ProxyToApi("/api/v1/organization/%s/members/%s", "namespace", "username"))
+		apiGroup.PUT("/organization/:namespace/members/:username", middlewareCollection.Auth.NeedLogin, userProxyHandler.ProxyToApi("/api/v1/organization/%s/members/%s", "namespace", "username"))
+		apiGroup.DELETE("/organization/:namespace/members/:username", middlewareCollection.Auth.NeedLogin, userProxyHandler.ProxyToApi("/api/v1/organization/%s/members/%s", "namespace", "username"))
 	}
 	{
 		apiGroup.POST("/organization/verify", middlewareCollection.Auth.NeedLogin, userProxyHandler.Proxy)
