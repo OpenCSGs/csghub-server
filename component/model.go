@@ -69,6 +69,8 @@ saved_model/**/* filter=lfs diff=lfs merge=lfs -text
 
 type ModelComponent interface {
 	Index(ctx context.Context, filter *types.RepoFilter, per, page int, needOpWeight bool) ([]*types.Model, int, error)
+	// IndexV2 returns basic model data only (no tags, mirror, enrichment) for fast list rendering
+	IndexV2(ctx context.Context, filter *types.RepoFilter, per, page int, needOpWeight bool) ([]*types.Model, int, error)
 	Create(ctx context.Context, req *types.CreateModelReq) (*types.Model, error)
 	Update(ctx context.Context, req *types.UpdateModelReq) (*types.Model, error)
 	Delete(ctx context.Context, namespace, name, currentUser string) error
@@ -277,6 +279,59 @@ func (c *modelComponentImpl) Index(ctx context.Context, filter *types.RepoFilter
 	if needOpWeight {
 		c.addOpWeightToModel(ctx, repoIDs, resModels)
 	}
+	return resModels, total, nil
+}
+
+// IndexV2 returns basic model data only (no tags, mirror status, or other enrichment data).
+// Use Enrich() to fetch the enrichment data asynchronously.
+func (c *modelComponentImpl) IndexV2(ctx context.Context, filter *types.RepoFilter, per, page int, needOpWeight bool) ([]*types.Model, int, error) {
+	repos, total, err := c.repoComponent.PublicToUserV2(ctx, types.ModelRepo, filter.Username, filter, per, page)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to get public model repos v2, error: %w", err)
+	}
+
+	var repoIDs []int64
+	for _, repo := range repos {
+		repoIDs = append(repoIDs, repo.ID)
+	}
+
+	// Load real model IDs (no Relations — fast)
+	modelMap := make(map[int64]int64, len(repos))
+	if len(repoIDs) > 0 {
+		models, err := c.modelStore.ByRepoIDsBasic(ctx, repoIDs)
+		if err != nil {
+			return nil, 0, fmt.Errorf("failed to get model ids by repo ids, error: %w", err)
+		}
+		for _, m := range models {
+			modelMap[m.RepositoryID] = m.ID
+		}
+	}
+
+	resModels := make([]*types.Model, 0, len(repos))
+	for _, repo := range repos {
+		modelID := modelMap[repo.ID]
+		resModels = append(resModels, &types.Model{
+			ID:           modelID,
+			Name:         repo.Name,
+			Nickname:     repo.Nickname,
+			Description:  repo.Description,
+			Likes:        repo.Likes,
+			Downloads:    repo.DownloadCount,
+			Path:         repo.Path,
+			RepositoryID: repo.ID,
+			Private:      repo.Private,
+			CreatedAt:    repo.CreatedAt,
+			UpdatedAt:    repo.UpdatedAt,
+			Source:       repo.Source,
+			SyncStatus:   repo.SyncStatus,
+			License:      repo.License,
+		})
+	}
+
+	if needOpWeight {
+		c.addOpWeightToModel(ctx, repoIDs, resModels)
+	}
+
 	return resModels, total, nil
 }
 

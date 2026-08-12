@@ -103,6 +103,8 @@ type repoComponentImpl struct {
 	pendingDeletion                database.PendingDeletionStore
 	xnetClient                     rpc.XnetSvcClient
 	clusterComponent               ClusterComponent
+	modelStore                     database.ModelStore
+	tagStore                       database.TagStore
 	extendRepoImpl
 }
 
@@ -114,6 +116,8 @@ type RepoComponent interface {
 	CreateFork(ctx context.Context, req types.CreateForkReq) (*database.Repository, error)
 	// PublicToUser gets visible repos of the given user and user's orgs
 	PublicToUser(ctx context.Context, repoType types.RepositoryType, userName string, filter *types.RepoFilter, per, page int) (repos []*database.Repository, count int, err error)
+	// PublicToUserV2 is like PublicToUser but skips Tag eager-loading for faster list queries
+	PublicToUserV2(ctx context.Context, repoType types.RepositoryType, userName string, filter *types.RepoFilter, per, page int) (repos []*database.Repository, count int, err error)
 	CreateFile(ctx context.Context, req *types.CreateFileReq) (*types.CreateFileResp, error)
 	UpdateFile(ctx context.Context, req *types.UpdateFileReq) (*types.UpdateFileResp, error)
 	DeleteFile(ctx context.Context, req *types.DeleteFileReq) (*types.DeleteFileResp, error)
@@ -699,6 +703,26 @@ func (c *repoComponentImpl) PublicToUser(ctx context.Context, repoType types.Rep
 	repos, count, err = c.repoStore.PublicToUser(ctx, repoType, ownerNamespaces, filter, per, page, isAdmin)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to get user public repos, error: %w", err)
+	}
+
+	return repos, count, nil
+}
+
+// PublicToUserV2 gets visible repos without eager-loading Tags for faster list queries.
+func (c *repoComponentImpl) PublicToUserV2(ctx context.Context, repoType types.RepositoryType, userName string, filter *types.RepoFilter, per, page int) (repos []*database.Repository, count int, err error) {
+	var ownerNamespaces []string
+	var isAdmin bool
+
+	if len(userName) > 0 {
+		user, err := c.userSvcClient.GetUserInfo(ctx, userName, userName)
+		if err != nil {
+			return nil, 0, fmt.Errorf("failed to get user info, error: %w", err)
+		}
+		ownerNamespaces, isAdmin = buildAccessibleNamespaces(user)
+	}
+	repos, count, err = c.repoStore.PublicToUserV2(ctx, repoType, ownerNamespaces, filter, per, page, isAdmin)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to get user public repos v2, error: %w", err)
 	}
 
 	return repos, count, nil
@@ -3269,6 +3293,12 @@ func (c *repoComponentImpl) BatchGetRepoExtra(ctx context.Context, repoIDs []int
 		}
 	}
 
+	// Collect readable repo IDs for enrichment queries
+	readableRepoIDs := make([]int64, len(readableRepos))
+	for i, repo := range readableRepos {
+		readableRepoIDs[i] = repo.ID
+	}
+
 	// Collect repos that have a default branch for statistics lookup
 	repoDefaultBranches := make(map[int64]string, len(readableRepos))
 	for _, repo := range readableRepos {
@@ -3300,13 +3330,69 @@ func (c *repoComponentImpl) BatchGetRepoExtra(ctx context.Context, repoIDs []int
 		}
 	}
 
+	// Load enrichment data (tags, mirror, multi-source, clone info)
+	var tagMap map[int64][]database.Tag
+	var modelMap map[int64]database.Model
+	if len(readableRepoIDs) > 0 {
+		if c.tagStore != nil {
+			tm, err := c.tagStore.ByRepoIDs(ctx, readableRepoIDs)
+			if err != nil {
+				slog.Warn("failed to load tags for repo extras", "error", err)
+			} else {
+				tagMap = tm
+			}
+		}
+		if c.modelStore != nil {
+			models, err := c.modelStore.ByRepoIDs(ctx, readableRepoIDs)
+			if err != nil {
+				slog.Warn("failed to load models for repo extras", "error", err)
+			} else {
+				modelMap = make(map[int64]database.Model, len(models))
+				for _, m := range models {
+					modelMap[m.RepositoryID] = m
+				}
+			}
+		}
+	}
+
 	result := make([]types.RepoExtraItem, 0, len(readableRepos))
 	for _, repo := range readableRepos {
-		result = append(result, types.RepoExtraItem{
+		item := types.RepoExtraItem{
 			RepoID:         repo.ID,
 			Size:           sizeMap[repo.ID],
 			LastCommitSize: lastCommitSizeMap[repo.ID],
-		})
+		}
+		// Populate enrichment fields
+		if tagMap != nil {
+			if tags, ok := tagMap[repo.ID]; ok {
+				for _, t := range tags {
+					item.Tags = append(item.Tags, types.RepoTag{
+						Name:      t.Name,
+						Category:  t.Category,
+						Group:     t.Group,
+						BuiltIn:   t.BuiltIn,
+						ShowName:  t.I18nKey,
+						I18nKey:   t.I18nKey,
+						CreatedAt: t.CreatedAt,
+						UpdatedAt: t.UpdatedAt,
+					})
+				}
+			}
+		}
+		if m, ok := modelMap[repo.ID]; ok {
+			if m.Repository.Mirror.CurrentTask != nil {
+				item.MirrorTaskStatus = m.Repository.Mirror.CurrentTask.Status
+			}
+			item.MultiSource = types.MultiSource{
+				HFPath:  m.Repository.HFPath,
+				MSPath:  m.Repository.MSPath,
+				CSGPath: m.Repository.CSGPath,
+			}
+			cloneInfo := common.BuildCloneInfo(c.config, m.Repository)
+			item.Repository = &cloneInfo
+			item.ReportURL = m.ReportURL
+		}
+		result = append(result, item)
 	}
 	slices.SortFunc(result, func(a, b types.RepoExtraItem) int {
 		return cmp.Compare(a.RepoID, b.RepoID)

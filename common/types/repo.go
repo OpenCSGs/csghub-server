@@ -467,9 +467,14 @@ type BatchRepoExtraReq struct {
 }
 
 type RepoExtraItem struct {
-	RepoID         int64 `json:"repo_id"`
-	Size           int64 `json:"size"`
-	LastCommitSize int64 `json:"last_commit_size"`
+	RepoID           int64            `json:"repo_id"`
+	Size             int64            `json:"size"`
+	LastCommitSize   int64            `json:"last_commit_size"`
+	Tags             []RepoTag        `json:"tags,omitempty"`
+	MirrorTaskStatus MirrorTaskStatus `json:"mirror_task_status,omitempty"`
+	MultiSource      MultiSource      `json:"multi_source,omitempty"`
+	Repository       *Repository      `json:"repository,omitempty"`
+	ReportURL        string           `json:"report_url,omitempty"`
 }
 
 type RepoSizeResponse struct {

@@ -268,6 +268,65 @@ func (_c *MockModelStore_ByRepoIDs_Call) RunAndReturn(run func(context.Context, 
 	return _c
 }
 
+// ByRepoIDsBasic provides a mock function with given fields: ctx, repoIDs
+func (_m *MockModelStore) ByRepoIDsBasic(ctx context.Context, repoIDs []int64) ([]database.Model, error) {
+	ret := _m.Called(ctx, repoIDs)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ByRepoIDsBasic")
+	}
+
+	var r0 []database.Model
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, []int64) ([]database.Model, error)); ok {
+		return rf(ctx, repoIDs)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, []int64) []database.Model); ok {
+		r0 = rf(ctx, repoIDs)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]database.Model)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, []int64) error); ok {
+		r1 = rf(ctx, repoIDs)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockModelStore_ByRepoIDsBasic_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ByRepoIDsBasic'
+type MockModelStore_ByRepoIDsBasic_Call struct {
+	*mock.Call
+}
+
+// ByRepoIDsBasic is a helper method to define mock.On call
+//   - ctx context.Context
+//   - repoIDs []int64
+func (_e *MockModelStore_Expecter) ByRepoIDsBasic(ctx interface{}, repoIDs interface{}) *MockModelStore_ByRepoIDsBasic_Call {
+	return &MockModelStore_ByRepoIDsBasic_Call{Call: _e.mock.On("ByRepoIDsBasic", ctx, repoIDs)}
+}
+
+func (_c *MockModelStore_ByRepoIDsBasic_Call) Run(run func(ctx context.Context, repoIDs []int64)) *MockModelStore_ByRepoIDsBasic_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].([]int64))
+	})
+	return _c
+}
+
+func (_c *MockModelStore_ByRepoIDsBasic_Call) Return(models []database.Model, err error) *MockModelStore_ByRepoIDsBasic_Call {
+	_c.Call.Return(models, err)
+	return _c
+}
+
+func (_c *MockModelStore_ByRepoIDsBasic_Call) RunAndReturn(run func(context.Context, []int64) ([]database.Model, error)) *MockModelStore_ByRepoIDsBasic_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ByUsername provides a mock function with given fields: ctx, username, per, page, onlyPublic
 func (_m *MockModelStore) ByUsername(ctx context.Context, username string, per int, page int, onlyPublic bool) ([]database.Model, int, error) {
 	ret := _m.Called(ctx, username, per, page, onlyPublic)

@@ -420,6 +420,7 @@ func TestModelHandler_DeleteInferenceVersion_Forbidden(t *testing.T) {
 
 	assert.Equal(t, http.StatusForbidden, w.Code)
 }
+
 func TestModelHandler_IndexV2_Success(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router := gin.Default()

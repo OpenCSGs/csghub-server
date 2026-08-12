@@ -32,6 +32,9 @@ type ModelStore interface {
 	ByID(ctx context.Context, id int64) (*Model, error)
 	CreateIfNotExist(ctx context.Context, input Model) (*Model, error)
 	CreateAndUpdateRepoPath(ctx context.Context, input Model, path string) (*Model, error)
+	// ByRepoIDsBasic returns model rows without any Relation eager-loading.
+	// Only model table columns (ID, RepositoryID) are populated — fast for ID mapping.
+	ByRepoIDsBasic(ctx context.Context, repoIDs []int64) (models []Model, err error)
 }
 
 func NewModelStore() ModelStore {
@@ -64,6 +67,17 @@ func (s *modelStoreImpl) ByRepoIDs(ctx context.Context, repoIDs []int64) (models
 		Relation("Repository").
 		Relation("Repository.Mirror").
 		Relation("Repository.Mirror.CurrentTask").
+		Where("model.repository_id in (?)", bun.In(repoIDs)).
+		Scan(ctx)
+	err = errorx.HandleDBError(err, nil)
+	return
+}
+
+// ByRepoIDsBasic returns model rows without any Relation eager-loading.
+// Only model table columns (ID, RepositoryID) are populated. Fast for ID mapping.
+func (s *modelStoreImpl) ByRepoIDsBasic(ctx context.Context, repoIDs []int64) (models []Model, err error) {
+	err = s.db.Operator.Core.NewSelect().
+		Model(&models).
 		Where("model.repository_id in (?)", bun.In(repoIDs)).
 		Scan(ctx)
 	err = errorx.HandleDBError(err, nil)

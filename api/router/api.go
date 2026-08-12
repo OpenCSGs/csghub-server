@@ -644,6 +644,8 @@ func createModelRoutes(config *config.Config,
 	{
 		modelsGroup.POST("", middlewareCollection.Auth.NeedPhoneVerified, modelHandler.Create)
 		modelsGroup.GET("", cache.Cache(memoryStore, time.Minute, middleware.CacheStrategyTrendingRepos()), modelHandler.Index)
+		// V2 API for faster model list loading
+		modelsGroup.GET("/v2", modelHandler.IndexV2)
 		modelsGroup.PUT("/:namespace/:name", middlewareCollection.Auth.NeedLogin, modelHandler.Update)
 		modelsGroup.DELETE("/:namespace/:name", middlewareCollection.Auth.NeedLogin, modelHandler.Delete)
 		modelsGroup.GET("/:namespace/:name", cache.Cache(memoryStore, time.Minute*2, middleware.CacheRepoInfo()), modelHandler.Show)
