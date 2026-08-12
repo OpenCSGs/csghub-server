@@ -328,7 +328,8 @@ func (h *RepoHandler) DeployDetail(ctx *gin.Context) {
 	response, err := h.c.DeployDetail(ctx.Request.Context(), detailReq)
 	if err != nil {
 		if errors.Is(err, errorx.ErrForbidden) {
-			slog.Info("not allowed to get deploy detail", slog.Any("error", err), slog.Any("req", detailReq))
+			slog.WarnContext(ctx.Request.Context(), "not allowed to get deploy detail",
+				slog.Any("error", err), slog.Any("req", detailReq))
 			httpbase.ForbiddenError(ctx, err)
 		} else if errors.Is(err, errorx.ErrDatabaseNoRows) {
 			httpbase.NotFoundError(ctx, err)

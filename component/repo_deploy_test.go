@@ -33,10 +33,11 @@ func TestRepoComponent_DeployInstanceLastLogs_NormalUser(t *testing.T) {
 		RoleMask: "",
 	}
 	dbDeploy := &database.Deploy{
-		ID:        1,
-		UserID:    123,
-		SvcName:   "svc-1",
-		ClusterID: "cluster-1",
+		ID:           1,
+		UserID:       123,
+		SvcName:      "svc-1",
+		ClusterID:    "cluster-1",
+		SecureLevel:  types.EndpointPublic,
 	}
 
 	repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "test-user").Return(dbUser, nil)
@@ -97,10 +98,11 @@ func TestRepoComponent_DeployInstanceLastLogs_SingleStream(t *testing.T) {
 		RoleMask: "",
 	}
 	dbDeploy := &database.Deploy{
-		ID:        2,
-		UserID:    123,
-		SvcName:   "svc-2",
-		ClusterID: "cluster-2",
+		ID:           2,
+		UserID:       123,
+		SvcName:      "svc-2",
+		ClusterID:    "cluster-2",
+		SecureLevel:  types.EndpointPublic,
 	}
 
 	repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "test-user").Return(dbUser, nil)
@@ -150,10 +152,11 @@ func TestRepoComponent_DeployInstanceLastLogs_EmptyResult(t *testing.T) {
 		RoleMask: "",
 	}
 	dbDeploy := &database.Deploy{
-		ID:        3,
-		UserID:    123,
-		SvcName:   "svc-3",
-		ClusterID: "cluster-3",
+		ID:           3,
+		UserID:       123,
+		SvcName:      "svc-3",
+		ClusterID:    "cluster-3",
+		SecureLevel:  types.EndpointPublic,
 	}
 
 	repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "test-user").Return(dbUser, nil)
@@ -192,10 +195,11 @@ func TestRepoComponent_DeployInstanceLastLogs_DeployerError(t *testing.T) {
 		RoleMask: "",
 	}
 	dbDeploy := &database.Deploy{
-		ID:        4,
-		UserID:    123,
-		SvcName:   "svc-4",
-		ClusterID: "cluster-4",
+		ID:           4,
+		UserID:       123,
+		SvcName:      "svc-4",
+		ClusterID:    "cluster-4",
+		SecureLevel:  types.EndpointPublic,
 	}
 
 	repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "test-user").Return(dbUser, nil)
@@ -206,6 +210,238 @@ func TestRepoComponent_DeployInstanceLastLogs_DeployerError(t *testing.T) {
 	result, err := repo.DeployInstanceLastLogs(ctx, logReq)
 	require.Error(t, err)
 	require.Nil(t, result)
+}
+
+func TestCheckDeployPermissionForUser_ZeroSecureLevel_OwnerAllowed(t *testing.T) {
+	ctx := context.TODO()
+	repo := initializeTestRepoComponent(ctx, t)
+
+	dbUser := database.User{
+		ID:       123,
+		RoleMask: "",
+	}
+	dbDeploy := &database.Deploy{
+		ID:          1,
+		UserID:      123,
+		SvcName:     "svc-1",
+		ClusterID:   "cluster-1",
+		SecureLevel: 0,
+	}
+
+	repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "owner-user").Return(dbUser, nil)
+	repo.mocks.stores.DeployTaskMock().EXPECT().GetDeployByID(ctx, int64(1)).Return(dbDeploy, nil)
+
+	user, deploy, err := repo.CheckDeployPermissionForUser(ctx, types.DeployActReq{
+		CurrentUser: "owner-user",
+		DeployID:    1,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, user)
+	require.NotNil(t, deploy)
+	require.Equal(t, int64(123), user.ID)
+}
+
+func TestCheckDeployPermissionForUser_ZeroSecureLevel_NonOwnerForbidden(t *testing.T) {
+	ctx := context.TODO()
+	repo := initializeTestRepoComponent(ctx, t)
+	repo.orgStore = repo.mocks.stores.Org
+
+	dbUser := database.User{
+		ID:       456,
+		RoleMask: "",
+	}
+	dbDeploy := &database.Deploy{
+		ID:          1,
+		UserID:      123,
+		SvcName:     "svc-1",
+		ClusterID:   "cluster-1",
+		SecureLevel: 0,
+	}
+
+	repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "other-user").Return(dbUser, nil)
+	repo.mocks.stores.DeployTaskMock().EXPECT().GetDeployByID(ctx, int64(1)).Return(dbDeploy, nil)
+	repo.mocks.stores.OrgMock().EXPECT().GetSharedOrgIDs(ctx, []int64{456, 123}).Return([]int64{}, nil)
+
+	user, deploy, err := repo.CheckDeployPermissionForUser(ctx, types.DeployActReq{
+		CurrentUser: "other-user",
+		DeployID:    1,
+	})
+	require.Error(t, err)
+	require.Nil(t, user)
+	require.Nil(t, deploy)
+}
+
+func TestCheckDeployPermissionForUser_PrivateEndpoint_OwnerAllowed(t *testing.T) {
+	ctx := context.TODO()
+	repo := initializeTestRepoComponent(ctx, t)
+
+	dbUser := database.User{
+		ID:       123,
+		RoleMask: "",
+	}
+	dbDeploy := &database.Deploy{
+		ID:          1,
+		UserID:      123,
+		SvcName:     "svc-1",
+		ClusterID:   "cluster-1",
+		SecureLevel: types.EndpointPrivate,
+	}
+
+	repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "owner-user").Return(dbUser, nil)
+	repo.mocks.stores.DeployTaskMock().EXPECT().GetDeployByID(ctx, int64(1)).Return(dbDeploy, nil)
+
+	user, deploy, err := repo.CheckDeployPermissionForUser(ctx, types.DeployActReq{
+		CurrentUser: "owner-user",
+		DeployID:    1,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, user)
+	require.NotNil(t, deploy)
+}
+
+func TestCheckDeployPermissionForUser_PrivateEndpoint_AdminForbidden(t *testing.T) {
+	ctx := context.TODO()
+	repo := initializeTestRepoComponent(ctx, t)
+
+	dbUser := database.User{
+		ID:       456,
+		RoleMask: "admin",
+	}
+	dbDeploy := &database.Deploy{
+		ID:          1,
+		UserID:      123,
+		SvcName:     "svc-1",
+		ClusterID:   "cluster-1",
+		SecureLevel: types.EndpointPrivate,
+	}
+
+	repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "admin-user").Return(dbUser, nil)
+	repo.mocks.stores.DeployTaskMock().EXPECT().GetDeployByID(ctx, int64(1)).Return(dbDeploy, nil)
+
+	user, deploy, err := repo.CheckDeployPermissionForUser(ctx, types.DeployActReq{
+		CurrentUser: "admin-user",
+		DeployID:    1,
+	})
+	require.Error(t, err)
+	require.Nil(t, user)
+	require.Nil(t, deploy)
+}
+
+func TestCheckDeployPermissionForUser_PublicEndpoint_OwnerAllowed(t *testing.T) {
+	ctx := context.TODO()
+	repo := initializeTestRepoComponent(ctx, t)
+
+	dbUser := database.User{
+		ID:       123,
+		RoleMask: "",
+	}
+	dbDeploy := &database.Deploy{
+		ID:          1,
+		UserID:      123,
+		SvcName:     "svc-1",
+		ClusterID:   "cluster-1",
+		SecureLevel: types.EndpointPublic,
+	}
+
+	repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "owner-user").Return(dbUser, nil)
+	repo.mocks.stores.DeployTaskMock().EXPECT().GetDeployByID(ctx, int64(1)).Return(dbDeploy, nil)
+
+	user, deploy, err := repo.CheckDeployPermissionForUser(ctx, types.DeployActReq{
+		CurrentUser: "owner-user",
+		DeployID:    1,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, user)
+	require.NotNil(t, deploy)
+	require.Equal(t, int64(123), user.ID)
+}
+
+func TestCheckDeployPermissionForUser_PublicEndpoint_AdminAllowed(t *testing.T) {
+	ctx := context.TODO()
+	repo := initializeTestRepoComponent(ctx, t)
+
+	dbUser := database.User{
+		ID:       456,
+		RoleMask: "admin",
+	}
+	dbDeploy := &database.Deploy{
+		ID:          1,
+		UserID:      123,
+		SvcName:     "svc-1",
+		ClusterID:   "cluster-1",
+		SecureLevel: types.EndpointPublic,
+	}
+
+	repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "admin-user").Return(dbUser, nil)
+	repo.mocks.stores.DeployTaskMock().EXPECT().GetDeployByID(ctx, int64(1)).Return(dbDeploy, nil)
+
+	user, deploy, err := repo.CheckDeployPermissionForUser(ctx, types.DeployActReq{
+		CurrentUser: "admin-user",
+		DeployID:    1,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, user)
+	require.NotNil(t, deploy)
+}
+
+func TestCheckDeployPermissionForUser_PublicEndpoint_SameOrgAllowed(t *testing.T) {
+	ctx := context.TODO()
+	repo := initializeTestRepoComponent(ctx, t)
+	repo.orgStore = repo.mocks.stores.Org
+
+	dbUser := database.User{
+		ID:       456,
+		RoleMask: "",
+	}
+	dbDeploy := &database.Deploy{
+		ID:          1,
+		UserID:      123,
+		SvcName:     "svc-1",
+		ClusterID:   "cluster-1",
+		SecureLevel: types.EndpointPublic,
+	}
+
+	repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "org-member").Return(dbUser, nil)
+	repo.mocks.stores.DeployTaskMock().EXPECT().GetDeployByID(ctx, int64(1)).Return(dbDeploy, nil)
+	repo.mocks.stores.OrgMock().EXPECT().GetSharedOrgIDs(ctx, []int64{456, 123}).Return([]int64{10}, nil)
+
+	user, deploy, err := repo.CheckDeployPermissionForUser(ctx, types.DeployActReq{
+		CurrentUser: "org-member",
+		DeployID:    1,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, user)
+	require.NotNil(t, deploy)
+}
+
+func TestCheckDeployPermissionForUser_PublicEndpoint_DifferentOrgForbidden(t *testing.T) {
+	ctx := context.TODO()
+	repo := initializeTestRepoComponent(ctx, t)
+	repo.orgStore = repo.mocks.stores.Org
+
+	dbUser := database.User{
+		ID:       456,
+		RoleMask: "",
+	}
+	dbDeploy := &database.Deploy{
+		ID:          1,
+		UserID:      123,
+		SvcName:     "svc-1",
+		ClusterID:   "cluster-1",
+		SecureLevel: types.EndpointPublic,
+	}
+
+	repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "other-user").Return(dbUser, nil)
+	repo.mocks.stores.DeployTaskMock().EXPECT().GetDeployByID(ctx, int64(1)).Return(dbDeploy, nil)
+	repo.mocks.stores.OrgMock().EXPECT().GetSharedOrgIDs(ctx, []int64{456, 123}).Return([]int64{}, nil)
+
+	user, deploy, err := repo.CheckDeployPermissionForUser(ctx, types.DeployActReq{
+		CurrentUser: "other-user",
+		DeployID:    1,
+	})
+	require.Error(t, err)
+	require.Nil(t, user)
+	require.Nil(t, deploy)
 }
 
 func TestRepoComponent_DeployInstanceLastLogs_ServerlessType(t *testing.T) {
@@ -227,10 +463,11 @@ func TestRepoComponent_DeployInstanceLastLogs_ServerlessType(t *testing.T) {
 		RoleMask: "admin",
 	}
 	dbDeploy := &database.Deploy{
-		ID:        6,
-		UserID:    1,
-		SvcName:   "svc-6",
-		ClusterID: "cluster-6",
+		ID:           6,
+		UserID:       1,
+		SvcName:      "svc-6",
+		ClusterID:    "cluster-6",
+		SecureLevel:  types.EndpointPublic,
 	}
 
 	repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "admin-user").Return(dbUser, nil)
