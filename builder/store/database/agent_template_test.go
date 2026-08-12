@@ -148,6 +148,13 @@ func TestAgentTemplateStore_ListByUserUUID_WithPublicTemplates(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, templates, 2) // public template from user1 + private template from user2
 	require.Equal(t, 2, total)
+
+	// Anonymous callers receive public templates only.
+	templates, total, err = store.ListByUserUUID(ctx, "", types.AgentTemplateFilter{}, 10, 1)
+	require.NoError(t, err)
+	require.Len(t, templates, 1)
+	require.Equal(t, 1, total)
+	require.Equal(t, publicTemplate.ID, templates[0].ID)
 }
 
 func TestAgentTemplateStore_NotFound(t *testing.T) {

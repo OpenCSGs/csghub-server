@@ -42,6 +42,7 @@ type AgentInstance struct {
 	IsPinned    bool           `bun:",scanonly" json:"is_pinned"` // Whether the instance is pinned (from LEFT JOIN, scanonly means not used in INSERT/UPDATE)
 	PinnedAt    *time.Time     `bun:",scanonly" json:"pinned_at"` // When the instance was pinned (from LEFT JOIN)
 	Config      map[string]any `bun:",scanonly" json:"config"`    // Per-user config from agent_user_preferences (config-instance action)
+	IsShared    bool           `bun:",scanonly" json:"is_shared"` // Whether the instance has an agent_shares record (from EXISTS subquery)
 	times
 }
 
@@ -49,6 +50,7 @@ type AgentInstance struct {
 type AgentTemplateStore interface {
 	Create(ctx context.Context, template *AgentTemplate) (*AgentTemplate, error)
 	FindByID(ctx context.Context, id int64) (*AgentTemplate, error)
+	FindByTypeAndName(ctx context.Context, agentType, name string) ([]AgentTemplate, error)
 	ListByUserUUID(ctx context.Context, userUUID string, filter types.AgentTemplateFilter, per int, page int) ([]AgentTemplate, int, error)
 	Update(ctx context.Context, template *AgentTemplate) error
 	Delete(ctx context.Context, id int64) error
@@ -128,6 +130,17 @@ func (s *agentTemplateStoreImpl) FindByID(ctx context.Context, id int64) (*Agent
 		})
 	}
 	return template, nil
+}
+
+func (s *agentTemplateStoreImpl) FindByTypeAndName(ctx context.Context, agentType, name string) ([]AgentTemplate, error) {
+	var templates []AgentTemplate
+	err := s.db.Core.NewSelect().Model(&templates).
+		Where("type = ? AND name = ?", agentType, name).
+		Scan(ctx)
+	if err != nil {
+		return nil, errorx.HandleDBError(err, map[string]any{"agent_type": agentType, "name": name})
+	}
+	return templates, nil
 }
 
 func (s *agentTemplateStoreImpl) applyAgentTemplateFilters(query *bun.SelectQuery, filter types.AgentTemplateFilter) *bun.SelectQuery {
@@ -224,7 +237,13 @@ func (s *agentInstanceStoreImpl) Create(ctx context.Context, instance *AgentInst
 // FindByID retrieves an AgentInstance by its ID
 func (s *agentInstanceStoreImpl) FindByID(ctx context.Context, id int64) (*AgentInstance, error) {
 	instance := &AgentInstance{}
-	err := s.db.Core.NewSelect().Model(instance).Where("id = ?", id).Scan(ctx, instance)
+	err := s.db.Core.NewSelect().
+		TableExpr("agent_instances AS ai").
+		ColumnExpr("ai.*").
+		ColumnExpr("(EXISTS(SELECT 1 FROM agent_shares ash WHERE ash.instance_id = ai.id)) AS is_shared").
+		Where("ai.deleted_at IS NULL").
+		Where("ai.id = ?", id).
+		Scan(ctx, instance)
 	if err != nil {
 		return nil, errorx.HandleDBError(err, map[string]any{
 			"instance_id": id,
@@ -248,7 +267,14 @@ func (s *agentInstanceStoreImpl) FindByIDs(ctx context.Context, ids []int64) ([]
 // FindByContentID retrieves an AgentInstance by its content ID
 func (s *agentInstanceStoreImpl) FindByContentID(ctx context.Context, instanceType string, contentID string) (*AgentInstance, error) {
 	instance := &AgentInstance{}
-	err := s.db.Core.NewSelect().Model(instance).Where("type = ? AND content_id = ?", instanceType, contentID).Limit(1).Scan(ctx, instance)
+	err := s.db.Core.NewSelect().
+		TableExpr("agent_instances AS ai").
+		ColumnExpr("ai.*").
+		ColumnExpr("(EXISTS(SELECT 1 FROM agent_shares ash WHERE ash.instance_id = ai.id)) AS is_shared").
+		Where("ai.deleted_at IS NULL").
+		Where("ai.type = ? AND ai.content_id = ?", instanceType, contentID).
+		Limit(1).
+		Scan(ctx, instance)
 	if err != nil {
 		return nil, errorx.HandleDBError(err, map[string]any{
 			"instance_type": instanceType,
@@ -317,6 +343,7 @@ func (s *agentInstanceStoreImpl) ListByUserUUID(ctx context.Context, userUUID st
 		ColumnExpr("(pin_pref.id IS NOT NULL) AS is_pinned").
 		ColumnExpr("pin_pref.created_at AS pinned_at").
 		ColumnExpr("config_pref.value AS config").
+		ColumnExpr("(EXISTS(SELECT 1 FROM agent_shares ash WHERE ash.instance_id = ai.id)) AS is_shared").
 		Join(`
         LEFT JOIN agent_user_preferences pin_pref
           ON pin_pref.user_uuid = ?

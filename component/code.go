@@ -56,6 +56,7 @@ func NewCodeComponent(config *config.Config) (CodeComponent, error) {
 	}
 	c.codeStore = database.NewCodeStore()
 	c.repoStore = database.NewRepoStore()
+	c.templateStore = database.NewAgentTemplateStore()
 	c.recomStore = database.NewRecomStore()
 	gs, err := git.NewGitServer(config)
 	if err != nil {
@@ -81,6 +82,7 @@ type codeComponentImpl struct {
 	mirrorComponent MirrorComponent
 	codeStore       database.CodeStore
 	repoStore       database.RepoStore
+	templateStore   database.AgentTemplateStore
 	userLikesStore  database.UserLikesStore
 	gitServer       gitserver.GitServer
 	userSvcClient   rpc.UserSvcClient
@@ -342,6 +344,11 @@ func (c *codeComponentImpl) Update(ctx context.Context, req *types.UpdateCodeReq
 	if err != nil {
 		return nil, err
 	}
+	if req.Private != nil {
+		if err := c.syncAgentTemplateVisibility(ctx, dbRepo, !dbRepo.Private); err != nil {
+			return nil, err
+		}
+	}
 
 	code, err := c.codeStore.ByRepoID(ctx, dbRepo.ID)
 	if err != nil {
@@ -371,6 +378,23 @@ func (c *codeComponentImpl) Update(ctx context.Context, req *types.UpdateCodeReq
 	return resCode, nil
 }
 
+func (c *codeComponentImpl) syncAgentTemplateVisibility(ctx context.Context, repo *database.Repository, public bool) error {
+	templates, err := c.templateStore.FindByTypeAndName(ctx, "csgclaw", repo.Path)
+	if err != nil {
+		return fmt.Errorf("find csgclaw templates by name: %w", err)
+	}
+	for i := range templates {
+		if templates[i].Metadata["repo_path"] != repo.Path || templates[i].Public == public {
+			continue
+		}
+		templates[i].Public = public
+		if err := c.templateStore.Update(ctx, &templates[i]); err != nil {
+			return fmt.Errorf("update agent template visibility: %w", err)
+		}
+	}
+	return nil
+}
+
 func (c *codeComponentImpl) Delete(ctx context.Context, namespace, name, currentUser string) error {
 	code, err := c.codeStore.FindByPath(ctx, namespace, name)
 	if err != nil {
@@ -392,6 +416,9 @@ func (c *codeComponentImpl) Delete(ctx context.Context, namespace, name, current
 	if err != nil {
 		return fmt.Errorf("failed to delete database code, error: %w", err)
 	}
+	if err := c.deleteRepositoryManagedAgentTemplates(ctx, repo.Path); err != nil {
+		return err
+	}
 
 	go func() {
 		notificationCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -407,6 +434,22 @@ func (c *codeComponentImpl) Delete(ctx context.Context, namespace, name, current
 		}
 	}()
 
+	return nil
+}
+
+func (c *codeComponentImpl) deleteRepositoryManagedAgentTemplates(ctx context.Context, repoPath string) error {
+	templates, err := c.templateStore.FindByTypeAndName(ctx, "csgclaw", repoPath)
+	if err != nil {
+		return fmt.Errorf("find csgclaw templates by name: %w", err)
+	}
+	for i := range templates {
+		if templates[i].Metadata["repo_path"] != repoPath {
+			continue
+		}
+		if err := c.templateStore.Delete(ctx, templates[i].ID); err != nil {
+			return fmt.Errorf("delete repository-managed agent template: %w", err)
+		}
+	}
 	return nil
 }
 

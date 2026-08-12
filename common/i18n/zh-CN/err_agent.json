@@ -23,8 +23,26 @@
     "error.AGENT-ERR-15": {
         "other": "凭证验证失败"
     },
+    "error.AGENT-ERR-16": {
+        "other": "{{.instance_type}} 实例的部署元数据在创建后无法更新"
+    },
+    "error.AGENT-ERR-17": {
+        "other": "{{.template_type}} 智能体模板由代码仓库托管，不能通过 API 创建"
+    },
+    "error.AGENT-ERR-18": {
+        "other": "{{.instance_type}} 部署请求字段 {{.field}} 不能为 null"
+    },
+    "error.AGENT-ERR-19": {
+        "other": "{{.instance_type}} 部署请求字段 {{.field}} 类型无效"
+    },
     "error.AGENT-ERR-2": {
         "other": "您已存在相同名称的知识库: {{.knowledge_base_name}}"
+    },
+    "error.AGENT-ERR-20": {
+        "other": "{{.instance_type}} 部署请求字段 {{.field}} 不能为空"
+    },
+    "error.AGENT-ERR-21": {
+        "other": "llm 模型 {{.model}} 不适用于 {{.instance_type}}"
     },
     "error.AGENT-ERR-3": {
         "other": "您已存在相同名称的MCP服务器: {{.server_name}}"
