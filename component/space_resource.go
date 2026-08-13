@@ -165,6 +165,7 @@ func (c *spaceResourceComponentImpl) Index(ctx context.Context, req *types.Space
 				Type:                resourceType,
 				Scenarios:           scenarios,
 				AvailableStatusList: availableStatusList,
+				HardwareModel:       c.getHardwareModel(hardware),
 			})
 		}
 
@@ -211,6 +212,46 @@ func (c *spaceResourceComponentImpl) replicaSatisfiesConstraint(constraint *data
 		return true
 	}
 	return types.ReplicaSatisfiesConstraint(constraint.MaxReplica, replicas)
+}
+
+func (c *spaceResourceComponentImpl) getHardwareModel(hardware types.HardWare) types.HardwareModel {
+	// Determine the XPU processor (first non-empty Num field), same order as
+	// common.ResourceType / types.GetResXPUMode.
+	var xpuProc *types.Processor
+	switch {
+	case strings.TrimSpace(hardware.Gpu.Num) != "":
+		xpuProc = &hardware.Gpu
+	case strings.TrimSpace(hardware.Npu.Num) != "":
+		xpuProc = &hardware.Npu
+	case strings.TrimSpace(hardware.Gcu.Num) != "":
+		xpuProc = &hardware.Gcu
+	case strings.TrimSpace(hardware.Mlu.Num) != "":
+		xpuProc = &hardware.Mlu
+	case strings.TrimSpace(hardware.Dcu.Num) != "":
+		xpuProc = &hardware.Dcu
+	case strings.TrimSpace(hardware.GPGpu.Num) != "":
+		xpuProc = &hardware.GPGpu
+	case strings.TrimSpace(hardware.Tpu.Num) != "":
+		xpuProc = &hardware.Tpu
+	}
+
+	// No XPU configured → pure CPU.
+	if xpuProc == nil {
+		return types.HardwareModelCPU
+	}
+
+	// VXPU: virtual XPU has a ResourceMemName (e.g. volcano.sh/vgpu-memory).
+	if len(strings.TrimSpace(xpuProc.ResourceMemName)) > 0 {
+		return types.HardwareModelVXPU
+	}
+
+	// MIG: resource name starts with nvidia.com/mig- prefix.
+	if strings.HasPrefix(xpuProc.ResourceName, common.MIGResourcePrefix) {
+		return types.HardwareModelMIG
+	}
+
+	// Any other physical XPU.
+	return types.HardwareModelXPU
 }
 
 func (c *spaceResourceComponentImpl) Update(ctx context.Context, req *types.UpdateSpaceResourceReq) (*types.SpaceResource, error) {

@@ -266,6 +266,15 @@ var ResourceTypeValidator validator.Func = func(fl validator.FieldLevel) bool {
 	return ResourceTypeValid(ResourceType(fl.Field().String()))
 }
 
+type HardwareModel string
+
+const (
+	HardwareModelCPU  HardwareModel = "CPU"
+	HardwareModelXPU  HardwareModel = "XPU"
+	HardwareModelVXPU HardwareModel = "VXPU"
+	HardwareModelMIG  HardwareModel = "MIG"
+)
+
 type SpaceResource struct {
 	ID                  int64                     `json:"id"`
 	Name                string                    `json:"name"`
@@ -283,6 +292,7 @@ type SpaceResource struct {
 	AvailableStatusList []ResourceAvailableStatus `json:"available_status_list"`
 	PriceUndefined      bool                      `json:"price_undefined"`
 	Scenarios           []string                  `json:"scenarios"`
+	HardwareModel       HardwareModel             `json:"hardware_model"` // CPU, or XPU, VXPU, MIG
 }
 
 type CreateSpaceResourceReq struct {
