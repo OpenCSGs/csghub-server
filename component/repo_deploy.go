@@ -1024,26 +1024,18 @@ func (c *repoComponentImpl) DeployUpdate(ctx context.Context, updateReq types.De
 	}
 
 	if req.ClusterID != nil {
-		_, err = c.clusterInfoStore.ByClusterID(ctx, *req.ClusterID)
+		clusterHealthy, err := c.deployer.CheckClusterHealthy(ctx, *req.ClusterID)
 		if err != nil {
-			return fmt.Errorf("invalid cluster %v, %w", *req.ClusterID, err)
+			return errorx.ClusterUnavailable(err, errorx.Ctx().Set("cluster ID", *req.ClusterID))
+		}
+		if !clusterHealthy {
+			return errorx.ClusterUnavailable(fmt.Errorf("cluster is not healthy"),
+				errorx.Ctx().Set("cluster ID", *req.ClusterID))
 		}
 	}
 
-	// check service
-	deployRepo := types.DeployRequest{
-		DeployID:  updateReq.DeployID,
-		SpaceID:   deploy.SpaceID,
-		ModelID:   deploy.ModelID,
-		Namespace: updateReq.Namespace,
-		Name:      updateReq.Name,
-		SvcName:   deploy.SvcName,
-		ClusterID: deploy.ClusterID,
-	}
-	exist, err := c.deployer.Exist(ctx, deployRepo)
-	if err != nil {
-		return fmt.Errorf("check deploy exists, err: %w", err)
-	}
+	// check service status
+	exist := deploy.Status != deployStatus.Stopped && deploy.Status != deployStatus.Deleted
 
 	if needRestartDeploy(req) && exist {
 		// deploy instance is running
