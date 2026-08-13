@@ -23,8 +23,26 @@
     "error.AGENT-ERR-15": {
         "other": "Credential verification failed"
     },
+    "error.AGENT-ERR-16": {
+        "other": "{{.instance_type}} instance provisioning metadata cannot be updated after creation"
+    },
+    "error.AGENT-ERR-17": {
+        "other": "{{.template_type}} agent templates are managed by the code repository and cannot be created via the API"
+    },
+    "error.AGENT-ERR-18": {
+        "other": "{{.instance_type}} provision request field {{.field}} must not be null"
+    },
+    "error.AGENT-ERR-19": {
+        "other": "{{.instance_type}} provision request field {{.field}} has an invalid type"
+    },
     "error.AGENT-ERR-2": {
         "other": "You have a knowledge base with the same name: {{.knowledge_base_name}}"
+    },
+    "error.AGENT-ERR-20": {
+        "other": "{{.instance_type}} provision request field {{.field}} must not be empty"
+    },
+    "error.AGENT-ERR-21": {
+        "other": "llm model {{.model}} is not available for {{.instance_type}}"
     },
     "error.AGENT-ERR-3": {
         "other": "You have an MCP server with the same name: {{.server_name}}"

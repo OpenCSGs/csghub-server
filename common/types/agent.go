@@ -72,6 +72,7 @@ type AgentInstance struct {
 	IsRunning   bool            `json:"is_running"`                            // Whether the instance is running
 	BuiltIn     bool            `json:"built_in"`                              // Whether the instance is built-in
 	IsPinned    bool            `json:"is_pinned"`                             // Whether the instance is pinned by the user
+	IsShared    bool            `json:"is_shared"`                             // Whether the instance has been shared via agent_shares
 	Config      map[string]any  `json:"config,omitempty"`                      // Per-user instance configuration from user preferences
 	Metadata    *map[string]any `json:"metadata,omitempty"`                    // Instance metadata
 	Data        json.RawMessage `json:"-"`                                     // Request-only flow data; excluded from responses
@@ -265,6 +266,21 @@ type AgentSessionShareResponse struct {
 // AgentSessionShareTokenResponse represents the response for creating a share token.
 type AgentSessionShareTokenResponse struct {
 	Token string `json:"token"`
+}
+
+type AgentInstanceShareResponse struct {
+	ShareUUID string `json:"share_uuid"`
+	ShareName string `json:"share_name"`
+	Type      string `json:"type"`
+}
+
+type AgentSharedInstanceResponse struct {
+	ID                int64  `json:"id"`
+	InstanceID        int64  `json:"instance_id"`
+	Type              string `json:"type"`
+	Name              string `json:"name"`
+	Description       string `json:"description"`
+	SharedSandboxName string `json:"shared_sandbox_name"`
 }
 
 // AgentSharedSessionResponse represents the public shared session response.

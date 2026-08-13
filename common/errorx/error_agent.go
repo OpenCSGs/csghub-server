@@ -19,6 +19,12 @@ const (
 	credentialVerifyURLInvalid
 	credentialVerifyTokenInvalid
 	credentialVerifyFailed
+	instanceProvisioningMetadataImmutable
+	csgclawTemplateCreationForbidden
+	agentProvisionRequestFieldNull
+	agentProvisionRequestFieldType
+	agentProvisionRequestFieldEmpty
+	agentProvisionRequestModelUnavailable
 )
 
 var (
@@ -229,6 +235,84 @@ var (
 	//
 	// zh-HK: 憑證驗證失敗
 	ErrCredentialVerifyFailed error = CustomError{prefix: errAgentPrefix, code: credentialVerifyFailed}
+
+	// instance provisioning metadata is immutable after creation
+	//
+	// Description: Agent instance provisioning metadata cannot be updated after creation. Sandbox provisioning is fixed at instance creation and there is no live sandbox update path. The error message includes the agent instance type.
+	//
+	// Description_ZH: 智能体实例的部署元数据在创建后无法更新。沙箱部署在实例创建时确定，且没有实时沙箱更新路径。错误消息中包含智能体实例类型。
+	//
+	// en-US: {{.instance_type}} instance provisioning metadata cannot be updated after creation
+	//
+	// zh-CN: {{.instance_type}} 实例的部署元数据在创建后无法更新
+	//
+	// zh-HK: {{.instance_type}} 實例的部署元數據在創建後無法更新
+	ErrInstanceProvisioningMetadataImmutable error = CustomError{prefix: errAgentPrefix, code: instanceProvisioningMetadataImmutable}
+
+	// csgclaw agent template creation is forbidden via the API
+	//
+	// Description: csgclaw agent templates are managed by the code repository and cannot be created via the API. The error message includes the template type.
+	//
+	// Description_ZH: csgclaw 智能体模板由代码仓库托管，不能通过 API 创建。错误消息中包含模板类型。
+	//
+	// en-US: {{.template_type}} agent templates are managed by the code repository and cannot be created via the API
+	//
+	// zh-CN: {{.template_type}} 智能体模板由代码仓库托管，不能通过 API 创建
+	//
+	// zh-HK: {{.template_type}} 智能體模板由程式碼倉庫托管，不能通過 API 建立
+	ErrCSGClawTemplateCreationForbidden error = CustomError{prefix: errAgentPrefix, code: csgclawTemplateCreationForbidden}
+
+	// an agent provision request field is null but must not be
+	//
+	// Description: A field in the agent instance provision request metadata is null. The error message includes the agent instance type and the offending field.
+	//
+	// Description_ZH: 智能体实例部署请求元数据中的字段为 null。错误消息中包含智能体实例类型和出错的字段。
+	//
+	// en-US: {{.instance_type}} provision request field {{.field}} must not be null
+	//
+	// zh-CN: {{.instance_type}} 部署请求字段 {{.field}} 不能为 null
+	//
+	// zh-HK: {{.instance_type}} 部署請求欄位 {{.field}} 不能為 null
+	ErrAgentProvisionRequestFieldNull error = CustomError{prefix: errAgentPrefix, code: agentProvisionRequestFieldNull}
+
+	// an agent provision request field has an invalid type
+	//
+	// Description: A field in the agent instance provision request metadata has an invalid type. The error message includes the agent instance type and the offending field.
+	//
+	// Description_ZH: 智能体实例部署请求元数据中的字段类型无效。错误消息中包含智能体实例类型和出错的字段。
+	//
+	// en-US: {{.instance_type}} provision request field {{.field}} has an invalid type
+	//
+	// zh-CN: {{.instance_type}} 部署请求字段 {{.field}} 类型无效
+	//
+	// zh-HK: {{.instance_type}} 部署請求欄位 {{.field}} 類型無效
+	ErrAgentProvisionRequestFieldType error = CustomError{prefix: errAgentPrefix, code: agentProvisionRequestFieldType}
+
+	// an agent provision request field is empty but must not be
+	//
+	// Description: A field in the agent instance provision request metadata is empty. The error message includes the agent instance type and the offending field.
+	//
+	// Description_ZH: 智能体实例部署请求元数据中的字段为空。错误消息中包含智能体实例类型和出错的字段。
+	//
+	// en-US: {{.instance_type}} provision request field {{.field}} must not be empty
+	//
+	// zh-CN: {{.instance_type}} 部署请求字段 {{.field}} 不能为空
+	//
+	// zh-HK: {{.instance_type}} 部署請求欄位 {{.field}} 不能為空
+	ErrAgentProvisionRequestFieldEmpty error = CustomError{prefix: errAgentPrefix, code: agentProvisionRequestFieldEmpty}
+
+	// a pinned llm model is not available for the agent provision request
+	//
+	// Description: The model pinned in the agent instance provision request is not in the available llm model catalog. The error message includes the model name and the agent instance type.
+	//
+	// Description_ZH: 智能体实例部署请求中指定的模型不在可用 llm 模型目录中。错误消息中包含模型名称和智能体实例类型。
+	//
+	// en-US: llm model {{.model}} is not available for {{.instance_type}}
+	//
+	// zh-CN: llm 模型 {{.model}} 不适用于 {{.instance_type}}
+	//
+	// zh-HK: llm 模型 {{.model}} 不適用於 {{.instance_type}}
+	ErrAgentProvisionRequestModelUnavailable error = CustomError{prefix: errAgentPrefix, code: agentProvisionRequestModelUnavailable}
 )
 
 func InstanceQuotaExceeded(err error, ctx context) error {
@@ -350,5 +434,59 @@ func CredentialVerifyFailed(err error, ctx context) error {
 		context: ctx,
 		err:     err,
 		code:    int(credentialVerifyFailed),
+	}
+}
+
+func InstanceProvisioningMetadataImmutable(err error, ctx context) error {
+	return CustomError{
+		prefix:  errAgentPrefix,
+		context: ctx,
+		err:     err,
+		code:    int(instanceProvisioningMetadataImmutable),
+	}
+}
+
+func CSGClawTemplateCreationForbidden(err error, ctx context) error {
+	return CustomError{
+		prefix:  errAgentPrefix,
+		context: ctx,
+		err:     err,
+		code:    int(csgclawTemplateCreationForbidden),
+	}
+}
+
+func AgentProvisionRequestFieldNull(err error, ctx context) error {
+	return CustomError{
+		prefix:  errAgentPrefix,
+		context: ctx,
+		err:     err,
+		code:    int(agentProvisionRequestFieldNull),
+	}
+}
+
+func AgentProvisionRequestFieldType(err error, ctx context) error {
+	return CustomError{
+		prefix:  errAgentPrefix,
+		context: ctx,
+		err:     err,
+		code:    int(agentProvisionRequestFieldType),
+	}
+}
+
+func AgentProvisionRequestFieldEmpty(err error, ctx context) error {
+	return CustomError{
+		prefix:  errAgentPrefix,
+		context: ctx,
+		err:     err,
+		code:    int(agentProvisionRequestFieldEmpty),
+	}
+}
+
+func AgentProvisionRequestModelUnavailable(err error, ctx context) error {
+	return CustomError{
+		prefix:  errAgentPrefix,
+		context: ctx,
+		err:     err,
+		code:    int(agentProvisionRequestModelUnavailable),
 	}
 }

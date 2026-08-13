@@ -23,8 +23,26 @@
     "error.AGENT-ERR-15": {
         "other": "憑證驗證失敗"
     },
+    "error.AGENT-ERR-16": {
+        "other": "{{.instance_type}} 實例的部署元數據在創建後無法更新"
+    },
+    "error.AGENT-ERR-17": {
+        "other": "{{.template_type}} 智能體模板由程式碼倉庫托管，不能通過 API 建立"
+    },
+    "error.AGENT-ERR-18": {
+        "other": "{{.instance_type}} 部署請求欄位 {{.field}} 不能為 null"
+    },
+    "error.AGENT-ERR-19": {
+        "other": "{{.instance_type}} 部署請求欄位 {{.field}} 類型無效"
+    },
     "error.AGENT-ERR-2": {
         "other": "您已存在相同名稱的知識庫: {{.knowledge_base_name}}"
+    },
+    "error.AGENT-ERR-20": {
+        "other": "{{.instance_type}} 部署請求欄位 {{.field}} 不能為空"
+    },
+    "error.AGENT-ERR-21": {
+        "other": "llm 模型 {{.model}} 不適用於 {{.instance_type}}"
     },
     "error.AGENT-ERR-3": {
         "other": "您已存在相同名稱的MCP服務器: {{.server_name}}"

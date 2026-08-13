@@ -175,6 +175,32 @@ func TestCodeComponent_Update(t *testing.T) {
 
 }
 
+func TestCodeComponent_Update_SyncsRepositoryManagedTemplateVisibility(t *testing.T) {
+	ctx := context.TODO()
+	cc := initializeTestCodeComponent(ctx, t)
+	private := false
+	req := &types.UpdateCodeReq{UpdateRepoReq: types.UpdateRepoReq{
+		Namespace: "owner",
+		Name:      "agent",
+		RepoType:  types.CodeRepo,
+		Private:   &private,
+	}}
+	dbRepo := &database.Repository{ID: 1, UserID: 2, Path: "owner/agent", Name: "agent", Private: false}
+	cc.mocks.components.repo.EXPECT().UpdateRepo(ctx, req.UpdateRepoReq).Return(dbRepo, nil)
+	cc.mocks.stores.AgentTemplateMock().EXPECT().FindByTypeAndName(ctx, "csgclaw", "owner/agent").Return([]database.AgentTemplate{
+		{ID: 10, UserUUID: "owner-uuid", Public: false, Metadata: map[string]any{"repo_path": "owner/agent"}},
+		{ID: 11, UserUUID: "owner-uuid", Public: false, Metadata: map[string]any{"repo_path": "owner/other"}},
+	}, nil)
+	cc.mocks.stores.AgentTemplateMock().EXPECT().Update(ctx, mock.MatchedBy(func(template *database.AgentTemplate) bool {
+		return template.ID == 10 && template.Public
+	})).Return(nil)
+	cc.mocks.stores.CodeMock().EXPECT().ByRepoID(ctx, int64(1)).Return(&database.Code{ID: 1}, nil)
+	cc.mocks.stores.CodeMock().EXPECT().Update(ctx, database.Code{ID: 1}).Return(nil)
+
+	_, err := cc.Update(ctx, req)
+	require.NoError(t, err)
+}
+
 func TestCodeComponent_Delete(t *testing.T) {
 	ctx := context.TODO()
 	cc := initializeTestCodeComponent(ctx, t)
@@ -206,6 +232,10 @@ func TestCodeComponent_Delete(t *testing.T) {
 	}).Return(repo, nil)
 
 	cc.mocks.stores.CodeMock().EXPECT().Delete(ctx, *code).Return(nil)
+	cc.mocks.stores.AgentTemplateMock().EXPECT().FindByTypeAndName(ctx, "csgclaw", "ns/n").Return([]database.AgentTemplate{{
+		ID: 9, Type: "csgclaw", Metadata: map[string]any{"repo_path": "ns/n"},
+	}}, nil)
+	cc.mocks.stores.AgentTemplateMock().EXPECT().Delete(ctx, int64(9)).Return(nil)
 	var wg sync.WaitGroup
 	wg.Add(1)
 	cc.mocks.components.repo.EXPECT().

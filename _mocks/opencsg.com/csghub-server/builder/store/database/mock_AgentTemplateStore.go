@@ -189,6 +189,66 @@ func (_c *MockAgentTemplateStore_FindByID_Call) RunAndReturn(run func(context.Co
 	return _c
 }
 
+// FindByTypeAndName provides a mock function with given fields: ctx, agentType, name
+func (_m *MockAgentTemplateStore) FindByTypeAndName(ctx context.Context, agentType string, name string) ([]database.AgentTemplate, error) {
+	ret := _m.Called(ctx, agentType, name)
+
+	if len(ret) == 0 {
+		panic("no return value specified for FindByTypeAndName")
+	}
+
+	var r0 []database.AgentTemplate
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) ([]database.AgentTemplate, error)); ok {
+		return rf(ctx, agentType, name)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) []database.AgentTemplate); ok {
+		r0 = rf(ctx, agentType, name)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]database.AgentTemplate)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
+		r1 = rf(ctx, agentType, name)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAgentTemplateStore_FindByTypeAndName_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FindByTypeAndName'
+type MockAgentTemplateStore_FindByTypeAndName_Call struct {
+	*mock.Call
+}
+
+// FindByTypeAndName is a helper method to define mock.On call
+//   - ctx context.Context
+//   - agentType string
+//   - name string
+func (_e *MockAgentTemplateStore_Expecter) FindByTypeAndName(ctx interface{}, agentType interface{}, name interface{}) *MockAgentTemplateStore_FindByTypeAndName_Call {
+	return &MockAgentTemplateStore_FindByTypeAndName_Call{Call: _e.mock.On("FindByTypeAndName", ctx, agentType, name)}
+}
+
+func (_c *MockAgentTemplateStore_FindByTypeAndName_Call) Run(run func(ctx context.Context, agentType string, name string)) *MockAgentTemplateStore_FindByTypeAndName_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(string))
+	})
+	return _c
+}
+
+func (_c *MockAgentTemplateStore_FindByTypeAndName_Call) Return(_a0 []database.AgentTemplate, _a1 error) *MockAgentTemplateStore_FindByTypeAndName_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAgentTemplateStore_FindByTypeAndName_Call) RunAndReturn(run func(context.Context, string, string) ([]database.AgentTemplate, error)) *MockAgentTemplateStore_FindByTypeAndName_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ListByUserUUID provides a mock function with given fields: ctx, userUUID, filter, per, page
 func (_m *MockAgentTemplateStore) ListByUserUUID(ctx context.Context, userUUID string, filter types.AgentTemplateFilter, per int, page int) ([]database.AgentTemplate, int, error) {
 	ret := _m.Called(ctx, userUUID, filter, per, page)

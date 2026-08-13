@@ -23,6 +23,7 @@ import (
 type GitCallbackComponent interface {
 	SetRepoVisibility(yes bool)
 	WatchSpaceChange(ctx context.Context, req *types.GiteaCallbackPushReq) error
+	WatchAgentChange(ctx context.Context, req *types.GiteaCallbackPushReq) error
 	WatchRepoRelation(ctx context.Context, req *types.GiteaCallbackPushReq) error
 	GenSyncVersion(ctx context.Context, req *types.GiteaCallbackPushReq) error
 	SetRepoUpdateTime(ctx context.Context, req *types.GiteaCallbackPushReq) error
