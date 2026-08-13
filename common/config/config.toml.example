@@ -16,6 +16,7 @@ ssh_domain = "git@localhost:2222"
 [aigateway]
 responses_id_secret = "responses-id-secret"
 public_aigateway_url = "http://aigateway:8094/v1"
+metrics_collector_lookback_minutes = 60
 
 [mirror]
 url = "http://localhost:8085"
@@ -239,6 +240,7 @@ calc_recom_score_cron_expression = "0 1 * * *"
 mirror_cron_expression = "* * * * *"
 public_model_repo_cron_expression = "* * * * *"
 glama_crawl_cron_expression = "0 1 * * *"
+aigateway_metrics_collector_cron_expression = "* * * * *"
 
 [dataviewer]
 host = "http://localhost"

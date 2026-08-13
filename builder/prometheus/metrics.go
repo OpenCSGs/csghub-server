@@ -21,6 +21,13 @@ var (
 	AIGatewayUpstreamHealthLatency *prometheus.GaugeVec
 	// AIGateway chat upstream attempt count
 	AIGatewayChatUpstreamAttemptTotal *prometheus.CounterVec
+
+	// AIGateway request metrics (dashboard)
+	AIGatewayRequestTotal    *prometheus.CounterVec
+	AIGatewayRequestDuration *prometheus.HistogramVec
+	AIGatewayTTFT            *prometheus.HistogramVec
+	AIGatewayTokensTotal     *prometheus.CounterVec
+	AIGatewayActiveRequests  prometheus.Gauge
 )
 
 func InitMetrics() {
@@ -70,4 +77,52 @@ func InitMetrics() {
 		Name: "csghub_aigateway_chat_upstream_attempt_total",
 		Help: "Total number of AIGateway chat upstream attempts",
 	}, []string{"phase", "provider", "model_name", "status_class", "retryable"})
+
+	// AIGateway request total (dashboard KPI: total requests / success rate).
+	// Labels: model, provider, status_class (2xx/4xx/5xx), is_stream, error_type.
+	// error_type is empty for successful requests; for failures it identifies
+	// the error category (e.g. "rate_limit", "timeout", "upstream_error").
+	AIGatewayRequestTotal = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "csghub_aigateway_request_total",
+		Help: "Total number of AIGateway requests",
+	}, []string{"model", "provider", "status_class", "is_stream", "error_type"})
+
+	// AIGateway request duration in milliseconds (dashboard: total latency P50/P90).
+	// Labels: model, provider, is_stream.
+	// Buckets are chosen with extra density in the 500–5000 ms range where most
+	// inference requests land, so histogram_quantile() produces accurate P50/P90
+	// values.  Long-tail buckets (2m–1h) cover slow batch/long-generation requests.
+	AIGatewayRequestDuration = promauto.NewHistogramVec(prometheus.HistogramOpts{
+		Name:    "csghub_aigateway_request_duration_ms",
+		Help:    "AIGateway request total latency in milliseconds",
+		Buckets: []float64{
+			50, 100, 200, 300, 500, 750, 1000, 1500, 2000, 3000, 5000, 10000, 30000, 60000,
+			120000, 300000, 600000, 1200000, 1800000, 3600000, // 2m, 5m, 10m, 20m, 30m, 1h
+		},
+	}, []string{"model", "provider", "is_stream"})
+
+	// AIGateway TTFT (time to first token) in milliseconds (dashboard: TTFT P50/P90).
+	// Labels: model, provider, is_stream.
+	// TTFT is more latency-sensitive than total duration, so extra density is
+	// added in the 600–4000 ms range where streaming first-token typically lands.
+	AIGatewayTTFT = promauto.NewHistogramVec(prometheus.HistogramOpts{
+		Name:    "csghub_aigateway_ttft_ms",
+		Help:    "AIGateway time to first token in milliseconds (streaming only)",
+		Buckets: []float64{
+			50, 100, 200, 300, 500, 600, 700, 800, 900, 1000, 1200, 1500, 2000, 2500, 3000, 4000, 5000, 10000, 30000, 60000,
+		},
+	}, []string{"model", "provider", "is_stream"})
+
+	// AIGateway token consumption (dashboard: total token usage).
+	// Labels: model, provider, token_type (prompt/completion/cached/cache_creation).
+	AIGatewayTokensTotal = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "csghub_aigateway_tokens_total",
+		Help: "Total AIGateway token consumption",
+	}, []string{"model", "provider", "token_type"})
+
+	// AIGateway active requests (dashboard: real-time concurrency).
+	AIGatewayActiveRequests = promauto.NewGauge(prometheus.GaugeOpts{
+		Name: "csghub_aigateway_active_requests",
+		Help: "Number of active AIGateway requests being processed",
+	})
 }

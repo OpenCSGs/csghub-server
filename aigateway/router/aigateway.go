@@ -70,29 +70,34 @@ func NewRouter(config *config.Config) (*gin.Engine, func(), error) {
 		return nil, nil, fmt.Errorf("error creating openai handler :%w", err)
 	}
 
+	// Metrics middleware: manages request lifecycle metrics for inference
+	// routes.  Each route opts in by including metricsMw in its handler chain.
+	// Returns a no-op handler + cleanup when the metrics feature is not
+	// compiled in (ce build).
+	metricsMw, metricsCleanup := newMetricsMiddleware(config)
+
 	v1Group.GET("/models", openAIhandler.ListModels)
 	v1Group.GET("/models/*model", openAIhandler.GetModel)
-	v1Group.POST("/responses", middlewareCollection.Auth.MustUserOrgApiKey, openAIhandler.Responses)
-	v1Group.POST("/chat/completions", middlewareCollection.Auth.MustUserOrgApiKey, openAIhandler.Chat)
-	v1Group.POST("/embeddings", middlewareCollection.Auth.MustUserOrgApiKey, openAIhandler.Embedding)
-	v1Group.POST("/rerank", middlewareCollection.Auth.MustUserOrgApiKey, openAIhandler.Rerank)
-	v1Group.POST("/images/generations", middlewareCollection.Auth.MustUserOrgApiKey, modalAPIRateLimiter, openAIhandler.GenerateImage)
-	v1Group.POST("/images/edits", middlewareCollection.Auth.MustUserOrgApiKey, modalAPIRateLimiter, openAIhandler.EditImage)
-	v1Group.POST("/audio/transcriptions", middlewareCollection.Auth.MustUserOrgApiKey, openAIhandler.Transcription)
-	v1Group.POST("/audio/translations", middlewareCollection.Auth.MustUserOrgApiKey, openAIhandler.Translation)
-	v1Group.POST("/audio/speech", middlewareCollection.Auth.MustUserOrgApiKey, modalAPIRateLimiter, openAIhandler.Speech)
-	v1Group.POST("/audio/speech/batch", middlewareCollection.Auth.MustUserOrgApiKey, modalAPIRateLimiter, openAIhandler.SpeechBatch)
+	v1Group.POST("/responses", middlewareCollection.Auth.MustUserOrgApiKey, metricsMw, openAIhandler.Responses)
+	v1Group.POST("/chat/completions", middlewareCollection.Auth.MustUserOrgApiKey, metricsMw, openAIhandler.Chat)
+	v1Group.POST("/embeddings", middlewareCollection.Auth.MustUserOrgApiKey, metricsMw, openAIhandler.Embedding)
+	v1Group.POST("/rerank", middlewareCollection.Auth.MustUserOrgApiKey, metricsMw, openAIhandler.Rerank)
+	v1Group.POST("/images/generations", middlewareCollection.Auth.MustUserOrgApiKey, metricsMw, modalAPIRateLimiter, openAIhandler.GenerateImage)
+	v1Group.POST("/images/edits", middlewareCollection.Auth.MustUserOrgApiKey, metricsMw, modalAPIRateLimiter, openAIhandler.EditImage)
+	v1Group.POST("/audio/transcriptions", middlewareCollection.Auth.MustUserOrgApiKey, metricsMw, openAIhandler.Transcription)
+	v1Group.POST("/audio/speech", middlewareCollection.Auth.MustUserOrgApiKey, metricsMw, modalAPIRateLimiter, openAIhandler.Speech)
+	v1Group.POST("/audio/speech/batch", middlewareCollection.Auth.MustUserOrgApiKey, metricsMw, modalAPIRateLimiter, openAIhandler.SpeechBatch)
 	v1Group.GET("/audio/voices", middlewareCollection.Auth.MustUserOrgApiKey, modalAPIRateLimiter, openAIhandler.ListVoices)
 	v1Group.POST("/audio/voices", middlewareCollection.Auth.MustUserOrgApiKey, modalAPIRateLimiter, openAIhandler.UploadVoice)
 	v1Group.PUT("/audio/voices", middlewareCollection.Auth.MustUserOrgApiKey, modalAPIRateLimiter, openAIhandler.UpdateVoice)
 	v1Group.DELETE("/audio/voices/:name", middlewareCollection.Auth.MustUserOrgApiKey, modalAPIRateLimiter, openAIhandler.DeleteVoice)
-	v1Group.POST("/videos", middlewareCollection.Auth.MustUserOrgApiKey, modalAPIRateLimiter, openAIhandler.CreateVideoDeprecated)
-	v1Group.GET("/videos/:video_id", middlewareCollection.Auth.MustUserOrgApiKey, openAIhandler.GetVideoDeprecated)
-	v1Group.GET("/videos/:video_id/content", middlewareCollection.Auth.MustUserOrgApiKey, modalAPIRateLimiter, openAIhandler.GetVideoContentDeprecated)
-	v1Group.POST("/video/generations", middlewareCollection.Auth.MustUserOrgApiKey, modalAPIRateLimiter, openAIhandler.CreateVideo)
-	v1Group.GET("/video/generations/:video_id", middlewareCollection.Auth.MustUserOrgApiKey, openAIhandler.GetVideo)
-	v1Group.GET("/video/generations/:video_id/content", middlewareCollection.Auth.MustUserOrgApiKey, modalAPIRateLimiter, openAIhandler.GetVideoContent)
-	v1Group.POST("/ocr", middlewareCollection.Auth.MustUserOrgApiKey, modalAPIRateLimiter, openAIhandler.OCR)
+	v1Group.POST("/videos", middlewareCollection.Auth.MustUserOrgApiKey, metricsMw, modalAPIRateLimiter, openAIhandler.CreateVideoDeprecated)
+	v1Group.GET("/videos/:video_id", middlewareCollection.Auth.MustUserOrgApiKey, metricsMw, openAIhandler.GetVideoDeprecated)
+	v1Group.GET("/videos/:video_id/content", middlewareCollection.Auth.MustUserOrgApiKey, metricsMw, modalAPIRateLimiter, openAIhandler.GetVideoContentDeprecated)
+	v1Group.POST("/video/generations", middlewareCollection.Auth.MustUserOrgApiKey, metricsMw, modalAPIRateLimiter, openAIhandler.CreateVideo)
+	v1Group.GET("/video/generations/:video_id", middlewareCollection.Auth.MustUserOrgApiKey, metricsMw, openAIhandler.GetVideo)
+	v1Group.GET("/video/generations/:video_id/content", middlewareCollection.Auth.MustUserOrgApiKey, metricsMw, modalAPIRateLimiter, openAIhandler.GetVideoContent)
+	v1Group.POST("/ocr", middlewareCollection.Auth.MustUserOrgApiKey, metricsMw, modalAPIRateLimiter, openAIhandler.OCR)
 
 	apiV1Group := r.Group("/api/v1")
 	adminGroup := apiV1Group.Group("/admin", middlewareCollection.Auth.NeedAdmin)
@@ -107,6 +112,7 @@ func NewRouter(config *config.Config) (*gin.Engine, func(), error) {
 	if err != nil {
 		return nil, nil, fmt.Errorf("error creating extended routes :%w", err)
 	}
+	cleanup = combineCleanup(cleanup, metricsCleanup)
 	cleanup = combineCleanup(cleanup, func() {
 		_ = openAIhandler.Shutdown(context.Background())
 	})
