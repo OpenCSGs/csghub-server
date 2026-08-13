@@ -64,5 +64,8 @@
     },
     "error.AGENT-ERR-9": {
         "other": "定时任务开始时间已过去，一次性任务请使用未来的日期/时间"
+    },
+    "error.AGENT-ERR-22": {
+        "other": "仓库路径 {{.repo_path}} 未找到对应的 csgclaw 模板"
     }
 }
