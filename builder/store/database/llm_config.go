@@ -126,7 +126,6 @@ func (s *lLMConfigStoreImpl) GetOptimization(ctx context.Context) (*LLMConfig, e
 	if err != nil {
 		return nil, fmt.Errorf("select optimization llm, %w", err)
 	}
-	config.populateDerivedFields()
 	return &config, nil
 }
 
@@ -136,7 +135,6 @@ func (s *lLMConfigStoreImpl) GetModelForSummaryReadme(ctx context.Context) (*LLM
 	if err != nil {
 		return nil, fmt.Errorf("select llm for summary readme, %w", err)
 	}
-	config.populateDerivedFields()
 	return &config, nil
 }
 
@@ -146,7 +144,6 @@ func (s *lLMConfigStoreImpl) GetByType(ctx context.Context, llmType int) (*LLMCo
 	if err != nil {
 		return nil, fmt.Errorf("select llm by type %d, %w", llmType, err)
 	}
-	config.populateDerivedFields()
 	return &config, nil
 }
 
@@ -190,10 +187,6 @@ func (s *lLMConfigStoreImpl) Index(ctx context.Context, per, page int, search *t
 	if err != nil {
 		return nil, 0, err
 	}
-
-	for _, cfg := range configs {
-		cfg.populateDerivedFields()
-	}
 	return configs, total, nil
 }
 
@@ -211,10 +204,6 @@ func (s *lLMConfigStoreImpl) IndexWithRepo(ctx context.Context, per, page int, s
 	if err != nil {
 		return nil, 0, err
 	}
-
-	for _, cfg := range configs {
-		cfg.populateDerivedFields()
-	}
 	return configs, total, nil
 }
 func (s *lLMConfigStoreImpl) GetByModelName(ctx context.Context, modelName string) (*LLMConfig, error) {
@@ -223,7 +212,6 @@ func (s *lLMConfigStoreImpl) GetByModelName(ctx context.Context, modelName strin
 	if err != nil {
 		return nil, fmt.Errorf("select llm config by model_name %s: %w", modelName, err)
 	}
-	config.populateDerivedFields()
 	return &config, nil
 }
 
@@ -233,7 +221,6 @@ func (s *lLMConfigStoreImpl) GetByID(ctx context.Context, id int64) (*LLMConfig,
 	if err != nil {
 		return nil, fmt.Errorf("select llm config by id %d, %w", id, err)
 	}
-	config.populateDerivedFields()
 	return &config, nil
 }
 
@@ -281,10 +268,13 @@ func applyLLMConfigSort(q *bun.SelectQuery, sortBy, sortOrder string) {
 	q.OrderExpr(column + " " + direction)
 }
 
-// populateDerivedFields fills ApiEndpoint, AuthHeader, Provider from the best available upstream.
+// PopulateDerivedFields fills ApiEndpoint, AuthHeader, Provider, and ModelName from the best available upstream.
 // Prefers healthy enabled upstreams; falls back to the first enabled upstream.
 // If no upstream is available at all, uses upstream[0] and logs a warning.
-func (c *LLMConfig) populateDerivedFields() {
+// Callers that use the LLMConfig to make llm.NewClient() requests should call this
+// method after querying from DB to ensure the derived fields are populated from the
+// best available upstream.
+func (c *LLMConfig) PopulateDerivedFields() {
 	if len(c.Upstreams) == 0 {
 		return
 	}
@@ -294,6 +284,7 @@ func (c *LLMConfig) populateDerivedFields() {
 			c.ApiEndpoint = u.URL
 			c.AuthHeader = u.AuthHeader
 			c.Provider = u.Provider
+			c.applyUpstreamModelName(u)
 			return
 		}
 	}
@@ -303,6 +294,7 @@ func (c *LLMConfig) populateDerivedFields() {
 			c.ApiEndpoint = u.URL
 			c.AuthHeader = u.AuthHeader
 			c.Provider = u.Provider
+			c.applyUpstreamModelName(u)
 			slog.Warn("no healthy upstream available, using first enabled upstream",
 				"model_name", c.ModelName, "upstream_id", u.ID, "url", u.URL)
 			return
@@ -313,20 +305,31 @@ func (c *LLMConfig) populateDerivedFields() {
 	c.ApiEndpoint = u.URL
 	c.AuthHeader = u.AuthHeader
 	c.Provider = u.Provider
+	c.applyUpstreamModelName(u)
 	slog.Error("no enabled upstream available, using upstream[0]",
 		"model_name", c.ModelName, "upstream_id", u.ID, "url", u.URL)
 }
 
+// applyUpstreamModelName overrides the LLMConfig ModelName with the upstream's
+// ModelName when the upstream defines one. This ensures that requests are sent
+// with the model name expected by the upstream endpoint.
+func (c *LLMConfig) applyUpstreamModelName(u Upstream) {
+	if u.ModelName != "" {
+		c.ModelName = u.ModelName
+	}
+}
+
 // isHealthy checks whether this upstream has a healthy health state.
+// An upstream is considered healthy if it is not explicitly marked unhealthy.
 func (u *Upstream) isHealthy() bool {
 	if u.HealthState == nil {
 		return true // no health state yet, assume healthy
 	}
-	return u.HealthState.HealthState == "healthy"
+	return u.HealthState.HealthState != "unhealthy"
 }
 
 // PrimaryEndpoint returns the URL of the best available upstream.
-// Call populateDerivedFields() first after querying from DB.
+// Call PopulateDerivedFields() first after querying from DB.
 func (c *LLMConfig) PrimaryEndpoint() string {
 	return c.ApiEndpoint
 }

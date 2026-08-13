@@ -5,6 +5,9 @@ package llm
 import (
 	context "context"
 
+	llm "opencsg.com/csghub-server/builder/llm"
+	database "opencsg.com/csghub-server/builder/store/database"
+
 	mock "github.com/stretchr/testify/mock"
 
 	types "opencsg.com/csghub-server/common/types"
@@ -263,6 +266,54 @@ func (_c *MockLLMSvcClient_Tokenize_Call) Return(_a0 []byte, _a1 error) *MockLLM
 }
 
 func (_c *MockLLMSvcClient_Tokenize_Call) RunAndReturn(run func(context.Context, string, string, interface{}) ([]byte, error)) *MockLLMSvcClient_Tokenize_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// WithLLMConfig provides a mock function with given fields: llmConfig
+func (_m *MockLLMSvcClient) WithLLMConfig(llmConfig *database.LLMConfig) llm.LLMSvcClient {
+	ret := _m.Called(llmConfig)
+
+	if len(ret) == 0 {
+		panic("no return value specified for WithLLMConfig")
+	}
+
+	var r0 llm.LLMSvcClient
+	if rf, ok := ret.Get(0).(func(*database.LLMConfig) llm.LLMSvcClient); ok {
+		r0 = rf(llmConfig)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(llm.LLMSvcClient)
+		}
+	}
+
+	return r0
+}
+
+// MockLLMSvcClient_WithLLMConfig_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'WithLLMConfig'
+type MockLLMSvcClient_WithLLMConfig_Call struct {
+	*mock.Call
+}
+
+// WithLLMConfig is a helper method to define mock.On call
+//   - llmConfig *database.LLMConfig
+func (_e *MockLLMSvcClient_Expecter) WithLLMConfig(llmConfig interface{}) *MockLLMSvcClient_WithLLMConfig_Call {
+	return &MockLLMSvcClient_WithLLMConfig_Call{Call: _e.mock.On("WithLLMConfig", llmConfig)}
+}
+
+func (_c *MockLLMSvcClient_WithLLMConfig_Call) Run(run func(llmConfig *database.LLMConfig)) *MockLLMSvcClient_WithLLMConfig_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(*database.LLMConfig))
+	})
+	return _c
+}
+
+func (_c *MockLLMSvcClient_WithLLMConfig_Call) Return(_a0 llm.LLMSvcClient) *MockLLMSvcClient_WithLLMConfig_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockLLMSvcClient_WithLLMConfig_Call) RunAndReturn(run func(*database.LLMConfig) llm.LLMSvcClient) *MockLLMSvcClient_WithLLMConfig_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/types"
 )
 
@@ -461,5 +462,195 @@ func TestClient_readToChannel(t *testing.T) {
 			lines = append(lines, msg)
 		}
 		assert.Empty(t, lines)
+	})
+}
+
+func TestClient_WithLLMConfig(t *testing.T) {
+	t.Run("chat uses llmConfig endpoint headers and model", func(t *testing.T) {
+		mockDoer := new(mockHttpDoer)
+		c := &Client{client: mockDoer}
+
+		llmConfig := &database.LLMConfig{
+			ModelName:   "upstream-model",
+			ApiEndpoint: "http://upstream.example.com/chat",
+			AuthHeader:  `{"Authorization":"Bearer token123"}`,
+			Upstreams: []database.Upstream{
+				{
+					URL:        "http://upstream.example.com/chat",
+					Enabled:    true,
+					ModelName:  "upstream-model",
+					AuthHeader: `{"Authorization":"Bearer token123"}`,
+					Provider:   "test-provider",
+				},
+			},
+		}
+
+		chatResp := types.ChatCompletion{
+			ID: "chatcmpl-456",
+			Choices: []types.Choice{
+				{
+					Index: 0,
+					Message: types.Message{
+						Role:    "assistant",
+						Content: "Response from upstream",
+					},
+				},
+			},
+		}
+		data, _ := json.Marshal(chatResp)
+		resp := &http.Response{
+			StatusCode: http.StatusOK,
+			Body:       io.NopCloser(strings.NewReader(string(data))),
+		}
+
+		var capturedReq *http.Request
+		mockDoer.On("Do", mock.MatchedBy(func(req *http.Request) bool {
+			capturedReq = req
+			return true
+		})).Return(resp, nil).Once()
+
+		result, err := c.WithLLMConfig(llmConfig).Chat(context.Background(), "http://should-be-overridden", "", nil, types.LLMReqBody{
+			Messages: []types.LLMMessage{
+				{Role: "user", Content: "hello"},
+			},
+		})
+		require.NoError(t, err)
+		assert.Equal(t, "Response from upstream", result)
+
+		// Verify the request used the upstream endpoint
+		assert.Equal(t, "http://upstream.example.com/chat", capturedReq.URL.String())
+		// Verify the request used the upstream auth header
+		assert.Equal(t, "Bearer token123", capturedReq.Header.Get("Authorization"))
+
+		// Verify the original client was not modified (WithLLMConfig creates a new client)
+		assert.Nil(t, c.llmConfig)
+	})
+
+	t.Run("chat without llmConfig uses explicit params", func(t *testing.T) {
+		mockDoer := new(mockHttpDoer)
+		c := &Client{client: mockDoer}
+
+		chatResp := types.ChatCompletion{
+			ID: "chatcmpl-789",
+			Choices: []types.Choice{
+				{
+					Index: 0,
+					Message: types.Message{
+						Role:    "assistant",
+						Content: "Normal response",
+					},
+				},
+			},
+		}
+		data, _ := json.Marshal(chatResp)
+		resp := &http.Response{
+			StatusCode: http.StatusOK,
+			Body:       io.NopCloser(strings.NewReader(string(data))),
+		}
+
+		var capturedReq *http.Request
+		mockDoer.On("Do", mock.MatchedBy(func(req *http.Request) bool {
+			capturedReq = req
+			return true
+		})).Return(resp, nil).Once()
+
+		headers := map[string]string{"X-Custom": "val"}
+		result, err := c.Chat(context.Background(), "http://explicit.example.com", "", headers, types.LLMReqBody{
+			Model: "explicit-model",
+			Messages: []types.LLMMessage{
+				{Role: "user", Content: "hi"},
+			},
+		})
+		require.NoError(t, err)
+		assert.Equal(t, "Normal response", result)
+		assert.Equal(t, "http://explicit.example.com", capturedReq.URL.String())
+		assert.Equal(t, "val", capturedReq.Header.Get("X-Custom"))
+	})
+
+	t.Run("WithLLMConfig does not mutate original client", func(t *testing.T) {
+		mockDoer := new(mockHttpDoer)
+		c := &Client{client: mockDoer}
+
+		llmConfig := &database.LLMConfig{
+			ModelName:   "upstream-model",
+			ApiEndpoint: "http://upstream.example.com/chat",
+			AuthHeader:  `{"Authorization":"Bearer token"}`,
+			Upstreams: []database.Upstream{
+				{
+					URL:        "http://upstream.example.com/chat",
+					Enabled:    true,
+					ModelName:  "upstream-model",
+					AuthHeader: `{"Authorization":"Bearer token"}`,
+				},
+			},
+		}
+
+		// WithLLMConfig should return a new client, not modify the original
+		configured := c.WithLLMConfig(llmConfig)
+		assert.Nil(t, c.llmConfig, "original client should not have llmConfig set")
+
+		// First call with WithLLMConfig
+		chatResp1 := types.ChatCompletion{
+			Choices: []types.Choice{
+				{Index: 0, Message: types.Message{Role: "assistant", Content: "first"}},
+			},
+		}
+		data1, _ := json.Marshal(chatResp1)
+		resp1 := &http.Response{
+			StatusCode: http.StatusOK,
+			Body:       io.NopCloser(strings.NewReader(string(data1))),
+		}
+		mockDoer.On("Do", mock.Anything).Return(resp1, nil).Once()
+
+		_, err := configured.Chat(context.Background(), "", "", nil, types.LLMReqBody{
+			Messages: []types.LLMMessage{{Role: "user", Content: "first"}},
+		})
+		require.NoError(t, err)
+
+		// Second call without WithLLMConfig on the original client should use explicit params
+		chatResp2 := types.ChatCompletion{
+			Choices: []types.Choice{
+				{Index: 0, Message: types.Message{Role: "assistant", Content: "second"}},
+			},
+		}
+		data2, _ := json.Marshal(chatResp2)
+		resp2 := &http.Response{
+			StatusCode: http.StatusOK,
+			Body:       io.NopCloser(strings.NewReader(string(data2))),
+		}
+
+		var capturedReq *http.Request
+		mockDoer.On("Do", mock.MatchedBy(func(req *http.Request) bool {
+			capturedReq = req
+			return true
+		})).Return(resp2, nil).Once()
+
+		_, err = c.Chat(context.Background(), "http://explicit.example.com", "", nil, types.LLMReqBody{
+			Messages: []types.LLMMessage{{Role: "user", Content: "second"}},
+		})
+		require.NoError(t, err)
+		assert.Equal(t, "http://explicit.example.com", capturedReq.URL.String())
+	})
+
+	t.Run("with nil llmConfig is no-op", func(t *testing.T) {
+		mockDoer := new(mockHttpDoer)
+		c := &Client{client: mockDoer}
+
+		chatResp := types.ChatCompletion{
+			Choices: []types.Choice{
+				{Index: 0, Message: types.Message{Role: "assistant", Content: "ok"}},
+			},
+		}
+		data, _ := json.Marshal(chatResp)
+		resp := &http.Response{
+			StatusCode: http.StatusOK,
+			Body:       io.NopCloser(strings.NewReader(string(data))),
+		}
+		mockDoer.On("Do", mock.Anything).Return(resp, nil).Once()
+
+		_, err := c.WithLLMConfig(nil).Chat(context.Background(), "http://explicit.example.com", "", nil, types.LLMReqBody{
+			Messages: []types.LLMMessage{{Role: "user", Content: "hi"}},
+		})
+		require.NoError(t, err)
 	})
 }
