@@ -1,0 +1,23 @@
+# Generic vLLM Ascend 0.25.1 RC image for Atlas A2/910B.
+# The build can override this tag when upgrading the runtime.
+ARG VLLM_ASCEND_IMAGE=quay.io/ascend/vllm-ascend:nightly-releases-v0.25.1rc
+FROM ${VLLM_ASCEND_IMAGE}
+
+RUN python3 -m pip config set global.index-url https://mirrors.aliyun.com/pypi/simple && \
+    python3 -m pip install --no-cache-dir csghub-sdk==0.7.3 supervisor
+
+RUN mkdir -p /var/log/supervisord
+COPY ./supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+COPY ./vllm/ /etc/csghub/
+RUN chmod +x /etc/csghub/*.sh
+
+WORKDIR /workspace/
+ENV HUGGINGFACE_HUB_CACHE=/workspace/ \
+    HF_HUB_ENABLE_HF_TRANSFER=0
+
+EXPOSE 8000
+
+# The 0.25.1 RC base image has no /usr/local/bin/entrypoint.sh. Reset any
+# inherited entrypoint and let Kubernetes override CMD when needed.
+ENTRYPOINT []
+CMD ["/usr/local/python3.12.13/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
