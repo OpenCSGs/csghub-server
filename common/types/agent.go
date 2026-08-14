@@ -280,6 +280,7 @@ type AgentSharedInstanceResponse struct {
 	Type              string `json:"type"`
 	Name              string `json:"name"`
 	Description       string `json:"description"`
+	AgentName         string `json:"agent_name"`
 	SharedSandboxName string `json:"shared_sandbox_name"`
 }
 

@@ -64,5 +64,8 @@
     },
     "error.AGENT-ERR-9": {
         "other": "Scheduler start time is in the past; use a future date/time for one-time schedules"
+    },
+    "error.AGENT-ERR-22": {
+        "other": "csgclaw template not found for repository path {{.repo_path}}"
     }
 }

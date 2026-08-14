@@ -25,6 +25,7 @@ const (
 	agentProvisionRequestFieldType
 	agentProvisionRequestFieldEmpty
 	agentProvisionRequestModelUnavailable
+	csgclawTemplateNotFound
 )
 
 var (
@@ -313,6 +314,19 @@ var (
 	//
 	// zh-HK: llm 模型 {{.model}} 不適用於 {{.instance_type}}
 	ErrAgentProvisionRequestModelUnavailable error = CustomError{prefix: errAgentPrefix, code: agentProvisionRequestModelUnavailable}
+
+	// csgclaw agent template not found for the repository path
+	//
+	// Description: No csgclaw agent template matches the repository path in the instance provision request.
+	//
+	// Description_ZH: 未找到与实例部署请求中的仓库路径匹配的 csgclaw 智能体模板。
+	//
+	// en-US: csgclaw template not found for repository path {{.repo_path}}
+	//
+	// zh-CN: 仓库路径 {{.repo_path}} 未找到对应的 csgclaw 模板
+	//
+	// zh-HK: 倉庫路徑 {{.repo_path}} 未找到對應的 csgclaw 模板
+	ErrCSGClawTemplateNotFound error = CustomError{prefix: errAgentPrefix, code: csgclawTemplateNotFound}
 )
 
 func InstanceQuotaExceeded(err error, ctx context) error {
@@ -488,5 +502,14 @@ func AgentProvisionRequestModelUnavailable(err error, ctx context) error {
 		context: ctx,
 		err:     err,
 		code:    int(agentProvisionRequestModelUnavailable),
+	}
+}
+
+func CSGClawTemplateNotFound(err error, ctx context) error {
+	return CustomError{
+		prefix:  errAgentPrefix,
+		context: ctx,
+		err:     err,
+		code:    int(csgclawTemplateNotFound),
 	}
 }

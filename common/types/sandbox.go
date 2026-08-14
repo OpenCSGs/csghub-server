@@ -15,17 +15,25 @@ type SandboxVolume struct {
 	ReadOnly            bool   `json:"read_only"`
 }
 
+type SandboxReadinessProbe struct {
+	Protocol            string `json:"protocol,omitempty"`
+	Path                string `json:"path,omitempty"`
+	Port                int    `json:"port,omitempty"`
+	InitialDelaySeconds int    `json:"initial_delay_seconds,omitempty"`
+}
+
 type SandboxCreateRequest struct {
-	UUID         string            `json:"-"`
-	Image        string            `json:"image" binding:"required"`
-	ResourceID   int64             `json:"resource_id"`
-	SandboxName  string            `json:"sandbox_name" binding:"required"`
-	Environments map[string]string `json:"environments,omitempty"`
-	Volumes      []SandboxVolume   `json:"volumes,omitempty"`
-	Port         int               `json:"port,omitempty"`
-	Timeout      int               `json:"timeout,omitempty"`
-	MinCPU       string            `json:"min_cpu"`
-	MinMemory    string            `json:"min_memory"`
+	UUID           string                 `json:"-"`
+	Image          string                 `json:"image" binding:"required"`
+	ResourceID     int64                  `json:"resource_id"`
+	SandboxName    string                 `json:"sandbox_name" binding:"required"`
+	Environments   map[string]string      `json:"environments,omitempty"`
+	Volumes        []SandboxVolume        `json:"volumes,omitempty"`
+	Port           int                    `json:"port,omitempty"`
+	Timeout        int                    `json:"timeout,omitempty"`
+	MinCPU         string                 `json:"min_cpu"`
+	MinMemory      string                 `json:"min_memory"`
+	ReadinessProbe *SandboxReadinessProbe `json:"readiness_probe,omitempty"`
 }
 
 type SandboxUpdateRequest struct {

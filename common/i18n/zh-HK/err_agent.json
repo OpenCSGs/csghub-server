@@ -64,5 +64,8 @@
     },
     "error.AGENT-ERR-9": {
         "other": "定時任務開始時間已過去，一次性任務請使用未來的日期/時間"
+    },
+    "error.AGENT-ERR-22": {
+        "other": "倉庫路徑 {{.repo_path}} 未找到對應的 csgclaw 模板"
     }
 }

@@ -8,7 +8,12 @@
     "--",
     "/usr/local/bin/docker-entrypoint.sh"
   ],
-  "health_check": {},
+  "readiness_probe": {
+    "protocol": "http",
+    "path": "/",
+    "port": 8888,
+    "initial_delay_seconds": 10
+  },
   "default_env": {
     "OPENCSG_SANDBOX_TYPE": "csgclaw",
     "CSGCLAW_ROLE": "server",

@@ -11,25 +11,23 @@ import (
 	"strings"
 
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/common/types"
 )
 
 const csgclawRuntimeProfileName = "sandbox_runtime.csgclaw"
 
 type CSGClawRuntimeProfile struct {
-	AgentType   string                    `json:"agent_type"`
-	Version     string                    `json:"version"`
-	Image       string                    `json:"image"`
-	Port        int                       `json:"port"`
-	Command     []string                  `json:"command"`
-	HealthCheck SandboxRuntimeHealthCheck `json:"health_check"`
-	DefaultEnv  map[string]string         `json:"default_env"`
-	ContentSHA  string                    `json:"content_sha"`
+	AgentType      string                       `json:"agent_type"`
+	Version        string                       `json:"version"`
+	Image          string                       `json:"image"`
+	Port           int                          `json:"port"`
+	Command        []string                     `json:"command"`
+	ReadinessProbe SandboxRuntimeReadinessProbe `json:"readiness_probe"`
+	DefaultEnv     map[string]string            `json:"default_env"`
+	ContentSHA     string                       `json:"content_sha"`
 }
 
-type SandboxRuntimeHealthCheck struct {
-	Protocol string `json:"protocol"`
-	Path     string `json:"path"`
-}
+type SandboxRuntimeReadinessProbe = types.SandboxReadinessProbe
 
 func initAgentRuntimeProfiles(ctx context.Context) error {
 	path, err := agentRuntimeProfilePath("csgclaw.json")
@@ -101,14 +99,14 @@ func validateCSGClawRuntimeProfile(profile *CSGClawRuntimeProfile) error {
 			return fmt.Errorf("csgclaw runtime profile command cannot contain empty arguments")
 		}
 	}
-	if profile.HealthCheck.Protocol == "" && profile.HealthCheck.Path == "" {
+	if profile.ReadinessProbe.Protocol == "" && profile.ReadinessProbe.Path == "" {
 		return nil
 	}
-	if profile.HealthCheck.Protocol != "http" {
-		return fmt.Errorf("csgclaw runtime profile health_check.protocol must be http")
+	if profile.ReadinessProbe.Protocol != "http" {
+		return fmt.Errorf("csgclaw runtime profile readiness_probe.protocol must be http")
 	}
-	if !strings.HasPrefix(profile.HealthCheck.Path, "/") {
-		return fmt.Errorf("csgclaw runtime profile health_check.path must start with /")
+	if !strings.HasPrefix(profile.ReadinessProbe.Path, "/") {
+		return fmt.Errorf("csgclaw runtime profile readiness_probe.path must start with /")
 	}
 	return nil
 }
