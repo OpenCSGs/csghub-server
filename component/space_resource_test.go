@@ -48,6 +48,79 @@ func TestValidateResources(t *testing.T) {
 	})
 }
 
+func TestGetHardwareModel(t *testing.T) {
+	c := &spaceResourceComponentImpl{}
+
+	t.Run("CPU when no XPU configured", func(t *testing.T) {
+		hw := types.HardWare{
+			Cpu:    types.CPU{Type: "intel", Num: "2"},
+			Memory: "8G",
+		}
+		require.Equal(t, types.HardwareModelCPU, c.getHardwareModel(hw))
+	})
+
+	t.Run("MIG when ResourceName has nvidia.com/mig- prefix", func(t *testing.T) {
+		hw := types.HardWare{
+			Cpu: types.CPU{Type: "intel", Num: "2"},
+			Gpu: types.Processor{Type: "A100", Num: "1", ResourceName: "nvidia.com/mig-1g.10gb"},
+		}
+		require.Equal(t, types.HardwareModelMIG, c.getHardwareModel(hw))
+	})
+
+	t.Run("VXPU when ResourceMemName is set", func(t *testing.T) {
+		hw := types.HardWare{
+			Cpu: types.CPU{Type: "intel", Num: "2"},
+			Gpu: types.Processor{Type: "A100", Num: "1", ResourceMemName: "volcano.sh/vgpu-memory"},
+		}
+		require.Equal(t, types.HardwareModelVXPU, c.getHardwareModel(hw))
+	})
+
+	t.Run("XPU for physical GPU without MIG or VXPU", func(t *testing.T) {
+		hw := types.HardWare{
+			Cpu: types.CPU{Type: "intel", Num: "2"},
+			Gpu: types.Processor{Type: "A100", Num: "1", ResourceName: "nvidia.com/gpu"},
+		}
+		require.Equal(t, types.HardwareModelXPU, c.getHardwareModel(hw))
+	})
+
+	t.Run("VXPU takes priority over MIG", func(t *testing.T) {
+		hw := types.HardWare{
+			Cpu: types.CPU{Type: "intel", Num: "2"},
+			Gpu: types.Processor{
+				Type:            "A100",
+				Num:             "1",
+				ResourceName:    "nvidia.com/mig-1g.10gb",
+				ResourceMemName: "volcano.sh/vgpu-memory",
+			},
+		}
+		require.Equal(t, types.HardwareModelVXPU, c.getHardwareModel(hw))
+	})
+
+	t.Run("XPU for NPU", func(t *testing.T) {
+		hw := types.HardWare{
+			Cpu: types.CPU{Type: "intel", Num: "2"},
+			Npu: types.Processor{Type: "ascend910", Num: "1", ResourceName: "huawei.com/npu"},
+		}
+		require.Equal(t, types.HardwareModelXPU, c.getHardwareModel(hw))
+	})
+
+	t.Run("VXPU for DCU with ResourceMemName", func(t *testing.T) {
+		hw := types.HardWare{
+			Cpu: types.CPU{Type: "intel", Num: "2"},
+			Dcu: types.Processor{Type: "hygon", Num: "1", ResourceMemName: "volcano.sh/vgpu-memory"},
+		}
+		require.Equal(t, types.HardwareModelVXPU, c.getHardwareModel(hw))
+	})
+
+	t.Run("XPU for TPU", func(t *testing.T) {
+		hw := types.HardWare{
+			Cpu: types.CPU{Type: "intel", Num: "2"},
+			Tpu: types.Processor{Type: "chipltech", Num: "1"},
+		}
+		require.Equal(t, types.HardwareModelXPU, c.getHardwareModel(hw))
+	})
+}
+
 func TestSpaceResourceComponent_Update(t *testing.T) {
 	ctx := context.TODO()
 	sc := initializeTestSpaceResourceComponent(ctx, t)
