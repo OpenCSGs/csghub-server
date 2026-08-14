@@ -504,3 +504,138 @@ func TestLLMConfigStore_Index_SortByModelSizeB(t *testing.T) {
 	require.Equal(t, "size-medium", cfgsDesc[1].ModelName)
 	require.Equal(t, "size-small", cfgsDesc[2].ModelName)
 }
+
+func TestLLMConfig_PopulateDerivedFields_NoUpstreams(t *testing.T) {
+	cfg := &database.LLMConfig{
+		ModelName:   "original-model",
+		ApiEndpoint: "original-endpoint",
+		AuthHeader:  "original-auth",
+		Provider:    "original-provider",
+	}
+	cfg.PopulateDerivedFields()
+	require.Equal(t, "original-model", cfg.ModelName)
+	require.Equal(t, "original-endpoint", cfg.ApiEndpoint)
+	require.Equal(t, "original-auth", cfg.AuthHeader)
+	require.Equal(t, "original-provider", cfg.Provider)
+}
+
+func TestLLMConfig_PopulateDerivedFields_HealthyUpstream(t *testing.T) {
+	cfg := &database.LLMConfig{
+		ModelName:   "original-model",
+		ApiEndpoint: "original-endpoint",
+		AuthHeader:  "original-auth",
+		Provider:    "original-provider",
+		Upstreams: []database.Upstream{
+			{
+				URL:      "http://disabled-upstream",
+				Enabled:  false,
+				ModelName: "disabled-model",
+				AuthHeader: `{"Authorization":"disabled"}`,
+				Provider: "disabled-provider",
+			},
+			{
+				URL:      "http://healthy-upstream",
+				Enabled:  true,
+				ModelName: "healthy-model",
+				AuthHeader: `{"Authorization":"healthy"}`,
+				Provider: "healthy-provider",
+				HealthState: &database.AIGatewayUpstreamHealthState{
+					HealthState: "healthy",
+				},
+			},
+		},
+	}
+	cfg.PopulateDerivedFields()
+	require.Equal(t, "http://healthy-upstream", cfg.ApiEndpoint)
+	require.Equal(t, `{"Authorization":"healthy"}`, cfg.AuthHeader)
+	require.Equal(t, "healthy-provider", cfg.Provider)
+	require.Equal(t, "healthy-model", cfg.ModelName)
+}
+
+func TestLLMConfig_PopulateDerivedFields_UnhealthyUpstream(t *testing.T) {
+	cfg := &database.LLMConfig{
+		ModelName:   "original-model",
+		ApiEndpoint: "original-endpoint",
+		Upstreams: []database.Upstream{
+			{
+				URL:      "http://unhealthy-upstream",
+				Enabled:  true,
+				ModelName: "unhealthy-model",
+				AuthHeader: `{"Authorization":"unhealthy"}`,
+				Provider: "unhealthy-provider",
+				HealthState: &database.AIGatewayUpstreamHealthState{
+					HealthState: "unhealthy",
+				},
+			},
+			{
+				URL:      "http://fallback-upstream",
+				Enabled:  true,
+				ModelName: "fallback-model",
+				AuthHeader: `{"Authorization":"fallback"}`,
+				Provider: "fallback-provider",
+			},
+		},
+	}
+	cfg.PopulateDerivedFields()
+	// Should skip unhealthy upstream and use the fallback (no health state = healthy)
+	require.Equal(t, "http://fallback-upstream", cfg.ApiEndpoint)
+	require.Equal(t, "fallback-model", cfg.ModelName)
+	require.Equal(t, "fallback-provider", cfg.Provider)
+}
+
+func TestLLMConfig_PopulateDerivedFields_DegradedIsHealthy(t *testing.T) {
+	cfg := &database.LLMConfig{
+		ModelName: "original-model",
+		Upstreams: []database.Upstream{
+			{
+				URL:      "http://degraded-upstream",
+				Enabled:  true,
+				ModelName: "degraded-model",
+				AuthHeader: `{"Authorization":"degraded"}`,
+				Provider: "degraded-provider",
+				HealthState: &database.AIGatewayUpstreamHealthState{
+					HealthState: "degraded",
+				},
+			},
+		},
+	}
+	cfg.PopulateDerivedFields()
+	// "degraded" is not "unhealthy", so it should be considered healthy
+	require.Equal(t, "http://degraded-upstream", cfg.ApiEndpoint)
+	require.Equal(t, "degraded-model", cfg.ModelName)
+}
+
+func TestLLMConfig_PopulateDerivedFields_OverridesModelName(t *testing.T) {
+	cfg := &database.LLMConfig{
+		ModelName: "config-model",
+		Upstreams: []database.Upstream{
+			{
+				URL:       "http://upstream",
+				Enabled:   true,
+				ModelName: "upstream-model",
+				AuthHeader: "{}",
+				Provider:  "upstream-provider",
+			},
+		},
+	}
+	cfg.PopulateDerivedFields()
+	require.Equal(t, "upstream-model", cfg.ModelName)
+}
+
+func TestLLMConfig_PopulateDerivedFields_EmptyUpstreamModelName(t *testing.T) {
+	cfg := &database.LLMConfig{
+		ModelName: "config-model",
+		Upstreams: []database.Upstream{
+			{
+				URL:       "http://upstream",
+				Enabled:   true,
+				ModelName: "",
+				AuthHeader: "{}",
+				Provider:  "upstream-provider",
+			},
+		},
+	}
+	cfg.PopulateDerivedFields()
+	// Should keep original ModelName when upstream ModelName is empty
+	require.Equal(t, "config-model", cfg.ModelName)
+}
