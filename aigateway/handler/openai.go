@@ -195,9 +195,10 @@ func (h *OpenAIHandlerImpl) Shutdown(ctx context.Context) error {
 	return h.llmTracer.Shutdown(ctx)
 }
 
-// handleInsufficientBalance handles the insufficient balance error response
-// for both stream and non-stream requests
-func (h *OpenAIHandlerImpl) handleInsufficientBalance(c *gin.Context, isStream bool, nsUUID, modelID string, err error) {
+// handleInsufficientBalance returns an HTTP error before any upstream response
+// stream starts. Streaming requests must also receive a non-2xx status so
+// clients can distinguish this preflight failure from a successful SSE stream.
+func (h *OpenAIHandlerImpl) handleInsufficientBalance(c *gin.Context, _ bool, nsUUID, modelID string, err error) {
 	// Check if the error is the standard insufficient balance error
 	if !errors.Is(err, errorx.ErrInsufficientBalance) {
 		// If it's a different error, log and return generic error
@@ -210,18 +211,22 @@ func (h *OpenAIHandlerImpl) handleInsufficientBalance(c *gin.Context, isStream b
 	slog.WarnContext(c.Request.Context(), "insufficient balance for request",
 		slog.Any("ns_uuid", nsUUID), slog.Any("model", modelID))
 
-	if isStream {
-		// For stream requests, write error chunk
-		errorChunk := generateInsufficientBalanceResp(h.config.Frontend.URL)
-		errorChunkJson, _ := json.Marshal(errorChunk)
-		_, writeErr := c.Writer.Write([]byte("data: " + string(errorChunkJson) + "\n\ndata: [DONE]\n\n"))
-		if writeErr != nil {
-			slog.Error("failed to write insufficient balance error to stream", "error", writeErr)
-		}
-		c.Writer.Flush()
-	} else {
-		httpbase.ForbiddenError(c, err)
-	}
+	c.Header("Content-Type", "application/json; charset=utf-8")
+	c.JSON(http.StatusPaymentRequired, gin.H{
+		"error": gin.H{
+			"code":    "insufficient_balance",
+			"message": insufficientBalanceMessage(h.config.Frontend.URL),
+			"type":    "insufficient_balance",
+		},
+	})
+}
+
+func insufficientBalanceMessage(frontendURL string) string {
+	rechargeURL := strings.TrimRight(frontendURL, "/") + "/settings/recharge-payment"
+	return fmt.Sprintf(
+		"**Insufficient balance**\n\n👉 [Recharge your account](%s) to continue.",
+		rechargeURL,
+	)
 }
 
 func (h *OpenAIHandlerImpl) handleUsageLimitExceeded(c *gin.Context, isStream bool, username, modelID string, err error) {

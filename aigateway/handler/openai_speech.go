@@ -105,9 +105,6 @@ func (h *OpenAIHandlerImpl) Speech(c *gin.Context) {
 	if !modelTarget.Model.SkipBalance() {
 		if err := h.openaiComponent.CheckBalance(ctx, nsUUID); err != nil {
 			finishModalGenerationTraceWithError(generationRecorder, err, types.TraceErrInsufficientBalance)
-			if isSSE {
-				c.Writer.Header().Set("Content-Type", "text/event-stream")
-			}
 			h.handleInsufficientBalance(c, isSSE, nsUUID, modelID, err)
 			return
 		}

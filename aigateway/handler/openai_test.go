@@ -1433,7 +1433,7 @@ func TestOpenAIHandler_EmbeddingTrace(t *testing.T) {
 	})
 
 	t.Run("balance failure records trace error", func(t *testing.T) {
-		tester, c, _ := setupTest(t)
+		tester, c, w := setupTest(t)
 		tester.mocks.openAIComp.ExpectedCalls = nil
 
 		recorder := &testEmbeddingRecorderWithMutex{}
@@ -1463,6 +1463,8 @@ func TestOpenAIHandler_EmbeddingTrace(t *testing.T) {
 
 		tester.handler.Embedding(c)
 
+		require.Equal(t, http.StatusPaymentRequired, w.Code)
+		require.Contains(t, w.Body.String(), `"code":"insufficient_balance"`)
 		_, errorCode, ended, _ := recorder.snapshot()
 		require.True(t, ended)
 		require.Equal(t, types.TraceErrInsufficientBalance, errorCode)
@@ -1717,8 +1719,9 @@ func TestOpenAIHandler_Transcription(t *testing.T) {
 		require.Contains(t, w.Body.String(), "model_not_found")
 	})
 
-	t.Run("stream insufficient balance uses chat completion stream error", func(t *testing.T) {
+	t.Run("stream insufficient balance returns payment required before SSE starts", func(t *testing.T) {
 		tester, c, w := setupTest(t)
+		tester.handler.config.Frontend.URL = "https://hub.example.com/"
 		c.Request = newMultipartTranscriptionRequest(t, "model1", "audio-bytes", map[string]string{
 			"stream": "true",
 		})
@@ -1741,11 +1744,15 @@ func TestOpenAIHandler_Transcription(t *testing.T) {
 		tester.handler.Transcription(c)
 
 		body := w.Body.String()
-		require.Equal(t, http.StatusOK, w.Code)
-		require.Equal(t, "text/event-stream", w.Header().Get("Content-Type"))
-		require.Contains(t, body, "data: ")
-		require.Contains(t, body, `"finish_reason":"insufficient_balance"`)
-		require.Contains(t, body, "data: [DONE]\n\n")
+		require.Equal(t, http.StatusPaymentRequired, w.Code)
+		require.Equal(t, "application/json; charset=utf-8", w.Header().Get("Content-Type"))
+		require.JSONEq(t, `{
+			"error": {
+				"code": "insufficient_balance",
+				"message": "**Insufficient balance**\n\n👉 [Recharge your account](https://hub.example.com/settings/recharge-payment) to continue.",
+				"type": "insufficient_balance"
+			}
+		}`, body)
 	})
 
 	t.Run("upstream error status ends trace without billing", func(t *testing.T) {

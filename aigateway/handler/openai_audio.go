@@ -155,9 +155,6 @@ func (h *OpenAIHandlerImpl) handleAudioSTT(c *gin.Context, kind string) {
 	if !modelTarget.Model.SkipBalance() {
 		if err := h.openaiComponent.CheckBalance(ctx, nsUUID); err != nil {
 			finishModalGenerationTraceWithError(generationRecorder, err, types.TraceErrInsufficientBalance)
-			if isStream {
-				c.Writer.Header().Set("Content-Type", "text/event-stream")
-			}
 			h.handleInsufficientBalance(c, isStream, nsUUID, modelID, err)
 			return
 		}
