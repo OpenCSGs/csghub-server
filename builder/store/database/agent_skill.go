@@ -71,6 +71,7 @@ func (s *agentSkillStoreImpl) ListForAgent(ctx context.Context, userUUID string,
 	query := s.db.Operator.Core.NewSelect().
 		TableExpr("skills AS s").
 		ColumnExpr("s.id AS id, s.created_at AS created_at, s.updated_at AS updated_at").
+		ColumnExpr("r.id AS repository_id").
 		ColumnExpr("(pin_pref.id IS NOT NULL) AS is_pinned").
 		ColumnExpr("pin_pref.created_at AS pinned_at").
 		ColumnExpr(`(EXISTS(
@@ -79,6 +80,7 @@ func (s *agentSkillStoreImpl) ListForAgent(ctx context.Context, userUUID string,
 			WHERE rt.repository_id = s.repository_id AND rt.count > 0
 		) AND r.path NOT LIKE ?) AS built_in`, types.AgentichubSkillsTagName, types.SkillTagScope, username+"/%").
 		ColumnExpr("r.path AS path").
+		ColumnExpr("r.default_branch AS default_branch").
 		ColumnExpr("r.name AS name").
 		ColumnExpr("r.description AS description").
 		ColumnExpr("r.private AS private").

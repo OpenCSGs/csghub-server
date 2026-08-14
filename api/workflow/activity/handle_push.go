@@ -54,6 +54,12 @@ func (a *Activities) UpdateRepoInfos(ctx context.Context, req *types.GiteaCallba
 	return nil
 }
 
+func (a *Activities) SyncRepositoryPackage(ctx context.Context, req *types.GiteaCallbackPushReq) error {
+	logger := activity.GetLogger(ctx)
+	logger.Info("[git_callback] sync repository package start", slog.Any("req", req))
+	return a.callback.SyncRepositoryPackage(ctx, req)
+}
+
 func (a *Activities) SensitiveCheck(ctx context.Context, req *types.GiteaCallbackPushReq) error {
 	logger := activity.GetLogger(ctx)
 	logger.Info("[git_callback] sensitive check start", slog.Any("req", req))

@@ -66,6 +66,7 @@ func NewRepoComponent(config *config.Config) (RepoComponent, error) {
 		slog.Error(newError.Error())
 		return nil, newError
 	}
+	c.repositoryPackageSyncer = newRepositoryPackageSyncer(config, c.repoStore, c.git, c.s3Client, database.NewAgentTemplateStore())
 	c.lfsBucket = config.S3.Bucket
 	c.userSvcClient = rpc.NewUserSvcHttpClient(fmt.Sprintf("%s:%d", config.User.Host, config.User.Port),
 		rpc.AuthWithApiKey(config.APIToken))

@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -338,4 +339,102 @@ func TestSkillHandler_GetUploadUrl(t *testing.T) {
 		expectedFormDataMap[k] = v
 	}
 	require.Equal(t, expectedFormDataMap, formData)
+}
+
+func TestSkillHandler_DownloadZip(t *testing.T) {
+	t.Run("success with ref", func(t *testing.T) {
+		tester := NewSkillTester(t).WithHandleFunc(func(h *SkillHandler) gin.HandlerFunc {
+			return h.DownloadZip
+		})
+		tester.WithUser()
+		tester.WithParam("ref", "feature/branch")
+
+		tester.mocks.repo.EXPECT().DownloadRepoZip(tester.Ctx(), types.DownloadRepoZipReq{
+			RepoType:  types.SkillRepo,
+			Namespace: "u",
+			Name:      "r",
+			Revision:  "feature/branch",
+		}, "u").Return([]byte("zip-data"), nil)
+
+		tester.Execute()
+
+		require.Equal(t, http.StatusOK, tester.Response().Code)
+		headers := tester.Response().Header()
+		require.Equal(t, "application/zip", headers.Get("Content-Type"))
+		require.Equal(t, `attachment; filename=r-feature-branch.zip`, headers.Get("Content-Disposition"))
+		require.Equal(t, "zip-data", tester.Response().Body.String())
+	})
+
+	t.Run("success without ref", func(t *testing.T) {
+		tester := NewSkillTester(t).WithHandleFunc(func(h *SkillHandler) gin.HandlerFunc {
+			return h.DownloadZip
+		})
+		tester.WithUser()
+
+		tester.mocks.repo.EXPECT().DownloadRepoZip(tester.Ctx(), types.DownloadRepoZipReq{
+			RepoType:  types.SkillRepo,
+			Namespace: "u",
+			Name:      "r",
+			Revision:  "",
+		}, "u").Return([]byte("zip-data"), nil)
+
+		tester.Execute()
+
+		require.Equal(t, http.StatusOK, tester.Response().Code)
+		headers := tester.Response().Header()
+		require.Equal(t, "application/zip", headers.Get("Content-Type"))
+		require.Equal(t, `attachment; filename=r.zip`, headers.Get("Content-Disposition"))
+		require.Equal(t, "zip-data", tester.Response().Body.String())
+	})
+
+	t.Run("forbidden error", func(t *testing.T) {
+		tester := NewSkillTester(t).WithHandleFunc(func(h *SkillHandler) gin.HandlerFunc {
+			return h.DownloadZip
+		})
+		tester.WithUser()
+
+		tester.mocks.repo.EXPECT().DownloadRepoZip(tester.Ctx(), types.DownloadRepoZipReq{
+			RepoType:  types.SkillRepo,
+			Namespace: "u",
+			Name:      "r",
+			Revision:  "",
+		}, "u").Return(nil, errorx.ErrForbiddenMsg("no permission"))
+
+		tester.Execute()
+		tester.ResponseEqCode(t, http.StatusForbidden)
+	})
+
+	t.Run("not found error", func(t *testing.T) {
+		tester := NewSkillTester(t).WithHandleFunc(func(h *SkillHandler) gin.HandlerFunc {
+			return h.DownloadZip
+		})
+		tester.WithUser()
+
+		tester.mocks.repo.EXPECT().DownloadRepoZip(tester.Ctx(), types.DownloadRepoZipReq{
+			RepoType:  types.SkillRepo,
+			Namespace: "u",
+			Name:      "r",
+			Revision:  "",
+		}, "u").Return(nil, errorx.SkillNotFound(errors.New("not found"), errorx.Ctx()))
+
+		tester.Execute()
+		tester.ResponseEqCode(t, http.StatusNotFound)
+	})
+
+	t.Run("server error", func(t *testing.T) {
+		tester := NewSkillTester(t).WithHandleFunc(func(h *SkillHandler) gin.HandlerFunc {
+			return h.DownloadZip
+		})
+		tester.WithUser()
+
+		tester.mocks.repo.EXPECT().DownloadRepoZip(tester.Ctx(), types.DownloadRepoZipReq{
+			RepoType:  types.SkillRepo,
+			Namespace: "u",
+			Name:      "r",
+			Revision:  "",
+		}, "u").Return(nil, errors.New("failed"))
+
+		tester.Execute()
+		tester.ResponseEqCode(t, http.StatusInternalServerError)
+	})
 }

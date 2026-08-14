@@ -1526,6 +1526,7 @@ func createSkillRoutes(
 		skillGroup.DELETE("/:namespace/:name", middlewareCollection.Auth.NeedLogin, skillHandler.Delete)
 		skillGroup.GET("/:namespace/:name", skillHandler.Show)
 		skillGroup.POST("/:namespace/:name/publish", middlewareCollection.Auth.NeedPhoneVerified, skillHandler.Publish)
+		skillGroup.GET("/:namespace/:name/download_archive/refs/*ref", skillHandler.DownloadZip)
 		skillGroup.GET("/:namespace/:name/branches", repoCommonHandler.Branches)
 		skillGroup.GET("/:namespace/:name/tags", repoCommonHandler.Tags)
 		skillGroup.POST("/:namespace/:name/preupload/:revision", middlewareCollection.Auth.NeedPhoneVerified, repoCommonHandler.Preupload)

@@ -37,6 +37,11 @@ func HandlePushWorkflow(ctx workflow.Context, req *types.GiteaCallbackPushReq) e
 		logger.Error("[git_callback] failed to watch agent change", slog.Any("error", err), slog.Any("req", req))
 	}
 
+	err = workflow.ExecuteActivity(actCtx, activities.SyncRepositoryPackage, req).Get(ctx, nil)
+	if err != nil {
+		logger.Error("[git_callback] failed to sync repository package", slog.Any("error", err), slog.Any("req", req))
+	}
+
 	// Watch repo relation
 	err = workflow.ExecuteActivity(actCtx, activities.WatchRepoRelation, req).Get(ctx, nil)
 	if err != nil {
