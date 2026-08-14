@@ -52,3 +52,4 @@ docs/swagger.yaml
 docs/docs.go
 pgdata15/
 .prd/
+/docker/finetune/local/

@@ -1,0 +1,88 @@
+# Use the Ubuntu 22.04 image with CANN 9.0.1
+# More versions can be found at https://hub.docker.com/r/ascendai/cann
+FROM ascendai/cann:9.0.1-910b-ubuntu22.04-py3.11-devel
+
+# Define environments
+ENV DEBIAN_FRONTEND=noninteractive
+ENV SHELL=/bin/bash
+ENV JUPYTERHUB_SERVICE_PREFIX=/proxy/
+ENV GRADIO_ROOT_PATH=/proxy/7860/
+ENV TZ=Asia/Shanghai
+ENV NCCL_IB_DISABLE=1 NCCL_P2P_DISABLE=1
+ENV HF_HOME=/workspace/.cache
+
+# Define installation arguments
+ARG INSTALL_DEEPSPEED=false
+ARG PIP_INDEX=https://pypi.org/simple
+ARG TORCH_INDEX=https://download.pytorch.org/whl/cpu
+
+# Build with some basic utilities
+RUN apt-get update && apt-get install -y \
+    apt-utils \
+    wget curl vim \
+    git git-lfs \
+    supervisor \
+    unzip
+# set timezone
+ARG DEBIAN_FRONTEND=noninteractive
+RUN apt-get install -y tzdata \
+    && ln -snf /usr/share/zoneinfo/$TZ /etc/localtime \
+    && echo $TZ > /etc/timezone \
+    && dpkg-reconfigure -f noninteractive tzdata
+    
+# alias python='python3'
+#RUN ln -s /usr/bin/python3 /usr/bin/python
+RUN pip config set global.index-url https://mirrors.huaweicloud.com/repository/pypi/simple
+
+# Install the appropriate torch version 
+RUN pip install --no-cache-dir jupyterlab jupyter-server-proxy==4.2.0 
+
+# Set the working directory
+WORKDIR /etc/csghub
+RUN git clone https://gitee.com/xzgan/LLaMA-Factory.git --branch v0.9.5 --single-branch
+
+# Install the build and Ascend dependencies provided by LLaMA-Factory v0.9.5.
+RUN cd LLaMA-Factory && \
+    python -m pip install --upgrade pip packaging wheel setuptools editables "hatchling>=1.18.0" && \
+    python -m pip uninstall -y torch torchvision torchaudio && \
+    python -m pip install --no-cache-dir --no-build-isolation \
+        -r requirements/npu.txt \
+        -r requirements/metrics.txt
+
+RUN cd LLaMA-Factory && \
+    python -m pip install --no-cache-dir --no-build-isolation -e . && \
+    if [ "$INSTALL_DEEPSPEED" == "true" ]; then \
+        python -m pip install --no-cache-dir --no-build-isolation -r requirements/deepspeed.txt; \
+    fi
+
+# Set environment variables for CANN
+RUN CANN_TOOLKIT_ENV_FILE="/usr/local/Ascend/ascend-toolkit/set_env.sh" && \
+    DRIVER_LIBRARY_PATH="LD_LIBRARY_PATH=/usr/local/Ascend/driver/lib64/common/:/usr/local/Ascend/driver/lib64/driver/:\${LD_LIBRARY_PATH}" && \
+    echo "export ${DRIVER_LIBRARY_PATH}" >> /etc/profile && \
+    echo "export ${DRIVER_LIBRARY_PATH}" >> ~/.bashrc && \
+    echo "source ${CANN_TOOLKIT_ENV_FILE}" >> /etc/profile && \
+    echo "source ${CANN_TOOLKIT_ENV_FILE}" >> ~/.bashrc
+
+#ATTENTION: need copy /usr/local/bin/npu-smi and /usr/local/Ascend/driver to local
+COPY local/npu-smi /usr/local/bin/npu-smi
+COPY local/driver /usr/local/Ascend/driver
+
+# Setup supervisord
+COPY llama-factory/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+COPY llama-factory/jupyter_notebook_config.py /root/.jupyter/jupyter_notebook_config.py
+COPY llama-factory/ /etc/csghub/
+
+RUN mkdir -p /var/log/supervisord && \
+    chmod +x /etc/csghub/*.sh && \
+    chmod +x /etc/csghub/*.py && \
+    mkdir -p /root/.jupyter/lab/user-settings/@jupyterlab/apputils-extension && \
+	echo '{"theme":"JupyterLab Dark"}' > /root/.jupyter/lab/user-settings/@jupyterlab/apputils-extension/themes.jupyterlab-settings && \
+	mkdir -p /root/.jupyter/lab/user-settings/@jupyterlab/notebook-extension && \
+	echo '{"codeCellConfig":{"lineNumbers":true }}' > /root/.jupyter/lab/user-settings/@jupyterlab/notebook-extension/tracker.jupyterlab-settings
+
+#fix gradio proxy issue
+RUN pip install https://git-devops.opencsg.com/opensource/gradio/-/raw/main/gradio-5.31.0-py3-none-any.whl --force-reinstall --no-deps
+# Create a working directory
+WORKDIR /workspace/
+ENTRYPOINT ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
+EXPOSE 8000
