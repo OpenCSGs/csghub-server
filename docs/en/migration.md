@@ -14,7 +14,7 @@ Before using Starhub Server locally, it is necessary to manually create the data
 | --- | --- | --- |
 | STARHUB_DATABASE_DRIVER | Database driver, e.g., pg | pg |
 | STARHUB_DATABASE_DSN | Database connection DSN | postgresql://postgres:postgres@localhost:5432/starhub_server?sslmode=disable |
-| STARHUB_DATABASE_TIMEZONE | Database timezone | Asia/Shanghai |
+| STARHUB_SERVER_TIMEZONE | Application-wide timezone (used for formatting Loki log timestamps) | Asia/Shanghai |
 
 ## Initializing Database Migrations
 

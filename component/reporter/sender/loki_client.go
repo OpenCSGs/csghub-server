@@ -31,7 +31,7 @@ func NewLokiClient(url string, clientID types.ClientType, config *config.Config)
 	if err != nil {
 		slog.Error("failed to create loki client", slog.Any("error", err))
 	}
-	timeLoc, err := time.LoadLocation(config.Database.TimeZone)
+	timeLoc, err := time.LoadLocation(config.TimeZone)
 	if err != nil {
 		slog.Error("failed to create loki client by TimeZone error", slog.Any("error", err))
 	}

@@ -48,6 +48,10 @@ type Config struct {
 	UniqueServiceName        string            `env:"STARHUB_SERVER_UNIQUE_SERVICE_NAME" default:""`
 	ServerFailureRedirectURL string            `env:"STARHUB_SERVER_FAIL_REDIRECT_URL" default:"http://localhost:3000/errors/server-error"`
 	NeedPhoneVerify          bool              `env:"STARHUB_SERVER_NEED_PHONE_VERIFY" default:"false"`
+	// TimeZone is the application-wide timezone used for formatting
+	// timestamps (e.g. Loki log timestamps). It is not used by the
+	// database connection layer.
+	TimeZone string `env:"STARHUB_SERVER_TIMEZONE" default:"Asia/Shanghai"`
 
 	APIServer struct {
 		Port         int    `env:"STARHUB_SERVER_SERVER_PORT" default:"8080"`
@@ -76,7 +80,6 @@ type Config struct {
 	Database struct {
 		Driver              string `env:"STARHUB_DATABASE_DRIVER" default:"pg"`
 		DSN                 string `env:"STARHUB_DATABASE_DSN" default:"postgresql://postgres:postgres@localhost:5432/starhub_server?sslmode=disable"`
-		TimeZone            string `env:"STARHUB_DATABASE_TIMEZONE" default:"Asia/Shanghai"`
 		SearchConfiguration string `env:"STARHUB_DATABASE_SEARCH_CONFIGURATION" default:"opencsgchinese"`
 	}
 
