@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/types"
 )
@@ -588,8 +589,6 @@ func TestUserComponent_ListServeless(t *testing.T) {
 			PageSize: 10,
 		},
 	}
-	uc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{ID: 1}, nil)
-	uc.mocks.components.repo.EXPECT().IsAdminRole(database.User{ID: 1}).Return(true)
 	uc.mocks.stores.DeployTaskMock().EXPECT().ListServerless(ctx, *req).Return([]database.Deploy{
 		{
 			SvcName: "svc", ClusterID: "cluster", SKU: "sku",
@@ -608,6 +607,37 @@ func TestUserComponent_ListServeless(t *testing.T) {
 		},
 	}, data)
 
+}
+
+func TestUserComponent_ListServerless_StatusFilter(t *testing.T) {
+	ctx := context.TODO()
+	uc := initializeTestUserComponent(ctx, t)
+
+	req := &types.DeployReq{
+		CurrentUser: "user",
+		Status:      []int{common.Running},
+		PageOpts: types.PageOpts{
+			Page:     1,
+			PageSize: 10,
+		},
+	}
+	uc.mocks.stores.DeployTaskMock().EXPECT().ListServerless(ctx, *req).Return([]database.Deploy{
+		{
+			SvcName: "svc", ClusterID: "cluster", SKU: "sku",
+			GitPath: "models_foo/bar", Hardware: `{"memory": "foo"}`,
+			RepoID: 123, Status: common.Running,
+		},
+	}, 1, nil)
+
+	data, total, err := uc.ListServerless(ctx, *req)
+	require.Nil(t, err)
+	require.Equal(t, 1, total)
+	require.Equal(t, []types.DeployRequest{
+		{
+			Path: "models_foo/bar", Status: "Running", GitPath: "models_foo/bar", Hardware: `{"memory": "foo"}`,
+			RepoID: 123, SvcName: "svc", ClusterID: "cluster", SKU: "sku",
+		},
+	}, data)
 }
 
 func TestUserComponent_GetUserByName(t *testing.T) {

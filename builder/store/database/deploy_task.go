@@ -476,6 +476,10 @@ func (s *deployTaskStoreImpl) ListServerless(ctx context.Context, req types.Depl
 	query := s.db.Operator.Core.NewSelect().Model(&result).Where("type = ?", req.DeployType)
 	query = query.Where("status != ?", common.Deleted)
 
+	if len(req.Status) > 0 {
+		query = query.Where("status in (?)", bun.In(req.Status))
+	}
+
 	searchQuery := strings.TrimSpace(req.Query)
 	if searchQuery != "" {
 		searchPattern := "%" + strings.ToLower(searchQuery) + "%"
