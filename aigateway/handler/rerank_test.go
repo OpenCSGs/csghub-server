@@ -9,7 +9,9 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/openai/openai-go/v3"
 	"github.com/stretchr/testify/assert"
@@ -169,6 +171,118 @@ func TestOpenAIHandler_Rerank(t *testing.T) {
 
 		tester.handler.Rerank(c)
 		wg.Wait()
+	})
+
+	t.Run("upstream error status skips billing", func(t *testing.T) {
+		tester, c, _ := setupTest(t)
+
+		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusInternalServerError)
+			_, err := w.Write([]byte(`{"id":"rerank-1","model":"resolved-rerank","usage":{"total_tokens":9},"results":[]}`))
+			require.NoError(t, err)
+		}))
+		defer upstream.Close()
+
+		model := &types.Model{
+			BaseModel: types.BaseModel{ID: "rerank-model", Object: "model", OwnedBy: "testuser"},
+			Upstreams: []commontypes.UpstreamConfig{
+				{
+					URL:       upstream.URL,
+					Enabled:   true,
+					ModelName: "resolved-rerank",
+				},
+			},
+		}
+
+		counter := mocktoken.NewMockEmbeddingTokenCounter(t)
+		counter.EXPECT().Input("what is a panda?\npandas are bears\nparis is a city").Return().Once()
+		counter.EXPECT().Embedding(mock.MatchedBy(func(usage openai.CreateEmbeddingResponseUsage) bool {
+			return usage.PromptTokens == 9 && usage.TotalTokens == 9
+		})).Return().Once()
+		tester.mocks.tokenCounterFactory.EXPECT().NewEmbedding(token.CreateParam{
+			Endpoint: upstream.URL,
+			Model:    "resolved-rerank",
+		}).Return(counter).Once()
+		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "rerank-model").Return(model, nil).Once()
+		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil).Once()
+		var billingCalled atomic.Bool
+		tester.mocks.openAIComp.EXPECT().RecordUsage(mock.Anything, "testuuid", model, "resolved-rerank", counter, "").
+			Run(func(context.Context, string, *types.Model, string, token.Counter, string) {
+				billingCalled.Store(true)
+			}).Maybe()
+
+		body, _ := json.Marshal(RerankRequest{
+			Model:     "rerank-model",
+			Query:     "what is a panda?",
+			Documents: []string{"pandas are bears", "paris is a city"},
+		})
+		c.Request.Method = http.MethodPost
+		c.Request.Body = io.NopCloser(bytes.NewReader(body))
+
+		tester.handler.Rerank(c)
+
+		// the async goroutine finishes well within this window; if billing were
+		// published on error status it would flip the flag and fail the test
+		require.Never(t, func() bool {
+			return billingCalled.Load()
+		}, 100*time.Millisecond, 10*time.Millisecond)
+		require.False(t, billingCalled.Load())
+	})
+
+	t.Run("upstream redirect status skips billing", func(t *testing.T) {
+		tester, c, _ := setupTest(t)
+
+		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusFound)
+			_, err := w.Write([]byte(`{"id":"rerank-1","model":"resolved-rerank","usage":{"total_tokens":9},"results":[]}`))
+			require.NoError(t, err)
+		}))
+		defer upstream.Close()
+
+		model := &types.Model{
+			BaseModel: types.BaseModel{ID: "rerank-model", Object: "model", OwnedBy: "testuser"},
+			Upstreams: []commontypes.UpstreamConfig{
+				{
+					URL:       upstream.URL,
+					Enabled:   true,
+					ModelName: "resolved-rerank",
+				},
+			},
+		}
+
+		counter := mocktoken.NewMockEmbeddingTokenCounter(t)
+		counter.EXPECT().Input("what is a panda?\npandas are bears\nparis is a city").Return().Once()
+		counter.EXPECT().Embedding(mock.MatchedBy(func(usage openai.CreateEmbeddingResponseUsage) bool {
+			return usage.PromptTokens == 9 && usage.TotalTokens == 9
+		})).Return().Once()
+		tester.mocks.tokenCounterFactory.EXPECT().NewEmbedding(token.CreateParam{
+			Endpoint: upstream.URL,
+			Model:    "resolved-rerank",
+		}).Return(counter).Once()
+		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "rerank-model").Return(model, nil).Once()
+		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil).Once()
+		var billingCalled atomic.Bool
+		tester.mocks.openAIComp.EXPECT().RecordUsage(mock.Anything, "testuuid", model, "resolved-rerank", counter, "").
+			Run(func(context.Context, string, *types.Model, string, token.Counter, string) {
+				billingCalled.Store(true)
+			}).Maybe()
+
+		body, _ := json.Marshal(RerankRequest{
+			Model:     "rerank-model",
+			Query:     "what is a panda?",
+			Documents: []string{"pandas are bears", "paris is a city"},
+		})
+		c.Request.Method = http.MethodPost
+		c.Request.Body = io.NopCloser(bytes.NewReader(body))
+
+		tester.handler.Rerank(c)
+
+		// the async goroutine finishes well within this window; if billing were
+		// published on redirect status it would flip the flag and fail the test
+		require.Never(t, func() bool {
+			return billingCalled.Load()
+		}, 100*time.Millisecond, 10*time.Millisecond)
+		require.False(t, billingCalled.Load())
 	})
 }
 

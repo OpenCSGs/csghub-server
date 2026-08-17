@@ -637,6 +637,7 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 		TokenCounter:    chatCtx.tokenCounter,
 		LogCapture:      chatCtx.logCapture,
 		Trace:           newChatTracePostProcessInput(generationRecorder, chatReq, finalWriter),
+		StatusCode:      retryWriterStatusCode(finalWriter),
 	})
 }
 
@@ -648,6 +649,7 @@ type chatPostProcessInput struct {
 	TokenCounter    token.Counter
 	LogCapture      component.LLMLogRecorder
 	Trace           chatTracePostProcessInput
+	StatusCode      int
 }
 
 type chatContext struct {
@@ -802,7 +804,7 @@ func (h *OpenAIHandlerImpl) runChatPostProcessAsync(ctx context.Context, input c
 			slog.ErrorContext(usageCtx, "failed to commit usage limit", slog.Any("error", err))
 		}
 
-		if usage != nil {
+		if usage != nil && isSuccessfulStatus(input.StatusCode) {
 			if err := h.openaiComponent.RecordUsageFromTokenUsage(usageCtx, input.NSUUID, input.Model, input.TargetModelName, usage, input.ApiKey); err != nil {
 				slog.ErrorContext(usageCtx, "failed to record token usage", slog.Any("error", err))
 			}
@@ -1020,9 +1022,11 @@ func (h *OpenAIHandlerImpl) Embedding(c *gin.Context) {
 			embeddingRecorder.End()
 		}
 
-		err := h.openaiComponent.RecordUsage(usageCtx, nsUUID, modelTarget.Model, modelTarget.ModelName, tokenCounter, apikey)
-		if err != nil {
-			slog.ErrorContext(c, "failed to record embedding token usage", "error", err)
+		if isSuccessfulStatus(w.StatusCode()) {
+			err := h.openaiComponent.RecordUsage(usageCtx, nsUUID, modelTarget.Model, modelTarget.ModelName, tokenCounter, apikey)
+			if err != nil {
+				slog.ErrorContext(c, "failed to record embedding token usage", "error", err)
+			}
 		}
 	}()
 }

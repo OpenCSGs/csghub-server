@@ -109,9 +109,11 @@ func (h *OpenAIHandlerImpl) Rerank(c *gin.Context) {
 
 		w.CaptureRerankUsage()
 
-		err := h.openaiComponent.RecordUsage(usageCtx, nsUUID, modelTarget.Model, modelTarget.ModelName, tokenCounter, apikey)
-		if err != nil {
-			slog.ErrorContext(c, "failed to record rerank token usage", "error", err)
+		if isSuccessfulStatus(w.StatusCode()) {
+			err := h.openaiComponent.RecordUsage(usageCtx, nsUUID, modelTarget.Model, modelTarget.ModelName, tokenCounter, apikey)
+			if err != nil {
+				slog.ErrorContext(c, "failed to record rerank token usage", "error", err)
+			}
 		}
 	}()
 }

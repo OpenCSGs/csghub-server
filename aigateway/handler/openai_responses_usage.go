@@ -92,7 +92,7 @@ func (h *OpenAIHandlerImpl) recordResponsesUsageWithTrace(c *gin.Context, counte
 			}
 			cancel()
 		}
-		if tokenUsage != nil {
+		if tokenUsage != nil && isSuccessfulStatus(traceInput.StatusCode) {
 			recordCtx, cancel := context.WithTimeout(baseCtx, time.Second)
 			if err := h.openaiComponent.RecordUsageFromTokenUsage(recordCtx, nsUUID, modelTarget.Model, modelTarget.ModelName, tokenUsage, apikey); err != nil {
 				slog.ErrorContext(baseCtx, "failed to record responses usage",

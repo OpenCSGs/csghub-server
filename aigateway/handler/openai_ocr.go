@@ -208,7 +208,7 @@ func (h *OpenAIHandlerImpl) OCR(c *gin.Context) {
 		defer cancel()
 
 		var usage *token.Usage
-		if w.StatusCode() < http.StatusBadRequest {
+		if isSuccessfulStatus(w.StatusCode()) {
 			var usageErr error
 			usage, usageErr = ocrCounter.Usage(usageCtx)
 			if usageErr != nil {
@@ -232,7 +232,7 @@ func (h *OpenAIHandlerImpl) OCR(c *gin.Context) {
 			generationRecorder.End()
 		}
 
-		if w.StatusCode() < http.StatusBadRequest && usage != nil {
+		if isSuccessfulStatus(w.StatusCode()) && usage != nil {
 			if err := h.openaiComponent.RecordUsageFromTokenUsage(usageCtx, nsUUID, modelTarget.Model, modelTarget.ModelName, usage, apikey); err != nil {
 				slog.ErrorContext(usageCtx, "failed to record ocr usage", slog.Any("error", err))
 			}

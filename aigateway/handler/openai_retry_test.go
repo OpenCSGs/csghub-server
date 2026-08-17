@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -682,6 +683,7 @@ func TestRetryChatWithFallback_UsesFallbackModelName(t *testing.T) {
 		Model:           modelTarget.Model,
 		TargetModelName: modelTarget.ModelName,
 		TokenCounter:    tokenCounter,
+		StatusCode:      http.StatusOK,
 	})
 	wg.Wait()
 }
@@ -741,6 +743,7 @@ func TestRunChatPostProcessAsync_RecordsTraceUsageBeforeAccounting(t *testing.T)
 		Model:           model,
 		TargetModelName: "target-model",
 		TokenCounter:    tokenCounter,
+		StatusCode:      http.StatusOK,
 		Trace: chatTracePostProcessInput{
 			Recorder: recorder,
 		},
@@ -788,6 +791,7 @@ func TestRunChatPostProcessAsync_RecordsTraceCompletionBeforeUsage(t *testing.T)
 			Model:           model,
 			TargetModelName: "target-model",
 			TokenCounter:    tokenCounter,
+			StatusCode:      http.StatusOK,
 			Trace: chatTracePostProcessInput{
 				Recorder:     recorder,
 				Completion:   true,
@@ -814,6 +818,96 @@ func TestRunChatPostProcessAsync_RecordsTraceCompletionBeforeUsage(t *testing.T)
 		require.NotNil(t, firstChunk)
 		require.Equal(t, firstWriteAt, firstChunk.At)
 		require.Equal(t, types.TraceErrUpstreamError, errorCode)
+	})
+}
+
+func TestRunChatPostProcessAsync_SkipsBillingOnErrorStatus(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		tester, c, _ := setupTest(t)
+		tester.mocks.openAIComp.ExpectedCalls = nil
+		c.Request = httptest.NewRequest("POST", "/v1/chat/completions", nil)
+
+		model := &types.Model{BaseModel: types.BaseModel{ID: "model-1"}}
+		tokenCounter := mocktoken.NewMockCounter(t)
+		tokenCounter.EXPECT().
+			Usage(mock.Anything).
+			Return(&token.Usage{
+				PromptTokens:     5,
+				CompletionTokens: 8,
+				TotalTokens:      13,
+			}, nil).
+			Once()
+
+		var billingCalled atomic.Bool
+		tester.mocks.openAIComp.EXPECT().
+			CommitUsageLimit(mock.Anything, "user-1", model, tokenCounter).
+			Return(nil).
+			Once()
+		tester.mocks.openAIComp.EXPECT().
+			RecordUsageFromTokenUsage(mock.Anything, "user-1", model, "target-model", mock.Anything, "api-key").
+			Run(func(context.Context, string, *types.Model, string, *token.Usage, string) {
+				billingCalled.Store(true)
+			}).
+			Maybe()
+
+		tester.handler.runChatPostProcessAsync(c.Request.Context(), chatPostProcessInput{
+			NSUUID:          "user-1",
+			ApiKey:          "api-key",
+			Model:           model,
+			TargetModelName: "target-model",
+			TokenCounter:    tokenCounter,
+			StatusCode:      http.StatusBadGateway,
+		})
+
+		// synctest.Wait blocks until the async post-processing goroutine has
+		// fully completed, so the billing flag is settled.
+		synctest.Wait()
+		require.False(t, billingCalled.Load())
+	})
+}
+
+func TestRunChatPostProcessAsync_SkipsBillingOnRedirectStatus(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		tester, c, _ := setupTest(t)
+		tester.mocks.openAIComp.ExpectedCalls = nil
+		c.Request = httptest.NewRequest("POST", "/v1/chat/completions", nil)
+
+		model := &types.Model{BaseModel: types.BaseModel{ID: "model-1"}}
+		tokenCounter := mocktoken.NewMockCounter(t)
+		tokenCounter.EXPECT().
+			Usage(mock.Anything).
+			Return(&token.Usage{
+				PromptTokens:     5,
+				CompletionTokens: 8,
+				TotalTokens:      13,
+			}, nil).
+			Once()
+
+		var billingCalled atomic.Bool
+		tester.mocks.openAIComp.EXPECT().
+			CommitUsageLimit(mock.Anything, "user-1", model, tokenCounter).
+			Return(nil).
+			Once()
+		tester.mocks.openAIComp.EXPECT().
+			RecordUsageFromTokenUsage(mock.Anything, "user-1", model, "target-model", mock.Anything, "api-key").
+			Run(func(context.Context, string, *types.Model, string, *token.Usage, string) {
+				billingCalled.Store(true)
+			}).
+			Maybe()
+
+		tester.handler.runChatPostProcessAsync(c.Request.Context(), chatPostProcessInput{
+			NSUUID:          "user-1",
+			ApiKey:          "api-key",
+			Model:           model,
+			TargetModelName: "target-model",
+			TokenCounter:    tokenCounter,
+			StatusCode:      http.StatusFound,
+		})
+
+		// synctest.Wait blocks until the async post-processing goroutine has
+		// fully completed, so the billing flag is settled.
+		synctest.Wait()
+		require.False(t, billingCalled.Load())
 	})
 }
 

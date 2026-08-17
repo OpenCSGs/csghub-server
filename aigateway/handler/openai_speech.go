@@ -176,7 +176,7 @@ func (h *OpenAIHandlerImpl) Speech(c *gin.Context) {
 		defer cancel()
 
 		var usage *token.Usage
-		if w.StatusCode() < http.StatusBadRequest {
+		if isSuccessfulStatus(w.StatusCode()) {
 			var usageErr error
 			usage, usageErr = speechCounter.Usage(usageCtx)
 			if usageErr != nil {
@@ -194,7 +194,7 @@ func (h *OpenAIHandlerImpl) Speech(c *gin.Context) {
 			generationRecorder.End()
 		}
 
-		if w.StatusCode() < http.StatusBadRequest && usage != nil {
+		if isSuccessfulStatus(w.StatusCode()) && usage != nil {
 			if err := h.openaiComponent.RecordUsageFromTokenUsage(usageCtx, nsUUID, modelTarget.Model, modelTarget.ModelName, usage, apikey); err != nil {
 				slog.ErrorContext(usageCtx, "failed to record audio speech usage", slog.Any("error", err))
 			}
@@ -368,7 +368,7 @@ func (h *OpenAIHandlerImpl) SpeechBatch(c *gin.Context) {
 		defer cancel()
 
 		var usage *token.Usage
-		if w.StatusCode() < http.StatusBadRequest {
+		if isSuccessfulStatus(w.StatusCode()) {
 			var usageErr error
 			usage, usageErr = speechCounter.Usage(usageCtx)
 			if usageErr != nil {
@@ -386,7 +386,7 @@ func (h *OpenAIHandlerImpl) SpeechBatch(c *gin.Context) {
 			generationRecorder.End()
 		}
 
-		if w.StatusCode() < http.StatusBadRequest && usage != nil {
+		if isSuccessfulStatus(w.StatusCode()) && usage != nil {
 			if err := h.openaiComponent.RecordUsageFromTokenUsage(usageCtx, nsUUID, modelTarget.Model, modelTarget.ModelName, usage, apikey); err != nil {
 				slog.ErrorContext(usageCtx, "failed to record audio speech batch usage", slog.Any("error", err))
 			}
