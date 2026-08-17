@@ -288,8 +288,9 @@ const (
 
 // ModelTokenPrice is currency plus per-million-token rate (major units, from accounting cents + sku_unit).
 type ModelTokenPrice struct {
-	Currency        string  `json:"currency"`
-	PricePerMillion float64 `json:"price_per_million"`
+	Currency              string   `json:"currency"`
+	PricePerMillion       float64  `json:"price_per_million"`
+	CachedPricePerMillion *float64 `json:"cached_price_per_million,omitempty"`
 }
 
 // ModelModalPrice is a unit-based media generation price.
