@@ -244,7 +244,8 @@ func TestOpenAIHandler_OCRPreProxyErrors(t *testing.T) {
 
 		tester.handler.OCR(c)
 
-		require.Equal(t, http.StatusForbidden, w.Code)
+		require.Equal(t, http.StatusPaymentRequired, w.Code)
+		require.Contains(t, w.Body.String(), `"code":"insufficient_balance"`)
 	})
 }
 
