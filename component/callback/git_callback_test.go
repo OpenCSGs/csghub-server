@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	mockcomponent "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/types"
@@ -262,6 +263,57 @@ func TestGitCallbackComponentImpl_UpdateRepoInfos(t *testing.T) {
 
 		err := gc.UpdateRepoInfos(context.Background(), req)
 		assert.NoError(t, err)
+	})
+}
+
+func TestGitCallbackComponentImpl_SyncRepositoryPackage(t *testing.T) {
+	for _, tt := range []struct {
+		name     string
+		fullName string
+		repoType types.RepositoryType
+	}{
+		{
+			name:     "skill repo",
+			fullName: "skills_namespace/repo",
+			repoType: types.SkillRepo,
+		},
+		{
+			name:     "code repo",
+			fullName: "codes_namespace/repo",
+			repoType: types.CodeRepo,
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			gc := initializeTestGitCallbackComponent(context.Background(), t)
+			syncer := mockcomponent.NewMockRepositoryPackageSyncer(t)
+			gc.repositoryPackageSyncer = syncer
+
+			syncer.EXPECT().SyncBranch(mock.Anything, tt.repoType, "namespace", "repo", "main").Return(nil)
+
+			err := gc.SyncRepositoryPackage(context.Background(), &types.GiteaCallbackPushReq{
+				Ref: "refs/heads/main",
+				HeadCommit: types.GiteaCallbackPushReq_HeadCommit{
+					Id: "commit-main",
+				},
+				Repository: types.GiteaCallbackPushReq_Repository{
+					FullName: tt.fullName,
+				},
+			})
+			require.NoError(t, err)
+		})
+	}
+
+	t.Run("skips branch delete callback", func(t *testing.T) {
+		gc := initializeTestGitCallbackComponent(context.Background(), t)
+		gc.repositoryPackageSyncer = mockcomponent.NewMockRepositoryPackageSyncer(t)
+
+		err := gc.SyncRepositoryPackage(context.Background(), &types.GiteaCallbackPushReq{
+			Ref: "refs/heads/main",
+			Repository: types.GiteaCallbackPushReq_Repository{
+				FullName: "skills_namespace/repo",
+			},
+		})
+		require.NoError(t, err)
 	})
 }
 

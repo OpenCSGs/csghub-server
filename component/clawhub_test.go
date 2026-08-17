@@ -419,6 +419,111 @@ func TestClawHubComponent_DownloadSkillUsesLatestPublishedVersion(t *testing.T) 
 	require.Equal(t, "1.2.3", version)
 }
 
+func TestClawHubComponent_DownloadSkillUsesS3PackageWhenAvailable(t *testing.T) {
+	ctx := context.Background()
+	skillStore := mockdatabase.NewMockSkillStore(t)
+	skillVersionStore := mockdatabase.NewMockSkillVersionStore(t)
+	repoComponent := mockcomponent.NewMockRepoComponent(t)
+	component := &clawHubComponent{
+		config:            &config.Config{},
+		skillStore:        skillStore,
+		skillVersionStore: skillVersionStore,
+		repoComponent:     repoComponent,
+		packageWriter: func(context.Context, int64, string, []byte) error {
+			t.Fatal("package writer should not be called when s3 package exists")
+			return nil
+		},
+		packageReader: func(_ context.Context, repoID int64, branch, commitID string) ([]byte, bool) {
+			require.Equal(t, int64(42), repoID)
+			require.Equal(t, "main", branch)
+			require.Equal(t, "commit-v123", commitID)
+			return []byte("s3-zip"), true
+		},
+	}
+
+	repo := &database.Repository{ID: 42, Nickname: "test skill", DefaultBranch: "main"}
+	skillStore.EXPECT().FindByPath(ctx, "u", "test-skill").Return(&database.Skill{
+		ID: 1, RepositoryID: 42, Repository: repo,
+	}, nil)
+	repoComponent.EXPECT().GetUserRepoPermission(ctx, "", repo).Return(&types.UserRepoPermission{CanRead: true}, nil)
+	skillVersionStore.EXPECT().LatestBySkillID(ctx, int64(1)).Return(&database.SkillVersion{
+		SkillID: 1,
+		Version: "v1.2.3",
+		Hash:    "commit-v123",
+	}, nil)
+
+	content, version, err := component.DownloadSkill(ctx, "u--test-skill-1-2-3", "latest", "")
+
+	require.NoError(t, err)
+	require.Equal(t, []byte("s3-zip"), content)
+	require.Equal(t, "1.2.3", version)
+}
+
+func TestClawHubComponent_DownloadSkillFallsBackToGitWhenS3PackageMissing(t *testing.T) {
+	ctx := context.Background()
+	skillStore := mockdatabase.NewMockSkillStore(t)
+	skillVersionStore := mockdatabase.NewMockSkillVersionStore(t)
+	gitServer := mockgitserver.NewMockGitServer(t)
+	repoComponent := mockcomponent.NewMockRepoComponent(t)
+	packageWrites := make(chan struct {
+		repoID   int64
+		commitID string
+		archive  []byte
+	}, 1)
+	component := &clawHubComponent{
+		config:            &config.Config{},
+		skillStore:        skillStore,
+		skillVersionStore: skillVersionStore,
+		gitServer:         gitServer,
+		repoComponent:     repoComponent,
+		packageWriter: func(_ context.Context, repoID int64, commitID string, archive []byte) error {
+			packageWrites <- struct {
+				repoID   int64
+				commitID string
+				archive  []byte
+			}{repoID: repoID, commitID: commitID, archive: append([]byte(nil), archive...)}
+			return nil
+		},
+		packageReader: func(_ context.Context, repoID int64, branch, commitID string) ([]byte, bool) {
+			require.Equal(t, int64(42), repoID)
+			require.Equal(t, "main", branch)
+			require.Equal(t, "commit-v123", commitID)
+			return nil, false
+		},
+	}
+
+	repo := &database.Repository{ID: 42, Nickname: "test skill", DefaultBranch: "main"}
+	skillStore.EXPECT().FindByPath(ctx, "u", "test-skill").Return(&database.Skill{
+		ID: 1, RepositoryID: 42, Repository: repo,
+	}, nil)
+	repoComponent.EXPECT().GetUserRepoPermission(ctx, "", repo).Return(&types.UserRepoPermission{CanRead: true}, nil)
+	skillVersionStore.EXPECT().LatestBySkillID(ctx, int64(1)).Return(&database.SkillVersion{
+		SkillID: 1,
+		Version: "v1.2.3",
+		Hash:    "commit-v123",
+	}, nil)
+	gitServer.EXPECT().GetArchive(ctx, gitserver.GetArchiveReq{
+		Namespace: "u",
+		Name:      "test-skill",
+		Revision:  "commit-v123",
+		RepoType:  types.SkillRepo,
+	}).Return([]byte("git-zip"), nil)
+
+	content, version, err := component.DownloadSkill(ctx, "u--test-skill-1-2-3", "latest", "")
+
+	require.NoError(t, err)
+	require.Equal(t, []byte("git-zip"), content)
+	require.Equal(t, "1.2.3", version)
+	select {
+	case writeCall := <-packageWrites:
+		require.Equal(t, int64(42), writeCall.repoID)
+		require.Equal(t, "commit-v123", writeCall.commitID)
+		require.Equal(t, []byte("git-zip"), writeCall.archive)
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for async clawhub package write")
+	}
+}
+
 func TestClawHubComponent_ResolveSkillNormalizesSlug(t *testing.T) {
 	ctx := context.Background()
 	skillStore := mockdatabase.NewMockSkillStore(t)

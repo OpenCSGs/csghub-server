@@ -456,10 +456,11 @@ type CheckResourceAndAccountReq struct {
 	CurrentUser   string `json:"current_user"`
 }
 
-type DownloadCodeZipReq struct {
-	Namespace string `json:"namespace"`
-	Name      string `json:"name"`
-	Revision  string `json:"revision"`
+type DownloadRepoZipReq struct {
+	RepoType  RepositoryType `json:"repo_type"`
+	Namespace string         `json:"namespace"`
+	Name      string         `json:"name"`
+	Revision  string         `json:"revision"`
 }
 
 type BatchRepoExtraReq struct {
