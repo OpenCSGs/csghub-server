@@ -110,7 +110,7 @@ func TestRepoComponent_DeployUpdate_RunningDeploy_StopFirst(t *testing.T) {
 		InstanceName: "i1",
 	}, req)
 	require.NotNil(t, err)
-	require.Contains(t, err.Error(), "stop deploy first")
+	require.ErrorIs(t, err, errorx.ErrDeployStopFirst)
 }
 
 func TestRepoComponent_DeployUpdate_StoppedDeploy(t *testing.T) {
@@ -404,7 +404,7 @@ func TestRepoComponent_DeployStart_ExistAndRunning(t *testing.T) {
 		InstanceName: "i1",
 	})
 	require.NotNil(t, err)
-	require.Contains(t, err.Error(), "stop deploy first")
+	require.ErrorIs(t, err, errorx.ErrDeployStopFirst)
 }
 
 func TestRepoComponent_DeployStart_ExistButNotRunning(t *testing.T) {
