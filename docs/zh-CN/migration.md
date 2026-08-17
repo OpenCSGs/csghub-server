@@ -14,7 +14,7 @@ Migration 文件的名字有两个部分，时间戳和迁移名（也就是这�
 | --- | --- | --- |
 | STARHUB_DATABASE_DRIVER | 数据库的 dirver，例如 pg | pg |
 | STARHUB_DATABASE_DSN | 数据库的连接 DSN | postgresql://postgres:postgres@localhost:5432/starhub_server?sslmode=disable |
-| STARHUB_DATABASE_TIMEZONE | 数据库的时区 | Asia/Shanghai |
+| STARHUB_SERVER_TIMEZONE | 应用全局时区（用于格式化 Loki 日志时间戳） | Asia/Shanghai |
 
 ## 初始化数据库迁移
 

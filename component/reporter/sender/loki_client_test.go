@@ -594,7 +594,7 @@ func TestNewLokiClient_ReturnsLogSender(t *testing.T) {
 	cfg.LogCollector.AcceptLabelPrefix = "csghub_"
 	cfg.LogCollector.LineSeparator = "\\n"
 	cfg.LogCollector.MaxStoreTimeDay = 7
-	cfg.Database.TimeZone = "UTC"
+	cfg.TimeZone = "UTC"
 
 	sender, err := NewLokiClient(server.URL, types.ClientType("test-client"), cfg)
 	require.NoError(t, err)

@@ -314,7 +314,7 @@ services:
           memory: 2048M
     environment:
       STARHUB_DATABASE_DSN: postgresql://postgres:postgres@postgres:5432/starhub_server?sslmode=disable
-      STARHUB_DATABASE_TIMEZONE: Asia/Shanghai
+      STARHUB_SERVER_TIMEZONE: Asia/Shanghai
       STARHUB_SERVER_REDIS_ENDPOINT: redis:6379
       STARHUB_SERVER_GITSERVER_TYPE: gitaly
       STARHUB_SERVER_GITALY_SERVER_SOCKET: tcp://gitaly:8075
@@ -336,7 +336,7 @@ services:
       - postgres
     environment:
       STARHUB_DATABASE_DSN: postgresql://postgres:postgres@postgres:5432/starhub_server?sslmode=disable
-      STARHUB_DATABASE_TIMEZONE: Asia/Shanghai
+      STARHUB_SERVER_TIMEZONE: Asia/Shanghai
       STARHUB_SERVER_REDIS_ENDPOINT: redis:6379
       STARHUB_SERVER_MIRROR_REMOTE: false
       STARHUB_SERVER_S3_ACCESS_KEY_ID: admin
