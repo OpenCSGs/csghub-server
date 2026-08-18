@@ -211,6 +211,21 @@ type Config struct {
 		PYPIIndexURL              string `env:"STARHUB_SERVER_SPACE_PYPI_INDEX_URL" default:""`
 		InformerSyncPeriodInMin   int    `env:"STARHUB_SERVER_SPACE_INFORMER_SYNC_PERIOD_IN_MINUTES" default:"2"`
 		StatusCheckInterval       int    `env:"STARHUB_SERVER_SPACE_STATUS_CHECK_INTERVAL" default:"10"` // 10 seconds
+		SandboxPVCName            string `env:"STARHUB_SERVER_SANDBOX_PVC_NAME" default:"sandbox-storage"`
+		SandboxRuntimeClass       string `env:"STARHUB_SERVER_SANDBOX_RUNTIME_CLASS" default:"gvisor"`
+		// SandboxEphemeralIdleTimeoutMin: how long an ephemeral sandbox stays idle before being deleted
+		// (destroys CR+PVC, irreversible). Measured from the last active-counter change.
+		// Defaults to 10 minutes.
+		SandboxEphemeralIdleTimeoutMin int `env:"STARHUB_SERVER_SANDBOX_EPHEMERAL_IDLE_TIMEOUT_MIN" default:"10"`
+		// SandboxPersistentIdleTimeoutHours: how long a persistent sandbox stays idle before being suspended
+		// (reversible, keeps PVC). Measured from the last active-counter change.
+		// Defaults to 24 hours.
+		SandboxPersistentIdleTimeoutHours int `env:"STARHUB_SERVER_SANDBOX_PERSISTENT_IDLE_TIMEOUT_HOURS" default:"24"`
+		// SandboxIdleSweepIntervalSec is the idle scan period. The scan reads the informer cache, zero API calls.
+		SandboxIdleSweepIntervalSec int `env:"STARHUB_SERVER_SANDBOX_IDLE_SWEEP_INTERVAL_SECONDS" default:"60"`
+		// SandboxIdleStartupGraceMin: for how many minutes after Runner startup only record activity and do not
+		// suspend, to avoid an instant batch suspend right after a restart.
+		SandboxIdleStartupGraceMin int `env:"STARHUB_SERVER_SANDBOX_IDLE_STARTUP_GRACE_MINUTES" default:"5"`
 	}
 
 	Model struct {

@@ -16,7 +16,11 @@ import (
 	"opencsg.com/csghub-server/runner/handler"
 )
 
-func NewHttpServer(ctx context.Context, config *config.Config) (*gin.Engine, error) {
+// NewHttpServer builds the runner HTTP server. The returned cleanup function (non-nil in
+// ee/saas builds) must be registered on the graceful server via
+// httpbase.GracefulServer.RegisterOnShutdown so server-lifetime background goroutines
+// (e.g. the SandboxV2 informer and idle sweeper) exit on shutdown. It is nil for CE.
+func NewHttpServer(ctx context.Context, config *config.Config) (*gin.Engine, func(), error) {
 	r := gin.New()
 	middleware.SetInfraMiddleware(r, config, instrumentation.Runner)
 
@@ -28,16 +32,16 @@ func NewHttpServer(ctx context.Context, config *config.Config) (*gin.Engine, err
 	clusterPool, err := cluster.NewClusterPool(config)
 	if err != nil {
 		slog.Error("failed to build cluster pool by auto detect environment", slog.Any("error", err))
-		return nil, fmt.Errorf("failed to build cluster pool by auto detect environment error: %w", err)
+		return nil, nil, fmt.Errorf("failed to build cluster pool by auto detect environment error: %w", err)
 	}
 	logReporter, err := reporter.NewAndStartLogCollector(ctx, config, types.ClientTypeRunner)
 	if err != nil {
-		return nil, fmt.Errorf("failed to start logReporter error: %w", err)
+		return nil, nil, fmt.Errorf("failed to start logReporter error: %w", err)
 	}
 	// runner apis
 	k8sHandler, err := handler.NewK8sHandler(config, clusterPool, logReporter)
 	if err != nil {
-		return nil, fmt.Errorf("failed to build NewK8sHandler error: %w", err)
+		return nil, nil, fmt.Errorf("failed to build NewK8sHandler error: %w", err)
 	}
 	apiGroup := r.Group("/api/v1", needAPIKey)
 	service := apiGroup.Group("/service")
@@ -61,7 +65,7 @@ func NewHttpServer(ctx context.Context, config *config.Config) (*gin.Engine, err
 	// cluster api
 	clusterHandler, err := handler.NewClusterHandler(config, clusterPool)
 	if err != nil {
-		return nil, fmt.Errorf("failed to build NewClusterHandler error: %w", err)
+		return nil, nil, fmt.Errorf("failed to build NewClusterHandler error: %w", err)
 	}
 	cluster := apiGroup.Group("/cluster")
 	{
@@ -72,7 +76,7 @@ func NewHttpServer(ctx context.Context, config *config.Config) (*gin.Engine, err
 	// argo for evaluation
 	argoHandler, err := handler.NewArgoHandler(config, clusterPool, logReporter)
 	if err != nil {
-		return nil, fmt.Errorf("failed to build NewArgoHandler error: %w", err)
+		return nil, nil, fmt.Errorf("failed to build NewArgoHandler error: %w", err)
 	}
 	workflows := apiGroup.Group("/workflows")
 	{
@@ -85,7 +89,7 @@ func NewHttpServer(ctx context.Context, config *config.Config) (*gin.Engine, err
 	// dataflow
 	dataflowHandler, err := handler.NewDataflowHandler(config, clusterPool)
 	if err != nil {
-		return nil, fmt.Errorf("failed to build NewDataflowHandler error: %w", err)
+		return nil, nil, fmt.Errorf("failed to build NewDataflowHandler error: %w", err)
 	}
 	dataflowGroup := apiGroup.Group("/dataflow/jobs")
 	{
@@ -97,7 +101,7 @@ func NewHttpServer(ctx context.Context, config *config.Config) (*gin.Engine, err
 	// image builder
 	imagebuilderHandler, err := handler.NewImagebuilderHandler(ctx, config, clusterPool, logReporter)
 	if err != nil {
-		return nil, fmt.Errorf("failed to build NewImagebuilderHandler error: %w", err)
+		return nil, nil, fmt.Errorf("failed to build NewImagebuilderHandler error: %w", err)
 	}
 	imagebuilderGroup := apiGroup.Group("/imagebuilder")
 	{
@@ -106,13 +110,13 @@ func NewHttpServer(ctx context.Context, config *config.Config) (*gin.Engine, err
 	}
 
 	// sandbox
-	err = addSandboxRoutes(apiGroup, config, clusterPool)
+	sandboxCleanup, err := addSandboxRoutes(apiGroup, config, clusterPool)
 	if err != nil {
-		return nil, fmt.Errorf("failed to add sandbox routes error: %w", err)
+		return nil, nil, fmt.Errorf("failed to add sandbox routes error: %w", err)
 	}
 
 	// batch status
 	addBatchStatusRoute(apiGroup, config, clusterPool, argoHandler)
 
-	return r, nil
+	return r, sandboxCleanup, nil
 }
