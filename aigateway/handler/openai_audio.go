@@ -206,7 +206,7 @@ func (h *OpenAIHandlerImpl) handleAudioSTT(c *gin.Context, kind string) {
 		defer cancel()
 
 		var usage *token.Usage
-		if w.StatusCode() < http.StatusBadRequest {
+		if isSuccessfulStatus(w.StatusCode()) {
 			var usageErr error
 			usage, usageErr = audioCounter.Usage(usageCtx)
 			if usageErr != nil {
@@ -229,7 +229,7 @@ func (h *OpenAIHandlerImpl) handleAudioSTT(c *gin.Context, kind string) {
 			generationRecorder.End()
 		}
 
-		if w.StatusCode() < http.StatusBadRequest && usage != nil {
+		if isSuccessfulStatus(w.StatusCode()) && usage != nil {
 			if err := h.openaiComponent.RecordUsageFromTokenUsage(usageCtx, nsUUID, modelTarget.Model, modelTarget.ModelName, usage, apikey); err != nil {
 				slog.ErrorContext(usageCtx, fmt.Sprintf("failed to record audio %s usage", kind), slog.Any("error", err))
 			}

@@ -123,7 +123,7 @@ func (h *OpenAIHandlerImpl) CreateVideo(c *gin.Context) {
 	}
 	body := capture.Body()
 	var videoResp *types.VideoObject
-	if capture.StatusCode() < http.StatusBadRequest {
+	if isSuccessfulStatus(capture.StatusCode()) {
 		var videoProviderResp *text2video.ProviderResponse
 		videoProviderResp, ok = parseCreateVideoProviderResponse(c, ctx, adapter, body, generationRecorder)
 		if !ok {
