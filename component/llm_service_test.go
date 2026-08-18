@@ -503,6 +503,203 @@ func TestLLMServiceComponent_CreateUpstream_TrimsWhitespace(t *testing.T) {
 	require.Equal(t, "test-provider", res.Provider)
 }
 
+func TestLLMServiceComponent_CreateUpstream_HealthCheckDefaultsFalseWhenNil(t *testing.T) {
+	ctx := context.TODO()
+	stores := tests.NewMockStores(t)
+	upstreamStore := mockdatabase.NewMockUpstreamStore(t)
+	stores.LLMConfigMock().EXPECT().GetByID(ctx, int64(100)).Return(&database.LLMConfig{ID: 100}, nil)
+	// When HealthCheckEnabled and CircuitBreakerEnabled are nil (not provided),
+	// the component should default to false.
+	upstreamStore.EXPECT().Create(ctx, &database.Upstream{
+		LLMConfigID:           100,
+		URL:                   "http://upstream.example.com/v1",
+		Weight:                1,
+		Enabled:               true,
+		HealthCheckEnabled:    false,
+		CircuitBreakerEnabled: false,
+	}).Return(nil)
+	mc := &llmServiceComponentImpl{
+		llmConfigStore:    stores.LLMConfig,
+		promptPrefixStore: stores.PromptPrefix,
+		upstreamStore:     upstreamStore,
+	}
+	req := &types.CreateUpstreamReq{
+		LLMConfigID: 100,
+		URL:         "http://upstream.example.com/v1",
+		Enabled:     true,
+		// HealthCheckEnabled and CircuitBreakerEnabled intentionally left nil
+	}
+	res, err := mc.CreateUpstream(ctx, req)
+	require.Nil(t, err)
+	require.NotNil(t, res)
+	require.False(t, res.HealthCheckEnabled)
+	require.False(t, res.CircuitBreakerEnabled)
+}
+
+func TestLLMServiceComponent_CreateUpstream_HealthCheckExplicitFalse(t *testing.T) {
+	ctx := context.TODO()
+	stores := tests.NewMockStores(t)
+	upstreamStore := mockdatabase.NewMockUpstreamStore(t)
+	stores.LLMConfigMock().EXPECT().GetByID(ctx, int64(100)).Return(&database.LLMConfig{ID: 100}, nil)
+	// When HealthCheckEnabled is explicitly set to false via pointer,
+	// the component should persist false (not a DB default of true).
+	healthCheckFalse := false
+	circuitBreakerFalse := false
+	upstreamStore.EXPECT().Create(ctx, &database.Upstream{
+		LLMConfigID:           100,
+		URL:                   "http://upstream.example.com/v1",
+		Weight:                1,
+		Enabled:               true,
+		HealthCheckEnabled:    false,
+		CircuitBreakerEnabled: false,
+	}).Return(nil)
+	mc := &llmServiceComponentImpl{
+		llmConfigStore:    stores.LLMConfig,
+		promptPrefixStore: stores.PromptPrefix,
+		upstreamStore:     upstreamStore,
+	}
+	req := &types.CreateUpstreamReq{
+		LLMConfigID:           100,
+		URL:                   "http://upstream.example.com/v1",
+		Enabled:               true,
+		HealthCheckEnabled:    &healthCheckFalse,
+		CircuitBreakerEnabled: &circuitBreakerFalse,
+	}
+	res, err := mc.CreateUpstream(ctx, req)
+	require.Nil(t, err)
+	require.NotNil(t, res)
+	require.False(t, res.HealthCheckEnabled)
+	require.False(t, res.CircuitBreakerEnabled)
+}
+
+func TestLLMServiceComponent_CreateUpstream_HealthCheckExplicitTrue(t *testing.T) {
+	ctx := context.TODO()
+	stores := tests.NewMockStores(t)
+	upstreamStore := mockdatabase.NewMockUpstreamStore(t)
+	stores.LLMConfigMock().EXPECT().GetByID(ctx, int64(100)).Return(&database.LLMConfig{ID: 100}, nil)
+	// When HealthCheckEnabled is explicitly set to true via pointer,
+	// the component should persist true.
+	healthCheckTrue := true
+	circuitBreakerTrue := true
+	upstreamStore.EXPECT().Create(ctx, &database.Upstream{
+		LLMConfigID:           100,
+		URL:                   "http://upstream.example.com/v1",
+		Weight:                1,
+		Enabled:               true,
+		HealthCheckEnabled:    true,
+		CircuitBreakerEnabled: true,
+	}).Return(nil)
+	mc := &llmServiceComponentImpl{
+		llmConfigStore:    stores.LLMConfig,
+		promptPrefixStore: stores.PromptPrefix,
+		upstreamStore:     upstreamStore,
+	}
+	req := &types.CreateUpstreamReq{
+		LLMConfigID:           100,
+		URL:                   "http://upstream.example.com/v1",
+		Enabled:               true,
+		HealthCheckEnabled:    &healthCheckTrue,
+		CircuitBreakerEnabled: &circuitBreakerTrue,
+	}
+	res, err := mc.CreateUpstream(ctx, req)
+	require.Nil(t, err)
+	require.NotNil(t, res)
+	require.True(t, res.HealthCheckEnabled)
+	require.True(t, res.CircuitBreakerEnabled)
+}
+
+func TestLLMServiceComponent_CreateLLMConfig_HealthCheckPersistedFalse(t *testing.T) {
+	ctx := context.TODO()
+	stores := tests.NewMockStores(t)
+	upstreamStore := mockdatabase.NewMockUpstreamStore(t)
+	// Verify that when UpstreamConfig has HealthCheckEnabled=false and
+	// CircuitBreakerEnabled=false (the zero value / default), the database
+	// Upstream persisted via CreateLLMConfig also has false values.
+	// This is the core regression test for the bun default:true bug.
+	upstreamStore.EXPECT().Create(ctx, &database.Upstream{
+		LLMConfigID:           123,
+		URL:                   "http://upstream.example.com/v1",
+		Weight:                1,
+		Enabled:               true,
+		HealthCheckEnabled:    false,
+		CircuitBreakerEnabled: false,
+	}).Return(nil)
+	mc := &llmServiceComponentImpl{
+		llmConfigStore:    stores.LLMConfig,
+		promptPrefixStore: stores.PromptPrefix,
+		upstreamStore:     upstreamStore,
+	}
+	req := &types.CreateLLMConfigReq{
+		ModelName: "test-model",
+		Types:     []int{16},
+		Enabled:   true,
+		Upstreams: []types.UpstreamConfig{
+			{
+				URL:                   "http://upstream.example.com/v1",
+				Enabled:               true,
+				Weight:                1,
+				HealthCheckEnabled:    false,
+				CircuitBreakerEnabled: false,
+			},
+		},
+	}
+	dbLLMConfig := &database.LLMConfig{ID: 123, ModelName: "test-model", Type: 16, Enabled: true}
+	stores.LLMConfigMock().EXPECT().Create(ctx, database.LLMConfig{
+		ModelName: "test-model",
+		Type:      16,
+		Enabled:   true,
+	}).Return(dbLLMConfig, nil)
+	res, err := mc.CreateLLMConfig(ctx, req)
+	require.Nil(t, err)
+	require.NotNil(t, res)
+	require.False(t, res.Upstreams[0].HealthCheckEnabled)
+	require.False(t, res.Upstreams[0].CircuitBreakerEnabled)
+}
+
+func TestLLMServiceComponent_CreateLLMConfig_HealthCheckPersistedTrue(t *testing.T) {
+	ctx := context.TODO()
+	stores := tests.NewMockStores(t)
+	upstreamStore := mockdatabase.NewMockUpstreamStore(t)
+	upstreamStore.EXPECT().Create(ctx, &database.Upstream{
+		LLMConfigID:           123,
+		URL:                   "http://upstream.example.com/v1",
+		Weight:                1,
+		Enabled:               true,
+		HealthCheckEnabled:    true,
+		CircuitBreakerEnabled: true,
+	}).Return(nil)
+	mc := &llmServiceComponentImpl{
+		llmConfigStore:    stores.LLMConfig,
+		promptPrefixStore: stores.PromptPrefix,
+		upstreamStore:     upstreamStore,
+	}
+	req := &types.CreateLLMConfigReq{
+		ModelName: "test-model",
+		Types:     []int{16},
+		Enabled:   true,
+		Upstreams: []types.UpstreamConfig{
+			{
+				URL:                   "http://upstream.example.com/v1",
+				Enabled:               true,
+				Weight:                1,
+				HealthCheckEnabled:    true,
+				CircuitBreakerEnabled: true,
+			},
+		},
+	}
+	dbLLMConfig := &database.LLMConfig{ID: 123, ModelName: "test-model", Type: 16, Enabled: true}
+	stores.LLMConfigMock().EXPECT().Create(ctx, database.LLMConfig{
+		ModelName: "test-model",
+		Type:      16,
+		Enabled:   true,
+	}).Return(dbLLMConfig, nil)
+	res, err := mc.CreateLLMConfig(ctx, req)
+	require.Nil(t, err)
+	require.NotNil(t, res)
+	require.True(t, res.Upstreams[0].HealthCheckEnabled)
+	require.True(t, res.Upstreams[0].CircuitBreakerEnabled)
+}
+
 func TestLLMServiceComponent_UpdateUpstream_TrimsWhitespace(t *testing.T) {
 	ctx := context.TODO()
 	stores := tests.NewMockStores(t)
