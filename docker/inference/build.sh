@@ -50,6 +50,10 @@ case "${IMAGE%:*}" in
     PLATFORMS="linux/amd64"
     DOCKERFILE="Dockerfile.tgi"
     ;;
+  tgi-rocm)
+    PLATFORMS="linux/amd64"
+    DOCKERFILE="Dockerfile.tgi-rocm"
+    ;;
   audiofly)
     PLATFORMS="linux/amd64"
     DOCKERFILE="Dockerfile.audiofly"
