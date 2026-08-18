@@ -1,5 +1,8 @@
 {
     "error.DEPLOY-ERR-0": {
         "other": "Deploy name already exists for this deploy type."
+    },
+    "error.DEPLOY-ERR-1": {
+        "other": "The deploy is still running, please stop it first before updating."
     }
 }

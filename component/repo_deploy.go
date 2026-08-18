@@ -1038,8 +1038,7 @@ func (c *repoComponentImpl) DeployUpdate(ctx context.Context, updateReq types.De
 	exist := deploy.Status != deployStatus.Stopped && deploy.Status != deployStatus.Deleted
 
 	if needRestartDeploy(req) && exist {
-		// deploy instance is running
-		return errors.New("stop deploy first")
+		return errorx.ErrDeployStopFirst
 	}
 
 	if req.EngineArgs != nil {
@@ -1148,7 +1147,7 @@ func (c *repoComponentImpl) DeployStart(ctx context.Context, startReq types.Depl
 		// if deploy is in running status, return error
 		const deployStatusRunning = 4
 		if status == deployStatusRunning {
-			return errors.New("stop deploy first")
+			return errorx.ErrDeployStopFirst
 		}
 
 		// if deploy exists but not running, stop it first

@@ -1,5 +1,8 @@
 {
     "error.DEPLOY-ERR-0": {
         "other": "同類型下已存在同名部署"
+    },
+    "error.DEPLOY-ERR-1": {
+        "other": "部署實例仍在運行中，請先停止後再更新"
     }
 }
