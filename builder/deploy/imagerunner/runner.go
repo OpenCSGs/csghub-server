@@ -9,6 +9,7 @@ import (
 )
 
 type Runner interface {
+	SandboxV2Runner
 	Run(context.Context, *types.RunRequest) (*types.RunResponse, error)
 	Stop(context.Context, *types.StopRequest) (*types.StopResponse, error)
 	Purge(context.Context, *types.PurgeRequest) (*types.PurgeResponse, error)

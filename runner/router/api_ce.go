@@ -13,9 +13,9 @@ func addClusterNodeRoutes(clusterGroup *gin.RouterGroup, clusterHandler *handler
 	// No-op for CE
 }
 
-func addSandboxRoutes(apiGroup *gin.RouterGroup, config *config.Config, clusterPool cluster.Pool) error {
+func addSandboxRoutes(apiGroup *gin.RouterGroup, config *config.Config, clusterPool cluster.Pool) (func(), error) {
 	// No-op for CE
-	return nil
+	return nil, nil
 }
 
 func addBatchStatusRoute(apiGroup *gin.RouterGroup, config *config.Config, clusterPool cluster.Pool, argoHandler *handler.ArgoHandler) {
