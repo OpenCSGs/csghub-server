@@ -15,6 +15,17 @@ import (
 	"opencsg.com/csghub-server/common/utils/common"
 )
 
+// SetMetricsModelParams bundles inputs for SetMetricsModelTarget so the
+// signature stays stable as fields are added.  ModelTarget is nil when
+// model resolution fails; in that case ModelID is used as a fallback so
+// the error can still be attributed to the requested model.
+type SetMetricsModelParams struct {
+	C           *gin.Context
+	ModelID     string
+	ModelTarget *resolvedModelTarget
+	IsStream    bool
+}
+
 type resolvedModelTarget struct {
 	Model           *types.Model
 	Upstream        commonType.UpstreamConfig

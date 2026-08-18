@@ -114,8 +114,8 @@ func TestRecordResponsesUsageHappyPathCallsComponent(t *testing.T) {
 		var wg sync.WaitGroup
 		wg.Add(2)
 		var seenUsage *token.Usage
-		tester.mocks.openAIComp.EXPECT().CommitUsageLimit(mock.Anything, "testuuid", model, mock.Anything).
-			RunAndReturn(func(_ context.Context, _ string, _ *types.Model, _ token.Counter) error {
+		tester.mocks.openAIComp.EXPECT().CommitUsageLimitFromUsage(mock.Anything, "testuuid", model, mock.Anything).
+			RunAndReturn(func(_ context.Context, _ string, _ *types.Model, _ *token.Usage) error {
 				wg.Done()
 				return nil
 			}).Once()
@@ -127,7 +127,7 @@ func TestRecordResponsesUsageHappyPathCallsComponent(t *testing.T) {
 			return nil
 		}).Once()
 
-		tester.handler.recordResponsesUsageWithTrace(c, counter, "testuuid", modelTarget, "apikey", nil, responsesTracePostProcessInput{StatusCode: http.StatusOK})
+		tester.handler.recordResponsesUsageWithTrace(c, counter, nil, "testuuid", modelTarget, "apikey", nil, responsesTracePostProcessInput{StatusCode: http.StatusOK})
 
 		synctest.Wait()
 		require.NotNil(t, seenUsage)
@@ -178,8 +178,8 @@ func TestRecordResponsesUsagePublishesLLMLog(t *testing.T) {
 
 		var wg sync.WaitGroup
 		wg.Add(3)
-		tester.mocks.openAIComp.EXPECT().CommitUsageLimit(mock.Anything, "testuuid", model, mock.Anything).
-			RunAndReturn(func(_ context.Context, _ string, _ *types.Model, _ token.Counter) error {
+		tester.mocks.openAIComp.EXPECT().CommitUsageLimitFromUsage(mock.Anything, "testuuid", model, mock.Anything).
+			RunAndReturn(func(_ context.Context, _ string, _ *types.Model, _ *token.Usage) error {
 				wg.Done()
 				return nil
 			}).Once()
@@ -193,7 +193,7 @@ func TestRecordResponsesUsagePublishesLLMLog(t *testing.T) {
 			wg.Done()
 		}
 
-		tester.handler.recordResponsesUsageWithTrace(c, counter, "testuuid", modelTarget, "apikey", recorder, responsesTracePostProcessInput{StatusCode: http.StatusOK})
+		tester.handler.recordResponsesUsageWithTrace(c, counter, nil, "testuuid", modelTarget, "apikey", recorder, responsesTracePostProcessInput{StatusCode: http.StatusOK})
 
 		synctest.Wait()
 		require.NotNil(t, publisher.payload)
@@ -241,8 +241,8 @@ func TestRecordResponsesUsageRecordsLLMTrace(t *testing.T) {
 
 		var wg sync.WaitGroup
 		wg.Add(2)
-		tester.mocks.openAIComp.EXPECT().CommitUsageLimit(mock.Anything, "testuuid", model, mock.Anything).
-			RunAndReturn(func(_ context.Context, _ string, _ *types.Model, _ token.Counter) error {
+		tester.mocks.openAIComp.EXPECT().CommitUsageLimitFromUsage(mock.Anything, "testuuid", model, mock.Anything).
+			RunAndReturn(func(_ context.Context, _ string, _ *types.Model, _ *token.Usage) error {
 				wg.Done()
 				return nil
 			}).Once()
@@ -253,7 +253,7 @@ func TestRecordResponsesUsageRecordsLLMTrace(t *testing.T) {
 			return nil
 		}).Once()
 
-		tester.handler.recordResponsesUsageWithTrace(c, counter, "testuuid", modelTarget, "apikey", recorder, traceInput)
+		tester.handler.recordResponsesUsageWithTrace(c, counter, nil, "testuuid", modelTarget, "apikey", recorder, traceInput)
 
 		synctest.Wait()
 		usage, usageEnded, usageEvents := traceRecorder.snapshot()
@@ -290,7 +290,7 @@ func TestRecordResponsesUsageSkipsBillingOnErrorStatus(t *testing.T) {
 
 		var billingCalled atomic.Bool
 		tester.mocks.openAIComp.EXPECT().
-			CommitUsageLimit(mock.Anything, "testuuid", model, mock.Anything).
+			CommitUsageLimitFromUsage(mock.Anything, "testuuid", model, mock.Anything).
 			Return(nil).
 			Once()
 		tester.mocks.openAIComp.EXPECT().
@@ -300,7 +300,7 @@ func TestRecordResponsesUsageSkipsBillingOnErrorStatus(t *testing.T) {
 			}).
 			Maybe()
 
-		tester.handler.recordResponsesUsageWithTrace(c, counter, "testuuid", modelTarget, "apikey", nil, responsesTracePostProcessInput{
+		tester.handler.recordResponsesUsageWithTrace(c, counter, nil, "testuuid", modelTarget, "apikey", nil, responsesTracePostProcessInput{
 			StatusCode: http.StatusInternalServerError,
 		})
 
@@ -326,7 +326,7 @@ func TestRecordResponsesUsageSkipsBillingOnRedirectStatus(t *testing.T) {
 
 		var billingCalled atomic.Bool
 		tester.mocks.openAIComp.EXPECT().
-			CommitUsageLimit(mock.Anything, "testuuid", model, mock.Anything).
+			CommitUsageLimitFromUsage(mock.Anything, "testuuid", model, mock.Anything).
 			Return(nil).
 			Once()
 		tester.mocks.openAIComp.EXPECT().
@@ -336,7 +336,7 @@ func TestRecordResponsesUsageSkipsBillingOnRedirectStatus(t *testing.T) {
 			}).
 			Maybe()
 
-		tester.handler.recordResponsesUsageWithTrace(c, counter, "testuuid", modelTarget, "apikey", nil, responsesTracePostProcessInput{
+		tester.handler.recordResponsesUsageWithTrace(c, counter, nil, "testuuid", modelTarget, "apikey", nil, responsesTracePostProcessInput{
 			StatusCode: http.StatusFound,
 		})
 

@@ -27,12 +27,13 @@ type RecordMetricsParams struct {
 	FinalWrite     MetricsRecorderWriter
 	Counter        token.Counter
 	ProxyStartTime time.Time
+	Usage          *token.Usage
 }
 
 // Stubs for ce build — metrics helpers are no-ops when the metrics feature is
 // not compiled in.
 
-func SetMetricsModelTarget(c *gin.Context, modelName, provider string, upstreamID int64, isStream bool) {
+func SetMetricsModelTarget(p SetMetricsModelParams) {
 }
 
 func SetMetricsTTFT(c *gin.Context, ttftMs int64) {

@@ -58,7 +58,7 @@ func TestResponsesCSGHubHostedVLLMUsesNativeResponsesBackendURL(t *testing.T) {
 	}, nil).Once()
 	tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil).Once()
 	tester.mocks.openAIComp.EXPECT().CheckUsageLimit(mock.Anything, "testuuid", mock.Anything, upstream.URL+"/v1/responses").Return(nil).Once()
-	tester.mocks.openAIComp.EXPECT().CommitUsageLimit(mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
+	tester.mocks.openAIComp.EXPECT().CommitUsageLimitFromUsage(mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 	tester.mocks.openAIComp.EXPECT().RecordUsageFromTokenUsage(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 
 	tester.handler.Responses(c)
@@ -258,7 +258,7 @@ func TestResponsesPreRequestSensitivePromptCleanAllowsExecution(t *testing.T) {
 	}).
 		Return(&rpc.CheckResult{IsSensitive: false}, nil).Once()
 	tester.mocks.openAIComp.EXPECT().CheckUsageLimit(mock.Anything, "testuuid", model, mock.Anything).Return(nil).Maybe()
-	tester.mocks.openAIComp.EXPECT().CommitUsageLimit(mock.Anything, mock.Anything, model, mock.Anything).Return(nil).Maybe()
+	tester.mocks.openAIComp.EXPECT().CommitUsageLimitFromUsage(mock.Anything, mock.Anything, model, mock.Anything).Return(nil).Maybe()
 	tester.mocks.openAIComp.EXPECT().RecordUsageFromTokenUsage(mock.Anything, mock.Anything, model, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 
 	tester.handler.Responses(c)
@@ -297,7 +297,7 @@ func TestResponsesWhitelistSkipsOutputModeration(t *testing.T) {
 		[]database.RepositoryFileCheckRule{{RuleType: database.RuleTypeNamespace, Pattern: "sensitive-model"}}, nil,
 	).Once()
 	tester.mocks.openAIComp.EXPECT().CheckUsageLimit(mock.Anything, "testuuid", model, mock.Anything).Return(nil).Maybe()
-	tester.mocks.openAIComp.EXPECT().CommitUsageLimit(mock.Anything, mock.Anything, model, mock.Anything).Return(nil).Maybe()
+	tester.mocks.openAIComp.EXPECT().CommitUsageLimitFromUsage(mock.Anything, mock.Anything, model, mock.Anything).Return(nil).Maybe()
 	tester.mocks.openAIComp.EXPECT().RecordUsageFromTokenUsage(mock.Anything, mock.Anything, model, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 
 	tester.handler.Responses(c)

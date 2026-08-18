@@ -8,9 +8,7 @@ import (
 	context "context"
 
 	mock "github.com/stretchr/testify/mock"
-
 	token "opencsg.com/csghub-server/aigateway/token"
-
 	types "opencsg.com/csghub-server/aigateway/types"
 )
 
@@ -290,6 +288,55 @@ func (_c *MockOpenAIComponent_CommitUsageLimit_Call) Return(_a0 error) *MockOpen
 }
 
 func (_c *MockOpenAIComponent_CommitUsageLimit_Call) RunAndReturn(run func(context.Context, string, *types.Model, token.Counter) error) *MockOpenAIComponent_CommitUsageLimit_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// CommitUsageLimitFromUsage provides a mock function with given fields: ctx, userUUID, model, usage
+func (_m *MockOpenAIComponent) CommitUsageLimitFromUsage(ctx context.Context, userUUID string, model *types.Model, usage *token.Usage) error {
+	ret := _m.Called(ctx, userUUID, model, usage)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CommitUsageLimitFromUsage")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, *types.Model, *token.Usage) error); ok {
+		r0 = rf(ctx, userUUID, model, usage)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockOpenAIComponent_CommitUsageLimitFromUsage_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CommitUsageLimitFromUsage'
+type MockOpenAIComponent_CommitUsageLimitFromUsage_Call struct {
+	*mock.Call
+}
+
+// CommitUsageLimitFromUsage is a helper method to define mock.On call
+//   - ctx context.Context
+//   - userUUID string
+//   - model *types.Model
+//   - usage *token.Usage
+func (_e *MockOpenAIComponent_Expecter) CommitUsageLimitFromUsage(ctx interface{}, userUUID interface{}, model interface{}, usage interface{}) *MockOpenAIComponent_CommitUsageLimitFromUsage_Call {
+	return &MockOpenAIComponent_CommitUsageLimitFromUsage_Call{Call: _e.mock.On("CommitUsageLimitFromUsage", ctx, userUUID, model, usage)}
+}
+
+func (_c *MockOpenAIComponent_CommitUsageLimitFromUsage_Call) Run(run func(ctx context.Context, userUUID string, model *types.Model, usage *token.Usage)) *MockOpenAIComponent_CommitUsageLimitFromUsage_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(*types.Model), args[3].(*token.Usage))
+	})
+	return _c
+}
+
+func (_c *MockOpenAIComponent_CommitUsageLimitFromUsage_Call) Return(_a0 error) *MockOpenAIComponent_CommitUsageLimitFromUsage_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockOpenAIComponent_CommitUsageLimitFromUsage_Call) RunAndReturn(run func(context.Context, string, *types.Model, *token.Usage) error) *MockOpenAIComponent_CommitUsageLimitFromUsage_Call {
 	_c.Call.Return(run)
 	return _c
 }

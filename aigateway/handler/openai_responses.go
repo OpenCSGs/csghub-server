@@ -59,6 +59,15 @@ func (h *OpenAIHandlerImpl) Responses(c *gin.Context) {
 	}
 
 	modelTarget, ok := h.resolveResponsesModelTarget(c, username, publicModelID, previousResponse.RequiredUpstreamID)
+	// Metrics key point 1: enrich business data on the RequestMetrics object.
+	// When resolution fails (ok == false), modelTarget is nil and only the
+	// requested modelID is recorded.
+	SetMetricsModelTarget(SetMetricsModelParams{
+		C:           c,
+		ModelID:     publicModelID,
+		ModelTarget: modelTarget,
+		IsStream:    req.Stream,
+	})
 	if !ok {
 		return
 	}

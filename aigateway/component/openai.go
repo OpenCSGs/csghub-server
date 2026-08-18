@@ -40,6 +40,7 @@ type OpenAIComponent interface {
 	CheckBalance(ctx context.Context, nsUUID string) error
 	CheckUsageLimit(ctx context.Context, userUUID string, model *types.Model, endpoint string) error
 	CommitUsageLimit(ctx context.Context, userUUID string, model *types.Model, tokenCounter token.Counter) error
+	CommitUsageLimitFromUsage(ctx context.Context, userUUID string, model *types.Model, usage *token.Usage) error
 	// CanManageModel reports whether the user can manage the given model
 	// (e.g. upload or delete voices of a TTS deployment): only the deploy
 	// owner and platform admins are allowed.
