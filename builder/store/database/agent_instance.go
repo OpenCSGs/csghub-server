@@ -143,7 +143,7 @@ func (s *agentTemplateStoreImpl) FindByTypeAndName(ctx context.Context, agentTyp
 	return templates, nil
 }
 
-func (s *agentTemplateStoreImpl) applyAgentTemplateFilters(query *bun.SelectQuery, filter types.AgentTemplateFilter) *bun.SelectQuery {
+func (s *agentTemplateStoreImpl) applyAgentTemplateFilters(query *bun.SelectQuery, userUUID string, filter types.AgentTemplateFilter) *bun.SelectQuery {
 	filter.Search = strings.TrimSpace(filter.Search)
 	if filter.Search != "" {
 		searchPattern := "%" + filter.Search + "%"
@@ -152,6 +152,14 @@ func (s *agentTemplateStoreImpl) applyAgentTemplateFilters(query *bun.SelectQuer
 
 	if filter.Type != "" {
 		query = query.Where("at.type = ?", filter.Type)
+	}
+
+	if filter.Editable != nil {
+		if *filter.Editable {
+			query = query.Where("at.user_uuid = ?", userUUID)
+		} else {
+			query = query.Where("at.user_uuid != ?", userUUID)
+		}
 	}
 
 	return query
@@ -177,7 +185,7 @@ func (s *agentTemplateStoreImpl) ListByUserUUID(ctx context.Context, userUUID st
 		Where("at.deleted_at IS NULL").
 		Where("at.user_uuid = ? OR at.public = ?", userUUID, true)
 
-	query = s.applyAgentTemplateFilters(query, filter)
+	query = s.applyAgentTemplateFilters(query, userUUID, filter)
 
 	total, err := query.Count(ctx)
 	if err != nil {

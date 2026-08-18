@@ -47,6 +47,7 @@ type AgentTemplate struct {
 	Description *string         `json:"description" binding:"omitempty,max=500"` // Agent template description
 	Content     *string         `json:"content,omitempty"`                       // Used to store the complete content of the template
 	Public      *bool           `json:"public,omitempty"`                        // Whether the template is public
+	Editable    bool            `json:"editable"`                                // Whether the template is editable (only the owner can delete)
 	Metadata    *map[string]any `json:"metadata,omitempty"`                      // Template metadata
 	IsPinned    bool            `json:"is_pinned"`                               // Whether the template is pinned by the user
 	CreatedAt   time.Time       `json:"created_at"`                              // When the template was created
@@ -54,8 +55,9 @@ type AgentTemplate struct {
 }
 
 type AgentTemplateFilter struct {
-	Search string
-	Type   string
+	Search   string
+	Type     string
+	Editable *bool
 }
 
 // AgentInstance represents an instance created from an agent template

@@ -282,3 +282,97 @@ func TestAgentTemplateStore_ListByUserUUID_WithFilters(t *testing.T) {
 	require.Len(t, templates, 1) // Should return 1 template on second page
 	require.Equal(t, 3, total)   // Total should still be 3
 }
+
+func TestAgentTemplateStore_ListByUserUUID_WithEditableFilter(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewAgentTemplateStoreWithDB(db)
+
+	userUUID1 := uuid.New().String()
+	userUUID2 := uuid.New().String()
+
+	// Create user1's private template (owned by user1)
+	user1Private := &database.AgentTemplate{
+		Type:     "langflow",
+		UserUUID: userUUID1,
+		Name:     "User1 Private Template",
+		Content:  "private",
+		Public:   false,
+	}
+	_, err := store.Create(ctx, user1Private)
+	require.NoError(t, err)
+
+	// Create user1's public template (owned by user1)
+	user1Public := &database.AgentTemplate{
+		Type:     "code",
+		UserUUID: userUUID1,
+		Name:     "User1 Public Template",
+		Content:  "public",
+		Public:   true,
+	}
+	_, err = store.Create(ctx, user1Public)
+	require.NoError(t, err)
+
+	// Create user2's public template (not owned by user1)
+	user2Public := &database.AgentTemplate{
+		Type:     "agno",
+		UserUUID: userUUID2,
+		Name:     "User2 Public Template",
+		Content:  "public",
+		Public:   true,
+	}
+	_, err = store.Create(ctx, user2Public)
+	require.NoError(t, err)
+
+	// Create user2's private template (not owned by user1, excluded by base query)
+	user2Private := &database.AgentTemplate{
+		Type:     "langflow",
+		UserUUID: userUUID2,
+		Name:     "User2 Private Template",
+		Content:  "private",
+		Public:   false,
+	}
+	_, err = store.Create(ctx, user2Private)
+	require.NoError(t, err)
+
+	// Editable=true should return only templates owned by user1
+	editableTrue := true
+	templates, total, err := store.ListByUserUUID(ctx, userUUID1, types.AgentTemplateFilter{Editable: &editableTrue}, 10, 1)
+	require.NoError(t, err)
+	require.Len(t, templates, 2)
+	require.Equal(t, 2, total)
+	for _, tmpl := range templates {
+		require.Equal(t, userUUID1, tmpl.UserUUID, "All templates should belong to user1 when Editable=true")
+	}
+
+	// Editable=false should return only public templates not owned by user1
+	editableFalse := false
+	templates, total, err = store.ListByUserUUID(ctx, userUUID1, types.AgentTemplateFilter{Editable: &editableFalse}, 10, 1)
+	require.NoError(t, err)
+	require.Len(t, templates, 1)
+	require.Equal(t, 1, total)
+	require.Equal(t, user2Public.ID, templates[0].ID, "Only user2's public template should be returned when Editable=false")
+
+	// Combined filter (Editable=true + Type)
+	templates, total, err = store.ListByUserUUID(ctx, userUUID1, types.AgentTemplateFilter{Editable: &editableTrue, Type: "langflow"}, 10, 1)
+	require.NoError(t, err)
+	require.Len(t, templates, 1)
+	require.Equal(t, 1, total)
+	require.Equal(t, user1Private.ID, templates[0].ID, "Only user1's private langflow template should be returned")
+
+	// Combined filter (Editable=false + Type)
+	templates, total, err = store.ListByUserUUID(ctx, userUUID1, types.AgentTemplateFilter{Editable: &editableFalse, Type: "agno"}, 10, 1)
+	require.NoError(t, err)
+	require.Len(t, templates, 1)
+	require.Equal(t, 1, total)
+	require.Equal(t, user2Public.ID, templates[0].ID, "Only user2's public agno template should be returned")
+
+	// Combined filter (Editable=true + Search)
+	templates, total, err = store.ListByUserUUID(ctx, userUUID1, types.AgentTemplateFilter{Editable: &editableTrue, Search: "Public"}, 10, 1)
+	require.NoError(t, err)
+	require.Len(t, templates, 1)
+	require.Equal(t, 1, total)
+	require.Equal(t, user1Public.ID, templates[0].ID, "Only user1's public template should match the search")
+}
