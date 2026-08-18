@@ -159,7 +159,7 @@ func (s *serviceComponentImpl) generateService(ctx context.Context, cluster *clu
 		environments = append(environments, corev1.EnvVar{Name: "NVIDIA_VISIBLE_DEVICES", Value: "none"})
 	}
 	if hardware.Npu.ResourceName == "" || hardware.Npu.Num == "" {
-		environments = append(environments, corev1.EnvVar{Name: "ASCEND_VISIBLE_DEVICES", Value: "none"})
+		environments = append(environments, corev1.EnvVar{Name: "ASCEND_VISIBLE_DEVICES", Value: "void"})
 	}
 
 	if hardware.Gcu.ResourceName == "" || hardware.Gcu.Num == "" {

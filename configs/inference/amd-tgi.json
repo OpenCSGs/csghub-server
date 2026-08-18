@@ -1,0 +1,63 @@
+{
+  "engine_name": "amd-tgi",
+  "enabled": 1,
+  "container_port": 8000,
+  "model_format": "safetensors",
+  "description": "Text Generation Inference service for AMD ROCm",
+  "engine_images": [
+    {
+      "compute_type": "gpu",
+      "image": "opencsghq/tgi-rocm:rocm6.3.1_tgi_3.3.6",
+      "driver_version": "6.3.1",
+      "engine_version": "3.3.6"
+    }
+  ],
+  "engine_args": [
+    {
+      "name": "custom-options",
+      "value": "",
+      "format": "%s"
+    }
+  ],
+  "supported_archs": [
+    "BaichuanForCausalLM",
+    "BloomForCausalLM",
+    "CohereForCausalLM",
+    "DbrxForCausalLM",
+    "DeepseekV2ForCausalLM",
+    "DeepseekV3ForCausalLM",
+    "FalconForCausalLM",
+    "GPT2LMHeadCustomModel",
+    "GPT2LMHeadModel",
+    "GPTBigCodeForCausalLM",
+    "GPTJForCausalLM",
+    "GPTNeoXForCausalLM",
+    "Gemma2ForCausalLM",
+    "Gemma3ForCausalLM",
+    "Gemma3ForConditionalGeneration",
+    "GemmaForCausalLM",
+    "GraniteForCausalLM",
+    "Idefics2ForConditionalGeneration",
+    "Idefics3ForConditionalGeneration",
+    "IdeficsForVisionText2Text",
+    "LlamaForCausalLM",
+    "Llama4ForConditionalGeneration",
+    "LlavaNextForConditionalGeneration",
+    "MPTForCausalLM",
+    "MambaForCausalLM",
+    "MistralForCausalLM",
+    "MixtralForCausalLM",
+    "MllamaForConditionalGeneration",
+    "OPTForCausalLM",
+    "PaliGemmaForConditionalGeneration",
+    "Phi3ForCausalLM",
+    "PhiForCausalLM",
+    "PhiMoEForCausalLM",
+    "Qwen2ForCausalLM",
+    "Qwen2VLForConditionalGeneration",
+    "Qwen2_5_VLForConditionalGeneration",
+    "RWForCausalLM",
+    "Starcoder2ForCausalLM",
+    "T5ForConditionalGeneration"
+  ]
+}

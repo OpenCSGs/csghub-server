@@ -26,13 +26,16 @@ fi
 GPU_MEMORY_UTILIZATION=0.9
 ENGINE_ARGS="${ENGINE_ARGS:-} --trust-remote-code --model $REPO_ID --port 8000"
 if [[ ! $ENGINE_ARGS == *"--tensor-parallel-size"* ]]; then
-    ENGINE_ARGS="$ENGINE_ARGS --tensor-parallel-size $TOTAL_GPU"
+    ENGINE_ARGS="$ENGINE_ARGS --tensor-parallel-size $GPU_NUM"
 fi
 if [[ ! $ENGINE_ARGS == *"--pipeline-parallel-size"* ]]; then
-    ENGINE_ARGS="$ENGINE_ARGS --pipeline-parallel-size 1"
+    ENGINE_ARGS="$ENGINE_ARGS --pipeline-parallel-size $LWS_GROUP_SIZE"
 fi
 if [[ ! $ENGINE_ARGS == *"--gpu-memory-utilization"* ]]; then
     ENGINE_ARGS="$ENGINE_ARGS --gpu-memory-utilization $GPU_MEMORY_UTILIZATION"
+fi
+if [[ ! $ENGINE_ARGS == *"--distributed-executor-backend"* ]]; then
+    ENGINE_ARGS="$ENGINE_ARGS --distributed-executor-backend ray"
 fi
 
 if [[ ! $ENGINE_ARGS == *"--max-model-len"* ]]; then

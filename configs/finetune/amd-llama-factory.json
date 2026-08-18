@@ -8,7 +8,7 @@
       "compute_type": "gpu",
       "image": "opencsghq/llama-factory-amd:0.9.5",
       "driver_version": "12.4",
-      "engine_version": "7.1"
+      "engine_version": "0.9.5"
     }
   ],
   "supported_models": [
