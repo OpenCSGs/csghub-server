@@ -1017,6 +1017,64 @@ func TestDeployTaskStore_ListServerless_Search(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, 3, total)    // Total should be 4
 	require.Equal(t, 2, len(dps)) // But only 2 per page
+
+	// Test 9: Filter by status (Running only)
+	dps, total, err = store.ListServerless(ctx, types.DeployReq{
+		DeployType: types.ServerlessType,
+		Status:     []int{common.Running},
+		PageOpts: types.PageOpts{
+			Page:     1,
+			PageSize: 10,
+		},
+	})
+	require.Nil(t, err)
+	require.Equal(t, 4, total) // 4 Running serverless deploys
+	require.Equal(t, 4, len(dps))
+	for _, dp := range dps {
+		require.Equal(t, common.Running, dp.Status)
+	}
+
+	// Test 10: Filter by status (Stopped only, should return 0)
+	dps, total, err = store.ListServerless(ctx, types.DeployReq{
+		DeployType: types.ServerlessType,
+		Status:     []int{common.Stopped},
+		PageOpts: types.PageOpts{
+			Page:     1,
+			PageSize: 10,
+		},
+	})
+	require.Nil(t, err)
+	require.Equal(t, 0, total)
+	require.Equal(t, 0, len(dps))
+
+	// Test 11: Filter by status combined with search
+	dps, total, err = store.ListServerless(ctx, types.DeployReq{
+		DeployType: types.ServerlessType,
+		Status:     []int{common.Running},
+		Query:      "qwen",
+		PageOpts: types.PageOpts{
+			Page:     1,
+			PageSize: 10,
+		},
+	})
+	require.Nil(t, err)
+	require.Equal(t, 3, total) // 3 Running serverless deploys matching "qwen"
+	require.Equal(t, 3, len(dps))
+
+	// Test 12: Filter by multiple statuses (Running + Deleted)
+	// Note: when Status filter is specified, both "status != Deleted" and "status IN (...)" apply as AND conditions,
+	// so Deleted records are still excluded by the first condition. This is a known limitation to be fixed.
+	dps, total, err = store.ListServerless(ctx, types.DeployReq{
+		DeployType: types.ServerlessType,
+		Status:     []int{common.Running, common.Deleted},
+		PageOpts: types.PageOpts{
+			Page:     1,
+			PageSize: 10,
+		},
+	})
+	require.Nil(t, err)
+	require.Equal(t, 4, total) // 4 Running serverless deploys (Deleted excluded by "status != Deleted" AND condition)
+	require.Equal(t, 4, len(dps))
 }
 
 func TestDeployTaskStore_GetClusterDeploys(t *testing.T) {

@@ -709,15 +709,6 @@ func (c *userComponentImpl) LikesDatasets(ctx context.Context, req *types.UserDa
 }
 
 func (c *userComponentImpl) ListServerless(ctx context.Context, req types.DeployReq) ([]types.DeployRequest, int, error) {
-	user, err := c.userStore.FindByUsername(ctx, req.CurrentUser)
-	if err != nil {
-		newError := fmt.Errorf("failed to check for the presence of the user:%s, error:%w", req.CurrentUser, err)
-		return nil, 0, newError
-	}
-	isAdmin := c.repoComponent.IsAdminRole(user)
-	if !isAdmin {
-		return nil, 0, fmt.Errorf("user %s does not have admin privileges", req.CurrentUser)
-	}
 	deploys, total, err := c.deployTaskStore.ListServerless(ctx, req)
 	if err != nil {
 		newError := fmt.Errorf("failed to get user serverless for %s with error:%w", req.RepoType, err)
