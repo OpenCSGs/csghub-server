@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/aigateway/component"
@@ -44,6 +45,7 @@ func (h *OpenAIHandlerImpl) executeAdapterResponses(c *gin.Context, req *types.R
 		return
 	}
 	setResponsesAdapterToolNamespaces(writer, toolNamespaces)
+	proxyStartTime := time.Now()
 	primaryWriter, proxyErr := h.executeChatProxyAttempt(c, writer, modelTarget, nsUUID, chatReq)
 	if proxyErr != nil {
 		finishLLMTraceWithError(generationRecorder, proxyErr, types.TraceErrUpstreamUnavailable)
@@ -61,8 +63,22 @@ func (h *OpenAIHandlerImpl) executeAdapterResponses(c *gin.Context, req *types.R
 		writeResponsesError(c, http.StatusBadGateway, "upstream_response_invalid", "api_error", err.Error())
 		return
 	}
+
+	// Synchronously record proxy-level metrics before c.Next() returns.
+	// Pre-compute usage once and share with the async post-process goroutine
+	// to avoid duplicate counter.Usage() calls.
+	responsesUsage := preComputeUsage(c.Request.Context(), responsesCounter)
+	RecordMetrics(RecordMetricsParams{
+		C:              c,
+		Ctx:            c.Request.Context(),
+		FinalWrite:     finalWriter,
+		Counter:        responsesCounter,
+		ProxyStartTime: proxyStartTime,
+		Usage:          responsesUsage,
+	})
+
 	traceInput := newResponsesTracePostProcessInput(generationRecorder, req, retryWriterStatusCode(finalWriter), finalWriter.FirstWriteAt())
-	h.recordResponsesUsageWithTrace(c, responsesCounter, nsUUID, modelTarget, apikey, logCapture, traceInput)
+	h.recordResponsesUsageWithTrace(c, responsesCounter, responsesUsage, nsUUID, modelTarget, apikey, logCapture, traceInput)
 }
 
 func decodeResponsesAdapterChatBody(bufferWriter *bufferCommonResponseWriter) ([]byte, error) {

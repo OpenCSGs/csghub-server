@@ -149,14 +149,15 @@ func TestOpenAIHandler_Rerank(t *testing.T) {
 		counter.EXPECT().Embedding(mock.MatchedBy(func(usage openai.CreateEmbeddingResponseUsage) bool {
 			return usage.PromptTokens == 9 && usage.TotalTokens == 9
 		})).Return().Once()
+		counter.EXPECT().Usage(mock.Anything).Return(&token.Usage{PromptTokens: 9, TotalTokens: 9}, nil).Once()
 		tester.mocks.tokenCounterFactory.EXPECT().NewEmbedding(token.CreateParam{
 			Endpoint: upstream.URL,
 			Model:    "resolved-rerank",
 		}).Return(counter).Once()
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "rerank-model").Return(model, nil).Once()
 		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil).Once()
-		tester.mocks.openAIComp.EXPECT().RecordUsage(mock.Anything, "testuuid", model, "resolved-rerank", counter, "").RunAndReturn(
-			func(ctx context.Context, userID string, model *types.Model, targetModelName string, tokenCounter token.Counter, apikey string) error {
+		tester.mocks.openAIComp.EXPECT().RecordUsageFromTokenUsage(mock.Anything, "testuuid", model, "resolved-rerank", mock.Anything, "").RunAndReturn(
+			func(ctx context.Context, userID string, model *types.Model, targetModelName string, usage *token.Usage, apikey string) error {
 				wg.Done()
 				return nil
 			}).Once()
@@ -199,6 +200,7 @@ func TestOpenAIHandler_Rerank(t *testing.T) {
 		counter.EXPECT().Embedding(mock.MatchedBy(func(usage openai.CreateEmbeddingResponseUsage) bool {
 			return usage.PromptTokens == 9 && usage.TotalTokens == 9
 		})).Return().Once()
+		counter.EXPECT().Usage(mock.Anything).Return(&token.Usage{PromptTokens: 9, TotalTokens: 9}, nil).Once()
 		tester.mocks.tokenCounterFactory.EXPECT().NewEmbedding(token.CreateParam{
 			Endpoint: upstream.URL,
 			Model:    "resolved-rerank",
@@ -206,8 +208,8 @@ func TestOpenAIHandler_Rerank(t *testing.T) {
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "rerank-model").Return(model, nil).Once()
 		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil).Once()
 		var billingCalled atomic.Bool
-		tester.mocks.openAIComp.EXPECT().RecordUsage(mock.Anything, "testuuid", model, "resolved-rerank", counter, "").
-			Run(func(context.Context, string, *types.Model, string, token.Counter, string) {
+		tester.mocks.openAIComp.EXPECT().RecordUsageFromTokenUsage(mock.Anything, "testuuid", model, "resolved-rerank", mock.Anything, "").
+			Run(func(context.Context, string, *types.Model, string, *token.Usage, string) {
 				billingCalled.Store(true)
 			}).Maybe()
 
@@ -255,6 +257,7 @@ func TestOpenAIHandler_Rerank(t *testing.T) {
 		counter.EXPECT().Embedding(mock.MatchedBy(func(usage openai.CreateEmbeddingResponseUsage) bool {
 			return usage.PromptTokens == 9 && usage.TotalTokens == 9
 		})).Return().Once()
+		counter.EXPECT().Usage(mock.Anything).Return(&token.Usage{PromptTokens: 9, TotalTokens: 9}, nil).Once()
 		tester.mocks.tokenCounterFactory.EXPECT().NewEmbedding(token.CreateParam{
 			Endpoint: upstream.URL,
 			Model:    "resolved-rerank",
@@ -262,8 +265,8 @@ func TestOpenAIHandler_Rerank(t *testing.T) {
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "rerank-model").Return(model, nil).Once()
 		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil).Once()
 		var billingCalled atomic.Bool
-		tester.mocks.openAIComp.EXPECT().RecordUsage(mock.Anything, "testuuid", model, "resolved-rerank", counter, "").
-			Run(func(context.Context, string, *types.Model, string, token.Counter, string) {
+		tester.mocks.openAIComp.EXPECT().RecordUsageFromTokenUsage(mock.Anything, "testuuid", model, "resolved-rerank", mock.Anything, "").
+			Run(func(context.Context, string, *types.Model, string, *token.Usage, string) {
 				billingCalled.Store(true)
 			}).Maybe()
 

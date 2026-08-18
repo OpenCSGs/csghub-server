@@ -69,6 +69,12 @@ func (h *OpenAIHandlerImpl) Speech(c *gin.Context) {
 	isSSE := req.Stream || strings.EqualFold(req.StreamFormat, "sse")
 
 	modelTarget, err := h.resolveModelTarget(ctx, username, modelID, c.Request.Header)
+	SetMetricsModelTarget(SetMetricsModelParams{
+		C:           c,
+		ModelID:     modelID,
+		ModelTarget: modelTarget,
+		IsStream:    isSSE,
+	})
 	if err != nil {
 		preflight.RecordError(err, "model_resolve")
 		handleModelTargetError(c, ctx, modelID, "failed to get speech target address", err)
@@ -274,6 +280,12 @@ func (h *OpenAIHandlerImpl) SpeechBatch(c *gin.Context) {
 	}
 
 	modelTarget, err := h.resolveModelTarget(ctx, username, modelID, c.Request.Header)
+	SetMetricsModelTarget(SetMetricsModelParams{
+		C:           c,
+		ModelID:     modelID,
+		ModelTarget: modelTarget,
+		IsStream:    false,
+	})
 	if err != nil {
 		preflight.RecordError(err, "model_resolve")
 		handleModelTargetError(c, ctx, modelID, "failed to get speech batch target address", err)

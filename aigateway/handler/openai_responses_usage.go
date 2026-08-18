@@ -32,7 +32,7 @@ func (h *OpenAIHandlerImpl) newResponsesTokenCounter(modelTarget *resolvedModelT
 	return token.NewResponsesTokenCounter(tokenizer)
 }
 
-func (h *OpenAIHandlerImpl) recordResponsesUsageWithTrace(c *gin.Context, counter token.ResponsesTokenCounter, nsUUID string, modelTarget *resolvedModelTarget, apikey string, recorder *responsespkg.LLMLogRecorder, traceInput responsesTracePostProcessInput) {
+func (h *OpenAIHandlerImpl) recordResponsesUsageWithTrace(c *gin.Context, counter token.ResponsesTokenCounter, preUsage *token.Usage, nsUUID string, modelTarget *resolvedModelTarget, apikey string, recorder *responsespkg.LLMLogRecorder, traceInput responsesTracePostProcessInput) {
 	if modelTarget == nil || modelTarget.Model == nil {
 		return
 	}
@@ -46,8 +46,11 @@ func (h *OpenAIHandlerImpl) recordResponsesUsageWithTrace(c *gin.Context, counte
 				}
 			}
 		}()
-		var tokenUsage *token.Usage
-		if counter != nil {
+		// Use the pre-computed usage from the sync path when available;
+		// fall back to a fresh counter.Usage() call only when the sync
+		// pre-compute failed (nil).
+		tokenUsage := preUsage
+		if tokenUsage == nil && counter != nil {
 			var err error
 			usageCtx, cancel := context.WithTimeout(baseCtx, 2*time.Second)
 			tokenUsage, err = counter.Usage(usageCtx)
@@ -59,17 +62,17 @@ func (h *OpenAIHandlerImpl) recordResponsesUsageWithTrace(c *gin.Context, counte
 					slog.String("provider", modelTarget.Model.Provider),
 					slog.Any("error", err))
 			}
-			if tokenUsage != nil && tokenUsage.Source != "" {
-				slog.WarnContext(baseCtx, "responses usage fallback",
-					slog.String("step", "token_usage"),
-					slog.String("usage_source", tokenUsage.Source),
-					slog.String("usage_reason", tokenUsage.SourceReason),
-					slog.String("model", modelTarget.ModelName),
-					slog.String("provider", modelTarget.Model.Provider),
-					slog.Int64("prompt_tokens", tokenUsage.PromptTokens),
-					slog.Int64("completion_tokens", tokenUsage.CompletionTokens),
-					slog.Int64("total_tokens", tokenUsage.TotalTokens))
-			}
+		}
+		if tokenUsage != nil && tokenUsage.Source != "" {
+			slog.WarnContext(baseCtx, "responses usage fallback",
+				slog.String("step", "token_usage"),
+				slog.String("usage_source", tokenUsage.Source),
+				slog.String("usage_reason", tokenUsage.SourceReason),
+				slog.String("model", modelTarget.ModelName),
+				slog.String("provider", modelTarget.Model.Provider),
+				slog.Int64("prompt_tokens", tokenUsage.PromptTokens),
+				slog.Int64("completion_tokens", tokenUsage.CompletionTokens),
+				slog.Int64("total_tokens", tokenUsage.TotalTokens))
 		}
 		if traceInput.Recorder != nil {
 			var inputMsgs, outputMsgs []types.GenerationMessage
@@ -81,9 +84,9 @@ func (h *OpenAIHandlerImpl) recordResponsesUsageWithTrace(c *gin.Context, counte
 			recordResponsesTraceCompletion(traceInput, modelTarget.Model.Provider, modelTarget.ModelName, tokenUsage, inputMsgs, outputMsgs, recorderTraceInfo(recorder))
 			traceInput.Recorder.End()
 		}
-		if counter != nil {
+		if tokenUsage != nil {
 			commitCtx, cancel := context.WithTimeout(baseCtx, time.Second)
-			if err := h.openaiComponent.CommitUsageLimit(commitCtx, nsUUID, modelTarget.Model, counter); err != nil {
+			if err := h.openaiComponent.CommitUsageLimitFromUsage(commitCtx, nsUUID, modelTarget.Model, tokenUsage); err != nil {
 				slog.ErrorContext(baseCtx, "failed to commit responses usage limit",
 					slog.String("step", "commit_usage_limit"),
 					slog.String("model", modelTarget.ModelName),

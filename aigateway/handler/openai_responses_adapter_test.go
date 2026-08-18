@@ -38,7 +38,7 @@ func TestExecuteAdapterResponsesSetsStreamHeader(t *testing.T) {
 	tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "adapter-model").Return(model, nil).Maybe()
 	tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil).Maybe()
 	tester.mocks.openAIComp.EXPECT().CheckUsageLimit(mock.Anything, "testuuid", model, mock.Anything).Return(nil).Maybe()
-	tester.mocks.openAIComp.EXPECT().CommitUsageLimit(mock.Anything, mock.Anything, model, mock.Anything).Return(nil).Maybe()
+	tester.mocks.openAIComp.EXPECT().CommitUsageLimitFromUsage(mock.Anything, mock.Anything, model, mock.Anything).Return(nil).Maybe()
 	tester.mocks.openAIComp.EXPECT().RecordUsageFromTokenUsage(mock.Anything, mock.Anything, model, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 
 	req := &types.ResponsesRequest{Model: "adapter-model", Input: json.RawMessage(`"hi"`), Stream: true}
@@ -73,7 +73,7 @@ func TestExecuteAdapterResponsesStreamPassthroughUpstreamJSONError(t *testing.T)
 		}},
 	}
 	tester.mocks.openAIComp.EXPECT().CheckUsageLimit(mock.Anything, "testuuid", model, mock.Anything).Return(nil).Once()
-	tester.mocks.openAIComp.EXPECT().CommitUsageLimit(mock.Anything, mock.Anything, model, mock.Anything).Return(nil).Maybe()
+	tester.mocks.openAIComp.EXPECT().CommitUsageLimitFromUsage(mock.Anything, mock.Anything, model, mock.Anything).Return(nil).Maybe()
 	tester.mocks.openAIComp.EXPECT().RecordUsageFromTokenUsage(mock.Anything, mock.Anything, model, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 
 	req := &types.ResponsesRequest{Model: "adapter-model", Input: json.RawMessage(`"hi"`), Stream: true}

@@ -59,6 +59,10 @@ func (c *fakeOpenAIComponent) CommitUsageLimit(ctx context.Context, userUUID str
 	return nil
 }
 
+func (c *fakeOpenAIComponent) CommitUsageLimitFromUsage(ctx context.Context, userUUID string, model *aigwtypes.Model, usage *token.Usage) error {
+	return nil
+}
+
 type fakeHTTPDoer struct {
 	t        *testing.T
 	wantURL  string
