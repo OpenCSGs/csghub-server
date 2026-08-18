@@ -818,11 +818,15 @@ func (h *UserHandler) GetRunServerless(ctx *gin.Context) {
 
 	statusQuery := ctx.Query("status")
 	if len(statusQuery) > 0 {
-		code, err := strconv.Atoi(strings.TrimSpace(statusQuery))
-		if err == nil {
-			req.Status = append(req.Status, code)
-		} else {
-			httpbase.BadRequestWithExt(ctx, err)
+		statusCodes := strings.Split(strings.TrimSpace(statusQuery), ",")
+		for _, status := range statusCodes {
+			code, err := strconv.Atoi(status)
+			if err == nil {
+				req.Status = append(req.Status, code)
+			} else {
+				httpbase.BadRequestWithExt(ctx, errorx.ReqParamInvalid(err, errorx.Ctx().Set("invalid", "status")))
+				return
+			}
 		}
 	}
 
