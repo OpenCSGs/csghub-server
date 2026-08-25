@@ -48,6 +48,7 @@ require (
 	github.com/naoina/toml v0.1.1
 	github.com/nicksnyder/go-i18n/v2 v2.6.0
 	github.com/nyaruka/phonenumbers v1.6.5
+	github.com/open-feature/go-sdk v1.17.2
 	github.com/openai/openai-go/v3 v3.8.1
 	github.com/oschwald/geoip2-golang/v2 v2.0.0
 	github.com/parquet-go/parquet-go v0.24.0
@@ -299,7 +300,7 @@ require (
 	go.uber.org/dig v1.18.1 // indirect
 	go.uber.org/fx v1.23.0 // indirect
 	go.uber.org/goleak v1.3.0 // indirect
-	go.uber.org/mock v0.5.0 // indirect
+	go.uber.org/mock v0.6.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.4 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/exp v0.0.0-20260112195511-716be5621a96 // indirect

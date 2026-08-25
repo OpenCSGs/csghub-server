@@ -1,5 +1,17 @@
 {
     "error.LICENSE-ERR-0": {
-        "other": "未找到有效的許可證"
+        "other": "未找到有效的許可證。"
+    },
+    "error.LICENSE-ERR-1": {
+        "other": "許可證已過期，無法驗證和導入。"
+    },
+    "error.LICENSE-ERR-2": {
+        "other": "當前許可證未啟用該功能。"
+    },
+    "error.LICENSE-ERR-3": {
+        "other": "當前操作超出許可證允許的限制。"
+    },
+    "error.LICENSE-ERR-4": {
+        "other": "許可證擴展數據無效。"
     }
 }

@@ -86,6 +86,12 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	middlewareCollection.Repo.RepoExists = middleware.RepoExists(config)
 	middlewareCollection.License.Check = middleware.CheckLicense(config)
 
+	featureGate, err := middleware.NewFeatureGate(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating license feature gate: %w", err)
+	}
+	middlewareCollection.License.FeatureGate = featureGate
+
 	//add router for golang pprof
 	debugGroup := r.Group("/debug", middlewareCollection.Auth.NeedAPIKey)
 	pprof.RouteRegister(debugGroup, "pprof")

@@ -1,0 +1,8 @@
+{
+    "license.feature.audit_log.name": {
+        "other": "审计日志"
+    },
+    "license.feature.audit_log.description": {
+        "other": "允许访问审计日志功能。"
+    }
+}

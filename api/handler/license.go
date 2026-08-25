@@ -16,5 +16,6 @@ func NewLicenseHandler(config *config.Config) (*LicenseHandler, error) {
 	if err != nil {
 		return nil, fmt.Errorf("fail to create license component, err: %w", err)
 	}
+	lc = component.NewSharedCachedLicenseComponentWithKey(config, lc)
 	return &LicenseHandler{lc: lc}, nil
 }

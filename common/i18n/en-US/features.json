@@ -1,0 +1,8 @@
+{
+    "license.feature.audit_log.name": {
+        "other": "Audit log"
+    },
+    "license.feature.audit_log.description": {
+        "other": "Allow access to audit log functionality."
+    }
+}
