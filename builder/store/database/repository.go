@@ -890,7 +890,7 @@ func (s *repoStoreImpl) PublicToUser(ctx context.Context, repoType types.Reposit
 		return
 	}
 
-	q.Order(sortBy[filter.Sort])
+	applyRepositorySort(q, filter.Sort)
 
 	count, err = q.Count(ctx)
 	err = errorx.HandleDBError(err, errorx.Ctx().
@@ -1050,7 +1050,7 @@ func (s *repoStoreImpl) publicToUserTrending(ctx context.Context, repoType types
 		return
 	}
 
-	err = q.OrderExpr("rrs.score DESC NULLS LAST").
+	err = q.OrderExpr("rrs.score DESC NULLS LAST, r.id DESC").
 		Limit(per).
 		Offset((page-1)*per).
 		Scan(ctx, &repos)
@@ -1238,7 +1238,7 @@ func (s *repoStoreImpl) PublicToUserV2(ctx context.Context, repoType types.Repos
 		return
 	}
 
-	q.Order(sortBy[filter.Sort])
+	applyRepositorySort(q, filter.Sort)
 
 	count, err = q.Count(ctx)
 	err = errorx.HandleDBError(err, errorx.Ctx().
@@ -1252,6 +1252,20 @@ func (s *repoStoreImpl) PublicToUserV2(ctx context.Context, repoType types.Repos
 	err = q.Limit(per).Offset((page - 1) * per).Scan(ctx)
 
 	return
+}
+
+// applyRepositorySort applies stable, repository-qualified ordering to list queries.
+func applyRepositorySort(q *bun.SelectQuery, sort string) {
+	switch sort {
+	case "recently_update":
+		q.OrderExpr("repository.updated_at DESC NULLS LAST, repository.id DESC")
+	case "most_download":
+		q.OrderExpr("repository.download_count DESC NULLS LAST, repository.id DESC")
+	case "most_favorite":
+		q.OrderExpr("repository.likes DESC NULLS LAST, repository.id DESC")
+	case "most_star":
+		q.OrderExpr("repository.star_count DESC NULLS LAST, repository.id DESC")
+	}
 }
 
 // publicToUserTrendingV2 is like publicToUserTrending but skips post-hoc tag batch loading.
@@ -1391,7 +1405,7 @@ func (s *repoStoreImpl) publicToUserTrendingV2(ctx context.Context, repoType typ
 		return
 	}
 
-	err = q.OrderExpr("rrs.score DESC NULLS LAST").
+	err = q.OrderExpr("rrs.score DESC NULLS LAST, r.id DESC").
 		Limit(per).
 		Offset((page-1)*per).
 		Scan(ctx, &repos)

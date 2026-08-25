@@ -711,6 +711,16 @@ func TestRepoStore_PublicToUser(t *testing.T) {
 		},
 		{
 			admin: false, repoType: types.CodeRepo,
+			sort:     "most_favorite",
+			expected: []string{"rp6", "rp5", "rp4", "rp2", "rp1"},
+		},
+		{
+			admin: false, repoType: types.CodeRepo,
+			sort:     "most_star",
+			expected: []string{"rp6", "rp5", "rp4", "rp2", "rp1"},
+		},
+		{
+			admin: false, repoType: types.CodeRepo,
 			sort:     "trending",
 			expected: []string{"rp6", "rp5", "rp4", "rp2", "rp1"},
 		},
@@ -768,10 +778,11 @@ func TestRepoStore_PublicToUser(t *testing.T) {
 				},
 			}
 
+			fixedUpdatedAt := time.Now()
 			for _, repo := range repos {
 				repo.GitPath = repo.Path
-				// update time forcely to make sure the order of repos since the updated_at will not be updated automatically
-				repo.UpdatedAt = time.Now()
+				// Use the same update time to verify ID provides deterministic tie-breaking.
+				repo.UpdatedAt = fixedUpdatedAt
 				rn, err := store.CreateRepo(ctx, *repo)
 				require.Nil(t, err)
 
