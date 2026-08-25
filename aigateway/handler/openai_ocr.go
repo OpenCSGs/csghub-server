@@ -79,6 +79,12 @@ func (h *OpenAIHandlerImpl) OCR(c *gin.Context) {
 	modelID := ocrReq.Model
 
 	modelTarget, err := h.resolveModelTarget(ctx, username, modelID, c.Request.Header)
+	SetMetricsModelTarget(SetMetricsModelParams{
+		C:           c,
+		ModelID:     modelID,
+		ModelTarget: modelTarget,
+		IsStream:    false,
+	})
 	if err != nil {
 		preflight.RecordError(err, "model_resolve")
 		handleModelTargetError(c, ctx, modelID, "failed to get ocr target address", err)

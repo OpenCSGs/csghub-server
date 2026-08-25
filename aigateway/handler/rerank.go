@@ -56,6 +56,12 @@ func (h *OpenAIHandlerImpl) Rerank(c *gin.Context) {
 	}
 	modelID := req.Model
 	modelTarget, err := h.resolveModelTarget(ctx, username, modelID, c.Request.Header)
+	SetMetricsModelTarget(SetMetricsModelParams{
+		C:           c,
+		ModelID:     modelID,
+		ModelTarget: modelTarget,
+		IsStream:    false,
+	})
 	if err != nil {
 		preflight.RecordError(err, "model_resolve")
 		handleModelTargetError(c, ctx, modelID, "failed to get rerank target address", err)
@@ -102,15 +108,43 @@ func (h *OpenAIHandlerImpl) Rerank(c *gin.Context) {
 	// tokenizer fallback input in case the engine returns no usage info
 	tokenCounter.Input(req.Query + "\n" + strings.Join(req.Documents, "\n"))
 
+	proxyStartTime := time.Now()
 	rp.ServeHTTP(w, c.Request, proxyToAPI, modelTarget.Host)
+
+	// Synchronously record proxy-level metrics before c.Next() returns.
+	// Capture usage first so the counter has token counts available for
+	// RecordMetrics to pre-fetch synchronously.  FinalWrite is nil because
+	// rerank is non-streaming — TTFT is not applicable.
+	// Pre-compute usage once and share with the async goroutine to avoid
+	// duplicate counter.Usage() calls.
+	w.CaptureRerankUsage()
+	rerankUsage := preComputeUsage(ctx, tokenCounter)
+	RecordMetrics(RecordMetricsParams{
+		C:              c,
+		Ctx:            ctx,
+		FinalWrite:     nil,
+		Counter:        tokenCounter,
+		ProxyStartTime: proxyStartTime,
+		Usage:          rerankUsage,
+	})
+
 	go func() {
 		usageCtx, cancel := context.WithTimeout(context.WithoutCancel(c.Request.Context()), 3*time.Second)
 		defer cancel()
 
-		w.CaptureRerankUsage()
+		// Use the pre-computed usage from the sync path; fall back to a
+		// fresh counter.Usage() call only when sync pre-compute failed.
+		usage := rerankUsage
+		if usage == nil && tokenCounter != nil {
+			var usageErr error
+			usage, usageErr = tokenCounter.Usage(usageCtx)
+			if usageErr != nil {
+				slog.ErrorContext(usageCtx, "failed to get rerank token usage", slog.Any("error", usageErr))
+			}
+		}
 
-		if isSuccessfulStatus(w.StatusCode()) {
-			err := h.openaiComponent.RecordUsage(usageCtx, nsUUID, modelTarget.Model, modelTarget.ModelName, tokenCounter, apikey)
+		if usage != nil && isSuccessfulStatus(w.StatusCode()) {
+			err := h.openaiComponent.RecordUsageFromTokenUsage(usageCtx, nsUUID, modelTarget.Model, modelTarget.ModelName, usage, apikey)
 			if err != nil {
 				slog.ErrorContext(c, "failed to record rerank token usage", "error", err)
 			}

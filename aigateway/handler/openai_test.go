@@ -129,7 +129,7 @@ func expectCheckUsageLimit(tester *testerOpenAIHandler, model *types.Model, endp
 }
 
 func expectCommitUsageLimit(tester *testerOpenAIHandler, model *types.Model, counter token.Counter) {
-	tester.mocks.openAIComp.EXPECT().CommitUsageLimit(mock.Anything, "testuuid", model, counter).Return(nil).Once()
+	tester.mocks.openAIComp.EXPECT().CommitUsageLimitFromUsage(mock.Anything, "testuuid", model, mock.Anything).Return(nil).Once()
 }
 
 func expectBuildVideoMeteringEvent(t *testing.T, tester *testerOpenAIHandler) *commontypes.MeteringEvent {
@@ -1159,7 +1159,7 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 			llmTokenCounter.EXPECT().AppendPrompts(expectReq.Messages).Return()
 			llmTokenCounter.EXPECT().Usage(mock.Anything).Return(&token.Usage{PromptTokens: 10, CompletionTokens: 20, TotalTokens: 30}, nil).Once()
 			llmTokenCounter.EXPECT().Completion(mock.Anything).Return().Once()
-			tester.mocks.openAIComp.EXPECT().CommitUsageLimit(mock.Anything, "testuuid", model, llmTokenCounter).
+			tester.mocks.openAIComp.EXPECT().CommitUsageLimitFromUsage(mock.Anything, "testuuid", model, mock.Anything).
 				Return(nil).
 				Once()
 
@@ -1378,8 +1378,8 @@ func TestOpenAIHandler_Embedding(t *testing.T) {
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "model1").
 			Return(model, nil)
 		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil)
-		tester.mocks.openAIComp.EXPECT().RecordUsage(mock.Anything, "testuuid", model, mock.Anything, mock.Anything, "").RunAndReturn(
-			func(ctx context.Context, userID string, model *types.Model, targetModelName string, counter token.Counter, apikey string) error {
+		tester.mocks.openAIComp.EXPECT().RecordUsageFromTokenUsage(mock.Anything, "testuuid", model, mock.Anything, mock.Anything, "").RunAndReturn(
+			func(ctx context.Context, userID string, model *types.Model, targetModelName string, usage *token.Usage, apikey string) error {
 				wg.Done()
 				return nil
 			})
@@ -1433,7 +1433,7 @@ func TestOpenAIHandler_EmbeddingTrace(t *testing.T) {
 		}).Return(counter).Once()
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "embedding-model").Return(model, nil).Once()
 		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil).Once()
-		tester.mocks.openAIComp.EXPECT().RecordUsage(mock.Anything, "testuuid", model, "resolved-embedding", counter, "").Return(nil).Once()
+		tester.mocks.openAIComp.EXPECT().RecordUsageFromTokenUsage(mock.Anything, "testuuid", model, "resolved-embedding", mock.Anything, "").Return(nil).Once()
 
 		req := EmbeddingRequest{EmbeddingNewParams: openai.EmbeddingNewParams{
 			Model: "embedding-model",

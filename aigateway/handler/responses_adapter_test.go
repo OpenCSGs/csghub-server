@@ -264,8 +264,8 @@ func TestResponsesNativeDisablesAcceptEncoding(t *testing.T) {
 			var wg sync.WaitGroup
 			wg.Add(2)
 			tester.mocks.openAIComp.EXPECT().
-				CommitUsageLimit(mock.Anything, "testuuid", model, mock.Anything).
-				RunAndReturn(func(ctx context.Context, userUUID string, model *types.Model, counter token.Counter) error {
+				CommitUsageLimitFromUsage(mock.Anything, "testuuid", model, mock.Anything).
+				RunAndReturn(func(ctx context.Context, userUUID string, model *types.Model, usage *token.Usage) error {
 					wg.Done()
 					return nil
 				}).
@@ -1421,8 +1421,8 @@ func TestRecordResponsesUsageFallsBackToTokenCounter(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(2)
 	tester.mocks.openAIComp.EXPECT().
-		CommitUsageLimit(mock.Anything, "testuuid", model, counter).
-		RunAndReturn(func(ctx context.Context, userUUID string, model *types.Model, counter token.Counter) error {
+		CommitUsageLimitFromUsage(mock.Anything, "testuuid", model, mock.Anything).
+		RunAndReturn(func(ctx context.Context, userUUID string, model *types.Model, usage *token.Usage) error {
 			wg.Done()
 			return nil
 		}).
@@ -1440,7 +1440,7 @@ func TestRecordResponsesUsageFallsBackToTokenCounter(t *testing.T) {
 		}).
 		Once()
 
-	tester.handler.recordResponsesUsageWithTrace(c, counter, "testuuid", modelTarget, "api-key", nil, responsesTracePostProcessInput{StatusCode: http.StatusOK})
+	tester.handler.recordResponsesUsageWithTrace(c, counter, nil, "testuuid", modelTarget, "api-key", nil, responsesTracePostProcessInput{StatusCode: http.StatusOK})
 	wg.Wait()
 }
 
@@ -1457,8 +1457,8 @@ func TestRecordResponsesUsagePrefersResponsesUsage(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(2)
 	tester.mocks.openAIComp.EXPECT().
-		CommitUsageLimit(mock.Anything, "testuuid", model, mock.Anything).
-		RunAndReturn(func(ctx context.Context, userUUID string, model *types.Model, counter token.Counter) error {
+		CommitUsageLimitFromUsage(mock.Anything, "testuuid", model, mock.Anything).
+		RunAndReturn(func(ctx context.Context, userUUID string, model *types.Model, usage *token.Usage) error {
 			wg.Done()
 			return nil
 		}).
@@ -1476,7 +1476,7 @@ func TestRecordResponsesUsagePrefersResponsesUsage(t *testing.T) {
 		}).
 		Once()
 
-	tester.handler.recordResponsesUsageWithTrace(c, counter, "testuuid", modelTarget, "api-key", nil, responsesTracePostProcessInput{StatusCode: http.StatusOK})
+	tester.handler.recordResponsesUsageWithTrace(c, counter, nil, "testuuid", modelTarget, "api-key", nil, responsesTracePostProcessInput{StatusCode: http.StatusOK})
 	wg.Wait()
 }
 
@@ -1956,8 +1956,8 @@ func TestResponsesAdapterEndToEndNonFunctionToolsDropped(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(2)
 	tester.mocks.openAIComp.EXPECT().
-		CommitUsageLimit(mock.Anything, "testuuid", model, mock.Anything).
-		RunAndReturn(func(ctx context.Context, userUUID string, model *types.Model, counter token.Counter) error {
+		CommitUsageLimitFromUsage(mock.Anything, "testuuid", model, mock.Anything).
+		RunAndReturn(func(ctx context.Context, userUUID string, model *types.Model, usage *token.Usage) error {
 			wg.Done()
 			return nil
 		}).Once()

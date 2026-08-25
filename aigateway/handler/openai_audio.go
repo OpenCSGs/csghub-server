@@ -121,6 +121,12 @@ func (h *OpenAIHandlerImpl) handleAudioSTT(c *gin.Context, kind string) {
 	isStream := strings.EqualFold(firstMultipartValue(form, "stream"), "true")
 
 	modelTarget, err := h.resolveModelTarget(ctx, username, modelID, c.Request.Header)
+	SetMetricsModelTarget(SetMetricsModelParams{
+		C:           c,
+		ModelID:     modelID,
+		ModelTarget: modelTarget,
+		IsStream:    isStream,
+	})
 	if err != nil {
 		preflight.RecordError(err, "model_resolve")
 		handleModelTargetError(c, ctx, modelID, fmt.Sprintf("failed to get %s target address", kind), err)
