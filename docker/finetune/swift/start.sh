@@ -1,67 +1,91 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-if [ "x${REPO_ID}" != "x" ]; then
-    MODEL_NAME=$(echo "$REPO_ID" | cut -d'/' -f2)
-fi
-if [ ! -f "/workspace/.csghub_init" ]; then
-    touch /workspace/.csghub_init
-fi
+set -u
 
-#use csghub variable
-sed -i "s|get_hub(use_hf)|get_hub(True)|g" /etc/csghub/ms-swift/swift/llm/model/utils.py
-#change deploy port
-sed -i "s|8000|9000|" /etc/csghub/ms-swift/swift/ui/llm_infer/generate.py
+REPO_ID="${REPO_ID:-Qwen/Qwen2.5-7B-Instruct}"
+REVISION="${REVISION:-main}"
+CONTEXT_PATH="${CONTEXT_PATH:-}"
+MODEL_NAME="${REPO_ID##*/}"
+MODEL_NAME="${MODEL_NAME%%:*}"
 
-template_path="/etc/csghub/ms-swift/swift/llm/utils/template.py"
-model_ui_path="/etc/csghub/ms-swift/swift/ui/llm_train/model.py"
-infer_ui_path="/etc/csghub/ms-swift/swift/ui/llm_infer/model.py"
-export_ui_path="/etc/csghub/ms-swift/swift/ui/llm_export/model.py"
-eval_ui_path="/etc/csghub/ms-swift/swift/ui/llm_eval/model.py"
-hub_path="/etc/csghub/ms-swift/swift/hub/hub.py"
-#find model type and template type
-model_template=`python /etc/csghub/get_model_info_clean.py $MODEL_NAME`
-echo $model_template
-IFS=',' read -ra item_types <<< $model_template
-model_type=${item_types[0]}
-template_type=${item_types[1]}
-lower_transformers=${item_types[2]}
-modify_if_exists() {
-    local ui_path=$1
-    # set default model type for csghub
-    grep -q "elem_id='model_type',value=" $ui_path
-    if [ $? -ne 0 ]; then
-        sed -i "s|elem_id='model_type'|elem_id='model_type',value='${model_type}'|" $ui_path
-    fi
-    # set default template type for csghub
-    grep -q "elem_id='template',value=" $ui_path
-    if [ $? -ne 0 ]; then
-        sed -i "s|elem_id='template'|elem_id='template',value='${template_type}'|" $ui_path
-    fi
-    # set default model id for training
-    sed -i "s|Qwen/Qwen2.5-7B-Instruct|$REPO_ID|" $ui_path
-}
-if [ "x${model_type}" != "x" ]; then
-    modify_if_exists $model_ui_path
-    modify_if_exists $infer_ui_path
-    modify_if_exists $export_ui_path
-    modify_if_exists $eval_ui_path
-    #fix revision
-    sed -i "s/repo_type='model', revision=revision/repo_type='model', revision=\"$REVISION\"/g" $hub_path
-    # set required transformers
-    if [ "x${lower_transformers}" = "xyes" ]; then
-        pip install transformers==4.33.3
-    fi
+touch /workspace/.csghub_init
+
+swift_path="$(python -c 'import pathlib, swift; print(pathlib.Path(swift.__file__).resolve().parent)')"
+if [ ! -d "$swift_path" ]; then
+    echo "Unable to locate the ms-swift package directory: $swift_path" >&2
+    exit 1
 fi
 
+model_template="$(python /etc/csghub/get_model_info_clean.py "$MODEL_NAME")"
+echo "$model_template"
+IFS=',' read -r model_type template_type _ <<< "$model_template"
+
+export REPO_ID REVISION model_type template_type swift_path
+python - <<'PY'
+import os
+import re
+from pathlib import Path
+
+swift_path = Path(os.environ["swift_path"])
+repo_id = os.environ["REPO_ID"]
+model_type = os.environ["model_type"]
+template_type = os.environ["template_type"]
+
+ui_paths = [
+    swift_path / "ui/llm_train/model.py",
+    swift_path / "ui/llm_infer/model.py",
+    swift_path / "ui/llm_export/model.py",
+    swift_path / "ui/llm_eval/model.py",
+]
+
+for ui_path in ui_paths:
+    if not ui_path.is_file():
+        continue
+    content = ui_path.read_text()
+    content = content.replace("Qwen/Qwen2.5-7B-Instruct", repo_id)
+    if model_type:
+        content = re.sub(
+            r"elem_id='model_type'(?:,\s*value='[^']*')?",
+            f"elem_id='model_type', value='{model_type}'",
+            content,
+        )
+    if template_type:
+        content = re.sub(
+            r"elem_id='template'(?:,\s*value='[^']*')?",
+            f"elem_id='template', value='{template_type}'",
+            content,
+        )
+    ui_path.write_text(content)
+
+infer_ui_path = swift_path / "ui/llm_infer/llm_infer.py"
+if infer_ui_path.is_file():
+    content = infer_ui_path.read_text()
+    content = content.replace(
+        "gr.Textbox(elem_id='port', lines=1, value='8000', scale=4)",
+        "gr.Textbox(elem_id='port', lines=1, value='9000', scale=4)",
+    )
+    infer_ui_path.write_text(content)
+
+hub_utils_path = swift_path / "utils/hub_utils.py"
+if hub_utils_path.is_file():
+    content = hub_utils_path.read_text()
+    content = content.replace(
+        "hub.download_model(model_id_or_path, revision, ignore_patterns",
+        "hub.download_model(model_id_or_path, revision or os.getenv('REVISION'), ignore_patterns",
+    )
+    hub_utils_path.write_text(content)
+PY
 
 export GRADIO_ROOT_PATH="${CONTEXT_PATH}/proxy/7860"
-
+export USE_CSGHUB_TRANSFER=1
+export USE_HF=1
+export SWIFT_UI_LANG=en
 
 ascend_env=/usr/local/Ascend/ascend-toolkit/set_env.sh
 if [ -f "$ascend_env" ]; then
-    source $ascend_env
-    USE_CSGHUB_TRANSFER=1 SWIFT_UI_LANG=en swift web-ui
-else
-    USE_CSGHUB_TRANSFER=1 SWIFT_UI_LANG=en swift web-ui
+    # shellcheck disable=SC1090
+    source "$ascend_env"
 fi
+
+exec swift web-ui
 

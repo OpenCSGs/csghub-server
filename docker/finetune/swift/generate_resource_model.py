@@ -1,6 +1,7 @@
 from typing import Any, List
 import argparse
-from swift.llm import MODEL_MAPPING, TEMPLATE_MAPPING, ModelType, TemplateType
+from swift.model import MODEL_MAPPING, ModelType
+from swift.template import TEMPLATE_MAPPING, TemplateType
 
 
 def get_url_suffix(model_id):
