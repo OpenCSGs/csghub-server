@@ -291,6 +291,7 @@ type Config struct {
 		ThresholdOfStopLLMInference  int    `env:"OPENCSG_ACCOUNTING_THRESHOLD_OF_STOP_LLM_INFERENCE" default:"5000"`
 		LLMBalanceCheckCacheTTL      int    `env:"OPENCSG_ACCOUNTING_LLM_BALANCE_CHECK_CACHE_TTL" default:"120"`
 		RetryLimit                   int    `env:"OPENCSG_ACCOUNTING_RETRY_LIMIT" default:"1"`
+		AllowedSyncDeductScenes      string `env:"OPENCSG_ACCOUNTING_ALLOWED_SYNC_DEDUCT_SCENES" default:"30"`
 	}
 
 	User struct {

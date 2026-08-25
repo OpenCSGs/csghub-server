@@ -14,6 +14,7 @@ var (
 	ErrDuplicatedEvent         = errors.New("duplicated fee event uuid")
 	ErrDuplicatedMeterByUUID   = errors.New("duplicated metering event by event uuid")
 	ErrDuplicatedMeterInMinute = errors.New("duplicated metering event in minute level")
+	ErrDuplicatedAcademyOrder  = errors.New("duplicated academy order by user_uuid, scene and customer_id")
 )
 
 const (
@@ -137,9 +138,12 @@ var (
 	// starship
 	SceneStarship SceneType = 20 // starship is deprecated
 	SceneGuiAgent SceneType = 22 // gui agent is deprecated
+	// academy
+	SceneAcademyPurchase SceneType = 30 // AI Academy course purchase
 	// dataset
 	SceneDatasetPurchase   SceneType = 40 // dataset purchase
 	SceneDatasetSaleIncome SceneType = 41 // dataset sale income for seller
+
 	// unknow
 	SceneUnknow SceneType = 99 // unknow
 )
@@ -904,4 +908,35 @@ type AcctPriceOffLineReq struct {
 	CurrentUser string  `json:"-"`
 	SkuType     SKUType `json:"sku_type" binding:"required"`
 	ResourceID  string  `json:"resource_id" binding:"required"`
+}
+
+type SyncDeductReq struct {
+	CurrentUser  string    `json:"-"`
+	EventUUID    uuid.UUID `json:"-"`
+	TargetUUID   string    `json:"-"`
+	Value        float64   `json:"value" binding:"required,lt=0"`
+	Scene        SceneType `json:"scene" binding:"required"`
+	ResourceID   string    `json:"resource_id"`
+	ResourceName string    `json:"resource_name"`
+	CustomerID   string    `json:"customer_id" binding:"required"`
+}
+
+type SyncDeductResp struct {
+	EventUUID  uuid.UUID `json:"event_uuid"`
+	TargetUUID string    `json:"target_uuid"`
+	Value      float64   `json:"value"`
+	Scene      SceneType `json:"scene"`
+	CustomerID string    `json:"customer_id"`
+}
+
+type DeductionSummary struct {
+	UserUUID    string    `json:"user_uuid"`
+	Scene       SceneType `json:"scene"`
+	CustomerID  string    `json:"customer_id"`
+	TotalValue  float64   `json:"total_value"`
+	EventUUID   uuid.UUID `json:"event_uuid"`
+}
+
+type AcctStatementExtra struct {
+	CheckBalance bool
 }
