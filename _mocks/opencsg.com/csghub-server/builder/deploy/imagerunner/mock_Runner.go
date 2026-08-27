@@ -7,10 +7,12 @@ package imagerunner
 import (
 	context "context"
 
-	httpbase "opencsg.com/csghub-server/api/httpbase"
 	commontypes "opencsg.com/csghub-server/common/types"
 
+	httpbase "opencsg.com/csghub-server/api/httpbase"
+
 	mock "github.com/stretchr/testify/mock"
+
 	types "opencsg.com/csghub-server/runner/types"
 )
 
