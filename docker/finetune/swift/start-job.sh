@@ -71,16 +71,17 @@ fi
 # Check if fine-tuning was successful
 if [ $? -eq 0 ]; then
     echo "Fine-tuning completed successfully!"
-    
-    # Check if Hugging Face export is requested
-    echo "Starting export to CSGHUB..."
-    /etc/csghub/export-to-csg.sh
-    
-    if [ $? -eq 0 ]; then
-        echo "Export to CSGHUB completed successfully!"
+
+    if [ "${EXPORT_TO_HF:-false}" = "true" ]; then
+        echo "Starting export to CSGHUB..."
+        if /etc/csghub/export-to-csg.sh; then
+            echo "Export to CSGHUB completed successfully!"
+        else
+            echo "Export to CSGHUB failed!"
+            exit 1
+        fi
     else
-        echo "Export to CSGHUB failed!"
-        exit 1
+        echo "Skipping export because EXPORT_TO_HF is not true."
     fi
 else
     echo "Fine-tuning failed!"

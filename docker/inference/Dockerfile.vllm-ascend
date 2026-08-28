@@ -13,7 +13,8 @@ RUN chmod +x /etc/csghub/*.sh
 
 WORKDIR /workspace/
 ENV HUGGINGFACE_HUB_CACHE=/workspace/ \
-    HF_HUB_ENABLE_HF_TRANSFER=0
+    HF_HUB_ENABLE_HF_TRANSFER=0 \
+    VLLM_ENFORCE_EAGER=0
 
 EXPOSE 8000
 

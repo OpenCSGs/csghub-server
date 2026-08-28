@@ -40,7 +40,8 @@ def suppress_output():
 
 # Import swift modules with all output suppressed
 with suppress_output():
-    from swift.llm import MODEL_MAPPING, TEMPLATE_MAPPING, ModelType, TemplateType
+    from swift.model import MODEL_MAPPING, ModelType
+    from swift.template import TEMPLATE_MAPPING, TemplateType
 
 
 def get_url_suffix(model_id):
@@ -56,8 +57,8 @@ def get_model_info(model_name: str):
 
         for model_type in ModelType.get_model_name_list():
             model_meta = MODEL_MAPPING[model_type]
-            template = model_meta.template
             for group in model_meta.model_groups:
+                template = group.template or model_meta.template
                 for model in group.models:
                     hf_model_id = model.hf_model_id
                     if hf_model_id is None:
@@ -68,11 +69,11 @@ def get_model_info(model_name: str):
                         lower_transformers = "yes" if '<' in requires else "no"
                         print(f'{model_type},{template},{lower_transformers}')
                         return
-        # If no model found, print default values
-        print('qwen3,qwen3,no')
+        # Let ms-swift auto-detect unknown models instead of applying an
+        # incorrect Qwen model type and template.
+        print(',,no')
     except Exception:
-        # If any error occurs, print default values
-        print('qwen3,qwen3,no')
+        print(',,no')
 
 
 if __name__ == '__main__':
