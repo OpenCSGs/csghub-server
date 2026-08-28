@@ -437,6 +437,66 @@ func (_c *MockDeployTaskStore_FindActiveDeployByNameAndType_Call) RunAndReturn(r
 	return _c
 }
 
+// FindActiveSandboxByDeployName provides a mock function with given fields: ctx, uuid, deployName
+func (_m *MockDeployTaskStore) FindActiveSandboxByDeployName(ctx context.Context, uuid string, deployName string) (*database.Deploy, error) {
+	ret := _m.Called(ctx, uuid, deployName)
+
+	if len(ret) == 0 {
+		panic("no return value specified for FindActiveSandboxByDeployName")
+	}
+
+	var r0 *database.Deploy
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) (*database.Deploy, error)); ok {
+		return rf(ctx, uuid, deployName)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) *database.Deploy); ok {
+		r0 = rf(ctx, uuid, deployName)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*database.Deploy)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
+		r1 = rf(ctx, uuid, deployName)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockDeployTaskStore_FindActiveSandboxByDeployName_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FindActiveSandboxByDeployName'
+type MockDeployTaskStore_FindActiveSandboxByDeployName_Call struct {
+	*mock.Call
+}
+
+// FindActiveSandboxByDeployName is a helper method to define mock.On call
+//   - ctx context.Context
+//   - uuid string
+//   - deployName string
+func (_e *MockDeployTaskStore_Expecter) FindActiveSandboxByDeployName(ctx interface{}, uuid interface{}, deployName interface{}) *MockDeployTaskStore_FindActiveSandboxByDeployName_Call {
+	return &MockDeployTaskStore_FindActiveSandboxByDeployName_Call{Call: _e.mock.On("FindActiveSandboxByDeployName", ctx, uuid, deployName)}
+}
+
+func (_c *MockDeployTaskStore_FindActiveSandboxByDeployName_Call) Run(run func(ctx context.Context, uuid string, deployName string)) *MockDeployTaskStore_FindActiveSandboxByDeployName_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(string))
+	})
+	return _c
+}
+
+func (_c *MockDeployTaskStore_FindActiveSandboxByDeployName_Call) Return(_a0 *database.Deploy, _a1 error) *MockDeployTaskStore_FindActiveSandboxByDeployName_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockDeployTaskStore_FindActiveSandboxByDeployName_Call) RunAndReturn(run func(context.Context, string, string) (*database.Deploy, error)) *MockDeployTaskStore_FindActiveSandboxByDeployName_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // FindByDeployNameAndType provides a mock function with given fields: ctx, uuid, deployName, deployType
 func (_m *MockDeployTaskStore) FindByDeployNameAndType(ctx context.Context, uuid string, deployName string, deployType int) (*database.Deploy, error) {
 	ret := _m.Called(ctx, uuid, deployName, deployType)
@@ -494,66 +554,6 @@ func (_c *MockDeployTaskStore_FindByDeployNameAndType_Call) Return(_a0 *database
 }
 
 func (_c *MockDeployTaskStore_FindByDeployNameAndType_Call) RunAndReturn(run func(context.Context, string, string, int) (*database.Deploy, error)) *MockDeployTaskStore_FindByDeployNameAndType_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// FindSandboxByDeployName provides a mock function with given fields: ctx, uuid, deployName
-func (_m *MockDeployTaskStore) FindSandboxByDeployName(ctx context.Context, uuid string, deployName string) (*database.Deploy, error) {
-	ret := _m.Called(ctx, uuid, deployName)
-
-	if len(ret) == 0 {
-		panic("no return value specified for FindSandboxByDeployName")
-	}
-
-	var r0 *database.Deploy
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string) (*database.Deploy, error)); ok {
-		return rf(ctx, uuid, deployName)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, string) *database.Deploy); ok {
-		r0 = rf(ctx, uuid, deployName)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*database.Deploy)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
-		r1 = rf(ctx, uuid, deployName)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// MockDeployTaskStore_FindSandboxByDeployName_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FindSandboxByDeployName'
-type MockDeployTaskStore_FindSandboxByDeployName_Call struct {
-	*mock.Call
-}
-
-// FindSandboxByDeployName is a helper method to define mock.On call
-//   - ctx context.Context
-//   - uuid string
-//   - deployName string
-func (_e *MockDeployTaskStore_Expecter) FindSandboxByDeployName(ctx interface{}, uuid interface{}, deployName interface{}) *MockDeployTaskStore_FindSandboxByDeployName_Call {
-	return &MockDeployTaskStore_FindSandboxByDeployName_Call{Call: _e.mock.On("FindSandboxByDeployName", ctx, uuid, deployName)}
-}
-
-func (_c *MockDeployTaskStore_FindSandboxByDeployName_Call) Run(run func(ctx context.Context, uuid string, deployName string)) *MockDeployTaskStore_FindSandboxByDeployName_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string))
-	})
-	return _c
-}
-
-func (_c *MockDeployTaskStore_FindSandboxByDeployName_Call) Return(_a0 *database.Deploy, _a1 error) *MockDeployTaskStore_FindSandboxByDeployName_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *MockDeployTaskStore_FindSandboxByDeployName_Call) RunAndReturn(run func(context.Context, string, string) (*database.Deploy, error)) *MockDeployTaskStore_FindSandboxByDeployName_Call {
 	_c.Call.Return(run)
 	return _c
 }

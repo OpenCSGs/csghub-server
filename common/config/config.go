@@ -212,10 +212,7 @@ type Config struct {
 		InformerSyncPeriodInMin   int    `env:"STARHUB_SERVER_SPACE_INFORMER_SYNC_PERIOD_IN_MINUTES" default:"2"`
 		StatusCheckInterval       int    `env:"STARHUB_SERVER_SPACE_STATUS_CHECK_INTERVAL" default:"10"` // 10 seconds
 		SandboxPVCName            string `env:"STARHUB_SERVER_SANDBOX_PVC_NAME" default:"sandbox-storage"`
-		// SandboxRuntimeClass is the Kubernetes RuntimeClass applied to sandbox pods.
-		// Empty means "use the cluster's default runtime" (typically runc); set it to a
-		// RuntimeClass name (e.g. "gvisor") to use a sandboxed runtime.
-		SandboxRuntimeClass string `env:"STARHUB_SERVER_SANDBOX_RUNTIME_CLASS"`
+		SandboxRuntimeClass       string `env:"STARHUB_SERVER_SANDBOX_RUNTIME_CLASS" default:"gvisor"`
 		// SandboxFreeResourceMaxIdleTimeoutMin: the idle-reclaim timeout (in minutes) applied to
 		// sandboxes created on free resources (price == 0). It acts as BOTH the default (when the
 		// caller does not pass a timeout) and the upper bound (a larger caller-provided timeout is

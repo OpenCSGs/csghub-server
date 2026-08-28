@@ -16,8 +16,9 @@ import (
 )
 
 type AccountingHandler struct {
-	accounting component.AccountingComponent
-	apiToken   string
+	accounting     component.AccountingComponent
+	apiToken       string
+	maxExportPages int
 }
 
 func NewAccountingHandler(config *config.Config) (*AccountingHandler, error) {
@@ -26,8 +27,9 @@ func NewAccountingHandler(config *config.Config) (*AccountingHandler, error) {
 		return nil, err
 	}
 	return &AccountingHandler{
-		accounting: acctComp,
-		apiToken:   config.APIToken,
+		accounting:     acctComp,
+		apiToken:       config.APIToken,
+		maxExportPages: config.Accounting.MaxExportPages,
 	}, nil
 }
 
