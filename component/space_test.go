@@ -331,6 +331,32 @@ func TestSpaceComponent_Index(t *testing.T) {
 
 }
 
+func TestSpaceComponent_IndexWithStatusUsesFilteredRepositoryQuery(t *testing.T) {
+	ctx := context.TODO()
+	sc := initializeTestSpaceComponent(ctx, t)
+	filter := &types.RepoFilter{Sort: "z", Username: "user", Status: SpaceStatusNoAppFile}
+	repos := []*database.Repository{
+		{ID: 123, Name: "r1", User: database.User{Username: "user"}},
+		{ID: 124, Name: "r2", User: database.User{Username: "user"}},
+	}
+	spaces := []database.Space{
+		{ID: 11, RepositoryID: 123},
+		{ID: 12, RepositoryID: 124},
+	}
+
+	sc.mocks.components.repo.EXPECT().
+		PublicToUser(ctx, types.SpaceRepo, "user", filter, 10, 1).
+		Return(repos, 2, nil)
+	sc.mocks.stores.SpaceMock().EXPECT().
+		ByRepoIDs(ctx, []int64{123, 124}).
+		Return(spaces, nil)
+
+	data, total, err := sc.Index(ctx, filter, 10, 1, false)
+	require.NoError(t, err)
+	require.Len(t, data, 2)
+	require.Equal(t, 2, total)
+}
+
 func TestSpaceComponent_Index_HalfCreatedRepos(t *testing.T) {
 	ctx := context.TODO()
 	sc := initializeTestSpaceComponent(ctx, t)

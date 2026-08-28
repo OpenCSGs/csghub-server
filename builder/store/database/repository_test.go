@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	mockcache "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/cache"
+	deployCommon "opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/builder/store/cache"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
@@ -984,6 +985,112 @@ func TestRepoStore_PublicToUserRangeFilters(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, 1, count)
 	require.Equal(t, "large-dataset", repos[0].Name)
+}
+
+func TestRepoStore_PublicToUserTrendingModels(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewRepoStoreWithDB(db)
+	modelStore := database.NewModelStoreWithDB(db)
+	recomStore := database.NewRecomStoreWithDB(db)
+
+	for i, name := range []string{"lower-score", "higher-score"} {
+		repo, err := store.CreateRepo(ctx, database.Repository{
+			Name:           name,
+			Path:           "test/" + name,
+			GitPath:        "models_test/" + name,
+			UserID:         123,
+			RepositoryType: types.ModelRepo,
+		})
+		require.NoError(t, err)
+		_, err = modelStore.Create(ctx, database.Model{RepositoryID: repo.ID})
+		require.NoError(t, err)
+		err = recomStore.UpsertScore(ctx, []*database.RecomRepoScore{{
+			RepositoryID: repo.ID,
+			WeightName:   database.RecomWeightTotal,
+			Score:        float64(i + 1),
+		}})
+		require.NoError(t, err)
+	}
+
+	repos, count, err := store.PublicToUser(ctx, types.ModelRepo, nil, &types.RepoFilter{
+		Sort: "trending",
+	}, 20, 1, false)
+	require.NoError(t, err)
+	require.Equal(t, 2, count)
+	require.Len(t, repos, 2)
+	require.Equal(t, "higher-score", repos[0].Name)
+	require.Equal(t, "lower-score", repos[1].Name)
+}
+
+func TestRepoStore_PublicToUserFiltersSpaceStatus(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	repoStore := database.NewRepoStoreWithDB(db)
+	spaceStore := database.NewSpaceStoreWithDB(db)
+	deployStore := database.NewDeployTaskStoreWithDB(db)
+
+	createSpace := func(name string, hasAppFile bool, status *int) *database.Repository {
+		repo, err := repoStore.CreateRepo(ctx, database.Repository{
+			Name:           name,
+			Path:           "test/" + name,
+			GitPath:        "spaces_test/" + name,
+			UserID:         123,
+			RepositoryType: types.SpaceRepo,
+		})
+		require.NoError(t, err)
+		_, err = spaceStore.Create(ctx, database.Space{
+			RepositoryID: repo.ID,
+			Sdk:          types.GRADIO.Name,
+			HasAppFile:   hasAppFile,
+		})
+		require.NoError(t, err)
+		space, err := spaceStore.ByRepoID(ctx, repo.ID)
+		require.NoError(t, err)
+		if status != nil {
+			err = deployStore.CreateDeploy(ctx, &database.Deploy{
+				SpaceID: space.ID,
+				RepoID:  repo.ID,
+				Status:  *status,
+			})
+			require.NoError(t, err)
+			latestDeploy, err := deployStore.GetLatestDeployBySpaceID(ctx, space.ID)
+			require.NoError(t, err)
+			require.Equal(t, *status, latestDeploy.Status)
+		}
+		return repo
+	}
+
+	runningStatus := deployCommon.Running
+	stoppedStatus := deployCommon.Stopped
+	runningRepo := createSpace("running", true, &runningStatus)
+	createSpace("stopped", true, &stoppedStatus)
+	noAppRepo := createSpace("no-app", false, nil)
+
+	tests := []struct {
+		name       string
+		status     string
+		expectedID int64
+	}{
+		{name: "running", status: "Running", expectedID: runningRepo.ID},
+		{name: "no app file", status: "NoAppFile", expectedID: noAppRepo.ID},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repos, count, err := repoStore.PublicToUser(ctx, types.SpaceRepo, nil, &types.RepoFilter{
+				Sort:   "recently_update",
+				Status: tt.status,
+			}, 20, 1, false)
+			require.NoError(t, err)
+			require.Equal(t, 1, count)
+			require.Len(t, repos, 1)
+			require.Equal(t, tt.expectedID, repos[0].ID)
+		})
+	}
 }
 
 func TestRepoStore_IsMirrorRepo(t *testing.T) {
