@@ -287,8 +287,9 @@ type DeployRequest struct {
 	DeployExtend
 
 	Sandbox struct {
-		Timeout    int64  `json:"timeout,omitempty"`
-		TemplateID string `json:"templateID,omitempty"`
+		Timeout        int64                  `json:"timeout,omitempty"`
+		TemplateID     string                 `json:"templateID,omitempty"`
+		ReadinessProbe *SandboxReadinessProbe `json:"readiness_probe,omitempty"`
 	}
 }
 

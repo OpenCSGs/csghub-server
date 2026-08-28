@@ -147,7 +147,9 @@ func (d *deployer) serverlessDeploy(ctx context.Context, dr types.DeployRequest)
 		// Sandbox-only fields and state reset: a reused sandbox deploy must restart from
 		// Pending. Space/serverless reset their status via StartDeploy instead, and
 		// dr.Sandbox is zero-valued for them (overwriting Timeout here would clear it).
+		deploy.RuntimeFramework = types.SandboxV2RuntimeFramework
 		deploy.Timeout = int(dr.Sandbox.Timeout)
+		deploy.ReadinessProbe = dr.Sandbox.ReadinessProbe
 		deploy.Status = common.Pending
 		deploy.StatusUpdateAt = time.Now()
 	}
@@ -205,6 +207,11 @@ func (d *deployer) dedicatedDeploy(ctx context.Context, dr types.DeployRequest) 
 		Tolerations:      dr.Tolerations,
 		PD:               dr.PD,
 		VolumeMounts:     dr.VolumeMounts,
+	}
+	if types.IsSandboxType(dr.Type) {
+		deploy.RuntimeFramework = types.SandboxV2RuntimeFramework
+		deploy.ReadinessProbe = dr.Sandbox.ReadinessProbe
+		deploy.Timeout = int(dr.Sandbox.Timeout)
 	}
 	updateDatabaseDeploy(deploy, dr)
 	err := d.deployTaskStore.CreateDeploy(ctx, deploy)
@@ -301,9 +308,18 @@ func (d *deployer) Deploy(ctx context.Context, dr types.DeployRequest) (int64, e
 }
 
 func (d *deployer) Status(ctx context.Context, dr types.DeployRequest, needDetails bool) (string, int, []types.Instance, error) {
-	deploy, err := d.deployTaskStore.GetDeployByID(ctx, dr.DeployID)
+	var deploy *database.Deploy
+	var err error
+	if dr.DeployID != 0 {
+		deploy, err = d.deployTaskStore.GetDeployByID(ctx, dr.DeployID)
+	} else if dr.SvcName != "" {
+		deploy, err = d.deployTaskStore.GetDeployBySvcName(ctx, dr.SvcName)
+	} else {
+		slog.ErrorContext(ctx, "failed to get deploy: neither deploy_id nor svc_name provided")
+		return "", common.Stopped, nil, fmt.Errorf("can't get deploy: neither deploy_id nor svc_name provided")
+	}
 	if err != nil || deploy == nil {
-		slog.ErrorContext(ctx, "failed to get deploy by deploy id", slog.Any("DeployID", dr.DeployID), slog.Any("error", err))
+		slog.ErrorContext(ctx, "failed to get deploy", slog.Any("DeployID", dr.DeployID), slog.Any("SvcName", dr.SvcName), slog.Any("error", err))
 		return "", common.Stopped, nil, fmt.Errorf("can't get deploy, %w", err)
 	}
 

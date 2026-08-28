@@ -145,12 +145,9 @@ func (c *spaceResourceComponentImpl) Index(ctx context.Context, req *types.Space
 					availableStatusList[i].NodeName = maskNodeName(availableStatusList[i].NodeName)
 				}
 			}
-			if !c.hardwareSatisfiesConstraint(constraint, hardware) {
-				// resource hardware does not meet the scenario's required_hardware bitmask
-				continue
-			}
-			if !c.replicaSatisfiesConstraint(constraint, hardware.Replicas) {
-				// resource replicas exceed the scenario's max_replica (0 = unlimited)
+			if !constraint.Satisfies(hardware) {
+				// resource hardware/replicas do not meet the scenario's constraint
+				// (required_hardware / exclude_hardware / max_replica)
 				continue
 			}
 			resourceType := common.ResourceType(hardware)
@@ -189,29 +186,6 @@ func (c *spaceResourceComponentImpl) Index(ctx context.Context, req *types.Space
 	}
 	total = len(result)
 	return result, total, nil
-}
-
-// hardwareSatisfiesConstraint reports whether the resource hardware meets the
-// scenario's hardware constraints. Delegates to the shared
-// types.HardwareSatisfiesConstraint so the Index query and the sandbox
-// auto-allocator apply identical rules. A nil constraint means no rule
-// configured => always satisfied.
-func (c *spaceResourceComponentImpl) hardwareSatisfiesConstraint(constraint *database.ScenarioConstraint, hardware types.HardWare) bool {
-	if constraint == nil {
-		return true
-	}
-	return types.HardwareSatisfiesConstraint(constraint.RequiredHardware, constraint.ExcludeHardware, hardware)
-}
-
-// replicaSatisfiesConstraint reports whether the resource replica count is within
-// the scenario's max_replica. Delegates to the shared types.ReplicaSatisfiesConstraint
-// so the Index query and the sandbox auto-allocator apply identical rules. A nil
-// constraint or a zero max_replica means "unlimited" (always satisfied).
-func (c *spaceResourceComponentImpl) replicaSatisfiesConstraint(constraint *database.ScenarioConstraint, replicas int) bool {
-	if constraint == nil {
-		return true
-	}
-	return types.ReplicaSatisfiesConstraint(constraint.MaxReplica, replicas)
 }
 
 func (c *spaceResourceComponentImpl) getHardwareModel(hardware types.HardWare) types.HardwareModel {
