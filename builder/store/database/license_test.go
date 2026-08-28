@@ -117,6 +117,13 @@ func TestLicenseStore_List(t *testing.T) {
 			req:      types.QueryLicenseReq{Search: "bar", Edition: "e2"},
 			expected: []string{"k4"},
 		},
+		{
+			// Issue #2495: "pp" only appears in k5's remark ("approved by bob"),
+			// not in company/email. After narrowing search to company+email,
+			// remark is no longer matched, so this returns nothing.
+			req:      types.QueryLicenseReq{Search: "pp"},
+			expected: []string{},
+		},
 	}
 
 	for _, c := range cases {
@@ -160,6 +167,16 @@ func TestLicenseStore_List(t *testing.T) {
 					MaxUser: 40, StartTime: time.Now(),
 					ExpireTime: time.Now().Add(time.Hour),
 					UserUUID:   "user4",
+				},
+				{
+					// Issue #2495: remark uniquely contains "pp" (in "approved"),
+					// while company/email do not — proves remark is no longer searched.
+					Key: "k5", Product: "p4",
+					Edition: "e3", Company: "acme",
+					Email: "admin@acme.com", Remark: "approved by bob",
+					MaxUser: 50, StartTime: time.Now(),
+					ExpireTime: time.Now().Add(time.Hour),
+					UserUUID: "user5",
 				},
 			}
 			for _, l := range ls {

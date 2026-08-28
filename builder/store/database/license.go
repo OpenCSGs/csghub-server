@@ -63,8 +63,10 @@ func (s *licenseStoreImpl) List(ctx context.Context, req types.QueryLicenseReq) 
 	}
 
 	if req.Search != "" {
-		query = query.Where("company LIKE ? OR email LIKE ? OR remark LIKE ?",
-			fmt.Sprintf("%%%s%%", req.Search),
+		// Issue #2495: remark is not shown in the admin license list, so
+		// matching it (e.g. "pp" matching "approve" in a remark) is confusing.
+		// Narrow search to the visible columns company and email only.
+		query = query.Where("company LIKE ? OR email LIKE ?",
 			fmt.Sprintf("%%%s%%", req.Search),
 			fmt.Sprintf("%%%s%%", req.Search))
 	}
