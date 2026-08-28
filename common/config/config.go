@@ -8,6 +8,7 @@ import (
 	"os"
 	"reflect"
 	"sync"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/mcuadros/go-defaults"
@@ -49,8 +50,7 @@ type Config struct {
 	ServerFailureRedirectURL string            `env:"STARHUB_SERVER_FAIL_REDIRECT_URL" default:"http://localhost:3000/errors/server-error"`
 	NeedPhoneVerify          bool              `env:"STARHUB_SERVER_NEED_PHONE_VERIFY" default:"false"`
 	// TimeZone is the application-wide timezone used for formatting
-	// timestamps (e.g. Loki log timestamps). It is not used by the
-	// database connection layer.
+	// timestamps (e.g. Loki log timestamps).
 	TimeZone string `env:"STARHUB_SERVER_TIMEZONE" default:"Asia/Shanghai"`
 
 	APIServer struct {
@@ -831,6 +831,7 @@ func SetConfigFile(file string) {
 
 var globalConfig *Config
 var globalConfigError error
+var _globalLocation *time.Location // private in package
 var once sync.Once
 
 func LoadConfig() (*Config, error) {
@@ -876,6 +877,13 @@ func loadConfig() (*Config, error) {
 		cfg.UniqueServiceName = genServiceName()
 	}
 
+	loc, err := time.LoadLocation(cfg.TimeZone)
+	if err != nil {
+		return nil, fmt.Errorf("invalid timezone %q: %w", cfg.TimeZone, err)
+	}
+	SetGlobalTimeZone(loc)
+	slog.Info("Init server timezone", slog.Any("config", cfg.TimeZone), slog.Any("using", _globalLocation.String()))
+
 	return cfg, nil
 }
 
@@ -899,4 +907,18 @@ func genServiceName() string {
 	}
 	slog.Debug("auto generate service name", slog.String("service_name", autoGenServiceName))
 	return autoGenServiceName
+}
+
+func GetGlobalTimeZone() *time.Location {
+	if _globalLocation == nil {
+		return time.Local
+	}
+	return _globalLocation
+}
+
+// SetGlobalTimeZone sets the global timezone location used by GetGlobalTimeZone.
+// This is primarily useful for tests that need to verify timezone-aware behavior
+// without calling LoadConfig.
+func SetGlobalTimeZone(loc *time.Location) {
+	_globalLocation = loc
 }

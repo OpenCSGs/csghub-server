@@ -26,23 +26,19 @@ type lokiClient struct {
 }
 
 // NewLokiClient creates a new Loki client
-func NewLokiClient(url string, clientID types.ClientType, config *config.Config) (LogSender, error) {
+func NewLokiClient(url string, clientID types.ClientType, cfg *config.Config) (LogSender, error) {
 	lc, err := loki.NewClient(url)
 	if err != nil {
 		slog.Error("failed to create loki client", slog.Any("error", err))
 	}
-	timeLoc, err := time.LoadLocation(config.TimeZone)
-	if err != nil {
-		slog.Error("failed to create loki client by TimeZone error", slog.Any("error", err))
-	}
 	return &lokiClient{
 		clientID:               clientID,
-		acceptLabelPrefix:      config.LogCollector.AcceptLabelPrefix,
+		acceptLabelPrefix:      cfg.LogCollector.AcceptLabelPrefix,
 		lokiClient:             lc,
-		timeLoc:                timeLoc,
-		lineSeparator:          config.LogCollector.LineSeparator,
-		maxStoreTimeDay:        config.LogCollector.MaxStoreTimeDay,
-		queryLastReportTimeout: config.LogCollector.QueryLastReportTimeout,
+		timeLoc:                config.GetGlobalTimeZone(),
+		lineSeparator:          cfg.LogCollector.LineSeparator,
+		maxStoreTimeDay:        cfg.LogCollector.MaxStoreTimeDay,
+		queryLastReportTimeout: cfg.LogCollector.QueryLastReportTimeout,
 	}, err
 }
 
