@@ -219,11 +219,10 @@ func TestGitalyFile_GetRepoFileContents(t *testing.T) {
 	}, nil)
 
 	tester.mocks.commitClient.EXPECT().ListLastCommitsForTree(mock.Anything, &gitalypb.ListLastCommitsForTreeRequest{
-		Repository:      repo,
-		Revision:        "main",
-		Path:            []byte("foo"),
-		Limit:           1000,
-		LiteralPathspec: true,
+		Repository: repo,
+		Revision:   "main",
+		Path:       []byte("foo"),
+		Limit:      1000,
 	}).Return(&MockGrpcStreamClient[*gitalypb.ListLastCommitsForTreeResponse]{
 		data: []*gitalypb.ListLastCommitsForTreeResponse{
 			{Commits: []*gitalypb.ListLastCommitsForTreeResponse_CommitForTree{
@@ -545,11 +544,10 @@ func TestGitalyFile_GetRepoFileTree(t *testing.T) {
 	}, nil)
 
 	tester.mocks.commitClient.EXPECT().ListLastCommitsForTree(mock.Anything, &gitalypb.ListLastCommitsForTreeRequest{
-		Repository:      repo,
-		Revision:        "main",
-		Path:            []byte("foo/"),
-		Limit:           1000,
-		LiteralPathspec: true,
+		Repository: repo,
+		Revision:   "main",
+		Path:       []byte("foo/"),
+		Limit:      1000,
 	}).Return(&MockGrpcStreamClient[*gitalypb.ListLastCommitsForTreeResponse]{
 		data: []*gitalypb.ListLastCommitsForTreeResponse{
 			{Commits: []*gitalypb.ListLastCommitsForTreeResponse_CommitForTree{
