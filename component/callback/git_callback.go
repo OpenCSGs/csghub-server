@@ -277,16 +277,19 @@ func (c *gitCallbackComponentImpl) SyncRepositoryPackage(ctx context.Context, re
 }
 
 func (c *gitCallbackComponentImpl) SensitiveCheck(ctx context.Context, req *types.GiteaCallbackPushReq) error {
+	if c.modSvcClient == nil {
+		return nil
+	}
 	// split req.Repository.FullName by '/'
 	splits := strings.Split(req.Repository.FullName, "/")
+	if len(splits) != 2 {
+		return fmt.Errorf("invalid callback repo full name for sensitive check: %s", req.Repository.FullName)
+	}
 	fullNamespace, repoName := splits[0], splits[1]
 	repoType, namespace, _ := strings.Cut(fullNamespace, "_")
 	adjustedRepoType := types.RepositoryType(strings.TrimRight(repoType, "s"))
 
-	var err error
-	if c.modSvcClient != nil {
-		err = c.modSvcClient.SubmitRepoCheck(ctx, adjustedRepoType, namespace, repoName)
-	}
+	err := c.modSvcClient.SubmitRepoCheck(ctx, adjustedRepoType, namespace, repoName)
 	if err != nil {
 		slog.Error("fail to submit repo sensitive check", slog.Any("error", err), slog.Any("repo_type", adjustedRepoType), slog.String("namespace", namespace), slog.String("name", repoName))
 		return err

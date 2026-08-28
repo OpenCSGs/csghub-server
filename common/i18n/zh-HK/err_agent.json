@@ -67,5 +67,11 @@
     },
     "error.AGENT-ERR-22": {
         "other": "倉庫路徑 {{.repo_path}} 未找到對應的 csgclaw 模板"
+    },
+    "error.AGENT-ERR-23": {
+        "other": "該智能體模板未通過敏感內容檢查，無法建立智能體。"
+    },
+    "error.AGENT-ERR-24": {
+        "other": "該智能體模板未通過敏感內容檢查，無法設為公開。"
     }
 }

@@ -89,10 +89,11 @@ func TestRepoFileComponent_DetectRepoSensitiveCheckStatus(t *testing.T) {
 		mockRepoStore.EXPECT().UpdateRepoSensitiveCheckStatus(mock.Anything, repo.ID, types.SensitiveCheckFail).Return(nil)
 
 		// Call method
-		err := componentImpl.DetectRepoSensitiveCheckStatus(ctx, repo.ID, repo.DefaultBranch)
+		status, err := componentImpl.DetectRepoSensitiveCheckStatus(ctx, repo.ID, repo.DefaultBranch)
 
 		// Assertions
 		require.NoError(t, err)
+		require.Equal(t, types.SensitiveCheckFail, status)
 	})
 	t.Run("check exception", func(t *testing.T) {
 		// Prepare mocks
@@ -125,10 +126,11 @@ func TestRepoFileComponent_DetectRepoSensitiveCheckStatus(t *testing.T) {
 		mockRepoStore.EXPECT().UpdateRepoSensitiveCheckStatus(mock.Anything, repo.ID, types.SensitiveCheckException).Return(nil)
 
 		// Call method
-		err := componentImpl.DetectRepoSensitiveCheckStatus(ctx, repo.ID, repo.DefaultBranch)
+		status, err := componentImpl.DetectRepoSensitiveCheckStatus(ctx, repo.ID, repo.DefaultBranch)
 
 		// Assertions
 		require.NoError(t, err)
+		require.Equal(t, types.SensitiveCheckException, status)
 	})
 	t.Run("check success", func(t *testing.T) {
 		// Prepare mocks
@@ -159,10 +161,11 @@ func TestRepoFileComponent_DetectRepoSensitiveCheckStatus(t *testing.T) {
 		mockRepoStore.EXPECT().UpdateRepoSensitiveCheckStatus(mock.Anything, repo.ID, types.SensitiveCheckPass).Return(nil)
 
 		// Call method
-		err := componentImpl.DetectRepoSensitiveCheckStatus(ctx, repo.ID, repo.DefaultBranch)
+		status, err := componentImpl.DetectRepoSensitiveCheckStatus(ctx, repo.ID, repo.DefaultBranch)
 
 		// Assertions
 		require.NoError(t, err)
+		require.Equal(t, types.SensitiveCheckPass, status)
 
 	})
 }

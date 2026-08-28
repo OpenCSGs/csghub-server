@@ -60,6 +60,17 @@ type AgentTemplateFilter struct {
 	Editable *bool
 }
 
+// UpdateAgentTemplateRequest is a partial update for an agent template.
+// Name and type are optional so a visibility-only update does not modify them.
+type UpdateAgentTemplateRequest struct {
+	Type        *string         `json:"type,omitempty"`
+	Name        *string         `json:"name,omitempty" binding:"omitempty,max=255"`
+	Description *string         `json:"description,omitempty" binding:"omitempty,max=500"`
+	Content     *string         `json:"content,omitempty"`
+	Public      *bool           `json:"public,omitempty"`
+	Metadata    *map[string]any `json:"metadata,omitempty"`
+}
+
 // AgentInstance represents an instance created from an agent template
 type AgentInstance struct {
 	ID          int64           `json:"id"`
