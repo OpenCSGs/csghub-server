@@ -36,6 +36,7 @@ type LaunchDeployBenchmarkFunc func(ctx context.Context, req types.DeployBenchma
 var LaunchDeployBenchmark LaunchDeployBenchmarkFunc
 
 type Deployer interface {
+	SandboxV2Deployer
 	Deploy(ctx context.Context, dr types.DeployRequest) (deployID int64, err error)
 	Status(ctx context.Context, dr types.DeployRequest, needDetails bool) (srvName string, status int, instances []types.Instance, err error)
 	Logs(ctx context.Context, dr types.DeployRequest) (*MultiLogReader, error)
@@ -85,6 +86,10 @@ func (d *deployer) generateUniqueSvcName(dr types.DeployRequest) string {
 		// model serverless
 		fields := strings.Split(dr.Path, "/")
 		uniqueSvcName = common.UniqueSpaceAppName("s", fields[0], fields[1], dr.RepoID)
+	case types.SandboxType, types.SandboxEphemeralType:
+		// sandbox: persistent keeps the caller-provided svc_name; ephemeral leaves it empty
+		// and lets the runner generate the name (backfilled after creation).
+		uniqueSvcName = dr.SvcName
 	default:
 		// model inference
 		// generate unique service name from uuid when create new deploy by snowflake
@@ -101,6 +106,8 @@ func (d *deployer) serverlessDeploy(ctx context.Context, dr types.DeployRequest)
 	slog.Debug("do deployer.serverlessDeploy check type", slog.Any("dr.Type", dr.Type))
 	if dr.Type == types.SpaceType {
 		deploy, err = d.deployTaskStore.GetLatestDeployBySpaceID(ctx, dr.SpaceID)
+	} else if types.IsSandboxType(dr.Type) {
+		deploy, err = d.deployTaskStore.FindByDeployNameAndType(ctx, dr.UserUUID, dr.DeployName, dr.Type)
 	} else {
 		deploy, err = d.deployTaskStore.GetServerlessDeployByRepID(ctx, dr.RepoID)
 	}
@@ -135,6 +142,15 @@ func (d *deployer) serverlessDeploy(ctx context.Context, dr types.DeployRequest)
 	deploy.NodeAffinity = dr.NodeAffinity
 	deploy.Tolerations = dr.Tolerations
 	deploy.PD = dr.PD
+	deploy.VolumeMounts = dr.VolumeMounts
+	if types.IsSandboxType(dr.Type) {
+		// Sandbox-only fields and state reset: a reused sandbox deploy must restart from
+		// Pending. Space/serverless reset their status via StartDeploy instead, and
+		// dr.Sandbox is zero-valued for them (overwriting Timeout here would clear it).
+		deploy.Timeout = int(dr.Sandbox.Timeout)
+		deploy.Status = common.Pending
+		deploy.StatusUpdateAt = time.Now()
+	}
 	slog.Debug("do deployer.serverlessDeploy", slog.Any("dr", dr), slog.Any("deploy", deploy))
 	err = d.deployTaskStore.UpdateDeploy(ctx, deploy)
 	if err != nil {
@@ -146,7 +162,7 @@ func (d *deployer) serverlessDeploy(ctx context.Context, dr types.DeployRequest)
 
 func (d *deployer) dedicatedDeploy(ctx context.Context, dr types.DeployRequest) (*database.Deploy, error) {
 	uniqueSvcName := d.generateUniqueSvcName(dr)
-	if len(uniqueSvcName) < 1 {
+	if len(uniqueSvcName) < 1 && !types.IsSandboxType(dr.Type) {
 		err := fmt.Errorf("failed to generate uuid for deploy")
 		return nil, errorx.InternalServerError(err,
 			errorx.Ctx().
@@ -188,6 +204,7 @@ func (d *deployer) dedicatedDeploy(ctx context.Context, dr types.DeployRequest) 
 		NodeAffinity:     dr.NodeAffinity,
 		Tolerations:      dr.Tolerations,
 		PD:               dr.PD,
+		VolumeMounts:     dr.VolumeMounts,
 	}
 	updateDatabaseDeploy(deploy, dr)
 	err := d.deployTaskStore.CreateDeploy(ctx, deploy)
@@ -198,8 +215,9 @@ func (d *deployer) buildDeploy(ctx context.Context, dr types.DeployRequest) (*da
 	var deploy *database.Deploy = nil
 	var err error = nil
 	slog.Debug("do deployer.buildDeploy check type", slog.Any("dr.Type", dr.Type))
-	if dr.Type == types.SpaceType || dr.Type == types.ServerlessType {
+	if dr.Type == types.SpaceType || dr.Type == types.ServerlessType || types.IsSandboxType(dr.Type) {
 		// space case: SpaceID>0 and ModelID=0, reuse latest deploy of spaces
+		// sandbox case: DeployName is not empty, reuse deploy by deployName
 		deploy, err = d.serverlessDeploy(ctx, dr)
 		if err != nil {
 			return nil, fmt.Errorf("fail to check serverless deploy for spaceID %v, %w", dr.SpaceID, err)
