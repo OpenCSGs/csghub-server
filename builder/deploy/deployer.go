@@ -308,18 +308,13 @@ func (d *deployer) Deploy(ctx context.Context, dr types.DeployRequest) (int64, e
 }
 
 func (d *deployer) Status(ctx context.Context, dr types.DeployRequest, needDetails bool) (string, int, []types.Instance, error) {
-	var deploy *database.Deploy
-	var err error
-	if dr.DeployID != 0 {
-		deploy, err = d.deployTaskStore.GetDeployByID(ctx, dr.DeployID)
-	} else if dr.SvcName != "" {
-		deploy, err = d.deployTaskStore.GetDeployBySvcName(ctx, dr.SvcName)
-	} else {
-		slog.ErrorContext(ctx, "failed to get deploy: neither deploy_id nor svc_name provided")
-		return "", common.Stopped, nil, fmt.Errorf("can't get deploy: neither deploy_id nor svc_name provided")
+	if dr.DeployID == 0 {
+		slog.ErrorContext(ctx, "failed to get deploy: deploy_id not provided")
+		return "", common.Stopped, nil, fmt.Errorf("can't get deploy: deploy_id not provided")
 	}
+	deploy, err := d.deployTaskStore.GetDeployByID(ctx, dr.DeployID)
 	if err != nil || deploy == nil {
-		slog.ErrorContext(ctx, "failed to get deploy", slog.Any("DeployID", dr.DeployID), slog.Any("SvcName", dr.SvcName), slog.Any("error", err))
+		slog.ErrorContext(ctx, "failed to get deploy", slog.Any("DeployID", dr.DeployID), slog.Any("error", err))
 		return "", common.Stopped, nil, fmt.Errorf("can't get deploy, %w", err)
 	}
 
