@@ -438,6 +438,14 @@ type Config struct {
 		AIGatewayMetricsCollectorCronExpression  string `env:"STARHUB_SERVER_CRON_JOB_AIGATEWAY_METRICS_COLLECTOR_CRON_EXPRESSION" default:"* * * * *"` // every minute
 		SyncLLMLogsToDatasetCronExpression       string `env:"STARHUB_SERVER_SYNC_LLMLOGS_TO_DATASET_CRON_EXPRESSION" default:"0 1 * * *"`
 		StatementDailySummaryCronExpression      string `env:"STARHUB_SERVER_CRON_JOB_STATEMENT_DAILY_SUMMARY_CRON_EXPRESSION" default:"17 2 * * *"` // 02:17 daily
+		HistoryArchiveCronExpression             string `env:"STARHUB_SERVER_CRON_JOB_HISTORY_ARCHIVE_CRON_EXPRESSION" default:"30 2 * * *"`         // 02:30 daily (Asia/Shanghai, applied via ScheduleSpec.TimeZoneName)
+	}
+
+	HistoryArchive struct {
+		Enable           bool `env:"STARHUB_SERVER_HISTORY_ARCHIVE_ENABLE" default:"false"`
+		BatchSize        int  `env:"STARHUB_SERVER_HISTORY_ARCHIVE_BATCH_SIZE" default:"50000"`
+		MaxBatchesPerRun int  `env:"STARHUB_SERVER_HISTORY_ARCHIVE_MAX_BATCHES_PER_RUN" default:"200"`
+		MaxRunMinutes    int  `env:"STARHUB_SERVER_HISTORY_ARCHIVE_MAX_RUN_MINUTES" default:"300"`
 	}
 
 	DeployReconcile struct {
