@@ -2,6 +2,8 @@ package database
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -347,9 +349,15 @@ func (s *mirrorStoreImpl) DeleteWithTaskCancelTx(ctx context.Context, mirrorID i
 				Where("id = ?", mirror.RepositoryID).
 				For("UPDATE").
 				Scan(ctx); err != nil {
-				return err
+				// The repository may have been hard-deleted already; in that case
+				// there is no row to lock or sync-status to update, so proceed with
+				// deleting the mirror and its tasks.
+				if !errors.Is(err, sql.ErrNoRows) {
+					return err
+				}
+			} else {
+				mirror.Repository = &repo
 			}
-			mirror.Repository = &repo
 		}
 
 		var currentTask *MirrorTask
@@ -366,7 +374,7 @@ func (s *mirrorStoreImpl) DeleteWithTaskCancelTx(ctx context.Context, mirrorID i
 			currentTask = &task
 		}
 
-		if mirror.RepositoryID != 0 && shouldCancelRepoSyncOnMirrorDelete(mirror, currentTask) {
+		if mirror.Repository != nil && shouldCancelRepoSyncOnMirrorDelete(mirror, currentTask) {
 			if err := updateRepoSyncStatus(ctx, tx, mirror.RepositoryID, types.SyncStatusCanceled); err != nil {
 				return err
 			}
