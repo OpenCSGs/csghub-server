@@ -1096,27 +1096,27 @@ func TestComputeUpstreamAvailability(t *testing.T) {
 			wantReason:    aigatewaytypes.ReasonCircuitBreakerOpen,
 		},
 		{
-			name: "unknown health state makes upstream unavailable",
+			name: "unknown health state is available (not yet probed)",
 			upstream: types.UpstreamConfig{
 				Enabled:            true,
 				HealthCheckEnabled: true,
 				HealthState:        string(aigatewaytypes.HealthStateUnknown),
 			},
-			wantAvailable: false,
-			wantReason:    aigatewaytypes.ReasonHealthStateUnknown,
+			wantAvailable: true,
+			wantReason:    "",
 		},
 		{
-			name: "unknown circuit state makes upstream unavailable",
+			name: "unknown circuit state is available (not yet probed)",
 			upstream: types.UpstreamConfig{
 				Enabled:               true,
 				CircuitBreakerEnabled: true,
 				CircuitState:          string(aigatewaytypes.CircuitStateUnknown),
 			},
-			wantAvailable: false,
-			wantReason:    aigatewaytypes.ReasonCircuitStateUnknown,
+			wantAvailable: true,
+			wantReason:    "",
 		},
 		{
-			name: "circuit unknown takes priority over health unknown",
+			name: "both unknown states are available (not yet probed)",
 			upstream: types.UpstreamConfig{
 				Enabled:               true,
 				HealthCheckEnabled:    true,
@@ -1124,11 +1124,11 @@ func TestComputeUpstreamAvailability(t *testing.T) {
 				HealthState:           string(aigatewaytypes.HealthStateUnknown),
 				CircuitState:          string(aigatewaytypes.CircuitStateUnknown),
 			},
-			wantAvailable: false,
-			wantReason:    aigatewaytypes.ReasonCircuitStateUnknown,
+			wantAvailable: true,
+			wantReason:    "",
 		},
 		{
-			name: "health unknown with healthy circuit state",
+			name: "health unknown with healthy circuit state is available",
 			upstream: types.UpstreamConfig{
 				Enabled:               true,
 				HealthCheckEnabled:    true,
@@ -1136,8 +1136,8 @@ func TestComputeUpstreamAvailability(t *testing.T) {
 				HealthState:           string(aigatewaytypes.HealthStateUnknown),
 				CircuitState:          string(aigatewaytypes.CircuitStateClosed),
 			},
-			wantAvailable: false,
-			wantReason:    aigatewaytypes.ReasonHealthStateUnknown,
+			wantAvailable: true,
+			wantReason:    "",
 		},
 		{
 			name: "empty health state treated as unknown when health check enabled",
@@ -1189,6 +1189,49 @@ func TestComputeUpstreamAvailability(t *testing.T) {
 			wantAvailable: true,
 			wantReason:    "",
 		},
+		{
+			name: "health check disabled ignores historical unhealthy state",
+			upstream: types.UpstreamConfig{
+				Enabled:            true,
+				HealthCheckEnabled: false,
+				HealthState:        string(aigatewaytypes.HealthStateUnhealthy),
+			},
+			wantAvailable: true,
+			wantReason:    "",
+		},
+		{
+			name: "circuit breaker disabled ignores historical open circuit",
+			upstream: types.UpstreamConfig{
+				Enabled:               true,
+				CircuitBreakerEnabled: false,
+				CircuitState:          string(aigatewaytypes.CircuitStateOpen),
+			},
+			wantAvailable: true,
+			wantReason:    "",
+		},
+		{
+			name: "health check off, circuit breaker on, circuit unknown -> available",
+			upstream: types.UpstreamConfig{
+				Enabled:               true,
+				HealthCheckEnabled:    false,
+				CircuitBreakerEnabled: true,
+				CircuitState:          string(aigatewaytypes.CircuitStateUnknown),
+			},
+			wantAvailable: true,
+			wantReason:    "",
+		},
+		{
+			name: "both disabled with stale historical states -> available",
+			upstream: types.UpstreamConfig{
+				Enabled:               true,
+				HealthCheckEnabled:    false,
+				CircuitBreakerEnabled: false,
+				HealthState:           string(aigatewaytypes.HealthStateUnhealthy),
+				CircuitState:          string(aigatewaytypes.CircuitStateOpen),
+			},
+			wantAvailable: true,
+			wantReason:    "",
+		},
 	}
 
 	for _, tc := range testCases {
@@ -1214,7 +1257,7 @@ func TestComputeUpstreamAvailabilityStatus(t *testing.T) {
 			wantStatus: string(aigatewaytypes.UpstreamStatusDisabled),
 		},
 		{
-			name: "unknown health state returns unknown status",
+			name: "unknown health state returns unknown status (not yet probed)",
 			upstream: types.UpstreamConfig{
 				Enabled:            true,
 				HealthCheckEnabled: true,
@@ -1223,7 +1266,7 @@ func TestComputeUpstreamAvailabilityStatus(t *testing.T) {
 			wantStatus: string(aigatewaytypes.UpstreamStatusUnknown),
 		},
 		{
-			name: "unknown circuit state returns unknown status",
+			name: "unknown circuit state returns unknown status (not yet probed)",
 			upstream: types.UpstreamConfig{
 				Enabled:               true,
 				CircuitBreakerEnabled: true,
@@ -1232,7 +1275,7 @@ func TestComputeUpstreamAvailabilityStatus(t *testing.T) {
 			wantStatus: string(aigatewaytypes.UpstreamStatusUnknown),
 		},
 		{
-			name: "circuit unknown takes priority over health unknown",
+			name: "both unknown states return unknown status (not yet probed)",
 			upstream: types.UpstreamConfig{
 				Enabled:               true,
 				HealthCheckEnabled:    true,
@@ -1305,6 +1348,67 @@ func TestComputeUpstreamAvailabilityStatus(t *testing.T) {
 			},
 			wantStatus: string(aigatewaytypes.UpstreamStatusAvailable),
 		},
+		{
+			name: "health check disabled ignores historical unhealthy state",
+			upstream: types.UpstreamConfig{
+				Enabled:            true,
+				HealthCheckEnabled: false,
+				HealthState:        string(aigatewaytypes.HealthStateUnhealthy),
+			},
+			wantStatus: string(aigatewaytypes.UpstreamStatusAvailable),
+		},
+		{
+			name: "circuit breaker disabled ignores historical open circuit",
+			upstream: types.UpstreamConfig{
+				Enabled:               true,
+				CircuitBreakerEnabled: false,
+				CircuitState:          string(aigatewaytypes.CircuitStateOpen),
+			},
+			wantStatus: string(aigatewaytypes.UpstreamStatusAvailable),
+		},
+		{
+			name: "health check off, circuit breaker on, circuit unknown -> unknown status",
+			upstream: types.UpstreamConfig{
+				Enabled:               true,
+				HealthCheckEnabled:    false,
+				CircuitBreakerEnabled: true,
+				CircuitState:          string(aigatewaytypes.CircuitStateUnknown),
+			},
+			wantStatus: string(aigatewaytypes.UpstreamStatusUnknown),
+		},
+		{
+			name: "both disabled with stale historical states -> available",
+			upstream: types.UpstreamConfig{
+				Enabled:               true,
+				HealthCheckEnabled:    false,
+				CircuitBreakerEnabled: false,
+				HealthState:           string(aigatewaytypes.HealthStateUnhealthy),
+				CircuitState:          string(aigatewaytypes.CircuitStateOpen),
+			},
+			wantStatus: string(aigatewaytypes.UpstreamStatusAvailable),
+		},
+		{
+			name: "health unhealthy + circuit unknown -> unavailable (bad state takes priority over unknown)",
+			upstream: types.UpstreamConfig{
+				Enabled:               true,
+				HealthCheckEnabled:    true,
+				CircuitBreakerEnabled: true,
+				HealthState:           string(aigatewaytypes.HealthStateUnhealthy),
+				CircuitState:          string(aigatewaytypes.CircuitStateUnknown),
+			},
+			wantStatus: string(aigatewaytypes.UpstreamStatusUnavailable),
+		},
+		{
+			name: "circuit open + health unknown -> unavailable (bad state takes priority over unknown)",
+			upstream: types.UpstreamConfig{
+				Enabled:               true,
+				HealthCheckEnabled:    true,
+				CircuitBreakerEnabled: true,
+				HealthState:           string(aigatewaytypes.HealthStateUnknown),
+				CircuitState:          string(aigatewaytypes.CircuitStateOpen),
+			},
+			wantStatus: string(aigatewaytypes.UpstreamStatusUnavailable),
+		},
 	}
 
 	for _, tc := range testCases {
@@ -1337,12 +1441,12 @@ func TestComputeLLMAvailability(t *testing.T) {
 			wantReason:    "",
 		},
 		{
-			name: "all upstreams unknown makes LLM unavailable",
+			name: "all upstreams unknown makes LLM available (unknown is not unavailable)",
 			upstreams: []types.UpstreamConfig{
 				{Enabled: true, HealthCheckEnabled: true, HealthState: string(aigatewaytypes.HealthStateUnknown)},
 			},
-			wantAvailable: false,
-			wantReason:    aigatewaytypes.ReasonAllUpstreamsUnavailable,
+			wantAvailable: true,
+			wantReason:    "",
 		},
 		{
 			name: "mixed available and unknown upstreams makes LLM available",
@@ -1390,7 +1494,7 @@ func TestBuildUpstreamConfigs_UnknownStateWhenNoDBRecord(t *testing.T) {
 		wantAvailabilitySts string
 	}{
 		{
-			name: "health check enabled with no DB health record -> unknown health state and unavailable",
+			name: "health check enabled with no DB health record -> unknown health state, available, unknown status",
 			dbUpstream: database.Upstream{
 				ID:                 1,
 				URL:                "http://upstream.example.com/v1",
@@ -1400,12 +1504,12 @@ func TestBuildUpstreamConfigs_UnknownStateWhenNoDBRecord(t *testing.T) {
 				CircuitState:       nil,
 			},
 			wantHealthState:     string(aigatewaytypes.HealthStateUnknown),
-			wantCircuitState:    "",
-			wantIsAvailable:     false,
+			wantCircuitState:    string(aigatewaytypes.CircuitStateUnknown),
+			wantIsAvailable:     true,
 			wantAvailabilitySts: string(aigatewaytypes.UpstreamStatusUnknown),
 		},
 		{
-			name: "circuit breaker enabled with no DB circuit record -> unknown circuit state and unavailable",
+			name: "circuit breaker enabled with no DB circuit record -> unknown circuit state, available, unknown status",
 			dbUpstream: database.Upstream{
 				ID:                    2,
 				URL:                   "http://upstream.example.com/v1",
@@ -1414,13 +1518,13 @@ func TestBuildUpstreamConfigs_UnknownStateWhenNoDBRecord(t *testing.T) {
 				HealthState:           nil,
 				CircuitState:          nil,
 			},
-			wantHealthState:     "",
+			wantHealthState:     string(aigatewaytypes.HealthStateUnknown),
 			wantCircuitState:    string(aigatewaytypes.CircuitStateUnknown),
-			wantIsAvailable:     false,
+			wantIsAvailable:     true,
 			wantAvailabilitySts: string(aigatewaytypes.UpstreamStatusUnknown),
 		},
 		{
-			name: "both enabled with no DB records -> both unknown and unavailable",
+			name: "both enabled with no DB records -> both unknown, available, unknown status",
 			dbUpstream: database.Upstream{
 				ID:                    3,
 				URL:                   "http://upstream.example.com/v1",
@@ -1432,7 +1536,7 @@ func TestBuildUpstreamConfigs_UnknownStateWhenNoDBRecord(t *testing.T) {
 			},
 			wantHealthState:     string(aigatewaytypes.HealthStateUnknown),
 			wantCircuitState:    string(aigatewaytypes.CircuitStateUnknown),
-			wantIsAvailable:     false,
+			wantIsAvailable:     true,
 			wantAvailabilitySts: string(aigatewaytypes.UpstreamStatusUnknown),
 		},
 		{
@@ -1446,8 +1550,8 @@ func TestBuildUpstreamConfigs_UnknownStateWhenNoDBRecord(t *testing.T) {
 				HealthState:           nil,
 				CircuitState:          nil,
 			},
-			wantHealthState:     "",
-			wantCircuitState:    "",
+			wantHealthState:     string(aigatewaytypes.HealthStateUnknown),
+			wantCircuitState:    string(aigatewaytypes.CircuitStateUnknown),
 			wantIsAvailable:     true,
 			wantAvailabilitySts: string(aigatewaytypes.UpstreamStatusAvailable),
 		},
@@ -1462,7 +1566,7 @@ func TestBuildUpstreamConfigs_UnknownStateWhenNoDBRecord(t *testing.T) {
 				CircuitState:       nil,
 			},
 			wantHealthState:     string(aigatewaytypes.HealthStateHealthy),
-			wantCircuitState:    "",
+			wantCircuitState:    string(aigatewaytypes.CircuitStateUnknown),
 			wantIsAvailable:     true,
 			wantAvailabilitySts: string(aigatewaytypes.UpstreamStatusAvailable),
 		},
@@ -1481,6 +1585,38 @@ func TestBuildUpstreamConfigs_UnknownStateWhenNoDBRecord(t *testing.T) {
 			wantCircuitState:    string(aigatewaytypes.CircuitStateUnknown),
 			wantIsAvailable:     false,
 			wantAvailabilitySts: string(aigatewaytypes.UpstreamStatusDisabled),
+		},
+		{
+			name: "checks disabled with stale DB records -> unknown states and available",
+			dbUpstream: database.Upstream{
+				ID:                    7,
+				URL:                   "http://upstream.example.com/v1",
+				Enabled:               true,
+				HealthCheckEnabled:    false,
+				CircuitBreakerEnabled: false,
+				HealthState:           &database.AIGatewayUpstreamHealthState{HealthState: string(aigatewaytypes.HealthStateUnhealthy)},
+				CircuitState:          &database.AIGatewayUpstreamCircuitState{CircuitState: string(aigatewaytypes.CircuitStateOpen)},
+			},
+			wantHealthState:     string(aigatewaytypes.HealthStateUnknown),
+			wantCircuitState:    string(aigatewaytypes.CircuitStateUnknown),
+			wantIsAvailable:     true,
+			wantAvailabilitySts: string(aigatewaytypes.UpstreamStatusAvailable),
+		},
+		{
+			name: "health check off, circuit breaker on, stale unhealthy DB record -> available, unknown status",
+			dbUpstream: database.Upstream{
+				ID:                    8,
+				URL:                   "http://upstream.example.com/v1",
+				Enabled:               true,
+				HealthCheckEnabled:    false,
+				CircuitBreakerEnabled: true,
+				HealthState:           &database.AIGatewayUpstreamHealthState{HealthState: string(aigatewaytypes.HealthStateUnhealthy)},
+				CircuitState:          nil,
+			},
+			wantHealthState:     string(aigatewaytypes.HealthStateUnknown),
+			wantCircuitState:    string(aigatewaytypes.CircuitStateUnknown),
+			wantIsAvailable:     true,
+			wantAvailabilitySts: string(aigatewaytypes.UpstreamStatusUnknown),
 		},
 	}
 
@@ -1564,7 +1700,7 @@ func TestUpdateUpstream_ResetStaleStateOnReEnable(t *testing.T) {
 		require.Nil(t, err)
 		require.NotNil(t, res)
 		require.Equal(t, string(aigatewaytypes.UpstreamStatusUnknown), res.AvailabilityStatus)
-		require.False(t, res.IsAvailable)
+		require.True(t, res.IsAvailable)
 	})
 
 	t.Run("health_check_re_enabled_resets_health_state_to_unknown", func(t *testing.T) {
@@ -1617,7 +1753,7 @@ func TestUpdateUpstream_ResetStaleStateOnReEnable(t *testing.T) {
 		require.Nil(t, err)
 		require.NotNil(t, res)
 		require.Equal(t, string(aigatewaytypes.UpstreamStatusUnknown), res.AvailabilityStatus)
-		require.False(t, res.IsAvailable)
+		require.True(t, res.IsAvailable)
 	})
 
 	t.Run("circuit_breaker_re_enabled_resets_circuit_state_to_unknown", func(t *testing.T) {
@@ -1670,7 +1806,7 @@ func TestUpdateUpstream_ResetStaleStateOnReEnable(t *testing.T) {
 		require.Nil(t, err)
 		require.NotNil(t, res)
 		require.Equal(t, string(aigatewaytypes.UpstreamStatusUnknown), res.AvailabilityStatus)
-		require.False(t, res.IsAvailable)
+		require.True(t, res.IsAvailable)
 	})
 
 	t.Run("no_reset_when_already_enabled_and_checks_unchanged", func(t *testing.T) {
@@ -1765,7 +1901,7 @@ func TestUpdateUpstream_ResetStaleStateOnReEnable(t *testing.T) {
 		require.NotNil(t, res)
 		// buildUpstreamConfigs handles nil → unknown
 		require.Equal(t, string(aigatewaytypes.UpstreamStatusUnknown), res.AvailabilityStatus)
-		require.False(t, res.IsAvailable)
+		require.True(t, res.IsAvailable)
 	})
 
 	t.Run("disabling_upstream_does_not_reset_state", func(t *testing.T) {

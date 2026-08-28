@@ -670,16 +670,16 @@ func buildUpstreamConfigs(dbUpstreams []database.Upstream) []types.UpstreamConfi
 			Metadata:              u.Metadata,
 			LimitPolicy:           u.LimitPolicy,
 		}
-		if u.HealthState != nil {
+		// Only use the real DB state when the feature is enabled AND a record exists.
+		// In all other cases (feature off, no record yet), the state is "unknown".
+		if u.HealthCheckEnabled && u.HealthState != nil {
 			uc.HealthState = u.HealthState.HealthState
-		} else if u.HealthCheckEnabled {
-			// No health check record yet, treat as unknown until first probe
+		} else {
 			uc.HealthState = string(aigatewaytypes.HealthStateUnknown)
 		}
-		if u.CircuitState != nil {
+		if u.CircuitBreakerEnabled && u.CircuitState != nil {
 			uc.CircuitState = u.CircuitState.CircuitState
-		} else if u.CircuitBreakerEnabled {
-			// No circuit state record yet, treat as unknown until first probe
+		} else {
 			uc.CircuitState = string(aigatewaytypes.CircuitStateUnknown)
 		}
 		uc.IsAvailable, _ = computeUpstreamAvailability(uc)
@@ -693,16 +693,14 @@ func computeUpstreamAvailability(u types.UpstreamConfig) (bool, string) {
 	if !u.Enabled {
 		return false, aigatewaytypes.ReasonUpstreamDisabled
 	}
-	// When health check or circuit breaker is enabled but state is unknown
-	// (not yet probed), treat upstream as unavailable to avoid misleading users.
-	if u.CircuitBreakerEnabled && u.CircuitState == string(aigatewaytypes.CircuitStateUnknown) {
-		return false, aigatewaytypes.ReasonCircuitStateUnknown
+	// Only check states when the corresponding feature is enabled.
+	// "unknown" state means "not yet probed" and should NOT block traffic —
+	// only explicitly bad states (open circuit, unhealthy) make an upstream unavailable.
+	if u.CircuitBreakerEnabled && u.CircuitState == string(aigatewaytypes.CircuitStateOpen) {
+		return false, aigatewaytypes.ReasonCircuitBreakerOpen
 	}
-	if u.HealthCheckEnabled && u.HealthState == string(aigatewaytypes.HealthStateUnknown) {
-		return false, aigatewaytypes.ReasonHealthStateUnknown
-	}
-	if unavailable, reason := aigatewaytypes.IsUpstreamUnavailable(u); unavailable {
-		return false, reason
+	if u.HealthCheckEnabled && u.HealthState == string(aigatewaytypes.HealthStateUnhealthy) {
+		return false, aigatewaytypes.ReasonHealthStateUnhealthy
 	}
 	return true, ""
 }
@@ -711,14 +709,7 @@ func computeUpstreamAvailabilityStatus(u types.UpstreamConfig) string {
 	if !u.Enabled {
 		return string(aigatewaytypes.UpstreamStatusDisabled)
 	}
-	// When health check or circuit breaker is enabled but state is unknown
-	// (not yet probed), return unknown status to reflect real state.
-	if u.CircuitBreakerEnabled && u.CircuitState == string(aigatewaytypes.CircuitStateUnknown) {
-		return string(aigatewaytypes.UpstreamStatusUnknown)
-	}
-	if u.HealthCheckEnabled && u.HealthState == string(aigatewaytypes.HealthStateUnknown) {
-		return string(aigatewaytypes.UpstreamStatusUnknown)
-	}
+	// Check explicitly bad states first — they take priority over "unknown".
 	if u.CircuitBreakerEnabled && u.CircuitState == string(aigatewaytypes.CircuitStateOpen) {
 		return string(aigatewaytypes.UpstreamStatusUnavailable)
 	}
@@ -727,6 +718,14 @@ func computeUpstreamAvailabilityStatus(u types.UpstreamConfig) string {
 	}
 	if u.HealthCheckEnabled && u.HealthState == string(aigatewaytypes.HealthStateDegraded) {
 		return string(aigatewaytypes.UpstreamStatusDegraded)
+	}
+	// No explicitly bad state — if any enabled check is still "unknown" (not
+	// yet probed), report unknown to reflect that we don't have full data.
+	if u.CircuitBreakerEnabled && u.CircuitState == string(aigatewaytypes.CircuitStateUnknown) {
+		return string(aigatewaytypes.UpstreamStatusUnknown)
+	}
+	if u.HealthCheckEnabled && u.HealthState == string(aigatewaytypes.HealthStateUnknown) {
+		return string(aigatewaytypes.UpstreamStatusUnknown)
 	}
 	return string(aigatewaytypes.UpstreamStatusAvailable)
 }
