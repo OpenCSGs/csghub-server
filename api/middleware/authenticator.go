@@ -486,5 +486,9 @@ type MiddlewareCollection struct {
 	License struct {
 		// Check if license is active
 		Check gin.HandlerFunc
+		// FeatureGate returns a middleware that rejects the request when the
+		// given license feature is disabled; attach per route after
+		// auth/authorization middlewares
+		FeatureGate func(def types.FeatureDefinition) gin.HandlerFunc
 	}
 }

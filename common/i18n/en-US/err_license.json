@@ -1,5 +1,17 @@
 {
     "error.LICENSE-ERR-0": {
         "other": "No active license found"
+    },
+    "error.LICENSE-ERR-1": {
+        "other": "License is expired, could not be verified and imported."
+    },
+    "error.LICENSE-ERR-2": {
+        "other": "Feature is not enabled by license"
+    },
+    "error.LICENSE-ERR-3": {
+        "other": "License limit exceeded"
+    },
+    "error.LICENSE-ERR-4": {
+        "other": "License extra is invalid"
     }
 }

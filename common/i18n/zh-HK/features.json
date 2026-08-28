@@ -1,0 +1,8 @@
+{
+    "license.feature.audit_log.name": {
+        "other": "審計日誌"
+    },
+    "license.feature.audit_log.description": {
+        "other": "允許存取審計日誌功能。"
+    }
+}

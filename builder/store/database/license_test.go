@@ -62,6 +62,24 @@ func TestLicenseStore_CRUD(t *testing.T) {
 	err = store.Update(ctx, *l)
 	require.Nil(t, err)
 
+	startTime := time.Now().Add(time.Hour)
+	err = store.Create(ctx, database.License{
+		Key:        "future-key",
+		Company:    "foo",
+		Email:      "future@example.com",
+		Product:    "test",
+		Edition:    "standard",
+		MaxUser:    10,
+		StartTime:  startTime,
+		ExpireTime: startTime.Add(time.Hour),
+		UserUUID:   "test-user-uuid",
+		Issuer:     "tester",
+	})
+	require.NoError(t, err)
+	upcoming, err := store.GetNextUpcoming(ctx)
+	require.NoError(t, err)
+	require.Equal(t, "future-key", upcoming.Key)
+
 	lVerify2 := &database.License{}
 	err = db.Core.NewSelect().Model(lVerify2).Where("key=?", "key").Scan(ctx, lVerify2)
 	require.Nil(t, err)

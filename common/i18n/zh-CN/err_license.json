@@ -1,5 +1,17 @@
 {
     "error.LICENSE-ERR-0": {
-        "other": "未找到有效的许可证"
+        "other": "未找到有效的许可证。"
+    },
+    "error.LICENSE-ERR-1": {
+        "other": "许可证已过期，无法验证和导入。"
+    },
+    "error.LICENSE-ERR-2": {
+        "other": "当前许可证未启用该功能。"
+    },
+    "error.LICENSE-ERR-3": {
+        "other": "当前操作超出许可证允许的限制。"
+    },
+    "error.LICENSE-ERR-4": {
+        "other": "许可证扩展数据无效。"
     }
 }

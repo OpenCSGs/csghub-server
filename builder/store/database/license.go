@@ -14,6 +14,7 @@ type LicenseStore interface {
 	GetByID(ctx context.Context, id int64) (*License, error)
 	Update(ctx context.Context, input License) error
 	GetLatestActive(ctx context.Context) (*License, error)
+	GetNextUpcoming(ctx context.Context) (*License, error)
 	Delete(ctx context.Context, input License) error
 }
 
@@ -127,6 +128,19 @@ func (s *licenseStoreImpl) GetLatestActive(ctx context.Context) (*License, error
 		Scan(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("select latest active license with error: %w", err)
+	}
+	return &license, nil
+}
+
+func (s *licenseStoreImpl) GetNextUpcoming(ctx context.Context) (*License, error) {
+	var license License
+	err := s.db.Operator.Core.NewSelect().Model(&license).
+		Where("start_time > NOW() AND expire_time >= NOW()").
+		Order("start_time ASC", "id DESC").
+		Limit(1).
+		Scan(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("select next upcoming license with error: %w", err)
 	}
 	return &license, nil
 }
