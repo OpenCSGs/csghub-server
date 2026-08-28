@@ -303,7 +303,7 @@ func (suite *LfsSyncWorkerTestSuite) SetupTest() {
 	suite.worker, suite.mocks = newTestLfsSyncWorker(suite.T(), "")
 }
 
-func (suite *LfsSyncWorkerTestSuite) TestRefreshLfsMetaObjectsUsesAfterCommit() {
+func (suite *LfsSyncWorkerTestSuite) TestRefreshLfsMetaObjectsScansAllRefs() {
 	repo := createTestRepository()
 	mirror := createTestMirror(repo, "http://example.com/test/repo.git")
 	task := createTestMirrorTask(mirror, types.MirrorLfsSyncStart)
@@ -311,7 +311,7 @@ func (suite *LfsSyncWorkerTestSuite) TestRefreshLfsMetaObjectsUsesAfterCommit() 
 	suite.mocks.git.EXPECT().GetRepoAllLfsPointers(suite.ctx, mock.MatchedBy(func(req gitserver.GetRepoAllFilesReq) bool {
 		return req.Namespace == "test" &&
 			req.Name == "repo" &&
-			req.Ref == task.AfterLastCommitID &&
+			req.Ref == "" &&
 			req.RepoType == repo.RepositoryType &&
 			req.RelativePath == repo.GitalyPath()
 	})).Return([]*types.LFSPointer{
@@ -347,17 +347,13 @@ func (suite *LfsSyncWorkerTestSuite) TestSyncLfsUsesRepositoryRelativePath() {
 	suite.mocks.msgSender.EXPECT().Send(suite.ctx, mock.Anything).Return(hook.Response{}, nil)
 	suite.mocks.lfsMetaObjectStore.EXPECT().FindByRepoID(suite.ctx, repo.ID).
 		Return([]database.LfsMetaObject{}, nil)
-	suite.mocks.git.EXPECT().GetRepoLastCommit(suite.ctx, mock.MatchedBy(func(req gitserver.GetRepoLastCommitReq) bool {
-		return req.RelativePath == expectedRelativePath
-	})).Return(&types.Commit{ID: "old-commit"}, nil).Once()
+	// PublishCommitAndTriggerCallback points HEAD to the synced commit and
+	// triggers the callback workflow without re-fetching the last commit.
 	suite.mocks.git.EXPECT().UpdateRef(suite.ctx, mock.MatchedBy(func(req gitserver.UpdateRefReq) bool {
-		return req.RelativePath == expectedRelativePath
+		return req.RelativePath == expectedRelativePath && req.NewObjectId == task.AfterLastCommitID
 	})).Return(nil)
-	suite.mocks.git.EXPECT().GetRepoLastCommit(suite.ctx, mock.MatchedBy(func(req gitserver.GetRepoLastCommitReq) bool {
-		return req.RelativePath == expectedRelativePath
-	})).Return(&types.Commit{ID: task.AfterLastCommitID}, nil).Once()
 	suite.mocks.git.EXPECT().GetDiffBetweenTwoCommits(suite.ctx, mock.MatchedBy(func(req gitserver.GetDiffBetweenTwoCommitsReq) bool {
-		return req.RelativePath == expectedRelativePath
+		return req.RelativePath == expectedRelativePath && req.RightCommitId == task.AfterLastCommitID
 	})).Return(&types.GiteaCallbackPushReq{}, nil)
 	suite.mocks.workflowClient.EXPECT().ExecuteWorkflow(
 		suite.ctx, mock.Anything, mock.Anything, mock.Anything,

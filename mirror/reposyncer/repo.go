@@ -15,6 +15,7 @@ import (
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/builder/temporal"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/utils/common"
@@ -34,6 +35,14 @@ type commitCheckpointStore interface {
 	UpdateCommitCheckpoint(ctx context.Context, taskID int64, beforeCommitID, afterCommitID string) (database.MirrorTask, error)
 }
 
+// RepoSyncResult carries the synced mirror task plus signals discovered during
+// repo sync. NoLFS reports that the repository has no LFS objects, so the
+// caller can finish the task without entering the LFS queue.
+type RepoSyncResult struct {
+	Task  *database.MirrorTask
+	NoLFS bool
+}
+
 type RepoSyncWorker struct {
 	mirrorTaskStore        database.MirrorTaskStore
 	repoStore              database.RepoStore
@@ -44,6 +53,9 @@ type RepoSyncWorker struct {
 	config                 *config.Config
 	msgSender              hook.MessageSender
 	httpClient             *http.Client
+	// workflowClient starts the git push callback workflow when a sync finishes
+	// without LFS objects. It is initialized once the temporal client is up.
+	workflowClient temporal.Client
 }
 
 func NewRepoSyncWorker(config *config.Config) (*RepoSyncWorker, error) {
@@ -61,6 +73,7 @@ func NewRepoSyncWorker(config *config.Config) (*RepoSyncWorker, error) {
 	w.syncClientSettingStore = database.NewSyncClientSettingStore()
 	w.mirrorTaskStore = database.NewMirrorTaskStore()
 	w.config = config
+	w.workflowClient = temporal.GetClient()
 	msgSender := hook.NewMessageSender(
 		fmt.Sprintf("%s:%d", config.Notification.Host, config.Notification.Port),
 		rpc.AuthWithApiKey(config.APIToken),
@@ -78,14 +91,17 @@ func NewRepoSyncWorker(config *config.Config) (*RepoSyncWorker, error) {
 }
 
 // SyncRepo fetches remote Git data and records commit checkpoints for the following LFS stage.
+// When the synced repository has no LFS objects, it publishes the new commit and triggers the
+// git callback immediately, returning NoLFS=true so the caller can finish the task without the
+// LFS queue.
 func (w *RepoSyncWorker) SyncRepo(
 	ctx context.Context,
 	mirror *database.Mirror,
 	mt *database.MirrorTask,
-) (*database.MirrorTask, error) {
+) (RepoSyncResult, error) {
 	// Check if repository is not present
 	if mirror.Repository == nil {
-		return mt, fmt.Errorf("mirror repository is nil")
+		return RepoSyncResult{}, fmt.Errorf("mirror repository is nil")
 	}
 	mt.Mirror = mirror
 
@@ -97,7 +113,7 @@ func (w *RepoSyncWorker) SyncRepo(
 
 	namespace, name, err := common.GetNamespaceAndNameFromPath(mirror.Repository.Path)
 	if err != nil {
-		return mt, fmt.Errorf("failed to get namespace and name from mirror repository path: %w", err)
+		return RepoSyncResult{Task: mt}, fmt.Errorf("failed to get namespace and name from mirror repository path: %w", err)
 	}
 	relativePath := mirror.Repository.GitalyPath()
 
@@ -111,7 +127,7 @@ func (w *RepoSyncWorker) SyncRepo(
 		relativePath,
 	)
 	if err != nil {
-		return mt, fmt.Errorf("failed to ensure repository exists: %w", err)
+		return RepoSyncResult{Task: mt}, fmt.Errorf("failed to ensure repository exists: %w", err)
 	}
 
 	// Get before last commit id
@@ -129,7 +145,7 @@ func (w *RepoSyncWorker) SyncRepo(
 			beforeCommitID = commitBefore.ID
 			mt.BeforeLastCommitID = beforeCommitID
 			if err := w.updateCommitCheckpoint(ctx, mt, beforeCommitID, ""); err != nil {
-				return mt, err
+				return RepoSyncResult{Task: mt}, err
 			}
 		} else if err != nil {
 			slog.Info(
@@ -161,18 +177,18 @@ func (w *RepoSyncWorker) SyncRepo(
 	if mirror.Repository.IsOpenCSGRepo() && !w.config.Saas {
 		syncClientSetting, err := w.syncClientSettingStore.First(ctx)
 		if err != nil {
-			return mt, fmt.Errorf("failed to find sync client setting, error: %w", err)
+			return RepoSyncResult{Task: mt}, fmt.Errorf("failed to find sync client setting, error: %w", err)
 		}
 		req.MirrorToken = syncClientSetting.Token
 	}
 
 	if err := w.checkSourceURL(ctx, mirror.SourceUrl, mirror.Username, mirror.AccessToken); err != nil {
-		return mt, err
+		return RepoSyncResult{Task: mt}, err
 	}
 
 	err = w.git.MirrorSync(ctx, req)
 	if err != nil {
-		return mt, fmt.Errorf("failed to sync mirror repo, error: %w", err)
+		return RepoSyncResult{Task: mt}, fmt.Errorf("failed to sync mirror repo, error: %w", err)
 	}
 
 	slog.Info(
@@ -189,7 +205,7 @@ func (w *RepoSyncWorker) SyncRepo(
 		RelativePath: relativePath,
 	})
 	if err != nil {
-		return mt, fmt.Errorf("failed to get repo, error: %w", err)
+		return RepoSyncResult{Task: mt}, fmt.Errorf("failed to get repo, error: %w", err)
 	}
 
 	parts := strings.Split(resp.DefaultBranch, "/")
@@ -213,13 +229,13 @@ func (w *RepoSyncWorker) SyncRepo(
 		relativePath,
 	)
 	if err != nil {
-		return mt, fmt.Errorf("failed to get repo last commit: %w", err)
+		return RepoSyncResult{Task: mt}, fmt.Errorf("failed to get repo last commit: %w", err)
 	}
 
 	mt.BeforeLastCommitID = beforeCommitID
 	mt.AfterLastCommitID = commit.ID
 	if err := w.updateCommitCheckpoint(ctx, mt, "", commit.ID); err != nil {
-		return mt, err
+		return RepoSyncResult{Task: mt}, err
 	}
 
 	w.generateDescriptionFromReadme(ctx, mirror.Repository.RepositoryType, namespace, name, commit.ID)
@@ -242,7 +258,7 @@ func (w *RepoSyncWorker) SyncRepo(
 			RelativePath: relativePath,
 		})
 		if err != nil {
-			return mt, fmt.Errorf("failed to point HEAD to old commit: %w", err)
+			return RepoSyncResult{Task: mt}, fmt.Errorf("failed to point HEAD to old commit: %w", err)
 		}
 		slog.Info(
 			"Point HEAD to old commit successfully",
@@ -252,6 +268,29 @@ func (w *RepoSyncWorker) SyncRepo(
 		)
 	}
 
+	// Fast path: repos with no LFS objects publish the new commit immediately and
+	// skip the LFS queue entirely. Code and skill repos usually have no LFS files,
+	// so this avoids waiting for an empty LFS sync phase just to flip HEAD.
+	lfsPointers, err := w.git.GetRepoAllLfsPointers(ctx, gitserver.GetRepoAllFilesReq{
+		Namespace:    namespace,
+		Name:         name,
+		RepoType:     mirror.Repository.RepositoryType,
+		RelativePath: relativePath,
+		Limit:        1,
+	})
+	if err != nil {
+		return RepoSyncResult{Task: mt}, fmt.Errorf("failed to check lfs pointers: %w", err)
+	}
+	if len(lfsPointers) == 0 {
+		if err := PublishCommitAndTriggerCallback(
+			ctx, w.git, w.workflowClient,
+			mirror.Repository, namespace, name, relativePath, commit.ID,
+		); err != nil {
+			return RepoSyncResult{Task: mt}, fmt.Errorf("failed to publish commit without lfs: %w", err)
+		}
+		return RepoSyncResult{Task: mt, NoLFS: true}, nil
+	}
+
 	if beforeCommitID != "" && commit.ID == beforeCommitID {
 		slog.Info(
 			"sync repo successfully, no changes detected.",
@@ -259,10 +298,9 @@ func (w *RepoSyncWorker) SyncRepo(
 			slog.Any("namespace", namespace),
 			slog.Any("name", name),
 		)
-		return mt, nil
 	}
 
-	return mt, nil
+	return RepoSyncResult{Task: mt, NoLFS: false}, nil
 }
 
 func (w *RepoSyncWorker) updateCommitCheckpoint(ctx context.Context, mt *database.MirrorTask, beforeCommitID, afterCommitID string) error {

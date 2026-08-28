@@ -596,6 +596,40 @@ func TestMirrorComponent_CreateMirrorSkipsSourcePathForCodeAndSkill(t *testing.T
 	}
 }
 
+// TestMirrorComponent_CreateMirrorHonorsRequestPriority verifies that CreateMirror
+// propagates an explicit priority (e.g. ASAP for code/skill imports) instead of
+// always defaulting to the lowest priority.
+func TestMirrorComponent_CreateMirrorHonorsRequestPriority(t *testing.T) {
+	ctx := context.TODO()
+	mc := initializeTestMirrorComponent(ctx, t)
+	fakeStore := &fakeMirrorRepoStore{}
+	mc.mirrorRepoStore = fakeStore
+
+	repo := &database.Repository{
+		ID:             123,
+		Path:           "ns/n",
+		HTTPCloneURL:   "https://opencsg.com/codes/ns/n.git",
+		RepositoryType: types.CodeRepo,
+	}
+
+	mc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "user", "ns", membership.RoleAdmin).Return(true, nil)
+	mc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.CodeRepo, "ns", "n").Return(repo, nil)
+	mc.mocks.stores.MirrorMock().EXPECT().FindByRepoID(ctx, repo.ID).Return(nil, sql.ErrNoRows)
+
+	_, err := mc.CreateMirror(ctx, types.CreateMirrorReq{
+		SourceUrl:      "https://github.com/upstream/repo",
+		CurrentUser:    "user",
+		Namespace:      "ns",
+		Name:           "n",
+		RepoType:       types.CodeRepo,
+		Priority:       types.ASAPMirrorPriority,
+		SkipSourcePath: true,
+	})
+	require.NoError(t, err)
+	require.Len(t, fakeStore.inputs, 1)
+	require.Equal(t, types.ASAPMirrorPriority, fakeStore.inputs[0].Mirror.Priority)
+}
+
 // TestMirrorComponent_CreateMirrorRejectsDifferentSource verifies creation cannot replace an existing mirror source.
 func TestMirrorComponent_CreateMirrorRejectsDifferentSource(t *testing.T) {
 	ctx := context.TODO()

@@ -1307,6 +1307,73 @@ func TestMirrorTaskStore_CompleteRepoSyncAndInsertLFSJobCommitsRepoResultAndJob(
 	require.Equal(t, "master", updatedRepo.DefaultBranch)
 }
 
+func TestMirrorTaskStore_CompleteRepoSyncWithoutLFSFinishesTaskWithoutLFSJob(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	taskStore := database.NewMirrorTaskJobStoreWithDB(db)
+	mirrorStore := database.NewMirrorStoreWithDB(db)
+	repoStore := database.NewRepoStoreWithDB(db)
+
+	repo, err := repoStore.CreateRepo(ctx, database.Repository{
+		UserID:        1,
+		Path:          "test/repo9",
+		GitPath:       "test/repo9.git",
+		Name:          "repo9",
+		Nickname:      "Test Repo 9",
+		DefaultBranch: "main",
+		Private:       false,
+		SyncStatus:    types.SyncStatusInProgress,
+	})
+	require.Nil(t, err)
+
+	mirror, err := mirrorStore.Create(ctx, &database.Mirror{
+		SourceUrl:      "https://example.com/test/repo9.git",
+		RepositoryID:   repo.ID,
+		MirrorSourceID: 1,
+		Status:         types.MirrorRepoSyncStart,
+	})
+	require.Nil(t, err)
+
+	task, err := taskStore.Create(ctx, database.MirrorTask{
+		MirrorID:           mirror.ID,
+		Status:             types.MirrorRepoSyncStart,
+		Priority:           types.ASAPMirrorPriority,
+		BeforeLastCommitID: "before",
+		AfterLastCommitID:  "after",
+	})
+	require.Nil(t, err)
+
+	updatedTask, err := taskStore.CompleteRepoSyncAndInsertLFSJob(ctx, database.CompleteRepoSyncInput{
+		Task:          task,
+		DefaultBranch: "master",
+		SkipLFSJob:    true,
+	})
+	require.Nil(t, err)
+	require.Equal(t, types.MirrorLfsSyncFinished, updatedTask.Status)
+	// No LFS job is enqueued on the no-LFS fast path.
+	require.Equal(t, int64(0), updatedTask.LFSJobID)
+
+	storedTask, err := taskStore.FindByID(ctx, task.ID)
+	require.Nil(t, err)
+	require.Equal(t, types.MirrorLfsSyncFinished, storedTask.Status)
+	require.Equal(t, int64(0), storedTask.LFSJobID)
+
+	var updatedMirror database.Mirror
+	err = db.Core.NewSelect().Model(&updatedMirror).Where("id = ?", mirror.ID).Scan(ctx)
+	require.Nil(t, err)
+	require.Equal(t, types.MirrorLfsSyncFinished, updatedMirror.Status)
+	require.Equal(t, task.ID, updatedMirror.CurrentTaskID)
+	require.False(t, updatedMirror.LastUpdatedAt.IsZero())
+
+	var updatedRepo database.Repository
+	err = db.Core.NewSelect().Model(&updatedRepo).Where("id = ?", repo.ID).Scan(ctx)
+	require.Nil(t, err)
+	require.Equal(t, types.SyncStatusCompleted, updatedRepo.SyncStatus)
+	require.Equal(t, "master", updatedRepo.DefaultBranch)
+}
+
 func TestMirrorTaskStore_CompleteRepoSyncAndInsertLFSJobRollsBackRepoResultOnJobInsertError(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()

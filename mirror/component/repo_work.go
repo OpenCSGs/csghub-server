@@ -10,6 +10,7 @@ import (
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/workhub"
 	"opencsg.com/csghub-server/common/types"
+	"opencsg.com/csghub-server/mirror/reposyncer"
 )
 
 // repoWorker handles repository mirror jobs registered on the mirror repo queue.
@@ -34,7 +35,7 @@ type repoTaskStore interface {
 
 // repoSyncer performs the external Git repository mirror operation.
 type repoSyncer interface {
-	SyncRepo(ctx context.Context, mirror *database.Mirror, mt *database.MirrorTask) (*database.MirrorTask, error)
+	SyncRepo(ctx context.Context, mirror *database.Mirror, mt *database.MirrorTask) (reposyncer.RepoSyncResult, error)
 }
 
 // RepoWorkDeps contains dependencies supplied by the mirror package at worker initialization.
@@ -104,7 +105,7 @@ func (w *repoWorker) work(ctx context.Context, args workhub.RepoArgs, retryCount
 		slog.String("after_status", string(task.Status)),
 	)...)
 
-	syncedTask, err := w.syncer.SyncRepo(ctx, task.Mirror, task)
+	synced, err := w.syncer.SyncRepo(ctx, task.Mirror, task)
 	if err != nil {
 		if isWorkContextTermination(ctx, err) {
 			slog.InfoContext(ctx, "mirror repo sync stopped by execution context",
@@ -122,8 +123,16 @@ func (w *repoWorker) work(ctx context.Context, args workhub.RepoArgs, retryCount
 	if err := ctx.Err(); err != nil {
 		return task, err
 	}
+	syncedTask := synced.Task
 	if syncedTask == nil || syncedTask.Mirror == nil || syncedTask.Mirror.Repository == nil {
 		return task, fmt.Errorf("synced mirror repo task has no mirror repository")
+	}
+
+	// Repositories without LFS objects are already published by the repo syncer;
+	// finish the task straight to the terminal LFS-finished state without
+	// enqueueing an LFS job.
+	if synced.NoLFS {
+		syncedTask.Progress = 100
 	}
 
 	if _, err := w.mirrorTaskStore.CompleteRepoSyncAndInsertLFSJob(ctx, database.CompleteRepoSyncInput{
@@ -138,6 +147,7 @@ func (w *repoWorker) work(ctx context.Context, args workhub.RepoArgs, retryCount
 			Priority:     syncedTask.Priority,
 			Urgent:       args.Urgent,
 		},
+		SkipLFSJob: synced.NoLFS,
 	}); err != nil {
 		return syncedTask, fmt.Errorf("enqueue mirror LFS job: %w", err)
 	}

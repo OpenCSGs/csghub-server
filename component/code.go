@@ -829,6 +829,7 @@ func (c *codeComponentImpl) createMirrorIfNeeded(ctx context.Context, req *types
 		CurrentUser:    req.Username,
 		RepoType:       types.CodeRepo,
 		SyncLfs:        true,
+		Priority:       types.ASAPMirrorPriority,
 		SkipSourcePath: true, // user-created code repos should not set source paths
 	}
 
