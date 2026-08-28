@@ -48,6 +48,71 @@ func escapeLikePattern(value string) string {
 	return builder.String()
 }
 
+func repoListCountLimit(per, page int) int {
+	if per <= 0 {
+		return 0
+	}
+	return max(types.RepoListVisiblePageLimit+1, page+1) * per
+}
+
+func (s *repoStoreImpl) countRepoList(ctx context.Context, q *bun.SelectQuery, per, page int) (int, error) {
+	if per <= 0 {
+		return q.Count(ctx)
+	}
+	countQuery := q.Clone().Limit(repoListCountLimit(per, page))
+	return s.db.Operator.Core.NewSelect().
+		TableExpr("(?) AS limited_repositories", countQuery).
+		Count(ctx)
+}
+
+func applySpaceStatusFilter(q *bun.SelectQuery, status string) {
+	if status == "" {
+		return
+	}
+
+	const latestDeployStatus = `(SELECT d.status
+		FROM deploys AS d
+		WHERE d.space_id = spaces.id
+		ORDER BY d.created_at DESC
+		LIMIT 1)`
+
+	switch status {
+	case "NoAppFile":
+		q.Where("spaces.has_app_file = ? AND spaces.sdk <> ?", false, types.NGINX.Name)
+	case "NoNGINXConf":
+		q.Where("spaces.has_app_file = ? AND spaces.sdk = ?", false, types.NGINX.Name)
+	case "Pending":
+		q.Where("spaces.has_app_file = ?", true).
+			Where(latestDeployStatus+" = ?", common.Pending)
+	case "Building":
+		q.Where("spaces.has_app_file = ?", true).
+			Where(latestDeployStatus+" IN (?)", bun.In([]int{common.BuildInQueue, common.Building}))
+	case "BuildingFailed":
+		q.Where("spaces.has_app_file = ?", true).
+			Where(latestDeployStatus+" = ?", common.BuildFailed)
+	case "Deploying":
+		q.Where("spaces.has_app_file = ?", true).
+			Where(latestDeployStatus+" IN (?)", bun.In([]int{common.BuildSuccess, common.Deploying, common.Startup}))
+	case "DeployFailed":
+		q.Where("spaces.has_app_file = ?", true).
+			Where(latestDeployStatus+" = ?", common.DeployFailed)
+	case "Running":
+		q.Where("spaces.has_app_file = ?", true).
+			Where(latestDeployStatus+" = ?", common.Running)
+	case "RuntimeError":
+		q.Where("spaces.has_app_file = ?", true).
+			Where(latestDeployStatus+" = ?", common.RunTimeError)
+	case "Sleeping":
+		q.Where("spaces.has_app_file = ?", true).
+			Where(latestDeployStatus+" = ?", common.Sleeping)
+	case "Stopped":
+		q.Where("spaces.has_app_file = ?", true).
+			Where("COALESCE("+latestDeployStatus+", ?) = ?", common.Stopped, common.Stopped)
+	default:
+		q.Where("FALSE")
+	}
+}
+
 type repoStoreImpl struct {
 	config              *config.Config
 	db                  *DB
@@ -765,6 +830,7 @@ func (s *repoStoreImpl) PublicToUser(ctx context.Context, repoType types.Reposit
 		q.Join("INNER JOIN codes ON codes.repository_id = repository.id")
 	case types.SpaceRepo:
 		q.Join("INNER JOIN spaces ON spaces.repository_id = repository.id")
+		applySpaceStatusFilter(q, filter.Status)
 	case types.PromptRepo:
 		q.Join("INNER JOIN prompts ON prompts.repository_id = repository.id")
 	case types.MCPServerRepo:
@@ -892,7 +958,7 @@ func (s *repoStoreImpl) PublicToUser(ctx context.Context, repoType types.Reposit
 
 	q.Order(sortBy[filter.Sort])
 
-	count, err = q.Count(ctx)
+	count, err = s.countRepoList(ctx, q, per, page)
 	err = errorx.HandleDBError(err, errorx.Ctx().
 		Set("repo_type", repoType).
 		Set("filter", filter),
@@ -934,6 +1000,9 @@ func (s *repoStoreImpl) publicToUserTrending(ctx context.Context, repoType types
 
 	// Join with business table
 	q.Join(fmt.Sprintf("INNER JOIN %s ON %s.repository_id = r.id", bizTable, bizTable))
+	if repoType == types.SpaceRepo {
+		applySpaceStatusFilter(q, filter.Status)
+	}
 
 	// Filter by dataset type for dataset repo
 	if repoType == types.DatasetRepo && filter.DatasetType != "" {
@@ -967,8 +1036,7 @@ func (s *repoStoreImpl) publicToUserTrending(ctx context.Context, repoType types
 		}
 	}
 
-	q.Where("r.deleted_at IS NULL").
-		Where(fmt.Sprintf("EXISTS (SELECT 1 FROM %s m WHERE m.repository_id = r.id)", bizTable))
+	q.Where("r.deleted_at IS NULL")
 
 	if !isAdmin {
 		if len(ownerNamespaces) > 0 {
@@ -1041,7 +1109,10 @@ func (s *repoStoreImpl) publicToUserTrending(ctx context.Context, repoType types
 		q.Distinct()
 	}
 
-	count, err = q.Count(ctx)
+	// Repository lists only render the first 100 page numbers and use the next-page
+	// control afterwards. Count only far enough to keep that control accurate for
+	// the current page instead of scanning every matching repository.
+	count, err = s.countRepoList(ctx, q, per, page)
 	err = errorx.HandleDBError(err, errorx.Ctx().
 		Set("repo_type", repoType).
 		Set("filter", filter),

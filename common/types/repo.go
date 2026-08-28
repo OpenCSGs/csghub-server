@@ -132,7 +132,8 @@ const (
 	TEI                         InferenceEngine = "tei"
 	Ktransformers               InferenceEngine = "ktransformers"
 
-	MaxFileTreeSize int = 500
+	MaxFileTreeSize          int = 500
+	RepoListVisiblePageLimit int = 100
 )
 
 var (
