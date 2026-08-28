@@ -17,6 +17,7 @@ import (
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/workhub"
 	"opencsg.com/csghub-server/common/types"
+	"opencsg.com/csghub-server/mirror/reposyncer"
 )
 
 // fakeRepoTaskStore records repo worker task state transitions.
@@ -52,9 +53,13 @@ func (s *fakeRepoTaskStore) UpdateStatusAndRepoSyncStatus(ctx context.Context, t
 // CompleteRepoSyncAndInsertLFSJob records the repo completion transaction.
 func (s *fakeRepoTaskStore) CompleteRepoSyncAndInsertLFSJob(ctx context.Context, input database.CompleteRepoSyncInput) (database.MirrorTask, error) {
 	s.actions = append(s.actions, database.MirrorSuccess)
-	s.lfsInputs = append(s.lfsInputs, input.JobInput)
-	s.insertedLFS = true
-	input.Task.Status = types.MirrorRepoSyncFinished
+	if input.SkipLFSJob {
+		input.Task.Status = types.MirrorLfsSyncFinished
+	} else {
+		s.lfsInputs = append(s.lfsInputs, input.JobInput)
+		s.insertedLFS = true
+		input.Task.Status = types.MirrorRepoSyncFinished
+	}
 	if input.Task.Mirror != nil && input.Task.Mirror.Repository != nil {
 		input.Task.Mirror.Repository.DefaultBranch = input.DefaultBranch
 	}
@@ -69,31 +74,32 @@ type fakeRepoSyncer struct {
 	started                  chan context.Context
 	returnSuccessAfterCancel bool
 	returnCauseAfterCancel   bool
+	noLFS                    bool
 }
 
 // SyncRepo returns the configured sync result.
-func (s fakeRepoSyncer) SyncRepo(ctx context.Context, mirror *database.Mirror, mt *database.MirrorTask) (*database.MirrorTask, error) {
+func (s fakeRepoSyncer) SyncRepo(ctx context.Context, mirror *database.Mirror, mt *database.MirrorTask) (reposyncer.RepoSyncResult, error) {
 	if s.started != nil {
 		s.started <- ctx
 		<-ctx.Done()
 		if s.returnSuccessAfterCancel {
 			if s.task != nil {
-				return s.task, nil
+				return reposyncer.RepoSyncResult{Task: s.task, NoLFS: s.noLFS}, nil
 			}
-			return mt, nil
+			return reposyncer.RepoSyncResult{Task: mt, NoLFS: s.noLFS}, nil
 		}
 		if s.returnCauseAfterCancel {
-			return s.task, context.Cause(ctx)
+			return reposyncer.RepoSyncResult{Task: s.task, NoLFS: s.noLFS}, context.Cause(ctx)
 		}
-		return s.task, ctx.Err()
+		return reposyncer.RepoSyncResult{Task: s.task, NoLFS: s.noLFS}, ctx.Err()
 	}
 	if s.err != nil {
-		return s.task, s.err
+		return reposyncer.RepoSyncResult{Task: s.task, NoLFS: s.noLFS}, s.err
 	}
 	if s.task != nil {
-		return s.task, nil
+		return reposyncer.RepoSyncResult{Task: s.task, NoLFS: s.noLFS}, nil
 	}
-	return mt, nil
+	return reposyncer.RepoSyncResult{Task: mt, NoLFS: s.noLFS}, nil
 }
 
 // failRepoSyncer fails the test if a skipped repo job reaches the syncer.
@@ -102,9 +108,9 @@ type failRepoSyncer struct {
 }
 
 // SyncRepo fails because stale or terminal jobs must stop before repo sync.
-func (s failRepoSyncer) SyncRepo(ctx context.Context, mirror *database.Mirror, mt *database.MirrorTask) (*database.MirrorTask, error) {
+func (s failRepoSyncer) SyncRepo(ctx context.Context, mirror *database.Mirror, mt *database.MirrorTask) (reposyncer.RepoSyncResult, error) {
 	s.t.Fatalf("SyncRepo should not be called")
-	return nil, nil
+	return reposyncer.RepoSyncResult{}, nil
 }
 
 // fakeMirrorLFSJobClient satisfies the LFS job client dependency for config tests.
@@ -218,6 +224,31 @@ func TestRepoWorker_WorkEnqueuesLFSJobWhenRepoHasLFS(t *testing.T) {
 	require.Equal(t, task.MirrorID, store.lfsInputs[0].MirrorID)
 	require.Equal(t, task.Mirror.RepositoryID, store.lfsInputs[0].RepositoryID)
 	require.Equal(t, task.Mirror.SourceUrl, store.lfsInputs[0].SourceURL)
+}
+
+// TestRepoWorker_WorkSkipsLFSJobWhenRepoHasNoLFS verifies that a repo sync which
+// reports no LFS objects finishes the task straight to the terminal state
+// without enqueuing an LFS job.
+func TestRepoWorker_WorkSkipsLFSJobWhenRepoHasNoLFS(t *testing.T) {
+	ctx := context.TODO()
+	task := repoWorkerTask(types.MirrorQueued)
+	syncedTask := *task
+	syncedTask.Status = types.MirrorRepoSyncStart
+	syncedTask.BeforeLastCommitID = "before"
+	syncedTask.AfterLastCommitID = "after"
+	store := &fakeRepoTaskStore{task: task}
+	worker := &repoWorker{
+		mirrorTaskStore: store,
+		urgentManager:   newWorkerTestManager(t),
+		syncer:          fakeRepoSyncer{task: &syncedTask, noLFS: true},
+		lfsJobClient:    fakeMirrorLFSJobClient{},
+	}
+
+	err := worker.Work(ctx, riverJob(repoArgsFromTask(task)))
+	require.NoError(t, err)
+	require.Equal(t, []string{database.MirrorContinue, database.MirrorSuccess}, store.actions)
+	require.False(t, store.insertedLFS)
+	require.Empty(t, store.lfsInputs)
 }
 
 func TestRepoWorker_WorkMarksOriginalTaskFailedWhenSyncReturnsNilTask(t *testing.T) {

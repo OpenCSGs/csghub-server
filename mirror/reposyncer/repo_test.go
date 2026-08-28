@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 	mockgit "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/git/gitserver"
 	mockdb "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/database"
+	mock_workflow "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/temporal"
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
@@ -146,6 +147,11 @@ func TestRepoSyncWorker_SyncRepo(t *testing.T) {
 			return req.RelativePath == expectedRelativePath
 		})).Return(nil)
 
+		// Repository has LFS objects, so the sync takes the normal LFS path.
+		mockGit.EXPECT().GetRepoAllLfsPointers(mock.Anything, mock.MatchedBy(func(req gitserver.GetRepoAllFilesReq) bool {
+			return req.RelativePath == expectedRelativePath
+		})).Return([]*types.LFSPointer{{Oid: "lfs-oid", Size: 100}}, nil)
+
 		cfg := &config.Config{}
 		cfg.Frontend.URL = "http://localhost"
 
@@ -171,9 +177,11 @@ func TestRepoSyncWorker_SyncRepo(t *testing.T) {
 
 		result, err := worker.SyncRepo(context.Background(), &mirror, mt)
 		assert.Nil(t, err)
-		assert.Equal(t, "main", result.Mirror.Repository.DefaultBranch)
-		assert.Equal(t, "old-commit", result.BeforeLastCommitID)
-		assert.Equal(t, "new-commit", result.AfterLastCommitID)
+		require.NotNil(t, result.Task)
+		assert.Equal(t, "main", result.Task.Mirror.Repository.DefaultBranch)
+		assert.Equal(t, "old-commit", result.Task.BeforeLastCommitID)
+		assert.Equal(t, "new-commit", result.Task.AfterLastCommitID)
+		assert.False(t, result.NoLFS)
 	})
 
 	t.Run("description generation error does not fail sync", func(t *testing.T) {
@@ -209,6 +217,9 @@ func TestRepoSyncWorker_SyncRepo(t *testing.T) {
 			assert.AnError,
 		)
 
+		// Repository has LFS objects, so the sync takes the normal LFS path.
+		mockGit.EXPECT().GetRepoAllLfsPointers(mock.Anything, mock.Anything).Return([]*types.LFSPointer{{Oid: "lfs-oid", Size: 100}}, nil)
+
 		cfg := &config.Config{}
 		cfg.Frontend.URL = "http://localhost"
 
@@ -234,8 +245,10 @@ func TestRepoSyncWorker_SyncRepo(t *testing.T) {
 
 		result, err := worker.SyncRepo(context.Background(), &mirror, mt)
 		assert.NoError(t, err)
-		assert.Equal(t, "same-commit", result.BeforeLastCommitID)
-		assert.Equal(t, "same-commit", result.AfterLastCommitID)
+		require.NotNil(t, result.Task)
+		assert.Equal(t, "same-commit", result.Task.BeforeLastCommitID)
+		assert.Equal(t, "same-commit", result.Task.AfterLastCommitID)
+		assert.False(t, result.NoLFS)
 		assert.Equal(t, 0, mt.Progress)
 	})
 
@@ -271,6 +284,9 @@ func TestRepoSyncWorker_SyncRepo(t *testing.T) {
 			nil,
 		)
 
+		// Repository has LFS objects, so the sync takes the normal LFS path.
+		mockGit.EXPECT().GetRepoAllLfsPointers(mock.Anything, mock.Anything).Return([]*types.LFSPointer{{Oid: "lfs-oid", Size: 100}}, nil)
+
 		cfg := &config.Config{}
 		cfg.Frontend.URL = "http://localhost"
 
@@ -298,8 +314,104 @@ func TestRepoSyncWorker_SyncRepo(t *testing.T) {
 
 		result, err := worker.SyncRepo(context.Background(), &mirror, mt)
 		assert.NoError(t, err)
-		assert.Empty(t, result.BeforeLastCommitID)
-		assert.Equal(t, "after", result.AfterLastCommitID)
+		require.NotNil(t, result.Task)
+		assert.Empty(t, result.Task.BeforeLastCommitID)
+		assert.Equal(t, "after", result.Task.AfterLastCommitID)
+		assert.False(t, result.NoLFS)
+	})
+
+	t.Run("publishes commit and skips lfs when repo has no lfs", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		}))
+		defer server.Close()
+
+		mockGit := mockgit.NewMockGitServer(t)
+		mockSender := new(MockMessageSender)
+		mockTaskStore := mockdb.NewMockMirrorTaskStore(t)
+		mockRepoStore := mockdb.NewMockRepoStore(t)
+		mockPromptPrefixStore := mockdb.NewMockPromptPrefixStore(t)
+		mockLLMConfigStore := mockdb.NewMockLLMConfigStore(t)
+		mockWorkflowClient := mock_workflow.NewMockClient(t)
+		expectedRelativePath := "codes_namespace/name.git"
+
+		mockSender.On("Send", mock.Anything, mock.Anything).Return(hook.Response{}, nil)
+		mockGit.EXPECT().RepositoryExists(mock.Anything, mock.MatchedBy(func(req gitserver.CheckRepoReq) bool {
+			return req.RelativePath == expectedRelativePath
+		})).Return(true, nil)
+		mockGit.EXPECT().GetRepoLastCommit(mock.Anything, mock.MatchedBy(func(req gitserver.GetRepoLastCommitReq) bool {
+			return req.RelativePath == expectedRelativePath
+		})).Return(&types.Commit{ID: "old-commit"}, nil).Once()
+		mockGit.EXPECT().MirrorSync(mock.Anything, mock.MatchedBy(func(req gitserver.MirrorSyncReq) bool {
+			return req.RelativePath == expectedRelativePath
+		})).Return(nil)
+		mockGit.EXPECT().GetRepo(mock.Anything, mock.MatchedBy(func(req gitserver.GetRepoReq) bool {
+			return req.RelativePath == expectedRelativePath
+		})).Return(&gitserver.CreateRepoResp{DefaultBranch: "main"}, nil)
+		mockGit.EXPECT().GetRepoLastCommit(mock.Anything, mock.MatchedBy(func(req gitserver.GetRepoLastCommitReq) bool {
+			return req.RelativePath == expectedRelativePath
+		})).Return(&types.Commit{ID: "new-commit"}, nil).Once()
+
+		expectDescriptionGeneration(
+			t,
+			mockGit,
+			mockRepoStore,
+			mockPromptPrefixStore,
+			mockLLMConfigStore,
+			types.CodeRepo,
+			"namespace",
+			"name",
+			"new-commit",
+			nil,
+		)
+
+		// Point HEAD to old commit before the fast path publishes the new one.
+		mockGit.EXPECT().UpdateRef(mock.Anything, mock.MatchedBy(func(req gitserver.UpdateRefReq) bool {
+			return req.RelativePath == expectedRelativePath && req.NewObjectId == "old-commit"
+		})).Return(nil)
+
+		// No LFS objects: the fast path publishes the new commit and triggers the callback.
+		mockGit.EXPECT().GetRepoAllLfsPointers(mock.Anything, mock.MatchedBy(func(req gitserver.GetRepoAllFilesReq) bool {
+			return req.RelativePath == expectedRelativePath
+		})).Return([]*types.LFSPointer{}, nil)
+
+		mockGit.EXPECT().UpdateRef(mock.Anything, mock.MatchedBy(func(req gitserver.UpdateRefReq) bool {
+			return req.RelativePath == expectedRelativePath && req.NewObjectId == "new-commit"
+		})).Return(nil)
+		mockGit.EXPECT().GetDiffBetweenTwoCommits(mock.Anything, mock.MatchedBy(func(req gitserver.GetDiffBetweenTwoCommitsReq) bool {
+			return req.RelativePath == expectedRelativePath && req.RightCommitId == "new-commit"
+		})).Return(&types.GiteaCallbackPushReq{}, nil)
+		mockWorkflowClient.EXPECT().ExecuteWorkflow(mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
+
+		cfg := &config.Config{}
+		cfg.Frontend.URL = "http://localhost"
+
+		worker := &RepoSyncWorker{
+			httpClient:        server.Client(),
+			git:               mockGit,
+			msgSender:         mockSender,
+			mirrorTaskStore:   mockTaskStore,
+			repoStore:         mockRepoStore,
+			promptPrefixStore: mockPromptPrefixStore,
+			llmConfigStore:    mockLLMConfigStore,
+			workflowClient:    mockWorkflowClient,
+			config:            cfg,
+		}
+
+		mirror := database.Mirror{
+			SourceUrl: server.URL,
+			Repository: &database.Repository{
+				Path:           "namespace/name",
+				RepositoryType: types.CodeRepo,
+			},
+		}
+		mt := &database.MirrorTask{}
+
+		result, err := worker.SyncRepo(context.Background(), &mirror, mt)
+		assert.NoError(t, err)
+		require.NotNil(t, result.Task)
+		assert.Equal(t, "new-commit", result.Task.AfterLastCommitID)
+		assert.True(t, result.NoLFS)
 	})
 }
 

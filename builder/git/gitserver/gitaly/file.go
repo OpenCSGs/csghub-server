@@ -975,6 +975,10 @@ func (c *Client) GetRepoAllLfsPointers(ctx context.Context, req gitserver.GetRep
 		},
 	}
 
+	if req.Limit > 0 {
+		allPointersReq.Limit = req.Limit
+	}
+
 	allPointersStream, err := c.blobClient.ListAllLFSPointers(ctx, allPointersReq)
 	if err != nil {
 		return nil, errorx.ErrGitGetLfsPointersFailed(err, errorx.Ctx())

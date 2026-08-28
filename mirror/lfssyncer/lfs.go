@@ -18,12 +18,9 @@ import (
 
 	"github.com/minio/minio-go/v7"
 	"github.com/redis/go-redis/v9"
-	"go.temporal.io/sdk/client"
 	"golang.org/x/sync/errgroup"
-	"opencsg.com/csghub-server/api/workflow"
 	"opencsg.com/csghub-server/builder/git"
 	"opencsg.com/csghub-server/builder/git/gitserver"
-	"opencsg.com/csghub-server/builder/git/gitserver/gitaly"
 	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/store/s3"
@@ -285,7 +282,6 @@ func (w *LfsSyncWorker) refreshLfsMetaObjects(ctx context.Context, mt *database.
 	lfsPointers, err := w.git.GetRepoAllLfsPointers(ctx, gitserver.GetRepoAllFilesReq{
 		Namespace:    namespace,
 		Name:         name,
-		Ref:          mt.AfterLastCommitID,
 		RepoType:     repo.RepositoryType,
 		RelativePath: relativePath,
 	})
@@ -412,61 +408,19 @@ func (w *LfsSyncWorker) SyncLfs(ctx context.Context, mt *database.MirrorTask) er
 		}
 	}
 
-	// Get repo last commit
+	// Publish the synced commit and trigger the git push callback so
+	// downstream handlers run. Shared with the repo-sync no-LFS fast path.
 	namespace, name, err := common.GetNamespaceAndNameFromPath(repo.Path)
 	if err != nil {
 		return fmt.Errorf("failed to get namespace and name from mirror repository path: %w", err)
 	}
 	relativePath := repo.GitalyPath()
 
-	commit, err := w.getRepoLastCommit(
-		ctx, namespace, name, repo.DefaultBranch, repo.RepositoryType, relativePath,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to get repo last commit: %w", err)
-	}
-
-	if commit.ID != mt.AfterLastCommitID {
-		// Point HEAD to new commit, so the uesrs can clone the changes
-		loggerFromLFSContext(ctx).InfoContext(ctx,
-			"Point HEAD to new commit",
-			slog.Any("repo_type", mirror.Repository.RepositoryType),
-			slog.Any("namespace", namespace),
-			slog.Any("name", name),
-			slog.Any("commit_id", mt.AfterLastCommitID),
-		)
-
-		err = w.git.UpdateRef(ctx, gitserver.UpdateRefReq{
-			Namespace:    namespace,
-			Name:         name,
-			Ref:          fmt.Sprintf("refs/heads/%s", repo.DefaultBranch),
-			RepoType:     mirror.Repository.RepositoryType,
-			NewObjectId:  mt.AfterLastCommitID,
-			RelativePath: relativePath,
-		})
-		if err != nil {
-			return fmt.Errorf("failed to point HEAD to new commit: %w", err)
-		}
-		loggerFromLFSContext(ctx).InfoContext(ctx,
-			"Point HEAD to new commit successfully",
-			slog.Any("repo_type", mirror.Repository.RepositoryType),
-			slog.Any("namespace", namespace),
-			slog.Any("name", name),
-			slog.Any("commit_id", mt.AfterLastCommitID),
-		)
-	}
-
-	lastCommit, err := w.getRepoLastCommit(
-		ctx, namespace, name, repo.DefaultBranch, repo.RepositoryType, relativePath,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to get repo last commit: %w", err)
-	}
-
-	// Trigger git callback
-	err = w.triggerGitCallback(ctx, namespace, name, repo.DefaultBranch, lastCommit, repo, relativePath)
-	if err != nil {
-		return fmt.Errorf("failed to trigger git callback: %w", err)
+	if err := reposyncer.PublishCommitAndTriggerCallback(
+		ctx, w.git, w.workflowClient,
+		repo, namespace, name, relativePath, mt.AfterLastCommitID,
+	); err != nil {
+		return fmt.Errorf("failed to publish commit and trigger callback: %w", err)
 	}
 
 	return nil
@@ -1543,72 +1497,6 @@ func (w *LfsSyncWorker) GetLFSDownloadURLs(
 	}
 
 	return resPointers, nil
-}
-
-// getRepoLastCommit resolves a commit without requiring Gitaly to query repository metadata.
-func (w *LfsSyncWorker) getRepoLastCommit(
-	ctx context.Context,
-	namespace, name, branch string,
-	repoType types.RepositoryType,
-	relativePath string,
-) (*types.Commit, error) {
-	commit, err := w.git.GetRepoLastCommit(ctx, gitserver.GetRepoLastCommitReq{
-		Namespace:    namespace,
-		Name:         name,
-		RepoType:     repoType,
-		Ref:          branch,
-		RelativePath: relativePath,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to get repo last commit: %w", err)
-	}
-	return commit, nil
-}
-
-// triggerGitCallback submits the synchronized Git diff to the repository callback workflow.
-func (w *LfsSyncWorker) triggerGitCallback(
-	ctx context.Context,
-	namespace, name, branch string,
-	commit *types.Commit,
-	repo *database.Repository,
-	relativePath string,
-) error {
-	callback, err := w.git.GetDiffBetweenTwoCommits(ctx, gitserver.GetDiffBetweenTwoCommitsReq{
-		Namespace:     namespace,
-		Name:          name,
-		RepoType:      repo.RepositoryType,
-		Ref:           branch,
-		LeftCommitId:  gitaly.SHA1EmptyTreeID,
-		RightCommitId: commit.ID,
-		Private:       repo.Private,
-		RelativePath:  relativePath,
-	})
-	if err != nil {
-		return fmt.Errorf("failed to get diff between two commits: %w", err)
-	}
-	callback.Ref = branch
-
-	//start workflow to handle push request
-
-	workflowOptions := client.StartWorkflowOptions{
-		TaskQueue: workflow.HandlePushQueueName,
-		ID:        fmt.Sprintf("mirror-lfs-%s-%s-%s-%s", repo.RepositoryType, namespace, name, commit.ID),
-	}
-
-	_, err = w.workflowClient.ExecuteWorkflow(
-		ctx, workflowOptions, workflow.HandlePushWorkflow, callback,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to handle git push callback: %w", err)
-	}
-
-	loggerFromLFSContext(ctx).InfoContext(ctx,
-		"start handle push workflow",
-		// slog.String("workflowID", we.GetID()),
-		slog.Any("req", callback),
-		slog.Any("repoType", repo.RepositoryType))
-
-	return nil
 }
 
 func SplitPointersBySizeAndCount(pointers []*types.Pointer) [][]*types.Pointer {

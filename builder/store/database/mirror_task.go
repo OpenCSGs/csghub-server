@@ -76,6 +76,8 @@ type CompleteRepoSyncInput struct {
 	JobClient MirrorLFSJobClient
 	// JobInput describes the follow-up LFS job.
 	JobInput MirrorLFSJobInput
+	// SkipLFSJob controls whether a follow-up LFS job is created after repo sync. When false, the task is finished without enqueueing an LFS job.
+	SkipLFSJob bool
 }
 
 // RequeueMirrorRepoTaskInput carries the data needed to manually enqueue a repository mirror sync.
@@ -616,7 +618,11 @@ func (m *mirrorTaskStoreImpl) CompleteRepoSyncAndInsertLFSJob(ctx context.Contex
 	task := input.Task
 	err := m.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		var err error
-		task, err = updateMirrorTaskStateTx(ctx, tx, task, MirrorSuccess)
+		action := MirrorSuccess
+		if input.SkipLFSJob {
+			action = MirrorNoLfsToSync
+		}
+		task, err = updateMirrorTaskStateTx(ctx, tx, task, action)
 		if err != nil {
 			return err
 		}
@@ -638,6 +644,9 @@ func (m *mirrorTaskStoreImpl) CompleteRepoSyncAndInsertLFSJob(ctx context.Contex
 			Where("id = ?", task.MirrorID).
 			Exec(ctx); err != nil {
 			return err
+		}
+		if input.SkipLFSJob {
+			return nil
 		}
 		if input.JobClient == nil {
 			return fmt.Errorf("mirror LFS job client is required")
