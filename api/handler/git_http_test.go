@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	mockcomponent "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
 	"opencsg.com/csghub-server/builder/store/database"
@@ -19,8 +20,9 @@ import (
 
 type GitHTTPTester struct {
 	*testutil.GinTester
-	handler *GitHTTPHandler
-	mocks   struct {
+	handler   *GitHTTPHandler
+	publisher *recordingPublisher
+	mocks     struct {
 		gitHttp *mockcomponent.MockGitHTTPComponent
 	}
 }
@@ -28,9 +30,11 @@ type GitHTTPTester struct {
 func NewGitHTTPTester(t *testing.T) *GitHTTPTester {
 	tester := &GitHTTPTester{GinTester: testutil.NewGinTester()}
 	tester.mocks.gitHttp = mockcomponent.NewMockGitHTTPComponent(t)
+	tester.publisher = &recordingPublisher{}
 
 	tester.handler = &GitHTTPHandler{
-		gitHttp: tester.mocks.gitHttp,
+		gitHttp:   tester.mocks.gitHttp,
+		analytics: tester.publisher,
 	}
 	tester.WithParam("repo", "testRepo")
 	tester.WithParam("branch", "testBranch")
@@ -96,6 +100,15 @@ func TestGitHTTPHandler_GitUploadPack(t *testing.T) {
 		headers := tester.Response().Header()
 		require.Equal(t, "application/x-git-result", headers.Get("Content-Type"))
 		require.Equal(t, "no-cache", headers.Get("Cache-Control"))
+		if serverAnalyticsEnabled {
+			require.Len(t, tester.publisher.events, 1)
+			event := tester.publisher.events[0]
+			require.Equal(t, modelGitClonePackServed, event.Name)
+			require.Equal(t, downloadChannelHTTPSGit, event.Properties["download_channel"])
+			require.Equal(t, deliveryTypeGitPack, event.Properties["delivery_type"])
+		} else {
+			require.Empty(t, tester.publisher.events)
+		}
 	})
 
 	t.Run("no permission", func(t *testing.T) {
@@ -116,6 +129,25 @@ func TestGitHTTPHandler_GitUploadPack(t *testing.T) {
 		tester.WithKV("repo_type", "model").WithUser().WithHeader("Accept-Encoding", "gzip").Execute()
 
 		require.Equal(t, 403, tester.Response().Code)
+		require.Empty(t, tester.publisher.events)
+	})
+
+	t.Run("publisher failure does not alter a successful response", func(t *testing.T) {
+		tester := NewGitHTTPTester(t).WithHandleFunc(func(h *GitHTTPHandler) gin.HandlerFunc {
+			return h.GitUploadPack
+		})
+		tester.publisher.err = errors.New("PostHog unavailable")
+		tester.mocks.gitHttp.EXPECT().GitUploadPack(tester.Ctx(), mock.Anything).Return(nil)
+		tester.SetPath("git").WithQuery("service", "git-upload-pack")
+		tester.WithKV("namespace", "u").WithKV("name", "r")
+		tester.WithKV("repo_type", "model").WithUser().Execute()
+
+		require.Equal(t, 200, tester.Response().Code)
+		if serverAnalyticsEnabled {
+			require.Len(t, tester.publisher.events, 1)
+		} else {
+			require.Empty(t, tester.publisher.events)
+		}
 	})
 }
 
@@ -250,6 +282,16 @@ func TestGitHTTPHandler_LfsDownload(t *testing.T) {
 	lc, err := resp.Location()
 	require.NoError(t, err)
 	require.Equal(t, "url", lc.String())
+	if serverAnalyticsEnabled {
+		require.Len(t, tester.publisher.events, 1)
+		event := tester.publisher.events[0]
+		require.Equal(t, modelFileDownloadURLIssued, event.Name)
+		require.Equal(t, downloadChannelHTTPSGit, event.Properties["download_channel"])
+		require.Equal(t, deliveryTypeLFSURL, event.Properties["delivery_type"])
+		require.Equal(t, "o", event.Properties["lfs_oid"])
+	} else {
+		require.Empty(t, tester.publisher.events)
+	}
 }
 
 func TestGitHTTPHandler_LfsVerify(t *testing.T) {

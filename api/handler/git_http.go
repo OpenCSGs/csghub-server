@@ -15,6 +15,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/golang/gddo/httputil"
 	"opencsg.com/csghub-server/api/httpbase"
+	"opencsg.com/csghub-server/builder/analytics"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/errorx"
@@ -28,12 +29,14 @@ func NewGitHTTPHandler(config *config.Config) (*GitHTTPHandler, error) {
 		return nil, err
 	}
 	return &GitHTTPHandler{
-		gitHttp: uc,
+		gitHttp:   uc,
+		analytics: analytics.Default(),
 	}, nil
 }
 
 type GitHTTPHandler struct {
-	gitHttp component.GitHTTPComponent
+	gitHttp   component.GitHTTPComponent
+	analytics analytics.Publisher
 }
 
 func (h *GitHTTPHandler) InfoRefs(ctx *gin.Context) {
@@ -133,6 +136,15 @@ func (h *GitHTTPHandler) GitUploadPack(ctx *gin.Context) {
 		}
 		httpbase.ServerError(ctx, err)
 		return
+	}
+	if req.RepoType == types.ModelRepo {
+		captureStandaloneModelDownload(ctx, h.analytics, modelDownloadEvent{
+			Name:         modelGitClonePackServed,
+			Namespace:    req.Namespace,
+			RepoName:     req.Name,
+			Channel:      downloadChannelHTTPSGit,
+			DeliveryType: deliveryTypeGitPack,
+		})
 	}
 }
 
@@ -330,6 +342,17 @@ func (h *GitHTTPHandler) LfsDownload(ctx *gin.Context) {
 		return
 	}
 	ctx.Redirect(http.StatusFound, url.String())
+	if downloadRequest.RepoType == types.ModelRepo {
+		captureStandaloneModelDownload(ctx, h.analytics, modelDownloadEvent{
+			Name:         modelFileDownloadURLIssued,
+			Namespace:    downloadRequest.Namespace,
+			RepoName:     downloadRequest.Name,
+			FileSize:     downloadRequest.Size,
+			LFSOID:       downloadRequest.Oid,
+			Channel:      downloadChannelHTTPSGit,
+			DeliveryType: deliveryTypeLFSURL,
+		})
+	}
 }
 
 func (h *GitHTTPHandler) LfsVerify(ctx *gin.Context) {

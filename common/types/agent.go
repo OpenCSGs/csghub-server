@@ -197,8 +197,9 @@ type RecordAgentInstanceSessionHistoryRequest struct {
 }
 
 type CreateSessionHistoryRequest struct {
-	SessionUUID string                  `json:"-"`
-	Messages    []SessionHistoryMessage `json:"messages" binding:"required"`
+	SessionUUID      string                  `json:"-"`
+	PostHogSessionID string                  `json:"-"`
+	Messages         []SessionHistoryMessage `json:"messages" binding:"required"`
 }
 
 type SessionHistoryMessage struct {
@@ -221,11 +222,15 @@ const (
 // SessionHistoryMessageEnvelope is a unified message structure for all session history operations
 type SessionHistoryMessageEnvelope struct {
 	// Common fields
-	MessageType SessionHistoryMessageType `json:"message_type"`
-	MsgUUID     string                    `json:"msg_uuid"`
-	SessionID   int64                     `json:"session_id"`
-	SessionUUID string                    `json:"session_uuid"`
-	Request     bool                      `json:"request"` // true: request, false: response
+	MessageType      SessionHistoryMessageType `json:"message_type"`
+	MsgUUID          string                    `json:"msg_uuid"`
+	SessionID        int64                     `json:"session_id"`
+	SessionUUID      string                    `json:"session_uuid"`
+	Request          bool                      `json:"request"` // true: request, false: response
+	InstanceID       int64                     `json:"instance_id,omitempty"`
+	UserUUID         string                    `json:"user_uuid,omitempty"`
+	AgentType        string                    `json:"agent_type,omitempty"`
+	PostHogSessionID string                    `json:"posthog_session_id,omitempty"`
 
 	// Create/Rewrite fields
 	Content     string `json:"content,omitempty"`      // message content

@@ -53,6 +53,13 @@ type Config struct {
 	// timestamps (e.g. Loki log timestamps).
 	TimeZone string `env:"STARHUB_SERVER_TIMEZONE" default:"Asia/Shanghai"`
 
+	PostHog struct {
+		Enabled      bool   `env:"STARHUB_SERVER_POSTHOG_ENABLED" default:"false"`
+		ProjectToken string `env:"STARHUB_SERVER_POSTHOG_PROJECT_TOKEN" default:""`
+		APIHost      string `env:"STARHUB_SERVER_POSTHOG_API_HOST" default:""`
+		Environment  string `env:"STARHUB_SERVER_POSTHOG_ENVIRONMENT" default:"development"`
+	}
+
 	APIServer struct {
 		Port         int    `env:"STARHUB_SERVER_SERVER_PORT" default:"8080"`
 		PublicDomain string `env:"STARHUB_SERVER_PUBLIC_DOMAIN" default:"http://localhost:8080"`

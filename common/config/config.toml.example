@@ -9,6 +9,12 @@ city_to_cdn_domain = {}
 docs_host = "http://localhost:6636"
 timezone = "Asia/Shanghai"
 
+[posthog]
+enabled = false
+project_token = ""
+api_host = ""
+environment = "development"
+
 [api_server]
 port = 8080
 public_domain = "http://localhost:8080"

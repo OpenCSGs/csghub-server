@@ -8,6 +8,7 @@ import (
 
 	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/log"
+	"opencsg.com/csghub-server/builder/analytics"
 	"opencsg.com/csghub-server/builder/instrumentation"
 	"opencsg.com/csghub-server/builder/temporal"
 
@@ -36,6 +37,22 @@ var cmdLaunch = &cobra.Command{
 		if len(cfg.APIToken) < 128 {
 			return fmt.Errorf("API token length is less than 128, please check")
 		}
+		analyticsPublisher, analyticsErr := analytics.New(analytics.Config{
+			Enabled:      cfg.PostHog.Enabled,
+			ProjectToken: cfg.PostHog.ProjectToken,
+			APIHost:      cfg.PostHog.APIHost,
+			Environment:  cfg.PostHog.Environment,
+		})
+		if analyticsErr != nil {
+			slog.Error("PostHog publisher is disabled", slog.Any("error", analyticsErr))
+		}
+		analytics.Assign(analyticsPublisher)
+		defer func() {
+			if closeErr := analyticsPublisher.Close(); closeErr != nil {
+				slog.Warn("Failed to flush PostHog events during shutdown", slog.Any("error", closeErr))
+			}
+			analytics.Assign(nil)
+		}()
 		dbConfig := database.DBConfig{
 			Dialect: database.DatabaseDialect(cfg.Database.Driver),
 			DSN:     cfg.Database.DSN,

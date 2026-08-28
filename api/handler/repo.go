@@ -21,6 +21,7 @@ import (
 	"go.temporal.io/sdk/client"
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/api/workflow"
+	"opencsg.com/csghub-server/builder/analytics"
 	"opencsg.com/csghub-server/builder/temporal"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/errorx"
@@ -74,6 +75,7 @@ func NewRepoHandler(config *config.Config) (*RepoHandler, error) {
 		temporal:                  temporal.GetClient(),
 		deployStatusCheckInterval: time.Duration(config.Model.DeployStatusCheckInterval) * time.Second,
 		config:                    config,
+		analytics:                 analytics.Default(),
 	}, nil
 }
 
@@ -85,6 +87,7 @@ type RepoHandler struct {
 	temporal                  temporal.Client
 	deployStatusCheckInterval time.Duration
 	config                    *config.Config
+	analytics                 analytics.Publisher
 }
 
 // ScanIndustryTags godoc
@@ -658,6 +661,7 @@ func (h *RepoHandler) DownloadFile(ctx *gin.Context) {
 
 	if req.Lfs {
 		httpbase.OK(ctx, url)
+		h.captureDownloadResult(ctx, req, size, modelFileDownloadURLIssued)
 	} else {
 		slog.Debug("Download repo file succeed", slog.String("repo_type", string(req.RepoType)), slog.String("name", name), slog.String("path", req.Path), slog.String("ref", req.Ref))
 		fileName := path.Base(req.Path)
@@ -670,6 +674,7 @@ func (h *RepoHandler) DownloadFile(ctx *gin.Context) {
 			httpbase.ServerError(ctx, err)
 			return
 		}
+		h.captureDownloadResult(ctx, req, size, modelFileDownloadSuccess)
 	}
 }
 
@@ -1364,6 +1369,18 @@ func (h *RepoHandler) handleDownload(ctx *gin.Context, isResolve bool) {
 	ctx.Header("Accept-Ranges", "bytes")
 	if lfs {
 		ctx.Redirect(http.StatusFound, downloadURL)
+		if req.CountDownload && req.RepoType == types.ModelRepo {
+			captureStandaloneModelDownload(ctx, h.analytics, modelDownloadEvent{
+				Name:         modelFileDownloadURLIssued,
+				Namespace:    req.Namespace,
+				RepoName:     req.Name,
+				FilePath:     req.Path,
+				FileSize:     size,
+				Ref:          req.Ref,
+				Channel:      downloadChannelSDKCompatible,
+				DeliveryType: deliveryTypeLFSURL,
+			})
+		}
 		return
 	}
 	defer reader.Close()
@@ -1416,6 +1433,18 @@ func (h *RepoHandler) handleDownload(ctx *gin.Context, isResolve bool) {
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "Failed to stream repository file", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err))
 		return
+	}
+	if req.CountDownload && req.RepoType == types.ModelRepo {
+		captureStandaloneModelDownload(ctx, h.analytics, modelDownloadEvent{
+			Name:         modelFileDownloadSuccess,
+			Namespace:    req.Namespace,
+			RepoName:     req.Name,
+			FilePath:     req.Path,
+			FileSize:     size,
+			Ref:          req.Ref,
+			Channel:      downloadChannelSDKCompatible,
+			DeliveryType: deliveryTypeDirectStream,
+		})
 	}
 }
 

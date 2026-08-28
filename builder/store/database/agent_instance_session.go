@@ -63,10 +63,42 @@ type AgentInstanceSessionHistoryStore interface {
 	Create(ctx context.Context, history *AgentInstanceSessionHistory) error
 	FindByID(ctx context.Context, id int64) (*AgentInstanceSessionHistory, error)
 	FindByUUID(ctx context.Context, uuid string) (*AgentInstanceSessionHistory, error)
+	IsFirstAssistantReplyByInstanceID(ctx context.Context, instanceID int64, historyUUID string) (bool, error)
 	ListBySessionID(ctx context.Context, sessionID int64, maxTurn *int64) ([]AgentInstanceSessionHistory, error)
 	Update(ctx context.Context, history *AgentInstanceSessionHistory) error
 	Delete(ctx context.Context, id int64) error
 	Rewrite(ctx context.Context, originalMsgUUID string, history *AgentInstanceSessionHistory) error
+}
+
+func (s *agentInstanceSessionHistoryStoreImpl) IsFirstAssistantReplyByInstanceID(
+	ctx context.Context,
+	instanceID int64,
+	historyUUID string,
+) (bool, error) {
+	var firstHistoryUUID string
+	err := s.db.Core.NewSelect().
+		TableExpr("agent_instance_session_histories AS history").
+		ColumnExpr("history.uuid").
+		Join("JOIN agent_instance_sessions AS session ON session.id = history.session_id").
+		Where("session.instance_id = ?", instanceID).
+		Where("history.request = ?", false).
+		Where("history.is_rewritten = ?", false).
+		Where("history.deleted_at IS NULL").
+		Where("session.deleted_at IS NULL").
+		OrderExpr("history.id ASC").
+		Limit(1).
+		Scan(ctx, &firstHistoryUUID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, errorx.HandleDBError(err, map[string]any{
+			"instance_id":  instanceID,
+			"history_uuid": historyUUID,
+			"operation":    "is_first_assistant_reply_by_instance_id",
+		})
+	}
+	return firstHistoryUUID == historyUUID, nil
 }
 
 // agentInstanceSessionStoreImpl is the implementation of AgentInstanceSessionStore
