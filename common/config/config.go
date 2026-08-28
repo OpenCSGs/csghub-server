@@ -213,14 +213,11 @@ type Config struct {
 		StatusCheckInterval       int    `env:"STARHUB_SERVER_SPACE_STATUS_CHECK_INTERVAL" default:"10"` // 10 seconds
 		SandboxPVCName            string `env:"STARHUB_SERVER_SANDBOX_PVC_NAME" default:"sandbox-storage"`
 		SandboxRuntimeClass       string `env:"STARHUB_SERVER_SANDBOX_RUNTIME_CLASS" default:"gvisor"`
-		// SandboxEphemeralIdleTimeoutMin: how long an ephemeral sandbox stays idle before being deleted
-		// (destroys CR+PVC, irreversible). Measured from the last active-counter change.
-		// Defaults to 10 minutes.
-		SandboxEphemeralIdleTimeoutMin int `env:"STARHUB_SERVER_SANDBOX_EPHEMERAL_IDLE_TIMEOUT_MIN" default:"10"`
-		// SandboxPersistentIdleTimeoutHours: how long a persistent sandbox stays idle before being suspended
-		// (reversible, keeps PVC). Measured from the last active-counter change.
-		// Defaults to 24 hours.
-		SandboxPersistentIdleTimeoutHours int `env:"STARHUB_SERVER_SANDBOX_PERSISTENT_IDLE_TIMEOUT_HOURS" default:"24"`
+		// SandboxFreeResourceMaxIdleTimeoutMin: the idle-reclaim timeout (in minutes) applied to
+		// sandboxes created on free resources (price == 0). It acts as BOTH the default (when the
+		// caller does not pass a timeout) and the upper bound (a larger caller-provided timeout is
+		// clamped down to this value), so free resources cannot be held indefinitely. Defaults to 10.
+		SandboxFreeResourceMaxIdleTimeoutMin int `env:"STARHUB_SERVER_SANDBOX_FREE_RESOURCE_MAX_IDLE_TIMEOUT_MIN" default:"10"`
 		// SandboxIdleSweepIntervalSec is the idle scan period. The scan reads the informer cache, zero API calls.
 		SandboxIdleSweepIntervalSec int `env:"STARHUB_SERVER_SANDBOX_IDLE_SWEEP_INTERVAL_SECONDS" default:"60"`
 		// SandboxIdleStartupGraceMin: for how many minutes after Runner startup only record activity and do not

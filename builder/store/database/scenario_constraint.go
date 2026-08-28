@@ -7,6 +7,7 @@ import (
 
 	"github.com/uptrace/bun"
 	"opencsg.com/csghub-server/common/errorx"
+	"opencsg.com/csghub-server/common/types"
 )
 
 type scenarioConstraintStoreImpl struct {
@@ -75,6 +76,19 @@ type ScenarioConstraint struct {
 	ExcludeHardware  int64  `bun:",notnull,default:0" json:"exclude_hardware"`
 	MaxReplica       int    `bun:",notnull,default:0" json:"max_replica"`
 	times
+}
+
+// Satisfies reports whether the given hardware (and its replica count) meets this
+// scenario's constraints. It combines the required/exclude hardware bitmask check
+// and the max_replica check into a single predicate, delegating to the shared
+// types.HardwareSatisfiesConstraint / types.ReplicaSatisfiesConstraint. A nil
+// receiver means "no constraint configured" and always satisfies.
+func (c *ScenarioConstraint) Satisfies(hardware types.HardWare) bool {
+	if c == nil {
+		return true
+	}
+	return types.HardwareSatisfiesConstraint(c.RequiredHardware, c.ExcludeHardware, hardware) &&
+		types.ReplicaSatisfiesConstraint(c.MaxReplica, hardware.Replicas)
 }
 
 func (s *scenarioConstraintStoreImpl) FindByScenario(ctx context.Context, scenario string) (*ScenarioConstraint, error) {
