@@ -403,6 +403,7 @@ func (c *skillComponentImpl) createMirrorIfNeeded(ctx context.Context, req *type
 		CurrentUser:    req.Username,
 		RepoType:       types.SkillRepo,
 		SyncLfs:        true,
+		Priority:       types.ASAPMirrorPriority,
 		SkipSourcePath: true, // user-created skill repos should not set source paths
 	}
 
