@@ -49,7 +49,7 @@ func NewImageHandler(openai *OpenAIHandlerImpl) *ImageHandlerImpl {
 // @Tags         AIGateway
 // @Accept       json
 // @Produce      json
-// @Param        request body  ImageGenerationRequest true "Image generation request"
+// @Param        request body  types.ImageGenerationRequest true "Image generation request"
 // @Success      200  {object}  types.ImageGenerationResponse "OK"
 // @Failure      400  {object}  error "Bad request or sensitive input"
 // @Failure      404  {object}  error "Model not found"

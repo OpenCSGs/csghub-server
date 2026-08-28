@@ -44,7 +44,7 @@ func NewEmbeddingHandler(openai *OpenAIHandlerImpl) *EmbeddingHandlerImpl {
 // @Tags         AIGateway
 // @Accept       json
 // @Produce      json
-// @Param        request body EmbeddingRequest true "Embedding request"
+// @Param        request body types.EmbeddingRequest true "Embedding request"
 // @Success      200  {object}  types.Response{} "OK"
 // @Failure      400  {object}  error "Bad request"
 // @Failure      402  {object}  error "Insufficient balance"

@@ -48,7 +48,7 @@ func NewRerankHandler(openai *OpenAIHandlerImpl) *RerankHandlerImpl {
 // @Tags         AIGateway
 // @Accept       json
 // @Produce      json
-// @Param        request body RerankRequest true "Rerank request"
+// @Param        request body types.RerankRequest true "Rerank request"
 // @Success      200  {object}  types.Response{} "OK"
 // @Failure      400  {object}  error "Bad request"
 // @Failure      402  {object}  error "Insufficient balance"

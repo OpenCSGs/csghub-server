@@ -47,7 +47,7 @@ func NewChatHandler(openai *OpenAIHandlerImpl) *ChatHandlerImpl {
 // @Tags         AIGateway
 // @Accept       json
 // @Produce      json
-// @Param        request body ChatCompletionRequest true "Chat completion request"
+// @Param        request body types.ChatCompletionRequest true "Chat completion request"
 // @Success      200  {object}  map[string]interface{} "OK"
 // @Success      200  {object}  string "Server-Sent Events stream when stream=true"
 // @Failure      400  {object}  error "Bad request"

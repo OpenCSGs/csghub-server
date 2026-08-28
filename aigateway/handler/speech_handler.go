@@ -47,7 +47,7 @@ func NewSpeechHandler(openai *OpenAIHandlerImpl) *SpeechHandlerImpl {
 // @Tags         AIGateway
 // @Accept       json
 // @Produce      audio/wav
-// @Param        request body  SpeechRequest true "Speech generation request"
+// @Param        request body  types.SpeechRequest true "Speech generation request"
 // @Success      200  {file}  binary "Audio data"
 // @Failure      400  {object}  error "Bad request or sensitive input"
 // @Failure      404  {object}  error "Model not found"
@@ -63,7 +63,7 @@ func (h *SpeechHandlerImpl) Speech(c *gin.Context) {
 // @Tags         AIGateway
 // @Accept       json
 // @Produce      json
-// @Param        request body  BatchSpeechRequest true "Batch speech generation request"
+// @Param        request body  types.BatchSpeechRequest true "Batch speech generation request"
 // @Success      200  {object}  types.Response{} "OK"
 // @Failure      400  {object}  error "Bad request or sensitive input"
 // @Failure      404  {object}  error "Model not found"
