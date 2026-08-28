@@ -256,7 +256,7 @@ func (h *ClusterHandler) GetDeploysReport(ctx *gin.Context) {
 				d.DeployName,
 				d.User.Username,
 				d.Resource,
-				d.CreateTime.Local().Format(deployTimeLayout),
+				d.CreateTime.In(config.GetGlobalTimeZone()).Format(deployTimeLayout),
 				d.Status,
 				strconv.Itoa(d.TotalTimeInMin),
 				strconv.Itoa(d.TotalFeeInCents),
@@ -319,11 +319,7 @@ func (h *ClusterHandler) bindDeployDateRange(ctx *gin.Context, req *types.Deploy
 }
 
 func (h *ClusterHandler) parseDeployQueryTime(value string, isEnd bool) (time.Time, error) {
-	loc, err := time.LoadLocation(h.config.TimeZone)
-	if err != nil {
-		slog.Warn("failed to load timezone, falling back to UTC", "timezone", h.config.TimeZone, "error", err)
-		loc = time.UTC
-	}
+	loc := config.GetGlobalTimeZone()
 	layouts := []string{deployTimeLayout, deployDateOnlyLayout}
 	for _, layout := range layouts {
 		parsed, err := time.ParseInLocation(layout, value, loc)
