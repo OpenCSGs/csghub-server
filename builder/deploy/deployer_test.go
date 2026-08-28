@@ -969,12 +969,6 @@ func TestDeployer_SubmitFinetune(t *testing.T) {
 		},
 	)
 
-	tester.mocks.stores.ClusterInfoMock().EXPECT().FindNodeByClusterID(ctx, "").Return([]database.ClusterNode{
-		{
-			Name: "node1",
-		},
-	}, nil)
-
 	resp, err := tester.SubmitFinetuneJob(ctx, types.FinetuneReq{
 		ModelId:          "m1",
 		DatasetId:        "d1",

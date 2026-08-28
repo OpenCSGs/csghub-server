@@ -1169,6 +1169,7 @@ func (d *deployer) SubmitFinetuneJob(ctx context.Context, req types.FinetuneReq)
 		ResourceId:         req.ResourceId,
 		ResourceName:       req.ResourceName,
 		FinetunedModelName: finetunedModelName,
+		Nodes:              req.Nodes,
 		Scheduler:          common.GenerateScheduler(cluster.VXPUConfig),
 		DeployExtend: types.DeployExtend{
 			NodeAffinity: req.NodeAffinity,
@@ -1177,19 +1178,6 @@ func (d *deployer) SubmitFinetuneJob(ctx context.Context, req types.FinetuneReq)
 	}
 	if req.ResourceId == 0 {
 		flowReq.ShareMode = true
-	}
-
-	clusterNodes, err := d.clusterStore.FindNodeByClusterID(ctx, req.ClusterID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to find nodes by cluster id, clusterID: %s, error: %w", req.ClusterID, err)
-	}
-
-	for _, node := range clusterNodes {
-		req.Nodes = append(req.Nodes, types.Node{
-			Name:       node.Name,
-			EnableVXPU: node.EnableVXPU,
-			HasXPU:     node.Hardware.HasXPU() || node.EnableVXPU,
-		})
 	}
 
 	slog.Debug("submit finetune workflow request to runner", slog.Any("flowReq", flowReq))
