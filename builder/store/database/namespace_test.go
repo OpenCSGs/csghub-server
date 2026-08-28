@@ -49,3 +49,25 @@ func TestNamespaceStore_All(t *testing.T) {
 	_, err = store.FindByUUID(ctx, "non-existent-uuid")
 	require.NotNil(t, err)
 }
+
+func TestNamespaceStoreFindByPathCaseConflicts(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewNamespaceStoreWithDB(db)
+	namespaces := []database.Namespace{
+		{Path: "AIWizards", UUID: "namespace-upper"},
+		{Path: "aiwizards", UUID: "namespace-lower"},
+	}
+	_, err := db.Core.NewInsert().Model(&namespaces).Exec(ctx)
+	require.NoError(t, err)
+
+	ns, err := store.FindByPath(ctx, "aiwizards")
+	require.NoError(t, err)
+	require.Equal(t, "aiwizards", ns.Path)
+
+	ns, err = store.FindByPath(ctx, "AiWizards")
+	require.NoError(t, err)
+	require.Equal(t, "AIWizards", ns.Path)
+}
