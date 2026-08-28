@@ -289,7 +289,6 @@ func (c *tagComponentImpl) CreateTag(ctx context.Context, req types.CreateTag) (
 		Group:    req.Group,
 		Scope:    types.TagScope(req.Scope),
 		BuiltIn:  req.BuiltIn,
-		ShowName: req.ShowName,
 		I18nKey:  req.I18nKey,
 	}
 
@@ -326,7 +325,6 @@ func (c *tagComponentImpl) UpdateTag(ctx context.Context, id int64, req types.Up
 		Group:    req.Group,
 		Scope:    types.TagScope(req.Scope),
 		BuiltIn:  req.BuiltIn,
-		ShowName: req.ShowName,
 		I18nKey:  req.I18nKey,
 	}
 	newTag, err := c.tagStore.UpdateTagByID(ctx, tag)
