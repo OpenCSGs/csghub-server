@@ -40,6 +40,8 @@ var deployTypeNames = map[int]string{
 	3: "serverless",
 	4: "evaluation",
 	5: "notebook",
+	7: "sandbox",
+	8: "sandbox-ephemeral",
 }
 
 var GetClientFunc = temporal.GetClient
@@ -86,6 +88,9 @@ func getDeploymentWorkflowID(deploy *database.Deploy) string {
 		sanitizedGitPath = sanitizedGitPath[:20]
 	}
 
+	if sanitizedGitPath == "" {
+		return fmt.Sprintf("deploy-%s-%d", typeName, deploy.ID)
+	}
 	return fmt.Sprintf("deploy-%s-%s-%d", typeName, sanitizedGitPath, deploy.ID)
 }
 
@@ -233,7 +238,7 @@ func IsWorkflowNotFoundError(err error) bool {
 
 func DeployWorkflow(ctx workflow.Context, buildTaskId, runTaskId int64) ([]string, error) {
 	logger := workflow.GetLogger(ctx)
-	logger.Info("deploy workflow started buildTaskId %d runTaskId %d", buildTaskId, runTaskId)
+	logger.Info("deploy workflow started", "buildTaskId", buildTaskId, "runTaskId", runTaskId)
 
 	result := []string{"deploy workflow started"}
 	retryPolicy := &sdkTemporal.RetryPolicy{
@@ -256,7 +261,7 @@ func DeployWorkflow(ctx workflow.Context, buildTaskId, runTaskId int64) ([]strin
 		result = append(result, "ExecuteActivity build")
 		err := workflow.ExecuteActivity(actCtx, deployActivity.Build, buildTaskId).Get(ctx, nil)
 		if err != nil {
-			logger.Error("failed to execute build task", slog.Any("buildTaskId", buildTaskId), slog.Any("error", err))
+			logger.Error("failed to execute build task", "buildTaskId", buildTaskId, "error", err)
 			result = append(result, "ExecuteActivity build failed")
 			return result, err
 		}
@@ -271,7 +276,7 @@ func DeployWorkflow(ctx workflow.Context, buildTaskId, runTaskId int64) ([]strin
 		result = append(result, "ExecuteActivity run")
 		err := workflow.ExecuteActivity(actCtx, deployActivity.Deploy, runTaskId).Get(ctx, nil)
 		if err != nil {
-			logger.Error("failed to execute deploy task", slog.Any("runTaskId", runTaskId), slog.Any("error", err))
+			logger.Error("failed to execute deploy task", "runTaskId", runTaskId, "error", err)
 			result = append(result, "ExecuteActivity run failed")
 			return result, err
 		}
@@ -279,7 +284,7 @@ func DeployWorkflow(ctx workflow.Context, buildTaskId, runTaskId int64) ([]strin
 		result = append(result, "ExecuteActivity run succeeded")
 	}
 
-	logger.Info("deploy workflow completed buildTaskId %d runTaskId %d", buildTaskId, runTaskId)
+	logger.Info("deploy workflow completed", "buildTaskId", buildTaskId, "runTaskId", runTaskId)
 	result = append(result, "deploy workflow completed")
 	return result, nil
 }

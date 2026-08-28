@@ -71,7 +71,8 @@ type Deploy struct {
 	NodeAffinity   *corev1.NodeAffinity `json:"node_affinity,omitempty"`
 	Tolerations    []types.Toleration   `json:"tolerations,omitempty"`
 	PD             *types.PDConfig      `bun:"type:jsonb,nullzero" json:"pd,omitempty"`
-	Timeout        int                  `json:"timeout,omitempty"`
+	VolumeMounts   []types.VolumeMount  `bun:"type:jsonb,nullzero" json:"volume_mounts,omitempty"`
+	Timeout        int                  `json:"timeout,omitempty"` // reserved: written from dr.Sandbox.Timeout but not yet consumed downstream
 	StatusUpdateAt time.Time            `bun:",nullzero,notnull,default:current_timestamp" json:"status_update_at,omitempty"`
 	times
 }
@@ -130,6 +131,7 @@ type DeployTaskStore interface {
 	ListDeploysByTimeRange(ctx context.Context, req types.DeployTimeRangeReq) ([]Deploy, int, error)
 	FindByDeployNameAndType(ctx context.Context, uuid, deployName string, deployType int) (*Deploy, error)
 	FindActiveDeployByNameAndType(ctx context.Context, userUUID, deployName string, deployType int) (*Deploy, error)
+	FindSandboxByDeployName(ctx context.Context, uuid, deployName string) (*Deploy, error)
 	CountRunningDeploysByNodeName(ctx context.Context, nodeName string) (int, error)
 	ListDeploysNeedingReconcile(ctx context.Context, statuses []int, timeoutMin int, limit int) ([]Deploy, error)
 	CountByRepoID(ctx context.Context, repoID int64) (int, error)
@@ -786,6 +788,26 @@ func (s *deployTaskStoreImpl) FindActiveDeployByNameAndType(ctx context.Context,
 	var result Deploy
 	err := s.db.Operator.Core.NewSelect().Model(&result).
 		Where("user_uuid = ? and deploy_name = ? and type = ? and status != ?", userUUID, deployName, deployType, common.Deleted).
+		Scan(ctx, &result)
+	if err != nil {
+		err = errorx.HandleDBError(err, nil)
+		if errors.Is(err, errorx.ErrDatabaseNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &result, nil
+}
+
+// FindSandboxByDeployName looks up a sandbox deploy (persistent or ephemeral) by user UUID
+// and deploy name. Returns (nil, nil) when absent.
+func (s *deployTaskStoreImpl) FindSandboxByDeployName(ctx context.Context, uuid, deployName string) (*Deploy, error) {
+	var result Deploy
+	err := s.db.Operator.Core.NewSelect().Model(&result).
+		Where("user_uuid = ? and deploy_name = ? and type IN (?)", uuid, deployName,
+			bun.In([]int{types.SandboxType, types.SandboxEphemeralType})).
+		Order("id DESC").
+		Limit(1).
 		Scan(ctx, &result)
 	if err != nil {
 		err = errorx.HandleDBError(err, nil)

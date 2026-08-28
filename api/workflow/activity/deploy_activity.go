@@ -95,6 +95,13 @@ func (a *DeployActivity) Deploy(ctx context.Context, taskId int64) error {
 	}
 	a.reportLog(types.DeployInProgress.String(), types.StepDeploying, task)
 
+	// Sandboxes skip the build phase (image already exists) and repo lookup; they create the
+	// sandbox directly via the runner. deploySandboxV2 is implemented for ee/saas and returns
+	// "not supported" in CE.
+	if types.IsSandboxType(task.Deploy.Type) {
+		return a.deploySandboxV2(ctx, task)
+	}
+
 	repoInfo, err := a.getRepositoryInfo(ctx, task)
 	if err != nil {
 		if herr := a.handleRepoInfoError(ctx, task, err); herr != nil {
