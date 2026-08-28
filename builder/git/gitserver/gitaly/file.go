@@ -642,11 +642,10 @@ func (c *Client) GetRepoFileTree(ctx context.Context, req gitserver.GetRepoInfoB
 	// Get last commit
 	pathCommitMap := make(map[string]*gitalypb.GitCommit)
 	gitalyReq := &gitalypb.ListLastCommitsForTreeRequest{
-		Repository:      repository,
-		Revision:        req.Ref,
-		Path:            []byte(req.Path),
-		Limit:           1000,
-		LiteralPathspec: true,
+		Repository: repository,
+		Revision:   req.Ref,
+		Path:       []byte(req.Path),
+		Limit:      1000,
 	}
 	commitStream, err := c.commitClient.ListLastCommitsForTree(ctx, gitalyReq)
 	if err != nil {
