@@ -15,6 +15,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/uptrace/bun"
 	"opencsg.com/csghub-server/accounting/utils"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
 
@@ -23,10 +24,11 @@ type accountStatementStoreImpl struct {
 }
 
 type AccountStatementStore interface {
-	Create(ctx context.Context, input AccountStatement, checkBalance ...bool) error
+	Create(ctx context.Context, input AccountStatement, extra types.AcctStatementExtra) error
 	CreateTradeStatements(ctx context.Context, buyerStmt, sellerStmt AccountStatement) error
 	ListByUserIDAndTime(ctx context.Context, req types.ActStatementsReq) (AccountStatementRes, error)
 	GetByEventID(ctx context.Context, eventID uuid.UUID) (AccountStatement, error)
+	GetDeductionSummaryByUserSceneCustomer(ctx context.Context, input AccountStatement) (*types.DeductionSummary, error)
 	ListRechargeByUserIDAndTime(ctx context.Context, req types.AcctRechargeListReq) (AccountStatementRes, error)
 	ListStatementByUserAndSku(ctx context.Context, req types.ActStatementsReq) ([]UserSkuStatement, int, error)
 	ListPortalRecharges(ctx context.Context, req types.AcctRechargeListReq) ([]AccountStatement, int, float64, error)
@@ -102,13 +104,13 @@ type ChangedValue struct {
 	Voucher float64
 }
 
-func (as *accountStatementStoreImpl) Create(ctx context.Context, input AccountStatement, checkBalance ...bool) error {
-	check := len(checkBalance) > 0 && checkBalance[0]
-	if input.Scene == types.ScenePortalCharge || input.Scene == types.SceneCashCharge ||
+func (as *accountStatementStoreImpl) Create(ctx context.Context, input AccountStatement, extra types.AcctStatementExtra) error {
+	if input.Scene == types.ScenePortalCharge ||
+		input.Scene == types.SceneCashCharge ||
 		input.Scene == types.SceneDatasetSaleIncome {
 		return as.chargeFeeStatement(ctx, input)
 	} else {
-		return as.deductFeeStatement(ctx, input, check)
+		return as.deductFeeStatement(ctx, input, extra)
 	}
 }
 
@@ -222,7 +224,7 @@ func (as *accountStatementStoreImpl) chargeFeeStatement(ctx context.Context, inp
 	return err
 }
 
-func (as *accountStatementStoreImpl) deductFeeStatement(ctx context.Context, input AccountStatement, checkBalance bool) error {
+func (as *accountStatementStoreImpl) deductFeeStatement(ctx context.Context, input AccountStatement, extra types.AcctStatementExtra) error {
 	err := as.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		if input.Value > 0 {
 			return fmt.Errorf("deduct fee statement value must be negative or zero")
@@ -244,10 +246,14 @@ func (as *accountStatementStoreImpl) deductFeeStatement(ctx context.Context, inp
 			}
 		}
 
-		changed, err = DeductAccountFee(ctx, tx, input, checkBalance)
+		changed, err = DeductAccountFee(ctx, tx, input, extra.CheckBalance)
 		if err != nil {
 			if errors.Is(err, types.ErrDuplicatedEvent) {
 				slog.Warn("skip duplicated deduct fee by event uuid", slog.Any("input", input))
+				return nil
+			}
+			if errors.Is(err, types.ErrDuplicatedAcademyOrder) {
+				slog.Warn("skip duplicated academy order", slog.Any("input", input))
 				return nil
 			}
 			return fmt.Errorf("deduct account fee, error: %w", err)
@@ -353,6 +359,22 @@ func DeductAccountFee(ctx context.Context, tx bun.Tx, input AccountStatement, ch
 		return changedValue, fmt.Errorf("failed to get account user: %w", err)
 	}
 
+	if input.Scene == types.SceneAcademyPurchase {
+		// check if user uuid and customer id is duplicated
+		var stmt AccountStatement
+		err = tx.NewSelect().Model(&stmt).
+			Where("user_uuid = ?", input.UserUUID).
+			Where("scene = ?", input.Scene).
+			Where("customer_id = ?", input.CustomerID).
+			Scan(ctx, &stmt)
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			return changedValue, fmt.Errorf("check duplicated %s event failed, error: %w", input.CustomerID, err)
+		}
+		if err == nil {
+			return changedValue, types.ErrDuplicatedAcademyOrder
+		}
+	}
+
 	err = CheckDuplicatedEvent(ctx, tx, input)
 	if err != nil {
 		if errors.Is(err, types.ErrDuplicatedEvent) {
@@ -364,8 +386,8 @@ func DeductAccountFee(ctx context.Context, tx bun.Tx, input AccountStatement, ch
 
 	// Check balance if needed
 	if checkBalance && input.Value < 0 {
-		if acctUser.Balance+acctUser.CashBalance < -input.Value {
-			return changedValue, fmt.Errorf("insufficient balance")
+		if acctUser.Balance+acctUser.CashBalance+input.Value < 0 {
+			return changedValue, errorx.ErrInsufficientBalance
 		}
 	}
 
@@ -786,6 +808,25 @@ func (as *accountStatementStoreImpl) GetByEventID(ctx context.Context, eventID u
 		return result, fmt.Errorf("get statement, error:%w", err)
 	}
 	return result, nil
+}
+
+func (as *accountStatementStoreImpl) GetDeductionSummaryByUserSceneCustomer(ctx context.Context, input AccountStatement) (*types.DeductionSummary, error) {
+	var summary types.DeductionSummary
+	err := as.db.Operator.Core.NewSelect().Model((*AccountStatement)(nil)).
+		ColumnExpr("user_uuid, scene, customer_id, COALESCE(SUM(value), 0) as total_value, MIN(event_uuid::text)::uuid as event_uuid").
+		Where("user_uuid = ?", input.UserUUID).
+		Where("scene = ?", input.Scene).
+		Where("customer_id = ?", input.CustomerID).
+		Group("user_uuid", "scene", "customer_id").
+		Scan(ctx, &summary)
+	if err != nil {
+		return nil, errorx.HandleDBError(err, map[string]interface{}{
+			"user_uuid":   input.UserUUID,
+			"scene":       input.Scene,
+			"customer_id": input.CustomerID,
+		})
+	}
+	return &summary, nil
 }
 
 func (as *accountStatementStoreImpl) ListRechargeByUserIDAndTime(ctx context.Context, req types.AcctRechargeListReq) (AccountStatementRes, error) {

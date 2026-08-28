@@ -52,7 +52,7 @@ func TestAccountStatementStore_Create(t *testing.T) {
 		SkuPriceCurrency: "",
 		EventValue:       100,
 		IsCancel:         false,
-	})
+	}, types.AcctStatementExtra{})
 
 	require.Nil(t, err)
 
@@ -117,7 +117,7 @@ func TestAccountStatementStore_CreateSimple(t *testing.T) {
 			if c.scene == types.SceneSpace {
 				input.ResourceID = "1"
 			}
-			err = store.Create(ctx, input)
+			err = store.Create(ctx, input, types.AcctStatementExtra{})
 			require.Nil(t, err)
 
 			as := &database.AccountStatement{}
@@ -592,4 +592,128 @@ func TestGetConsumeResource(t *testing.T) {
 			require.Nil(t, err)
 		})
 	}
+}
+
+func TestAccountStatementStore_GetDeductionSummaryByUserSceneCustomer(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+	store := database.NewAccountStatementStoreWithDB(db)
+
+	t.Run("returns aggregated value for multiple records", func(t *testing.T) {
+		uid := uuid.New()
+		_, err := db.Core.NewInsert().Model(&database.AccountStatement{
+			EventUUID: uid, UserUUID: "sum_u1", Scene: types.SceneSpace, CustomerID: "sum_c1", Value: -6,
+		}).Exec(ctx)
+		require.Nil(t, err)
+		_, err = db.Core.NewInsert().Model(&database.AccountStatement{
+			EventUUID: uid, UserUUID: "sum_u1", Scene: types.SceneSpace, CustomerID: "sum_c1", Value: -4,
+		}).Exec(ctx)
+		require.Nil(t, err)
+
+		result, err := store.GetDeductionSummaryByUserSceneCustomer(ctx, database.AccountStatement{
+			UserUUID: "sum_u1", Scene: types.SceneSpace, CustomerID: "sum_c1",
+		})
+		require.Nil(t, err)
+		require.NotNil(t, result)
+		require.Equal(t, -10.0, result.TotalValue)
+		require.Equal(t, "sum_u1", result.UserUUID)
+		require.Equal(t, types.SceneSpace, result.Scene)
+		require.Equal(t, "sum_c1", result.CustomerID)
+		require.Equal(t, uid, result.EventUUID)
+	})
+
+	t.Run("no matching record returns error", func(t *testing.T) {
+		_, err := store.GetDeductionSummaryByUserSceneCustomer(ctx, database.AccountStatement{
+			UserUUID: "nonexistent_sum", Scene: types.SceneSpace, CustomerID: "nope",
+		})
+		require.Error(t, err)
+	})
+
+	t.Run("does not match different customer_id", func(t *testing.T) {
+		uid := uuid.New()
+		_, err := db.Core.NewInsert().Model(&database.AccountStatement{
+			EventUUID: uid, UserUUID: "sum_u2", Scene: types.SceneSpace, CustomerID: "sum_c2", Value: -5,
+		}).Exec(ctx)
+		require.Nil(t, err)
+
+		_, err = store.GetDeductionSummaryByUserSceneCustomer(ctx, database.AccountStatement{
+			UserUUID: "sum_u2", Scene: types.SceneSpace, CustomerID: "other_sum",
+		})
+		require.Error(t, err)
+	})
+}
+
+func TestAccountStatementStore_DeductFeeStatement_AcademyIdempotent(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+	store := database.NewAccountStatementStoreWithDB(db)
+
+	// Setup account user with sufficient balance
+	au := database.AccountUser{
+		UserUUID:    "academy_idem_user",
+		Balance:     0,
+		CashBalance: 100,
+	}
+	_, err := db.Core.NewInsert().Model(&au).Exec(ctx)
+	require.Nil(t, err)
+
+	input := database.AccountStatement{
+		EventUUID:  uuid.New(),
+		UserUUID:   "academy_idem_user",
+		Scene:      types.SceneAcademyPurchase,
+		Value:      -10,
+		CustomerID: "academy_order_1",
+		EventDate:  time.Now().UTC(),
+		RecordedAt: time.Now().UTC(),
+	}
+
+	// First call: should succeed and deduct balance
+	err = store.Create(ctx, input, types.AcctStatementExtra{CheckBalance: true})
+	require.Nil(t, err)
+
+	// Verify balance was deducted
+	acctUser := &database.AccountUser{}
+	err = db.Core.NewSelect().Model(acctUser).Where("user_uuid = ?", "academy_idem_user").Scan(ctx)
+	require.Nil(t, err)
+	firstBalance := acctUser.CashBalance
+	require.Equal(t, 90.0, firstBalance)
+
+	// Verify statement was created
+	var stmtCount int
+	stmtCount, err = db.Core.NewSelect().Model((*database.AccountStatement)(nil)).
+		Where("user_uuid = ?", "academy_idem_user").
+		Where("scene = ?", types.SceneAcademyPurchase).
+		Where("customer_id = ?", "academy_order_1").
+		Count(ctx)
+	require.Nil(t, err)
+	firstStmtCount := stmtCount
+
+	// Second call (duplicate customer_id): should succeed (idempotent) but NOT change balance, statement, or bill
+	dupInput := database.AccountStatement{
+		EventUUID:  uuid.New(), // different event_uuid, same user+scene+customer_id
+		UserUUID:   "academy_idem_user",
+		Scene:      types.SceneAcademyPurchase,
+		Value:      -10,
+		CustomerID: "academy_order_1",
+		EventDate:  time.Now().UTC(),
+		RecordedAt: time.Now().UTC(),
+	}
+	err = store.Create(ctx, dupInput, types.AcctStatementExtra{CheckBalance: true})
+	require.Nil(t, err)
+
+	// Balance should not change after duplicate call
+	err = db.Core.NewSelect().Model(acctUser).Where("user_uuid = ?", "academy_idem_user").Scan(ctx)
+	require.Nil(t, err)
+	require.Equal(t, firstBalance, acctUser.CashBalance, "balance should not change after duplicate academy order")
+
+	// Statement count should not increase after duplicate call
+	stmtCount, err = db.Core.NewSelect().Model((*database.AccountStatement)(nil)).
+		Where("user_uuid = ?", "academy_idem_user").
+		Where("scene = ?", types.SceneAcademyPurchase).
+		Where("customer_id = ?", "academy_order_1").
+		Count(ctx)
+	require.Nil(t, err)
+	require.Equal(t, firstStmtCount, stmtCount, "statement count should not increase after duplicate academy order")
 }

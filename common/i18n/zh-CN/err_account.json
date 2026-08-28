@@ -13,5 +13,8 @@
     },
     "error.ACT-ERR-4": {
         "other": "必须为非负数价格"
+    },
+    "error.ACT-ERR-5": {
+        "other": "该场景不允许同步扣费"
     }
 }

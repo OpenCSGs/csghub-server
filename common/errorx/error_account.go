@@ -8,6 +8,7 @@ const (
 	invalidUnitType
 	wrongTimeRange
 	negativePrice
+	sceneNotAllowed
 )
 
 var (
@@ -71,4 +72,16 @@ var (
 	//
 	// zh-HK: 必须為非負數價格
 	ErrNegativePrice error = CustomError{prefix: errAccountPrefix, code: negativePrice}
+	// the scene is not allowed for sync deduct
+	//
+	// Description: The specified scene type is not in the allowed list for sync deduction operations.
+	//
+	// Description_ZH: 指定的场景类型不在同步扣费允许的列表中。
+	//
+	// en-US: Scene is not allowed for sync deduct
+	//
+	// zh-CN: 该场景不允许同步扣费
+	//
+	// zh-HK: 該場景不允許同步扣費
+	ErrSceneNotAllowed error = CustomError{prefix: errAccountPrefix, code: sceneNotAllowed}
 )
