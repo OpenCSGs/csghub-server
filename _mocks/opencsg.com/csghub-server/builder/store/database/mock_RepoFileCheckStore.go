@@ -69,6 +69,66 @@ func (_c *MockRepoFileCheckStore_Create_Call) RunAndReturn(run func(context.Cont
 	return _c
 }
 
+// ListSensitiveCheckDetails provides a mock function with given fields: ctx, repoID, branch
+func (_m *MockRepoFileCheckStore) ListSensitiveCheckDetails(ctx context.Context, repoID int64, branch string) ([]database.RepositoryFileCheckDetail, error) {
+	ret := _m.Called(ctx, repoID, branch)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListSensitiveCheckDetails")
+	}
+
+	var r0 []database.RepositoryFileCheckDetail
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, int64, string) ([]database.RepositoryFileCheckDetail, error)); ok {
+		return rf(ctx, repoID, branch)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, int64, string) []database.RepositoryFileCheckDetail); ok {
+		r0 = rf(ctx, repoID, branch)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]database.RepositoryFileCheckDetail)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, int64, string) error); ok {
+		r1 = rf(ctx, repoID, branch)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockRepoFileCheckStore_ListSensitiveCheckDetails_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListSensitiveCheckDetails'
+type MockRepoFileCheckStore_ListSensitiveCheckDetails_Call struct {
+	*mock.Call
+}
+
+// ListSensitiveCheckDetails is a helper method to define mock.On call
+//   - ctx context.Context
+//   - repoID int64
+//   - branch string
+func (_e *MockRepoFileCheckStore_Expecter) ListSensitiveCheckDetails(ctx interface{}, repoID interface{}, branch interface{}) *MockRepoFileCheckStore_ListSensitiveCheckDetails_Call {
+	return &MockRepoFileCheckStore_ListSensitiveCheckDetails_Call{Call: _e.mock.On("ListSensitiveCheckDetails", ctx, repoID, branch)}
+}
+
+func (_c *MockRepoFileCheckStore_ListSensitiveCheckDetails_Call) Run(run func(ctx context.Context, repoID int64, branch string)) *MockRepoFileCheckStore_ListSensitiveCheckDetails_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(int64), args[2].(string))
+	})
+	return _c
+}
+
+func (_c *MockRepoFileCheckStore_ListSensitiveCheckDetails_Call) Return(_a0 []database.RepositoryFileCheckDetail, _a1 error) *MockRepoFileCheckStore_ListSensitiveCheckDetails_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockRepoFileCheckStore_ListSensitiveCheckDetails_Call) RunAndReturn(run func(context.Context, int64, string) ([]database.RepositoryFileCheckDetail, error)) *MockRepoFileCheckStore_ListSensitiveCheckDetails_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Upsert provides a mock function with given fields: ctx, history
 func (_m *MockRepoFileCheckStore) Upsert(ctx context.Context, history database.RepositoryFileCheck) error {
 	ret := _m.Called(ctx, history)

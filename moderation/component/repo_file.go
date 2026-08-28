@@ -153,25 +153,26 @@ func (c *repoFileComponentImpl) createRepoFileRecords(ctx context.Context, repo 
 	return nil
 }
 
-func (c *repoFileComponentImpl) DetectRepoSensitiveCheckStatus(ctx context.Context, repoId int64, branch string) error {
+func (c *repoFileComponentImpl) DetectRepoSensitiveCheckStatus(ctx context.Context, repoId int64, branch string) (types.SensitiveCheckStatus, error) {
 	status := types.SensitiveCheckFail
 	exists, err := c.rfs.ExistsSensitiveCheckRecord(ctx, repoId, branch, types.SensitiveCheckFail)
 	if err != nil {
-		return fmt.Errorf("failed to check repo file sensitive check record exists, error: %w", err)
+		return status, fmt.Errorf("failed to check repo file sensitive check record exists, error: %w", err)
 	}
 	if exists {
 		err = c.rs.UpdateRepoSensitiveCheckStatus(ctx, repoId, status)
-		return err
+		return status, err
 	}
 
 	status = types.SensitiveCheckException
 	exists, err = c.rfs.ExistsSensitiveCheckRecord(ctx, repoId, branch, types.SensitiveCheckException)
 	if err != nil {
-		return fmt.Errorf("failed to check repo file sensitive check record exists, error: %w", err)
+		return status, fmt.Errorf("failed to check repo file sensitive check record exists, error: %w", err)
 	}
 	if exists {
-		return c.rs.UpdateRepoSensitiveCheckStatus(ctx, repoId, status)
+		return status, c.rs.UpdateRepoSensitiveCheckStatus(ctx, repoId, status)
 	}
 
-	return c.rs.UpdateRepoSensitiveCheckStatus(ctx, repoId, types.SensitiveCheckPass)
+	status = types.SensitiveCheckPass
+	return status, c.rs.UpdateRepoSensitiveCheckStatus(ctx, repoId, status)
 }

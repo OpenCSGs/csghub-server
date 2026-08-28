@@ -19,7 +19,7 @@ type RepoComponent interface {
 type RepoFileComponent interface {
 	GenRepoFileRecords(ctx context.Context, repo *database.Repository) error
 	GenRepoFileRecordsBatch(ctx context.Context, repoType types.RepositoryType, lastRepoID int64, concurrency int) error
-	DetectRepoSensitiveCheckStatus(ctx context.Context, repoId int64, branch string) error
+	DetectRepoSensitiveCheckStatus(ctx context.Context, repoId int64, branch string) (types.SensitiveCheckStatus, error)
 }
 
 type SensitiveWordSetComponent interface {

@@ -26,6 +26,8 @@ const (
 	agentProvisionRequestFieldEmpty
 	agentProvisionRequestModelUnavailable
 	csgclawTemplateNotFound
+	agentTemplateSensitiveCheckCreateAgentBlocked
+	agentTemplateSensitiveCheckMakePublicBlocked
 )
 
 var (
@@ -327,6 +329,12 @@ var (
 	//
 	// zh-HK: 倉庫路徑 {{.repo_path}} 未找到對應的 csgclaw 模板
 	ErrCSGClawTemplateNotFound error = CustomError{prefix: errAgentPrefix, code: csgclawTemplateNotFound}
+
+	// agent template sensitive check blocks creating an agent
+	ErrAgentTemplateSensitiveCheckCreateAgentBlocked error = CustomError{prefix: errAgentPrefix, code: agentTemplateSensitiveCheckCreateAgentBlocked}
+
+	// agent template sensitive check blocks making a template public
+	ErrAgentTemplateSensitiveCheckMakePublicBlocked error = CustomError{prefix: errAgentPrefix, code: agentTemplateSensitiveCheckMakePublicBlocked}
 )
 
 func InstanceQuotaExceeded(err error, ctx context) error {
@@ -511,5 +519,23 @@ func CSGClawTemplateNotFound(err error, ctx context) error {
 		context: ctx,
 		err:     err,
 		code:    int(csgclawTemplateNotFound),
+	}
+}
+
+func AgentTemplateSensitiveCheckCreateAgentBlocked(err error, ctx context) error {
+	return CustomError{
+		prefix:  errAgentPrefix,
+		context: ctx,
+		err:     err,
+		code:    int(agentTemplateSensitiveCheckCreateAgentBlocked),
+	}
+}
+
+func AgentTemplateSensitiveCheckMakePublicBlocked(err error, ctx context) error {
+	return CustomError{
+		prefix:  errAgentPrefix,
+		context: ctx,
+		err:     err,
+		code:    int(agentTemplateSensitiveCheckMakePublicBlocked),
 	}
 }

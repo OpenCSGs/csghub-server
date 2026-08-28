@@ -67,5 +67,11 @@
     },
     "error.AGENT-ERR-22": {
         "other": "csgclaw template not found for repository path {{.repo_path}}"
+    },
+    "error.AGENT-ERR-23": {
+        "other": "Cannot create an agent from this agent template because it has not passed the sensitive-content check."
+    },
+    "error.AGENT-ERR-24": {
+        "other": "Cannot make this agent template public because it has not passed the sensitive-content check."
     }
 }
