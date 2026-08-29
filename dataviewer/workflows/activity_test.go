@@ -3,6 +3,7 @@ package workflows
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	"testing"
 
 	"github.com/mcuadros/go-defaults"
@@ -535,5 +536,71 @@ func TestActivity_CalcStatistics(t *testing.T) {
 		require.Equal(t, expectedRows, cardReq.FinalCardData.Rows_Num)
 		require.Equal(t, expectedConvertedSize, cardReq.FinalCardData.Converted_Size)
 		require.Equal(t, expectedDownloadSize, cardReq.FinalCardData.Downloaded_Size)
+	})
+}
+
+func TestActivity_getExistingRepoFiles(t *testing.T) {
+	ctx := context.TODO()
+	cfg := &config.Config{}
+	dvstore := mockdb.NewMockDataviewerStore(t)
+	s3Client := mockS3.NewMockClient(t)
+	req := types.UpdateViewerReq{
+		Namespace: "ns",
+		Name:      "name",
+		RepoType:  types.DatasetRepo,
+		Branch:    "refs-convert-parquet",
+	}
+
+	t.Run("empty paths skip git call", func(t *testing.T) {
+		mockGitServer := mockGit.NewMockGitServer(t)
+		dvActivity, err := NewTestDataViewerActivity(cfg, mockGitServer, s3Client, dvstore)
+		require.Nil(t, err)
+
+		existing, err := dvActivity.(*dataViewerActivityImpl).getExistingRepoFiles(ctx, req, nil)
+		require.NoError(t, err)
+		require.Empty(t, existing)
+	})
+
+	t.Run("returns existing paths", func(t *testing.T) {
+		mockGitServer := mockGit.NewMockGitServer(t)
+		paths := []string{"default/train/00000.parquet", "default/train/00001.parquet"}
+		mockGitServer.EXPECT().GetFilesByRevisionAndPaths(ctx, gitserver.GetFilesByRevisionAndPathsReq{
+			Namespace: req.Namespace,
+			Name:      req.Name,
+			RepoType:  req.RepoType,
+			Revision:  req.Branch,
+			Paths:     paths,
+		}).Return([]*types.File{
+			{Path: "default/train/00000.parquet"},
+		}, nil)
+
+		dvActivity, err := NewTestDataViewerActivity(cfg, mockGitServer, s3Client, dvstore)
+		require.Nil(t, err)
+
+		existing, err := dvActivity.(*dataViewerActivityImpl).getExistingRepoFiles(ctx, req, paths)
+		require.NoError(t, err)
+		require.Equal(t, "default/train/00000.parquet", existing["default/train/00000.parquet"])
+		_, exists := existing["default/train/00001.parquet"]
+		require.False(t, exists)
+	})
+
+	t.Run("returns git error", func(t *testing.T) {
+		mockGitServer := mockGit.NewMockGitServer(t)
+		paths := []string{"default/train/00000.parquet"}
+		mockGitServer.EXPECT().GetFilesByRevisionAndPaths(ctx, gitserver.GetFilesByRevisionAndPathsReq{
+			Namespace: req.Namespace,
+			Name:      req.Name,
+			RepoType:  req.RepoType,
+			Revision:  req.Branch,
+			Paths:     paths,
+		}).Return(nil, errors.New("blob lookup failed"))
+
+		dvActivity, err := NewTestDataViewerActivity(cfg, mockGitServer, s3Client, dvstore)
+		require.Nil(t, err)
+
+		existing, err := dvActivity.(*dataViewerActivityImpl).getExistingRepoFiles(ctx, req, paths)
+		require.Error(t, err)
+		require.Nil(t, existing)
+		require.Contains(t, err.Error(), "files by paths")
 	})
 }
