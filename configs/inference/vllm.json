@@ -250,8 +250,8 @@
     },
     {
       "compute_type": "cpu",
-      "image": "opencsghq/vllm-cpu:2.4",
-      "engine_version": "0.4.12-fix1"
+      "image": "opencsghq/vllm-cpu:v0.24.0",
+      "engine_version": "v0.24.0"
     }
   ],
   "engine_args": [
@@ -329,6 +329,11 @@
       "name": "enable-prefix-caching",
       "value": "enable",
       "format": "--enable-prefix-caching"
+    },
+    {
+      "name": "enable-prompt-tokens-details",
+      "value": "disable",
+      "format": "--enable-prompt-tokens-details"
     },
     {
       "name": "enable-chunked-prefill",

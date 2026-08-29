@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -32,6 +33,9 @@ func NewRuntimeArchitectureHandler(config *config.Config) (*RuntimeArchitectureH
 	err = nrac.InitRuntimeFrameworkAndArchitectures()
 	if err != nil {
 		slog.Error("Failed to initialize runtime framework and architectures", slog.Any("error", err))
+	}
+	if err := component.InitAgentRuntimeProfiles(context.Background()); err != nil {
+		slog.Error("Failed to initialize agent runtime profiles", slog.Any("error", err))
 	}
 
 	return &RuntimeArchitectureHandler{

@@ -25,6 +25,7 @@ const (
 	UnAvailableTypeDisableScheduling    ResourceReasonType = "disable_scheduling"
 	UnAvailableTypeNodeOffline          ResourceReasonType = "node_offline"
 	UnAvailableTypePriceUndefined       ResourceReasonType = "price_undefined"
+	UnAvailableTypeWrongMemResource     ResourceReasonType = "wrong_mem_resource"
 )
 
 type (

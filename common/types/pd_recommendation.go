@@ -60,11 +60,10 @@ type PDRoleConfig struct {
 	TP int `json:"tp"`
 	// EP is the expert parallelism degree (1 for dense models).
 	EP int `json:"ep"`
-	// DP is the data parallelism degree (number of model replicas).
-	// DP replicates the model across groups for higher throughput.
-	// TotalGPUs = TP * EP * DP.
+	// DP is the data parallelism degree (always 1 in PD planning).
+	// TotalGPUs = TP (DP=1, EP follows TP and does not add extra GPUs).
 	DP int `json:"dp"`
-	// TotalGPUs is the total number of GPUs required (TP * EP * DP).
+	// TotalGPUs is the total number of GPUs required (TP, since DP=1 and EP follows TP).
 	TotalGPUs int `json:"total_gpus"`
 	// Pods is the number of pods per LWS group (maps to LWS spec.leaderWorkerTemplate.size).
 	// Each pod runs one vLLM/SGLang instance.

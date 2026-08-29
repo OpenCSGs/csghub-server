@@ -26,8 +26,8 @@ docker buildx build --platform linux/amd64 \
   -f Dockerfile.vllm-amd \
   --push .
   
-# For vllm cpu only: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/vllm-cpu:2.3
-export IMAGE_TAG=2.4
+# For vllm cpu only: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/vllm-cpu:v0.24.0
+export IMAGE_TAG=v0.24.0
 docker buildx build --platform linux/amd64,linux/arm64 \
   -t ${OPENCSG_ACR}/opencsghq/vllm-cpu:${IMAGE_TAG} \
   -t ${OPENCSG_ACR}/opencsghq/vllm-cpu:latest \
@@ -40,6 +40,14 @@ docker buildx build --platform linux/amd64 \
   -t ${OPENCSG_ACR}/opencsghq/tgi:${IMAGE_TAG} \
   -t ${OPENCSG_ACR}/opencsghq/tgi:latest \
   -f Dockerfile.tgi \
+  --push .
+
+# For TGI ROCm: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/tgi-rocm:rocm6.3.1_tgi_3.3.6
+export IMAGE_TAG=rocm6.3.1_tgi_3.3.6
+docker buildx build --platform linux/amd64 \
+  -t ${OPENCSG_ACR}/opencsghq/tgi-rocm:${IMAGE_TAG} \
+  -t ${OPENCSG_ACR}/opencsghq/tgi-rocm:latest \
+  -f Dockerfile.tgi-rocm \
   --push .
 
 # For sglang: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/sglang:v0.5.14-cu130
@@ -198,6 +206,20 @@ docker run -d \
   -p 8000:8000
   ${OPENCSG_ACR}/opencsghq/tgi:2.2
 
+# Run TGI on AMD ROCm (the image supports gfx90a and gfx942)
+docker run -d \
+  --device=/dev/kfd \
+  --device=/dev/dri \
+  --group-add video \
+  --ipc=host \
+  --shm-size 256g \
+  -e ACCESS_TOKEN=xxx \
+  -e REPO_ID="xzgan001/csg-wukong-1B" \
+  -e HF_ENDPOINT=https://hub.opencsg.com \
+  -v llm-rocm:/workspace \
+  -p 8000:8000 \
+  ${OPENCSG_ACR}/opencsghq/tgi-rocm:rocm6.3.1_tgi_3.3.6
+
 # Run MINDIE
 docker run -d \
   -e ACCESS_TOKEN=xxx  \
@@ -220,6 +242,16 @@ docker run --rm -it \
 
 # Call FunASR OpenAI-compatible transcription API
 curl --max-time 600 -X POST http://127.0.0.1:8000/v1/audio/transcriptions \
+  -F "file=@/path/to/audio.mp3" \
+  -F "model=local" \
+  -F "response_format=text"
+
+# Call FunASR OpenAI-compatible translation API (any language -> English).
+# Only works when REPO_ID is a multilingual Whisper model (e.g. openai/whisper-large-v3);
+# turbo, English-only (.en) checkpoints (e.g. openai/whisper-small.en), and non-Whisper
+# models (Fun-ASR, SenseVoice, Paraformer, Qwen3-ASR) return 501. Translation is passed
+# to the underlying Whisper model via FunASR's DecodingOptions (task=translate).
+curl --max-time 600 -X POST http://127.0.0.1:8000/v1/audio/translations \
   -F "file=@/path/to/audio.mp3" \
   -F "model=local" \
   -F "response_format=text"
@@ -312,15 +344,34 @@ curl -o result.mp4 \
 *Note: vLLM text-to-speech is served by vLLM-Omni (`vllm serve --omni`) and exposes `POST /v1/audio/speech` plus `GET /v1/audio/voices`. Supported architectures (see `configs/inference/vllm.json` extra_archs): Qwen3-TTS, Fish Speech S2 Pro, Voxtral TTS, CosyVoice3, OmniVoice, VoxCPM2, MOSS-TTS-Nano.*
 *Note: AudioFly is a latent-diffusion text-to-audio (sound effect) model, not an LLM-based TTS, so vLLM-Omni cannot serve it; the dedicated `audiofly` image wraps the model's own `ldm` inference code with the same OpenAI speech API (`/v1/audio/speech`, `/v1/audio/speech/batch`, `/v1/audio/voices`). Generation is non-streaming and wav-only; see `docker/inference/audiofly/README.md`.*
 
+### TGI ROCm model compatibility
+
+The `3.3.6-rocm` image has dedicated TGI routes for these model families:
+
+- Text: Baichuan, Bloom, Cohere, DBRX, DeepSeek V2/V3, Falcon, Gemma 1/2/3 Text, GPT-2, GPT BigCode/SantaCoder, GPT-J, GPT-NeoX, Granite, Llama, Mamba, Mistral, Mixtral, MPT, OPT/Galactica, Phi/Phi-3/PhiMoE, Qwen2, StarCoder2, and T5.
+- Multimodal: Gemma 3, Idefics 1/2/3, Llama 4, Llama 3.2 Vision (Mllama), Llava Next, PaliGemma, Qwen2-VL, and Qwen2.5-VL.
+
+Other Transformers `AutoModelForCausalLM` and `AutoModelForSeq2SeqLM` architectures may use TGI's generic fallback, but are not registered in `amd-tgi.json` because optimized execution and sharding are not guaranteed.
+
+ROCm-specific limits:
+
+- The image is compiled for `gfx90a` and `gfx942` (MI210/MI250 and MI300; MI325X is architecture-compatible but not listed as tested upstream).
+- Upstream TGI does not support AWQ checkpoints or a sliding-window attention kernel on ROCm. Mistral, Gemma 2, and Gemma 3 models must set `--max-input-tokens` no greater than the model's `sliding_window`.
+- Gemma 2 passes an attention softcap that the ROCm paged-attention implementation rejects during paged decoding. Treat Gemma 2 and Gemma 3 as source-routed candidates that require ROCm smoke testing rather than default-stable models.
+- The custom paged-attention fast path applies to FP16/BF16, head sizes 64 or 128, block sizes 16 or 32, GQA ratios 1 through 16, and contexts up to 131072 tokens; other shapes fall back to the bundled vLLM paged-attention kernel.
+- AITER kernels are prebuilt only for `gfx942`; MoE models need additional validation on `gfx90a` devices.
+- This CSGHub wrapper downloads safetensors weights only. Models available exclusively as PyTorch `.bin` files are not supported.
+
 ## inference image name, version and cuda version
 | Task| Image Name | Version | CUDA Version | Fix
 | --- | --- | --- | --- |--- |
 |text generation / embedding / reranking / text to speech| vllm | v0.24.0 | 13.0 |pooling runner support for embedding and reranking; vllm-omni 0.24.0 for text-to-speech (/v1/audio/speech)|
 |text generation / embedding / reranking| amd-vllm | rocm7.2.1_vllm_0.24.0 | - |ROCm 7.2.1, vLLM 0.24.0|
 |text generation| vllm | v0.8.5 | 12.4 |fix hf hub timestamp|
-|text generation| vllm-cpu | 2.4 | -|fix hf hub timestamp |
+|text generation| vllm-cpu | v0.24.0 | - |vLLM 0.24.0, supports --enable-prompt-tokens-details|
 |text generation| tgi | 2.2 | 12.1 |- |
 |text generation| tgi | 3.2 | 12.4 |fix hf hub timestamp|
+|text generation| tgi-rocm | rocm6.3.1_tgi_3.3.6 | - |TGI 3.3.6, ROCm 6.3.1|
 |image generation| hf-inference-toolkit | 0.5.3 | 12.1 |-|
 |speech recognition| funasr | cuda12.8 | 12.8 |-|
 |speech recognition| funasr-rocm | rocm7.2.2 | - |-|

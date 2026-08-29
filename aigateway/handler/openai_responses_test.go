@@ -16,6 +16,60 @@ import (
 	commontypes "opencsg.com/csghub-server/common/types"
 )
 
+func TestResponsesCSGHubHostedVLLMUsesNativeResponsesBackendURL(t *testing.T) {
+	tester, c, w := setupTest(t)
+	tester.mocks.openAIComp.ExpectedCalls = nil
+	tester.handler.config.AIGateway.ResponsesIDSecret = "responses-secret"
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/responses",
+		strings.NewReader(`{"model":"hosted-model","input":"hi"}`))
+	c.Request.Header.Set("Content-Type", "application/json")
+
+	var upstreamPath string
+	var upstreamModel string
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		upstreamPath = r.URL.Path
+		var body struct {
+			Model string `json:"model"`
+		}
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		upstreamModel = body.Model
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":"resp_upstream","object":"response","status":"completed"}`))
+	}))
+	defer upstream.Close()
+
+	model := &types.Model{
+		BaseModel: types.BaseModel{
+			ID:       "hosted-model",
+			Metadata: map[string]any{},
+		},
+		InternalModelInfo: types.InternalModelInfo{
+			CSGHubModelID:    "namespace/model",
+			ClusterID:        "cluster-1",
+			SvcName:          "svc-model",
+			RuntimeFramework: "vllm",
+			ImageID:          "opencsghq/vllm:v0.24.0",
+		},
+		Endpoint: upstream.URL,
+	}
+	tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "hosted-model").Return(model, nil).Once()
+	tester.mocks.mockClsComp.EXPECT().GetClusterByID(mock.Anything, "cluster-1").Return(&database.ClusterInfo{
+		ClusterID: "cluster-1",
+	}, nil).Once()
+	tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil).Once()
+	tester.mocks.openAIComp.EXPECT().CheckUsageLimit(mock.Anything, "testuuid", mock.Anything, upstream.URL+"/v1/responses").Return(nil).Once()
+	tester.mocks.openAIComp.EXPECT().CommitUsageLimitFromUsage(mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
+	tester.mocks.openAIComp.EXPECT().RecordUsageFromTokenUsage(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
+
+	tester.handler.Responses(c)
+
+	require.Equal(t, http.StatusOK, w.Code)
+	require.Equal(t, "/v1/responses", upstreamPath)
+	require.Equal(t, "namespace/model", upstreamModel)
+	require.Contains(t, w.Body.String(), `"object":"response"`)
+	require.NotContains(t, w.Body.String(), `"id":"resp_upstream"`)
+}
+
 func TestResolvePreviousResponseRoute(t *testing.T) {
 	tester, c, _ := setupTest(t)
 	tester.handler.config.AIGateway.ResponsesIDSecret = "responses-secret"
@@ -204,7 +258,7 @@ func TestResponsesPreRequestSensitivePromptCleanAllowsExecution(t *testing.T) {
 	}).
 		Return(&rpc.CheckResult{IsSensitive: false}, nil).Once()
 	tester.mocks.openAIComp.EXPECT().CheckUsageLimit(mock.Anything, "testuuid", model, mock.Anything).Return(nil).Maybe()
-	tester.mocks.openAIComp.EXPECT().CommitUsageLimit(mock.Anything, mock.Anything, model, mock.Anything).Return(nil).Maybe()
+	tester.mocks.openAIComp.EXPECT().CommitUsageLimitFromUsage(mock.Anything, mock.Anything, model, mock.Anything).Return(nil).Maybe()
 	tester.mocks.openAIComp.EXPECT().RecordUsageFromTokenUsage(mock.Anything, mock.Anything, model, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 
 	tester.handler.Responses(c)
@@ -243,7 +297,7 @@ func TestResponsesWhitelistSkipsOutputModeration(t *testing.T) {
 		[]database.RepositoryFileCheckRule{{RuleType: database.RuleTypeNamespace, Pattern: "sensitive-model"}}, nil,
 	).Once()
 	tester.mocks.openAIComp.EXPECT().CheckUsageLimit(mock.Anything, "testuuid", model, mock.Anything).Return(nil).Maybe()
-	tester.mocks.openAIComp.EXPECT().CommitUsageLimit(mock.Anything, mock.Anything, model, mock.Anything).Return(nil).Maybe()
+	tester.mocks.openAIComp.EXPECT().CommitUsageLimitFromUsage(mock.Anything, mock.Anything, model, mock.Anything).Return(nil).Maybe()
 	tester.mocks.openAIComp.EXPECT().RecordUsageFromTokenUsage(mock.Anything, mock.Anything, model, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 
 	tester.handler.Responses(c)

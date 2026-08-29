@@ -290,6 +290,7 @@ func TestDeployer_Deploy(t *testing.T) {
 func TestDeployer_Status(t *testing.T) {
 	t.Run("no deploy", func(t *testing.T) {
 		dr := types.DeployRequest{
+			DeployID: 1,
 			UserUUID: "1",
 			Path:     "namespace/name",
 			Type:     types.InferenceType,
@@ -308,6 +309,25 @@ func TestDeployer_Status(t *testing.T) {
 		require.Equal(t, common.Stopped, deployStatus)
 		require.Nil(t, instances)
 
+	})
+	t.Run("neither deploy_id nor svc_name", func(t *testing.T) {
+		dr := types.DeployRequest{
+			UserUUID: "1",
+			Path:     "namespace/name",
+			Type:     types.InferenceType,
+		}
+
+		mockDeployTaskStore := mockdb.NewMockDeployTaskStore(t)
+		// no store expectation: the method must fail fast without querying
+		d := &deployer{
+			deployTaskStore: mockDeployTaskStore,
+		}
+
+		svcName, deployStatus, instances, err := d.Status(context.TODO(), dr, false)
+		require.NotNil(t, err)
+		require.Equal(t, "", svcName)
+		require.Equal(t, common.Stopped, deployStatus)
+		require.Nil(t, instances)
 	})
 	t.Run("cache miss and running", func(t *testing.T) {
 		dr := types.DeployRequest{
@@ -948,12 +968,6 @@ func TestDeployer_SubmitFinetune(t *testing.T) {
 			return &types.ArgoWorkFlowRes{ID: 1}, nil
 		},
 	)
-
-	tester.mocks.stores.ClusterInfoMock().EXPECT().FindNodeByClusterID(ctx, "").Return([]database.ClusterNode{
-		{
-			Name: "node1",
-		},
-	}, nil)
 
 	resp, err := tester.SubmitFinetuneJob(ctx, types.FinetuneReq{
 		ModelId:          "m1",

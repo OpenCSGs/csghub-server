@@ -12,11 +12,13 @@ import (
 	"strings"
 
 	"opencsg.com/csghub-server/builder/rpc"
+	"opencsg.com/csghub-server/builder/store/database"
 
 	"opencsg.com/csghub-server/common/types"
 )
 
 type LLMSvcClient interface {
+	WithLLMConfig(llmConfig *database.LLMConfig) LLMSvcClient
 	Chat(ctx context.Context, endpoint, host string, headers map[string]string, data types.LLMReqBody) (string, error)
 	ChatStream(ctx context.Context, endpoint, host string, headers map[string]string, data types.LLMReqBody) (<-chan string, error)
 	Tokenize(ctx context.Context, endpoint, host string, req interface{}) ([]byte, error)
@@ -24,7 +26,8 @@ type LLMSvcClient interface {
 }
 
 type Client struct {
-	client rpc.HttpDoer
+	client    rpc.HttpDoer
+	llmConfig *database.LLMConfig
 }
 
 func NewClient() *Client {
@@ -33,7 +36,47 @@ func NewClient() *Client {
 	}
 }
 
+// WithLLMConfig returns a new Client that derives endpoint, headers, and model name
+// from the given LLMConfig's best available upstream. PopulateDerivedFields is called
+// internally to select the best upstream. The original client is not modified, making
+// this method safe for concurrent use.
+func (c *Client) WithLLMConfig(llmConfig *database.LLMConfig) LLMSvcClient {
+	if llmConfig != nil {
+		llmConfig.PopulateDerivedFields()
+	}
+	return &Client{
+		client:    c.client,
+		llmConfig: llmConfig,
+	}
+}
+
+// resolveLLMConfig overrides endpoint, host, headers, and model from the stored
+// llmConfig (if set). Since WithLLMConfig creates a new Client per call, there is
+// no need to clear llmConfig after use.
+func (c *Client) resolveLLMConfig(endpoint, host string, headers map[string]string, data types.LLMReqBody) (string, string, map[string]string, types.LLMReqBody) {
+	if c.llmConfig == nil {
+		return endpoint, host, headers, data
+	}
+	cfg := c.llmConfig
+
+	resolvedHeaders := headers
+	if len(cfg.AuthHeader) > 0 {
+		var parsed map[string]string
+		if err := json.Unmarshal([]byte(cfg.AuthHeader), &parsed); err == nil {
+			resolvedHeaders = parsed
+		} else {
+			slog.Error("failed to parse llm config auth header json, request will proceed without resolved headers",
+				slog.Any("error", err), slog.String("model_name", cfg.ModelName))
+		}
+	}
+	if cfg.ModelName != "" {
+		data.Model = cfg.ModelName
+	}
+	return cfg.ApiEndpoint, host, resolvedHeaders, data
+}
+
 func (c *Client) ChatStream(ctx context.Context, endpoint, host string, headers map[string]string, data types.LLMReqBody) (<-chan string, error) {
+	endpoint, host, headers, data = c.resolveLLMConfig(endpoint, host, headers, data)
 	slog.Debug("chat with llm", slog.Any("endpoint", endpoint), slog.Any("data", data))
 	rc, err := c.doRequest(ctx, http.MethodPost, strings.TrimSpace(endpoint), host, headers, data)
 	if err != nil {
@@ -101,6 +144,7 @@ func (c *Client) readToChannel(rc io.ReadCloser) <-chan string {
 }
 
 func (c *Client) Chat(ctx context.Context, endpoint, host string, headers map[string]string, data types.LLMReqBody) (string, error) {
+	endpoint, host, headers, data = c.resolveLLMConfig(endpoint, host, headers, data)
 	slog.Debug("chat with llm", slog.Any("endpoint", endpoint), slog.Any("data", data))
 	rc, err := c.doRequest(ctx, http.MethodPost, endpoint, host, headers, data)
 	if err != nil {
@@ -131,7 +175,8 @@ func (c *Client) Chat(ctx context.Context, endpoint, host string, headers map[st
 }
 
 func (c *Client) Tokenize(ctx context.Context, endpoint, host string, req interface{}) ([]byte, error) {
-	rc, err := c.doRequest(ctx, http.MethodPost, endpoint, host, nil, req)
+	endpoint, host, headers, _ := c.resolveLLMConfig(endpoint, host, nil, types.LLMReqBody{})
+	rc, err := c.doRequest(ctx, http.MethodPost, endpoint, host, headers, req)
 	if err != nil {
 		return nil, fmt.Errorf("do llm request, error: %w", err)
 	}
@@ -145,7 +190,8 @@ func (c *Client) Tokenize(ctx context.Context, endpoint, host string, req interf
 
 func (c *Client) EmbeddingTokenize(ctx context.Context, endpoint, host string, req interface{}) ([]byte, error) {
 	const path = "/tokenize"
-	rc, err := c.doRequest(ctx, http.MethodPost, endpoint+path, host, nil, req)
+	endpoint, host, headers, _ := c.resolveLLMConfig(endpoint, host, nil, types.LLMReqBody{})
+	rc, err := c.doRequest(ctx, http.MethodPost, endpoint+path, host, headers, req)
 	if err != nil {
 		return nil, fmt.Errorf("do llm request, error: %w", err)
 	}

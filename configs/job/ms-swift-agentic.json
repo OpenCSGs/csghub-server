@@ -1,0 +1,20 @@
+{
+  "engine_name": "ms-swift-agentic",
+  "model_format": "safetensors",
+  "enabled": 1,
+  "container_port": 8000,
+  "engine_images": [
+    {
+      "compute_type": "gpu",
+      "image": "opencsghq/swift-agentic:latest",
+      "driver_version": "12.9",
+      "engine_version": "v4.3.1"
+    },
+    {
+      "compute_type": "npu",
+      "image": "opencsghq/swift-agentic-npu:latest",
+      "driver_version": "12.9",
+      "engine_version": "v4.3.1"
+    }
+  ]
+}

@@ -8,6 +8,7 @@ import (
 	"os"
 	"reflect"
 	"sync"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/mcuadros/go-defaults"
@@ -48,6 +49,9 @@ type Config struct {
 	UniqueServiceName        string            `env:"STARHUB_SERVER_UNIQUE_SERVICE_NAME" default:""`
 	ServerFailureRedirectURL string            `env:"STARHUB_SERVER_FAIL_REDIRECT_URL" default:"http://localhost:3000/errors/server-error"`
 	NeedPhoneVerify          bool              `env:"STARHUB_SERVER_NEED_PHONE_VERIFY" default:"false"`
+	// TimeZone is the application-wide timezone used for formatting
+	// timestamps (e.g. Loki log timestamps).
+	TimeZone string `env:"STARHUB_SERVER_TIMEZONE" default:"Asia/Shanghai"`
 
 	APIServer struct {
 		Port         int    `env:"STARHUB_SERVER_SERVER_PORT" default:"8080"`
@@ -76,7 +80,6 @@ type Config struct {
 	Database struct {
 		Driver              string `env:"STARHUB_DATABASE_DRIVER" default:"pg"`
 		DSN                 string `env:"STARHUB_DATABASE_DSN" default:"postgresql://postgres:postgres@localhost:5432/starhub_server?sslmode=disable"`
-		TimeZone            string `env:"STARHUB_DATABASE_TIMEZONE" default:"Asia/Shanghai"`
 		SearchConfiguration string `env:"STARHUB_DATABASE_SEARCH_CONFIGURATION" default:"opencsgchinese"`
 	}
 
@@ -208,6 +211,18 @@ type Config struct {
 		PYPIIndexURL              string `env:"STARHUB_SERVER_SPACE_PYPI_INDEX_URL" default:""`
 		InformerSyncPeriodInMin   int    `env:"STARHUB_SERVER_SPACE_INFORMER_SYNC_PERIOD_IN_MINUTES" default:"2"`
 		StatusCheckInterval       int    `env:"STARHUB_SERVER_SPACE_STATUS_CHECK_INTERVAL" default:"10"` // 10 seconds
+		SandboxPVCName            string `env:"STARHUB_SERVER_SANDBOX_PVC_NAME" default:"sandbox-storage"`
+		SandboxRuntimeClass       string `env:"STARHUB_SERVER_SANDBOX_RUNTIME_CLASS" default:"gvisor"`
+		// SandboxFreeResourceMaxIdleTimeoutMin: the idle-reclaim timeout (in minutes) applied to
+		// sandboxes created on free resources (price == 0). It acts as BOTH the default (when the
+		// caller does not pass a timeout) and the upper bound (a larger caller-provided timeout is
+		// clamped down to this value), so free resources cannot be held indefinitely. Defaults to 10.
+		SandboxFreeResourceMaxIdleTimeoutMin int `env:"STARHUB_SERVER_SANDBOX_FREE_RESOURCE_MAX_IDLE_TIMEOUT_MIN" default:"10"`
+		// SandboxIdleSweepIntervalSec is the idle scan period. The scan reads the informer cache, zero API calls.
+		SandboxIdleSweepIntervalSec int `env:"STARHUB_SERVER_SANDBOX_IDLE_SWEEP_INTERVAL_SECONDS" default:"60"`
+		// SandboxIdleStartupGraceMin: for how many minutes after Runner startup only record activity and do not
+		// suspend, to avoid an instant batch suspend right after a restart.
+		SandboxIdleStartupGraceMin int `env:"STARHUB_SERVER_SANDBOX_IDLE_STARTUP_GRACE_MINUTES" default:"5"`
 	}
 
 	Model struct {
@@ -273,6 +288,8 @@ type Config struct {
 		ThresholdOfStopLLMInference  int    `env:"OPENCSG_ACCOUNTING_THRESHOLD_OF_STOP_LLM_INFERENCE" default:"5000"`
 		LLMBalanceCheckCacheTTL      int    `env:"OPENCSG_ACCOUNTING_LLM_BALANCE_CHECK_CACHE_TTL" default:"120"`
 		RetryLimit                   int    `env:"OPENCSG_ACCOUNTING_RETRY_LIMIT" default:"1"`
+		MaxExportPages               int    `env:"OPENCSG_ACCOUNTING_MAX_EXPORT_PAGES" default:"1000"`
+		AllowedSyncDeductScenes      string `env:"OPENCSG_ACCOUNTING_ALLOWED_SYNC_DEDUCT_SCENES" default:"30"`
 	}
 
 	User struct {
@@ -418,8 +435,17 @@ type Config struct {
 		ReleaseInvitationCreditCronExpression    string `env:"STARHUB_SERVER_CRON_JOB_RELEASE_INVITATION_CREDIT_CRON_EXPRESSION" default:"0 0 5 * *"`
 		MCPInspectCronExpression                 string `env:"STARHUB_SERVER_CRON_JOB_MCP_INSPECT_CRON_EXPRESSION" default:"*/10 * * * *"`
 		AIGatewayAsyncGenerationCronExpression   string `env:"STARHUB_SERVER_CRON_JOB_AIGATEWAY_ASYNC_GENERATION_CRON_EXPRESSION" default:"*/1 * * * *"`
+		AIGatewayMetricsCollectorCronExpression  string `env:"STARHUB_SERVER_CRON_JOB_AIGATEWAY_METRICS_COLLECTOR_CRON_EXPRESSION" default:"* * * * *"` // every minute
 		SyncLLMLogsToDatasetCronExpression       string `env:"STARHUB_SERVER_SYNC_LLMLOGS_TO_DATASET_CRON_EXPRESSION" default:"0 1 * * *"`
 		StatementDailySummaryCronExpression      string `env:"STARHUB_SERVER_CRON_JOB_STATEMENT_DAILY_SUMMARY_CRON_EXPRESSION" default:"17 2 * * *"` // 02:17 daily
+		HistoryArchiveCronExpression             string `env:"STARHUB_SERVER_CRON_JOB_HISTORY_ARCHIVE_CRON_EXPRESSION" default:"30 2 * * *"`         // 02:30 daily (Asia/Shanghai, applied via ScheduleSpec.TimeZoneName)
+	}
+
+	HistoryArchive struct {
+		Enable           bool `env:"STARHUB_SERVER_HISTORY_ARCHIVE_ENABLE" default:"false"`
+		BatchSize        int  `env:"STARHUB_SERVER_HISTORY_ARCHIVE_BATCH_SIZE" default:"50000"`
+		MaxBatchesPerRun int  `env:"STARHUB_SERVER_HISTORY_ARCHIVE_MAX_BATCHES_PER_RUN" default:"200"`
+		MaxRunMinutes    int  `env:"STARHUB_SERVER_HISTORY_ARCHIVE_MAX_RUN_MINUTES" default:"300"`
 	}
 
 	DeployReconcile struct {
@@ -517,6 +543,25 @@ type Config struct {
 			Enable bool  `env:"OPENCSG_AIGATEWAY_MODAL_API_RATE_LIMITER_ENABLE" default:"true"`
 			Limit  int64 `env:"OPENCSG_AIGATEWAY_MODAL_API_RATE_LIMITER_LIMIT" default:"2"`
 			Window int64 `env:"OPENCSG_AIGATEWAY_MODAL_API_RATE_LIMITER_WINDOW" default:"60"`
+		}
+		MetricsCollectorLookbackMinutes int `env:"OPENCSG_AIGATEWAY_METRICS_COLLECTOR_LOOKBACK_MINUTES" default:"60"`
+
+		Metrics struct {
+			// DBSinkBufferSize is the buffered channel capacity used by the
+			// AIGateway metrics DBSink (EE/SaaS).  When the channel is
+			// full, new events are dropped with a WARN log to avoid
+			// blocking request goroutines under load.
+			DBSinkBufferSize int `env:"OPENCSG_AIGATEWAY_METRICS_DBSINK_BUFFER_SIZE" default:"4096"`
+			// DBSinkFlushBatchSize is the maximum number of metric events
+			// batched together before being flushed to TimescaleDB by the
+			// DBSink background goroutine.  Also acts as upper bound on
+			// slice pre-allocation in the flush loop.
+			DBSinkFlushBatchSize int `env:"OPENCSG_AIGATEWAY_METRICS_DBSINK_FLUSH_BATCH_SIZE" default:"100"`
+			// DBSinkFlushIntervalSeconds is the longest time (wall-clock
+			// seconds) the DBSink background goroutine waits between
+			// flushes, even when the current batch has fewer events than
+			// DBSinkFlushBatchSize.
+			DBSinkFlushIntervalSeconds int `env:"OPENCSG_AIGATEWAY_METRICS_DBSINK_FLUSH_INTERVAL_SECONDS" default:"5"`
 		}
 	}
 
@@ -621,6 +666,7 @@ type Config struct {
 	Prometheus struct {
 		ApiAddress           string   `env:"STARHUB_SERVER_PROMETHEUS_API_ADDRESS" default:""`
 		BasicAuth            string   `env:"STARHUB_SERVER_PROMETHEUS_BASIC_AUTH" default:""`
+		InsecureSkipVerify   bool     `env:"STARHUB_SERVER_PROMETHEUS_INSECURE_SKIP_VERIFY" default:"false"`
 		CPUUsageMetric       string   `env:"STARHUB_SERVER_PROMETHEUS_CPU_USAGE_METRIC" default:"container_cpu_usage_seconds_total"`
 		CPULimitMetric       string   `env:"STARHUB_SERVER_PROMETHEUS_CPU_LIMIT_METRIC" default:"kube_pod_container_resource_limits"`
 		MemoryUsageMetric    string   `env:"STARHUB_SERVER_PROMETHEUS_MEMORY_USAGE_METRIC" default:"container_memory_usage_bytes"`
@@ -793,6 +839,7 @@ func SetConfigFile(file string) {
 
 var globalConfig *Config
 var globalConfigError error
+var _globalLocation *time.Location // private in package
 var once sync.Once
 
 func LoadConfig() (*Config, error) {
@@ -838,6 +885,13 @@ func loadConfig() (*Config, error) {
 		cfg.UniqueServiceName = genServiceName()
 	}
 
+	loc, err := time.LoadLocation(cfg.TimeZone)
+	if err != nil {
+		return nil, fmt.Errorf("invalid timezone %q: %w", cfg.TimeZone, err)
+	}
+	SetGlobalTimeZone(loc)
+	slog.Info("Init server timezone", slog.Any("config", cfg.TimeZone), slog.Any("using", _globalLocation.String()))
+
 	return cfg, nil
 }
 
@@ -861,4 +915,18 @@ func genServiceName() string {
 	}
 	slog.Debug("auto generate service name", slog.String("service_name", autoGenServiceName))
 	return autoGenServiceName
+}
+
+func GetGlobalTimeZone() *time.Location {
+	if _globalLocation == nil {
+		return time.Local
+	}
+	return _globalLocation
+}
+
+// SetGlobalTimeZone sets the global timezone location used by GetGlobalTimeZone.
+// This is primarily useful for tests that need to verify timezone-aware behavior
+// without calling LoadConfig.
+func SetGlobalTimeZone(loc *time.Location) {
+	_globalLocation = loc
 }

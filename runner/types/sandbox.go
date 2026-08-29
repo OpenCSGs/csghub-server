@@ -8,21 +8,22 @@ import (
 
 // SandboxSpec defines sandbox specification
 type SandboxRequest struct {
-	SandboxName string                `json:"sandbox_name"`
-	Image       string                `json:"image,omitempty"`
-	Hardware    types.HardWare        `json:"hardware,omitempty"`
-	ClusterID   string                `json:"cluster_id"`
-	DeployID    string                `json:"deploy_id"`
-	TaskId      string                `json:"task_id"`
-	UserUUID    string                `json:"user_id"`
-	ResourceID  int64                 `json:"resource_id"`
-	EnvVars     map[string]string     `json:"env_vars,omitempty"`
-	Labels      map[string]string     `json:"labels,omitempty"`
-	TemplateID  string                `json:"templateID,omitempty"`
-	Timeout     int                   `json:"timeout,omitempty"`
-	Volumes     []types.SandboxVolume `json:"volumes,omitempty"`
-	Port        int                   `json:"port,omitempty"`
-	DeployName  string                `json:"deploy_name,omitempty"`
+	SandboxName    string                       `json:"sandbox_name"`
+	Image          string                       `json:"image,omitempty"`
+	Hardware       types.HardWare               `json:"hardware,omitempty"`
+	ClusterID      string                       `json:"cluster_id"`
+	DeployID       string                       `json:"deploy_id"`
+	TaskId         string                       `json:"task_id"`
+	UserUUID       string                       `json:"user_id"`
+	ResourceID     int64                        `json:"resource_id"`
+	EnvVars        map[string]string            `json:"env_vars,omitempty"`
+	Labels         map[string]string            `json:"labels,omitempty"`
+	TemplateID     string                       `json:"templateID,omitempty"`
+	Timeout        int                          `json:"timeout,omitempty"`
+	Volumes        []types.SandboxVolume        `json:"volumes,omitempty"`
+	Port           int                          `json:"port,omitempty"`
+	DeployName     string                       `json:"deploy_name,omitempty"`
+	ReadinessProbe *types.SandboxReadinessProbe `json:"readiness_probe,omitempty"`
 }
 
 type SandboxResponse struct {

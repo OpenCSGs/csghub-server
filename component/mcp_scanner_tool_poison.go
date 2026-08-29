@@ -2,8 +2,6 @@ package component
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
 	"strings"
 
 	"opencsg.com/csghub-server/builder/llm"
@@ -40,7 +38,6 @@ func (plugin *toolPoisoningPlugin) Check(ctx context.Context, files []*types.Fil
 		}
 		// 2. Check the code content, file by file
 		reqData := types.LLMReqBody{
-			Model: plugin.llmConfig.ModelName,
 			Messages: []types.LLMMessage{
 				{Role: SystemRole, Content: plugin.prompt.ZH},
 				{Role: UserRole, Content: file.Content},
@@ -48,12 +45,7 @@ func (plugin *toolPoisoningPlugin) Check(ctx context.Context, files []*types.Fil
 			Stream:      false,
 			Temperature: plugin.temperature,
 		}
-		var headers map[string]string
-		err := json.Unmarshal([]byte(plugin.llmConfig.AuthHeader), &headers)
-		if err != nil {
-			return nil, fmt.Errorf("parse llm config header error: %w", err)
-		}
-		resp, err := plugin.llmClient.Chat(ctx, plugin.llmConfig.ApiEndpoint, "", headers, reqData)
+		resp, err := plugin.llmClient.WithLLMConfig(plugin.llmConfig).Chat(ctx, "", "", nil, reqData)
 		if err != nil {
 			return nil, err
 		}

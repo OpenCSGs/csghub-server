@@ -329,15 +329,33 @@ func (c *repoComponentImpl) CheckDeployPermissionForUser(ctx context.Context, de
 	}
 	deploy, err := c.deployTaskStore.GetDeployByID(ctx, deployReq.DeployID)
 	if err != nil {
-		return nil, nil, fmt.Errorf("fail to get user deploy %v, %w", deployReq.DeployID, err)
+		return nil, nil, fmt.Errorf("failed to get user deploy %v, %w", deployReq.DeployID, err)
 	}
 	if deploy == nil {
 		return nil, nil, fmt.Errorf("do not found user deploy %v", deployReq.DeployID)
 	}
 
-	if deploy.UserID == user.ID || c.IsAdminRole(user) || c.IsInSameOrg(ctx, user.ID, deploy.UserID) {
+	// Creator is always allowed, regardless of SecureLevel for backward compatibility.
+	if deploy.UserID == user.ID {
 		return &user, deploy, nil
 	}
+
+	switch deploy.SecureLevel {
+	case types.EndpointPublic:
+		if c.IsAdminRole(user) || c.IsInSameOrg(ctx, user.ID, deploy.UserID) {
+			return &user, deploy, nil
+		}
+	case types.EndpointPrivate:
+		// Only creator is allowed for private endpoints;
+		// fall through to forbidden below
+	default:
+		// Default to public behavior for backward compatibility
+		// with existing deployments that have SecureLevel = 0 (unset)
+		if c.IsAdminRole(user) || c.IsInSameOrg(ctx, user.ID, deploy.UserID) {
+			return &user, deploy, nil
+		}
+	}
+
 	return nil, nil, errorx.ErrForbiddenMsg("deploy was not created by user")
 }
 
@@ -510,34 +528,8 @@ func (c *repoComponentImpl) DeployDetail(ctx context.Context, detailReq types.De
 		return nil, err
 	}
 
-	req := types.DeployRequest{
-		DeployID:  deploy.ID,
-		SpaceID:   deploy.SpaceID,
-		ModelID:   deploy.ModelID,
-		Namespace: detailReq.Namespace,
-		Name:      detailReq.Name,
-		SvcName:   deploy.SvcName,
-		ClusterID: deploy.ClusterID,
-	}
-	actualReplica, desiredReplica, instList, err := c.deployer.GetReplica(ctx, req)
-	if err != nil {
-		slog.Warn("fail to get deploy replica", slog.Any("repotype", detailReq.RepoType), slog.Any("req", req), slog.Any("error", err))
-	}
+	actualReplica, desiredReplica, instList := c.queryDeployReplica(ctx, detailReq, deploy)
 
-	_, code, _, err := c.deployer.Status(ctx, types.DeployRequest{
-		DeployID:  deploy.ID,
-		SpaceID:   deploy.SpaceID,
-		ModelID:   deploy.ModelID,
-		Namespace: detailReq.Namespace,
-		Name:      detailReq.Name,
-		SvcName:   deploy.SvcName,
-		ClusterID: deploy.ClusterID,
-	}, false)
-	if err != nil {
-		slog.Warn("fail to get deploy status", slog.Any("repo type", detailReq.RepoType), slog.Any("svc name", deploy.SvcName), slog.Any("error", err))
-	}
-
-	deploy.Status = code
 	deploy.StatusUpdateAt = time.Now()
 
 	endpoint, _ := c.GenerateEndpoint(ctx, deploy)
@@ -567,7 +559,7 @@ func (c *repoComponentImpl) DeployDetail(ctx context.Context, detailReq types.De
 		DeployName:          deploy.DeployName,
 		RepoID:              deploy.RepoID,
 		SvcName:             deploy.SvcName,
-		Status:              deployStatusCodeToString(code),
+		Status:              deployStatusCodeToString(deploy.Status),
 		Hardware:            deploy.Hardware,
 		Env:                 deploy.Env,
 		RuntimeFramework:    deploy.RuntimeFramework,
@@ -601,6 +593,30 @@ func (c *repoComponentImpl) DeployDetail(ctx context.Context, detailReq types.De
 	resDeploy.PD = deploy.PD
 
 	return &resDeploy, nil
+}
+
+func (c *repoComponentImpl) queryDeployReplica(ctx context.Context, detailReq types.DeployActReq, deploy *database.Deploy) (int, int, []types.Instance) {
+	ok, err := c.deployer.CheckClusterHealthy(ctx, deploy.ClusterID)
+	if !ok || err != nil {
+		slog.WarnContext(ctx, "failed to check cluster healthy", slog.Any("cluster id", deploy.ClusterID), slog.Any("error", err))
+		return 0, 0, []types.Instance{}
+	}
+
+	req := types.DeployRequest{
+		DeployID:  deploy.ID,
+		SpaceID:   deploy.SpaceID,
+		ModelID:   deploy.ModelID,
+		Namespace: detailReq.Namespace,
+		Name:      detailReq.Name,
+		SvcName:   deploy.SvcName,
+		ClusterID: deploy.ClusterID,
+	}
+	actualReplica, desiredReplica, instList, err := c.deployer.GetReplica(ctx, req)
+	if err != nil {
+		slog.WarnContext(ctx, "failed to get deploy replica from runner", slog.Any("req", req), slog.Any("error", err))
+	}
+
+	return actualReplica, desiredReplica, instList
 }
 
 func deployStatusCodeToString(code int) string {
@@ -782,7 +798,7 @@ func (c *repoComponentImpl) DeployStop(ctx context.Context, stopReq types.Deploy
 		user, deploy, err = c.CheckDeployPermissionForUser(ctx, stopReq)
 	}
 	if err != nil {
-		return fmt.Errorf("fail to check permission for stop deploy, %w", err)
+		return fmt.Errorf("failed to check permission for stop deploy, %w", err)
 	}
 
 	// delete service
@@ -803,19 +819,21 @@ func (c *repoComponentImpl) DeployStop(ctx context.Context, stopReq types.Deploy
 		slog.Warn("stop deploy instance with error", slog.Any("error", err), slog.Any("stopReq", stopReq))
 	}
 
-	exist, err := c.deployer.Exist(ctx, deployRepo)
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		// failed to check service in cluster
-		return err
-	}
+	if !stopReq.Force {
+		exist, err := c.deployer.Exist(ctx, deployRepo)
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			// failed to check service in cluster
+			return err
+		}
 
-	if errors.Is(err, sql.ErrNoRows) {
-		exist = false
-	}
+		if errors.Is(err, sql.ErrNoRows) {
+			exist = false
+		}
 
-	if exist {
-		// failed to delete service in cluster
-		return errors.New("failed to stop deploy instance")
+		if exist {
+			// failed to delete service in cluster
+			return errors.New("failed to stop deploy instance")
+		}
 	}
 
 	// update database deploy to stopped
@@ -1006,30 +1024,21 @@ func (c *repoComponentImpl) DeployUpdate(ctx context.Context, updateReq types.De
 	}
 
 	if req.ClusterID != nil {
-		_, err = c.clusterInfoStore.ByClusterID(ctx, *req.ClusterID)
+		clusterHealthy, err := c.deployer.CheckClusterHealthy(ctx, *req.ClusterID)
 		if err != nil {
-			return fmt.Errorf("invalid cluster %v, %w", *req.ClusterID, err)
+			return errorx.ClusterUnavailable(err, errorx.Ctx().Set("cluster ID", *req.ClusterID))
+		}
+		if !clusterHealthy {
+			return errorx.ClusterUnavailable(fmt.Errorf("cluster is not healthy"),
+				errorx.Ctx().Set("cluster ID", *req.ClusterID))
 		}
 	}
 
-	// check service
-	deployRepo := types.DeployRequest{
-		DeployID:  updateReq.DeployID,
-		SpaceID:   deploy.SpaceID,
-		ModelID:   deploy.ModelID,
-		Namespace: updateReq.Namespace,
-		Name:      updateReq.Name,
-		SvcName:   deploy.SvcName,
-		ClusterID: deploy.ClusterID,
-	}
-	exist, err := c.deployer.Exist(ctx, deployRepo)
-	if err != nil {
-		return fmt.Errorf("check deploy exists, err: %w", err)
-	}
+	// check service status
+	exist := deploy.Status != deployStatus.Stopped && deploy.Status != deployStatus.Deleted
 
 	if needRestartDeploy(req) && exist {
-		// deploy instance is running
-		return errors.New("stop deploy first")
+		return errorx.ErrDeployStopFirst
 	}
 
 	if req.EngineArgs != nil {
@@ -1138,7 +1147,7 @@ func (c *repoComponentImpl) DeployStart(ctx context.Context, startReq types.Depl
 		// if deploy is in running status, return error
 		const deployStatusRunning = 4
 		if status == deployStatusRunning {
-			return errors.New("stop deploy first")
+			return errorx.ErrDeployStopFirst
 		}
 
 		// if deploy exists but not running, stop it first

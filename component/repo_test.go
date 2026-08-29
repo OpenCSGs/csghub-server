@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/alibabacloud-go/tea/tea"
 	"github.com/gin-gonic/gin"
@@ -511,6 +512,130 @@ func TestRepoComponent_DeleteFile(t *testing.T) {
 			require.Nil(t, err)
 			require.Equal(t, &types.DeleteFileResp{}, resp)
 		})
+	}
+}
+
+func TestRepoComponent_CreateFileIgnoresPackageSyncFailure(t *testing.T) {
+	ctx := context.TODO()
+	repo := initializeTestRepoComponent(ctx, t)
+	dbRepo := setupSkillFileWrite(t, repo, ctx, true)
+	syncDone := expectAsyncPackageBranchResolveFailure(t, repo, types.SkillRepo, "ns", "n", "main")
+
+	req := &types.CreateFileReq{
+		RepoType:        types.SkillRepo,
+		Namespace:       "ns",
+		Name:            "n",
+		CurrentUser:     "user",
+		Username:        "un",
+		Branch:          "main",
+		FilePath:        "test.go",
+		OriginalContent: []byte{},
+	}
+	repo.mocks.gitServer.EXPECT().CreateRepoFile(req).Return(nil)
+
+	resp, err := repo.CreateFile(ctx, req)
+	require.NoError(t, err)
+	require.Equal(t, &types.CreateFileResp{}, resp)
+	require.Equal(t, int64(123), dbRepo.ID)
+	requireAsyncPackageSyncAttempt(t, syncDone)
+}
+
+func TestRepoComponent_UpdateFileIgnoresPackageSyncFailure(t *testing.T) {
+	ctx := context.TODO()
+	repo := initializeTestRepoComponent(ctx, t)
+	setupSkillFileWrite(t, repo, ctx, true)
+	syncDone := expectAsyncPackageBranchResolveFailure(t, repo, types.SkillRepo, "ns", "n", "main")
+
+	req := &types.UpdateFileReq{
+		RepoType:        types.SkillRepo,
+		Namespace:       "ns",
+		Name:            "n",
+		CurrentUser:     "user",
+		Username:        "un",
+		Branch:          "main",
+		FilePath:        "test.go",
+		OriginalContent: []byte{1, 0, 0, 1},
+		Email:           "foo@bar.com",
+	}
+	repo.mocks.gitServer.EXPECT().UpdateRepoFile(req).Return(nil)
+
+	resp, err := repo.UpdateFile(ctx, req)
+	require.NoError(t, err)
+	require.Equal(t, &types.UpdateFileResp{}, resp)
+	requireAsyncPackageSyncAttempt(t, syncDone)
+}
+
+func TestRepoComponent_DeleteFileIgnoresPackageSyncFailure(t *testing.T) {
+	ctx := context.TODO()
+	repo := initializeTestRepoComponent(ctx, t)
+	setupSkillFileWrite(t, repo, ctx, false)
+	syncDone := expectAsyncPackageBranchResolveFailure(t, repo, types.SkillRepo, "ns", "n", "main")
+
+	req := &types.DeleteFileReq{
+		RepoType:        types.SkillRepo,
+		Namespace:       "ns",
+		Name:            "n",
+		CurrentUser:     "user",
+		Username:        "un",
+		Branch:          "main",
+		FilePath:        "test.go",
+		OriginalContent: []byte{1, 0, 0, 1},
+	}
+	repo.mocks.gitServer.EXPECT().DeleteRepoFile(req).Return(nil)
+
+	resp, err := repo.DeleteFile(ctx, req)
+	require.NoError(t, err)
+	require.Equal(t, &types.DeleteFileResp{}, resp)
+	requireAsyncPackageSyncAttempt(t, syncDone)
+}
+
+func setupSkillFileWrite(t *testing.T, repo *testRepoWithMocks, ctx context.Context, includeGitattributes bool) *database.Repository {
+	t.Helper()
+	dbRepo := &database.Repository{
+		ID:             123,
+		RepositoryType: types.SkillRepo,
+		Path:           "ns/n",
+		DefaultBranch:  "main",
+	}
+	repo.repositoryPackageSyncer = newRepositoryPackageSyncer(repo.config, repo.mocks.stores.RepoMock(), repo.mocks.gitServer, repo.mocks.s3Client, nil)
+	repo.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.SkillRepo, "ns", "n").Return(dbRepo, nil)
+	mockUserRepoAdminPermission(ctx, repo.mocks.stores, "user")
+	repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "un").Return(database.User{Email: "foo@bar.com"}, nil)
+	repo.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "ns").Return(database.Namespace{}, nil)
+	if includeGitattributes {
+		repo.mocks.gitServer.EXPECT().GetRepoFileContents(mock.Anything, gitserver.GetRepoInfoByPathReq{
+			RepoType:  types.SkillRepo,
+			Namespace: "ns",
+			Name:      "n",
+			Ref:       "main",
+			Path:      GitAttributesFileName,
+		}).Return(&types.File{}, nil)
+	}
+	repo.mocks.stores.RepoMock().EXPECT().SetUpdateTimeByPath(mock.Anything, types.SkillRepo, "ns", "n", mock.Anything).Return(nil)
+	repo.mocks.components.tag.EXPECT().UpdateLibraryTags(mock.Anything, getTagScopeByRepoType(types.SkillRepo), "ns", "n", "", "test.go").Return(nil)
+	return dbRepo
+}
+
+func expectAsyncPackageBranchResolveFailure(t *testing.T, repo *testRepoWithMocks, repoType types.RepositoryType, namespace, name, branch string) <-chan struct{} {
+	t.Helper()
+	done := make(chan struct{})
+	repo.mocks.gitServer.EXPECT().GetRepoBranchByName(mock.Anything, gitserver.GetBranchReq{
+		Namespace: namespace,
+		Name:      name,
+		Ref:       branch,
+		RepoType:  repoType,
+	}).Run(func(context.Context, gitserver.GetBranchReq) {
+		close(done)
+	}).Return(nil, errors.New("package sync failed")).Once()
+	return done
+}
+
+func requireAsyncPackageSyncAttempt(t *testing.T, done <-chan struct{}) {
+	t.Helper()
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for async package sync")
 	}
 }
 
@@ -1342,6 +1467,7 @@ func TestRepoComponent_DeleteDeploy(t *testing.T) {
 		UserUUID:      "uuid",
 		OrderDetailID: 11,
 		ClusterID:     "cluster",
+		SecureLevel:   types.EndpointPublic,
 	}, nil)
 	repo.mocks.stores.DeployTaskMock().EXPECT().DeleteDeploy(
 		ctx, types.ModelRepo, int64(1), int64(0), int64(3),
@@ -1377,24 +1503,16 @@ func TestRepoComponent_DeployDetail(t *testing.T) {
 		SvcName:       "svc",
 		Status:        deployStatus.Running,
 		Type:          types.InferenceType,
+		SecureLevel:   types.EndpointPublic,
 	}, nil)
 
+	repo.mocks.deployer.EXPECT().CheckClusterHealthy(ctx, "cluster").Return(true, nil)
 	repo.mocks.deployer.EXPECT().GetReplica(ctx, types.DeployRequest{
 		Namespace: "ns",
 		Name:      "n",
 		ClusterID: "cluster",
 		SvcName:   "svc",
 	}).Return(1, 2, []types.Instance{{Name: "i1"}}, nil)
-
-	repo.mocks.deployer.EXPECT().Status(ctx, types.DeployRequest{
-		DeployID:  0,
-		SpaceID:   0,
-		ModelID:   0,
-		Namespace: "ns",
-		Name:      "n",
-		SvcName:   "svc",
-		ClusterID: "cluster",
-	}, false).Return("svc", 23, nil, nil)
 
 	dp, err := repo.DeployDetail(ctx, types.DeployActReq{
 		RepoType:     types.ModelRepo,
@@ -1413,7 +1531,8 @@ func TestRepoComponent_DeployDetail(t *testing.T) {
 		Status:         "Running",
 		ClusterID:      "cluster",
 		Instances:      []types.Instance{{Name: "i1"}},
-		Private:        true,
+		Private:        false,
+		SecureLevel:    types.EndpointPublic,
 		SvcName:        "svc",
 		Endpoint:       "endpoint/svc",
 		Type:           types.InferenceType,
@@ -1451,24 +1570,16 @@ func TestRepoComponent_DeployDetailWithPD(t *testing.T) {
 		SvcName:       "svc",
 		Status:        deployStatus.Running,
 		PD:            pdConfig,
+		SecureLevel:   types.EndpointPublic,
 	}, nil)
 
+	repo.mocks.deployer.EXPECT().CheckClusterHealthy(ctx, "cluster").Return(true, nil)
 	repo.mocks.deployer.EXPECT().GetReplica(ctx, types.DeployRequest{
 		Namespace: "ns",
 		Name:      "n",
 		ClusterID: "cluster",
 		SvcName:   "svc",
 	}).Return(1, 2, []types.Instance{{Name: "i1"}}, nil)
-
-	repo.mocks.deployer.EXPECT().Status(ctx, types.DeployRequest{
-		DeployID:  0,
-		SpaceID:   0,
-		ModelID:   0,
-		Namespace: "ns",
-		Name:      "n",
-		SvcName:   "svc",
-		ClusterID: "cluster",
-	}, false).Return("svc", 23, nil, nil)
 
 	dp, err := repo.DeployDetail(ctx, types.DeployActReq{
 		RepoType:     types.ModelRepo,
@@ -1504,6 +1615,7 @@ func TestRepoComponent_DeployInstanceLogs(t *testing.T) {
 		ClusterID:     "cluster",
 		SvcName:       "svc",
 		Status:        deployStatus.Running,
+		SecureLevel:   types.EndpointPublic,
 	}, nil)
 
 	m := &deploy.MultiLogReader{}
@@ -1516,7 +1628,7 @@ func TestRepoComponent_DeployInstanceLogs(t *testing.T) {
 		InstanceName: "i1",
 	}).Return(m, nil)
 
-	mr, err := repo.DeployInstanceLogs(ctx, types.DeployActReq{
+	_, err := repo.DeployInstanceLogs(ctx, types.DeployActReq{
 		RepoType:     types.ModelRepo,
 		Namespace:    "ns",
 		Name:         "n",
@@ -1526,7 +1638,70 @@ func TestRepoComponent_DeployInstanceLogs(t *testing.T) {
 		InstanceName: "i1",
 	})
 	require.Nil(t, err)
-	require.Equal(t, m, mr)
+
+}
+
+func TestRepoComponent_DeployStop_WithForce(t *testing.T) {
+	ctx := context.TODO()
+	repo := initializeTestRepoComponent(ctx, t)
+
+	dr := types.DeployRequest{DeployID: 3, Namespace: "ns", Name: "n"}
+	repo.mocks.deployer.EXPECT().Stop(ctx, dr).Return(nil)
+	// Force=true should NOT call Exist
+	repo.mocks.stores.DeployTaskMock().EXPECT().StopDeploy(
+		ctx, types.ModelRepo, int64(0), int64(2), int64(3),
+	).Return(nil)
+	repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{
+		ID: 2,
+	}, nil)
+	repo.mocks.stores.DeployTaskMock().EXPECT().GetDeployByID(ctx, int64(3)).Return(&database.Deploy{
+		UserID:      2,
+		SecureLevel: types.EndpointPublic,
+	}, nil)
+
+	err := repo.DeployStop(ctx, types.DeployActReq{
+		RepoType:     types.ModelRepo,
+		Namespace:    "ns",
+		Name:         "n",
+		CurrentUser:  "user",
+		DeployID:     3,
+		DeployType:   1,
+		InstanceName: "i1",
+		Force:        true,
+	})
+	require.Nil(t, err)
+}
+
+func TestRepoComponent_DeployStop_ForceFalse_CallsExist(t *testing.T) {
+	ctx := context.TODO()
+	repo := initializeTestRepoComponent(ctx, t)
+
+	dr := types.DeployRequest{DeployID: 3, Namespace: "ns", Name: "n"}
+	repo.mocks.deployer.EXPECT().Stop(ctx, dr).Return(nil)
+	// Force=false must still call Exist
+	repo.mocks.deployer.EXPECT().Exist(ctx, dr).Return(false, nil)
+	repo.mocks.stores.DeployTaskMock().EXPECT().StopDeploy(
+		ctx, types.ModelRepo, int64(0), int64(2), int64(3),
+	).Return(nil)
+	repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{
+		ID: 2,
+	}, nil)
+	repo.mocks.stores.DeployTaskMock().EXPECT().GetDeployByID(ctx, int64(3)).Return(&database.Deploy{
+		UserID:      2,
+		SecureLevel: types.EndpointPublic,
+	}, nil)
+
+	err := repo.DeployStop(ctx, types.DeployActReq{
+		RepoType:     types.ModelRepo,
+		Namespace:    "ns",
+		Name:         "n",
+		CurrentUser:  "user",
+		DeployID:     3,
+		DeployType:   1,
+		InstanceName: "i1",
+		Force:        false,
+	})
+	require.Nil(t, err)
 }
 
 func TestRepoComponent_AllowAccessByRepoID(t *testing.T) {
@@ -1604,7 +1779,8 @@ func TestRepoComponent_DeployStop(t *testing.T) {
 		ID: 2,
 	}, nil)
 	repo.mocks.stores.DeployTaskMock().EXPECT().GetDeployByID(ctx, int64(3)).Return(&database.Deploy{
-		UserID: 2,
+		UserID:      2,
+		SecureLevel: types.EndpointPublic,
 	}, nil)
 
 	err := repo.DeployStop(ctx, types.DeployActReq{
@@ -1634,7 +1810,8 @@ func TestRepoComponent_DeployStop_ErrNoRows(t *testing.T) {
 		ID: 2,
 	}, nil)
 	repo.mocks.stores.DeployTaskMock().EXPECT().GetDeployByID(ctx, int64(3)).Return(&database.Deploy{
-		UserID: 2,
+		UserID:      2,
+		SecureLevel: types.EndpointPublic,
 	}, nil)
 
 	err := repo.DeployStop(ctx, types.DeployActReq{
@@ -1823,6 +2000,9 @@ func TestRepoComponent_checkCurrentUserPermission(t *testing.T) {
 	t.Run("can read self-owned", func(t *testing.T) {
 		ctx := context.TODO()
 		repoComp := initializeTestRepoComponent(ctx, t)
+		repoComp.packageReader = func(context.Context, types.RepositoryType, int64, string, string) ([]byte, bool) {
+			return nil, false
+		}
 
 		ns := database.Namespace{}
 		ns.NamespaceType = "user"
@@ -2692,6 +2872,9 @@ func TestRepoComponent_BatchGetRepoExtra(t *testing.T) {
 		}
 		repoComp.mocks.stores.RepositoryStatisticsMock().EXPECT().FindByRepositoryIDs(ctx, []int64{1, 2}).Return(stats, nil)
 
+		repoComp.mocks.stores.TagMock().EXPECT().ByRepoIDs(ctx, []int64{1, 2}).Return(nil, nil)
+		repoComp.mocks.stores.ModelMock().EXPECT().ByRepoIDs(ctx, []int64{1, 2}).Return(nil, nil)
+
 		result, err := repoComp.BatchGetRepoExtra(ctx, []int64{1, 2}, "admin")
 		require.Nil(t, err)
 		require.Equal(t, []types.RepoExtraItem{{RepoID: 1, Size: 1024, LastCommitSize: 100}, {RepoID: 2, Size: 2048}}, result)
@@ -2724,6 +2907,9 @@ func TestRepoComponent_BatchGetRepoExtra(t *testing.T) {
 			{RepositoryID: 3, Branch: "main", TotalSize: 300},
 		}
 		repoComp.mocks.stores.RepositoryStatisticsMock().EXPECT().FindByRepositoryIDs(ctx, []int64{1, 2, 3}).Return(stats, nil)
+
+		repoComp.mocks.stores.TagMock().EXPECT().ByRepoIDs(ctx, []int64{1, 2, 3}).Return(nil, nil)
+		repoComp.mocks.stores.ModelMock().EXPECT().ByRepoIDs(ctx, []int64{1, 2, 3}).Return(nil, nil)
 
 		result, err := repoComp.BatchGetRepoExtra(ctx, []int64{1, 2, 3, 4}, "user1")
 		require.Nil(t, err)
@@ -2763,6 +2949,9 @@ func TestRepoComponent_BatchGetRepoExtra(t *testing.T) {
 		}
 		repoComp.mocks.stores.RepositoryStatisticsMock().EXPECT().FindByRepositoryIDs(ctx, []int64{1, 2, 3}).Return(stats, nil)
 
+		repoComp.mocks.stores.TagMock().EXPECT().ByRepoIDs(ctx, []int64{1, 2, 3}).Return(nil, nil)
+		repoComp.mocks.stores.ModelMock().EXPECT().ByRepoIDs(ctx, []int64{1, 2, 3}).Return(nil, nil)
+
 		result, err := repoComp.BatchGetRepoExtra(ctx, []int64{1, 2, 3, 4}, "user1")
 		require.Nil(t, err)
 		require.Equal(t, []types.RepoExtraItem{{RepoID: 1, Size: 100}, {RepoID: 2, Size: 200}, {RepoID: 3, Size: 300}}, result)
@@ -2782,6 +2971,9 @@ func TestRepoComponent_BatchGetRepoExtra(t *testing.T) {
 			{RepositoryID: 2, Branch: "main", TotalSize: 500},
 		}
 		repoComp.mocks.stores.RepositoryStatisticsMock().EXPECT().FindByRepositoryIDs(ctx, []int64{2}).Return(stats, nil)
+
+		repoComp.mocks.stores.TagMock().EXPECT().ByRepoIDs(ctx, []int64{2}).Return(nil, nil)
+		repoComp.mocks.stores.ModelMock().EXPECT().ByRepoIDs(ctx, []int64{2}).Return(nil, nil)
 
 		result, err := repoComp.BatchGetRepoExtra(ctx, []int64{1, 2}, "")
 		require.Nil(t, err)
@@ -2803,6 +2995,9 @@ func TestRepoComponent_BatchGetRepoExtra(t *testing.T) {
 			{ID: 1, UserID: 1, Path: "user1/repo1", Private: true, DefaultBranch: ""},
 		}
 		repoComp.mocks.stores.RepoMock().EXPECT().FindByIds(ctx, []int64{1}).Return(repos, nil)
+
+		repoComp.mocks.stores.TagMock().EXPECT().ByRepoIDs(ctx, []int64{1}).Return(nil, nil)
+		repoComp.mocks.stores.ModelMock().EXPECT().ByRepoIDs(ctx, []int64{1}).Return(nil, nil)
 
 		result, err := repoComp.BatchGetRepoExtra(ctx, []int64{1}, "user1")
 		require.Nil(t, err)
@@ -2829,6 +3024,9 @@ func TestRepoComponent_BatchGetRepoExtra(t *testing.T) {
 			{RepositoryID: 1, Branch: "dev", TotalSize: 100},
 		}
 		repoComp.mocks.stores.RepositoryStatisticsMock().EXPECT().FindByRepositoryIDs(ctx, []int64{1}).Return(stats, nil)
+
+		repoComp.mocks.stores.TagMock().EXPECT().ByRepoIDs(ctx, []int64{1}).Return(nil, nil)
+		repoComp.mocks.stores.ModelMock().EXPECT().ByRepoIDs(ctx, []int64{1}).Return(nil, nil)
 
 		result, err := repoComp.BatchGetRepoExtra(ctx, []int64{1}, "user1")
 		require.Nil(t, err)
@@ -2905,9 +3103,229 @@ func TestRepoComponent_BatchGetRepoExtra(t *testing.T) {
 }
 
 func TestRepoComponent_DownloadCodeZip(t *testing.T) {
+	type packageWriteCall struct {
+		repoType types.RepositoryType
+		repoID   int64
+		commitID string
+		archive  []byte
+	}
+
+	requirePackageWrite := func(t *testing.T, packageWrites <-chan packageWriteCall) packageWriteCall {
+		t.Helper()
+		select {
+		case call := <-packageWrites:
+			return call
+		case <-time.After(time.Second):
+			t.Fatal("timed out waiting for package write")
+			return packageWriteCall{}
+		}
+	}
+
+	requireNoPackageWrite := func(t *testing.T, packageWrites <-chan packageWriteCall) {
+		t.Helper()
+		select {
+		case call := <-packageWrites:
+			t.Fatalf("unexpected package write: %+v", call)
+		case <-time.After(20 * time.Millisecond):
+		}
+	}
+
+	t.Run("should use repository package when code branch package exists", func(t *testing.T) {
+		ctx := context.TODO()
+		repoComp := initializeTestRepoComponent(ctx, t)
+		packageWrites := make(chan packageWriteCall, 1)
+		repoComp.packageReader = func(_ context.Context, repoType types.RepositoryType, repoID int64, branch, commitID string) ([]byte, bool) {
+			require.Equal(t, types.CodeRepo, repoType)
+			require.Equal(t, int64(42), repoID)
+			require.Equal(t, "main", branch)
+			require.Equal(t, "commit-main", commitID)
+			return []byte("s3-code-zip"), true
+		}
+		repoComp.packageWriter = func(_ context.Context, repoType types.RepositoryType, repoID int64, commitID string, archive []byte) error {
+			packageWrites <- packageWriteCall{repoType: repoType, repoID: repoID, commitID: commitID, archive: append([]byte(nil), archive...)}
+			return nil
+		}
+
+		user := database.User{Username: "user_name"}
+		repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username).Return(user, nil)
+		ns := database.Namespace{NamespaceType: "user", Path: "user_name"}
+		repoComp.mocks.stores.NamespaceMock().EXPECT().FindByPath(mock.Anything, ns.Path).Return(ns, nil)
+		repo := &database.Repository{
+			ID:             42,
+			Private:        true,
+			User:           user,
+			Path:           fmt.Sprintf("%s/%s", ns.Path, "repo_name"),
+			DefaultBranch:  "main",
+			RepositoryType: types.CodeRepo,
+		}
+		repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(mock.Anything, types.CodeRepo, ns.Path, repo.Name).Return(repo, nil)
+		repoComp.mocks.gitServer.EXPECT().GetRepoBranchByName(mock.Anything, gitserver.GetBranchReq{
+			Namespace: ns.Path,
+			Name:      repo.Name,
+			Ref:       "main",
+			RepoType:  types.CodeRepo,
+		}).Return(&types.Branch{Commit: types.RepoBranchCommit{ID: "commit-main"}}, nil)
+
+		zipData, err := repoComp.DownloadRepoZip(ctx, types.DownloadRepoZipReq{
+			RepoType:  types.CodeRepo,
+			Namespace: ns.Path,
+			Name:      repo.Name,
+		}, user.Username)
+		require.NoError(t, err)
+		require.Equal(t, []byte("s3-code-zip"), zipData)
+		requireNoPackageWrite(t, packageWrites)
+	})
+
+	t.Run("should use repository package when skill branch package exists", func(t *testing.T) {
+		ctx := context.TODO()
+		repoComp := initializeTestRepoComponent(ctx, t)
+		packageWrites := make(chan packageWriteCall, 1)
+		repoComp.packageReader = func(_ context.Context, repoType types.RepositoryType, repoID int64, branch, commitID string) ([]byte, bool) {
+			require.Equal(t, types.SkillRepo, repoType)
+			require.Equal(t, int64(42), repoID)
+			require.Equal(t, "main", branch)
+			require.Equal(t, "commit-main", commitID)
+			return []byte("s3-skill-zip"), true
+		}
+		repoComp.packageWriter = func(_ context.Context, repoType types.RepositoryType, repoID int64, commitID string, archive []byte) error {
+			packageWrites <- packageWriteCall{repoType: repoType, repoID: repoID, commitID: commitID, archive: append([]byte(nil), archive...)}
+			return nil
+		}
+
+		user := database.User{Username: "user_name"}
+		repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username).Return(user, nil)
+		ns := database.Namespace{NamespaceType: "user", Path: "user_name"}
+		repoComp.mocks.stores.NamespaceMock().EXPECT().FindByPath(mock.Anything, ns.Path).Return(ns, nil)
+		repo := &database.Repository{
+			ID:             42,
+			Private:        true,
+			User:           user,
+			Path:           fmt.Sprintf("%s/%s", ns.Path, "skill_name"),
+			DefaultBranch:  "main",
+			RepositoryType: types.SkillRepo,
+		}
+		repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(mock.Anything, types.SkillRepo, ns.Path, repo.Name).Return(repo, nil)
+		repoComp.mocks.gitServer.EXPECT().GetRepoBranchByName(mock.Anything, gitserver.GetBranchReq{
+			Namespace: ns.Path,
+			Name:      repo.Name,
+			Ref:       "main",
+			RepoType:  types.SkillRepo,
+		}).Return(&types.Branch{Commit: types.RepoBranchCommit{ID: "commit-main"}}, nil)
+
+		zipData, err := repoComp.DownloadRepoZip(ctx, types.DownloadRepoZipReq{
+			RepoType:  types.SkillRepo,
+			Namespace: ns.Path,
+			Name:      repo.Name,
+		}, user.Username)
+		require.NoError(t, err)
+		require.Equal(t, []byte("s3-skill-zip"), zipData)
+		requireNoPackageWrite(t, packageWrites)
+	})
+
+	t.Run("should fall back to git archive when package is missing", func(t *testing.T) {
+		ctx := context.TODO()
+		repoComp := initializeTestRepoComponent(ctx, t)
+		packageWrites := make(chan packageWriteCall, 1)
+		repoComp.packageReader = func(context.Context, types.RepositoryType, int64, string, string) ([]byte, bool) {
+			return nil, false
+		}
+		repoComp.packageWriter = func(_ context.Context, repoType types.RepositoryType, repoID int64, commitID string, archive []byte) error {
+			packageWrites <- packageWriteCall{repoType: repoType, repoID: repoID, commitID: commitID, archive: append([]byte(nil), archive...)}
+			return nil
+		}
+
+		user := database.User{Username: "user_name"}
+		repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username).Return(user, nil)
+		ns := database.Namespace{NamespaceType: "user", Path: "user_name"}
+		repoComp.mocks.stores.NamespaceMock().EXPECT().FindByPath(mock.Anything, ns.Path).Return(ns, nil)
+		repo := &database.Repository{
+			ID:             42,
+			Private:        true,
+			User:           user,
+			Path:           fmt.Sprintf("%s/%s", ns.Path, "repo_name"),
+			DefaultBranch:  "main",
+			RepositoryType: types.CodeRepo,
+		}
+		repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(mock.Anything, types.CodeRepo, ns.Path, repo.Name).Return(repo, nil)
+		repoComp.mocks.gitServer.EXPECT().GetRepoBranchByName(mock.Anything, gitserver.GetBranchReq{
+			Namespace: ns.Path,
+			Name:      repo.Name,
+			Ref:       "main",
+			RepoType:  types.CodeRepo,
+		}).Return(&types.Branch{Commit: types.RepoBranchCommit{ID: "commit-main"}}, nil)
+		repoComp.mocks.gitServer.EXPECT().GetArchive(mock.Anything, gitserver.GetArchiveReq{
+			Namespace: ns.Path,
+			Name:      repo.Name,
+			Revision:  "commit-main",
+			RepoType:  types.CodeRepo,
+		}).Return([]byte("git-zip"), nil)
+
+		zipData, err := repoComp.DownloadRepoZip(ctx, types.DownloadRepoZipReq{
+			RepoType:  types.CodeRepo,
+			Namespace: ns.Path,
+			Name:      repo.Name,
+		}, user.Username)
+		require.NoError(t, err)
+		require.Equal(t, []byte("git-zip"), zipData)
+		writeCall := requirePackageWrite(t, packageWrites)
+		require.Equal(t, types.CodeRepo, writeCall.repoType)
+		require.Equal(t, int64(42), writeCall.repoID)
+		require.Equal(t, "commit-main", writeCall.commitID)
+		require.Equal(t, []byte("git-zip"), writeCall.archive)
+	})
+
+	t.Run("should fall back to requested revision when branch cannot resolve", func(t *testing.T) {
+		ctx := context.TODO()
+		repoComp := initializeTestRepoComponent(ctx, t)
+		packageWrites := make(chan packageWriteCall, 1)
+		repoComp.packageWriter = func(_ context.Context, repoType types.RepositoryType, repoID int64, commitID string, archive []byte) error {
+			packageWrites <- packageWriteCall{repoType: repoType, repoID: repoID, commitID: commitID, archive: append([]byte(nil), archive...)}
+			return nil
+		}
+
+		user := database.User{Username: "user_name"}
+		repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username).Return(user, nil)
+		ns := database.Namespace{NamespaceType: "user", Path: "user_name"}
+		repoComp.mocks.stores.NamespaceMock().EXPECT().FindByPath(mock.Anything, ns.Path).Return(ns, nil)
+		repo := &database.Repository{
+			ID:             42,
+			Private:        true,
+			User:           user,
+			Path:           fmt.Sprintf("%s/%s", ns.Path, "repo_name"),
+			DefaultBranch:  "main",
+			RepositoryType: types.CodeRepo,
+		}
+		repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(mock.Anything, types.CodeRepo, ns.Path, repo.Name).Return(repo, nil)
+		repoComp.mocks.gitServer.EXPECT().GetRepoBranchByName(mock.Anything, gitserver.GetBranchReq{
+			Namespace: ns.Path,
+			Name:      repo.Name,
+			Ref:       "v1.0.0",
+			RepoType:  types.CodeRepo,
+		}).Return(nil, errors.New("branch not found"))
+		repoComp.mocks.gitServer.EXPECT().GetArchive(mock.Anything, gitserver.GetArchiveReq{
+			Namespace: ns.Path,
+			Name:      repo.Name,
+			Revision:  "v1.0.0",
+			RepoType:  types.CodeRepo,
+		}).Return([]byte("tag-zip"), nil)
+
+		zipData, err := repoComp.DownloadRepoZip(ctx, types.DownloadRepoZipReq{
+			RepoType:  types.CodeRepo,
+			Namespace: ns.Path,
+			Name:      repo.Name,
+			Revision:  "v1.0.0",
+		}, user.Username)
+		require.NoError(t, err)
+		require.Equal(t, []byte("tag-zip"), zipData)
+		requireNoPackageWrite(t, packageWrites)
+	})
+
 	t.Run("should return zip data when user has read permission and ref is provided", func(t *testing.T) {
 		ctx := context.TODO()
 		repoComp := initializeTestRepoComponent(ctx, t)
+		repoComp.packageReader = func(context.Context, types.RepositoryType, int64, string, string) ([]byte, bool) {
+			return nil, false
+		}
 
 		user := database.User{}
 		user.Username = "user_name"
@@ -2926,16 +3344,23 @@ func TestRepoComponent_DownloadCodeZip(t *testing.T) {
 			DefaultBranch: "main",
 		}
 		repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(mock.Anything, types.CodeRepo, ns.Path, repo.Name).Return(repo, nil)
+		repoComp.mocks.gitServer.EXPECT().GetRepoBranchByName(mock.Anything, gitserver.GetBranchReq{
+			Namespace: ns.Path,
+			Name:      repo.Name,
+			Ref:       "feature-branch",
+			RepoType:  types.CodeRepo,
+		}).Return(&types.Branch{Commit: types.RepoBranchCommit{ID: "commit-feature"}}, nil)
 
 		expectedZip := []byte("zip-data")
 		repoComp.mocks.gitServer.EXPECT().GetArchive(mock.Anything, gitserver.GetArchiveReq{
 			Namespace: ns.Path,
 			Name:      repo.Name,
-			Revision:  "feature-branch",
+			Revision:  "commit-feature",
 			RepoType:  types.CodeRepo,
 		}).Return(expectedZip, nil)
 
-		zipData, err := repoComp.DownloadCodeZip(ctx, types.DownloadCodeZipReq{
+		zipData, err := repoComp.DownloadRepoZip(ctx, types.DownloadRepoZipReq{
+			RepoType:  types.CodeRepo,
 			Namespace: ns.Path,
 			Name:      repo.Name,
 			Revision:  "feature-branch",
@@ -2947,6 +3372,9 @@ func TestRepoComponent_DownloadCodeZip(t *testing.T) {
 	t.Run("should use default branch when ref is empty", func(t *testing.T) {
 		ctx := context.TODO()
 		repoComp := initializeTestRepoComponent(ctx, t)
+		repoComp.packageReader = func(context.Context, types.RepositoryType, int64, string, string) ([]byte, bool) {
+			return nil, false
+		}
 
 		user := database.User{}
 		user.Username = "user_name"
@@ -2965,16 +3393,23 @@ func TestRepoComponent_DownloadCodeZip(t *testing.T) {
 			DefaultBranch: "main",
 		}
 		repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(mock.Anything, types.CodeRepo, ns.Path, repo.Name).Return(repo, nil)
+		repoComp.mocks.gitServer.EXPECT().GetRepoBranchByName(mock.Anything, gitserver.GetBranchReq{
+			Namespace: ns.Path,
+			Name:      repo.Name,
+			Ref:       "main",
+			RepoType:  types.CodeRepo,
+		}).Return(&types.Branch{Commit: types.RepoBranchCommit{ID: "commit-main"}}, nil)
 
 		expectedZip := []byte("zip-data")
 		repoComp.mocks.gitServer.EXPECT().GetArchive(mock.Anything, gitserver.GetArchiveReq{
 			Namespace: ns.Path,
 			Name:      repo.Name,
-			Revision:  "main",
+			Revision:  "commit-main",
 			RepoType:  types.CodeRepo,
 		}).Return(expectedZip, nil)
 
-		zipData, err := repoComp.DownloadCodeZip(ctx, types.DownloadCodeZipReq{
+		zipData, err := repoComp.DownloadRepoZip(ctx, types.DownloadRepoZipReq{
+			RepoType:  types.CodeRepo,
 			Namespace: ns.Path,
 			Name:      repo.Name,
 			Revision:  "",
@@ -2986,10 +3421,14 @@ func TestRepoComponent_DownloadCodeZip(t *testing.T) {
 	t.Run("should return error when repo not found", func(t *testing.T) {
 		ctx := context.TODO()
 		repoComp := initializeTestRepoComponent(ctx, t)
+		repoComp.packageReader = func(context.Context, types.RepositoryType, int64, string, string) ([]byte, bool) {
+			return nil, false
+		}
 
 		repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(mock.Anything, types.CodeRepo, "namespace", "name").Return(nil, errors.New("repo not found"))
 
-		zipData, err := repoComp.DownloadCodeZip(ctx, types.DownloadCodeZipReq{
+		zipData, err := repoComp.DownloadRepoZip(ctx, types.DownloadRepoZipReq{
+			RepoType:  types.CodeRepo,
 			Namespace: "namespace",
 			Name:      "name",
 			Revision:  "main",
@@ -3020,7 +3459,8 @@ func TestRepoComponent_DownloadCodeZip(t *testing.T) {
 		}
 		repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(mock.Anything, types.CodeRepo, ns.Path, repo.Name).Return(repo, nil)
 
-		zipData, err := repoComp.DownloadCodeZip(ctx, types.DownloadCodeZipReq{
+		zipData, err := repoComp.DownloadRepoZip(ctx, types.DownloadRepoZipReq{
+			RepoType:  types.CodeRepo,
 			Namespace: ns.Path,
 			Name:      repo.Name,
 			Revision:  "main",
@@ -3032,6 +3472,9 @@ func TestRepoComponent_DownloadCodeZip(t *testing.T) {
 	t.Run("should return error when git server fails", func(t *testing.T) {
 		ctx := context.TODO()
 		repoComp := initializeTestRepoComponent(ctx, t)
+		repoComp.packageReader = func(context.Context, types.RepositoryType, int64, string, string) ([]byte, bool) {
+			return nil, false
+		}
 
 		user := database.User{}
 		user.Username = "user_name"
@@ -3050,16 +3493,23 @@ func TestRepoComponent_DownloadCodeZip(t *testing.T) {
 			DefaultBranch: "main",
 		}
 		repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(mock.Anything, types.CodeRepo, ns.Path, repo.Name).Return(repo, nil)
+		repoComp.mocks.gitServer.EXPECT().GetRepoBranchByName(mock.Anything, gitserver.GetBranchReq{
+			Namespace: ns.Path,
+			Name:      repo.Name,
+			Ref:       "main",
+			RepoType:  types.CodeRepo,
+		}).Return(&types.Branch{Commit: types.RepoBranchCommit{ID: "commit-main"}}, nil)
 
 		repoComp.mocks.gitServer.EXPECT().GetArchive(mock.Anything, mock.Anything).Return(nil, errors.New("git server error"))
 
-		zipData, err := repoComp.DownloadCodeZip(ctx, types.DownloadCodeZipReq{
+		zipData, err := repoComp.DownloadRepoZip(ctx, types.DownloadRepoZipReq{
+			RepoType:  types.CodeRepo,
 			Namespace: ns.Path,
 			Name:      repo.Name,
 			Revision:  "",
 		}, user.Username)
 		require.Error(t, err)
-		require.True(t, errors.Is(err, errorx.ErrCodeZipDownloadFailed))
+		require.True(t, errors.Is(err, errorx.ErrRepoZipDownloadFailed))
 		require.Nil(t, zipData)
 	})
 
@@ -3085,7 +3535,8 @@ func TestRepoComponent_DownloadCodeZip(t *testing.T) {
 		}
 		repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(mock.Anything, types.CodeRepo, ns.Path, repo.Name).Return(repo, nil)
 
-		zipData, err := repoComp.DownloadCodeZip(ctx, types.DownloadCodeZipReq{
+		zipData, err := repoComp.DownloadRepoZip(ctx, types.DownloadRepoZipReq{
+			RepoType:  types.CodeRepo,
 			Namespace: ns.Path,
 			Name:      repo.Name,
 			Revision:  "",
@@ -3349,6 +3800,71 @@ func TestRepoComponent_CommitFiles(t *testing.T) {
 
 	err := repoComp.CommitFiles(ctx, req)
 	require.Equal(t, nil, err)
+}
+
+func TestRepoComponent_CommitFilesIgnoresPackageSyncFailure(t *testing.T) {
+	ctx := context.TODO()
+	repoComp := initializeTestRepoComponent(ctx, t)
+	repoComp.repositoryPackageSyncer = newRepositoryPackageSyncer(repoComp.config, repoComp.mocks.stores.RepoMock(), repoComp.mocks.gitServer, repoComp.mocks.s3Client, nil)
+
+	user := database.User{Username: "user_name"}
+	repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username).Return(user, nil)
+
+	ns := database.Namespace{NamespaceType: "user", Path: "user_name"}
+	repoComp.mocks.stores.NamespaceMock().EXPECT().FindByPath(mock.Anything, ns.Path).Return(ns, nil)
+
+	repo := &database.Repository{
+		ID:             1,
+		Private:        true,
+		User:           user,
+		Path:           fmt.Sprintf("%s/%s", ns.Path, "repo_name"),
+		Source:         types.OpenCSGSource,
+		RepositoryType: types.SkillRepo,
+	}
+
+	req := types.CommitFilesReq{
+		Namespace:   ns.Path,
+		Name:        "repo_name",
+		RepoType:    types.SkillRepo,
+		Revision:    "main",
+		CurrentUser: user.Username,
+		Message:     "msg",
+		Files: []types.CommitFileReq{
+			{
+				Path:    "a.go",
+				Action:  types.CommitActionUpdate,
+				Content: "content",
+			},
+		},
+	}
+	repoComp.mocks.gitServer.EXPECT().GetRepoAllFiles(ctx, gitserver.GetRepoAllFilesReq{
+		Namespace: ns.Path,
+		Name:      req.Name,
+		Ref:       "main",
+		RepoType:  types.SkillRepo,
+	}).Return([]*types.File{{Path: "a.go"}}, nil)
+	repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(mock.Anything, types.SkillRepo, ns.Path, req.Name).Return(repo, nil)
+	repoComp.mocks.gitServer.EXPECT().CommitFiles(mock.Anything, gitserver.CommitFilesReq{
+		Namespace: req.Namespace,
+		Name:      req.Name,
+		RepoType:  req.RepoType,
+		Revision:  req.Revision,
+		Username:  user.Username,
+		Email:     user.Email,
+		Message:   req.Message,
+		Files: []gitserver.CommitFile{
+			{
+				Path:    "a.go",
+				Content: "content=",
+				Action:  gitserver.CommitActionUpdate,
+			},
+		},
+	}).Return(nil)
+	syncDone := expectAsyncPackageBranchResolveFailure(t, repoComp, types.SkillRepo, ns.Path, req.Name, req.Revision)
+
+	err := repoComp.CommitFiles(ctx, req)
+	require.NoError(t, err)
+	requireAsyncPackageSyncAttempt(t, syncDone)
 }
 
 func TestRepoComponent_IsExists(t *testing.T) {

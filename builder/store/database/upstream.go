@@ -21,8 +21,8 @@ type Upstream struct {
 	ModelName             string                         `bun:",nullzero" json:"model_name"`
 	AuthHeader            string                         `bun:",nullzero" json:"auth_header"`
 	Provider              string                         `bun:",nullzero" json:"provider"`
-	HealthCheckEnabled    bool                           `bun:",notnull,default:true" json:"health_check_enabled"`
-	CircuitBreakerEnabled bool                           `bun:",notnull,default:true" json:"circuit_breaker_enabled"`
+	HealthCheckEnabled    bool                           `bun:",notnull,default:false" json:"health_check_enabled"`
+	CircuitBreakerEnabled bool                           `bun:",notnull,default:false" json:"circuit_breaker_enabled"`
 	Tags                  map[string]string              `bun:",type:jsonb,nullzero" json:"tags,omitempty"`
 	Metadata              map[string]any                 `bun:",type:jsonb,nullzero" json:"metadata,omitempty"`
 	LimitPolicy           *types.UsageLimitPolicy        `bun:",type:jsonb,nullzero" json:"limit_policy,omitempty"`

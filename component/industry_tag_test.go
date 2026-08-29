@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	mockgitserver "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/git/gitserver"
 	mockllm "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/llm"
@@ -39,8 +40,8 @@ func TestIndustryTagComponent_IdentifyIndustryTags(t *testing.T) {
 			{URL: "http://llm", Enabled: true, AuthHeader: "{}"},
 		},
 	}, nil)
-	llmClient.EXPECT().Chat(ctx, "http://llm", "", map[string]string{}, types.LLMReqBody{
-		Model: "mock",
+	llmClient.EXPECT().WithLLMConfig(mock.Anything).Return(llmClient)
+	llmClient.EXPECT().Chat(ctx, "", "", mock.Anything, types.LLMReqBody{
 		Messages: []types.LLMMessage{
 			{Role: SystemRole, Content: "prompt"},
 			{Role: UserRole, Content: "{\"candidates\":[\"finance\",\"healthcare\"],\"description\":\"financial dataset\",\"readme\":\"dataset about banks\"}"},
@@ -101,8 +102,8 @@ func TestIndustryTagComponent_RefreshRepoAutoIndustryTags(t *testing.T) {
 			{URL: "http://llm", Enabled: true, AuthHeader: "{}"},
 		},
 	}, nil)
-	llmClient.EXPECT().Chat(ctx, "http://llm", "", map[string]string{}, types.LLMReqBody{
-		Model: "mock",
+	llmClient.EXPECT().WithLLMConfig(mock.Anything).Return(llmClient)
+	llmClient.EXPECT().Chat(ctx, "", "", mock.Anything, types.LLMReqBody{
 		Messages: []types.LLMMessage{
 			{Role: SystemRole, Content: "prompt"},
 			{Role: UserRole, Content: "{\"candidates\":[\"finance\"],\"description\":\"financial dataset\",\"readme\":\"dataset about banks\"}"},
@@ -157,8 +158,8 @@ func TestIndustryTagComponent_IdentifyIndustryTags_ModelRepo(t *testing.T) {
 			{URL: "http://llm", Enabled: true, AuthHeader: "{}"},
 		},
 	}, nil)
-	llmClient.EXPECT().Chat(ctx, "http://llm", "", map[string]string{}, types.LLMReqBody{
-		Model: "mock",
+	llmClient.EXPECT().WithLLMConfig(mock.Anything).Return(llmClient)
+	llmClient.EXPECT().Chat(ctx, "", "", mock.Anything, types.LLMReqBody{
 		Messages: []types.LLMMessage{
 			{Role: SystemRole, Content: "prompt"},
 			{Role: UserRole, Content: "{\"candidates\":[\"finance\"],\"description\":\"financial model\",\"readme\":\"model for banking risk\"}"},
@@ -213,8 +214,8 @@ func TestIndustryTagComponent_IdentifyIndustryTags_ChineseDescriptionMatchesEngl
 			{URL: "http://llm", Enabled: true, AuthHeader: "{}"},
 		},
 	}, nil)
-	llmClient.EXPECT().Chat(ctx, "http://llm", "", map[string]string{}, types.LLMReqBody{
-		Model: "mock",
+	llmClient.EXPECT().WithLLMConfig(mock.Anything).Return(llmClient)
+	llmClient.EXPECT().Chat(ctx, "", "", mock.Anything, types.LLMReqBody{
 		Messages: []types.LLMMessage{
 			{Role: SystemRole, Content: "prompt"},
 			{Role: UserRole, Content: "{\"candidates\":[\"finance\",\"healthcare\"],\"description\":\"这是一个银行风控和信贷评估数据集\",\"readme\":\"包含贷款违约预测、银行客户评分等金融场景样本\"}"},

@@ -208,6 +208,7 @@ type GetRepoAllFilesReq struct {
 	RepoType  types.RepositoryType `json:"repo_type"`
 	// RelativePath bypasses repository metadata lookup when the caller already knows the Gitaly path.
 	RelativePath string `json:"-"`
+	Limit        int32  `json:"-"`
 }
 
 type CreateMirrorRepoReq struct {

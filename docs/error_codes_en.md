@@ -170,6 +170,54 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Name:** `credentialVerifyFailed`
 - **Description:** Credential verification failed.
 
+---
+
+### `AGENT-ERR-16`
+
+- **Error Code:** `AGENT-ERR-16`
+- **Error Name:** `instanceProvisioningMetadataImmutable`
+- **Description:** Agent instance provisioning metadata cannot be updated after creation. Sandbox provisioning is fixed at instance creation and there is no live sandbox update path. The error message includes the agent instance type.
+
+---
+
+### `AGENT-ERR-17`
+
+- **Error Code:** `AGENT-ERR-17`
+- **Error Name:** `csgclawTemplateCreationForbidden`
+- **Description:** csgclaw agent templates are managed by the code repository and cannot be created via the API. The error message includes the template type.
+
+---
+
+### `AGENT-ERR-18`
+
+- **Error Code:** `AGENT-ERR-18`
+- **Error Name:** `agentProvisionRequestFieldNull`
+- **Description:** A field in the agent instance provision request metadata is null. The error message includes the agent instance type and the offending field.
+
+---
+
+### `AGENT-ERR-19`
+
+- **Error Code:** `AGENT-ERR-19`
+- **Error Name:** `agentProvisionRequestFieldType`
+- **Description:** A field in the agent instance provision request metadata has an invalid type. The error message includes the agent instance type and the offending field.
+
+---
+
+### `AGENT-ERR-20`
+
+- **Error Code:** `AGENT-ERR-20`
+- **Error Name:** `agentProvisionRequestFieldEmpty`
+- **Description:** A field in the agent instance provision request metadata is empty. The error message includes the agent instance type and the offending field.
+
+---
+
+### `AGENT-ERR-21`
+
+- **Error Code:** `AGENT-ERR-21`
+- **Error Name:** `agentProvisionRequestModelUnavailable`
+- **Description:** The model pinned in the agent instance provision request is not in the available llm model catalog. The error message includes the model name and the agent instance type.
+
 ## Auth Errors
 
 ### `AUTH-ERR-0`
@@ -1769,3 +1817,4 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Code:** `USER-ERR-20`
 - **Error Name:** `namespaceAlreadyExists`
 - **Description:** The namespace already exists in the system.
+

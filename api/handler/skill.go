@@ -178,6 +178,56 @@ func (h *SkillHandler) Index(ctx *gin.Context) {
 	httpbase.OKWithTotal(ctx, skills, total)
 }
 
+// DownloadSkillZip godoc
+// @Security     ApiKey
+// @Summary      Download skill repository as zip archive
+// @Description  Download skill repository as zip archive
+// @Tags         Skill
+// @Produce      application/zip
+// @Param        namespace path string true "repo owner name"
+// @Param        name path string true "repo name"
+// @Param        ref path string true "branch or tag name"
+// @Success      200  {file}  file "OK"
+// @Router       /skills/{namespace}/{name}/download_archive/refs/{ref}/ [get]
+func (h *SkillHandler) DownloadZip(ctx *gin.Context) {
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	currentUser := httpbase.GetCurrentUser(ctx)
+	ref := strings.TrimPrefix(ctx.Param("ref"), "/")
+
+	zipData, err := h.repo.DownloadRepoZip(ctx.Request.Context(), types.DownloadRepoZipReq{
+		RepoType:  types.SkillRepo,
+		Namespace: namespace,
+		Name:      name,
+		Revision:  ref,
+	}, currentUser)
+	if err != nil {
+		slog.ErrorContext(ctx.Request.Context(), "Failed to download skill zip", slog.String("namespace", namespace), slog.String("name", name), slog.Any("error", err))
+		if errors.Is(err, errorx.ErrForbidden) {
+			httpbase.ForbiddenError(ctx, err)
+			return
+		}
+		if errors.Is(err, errorx.ErrSkillNotFound) {
+			httpbase.NotFoundError(ctx, err)
+			return
+		}
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	filename := name + ".zip"
+	if ref != "" {
+		filename = fmt.Sprintf("%s-%s.zip", name, strings.ReplaceAll(ref, "/", "-"))
+	}
+	ctx.Header("Content-Type", "application/zip")
+	ctx.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%s", filename))
+	ctx.Data(200, "application/zip", zipData)
+}
+
 // UpdateSkill   godoc
 // @Security     ApiKey
 // @Summary      Update a exists skill

@@ -145,12 +145,9 @@ func (c *spaceResourceComponentImpl) Index(ctx context.Context, req *types.Space
 					availableStatusList[i].NodeName = maskNodeName(availableStatusList[i].NodeName)
 				}
 			}
-			if !c.hardwareSatisfiesConstraint(constraint, hardware) {
-				// resource hardware does not meet the scenario's required_hardware bitmask
-				continue
-			}
-			if !c.replicaSatisfiesConstraint(constraint, hardware.Replicas) {
-				// resource replicas exceed the scenario's max_replica (0 = unlimited)
+			if !constraint.Satisfies(hardware) {
+				// resource hardware/replicas do not meet the scenario's constraint
+				// (required_hardware / exclude_hardware / max_replica)
 				continue
 			}
 			resourceType := common.ResourceType(hardware)
@@ -165,6 +162,7 @@ func (c *spaceResourceComponentImpl) Index(ctx context.Context, req *types.Space
 				Type:                resourceType,
 				Scenarios:           scenarios,
 				AvailableStatusList: availableStatusList,
+				HardwareModel:       c.getHardwareModel(hardware),
 			})
 		}
 
@@ -190,27 +188,44 @@ func (c *spaceResourceComponentImpl) Index(ctx context.Context, req *types.Space
 	return result, total, nil
 }
 
-// hardwareSatisfiesConstraint reports whether the resource hardware meets the
-// scenario's hardware constraints. Delegates to the shared
-// types.HardwareSatisfiesConstraint so the Index query and the sandbox
-// auto-allocator apply identical rules. A nil constraint means no rule
-// configured => always satisfied.
-func (c *spaceResourceComponentImpl) hardwareSatisfiesConstraint(constraint *database.ScenarioConstraint, hardware types.HardWare) bool {
-	if constraint == nil {
-		return true
+func (c *spaceResourceComponentImpl) getHardwareModel(hardware types.HardWare) types.HardwareModel {
+	// Determine the XPU processor (first non-empty Num field), same order as
+	// common.ResourceType / types.GetResXPUMode.
+	var xpuProc *types.Processor
+	switch {
+	case strings.TrimSpace(hardware.Gpu.Num) != "":
+		xpuProc = &hardware.Gpu
+	case strings.TrimSpace(hardware.Npu.Num) != "":
+		xpuProc = &hardware.Npu
+	case strings.TrimSpace(hardware.Gcu.Num) != "":
+		xpuProc = &hardware.Gcu
+	case strings.TrimSpace(hardware.Mlu.Num) != "":
+		xpuProc = &hardware.Mlu
+	case strings.TrimSpace(hardware.Dcu.Num) != "":
+		xpuProc = &hardware.Dcu
+	case strings.TrimSpace(hardware.GPGpu.Num) != "":
+		xpuProc = &hardware.GPGpu
+	case strings.TrimSpace(hardware.Tpu.Num) != "":
+		xpuProc = &hardware.Tpu
 	}
-	return types.HardwareSatisfiesConstraint(constraint.RequiredHardware, constraint.ExcludeHardware, hardware)
-}
 
-// replicaSatisfiesConstraint reports whether the resource replica count is within
-// the scenario's max_replica. Delegates to the shared types.ReplicaSatisfiesConstraint
-// so the Index query and the sandbox auto-allocator apply identical rules. A nil
-// constraint or a zero max_replica means "unlimited" (always satisfied).
-func (c *spaceResourceComponentImpl) replicaSatisfiesConstraint(constraint *database.ScenarioConstraint, replicas int) bool {
-	if constraint == nil {
-		return true
+	// No XPU configured → pure CPU.
+	if xpuProc == nil {
+		return types.HardwareModelCPU
 	}
-	return types.ReplicaSatisfiesConstraint(constraint.MaxReplica, replicas)
+
+	// VXPU: virtual XPU has a ResourceMemName (e.g. volcano.sh/vgpu-memory).
+	if len(strings.TrimSpace(xpuProc.ResourceMemName)) > 0 {
+		return types.HardwareModelVXPU
+	}
+
+	// MIG: resource name starts with nvidia.com/mig- prefix.
+	if strings.HasPrefix(xpuProc.ResourceName, common.MIGResourcePrefix) {
+		return types.HardwareModelMIG
+	}
+
+	// Any other physical XPU.
+	return types.HardwareModelXPU
 }
 
 func (c *spaceResourceComponentImpl) Update(ctx context.Context, req *types.UpdateSpaceResourceReq) (*types.SpaceResource, error) {

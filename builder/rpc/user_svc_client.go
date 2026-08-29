@@ -19,6 +19,8 @@ type UserSvcClient interface {
 	GetNameSpaceInfoByUUID(ctx context.Context, uuid string) (*Namespace, error)
 	GetUserInfo(ctx context.Context, userName, visitorName string) (*User, error)
 	GetOrCreateFirstAvaiTokens(ctx context.Context, userName, visitorName, app, tokenName string) (string, error)
+	// GetOrCreateBuiltinAPIKey returns the builtin (aigateway) API key token for a user namespace.
+	GetOrCreateBuiltinAPIKey(ctx context.Context, userName, nsUUID string) (string, error)
 	VerifyByAccessToken(ctx context.Context, token string) (*types.CheckAccessTokenResp, error)
 	// OAuthExchangeToken exchanges an OAuth access token for a locally issued JWT.
 	OAuthExchangeToken(ctx context.Context, req *types.OAuthExchangeTokenReq) (*types.OAuthExchangeTokenResp, error)
@@ -138,6 +140,22 @@ func (c *UserSvcHttpClient) GetOrCreateFirstAvaiTokens(ctx context.Context, user
 				Set("app", app))
 	}
 	return r.Data.(string), nil
+}
+
+func (c *UserSvcHttpClient) GetOrCreateBuiltinAPIKey(ctx context.Context, userName, nsUUID string) (string, error) {
+	url := fmt.Sprintf("/api/v1/namespaces/%s/apikeys/builtin?current_user=%s", nsUUID, url.QueryEscape(userName))
+	var r httpbase.R
+	r.Data = &types.CheckAccessTokenResp{}
+	err := c.hc.Get(ctx, url, &r)
+	if err != nil {
+		slog.ErrorContext(ctx, "call user service failed", slog.String("error", err.Error()))
+		return "", errorx.RemoteSvcFail(err,
+			errorx.Ctx().
+				Set("service", "user service").
+				Set("action", "get or create builtin api key").
+				Set("userName", userName))
+	}
+	return r.Data.(*types.CheckAccessTokenResp).Token, nil
 }
 
 func (c *UserSvcHttpClient) VerifyByAccessToken(ctx context.Context, token string) (*types.CheckAccessTokenResp, error) {

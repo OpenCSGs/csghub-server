@@ -20,6 +20,15 @@ import (
 	"opencsg.com/csghub-server/common/utils/trace"
 )
 
+const (
+	audioSTTKindTranscription = "transcription"
+	audioSTTKindTranslation   = "translation"
+
+	audioTranscriptionsPathSuffix = "/audio/transcriptions"
+	audioTranslationsPathSuffix   = "/audio/translations"
+	audioTranslationsDefaultPath  = "/v1/audio/translations"
+)
+
 // Transcription godoc
 // @Security     ApiKey
 // @Summary      Transcribe audio to text
@@ -35,6 +44,28 @@ import (
 // @Failure      500  {object}  error "Internal server error"
 // @Router       /v1/audio/transcriptions [post]
 func (h *OpenAIHandlerImpl) Transcription(c *gin.Context) {
+	h.handleAudioSTT(c, audioSTTKindTranscription)
+}
+
+// Translation godoc
+// @Security     ApiKey
+// @Summary      Translate audio to English text
+// @Description  Sends an OpenAI-compatible multipart audio translation request to the backend model. Translates speech in any language into English.
+// @Tags         AIGateway
+// @Accept       multipart/form-data
+// @Produce      json
+// @Param        model formData string true "Model ID"
+// @Param        file formData file true "Audio file"
+// @Success      200  {object}  types.Response{} "OK"
+// @Failure      400  {object}  error "Bad request"
+// @Failure      404  {object}  error "Model not found"
+// @Failure      500  {object}  error "Internal server error"
+// @Router       /v1/audio/translations [post]
+func (h *OpenAIHandlerImpl) Translation(c *gin.Context) {
+	h.handleAudioSTT(c, audioSTTKindTranslation)
+}
+
+func (h *OpenAIHandlerImpl) handleAudioSTT(c *gin.Context, kind string) {
 	username := httpbase.GetCurrentUser(c)
 	nsUUID := httpbase.GetCurrentNamespaceUUID(c)
 	apikey := httpbase.GetAccessToken(c)
@@ -90,13 +121,29 @@ func (h *OpenAIHandlerImpl) Transcription(c *gin.Context) {
 	isStream := strings.EqualFold(firstMultipartValue(form, "stream"), "true")
 
 	modelTarget, err := h.resolveModelTarget(ctx, username, modelID, c.Request.Header)
+	SetMetricsModelTarget(SetMetricsModelParams{
+		C:           c,
+		ModelID:     modelID,
+		ModelTarget: modelTarget,
+		IsStream:    isStream,
+	})
 	if err != nil {
 		preflight.RecordError(err, "model_resolve")
-		handleModelTargetError(c, ctx, modelID, "failed to get transcription target address", err)
+		handleModelTargetError(c, ctx, modelID, fmt.Sprintf("failed to get %s target address", kind), err)
 		return
 	}
 	preflight.SetTargetModel(modelID, modelTarget)
 	preflight.End()
+
+	traceMetadata := map[string]any{
+		"aigateway.audio.response_format": firstMultipartValue(form, "response_format"),
+		"aigateway.audio.kind":            kind,
+	}
+	if kind == audioSTTKindTranscription {
+		traceMetadata["aigateway.audio.language"] = firstMultipartValue(form, "language")
+	} else {
+		traceMetadata["aigateway.audio.language"] = "english"
+	}
 
 	traceCtx, generationRecorder := h.startModalGenerationTrace(ctx, modalTraceStartInput{
 		API:           c.FullPath(),
@@ -106,10 +153,7 @@ func (h *OpenAIHandlerImpl) Transcription(c *gin.Context) {
 		NSUUID:        nsUUID,
 		ModelID:       modelID,
 		ModelTarget:   modelTarget,
-		Metadata: map[string]any{
-			"aigateway.audio.response_format": firstMultipartValue(form, "response_format"),
-			"aigateway.audio.language":        firstMultipartValue(form, "language"),
-		},
+		Metadata:      traceMetadata,
 	})
 	ctx = traceCtx
 	c.Request = c.Request.WithContext(traceCtx)
@@ -117,9 +161,6 @@ func (h *OpenAIHandlerImpl) Transcription(c *gin.Context) {
 	if !modelTarget.Model.SkipBalance() {
 		if err := h.openaiComponent.CheckBalance(ctx, nsUUID); err != nil {
 			finishModalGenerationTraceWithError(generationRecorder, err, types.TraceErrInsufficientBalance)
-			if isStream {
-				c.Writer.Header().Set("Content-Type", "text/event-stream")
-			}
 			h.handleInsufficientBalance(c, isStream, nsUUID, modelID, err)
 			return
 		}
@@ -149,17 +190,18 @@ func (h *OpenAIHandlerImpl) Transcription(c *gin.Context) {
 		return
 	}
 
-	proxyToApi := ""
-	if modelTarget.Model.Endpoint != "" {
-		uri, err := url.ParseRequestURI(modelTarget.Model.Endpoint)
-		if err != nil {
-			slog.WarnContext(ctx, "endpoint has wrong struct", slog.String("model", modelTarget.ModelName))
-		} else {
-			proxyToApi = uri.Path
-		}
+	proxyToApi, pathErr := audioSTTProxyPath(kind, modelTarget.Model.Endpoint)
+	if pathErr != nil {
+		slog.WarnContext(ctx, "endpoint has wrong struct", slog.String("model", modelTarget.ModelName), slog.Any("error", pathErr))
 	}
-
-	slog.InfoContext(ctx, "proxy audio transcription request to model endpoint", slog.Any("target", modelTarget.Target), slog.Any("host", modelTarget.Host), slog.Any("user", username), slog.Any("model_id", modelID), slog.Any("model_name", modelTarget.ModelName))
+	slog.InfoContext(ctx, fmt.Sprintf("proxy audio %s request to model endpoint", kind),
+		slog.Any("target", modelTarget.Target),
+		slog.Any("host", modelTarget.Host),
+		slog.Any("user", username),
+		slog.Any("model_id", modelID),
+		slog.Any("model_name", modelTarget.ModelName),
+		slog.String("proxy_path", proxyToApi),
+	)
 
 	audioCounter := token.NewAudioUsageCounter(token.NewTokenizerImpl(modelTarget.Target, modelTarget.Host, modelTarget.ModelName, modelTarget.Model.ImageID, modelTarget.Model.Provider))
 	w := NewResponseWriterWrapperAudio(c.Writer, audioCounter, isStream, adapter)
@@ -170,11 +212,11 @@ func (h *OpenAIHandlerImpl) Transcription(c *gin.Context) {
 		defer cancel()
 
 		var usage *token.Usage
-		if w.StatusCode() < http.StatusBadRequest {
+		if isSuccessfulStatus(w.StatusCode()) {
 			var usageErr error
 			usage, usageErr = audioCounter.Usage(usageCtx)
 			if usageErr != nil {
-				slog.ErrorContext(usageCtx, "failed to get audio transcription token usage", slog.Any("error", usageErr))
+				slog.ErrorContext(usageCtx, fmt.Sprintf("failed to get audio %s token usage", kind), slog.Any("error", usageErr))
 			}
 		}
 		if generationRecorder != nil {
@@ -193,12 +235,55 @@ func (h *OpenAIHandlerImpl) Transcription(c *gin.Context) {
 			generationRecorder.End()
 		}
 
-		if w.StatusCode() < http.StatusBadRequest && usage != nil {
+		if isSuccessfulStatus(w.StatusCode()) && usage != nil {
 			if err := h.openaiComponent.RecordUsageFromTokenUsage(usageCtx, nsUUID, modelTarget.Model, modelTarget.ModelName, usage, apikey); err != nil {
-				slog.ErrorContext(usageCtx, "failed to record audio transcription usage", slog.Any("error", err))
+				slog.ErrorContext(usageCtx, fmt.Sprintf("failed to record audio %s usage", kind), slog.Any("error", err))
 			}
 		}
 	}()
+}
+
+func audioSTTProxyPath(kind, endpoint string) (string, error) {
+	if kind == audioSTTKindTranslation {
+		return audioTranslationProxyPath(endpoint)
+	}
+	return audioTranscriptionProxyPath(endpoint)
+}
+
+func audioTranscriptionProxyPath(endpoint string) (string, error) {
+	if endpoint == "" {
+		return "", nil
+	}
+	uri, err := url.ParseRequestURI(endpoint)
+	if err != nil {
+		return "", err
+	}
+	return uri.Path, nil
+}
+
+// audioTranslationProxyPath rewrites a model endpoint that points at
+// /audio/transcriptions to /audio/translations so the same Whisper-style
+// deployment can serve OpenAI-compatible translations without a separate
+// endpoint configuration.
+func audioTranslationProxyPath(endpoint string) (string, error) {
+	if endpoint == "" {
+		return audioTranslationsDefaultPath, nil
+	}
+	uri, err := url.ParseRequestURI(endpoint)
+	if err != nil {
+		return audioTranslationsDefaultPath, err
+	}
+	path := uri.Path
+	if path == "" || path == "/" {
+		return audioTranslationsDefaultPath, nil
+	}
+	if strings.HasSuffix(path, audioTranslationsPathSuffix) {
+		return path, nil
+	}
+	if strings.HasSuffix(path, audioTranscriptionsPathSuffix) {
+		return strings.TrimSuffix(path, audioTranscriptionsPathSuffix) + audioTranslationsPathSuffix, nil
+	}
+	return path, nil
 }
 
 func (h *OpenAIHandlerImpl) audioAdapter(model *types.Model) audioadapter.Adapter {

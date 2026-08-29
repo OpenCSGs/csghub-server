@@ -40,7 +40,7 @@ func TestAccountSubscriptionUsageStore_CURD(t *testing.T) {
 		SubBillID: 1,
 	}
 
-	err = stStore.Create(ctx, statement)
+	err = stStore.Create(ctx, statement, types.AcctStatementExtra{})
 	require.Nil(t, err)
 
 	res, err := usageStore.GetByBillID(ctx, statement.SubBillID, statement.UserUUID, types.SKUStarship)
@@ -60,7 +60,7 @@ func TestAccountSubscriptionUsageStore_CURD(t *testing.T) {
 		ResourceName: "res1",
 		CustomerID:   "cus1",
 	}
-	err = stStore.Create(ctx, statement)
+	err = stStore.Create(ctx, statement, types.AcctStatementExtra{})
 	require.Nil(t, err)
 
 	res, err = usageStore.GetByBillMonth(ctx, time.Now().Format("2006-01"), statement.UserUUID, types.SKUStarship)

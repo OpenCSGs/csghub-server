@@ -145,6 +145,9 @@ packages:
     interfaces:
       Deployer:
         config:
+          # CE mock excludes ee/saas so it does not collide with the ee/saas variants
+          # (mock_Deployer_ee.go / mock_Deployer_saas.go) which carry the SandboxV2 methods.
+          mock-build-tags: "!saas && !ee"
           replace-type:
             - opencsg.com/csghub-server/common/types.ClawEvaluationReq=commontypes:opencsg.com/csghub-server/common/types.ClawEvaluationReq
             - opencsg.com/csghub-server/common/types.ArgoWorkFlowRes=commontypes:opencsg.com/csghub-server/common/types.ArgoWorkFlowRes
@@ -160,6 +163,13 @@ packages:
     config:
     interfaces:
       Runner:
+        config:
+          # CE mock excludes ee/saas so it does not collide with the ee/saas
+          # variants (mock_Runner_ee.go / mock_Runner_saas.go) which carry the
+          # SandboxV2 methods. Runner has no build tag itself, so without this
+          # guard the CE mock would also compile under ee/saas and redefine
+          # MockRunner.
+          mock-build-tags: "!saas && !ee"
   opencsg.com/csghub-server/builder/deploy/imagebuilder:
     config:
     interfaces:

@@ -71,6 +71,7 @@ type repoComponentImpl struct {
 	mirrorStore                    database.MirrorStore
 	git                            gitserver.GitServer
 	s3Client                       s3.Client
+	repositoryPackageSyncer        *repositoryPackageSyncer
 	userSvcClient                  rpc.UserSvcClient
 	lfsBucket                      string
 	userLikesStore                 database.UserLikesStore
@@ -103,6 +104,10 @@ type repoComponentImpl struct {
 	pendingDeletion                database.PendingDeletionStore
 	xnetClient                     rpc.XnetSvcClient
 	clusterComponent               ClusterComponent
+	modelStore                     database.ModelStore
+	tagStore                       database.TagStore
+	packageReader                  func(ctx context.Context, repoType types.RepositoryType, repoID int64, branch, commitID string) ([]byte, bool)
+	packageWriter                  func(ctx context.Context, repoType types.RepositoryType, repoID int64, commitID string, archive []byte) error
 	extendRepoImpl
 }
 
@@ -114,6 +119,8 @@ type RepoComponent interface {
 	CreateFork(ctx context.Context, req types.CreateForkReq) (*database.Repository, error)
 	// PublicToUser gets visible repos of the given user and user's orgs
 	PublicToUser(ctx context.Context, repoType types.RepositoryType, userName string, filter *types.RepoFilter, per, page int) (repos []*database.Repository, count int, err error)
+	// PublicToUserV2 is like PublicToUser but skips Tag eager-loading for faster list queries
+	PublicToUserV2(ctx context.Context, repoType types.RepositoryType, userName string, filter *types.RepoFilter, per, page int) (repos []*database.Repository, count int, err error)
 	CreateFile(ctx context.Context, req *types.CreateFileReq) (*types.CreateFileResp, error)
 	UpdateFile(ctx context.Context, req *types.UpdateFileReq) (*types.UpdateFileResp, error)
 	DeleteFile(ctx context.Context, req *types.DeleteFileReq) (*types.DeleteFileResp, error)
@@ -201,8 +208,10 @@ type RepoComponent interface {
 	GetRepoSizeByBranch(ctx context.Context, repoType types.RepositoryType, namespace, name, branch, currentUser string) (types.RepoSizeResponse, error)
 	// BatchGetRepoExtra gets the default branch size for multiple repositories
 	BatchGetRepoExtra(ctx context.Context, repoIDs []int64, currentUser string) ([]types.RepoExtraItem, error)
-	// DownloadCodeZip downloads the code repository as a zip archive
-	DownloadCodeZip(ctx context.Context, req types.DownloadCodeZipReq, currentUser string) ([]byte, error)
+	// SyncRepositoryPackage stores the current branch archive package for supported repository types.
+	SyncRepositoryPackage(ctx context.Context, repo *database.Repository, namespace, name, branch string) error
+	// DownloadRepoZip downloads a supported repository as a zip archive.
+	DownloadRepoZip(ctx context.Context, req types.DownloadRepoZipReq, currentUser string) ([]byte, error)
 	advancedRepoInterface
 }
 
@@ -476,6 +485,12 @@ func (c *repoComponentImpl) DeleteRepo(ctx context.Context, req types.DeleteRepo
 		slog.Error("fail to fetch lfs metas for cleanup", slog.Int64("repo_id", repo.ID), slog.Any("error", err))
 	}
 
+	if c.repositoryPackageSyncer != nil {
+		if err := c.repositoryPackageSyncer.RemoveRepoPackages(ctx, req.RepoType, repo.ID); err != nil {
+			return nil, err
+		}
+	}
+
 	err = c.repoStore.CleanRelationsByRepoID(ctx, repo.ID)
 	if err != nil {
 		return nil, fmt.Errorf("fail to clean repo relations, %w", err)
@@ -704,6 +719,26 @@ func (c *repoComponentImpl) PublicToUser(ctx context.Context, repoType types.Rep
 	return repos, count, nil
 }
 
+// PublicToUserV2 gets visible repos without eager-loading Tags for faster list queries.
+func (c *repoComponentImpl) PublicToUserV2(ctx context.Context, repoType types.RepositoryType, userName string, filter *types.RepoFilter, per, page int) (repos []*database.Repository, count int, err error) {
+	var ownerNamespaces []string
+	var isAdmin bool
+
+	if len(userName) > 0 {
+		user, err := c.userSvcClient.GetUserInfo(ctx, userName, userName)
+		if err != nil {
+			return nil, 0, fmt.Errorf("failed to get user info, error: %w", err)
+		}
+		ownerNamespaces, isAdmin = buildAccessibleNamespaces(user)
+	}
+	repos, count, err = c.repoStore.PublicToUserV2(ctx, repoType, ownerNamespaces, filter, per, page, isAdmin)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to get user public repos v2, error: %w", err)
+	}
+
+	return repos, count, nil
+}
+
 // relatedRepos gets all repos related to the given repo, and return them by repo type
 func (c *repoComponentImpl) RelatedRepos(ctx context.Context, repoID int64, currentUser string) (map[types.RepositoryType][]*database.Repository, error) {
 	fromRelations, err := c.repoRelationsStore.From(ctx, repoID)
@@ -851,6 +886,9 @@ func (c *repoComponentImpl) CreateFile(ctx context.Context, req *types.CreateFil
 	if err != nil {
 		slog.Error("failed to set repo update time", slog.Any("error", err), slog.String("repo_type", string(req.RepoType)), slog.String("namespace", req.Namespace), slog.String("name", req.Name))
 	}
+	if supportedRepositoryPackageType(req.RepoType) && c.repositoryPackageSyncer != nil {
+		c.asyncSyncRepositoryPackage(ctx, repo, req.Namespace, req.Name, req.Branch)
+	}
 
 	var resp types.CreateFileResp
 	return &resp, nil
@@ -972,6 +1010,9 @@ func (c *repoComponentImpl) UpdateFile(ctx context.Context, req *types.UpdateFil
 	if err != nil {
 		slog.Error("failed to set repo update time", slog.Any("error", err), slog.String("repo_type", string(req.RepoType)), slog.String("namespace", req.Namespace), slog.String("name", req.Name))
 	}
+	if supportedRepositoryPackageType(req.RepoType) && c.repositoryPackageSyncer != nil {
+		c.asyncSyncRepositoryPackage(ctx, repo, req.Namespace, req.Name, req.Branch)
+	}
 
 	resp := new(types.UpdateFileResp)
 	return resp, nil
@@ -1033,6 +1074,9 @@ func (c *repoComponentImpl) DeleteFile(ctx context.Context, req *types.DeleteFil
 	err = c.repoStore.SetUpdateTimeByPath(ctx, req.RepoType, req.Namespace, req.Name, time.Now())
 	if err != nil {
 		slog.Error("failed to set repo update time", slog.Any("error", err), slog.String("repo_type", string(req.RepoType)), slog.String("namespace", req.Namespace), slog.String("name", req.Name))
+	}
+	if supportedRepositoryPackageType(req.RepoType) && c.repositoryPackageSyncer != nil {
+		c.asyncSyncRepositoryPackage(ctx, repo, req.Namespace, req.Name, req.Branch)
 	}
 
 	resp := new(types.DeleteFileResp)
@@ -2613,7 +2657,13 @@ func (c *repoComponentImpl) CommitFiles(ctx context.Context, req types.CommitFil
 		Message:   req.Message,
 		Files:     files,
 	})
-	return err
+	if err != nil {
+		return err
+	}
+	if supportedRepositoryPackageType(req.RepoType) && c.repositoryPackageSyncer != nil {
+		c.asyncSyncRepositoryPackage(ctx, repo, req.Namespace, req.Name, req.Revision)
+	}
+	return nil
 }
 
 func (c *repoComponentImpl) IsExists(ctx context.Context, repoType types.RepositoryType, namespace, name string) (bool, error) {
@@ -3269,6 +3319,12 @@ func (c *repoComponentImpl) BatchGetRepoExtra(ctx context.Context, repoIDs []int
 		}
 	}
 
+	// Collect readable repo IDs for enrichment queries
+	readableRepoIDs := make([]int64, len(readableRepos))
+	for i, repo := range readableRepos {
+		readableRepoIDs[i] = repo.ID
+	}
+
 	// Collect repos that have a default branch for statistics lookup
 	repoDefaultBranches := make(map[int64]string, len(readableRepos))
 	for _, repo := range readableRepos {
@@ -3300,13 +3356,69 @@ func (c *repoComponentImpl) BatchGetRepoExtra(ctx context.Context, repoIDs []int
 		}
 	}
 
+	// Load enrichment data (tags, mirror, multi-source, clone info)
+	var tagMap map[int64][]database.Tag
+	var modelMap map[int64]database.Model
+	if len(readableRepoIDs) > 0 {
+		if c.tagStore != nil {
+			tm, err := c.tagStore.ByRepoIDs(ctx, readableRepoIDs)
+			if err != nil {
+				slog.Warn("failed to load tags for repo extras", "error", err)
+			} else {
+				tagMap = tm
+			}
+		}
+		if c.modelStore != nil {
+			models, err := c.modelStore.ByRepoIDs(ctx, readableRepoIDs)
+			if err != nil {
+				slog.Warn("failed to load models for repo extras", "error", err)
+			} else {
+				modelMap = make(map[int64]database.Model, len(models))
+				for _, m := range models {
+					modelMap[m.RepositoryID] = m
+				}
+			}
+		}
+	}
+
 	result := make([]types.RepoExtraItem, 0, len(readableRepos))
 	for _, repo := range readableRepos {
-		result = append(result, types.RepoExtraItem{
+		item := types.RepoExtraItem{
 			RepoID:         repo.ID,
 			Size:           sizeMap[repo.ID],
 			LastCommitSize: lastCommitSizeMap[repo.ID],
-		})
+		}
+		// Populate enrichment fields
+		if tagMap != nil {
+			if tags, ok := tagMap[repo.ID]; ok {
+				for _, t := range tags {
+					item.Tags = append(item.Tags, types.RepoTag{
+						Name:      t.Name,
+						Category:  t.Category,
+						Group:     t.Group,
+						BuiltIn:   t.BuiltIn,
+						ShowName:  t.I18nKey,
+						I18nKey:   t.I18nKey,
+						CreatedAt: t.CreatedAt,
+						UpdatedAt: t.UpdatedAt,
+					})
+				}
+			}
+		}
+		if m, ok := modelMap[repo.ID]; ok {
+			if m.Repository.Mirror.CurrentTask != nil {
+				item.MirrorTaskStatus = m.Repository.Mirror.CurrentTask.Status
+			}
+			item.MultiSource = types.MultiSource{
+				HFPath:  m.Repository.HFPath,
+				MSPath:  m.Repository.MSPath,
+				CSGPath: m.Repository.CSGPath,
+			}
+			cloneInfo := common.BuildCloneInfo(c.config, m.Repository)
+			item.Repository = &cloneInfo
+			item.ReportURL = m.ReportURL
+		}
+		result = append(result, item)
 	}
 	slices.SortFunc(result, func(a, b types.RepoExtraItem) int {
 		return cmp.Compare(a.RepoID, b.RepoID)
@@ -3315,9 +3427,43 @@ func (c *repoComponentImpl) BatchGetRepoExtra(ctx context.Context, repoIDs []int
 	return result, nil
 }
 
-func (c *repoComponentImpl) DownloadCodeZip(ctx context.Context, req types.DownloadCodeZipReq, currentUser string) ([]byte, error) {
-	repo, err := c.repoStore.FindByPath(ctx, types.CodeRepo, req.Namespace, req.Name)
+func (c *repoComponentImpl) SyncRepositoryPackage(ctx context.Context, repo *database.Repository, namespace, name, branch string) error {
+	if c.repositoryPackageSyncer == nil || repo == nil || !supportedRepositoryPackageType(repo.RepositoryType) {
+		return nil
+	}
+	return c.repositoryPackageSyncer.SyncRepoBranch(ctx, repo, namespace, name, branch)
+}
+
+func (c *repoComponentImpl) asyncSyncRepositoryPackage(ctx context.Context, repo *database.Repository, namespace, name, branch string) {
+	if c.repositoryPackageSyncer == nil || repo == nil || !supportedRepositoryPackageType(repo.RepositoryType) {
+		return
+	}
+	repoCopy := *repo
+	go func() {
+		syncCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), repositoryPackageSyncTimeout)
+		defer cancel()
+		if err := c.repositoryPackageSyncer.SyncRepoBranch(syncCtx, &repoCopy, namespace, name, branch); err != nil {
+			slog.WarnContext(syncCtx, "failed to async sync repository package",
+				slog.Any("error", err),
+				slog.String("repo_type", string(repoCopy.RepositoryType)),
+				slog.Int64("repo_id", repoCopy.ID),
+				slog.String("namespace", namespace),
+				slog.String("name", name),
+				slog.String("branch", branch),
+			)
+		}
+	}()
+}
+
+func (c *repoComponentImpl) DownloadRepoZip(ctx context.Context, req types.DownloadRepoZipReq, currentUser string) ([]byte, error) {
+	if !supportedRepositoryPackageType(req.RepoType) {
+		return nil, errorx.RepoNotFound(fmt.Errorf("unsupported repository package type %s", req.RepoType), errorx.Ctx().Set("namespace", req.Namespace).Set("name", req.Name))
+	}
+	repo, err := c.repoStore.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
 	if err != nil {
+		if req.RepoType == types.SkillRepo {
+			return nil, errorx.SkillNotFound(err, errorx.Ctx().Set("namespace", req.Namespace).Set("name", req.Name))
+		}
 		return nil, errorx.RepoNotFound(err, errorx.Ctx().Set("namespace", req.Namespace).Set("name", req.Name))
 	}
 
@@ -3326,7 +3472,7 @@ func (c *repoComponentImpl) DownloadCodeZip(ctx context.Context, req types.Downl
 		return nil, fmt.Errorf("failed to get user repo permission, error: %w", err)
 	}
 	if !permission.CanRead {
-		return nil, errorx.ErrForbiddenMsg("users do not have permission to download code zip in this repo")
+		return nil, errorx.ErrForbiddenMsg("users do not have permission to download repository zip in this repo")
 	}
 
 	revision := req.Revision
@@ -3334,18 +3480,80 @@ func (c *repoComponentImpl) DownloadCodeZip(ctx context.Context, req types.Downl
 		revision = repo.DefaultBranch
 	}
 	if revision == "" {
-		return nil, errorx.RepoNoDefaultBranch(errorx.Ctx().Set("namespace", req.Namespace).Set("name", req.Name))
+		if req.RepoType == types.CodeRepo {
+			return nil, errorx.RepoNoDefaultBranch(errorx.Ctx().Set("namespace", req.Namespace).Set("name", req.Name))
+		}
+		revision = types.MainBranch
+	}
+
+	archiveRevision := revision
+	resolvedCommitID := ""
+	commitID, err := c.resolveRepositoryArchiveCommit(ctx, req.RepoType, req.Namespace, req.Name, revision)
+	if err == nil {
+		archiveRevision = commitID
+		resolvedCommitID = commitID
+		if archiveData, ok := c.readRepositoryPackageArchive(ctx, req.RepoType, repo.ID, revision, commitID); ok {
+			return archiveData, nil
+		}
+	} else {
+		slog.WarnContext(ctx, "failed to resolve repository archive commit for package cache lookup",
+			slog.Any("error", err),
+			slog.String("repo_type", string(req.RepoType)),
+			slog.String("namespace", req.Namespace),
+			slog.String("name", req.Name),
+			slog.String("revision", revision),
+		)
 	}
 
 	archiveData, err := c.git.GetArchive(ctx, gitserver.GetArchiveReq{
 		Namespace: req.Namespace,
 		Name:      req.Name,
-		Revision:  revision,
-		RepoType:  types.CodeRepo,
+		Revision:  archiveRevision,
+		RepoType:  req.RepoType,
 	})
 	if err != nil {
-		return nil, errorx.CodeZipDownloadFailed(err, errorx.Ctx().Set("namespace", req.Namespace).Set("name", req.Name).Set("revision", revision))
+		return nil, errorx.RepoZipDownloadFailed(err, errorx.Ctx().Set("repo_type", req.RepoType).Set("namespace", req.Namespace).Set("name", req.Name).Set("revision", revision))
+	}
+	if resolvedCommitID != "" {
+		c.asyncWriteRepositoryPackageArchive(ctx, req.RepoType, repo.ID, resolvedCommitID, archiveData)
 	}
 
 	return archiveData, nil
+}
+
+func (c *repoComponentImpl) resolveRepositoryArchiveCommit(ctx context.Context, repoType types.RepositoryType, namespace, name, revision string) (string, error) {
+	branch, err := c.git.GetRepoBranchByName(ctx, gitserver.GetBranchReq{
+		Namespace: namespace,
+		Name:      name,
+		Ref:       revision,
+		RepoType:  repoType,
+	})
+	if err != nil {
+		return "", err
+	}
+	if branch == nil || branch.Commit.ID == "" {
+		return "", fmt.Errorf("empty branch commit id")
+	}
+	return branch.Commit.ID, nil
+}
+
+func (c *repoComponentImpl) readRepositoryPackageArchive(ctx context.Context, repoType types.RepositoryType, repoID int64, branch, commitID string) ([]byte, bool) {
+	if c.packageReader != nil {
+		return c.packageReader(ctx, repoType, repoID, branch, commitID)
+	}
+	return readRepositoryPackageFromS3(ctx, c.config, c.s3Client, repoType, repoID, branch, commitID)
+}
+
+func (c *repoComponentImpl) asyncWriteRepositoryPackageArchive(ctx context.Context, repoType types.RepositoryType, repoID int64, commitID string, archive []byte) {
+	asyncWriteRepositoryPackageArchive(ctx, repoType, repoID, commitID, archive, c.writeRepositoryPackageArchive, "failed to async upload repository package to s3")
+}
+
+func (c *repoComponentImpl) writeRepositoryPackageArchive(ctx context.Context, repoType types.RepositoryType, repoID int64, commitID string, archive []byte) error {
+	if c.packageWriter != nil {
+		return c.packageWriter(ctx, repoType, repoID, commitID, archive)
+	}
+	if c.repositoryPackageSyncer == nil {
+		return nil
+	}
+	return c.repositoryPackageSyncer.WriteArchive(ctx, repoType, repoID, commitID, archive)
 }

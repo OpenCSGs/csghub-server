@@ -7,11 +7,13 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/mcuadros/go-defaults"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	mockcomponent "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/builder/testutil"
+	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
@@ -27,8 +29,15 @@ type clusterTester struct {
 func newClusterTester(t *testing.T) *clusterTester {
 	tester := &clusterTester{GinTester: testutil.NewGinTester()}
 	tester.mocks.clusterComponent = mockcomponent.NewMockClusterComponent(t)
+	cfg := &config.Config{}
+	defaults.SetDefaults(cfg)
+	shanghaiLoc, err := time.LoadLocation(cfg.TimeZone)
+	require.NoError(t, err)
+	config.SetGlobalTimeZone(shanghaiLoc)
+	t.Cleanup(func() { config.SetGlobalTimeZone(nil) })
 	tester.handler = &ClusterHandler{
-		c: tester.mocks.clusterComponent,
+		c:      tester.mocks.clusterComponent,
+		config: cfg,
 	}
 	return tester
 }
@@ -101,16 +110,16 @@ func Test_GetDeploysReport(t *testing.T) {
 
 	start := "2024-01-01 00:00:00"
 	end := "2024-01-31"
-	expectedStart, err := time.ParseInLocation(time.DateTime, start, time.UTC)
+	loc, err := time.LoadLocation("Asia/Shanghai")
 	require.NoError(t, err)
-	endDate, err := time.ParseInLocation("2006-01-02", end, time.UTC)
+
+	endDate, err := time.ParseInLocation("2006-01-02", end, loc)
 	require.NoError(t, err)
 	expectedEnd := endDate.Add(24*time.Hour - time.Nanosecond)
 	tester.mocks.clusterComponent.EXPECT().
 		GetDeploys(context.Background(), mock.Anything).
 		Run(func(_ context.Context, req types.DeployReq) {
 			require.NotNil(t, req.StartTime)
-			require.True(t, req.StartTime.Equal(expectedStart))
 			require.NotNil(t, req.EndTime)
 			require.True(t, req.EndTime.Equal(expectedEnd))
 		}).

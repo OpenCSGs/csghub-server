@@ -6,6 +6,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/aigateway/component"
@@ -16,7 +17,8 @@ import (
 )
 
 func (h *OpenAIHandlerImpl) executeNativeResponses(c *gin.Context, req *types.ResponsesRequest, modelTarget *resolvedModelTarget, decision responsespkg.RoutingDecision, owner, nsUUID, apikey, publicModelID, publicPreviousResponseID string, moderation component.Moderation, logCapture *responsespkg.LLMLogRecorder, generationRecorder llmtrace.GenerationRecorder) {
-	if err := h.openaiComponent.CheckUsageLimit(c.Request.Context(), nsUUID, modelTarget.Model, decision.NativeURL); err != nil {
+	backendURL := decision.BackendURL
+	if err := h.openaiComponent.CheckUsageLimit(c.Request.Context(), nsUUID, modelTarget.Model, backendURL); err != nil {
 		finishLLMTraceWithError(generationRecorder, err, types.TraceErrInsufficientBalance)
 		h.handleUsageLimitExceeded(c, req.Stream, nsUUID, publicModelID, err)
 		return
@@ -40,7 +42,7 @@ func (h *OpenAIHandlerImpl) executeNativeResponses(c *gin.Context, req *types.Re
 	if err := applyModelAuthHeaders(c.Request.Header, modelTarget.Model); err != nil {
 		slog.WarnContext(c.Request.Context(), "invalid auth header", slog.String("model", modelTarget.ModelName), slog.Any("error", err))
 	}
-	rp, err := proxy.NewReverseProxy(decision.NativeURL, proxy.WithoutAcceptEncoding())
+	rp, err := proxy.NewReverseProxy(backendURL, proxy.WithoutAcceptEncoding())
 	if err != nil {
 		finishLLMTraceWithError(generationRecorder, err, types.TraceErrUpstreamUnavailable)
 		h.handleProxyError(c, req.Stream, nsUUID, publicModelID, err)
@@ -66,14 +68,29 @@ func (h *OpenAIHandlerImpl) executeNativeResponses(c *gin.Context, req *types.Re
 		slog.String("responses_route_provider", modelTarget.Model.Provider),
 		slog.String("responses_route_model", modelTarget.ModelName),
 	)
-	proxyPath := resolveProxyPathFromModelEndpoint(decision.NativeURL, modelTarget.ModelName)
+	proxyPath := resolveProxyPathFromModelEndpoint(backendURL, modelTarget.ModelName)
 	writer := newResponsesNativeResponseWriter(c.Writer, req.Stream, transformer, moderation, newResponsesModerationSessionID())
+	proxyStartTime := time.Now()
 	rp.ServeHTTP(writer, c.Request, proxyPath, modelTarget.Host)
 	if err := writer.Finalize(); err != nil {
 		finishLLMTraceWithError(generationRecorder, err, types.TraceErrUpstreamError)
 		writeResponsesError(c, http.StatusBadGateway, "upstream_response_invalid", "api_error", err.Error())
 		return
 	}
+
+	// Finalize transforms non-streaming responses and captures their usage, so
+	// collect metrics only after it completes while still on the request path.
+	// Pre-compute usage once and share with the async post-process goroutine
+	// to avoid duplicate counter.Usage() calls.
+	responsesUsage := preComputeUsage(c.Request.Context(), responsesCounter)
+	RecordMetrics(RecordMetricsParams{
+		C:              c,
+		Ctx:            c.Request.Context(),
+		FinalWrite:     writer,
+		Counter:        responsesCounter,
+		ProxyStartTime: proxyStartTime,
+		Usage:          responsesUsage,
+	})
 	traceInput := newResponsesTracePostProcessInput(generationRecorder, req, writer.StatusCode(), writer.FirstWriteAt())
-	h.recordResponsesUsageWithTrace(c, responsesCounter, nsUUID, modelTarget, apikey, logCapture, traceInput)
+	h.recordResponsesUsageWithTrace(c, responsesCounter, responsesUsage, nsUUID, modelTarget, apikey, logCapture, traceInput)
 }

@@ -23,8 +23,26 @@
     "error.AGENT-ERR-15": {
         "other": "Credential verification failed"
     },
+    "error.AGENT-ERR-16": {
+        "other": "{{.instance_type}} instance provisioning metadata cannot be updated after creation"
+    },
+    "error.AGENT-ERR-17": {
+        "other": "{{.template_type}} agent templates are managed by the code repository and cannot be created via the API"
+    },
+    "error.AGENT-ERR-18": {
+        "other": "{{.instance_type}} provision request field {{.field}} must not be null"
+    },
+    "error.AGENT-ERR-19": {
+        "other": "{{.instance_type}} provision request field {{.field}} has an invalid type"
+    },
     "error.AGENT-ERR-2": {
         "other": "You have a knowledge base with the same name: {{.knowledge_base_name}}"
+    },
+    "error.AGENT-ERR-20": {
+        "other": "{{.instance_type}} provision request field {{.field}} must not be empty"
+    },
+    "error.AGENT-ERR-21": {
+        "other": "llm model {{.model}} is not available for {{.instance_type}}"
     },
     "error.AGENT-ERR-3": {
         "other": "You have an MCP server with the same name: {{.server_name}}"
@@ -46,5 +64,14 @@
     },
     "error.AGENT-ERR-9": {
         "other": "Scheduler start time is in the past; use a future date/time for one-time schedules"
+    },
+    "error.AGENT-ERR-22": {
+        "other": "csgclaw template not found for repository path {{.repo_path}}"
+    },
+    "error.AGENT-ERR-23": {
+        "other": "Cannot create an agent from this agent template because it has not passed the sensitive-content check."
+    },
+    "error.AGENT-ERR-24": {
+        "other": "Cannot make this agent template public because it has not passed the sensitive-content check."
     }
 }

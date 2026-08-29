@@ -64,6 +64,12 @@ func (h *OpenAIHandlerImpl) GenerateImage(c *gin.Context) {
 
 	modelID := req.Model
 	modelTarget, err := h.resolveModelTarget(ctx, username, modelID, c.Request.Header)
+	SetMetricsModelTarget(SetMetricsModelParams{
+		C:           c,
+		ModelID:     modelID,
+		ModelTarget: modelTarget,
+		IsStream:    false,
+	})
 	if err != nil {
 		preflight.RecordError(err, "model_resolve")
 		handleModelTargetError(c, ctx, modelID, "failed to get model target address", err)
@@ -196,7 +202,7 @@ func (h *OpenAIHandlerImpl) GenerateImage(c *gin.Context) {
 		defer cancel()
 
 		var usage *token.Usage
-		if imageWrapper.StatusCode() < http.StatusBadRequest && imageCounter != nil {
+		if isSuccessfulStatus(imageWrapper.StatusCode()) && imageCounter != nil {
 			var usageErr error
 			usage, usageErr = imageCounter.Usage(usageCtx)
 			if usageErr != nil {
@@ -218,7 +224,7 @@ func (h *OpenAIHandlerImpl) GenerateImage(c *gin.Context) {
 			})
 			generationRecorder.End()
 		}
-		if imageWrapper.StatusCode() < http.StatusBadRequest && usage != nil {
+		if isSuccessfulStatus(imageWrapper.StatusCode()) && usage != nil {
 			if err := h.openaiComponent.RecordUsageFromTokenUsage(usageCtx, nsUUID, modelTarget.Model, modelTarget.ModelName, usage, apikey); err != nil {
 				slog.ErrorContext(usageCtx, "failed to record image usage", slog.Any("error", err))
 			}

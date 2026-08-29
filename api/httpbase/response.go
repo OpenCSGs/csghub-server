@@ -232,6 +232,23 @@ func ForbiddenError(c *gin.Context, err error) {
 	})
 }
 
+// PaymentRequiredError if the user's account balance is insufficient for the operation.
+func PaymentRequiredError(c *gin.Context, err error) {
+	err, ok := errorx.GetFirstCustomError(err)
+	if ok {
+		customErr := err.(errorx.CustomError)
+		c.PureJSON(http.StatusPaymentRequired, R{
+			Code:    customErr.Code(),
+			Msg:     customErr.Error(),
+			Context: customErr.Context(),
+		})
+		return
+	}
+	c.PureJSON(http.StatusPaymentRequired, R{
+		Msg: err.Error(),
+	})
+}
+
 // NotFoundError responds with a JSON-formatted error message.
 //
 // Example:

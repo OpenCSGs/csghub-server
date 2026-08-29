@@ -62,6 +62,24 @@ func TestLicenseStore_CRUD(t *testing.T) {
 	err = store.Update(ctx, *l)
 	require.Nil(t, err)
 
+	startTime := time.Now().Add(time.Hour)
+	err = store.Create(ctx, database.License{
+		Key:        "future-key",
+		Company:    "foo",
+		Email:      "future@example.com",
+		Product:    "test",
+		Edition:    "standard",
+		MaxUser:    10,
+		StartTime:  startTime,
+		ExpireTime: startTime.Add(time.Hour),
+		UserUUID:   "test-user-uuid",
+		Issuer:     "tester",
+	})
+	require.NoError(t, err)
+	upcoming, err := store.GetNextUpcoming(ctx)
+	require.NoError(t, err)
+	require.Equal(t, "future-key", upcoming.Key)
+
 	lVerify2 := &database.License{}
 	err = db.Core.NewSelect().Model(lVerify2).Where("key=?", "key").Scan(ctx, lVerify2)
 	require.Nil(t, err)
@@ -98,6 +116,13 @@ func TestLicenseStore_List(t *testing.T) {
 		{
 			req:      types.QueryLicenseReq{Search: "bar", Edition: "e2"},
 			expected: []string{"k4"},
+		},
+		{
+			// Issue #2495: "pp" only appears in k5's remark ("approved by bob"),
+			// not in company/email. After narrowing search to company+email,
+			// remark is no longer matched, so this returns nothing.
+			req:      types.QueryLicenseReq{Search: "pp"},
+			expected: []string{},
 		},
 	}
 
@@ -142,6 +167,16 @@ func TestLicenseStore_List(t *testing.T) {
 					MaxUser: 40, StartTime: time.Now(),
 					ExpireTime: time.Now().Add(time.Hour),
 					UserUUID:   "user4",
+				},
+				{
+					// Issue #2495: remark uniquely contains "pp" (in "approved"),
+					// while company/email do not — proves remark is no longer searched.
+					Key: "k5", Product: "p4",
+					Edition: "e3", Company: "acme",
+					Email: "admin@acme.com", Remark: "approved by bob",
+					MaxUser: 50, StartTime: time.Now(),
+					ExpireTime: time.Now().Add(time.Hour),
+					UserUUID: "user5",
 				},
 			}
 			for _, l := range ls {

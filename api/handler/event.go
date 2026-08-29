@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/api/httpbase"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/component"
 )
@@ -30,13 +31,35 @@ func NewEventHandler() (*EventHandler, error) {
 // @Failure     500	{object}  types.APIInternalServerError "Internal server error"
 // @Router /events [post]
 func (h *EventHandler) Create(ctx *gin.Context) {
-	//TODO: authentication?
-
 	var events []types.Event
 	if err := ctx.ShouldBindJSON(&events); err != nil {
 		err = fmt.Errorf("cant parse as Event array,%w", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
+	}
+
+	if len(events) > 300 {
+		httpbase.BadRequestWithExt(ctx, errorx.ReqParamInvalid(
+			fmt.Errorf("too many events: %d", len(events)), nil))
+		return
+	}
+
+	userUUID := httpbase.GetCurrentUserUUID(ctx)
+	clientIP := ctx.ClientIP()
+	for i := range events {
+		if events[i].Module == "" || events[i].ID == "" {
+			httpbase.BadRequestWithExt(ctx, errorx.ReqParamInvalid(
+				fmt.Errorf("event[%d] missing module or id", i), nil))
+			return
+		}
+		if len(events[i].Extension) > 4096 {
+			httpbase.BadRequestWithExt(ctx, errorx.ReqParamInvalid(
+				fmt.Errorf("event[%d] extension too long", i), nil))
+			return
+		}
+		// overwrite with server side info
+		events[i].ClientID = userUUID
+		events[i].ClientIP = clientIP
 	}
 
 	if err := h.ec.NewEvents(ctx.Request.Context(), events); err != nil {

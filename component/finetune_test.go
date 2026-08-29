@@ -30,7 +30,7 @@ func NewTestFinetuneComponent(config *config.Config,
 	repoStore database.RepoStore, frameStore database.RuntimeFrameworksStore,
 	argoStore database.ArgoWorkFlowStore,
 	acctComp AccountingComponent, repoComp RepoComponent, deployTaskStore database.DeployTaskStore,
-	userSvcClient rpc.UserSvcClient) FinetuneComponent {
+	userSvcClient rpc.UserSvcClient, clusterStore database.ClusterInfoStore) FinetuneComponent {
 	c := &finetuneComponentImpl{}
 	c.deployer = deployer
 	c.userStore = userStore
@@ -47,6 +47,7 @@ func NewTestFinetuneComponent(config *config.Config,
 	c.repoComponent = repoComp
 	c.accountingComponent = acctComp
 	c.userSvcClient = userSvcClient
+	c.clusterStore = clusterStore
 	return c
 }
 
@@ -79,6 +80,7 @@ func TestEvaluationComponent_CreateFinetune(t *testing.T) {
 	argoStore := mockdb.NewMockArgoWorkFlowStore(t)
 	acctComp := mockComps.NewMockAccountingComponent(t)
 	repoComp := mockComps.NewMockRepoComponent(t)
+	clusterStore := mockdb.NewMockClusterInfoStore(t)
 
 	req2 := types.FinetuneReq{
 		UserUUID:           "testuser",
@@ -106,13 +108,14 @@ func TestEvaluationComponent_CreateFinetune(t *testing.T) {
 		Epochs:          3,
 		Revision:        "main",
 		DatasetRevision: "main",
+		Nodes:           []types.Node{{Name: "node1", EnableVXPU: false, HasXPU: false}},
 	}
 
 	resource, err := json.Marshal(req2.Hardware)
 	require.Nil(t, err)
 
 	c := NewTestFinetuneComponent(cfg, mockDeployer, mockUser, modelStore, spaceResStore, datasetStore, mirrorStore,
-		tokenStore, repoStore, frameStore, argoStore, acctComp, repoComp, nil, nil)
+		tokenStore, repoStore, frameStore, argoStore, acctComp, repoComp, nil, nil, clusterStore)
 
 	mockUser.EXPECT().FindByUsername(ctx, req.Username).Return(database.User{
 		Username: req.Username,
@@ -146,6 +149,10 @@ func TestEvaluationComponent_CreateFinetune(t *testing.T) {
 
 	repoComp.EXPECT().GetNamespaceBillingUUID(ctx, "testuser").Return("testuser", nil)
 	repoComp.EXPECT().CheckAccountAndResource(ctx, types.CheckResourceAndAccountReq{UserName: "testuser", ClusterID: "cluster-1", OrderDetailID: 0, CurrentUser: "testuser"}, mock.Anything).Return(&types.CheckExclusiveResp{}, nil)
+
+	clusterStore.EXPECT().FindNodeByClusterID(ctx, "cluster-1").Return([]database.ClusterNode{
+		{Name: "node1"},
+	}, nil)
 
 	req2.ResourceName = "1 GPU · 4 vCPU · 32Gi"
 	req2.ClusterID = "cluster-1"
@@ -188,7 +195,7 @@ func TestFinetuneComponent_CreateFinetuneJob_UsesRequestedDatasetRevision(t *tes
 	repoComp := mockComps.NewMockRepoComponent(t)
 
 	c := NewTestFinetuneComponent(cfg, mockDeployer, mockUser, modelStore, spaceResStore, datasetStore, mirrorStore,
-		tokenStore, repoStore, frameStore, argoStore, acctComp, repoComp, nil, nil)
+		tokenStore, repoStore, frameStore, argoStore, acctComp, repoComp, nil, nil, nil)
 
 	mockUser.EXPECT().FindByUsername(ctx, req.Username).Return(database.User{
 		Username: req.Username,
@@ -252,7 +259,7 @@ func TestFinetuneComponent_CreateFinetuneJob_NonAdminNamespace(t *testing.T) {
 
 	t.Run("namespace_permission_error", func(t *testing.T) {
 		c := NewTestFinetuneComponent(cfg, mockDeployer, mockUser, modelStore, spaceResStore, datasetStore, mirrorStore,
-			tokenStore, repoStore, frameStore, argoStore, acctComp, repoComp, nil, nil)
+			tokenStore, repoStore, frameStore, argoStore, acctComp, repoComp, nil, nil, nil)
 		mockUser.EXPECT().FindByUsername(ctx, req.Username).Return(database.User{
 			Username: req.Username,
 			UUID:     req.Username,
@@ -266,7 +273,7 @@ func TestFinetuneComponent_CreateFinetuneJob_NonAdminNamespace(t *testing.T) {
 	})
 	t.Run("namespace_forbidden", func(t *testing.T) {
 		c := NewTestFinetuneComponent(cfg, mockDeployer, mockUser, modelStore, spaceResStore, datasetStore, mirrorStore,
-			tokenStore, repoStore, frameStore, argoStore, acctComp, repoComp, nil, nil)
+			tokenStore, repoStore, frameStore, argoStore, acctComp, repoComp, nil, nil, nil)
 		mockUser.EXPECT().FindByUsername(ctx, req.Username).Return(database.User{
 			Username: req.Username,
 			UUID:     req.Username,
@@ -305,7 +312,7 @@ func TestEvaluationComponent_GetFinetune(t *testing.T) {
 	}
 
 	c := NewTestFinetuneComponent(cfg, mockDeployer, mockUser, modelStore, spaceResStore, datasetStore, mirrorStore,
-		tokenStore, repoStore, frameStore, argoStore, acctComp, repoComp, nil, nil)
+		tokenStore, repoStore, frameStore, argoStore, acctComp, repoComp, nil, nil, nil)
 
 	argoStore.EXPECT().FindByID(ctx, int64(1)).Return(database.ArgoWorkflow{
 		ID:       1,
@@ -339,7 +346,7 @@ func TestEvaluationComponent_DeleteFinetune(t *testing.T) {
 	repoComp := mockComps.NewMockRepoComponent(t)
 
 	c := NewTestFinetuneComponent(cfg, mockDeployer, mockUser, modelStore, spaceResStore, datasetStore, mirrorStore,
-		tokenStore, repoStore, frameStore, argoStore, acctComp, repoComp, nil, nil)
+		tokenStore, repoStore, frameStore, argoStore, acctComp, repoComp, nil, nil, nil)
 
 	argoStore.EXPECT().FindByID(ctx, int64(1)).Return(database.ArgoWorkflow{
 		ID:        1,
@@ -380,7 +387,7 @@ func TestFinetuneComponent_ReadJobLogsNonStream(t *testing.T) {
 		mockUserSvcClient := mockrpc.NewMockUserSvcClient(t)
 
 		c := NewTestFinetuneComponent(cfg, mockDeployer, nil, nil, nil, nil, nil,
-			nil, nil, nil, argoStore, nil, nil, nil, mockUserSvcClient)
+			nil, nil, nil, argoStore, nil, nil, nil, mockUserSvcClient, nil)
 
 		req := types.FinetuneLogReq{
 			CurrentUser: "testuser",
@@ -418,7 +425,7 @@ func TestFinetuneComponent_ReadJobLogsNonStream(t *testing.T) {
 		mockUserSvcClient := mockrpc.NewMockUserSvcClient(t)
 
 		c := NewTestFinetuneComponent(cfg, mockDeployer, nil, nil, nil, nil, nil,
-			nil, nil, nil, argoStore, nil, nil, nil, mockUserSvcClient)
+			nil, nil, nil, argoStore, nil, nil, nil, mockUserSvcClient, nil)
 
 		req := types.FinetuneLogReq{
 			CurrentUser: "testuser",
@@ -438,7 +445,7 @@ func TestFinetuneComponent_ReadJobLogsNonStream(t *testing.T) {
 		mockUserSvcClient := mockrpc.NewMockUserSvcClient(t)
 
 		c := NewTestFinetuneComponent(cfg, mockDeployer, nil, nil, nil, nil, nil,
-			nil, nil, nil, argoStore, nil, nil, nil, mockUserSvcClient)
+			nil, nil, nil, argoStore, nil, nil, nil, mockUserSvcClient, nil)
 		req := types.FinetuneLogReq{
 			CurrentUser: "testuser",
 			ID:          1,
@@ -479,7 +486,7 @@ func TestFinetuneComponent_ReadJobLogsInStream(t *testing.T) {
 		mockUserSvcClient := mockrpc.NewMockUserSvcClient(t)
 
 		c := NewTestFinetuneComponent(cfg, mockDeployer, nil, nil, nil, nil, nil,
-			nil, nil, nil, argoStore, nil, nil, nil, mockUserSvcClient)
+			nil, nil, nil, argoStore, nil, nil, nil, mockUserSvcClient, nil)
 
 		req := types.FinetuneLogReq{
 			CurrentUser: "testuser",
@@ -517,7 +524,7 @@ func TestFinetuneComponent_ReadJobLogsInStream(t *testing.T) {
 		mockUserSvcClient := mockrpc.NewMockUserSvcClient(t)
 
 		c := NewTestFinetuneComponent(cfg, mockDeployer, nil, nil, nil, nil, nil,
-			nil, nil, nil, argoStore, nil, nil, nil, mockUserSvcClient)
+			nil, nil, nil, argoStore, nil, nil, nil, mockUserSvcClient, nil)
 
 		req := types.FinetuneLogReq{
 			CurrentUser: "testuser",
@@ -548,7 +555,7 @@ func TestFinetuneComponent_OrgFinetuneInstances(t *testing.T) {
 	mockDeployTask.EXPECT().ListDeployByOwnerNamespace(ctx, "org1", mock.Anything).Return([]database.Deploy{
 		{ID: 1, DeployName: "ft1", OwnerNamespace: "org1", RepoID: 101, Status: 1},
 	}, 1, nil)
-	c := NewTestFinetuneComponent(cfg, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, mockAcctComp, mockRepoComp, mockDeployTask, nil)
+	c := NewTestFinetuneComponent(cfg, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, mockAcctComp, mockRepoComp, mockDeployTask, nil, nil)
 	res, total, err := c.OrgFinetuneInstances(ctx, req)
 	require.Nil(t, err)
 	require.Equal(t, 1, total)
@@ -572,7 +579,7 @@ func TestFinetuneComponent_OrgFinetuneJobs(t *testing.T) {
 	mockArgoStore.EXPECT().FindByUsername(ctx, "org1", types.TaskTypeFinetune, 10, 1).Return([]database.ArgoWorkflow{
 		{ID: 1, TaskName: "ftjob1", Username: "org1", TaskType: types.TaskTypeFinetune},
 	}, 1, nil)
-	c := NewTestFinetuneComponent(cfg, nil, nil, nil, nil, nil, nil, nil, nil, nil, mockArgoStore, mockAcctComp, mockRepoComp, nil, nil)
+	c := NewTestFinetuneComponent(cfg, nil, nil, nil, nil, nil, nil, nil, nil, nil, mockArgoStore, mockAcctComp, mockRepoComp, nil, nil, nil)
 	res, total, err := c.OrgFinetuneJobs(ctx, req)
 	require.Nil(t, err)
 	require.Equal(t, 1, total)

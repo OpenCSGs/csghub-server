@@ -3,7 +3,6 @@ package component
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 
 	"opencsg.com/csghub-server/builder/llm"
 	"opencsg.com/csghub-server/builder/store/database"
@@ -17,7 +16,6 @@ type MCPScannerPlugin interface {
 
 func summaryResult(ctx context.Context, llmClient *llm.Client, llmConfig *database.LLMConfig, summaryPrompt, result string, temperature float64) ([]types.ScannerIssue, error) {
 	req := types.LLMReqBody{
-		Model: llmConfig.ModelName,
 		Messages: []types.LLMMessage{
 			{Role: SystemRole, Content: summaryPrompt},
 			{Role: UserRole, Content: result},
@@ -25,12 +23,7 @@ func summaryResult(ctx context.Context, llmClient *llm.Client, llmConfig *databa
 		Stream:      false,
 		Temperature: temperature,
 	}
-	headers := make(map[string]string)
-	err := json.Unmarshal([]byte(llmConfig.AuthHeader), &headers)
-	if err != nil {
-		return nil, fmt.Errorf("parse llm config header error: %w", err)
-	}
-	summaryResult, err := llmClient.Chat(ctx, llmConfig.ApiEndpoint, "", headers, req)
+	summaryResult, err := llmClient.WithLLMConfig(llmConfig).Chat(ctx, "", "", nil, req)
 	if err != nil {
 		return nil, err
 	}

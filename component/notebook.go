@@ -292,8 +292,7 @@ func (c *notebookComponentImpl) UpdateNotebook(ctx context.Context, req *types.U
 		return fmt.Errorf("check deploy exists, err: %w", err)
 	}
 	if exist {
-		// deploy instance is running
-		return errors.New("stop deploy first")
+		return errorx.ErrDeployStopFirst
 	}
 
 	resource, err := c.spaceResourceStore.FindByID(ctx, req.ResourceID)

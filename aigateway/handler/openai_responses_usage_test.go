@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"testing/synctest"
 
@@ -55,6 +56,42 @@ func TestNewResponsesTokenCounterBuildsTokenizer(t *testing.T) {
 	require.NotNil(t, usage)
 }
 
+func TestNewResponsesTokenCounterUsesTokenizerTarget(t *testing.T) {
+	tester, _, _ := setupTest(t)
+	var tokenizePaths []string
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		tokenizePaths = append(tokenizePaths, r.URL.Path)
+		require.Equal(t, "/tokenize", r.URL.Path)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"count":3}`))
+	}))
+	defer upstream.Close()
+
+	model := &types.Model{
+		BaseModel: types.BaseModel{ID: "m"},
+		InternalModelInfo: types.InternalModelInfo{
+			ImageID: "vllm-local:latest",
+		},
+	}
+	modelTarget := &resolvedModelTarget{
+		Model:           model,
+		Target:          upstream.URL + "/v1/responses",
+		TokenizerTarget: upstream.URL,
+		ModelName:       "upstream-model",
+	}
+
+	counter := tester.handler.newResponsesTokenCounter(modelTarget)
+	counter.Request(&types.ResponsesRequest{Model: "m", Input: json.RawMessage(`"hi"`)})
+	counter.Response(&types.ResponsesResponse{OutputText: "ok"})
+
+	usage, err := counter.Usage(context.Background())
+	require.NoError(t, err)
+	require.Equal(t, int64(3), usage.PromptTokens)
+	require.Equal(t, int64(3), usage.CompletionTokens)
+	require.Equal(t, int64(6), usage.TotalTokens)
+	require.Equal(t, []string{"/tokenize", "/tokenize"}, tokenizePaths)
+}
+
 func TestRecordResponsesUsageHappyPathCallsComponent(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		tester, c, _ := setupTest(t)
@@ -77,8 +114,8 @@ func TestRecordResponsesUsageHappyPathCallsComponent(t *testing.T) {
 		var wg sync.WaitGroup
 		wg.Add(2)
 		var seenUsage *token.Usage
-		tester.mocks.openAIComp.EXPECT().CommitUsageLimit(mock.Anything, "testuuid", model, mock.Anything).
-			RunAndReturn(func(_ context.Context, _ string, _ *types.Model, _ token.Counter) error {
+		tester.mocks.openAIComp.EXPECT().CommitUsageLimitFromUsage(mock.Anything, "testuuid", model, mock.Anything).
+			RunAndReturn(func(_ context.Context, _ string, _ *types.Model, _ *token.Usage) error {
 				wg.Done()
 				return nil
 			}).Once()
@@ -90,7 +127,7 @@ func TestRecordResponsesUsageHappyPathCallsComponent(t *testing.T) {
 			return nil
 		}).Once()
 
-		tester.handler.recordResponsesUsageWithTrace(c, counter, "testuuid", modelTarget, "apikey", nil, responsesTracePostProcessInput{})
+		tester.handler.recordResponsesUsageWithTrace(c, counter, nil, "testuuid", modelTarget, "apikey", nil, responsesTracePostProcessInput{StatusCode: http.StatusOK})
 
 		synctest.Wait()
 		require.NotNil(t, seenUsage)
@@ -141,8 +178,8 @@ func TestRecordResponsesUsagePublishesLLMLog(t *testing.T) {
 
 		var wg sync.WaitGroup
 		wg.Add(3)
-		tester.mocks.openAIComp.EXPECT().CommitUsageLimit(mock.Anything, "testuuid", model, mock.Anything).
-			RunAndReturn(func(_ context.Context, _ string, _ *types.Model, _ token.Counter) error {
+		tester.mocks.openAIComp.EXPECT().CommitUsageLimitFromUsage(mock.Anything, "testuuid", model, mock.Anything).
+			RunAndReturn(func(_ context.Context, _ string, _ *types.Model, _ *token.Usage) error {
 				wg.Done()
 				return nil
 			}).Once()
@@ -156,7 +193,7 @@ func TestRecordResponsesUsagePublishesLLMLog(t *testing.T) {
 			wg.Done()
 		}
 
-		tester.handler.recordResponsesUsageWithTrace(c, counter, "testuuid", modelTarget, "apikey", recorder, responsesTracePostProcessInput{})
+		tester.handler.recordResponsesUsageWithTrace(c, counter, nil, "testuuid", modelTarget, "apikey", recorder, responsesTracePostProcessInput{StatusCode: http.StatusOK})
 
 		synctest.Wait()
 		require.NotNil(t, publisher.payload)
@@ -204,8 +241,8 @@ func TestRecordResponsesUsageRecordsLLMTrace(t *testing.T) {
 
 		var wg sync.WaitGroup
 		wg.Add(2)
-		tester.mocks.openAIComp.EXPECT().CommitUsageLimit(mock.Anything, "testuuid", model, mock.Anything).
-			RunAndReturn(func(_ context.Context, _ string, _ *types.Model, _ token.Counter) error {
+		tester.mocks.openAIComp.EXPECT().CommitUsageLimitFromUsage(mock.Anything, "testuuid", model, mock.Anything).
+			RunAndReturn(func(_ context.Context, _ string, _ *types.Model, _ *token.Usage) error {
 				wg.Done()
 				return nil
 			}).Once()
@@ -216,7 +253,7 @@ func TestRecordResponsesUsageRecordsLLMTrace(t *testing.T) {
 			return nil
 		}).Once()
 
-		tester.handler.recordResponsesUsageWithTrace(c, counter, "testuuid", modelTarget, "apikey", recorder, traceInput)
+		tester.handler.recordResponsesUsageWithTrace(c, counter, nil, "testuuid", modelTarget, "apikey", recorder, traceInput)
 
 		synctest.Wait()
 		usage, usageEnded, usageEvents := traceRecorder.snapshot()
@@ -235,6 +272,78 @@ func TestRecordResponsesUsageRecordsLLMTrace(t *testing.T) {
 		require.Contains(t, events, "response")
 		require.Contains(t, events, "end")
 		require.Contains(t, usageEvents, "usage")
+	})
+}
+
+func TestRecordResponsesUsageSkipsBillingOnErrorStatus(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		tester, c, _ := setupTest(t)
+		tester.mocks.openAIComp.ExpectedCalls = nil
+		c.Request = httptest.NewRequest("POST", "/v1/responses", nil)
+
+		model := &types.Model{BaseModel: types.BaseModel{ID: "m"}}
+		modelTarget := &resolvedModelTarget{Model: model, ModelName: "upstream"}
+
+		counter := token.NewResponsesTokenCounter(&token.DumyTokenizer{})
+		counter.Request(&types.ResponsesRequest{Model: "m", Input: json.RawMessage(`"hi"`)})
+		counter.Response(&types.ResponsesResponse{OutputText: "world"})
+
+		var billingCalled atomic.Bool
+		tester.mocks.openAIComp.EXPECT().
+			CommitUsageLimitFromUsage(mock.Anything, "testuuid", model, mock.Anything).
+			Return(nil).
+			Once()
+		tester.mocks.openAIComp.EXPECT().
+			RecordUsageFromTokenUsage(mock.Anything, "testuuid", model, "upstream", mock.Anything, "apikey").
+			Run(func(context.Context, string, *types.Model, string, *token.Usage, string) {
+				billingCalled.Store(true)
+			}).
+			Maybe()
+
+		tester.handler.recordResponsesUsageWithTrace(c, counter, nil, "testuuid", modelTarget, "apikey", nil, responsesTracePostProcessInput{
+			StatusCode: http.StatusInternalServerError,
+		})
+
+		// synctest.Wait blocks until the async post-processing goroutine has
+		// fully completed, so the billing flag is settled.
+		synctest.Wait()
+		require.False(t, billingCalled.Load())
+	})
+}
+
+func TestRecordResponsesUsageSkipsBillingOnRedirectStatus(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		tester, c, _ := setupTest(t)
+		tester.mocks.openAIComp.ExpectedCalls = nil
+		c.Request = httptest.NewRequest("POST", "/v1/responses", nil)
+
+		model := &types.Model{BaseModel: types.BaseModel{ID: "m"}}
+		modelTarget := &resolvedModelTarget{Model: model, ModelName: "upstream"}
+
+		counter := token.NewResponsesTokenCounter(&token.DumyTokenizer{})
+		counter.Request(&types.ResponsesRequest{Model: "m", Input: json.RawMessage(`"hi"`)})
+		counter.Response(&types.ResponsesResponse{OutputText: "world"})
+
+		var billingCalled atomic.Bool
+		tester.mocks.openAIComp.EXPECT().
+			CommitUsageLimitFromUsage(mock.Anything, "testuuid", model, mock.Anything).
+			Return(nil).
+			Once()
+		tester.mocks.openAIComp.EXPECT().
+			RecordUsageFromTokenUsage(mock.Anything, "testuuid", model, "upstream", mock.Anything, "apikey").
+			Run(func(context.Context, string, *types.Model, string, *token.Usage, string) {
+				billingCalled.Store(true)
+			}).
+			Maybe()
+
+		tester.handler.recordResponsesUsageWithTrace(c, counter, nil, "testuuid", modelTarget, "apikey", nil, responsesTracePostProcessInput{
+			StatusCode: http.StatusFound,
+		})
+
+		// synctest.Wait blocks until the async post-processing goroutine has
+		// fully completed, so the billing flag is settled.
+		synctest.Wait()
+		require.False(t, billingCalled.Load())
 	})
 }
 

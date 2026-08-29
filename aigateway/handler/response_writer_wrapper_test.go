@@ -61,15 +61,6 @@ func TestResponseWriterWrapper_StreamWrite(t *testing.T) {
 	}
 }
 
-func TestGenerateInsufficientBalanceResp(t *testing.T) {
-	frontendURL := "http://localhost:8080"
-	chunk := generateInsufficientBalanceResp(frontendURL)
-	assert.Len(t, chunk.Choices, 1)
-	assert.Equal(t, "insufficient_balance", chunk.Choices[0].FinishReason)
-	assert.Contains(t, chunk.Choices[0].Delta.Content, "**Insufficient balance**")
-	assert.Contains(t, chunk.Choices[0].Delta.Content, frontendURL+"/settings/recharge-payment")
-}
-
 func TestWriteSensitiveStreamResponse(t *testing.T) {
 	w := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(w)

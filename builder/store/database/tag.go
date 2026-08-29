@@ -55,6 +55,8 @@ type TagStore interface {
 	DeleteCategory(ctx context.Context, id int64) error
 	CheckTagIDsExist(ctx context.Context, ids []int64) error
 	CheckTagIDsExistInScope(ctx context.Context, ids []int64, scope types.TagScope, category string) error
+	// ByRepoIDs returns tags grouped by repository ID for batch enrichment
+	ByRepoIDs(ctx context.Context, repoIDs []int64) (map[int64][]Tag, error)
 }
 
 func NewTagStore() TagStore {
@@ -663,6 +665,32 @@ func (ts *tagStoreImpl) CheckTagIDsExistInScope(ctx context.Context, ids []int64
 		return ErrTagIDsNotFoundInScope
 	}
 	return nil
+}
+
+// ByRepoIDs returns tags grouped by repository ID for the given repo IDs.
+func (ts *tagStoreImpl) ByRepoIDs(ctx context.Context, repoIDs []int64) (map[int64][]Tag, error) {
+	if len(repoIDs) == 0 {
+		return make(map[int64][]Tag), nil
+	}
+
+	var repoTags []RepositoryTag
+	err := ts.db.Operator.Core.
+		NewSelect().
+		Model(&repoTags).
+		Relation("Tag").
+		Where("repository_tag.repository_id IN (?)", bun.In(repoIDs)).
+		Scan(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get tags by repo ids: %w", err)
+	}
+
+	result := make(map[int64][]Tag, len(repoIDs))
+	for _, rt := range repoTags {
+		if rt.Tag != nil {
+			result[rt.RepositoryID] = append(result[rt.RepositoryID], *rt.Tag)
+		}
+	}
+	return result, nil
 }
 
 // ErrTagIDsNotFoundInScope is returned when some tag IDs do not exist or belong to the wrong scope/category.

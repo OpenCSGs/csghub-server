@@ -7,6 +7,7 @@ api_token = "f3a7b9c1d6e5f8e2a1b5d4f9e6a2b8d7c3a4e2b1d9f6e7a8d2c5a7b4c1e3f5b8a1d
 lbs_service_key = "123456"
 city_to_cdn_domain = {}
 docs_host = "http://localhost:6636"
+timezone = "Asia/Shanghai"
 
 [api_server]
 port = 8080
@@ -16,6 +17,7 @@ ssh_domain = "git@localhost:2222"
 [aigateway]
 responses_id_secret = "responses-id-secret"
 public_aigateway_url = "http://aigateway:8094/v1"
+metrics_collector_lookback_minutes = 60
 
 [mirror]
 url = "http://localhost:8085"
@@ -30,7 +32,6 @@ lfs_concurrency = 5
 [database]
 driver = "pg"
 dsn = "postgresql://postgres:postgres@localhost:5433/starhub_server?sslmode=disable"
-timezone = "Asia/Shanghai"
 
 [redis]
 endpoint = "localhost:6379"
@@ -239,6 +240,7 @@ calc_recom_score_cron_expression = "0 1 * * *"
 mirror_cron_expression = "* * * * *"
 public_model_repo_cron_expression = "* * * * *"
 glama_crawl_cron_expression = "0 1 * * *"
+aigateway_metrics_collector_cron_expression = "* * * * *"
 
 [dataviewer]
 host = "http://localhost"

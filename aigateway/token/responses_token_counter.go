@@ -29,6 +29,7 @@ type responsesTokenCounterImpl struct {
 	toolCallText   strings.Builder
 	tokenizer      Tokenizer
 	promptFallback strings.Builder
+	computedUsage  *Usage
 }
 
 func NewResponsesTokenCounter(tokenizer Tokenizer) ResponsesTokenCounter {
@@ -41,6 +42,7 @@ func (c *responsesTokenCounterImpl) Request(req *types.ResponsesRequest) {
 	}
 	cp := *req
 	c.request = &cp
+	c.computedUsage = nil
 	c.promptFallback.Reset()
 	c.promptFallback.WriteString(types.ResponsesPromptText(req))
 }
@@ -50,6 +52,7 @@ func (c *responsesTokenCounterImpl) Response(resp *types.ResponsesResponse) {
 		return
 	}
 	cp := *resp
+	c.computedUsage = nil
 	c.response = &cp
 	if resp.Usage != nil {
 		c.usage = resp.Usage
@@ -64,6 +67,7 @@ func (c *responsesTokenCounterImpl) Response(resp *types.ResponsesResponse) {
 }
 
 func (c *responsesTokenCounterImpl) AppendEvent(event types.ResponsesStreamEvent) {
+	c.computedUsage = nil
 	if event.Response != nil {
 		cp := *event.Response
 		c.response = &cp
@@ -98,7 +102,11 @@ func (c *responsesTokenCounterImpl) AppendEvent(event types.ResponsesStreamEvent
 }
 
 func (c *responsesTokenCounterImpl) Usage(ctx context.Context) (*Usage, error) {
+	if c.computedUsage != nil {
+		return c.computedUsage, nil
+	}
 	if usage := responsesUsageToTokenUsage(c.usage); usage != nil {
+		c.computedUsage = usage
 		return usage, nil
 	}
 
@@ -109,34 +117,81 @@ func (c *responsesTokenCounterImpl) Usage(ctx context.Context) (*Usage, error) {
 	}
 
 	if c.tokenizer == nil {
-		promptTokens := approxTokensByText(promptText)
-		completionTokens := approxTokensByText(outputText)
-		totalTokens := promptTokens + completionTokens
-		slog.WarnContext(ctx, "responses tokenizer unavailable, using approximate token usage",
-			slog.Int64("prompt_tokens", promptTokens),
-			slog.Int64("completion_tokens", completionTokens),
-			slog.Int64("total_tokens", totalTokens))
-		return &Usage{
-			PromptTokens:     promptTokens,
-			CompletionTokens: completionTokens,
-			TotalTokens:      totalTokens,
-		}, nil
+		c.computedUsage = approximateResponsesUsage(ctx, "responses tokenizer unavailable, using approximate token usage", "tokenizer_unavailable", promptText, outputText)
+		return c.computedUsage, nil
 	}
 
-	promptTokens, err := c.tokenizer.Encode(types.Message{Role: string(types.RoleUser), Content: promptText})
+	promptTokens, err := encodeResponsesTokens(ctx, c.tokenizer, types.Message{Role: string(types.RoleUser), Content: promptText})
 	if err != nil {
-		return nil, err
+		c.computedUsage = approximateResponsesUsage(ctx, "responses tokenizer failed, using approximate token usage", responsesTokenizerFallbackReason(err), promptText, outputText)
+		return c.computedUsage, nil
 	}
-	completionTokens, err := c.tokenizer.Encode(types.Message{Content: outputText})
+	completionTokens, err := encodeResponsesTokens(ctx, c.tokenizer, types.Message{Content: outputText})
 	if err != nil {
-		return nil, err
+		c.computedUsage = approximateResponsesUsage(ctx, "responses tokenizer failed, using approximate token usage", responsesTokenizerFallbackReason(err), promptText, outputText)
+		return c.computedUsage, nil
 	}
 	totalTokens := promptTokens + completionTokens
+	c.computedUsage = &Usage{
+		PromptTokens:     promptTokens,
+		CompletionTokens: completionTokens,
+		TotalTokens:      totalTokens,
+	}
+	return c.computedUsage, nil
+}
+
+type responsesEncodeResult struct {
+	tokens int64
+	err    error
+}
+
+func encodeResponsesTokens(ctx context.Context, tokenizer Tokenizer, message types.Message) (int64, error) {
+	if err := ctx.Err(); err != nil {
+		return 0, err
+	}
+	resultCh := make(chan responsesEncodeResult, 1)
+	go func() {
+		tokens, err := tokenizer.Encode(message)
+		resultCh <- responsesEncodeResult{tokens: tokens, err: err}
+	}()
+	select {
+	case result := <-resultCh:
+		return result.tokens, result.err
+	case <-ctx.Done():
+		return 0, ctx.Err()
+	}
+}
+
+func responsesTokenizerFallbackReason(err error) string {
+	switch {
+	case errors.Is(err, errUnsupportedTokenizer):
+		return "unsupported_tokenizer"
+	case errors.Is(err, context.DeadlineExceeded):
+		return "tokenizer_timeout"
+	case errors.Is(err, context.Canceled):
+		return "tokenizer_canceled"
+	default:
+		return "tokenizer_error"
+	}
+}
+
+func approximateResponsesUsage(ctx context.Context, message, reason, promptText, outputText string) *Usage {
+	promptTokens := approxTokensByText(promptText)
+	completionTokens := approxTokensByText(outputText)
+	totalTokens := promptTokens + completionTokens
+	slog.WarnContext(ctx, message,
+		slog.String("usage_source", "approx_chars_div_4"),
+		slog.String("usage_reason", reason),
+		slog.Int64("prompt_tokens", promptTokens),
+		slog.Int64("completion_tokens", completionTokens),
+		slog.Int64("total_tokens", totalTokens))
 	return &Usage{
 		PromptTokens:     promptTokens,
 		CompletionTokens: completionTokens,
 		TotalTokens:      totalTokens,
-	}, nil
+		Source:           "approx_chars_div_4",
+		SourceReason:     reason,
+	}
 }
 
 func (c *responsesTokenCounterImpl) captureOutputItem(item types.ResponsesOutputItem) {

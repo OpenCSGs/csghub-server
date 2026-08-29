@@ -771,9 +771,10 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 					organStore:  mockOrgStore,
 				}
 				mockCounter.EXPECT().Usage(mock.Anything).Return(&token.Usage{
-					PromptTokens:     100,
-					CompletionTokens: 50,
-					TotalTokens:      150,
+					PromptTokens:       100,
+					CachedPromptTokens: 40,
+					CompletionTokens:   50,
+					TotalTokens:        150,
 				}, nil)
 				user := &database.User{
 					ID:       1,
@@ -798,15 +799,17 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 					require.Equal(t, commontypes.TokenNumberType, evt.ValueType)
 					require.Equal(t, int64(150), evt.Value)
 					var tokenUsageExtra struct {
-						PromptTokenNum     string                     `json:"prompt_token_num"`
-						CompletionTokenNum string                     `json:"completion_token_num"`
-						OwnerType          commontypes.TokenUsageType `json:"owner_type"`
-						Provider           string                     `json:"provider"`
-						ModelName          string                     `json:"model_name"`
+						PromptTokenNum      string                     `json:"prompt_token_num"`
+						PromptTokenCacheNum string                     `json:"prompt_token_cache_num"`
+						CompletionTokenNum  string                     `json:"completion_token_num"`
+						OwnerType           commontypes.TokenUsageType `json:"owner_type"`
+						Provider            string                     `json:"provider"`
+						ModelName           string                     `json:"model_name"`
 					}
 					err = json.Unmarshal([]byte(evt.Extra), &tokenUsageExtra)
 					require.NoError(t, err)
 					require.Equal(t, "100", tokenUsageExtra.PromptTokenNum)
+					require.Equal(t, "40", tokenUsageExtra.PromptTokenCacheNum)
 					require.Equal(t, "50", tokenUsageExtra.CompletionTokenNum)
 					require.Equal(t, commontypes.CSGHubOtherDeployedInference, tokenUsageExtra.OwnerType)
 					require.Empty(t, tokenUsageExtra.Provider)
@@ -1213,6 +1216,41 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 			}
+		})
+	}
+}
+
+func TestBuildUsageExtraDataIncludesCachedPromptTokens(t *testing.T) {
+	meteringInfo := usageMeteringInfo{OwnerType: commontypes.ExternalInference}
+
+	for _, tt := range []struct {
+		name               string
+		cachedPromptTokens int64
+		wantCachedTokens   string
+	}{
+		{
+			name:               "cached prompt tokens reported",
+			cachedPromptTokens: 40,
+			wantCachedTokens:   "40",
+		},
+		{
+			name:             "cached prompt tokens absent",
+			wantCachedTokens: "0",
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			extraData, err := buildUsageExtraData(&types.Model{}, "target-model", &token.Usage{
+				PromptTokens:       100,
+				CachedPromptTokens: tt.cachedPromptTokens,
+				CompletionTokens:   50,
+			}, "", meteringInfo)
+			require.NoError(t, err)
+
+			var extra usageMeteringExtra
+			require.NoError(t, json.Unmarshal([]byte(extraData), &extra))
+			require.Equal(t, "100", extra.PromptTokenNum)
+			require.Equal(t, tt.wantCachedTokens, extra.PromptTokenCacheNum)
+			require.Equal(t, "50", extra.CompletionTokenNum)
 		})
 	}
 }

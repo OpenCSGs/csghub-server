@@ -21,6 +21,11 @@ type CreateMirrorReq struct {
 	SyncLfs         bool           `json:"sync_lfs"`
 	// Urgent routes the next synchronization through the urgent mirror queues.
 	Urgent bool `json:"urgent,omitempty"`
+	// Priority controls the new repo job scheduling order; 0 defaults to lowest.
+	Priority MirrorPriority `json:"priority,omitempty"`
+	// SkipSourcePath skips setting HFPath/MSPath/GithubPath on the repository.
+	// Used for user-created code/skill repos where auto-generated descriptions are not desired.
+	SkipSourcePath bool `json:"-"`
 }
 
 // MirrorFromSaasReq identifies an existing repository and the user requesting a SaaS mirror sync.
@@ -272,6 +277,9 @@ type CreateMirrorRepoReq struct {
 	Priority MirrorPriority `json:"priority,omitempty"`
 	// Urgent routes the initial synchronization through the urgent mirror queues.
 	Urgent bool `json:"urgent,omitempty"`
+	// SkipSourcePath skips setting HFPath/MSPath/GithubPath on the repository.
+	// Used for user-imported code/skill repos where auto-generated descriptions are not desired.
+	SkipSourcePath bool `json:"-"`
 }
 
 type ResolveNamespaceReq struct {

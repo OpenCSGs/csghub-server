@@ -9,6 +9,7 @@ import (
 	deployer "opencsg.com/csghub-server/builder/deploy"
 	"opencsg.com/csghub-server/builder/git/membership"
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 
 	corev1 "k8s.io/api/core/v1"
@@ -450,7 +451,7 @@ func TestNotebookComponentImpl_UpdateNotebook_DeployRunning(t *testing.T) {
 		ResourceID:  2,
 	})
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "stop deploy first")
+	require.ErrorIs(t, err, errorx.ErrDeployStopFirst)
 }
 
 func TestNotebookComponentImpl_UpdateNotebook_ResourceNotFound(t *testing.T) {

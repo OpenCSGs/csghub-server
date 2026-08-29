@@ -73,6 +73,12 @@ func (h *OpenAIHandlerImpl) CreateVideo(c *gin.Context) {
 	}
 
 	modelTarget, err := h.resolveModelTarget(ctx, username, input.modelID, c.Request.Header)
+	SetMetricsModelTarget(SetMetricsModelParams{
+		C:           c,
+		ModelID:     input.modelID,
+		ModelTarget: modelTarget,
+		IsStream:    false,
+	})
 	if err != nil {
 		preflight.RecordError(err, "model_resolve")
 		handleModelTargetError(c, ctx, input.modelID, "failed to get video target address", err)
@@ -123,7 +129,7 @@ func (h *OpenAIHandlerImpl) CreateVideo(c *gin.Context) {
 	}
 	body := capture.Body()
 	var videoResp *types.VideoObject
-	if capture.StatusCode() < http.StatusBadRequest {
+	if isSuccessfulStatus(capture.StatusCode()) {
 		var videoProviderResp *text2video.ProviderResponse
 		videoProviderResp, ok = parseCreateVideoProviderResponse(c, ctx, adapter, body, generationRecorder)
 		if !ok {

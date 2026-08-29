@@ -55,24 +55,26 @@ type Deploy struct {
 	// 1-public, 2-private, 3-extension in future
 	SecureLevel int `json:"secure_level"`
 	// 0-space, 1-inference, 2-finetune, 3-serverless, 4-evaluation, 5-notebook
-	Type           int                  `json:"type"`
-	Task           types.PipelineTask   `bun:",nullzero" json:"task"` // text-generation,text-to-image,image-to-image,text-to-speech
-	UserUUID       string               `bun:"," json:"user_uuid"`
-	SKU            string               `bun:"," json:"sku"`
-	OrderDetailID  int64                `bun:"," json:"order_detail_id"`
-	EngineArgs     string               `bun:"," json:"engine_args"`
-	Variables      string               `bun:",nullzero" json:"variables"`
-	Message        string               `bun:",nullzero" json:"message"`
-	Reason         string               `bun:",nullzero" json:"reason"`
-	ClusterNode    string               `bun:"," json:"cluster_node"`
-	QueueName      string               `bun:"," json:"queue_name"`
-	OwnerNamespace string               `bun:"," json:"owner_namespace"`
-	Instances      []types.Instance     `bun:"type:jsonb" json:"instances"`
-	NodeAffinity   *corev1.NodeAffinity `json:"node_affinity,omitempty"`
-	Tolerations    []types.Toleration   `json:"tolerations,omitempty"`
-	PD             *types.PDConfig      `bun:"type:jsonb,nullzero" json:"pd,omitempty"`
-	Timeout        int                  `json:"timeout,omitempty"`
-	StatusUpdateAt time.Time            `bun:",nullzero,notnull,default:current_timestamp" json:"status_update_at,omitempty"`
+	Type           int                          `json:"type"`
+	Task           types.PipelineTask           `bun:",nullzero" json:"task"` // text-generation,text-to-image,image-to-image,text-to-speech
+	UserUUID       string                       `bun:"," json:"user_uuid"`
+	SKU            string                       `bun:"," json:"sku"`
+	OrderDetailID  int64                        `bun:"," json:"order_detail_id"`
+	EngineArgs     string                       `bun:"," json:"engine_args"`
+	Variables      string                       `bun:",nullzero" json:"variables"`
+	Message        string                       `bun:",nullzero" json:"message"`
+	Reason         string                       `bun:",nullzero" json:"reason"`
+	ClusterNode    string                       `bun:"," json:"cluster_node"`
+	QueueName      string                       `bun:"," json:"queue_name"`
+	OwnerNamespace string                       `bun:"," json:"owner_namespace"`
+	Instances      []types.Instance             `bun:"type:jsonb" json:"instances"`
+	NodeAffinity   *corev1.NodeAffinity         `json:"node_affinity,omitempty"`
+	Tolerations    []types.Toleration           `json:"tolerations,omitempty"`
+	PD             *types.PDConfig              `bun:"type:jsonb,nullzero" json:"pd,omitempty"`
+	VolumeMounts   []types.VolumeMount          `bun:"type:jsonb,nullzero" json:"volume_mounts,omitempty"`
+	ReadinessProbe *types.SandboxReadinessProbe `bun:"type:jsonb,nullzero" json:"readiness_probe,omitempty"`
+	Timeout        int                          `json:"timeout,omitempty"` // reserved: written from dr.Sandbox.Timeout but not yet consumed downstream
+	StatusUpdateAt time.Time                    `bun:",nullzero,notnull,default:current_timestamp" json:"status_update_at,omitempty"`
 	times
 }
 
@@ -130,6 +132,7 @@ type DeployTaskStore interface {
 	ListDeploysByTimeRange(ctx context.Context, req types.DeployTimeRangeReq) ([]Deploy, int, error)
 	FindByDeployNameAndType(ctx context.Context, uuid, deployName string, deployType int) (*Deploy, error)
 	FindActiveDeployByNameAndType(ctx context.Context, userUUID, deployName string, deployType int) (*Deploy, error)
+	FindActiveSandboxByDeployName(ctx context.Context, uuid, deployName string) (*Deploy, error)
 	CountRunningDeploysByNodeName(ctx context.Context, nodeName string) (int, error)
 	ListDeploysNeedingReconcile(ctx context.Context, statuses []int, timeoutMin int, limit int) ([]Deploy, error)
 	CountByRepoID(ctx context.Context, repoID int64) (int, error)
@@ -476,6 +479,10 @@ func (s *deployTaskStoreImpl) ListServerless(ctx context.Context, req types.Depl
 	query := s.db.Operator.Core.NewSelect().Model(&result).Where("type = ?", req.DeployType)
 	query = query.Where("status != ?", common.Deleted)
 
+	if len(req.Status) > 0 {
+		query = query.Where("status in (?)", bun.In(req.Status))
+	}
+
 	searchQuery := strings.TrimSpace(req.Query)
 	if searchQuery != "" {
 		searchPattern := "%" + strings.ToLower(searchQuery) + "%"
@@ -782,6 +789,29 @@ func (s *deployTaskStoreImpl) FindActiveDeployByNameAndType(ctx context.Context,
 	var result Deploy
 	err := s.db.Operator.Core.NewSelect().Model(&result).
 		Where("user_uuid = ? and deploy_name = ? and type = ? and status != ?", userUUID, deployName, deployType, common.Deleted).
+		Scan(ctx, &result)
+	if err != nil {
+		err = errorx.HandleDBError(err, nil)
+		if errors.Is(err, errorx.ErrDatabaseNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &result, nil
+}
+
+// FindActiveSandboxByDeployName looks up a non-deleted sandbox deploy (persistent or
+// ephemeral) by user UUID and deploy name. Returns (nil, nil) when absent. The
+// status != Deleted filter matters for proxy lookup: a deleted deploy's SvcName is
+// still populated, so without it GetProxyURL would hand back a proxy URL for a
+// sandbox that no longer exists (404).
+func (s *deployTaskStoreImpl) FindActiveSandboxByDeployName(ctx context.Context, uuid, deployName string) (*Deploy, error) {
+	var result Deploy
+	err := s.db.Operator.Core.NewSelect().Model(&result).
+		Where("user_uuid = ? and deploy_name = ? and type IN (?) and status != ?", uuid, deployName,
+			bun.In([]int{types.SandboxType, types.SandboxEphemeralType}), common.Deleted).
+		Order("id DESC").
+		Limit(1).
 		Scan(ctx, &result)
 	if err != nil {
 		err = errorx.HandleDBError(err, nil)

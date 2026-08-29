@@ -187,6 +187,19 @@ func (c *finetuneComponentImpl) CreateFinetuneJob(ctx context.Context, req types
 		// req.ResourceName = resource
 	}
 
+	clusterNodes, err := c.clusterStore.FindNodeByClusterID(ctx, req.ClusterID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find nodes by cluster id, clusterID: %s, error: %w", req.ClusterID, err)
+	}
+
+	for _, node := range clusterNodes {
+		req.Nodes = append(req.Nodes, types.Node{
+			Name:       node.Name,
+			EnableVXPU: node.EnableVXPU,
+			HasXPU:     node.Hardware.HasXPU() || node.EnableVXPU,
+		})
+	}
+
 	req.Hardware = hardware
 	// choose image
 	containerImg := frame.FrameImage

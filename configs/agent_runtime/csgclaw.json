@@ -1,0 +1,23 @@
+{
+  "agent_type": "csgclaw",
+  "version": "v0.4.5",
+  "image": "opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/csgclaw-server-sandbox:2026080603",
+  "port": 18080,
+  "command": [
+    "/sbin/tini",
+    "--",
+    "/usr/local/bin/docker-entrypoint.sh"
+  ],
+  "readiness_probe": {
+    "protocol": "http",
+    "path": "/",
+    "port": 8888,
+    "initial_delay_seconds": 10
+  },
+  "default_env": {
+    "OPENCSG_SANDBOX_TYPE": "csgclaw",
+    "CSGCLAW_ROLE": "server",
+    "CSGCLAW_PVC_MOUNT_PATH": "/home/picoclaw/.csgclaw",
+    "SKILLS_POLL_INTERVAL": "600"
+  }
+}

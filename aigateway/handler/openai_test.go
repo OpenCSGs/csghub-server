@@ -16,6 +16,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -115,11 +116,20 @@ func setupTest(t *testing.T) (*testerOpenAIHandler, *gin.Context, *httptest.Resp
 	tester.mocks.whitelistRule = mockWhitelistRule
 	tester.mocks.aiGenerationStore = mockAIGenerationStore
 
-	tester.mocks.whitelistRule.EXPECT().ListBySensitiveCheckTargets(mock.Anything, mock.Anything, mock.Anything).Return([]database.RepositoryFileCheckRule{}, nil).Maybe()
-	tester.mocks.openAIComp.EXPECT().CheckUsageLimit(mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
-	tester.mocks.openAIComp.EXPECT().CommitUsageLimit(mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
-
 	return tester, c, w
+}
+
+func expectNoSensitiveCheckWhitelist(tester *testerOpenAIHandler) {
+	tester.mocks.whitelistRule.EXPECT().ListBySensitiveCheckTargets(mock.Anything, mock.Anything, mock.Anything).
+		Return([]database.RepositoryFileCheckRule{}, nil).Once()
+}
+
+func expectCheckUsageLimit(tester *testerOpenAIHandler, model *types.Model, endpoint string) {
+	tester.mocks.openAIComp.EXPECT().CheckUsageLimit(mock.Anything, "testuuid", model, endpoint).Return(nil).Once()
+}
+
+func expectCommitUsageLimit(tester *testerOpenAIHandler, model *types.Model, counter token.Counter) {
+	tester.mocks.openAIComp.EXPECT().CommitUsageLimitFromUsage(mock.Anything, "testuuid", model, mock.Anything).Return(nil).Once()
 }
 
 func expectBuildVideoMeteringEvent(t *testing.T, tester *testerOpenAIHandler) *commontypes.MeteringEvent {
@@ -675,6 +685,7 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 		}, nil)
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "model1:svc1").Return(model, nil)
 		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil)
+		expectNoSensitiveCheckWhitelist(tester)
 		expectReq := ChatCompletionRequest{}
 		_ = json.Unmarshal(body, &expectReq)
 		tester.mocks.moderationComp.EXPECT().CheckChatPrompts(mock.Anything, expectReq.Messages, "testuuid:"+model.ID, false).
@@ -724,6 +735,8 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 		}, nil)
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "model1:svc1").Return(model, nil)
 		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil)
+		expectNoSensitiveCheckWhitelist(tester)
+		expectCheckUsageLimit(tester, model, testServer.URL)
 		expectReq := ChatCompletionRequest{}
 		_ = json.Unmarshal(body, &expectReq)
 		tester.mocks.moderationComp.EXPECT().CheckChatPrompts(mock.Anything, expectReq.Messages, "testuuid:"+model.ID, false).
@@ -738,12 +751,14 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 				Provider: model.Provider,
 			}).
 			Return(llmTokenCounter)
+		expectCommitUsageLimit(tester, model, llmTokenCounter)
 		llmTokenCounter.EXPECT().AppendPrompts(expectReq.Messages).Return()
-		llmTokenCounter.EXPECT().Usage(mock.Anything).Return(&token.Usage{}, nil).Maybe()
+		llmTokenCounter.EXPECT().Usage(mock.Anything).Return(&token.Usage{PromptTokens: 10, CompletionTokens: 20, TotalTokens: 30}, nil).Once()
 		var wg sync.WaitGroup
 		wg.Add(1)
 		tester.mocks.openAIComp.EXPECT().RecordUsageFromTokenUsage(mock.Anything, "testuuid", model, mock.Anything, mock.Anything, "").
 			RunAndReturn(func(ctx context.Context, uuid string, model *types.Model, targetModelName string, usage *token.Usage, apikey string) error {
+				require.Equal(t, &token.Usage{PromptTokens: 10, CompletionTokens: 20, TotalTokens: 30}, usage)
 				wg.Done()
 				return nil
 			})
@@ -798,7 +813,6 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 			}).
 			Return(llmTokenCounter)
 		llmTokenCounter.EXPECT().AppendPrompts(expectReq.Messages).Return()
-		llmTokenCounter.EXPECT().Usage(mock.Anything).Return(&token.Usage{}, nil).Maybe()
 
 		tester.handler.Chat(c)
 
@@ -845,6 +859,8 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 		}, nil)
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "model1:svc1").Return(model, nil)
 		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil)
+		expectNoSensitiveCheckWhitelist(tester)
+		expectCheckUsageLimit(tester, model, testServer.URL)
 		expectReq := ChatCompletionRequest{}
 		_ = json.Unmarshal(body, &expectReq)
 		tester.mocks.moderationComp.EXPECT().CheckChatPrompts(mock.Anything, expectReq.Messages, "testuuid:"+model.ID, false).
@@ -859,8 +875,9 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 				Provider: model.Provider,
 			}).
 			Return(llmTokenCounter)
+		expectCommitUsageLimit(tester, model, llmTokenCounter)
 		llmTokenCounter.EXPECT().AppendPrompts(expectReq.Messages).Return()
-		llmTokenCounter.EXPECT().Usage(mock.Anything).Return(&token.Usage{}, nil).Maybe()
+		llmTokenCounter.EXPECT().Usage(mock.Anything).Return(&token.Usage{PromptTokens: 10, CompletionTokens: 20, TotalTokens: 30}, nil).Once()
 		var wg sync.WaitGroup
 		wg.Add(1)
 		tester.mocks.openAIComp.EXPECT().RecordUsageFromTokenUsage(mock.Anything, "testuuid", model, mock.Anything, mock.Anything, "").
@@ -912,6 +929,8 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 		}, nil)
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "model1:svc1").Return(model, nil)
 		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil)
+		expectNoSensitiveCheckWhitelist(tester)
+		expectCheckUsageLimit(tester, model, testServer.URL)
 		expectReq := ChatCompletionRequest{}
 		_ = json.Unmarshal(body, &expectReq)
 		tester.mocks.moderationComp.EXPECT().CheckChatPrompts(mock.Anything, expectReq.Messages, "testuuid:"+model.ID, false).
@@ -926,8 +945,9 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 				Provider: model.Provider,
 			}).
 			Return(llmTokenCounter)
+		expectCommitUsageLimit(tester, model, llmTokenCounter)
 		llmTokenCounter.EXPECT().AppendPrompts(expectReq.Messages).Return()
-		llmTokenCounter.EXPECT().Usage(mock.Anything).Return(&token.Usage{}, nil).Maybe()
+		llmTokenCounter.EXPECT().Usage(mock.Anything).Return(&token.Usage{PromptTokens: 10, CompletionTokens: 20, TotalTokens: 30}, nil).Once()
 		var wg sync.WaitGroup
 		wg.Add(1)
 		tester.mocks.openAIComp.EXPECT().RecordUsageFromTokenUsage(mock.Anything, "testuuid", model, mock.Anything, mock.Anything, "").
@@ -975,6 +995,8 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 		}
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "external-model-id").Return(model, nil)
 		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil)
+		expectNoSensitiveCheckWhitelist(tester)
+		expectCheckUsageLimit(tester, model, testServer.URL)
 		expectReq := ChatCompletionRequest{}
 		_ = json.Unmarshal(body, &expectReq)
 		tester.mocks.moderationComp.EXPECT().CheckChatPrompts(mock.Anything, expectReq.Messages, "testuuid:"+model.ID, false).
@@ -988,8 +1010,9 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 				ImageID:  model.ImageID,
 			}).
 			Return(llmTokenCounter)
+		expectCommitUsageLimit(tester, model, llmTokenCounter)
 		llmTokenCounter.EXPECT().AppendPrompts(expectReq.Messages).Return()
-		llmTokenCounter.EXPECT().Usage(mock.Anything).Return(&token.Usage{}, nil).Maybe()
+		llmTokenCounter.EXPECT().Usage(mock.Anything).Return(&token.Usage{PromptTokens: 10, CompletionTokens: 20, TotalTokens: 30}, nil).Once()
 
 		var wg sync.WaitGroup
 		wg.Add(1)
@@ -1046,6 +1069,8 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 		}
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "test-model-1(OpenAI)").Return(model, nil)
 		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil)
+		expectNoSensitiveCheckWhitelist(tester)
+		expectCheckUsageLimit(tester, model, testServer.URL)
 		expectReq := ChatCompletionRequest{}
 		_ = json.Unmarshal(body, &expectReq)
 		tester.mocks.moderationComp.EXPECT().CheckChatPrompts(mock.Anything, expectReq.Messages, "testuuid:"+model.ID, false).
@@ -1059,8 +1084,9 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 				ImageID:  model.ImageID,
 			}).
 			Return(llmTokenCounter)
+		expectCommitUsageLimit(tester, model, llmTokenCounter)
 		llmTokenCounter.EXPECT().AppendPrompts(expectReq.Messages).Return()
-		llmTokenCounter.EXPECT().Usage(mock.Anything).Return(&token.Usage{}, nil).Maybe()
+		llmTokenCounter.EXPECT().Usage(mock.Anything).Return(&token.Usage{PromptTokens: 10, CompletionTokens: 20, TotalTokens: 30}, nil).Once()
 
 		var wg sync.WaitGroup
 		wg.Add(1)
@@ -1076,87 +1102,93 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 		assert.Equal(t, "test-model-1", forwardedModel)
 	})
 	t.Run("report primary upstream http status failure for downstream processing", func(t *testing.T) {
-		tester, c, w := setupTest(t)
-		tester.mocks.openAIComp.ExpectedCalls = nil
-		reporter := &testChatAttemptFailureReporterWithMutex{doneCh: make(chan struct{}, 10)}
-		tester.handler.SetChatAttemptFailureReporter(reporter)
+		synctest.Test(t, func(t *testing.T) {
+			tester, c, w := setupTest(t)
+			tester.mocks.openAIComp.ExpectedCalls = nil
+			reporter := &testChatAttemptFailureReporterWithMutex{doneCh: make(chan struct{}, 10)}
+			tester.handler.SetChatAttemptFailureReporter(reporter)
 
-		chatReq := ChatCompletionRequest{
-			Model: "external-model-id",
-			Messages: []openai.ChatCompletionMessageParamUnion{
-				openai.UserMessage("Hello"),
-			},
-		}
-		body, _ := json.Marshal(chatReq)
-		c.Request.Method = http.MethodPost
-		c.Request.Body = io.NopCloser(bytes.NewReader(body))
+			chatReq := ChatCompletionRequest{
+				Model: "external-model-id",
+				Messages: []openai.ChatCompletionMessageParamUnion{
+					openai.UserMessage("Hello"),
+				},
+			}
+			body, _ := json.Marshal(chatReq)
+			c.Request.Method = http.MethodPost
+			c.Request.Body = io.NopCloser(bytes.NewReader(body))
 
-		testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusNotFound)
-			_, err := w.Write([]byte(`{"error":"not found"}`))
-			require.NoError(t, err)
-		}))
-		defer testServer.Close()
+			testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusNotFound)
+				_, err := w.Write([]byte(`{"error":"not found"}`))
+				require.NoError(t, err)
+			}))
 
-		model := &types.Model{
-			BaseModel: types.BaseModel{
-				ID:      "external-model-id",
-				Object:  "model",
-				OwnedBy: "testuser",
-			},
-			ExternalModelInfo: types.ExternalModelInfo{
-				NeedSensitiveCheck: true,
-			},
-			Endpoint: testServer.URL,
-			Upstreams: []commontypes.UpstreamConfig{
-				{URL: testServer.URL, Enabled: true, ModelName: "external-model-id"},
-			},
-		}
-		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "external-model-id").Return(model, nil).Once()
-		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil).Once()
-		tester.mocks.openAIComp.EXPECT().CheckUsageLimit(mock.Anything, "testuuid", model, testServer.URL).Return(nil).Once()
-		expectReq := ChatCompletionRequest{}
-		_ = json.Unmarshal(body, &expectReq)
-		tester.mocks.moderationComp.EXPECT().CheckChatPrompts(mock.Anything, expectReq.Messages, "testuuid:"+model.ID, false).
-			Return(&rpc.CheckResult{IsSensitive: false}, nil)
-		llmTokenCounter := mocktoken.NewMockChatTokenCounter(t)
-		tester.mocks.tokenCounterFactory.EXPECT().NewChat(
-			token.CreateParam{
-				Endpoint: model.Endpoint,
-				Host:     "",
-				Model:    model.ID,
-				ImageID:  model.ImageID,
-				Provider: model.Provider,
-			},
-		).Return(llmTokenCounter)
-		llmTokenCounter.EXPECT().AppendPrompts(expectReq.Messages).Return()
-		llmTokenCounter.EXPECT().Usage(mock.Anything).Return(&token.Usage{}, nil).Maybe()
-		llmTokenCounter.EXPECT().Completion(mock.Anything).Return().Maybe()
-		var wg sync.WaitGroup
-		wg.Add(2)
-		tester.mocks.openAIComp.EXPECT().CommitUsageLimit(mock.Anything, "testuuid", model, llmTokenCounter).
-			RunAndReturn(func(ctx context.Context, userUUID string, model *types.Model, counter token.Counter) error {
-				wg.Done()
-				return nil
-			})
-		tester.mocks.openAIComp.EXPECT().RecordUsageFromTokenUsage(mock.Anything, "testuuid", model, mock.Anything, mock.Anything, mock.Anything).
-			RunAndReturn(func(ctx context.Context, userUUID string, model *types.Model, targetModelName string, usage *token.Usage, apikey string) error {
-				wg.Done()
-				return nil
-			})
+			model := &types.Model{
+				BaseModel: types.BaseModel{
+					ID:      "external-model-id",
+					Object:  "model",
+					OwnedBy: "testuser",
+				},
+				ExternalModelInfo: types.ExternalModelInfo{
+					NeedSensitiveCheck: true,
+				},
+				Endpoint: testServer.URL,
+				Upstreams: []commontypes.UpstreamConfig{
+					{URL: testServer.URL, Enabled: true, ModelName: "external-model-id"},
+				},
+			}
+			tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "external-model-id").Return(model, nil).Once()
+			tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil).Once()
+			tester.mocks.openAIComp.EXPECT().CheckUsageLimit(mock.Anything, "testuuid", model, testServer.URL).Return(nil).Once()
+			expectNoSensitiveCheckWhitelist(tester)
+			expectReq := ChatCompletionRequest{}
+			_ = json.Unmarshal(body, &expectReq)
+			tester.mocks.moderationComp.EXPECT().CheckChatPrompts(mock.Anything, expectReq.Messages, "testuuid:"+model.ID, false).
+				Return(&rpc.CheckResult{IsSensitive: false}, nil)
+			llmTokenCounter := mocktoken.NewMockChatTokenCounter(t)
+			tester.mocks.tokenCounterFactory.EXPECT().NewChat(
+				token.CreateParam{
+					Endpoint: model.Endpoint,
+					Host:     "",
+					Model:    model.ID,
+					ImageID:  model.ImageID,
+					Provider: model.Provider,
+				},
+			).Return(llmTokenCounter)
+			llmTokenCounter.EXPECT().AppendPrompts(expectReq.Messages).Return()
+			llmTokenCounter.EXPECT().Usage(mock.Anything).Return(&token.Usage{PromptTokens: 10, CompletionTokens: 20, TotalTokens: 30}, nil).Once()
+			llmTokenCounter.EXPECT().Completion(mock.Anything).Return().Once()
+			tester.mocks.openAIComp.EXPECT().CommitUsageLimitFromUsage(mock.Anything, "testuuid", model, mock.Anything).
+				Return(nil).
+				Once()
 
-		tester.handler.Chat(c)
-		wg.Wait()
+			tester.handler.Chat(c)
 
-		assert.Equal(t, http.StatusNotFound, w.Code)
-		reporter.Wait()
-		events := reporter.Events()
-		require.Len(t, events, 1)
-		assert.Equal(t, chatAttemptPhasePrimary, events[0].Phase)
-		assert.Equal(t, "external-model-id", events[0].ModelID)
-		assert.Equal(t, testServer.URL, events[0].Target)
-		assert.Equal(t, http.StatusNotFound, events[0].StatusCode)
-		assert.True(t, events[0].Retryable)
+			// The proxy has already consumed the 404 by now, so shut the test
+			// server down before synctest.Wait: a live listener's accept-loop
+			// goroutine is blocked on a network syscall, which synctest does not
+			// count as idle and would otherwise keep Wait spinning until timeout.
+			testServer.Close()
+
+			// synctest.Wait blocks until the async post-process goroutine has
+			// fully completed (usage capture, CommitUsageLimit, billing gate), so
+			// the billing assertion below is settled.
+			synctest.Wait()
+
+			// upstream returned 404, so billing must be skipped
+			tester.mocks.openAIComp.AssertNotCalled(t, "RecordUsageFromTokenUsage", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+
+			assert.Equal(t, http.StatusNotFound, w.Code)
+			reporter.Wait()
+			events := reporter.Events()
+			require.Len(t, events, 1)
+			assert.Equal(t, chatAttemptPhasePrimary, events[0].Phase)
+			assert.Equal(t, "external-model-id", events[0].ModelID)
+			assert.Equal(t, testServer.URL, events[0].Target)
+			assert.Equal(t, http.StatusNotFound, events[0].StatusCode)
+			assert.True(t, events[0].Retryable)
+		})
 	})
 }
 
@@ -1297,6 +1329,13 @@ func TestOpenAIHandler_Embedding(t *testing.T) {
 
 	t.Run("model without svc name", func(t *testing.T) {
 		tester, c, _ := setupTest(t)
+		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			_, err := w.Write([]byte(`{"object":"list","data":[],"model":"model1","usage":{"prompt_tokens":2,"total_tokens":2}}`))
+			require.NoError(t, err)
+		}))
+		defer upstream.Close()
+
 		embeddingReq := EmbeddingRequest{
 			EmbeddingNewParams: openai.EmbeddingNewParams{
 				Model: "model1",
@@ -1318,9 +1357,9 @@ func TestOpenAIHandler_Embedding(t *testing.T) {
 			InternalModelInfo: types.InternalModelInfo{
 				SvcName: "",
 			},
-			Endpoint: "https://api.example.com/embeddings",
+			Endpoint: upstream.URL,
 			Upstreams: []commontypes.UpstreamConfig{
-				{URL: "https://api.example.com/embeddings", Enabled: true, ModelName: "model1"},
+				{URL: upstream.URL, Enabled: true, ModelName: "model1"},
 			},
 		}
 		var wg sync.WaitGroup
@@ -1339,8 +1378,8 @@ func TestOpenAIHandler_Embedding(t *testing.T) {
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "model1").
 			Return(model, nil)
 		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil)
-		tester.mocks.openAIComp.EXPECT().RecordUsage(mock.Anything, "testuuid", model, mock.Anything, mock.Anything, "").RunAndReturn(
-			func(ctx context.Context, userID string, model *types.Model, targetModelName string, counter token.Counter, apikey string) error {
+		tester.mocks.openAIComp.EXPECT().RecordUsageFromTokenUsage(mock.Anything, "testuuid", model, mock.Anything, mock.Anything, "").RunAndReturn(
+			func(ctx context.Context, userID string, model *types.Model, targetModelName string, usage *token.Usage, apikey string) error {
 				wg.Done()
 				return nil
 			})
@@ -1394,7 +1433,7 @@ func TestOpenAIHandler_EmbeddingTrace(t *testing.T) {
 		}).Return(counter).Once()
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "embedding-model").Return(model, nil).Once()
 		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil).Once()
-		tester.mocks.openAIComp.EXPECT().RecordUsage(mock.Anything, "testuuid", model, "resolved-embedding", counter, "").Return(nil).Once()
+		tester.mocks.openAIComp.EXPECT().RecordUsageFromTokenUsage(mock.Anything, "testuuid", model, "resolved-embedding", mock.Anything, "").Return(nil).Once()
 
 		req := EmbeddingRequest{EmbeddingNewParams: openai.EmbeddingNewParams{
 			Model: "embedding-model",
@@ -1433,7 +1472,7 @@ func TestOpenAIHandler_EmbeddingTrace(t *testing.T) {
 	})
 
 	t.Run("balance failure records trace error", func(t *testing.T) {
-		tester, c, _ := setupTest(t)
+		tester, c, w := setupTest(t)
 		tester.mocks.openAIComp.ExpectedCalls = nil
 
 		recorder := &testEmbeddingRecorderWithMutex{}
@@ -1463,6 +1502,8 @@ func TestOpenAIHandler_EmbeddingTrace(t *testing.T) {
 
 		tester.handler.Embedding(c)
 
+		require.Equal(t, http.StatusPaymentRequired, w.Code)
+		require.Contains(t, w.Body.String(), `"code":"insufficient_balance"`)
 		_, errorCode, ended, _ := recorder.snapshot()
 		require.True(t, ended)
 		require.Equal(t, types.TraceErrInsufficientBalance, errorCode)
@@ -1503,7 +1544,6 @@ func TestOpenAIHandler_EmbeddingTrace(t *testing.T) {
 		}).Return(counter).Once()
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "embedding-model").Return(model, nil).Once()
 		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil).Once()
-		tester.mocks.openAIComp.EXPECT().RecordUsage(mock.Anything, "testuuid", model, "resolved-embedding", counter, "").Return(nil).Once()
 
 		req := EmbeddingRequest{EmbeddingNewParams: openai.EmbeddingNewParams{
 			Model: "embedding-model",
@@ -1521,12 +1561,74 @@ func TestOpenAIHandler_EmbeddingTrace(t *testing.T) {
 			_, _, ended, _ := recorder.snapshot()
 			return ended
 		}, time.Second, 10*time.Millisecond)
+		tester.mocks.openAIComp.AssertNotCalled(t, "RecordUsage", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 		result, errorCode, ended, events := recorder.snapshot()
 		require.True(t, ended)
 		require.NotNil(t, result)
 		require.Equal(t, int64(3), result.InputTokens)
 		require.Equal(t, types.TraceErrUpstreamError, errorCode)
 		require.Equal(t, []string{"error", "result", "end"}, events)
+	})
+
+	t.Run("upstream redirect status skips billing", func(t *testing.T) {
+		tester, c, _ := setupTest(t)
+		tester.mocks.openAIComp.ExpectedCalls = nil
+
+		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusFound)
+			_, err := w.Write([]byte(`{"object":"list","data":[],"model":"resolved-embedding","usage":{"prompt_tokens":3,"total_tokens":3}}`))
+			require.NoError(t, err)
+		}))
+		defer upstream.Close()
+
+		recorder := &testEmbeddingRecorderWithMutex{}
+		tester.handler.llmTracer = &testLLMTracerWithMutex{embeddingRecorder: recorder}
+
+		model := &types.Model{
+			BaseModel: types.BaseModel{ID: "embedding-model", Object: "model", OwnedBy: "testuser"},
+			ExternalModelInfo: types.ExternalModelInfo{
+				Provider: "openai",
+			},
+			Upstreams: []commontypes.UpstreamConfig{
+				{URL: upstream.URL, Enabled: true, ModelName: "resolved-embedding", Provider: "openai"},
+			},
+		}
+		counter := mocktoken.NewMockEmbeddingTokenCounter(t)
+		counter.EXPECT().Embedding(mock.MatchedBy(func(usage openai.CreateEmbeddingResponseUsage) bool {
+			return usage.PromptTokens == 3 && usage.TotalTokens == 3
+		})).Return().Once()
+		counter.EXPECT().Usage(mock.Anything).Return(&token.Usage{PromptTokens: 3, TotalTokens: 3}, nil).Once()
+		tester.mocks.tokenCounterFactory.EXPECT().NewEmbedding(token.CreateParam{
+			Endpoint: upstream.URL,
+			Model:    "resolved-embedding",
+			Provider: "openai",
+		}).Return(counter).Once()
+		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "embedding-model").Return(model, nil).Once()
+		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil).Once()
+
+		req := EmbeddingRequest{EmbeddingNewParams: openai.EmbeddingNewParams{
+			Model: "embedding-model",
+			Input: openai.EmbeddingNewParamsInputUnion{OfArrayOfStrings: []string{"test input"}},
+		}}
+		body, err := json.Marshal(req)
+		require.NoError(t, err)
+		c.Request = httptest.NewRequest(http.MethodPost, "/v1/embeddings", bytes.NewReader(body))
+		httpbase.SetCurrentUser(c, "testuser")
+		httpbase.SetCurrentNamespaceUUID(c, "testuuid")
+
+		tester.handler.Embedding(c)
+
+		require.Eventually(t, func() bool {
+			_, _, ended, _ := recorder.snapshot()
+			return ended
+		}, time.Second, 10*time.Millisecond)
+		tester.mocks.openAIComp.AssertNotCalled(t, "RecordUsage", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+		result, errorCode, ended, events := recorder.snapshot()
+		require.True(t, ended)
+		require.NotNil(t, result)
+		require.Equal(t, int64(3), result.InputTokens)
+		require.Empty(t, errorCode)
+		require.Equal(t, []string{"result", "end"}, events)
 	})
 }
 
@@ -1717,8 +1819,9 @@ func TestOpenAIHandler_Transcription(t *testing.T) {
 		require.Contains(t, w.Body.String(), "model_not_found")
 	})
 
-	t.Run("stream insufficient balance uses chat completion stream error", func(t *testing.T) {
+	t.Run("stream insufficient balance returns payment required before SSE starts", func(t *testing.T) {
 		tester, c, w := setupTest(t)
+		tester.handler.config.Frontend.URL = "https://hub.example.com/"
 		c.Request = newMultipartTranscriptionRequest(t, "model1", "audio-bytes", map[string]string{
 			"stream": "true",
 		})
@@ -1741,11 +1844,15 @@ func TestOpenAIHandler_Transcription(t *testing.T) {
 		tester.handler.Transcription(c)
 
 		body := w.Body.String()
-		require.Equal(t, http.StatusOK, w.Code)
-		require.Equal(t, "text/event-stream", w.Header().Get("Content-Type"))
-		require.Contains(t, body, "data: ")
-		require.Contains(t, body, `"finish_reason":"insufficient_balance"`)
-		require.Contains(t, body, "data: [DONE]\n\n")
+		require.Equal(t, http.StatusPaymentRequired, w.Code)
+		require.Equal(t, "application/json; charset=utf-8", w.Header().Get("Content-Type"))
+		require.JSONEq(t, `{
+			"error": {
+				"code": "insufficient_balance",
+				"message": "**Insufficient balance**\n\n👉 [Recharge your account](https://hub.example.com/settings/recharge-payment) to continue.",
+				"type": "insufficient_balance"
+			}
+		}`, body)
 	})
 
 	t.Run("upstream error status ends trace without billing", func(t *testing.T) {
@@ -1794,7 +1901,143 @@ func TestOpenAIHandler_Transcription(t *testing.T) {
 	})
 }
 
+func TestOpenAIHandler_Translation(t *testing.T) {
+	t.Run("rewrites transcriptions endpoint to translations and records usage", func(t *testing.T) {
+		tester, c, w := setupTest(t)
+
+		var downstreamModel string
+		var downstreamPrompt string
+		var downstreamFile string
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			require.Equal(t, "/v1/audio/translations", r.URL.Path)
+			require.NoError(t, r.ParseMultipartForm(32<<20))
+			downstreamModel = r.FormValue("model")
+			downstreamPrompt = r.FormValue("prompt")
+			file, _, err := r.FormFile("file")
+			require.NoError(t, err)
+			defer file.Close()
+			data, err := io.ReadAll(file)
+			require.NoError(t, err)
+			downstreamFile = string(data)
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"text":"hello world","usage":{"prompt_tokens":100,"completion_tokens":20,"total_tokens":120,"seconds":3.5}}`))
+		}))
+		defer server.Close()
+
+		c.Request = newMultipartAudioSTTRequest(t, "/v1/audio/translations", "model1", "audio-bytes", map[string]string{
+			"prompt": "meeting",
+		})
+		c.Set(trace.HeaderRequestID, "req-audio-translate-ok")
+		recorder := &testGenerationRecorderWithMutex{}
+		tracer := &testLLMTracerWithMutex{recorder: recorder}
+		tester.handler.llmTracer = tracer
+		// Endpoint still points at transcriptions (common Whisper deploy); gateway must rewrite.
+		model := &types.Model{
+			BaseModel: types.BaseModel{
+				ID:       "backend-model",
+				Object:   "model",
+				Metadata: map[string]any{},
+				Task:     "audio-transcription",
+			},
+			Endpoint: server.URL + "/v1/audio/transcriptions",
+			Upstreams: []commontypes.UpstreamConfig{
+				{URL: server.URL + "/v1/audio/transcriptions", Enabled: true, ModelName: "backend-model"},
+			},
+		}
+
+		var wg sync.WaitGroup
+		wg.Add(1)
+		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "model1").Return(model, nil).Once()
+		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil).Once()
+		tester.mocks.openAIComp.EXPECT().RecordUsageFromTokenUsage(mock.Anything, "testuuid", model, mock.Anything, mock.MatchedBy(func(usage *token.Usage) bool {
+			return usage != nil &&
+				usage.TotalTokens == 120 &&
+				usage.PromptTokens == 100 &&
+				usage.CompletionTokens == 20 &&
+				usage.Duration == 3.5
+		}), "").RunAndReturn(
+			func(ctx context.Context, userUUID string, model *types.Model, targetModelName string, usage *token.Usage, apikey string) error {
+				wg.Done()
+				return nil
+			}).Once()
+
+		tester.handler.Translation(c)
+		wg.Wait()
+
+		require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+		require.JSONEq(t, `{"text":"hello world","usage":{"prompt_tokens":100,"completion_tokens":20,"total_tokens":120,"seconds":3.5}}`, w.Body.String())
+		require.Equal(t, "backend-model", downstreamModel)
+		require.Equal(t, "meeting", downstreamPrompt)
+		require.Equal(t, "audio-bytes", downstreamFile)
+		starts := tracer.Starts()
+		require.Len(t, starts, 1)
+		require.Equal(t, "translation", starts[0].Metadata["aigateway.audio.kind"])
+		require.Equal(t, "english", starts[0].Metadata["aigateway.audio.language"])
+		usage, response, errorCode, ended, events := generationTraceSnapshot(recorder)
+		require.True(t, ended)
+		require.NotNil(t, response)
+		require.Equal(t, "backend-model", response.Model)
+		require.Equal(t, 3.5, response.Metadata[llmtrace.TraceMetadataKeyAudioDurationSeconds])
+		require.NotNil(t, usage)
+		require.Equal(t, int64(120), usage.TotalTokens)
+		require.Empty(t, errorCode)
+		require.Equal(t, []string{"response", "usage", "end"}, events)
+	})
+
+	t.Run("missing model", func(t *testing.T) {
+		tester, c, w := setupTest(t)
+		c.Request = newMultipartAudioSTTRequest(t, "/v1/audio/translations", "", "audio-bytes", nil)
+
+		tester.handler.Translation(c)
+
+		require.Equal(t, http.StatusBadRequest, w.Code)
+		require.Contains(t, w.Body.String(), "Model cannot be empty")
+	})
+
+	t.Run("missing file", func(t *testing.T) {
+		tester, c, w := setupTest(t)
+		var body bytes.Buffer
+		writer := multipart.NewWriter(&body)
+		require.NoError(t, writer.WriteField("model", "model1"))
+		require.NoError(t, writer.Close())
+		c.Request = httptest.NewRequest(http.MethodPost, "/v1/audio/translations", &body)
+		c.Request.Header.Set("Content-Type", writer.FormDataContentType())
+
+		tester.handler.Translation(c)
+
+		require.Equal(t, http.StatusBadRequest, w.Code)
+		require.Contains(t, w.Body.String(), "File cannot be empty")
+	})
+}
+
+func TestAudioTranslationProxyPath(t *testing.T) {
+	tests := []struct {
+		name     string
+		endpoint string
+		want     string
+	}{
+		{name: "empty endpoint", endpoint: "", want: "/v1/audio/translations"},
+		{name: "host only", endpoint: "http://whisper:8000", want: "/v1/audio/translations"},
+		{name: "root path", endpoint: "http://whisper:8000/", want: "/v1/audio/translations"},
+		{name: "rewrites transcriptions", endpoint: "http://whisper:8000/v1/audio/transcriptions", want: "/v1/audio/translations"},
+		{name: "keeps translations", endpoint: "http://whisper:8000/v1/audio/translations", want: "/v1/audio/translations"},
+		{name: "preserves path prefix", endpoint: "http://gateway/maas/whisper/v1/audio/transcriptions", want: "/maas/whisper/v1/audio/translations"},
+		{name: "unknown path unchanged", endpoint: "http://whisper:8000/custom/asr", want: "/custom/asr"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := audioTranslationProxyPath(tt.endpoint)
+			require.NoError(t, err)
+			require.Equal(t, tt.want, got)
+		})
+	}
+}
+
 func newMultipartTranscriptionRequest(t *testing.T, model, fileContent string, fields map[string]string) *http.Request {
+	return newMultipartAudioSTTRequest(t, "/v1/audio/transcriptions", model, fileContent, fields)
+}
+
+func newMultipartAudioSTTRequest(t *testing.T, path, model, fileContent string, fields map[string]string) *http.Request {
 	t.Helper()
 
 	var body bytes.Buffer
@@ -1813,7 +2056,7 @@ func newMultipartTranscriptionRequest(t *testing.T, model, fileContent string, f
 	}
 	require.NoError(t, writer.Close())
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/audio/transcriptions", &body)
+	req := httptest.NewRequest(http.MethodPost, path, &body)
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 	return req
 }
@@ -2224,7 +2467,6 @@ func TestOpenAIHandler_CreateVideo(t *testing.T) {
 		}
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "image-video-model").Return(model, nil).Once()
 		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil).Once()
-		tester.mocks.openAIComp.EXPECT().RecordUsage(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 		tester.mocks.moderationComp.EXPECT().CheckImagePrompts(mock.Anything, "animate this image", "testuuid").Return(&rpc.CheckResult{IsSensitive: false}, nil).Once()
 		expectBuildVideoMeteringEvent(t, tester)
 		tester.mocks.aiGenerationStore.EXPECT().Create(mock.Anything, mock.Anything).
@@ -2263,7 +2505,6 @@ func TestOpenAIHandler_CreateVideo(t *testing.T) {
 		}
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "video-model").Return(model, nil).Once()
 		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil).Once()
-		tester.mocks.openAIComp.EXPECT().RecordUsage(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 		tester.mocks.moderationComp.EXPECT().CheckImagePrompts(mock.Anything, "animate this asset", "testuuid").Return(&rpc.CheckResult{IsSensitive: false}, nil).Once()
 		expectBuildVideoMeteringEvent(t, tester)
 		tester.mocks.aiGenerationStore.EXPECT().Create(mock.Anything, mock.Anything).
@@ -2316,7 +2557,6 @@ func TestOpenAIHandler_CreateVideo(t *testing.T) {
 		}
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "video-model").Return(model, nil).Once()
 		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil).Once()
-		tester.mocks.openAIComp.EXPECT().RecordUsage(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 		tester.mocks.moderationComp.EXPECT().CheckImagePrompts(mock.Anything, "make a boat", "testuuid").Return(&rpc.CheckResult{IsSensitive: false}, nil).Once()
 		expectBuildVideoMeteringEvent(t, tester)
 		tester.mocks.aiGenerationStore.EXPECT().Create(mock.Anything, mock.MatchedBy(func(generation database.AIGeneration) bool {
@@ -2367,7 +2607,6 @@ func TestOpenAIHandler_CreateVideo(t *testing.T) {
 		}
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "video-model").Return(model, nil).Once()
 		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil).Once()
-		tester.mocks.openAIComp.EXPECT().RecordUsage(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 		tester.mocks.moderationComp.EXPECT().CheckImagePrompts(mock.Anything, "make a boat", "testuuid").Return(&rpc.CheckResult{IsSensitive: false}, nil).Once()
 		expectBuildVideoMeteringEvent(t, tester)
 		tester.mocks.aiGenerationStore.EXPECT().Create(mock.Anything, mock.MatchedBy(func(generation database.AIGeneration) bool {
@@ -2410,7 +2649,6 @@ func TestOpenAIHandler_CreateVideo(t *testing.T) {
 		}
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "video-model").Return(model, nil).Once()
 		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil).Once()
-		tester.mocks.openAIComp.EXPECT().RecordUsage(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 		tester.mocks.moderationComp.EXPECT().CheckImagePrompts(mock.Anything, "make a boat", "testuuid").Return(&rpc.CheckResult{IsSensitive: false}, nil).Once()
 
 		body := `{"model":"video-model","prompt":"make a boat","size":"1024x1792"}`
@@ -2452,7 +2690,6 @@ func TestOpenAIHandler_CreateVideo(t *testing.T) {
 		}
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "video-model").Return(model, nil).Once()
 		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil).Once()
-		tester.mocks.openAIComp.EXPECT().RecordUsage(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 		tester.mocks.moderationComp.EXPECT().CheckImagePrompts(mock.Anything, "make a boat", "testuuid").Return(&rpc.CheckResult{IsSensitive: false}, nil).Once()
 
 		body := `{"model":"video-model","prompt":"make a boat","size":"1280x720"}`
@@ -2490,7 +2727,6 @@ func TestOpenAIHandler_CreateVideo(t *testing.T) {
 		}
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "video-model").Return(model, nil).Once()
 		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil).Once()
-		tester.mocks.openAIComp.EXPECT().RecordUsage(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 		tester.mocks.moderationComp.EXPECT().CheckImagePrompts(mock.Anything, "make a boat", "testuuid").Return(&rpc.CheckResult{IsSensitive: false}, nil).Once()
 
 		body := `{"model":"video-model","prompt":"make a boat"}`
@@ -2521,7 +2757,6 @@ func TestOpenAIHandler_CreateVideo(t *testing.T) {
 		}
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "video-model").Return(model, nil).Once()
 		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil).Once()
-		tester.mocks.openAIComp.EXPECT().RecordUsage(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 		tester.mocks.moderationComp.EXPECT().CheckImagePrompts(mock.Anything, "make a boat", "testuuid").Return(&rpc.CheckResult{IsSensitive: false}, nil).Once()
 
 		body := `{"model":"video-model","prompt":"make a boat","size":"1024x1792"}`
@@ -2568,7 +2803,6 @@ func TestOpenAIHandler_CreateVideo(t *testing.T) {
 		}
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "video-model").Return(model, nil).Once()
 		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil).Once()
-		tester.mocks.openAIComp.EXPECT().RecordUsage(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 		tester.mocks.moderationComp.EXPECT().CheckImagePrompts(mock.Anything, "make a boat", "testuuid").Return(&rpc.CheckResult{IsSensitive: false}, nil).Once()
 		expectBuildVideoMeteringEvent(t, tester)
 		tester.mocks.aiGenerationStore.EXPECT().Create(mock.Anything, mock.MatchedBy(func(generation database.AIGeneration) bool {
@@ -2643,7 +2877,6 @@ func TestOpenAIHandler_CreateVideo(t *testing.T) {
 		}
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "video-model").Return(model, nil).Once()
 		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil).Once()
-		tester.mocks.openAIComp.EXPECT().RecordUsage(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 		tester.mocks.moderationComp.EXPECT().CheckImagePrompts(mock.Anything, "make a boat", "testuuid").Return(&rpc.CheckResult{IsSensitive: false}, nil).Once()
 		expectBuildVideoMeteringEvent(t, tester)
 		tester.mocks.aiGenerationStore.EXPECT().Create(mock.Anything, mock.MatchedBy(func(generation database.AIGeneration) bool {
@@ -2698,7 +2931,6 @@ func TestOpenAIHandler_CreateVideo(t *testing.T) {
 		}
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "longcat-model").Return(model, nil).Once()
 		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil).Once()
-		tester.mocks.openAIComp.EXPECT().RecordUsage(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 		tester.mocks.moderationComp.EXPECT().CheckImagePrompts(mock.Anything, "two presenters talking", "testuuid").Return(&rpc.CheckResult{IsSensitive: false}, nil).Once()
 		expectBuildVideoMeteringEvent(t, tester)
 		tester.mocks.aiGenerationStore.EXPECT().Create(mock.Anything, mock.MatchedBy(func(generation database.AIGeneration) bool {

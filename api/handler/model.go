@@ -115,6 +115,103 @@ func (h *ModelHandler) Index(ctx *gin.Context) {
 	httpbase.OKWithTotal(ctx, models, total)
 }
 
+// IndexV2 godoc
+// @Security     ApiKey
+// @Summary      Get visible models (V2 - basic data only, fast)
+// @Description  get visible models returning only basic repository fields for fast initial render. Use /models/enrich for enrichment data.
+// @Tags         Model
+// @Accept       json
+// @Produce      json
+// @Param        current_user query string false "current user"
+// @Param        search query string false "search text"
+// @Param        task_tag query string false "filter by task tag, deprecated"
+// @Param        framework_tag query string false "filter by framework tag, deprecated"
+// @Param        license_tag query string false "filter by license tag, deprecated"
+// @Param        language_tag query string false "filter by language tag, deprecated"
+// @Param        tag_category query string false "filter by tag category"
+// @Param        tag_name query string false "filter by tag name"
+// @Param        tag_group query string false "filter by tag group"
+// @Param        sort query string false "sort by"
+// @Param        source query string false "source" Enums(opencsg, huggingface, local)
+// @Param        xnet_migration_status query string false "filter by xnet migration status"
+// @Param        per query int false "per" default(20)
+// @Param        page query int false "per page" default(1)
+// @Param        model_tree query string false "example: base_model:finetune:1"
+// @Param        list_serverless query bool false "list serverless" default(false)
+// @Param        model_params_min query number false "minimum model parameters in billions"
+// @Param        model_params_max query number false "maximum model parameters in billions"
+// @Success      200  {object}  types.ResponseWithTotal{data=[]types.Model,total=int} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /models/v2 [get]
+func (h *ModelHandler) IndexV2(ctx *gin.Context) {
+	filter := new(types.RepoFilter)
+	filter.Tags = parseTagReqs(ctx)
+	tree, err := parseTreeReqs(ctx)
+	if err != nil {
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
+		httpbase.BadRequestWithExt(ctx, err)
+		return
+	}
+	filter.Tree = tree
+	filter.Username = httpbase.GetCurrentUser(ctx)
+	per, page, err := common.GetPerAndPageFromContext(ctx)
+	if err != nil {
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
+		httpbase.BadRequestWithExt(ctx, err)
+		return
+	}
+	filter = getFilterFromContext(ctx, filter)
+	filter.ModelParamsMin, filter.ModelParamsMax, err = parseFloatRangeFromContext(ctx, "model_params_min", "model_params_max")
+	if err != nil {
+		slog.ErrorContext(ctx.Request.Context(), "Bad model params range request format,", slog.Any("error", err))
+		httpbase.BadRequestWithExt(ctx, errorx.ReqParamInvalid(err, errorx.Ctx().Set("query", "model_params_range")))
+		return
+	}
+	if !slices.Contains(types.Sorts, filter.Sort) {
+		msg := fmt.Sprintf("sort parameter must be one of %v", types.Sorts)
+		err := errorx.ReqParamInvalid(errors.New(msg),
+			errorx.Ctx().
+				Set("param", "sort").
+				Set("provided", filter.Sort).
+				Set("allowed", types.Sorts))
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format,", slog.String("error", msg))
+		httpbase.BadRequestWithExt(ctx, err)
+		return
+	}
+
+	if filter.Source != "" && !slices.Contains(types.Sources, filter.Source) {
+		msg := fmt.Sprintf("source parameter must be one of %v", types.Sources)
+		err := errorx.ReqParamInvalid(errors.New(msg),
+			errorx.Ctx().
+				Set("param", "source").
+				Set("provided", filter.Source).
+				Set("allowed", types.Sources))
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format,", slog.String("error", msg))
+		httpbase.BadRequestWithExt(ctx, err)
+		return
+	}
+
+	qNeedOpWeight := ctx.Query("need_op_weight")
+	needOpWeight, err := strconv.ParseBool(qNeedOpWeight)
+	if err != nil {
+		needOpWeight = false
+	}
+	listServerlessQ := ctx.Query("list_serverless")
+	if listServerlessQ != "" {
+		listServerless, _ := strconv.ParseBool(listServerlessQ)
+		filter.ListServerless = listServerless
+	}
+	models, total, err := h.model.IndexV2(ctx.Request.Context(), filter, per, page, needOpWeight)
+	if err != nil {
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get models v2", slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	slog.Info("Get public models v2 succeed", slog.Int("count", total))
+	httpbase.OKWithTotal(ctx, models, total)
+}
+
 // CreateModel   godoc
 // @Security     ApiKey
 // @Summary      Create a new model
@@ -1752,6 +1849,7 @@ func (h *ModelHandler) ServerlessStart(ctx *gin.Context) {
 // @Param        namespace path string true "namespace"
 // @Param        name path string true "name"
 // @Param        id path int true "id"
+// @Param        force query bool false "force stop when cluster is unavailable" default(false)
 // @Param        current_user query string false "current user"
 // @Success      200  {object}  types.Response{} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
@@ -1777,6 +1875,8 @@ func (h *ModelHandler) ServerlessStop(ctx *gin.Context) {
 		return
 	}
 
+	force := strings.ToLower(ctx.Query("force")) == "true"
+
 	stopReq := types.DeployActReq{
 		RepoType:    types.ModelRepo,
 		Namespace:   namespace,
@@ -1784,6 +1884,7 @@ func (h *ModelHandler) ServerlessStop(ctx *gin.Context) {
 		CurrentUser: currentUser,
 		DeployID:    id,
 		DeployType:  types.ServerlessType,
+		Force:       force,
 	}
 
 	err = h.repo.DeployStop(ctx.Request.Context(), stopReq)
@@ -1881,6 +1982,7 @@ func (h *ModelHandler) ListQuantizations(ctx *gin.Context) {
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /models/{namespace}/{name}/run/versions/{id} [post]
 func (h *ModelHandler) CreateInferenceVersion(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
 	id, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
@@ -1902,12 +2004,21 @@ func (h *ModelHandler) CreateInferenceVersion(ctx *gin.Context) {
 		return
 	}
 
+	versionReq.CurrentUser = currentUser
 	versionReq.DeployId = id
+
 	err = h.model.CreateInferenceVersion(ctx.Request.Context(), versionReq)
 	if err != nil {
-		slog.ErrorContext(ctx.Request.Context(), "failed to create inference version", "error", err, "req", versionReq)
-		httpbase.ServerError(ctx, err)
-		return
+		if errors.Is(err, errorx.ErrForbidden) {
+			slog.WarnContext(ctx.Request.Context(), "not allowed to create inference version",
+				slog.Any("error", err), slog.Any("req", versionReq))
+			httpbase.ForbiddenError(ctx, err)
+			return
+		} else {
+			slog.ErrorContext(ctx.Request.Context(), "failed to create inference version", "error", err, "req", versionReq)
+			httpbase.ServerError(ctx, err)
+			return
+		}
 	}
 
 	httpbase.OK(ctx, nil)
@@ -1927,6 +2038,7 @@ func (h *ModelHandler) CreateInferenceVersion(ctx *gin.Context) {
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /models/{namespace}/{name}/run/versions/{id} [get]
 func (h *ModelHandler) ListInferenceVersions(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
 	id, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
@@ -1941,11 +2053,22 @@ func (h *ModelHandler) ListInferenceVersions(ctx *gin.Context) {
 		return
 	}
 
-	versions, err := h.model.ListInferenceVersions(ctx.Request.Context(), id)
+	versionReq := types.DeployActReq{
+		CurrentUser: currentUser,
+		DeployID:    id,
+	}
+	versions, err := h.model.ListInferenceVersions(ctx.Request.Context(), versionReq)
 	if err != nil {
-		slog.ErrorContext(ctx.Request.Context(), "failed to list inference versions", "error", err)
-		httpbase.ServerError(ctx, err)
-		return
+		if errors.Is(err, errorx.ErrForbidden) {
+			slog.WarnContext(ctx.Request.Context(), "not allowed to list inference versions",
+				slog.Any("error", err), slog.Any("req", versionReq))
+			httpbase.ForbiddenError(ctx, err)
+			return
+		} else {
+			slog.ErrorContext(ctx.Request.Context(), "failed to list inference versions", "error", err)
+			httpbase.ServerError(ctx, err)
+			return
+		}
 	}
 
 	httpbase.OK(ctx, versions)
@@ -1966,6 +2089,7 @@ func (h *ModelHandler) ListInferenceVersions(ctx *gin.Context) {
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /models/{namespace}/{name}/run/versions/{id}/traffic [put]
 func (h *ModelHandler) UpdateInferenceTraffic(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
 	id, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
@@ -1986,11 +2110,23 @@ func (h *ModelHandler) UpdateInferenceTraffic(ctx *gin.Context) {
 		return
 	}
 
-	err = h.model.UpdateInferenceVersionTraffic(ctx.Request.Context(), id, trafficReq)
+	versionReq := types.DeployActReq{
+		CurrentUser: currentUser,
+		DeployID:    id,
+	}
+
+	err = h.model.UpdateInferenceVersionTraffic(ctx.Request.Context(), versionReq, trafficReq)
 	if err != nil {
-		slog.ErrorContext(ctx.Request.Context(), "failed to update inference version traffic", "error", err)
-		httpbase.ServerError(ctx, err)
-		return
+		if errors.Is(err, errorx.ErrForbidden) {
+			slog.WarnContext(ctx.Request.Context(), "not allowed to update inference version traffic",
+				slog.Any("error", err), slog.Any("req", versionReq))
+			httpbase.ForbiddenError(ctx, err)
+			return
+		} else {
+			slog.ErrorContext(ctx.Request.Context(), "failed to update inference version traffic", "error", err)
+			httpbase.ServerError(ctx, err)
+			return
+		}
 	}
 
 	httpbase.OK(ctx, nil)
@@ -2011,6 +2147,7 @@ func (h *ModelHandler) UpdateInferenceTraffic(ctx *gin.Context) {
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /models/{namespace}/{name}/run/versions/{id}/{commit_id} [delete]
 func (h *ModelHandler) DeleteInferenceVersion(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
 	id, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
@@ -2020,11 +2157,23 @@ func (h *ModelHandler) DeleteInferenceVersion(ctx *gin.Context) {
 	}
 	commit_id := ctx.Param("commit_id")
 
-	err = h.model.DeleteInferenceVersion(ctx.Request.Context(), id, commit_id)
+	versionReq := types.DeployActReq{
+		CurrentUser: currentUser,
+		DeployID:    id,
+	}
+
+	err = h.model.DeleteInferenceVersion(ctx.Request.Context(), versionReq, commit_id)
 	if err != nil {
-		slog.ErrorContext(ctx.Request.Context(), "failed to delete inference version", "error", err)
-		httpbase.ServerError(ctx, err)
-		return
+		if errors.Is(err, errorx.ErrForbidden) {
+			slog.WarnContext(ctx.Request.Context(), "not allowed to delete inference version",
+				slog.Any("error", err), slog.Any("req", versionReq))
+			httpbase.ForbiddenError(ctx, err)
+			return
+		} else {
+			slog.ErrorContext(ctx.Request.Context(), "failed to delete inference version", "error", err)
+			httpbase.ServerError(ctx, err)
+			return
+		}
 	}
 
 	httpbase.OK(ctx, nil)

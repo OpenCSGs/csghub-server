@@ -3,11 +3,13 @@ package activity
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	"go.temporal.io/sdk/activity"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
+	servercomponent "opencsg.com/csghub-server/component"
 	"opencsg.com/csghub-server/moderation/component"
 )
 
@@ -49,7 +51,14 @@ func RepoSensitiveCheckPending(ctx context.Context, repo *database.Repository, c
 	if err != nil {
 		return fmt.Errorf("failed to create repo component, error: %w", err)
 	}
-	return rc.UpdateRepoSensitiveCheckStatus(ctx, repo.ID, types.SensitiveCheckPending)
+	if err := rc.UpdateRepoSensitiveCheckStatus(ctx, repo.ID, types.SensitiveCheckPending); err != nil {
+		return err
+	}
+	repo.SensitiveCheckStatus = types.SensitiveCheckPending
+	if err := servercomponent.SyncAgentTemplateSensitiveCheckResult(ctx, repo, database.NewAgentTemplateStore(), database.NewRepoFileCheckStore()); err != nil {
+		slog.WarnContext(ctx, "failed to sync agent template sensitive check pending status", "error", err, "repo_path", repo.Path)
+	}
+	return nil
 }
 
 func DetectRepoSensitiveCheckStatus(ctx context.Context, repo *database.Repository, config *config.Config) error {
@@ -60,5 +69,13 @@ func DetectRepoSensitiveCheckStatus(ctx context.Context, repo *database.Reposito
 		return fmt.Errorf("failed to create repo file component, error: %w", err)
 	}
 	// TODO: handle other branches
-	return rfc.DetectRepoSensitiveCheckStatus(ctx, repo.ID, repo.DefaultBranch)
+	status, err := rfc.DetectRepoSensitiveCheckStatus(ctx, repo.ID, repo.DefaultBranch)
+	if err != nil {
+		return err
+	}
+	repo.SensitiveCheckStatus = status
+	if err := servercomponent.SyncAgentTemplateSensitiveCheckResult(ctx, repo, database.NewAgentTemplateStore(), database.NewRepoFileCheckStore()); err != nil {
+		slog.WarnContext(ctx, "failed to sync agent template sensitive check result", "error", err, "repo_path", repo.Path)
+	}
+	return nil
 }

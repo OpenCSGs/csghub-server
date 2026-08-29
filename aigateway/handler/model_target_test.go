@@ -75,7 +75,7 @@ func TestResolveModelTargetWithOptionsRequiredUpstreamID(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Equal(t, responsespkg.ResponsesModeChatAdapter, decision.Mode)
-	require.Empty(t, decision.NativeURL)
+	require.Equal(t, "https://native.example.com/v1/chat/completions", decision.BackendURL)
 }
 
 func TestResolveModelTargetWithOptionsRequiredUpstreamIDUnavailable(t *testing.T) {

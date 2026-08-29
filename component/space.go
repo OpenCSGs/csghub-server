@@ -546,66 +546,15 @@ func (c *spaceComponentImpl) Update(ctx context.Context, req *types.UpdateSpaceR
 }
 
 func (c *spaceComponentImpl) Index(ctx context.Context, repoFilter *types.RepoFilter, per, page int, needOpWeight bool) ([]*types.Space, int, error) {
-	var (
-		resSpaces []*types.Space
-		err       error
+	repos, total, err := c.repoComponent.PublicToUser(
+		ctx, types.SpaceRepo, repoFilter.Username, repoFilter, per, page,
 	)
-
-	if repoFilter.Status == "" {
-		repos, total, err := c.repoComponent.PublicToUser(ctx, types.SpaceRepo, repoFilter.Username, repoFilter, per, page)
-		if err != nil {
-			newError := fmt.Errorf("failed to get public space repos,error:%w", err)
-			return nil, 0, newError
-		}
-		resSpaces, err = c.convertReposToSpaces(ctx, repos)
-		if err != nil {
-			return nil, 0, err
-		}
-		if needOpWeight {
-			var repoIDs []int64
-			for _, s := range resSpaces {
-				repoIDs = append(repoIDs, s.RepositoryID)
-			}
-			c.addOpWeightToSpaces(ctx, repoIDs, resSpaces)
-		}
-		return resSpaces, total, nil
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to get public space repos,error:%w", err)
 	}
-
-	currentPage := page
-	maxPages := 100
-	pagesChecked := 0
-
-	for len(resSpaces) < per && pagesChecked < maxPages {
-		repos, total, err := c.repoComponent.PublicToUser(ctx, types.SpaceRepo, repoFilter.Username, repoFilter, per, currentPage)
-		if err != nil {
-			newError := fmt.Errorf("failed to get public space repos,error:%w", err)
-			return nil, 0, newError
-		}
-
-		if len(repos) == 0 {
-			break
-		}
-
-		pageSpaces, err := c.convertReposToSpaces(ctx, repos)
-		if err != nil {
-			return nil, 0, err
-		}
-
-		for _, space := range pageSpaces {
-			if space.Status == repoFilter.Status {
-				resSpaces = append(resSpaces, space)
-				if len(resSpaces) >= per {
-					break
-				}
-			}
-		}
-
-		if total <= currentPage*per {
-			break
-		}
-
-		currentPage++
-		pagesChecked++
+	resSpaces, err := c.convertReposToSpaces(ctx, repos)
+	if err != nil {
+		return nil, 0, err
 	}
 
 	if needOpWeight {
@@ -616,36 +565,7 @@ func (c *spaceComponentImpl) Index(ctx context.Context, repoFilter *types.RepoFi
 		c.addOpWeightToSpaces(ctx, repoIDs, resSpaces)
 	}
 
-	allRepos, allTotal, err := c.repoComponent.PublicToUser(ctx, types.SpaceRepo, repoFilter.Username, repoFilter, 0, 1)
-	if err != nil {
-		return resSpaces, len(resSpaces), nil
-	}
-	_ = allRepos
-
-	filteredTotal := 0
-	batchSize := 100
-	for offset := 0; offset < allTotal; offset += batchSize {
-		batchRepos, _, err := c.repoComponent.PublicToUser(ctx, types.SpaceRepo, repoFilter.Username, repoFilter, batchSize, offset/batchSize+1)
-		if err != nil {
-			break
-		}
-		if len(batchRepos) == 0 {
-			break
-		}
-
-		batchSpaces, err := c.convertReposToSpaces(ctx, batchRepos)
-		if err != nil {
-			break
-		}
-
-		for _, space := range batchSpaces {
-			if space.Status == repoFilter.Status {
-				filteredTotal++
-			}
-		}
-	}
-
-	return resSpaces, filteredTotal, nil
+	return resSpaces, total, nil
 }
 
 func (c *spaceComponentImpl) convertReposToSpaces(ctx context.Context, repos []*database.Repository) ([]*types.Space, error) {
@@ -665,6 +585,19 @@ func (c *spaceComponentImpl) convertReposToSpaces(ctx context.Context, repos []*
 		newError := fmt.Errorf("failed to get spaces by repo ids,error:%w", err)
 		return nil, newError
 	}
+	spaceIDs := make([]int64, 0, len(spaces))
+	for i := range spaces {
+		if spaces[i].HasAppFile {
+			spaceIDs = append(spaceIDs, spaces[i].ID)
+		}
+	}
+	latestDeploys := make(map[int64]*database.Deploy)
+	if len(spaceIDs) > 0 {
+		latestDeploys, err = c.deployTaskStore.GetLatestDeploysBySpaceIDs(ctx, spaceIDs)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get latest space deploys: %w", err)
+		}
+	}
 
 	for _, repo := range repos {
 		var space *database.Space
@@ -678,7 +611,7 @@ func (c *spaceComponentImpl) convertReposToSpaces(ctx context.Context, repos []*
 		if space == nil {
 			continue
 		}
-		spaceStatus, _ := c.status(ctx, space)
+		spaceStatus := persistedSpaceStatus(space, latestDeploys[space.ID])
 
 		var tags []types.RepoTag
 		for _, tag := range space.Repository.Tags {
@@ -723,6 +656,24 @@ func (c *spaceComponentImpl) convertReposToSpaces(ctx context.Context, repos []*
 	}
 
 	return resSpaces, nil
+}
+
+func persistedSpaceStatus(space *database.Space, deploy *database.Deploy) types.SpaceStatus {
+	if !space.HasAppFile {
+		if space.Sdk == types.NGINX.Name {
+			return types.SpaceStatus{Status: SpaceStatusNoNGINXConf}
+		}
+		return types.SpaceStatus{Status: SpaceStatusNoAppFile}
+	}
+	if deploy == nil {
+		return types.SpaceStatus{Status: SpaceStatusStopped}
+	}
+	return types.SpaceStatus{
+		SvcName:   deploy.SvcName,
+		Status:    deployStatusCodeToString(deploy.Status),
+		DeployID:  deploy.ID,
+		ClusterID: deploy.ClusterID,
+	}
 }
 
 func (c *spaceComponentImpl) OrgSpaces(ctx context.Context, req *types.OrgSpacesReq) ([]types.Space, int, error) {

@@ -163,8 +163,8 @@ type CreateUpstreamReq struct {
 	ModelName             string            `json:"model_name,omitempty"`
 	AuthHeader            string            `json:"auth_header,omitempty"`
 	Provider              string            `json:"provider,omitempty"`
-	HealthCheckEnabled    bool              `json:"health_check_enabled"`
-	CircuitBreakerEnabled bool              `json:"circuit_breaker_enabled"`
+	HealthCheckEnabled    *bool             `json:"health_check_enabled"`
+	CircuitBreakerEnabled *bool             `json:"circuit_breaker_enabled"`
 	LimitPolicy           *UsageLimitPolicy `json:"limit_policy,omitempty"`
 	Tags                  map[string]string `json:"tags,omitempty"`
 	Metadata              map[string]any    `json:"metadata,omitempty"`

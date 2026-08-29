@@ -226,7 +226,7 @@ func TestDatasetStore_UserLikesDatasets(t *testing.T) {
 	for _, ds := range dss {
 		names = append(names, ds.Repository.Name)
 	}
-	require.Equal(t, []string{"repo1", "repo3"}, names)
+	require.ElementsMatch(t, []string{"repo1", "repo3"}, names)
 
 }
 

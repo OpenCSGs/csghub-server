@@ -2342,7 +2342,8 @@ func (h *RepoHandler) DownloadCodeZip(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	ref := strings.TrimPrefix(ctx.Param("ref"), "/")
 
-	zipData, err := h.c.DownloadCodeZip(ctx.Request.Context(), types.DownloadCodeZipReq{
+	zipData, err := h.c.DownloadRepoZip(ctx.Request.Context(), types.DownloadRepoZipReq{
+		RepoType:  types.CodeRepo,
 		Namespace: namespace,
 		Name:      name,
 		Revision:  ref,

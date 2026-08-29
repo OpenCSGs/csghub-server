@@ -69,6 +69,8 @@ saved_model/**/* filter=lfs diff=lfs merge=lfs -text
 
 type ModelComponent interface {
 	Index(ctx context.Context, filter *types.RepoFilter, per, page int, needOpWeight bool) ([]*types.Model, int, error)
+	// IndexV2 returns basic model data only (no tags, mirror, enrichment) for fast list rendering
+	IndexV2(ctx context.Context, filter *types.RepoFilter, per, page int, needOpWeight bool) ([]*types.Model, int, error)
 	Create(ctx context.Context, req *types.CreateModelReq) (*types.Model, error)
 	Update(ctx context.Context, req *types.UpdateModelReq) (*types.Model, error)
 	Delete(ctx context.Context, namespace, name, currentUser string) error
@@ -91,9 +93,9 @@ type ModelComponent interface {
 	OrgModels(ctx context.Context, req *types.OrgModelsReq) ([]types.Model, int, error)
 	ListQuantizations(ctx context.Context, namespace, name string) ([]*types.File, error)
 	CreateInferenceVersion(ctx context.Context, req types.CreateInferenceVersionReq) error
-	ListInferenceVersions(ctx context.Context, id int64) ([]types.ListInferenceVersionsResp, error)
-	UpdateInferenceVersionTraffic(ctx context.Context, id int64, req []types.UpdateInferenceVersionTrafficReq) error
-	DeleteInferenceVersion(ctx context.Context, id int64, commitID string) error
+	ListInferenceVersions(ctx context.Context, verReq types.DeployActReq) ([]types.ListInferenceVersionsResp, error)
+	UpdateInferenceVersionTraffic(ctx context.Context, verReq types.DeployActReq, req []types.UpdateInferenceVersionTrafficReq) error
+	DeleteInferenceVersion(ctx context.Context, verReq types.DeployActReq, commitID string) error
 }
 
 func NewModelComponent(config *config.Config) (ModelComponent, error) {
@@ -277,6 +279,59 @@ func (c *modelComponentImpl) Index(ctx context.Context, filter *types.RepoFilter
 	if needOpWeight {
 		c.addOpWeightToModel(ctx, repoIDs, resModels)
 	}
+	return resModels, total, nil
+}
+
+// IndexV2 returns basic model data only (no tags, mirror status, or other enrichment data).
+// Use Enrich() to fetch the enrichment data asynchronously.
+func (c *modelComponentImpl) IndexV2(ctx context.Context, filter *types.RepoFilter, per, page int, needOpWeight bool) ([]*types.Model, int, error) {
+	repos, total, err := c.repoComponent.PublicToUserV2(ctx, types.ModelRepo, filter.Username, filter, per, page)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to get public model repos v2, error: %w", err)
+	}
+
+	var repoIDs []int64
+	for _, repo := range repos {
+		repoIDs = append(repoIDs, repo.ID)
+	}
+
+	// Load real model IDs (no Relations — fast)
+	modelMap := make(map[int64]int64, len(repos))
+	if len(repoIDs) > 0 {
+		models, err := c.modelStore.ByRepoIDsBasic(ctx, repoIDs)
+		if err != nil {
+			return nil, 0, fmt.Errorf("failed to get model ids by repo ids, error: %w", err)
+		}
+		for _, m := range models {
+			modelMap[m.RepositoryID] = m.ID
+		}
+	}
+
+	resModels := make([]*types.Model, 0, len(repos))
+	for _, repo := range repos {
+		modelID := modelMap[repo.ID]
+		resModels = append(resModels, &types.Model{
+			ID:           modelID,
+			Name:         repo.Name,
+			Nickname:     repo.Nickname,
+			Description:  repo.Description,
+			Likes:        repo.Likes,
+			Downloads:    repo.DownloadCount,
+			Path:         repo.Path,
+			RepositoryID: repo.ID,
+			Private:      repo.Private,
+			CreatedAt:    repo.CreatedAt,
+			UpdatedAt:    repo.UpdatedAt,
+			Source:       repo.Source,
+			SyncStatus:   repo.SyncStatus,
+			License:      repo.License,
+		})
+	}
+
+	if needOpWeight {
+		c.addOpWeightToModel(ctx, repoIDs, resModels)
+	}
+
 	return resModels, total, nil
 }
 
@@ -1625,106 +1680,4 @@ func (c *modelComponentImpl) addWeightsToModel(ctx context.Context, repoID int64
 			}
 		}
 	}
-}
-
-func (c *modelComponentImpl) CreateInferenceVersion(ctx context.Context, req types.CreateInferenceVersionReq) error {
-	deploy, err := c.deployTaskStore.GetDeployByID(ctx, req.DeployId)
-	if err != nil {
-		return errorx.ErrDeployNotFoundErr
-	}
-
-	if deploy.Status != dcommon.Running {
-		return errorx.ErrDeployStatusNotMatchErr
-	}
-
-	if req.TrafficPercent > 100 || req.TrafficPercent < 0 {
-		return errorx.ErrTrafficInvalid
-	}
-
-	if req.CommitID == "" {
-		return errorx.ErrCommitIDEmpty
-	}
-	commitID, err := common.ShortenCommitID7(req.CommitID)
-	if err != nil {
-		return errorx.ErrInvalidCommitID
-	}
-
-	req.CommitID = commitID
-
-	return c.imageRunner.CreateRevisions(ctx, &types.CreateRevisionReq{
-		ClusterID:      deploy.ClusterID,
-		SvcName:        deploy.SvcName,
-		Commit:         req.CommitID,
-		InitialTraffic: req.TrafficPercent,
-	})
-}
-
-func (c *modelComponentImpl) ListInferenceVersions(ctx context.Context, id int64) ([]types.ListInferenceVersionsResp, error) {
-	deploy, err := c.deployTaskStore.GetDeployByID(ctx, id)
-	if err != nil {
-		return nil, errorx.ErrDeployNotFoundErr
-	}
-	var resp = []types.ListInferenceVersionsResp{}
-
-	versions, err := c.imageRunner.ListKsvcVersions(ctx, deploy.ClusterID, deploy.SvcName)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, version := range versions {
-		resp = append(resp, types.ListInferenceVersionsResp{
-			Commit:         version.Commit,
-			CreateTime:     version.CreateTime,
-			IsReady:        version.IsReady,
-			TrafficPercent: version.TrafficPercent,
-			RevisionName:   version.RevisionName,
-			Message:        version.Message,
-			Reason:         version.Reason,
-		})
-	}
-
-	return resp, nil
-}
-
-func (c *modelComponentImpl) UpdateInferenceVersionTraffic(ctx context.Context, id int64, req []types.UpdateInferenceVersionTrafficReq) error {
-	deploy, err := c.deployTaskStore.GetDeployByID(ctx, id)
-	if err != nil {
-		return errorx.ErrDeployNotFoundErr
-	}
-
-	if deploy.Status != dcommon.Running {
-		return errorx.ErrDeployStatusNotMatchErr
-	}
-
-	params := []types.TrafficReq{}
-	for _, item := range req {
-		params = append(params, types.TrafficReq{
-			Commit:         item.CommitID,
-			TrafficPercent: item.TrafficPercent,
-		})
-	}
-	err = c.imageRunner.SetVersionsTraffic(ctx, deploy.ClusterID, deploy.SvcName, params)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (c *modelComponentImpl) DeleteInferenceVersion(ctx context.Context, id int64, commitID string) error {
-	deploy, err := c.deployTaskStore.GetDeployByID(ctx, id)
-	if err != nil {
-		return errorx.ErrDeployNotFoundErr
-	}
-
-	if deploy.Status != dcommon.Running {
-		return errorx.ErrDeployStatusNotMatchErr
-	}
-
-	shortCommitId, err := common.ShortenCommitID7(commitID)
-	if err != nil {
-		return errorx.ErrInvalidCommitID
-	}
-
-	return c.imageRunner.DeleteKsvcVersion(ctx, deploy.ClusterID, deploy.SvcName, shortCommitId)
 }

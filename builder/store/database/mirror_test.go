@@ -275,6 +275,64 @@ func TestMirrorStore_DeleteWithTaskCancelTxKeepsCompletedRepoStatus(t *testing.T
 	require.Equal(t, types.SyncStatusCompleted, storedRepo.SyncStatus)
 }
 
+// TestMirrorStore_DeleteWithTaskCancelTxSucceedsWhenRepoDeleted verifies that a
+// mirror can still be deleted by id when its repository row has already been
+// hard-deleted. The mirror keeps a stale RepositoryID pointing at the gone
+// repo, so the repo lookup inside the transaction must tolerate the missing
+// row instead of rolling the whole deletion back.
+func TestMirrorStore_DeleteWithTaskCancelTxSucceedsWhenRepoDeleted(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewMirrorStoreWithDB(db)
+	repo := &database.Repository{
+		RepositoryType: types.ModelRepo,
+		GitPath:        "models_ns/repo",
+		Name:           "repo",
+		Path:           "ns/repo",
+		SyncStatus:     types.SyncStatusInProgress,
+	}
+	require.NoError(t, db.Core.NewInsert().Model(repo).Scan(ctx, repo))
+	// Simulate the repo being hard-deleted ahead of the mirror, as
+	// repoStoreImpl.DeleteRepo does via ForceDelete.
+	_, err := db.Core.NewDelete().Model(repo).WherePK().ForceDelete().Exec(ctx)
+	require.NoError(t, err)
+
+	mirror, err := store.Create(ctx, &database.Mirror{
+		SourceUrl:    "https://github.com/a/repo.git",
+		RepositoryID: repo.ID,
+		Status:       types.MirrorRepoSyncStart,
+		Priority:     types.ASAPMirrorPriority,
+	})
+	require.NoError(t, err)
+	tasks := []database.MirrorTask{
+		{MirrorID: mirror.ID, Status: types.MirrorCanceled, Priority: types.ASAPMirrorPriority, RepoJobID: 31, LFSJobID: 32},
+		{MirrorID: mirror.ID, Status: types.MirrorRepoSyncStart, Priority: types.HighMirrorPriority, RepoJobID: 41},
+	}
+	for i := range tasks {
+		require.NoError(t, db.Core.NewInsert().Model(&tasks[i]).Scan(ctx, &tasks[i]))
+	}
+	_, err = db.Core.NewUpdate().
+		Model((*database.Mirror)(nil)).
+		Set("current_task_id = ?", tasks[1].ID).
+		Where("id = ?", mirror.ID).
+		Exec(ctx)
+	require.NoError(t, err)
+
+	cancelClient := &fakeMirrorDeleteJobCancelClient{}
+	err = store.DeleteWithTaskCancelTx(ctx, mirror.ID, cancelClient)
+	require.NoError(t, err)
+	require.Equal(t, []int64{41}, cancelClient.cancelled)
+
+	// The mirror and its tasks must be gone even though the repo row was missing.
+	_, err = store.FindByID(ctx, mirror.ID)
+	require.Error(t, err)
+	count, err := db.Core.NewSelect().Model((*database.MirrorTask)(nil)).Where("mirror_id = ?", mirror.ID).Count(ctx)
+	require.NoError(t, err)
+	require.Zero(t, count)
+}
+
 func TestMirrorStore_FindWithMapping(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()

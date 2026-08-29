@@ -104,3 +104,5 @@ Folders relative to the root of the repository for each service:
 - Each PR must include a clear description of the changes made and their impact, including root cause analysis if applicable, and solution details, and local test result.
 
 ## Specific Instructions
+
+- 所有发布到 GitLab 的内容，包括 Issue、Merge Request、描述、评论和评审意见，都必须使用中文。

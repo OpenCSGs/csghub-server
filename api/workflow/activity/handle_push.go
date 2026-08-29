@@ -15,6 +15,12 @@ func (a *Activities) WatchSpaceChange(ctx context.Context, req *types.GiteaCallb
 	return a.callback.WatchSpaceChange(ctx, req)
 }
 
+func (a *Activities) WatchAgentChange(ctx context.Context, req *types.GiteaCallbackPushReq) error {
+	logger := activity.GetLogger(ctx)
+	logger.Info("[git_callback] watch agent change start", slog.Any("req", req))
+	return a.callback.WatchAgentChange(ctx, req)
+}
+
 func (a *Activities) WatchRepoRelation(ctx context.Context, req *types.GiteaCallbackPushReq) error {
 	logger := activity.GetLogger(ctx)
 	logger.Info("[git_callback] watch repo relation start", slog.Any("req", req))
@@ -46,6 +52,12 @@ func (a *Activities) UpdateRepoInfos(ctx context.Context, req *types.GiteaCallba
 		return err
 	}
 	return nil
+}
+
+func (a *Activities) SyncRepositoryPackage(ctx context.Context, req *types.GiteaCallbackPushReq) error {
+	logger := activity.GetLogger(ctx)
+	logger.Info("[git_callback] sync repository package start", slog.Any("req", req))
+	return a.callback.SyncRepositoryPackage(ctx, req)
 }
 
 func (a *Activities) SensitiveCheck(ctx context.Context, req *types.GiteaCallbackPushReq) error {

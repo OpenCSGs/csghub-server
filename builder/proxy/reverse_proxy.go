@@ -66,6 +66,7 @@ func (rp *reverseProxyImpl) ServeHTTP(w http.ResponseWriter, r *http.Request, ap
 		slog.ErrorContext(req.Context(), "http: proxy error", slog.Any("error", err))
 		rw.WriteHeader(http.StatusBadGateway)
 	}
+	//nolint:staticcheck // Director is deprecated since Go 1.26; migration to Rewrite pending validation
 	proxy.Director = func(req *http.Request) {
 		if len(svcHost) > 0 {
 			slog.Info("update reverse proxy header host", slog.Any("svc-host", svcHost))

@@ -24,12 +24,13 @@ if [ ! -f "/workspace/.csghub_init" ]; then
     if [ ! -d "/workspace/examples" ]; then
         cp -rf /app/examples /workspace/examples
     fi
-    #fix revision if REVISION is not empty
-    if [ "x${REVISION}" != "x" ]; then
-        sed -i "s/model_args.model_revision/\"$REVISION\"/g" /app/src/llamafactory/model/loader.py
-    fi
     touch /workspace/.csghub_init
 fi 
+
+# fix revision if REVISION is not empty
+if [ "x${REVISION}" != "x" ]; then
+    sed -i "s/model_args.model_revision/\"$REVISION\"/g" /app/src/llamafactory/model/loader.py
+fi
 #fix upload issue
 sed -i "s|and repo_type != constants.REPO_TYPE_MODEL||g" /usr/local/lib/python3.11/dist-packages/huggingface_hub/hf_api.py
 

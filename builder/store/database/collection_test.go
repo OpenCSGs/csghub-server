@@ -254,7 +254,7 @@ func TestCollectionStore_ByUserLikesOrgs(t *testing.T) {
 	for _, c := range cs {
 		names = append(names, c.Name)
 	}
-	require.Equal(t, []string{"col1-1", "col2-1"}, names)
+	require.ElementsMatch(t, []string{"col1-1", "col2-1"}, names)
 
 	cs, total, err = store.ByUserOrgs(ctx, "ns2", 10, 1, false)
 	require.Nil(t, err)

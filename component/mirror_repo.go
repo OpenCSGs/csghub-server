@@ -124,7 +124,8 @@ func (m *mirrorComponentImpl) CreateMirrorRepo(ctx context.Context, req types.Cr
 			)
 		}
 
-		return m.createMirrorRepoRecords(ctx, req, repo, namespace, name, false)
+		repoNamespace, _ := repo.NamespaceAndName()
+		return m.createMirrorRepoRecords(ctx, req, repo, repoNamespace, repo.Name, false)
 	}
 	if req.CreateTargetRepo != nil && !*req.CreateTargetRepo {
 		return nil, errorx.RepoNotFound(
@@ -155,13 +156,17 @@ func (m *mirrorComponentImpl) CreateMirrorRepo(ctx context.Context, req types.Cr
 		StarCount:     req.MCPServerAttributes.StarCount,
 	}
 
-	sourceType, sourcePath, _ := common.GetSourceTypeAndPathFromURL(req.SourceGitCloneUrl)
+	sourceType, sourcePath := "", ""
+	if !req.SkipSourcePath {
+		sourceType, sourcePath, _ = common.GetSourceTypeAndPathFromURL(req.SourceGitCloneUrl)
+	}
 	dbRepo, err := m.prepareMirrorRepository(ctx, createRepoReq, sourceType, sourcePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare mirror repository, error: %w", err)
 	}
 
-	return m.createMirrorRepoRecords(ctx, req, dbRepo, namespace, name, true)
+	repoNamespace, _ := dbRepo.NamespaceAndName()
+	return m.createMirrorRepoRecords(ctx, req, dbRepo, repoNamespace, dbRepo.Name, true)
 }
 
 // normalizeMirrorPriority defaults an omitted priority and rejects values unsupported by workhub.
@@ -235,7 +240,7 @@ func normalizeMirrorSource(sourceURL, username, accessToken string) (string, str
 	return parsedURL.String(), username, accessToken, nil
 }
 
-// resolveMirrorRepoTarget chooses and lowercases the local mirror target path from fork fields or namespace mapping.
+// resolveMirrorRepoTarget chooses and trims the local mirror target path from fork fields or namespace mapping.
 func (m *mirrorComponentImpl) resolveMirrorRepoTarget(req types.CreateMirrorRepoReq) (string, string) {
 	namespace := req.ForkNamespace
 	if namespace == "" {
@@ -245,13 +250,13 @@ func (m *mirrorComponentImpl) resolveMirrorRepoTarget(req types.CreateMirrorRepo
 	if name == "" {
 		name = req.SourceName
 	}
-	return strings.ToLower(strings.TrimSpace(namespace)), strings.ToLower(strings.TrimSpace(name))
+	return strings.TrimSpace(namespace), strings.TrimSpace(name)
 }
 
 // createMirrorRepoRecords creates mirror rows transactionally, and optionally the target repo rows too.
 func (m *mirrorComponentImpl) createMirrorRepoRecords(ctx context.Context, req types.CreateMirrorRepoReq, repo *database.Repository, namespace, name string, createRepository bool) (*database.Mirror, error) {
 	mirror := buildMirrorRepoRecord(req, repo, namespace, name)
-	if !createRepository {
+	if !createRepository && !req.SkipSourcePath {
 		sourceType, sourcePath, _ := common.GetSourceTypeAndPathFromURL(req.SourceGitCloneUrl)
 		applyMirrorRepositorySourcePath(repo, sourceType, sourcePath)
 	}
@@ -282,7 +287,8 @@ func (m *mirrorComponentImpl) prepareMirrorRepository(ctx context.Context, req t
 		return nil, errorx.ErrRepoNameInvalid
 	}
 
-	if _, err := m.namespaceStore.FindByPath(ctx, req.Namespace); err != nil {
+	namespace, err := m.namespaceStore.FindByPath(ctx, req.Namespace)
+	if err != nil {
 		slog.ErrorContext(ctx, "namespace does not exist", slog.Any("error", err))
 		return nil, errorx.ErrNamespaceNotFound
 	}
@@ -301,7 +307,7 @@ func (m *mirrorComponentImpl) prepareMirrorRepository(ctx context.Context, req t
 		req.DefaultBranch = types.MainBranch
 	}
 
-	repoPath := path.Join(req.Namespace, req.Name)
+	repoPath := path.Join(namespace.Path, req.Name)
 	repo := &database.Repository{
 		UserID:         user.ID,
 		Path:           repoPath,

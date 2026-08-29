@@ -78,6 +78,9 @@ func TestServiceComponent_RunService(t *testing.T) {
 	kss.EXPECT().Add(mock.Anything, mock.Anything).Return(nil)
 	err := sc.RunService(ctx, req)
 	require.Nil(t, err)
+	service, err := expectCluster.KnativeClient.ServingV1().Services(sc.k8sNameSpace).Get(ctx, req.SvcName, metav1.GetOptions{})
+	require.NoError(t, err)
+	require.Equal(t, corev1.PullAlways, service.Spec.Template.Spec.Containers[0].ImagePullPolicy)
 }
 
 func TestServiceComponent_StopService(t *testing.T) {

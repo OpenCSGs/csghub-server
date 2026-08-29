@@ -161,6 +161,16 @@ func (m *openaiComponentImpl) CommitUsageLimit(ctx context.Context, userUUID str
 	if err != nil {
 		return err
 	}
+	return m.CommitUsageLimitFromUsage(ctx, userUUID, model, usage)
+}
+
+// CommitUsageLimitFromUsage commits a pre-computed usage snapshot to the
+// usage-limiter quota window.  This avoids a redundant counter.Usage() call
+// when the caller has already computed usage on the sync metrics path.
+func (m *openaiComponentImpl) CommitUsageLimitFromUsage(ctx context.Context, userUUID string, model *types.Model, usage *token.Usage) error {
+	if usage == nil {
+		return nil
+	}
 	return m.getUsageLimiter().Commit(ctx, userUUID, model, model.Endpoint, usage)
 }
 

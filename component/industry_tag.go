@@ -140,11 +140,6 @@ func (c *industryTagComponentImpl) IdentifyIndustryTags(ctx context.Context, req
 		return &types.IdentifyIndustryTagsResult{Reason: fmt.Sprintf("failed to load LLM config: %v", err)}, nil
 	}
 
-	var headers map[string]string
-	if err := json.Unmarshal([]byte(llmConfig.AuthHeader), &headers); err != nil {
-		return nil, fmt.Errorf("parse llm auth header: %w", err)
-	}
-
 	candidates := make([]string, 0, len(allTags))
 	for _, tag := range allTags {
 		candidates = append(candidates, tag.Name)
@@ -159,8 +154,7 @@ func (c *industryTagComponentImpl) IdentifyIndustryTags(ctx context.Context, req
 		return nil, fmt.Errorf("marshal industry identify input: %w", err)
 	}
 
-	resp, err := c.llmClient.Chat(ctx, llmConfig.ApiEndpoint, "", headers, types.LLMReqBody{
-		Model: llmConfig.ModelName,
+	resp, err := c.llmClient.WithLLMConfig(llmConfig).Chat(ctx, "", "", nil, types.LLMReqBody{
 		Messages: []types.LLMMessage{
 			{Role: SystemRole, Content: prompt.ZH},
 			{Role: UserRole, Content: string(input)},

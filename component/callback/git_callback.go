@@ -15,6 +15,7 @@ import (
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/builder/store/s3"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/component"
@@ -23,6 +24,7 @@ import (
 type GitCallbackComponent interface {
 	SetRepoVisibility(yes bool)
 	WatchSpaceChange(ctx context.Context, req *types.GiteaCallbackPushReq) error
+	WatchAgentChange(ctx context.Context, req *types.GiteaCallbackPushReq) error
 	WatchRepoRelation(ctx context.Context, req *types.GiteaCallbackPushReq) error
 	GenSyncVersion(ctx context.Context, req *types.GiteaCallbackPushReq) error
 	SetRepoUpdateTime(ctx context.Context, req *types.GiteaCallbackPushReq) error
@@ -30,6 +32,7 @@ type GitCallbackComponent interface {
 	SensitiveCheck(ctx context.Context, req *types.GiteaCallbackPushReq) error
 	MCPScan(ctx context.Context, req *types.GiteaCallbackPushReq) error
 	CalculateRepoSize(ctx context.Context, req *types.GiteaCallbackPushReq) error
+	SyncRepositoryPackage(ctx context.Context, req *types.GiteaCallbackPushReq) error
 }
 
 type gitCallbackComponentImpl struct {
@@ -57,6 +60,7 @@ type gitCallbackComponentImpl struct {
 	mcpScanResultStore        database.MCPScanResultStore
 	mcpScanner                component.MCPScannerComponent
 	repositoryStatisticsStore database.RepositoryStatisticsStore
+	repositoryPackageSyncer   component.RepositoryPackageSyncer
 	// set visibility if file content is sensitive
 	setRepoVisibility bool
 	maxPromptFS       int64
@@ -105,6 +109,10 @@ func NewGitCallback(config *config.Config) (*gitCallbackComponentImpl, error) {
 	mcpScanResultStore := database.NewMCPScanResultStore()
 	mcpScanner := component.NewMCPScannerComponent(config)
 	repositoryStatisticsStore := database.NewRepositoryStatisticsStore()
+	s3Client, err := s3.NewMinio(config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create repository package s3 client: %w", err)
+	}
 	return &gitCallbackComponentImpl{
 		config:                    config,
 		gitServer:                 gs,
@@ -131,6 +139,7 @@ func NewGitCallback(config *config.Config) (*gitCallbackComponentImpl, error) {
 		mcpScanResultStore:        mcpScanResultStore,
 		mcpScanner:                mcpScanner,
 		repositoryStatisticsStore: repositoryStatisticsStore,
+		repositoryPackageSyncer:   component.NewRepositoryPackageSyncer(config, rs, gs, s3Client),
 	}, nil
 }
 
@@ -248,17 +257,39 @@ func (c *gitCallbackComponentImpl) UpdateRepoInfos(ctx context.Context, req *typ
 	return err
 }
 
+func (c *gitCallbackComponentImpl) SyncRepositoryPackage(ctx context.Context, req *types.GiteaCallbackPushReq) error {
+	if req.HeadCommit.Id == "" {
+		return nil
+	}
+	splits := strings.Split(req.Repository.FullName, "/")
+	if len(splits) != 2 {
+		slog.Warn("invalid callback repo full name for repository package sync", slog.String("full_name", req.Repository.FullName))
+		return nil
+	}
+	fullNamespace, repoName := splits[0], splits[1]
+	repoType, namespace, _ := strings.Cut(fullNamespace, "_")
+	adjustedRepoType := types.RepositoryType(strings.TrimRight(repoType, "s"))
+	if c.repositoryPackageSyncer == nil {
+		return nil
+	}
+	branch := strings.TrimPrefix(req.Ref, "refs/heads/")
+	return c.repositoryPackageSyncer.SyncBranch(ctx, adjustedRepoType, namespace, repoName, branch)
+}
+
 func (c *gitCallbackComponentImpl) SensitiveCheck(ctx context.Context, req *types.GiteaCallbackPushReq) error {
+	if c.modSvcClient == nil {
+		return nil
+	}
 	// split req.Repository.FullName by '/'
 	splits := strings.Split(req.Repository.FullName, "/")
+	if len(splits) != 2 {
+		return fmt.Errorf("invalid callback repo full name for sensitive check: %s", req.Repository.FullName)
+	}
 	fullNamespace, repoName := splits[0], splits[1]
 	repoType, namespace, _ := strings.Cut(fullNamespace, "_")
 	adjustedRepoType := types.RepositoryType(strings.TrimRight(repoType, "s"))
 
-	var err error
-	if c.modSvcClient != nil {
-		err = c.modSvcClient.SubmitRepoCheck(ctx, adjustedRepoType, namespace, repoName)
-	}
+	err := c.modSvcClient.SubmitRepoCheck(ctx, adjustedRepoType, namespace, repoName)
 	if err != nil {
 		slog.Error("fail to submit repo sensitive check", slog.Any("error", err), slog.Any("repo_type", adjustedRepoType), slog.String("namespace", namespace), slog.String("name", repoName))
 		return err

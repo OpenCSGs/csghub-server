@@ -69,6 +69,12 @@ func (h *OpenAIHandlerImpl) Speech(c *gin.Context) {
 	isSSE := req.Stream || strings.EqualFold(req.StreamFormat, "sse")
 
 	modelTarget, err := h.resolveModelTarget(ctx, username, modelID, c.Request.Header)
+	SetMetricsModelTarget(SetMetricsModelParams{
+		C:           c,
+		ModelID:     modelID,
+		ModelTarget: modelTarget,
+		IsStream:    isSSE,
+	})
 	if err != nil {
 		preflight.RecordError(err, "model_resolve")
 		handleModelTargetError(c, ctx, modelID, "failed to get speech target address", err)
@@ -105,9 +111,6 @@ func (h *OpenAIHandlerImpl) Speech(c *gin.Context) {
 	if !modelTarget.Model.SkipBalance() {
 		if err := h.openaiComponent.CheckBalance(ctx, nsUUID); err != nil {
 			finishModalGenerationTraceWithError(generationRecorder, err, types.TraceErrInsufficientBalance)
-			if isSSE {
-				c.Writer.Header().Set("Content-Type", "text/event-stream")
-			}
 			h.handleInsufficientBalance(c, isSSE, nsUUID, modelID, err)
 			return
 		}
@@ -179,7 +182,7 @@ func (h *OpenAIHandlerImpl) Speech(c *gin.Context) {
 		defer cancel()
 
 		var usage *token.Usage
-		if w.StatusCode() < http.StatusBadRequest {
+		if isSuccessfulStatus(w.StatusCode()) {
 			var usageErr error
 			usage, usageErr = speechCounter.Usage(usageCtx)
 			if usageErr != nil {
@@ -197,7 +200,7 @@ func (h *OpenAIHandlerImpl) Speech(c *gin.Context) {
 			generationRecorder.End()
 		}
 
-		if w.StatusCode() < http.StatusBadRequest && usage != nil {
+		if isSuccessfulStatus(w.StatusCode()) && usage != nil {
 			if err := h.openaiComponent.RecordUsageFromTokenUsage(usageCtx, nsUUID, modelTarget.Model, modelTarget.ModelName, usage, apikey); err != nil {
 				slog.ErrorContext(usageCtx, "failed to record audio speech usage", slog.Any("error", err))
 			}
@@ -277,6 +280,12 @@ func (h *OpenAIHandlerImpl) SpeechBatch(c *gin.Context) {
 	}
 
 	modelTarget, err := h.resolveModelTarget(ctx, username, modelID, c.Request.Header)
+	SetMetricsModelTarget(SetMetricsModelParams{
+		C:           c,
+		ModelID:     modelID,
+		ModelTarget: modelTarget,
+		IsStream:    false,
+	})
 	if err != nil {
 		preflight.RecordError(err, "model_resolve")
 		handleModelTargetError(c, ctx, modelID, "failed to get speech batch target address", err)
@@ -371,7 +380,7 @@ func (h *OpenAIHandlerImpl) SpeechBatch(c *gin.Context) {
 		defer cancel()
 
 		var usage *token.Usage
-		if w.StatusCode() < http.StatusBadRequest {
+		if isSuccessfulStatus(w.StatusCode()) {
 			var usageErr error
 			usage, usageErr = speechCounter.Usage(usageCtx)
 			if usageErr != nil {
@@ -389,7 +398,7 @@ func (h *OpenAIHandlerImpl) SpeechBatch(c *gin.Context) {
 			generationRecorder.End()
 		}
 
-		if w.StatusCode() < http.StatusBadRequest && usage != nil {
+		if isSuccessfulStatus(w.StatusCode()) && usage != nil {
 			if err := h.openaiComponent.RecordUsageFromTokenUsage(usageCtx, nsUUID, modelTarget.Model, modelTarget.ModelName, usage, apikey); err != nil {
 				slog.ErrorContext(usageCtx, "failed to record audio speech batch usage", slog.Any("error", err))
 			}

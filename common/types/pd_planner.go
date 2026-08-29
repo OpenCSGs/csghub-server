@@ -6,8 +6,9 @@
 //   (TP/EP/DP), and estimates per-GPU weight memory usage and remaining KV cache space.
 //
 // Core functions:
-//   - PlanPD: enumerates all valid (TP, EP, DP) combinations and selects the optimal config
-//     using different heuristics for prefill vs decode
+//   - PlanPD: enumerates TP candidates, derives EP from TP (MoE: EP=TP, dense: EP=1),
+//     DP=1 always, and selects the optimal config using different heuristics
+//     for prefill vs decode
 //   - PlanPDRecommendation: estimates NonMoE parameter count from config.json metadata
 //     (hidden_size, num_hidden_layers, etc.), calls PlanPD to generate a PDRecommendation,
 //     and stores it in the metadata table
@@ -45,7 +46,11 @@ const systemOverheadFactor = 1.15
 const defaultKVRatioPrefill = 0.15
 
 // defaultKVRatioDecode is the fraction of GPU VRAM reserved for KV cache in decode.
-const defaultKVRatioDecode = 0.35
+// Decode processes small batches (often batch=1), so KV cache demand is modest.
+// A lower ratio leaves more VRAM for model weights, which is critical for large
+// bf16 models (e.g. 235B bf16 needs ~67.6GB weights on TP=8, leaving little room
+// with a higher KV ratio).
+const defaultKVRatioDecode = 0.15
 
 // ===== PD Planning Algorithm =====
 
@@ -61,11 +66,13 @@ type pdCandidate struct {
 // PlanPD computes the optimal prefill and decode LWS configurations for PD disaggregation.
 //
 // Algorithm overview:
-//  1. Enumerate all (TP, EP) combinations satisfying divisibility constraints.
+//  1. Enumerate TP candidates (powers of 2, ≤ MaxTotalGPUs). EP follows TP (TP==EP for MoE,
+//     EP=1 for dense). DP is always 1. TotalGPUs = TP. Single-node vs multi-node is
+//     decided later by planPrefill/planDecode using GPUsPerNode.
 //  2. For each candidate, estimate per-GPU weight memory using:
-//     M = (NonMoE/TP + Expert/(TP*EP)) * B * alpha
-//  3. Select the best prefill config: maximize TP (within single node), minimize total GPUs.
-//  4. Select the best decode config: minimize TP (<=2 preferred), maximize EP, minimize total GPUs.
+//     M = (NonMoE/TP + Expert/EP) * B * alpha
+//  3. Select the best prefill config: prefer single node (TP ≤ GPUsPerNode), minimize GPUs.
+//  4. Select the best decode config: minimize TP (<=2 preferred), minimize total GPUs.
 //
 // Returns (prefillResult, decodeResult, error). Returns an error if no valid config is found.
 func PlanPD(input PDPlanInput) (prefill PDPlanResult, decode PDPlanResult, err error) {
@@ -85,55 +92,52 @@ func PlanPD(input PDPlanInput) (prefill PDPlanResult, decode PDPlanResult, err e
 	isMoE := spec.TotalExperts > 0
 	expertParamsB := spec.TotalParamsB - spec.NonMoEParamsB
 
-	// Build TP candidates: powers of 2, limited to GPUsPerNode for NVLink efficiency
-	tpCandidates := buildTPCandidates(input.GPU.GPUsPerNode)
-
-	// Build EP candidates: for MoE models, factors of TotalExperts; for dense, only EP=1
-	epCandidates := buildEPCandidates(spec.TotalExperts, isMoE)
-
-	// Build DP candidates: powers of 2, default [1].
-	// DP replicates the model for higher throughput; it does not reduce per-GPU memory.
-	dpCandidates := []int{1}
-
-	// Enumerate all valid candidates
-	candidates := make([]pdCandidate, 0, len(tpCandidates)*len(epCandidates)*len(dpCandidates))
-	for _, tp := range tpCandidates {
-		for _, ep := range epCandidates {
-			weightMem := calcWeightMemPerGPU(spec.NonMoEParamsB, expertParamsB, tp, ep, bParam)
-			for _, dp := range dpCandidates {
-				candidates = append(candidates, pdCandidate{
-					TP:        tp,
-					EP:        ep,
-					DP:        dp,
-					WeightMem: weightMem,
-					TotalGPUs: tp * ep * dp,
-				})
-			}
-		}
-	}
-
-	// Apply MaxTotalGPUs limit (default: 32 = 4 nodes of 8 GPUs)
+	// MaxTotalGPUs limits the TP degree (and thus total GPUs, since TotalGPUs = TP).
+	// Default 1024 = 128 nodes of 8 GPUs. This allows multi-node TP for very large
+	// models (e.g. K3 2.8T fp8 needs TP=64 on 80GB GPUs).
 	maxGPUs := input.MaxTotalGPUs
 	if maxGPUs <= 0 {
-		maxGPUs = 32
+		maxGPUs = 1024
 	}
 
-	// Filter candidates by MaxTotalGPUs
-	filtered := make([]pdCandidate, 0, len(candidates))
-	for _, c := range candidates {
-		if c.TotalGPUs <= maxGPUs {
-			filtered = append(filtered, c)
+	// Build TP candidates: powers of 2, up to MaxTotalGPUs.
+	// Single-node (TP ≤ GPUsPerNode) is preferred by planPrefill/planDecode,
+	// but multi-node TP is allowed as a fallback for large models.
+	tpCandidates := buildTPCandidates(maxGPUs)
+
+	// Enumerate candidates. In PD planning:
+	//   - DP is always 1 (model is not replicated; throughput is scaled via LWS Replicas/HPA).
+	//   - EP follows TP (TP==EP for MoE models, EP=1 for dense). In SGLang EP follows TP,
+	//     in vLLM EP follows DP — either way EP does not add extra GPUs.
+	//   - TotalGPUs = TP (since DP=1 and EP shares the same GPUs as TP).
+	candidates := make([]pdCandidate, 0, len(tpCandidates))
+	for _, tp := range tpCandidates {
+		ep := 1
+		if isMoE {
+			// TP must evenly divide the expert count so that EP==TP shards experts uniformly.
+			if spec.TotalExperts%tp != 0 {
+				continue
+			}
+			ep = tp
 		}
+		weightMem := calcWeightMemPerGPU(spec.NonMoEParamsB, expertParamsB, tp, ep, bParam)
+		candidates = append(candidates, pdCandidate{
+			TP:        tp,
+			EP:        ep,
+			DP:        1,
+			WeightMem: weightMem,
+			TotalGPUs: tp,
+		})
 	}
 
-	// Plan prefill: maximize TP, prefer single node, minimize total GPUs
-	prefill, err = planPrefill(filtered, input.GPU.VRAMGB, input.KVRatioPrefill, input.GPU.GPUsPerNode)
+	// Plan prefill: prefer single node, minimize GPUs, allow multi-node fallback
+	prefill, err = planPrefill(candidates, input.GPU.VRAMGB, input.KVRatioPrefill, input.GPU.GPUsPerNode)
 	if err != nil {
 		return PDPlanResult{}, PDPlanResult{}, fmt.Errorf("prefill planning failed: %w", err)
 	}
 
-	// Plan decode: minimize TP (<=2 preferred), maximize EP, minimize total GPUs
-	decode, err = planDecode(filtered, input.GPU.VRAMGB, input.KVRatioDecode, input.GPU.GPUsPerNode)
+	// Plan decode: minimize TP (<=2 preferred), minimize total GPUs
+	decode, err = planDecode(candidates, input.GPU.VRAMGB, input.KVRatioDecode, input.GPU.GPUsPerNode)
 	if err != nil {
 		return PDPlanResult{}, PDPlanResult{}, fmt.Errorf("decode planning failed: %w", err)
 	}
@@ -142,49 +146,44 @@ func PlanPD(input PDPlanInput) (prefill PDPlanResult, decode PDPlanResult, err e
 }
 
 // calcWeightMemPerGPU estimates the model weight memory per GPU in GB.
-// Formula: (NonMoE/TP + Expert/(TP*EP)) * B * alpha
+// Formula: (NonMoE/TP + Expert/EP) * B * alpha
 //
-// Preconditions: tp >= 1 and ep >= 1 (callers use buildTPCandidates/buildEPCandidates
-// which always return values >= 1). Violating this would cause division by zero.
+// Non-expert parameters (attention, shared FFN, embedding) are sharded by TP.
+// Expert parameters are sharded by EP. TP and EP are independent dimensions
+// that share the same set of GPUs — they are NOT nested.
+//
+// Preconditions: tp >= 1 and ep >= 1 (callers use buildTPCandidates (powers of 2,
+// >=1), and ep is derived from tp (ep==tp for MoE, ep==1 for dense), so both are
+// always >= 1. Violating this would cause division by zero.
 func calcWeightMemPerGPU(nonMoEParamsB, expertParamsB float64, tp, ep int, bParam float64) float64 {
-	return (nonMoEParamsB/float64(tp) + expertParamsB/(float64(tp)*float64(ep))) * bParam * systemOverheadFactor
+	return (nonMoEParamsB/float64(tp) + expertParamsB/float64(ep)) * bParam * systemOverheadFactor
 }
 
-// buildTPCandidates returns TP values as powers of 2, not exceeding GPUsPerNode.
-func buildTPCandidates(gpusPerNode int) []int {
-	powers := []int{1, 2, 4, 8, 16, 32, 64}
+// buildTPCandidates returns TP values as powers of 2, not exceeding maxTotalGPUs.
+// This allows multi-node TP (e.g. TP=16 = 2 nodes, TP=32 = 4 nodes, TP=64 = 8 nodes)
+// for large models that don't fit within a single node. The caller passes MaxTotalGPUs
+// (default 1024).
+func buildTPCandidates(maxTotalGPUs int) []int {
+	if maxTotalGPUs <= 0 {
+		maxTotalGPUs = 1024
+	}
+	powers := []int{1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024}
 	result := make([]int, 0, len(powers))
 	for _, tp := range powers {
-		if tp <= gpusPerNode {
+		if tp <= maxTotalGPUs {
 			result = append(result, tp)
 		}
 	}
 	return result
 }
 
-// buildEPCandidates returns EP values for expert parallelism.
-// For dense models (totalExperts==0), returns [1].
-// For MoE models, returns all factors of totalExperts.
-func buildEPCandidates(totalExperts int, isMoE bool) []int {
-	if !isMoE || totalExperts <= 0 {
-		return []int{1}
-	}
-	factors := make([]int, 0)
-	for i := 1; i <= totalExperts; i++ {
-		if totalExperts%i == 0 {
-			factors = append(factors, i)
-		}
-	}
-	return factors
-}
-
 // planPrefill selects the best prefill configuration.
 // Heuristic: maximize TP (for compute throughput), prefer single node (NVLink),
-// but allow multi-node with EP if the model is too large for a single node.
+// but allow multi-node if the model is too large for a single node.
 func planPrefill(candidates []pdCandidate, gpuVRAMGB, kvRatio float64, gpusPerNode int) (PDPlanResult, error) {
 	maxWeight := gpuVRAMGB * (1 - kvRatio)
 
-	// Primary: single-node candidates (TP*EP <= gpusPerNode)
+	// Primary: single-node candidates (TotalGPUs = TP <= gpusPerNode)
 	var singleNode []pdCandidate
 	for _, c := range candidates {
 		if c.WeightMem <= maxWeight && c.TotalGPUs <= gpusPerNode {
@@ -193,15 +192,12 @@ func planPrefill(candidates []pdCandidate, gpuVRAMGB, kvRatio float64, gpusPerNo
 	}
 
 	if len(singleNode) > 0 {
-		// Sort: minimize total GPUs first, then maximize TP, then minimize EP
+		// Sort: minimize total GPUs first, then maximize TP
 		sortCandidates(singleNode, func(a, b pdCandidate) bool {
 			if a.TotalGPUs != b.TotalGPUs {
 				return a.TotalGPUs < b.TotalGPUs
 			}
-			if a.TP != b.TP {
-				return a.TP > b.TP
-			}
-			return a.EP < b.EP
+			return a.TP > b.TP
 		})
 		return buildPlanResult(singleNode[0], gpuVRAMGB, gpusPerNode), nil
 	}
@@ -231,8 +227,7 @@ func planPrefill(candidates []pdCandidate, gpuVRAMGB, kvRatio float64, gpusPerNo
 
 // planDecode selects the best decode configuration.
 // Heuristic: minimize TP (TP<=2 preferred for small-batch efficiency),
-// maximize EP (spread expert weights across more GPUs for KV cache headroom),
-// minimize total GPUs.
+// minimize total GPUs. EP always equals TP, so there is no separate EP dimension.
 func planDecode(candidates []pdCandidate, gpuVRAMGB, kvRatio float64, gpusPerNode int) (PDPlanResult, error) {
 	maxWeight := gpuVRAMGB * (1 - kvRatio)
 
@@ -248,15 +243,12 @@ func planDecode(candidates []pdCandidate, gpuVRAMGB, kvRatio float64, gpusPerNod
 	found := false
 
 	if len(primary) > 0 {
-		// Sort: minimize TP, then minimize total GPUs, then maximize EP
+		// Sort: minimize TP, then minimize total GPUs
 		sortCandidates(primary, func(a, b pdCandidate) bool {
 			if a.TP != b.TP {
 				return a.TP < b.TP
 			}
-			if a.TotalGPUs != b.TotalGPUs {
-				return a.TotalGPUs < b.TotalGPUs
-			}
-			return a.EP > b.EP
+			return a.TotalGPUs < b.TotalGPUs
 		})
 		best = primary[0]
 		found = true

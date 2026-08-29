@@ -59,13 +59,25 @@ func (h *OpenAIHandlerImpl) Responses(c *gin.Context) {
 	}
 
 	modelTarget, ok := h.resolveResponsesModelTarget(c, username, publicModelID, previousResponse.RequiredUpstreamID)
+	// Metrics key point 1: enrich business data on the RequestMetrics object.
+	// When resolution fails (ok == false), modelTarget is nil and only the
+	// requested modelID is recorded.
+	SetMetricsModelTarget(SetMetricsModelParams{
+		C:           c,
+		ModelID:     publicModelID,
+		ModelTarget: modelTarget,
+		IsStream:    req.Stream,
+	})
 	if !ok {
 		return
 	}
 
 	decision, err := responsespkg.ResolveRouting(responsespkg.RoutingTarget{
-		ModelID: modelTarget.Model.ID,
-		Target:  modelTarget.Target,
+		ModelID:          modelTarget.Model.ID,
+		Target:           modelTarget.Target,
+		CSGHubHosted:     isCSGHubHostedModel(modelTarget.Model),
+		RuntimeFramework: modelTarget.Model.RuntimeFramework,
+		ImageID:          modelTarget.Model.ImageID,
 	})
 	if err != nil {
 		writeResponsesError(c, http.StatusBadRequest, "unsupported_feature", "invalid_request_error", err.Error())
@@ -111,12 +123,32 @@ func (h *OpenAIHandlerImpl) Responses(c *gin.Context) {
 
 	switch decision.Mode {
 	case responsespkg.ResponsesModeNative:
-		h.executeNativeResponses(c, req, modelTarget, decision, owner, nsUUID, apikey, publicModelID, publicPreviousResponseID, responsesModeration, responseCapture, generationRecorder)
+		h.executeNativeResponses(c, req, withResponsesBackendURL(modelTarget, decision.BackendURL), decision, owner, nsUUID, apikey, publicModelID, publicPreviousResponseID, responsesModeration, responseCapture, generationRecorder)
 	case responsespkg.ResponsesModeChatAdapter:
-		h.executeAdapterResponses(c, req, modelTarget, nsUUID, apikey, publicModelID, responsesModeration, responseCapture, generationRecorder)
+		h.executeAdapterResponses(c, req, withResponsesBackendURL(modelTarget, decision.BackendURL), nsUUID, apikey, publicModelID, responsesModeration, responseCapture, generationRecorder)
 	default:
 		writeResponsesError(c, http.StatusBadRequest, "unsupported_feature", "invalid_request_error", "unsupported responses execution mode")
 	}
+}
+
+func isCSGHubHostedModel(model *types.Model) bool {
+	return model != nil && model.SvcName != ""
+}
+
+func withResponsesBackendURL(modelTarget *resolvedModelTarget, backendURL string) *resolvedModelTarget {
+	backendURL = strings.TrimSpace(backendURL)
+	if modelTarget == nil || backendURL == "" {
+		return modelTarget
+	}
+	resolved := *modelTarget
+	resolved.Target = backendURL
+	resolved.Upstream.URL = backendURL
+	if modelTarget.Model != nil {
+		modelCopy := *modelTarget.Model
+		modelCopy.Endpoint = backendURL
+		resolved.Model = &modelCopy
+	}
+	return &resolved
 }
 
 func (h *OpenAIHandlerImpl) setupResponsesCapture(c *gin.Context, req *types.ResponsesRequest, modelTarget *resolvedModelTarget, decision responsespkg.RoutingDecision, nsUUID string) *responsespkg.LLMLogRecorder {

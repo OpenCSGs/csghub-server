@@ -16,6 +16,8 @@ const (
 // ClawEvalSummary mirrors claw-eval batch_summary.json.
 // PassHatK and PassAtK serialize as pass_hat_{trials_per_task} and pass_at_{trials_per_task}
 // to stay compatible with the upstream evaluator output format.
+// InputTokens/OutputTokens/TotalTokens serialize as input_tokens/output_tokens/total_tokens
+// in the API response.
 type ClawEvalSummary struct {
 	Tasks         int     `json:"tasks"`
 	TrialsPerTask int     `json:"trials_per_task"`
@@ -23,6 +25,9 @@ type ClawEvalSummary struct {
 	AvgScore      float64 `json:"avg_score"`
 	PassHatK      int     `json:"-"`
 	PassAtK       int     `json:"-"`
+	InputTokens   int     `json:"input_tokens"`
+	OutputTokens  int     `json:"output_tokens"`
+	TotalTokens   int     `json:"total_tokens"`
 }
 
 func (s ClawEvalSummary) MarshalJSON() ([]byte, error) {
@@ -31,6 +36,9 @@ func (s ClawEvalSummary) MarshalJSON() ([]byte, error) {
 		"trials_per_task": s.TrialsPerTask,
 		"errored":         s.Errored,
 		"avg_score":       s.AvgScore,
+		"input_tokens":    s.InputTokens,
+		"output_tokens":   s.OutputTokens,
+		"total_tokens":    s.TotalTokens,
 	}
 	k := s.TrialsPerTask
 	if k <= 0 {
@@ -71,6 +79,16 @@ func ParseClawEvalSummary(raw []byte) (*ClawEvalSummary, error) {
 	if err := decodeIntField(payload, fmt.Sprintf("pass_at_%d", k), &summary.PassAtK); err != nil {
 		return nil, err
 	}
+	if err := decodeIntField(payload, "total_input_tokens", &summary.InputTokens); err != nil {
+		return nil, err
+	}
+	if err := decodeIntField(payload, "total_output_tokens", &summary.OutputTokens); err != nil {
+		return nil, err
+	}
+	if err := decodeIntField(payload, "total_tokens", &summary.TotalTokens); err != nil {
+		return nil, err
+	}
+
 	return summary, nil
 }
 

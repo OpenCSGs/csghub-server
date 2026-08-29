@@ -5,7 +5,7 @@
   "engine_images": [
     {
       "compute_type": "cpu",
-      "image": "opencsghq/claw-eval:1.0.0",
+      "image": "opencsghq/claw-eval:1.0.1",
       "engine_version": "1.0.0"
     }
   ],

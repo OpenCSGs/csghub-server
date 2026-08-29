@@ -350,6 +350,8 @@ type EmailLLMLogSyncNotification struct {
 	Date            string   `json:"date"`
 	Status          string   `json:"status"`
 	FileCount       int      `json:"file_count"`
+	SourceLineCount int64    `json:"source_line_count"`
+	DatasetRowCount int64    `json:"dataset_row_count"`
 	DataflowStarted bool     `json:"dataflow_started"`
 	DataflowJobID   string   `json:"dataflow_job_id"`
 	ArgoTaskID      string   `json:"argo_task_id"`
@@ -365,6 +367,8 @@ type SendLLMLogSyncMailInput struct {
 	Date            string
 	Status          string
 	FileCount       int
+	SourceLineCount int64
+	DatasetRowCount int64
 	DataflowStarted bool
 	DataflowJobID   string
 	ArgoTaskID      string

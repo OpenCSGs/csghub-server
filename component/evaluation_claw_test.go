@@ -77,8 +77,8 @@ func TestEvaluationComponent_CreateClawEvaluation(t *testing.T) {
 	mockUser.EXPECT().FindByUsername(ctx, "user1").Return(database.User{Username: "user1", UUID: "uuid1", RoleMask: "admin"}, nil)
 	mockFrame.EXPECT().FindEnabledByID(ctx, int64(1)).Return(&database.RuntimeFramework{
 		ID:          1,
-		FrameName:   types.ClawEvalFrameName,
-		FrameImage:  "opencsghq/claw-eval:1.0.0",
+		FrameName:   "claw-eval-codex",
+		FrameImage:  "opencsghq/claw-eval-codex:1.0.0",
 		ComputeType: "cpu",
 	}, nil)
 	mockSpaceRes.EXPECT().FindByID(ctx, int64(2)).Return(&database.SpaceResource{
@@ -94,7 +94,7 @@ func TestEvaluationComponent_CreateClawEvaluation(t *testing.T) {
 	mockDeployer.EXPECT().SubmitClawEvaluation(ctx, mock.MatchedBy(func(r types.ClawEvaluationReq) bool {
 		return r.TaskType == types.TaskTypeClawEval &&
 			r.Model == "glm-5.1" &&
-			r.Image == "opencsghq/claw-eval:1.0.0" &&
+			r.Image == "opencsghq/claw-eval-codex:1.0.0" &&
 			r.Tasks == "1-9" &&
 			r.ApiKey == "sk-test" &&
 			r.JudgeBaseURL == "http://aigateway.test/v1" &&
@@ -111,7 +111,7 @@ func TestEvaluationComponent_CreateClawEvaluation(t *testing.T) {
 			wf.ResourceId == 2 &&
 			wf.ResourceName == "cpu-small" &&
 			wf.Status == v1alpha1.WorkflowPending
-	})).Return(&database.ArgoWorkflow{ID: 101, TaskId: "task-1", ResourceId: 2, ResourceName: "cpu-small", Image: "opencsghq/claw-eval:1.0.0", Status: v1alpha1.WorkflowPending}, nil)
+	})).Return(&database.ArgoWorkflow{ID: 101, TaskId: "task-1", ResourceId: 2, ResourceName: "cpu-small", Image: "opencsghq/claw-eval-codex:1.0.0", Status: v1alpha1.WorkflowPending}, nil)
 
 	resp, err := c.CreateEvaluation(ctx, req)
 	require.NoError(t, err)
@@ -393,7 +393,10 @@ func TestEvaluationComponent_GetClawEvaluationSummary(t *testing.T) {
 			"errored": 3,
 			"avg_score": 0.72,
 			"pass_hat_3": 40,
-			"pass_at_3": 55
+			"pass_at_3": 55,
+			"total_input_tokens": 12000,
+			"total_output_tokens": 3400,
+			"total_tokens": 15400
 		}`))
 	}))
 	defer summaryServer.Close()
@@ -421,6 +424,9 @@ func TestEvaluationComponent_GetClawEvaluationSummary(t *testing.T) {
 	require.InDelta(t, 0.72, res.Summary.AvgScore, 0.0001)
 	require.Equal(t, 40, res.Summary.PassHatK)
 	require.Equal(t, 55, res.Summary.PassAtK)
+	require.Equal(t, 12000, res.Summary.InputTokens)
+	require.Equal(t, 3400, res.Summary.OutputTokens)
+	require.Equal(t, 15400, res.Summary.TotalTokens)
 }
 
 func TestEvaluationComponent_DeleteClawEvaluation(t *testing.T) {

@@ -36,6 +36,7 @@ type LaunchDeployBenchmarkFunc func(ctx context.Context, req types.DeployBenchma
 var LaunchDeployBenchmark LaunchDeployBenchmarkFunc
 
 type Deployer interface {
+	SandboxV2Deployer
 	Deploy(ctx context.Context, dr types.DeployRequest) (deployID int64, err error)
 	Status(ctx context.Context, dr types.DeployRequest, needDetails bool) (srvName string, status int, instances []types.Instance, err error)
 	Logs(ctx context.Context, dr types.DeployRequest) (*MultiLogReader, error)
@@ -71,6 +72,7 @@ type Deployer interface {
 	GetWorkFlow(ctx context.Context, req types.ArgoWorkFlowDeleteReq) (*types.ArgoWorkFlowRes, error)
 	GetSandbox(ctx context.Context, clusterID, sandboxName string) (*runnerTypes.SandboxDetail, error)
 	BatchStatus(ctx context.Context, req *runnerTypes.BatchStatusRequest) (*runnerTypes.BatchStatusResponse, error)
+	CheckClusterHealthy(ctx context.Context, clusterId string) (bool, error)
 }
 
 func (d *deployer) generateUniqueSvcName(dr types.DeployRequest) string {
@@ -84,6 +86,10 @@ func (d *deployer) generateUniqueSvcName(dr types.DeployRequest) string {
 		// model serverless
 		fields := strings.Split(dr.Path, "/")
 		uniqueSvcName = common.UniqueSpaceAppName("s", fields[0], fields[1], dr.RepoID)
+	case types.SandboxType, types.SandboxEphemeralType:
+		// sandbox: persistent keeps the caller-provided svc_name; ephemeral leaves it empty
+		// and lets the runner generate the name (backfilled after creation).
+		uniqueSvcName = dr.SvcName
 	default:
 		// model inference
 		// generate unique service name from uuid when create new deploy by snowflake
@@ -100,6 +106,8 @@ func (d *deployer) serverlessDeploy(ctx context.Context, dr types.DeployRequest)
 	slog.Debug("do deployer.serverlessDeploy check type", slog.Any("dr.Type", dr.Type))
 	if dr.Type == types.SpaceType {
 		deploy, err = d.deployTaskStore.GetLatestDeployBySpaceID(ctx, dr.SpaceID)
+	} else if types.IsSandboxType(dr.Type) {
+		deploy, err = d.deployTaskStore.FindByDeployNameAndType(ctx, dr.UserUUID, dr.DeployName, dr.Type)
 	} else {
 		deploy, err = d.deployTaskStore.GetServerlessDeployByRepID(ctx, dr.RepoID)
 	}
@@ -134,6 +142,17 @@ func (d *deployer) serverlessDeploy(ctx context.Context, dr types.DeployRequest)
 	deploy.NodeAffinity = dr.NodeAffinity
 	deploy.Tolerations = dr.Tolerations
 	deploy.PD = dr.PD
+	deploy.VolumeMounts = dr.VolumeMounts
+	if types.IsSandboxType(dr.Type) {
+		// Sandbox-only fields and state reset: a reused sandbox deploy must restart from
+		// Pending. Space/serverless reset their status via StartDeploy instead, and
+		// dr.Sandbox is zero-valued for them (overwriting Timeout here would clear it).
+		deploy.RuntimeFramework = types.SandboxV2RuntimeFramework
+		deploy.Timeout = int(dr.Sandbox.Timeout)
+		deploy.ReadinessProbe = dr.Sandbox.ReadinessProbe
+		deploy.Status = common.Pending
+		deploy.StatusUpdateAt = time.Now()
+	}
 	slog.Debug("do deployer.serverlessDeploy", slog.Any("dr", dr), slog.Any("deploy", deploy))
 	err = d.deployTaskStore.UpdateDeploy(ctx, deploy)
 	if err != nil {
@@ -145,7 +164,7 @@ func (d *deployer) serverlessDeploy(ctx context.Context, dr types.DeployRequest)
 
 func (d *deployer) dedicatedDeploy(ctx context.Context, dr types.DeployRequest) (*database.Deploy, error) {
 	uniqueSvcName := d.generateUniqueSvcName(dr)
-	if len(uniqueSvcName) < 1 {
+	if len(uniqueSvcName) < 1 && !types.IsSandboxType(dr.Type) {
 		err := fmt.Errorf("failed to generate uuid for deploy")
 		return nil, errorx.InternalServerError(err,
 			errorx.Ctx().
@@ -187,6 +206,12 @@ func (d *deployer) dedicatedDeploy(ctx context.Context, dr types.DeployRequest) 
 		NodeAffinity:     dr.NodeAffinity,
 		Tolerations:      dr.Tolerations,
 		PD:               dr.PD,
+		VolumeMounts:     dr.VolumeMounts,
+	}
+	if types.IsSandboxType(dr.Type) {
+		deploy.RuntimeFramework = types.SandboxV2RuntimeFramework
+		deploy.ReadinessProbe = dr.Sandbox.ReadinessProbe
+		deploy.Timeout = int(dr.Sandbox.Timeout)
 	}
 	updateDatabaseDeploy(deploy, dr)
 	err := d.deployTaskStore.CreateDeploy(ctx, deploy)
@@ -197,8 +222,9 @@ func (d *deployer) buildDeploy(ctx context.Context, dr types.DeployRequest) (*da
 	var deploy *database.Deploy = nil
 	var err error = nil
 	slog.Debug("do deployer.buildDeploy check type", slog.Any("dr.Type", dr.Type))
-	if dr.Type == types.SpaceType || dr.Type == types.ServerlessType {
+	if dr.Type == types.SpaceType || dr.Type == types.ServerlessType || types.IsSandboxType(dr.Type) {
 		// space case: SpaceID>0 and ModelID=0, reuse latest deploy of spaces
+		// sandbox case: DeployName is not empty, reuse deploy by deployName
 		deploy, err = d.serverlessDeploy(ctx, dr)
 		if err != nil {
 			return nil, fmt.Errorf("fail to check serverless deploy for spaceID %v, %w", dr.SpaceID, err)
@@ -282,15 +308,19 @@ func (d *deployer) Deploy(ctx context.Context, dr types.DeployRequest) (int64, e
 }
 
 func (d *deployer) Status(ctx context.Context, dr types.DeployRequest, needDetails bool) (string, int, []types.Instance, error) {
+	if dr.DeployID == 0 {
+		slog.ErrorContext(ctx, "failed to get deploy: deploy_id not provided")
+		return "", common.Stopped, nil, fmt.Errorf("can't get deploy: deploy_id not provided")
+	}
 	deploy, err := d.deployTaskStore.GetDeployByID(ctx, dr.DeployID)
 	if err != nil || deploy == nil {
-		slog.Error("fail to get deploy by deploy id", slog.Any("DeployID", dr.DeployID), slog.Any("error", err))
+		slog.ErrorContext(ctx, "failed to get deploy", slog.Any("DeployID", dr.DeployID), slog.Any("error", err))
 		return "", common.Stopped, nil, fmt.Errorf("can't get deploy, %w", err)
 	}
 
-	healthy := d.CheckClusterHealthy(ctx, deploy.ClusterID)
+	healthy, err := d.CheckClusterHealthy(ctx, deploy.ClusterID)
 	if !healthy {
-		slog.WarnContext(ctx, "cluster resources unhealthy")
+		slog.WarnContext(ctx, "cluster resources unhealthy", slog.Any("error", err), slog.Any("clusterID", deploy.ClusterID))
 		return "", common.ResourceUnhealthy, nil, nil
 	}
 	// deploy status and instances reported from runner
@@ -380,7 +410,11 @@ func (d *deployer) Stop(ctx context.Context, dr types.DeployRequest) error {
 	if dr.SpaceID == 0 {
 		targetID = dr.DeployID // support model deploy with multi-instance
 	}
-	resp, err := d.imageRunner.Stop(ctx, &types.StopRequest{
+	// set independent timeout for remote runner call to prevent blocking when cluster is unreachable
+	stopCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	resp, err := d.imageRunner.Stop(stopCtx, &types.StopRequest{
 		ID:        targetID,
 		OrgName:   dr.Namespace,
 		RepoName:  dr.Name,
@@ -390,7 +424,7 @@ func (d *deployer) Stop(ctx context.Context, dr types.DeployRequest) error {
 	if err != nil {
 		slog.Error("deployer stop deploy", slog.Any("runner_resp", resp), slog.Int64("space_id", dr.SpaceID), slog.Any("deploy_id", dr.DeployID), slog.Any("error", err))
 	}
-	// release resource if it's a order case
+	// release resource if it's a order case, use original ctx to not be affected by stop timeout
 	err = d.releaseUserResourceByOrder(ctx, dr)
 	if err != nil {
 		return err
@@ -1135,6 +1169,7 @@ func (d *deployer) SubmitFinetuneJob(ctx context.Context, req types.FinetuneReq)
 		ResourceId:         req.ResourceId,
 		ResourceName:       req.ResourceName,
 		FinetunedModelName: finetunedModelName,
+		Nodes:              req.Nodes,
 		Scheduler:          common.GenerateScheduler(cluster.VXPUConfig),
 		DeployExtend: types.DeployExtend{
 			NodeAffinity: req.NodeAffinity,
@@ -1143,19 +1178,6 @@ func (d *deployer) SubmitFinetuneJob(ctx context.Context, req types.FinetuneReq)
 	}
 	if req.ResourceId == 0 {
 		flowReq.ShareMode = true
-	}
-
-	clusterNodes, err := d.clusterStore.FindNodeByClusterID(ctx, req.ClusterID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to find nodes by cluster id, clusterID: %s, error: %w", req.ClusterID, err)
-	}
-
-	for _, node := range clusterNodes {
-		req.Nodes = append(req.Nodes, types.Node{
-			Name:       node.Name,
-			EnableVXPU: node.EnableVXPU,
-			HasXPU:     node.Hardware.HasXPU() || node.EnableVXPU,
-		})
 	}
 
 	slog.Debug("submit finetune workflow request to runner", slog.Any("flowReq", flowReq))
@@ -1208,29 +1230,26 @@ func (d *deployer) GetWorkflowLogsNonStream(ctx context.Context, req types.Workf
 	return d.lokiClient.QueryRange(ctx, params)
 }
 
-func (d *deployer) CheckClusterHealthy(ctx context.Context, deployId string) bool {
-	clusterRes, err := d.clusterStore.GetClusterResources(ctx, deployId)
+func (d *deployer) CheckClusterHealthy(ctx context.Context, clusterId string) (bool, error) {
+	clusterRes, err := d.clusterStore.GetClusterResources(ctx, clusterId)
 	if err != nil {
-		slog.ErrorContext(ctx, "failed to get cluster resources", slog.Any("error", err))
-		return false
+		return false, fmt.Errorf("failed to get cluster resources, clusterID: %s, error: %w", clusterId, err)
 	}
 
 	if !clusterRes.Enable {
-		slog.WarnContext(ctx, "cluster resources unhealthy, cluster is disabled")
-		return false
+		return false, fmt.Errorf("cluster resources unhealthy, cluster is disabled")
 	}
 
-	if clusterRes.Status == types.ClusterStatusUnavailable {
-		slog.WarnContext(ctx, "cluster resources unhealthy, cluster status is unavailable")
-		return false
+	if clusterRes.Status != types.ClusterStatusRunning {
+		return false, fmt.Errorf("cluster resources unhealthy, cluster status is not running")
 	}
 
 	timePassed := time.Since(time.Unix(clusterRes.LastUpdateTime, 0))
-	if timePassed > time.Duration(d.config.Runner.HearBeatIntervalInSec*2*int(time.Second)) {
-		slog.WarnContext(ctx, "cluster resources unhealthy, last update time", slog.Any("last_update_time", clusterRes.LastUpdateTime))
-		return false
+	maxDuration := time.Duration(d.config.Runner.HearBeatIntervalInSec * 2 * int(time.Second))
+	if timePassed > maxDuration {
+		return false, fmt.Errorf("cluster resources unhealthy, last update duration is greater than %s", maxDuration.String())
 	}
-	return true
+	return true, nil
 }
 
 func (d *deployer) IsDefaultScheduler(VXPUConfig map[string]string) bool {

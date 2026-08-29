@@ -132,7 +132,8 @@ const (
 	TEI                         InferenceEngine = "tei"
 	Ktransformers               InferenceEngine = "ktransformers"
 
-	MaxFileTreeSize int = 500
+	MaxFileTreeSize          int = 500
+	RepoListVisiblePageLimit int = 100
 )
 
 var (
@@ -287,8 +288,9 @@ type DeployRequest struct {
 	DeployExtend
 
 	Sandbox struct {
-		Timeout    int64  `json:"timeout,omitempty"`
-		TemplateID string `json:"templateID,omitempty"`
+		Timeout        int64                  `json:"timeout,omitempty"`
+		TemplateID     string                 `json:"templateID,omitempty"`
+		ReadinessProbe *SandboxReadinessProbe `json:"readiness_probe,omitempty"`
 	}
 }
 
@@ -456,10 +458,11 @@ type CheckResourceAndAccountReq struct {
 	CurrentUser   string `json:"current_user"`
 }
 
-type DownloadCodeZipReq struct {
-	Namespace string `json:"namespace"`
-	Name      string `json:"name"`
-	Revision  string `json:"revision"`
+type DownloadRepoZipReq struct {
+	RepoType  RepositoryType `json:"repo_type"`
+	Namespace string         `json:"namespace"`
+	Name      string         `json:"name"`
+	Revision  string         `json:"revision"`
 }
 
 type BatchRepoExtraReq struct {
@@ -467,9 +470,14 @@ type BatchRepoExtraReq struct {
 }
 
 type RepoExtraItem struct {
-	RepoID         int64 `json:"repo_id"`
-	Size           int64 `json:"size"`
-	LastCommitSize int64 `json:"last_commit_size"`
+	RepoID           int64            `json:"repo_id"`
+	Size             int64            `json:"size"`
+	LastCommitSize   int64            `json:"last_commit_size"`
+	Tags             []RepoTag        `json:"tags,omitempty"`
+	MirrorTaskStatus MirrorTaskStatus `json:"mirror_task_status,omitempty"`
+	MultiSource      MultiSource      `json:"multi_source,omitempty"`
+	Repository       *Repository      `json:"repository,omitempty"`
+	ReportURL        string           `json:"report_url,omitempty"`
 }
 
 type RepoSizeResponse struct {

@@ -11,8 +11,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	dcommon "opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
 
@@ -33,6 +35,8 @@ func TestRepoComponent_DeployUpdate(t *testing.T) {
 		SvcName:          "svc",
 		ClusterID:        "cluster",
 		RuntimeFramework: "fm",
+		SecureLevel:      types.EndpointPublic,
+		Status:           dcommon.Stopped,
 	}
 	repo.mocks.stores.DeployTaskMock().EXPECT().GetDeployByID(ctx, int64(1)).Return(deploy, nil)
 	repo.mocks.stores.SpaceResourceMock().EXPECT().FindByID(ctx, int64(111)).Return(&database.SpaceResource{
@@ -46,17 +50,8 @@ func TestRepoComponent_DeployUpdate(t *testing.T) {
 	repo.mocks.stores.RuntimeFrameworkMock().EXPECT().FindEnabledByName(ctx, "fm").Return(&database.RuntimeFramework{
 		ID: 999,
 	}, nil)
-	repo.mocks.stores.ClusterInfoMock().EXPECT().ByClusterID(ctx, "cluster").Return(database.ClusterInfo{}, nil)
+	repo.mocks.deployer.EXPECT().CheckClusterHealthy(ctx, "cluster").Return(true, nil)
 
-	repo.mocks.deployer.EXPECT().Exist(ctx, types.DeployRequest{
-		DeployID:  1,
-		Namespace: "ns",
-		Name:      "n",
-		SvcName:   "svc",
-		ClusterID: "cluster",
-		SpaceID:   2,
-		ModelID:   3,
-	}).Return(false, nil)
 	repo.mocks.deployer.EXPECT().UpdateDeploy(ctx, req, deploy).Return(nil)
 
 	err := repo.DeployUpdate(ctx, types.DeployActReq{
@@ -69,6 +64,248 @@ func TestRepoComponent_DeployUpdate(t *testing.T) {
 		InstanceName: "i1",
 	}, req)
 	require.Nil(t, err)
+}
+
+func TestRepoComponent_DeployUpdate_RunningDeploy_StopFirst(t *testing.T) {
+	ctx := context.TODO()
+	repo := initializeTestRepoComponent(ctx, t)
+	mockUserRepoAdminPermission(ctx, repo.mocks.stores, "user")
+
+	req := &types.DeployUpdateReq{
+		ResourceID: tea.Int64(111),
+		ClusterID:  tea.String("cluster"),
+	}
+
+	deploy := &database.Deploy{
+		ID:               1,
+		SpaceID:          2,
+		ModelID:          3,
+		SvcName:          "svc",
+		ClusterID:        "cluster",
+		RuntimeFramework: "fm",
+		SecureLevel:      types.EndpointPublic,
+		Status:           dcommon.Running,
+	}
+	repo.mocks.stores.DeployTaskMock().EXPECT().GetDeployByID(ctx, int64(1)).Return(deploy, nil)
+	repo.mocks.stores.SpaceResourceMock().EXPECT().FindByID(ctx, int64(111)).Return(&database.SpaceResource{
+		ID:        111,
+		ClusterID: "cluster",
+		Resources: `{ "gpu": { "type": "A10", "num": "1", "resource_name": "nvidia.com/gpu", "labels": { "aliyun.accelerator/nvidia_name": "NVIDIA-A10" } }, "cpu": { "type": "Intel", "num": "12" },  "memory": "46Gi" }`,
+	}, nil)
+
+	repo.mocks.deployer.EXPECT().CheckResourceAvailable(ctx, "cluster", int64(0), mock.Anything).Return(true, []types.ResourceAvailableStatus{}, nil)
+
+	repo.mocks.stores.RuntimeFrameworkMock().EXPECT().FindEnabledByName(ctx, "fm").Return(&database.RuntimeFramework{
+		ID: 999,
+	}, nil)
+	repo.mocks.deployer.EXPECT().CheckClusterHealthy(ctx, "cluster").Return(true, nil)
+
+	err := repo.DeployUpdate(ctx, types.DeployActReq{
+		RepoType:     types.ModelRepo,
+		Namespace:    "ns",
+		Name:         "n",
+		CurrentUser:  "user",
+		DeployID:     1,
+		DeployType:   1,
+		InstanceName: "i1",
+	}, req)
+	require.NotNil(t, err)
+	require.ErrorIs(t, err, errorx.ErrDeployStopFirst)
+}
+
+func TestRepoComponent_DeployUpdate_StoppedDeploy(t *testing.T) {
+	ctx := context.TODO()
+	repo := initializeTestRepoComponent(ctx, t)
+	mockUserRepoAdminPermission(ctx, repo.mocks.stores, "user")
+
+	req := &types.DeployUpdateReq{
+		ResourceID: tea.Int64(111),
+		ClusterID:  tea.String("cluster"),
+	}
+
+	deploy := &database.Deploy{
+		ID:               1,
+		SpaceID:          2,
+		ModelID:          3,
+		SvcName:          "svc",
+		ClusterID:        "cluster",
+		RuntimeFramework: "fm",
+		SecureLevel:      types.EndpointPublic,
+		Status:           dcommon.Stopped,
+	}
+	repo.mocks.stores.DeployTaskMock().EXPECT().GetDeployByID(ctx, int64(1)).Return(deploy, nil)
+	repo.mocks.stores.SpaceResourceMock().EXPECT().FindByID(ctx, int64(111)).Return(&database.SpaceResource{
+		ID:        111,
+		ClusterID: "cluster",
+		Resources: `{ "gpu": { "type": "A10", "num": "1", "resource_name": "nvidia.com/gpu", "labels": { "aliyun.accelerator/nvidia_name": "NVIDIA-A10" } }, "cpu": { "type": "Intel", "num": "12" },  "memory": "46Gi" }`,
+	}, nil)
+
+	repo.mocks.deployer.EXPECT().CheckResourceAvailable(ctx, "cluster", int64(0), mock.Anything).Return(true, []types.ResourceAvailableStatus{}, nil)
+
+	repo.mocks.stores.RuntimeFrameworkMock().EXPECT().FindEnabledByName(ctx, "fm").Return(&database.RuntimeFramework{
+		ID: 999,
+	}, nil)
+	repo.mocks.deployer.EXPECT().CheckClusterHealthy(ctx, "cluster").Return(true, nil)
+
+	repo.mocks.deployer.EXPECT().UpdateDeploy(ctx, req, deploy).Return(nil)
+
+	err := repo.DeployUpdate(ctx, types.DeployActReq{
+		RepoType:     types.ModelRepo,
+		Namespace:    "ns",
+		Name:         "n",
+		CurrentUser:  "user",
+		DeployID:     1,
+		DeployType:   1,
+		InstanceName: "i1",
+	}, req)
+	require.Nil(t, err)
+}
+
+func TestRepoComponent_DeployUpdate_DeletedDeploy(t *testing.T) {
+	ctx := context.TODO()
+	repo := initializeTestRepoComponent(ctx, t)
+	mockUserRepoAdminPermission(ctx, repo.mocks.stores, "user")
+
+	req := &types.DeployUpdateReq{
+		ResourceID: tea.Int64(111),
+		ClusterID:  tea.String("cluster"),
+	}
+
+	deploy := &database.Deploy{
+		ID:               1,
+		SpaceID:          2,
+		ModelID:          3,
+		SvcName:          "svc",
+		ClusterID:        "cluster",
+		RuntimeFramework: "fm",
+		SecureLevel:      types.EndpointPublic,
+		Status:           dcommon.Deleted,
+	}
+	repo.mocks.stores.DeployTaskMock().EXPECT().GetDeployByID(ctx, int64(1)).Return(deploy, nil)
+	repo.mocks.stores.SpaceResourceMock().EXPECT().FindByID(ctx, int64(111)).Return(&database.SpaceResource{
+		ID:        111,
+		ClusterID: "cluster",
+		Resources: `{ "gpu": { "type": "A10", "num": "1", "resource_name": "nvidia.com/gpu", "labels": { "aliyun.accelerator/nvidia_name": "NVIDIA-A10" } }, "cpu": { "type": "Intel", "num": "12" },  "memory": "46Gi" }`,
+	}, nil)
+
+	repo.mocks.deployer.EXPECT().CheckResourceAvailable(ctx, "cluster", int64(0), mock.Anything).Return(true, []types.ResourceAvailableStatus{}, nil)
+
+	repo.mocks.stores.RuntimeFrameworkMock().EXPECT().FindEnabledByName(ctx, "fm").Return(&database.RuntimeFramework{
+		ID: 999,
+	}, nil)
+	repo.mocks.deployer.EXPECT().CheckClusterHealthy(ctx, "cluster").Return(true, nil)
+
+	// Exist is intentionally NOT mocked here: for deleted deploys the code
+	// skips the Exist call entirely, so any accidental invocation would
+	// cause gomock to panic (unexpected call), serving as an implicit
+	// negative assertion.
+
+	repo.mocks.deployer.EXPECT().UpdateDeploy(ctx, req, deploy).Return(nil)
+
+	err := repo.DeployUpdate(ctx, types.DeployActReq{
+		RepoType:     types.ModelRepo,
+		Namespace:    "ns",
+		Name:         "n",
+		CurrentUser:  "user",
+		DeployID:     1,
+		DeployType:   1,
+		InstanceName: "i1",
+	}, req)
+	require.Nil(t, err)
+}
+
+func TestRepoComponent_DeployUpdate_UnhealthyCluster_ReturnsError(t *testing.T) {
+	ctx := context.TODO()
+	repo := initializeTestRepoComponent(ctx, t)
+	mockUserRepoAdminPermission(ctx, repo.mocks.stores, "user")
+
+	req := &types.DeployUpdateReq{
+		ResourceID: tea.Int64(111),
+		ClusterID:  tea.String("bad-cluster"),
+	}
+
+	deploy := &database.Deploy{
+		ID:               1,
+		SpaceID:          2,
+		ModelID:          3,
+		SvcName:          "svc",
+		ClusterID:        "bad-cluster",
+		RuntimeFramework: "fm",
+		SecureLevel:      types.EndpointPublic,
+		Status:           dcommon.Stopped,
+	}
+	repo.mocks.stores.DeployTaskMock().EXPECT().GetDeployByID(ctx, int64(1)).Return(deploy, nil)
+	repo.mocks.stores.SpaceResourceMock().EXPECT().FindByID(ctx, int64(111)).Return(&database.SpaceResource{
+		ID:        111,
+		ClusterID: "bad-cluster",
+		Resources: `{ "gpu": { "type": "A10", "num": "1", "resource_name": "nvidia.com/gpu", "labels": { "aliyun.accelerator/nvidia_name": "NVIDIA-A10" } }, "cpu": { "type": "Intel", "num": "12" },  "memory": "46Gi" }`,
+	}, nil)
+
+	repo.mocks.deployer.EXPECT().CheckResourceAvailable(ctx, "bad-cluster", int64(0), mock.Anything).Return(true, []types.ResourceAvailableStatus{}, nil)
+
+	repo.mocks.stores.RuntimeFrameworkMock().EXPECT().FindEnabledByName(ctx, "fm").Return(&database.RuntimeFramework{
+		ID: 999,
+	}, nil)
+	repo.mocks.deployer.EXPECT().CheckClusterHealthy(ctx, "bad-cluster").Return(false, nil)
+
+	err := repo.DeployUpdate(ctx, types.DeployActReq{
+		RepoType:     types.ModelRepo,
+		Namespace:    "ns",
+		Name:         "n",
+		CurrentUser:  "user",
+		DeployID:     1,
+		DeployType:   1,
+		InstanceName: "i1",
+	}, req)
+	require.NotNil(t, err)
+	require.True(t, errors.Is(err, errorx.ErrClusterUnavailable))
+}
+
+func TestRepoComponent_DeployUpdate_CheckClusterHealthyError_ReturnsError(t *testing.T) {
+	ctx := context.TODO()
+	repo := initializeTestRepoComponent(ctx, t)
+	mockUserRepoAdminPermission(ctx, repo.mocks.stores, "user")
+
+	req := &types.DeployUpdateReq{
+		ResourceID: tea.Int64(111),
+		ClusterID:  tea.String("down-cluster"),
+	}
+
+	deploy := &database.Deploy{
+		ID:               1,
+		SpaceID:          2,
+		ModelID:          3,
+		SvcName:          "svc",
+		ClusterID:        "down-cluster",
+		RuntimeFramework: "fm",
+		SecureLevel:      types.EndpointPublic,
+		Status:           dcommon.Stopped,
+	}
+	repo.mocks.stores.DeployTaskMock().EXPECT().GetDeployByID(ctx, int64(1)).Return(deploy, nil)
+	repo.mocks.stores.SpaceResourceMock().EXPECT().FindByID(ctx, int64(111)).Return(&database.SpaceResource{
+		ID:        111,
+		ClusterID: "down-cluster",
+		Resources: `{ "gpu": { "type": "A10", "num": "1", "resource_name": "nvidia.com/gpu", "labels": { "aliyun.accelerator/nvidia_name": "NVIDIA-A10" } }, "cpu": { "type": "Intel", "num": "12" },  "memory": "46Gi" }`,
+	}, nil)
+
+	repo.mocks.deployer.EXPECT().CheckResourceAvailable(ctx, "down-cluster", int64(0), mock.Anything).Return(true, []types.ResourceAvailableStatus{}, nil)
+
+	repo.mocks.stores.RuntimeFrameworkMock().EXPECT().FindEnabledByName(ctx, "fm").Return(&database.RuntimeFramework{
+		ID: 999,
+	}, nil)
+	repo.mocks.deployer.EXPECT().CheckClusterHealthy(ctx, "down-cluster").Return(false, errors.New("connection refused"))
+
+	err := repo.DeployUpdate(ctx, types.DeployActReq{
+		RepoType:     types.ModelRepo,
+		Namespace:    "ns",
+		Name:         "n",
+		CurrentUser:  "user",
+		DeployID:     1,
+		DeployType:   1,
+		InstanceName: "i1",
+	}, req)
+	require.NotNil(t, err)
+	require.True(t, errors.Is(err, errorx.ErrClusterUnavailable))
 }
 
 func TestRepoComponent_DeployStart(t *testing.T) {
@@ -84,6 +321,7 @@ func TestRepoComponent_DeployStart(t *testing.T) {
 		ClusterID:        "cluster",
 		RuntimeFramework: "fm",
 		SKU:              "111",
+		SecureLevel:      types.EndpointPublic,
 	}
 	repo.mocks.stores.DeployTaskMock().EXPECT().GetDeployByID(ctx, int64(1)).Return(deploy, nil)
 
@@ -131,6 +369,7 @@ func TestRepoComponent_DeployStart_ExistAndRunning(t *testing.T) {
 		ClusterID:        "cluster",
 		RuntimeFramework: "fm",
 		SKU:              "111",
+		SecureLevel:      types.EndpointPublic,
 	}
 	repo.mocks.stores.DeployTaskMock().EXPECT().GetDeployByID(ctx, int64(1)).Return(deploy, nil)
 
@@ -165,7 +404,7 @@ func TestRepoComponent_DeployStart_ExistAndRunning(t *testing.T) {
 		InstanceName: "i1",
 	})
 	require.NotNil(t, err)
-	require.Contains(t, err.Error(), "stop deploy first")
+	require.ErrorIs(t, err, errorx.ErrDeployStopFirst)
 }
 
 func TestRepoComponent_DeployStart_ExistButNotRunning(t *testing.T) {
@@ -181,6 +420,7 @@ func TestRepoComponent_DeployStart_ExistButNotRunning(t *testing.T) {
 		ClusterID:        "cluster",
 		RuntimeFramework: "fm",
 		SKU:              "111",
+		SecureLevel:      types.EndpointPublic,
 	}
 	repo.mocks.stores.DeployTaskMock().EXPECT().GetDeployByID(ctx, int64(1)).Return(deploy, nil)
 

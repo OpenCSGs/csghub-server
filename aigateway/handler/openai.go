@@ -72,6 +72,8 @@ type OpenAIHandler interface {
 	GetVideoContentDeprecated(c *gin.Context)
 	// Transcribe audio to text
 	Transcription(c *gin.Context)
+	// Translate audio to English text
+	Translation(c *gin.Context)
 	// Extract text from an image with OCR
 	OCR(c *gin.Context)
 	// Generate speech audio from text
@@ -193,9 +195,10 @@ func (h *OpenAIHandlerImpl) Shutdown(ctx context.Context) error {
 	return h.llmTracer.Shutdown(ctx)
 }
 
-// handleInsufficientBalance handles the insufficient balance error response
-// for both stream and non-stream requests
-func (h *OpenAIHandlerImpl) handleInsufficientBalance(c *gin.Context, isStream bool, nsUUID, modelID string, err error) {
+// handleInsufficientBalance returns an HTTP error before any upstream response
+// stream starts. Streaming requests must also receive a non-2xx status so
+// clients can distinguish this preflight failure from a successful SSE stream.
+func (h *OpenAIHandlerImpl) handleInsufficientBalance(c *gin.Context, _ bool, nsUUID, modelID string, err error) {
 	// Check if the error is the standard insufficient balance error
 	if !errors.Is(err, errorx.ErrInsufficientBalance) {
 		// If it's a different error, log and return generic error
@@ -208,18 +211,22 @@ func (h *OpenAIHandlerImpl) handleInsufficientBalance(c *gin.Context, isStream b
 	slog.WarnContext(c.Request.Context(), "insufficient balance for request",
 		slog.Any("ns_uuid", nsUUID), slog.Any("model", modelID))
 
-	if isStream {
-		// For stream requests, write error chunk
-		errorChunk := generateInsufficientBalanceResp(h.config.Frontend.URL)
-		errorChunkJson, _ := json.Marshal(errorChunk)
-		_, writeErr := c.Writer.Write([]byte("data: " + string(errorChunkJson) + "\n\ndata: [DONE]\n\n"))
-		if writeErr != nil {
-			slog.Error("failed to write insufficient balance error to stream", "error", writeErr)
-		}
-		c.Writer.Flush()
-	} else {
-		httpbase.ForbiddenError(c, err)
-	}
+	c.Header("Content-Type", "application/json; charset=utf-8")
+	c.JSON(http.StatusPaymentRequired, gin.H{
+		"error": gin.H{
+			"code":    "insufficient_balance",
+			"message": insufficientBalanceMessage(h.config.Frontend.URL),
+			"type":    "insufficient_balance",
+		},
+	})
+}
+
+func insufficientBalanceMessage(frontendURL string) string {
+	rechargeURL := strings.TrimRight(frontendURL, "/") + "/settings/recharge-payment"
+	return fmt.Sprintf(
+		"**Insufficient balance**\n\n👉 [Recharge your account](%s) to continue.",
+		rechargeURL,
+	)
 }
 
 func (h *OpenAIHandlerImpl) handleUsageLimitExceeded(c *gin.Context, isStream bool, username, modelID string, err error) {
@@ -502,6 +509,16 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 	modelID := chatReq.Model
 
 	modelTarget, err := h.resolveModelTarget(ctx, username, modelID, c.Request.Header)
+	// Metrics key point 1: enrich business data on the RequestMetrics object.
+	// A single call covers both paths — when err != nil, modelTarget is nil
+	// and only the requested modelID is recorded so the error is still
+	// attributed to the right model.
+	SetMetricsModelTarget(SetMetricsModelParams{
+		C:           c,
+		ModelID:     modelID,
+		ModelTarget: modelTarget,
+		IsStream:    chatReq.Stream,
+	})
 	if err != nil {
 		preflight.RecordError(err, "model_resolve")
 		handleModelTargetError(c, ctx, modelID, "failed to get model target address", err)
@@ -510,6 +527,7 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 	applyChatCompletionsEndpointCompatibility(ctx, modelTarget)
 	preflight.SetTargetModel(modelID, modelTarget)
 	chatReq.Model = modelTarget.ModelName
+
 	if chatReq.Stream {
 		c.Writer.Header().Set("Content-Type", "text/event-stream")
 		if !strings.Contains(modelTarget.Model.ImageID, "vllm-cpu") {
@@ -603,14 +621,34 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 	}
 	log.InfoContext(ctx, "fallback chat request to model target", slog.Int("status", retryWriterStatusCode(finalWriter)), slog.Int64("proxy_latency(ms)", time.Since(proxyStartTime).Milliseconds()), slog.Int64("ttft(ms)", retryWriterTTFTMs(finalWriter, proxyStartTime)))
 
+	// Synchronously record proxy-level metrics before c.Next() returns.
+	// Metrics middleware Finalize()es RequestMetrics as soon as the handler
+	// returns, so this MUST stay on the hot path — never move it to the
+	// async post-process goroutine or the write will race Finalize().
+	//
+	// Pre-compute usage once here and share the *Usage pointer with both
+	// RecordMetrics (sync) and runChatPostProcessAsync (async) to avoid
+	// calling counter.Usage() three times (metrics, trace, CommitUsageLimit).
+	chatUsage := preComputeUsage(ctx, chatCtx.tokenCounter)
+	RecordMetrics(RecordMetricsParams{
+		C:              c,
+		Ctx:            ctx,
+		FinalWrite:     finalWriter,
+		Counter:        chatCtx.tokenCounter,
+		ProxyStartTime: proxyStartTime,
+		Usage:          chatUsage,
+	})
+
 	h.runChatPostProcessAsync(ctx, chatPostProcessInput{
 		NSUUID:          nsUUID,
 		ApiKey:          apikey,
 		Model:           modelTarget.Model,
 		TargetModelName: modelTarget.ModelName,
 		TokenCounter:    chatCtx.tokenCounter,
+		Usage:           chatUsage,
 		LogCapture:      chatCtx.logCapture,
 		Trace:           newChatTracePostProcessInput(generationRecorder, chatReq, finalWriter),
+		StatusCode:      retryWriterStatusCode(finalWriter),
 	})
 }
 
@@ -620,8 +658,10 @@ type chatPostProcessInput struct {
 	Model           *types.Model
 	TargetModelName string
 	TokenCounter    token.Counter
+	Usage           *token.Usage
 	LogCapture      component.LLMLogRecorder
 	Trace           chatTracePostProcessInput
+	StatusCode      int
 }
 
 type chatContext struct {
@@ -733,6 +773,24 @@ func (h *OpenAIHandlerImpl) executeChatWithFallback(
 	return retryWriter, nil
 }
 
+// preComputeUsage synchronously calls counter.Usage() with a short timeout
+// so the resulting *Usage pointer can be shared between the sync metrics path
+// and the async post-process goroutine, avoiding duplicate computation.
+// Returns nil if the counter is nil or the call fails/times out.
+func preComputeUsage(ctx context.Context, counter token.Counter) *token.Usage {
+	if counter == nil {
+		return nil
+	}
+	usageCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), time.Second)
+	defer cancel()
+	usage, err := counter.Usage(usageCtx)
+	if err != nil {
+		slog.DebugContext(usageCtx, "pre-compute token usage failed", slog.Any("error", err))
+		return nil
+	}
+	return usage
+}
+
 func (h *OpenAIHandlerImpl) runChatPostProcessAsync(ctx context.Context, input chatPostProcessInput) {
 	go func() {
 		defer func() {
@@ -747,8 +805,11 @@ func (h *OpenAIHandlerImpl) runChatPostProcessAsync(ctx context.Context, input c
 		usageCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 3*time.Second)
 		defer cancel()
 
-		var usage *token.Usage
-		if input.TokenCounter != nil {
+		// Use the pre-computed usage from the sync path when available;
+		// fall back to a fresh counter.Usage() call only when the sync
+		// pre-compute failed (nil).
+		usage := input.Usage
+		if usage == nil && input.TokenCounter != nil {
 			var usageErr error
 			usage, usageErr = input.TokenCounter.Usage(usageCtx)
 			if usageErr != nil {
@@ -772,11 +833,11 @@ func (h *OpenAIHandlerImpl) runChatPostProcessAsync(ctx context.Context, input c
 			input.Trace.Recorder.End()
 		}
 
-		if err := h.openaiComponent.CommitUsageLimit(usageCtx, input.NSUUID, input.Model, input.TokenCounter); err != nil {
+		if err := h.openaiComponent.CommitUsageLimitFromUsage(usageCtx, input.NSUUID, input.Model, usage); err != nil {
 			slog.ErrorContext(usageCtx, "failed to commit usage limit", slog.Any("error", err))
 		}
 
-		if usage != nil {
+		if usage != nil && isSuccessfulStatus(input.StatusCode) {
 			if err := h.openaiComponent.RecordUsageFromTokenUsage(usageCtx, input.NSUUID, input.Model, input.TargetModelName, usage, input.ApiKey); err != nil {
 				slog.ErrorContext(usageCtx, "failed to record token usage", slog.Any("error", err))
 			}
@@ -919,6 +980,12 @@ func (h *OpenAIHandlerImpl) Embedding(c *gin.Context) {
 	}
 	modelID := req.Model
 	modelTarget, err := h.resolveModelTarget(ctx, username, modelID, c.Request.Header)
+	SetMetricsModelTarget(SetMetricsModelParams{
+		C:           c,
+		ModelID:     modelID,
+		ModelTarget: modelTarget,
+		IsStream:    false,
+	})
 	if err != nil {
 		preflight.RecordError(err, "model_resolve")
 		handleModelTargetError(c, ctx, modelID, "failed to get embedding target address", err)
@@ -973,29 +1040,48 @@ func (h *OpenAIHandlerImpl) Embedding(c *gin.Context) {
 		tokenCounter.Input(req.Input.OfString.Value)
 	}
 
+	proxyStartTime := time.Now()
 	rp.ServeHTTP(w, c.Request, proxyToAPI, modelTarget.Host)
+
+	// Synchronously record proxy-level metrics before c.Next() returns.
+	// Capture usage first so the counter has token counts available for
+	// RecordMetrics to pre-fetch synchronously.  FinalWrite is nil because
+	// embedding is non-streaming — TTFT is not applicable.
+	w.CaptureEmbeddingUsage()
+	embeddingUsage := preComputeUsage(ctx, tokenCounter)
+	RecordMetrics(RecordMetricsParams{
+		C:              c,
+		Ctx:            ctx,
+		FinalWrite:     nil,
+		Counter:        tokenCounter,
+		ProxyStartTime: proxyStartTime,
+		Usage:          embeddingUsage,
+	})
+
 	go func() {
 		usageCtx, cancel := context.WithTimeout(context.WithoutCancel(c.Request.Context()), 3*time.Second)
 		defer cancel()
 
-		w.CaptureEmbeddingUsage()
-
-		if embeddingRecorder != nil {
-			var usage *token.Usage
-			if tokenCounter != nil {
-				var usageErr error
-				usage, usageErr = tokenCounter.Usage(usageCtx)
-				if usageErr != nil {
-					slog.ErrorContext(usageCtx, "failed to get embedding token usage", slog.Any("error", usageErr))
-				}
+		// Use the pre-computed usage from the sync path; fall back to a
+		// fresh counter.Usage() call only when sync pre-compute failed.
+		usage := embeddingUsage
+		if usage == nil && tokenCounter != nil {
+			var usageErr error
+			usage, usageErr = tokenCounter.Usage(usageCtx)
+			if usageErr != nil {
+				slog.ErrorContext(usageCtx, "failed to get embedding token usage", slog.Any("error", usageErr))
 			}
+		}
+		if embeddingRecorder != nil {
 			recordEmbeddingTraceCompletion(embeddingRecorder, &req, modelTarget.ModelName, usage, w.StatusCode())
 			embeddingRecorder.End()
 		}
 
-		err := h.openaiComponent.RecordUsage(usageCtx, nsUUID, modelTarget.Model, modelTarget.ModelName, tokenCounter, apikey)
-		if err != nil {
-			slog.ErrorContext(c, "failed to record embedding token usage", "error", err)
+		if usage != nil && isSuccessfulStatus(w.StatusCode()) {
+			err := h.openaiComponent.RecordUsageFromTokenUsage(usageCtx, nsUUID, modelTarget.Model, modelTarget.ModelName, usage, apikey)
+			if err != nil {
+				slog.ErrorContext(c, "failed to record embedding token usage", "error", err)
+			}
 		}
 	}()
 }

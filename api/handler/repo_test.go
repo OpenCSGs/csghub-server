@@ -613,7 +613,8 @@ func TestRepoHandler_DownloadCodeZip(t *testing.T) {
 		tester.WithParam("ref", "feature-branch")
 
 		expectedZip := []byte("zip-data")
-		tester.mocks.repo.EXPECT().DownloadCodeZip(tester.Ctx(), types.DownloadCodeZipReq{
+		tester.mocks.repo.EXPECT().DownloadRepoZip(tester.Ctx(), types.DownloadRepoZipReq{
+			RepoType:  types.CodeRepo,
 			Namespace: "u",
 			Name:      "r",
 			Revision:  "feature-branch",
@@ -636,7 +637,8 @@ func TestRepoHandler_DownloadCodeZip(t *testing.T) {
 		tester.WithParam("ref", "feature/branch")
 
 		expectedZip := []byte("zip-data")
-		tester.mocks.repo.EXPECT().DownloadCodeZip(tester.Ctx(), types.DownloadCodeZipReq{
+		tester.mocks.repo.EXPECT().DownloadRepoZip(tester.Ctx(), types.DownloadRepoZipReq{
+			RepoType:  types.CodeRepo,
 			Namespace: "u",
 			Name:      "r",
 			Revision:  "feature/branch",
@@ -658,7 +660,8 @@ func TestRepoHandler_DownloadCodeZip(t *testing.T) {
 		tester.WithUser()
 
 		expectedZip := []byte("zip-data")
-		tester.mocks.repo.EXPECT().DownloadCodeZip(tester.Ctx(), types.DownloadCodeZipReq{
+		tester.mocks.repo.EXPECT().DownloadRepoZip(tester.Ctx(), types.DownloadRepoZipReq{
+			RepoType:  types.CodeRepo,
 			Namespace: "u",
 			Name:      "r",
 			Revision:  "",
@@ -679,7 +682,8 @@ func TestRepoHandler_DownloadCodeZip(t *testing.T) {
 		})
 		tester.WithUser()
 
-		tester.mocks.repo.EXPECT().DownloadCodeZip(tester.Ctx(), types.DownloadCodeZipReq{
+		tester.mocks.repo.EXPECT().DownloadRepoZip(tester.Ctx(), types.DownloadRepoZipReq{
+			RepoType:  types.CodeRepo,
 			Namespace: "u",
 			Name:      "r",
 			Revision:  "",
@@ -695,7 +699,8 @@ func TestRepoHandler_DownloadCodeZip(t *testing.T) {
 		})
 		tester.WithUser()
 
-		tester.mocks.repo.EXPECT().DownloadCodeZip(tester.Ctx(), types.DownloadCodeZipReq{
+		tester.mocks.repo.EXPECT().DownloadRepoZip(tester.Ctx(), types.DownloadRepoZipReq{
+			RepoType:  types.CodeRepo,
 			Namespace: "u",
 			Name:      "r",
 			Revision:  "",
@@ -711,7 +716,8 @@ func TestRepoHandler_DownloadCodeZip(t *testing.T) {
 		})
 		tester.WithUser()
 
-		tester.mocks.repo.EXPECT().DownloadCodeZip(tester.Ctx(), types.DownloadCodeZipReq{
+		tester.mocks.repo.EXPECT().DownloadRepoZip(tester.Ctx(), types.DownloadRepoZipReq{
+			RepoType:  types.CodeRepo,
 			Namespace: "u",
 			Name:      "r",
 			Revision:  "",
@@ -727,7 +733,8 @@ func TestRepoHandler_DownloadCodeZip(t *testing.T) {
 		})
 		tester.WithUser()
 
-		tester.mocks.repo.EXPECT().DownloadCodeZip(tester.Ctx(), types.DownloadCodeZipReq{
+		tester.mocks.repo.EXPECT().DownloadRepoZip(tester.Ctx(), types.DownloadRepoZipReq{
+			RepoType:  types.CodeRepo,
 			Namespace: "u",
 			Name:      "r",
 			Revision:  "",
@@ -743,11 +750,12 @@ func TestRepoHandler_DownloadCodeZip(t *testing.T) {
 		})
 		tester.WithUser()
 
-		tester.mocks.repo.EXPECT().DownloadCodeZip(tester.Ctx(), types.DownloadCodeZipReq{
+		tester.mocks.repo.EXPECT().DownloadRepoZip(tester.Ctx(), types.DownloadRepoZipReq{
+			RepoType:  types.CodeRepo,
 			Namespace: "u",
 			Name:      "r",
 			Revision:  "",
-		}, "u").Return(nil, errorx.CodeZipDownloadFailed(errors.New("git error"), errorx.Ctx()))
+		}, "u").Return(nil, errorx.RepoZipDownloadFailed(errors.New("git error"), errorx.Ctx()))
 
 		tester.Execute()
 		tester.ResponseEqCode(t, http.StatusInternalServerError)

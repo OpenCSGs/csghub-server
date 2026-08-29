@@ -92,6 +92,18 @@ func TestLocalizedErrorMiddleware(t *testing.T) {
 			errorx.Ctx().Set("source_namespace", "SourceTeam"),
 		))
 	})
+	router.GET("/agent-template-sensitive-check-create", func(c *gin.Context) {
+		httpbase.ConflictError(c, errorx.AgentTemplateSensitiveCheckCreateAgentBlocked(
+			nil,
+			errorx.Ctx().Set("sensitive_check_status", "Fail"),
+		))
+	})
+	router.GET("/agent-template-sensitive-check-make-public", func(c *gin.Context) {
+		httpbase.ConflictError(c, errorx.AgentTemplateSensitiveCheckMakePublicBlocked(
+			nil,
+			errorx.Ctx().Set("sensitive_check_status", "Fail"),
+		))
+	})
 
 	// Run tests
 	t.Run("SkipRoute", func(t *testing.T) {
@@ -226,6 +238,32 @@ func TestLocalizedErrorMiddleware(t *testing.T) {
 		var resp httpbase.R
 		_ = json.Unmarshal(w.Body.Bytes(), &resp)
 		assert.Equal(t, "MIRROR-ERR-7: 源命名空间映射关系不存在。", resp.Msg)
+	})
+
+	t.Run("LocalizedAgentTemplateSensitiveCheckCreate", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", "/agent-template-sensitive-check-create", nil)
+		req.Header.Set("Accept-Language", "zh-CN")
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusConflict, w.Code)
+		var resp httpbase.R
+		_ = json.Unmarshal(w.Body.Bytes(), &resp)
+		assert.Equal(t, "AGENT-ERR-23: 该智能体模板未通过敏感内容检查，无法创建智能体。", resp.Msg)
+		assert.Equal(t, "Fail", resp.Context["sensitive_check_status"])
+	})
+
+	t.Run("LocalizedAgentTemplateSensitiveCheckMakePublic", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", "/agent-template-sensitive-check-make-public", nil)
+		req.Header.Set("Accept-Language", "zh-CN")
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusConflict, w.Code)
+		var resp httpbase.R
+		_ = json.Unmarshal(w.Body.Bytes(), &resp)
+		assert.Equal(t, "AGENT-ERR-24: 该智能体模板未通过敏感内容检查，无法设为公开。", resp.Msg)
+		assert.Equal(t, "Fail", resp.Context["sensitive_check_status"])
 	})
 }
 

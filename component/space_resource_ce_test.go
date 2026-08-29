@@ -43,7 +43,7 @@ func TestSpaceResourceComponent_Index(t *testing.T) {
 	require.Equal(t, []types.SpaceResource{
 		{
 			ID: 1, Name: "sr", Resources: `{"memory": "1000", "gpu": {"num": "5"}}`,
-			IsAvailable: false, Type: "gpu", Scenarios: []string{"finetune"},
+			IsAvailable: false, Type: "gpu", Scenarios: []string{"finetune"}, HardwareModel: types.HardwareModelXPU,
 		},
 	}, data)
 
@@ -149,6 +149,6 @@ func TestSpaceResourceComponent_Index_Sandbox_ExcludeHardware(t *testing.T) {
 	require.Nil(t, err)
 	// only the pure-CPU resource survives; the CPU+GPU one is filtered out
 	require.Equal(t, []types.SpaceResource{
-		{ID: 1, Name: "cpu-only", Resources: `{"memory": "1000"}`, IsAvailable: false, Type: "cpu", Scenarios: []string{"sandbox"}},
+		{ID: 1, Name: "cpu-only", Resources: `{"memory": "1000"}`, IsAvailable: false, Type: "cpu", Scenarios: []string{"sandbox"}, HardwareModel: types.HardwareModelCPU},
 	}, data)
 }

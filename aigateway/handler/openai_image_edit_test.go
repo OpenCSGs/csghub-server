@@ -120,8 +120,8 @@ func TestOpenAIHandler_EditImagePreProxyErrors(t *testing.T) {
 
 		tester.handler.EditImage(c)
 
-		require.Equal(t, http.StatusForbidden, w.Code)
-		require.Contains(t, w.Body.String(), "ACT-ERR-0")
+		require.Equal(t, http.StatusPaymentRequired, w.Code)
+		require.Contains(t, w.Body.String(), `"code":"insufficient_balance"`)
 	})
 
 	t.Run("sensitive prompt", func(t *testing.T) {

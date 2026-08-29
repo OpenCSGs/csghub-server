@@ -63,6 +63,26 @@ func TestResponsesLLMLogRecorderRecordNormalizesInputAndOutput(t *testing.T) {
 	require.Empty(t, traceInfo.FinishReasons)
 }
 
+func TestResponsesLLMLogRecorderRecordIncludesUsageSourceMetadata(t *testing.T) {
+	recorder, err := NewLLMLogRecorder("req-1", "backend-model", "user-1", &types.ResponsesRequest{
+		Model: "public-model",
+		Input: json.RawMessage(`"hello"`),
+	}, nil)
+	require.NoError(t, err)
+
+	record, err := recorder.Record(&token.Usage{
+		PromptTokens:     1,
+		CompletionTokens: 2,
+		TotalTokens:      3,
+		Source:           "approx_chars_div_4",
+		SourceReason:     "unsupported_tokenizer",
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, "approx_chars_div_4", record.Metadata["usage_source"])
+	require.Equal(t, "unsupported_tokenizer", record.Metadata["usage_reason"])
+}
+
 func TestResponsesLLMLogRecorderCapturesStreamPayloads(t *testing.T) {
 	recorder, err := NewLLMLogRecorder("req-1", "backend-model", "user-1", &types.ResponsesRequest{
 		Model: "public-model",

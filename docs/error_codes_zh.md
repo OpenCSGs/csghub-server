@@ -170,6 +170,54 @@
 - **错误名:** `credentialVerifyFailed`
 - **描述:** 凭证验证失败。
 
+---
+
+### `AGENT-ERR-16`
+
+- **错误代码:** `AGENT-ERR-16`
+- **错误名:** `instanceProvisioningMetadataImmutable`
+- **描述:** 智能体实例的部署元数据在创建后无法更新。沙箱部署在实例创建时确定，且没有实时沙箱更新路径。错误消息中包含智能体实例类型。
+
+---
+
+### `AGENT-ERR-17`
+
+- **错误代码:** `AGENT-ERR-17`
+- **错误名:** `csgclawTemplateCreationForbidden`
+- **描述:** csgclaw 智能体模板由代码仓库托管，不能通过 API 创建。错误消息中包含模板类型。
+
+---
+
+### `AGENT-ERR-18`
+
+- **错误代码:** `AGENT-ERR-18`
+- **错误名:** `agentProvisionRequestFieldNull`
+- **描述:** 智能体实例部署请求元数据中的字段为 null。错误消息中包含智能体实例类型和出错的字段。
+
+---
+
+### `AGENT-ERR-19`
+
+- **错误代码:** `AGENT-ERR-19`
+- **错误名:** `agentProvisionRequestFieldType`
+- **描述:** 智能体实例部署请求元数据中的字段类型无效。错误消息中包含智能体实例类型和出错的字段。
+
+---
+
+### `AGENT-ERR-20`
+
+- **错误代码:** `AGENT-ERR-20`
+- **错误名:** `agentProvisionRequestFieldEmpty`
+- **描述:** 智能体实例部署请求元数据中的字段为空。错误消息中包含智能体实例类型和出错的字段。
+
+---
+
+### `AGENT-ERR-21`
+
+- **错误代码:** `AGENT-ERR-21`
+- **错误名:** `agentProvisionRequestModelUnavailable`
+- **描述:** 智能体实例部署请求中指定的模型不在可用 llm 模型目录中。错误消息中包含模型名称和智能体实例类型。
+
 ## Auth 错误
 
 ### `AUTH-ERR-0`
@@ -1769,3 +1817,4 @@
 - **错误代码:** `USER-ERR-20`
 - **错误名:** `namespaceAlreadyExists`
 - **描述:** 命名空间已存在于系统中。
+

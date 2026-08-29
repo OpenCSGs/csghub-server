@@ -33,8 +33,6 @@ const (
 	ReasonCircuitBreakerOpen      = "circuit breaker is open"
 	ReasonHealthStateUnhealthy    = "health state is unhealthy"
 	ReasonAllUpstreamsUnavailable = "all upstreams unavailable"
-	ReasonHealthStateUnknown      = "health state is unknown"
-	ReasonCircuitStateUnknown     = "circuit state is unknown"
 )
 
 // CircuitState represents the circuit breaker state

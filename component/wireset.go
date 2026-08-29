@@ -410,6 +410,7 @@ func NewTestCodeComponent(config *config.Config, stores *tests.MockStores, repoC
 		repoComponent:  repoComponent,
 		codeStore:      stores.Code,
 		repoStore:      stores.Repo,
+		templateStore:  stores.AgentTemplate,
 		userLikesStore: stores.UserLikes,
 		gitServer:      gitServer,
 		userSvcClient:  userSvcClient,
@@ -534,6 +535,7 @@ func NewTestClusterComponent(config *config.Config, deployer deploy.Deployer, st
 		resStore:        stores.SpaceResource,
 		workflowStore:   stores.Workflow,
 		namespaceStore:  stores.Namespace,
+		config:          config,
 	}
 }
 

@@ -26,6 +26,24 @@ func TestSpeechAudioResponseWriterCapturesDurationHeader(t *testing.T) {
 	require.Equal(t, 2.5, usage.Duration)
 }
 
+func TestSpeechAudioResponseWriterCapturesDurationFromSSEDone(t *testing.T) {
+	counter := token.NewAudioUsageCounter(nil)
+	recorder := httptest.NewRecorder()
+	writer := NewResponseWriterWrapperSpeech(recorder, counter)
+
+	writer.Header().Set("Content-Type", "text/event-stream")
+	writer.WriteHeader(http.StatusOK)
+	_, err := writer.Write([]byte(
+		"event: speech.audio.done\n" +
+			`data: {"type":"speech.audio.done","duration":1.23}` + "\n\n",
+	))
+	require.NoError(t, err)
+
+	usage, err := counter.Usage(context.Background())
+	require.NoError(t, err)
+	require.Equal(t, 1.23, usage.Duration)
+}
+
 func TestSpeechBatchResponseWriterSumsDuration(t *testing.T) {
 	counter := token.NewAudioUsageCounter(nil)
 	recorder := httptest.NewRecorder()

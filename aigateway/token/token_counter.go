@@ -49,4 +49,8 @@ type Usage struct {
 	// Completion resource count for multi-modal
 	CompletionRC   int64
 	CompletionDesc string
+	// Usage source metadata. Empty means usage came from the upstream response
+	// or the normal tokenizer path.
+	Source       string
+	SourceReason string
 }

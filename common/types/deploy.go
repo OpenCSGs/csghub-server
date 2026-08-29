@@ -74,6 +74,7 @@ type ServiceEvent struct {
 	Message     string     `json:"message"`      // event message
 	Reason      string     `json:"reason"`       // event reason
 	TaskID      int64      `json:"task_id"`      // task id
+	DeployID    int64      `json:"deploy_id"`    // deploy id
 	ClusterNode string     `json:"cluster_node"` // cluster node name
 	QueueName   string     `json:"queue_name"`   // queue name
 	Instances   []Instance `json:"instances"`
@@ -103,12 +104,22 @@ type ClusterDeployReq struct {
 	EndTime      *time.Time `json:"end_time,omitempty"`
 }
 
+// VolumeMount is a generic persistent-volume mount configuration, reusable across
+// deploy types (sandbox, model, space, ...).
+type VolumeMount struct {
+	PVCName   string `json:"pvc_name,omitempty"` // PVC to mount; empty uses the deploy's default/shared PVC
+	SubPath   string `json:"subpath,omitempty"`  // relative subdirectory inside the PVC
+	MountPath string `json:"mount_path"`         // in-container mount point
+	ReadOnly  bool   `json:"read_only,omitempty"`
+}
+
 // DeployExtend Use common fields for storage deployment to simplify the process of adding a large number
 // of repetitive fields to the request structure for each different scenario.
 type DeployExtend struct {
 	NodeAffinity *corev1.NodeAffinity `json:"node_affinity,omitempty"`
 	Tolerations  []Toleration         `json:"tolerations,omitempty"`
 	PD           *PDConfig            `json:"pd,omitempty"`
+	VolumeMounts []VolumeMount        `json:"volume_mounts,omitempty"`
 }
 
 type DeployTimeRangeReq struct {

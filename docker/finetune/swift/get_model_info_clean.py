@@ -27,12 +27,12 @@ def main():
             if ',' in last_line and len(last_line.split(',')) == 3:
                 print(last_line)
             else:
-                print('qwen3,qwen3,no')
+                print(',,no')
         else:
-            print('qwen3,qwen3,no')
+            print(',,no')
             
     except Exception:
-        print('qwen3,qwen3,no')
+        print(',,no')
 
 if __name__ == '__main__':
     main()

@@ -12,6 +12,7 @@ const (
 	codeBatchGetRepoExtraFailedErr
 	codeChangePathBlockedErr
 	codeSensitiveCheckNotPassedErr
+	codeRepoZipDownloadFailedErr
 )
 
 var (
@@ -81,6 +82,17 @@ var (
 	// zh-HK: 下載代碼 zip 歸檔失敗
 	ErrCodeZipDownloadFailed error = CustomError{prefix: errRepoPrefix, code: codeCodeZipDownloadFailedErr}
 
+	// Description: Failed to download repository as zip archive.
+	//
+	// Description_ZH: 下载仓库 zip 归档失败
+	//
+	// en-US: Failed to download repository zip archive
+	//
+	// zh-CN: 下载仓库 zip 归档失败
+	//
+	// zh-HK: 下載倉庫 zip 歸檔失敗
+	ErrRepoZipDownloadFailed error = CustomError{prefix: errRepoPrefix, code: codeRepoZipDownloadFailedErr}
+
 	// Description: Failed to batch get repository extra information.
 	//
 	// Description_ZH: 批量获取仓库额外信息失败
@@ -128,6 +140,11 @@ func RepoNoDefaultBranch(ctx context) error {
 // CodeZipDownloadFailed creates a REPO-ERR-5 error with context.
 func CodeZipDownloadFailed(err error, ctx context) error {
 	return CustomError{prefix: errRepoPrefix, code: codeCodeZipDownloadFailedErr, err: err, context: ctx}
+}
+
+// RepoZipDownloadFailed creates a REPO-ERR-9 error with context.
+func RepoZipDownloadFailed(err error, ctx context) error {
+	return CustomError{prefix: errRepoPrefix, code: codeRepoZipDownloadFailedErr, err: err, context: ctx}
 }
 
 // BatchGetRepoExtraFailed creates a REPO-ERR-6 error.

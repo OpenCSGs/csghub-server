@@ -6,9 +6,10 @@ import (
 	"encoding/hex"
 	"log/slog"
 	"net/http"
-	"opencsg.com/csghub-server/aigateway/types"
 	"strings"
 	"time"
+
+	"opencsg.com/csghub-server/aigateway/types"
 
 	commontypes "opencsg.com/csghub-server/common/types"
 	commonutils "opencsg.com/csghub-server/common/utils/common"

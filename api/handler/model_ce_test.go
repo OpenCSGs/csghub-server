@@ -761,9 +761,31 @@ func TestModelHandler_ServerlessStop(t *testing.T) {
 		CurrentUser: "u",
 		DeployID:    1,
 		DeployType:  types.ServerlessType,
+		Force:       false,
 	}).Return(nil)
 
 	tester.WithParam("id", "1").Execute()
+
+	tester.ResponseEq(t, 200, tester.OKText, nil)
+}
+
+func TestModelHandler_ServerlessStop_WithForce(t *testing.T) {
+	tester := NewModelTester(t).WithHandleFunc(func(h *ModelHandler) gin.HandlerFunc {
+		return h.ServerlessStop
+	})
+	tester.WithUser()
+
+	tester.mocks.repo.EXPECT().DeployStop(tester.Ctx(), types.DeployActReq{
+		RepoType:    types.ModelRepo,
+		Namespace:   "u",
+		Name:        "r",
+		CurrentUser: "u",
+		DeployID:    1,
+		DeployType:  types.ServerlessType,
+		Force:       true,
+	}).Return(nil)
+
+	tester.WithParam("id", "1").WithQuery("force", "true").Execute()
 
 	tester.ResponseEq(t, 200, tester.OKText, nil)
 }

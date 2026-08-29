@@ -13,6 +13,7 @@ import (
 	"opencsg.com/csghub-server/builder/git"
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/builder/store/s3"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
@@ -67,6 +68,10 @@ func NewClawHubComponent(config *config.Config) (ClawHubComponent, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create repo component: %w", err)
 	}
+	s3Client, err := s3.NewMinio(config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create skill package s3 client: %w", err)
+	}
 
 	return &clawHubComponent{
 		skill:             skillComponent,
@@ -75,6 +80,7 @@ func NewClawHubComponent(config *config.Config) (ClawHubComponent, error) {
 		skillStore:        database.NewSkillStore(),
 		skillVersionStore: database.NewSkillVersionStore(),
 		userStore:         database.NewUserStore(),
+		s3Client:          s3Client,
 		config:            config,
 	}, nil
 }
@@ -86,7 +92,10 @@ type clawHubComponent struct {
 	skillStore        database.SkillStore
 	skillVersionStore database.SkillVersionStore
 	userStore         database.UserStore
+	s3Client          s3.Client
 	config            *config.Config
+	packageReader     func(ctx context.Context, repoID int64, branch, commitID string) ([]byte, bool)
+	packageWriter     func(ctx context.Context, repoID int64, commitID string, archive []byte) error
 }
 
 func (c *clawHubComponent) Search(ctx context.Context, query string, limit int, username string) (*types.ClawHubSearchResponse, error) {
@@ -676,7 +685,16 @@ func (c *clawHubComponent) DownloadSkill(ctx context.Context, canonicalSlug stri
 	}
 
 	actualVersion := version
-	archiveRevision := types.MainBranch
+	packageBranch := types.MainBranch
+	repoID := skillDB.RepositoryID
+	if skillDB.Repository != nil {
+		packageBranch = normalizeRepositoryPackageBranch("", skillDB.Repository.DefaultBranch)
+		if repoID == 0 {
+			repoID = skillDB.Repository.ID
+		}
+	}
+	archiveRevision := packageBranch
+	packageCommitID := ""
 	if actualVersion == "" || actualVersion == "latest" {
 		actualVersion = "latest"
 		latest, err := c.skillVersionStore.LatestBySkillID(ctx, skillDB.ID)
@@ -684,6 +702,20 @@ func (c *clawHubComponent) DownloadSkill(ctx context.Context, canonicalSlug stri
 			actualVersion = clawHubResponseVersion(latest.Version)
 			if latest.Hash != "" {
 				archiveRevision = latest.Hash
+				packageCommitID = latest.Hash
+			}
+		} else if repoID > 0 {
+			commitID, err := c.resolveClawHubPackageCommit(ctx, namespace, slug, packageBranch)
+			if err == nil {
+				archiveRevision = commitID
+				packageCommitID = commitID
+			} else {
+				slog.WarnContext(ctx, "failed to resolve clawhub skill package commit",
+					slog.Any("error", err),
+					slog.String("namespace", namespace),
+					slog.String("name", slug),
+					slog.String("branch", packageBranch),
+				)
 			}
 		}
 	} else {
@@ -694,6 +726,13 @@ func (c *clawHubComponent) DownloadSkill(ctx context.Context, canonicalSlug stri
 		actualVersion = clawHubResponseVersion(versionInfo.Version)
 		if versionInfo.Hash != "" {
 			archiveRevision = versionInfo.Hash
+			packageCommitID = versionInfo.Hash
+		}
+	}
+
+	if packageCommitID != "" && repoID > 0 {
+		if archiveData, ok := c.readClawHubPackageArchive(ctx, repoID, packageBranch, packageCommitID); ok {
+			return archiveData, actualVersion, nil
 		}
 	}
 
@@ -706,8 +745,45 @@ func (c *clawHubComponent) DownloadSkill(ctx context.Context, canonicalSlug stri
 	if err != nil {
 		return nil, "", errorx.SkillDownloadFailed(err, errorx.Ctx().Set("slug", canonicalSlug).Set("version", actualVersion))
 	}
+	if repoID > 0 && packageCommitID != "" {
+		c.asyncWriteClawHubPackageArchive(ctx, repoID, packageCommitID, archiveData)
+	}
 
 	return archiveData, actualVersion, nil
+}
+
+func (c *clawHubComponent) resolveClawHubPackageCommit(ctx context.Context, namespace, name, branch string) (string, error) {
+	currentBranch, err := c.gitServer.GetRepoBranchByName(ctx, gitserver.GetBranchReq{
+		Namespace: namespace,
+		Name:      name,
+		Ref:       branch,
+		RepoType:  types.SkillRepo,
+	})
+	if err != nil {
+		return "", err
+	}
+	if currentBranch == nil || currentBranch.Commit.ID == "" {
+		return "", fmt.Errorf("empty branch commit id")
+	}
+	return currentBranch.Commit.ID, nil
+}
+
+func (c *clawHubComponent) readClawHubPackageArchive(ctx context.Context, repoID int64, branch, commitID string) ([]byte, bool) {
+	if c.packageReader != nil {
+		return c.packageReader(ctx, repoID, branch, commitID)
+	}
+	return readRepositoryPackageFromS3(ctx, c.config, c.s3Client, types.SkillRepo, repoID, branch, commitID)
+}
+
+func (c *clawHubComponent) asyncWriteClawHubPackageArchive(ctx context.Context, repoID int64, commitID string, archive []byte) {
+	asyncWriteRepositoryPackageArchive(ctx, types.SkillRepo, repoID, commitID, archive, c.writeClawHubPackageArchive, "failed to async upload clawhub package to s3")
+}
+
+func (c *clawHubComponent) writeClawHubPackageArchive(ctx context.Context, _ types.RepositoryType, repoID int64, commitID string, archive []byte) error {
+	if c.packageWriter != nil {
+		return c.packageWriter(ctx, repoID, commitID, archive)
+	}
+	return writeRepositoryPackageToS3(ctx, c.config, c.s3Client, types.SkillRepo, repoID, commitID, archive)
 }
 
 func (c *clawHubComponent) Whoami(ctx context.Context, username string) (*types.ClawHubUserResponse, error) {

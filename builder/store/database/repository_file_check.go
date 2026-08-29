@@ -18,6 +18,12 @@ type RepositoryFileCheck struct {
 	TaskID string `bun:",nullzero" json:"task_id"`
 }
 
+type RepositoryFileCheckDetail struct {
+	Path    string
+	Status  types.SensitiveCheckStatus
+	Message string
+}
+
 type repoFileCheckStoreImpl struct {
 	db *DB
 }
@@ -25,6 +31,7 @@ type repoFileCheckStoreImpl struct {
 type RepoFileCheckStore interface {
 	Create(ctx context.Context, history RepositoryFileCheck) error
 	Upsert(ctx context.Context, history RepositoryFileCheck) error
+	ListSensitiveCheckDetails(ctx context.Context, repoID int64, branch string) ([]RepositoryFileCheckDetail, error)
 }
 
 func NewRepoFileCheckStore() RepoFileCheckStore {
@@ -49,4 +56,20 @@ func (s *repoFileCheckStoreImpl) Upsert(ctx context.Context, history RepositoryF
 		On("CONFLICT (repo_file_id) DO UPDATE").
 		Exec(ctx)
 	return err
+}
+
+func (s *repoFileCheckStoreImpl) ListSensitiveCheckDetails(ctx context.Context, repoID int64, branch string) ([]RepositoryFileCheckDetail, error) {
+	var details []RepositoryFileCheckDetail
+	err := s.db.Operator.Core.NewSelect().
+		ColumnExpr("rf.path AS path").
+		ColumnExpr("rfc.status AS status").
+		ColumnExpr("rfc.message AS message").
+		TableExpr("repository_file_checks AS rfc").
+		Join("INNER JOIN repository_files AS rf ON rf.id = rfc.repo_file_id").
+		Where("rf.repository_id = ? AND rf.branch = ?", repoID, branch).
+		Where("rfc.status IN (?, ?)", types.SensitiveCheckFail, types.SensitiveCheckException).
+		Where("rfc.message <> ''").
+		OrderExpr("rf.path ASC").
+		Scan(ctx, &details)
+	return details, err
 }

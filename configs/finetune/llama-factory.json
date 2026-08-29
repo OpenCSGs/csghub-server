@@ -11,6 +11,12 @@
       "engine_version": "0.9.5"
     },
     {
+      "compute_type": "npu",
+      "image": "opencsghq/llama-factory:0.9.5-npu",
+      "driver_version": "9.0.1",
+      "engine_version": "0.9.5"
+    },
+    {
       "compute_type": "dcu",
       "image": "opencsghq/llama-factory:0.9.3-dtk25.04",
       "driver_version": "25.04",

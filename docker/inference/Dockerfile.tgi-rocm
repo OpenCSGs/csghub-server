@@ -1,0 +1,15 @@
+FROM ghcr.io/huggingface/text-generation-inference:3.3.6-rocm@sha256:a73ea01a3be9c04336e4e4b2f67faf3c5707d34dfe9e0d779718128d6259f3dd
+
+RUN pip config set global.index-url https://mirrors.aliyun.com/pypi/simple
+RUN pip install --no-cache-dir csghub-sdk==0.7.3
+RUN apt-get update && apt-get install -y dumb-init && apt-get clean && rm -rf /var/lib/apt/lists/*
+COPY ./tgi/ /etc/csghub/
+RUN chmod +x /etc/csghub/*.sh
+
+WORKDIR /workspace/
+ENV HUGGINGFACE_HUB_CACHE=/workspace/ \
+    HF_HUB_ENABLE_HF_TRANSFER=0
+ENV PORT=8000
+EXPOSE 8000
+ENTRYPOINT ["/usr/bin/dumb-init", "--"]
+CMD ["/etc/csghub/serve.sh"]

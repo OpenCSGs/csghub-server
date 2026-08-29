@@ -40,6 +40,7 @@ type OpenAIComponent interface {
 	CheckBalance(ctx context.Context, nsUUID string) error
 	CheckUsageLimit(ctx context.Context, userUUID string, model *types.Model, endpoint string) error
 	CommitUsageLimit(ctx context.Context, userUUID string, model *types.Model, tokenCounter token.Counter) error
+	CommitUsageLimitFromUsage(ctx context.Context, userUUID string, model *types.Model, usage *token.Usage) error
 	// CanManageModel reports whether the user can manage the given model
 	// (e.g. upload or delete voices of a TTS deployment): only the deploy
 	// owner and platform admins are allowed.
@@ -657,12 +658,13 @@ func (m *openaiComponentImpl) resolveUsageOwnerType(c context.Context, nsUUID st
 
 // usageMeteringExtra is serialized into MeteringEvent.Extra for usage billing breakdown.
 type usageMeteringExtra struct {
-	PromptTokenNum     string                     `json:"prompt_token_num"`
-	CompletionTokenNum string                     `json:"completion_token_num"`
-	OwnerType          commontypes.TokenUsageType `json:"owner_type"`
-	APIKey             string                     `json:"api_key"`
-	Provider           string                     `json:"provider"`
-	ModelName          string                     `json:"model_name"`
+	PromptTokenNum      string                     `json:"prompt_token_num"`
+	PromptTokenCacheNum string                     `json:"prompt_token_cache_num"`
+	CompletionTokenNum  string                     `json:"completion_token_num"`
+	OwnerType           commontypes.TokenUsageType `json:"owner_type"`
+	APIKey              string                     `json:"api_key"`
+	Provider            string                     `json:"provider"`
+	ModelName           string                     `json:"model_name"`
 	// multiModalMeteringExtra is serialized into MeteringEvent.Extra for multi-modal billing.
 	CompletionDataType   string `json:"completion_data_type"`
 	CompletionResolution string `json:"completion_resolution"`
@@ -682,6 +684,7 @@ func sanitizeMeteringEventForLog(event commontypes.MeteringEvent) commontypes.Me
 func buildUsageExtraData(usageModel *types.Model, upstreamModelName string, usage *token.Usage, apikey string, meteringInfo usageMeteringInfo) (string, error) {
 	extra := usageMeteringExtra{
 		PromptTokenNum:       fmt.Sprintf("%d", usage.PromptTokens),
+		PromptTokenCacheNum:  fmt.Sprintf("%d", usage.CachedPromptTokens),
 		CompletionTokenNum:   fmt.Sprintf("%d", usage.CompletionTokens),
 		OwnerType:            meteringInfo.OwnerType,
 		APIKey:               apikey,

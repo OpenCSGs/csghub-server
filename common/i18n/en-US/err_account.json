@@ -13,5 +13,8 @@
     },
     "error.ACT-ERR-4": {
         "other": "Price must be non-negative"
+    },
+    "error.ACT-ERR-5": {
+        "other": "Scene is not allowed for sync deduct"
     }
 }

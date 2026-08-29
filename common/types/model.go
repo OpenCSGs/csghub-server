@@ -368,16 +368,22 @@ type ModelStatusEventData struct {
 }
 
 const (
-	SpaceType      = iota // space
-	InferenceType  = 1    // inference endpoint
-	FinetuneType   = 2    // finetune
-	ServerlessType = 3    // serverless
-	EvaluationType = 4    // evaluation
-	NotebookType   = 5    // notebook
-	JobType        = 6    // job
-	SandboxType    = 7    // sandbox
-	UnknownType    = -1   // unknown case
+	SpaceType            = iota // space
+	InferenceType        = 1    // inference endpoint
+	FinetuneType         = 2    // finetune
+	ServerlessType       = 3    // serverless
+	EvaluationType       = 4    // evaluation
+	NotebookType         = 5    // notebook
+	JobType              = 6    // job
+	SandboxType          = 7    // sandbox (persistent)
+	SandboxEphemeralType = 8    // sandbox (ephemeral)
+	UnknownType          = -1   // unknown case
 )
+
+// IsSandboxType reports whether the deploy type is a sandbox (persistent or ephemeral).
+func IsSandboxType(t int) bool {
+	return t == SandboxType || t == SandboxEphemeralType
+}
 
 type DeployActReq struct {
 	RepoType     RepositoryType `json:"repo_type"`
@@ -392,6 +398,7 @@ type DeployActReq struct {
 	CommitID     string         `json:"commit_id"`
 	IPAddress    string         `json:"-"`
 	AuthType     string         `json:"-"`
+	Force        bool           `json:"-"`
 }
 
 type DeployUpdateReq struct {
@@ -562,8 +569,9 @@ type Image struct {
 }
 
 type CreateInferenceVersionReq struct {
-	DeployId int64  `json:"-"`
-	CommitID string `json:"commit_id"`
+	CurrentUser string `json:"-"`
+	DeployId    int64  `json:"-"`
+	CommitID    string `json:"commit_id"`
 
 	TrafficPercent int `json:"traffic_percent"`
 }

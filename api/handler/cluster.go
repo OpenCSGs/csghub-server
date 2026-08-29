@@ -23,12 +23,14 @@ func NewClusterHandler(config *config.Config) (*ClusterHandler, error) {
 		return nil, err
 	}
 	return &ClusterHandler{
-		c: ncc,
+		c:      ncc,
+		config: config,
 	}, nil
 }
 
 type ClusterHandler struct {
-	c component.ClusterComponent
+	c      component.ClusterComponent
+	config *config.Config
 }
 
 const (
@@ -208,7 +210,7 @@ func (h *ClusterHandler) GetDeploysReport(ctx *gin.Context) {
 		req.Status = []int{code.DeployFailed}
 	}
 	req.Query = ctx.Query("search")
-	if err := bindDeployDateRange(ctx, &req); err != nil {
+	if err := h.bindDeployDateRange(ctx, &req); err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "Invalid date range for deploy report", slog.Any("error", err))
 		httpbase.BadRequest(ctx, err.Error())
 		return
@@ -254,7 +256,7 @@ func (h *ClusterHandler) GetDeploysReport(ctx *gin.Context) {
 				d.DeployName,
 				d.User.Username,
 				d.Resource,
-				d.CreateTime.Local().Format(deployTimeLayout),
+				d.CreateTime.In(config.GetGlobalTimeZone()).Format(deployTimeLayout),
 				d.Status,
 				strconv.Itoa(d.TotalTimeInMin),
 				strconv.Itoa(d.TotalFeeInCents),
@@ -294,7 +296,7 @@ func (h *ClusterHandler) Update(ctx *gin.Context) {
 	httpbase.OK(ctx, result)
 }
 
-func bindDeployDateRange(ctx *gin.Context, req *types.DeployReq) error {
+func (h *ClusterHandler) bindDeployDateRange(ctx *gin.Context, req *types.DeployReq) error {
 	startTime := ctx.Query("start_time")
 	endTime := ctx.Query("end_time")
 	if startTime == "" && endTime == "" {
@@ -303,11 +305,11 @@ func bindDeployDateRange(ctx *gin.Context, req *types.DeployReq) error {
 	if startTime == "" || endTime == "" {
 		return fmt.Errorf("start_time and end_time must be provided together")
 	}
-	parsedStart, err := parseDeployQueryTime(startTime, false)
+	parsedStart, err := h.parseDeployQueryTime(startTime, false)
 	if err != nil {
 		return err
 	}
-	parsedEnd, err := parseDeployQueryTime(endTime, true)
+	parsedEnd, err := h.parseDeployQueryTime(endTime, true)
 	if err != nil {
 		return err
 	}
@@ -316,10 +318,11 @@ func bindDeployDateRange(ctx *gin.Context, req *types.DeployReq) error {
 	return nil
 }
 
-func parseDeployQueryTime(value string, isEnd bool) (time.Time, error) {
+func (h *ClusterHandler) parseDeployQueryTime(value string, isEnd bool) (time.Time, error) {
+	loc := config.GetGlobalTimeZone()
 	layouts := []string{deployTimeLayout, deployDateOnlyLayout}
 	for _, layout := range layouts {
-		parsed, err := time.ParseInLocation(layout, value, time.UTC)
+		parsed, err := time.ParseInLocation(layout, value, loc)
 		if err != nil {
 			continue
 		}

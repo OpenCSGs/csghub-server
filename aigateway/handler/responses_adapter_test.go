@@ -264,8 +264,8 @@ func TestResponsesNativeDisablesAcceptEncoding(t *testing.T) {
 			var wg sync.WaitGroup
 			wg.Add(2)
 			tester.mocks.openAIComp.EXPECT().
-				CommitUsageLimit(mock.Anything, "testuuid", model, mock.Anything).
-				RunAndReturn(func(ctx context.Context, userUUID string, model *types.Model, counter token.Counter) error {
+				CommitUsageLimitFromUsage(mock.Anything, "testuuid", model, mock.Anything).
+				RunAndReturn(func(ctx context.Context, userUUID string, model *types.Model, usage *token.Usage) error {
 					wg.Done()
 					return nil
 				}).
@@ -351,6 +351,66 @@ func TestResponsesToChatRequestMapsInputImageStringURL(t *testing.T) {
 				{"type": "image_url", "image_url": {"url": "https://example.test/a.png"}}
 			]
 		}],
+		"parallel_tool_calls": true
+	}`, string(body))
+}
+
+func TestResponsesToChatRequestMapsFunctionCallOutputInputImage(t *testing.T) {
+	req := &types.ResponsesRequest{
+		Model: "public",
+		Input: json.RawMessage(`[
+			{
+				"type": "function_call",
+				"call_id": "call_view_image_1",
+				"name": "view_image",
+				"arguments": "{\"path\":\"/tmp/image.png\"}"
+			},
+			{
+				"type": "function_call_output",
+				"call_id": "call_view_image_1",
+				"output": [
+					{"type": "input_image", "image_url": "data:image/jpeg;base64,abc", "detail": "high"}
+				]
+			},
+			{
+				"role": "user",
+				"content": [
+					{"type": "input_text", "text": "describe it"}
+				]
+			}
+		]`),
+	}
+	chatReq, err := responsesToChatRequest(context.Background(), req, "upstream-model", nil)
+	require.NoError(t, err)
+
+	body, err := marshalChatRequestBody(chatReq, "upstream-model")
+	require.NoError(t, err)
+	require.JSONEq(t, `{
+		"model": "upstream-model",
+		"messages": [
+			{
+				"role": "assistant",
+				"content": "",
+				"tool_calls": [{
+					"id": "call_view_image_1",
+					"type": "function",
+					"function": {"name": "view_image", "arguments": "{\"path\":\"/tmp/image.png\"}"}
+				}]
+			},
+			{
+				"role": "tool",
+				"tool_call_id": "call_view_image_1",
+				"content": [
+					{"type": "image_url", "image_url": {"url": "data:image/jpeg;base64,abc", "detail": "high"}}
+				]
+			},
+			{
+				"role": "user",
+				"content": [
+					{"type": "text", "text": "describe it"}
+				]
+			}
+		],
 		"parallel_tool_calls": true
 	}`, string(body))
 }
@@ -882,6 +942,54 @@ func TestResponsesAdapterNonStreamWriterFinalizesResponse(t *testing.T) {
 	require.Equal(t, int64(5), usage.TotalTokens)
 }
 
+func extractResponsesOutputItem(t *testing.T, data []byte, index int) []byte {
+	t.Helper()
+	var body struct {
+		Output []json.RawMessage `json:"output"`
+	}
+	require.NoError(t, json.Unmarshal(data, &body))
+	require.Greater(t, len(body.Output), index)
+	return body.Output[index]
+}
+
+func TestResponsesAdapterNonStreamWriterRestoresNamespaceToolCall(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(w)
+	writer := newResponsesAdapterNonStreamWriter(ctx.Writer, "public-model", nil, nil, "")
+	writer.toolNamespaces = map[string]string{"get_top_download_models": "mcp__csghub_production"}
+	writer.WriteHeader(http.StatusOK)
+	_, err := writer.Write([]byte(`{
+		"id":"chatcmpl_1",
+		"created":123,
+		"model":"upstream-model",
+		"choices":[{
+			"message":{
+				"role":"assistant",
+				"tool_calls":[{
+					"id":"call_1",
+					"type":"function",
+					"function":{"name":"get_top_download_models","arguments":"{\"num\":20}"}
+				}]
+			},
+			"finish_reason":"tool_calls"
+		}]
+	}`))
+	require.NoError(t, err)
+
+	require.NoError(t, writer.Finalize(http.StatusOK))
+	require.Equal(t, http.StatusOK, w.Code)
+	require.JSONEq(t, `{
+		"id": "call_1",
+		"type": "function_call",
+		"status": "completed",
+		"call_id": "call_1",
+		"name": "get_top_download_models",
+		"namespace": "mcp__csghub_production",
+		"arguments": "{\"num\":20}"
+	}`, string(extractResponsesOutputItem(t, w.Body.Bytes(), 0)))
+}
+
 func TestResponsesAdapterNonStreamWriterForwardsUpstreamError(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	w := httptest.NewRecorder()
@@ -1147,6 +1255,90 @@ func TestResponsesAdapterStreamWriterToolOnlyStreamDoesNotEmitTextItem(t *testin
 	require.Contains(t, body, "event: response.completed")
 }
 
+func TestResponsesAdapterStreamWriterRestoresNamespaceToolCall(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(w)
+	writer := newResponsesAdapterStreamWriter(ctx.Writer, "public-model", nil, nil, "")
+	writer.toolNamespaces = map[string]string{"get_top_download_models": "mcp__csghub_production"}
+	writer.WriteHeader(200)
+
+	_, err := writer.Write([]byte(`data: {"id":"chatcmpl_1","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"id":"call_1","type":"function","function":{"name":"get_top_download_models","arguments":"{\"num\":20}"}}]}}]}` + "\n\n"))
+	require.NoError(t, err)
+	_, err = writer.Write([]byte(`data: {"id":"chatcmpl_1","choices":[{"index":0,"delta":{},"finish_reason":"tool_calls"}]}` + "\n\n"))
+	require.NoError(t, err)
+	_, err = writer.Write([]byte("data: [DONE]\n\n"))
+	require.NoError(t, err)
+
+	body := w.Body.String()
+	require.Contains(t, body, `"type":"function_call"`)
+	require.Contains(t, body, `"name":"get_top_download_models"`)
+	require.Contains(t, body, `"namespace":"mcp__csghub_production"`)
+	require.Contains(t, body, `"call_id":"call_1"`)
+	require.Contains(t, body, "event: response.output_item.added")
+	require.Contains(t, body, "event: response.output_item.done")
+	require.Contains(t, body, "event: response.completed")
+}
+
+func TestResponsesAdapterStreamWriterRestoresNamespaceWhenToolNameArrivesLate(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(w)
+	writer := newResponsesAdapterStreamWriter(ctx.Writer, "public-model", nil, nil, "")
+	writer.toolNamespaces = map[string]string{"get_top_download_models": "mcp__csghub_production"}
+	writer.WriteHeader(200)
+
+	_, err := writer.Write([]byte(`data: {"id":"chatcmpl_1","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"id":"call_1","type":"function","function":{}}]}}]}` + "\n\n"))
+	require.NoError(t, err)
+	require.NotContains(t, w.Body.String(), "event: response.output_item.added")
+	_, err = writer.Write([]byte(`data: {"id":"chatcmpl_1","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"type":"function","function":{"name":"get_top_download_models"}}]}}]}` + "\n\n"))
+	require.NoError(t, err)
+	_, err = writer.Write([]byte(`data: {"id":"chatcmpl_1","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"type":"function","function":{"arguments":"{\"num\":20}"}}]}}]}` + "\n\n"))
+	require.NoError(t, err)
+	_, err = writer.Write([]byte(`data: {"id":"chatcmpl_1","choices":[{"index":0,"delta":{},"finish_reason":"tool_calls"}]}` + "\n\n"))
+	require.NoError(t, err)
+
+	body := w.Body.String()
+	added := strings.Index(body, "event: response.output_item.added")
+	delta := strings.Index(body, "event: response.function_call_arguments.delta")
+	require.NotEqual(t, -1, added)
+	require.NotEqual(t, -1, delta)
+	require.Less(t, added, delta)
+	addedEnd := strings.Index(body[added:], "\n\n")
+	require.NotEqual(t, -1, addedEnd)
+	require.Contains(t, body[added:added+addedEnd], `"name":"get_top_download_models"`)
+	require.Contains(t, body[added:added+addedEnd], `"namespace":"mcp__csghub_production"`)
+}
+
+func TestResponsesAdapterStreamWriterBuffersArgumentsUntilToolNameArrives(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(w)
+	writer := newResponsesAdapterStreamWriter(ctx.Writer, "public-model", nil, nil, "")
+	writer.toolNamespaces = map[string]string{"get_top_download_models": "mcp__csghub_production"}
+	writer.WriteHeader(200)
+
+	_, err := writer.Write([]byte(`data: {"id":"chatcmpl_1","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"id":"call_1","type":"function","function":{"arguments":"{\"num\":"}}]}}]}` + "\n\n"))
+	require.NoError(t, err)
+	require.NotContains(t, w.Body.String(), "event: response.output_item.added")
+	require.NotContains(t, w.Body.String(), "event: response.function_call_arguments.delta")
+
+	_, err = writer.Write([]byte(`data: {"id":"chatcmpl_1","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"type":"function","function":{"name":"get_top_download_models"}}]}}]}` + "\n\n"))
+	require.NoError(t, err)
+
+	body := w.Body.String()
+	added := strings.Index(body, "event: response.output_item.added")
+	delta := strings.Index(body, "event: response.function_call_arguments.delta")
+	require.NotEqual(t, -1, added)
+	require.NotEqual(t, -1, delta)
+	require.Less(t, added, delta)
+	addedEnd := strings.Index(body[added:], "\n\n")
+	require.NotEqual(t, -1, addedEnd)
+	require.Contains(t, body[added:added+addedEnd], `"name":"get_top_download_models"`)
+	require.Contains(t, body[added:added+addedEnd], `"namespace":"mcp__csghub_production"`)
+	require.Contains(t, body, `"delta":"{\"num\":"`)
+}
+
 func TestResponsesAdapterStreamWriterEmitsRefusalEvents(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	w := httptest.NewRecorder()
@@ -1229,8 +1421,8 @@ func TestRecordResponsesUsageFallsBackToTokenCounter(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(2)
 	tester.mocks.openAIComp.EXPECT().
-		CommitUsageLimit(mock.Anything, "testuuid", model, counter).
-		RunAndReturn(func(ctx context.Context, userUUID string, model *types.Model, counter token.Counter) error {
+		CommitUsageLimitFromUsage(mock.Anything, "testuuid", model, mock.Anything).
+		RunAndReturn(func(ctx context.Context, userUUID string, model *types.Model, usage *token.Usage) error {
 			wg.Done()
 			return nil
 		}).
@@ -1248,7 +1440,7 @@ func TestRecordResponsesUsageFallsBackToTokenCounter(t *testing.T) {
 		}).
 		Once()
 
-	tester.handler.recordResponsesUsageWithTrace(c, counter, "testuuid", modelTarget, "api-key", nil, responsesTracePostProcessInput{})
+	tester.handler.recordResponsesUsageWithTrace(c, counter, nil, "testuuid", modelTarget, "api-key", nil, responsesTracePostProcessInput{StatusCode: http.StatusOK})
 	wg.Wait()
 }
 
@@ -1265,8 +1457,8 @@ func TestRecordResponsesUsagePrefersResponsesUsage(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(2)
 	tester.mocks.openAIComp.EXPECT().
-		CommitUsageLimit(mock.Anything, "testuuid", model, mock.Anything).
-		RunAndReturn(func(ctx context.Context, userUUID string, model *types.Model, counter token.Counter) error {
+		CommitUsageLimitFromUsage(mock.Anything, "testuuid", model, mock.Anything).
+		RunAndReturn(func(ctx context.Context, userUUID string, model *types.Model, usage *token.Usage) error {
 			wg.Done()
 			return nil
 		}).
@@ -1284,7 +1476,7 @@ func TestRecordResponsesUsagePrefersResponsesUsage(t *testing.T) {
 		}).
 		Once()
 
-	tester.handler.recordResponsesUsageWithTrace(c, counter, "testuuid", modelTarget, "api-key", nil, responsesTracePostProcessInput{})
+	tester.handler.recordResponsesUsageWithTrace(c, counter, nil, "testuuid", modelTarget, "api-key", nil, responsesTracePostProcessInput{StatusCode: http.StatusOK})
 	wg.Wait()
 }
 
@@ -1318,6 +1510,203 @@ func TestResponsesToChatRequestDropsNonFunctionTools(t *testing.T) {
 	var parsed map[string]json.RawMessage
 	require.NoError(t, json.Unmarshal(body, &parsed))
 	require.NotContains(t, parsed, "tools")
+}
+
+func TestResponsesToChatRequestFlattensNamespaceFunctionTools(t *testing.T) {
+	req := &types.ResponsesRequest{
+		Model: "public",
+		Input: json.RawMessage(`"hello"`),
+		Tools: json.RawMessage(`[
+			{
+				"type": "namespace",
+				"name": "mcp",
+				"description": "CSGHub production MCP server",
+				"tools": [
+					{
+						"type": "function",
+						"name": "view_image",
+						"description": "View an image",
+						"parameters": {
+							"type": "object",
+							"properties": {"path": {"type": "string"}},
+							"required": ["path"]
+						}
+					},
+					{"type": "web_search"}
+				]
+			},
+			{"type": "web_search"}
+		]`),
+	}
+	chatReq, err := responsesToChatRequest(context.Background(), req, "upstream-model", nil)
+	require.NoError(t, err)
+
+	require.Len(t, chatReq.Tools, 1)
+	data, err := json.Marshal(chatReq.Tools)
+	require.NoError(t, err)
+	require.JSONEq(t, `[
+		{
+			"type": "function",
+			"function": {
+				"name": "view_image",
+				"description": "View an image",
+				"parameters": {
+					"type": "object",
+					"properties": {"path": {"type": "string"}},
+					"required": ["path"]
+				}
+			}
+		}
+	]`, string(data))
+	toolNamespaces, err := responsesNamespaceByFunctionName(req.Tools)
+	require.NoError(t, err)
+	require.Equal(t, map[string]string{"view_image": "mcp"}, toolNamespaces)
+}
+
+func TestResponsesToChatRequestConvertsCallableNamespaceTool(t *testing.T) {
+	req := &types.ResponsesRequest{
+		Model: "public",
+		Input: json.RawMessage(`"hello"`),
+		Tools: json.RawMessage(`[
+			{
+				"type": "namespace",
+				"name": "exec_command",
+				"description": "Run a command",
+				"parameters": {
+					"type": "object",
+					"properties": {"cmd": {"type": "string"}},
+					"required": ["cmd"]
+				}
+			}
+		]`),
+	}
+	chatReq, err := responsesToChatRequest(context.Background(), req, "upstream-model", nil)
+	require.NoError(t, err)
+
+	require.Len(t, chatReq.Tools, 1)
+	data, err := json.Marshal(chatReq.Tools)
+	require.NoError(t, err)
+	require.JSONEq(t, `[
+		{
+			"type": "function",
+			"function": {
+				"name": "exec_command",
+				"description": "Run a command",
+				"parameters": {
+					"type": "object",
+					"properties": {"cmd": {"type": "string"}},
+					"required": ["cmd"]
+				}
+			}
+		}
+	]`, string(data))
+	toolNamespaces, err := responsesNamespaceByFunctionName(req.Tools)
+	require.NoError(t, err)
+	require.Equal(t, map[string]string{"exec_command": "exec_command"}, toolNamespaces)
+
+	resp, err := chatResponseToResponsesWithToolNamespaces([]byte(`{
+		"id":"chatcmpl_1",
+		"created":123,
+		"model":"upstream-model",
+		"choices":[{
+			"message":{
+				"role":"assistant",
+				"tool_calls":[{
+					"id":"call_1",
+					"type":"function",
+					"function":{"name":"exec_command","arguments":"{\"cmd\":\"pwd\"}"}
+				}]
+			},
+			"finish_reason":"tool_calls"
+		}]
+	}`), "public-model", toolNamespaces)
+	require.NoError(t, err)
+	require.Len(t, resp.Output, 1)
+	data, err = json.Marshal(resp.Output[0])
+	require.NoError(t, err)
+	require.JSONEq(t, `{
+		"id": "call_1",
+		"type": "function_call",
+		"status": "completed",
+		"call_id": "call_1",
+		"name": "exec_command",
+		"namespace": "exec_command",
+		"arguments": "{\"cmd\":\"pwd\"}"
+	}`, string(data))
+}
+
+func TestResponsesToChatRequestRejectsDuplicateNamespaceToolNames(t *testing.T) {
+	req := &types.ResponsesRequest{
+		Model: "public",
+		Input: json.RawMessage(`"hello"`),
+		Tools: json.RawMessage(`[
+			{
+				"type": "namespace",
+				"name": "mcp_filesystem",
+				"tools": [
+					{"type": "function", "name": "filesystem.read", "parameters": {"type": "object"}}
+				]
+			},
+			{
+				"type": "namespace",
+				"name": "codex_filesystem",
+				"tools": [
+					{"type": "function", "name": "filesystem.read", "parameters": {"type": "object"}}
+				]
+			}
+		]`),
+	}
+
+	_, err := responsesToChatRequest(context.Background(), req, "upstream-model", nil)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "duplicated tool name across namespaces: filesystem.read")
+
+	_, err = responsesNamespaceByFunctionName(req.Tools)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "duplicated tool name across namespaces: filesystem.read")
+}
+
+func TestResponsesToChatRequestFlattensNestedNamespaceFunctionTools(t *testing.T) {
+	req := &types.ResponsesRequest{
+		Model:      "public",
+		Input:      json.RawMessage(`"hello"`),
+		ToolChoice: json.RawMessage(`{"type":"function","function":{"name":"exec_command"}}`),
+		Tools: json.RawMessage(`[
+			{
+				"type": "namespace",
+				"namespace": {
+					"name": "local",
+					"functions": [
+						{
+							"function": {
+								"name": "exec_command",
+								"description": "Run a command",
+								"parameters": {"type": "object"}
+							}
+						}
+					]
+				}
+			}
+		]`),
+	}
+	chatReq, err := responsesToChatRequest(context.Background(), req, "upstream-model", nil)
+	require.NoError(t, err)
+
+	body, err := marshalChatRequestBody(chatReq, "upstream-model")
+	require.NoError(t, err)
+	var parsed map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(body, &parsed))
+	require.JSONEq(t, `{"type":"function","function":{"name":"exec_command"}}`, string(parsed["tool_choice"]))
+	require.JSONEq(t, `[
+		{
+			"type": "function",
+			"function": {
+				"name": "exec_command",
+				"description": "Run a command",
+				"parameters": {"type": "object"}
+			}
+		}
+	]`, string(parsed["tools"]))
 }
 
 func TestResponsesToChatRequestDropsRequiredToolChoiceWhenNoFunctionToolsRemain(t *testing.T) {
@@ -1567,8 +1956,8 @@ func TestResponsesAdapterEndToEndNonFunctionToolsDropped(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(2)
 	tester.mocks.openAIComp.EXPECT().
-		CommitUsageLimit(mock.Anything, "testuuid", model, mock.Anything).
-		RunAndReturn(func(ctx context.Context, userUUID string, model *types.Model, counter token.Counter) error {
+		CommitUsageLimitFromUsage(mock.Anything, "testuuid", model, mock.Anything).
+		RunAndReturn(func(ctx context.Context, userUUID string, model *types.Model, usage *token.Usage) error {
 			wg.Done()
 			return nil
 		}).Once()

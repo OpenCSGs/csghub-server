@@ -47,6 +47,7 @@ type AgentTemplate struct {
 	Description *string         `json:"description" binding:"omitempty,max=500"` // Agent template description
 	Content     *string         `json:"content,omitempty"`                       // Used to store the complete content of the template
 	Public      *bool           `json:"public,omitempty"`                        // Whether the template is public
+	Editable    bool            `json:"editable"`                                // Whether the template is editable (only the owner can delete)
 	Metadata    *map[string]any `json:"metadata,omitempty"`                      // Template metadata
 	IsPinned    bool            `json:"is_pinned"`                               // Whether the template is pinned by the user
 	CreatedAt   time.Time       `json:"created_at"`                              // When the template was created
@@ -54,8 +55,20 @@ type AgentTemplate struct {
 }
 
 type AgentTemplateFilter struct {
-	Search string
-	Type   string
+	Search   string
+	Type     string
+	Editable *bool
+}
+
+// UpdateAgentTemplateRequest is a partial update for an agent template.
+// Name and type are optional so a visibility-only update does not modify them.
+type UpdateAgentTemplateRequest struct {
+	Type        *string         `json:"type,omitempty"`
+	Name        *string         `json:"name,omitempty" binding:"omitempty,max=255"`
+	Description *string         `json:"description,omitempty" binding:"omitempty,max=500"`
+	Content     *string         `json:"content,omitempty"`
+	Public      *bool           `json:"public,omitempty"`
+	Metadata    *map[string]any `json:"metadata,omitempty"`
 }
 
 // AgentInstance represents an instance created from an agent template
@@ -72,6 +85,7 @@ type AgentInstance struct {
 	IsRunning   bool            `json:"is_running"`                            // Whether the instance is running
 	BuiltIn     bool            `json:"built_in"`                              // Whether the instance is built-in
 	IsPinned    bool            `json:"is_pinned"`                             // Whether the instance is pinned by the user
+	IsShared    bool            `json:"is_shared"`                             // Whether the instance has been shared via agent_shares
 	Config      map[string]any  `json:"config,omitempty"`                      // Per-user instance configuration from user preferences
 	Metadata    *map[string]any `json:"metadata,omitempty"`                    // Instance metadata
 	Data        json.RawMessage `json:"-"`                                     // Request-only flow data; excluded from responses
@@ -265,6 +279,22 @@ type AgentSessionShareResponse struct {
 // AgentSessionShareTokenResponse represents the response for creating a share token.
 type AgentSessionShareTokenResponse struct {
 	Token string `json:"token"`
+}
+
+type AgentInstanceShareResponse struct {
+	ShareUUID string `json:"share_uuid"`
+	ShareName string `json:"share_name"`
+	Type      string `json:"type"`
+}
+
+type AgentSharedInstanceResponse struct {
+	ID                int64  `json:"id"`
+	InstanceID        int64  `json:"instance_id"`
+	Type              string `json:"type"`
+	Name              string `json:"name"`
+	Description       string `json:"description"`
+	AgentName         string `json:"agent_name"`
+	SharedSandboxName string `json:"shared_sandbox_name"`
 }
 
 // AgentSharedSessionResponse represents the public shared session response.
@@ -741,20 +771,23 @@ type AgentUserPreferenceRequest struct {
 // AgentSkillListItem represents a skill in the agent skills list response.
 // Used for both bun scan (List query) and API JSON; Private is scan-only, Public is set after scan.
 type AgentSkillListItem struct {
-	ID          int64      `bun:",scanonly" json:"id"`
-	Name        string     `bun:",scanonly" json:"name"`
-	Description string     `bun:",scanonly" json:"description"`
-	Path        string     `bun:",scanonly" json:"path"`
-	Repository  Repository `json:"repository"`
-	Private     bool       `bun:",scanonly" json:"-"`                   // from DB; Public is derived as !Private
-	Public      bool       `json:"public"`                              // set after scan
-	IsPinned    bool       `bun:",scanonly" json:"is_pinned"`           // true if pinned by user
-	PinnedAt    time.Time  `bun:",scanonly" json:"pinned_at,omitempty"` // when pinned (optional in API)
-	BuiltIn     bool       `bun:",scanonly" json:"built_in"`            // true if platform skill (has agentichub-skills tag)
-	Owner       string     `bun:",scanonly" json:"owner,omitempty"`
-	OwnerAvatar string     `bun:",scanonly" json:"owner_avatar,omitempty"`
-	CreatedAt   time.Time  `bun:",scanonly" json:"created_at"`
-	UpdatedAt   time.Time  `bun:",scanonly" json:"updated_at"`
+	ID            int64      `bun:",scanonly" json:"id"`
+	RepositoryID  int64      `bun:",scanonly" json:"repository_id"`
+	Name          string     `bun:",scanonly" json:"name"`
+	Description   string     `bun:",scanonly" json:"description"`
+	Path          string     `bun:",scanonly" json:"path"`
+	DefaultBranch string     `bun:",scanonly" json:"-"`
+	DownloadURL   string     `json:"download_url"`
+	Repository    Repository `json:"repository"`
+	Private       bool       `bun:",scanonly" json:"-"`                   // from DB; Public is derived as !Private
+	Public        bool       `json:"public"`                              // set after scan
+	IsPinned      bool       `bun:",scanonly" json:"is_pinned"`           // true if pinned by user
+	PinnedAt      time.Time  `bun:",scanonly" json:"pinned_at,omitempty"` // when pinned (optional in API)
+	BuiltIn       bool       `bun:",scanonly" json:"built_in"`            // true if platform skill (has agentichub-skills tag)
+	Owner         string     `bun:",scanonly" json:"owner,omitempty"`
+	OwnerAvatar   string     `bun:",scanonly" json:"owner_avatar,omitempty"`
+	CreatedAt     time.Time  `bun:",scanonly" json:"created_at"`
+	UpdatedAt     time.Time  `bun:",scanonly" json:"updated_at"`
 }
 
 // AgentSkillFilter for list filtering

@@ -7,6 +7,9 @@ import (
 )
 
 func ApplyRequestAuthHeaders(header http.Header, authHeadStr string) error {
+	// Never forward the caller's Authorization to upstream providers.
+	// Empty AuthHead means the upstream needs no auth (e.g. public Whisper space).
+	header.Del("Authorization")
 	if authHeadStr == "" {
 		return nil
 	}
