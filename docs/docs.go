@@ -41049,14 +41049,6 @@ const docTemplate = `{
                 "license": {
                     "type": "string"
                 },
-                "mcp_server_attributes": {
-                    "description": "MCP only",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/types.MCPServerAttributes"
-                        }
-                    ]
-                },
                 "mirror_source_id": {
                     "description": "source id for HF,github etc",
                     "type": "integer"
@@ -43193,26 +43185,6 @@ const docTemplate = `{
                 },
                 "user_likes": {
                     "type": "boolean"
-                }
-            }
-        },
-        "types.MCPServerAttributes": {
-            "type": "object",
-            "properties": {
-                "avatar_url": {
-                    "type": "string"
-                },
-                "configuration": {
-                    "$ref": "#/definitions/types.MCPSchema"
-                },
-                "star_count": {
-                    "type": "integer"
-                },
-                "tools": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/types.MCPTool"
-                    }
                 }
             }
         },
