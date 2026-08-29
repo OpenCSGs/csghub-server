@@ -661,7 +661,7 @@ func CheckDuplicatedEvent(ctx context.Context, tx bun.Tx, input AccountStatement
 	}
 
 	if !errors.Is(err, sql.ErrNoRows) {
-		return fmt.Errorf("verfiy account statement, event_uuid: %s, err: %w", input.EventUUID, err)
+		return fmt.Errorf("verify account statement, event_uuid: %s, err: %w", input.EventUUID, err)
 	}
 
 	return nil
