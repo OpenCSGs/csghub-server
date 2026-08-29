@@ -1,8 +1,12 @@
 package ocr
 
 import (
+	"errors"
+
 	"opencsg.com/csghub-server/aigateway/types"
 )
+
+var ErrUnsupportedOption = errors.New("unsupported OCR option")
 
 // PaddleX fileType values for the upstream serving contract.
 const (
@@ -19,6 +23,7 @@ type UpstreamInput struct {
 	UseDocUnwarping           *bool
 	UseTextlineOrientation    *bool
 	Visualize                 bool
+	ReturnMarkdownImages      bool
 }
 
 // ResponseOptions controls how the upstream response is normalized.
@@ -33,6 +38,7 @@ type ResponseOptions struct {
 type Adapter interface {
 	Name() string
 	CanHandle(model *types.Model) bool
+	SupportsFileType(fileType int) bool
 	// EndpointPath is the upstream OCR route path, default "/ocr".
 	EndpointPath(model *types.Model) string
 	BuildUpstreamRequest(in *UpstreamInput) ([]byte, error)
@@ -46,6 +52,7 @@ type Registry struct {
 func NewRegistry() *Registry {
 	return &Registry{
 		adapters: []Adapter{
+			NewPaddleXVLAdapter(),
 			NewPaddleXAdapter(),
 		},
 	}

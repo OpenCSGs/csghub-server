@@ -65,6 +65,12 @@ func TestPaddleXAdapter_CanHandle(t *testing.T) {
 	}
 }
 
+func TestPaddleXAdapter_SupportsFileType(t *testing.T) {
+	a := NewPaddleXAdapter()
+	assert.True(t, a.SupportsFileType(FileTypeImage))
+	assert.False(t, a.SupportsFileType(FileTypePDF))
+}
+
 func TestPaddleXAdapter_BuildUpstreamRequest(t *testing.T) {
 	a := NewPaddleXAdapter()
 
@@ -211,6 +217,10 @@ func TestPaddleXAdapter_TransformResponse_MultiPage(t *testing.T) {
 
 func TestRegistry_GetAdapter(t *testing.T) {
 	r := NewRegistry()
+	vlModel := &types.Model{
+		InternalModelInfo: types.InternalModelInfo{RuntimeFramework: "paddleocr-vl"},
+	}
+	assert.Equal(t, paddleXVLAdapterName, r.GetAdapter(vlModel).Name())
 
 	model := &types.Model{
 		InternalModelInfo: types.InternalModelInfo{RuntimeFramework: "paddleocr"},

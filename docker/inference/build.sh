@@ -39,6 +39,7 @@ echo "$OPENCSG_ACR_PASSWORD" | docker login "$OPENCSG_ACR" -u "$OPENCSG_ACR_USER
 echo "Building images..."
 export IMAGE=$3
 export PLATFORMS="linux/amd64,linux/arm64"
+BUILD_TARGET_ARGS=()
 case "${IMAGE%:*}" in
   vllm-local)
     DOCKERFILE="Dockerfile.vllm"
@@ -73,6 +74,12 @@ case "${IMAGE%:*}" in
   paddleocr)
     PLATFORMS="linux/amd64"
     DOCKERFILE="Dockerfile.paddleocr"
+    BUILD_TARGET_ARGS=(--target paddleocr)
+    ;;
+  paddleocr-vl)
+    PLATFORMS="linux/amd64"
+    DOCKERFILE="Dockerfile.paddleocr"
+    BUILD_TARGET_ARGS=(--target paddleocr-vl)
     ;;
   paddleocr-cpu)
     DOCKERFILE="Dockerfile.paddleocr-cpu"
@@ -82,6 +89,7 @@ esac
 docker buildx build --platform ${PLATFORMS} \
     -t ${DOCKER_IMAGE_PREFIX}/${IMAGE} \
     -t ${DOCKER_IMAGE_PREFIX}/${IMAGE%:*}:latest \
+    "${BUILD_TARGET_ARGS[@]}" \
     -f ${DOCKERFILE} \
     --push .
 

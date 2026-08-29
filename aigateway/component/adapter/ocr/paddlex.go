@@ -50,6 +50,10 @@ func (a *PaddleXAdapter) CanHandle(model *types.Model) bool {
 	return false
 }
 
+func (a *PaddleXAdapter) SupportsFileType(fileType int) bool {
+	return fileType == FileTypeImage
+}
+
 func isValue(value, expected string) bool {
 	return strings.EqualFold(strings.TrimSpace(value), expected)
 }

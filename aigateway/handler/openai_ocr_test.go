@@ -83,6 +83,10 @@ func withCancelableContext(t *testing.T, req *http.Request) *http.Request {
 }
 
 func ocrTestModelWithEndpoint(id, upstreamModelName, endpoint string) *types.Model {
+	return ocrTestModelWithRuntime(id, upstreamModelName, endpoint, "paddleocr")
+}
+
+func ocrTestModelWithRuntime(id, upstreamModelName, endpoint, runtimeFramework string) *types.Model {
 	return &types.Model{
 		BaseModel: types.BaseModel{
 			ID:      id,
@@ -91,33 +95,13 @@ func ocrTestModelWithEndpoint(id, upstreamModelName, endpoint string) *types.Mod
 			Task:    string(commontypes.OpticalCharacterRecognition),
 		},
 		InternalModelInfo: types.InternalModelInfo{
-			RuntimeFramework: "paddleocr",
+			RuntimeFramework: runtimeFramework,
 		},
 		Endpoint: endpoint,
 		Upstreams: []commontypes.UpstreamConfig{
 			{URL: endpoint, Enabled: true, ModelName: upstreamModelName},
 		},
 	}
-}
-
-func TestSupportsOCRTask(t *testing.T) {
-	assert.False(t, supportsOCRTask(nil))
-	assert.True(t, supportsOCRTask(&types.Model{
-		BaseModel: types.BaseModel{Task: "optical-character-recognition"},
-	}))
-	assert.True(t, supportsOCRTask(&types.Model{
-		BaseModel: types.BaseModel{Task: "text-generation, optical-character-recognition"},
-	}))
-	assert.True(t, supportsOCRTask(&types.Model{
-		InternalModelInfo: types.InternalModelInfo{RuntimeFramework: "paddleocr"},
-	}))
-	assert.True(t, supportsOCRTask(&types.Model{
-		ExternalModelInfo: types.ExternalModelInfo{Provider: "opencsg"},
-	}))
-	assert.False(t, supportsOCRTask(&types.Model{
-		BaseModel:         types.BaseModel{Task: "text-generation"},
-		InternalModelInfo: types.InternalModelInfo{RuntimeFramework: "vllm"},
-	}))
 }
 
 func TestOpenAIHandler_OCRValidation(t *testing.T) {
@@ -162,14 +146,14 @@ func TestOpenAIHandler_OCRValidation(t *testing.T) {
 		require.Contains(t, w.Body.String(), "Only one file is allowed")
 	})
 
-	t.Run("pdf rejected", func(t *testing.T) {
+	t.Run("page ranges rejected", func(t *testing.T) {
 		tester, c, w := setupTest(t)
-		c.Request = newMultipartOCRRequest(t, "model1", "pdf-bytes", "application/pdf", nil, 1)
+		c.Request = newMultipartOCRRequest(t, "model1", "image-bytes", "image/png", map[string]string{"page_ranges": "1-2"}, 1)
 
 		tester.handler.OCR(c)
 
 		require.Equal(t, http.StatusBadRequest, w.Code)
-		require.Contains(t, w.Body.String(), "PDF input is not supported yet")
+		require.Contains(t, w.Body.String(), "page_ranges is not supported")
 	})
 
 	t.Run("unsupported content type", func(t *testing.T) {
@@ -205,6 +189,33 @@ func TestOpenAIHandler_OCRValidation(t *testing.T) {
 }
 
 func TestOpenAIHandler_OCRPreProxyErrors(t *testing.T) {
+	t.Run("vl runtime rejects classic textline option", func(t *testing.T) {
+		tester, c, w := setupTest(t)
+		c.Request = newMultipartOCRRequest(t, "model1", "image-bytes", "image/png", map[string]string{
+			"use_textline_orientation": "true",
+		}, 1)
+		model := ocrTestModelWithRuntime("model1", "paddleocr-vl-model", "https://api.example.com", "paddleocr-vl")
+		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "model1").Return(model, nil).Once()
+		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil).Once()
+
+		tester.handler.OCR(c)
+
+		require.Equal(t, http.StatusBadRequest, w.Code)
+		require.Contains(t, w.Body.String(), "use_textline_orientation is not supported by paddleocr-vl")
+	})
+
+	t.Run("classic runtime rejects pdf", func(t *testing.T) {
+		tester, c, w := setupTest(t)
+		c.Request = newMultipartOCRRequest(t, "model1", "pdf-bytes", "application/pdf", nil, 1)
+		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "model1").
+			Return(ocrTestModelWithEndpoint("model1", "paddleocr-model", "https://api.example.com"), nil).Once()
+
+		tester.handler.OCR(c)
+
+		require.Equal(t, http.StatusBadRequest, w.Code)
+		require.Contains(t, w.Body.String(), "PDF input requires a paddleocr-vl runtime")
+	})
+
 	t.Run("model not found", func(t *testing.T) {
 		tester, c, w := setupTest(t)
 		c.Request = newMultipartOCRRequest(t, "missing-model", "image-bytes", "image/png", nil, 1)
@@ -247,6 +258,60 @@ func TestOpenAIHandler_OCRPreProxyErrors(t *testing.T) {
 		require.Equal(t, http.StatusPaymentRequired, w.Code)
 		require.Contains(t, w.Body.String(), `"code":"insufficient_balance"`)
 	})
+}
+
+func TestOpenAIHandler_OCRPaddleXVLPDF(t *testing.T) {
+	tester, c, w := setupTest(t)
+
+	var gotPath string
+	var gotBody []byte
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		gotBody, _ = io.ReadAll(r.Body)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{
+          "errorCode": 0,
+          "result": {"layoutParsingResults": [{
+            "prunedResult": {"parsing_res_list": [{"block_content": "page text"}]},
+            "markdown": {"text": "# Page text", "images": null}
+          }]}
+        }`))
+	}))
+	defer upstream.Close()
+
+	c.Request = withCancelableContext(t, newMultipartOCRRequest(t, "model1", "pdf-bytes", "application/pdf", nil, 1))
+	model := ocrTestModelWithRuntime("model1", "paddleocr-vl-model", upstream.URL, "paddleocr-vl")
+	tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "model1").Return(model, nil).Once()
+	tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil).Once()
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	tester.mocks.openAIComp.EXPECT().
+		RecordUsageFromTokenUsage(mock.Anything, "testuuid", model, "paddleocr-vl-model", mock.MatchedBy(func(usage *token.Usage) bool {
+			return usage != nil && usage.DataType == string(commontypes.DataTypeOCR) && usage.CompletionRC == 1
+		}), mock.Anything).
+		RunAndReturn(func(context.Context, string, *types.Model, string, *token.Usage, string) error {
+			wg.Done()
+			return nil
+		}).Once()
+
+	tester.handler.OCR(c)
+
+	require.Equal(t, "/layout-parsing", gotPath)
+	var payload map[string]any
+	require.NoError(t, json.Unmarshal(gotBody, &payload))
+	assert.EqualValues(t, 0, payload["fileType"])
+	assert.Equal(t, false, payload["returnMarkdownImages"])
+
+	require.Equal(t, http.StatusOK, w.Code)
+	var resp types.OCRResponse
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+	assert.Equal(t, "page text", resp.Text)
+	require.Len(t, resp.Pages, 1)
+	assert.Equal(t, "# Page text", resp.Pages[0].Markdown)
+	assert.Empty(t, resp.Pages[0].Lines)
+	wg.Wait()
 }
 
 func TestOpenAIHandler_OCRUpstreamErrorPassthrough(t *testing.T) {

@@ -103,6 +103,14 @@ docker buildx build --platform linux/amd64,linux/arm64 \
 export IMAGE_TAG=3.7.0
 docker buildx build --platform linux/amd64 \
   -t ${OPENCSG_ACR}/opencsghq/paddleocr:${IMAGE_TAG} \
+  --target paddleocr \
+  -f Dockerfile.paddleocr \
+  --push .
+# For PaddleOCR-VL CUDA: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/paddleocr-vl:3.7.0
+export IMAGE_TAG=3.7.0
+docker buildx build --platform linux/amd64 \
+  -t ${OPENCSG_ACR}/opencsghq/paddleocr-vl:${IMAGE_TAG} \
+  --target paddleocr-vl \
   -f Dockerfile.paddleocr \
   --push .
 # For PaddleOCR CPU: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/paddleocr-cpu:3.7.0

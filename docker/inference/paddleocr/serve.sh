@@ -1,6 +1,21 @@
 #!/bin/bash
 set -euo pipefail
 
+RUNTIME_MODE="${1:-}"
+
+case "${RUNTIME_MODE}" in
+  paddleocr|paddleocr-vl)
+    ;;
+  "")
+    echo "ERROR: image runtime mode is required (expected paddleocr|paddleocr-vl)" >&2
+    exit 1
+    ;;
+  *)
+    echo "ERROR: unknown image runtime mode '${RUNTIME_MODE}' (expected paddleocr|paddleocr-vl)" >&2
+    exit 1
+    ;;
+esac
+
 python /etc/csghub/entry.py
 
 PORT="${PORT:-8000}"
@@ -37,12 +52,42 @@ PIPELINE="${PADDLEX_PIPELINE:-}"
 if [ -z "${PIPELINE}" ]; then
   if [ -f "${MODEL_DIR}/pipeline.yaml" ]; then
     PIPELINE="${MODEL_DIR}/pipeline.yaml"
-  elif [ -f "${MODEL_DIR}/OCR.yaml" ]; then
+  elif [ "${RUNTIME_MODE}" = "paddleocr" ] && [ -f "${MODEL_DIR}/OCR.yaml" ]; then
     PIPELINE="${MODEL_DIR}/OCR.yaml"
   elif [ "${MODEL_SOURCE}" = "local-only" ]; then
-    echo "ERROR: ${MODEL_DIR} contains no pipeline.yaml/OCR.yaml and PADDLEOCR_MODEL_SOURCE=local-only." >&2
+    echo "ERROR: ${MODEL_DIR} contains no pipeline config for ${RUNTIME_MODE} and PADDLEOCR_MODEL_SOURCE=local-only." >&2
     echo "The model repo must be a PaddleX pipeline bundle (pipeline.yaml + local model_dir subdirs)." >&2
     exit 1
+  elif [ "${RUNTIME_MODE}" = "paddleocr-vl" ]; then
+    MODEL_NAME="$(basename "${REPO_ID}")"
+    case "${MODEL_NAME}" in
+      PaddleOCR-VL-1.6*)
+        PIPELINE_NAME="PaddleOCR-VL-1.6"
+        ;;
+      PaddleOCR-VL-1.5*)
+        PIPELINE_NAME="PaddleOCR-VL-1.5"
+        ;;
+      PaddleOCR-VL*)
+        PIPELINE_NAME="PaddleOCR-VL"
+        ;;
+      *)
+        echo "ERROR: unsupported PaddleOCR-VL model '${MODEL_NAME}'" >&2
+        exit 1
+        ;;
+    esac
+    GEN_DIR="${MODEL_DIR}/.csghub"
+    PIPELINE="${GEN_DIR}/${PIPELINE_NAME}.yaml"
+    rm -f "${PIPELINE}"
+    paddlex --get_pipeline_config "${PIPELINE_NAME}" --save_path "${GEN_DIR}"
+    [ -f "${PIPELINE}" ] || {
+      echo "ERROR: failed to generate PaddleX pipeline config at ${PIPELINE}" >&2
+      exit 1
+    }
+    python /etc/csghub/gen_pipeline.py \
+      --pipeline paddleocr-vl \
+      --config "${PIPELINE}" \
+      --rec-name "${MODEL_NAME}" \
+      --rec-dir "${MODEL_DIR}"
   else
     REC_NAME="$(basename "${REPO_ID}")"
     if [ -f "${MODEL_DIR}/inference.pdiparams" ] && [[ "${REC_NAME}" == *_rec ]]; then
@@ -59,7 +104,7 @@ if [ -z "${PIPELINE}" ]; then
         echo "ERROR: failed to generate PaddleX pipeline config at ${PIPELINE}" >&2
         exit 1
       }
-      python /etc/csghub/gen_pipeline.py --config "${PIPELINE}" --rec-name "${REC_NAME}" --rec-dir "${MODEL_DIR}"
+      python /etc/csghub/gen_pipeline.py --pipeline ocr --config "${PIPELINE}" --rec-name "${REC_NAME}" --rec-dir "${MODEL_DIR}"
     else
       # Sub-models are resolved by name from the configured model sources.
       PIPELINE="OCR"
@@ -67,7 +112,7 @@ if [ -z "${PIPELINE}" ]; then
   fi
 fi
 
-echo "Starting PaddleX serving: pipeline=${PIPELINE} device=${DEVICE} port=${PORT} model_source=${MODEL_SOURCE}"
+echo "Starting PaddleX serving: runtime_mode=${RUNTIME_MODE} pipeline=${PIPELINE} device=${DEVICE} port=${PORT} model_source=${MODEL_SOURCE}"
 
 exec paddlex --serve \
     --pipeline "${PIPELINE}" \
