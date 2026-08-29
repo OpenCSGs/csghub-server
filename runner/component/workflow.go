@@ -111,8 +111,11 @@ func (wc *workFlowComponentImpl) CreateWorkflow(ctx context.Context, req types.A
 		return nil, fmt.Errorf("failed to generate workflow: %v", err)
 	}
 	wc.setLabels(argowf, awf)
-	slog.InfoContext(ctx, "create workflow in runner", slog.Any("namespace", namespace), slog.Any("awf.name", awf.Name),
-		slog.Any("result-url", argowf.ResultURL), slog.Any("task-type", argowf.TaskType))
+	slog.InfoContext(ctx, "create workflow in runner",
+		slog.Any("namespace", namespace),
+		slog.Any("awf", awf),
+		slog.Any("result-url", argowf.ResultURL),
+		slog.Any("task-type", argowf.TaskType))
 	_, err = cluster.ArgoClient.ArgoprojV1alpha1().Workflows(namespace).Create(ctx, awf, v1.CreateOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create workflow in argo: %v", err)

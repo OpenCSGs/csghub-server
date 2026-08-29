@@ -48,7 +48,7 @@ func (a *ArgoHandler) CreateWorkflow(ctx *gin.Context) {
 	}
 	wf, err := a.wfc.CreateWorkflow(ctx, req)
 	if err != nil {
-		slog.ErrorContext(ctx, "fail to create workflow", slog.Any("error", err), slog.Any("req", req))
+		slog.ErrorContext(ctx, "failed to create workflow", slog.Any("error", err), slog.Any("req", req))
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
