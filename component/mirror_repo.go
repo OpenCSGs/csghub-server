@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"opencsg.com/csghub-server/builder/git/membership"
+	"opencsg.com/csghub-server/builder/multisync"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
@@ -19,8 +20,77 @@ import (
 	"opencsg.com/csghub-server/common/utils/common"
 )
 
+// mirrorMetadataClientFactory creates an OpenCSG API client for one mirror source.
+type mirrorMetadataClientFactory func(endpoint, accessToken string) multisync.Client
+
+// openCSGSaaSMetadataEndpoint is the trusted metadata API endpoint for OpenCSG SaaS Git repositories.
+const openCSGSaaSMetadataEndpoint = "https://hub.opencsg.com"
+
+// mirrorRepoMetadata contains type-specific metadata fetched before transactional mirror creation.
+type mirrorRepoMetadata struct {
+	mcpServer *types.MCPServer
+	skill     *types.Skill
+}
+
 // requeueMirrorRepoTask atomically schedules a new sync for an existing mirror target.
 func (m *mirrorComponentImpl) requeueMirrorRepoTask(ctx context.Context, repo *database.Repository, mirror *database.Mirror, username, accessToken *string, priority types.MirrorPriority, urgent bool) (database.MirrorTask, error) {
+	metadata, err := m.prepareExistingMirrorRepoMetadataUpdate(ctx, repo, mirror, username, accessToken)
+	if err != nil {
+		return database.MirrorTask{}, err
+	}
+	return m.requeueMirrorRepoTaskWithMetadata(ctx, repo, mirror, username, accessToken, priority, urgent, metadata)
+}
+
+// prepareExistingMirrorRepoMetadataUpdate converts an existing mirror into one metadata update payload.
+func (m *mirrorComponentImpl) prepareExistingMirrorRepoMetadataUpdate(ctx context.Context, repo *database.Repository, mirror *database.Mirror, username, accessToken *string) (*database.MirrorRepoMetadataUpdate, error) {
+	if repo.RepositoryType != types.MCPServerRepo && repo.RepositoryType != types.SkillRepo {
+		return nil, nil
+	}
+	sourcePath := strings.Trim(strings.TrimSuffix(mirror.SourceRepoPath, ".git"), "/")
+	if sourcePath == "" {
+		_, sourcePath, _ = common.GetSourceTypeAndPathFromURL(mirror.SourceUrl)
+		sourcePath = strings.Trim(strings.TrimSuffix(sourcePath, ".git"), "/")
+	}
+	sourceNamespace, sourceName := path.Split(sourcePath)
+	sourceNamespace = strings.Trim(sourceNamespace, "/")
+	if sourceNamespace == "" || sourceName == "" {
+		return nil, fmt.Errorf("failed to resolve source repository path for %s metadata refresh", repo.RepositoryType)
+	}
+	sourceUsername, sourceAccessToken := mirror.Username, mirror.AccessToken
+	if username != nil && accessToken != nil {
+		sourceUsername, sourceAccessToken = *username, *accessToken
+	}
+	req := types.CreateMirrorRepoReq{
+		SourceNamespace:   sourceNamespace,
+		SourceName:        sourceName,
+		MirrorSourceID:    mirror.MirrorSourceID,
+		RepoType:          repo.RepositoryType,
+		SourceGitCloneUrl: mirror.SourceUrl,
+		Username:          sourceUsername,
+		AccessToken:       sourceAccessToken,
+	}
+	metadata, err := m.prepareExistingMirrorRepoMetadata(ctx, repo, req)
+	if err != nil {
+		return nil, err
+	}
+	return buildMirrorRepoMetadataUpdate(req, repo, metadata)
+}
+
+// prepareExistingMirrorRepoMetadata fetches and applies source API metadata to an existing repository.
+func (m *mirrorComponentImpl) prepareExistingMirrorRepoMetadata(ctx context.Context, repo *database.Repository, req types.CreateMirrorRepoReq) (*mirrorRepoMetadata, error) {
+	if repo.RepositoryType != types.MCPServerRepo && repo.RepositoryType != types.SkillRepo {
+		return nil, nil
+	}
+	metadata, err := m.fetchMirrorRepoMetadata(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	applyMirrorRepoMetadataToExistingRepository(repo, metadata)
+	return metadata, nil
+}
+
+// requeueMirrorRepoTaskWithMetadata schedules a new sync task and optionally applies source metadata atomically.
+func (m *mirrorComponentImpl) requeueMirrorRepoTaskWithMetadata(ctx context.Context, repo *database.Repository, mirror *database.Mirror, username, accessToken *string, priority types.MirrorPriority, urgent bool, metadata *database.MirrorRepoMetadataUpdate) (database.MirrorTask, error) {
 	task, err := m.mirrorTaskJobStore.RequeueMirrorRepoTask(ctx, database.RequeueMirrorRepoTaskInput{
 		MirrorID:        mirror.ID,
 		RepositoryID:    repo.ID,
@@ -30,6 +100,7 @@ func (m *mirrorComponentImpl) requeueMirrorRepoTask(ctx context.Context, repo *d
 		Urgent:          urgent,
 		JobClient:       m.mirrorRepoJobClient,
 		JobCancelClient: m.mirrorJobClient,
+		Metadata:        metadata,
 	})
 	if err != nil {
 		return database.MirrorTask{}, fmt.Errorf("failed to create mirror task: %w", err)
@@ -37,9 +108,9 @@ func (m *mirrorComponentImpl) requeueMirrorRepoTask(ctx context.Context, repo *d
 	return task, nil
 }
 
-// requeueMirrorFromSaas atomically replaces existing mirror work with a new workhub repo job.
+// requeueMirrorFromSaas atomically replaces existing SaaS mirror work without fetching source API metadata.
 func (m *mirrorComponentImpl) requeueMirrorFromSaas(ctx context.Context, repo *database.Repository, mirror *database.Mirror) (database.MirrorTask, error) {
-	return m.requeueMirrorRepoTask(ctx, repo, mirror, nil, nil, types.LowMirrorPriority, false)
+	return m.requeueMirrorRepoTaskWithMetadata(ctx, repo, mirror, nil, nil, types.LowMirrorPriority, false, nil)
 }
 
 // CreateMirrorRepo creates or binds one mirror source to one target repository.
@@ -100,12 +171,21 @@ func (m *mirrorComponentImpl) CreateMirrorRepo(ctx context.Context, req types.Cr
 		// mirror exists
 		if mirror != nil && mirror.ID != 0 {
 			if mirror.SourceUrl == req.SourceGitCloneUrl {
+				metadata, err := m.prepareExistingMirrorRepoMetadata(ctx, repo, req)
+				if err != nil {
+					return nil, err
+				}
+				metadataUpdate, err := buildMirrorRepoMetadataUpdate(req, repo, metadata)
+				if err != nil {
+					return nil, err
+				}
+
 				var usernamePtr, accessTokenPtr *string
 				if req.Username != "" {
 					usernamePtr = &req.Username
 					accessTokenPtr = &req.AccessToken
 				}
-				if _, err := m.requeueMirrorRepoTask(ctx, repo, mirror, usernamePtr, accessTokenPtr, req.Priority, req.Urgent); err != nil {
+				if _, err := m.requeueMirrorRepoTaskWithMetadata(ctx, repo, mirror, usernamePtr, accessTokenPtr, req.Priority, req.Urgent, metadataUpdate); err != nil {
 					return nil, fmt.Errorf("failed to sync mirror repo, error: %w", err)
 				}
 				if req.Username != "" {
@@ -124,8 +204,12 @@ func (m *mirrorComponentImpl) CreateMirrorRepo(ctx context.Context, req types.Cr
 			)
 		}
 
+		metadata, err := m.prepareExistingMirrorRepoMetadata(ctx, repo, req)
+		if err != nil {
+			return nil, err
+		}
 		repoNamespace, _ := repo.NamespaceAndName()
-		return m.createMirrorRepoRecords(ctx, req, repo, repoNamespace, repo.Name, false)
+		return m.createMirrorRepoRecords(ctx, req, repo, repoNamespace, repo.Name, false, metadata)
 	}
 	if req.CreateTargetRepo != nil && !*req.CreateTargetRepo {
 		return nil, errorx.RepoNotFound(
@@ -141,6 +225,10 @@ func (m *mirrorComponentImpl) CreateMirrorRepo(ctx context.Context, req types.Cr
 	if req.Private != nil {
 		private = *req.Private
 	}
+	metadata, err := m.fetchMirrorRepoMetadata(ctx, req)
+	if err != nil {
+		return nil, err
+	}
 
 	createRepoReq := types.CreateRepoReq{
 		Username:      req.CurrentUser,
@@ -155,6 +243,7 @@ func (m *mirrorComponentImpl) CreateMirrorRepo(ctx context.Context, req types.Cr
 		ToolCount:     len(req.MCPServerAttributes.Tools),
 		StarCount:     req.MCPServerAttributes.StarCount,
 	}
+	applyMirrorRepoMetadata(&createRepoReq, metadata)
 
 	sourceType, sourcePath := "", ""
 	if !req.SkipSourcePath {
@@ -166,7 +255,217 @@ func (m *mirrorComponentImpl) CreateMirrorRepo(ctx context.Context, req types.Cr
 	}
 
 	repoNamespace, _ := dbRepo.NamespaceAndName()
-	return m.createMirrorRepoRecords(ctx, req, dbRepo, repoNamespace, dbRepo.Name, true)
+	return m.createMirrorRepoRecords(ctx, req, dbRepo, repoNamespace, dbRepo.Name, true, metadata)
+}
+
+// fetchMirrorRepoMetadata imports MCP or skill metadata from the source API before repository creation.
+func (m *mirrorComponentImpl) fetchMirrorRepoMetadata(ctx context.Context, req types.CreateMirrorRepoReq) (*mirrorRepoMetadata, error) {
+	if req.RepoType != types.MCPServerRepo && req.RepoType != types.SkillRepo {
+		return nil, nil
+	}
+	// Explicit MCP attributes remain authoritative for compatibility with existing callers.
+	if req.RepoType == types.MCPServerRepo && hasMCPServerAttributes(req.MCPServerAttributes) {
+		return nil, nil
+	}
+
+	endpoint, err := m.resolveMirrorMetadataEndpoint(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+
+	clientFactory := m.mirrorMetadataClientFactory
+	if clientFactory == nil {
+		clientFactory = multisync.FromOpenCSG
+	}
+	client := clientFactory(endpoint, req.AccessToken)
+	version := types.SyncVersion{
+		RepoPath: path.Join(path.Base(strings.TrimSpace(req.SourceNamespace)), req.SourceName),
+		RepoType: req.RepoType,
+	}
+	metadata := &mirrorRepoMetadata{}
+	switch req.RepoType {
+	case types.MCPServerRepo:
+		metadata.mcpServer, err = client.MCPServerInfo(ctx, version)
+		if err == nil && metadata.mcpServer == nil {
+			err = errors.New("source returned empty mcp server metadata")
+		}
+	case types.SkillRepo:
+		metadata.skill, err = client.SkillInfo(ctx, version)
+		if err == nil && metadata.skill == nil {
+			err = errors.New("source returned empty skill metadata")
+		}
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch %s mirror metadata: %w", req.RepoType, err)
+	}
+	return metadata, nil
+}
+
+// resolveMirrorMetadataEndpoint returns a trusted OpenCSG-compatible API endpoint for MCP and skill metadata.
+func (m *mirrorComponentImpl) resolveMirrorMetadataEndpoint(ctx context.Context, req types.CreateMirrorRepoReq) (string, error) {
+	parsedURL, err := url.Parse(req.SourceGitCloneUrl)
+	if err != nil {
+		return "", errorx.BadRequest(
+			fmt.Errorf("failed to parse source git clone url for metadata: %w", err),
+			errorx.Ctx().Set("source url", req.SourceGitCloneUrl),
+		)
+	}
+	isOpenCSGSaaS := isOpenCSGSaaSHost(parsedURL.Hostname())
+
+	if req.MirrorSourceID != 0 {
+		source, err := m.mirrorSourceStore.Get(ctx, req.MirrorSourceID)
+		if errors.Is(err, sql.ErrNoRows) {
+			return "", errorx.BadRequest(
+				fmt.Errorf("mirror source %d does not exist", req.MirrorSourceID),
+				errorx.Ctx().Set("mirror source id", req.MirrorSourceID),
+			)
+		}
+		if err != nil {
+			return "", fmt.Errorf("failed to get mirror source metadata endpoint: %w", err)
+		}
+		if source == nil {
+			return "", errorx.BadRequest(
+				fmt.Errorf("mirror source %d does not exist", req.MirrorSourceID),
+				errorx.Ctx().Set("mirror source id", req.MirrorSourceID),
+			)
+		}
+		if strings.TrimSpace(source.InfoAPIUrl) == "" {
+			if isOpenCSGSaaS {
+				return openCSGSaaSMetadataEndpoint, nil
+			}
+			return "", errorx.BadRequest(
+				fmt.Errorf("mirror source %d does not configure an info_api_url required for %s metadata", req.MirrorSourceID, req.RepoType),
+				errorx.Ctx().Set("mirror source id", req.MirrorSourceID).Set("repo type", req.RepoType),
+			)
+		}
+		endpoint, err := normalizeMirrorMetadataEndpoint(source.InfoAPIUrl)
+		if err != nil {
+			return "", errorx.BadRequest(
+				fmt.Errorf("invalid info_api_url for mirror source %d: %w", req.MirrorSourceID, err),
+				errorx.Ctx().Set("mirror source id", req.MirrorSourceID).Set("info api url", source.InfoAPIUrl),
+			)
+		}
+		return endpoint, nil
+	}
+
+	if isOpenCSGSaaS {
+		return openCSGSaaSMetadataEndpoint, nil
+	}
+
+	return "", errorx.BadRequest(
+		fmt.Errorf("mirror_source_id with a configured info_api_url is required for non-OpenCSG %s sources", req.RepoType),
+		errorx.Ctx().Set("repo type", req.RepoType).Set("source host", parsedURL.Hostname()),
+	)
+}
+
+// isOpenCSGSaaSHost reports whether a Git host uses the trusted OpenCSG SaaS metadata API.
+func isOpenCSGSaaSHost(host string) bool {
+	switch strings.ToLower(strings.TrimSpace(host)) {
+	case "opencsg.com", "hub.opencsg.com":
+		return true
+	default:
+		return false
+	}
+}
+
+// normalizeMirrorMetadataEndpoint validates a configured OpenCSG API base URL.
+func normalizeMirrorMetadataEndpoint(endpoint string) (string, error) {
+	endpoint = strings.TrimRight(strings.TrimSpace(endpoint), "/")
+	parsedURL, err := url.Parse(endpoint)
+	if err != nil {
+		return "", fmt.Errorf("invalid mirror metadata endpoint: %w", err)
+	}
+	if (parsedURL.Scheme != "http" && parsedURL.Scheme != "https") || parsedURL.Hostname() == "" {
+		return "", errors.New("mirror metadata endpoint must be an HTTP(S) URL with a host")
+	}
+	if parsedURL.RawQuery != "" || parsedURL.Fragment != "" {
+		return "", errors.New("mirror metadata endpoint must not contain query or fragment")
+	}
+	return endpoint, nil
+}
+
+// hasMCPServerAttributes reports whether a caller supplied legacy MCP metadata explicitly.
+func hasMCPServerAttributes(attributes types.MCPServerAttributes) bool {
+	return attributes.StarCount != 0 || len(attributes.Tools) != 0 || attributes.AvatarURL != "" ||
+		attributes.Configuration.Type != "" || len(attributes.Configuration.Properties) != 0 ||
+		len(attributes.Configuration.Required) != 0
+}
+
+// applyMirrorRepoMetadata fills API metadata fields while leaving README content to the mirrored Git repository.
+func applyMirrorRepoMetadata(req *types.CreateRepoReq, metadata *mirrorRepoMetadata) {
+	if metadata == nil {
+		return
+	}
+
+	var nickname, description, license, defaultBranch string
+	switch {
+	case metadata.mcpServer != nil:
+		nickname = metadata.mcpServer.Nickname
+		description = metadata.mcpServer.Description
+		license = metadata.mcpServer.License
+		defaultBranch = metadata.mcpServer.DefaultBranch
+		req.ToolCount = metadata.mcpServer.ToolsNum
+		req.StarCount = metadata.mcpServer.StarNum
+	case metadata.skill != nil:
+		nickname = metadata.skill.Nickname
+		description = metadata.skill.Description
+		license = metadata.skill.License
+		defaultBranch = metadata.skill.DefaultBranch
+	}
+	if nickname != "" {
+		req.Nickname = nickname
+	}
+	if req.Description == "" {
+		req.Description = description
+	}
+	if req.License == "" {
+		req.License = license
+	}
+	if req.DefaultBranch == "" {
+		req.DefaultBranch = defaultBranch
+	}
+}
+
+// applyMirrorRepoMetadataToExistingRepository refreshes source-owned fields before task creation.
+func applyMirrorRepoMetadataToExistingRepository(repo *database.Repository, metadata *mirrorRepoMetadata) {
+	if metadata == nil {
+		return
+	}
+	metadataReq := types.CreateRepoReq{
+		Nickname:  repo.Nickname,
+		StarCount: repo.StarCount,
+	}
+	applyMirrorRepoMetadata(&metadataReq, metadata)
+	if metadataReq.Nickname != "" {
+		repo.Nickname = metadataReq.Nickname
+	}
+	repo.Description = metadataReq.Description
+	repo.License = metadataReq.License
+	if metadataReq.DefaultBranch != "" {
+		repo.DefaultBranch = metadataReq.DefaultBranch
+	}
+	repo.StarCount = metadataReq.StarCount
+}
+
+// buildMirrorRepoMetadataUpdate converts fetched metadata into one transactional update payload.
+func buildMirrorRepoMetadataUpdate(req types.CreateMirrorRepoReq, repo *database.Repository, metadata *mirrorRepoMetadata) (*database.MirrorRepoMetadataUpdate, error) {
+	if metadata == nil && !(req.RepoType == types.MCPServerRepo && hasMCPServerAttributes(req.MCPServerAttributes)) {
+		return nil, nil
+	}
+	update := &database.MirrorRepoMetadataUpdate{Repository: *repo}
+	if req.RepoType == types.MCPServerRepo {
+		mcpServer, properties, err := buildMCPServerRows(req.RepoType, req.MCPServerAttributes, metadata)
+		if err != nil {
+			return nil, err
+		}
+		update.MCPServer = mcpServer
+		update.MCPServerProperties = properties
+	}
+	if metadata != nil && metadata.skill != nil && !metadata.skill.UpdatedAt.IsZero() {
+		updatedAt := metadata.skill.UpdatedAt
+		update.SkillLastUpdatedAt = &updatedAt
+	}
+	return update, nil
 }
 
 // normalizeMirrorPriority defaults an omitted priority and rejects values unsupported by workhub.
@@ -254,20 +553,28 @@ func (m *mirrorComponentImpl) resolveMirrorRepoTarget(req types.CreateMirrorRepo
 }
 
 // createMirrorRepoRecords creates mirror rows transactionally, and optionally the target repo rows too.
-func (m *mirrorComponentImpl) createMirrorRepoRecords(ctx context.Context, req types.CreateMirrorRepoReq, repo *database.Repository, namespace, name string, createRepository bool) (*database.Mirror, error) {
+func (m *mirrorComponentImpl) createMirrorRepoRecords(ctx context.Context, req types.CreateMirrorRepoReq, repo *database.Repository, namespace, name string, createRepository bool, metadata *mirrorRepoMetadata) (*database.Mirror, error) {
 	mirror := buildMirrorRepoRecord(req, repo, namespace, name)
 	if !createRepository && !req.SkipSourcePath {
 		sourceType, sourcePath, _ := common.GetSourceTypeAndPathFromURL(req.SourceGitCloneUrl)
 		applyMirrorRepositorySourcePath(repo, sourceType, sourcePath)
 	}
-	mcpServer, mcpServerProperties, err := buildMCPServerRows(req.RepoType, req.MCPServerAttributes)
+	mcpServer, mcpServerProperties, err := buildMCPServerRows(req.RepoType, req.MCPServerAttributes, metadata)
 	if err != nil {
 		return nil, err
+	}
+	var metadataUpdate *database.MirrorRepoMetadataUpdate
+	if !createRepository {
+		metadataUpdate, err = buildMirrorRepoMetadataUpdate(req, repo, metadata)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	reqMirror, err := m.mirrorRepoStore.CreateMirrorRepoRecords(ctx, database.CreateMirrorRepoRecordsInput{
 		Repository:          repo,
 		CreateRepository:    createRepository,
+		Metadata:            metadataUpdate,
 		MCPServer:           mcpServer,
 		MCPServerProperties: mcpServerProperties,
 		Mirror:              mirror,
@@ -317,6 +624,7 @@ func (m *mirrorComponentImpl) prepareMirrorRepository(ctx context.Context, req t
 		Description:    req.Description,
 		Private:        req.Private,
 		License:        req.License,
+		Readme:         req.Readme,
 		DefaultBranch:  req.DefaultBranch,
 		RepositoryType: req.RepoType,
 		StarCount:      req.StarCount,
@@ -340,10 +648,13 @@ func applyMirrorRepositorySourcePath(repo *database.Repository, sourceType, sour
 	}
 }
 
-// buildMCPServerRows converts MCP mirror attributes into database rows before entering the transaction store.
-func buildMCPServerRows(repoType types.RepositoryType, attributes types.MCPServerAttributes) (*database.MCPServer, []database.MCPServerProperty, error) {
+// buildMCPServerRows converts fetched or caller-provided MCP metadata into transactional database rows.
+func buildMCPServerRows(repoType types.RepositoryType, attributes types.MCPServerAttributes, metadata *mirrorRepoMetadata) (*database.MCPServer, []database.MCPServerProperty, error) {
 	if repoType != types.MCPServerRepo {
 		return nil, nil, nil
+	}
+	if metadata != nil && metadata.mcpServer != nil {
+		return buildFetchedMCPServerRows(metadata.mcpServer)
 	}
 
 	configuration, err := json.Marshal(attributes.Configuration)
@@ -376,6 +687,49 @@ func buildMCPServerRows(repoType types.RepositoryType, attributes types.MCPServe
 			Name:        tool.Name,
 			Description: tool.Description,
 			Schema:      string(schema),
+		})
+	}
+	return mcpServer, properties, nil
+}
+
+// buildFetchedMCPServerRows preserves full MCP metadata and derives tool properties when the schema includes tools.
+func buildFetchedMCPServerRows(metadata *types.MCPServer) (*database.MCPServer, []database.MCPServerProperty, error) {
+	mcpServer := &database.MCPServer{
+		ToolsNum:        metadata.ToolsNum,
+		Configuration:   metadata.Configuration,
+		Schema:          metadata.Schema,
+		ProgramLanguage: metadata.ProgramLanguage,
+		RunMode:         metadata.RunMode,
+		InstallDepsCmds: metadata.InstallDepsCmds,
+		BuildCmds:       metadata.BuildCmds,
+		LaunchCmds:      metadata.LaunchCmds,
+		AvatarURL:       metadata.AvatarURL,
+	}
+	if strings.TrimSpace(metadata.Schema) == "" {
+		return mcpServer, nil, nil
+	}
+
+	var schema struct {
+		Tools []types.MCPTool `json:"tools"`
+	}
+	if err := json.Unmarshal([]byte(metadata.Schema), &schema); err != nil {
+		// The MCP schema is still persisted verbatim when it is not the legacy tools wrapper.
+		return mcpServer, nil, nil
+	}
+	if mcpServer.ToolsNum == 0 {
+		mcpServer.ToolsNum = len(schema.Tools)
+	}
+	properties := make([]database.MCPServerProperty, 0, len(schema.Tools))
+	for _, tool := range schema.Tools {
+		inputSchema, err := json.Marshal(tool.InputSchema)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to marshal fetched mcp tool input schema: %w", err)
+		}
+		properties = append(properties, database.MCPServerProperty{
+			Kind:        types.MCPPropTool,
+			Name:        tool.Name,
+			Description: tool.Description,
+			Schema:      string(inputSchema),
 		})
 	}
 	return mcpServer, properties, nil

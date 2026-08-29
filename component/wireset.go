@@ -357,6 +357,7 @@ func NewTestMirrorComponent(config *config.Config, stores *tests.MockStores, rep
 		userStore:                   stores.User,
 		config:                      config,
 		mirrorNamespaceMappingStore: stores.MirrorNamespaceMapping,
+		mirrorMetadataClientFactory: multisync.FromOpenCSG,
 	}
 }
 

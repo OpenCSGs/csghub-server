@@ -48,6 +48,8 @@ type CreateMirrorRepoRecordsInput struct {
 	Repository *Repository
 	// CreateRepository controls whether repository and type-specific rows are inserted.
 	CreateRepository bool
+	// Metadata refreshes source API metadata when binding an existing target repository.
+	Metadata *MirrorRepoMetadataUpdate
 
 	// MCPServer is inserted when creating an MCP server repository.
 	MCPServer *MCPServer
@@ -56,6 +58,18 @@ type CreateMirrorRepoRecordsInput struct {
 	Mirror              Mirror
 	// Urgent routes the initial repository job to the urgent queue.
 	Urgent bool
+}
+
+// MirrorRepoMetadataUpdate contains source API metadata refreshed with a mirror task.
+type MirrorRepoMetadataUpdate struct {
+	// Repository contains the source-owned repository metadata fields to update.
+	Repository Repository
+	// MCPServer contains MCP-specific metadata for MCP repositories.
+	MCPServer *MCPServer
+	// MCPServerProperties replace existing MCP tool rows while preserving other property kinds.
+	MCPServerProperties []MCPServerProperty
+	// SkillLastUpdatedAt updates the source timestamp when the API provides one.
+	SkillLastUpdatedAt *time.Time
 }
 
 type mirrorRepoStoreImpl struct {
@@ -111,6 +125,14 @@ func (s *mirrorRepoStoreImpl) CreateMirrorRepoRecords(ctx context.Context, input
 			input.Repository.SyncStatus = types.SyncStatusPending
 			if err := updateRepoSourceFields(ctx, tx, *input.Repository); err != nil {
 				return fmt.Errorf("failed to update repository source path: %w", err)
+			}
+			if input.Metadata != nil {
+				if input.Metadata.Repository.ID != input.Repository.ID || input.Metadata.Repository.RepositoryType != input.Repository.RepositoryType {
+					return fmt.Errorf("metadata repository does not match mirror target")
+				}
+				if err := updateMirrorRepoMetadata(ctx, tx, *input.Metadata); err != nil {
+					return err
+				}
 			}
 		}
 
@@ -325,4 +347,75 @@ func updateRepoSyncStatus(ctx context.Context, tx bun.Tx, repoID int64, status t
 		Where("id = ?", repoID).
 		Exec(ctx)
 	return err
+}
+
+// updateMirrorRepoMetadata replaces source API metadata inside the task creation transaction.
+func updateMirrorRepoMetadata(ctx context.Context, tx bun.Tx, input MirrorRepoMetadataUpdate) error {
+	if input.Repository.ID == 0 {
+		return fmt.Errorf("metadata repository id is required")
+	}
+
+	if _, err := tx.NewUpdate().
+		Model((*Repository)(nil)).
+		Set("nickname = ?", input.Repository.Nickname).
+		Set("description = ?", input.Repository.Description).
+		Set("license = ?", input.Repository.License).
+		Set("default_branch = ?", input.Repository.DefaultBranch).
+		Set("star_count = ?", input.Repository.StarCount).
+		Where("id = ?", input.Repository.ID).
+		Exec(ctx); err != nil {
+		return fmt.Errorf("failed to update mirror repository metadata: %w", err)
+	}
+
+	switch input.Repository.RepositoryType {
+	case types.MCPServerRepo:
+		if input.MCPServer == nil {
+			return fmt.Errorf("mcp server metadata is required")
+		}
+		var stored MCPServer
+		if err := tx.NewSelect().
+			Model(&stored).
+			Where("repository_id = ?", input.Repository.ID).
+			For("UPDATE").
+			Scan(ctx); err != nil {
+			return fmt.Errorf("failed to lock mcp server metadata: %w", err)
+		}
+
+		mcpServer := *input.MCPServer
+		mcpServer.ID = stored.ID
+		mcpServer.RepositoryID = input.Repository.ID
+		if _, err := tx.NewUpdate().
+			Model(&mcpServer).
+			Column("tools_num", "configuration", "schema", "program_language", "run_mode", "install_deps_cmds", "build_cmds", "launch_cmds", "avatar_url").
+			WherePK().
+			Exec(ctx); err != nil {
+			return fmt.Errorf("failed to update mcp server metadata: %w", err)
+		}
+		if _, err := tx.NewDelete().
+			Model((*MCPServerProperty)(nil)).
+			Where("mcp_server_id = ?", stored.ID).
+			Where("kind = ?", types.MCPPropTool).
+			Exec(ctx); err != nil {
+			return fmt.Errorf("failed to delete stale mcp server tool properties: %w", err)
+		}
+		for _, property := range input.MCPServerProperties {
+			property.MCPServerID = stored.ID
+			if _, err := tx.NewInsert().Model(&property).Exec(ctx, &property); err != nil {
+				return fmt.Errorf("failed to add refreshed mcp server property: %w", err)
+			}
+		}
+	case types.SkillRepo:
+		if input.SkillLastUpdatedAt != nil {
+			if _, err := tx.NewUpdate().
+				Model((*Skill)(nil)).
+				Set("last_updated_at = ?", *input.SkillLastUpdatedAt).
+				Where("repository_id = ?", input.Repository.ID).
+				Exec(ctx); err != nil {
+				return fmt.Errorf("failed to update skill source timestamp: %w", err)
+			}
+		}
+	default:
+		return fmt.Errorf("unsupported metadata repository type: %s", input.Repository.RepositoryType)
+	}
+	return nil
 }

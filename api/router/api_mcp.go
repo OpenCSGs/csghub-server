@@ -32,7 +32,7 @@ func CreateMCPServerRoutes(
 		mcpGroup.GET("/:namespace/:name/branches", repoCommonHandler.Branches)
 		mcpGroup.GET("/:namespace/:name/tags", repoCommonHandler.Tags)
 		mcpGroup.POST("/:namespace/:name/transfer", middlewareCollection.Auth.NeedLogin, repoCommonHandler.TransferOwnership)
-	mcpGroup.POST("/:namespace/:name/preupload/:revision", repoCommonHandler.Preupload)
+		mcpGroup.POST("/:namespace/:name/preupload/:revision", repoCommonHandler.Preupload)
 		mcpGroup.POST("/:namespace/:name/tags/:category", middlewareCollection.Auth.NeedLogin, repoCommonHandler.UpdateTags)
 		mcpGroup.GET("/:namespace/:name/last_commit", repoCommonHandler.LastCommit)
 		mcpGroup.GET("/:namespace/:name/commit/:commit_id", repoCommonHandler.CommitWithDiff)
@@ -55,6 +55,7 @@ func CreateMCPServerRoutes(
 		mcpGroup.PUT("/:namespace/:name/incr_downloads", middlewareCollection.Auth.NeedAdmin, repoCommonHandler.IncrDownloads)
 		mcpGroup.POST("/:namespace/:name/upload_file", middlewareCollection.Auth.NeedLogin, repoCommonHandler.UploadFile)
 		mcpGroup.GET("/:namespace/:name/mirror", middlewareCollection.Auth.NeedLogin, repoCommonHandler.GetMirror)
+		mcpGroup.POST("/:namespace/:name/mirror", middlewareCollection.Auth.NeedLogin, repoCommonHandler.CreateMirror)
 		mcpGroup.POST("/:namespace/:name/mirror/sync", middlewareCollection.Auth.NeedLogin, repoCommonHandler.SyncMirror)
 		// Get repo size by branch
 		mcpGroup.GET("/:namespace/:name/size/:branch", repoCommonHandler.GetRepoSizeByBranch)
