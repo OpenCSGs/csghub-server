@@ -98,6 +98,8 @@ type RequeueMirrorRepoTaskInput struct {
 	JobClient MirrorJobClient
 	// JobCancelClient cancels replaced workhub jobs inside the same transaction.
 	JobCancelClient MirrorJobCancelClient
+	// Metadata refreshes MCP or skill source API metadata in the same transaction.
+	Metadata *MirrorRepoMetadataUpdate
 }
 
 var mirrorTaskStatusToRepoStatusMap = map[types.MirrorTaskStatus]types.RepositorySyncStatus{
@@ -433,6 +435,17 @@ func (m *mirrorTaskStoreImpl) RequeueMirrorRepoTask(ctx context.Context, input R
 			return fmt.Errorf("failed to lock repository: %w", err)
 		}
 		mirror.Repository = &repo
+		if input.Metadata != nil {
+			if input.Metadata.Repository.ID != repo.ID {
+				return fmt.Errorf("metadata repository mismatch, metadata repository id: %d, mirror repository id: %d", input.Metadata.Repository.ID, repo.ID)
+			}
+			if input.Metadata.Repository.RepositoryType != repo.RepositoryType {
+				return fmt.Errorf("metadata repository type mismatch, metadata repository type: %s, mirror repository type: %s", input.Metadata.Repository.RepositoryType, repo.RepositoryType)
+			}
+			if err := updateMirrorRepoMetadata(ctx, tx, *input.Metadata); err != nil {
+				return err
+			}
+		}
 
 		var currentTask *MirrorTask
 		if mirror.CurrentTaskID != 0 {

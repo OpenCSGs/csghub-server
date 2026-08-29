@@ -3,6 +3,7 @@ package component
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"testing"
 	"time"
@@ -12,6 +13,7 @@ import (
 	mockdb "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/database"
 	mockcache "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/mirror/cache"
 	"opencsg.com/csghub-server/builder/git/membership"
+	"opencsg.com/csghub-server/builder/multisync"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/workhub"
 	"opencsg.com/csghub-server/common/errorx"
@@ -163,6 +165,7 @@ func TestMirrorComponent_SyncMirrorRequiresWritePermission(t *testing.T) {
 	}
 }
 
+// TestMirrorComponent_MirrorFromSaas verifies SaaS sync creation, requeue, and permission behavior.
 func TestMirrorComponent_MirrorFromSaas(t *testing.T) {
 	t.Run("creates mirror records and repo job for existing repo without mirror", func(t *testing.T) {
 		ctx := context.TODO()
@@ -243,6 +246,42 @@ func TestMirrorComponent_MirrorFromSaas(t *testing.T) {
 			Status:       types.MirrorQueued,
 		}, result)
 	})
+
+	for _, repoType := range []types.RepositoryType{types.MCPServerRepo, types.SkillRepo} {
+		t.Run(fmt.Sprintf("requeues existing %s mirror without metadata refresh", repoType), func(t *testing.T) {
+			ctx := context.TODO()
+			mc := initializeTestMirrorComponent(ctx, t)
+			taskJobStore := mockdb.NewMockMirrorTaskJobStore(t)
+			mc.mirrorTaskJobStore = taskJobStore
+			useFakeMirrorJobClient(mc)
+
+			repo := &database.Repository{ID: 123, Path: "CSG_ns/n", RepositoryType: repoType, Source: types.OpenCSGSource}
+			mirror := &database.Mirror{
+				ID: 1, SourceUrl: fmt.Sprintf("https://sync.opencsg.com/%ss/ns/n.git", repoType), RepositoryID: repo.ID, Repository: repo,
+			}
+			mc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, repoType, "CSG_ns", "n").Return(repo, nil)
+			mc.mocks.components.repo.EXPECT().GetUserRepoPermission(ctx, "writer", repo).Return(&types.UserRepoPermission{CanWrite: true}, nil)
+			mc.mocks.stores.MirrorMock().EXPECT().FindByRepoID(ctx, repo.ID).Return(mirror, nil)
+			taskJobStore.EXPECT().RequeueMirrorRepoTask(ctx, mock.MatchedBy(func(input database.RequeueMirrorRepoTaskInput) bool {
+				return input.MirrorID == mirror.ID &&
+					input.RepositoryID == repo.ID &&
+					input.Priority == types.LowMirrorPriority &&
+					!input.Urgent &&
+					input.JobClient != nil &&
+					input.JobCancelClient != nil &&
+					input.Metadata == nil
+			})).Return(database.MirrorTask{ID: 99, Status: types.MirrorQueued}, nil)
+
+			result, err := mc.MirrorFromSaas(ctx, types.MirrorFromSaasReq{
+				Namespace: "CSG_ns", Name: "n", RepoType: repoType, CurrentUser: "writer",
+			})
+
+			require.NoError(t, err)
+			require.Equal(t, &types.MirrorFromSaasResponse{
+				RepositoryID: repo.ID, MirrorID: mirror.ID, TaskID: 99, Status: types.MirrorQueued,
+			}, result)
+		})
+	}
 
 	t.Run("rejects users without write permission", func(t *testing.T) {
 		ctx := context.TODO()
@@ -573,13 +612,25 @@ func TestMirrorComponent_CreateMirrorSkipsSourcePathForCodeAndSkill(t *testing.T
 				HTTPCloneURL:   "https://opencsg.com/repos/ns/n.git",
 				RepositoryType: repoType,
 			}
+			sourceURL := "https://github.com/upstream/repo"
+			if repoType == types.SkillRepo {
+				sourceURL = "https://opencsg.com/upstream/repo"
+				mc.mirrorMetadataClientFactory = func(endpoint, accessToken string) multisync.Client {
+					require.Equal(t, "https://hub.opencsg.com", endpoint)
+					require.Empty(t, accessToken)
+					return mc.mocks.multiSyncClient
+				}
+				mc.mocks.multiSyncClient.EXPECT().SkillInfo(ctx, types.SyncVersion{
+					RepoPath: "upstream/repo", RepoType: types.SkillRepo,
+				}).Return(&types.Skill{Description: "fresh skill description", DefaultBranch: "develop"}, nil)
+			}
 
 			mc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "user", "ns", membership.RoleAdmin).Return(true, nil)
 			mc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, repoType, "ns", "n").Return(repo, nil)
 			mc.mocks.stores.MirrorMock().EXPECT().FindByRepoID(ctx, repo.ID).Return(nil, sql.ErrNoRows)
 
 			got, err := mc.CreateMirror(ctx, types.CreateMirrorReq{
-				SourceUrl:      "https://github.com/upstream/repo",
+				SourceUrl:      sourceURL,
 				CurrentUser:    "user",
 				Namespace:      "ns",
 				Name:           "n",
@@ -589,9 +640,17 @@ func TestMirrorComponent_CreateMirrorSkipsSourcePathForCodeAndSkill(t *testing.T
 			require.NoError(t, err)
 			require.Equal(t, repo.ID, got.RepositoryID)
 			require.Len(t, fakeStore.inputs, 1)
-			require.Empty(t, fakeStore.inputs[0].Repository.GithubPath)
-			require.Empty(t, fakeStore.inputs[0].Repository.HFPath)
-			require.Empty(t, fakeStore.inputs[0].Repository.MSPath)
+			input := fakeStore.inputs[0]
+			require.Empty(t, input.Repository.GithubPath)
+			require.Empty(t, input.Repository.HFPath)
+			require.Empty(t, input.Repository.MSPath)
+			if repoType == types.SkillRepo {
+				require.NotNil(t, input.Metadata)
+				require.Equal(t, "fresh skill description", input.Metadata.Repository.Description)
+				require.Equal(t, "develop", input.Metadata.Repository.DefaultBranch)
+			} else {
+				require.Nil(t, input.Metadata)
+			}
 		})
 	}
 }
@@ -1216,6 +1275,24 @@ func TestMirrorComponent_CreateMirrorRepoCreatesAllMirrorRepoTypes(t *testing.T)
 					AvatarURL:     "https://example.com/avatar.png",
 				}
 			}
+			if repoType == types.SkillRepo {
+				req.MirrorSourceID = 43
+				version := types.SyncVersion{RepoPath: "upstream/repo", RepoType: types.SkillRepo}
+				mc.mocks.stores.MirrorSourceMock().EXPECT().Get(ctx, int64(43)).Return(&database.MirrorSource{
+					ID:         43,
+					InfoAPIUrl: "https://api.community.example.com/",
+				}, nil)
+				mc.mirrorMetadataClientFactory = func(endpoint, accessToken string) multisync.Client {
+					require.Equal(t, "https://api.community.example.com", endpoint)
+					return mc.mocks.multiSyncClient
+				}
+				mc.mocks.multiSyncClient.EXPECT().SkillInfo(ctx, version).Return(&types.Skill{}, nil)
+			} else {
+				mc.mirrorMetadataClientFactory = func(endpoint, accessToken string) multisync.Client {
+					t.Fatal("non-MCP/skill requests and legacy MCP attributes must not fetch metadata")
+					return nil
+				}
+			}
 
 			mc.mocks.stores.MirrorNamespaceMappingMock().EXPECT().FindBySourceNamespace(context.Background(), "upstream").Return(&database.MirrorNamespaceMapping{
 				TargetNamespace: "mapped",
@@ -1257,6 +1334,268 @@ func TestMirrorComponent_CreateMirrorRepoCreatesAllMirrorRepoTypes(t *testing.T)
 	}
 }
 
+// TestMirrorComponent_CreateMirrorRepoFetchesMCPMetadata verifies OpenCSG MCP mirrors import metadata before transactional creation.
+func TestMirrorComponent_CreateMirrorRepoFetchesMCPMetadata(t *testing.T) {
+	ctx := context.TODO()
+	mc := initializeTestMirrorComponent(ctx, t)
+	fakeStore := &fakeMirrorRepoStore{}
+	mc.mirrorRepoStore = fakeStore
+	createTargetRepo := true
+	private := false
+	req := types.CreateMirrorRepoReq{
+		SourceNamespace:   "CSG_AIWizards",
+		SourceName:        "zaturn",
+		MirrorSourceID:    42,
+		RepoType:          types.MCPServerRepo,
+		Private:           &private,
+		CreateTargetRepo:  &createTargetRepo,
+		SourceGitCloneUrl: "https://git.example.opencsg.com/CSG_AIWizards/zaturn.git",
+		AccessToken:       "source-token",
+		Username:          "source-user",
+		Description:       "web description",
+		CurrentUser:       "admin",
+		ForkNamespace:     "local",
+		ForkName:          "zaturn-mirror",
+	}
+	version := types.SyncVersion{RepoPath: "CSG_AIWizards/zaturn", RepoType: types.MCPServerRepo}
+	mcpMetadata := &types.MCPServer{
+		Nickname:        "Zaturn MCP",
+		Description:     "source description",
+		Private:         true,
+		DefaultBranch:   "develop",
+		License:         "Apache-2.0",
+		ToolsNum:        1,
+		Configuration:   `{"command":"zaturn"}`,
+		Schema:          `{"tools":[{"name":"search","description":"Search things","inputSchema":{"required":["query"],"type":"object"}}]}`,
+		StarNum:         12,
+		ProgramLanguage: "python",
+		RunMode:         "stdio",
+		InstallDepsCmds: "pip install -r requirements.txt",
+		BuildCmds:       "python -m build",
+		LaunchCmds:      "python server.py",
+		AvatarURL:       "https://example.com/avatar.png",
+		Readme:          "API README must be ignored",
+	}
+
+	mc.mocks.stores.MirrorSourceMock().EXPECT().Get(ctx, int64(42)).Return(&database.MirrorSource{
+		ID:         42,
+		InfoAPIUrl: "https://api.example.opencsg.com/",
+	}, nil)
+	mc.mirrorMetadataClientFactory = func(endpoint, accessToken string) multisync.Client {
+		require.Equal(t, "https://api.example.opencsg.com", endpoint)
+		require.Equal(t, "source-token", accessToken)
+		return mc.mocks.multiSyncClient
+	}
+	mc.mocks.multiSyncClient.EXPECT().MCPServerInfo(ctx, version).Return(mcpMetadata, nil)
+	mc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "admin", "local", membership.RoleWrite).Return(true, nil)
+	mc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.MCPServerRepo, "local", "zaturn-mirror").Return(nil, sql.ErrNoRows)
+	mc.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "local").Return(database.Namespace{Path: "local"}, nil)
+	mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "admin").Return(database.User{
+		ID: 1, Username: "admin", Email: "admin@example.com", RoleMask: "admin",
+	}, nil)
+
+	got, err := mc.CreateMirrorRepo(ctx, req)
+	require.NoError(t, err)
+	require.NotNil(t, got)
+	require.Len(t, fakeStore.inputs, 1)
+	input := fakeStore.inputs[0]
+	require.Equal(t, "Zaturn MCP", input.Repository.Nickname)
+	require.Equal(t, "web description", input.Repository.Description)
+	require.Equal(t, "Apache-2.0", input.Repository.License)
+	require.Equal(t, "develop", input.Repository.DefaultBranch)
+	require.Empty(t, input.Repository.Readme)
+	require.Equal(t, 12, input.Repository.StarCount)
+	require.False(t, input.Repository.Private)
+	require.NotNil(t, input.MCPServer)
+	require.Equal(t, "python", input.MCPServer.ProgramLanguage)
+	require.Equal(t, "stdio", input.MCPServer.RunMode)
+	require.Equal(t, "python server.py", input.MCPServer.LaunchCmds)
+	require.Equal(t, "https://example.com/avatar.png", input.MCPServer.AvatarURL)
+	require.Len(t, input.MCPServerProperties, 1)
+	require.Equal(t, "search", input.MCPServerProperties[0].Name)
+	require.Contains(t, input.MCPServerProperties[0].Schema, `"required":["query"]`)
+}
+
+// TestMirrorComponent_CreateMirrorRepoFetchesSkillMetadata verifies third-party skill mirrors use the configured source API endpoint.
+func TestMirrorComponent_CreateMirrorRepoFetchesSkillMetadata(t *testing.T) {
+	ctx := context.TODO()
+	mc := initializeTestMirrorComponent(ctx, t)
+	fakeStore := &fakeMirrorRepoStore{}
+	mc.mirrorRepoStore = fakeStore
+	req := types.CreateMirrorRepoReq{
+		SourceNamespace:   "test/abc/skills",
+		SourceName:        "reviewer",
+		MirrorSourceID:    44,
+		RepoType:          types.SkillRepo,
+		SourceGitCloneUrl: "https://github.com/skills/reviewer.git",
+		CurrentUser:       "admin",
+		ForkNamespace:     "local",
+		ForkName:          "reviewer",
+	}
+	version := types.SyncVersion{RepoPath: "skills/reviewer", RepoType: types.SkillRepo}
+	skillMetadata := &types.Skill{
+		Nickname:      "Code Reviewer",
+		Description:   "Reviews code changes",
+		DefaultBranch: "master",
+		License:       "MIT",
+		Readme:        "API README must be ignored",
+	}
+
+	mc.mocks.stores.MirrorSourceMock().EXPECT().Get(ctx, int64(44)).Return(&database.MirrorSource{
+		ID:         44,
+		InfoAPIUrl: "https://community.example.com/",
+	}, nil)
+	mc.mirrorMetadataClientFactory = func(endpoint, accessToken string) multisync.Client {
+		require.Equal(t, "https://community.example.com", endpoint)
+		require.Empty(t, accessToken)
+		return mc.mocks.multiSyncClient
+	}
+	mc.mocks.multiSyncClient.EXPECT().SkillInfo(ctx, version).Return(skillMetadata, nil)
+	mc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "admin", "local", membership.RoleWrite).Return(true, nil)
+	mc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.SkillRepo, "local", "reviewer").Return(nil, sql.ErrNoRows)
+	mc.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "local").Return(database.Namespace{Path: "local"}, nil)
+	mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "admin").Return(database.User{
+		ID: 1, Username: "admin", Email: "admin@example.com", RoleMask: "admin",
+	}, nil)
+
+	got, err := mc.CreateMirrorRepo(ctx, req)
+	require.NoError(t, err)
+	require.NotNil(t, got)
+	require.Len(t, fakeStore.inputs, 1)
+	input := fakeStore.inputs[0]
+	require.Equal(t, types.SkillRepo, input.Repository.RepositoryType)
+	require.Equal(t, "Code Reviewer", input.Repository.Nickname)
+	require.Equal(t, "Reviews code changes", input.Repository.Description)
+	require.Equal(t, "master", input.Repository.DefaultBranch)
+	require.Equal(t, "MIT", input.Repository.License)
+	require.Empty(t, input.Repository.Readme)
+	require.Nil(t, input.MCPServer)
+}
+
+// TestMirrorComponent_CreateMirrorRepoRejectsUnsupportedMetadataSources verifies MCP and skill metadata APIs are never inferred from arbitrary Git hosts.
+func TestMirrorComponent_CreateMirrorRepoRejectsUnsupportedMetadataSources(t *testing.T) {
+	tests := []struct {
+		name             string
+		repoType         types.RepositoryType
+		sourceURL        string
+		mirrorSourceID   int64
+		mirrorSource     *database.MirrorSource
+		mirrorSourceErr  error
+		wantErrorMessage string
+	}{
+		{
+			name:             "GitHub skill without mirror source",
+			repoType:         types.SkillRepo,
+			sourceURL:        "https://github.com/upstream/reviewer.git",
+			wantErrorMessage: "mirror_source_id with a configured info_api_url is required",
+		},
+		{
+			name:             "GitLab MCP without mirror source",
+			repoType:         types.MCPServerRepo,
+			sourceURL:        "https://gitlab.com/upstream/server.git",
+			wantErrorMessage: "mirror_source_id with a configured info_api_url is required",
+		},
+		{
+			name:             "missing mirror source",
+			repoType:         types.SkillRepo,
+			sourceURL:        "https://github.com/upstream/reviewer.git",
+			mirrorSourceID:   51,
+			mirrorSourceErr:  sql.ErrNoRows,
+			wantErrorMessage: "mirror source 51 does not exist",
+		},
+		{
+			name:           "mirror source without info API URL",
+			repoType:       types.SkillRepo,
+			sourceURL:      "https://github.com/upstream/reviewer.git",
+			mirrorSourceID: 52,
+			mirrorSource: &database.MirrorSource{
+				ID: 52,
+			},
+			wantErrorMessage: "does not configure an info_api_url",
+		},
+		{
+			name:           "mirror source with invalid info API URL",
+			repoType:       types.MCPServerRepo,
+			sourceURL:      "https://gitlab.com/upstream/server.git",
+			mirrorSourceID: 53,
+			mirrorSource: &database.MirrorSource{
+				ID:         53,
+				InfoAPIUrl: "ftp://community.example.com",
+			},
+			wantErrorMessage: "invalid info_api_url for mirror source 53",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.TODO()
+			mc := initializeTestMirrorComponent(ctx, t)
+			fakeStore := &fakeMirrorRepoStore{}
+			mc.mirrorRepoStore = fakeStore
+			req := types.CreateMirrorRepoReq{
+				SourceNamespace:   "upstream",
+				SourceName:        "repo",
+				MirrorSourceID:    tt.mirrorSourceID,
+				RepoType:          tt.repoType,
+				SourceGitCloneUrl: tt.sourceURL,
+				CurrentUser:       "admin",
+				ForkNamespace:     "local",
+				ForkName:          "repo",
+			}
+
+			mc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "admin", "local", membership.RoleWrite).Return(true, nil)
+			mc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, tt.repoType, "local", "repo").Return(nil, sql.ErrNoRows)
+			if tt.mirrorSourceID != 0 {
+				mc.mocks.stores.MirrorSourceMock().EXPECT().Get(ctx, tt.mirrorSourceID).Return(tt.mirrorSource, tt.mirrorSourceErr)
+			}
+			mc.mirrorMetadataClientFactory = func(endpoint, accessToken string) multisync.Client {
+				t.Fatal("unsupported metadata sources must be rejected before creating a client")
+				return nil
+			}
+
+			got, err := mc.CreateMirrorRepo(ctx, req)
+			require.Error(t, err)
+			require.ErrorContains(t, err, tt.wantErrorMessage)
+			require.True(t, errors.Is(err, errorx.ErrBadRequest))
+			require.Nil(t, got)
+			require.Empty(t, fakeStore.inputs)
+		})
+	}
+}
+
+// TestMirrorComponent_CreateMirrorRepoReturnsMetadataError verifies identified OpenCSG metadata failures abort creation before database writes.
+func TestMirrorComponent_CreateMirrorRepoReturnsMetadataError(t *testing.T) {
+	ctx := context.TODO()
+	mc := initializeTestMirrorComponent(ctx, t)
+	fakeStore := &fakeMirrorRepoStore{}
+	mc.mirrorRepoStore = fakeStore
+	req := types.CreateMirrorRepoReq{
+		SourceNamespace:   "skills",
+		SourceName:        "broken",
+		MirrorSourceID:    54,
+		RepoType:          types.SkillRepo,
+		SourceGitCloneUrl: "https://opencsg.com/skills/broken.git",
+		CurrentUser:       "admin",
+		ForkNamespace:     "local",
+		ForkName:          "broken",
+	}
+	version := types.SyncVersion{RepoPath: "skills/broken", RepoType: types.SkillRepo}
+
+	mc.mocks.stores.MirrorSourceMock().EXPECT().Get(ctx, int64(54)).Return(&database.MirrorSource{ID: 54}, nil)
+	mc.mirrorMetadataClientFactory = func(endpoint, accessToken string) multisync.Client {
+		require.Equal(t, "https://hub.opencsg.com", endpoint)
+		return mc.mocks.multiSyncClient
+	}
+	mc.mocks.multiSyncClient.EXPECT().SkillInfo(ctx, version).Return(nil, fmt.Errorf("upstream unavailable"))
+	mc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "admin", "local", membership.RoleWrite).Return(true, nil)
+	mc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.SkillRepo, "local", "broken").Return(nil, sql.ErrNoRows)
+
+	got, err := mc.CreateMirrorRepo(ctx, req)
+	require.ErrorContains(t, err, "failed to fetch skill mirror metadata")
+	require.Nil(t, got)
+	require.Empty(t, fakeStore.inputs)
+}
+
 // TestMirrorComponent_CreateMirrorRepoSkipSourcePath verifies that when SkipSourcePath is true,
 // the source path fields (HFPath/MSPath/GithubPath) are not set on the repository.
 func TestMirrorComponent_CreateMirrorRepoSkipSourcePath(t *testing.T) {
@@ -1295,4 +1634,215 @@ func TestMirrorComponent_CreateMirrorRepoSkipSourcePath(t *testing.T) {
 	require.Empty(t, fakeStore.inputs[0].Repository.GithubPath)
 	require.Empty(t, fakeStore.inputs[0].Repository.HFPath)
 	require.Empty(t, fakeStore.inputs[0].Repository.MSPath)
+}
+
+// TestMirrorComponent_CreateMirrorRepoRefreshesMCPMetadataOnRequeue verifies repeated MCP syncs refresh API metadata with the new task.
+func TestMirrorComponent_CreateMirrorRepoRefreshesMCPMetadataOnRequeue(t *testing.T) {
+	ctx := context.TODO()
+	mc := initializeTestMirrorComponent(ctx, t)
+	req := types.CreateMirrorRepoReq{
+		SourceNamespace:   "upstream",
+		SourceName:        "server",
+		RepoType:          types.MCPServerRepo,
+		CurrentUser:       "admin",
+		SourceGitCloneUrl: "https://opencsg.com/upstream/server.git",
+		ForkNamespace:     "local",
+		ForkName:          "server",
+	}
+	repo := &database.Repository{
+		ID: 11, Path: "local/server", Name: "server", Nickname: "Old MCP", Description: "old description",
+		License: "old-license", Readme: "old readme", DefaultBranch: "main", StarCount: 1, RepositoryType: types.MCPServerRepo,
+	}
+	mirror := &database.Mirror{ID: 3, RepositoryID: repo.ID, SourceUrl: req.SourceGitCloneUrl}
+	version := types.SyncVersion{RepoPath: "upstream/server", RepoType: types.MCPServerRepo}
+	metadata := &types.MCPServer{
+		Nickname: "Fresh MCP", Description: "fresh description", License: "MIT", DefaultBranch: "develop",
+		Readme: "ignored", StarNum: 9, ToolsNum: 1, Configuration: `{"command":"fresh"}`,
+		Schema:          `{"tools":[{"name":"search","description":"Fresh search","inputSchema":{"type":"object"}}]}`,
+		ProgramLanguage: "go", RunMode: "stdio", LaunchCmds: "go run .",
+	}
+
+	mc.mirrorMetadataClientFactory = func(endpoint, accessToken string) multisync.Client {
+		require.Equal(t, "https://hub.opencsg.com", endpoint)
+		require.Empty(t, accessToken)
+		return mc.mocks.multiSyncClient
+	}
+	mc.mocks.multiSyncClient.EXPECT().MCPServerInfo(ctx, version).Return(metadata, nil)
+	mc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "admin", "local", membership.RoleWrite).Return(true, nil)
+	mc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, req.RepoType, "local", "server").Return(repo, nil)
+	mc.mocks.stores.MirrorMock().EXPECT().FindByRepoID(ctx, repo.ID).Return(mirror, nil)
+
+	taskJobStore := mockdb.NewMockMirrorTaskJobStore(t)
+	mc.mirrorTaskJobStore = taskJobStore
+	useFakeMirrorJobClient(mc)
+	taskJobStore.EXPECT().RequeueMirrorRepoTask(ctx, mock.MatchedBy(func(input database.RequeueMirrorRepoTaskInput) bool {
+		if input.Metadata == nil || input.Metadata.MCPServer == nil {
+			return false
+		}
+		updatedRepo := input.Metadata.Repository
+		return updatedRepo.ID == repo.ID &&
+			updatedRepo.Nickname == "Fresh MCP" &&
+			updatedRepo.Description == "fresh description" &&
+			updatedRepo.License == "MIT" &&
+			updatedRepo.Readme == "old readme" &&
+			updatedRepo.DefaultBranch == "develop" &&
+			updatedRepo.StarCount == 9 &&
+			input.Metadata.MCPServer.Configuration == `{"command":"fresh"}` &&
+			input.Metadata.MCPServer.ProgramLanguage == "go" &&
+			len(input.Metadata.MCPServerProperties) == 1 &&
+			input.Metadata.MCPServerProperties[0].Name == "search"
+	})).Return(database.MirrorTask{ID: 99}, nil)
+
+	got, err := mc.CreateMirrorRepo(ctx, req)
+	require.NoError(t, err)
+	require.Equal(t, mirror.ID, got.ID)
+}
+
+// TestMirrorComponent_CreateMirrorRepoRefreshesSkillMetadataOnRequeue verifies repeated skill syncs refresh API metadata with the new task.
+func TestMirrorComponent_CreateMirrorRepoRefreshesSkillMetadataOnRequeue(t *testing.T) {
+	ctx := context.TODO()
+	mc := initializeTestMirrorComponent(ctx, t)
+	req := types.CreateMirrorRepoReq{
+		SourceNamespace:   "upstream",
+		SourceName:        "reviewer",
+		RepoType:          types.SkillRepo,
+		CurrentUser:       "admin",
+		SourceGitCloneUrl: "https://opencsg.com/upstream/reviewer.git",
+		Description:       "stale request description",
+		License:           "stale-request-license",
+		DefaultBranch:     "stale-request-branch",
+		ForkNamespace:     "local",
+		ForkName:          "reviewer",
+	}
+	repo := &database.Repository{
+		ID: 12, Path: "local/reviewer", Name: "reviewer", Nickname: "Old Skill", Description: "old description",
+		License: "old-license", Readme: "old readme", DefaultBranch: "main", RepositoryType: types.SkillRepo,
+	}
+	mirror := &database.Mirror{ID: 4, RepositoryID: repo.ID, SourceUrl: req.SourceGitCloneUrl}
+	version := types.SyncVersion{RepoPath: "upstream/reviewer", RepoType: types.SkillRepo}
+	updatedAt := time.Date(2026, time.August, 18, 8, 0, 0, 0, time.UTC)
+	metadata := &types.Skill{
+		Nickname: "Fresh Skill", Description: "fresh description", License: "Apache-2.0",
+		DefaultBranch: "develop", UpdatedAt: updatedAt,
+	}
+
+	mc.mirrorMetadataClientFactory = func(endpoint, accessToken string) multisync.Client {
+		require.Equal(t, "https://hub.opencsg.com", endpoint)
+		require.Empty(t, accessToken)
+		return mc.mocks.multiSyncClient
+	}
+	mc.mocks.multiSyncClient.EXPECT().SkillInfo(ctx, version).Return(metadata, nil)
+	mc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "admin", "local", membership.RoleWrite).Return(true, nil)
+	mc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, req.RepoType, "local", "reviewer").Return(repo, nil)
+	mc.mocks.stores.MirrorMock().EXPECT().FindByRepoID(ctx, repo.ID).Return(mirror, nil)
+
+	taskJobStore := mockdb.NewMockMirrorTaskJobStore(t)
+	mc.mirrorTaskJobStore = taskJobStore
+	useFakeMirrorJobClient(mc)
+	taskJobStore.EXPECT().RequeueMirrorRepoTask(ctx, mock.MatchedBy(func(input database.RequeueMirrorRepoTaskInput) bool {
+		if input.Metadata == nil || input.Metadata.SkillLastUpdatedAt == nil {
+			return false
+		}
+		updatedRepo := input.Metadata.Repository
+		return updatedRepo.ID == repo.ID &&
+			updatedRepo.Nickname == "Fresh Skill" &&
+			updatedRepo.Description == "fresh description" &&
+			updatedRepo.License == "Apache-2.0" &&
+			updatedRepo.Readme == "old readme" &&
+			updatedRepo.DefaultBranch == "develop" &&
+			input.Metadata.SkillLastUpdatedAt.Equal(updatedAt)
+	})).Return(database.MirrorTask{ID: 100}, nil)
+
+	got, err := mc.CreateMirrorRepo(ctx, req)
+	require.NoError(t, err)
+	require.Equal(t, mirror.ID, got.ID)
+}
+
+// TestMirrorComponent_CreateMirrorRepoRefreshesSkillMetadataWhenBindingExistingTarget verifies first task creation also refreshes an existing target.
+func TestMirrorComponent_CreateMirrorRepoRefreshesSkillMetadataWhenBindingExistingTarget(t *testing.T) {
+	ctx := context.TODO()
+	mc := initializeTestMirrorComponent(ctx, t)
+	fakeStore := &fakeMirrorRepoStore{}
+	mc.mirrorRepoStore = fakeStore
+	createTargetRepo := false
+	req := types.CreateMirrorRepoReq{
+		SourceNamespace: "upstream", SourceName: "writer", RepoType: types.SkillRepo,
+		CurrentUser: "admin", SourceGitCloneUrl: "https://opencsg.com/upstream/writer.git",
+		ForkNamespace: "local", ForkName: "writer", CreateTargetRepo: &createTargetRepo,
+	}
+	repo := &database.Repository{
+		ID: 13, Path: "local/writer", Name: "writer", Nickname: "Old Writer", Description: "old description",
+		License: "old-license", Readme: "old readme", DefaultBranch: "main", RepositoryType: types.SkillRepo,
+	}
+	version := types.SyncVersion{RepoPath: "upstream/writer", RepoType: types.SkillRepo}
+	updatedAt := time.Date(2026, time.August, 18, 9, 0, 0, 0, time.UTC)
+
+	mc.mirrorMetadataClientFactory = func(endpoint, accessToken string) multisync.Client {
+		require.Equal(t, "https://hub.opencsg.com", endpoint)
+		return mc.mocks.multiSyncClient
+	}
+	mc.mocks.multiSyncClient.EXPECT().SkillInfo(ctx, version).Return(&types.Skill{
+		Nickname: "Fresh Writer", Description: "fresh description", License: "MIT", DefaultBranch: "develop", UpdatedAt: updatedAt,
+	}, nil)
+	mc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "admin", "local", membership.RoleWrite).Return(true, nil)
+	mc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, req.RepoType, "local", "writer").Return(repo, nil)
+	mc.mocks.stores.MirrorMock().EXPECT().FindByRepoID(ctx, repo.ID).Return(nil, sql.ErrNoRows)
+
+	got, err := mc.CreateMirrorRepo(ctx, req)
+	require.NoError(t, err)
+	require.NotNil(t, got)
+	require.Len(t, fakeStore.inputs, 1)
+	input := fakeStore.inputs[0]
+	require.False(t, input.CreateRepository)
+	require.NotNil(t, input.Metadata)
+	require.Equal(t, "Fresh Writer", input.Metadata.Repository.Nickname)
+	require.Equal(t, "fresh description", input.Metadata.Repository.Description)
+	require.Equal(t, "MIT", input.Metadata.Repository.License)
+	require.Equal(t, "old readme", input.Metadata.Repository.Readme)
+	require.Equal(t, "develop", input.Metadata.Repository.DefaultBranch)
+	require.NotNil(t, input.Metadata.SkillLastUpdatedAt)
+	require.True(t, input.Metadata.SkillLastUpdatedAt.Equal(updatedAt))
+}
+
+// TestMirrorComponent_SyncMirrorRefreshesSkillMetadata verifies manual sync refreshes skill API metadata before task creation.
+func TestMirrorComponent_SyncMirrorRefreshesSkillMetadata(t *testing.T) {
+	ctx := context.TODO()
+	mc := initializeTestMirrorComponent(ctx, t)
+	repo := &database.Repository{
+		ID: 21, Path: "local/reviewer", Name: "reviewer", Nickname: "Old Skill", Description: "old description",
+		License: "old-license", Readme: "old readme", DefaultBranch: "main", RepositoryType: types.SkillRepo,
+	}
+	mirror := &database.Mirror{
+		ID: 31, RepositoryID: repo.ID, Repository: repo, SourceUrl: "https://opencsg.com/upstream/reviewer.git",
+		SourceRepoPath: "upstream/reviewer", Priority: types.HighMirrorPriority,
+	}
+	version := types.SyncVersion{RepoPath: "upstream/reviewer", RepoType: types.SkillRepo}
+	updatedAt := time.Date(2026, time.August, 18, 10, 0, 0, 0, time.UTC)
+
+	mc.mirrorMetadataClientFactory = func(endpoint, accessToken string) multisync.Client {
+		require.Equal(t, "https://hub.opencsg.com", endpoint)
+		return mc.mocks.multiSyncClient
+	}
+	mc.mocks.multiSyncClient.EXPECT().SkillInfo(ctx, version).Return(&types.Skill{
+		Nickname: "Fresh Skill", Description: "fresh description", License: "MIT", DefaultBranch: "develop", UpdatedAt: updatedAt,
+	}, nil)
+	mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "admin").Return(database.User{RoleMask: "admin"}, nil)
+	mc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.SkillRepo, "local", "reviewer").Return(repo, nil)
+	mc.mocks.stores.MirrorMock().EXPECT().FindByRepoID(ctx, repo.ID).Return(mirror, nil)
+
+	taskJobStore := mockdb.NewMockMirrorTaskJobStore(t)
+	mc.mirrorTaskJobStore = taskJobStore
+	useFakeMirrorJobClient(mc)
+	taskJobStore.EXPECT().RequeueMirrorRepoTask(ctx, mock.MatchedBy(func(input database.RequeueMirrorRepoTaskInput) bool {
+		return input.Metadata != nil &&
+			input.Metadata.Repository.Nickname == "Fresh Skill" &&
+			input.Metadata.Repository.Readme == "old readme" &&
+			input.Metadata.SkillLastUpdatedAt != nil &&
+			input.Metadata.SkillLastUpdatedAt.Equal(updatedAt)
+	})).Return(database.MirrorTask{ID: 101}, nil)
+
+	err := mc.SyncMirror(ctx, types.SyncMirrorReq{
+		RepoType: types.SkillRepo, Namespace: "local", Name: "reviewer", CurrentUser: "admin",
+	})
+	require.NoError(t, err)
 }
