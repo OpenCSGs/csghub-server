@@ -1,5 +1,5 @@
 {{/* title section */}}
-LLM log sync {{.status}} for {{.date}}
+LLM log sync {{.status}} for {{.date}}{{if .is_staging}} [staging]{{end}}
 ---
 {{/* content section */}}
 <html>

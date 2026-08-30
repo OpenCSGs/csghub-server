@@ -363,6 +363,12 @@ type EmailLLMLogSyncNotification struct {
 	FinishedAt      string   `json:"finished_at"`
 }
 
+type EmailLLMLogCuratedDataflowNotification struct {
+	Emails []string `json:"emails"`
+	Number int64    `json:"number"`
+	Result string   `json:"result"`
+}
+
 type SendLLMLogSyncMailInput struct {
 	Date            string
 	Status          string
