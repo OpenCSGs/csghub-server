@@ -12,6 +12,7 @@ import (
 	"sync"
 
 	"opencsg.com/csghub-server/builder/git/membership"
+	"opencsg.com/csghub-server/builder/multisync"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/workhub"
 	"opencsg.com/csghub-server/common/config"
@@ -42,6 +43,8 @@ type mirrorComponentImpl struct {
 	syncCacheMu                 sync.Mutex
 	syncCache                   mirrorcache.Cache
 	mirrorNamespaceMappingStore database.MirrorNamespaceMappingStore
+	// mirrorMetadataClientFactory creates source-specific clients used to import MCP and skill metadata.
+	mirrorMetadataClientFactory mirrorMetadataClientFactory
 }
 
 type MirrorComponent interface {
@@ -341,6 +344,7 @@ func NewMirrorComponent(config *config.Config) (MirrorComponent, error) {
 	c.userStore = database.NewUserStore()
 	c.config = config
 	c.mirrorNamespaceMappingStore = database.NewMirrorNamespaceMappingStore()
+	c.mirrorMetadataClientFactory = multisync.FromOpenCSG
 	return c, nil
 }
 
@@ -438,9 +442,14 @@ func (m *mirrorComponentImpl) CreateMirror(ctx context.Context, req types.Create
 		sourceType, sourcePath, _ := common.GetSourceTypeAndPathFromURL(req.SourceUrl)
 		applyMirrorRepositorySourcePath(repo, sourceType, sourcePath)
 	}
+	metadataUpdate, err := m.prepareExistingMirrorRepoMetadataUpdate(ctx, repo, &mirror, nil, nil)
+	if err != nil {
+		return nil, err
+	}
 	reqMirror, err := m.mirrorRepoStore.CreateMirrorRepoRecords(ctx, database.CreateMirrorRepoRecordsInput{
 		Repository:       repo,
 		CreateRepository: false,
+		Metadata:         metadataUpdate,
 		Mirror:           mirror,
 		Urgent:           req.Urgent,
 	})

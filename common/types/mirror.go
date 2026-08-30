@@ -245,7 +245,7 @@ type UpdateMirrorSourceReq struct {
 type CreateMirrorRepoReq struct {
 	SourceNamespace string `json:"source_namespace" binding:"required"`
 	SourceName      string `json:"source_name" binding:"required"`
-	// source id for HF,github etc
+	// MirrorSourceID selects a configured source and is required for non-OpenCSG MCP and skill metadata APIs.
 	MirrorSourceID int64 `json:"mirror_source_id"`
 
 	// repo basic info
@@ -267,8 +267,8 @@ type CreateMirrorRepoReq struct {
 	License     string `json:"license"`
 	CurrentUser string `json:"current_user"`
 
-	//MCP only
-	MCPServerAttributes MCPServerAttributes `json:"mcp_server_attributes"`
+	// MCPServerAttributes supplies metadata for internal crawler calls and is not accepted from JSON requests.
+	MCPServerAttributes MCPServerAttributes `json:"-"`
 
 	// fork repo, local namespace/name
 	ForkNamespace string `json:"fork_namespace"`

@@ -26,7 +26,11 @@ func FromOpenCSG(endpoint string, accessToken string) Client {
 	if endpoint == "" {
 		return &commonClient{}
 	}
-	return &commonClient{rpcClent: rpc.NewHttpClient(endpoint, rpc.AuthWithApiKey(accessToken))}
+	var opts []rpc.RequestOption
+	if accessToken != "" {
+		opts = append(opts, rpc.AuthWithApiKey(accessToken))
+	}
+	return &commonClient{rpcClent: rpc.NewHttpClient(endpoint, opts...)}
 }
 
 type commonClient struct {

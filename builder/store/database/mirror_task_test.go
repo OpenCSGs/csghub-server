@@ -1539,3 +1539,140 @@ func TestMirrorTaskStore_UpdateProgress_DoesNotOverwritePriority(t *testing.T) {
 	require.Equal(t, types.LowMirrorPriority, dbTask.Priority,
 		"UpdateProgress must not overwrite priority set by another process")
 }
+
+// TestMirrorTaskStore_RequeueMirrorRepoTaskRefreshesMCPMetadata verifies metadata and task state commit together.
+func TestMirrorTaskStore_RequeueMirrorRepoTaskRefreshesMCPMetadata(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	repo, err := database.NewRepoStoreWithDB(db).CreateRepo(ctx, database.Repository{
+		UserID: 1, Path: "test/mcp-refresh", GitPath: "mcpservers_test/mcp-refresh", Name: "mcp-refresh",
+		Nickname: "Old MCP", Description: "old description", License: "old-license", Readme: "old readme",
+		DefaultBranch: "main", StarCount: 1, RepositoryType: types.MCPServerRepo, SyncStatus: types.SyncStatusCompleted,
+	})
+	require.NoError(t, err)
+	mcpStore := database.NewMCPServerStoreWithDB(db)
+	server, err := mcpStore.Create(ctx, database.MCPServer{
+		RepositoryID: repo.ID, ToolsNum: 1, Configuration: `{"command":"old"}`, Schema: `{"tools":[]}`, ProgramLanguage: "python",
+	})
+	require.NoError(t, err)
+	propertiesToSeed := []database.MCPServerProperty{
+		{MCPServerID: server.ID, Kind: types.MCPPropTool, Name: "old-tool", Description: "old tool", Schema: `{}`},
+		{MCPServerID: server.ID, Kind: types.MCPPropPrompt, Name: "saved-prompt", Description: "saved prompt", Schema: `{}`},
+		{MCPServerID: server.ID, Kind: types.MCPPropResource, Name: "saved-resource", Description: "saved resource", Schema: `{}`},
+		{MCPServerID: server.ID, Kind: types.MCPPropresourceTemplate, Name: "saved-template", Description: "saved template", Schema: `{}`},
+	}
+	for _, property := range propertiesToSeed {
+		_, err = mcpStore.AddProperty(ctx, property)
+		require.NoError(t, err)
+	}
+	mirror, err := database.NewMirrorStoreWithDB(db).Create(ctx, &database.Mirror{
+		SourceUrl: "https://opencsg.com/test/mcp-refresh.git", RepositoryID: repo.ID,
+		MirrorSourceID: 1, Status: types.MirrorLfsSyncFinished, Priority: types.LowMirrorPriority,
+	})
+	require.NoError(t, err)
+
+	refreshedRepo := *repo
+	refreshedRepo.Nickname = "Fresh MCP"
+	refreshedRepo.Description = "fresh description"
+	refreshedRepo.License = "MIT"
+	refreshedRepo.Readme = "# Fresh MCP"
+	refreshedRepo.DefaultBranch = "develop"
+	refreshedRepo.StarCount = 9
+	jobClient := &fakeMirrorRepoJobClient{}
+	task, err := database.NewMirrorTaskJobStoreWithDB(db).RequeueMirrorRepoTask(ctx, database.RequeueMirrorRepoTaskInput{
+		MirrorID: mirror.ID, RepositoryID: repo.ID, Priority: types.LowMirrorPriority, JobClient: jobClient,
+		Metadata: &database.MirrorRepoMetadataUpdate{
+			Repository: refreshedRepo,
+			MCPServer: &database.MCPServer{
+				ToolsNum: 1, Configuration: `{"command":"fresh"}`, Schema: `{"tools":[{"name":"search"}]}`,
+				ProgramLanguage: "go", RunMode: "stdio", LaunchCmds: "go run .",
+			},
+			MCPServerProperties: []database.MCPServerProperty{{
+				Kind: types.MCPPropTool, Name: "search", Description: "fresh search", Schema: `{"type":"object"}`,
+			}},
+		},
+	})
+	require.NoError(t, err)
+	require.NotZero(t, task.ID)
+
+	storedRepo, err := database.NewRepoStoreWithDB(db).FindById(ctx, repo.ID)
+	require.NoError(t, err)
+	require.Equal(t, "Fresh MCP", storedRepo.Nickname)
+	require.Equal(t, "fresh description", storedRepo.Description)
+	require.Equal(t, "MIT", storedRepo.License)
+	require.Equal(t, "old readme", storedRepo.Readme)
+	require.Equal(t, "develop", storedRepo.DefaultBranch)
+	require.Equal(t, 9, storedRepo.StarCount)
+	storedServer, err := mcpStore.ByRepoID(ctx, repo.ID)
+	require.NoError(t, err)
+	require.Equal(t, `{"command":"fresh"}`, storedServer.Configuration)
+	require.Equal(t, "go", storedServer.ProgramLanguage)
+	require.Equal(t, "stdio", storedServer.RunMode)
+	var properties []database.MCPServerProperty
+	err = db.Core.NewSelect().
+		Model(&properties).
+		Where("mcp_server_id = ?", storedServer.ID).
+		Order("kind ASC").
+		Scan(ctx)
+	require.NoError(t, err)
+	require.Len(t, properties, 4)
+	propertiesByKind := make(map[types.MCPPropertyKind]database.MCPServerProperty, len(properties))
+	for _, property := range properties {
+		propertiesByKind[property.Kind] = property
+	}
+	require.Equal(t, "search", propertiesByKind[types.MCPPropTool].Name)
+	require.Equal(t, "saved-prompt", propertiesByKind[types.MCPPropPrompt].Name)
+	require.Equal(t, "saved-resource", propertiesByKind[types.MCPPropResource].Name)
+	require.Equal(t, "saved-template", propertiesByKind[types.MCPPropresourceTemplate].Name)
+}
+
+// TestMirrorTaskStore_RequeueMirrorRepoTaskRollsBackSkillMetadata verifies failed task enqueue does not expose refreshed skill metadata.
+func TestMirrorTaskStore_RequeueMirrorRepoTaskRollsBackSkillMetadata(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	oldUpdatedAt := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC)
+	repo, err := database.NewRepoStoreWithDB(db).CreateRepo(ctx, database.Repository{
+		UserID: 1, Path: "test/skill-refresh", GitPath: "skills_test/skill-refresh", Name: "skill-refresh",
+		Nickname: "Old Skill", Description: "old description", License: "old-license", Readme: "old readme",
+		DefaultBranch: "main", RepositoryType: types.SkillRepo, SyncStatus: types.SyncStatusCompleted,
+	})
+	require.NoError(t, err)
+	_, err = database.NewSkillStoreWithDB(db).Create(ctx, database.Skill{RepositoryID: repo.ID, LastUpdatedAt: oldUpdatedAt})
+	require.NoError(t, err)
+	mirror, err := database.NewMirrorStoreWithDB(db).Create(ctx, &database.Mirror{
+		SourceUrl: "https://opencsg.com/test/skill-refresh.git", RepositoryID: repo.ID,
+		MirrorSourceID: 1, Status: types.MirrorLfsSyncFinished, Priority: types.LowMirrorPriority,
+	})
+	require.NoError(t, err)
+
+	refreshedRepo := *repo
+	refreshedRepo.Nickname = "Fresh Skill"
+	refreshedRepo.Description = "fresh description"
+	refreshedRepo.License = "Apache-2.0"
+	refreshedRepo.Readme = "# Fresh Skill"
+	refreshedRepo.DefaultBranch = "develop"
+	freshUpdatedAt := time.Date(2026, time.August, 18, 8, 0, 0, 0, time.UTC)
+	_, err = database.NewMirrorTaskJobStoreWithDB(db).RequeueMirrorRepoTask(ctx, database.RequeueMirrorRepoTaskInput{
+		MirrorID: mirror.ID, RepositoryID: repo.ID, Priority: types.LowMirrorPriority,
+		JobClient: &fakeMirrorRepoJobClient{err: errors.New("insert job failed")},
+		Metadata: &database.MirrorRepoMetadataUpdate{
+			Repository: refreshedRepo, SkillLastUpdatedAt: &freshUpdatedAt,
+		},
+	})
+	require.ErrorContains(t, err, "insert job failed")
+
+	storedRepo, err := database.NewRepoStoreWithDB(db).FindById(ctx, repo.ID)
+	require.NoError(t, err)
+	require.Equal(t, "Old Skill", storedRepo.Nickname)
+	require.Equal(t, "old description", storedRepo.Description)
+	require.Equal(t, "old-license", storedRepo.License)
+	require.Equal(t, "old readme", storedRepo.Readme)
+	require.Equal(t, "main", storedRepo.DefaultBranch)
+	storedSkill, err := database.NewSkillStoreWithDB(db).ByRepoID(ctx, repo.ID)
+	require.NoError(t, err)
+	require.True(t, storedSkill.LastUpdatedAt.Equal(oldUpdatedAt))
+}

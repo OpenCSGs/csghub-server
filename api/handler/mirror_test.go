@@ -78,6 +78,39 @@ func TestMirrorHandler_CreateMirrorRepo(t *testing.T) {
 
 }
 
+// TestMirrorHandler_CreateMirrorRepoIgnoresMCPServerAttributes verifies callers cannot inject internal MCP metadata through JSON.
+func TestMirrorHandler_CreateMirrorRepoIgnoresMCPServerAttributes(t *testing.T) {
+	tester := NewMirrorTester(t).WithHandleFunc(func(h *MirrorHandler) gin.HandlerFunc {
+		return h.CreateMirrorRepo
+	})
+	tester.WithUser()
+
+	tester.mocks.mirror.EXPECT().CreateMirrorRepo(tester.Ctx(), mock.MatchedBy(func(req types.CreateMirrorRepoReq) bool {
+		attributes := req.MCPServerAttributes
+		return req.RepoType == types.MCPServerRepo &&
+			attributes.StarCount == 0 &&
+			len(attributes.Tools) == 0 &&
+			attributes.AvatarURL == "" &&
+			attributes.Configuration.Type == "" &&
+			len(attributes.Configuration.Properties) == 0 &&
+			len(attributes.Configuration.Required) == 0
+	})).Return(&database.Mirror{}, nil)
+	tester.WithBody(t, map[string]any{
+		"source_namespace": "ns",
+		"source_name":      "server",
+		"repo_type":        types.MCPServerRepo,
+		"source_url":       "https://opencsg.com/ns/server.git",
+		"fork_namespace":   "target-ns",
+		"fork_name":        "server",
+		"mcp_server_attributes": map[string]any{
+			"star_count": 99,
+			"avatar_url": "https://example.com/avatar.png",
+		},
+	}).Execute()
+
+	tester.ResponseEq(t, 200, tester.OKText, nil)
+}
+
 func TestMirrorHandler_CreateMirrorRepoRequiresForkTarget(t *testing.T) {
 	cases := []struct {
 		name string
@@ -176,6 +209,33 @@ func TestMirrorHandler_CreateMirrorRepoBadRequest(t *testing.T) {
 	tester.ResponseEqSimple(t, 400, gin.H{
 		"code": "REQ-ERR-0",
 		"msg":  "REQ-ERR-0: invalid source git clone url",
+	})
+}
+
+// TestMirrorHandler_CreateMirrorRepoUnsupportedMetadataSource verifies unsupported MCP and skill sources return HTTP 400.
+func TestMirrorHandler_CreateMirrorRepoUnsupportedMetadataSource(t *testing.T) {
+	tester := NewMirrorTester(t).WithHandleFunc(func(h *MirrorHandler) gin.HandlerFunc {
+		return h.CreateMirrorRepo
+	})
+	tester.WithUser().WithBody(t, &types.CreateMirrorRepoReq{
+		SourceNamespace:   "upstream",
+		SourceName:        "reviewer",
+		RepoType:          types.SkillRepo,
+		SourceGitCloneUrl: "https://github.com/upstream/reviewer.git",
+		ForkNamespace:     "target-ns",
+		ForkName:          "reviewer",
+	})
+	badRequestErr := errorx.BadRequest(
+		errors.New("mirror_source_id with a configured info_api_url is required for non-OpenCSG skill sources"),
+		errorx.Ctx(),
+	)
+	tester.mocks.mirror.EXPECT().CreateMirrorRepo(tester.Ctx(), mock.Anything).Return(nil, badRequestErr)
+
+	tester.Execute()
+
+	tester.ResponseEqSimple(t, 400, gin.H{
+		"code": "REQ-ERR-0",
+		"msg":  "REQ-ERR-0: mirror_source_id with a configured info_api_url is required for non-OpenCSG skill sources",
 	})
 }
 
