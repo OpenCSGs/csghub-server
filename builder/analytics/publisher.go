@@ -2,8 +2,6 @@ package analytics
 
 import "sync"
 
-const eventVersion = "1.0.0"
-
 type Config struct {
 	Enabled      bool
 	ProjectToken string
