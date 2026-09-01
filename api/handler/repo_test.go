@@ -1433,6 +1433,8 @@ func TestRepoHandler_HeadSDKDownload(t *testing.T) {
 	})
 
 	tester.WithUser()
+	publisher := &recordingPublisher{}
+	tester.handler.analytics = publisher
 	tester.WithParam("file_path", "foo")
 	tester.WithParam("branch", "main")
 	tester.WithKV("repo_type", types.ModelRepo)
@@ -1454,6 +1456,7 @@ func TestRepoHandler_HeadSDKDownload(t *testing.T) {
 	require.Equal(t, "abc", headers.Get("X-Repo-Commit"))
 	require.Equal(t, `"def"`, headers.Get("ETag"))
 	require.Equal(t, "bytes", headers.Get("Accept-Ranges"))
+	require.Empty(t, publisher.events)
 }
 
 // TestRepoHandler_HeadSDKDownloadLFS verifies LFS metadata advertises byte-range support.

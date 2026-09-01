@@ -22,6 +22,7 @@ import (
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/api/middleware"
 	"opencsg.com/csghub-server/api/workflow"
+	"opencsg.com/csghub-server/builder/analytics"
 	"opencsg.com/csghub-server/builder/deploy"
 	"opencsg.com/csghub-server/builder/instrumentation"
 	bldmq "opencsg.com/csghub-server/builder/mq"
@@ -35,6 +36,23 @@ import (
 )
 
 func RunServer(config *config.Config, enableSwagger bool) {
+	analyticsPublisher, err := analytics.New(analytics.Config{
+		Enabled:      config.PostHog.Enabled,
+		ProjectToken: config.PostHog.ProjectToken,
+		APIHost:      config.PostHog.APIHost,
+		Environment:  config.PostHog.Environment,
+	})
+	if err != nil {
+		slog.Error("PostHog publisher is disabled", slog.Any("error", err))
+	}
+	analytics.Assign(analyticsPublisher)
+	defer func() {
+		if err := analyticsPublisher.Close(); err != nil {
+			slog.Warn("Failed to flush PostHog events during shutdown", slog.Any("error", err))
+		}
+		analytics.Assign(nil)
+	}()
+
 	deploy.DeployWorkflow = func(buildTask, runTask *database.DeployTask) {
 		if err := workflow.StartNewDeployTaskWithCancelOld(buildTask, runTask); err != nil {
 			slog.Error("start new deploy task failed", slog.Any("error", err))

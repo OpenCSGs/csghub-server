@@ -234,6 +234,64 @@ func (_c *MockAgentInstanceSessionHistoryStore_FindByUUID_Call) RunAndReturn(run
 	return _c
 }
 
+// IsFirstAssistantReplyByInstanceID provides a mock function with given fields: ctx, instanceID, historyUUID
+func (_m *MockAgentInstanceSessionHistoryStore) IsFirstAssistantReplyByInstanceID(ctx context.Context, instanceID int64, historyUUID string) (bool, error) {
+	ret := _m.Called(ctx, instanceID, historyUUID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for IsFirstAssistantReplyByInstanceID")
+	}
+
+	var r0 bool
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, int64, string) (bool, error)); ok {
+		return rf(ctx, instanceID, historyUUID)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, int64, string) bool); ok {
+		r0 = rf(ctx, instanceID, historyUUID)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, int64, string) error); ok {
+		r1 = rf(ctx, instanceID, historyUUID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAgentInstanceSessionHistoryStore_IsFirstAssistantReplyByInstanceID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'IsFirstAssistantReplyByInstanceID'
+type MockAgentInstanceSessionHistoryStore_IsFirstAssistantReplyByInstanceID_Call struct {
+	*mock.Call
+}
+
+// IsFirstAssistantReplyByInstanceID is a helper method to define mock.On call
+//   - ctx context.Context
+//   - instanceID int64
+//   - historyUUID string
+func (_e *MockAgentInstanceSessionHistoryStore_Expecter) IsFirstAssistantReplyByInstanceID(ctx interface{}, instanceID interface{}, historyUUID interface{}) *MockAgentInstanceSessionHistoryStore_IsFirstAssistantReplyByInstanceID_Call {
+	return &MockAgentInstanceSessionHistoryStore_IsFirstAssistantReplyByInstanceID_Call{Call: _e.mock.On("IsFirstAssistantReplyByInstanceID", ctx, instanceID, historyUUID)}
+}
+
+func (_c *MockAgentInstanceSessionHistoryStore_IsFirstAssistantReplyByInstanceID_Call) Run(run func(ctx context.Context, instanceID int64, historyUUID string)) *MockAgentInstanceSessionHistoryStore_IsFirstAssistantReplyByInstanceID_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(int64), args[2].(string))
+	})
+	return _c
+}
+
+func (_c *MockAgentInstanceSessionHistoryStore_IsFirstAssistantReplyByInstanceID_Call) Return(_a0 bool, _a1 error) *MockAgentInstanceSessionHistoryStore_IsFirstAssistantReplyByInstanceID_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAgentInstanceSessionHistoryStore_IsFirstAssistantReplyByInstanceID_Call) RunAndReturn(run func(context.Context, int64, string) (bool, error)) *MockAgentInstanceSessionHistoryStore_IsFirstAssistantReplyByInstanceID_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ListBySessionID provides a mock function with given fields: ctx, sessionID, maxTurn
 func (_m *MockAgentInstanceSessionHistoryStore) ListBySessionID(ctx context.Context, sessionID int64, maxTurn *int64) ([]database.AgentInstanceSessionHistory, error) {
 	ret := _m.Called(ctx, sessionID, maxTurn)

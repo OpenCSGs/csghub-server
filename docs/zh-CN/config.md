@@ -18,6 +18,10 @@
 | STARHUB_SERVER_GITSERVER_USERNAME | root | Git server 管理员用户的账号 |
 | STARHUB_SERVER_GITSERVER_PASSWORD | password123 | Git server 管理员用户的密码 |
 | STARHUB_SERVER_FRONTEND_URL | https://portal-stg.opencsg.com | Starhub 前端项目启动后的 URL |
+| STARHUB_SERVER_POSTHOG_ENABLED | false | 是否向 PostHog 上报服务端分析事件 |
+| STARHUB_SERVER_POSTHOG_PROJECT_TOKEN | none | 服务端事件写入使用的 PostHog Project Token |
+| STARHUB_SERVER_POSTHOG_API_HOST | none | PostHog API Host，可配置为 Cloud 或自部署环境的接收地址 |
+| STARHUB_SERVER_POSTHOG_ENVIRONMENT | development | 写入 PostHog 事件的部署环境标识 |
 | STARHUB_SERVER_S3_ACCESS_KEY_ID | none | S3 存储的 Access key ID |
 | STARHUB_SERVER_S3_ACCESS_KEY_SECRET | none | S3 存储的 Access key Secret |
 | STARHUB_SERVER_S3_REGION | none | S3 存储的 region |

@@ -14,6 +14,7 @@ import (
 	"github.com/bwmarrin/snowflake"
 	"github.com/google/uuid"
 	"opencsg.com/csghub-server/builder/accounting"
+	"opencsg.com/csghub-server/builder/analytics"
 	"opencsg.com/csghub-server/builder/git"
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/rpc"
@@ -58,6 +59,7 @@ type userComponentImpl struct {
 	ts              database.TagStore
 	uts             database.UserTagStore
 	acctClient      accounting.AccountingClient
+	analytics       analytics.Publisher
 }
 
 type UserComponent interface {
@@ -166,6 +168,7 @@ func NewUserComponent(config *config.Config) (UserComponent, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create accounting client,error: %w", err)
 	}
+	c.analytics = analytics.Default()
 
 	return c, nil
 }
@@ -990,6 +993,7 @@ func (c *userComponentImpl) ensureLocalUserFromSSO(ctx context.Context, cu *rpc.
 		}
 		c.createDefaultGitTokenAsync(dbu.Username)
 		c.awardInviteeCreditAsync(dbu)
+		c.captureSignupSuccess(dbu)
 	} else {
 		// get user from db for username, as casdoor may have different username
 		dbu, err = c.userStore.FindByUUID(ctx, cu.UUID)

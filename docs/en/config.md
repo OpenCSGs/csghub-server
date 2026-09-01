@@ -18,6 +18,10 @@
 | STARHUB_SERVER_GITSERVER_USERNAME | root | Account of the Git server administrator user |
 | STARHUB_SERVER_GITSERVER_PASSWORD | password123 | Password of the Git server administrator user |
 | STARHUB_SERVER_FRONTEND_URL | https://portal-stg.opencsg.com | URL after CSGhub frontend project startup |
+| STARHUB_SERVER_POSTHOG_ENABLED | false | Whether to publish server-side analytics events to PostHog |
+| STARHUB_SERVER_POSTHOG_PROJECT_TOKEN | none | PostHog project token used for server-side event ingestion |
+| STARHUB_SERVER_POSTHOG_API_HOST | none | PostHog API host, for example the Cloud or self-hosted ingestion endpoint |
+| STARHUB_SERVER_POSTHOG_ENVIRONMENT | development | Deployment environment attached to PostHog events |
 | STARHUB_SERVER_S3_ACCESS_KEY_ID | none | S3 storage Access key ID |
 | STARHUB_SERVER_S3_ACCESS_KEY_SECRET | none | S3 storage Access key Secret |
 | STARHUB_SERVER_S3_REGION | none | S3 storage region |

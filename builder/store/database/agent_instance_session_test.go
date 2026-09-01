@@ -353,6 +353,72 @@ func TestAgentInstanceSessionHistoryStore_MultipleHistories(t *testing.T) {
 	require.False(t, foundHistories[3].Request)
 }
 
+func TestAgentInstanceSessionHistoryStore_IsFirstAssistantReplyByInstanceID(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	sessionStore := database.NewAgentInstanceSessionStoreWithDB(db)
+	historyStore := database.NewAgentInstanceSessionHistoryStoreWithDB(db)
+	instanceID := int64(54321)
+	userUUID := uuid.New().String()
+
+	firstSession, err := sessionStore.Create(ctx, &database.AgentInstanceSession{
+		UUID:       uuid.New().String(),
+		Name:       "First Session",
+		InstanceID: instanceID,
+		UserUUID:   userUUID,
+		Type:       "langflow",
+	})
+	require.NoError(t, err)
+	secondSession, err := sessionStore.Create(ctx, &database.AgentInstanceSession{
+		UUID:       uuid.New().String(),
+		Name:       "Second Session",
+		InstanceID: instanceID,
+		UserUUID:   userUUID,
+		Type:       "langflow",
+	})
+	require.NoError(t, err)
+
+	histories := []*database.AgentInstanceSessionHistory{
+		{
+			UUID:      uuid.New().String(),
+			SessionID: firstSession.ID,
+			Request:   true,
+			Content:   "User request",
+		},
+		{
+			UUID:      uuid.New().String(),
+			SessionID: firstSession.ID,
+			Request:   false,
+			Content:   "First valid assistant response",
+		},
+		{
+			UUID:      uuid.New().String(),
+			SessionID: secondSession.ID,
+			Request:   true,
+			Content:   "Later user request",
+		},
+		{
+			UUID:      uuid.New().String(),
+			SessionID: secondSession.ID,
+			Request:   false,
+			Content:   "Later assistant response",
+		},
+	}
+	for _, history := range histories {
+		require.NoError(t, historyStore.Create(ctx, history))
+	}
+
+	isFirst, err := historyStore.IsFirstAssistantReplyByInstanceID(ctx, instanceID, histories[1].UUID)
+	require.NoError(t, err)
+	require.True(t, isFirst)
+
+	isFirst, err = historyStore.IsFirstAssistantReplyByInstanceID(ctx, instanceID, histories[3].UUID)
+	require.NoError(t, err)
+	require.False(t, isFirst)
+}
+
 func TestAgentInstanceSessionHistoryStore_ListBySessionID_WithMaxTurn(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()

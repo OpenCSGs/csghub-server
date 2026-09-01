@@ -10,11 +10,19 @@ func TestConfig_loadConfig(t *testing.T) {
 	t.Run("config env", func(t *testing.T) {
 		t.Setenv("STARHUB_SERVER_INSTANCE_ID", "foo")
 		t.Setenv("STARHUB_SERVER_SERVER_PORT", "6789")
+		t.Setenv("STARHUB_SERVER_POSTHOG_ENABLED", "true")
+		t.Setenv("STARHUB_SERVER_POSTHOG_PROJECT_TOKEN", "phc_test")
+		t.Setenv("STARHUB_SERVER_POSTHOG_API_HOST", "https://example.posthog.test")
+		t.Setenv("STARHUB_SERVER_POSTHOG_ENVIRONMENT", "staging")
 		cfg, err := loadConfig()
 		require.Nil(t, err)
 
 		require.Equal(t, "foo", cfg.InstanceID)
 		require.Equal(t, 6789, cfg.APIServer.Port)
+		require.True(t, cfg.PostHog.Enabled)
+		require.Equal(t, "phc_test", cfg.PostHog.ProjectToken)
+		require.Equal(t, "https://example.posthog.test", cfg.PostHog.APIHost)
+		require.Equal(t, "staging", cfg.PostHog.Environment)
 	})
 
 	t.Run("config file", func(t *testing.T) {
