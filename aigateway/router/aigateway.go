@@ -70,16 +70,25 @@ func NewRouter(config *config.Config) (*gin.Engine, func(), error) {
 		return nil, nil, fmt.Errorf("error creating openai handler :%w", err)
 	}
 
+	// AnthropicHandlerImpl embeds OpenAIHandlerImpl and adds the
+	// Anthropic Messages protocol on top of the shared infrastructure.
+	anthropicHandler := handler.NewAnthropicHandler(openAIhandler)
 	// Metrics middleware: manages request lifecycle metrics for inference
 	// routes.  Each route opts in by including metricsMw in its handler chain.
 	// Returns a no-op handler + cleanup when the metrics feature is not
 	// compiled in (ce build).
 	metricsMw, metricsCleanup := newMetricsMiddleware(config)
+	// Also mount the Anthropic Messages API under /anthropic/v1 to match the
+	// official Anthropic API path layout. Both /v1/messages and
+	// /anthropic/v1/messages are supported.
+	anthropicGroup := r.Group("/anthropic/v1")
+	anthropicGroup.POST("/messages", middlewareCollection.Auth.MustUserOrgApiKey, metricsMw, anthropicHandler.Messages)
 
 	v1Group.GET("/models", openAIhandler.ListModels)
 	v1Group.GET("/models/*model", openAIhandler.GetModel)
 	v1Group.POST("/responses", middlewareCollection.Auth.MustUserOrgApiKey, metricsMw, openAIhandler.Responses)
 	v1Group.POST("/chat/completions", middlewareCollection.Auth.MustUserOrgApiKey, metricsMw, openAIhandler.Chat)
+	v1Group.POST("/messages", middlewareCollection.Auth.MustUserOrgApiKey, metricsMw, anthropicHandler.Messages)
 	v1Group.POST("/embeddings", middlewareCollection.Auth.MustUserOrgApiKey, metricsMw, openAIhandler.Embedding)
 	v1Group.POST("/rerank", middlewareCollection.Auth.MustUserOrgApiKey, metricsMw, openAIhandler.Rerank)
 	v1Group.POST("/images/generations", middlewareCollection.Auth.MustUserOrgApiKey, metricsMw, modalAPIRateLimiter, openAIhandler.GenerateImage)

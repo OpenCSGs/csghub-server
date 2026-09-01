@@ -94,7 +94,7 @@ type OpenAIHandler interface {
 	Shutdown(ctx context.Context) error
 }
 
-func NewOpenAIHandlerFromConfig(config *config.Config) (OpenAIHandler, error) {
+func NewOpenAIHandlerFromConfig(config *config.Config) (*OpenAIHandlerImpl, error) {
 	modelService, err := component.NewOpenAIComponentFromConfig(config)
 	if err != nil {
 		return nil, err
@@ -194,6 +194,7 @@ func (h *OpenAIHandlerImpl) Shutdown(ctx context.Context) error {
 	}
 	return h.llmTracer.Shutdown(ctx)
 }
+
 
 // handleInsufficientBalance returns an HTTP error before any upstream response
 // stream starts. Streaming requests must also receive a non-2xx status so
