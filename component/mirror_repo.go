@@ -333,9 +333,13 @@ func (m *mirrorComponentImpl) resolveMirrorMetadataEndpoint(ctx context.Context,
 			if isOpenCSGSaaS {
 				return openCSGSaaSMetadataEndpoint, nil
 			}
-			return "", errorx.BadRequest(
-				fmt.Errorf("mirror source %d does not configure an info_api_url required for %s metadata", req.MirrorSourceID, req.RepoType),
-				errorx.Ctx().Set("mirror source id", req.MirrorSourceID).Set("repo type", req.RepoType),
+			return "", errorx.MirrorSourceURLInvalid(
+				fmt.Errorf("source host %q is neither configured by mirror source %d nor OpenCSG SaaS", parsedURL.Hostname(), req.MirrorSourceID),
+				errorx.Ctx().
+					Set("mirror source id", req.MirrorSourceID).
+					Set("repo type", req.RepoType).
+					Set("source host", parsedURL.Hostname()).
+					Set("source url", req.SourceGitCloneUrl),
 			)
 		}
 		endpoint, err := normalizeMirrorMetadataEndpoint(source.InfoAPIUrl)
@@ -352,9 +356,12 @@ func (m *mirrorComponentImpl) resolveMirrorMetadataEndpoint(ctx context.Context,
 		return openCSGSaaSMetadataEndpoint, nil
 	}
 
-	return "", errorx.BadRequest(
-		fmt.Errorf("mirror_source_id with a configured info_api_url is required for non-OpenCSG %s sources", req.RepoType),
-		errorx.Ctx().Set("repo type", req.RepoType).Set("source host", parsedURL.Hostname()),
+	return "", errorx.MirrorSourceURLInvalid(
+		fmt.Errorf("source host %q is neither a configured mirror source nor OpenCSG SaaS", parsedURL.Hostname()),
+		errorx.Ctx().
+			Set("repo type", req.RepoType).
+			Set("source host", parsedURL.Hostname()).
+			Set("source url", req.SourceGitCloneUrl),
 	)
 }
 

@@ -3,7 +3,6 @@ package component
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
 	"testing"
 	"time"
@@ -1482,18 +1481,21 @@ func TestMirrorComponent_CreateMirrorRepoRejectsUnsupportedMetadataSources(t *te
 		mirrorSource     *database.MirrorSource
 		mirrorSourceErr  error
 		wantErrorMessage string
+		wantError        error
 	}{
 		{
 			name:             "GitHub skill without mirror source",
 			repoType:         types.SkillRepo,
 			sourceURL:        "https://github.com/upstream/reviewer.git",
-			wantErrorMessage: "mirror_source_id with a configured info_api_url is required",
+			wantErrorMessage: "neither a configured mirror source nor OpenCSG SaaS",
+			wantError:        errorx.ErrMirrorSourceURLInvalid,
 		},
 		{
 			name:             "GitLab MCP without mirror source",
 			repoType:         types.MCPServerRepo,
 			sourceURL:        "https://gitlab.com/upstream/server.git",
-			wantErrorMessage: "mirror_source_id with a configured info_api_url is required",
+			wantErrorMessage: "neither a configured mirror source nor OpenCSG SaaS",
+			wantError:        errorx.ErrMirrorSourceURLInvalid,
 		},
 		{
 			name:             "missing mirror source",
@@ -1502,6 +1504,7 @@ func TestMirrorComponent_CreateMirrorRepoRejectsUnsupportedMetadataSources(t *te
 			mirrorSourceID:   51,
 			mirrorSourceErr:  sql.ErrNoRows,
 			wantErrorMessage: "mirror source 51 does not exist",
+			wantError:        errorx.ErrBadRequest,
 		},
 		{
 			name:           "mirror source without info API URL",
@@ -1511,7 +1514,8 @@ func TestMirrorComponent_CreateMirrorRepoRejectsUnsupportedMetadataSources(t *te
 			mirrorSource: &database.MirrorSource{
 				ID: 52,
 			},
-			wantErrorMessage: "does not configure an info_api_url",
+			wantErrorMessage: "neither configured by mirror source 52 nor OpenCSG SaaS",
+			wantError:        errorx.ErrMirrorSourceURLInvalid,
 		},
 		{
 			name:           "mirror source with invalid info API URL",
@@ -1523,6 +1527,7 @@ func TestMirrorComponent_CreateMirrorRepoRejectsUnsupportedMetadataSources(t *te
 				InfoAPIUrl: "ftp://community.example.com",
 			},
 			wantErrorMessage: "invalid info_api_url for mirror source 53",
+			wantError:        errorx.ErrBadRequest,
 		},
 	}
 
@@ -1556,7 +1561,7 @@ func TestMirrorComponent_CreateMirrorRepoRejectsUnsupportedMetadataSources(t *te
 			got, err := mc.CreateMirrorRepo(ctx, req)
 			require.Error(t, err)
 			require.ErrorContains(t, err, tt.wantErrorMessage)
-			require.True(t, errors.Is(err, errorx.ErrBadRequest))
+			require.ErrorIs(t, err, tt.wantError)
 			require.Nil(t, got)
 			require.Empty(t, fakeStore.inputs)
 		})

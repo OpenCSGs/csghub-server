@@ -60,7 +60,9 @@ func (h *MirrorHandler) CreateMirrorRepo(ctx *gin.Context) {
 	m, err := h.mirror.CreateMirrorRepo(ctx.Request.Context(), req)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "failed to create mirror repo", slog.Any("error", err))
-		if errors.Is(err, errorx.ErrMirrorSourceRepoAuthInvalid) || errors.Is(err, errorx.ErrBadRequest) {
+		if errors.Is(err, errorx.ErrMirrorSourceRepoAuthInvalid) ||
+			errors.Is(err, errorx.ErrMirrorSourceURLInvalid) ||
+			errors.Is(err, errorx.ErrBadRequest) {
 			httpbase.BadRequestWithExt(ctx, err)
 			return
 		}

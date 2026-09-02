@@ -22,5 +22,8 @@
     },
     "error.MIRROR-ERR-7": {
         "other": "The source namespace mapping does not exist."
+    },
+    "error.MIRROR-ERR-8": {
+        "other": "The mirror source URL is invalid or unsupported."
     }
 }

@@ -11,6 +11,7 @@ const (
 	mirrorSourceRepoAuthInvalid
 	sourceNamespaceMappingExists
 	sourceNamespaceMappingNotFound
+	mirrorSourceURLInvalid
 )
 
 var (
@@ -117,6 +118,19 @@ var (
 	//
 	// zh-HK: 源命名空間映射關係不存在。
 	ErrSourceNamespaceMappingNotFound error = CustomError{prefix: errMirrorPrefix, code: sourceNamespaceMappingNotFound}
+
+	// ErrMirrorSourceURLInvalid indicates that the mirror source URL is invalid or unsupported.
+	//
+	// Description: The mirror source URL is invalid or unsupported.
+	//
+	// Description_ZH: 镜像源地址无效或不受支持。
+	//
+	// en-US: The mirror source URL is invalid or unsupported.
+	//
+	// zh-CN: 镜像源地址无效或不受支持。
+	//
+	// zh-HK: 鏡像源地址無效或不受支持。
+	ErrMirrorSourceURLInvalid error = CustomError{prefix: errMirrorPrefix, code: mirrorSourceURLInvalid}
 )
 
 // MirrorSourceConflict wraps a mirror source conflict with optional context.
@@ -162,4 +176,9 @@ func SourceNamespaceMappingExists(err error, ctx context) error {
 // SourceNamespaceMappingNotFound wraps a missing source namespace mapping with optional context.
 func SourceNamespaceMappingNotFound(err error, ctx context) error {
 	return CustomError{prefix: errMirrorPrefix, context: ctx, err: err, code: int(sourceNamespaceMappingNotFound)}
+}
+
+// MirrorSourceURLInvalid wraps an invalid or unsupported mirror source URL with optional context.
+func MirrorSourceURLInvalid(err error, ctx context) error {
+	return CustomError{prefix: errMirrorPrefix, context: ctx, err: err, code: int(mirrorSourceURLInvalid)}
 }

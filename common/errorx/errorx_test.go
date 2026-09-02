@@ -290,6 +290,16 @@ func Test_Err_SourceNamespaceMappingNotFound(t *testing.T) {
 	assert.True(t, errors.Is(err, ErrSourceNamespaceMappingNotFound))
 }
 
+func Test_Err_MirrorSourceURLInvalid(t *testing.T) {
+	err := MirrorSourceURLInvalid(
+		errors.New("mirror source URL is invalid"),
+		Ctx().Set("source_url", "https://example.com/repo.git"),
+	)
+
+	assert.Equal(t, "MIRROR-ERR-8", ErrMirrorSourceURLInvalid.(CustomError).Code())
+	assert.True(t, errors.Is(err, ErrMirrorSourceURLInvalid))
+}
+
 func Test_Err_ChangePathBlocked(t *testing.T) {
 	err := ChangePathBlocked(
 		errors.New("cannot change path: the following dependent entities exist: deploy tasks, mirrors. Please remove them first"),
