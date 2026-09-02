@@ -212,7 +212,7 @@ func TestMirrorHandler_CreateMirrorRepoBadRequest(t *testing.T) {
 	})
 }
 
-// TestMirrorHandler_CreateMirrorRepoUnsupportedMetadataSource verifies unsupported MCP and skill sources return HTTP 400.
+// TestMirrorHandler_CreateMirrorRepoUnsupportedMetadataSource verifies an unconfigured non-OpenCSG source returns HTTP 400.
 func TestMirrorHandler_CreateMirrorRepoUnsupportedMetadataSource(t *testing.T) {
 	tester := NewMirrorTester(t).WithHandleFunc(func(h *MirrorHandler) gin.HandlerFunc {
 		return h.CreateMirrorRepo
@@ -225,17 +225,17 @@ func TestMirrorHandler_CreateMirrorRepoUnsupportedMetadataSource(t *testing.T) {
 		ForkNamespace:     "target-ns",
 		ForkName:          "reviewer",
 	})
-	badRequestErr := errorx.BadRequest(
-		errors.New("mirror_source_id with a configured info_api_url is required for non-OpenCSG skill sources"),
+	sourceURLErr := errorx.MirrorSourceURLInvalid(
+		errors.New(`source host "github.com" is neither a configured mirror source nor OpenCSG SaaS`),
 		errorx.Ctx(),
 	)
-	tester.mocks.mirror.EXPECT().CreateMirrorRepo(tester.Ctx(), mock.Anything).Return(nil, badRequestErr)
+	tester.mocks.mirror.EXPECT().CreateMirrorRepo(tester.Ctx(), mock.Anything).Return(nil, sourceURLErr)
 
 	tester.Execute()
 
 	tester.ResponseEqSimple(t, 400, gin.H{
-		"code": "REQ-ERR-0",
-		"msg":  "REQ-ERR-0: mirror_source_id with a configured info_api_url is required for non-OpenCSG skill sources",
+		"code": "MIRROR-ERR-8",
+		"msg":  `MIRROR-ERR-8: source host "github.com" is neither a configured mirror source nor OpenCSG SaaS`,
 	})
 }
 

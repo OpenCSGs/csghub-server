@@ -1018,6 +1018,14 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Name:** `sourceNamespaceMappingNotFound`
 - **Description:** The source namespace mapping does not exist.
 
+---
+
+### `MIRROR-ERR-8`
+
+- **Error Code:** `MIRROR-ERR-8`
+- **Error Name:** `mirrorSourceURLInvalid`
+- **Description:** The mirror source URL is invalid or unsupported.
+
 ## Moderation Errors
 
 ### `MOD-ERR-0`
@@ -1817,4 +1825,3 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Code:** `USER-ERR-20`
 - **Error Name:** `namespaceAlreadyExists`
 - **Description:** The namespace already exists in the system.
-

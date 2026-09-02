@@ -1018,6 +1018,14 @@
 - **错误名:** `sourceNamespaceMappingNotFound`
 - **描述:** 源命名空间映射关系不存在。
 
+---
+
+### `MIRROR-ERR-8`
+
+- **错误代码:** `MIRROR-ERR-8`
+- **错误名:** `mirrorSourceURLInvalid`
+- **描述:** 镜像源地址无效或不受支持。
+
 ## Moderation 错误
 
 ### `MOD-ERR-0`
@@ -1817,4 +1825,3 @@
 - **错误代码:** `USER-ERR-20`
 - **错误名:** `namespaceAlreadyExists`
 - **描述:** 命名空间已存在于系统中。
-
