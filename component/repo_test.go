@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http/httptest"
@@ -3802,6 +3803,61 @@ func TestRepoComponent_CommitFiles(t *testing.T) {
 	require.Equal(t, nil, err)
 }
 
+func TestRepoComponent_CommitFilesRejectsOversizedNonLFSFile(t *testing.T) {
+	ctx := context.TODO()
+	repoComp := initializeTestRepoComponent(ctx, t)
+	repoComp.config.Git.MaxUnLfsFileSize = 4
+
+	user := database.User{Username: "user_name"}
+	repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username).Return(user, nil)
+
+	ns := database.Namespace{NamespaceType: "user", Path: user.Username}
+	repoComp.mocks.stores.NamespaceMock().EXPECT().FindByPath(mock.Anything, ns.Path).Return(ns, nil)
+
+	repo := &database.Repository{
+		ID:      1,
+		Name:    "repo_name",
+		Private: true,
+		User:    user,
+		Path:    fmt.Sprintf("%s/%s", ns.Path, "repo_name"),
+		Source:  types.OpenCSGSource,
+	}
+	repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(
+		mock.Anything, types.ModelRepo, ns.Path, repo.Name,
+	).Return(repo, nil)
+	repoComp.mocks.gitServer.EXPECT().GetRepoAllFiles(ctx, gitserver.GetRepoAllFilesReq{
+		Namespace: ns.Path,
+		Name:      repo.Name,
+		Ref:       "main",
+		RepoType:  types.ModelRepo,
+	}).Return(nil, nil)
+
+	pointerPrefix := fmt.Sprintf(
+		"version https://git-lfs.github.com/spec/v1\noid sha256:%s\nsize 1\n",
+		strings.Repeat("a", 64),
+	)
+	err := repoComp.CommitFiles(ctx, types.CommitFilesReq{
+		Namespace:   ns.Path,
+		Name:        repo.Name,
+		RepoType:    types.ModelRepo,
+		Revision:    "main",
+		CurrentUser: user.Username,
+		Message:     "msg",
+		Files: []types.CommitFileReq{
+			{
+				Path:    "oversized.json",
+				Action:  types.CommitActionCreate,
+				Content: base64.StdEncoding.EncodeToString([]byte(pointerPrefix + "trailing content")),
+			},
+		},
+	})
+
+	require.ErrorContains(t, err, "exceeds the maximum allowed size for non-LFS files")
+	require.ErrorIs(t, err, errorx.ErrFileTooLarge)
+	repoComp.mocks.gitServer.AssertNotCalled(t, "CommitFiles", mock.Anything, mock.Anything)
+	repoComp.mocks.stores.LfsMetaObjectMock().AssertNotCalled(t, "UpdateOrCreate", mock.Anything, mock.Anything)
+}
+
 func TestRepoComponent_CommitFilesIgnoresPackageSyncFailure(t *testing.T) {
 	ctx := context.TODO()
 	repoComp := initializeTestRepoComponent(ctx, t)
@@ -3972,6 +4028,76 @@ func TestParseNDJson_AllKeyTypes(t *testing.T) {
 	assert.Equal(t, "old_dir/", result.Files[3].Path)
 	assert.Equal(t, "", result.Files[3].Content)
 	assert.Equal(t, types.CommitActionDelete, result.Files[3].Action)
+}
+
+func TestParseNDJson_AcceptsBase64ExpansionAtFileSizeLimit(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	const maxUnLfsFileSize = 1 << 20
+	cfg := &config.Config{}
+	cfg.Git.MaxUnLfsFileSize = maxUnLfsFileSize
+
+	component := &repoComponentImpl{
+		config: cfg,
+	}
+
+	// HF sends regular file content as Base64. A file at the configured raw size
+	// limit therefore produces an NDJSON record larger than that limit.
+	largeContent := base64.StdEncoding.EncodeToString(
+		[]byte(strings.Repeat("a", maxUnLfsFileSize)),
+	)
+	largeFileJSON, err := json.Marshal(types.CommitFile{
+		Path:    "tokenizer.json",
+		Content: largeContent,
+	})
+	require.NoError(t, err)
+
+	requestBody := fmt.Sprintf(`{"key": "header", "value": {"summary": "Large file commit"}}
+{"key": "file", "value": %s}`, string(largeFileJSON))
+	require.Greater(t, len(requestBody), maxUnLfsFileSize)
+
+	req := httptest.NewRequest("POST", "/test", strings.NewReader(requestBody))
+	w := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(w)
+	ctx.Request = req
+
+	result, err := component.ParseNDJson(ctx)
+
+	require.NoError(t, err)
+	assert.Equal(t, "Large file commit", result.Message)
+	assert.Len(t, result.Files, 1)
+	assert.Equal(t, "tokenizer.json", result.Files[0].Path)
+	assert.Equal(t, largeContent, result.Files[0].Content)
+}
+
+func TestParseNDJson_RejectsOversizedRecord(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	const maxUnLfsFileSize = 1 << 20
+	component := &repoComponentImpl{
+		config: &config.Config{},
+	}
+	component.config.Git.MaxUnLfsFileSize = maxUnLfsFileSize
+
+	oversizedContent := base64.StdEncoding.EncodeToString(
+		[]byte(strings.Repeat("a", 2*maxUnLfsFileSize)),
+	)
+	fileJSON, err := json.Marshal(types.CommitFile{
+		Path:    "oversized.json",
+		Content: oversizedContent,
+	})
+	require.NoError(t, err)
+
+	requestBody := fmt.Sprintf(`{"key":"file","value":%s}`, fileJSON)
+	req := httptest.NewRequest("POST", "/test", strings.NewReader(requestBody))
+	w := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(w)
+	ctx.Request = req
+
+	result, err := component.ParseNDJson(ctx)
+
+	require.Error(t, err)
+	assert.Nil(t, result)
 }
 
 func TestGetRepoUrl(t *testing.T) {

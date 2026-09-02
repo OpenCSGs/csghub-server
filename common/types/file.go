@@ -1,5 +1,7 @@
 package types
 
+import "encoding/json"
+
 type File struct {
 	Name   string `json:"name"`
 	Type   string `json:"type"`
@@ -334,8 +336,8 @@ type CommitFile struct {
 
 // FormField represents a form field with key-value structure
 type FormField struct {
-	Key   string `json:"key"`
-	Value any    `json:"value"`
+	Key   string          `json:"key"`
+	Value json.RawMessage `json:"value"`
 }
 
 // CommitRequest represents the complete commit request
