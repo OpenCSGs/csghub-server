@@ -56,6 +56,10 @@ const (
 	MaxTreeLimit          = 10000
 	DefaultLogTreeLimit   = 25
 	MaxLogTreeLimit       = 100
+	// HF commit requests encode regular file content as Base64 inside one NDJSON
+	// record. Reserve room for the record envelope and path in addition to the
+	// configured maximum decoded file size.
+	maxNDJSONRecordOverhead = 64 * 1024
 )
 
 type repoComponentImpl struct {
@@ -2609,21 +2613,26 @@ func (c *repoComponentImpl) CommitFiles(ctx context.Context, req types.CommitFil
 			return fmt.Errorf("invalid action: %s", file.Action)
 		}
 		cleanedContent := cleanBase64(file.Content)
+		content, err := base64.StdEncoding.DecodeString(cleanedContent)
+		if err != nil {
+			return fmt.Errorf("failed to decode content, err: %w", err)
+		}
+		pointer, isLFSPointer := parseCanonicalLFSPointer(content)
+		if !isLFSPointer && c.config.Git.MaxUnLfsFileSize > 0 && int64(len(content)) > c.config.Git.MaxUnLfsFileSize {
+			return fmt.Errorf(
+				"%w: file %s exceeds the maximum allowed size for non-LFS files: %d > %d",
+				errorx.ErrFileTooLarge, file.Path, len(content), c.config.Git.MaxUnLfsFileSize,
+			)
+		}
 
 		files = append(files, gitserver.CommitFile{
 			Path:    file.Path,
 			Content: cleanedContent,
 			Action:  action,
 		})
-		content, err := base64.StdEncoding.DecodeString(cleanedContent)
-		if err != nil {
-			return fmt.Errorf("failed to decode content, err: %w", err)
+		if isLFSPointer {
+			lfsFiles = append(lfsFiles, pointer)
 		}
-		p, err := gitaly.ReadPointerFromBuffer(content)
-		if err != nil {
-			continue
-		}
-		lfsFiles = append(lfsFiles, p)
 	}
 
 	for _, lfsFile := range lfsFiles {
@@ -2752,6 +2761,23 @@ func cleanBase64(input string) string {
 	return cleaned
 }
 
+func parseCanonicalLFSPointer(content []byte) (types.Pointer, bool) {
+	pointer, err := gitaly.ReadPointerFromBuffer(content)
+	if err != nil || !pointer.Valid() {
+		return types.Pointer{}, false
+	}
+
+	expected := fmt.Sprintf(
+		"%s\n%s%s\nsize %d",
+		gitaly.MetaFileIdentifier, gitaly.MetaFileOidPrefix, pointer.Oid, pointer.Size,
+	)
+	if !bytes.Equal(bytes.TrimSuffix(content, []byte("\n")), []byte(expected)) {
+		return types.Pointer{}, false
+	}
+
+	return pointer, true
+}
+
 func (c *repoComponentImpl) SendAssetManagementMsg(ctx context.Context, req types.RepoNotificationReq) error {
 	if req.RepoType == types.UnknownRepo {
 		return fmt.Errorf("unknown repository")
@@ -2860,45 +2886,37 @@ func metaText(readme string) string {
 
 func (c *repoComponentImpl) ParseNDJson(ctx *gin.Context) (*types.CommitFilesReq, error) {
 	req := &types.CommitFilesReq{}
+	maxRecordSize, err := maxNDJSONRecordSize(c.config.Git.MaxUnLfsFileSize)
+	if err != nil {
+		return nil, err
+	}
 	scanner := bufio.NewScanner(ctx.Request.Body)
-	maxCapacity := int(c.config.Git.MaxUnLfsFileSize)
-	buf := make([]byte, maxCapacity)
-	scanner.Buffer(buf, maxCapacity)
+	scanner.Buffer(make([]byte, bufio.MaxScanTokenSize), maxRecordSize)
 
 	lineNumber := 0
 	for scanner.Scan() {
 		lineNumber++
-		line := strings.TrimSpace(scanner.Text())
-		// Skip empty lines
-		if line == "" {
+		line := bytes.TrimSpace(scanner.Bytes())
+		if len(line) == 0 {
 			continue
 		}
+
 		var item types.FormField
-		if err := json.Unmarshal([]byte(line), &item); err != nil {
+		if err := json.Unmarshal(line, &item); err != nil {
 			return nil, fmt.Errorf("invalid JSON on line %d: %v", lineNumber, err)
 		}
 
 		// Parse based on key type
 		switch item.Key {
 		case "header":
-			headerBytes, err := json.Marshal(item.Value)
-			if err != nil {
-				return nil, fmt.Errorf("failed to marshal header value on line %d: %v", lineNumber, err)
-			}
-
 			var header types.CommitHeader
-			if err := json.Unmarshal(headerBytes, &header); err != nil {
+			if err := json.Unmarshal(item.Value, &header); err != nil {
 				return nil, fmt.Errorf("invalid header format on line %d: %v", lineNumber, err)
 			}
 			req.Message = header.Summary
 		case "file":
-			fileBytes, err := json.Marshal(item.Value)
-			if err != nil {
-				return nil, fmt.Errorf("failed to marshal file value on line %d: %v", lineNumber, err)
-			}
-
 			var file types.CommitFile
-			if err := json.Unmarshal(fileBytes, &file); err != nil {
+			if err := json.Unmarshal(item.Value, &file); err != nil {
 				return nil, fmt.Errorf("invalid file format on line %d: %v", lineNumber, err)
 			}
 			req.Files = append(req.Files, types.CommitFileReq{
@@ -2907,12 +2925,8 @@ func (c *repoComponentImpl) ParseNDJson(ctx *gin.Context) (*types.CommitFilesReq
 				Action:  types.CommitActionCreate,
 			})
 		case "lfsFile":
-			fileBytes, err := json.Marshal(item.Value)
-			if err != nil {
-				return nil, fmt.Errorf("failed to marshal file value on line %d: %v", lineNumber, err)
-			}
 			var file types.CommitLFSFile
-			if err := json.Unmarshal(fileBytes, &file); err != nil {
+			if err := json.Unmarshal(item.Value, &file); err != nil {
 				return nil, fmt.Errorf("invalid file format on line %d: %v", lineNumber, err)
 			}
 			oid := fmt.Sprintf("%s:%s", file.Algo, file.OID)
@@ -2927,13 +2941,8 @@ func (c *repoComponentImpl) ParseNDJson(ctx *gin.Context) (*types.CommitFilesReq
 			})
 
 		case "deletedFolder":
-			fileBytes, err := json.Marshal(item.Value)
-			if err != nil {
-				return nil, fmt.Errorf("failed to marshal file value on line %d: %v", lineNumber, err)
-			}
-
 			var file types.CommitFile
-			if err := json.Unmarshal(fileBytes, &file); err != nil {
+			if err := json.Unmarshal(item.Value, &file); err != nil {
 				return nil, fmt.Errorf("invalid file format on line %d: %v", lineNumber, err)
 			}
 			req.Files = append(req.Files, types.CommitFileReq{
@@ -2941,13 +2950,8 @@ func (c *repoComponentImpl) ParseNDJson(ctx *gin.Context) (*types.CommitFilesReq
 				Action: types.CommitActionDelete,
 			})
 		case "deletedFile":
-			fileBytes, err := json.Marshal(item.Value)
-			if err != nil {
-				return nil, fmt.Errorf("failed to marshal file value on line %d: %v", lineNumber, err)
-			}
-
 			var file types.CommitFile
-			if err := json.Unmarshal(fileBytes, &file); err != nil {
+			if err := json.Unmarshal(item.Value, &file); err != nil {
 				return nil, fmt.Errorf("invalid file format on line %d: %v", lineNumber, err)
 			}
 			req.Files = append(req.Files, types.CommitFileReq{
@@ -2960,9 +2964,24 @@ func (c *repoComponentImpl) ParseNDJson(ctx *gin.Context) (*types.CommitFilesReq
 		}
 	}
 	if err := scanner.Err(); err != nil {
-		return nil, fmt.Errorf("error reading NDJSON: %v", err)
+		return nil, fmt.Errorf("error reading NDJSON: %w", err)
 	}
 	return req, nil
+}
+
+func maxNDJSONRecordSize(maxUnLfsFileSize int64) (int, error) {
+	if maxUnLfsFileSize <= 0 {
+		return 0, fmt.Errorf("max non-LFS file size must be positive")
+	}
+
+	maxInt := int64(^uint(0) >> 1)
+	maxInputSize := ((maxInt - maxNDJSONRecordOverhead) / 4 * 3) - 2
+	if maxUnLfsFileSize > maxInputSize {
+		return 0, fmt.Errorf("max non-LFS file size is too large: %d", maxUnLfsFileSize)
+	}
+
+	encodedSize := ((maxUnLfsFileSize + 2) / 3) * 4
+	return int(encodedSize + maxNDJSONRecordOverhead), nil
 }
 
 func (c *repoComponentImpl) IsSyncing(ctx context.Context, repoType types.RepositoryType, namespace, name string) (bool, error) {

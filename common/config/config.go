@@ -505,6 +505,7 @@ type Config struct {
 		OperationTimeout       int    `env:"STARHUB_SERVER_GIT_OPERATION_TIMEOUT" default:"10"`
 		CheckFileSizeEnabled   bool   `env:"STARHUB_SERVER_CHECK_FILE_SIZE_ENABLED" default:"true"`
 		MaxUnLfsFileSize       int64  `env:"STARHUB_SERVER_GIT_MAX_UN_LFS_FILE_SIZE" default:"20971520"`
+		MaxHFCommitBodySize    int64  `env:"STARHUB_SERVER_GIT_MAX_HF_COMMIT_BODY_SIZE" default:"268435456"`
 		SkipLfsFileValidation  bool   `env:"STARHUB_SERVER_SKIP_LFS_FILE_VALIDATION" default:"false"`
 		SignatureSecertKey     string `env:"STARHUB_SERVER_GIT_SIGNATURE_SECRET_KEY" default:"git-secret"`
 		MinMultipartSize       int64  `env:"STARHUB_SERVER_GIT_MIN_MULTIPART_SIZE" default:"52428800"`

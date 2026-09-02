@@ -65,6 +65,7 @@ func NewRepoTester(t *testing.T) *RepoTester {
 			MaxRepoBatchNum: 500,
 		},
 	}
+	tester.handler.config.Git.MaxHFCommitBodySize = 1 << 20
 	tester.WithParam("name", "r")
 	tester.WithParam("namespace", "u")
 	return tester
@@ -2613,6 +2614,82 @@ func TestRepoHandler_CommitFiles(t *testing.T) {
 	tester.ResponseEq(
 		t, 200, tester.OKText, nil,
 	)
+}
+
+func TestRepoHandler_CommitFilesHFRejectsOversizedBody(t *testing.T) {
+	for _, tc := range []struct {
+		name          string
+		contentLength int64
+	}{
+		{name: "known content length", contentLength: 256},
+		{name: "chunked body", contentLength: -1},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
+				return rp.CommitFilesHF
+			})
+			tester.handler.config.Git.MaxHFCommitBodySize = 128
+			tester.Gctx().Request.Body = io.NopCloser(strings.NewReader(strings.Repeat("x", 256)))
+			tester.Gctx().Request.ContentLength = tc.contentLength
+
+			if tc.contentLength < 0 {
+				tester.mocks.repo.EXPECT().ParseNDJson(mock.Anything).RunAndReturn(
+					func(ctx *gin.Context) (*types.CommitFilesReq, error) {
+						_, err := io.ReadAll(ctx.Request.Body)
+						return nil, err
+					},
+				).Once()
+			}
+
+			tester.Execute()
+
+			tester.ResponseEqCode(t, http.StatusBadRequest)
+		})
+	}
+}
+
+func TestRepoHandler_CommitFilesHFReturnsPayloadTooLargeForOversizedNonLFSFile(t *testing.T) {
+	tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
+		return rp.CommitFilesHF
+	})
+	tester.WithUser().WithKV("repo_type", types.ModelRepo).WithParam("revision", "main")
+	tester.Gctx().Request.Body = io.NopCloser(strings.NewReader(""))
+
+	tester.mocks.repo.EXPECT().ParseNDJson(mock.Anything).Return(&types.CommitFilesReq{}, nil).Once()
+	tester.mocks.repo.EXPECT().CommitFiles(mock.Anything, mock.Anything).Return(
+		fmt.Errorf("%w: oversized.json", errorx.ErrFileTooLarge),
+	).Once()
+
+	tester.Execute()
+
+	tester.ResponseEqCode(t, http.StatusRequestEntityTooLarge)
+}
+
+func TestRepoHandler_CommitFilesReturnsPayloadTooLargeForOversizedNonLFSFile(t *testing.T) {
+	tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
+		return rp.CommitFiles
+	})
+	req := types.CommitFilesReq{
+		Namespace:   "u",
+		Name:        "r",
+		RepoType:    types.ModelRepo,
+		Revision:    "main",
+		CurrentUser: "u",
+		Message:     "msg",
+		Files: []types.CommitFileReq{
+			{
+				Path:    "oversized.json",
+				Action:  types.CommitActionCreate,
+				Content: "",
+			},
+		},
+	}
+	tester.mocks.repo.EXPECT().CommitFiles(mock.Anything, req).Return(
+		fmt.Errorf("%w: oversized.json", errorx.ErrFileTooLarge),
+	).Once()
+	tester.WithParam("path", "CSG_u/r").WithKV("repo_type", types.ModelRepo).WithParam("revision", "main").WithBody(t, req).WithUser().Execute()
+
+	tester.ResponseEqCode(t, http.StatusRequestEntityTooLarge)
 }
 
 func TestRepoHandler_GetRepos(t *testing.T) {

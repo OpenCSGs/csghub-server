@@ -2059,14 +2059,23 @@ func (h *RepoHandler) CommitFiles(ctx *gin.Context) {
 
 	err = h.c.CommitFiles(ctx.Request.Context(), req)
 	if err != nil {
-		slog.ErrorContext(ctx.Request.Context(), "failed to commit files", slog.Any("error", err))
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		h.handleCommitFilesError(ctx, err)
 		return
 	}
 	httpbase.OK(ctx, nil)
 }
 
 func (h *RepoHandler) CommitFilesHF(ctx *gin.Context) {
+	maxBodySize := h.config.Git.MaxHFCommitBodySize
+	if ctx.Request.ContentLength > maxBodySize {
+		httpbase.BadRequest(ctx, fmt.Sprintf(
+			"HF commit request body exceeds the maximum allowed size: %d > %d",
+			ctx.Request.ContentLength, maxBodySize,
+		))
+		return
+	}
+	ctx.Request.Body = http.MaxBytesReader(ctx.Writer, ctx.Request.Body, maxBodySize)
+
 	req, err := h.c.ParseNDJson(ctx)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "invalid request body", slog.Any("error", err))
@@ -2091,14 +2100,22 @@ func (h *RepoHandler) CommitFilesHF(ctx *gin.Context) {
 
 	err = h.c.CommitFiles(ctx.Request.Context(), *req)
 	if err != nil {
-		slog.ErrorContext(ctx.Request.Context(), "failed to commit files", slog.Any("error", err))
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		h.handleCommitFilesError(ctx, err)
 		return
 	}
 	ctx.JSON(http.StatusOK, gin.H{
 		"commitUrl": fmt.Sprintf("%s/%s", namespace, name),
 		"commitOid": "",
 	})
+}
+
+func (h *RepoHandler) handleCommitFilesError(ctx *gin.Context, err error) {
+	slog.ErrorContext(ctx.Request.Context(), "failed to commit files", slog.Any("error", err))
+	if errors.Is(err, errorx.ErrFileTooLarge) {
+		ctx.JSON(http.StatusRequestEntityTooLarge, gin.H{"error": err.Error()})
+		return
+	}
+	ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 }
 
 // ChangePath    godoc
