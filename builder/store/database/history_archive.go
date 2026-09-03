@@ -11,11 +11,11 @@ import (
 )
 
 var defaultHistoryArchiveTables = []HistoryArchiveTable{
-	{SourceTable: "account_statements", PartitionedTable: "account_statements_partitioned", PrimaryKey: "id", TimeColumn: "created_at", ConflictColumns: []string{"id", "created_at"}},
+	{SourceTable: "account_statements", PartitionedTable: "account_statements_partitioned", PrimaryKey: "id", TimeColumn: "recorded_at", ConflictColumns: []string{"id", "recorded_at"}},
 	{SourceTable: "audit_logs", PartitionedTable: "audit_logs_partitioned", PrimaryKey: "id", TimeColumn: "created_at", ConflictColumns: []string{"id", "created_at"}},
 	{SourceTable: "account_events", PartitionedTable: "account_events_partitioned", PrimaryKey: "event_uuid", TimeColumn: "created_at", ConflictColumns: []string{"event_uuid", "created_at"}},
 	{SourceTable: "events", PartitionedTable: "events_partitioned", PrimaryKey: "id", TimeColumn: "created_at", ConflictColumns: []string{"id", "created_at"}},
-	{SourceTable: "account_meterings", PartitionedTable: "account_meterings_partitioned", PrimaryKey: "id", TimeColumn: "created_at", ConflictColumns: []string{"id", "created_at"}},
+	{SourceTable: "account_meterings", PartitionedTable: "account_meterings_partitioned", PrimaryKey: "id", TimeColumn: "recorded_at", ConflictColumns: []string{"id", "recorded_at"}},
 }
 
 type HistoryArchiveTable struct {
@@ -222,9 +222,10 @@ func (s *historyArchiveStoreImpl) backfillTable(ctx context.Context, table Histo
 		}
 		newLastPK = pkRows[len(pkRows)-1]
 
-		// Ensure the quarterly partitions for these rows' created_at values exist
-		// before the INSERT (the AFTER INSERT trigger on the source table does
-		// not fire for direct inserts into the partitioned table).
+		// Ensure the quarterly partitions for these rows' time-column values
+		// (created_at or recorded_at, depending on the table) exist before the
+		// INSERT (the AFTER INSERT trigger on the source table does not fire
+		// for direct inserts into the partitioned table).
 		if err := ensurePartitionsForPKs(ctx, tx, table, pkRows); err != nil {
 			return err
 		}
@@ -293,12 +294,12 @@ func buildKeysetInsertQuery(table HistoryArchiveTable, lastPK, newLastPK string,
 		[]any{lastPK, newLastPK}
 }
 
-// ensurePartitionsForPKs creates the quarterly partitions for the created_at
-// values of the given primary keys before they are inserted into the
-// partitioned table.
+// ensurePartitionsForPKs creates the quarterly partitions for the time-column
+// values (created_at or recorded_at, depending on the table) of the given
+// primary keys before they are inserted into the partitioned table.
 func ensurePartitionsForPKs(ctx context.Context, tx bun.Tx, table HistoryArchiveTable, pks []string) error {
 	// Cast pks back to the column type via a parameterized IN list so the
-	// created_at values can be read and their quarters ensured.
+	// time-column values can be read and their quarters ensured.
 	q := fmt.Sprintf(`SELECT ensure_quarter_partition(?, src.%s) FROM %s AS src WHERE src.%s IN (?)`,
 		table.TimeColumn, table.SourceTable, table.PrimaryKey)
 	_, err := tx.NewRaw(q, table.PartitionedTable, bun.In(pks)).Exec(ctx)
