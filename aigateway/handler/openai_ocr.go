@@ -3,6 +3,7 @@ package handler
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -32,23 +33,24 @@ const (
 )
 
 var ocrAllowedContentTypes = map[string]struct{}{
-	"image/png":  {},
-	"image/jpeg": {},
-	"image/webp": {},
-	"image/bmp":  {},
-	"image/tiff": {},
+	"image/png":       {},
+	"image/jpeg":      {},
+	"image/webp":      {},
+	"image/bmp":       {},
+	"image/tiff":      {},
+	"application/pdf": {},
 }
 
 // OCR godoc
 // @Security     ApiKey
-// @Summary      Extract text from an image with OCR
-// @Description  Sends a multipart OCR request to a PaddleOCR-capable backend model and returns normalized text, pages and lines. PDF input is not supported yet; page_ranges is accepted for API stability but not forwarded upstream.
+// @Summary      Extract text from an image or document with OCR
+// @Description  Sends a multipart OCR request to a PaddleOCR-capable backend model and returns normalized text and pages. PDF input requires the paddleocr-vl runtime.
 // @Tags         AIGateway
 // @Accept       multipart/form-data
 // @Produce      json
 // @Param        model formData string true "Model ID"
-// @Param        file formData file true "Image file (png, jpeg, webp, bmp, tiff)"
-// @Param        page_ranges formData string false "Page range for multi-page input, e.g. 1,3-5 (reserved)"
+// @Param        file formData file true "Image or PDF file (PDF requires paddleocr-vl)"
+// @Param        page_ranges formData string false "Reserved; non-empty values are rejected"
 // @Param        use_doc_orientation_classify formData bool false "Enable document orientation classification"
 // @Param        use_doc_unwarping formData bool false "Enable document unwarping"
 // @Param        use_textline_orientation formData bool false "Enable text line orientation classification"
@@ -90,13 +92,26 @@ func (h *OpenAIHandlerImpl) OCR(c *gin.Context) {
 		handleModelTargetError(c, ctx, modelID, "failed to get ocr target address", err)
 		return
 	}
-	if !supportsOCRTask(modelTarget.Model) {
+	adapter := h.ocrRegistry.GetAdapter(modelTarget.Model)
+	if adapter == nil {
 		err := fmt.Errorf("model '%s' does not support OCR", modelID)
 		preflight.RecordError(err, "unsupported_model")
 		preflight.End()
 		c.JSON(http.StatusBadRequest, gin.H{"error": types.Error{
 			Code:    "unsupported_model",
 			Message: err.Error(),
+			Type:    "invalid_request_error",
+		}})
+		return
+	}
+	fileType, _ := ocrFileTypeForContentType(fileHeader.Header.Get("Content-Type"))
+	if !adapter.SupportsFileType(fileType) {
+		err := fmt.Errorf("content type %q is not supported by runtime framework %q", fileHeader.Header.Get("Content-Type"), modelTarget.Model.RuntimeFramework)
+		preflight.RecordError(err, "unsupported_file_type")
+		preflight.End()
+		c.JSON(http.StatusBadRequest, gin.H{"error": types.Error{
+			Code:    "invalid_request_error",
+			Message: "PDF input requires a paddleocr-vl runtime",
 			Type:    "invalid_request_error",
 		}})
 		return
@@ -128,17 +143,6 @@ func (h *OpenAIHandlerImpl) OCR(c *gin.Context) {
 		}
 	}
 
-	adapter := h.ocrRegistry.GetAdapter(modelTarget.Model)
-	if adapter == nil {
-		finishModalGenerationTraceWithError(generationRecorder, fmt.Errorf("no ocr adapter for model '%s'", modelID), types.TraceErrUpstreamUnavailable)
-		c.JSON(http.StatusBadRequest, gin.H{"error": types.Error{
-			Code:    "unsupported_model",
-			Message: fmt.Sprintf("no ocr adapter for model '%s'", modelID),
-			Type:    "invalid_request_error",
-		}})
-		return
-	}
-
 	fileBytes, err := readOCRUpload(fileHeader)
 	if err != nil {
 		finishModalGenerationTraceWithError(generationRecorder, err, types.TraceErrUpstreamUnavailable)
@@ -151,13 +155,23 @@ func (h *OpenAIHandlerImpl) OCR(c *gin.Context) {
 
 	bodyBytes, err := adapter.BuildUpstreamRequest(&ocr.UpstreamInput{
 		FileBytes:                 fileBytes,
-		FileType:                  ocr.FileTypeImage,
+		FileType:                  fileType,
 		UseDocOrientationClassify: ocrReq.UseDocOrientationClassify,
 		UseDocUnwarping:           ocrReq.UseDocUnwarping,
 		UseTextlineOrientation:    ocrReq.UseTextlineOrientation,
 		Visualize:                 ocrReq.ReturnImage,
+		ReturnMarkdownImages:      ocrReq.RawResponse,
 	})
 	if err != nil {
+		if errors.Is(err, ocr.ErrUnsupportedOption) {
+			finishModalGenerationTraceWithError(generationRecorder, err, types.TraceErrUpstreamUnavailable)
+			c.JSON(http.StatusBadRequest, gin.H{"error": types.Error{
+				Code:    "invalid_request_error",
+				Message: err.Error(),
+				Type:    "invalid_request_error",
+			}})
+			return
+		}
 		finishModalGenerationTraceWithError(generationRecorder, err, types.TraceErrUpstreamUnavailable)
 		slog.ErrorContext(ctx, "failed to build ocr upstream request", slog.Any("error", err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": types.Error{
@@ -282,11 +296,12 @@ func (h *OpenAIHandlerImpl) parseOCRMultipartForm(c *gin.Context, preflight *pre
 		return fail(fmt.Errorf("only one file is allowed"), "Only one file is allowed")
 	}
 	fileHeader := files[0]
+	pageRanges := strings.TrimSpace(firstMultipartValue(form, "page_ranges"))
+	if pageRanges != "" {
+		return fail(fmt.Errorf("page_ranges is not supported"), "page_ranges is not supported")
+	}
 
 	contentType := strings.ToLower(strings.TrimSpace(fileHeader.Header.Get("Content-Type")))
-	if contentType == "application/pdf" {
-		return fail(fmt.Errorf("pdf input is not supported yet"), "PDF input is not supported yet")
-	}
 	if _, allowed := ocrAllowedContentTypes[contentType]; !allowed {
 		return fail(fmt.Errorf("unsupported content type %q", contentType), fmt.Sprintf("Unsupported file content type: %s", contentType))
 	}
@@ -296,13 +311,24 @@ func (h *OpenAIHandlerImpl) parseOCRMultipartForm(c *gin.Context, preflight *pre
 
 	return &types.OCRRequest{
 		Model:                     modelID,
-		PageRanges:                strings.TrimSpace(firstMultipartValue(form, "page_ranges")),
+		PageRanges:                pageRanges,
 		UseDocOrientationClassify: optionalMultipartBool(form, "use_doc_orientation_classify"),
 		UseDocUnwarping:           optionalMultipartBool(form, "use_doc_unwarping"),
 		UseTextlineOrientation:    optionalMultipartBool(form, "use_textline_orientation"),
 		ReturnImage:               strings.EqualFold(firstMultipartValue(form, "return_image"), "true"),
 		RawResponse:               strings.EqualFold(firstMultipartValue(form, "raw_response"), "true"),
 	}, fileHeader, true
+}
+
+func ocrFileTypeForContentType(contentType string) (int, bool) {
+	contentType = strings.ToLower(strings.TrimSpace(contentType))
+	if contentType == "application/pdf" {
+		return ocr.FileTypePDF, true
+	}
+	if _, allowed := ocrAllowedContentTypes[contentType]; allowed {
+		return ocr.FileTypeImage, true
+	}
+	return 0, false
 }
 
 func optionalMultipartBool(form *multipart.Form, key string) *bool {
@@ -326,13 +352,4 @@ func readOCRUpload(fileHeader *multipart.FileHeader) ([]byte, error) {
 		_ = f.Close()
 	}()
 	return io.ReadAll(f)
-}
-
-// supportsOCRTask reports whether the model can serve OCR requests. Logic is
-// delegated to the OCR adapter registry so handler and adapter stay aligned.
-func supportsOCRTask(model *types.Model) bool {
-	if model == nil {
-		return false
-	}
-	return ocr.NewPaddleXAdapter().CanHandle(model)
 }

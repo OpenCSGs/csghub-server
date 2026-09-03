@@ -41,4 +41,4 @@ ENV HUGGINGFACE_HUB_CACHE=/workspace/ \
 
 EXPOSE 8000
 ENTRYPOINT ["/usr/bin/dumb-init", "--"]
-CMD ["/etc/csghub/serve.sh"]
+CMD ["/etc/csghub/serve.sh", "paddleocr"]
