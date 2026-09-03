@@ -3,6 +3,7 @@ package ocr
 import (
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -37,9 +38,40 @@ func TestPaddleXVLAdapter_BuildUpstreamRequest(t *testing.T) {
 	assert.Equal(t, base64.StdEncoding.EncodeToString([]byte("pdf-bytes")), got["file"])
 	assert.EqualValues(t, FileTypePDF, got["fileType"])
 	assert.Equal(t, true, got["useDocOrientationClassify"])
+	assert.Equal(t, false, got["useDocUnwarping"])
 	assert.Equal(t, true, got["visualize"])
 	assert.Equal(t, true, got["returnMarkdownImages"])
-	assert.NotContains(t, got, "useDocUnwarping")
+}
+
+func TestPaddleXVLAdapter_PreprocessingDefaultsAndOptIn(t *testing.T) {
+	tests := []struct {
+		name            string
+		orientation     *bool
+		unwarping       *bool
+		wantOrientation bool
+		wantUnwarping   bool
+	}{
+		{name: "defaults disabled"},
+		{name: "orientation enabled", orientation: boolPtr(true), wantOrientation: true},
+		{name: "unwarping enabled", unwarping: boolPtr(true), wantUnwarping: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			body, err := NewPaddleXVLAdapter().BuildUpstreamRequest(&UpstreamInput{
+				FileBytes:                 []byte("image"),
+				FileType:                  FileTypeImage,
+				UseDocOrientationClassify: tt.orientation,
+				UseDocUnwarping:           tt.unwarping,
+			})
+			require.NoError(t, err)
+
+			var got map[string]any
+			require.NoError(t, json.Unmarshal(body, &got))
+			assert.Equal(t, tt.wantOrientation, got["useDocOrientationClassify"])
+			assert.Equal(t, tt.wantUnwarping, got["useDocUnwarping"])
+		})
+	}
 }
 
 func TestPaddleXVLAdapter_RejectsClassicTextlineOption(t *testing.T) {
@@ -80,7 +112,7 @@ const paddleXVLSuccessBody = `{
 
 func TestPaddleXVLAdapter_TransformResponse(t *testing.T) {
 	a := NewPaddleXVLAdapter()
-	resp, err := a.TransformResponse([]byte(paddleXVLSuccessBody), &ResponseOptions{ModelID: "owner/vl:1"})
+	resp, err := a.TransformResponse([]byte(paddleXVLSuccessBody), &ResponseOptions{ModelID: "owner/vl:1", ReturnImage: true})
 	require.NoError(t, err)
 
 	assert.Equal(t, "owner/vl:1", resp.Model)
@@ -89,10 +121,39 @@ func TestPaddleXVLAdapter_TransformResponse(t *testing.T) {
 	assert.Equal(t, "Title\nFirst paragraph", resp.Pages[0].Text)
 	assert.Equal(t, "# Title\n\nFirst paragraph", resp.Pages[0].Markdown)
 	assert.Empty(t, resp.Pages[0].Lines)
+	require.Len(t, resp.Pages[0].Images, 1)
+	assert.Equal(t, types.OCRImage{Name: "imgs/figure_1.jpg", Content: "aW1hZ2U="}, resp.Pages[0].Images[0])
 	assert.Equal(t, "| A | B |\n|---|---|", resp.Pages[1].Markdown)
+	assert.Empty(t, resp.Pages[1].Images)
 	assert.Equal(t, 2, resp.Usage.Pages)
 	assert.Equal(t, 1, resp.Usage.Images)
 	assert.Nil(t, resp.RawResult)
+}
+
+func TestPaddleXVLAdapter_TransformResponseOmitsImagesWithoutReturnImage(t *testing.T) {
+	resp, err := NewPaddleXVLAdapter().TransformResponse([]byte(paddleXVLSuccessBody), &ResponseOptions{ModelID: "owner/vl:1"})
+	require.NoError(t, err)
+
+	require.Len(t, resp.Pages, 2)
+	assert.Empty(t, resp.Pages[0].Images)
+	assert.Empty(t, resp.Pages[1].Images)
+}
+
+func TestPaddleXVLAdapter_TransformResponseToleratesUnexpectedMarkdownImages(t *testing.T) {
+	for _, imagesValue := range []string{`[]`, `"unexpected"`, `{"imgs/figure_1.jpg": 123}`} {
+		body := fmt.Sprintf(`{
+		  "errorCode": 0,
+		  "result": {"layoutParsingResults": [{
+		    "prunedResult": {"parsing_res_list": [{"block_content": "page text"}]},
+		    "markdown": {"text": "# Page text", "images": %s}
+		  }]}
+		}`, imagesValue)
+		resp, err := NewPaddleXVLAdapter().TransformResponse([]byte(body), &ResponseOptions{ReturnImage: true})
+		require.NoError(t, err, imagesValue)
+		require.Len(t, resp.Pages, 1, imagesValue)
+		assert.Equal(t, "# Page text", resp.Pages[0].Markdown, imagesValue)
+		assert.Empty(t, resp.Pages[0].Images, imagesValue)
+	}
 }
 
 func TestPaddleXVLAdapter_TransformResponseRawResult(t *testing.T) {
