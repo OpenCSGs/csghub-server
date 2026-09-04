@@ -44,6 +44,7 @@ type runtimeArchitectureComponentImpl struct {
 	runtimeArchStore          database.RuntimeArchitecturesStore
 	runtimeFrameworksStore    database.RuntimeFrameworksStore
 	tagStore                  database.TagStore
+	tagRuleStore              database.TagRuleStore
 	tagComponent              TagComponent
 	resouceModelStore         database.ResourceModelStore
 	metadataStore             database.MetadataStore
@@ -77,6 +78,7 @@ func NewRuntimeArchitectureComponent(config *config.Config) (RuntimeArchitecture
 	c.runtimeFrameworksStore = database.NewRuntimeFrameworksStore()
 	c.runtimeArchStore = database.NewRuntimeArchitecturesStore()
 	c.tagStore = database.NewTagStore()
+	c.tagRuleStore = database.NewTagRuleStore()
 	c.resouceModelStore = database.NewResourceModelStore()
 	c.metadataStore = database.NewMetadataStore()
 	c.llmConfigStore = database.NewLLMConfigStore(config)
@@ -815,6 +817,98 @@ func (c *runtimeArchitectureComponentImpl) InitRuntimeFrameworkAndArchitectures(
 	return nil
 }
 
+func (c *runtimeArchitectureComponentImpl) syncEvaluationDatasets(ctx context.Context) error {
+	configPaths, err := getJsonfiles(filepath.Join("evaluation", "datasets"))
+	if err != nil {
+		return fmt.Errorf("getting evaluation dataset configs: %w", err)
+	}
+	engineConfigPaths, err := getJsonfiles("evaluation")
+	if err != nil {
+		return fmt.Errorf("getting evaluation engine configs: %w", err)
+	}
+	engineConfigs := make(map[string]string, len(engineConfigPaths))
+	for _, engineConfigPath := range engineConfigPaths {
+		runtimeFramework := strings.TrimSuffix(filepath.Base(engineConfigPath), filepath.Ext(engineConfigPath))
+		engineConfigs[runtimeFramework] = engineConfigPath
+	}
+
+	var syncErrors []error
+	for _, configPath := range configPaths {
+		if !strings.HasSuffix(filepath.Base(configPath), "-datasets.json") {
+			continue
+		}
+		jsonData, readErr := os.ReadFile(configPath)
+		if readErr != nil {
+			syncErrors = append(syncErrors, fmt.Errorf("reading evaluation dataset config %s: %w", configPath, readErr))
+			continue
+		}
+		var datasetConfig types.EvaluationDatasetsConfig
+		if parseErr := json.Unmarshal(jsonData, &datasetConfig); parseErr != nil {
+			syncErrors = append(syncErrors, fmt.Errorf("parsing evaluation dataset config %s: %w", configPath, parseErr))
+			continue
+		}
+		if validateErr := validateEvaluationDatasetConfigFile(configPath, datasetConfig); validateErr != nil {
+			syncErrors = append(syncErrors, fmt.Errorf("validating evaluation dataset config %s: %w", configPath, validateErr))
+			continue
+		}
+
+		for _, runtimeFramework := range datasetConfig.RuntimeFrameworkNames() {
+			engineConfigPath, ok := engineConfigs[runtimeFramework]
+			if !ok {
+				continue
+			}
+			engineConfigData, readErr := os.ReadFile(engineConfigPath)
+			if readErr != nil {
+				syncErrors = append(syncErrors, fmt.Errorf("reading evaluation engine config %s: %w", engineConfigPath, readErr))
+				continue
+			}
+			enabled, parseErr := evaluationDatasetsEnabled(engineConfigData, runtimeFramework)
+			if parseErr != nil {
+				syncErrors = append(syncErrors, fmt.Errorf("parsing evaluation engine config %s: %w", engineConfigPath, parseErr))
+				continue
+			}
+			if !enabled {
+				continue
+			}
+			if syncErr := c.tagRuleStore.SyncEvaluationDatasets(
+				ctx,
+				runtimeFramework,
+				datasetConfig.Datasets,
+				datasetConfig.Prune,
+			); syncErr != nil {
+				syncErrors = append(syncErrors, fmt.Errorf(
+					"syncing evaluation dataset config %s for %s: %w",
+					configPath,
+					runtimeFramework,
+					syncErr,
+				))
+			}
+		}
+	}
+	return errors.Join(syncErrors...)
+}
+
+func validateEvaluationDatasetConfigFile(configPath string, datasetConfig types.EvaluationDatasetsConfig) error {
+	fileName := filepath.Base(configPath)
+	fileRuntimeFramework := strings.TrimSuffix(fileName, "-datasets.json")
+	if datasetConfig.RuntimeFramework != fileRuntimeFramework {
+		return fmt.Errorf(
+			"runtime_framework %q does not match filename %q",
+			datasetConfig.RuntimeFramework,
+			fileRuntimeFramework,
+		)
+	}
+	return datasetConfig.Validate()
+}
+
+func evaluationDatasetsEnabled(jsonData []byte, runtimeFramework string) (bool, error) {
+	var engineConfig types.EngineConfig
+	if err := json.Unmarshal(jsonData, &engineConfig); err != nil {
+		return false, err
+	}
+	return engineConfig.EngineName == runtimeFramework && engineConfig.Enabled == 1, nil
+}
+
 // update by engine type
 func (c *runtimeArchitectureComponentImpl) UpdateRuntimeFrameworkByType(ctx context.Context, engineType int) error {
 	var jsonFiles []string
@@ -884,6 +978,11 @@ func (c *runtimeArchitectureComponentImpl) UpdateRuntimeFrameworkByType(ctx cont
 			slog.Error("failed to update runtime_framework and archs", slog.Any("file", filePath), slog.Any("error", err))
 		}
 
+	}
+	if engineType == types.EvaluationType {
+		if err = c.syncEvaluationDatasets(ctx); err != nil {
+			return fmt.Errorf("syncing evaluation datasets: %w", err)
+		}
 	}
 	return nil
 }

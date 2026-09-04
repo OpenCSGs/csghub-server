@@ -334,6 +334,7 @@ func NewTestRuntimeArchitectureComponent(stores *tests.MockStores, repoComponent
 		runtimeArchStore:          stores.RuntimeArch,
 		resouceModelStore:         stores.ResourceModel,
 		tagStore:                  stores.Tag,
+		tagRuleStore:              stores.TagRule,
 		metadataStore:             stores.Metadata,
 		gitServer:                 gitServer,
 	}

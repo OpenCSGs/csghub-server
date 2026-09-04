@@ -1,0 +1,865 @@
+{
+  "version": "1.10.0",
+  "runtime_framework": "evalscope",
+  "compatible_runtime_frameworks": [
+    "amd-evalscope"
+  ],
+  "prune": true,
+  "datasets": [
+    {
+      "namespace": "HuggingFaceH4",
+      "repo_name": "aime_2024",
+      "category": "evaluation",
+      "tag_name": "examination",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "evalscope",
+      "repo_name": "aime25",
+      "category": "evaluation",
+      "tag_name": "examination",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "AI-ModelScope",
+      "repo_name": "alpaca_eval",
+      "category": "evaluation",
+      "tag_name": "other",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "modelscope",
+      "repo_name": "ai2_arc",
+      "category": "evaluation",
+      "tag_name": "examination",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "AI-ModelScope",
+      "repo_name": "arena-hard-auto-v0.1",
+      "category": "evaluation",
+      "tag_name": "reasoning",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "modelscope",
+      "repo_name": "bbh",
+      "category": "evaluation",
+      "tag_name": "reasoning",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "modelscope",
+      "repo_name": "ceval-exam",
+      "category": "evaluation",
+      "tag_name": "examination",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "AI-ModelScope",
+      "repo_name": "Chinese-SimpleQA",
+      "category": "evaluation",
+      "tag_name": "knowledge",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "modelscope",
+      "repo_name": "cmmlu",
+      "category": "evaluation",
+      "tag_name": "examination",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "modelscope",
+      "repo_name": "competition_math",
+      "category": "evaluation",
+      "tag_name": "examination",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "yale-nlp",
+      "repo_name": "DocMath-Eval",
+      "category": "evaluation",
+      "tag_name": "reasoning",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "AI-ModelScope",
+      "repo_name": "DROP",
+      "category": "evaluation",
+      "tag_name": "reasoning",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "iic",
+      "repo_name": "frames",
+      "category": "evaluation",
+      "tag_name": "understanding",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "modelscope",
+      "repo_name": "gpqa",
+      "category": "evaluation",
+      "tag_name": "examination",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "modelscope",
+      "repo_name": "gsm8k",
+      "category": "evaluation",
+      "tag_name": "examination",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "modelscope",
+      "repo_name": "hellaswag",
+      "category": "evaluation",
+      "tag_name": "reasoning",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "modelscope",
+      "repo_name": "humaneval",
+      "category": "evaluation",
+      "tag_name": "code",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "modelscope",
+      "repo_name": "ifeval",
+      "category": "evaluation",
+      "tag_name": "other",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "modelscope",
+      "repo_name": "iquiz",
+      "category": "evaluation",
+      "tag_name": "other",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "AI-ModelScope",
+      "repo_name": "code_generation_lite",
+      "category": "evaluation",
+      "tag_name": "code",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "AI-ModelScope",
+      "repo_name": "MATH-500",
+      "category": "evaluation",
+      "tag_name": "examination",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "HiDolphin",
+      "repo_name": "MaritimeBench",
+      "category": "evaluation",
+      "tag_name": "knowledge",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "modelscope",
+      "repo_name": "mmlu",
+      "category": "evaluation",
+      "tag_name": "examination",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "modelscope",
+      "repo_name": "mmlu-pro",
+      "category": "evaluation",
+      "tag_name": "examination",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "AI-ModelScope",
+      "repo_name": "mmlu-redux-2.0",
+      "category": "evaluation",
+      "tag_name": "examination",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "AI-ModelScope",
+      "repo_name": "MuSR",
+      "category": "evaluation",
+      "tag_name": "reasoning",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "AI-ModelScope",
+      "repo_name": "Needle-in-a-Haystack-Corpus",
+      "category": "evaluation",
+      "tag_name": "other",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "Qwen",
+      "repo_name": "ProcessBench",
+      "category": "evaluation",
+      "tag_name": "reasoning",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "modelscope",
+      "repo_name": "race",
+      "category": "evaluation",
+      "tag_name": "knowledge",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "AI-ModelScope",
+      "repo_name": "SimpleQA",
+      "category": "evaluation",
+      "tag_name": "knowledge",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "m-a-p",
+      "repo_name": "SuperGPQA",
+      "category": "evaluation",
+      "tag_name": "examination",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "AI-ModelScope",
+      "repo_name": "ToolBench-Statich",
+      "category": "evaluation",
+      "tag_name": "other",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "modelscope",
+      "repo_name": "trivia_qa",
+      "category": "evaluation",
+      "tag_name": "knowledge",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "modelscope",
+      "repo_name": "truthful_qa",
+      "category": "evaluation",
+      "tag_name": "other",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "AI-ModelScope",
+      "repo_name": "winogrande_val",
+      "category": "evaluation",
+      "tag_name": "reasoning",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "evalscope",
+      "repo_name": "acebench",
+      "category": "evaluation",
+      "tag_name": "other",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "evalscope",
+      "repo_name": "AIR-Bench",
+      "category": "evaluation",
+      "tag_name": "understanding",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "opencompass",
+      "repo_name": "agieval",
+      "category": "evaluation",
+      "tag_name": "examination",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "evalscope",
+      "repo_name": "aime26",
+      "category": "evaluation",
+      "tag_name": "examination",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "evalscope",
+      "repo_name": "arc-agi-2",
+      "category": "evaluation",
+      "tag_name": "reasoning",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "evalscope",
+      "repo_name": "arxivmath",
+      "category": "evaluation",
+      "tag_name": "examination",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "liangzid",
+      "repo_name": "arxivrollbench",
+      "category": "evaluation",
+      "tag_name": "reasoning",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "liangzid",
+      "repo_name": "arxivrollbench-full",
+      "category": "evaluation",
+      "tag_name": "reasoning",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "evalscope",
+      "repo_name": "BabyVision",
+      "category": "evaluation",
+      "tag_name": "understanding",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "evalscope",
+      "repo_name": "bigcodebench",
+      "category": "evaluation",
+      "tag_name": "code",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "evalscope",
+      "repo_name": "bigcodebench-hard",
+      "category": "evaluation",
+      "tag_name": "code",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "evalscope",
+      "repo_name": "browse_comp",
+      "category": "evaluation",
+      "tag_name": "other",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "princeton-nlp",
+      "repo_name": "CharXiv",
+      "category": "evaluation",
+      "tag_name": "understanding",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "tencent-community",
+      "repo_name": "CL-bench",
+      "category": "evaluation",
+      "tag_name": "reasoning",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "evalscope",
+      "repo_name": "cmath",
+      "category": "evaluation",
+      "tag_name": "examination",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "claw-eval",
+      "repo_name": "Claw-Eval",
+      "category": "evaluation",
+      "tag_name": "understanding",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "lmms-lab",
+      "repo_name": "common_voice_15",
+      "category": "evaluation",
+      "tag_name": "understanding",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "evalscope",
+      "repo_name": "deep-swe",
+      "category": "evaluation",
+      "tag_name": "code",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "google",
+      "repo_name": "deepsearchqa",
+      "category": "evaluation",
+      "tag_name": "other",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "evalscope",
+      "repo_name": "EmbSpatial-Bench",
+      "category": "evaluation",
+      "tag_name": "understanding",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "evalscope",
+      "repo_name": "ERQA",
+      "category": "evaluation",
+      "tag_name": "understanding",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "gaia-benchmark",
+      "repo_name": "GAIA",
+      "category": "evaluation",
+      "tag_name": "reasoning",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "openai-mirror",
+      "repo_name": "gdpval",
+      "category": "evaluation",
+      "tag_name": "other",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "evalscope",
+      "repo_name": "hmmt_feb_2025",
+      "category": "evaluation",
+      "tag_name": "examination",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "evalscope",
+      "repo_name": "hmmt_feb_2026",
+      "category": "evaluation",
+      "tag_name": "examination",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "evalscope",
+      "repo_name": "imo-answerbench",
+      "category": "evaluation",
+      "tag_name": "examination",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "evalscope",
+      "repo_name": "job-bench",
+      "category": "evaluation",
+      "tag_name": "other",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "evalscope",
+      "repo_name": "K2VendorVerifier",
+      "category": "evaluation",
+      "tag_name": "other",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "evalscope",
+      "repo_name": "KINA",
+      "category": "evaluation",
+      "tag_name": "knowledge",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "evalscope",
+      "repo_name": "locomo",
+      "category": "evaluation",
+      "tag_name": "other",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "ZhipuAI",
+      "repo_name": "LongBench-v2",
+      "category": "evaluation",
+      "tag_name": "other",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "evalscope",
+      "repo_name": "longmemeval-cleaned",
+      "category": "evaluation",
+      "tag_name": "other",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "HiDolphin",
+      "repo_name": "MaritimeOCRBench",
+      "category": "evaluation",
+      "tag_name": "understanding",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "evalscope",
+      "repo_name": "MeasureBench",
+      "category": "evaluation",
+      "tag_name": "understanding",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "lmms-lab",
+      "repo_name": "MIA-Bench",
+      "category": "evaluation",
+      "tag_name": "understanding",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "evalscope",
+      "repo_name": "MiniMaxVendorVerifier",
+      "category": "evaluation",
+      "tag_name": "other",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "lmms-lab",
+      "repo_name": "mmau",
+      "category": "evaluation",
+      "tag_name": "understanding",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "openai-mirror",
+      "repo_name": "MMMLU",
+      "category": "evaluation",
+      "tag_name": "knowledge",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "AI-ModelScope",
+      "repo_name": "msr-vtt",
+      "category": "evaluation",
+      "tag_name": "understanding",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "evalscope",
+      "repo_name": "MSVD",
+      "category": "evaluation",
+      "tag_name": "understanding",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "PKU-Alignment",
+      "repo_name": "MVBench",
+      "category": "evaluation",
+      "tag_name": "understanding",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "evalscope",
+      "repo_name": "officeqa",
+      "category": "evaluation",
+      "tag_name": "other",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "OpenDataLab",
+      "repo_name": "OmniDocBench",
+      "category": "evaluation",
+      "tag_name": "understanding",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "evalscope",
+      "repo_name": "PerspectiveGap",
+      "category": "evaluation",
+      "tag_name": "other",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "evalscope",
+      "repo_name": "researchrubrics",
+      "category": "evaluation",
+      "tag_name": "reasoning",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "evalscope",
+      "repo_name": "Seed-TTS-Eval",
+      "category": "evaluation",
+      "tag_name": "understanding",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "princeton-nlp",
+      "repo_name": "SWE-bench_Lite",
+      "category": "evaluation",
+      "tag_name": "code",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "SWE-bench",
+      "repo_name": "SWE-bench_Multilingual",
+      "category": "evaluation",
+      "tag_name": "code",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "ScaleAI",
+      "repo_name": "SWE-bench_Pro",
+      "category": "evaluation",
+      "tag_name": "code",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "ScaleAI",
+      "repo_name": "MCP-Atlas",
+      "category": "evaluation",
+      "tag_name": "other",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "princeton-nlp",
+      "repo_name": "SWE-bench_Verified",
+      "category": "evaluation",
+      "tag_name": "code",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "evalscope",
+      "repo_name": "swe-bench-verified-mini",
+      "category": "evaluation",
+      "tag_name": "code",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "evalscope",
+      "repo_name": "tau3-bench-data",
+      "category": "evaluation",
+      "tag_name": "reasoning",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "evalscope",
+      "repo_name": "TIR-Bench",
+      "category": "evaluation",
+      "tag_name": "understanding",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "evalscope",
+      "repo_name": "TVBench",
+      "category": "evaluation",
+      "tag_name": "understanding",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "MME-Benchmarks",
+      "repo_name": "Video-MME-v2",
+      "category": "evaluation",
+      "tag_name": "understanding",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "lmms-lab",
+      "repo_name": "VQAv2",
+      "category": "evaluation",
+      "tag_name": "understanding",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "lmms-lab",
+      "repo_name": "WenetSpeech",
+      "category": "evaluation",
+      "tag_name": "understanding",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "bytedance-community",
+      "repo_name": "WideSearch",
+      "category": "evaluation",
+      "tag_name": "other",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "evalscope",
+      "repo_name": "WorldVQA",
+      "category": "evaluation",
+      "tag_name": "understanding",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    }
+  ]
+}
