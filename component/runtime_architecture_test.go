@@ -3,6 +3,8 @@ package component
 import (
 	"context"
 	"errors"
+	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/mock"
@@ -584,4 +586,120 @@ func TestRuntimeArchComponent_ScanModel_UpdateRuntimeFrameworkTagError(t *testin
 	// Assertions
 	require.NotNil(t, err)
 	require.Contains(t, err.Error(), "fail to update model metadata")
+}
+
+func TestRuntimeArchitectureComponent_SyncEvaluationDatasets(t *testing.T) {
+	chdirToServerCommand(t)
+	ctx := context.Background()
+	rc := initializeTestRuntimeArchComponent(ctx, t)
+	for _, runtimeFramework := range []string{"evalscope", "amd-evalscope"} {
+		rc.mocks.stores.TagRuleMock().
+			EXPECT().
+			SyncEvaluationDatasets(
+				ctx,
+				runtimeFramework,
+				mock.MatchedBy(func(datasets []types.EvaluationDatasetConfig) bool {
+					return len(datasets) > 0
+				}),
+				true,
+			).
+			Return(nil)
+	}
+
+	require.NoError(t, rc.syncEvaluationDatasets(ctx))
+}
+
+func TestRuntimeArchitectureComponent_SyncEvaluationDatasetsError(t *testing.T) {
+	chdirToServerCommand(t)
+	ctx := context.Background()
+	rc := initializeTestRuntimeArchComponent(ctx, t)
+	syncErr := errors.New("sync failed")
+	rc.mocks.stores.TagRuleMock().
+		EXPECT().
+		SyncEvaluationDatasets(ctx, "evalscope", mock.Anything, true).
+		Return(syncErr)
+	rc.mocks.stores.TagRuleMock().
+		EXPECT().
+		SyncEvaluationDatasets(ctx, "amd-evalscope", mock.Anything, true).
+		Return(nil)
+
+	err := rc.syncEvaluationDatasets(ctx)
+	require.ErrorIs(t, err, syncErr)
+	require.Contains(t, err.Error(), "evalscope")
+}
+
+func TestEvaluationDatasetsEnabled(t *testing.T) {
+	t.Run("enabled evalscope", func(t *testing.T) {
+		enabled, err := evaluationDatasetsEnabled(
+			[]byte(`{"engine_name":"evalscope","enabled":1}`),
+			"evalscope",
+		)
+		require.NoError(t, err)
+		require.True(t, enabled)
+	})
+
+	t.Run("disabled evalscope", func(t *testing.T) {
+		enabled, err := evaluationDatasetsEnabled(
+			[]byte(`{"engine_name":"evalscope","enabled":0}`),
+			"evalscope",
+		)
+		require.NoError(t, err)
+		require.False(t, enabled)
+	})
+
+	t.Run("enabled other evaluation framework", func(t *testing.T) {
+		enabled, err := evaluationDatasetsEnabled(
+			[]byte(`{"engine_name":"opencompass","enabled":1}`),
+			"opencompass",
+		)
+		require.NoError(t, err)
+		require.True(t, enabled)
+	})
+
+	t.Run("framework mismatch", func(t *testing.T) {
+		enabled, err := evaluationDatasetsEnabled(
+			[]byte(`{"engine_name":"opencompass","enabled":1}`),
+			"evalscope",
+		)
+		require.NoError(t, err)
+		require.False(t, enabled)
+	})
+
+	t.Run("invalid config", func(t *testing.T) {
+		_, err := evaluationDatasetsEnabled([]byte(`{`), "evalscope")
+		require.Error(t, err)
+	})
+}
+
+func TestValidateEvaluationDatasetConfigFile(t *testing.T) {
+	config := types.EvaluationDatasetsConfig{
+		RuntimeFramework: "evalscope",
+		Datasets: []types.EvaluationDatasetConfig{{
+			Namespace:        "evalscope",
+			RepoName:         "aime25",
+			Category:         "evaluation",
+			TagName:          "examination",
+			RepoType:         "dataset",
+			RuntimeFramework: "evalscope",
+			Source:           "ms",
+		}},
+	}
+
+	require.NoError(t, validateEvaluationDatasetConfigFile("evalscope-datasets.json", config))
+	require.Error(t, validateEvaluationDatasetConfigFile("opencompass-datasets.json", config))
+}
+
+func TestGetEvaluationDatasetJsonFilesFromDeploymentPaths(t *testing.T) {
+	chdirToServerCommand(t)
+	commandFiles, err := getJsonfiles(filepath.Join("evaluation", "datasets"))
+	require.NoError(t, err)
+	require.Len(t, commandFiles, 1)
+	require.Equal(t, "evalscope-datasets.json", filepath.Base(commandFiles[0]))
+}
+
+func chdirToServerCommand(t *testing.T) {
+	t.Helper()
+	_, testFile, _, ok := runtime.Caller(0)
+	require.True(t, ok)
+	t.Chdir(filepath.Join(filepath.Dir(testFile), "..", "cmd", "csghub-server"))
 }

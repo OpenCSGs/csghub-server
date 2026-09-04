@@ -10,14 +10,15 @@
 export DATASET_IDS="James/civil_comments"
 export MODEL_IDS="your-model"
 export USE_CUSTOM_DATASETS="false"
+export EVALSCOPE_GENERATION_CONFIG='{"max_tokens":30000,"do_sample":true,"temperature":0.6,"top_p":0.95,"top_k":20}'
+export EVALUATION_LIMIT=10
 ./start.sh
 ```
 
 ### 预期日志
 
 ```
-[DEBUG] Successfully imported evalscope v1.1.1+ API
-[DEBUG] Using BENCHMARK_REGISTRY from evalscope.benchmarks
+[DEBUG] Successfully imported EvalScope v1.10.0 API
 ✓ Custom dataset 'James/civil_comments' registered successfully as 'James_civil_comments'
 [SUCCESS] Found task name: James_civil_comments
 Loading civil_comments from remote: James/civil_comments, split: test
@@ -41,7 +42,7 @@ Loading civil_comments from remote: James/civil_comments, split: test
 
 ## 🔧 技术细节
 
-### Evalscope v1.1.1 API
+### EvalScope v1.10.0 API
 
 **正确的导入：**
 ```python
@@ -65,6 +66,12 @@ BENCHMARK_REGISTRY['benchmark_name'] = meta
 ```
 
 ## 📝 支持的数据集
+
+### AIME2025
+
+- **仓库**: `evalscope/aime25`
+- **子集**: 由 EvalScope 官方 benchmark metadata 管理
+- **适配器**: EvalScope 1.10.0 官方 `AIME25Adapter`
 
 ### civil_comments (任意组织)
 
@@ -130,6 +137,6 @@ for dataset_id in dataset_id_list:
 
 ---
 
-**版本**: Evalscope v1.1.1
+**版本**: EvalScope v1.10.0
 **状态**: ✅ 已测试并修复
 
