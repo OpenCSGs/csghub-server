@@ -41,11 +41,20 @@ type OCRResponse struct {
 
 // OCRPage is the recognized content of a single page or image.
 type OCRPage struct {
-	Index    int       `json:"index"`
-	Text     string    `json:"text"`
-	Markdown string    `json:"markdown,omitempty"`
-	Lines    []OCRLine `json:"lines"`
-	ImageURL string    `json:"image_url,omitempty"`
+	Index    int        `json:"index"`
+	Text     string     `json:"text"`
+	Markdown string     `json:"markdown,omitempty"`
+	Lines    []OCRLine  `json:"lines"`
+	ImageURL string     `json:"image_url,omitempty"`
+	Images   []OCRImage `json:"images,omitempty"`
+}
+
+// OCRImage is one embedded image extracted from a page. Name matches the
+// reference used in Markdown (for example imgs/img_in_image_box_*.jpg) and
+// Content carries the base64-encoded image bytes.
+type OCRImage struct {
+	Name    string `json:"name"`
+	Content string `json:"content"`
 }
 
 // OCRLine is one recognized text line with its confidence and bounding box.

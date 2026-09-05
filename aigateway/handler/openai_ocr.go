@@ -54,8 +54,8 @@ var ocrAllowedContentTypes = map[string]struct{}{
 // @Param        use_doc_orientation_classify formData bool false "Enable document orientation classification"
 // @Param        use_doc_unwarping formData bool false "Enable document unwarping"
 // @Param        use_textline_orientation formData bool false "Enable text line orientation classification"
-// @Param        return_image formData bool false "Ask upstream to visualize results (images surface only in raw_result)"
-// @Param        raw_response formData bool false "Include the raw upstream OCR result in the response"
+// @Param        return_image formData bool false "Return embedded document images in pages[].images (base64)"
+// @Param        raw_response formData bool false "Include the raw upstream OCR result in the response (does not request embedded markdown images; pass return_image=true for those)"
 // @Success      200  {object}  types.OCRResponse "OK"
 // @Failure      400  {object}  error "Bad request"
 // @Failure      404  {object}  error "Model not found"
@@ -160,7 +160,7 @@ func (h *OpenAIHandlerImpl) OCR(c *gin.Context) {
 		UseDocUnwarping:           ocrReq.UseDocUnwarping,
 		UseTextlineOrientation:    ocrReq.UseTextlineOrientation,
 		Visualize:                 ocrReq.ReturnImage,
-		ReturnMarkdownImages:      ocrReq.RawResponse,
+		ReturnMarkdownImages:      ocrReq.ReturnImage,
 	})
 	if err != nil {
 		if errors.Is(err, ocr.ErrUnsupportedOption) {
