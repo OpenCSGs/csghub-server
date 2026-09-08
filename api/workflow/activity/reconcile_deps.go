@@ -28,9 +28,13 @@ func NewDeployerForReconcile(cfg *config.Config) deploy.Deployer {
 }
 
 // NewMetricCollectorForReconcile builds a MetricCollector used by the
-// temporal cron collector activity. Returns nil on failure (worker still
-// starts); the collector activity will be a no-op when the pointer is nil.
+// temporal cron collector activity. Returns nil when metrics are disabled
+// (AIGateway.Metrics.Enabled=false) or on failure; the collector activity
+// will be a no-op when the pointer is nil.
 func NewMetricCollectorForReconcile(cfg *config.Config) *metrics.MetricCollector {
+	if !cfg.AIGateway.Metrics.Enabled {
+		return nil
+	}
 	promClient := prometheus.NewPrometheusClient(cfg)
 	metricStore := database.NewAIGatewayMetricMinuteStore()
 	checkpointStore := database.NewAIGatewayMetricsCheckpointStore()

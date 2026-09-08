@@ -1,6 +1,9 @@
 -- Create the aigateway_metrics_minute and aigateway_metrics_checkpoints base
--- tables (plain tables; the TimescaleDB hypertable + views are created by the
--- companion SQL migration 20260731060002_create_aigateway_metrics_schema).
+-- tables. These are plain PostgreSQL tables with no TimescaleDB dependency.
+-- The TimescaleDB hypertable, views, and indexes are created by the companion
+-- SQL migration 20260731060002_create_aigateway_metrics_schema, which checks at
+-- runtime whether the timescaledb extension is available and skips gracefully
+-- if it is not (e.g. on AWS RDS).
 
 -- 1. aigateway_metrics_minute: per-minute aggregated business metrics.
 --    Composite PK (bucket_time, model, provider) enables idempotent upserts.
