@@ -1,41 +1,62 @@
 package component
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	mockdatabase "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/aigateway/sample"
+	aigatewaytypes "opencsg.com/csghub-server/aigateway/types"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
 
-func TestDetectEndpointKind(t *testing.T) {
-	tests := []struct {
-		name    string
-		url     string
-		want    testEndpointKind
-	}{
-		{"chat completions", "https://api.example.com/v1/chat/completions", endpointKindChatCompletions},
-		{"chat completions trailing slash", "https://api.example.com/v1/chat/completions/", endpointKindChatCompletions},
-		{"chat completions with query", "https://api.example.com/v1/chat/completions?foo=bar", endpointKindChatCompletions},
-		{"responses", "https://api.example.com/v1/responses", endpointKindResponses},
-		{"responses trailing slash", "https://api.example.com/v1/responses/", endpointKindResponses},
-		{"responses with fragment", "https://api.example.com/v1/responses#frag", endpointKindResponses},
-		{"unsupported root", "https://api.example.com/v1", endpointKindUnsupported},
-		{"unsupported embeddings", "https://api.example.com/v1/embeddings", endpointKindUnsupported},
-		{"empty", "", endpointKindUnsupported},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			require.Equal(t, tt.want, detectEndpointKind(tt.url))
-		})
-	}
+type policyCapturingSampleProvider struct {
+	policy                aigatewaytypes.SampleExecutionPolicy
+	capturedDeadline      time.Time
+	capturedClientTimeout time.Duration
+}
+
+func (*policyCapturingSampleProvider) Supports(string) bool { return true }
+
+func (p *policyCapturingSampleProvider) ExecutionPolicy(aigatewaytypes.SampleKind) (aigatewaytypes.SampleExecutionPolicy, error) {
+	return p.policy, nil
+}
+
+func (p *policyCapturingSampleProvider) Execute(ctx context.Context, _ aigatewaytypes.SampleKind, input aigatewaytypes.SampleInput, client aigatewaytypes.HTTPDoer) (*aigatewaytypes.SampleExecutionResult, error) {
+	p.capturedDeadline, _ = ctx.Deadline()
+	p.capturedClientTimeout = client.(*http.Client).Timeout
+	return &aigatewaytypes.SampleExecutionResult{
+		Request:    &aigatewaytypes.SampleRequest{Endpoint: input.Endpoint, Headers: input.Headers},
+		StatusCode: http.StatusOK,
+		Status:     "200 OK",
+	}, nil
+}
+
+func TestValidateHealthCheckEndpoint(t *testing.T) {
+	mc := &llmServiceComponentImpl{sampleRegistry: sample.NewDefaultRegistry()}
+	require.NoError(t, mc.validateHealthCheckEndpoint("https://api.example.com/v1/embeddings", false))
+	require.NoError(t, mc.validateHealthCheckEndpoint("https://api.example.com/v1/chat/completions", true))
+	require.NoError(t, mc.validateHealthCheckEndpoint("https://api.example.com/v1/responses", true))
+
+	err := mc.validateHealthCheckEndpoint("https://api.example.com/v1/ocr", true)
+	require.Error(t, err)
+	customErr, ok := errorx.GetFirstCustomError(err)
+	require.True(t, ok)
+	require.ErrorIs(t, customErr, errorx.ErrUpstreamHealthCheckNotSupported)
+
+	customRegistry := sample.NewRegistry(&policyCapturingSampleProvider{})
+	customComponent := &llmServiceComponentImpl{sampleRegistry: customRegistry}
+	require.NoError(t, customComponent.validateHealthCheckEndpoint("https://api.example.com/v1/ocr", true))
 }
 
 func TestParseAuthHeader(t *testing.T) {
@@ -64,40 +85,43 @@ func TestParseAuthHeader(t *testing.T) {
 
 func TestMaskRequestHeaders(t *testing.T) {
 	headers := map[string]string{
-		"Content-Type":  "application/json",
-		"Authorization": "Bearer secret",
-		"X-Api-Key":     "key123",
+		"Content-Type":      "application/json",
+		"Anthropic-Version": "2023-06-01",
+		"Authorization":     "Bearer secret",
+		"X-Api-Key":         "key123",
 	}
 	masked := maskRequestHeaders(headers)
 	require.Equal(t, "application/json", masked["Content-Type"])
+	require.Equal(t, "2023-06-01", masked["Anthropic-Version"])
 	require.Equal(t, maskedAuthSecret, masked["Authorization"])
 	require.Equal(t, maskedAuthSecret, masked["X-Api-Key"])
 }
 
-func TestBuildTestRequestBody(t *testing.T) {
-	t.Run("chat completions", func(t *testing.T) {
-		body, err := buildTestRequestBody(endpointKindChatCompletions, "gpt-4")
-		require.NoError(t, err)
-		require.Equal(t, "gpt-4", body["model"])
-		require.Equal(t, false, body["stream"])
-		require.NotContains(t, body, "max_tokens")
-		messages, ok := body["messages"].([]map[string]string)
-		require.True(t, ok)
-		require.Len(t, messages, 1)
-		require.Equal(t, "hi", messages[0]["content"])
-	})
-	t.Run("responses", func(t *testing.T) {
-		body, err := buildTestRequestBody(endpointKindResponses, "gpt-4o")
-		require.NoError(t, err)
-		require.Equal(t, "gpt-4o", body["model"])
-		require.Equal(t, "hi", body["input"])
-		require.Equal(t, false, body["stream"])
-		require.NotContains(t, body, "max_output_tokens")
-	})
-	t.Run("unsupported returns error", func(t *testing.T) {
-		_, err := buildTestRequestBody(endpointKindUnsupported, "model")
-		require.Error(t, err)
-	})
+func TestSummarizeSampleRequestBodyMultipart(t *testing.T) {
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	require.NoError(t, writer.WriteField("model", "audio-model"))
+	part, err := writer.CreateFormFile("file", "sample.wav")
+	require.NoError(t, err)
+	_, err = part.Write([]byte("audio bytes"))
+	require.NoError(t, err)
+	require.NoError(t, writer.Close())
+	headers := make(http.Header)
+	headers.Set("Content-Type", writer.FormDataContentType())
+	summary, err := summarizeSampleRequestBody(headers, body.Bytes())
+	require.NoError(t, err)
+	require.Equal(t, "audio-model", summary["model"])
+	fileSummary := summary["file"].(map[string]any)
+	require.Equal(t, "sample.wav", fileSummary["filename"])
+	require.Equal(t, "application/octet-stream", fileSummary["content_type"])
+	require.Equal(t, len("audio bytes"), fileSummary["size"])
+}
+
+func TestSummarizeSampleRequestBodyRejectsMalformedMultipart(t *testing.T) {
+	headers := make(http.Header)
+	headers.Set("Content-Type", "multipart/form-data")
+	_, err := summarizeSampleRequestBody(headers, []byte("invalid"))
+	require.ErrorContains(t, err, "boundary is missing")
 }
 
 func TestDoUpstreamTest_ChatCompletionsSuccess(t *testing.T) {
@@ -112,8 +136,7 @@ func TestDoUpstreamTest_ChatCompletionsSuccess(t *testing.T) {
 	defer srv.Close()
 
 	url := srv.URL + "/v1/chat/completions"
-	client := &http.Client{}
-	result, err := doUpstreamTest(context.Background(), client, url, endpointKindChatCompletions, "gpt-4", map[string]string{"Authorization": "Bearer secret"})
+	result, err := doUpstreamTest(context.Background(), mustSampleProvider(t, url), url, "gpt-4", map[string]string{"Authorization": "Bearer secret"})
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	require.True(t, result.OK)
@@ -139,12 +162,46 @@ func TestDoUpstreamTest_ResponsesSuccess(t *testing.T) {
 	defer srv.Close()
 
 	url := srv.URL + "/v1/responses"
-	client := &http.Client{}
-	result, err := doUpstreamTest(context.Background(), client, url, endpointKindResponses, "gpt-4o", map[string]string{})
+	result, err := doUpstreamTest(context.Background(), mustSampleProvider(t, url), url, "gpt-4o", map[string]string{})
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	require.True(t, result.OK)
 	require.Contains(t, result.Content, "resp")
+}
+
+func TestDoUpstreamTest_MessagesPreservesVersionHeaderAndMasksAuth(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, "2023-06-01", r.Header.Get("anthropic-version"))
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"content":[{"type":"text","text":"hello"}]}`))
+	}))
+	defer srv.Close()
+	url := srv.URL + "/v1/messages"
+	result, err := doUpstreamTest(context.Background(), mustSampleProvider(t, url), url, "claude-model", map[string]string{"x-api-key": "secret"})
+	require.NoError(t, err)
+	var summary requestSummary
+	require.NoError(t, json.Unmarshal([]byte(result.Request), &summary))
+	require.Equal(t, "2023-06-01", summary.Headers["Anthropic-Version"])
+	require.Equal(t, maskedAuthSecret, summary.Headers["X-Api-Key"])
+}
+
+func TestDoUpstreamTest_MultipartSummary(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Contains(t, r.Header.Get("Content-Type"), "multipart/form-data")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"text":"hello"}`))
+	}))
+	defer srv.Close()
+	url := srv.URL + "/v1/audio/transcriptions"
+	result, err := doUpstreamTest(context.Background(), mustSampleProvider(t, url), url, "audio-model", map[string]string{"Authorization": "secret"})
+	require.NoError(t, err)
+	var summary requestSummary
+	require.NoError(t, json.Unmarshal([]byte(result.Request), &summary))
+	require.Equal(t, "audio-model", summary.Body["model"])
+	fileSummary := summary.Body["file"].(map[string]any)
+	require.Equal(t, "sample.wav", fileSummary["filename"])
+	require.Equal(t, "audio/wav", fileSummary["content_type"])
+	require.NotContains(t, result.Request, "RIFF")
 }
 
 func TestDoUpstreamTest_NonOKStatus(t *testing.T) {
@@ -155,8 +212,7 @@ func TestDoUpstreamTest_NonOKStatus(t *testing.T) {
 	defer srv.Close()
 
 	url := srv.URL + "/v1/chat/completions"
-	client := &http.Client{}
-	result, err := doUpstreamTest(context.Background(), client, url, endpointKindChatCompletions, "gpt-4", map[string]string{})
+	result, err := doUpstreamTest(context.Background(), mustSampleProvider(t, url), url, "gpt-4", map[string]string{})
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	require.False(t, result.OK)
@@ -171,12 +227,33 @@ func TestDoUpstreamTest_NetworkError(t *testing.T) {
 	srv.Close()
 
 	url := srv.URL + "/v1/chat/completions"
-	client := &http.Client{}
-	result, err := doUpstreamTest(context.Background(), client, url, endpointKindChatCompletions, "gpt-4", map[string]string{})
+	result, err := doUpstreamTest(context.Background(), mustSampleProvider(t, url), url, "gpt-4", map[string]string{})
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	require.False(t, result.OK)
 	require.NotEmpty(t, result.Error)
+}
+
+func TestDoUpstreamTestUsesProviderExecutionPolicy(t *testing.T) {
+	provider := &policyCapturingSampleProvider{policy: aigatewaytypes.SampleExecutionPolicy{Timeout: 2 * time.Minute}}
+	result, err := doUpstreamTest(context.Background(), provider, "https://api.example.com/v1/test", "model", nil)
+	require.NoError(t, err)
+	require.True(t, result.OK)
+	require.Equal(t, 2*time.Minute, provider.capturedClientTimeout)
+	require.WithinDuration(t, time.Now().Add(2*time.Minute), provider.capturedDeadline, time.Second)
+}
+
+func TestDoUpstreamTestRejectsNonPositiveTimeout(t *testing.T) {
+	provider := &policyCapturingSampleProvider{}
+	_, err := doUpstreamTest(context.Background(), provider, "https://api.example.com/v1/test", "model", nil)
+	require.ErrorContains(t, err, "timeout must be positive")
+}
+
+func mustSampleProvider(t *testing.T, url string) aigatewaytypes.SampleProvider {
+	t.Helper()
+	provider, ok := sample.NewDefaultRegistry().Find(url)
+	require.True(t, ok)
+	return provider
 }
 
 func TestLLMServiceComponent_TestUpstream_ChatCompletions(t *testing.T) {
@@ -190,14 +267,15 @@ func TestLLMServiceComponent_TestUpstream_ChatCompletions(t *testing.T) {
 	ctx := context.TODO()
 	upstreamStore := mockdatabase.NewMockUpstreamStore(t)
 	upstreamStore.EXPECT().GetByID(ctx, int64(42)).Return(&database.Upstream{
-		ID:        42,
-		URL:       srv.URL + "/v1/chat/completions",
-		ModelName: "gpt-4",
+		ID:         42,
+		URL:        srv.URL + "/v1/chat/completions",
+		ModelName:  "gpt-4",
 		AuthHeader: `{"Authorization":"Bearer secret"}`,
 	}, nil)
 
 	mc := &llmServiceComponentImpl{
-		upstreamStore: upstreamStore,
+		upstreamStore:  upstreamStore,
+		sampleRegistry: sample.NewDefaultRegistry(),
 	}
 	result, err := mc.TestUpstream(ctx, &types.TestUpstreamReq{ID: 42})
 	require.NoError(t, err)
@@ -217,14 +295,15 @@ func TestLLMServiceComponent_TestUpstream_Responses(t *testing.T) {
 	ctx := context.TODO()
 	upstreamStore := mockdatabase.NewMockUpstreamStore(t)
 	upstreamStore.EXPECT().GetByID(ctx, int64(43)).Return(&database.Upstream{
-		ID:        43,
-		URL:       srv.URL + "/v1/responses",
-		ModelName: "gpt-4o",
+		ID:         43,
+		URL:        srv.URL + "/v1/responses",
+		ModelName:  "gpt-4o",
 		AuthHeader: "",
 	}, nil)
 
 	mc := &llmServiceComponentImpl{
-		upstreamStore: upstreamStore,
+		upstreamStore:  upstreamStore,
+		sampleRegistry: sample.NewDefaultRegistry(),
 	}
 	result, err := mc.TestUpstream(ctx, &types.TestUpstreamReq{ID: 43})
 	require.NoError(t, err)
@@ -238,12 +317,13 @@ func TestLLMServiceComponent_TestUpstream_UnsupportedEndpoint(t *testing.T) {
 	upstreamStore := mockdatabase.NewMockUpstreamStore(t)
 	upstreamStore.EXPECT().GetByID(ctx, int64(44)).Return(&database.Upstream{
 		ID:        44,
-		URL:       "https://api.example.com/v1/embeddings",
+		URL:       "https://api.example.com/v1/ocr",
 		ModelName: "text-embedding",
 	}, nil)
 
 	mc := &llmServiceComponentImpl{
-		upstreamStore: upstreamStore,
+		upstreamStore:  upstreamStore,
+		sampleRegistry: sample.NewDefaultRegistry(),
 	}
 	_, err := mc.TestUpstream(ctx, &types.TestUpstreamReq{ID: 44})
 	require.Error(t, err)
@@ -251,7 +331,28 @@ func TestLLMServiceComponent_TestUpstream_UnsupportedEndpoint(t *testing.T) {
 	// handler can map it to a 422 response instead of 500.
 	customErr, ok := errorx.GetFirstCustomError(err)
 	require.True(t, ok, "expected an errorx custom error for unsupported endpoint")
-	require.ErrorIs(t, customErr, errorx.ErrReqParamInvalid)
+	require.ErrorIs(t, customErr, errorx.ErrUpstreamConnectionTestNotSupported)
+}
+
+func TestLLMServiceComponent_TestUpstreamUsesComponentRegistry(t *testing.T) {
+	ctx := context.Background()
+	upstreamStore := mockdatabase.NewMockUpstreamStore(t)
+	upstreamStore.EXPECT().GetByID(ctx, int64(47)).Return(&database.Upstream{
+		ID:        47,
+		URL:       "https://api.example.com/v1/custom",
+		ModelName: "custom-model",
+	}, nil)
+	provider := &policyCapturingSampleProvider{
+		policy: aigatewaytypes.SampleExecutionPolicy{Timeout: time.Minute},
+	}
+	mc := &llmServiceComponentImpl{
+		upstreamStore:  upstreamStore,
+		sampleRegistry: sample.NewRegistry(provider),
+	}
+
+	result, err := mc.TestUpstream(ctx, &types.TestUpstreamReq{ID: 47})
+	require.NoError(t, err)
+	require.True(t, result.OK)
 }
 
 func TestLLMServiceComponent_TestUpstream_EmptyURL(t *testing.T) {

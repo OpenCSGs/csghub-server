@@ -1,4 +1,3 @@
-
 package component
 
 import (
@@ -8,57 +7,19 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"mime"
+	"mime/multipart"
 	"net/http"
 	"strings"
-	"time"
 
+	aigatewaytypes "opencsg.com/csghub-server/aigateway/types"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
 
-// upstreamTestTimeout is the maximum duration allowed for an upstream
-// connectivity test request.
-const upstreamTestTimeout = 30 * time.Second
-
 // maskedAuthSecret is the placeholder used to redact sensitive header values
 // in the request summary returned to the frontend.
 const maskedAuthSecret = "................."
-
-// endpointChatCompletions and endpointResponses are the two supported
-// upstream endpoint path suffixes.
-const (
-	endpointChatCompletions = "/chat/completions"
-	endpointResponses       = "/responses"
-)
-
-// testEndpointKind describes which protocol the upstream URL speaks.
-type testEndpointKind int
-
-const (
-	endpointKindUnsupported testEndpointKind = iota
-	endpointKindChatCompletions
-	endpointKindResponses
-)
-
-// detectEndpointKind inspects the upstream URL path and returns the
-// supported endpoint kind. Only /chat/completions and /responses are
-// supported; anything else returns endpointKindUnsupported.
-func detectEndpointKind(rawURL string) testEndpointKind {
-	// Trim query string and fragment before checking the path suffix.
-	u := rawURL
-	if idx := strings.IndexAny(u, "?#"); idx >= 0 {
-		u = u[:idx]
-	}
-	u = strings.TrimRight(u, "/")
-	switch {
-	case strings.HasSuffix(u, endpointChatCompletions):
-		return endpointKindChatCompletions
-	case strings.HasSuffix(u, endpointResponses):
-		return endpointKindResponses
-	default:
-		return endpointKindUnsupported
-	}
-}
 
 // parseAuthHeader parses the upstream auth_header field into a map of
 // HTTP headers. The auth_header is either a plain "Bearer xxx" string or
@@ -89,40 +50,19 @@ func parseAuthHeader(authHeader string) (map[string]string, error) {
 }
 
 // maskRequestHeaders returns a copy of the headers with sensitive values
-// redacted. Only Content-Type is preserved verbatim; all other values
-// (including Authorization / apikey) are masked.
+// redacted. Content-Type and Anthropic-Version are non-secret protocol metadata;
+// all other values are masked because authentication header names are user-defined.
 func maskRequestHeaders(headers map[string]string) map[string]string {
 	masked := make(map[string]string, len(headers))
 	for k, v := range headers {
 		switch strings.ToLower(k) {
-		case "content-type":
+		case "content-type", "anthropic-version":
 			masked[k] = v
 		default:
 			masked[k] = maskedAuthSecret
 		}
 	}
 	return masked
-}
-
-// buildTestRequestBody constructs the request body for the given endpoint
-// kind. A simple "hi" prompt is used for both protocols.
-func buildTestRequestBody(kind testEndpointKind, modelName string) (map[string]any, error) {
-	switch kind {
-	case endpointKindChatCompletions:
-		return map[string]any{
-			"model":    modelName,
-			"messages": []map[string]string{{"role": "user", "content": "hi"}},
-			"stream":   false,
-		}, nil
-	case endpointKindResponses:
-		return map[string]any{
-			"model":  modelName,
-			"input":  "hi",
-			"stream": false,
-		}, nil
-	default:
-		return nil, fmt.Errorf("unsupported upstream endpoint, only %s and %s are supported", endpointChatCompletions, endpointResponses)
-	}
 }
 
 // requestSummary is the masked request representation sent to the frontend.
@@ -133,71 +73,132 @@ type requestSummary struct {
 	Body    map[string]any    `json:"body"`
 }
 
-// doUpstreamTest performs the HTTP request against the upstream and returns
-// the test result. It is split from TestUpstream so it can be unit tested
-// with an injectable http.Client.
-func doUpstreamTest(ctx context.Context, client *http.Client, url string, kind testEndpointKind, modelName string, authHeaders map[string]string) (*types.TestUpstreamResult, error) {
-	body, err := buildTestRequestBody(kind, modelName)
+func summarizeSampleRequestBody(headers http.Header, body []byte) (map[string]any, error) {
+	if len(body) == 0 {
+		return nil, nil
+	}
+	mediaType, parameters, err := mime.ParseMediaType(headers.Get("Content-Type"))
+	if err != nil {
+		return nil, fmt.Errorf("parse sample request content type: %w", err)
+	}
+	switch mediaType {
+	case "application/json":
+		var summary map[string]any
+		if err := json.Unmarshal(body, &summary); err != nil {
+			return nil, fmt.Errorf("decode sample request body: %w", err)
+		}
+		return summary, nil
+	case "multipart/form-data":
+		boundary := parameters["boundary"]
+		if boundary == "" {
+			return nil, fmt.Errorf("decode sample multipart body: boundary is missing")
+		}
+		return summarizeMultipartBody(multipart.NewReader(bytes.NewReader(body), boundary))
+	default:
+		return nil, fmt.Errorf("unsupported sample request content type %q", mediaType)
+	}
+}
+
+func summarizeMultipartBody(reader *multipart.Reader) (map[string]any, error) {
+	summary := map[string]any{}
+	for {
+		part, err := reader.NextPart()
+		if err == io.EOF {
+			return summary, nil
+		}
+		if err != nil {
+			return nil, fmt.Errorf("decode sample multipart body: %w", err)
+		}
+		data, err := io.ReadAll(part)
+		if err != nil {
+			return nil, fmt.Errorf("read sample multipart field %q: %w", part.FormName(), err)
+		}
+		var value any = string(data)
+		if part.FileName() != "" {
+			value = map[string]any{
+				"filename":     part.FileName(),
+				"content_type": part.Header.Get("Content-Type"),
+				"size":         len(data),
+			}
+		}
+		appendRequestSummaryValue(summary, part.FormName(), value)
+	}
+}
+
+func appendRequestSummaryValue(summary map[string]any, key string, value any) {
+	if existing, ok := summary[key]; ok {
+		if values, ok := existing.([]any); ok {
+			summary[key] = append(values, value)
+		} else {
+			summary[key] = []any{existing, value}
+		}
+		return
+	}
+	summary[key] = value
+}
+
+// doUpstreamTest performs the protocol-specific sample request against the
+// upstream and returns the test result. It applies the provider's inference
+// policy to both the request context and HTTP client.
+func doUpstreamTest(ctx context.Context, provider aigatewaytypes.SampleProvider, url, modelName string, authHeaders map[string]string) (*types.TestUpstreamResult, error) {
+	policy, err := provider.ExecutionPolicy(aigatewaytypes.SampleKindInference)
+	if err != nil {
+		return nil, fmt.Errorf("get sample execution policy: %w", err)
+	}
+	if policy.Timeout <= 0 {
+		return nil, fmt.Errorf("sample execution timeout must be positive")
+	}
+	testCtx, cancel := context.WithTimeout(ctx, policy.Timeout)
+	defer cancel()
+	client := &http.Client{Timeout: policy.Timeout}
+
+	headers := make(http.Header, len(authHeaders))
+	for k, v := range authHeaders {
+		headers.Set(k, v)
+	}
+
+	execution, err := provider.Execute(testCtx, aigatewaytypes.SampleKindInference, aigatewaytypes.SampleInput{
+		Endpoint: url,
+		Headers:  headers,
+		Model:    modelName,
+		Text:     "hi",
+	}, client)
+	if err != nil {
+		return nil, err
+	}
+	if execution == nil || execution.Request == nil {
+		return nil, fmt.Errorf("sample execution returned no request")
+	}
+
+	requestHeaders := make(map[string]string, len(execution.Request.Headers))
+	for k, values := range execution.Request.Headers {
+		if len(values) > 0 {
+			requestHeaders[k] = values[0]
+		}
+	}
+	body, err := summarizeSampleRequestBody(execution.Request.Headers, execution.Request.Body)
 	if err != nil {
 		return nil, err
 	}
 
-	bodyBytes, err := json.Marshal(body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal request body: %w", err)
-	}
-
-	requestHeaders := map[string]string{
-		"Content-Type": "application/json",
-	}
-	for k, v := range authHeaders {
-		requestHeaders[k] = v
-	}
-
 	summary := requestSummary{
-		URL:     url,
-		Method:  http.MethodPost,
+		URL:     execution.Request.Endpoint,
+		Method:  execution.Request.Method,
 		Headers: maskRequestHeaders(requestHeaders),
 		Body:    body,
 	}
 	summaryBytes, _ := json.MarshalIndent(summary, "", "  ")
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(bodyBytes))
-	if err != nil {
+	if execution.Error != nil {
 		return &types.TestUpstreamResult{
 			Request: string(summaryBytes),
-			Error:   err.Error(),
+			Error:   execution.Error.Error(),
 		}, nil
 	}
-	for k, v := range requestHeaders {
-		req.Header.Set(k, v)
-	}
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return &types.TestUpstreamResult{
-			Request: string(summaryBytes),
-			Error:   err.Error(),
-		}, nil
-	}
-	defer resp.Body.Close()
-
-	rawBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return &types.TestUpstreamResult{
-			Request:     string(summaryBytes),
-			OK:          false,
-			Status:      resp.StatusCode,
-			StatusText:  resp.Status,
-			ResponseBody: "",
-			Error:       fmt.Sprintf("failed to read response body: %v", err),
-		}, nil
-	}
-	rawText := string(rawBytes)
+	rawText := string(execution.ResponseBody)
 
 	var prettyBody string
 	var jsonObj map[string]any
-	if json.Unmarshal(rawBytes, &jsonObj) == nil {
+	if json.Unmarshal(execution.ResponseBody, &jsonObj) == nil {
 		pretty, _ := json.MarshalIndent(jsonObj, "", "  ")
 		prettyBody = string(pretty)
 	} else {
@@ -206,9 +207,9 @@ func doUpstreamTest(ctx context.Context, client *http.Client, url string, kind t
 
 	return &types.TestUpstreamResult{
 		Request:      string(summaryBytes),
-		OK:           resp.StatusCode >= 200 && resp.StatusCode < 300,
-		Status:       resp.StatusCode,
-		StatusText:   resp.Status,
+		OK:           execution.StatusCode >= 200 && execution.StatusCode < 300,
+		Status:       execution.StatusCode,
+		StatusText:   execution.Status,
 		Content:      rawText,
 		ResponseBody: prettyBody,
 	}, nil
@@ -230,12 +231,9 @@ func (s *llmServiceComponentImpl) TestUpstream(ctx context.Context, req *types.T
 		return nil, fmt.Errorf("upstream model_name is empty")
 	}
 
-	kind := detectEndpointKind(url)
-	if kind == endpointKindUnsupported {
-		return nil, errorx.ReqParamInvalid(
-			fmt.Errorf("unsupported upstream endpoint, only %s and %s are supported", endpointChatCompletions, endpointResponses),
-			nil,
-		)
+	provider, ok := s.sampleRegistry.Find(url)
+	if !ok {
+		return nil, errorx.ErrUpstreamConnectionTestNotSupported
 	}
 
 	authHeaders, err := parseAuthHeader(dbUp.AuthHeader)
@@ -243,27 +241,20 @@ func (s *llmServiceComponentImpl) TestUpstream(ctx context.Context, req *types.T
 		return nil, fmt.Errorf("invalid auth_header: %w", err)
 	}
 
-	testCtx, cancel := context.WithTimeout(ctx, upstreamTestTimeout)
-	defer cancel()
-
-	client := &http.Client{Timeout: upstreamTestTimeout}
-
 	slog.InfoContext(ctx, "testing upstream connection",
 		slog.Int64("upstream_id", dbUp.ID),
 		slog.String("url", url),
-		slog.String("endpoint_kind", endpointKindString(kind)),
 	)
 
-	return doUpstreamTest(testCtx, client, url, kind, modelName, authHeaders)
+	return doUpstreamTest(ctx, provider, url, modelName, authHeaders)
 }
 
-func endpointKindString(k testEndpointKind) string {
-	switch k {
-	case endpointKindChatCompletions:
-		return endpointChatCompletions
-	case endpointKindResponses:
-		return endpointResponses
-	default:
-		return "unsupported"
+func (s *llmServiceComponentImpl) validateHealthCheckEndpoint(url string, healthCheckEnabled bool) error {
+	if !healthCheckEnabled {
+		return nil
 	}
+	if _, ok := s.sampleRegistry.Find(strings.TrimSpace(url)); !ok {
+		return errorx.ErrUpstreamHealthCheckNotSupported
+	}
+	return nil
 }

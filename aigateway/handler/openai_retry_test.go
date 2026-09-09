@@ -313,7 +313,7 @@ func TestExecuteChatProxyAttempt_ReturnsUsageLimitError(t *testing.T) {
 
 	c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewReader([]byte(`{"message":"hello"}`)))
 	writer := newTestCommonResponseWriter()
-	chatReq := &ChatCompletionRequest{Model: "test-model"}
+	chatReq := &types.ChatCompletionRequest{Model: "test-model"}
 
 	retryWriter, err := tester.handler.executeChatProxyAttempt(c, writer, modelTarget, "user-1", chatReq)
 
@@ -357,7 +357,7 @@ func TestExecuteChatProxyAttempt_ProxiesRequestAfterUsageLimitCheck(t *testing.T
 	requestBody := []byte(`{"message":"hello"}`)
 	c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewReader(requestBody))
 	writer := newTestCommonResponseWriter()
-	chatReq := &ChatCompletionRequest{
+	chatReq := &types.ChatCompletionRequest{
 		Model: "test-model",
 	}
 
@@ -410,7 +410,7 @@ func TestExecuteChatProxyAttempt_RewritesResponsesURLForChatRequest(t *testing.T
 
 	c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewReader([]byte(`{"message":"hello"}`)))
 	writer := newTestCommonResponseWriter()
-	chatReq := &ChatCompletionRequest{
+	chatReq := &types.ChatCompletionRequest{
 		Model: "test-model",
 	}
 
@@ -443,7 +443,7 @@ func TestRetryChatWithFallback_ReturnsNilWithoutFallbackTargets(t *testing.T) {
 		AttemptTargets: nil,
 	}
 
-	_, err := tester.handler.retryChatWithFallback(c, newTestCommonResponseWriter(), modelTarget, "user-1", &ChatCompletionRequest{Model: "test-model"}, nil, nil)
+	_, err := tester.handler.retryChatWithFallback(c, newTestCommonResponseWriter(), modelTarget, "user-1", &types.ChatCompletionRequest{Model: "test-model"}, nil, nil)
 
 	require.NoError(t, err)
 }
@@ -483,7 +483,7 @@ func TestRetryChatWithFallback_ReplaysLastRetryableFallbackResponse(t *testing.T
 	c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewReader(body))
 	writer := newTestCommonResponseWriter()
 
-	_, err := tester.handler.retryChatWithFallback(c, writer, modelTarget, "user-1", &ChatCompletionRequest{Model: "test-model"}, nil, nil)
+	_, err := tester.handler.retryChatWithFallback(c, writer, modelTarget, "user-1", &types.ChatCompletionRequest{Model: "test-model"}, nil, nil)
 
 	require.NoError(t, err)
 	require.Equal(t, http.StatusServiceUnavailable, writer.statusCode)
@@ -539,7 +539,7 @@ func TestRetryChatWithFallback_ContinuesUntilNextFallbackSucceeds(t *testing.T) 
 	c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewReader(body))
 	writer := newTestCommonResponseWriter()
 
-	_, err := tester.handler.retryChatWithFallback(c, writer, modelTarget, "user-1", &ChatCompletionRequest{Model: "test-model"}, nil, nil)
+	_, err := tester.handler.retryChatWithFallback(c, writer, modelTarget, "user-1", &types.ChatCompletionRequest{Model: "test-model"}, nil, nil)
 
 	require.NoError(t, err)
 	require.Equal(t, http.StatusOK, writer.statusCode)
@@ -586,7 +586,7 @@ func TestRetryChatWithFallback_RewritesResponsesFallbackURLForChatRequest(t *tes
 	c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewReader(body))
 	writer := newTestCommonResponseWriter()
 
-	_, err := tester.handler.retryChatWithFallback(c, writer, modelTarget, "user-1", &ChatCompletionRequest{Model: "test-model"}, nil, nil)
+	_, err := tester.handler.retryChatWithFallback(c, writer, modelTarget, "user-1", &types.ChatCompletionRequest{Model: "test-model"}, nil, nil)
 
 	require.NoError(t, err)
 	require.Equal(t, http.StatusOK, writer.statusCode)
@@ -646,7 +646,7 @@ func TestRetryChatWithFallback_UsesFallbackModelName(t *testing.T) {
 		newTestCommonResponseWriter(),
 		modelTarget,
 		"user-1",
-		&ChatCompletionRequest{Model: "logical-model"},
+		&types.ChatCompletionRequest{Model: "logical-model"},
 		nil,
 		nil,
 	)
@@ -946,7 +946,7 @@ func TestRetryChatWithFallback_ReportsFallbackAttemptFailure(t *testing.T) {
 		newTestCommonResponseWriter(),
 		modelTarget,
 		"user-1",
-		&ChatCompletionRequest{Model: "logical-model"},
+		&types.ChatCompletionRequest{Model: "logical-model"},
 		nil,
 		nil,
 	)

@@ -2,6 +2,7 @@ package component
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"math"
 	"testing"
@@ -10,8 +11,10 @@ import (
 	"github.com/stretchr/testify/require"
 	mockdatabase "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/database"
 	mockComps "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
+	"opencsg.com/csghub-server/aigateway/sample"
 	aigatewaytypes "opencsg.com/csghub-server/aigateway/types"
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/tests"
 	"opencsg.com/csghub-server/common/types"
 )
@@ -90,6 +93,7 @@ func TestLLMServiceComponent_CreateLLMConfig_TrimsWhitespace(t *testing.T) {
 		llmConfigStore:    stores.LLMConfig,
 		promptPrefixStore: stores.PromptPrefix,
 		upstreamStore:     upstreamStore,
+		sampleRegistry:    sample.NewDefaultRegistry(),
 	}
 	req := &types.CreateLLMConfigReq{
 		ModelName: "  new-model  ",
@@ -583,7 +587,7 @@ func TestLLMServiceComponent_CreateUpstream_HealthCheckExplicitTrue(t *testing.T
 	circuitBreakerTrue := true
 	upstreamStore.EXPECT().Create(ctx, &database.Upstream{
 		LLMConfigID:           100,
-		URL:                   "http://upstream.example.com/v1",
+		URL:                   "http://upstream.example.com/v1/chat/completions",
 		Weight:                1,
 		Enabled:               true,
 		HealthCheckEnabled:    true,
@@ -593,10 +597,11 @@ func TestLLMServiceComponent_CreateUpstream_HealthCheckExplicitTrue(t *testing.T
 		llmConfigStore:    stores.LLMConfig,
 		promptPrefixStore: stores.PromptPrefix,
 		upstreamStore:     upstreamStore,
+		sampleRegistry:    sample.NewDefaultRegistry(),
 	}
 	req := &types.CreateUpstreamReq{
 		LLMConfigID:           100,
-		URL:                   "http://upstream.example.com/v1",
+		URL:                   "http://upstream.example.com/v1/chat/completions",
 		Enabled:               true,
 		HealthCheckEnabled:    &healthCheckTrue,
 		CircuitBreakerEnabled: &circuitBreakerTrue,
@@ -606,6 +611,106 @@ func TestLLMServiceComponent_CreateUpstream_HealthCheckExplicitTrue(t *testing.T
 	require.NotNil(t, res)
 	require.True(t, res.HealthCheckEnabled)
 	require.True(t, res.CircuitBreakerEnabled)
+}
+
+func TestLLMServiceComponent_CreateUpstream_RejectsUnsupportedHealthCheck(t *testing.T) {
+	healthCheckEnabled := true
+	mc := &llmServiceComponentImpl{sampleRegistry: sample.NewDefaultRegistry()}
+
+	_, err := mc.CreateUpstream(context.Background(), &types.CreateUpstreamReq{
+		LLMConfigID:        100,
+		URL:                "https://api.example.com/v1/ocr",
+		HealthCheckEnabled: &healthCheckEnabled,
+	})
+
+	customErr, ok := errorx.GetFirstCustomError(err)
+	require.True(t, ok)
+	require.ErrorIs(t, customErr, errorx.ErrUpstreamHealthCheckNotSupported)
+}
+
+func TestLLMServiceComponent_UpdateUpstream_RejectsExplicitUnsupportedHealthCheck(t *testing.T) {
+	upstreamStore := mockdatabase.NewMockUpstreamStore(t)
+	upstreamStore.EXPECT().GetByID(mock.Anything, int64(10)).Return(&database.Upstream{
+		ID:  10,
+		URL: "https://api.example.com/v1/chat/completions",
+	}, nil).Once()
+	healthCheckEnabled := true
+	unsupportedURL := "https://api.example.com/v1/ocr"
+	mc := &llmServiceComponentImpl{
+		upstreamStore:  upstreamStore,
+		sampleRegistry: sample.NewDefaultRegistry(),
+	}
+
+	_, err := mc.UpdateUpstream(context.Background(), &types.UpdateUpstreamReq{
+		ID:                 10,
+		URL:                &unsupportedURL,
+		HealthCheckEnabled: &healthCheckEnabled,
+	})
+
+	customErr, ok := errorx.GetFirstCustomError(err)
+	require.True(t, ok)
+	require.ErrorIs(t, customErr, errorx.ErrUpstreamHealthCheckNotSupported)
+}
+
+func TestLLMServiceComponent_UpdateUpstream_RejectsUnsupportedURLWhenHealthCheckAlreadyEnabled(t *testing.T) {
+	upstreamStore := mockdatabase.NewMockUpstreamStore(t)
+	upstreamStore.EXPECT().GetByID(mock.Anything, int64(10)).Return(&database.Upstream{
+		ID:                 10,
+		URL:                "https://api.example.com/v1/chat/completions",
+		HealthCheckEnabled: true,
+	}, nil).Once()
+	unsupportedURL := "https://api.example.com/v1/ocr"
+	mc := &llmServiceComponentImpl{
+		upstreamStore:  upstreamStore,
+		sampleRegistry: sample.NewDefaultRegistry(),
+	}
+
+	_, err := mc.UpdateUpstream(context.Background(), &types.UpdateUpstreamReq{
+		ID:  10,
+		URL: &unsupportedURL,
+	})
+
+	customErr, ok := errorx.GetFirstCustomError(err)
+	require.True(t, ok)
+	require.ErrorIs(t, customErr, errorx.ErrUpstreamHealthCheckNotSupported)
+}
+
+func TestLLMServiceComponent_UpdateUpstream_AllowsUnsupportedURLWhenHealthCheckDisabled(t *testing.T) {
+	ctx := context.Background()
+	unsupportedURL := "https://api.example.com/v1/ocr"
+	healthCheckEnabled := false
+	upstreamStore := mockdatabase.NewMockUpstreamStore(t)
+	callCount := 0
+	upstreamStore.EXPECT().GetByID(ctx, int64(10)).RunAndReturn(func(context.Context, int64) (*database.Upstream, error) {
+		callCount++
+		if callCount == 1 {
+			return &database.Upstream{
+				ID:                 10,
+				URL:                "https://api.example.com/v1/chat/completions",
+				Enabled:            true,
+				HealthCheckEnabled: true,
+			}, nil
+		}
+		return &database.Upstream{
+			ID:                 10,
+			URL:                unsupportedURL,
+			Enabled:            true,
+			HealthCheckEnabled: false,
+		}, nil
+	}).Times(2)
+	upstreamStore.EXPECT().Update(ctx, mock.MatchedBy(func(upstream *database.Upstream) bool {
+		return upstream.URL == unsupportedURL && !upstream.HealthCheckEnabled
+	})).Return(nil).Once()
+	mc := &llmServiceComponentImpl{upstreamStore: upstreamStore}
+
+	result, err := mc.UpdateUpstream(ctx, &types.UpdateUpstreamReq{
+		ID:                 10,
+		URL:                &unsupportedURL,
+		HealthCheckEnabled: &healthCheckEnabled,
+	})
+
+	require.NoError(t, err)
+	require.False(t, result.HealthCheckEnabled)
 }
 
 func TestLLMServiceComponent_CreateLLMConfig_HealthCheckPersistedFalse(t *testing.T) {
@@ -1644,7 +1749,7 @@ func TestUpdateUpstream_ResetStaleStateOnReEnable(t *testing.T) {
 		// Upstream is disabled with stale healthy state in DB
 		disabledUp := &database.Upstream{
 			ID:                    10,
-			URL:                   "http://upstream.example.com/v1",
+			URL:                   "http://upstream.example.com/v1/chat/completions",
 			Enabled:               false,
 			HealthCheckEnabled:    true,
 			CircuitBreakerEnabled: true,
@@ -1653,7 +1758,7 @@ func TestUpdateUpstream_ResetStaleStateOnReEnable(t *testing.T) {
 		}
 		enabledUp := &database.Upstream{
 			ID:                    10,
-			URL:                   "http://upstream.example.com/v1",
+			URL:                   "http://upstream.example.com/v1/chat/completions",
 			Enabled:               true,
 			HealthCheckEnabled:    true,
 			CircuitBreakerEnabled: true,
@@ -1670,15 +1775,12 @@ func TestUpdateUpstream_ResetStaleStateOnReEnable(t *testing.T) {
 		}).Times(2)
 		upstreamStore.EXPECT().Update(ctx, mock.Anything).Return(nil)
 
-		// Health state should be fetched and updated to unknown
-		healthStateStore.EXPECT().GetByUpstreamID(ctx, int64(10)).Return(&database.AIGatewayUpstreamHealthState{
-			ID:          1,
-			UpstreamID:  10,
-			HealthState: string(aigatewaytypes.HealthStateHealthy),
-		}, nil)
-		healthStateStore.EXPECT().Update(ctx, mock.MatchedBy(func(s *database.AIGatewayUpstreamHealthState) bool {
-			return s.UpstreamID == 10 && s.HealthState == string(aigatewaytypes.HealthStateUnknown)
-		})).Return(nil)
+		// Health state should be atomically updated to unknown.
+		healthStateStore.EXPECT().MutateByUpstreamID(ctx, mock.MatchedBy(func(m database.AIGatewayUpstreamHealthStateMutation) bool {
+			state := &database.AIGatewayUpstreamHealthState{UpstreamID: 10, HealthState: string(aigatewaytypes.HealthStateHealthy)}
+			return m.UpstreamID == 10 && !m.CreateIfMissing && m.Mutate(state) == nil &&
+				state.HealthState == string(aigatewaytypes.HealthStateUnknown)
+		})).Return(&database.AIGatewayUpstreamHealthState{UpstreamID: 10, HealthState: string(aigatewaytypes.HealthStateUnknown)}, nil)
 
 		// Circuit state should be fetched and updated to unknown
 		circuitStateStore.EXPECT().GetByUpstreamID(ctx, int64(10)).Return(&database.AIGatewayUpstreamCircuitState{
@@ -1694,6 +1796,7 @@ func TestUpdateUpstream_ResetStaleStateOnReEnable(t *testing.T) {
 			upstreamStore:     upstreamStore,
 			healthStateStore:  healthStateStore,
 			circuitStateStore: circuitStateStore,
+			sampleRegistry:    sample.NewDefaultRegistry(),
 		}
 		enabled := true
 		res, err := mc.UpdateUpstream(ctx, &types.UpdateUpstreamReq{ID: 10, Enabled: &enabled})
@@ -1715,7 +1818,7 @@ func TestUpdateUpstream_ResetStaleStateOnReEnable(t *testing.T) {
 			if callCount == 1 {
 				return &database.Upstream{
 					ID:                    10,
-					URL:                   "http://upstream.example.com/v1",
+					URL:                   "http://upstream.example.com/v1/chat/completions",
 					Enabled:               true,
 					HealthCheckEnabled:    false,
 					CircuitBreakerEnabled: false,
@@ -1724,7 +1827,7 @@ func TestUpdateUpstream_ResetStaleStateOnReEnable(t *testing.T) {
 			}
 			return &database.Upstream{
 				ID:                    10,
-				URL:                   "http://upstream.example.com/v1",
+				URL:                   "http://upstream.example.com/v1/chat/completions",
 				Enabled:               true,
 				HealthCheckEnabled:    true,
 				CircuitBreakerEnabled: false,
@@ -1733,20 +1836,18 @@ func TestUpdateUpstream_ResetStaleStateOnReEnable(t *testing.T) {
 		}).Times(2)
 		upstreamStore.EXPECT().Update(ctx, mock.Anything).Return(nil)
 
-		// Health state should be reset to unknown when health check is re-enabled
-		healthStateStore.EXPECT().GetByUpstreamID(ctx, int64(10)).Return(&database.AIGatewayUpstreamHealthState{
-			ID:          1,
-			UpstreamID:  10,
-			HealthState: string(aigatewaytypes.HealthStateHealthy),
-		}, nil)
-		healthStateStore.EXPECT().Update(ctx, mock.MatchedBy(func(s *database.AIGatewayUpstreamHealthState) bool {
-			return s.UpstreamID == 10 && s.HealthState == string(aigatewaytypes.HealthStateUnknown)
-		})).Return(nil)
+		// Health state should be atomically reset to unknown when health check is re-enabled.
+		healthStateStore.EXPECT().MutateByUpstreamID(ctx, mock.MatchedBy(func(m database.AIGatewayUpstreamHealthStateMutation) bool {
+			state := &database.AIGatewayUpstreamHealthState{UpstreamID: 10, HealthState: string(aigatewaytypes.HealthStateHealthy)}
+			return m.UpstreamID == 10 && !m.CreateIfMissing && m.Mutate(state) == nil &&
+				state.HealthState == string(aigatewaytypes.HealthStateUnknown)
+		})).Return(&database.AIGatewayUpstreamHealthState{UpstreamID: 10, HealthState: string(aigatewaytypes.HealthStateUnknown)}, nil)
 
 		mc := &llmServiceComponentImpl{
 			upstreamStore:     upstreamStore,
 			healthStateStore:  healthStateStore,
 			circuitStateStore: circuitStateStore,
+			sampleRegistry:    sample.NewDefaultRegistry(),
 		}
 		healthCheckOn := true
 		res, err := mc.UpdateUpstream(ctx, &types.UpdateUpstreamReq{ID: 10, HealthCheckEnabled: &healthCheckOn})
@@ -1800,6 +1901,7 @@ func TestUpdateUpstream_ResetStaleStateOnReEnable(t *testing.T) {
 			upstreamStore:     upstreamStore,
 			healthStateStore:  healthStateStore,
 			circuitStateStore: circuitStateStore,
+			sampleRegistry:    sample.NewDefaultRegistry(),
 		}
 		cbOn := true
 		res, err := mc.UpdateUpstream(ctx, &types.UpdateUpstreamReq{ID: 10, CircuitBreakerEnabled: &cbOn})
@@ -1821,7 +1923,7 @@ func TestUpdateUpstream_ResetStaleStateOnReEnable(t *testing.T) {
 			if callCount == 1 {
 				return &database.Upstream{
 					ID:                    10,
-					URL:                   "http://old-endpoint",
+					URL:                   "http://old-endpoint/v1/chat/completions",
 					Enabled:               true,
 					HealthCheckEnabled:    true,
 					CircuitBreakerEnabled: true,
@@ -1831,7 +1933,7 @@ func TestUpdateUpstream_ResetStaleStateOnReEnable(t *testing.T) {
 			}
 			return &database.Upstream{
 				ID:                    10,
-				URL:                   "http://new-endpoint",
+				URL:                   "http://new-endpoint/v1/chat/completions",
 				Enabled:               true,
 				HealthCheckEnabled:    true,
 				CircuitBreakerEnabled: true,
@@ -1845,8 +1947,9 @@ func TestUpdateUpstream_ResetStaleStateOnReEnable(t *testing.T) {
 			upstreamStore:     upstreamStore,
 			healthStateStore:  healthStateStore,
 			circuitStateStore: circuitStateStore,
+			sampleRegistry:    sample.NewDefaultRegistry(),
 		}
-		newURL := "http://new-endpoint"
+		newURL := "http://new-endpoint/v1/chat/completions"
 		res, err := mc.UpdateUpstream(ctx, &types.UpdateUpstreamReq{ID: 10, URL: &newURL})
 		require.Nil(t, err)
 		require.NotNil(t, res)
@@ -1866,7 +1969,7 @@ func TestUpdateUpstream_ResetStaleStateOnReEnable(t *testing.T) {
 			if callCount == 1 {
 				return &database.Upstream{
 					ID:                    10,
-					URL:                   "http://upstream.example.com/v1",
+					URL:                   "http://upstream.example.com/v1/chat/completions",
 					Enabled:               false,
 					HealthCheckEnabled:    true,
 					CircuitBreakerEnabled: true,
@@ -1876,7 +1979,7 @@ func TestUpdateUpstream_ResetStaleStateOnReEnable(t *testing.T) {
 			}
 			return &database.Upstream{
 				ID:                    10,
-				URL:                   "http://upstream.example.com/v1",
+				URL:                   "http://upstream.example.com/v1/chat/completions",
 				Enabled:               true,
 				HealthCheckEnabled:    true,
 				CircuitBreakerEnabled: true,
@@ -1886,14 +1989,17 @@ func TestUpdateUpstream_ResetStaleStateOnReEnable(t *testing.T) {
 		}).Times(2)
 		upstreamStore.EXPECT().Update(ctx, mock.Anything).Return(nil)
 
-		// GetByUpstreamID returns error (no record) - should not call Update
-		healthStateStore.EXPECT().GetByUpstreamID(ctx, int64(10)).Return(nil, fmt.Errorf("not found"))
+		// A missing health state remains a no-op.
+		healthStateStore.EXPECT().MutateByUpstreamID(ctx, mock.MatchedBy(func(m database.AIGatewayUpstreamHealthStateMutation) bool {
+			return m.UpstreamID == 10 && !m.CreateIfMissing
+		})).Return(nil, sql.ErrNoRows)
 		circuitStateStore.EXPECT().GetByUpstreamID(ctx, int64(10)).Return(nil, fmt.Errorf("not found"))
 
 		mc := &llmServiceComponentImpl{
 			upstreamStore:     upstreamStore,
 			healthStateStore:  healthStateStore,
 			circuitStateStore: circuitStateStore,
+			sampleRegistry:    sample.NewDefaultRegistry(),
 		}
 		enabled := true
 		res, err := mc.UpdateUpstream(ctx, &types.UpdateUpstreamReq{ID: 10, Enabled: &enabled})
@@ -1916,7 +2022,7 @@ func TestUpdateUpstream_ResetStaleStateOnReEnable(t *testing.T) {
 			if callCount == 1 {
 				return &database.Upstream{
 					ID:                    10,
-					URL:                   "http://upstream.example.com/v1",
+					URL:                   "http://upstream.example.com/v1/chat/completions",
 					Enabled:               true,
 					HealthCheckEnabled:    true,
 					CircuitBreakerEnabled: true,
@@ -1926,7 +2032,7 @@ func TestUpdateUpstream_ResetStaleStateOnReEnable(t *testing.T) {
 			}
 			return &database.Upstream{
 				ID:                    10,
-				URL:                   "http://upstream.example.com/v1",
+				URL:                   "http://upstream.example.com/v1/chat/completions",
 				Enabled:               false,
 				HealthCheckEnabled:    true,
 				CircuitBreakerEnabled: true,
@@ -1940,6 +2046,7 @@ func TestUpdateUpstream_ResetStaleStateOnReEnable(t *testing.T) {
 			upstreamStore:     upstreamStore,
 			healthStateStore:  healthStateStore,
 			circuitStateStore: circuitStateStore,
+			sampleRegistry:    sample.NewDefaultRegistry(),
 		}
 		disabled := false
 		res, err := mc.UpdateUpstream(ctx, &types.UpdateUpstreamReq{ID: 10, Enabled: &disabled})

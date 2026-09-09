@@ -26,6 +26,12 @@
     "error.REQ-ERR-16": {
         "other": "Repository not supported to transfer ownership"
     },
+    "error.REQ-ERR-17": {
+        "other": "The upstream API does not support connection testing"
+    },
+    "error.REQ-ERR-18": {
+        "other": "The upstream API does not support health checks"
+    },
     "error.REQ-ERR-2": {
         "other": "Request body cannot be empty"
     },

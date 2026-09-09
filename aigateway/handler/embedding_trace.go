@@ -9,7 +9,7 @@ import (
 	"opencsg.com/csghub-server/aigateway/types"
 )
 
-func (h *OpenAIHandlerImpl) startEmbeddingTrace(ctx context.Context, modelID string, modelTarget *resolvedModelTarget, req *EmbeddingRequest, requestID string, userID string) (context.Context, llmtrace.EmbeddingRecorder) {
+func (h *OpenAIHandlerImpl) startEmbeddingTrace(ctx context.Context, modelID string, modelTarget *resolvedModelTarget, req *types.EmbeddingRequest, requestID string, userID string) (context.Context, llmtrace.EmbeddingRecorder) {
 	if h == nil || h.llmTracer == nil || modelTarget == nil || modelTarget.Model == nil {
 		return ctx, nil
 	}
@@ -32,7 +32,7 @@ func (h *OpenAIHandlerImpl) startEmbeddingTrace(ctx context.Context, modelID str
 	return traceCtx, recorder
 }
 
-func recordEmbeddingTraceCompletion(recorder llmtrace.EmbeddingRecorder, req *EmbeddingRequest, model string, usage *token.Usage, statusCode int) {
+func recordEmbeddingTraceCompletion(recorder llmtrace.EmbeddingRecorder, req *types.EmbeddingRequest, model string, usage *token.Usage, statusCode int) {
 	if recorder == nil {
 		return
 	}
@@ -60,7 +60,7 @@ func finishEmbeddingTraceWithError(recorder llmtrace.EmbeddingRecorder, err erro
 	recorder.End()
 }
 
-func embeddingTraceDimensions(req *EmbeddingRequest) *int64 {
+func embeddingTraceDimensions(req *types.EmbeddingRequest) *int64 {
 	if req == nil || !req.Dimensions.Valid() {
 		return nil
 	}
@@ -68,14 +68,14 @@ func embeddingTraceDimensions(req *EmbeddingRequest) *int64 {
 	return &value
 }
 
-func embeddingTraceEncodingFormat(req *EmbeddingRequest) string {
+func embeddingTraceEncodingFormat(req *types.EmbeddingRequest) string {
 	if req == nil {
 		return ""
 	}
 	return string(req.EncodingFormat)
 }
 
-func embeddingTraceInputCount(req *EmbeddingRequest) int {
+func embeddingTraceInputCount(req *types.EmbeddingRequest) int {
 	if req == nil {
 		return 0
 	}

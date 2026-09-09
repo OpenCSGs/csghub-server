@@ -92,7 +92,7 @@ func TestApplyAdapterReasoningRequest(t *testing.T) {
 	}
 
 	t.Run("config absent", func(t *testing.T) {
-		chatReq := &ChatCompletionRequest{}
+		chatReq := &types.ChatCompletionRequest{}
 		err := applyAdapterReasoningRequest(ctx, chatReq, nil, json.RawMessage(`{"effort":"high"}`))
 		require.NoError(t, err)
 		require.Empty(t, chatReq.RawJSON)
@@ -100,7 +100,7 @@ func TestApplyAdapterReasoningRequest(t *testing.T) {
 
 	t.Run("enabled false effort none", func(t *testing.T) {
 		cfg := loadReasoningRequestConfig(disabledMetadata)
-		chatReq := &ChatCompletionRequest{}
+		chatReq := &types.ChatCompletionRequest{}
 		err := applyAdapterReasoningRequest(ctx, chatReq, cfg, json.RawMessage(`{"effort":"none"}`))
 		require.NoError(t, err)
 		require.Empty(t, chatReq.RawJSON)
@@ -108,7 +108,7 @@ func TestApplyAdapterReasoningRequest(t *testing.T) {
 
 	t.Run("enabled false effort high", func(t *testing.T) {
 		cfg := loadReasoningRequestConfig(disabledMetadata)
-		chatReq := &ChatCompletionRequest{}
+		chatReq := &types.ChatCompletionRequest{}
 		err := applyAdapterReasoningRequest(ctx, chatReq, cfg, json.RawMessage(`{"effort":"high"}`))
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "unsupported_feature:reasoning")
@@ -116,7 +116,7 @@ func TestApplyAdapterReasoningRequest(t *testing.T) {
 
 	t.Run("enabled true effort none merges disable extra", func(t *testing.T) {
 		cfg := loadReasoningRequestConfig(deepSeekMetadata)
-		chatReq := &ChatCompletionRequest{}
+		chatReq := &types.ChatCompletionRequest{}
 		err := applyAdapterReasoningRequest(ctx, chatReq, cfg, json.RawMessage(`{"effort":"none"}`))
 		require.NoError(t, err)
 		var raw map[string]json.RawMessage
@@ -128,7 +128,7 @@ func TestApplyAdapterReasoningRequest(t *testing.T) {
 
 	t.Run("enabled true effort low", func(t *testing.T) {
 		cfg := loadReasoningRequestConfig(glmMetadata)
-		chatReq := &ChatCompletionRequest{}
+		chatReq := &types.ChatCompletionRequest{}
 		err := applyAdapterReasoningRequest(ctx, chatReq, cfg, json.RawMessage(`{"effort":"low"}`))
 		require.NoError(t, err)
 		var raw map[string]json.RawMessage
@@ -139,7 +139,7 @@ func TestApplyAdapterReasoningRequest(t *testing.T) {
 
 	t.Run("enabled true effort xhigh maps to max", func(t *testing.T) {
 		cfg := loadReasoningRequestConfig(glmMetadata)
-		chatReq := &ChatCompletionRequest{}
+		chatReq := &types.ChatCompletionRequest{}
 		err := applyAdapterReasoningRequest(ctx, chatReq, cfg, json.RawMessage(`{"effort":"xhigh"}`))
 		require.NoError(t, err)
 		var raw map[string]json.RawMessage
@@ -149,7 +149,7 @@ func TestApplyAdapterReasoningRequest(t *testing.T) {
 
 	t.Run("enabled true effort minimal", func(t *testing.T) {
 		cfg := loadReasoningRequestConfig(genericMetadata)
-		chatReq := &ChatCompletionRequest{}
+		chatReq := &types.ChatCompletionRequest{}
 		err := applyAdapterReasoningRequest(ctx, chatReq, cfg, json.RawMessage(`{"effort":"minimal"}`))
 		require.NoError(t, err)
 		var raw map[string]json.RawMessage
@@ -159,7 +159,7 @@ func TestApplyAdapterReasoningRequest(t *testing.T) {
 
 	t.Run("enabled true unknown effort", func(t *testing.T) {
 		cfg := loadReasoningRequestConfig(genericMetadata)
-		chatReq := &ChatCompletionRequest{}
+		chatReq := &types.ChatCompletionRequest{}
 		err := applyAdapterReasoningRequest(ctx, chatReq, cfg, json.RawMessage(`{"effort":"foobar"}`))
 		require.Error(t, err)
 		require.Contains(t, err.Error(), `invalid reasoning effort: "foobar"`)
@@ -167,7 +167,7 @@ func TestApplyAdapterReasoningRequest(t *testing.T) {
 
 	t.Run("effort normalized case and whitespace", func(t *testing.T) {
 		cfg := loadReasoningRequestConfig(genericMetadata)
-		chatReq := &ChatCompletionRequest{}
+		chatReq := &types.ChatCompletionRequest{}
 		err := applyAdapterReasoningRequest(ctx, chatReq, cfg, json.RawMessage(`{"effort":" High "}`))
 		require.NoError(t, err)
 		var raw map[string]json.RawMessage
@@ -177,7 +177,7 @@ func TestApplyAdapterReasoningRequest(t *testing.T) {
 
 	t.Run("reasoning object without effort", func(t *testing.T) {
 		cfg := loadReasoningRequestConfig(glmMetadata)
-		chatReq := &ChatCompletionRequest{}
+		chatReq := &types.ChatCompletionRequest{}
 		err := applyAdapterReasoningRequest(ctx, chatReq, cfg, json.RawMessage(`{"summary":"auto"}`))
 		require.NoError(t, err)
 		require.Empty(t, chatReq.RawJSON)
@@ -608,7 +608,7 @@ func TestResponsesAdapterChatRequestIncludesStreamUsage(t *testing.T) {
 	}
 	chatReq, err := responsesToChatRequest(context.Background(), req, "upstream-model", nil)
 	require.NoError(t, err)
-	chatReq.StreamOptions = &StreamOptions{IncludeUsage: true}
+	chatReq.StreamOptions = &types.StreamOptions{IncludeUsage: true}
 
 	body, err := marshalChatRequestBody(chatReq, "upstream-model")
 	require.NoError(t, err)

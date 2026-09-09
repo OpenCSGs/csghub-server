@@ -92,6 +92,12 @@ func TestLocalizedErrorMiddleware(t *testing.T) {
 			errorx.Ctx().Set("source_namespace", "SourceTeam"),
 		))
 	})
+	router.GET("/upstream-connection-test-not-supported", func(c *gin.Context) {
+		httpbase.UnprocessableEntityWithExt(c, errorx.ErrUpstreamConnectionTestNotSupported)
+	})
+	router.GET("/upstream-health-check-not-supported", func(c *gin.Context) {
+		httpbase.UnprocessableEntityWithExt(c, errorx.ErrUpstreamHealthCheckNotSupported)
+	})
 	router.GET("/agent-template-sensitive-check-create", func(c *gin.Context) {
 		httpbase.ConflictError(c, errorx.AgentTemplateSensitiveCheckCreateAgentBlocked(
 			nil,
@@ -238,6 +244,30 @@ func TestLocalizedErrorMiddleware(t *testing.T) {
 		var resp httpbase.R
 		_ = json.Unmarshal(w.Body.Bytes(), &resp)
 		assert.Equal(t, "MIRROR-ERR-7: 源命名空间映射关系不存在。", resp.Msg)
+	})
+
+	t.Run("LocalizedUpstreamConnectionTestNotSupported", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", "/upstream-connection-test-not-supported", nil)
+		req.Header.Set("Accept-Language", "en-US")
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusUnprocessableEntity, w.Code)
+		var resp httpbase.R
+		_ = json.Unmarshal(w.Body.Bytes(), &resp)
+		assert.Equal(t, "REQ-ERR-17: The upstream API does not support connection testing", resp.Msg)
+	})
+
+	t.Run("LocalizedUpstreamHealthCheckNotSupported", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", "/upstream-health-check-not-supported", nil)
+		req.Header.Set("Accept-Language", "en-US")
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusUnprocessableEntity, w.Code)
+		var resp httpbase.R
+		_ = json.Unmarshal(w.Body.Bytes(), &resp)
+		assert.Equal(t, "REQ-ERR-18: The upstream API does not support health checks", resp.Msg)
 	})
 
 	t.Run("LocalizedAgentTemplateSensitiveCheckCreate", func(t *testing.T) {
