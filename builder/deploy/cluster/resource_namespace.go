@@ -39,11 +39,11 @@ func (cluster *Cluster) GetResourceInNamespace(namespace string, quotaName strin
 		available.Sub(usedAmount)
 		return available
 	}
-	xpuCapacityLabel, xpuTypeLabel, _ := getXPULabel(quota.Labels, config, quotaName)
-	gpuModelVendor, gpuModel := getGpuTypeAndVendor(quota.Labels[xpuTypeLabel], xpuCapacityLabel)
+	xpuLabelRes := getXPULabel(quota.Labels, config, quotaName)
+	gpuModelVendor, gpuModel := getGpuTypeAndVendor(quota.Labels[xpuLabelRes.TypeLabel], xpuLabelRes.CapacityLabel)
 	var totalXPU int64 = 0
 	var availableXPU int64 = 0
-	resourceName := v1.ResourceName(xpuCapacityLabel)
+	resourceName := v1.ResourceName(xpuLabelRes.CapacityLabel)
 	if hardLimit, ok := hard[common.QuotaRequest+resourceName]; ok {
 		totalXPU = parseQuantityToInt64(hardLimit)
 		availableXPU = parseQuantityToInt64(calculateAvailable(resourceName))
@@ -72,7 +72,7 @@ func (cluster *Cluster) GetResourceInNamespace(namespace string, quotaName strin
 				AvailableMem:     getMem(availableMem.Value()),
 				TotalXPU:         totalXPU,
 				AvailableXPU:     availableXPU,
-				XPUCapacityLabel: xpuCapacityLabel,
+				XPUCapacityLabel: xpuLabelRes.CapacityLabel,
 				XPUModel:         gpuModel,
 				GPUVendor:        gpuModelVendor,
 			},

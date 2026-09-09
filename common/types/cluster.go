@@ -161,6 +161,7 @@ type NodeHardware struct {
 	UsedVXPUNum      int64  `json:"used_vxpu_num"`      // used vxpu num
 	TotalVXPUMem     int64  `json:"total_vxpu_mem"`     // total mem in MB
 	AvailableVXPUMem int64  `json:"available_vxpu_mem"` // available mem in MB
+	XPUType          string `json:"xpu_type"`
 
 	MIGs map[string]*MIGResource `json:"migs"` // mig resources
 }
@@ -192,6 +193,7 @@ type GPUModel struct {
 	TypeLabel     string `json:"type_label"`
 	CapacityLabel string `json:"capacity_label"`
 	MemLabel      string `json:"mem_label"`
+	XPUType       string `json:"xpu_type"`
 }
 
 type ClusterStatus string
@@ -299,4 +301,11 @@ type ExclusiveOwner struct {
 	UserID    int64  `json:"user_id"`
 	UserName  string `json:"user_name"`
 	UpdatedAt int64  `json:"updated_at"`
+}
+
+type XPULabelResult struct {
+	CapacityLabel string   `json:"capacity_label"`
+	TypeLabel     string   `json:"type_label"`
+	MemLabels     []string `json:"mem_labels"`
+	XPUType       string   `json:"xpu_type"`
 }

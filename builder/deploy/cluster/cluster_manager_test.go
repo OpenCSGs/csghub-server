@@ -263,9 +263,9 @@ func TestGetXPULabel(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotCapacity, gotTypeLabel, _ := getXPULabel(tt.labels, tt.config, "")
-			assert.Equal(t, tt.wantCapacity, gotCapacity)
-			assert.Equal(t, tt.wantTypeLabel, gotTypeLabel)
+			got := getXPULabel(tt.labels, tt.config, "")
+			assert.Equal(t, tt.wantCapacity, got.CapacityLabel)
+			assert.Equal(t, tt.wantTypeLabel, got.TypeLabel)
 		})
 	}
 }
