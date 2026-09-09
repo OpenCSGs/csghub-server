@@ -317,7 +317,7 @@ func TestPodMonitor_extractServiceName(t *testing.T) {
 	}
 }
 
-func TestGetPodLogStream(t *testing.T) {
+func TestPodMonitorGetPodLogStream(t *testing.T) {
 	podName := "test-pod"
 	namespace := "test-ns"
 	containerName := "test-container"
@@ -338,10 +338,8 @@ func TestGetPodLogStream(t *testing.T) {
 		},
 	}
 
-	pm := &PodMonitor{}
-
 	clientset := fake.NewClientset(pod)
-	logChan, msg, err := pm.getPodLogStream(context.Background(), clientset, pod, containerName, nil)
+	logChan, msg, err := GetPodLogStream(context.Background(), clientset, pod, containerName, nil)
 
 	assert.NoError(t, err)
 	assert.Empty(t, msg)
