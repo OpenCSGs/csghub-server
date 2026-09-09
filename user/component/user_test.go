@@ -11,10 +11,12 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	mockgit "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/git/gitserver"
+	mockrebac "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/rebac"
 	mockrpc "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/rpc"
 	mockcache "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/cache"
 	mockdb "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/database"
 	mockphone "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/user/component"
+	"opencsg.com/csghub-server/builder/rebac"
 	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
@@ -22,21 +24,19 @@ import (
 	"opencsg.com/csghub-server/common/types"
 )
 
-func TestUserComponent_CheckIfUserHasOrgs(t *testing.T) {
+func TestUserComponent_CheckIfUserIsLastOrgAdmin(t *testing.T) {
 	mockOrgStore := mockdb.NewMockOrgStore(t)
-	mockOrgStore.EXPECT().GetUserOwnOrgs(context.TODO(), "user1").Return([]database.Organization{}, 0, nil)
-	mockOrgStore.EXPECT().GetUserOwnOrgs(context.TODO(), "user2").Return([]database.Organization{
-		{ID: 1},
-	}, 1, nil)
+	mockOrgStore.EXPECT().IsLastOrganizationAdmin(context.TODO(), "user1").Return(false, nil)
+	mockOrgStore.EXPECT().IsLastOrganizationAdmin(context.TODO(), "user2").Return(true, nil)
 	uc := &userComponentImpl{
 		orgStore: mockOrgStore,
 	}
 
-	has, err := uc.CheckIfUserHasOrgs(context.TODO(), "user1")
+	has, err := uc.CheckIfUserIsLastOrgAdmin(context.TODO(), "user1")
 	require.Nil(t, err)
 	require.False(t, has)
 
-	has, err = uc.CheckIfUserHasOrgs(context.TODO(), "user2")
+	has, err = uc.CheckIfUserIsLastOrgAdmin(context.TODO(), "user2")
 	require.Nil(t, err)
 	require.True(t, has)
 }
@@ -129,24 +129,70 @@ func TestUserComponent_GetAdminEmails(t *testing.T) {
 }
 
 func TestUserComponent_SoftDelete(t *testing.T) {
+	ctx := context.TODO()
 	mockUserStore := mockdb.NewMockUserStore(t)
+	mockOrgStore := mockdb.NewMockOrgStore(t)
 	mockAuditStore := mockdb.NewMockAuditLogStore(t)
+	mockNamespaceStore := mockdb.NewMockNamespaceStore(t)
+	mockAuthorizer := mockrebac.NewMockAuthorizer(t)
 	user := database.User{
-		Username: "user1",
+		ID: 1, Username: "user1", UUID: "user1-uuid",
 	}
-	mockAuditStore.EXPECT().Create(context.TODO(), mock.Anything).Return(nil)
-	mockUserStore.EXPECT().SoftDeleteUserAndRelations(context.TODO(), user, types.CloseAccountReq{}).Return(nil)
-	mockUserStore.EXPECT().FindByUsername(context.TODO(), user.Username).Return(user, nil)
-	mockUserStore.EXPECT().FindByUsernameWithDeleted(context.TODO(), user.Username).Return(user, nil)
+	namespace := database.Namespace{
+		Path: "user1", UUID: "user1-namespace-uuid", NamespaceType: database.UserNamespace,
+	}
+	relationship := rebac.Relationship{
+		Subject: rebac.UserSubject(user.UUID), Relation: rebac.RelationOwner, Object: rebac.NamespaceObject(namespace.UUID),
+	}
+	mockAuditStore.EXPECT().Create(ctx, mock.Anything).Return(nil)
+	mockUserStore.EXPECT().SoftDeleteUserAndRelations(ctx, user, types.CloseAccountReq{}).Return(nil)
+	mockUserStore.EXPECT().FindByUsername(ctx, user.Username).Return(user, nil)
+	mockUserStore.EXPECT().FindByUsernameWithDeleted(ctx, user.Username).Return(user, nil)
+	organizations := []database.Organization{
+		{ID: 11, UUID: uuid.MustParse("00000000-0000-0000-0000-000000000011")},
+		{ID: 12, UUID: uuid.MustParse("00000000-0000-0000-0000-000000000012")},
+	}
+	mockOrgStore.EXPECT().GetUserBelongOrgs(mock.Anything, user.ID).Return(organizations, nil).Once()
+	mockNamespaceStore.EXPECT().FindByPathWithDeleted(ctx, user.Username).Return(namespace, nil).Once()
+	correlationID := rebac.BatchCheckCorrelationID(0)
+	mockAuthorizer.EXPECT().BatchCheck(ctx, rebac.BatchCheckRequest{Checks: []rebac.BatchCheckItem{{
+		CorrelationID: correlationID,
+		Check: rebac.CheckRequest{
+			Subject: relationship.Subject, Relation: relationship.Relation, Object: relationship.Object,
+			Consistency: rebac.ConsistencyHigher,
+		},
+	}}}).Return(rebac.BatchCheckResult{Results: map[string]rebac.BatchCheckOutcome{
+		correlationID: {Decision: rebac.Decision{Allowed: true}},
+	}}, nil).Once()
+	mockAuthorizer.EXPECT().Delete(ctx, []rebac.Relationship{relationship}).Return(nil).Once()
+	organizationCleanups := make([]types.OrganizationReBACCleanup, 0, len(organizations))
+	for _, organization := range organizations {
+		organizationCleanups = append(organizationCleanups, types.OrganizationReBACCleanup{
+			OrganizationUUID: organization.UUID.String(),
+			UserUUIDs:        []string{user.UUID},
+		})
+	}
+	expectOrganizationReBACCleanups(t, mockAuthorizer, organizationCleanups)
+	userObjectRelationship := rebac.Relationship{
+		Subject: rebac.UserSubject(user.UUID), Relation: rebac.RelationOwner, Object: rebac.UserObject(user.UUID),
+	}
+	mockAuthorizer.EXPECT().Check(ctx, rebac.CheckRequest{
+		Subject: userObjectRelationship.Subject, Relation: userObjectRelationship.Relation, Object: userObjectRelationship.Object,
+		Consistency: rebac.ConsistencyHigher,
+	}).Return(rebac.Decision{Allowed: true}, nil).Once()
+	mockAuthorizer.EXPECT().Delete(ctx, []rebac.Relationship{userObjectRelationship}).Return(nil).Once()
 	uc := &userComponentImpl{
 		userStore: mockUserStore,
+		orgStore:  mockOrgStore,
+		nsStore:   mockNamespaceStore,
 		audit:     mockAuditStore,
+		rebac:     mockAuthorizer,
 	}
 
-	err := uc.SoftDelete(context.TODO(), "user1", "user2", types.CloseAccountReq{})
+	err := uc.SoftDelete(ctx, "user1", "user2", types.CloseAccountReq{})
 	require.NotNil(t, err)
 
-	err = uc.SoftDelete(context.TODO(), "user1", "user1", types.CloseAccountReq{})
+	err = uc.SoftDelete(ctx, "user1", "user1", types.CloseAccountReq{})
 	require.Nil(t, err)
 }
 
@@ -173,40 +219,106 @@ func TestUserComponent_ResetUserTags(t *testing.T) {
 }
 
 func TestUserComponent_Delete(t *testing.T) {
+	ctx := context.TODO()
 	mockUserStore := mockdb.NewMockUserStore(t)
 	mockAuditStore := mockdb.NewMockAuditLogStore(t)
 	mockRepoStore := mockdb.NewMockRepoStore(t)
+	mockNamespaceStore := mockdb.NewMockNamespaceStore(t)
 	mockPendingDeletionStore := mockdb.NewMockPendingDeletionStore(t)
 	mockGitserver := mockgit.NewMockGitServer(t)
+	mockAuthorizer := mockrebac.NewMockAuthorizer(t)
 	user1 := database.User{
 		Username: "user1",
 	}
 	user2 := database.User{
-		Username: "user2",
+		ID: 2, Username: "user2", UUID: "user2-uuid",
 	}
-	mockAuditStore.EXPECT().Create(context.TODO(), mock.Anything).Return(nil)
-	mockUserStore.EXPECT().DeleteUserAndRelations(context.TODO(), user2, types.CloseAccountReq{}).Return(nil)
-	mockUserStore.EXPECT().FindByUsernameWithDeleted(context.TODO(), user2.Username).Return(user2, nil)
-	mockUserStore.EXPECT().FindByUsername(context.TODO(), user1.Username).Return(user1, nil)
-	mockRepoStore.EXPECT().ByUser(context.TODO(), user2.ID, 1000, 0).Return([]database.Repository{{
-		Path:           "foo/bar",
-		RepositoryType: types.ModelRepo,
-	}}, nil)
-	mockRepoStore.EXPECT().ByUser(context.TODO(), user2.ID, 1000, 1).Return([]database.Repository{}, nil)
-	mockPendingDeletionStore.EXPECT().Create(context.TODO(), &database.PendingDeletion{
+	mockOrgStore := mockdb.NewMockOrgStore(t)
+	repository := database.Repository{
+		ID: 42, Path: "foo/bar", RepositoryType: types.ModelRepo,
+	}
+	relationship := rebac.Relationship{
+		Subject: rebac.UserSubject("foo-user-uuid"), Relation: rebac.RelationOwner, Object: rebac.RepositoryObject(repository.ID),
+	}
+	userNamespace := database.Namespace{
+		Path: user2.Username, UUID: "user2-namespace-uuid", NamespaceType: database.UserNamespace,
+	}
+	userNamespaceRelationship := rebac.Relationship{
+		Subject: rebac.UserSubject(user2.UUID), Relation: rebac.RelationOwner, Object: rebac.NamespaceObject(userNamespace.UUID),
+	}
+	repositoryCorrelationID := rebac.BatchCheckCorrelationID(0)
+	check := rebac.BatchCheckItem{
+		CorrelationID: repositoryCorrelationID,
+		Check: rebac.CheckRequest{
+			Subject: relationship.Subject, Relation: relationship.Relation, Object: relationship.Object,
+			Consistency: rebac.ConsistencyHigher,
+		},
+	}
+	mockAuditStore.EXPECT().Create(ctx, mock.Anything).Return(nil)
+	mockUserStore.EXPECT().DeleteUserAndRelations(ctx, user2, types.CloseAccountReq{}).Return(nil)
+	mockUserStore.EXPECT().FindByUsernameWithDeleted(ctx, user2.Username).Return(user2, nil)
+	mockUserStore.EXPECT().FindByUsername(ctx, user1.Username).Return(user1, nil)
+	organizations := []database.Organization{
+		{ID: 11, UUID: uuid.MustParse("00000000-0000-0000-0000-000000000011")},
+		{ID: 12, UUID: uuid.MustParse("00000000-0000-0000-0000-000000000012")},
+	}
+	mockOrgStore.EXPECT().GetUserBelongOrgs(mock.Anything, user2.ID).Return(organizations, nil).Once()
+	mockRepoStore.EXPECT().ByUser(ctx, user2.ID, 1000, 0).Return([]database.Repository{repository}, nil)
+	mockRepoStore.EXPECT().ByUser(ctx, user2.ID, 1000, 1).Return([]database.Repository{}, nil)
+	mockNamespaceStore.EXPECT().FindByPathWithDeleted(ctx, user2.Username).Return(userNamespace, nil).Once()
+	mockNamespaceStore.EXPECT().FindByPath(ctx, "foo").Return(database.Namespace{
+		Path: "foo", NamespaceType: database.UserNamespace, User: database.User{UUID: "foo-user-uuid"},
+	}, nil)
+	mockPendingDeletionStore.EXPECT().Create(ctx, &database.PendingDeletion{
 		TableName: "repositories",
 		Value:     "models_foo/bar.git",
 	}).Return(nil)
+	mockAuthorizer.EXPECT().BatchCheck(ctx, rebac.BatchCheckRequest{Checks: []rebac.BatchCheckItem{check}}).Return(
+		rebac.BatchCheckResult{Results: map[string]rebac.BatchCheckOutcome{
+			repositoryCorrelationID: {Decision: rebac.Decision{Allowed: true}},
+		}}, nil,
+	)
+	mockAuthorizer.EXPECT().Delete(ctx, []rebac.Relationship{relationship}).Return(nil)
+	namespaceCorrelationID := rebac.BatchCheckCorrelationID(0)
+	mockAuthorizer.EXPECT().BatchCheck(ctx, rebac.BatchCheckRequest{Checks: []rebac.BatchCheckItem{{
+		CorrelationID: namespaceCorrelationID,
+		Check: rebac.CheckRequest{
+			Subject: userNamespaceRelationship.Subject, Relation: userNamespaceRelationship.Relation, Object: userNamespaceRelationship.Object,
+			Consistency: rebac.ConsistencyHigher,
+		},
+	}}}).Return(rebac.BatchCheckResult{Results: map[string]rebac.BatchCheckOutcome{
+		namespaceCorrelationID: {Decision: rebac.Decision{Allowed: true}},
+	}}, nil).Once()
+	mockAuthorizer.EXPECT().Delete(ctx, []rebac.Relationship{userNamespaceRelationship}).Return(nil).Once()
+	organizationCleanups := make([]types.OrganizationReBACCleanup, 0, len(organizations))
+	for _, organization := range organizations {
+		organizationCleanups = append(organizationCleanups, types.OrganizationReBACCleanup{
+			OrganizationUUID: organization.UUID.String(),
+			UserUUIDs:        []string{user2.UUID},
+		})
+	}
+	expectOrganizationReBACCleanups(t, mockAuthorizer, organizationCleanups)
+	userObjectRelationship := rebac.Relationship{
+		Subject: rebac.UserSubject(user2.UUID), Relation: rebac.RelationOwner, Object: rebac.UserObject(user2.UUID),
+	}
+	mockAuthorizer.EXPECT().Check(ctx, rebac.CheckRequest{
+		Subject: userObjectRelationship.Subject, Relation: userObjectRelationship.Relation, Object: userObjectRelationship.Object,
+		Consistency: rebac.ConsistencyHigher,
+	}).Return(rebac.Decision{Allowed: true}, nil).Once()
+	mockAuthorizer.EXPECT().Delete(ctx, []rebac.Relationship{userObjectRelationship}).Return(nil).Once()
 	uc := &userComponentImpl{
 		userStore: mockUserStore,
+		orgStore:  mockOrgStore,
 		audit:     mockAuditStore,
 		repo:      mockRepoStore,
+		nsStore:   mockNamespaceStore,
 		gs:        mockGitserver,
 		pdStore:   mockPendingDeletionStore,
+		rebac:     mockAuthorizer,
 		config:    &config.Config{},
 	}
 
-	err := uc.Delete(context.TODO(), "user1", "user2")
+	err := uc.Delete(ctx, "user1", "user2")
 	require.Nil(t, err)
 }
 
@@ -1402,7 +1514,7 @@ func TestUserComponent_Get_RoleVisibility(t *testing.T) {
 				Homepage: "https://org1.com",
 				OrgType:  "company",
 				Verified: true,
-				Role:     "admin",
+				Role:     string(types.UserAdmin),
 				Namespace: &database.Namespace{
 					ID:            2,
 					Path:          "org_path_1",
@@ -1472,7 +1584,7 @@ func TestUserComponent_Get_RoleVisibility(t *testing.T) {
 				Homepage: "https://org1.com",
 				OrgType:  "company",
 				Verified: true,
-				Role:     "admin",
+				Role:     string(types.UserAdmin),
 			},
 		}
 
@@ -1528,7 +1640,7 @@ func TestUserComponent_Get_RoleVisibility(t *testing.T) {
 				Homepage: "https://org1.com",
 				OrgType:  "company",
 				Verified: true,
-				Role:     "admin",
+				Role:     string(types.UserAdmin),
 			},
 		}
 

@@ -8,6 +8,7 @@ import (
 
 func TestConfig_loadConfig(t *testing.T) {
 	t.Run("config env", func(t *testing.T) {
+		SetConfigFile("")
 		t.Setenv("STARHUB_SERVER_INSTANCE_ID", "foo")
 		t.Setenv("STARHUB_SERVER_SERVER_PORT", "6789")
 		t.Setenv("STARHUB_SERVER_POSTHOG_ENABLED", "true")
@@ -23,6 +24,7 @@ func TestConfig_loadConfig(t *testing.T) {
 		require.Equal(t, "phc_test", cfg.PostHog.ProjectToken)
 		require.Equal(t, "https://example.posthog.test", cfg.PostHog.APIHost)
 		require.Equal(t, "staging", cfg.PostHog.Environment)
+		require.False(t, cfg.Organization.EnableUnit)
 	})
 
 	t.Run("config file", func(t *testing.T) {

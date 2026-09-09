@@ -9,6 +9,7 @@ import (
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"opencsg.com/csghub-server/builder/rebac"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
@@ -376,13 +377,9 @@ func TestRuntimeArchComponent_ScanModel_Success(t *testing.T) {
 		Tags:          []database.Tag{{Name: "safetensors", Category: "framework"}},
 	}
 
-	permission := &types.UserRepoPermission{
-		CanWrite: true,
-	}
-
 	// Mock expectations
 	rc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, namespace, name).Return(repo, nil)
-	rc.mocks.components.repo.EXPECT().GetUserRepoPermission(ctx, currentUser, repo).Return(permission, nil)
+	rc.mocks.components.repo.EXPECT().CheckUserRepoPermission(ctx, currentUser, repo, rebac.RepositoryCanWrite).Return(true, nil)
 
 	// Mock UpdateModelMetadata call - simplified to return error since we can't easily mock the full chain
 	rc.mocks.gitServer.EXPECT().GetTree(mock.Anything, mock.Anything).Return(
@@ -421,7 +418,7 @@ func TestRuntimeArchComponent_ScanModel_UpdateTagsWhenModelFormatMissing(t *test
 	}
 
 	rc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, namespace, name).Return(repoWithoutFormat, nil).Once()
-	rc.mocks.components.repo.EXPECT().GetUserRepoPermission(ctx, currentUser, repoWithoutFormat).Return(&types.UserRepoPermission{CanWrite: true}, nil)
+	rc.mocks.components.repo.EXPECT().CheckUserRepoPermission(ctx, currentUser, repoWithoutFormat, rebac.RepositoryCanWrite).Return(true, nil)
 	rc.mocks.gitServer.EXPECT().GetRepoFileRaw(ctx, mock.Anything).Return("---\nlibrary_name: transformers\n---\nreadme", nil).Once()
 	rc.mocks.components.tag.EXPECT().UpdateMetaTags(ctx, types.ModelTagScope, namespace, name, "---\nlibrary_name: transformers\n---\nreadme").Return(nil, nil).Once()
 	rc.mocks.gitServer.EXPECT().GetTree(ctx, mock.Anything).Return(&types.GetRepoFileTreeResp{
@@ -475,8 +472,8 @@ func TestRuntimeArchComponent_ScanModel_PermissionError(t *testing.T) {
 
 	// Mock repository found but permission error
 	rc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, namespace, name).Return(repo, nil)
-	rc.mocks.components.repo.EXPECT().GetUserRepoPermission(ctx, currentUser, repo).Return(
-		nil, errors.New("permission error"))
+	rc.mocks.components.repo.EXPECT().CheckUserRepoPermission(ctx, currentUser, repo, rebac.RepositoryCanWrite).Return(
+		false, errors.New("permission error"))
 
 	// Execute test
 	err := rc.ScanModel(ctx, currentUser, namespace, name)
@@ -499,13 +496,9 @@ func TestRuntimeArchComponent_ScanModel_NoWritePermission(t *testing.T) {
 		Path: "testnamespace/testmodel",
 	}
 
-	permission := &types.UserRepoPermission{
-		CanWrite: false,
-	}
-
 	// Mock repository found but no write permission
 	rc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, namespace, name).Return(repo, nil)
-	rc.mocks.components.repo.EXPECT().GetUserRepoPermission(ctx, currentUser, repo).Return(permission, nil)
+	rc.mocks.components.repo.EXPECT().CheckUserRepoPermission(ctx, currentUser, repo, rebac.RepositoryCanWrite).Return(false, nil)
 
 	// Execute test
 	err := rc.ScanModel(ctx, currentUser, namespace, name)
@@ -531,13 +524,9 @@ func TestRuntimeArchComponent_ScanModel_UpdateMetadataError(t *testing.T) {
 		Tags:          []database.Tag{{Name: "safetensors", Category: "framework"}},
 	}
 
-	permission := &types.UserRepoPermission{
-		CanWrite: true,
-	}
-
 	// Mock successful permission check but metadata update failure
 	rc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, namespace, name).Return(repo, nil)
-	rc.mocks.components.repo.EXPECT().GetUserRepoPermission(ctx, currentUser, repo).Return(permission, nil)
+	rc.mocks.components.repo.EXPECT().CheckUserRepoPermission(ctx, currentUser, repo, rebac.RepositoryCanWrite).Return(true, nil)
 
 	// Mock UpdateModelMetadata failure
 	rc.mocks.gitServer.EXPECT().GetTree(mock.Anything, mock.Anything).Return(
@@ -566,14 +555,10 @@ func TestRuntimeArchComponent_ScanModel_UpdateRuntimeFrameworkTagError(t *testin
 		Tags:          []database.Tag{{Name: "safetensors", Category: "framework"}},
 	}
 
-	permission := &types.UserRepoPermission{
-		CanWrite: true,
-	}
-
 	// Mock successful permission check but metadata update failure to simulate the case where metadata update succeeds
 	// but runtime framework tag update fails
 	rc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, namespace, name).Return(repo, nil)
-	rc.mocks.components.repo.EXPECT().GetUserRepoPermission(ctx, currentUser, repo).Return(permission, nil)
+	rc.mocks.components.repo.EXPECT().CheckUserRepoPermission(ctx, currentUser, repo, rebac.RepositoryCanWrite).Return(true, nil)
 
 	// Mock UpdateModelMetadata failure to simulate the case where metadata update succeeds
 	// but runtime framework tag update fails

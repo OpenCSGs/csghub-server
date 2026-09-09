@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -47,8 +48,12 @@ type UserStore interface {
 
 // Implement the UserStore interface in UserStoreImpl
 type UserStoreImpl struct {
-	db *DB
+	db                 *DB
+	transactionCleanup TransactionCleanup
 }
+
+// TransactionCleanup removes edition-specific user relationships inside an existing transaction.
+type TransactionCleanup func(ctx context.Context, tx bun.Tx, userID int64) error
 
 func NewUserStore() UserStore {
 	return &UserStoreImpl{
@@ -60,6 +65,99 @@ func NewUserStoreWithDB(db *DB) UserStore {
 	return &UserStoreImpl{
 		db: db,
 	}
+}
+
+// NewUserStoreWithCleanup creates a Store with an optional transactional relationship cleanup.
+func NewUserStoreWithCleanup(cleanup TransactionCleanup) UserStore {
+	return &UserStoreImpl{
+		db:                 defaultDB,
+		transactionCleanup: cleanup,
+	}
+}
+
+// NewUserStoreWithDBAndCleanup creates a Store with explicit database and cleanup dependencies.
+func NewUserStoreWithDBAndCleanup(db *DB, cleanup TransactionCleanup) UserStore {
+	return &UserStoreImpl{
+		db:                 db,
+		transactionCleanup: cleanup,
+	}
+}
+
+// runTransactionCleanup locks the user before removing edition-specific relationships.
+func (s *UserStoreImpl) runTransactionCleanup(ctx context.Context, tx bun.Tx, userID int64) error {
+	if s.transactionCleanup == nil {
+		return nil
+	}
+	var lockedUser User
+	if err := tx.NewSelect().Model(&lockedUser).
+		Column("id").
+		WhereAllWithDeleted().
+		Where("id = ?", userID).
+		For("UPDATE").
+		Scan(ctx); err != nil {
+		return fmt.Errorf("failed to lock user %d for relationship cleanup: %w", userID, err)
+	}
+	if err := s.transactionCleanup(ctx, tx, userID); err != nil {
+		return fmt.Errorf("failed to clean up user relationships for user %d: %w", userID, err)
+	}
+	return nil
+}
+
+// ensureUserIsNotLastOrganizationAdmin locks every active admin membership for the user's organizations
+// and rejects the request when any organization would lose its final administrator.
+func (s *UserStoreImpl) ensureUserIsNotLastOrganizationAdmin(ctx context.Context, tx bun.Tx, input User) error {
+	var targetOrganizationIDs []int64
+	if err := tx.NewSelect().
+		Model((*Member)(nil)).
+		Column("member.organization_id").
+		Join("JOIN users AS target_user ON target_user.id = member.user_id AND target_user.deleted_at IS NULL").
+		Join("JOIN organizations AS organization ON organization.id = member.organization_id AND organization.deleted_at IS NULL").
+		Where("member.user_id = ?", input.ID).
+		Where("member.deleted_at IS NULL").
+		Where("member.role IN (?, ?)", string(types.UserAdmin), "owner").
+		For("UPDATE").
+		Scan(ctx, &targetOrganizationIDs); err != nil {
+		return fmt.Errorf("lock user administrator memberships: %w", err)
+	}
+	if len(targetOrganizationIDs) == 0 {
+		return nil
+	}
+
+	type organizationAdminRow struct {
+		OrganizationID int64 `bun:"organization_id"`
+	}
+	var adminRows []organizationAdminRow
+	if err := tx.NewSelect().
+		Model((*Member)(nil)).
+		Column("member.organization_id").
+		Join("JOIN users AS admin_user ON admin_user.id = member.user_id AND admin_user.deleted_at IS NULL").
+		Join("JOIN organizations AS organization ON organization.id = member.organization_id AND organization.deleted_at IS NULL").
+		Where("member.organization_id IN (?)", bun.In(targetOrganizationIDs)).
+		Where("member.deleted_at IS NULL").
+		Where("member.role IN (?, ?)", string(types.UserAdmin), "owner").
+		For("UPDATE").
+		Scan(ctx, &adminRows); err != nil {
+		return fmt.Errorf("lock organization administrators: %w", err)
+	}
+
+	counts := make(map[int64]int, len(targetOrganizationIDs))
+	for _, row := range adminRows {
+		counts[row.OrganizationID]++
+	}
+	seen := make(map[int64]struct{}, len(targetOrganizationIDs))
+	for _, orgID := range targetOrganizationIDs {
+		if _, ok := seen[orgID]; ok {
+			continue
+		}
+		seen[orgID] = struct{}{}
+		if counts[orgID] <= 1 {
+			return errorx.LastOrgAdmin(
+				errors.New("cannot delete the last administrator of an organization"),
+				errorx.Ctx().Set("username", input.Username),
+			)
+		}
+	}
+	return nil
 }
 
 type User struct {
@@ -295,13 +393,11 @@ func (s *UserStoreImpl) IsExistByUUID(ctx context.Context, uuid string) (exists 
 // FindByAccessToken retrieves user information based on the access token. The access token must be active and not expired.
 func (s *UserStoreImpl) FindByGitAccessToken(ctx context.Context, token string) (*User, error) {
 	var user User
-	_, err := s.db.Operator.Core.
-		NewSelect().
-		ColumnExpr("u.*").
-		TableExpr("users AS u").
-		Join("JOIN access_tokens AS t ON u.id = t.user_id").
-		Where("t.token = ? and t.is_active = true and (t.expired_at is null or t.expired_at > now()) and app = 'git'", token).
-		Exec(ctx, &user)
+	err := s.db.Operator.Core.NewSelect().
+		Model(&user).
+		Join(`JOIN access_tokens AS t ON t.user_id = "user".id`).
+		Where("t.token = ? and t.is_active = true and (t.expired_at is null or t.expired_at > now()) and t.app = 'git'", token).
+		Scan(ctx)
 
 	if err != nil {
 		return nil, errorx.HandleDBError(err, nil)
@@ -339,6 +435,12 @@ func (s *UserStoreImpl) DeleteUserAndRelations(ctx context.Context, input User, 
 	}
 
 	err = s.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		if err := s.runTransactionCleanup(ctx, tx, input.ID); err != nil {
+			return err
+		}
+		if err := s.ensureUserIsNotLastOrganizationAdmin(ctx, tx, input); err != nil {
+			return err
+		}
 		// Delete user
 		if err = assertAffectedOneRow(tx.NewDelete().Model(&input).Where("id = ?", input.ID).ForceDelete().Exec(ctx)); err != nil {
 			return fmt.Errorf("failed to delete user %d: %v", input.ID, err)
@@ -491,6 +593,12 @@ func (s *UserStoreImpl) SoftDeleteUserAndRelations(ctx context.Context, input Us
 		return errorx.ErrDatabaseNoRows
 	}
 	err = s.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		if err := s.runTransactionCleanup(ctx, tx, input.ID); err != nil {
+			return err
+		}
+		if err := s.ensureUserIsNotLastOrganizationAdmin(ctx, tx, input); err != nil {
+			return err
+		}
 		// Update ueser retain data
 		mReq, err := json.Marshal(req)
 		if err != nil {

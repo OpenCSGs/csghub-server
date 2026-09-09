@@ -23,6 +23,13 @@ import (
 
 var enableSwagger bool
 
+const (
+	// historicalMigrationTimeout limits the migration context during server startup.
+	historicalMigrationTimeout = 60 * time.Second
+	// historicalMigrationLockExpiration keeps the startup migration lock slightly longer than its context.
+	historicalMigrationLockExpiration = 80 * time.Second
+)
+
 func init() {
 	serverCmd.Flags().BoolVar(&enableSwagger, "swagger", false, "Start swagger help docs")
 }
@@ -70,11 +77,13 @@ var serverCmd = &cobra.Command{
 			return fmt.Errorf("database initialization failed: %w", err)
 		}
 
-		migrator := migrations.NewMigrator(database.GetDB())
+		appDB := database.GetDB()
+		migrator := migrations.NewMigrator(appDB)
 
 		slog.Info("run migration")
-		ctx, cancel := context.WithTimeout(cmd.Context(), 20*time.Second)
+		ctx, cancel := context.WithTimeout(cmd.Context(), historicalMigrationTimeout)
 		defer cancel()
+		ctx = migrations.WithDatabase(ctx, appDB)
 
 		locker, err := cache.NewCache(cmd.Context(), cache.RedisConfig{
 			Addr:     cfg.Redis.Endpoint,
@@ -85,7 +94,7 @@ var serverCmd = &cobra.Command{
 			return fmt.Errorf("initializing locker: %w", err)
 		}
 
-		err = locker.RunWhileLocked(ctx, "migration_migrate", 1*time.Minute, func(ctx context.Context) error {
+		err = locker.RunWhileLocked(ctx, "migration_migrate", historicalMigrationLockExpiration, func(ctx context.Context) error {
 			// migration init
 			err = migrator.Init(ctx)
 			if err != nil {

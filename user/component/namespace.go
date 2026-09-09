@@ -22,7 +22,7 @@ type NamespaceComponent interface {
 func NewNamespaceComponent(config *config.Config) (NamespaceComponent, error) {
 	return &namespaceComponentImpl{
 		ns: database.NewNamespaceStore(),
-		os: database.NewOrgStore(),
+		os: database.NewOrgStore(config),
 	}, nil
 }
 

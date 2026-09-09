@@ -1,0 +1,14 @@
+{
+    "error.ORG-ERR-0": {
+        "other": "組織成員不存在"
+    },
+    "error.ORG-ERR-1": {
+        "other": "組織不存在"
+    },
+    "error.ORG-ERR-2": {
+        "other": "無權管理該組織"
+    },
+    "error.ORG-ERR-3": {
+        "other": "無權訪問該組織"
+    }
+}

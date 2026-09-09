@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/tests"
+	"opencsg.com/csghub-server/common/types"
 )
 
 func TestMemberStore_CRUD(t *testing.T) {
@@ -29,30 +30,33 @@ func TestMemberStore_CRUD(t *testing.T) {
 
 	store := database.NewMemberStoreWithDB(db)
 
-	err = store.Add(ctx, 123, 456, "foo")
+	err = store.Add(ctx, 123, 456, string(types.UserRead))
 	require.Nil(t, err)
 	mem := &database.Member{}
 	err = db.Core.NewSelect().Model(mem).Where("user_id=?", 456).Scan(ctx)
 	require.Nil(t, err)
-	require.Equal(t, "foo", mem.Role)
+	require.Equal(t, string(types.UserRead), mem.Role)
 
 	mem, err = store.Find(ctx, 123, 456)
 	require.Nil(t, err)
-	require.Equal(t, "foo", mem.Role)
+	require.Equal(t, string(types.UserRead), mem.Role)
 
 	ms, err := store.UserMembers(ctx, 456)
 	require.Nil(t, err)
 	require.Equal(t, 1, len(ms))
-	require.Equal(t, "foo", ms[0].Role)
+	require.Equal(t, string(types.UserRead), ms[0].Role)
 
 	ms, count, err := store.OrganizationMembers(ctx, 123, "", 10, 1)
 	require.Nil(t, err)
 	require.Equal(t, 1, len(ms))
 	require.Equal(t, 1, count)
-	require.Equal(t, "foo", ms[0].Role)
+	require.Equal(t, string(types.UserRead), ms[0].Role)
 	require.Equal(t, user, ms[0].User)
 
-	err = store.Delete(ctx, 123, 456, "foo")
+	err = store.Update(ctx, 123, 456, string(types.UserWrite))
+	require.Nil(t, err)
+
+	err = store.Delete(ctx, 123, 456)
 	require.Nil(t, err)
 	_, err = store.Find(ctx, 123, 456)
 	require.NotNil(t, err)
@@ -66,17 +70,17 @@ func TestMemberStore_OrgMembersWithNilUser(t *testing.T) {
 	ctx := context.TODO()
 	store := database.NewMemberStoreWithDB(db)
 
-	err := store.Add(ctx, 123, 456, "foo")
+	err := store.Add(ctx, 123, 456, string(types.UserRead))
 	require.Nil(t, err)
 	mem := &database.Member{}
 	err = db.Core.NewSelect().Model(mem).Where("user_id=?", 456).Scan(ctx)
 	require.Nil(t, err)
-	require.Equal(t, "foo", mem.Role)
+	require.Equal(t, string(types.UserRead), mem.Role)
 
 	ms, err := store.UserMembers(ctx, 456)
 	require.Nil(t, err)
 	require.Equal(t, 1, len(ms))
-	require.Equal(t, "foo", ms[0].Role)
+	require.Equal(t, string(types.UserRead), ms[0].Role)
 
 	ms, count, err := store.OrganizationMembers(ctx, 123, "", 10, 1)
 	require.Nil(t, err)
@@ -94,7 +98,7 @@ func TestMemberStore_UserUUIDsByOrganizationID(t *testing.T) {
 	memberStore := database.NewMemberStoreWithDB(db)
 
 	orgID := int64(9999)
-	role := "member"
+	role := string(types.UserRead)
 
 	testUsers := []struct {
 		GitID    int64
@@ -143,16 +147,16 @@ func TestMemberStore_Update(t *testing.T) {
 
 	store := database.NewMemberStoreWithDB(db)
 
-	err := store.Add(ctx, 123, 456, "foo")
+	err := store.Add(ctx, 123, 456, string(types.UserRead))
 	require.Nil(t, err)
 
-	err = store.Update(ctx, 123, 456, "bar")
+	err = store.Update(ctx, 123, 456, string(types.UserWrite))
 	require.Nil(t, err)
 
-	err = store.Update(ctx, 123, 1, "baz")
+	err = store.Update(ctx, 123, 1, string(types.UserAdmin))
 	require.NotNil(t, err)
 
 	mem, err := store.Find(ctx, 123, 456)
 	require.Nil(t, err)
-	require.Equal(t, "bar", mem.Role)
+	require.Equal(t, string(types.UserWrite), mem.Role)
 }

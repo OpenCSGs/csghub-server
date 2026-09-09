@@ -9,10 +9,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"opencsg.com/csghub-server/api/httpbase"
-	"opencsg.com/csghub-server/builder/git/membership"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/types"
 )
@@ -25,47 +23,6 @@ func setupTestClient(server *httptest.Server) *UserSvcHttpClient {
 			logger:   slog.New(slog.NewJSONHandler(os.Stdout, nil)),
 		},
 	}
-}
-
-func TestGetMemberRole_Success(t *testing.T) {
-	// 创建模拟服务器
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, "/api/v1/organization/test-org/members/test-user?current_user=test-user", r.URL.String())
-		assert.Equal(t, http.MethodGet, r.Method)
-
-		resp := httpbase.R{
-			Data: "admin",
-		}
-		err := json.NewEncoder(w).Encode(resp)
-		assert.NoError(t, err)
-	}))
-	defer server.Close()
-
-	client := setupTestClient(server)
-
-	// 执行测试
-	role, err := client.GetMemberRole(context.Background(), "test-org", "test-user")
-
-	// 验证结果
-	assert.NoError(t, err)
-	assert.Equal(t, membership.RoleAdmin, role)
-}
-
-func TestGetMemberRole_Failure(t *testing.T) {
-	// 创建模拟服务器返回错误
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusInternalServerError)
-	}))
-	defer server.Close()
-
-	client := setupTestClient(server)
-
-	// 执行测试
-	role, err := client.GetMemberRole(context.Background(), "test-org", "test-user")
-
-	// 验证结果
-	assert.Error(t, err)
-	assert.Equal(t, membership.RoleUnknown, role)
 }
 
 func TestGetNameSpaceInfo_Success(t *testing.T) {
@@ -509,123 +466,6 @@ func TestGetEmails_Success(t *testing.T) {
 	assert.Len(t, emails, 2)
 	assert.Equal(t, 50, total)
 	assert.Contains(t, emails, "test1@example.com")
-}
-
-func TestGetMemberRole_DataConversionError(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		resp := httpbase.R{
-			Data: 123, // 返回非字符串类型，应该导致类型转换错误
-		}
-		err := json.NewEncoder(w).Encode(resp)
-		assert.NoError(t, err)
-	}))
-	defer server.Close()
-
-	client := setupTestClient(server)
-
-	role, err := client.GetMemberRole(context.Background(), "test-org", "test-user")
-
-	assert.Error(t, err)
-	assert.Equal(t, membership.RoleUnknown, role)
-}
-
-func TestGetOrgByUUID_Success(t *testing.T) {
-	orgUUID := uuid.MustParse("12345678-1234-1234-1234-123456789012")
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, "/api/v1/organization/uuid/12345678-1234-1234-1234-123456789012", r.URL.Path)
-		assert.Equal(t, http.MethodGet, r.Method)
-
-		resp := httpbase.R{
-			Data: &types.Organization{
-				Name:     "test-org",
-				Nickname: "Test Organization",
-				UUID:     orgUUID,
-			},
-		}
-		err := json.NewEncoder(w).Encode(resp)
-		assert.NoError(t, err)
-	}))
-	defer server.Close()
-
-	client := setupTestClient(server)
-
-	org, err := client.GetOrgByUUID(context.Background(), "12345678-1234-1234-1234-123456789012")
-
-	assert.NoError(t, err)
-	assert.NotNil(t, org)
-	assert.Equal(t, "test-org", org.Name)
-	assert.Equal(t, orgUUID, org.UUID)
-}
-
-func TestGetOrgByUUID_Failure(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusInternalServerError)
-	}))
-	defer server.Close()
-
-	client := setupTestClient(server)
-
-	org, err := client.GetOrgByUUID(context.Background(), "test-org-uuid")
-
-	assert.Error(t, err)
-	assert.Nil(t, org)
-}
-
-func TestGetMemberRoleByUUID_Success(t *testing.T) {
-	orgUUID := uuid.MustParse("12345678-1234-1234-1234-123456789012")
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, "/api/v1/organization/uuid/12345678-1234-1234-1234-123456789012/members/test-user", r.URL.Path)
-		assert.Equal(t, http.MethodGet, r.Method)
-		assert.Equal(t, "test-user", r.URL.Query().Get("current_user"))
-
-		resp := httpbase.R{
-			Data: "admin",
-		}
-		err := json.NewEncoder(w).Encode(resp)
-		assert.NoError(t, err)
-	}))
-	defer server.Close()
-
-	client := setupTestClient(server)
-
-	role, err := client.GetMemberRoleByUUID(context.Background(), orgUUID.String(), "test-user")
-
-	assert.NoError(t, err)
-	assert.Equal(t, membership.RoleAdmin, role)
-}
-
-func TestGetMemberRoleByUUID_Failure(t *testing.T) {
-	orgUUID := uuid.MustParse("12345678-1234-1234-1234-123456789012")
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusInternalServerError)
-	}))
-	defer server.Close()
-
-	client := setupTestClient(server)
-
-	role, err := client.GetMemberRoleByUUID(context.Background(), orgUUID.String(), "test-user")
-
-	assert.Error(t, err)
-	assert.Equal(t, membership.RoleUnknown, role)
-}
-
-func TestGetMemberRoleByUUID_DataConversionError(t *testing.T) {
-	orgUUID := uuid.MustParse("12345678-1234-1234-1234-123456789012")
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		resp := httpbase.R{
-			Data: 123,
-		}
-		err := json.NewEncoder(w).Encode(resp)
-		assert.NoError(t, err)
-	}))
-	defer server.Close()
-
-	client := setupTestClient(server)
-
-	role, err := client.GetMemberRoleByUUID(context.Background(), orgUUID.String(), "test-user")
-
-	assert.Error(t, err)
-	assert.Equal(t, membership.RoleUnknown, role)
 }
 
 func TestGetAPIKeyQuotas_Success(t *testing.T) {

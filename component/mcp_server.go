@@ -16,7 +16,8 @@ import (
 
 	"opencsg.com/csghub-server/builder/git"
 	"opencsg.com/csghub-server/builder/git/gitserver"
-	"opencsg.com/csghub-server/builder/git/membership"
+	"opencsg.com/csghub-server/builder/rebac"
+	rebacfactory "opencsg.com/csghub-server/builder/rebac/factory"
 	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
@@ -40,6 +41,7 @@ type mcpServerComponentImpl struct {
 	config             *config.Config
 	repoComponent      RepoComponent
 	repoStore          database.RepoStore
+	orgStore           database.OrgStore
 	gitServer          gitserver.GitServer
 	userSvcClient      rpc.UserSvcClient
 	mcpServerStore     database.MCPServerStore
@@ -49,6 +51,7 @@ type mcpServerComponentImpl struct {
 	spaceResourceStore database.SpaceResourceStore
 	tokenStore         database.AccessTokenStore
 	namespaceStore     database.NamespaceStore
+	rebac              rebac.Authorizer
 }
 
 func NewMCPServerComponent(config *config.Config) (MCPServerComponent, error) {
@@ -60,6 +63,11 @@ func NewMCPServerComponent(config *config.Config) (MCPServerComponent, error) {
 		return nil, fmt.Errorf("failed to create repo component for mcp, error: %w", err)
 	}
 	m.repoStore = database.NewRepoStore()
+	m.orgStore = database.NewOrgStore(config)
+	m.rebac, err = rebacfactory.NewAuthorizer()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create ReBAC authorizer for mcp, error: %w", err)
+	}
 	gs, err := git.NewGitServer(config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create git server for mcp, error: %w", err)
@@ -178,12 +186,12 @@ func (m *mcpServerComponentImpl) Delete(ctx context.Context, req *types.UpdateMC
 		return fmt.Errorf("failed to find mcp server %s/%s, error: %w", req.Namespace, req.Name, err)
 	}
 
-	permission, err := m.repoComponent.GetUserRepoPermission(ctx, req.Username, mcpServer.Repository)
+	permission, err := m.repoComponent.CheckUserRepoPermission(ctx, req.Username, mcpServer.Repository, rebac.RepositoryCanAdmin)
 	if err != nil {
 		return fmt.Errorf("failed to get user %s permission for repo %s/%s, error: %w", req.Username, req.Namespace, req.Name, err)
 	}
 
-	if !permission.CanAdmin {
+	if !permission {
 		return errorx.ErrForbidden
 	}
 
@@ -226,11 +234,11 @@ func (m *mcpServerComponentImpl) Update(ctx context.Context, req *types.UpdateMC
 		return nil, fmt.Errorf("failed to find mcp server %s/%s, error: %w", req.Namespace, req.Name, err)
 	}
 
-	permission, err := m.repoComponent.GetUserRepoPermission(ctx, req.Username, mcpServer.Repository)
+	permission, err := m.repoComponent.CheckUserRepoPermission(ctx, req.Username, mcpServer.Repository, rebac.RepositoryCanAdmin)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user %s permission for repo %s/%s, error: %w", req.Namespace, req.Namespace, req.Name, err)
 	}
-	if !permission.CanAdmin {
+	if !permission {
 		return nil, errorx.ErrForbidden
 	}
 
@@ -538,19 +546,18 @@ func (m *mcpServerComponentImpl) OrgMCPServers(ctx context.Context, req *types.O
 	var resp []types.MCPServer
 	var err error
 
-	r := membership.RoleUnknown
-
+	canRead := false
 	if req.CurrentUser != "" {
-		r, err = m.userSvcClient.GetMemberRole(ctx, req.Namespace, req.CurrentUser)
-		// log error, and treat user as unknown role in org
+		canRead, err = m.repoComponent.CheckCurrentUserPermission(ctx, req.CurrentUser, req.Namespace, rebac.NamespaceCanRead)
 		if err != nil {
-			slog.Warn("faild to get member role",
-				slog.String("org", req.Namespace), slog.String("user", req.CurrentUser),
-				slog.String("error", err.Error()))
+			slog.ErrorContext(ctx, "failed to check namespace permission",
+				slog.String("namespace", req.Namespace), slog.String("user", req.CurrentUser),
+				slog.Any("error", err))
+			canRead = false
 		}
 	}
 
-	onlyPublic := !r.CanRead()
+	onlyPublic := !canRead
 
 	mcps, total, err := m.mcpServerStore.ByOrgPath(ctx, req.Namespace, req.PageSize, req.Page, onlyPublic)
 	if err != nil {
@@ -605,12 +612,12 @@ func (m *mcpServerComponentImpl) Deploy(ctx context.Context, req *types.DeployMC
 			req.MCPRepo.Namespace, req.MCPRepo.Name, err)
 	}
 
-	permission, err := m.repoComponent.GetUserRepoPermission(ctx, req.CurrentUser, mcpServer.Repository)
+	permission, err := m.repoComponent.CheckUserRepoPermission(ctx, req.CurrentUser, mcpServer.Repository, rebac.RepositoryCanRead)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user %s permission for mcp server %s/%s, error: %w",
 			req.CurrentUser, req.MCPRepo.Namespace, req.MCPRepo.Name, err)
 	}
-	if !permission.CanRead {
+	if !permission {
 		return nil, errorx.ErrForbidden
 	}
 
@@ -652,18 +659,12 @@ func (m *mcpServerComponentImpl) Deploy(ctx context.Context, req *types.DeployMC
 	dbUser.SetRoles(user.Roles)
 
 	if !dbUser.CanAdmin() {
-		if namespace.NamespaceType == database.OrgNamespace {
-			canWrite, err := m.repoComponent.CheckCurrentUserPermission(ctx, req.Username, req.Namespace, membership.RoleWrite)
-			if err != nil {
-				return nil, fmt.Errorf("failed to check user %s permission for namespace %s, error: %w", req.CurrentUser, req.Namespace, err)
-			}
-			if !canWrite {
-				return nil, errorx.ErrForbiddenMsg("users do not have permission to create repo in this organization")
-			}
-		} else {
-			if namespace.Path != user.Username {
-				return nil, errorx.ErrForbiddenMsg("users do not have permission to create repo in this namespace")
-			}
+		canWrite, err := m.repoComponent.CheckCurrentUserPermission(ctx, req.Username, req.Namespace, rebac.NamespaceCanWrite)
+		if err != nil {
+			return nil, fmt.Errorf("failed to check user %s permission for namespace %s, error: %w", req.CurrentUser, req.Namespace, err)
+		}
+		if !canWrite {
+			return nil, errorx.ErrForbiddenMsg("users do not have permission to create repo in this namespace")
 		}
 	}
 
@@ -708,6 +709,9 @@ func (m *mcpServerComponentImpl) Deploy(ctx context.Context, req *types.DeployMC
 		return nil, fmt.Errorf("failed to create mcp space and repo %s/%s to deploy mcp server %s/%s, %w",
 			req.Namespace, req.Name, req.MCPRepo.Namespace, req.MCPRepo.Name, err)
 	}
+	if err := ensureRepositoryNamespaceRelationship(ctx, m.rebac, m.orgStore, namespace, dbRepo.ID); err != nil {
+		return nil, fmt.Errorf("failed to synchronize deployed repository namespace relationship: %w", err)
+	}
 
 	cloneReq := gitserver.CopyRepositoryReq{
 		RepoType:  types.MCPServerRepo,                       // clone from repo type
@@ -723,6 +727,7 @@ func (m *mcpServerComponentImpl) Deploy(ctx context.Context, req *types.DeployMC
 			slog.Error("failed to delete created space and repo after failed to clone mcp server files",
 				slog.Any("req", req), slog.Any("delErr", delErr))
 		}
+		m.cleanupFailedMCPDeploy(ctx, namespace, dbSpace.ID, dbRepo.ID)
 		return nil, fmt.Errorf("failed to clone mcp server %s/%s files to mcp space %s/%s with repo id %d, error: %w",
 			req.MCPRepo.Namespace, req.MCPRepo.Name, req.Namespace, req.Name, dbRepo.ID, err)
 	}
@@ -745,6 +750,7 @@ func (m *mcpServerComponentImpl) Deploy(ctx context.Context, req *types.DeployMC
 			slog.Error("failed to delete created space and repo after failed to create default files for new mcp space",
 				slog.Any("req", req), slog.Any("delErr", delErr))
 		}
+		m.cleanupFailedMCPDeploy(ctx, namespace, dbSpace.ID, dbRepo.ID)
 		return nil, fmt.Errorf("failed to create default files for mcp space %s/%s, error: %w", req.Namespace, req.Name, err)
 	}
 
@@ -767,6 +773,19 @@ func (m *mcpServerComponentImpl) Deploy(ctx context.Context, req *types.DeployMC
 		DefaultBranch: dbRepo.DefaultBranch,
 	}
 	return space, nil
+}
+
+// cleanupFailedMCPDeploy removes the repository namespace tuple during deploy compensation.
+func (m *mcpServerComponentImpl) cleanupFailedMCPDeploy(
+	ctx context.Context,
+	namespace database.Namespace,
+	spaceID int64,
+	repositoryID int64,
+) {
+	if err := deleteRepositoryNamespaceRelationship(ctx, m.rebac, m.orgStore, namespace, repositoryID); err != nil {
+		slog.ErrorContext(ctx, "failed to delete repository ReBAC relationship after failed mcp deploy",
+			slog.Int64("space_id", spaceID), slog.Int64("repository_id", repositoryID), slog.Any("error", err))
+	}
 }
 
 func (m *mcpServerComponentImpl) createDeployDefaultFiles(ctx context.Context, req *types.DeployMCPServerReq,

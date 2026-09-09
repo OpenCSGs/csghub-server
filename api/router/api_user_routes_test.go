@@ -10,6 +10,7 @@ import (
 	"opencsg.com/csghub-server/api/handler"
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/api/middleware"
+	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/errorx"
 )
 
@@ -268,7 +269,7 @@ func newOrgRoutesTestRouter(t *testing.T) *gin.Engine {
 	router.Use(setTestUser)
 
 	apiGroup := router.Group("/api/v1")
-	createOrgRoutes(apiGroup, mc, proxyHandler, &handler.OrganizationHandler{})
+	createOrgRoutes(apiGroup, mc, proxyHandler, &handler.OrganizationHandler{}, &config.Config{})
 
 	return router
 }

@@ -10,7 +10,6 @@ import (
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/builder/testutil"
 	"opencsg.com/csghub-server/common/errorx"
-	"opencsg.com/csghub-server/common/types"
 )
 
 type MemberTester struct {
@@ -42,16 +41,11 @@ func Test_Membership_Delete(t *testing.T) {
 			return h.Delete
 		})
 
-		req := types.RemoveMemberRequest{
-			Role: "admin",
-		}
-
-		tester.mocks.member.EXPECT().Delete(tester.Gctx(), "org2", "u", "u", "admin").Return(nil)
+		tester.mocks.member.EXPECT().Delete(tester.Gctx(), "org2", "u", "u").Return(nil)
 
 		tester.WithUser().
 			WithParam("namespace", "org2").
-			WithParam("username", "u").
-			WithBody(t, req).Execute()
+			WithParam("username", "u").Execute()
 
 		tester.ResponseEqSimple(t, 200, httpbase.R{
 			Msg: "OK",
@@ -62,9 +56,6 @@ func Test_Membership_Delete(t *testing.T) {
 			return h.Delete
 		})
 
-		req := types.RemoveMemberRequest{
-			Role: "admin",
-		}
 		err := errorx.ReqParamInvalid(
 			errors.New("can't remove the last member of this organization"),
 			errorx.Ctx().
@@ -72,12 +63,11 @@ func Test_Membership_Delete(t *testing.T) {
 				Set("detail", "can't remove the last member of this organization"),
 		)
 		tester.mocks.member.EXPECT().
-			Delete(tester.Gctx(), "org1", "u", "u", "admin").
+			Delete(tester.Gctx(), "org1", "u", "u").
 			Return(err)
 		tester.WithUser().
 			WithParam("namespace", "org1").
-			WithParam("username", "u").
-			WithBody(t, req).Execute()
+			WithParam("username", "u").Execute()
 		tester.ResponseEqSimple(t, 400, httpbase.R{
 			Code:    err.(errorx.CustomError).Code(),
 			Msg:     err.Error(),

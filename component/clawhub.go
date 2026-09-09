@@ -12,6 +12,7 @@ import (
 
 	"opencsg.com/csghub-server/builder/git"
 	"opencsg.com/csghub-server/builder/git/gitserver"
+	"opencsg.com/csghub-server/builder/rebac"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/store/s3"
 	"opencsg.com/csghub-server/common/config"
@@ -410,11 +411,11 @@ func (c *clawHubComponent) PublishSkill(ctx context.Context, req *types.ClawHubP
 		return c.createSkill(ctx, files, username, namespace, slug, displayName, version, req.Changelog)
 	}
 
-	permission, err := c.repoComponent.GetUserRepoPermission(ctx, username, skillDB.Repository)
+	permission, err := c.repoComponent.CheckUserRepoPermission(ctx, username, skillDB.Repository, rebac.RepositoryCanWrite)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user repo permission: %w", err)
 	}
-	if !permission.CanWrite {
+	if !permission {
 		return nil, errorx.ErrForbidden
 	}
 
@@ -625,11 +626,11 @@ func filePathSet(files []*types.File) map[string]struct{} {
 }
 
 func (c *clawHubComponent) checkSkillReadPermission(ctx context.Context, username string, repo *database.Repository) error {
-	permission, err := c.repoComponent.GetUserRepoPermission(ctx, username, repo)
+	permission, err := c.repoComponent.CheckUserRepoPermission(ctx, username, repo, rebac.RepositoryCanRead)
 	if err != nil {
 		return fmt.Errorf("failed to get user repo permission: %w", err)
 	}
-	if !permission.CanRead {
+	if !permission {
 		return errorx.ErrForbidden
 	}
 	return nil

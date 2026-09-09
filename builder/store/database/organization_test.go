@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/tests"
+	"opencsg.com/csghub-server/common/types"
 )
 
 func TestOrganizationStore_CRUD(t *testing.T) {
@@ -81,6 +82,7 @@ func TestOrganizationStore_CRUD(t *testing.T) {
 	member := &database.Member{
 		OrganizationID: org.ID,
 		UserID:         321,
+		Role:           string(types.UserRead),
 	}
 
 	err = store.Create(ctx, &database.Organization{
@@ -97,6 +99,7 @@ func TestOrganizationStore_CRUD(t *testing.T) {
 	member2 := &database.Member{
 		OrganizationID: org2.ID,
 		UserID:         321,
+		Role:           string(types.UserRead),
 		DeletedAt:      time.Now(),
 	}
 
@@ -113,6 +116,22 @@ func TestOrganizationStore_CRUD(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, 1, len(orgs))
 	require.Equal(t, 1, total)
+	isLastAdmin, err := store.IsLastOrganizationAdmin(ctx, "u1")
+	require.NoError(t, err)
+	require.False(t, isLastAdmin)
+	adminMember := &database.Member{
+		OrganizationID: org.ID,
+		UserID:         owner.ID,
+		Role:           string(types.UserAdmin),
+	}
+	require.NoError(t, db.Core.NewInsert().Model(adminMember).Scan(ctx, adminMember))
+	isLastAdmin, err = store.IsLastOrganizationAdmin(ctx, "u1")
+	require.NoError(t, err)
+	require.True(t, isLastAdmin)
+	require.NoError(t, database.NewMemberStoreWithDB(db).Delete(ctx, org.ID, owner.ID))
+	isLastAdmin, err = store.IsLastOrganizationAdmin(ctx, "u1")
+	require.NoError(t, err)
+	require.False(t, isLastAdmin)
 
 	orgs, err = store.GetUserBelongOrgs(ctx, 321)
 	require.Nil(t, err)
@@ -120,10 +139,186 @@ func TestOrganizationStore_CRUD(t *testing.T) {
 
 	err = store.Delete(ctx, "o1")
 	require.Nil(t, err)
+	membershipCount, err := db.Core.NewSelect().Model((*database.Member)(nil)).Where("member.organization_id = ?", org.ID).Count(ctx)
+	require.NoError(t, err)
+	require.Zero(t, membershipCount)
 	exist, err = store.Exists(ctx, "foo")
 	require.Nil(t, err)
 	require.False(t, exist)
 
+}
+
+func TestOrganizationStore_ModeFilters(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.Background()
+
+	legacyStore := database.NewOrgStoreWithDB(db)
+	hierarchyStore := database.NewOrgStoreWithMode(db, true)
+	legacyOrganization := &database.Organization{
+		Name: "mode-legacy", Nickname: "Legacy", UUID: uuid.New(),
+	}
+	hierarchyOrganization := &database.Organization{
+		Name: "mode-hierarchy", Nickname: "Hierarchy", UUID: uuid.New(),
+	}
+	require.NoError(t, legacyStore.Create(ctx, legacyOrganization, &database.Namespace{Path: legacyOrganization.Name}))
+	require.NoError(t, hierarchyStore.Create(ctx, hierarchyOrganization, &database.Namespace{Path: hierarchyOrganization.Name}))
+
+	var storedLegacy, storedHierarchy database.Organization
+	require.NoError(t, db.Core.NewSelect().Model(&storedLegacy).Where("id = ?", legacyOrganization.ID).Scan(ctx))
+	require.NoError(t, db.Core.NewSelect().Model(&storedHierarchy).Where("id = ?", hierarchyOrganization.ID).Scan(ctx))
+	require.False(t, storedLegacy.IsUnit)
+	require.True(t, storedHierarchy.IsUnit)
+
+	_, err := legacyStore.FindByPath(ctx, hierarchyOrganization.Name)
+	require.ErrorIs(t, err, sql.ErrNoRows)
+	_, err = hierarchyStore.FindByPath(ctx, legacyOrganization.Name)
+	require.ErrorIs(t, err, sql.ErrNoRows)
+
+	legacyOrganizations, total, err := legacyStore.Search(ctx, "mode-", 20, 1, "", "", "")
+	require.NoError(t, err)
+	require.Equal(t, 1, total)
+	require.Equal(t, legacyOrganization.Name, legacyOrganizations[0].Name)
+
+	hierarchyOrganizations, total, err := hierarchyStore.Search(ctx, "mode-", 20, 1, "", "", "")
+	require.NoError(t, err)
+	require.Equal(t, 1, total)
+	require.Equal(t, hierarchyOrganization.Name, hierarchyOrganizations[0].Name)
+}
+
+// TestOrganizationStore_IsLastOrganizationAdmin verifies every organization is evaluated independently.
+func TestOrganizationStore_IsLastOrganizationAdmin(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.Background()
+
+	legacyStore := database.NewOrgStoreWithDB(db)
+	hierarchyStore := database.NewOrgStoreWithMode(db, true)
+	organizations := map[string]*database.Organization{}
+	createOrganization := func(store database.OrgStore, name string) {
+		organization := &database.Organization{Name: name, Nickname: name, UUID: uuid.New()}
+		require.NoError(t, store.Create(ctx, organization, &database.Namespace{Path: name}))
+		organizations[name] = organization
+	}
+	createOrganization(legacyStore, "last-admin-kng")
+	createOrganization(hierarchyStore, "last-admin-dep")
+	createOrganization(hierarchyStore, "last-admin-qa")
+	createOrganization(hierarchyStore, "last-admin-ci")
+
+	users := map[string]*database.User{}
+	for _, username := range []string{"last-admin-test", "last-admin-backup-one", "last-admin-backup-two"} {
+		user := &database.User{Username: username, UUID: uuid.NewString(), Password: "test-password"}
+		require.NoError(t, db.Core.NewInsert().Model(user).Scan(ctx, user))
+		users[username] = user
+	}
+	addMember := func(organizationName, username string, role types.UserRole) {
+		member := &database.Member{
+			OrganizationID: organizations[organizationName].ID,
+			UserID:         users[username].ID,
+			Role:           string(role),
+		}
+		require.NoError(t, db.Core.NewInsert().Model(member).Scan(ctx, member))
+	}
+
+	addMember("last-admin-kng", "last-admin-test", types.UserAdmin)
+	addMember("last-admin-kng", "last-admin-backup-one", types.UserAdmin)
+	addMember("last-admin-kng", "last-admin-backup-two", types.UserAdmin)
+	addMember("last-admin-dep", "last-admin-test", types.UserAdmin)
+	addMember("last-admin-dep", "last-admin-backup-one", types.UserAdmin)
+	addMember("last-admin-qa", "last-admin-test", types.UserWrite)
+	addMember("last-admin-ci", "last-admin-test", types.UserAdmin)
+
+	isLastAdmin, err := legacyStore.IsLastOrganizationAdmin(ctx, "last-admin-test")
+	require.NoError(t, err)
+	require.False(t, isLastAdmin)
+
+	isLastAdmin, err = hierarchyStore.IsLastOrganizationAdmin(ctx, "last-admin-test")
+	require.NoError(t, err)
+	require.True(t, isLastAdmin)
+
+	addMember("last-admin-ci", "last-admin-backup-two", types.UserAdmin)
+	isLastAdmin, err = hierarchyStore.IsLastOrganizationAdmin(ctx, "last-admin-test")
+	require.NoError(t, err)
+	require.False(t, isLastAdmin)
+}
+
+func TestOrganizationStore_CreateWithRelations(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.Background()
+
+	userStore := database.NewUserStoreWithDB(db)
+	require.NoError(t, userStore.Create(ctx, &database.User{
+		GitID:    90001,
+		UUID:     uuid.NewString(),
+		Username: "atomic-owner",
+		Password: "test-password",
+	}, &database.Namespace{Path: "atomic-owner"}))
+	owner, err := userStore.FindByUsername(ctx, "atomic-owner")
+	require.NoError(t, err)
+
+	store := database.NewOrgStoreWithDB(db)
+
+	org := &database.Organization{
+		Name:     "atomic-org",
+		Nickname: "Atomic Org",
+		UUID:     uuid.New(),
+		UserID:   owner.ID,
+	}
+	require.NoError(t, store.CreateWithRelations(ctx, org, &database.Namespace{Path: org.Name}, []int64{201, 202}))
+
+	storedOrg, err := store.FindByPath(ctx, org.Name)
+	require.NoError(t, err)
+	require.Equal(t, org.ID, storedOrg.ID)
+
+	member, err := database.NewMemberStoreWithDB(db).Find(ctx, org.ID, owner.ID)
+	require.NoError(t, err)
+	require.Equal(t, string(types.UserAdmin), member.Role)
+
+	var tagCount int
+	tagCount, err = db.Core.NewSelect().
+		Model((*database.OrganizationTag)(nil)).
+		Where("organization_tag.organization_id = ?", org.ID).
+		Count(ctx)
+	require.NoError(t, err)
+	require.Equal(t, 2, tagCount)
+}
+
+func TestOrganizationStore_CreateWithRelationsRollback(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.Background()
+
+	userStore := database.NewUserStoreWithDB(db)
+	require.NoError(t, userStore.Create(ctx, &database.User{
+		GitID:    90002,
+		UUID:     uuid.NewString(),
+		Username: "rollback-owner",
+		Password: "test-password",
+	}, &database.Namespace{Path: "rollback-owner"}))
+	owner, err := userStore.FindByUsername(ctx, "rollback-owner")
+	require.NoError(t, err)
+
+	store := database.NewOrgStoreWithDB(db)
+
+	org := &database.Organization{
+		Name:     "rollback-org",
+		Nickname: "Rollback Org",
+		UUID:     uuid.New(),
+		UserID:   owner.ID,
+	}
+	err = store.CreateWithRelations(ctx, org, &database.Namespace{Path: org.Name}, []int64{301, 301})
+	require.Error(t, err)
+
+	_, err = store.FindByPath(ctx, org.Name)
+	require.ErrorIs(t, err, sql.ErrNoRows)
+
+	namespaceCount, err := db.Core.NewSelect().
+		Model((*database.Namespace)(nil)).
+		Where("namespace.path = ?", org.Name).
+		Count(ctx)
+	require.NoError(t, err)
+	require.Zero(t, namespaceCount)
 }
 
 func TestOrganization_CreateWithForceDelete(t *testing.T) {
@@ -185,6 +380,7 @@ func TestOrganizationStore_GetOrgByUserIDs(t *testing.T) {
 		member := &database.Member{
 			OrganizationID: org1.ID,
 			UserID:         uid,
+			Role:           string(types.UserRead),
 		}
 		err = db.Core.NewInsert().Model(member).Scan(ctx, member)
 		require.Nil(t, err)
@@ -193,6 +389,7 @@ func TestOrganizationStore_GetOrgByUserIDs(t *testing.T) {
 	member := &database.Member{
 		OrganizationID: org2.ID,
 		UserID:         101,
+		Role:           string(types.UserRead),
 	}
 	err = db.Core.NewInsert().Model(member).Scan(ctx, member)
 	require.Nil(t, err)
@@ -444,9 +641,9 @@ func TestOrganizationStore_SearchUserBelongOrgs(t *testing.T) {
 
 	// user1 is admin of org1, write of org2, not member of org3
 	members := []database.Member{
-		{OrganizationID: org1.ID, UserID: user1.ID, Role: "admin"},
-		{OrganizationID: org2.ID, UserID: user1.ID, Role: "write"},
-		{OrganizationID: org1.ID, UserID: user2.ID, Role: "read"},
+		{OrganizationID: org1.ID, UserID: user1.ID, Role: string(types.UserAdmin)},
+		{OrganizationID: org2.ID, UserID: user1.ID, Role: string(types.UserWrite)},
+		{OrganizationID: org1.ID, UserID: user2.ID, Role: string(types.UserRead)},
 	}
 	for i := range members {
 		err = db.Core.NewInsert().Model(&members[i]).Scan(ctx, &members[i])
@@ -465,22 +662,16 @@ func TestOrganizationStore_SearchUserBelongOrgs(t *testing.T) {
 	require.True(t, names["belong_org2"])
 
 	// user1: admin role only
-	orgs, total, err = store.SearchUserBelongOrgs(ctx, user1.ID, "", 10, 1, "", "", "admin", "")
+	orgs, total, err = store.SearchUserBelongOrgs(ctx, user1.ID, "", 10, 1, "", "", string(types.UserAdmin), "")
 	require.Nil(t, err)
 	require.Equal(t, 1, total)
 	require.Equal(t, "belong_org1", orgs[0].Name)
 
 	// user1: write role only
-	orgs, total, err = store.SearchUserBelongOrgs(ctx, user1.ID, "", 10, 1, "", "", "write", "")
+	orgs, total, err = store.SearchUserBelongOrgs(ctx, user1.ID, "", 10, 1, "", "", string(types.UserWrite), "")
 	require.Nil(t, err)
 	require.Equal(t, 1, total)
 	require.Equal(t, "belong_org2", orgs[0].Name)
-
-	// user1: owner role — only belong_org3 (user_id = user1.ID)
-	orgs, total, err = store.SearchUserBelongOrgs(ctx, user1.ID, "", 10, 1, "", "", "owner", "")
-	require.Nil(t, err)
-	require.Equal(t, 1, total)
-	require.Equal(t, "belong_org3", orgs[0].Name)
 
 	// user2: all member orgs (only read on org1)
 	orgs, total, err = store.SearchUserBelongOrgs(ctx, user2.ID, "", 10, 1, "", "", "", "")
@@ -489,7 +680,7 @@ func TestOrganizationStore_SearchUserBelongOrgs(t *testing.T) {
 	require.Equal(t, "belong_org1", orgs[0].Name)
 
 	// user2: admin role — none
-	orgs, total, err = store.SearchUserBelongOrgs(ctx, user2.ID, "", 10, 1, "", "", "admin", "")
+	orgs, total, err = store.SearchUserBelongOrgs(ctx, user2.ID, "", 10, 1, "", "", string(types.UserAdmin), "")
 	require.Nil(t, err)
 	require.Equal(t, 0, total)
 	require.Empty(t, orgs)

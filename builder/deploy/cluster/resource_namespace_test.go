@@ -206,7 +206,7 @@ func TestGetNameSpaceResourcesQuota(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			// --- Setup ---
-			fakeClient := fake.NewSimpleClientset(tc.initialObjects...)
+			fakeClient := fake.NewClientset(tc.initialObjects...)
 			cluster := &Cluster{Client: fakeClient}
 
 			// --- Action ---
@@ -269,7 +269,7 @@ func TestGetXPUMem(t *testing.T) {
 		},
 	}
 
-	clientset := fake.NewSimpleClientset(node1, node2)
+	clientset := fake.NewClientset(node1, node2)
 	cluster := &Cluster{
 		Client: clientset,
 	}

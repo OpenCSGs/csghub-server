@@ -31,7 +31,7 @@ type OrganizationVerifyComponentImpl struct {
 func NewOrganizationVerifyComponent(config *config.Config) (OrganizationVerifyComponent, error) {
 	c := &OrganizationVerifyComponentImpl{}
 	c.orgVerifyStore = database.NewOrganizationVerifyStore()
-	c.orgStore = database.NewOrgStore()
+	c.orgStore = database.NewOrgStore(config)
 	c.config = config
 	c.notificationSvcClient = rpc.NewNotificationSvcHttpClient(fmt.Sprintf("%s:%d", config.Notification.Host, config.Notification.Port),
 		rpc.AuthWithApiKey(config.APIToken))

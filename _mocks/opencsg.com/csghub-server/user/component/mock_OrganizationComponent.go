@@ -130,65 +130,6 @@ func (_c *MockOrganizationComponent_Delete_Call) RunAndReturn(run func(context.C
 	return _c
 }
 
-// FixOrgData provides a mock function with given fields: ctx, org
-func (_m *MockOrganizationComponent) FixOrgData(ctx context.Context, org *database.Organization) (*database.Organization, error) {
-	ret := _m.Called(ctx, org)
-
-	if len(ret) == 0 {
-		panic("no return value specified for FixOrgData")
-	}
-
-	var r0 *database.Organization
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *database.Organization) (*database.Organization, error)); ok {
-		return rf(ctx, org)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, *database.Organization) *database.Organization); ok {
-		r0 = rf(ctx, org)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*database.Organization)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, *database.Organization) error); ok {
-		r1 = rf(ctx, org)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// MockOrganizationComponent_FixOrgData_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FixOrgData'
-type MockOrganizationComponent_FixOrgData_Call struct {
-	*mock.Call
-}
-
-// FixOrgData is a helper method to define mock.On call
-//   - ctx context.Context
-//   - org *database.Organization
-func (_e *MockOrganizationComponent_Expecter) FixOrgData(ctx interface{}, org interface{}) *MockOrganizationComponent_FixOrgData_Call {
-	return &MockOrganizationComponent_FixOrgData_Call{Call: _e.mock.On("FixOrgData", ctx, org)}
-}
-
-func (_c *MockOrganizationComponent_FixOrgData_Call) Run(run func(ctx context.Context, org *database.Organization)) *MockOrganizationComponent_FixOrgData_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(*database.Organization))
-	})
-	return _c
-}
-
-func (_c *MockOrganizationComponent_FixOrgData_Call) Return(_a0 *database.Organization, _a1 error) *MockOrganizationComponent_FixOrgData_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *MockOrganizationComponent_FixOrgData_Call) RunAndReturn(run func(context.Context, *database.Organization) (*database.Organization, error)) *MockOrganizationComponent_FixOrgData_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // Get provides a mock function with given fields: ctx, orgName
 func (_m *MockOrganizationComponent) Get(ctx context.Context, orgName string) (*types.Organization, error) {
 	ret := _m.Called(ctx, orgName)

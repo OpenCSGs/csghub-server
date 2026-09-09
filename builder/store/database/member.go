@@ -14,7 +14,8 @@ type MemberStore interface {
 	Find(ctx context.Context, orgID, userID int64) (*Member, error)
 	Add(ctx context.Context, orgID, userID int64, role string) error
 	Update(ctx context.Context, orgID, userID int64, role string) error
-	Delete(ctx context.Context, orgID, userID int64, role string) error
+	// Delete removes the membership identified by the organization and user IDs.
+	Delete(ctx context.Context, orgID, userID int64) error
 	UserMembers(ctx context.Context, userID int64) ([]Member, error)
 	OrganizationMembers(ctx context.Context, orgID int64, role string, pageSize, page int) ([]Member, int, error)
 	UserUUIDsByOrganizationID(ctx context.Context, orgID int64) ([]string, error)
@@ -35,8 +36,8 @@ func NewMemberStoreWithDB(db *DB) MemberStore {
 // Member is the relationship between a user and an organization.
 type Member struct {
 	ID             int64         `bun:",pk,autoincrement" json:"id"`
-	OrganizationID int64         `bun:",pk" json:"organization_id"`
-	UserID         int64         `bun:",pk" json:"user_id"`
+	OrganizationID int64         `bun:",notnull" json:"organization_id"`
+	UserID         int64         `bun:",notnull" json:"user_id"`
 	Organization   *Organization `bun:"rel:belongs-to,join:organization_id=id" json:"organization"`
 	User           *User         `bun:"rel:belongs-to,join:user_id=id" json:"user"`
 	Role           string        `bun:",notnull" json:"role"`
@@ -77,11 +78,12 @@ func (s *memberStoreImpl) Update(ctx context.Context, orgID, userID int64, role 
 	return assertAffectedOneRow(result, err)
 }
 
-func (s *memberStoreImpl) Delete(ctx context.Context, orgID, userID int64, role string) error {
+// Delete removes the membership identified by the organization and user IDs.
+func (s *memberStoreImpl) Delete(ctx context.Context, orgID, userID int64) error {
 	var member Member
 	_, err := s.db.Core.NewDelete().
 		Model(&member).
-		Where("organization_id=? and user_id=? and role=?", orgID, userID, role).
+		Where("organization_id=? and user_id=?", orgID, userID).
 		ForceDelete().
 		Exec(ctx)
 	return err

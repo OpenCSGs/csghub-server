@@ -9,6 +9,7 @@ import (
 
 	"opencsg.com/csghub-server/builder/git"
 	"opencsg.com/csghub-server/builder/git/gitserver"
+	"opencsg.com/csghub-server/builder/rebac"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/errorx"
@@ -50,11 +51,11 @@ func (c *skillPublishComponentImpl) Publish(ctx context.Context, req *types.Publ
 		return nil, errorx.SkillNotFound(err, errorx.Ctx().Set("namespace", req.Namespace).Set("name", req.Name))
 	}
 
-	permission, err := c.repoComponent.GetUserRepoPermission(ctx, req.Username, skill.Repository)
+	permission, err := c.repoComponent.CheckUserRepoPermission(ctx, req.Username, skill.Repository, rebac.RepositoryCanWrite)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user repo permission: %w", err)
 	}
-	if !permission.CanWrite {
+	if !permission {
 		return nil, errorx.ErrForbidden
 	}
 

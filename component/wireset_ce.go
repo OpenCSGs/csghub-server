@@ -11,6 +11,7 @@ import (
 	mock_importer "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/importer"
 	mock_multisync "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/multisync"
 	mock_preader "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/parquet"
+	mock_rebac "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/rebac"
 	mock_rpc "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/rpc"
 	mock_rsa "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/rsa"
 	mock_s3 "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/s3"
@@ -19,6 +20,7 @@ import (
 	"opencsg.com/csghub-server/builder/deploy"
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/multisync"
+	"opencsg.com/csghub-server/builder/rebac"
 	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/s3"
 	"opencsg.com/csghub-server/common/config"
@@ -56,6 +58,12 @@ var MockSuperSet = wire.NewSet(
 	MockedXnetSvcClientSet, MockedS3Set, MockedS3CoreSet, MockedMultiSyncClientSet, MockedDeployerSet, MockedCacheSet, ProvideTestConfig,
 	MockedAccountingClientSet, MockedParquetReaderSet, MockedCheckerSet,
 	MockedModerationSvcClientSet, MockedRsaReader, MockedImporterSet, MockedDataviewerClientSet,
+	MockedReBACSet,
+)
+
+var MockedReBACSet = wire.NewSet(
+	mock_rebac.NewMockAuthorizer,
+	wire.Bind(new(rebac.Authorizer), new(*mock_rebac.MockAuthorizer)),
 )
 
 func NewTestSpaceComponent(
@@ -105,9 +113,10 @@ func NewTestMirrorNamespaceMappingComponent(config *config.Config, stores *tests
 	}
 }
 
-func NewTestRepoComponent(config *config.Config, stores *tests.MockStores, rpcUser rpc.UserSvcClient, gitServer gitserver.GitServer, tagComponent TagComponent, s3Client s3.Client, deployer deploy.Deployer, cache cache.Cache, accountingComponent AccountingComponent, multiSyncClient multisync.Client, xnetClient rpc.XnetSvcClient, clusterComponent ClusterComponent) *repoComponentImpl {
+func NewTestRepoComponent(config *config.Config, stores *tests.MockStores, rpcUser rpc.UserSvcClient, gitServer gitserver.GitServer, tagComponent TagComponent, s3Client s3.Client, deployer deploy.Deployer, cache cache.Cache, accountingComponent AccountingComponent, multiSyncClient multisync.Client, xnetClient rpc.XnetSvcClient, clusterComponent ClusterComponent, authorizer rebac.Authorizer) *repoComponentImpl {
 	return &repoComponentImpl{
 		userStore:                      stores.User,
+		orgStore:                       stores.Org,
 		repoStore:                      stores.Repo,
 		repoRelationsStore:             stores.RepoRelation,
 		namespaceStore:                 stores.Namespace,
@@ -142,5 +151,6 @@ func NewTestRepoComponent(config *config.Config, stores *tests.MockStores, rpcUs
 		repoStatisticsStore:            stores.RepositoryStatistics,
 		modelStore:                     stores.Model,
 		tagStore:                       stores.Tag,
+		rebac:                          authorizer,
 	}
 }

@@ -12,6 +12,8 @@ import (
 	"github.com/bwmarrin/snowflake"
 	"opencsg.com/csghub-server/builder/deploy"
 	"opencsg.com/csghub-server/builder/loki"
+	"opencsg.com/csghub-server/builder/rebac"
+	rebacfactory "opencsg.com/csghub-server/builder/rebac/factory"
 	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
@@ -34,6 +36,7 @@ type platformDataflowComponentImpl struct {
 	clusterStore       database.ClusterInfoStore
 	spaceResourceStore database.SpaceResourceStore
 	repoComponent      RepoComponent
+	rebac              rebac.Authorizer
 	snowflakeNode      *snowflake.Node
 	config             *config.Config
 }
@@ -54,6 +57,10 @@ func NewPlatformDataflowComponent(cfg *config.Config) (PlatformDataflowComponent
 	if err != nil {
 		return nil, fmt.Errorf("failed to create repo component, error: %w", err)
 	}
+	c.rebac, err = rebacfactory.NewAuthorizer()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create ReBAC authorizer, error: %w", err)
+	}
 	node, err := snowflake.NewNode(1)
 	if err != nil || node == nil {
 		return nil, fmt.Errorf("failed to create snowflake node, error: %w", err)
@@ -64,7 +71,7 @@ func NewPlatformDataflowComponent(cfg *config.Config) (PlatformDataflowComponent
 
 func (c *platformDataflowComponentImpl) CreateJob(ctx context.Context, req *types.DataflowArgoJobReq) (*types.DataflowArgoJobResp, error) {
 	// Check user or org permission
-	ns, err := checkOwnerOrOrgMemberPermission(ctx, c.userSvcClient, req.Username, req.NSUUID)
+	ns, err := checkOwnerOrOrgMemberPermission(ctx, c.userSvcClient, c.rebac, req.Username, req.NSUUID)
 	if err != nil {
 		return nil, err
 	}
@@ -177,7 +184,7 @@ func (c *platformDataflowComponentImpl) DeleteJob(ctx context.Context, req *type
 	}
 
 	// Check owner or org permission
-	_, err = checkOwnerOrOrgMemberPermission(ctx, c.userSvcClient, req.Username, req.NSUUID)
+	_, err = checkOwnerOrOrgMemberPermission(ctx, c.userSvcClient, c.rebac, req.Username, req.NSUUID)
 	if err != nil {
 		return err
 	}
@@ -205,7 +212,7 @@ func (c *platformDataflowComponentImpl) GetJob(ctx context.Context, req *types.D
 		return nil, fmt.Errorf("failed to find dataflow workflow by task_id %s: %w", req.ArgoTaskID, err)
 	}
 
-	_, err = checkOwnerOrOrgMemberPermission(ctx, c.userSvcClient, req.Username, req.NSUUID)
+	_, err = checkOwnerOrOrgMemberPermission(ctx, c.userSvcClient, c.rebac, req.Username, req.NSUUID)
 	if err != nil {
 		return nil, err
 	}
@@ -230,7 +237,7 @@ func (c *platformDataflowComponentImpl) CheckUserPermission(ctx context.Context,
 		return false, fmt.Errorf("failed to find dataflow workflow by task_id %s error: %w", req.TaskId, err)
 	}
 
-	_, err = checkOwnerOrOrgMemberPermission(ctx, c.userSvcClient, req.CurrentUser, wf.UserUUID)
+	_, err = checkOwnerOrOrgMemberPermission(ctx, c.userSvcClient, c.rebac, req.CurrentUser, wf.UserUUID)
 	if err != nil {
 		return false, err
 	}

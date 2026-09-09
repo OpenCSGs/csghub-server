@@ -1,0 +1,8 @@
+{
+    "error.REBAC-ERR-0": {
+        "other": "Failed to create the namespace permission relationship."
+    },
+    "error.REBAC-ERR-1": {
+        "other": "Failed to delete the namespace permission relationship."
+    }
+}

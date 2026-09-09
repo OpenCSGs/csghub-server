@@ -24,6 +24,7 @@ import (
 	"opencsg.com/csghub-server/builder/llm"
 	"opencsg.com/csghub-server/builder/multisync"
 	"opencsg.com/csghub-server/builder/parquet"
+	"opencsg.com/csghub-server/builder/rebac"
 
 	// "opencsg.com/csghub-server/builder/parquet"
 	"opencsg.com/csghub-server/builder/dataviewer"
@@ -342,7 +343,7 @@ func NewTestRuntimeArchitectureComponent(stores *tests.MockStores, repoComponent
 
 var RuntimeArchComponentSet = wire.NewSet(NewTestRuntimeArchitectureComponent)
 
-func NewTestMirrorComponent(config *config.Config, stores *tests.MockStores, repoComponent RepoComponent, _ gitserver.GitServer, _ s3.Client) *mirrorComponentImpl {
+func NewTestMirrorComponent(config *config.Config, stores *tests.MockStores, repoComponent RepoComponent, _ gitserver.GitServer, _ s3.Client, authorizer rebac.Authorizer) *mirrorComponentImpl {
 	return &mirrorComponentImpl{
 		repoComp:                    repoComponent,
 		accessTokenStore:            stores.AccessToken,
@@ -356,6 +357,8 @@ func NewTestMirrorComponent(config *config.Config, stores *tests.MockStores, rep
 		syncVersionStore:            stores.SyncVersion,
 		namespaceStore:              stores.Namespace,
 		userStore:                   stores.User,
+		orgStore:                    stores.Org,
+		rebac:                       authorizer,
 		config:                      config,
 		mirrorNamespaceMappingStore: stores.MirrorNamespaceMapping,
 		mirrorMetadataClientFactory: multisync.FromOpenCSG,
@@ -364,15 +367,16 @@ func NewTestMirrorComponent(config *config.Config, stores *tests.MockStores, rep
 
 var MirrorComponentSet = wire.NewSet(NewTestMirrorComponent)
 
-func NewTestCollectionComponent(stores *tests.MockStores, userSvcClient rpc.UserSvcClient, spaceComponent SpaceComponent) *collectionComponentImpl {
+func NewTestCollectionComponent(stores *tests.MockStores, spaceComponent SpaceComponent, authorizer rebac.Authorizer) *collectionComponentImpl {
 	return &collectionComponentImpl{
 		collectionStore: stores.Collection,
 		orgStore:        stores.Org,
 		repoStore:       stores.Repo,
 		userStore:       stores.User,
+		namespaceStore:  stores.Namespace,
 		userLikesStore:  stores.UserLikes,
-		userSvcClient:   userSvcClient,
 		spaceComponent:  spaceComponent,
+		rebac:           authorizer,
 	}
 }
 
@@ -438,7 +442,7 @@ func NewTestSkillComponent(config *config.Config, stores *tests.MockStores, repo
 var CodeComponentSet = wire.NewSet(NewTestCodeComponent)
 var SkillComponentSet = wire.NewSet(NewTestSkillComponent)
 
-func NewTestMultiSyncComponent(config *config.Config, stores *tests.MockStores, gitServer gitserver.GitServer) *multiSyncComponentImpl {
+func NewTestMultiSyncComponent(config *config.Config, stores *tests.MockStores, gitServer gitserver.GitServer, authorizer rebac.Authorizer) *multiSyncComponentImpl {
 	return &multiSyncComponentImpl{
 		multiSyncStore:   stores.MultiSync,
 		repoStore:        stores.Repo,
@@ -456,6 +460,7 @@ func NewTestMultiSyncComponent(config *config.Config, stores *tests.MockStores, 
 		skillStore:       stores.Skill,
 		metadataStore:    stores.Metadata,
 		gitServer:        gitServer,
+		rebac:            authorizer,
 	}
 }
 
@@ -678,11 +683,12 @@ func NewTestRuleComponent(config *config.Config, stores *tests.MockStores) *rule
 
 var RuleComponentSet = wire.NewSet(NewTestRuleComponent)
 
-func NewTestMCPServerComponent(config *config.Config, stores *tests.MockStores, rpcUser rpc.UserSvcClient, repoComponent RepoComponent, gitServer gitserver.GitServer) *mcpServerComponentImpl {
+func NewTestMCPServerComponent(config *config.Config, stores *tests.MockStores, rpcUser rpc.UserSvcClient, repoComponent RepoComponent, gitServer gitserver.GitServer, authorizer rebac.Authorizer) *mcpServerComponentImpl {
 	return &mcpServerComponentImpl{
 		config:             config,
 		repoComponent:      repoComponent,
 		repoStore:          stores.Repo,
+		orgStore:           stores.Org,
 		gitServer:          gitServer,
 		userSvcClient:      rpcUser,
 		mcpServerStore:     stores.MCPServerStore,
@@ -690,6 +696,7 @@ func NewTestMCPServerComponent(config *config.Config, stores *tests.MockStores, 
 		recomStore:         stores.Recom,
 		spaceResourceStore: stores.SpaceResource,
 		namespaceStore:     stores.Namespace,
+		rebac:              authorizer,
 	}
 }
 
