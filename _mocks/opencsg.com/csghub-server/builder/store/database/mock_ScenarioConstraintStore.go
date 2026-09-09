@@ -244,6 +244,65 @@ func (_c *MockScenarioConstraintStore_FindByCode_Call) RunAndReturn(run func(con
 	return _c
 }
 
+// FindByID provides a mock function with given fields: ctx, id
+func (_m *MockScenarioConstraintStore) FindByID(ctx context.Context, id int64) (*database.ScenarioConstraint, error) {
+	ret := _m.Called(ctx, id)
+
+	if len(ret) == 0 {
+		panic("no return value specified for FindByID")
+	}
+
+	var r0 *database.ScenarioConstraint
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, int64) (*database.ScenarioConstraint, error)); ok {
+		return rf(ctx, id)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, int64) *database.ScenarioConstraint); ok {
+		r0 = rf(ctx, id)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*database.ScenarioConstraint)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, int64) error); ok {
+		r1 = rf(ctx, id)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockScenarioConstraintStore_FindByID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FindByID'
+type MockScenarioConstraintStore_FindByID_Call struct {
+	*mock.Call
+}
+
+// FindByID is a helper method to define mock.On call
+//   - ctx context.Context
+//   - id int64
+func (_e *MockScenarioConstraintStore_Expecter) FindByID(ctx interface{}, id interface{}) *MockScenarioConstraintStore_FindByID_Call {
+	return &MockScenarioConstraintStore_FindByID_Call{Call: _e.mock.On("FindByID", ctx, id)}
+}
+
+func (_c *MockScenarioConstraintStore_FindByID_Call) Run(run func(ctx context.Context, id int64)) *MockScenarioConstraintStore_FindByID_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(int64))
+	})
+	return _c
+}
+
+func (_c *MockScenarioConstraintStore_FindByID_Call) Return(_a0 *database.ScenarioConstraint, _a1 error) *MockScenarioConstraintStore_FindByID_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockScenarioConstraintStore_FindByID_Call) RunAndReturn(run func(context.Context, int64) (*database.ScenarioConstraint, error)) *MockScenarioConstraintStore_FindByID_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // FindByScenario provides a mock function with given fields: ctx, scenario
 func (_m *MockScenarioConstraintStore) FindByScenario(ctx context.Context, scenario string) (*database.ScenarioConstraint, error) {
 	ret := _m.Called(ctx, scenario)
@@ -299,6 +358,65 @@ func (_c *MockScenarioConstraintStore_FindByScenario_Call) Return(_a0 *database.
 }
 
 func (_c *MockScenarioConstraintStore_FindByScenario_Call) RunAndReturn(run func(context.Context, string) (*database.ScenarioConstraint, error)) *MockScenarioConstraintStore_FindByScenario_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// Update provides a mock function with given fields: ctx, input
+func (_m *MockScenarioConstraintStore) Update(ctx context.Context, input database.ScenarioConstraint) (*database.ScenarioConstraint, error) {
+	ret := _m.Called(ctx, input)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Update")
+	}
+
+	var r0 *database.ScenarioConstraint
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, database.ScenarioConstraint) (*database.ScenarioConstraint, error)); ok {
+		return rf(ctx, input)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, database.ScenarioConstraint) *database.ScenarioConstraint); ok {
+		r0 = rf(ctx, input)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*database.ScenarioConstraint)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, database.ScenarioConstraint) error); ok {
+		r1 = rf(ctx, input)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockScenarioConstraintStore_Update_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Update'
+type MockScenarioConstraintStore_Update_Call struct {
+	*mock.Call
+}
+
+// Update is a helper method to define mock.On call
+//   - ctx context.Context
+//   - input database.ScenarioConstraint
+func (_e *MockScenarioConstraintStore_Expecter) Update(ctx interface{}, input interface{}) *MockScenarioConstraintStore_Update_Call {
+	return &MockScenarioConstraintStore_Update_Call{Call: _e.mock.On("Update", ctx, input)}
+}
+
+func (_c *MockScenarioConstraintStore_Update_Call) Run(run func(ctx context.Context, input database.ScenarioConstraint)) *MockScenarioConstraintStore_Update_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(database.ScenarioConstraint))
+	})
+	return _c
+}
+
+func (_c *MockScenarioConstraintStore_Update_Call) Return(_a0 *database.ScenarioConstraint, _a1 error) *MockScenarioConstraintStore_Update_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockScenarioConstraintStore_Update_Call) RunAndReturn(run func(context.Context, database.ScenarioConstraint) (*database.ScenarioConstraint, error)) *MockScenarioConstraintStore_Update_Call {
 	_c.Call.Return(run)
 	return _c
 }

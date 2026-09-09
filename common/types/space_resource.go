@@ -242,6 +242,7 @@ const (
 //     resource) before submitting. Semantics match HardwareSatisfiesConstraint
 //     and ReplicaSatisfiesConstraint.
 type ScenarioInfo struct {
+	ID               int64            `json:"id"`
 	Code             int              `json:"code"`
 	Name             string           `json:"name"`
 	I18nKey          string           `json:"i18n_key"`
@@ -324,4 +325,11 @@ type SpaceResourceFilter struct {
 	ClusterID    string       `json:"cluster_id"`
 	ResourceType ResourceType `json:"resource_type"`
 	HardwareType string       `json:"hardware_type"`
+}
+
+type UpdateScenarioConstraintReq struct {
+	ID               int64  `json:"-"`
+	RequiredHardware *int64 `json:"required_hardware"`
+	ExcludeHardware  *int64 `json:"exclude_hardware"`
+	MaxReplica       *int   `json:"max_replica"`
 }

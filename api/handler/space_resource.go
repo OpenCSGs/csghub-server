@@ -268,3 +268,61 @@ func (h *SpaceResourceHandler) ListAll(ctx *gin.Context) {
 	slog.Info("List all space resources successfully")
 	httpbase.OK(ctx, resources)
 }
+
+// UpdateScenarioConstraint godoc
+// @Security     ApiKey
+// @Summary      Update scenario constraint
+// @Description  update scenario constraint
+// @Tags         SpaceReource
+// @Accept       json
+// @Produce      json
+// @Param        id path int true "scenario constraint id"
+// @Param        body body types.UpdateScenarioConstraintReq true "body"
+// @Success      200  {object}  types.Response{data=types.ScenarioInfo} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      404  {object}  types.APINotFound "Not found"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /admin/scenario_constraints/{id} [put]
+func (h *SpaceResourceHandler) UpdateScenarioConstraint(ctx *gin.Context) {
+	var (
+		id  int64
+		err error
+	)
+	var req *types.UpdateScenarioConstraintReq
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
+		httpbase.BadRequestWithExt(ctx, err)
+		return
+	}
+	if req.RequiredHardware != nil && *req.RequiredHardware < 0 {
+		httpbase.BadRequest(ctx, "required_hardware must be >= 0")
+		return
+	}
+	if req.ExcludeHardware != nil && *req.ExcludeHardware < 0 {
+		httpbase.BadRequest(ctx, "exclude_hardware must be >= 0")
+		return
+	}
+	if req.MaxReplica != nil && *req.MaxReplica < 0 {
+		httpbase.BadRequest(ctx, "max_replica must be >= 0")
+		return
+	}
+	id, err = strconv.ParseInt(ctx.Param("id"), 10, 64)
+	if err != nil {
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
+		httpbase.BadRequestWithExt(ctx, err)
+		return
+	}
+	req.ID = id
+
+	constraint, err := h.spaceResource.UpdateScenarioConstraint(ctx.Request.Context(), req)
+	if err != nil {
+		if errors.Is(err, errorx.ErrNotFound) {
+			httpbase.NotFoundError(ctx, err)
+			return
+		}
+		slog.ErrorContext(ctx.Request.Context(), "Failed to update scenario constraint", slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	httpbase.OK(ctx, constraint)
+}

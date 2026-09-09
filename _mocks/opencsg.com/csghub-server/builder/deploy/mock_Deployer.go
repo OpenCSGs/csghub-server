@@ -7,11 +7,16 @@ package deploy
 import (
 	context "context"
 
-	mock "github.com/stretchr/testify/mock"
-	deploy "opencsg.com/csghub-server/builder/deploy"
-	loki "opencsg.com/csghub-server/builder/loki"
-	database "opencsg.com/csghub-server/builder/store/database"
 	commontypes "opencsg.com/csghub-server/common/types"
+
+	database "opencsg.com/csghub-server/builder/store/database"
+
+	deploy "opencsg.com/csghub-server/builder/deploy"
+
+	loki "opencsg.com/csghub-server/builder/loki"
+
+	mock "github.com/stretchr/testify/mock"
+
 	types "opencsg.com/csghub-server/runner/types"
 )
 
