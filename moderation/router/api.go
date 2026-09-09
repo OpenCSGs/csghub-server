@@ -37,6 +37,8 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 	apiV1Group.POST("/image", sc.Image)
 	apiV1Group.POST("/llmresp", sc.LlmResp)
 	apiV1Group.POST("/llmprompt", sc.LlmPrompt)
+	apiV1Group.POST("/media", sc.Media)
+	apiV1Group.POST("/media/result", sc.MediaResult)
 
 	adminGroup := apiV1Group.Group("/admin")
 

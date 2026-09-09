@@ -22,6 +22,11 @@ type ModerationSvcClient interface {
 	PassLLMRespCheck(ctx context.Context, req types.LLMCheckRequest) (*CheckResult, error)
 	PassLLMPromptCheck(ctx context.Context, req types.LLMCheckRequest) (*CheckResult, error)
 	SubmitRepoCheck(ctx context.Context, repoType types.RepositoryType, namespace, name string) error
+	// SubmitMediaModeration submits one audio/video URL for asynchronous
+	// moderation and returns the provider task handle.
+	SubmitMediaModeration(ctx context.Context, req types.MediaModerationRequest) (*types.MediaModerationSubmission, error)
+	// QueryMediaModerationResult polls a submitted media moderation task.
+	QueryMediaModerationResult(ctx context.Context, req types.MediaModerationRequest) (*types.MediaModerationResult, error)
 }
 
 type CheckResult struct {
@@ -157,6 +162,36 @@ func (c *ModerationSvcHttpClient) SubmitRepoCheck(ctx context.Context, repoType 
 				Set("action", "submit repo check"))
 	}
 	return nil
+}
+
+func (c *ModerationSvcHttpClient) SubmitMediaModeration(ctx context.Context, req types.MediaModerationRequest) (*types.MediaModerationSubmission, error) {
+	const path = "/api/v1/media"
+	var resp httpbase.R
+	resp.Data = &types.MediaModerationSubmission{}
+	err := c.hc.Post(ctx, path, req, &resp)
+	if err != nil {
+		slog.ErrorContext(ctx, "call moderation service failed", slog.String("error", err.Error()), slog.Any("req", req))
+		return nil, errorx.RemoteSvcFail(err,
+			errorx.Ctx().
+				Set("service", "moderation service").
+				Set("action", "submit media moderation"))
+	}
+	return resp.Data.(*types.MediaModerationSubmission), nil
+}
+
+func (c *ModerationSvcHttpClient) QueryMediaModerationResult(ctx context.Context, req types.MediaModerationRequest) (*types.MediaModerationResult, error) {
+	const path = "/api/v1/media/result"
+	var resp httpbase.R
+	resp.Data = &types.MediaModerationResult{}
+	err := c.hc.Post(ctx, path, req, &resp)
+	if err != nil {
+		slog.ErrorContext(ctx, "call moderation service failed", slog.String("error", err.Error()), slog.Any("req", req))
+		return nil, errorx.RemoteSvcFail(err,
+			errorx.Ctx().
+				Set("service", "moderation service").
+				Set("action", "query media moderation"))
+	}
+	return resp.Data.(*types.MediaModerationResult), nil
 }
 
 func (c *ModerationSvcHttpClient) PassLLMPromptCheck(ctx context.Context, req types.LLMCheckRequest) (*CheckResult, error) {

@@ -64,6 +64,38 @@ func (m *mockGreen2022) TextModerationPlusWithOptions(request *green20220302.Tex
 	return args.Get(0).(*green20220302.TextModerationPlusResponse), args.Error(1)
 }
 
+func (m *mockGreen2022) VoiceModeration(request *green20220302.VoiceModerationRequest) (*green20220302.VoiceModerationResponse, error) {
+	args := m.Called(request)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*green20220302.VoiceModerationResponse), args.Error(1)
+}
+
+func (m *mockGreen2022) VoiceModerationResult(request *green20220302.VoiceModerationResultRequest) (*green20220302.VoiceModerationResultResponse, error) {
+	args := m.Called(request)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*green20220302.VoiceModerationResultResponse), args.Error(1)
+}
+
+func (m *mockGreen2022) VideoModeration(request *green20220302.VideoModerationRequest) (*green20220302.VideoModerationResponse, error) {
+	args := m.Called(request)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*green20220302.VideoModerationResponse), args.Error(1)
+}
+
+func (m *mockGreen2022) VideoModerationResult(request *green20220302.VideoModerationResultRequest) (*green20220302.VideoModerationResultResponse, error) {
+	args := m.Called(request)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*green20220302.VideoModerationResultResponse), args.Error(1)
+}
+
 func TestPassImageStreamCheck_NilS3Client(t *testing.T) {
 	checker := NewAliyunChecker(nil, &mockGreen2022{})
 	_, err := checker.PassImageStreamCheck(context.Background(), types.ScenarioImageBaseLineCheck, strings.NewReader("image-data"))

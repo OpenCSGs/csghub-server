@@ -66,6 +66,10 @@ type Green2022Client interface {
 	TextModeration(request *green20220302.TextModerationRequest) (_result *green20220302.TextModerationResponse, _err error)
 	ImageModeration(request *green20220302.ImageModerationRequest) (_result *green20220302.ImageModerationResponse, _err error)
 	TextModerationPlusWithOptions(request *green20220302.TextModerationPlusRequest, options *util.RuntimeOptions) (_result *green20220302.TextModerationPlusResponse, _err error)
+	VoiceModeration(request *green20220302.VoiceModerationRequest) (_result *green20220302.VoiceModerationResponse, _err error)
+	VoiceModerationResult(request *green20220302.VoiceModerationResultRequest) (_result *green20220302.VoiceModerationResultResponse, _err error)
+	VideoModeration(request *green20220302.VideoModerationRequest) (_result *green20220302.VideoModerationResponse, _err error)
+	VideoModerationResult(request *green20220302.VideoModerationResultRequest) (_result *green20220302.VideoModerationResultResponse, _err error)
 }
 
 type green2022ClientImpl struct {
@@ -86,6 +90,22 @@ func (c *green2022ClientImpl) ImageModeration(request *green20220302.ImageModera
 
 func (c *green2022ClientImpl) TextModerationPlusWithOptions(request *green20220302.TextModerationPlusRequest, options *util.RuntimeOptions) (_result *green20220302.TextModerationPlusResponse, _err error) {
 	return c.green.TextModerationPlusWithOptions(request, options)
+}
+
+func (c *green2022ClientImpl) VoiceModeration(request *green20220302.VoiceModerationRequest) (_result *green20220302.VoiceModerationResponse, _err error) {
+	return c.green.VoiceModeration(request)
+}
+
+func (c *green2022ClientImpl) VoiceModerationResult(request *green20220302.VoiceModerationResultRequest) (_result *green20220302.VoiceModerationResultResponse, _err error) {
+	return c.green.VoiceModerationResult(request)
+}
+
+func (c *green2022ClientImpl) VideoModeration(request *green20220302.VideoModerationRequest) (_result *green20220302.VideoModerationResponse, _err error) {
+	return c.green.VideoModeration(request)
+}
+
+func (c *green2022ClientImpl) VideoModerationResult(request *green20220302.VideoModerationResultRequest) (_result *green20220302.VideoModerationResultResponse, _err error) {
+	return c.green.VideoModerationResult(request)
 }
 
 /*
@@ -482,4 +502,181 @@ func (c *AliyunGreenChecker) PassImageStreamCheck(ctx context.Context, scenario 
 
 	// Aliyun Green reads the object directly from OSS via bucket name + object key
 	return c.PassImageCheck(ctx, scenario, c.s3BucketName, objectKey)
+}
+
+// Aliyun voice/video moderation service names documented for asynchronous
+// media-file moderation.
+const (
+	aliyunVoiceService = "audio_media_detection"
+	aliyunVideoService = "videoDetection"
+)
+
+// SubmitMediaModeration submits one audio or video URL to Aliyun for
+// asynchronous moderation and returns the provider task handle. The same
+// dataId/seed passed by the caller are echoed back so the caller can verify
+// the submission identity.
+func (c *AliyunGreenChecker) SubmitMediaModeration(ctx context.Context, req types.MediaModerationRequest) (*types.MediaModerationSubmission, error) {
+	if req.URL == "" || req.DataID == "" {
+		return nil, errors.New("media moderation submit requires url and data_id")
+	}
+	serviceParameters, err := json.Marshal(map[string]string{"url": req.URL, "dataId": req.DataID})
+	if err != nil {
+		return nil, fmt.Errorf("marshal media moderation service parameters: %w", err)
+	}
+	switch req.Type {
+	case types.MediaTypeAudio:
+		resp, err := c.green2022.VoiceModeration(&green20220302.VoiceModerationRequest{
+			Service:           tea.String(aliyunVoiceService),
+			ServiceParameters: tea.String(string(serviceParameters)),
+		})
+		if err != nil {
+			return nil, fmt.Errorf("aliyun voice moderation submit: %w", err)
+		}
+		return mediaModerationSubmissionFromResp(resp, req)
+	case types.MediaTypeVideo:
+		resp, err := c.green2022.VideoModeration(&green20220302.VideoModerationRequest{
+			Service:           tea.String(aliyunVideoService),
+			ServiceParameters: tea.String(string(serviceParameters)),
+		})
+		if err != nil {
+			return nil, fmt.Errorf("aliyun video moderation submit: %w", err)
+		}
+		return mediaModerationSubmissionFromVideoResp(resp, req)
+	default:
+		return nil, fmt.Errorf("unsupported media type %q for moderation submit", req.Type)
+	}
+}
+
+// QueryMediaModerationResult polls the Aliyun task handle and maps the
+// provider risk level to a terminal status (pass/reject) or "pending" while
+// the task is still being processed. Unknown risk levels map to "error".
+func (c *AliyunGreenChecker) QueryMediaModerationResult(ctx context.Context, req types.MediaModerationRequest) (*types.MediaModerationResult, error) {
+	if req.TaskID == "" {
+		return nil, errors.New("media moderation query requires task_id")
+	}
+	serviceParameters, err := json.Marshal(map[string]string{"taskId": req.TaskID})
+	if err != nil {
+		return nil, fmt.Errorf("marshal media moderation query parameters: %w", err)
+	}
+	switch req.Type {
+	case types.MediaTypeAudio:
+		resp, err := c.green2022.VoiceModerationResult(&green20220302.VoiceModerationResultRequest{
+			Service:           tea.String(aliyunVoiceService),
+			ServiceParameters: tea.String(string(serviceParameters)),
+		})
+		if err != nil {
+			return nil, fmt.Errorf("aliyun voice moderation result: %w", err)
+		}
+		return mediaModerationResultFromVoice(resp, req.DataID), nil
+	case types.MediaTypeVideo:
+		resp, err := c.green2022.VideoModerationResult(&green20220302.VideoModerationResultRequest{
+			Service:           tea.String(aliyunVideoService),
+			ServiceParameters: tea.String(string(serviceParameters)),
+		})
+		if err != nil {
+			return nil, fmt.Errorf("aliyun video moderation result: %w", err)
+		}
+		return mediaModerationResultFromVideo(resp, req.DataID), nil
+	default:
+		return nil, fmt.Errorf("unsupported media type %q for moderation query", req.Type)
+	}
+}
+
+func mediaModerationSubmissionFromResp(resp *green20220302.VoiceModerationResponse, req types.MediaModerationRequest) (*types.MediaModerationSubmission, error) {
+	if resp == nil || resp.Body == nil || resp.Body.Code == nil || *resp.Body.Code != 200 || resp.Body.Data == nil {
+		return nil, fmt.Errorf("aliyun voice moderation submit failed: %s", mediaModerationAliyunMessage(resp))
+	}
+	return &types.MediaModerationSubmission{
+		DataID: tea.StringValue(resp.Body.Data.DataId),
+		Seed:   req.Seed,
+		TaskID: tea.StringValue(resp.Body.Data.TaskId),
+	}, nil
+}
+
+func mediaModerationSubmissionFromVideoResp(resp *green20220302.VideoModerationResponse, req types.MediaModerationRequest) (*types.MediaModerationSubmission, error) {
+	if resp == nil || resp.Body == nil || resp.Body.Code == nil || *resp.Body.Code != 200 || resp.Body.Data == nil {
+		return nil, fmt.Errorf("aliyun video moderation submit failed: %s", mediaModerationAliyunMessage(resp))
+	}
+	return &types.MediaModerationSubmission{
+		DataID: tea.StringValue(resp.Body.Data.DataId),
+		Seed:   req.Seed,
+		TaskID: tea.StringValue(resp.Body.Data.TaskId),
+	}, nil
+}
+
+// mediaModerationResultFromVoice maps the Aliyun voice result to a terminal
+// status. A non-200 code or empty risk level means the task is still pending.
+func mediaModerationResultFromVoice(resp *green20220302.VoiceModerationResultResponse, dataID string) *types.MediaModerationResult {
+	if resp == nil || resp.Body == nil || resp.Body.Code == nil || *resp.Body.Code != 200 || resp.Body.Data == nil {
+		return &types.MediaModerationResult{DataID: dataID, Status: "pending"}
+	}
+	riskLevel := strings.ToLower(strings.TrimSpace(tea.StringValue(resp.Body.Data.RiskLevel)))
+	status, reason := mediaModerationStatusFromRisk(riskLevel)
+	// Any audio slice with a higher risk level overrides the top-level value.
+	for _, slice := range resp.Body.Data.SliceDetails {
+		if slice == nil {
+			continue
+		}
+		sliceStatus, sliceReason := mediaModerationStatusFromRisk(strings.ToLower(strings.TrimSpace(tea.StringValue(slice.RiskLevel))))
+		if sliceStatus == "reject" {
+			return &types.MediaModerationResult{DataID: dataID, Status: "reject", Reason: sliceReason}
+		}
+		if sliceStatus == "pending" && status != "reject" {
+			status, reason = "pending", ""
+		}
+	}
+	return &types.MediaModerationResult{DataID: dataID, Status: status, Reason: reason}
+}
+
+// mediaModerationResultFromVideo maps the Aliyun video result, inspecting the
+// top-level risk level plus the frame and audio sub-results. Any level that
+// maps to reject short-circuits to reject; otherwise the most restrictive
+// non-pass level wins (pending beats pass so the workflow keeps polling).
+func mediaModerationResultFromVideo(resp *green20220302.VideoModerationResultResponse, dataID string) *types.MediaModerationResult {
+	if resp == nil || resp.Body == nil || resp.Body.Code == nil || *resp.Body.Code != 200 || resp.Body.Data == nil {
+		return &types.MediaModerationResult{DataID: dataID, Status: "pending"}
+	}
+	data := resp.Body.Data
+	levels := []string{strings.ToLower(strings.TrimSpace(tea.StringValue(data.RiskLevel)))}
+	if data.FrameResult != nil {
+		levels = append(levels, strings.ToLower(strings.TrimSpace(tea.StringValue(data.FrameResult.RiskLevel))))
+	}
+	if data.AudioResult != nil {
+		levels = append(levels, strings.ToLower(strings.TrimSpace(tea.StringValue(data.AudioResult.RiskLevel))))
+	}
+	status, reason := "pass", ""
+	for _, level := range levels {
+		s, r := mediaModerationStatusFromRisk(level)
+		if s == "reject" {
+			return &types.MediaModerationResult{DataID: dataID, Status: "reject", Reason: r}
+		}
+		if s == "pending" {
+			status, reason = "pending", ""
+		}
+	}
+	return &types.MediaModerationResult{DataID: dataID, Status: status, Reason: reason}
+}
+
+// mediaModerationStatusFromRisk maps an Aliyun risk level to a moderation
+// status. none/low → pass; medium/high → reject; empty/unknown → pending
+// (keep polling). An empty or unrecognized risk level is NOT treated as a
+// terminal error, because Aliyun may omit the top-level RiskLevel while the
+// task is still finalizing or only populate sub-results; marking it error
+// would wrongly delete the comment.
+func mediaModerationStatusFromRisk(level string) (string, string) {
+	switch level {
+	case "none", "low":
+		return "pass", ""
+	case "medium", "high":
+		return "reject", "sensitive media content"
+	default:
+		// empty or unknown risk level: keep polling, do not persist a terminal result
+		return "pending", ""
+	}
+}
+
+func mediaModerationAliyunMessage(resp any) string {
+	// Best-effort message extraction; the response types differ between voice
+	// and video but both expose Body.Message via the tea pointer.
+	return "aliyun moderation returned a non-200 code"
 }

@@ -1,24 +1,32 @@
 package handler
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/api/httpbase"
+	"opencsg.com/csghub-server/builder/temporal"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/utils/common"
 	"opencsg.com/csghub-server/component"
+	moderationworkflow "opencsg.com/csghub-server/moderation/workflow"
+	workflowcommon "opencsg.com/csghub-server/moderation/workflow/common"
 )
 
 type DiscussionHandler struct {
-	discussion component.DiscussionComponent
-	sensitive  component.SensitiveComponent
+	discussion         component.DiscussionComponent
+	sensitive          component.SensitiveComponent
+	commentMediaPolicy component.CommentMediaPolicy
+	temporal           temporal.Client
+	cfg                *config.Config
 }
 
 func NewDiscussionHandler(cfg *config.Config) (*DiscussionHandler, error) {
@@ -30,10 +38,30 @@ func NewDiscussionHandler(cfg *config.Config) (*DiscussionHandler, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create sensitive component: %w", err)
 	}
+	media, err := component.NewMediaModerationComponentFromConfig(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create media moderation component: %w", err)
+	}
+	policy := component.NewCommentMediaPolicyFromConfig(cfg, sc, media)
+	var tClient temporal.Client
+	if cfg.SensitiveCheck.Enable && cfg.SensitiveCheck.MediaModerationEnable {
+		tClient = getTemporalClient()
+	}
 	return &DiscussionHandler{
-		discussion: c,
-		sensitive:  sc,
+		discussion:         c,
+		sensitive:          sc,
+		commentMediaPolicy: policy,
+		temporal:           tClient,
+		cfg:                cfg,
 	}, nil
+}
+
+// getTemporalClient returns the process-wide temporal client, or nil when the
+// temporal worker has not been initialized (e.g. in unit tests). It is a
+// package variable so tests can substitute a stub.
+var getTemporalClient = func() temporal.Client {
+	defer func() { _ = recover() }()
+	return temporal.GetClient()
 }
 
 // CreateRepoDiscussion godoc
@@ -301,15 +329,29 @@ func (h *DiscussionHandler) CreateDiscussionComment(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
+	if err := h.discussion.CheckDiscussionCommentAccess(ctx.Request.Context(), currentUser, idInt); err != nil {
+		if errors.Is(err, errorx.ErrForbidden) {
+			httpbase.ForbiddenError(ctx, err)
+			return
+		}
+		slog.ErrorContext(ctx.Request.Context(), "failed to check discussion comment access", "error", err, "discussion_id", idInt)
+		httpbase.ServerError(ctx, fmt.Errorf("failed to check discussion comment access: %w", err))
+		return
+	}
 	_, err = h.sensitive.CheckRequestV2(ctx.Request.Context(), &req)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "failed to check sensitive request", slog.Any("error", err))
 		httpbase.BadRequestWithExt(ctx, errorx.ErrSensitiveInfoNotAllowed)
 		return
 	}
+	mediaDecision, ok := h.checkCommentMedia(ctx, req.Content)
+	if !ok {
+		return
+	}
 
 	req.CommentableID = idInt
 	req.CurrentUser = currentUser
+	req.MediaItems = mediaDecision.Items
 
 	resp, err := h.discussion.CreateDiscussionComment(ctx.Request.Context(), req)
 	if err != nil {
@@ -317,7 +359,82 @@ func (h *DiscussionHandler) CreateDiscussionComment(ctx *gin.Context) {
 		httpbase.ServerError(ctx, fmt.Errorf("failed to create discussion comment: %w", err))
 		return
 	}
+	// When the comment references audio/video that is still under moderation,
+	// link the comment to the media rows and start the poll workflow. The
+	// comment is already persisted and visible only to its author until the
+	// workflow finalizes it.
+	if mediaDecision.Decision == types.MediaModerationDecisionPending && len(mediaDecision.Items) > 0 {
+		if err := h.startCommentMediaModeration(ctx, resp.ID, mediaDecision.Items, resp.Notification); err != nil {
+			slog.ErrorContext(ctx.Request.Context(), "failed to start comment media moderation", "error", err, "comment_id", resp.ID)
+			cleanupCtx, cancelCleanup := context.WithTimeout(context.WithoutCancel(ctx.Request.Context()), 10*time.Second)
+			defer cancelCleanup()
+			if cleanupErr := h.discussion.DeleteComment(cleanupCtx, currentUser, resp.ID); cleanupErr != nil {
+				slog.ErrorContext(ctx.Request.Context(), "failed to remove comment after media moderation setup failure",
+					"error", cleanupErr, "comment_id", resp.ID)
+				httpbase.ServerError(ctx, fmt.Errorf(
+					"media moderation setup failed: %v; remove comment: %w", err, cleanupErr))
+				return
+			}
+			httpbase.ServiceUnavailableError(ctx, errorx.ErrMediaModerationUnavailable)
+			return
+		}
+		resp.PendingModeration = true
+	}
 	httpbase.OK(ctx, resp)
+}
+
+// startCommentMediaModeration starts the poll workflow after the component has
+// atomically created the comment and its media links. The caller removes the
+// pending comment if the workflow cannot be started.
+func (h *DiscussionHandler) startCommentMediaModeration(
+	ctx *gin.Context,
+	commentID int64,
+	items []types.CommentMediaItem,
+	notification *types.CommentNotification,
+) error {
+	if h.temporal == nil {
+		return errors.New("temporal client is not configured")
+	}
+	pollItems := make([]workflowcommon.PollCommentMediaItem, 0, len(items))
+	for _, item := range items {
+		pollItems = append(pollItems, workflowcommon.PollCommentMediaItem{
+			DataID: item.DataID, TaskID: item.TaskID, MediaType: item.MediaType,
+		})
+	}
+	return moderationworkflow.StartCommentMediaModerationWorkflow(
+		ctx.Request.Context(), h.temporal,
+		workflowcommon.PollCommentMediaReq{CommentID: commentID, Items: pollItems, Notification: notification},
+		workflowcommon.PollCommentMediaOptions{
+			PollInterval:    h.cfg.SensitiveCheck.MediaModerationPollInterval,
+			WorkflowTimeout: h.cfg.SensitiveCheck.MediaModerationWorkflowTimeout,
+		},
+	)
+}
+
+// checkCommentMedia runs the comment media policy and maps the decision to an
+// HTTP response when the comment must not be written. It returns ok=true when
+// the caller may proceed. For the create flow, a pending decision is
+// acceptable (the comment is created and a poll workflow is started).
+func (h *DiscussionHandler) checkCommentMedia(ctx *gin.Context, content string) (types.CommentMediaDecision, bool) {
+	decision, err := h.commentMediaPolicy.Check(ctx.Request.Context(), content)
+	if errors.Is(err, component.ErrInvalidCommentMedia) {
+		httpbase.BadRequest(ctx, err.Error())
+		return decision, false
+	}
+	switch decision.Decision {
+	case types.MediaModerationDecisionPass:
+		if err == nil {
+			return decision, true
+		}
+	case types.MediaModerationDecisionPending:
+		return decision, true
+	case types.MediaModerationDecisionReject:
+		httpbase.BadRequestWithExt(ctx, errorx.ErrSensitiveInfoNotAllowed)
+		return decision, false
+	}
+	slog.ErrorContext(ctx.Request.Context(), "comment media moderation unavailable", "decision", decision.Decision, "error", err)
+	httpbase.ServiceUnavailableError(ctx, errorx.ErrMediaModerationUnavailable)
+	return decision, false
 }
 
 // UpdateComment godoc
@@ -336,7 +453,7 @@ func (h *DiscussionHandler) CreateDiscussionComment(ctx *gin.Context) {
 // @Router       /comments/{id} [put]
 func (h *DiscussionHandler) UpdateComment(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
-	id := ctx.Param("id")
+	id := ctx.Param("comment_id")
 	idInt, err := strconv.ParseInt(id, 10, 64)
 	if err != nil {
 		httpbase.BadRequest(ctx, fmt.Errorf("invalid comment id: %w", err).Error())
@@ -348,9 +465,53 @@ func (h *DiscussionHandler) UpdateComment(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
+	if err := h.discussion.CheckCommentOwnership(ctx.Request.Context(), currentUser, idInt); err != nil {
+		if errors.Is(err, errorx.ErrForbidden) {
+			httpbase.ForbiddenError(ctx, err)
+			return
+		}
+		slog.ErrorContext(ctx.Request.Context(), "failed to check comment ownership", "error", err, "comment_id", idInt)
+		httpbase.ServerError(ctx, fmt.Errorf("failed to check comment ownership: %w", err))
+		return
+	}
 	_, err = h.sensitive.CheckRequestV2(ctx.Request.Context(), &req)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "failed to check sensitive request", slog.Any("error", err))
+		httpbase.BadRequestWithExt(ctx, errorx.ErrSensitiveInfoNotAllowed)
+		return
+	}
+	// A comment still under media moderation cannot be edited.
+	underModeration, err := h.discussion.CommentUnderModeration(ctx.Request.Context(), idInt)
+	if err != nil {
+		slog.ErrorContext(ctx.Request.Context(), "failed to check comment moderation state", "error", err, "comment_id", idInt)
+		httpbase.ServerError(ctx, fmt.Errorf("failed to check comment moderation state: %w", err))
+		return
+	}
+	if underModeration {
+		httpbase.ConflictError(ctx, errorx.ErrMediaModerationPending)
+		return
+	}
+	// Updates never submit asynchronous audio/video moderation: without a
+	// staged-edit workflow there is no safe way to apply the content later.
+	mediaDecision, err := h.commentMediaPolicy.CheckUpdate(ctx.Request.Context(), req.Content)
+	if errors.Is(err, component.ErrInvalidCommentMedia) {
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	if err != nil {
+		slog.ErrorContext(ctx.Request.Context(), "failed to check updated comment media", "error", err)
+		httpbase.ServerError(ctx, fmt.Errorf("failed to check updated comment media: %w", err))
+		return
+	}
+	if mediaDecision.Decision == types.MediaModerationDecisionError {
+		httpbase.ServerError(ctx, fmt.Errorf("failed to check updated comment media"))
+		return
+	}
+	if mediaDecision.Decision == types.MediaModerationDecisionPending {
+		httpbase.ConflictError(ctx, errorx.ErrMediaModerationPending)
+		return
+	}
+	if mediaDecision.Decision == types.MediaModerationDecisionReject {
 		httpbase.BadRequestWithExt(ctx, errorx.ErrSensitiveInfoNotAllowed)
 		return
 	}
@@ -383,7 +544,7 @@ func (h *DiscussionHandler) UpdateComment(ctx *gin.Context) {
 // @Router       /comments/{id} [delete]
 func (h *DiscussionHandler) DeleteComment(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
-	id := ctx.Param("id")
+	id := ctx.Param("comment_id")
 	idInt, err := strconv.ParseInt(id, 10, 64)
 	if err != nil {
 		httpbase.BadRequest(ctx, fmt.Errorf("invalid comment id: %w", err).Error())

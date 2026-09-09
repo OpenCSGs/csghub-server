@@ -1,0 +1,8 @@
+{
+    "error.MEDIA-ERR-0": {
+        "other": "評論正在審核中，無法編輯"
+    },
+    "error.MEDIA-ERR-1": {
+        "other": "媒體審核服務不可用"
+    }
+}

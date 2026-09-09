@@ -287,3 +287,65 @@ func TestModerationSvcHttpClient_PassImageURLCheck(t *testing.T) {
 	assert.False(t, res.IsSensitive)
 	assert.Empty(t, res.Reason)
 }
+
+func TestModerationSvcHttpClient_SubmitMediaModeration(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/api/v1/media", r.URL.Path)
+		assert.Equal(t, http.MethodPost, r.Method)
+		var req types.MediaModerationRequest
+		err := json.NewDecoder(r.Body).Decode(&req)
+		assert.NoError(t, err)
+		assert.Equal(t, "https://bucket.example/a.mp3", req.URL)
+		assert.Equal(t, types.MediaTypeAudio, req.Type)
+		resp := httpbase.R{
+			Data: types.MediaModerationSubmission{
+				DataID: req.DataID, Seed: req.Seed, TaskID: "task-1",
+			},
+		}
+		err = json.NewEncoder(w).Encode(resp)
+		assert.NoError(t, err)
+	}))
+	hc := &HttpClient{
+		endpoint: server.URL,
+		hc:       server.Client(),
+		logger:   slog.New(slog.NewJSONHandler(os.Stdout, nil)),
+	}
+	defer server.Close()
+	client := &ModerationSvcHttpClient{hc: hc}
+	res, err := client.SubmitMediaModeration(context.Background(), types.MediaModerationRequest{
+		URL: "https://bucket.example/a.mp3", Type: types.MediaTypeAudio, DataID: "d1", Seed: "s1",
+	})
+	assert.NoError(t, err)
+	assert.NotNil(t, res)
+	assert.Equal(t, "task-1", res.TaskID)
+	assert.Equal(t, "d1", res.DataID)
+}
+
+func TestModerationSvcHttpClient_QueryMediaModerationResult(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/api/v1/media/result", r.URL.Path)
+		assert.Equal(t, http.MethodPost, r.Method)
+		var req types.MediaModerationRequest
+		err := json.NewDecoder(r.Body).Decode(&req)
+		assert.NoError(t, err)
+		assert.Equal(t, "task-1", req.TaskID)
+		resp := httpbase.R{
+			Data: types.MediaModerationResult{DataID: req.DataID, Status: "pass"},
+		}
+		err = json.NewEncoder(w).Encode(resp)
+		assert.NoError(t, err)
+	}))
+	hc := &HttpClient{
+		endpoint: server.URL,
+		hc:       server.Client(),
+		logger:   slog.New(slog.NewJSONHandler(os.Stdout, nil)),
+	}
+	defer server.Close()
+	client := &ModerationSvcHttpClient{hc: hc}
+	res, err := client.QueryMediaModerationResult(context.Background(), types.MediaModerationRequest{
+		Type: types.MediaTypeAudio, DataID: "d1", TaskID: "task-1",
+	})
+	assert.NoError(t, err)
+	assert.NotNil(t, res)
+	assert.Equal(t, "pass", res.Status)
+}

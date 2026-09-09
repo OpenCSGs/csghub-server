@@ -122,3 +122,39 @@ func (h *SensitiveHandler) LlmPrompt(ctx *gin.Context) {
 
 	httpbase.OK(ctx, result)
 }
+
+// Media submits one audio/video URL for asynchronous moderation and returns the
+// provider task handle (data_id, seed, task_id).
+func (h *SensitiveHandler) Media(ctx *gin.Context) {
+	var req types.MediaModerationRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		slog.ErrorContext(ctx, "Bad request format", slog.String("err", err.Error()))
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	submission, err := h.c.SubmitMediaModeration(ctx.Request.Context(), req)
+	if err != nil {
+		slog.ErrorContext(ctx, "Failed to submit media moderation", slog.String("err", err.Error()), slog.Any("req", req))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	httpbase.OK(ctx, submission)
+}
+
+// MediaResult polls a submitted media moderation task and returns the
+// terminal status (pass/reject/error) or "pending" while still processing.
+func (h *SensitiveHandler) MediaResult(ctx *gin.Context) {
+	var req types.MediaModerationRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		slog.ErrorContext(ctx, "Bad request format", slog.String("err", err.Error()))
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	result, err := h.c.QueryMediaModerationResult(ctx.Request.Context(), req)
+	if err != nil {
+		slog.ErrorContext(ctx, "Failed to query media moderation result", slog.String("err", err.Error()), slog.Any("req", req))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	httpbase.OK(ctx, result)
+}

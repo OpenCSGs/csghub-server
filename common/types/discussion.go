@@ -81,10 +81,11 @@ type CommentsWithPagination struct {
 }
 
 type DiscussionResponse_Comment struct {
-	ID        int64                    `json:"id"`
-	Content   string                   `json:"content"`
-	User      *DiscussionResponse_User `json:"user"`
-	CreatedAt time.Time                `json:"created_at"`
+	ID                int64                    `json:"id"`
+	Content           string                   `json:"content"`
+	User              *DiscussionResponse_User `json:"user"`
+	CreatedAt         time.Time                `json:"created_at"`
+	PendingModeration bool                     `json:"pending_moderation,omitempty"`
 }
 
 type ListRepoDiscussionRequest struct {
@@ -103,6 +104,9 @@ type CreateCommentRequest struct {
 	CommentableID   int64  `json:"commentable_id"`
 	CommentableType string `json:"commentable_type"`
 	CurrentUser     string `json:"-"`
+	// MediaItems is internal component input. When non-empty, the database
+	// layer creates the comment and its moderation links in one transaction.
+	MediaItems []CommentMediaItem `json:"-"`
 }
 
 // CreateCommentRequest implements SensitiveRequestV2
@@ -121,11 +125,13 @@ func (req *CreateCommentRequest) GetSensitiveFields() []SensitiveField {
 }
 
 type CreateCommentResponse struct {
-	ID              int64                    `json:"id"`
-	CommentableID   int64                    `json:"commentable_id"`
-	CommentableType string                   `json:"commentable_type"`
-	CreatedAt       time.Time                `json:"created_at"`
-	User            *DiscussionResponse_User `json:"user"`
+	ID                int64                    `json:"id"`
+	CommentableID     int64                    `json:"commentable_id"`
+	CommentableType   string                   `json:"commentable_type"`
+	CreatedAt         time.Time                `json:"created_at"`
+	User              *DiscussionResponse_User `json:"user"`
+	PendingModeration bool                     `json:"pending_moderation,omitempty"`
+	Notification      *CommentNotification     `json:"-"`
 }
 
 type UpdateCommentRequest struct {

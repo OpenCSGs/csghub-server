@@ -62,6 +62,18 @@ type NotificationMessage struct {
 	Payload  map[string]any `json:"payload"`  // used to render the message content in portal
 }
 
+// CommentNotification contains stable data for a notification deferred until
+// asynchronous media moderation approves a discussion comment.
+type CommentNotification struct {
+	CommentID     int64          `json:"comment_id"`
+	MsgUUID       string         `json:"msg_uuid"`
+	RepoType      RepositoryType `json:"repo_type"`
+	RepoPath      string         `json:"repo_path"`
+	SenderUUID    string         `json:"sender_uuid"`
+	RecipientUUID string         `json:"recipient_uuid"`
+	CreatedAt     time.Time      `json:"created_at"`
+}
+
 type ResourceApplicationNotificationReq struct {
 	UserUUID    string `json:"user_uuid"`
 	UserName    string `json:"user_name"`

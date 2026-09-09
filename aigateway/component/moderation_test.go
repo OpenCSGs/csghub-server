@@ -66,6 +66,22 @@ func (m *MockModerationSvcClient) SubmitRepoCheck(ctx context.Context, repoType 
 	return args.Error(0)
 }
 
+func (m *MockModerationSvcClient) SubmitMediaModeration(ctx context.Context, req commontypes.MediaModerationRequest) (*commontypes.MediaModerationSubmission, error) {
+	args := m.Called(ctx, req)
+	if args.Get(0) != nil {
+		return args.Get(0).(*commontypes.MediaModerationSubmission), args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
+func (m *MockModerationSvcClient) QueryMediaModerationResult(ctx context.Context, req commontypes.MediaModerationRequest) (*commontypes.MediaModerationResult, error) {
+	args := m.Called(ctx, req)
+	if args.Get(0) != nil {
+		return args.Get(0).(*commontypes.MediaModerationResult), args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
 // MockStreamChecker is a mock of StreamChecker
 type MockStreamChecker struct {
 	mock.Mock
