@@ -437,15 +437,18 @@ func (m *mirrorComponentImpl) CreateMirror(ctx context.Context, req types.Create
 	mirror.Repository = repo
 
 	mirror.Priority = req.Priority
+	var metadataUpdate *database.MirrorRepoMetadataUpdate
 
 	if !req.SkipSourcePath {
 		sourceType, sourcePath, _ := common.GetSourceTypeAndPathFromURL(req.SourceUrl)
 		applyMirrorRepositorySourcePath(repo, sourceType, sourcePath)
+
+		metadataUpdate, err = m.prepareExistingMirrorRepoMetadataUpdate(ctx, repo, &mirror, nil, nil)
+		if err != nil {
+			return nil, err
+		}
 	}
-	metadataUpdate, err := m.prepareExistingMirrorRepoMetadataUpdate(ctx, repo, &mirror, nil, nil)
-	if err != nil {
-		return nil, err
-	}
+
 	reqMirror, err := m.mirrorRepoStore.CreateMirrorRepoRecords(ctx, database.CreateMirrorRepoRecordsInput{
 		Repository:       repo,
 		CreateRepository: false,

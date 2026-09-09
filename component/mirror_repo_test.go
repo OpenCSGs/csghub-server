@@ -611,18 +611,9 @@ func TestMirrorComponent_CreateMirrorSkipsSourcePathForCodeAndSkill(t *testing.T
 				HTTPCloneURL:   "https://opencsg.com/repos/ns/n.git",
 				RepositoryType: repoType,
 			}
+			// CreateMirror skips source metadata refresh when SkipSourcePath is set,
+			// so neither code nor skill repos fetch metadata during import.
 			sourceURL := "https://github.com/upstream/repo"
-			if repoType == types.SkillRepo {
-				sourceURL = "https://opencsg.com/upstream/repo"
-				mc.mirrorMetadataClientFactory = func(endpoint, accessToken string) multisync.Client {
-					require.Equal(t, "https://hub.opencsg.com", endpoint)
-					require.Empty(t, accessToken)
-					return mc.mocks.multiSyncClient
-				}
-				mc.mocks.multiSyncClient.EXPECT().SkillInfo(ctx, types.SyncVersion{
-					RepoPath: "upstream/repo", RepoType: types.SkillRepo,
-				}).Return(&types.Skill{Description: "fresh skill description", DefaultBranch: "develop"}, nil)
-			}
 
 			mc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "user", "ns", membership.RoleAdmin).Return(true, nil)
 			mc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, repoType, "ns", "n").Return(repo, nil)
@@ -643,15 +634,56 @@ func TestMirrorComponent_CreateMirrorSkipsSourcePathForCodeAndSkill(t *testing.T
 			require.Empty(t, input.Repository.GithubPath)
 			require.Empty(t, input.Repository.HFPath)
 			require.Empty(t, input.Repository.MSPath)
-			if repoType == types.SkillRepo {
-				require.NotNil(t, input.Metadata)
-				require.Equal(t, "fresh skill description", input.Metadata.Repository.Description)
-				require.Equal(t, "develop", input.Metadata.Repository.DefaultBranch)
-			} else {
-				require.Nil(t, input.Metadata)
-			}
+			require.Nil(t, input.Metadata)
 		})
 	}
+}
+
+// TestMirrorComponent_CreateMirrorRefreshesSkillMetadata verifies that CreateMirror refreshes
+// source API metadata for a skill repo when SkipSourcePath is not set, i.e. a normal mirror
+// (not a user-imported code/skill repo).
+func TestMirrorComponent_CreateMirrorRefreshesSkillMetadata(t *testing.T) {
+	ctx := context.TODO()
+	mc := initializeTestMirrorComponent(ctx, t)
+	fakeStore := &fakeMirrorRepoStore{}
+	mc.mirrorRepoStore = fakeStore
+
+	repo := &database.Repository{
+		ID:             123,
+		Path:           "ns/n",
+		HTTPCloneURL:   "https://opencsg.com/repos/ns/n.git",
+		RepositoryType: types.SkillRepo,
+	}
+	sourceURL := "https://opencsg.com/upstream/repo"
+	mc.mirrorMetadataClientFactory = func(endpoint, accessToken string) multisync.Client {
+		require.Equal(t, "https://hub.opencsg.com", endpoint)
+		require.Empty(t, accessToken)
+		return mc.mocks.multiSyncClient
+	}
+	mc.mocks.multiSyncClient.EXPECT().SkillInfo(ctx, types.SyncVersion{
+		RepoPath: "upstream/repo", RepoType: types.SkillRepo,
+	}).Return(&types.Skill{Description: "fresh skill description", DefaultBranch: "develop"}, nil)
+
+	mc.mocks.components.repo.EXPECT().CheckUserRepoPermission(ctx, "user", repo, rebac.RepositoryCanAdmin).Return(true, nil)
+	mc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.SkillRepo, "ns", "n").Return(repo, nil)
+	mc.mocks.stores.MirrorMock().EXPECT().FindByRepoID(ctx, repo.ID).Return(nil, sql.ErrNoRows)
+
+	got, err := mc.CreateMirror(ctx, types.CreateMirrorReq{
+		SourceUrl:   sourceURL,
+		CurrentUser: "user",
+		Namespace:   "ns",
+		Name:        "n",
+		RepoType:    types.SkillRepo,
+	})
+	require.NoError(t, err)
+	require.Equal(t, repo.ID, got.RepositoryID)
+	require.Len(t, fakeStore.inputs, 1)
+	input := fakeStore.inputs[0]
+	// OpenCSG source path is recorded since SkipSourcePath is not set.
+	require.Equal(t, "upstream/repo", input.Repository.CSGPath)
+	require.NotNil(t, input.Metadata)
+	require.Equal(t, "fresh skill description", input.Metadata.Repository.Description)
+	require.Equal(t, "develop", input.Metadata.Repository.DefaultBranch)
 }
 
 // TestMirrorComponent_CreateMirrorHonorsRequestPriority verifies that CreateMirror
