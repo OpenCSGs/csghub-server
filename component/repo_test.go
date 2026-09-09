@@ -4199,11 +4199,10 @@ func TestRepoComponent_CommitFilesRejectsOversizedNonLFSFile(t *testing.T) {
 	repoComp := initializeTestRepoComponent(ctx, t)
 	repoComp.config.Git.MaxUnLfsFileSize = 4
 
-	user := database.User{Username: "user_name"}
+	user := database.User{Username: "user_name", UUID: "user-uuid"}
 	repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username).Return(user, nil)
 
 	ns := database.Namespace{NamespaceType: "user", Path: user.Username}
-	repoComp.mocks.stores.NamespaceMock().EXPECT().FindByPath(mock.Anything, ns.Path).Return(ns, nil)
 
 	repo := &database.Repository{
 		ID:      1,
@@ -4216,6 +4215,7 @@ func TestRepoComponent_CommitFilesRejectsOversizedNonLFSFile(t *testing.T) {
 	repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(
 		mock.Anything, types.ModelRepo, ns.Path, repo.Name,
 	).Return(repo, nil)
+	expectReBACCheck(repoComp, true)
 	repoComp.mocks.gitServer.EXPECT().GetRepoAllFiles(ctx, gitserver.GetRepoAllFilesReq{
 		Namespace: ns.Path,
 		Name:      repo.Name,
