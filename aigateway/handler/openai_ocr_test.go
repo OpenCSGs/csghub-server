@@ -289,7 +289,7 @@ func TestOpenAIHandler_OCRPaddleXVLPDF(t *testing.T) {
 	wg.Add(1)
 	tester.mocks.openAIComp.EXPECT().
 		RecordUsageFromTokenUsage(mock.Anything, "testuuid", model, "paddleocr-vl-model", mock.MatchedBy(func(usage *token.Usage) bool {
-			return usage != nil && usage.DataType == string(commontypes.DataTypeOCR) && usage.CompletionRC == 1
+			return usage != nil && usage.DataType == string(commontypes.DataTypeImage) && usage.CompletionRC == 1
 		}), mock.Anything).
 		RunAndReturn(func(context.Context, string, *types.Model, string, *token.Usage, string) error {
 			wg.Done()
@@ -348,7 +348,7 @@ func TestOpenAIHandler_OCRPaddleXVLReturnImages(t *testing.T) {
 	wg.Add(1)
 	tester.mocks.openAIComp.EXPECT().
 		RecordUsageFromTokenUsage(mock.Anything, "testuuid", model, "paddleocr-vl-model", mock.MatchedBy(func(usage *token.Usage) bool {
-			return usage != nil && usage.DataType == string(commontypes.DataTypeOCR) && usage.CompletionRC == 1
+			return usage != nil && usage.DataType == string(commontypes.DataTypeImage) && usage.CompletionRC == 1
 		}), mock.Anything).
 		RunAndReturn(func(context.Context, string, *types.Model, string, *token.Usage, string) error {
 			wg.Done()
@@ -403,7 +403,7 @@ func TestOpenAIHandler_OCRPaddleXVLRawResponseOmitsMarkdownImages(t *testing.T) 
 	wg.Add(1)
 	tester.mocks.openAIComp.EXPECT().
 		RecordUsageFromTokenUsage(mock.Anything, "testuuid", model, "paddleocr-vl-model", mock.MatchedBy(func(usage *token.Usage) bool {
-			return usage != nil && usage.DataType == string(commontypes.DataTypeOCR) && usage.CompletionRC == 1
+			return usage != nil && usage.DataType == string(commontypes.DataTypeImage) && usage.CompletionRC == 1
 		}), mock.Anything).
 		RunAndReturn(func(context.Context, string, *types.Model, string, *token.Usage, string) error {
 			wg.Done()
@@ -485,7 +485,7 @@ func TestOpenAIHandler_OCRHappyPath(t *testing.T) {
 	tester.mocks.openAIComp.EXPECT().
 		RecordUsageFromTokenUsage(mock.Anything, "testuuid", model, "paddleocr-model", mock.MatchedBy(func(usage *token.Usage) bool {
 			return usage != nil &&
-				usage.DataType == string(commontypes.DataTypeOCR) &&
+				usage.DataType == string(commontypes.DataTypeImage) &&
 				usage.CompletionRC == 1
 		}), mock.Anything).
 		RunAndReturn(func(context.Context, string, *types.Model, string, *token.Usage, string) error {

@@ -44,7 +44,7 @@ func (c *OCRUsageCounter) OCRResponse(resp *types.OCRResponse) {
 		images = c.images
 	}
 	c.usage = &Usage{
-		DataType:       string(commontypes.DataTypeOCR),
+		DataType:       string(commontypes.DataTypeImage),
 		CompletionRC:   pages,
 		CompletionDesc: fmt.Sprintf("pages=%d,images=%d", pages, images),
 	}
