@@ -149,7 +149,14 @@ echo "Running tasks: $dataset_tasks, args: $dataset_tasks_args"
 if [ -z "$GPU_NUM" ]; then
     GPU_NUM=1
 fi
-#LimitedMaxToken is gpu_num multiplied by 4096
+if [ -z "$EVALSCOPE_GENERATION_CONFIG" ]; then
+    # Keep enough output budget for reasoning models while making default
+    # benchmark scores reproducible. Sampling can be enabled explicitly.
+    EVALSCOPE_GENERATION_CONFIG='{"max_tokens":30000,"do_sample":false}'
+fi
+if [ -z "$EVALUATION_LIMIT" ]; then
+    EVALUATION_LIMIT=10
+fi
 jsonFiles=""
 IFS=',' read -r -a model_repos <<< "$MODEL_IDS"
 IFS=',' read -r -a model_revisions <<< "$REVISIONS"
@@ -164,7 +171,12 @@ for index in "${!model_repos[@]}"; do
     model_name=`basename $modelID`
     echo "Start evaluating model $model_name, dataset $dataset_tasks"
     # Use wrapper script to ensure custom datasets are registered
-    python /etc/csghub/evalscope_wrapper.py eval --model /workspace/$modelID  --datasets $dataset_tasks --dataset-args "$dataset_tasks_args" --limit 10
+    python /etc/csghub/evalscope_wrapper.py eval \
+        --model /workspace/$modelID \
+        --datasets $dataset_tasks \
+        --dataset-args "$dataset_tasks_args" \
+        --generation-config "$EVALSCOPE_GENERATION_CONFIG" \
+        --limit "$EVALUATION_LIMIT"
     if [ $? -ne 0 ]; then
         echo "Evaluation failed for model $model_name."
         exit 1

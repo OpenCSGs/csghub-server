@@ -505,24 +505,32 @@ func (c *gitCallbackComponentImpl) updateDatasetTags(ctx context.Context, namesp
 		return fmt.Errorf("fail to query repo for in callback, cause: %w", err)
 	}
 	// check if it's evaluation dataset
-	evalDataset, err := c.tagRuleStore.FindByRepo(ctx, string(types.EvaluationCategory), namespace, repoName, string(types.DatasetRepo))
+	evalDatasets, err := c.tagRuleStore.FindAllByRepo(
+		ctx,
+		string(types.EvaluationCategory),
+		namespace,
+		repoName,
+		string(types.DatasetRepo),
+	)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			// check if it's a mirror repo
-			namespace, name := repo.OriginNamespaceAndName()
-			if namespace == "" || name == "" {
-				slog.Debug("not an evaluation dataset, ignore it", slog.Any("repo id", repo.Path))
-			}
-			// use mirror namespace and name to find dataset
-			evalDataset, err = c.tagRuleStore.FindByRepo(ctx, string(types.EvaluationCategory), namespace, name, string(types.DatasetRepo))
+		slog.Error("failed to query evaluation dataset", slog.Any("repo id", repo.Path), slog.Any("error", err))
+		return fmt.Errorf("failed to query evaluation dataset, cause: %w", err)
+	}
+	if len(evalDatasets) == 0 {
+		mirrorNamespace, mirrorName := repo.OriginNamespaceAndName()
+		if mirrorNamespace != "" && mirrorName != "" {
+			evalDatasets, err = c.tagRuleStore.FindAllByRepo(
+				ctx,
+				string(types.EvaluationCategory),
+				mirrorNamespace,
+				mirrorName,
+				string(types.DatasetRepo),
+			)
 			if err != nil {
-				slog.Debug("not an evaluation dataset, ignore it", slog.Any("repo id", repo.Path))
+				slog.Error("failed to query mirrored evaluation dataset", slog.Any("repo id", repo.Path), slog.Any("error", err))
+				return fmt.Errorf("failed to query mirrored evaluation dataset, cause: %w", err)
 			}
-		} else {
-			slog.Error("failed to query evaluation dataset", slog.Any("repo id", repo.Path), slog.Any("error", err))
-			return fmt.Errorf("failed to query evaluation dataset, cause: %w", err)
 		}
-
 	}
 
 	// check if it's a task dataset (e.g., ms-swift)
@@ -544,10 +552,15 @@ func (c *gitCallbackComponentImpl) updateDatasetTags(ctx context.Context, namesp
 
 	tagIds := []int64{}
 
-	if evalDataset != nil && evalDataset.RuntimeFramework != "" {
-		tagIds = append(tagIds, evalDataset.Tag.ID)
+	for _, evalDataset := range evalDatasets {
+		if evalDataset.RuntimeFramework == "" {
+			continue
+		}
+		if evalDataset.Tag.ID > 0 && !slices.Contains(tagIds, evalDataset.Tag.ID) {
+			tagIds = append(tagIds, evalDataset.Tag.ID)
+		}
 		rTag, _ := c.tagStore.FindTag(ctx, evalDataset.RuntimeFramework, string(types.DatasetRepo), "runtime_framework")
-		if rTag != nil {
+		if rTag != nil && !slices.Contains(tagIds, rTag.ID) {
 			tagIds = append(tagIds, rTag.ID)
 		}
 	}

@@ -25,6 +25,49 @@ func TestGitCallbackComponent_SetRepoVisibility(t *testing.T) {
 	require.True(t, gc.setRepoVisibility)
 }
 
+func TestGitCallbackComponent_UpdateDatasetTagsMultipleFrameworks(t *testing.T) {
+	ctx := context.Background()
+	gc := initializeTestGitCallbackComponent(ctx, t)
+	repo := &database.Repository{
+		ID:             1,
+		Path:           "evalscope/aime25",
+		RepositoryType: types.DatasetRepo,
+	}
+	evaluationTag := database.Tag{ID: 10, Name: "examination", Category: "evaluation"}
+	evalscopeTag := &database.Tag{ID: 11, Name: "evalscope", Category: "runtime_framework"}
+	amdEvalscopeTag := &database.Tag{ID: 12, Name: "amd-evalscope", Category: "runtime_framework"}
+
+	gc.mocks.stores.RepoMock().
+		EXPECT().
+		FindByPath(ctx, types.DatasetRepo, "evalscope", "aime25").
+		Return(repo, nil)
+	gc.mocks.stores.TagRuleMock().
+		EXPECT().
+		FindAllByRepo(ctx, "evaluation", "evalscope", "aime25", "dataset").
+		Return([]database.TagRule{
+			{Tag: evaluationTag, RuntimeFramework: "evalscope"},
+			{Tag: evaluationTag, RuntimeFramework: "amd-evalscope"},
+		}, nil)
+	gc.mocks.stores.TagRuleMock().
+		EXPECT().
+		FindByRepo(ctx, "task", "evalscope", "aime25", "dataset").
+		Return(&database.TagRule{}, nil)
+	gc.mocks.stores.TagMock().
+		EXPECT().
+		FindTag(ctx, "evalscope", "dataset", "runtime_framework").
+		Return(evalscopeTag, nil)
+	gc.mocks.stores.TagMock().
+		EXPECT().
+		FindTag(ctx, "amd-evalscope", "dataset", "runtime_framework").
+		Return(amdEvalscopeTag, nil)
+	gc.mocks.stores.TagMock().
+		EXPECT().
+		UpsertRepoTags(ctx, int64(1), []int64{}, []int64{10, 11, 12}).
+		Return(nil)
+
+	require.NoError(t, gc.updateDatasetTags(ctx, "evalscope", "aime25", nil))
+}
+
 func TestGetPipelineTaskFromTags_ASR(t *testing.T) {
 	tests := []struct {
 		name string

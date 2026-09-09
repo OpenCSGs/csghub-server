@@ -1,19 +1,19 @@
 """
-Custom dataset registration for evalscope v1.1.1+
-This module registers custom datasets that are not included in evalscope by default.
+Custom dataset registration for EvalScope v1.10.0.
+This module registers custom datasets that are not included in EvalScope by default.
 """
 
 try:
-    # Evalscope v1.1.1+ API
+    # EvalScope v1.10.0 API
     from evalscope.api.benchmark import DefaultDataAdapter
     from evalscope.api.benchmark.meta import BenchmarkMeta
     from evalscope.api.registry import BENCHMARK_REGISTRY, register_benchmark
     from evalscope.api.dataset import Sample  # Correct import path
     EVALSCOPE_AVAILABLE = True
-    print("[DEBUG] Successfully imported evalscope v1.1.1+ API")
+    print("[DEBUG] Successfully imported EvalScope v1.10.0 API")
 except ImportError as e:
     print(f"[ERROR] Failed to import evalscope: {e}")
-    print("[ERROR] Make sure evalscope v1.1.1+ is installed in the container")
+    print("[ERROR] Make sure EvalScope v1.10.0 is installed in the container")
     print("[ERROR] Custom datasets will not be registered")
     EVALSCOPE_AVAILABLE = False
     import traceback
@@ -117,7 +117,7 @@ def register_custom_datasets():
     dataset_id_list = [ds.strip() for ds in dataset_ids.split(',')]
     print(f"[DEBUG] Parsed dataset_id_list: {dataset_id_list}")
 
-    # Register civil_comments datasets
+    # Register datasets that need OpenCSG-specific metadata or schema adapters.
     registered_count = 0
     for dataset_id in dataset_id_list:
         print(f"[DEBUG] Processing dataset_id: '{dataset_id}'")
@@ -172,9 +172,9 @@ def register_custom_datasets():
                 import traceback
                 traceback.print_exc()
         else:
-            print(f"[DEBUG] Skipping '{dataset_id}' (not a civil_comments dataset)")
+            print(f"[DEBUG] Skipping '{dataset_id}' (no OpenCSG-specific adapter)")
 
-    print(f"[INFO] Total civil_comments datasets registered: {registered_count}")
+    print(f"[INFO] Total OpenCSG-specific datasets registered: {registered_count}")
 
 
 if __name__ == '__main__':

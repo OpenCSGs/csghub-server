@@ -28,19 +28,25 @@ docker buildx build --platform linux/amd64,linux/arm64 \
   -f Dockerfile.lm-evaluation-harness \
   --push .
 
-#opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/evalscope:1.4.2-cu124
-export IMAGE_TAG=1.4.2-cu124
+#opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/evalscope:1.10.0-cu124
+export IMAGE_TAG=1.10.0-cu124
 docker buildx build --platform linux/amd64 \
   -t ${OPENCSG_ACR}/opencsghq/evalscope:${IMAGE_TAG} \
   -t ${OPENCSG_ACR}/opencsghq/evalscope:latest \
   -f Dockerfile.evalscope-gpu \
   --push .
-#opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/evalscope:1.4.2-cpu
-export IMAGE_TAG=1.4.2-cpu
+#opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/evalscope:1.10.0-cpu
+export IMAGE_TAG=1.10.0-cpu
 docker buildx build --platform linux/amd64 \
   -t ${OPENCSG_ACR}/opencsghq/evalscope:${IMAGE_TAG} \
   -t ${OPENCSG_ACR}/opencsghq/evalscope:latest \
   -f Dockerfile.evalscope-cpu \
+  --push .
+#opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/evalscope-amd:1.10.0-rocm7.2.2
+export IMAGE_TAG=1.10.0-rocm7.2.2
+docker buildx build --platform linux/amd64 \
+  -t ${OPENCSG_ACR}/opencsghq/evalscope-amd:${IMAGE_TAG} \
+  -f Dockerfile.evalscope-amd \
   --push .
 
 # opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/claw-eval:1.0.0
