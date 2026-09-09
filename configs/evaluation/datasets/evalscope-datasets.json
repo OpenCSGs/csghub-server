@@ -7,8 +7,8 @@
   "prune": true,
   "datasets": [
     {
-      "namespace": "HuggingFaceH4",
-      "repo_name": "aime_2024",
+      "namespace": "evalscope",
+      "repo_name": "aime24",
       "category": "evaluation",
       "tag_name": "examination",
       "repo_type": "dataset",
@@ -34,7 +34,7 @@
       "source": "ms"
     },
     {
-      "namespace": "modelscope",
+      "namespace": "allenai",
       "repo_name": "ai2_arc",
       "category": "evaluation",
       "tag_name": "examination",
@@ -52,7 +52,7 @@
       "source": "ms"
     },
     {
-      "namespace": "modelscope",
+      "namespace": "evalscope",
       "repo_name": "bbh",
       "category": "evaluation",
       "tag_name": "reasoning",
@@ -61,8 +61,8 @@
       "source": "ms"
     },
     {
-      "namespace": "modelscope",
-      "repo_name": "ceval-exam",
+      "namespace": "evalscope",
+      "repo_name": "ceval",
       "category": "evaluation",
       "tag_name": "examination",
       "repo_type": "dataset",
@@ -79,7 +79,7 @@
       "source": "ms"
     },
     {
-      "namespace": "modelscope",
+      "namespace": "evalscope",
       "repo_name": "cmmlu",
       "category": "evaluation",
       "tag_name": "examination",
@@ -88,7 +88,7 @@
       "source": "ms"
     },
     {
-      "namespace": "modelscope",
+      "namespace": "evalscope",
       "repo_name": "competition_math",
       "category": "evaluation",
       "tag_name": "examination",
@@ -124,8 +124,8 @@
       "source": "ms"
     },
     {
-      "namespace": "modelscope",
-      "repo_name": "gpqa",
+      "namespace": "AI-ModelScope",
+      "repo_name": "gpqa_diamond",
       "category": "evaluation",
       "tag_name": "examination",
       "repo_type": "dataset",
@@ -133,7 +133,7 @@
       "source": "ms"
     },
     {
-      "namespace": "modelscope",
+      "namespace": "AI-ModelScope",
       "repo_name": "gsm8k",
       "category": "evaluation",
       "tag_name": "examination",
@@ -142,7 +142,7 @@
       "source": "ms"
     },
     {
-      "namespace": "modelscope",
+      "namespace": "evalscope",
       "repo_name": "hellaswag",
       "category": "evaluation",
       "tag_name": "reasoning",
@@ -151,7 +151,7 @@
       "source": "ms"
     },
     {
-      "namespace": "modelscope",
+      "namespace": "opencompass",
       "repo_name": "humaneval",
       "category": "evaluation",
       "tag_name": "code",
@@ -160,7 +160,7 @@
       "source": "ms"
     },
     {
-      "namespace": "modelscope",
+      "namespace": "opencompass",
       "repo_name": "ifeval",
       "category": "evaluation",
       "tag_name": "other",
@@ -169,8 +169,8 @@
       "source": "ms"
     },
     {
-      "namespace": "modelscope",
-      "repo_name": "iquiz",
+      "namespace": "AI-ModelScope",
+      "repo_name": "IQuiz",
       "category": "evaluation",
       "tag_name": "other",
       "repo_type": "dataset",
@@ -178,8 +178,8 @@
       "source": "ms"
     },
     {
-      "namespace": "AI-ModelScope",
-      "repo_name": "code_generation_lite",
+      "namespace": "evalscope",
+      "repo_name": "livecodebench_code_generation_lite_parquet",
       "category": "evaluation",
       "tag_name": "code",
       "repo_type": "dataset",
@@ -205,7 +205,7 @@
       "source": "ms"
     },
     {
-      "namespace": "modelscope",
+      "namespace": "cais",
       "repo_name": "mmlu",
       "category": "evaluation",
       "tag_name": "examination",
@@ -214,8 +214,8 @@
       "source": "ms"
     },
     {
-      "namespace": "modelscope",
-      "repo_name": "mmlu-pro",
+      "namespace": "TIGER-Lab",
+      "repo_name": "MMLU-Pro",
       "category": "evaluation",
       "tag_name": "examination",
       "repo_type": "dataset",
@@ -259,7 +259,7 @@
       "source": "ms"
     },
     {
-      "namespace": "modelscope",
+      "namespace": "evalscope",
       "repo_name": "race",
       "category": "evaluation",
       "tag_name": "knowledge",
@@ -268,7 +268,7 @@
       "source": "ms"
     },
     {
-      "namespace": "AI-ModelScope",
+      "namespace": "evalscope",
       "repo_name": "SimpleQA",
       "category": "evaluation",
       "tag_name": "knowledge",
@@ -287,7 +287,7 @@
     },
     {
       "namespace": "AI-ModelScope",
-      "repo_name": "ToolBench-Statich",
+      "repo_name": "ToolBench-Static",
       "category": "evaluation",
       "tag_name": "other",
       "repo_type": "dataset",
@@ -295,7 +295,7 @@
       "source": "ms"
     },
     {
-      "namespace": "modelscope",
+      "namespace": "evalscope",
       "repo_name": "trivia_qa",
       "category": "evaluation",
       "tag_name": "knowledge",
@@ -304,7 +304,7 @@
       "source": "ms"
     },
     {
-      "namespace": "modelscope",
+      "namespace": "evalscope",
       "repo_name": "truthful_qa",
       "category": "evaluation",
       "tag_name": "other",

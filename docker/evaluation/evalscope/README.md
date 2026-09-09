@@ -67,6 +67,12 @@ BENCHMARK_REGISTRY['benchmark_name'] = meta
 
 ## 📝 支持的数据集
 
+### AIME2024
+
+- **仓库**: `evalscope/aime24`
+- **子集**: 由 EvalScope 官方 benchmark metadata 管理（`default` / `test`）
+- **适配器**: EvalScope 1.10.0 官方 `AIME24Adapter`
+
 ### AIME2025
 
 - **仓库**: `evalscope/aime25`
