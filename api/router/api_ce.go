@@ -15,6 +15,17 @@ import (
 )
 
 func useAdvancedMiddleware(r *gin.Engine, config *config.Config) {}
+
+// enableUnit reports whether hierarchy organization routes are enabled in this edition.
+func enableUnit(_ *config.Config) bool {
+	return false
+}
+
+// addOrgRoutes registers edition-specific hierarchy organization routes.
+func addOrgRoutes(_ *gin.RouterGroup, _ middleware.MiddlewareCollection, _ *config.Config) error {
+	return nil
+}
+
 func createAdvancedRoutes(apiGroup *gin.RouterGroup, adminGroup *gin.RouterGroup, middlewareCollection middleware.MiddlewareCollection, config *config.Config, mqFactory bldmq.MessageQueueFactory, activityLogComp component.ActivityLogComponent) error {
 	repoHandler, err := handler.NewRepoHandler(config)
 	if err != nil {

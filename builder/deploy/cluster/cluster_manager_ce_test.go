@@ -85,7 +85,7 @@ func TestGetResourcesInCluster(t *testing.T) {
 		},
 	}
 
-	clientset := fake.NewSimpleClientset(node1, node2, pod1, pod2)
+	clientset := fake.NewClientset(node1, node2, pod1, pod2)
 
 	cluster := &Cluster{
 		Client: clientset,

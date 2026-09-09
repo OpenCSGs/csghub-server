@@ -121,15 +121,16 @@ func InitTestDB() *database.DB {
 		panic(err)
 	}
 	chProjectRoot()
-	bdb, err := newBun(ctx, database.DBConfig{
+	dbConfig := database.DBConfig{
 		Dialect: database.DialectPostgres,
 		DSN:     dsn + "sslmode=disable",
-	}, false)
+	}
+	migrationDB, err := database.NewDB(ctx, dbConfig)
 	if err != nil {
 		panic(err)
 	}
-	defer bdb.Close()
-	bdb.AddQueryHook(bundebug.NewQueryHook(
+	defer migrationDB.Close()
+	migrationDB.BunDB.AddQueryHook(bundebug.NewQueryHook(
 		bundebug.WithEnabled(false),
 
 		// BUNDEBUG=1 logs failed queries
@@ -137,19 +138,20 @@ func InitTestDB() *database.DB {
 		bundebug.FromEnv("BUNDEBUG"),
 	))
 
-	migrator := migrate.NewMigrator(bdb, migrations.Migrations)
-	err = migrator.Init(ctx)
+	migrator := migrate.NewMigrator(migrationDB.BunDB, migrations.Migrations)
+	migrationCtx := migrations.WithDatabase(ctx, migrationDB)
+	err = migrator.Init(migrationCtx)
 	if err != nil {
 		panic(err)
 	}
-	_, err = migrator.Migrate(ctx)
+	_, err = migrator.Migrate(migrationCtx)
 	if err != nil {
 		panic(err)
 	}
 
 	// create a new bun connection with txdb(the `true` param), so all sqls run
 	// using this connection will be wrapped in a Tx automatically.
-	bdb, err = newBun(ctx, database.DBConfig{
+	bdb, err := newBun(ctx, database.DBConfig{
 		Dialect: database.DialectPostgres,
 		DSN:     dsn + "sslmode=disable",
 	}, true)
@@ -202,30 +204,32 @@ func InitTransactionTestDB() *database.DB {
 
 	chProjectRoot()
 
-	bdb, err := newBun(ctx, database.DBConfig{
+	dbConfig := database.DBConfig{
 		Dialect: database.DialectPostgres,
 		DSN:     dsn + "sslmode=disable",
-	}, false)
+	}
+	migrationDB, err := database.NewDB(ctx, dbConfig)
 	if err != nil {
 		panic(err)
 	}
-	defer bdb.Close()
-	bdb.AddQueryHook(bundebug.NewQueryHook(
+	defer migrationDB.Close()
+	migrationDB.BunDB.AddQueryHook(bundebug.NewQueryHook(
 		bundebug.WithEnabled(false),
 
 		bundebug.FromEnv("BUNDEBUG"),
 	))
 
-	migrator := migrate.NewMigrator(bdb, migrations.Migrations)
-	err = migrator.Init(ctx)
+	migrator := migrate.NewMigrator(migrationDB.BunDB, migrations.Migrations)
+	migrationCtx := migrations.WithDatabase(ctx, migrationDB)
+	err = migrator.Init(migrationCtx)
 	if err != nil {
 		panic(err)
 	}
-	_, err = migrator.Migrate(ctx)
+	_, err = migrator.Migrate(migrationCtx)
 	if err != nil {
 		panic(err)
 	}
-	bdb, err = newBun(ctx, database.DBConfig{
+	bdb, err := newBun(ctx, database.DBConfig{
 		Dialect: database.DialectPostgres,
 		DSN:     dsn + "sslmode=disable",
 	}, false)

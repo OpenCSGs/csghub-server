@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 	mockcomponent "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
 	"opencsg.com/csghub-server/api/httpbase"
+	"opencsg.com/csghub-server/builder/rebac"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/testutil"
 	"opencsg.com/csghub-server/common/errorx"
@@ -364,7 +365,7 @@ func TestModelHandler_DeployDedicated(t *testing.T) {
 
 		tester.mocks.repo.EXPECT().IsSyncing(tester.Ctx(), types.ModelRepo, "u", "r").Return(false, nil)
 		tester.mocks.repo.EXPECT().AllowReadAccess(tester.Ctx(), types.ModelRepo, "u", "r", "u").Return(true, nil)
-		tester.mocks.repo.EXPECT().CheckCurrentUserPermission(tester.Ctx(), "u", "org1", mock.Anything).Return(true, nil)
+		tester.mocks.repo.EXPECT().CheckCurrentUserPermission(tester.Ctx(), "u", "org1", rebac.NamespaceCanWrite).Return(true, nil)
 		tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.Ctx(), &types.ModelRunReq{
 			DeployName:     "test",
 			MinReplica:     1,
@@ -389,7 +390,7 @@ func TestModelHandler_DeployDedicated(t *testing.T) {
 		tester.WithUser()
 		tester.mocks.repo.EXPECT().IsSyncing(tester.Ctx(), types.ModelRepo, "u", "r").Return(false, nil)
 		tester.mocks.repo.EXPECT().AllowReadAccess(tester.Ctx(), types.ModelRepo, "u", "r", "u").Return(true, nil)
-		tester.mocks.repo.EXPECT().CheckCurrentUserPermission(tester.Ctx(), "u", "org1", mock.Anything).Return(false, errors.New("rpc error"))
+		tester.mocks.repo.EXPECT().CheckCurrentUserPermission(tester.Ctx(), "u", "org1", rebac.NamespaceCanWrite).Return(false, errors.New("rpc error"))
 		tester.WithBody(t, &types.ModelRunReq{DeployName: "test", MinReplica: 1, MaxReplica: 2, Revision: "main", OwnerNamespace: "org1"}).Execute()
 		tester.ResponseEqCode(t, http.StatusInternalServerError)
 	})
@@ -400,7 +401,7 @@ func TestModelHandler_DeployDedicated(t *testing.T) {
 		tester.WithUser()
 		tester.mocks.repo.EXPECT().IsSyncing(tester.Ctx(), types.ModelRepo, "u", "r").Return(false, nil)
 		tester.mocks.repo.EXPECT().AllowReadAccess(tester.Ctx(), types.ModelRepo, "u", "r", "u").Return(true, nil)
-		tester.mocks.repo.EXPECT().CheckCurrentUserPermission(tester.Ctx(), "u", "org1", mock.Anything).Return(false, nil)
+		tester.mocks.repo.EXPECT().CheckCurrentUserPermission(tester.Ctx(), "u", "org1", rebac.NamespaceCanWrite).Return(false, nil)
 		tester.WithBody(t, &types.ModelRunReq{DeployName: "test", MinReplica: 1, MaxReplica: 2, Revision: "main", OwnerNamespace: "org1"}).Execute()
 		tester.ResponseEqCode(t, http.StatusForbidden)
 	})
@@ -453,7 +454,7 @@ func TestModelHandler_FinetuneCreate(t *testing.T) {
 
 		tester.mocks.repo.EXPECT().IsSyncing(tester.Ctx(), types.ModelRepo, "u", "r").Return(false, nil)
 		tester.mocks.repo.EXPECT().AllowReadAccess(tester.Ctx(), types.ModelRepo, "u", "r", "u").Return(true, nil)
-		tester.mocks.repo.EXPECT().CheckCurrentUserPermission(tester.Ctx(), "u", "org1", mock.Anything).Return(true, nil)
+		tester.mocks.repo.EXPECT().CheckCurrentUserPermission(tester.Ctx(), "u", "org1", rebac.NamespaceCanWrite).Return(true, nil)
 		tester.mocks.model.EXPECT().Deploy(tester.Ctx(), types.DeployActReq{
 			Namespace:   "u",
 			Name:        "r",
@@ -471,7 +472,7 @@ func TestModelHandler_FinetuneCreate(t *testing.T) {
 		tester.WithUser()
 		tester.mocks.repo.EXPECT().IsSyncing(tester.Ctx(), types.ModelRepo, "u", "r").Return(false, nil)
 		tester.mocks.repo.EXPECT().AllowReadAccess(tester.Ctx(), types.ModelRepo, "u", "r", "u").Return(true, nil)
-		tester.mocks.repo.EXPECT().CheckCurrentUserPermission(tester.Ctx(), "u", "org1", mock.Anything).Return(false, errors.New("rpc error"))
+		tester.mocks.repo.EXPECT().CheckCurrentUserPermission(tester.Ctx(), "u", "org1", rebac.NamespaceCanWrite).Return(false, errors.New("rpc error"))
 		tester.WithBody(t, &types.InstanceRunReq{DeployName: "test", Revision: "main", OwnerNamespace: "org1"}).Execute()
 		tester.ResponseEqCode(t, http.StatusInternalServerError)
 	})
@@ -482,7 +483,7 @@ func TestModelHandler_FinetuneCreate(t *testing.T) {
 		tester.WithUser()
 		tester.mocks.repo.EXPECT().IsSyncing(tester.Ctx(), types.ModelRepo, "u", "r").Return(false, nil)
 		tester.mocks.repo.EXPECT().AllowReadAccess(tester.Ctx(), types.ModelRepo, "u", "r", "u").Return(true, nil)
-		tester.mocks.repo.EXPECT().CheckCurrentUserPermission(tester.Ctx(), "u", "org1", mock.Anything).Return(false, nil)
+		tester.mocks.repo.EXPECT().CheckCurrentUserPermission(tester.Ctx(), "u", "org1", rebac.NamespaceCanWrite).Return(false, nil)
 		tester.WithBody(t, &types.InstanceRunReq{DeployName: "test", Revision: "main", OwnerNamespace: "org1"}).Execute()
 		tester.ResponseEqCode(t, http.StatusForbidden)
 	})

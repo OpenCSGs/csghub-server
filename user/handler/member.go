@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"opencsg.com/csghub-server/common/errorx"
-	"opencsg.com/csghub-server/common/types"
 
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/api/httpbase"
@@ -166,33 +165,26 @@ func (h *MemberHandler) Create(ctx *gin.Context) {
 // Delete   godoc
 // @Security     ApiKey
 // @Summary      Remove membership between org and user
-// @Description  user's role will be remove from org
+// @Description  Remove a user's membership from an organization. The member role is resolved from the database.
 // @Tags         Member
-// @Accept       json
 // @Produce      json
 // @Param        namespace path string true "org name"
 // @Param        username path string true "user name"
 // @Param        current_user query string false "the op user"
-// @Param        body body types.RemoveMemberRequest true "body"
 // @Success      200  {object}  types.Response{} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /organization/{namespace}/members/{username} [delete]
 func (h *MemberHandler) Delete(ctx *gin.Context) {
-	var req types.RemoveMemberRequest
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		httpbase.ServerError(ctx, fmt.Errorf("failed to unmarshal request body,caused by: %w", err))
-		return
-	}
 	currentUser := httpbase.GetCurrentUser(ctx)
 	org := ctx.Param("namespace")
 	userName := ctx.Param("username")
-	err := h.c.Delete(ctx, org, userName, currentUser, req.Role)
+	err := h.c.Delete(ctx, org, userName, currentUser)
 	if err != nil {
 		slog.ErrorContext(ctx, "delete member fail", slog.Any("error", err),
 			slog.Group("request",
 				slog.String("org", org), slog.String("username", userName),
-				slog.String("role", req.Role), slog.String("op_user", currentUser),
+				slog.String("op_user", currentUser),
 			),
 		)
 		if errors.Is(err, errorx.ErrReqParamInvalid) {

@@ -18,6 +18,7 @@ import (
 	"opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/importer"
 	"opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/multisync"
 	"opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/parquet"
+	"opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/rebac"
 	"opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/rsa"
 	"opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/s3"
@@ -47,7 +48,8 @@ func initializeTestRepoComponent(ctx context.Context, t interface {
 	multisyncMockClient := multisync.NewMockClient(t)
 	mockXnetSvcClient := rpc.NewMockXnetSvcClient(t)
 	mockClusterComponent := component.NewMockClusterComponent(t)
-	componentRepoComponentImpl := NewTestRepoComponent(config, mockStores, mockUserSvcClient, mockGitServer, mockTagComponent, mockClient, mockDeployer, mockCache, mockAccountingComponent, multisyncMockClient, mockXnetSvcClient, mockClusterComponent)
+	mockAuthorizer := rebac.NewMockAuthorizer(t)
+	componentRepoComponentImpl := NewTestRepoComponent(config, mockStores, mockUserSvcClient, mockGitServer, mockTagComponent, mockClient, mockDeployer, mockCache, mockAccountingComponent, multisyncMockClient, mockXnetSvcClient, mockClusterComponent, mockAuthorizer)
 	mockRepoComponent := component.NewMockRepoComponent(t)
 	mockSpaceComponent := component.NewMockSpaceComponent(t)
 	mockRuntimeArchitectureComponent := component.NewMockRuntimeArchitectureComponent(t)
@@ -357,6 +359,7 @@ func initializeTestAccountingComponent(ctx context.Context, t interface {
 	mockStores := tests.NewMockStores(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
 	componentAccountingComponentImpl := NewTestAccountingComponent(mockStores, mockAccountingClient)
+	componentAccountingComponentImpl.rebac = rebac.NewMockAuthorizer(t)
 	mockAccountingComponent := component.NewMockAccountingComponent(t)
 	mockRepoComponent := component.NewMockRepoComponent(t)
 	mockTagComponent := component.NewMockTagComponent(t)
@@ -612,7 +615,8 @@ func initializeTestMirrorComponent(ctx context.Context, t interface {
 	mockRepoComponent := component.NewMockRepoComponent(t)
 	mockGitServer := gitserver.NewMockGitServer(t)
 	mockClient := s3.NewMockClient(t)
-	componentMirrorComponentImpl := NewTestMirrorComponent(config, mockStores, mockRepoComponent, mockGitServer, mockClient)
+	mockAuthorizer := rebac.NewMockAuthorizer(t)
+	componentMirrorComponentImpl := NewTestMirrorComponent(config, mockStores, mockRepoComponent, mockGitServer, mockClient, mockAuthorizer)
 	mockAccountingComponent := component.NewMockAccountingComponent(t)
 	mockTagComponent := component.NewMockTagComponent(t)
 	mockSpaceComponent := component.NewMockSpaceComponent(t)
@@ -674,7 +678,8 @@ func initializeTestCollectionComponent(ctx context.Context, t interface {
 	mockStores := tests.NewMockStores(t)
 	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
 	mockSpaceComponent := component.NewMockSpaceComponent(t)
-	componentCollectionComponentImpl := NewTestCollectionComponent(mockStores, mockUserSvcClient, mockSpaceComponent)
+	mockAuthorizer := rebac.NewMockAuthorizer(t)
+	componentCollectionComponentImpl := NewTestCollectionComponent(mockStores, mockSpaceComponent, mockAuthorizer)
 	mockAccountingComponent := component.NewMockAccountingComponent(t)
 	mockRepoComponent := component.NewMockRepoComponent(t)
 	mockTagComponent := component.NewMockTagComponent(t)
@@ -864,7 +869,8 @@ func initializeTestMultiSyncComponent(ctx context.Context, t interface {
 	config := ProvideTestConfig()
 	mockStores := tests.NewMockStores(t)
 	mockGitServer := gitserver.NewMockGitServer(t)
-	componentMultiSyncComponentImpl := NewTestMultiSyncComponent(config, mockStores, mockGitServer)
+	mockAuthorizer := rebac.NewMockAuthorizer(t)
+	componentMultiSyncComponentImpl := NewTestMultiSyncComponent(config, mockStores, mockGitServer, mockAuthorizer)
 	mockAccountingComponent := component.NewMockAccountingComponent(t)
 	mockRepoComponent := component.NewMockRepoComponent(t)
 	mockTagComponent := component.NewMockTagComponent(t)
@@ -1444,6 +1450,7 @@ func initializeTestEvaluationComponent(ctx context.Context, t interface {
 	mockRepoComponent := component.NewMockRepoComponent(t)
 	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
 	componentEvaluationComponentImpl := NewTestEvaluationComponent(config, mockStores, mockDeployer, mockAccountingComponent, mockRepoComponent, mockUserSvcClient)
+	componentEvaluationComponentImpl.rebac = rebac.NewMockAuthorizer(t)
 	mockTagComponent := component.NewMockTagComponent(t)
 	mockSpaceComponent := component.NewMockSpaceComponent(t)
 	mockRuntimeArchitectureComponent := component.NewMockRuntimeArchitectureComponent(t)
@@ -2210,7 +2217,8 @@ func initializeTestMCPServerComponent(ctx context.Context, t interface {
 	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
 	mockRepoComponent := component.NewMockRepoComponent(t)
 	mockGitServer := gitserver.NewMockGitServer(t)
-	componentMcpServerComponentImpl := NewTestMCPServerComponent(config, mockStores, mockUserSvcClient, mockRepoComponent, mockGitServer)
+	mockAuthorizer := rebac.NewMockAuthorizer(t)
+	componentMcpServerComponentImpl := NewTestMCPServerComponent(config, mockStores, mockUserSvcClient, mockRepoComponent, mockGitServer, mockAuthorizer)
 	mockAccountingComponent := component.NewMockAccountingComponent(t)
 	mockTagComponent := component.NewMockTagComponent(t)
 	mockSpaceComponent := component.NewMockSpaceComponent(t)

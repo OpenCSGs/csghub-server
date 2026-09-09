@@ -212,17 +212,17 @@ var (
 	//
 	// zh-HK: 管理員用戶不能被刪除
 	ErrAdminUserCannotBeDeleted error = CustomError{prefix: errUserPrefix, code: adminUserCannotBeDeleted}
-	// user has organizations can not be deleted
+	// user administers organizations and cannot be deleted
 	//
-	// Description: The user who owns organizations cannot be deleted.
+	// Description: The user who administers organizations cannot be deleted.
 	//
-	// Description_ZH: 拥有组织的用户不能被删除。
+	// Description_ZH: 担任组织管理员的用户不能被删除。
 	//
-	// en-US: User who owns organizations cannot be deleted
+	// en-US: User who administers organizations cannot be deleted
 	//
-	// zh-CN: 拥有组织的用户不能被删除
+	// zh-CN: 担任组织管理员的用户不能被删除
 	//
-	// zh-HK: 擁有組織的用戶不能被刪除
+	// zh-HK: 擔任組織管理員的用戶不能被刪除
 	ErrUserHasOrganizations error = CustomError{prefix: errUserPrefix, code: userHasOrganizations}
 	// user has deployments can not be deleted
 	//

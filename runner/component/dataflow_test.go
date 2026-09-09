@@ -34,7 +34,7 @@ func TestDataflowComponent_CreateWorkflow(t *testing.T) {
 
 	t.Run("success", func(t *testing.T) {
 		df, pool := newTestDataflowComponent(t)
-		kubeClient := fake.NewSimpleClientset()
+		kubeClient := fake.NewClientset()
 		testCluster := &cluster.Cluster{
 			CID:        "config",
 			ID:         "test-cluster",
@@ -101,7 +101,7 @@ func TestDataflowComponent_CreateWorkflow(t *testing.T) {
 
 	t.Run("argo create fails and cleans up pvc", func(t *testing.T) {
 		df, pool := newTestDataflowComponent(t)
-		kubeClient := fake.NewSimpleClientset()
+		kubeClient := fake.NewClientset()
 		argoClient := argofake.NewSimpleClientset()
 		testCluster := &cluster.Cluster{
 			CID:        "config",
@@ -161,7 +161,7 @@ func TestDataflowComponent_deletePVC(t *testing.T) {
 
 	t.Run("success", func(t *testing.T) {
 		df, _ := newTestDataflowComponent(t)
-		kubeClient := fake.NewSimpleClientset()
+		kubeClient := fake.NewClientset()
 		testCluster := &cluster.Cluster{
 			Client: kubeClient,
 		}
@@ -192,7 +192,7 @@ func TestDataflowComponent_deletePVC(t *testing.T) {
 
 	t.Run("delete non-existent pvc returns error", func(t *testing.T) {
 		df, _ := newTestDataflowComponent(t)
-		kubeClient := fake.NewSimpleClientset()
+		kubeClient := fake.NewClientset()
 		testCluster := &cluster.Cluster{
 			Client: kubeClient,
 		}
@@ -281,7 +281,7 @@ func TestDataflowComponent_DeleteWorkflow(t *testing.T) {
 
 	t.Run("success", func(t *testing.T) {
 		df, pool := newTestDataflowComponent(t)
-		kubeClient := fake.NewSimpleClientset()
+		kubeClient := fake.NewClientset()
 		argoClient := argofake.NewSimpleClientset()
 		testCluster := &cluster.Cluster{
 			CID:        "config",
@@ -329,7 +329,7 @@ func TestDataflowComponent_DeleteWorkflow(t *testing.T) {
 
 	t.Run("workflow not found handled gracefully", func(t *testing.T) {
 		df, pool := newTestDataflowComponent(t)
-		kubeClient := fake.NewSimpleClientset()
+		kubeClient := fake.NewClientset()
 		argoClient := argofake.NewSimpleClientset()
 		testCluster := &cluster.Cluster{
 			CID:        "config",

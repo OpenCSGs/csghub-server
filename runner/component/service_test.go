@@ -33,7 +33,7 @@ func TestServiceComponent_RunService(t *testing.T) {
 	kss := mockdb.NewMockKnativeServiceStore(t)
 	ctx := context.TODO()
 	pool := mockCluster.NewMockPool(t)
-	kubeClient := fake.NewSimpleClientset()
+	kubeClient := fake.NewClientset()
 	expectCluster := &cluster.Cluster{
 		CID:           "config",
 		ID:            "test",
@@ -87,7 +87,7 @@ func TestServiceComponent_StopService(t *testing.T) {
 	kss := mockdb.NewMockKnativeServiceStore(t)
 	ctx := context.TODO()
 	pool := mockCluster.NewMockPool(t)
-	kubeClient := fake.NewSimpleClientset()
+	kubeClient := fake.NewClientset()
 	cluster := cluster.Cluster{
 		CID:           "config",
 		ID:            "test",
@@ -150,7 +150,7 @@ func TestServiceComponent_StopService_NotExistInK8s(t *testing.T) {
 	kss := mockdb.NewMockKnativeServiceStore(t)
 	ctx := context.TODO()
 	pool := mockCluster.NewMockPool(t)
-	kubeClient := fake.NewSimpleClientset()
+	kubeClient := fake.NewClientset()
 	knativeClient := knativefake.NewSimpleClientset()
 	cluster := cluster.Cluster{
 		CID:           "config",
@@ -186,7 +186,7 @@ func TestServiceComponent_PurgeService(t *testing.T) {
 	kss := mockdb.NewMockKnativeServiceStore(t)
 	ctx := context.TODO()
 	pool := mockCluster.NewMockPool(t)
-	kubeClient := fake.NewSimpleClientset()
+	kubeClient := fake.NewClientset()
 	cluster := cluster.Cluster{
 		CID:           "config",
 		ID:            "test",
@@ -244,7 +244,7 @@ func TestServiceComponent_UpdateService(t *testing.T) {
 	kss := mockdb.NewMockKnativeServiceStore(t)
 	ctx := context.TODO()
 	pool := mockCluster.NewMockPool(t)
-	kubeClient := fake.NewSimpleClientset()
+	kubeClient := fake.NewClientset()
 	cluster := cluster.Cluster{
 		CID:           "config",
 		ID:            "test",
@@ -311,7 +311,7 @@ func TestServiceComponent_GetServicePodWithStatus(t *testing.T) {
 	kss := mockdb.NewMockKnativeServiceStore(t)
 	ctx := context.TODO()
 	pool := mockCluster.NewMockPool(t)
-	kubeClient := fake.NewSimpleClientset()
+	kubeClient := fake.NewClientset()
 	expectCluster := &cluster.Cluster{
 		CID:           "config",
 		ID:            "test",
@@ -364,7 +364,7 @@ func TestServiceComponent_GetServiceByName(t *testing.T) {
 	kss := mockdb.NewMockKnativeServiceStore(t)
 	ctx := context.TODO()
 	pool := mockCluster.NewMockPool(t)
-	kubeClient := fake.NewSimpleClientset()
+	kubeClient := fake.NewClientset()
 	expectCluster := &cluster.Cluster{
 		CID:           "config",
 		ID:            "test",
@@ -425,7 +425,7 @@ func TestServiceComponent_GetServiceInfo(t *testing.T) {
 	kss := mockdb.NewMockKnativeServiceStore(t)
 	ctx := context.TODO()
 	pool := mockCluster.NewMockPool(t)
-	kubeClient := fake.NewSimpleClientset()
+	kubeClient := fake.NewClientset()
 	expectCluster := &cluster.Cluster{
 		CID:           "config",
 		ID:            "test",
@@ -486,7 +486,7 @@ func TestServiceComponent_GetServiceInfo(t *testing.T) {
 func TestServiceComponent_AddServiceInDB(t *testing.T) {
 	kss := mockdb.NewMockKnativeServiceStore(t)
 	pool := mockCluster.NewMockPool(t)
-	kubeClient := fake.NewSimpleClientset()
+	kubeClient := fake.NewClientset()
 	knativeClient := knativefake.NewSimpleClientset()
 	pool.EXPECT().GetClusterByID(mock.Anything, "test").Return(&cluster.Cluster{
 		CID:           "config",
@@ -544,7 +544,7 @@ func TestServiceComponent_AddServiceInDB(t *testing.T) {
 func TestServiceComponent_updateServiceInDB(t *testing.T) {
 	kss := mockdb.NewMockKnativeServiceStore(t)
 	pool := mockCluster.NewMockPool(t)
-	kubeClient := fake.NewSimpleClientset()
+	kubeClient := fake.NewClientset()
 	knativeClient := knativefake.NewSimpleClientset()
 	pool.EXPECT().GetClusterByID(mock.Anything, "test").Return(&cluster.Cluster{
 		CID:           "config",
@@ -685,7 +685,7 @@ func TestServiceComponent_PodExist(t *testing.T) {
 	kss := mockdb.NewMockKnativeServiceStore(t)
 
 	pool := mockCluster.NewMockPool(t)
-	kubeClient := fake.NewSimpleClientset()
+	kubeClient := fake.NewClientset()
 	expectCluster := &cluster.Cluster{
 		CID:           "config",
 		ID:            "test",
@@ -754,7 +754,7 @@ func TestServiceComponent_GetServiceByNameFromK8s(t *testing.T) {
 	ctx := context.TODO()
 	pool := mockCluster.NewMockPool(t)
 
-	kubeClient := fake.NewSimpleClientset()
+	kubeClient := fake.NewClientset()
 	expectCluster := &cluster.Cluster{
 		CID:           "config",
 		ID:            "test",
@@ -811,7 +811,7 @@ func TestServiceComponent_SetVersionsTraffic(t *testing.T) {
 	kss := mockdb.NewMockKnativeServiceStore(t)
 	ctx := context.TODO()
 	pool := mockCluster.NewMockPool(t)
-	kubeClient := fake.NewSimpleClientset()
+	kubeClient := fake.NewClientset()
 	knativeClient := knativefake.NewSimpleClientset()
 	pool.EXPECT().GetClusterByID(mock.Anything, "test").Return(&cluster.Cluster{
 		CID:           "config",
@@ -1000,7 +1000,7 @@ func TestServiceComponent_DeleteKsvcVersion(t *testing.T) {
 	ctx := context.TODO()
 	pool := mockCluster.NewMockPool(t)
 
-	kubeClient := fake.NewSimpleClientset()
+	kubeClient := fake.NewClientset()
 	knativeClient := knativefake.NewSimpleClientset()
 	pool.EXPECT().GetClusterByID(mock.Anything, "test").Return(&cluster.Cluster{
 		CID:           "config",
@@ -1091,7 +1091,7 @@ func TestServiceComponent_reportServiceLog(t *testing.T) {
 func TestServiceComponent_getServiceStatus(t *testing.T) {
 	ctx := context.TODO()
 	pool := mockCluster.NewMockPool(t)
-	kubeClient := fake.NewSimpleClientset()
+	kubeClient := fake.NewClientset()
 	knativeClient := knativefake.NewSimpleClientset()
 
 	expectCluster := &cluster.Cluster{

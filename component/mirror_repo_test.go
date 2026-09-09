@@ -9,10 +9,11 @@ import (
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	mockrebac "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/rebac"
 	mockdb "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/database"
 	mockcache "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/mirror/cache"
-	"opencsg.com/csghub-server/builder/git/membership"
 	"opencsg.com/csghub-server/builder/multisync"
+	"opencsg.com/csghub-server/builder/rebac"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/workhub"
 	"opencsg.com/csghub-server/common/errorx"
@@ -27,6 +28,9 @@ type fakeMirrorRepoStore struct {
 
 // CreateMirrorRepoRecords stores the input and returns the mirror as if the transaction committed.
 func (s *fakeMirrorRepoStore) CreateMirrorRepoRecords(ctx context.Context, input database.CreateMirrorRepoRecordsInput) (*database.Mirror, error) {
+	if input.CreateRepository && input.Repository != nil && input.Repository.ID == 0 {
+		input.Repository.ID = 123
+	}
 	s.inputs = append(s.inputs, input)
 	if s.result != nil {
 		return s.result, nil
@@ -76,6 +80,13 @@ func useFakeMirrorJobClient(mc *testMirrorWithMocks) *fakeWorkhubJobClient {
 	mc.mirrorJobClient = jobClient
 	mc.mirrorRepoJobClient = workhub.NewMirrorRepoJobClient(jobClient, workhub.MirrorJobClientConfig{MaxRetryCount: mc.config.Mirror.MaxRetryCount})
 	return jobClient
+}
+
+// expectMirrorRepositoryRelationship allows one new mirror repository tuple to be checked and written.
+func expectMirrorRepositoryRelationship(mc *testMirrorWithMocks) {
+	authorizer := mc.rebac.(*mockrebac.MockAuthorizer)
+	authorizer.EXPECT().Check(mock.Anything, mock.Anything).Return(rebac.Decision{Allowed: false}, nil).Once()
+	authorizer.EXPECT().Write(mock.Anything, mock.Anything).Return(nil).Once()
 }
 
 // expectMirrorRepoRequeue injects a mocked transactional requeue store for duplicate mirror sync tests.
@@ -142,11 +153,11 @@ func TestMirrorComponent_SyncMirrorRequiresWritePermission(t *testing.T) {
 			}
 
 			mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "member").Return(database.User{}, nil)
+			mc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "ns", "name").Return(repo, nil)
 			mc.mocks.components.repo.EXPECT().
-				CheckCurrentUserPermission(ctx, "member", "ns", membership.RoleWrite).
+				CheckUserRepoPermission(ctx, "member", repo, rebac.RepositoryCanWrite).
 				Return(tc.canWrite, nil)
 			if tc.canWrite {
-				mc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "ns", "name").Return(repo, nil)
 				mc.mocks.stores.MirrorMock().EXPECT().FindByRepoID(ctx, repo.ID).Return(mirror, nil)
 				expectMirrorRepoRequeue(ctx, t, mc, repo, mirror, nil, nil, types.LowMirrorPriority, false)
 			}
@@ -180,7 +191,7 @@ func TestMirrorComponent_MirrorFromSaas(t *testing.T) {
 
 		repo := &database.Repository{ID: 123, Path: "CSG_ns/n", RepositoryType: types.ModelRepo, Source: types.OpenCSGSource}
 		mc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "CSG_ns", "n").Return(repo, nil)
-		mc.mocks.components.repo.EXPECT().GetUserRepoPermission(ctx, "writer", repo).Return(&types.UserRepoPermission{CanWrite: true}, nil)
+		mc.mocks.components.repo.EXPECT().CheckUserRepoPermission(ctx, "writer", repo, rebac.RepositoryCanWrite).Return(true, nil)
 		mc.mocks.stores.MirrorMock().EXPECT().FindByRepoID(ctx, int64(123)).Return(nil, sql.ErrNoRows)
 		mc.mocks.stores.SyncVersionMock().EXPECT().FindByRepoTypeAndPath(ctx, "ns/n", types.ModelRepo).Return(&database.SyncVersion{SourceID: types.SyncVersionSourceOpenCSG}, nil)
 
@@ -220,7 +231,7 @@ func TestMirrorComponent_MirrorFromSaas(t *testing.T) {
 		repo := &database.Repository{ID: 123, Path: "CSG_ns/n", RepositoryType: types.ModelRepo, Source: types.OpenCSGSource}
 		mirror := &database.Mirror{ID: 1, SourceUrl: "https://saas.test/models/ns/n.git", RepositoryID: 123, Repository: repo}
 		mc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "CSG_ns", "n").Return(repo, nil)
-		mc.mocks.components.repo.EXPECT().GetUserRepoPermission(ctx, "writer", repo).Return(&types.UserRepoPermission{CanWrite: true}, nil)
+		mc.mocks.components.repo.EXPECT().CheckUserRepoPermission(ctx, "writer", repo, rebac.RepositoryCanWrite).Return(true, nil)
 		mc.mocks.stores.MirrorMock().EXPECT().FindByRepoID(ctx, int64(123)).Return(mirror, nil)
 		taskJobStore.EXPECT().RequeueMirrorRepoTask(ctx, mock.MatchedBy(func(input database.RequeueMirrorRepoTaskInput) bool {
 			return input.MirrorID == mirror.ID &&
@@ -259,7 +270,7 @@ func TestMirrorComponent_MirrorFromSaas(t *testing.T) {
 				ID: 1, SourceUrl: fmt.Sprintf("https://sync.opencsg.com/%ss/ns/n.git", repoType), RepositoryID: repo.ID, Repository: repo,
 			}
 			mc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, repoType, "CSG_ns", "n").Return(repo, nil)
-			mc.mocks.components.repo.EXPECT().GetUserRepoPermission(ctx, "writer", repo).Return(&types.UserRepoPermission{CanWrite: true}, nil)
+			mc.mocks.components.repo.EXPECT().CheckUserRepoPermission(ctx, "writer", repo, rebac.RepositoryCanWrite).Return(true, nil)
 			mc.mocks.stores.MirrorMock().EXPECT().FindByRepoID(ctx, repo.ID).Return(mirror, nil)
 			taskJobStore.EXPECT().RequeueMirrorRepoTask(ctx, mock.MatchedBy(func(input database.RequeueMirrorRepoTaskInput) bool {
 				return input.MirrorID == mirror.ID &&
@@ -287,7 +298,7 @@ func TestMirrorComponent_MirrorFromSaas(t *testing.T) {
 		mc := initializeTestMirrorComponent(ctx, t)
 		repo := &database.Repository{ID: 123, Path: "CSG_ns/n", RepositoryType: types.ModelRepo}
 		mc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "CSG_ns", "n").Return(repo, nil)
-		mc.mocks.components.repo.EXPECT().GetUserRepoPermission(ctx, "reader", repo).Return(&types.UserRepoPermission{CanRead: true}, nil)
+		mc.mocks.components.repo.EXPECT().CheckUserRepoPermission(ctx, "reader", repo, rebac.RepositoryCanWrite).Return(false, nil)
 
 		result, err := mc.MirrorFromSaas(ctx, types.MirrorFromSaasReq{
 			Namespace:   "CSG_ns",
@@ -386,7 +397,7 @@ func TestMirrorComponent_MirrorFromSaasStatus(t *testing.T) {
 			tt.task.UpdatedAt = updatedAt
 			mirror := &database.Mirror{ID: 8, RepositoryID: repo.ID, CurrentTaskID: tt.task.ID, CurrentTask: tt.task}
 			mc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "CSG_ns", "n").Return(repo, nil)
-			mc.mocks.components.repo.EXPECT().GetUserRepoPermission(ctx, "reader", repo).Return(&types.UserRepoPermission{CanRead: true}, nil)
+			mc.mocks.components.repo.EXPECT().CheckUserRepoPermission(ctx, "reader", repo, rebac.RepositoryCanRead).Return(true, nil)
 			mc.mocks.stores.MirrorMock().EXPECT().FindByRepoID(ctx, repo.ID).Return(mirror, nil)
 
 			got, err := mc.MirrorFromSaasStatus(ctx, types.MirrorFromSaasStatusReq{
@@ -401,7 +412,7 @@ func TestMirrorComponent_MirrorFromSaasStatus(t *testing.T) {
 	t.Run("rejects users without read permission", func(t *testing.T) {
 		mc := initializeTestMirrorComponent(ctx, t)
 		mc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "CSG_ns", "n").Return(repo, nil)
-		mc.mocks.components.repo.EXPECT().GetUserRepoPermission(ctx, "guest", repo).Return(&types.UserRepoPermission{}, nil)
+		mc.mocks.components.repo.EXPECT().CheckUserRepoPermission(ctx, "guest", repo, rebac.RepositoryCanRead).Return(false, nil)
 
 		got, err := mc.MirrorFromSaasStatus(ctx, types.MirrorFromSaasStatusReq{
 			Namespace: "CSG_ns", Name: "n", RepoType: types.ModelRepo, CurrentUser: "guest",
@@ -415,7 +426,7 @@ func TestMirrorComponent_MirrorFromSaasStatus(t *testing.T) {
 		task := &database.MirrorTask{ID: 14, MirrorID: 8, Status: types.MirrorRepoSyncStart}
 		mirror := &database.Mirror{ID: 8, RepositoryID: repo.ID, CurrentTaskID: task.ID, CurrentTask: task}
 		mc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "CSG_ns", "n").Return(repo, nil)
-		mc.mocks.components.repo.EXPECT().GetUserRepoPermission(ctx, "reader", repo).Return(&types.UserRepoPermission{CanRead: true}, nil)
+		mc.mocks.components.repo.EXPECT().CheckUserRepoPermission(ctx, "reader", repo, rebac.RepositoryCanRead).Return(true, nil)
 		mc.mocks.stores.MirrorMock().EXPECT().FindByRepoID(ctx, repo.ID).Return(mirror, nil)
 
 		got, err := mc.MirrorFromSaasStatus(ctx, types.MirrorFromSaasStatusReq{
@@ -438,8 +449,8 @@ func TestMirrorComponent_DeleteMirror(t *testing.T) {
 	repo := &database.Repository{ID: 123}
 	mirror := &database.Mirror{ID: 321, RepositoryID: repo.ID}
 
-	mc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "user", "ns", membership.RoleAdmin).Return(true, nil)
 	mc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "ns", "n").Return(repo, nil)
+	mc.mocks.components.repo.EXPECT().CheckUserRepoPermission(ctx, "user", repo, rebac.RepositoryCanAdmin).Return(true, nil)
 	mc.mocks.stores.MirrorMock().EXPECT().FindByRepoID(ctx, repo.ID).Return(mirror, nil)
 	mc.mocks.stores.MirrorMock().EXPECT().DeleteWithTaskCancelTx(ctx, mirror.ID, jobClient).Return(nil)
 	syncCache.EXPECT().DeleteRepoSyncCache(ctx, repo.ID, "100").Return(nil)
@@ -458,10 +469,9 @@ func TestMirrorComponent_GetMirror(t *testing.T) {
 	ctx := context.TODO()
 	mc := initializeTestMirrorComponent(ctx, t)
 
-	mc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "user", "ns", membership.RoleAdmin).Return(true, nil)
-	mc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "ns", "n").Return(&database.Repository{
-		ID: 123,
-	}, nil)
+	repo := &database.Repository{ID: 123}
+	mc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "ns", "n").Return(repo, nil)
+	mc.mocks.components.repo.EXPECT().CheckUserRepoPermission(ctx, "user", repo, rebac.RepositoryCanAdmin).Return(true, nil)
 	dm := &database.Mirror{ID: 11, SourceUrl: "test", Repository: &database.Repository{Path: "test/abc", RepositoryType: types.ModelRepo}}
 	m := &types.Mirror{ID: 11, SourceUrl: "test", LocalRepoPath: "models/test/abc"}
 	mc.mocks.stores.MirrorMock().EXPECT().FindByRepoID(ctx, int64(123)).Return(dm, nil)
@@ -480,10 +490,9 @@ func TestMirrorComponent_UpdateMirror(t *testing.T) {
 	ctx := context.TODO()
 	mc := initializeTestMirrorComponent(ctx, t)
 
-	mc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "user", "ns", membership.RoleAdmin).Return(true, nil)
-	mc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "ns", "n").Return(&database.Repository{
-		ID: 123,
-	}, nil)
+	repo := &database.Repository{ID: 123}
+	mc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "ns", "n").Return(repo, nil)
+	mc.mocks.components.repo.EXPECT().CheckUserRepoPermission(ctx, "user", repo, rebac.RepositoryCanAdmin).Return(true, nil)
 	m := database.Mirror{
 		ID:              123,
 		SourceUrl:       "https://example.com/source/repo.git",
@@ -525,8 +534,8 @@ func TestMirrorComponent_CreateMirror(t *testing.T) {
 		RepositoryType: types.ModelRepo,
 	}
 
-	mc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "user", "ns", membership.RoleAdmin).Return(true, nil)
 	mc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "ns", "n").Return(repo, nil)
+	mc.mocks.components.repo.EXPECT().CheckUserRepoPermission(ctx, "user", repo, rebac.RepositoryCanAdmin).Return(true, nil)
 	mc.mocks.stores.MirrorMock().EXPECT().FindByRepoID(ctx, repo.ID).Return(nil, sql.ErrNoRows)
 	mc.mocks.stores.MirrorSourceMock().EXPECT().Get(ctx, int64(321)).Return(&database.MirrorSource{
 		SourceName: "github",
@@ -573,8 +582,8 @@ func TestMirrorComponent_CreateMirrorRequeuesSameSource(t *testing.T) {
 	mirror := &database.Mirror{
 		ID: 456, RepositoryID: repo.ID, SourceUrl: "https://github.com/upstream/repo.git",
 	}
-	mc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "user", "ns", membership.RoleAdmin).Return(true, nil)
 	mc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "ns", "n").Return(repo, nil)
+	mc.mocks.components.repo.EXPECT().CheckUserRepoPermission(ctx, "user", repo, rebac.RepositoryCanAdmin).Return(true, nil)
 	mc.mocks.stores.MirrorMock().EXPECT().FindByRepoID(ctx, repo.ID).Return(mirror, nil)
 	username, accessToken := "source-user", "source-token"
 	expectMirrorRepoRequeue(ctx, t, mc, repo, mirror, &username, &accessToken, types.LowMirrorPriority, true)
@@ -615,7 +624,7 @@ func TestMirrorComponent_CreateMirrorSkipsSourcePathForCodeAndSkill(t *testing.T
 			// so neither code nor skill repos fetch metadata during import.
 			sourceURL := "https://github.com/upstream/repo"
 
-			mc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "user", "ns", membership.RoleAdmin).Return(true, nil)
+			mc.mocks.components.repo.EXPECT().CheckUserRepoPermission(ctx, "user", repo, rebac.RepositoryCanAdmin).Return(true, nil)
 			mc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, repoType, "ns", "n").Return(repo, nil)
 			mc.mocks.stores.MirrorMock().EXPECT().FindByRepoID(ctx, repo.ID).Return(nil, sql.ErrNoRows)
 
@@ -702,7 +711,7 @@ func TestMirrorComponent_CreateMirrorHonorsRequestPriority(t *testing.T) {
 		RepositoryType: types.CodeRepo,
 	}
 
-	mc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "user", "ns", membership.RoleAdmin).Return(true, nil)
+	mc.mocks.components.repo.EXPECT().CheckUserRepoPermission(ctx, "user", repo, rebac.RepositoryCanAdmin).Return(true, nil)
 	mc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.CodeRepo, "ns", "n").Return(repo, nil)
 	mc.mocks.stores.MirrorMock().EXPECT().FindByRepoID(ctx, repo.ID).Return(nil, sql.ErrNoRows)
 
@@ -729,8 +738,8 @@ func TestMirrorComponent_CreateMirrorRejectsDifferentSource(t *testing.T) {
 	mirror := &database.Mirror{
 		ID: 456, RepositoryID: repo.ID, SourceUrl: "https://github.com/existing/repo.git",
 	}
-	mc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "user", "ns", membership.RoleAdmin).Return(true, nil)
 	mc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "ns", "n").Return(repo, nil)
+	mc.mocks.components.repo.EXPECT().CheckUserRepoPermission(ctx, "user", repo, rebac.RepositoryCanAdmin).Return(true, nil)
 	mc.mocks.stores.MirrorMock().EXPECT().FindByRepoID(ctx, repo.ID).Return(mirror, nil)
 
 	got, err := mc.CreateMirror(ctx, types.CreateMirrorReq{
@@ -768,6 +777,7 @@ func TestMirrorComponent_CreateMirrorRepoPreservesForkTargetCase(t *testing.T) {
 	mc := initializeTestMirrorComponent(ctx, t)
 	fakeStore := &fakeMirrorRepoStore{}
 	mc.mirrorRepoStore = fakeStore
+	expectMirrorRepositoryRelationship(mc)
 
 	req := types.CreateMirrorRepoReq{
 		SourceNamespace:   "upstream",
@@ -779,10 +789,12 @@ func TestMirrorComponent_CreateMirrorRepoPreservesForkTargetCase(t *testing.T) {
 		ForkName:          " Qwen-Model  ",
 	}
 
-	mc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "admin", "ALICE-TEAM", membership.RoleWrite).Return(true, nil)
+	mc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "admin", "ALICE-TEAM", rebac.NamespaceCanWrite).Return(true, nil)
 	mc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, req.RepoType, "ALICE-TEAM", "Qwen-Model").Return(nil, sql.ErrNoRows)
 	mc.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "ALICE-TEAM").Return(database.Namespace{
-		Path: "Alice-Team",
+		Path:          "Alice-Team",
+		NamespaceType: database.UserNamespace,
+		User:          database.User{UUID: "alice-team-uuid"},
 	}, nil)
 	mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "admin").Return(database.User{
 		ID:       1,
@@ -808,8 +820,8 @@ func TestMirrorComponent_CreateMirrorRepoRejectsCaseVariantExistingTarget(t *tes
 	createTargetRepo := true
 	repo := &database.Repository{ID: 11, Path: "alice/MyName", Name: "MyName", RepositoryType: types.ModelRepo}
 
-	mc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "admin", "alice", membership.RoleWrite).Return(true, nil)
 	mc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "alice", "myname").Return(repo, nil)
+	mc.mocks.components.repo.EXPECT().CheckUserRepoPermission(ctx, "admin", repo, rebac.RepositoryCanWrite).Return(true, nil)
 
 	got, err := mc.CreateMirrorRepo(ctx, types.CreateMirrorRepoReq{
 		SourceNamespace:   "upstream",
@@ -832,6 +844,7 @@ func TestMirrorComponent_CreateMirrorRepoPersistsNormalizedSourceAndCredentials(
 	mc := initializeTestMirrorComponent(ctx, t)
 	fakeStore := &fakeMirrorRepoStore{}
 	mc.mirrorRepoStore = fakeStore
+	expectMirrorRepositoryRelationship(mc)
 
 	req := types.CreateMirrorRepoReq{
 		SourceNamespace:   "upstream",
@@ -844,10 +857,12 @@ func TestMirrorComponent_CreateMirrorRepoPersistsNormalizedSourceAndCredentials(
 		Priority:          types.ASAPMirrorPriority,
 	}
 
-	mc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "admin", "alice", membership.RoleWrite).Return(true, nil)
+	mc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "admin", "alice", rebac.NamespaceCanWrite).Return(true, nil)
 	mc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, req.RepoType, "alice", "forked").Return(nil, sql.ErrNoRows)
 	mc.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "alice").Return(database.Namespace{
-		Path: "alice",
+		Path:          "alice",
+		NamespaceType: database.UserNamespace,
+		User:          database.User{UUID: "alice-uuid"},
 	}, nil)
 	mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "admin").Return(database.User{
 		ID:       1,
@@ -873,6 +888,7 @@ func TestMirrorComponent_CreateMirrorRepoUsesExplicitVisibility(t *testing.T) {
 	mc := initializeTestMirrorComponent(ctx, t)
 	fakeStore := &fakeMirrorRepoStore{}
 	mc.mirrorRepoStore = fakeStore
+	expectMirrorRepositoryRelationship(mc)
 	private := false
 
 	req := types.CreateMirrorRepoReq{
@@ -886,10 +902,12 @@ func TestMirrorComponent_CreateMirrorRepoUsesExplicitVisibility(t *testing.T) {
 		Private:           &private,
 	}
 
-	mc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "admin", "alice", membership.RoleWrite).Return(true, nil)
+	mc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "admin", "alice", rebac.NamespaceCanWrite).Return(true, nil)
 	mc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, req.RepoType, "alice", "forked").Return(nil, sql.ErrNoRows)
 	mc.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "alice").Return(database.Namespace{
-		Path: "alice",
+		Path:          "alice",
+		NamespaceType: database.UserNamespace,
+		User:          database.User{UUID: "alice-uuid"},
 	}, nil)
 	mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "admin").Return(database.User{
 		ID:       1,
@@ -1086,8 +1104,8 @@ func TestMirrorComponent_CreateMirrorRepoRequeuesSameTargetAndSource(t *testing.
 	repo := &database.Repository{ID: 11, Path: "alice/forked", RepositoryType: types.ModelRepo}
 	mirror := &database.Mirror{ID: 3, RepositoryID: repo.ID, SourceUrl: "https://github.com/upstream/repo.git"}
 
-	mc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "admin", "alice", membership.RoleWrite).Return(true, nil)
 	mc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, req.RepoType, "alice", "forked").Return(repo, nil)
+	mc.mocks.components.repo.EXPECT().CheckUserRepoPermission(ctx, "admin", repo, rebac.RepositoryCanWrite).Return(true, nil)
 	mc.mocks.stores.MirrorMock().EXPECT().FindByRepoID(ctx, repo.ID).Return(mirror, nil)
 	username, accessToken := "new-user", "new-token"
 	expectMirrorRepoRequeue(ctx, t, mc, repo, mirror, &username, &accessToken, types.ASAPMirrorPriority, false)
@@ -1118,8 +1136,8 @@ func TestMirrorComponent_CreateMirrorRepoRequeuePreservesCredentials(t *testing.
 		Username: "old-user", AccessToken: "old-token",
 	}
 
-	mc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "admin", "alice", membership.RoleWrite).Return(true, nil)
 	mc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, req.RepoType, "alice", "forked").Return(repo, nil)
+	mc.mocks.components.repo.EXPECT().CheckUserRepoPermission(ctx, "admin", repo, rebac.RepositoryCanWrite).Return(true, nil)
 	mc.mocks.stores.MirrorMock().EXPECT().FindByRepoID(ctx, repo.ID).Return(mirror, nil)
 	expectMirrorRepoRequeue(ctx, t, mc, repo, mirror, nil, nil, types.LowMirrorPriority, false)
 
@@ -1150,8 +1168,8 @@ func TestMirrorComponent_CreateMirrorRepoAddsSourceToExistingTargetWithoutMirror
 	repo := &database.Repository{ID: 11, Path: "alice/Forked", Name: "Forked", RepositoryType: types.DatasetRepo}
 
 	mc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, req.RepoType, "ALICE", "FORKED").Return(repo, nil)
+	mc.mocks.components.repo.EXPECT().CheckUserRepoPermission(ctx, "admin", repo, rebac.RepositoryCanWrite).Return(true, nil)
 	mc.mocks.stores.MirrorMock().EXPECT().FindByRepoID(ctx, repo.ID).Return(nil, sql.ErrNoRows)
-	mc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "admin", "ALICE", membership.RoleWrite).Return(true, nil)
 
 	got, err := mc.CreateMirrorRepo(ctx, req)
 	require.NoError(t, err)
@@ -1181,8 +1199,8 @@ func TestMirrorComponent_CreateMirrorRepoRejectsExistingTargetWhenRequested(t *t
 	}
 	repo := &database.Repository{ID: 11, Path: "alice/forked", RepositoryType: types.CodeRepo}
 
-	mc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "admin", "alice", membership.RoleWrite).Return(true, nil)
 	mc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, req.RepoType, "alice", "forked").Return(repo, nil)
+	mc.mocks.components.repo.EXPECT().CheckUserRepoPermission(ctx, "admin", repo, rebac.RepositoryCanWrite).Return(true, nil)
 
 	got, err := mc.CreateMirrorRepo(ctx, req)
 	require.Error(t, err)
@@ -1206,7 +1224,7 @@ func TestMirrorComponent_CreateMirrorRepoRejectsMissingTargetWhenCreationIsDisab
 		CreateTargetRepo:  &createTargetRepo,
 	}
 
-	mc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "admin", "alice", membership.RoleWrite).Return(true, nil)
+	mc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "admin", "alice", rebac.NamespaceCanWrite).Return(true, nil)
 	mc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, req.RepoType, "alice", "forked").Return(nil, sql.ErrNoRows)
 
 	got, err := mc.CreateMirrorRepo(ctx, req)
@@ -1231,8 +1249,8 @@ func TestMirrorComponent_CreateMirrorRepoRejectsExistingTargetWithDifferentSourc
 	repo := &database.Repository{ID: 11, Path: "alice/forked", RepositoryType: types.ModelRepo}
 	mirror := &database.Mirror{ID: 3, RepositoryID: repo.ID, SourceUrl: "https://github.com/other/repo.git"}
 
-	mc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "admin", "alice", membership.RoleWrite).Return(true, nil)
 	mc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, req.RepoType, "alice", "forked").Return(repo, nil)
+	mc.mocks.components.repo.EXPECT().CheckUserRepoPermission(ctx, "admin", repo, rebac.RepositoryCanWrite).Return(true, nil)
 	mc.mocks.stores.MirrorMock().EXPECT().FindByRepoID(ctx, repo.ID).Return(mirror, nil)
 
 	got, err := mc.CreateMirrorRepo(ctx, req)
@@ -1256,7 +1274,8 @@ func TestMirrorComponent_CreateMirrorRepoRejectsMissingWritePermission(t *testin
 		ForkName:          "forked",
 	}
 
-	mc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "admin", "alice", membership.RoleWrite).Return(false, nil)
+	mc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, req.RepoType, "alice", "forked").Return(nil, sql.ErrNoRows)
+	mc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "admin", "alice", rebac.NamespaceCanWrite).Return(false, nil)
 
 	got, err := mc.CreateMirrorRepo(ctx, req)
 	require.Error(t, err)
@@ -1279,6 +1298,7 @@ func TestMirrorComponent_CreateMirrorRepoCreatesAllMirrorRepoTypes(t *testing.T)
 			mc := initializeTestMirrorComponent(ctx, t)
 			fakeStore := &fakeMirrorRepoStore{}
 			mc.mirrorRepoStore = fakeStore
+			expectMirrorRepositoryRelationship(mc)
 			createTargetRepo := true
 
 			req := types.CreateMirrorRepoReq{
@@ -1328,10 +1348,12 @@ func TestMirrorComponent_CreateMirrorRepoCreatesAllMirrorRepoTypes(t *testing.T)
 			mc.mocks.stores.MirrorNamespaceMappingMock().EXPECT().FindBySourceNamespace(context.Background(), "upstream").Return(&database.MirrorNamespaceMapping{
 				TargetNamespace: "mapped",
 			}, nil)
-			mc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "admin", "mapped", membership.RoleWrite).Return(true, nil)
+			mc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "admin", "mapped", rebac.NamespaceCanWrite).Return(true, nil)
 			mc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, repoType, "mapped", "forked").Return(nil, sql.ErrNoRows)
 			mc.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "mapped").Return(database.Namespace{
-				Path: "mapped",
+				Path:          "mapped",
+				NamespaceType: database.UserNamespace,
+				User:          database.User{UUID: "mapped-user-uuid"},
 			}, nil)
 			mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "admin").Return(database.User{
 				ID:       1,
@@ -1418,12 +1440,15 @@ func TestMirrorComponent_CreateMirrorRepoFetchesMCPMetadata(t *testing.T) {
 		return mc.mocks.multiSyncClient
 	}
 	mc.mocks.multiSyncClient.EXPECT().MCPServerInfo(ctx, version).Return(mcpMetadata, nil)
-	mc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "admin", "local", membership.RoleWrite).Return(true, nil)
+	mc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "admin", "local", rebac.NamespaceCanWrite).Return(true, nil)
 	mc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.MCPServerRepo, "local", "zaturn-mirror").Return(nil, sql.ErrNoRows)
-	mc.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "local").Return(database.Namespace{Path: "local"}, nil)
+	mc.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "local").Return(database.Namespace{
+		Path: "local", NamespaceType: database.UserNamespace, User: database.User{UUID: "admin-uuid"},
+	}, nil)
 	mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "admin").Return(database.User{
 		ID: 1, Username: "admin", Email: "admin@example.com", RoleMask: "admin",
 	}, nil)
+	expectMirrorRepositoryRelationship(mc)
 
 	got, err := mc.CreateMirrorRepo(ctx, req)
 	require.NoError(t, err)
@@ -1482,12 +1507,15 @@ func TestMirrorComponent_CreateMirrorRepoFetchesSkillMetadata(t *testing.T) {
 		return mc.mocks.multiSyncClient
 	}
 	mc.mocks.multiSyncClient.EXPECT().SkillInfo(ctx, version).Return(skillMetadata, nil)
-	mc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "admin", "local", membership.RoleWrite).Return(true, nil)
+	mc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "admin", "local", rebac.NamespaceCanWrite).Return(true, nil)
 	mc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.SkillRepo, "local", "reviewer").Return(nil, sql.ErrNoRows)
-	mc.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "local").Return(database.Namespace{Path: "local"}, nil)
+	mc.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "local").Return(database.Namespace{
+		Path: "local", NamespaceType: database.UserNamespace, User: database.User{UUID: "admin-uuid"},
+	}, nil)
 	mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "admin").Return(database.User{
 		ID: 1, Username: "admin", Email: "admin@example.com", RoleMask: "admin",
 	}, nil)
+	expectMirrorRepositoryRelationship(mc)
 
 	got, err := mc.CreateMirrorRepo(ctx, req)
 	require.NoError(t, err)
@@ -1580,7 +1608,7 @@ func TestMirrorComponent_CreateMirrorRepoRejectsUnsupportedMetadataSources(t *te
 				ForkName:          "repo",
 			}
 
-			mc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "admin", "local", membership.RoleWrite).Return(true, nil)
+			mc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "admin", "local", rebac.NamespaceCanWrite).Return(true, nil)
 			mc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, tt.repoType, "local", "repo").Return(nil, sql.ErrNoRows)
 			if tt.mirrorSourceID != 0 {
 				mc.mocks.stores.MirrorSourceMock().EXPECT().Get(ctx, tt.mirrorSourceID).Return(tt.mirrorSource, tt.mirrorSourceErr)
@@ -1624,7 +1652,7 @@ func TestMirrorComponent_CreateMirrorRepoReturnsMetadataError(t *testing.T) {
 		return mc.mocks.multiSyncClient
 	}
 	mc.mocks.multiSyncClient.EXPECT().SkillInfo(ctx, version).Return(nil, fmt.Errorf("upstream unavailable"))
-	mc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "admin", "local", membership.RoleWrite).Return(true, nil)
+	mc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "admin", "local", rebac.NamespaceCanWrite).Return(true, nil)
 	mc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.SkillRepo, "local", "broken").Return(nil, sql.ErrNoRows)
 
 	got, err := mc.CreateMirrorRepo(ctx, req)
@@ -1652,10 +1680,10 @@ func TestMirrorComponent_CreateMirrorRepoSkipSourcePath(t *testing.T) {
 		SkipSourcePath:    true,
 	}
 
-	mc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "admin", "alice", membership.RoleWrite).Return(true, nil)
+	mc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "admin", "alice", rebac.NamespaceCanWrite).Return(true, nil)
 	mc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, req.RepoType, "alice", "forked").Return(nil, sql.ErrNoRows)
 	mc.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "alice").Return(database.Namespace{
-		Path: "alice",
+		Path: "alice", NamespaceType: database.UserNamespace, User: database.User{UUID: "admin-uuid"},
 	}, nil)
 	mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "admin").Return(database.User{
 		ID:       1,
@@ -1663,6 +1691,7 @@ func TestMirrorComponent_CreateMirrorRepoSkipSourcePath(t *testing.T) {
 		Email:    "admin@example.com",
 		RoleMask: "admin",
 	}, nil)
+	expectMirrorRepositoryRelationship(mc)
 
 	got, err := mc.CreateMirrorRepo(ctx, req)
 	require.NoError(t, err)
@@ -1705,7 +1734,7 @@ func TestMirrorComponent_CreateMirrorRepoRefreshesMCPMetadataOnRequeue(t *testin
 		return mc.mocks.multiSyncClient
 	}
 	mc.mocks.multiSyncClient.EXPECT().MCPServerInfo(ctx, version).Return(metadata, nil)
-	mc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "admin", "local", membership.RoleWrite).Return(true, nil)
+	mc.mocks.components.repo.EXPECT().CheckUserRepoPermission(ctx, "admin", repo, rebac.RepositoryCanWrite).Return(true, nil)
 	mc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, req.RepoType, "local", "server").Return(repo, nil)
 	mc.mocks.stores.MirrorMock().EXPECT().FindByRepoID(ctx, repo.ID).Return(mirror, nil)
 
@@ -1769,7 +1798,7 @@ func TestMirrorComponent_CreateMirrorRepoRefreshesSkillMetadataOnRequeue(t *test
 		return mc.mocks.multiSyncClient
 	}
 	mc.mocks.multiSyncClient.EXPECT().SkillInfo(ctx, version).Return(metadata, nil)
-	mc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "admin", "local", membership.RoleWrite).Return(true, nil)
+	mc.mocks.components.repo.EXPECT().CheckUserRepoPermission(ctx, "admin", repo, rebac.RepositoryCanWrite).Return(true, nil)
 	mc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, req.RepoType, "local", "reviewer").Return(repo, nil)
 	mc.mocks.stores.MirrorMock().EXPECT().FindByRepoID(ctx, repo.ID).Return(mirror, nil)
 
@@ -1821,7 +1850,7 @@ func TestMirrorComponent_CreateMirrorRepoRefreshesSkillMetadataWhenBindingExisti
 	mc.mocks.multiSyncClient.EXPECT().SkillInfo(ctx, version).Return(&types.Skill{
 		Nickname: "Fresh Writer", Description: "fresh description", License: "MIT", DefaultBranch: "develop", UpdatedAt: updatedAt,
 	}, nil)
-	mc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "admin", "local", membership.RoleWrite).Return(true, nil)
+	mc.mocks.components.repo.EXPECT().CheckUserRepoPermission(ctx, "admin", repo, rebac.RepositoryCanWrite).Return(true, nil)
 	mc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, req.RepoType, "local", "writer").Return(repo, nil)
 	mc.mocks.stores.MirrorMock().EXPECT().FindByRepoID(ctx, repo.ID).Return(nil, sql.ErrNoRows)
 

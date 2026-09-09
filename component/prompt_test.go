@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"opencsg.com/csghub-server/builder/git/gitserver"
-	"opencsg.com/csghub-server/builder/git/membership"
+	"opencsg.com/csghub-server/builder/rebac"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/types"
 )
@@ -44,6 +44,7 @@ func TestPromptComponent_CheckPermission(t *testing.T) {
 		RoleMask: "foo",
 		Username: "zzz",
 	}, nil).Once()
+	pc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "foo", "ns", rebac.NamespaceCanWrite).Return(true, nil).Once()
 	_, err = pc.checkPromptRepoPermission(ctx, req)
 	require.Nil(t, err)
 
@@ -55,6 +56,7 @@ func TestPromptComponent_CheckPermission(t *testing.T) {
 		RoleMask: "foo",
 		Username: "vvv",
 	}, nil).Once()
+	pc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "foo", "ns", rebac.NamespaceCanWrite).Return(false, nil).Once()
 	_, err = pc.checkPromptRepoPermission(ctx, req)
 	require.Contains(t, err.Error(), "user do not have permission")
 
@@ -66,6 +68,7 @@ func TestPromptComponent_CheckPermission(t *testing.T) {
 		RoleMask: "foo",
 		Username: "uuu",
 	}, nil).Once()
+	pc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "foo", "ns", rebac.NamespaceCanWrite).Return(true, nil).Once()
 	_, err = pc.checkPromptRepoPermission(ctx, req)
 	require.Nil(t, err)
 
@@ -85,7 +88,7 @@ func TestPromptComponent_CheckPermission(t *testing.T) {
 	pc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "foo").Return(database.User{
 		RoleMask: "person",
 	}, nil).Once()
-	pc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "foo", "ns", membership.RoleWrite).Return(false, nil).Once()
+	pc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "foo", "ns", rebac.NamespaceCanWrite).Return(false, nil).Once()
 	_, err = pc.checkPromptRepoPermission(ctx, req)
 	require.Contains(t, err.Error(), "user do not have permission")
 
@@ -96,7 +99,7 @@ func TestPromptComponent_CheckPermission(t *testing.T) {
 	pc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "foo").Return(database.User{
 		RoleMask: "person",
 	}, nil).Once()
-	pc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "foo", "ns", membership.RoleWrite).Return(true, nil).Once()
+	pc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "foo", "ns", rebac.NamespaceCanWrite).Return(true, nil).Once()
 	_, err = pc.checkPromptRepoPermission(ctx, req)
 	time.Sleep(20 * time.Millisecond)
 	require.Nil(t, err)
@@ -367,9 +370,7 @@ func TestPromptComponent_SetRelationModels(t *testing.T) {
 	}, nil).Once()
 	repo := &database.Repository{}
 	pc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.PromptRepo, "ns", "n").Return(repo, nil).Once()
-	pc.mocks.components.repo.EXPECT().GetUserRepoPermission(ctx, "foo", repo).Return(&types.UserRepoPermission{
-		CanWrite: true,
-	}, nil).Once()
+	pc.mocks.components.repo.EXPECT().CheckUserRepoPermission(ctx, "foo", repo, rebac.RepositoryCanWrite).Return(true, nil).Once()
 	pc.mocks.gitServer.EXPECT().GetRepoFileContents(mock.Anything, gitserver.GetRepoInfoByPathReq{
 		Namespace: "ns",
 		Name:      "n",
@@ -493,10 +494,11 @@ func TestPromptComponent_CreatePromptRepo(t *testing.T) {
 		ID:       123,
 		Email:    "foo@bar.com",
 		Username: "foo",
-		RoleMask: "foo-admin",
+		RoleMask: "user",
 	}, nil).Once()
 
 	pc.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "ns").Return(database.Namespace{}, nil).Once()
+	pc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "foo", "ns", rebac.NamespaceCanWrite).Return(true, nil).Once()
 
 	req := types.CreateRepoReq{
 		Username:      "foo",
@@ -825,16 +827,16 @@ func TestPromptComponent_OrgPrompts(t *testing.T) {
 	pc := initializeTestPromptComponent(ctx, t)
 
 	cases := []struct {
-		role       membership.Role
+		role       types.UserRole
 		publicOnly bool
 	}{
-		{membership.RoleUnknown, true},
-		{membership.RoleAdmin, false},
+		{"", true},
+		{types.UserAdmin, false},
 	}
 
 	for _, c := range cases {
 		t.Run(string(c.role), func(t *testing.T) {
-			pc.mocks.userSvcClient.EXPECT().GetMemberRole(ctx, "ns", "foo").Return(c.role, nil).Once()
+			pc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "foo", "ns", rebac.NamespaceCanRead).Return(c.role != "", nil).Once()
 			pc.mocks.stores.PromptMock().EXPECT().ByOrgPath(ctx, "ns", 1, 1, c.publicOnly).Return([]database.Prompt{
 				{ID: 1, Repository: &database.Repository{Name: "r1"}},
 				{ID: 2, Repository: &database.Repository{Name: "r2"}},

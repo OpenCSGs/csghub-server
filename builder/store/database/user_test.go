@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/tests"
 	"opencsg.com/csghub-server/common/types"
 )
@@ -344,7 +345,7 @@ func TestUserStore_FindByAccessToken(t *testing.T) {
 	require.Nil(t, err)
 
 	user, err := us.FindByGitAccessToken(ctx, at.Token)
-	require.Empty(t, err)
+	require.NoError(t, err)
 	require.Equal(t, "u-foo", user.Username)
 }
 
@@ -610,4 +611,79 @@ func TestUserStore_IndexWithCursor1(t *testing.T) {
 	}
 
 	require.Equal(t, 3, total)
+}
+
+func TestUserStore_DeleteUserAndRelationsLastOrgAdmin(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.Background()
+
+	us := database.NewUserStoreWithDB(db)
+	os := database.NewOrgStoreWithDB(db)
+	user := createDeleteUserTestFixtures(t, ctx, db, us, os, "delete-last-admin")
+
+	err := us.DeleteUserAndRelations(ctx, *user, types.CloseAccountReq{})
+	require.ErrorIs(t, err, errorx.ErrLastOrgAdmin)
+
+	_, err = us.FindByUsername(ctx, user.Username)
+	require.NoError(t, err)
+
+	memberCount, err := db.Core.NewSelect().
+		Model((*database.Member)(nil)).
+		Where("member.user_id = ?", user.ID).
+		Count(ctx)
+	require.NoError(t, err)
+	require.Equal(t, 1, memberCount)
+}
+
+func TestUserStore_SoftDeleteUserAndRelationsLastOrgAdmin(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.Background()
+
+	us := database.NewUserStoreWithDB(db)
+	os := database.NewOrgStoreWithDB(db)
+	user := createDeleteUserTestFixtures(t, ctx, db, us, os, "soft-delete-last-admin")
+
+	err := us.SoftDeleteUserAndRelations(ctx, *user, types.CloseAccountReq{})
+	require.ErrorIs(t, err, errorx.ErrLastOrgAdmin)
+
+	_, err = us.FindByUsername(ctx, user.Username)
+	require.NoError(t, err)
+
+	memberCount, err := db.Core.NewSelect().
+		Model((*database.Member)(nil)).
+		Where("member.user_id = ?", user.ID).
+		Count(ctx)
+	require.NoError(t, err)
+	require.Equal(t, 1, memberCount)
+}
+
+func createDeleteUserTestFixtures(t *testing.T, ctx context.Context, db *database.DB, us database.UserStore, os database.OrgStore, suffix string) *database.User {
+	t.Helper()
+
+	user := &database.User{
+		GitID:    time.Now().UnixNano(),
+		UUID:     uuid.NewString(),
+		Username: "user-" + suffix,
+	}
+	require.NoError(t, us.Create(ctx, user, &database.Namespace{Path: user.Username}))
+
+	org := &database.Organization{
+		Name:     "org-" + suffix,
+		Nickname: "Org " + suffix,
+		UUID:     uuid.New(),
+	}
+	require.NoError(t, os.Create(ctx, org, &database.Namespace{Path: org.Name}))
+
+	storedOrg := &database.Organization{}
+	require.NoError(t, db.Core.NewSelect().Model(storedOrg).Where("path = ?", org.Name).Scan(ctx))
+	_, err := db.Core.NewInsert().Model(&database.Member{
+		OrganizationID: storedOrg.ID,
+		UserID:         user.ID,
+		Role:           string(types.UserAdmin),
+	}).Exec(ctx)
+	require.NoError(t, err)
+
+	return user
 }

@@ -11,8 +11,8 @@ import (
 	"strings"
 	"sync"
 
-	"opencsg.com/csghub-server/builder/git/membership"
 	"opencsg.com/csghub-server/builder/multisync"
+	"opencsg.com/csghub-server/builder/rebac"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/workhub"
 	"opencsg.com/csghub-server/common/config"
@@ -38,6 +38,8 @@ type mirrorComponentImpl struct {
 	mirrorRepoJobClient database.MirrorJobClient
 	namespaceStore      database.NamespaceStore
 	userStore           database.UserStore
+	orgStore            database.OrgStore
+	rebac               rebac.Authorizer
 	config              *config.Config
 	// syncCache removes LFS sync cache after mirror deletion.
 	syncCacheMu                 sync.Mutex
@@ -319,10 +321,13 @@ func NewMirrorComponent(config *config.Config) (MirrorComponent, error) {
 	var err error
 	c := &mirrorComponentImpl{}
 
-	c.repoComp, err = NewRepoComponentImpl(config)
+	repoComponent, err := NewRepoComponentImpl(config)
 	if err != nil {
 		return nil, fmt.Errorf("fail to create repo component,error:%w", err)
 	}
+	c.repoComp = repoComponent
+	c.orgStore = repoComponent.orgStore
+	c.rebac = repoComponent.rebac
 	c.accessTokenStore = database.NewAccessTokenStore()
 	c.modelStore = database.NewModelStore()
 	c.datasetStore = database.NewDatasetStore()
@@ -375,7 +380,11 @@ func (m *mirrorComponentImpl) CreateMirror(ctx context.Context, req types.Create
 	req.Username = username
 	req.AccessToken = accessToken
 	var mirror database.Mirror
-	admin, err := m.repoComp.CheckCurrentUserPermission(ctx, req.CurrentUser, req.Namespace, membership.RoleAdmin)
+	repo, err := m.repoStore.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find repo, error: %w", err)
+	}
+	admin, err := m.repoComp.CheckUserRepoPermission(ctx, req.CurrentUser, repo, rebac.RepositoryCanAdmin)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check permission to create mirror, error: %w", err)
 	}
@@ -384,10 +393,6 @@ func (m *mirrorComponentImpl) CreateMirror(ctx context.Context, req types.Create
 		return nil, fmt.Errorf("users do not have permission to create mirror for this repo")
 	}
 
-	repo, err := m.repoStore.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
-	if err != nil {
-		return nil, fmt.Errorf("failed to find repo, error: %w", err)
-	}
 	existingMirror, err := m.mirrorStore.FindByRepoID(ctx, repo.ID)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("failed to find mirror by target repo, error: %w", err)
@@ -469,11 +474,11 @@ func (m *mirrorComponentImpl) MirrorFromSaas(ctx context.Context, req types.Mirr
 	if err != nil {
 		return nil, fmt.Errorf("failed to find repo, error: %w", err)
 	}
-	permission, err := m.repoComp.GetUserRepoPermission(ctx, req.CurrentUser, repo)
+	permission, err := m.repoComp.CheckUserRepoPermission(ctx, req.CurrentUser, repo, rebac.RepositoryCanWrite)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check mirror sync permission: %w", err)
 	}
-	if !permission.CanWrite {
+	if !permission {
 		return nil, errorx.ErrForbiddenMsg("users do not have permission to sync this repository")
 	}
 
@@ -530,11 +535,11 @@ func (m *mirrorComponentImpl) MirrorFromSaasStatus(ctx context.Context, req type
 	if err != nil {
 		return nil, fmt.Errorf("failed to find repo, error: %w", err)
 	}
-	permission, err := m.repoComp.GetUserRepoPermission(ctx, req.CurrentUser, repo)
+	permission, err := m.repoComp.CheckUserRepoPermission(ctx, req.CurrentUser, repo, rebac.RepositoryCanRead)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check mirror status permission: %w", err)
 	}
-	if !permission.CanRead {
+	if !permission {
 		return nil, errorx.ErrForbiddenMsg("users do not have permission to read this repository")
 	}
 
@@ -632,17 +637,17 @@ func (m *mirrorComponentImpl) GetMirror(ctx context.Context, req types.GetMirror
 		progress    int8
 		lastMessage string
 	)
-	admin, err := m.repoComp.CheckCurrentUserPermission(ctx, req.CurrentUser, req.Namespace, membership.RoleAdmin)
+	repo, err := m.repoStore.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find repo, error: %w", err)
+	}
+	admin, err := m.repoComp.CheckUserRepoPermission(ctx, req.CurrentUser, repo, rebac.RepositoryCanAdmin)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check permission to create mirror, error: %w", err)
 	}
 
 	if !admin {
 		return nil, fmt.Errorf("users do not have permission to get mirror for this repo")
-	}
-	repo, err := m.repoStore.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
-	if err != nil {
-		return nil, fmt.Errorf("failed to find repo, error: %w", err)
 	}
 	mirror, err := m.mirrorStore.FindByRepoID(ctx, repo.ID)
 	if err != nil {
@@ -685,17 +690,17 @@ func (m *mirrorComponentImpl) UpdateMirror(ctx context.Context, req types.Update
 	req.SourceUrl = sourceURL
 	req.Username = username
 	req.AccessToken = accessToken
-	admin, err := m.repoComp.CheckCurrentUserPermission(ctx, req.CurrentUser, req.Namespace, membership.RoleAdmin)
+	repo, err := m.repoStore.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find repo, error: %w", err)
+	}
+	admin, err := m.repoComp.CheckUserRepoPermission(ctx, req.CurrentUser, repo, rebac.RepositoryCanAdmin)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check permission to create mirror, error: %w", err)
 	}
 
 	if !admin {
 		return nil, fmt.Errorf("users do not have permission to update mirror for this repo")
-	}
-	repo, err := m.repoStore.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
-	if err != nil {
-		return nil, fmt.Errorf("failed to find repo, error: %w", err)
 	}
 	mirror, err := m.mirrorStore.FindByRepoID(ctx, repo.ID)
 	if err != nil {
@@ -729,8 +734,12 @@ func (m *mirrorComponentImpl) SyncMirror(ctx context.Context, req types.SyncMirr
 	if err != nil {
 		return errors.New("user does not exist")
 	}
+	repo, err := m.repoStore.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
+	if err != nil {
+		return fmt.Errorf("failed to find repo, error: %w", err)
+	}
 	if !user.CanAdmin() {
-		canWrite, err := m.repoComp.CheckCurrentUserPermission(ctx, req.CurrentUser, req.Namespace, membership.RoleWrite)
+		canWrite, err := m.repoComp.CheckUserRepoPermission(ctx, req.CurrentUser, repo, rebac.RepositoryCanWrite)
 		if err != nil {
 			return fmt.Errorf("failed to check permission to sync mirror: %w", err)
 		}
@@ -738,10 +747,6 @@ func (m *mirrorComponentImpl) SyncMirror(ctx context.Context, req types.SyncMirr
 		if !canWrite {
 			return errorx.ErrForbiddenMsg("write permission is required to sync mirror for this repo")
 		}
-	}
-	repo, err := m.repoStore.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
-	if err != nil {
-		return fmt.Errorf("failed to find repo, error: %w", err)
 	}
 	mirror, err := m.mirrorStore.FindByRepoID(ctx, repo.ID)
 	if err != nil {
@@ -753,17 +758,17 @@ func (m *mirrorComponentImpl) SyncMirror(ctx context.Context, req types.SyncMirr
 
 // DeleteMirror validates access to an existing mirror repository and deletes it transactionally.
 func (m *mirrorComponentImpl) DeleteMirror(ctx context.Context, req types.DeleteMirrorReq) error {
-	admin, err := m.repoComp.CheckCurrentUserPermission(ctx, req.CurrentUser, req.Namespace, membership.RoleAdmin)
+	repo, err := m.repoStore.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
+	if err != nil {
+		return fmt.Errorf("failed to find repo, error: %w", err)
+	}
+	admin, err := m.repoComp.CheckUserRepoPermission(ctx, req.CurrentUser, repo, rebac.RepositoryCanAdmin)
 	if err != nil {
 		return fmt.Errorf("failed to check permission to create mirror, error: %w", err)
 	}
 
 	if !admin {
 		return fmt.Errorf("users do not have permission to delete mirror for this repo")
-	}
-	repo, err := m.repoStore.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
-	if err != nil {
-		return fmt.Errorf("failed to find repo, error: %w", err)
 	}
 	mirror, err := m.mirrorStore.FindByRepoID(ctx, repo.ID)
 	if err != nil {

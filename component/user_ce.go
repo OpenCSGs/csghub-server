@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"opencsg.com/csghub-server/builder/deploy/common"
-	"opencsg.com/csghub-server/builder/git/membership"
+	"opencsg.com/csghub-server/builder/rebac"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
@@ -160,7 +160,7 @@ func (c *userComponentImpl) ListNotebooks(ctx context.Context, req *types.Deploy
 
 func (c *userComponentImpl) ListNotebooksByNamespace(ctx context.Context, req *types.OrgNotebooksReq) ([]types.NotebookRes, int, error) {
 	if req.CurrentUser != "" {
-		canRead, err := c.repoComponent.CheckCurrentUserPermission(ctx, req.CurrentUser, req.Namespace, membership.RoleRead)
+		canRead, err := c.repoComponent.CheckCurrentUserPermission(ctx, req.CurrentUser, req.Namespace, rebac.NamespaceCanRead)
 		if err != nil {
 			return nil, 0, fmt.Errorf("failed to check namespace permission: %w", err)
 		}

@@ -7,9 +7,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/uptrace/bun/dialect/pgdialect"
 	"github.com/uptrace/bun/dialect/sqlitedialect"
-	"github.com/uptrace/bun/driver/pgdriver"
 	"github.com/uptrace/bun/driver/sqliteshim"
 	"github.com/uptrace/bun/extra/bundebug"
 	"github.com/uptrace/bun/extra/bunotel"
@@ -42,6 +43,15 @@ type DB struct {
 
 	// the underlying *bun.DB
 	BunDB *bun.DB
+
+	// pgxPool is the underlying pgx connection pool when the PostgreSQL driver is used.
+	// Other services can access it through GetPGXPool.
+	pgxPool *pgxpool.Pool
+}
+
+// GetPGXPool returns the underlying pgx connection pool when PostgreSQL is in use.
+func (db *DB) GetPGXPool() (*pgxpool.Pool, bool) {
+	return db.pgxPool, db.pgxPool != nil
 }
 
 // Operator is where database access/write methods implemented
@@ -72,12 +82,16 @@ func InitDB(config DBConfig) error {
 
 // NewDB initializes a DB via config
 func NewDB(ctx context.Context, config DBConfig) (db *DB, err error) {
+	db = &DB{}
 	var bunDB *bun.DB
 
 	switch config.Dialect {
 	case DialectPostgres:
-		sqlDB := sql.OpenDB(pgdriver.NewConnector(pgdriver.WithDSN(config.DSN)))
-		bunDB = bun.NewDB(sqlDB, pgdialect.New(), bun.WithDiscardUnknownColumns())
+		db.pgxPool, err = pgxpool.New(ctx, config.DSN)
+		if err != nil {
+			return nil, fmt.Errorf("failed to initialize database error: %w", err)
+		}
+		bunDB = bun.NewDB(stdlib.OpenDBFromPool(db.pgxPool), pgdialect.New(), bun.WithDiscardUnknownColumns())
 	case DialectSQLite:
 		var sqlDB *sql.DB
 		sqlDB, err = sql.Open(sqliteshim.ShimName, config.DSN)
@@ -123,10 +137,8 @@ func NewDB(ctx context.Context, config DBConfig) (db *DB, err error) {
 		return
 	}
 
-	db = &DB{
-		Operator: Operator{Core: bunDB},
-		BunDB:    bunDB,
-	}
+	db.Operator = Operator{Core: bunDB}
+	db.BunDB = bunDB
 
 	db.BunDB.RegisterModel((*RepositoryTag)(nil))
 	db.BunDB.RegisterModel((*CollectionRepository)(nil))
@@ -149,5 +161,16 @@ func (db *DB) RunInTx(ctx context.Context, fn func(ctx context.Context, tx Opera
 // It is rare to Close a DB,
 // as the DB handle is meant to be long-lived and shared between many goroutines.
 func (db *DB) Close() error {
-	return db.BunDB.Close()
+	if db == nil {
+		return nil
+	}
+
+	var err error
+	if db.BunDB != nil {
+		err = db.BunDB.Close()
+	}
+	if db.pgxPool != nil {
+		db.pgxPool.Close()
+	}
+	return err
 }

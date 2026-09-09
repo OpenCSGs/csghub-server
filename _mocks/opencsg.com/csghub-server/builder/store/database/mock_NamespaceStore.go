@@ -193,6 +193,63 @@ func (_c *MockNamespaceStore_FindByPath_Call) RunAndReturn(run func(context.Cont
 	return _c
 }
 
+// FindByPathWithDeleted provides a mock function with given fields: ctx, path
+func (_m *MockNamespaceStore) FindByPathWithDeleted(ctx context.Context, path string) (database.Namespace, error) {
+	ret := _m.Called(ctx, path)
+
+	if len(ret) == 0 {
+		panic("no return value specified for FindByPathWithDeleted")
+	}
+
+	var r0 database.Namespace
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (database.Namespace, error)); ok {
+		return rf(ctx, path)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) database.Namespace); ok {
+		r0 = rf(ctx, path)
+	} else {
+		r0 = ret.Get(0).(database.Namespace)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, path)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockNamespaceStore_FindByPathWithDeleted_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FindByPathWithDeleted'
+type MockNamespaceStore_FindByPathWithDeleted_Call struct {
+	*mock.Call
+}
+
+// FindByPathWithDeleted is a helper method to define mock.On call
+//   - ctx context.Context
+//   - path string
+func (_e *MockNamespaceStore_Expecter) FindByPathWithDeleted(ctx interface{}, path interface{}) *MockNamespaceStore_FindByPathWithDeleted_Call {
+	return &MockNamespaceStore_FindByPathWithDeleted_Call{Call: _e.mock.On("FindByPathWithDeleted", ctx, path)}
+}
+
+func (_c *MockNamespaceStore_FindByPathWithDeleted_Call) Run(run func(ctx context.Context, path string)) *MockNamespaceStore_FindByPathWithDeleted_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockNamespaceStore_FindByPathWithDeleted_Call) Return(_a0 database.Namespace, _a1 error) *MockNamespaceStore_FindByPathWithDeleted_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockNamespaceStore_FindByPathWithDeleted_Call) RunAndReturn(run func(context.Context, string) (database.Namespace, error)) *MockNamespaceStore_FindByPathWithDeleted_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // FindByUUID provides a mock function with given fields: ctx, uuid
 func (_m *MockNamespaceStore) FindByUUID(ctx context.Context, uuid string) (database.Namespace, error) {
 	ret := _m.Called(ctx, uuid)

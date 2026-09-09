@@ -16,10 +16,51 @@ import (
 	"github.com/stretchr/testify/mock"
 	"opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/user/component"
 	"opencsg.com/csghub-server/api/httpbase"
+	"opencsg.com/csghub-server/builder/testutil"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
+
+// TestUserHandler_RejectsLastOrganizationAdmin verifies deletion and account closure return lastOrgAdmin.
+func TestUserHandler_RejectsLastOrganizationAdmin(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	expectedErr := errorx.LastOrgAdmin(
+		errors.New("cannot delete the last administrator of an organization"),
+		errorx.Ctx().Set("username", "u"),
+	)
+	expectedCustomErr := expectedErr.(errorx.CustomError)
+	expectedResponse := httpbase.R{
+		Code:    expectedCustomErr.Code(),
+		Msg:     expectedCustomErr.Error(),
+		Context: expectedCustomErr.Context(),
+	}
+
+	t.Run("delete user", func(t *testing.T) {
+		tester := testutil.NewGinTester()
+		mockUserComponent := component.NewMockUserComponent(t)
+		handler := &UserHandler{c: mockUserComponent}
+		tester.Handler(handler.Delete)
+		mockUserComponent.EXPECT().CheckOperatorAndUser(tester.Gctx(), "u", "u").Return(false, nil)
+		mockUserComponent.EXPECT().CheckIfUserIsLastOrgAdmin(tester.Gctx(), "u").Return(true, nil)
+
+		tester.WithUser().WithParam("username", "u").Execute()
+
+		tester.ResponseEqSimple(t, http.StatusConflict, expectedResponse)
+	})
+
+	t.Run("close account", func(t *testing.T) {
+		tester := testutil.NewGinTester()
+		mockUserComponent := component.NewMockUserComponent(t)
+		handler := &UserHandler{c: mockUserComponent}
+		tester.Handler(handler.CloseAccount)
+		mockUserComponent.EXPECT().CheckIfUserIsLastOrgAdmin(tester.Gctx(), "u").Return(true, nil)
+
+		tester.WithUser().WithParam("username", "u").Execute()
+
+		tester.ResponseEqSimple(t, http.StatusConflict, expectedResponse)
+	})
+}
 
 func TestUserHandler_ResetUserTags_Success(t *testing.T) {
 	gin.SetMode(gin.TestMode)

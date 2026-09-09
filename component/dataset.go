@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"opencsg.com/csghub-server/builder/git/gitserver"
-	"opencsg.com/csghub-server/builder/git/membership"
+	"opencsg.com/csghub-server/builder/rebac"
 	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
@@ -47,20 +47,20 @@ type DatasetComponent interface {
 
 // datasetComponentImpl is the base implementation of DatasetComponent
 type datasetComponentImpl struct {
-	config                  *config.Config
-	repoComponent           RepoComponent
-	tagStore                database.TagStore
-	datasetStore            database.DatasetStore
-	repoStore               database.RepoStore
-	namespaceStore          database.NamespaceStore
-	userStore               database.UserStore
-	sensitiveComponent      SensitiveComponent
-	gitServer               gitserver.GitServer
-	userLikesStore          database.UserLikesStore
-	userSvcClient           rpc.UserSvcClient
-	recomStore              database.RecomStore
-	xnetMigrationTaskStore  database.XnetMigrationTaskStore
-	lfsMetaObjectStore      database.LfsMetaObjectStore
+	config                 *config.Config
+	repoComponent          RepoComponent
+	tagStore               database.TagStore
+	datasetStore           database.DatasetStore
+	repoStore              database.RepoStore
+	namespaceStore         database.NamespaceStore
+	userStore              database.UserStore
+	sensitiveComponent     SensitiveComponent
+	gitServer              gitserver.GitServer
+	userLikesStore         database.UserLikesStore
+	userSvcClient          rpc.UserSvcClient
+	recomStore             database.RecomStore
+	xnetMigrationTaskStore database.XnetMigrationTaskStore
+	lfsMetaObjectStore     database.LfsMetaObjectStore
 	extendDatasetImpl
 }
 
@@ -125,8 +125,7 @@ func (c *datasetComponentImpl) Create(ctx context.Context, req *types.CreateData
 		tags     []types.RepoTag
 	)
 
-	namespace, err := c.namespaceStore.FindByPath(ctx, req.Namespace)
-	if err != nil {
+	if _, err := c.namespaceStore.FindByPath(ctx, req.Namespace); err != nil {
 		return nil, fmt.Errorf("namespace does not exist, error: %w", err)
 	}
 
@@ -135,18 +134,12 @@ func (c *datasetComponentImpl) Create(ctx context.Context, req *types.CreateData
 		return nil, fmt.Errorf("user does not exist, error: %w", err)
 	}
 	if !user.CanAdmin() {
-		if namespace.NamespaceType == database.OrgNamespace {
-			canWrite, err := c.repoComponent.CheckCurrentUserPermission(ctx, req.Username, req.Namespace, membership.RoleWrite)
-			if err != nil {
-				return nil, err
-			}
-			if !canWrite {
-				return nil, errorx.ErrForbiddenMsg("users do not have permission to create datasets in this organization")
-			}
-		} else {
-			if namespace.Path != user.Username {
-				return nil, errorx.ErrForbiddenMsg("users do not have permission to create datasets in this namespace")
-			}
+		canWrite, err := c.repoComponent.CheckCurrentUserPermission(ctx, req.Username, req.Namespace, rebac.NamespaceCanWrite)
+		if err != nil {
+			return nil, err
+		}
+		if !canWrite {
+			return nil, errorx.ErrForbiddenMsg("users do not have permission to create datasets in this namespace")
 		}
 	}
 
@@ -397,17 +390,17 @@ func (c *datasetComponentImpl) getRelations(ctx context.Context, repoID int64, c
 func (c *datasetComponentImpl) OrgDatasets(ctx context.Context, req *types.OrgDatasetsReq) ([]types.Dataset, int, error) {
 	var resDatasets []types.Dataset
 	var err error
-	r := membership.RoleUnknown
+	canRead := false
 	if req.CurrentUser != "" {
-		r, err = c.userSvcClient.GetMemberRole(ctx, req.Namespace, req.CurrentUser)
-		// log error, and treat user as unknown role in org
+		canRead, err = c.repoComponent.CheckCurrentUserPermission(ctx, req.CurrentUser, req.Namespace, rebac.NamespaceCanRead)
 		if err != nil {
-			slog.Error("faild to get member role",
-				slog.String("org", req.Namespace), slog.String("user", req.CurrentUser),
-				slog.String("error", err.Error()))
+			slog.ErrorContext(ctx, "failed to check namespace permission",
+				slog.String("namespace", req.Namespace), slog.String("user", req.CurrentUser),
+				slog.Any("error", err))
+			canRead = false
 		}
 	}
-	onlyPublic := !r.CanRead()
+	onlyPublic := !canRead
 	datasets, total, err := c.datasetStore.ByOrgPath(ctx, req.Namespace, req.PageSize, req.Page, onlyPublic)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to get user datasets, error: %w", err)

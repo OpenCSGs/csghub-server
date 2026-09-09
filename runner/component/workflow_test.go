@@ -27,7 +27,7 @@ import (
 func TestArgoComponent_CreateWorkflow(t *testing.T) {
 	argoStore := mockdb.NewMockArgoWorkFlowStore(t)
 	pool := mockCluster.NewMockPool(t)
-	kubeClient := fake.NewSimpleClientset()
+	kubeClient := fake.NewClientset()
 	expectCluster := &cluster.Cluster{
 		CID:           "config",
 		ID:            "test",
@@ -76,7 +76,7 @@ func TestArgoComponent_CreateWorkflow(t *testing.T) {
 func TestArgoComponent_DeleteWorkflow(t *testing.T) {
 	argoStore := mockdb.NewMockArgoWorkFlowStore(t)
 	pool := mockCluster.NewMockPool(t)
-	kubeClient := fake.NewSimpleClientset()
+	kubeClient := fake.NewClientset()
 	argoClient := argofake.NewSimpleClientset()
 	expectCluster := &cluster.Cluster{
 		CID:           "config",
@@ -105,7 +105,7 @@ func TestArgoComponent_DeleteWorkflow(t *testing.T) {
 
 func TestArgoComponent_UpdateWorkflow(t *testing.T) {
 	argoStore := mockdb.NewMockArgoWorkFlowStore(t)
-	kubeClient := fake.NewSimpleClientset()
+	kubeClient := fake.NewClientset()
 	reporter := mockReporter.NewMockLogCollector(t)
 
 	wfc := workFlowComponentImpl{

@@ -17,11 +17,10 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	mock_rpc "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/rpc"
 	mock_database "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/database"
 	mock_component "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
 	"opencsg.com/csghub-server/builder/git/gitserver"
-	"opencsg.com/csghub-server/builder/git/membership"
+	"opencsg.com/csghub-server/builder/rebac"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
@@ -428,7 +427,7 @@ func TestSkillComponent_OrgSkills(t *testing.T) {
 	ctx := context.TODO()
 	cc := initializeTestSkillComponent(ctx, t)
 
-	cc.mocks.userSvcClient.EXPECT().GetMemberRole(ctx, "ns", "user").Return(membership.RoleAdmin, nil)
+	cc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "user", "ns", rebac.NamespaceCanRead).Return(true, nil)
 	cc.mocks.stores.SkillMock().EXPECT().ByOrgPath(ctx, "ns", 10, 1, false).Return(
 		[]database.Skill{{
 			ID: 1, Repository: &database.Repository{Name: "repo"},
@@ -936,7 +935,7 @@ func TestSkillComponent_CreateWithSkillPackageTarGz(t *testing.T) {
 func TestSkillComponent_OrgSkills_OnlyPublic(t *testing.T) {
 	// Setup mock stores
 	mockSkillStore := new(mock_database.MockSkillStore)
-	mockUserSvcClient := new(mock_rpc.MockUserSvcClient)
+	mockRepoComponent := mock_component.NewMockRepoComponent(t)
 
 	// Mock response
 	expectedSkills := []database.Skill{
@@ -957,14 +956,14 @@ func TestSkillComponent_OrgSkills_OnlyPublic(t *testing.T) {
 	}
 	expectedTotal := 1
 
-	// Setup mock expectations - user is not a member
-	mockUserSvcClient.On("GetMemberRole", mock.Anything, "test-org", "test-user").Return(membership.RoleUnknown, nil)
+	// Setup mock expectations - user cannot read the namespace
+	mockRepoComponent.EXPECT().CheckCurrentUserPermission(mock.Anything, "test-user", "test-org", rebac.NamespaceCanRead).Return(false, nil).Once()
 	mockSkillStore.On("ByOrgPath", mock.Anything, "test-org", 10, 1, true).Return(expectedSkills, expectedTotal, nil)
 
 	// Create skill component with mock dependencies
 	component := &skillComponentImpl{
 		skillStore:    mockSkillStore,
-		userSvcClient: mockUserSvcClient,
+		repoComponent: mockRepoComponent,
 	}
 
 	// Create request
@@ -994,23 +993,22 @@ func TestSkillComponent_OrgSkills_OnlyPublic(t *testing.T) {
 	assert.False(t, skills[0].Private)
 
 	// Verify mocks
-	mockUserSvcClient.AssertCalled(t, "GetMemberRole", mock.Anything, "test-org", "test-user")
 	mockSkillStore.AssertCalled(t, "ByOrgPath", mock.Anything, "test-org", 10, 1, true)
 }
 
 func TestSkillComponent_OrgSkills_Error(t *testing.T) {
 	// Setup mock stores
 	mockSkillStore := new(mock_database.MockSkillStore)
-	mockUserSvcClient := new(mock_rpc.MockUserSvcClient)
+	mockRepoComponent := mock_component.NewMockRepoComponent(t)
 
 	// Setup mock expectations
-	mockUserSvcClient.On("GetMemberRole", mock.Anything, "test-org", "test-user").Return(membership.RoleAdmin, nil)
+	mockRepoComponent.EXPECT().CheckCurrentUserPermission(mock.Anything, "test-user", "test-org", rebac.NamespaceCanRead).Return(true, nil).Once()
 	mockSkillStore.On("ByOrgPath", mock.Anything, "test-org", 10, 1, false).Return(nil, 0, assert.AnError)
 
 	// Create skill component with mock dependencies
 	component := &skillComponentImpl{
 		skillStore:    mockSkillStore,
-		userSvcClient: mockUserSvcClient,
+		repoComponent: mockRepoComponent,
 	}
 
 	// Create request
@@ -1032,6 +1030,5 @@ func TestSkillComponent_OrgSkills_Error(t *testing.T) {
 	assert.Equal(t, 0, total)
 
 	// Verify mocks
-	mockUserSvcClient.AssertCalled(t, "GetMemberRole", mock.Anything, "test-org", "test-user")
 	mockSkillStore.AssertCalled(t, "ByOrgPath", mock.Anything, "test-org", 10, 1, false)
 }

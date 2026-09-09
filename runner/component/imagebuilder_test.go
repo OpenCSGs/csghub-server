@@ -23,7 +23,7 @@ func TestImagebuilderComponent_Build(t *testing.T) {
 	testCluster := &cluster.Cluster{
 		CID:        "config",
 		ID:         "config",
-		Client:     fake.NewSimpleClientset(),
+		Client:     fake.NewClientset(),
 		ArgoClient: argofake.NewSimpleClientset(),
 	}
 
@@ -58,7 +58,7 @@ func TestImagebuilderComponent_Build_OldSpace(t *testing.T) {
 	testCluster := &cluster.Cluster{
 		CID:        "config",
 		ID:         "config",
-		Client:     fake.NewSimpleClientset(),
+		Client:     fake.NewClientset(),
 		ArgoClient: argofake.NewSimpleClientset(),
 	}
 
@@ -91,7 +91,7 @@ func TestImagebuilderComponent_Stop(t *testing.T) {
 	testCluster := &cluster.Cluster{
 		CID:        "config",
 		ID:         "config",
-		Client:     fake.NewSimpleClientset(),
+		Client:     fake.NewClientset(),
 		ArgoClient: argofake.NewSimpleClientset(),
 	}
 	pool := mockCluster.NewMockPool(t)

@@ -14,8 +14,8 @@ import (
 	mockdb "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/database"
 	mockComps "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
 	"opencsg.com/csghub-server/builder/deploy"
-	"opencsg.com/csghub-server/builder/git/membership"
 	"opencsg.com/csghub-server/builder/loki"
+	"opencsg.com/csghub-server/builder/rebac"
 	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
@@ -313,7 +313,7 @@ func TestEvaluationComponent_CreateClawEvaluation_Forbidden(t *testing.T) {
 	mockUser := c.userStore.(*mockdb.MockUserStore)
 
 	mockUser.EXPECT().FindByUsername(ctx, "user1").Return(database.User{Username: "user1"}, nil)
-	mockRepo.EXPECT().CheckCurrentUserPermission(ctx, "user1", "org1", membership.RoleWrite).Return(false, nil)
+	mockRepo.EXPECT().CheckCurrentUserPermission(ctx, "user1", "org1", rebac.NamespaceCanWrite).Return(false, nil)
 
 	_, err := c.CreateEvaluation(ctx, req)
 	require.ErrorIs(t, err, errorx.ErrForbidden)
@@ -343,7 +343,7 @@ func TestEvaluationComponent_GetClawEvaluation(t *testing.T) {
 		Username: "user1",
 		TaskType: types.TaskTypeEvaluation,
 	}, nil)
-	mockRepo.EXPECT().CheckCurrentUserPermission(ctx, "other", "user1", membership.RoleRead).Return(false, nil)
+	mockRepo.EXPECT().CheckCurrentUserPermission(ctx, "other", "user1", rebac.NamespaceCanRead).Return(false, nil)
 	_, err = c.GetEvaluation(ctx, types.EvaluationGetReq{ID: 2, Username: "other"})
 	require.ErrorIs(t, err, errorx.ErrForbidden)
 }

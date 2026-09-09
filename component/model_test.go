@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"opencsg.com/csghub-server/builder/git/gitserver"
-	"opencsg.com/csghub-server/builder/git/membership"
+	"opencsg.com/csghub-server/builder/rebac"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
@@ -1111,7 +1111,7 @@ func TestModelComponent_OrgModels(t *testing.T) {
 	ctx := context.TODO()
 	mc := initializeTestModelComponent(ctx, t)
 
-	mc.mocks.userSvcClient.EXPECT().GetMemberRole(ctx, "ns", "user").Return(membership.RoleAdmin, nil)
+	mc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "user", "ns", rebac.NamespaceCanRead).Return(true, nil)
 	mc.mocks.stores.ModelMock().EXPECT().ByOrgPath(ctx, "ns", 10, 1, false).Return([]database.Model{
 		{RepositoryID: 1, Repository: &database.Repository{ID: 1, Path: "foo", Name: "r1"}},
 	}, 100, nil)

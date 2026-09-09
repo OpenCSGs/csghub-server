@@ -14,6 +14,7 @@ import (
 	mockdatabase "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/database"
 	mockcomponent "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
 	"opencsg.com/csghub-server/builder/git/gitserver"
+	"opencsg.com/csghub-server/builder/rebac"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/errorx"
@@ -368,7 +369,7 @@ func TestClawHubComponent_PublishSkillForbiddenWithoutWritePermission(t *testing
 	skillStore.EXPECT().FindByPath(ctx, "attacker", "existing-skill").Return(&database.Skill{
 		ID: 1, RepositoryID: 1, Repository: repo,
 	}, nil)
-	repoComponent.EXPECT().GetUserRepoPermission(ctx, "attacker", repo).Return(&types.UserRepoPermission{CanWrite: false}, nil)
+	repoComponent.EXPECT().CheckUserRepoPermission(ctx, "attacker", repo, rebac.RepositoryCanWrite).Return(false, nil)
 
 	resp, err := component.PublishSkill(ctx, &types.ClawHubPublishRequest{
 		Slug:    "existing-skill",
@@ -399,7 +400,7 @@ func TestClawHubComponent_DownloadSkillUsesLatestPublishedVersion(t *testing.T) 
 	skillStore.EXPECT().FindByPath(ctx, "u", "test-skill").Return(&database.Skill{
 		ID: 1, Repository: repo,
 	}, nil)
-	repoComponent.EXPECT().GetUserRepoPermission(ctx, "", repo).Return(&types.UserRepoPermission{CanRead: true}, nil)
+	repoComponent.EXPECT().CheckUserRepoPermission(ctx, "", repo, rebac.RepositoryCanRead).Return(true, nil)
 	skillVersionStore.EXPECT().LatestBySkillID(ctx, int64(1)).Return(&database.SkillVersion{
 		SkillID: 1,
 		Version: "v1.2.3",
@@ -445,7 +446,7 @@ func TestClawHubComponent_DownloadSkillUsesS3PackageWhenAvailable(t *testing.T) 
 	skillStore.EXPECT().FindByPath(ctx, "u", "test-skill").Return(&database.Skill{
 		ID: 1, RepositoryID: 42, Repository: repo,
 	}, nil)
-	repoComponent.EXPECT().GetUserRepoPermission(ctx, "", repo).Return(&types.UserRepoPermission{CanRead: true}, nil)
+	repoComponent.EXPECT().CheckUserRepoPermission(ctx, "", repo, rebac.RepositoryCanRead).Return(true, nil)
 	skillVersionStore.EXPECT().LatestBySkillID(ctx, int64(1)).Return(&database.SkillVersion{
 		SkillID: 1,
 		Version: "v1.2.3",
@@ -496,7 +497,7 @@ func TestClawHubComponent_DownloadSkillFallsBackToGitWhenS3PackageMissing(t *tes
 	skillStore.EXPECT().FindByPath(ctx, "u", "test-skill").Return(&database.Skill{
 		ID: 1, RepositoryID: 42, Repository: repo,
 	}, nil)
-	repoComponent.EXPECT().GetUserRepoPermission(ctx, "", repo).Return(&types.UserRepoPermission{CanRead: true}, nil)
+	repoComponent.EXPECT().CheckUserRepoPermission(ctx, "", repo, rebac.RepositoryCanRead).Return(true, nil)
 	skillVersionStore.EXPECT().LatestBySkillID(ctx, int64(1)).Return(&database.SkillVersion{
 		SkillID: 1,
 		Version: "v1.2.3",
@@ -538,7 +539,7 @@ func TestClawHubComponent_ResolveSkillNormalizesSlug(t *testing.T) {
 
 	repo := &database.Repository{}
 	skillStore.EXPECT().FindByPath(ctx, "u", "test-skill").Return(&database.Skill{ID: 1, Repository: repo}, nil)
-	repoComponent.EXPECT().GetUserRepoPermission(ctx, "", repo).Return(&types.UserRepoPermission{CanRead: true}, nil)
+	repoComponent.EXPECT().CheckUserRepoPermission(ctx, "", repo, rebac.RepositoryCanRead).Return(true, nil)
 	skillVersionStore.EXPECT().LatestBySkillID(ctx, int64(1)).Return(&database.SkillVersion{
 		SkillID: 1,
 		Version: "v1.2.3",
@@ -569,7 +570,7 @@ func TestClawHubComponent_DownloadSkillUsesLatestForUnpublishedSkill(t *testing.
 	skillStore.EXPECT().FindByPath(ctx, "u", "draft-skill").Return(&database.Skill{
 		ID: 2, Repository: repo,
 	}, nil)
-	repoComponent.EXPECT().GetUserRepoPermission(ctx, "", repo).Return(&types.UserRepoPermission{CanRead: true}, nil)
+	repoComponent.EXPECT().CheckUserRepoPermission(ctx, "", repo, rebac.RepositoryCanRead).Return(true, nil)
 	skillVersionStore.EXPECT().LatestBySkillID(ctx, int64(2)).Return(nil, nil)
 	gitServer.EXPECT().GetArchive(ctx, gitserver.GetArchiveReq{
 		Namespace: "u",
@@ -603,7 +604,7 @@ func TestClawHubComponent_DownloadSkillUsesSpecifiedVersion(t *testing.T) {
 	skillStore.EXPECT().FindByPath(ctx, "u", "versioned-skill").Return(&database.Skill{
 		ID: 3, Repository: repo,
 	}, nil)
-	repoComponent.EXPECT().GetUserRepoPermission(ctx, "", repo).Return(&types.UserRepoPermission{CanRead: true}, nil)
+	repoComponent.EXPECT().CheckUserRepoPermission(ctx, "", repo, rebac.RepositoryCanRead).Return(true, nil)
 	skillVersionStore.EXPECT().BySkillIDAndVersion(ctx, int64(3), "v2.0.0").Return(&database.SkillVersion{
 		SkillID: 3,
 		Version: "v2.0.0",

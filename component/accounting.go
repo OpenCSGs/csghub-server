@@ -5,7 +5,8 @@ import (
 	"fmt"
 
 	"opencsg.com/csghub-server/builder/accounting"
-	"opencsg.com/csghub-server/builder/git/membership"
+	"opencsg.com/csghub-server/builder/rebac"
+	rebacfactory "opencsg.com/csghub-server/builder/rebac/factory"
 	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
@@ -23,6 +24,7 @@ type accountingComponentImpl struct {
 	userSvcClient         rpc.UserSvcClient
 	notificationSvcClient rpc.NotificationSvcClient
 	config                *config.Config
+	rebac                 rebac.Authorizer
 }
 
 type AccountingComponent interface {
@@ -64,10 +66,14 @@ func NewAccountingComponent(config *config.Config) (AccountingComponent, error) 
 	}
 	userSvcAddr := fmt.Sprintf("%s:%d", config.User.Host, config.User.Port)
 	userRpcClient := rpc.NewUserSvcHttpClient(userSvcAddr, rpc.AuthWithApiKey(config.APIToken))
+	authorizer, err := rebacfactory.NewAuthorizer()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create ReBAC authorizer: %w", err)
+	}
 	return &accountingComponentImpl{
 		accountingClient: c,
 		userStore:        database.NewUserStore(),
-		orgStore:         database.NewOrgStore(),
+		orgStore:         database.NewOrgStore(config),
 		memberStore:      database.NewMemberStore(),
 		deployTaskStore:  database.NewDeployTaskStore(),
 		userSvcClient:    userRpcClient,
@@ -75,11 +81,12 @@ func NewAccountingComponent(config *config.Config) (AccountingComponent, error) 
 			rpc.AuthWithApiKey(config.APIToken)),
 		config:         config,
 		namespaceStore: database.NewNamespaceStore(),
+		rebac:          authorizer,
 	}, nil
 }
 
 func (ac *accountingComponentImpl) ListMeteringsByUserIDAndTime(ctx context.Context, req types.ActStatementsReq) (interface{}, error) {
-	if _, err := checkOwnerOrOrgMemberPermission(ctx, ac.userSvcClient, req.CurrentUser, req.UserUUID); err != nil {
+	if _, err := checkOwnerOrOrgMemberPermission(ctx, ac.userSvcClient, ac.rebac, req.CurrentUser, req.UserUUID); err != nil {
 		return nil, errorx.Forbidden(err, map[string]any{
 			"user": req.CurrentUser,
 		})
@@ -91,8 +98,8 @@ func (ac *accountingComponentImpl) ListMeteringsByUserIDAndTime(ctx context.Cont
 // Permission is granted if:
 // 1. Current user is the same as the target user (querying own data)
 // 2. Current user is an admin
-// 3. Current user is a member of the organization that owns the target user's namespace
-func checkOwnerOrOrgMemberPermission(ctx context.Context, userSvcClient rpc.UserSvcClient, currentUser, targetUUID string) (*rpc.Namespace, error) {
+// 3. Current user can read the organization namespace that owns the target user's namespace
+func checkOwnerOrOrgMemberPermission(ctx context.Context, userSvcClient rpc.UserSvcClient, authorizer rebac.Authorizer, currentUser, targetUUID string) (*rpc.Namespace, error) {
 	user, err := userSvcClient.GetUserByName(ctx, currentUser)
 	if err != nil {
 		return nil, fmt.Errorf("current user not found: %w", err)
@@ -108,13 +115,25 @@ func checkOwnerOrOrgMemberPermission(ctx context.Context, userSvcClient rpc.User
 	}
 
 	if ns.NSType != string(database.OrgNamespace) {
-		return ns, fmt.Errorf("do not have permission to query the target org's data: %w", err)
+		return ns, fmt.Errorf("do not have permission to query the target org's data")
 	}
 
-	// Check if current user is member of org that owns target user's namespace
-	role, err := userSvcClient.GetMemberRoleByUUID(ctx, ns.UUID, currentUser)
-	if err != nil || role == membership.RoleUnknown {
-		return ns, fmt.Errorf("do not have permission to query the target org's data: %w", err)
+	if authorizer == nil {
+		return ns, fmt.Errorf("namespace ReBAC authorizer is required")
+	}
+
+	// Check whether the current user can read the organization namespace.
+	decision, err := authorizer.Check(ctx, rebac.CheckRequest{
+		Subject:     rebac.UserSubject(user.UUID),
+		Relation:    rebac.NamespaceCanRead,
+		Object:      rebac.NamespaceObject(ns.UUID),
+		Consistency: rebac.ConsistencyHigher,
+	})
+	if err != nil {
+		return ns, fmt.Errorf("failed to check target organization namespace permission: %w", err)
+	}
+	if !decision.Allowed {
+		return ns, fmt.Errorf("do not have permission to query the target org's data")
 	}
 
 	return ns, nil

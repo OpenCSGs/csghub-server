@@ -11,7 +11,7 @@ import (
 
 	"opencsg.com/csghub-server/builder/deploy"
 	"opencsg.com/csghub-server/builder/deploy/common"
-	"opencsg.com/csghub-server/builder/git/membership"
+	"opencsg.com/csghub-server/builder/rebac"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/errorx"
@@ -65,7 +65,7 @@ func (c *notebookComponentImpl) CreateNotebook(ctx context.Context, req *types.C
 	}
 
 	if !user.CanAdmin() {
-		canWrite, err := c.repoComponent.CheckCurrentUserPermission(ctx, req.CurrentUser, req.OwnerNamespace, membership.RoleWrite)
+		canWrite, err := c.repoComponent.CheckCurrentUserPermission(ctx, req.CurrentUser, req.OwnerNamespace, rebac.NamespaceCanWrite)
 		if err != nil {
 			return nil, fmt.Errorf("failed to check namespace permission, error: %w", err)
 		}

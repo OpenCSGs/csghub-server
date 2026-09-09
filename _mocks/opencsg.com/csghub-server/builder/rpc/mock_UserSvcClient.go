@@ -5,7 +5,6 @@ package rpc
 import (
 	context "context"
 
-	membership "opencsg.com/csghub-server/builder/git/membership"
 	database "opencsg.com/csghub-server/builder/store/database"
 
 	mock "github.com/stretchr/testify/mock"
@@ -280,122 +279,6 @@ func (_c *MockUserSvcClient_GetEmails_Call) Return(_a0 []string, _a1 int, _a2 er
 }
 
 func (_c *MockUserSvcClient_GetEmails_Call) RunAndReturn(run func(context.Context, int, int) ([]string, int, error)) *MockUserSvcClient_GetEmails_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// GetMemberRole provides a mock function with given fields: ctx, orgName, userName
-func (_m *MockUserSvcClient) GetMemberRole(ctx context.Context, orgName string, userName string) (membership.Role, error) {
-	ret := _m.Called(ctx, orgName, userName)
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetMemberRole")
-	}
-
-	var r0 membership.Role
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string) (membership.Role, error)); ok {
-		return rf(ctx, orgName, userName)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, string) membership.Role); ok {
-		r0 = rf(ctx, orgName, userName)
-	} else {
-		r0 = ret.Get(0).(membership.Role)
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
-		r1 = rf(ctx, orgName, userName)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// MockUserSvcClient_GetMemberRole_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetMemberRole'
-type MockUserSvcClient_GetMemberRole_Call struct {
-	*mock.Call
-}
-
-// GetMemberRole is a helper method to define mock.On call
-//   - ctx context.Context
-//   - orgName string
-//   - userName string
-func (_e *MockUserSvcClient_Expecter) GetMemberRole(ctx interface{}, orgName interface{}, userName interface{}) *MockUserSvcClient_GetMemberRole_Call {
-	return &MockUserSvcClient_GetMemberRole_Call{Call: _e.mock.On("GetMemberRole", ctx, orgName, userName)}
-}
-
-func (_c *MockUserSvcClient_GetMemberRole_Call) Run(run func(ctx context.Context, orgName string, userName string)) *MockUserSvcClient_GetMemberRole_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string))
-	})
-	return _c
-}
-
-func (_c *MockUserSvcClient_GetMemberRole_Call) Return(_a0 membership.Role, _a1 error) *MockUserSvcClient_GetMemberRole_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *MockUserSvcClient_GetMemberRole_Call) RunAndReturn(run func(context.Context, string, string) (membership.Role, error)) *MockUserSvcClient_GetMemberRole_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// GetMemberRoleByUUID provides a mock function with given fields: ctx, orgUUID, userName
-func (_m *MockUserSvcClient) GetMemberRoleByUUID(ctx context.Context, orgUUID string, userName string) (membership.Role, error) {
-	ret := _m.Called(ctx, orgUUID, userName)
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetMemberRoleByUUID")
-	}
-
-	var r0 membership.Role
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string) (membership.Role, error)); ok {
-		return rf(ctx, orgUUID, userName)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, string) membership.Role); ok {
-		r0 = rf(ctx, orgUUID, userName)
-	} else {
-		r0 = ret.Get(0).(membership.Role)
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
-		r1 = rf(ctx, orgUUID, userName)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// MockUserSvcClient_GetMemberRoleByUUID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetMemberRoleByUUID'
-type MockUserSvcClient_GetMemberRoleByUUID_Call struct {
-	*mock.Call
-}
-
-// GetMemberRoleByUUID is a helper method to define mock.On call
-//   - ctx context.Context
-//   - orgUUID string
-//   - userName string
-func (_e *MockUserSvcClient_Expecter) GetMemberRoleByUUID(ctx interface{}, orgUUID interface{}, userName interface{}) *MockUserSvcClient_GetMemberRoleByUUID_Call {
-	return &MockUserSvcClient_GetMemberRoleByUUID_Call{Call: _e.mock.On("GetMemberRoleByUUID", ctx, orgUUID, userName)}
-}
-
-func (_c *MockUserSvcClient_GetMemberRoleByUUID_Call) Run(run func(ctx context.Context, orgUUID string, userName string)) *MockUserSvcClient_GetMemberRoleByUUID_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string))
-	})
-	return _c
-}
-
-func (_c *MockUserSvcClient_GetMemberRoleByUUID_Call) Return(_a0 membership.Role, _a1 error) *MockUserSvcClient_GetMemberRoleByUUID_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *MockUserSvcClient_GetMemberRoleByUUID_Call) RunAndReturn(run func(context.Context, string, string) (membership.Role, error)) *MockUserSvcClient_GetMemberRoleByUUID_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -691,65 +574,6 @@ func (_c *MockUserSvcClient_GetOrgByName_Call) Return(_a0 *types.Organization, _
 }
 
 func (_c *MockUserSvcClient_GetOrgByName_Call) RunAndReturn(run func(context.Context, string) (*types.Organization, error)) *MockUserSvcClient_GetOrgByName_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// GetOrgByUUID provides a mock function with given fields: ctx, orgUUID
-func (_m *MockUserSvcClient) GetOrgByUUID(ctx context.Context, orgUUID string) (*types.Organization, error) {
-	ret := _m.Called(ctx, orgUUID)
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetOrgByUUID")
-	}
-
-	var r0 *types.Organization
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string) (*types.Organization, error)); ok {
-		return rf(ctx, orgUUID)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, string) *types.Organization); ok {
-		r0 = rf(ctx, orgUUID)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*types.Organization)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
-		r1 = rf(ctx, orgUUID)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// MockUserSvcClient_GetOrgByUUID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetOrgByUUID'
-type MockUserSvcClient_GetOrgByUUID_Call struct {
-	*mock.Call
-}
-
-// GetOrgByUUID is a helper method to define mock.On call
-//   - ctx context.Context
-//   - orgUUID string
-func (_e *MockUserSvcClient_Expecter) GetOrgByUUID(ctx interface{}, orgUUID interface{}) *MockUserSvcClient_GetOrgByUUID_Call {
-	return &MockUserSvcClient_GetOrgByUUID_Call{Call: _e.mock.On("GetOrgByUUID", ctx, orgUUID)}
-}
-
-func (_c *MockUserSvcClient_GetOrgByUUID_Call) Run(run func(ctx context.Context, orgUUID string)) *MockUserSvcClient_GetOrgByUUID_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string))
-	})
-	return _c
-}
-
-func (_c *MockUserSvcClient_GetOrgByUUID_Call) Return(_a0 *types.Organization, _a1 error) *MockUserSvcClient_GetOrgByUUID_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *MockUserSvcClient_GetOrgByUUID_Call) RunAndReturn(run func(context.Context, string) (*types.Organization, error)) *MockUserSvcClient_GetOrgByUUID_Call {
 	_c.Call.Return(run)
 	return _c
 }
