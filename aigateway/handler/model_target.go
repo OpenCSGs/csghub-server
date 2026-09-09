@@ -56,6 +56,13 @@ func (e *modelTargetError) Error() string {
 	return e.APIError.Message
 }
 
+// ModelErrorCode returns the structured error code so the plan-package
+// Planner can categorize the error via errors.As(CodedError) without
+// depending on this private type.
+func (e *modelTargetError) ModelErrorCode() string {
+	return e.APIError.Code
+}
+
 type modelTargetErrorOptions struct {
 	Cause     error
 	Model     *types.Model
