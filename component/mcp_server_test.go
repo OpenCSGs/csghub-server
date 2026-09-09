@@ -12,9 +12,12 @@ import (
 
 	"github.com/stretchr/testify/mock"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+	mockrebac "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/rebac"
+	mockdb "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/git/gitserver"
-	"opencsg.com/csghub-server/builder/git/membership"
+	"opencsg.com/csghub-server/builder/rebac"
 	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/types"
@@ -139,9 +142,7 @@ func TestMCPServerComponent_Delete(t *testing.T) {
 		Repository:   dbrepo,
 	}, nil)
 
-	mc.mocks.components.repo.EXPECT().GetUserRepoPermission(ctx, "user", dbrepo).Return(&types.UserRepoPermission{
-		CanAdmin: true,
-	}, nil)
+	mc.mocks.components.repo.EXPECT().CheckUserRepoPermission(ctx, "user", dbrepo, rebac.RepositoryCanAdmin).Return(true, nil)
 
 	mc.mocks.components.repo.EXPECT().DeleteRepo(ctx, types.DeleteRepoReq{
 		Username:  req.Username,
@@ -210,9 +211,7 @@ func TestMCPServerComponent_Update(t *testing.T) {
 		Repository:   dbrepo,
 	}, nil)
 
-	mc.mocks.components.repo.EXPECT().GetUserRepoPermission(ctx, "user", dbrepo).Return(&types.UserRepoPermission{
-		CanAdmin: true,
-	}, nil)
+	mc.mocks.components.repo.EXPECT().CheckUserRepoPermission(ctx, "user", dbrepo, rebac.RepositoryCanAdmin).Return(true, nil)
 
 	mc.mocks.components.repo.EXPECT().UpdateRepo(ctx, req.UpdateRepoReq).Return(dbrepo, nil)
 
@@ -403,16 +402,16 @@ func TestMCPServerComponent_OrgMCPServers(t *testing.T) {
 	mc := initializeTestMCPServerComponent(ctx, t)
 
 	cases := []struct {
-		role       membership.Role
+		role       types.UserRole
 		publicOnly bool
 	}{
-		{membership.RoleUnknown, true},
-		{membership.RoleAdmin, false},
+		{"", true},
+		{types.UserAdmin, false},
 	}
 
 	for _, c := range cases {
 		t.Run(string(c.role), func(t *testing.T) {
-			mc.mocks.userSvcClient.EXPECT().GetMemberRole(ctx, "ns", "foo").Return(c.role, nil).Once()
+			mc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "foo", "ns", rebac.NamespaceCanRead).Return(c.role != "", nil).Once()
 			mc.mocks.stores.MCPServerMock().EXPECT().ByOrgPath(ctx, "ns", 1, 1, c.publicOnly).Return([]database.MCPServer{
 				{ID: 1, Repository: &database.Repository{Name: "r1"}},
 				{ID: 2, Repository: &database.Repository{Name: "r2"}},
@@ -534,10 +533,7 @@ func TestMCPServerComponent_CheckDeployBranch(t *testing.T) {
 		Repository:   dbrepo,
 	}, nil)
 
-	mc.mocks.components.repo.EXPECT().GetUserRepoPermission(ctx, req.CurrentUser, dbrepo).Return(&types.UserRepoPermission{
-		CanAdmin: true,
-		CanRead:  true,
-	}, nil)
+	mc.mocks.components.repo.EXPECT().CheckUserRepoPermission(ctx, req.CurrentUser, dbrepo, rebac.RepositoryCanRead).Return(true, nil)
 
 	mc.mocks.stores.SpaceResourceMock().EXPECT().FindByID(ctx, req.ResourceID).Return(&database.SpaceResource{
 		ID: 1,
@@ -548,15 +544,22 @@ func TestMCPServerComponent_CheckDeployBranch(t *testing.T) {
 	}).Return(&types.CheckExclusiveResp{}, nil)
 
 	mc.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, req.Namespace).Return(database.Namespace{
-		ID: 1,
+		ID:            1,
+		Path:          req.Namespace,
+		NamespaceType: database.OrgNamespace,
 	}, nil)
+	organization := database.Organization{
+		UUID: uuid.MustParse("00000000-0000-0000-0000-000000000001"),
+	}
+	mc.mocks.stores.OrgMock().EXPECT().FindByPath(ctx, req.Namespace).Return(organization, nil)
 
 	mc.mocks.userSvcClient.EXPECT().GetUserInfo(ctx, req.CurrentUser, req.CurrentUser).Return(&rpc.User{
 		ID:       1,
 		Username: req.CurrentUser,
 		Email:    "email@example.com",
-		Roles:    []string{"admin"},
+		Roles:    []string{"user"},
 	}, nil)
+	mc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, req.Username, req.Namespace, rebac.NamespaceCanWrite).Return(true, nil).Once()
 
 	mc.mocks.stores.MCPServerMock().EXPECT().CreateSpaceAndRepoForDeploy(ctx, &database.Repository{
 		UserID:         int64(1),
@@ -581,7 +584,19 @@ func TestMCPServerComponent_CheckDeployBranch(t *testing.T) {
 		Template:      "",
 		SKU:           strconv.FormatInt(1, 10),
 		ClusterID:     req.ClusterID,
+	}).Run(func(_ context.Context, repo *database.Repository, _ *database.Space) {
+		repo.ID = dbrepo.ID
 	}).Return(nil)
+	relationship := rebac.Relationship{
+		Subject:  rebac.NewSubject(rebac.ObjectTypeOrganization, organization.UUID.String()),
+		Relation: rebac.RelationOrganization,
+		Object:   rebac.RepositoryObject(dbrepo.ID),
+	}
+	mc.rebac.(*mockrebac.MockAuthorizer).EXPECT().Check(ctx, rebac.CheckRequest{
+		Subject: relationship.Subject, Relation: relationship.Relation, Object: relationship.Object,
+		Consistency: rebac.ConsistencyHigher,
+	}).Return(rebac.Decision{Allowed: false}, nil).Once()
+	mc.rebac.(*mockrebac.MockAuthorizer).EXPECT().Write(ctx, []rebac.Relationship{relationship}).Return(nil).Once()
 
 	mc.mocks.gitServer.EXPECT().CopyRepository(mock.Anything, mock.Anything).Return(nil)
 
@@ -596,4 +611,35 @@ func TestMCPServerComponent_CheckDeployBranch(t *testing.T) {
 	res, err := mc.Deploy(ctx, req)
 	require.Nil(t, err)
 	require.NotNil(t, res)
+}
+
+// TestMCPServerComponent_CleanupFailedMCPDeployRemovesRepositoryTuple verifies deploy rollback removes ReBAC state.
+func TestMCPServerComponent_CleanupFailedMCPDeployRemovesRepositoryTuple(t *testing.T) {
+	ctx := context.Background()
+	namespace := database.Namespace{
+		Path:          "org",
+		NamespaceType: database.OrgNamespace,
+	}
+	organization := database.Organization{
+		UUID: uuid.MustParse("00000000-0000-0000-0000-000000000001"),
+	}
+	relationship := rebac.Relationship{
+		Subject:  rebac.NewSubject(rebac.ObjectTypeOrganization, organization.UUID.String()),
+		Relation: rebac.RelationOrganization,
+		Object:   rebac.RepositoryObject(42),
+	}
+	orgStore := mockdb.NewMockOrgStore(t)
+	authorizer := mockrebac.NewMockAuthorizer(t)
+	orgStore.EXPECT().FindByPath(ctx, namespace.Path).Return(organization, nil).Once()
+	authorizer.EXPECT().Check(ctx, rebac.CheckRequest{
+		Subject: relationship.Subject, Relation: relationship.Relation, Object: relationship.Object,
+		Consistency: rebac.ConsistencyHigher,
+	}).Return(rebac.Decision{Allowed: true}, nil).Once()
+	authorizer.EXPECT().Delete(ctx, []rebac.Relationship{relationship}).Return(nil).Once()
+
+	component := &mcpServerComponentImpl{
+		orgStore: orgStore,
+		rebac:    authorizer,
+	}
+	component.cleanupFailedMCPDeploy(ctx, namespace, 7, 42)
 }

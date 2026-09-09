@@ -180,6 +180,7 @@ func (h *UserHandler) Update(ctx *gin.Context) {
 // @Param        current_user  query  string true "current user"
 // @Success      200  {object}  types.Response{} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      409  {object}  types.APIBadRequest "The user is the last administrator of an organization"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /user/{username} [delete]
 func (h *UserHandler) Delete(ctx *gin.Context) {
@@ -188,27 +189,32 @@ func (h *UserHandler) Delete(ctx *gin.Context) {
 
 	// Check if operator can delete user
 	isServerErr, err := h.c.CheckOperatorAndUser(ctx, operator, userName)
-	if err != nil && isServerErr {
-		slog.ErrorContext(ctx.Request.Context(), "Check operator and user failed", slog.String("operator", operator), slog.String("user", userName), slog.Any("err", err))
-		httpbase.ServerError(ctx, fmt.Errorf("user cannot be deleted: %w", err))
-		return
-	}
-	if err != nil && !isServerErr {
+
+	if err != nil {
+		if isServerErr {
+			slog.ErrorContext(ctx.Request.Context(), "Check operator and user failed", slog.String("operator", operator), slog.String("user", userName), slog.Any("err", err))
+			httpbase.ServerError(ctx, fmt.Errorf("user cannot be deleted: %w", err))
+			return
+		}
 		slog.ErrorContext(ctx.Request.Context(), "Bad Request", slog.String("operator", operator), slog.String("user", userName), slog.Any("err", err))
 		httpbase.BadRequestWithExt(ctx, errorx.ErrAdminUserCannotBeDeleted)
 		return
 	}
 
-	// Check if user has organizations
-	hasOrgs, err := h.c.CheckIfUserHasOrgs(ctx, userName)
+	// Prevent deleting the only administrator of any organization.
+	isLastOrganizationAdmin, err := h.c.CheckIfUserIsLastOrgAdmin(ctx, userName)
 	if err != nil {
-		slog.ErrorContext(ctx.Request.Context(), "Check if user has organizations failed", slog.String("user", userName), slog.Any("err", err))
-		httpbase.ServerError(ctx, fmt.Errorf("failed to check if user has organzitions, error: %w", err))
+		slog.ErrorContext(ctx.Request.Context(), "Check last organization administrator failed", slog.String("user", userName), slog.Any("err", err))
+		httpbase.ServerError(ctx, fmt.Errorf("failed to check last organization administrator: %w", err))
 		return
 	}
-	if hasOrgs {
-		slog.ErrorContext(ctx.Request.Context(), "User has organizations", slog.String("user", userName))
-		httpbase.BadRequestWithExt(ctx, errorx.ErrUserHasOrganizations)
+	if isLastOrganizationAdmin {
+		err := errorx.LastOrgAdmin(
+			errors.New("cannot delete the last administrator of an organization"),
+			errorx.Ctx().Set("username", userName),
+		)
+		slog.ErrorContext(ctx.Request.Context(), "User is the last organization administrator", slog.String("user", userName))
+		httpbase.ConflictError(ctx, err)
 		return
 	}
 	// Check if user has running or building deployments
@@ -697,6 +703,7 @@ func (h *UserHandler) FindByUUIDs(ctx *gin.Context) {
 // @Param        discussion  query  bool false "discussion"
 // @Success      200  {object}  types.Response{} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      409  {object}  types.APIBadRequest "The user is the last administrator of an organization"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /user/{username}/close_account [delete]
 func (h *UserHandler) CloseAccount(ctx *gin.Context) {
@@ -715,14 +722,18 @@ func (h *UserHandler) CloseAccount(ctx *gin.Context) {
 		Discussion: discussion,
 	}
 
-	// Check if user has organizations
-	hasOrgs, err := h.c.CheckIfUserHasOrgs(ctx, userName)
+	// Prevent closing the account of the only administrator of any organization.
+	isLastOrganizationAdmin, err := h.c.CheckIfUserIsLastOrgAdmin(ctx, userName)
 	if err != nil {
-		httpbase.ServerError(ctx, fmt.Errorf("failed to check if user has organzitions, error: %w", err))
+		httpbase.ServerError(ctx, fmt.Errorf("failed to check last organization administrator: %w", err))
 		return
 	}
-	if hasOrgs {
-		httpbase.BadRequestWithExt(ctx, errorx.ReqParamInvalid(errors.New("users who own organizations cannot be deleted"), nil))
+	if isLastOrganizationAdmin {
+		err := errorx.LastOrgAdmin(
+			errors.New("cannot delete the last administrator of an organization"),
+			errorx.Ctx().Set("username", userName),
+		)
+		httpbase.ConflictError(ctx, err)
 		return
 	}
 	// Check if user has running or building deployments

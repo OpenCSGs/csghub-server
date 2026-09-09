@@ -9,7 +9,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"opencsg.com/csghub-server/builder/git/gitserver"
-	"opencsg.com/csghub-server/builder/git/membership"
+	"opencsg.com/csghub-server/builder/rebac"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/types"
 )
@@ -30,9 +30,10 @@ func TestDatasetCompnent_Create(t *testing.T) {
 	)
 
 	dc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{
-		RoleMask: "admin",
+		RoleMask: "user",
 		Username: "user",
 	}, nil)
+	dc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "user", "ns", rebac.NamespaceCanWrite).Return(true, nil).Once()
 
 	rq := req.CreateRepoReq
 	rq.RepoType = types.DatasetRepo
@@ -462,7 +463,7 @@ func TestDatasetCompnent_OrgDatasets(t *testing.T) {
 	ctx := context.TODO()
 	dc := initializeTestDatasetComponent(ctx, t)
 
-	dc.mocks.userSvcClient.EXPECT().GetMemberRole(ctx, "ns", "user").Return(membership.RoleAdmin, nil)
+	dc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "user", "ns", rebac.NamespaceCanRead).Return(true, nil)
 	dc.mocks.stores.DatasetMock().EXPECT().ByOrgPath(ctx, "ns", 10, 1, false).Return(
 		[]database.Dataset{
 			{ID: 1, Repository: &database.Repository{Name: "repo"}},

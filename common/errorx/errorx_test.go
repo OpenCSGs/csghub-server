@@ -300,6 +300,23 @@ func Test_Err_MirrorSourceURLInvalid(t *testing.T) {
 	assert.True(t, errors.Is(err, ErrMirrorSourceURLInvalid))
 }
 
+// Test_Err_Organization verifies organization error codes and context.
+func Test_Err_Organization(t *testing.T) {
+	notFoundErr := OrganizationNotFound("organization-uuid")
+	manageErr := OrganizationManageForbidden("organization-uuid")
+	accessErr := OrganizationAccessForbidden("organization-uuid")
+
+	assert.Equal(t, "ORG-ERR-1", ErrOrganizationNotFound.(CustomError).Code())
+	assert.Equal(t, "ORG-ERR-2", ErrOrganizationManageForbidden.(CustomError).Code())
+	assert.Equal(t, "ORG-ERR-3", ErrOrganizationAccessForbidden.(CustomError).Code())
+	assert.True(t, errors.Is(notFoundErr, ErrOrganizationNotFound))
+	assert.True(t, errors.Is(manageErr, ErrOrganizationManageForbidden))
+	assert.True(t, errors.Is(accessErr, ErrOrganizationAccessForbidden))
+	assert.Equal(t, "organization-uuid", notFoundErr.(CustomError).Context()["organization_uuid"])
+	assert.Equal(t, "organization-uuid", manageErr.(CustomError).Context()["organization_uuid"])
+	assert.Equal(t, "organization-uuid", accessErr.(CustomError).Context()["organization_uuid"])
+}
+
 func Test_Err_ChangePathBlocked(t *testing.T) {
 	err := ChangePathBlocked(
 		errors.New("cannot change path: the following dependent entities exist: deploy tasks, mirrors. Please remove them first"),

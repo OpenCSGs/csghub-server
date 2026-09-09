@@ -19,6 +19,7 @@ import (
 	"gopkg.in/yaml.v3"
 	"opencsg.com/csghub-server/builder/git"
 	"opencsg.com/csghub-server/builder/git/gitserver"
+	"opencsg.com/csghub-server/builder/rebac"
 	"opencsg.com/csghub-server/builder/store/cache"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
@@ -168,11 +169,11 @@ func (c *runtimeArchitectureComponentImpl) ScanModel(ctx context.Context, curren
 	if err != nil {
 		return fmt.Errorf("fail to find repository by namespace and name, %w", err)
 	}
-	permission, err := c.repoComponent.GetUserRepoPermission(ctx, currentUser, repo)
+	permission, err := c.repoComponent.CheckUserRepoPermission(ctx, currentUser, repo, rebac.RepositoryCanWrite)
 	if err != nil {
 		return fmt.Errorf("fail to get user permission for repository, %w", err)
 	}
-	if !permission.CanWrite {
+	if !permission {
 		return errorx.ErrForbiddenMsg(fmt.Sprintf("user %s does not have permission to update metadata for %s ", currentUser, repo.Path))
 	}
 	if repo.Format() == string(types.Unknown) {

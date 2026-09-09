@@ -110,6 +110,15 @@ func TestLocalizedErrorMiddleware(t *testing.T) {
 			errorx.Ctx().Set("sensitive_check_status", "Fail"),
 		))
 	})
+	router.GET("/organization-not-found", func(c *gin.Context) {
+		httpbase.NotFoundError(c, errorx.OrganizationNotFound("organization-uuid"))
+	})
+	router.GET("/organization-manage-forbidden", func(c *gin.Context) {
+		httpbase.ForbiddenError(c, errorx.OrganizationManageForbidden("organization-uuid"))
+	})
+	router.GET("/organization-access-forbidden", func(c *gin.Context) {
+		httpbase.ForbiddenError(c, errorx.OrganizationAccessForbidden("organization-uuid"))
+	})
 
 	// Run tests
 	t.Run("SkipRoute", func(t *testing.T) {
@@ -294,6 +303,42 @@ func TestLocalizedErrorMiddleware(t *testing.T) {
 		_ = json.Unmarshal(w.Body.Bytes(), &resp)
 		assert.Equal(t, "AGENT-ERR-24: 该智能体模板未通过敏感内容检查，无法设为公开。", resp.Msg)
 		assert.Equal(t, "Fail", resp.Context["sensitive_check_status"])
+	})
+
+	t.Run("LocalizedOrganizationNotFound", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", "/organization-not-found", nil)
+		req.Header.Set("Accept-Language", "zh-CN")
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusNotFound, w.Code)
+		var resp httpbase.R
+		_ = json.Unmarshal(w.Body.Bytes(), &resp)
+		assert.Equal(t, "ORG-ERR-1: 组织不存在", resp.Msg)
+	})
+
+	t.Run("LocalizedOrganizationManageForbidden", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", "/organization-manage-forbidden", nil)
+		req.Header.Set("Accept-Language", "zh-CN")
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusForbidden, w.Code)
+		var resp httpbase.R
+		_ = json.Unmarshal(w.Body.Bytes(), &resp)
+		assert.Equal(t, "ORG-ERR-2: 无权管理该组织", resp.Msg)
+	})
+
+	t.Run("LocalizedOrganizationAccessForbidden", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", "/organization-access-forbidden", nil)
+		req.Header.Set("Accept-Language", "zh-HK")
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusForbidden, w.Code)
+		var resp httpbase.R
+		_ = json.Unmarshal(w.Body.Bytes(), &resp)
+		assert.Equal(t, "ORG-ERR-3: 無權訪問該組織", resp.Msg)
 	})
 }
 

@@ -11,8 +11,8 @@ import (
 	"path"
 	"strings"
 
-	"opencsg.com/csghub-server/builder/git/membership"
 	"opencsg.com/csghub-server/builder/multisync"
+	"opencsg.com/csghub-server/builder/rebac"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
@@ -144,14 +144,6 @@ func (m *mirrorComponentImpl) CreateMirrorRepo(ctx context.Context, req types.Cr
 		)
 	}
 
-	canWrite, err := m.repoComp.CheckCurrentUserPermission(ctx, req.CurrentUser, namespace, membership.RoleWrite)
-	if err != nil {
-		return nil, fmt.Errorf("failed to check mirror repo permission: %w", err)
-	}
-	if !canWrite {
-		return nil, errorx.ErrForbiddenMsg("users do not have permission to create mirror in this namespace")
-	}
-
 	repo, err := m.repoStore.FindByPath(ctx, req.RepoType, namespace, name)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("failed to check target repo existence, error: %w", err)
@@ -159,6 +151,13 @@ func (m *mirrorComponentImpl) CreateMirrorRepo(ctx context.Context, req types.Cr
 
 	// repo exists
 	if repo != nil && repo.ID != 0 {
+		canWrite, err := m.repoComp.CheckUserRepoPermission(ctx, req.CurrentUser, repo, rebac.RepositoryCanWrite)
+		if err != nil {
+			return nil, fmt.Errorf("failed to check existing mirror repo permission: %w", err)
+		}
+		if !canWrite {
+			return nil, errorx.ErrForbiddenMsg("users do not have permission to create mirror for this repo")
+		}
 		if req.CreateTargetRepo != nil && *req.CreateTargetRepo {
 			return nil, errorx.ErrRepoAlreadyExist
 		}
@@ -209,7 +208,14 @@ func (m *mirrorComponentImpl) CreateMirrorRepo(ctx context.Context, req types.Cr
 			return nil, err
 		}
 		repoNamespace, _ := repo.NamespaceAndName()
-		return m.createMirrorRepoRecords(ctx, req, repo, repoNamespace, repo.Name, false, metadata)
+		return m.createMirrorRepoRecords(ctx, req, repo, repoNamespace, repo.Name, false, metadata, nil)
+	}
+	canWrite, err := m.repoComp.CheckCurrentUserPermission(ctx, req.CurrentUser, namespace, rebac.NamespaceCanWrite)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check mirror repo permission: %w", err)
+	}
+	if !canWrite {
+		return nil, errorx.ErrForbiddenMsg("users do not have permission to create mirror in this namespace")
 	}
 	if req.CreateTargetRepo != nil && !*req.CreateTargetRepo {
 		return nil, errorx.RepoNotFound(
@@ -249,13 +255,13 @@ func (m *mirrorComponentImpl) CreateMirrorRepo(ctx context.Context, req types.Cr
 	if !req.SkipSourcePath {
 		sourceType, sourcePath, _ = common.GetSourceTypeAndPathFromURL(req.SourceGitCloneUrl)
 	}
-	dbRepo, err := m.prepareMirrorRepository(ctx, createRepoReq, sourceType, sourcePath)
+	dbRepo, targetNamespace, err := m.prepareMirrorRepository(ctx, createRepoReq, sourceType, sourcePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare mirror repository, error: %w", err)
 	}
 
 	repoNamespace, _ := dbRepo.NamespaceAndName()
-	return m.createMirrorRepoRecords(ctx, req, dbRepo, repoNamespace, dbRepo.Name, true, metadata)
+	return m.createMirrorRepoRecords(ctx, req, dbRepo, repoNamespace, dbRepo.Name, true, metadata, &targetNamespace)
 }
 
 // fetchMirrorRepoMetadata imports MCP or skill metadata from the source API before repository creation.
@@ -560,7 +566,7 @@ func (m *mirrorComponentImpl) resolveMirrorRepoTarget(req types.CreateMirrorRepo
 }
 
 // createMirrorRepoRecords creates mirror rows transactionally, and optionally the target repo rows too.
-func (m *mirrorComponentImpl) createMirrorRepoRecords(ctx context.Context, req types.CreateMirrorRepoReq, repo *database.Repository, namespace, name string, createRepository bool, metadata *mirrorRepoMetadata) (*database.Mirror, error) {
+func (m *mirrorComponentImpl) createMirrorRepoRecords(ctx context.Context, req types.CreateMirrorRepoReq, repo *database.Repository, namespace, name string, createRepository bool, metadata *mirrorRepoMetadata, targetNamespace *database.Namespace) (*database.Mirror, error) {
 	mirror := buildMirrorRepoRecord(req, repo, namespace, name)
 	if !createRepository && !req.SkipSourcePath {
 		sourceType, sourcePath, _ := common.GetSourceTypeAndPathFromURL(req.SourceGitCloneUrl)
@@ -590,31 +596,39 @@ func (m *mirrorComponentImpl) createMirrorRepoRecords(ctx context.Context, req t
 	if err != nil {
 		return nil, fmt.Errorf("failed to create mirror repo records: %w", err)
 	}
+	if createRepository {
+		if targetNamespace == nil {
+			return nil, fmt.Errorf("mirror repository namespace is required")
+		}
+		if err := ensureRepositoryNamespaceRelationship(ctx, m.rebac, m.orgStore, *targetNamespace, reqMirror.RepositoryID); err != nil {
+			return nil, fmt.Errorf("failed to synchronize mirror repository namespace relationship: %w", err)
+		}
+	}
 	return reqMirror, nil
 }
 
 // prepareMirrorRepository validates repo creation inputs and builds the repository row.
-func (m *mirrorComponentImpl) prepareMirrorRepository(ctx context.Context, req types.CreateRepoReq, sourceType, sourcePath string) (*database.Repository, error) {
+func (m *mirrorComponentImpl) prepareMirrorRepository(ctx context.Context, req types.CreateRepoReq, sourceType, sourcePath string) (*database.Repository, database.Namespace, error) {
 	valid, err := common.IsValidName(req.Name)
 	if !valid {
 		slog.ErrorContext(ctx, "repo name is invalid", slog.Any("error", err))
-		return nil, errorx.ErrRepoNameInvalid
+		return nil, database.Namespace{}, errorx.ErrRepoNameInvalid
 	}
 
 	namespace, err := m.namespaceStore.FindByPath(ctx, req.Namespace)
 	if err != nil {
 		slog.ErrorContext(ctx, "namespace does not exist", slog.Any("error", err))
-		return nil, errorx.ErrNamespaceNotFound
+		return nil, database.Namespace{}, errorx.ErrNamespaceNotFound
 	}
 
 	user, err := m.userStore.FindByUsername(ctx, req.Username)
 	if err != nil {
 		slog.ErrorContext(ctx, "user does not exist", slog.Any("error", err))
-		return nil, errorx.ErrUserNotFound
+		return nil, database.Namespace{}, errorx.ErrUserNotFound
 	}
 	if user.Email == "" {
 		slog.ErrorContext(ctx, "user email is empty", slog.Any("user", user))
-		return nil, errorx.ErrUserEmailEmpty
+		return nil, database.Namespace{}, errorx.ErrUserEmailEmpty
 	}
 
 	if req.DefaultBranch == "" {
@@ -638,7 +652,7 @@ func (m *mirrorComponentImpl) prepareMirrorRepository(ctx context.Context, req t
 		User:           user,
 	}
 	applyMirrorRepositorySourcePath(repo, sourceType, sourcePath)
-	return repo, nil
+	return repo, namespace, nil
 }
 
 // applyMirrorRepositorySourcePath stores known upstream source paths on new repositories.

@@ -343,7 +343,10 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	}
 
 	// Organization routes
-	createOrgRoutes(apiGroup, middlewareCollection, userProxyHandler, orgHandler)
+	createOrgRoutes(apiGroup, middlewareCollection, userProxyHandler, orgHandler, config)
+	if err := addOrgRoutes(apiGroup, middlewareCollection, config); err != nil {
+		return nil, fmt.Errorf("error creating organization unit routes:%w", err)
+	}
 
 	// Tag
 	tagCtrl, err := handler.NewTagHandler(config)
@@ -1419,13 +1422,10 @@ func createTokenRoutes(apiGroup *gin.RouterGroup, middlewareCollection middlewar
 	}
 }
 
-func createOrgRoutes(apiGroup *gin.RouterGroup, middlewareCollection middleware.MiddlewareCollection, userProxyHandler *handler.InternalServiceProxyHandler, orgHandler *handler.OrganizationHandler) {
+func createOrgRoutes(apiGroup *gin.RouterGroup, middlewareCollection middleware.MiddlewareCollection, userProxyHandler *handler.InternalServiceProxyHandler, orgHandler *handler.OrganizationHandler, config *config.Config) {
 	{
 		apiGroup.GET("/organizations", middlewareCollection.License.Check, userProxyHandler.Proxy)
-		apiGroup.POST("/organizations", middlewareCollection.Auth.NeedLogin, userProxyHandler.Proxy)
 		apiGroup.GET("/organization/:namespace", userProxyHandler.ProxyToApi("/api/v1/organization/%s", "namespace"))
-		apiGroup.PUT("/organization/:namespace", middlewareCollection.Auth.NeedLogin, userProxyHandler.ProxyToApi("/api/v1/organization/%s", "namespace"))
-		apiGroup.DELETE("/organization/:namespace", middlewareCollection.Auth.NeedLogin, userProxyHandler.ProxyToApi("/api/v1/organization/%s", "namespace"))
 		// Organization assets
 		apiGroup.GET("/organization/:namespace/models", orgHandler.Models)
 		apiGroup.GET("/organization/:namespace/datasets", orgHandler.Datasets)
@@ -1442,7 +1442,11 @@ func createOrgRoutes(apiGroup *gin.RouterGroup, middlewareCollection middleware.
 		apiGroup.GET("/organization/:namespace/skills", orgHandler.Skills)
 	}
 
-	{
+	if !enableUnit(config) {
+		apiGroup.POST("/organizations", middlewareCollection.Auth.NeedLogin, userProxyHandler.Proxy)
+		apiGroup.PUT("/organization/:namespace", middlewareCollection.Auth.NeedLogin, userProxyHandler.ProxyToApi("/api/v1/organization/%s", "namespace"))
+		apiGroup.DELETE("/organization/:namespace", middlewareCollection.Auth.NeedLogin, userProxyHandler.ProxyToApi("/api/v1/organization/%s", "namespace"))
+
 		apiGroup.GET("/organization/:namespace/members", userProxyHandler.ProxyToApi("/api/v1/organization/%s/members", "namespace"))
 		apiGroup.POST("/organization/:namespace/members", middlewareCollection.Auth.NeedLogin, userProxyHandler.ProxyToApi("/api/v1/organization/%s/members", "namespace"))
 		apiGroup.GET("/organization/:namespace/members/:username", userProxyHandler.ProxyToApi("/api/v1/organization/%s/members/%s", "namespace", "username"))

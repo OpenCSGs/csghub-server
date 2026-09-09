@@ -8,16 +8,16 @@ import (
 	"fmt"
 	"log/slog"
 
-	msgMq "opencsg.com/csghub-server/mq"
-
 	"opencsg.com/csghub-server/builder/deploy"
 	"opencsg.com/csghub-server/builder/git"
 	"opencsg.com/csghub-server/builder/multisync"
+	rebacfactory "opencsg.com/csghub-server/builder/rebac/factory"
 	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/store/s3"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
+	msgMq "opencsg.com/csghub-server/mq"
 )
 
 type extendRepoImpl struct{}
@@ -28,7 +28,7 @@ func NewRepoComponent(config *config.Config) (RepoComponent, error) {
 	c.extendRepoImpl = extendRepoImpl{}
 	c.namespaceStore = database.NewNamespaceStore()
 	c.userStore = database.NewUserStore()
-	c.orgStore = database.NewOrgStore()
+	c.orgStore = database.NewOrgStore(config)
 	c.modelStore = database.NewModelStore()
 	c.tagStore = database.NewTagStore()
 	c.repoStore = database.NewRepoStore()
@@ -103,6 +103,10 @@ func NewRepoComponent(config *config.Config) (RepoComponent, error) {
 	c.accountSyncQuotaStatementStore = database.NewAccountSyncQuotaStatementStore()
 	c.accountPriceStore = database.NewAccountPriceStore()
 	c.clusterComponent, err = NewClusterComponent(config)
+	if err != nil {
+		return nil, err
+	}
+	c.rebac, err = rebacfactory.NewAuthorizer()
 	if err != nil {
 		return nil, err
 	}

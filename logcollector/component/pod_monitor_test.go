@@ -2,10 +2,11 @@ package component
 
 import (
 	"context"
-	"opencsg.com/csghub-server/common/config"
 	"sync"
 	"testing"
 	"time"
+
+	"opencsg.com/csghub-server/common/config"
 
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
@@ -21,7 +22,7 @@ import (
 )
 
 func TestNewPodMonitor(t *testing.T) {
-	client := fake.NewSimpleClientset()
+	client := fake.NewClientset()
 	logChan := make(chan types.LogEntry, 100)
 	namespaces := []string{"default"}
 	lastReportedTime := time.Now()
@@ -45,7 +46,7 @@ func TestNewPodMonitor(t *testing.T) {
 }
 
 func TestPodMonitor_Start(t *testing.T) {
-	client := fake.NewSimpleClientset()
+	client := fake.NewClientset()
 	logChan := make(chan types.LogEntry, 100)
 	config := &config.Config{}
 	pm := NewPodMonitor(client, []string{"default"}, config, logChan, time.Time{})
@@ -64,7 +65,7 @@ func TestPodMonitor_discoverExistingPods(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Name: "pod1", Namespace: "default"},
 		Status:     corev1.PodStatus{Phase: corev1.PodRunning},
 	}
-	client := fake.NewSimpleClientset(pod1)
+	client := fake.NewClientset(pod1)
 	logChan := make(chan types.LogEntry, 100)
 	config := &config.Config{}
 	pm := NewPodMonitor(client, []string{"default"}, config, logChan, time.Time{})
@@ -82,7 +83,7 @@ func TestPodMonitor_discoverExistingPods(t *testing.T) {
 }
 
 func TestPodMonitor_watchNamespace(t *testing.T) {
-	client := fake.NewSimpleClientset()
+	client := fake.NewClientset()
 	watcher := watch.NewFake()
 	client.PrependWatchReactor("pods", testcore.DefaultWatchReactor(watcher, nil))
 
@@ -110,7 +111,7 @@ func TestPodMonitor_watchNamespace(t *testing.T) {
 }
 
 func TestPodMonitor_processPodEvents(t *testing.T) {
-	client := fake.NewSimpleClientset()
+	client := fake.NewClientset()
 	logChan := make(chan types.LogEntry, 100)
 	config := &config.Config{}
 	pm := NewPodMonitor(client, []string{"default"}, config, logChan, time.Time{})
@@ -139,7 +140,7 @@ func TestPodMonitor_processPodEvents(t *testing.T) {
 }
 
 func TestPodMonitor_handlePodEvent(t *testing.T) {
-	client := fake.NewSimpleClientset()
+	client := fake.NewClientset()
 	logChan := make(chan types.LogEntry, 100)
 	config := &config.Config{}
 	pm := NewPodMonitor(client, []string{"default"}, config, logChan, time.Time{})
@@ -313,6 +314,42 @@ func TestPodMonitor_extractServiceName(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			assert.Equal(t, tc.expected, pm.extractServiceName(tc.pod))
 		})
+	}
+}
+
+func TestPodMonitorGetPodLogStream(t *testing.T) {
+	podName := "test-pod"
+	namespace := "test-ns"
+	containerName := "test-container"
+	logMessage := "fake logs"
+
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      podName,
+			Namespace: namespace,
+		},
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
+				{Name: containerName},
+			},
+		},
+		Status: corev1.PodStatus{
+			Phase: corev1.PodRunning,
+		},
+	}
+
+	clientset := fake.NewClientset(pod)
+	logChan, msg, err := GetPodLogStream(context.Background(), clientset, pod, containerName, nil)
+
+	assert.NoError(t, err)
+	assert.Empty(t, msg)
+	assert.NotNil(t, logChan)
+
+	select {
+	case logData := <-logChan:
+		assert.Equal(t, logMessage, string(logData))
+	case <-time.After(1 * time.Second):
+		t.Fatal("timed out waiting for log message")
 	}
 }
 

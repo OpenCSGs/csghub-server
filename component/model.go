@@ -17,7 +17,7 @@ import (
 	"opencsg.com/csghub-server/builder/deploy/imagerunner"
 	"opencsg.com/csghub-server/builder/git"
 	"opencsg.com/csghub-server/builder/git/gitserver"
-	"opencsg.com/csghub-server/builder/git/membership"
+	"opencsg.com/csghub-server/builder/rebac"
 	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
@@ -1539,17 +1539,17 @@ func (c *modelComponentImpl) ListModelsOfRuntimeFrameworks(ctx context.Context, 
 func (c *modelComponentImpl) OrgModels(ctx context.Context, req *types.OrgModelsReq) ([]types.Model, int, error) {
 	var resModels []types.Model
 	var err error
-	r := membership.RoleUnknown
+	canRead := false
 	if req.CurrentUser != "" {
-		r, err = c.userSvcClient.GetMemberRole(ctx, req.Namespace, req.CurrentUser)
-		// log error, and treat user as unknown role in org
+		canRead, err = c.repoComponent.CheckCurrentUserPermission(ctx, req.CurrentUser, req.Namespace, rebac.NamespaceCanRead)
 		if err != nil {
-			slog.Error("faild to get member role",
-				slog.String("org", req.Namespace), slog.String("user", req.CurrentUser),
-				slog.String("error", err.Error()))
+			slog.ErrorContext(ctx, "failed to check namespace permission",
+				slog.String("namespace", req.Namespace), slog.String("user", req.CurrentUser),
+				slog.Any("error", err))
+			canRead = false
 		}
 	}
-	onlyPublic := !r.CanRead()
+	onlyPublic := !canRead
 	ms, total, err := c.modelStore.ByOrgPath(ctx, req.Namespace, req.PageSize, req.Page, onlyPublic)
 	if err != nil {
 		newError := fmt.Errorf("failed to get user datasets,error:%w", err)

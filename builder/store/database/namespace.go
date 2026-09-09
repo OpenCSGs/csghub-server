@@ -11,6 +11,7 @@ import (
 // Define the NamespaceStore interface
 type NamespaceStore interface {
 	FindByPath(ctx context.Context, path string) (Namespace, error)
+	FindByPathWithDeleted(ctx context.Context, path string) (Namespace, error)
 	FindByUUID(ctx context.Context, uuid string) (Namespace, error)
 	Exists(ctx context.Context, path string) (bool, error)
 	ExistsByUUID(ctx context.Context, uuid string) (bool, error)
@@ -58,6 +59,18 @@ func (s *NamespaceStoreImpl) FindByPath(ctx context.Context, path string) (names
 		OrderExpr("(namespace.path = ?) DESC", path).
 		OrderExpr("namespace.id ASC").
 		Limit(1).
+		Scan(ctx)
+	err = errorx.HandleDBError(err, errorx.Ctx().Set("namespace", path))
+	return
+}
+
+// FindByPathWithDeleted returns a namespace by path, including soft-deleted records.
+func (s *NamespaceStoreImpl) FindByPathWithDeleted(ctx context.Context, path string) (namespace Namespace, err error) {
+	namespace.Path = path
+	err = s.db.Operator.Core.NewSelect().
+		Model(&namespace).
+		WhereAllWithDeleted().
+		Where("LOWER(path) = LOWER(?)", path).
 		Scan(ctx)
 	err = errorx.HandleDBError(err, errorx.Ctx().Set("namespace", path))
 	return

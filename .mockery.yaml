@@ -102,10 +102,12 @@ packages:
     config:
     interfaces:
       GitServer:
-  opencsg.com/csghub-server/builder/git/membership:
+  opencsg.com/csghub-server/builder/rebac:
     config:
     interfaces:
-      GitMemerShip:
+      Authorizer:
+        config:
+          mock-build-tags: "!saas && !ee"
   opencsg.com/csghub-server/builder/rsa:
     config:
     interfaces:

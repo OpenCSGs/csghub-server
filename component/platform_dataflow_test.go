@@ -11,10 +11,11 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	mockdeploy "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/deploy"
+	mockrebac "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/rebac"
 	mockrpc "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/rpc"
 	mockdb "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/database"
 	mockcomp "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
-	"opencsg.com/csghub-server/builder/git/membership"
+	"opencsg.com/csghub-server/builder/rebac"
 	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
@@ -30,6 +31,7 @@ type testPlatformDataflowComponent struct {
 		clusterStore       *mockdb.MockClusterInfoStore
 		spaceResourceStore *mockdb.MockSpaceResourceStore
 		repoComponent      *mockcomp.MockRepoComponent
+		rebac              *mockrebac.MockAuthorizer
 	}
 }
 
@@ -61,6 +63,8 @@ func newTestPlatformDataflowComponent(t *testing.T) *testPlatformDataflowCompone
 
 	c.mocks.repoComponent = mockcomp.NewMockRepoComponent(t)
 	c.repoComponent = c.mocks.repoComponent
+	c.mocks.rebac = mockrebac.NewMockAuthorizer(t)
+	c.rebac = c.mocks.rebac
 
 	return c
 }
@@ -416,7 +420,12 @@ func TestPlatformDataflowComponent_CreateJob(t *testing.T) {
 
 		c.mocks.userSvcClient.EXPECT().GetUserByName(ctx, req.Username).Return(user, nil)
 		c.mocks.userSvcClient.EXPECT().GetNameSpaceInfoByUUID(ctx, req.NSUUID).Return(ns, nil)
-		c.mocks.userSvcClient.EXPECT().GetMemberRoleByUUID(ctx, ns.UUID, req.Username).Return(membership.RoleAdmin, nil)
+		c.mocks.rebac.EXPECT().Check(ctx, rebac.CheckRequest{
+			Subject:     rebac.UserSubject("user-uuid-member"),
+			Relation:    rebac.NamespaceCanRead,
+			Object:      rebac.NamespaceObject(ns.UUID),
+			Consistency: rebac.ConsistencyHigher,
+		}).Return(rebac.Decision{Allowed: true}, nil).Once()
 		c.mocks.userSvcClient.EXPECT().GetOrCreateFirstAvaiTokens(ctx, req.Username, req.Username, string(types.AccessTokenAppGit), "dataflow").Return("test-token", nil)
 		c.mocks.spaceResourceStore.EXPECT().FindByID(ctx, req.ResourceId).Return(resource, nil)
 		c.mocks.repoComponent.EXPECT().CheckAccountAndResource(ctx, types.CheckResourceAndAccountReq{UserName: "testorg", ClusterID: "cluster-1", OrderDetailID: 0, CurrentUser: "orgmember"}, resource).Return(&types.CheckExclusiveResp{}, nil)
@@ -767,7 +776,12 @@ func TestPlatformDataflowComponent_GetJob(t *testing.T) {
 		c.mocks.workflowStore.EXPECT().FindByTaskID(ctx, req.ArgoTaskID).Return(wf, nil)
 		c.mocks.userSvcClient.EXPECT().GetUserByName(ctx, req.Username).Return(user, nil)
 		c.mocks.userSvcClient.EXPECT().GetNameSpaceInfoByUUID(ctx, req.NSUUID).Return(ns, nil)
-		c.mocks.userSvcClient.EXPECT().GetMemberRoleByUUID(ctx, ns.UUID, req.Username).Return(membership.RoleWrite, nil)
+		c.mocks.rebac.EXPECT().Check(ctx, rebac.CheckRequest{
+			Subject:     rebac.UserSubject("member-uuid"),
+			Relation:    rebac.NamespaceCanRead,
+			Object:      rebac.NamespaceObject(ns.UUID),
+			Consistency: rebac.ConsistencyHigher,
+		}).Return(rebac.Decision{Allowed: true}, nil).Once()
 
 		resp, err := c.GetJob(ctx, req)
 		require.NoError(t, err)
@@ -795,7 +809,7 @@ func TestCheckUserOrOrgPermission(t *testing.T) {
 		c.mocks.userSvcClient.EXPECT().GetUserByName(ctx, "admin").Return(user, nil)
 		c.mocks.userSvcClient.EXPECT().GetNameSpaceInfoByUUID(ctx, "target-uuid").Return(ns, nil)
 
-		result, err := checkOwnerOrOrgMemberPermission(ctx, c.userSvcClient, "admin", "target-uuid")
+		result, err := checkOwnerOrOrgMemberPermission(ctx, c.userSvcClient, c.rebac, "admin", "target-uuid")
 		require.NoError(t, err)
 		require.NotNil(t, result)
 	})
@@ -816,7 +830,7 @@ func TestCheckUserOrOrgPermission(t *testing.T) {
 		c.mocks.userSvcClient.EXPECT().GetUserByName(ctx, "testuser").Return(user, nil)
 		c.mocks.userSvcClient.EXPECT().GetNameSpaceInfoByUUID(ctx, "user-uuid-1").Return(ns, nil)
 
-		result, err := checkOwnerOrOrgMemberPermission(ctx, c.userSvcClient, "testuser", "user-uuid-1")
+		result, err := checkOwnerOrOrgMemberPermission(ctx, c.userSvcClient, c.rebac, "testuser", "user-uuid-1")
 		require.NoError(t, err)
 		require.NotNil(t, result)
 	})
@@ -836,9 +850,14 @@ func TestCheckUserOrOrgPermission(t *testing.T) {
 
 		c.mocks.userSvcClient.EXPECT().GetUserByName(ctx, "orgmember").Return(user, nil)
 		c.mocks.userSvcClient.EXPECT().GetNameSpaceInfoByUUID(ctx, "org-uuid-1").Return(ns, nil)
-		c.mocks.userSvcClient.EXPECT().GetMemberRoleByUUID(ctx, "org-uuid-1", "orgmember").Return("member", nil)
+		c.mocks.rebac.EXPECT().Check(ctx, rebac.CheckRequest{
+			Subject:     rebac.UserSubject("member-uuid"),
+			Relation:    rebac.NamespaceCanRead,
+			Object:      rebac.NamespaceObject("org-uuid-1"),
+			Consistency: rebac.ConsistencyHigher,
+		}).Return(rebac.Decision{Allowed: true}, nil).Once()
 
-		result, err := checkOwnerOrOrgMemberPermission(ctx, c.userSvcClient, "orgmember", "org-uuid-1")
+		result, err := checkOwnerOrOrgMemberPermission(ctx, c.userSvcClient, c.rebac, "orgmember", "org-uuid-1")
 		require.NoError(t, err)
 		require.NotNil(t, result)
 	})
@@ -859,7 +878,7 @@ func TestCheckUserOrOrgPermission(t *testing.T) {
 		c.mocks.userSvcClient.EXPECT().GetUserByName(ctx, "testuser").Return(user, nil)
 		c.mocks.userSvcClient.EXPECT().GetNameSpaceInfoByUUID(ctx, "other-uuid").Return(ns, nil)
 
-		result, err := checkOwnerOrOrgMemberPermission(ctx, c.userSvcClient, "testuser", "other-uuid")
+		result, err := checkOwnerOrOrgMemberPermission(ctx, c.userSvcClient, c.rebac, "testuser", "other-uuid")
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "do not have permission")
 		require.NotNil(t, result)
@@ -880,9 +899,14 @@ func TestCheckUserOrOrgPermission(t *testing.T) {
 
 		c.mocks.userSvcClient.EXPECT().GetUserByName(ctx, "testuser").Return(user, nil)
 		c.mocks.userSvcClient.EXPECT().GetNameSpaceInfoByUUID(ctx, "org-uuid-1").Return(ns, nil)
-		c.mocks.userSvcClient.EXPECT().GetMemberRoleByUUID(ctx, "org-uuid-1", "testuser").Return(membership.RoleUnknown, nil)
+		c.mocks.rebac.EXPECT().Check(ctx, rebac.CheckRequest{
+			Subject:     rebac.UserSubject("user-uuid-1"),
+			Relation:    rebac.NamespaceCanRead,
+			Object:      rebac.NamespaceObject("org-uuid-1"),
+			Consistency: rebac.ConsistencyHigher,
+		}).Return(rebac.Decision{Allowed: false}, nil).Once()
 
-		result, err := checkOwnerOrOrgMemberPermission(ctx, c.userSvcClient, "testuser", "org-uuid-1")
+		result, err := checkOwnerOrOrgMemberPermission(ctx, c.userSvcClient, c.rebac, "testuser", "org-uuid-1")
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "do not have permission")
 		require.NotNil(t, result)

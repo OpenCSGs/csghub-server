@@ -8,6 +8,7 @@ import (
 	context "context"
 
 	deploy "opencsg.com/csghub-server/builder/deploy"
+	rebac "opencsg.com/csghub-server/builder/rebac"
 	database "opencsg.com/csghub-server/builder/store/database"
 
 	gin "github.com/gin-gonic/gin"
@@ -17,8 +18,6 @@ import (
 	io "io"
 
 	loki "opencsg.com/csghub-server/builder/loki"
-
-	membership "opencsg.com/csghub-server/builder/git/membership"
 
 	mock "github.com/stretchr/testify/mock"
 
@@ -854,9 +853,9 @@ func (_c *MockRepoComponent_CheckAccountAndResource_Call) RunAndReturn(run func(
 	return _c
 }
 
-// CheckCurrentUserPermission provides a mock function with given fields: ctx, userName, namespace, role
-func (_m *MockRepoComponent) CheckCurrentUserPermission(ctx context.Context, userName string, namespace string, role membership.Role) (bool, error) {
-	ret := _m.Called(ctx, userName, namespace, role)
+// CheckCurrentUserPermission provides a mock function with given fields: ctx, userName, namespace, permission
+func (_m *MockRepoComponent) CheckCurrentUserPermission(ctx context.Context, userName string, namespace string, permission rebac.Permission) (bool, error) {
+	ret := _m.Called(ctx, userName, namespace, permission)
 
 	if len(ret) == 0 {
 		panic("no return value specified for CheckCurrentUserPermission")
@@ -864,17 +863,17 @@ func (_m *MockRepoComponent) CheckCurrentUserPermission(ctx context.Context, use
 
 	var r0 bool
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, membership.Role) (bool, error)); ok {
-		return rf(ctx, userName, namespace, role)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, rebac.Permission) (bool, error)); ok {
+		return rf(ctx, userName, namespace, permission)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, membership.Role) bool); ok {
-		r0 = rf(ctx, userName, namespace, role)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, rebac.Permission) bool); ok {
+		r0 = rf(ctx, userName, namespace, permission)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, string, membership.Role) error); ok {
-		r1 = rf(ctx, userName, namespace, role)
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, rebac.Permission) error); ok {
+		r1 = rf(ctx, userName, namespace, permission)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -891,14 +890,14 @@ type MockRepoComponent_CheckCurrentUserPermission_Call struct {
 //   - ctx context.Context
 //   - userName string
 //   - namespace string
-//   - role membership.Role
-func (_e *MockRepoComponent_Expecter) CheckCurrentUserPermission(ctx interface{}, userName interface{}, namespace interface{}, role interface{}) *MockRepoComponent_CheckCurrentUserPermission_Call {
-	return &MockRepoComponent_CheckCurrentUserPermission_Call{Call: _e.mock.On("CheckCurrentUserPermission", ctx, userName, namespace, role)}
+//   - permission rebac.Permission
+func (_e *MockRepoComponent_Expecter) CheckCurrentUserPermission(ctx interface{}, userName interface{}, namespace interface{}, permission interface{}) *MockRepoComponent_CheckCurrentUserPermission_Call {
+	return &MockRepoComponent_CheckCurrentUserPermission_Call{Call: _e.mock.On("CheckCurrentUserPermission", ctx, userName, namespace, permission)}
 }
 
-func (_c *MockRepoComponent_CheckCurrentUserPermission_Call) Run(run func(ctx context.Context, userName string, namespace string, role membership.Role)) *MockRepoComponent_CheckCurrentUserPermission_Call {
+func (_c *MockRepoComponent_CheckCurrentUserPermission_Call) Run(run func(ctx context.Context, userName string, namespace string, permission rebac.Permission)) *MockRepoComponent_CheckCurrentUserPermission_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(membership.Role))
+		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(rebac.Permission))
 	})
 	return _c
 }
@@ -908,7 +907,7 @@ func (_c *MockRepoComponent_CheckCurrentUserPermission_Call) Return(_a0 bool, _a
 	return _c
 }
 
-func (_c *MockRepoComponent_CheckCurrentUserPermission_Call) RunAndReturn(run func(context.Context, string, string, membership.Role) (bool, error)) *MockRepoComponent_CheckCurrentUserPermission_Call {
+func (_c *MockRepoComponent_CheckCurrentUserPermission_Call) RunAndReturn(run func(context.Context, string, string, rebac.Permission) (bool, error)) *MockRepoComponent_CheckCurrentUserPermission_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -2798,6 +2797,65 @@ func (_c *MockRepoComponent_GetRepos_Call) Return(_a0 []string, _a1 error) *Mock
 }
 
 func (_c *MockRepoComponent_GetRepos_Call) RunAndReturn(run func(context.Context, string, string, types.RepositoryType) ([]string, error)) *MockRepoComponent_GetRepos_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// CheckUserRepoPermission provides a mock function with given fields: ctx, userName, repo, permission
+func (_m *MockRepoComponent) CheckUserRepoPermission(ctx context.Context, userName string, repo *database.Repository, permission rebac.Permission) (bool, error) {
+	ret := _m.Called(ctx, userName, repo, permission)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CheckUserRepoPermission")
+	}
+
+	var r0 bool
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, *database.Repository, rebac.Permission) (bool, error)); ok {
+		return rf(ctx, userName, repo, permission)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, *database.Repository, rebac.Permission) bool); ok {
+		r0 = rf(ctx, userName, repo, permission)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, *database.Repository, rebac.Permission) error); ok {
+		r1 = rf(ctx, userName, repo, permission)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockRepoComponent_CheckUserRepoPermission_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CheckUserRepoPermission'
+type MockRepoComponent_CheckUserRepoPermission_Call struct {
+	*mock.Call
+}
+
+// CheckUserRepoPermission is a helper method to define mock.On call
+//   - ctx context.Context
+//   - userName string
+//   - repo *database.Repository
+//   - permission rebac.Permission
+func (_e *MockRepoComponent_Expecter) CheckUserRepoPermission(ctx interface{}, userName interface{}, repo interface{}, permission interface{}) *MockRepoComponent_CheckUserRepoPermission_Call {
+	return &MockRepoComponent_CheckUserRepoPermission_Call{Call: _e.mock.On("CheckUserRepoPermission", ctx, userName, repo, permission)}
+}
+
+func (_c *MockRepoComponent_CheckUserRepoPermission_Call) Run(run func(ctx context.Context, userName string, repo *database.Repository, permission rebac.Permission)) *MockRepoComponent_CheckUserRepoPermission_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(*database.Repository), args[3].(rebac.Permission))
+	})
+	return _c
+}
+
+func (_c *MockRepoComponent_CheckUserRepoPermission_Call) Return(_a0 bool, _a1 error) *MockRepoComponent_CheckUserRepoPermission_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockRepoComponent_CheckUserRepoPermission_Call) RunAndReturn(run func(context.Context, string, *database.Repository, rebac.Permission) (bool, error)) *MockRepoComponent_CheckUserRepoPermission_Call {
 	_c.Call.Return(run)
 	return _c
 }

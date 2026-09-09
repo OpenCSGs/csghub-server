@@ -8,9 +8,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	mockrebac "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/rebac"
 	mockdb "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/database"
-	mockusermodule "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/user/component"
-	"opencsg.com/csghub-server/builder/git/membership"
+	"opencsg.com/csghub-server/builder/rebac"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
@@ -430,12 +430,21 @@ func TestAccessTokenComponentImpl_Update(t *testing.T) {
 
 		mockUserStore := mockdb.NewMockUserStore(t)
 		mockUserStore.EXPECT().FindByUsername(mock.Anything, "user1").
-			Return(database.User{Username: "user1"}, nil).Once()
+			Return(database.User{Username: "user1", UUID: "user1-uuid"}, nil).Once()
+
+		mockAuthorizer := mockrebac.NewMockAuthorizer(t)
+		mockAuthorizer.EXPECT().Check(mock.Anything, rebac.CheckRequest{
+			Subject:     rebac.UserSubject("user1-uuid"),
+			Relation:    rebac.NamespaceCanAdmin,
+			Object:      rebac.NamespaceObject(nsUUID),
+			Consistency: rebac.ConsistencyHigher,
+		}).Return(rebac.Decision{Allowed: true}, nil).Once()
 
 		ac := &accessTokenComponentImpl{
 			ts:      mockTokenStore,
 			nsStore: mockNsStore,
 			us:      mockUserStore,
+			rebac:   mockAuthorizer,
 		}
 
 		resp, err := ac.Update(context.Background(), &types.UpdateAPIKeyRequest{
@@ -478,7 +487,15 @@ func TestAccessTokenComponentImpl_Update(t *testing.T) {
 
 		mockUserStore := mockdb.NewMockUserStore(t)
 		mockUserStore.EXPECT().FindByUsername(mock.Anything, "user1").
-			Return(database.User{Username: "user1"}, nil).Once()
+			Return(database.User{Username: "user1", UUID: "user1-uuid"}, nil).Once()
+
+		mockAuthorizer := mockrebac.NewMockAuthorizer(t)
+		mockAuthorizer.EXPECT().Check(mock.Anything, rebac.CheckRequest{
+			Subject:     rebac.UserSubject("user1-uuid"),
+			Relation:    rebac.NamespaceCanAdmin,
+			Object:      rebac.NamespaceObject(nsUUID),
+			Consistency: rebac.ConsistencyHigher,
+		}).Return(rebac.Decision{Allowed: true}, nil).Once()
 
 		mockQuotaStore := mockdb.NewMockAccountAccessTokenQuotaStore(t)
 		mockQuotaStore.EXPECT().FindByAPIKey(mock.Anything, tokenValue).
@@ -511,6 +528,7 @@ func TestAccessTokenComponentImpl_Update(t *testing.T) {
 			ts:               mockTokenStore,
 			nsStore:          mockNsStore,
 			us:               mockUserStore,
+			rebac:            mockAuthorizer,
 			tokenQuotaStore:  mockQuotaStore,
 			accountBillStore: mockBillStore,
 		}
@@ -559,11 +577,15 @@ func TestAccessTokenComponentImpl_Update(t *testing.T) {
 
 		mockUserStore := mockdb.NewMockUserStore(t)
 		mockUserStore.EXPECT().FindByUsername(mock.Anything, "admin").
-			Return(database.User{Username: "admin"}, nil).Once()
+			Return(database.User{Username: "admin", UUID: "admin-uuid"}, nil).Once()
 
-		mockMemberComponent := mockusermodule.NewMockMemberComponent(t)
-		mockMemberComponent.EXPECT().GetMemberRole(mock.Anything, "test-org", "admin").
-			Return(membership.RoleAdmin, nil).Once()
+		mockAuthorizer := mockrebac.NewMockAuthorizer(t)
+		mockAuthorizer.EXPECT().Check(mock.Anything, rebac.CheckRequest{
+			Subject:     rebac.UserSubject("admin-uuid"),
+			Relation:    rebac.NamespaceCanAdmin,
+			Object:      rebac.NamespaceObject(nsUUID),
+			Consistency: rebac.ConsistencyHigher,
+		}).Return(rebac.Decision{Allowed: true}, nil).Once()
 
 		mockQuotaStore := mockdb.NewMockAccountAccessTokenQuotaStore(t)
 		mockQuotaStore.EXPECT().FindByAPIKey(mock.Anything, tokenValue).
@@ -587,7 +609,7 @@ func TestAccessTokenComponentImpl_Update(t *testing.T) {
 			ts:               mockTokenStore,
 			nsStore:          mockNsStore,
 			us:               mockUserStore,
-			mc:               mockMemberComponent,
+			rebac:            mockAuthorizer,
 			tokenQuotaStore:  mockQuotaStore,
 			accountBillStore: mockBillStore,
 		}

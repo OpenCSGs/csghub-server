@@ -15,7 +15,8 @@ import (
 
 	"opencsg.com/csghub-server/builder/git"
 	"opencsg.com/csghub-server/builder/git/gitserver"
-	"opencsg.com/csghub-server/builder/git/membership"
+	"opencsg.com/csghub-server/builder/rebac"
+	rebacfactory "opencsg.com/csghub-server/builder/rebac/factory"
 	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
@@ -29,19 +30,17 @@ type memberComponentImpl struct {
 	gitServer             gitserver.GitServer
 	config                *config.Config
 	notificationSvcClient rpc.NotificationSvcClient
+	rebac                 rebac.Authorizer
 }
 
 type MemberComponent interface {
 	OrgMembers(ctx context.Context, orgName, currentUser string, pageSize, page int) ([]types.Member, int, error)
-	InitRoles(ctx context.Context, org *database.Organization) error
-	SetAdmin(ctx context.Context, org *database.Organization, user *database.User) error
 	ChangeMemberRole(ctx context.Context, orgName, userName, operatorName, oldRole, newRole string) error
-	GetMemberRole(ctx context.Context, orgName, userName string) (membership.Role, error)
+	GetMemberRole(ctx context.Context, orgName, userName string) (types.UserRole, error)
 	AddMembers(ctx context.Context, orgName string, users []string, operatorName string, role string) error
-	AddMember(ctx context.Context, orgName, userName, operatorName string, role string) error
-	Delete(ctx context.Context, orgName, userName, operatorName string, role string) error
-	GetMember(ctx context.Context, orgName, userName string) (*database.Member, error)
-	GetMemberRoleByUUID(ctx context.Context, orgUUID, userName string) (membership.Role, error)
+	// Delete removes the organization membership identified by the organization and user names.
+	Delete(ctx context.Context, orgName, userName, operatorName string) error
+	GetMemberRoleByUUID(ctx context.Context, orgUUID, userName string) (types.UserRole, error)
 }
 
 func NewMemberComponent(config *config.Config) (MemberComponent, error) {
@@ -51,13 +50,18 @@ func NewMemberComponent(config *config.Config) (MemberComponent, error) {
 	}
 	notificationSvcClient := rpc.NewNotificationSvcHttpClient(fmt.Sprintf("%s:%d", config.Notification.Host, config.Notification.Port),
 		rpc.AuthWithApiKey(config.APIToken))
+	authorizer, err := rebacfactory.NewAuthorizer()
+	if err != nil {
+		return nil, fmt.Errorf("create ReBAC authorizer: %w", err)
+	}
 	return &memberComponentImpl{
 		memberStore:           database.NewMemberStore(),
-		orgStore:              database.NewOrgStore(),
+		orgStore:              database.NewOrgStore(config),
 		userStore:             database.NewUserStore(),
 		gitServer:             gs,
 		config:                config,
 		notificationSvcClient: notificationSvcClient,
+		rebac:                 authorizer,
 	}, nil
 }
 
@@ -109,22 +113,6 @@ func (c *memberComponentImpl) OrgMembers(ctx context.Context, orgName, currentUs
 	return members, total, nil
 }
 
-func (c *memberComponentImpl) InitRoles(ctx context.Context, org *database.Organization) error {
-	return nil
-}
-
-func (c *memberComponentImpl) SetAdmin(ctx context.Context, org *database.Organization, user *database.User) error {
-	var (
-		err error
-	)
-	err = c.memberStore.Add(ctx, org.ID, user.ID, string(membership.RoleAdmin))
-	if err != nil {
-		err = fmt.Errorf("failed to create member,caused by:%w", err)
-		return err
-	}
-	return nil
-}
-
 func (c *memberComponentImpl) ChangeMemberRole(ctx context.Context, orgName, userName, operatorName, oldRole, newRole string) error {
 	var (
 		org  database.Organization
@@ -151,15 +139,15 @@ func (c *memberComponentImpl) ChangeMemberRole(ctx context.Context, orgName, use
 	}
 
 	if op.ID == user.ID {
-		_, adminCount, err := c.memberStore.OrganizationMembers(ctx, org.ID, string(membership.RoleAdmin), 1, 1)
+		_, adminCount, err := c.memberStore.OrganizationMembers(ctx, org.ID, string(types.UserAdmin), 1, 1)
 		if err != nil {
 			return fmt.Errorf("failed to count admins in org, caused by: %w", err)
 		}
-		if adminCount <= 1 && newRole != string(membership.RoleAdmin) {
+		if adminCount <= 1 && newRole != string(types.UserAdmin) {
 			err := errors.New("cannot revoke the last admin role from organization")
 			return errorx.LastOrgAdmin(err, errorx.Ctx().Set("username", userName))
 		}
-		if newRole == string(membership.RoleAdmin) && oldRole != string(membership.RoleAdmin) {
+		if newRole == string(types.UserAdmin) && oldRole != string(types.UserAdmin) {
 			err := errors.New("cannot promote yourself to admin")
 			return errorx.CannotPromoteSelfToAdmin(err, errorx.Ctx().Set("username", userName))
 		}
@@ -177,9 +165,17 @@ func (c *memberComponentImpl) ChangeMemberRole(ctx context.Context, orgName, use
 		return fmt.Errorf("user %s is not a member of organization %s", userName, orgName)
 	}
 
+	memberRole := types.UserRole(newRole)
+	if _, ok := memberRole.ReBACRelation(); !ok {
+		return errorx.ReqParamInvalid(fmt.Errorf("unsupported organization role %q", memberRole), nil)
+	}
 	err = c.memberStore.Update(ctx, org.ID, user.ID, newRole)
 	if err != nil {
 		return fmt.Errorf("failed to update member role,caused by:%w", err)
+	}
+	if err := reconcileOrganizationMemberRelationships(ctx, c.rebac, org.UUID.String(), []string{user.UUID},
+		desiredOrganizationMemberRoles([]string{user.UUID}, memberRole)); err != nil {
+		return fmt.Errorf("sync updated organization member role to ReBAC: %w", err)
 	}
 
 	userUUIDs, err := c.memberStore.UserUUIDsByOrganizationID(ctx, org.ID)
@@ -205,7 +201,7 @@ func (c *memberComponentImpl) ChangeMemberRole(ctx context.Context, orgName, use
 	return nil
 }
 
-func (c *memberComponentImpl) GetMemberRole(ctx context.Context, orgName, userName string) (membership.Role, error) {
+func (c *memberComponentImpl) GetMemberRole(ctx context.Context, orgName, userName string) (types.UserRole, error) {
 	var (
 		org  database.Organization
 		user database.User
@@ -213,20 +209,20 @@ func (c *memberComponentImpl) GetMemberRole(ctx context.Context, orgName, userNa
 	)
 	org, err = c.orgStore.FindByPath(ctx, orgName)
 	if err != nil {
-		return membership.RoleUnknown, fmt.Errorf("failed to find org %s, caused by:%w", orgName, err)
+		return "", fmt.Errorf("failed to find org %s, caused by:%w", orgName, err)
 	}
 	user, err = c.userStore.FindByUsername(ctx, userName)
 	if err != nil {
-		return membership.RoleUnknown, fmt.Errorf("failed to find user %s, caused by:%w", userName, err)
+		return "", fmt.Errorf("failed to find user %s, caused by:%w", userName, err)
 	}
 	m, err := c.memberStore.Find(ctx, org.ID, user.ID)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return membership.RoleUnknown, fmt.Errorf("failed to check membership existence, caused by:%w", err)
+		return "", fmt.Errorf("failed to check membership existence, caused by:%w", err)
 	}
-	if m == nil {
-		return membership.RoleUnknown, nil
+	if errors.Is(err, sql.ErrNoRows) || m == nil {
+		return "", nil
 	}
-	return c.toGitRole(m.Role), nil
+	return types.UserRole(m.Role), nil
 }
 
 func (c *memberComponentImpl) AddMembers(ctx context.Context, orgName string, users []string, operatorName string, role string) error {
@@ -251,6 +247,10 @@ func (c *memberComponentImpl) AddMembers(ctx context.Context, orgName string, us
 	if !c.allowMagnageMember(opMember) {
 		return errorx.ErrForbiddenMsg(fmt.Sprintf("add member operation not allowed, user:%s", operatorName))
 	}
+	memberRole := types.UserRole(role)
+	if _, ok := memberRole.ReBACRelation(); !ok {
+		return errorx.ReqParamInvalid(fmt.Errorf("unsupported organization role %q", memberRole), nil)
+	}
 
 	for _, userName := range users {
 		user, err = c.userStore.FindByUsername(ctx, userName)
@@ -261,14 +261,23 @@ func (c *memberComponentImpl) AddMembers(ctx context.Context, orgName string, us
 		if err != nil && !errors.Is(err, sql.ErrNoRows) {
 			return fmt.Errorf("failed to check membership existence, user:%s,caused by:%w", userName, err)
 		}
-		//skip existing member
+		// Reconcile existing memberships as well so retries can repair missing or stale tuples.
 		if m != nil {
+			existingRole := types.UserRole(m.Role)
+			if err := reconcileOrganizationMemberRelationships(ctx, c.rebac, org.UUID.String(), []string{user.UUID},
+				desiredOrganizationMemberRoles([]string{user.UUID}, existingRole)); err != nil {
+				return fmt.Errorf("sync existing organization member to ReBAC: %w", err)
+			}
 			continue
 		}
 		err = c.memberStore.Add(ctx, org.ID, user.ID, role)
 		if err != nil {
 			err = fmt.Errorf("failed to create db member, org:%s, user:%s,caused by:%w", orgName, userName, err)
 			return err
+		}
+		if err := reconcileOrganizationMemberRelationships(ctx, c.rebac, org.UUID.String(), []string{user.UUID},
+			desiredOrganizationMemberRoles([]string{user.UUID}, memberRole)); err != nil {
+			return fmt.Errorf("sync added organization member to ReBAC: %w", err)
 		}
 
 		userUUIDs, err := c.memberStore.UserUUIDsByOrganizationID(ctx, org.ID)
@@ -296,11 +305,8 @@ func (c *memberComponentImpl) AddMembers(ctx context.Context, orgName string, us
 	return nil
 }
 
-func (c *memberComponentImpl) AddMember(ctx context.Context, orgName, userName, operatorName string, role string) error {
-	return c.AddMembers(ctx, orgName, []string{userName}, operatorName, role)
-}
-
-func (c *memberComponentImpl) Delete(ctx context.Context, orgName, userName, operatorName string, role string) error {
+// Delete removes a user's organization membership after validating the operator's access.
+func (c *memberComponentImpl) Delete(ctx context.Context, orgName, userName, operatorName string) error {
 	var (
 		org  database.Organization
 		op   database.User
@@ -340,8 +346,8 @@ func (c *memberComponentImpl) Delete(ctx context.Context, orgName, userName, ope
 
 	if op.ID == user.ID {
 		// admin delete itself
-		if opMember.Role == string(membership.RoleAdmin) {
-			_, adminCount, err := c.memberStore.OrganizationMembers(ctx, org.ID, "admin", 1, 1)
+		if opMember.Role == string(types.UserAdmin) {
+			_, adminCount, err := c.memberStore.OrganizationMembers(ctx, org.ID, string(types.UserAdmin), 1, 1)
 			if err != nil {
 				return fmt.Errorf("failed to count admins in org, caused by: %w", err)
 			}
@@ -362,14 +368,20 @@ func (c *memberComponentImpl) Delete(ctx context.Context, orgName, userName, ope
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return fmt.Errorf("failed to check membership existence,caused by:%w", err)
 	}
-	//skip if not a member
+	// Reconcile absent memberships as well so retries can remove stale tuples.
 	if m == nil {
+		if err := reconcileOrganizationMemberRelationships(ctx, c.rebac, org.UUID.String(), []string{user.UUID}, nil); err != nil {
+			return fmt.Errorf("sync absent organization member to ReBAC: %w", err)
+		}
 		return nil
 	}
-	err = c.memberStore.Delete(ctx, org.ID, user.ID, role)
+	err = c.memberStore.Delete(ctx, org.ID, user.ID)
 	if err != nil {
 		err = fmt.Errorf("failed to delete member,caused by:%w", err)
 		return err
+	}
+	if err := reconcileOrganizationMemberRelationships(ctx, c.rebac, org.UUID.String(), []string{user.UUID}, nil); err != nil {
+		return fmt.Errorf("sync removed organization member to ReBAC: %w", err)
 	}
 	userUUIDs, err := c.memberStore.UserUUIDsByOrganizationID(ctx, org.ID)
 	if err != nil {
@@ -397,55 +409,26 @@ func (c *memberComponentImpl) Delete(ctx context.Context, orgName, userName, ope
 
 func (c *memberComponentImpl) allowMagnageMember(u *database.Member) bool {
 	//TODO: check more roles
-	return u != nil && u.Role == string(membership.RoleAdmin)
+	return u != nil && u.Role == string(types.UserAdmin)
 }
 
-func (c *memberComponentImpl) toGitRole(role string) membership.Role {
-	switch role {
-	case "admin":
-		return membership.RoleAdmin
-	case "write":
-		return membership.RoleWrite
-	case "read":
-		return membership.RoleRead
-	default:
-		return membership.RoleUnknown
-	}
-}
-
-func (c *memberComponentImpl) GetMember(ctx context.Context, orgName, userName string) (*database.Member, error) {
-	org, err := c.orgStore.FindByPath(ctx, orgName)
-	if err != nil {
-		return nil, fmt.Errorf("failed to find org,caused by:%w", err)
-	}
-	user, err := c.userStore.FindByUsername(ctx, userName)
-	if err != nil {
-		return nil, fmt.Errorf("failed to find user,caused by:%w", err)
-	}
-	m, err := c.memberStore.Find(ctx, org.ID, user.ID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to find member:%w", err)
-	}
-	return m, err
-}
-
-func (c *memberComponentImpl) GetMemberRoleByUUID(ctx context.Context, orgUUID, userName string) (membership.Role, error) {
+func (c *memberComponentImpl) GetMemberRoleByUUID(ctx context.Context, orgUUID, userName string) (types.UserRole, error) {
 	org, err := c.orgStore.FindByUUID(ctx, orgUUID)
 	if err != nil {
-		return membership.RoleUnknown, fmt.Errorf("failed to find org by uuid,caused by:%w", err)
+		return "", fmt.Errorf("failed to find org by uuid,caused by:%w", err)
 	}
 	user, err := c.userStore.FindByUsername(ctx, userName)
 	if err != nil {
-		return membership.RoleUnknown, fmt.Errorf("failed to find user,caused by:%w", err)
+		return "", fmt.Errorf("failed to find user,caused by:%w", err)
 	}
 	m, err := c.memberStore.Find(ctx, org.ID, user.ID)
-	if err != nil {
-		return membership.RoleUnknown, fmt.Errorf("failed to find member:%w", err)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return "", fmt.Errorf("failed to find member:%w", err)
 	}
-	if m == nil {
-		return membership.RoleUnknown, nil
+	if errors.Is(err, sql.ErrNoRows) || m == nil {
+		return "", nil
 	}
-	return c.toGitRole(m.Role), nil
+	return types.UserRole(m.Role), nil
 }
 
 func (c *memberComponentImpl) sendMemberMsg(ctx context.Context, req types.OrgMemberReq) error {

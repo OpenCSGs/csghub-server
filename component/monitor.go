@@ -11,6 +11,8 @@ import (
 
 	"opencsg.com/csghub-server/builder/deploy"
 	"opencsg.com/csghub-server/builder/prometheus"
+	"opencsg.com/csghub-server/builder/rebac"
+	rebacfactory "opencsg.com/csghub-server/builder/rebac/factory"
 	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
@@ -35,6 +37,7 @@ type monitorComponentImpl struct {
 	workflowStore   database.ArgoWorkFlowStore
 	k8sNameSpace    string
 	deployer        deploy.Deployer
+	rebac           rebac.Authorizer
 	metrics         metricNames
 }
 
@@ -51,6 +54,10 @@ func NewMonitorComponent(cfg *config.Config) (MonitorComponent, error) {
 	client := prometheus.NewPrometheusClient(cfg)
 	usc := rpc.NewUserSvcHttpClient(fmt.Sprintf("%s:%d", cfg.User.Host, cfg.User.Port),
 		rpc.AuthWithApiKey(cfg.APIToken))
+	authorizer, err := rebacfactory.NewAuthorizer()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create ReBAC authorizer: %w", err)
+	}
 	return &monitorComponentImpl{
 		k8sNameSpace:    cfg.Cluster.SpaceNamespace,
 		client:          client,
@@ -59,6 +66,7 @@ func NewMonitorComponent(cfg *config.Config) (MonitorComponent, error) {
 		repoStore:       database.NewRepoStore(),
 		workflowStore:   database.NewArgoWorkFlowStore(),
 		deployer:        deploy.NewDeployer(),
+		rebac:           authorizer,
 		metrics: metricNames{
 			cpuUsage:       cfg.Prometheus.CPUUsageMetric,
 			cpuLimit:       cfg.Prometheus.CPULimitMetric,
@@ -427,7 +435,7 @@ func (m *monitorComponentImpl) hasPermissionForEval(ctx context.Context, req *ty
 		return false, fmt.Errorf("failed to get argo workflow by id %d, error: %w", req.DeployID, err), "", ""
 	}
 
-	_, err = checkOwnerOrOrgMemberPermission(ctx, m.userSvcClient, req.CurrentUser, wf.UserUUID)
+	_, err = checkOwnerOrOrgMemberPermission(ctx, m.userSvcClient, m.rebac, req.CurrentUser, wf.UserUUID)
 	if err != nil {
 		return false, errorx.ErrForbidden, "", ""
 	}

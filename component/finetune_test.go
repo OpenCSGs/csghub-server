@@ -10,16 +10,16 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"opencsg.com/csghub-server/builder/deploy"
-	"opencsg.com/csghub-server/builder/git/membership"
 	"opencsg.com/csghub-server/builder/loki"
+	"opencsg.com/csghub-server/builder/rebac"
 	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
 
 	mockdeploy "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/deploy"
-	mockdb "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/database"
 	mockrpc "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/rpc"
+	mockdb "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/database"
 	mockComps "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
 )
 
@@ -266,7 +266,7 @@ func TestFinetuneComponent_CreateFinetuneJob_NonAdminNamespace(t *testing.T) {
 			ID:       1,
 			RoleMask: "",
 		}, nil).Once()
-		repoComp.EXPECT().CheckCurrentUserPermission(ctx, "testuser", "org1", membership.RoleWrite).Return(false, errors.New("rpc error")).Once()
+		repoComp.EXPECT().CheckCurrentUserPermission(ctx, "testuser", "org1", rebac.NamespaceCanWrite).Return(false, errors.New("rpc error")).Once()
 		_, err := c.CreateFinetuneJob(ctx, req)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "failed to check namespace permission")
@@ -280,7 +280,7 @@ func TestFinetuneComponent_CreateFinetuneJob_NonAdminNamespace(t *testing.T) {
 			ID:       1,
 			RoleMask: "",
 		}, nil).Once()
-		repoComp.EXPECT().CheckCurrentUserPermission(ctx, "testuser", "org1", membership.RoleWrite).Return(false, nil).Once()
+		repoComp.EXPECT().CheckCurrentUserPermission(ctx, "testuser", "org1", rebac.NamespaceCanWrite).Return(false, nil).Once()
 		_, err := c.CreateFinetuneJob(ctx, req)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "do not have permission to create finetune in this namespace")
@@ -550,7 +550,7 @@ func TestFinetuneComponent_OrgFinetuneInstances(t *testing.T) {
 		CurrentUser: "user1",
 		PageOpts:    types.PageOpts{Page: 1, PageSize: 10},
 	}
-	mockRepoComp.EXPECT().CheckCurrentUserPermission(ctx, "user1", "org1", mock.Anything).Return(true, nil)
+	mockRepoComp.EXPECT().CheckCurrentUserPermission(ctx, "user1", "org1", rebac.NamespaceCanRead).Return(true, nil)
 	mockAcctComp.EXPECT().QueryPricesBySKUType("", mock.Anything).Return(nil, nil)
 	mockDeployTask.EXPECT().ListDeployByOwnerNamespace(ctx, "org1", mock.Anything).Return([]database.Deploy{
 		{ID: 1, DeployName: "ft1", OwnerNamespace: "org1", RepoID: 101, Status: 1},
@@ -574,7 +574,7 @@ func TestFinetuneComponent_OrgFinetuneJobs(t *testing.T) {
 		CurrentUser: "user1",
 		PageOpts:    types.PageOpts{Page: 1, PageSize: 10},
 	}
-	mockRepoComp.EXPECT().CheckCurrentUserPermission(ctx, "user1", "org1", mock.Anything).Return(true, nil)
+	mockRepoComp.EXPECT().CheckCurrentUserPermission(ctx, "user1", "org1", rebac.NamespaceCanRead).Return(true, nil)
 	mockAcctComp.EXPECT().QueryPricesBySKUType("", mock.Anything).Return(nil, nil)
 	mockArgoStore.EXPECT().FindByUsername(ctx, "org1", types.TaskTypeFinetune, 10, 1).Return([]database.ArgoWorkflow{
 		{ID: 1, TaskName: "ftjob1", Username: "org1", TaskType: types.TaskTypeFinetune},

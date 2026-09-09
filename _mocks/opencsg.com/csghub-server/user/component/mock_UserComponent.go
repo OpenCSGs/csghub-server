@@ -136,63 +136,6 @@ func (_c *MockUserComponent_CheckIfUserHasBills_Call) RunAndReturn(run func(cont
 	return _c
 }
 
-// CheckIfUserHasOrgs provides a mock function with given fields: ctx, userName
-func (_m *MockUserComponent) CheckIfUserHasOrgs(ctx context.Context, userName string) (bool, error) {
-	ret := _m.Called(ctx, userName)
-
-	if len(ret) == 0 {
-		panic("no return value specified for CheckIfUserHasOrgs")
-	}
-
-	var r0 bool
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string) (bool, error)); ok {
-		return rf(ctx, userName)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, string) bool); ok {
-		r0 = rf(ctx, userName)
-	} else {
-		r0 = ret.Get(0).(bool)
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
-		r1 = rf(ctx, userName)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// MockUserComponent_CheckIfUserHasOrgs_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CheckIfUserHasOrgs'
-type MockUserComponent_CheckIfUserHasOrgs_Call struct {
-	*mock.Call
-}
-
-// CheckIfUserHasOrgs is a helper method to define mock.On call
-//   - ctx context.Context
-//   - userName string
-func (_e *MockUserComponent_Expecter) CheckIfUserHasOrgs(ctx interface{}, userName interface{}) *MockUserComponent_CheckIfUserHasOrgs_Call {
-	return &MockUserComponent_CheckIfUserHasOrgs_Call{Call: _e.mock.On("CheckIfUserHasOrgs", ctx, userName)}
-}
-
-func (_c *MockUserComponent_CheckIfUserHasOrgs_Call) Run(run func(ctx context.Context, userName string)) *MockUserComponent_CheckIfUserHasOrgs_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string))
-	})
-	return _c
-}
-
-func (_c *MockUserComponent_CheckIfUserHasOrgs_Call) Return(_a0 bool, _a1 error) *MockUserComponent_CheckIfUserHasOrgs_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *MockUserComponent_CheckIfUserHasOrgs_Call) RunAndReturn(run func(context.Context, string) (bool, error)) *MockUserComponent_CheckIfUserHasOrgs_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // CheckIfUserHasRunningOrBuildingDeployments provides a mock function with given fields: ctx, userName
 func (_m *MockUserComponent) CheckIfUserHasRunningOrBuildingDeployments(ctx context.Context, userName string) (bool, error) {
 	ret := _m.Called(ctx, userName)
@@ -246,6 +189,63 @@ func (_c *MockUserComponent_CheckIfUserHasRunningOrBuildingDeployments_Call) Ret
 }
 
 func (_c *MockUserComponent_CheckIfUserHasRunningOrBuildingDeployments_Call) RunAndReturn(run func(context.Context, string) (bool, error)) *MockUserComponent_CheckIfUserHasRunningOrBuildingDeployments_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// CheckIfUserIsLastOrgAdmin provides a mock function with given fields: ctx, userName
+func (_m *MockUserComponent) CheckIfUserIsLastOrgAdmin(ctx context.Context, userName string) (bool, error) {
+	ret := _m.Called(ctx, userName)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CheckIfUserIsLastOrgAdmin")
+	}
+
+	var r0 bool
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (bool, error)); ok {
+		return rf(ctx, userName)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) bool); ok {
+		r0 = rf(ctx, userName)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, userName)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockUserComponent_CheckIfUserIsLastOrgAdmin_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CheckIfUserIsLastOrgAdmin'
+type MockUserComponent_CheckIfUserIsLastOrgAdmin_Call struct {
+	*mock.Call
+}
+
+// CheckIfUserIsLastOrgAdmin is a helper method to define mock.On call
+//   - ctx context.Context
+//   - userName string
+func (_e *MockUserComponent_Expecter) CheckIfUserIsLastOrgAdmin(ctx interface{}, userName interface{}) *MockUserComponent_CheckIfUserIsLastOrgAdmin_Call {
+	return &MockUserComponent_CheckIfUserIsLastOrgAdmin_Call{Call: _e.mock.On("CheckIfUserIsLastOrgAdmin", ctx, userName)}
+}
+
+func (_c *MockUserComponent_CheckIfUserIsLastOrgAdmin_Call) Run(run func(ctx context.Context, userName string)) *MockUserComponent_CheckIfUserIsLastOrgAdmin_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockUserComponent_CheckIfUserIsLastOrgAdmin_Call) Return(_a0 bool, _a1 error) *MockUserComponent_CheckIfUserIsLastOrgAdmin_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockUserComponent_CheckIfUserIsLastOrgAdmin_Call) RunAndReturn(run func(context.Context, string) (bool, error)) *MockUserComponent_CheckIfUserIsLastOrgAdmin_Call {
 	_c.Call.Return(run)
 	return _c
 }

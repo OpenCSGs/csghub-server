@@ -9,6 +9,11 @@ import (
 	"opencsg.com/csghub-server/user/handler"
 )
 
+// enableUnit reports whether hierarchy organization routes are enabled in this edition.
+func enableUnit(_ *config.Config) bool {
+	return false
+}
+
 func extendRoutes(_ *gin.RouterGroup, _ middleware.MiddlewareCollection, _ *config.Config, _ *handler.UserHandler) error {
 	return nil
 }

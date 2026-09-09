@@ -1,0 +1,8 @@
+{
+    "error.REBAC-ERR-0": {
+        "other": "建立命名空間權限關係失敗。"
+    },
+    "error.REBAC-ERR-1": {
+        "other": "刪除命名空間權限關係失敗。"
+    }
+}

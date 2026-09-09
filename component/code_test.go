@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 	mock_component "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
 	"opencsg.com/csghub-server/builder/git/gitserver"
-	"opencsg.com/csghub-server/builder/git/membership"
+	"opencsg.com/csghub-server/builder/rebac"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
@@ -320,7 +320,7 @@ func TestCodeComponent_OrgCodes(t *testing.T) {
 	ctx := context.TODO()
 	cc := initializeTestCodeComponent(ctx, t)
 
-	cc.mocks.userSvcClient.EXPECT().GetMemberRole(ctx, "ns", "user").Return(membership.RoleAdmin, nil)
+	cc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "user", "ns", rebac.NamespaceCanRead).Return(true, nil)
 	cc.mocks.stores.CodeMock().EXPECT().ByOrgPath(ctx, "ns", 10, 1, false).Return(
 		[]database.Code{{
 			ID: 1, Repository: &database.Repository{Name: "repo"},

@@ -15,6 +15,8 @@ import (
 	"opencsg.com/csghub-server/builder/accounting"
 	"opencsg.com/csghub-server/builder/git"
 	"opencsg.com/csghub-server/builder/git/gitserver"
+	"opencsg.com/csghub-server/builder/rebac"
+	rebacfactory "opencsg.com/csghub-server/builder/rebac/factory"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/errorx"
@@ -45,7 +47,11 @@ func NewAccessTokenComponent(config *config.Config) (AccessTokenComponent, error
 	c.ts = database.NewAccessTokenStore()
 	c.us = database.NewUserStore()
 	c.nsStore = database.NewNamespaceStore()
-	c.orgStore = database.NewOrgStore()
+	c.rebac, err = rebacfactory.NewAuthorizer()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create ReBAC authorizer: %w", err)
+	}
+	c.orgStore = database.NewOrgStore(config)
 	c.gs, err = git.NewGitServer(config)
 	if err != nil {
 		return nil, fmt.Errorf("fail to create git server,error:%w", err)
@@ -72,6 +78,8 @@ type accessTokenComponentImpl struct {
 	mc               MemberComponent
 	tokenQuotaStore  database.AccountAccessTokenQuotaStore
 	accountBillStore database.AccountBillStore
+	// rebac checks namespace permissions for namespace-scoped API keys.
+	rebac rebac.Authorizer
 }
 
 func (c *accessTokenComponentImpl) Create(ctx context.Context, req *types.CreateUserTokenRequest) (*database.AccessToken, error) {
@@ -515,22 +523,21 @@ func (c *accessTokenComponentImpl) validateNamespacePermission(ctx context.Conte
 		return user, nil
 	}
 
-	if ns.NamespaceType == database.UserNamespace {
-		// user namespace must match user username for user's apikeys
-		if ns.Path == user.Username {
-			return user, nil
-		} else {
-			return database.User{}, fmt.Errorf("namespace path %s does not match user %s", ns.Path, user.Username)
-		}
+	// Check if the current user can administer the namespace, including personal namespaces.
+	if c.rebac == nil {
+		return database.User{}, fmt.Errorf("ReBAC authorizer is required")
 	}
-
-	// Check if current user is admin of the org
-	role, err := c.mc.GetMemberRole(ctx, ns.Path, req.Username)
+	decision, err := c.rebac.Check(ctx, rebac.CheckRequest{
+		Subject:     rebac.UserSubject(user.UUID),
+		Relation:    rebac.NamespaceCanAdmin,
+		Object:      rebac.NamespaceObject(ns.UUID),
+		Consistency: rebac.ConsistencyHigher,
+	})
 	if err != nil {
-		return database.User{}, fmt.Errorf("failed to get member role, org: %s, user: %s, error: %w", ns.Path, req.Username, err)
+		return database.User{}, fmt.Errorf("failed to check namespace admin permission, namespace: %s, user: %s, error: %w", ns.Path, req.Username, err)
 	}
-	if !role.CanAdmin() {
-		return database.User{}, errorx.ErrForbiddenMsg("current user does not have permission to manage API keys in this organization")
+	if !decision.Allowed {
+		return database.User{}, errorx.ErrForbiddenMsg("current user does not have permission to manage API keys in this namespace")
 	}
 
 	return user, nil
