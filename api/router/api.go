@@ -308,6 +308,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		spaceResource.GET("/scenarios", spaceResourceHandler.ListScenarios)
 	}
 	adminGrp.GET("/space_resources", spaceResourceHandler.ListAll)
+	adminGrp.PUT("/scenario_constraints/:id", spaceResourceHandler.UpdateScenarioConstraint)
 
 	spaceSdkHandler, err := handler.NewSpaceSdkHandler(config)
 	if err != nil {
