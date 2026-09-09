@@ -481,7 +481,7 @@ func (m *mcpServerComponentImpl) Index(ctx context.Context, filter *types.RepoFi
 
 func (m *mcpServerComponentImpl) Properties(ctx context.Context, req *types.MCPPropertyFilter) ([]types.MCPServerProperties, int, error) {
 	var (
-		isAdmin          bool
+		isAdmin         bool
 		ownerNamespaces []string
 	)
 	if len(req.CurrentUser) > 0 {
@@ -621,7 +621,7 @@ func (m *mcpServerComponentImpl) Deploy(ctx context.Context, req *types.DeployMC
 	}
 	_, err = m.repoComponent.CheckAccountAndResource(ctx,
 		types.CheckResourceAndAccountReq{
-			UserName:      req.MCPRepo.Namespace,
+			UserName:      req.CurrentUser,
 			ClusterID:     req.ClusterID,
 			OrderDetailID: 0,
 			CurrentUser:   req.CurrentUser,
