@@ -32,6 +32,9 @@ type ScenarioConstraintStore interface {
 	Upsert(ctx context.Context, input ScenarioConstraint) (*ScenarioConstraint, error)
 	// Delete removes the constraint for a scenario.
 	Delete(ctx context.Context, scenario string) error
+	// FindByID returns the constraint with the given id, or nil if no row matches.
+	FindByID(ctx context.Context, id int64) (*ScenarioConstraint, error)
+	Update(ctx context.Context, input ScenarioConstraint) (*ScenarioConstraint, error)
 }
 
 func NewScenarioConstraintStore() ScenarioConstraintStore {
@@ -159,4 +162,26 @@ func (s *scenarioConstraintStoreImpl) Delete(ctx context.Context, scenario strin
 		return errorx.HandleDBError(err, errorx.Ctx().Set("scenario", scenario))
 	}
 	return nil
+}
+
+func (s *scenarioConstraintStoreImpl) FindByID(ctx context.Context, id int64) (*ScenarioConstraint, error) {
+	var result ScenarioConstraint
+	err := s.db.Operator.Core.NewSelect().Model(&result).
+		Where("id = ?", id).
+		Scan(ctx)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, errorx.HandleDBError(err, errorx.Ctx().Set("id", id))
+	}
+	return &result, nil
+}
+
+func (s *scenarioConstraintStoreImpl) Update(ctx context.Context, input ScenarioConstraint) (*ScenarioConstraint, error) {
+	_, err := s.db.Core.NewUpdate().Model(&input).WherePK().Exec(ctx)
+	if err != nil {
+		return nil, errorx.HandleDBError(err, errorx.Ctx().Set("id", input.ID))
+	}
+	return &input, nil
 }
