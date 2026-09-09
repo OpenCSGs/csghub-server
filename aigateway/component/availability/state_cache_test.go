@@ -95,6 +95,151 @@ func TestStateCache_HealthStateRoundtrip(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestStateCache_GetMultimodalProbeState(t *testing.T) {
+	redisClient := mockcache.NewMockRedisClient(t)
+	cache := NewStateCache(redisClient).(multimodalProbeStateCache)
+	nextInferenceAt := time.Unix(1700003600, 0)
+
+	redisClient.EXPECT().
+		HGetAll(context.Background(), "aigateway:availability:multimodal-probe:1").
+		Return(map[string]string{
+			"mode":                 "inference_only",
+			"next_inference_at":    "1700003600",
+			"consecutive_failures": "2",
+			"l7_failures":          "1",
+		}, nil).
+		Once()
+
+	state, err := cache.GetMultimodalProbeState(context.Background(), 1)
+	require.NoError(t, err)
+	require.Equal(t, multimodalProbeInferenceOnly, state.mode)
+	require.Equal(t, nextInferenceAt, state.nextInferenceAt)
+}
+
+func TestStateCache_GetMultimodalProbeState_IgnoresLegacyHealthFields(t *testing.T) {
+	redisClient := mockcache.NewMockRedisClient(t)
+	cache := NewStateCache(redisClient).(multimodalProbeStateCache)
+
+	redisClient.EXPECT().
+		HGetAll(context.Background(), "aigateway:availability:multimodal-probe:1").
+		Return(map[string]string{
+			"mode":                 "l7_available",
+			"next_inference_at":    "1700003600",
+			"consecutive_failures": "0",
+		}, nil).
+		Once()
+
+	state, err := cache.GetMultimodalProbeState(context.Background(), 1)
+	require.NoError(t, err)
+	require.Equal(t, multimodalProbeL7Available, state.mode)
+	require.Equal(t, time.Unix(1700003600, 0), state.nextInferenceAt)
+}
+
+func TestStateCache_GetMultimodalProbeState_Miss(t *testing.T) {
+	redisClient := mockcache.NewMockRedisClient(t)
+	cache := NewStateCache(redisClient).(multimodalProbeStateCache)
+
+	redisClient.EXPECT().
+		HGetAll(context.Background(), "aigateway:availability:multimodal-probe:1").
+		Return(map[string]string{}, nil).
+		Once()
+
+	_, err := cache.GetMultimodalProbeState(context.Background(), 1)
+	require.ErrorIs(t, err, errStateCacheMiss)
+}
+
+func TestStateCache_GetMultimodalProbeState_RejectsMalformedState(t *testing.T) {
+	redisClient := mockcache.NewMockRedisClient(t)
+	cache := NewStateCache(redisClient).(multimodalProbeStateCache)
+
+	redisClient.EXPECT().
+		HGetAll(context.Background(), "aigateway:availability:multimodal-probe:1").
+		Return(map[string]string{
+			"mode":                 "unsupported",
+			"next_inference_at":    "1700003600",
+			"consecutive_failures": "0",
+		}, nil).
+		Once()
+
+	_, err := cache.GetMultimodalProbeState(context.Background(), 1)
+	require.ErrorContains(t, err, "invalid multimodal probe mode")
+}
+
+func TestStateCache_SetMultimodalProbeState(t *testing.T) {
+	redisClient := mockcache.NewMockRedisClient(t)
+	cache := NewStateCache(redisClient).(multimodalProbeStateCache)
+	state := multimodalProbeState{
+		mode:            multimodalProbeL7Available,
+		nextInferenceAt: time.Unix(1700003600, 0),
+	}
+
+	redisClient.EXPECT().
+		RunScript(
+			context.Background(),
+			setMultimodalProbeStateScript,
+			[]string{"aigateway:availability:multimodal-probe:1"},
+			"l7_available",
+			int64(1700003600),
+			7200,
+		).
+		Return(int64(1), nil).
+		Once()
+
+	require.NoError(t, cache.SetMultimodalProbeState(context.Background(), 1, state, 2*time.Hour))
+}
+
+func TestStateCache_TryReserveMultimodalInference(t *testing.T) {
+	for _, test := range []struct {
+		name     string
+		reserved int64
+		expected bool
+	}{
+		{name: "claimed", reserved: 1, expected: true},
+		{name: "already reserved", reserved: 0, expected: false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			redisClient := mockcache.NewMockRedisClient(t)
+			cache := NewStateCache(redisClient).(multimodalProbeStateCache)
+			now := time.Unix(1700000000, 0)
+			reservedUntil := now.Add(6 * time.Minute)
+			state := multimodalProbeState{mode: multimodalProbeInferenceOnly}
+
+			redisClient.EXPECT().
+				RunScript(
+					context.Background(),
+					reserveMultimodalInferenceScript,
+					[]string{"aigateway:availability:multimodal-probe:1"},
+					now.Unix(),
+					reservedUntil.Unix(),
+					"inference_only",
+					7200,
+				).
+				Return([]any{test.reserved, "inference_only", reservedUntil.Unix()}, nil).
+				Once()
+
+			reservedState, reserved, err := cache.TryReserveMultimodalInference(
+				context.Background(), 1, state, now, reservedUntil, 2*time.Hour,
+			)
+			require.NoError(t, err)
+			require.Equal(t, test.expected, reserved)
+			require.Equal(t, multimodalProbeInferenceOnly, reservedState.mode)
+			require.Equal(t, reservedUntil, reservedState.nextInferenceAt)
+		})
+	}
+}
+
+func TestStateCache_DeleteMultimodalProbeState(t *testing.T) {
+	redisClient := mockcache.NewMockRedisClient(t)
+	cache := NewStateCache(redisClient).(multimodalProbeStateCache)
+
+	redisClient.EXPECT().
+		Del(context.Background(), "aigateway:availability:multimodal-probe:1").
+		Return(nil).
+		Once()
+
+	require.NoError(t, cache.DeleteMultimodalProbeState(context.Background(), 1))
+}
+
 func TestStateCache_SetCircuitState_WithNextRetryAt(t *testing.T) {
 	redisClient := mockcache.NewMockRedisClient(t)
 	cache := NewStateCache(redisClient)

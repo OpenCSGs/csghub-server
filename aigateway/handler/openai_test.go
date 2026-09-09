@@ -602,7 +602,7 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 
 	t.Run("model not found", func(t *testing.T) {
 		tester, c, w := setupTest(t)
-		chatReq := ChatCompletionRequest{
+		chatReq := types.ChatCompletionRequest{
 			Model: "nonexistent:svc",
 			Messages: []openai.ChatCompletionMessageParamUnion{
 				openai.UserMessage("Hello"),
@@ -621,7 +621,7 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 
 	t.Run("model not running", func(t *testing.T) {
 		tester, c, w := setupTest(t)
-		chatReq := ChatCompletionRequest{
+		chatReq := types.ChatCompletionRequest{
 			Model: "model1:svc1",
 			Messages: []openai.ChatCompletionMessageParamUnion{
 				openai.UserMessage("Hello"),
@@ -654,7 +654,7 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 	})
 	t.Run("llm prompt sensitive detected", func(t *testing.T) {
 		tester, c, w := setupTest(t)
-		chatReq := ChatCompletionRequest{
+		chatReq := types.ChatCompletionRequest{
 			Model: "model1:svc1",
 			Messages: []openai.ChatCompletionMessageParamUnion{
 				openai.UserMessage("Hello"),
@@ -686,7 +686,7 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "model1:svc1").Return(model, nil)
 		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil)
 		expectNoSensitiveCheckWhitelist(tester)
-		expectReq := ChatCompletionRequest{}
+		expectReq := types.ChatCompletionRequest{}
 		_ = json.Unmarshal(body, &expectReq)
 		tester.mocks.moderationComp.EXPECT().CheckChatPrompts(mock.Anything, expectReq.Messages, "testuuid:"+model.ID, false).
 			Return(&rpc.CheckResult{IsSensitive: true}, nil)
@@ -697,7 +697,7 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 	})
 	t.Run("llm prompt sensitive check failed", func(t *testing.T) {
 		tester, c, w := setupTest(t)
-		chatReq := ChatCompletionRequest{
+		chatReq := types.ChatCompletionRequest{
 			Model: "model1:svc1",
 			Messages: []openai.ChatCompletionMessageParamUnion{
 				openai.UserMessage("Hello"),
@@ -737,7 +737,7 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil)
 		expectNoSensitiveCheckWhitelist(tester)
 		expectCheckUsageLimit(tester, model, testServer.URL)
-		expectReq := ChatCompletionRequest{}
+		expectReq := types.ChatCompletionRequest{}
 		_ = json.Unmarshal(body, &expectReq)
 		tester.mocks.moderationComp.EXPECT().CheckChatPrompts(mock.Anything, expectReq.Messages, "testuuid:"+model.ID, false).
 			Return(nil, errors.New("some error"))
@@ -770,7 +770,7 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 	t.Run("usage limit exceeded", func(t *testing.T) {
 		tester, c, w := setupTest(t)
 		tester.mocks.openAIComp.ExpectedCalls = nil
-		chatReq := ChatCompletionRequest{
+		chatReq := types.ChatCompletionRequest{
 			Model: "model1:svc1",
 			Messages: []openai.ChatCompletionMessageParamUnion{
 				openai.UserMessage("Hello"),
@@ -800,7 +800,7 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil).Once()
 		tester.mocks.openAIComp.EXPECT().CheckUsageLimit(mock.Anything, "testuuid", model, mock.Anything).
 			Return(&comp.UsageLimitExceededError{Message: "usage quota exceeded"}).Once()
-		expectReq := ChatCompletionRequest{}
+		expectReq := types.ChatCompletionRequest{}
 		_ = json.Unmarshal(body, &expectReq)
 		llmTokenCounter := mocktoken.NewMockChatTokenCounter(t)
 		tester.mocks.tokenCounterFactory.EXPECT().NewChat(
@@ -821,7 +821,7 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 	})
 	t.Run("success", func(t *testing.T) {
 		tester, c, w := setupTest(t)
-		chatReq := ChatCompletionRequest{
+		chatReq := types.ChatCompletionRequest{
 			Model: "model1:svc1",
 			Messages: []openai.ChatCompletionMessageParamUnion{
 				openai.UserMessage("Hello"),
@@ -861,7 +861,7 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil)
 		expectNoSensitiveCheckWhitelist(tester)
 		expectCheckUsageLimit(tester, model, testServer.URL)
-		expectReq := ChatCompletionRequest{}
+		expectReq := types.ChatCompletionRequest{}
 		_ = json.Unmarshal(body, &expectReq)
 		tester.mocks.moderationComp.EXPECT().CheckChatPrompts(mock.Anything, expectReq.Messages, "testuuid:"+model.ID, false).
 			Return(&rpc.CheckResult{IsSensitive: false}, nil)
@@ -891,7 +891,7 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 	})
 	t.Run("record usage error", func(t *testing.T) {
 		tester, c, w := setupTest(t)
-		chatReq := ChatCompletionRequest{
+		chatReq := types.ChatCompletionRequest{
 			Model: "model1:svc1",
 			Messages: []openai.ChatCompletionMessageParamUnion{
 				openai.UserMessage("Hello"),
@@ -931,7 +931,7 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil)
 		expectNoSensitiveCheckWhitelist(tester)
 		expectCheckUsageLimit(tester, model, testServer.URL)
-		expectReq := ChatCompletionRequest{}
+		expectReq := types.ChatCompletionRequest{}
 		_ = json.Unmarshal(body, &expectReq)
 		tester.mocks.moderationComp.EXPECT().CheckChatPrompts(mock.Anything, expectReq.Messages, "testuuid:"+model.ID, false).
 			Return(&rpc.CheckResult{IsSensitive: false}, nil)
@@ -961,7 +961,7 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 	})
 	t.Run("external model uses model id as request model", func(t *testing.T) {
 		tester, c, w := setupTest(t)
-		chatReq := ChatCompletionRequest{
+		chatReq := types.ChatCompletionRequest{
 			Model: "external-model-id",
 			Messages: []openai.ChatCompletionMessageParamUnion{
 				openai.UserMessage("Hello"),
@@ -997,7 +997,7 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil)
 		expectNoSensitiveCheckWhitelist(tester)
 		expectCheckUsageLimit(tester, model, testServer.URL)
-		expectReq := ChatCompletionRequest{}
+		expectReq := types.ChatCompletionRequest{}
 		_ = json.Unmarshal(body, &expectReq)
 		tester.mocks.moderationComp.EXPECT().CheckChatPrompts(mock.Anything, expectReq.Messages, "testuuid:"+model.ID, false).
 			Return(&rpc.CheckResult{IsSensitive: false}, nil)
@@ -1028,7 +1028,7 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 	})
 	t.Run("external formatted id request forwards base model id", func(t *testing.T) {
 		tester, c, w := setupTest(t)
-		chatReq := ChatCompletionRequest{
+		chatReq := types.ChatCompletionRequest{
 			Model: "test-model-1(OpenAI)",
 			Messages: []openai.ChatCompletionMessageParamUnion{
 				openai.UserMessage("Hello"),
@@ -1071,7 +1071,7 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil)
 		expectNoSensitiveCheckWhitelist(tester)
 		expectCheckUsageLimit(tester, model, testServer.URL)
-		expectReq := ChatCompletionRequest{}
+		expectReq := types.ChatCompletionRequest{}
 		_ = json.Unmarshal(body, &expectReq)
 		tester.mocks.moderationComp.EXPECT().CheckChatPrompts(mock.Anything, expectReq.Messages, "testuuid:"+model.ID, false).
 			Return(&rpc.CheckResult{IsSensitive: false}, nil)
@@ -1108,7 +1108,7 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 			reporter := &testChatAttemptFailureReporterWithMutex{doneCh: make(chan struct{}, 10)}
 			tester.handler.SetChatAttemptFailureReporter(reporter)
 
-			chatReq := ChatCompletionRequest{
+			chatReq := types.ChatCompletionRequest{
 				Model: "external-model-id",
 				Messages: []openai.ChatCompletionMessageParamUnion{
 					openai.UserMessage("Hello"),
@@ -1142,7 +1142,7 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 			tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil).Once()
 			tester.mocks.openAIComp.EXPECT().CheckUsageLimit(mock.Anything, "testuuid", model, testServer.URL).Return(nil).Once()
 			expectNoSensitiveCheckWhitelist(tester)
-			expectReq := ChatCompletionRequest{}
+			expectReq := types.ChatCompletionRequest{}
 			_ = json.Unmarshal(body, &expectReq)
 			tester.mocks.moderationComp.EXPECT().CheckChatPrompts(mock.Anything, expectReq.Messages, "testuuid:"+model.ID, false).
 				Return(&rpc.CheckResult{IsSensitive: false}, nil)
@@ -1206,7 +1206,7 @@ func TestOpenAIHandler_Embedding(t *testing.T) {
 	t.Run("empty input or model", func(t *testing.T) {
 		tester, c, w := setupTest(t)
 		// Empty Input
-		embeddingReq := EmbeddingRequest{
+		embeddingReq := types.EmbeddingRequest{
 			EmbeddingNewParams: openai.EmbeddingNewParams{
 				Model: "model1:svc1",
 				Input: openai.EmbeddingNewParamsInputUnion{
@@ -1231,7 +1231,7 @@ func TestOpenAIHandler_Embedding(t *testing.T) {
 		}
 		httpbase.SetCurrentUser(c, "testuser")
 		httpbase.SetCurrentUserUUID(c, "testuuid")
-		embeddingReq = EmbeddingRequest{
+		embeddingReq = types.EmbeddingRequest{
 			EmbeddingNewParams: openai.EmbeddingNewParams{
 				Model: "",
 				Input: openai.EmbeddingNewParamsInputUnion{
@@ -1249,7 +1249,7 @@ func TestOpenAIHandler_Embedding(t *testing.T) {
 
 	t.Run("model not found", func(t *testing.T) {
 		tester, c, w := setupTest(t)
-		embeddingReq := EmbeddingRequest{
+		embeddingReq := types.EmbeddingRequest{
 			EmbeddingNewParams: openai.EmbeddingNewParams{
 				Model: "nonexistent:svc",
 				Input: openai.EmbeddingNewParamsInputUnion{
@@ -1270,7 +1270,7 @@ func TestOpenAIHandler_Embedding(t *testing.T) {
 
 	t.Run("get model error", func(t *testing.T) {
 		tester, c, w := setupTest(t)
-		embeddingReq := EmbeddingRequest{
+		embeddingReq := types.EmbeddingRequest{
 			EmbeddingNewParams: openai.EmbeddingNewParams{
 				Model: "model1:svc1",
 				Input: openai.EmbeddingNewParamsInputUnion{
@@ -1291,7 +1291,7 @@ func TestOpenAIHandler_Embedding(t *testing.T) {
 
 	t.Run("model not running", func(t *testing.T) {
 		tester, c, w := setupTest(t)
-		embeddingReq := EmbeddingRequest{
+		embeddingReq := types.EmbeddingRequest{
 			EmbeddingNewParams: openai.EmbeddingNewParams{
 				Model: "model1:svc1",
 				Input: openai.EmbeddingNewParamsInputUnion{
@@ -1336,7 +1336,7 @@ func TestOpenAIHandler_Embedding(t *testing.T) {
 		}))
 		defer upstream.Close()
 
-		embeddingReq := EmbeddingRequest{
+		embeddingReq := types.EmbeddingRequest{
 			EmbeddingNewParams: openai.EmbeddingNewParams{
 				Model: "model1",
 				Input: openai.EmbeddingNewParamsInputUnion{
@@ -1435,7 +1435,7 @@ func TestOpenAIHandler_EmbeddingTrace(t *testing.T) {
 		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil).Once()
 		tester.mocks.openAIComp.EXPECT().RecordUsageFromTokenUsage(mock.Anything, "testuuid", model, "resolved-embedding", mock.Anything, "").Return(nil).Once()
 
-		req := EmbeddingRequest{EmbeddingNewParams: openai.EmbeddingNewParams{
+		req := types.EmbeddingRequest{EmbeddingNewParams: openai.EmbeddingNewParams{
 			Model: "embedding-model",
 			Input: openai.EmbeddingNewParamsInputUnion{OfArrayOfStrings: []string{"test input"}},
 		}}
@@ -1490,7 +1490,7 @@ func TestOpenAIHandler_EmbeddingTrace(t *testing.T) {
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "embedding-model").Return(model, nil).Once()
 		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(errorx.ErrInsufficientBalance).Once()
 
-		req := EmbeddingRequest{EmbeddingNewParams: openai.EmbeddingNewParams{
+		req := types.EmbeddingRequest{EmbeddingNewParams: openai.EmbeddingNewParams{
 			Model: "embedding-model",
 			Input: openai.EmbeddingNewParamsInputUnion{OfArrayOfStrings: []string{"test input"}},
 		}}
@@ -1545,7 +1545,7 @@ func TestOpenAIHandler_EmbeddingTrace(t *testing.T) {
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "embedding-model").Return(model, nil).Once()
 		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil).Once()
 
-		req := EmbeddingRequest{EmbeddingNewParams: openai.EmbeddingNewParams{
+		req := types.EmbeddingRequest{EmbeddingNewParams: openai.EmbeddingNewParams{
 			Model: "embedding-model",
 			Input: openai.EmbeddingNewParamsInputUnion{OfArrayOfStrings: []string{"test input"}},
 		}}
@@ -1606,7 +1606,7 @@ func TestOpenAIHandler_EmbeddingTrace(t *testing.T) {
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "embedding-model").Return(model, nil).Once()
 		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil).Once()
 
-		req := EmbeddingRequest{EmbeddingNewParams: openai.EmbeddingNewParams{
+		req := types.EmbeddingRequest{EmbeddingNewParams: openai.EmbeddingNewParams{
 			Model: "embedding-model",
 			Input: openai.EmbeddingNewParamsInputUnion{OfArrayOfStrings: []string{"test input"}},
 		}}
@@ -2084,7 +2084,7 @@ func TestOpenAIHandler_GenerateImage(t *testing.T) {
 	t.Run("missing required fields", func(t *testing.T) {
 		tester, c, w := setupTest(t)
 		// Test missing prompt
-		imageReq := ImageGenerationRequest{
+		imageReq := types.ImageGenerationRequest{
 			ImageGenerateParams: openai.ImageGenerateParams{
 				Model: "test-model:svc",
 			},
@@ -2099,7 +2099,7 @@ func TestOpenAIHandler_GenerateImage(t *testing.T) {
 
 		// Test missing model
 		tester2, c2, w2 := setupTest(t)
-		imageReq2 := ImageGenerationRequest{
+		imageReq2 := types.ImageGenerationRequest{
 			ImageGenerateParams: openai.ImageGenerateParams{
 				Prompt: "test prompt",
 			},
@@ -2115,7 +2115,7 @@ func TestOpenAIHandler_GenerateImage(t *testing.T) {
 
 	t.Run("model not found", func(t *testing.T) {
 		tester, c, w := setupTest(t)
-		imageReq := ImageGenerationRequest{
+		imageReq := types.ImageGenerationRequest{
 			ImageGenerateParams: openai.ImageGenerateParams{
 				Model:  "nonexistent:svc",
 				Prompt: "test prompt",
@@ -2134,7 +2134,7 @@ func TestOpenAIHandler_GenerateImage(t *testing.T) {
 
 	t.Run("get model error", func(t *testing.T) {
 		tester, c, w := setupTest(t)
-		imageReq := ImageGenerationRequest{
+		imageReq := types.ImageGenerationRequest{
 			ImageGenerateParams: openai.ImageGenerateParams{
 				Model:  "test-model:svc",
 				Prompt: "test prompt",
@@ -2153,7 +2153,7 @@ func TestOpenAIHandler_GenerateImage(t *testing.T) {
 
 	t.Run("model not running", func(t *testing.T) {
 		tester, c, w := setupTest(t)
-		imageReq := ImageGenerationRequest{
+		imageReq := types.ImageGenerationRequest{
 			ImageGenerateParams: openai.ImageGenerateParams{
 				Model:  "test-model:svc",
 				Prompt: "test prompt",
@@ -2172,7 +2172,7 @@ func TestOpenAIHandler_GenerateImage(t *testing.T) {
 
 	t.Run("sensitive content detected", func(t *testing.T) {
 		tester, c, w := setupTest(t)
-		imageReq := ImageGenerationRequest{
+		imageReq := types.ImageGenerationRequest{
 			ImageGenerateParams: openai.ImageGenerateParams{
 				Model:  "test-model",
 				Prompt: "sensitive prompt",
@@ -2208,7 +2208,7 @@ func TestOpenAIHandler_GenerateImage(t *testing.T) {
 
 	t.Run("sensitive content check failed", func(t *testing.T) {
 		tester, c, w := setupTest(t)
-		imageReq := ImageGenerationRequest{
+		imageReq := types.ImageGenerationRequest{
 			ImageGenerateParams: openai.ImageGenerateParams{
 				Model:  "test-model",
 				Prompt: "test prompt",
@@ -2256,7 +2256,7 @@ func TestOpenAIHandler_GenerateImage(t *testing.T) {
 		}))
 		defer server.Close()
 
-		imageReq := ImageGenerationRequest{
+		imageReq := types.ImageGenerationRequest{
 			ImageGenerateParams: openai.ImageGenerateParams{
 				Model:  "test-model",
 				Prompt: "test prompt",

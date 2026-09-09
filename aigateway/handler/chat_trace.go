@@ -32,7 +32,7 @@ func extractChatSessionID(headers http.Header) string {
 	return ""
 }
 
-func (h *OpenAIHandlerImpl) startChatTrace(ctx context.Context, headers http.Header, modelID string, modelTarget *resolvedModelTarget, chatReq *ChatCompletionRequest, requestID string, userID string) (context.Context, llmtrace.GenerationRecorder) {
+func (h *OpenAIHandlerImpl) startChatTrace(ctx context.Context, headers http.Header, modelID string, modelTarget *resolvedModelTarget, chatReq *types.ChatCompletionRequest, requestID string, userID string) (context.Context, llmtrace.GenerationRecorder) {
 	if h == nil || h.llmTracer == nil || modelTarget == nil || modelTarget.Model == nil || chatReq == nil {
 		return ctx, nil
 	}
@@ -70,7 +70,7 @@ type chatTraceToolDefinition struct {
 	} `json:"function"`
 }
 
-func chatTraceTools(chatReq *ChatCompletionRequest) []types.GenerationToolDefinition {
+func chatTraceTools(chatReq *types.ChatCompletionRequest) []types.GenerationToolDefinition {
 	if chatReq == nil || len(chatReq.Tools) == 0 {
 		return nil
 	}
@@ -101,7 +101,7 @@ func chatTraceTools(chatReq *ChatCompletionRequest) []types.GenerationToolDefini
 	return tools
 }
 
-func chatTraceToolChoice(chatReq *ChatCompletionRequest) *string {
+func chatTraceToolChoice(chatReq *types.ChatCompletionRequest) *string {
 	if chatReq == nil {
 		return nil
 	}
@@ -128,7 +128,7 @@ func chatTraceToolChoice(chatReq *ChatCompletionRequest) *string {
 	return &value
 }
 
-func chatTraceMaxTokens(chatReq *ChatCompletionRequest) *int64 {
+func chatTraceMaxTokens(chatReq *types.ChatCompletionRequest) *int64 {
 	if chatReq == nil || chatReq.MaxTokens == 0 {
 		return nil
 	}
@@ -136,7 +136,7 @@ func chatTraceMaxTokens(chatReq *ChatCompletionRequest) *int64 {
 	return &value
 }
 
-func chatTraceTemperature(chatReq *ChatCompletionRequest) *float64 {
+func chatTraceTemperature(chatReq *types.ChatCompletionRequest) *float64 {
 	if chatReq == nil || chatReq.Temperature == 0 {
 		return nil
 	}
@@ -144,7 +144,7 @@ func chatTraceTemperature(chatReq *ChatCompletionRequest) *float64 {
 	return &value
 }
 
-func chatTraceTopP(chatReq *ChatCompletionRequest) *float64 {
+func chatTraceTopP(chatReq *types.ChatCompletionRequest) *float64 {
 	if chatReq == nil || chatReq.TopP == 0 {
 		return nil
 	}
@@ -160,7 +160,7 @@ type chatTracePostProcessInput struct {
 	StatusCode   int
 }
 
-func newChatTracePostProcessInput(recorder llmtrace.GenerationRecorder, chatReq *ChatCompletionRequest, writer *chatRetryResponseWriter) chatTracePostProcessInput {
+func newChatTracePostProcessInput(recorder llmtrace.GenerationRecorder, chatReq *types.ChatCompletionRequest, writer *chatRetryResponseWriter) chatTracePostProcessInput {
 	input := chatTracePostProcessInput{
 		Recorder:   recorder,
 		Completion: recorder != nil,

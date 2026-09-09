@@ -195,7 +195,6 @@ func (h *OpenAIHandlerImpl) Shutdown(ctx context.Context) error {
 	return h.llmTracer.Shutdown(ctx)
 }
 
-
 // handleInsufficientBalance returns an HTTP error before any upstream response
 // stream starts. Streaming requests must also receive a non-2xx status so
 // clients can distinguish this preflight failure from a successful SSE stream.
@@ -474,7 +473,7 @@ var _ openai.ChatCompletionChunk
 // @Tags         AIGateway
 // @Accept       json
 // @Produce      json
-// @Param        request body ChatCompletionRequest true "Chat completion request"
+// @Param        request body types.ChatCompletionRequest true "Chat completion request"
 // @Success      200  {object}  openai.ChatCompletion "OK"
 // @Success      200  {object}  openai.ChatCompletionChunk "OK"
 // @Failure      400  {object}  error "Bad request"
@@ -483,7 +482,7 @@ var _ openai.ChatCompletionChunk
 // @Router       /v1/chat/completions [post]
 func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 	/*
-		1.parse request body of ChatCompletionRequest
+		1.parse request body of types.ChatCompletionRequest
 		2.get model id from request body
 		3.find running model endpoint by model id
 		4.proxy request to running model endpoint
@@ -500,7 +499,7 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 	})
 	c.Request = c.Request.WithContext(ctx)
 
-	chatReq := &ChatCompletionRequest{}
+	chatReq := &types.ChatCompletionRequest{}
 	if err := c.BindJSON(chatReq); err != nil {
 		slog.ErrorContext(ctx, "invalid chat completion request body", slog.Any("error", err))
 		preflight.RecordError(err, "bad_request")
@@ -532,7 +531,7 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 	if chatReq.Stream {
 		c.Writer.Header().Set("Content-Type", "text/event-stream")
 		if !strings.Contains(modelTarget.Model.ImageID, "vllm-cpu") {
-			chatReq.StreamOptions = &StreamOptions{
+			chatReq.StreamOptions = &types.StreamOptions{
 				IncludeUsage: true,
 			}
 		}
@@ -674,7 +673,7 @@ type chatContext struct {
 func (h *OpenAIHandlerImpl) setupChatContext(
 	ctx context.Context,
 	modelTarget *resolvedModelTarget,
-	chatReq *ChatCompletionRequest,
+	chatReq *types.ChatCompletionRequest,
 	modComponent component.Moderation,
 	ginWriter gin.ResponseWriter,
 	traceID string,
@@ -723,7 +722,7 @@ func (h *OpenAIHandlerImpl) executeChatWithFallback(
 	chatCtx *chatContext,
 	modelTarget *resolvedModelTarget,
 	userUUID string,
-	chatReq *ChatCompletionRequest,
+	chatReq *types.ChatCompletionRequest,
 	primaryWriter *chatRetryResponseWriter,
 	username string,
 	modelID string,
@@ -862,7 +861,7 @@ func (h *OpenAIHandlerImpl) runChatPostProcessAsync(ctx context.Context, input c
 	}()
 }
 
-func (h *OpenAIHandlerImpl) executeChatProxyAttempt(c *gin.Context, w CommonResponseWriter, modelTarget *resolvedModelTarget, userUUID string, chatReq *ChatCompletionRequest) (*chatRetryResponseWriter, error) {
+func (h *OpenAIHandlerImpl) executeChatProxyAttempt(c *gin.Context, w CommonResponseWriter, modelTarget *resolvedModelTarget, userUUID string, chatReq *types.ChatCompletionRequest) (*chatRetryResponseWriter, error) {
 	if err := h.openaiComponent.CheckUsageLimit(c.Request.Context(), userUUID, modelTarget.Model, modelTarget.Target); err != nil {
 		return nil, err
 	}
@@ -882,7 +881,7 @@ func (h *OpenAIHandlerImpl) executeChatProxyAttempt(c *gin.Context, w CommonResp
 	return retryWriter, nil
 }
 
-func (h *OpenAIHandlerImpl) retryChatWithFallback(c *gin.Context, w CommonResponseWriter, modelTarget *resolvedModelTarget, userUUID string, chatReq *ChatCompletionRequest, tokenCounter token.ChatTokenCounter, logCapture component.LLMLogRecorder) (*chatRetryResponseWriter, error) {
+func (h *OpenAIHandlerImpl) retryChatWithFallback(c *gin.Context, w CommonResponseWriter, modelTarget *resolvedModelTarget, userUUID string, chatReq *types.ChatCompletionRequest, tokenCounter token.ChatTokenCounter, logCapture component.LLMLogRecorder) (*chatRetryResponseWriter, error) {
 	if len(modelTarget.AttemptTargets) < 1 {
 		return nil, nil
 	}
@@ -941,7 +940,7 @@ func resolveFailureEventModelID(requestModelID string, model *types.Model) strin
 // @Tags         AIGateway
 // @Accept       json
 // @Produce      json
-// @Param        request body  EmbeddingRequest true "Embedding request"
+// @Param        request body  types.EmbeddingRequest true "Embedding request"
 // @Success      200  {object}  types.Response{} "OK"
 // @Failure      400  {object}  error "Bad request or sensitive input"
 // @Failure      404  {object}  error "Model not found"
@@ -960,7 +959,7 @@ func (h *OpenAIHandlerImpl) Embedding(c *gin.Context) {
 	})
 	c.Request = c.Request.WithContext(ctx)
 
-	var req EmbeddingRequest
+	var req types.EmbeddingRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		preflight.RecordError(err, "bad_request")
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})

@@ -62,7 +62,7 @@ func normalizeChatRole(role string) string {
 	}
 }
 
-func responsesToChatRequest(ctx context.Context, req *types.ResponsesRequest, modelName string, upstreamMetadata map[string]any) (*ChatCompletionRequest, error) {
+func responsesToChatRequest(ctx context.Context, req *types.ResponsesRequest, modelName string, upstreamMetadata map[string]any) (*types.ChatCompletionRequest, error) {
 	messages, err := responsesInputToChatMessages(ctx, req)
 	if err != nil {
 		return nil, err
@@ -76,7 +76,7 @@ func responsesToChatRequest(ctx context.Context, req *types.ResponsesRequest, mo
 		return nil, fmt.Errorf("convert responses input to chat messages: %w", err)
 	}
 
-	chatReq := &ChatCompletionRequest{
+	chatReq := &types.ChatCompletionRequest{
 		Model:       modelName,
 		Messages:    sdkMessages,
 		Stream:      req.Stream,
@@ -134,7 +134,7 @@ func responsesToChatRequest(ctx context.Context, req *types.ResponsesRequest, mo
 	return chatReq, nil
 }
 
-func mergeChatRawJSON(chatReq *ChatCompletionRequest, key string, value any) {
+func mergeChatRawJSON(chatReq *types.ChatCompletionRequest, key string, value any) {
 	rawValue, err := json.Marshal(value)
 	if err != nil {
 		return
@@ -142,7 +142,7 @@ func mergeChatRawJSON(chatReq *ChatCompletionRequest, key string, value any) {
 	mergeChatRawJSONRaw(chatReq, key, rawValue)
 }
 
-func mergeChatRawJSONRaw(chatReq *ChatCompletionRequest, key string, value json.RawMessage) {
+func mergeChatRawJSONRaw(chatReq *types.ChatCompletionRequest, key string, value json.RawMessage) {
 	if chatReq == nil || key == "" {
 		return
 	}
@@ -200,7 +200,7 @@ func loadReasoningRequestConfig(metadata map[string]any) *adapterReasoningReques
 	return cfg
 }
 
-func applyAdapterReasoningRequest(ctx context.Context, chatReq *ChatCompletionRequest, cfg *adapterReasoningRequestConfig, rawReasoning json.RawMessage) error {
+func applyAdapterReasoningRequest(ctx context.Context, chatReq *types.ChatCompletionRequest, cfg *adapterReasoningRequestConfig, rawReasoning json.RawMessage) error {
 	if cfg == nil {
 		return nil
 	}
@@ -279,7 +279,7 @@ func normalizeEffort(effort string) (string, bool) {
 	return mapped, true
 }
 
-func mergeChatRawJSONObject(chatReq *ChatCompletionRequest, extra json.RawMessage) error {
+func mergeChatRawJSONObject(chatReq *types.ChatCompletionRequest, extra json.RawMessage) error {
 	if len(extra) == 0 || string(extra) == "null" {
 		return nil
 	}

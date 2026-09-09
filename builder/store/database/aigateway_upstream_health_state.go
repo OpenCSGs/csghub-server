@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"time"
+
+	"github.com/uptrace/bun"
 )
 
 // AIGatewayUpstreamHealthState tracks health check state per upstream.
@@ -28,6 +30,16 @@ type AIGatewayUpstreamHealthStateStore interface {
 	GetAllHealthy(ctx context.Context) ([]AIGatewayUpstreamHealthState, error)
 	GetAllUnhealthy(ctx context.Context) ([]AIGatewayUpstreamHealthState, error)
 	DeleteByUpstreamID(ctx context.Context, upstreamID int64) error
+	MutateByUpstreamID(
+		ctx context.Context,
+		mutation AIGatewayUpstreamHealthStateMutation,
+	) (*AIGatewayUpstreamHealthState, error)
+}
+
+type AIGatewayUpstreamHealthStateMutation struct {
+	UpstreamID      int64
+	CreateIfMissing bool
+	Mutate          func(*AIGatewayUpstreamHealthState) error
 }
 
 type aigatewayUpstreamHealthStateStoreImpl struct {
@@ -99,4 +111,63 @@ func (s *aigatewayUpstreamHealthStateStoreImpl) DeleteByUpstreamID(ctx context.C
 		Where("upstream_id = ?", upstreamID).
 		Exec(ctx)
 	return err
+}
+
+func (s *aigatewayUpstreamHealthStateStoreImpl) MutateByUpstreamID(
+	ctx context.Context,
+	mutation AIGatewayUpstreamHealthStateMutation,
+) (*AIGatewayUpstreamHealthState, error) {
+	var state AIGatewayUpstreamHealthState
+	err := s.db.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		if mutation.CreateIfMissing {
+			seed := &AIGatewayUpstreamHealthState{
+				UpstreamID:  mutation.UpstreamID,
+				HealthState: "healthy",
+				// The row is updated within this transaction. Use an old non-zero
+				// value so the first real probe is not rejected as stale.
+				LastCheckAt: time.Unix(0, 0).UTC(),
+			}
+			if _, err := tx.NewInsert().
+				Model(seed).
+				Column("upstream_id", "health_state", "last_check_at").
+				On("CONFLICT (upstream_id) DO NOTHING").
+				Exec(ctx); err != nil {
+				return fmt.Errorf("ensure aigateway upstream health state: %w", err)
+			}
+		}
+
+		if err := tx.NewSelect().
+			Model(&state).
+			Where("upstream_id = ?", mutation.UpstreamID).
+			For("UPDATE").
+			Scan(ctx); err != nil {
+			return fmt.Errorf("lock aigateway upstream health state: %w", err)
+		}
+		if mutation.Mutate == nil {
+			return fmt.Errorf("mutate aigateway upstream health state: nil mutator")
+		}
+		if err := mutation.Mutate(&state); err != nil {
+			return err
+		}
+		if _, err := tx.NewUpdate().
+			Model(&state).
+			Column(
+				"health_state",
+				"last_check_at",
+				"last_error",
+				"consecutive_failures",
+				"latency_ms",
+				"metadata",
+				"updated_at",
+			).
+			Where("id = ?", state.ID).
+			Exec(ctx); err != nil {
+			return fmt.Errorf("update aigateway upstream health state: %w", err)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &state, nil
 }

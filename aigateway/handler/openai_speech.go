@@ -28,7 +28,7 @@ import (
 // @Tags         AIGateway
 // @Accept       json
 // @Produce      audio/wav
-// @Param        request body  SpeechRequest true "Speech generation request"
+// @Param        request body  types.SpeechRequest true "Speech generation request"
 // @Success      200  {file}  binary "Audio data"
 // @Failure      400  {object}  error "Bad request or sensitive input"
 // @Failure      404  {object}  error "Model not found"
@@ -47,7 +47,7 @@ func (h *OpenAIHandlerImpl) Speech(c *gin.Context) {
 	})
 	c.Request = c.Request.WithContext(ctx)
 
-	var req SpeechRequest
+	var req types.SpeechRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		preflight.RecordError(err, "bad_request")
 		c.JSON(http.StatusBadRequest, gin.H{"error": types.Error{
@@ -224,7 +224,7 @@ const (
 // @Tags         AIGateway
 // @Accept       json
 // @Produce      json
-// @Param        request body  BatchSpeechRequest true "Batch speech generation request"
+// @Param        request body  types.BatchSpeechRequest true "Batch speech generation request"
 // @Success      200  {object}  types.Response{} "OK"
 // @Failure      400  {object}  error "Bad request or sensitive input"
 // @Failure      404  {object}  error "Model not found"
@@ -243,7 +243,7 @@ func (h *OpenAIHandlerImpl) SpeechBatch(c *gin.Context) {
 	})
 	c.Request = c.Request.WithContext(ctx)
 
-	var req BatchSpeechRequest
+	var req types.BatchSpeechRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		preflight.RecordError(err, "bad_request")
 		c.JSON(http.StatusBadRequest, gin.H{"error": types.Error{

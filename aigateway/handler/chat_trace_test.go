@@ -56,7 +56,7 @@ func TestExtractChatSessionIDMissing(t *testing.T) {
 }
 
 func TestChatTraceToolsAndToolChoice(t *testing.T) {
-	var req ChatCompletionRequest
+	var req types.ChatCompletionRequest
 	require.NoError(t, json.Unmarshal([]byte(`{
 		"model": "deepseek-v4-flash",
 		"messages": [{"role": "user", "content": "weather"}],

@@ -83,10 +83,13 @@ type ProviderCircuitStatus struct {
 type HealthCheckConfig struct {
 	// Enable health checking
 	Enabled bool `json:"enabled"`
-	
+
 	// L7 API check configuration
 	L7APICheck L7APICheckConfig `json:"l7_api_check"`
-	
+
+	// Interval between successful multimodal inference checks
+	MultimodalInferenceInterval time.Duration `json:"multimodal_inference_interval"`
+
 	// Health determination rules
 	HealthRules HealthRulesConfig `json:"health_rules"`
 }
@@ -109,27 +112,28 @@ type InferenceCheckConfig struct {
 
 // HealthRulesConfig defines rules for determining health state
 type HealthRulesConfig struct {
-	ConsecutiveFailuresForUnhealthy int           `json:"consecutive_failures_for_unhealthy"` // Default 3
-	LatencyThresholdForDegraded     time.Duration `json:"latency_threshold_for_degraded"`     // Latency threshold for degraded state
+	ConsecutiveFailuresForUnhealthy       int           `json:"consecutive_failures_for_unhealthy"`        // Default 3
+	LatencyThresholdForDegraded           time.Duration `json:"latency_threshold_for_degraded"`            // Latency threshold for degraded state
+	MultimodalLatencyThresholdForDegraded time.Duration `json:"multimodal_latency_threshold_for_degraded"` // Multimodal latency threshold for degraded state
 }
 
 // CircuitBreakerConfig defines the configuration for circuit breaker
 type CircuitBreakerConfig struct {
 	// Enable circuit breaker
 	Enabled bool `json:"enabled"`
-	
+
 	// Failure threshold to trip the circuit
 	FailureThreshold int `json:"failure_threshold"` // Default 3
-	
+
 	// Error rate threshold (0.0 - 1.0)
 	ErrorRateThreshold float64 `json:"error_rate_threshold"` // Default 0.5 (50%)
-	
+
 	// Sliding window size for error rate calculation
 	SlidingWindowSize int `json:"sliding_window_size"` // Default 10
-	
+
 	// Duration to keep circuit open before trying half-open
 	OpenDuration time.Duration `json:"open_duration"` // Default 30s
-	
+
 	// Number of requests to allow in half-open state
 	HalfOpenMaxRequests int `json:"half_open_max_requests"` // Default 1
 }
@@ -148,15 +152,17 @@ type ModelAvailabilityStatus struct {
 
 // HealthCheckResult represents the result of a health check
 type HealthCheckResult struct {
-	UpstreamID int64           `json:"upstream_id"`
-	Provider   string          `json:"provider,omitempty"`
-	ModelName  string          `json:"model_name,omitempty"`
-	Endpoint   string          `json:"endpoint,omitempty"`
-	CheckType  HealthCheckType `json:"check_type"`
-	Healthy    bool            `json:"healthy"`
-	LatencyMs  int64           `json:"latency_ms"`
-	Error      string          `json:"error,omitempty"`
-	Timestamp  time.Time       `json:"timestamp"`
+	UpstreamID            int64           `json:"upstream_id"`
+	Provider              string          `json:"provider,omitempty"`
+	ModelName             string          `json:"model_name,omitempty"`
+	Endpoint              string          `json:"endpoint,omitempty"`
+	CheckType             HealthCheckType `json:"check_type"`
+	Healthy               bool            `json:"healthy"`
+	LatencyMs             int64           `json:"latency_ms"`
+	Error                 string          `json:"error,omitempty"`
+	Timestamp             time.Time       `json:"timestamp"`
+	UsedInferenceFallback bool            `json:"-"`
+	Multimodal            bool            `json:"-"`
 }
 
 // CircuitBreakerEvent represents an event in circuit breaker state machine

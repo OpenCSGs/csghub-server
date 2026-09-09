@@ -15,6 +15,7 @@ import (
 	mock_component "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
 	mock_checker "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component/checker"
 	mock_cache "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/mirror/cache"
+	"opencsg.com/csghub-server/aigateway/sample"
 	"opencsg.com/csghub-server/component/checker"
 
 	"opencsg.com/csghub-server/builder/accounting"
@@ -726,6 +727,7 @@ func NewTestLLMServiceComponent(config *config.Config, stores *tests.MockStores)
 	return &llmServiceComponentImpl{
 		llmConfigStore:    stores.LLMConfig,
 		promptPrefixStore: stores.PromptPrefix,
+		sampleRegistry:    sample.NewDefaultRegistry(),
 	}
 }
 

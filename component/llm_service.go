@@ -2,12 +2,14 @@ package component
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"log/slog"
 	"math"
 	"strings"
 
+	"opencsg.com/csghub-server/aigateway/sample"
 	aigatewaytypes "opencsg.com/csghub-server/aigateway/types"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
@@ -52,6 +54,7 @@ type llmServiceComponentImpl struct {
 	healthStateStore  database.AIGatewayUpstreamHealthStateStore
 	circuitStateStore database.AIGatewayUpstreamCircuitStateStore
 	accountComponent  AccountingComponent
+	sampleRegistry    *sample.Registry
 }
 
 var ErrInvalidLLMConfig = errors.New("invalid llm config")
@@ -75,6 +78,7 @@ func NewLLMServiceComponent(config *config.Config) (LLMServiceComponent, error) 
 		healthStateStore:  healthStateStore,
 		circuitStateStore: circuitStateStore,
 		accountComponent:  ac,
+		sampleRegistry:    sample.NewDefaultRegistry(),
 	}
 	return llmServiceComp, nil
 }
@@ -506,6 +510,11 @@ func (s *llmServiceComponentImpl) CreateUpstream(ctx context.Context, req *types
 	if strings.TrimSpace(req.URL) == "" {
 		return nil, fmt.Errorf("%w: upstream url cannot be empty", ErrInvalidLLMConfig)
 	}
+	if req.HealthCheckEnabled != nil {
+		if err := s.validateHealthCheckEndpoint(req.URL, *req.HealthCheckEnabled); err != nil {
+			return nil, err
+		}
+	}
 	// Verify the LLM config exists
 	_, err := s.llmConfigStore.GetByID(ctx, req.LLMConfigID)
 	if err != nil {
@@ -542,6 +551,17 @@ func (s *llmServiceComponentImpl) UpdateUpstream(ctx context.Context, req *types
 	dbUp, err := s.upstreamStore.GetByID(ctx, req.ID)
 	if err != nil {
 		return nil, fmt.Errorf("upstream not found: %w", err)
+	}
+	effectiveURL := dbUp.URL
+	if req.URL != nil {
+		effectiveURL = strings.TrimSpace(*req.URL)
+	}
+	effectiveHealthCheckEnabled := dbUp.HealthCheckEnabled
+	if req.HealthCheckEnabled != nil {
+		effectiveHealthCheckEnabled = *req.HealthCheckEnabled
+	}
+	if err := s.validateHealthCheckEndpoint(effectiveURL, effectiveHealthCheckEnabled); err != nil {
+		return nil, err
 	}
 	// Snapshot old state to detect transitions
 	wasEnabled := dbUp.Enabled
@@ -617,13 +637,17 @@ func (s *llmServiceComponentImpl) UpdateUpstream(ctx context.Context, req *types
 // if a DB record exists. No-op if no record exists (buildUpstreamConfigs
 // will treat nil as unknown).
 func (s *llmServiceComponentImpl) resetHealthStateToUnknown(ctx context.Context, upstreamID int64) error {
-	state, err := s.healthStateStore.GetByUpstreamID(ctx, upstreamID)
-	if err != nil {
-		// No record exists, nothing to reset
+	_, err := s.healthStateStore.MutateByUpstreamID(ctx, database.AIGatewayUpstreamHealthStateMutation{
+		UpstreamID: upstreamID,
+		Mutate: func(state *database.AIGatewayUpstreamHealthState) error {
+			state.HealthState = string(aigatewaytypes.HealthStateUnknown)
+			return nil
+		},
+	})
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil
 	}
-	state.HealthState = string(aigatewaytypes.HealthStateUnknown)
-	return s.healthStateStore.Update(ctx, state)
+	return err
 }
 
 // resetCircuitStateToUnknown resets the circuit state of an upstream to unknown

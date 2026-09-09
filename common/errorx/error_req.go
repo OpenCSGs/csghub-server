@@ -25,6 +25,8 @@ const (
 	errTransferSameNamespace
 	errTransferTargetExists
 	errTransferNotSupported
+	errUpstreamConnectionTestNotSupported
+	errUpstreamHealthCheckNotSupported
 )
 
 var (
@@ -201,6 +203,30 @@ var (
 	//
 	// zh-HK: 該倉庫不支持轉移所有權
 	ErrTransferNotSupported = CustomError{prefix: errReqPrefix, code: errTransferNotSupported}
+	// the upstream endpoint does not support connection testing
+	//
+	// Description: The configured upstream endpoint does not support connection testing.
+	//
+	// Description_ZH: 配置的上游端点不支持连接测试。
+	//
+	// en-US: The upstream API does not support connection testing
+	//
+	// zh-CN: 当前上游 API 不支持连接测试
+	//
+	// zh-HK: 目前上游 API 不支援連線測試
+	ErrUpstreamConnectionTestNotSupported = CustomError{prefix: errReqPrefix, code: errUpstreamConnectionTestNotSupported}
+	// the upstream endpoint does not support health checks
+	//
+	// Description: The configured upstream endpoint does not support health checks.
+	//
+	// Description_ZH: 配置的上游端点不支持健康检查。
+	//
+	// en-US: The upstream API does not support health checks
+	//
+	// zh-CN: 当前上游 API 不支持健康检查
+	//
+	// zh-HK: 目前上游 API 不支援健康檢查
+	ErrUpstreamHealthCheckNotSupported = CustomError{prefix: errReqPrefix, code: errUpstreamHealthCheckNotSupported}
 )
 
 func BadRequest(originErr error, ext context) error {

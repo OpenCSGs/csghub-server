@@ -254,7 +254,7 @@ func TestVoicesProxyPath(t *testing.T) {
 
 func TestBatchSpeechRequest_JSONRoundTrip(t *testing.T) {
 	body := `{"model":"m","items":[{"input":"hi","voice":"vivian"},{"input":"there"}],"response_format":"wav","non_streaming_mode":true}`
-	var req BatchSpeechRequest
+	var req types.BatchSpeechRequest
 	require.NoError(t, json.Unmarshal([]byte(body), &req))
 	require.Equal(t, "m", req.Model)
 	require.Len(t, req.Items, 2)

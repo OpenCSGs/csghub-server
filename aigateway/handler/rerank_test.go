@@ -36,7 +36,7 @@ func TestOpenAIHandler_Rerank(t *testing.T) {
 
 	t.Run("empty model", func(t *testing.T) {
 		tester, c, w := setupTest(t)
-		body, _ := json.Marshal(RerankRequest{
+		body, _ := json.Marshal(types.RerankRequest{
 			Model:     "",
 			Query:     "what is a panda?",
 			Documents: []string{"pandas are bears"},
@@ -51,7 +51,7 @@ func TestOpenAIHandler_Rerank(t *testing.T) {
 
 	t.Run("empty query", func(t *testing.T) {
 		tester, c, w := setupTest(t)
-		body, _ := json.Marshal(RerankRequest{
+		body, _ := json.Marshal(types.RerankRequest{
 			Model:     "model1:svc1",
 			Query:     "",
 			Documents: []string{"pandas are bears"},
@@ -66,7 +66,7 @@ func TestOpenAIHandler_Rerank(t *testing.T) {
 
 	t.Run("empty documents", func(t *testing.T) {
 		tester, c, w := setupTest(t)
-		body, _ := json.Marshal(RerankRequest{
+		body, _ := json.Marshal(types.RerankRequest{
 			Model:     "model1:svc1",
 			Query:     "what is a panda?",
 			Documents: []string{},
@@ -81,7 +81,7 @@ func TestOpenAIHandler_Rerank(t *testing.T) {
 
 	t.Run("model not found", func(t *testing.T) {
 		tester, c, w := setupTest(t)
-		body, _ := json.Marshal(RerankRequest{
+		body, _ := json.Marshal(types.RerankRequest{
 			Model:     "nonexistent:svc",
 			Query:     "what is a panda?",
 			Documents: []string{"pandas are bears"},
@@ -98,7 +98,7 @@ func TestOpenAIHandler_Rerank(t *testing.T) {
 
 	t.Run("get model error", func(t *testing.T) {
 		tester, c, w := setupTest(t)
-		body, _ := json.Marshal(RerankRequest{
+		body, _ := json.Marshal(types.RerankRequest{
 			Model:     "model1:svc1",
 			Query:     "what is a panda?",
 			Documents: []string{"pandas are bears"},
@@ -119,7 +119,7 @@ func TestOpenAIHandler_Rerank(t *testing.T) {
 		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// endpoint has no path, the gateway should fall back to /rerank
 			require.Equal(t, "/rerank", r.URL.Path)
-			var req RerankRequest
+			var req types.RerankRequest
 			require.NoError(t, json.NewDecoder(r.Body).Decode(&req))
 			// model must be rewritten to the resolved model name
 			require.Equal(t, "resolved-rerank", req.Model)
@@ -162,7 +162,7 @@ func TestOpenAIHandler_Rerank(t *testing.T) {
 				return nil
 			}).Once()
 
-		body, _ := json.Marshal(RerankRequest{
+		body, _ := json.Marshal(types.RerankRequest{
 			Model:     "rerank-model",
 			Query:     "what is a panda?",
 			Documents: []string{"pandas are bears", "paris is a city"},
@@ -213,7 +213,7 @@ func TestOpenAIHandler_Rerank(t *testing.T) {
 				billingCalled.Store(true)
 			}).Maybe()
 
-		body, _ := json.Marshal(RerankRequest{
+		body, _ := json.Marshal(types.RerankRequest{
 			Model:     "rerank-model",
 			Query:     "what is a panda?",
 			Documents: []string{"pandas are bears", "paris is a city"},
@@ -270,7 +270,7 @@ func TestOpenAIHandler_Rerank(t *testing.T) {
 				billingCalled.Store(true)
 			}).Maybe()
 
-		body, _ := json.Marshal(RerankRequest{
+		body, _ := json.Marshal(types.RerankRequest{
 			Model:     "rerank-model",
 			Query:     "what is a panda?",
 			Documents: []string{"pandas are bears", "paris is a city"},
@@ -292,7 +292,7 @@ func TestOpenAIHandler_Rerank(t *testing.T) {
 func TestRerankRequest_JSONRoundTrip(t *testing.T) {
 	raw := []byte(`{"model":"m1","query":"q","documents":["d1","d2"],"top_n":2,"return_documents":true,"custom_field":"custom_value"}`)
 
-	var req RerankRequest
+	var req types.RerankRequest
 	require.NoError(t, json.Unmarshal(raw, &req))
 	assert.Equal(t, "m1", req.Model)
 	assert.Equal(t, "q", req.Query)

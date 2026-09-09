@@ -31,7 +31,7 @@ func (h *OpenAIHandlerImpl) executeAdapterResponses(c *gin.Context, req *types.R
 	responsesCounter.Request(req)
 	if req.Stream {
 		if !strings.Contains(modelTarget.Model.ImageID, "vllm-cpu") {
-			chatReq.StreamOptions = &StreamOptions{IncludeUsage: true}
+			chatReq.StreamOptions = &types.StreamOptions{IncludeUsage: true}
 		}
 	}
 	if err := applyModelAuthHeaders(c.Request.Header, modelTarget.Model); err != nil {
