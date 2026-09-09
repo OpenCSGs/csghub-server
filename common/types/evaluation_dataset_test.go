@@ -102,6 +102,15 @@ func TestEvaluationDatasetsConfigFile(t *testing.T) {
 	require.NotEmpty(t, config.Datasets)
 	require.Contains(t, config.Datasets, EvaluationDatasetConfig{
 		Namespace:        "evalscope",
+		RepoName:         "aime24",
+		Category:         "evaluation",
+		TagName:          "examination",
+		RepoType:         "dataset",
+		RuntimeFramework: "evalscope",
+		Source:           "ms",
+	})
+	require.Contains(t, config.Datasets, EvaluationDatasetConfig{
+		Namespace:        "evalscope",
 		RepoName:         "aime25",
 		Category:         "evaluation",
 		TagName:          "examination",
@@ -109,5 +118,16 @@ func TestEvaluationDatasetsConfigFile(t *testing.T) {
 		RuntimeFramework: "evalscope",
 		Source:           "ms",
 	})
+	ids := make([]string, 0, len(config.Datasets))
+	for _, dataset := range config.Datasets {
+		ids = append(ids, dataset.Namespace+"/"+dataset.RepoName)
+	}
+	require.Contains(t, ids, "cais/mmlu")
+	require.Contains(t, ids, "TIGER-Lab/MMLU-Pro")
+	require.Contains(t, ids, "AI-ModelScope/gpqa_diamond")
+	require.Contains(t, ids, "AI-ModelScope/ToolBench-Static")
+	require.NotContains(t, ids, "HuggingFaceH4/aime_2024")
+	require.NotContains(t, ids, "modelscope/mmlu")
+	require.NotContains(t, ids, "AI-ModelScope/ToolBench-Statich")
 	require.NoError(t, config.Validate())
 }
