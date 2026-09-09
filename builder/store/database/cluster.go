@@ -88,6 +88,7 @@ type ClusterNode struct {
 	Hardware    types.NodeHardware  `bun:",type:jsonb,nullzero" json:"hardware"`
 	Processes   []types.ProcessInfo `bun:",type:jsonb,nullzero" json:"processes"`
 	Exclusive   bool                `bun:",default:false" json:"exclusive"`
+	XPUType     string              `bun:",nullzero" json:"xpu_type"`
 	times
 }
 
@@ -257,6 +258,7 @@ func (s *clusterInfoStoreImpl) BatchUpdateStatus(ctx context.Context, statusEven
 					Hardware:    nodeRes.NodeHardware,
 					Processes:   nodeRes.Processes,
 					ComputeCard: "",
+					XPUType:     nodeRes.NodeHardware.XPUType,
 				}
 
 				if nodeRes.NodeHardware.TotalXPU > 0 {
@@ -274,6 +276,7 @@ func (s *clusterInfoStoreImpl) BatchUpdateStatus(ctx context.Context, statusEven
 					Set("hardware = EXCLUDED.hardware").
 					Set("processes = EXCLUDED.processes").
 					Set("compute_card = EXCLUDED.compute_card").
+					Set("xpu_type = EXCLUDED.xpu_type").
 					Set("updated_at = now()").
 					Exec(ctx)
 

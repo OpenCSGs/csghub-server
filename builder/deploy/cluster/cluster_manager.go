@@ -491,15 +491,16 @@ func collectNodeResource(node v1.Node, config *config.Config) types.NodeResource
 	allocatableCPU := node.Status.Allocatable.Cpu().DeepCopy()
 	totalXPU := resource.Quantity{}
 	allocatableXPU := resource.Quantity{}
-	xpuCapacityLabel, xpuTypeLabel, xpuMemLabel := getXPULabel(node.Labels, config, node.Name)
-	if xpuCapacityLabel != "" {
-		totalXPU = node.Status.Capacity[v1.ResourceName(xpuCapacityLabel)]
-		allocatableXPU = node.Status.Allocatable[v1.ResourceName(xpuCapacityLabel)]
+
+	xpuLabelRes := getXPULabel(node.Labels, config, node.Name)
+	if xpuLabelRes.CapacityLabel != "" {
+		totalXPU = node.Status.Capacity[v1.ResourceName(xpuLabelRes.CapacityLabel)]
+		allocatableXPU = node.Status.Allocatable[v1.ResourceName(xpuLabelRes.CapacityLabel)]
 	}
 
 	bigXPUMem := ""
-	if len(xpuMemLabel) > 0 {
-		for _, memLabel := range xpuMemLabel {
+	if len(xpuLabelRes.MemLabels) > 0 {
+		for _, memLabel := range xpuLabelRes.MemLabels {
 			val, found := node.Labels[memLabel]
 			if !found {
 				continue
@@ -512,7 +513,7 @@ func collectNodeResource(node v1.Node, config *config.Config) types.NodeResource
 		}
 	}
 
-	gpuModelVendor, gpuModel := getGpuTypeAndVendor(node.Labels[xpuTypeLabel], xpuCapacityLabel)
+	gpuModelVendor, gpuModel := getGpuTypeAndVendor(node.Labels[xpuLabelRes.TypeLabel], xpuLabelRes.CapacityLabel)
 	vXPUs := collectNodeVXPU(node, config)
 	nodeResourceInfo := types.NodeResourceInfo{
 		NodeName:   node.Name,
@@ -527,10 +528,11 @@ func collectNodeResource(node v1.Node, config *config.Config) types.NodeResource
 			GPUVendor:        gpuModelVendor,
 			TotalXPU:         parseQuantityToInt64(totalXPU),
 			AvailableXPU:     parseQuantityToInt64(allocatableXPU),
-			XPUCapacityLabel: xpuCapacityLabel,
+			XPUCapacityLabel: xpuLabelRes.CapacityLabel,
 			XPUMem:           bigXPUMem,
 			VXPUs:            vXPUs,
 			MIGs:             collectMIGResources(node),
+			XPUType:          xpuLabelRes.XPUType,
 		},
 		Processes:  []types.ProcessInfo{},
 		EnableVXPU: (len(vXPUs) > 0),
@@ -594,7 +596,7 @@ func getGpuTypeAndVendor(vendorType string, label string) (string, string) {
 }
 
 // the first label is the xpu capacity label, the second is the gpu model label
-func getXPULabel(labels map[string]string, config *config.Config, nodeName string) (string, string, []string) {
+func getXPULabel(labels map[string]string, config *config.Config, nodeName string) types.XPULabelResult {
 	//check custom gpu model labels first
 	if len(config.Runner.GPUModelLabel) > 0 {
 		var gpuLabels []types.GPUModel
@@ -603,7 +605,12 @@ func getXPULabel(labels map[string]string, config *config.Config, nodeName strin
 			for _, gpuModel := range gpuLabels {
 				if _, found := labels[gpuModel.TypeLabel]; found {
 					slog.Info("use custom GPUModelLabel", slog.Any("nodeName", nodeName), slog.Any("GPUModelLabel", gpuModel.TypeLabel))
-					return gpuModel.CapacityLabel, gpuModel.TypeLabel, []string{gpuModel.MemLabel}
+					return types.XPULabelResult{
+						CapacityLabel: gpuModel.CapacityLabel,
+						TypeLabel:     gpuModel.TypeLabel,
+						MemLabels:     []string{gpuModel.MemLabel},
+						XPUType:       gpuModel.XPUType,
+					}
 				}
 			}
 			slog.Warn("no gpu model label found in custom GPUModelLabel and fallback to default GPUModelLabel",
@@ -616,57 +623,127 @@ func getXPULabel(labels map[string]string, config *config.Config, nodeName strin
 
 	if _, found := labels["aliyun.accelerator/nvidia_name"]; found {
 		//for default cluster
-		return "nvidia.com/gpu", "aliyun.accelerator/nvidia_name", []string{"aliyun.accelerator/nvidia_mem"}
+		return types.XPULabelResult{
+			CapacityLabel: "nvidia.com/gpu",
+			TypeLabel:     "aliyun.accelerator/nvidia_name",
+			MemLabels:     []string{"aliyun.accelerator/nvidia_mem"},
+			XPUType:       "gpu",
+		}
 	}
 	if _, found := labels["machine.cluster.vke.volcengine.com/gpu-name"]; found {
 		//for volcano cluster
-		return "nvidia.com/gpu", "machine.cluster.vke.volcengine.com/gpu-name", []string{"machine.cluster.vke.volcengine.com/gpu-mem"}
+		return types.XPULabelResult{
+			CapacityLabel: "nvidia.com/gpu",
+			TypeLabel:     "machine.cluster.vke.volcengine.com/gpu-name",
+			MemLabels:     []string{"machine.cluster.vke.volcengine.com/gpu-mem"},
+			XPUType:       "gpu",
+		}
 	}
 	if _, found := labels["eks.tke.cloud.tencent.com/gpu-type"]; found {
 		//for tencent cluster
-		return "nvidia.com/gpu", "eks.tke.cloud.tencent.com/gpu-type", []string{"eks.tke.cloud.tencent.com/gpu-mem"}
+		return types.XPULabelResult{
+			CapacityLabel: "nvidia.com/gpu",
+			TypeLabel:     "eks.tke.cloud.tencent.com/gpu-type",
+			MemLabels:     []string{"eks.tke.cloud.tencent.com/gpu-mem"},
+			XPUType:       "gpu",
+		}
 	}
 	if _, found := labels["nvidia.com/nvidia_name"]; found {
 		//for k3s cluster or A800 cluster
-		return "nvidia.com/gpu", "nvidia.com/nvidia_name", []string{"nvidia.com/nvidia_mem", rtypes.Nvida_Com_GPU_Memory}
+		return types.XPULabelResult{
+			CapacityLabel: "nvidia.com/gpu",
+			TypeLabel:     "nvidia.com/nvidia_name",
+			MemLabels:     []string{"nvidia.com/nvidia_mem", rtypes.Nvida_Com_GPU_Memory},
+			XPUType:       "gpu",
+		}
 	}
 	if _, found := labels["nvidia.com/gpu.product"]; found {
 		//for nvidia gpu product label
-		return "nvidia.com/gpu", "nvidia.com/gpu.product", []string{"nvidia.com/gpu.mem"}
+		return types.XPULabelResult{
+			CapacityLabel: "nvidia.com/gpu",
+			TypeLabel:     "nvidia.com/gpu.product",
+			MemLabels:     []string{"nvidia.com/gpu.mem"},
+			XPUType:       "gpu",
+		}
 	}
 	if _, found := labels["kubemore_xpu_type"]; found {
-		//for huawei gpu
-		return "huawei.com/Ascend910", "kubemore_xpu_type", []string{"kubemore_xpu_mem"}
+		//for huawei npu
+		return types.XPULabelResult{
+			CapacityLabel: "huawei.com/Ascend910",
+			TypeLabel:     "kubemore_xpu_type",
+			MemLabels:     []string{"kubemore_xpu_mem"},
+			XPUType:       "npu",
+		}
 	}
 	if _, found := labels["huawei.accelerator"]; found {
-		//for huawei gpu
-		return "huawei.com/Ascend910", "huawei.accelerator", []string{"huawei.accelerator.mem"}
+		//for huawei npu
+		return types.XPULabelResult{
+			CapacityLabel: "huawei.com/Ascend910",
+			TypeLabel:     "huawei.accelerator",
+			MemLabels:     []string{"huawei.accelerator.mem"},
+			XPUType:       "npu",
+		}
 	}
 	if _, found := labels["accelerator/huawei-npu"]; found {
-		//for huawei gpu
-		return "huawei.com/Ascend910", "accelerator/huawei-npu", []string{"accelerator/huawei-npu.mem"}
+		//for huawei npu
+		return types.XPULabelResult{
+			CapacityLabel: "huawei.com/Ascend910",
+			TypeLabel:     "accelerator/huawei-npu",
+			MemLabels:     []string{"accelerator/huawei-npu.mem"},
+			XPUType:       "npu",
+		}
 	}
 	if _, found := labels["hygon.com/dcu.name"]; found {
 		//for hy dcu
-		return "hygon.com/dcu", "hygon.com/dcu.name", []string{"hygon.com/dcu.mem"}
+		return types.XPULabelResult{
+			CapacityLabel: "hygon.com/dcu",
+			TypeLabel:     "hygon.com/dcu.name",
+			MemLabels:     []string{"hygon.com/dcu.mem"},
+			XPUType:       "dcu",
+		}
 	}
 	if _, found := labels["enflame.com/gcu"]; found {
 		//for enflame gcu
-		return "enflame.com/gcu", "enflame.com/gcu.model", []string{"enflame.com/gcu.mem"}
+		return types.XPULabelResult{
+			CapacityLabel: "enflame.com/gcu",
+			TypeLabel:     "enflame.com/gcu.model",
+			MemLabels:     []string{"enflame.com/gcu.mem"},
+			XPUType:       "gcu",
+		}
 	}
 	if _, found := labels["enflame.com/gcu.count"]; found {
 		//for enflame gcu
-		return "enflame.com/gcu.count", "enflame.com/gcu.model", []string{"enflame.com/gcu.mem"}
+		return types.XPULabelResult{
+			CapacityLabel: "enflame.com/gcu.count",
+			TypeLabel:     "enflame.com/gcu.model",
+			MemLabels:     []string{"enflame.com/gcu.mem"},
+			XPUType:       "gcu",
+		}
 	}
 	if _, found := labels["amd.com/gpu"]; found {
 		//for amd gpu
-		return "amd.com/gpu", "amd.com/gpu.product-name", []string{"amd.com/gpu.vram"}
+		return types.XPULabelResult{
+			CapacityLabel: "amd.com/gpu",
+			TypeLabel:     "amd.com/gpu.product-name",
+			MemLabels:     []string{"amd.com/gpu.vram"},
+			XPUType:       "gpu",
+		}
 	}
 	if _, found := labels["chipltech.com/tpu.product"]; found {
 		//for chipltech tpu
-		return "chipltech.com/dlc-lyp", "chipltech.com/tpu.product", []string{"chipltech.com/tpu.mem"}
+		return types.XPULabelResult{
+			CapacityLabel: "chipltech.com/dlc-lyp",
+			TypeLabel:     "chipltech.com/tpu.product",
+			MemLabels:     []string{"chipltech.com/tpu.mem"},
+			XPUType:       "tpu",
+		}
 	}
-	return "", "", []string{}
+	return types.XPULabelResult{
+		CapacityLabel: "",
+		TypeLabel:     "",
+		MemLabels:     []string{},
+		XPUType:       "",
+	}
 }
 
 func getXPUMemUnit(val string, label string) string {
