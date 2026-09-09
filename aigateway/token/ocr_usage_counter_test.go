@@ -18,7 +18,7 @@ func TestOCRUsageCounter_UsageFromResponse(t *testing.T) {
 
 	usage, err := c.Usage(context.Background())
 	require.NoError(t, err)
-	assert.Equal(t, string(commontypes.DataTypeOCR), usage.DataType)
+	assert.Equal(t, string(commontypes.DataTypeImage), usage.DataType)
 	assert.EqualValues(t, 3, usage.CompletionRC)
 	assert.Equal(t, "pages=3,images=1", usage.CompletionDesc)
 	assert.Zero(t, usage.TotalTokens)

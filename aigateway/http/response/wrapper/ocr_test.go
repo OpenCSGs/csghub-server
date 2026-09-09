@@ -56,7 +56,7 @@ func TestOCRWrapper_TransformOnSuccess(t *testing.T) {
 	usage, err := counter.Usage(t.Context())
 	require.NoError(t, err)
 	assert.EqualValues(t, 1, usage.CompletionRC)
-	assert.Equal(t, "ocr", usage.DataType)
+	assert.Equal(t, "image", usage.DataType)
 
 	assert.Equal(t, http.StatusOK, w.StatusCode())
 	assert.NotNil(t, w.Response())
