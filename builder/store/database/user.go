@@ -531,9 +531,16 @@ func (s *UserStoreImpl) DeleteUserAndRelations(ctx context.Context, input User, 
 	return errorx.HandleDBError(err, nil)
 }
 
+// CountUsers counts users whose personal namespace is not mirrored, i.e.
+// users created by normal registration rather than imported via multi-sync.
+// It joins the user's personal namespace (namespace_type = user) and excludes
+// mirrored ones (see component/multi_sync.go createUser), so the license
+// "users in subscription" metric reflects real local accounts only.
 func (s *UserStoreImpl) CountUsers(ctx context.Context) (int, error) {
 	var users []User
-	q := s.db.Operator.Core.NewSelect().Model(&users)
+	q := s.db.Operator.Core.NewSelect().Model(&users).
+		Join(fmt.Sprintf(`JOIN namespaces AS ns ON ns.user_id = "user".id AND ns.namespace_type = '%s' AND ns.deleted_at IS NULL`, UserNamespace)).
+		Where("ns.mirrored = false")
 	count, err := q.Count(ctx)
 	if err != nil {
 		return 0, errorx.HandleDBError(err, nil)
