@@ -27,7 +27,7 @@ import (
 // @Tags         AIGateway
 // @Accept       json
 // @Produce      json
-// @Param        request body  ImageGenerationRequest true "Image generation request"
+// @Param        request body  types.ImageGenerationRequest true "Image generation request"
 // @Success      200  {object}  types.ImageGenerationResponse "OK"
 // @Failure      400  {object}  error "Bad request or sensitive input"
 // @Failure      404  {object}  error "Model not found"
@@ -46,7 +46,7 @@ func (h *OpenAIHandlerImpl) GenerateImage(c *gin.Context) {
 	})
 	c.Request = c.Request.WithContext(ctx)
 
-	var req ImageGenerationRequest
+	var req types.ImageGenerationRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		preflight.RecordError(err, "bad_request")
 		c.JSON(http.StatusBadRequest, gin.H{"error": types.Error{

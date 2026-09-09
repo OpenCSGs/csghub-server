@@ -16,7 +16,7 @@ import (
 
 func TestOpenAIHandler_checkSensitive(t *testing.T) {
 	ctx := context.Background()
-	chatReq := &ChatCompletionRequest{
+	chatReq := &types.ChatCompletionRequest{
 		Messages: []openai.ChatCompletionMessageParamUnion{},
 	}
 	userUUID := "test-uuid"

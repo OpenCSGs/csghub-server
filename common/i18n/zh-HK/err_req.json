@@ -26,6 +26,12 @@
     "error.REQ-ERR-16": {
         "other": "該倉庫不支持轉移所有權"
     },
+    "error.REQ-ERR-17": {
+        "other": "目前上游 API 不支援連線測試"
+    },
+    "error.REQ-ERR-18": {
+        "other": "目前上游 API 不支援健康檢查"
+    },
     "error.REQ-ERR-2": {
         "other": "請求體不能為空"
     },

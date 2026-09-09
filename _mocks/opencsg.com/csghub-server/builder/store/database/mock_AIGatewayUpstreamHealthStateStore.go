@@ -291,6 +291,65 @@ func (_c *MockAIGatewayUpstreamHealthStateStore_GetByUpstreamID_Call) RunAndRetu
 	return _c
 }
 
+// MutateByUpstreamID provides a mock function with given fields: ctx, mutation
+func (_m *MockAIGatewayUpstreamHealthStateStore) MutateByUpstreamID(ctx context.Context, mutation database.AIGatewayUpstreamHealthStateMutation) (*database.AIGatewayUpstreamHealthState, error) {
+	ret := _m.Called(ctx, mutation)
+
+	if len(ret) == 0 {
+		panic("no return value specified for MutateByUpstreamID")
+	}
+
+	var r0 *database.AIGatewayUpstreamHealthState
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, database.AIGatewayUpstreamHealthStateMutation) (*database.AIGatewayUpstreamHealthState, error)); ok {
+		return rf(ctx, mutation)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, database.AIGatewayUpstreamHealthStateMutation) *database.AIGatewayUpstreamHealthState); ok {
+		r0 = rf(ctx, mutation)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*database.AIGatewayUpstreamHealthState)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, database.AIGatewayUpstreamHealthStateMutation) error); ok {
+		r1 = rf(ctx, mutation)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAIGatewayUpstreamHealthStateStore_MutateByUpstreamID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'MutateByUpstreamID'
+type MockAIGatewayUpstreamHealthStateStore_MutateByUpstreamID_Call struct {
+	*mock.Call
+}
+
+// MutateByUpstreamID is a helper method to define mock.On call
+//   - ctx context.Context
+//   - mutation database.AIGatewayUpstreamHealthStateMutation
+func (_e *MockAIGatewayUpstreamHealthStateStore_Expecter) MutateByUpstreamID(ctx interface{}, mutation interface{}) *MockAIGatewayUpstreamHealthStateStore_MutateByUpstreamID_Call {
+	return &MockAIGatewayUpstreamHealthStateStore_MutateByUpstreamID_Call{Call: _e.mock.On("MutateByUpstreamID", ctx, mutation)}
+}
+
+func (_c *MockAIGatewayUpstreamHealthStateStore_MutateByUpstreamID_Call) Run(run func(ctx context.Context, mutation database.AIGatewayUpstreamHealthStateMutation)) *MockAIGatewayUpstreamHealthStateStore_MutateByUpstreamID_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(database.AIGatewayUpstreamHealthStateMutation))
+	})
+	return _c
+}
+
+func (_c *MockAIGatewayUpstreamHealthStateStore_MutateByUpstreamID_Call) Return(_a0 *database.AIGatewayUpstreamHealthState, _a1 error) *MockAIGatewayUpstreamHealthStateStore_MutateByUpstreamID_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAIGatewayUpstreamHealthStateStore_MutateByUpstreamID_Call) RunAndReturn(run func(context.Context, database.AIGatewayUpstreamHealthStateMutation) (*database.AIGatewayUpstreamHealthState, error)) *MockAIGatewayUpstreamHealthStateStore_MutateByUpstreamID_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Update provides a mock function with given fields: ctx, state
 func (_m *MockAIGatewayUpstreamHealthStateStore) Update(ctx context.Context, state *database.AIGatewayUpstreamHealthState) error {
 	ret := _m.Called(ctx, state)

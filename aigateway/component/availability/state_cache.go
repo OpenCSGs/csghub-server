@@ -18,6 +18,7 @@ const (
 	stateCacheDefaultCircuitTTL         = 30 * time.Second
 	stateCacheDefaultHealthTTL          = 30 * time.Second
 	stateCacheDefaultHalfOpenCounterTTL = 30 * time.Second
+	stateCacheDefaultMultimodalProbeTTL = 2 * time.Hour
 )
 
 const transitionToHalfOpenScript = `
@@ -120,6 +121,31 @@ redis.call('EXPIRE', KEYS[1], ARGV[2])
 return 1
 `
 
+const reserveMultimodalInferenceScript = `
+local now_ts = tonumber(ARGV[1])
+local reserved_until = tonumber(ARGV[2])
+local mode = redis.call('HGET', KEYS[1], 'mode') or ARGV[3]
+local next_inference_at = tonumber(redis.call('HGET', KEYS[1], 'next_inference_at') or '0')
+
+if next_inference_at > now_ts then
+	return {0, mode, next_inference_at}
+end
+
+redis.call('HSET', KEYS[1], 'mode', mode)
+redis.call('HSET', KEYS[1], 'next_inference_at', reserved_until)
+redis.call('HDEL', KEYS[1], 'consecutive_failures', 'l7_failures')
+redis.call('EXPIRE', KEYS[1], ARGV[4])
+return {1, mode, reserved_until}
+`
+
+const setMultimodalProbeStateScript = `
+redis.call('HSET', KEYS[1], 'mode', ARGV[1])
+redis.call('HSET', KEYS[1], 'next_inference_at', ARGV[2])
+redis.call('HDEL', KEYS[1], 'consecutive_failures', 'l7_failures')
+redis.call('EXPIRE', KEYS[1], ARGV[3])
+return 1
+`
+
 var errStateCacheMiss = errors.New("state cache miss")
 
 type StateCache interface {
@@ -135,6 +161,14 @@ type StateCache interface {
 	TryAcquireLeader(ctx context.Context, electionKey, ownerID string, ttl time.Duration) (bool, error)
 	RenewLeader(ctx context.Context, electionKey, ownerID string, ttl time.Duration) (bool, error)
 	GetLeader(ctx context.Context, electionKey string) (string, error)
+}
+
+type multimodalProbeStateCache interface {
+	Enabled() bool
+	GetMultimodalProbeState(ctx context.Context, upstreamID int64) (multimodalProbeState, error)
+	SetMultimodalProbeState(ctx context.Context, upstreamID int64, state multimodalProbeState, ttl time.Duration) error
+	TryReserveMultimodalInference(ctx context.Context, upstreamID int64, state multimodalProbeState, now, reservedUntil time.Time, ttl time.Duration) (multimodalProbeState, bool, error)
+	DeleteMultimodalProbeState(ctx context.Context, upstreamID int64) error
 }
 
 type stateCacheImpl struct {
@@ -361,6 +395,75 @@ func (s *stateCacheImpl) SetHealthState(ctx context.Context, state *types.Provid
 	return s.redisClient.SetEx(ctx, s.healthStateKey(state.UpstreamID), string(payload), ttl)
 }
 
+func (s *stateCacheImpl) GetMultimodalProbeState(ctx context.Context, upstreamID int64) (multimodalProbeState, error) {
+	if !s.Enabled() {
+		return multimodalProbeState{}, errStateCacheMiss
+	}
+	fields, err := s.redisClient.HGetAll(ctx, s.multimodalProbeStateKey(upstreamID))
+	if err != nil {
+		return multimodalProbeState{}, err
+	}
+	if len(fields) == 0 {
+		return multimodalProbeState{}, errStateCacheMiss
+	}
+	return parseMultimodalProbeState(fields)
+}
+
+func (s *stateCacheImpl) SetMultimodalProbeState(
+	ctx context.Context,
+	upstreamID int64,
+	state multimodalProbeState,
+	ttl time.Duration,
+) error {
+	if !s.Enabled() {
+		return nil
+	}
+	ttlSeconds := durationSecondsOrDefault(ttl, stateCacheDefaultMultimodalProbeTTL)
+	_, err := s.redisClient.RunScript(
+		ctx,
+		setMultimodalProbeStateScript,
+		[]string{s.multimodalProbeStateKey(upstreamID)},
+		state.mode.String(),
+		state.nextInferenceAt.Unix(),
+		ttlSeconds,
+	)
+	return err
+}
+
+func (s *stateCacheImpl) TryReserveMultimodalInference(
+	ctx context.Context,
+	upstreamID int64,
+	state multimodalProbeState,
+	now time.Time,
+	reservedUntil time.Time,
+	ttl time.Duration,
+) (multimodalProbeState, bool, error) {
+	if !s.Enabled() {
+		return state, false, errStateCacheMiss
+	}
+	ttlSeconds := durationSecondsOrDefault(ttl, stateCacheDefaultMultimodalProbeTTL)
+	result, err := s.redisClient.RunScript(
+		ctx,
+		reserveMultimodalInferenceScript,
+		[]string{s.multimodalProbeStateKey(upstreamID)},
+		now.Unix(),
+		reservedUntil.Unix(),
+		state.mode.String(),
+		ttlSeconds,
+	)
+	if err != nil {
+		return multimodalProbeState{}, false, err
+	}
+	return parseMultimodalProbeReservation(result)
+}
+
+func (s *stateCacheImpl) DeleteMultimodalProbeState(ctx context.Context, upstreamID int64) error {
+	if !s.Enabled() {
+		return nil
+	}
+	return s.redisClient.Del(ctx, s.multimodalProbeStateKey(upstreamID))
+}
+
 func (s *stateCacheImpl) TryAcquireLeader(ctx context.Context, electionKey, ownerID string, ttl time.Duration) (bool, error) {
 	if !s.Enabled() {
 		return true, nil
@@ -401,7 +504,6 @@ func (s *stateCacheImpl) GetLeader(ctx context.Context, electionKey string) (str
 	}
 	return s.redisClient.Get(ctx, s.leaderKey(electionKey))
 }
-
 
 func (s *stateCacheImpl) parseCircuitScriptResult(input types.StateCacheRecordInput, result any) (*types.ProviderCircuitStatus, error) {
 	values, ok := result.([]any)
@@ -462,6 +564,60 @@ func (s *stateCacheImpl) healthStateKey(upstreamID int64) string {
 
 func (s *stateCacheImpl) leaderKey(electionKey string) string {
 	return fmt.Sprintf("%s:leader:%s", stateCacheKeyPrefix, electionKey)
+}
+
+func (s *stateCacheImpl) multimodalProbeStateKey(upstreamID int64) string {
+	return fmt.Sprintf("%s:multimodal-probe:%d", stateCacheKeyPrefix, upstreamID)
+}
+
+func parseMultimodalProbeState(fields map[string]string) (multimodalProbeState, error) {
+	mode, err := parseMultimodalProbeMode(fields["mode"])
+	if err != nil {
+		return multimodalProbeState{}, err
+	}
+	nextInferenceUnix, err := strconv.ParseInt(fields["next_inference_at"], 10, 64)
+	if err != nil {
+		return multimodalProbeState{}, fmt.Errorf("parse multimodal next inference time: %w", err)
+	}
+	return multimodalProbeState{
+		mode:            mode,
+		nextInferenceAt: time.Unix(nextInferenceUnix, 0),
+	}, nil
+}
+
+func parseMultimodalProbeReservation(result any) (multimodalProbeState, bool, error) {
+	values, ok := result.([]any)
+	if !ok || len(values) != 3 {
+		return multimodalProbeState{}, false, fmt.Errorf("invalid multimodal reservation result type: %T", result)
+	}
+	reserved, err := scriptResultToInt64(values[0])
+	if err != nil {
+		return multimodalProbeState{}, false, err
+	}
+	modeValue, ok := values[1].(string)
+	if !ok {
+		return multimodalProbeState{}, false, fmt.Errorf("invalid multimodal mode value type: %T", values[1])
+	}
+	mode, err := parseMultimodalProbeMode(modeValue)
+	if err != nil {
+		return multimodalProbeState{}, false, err
+	}
+	nextInferenceUnix, err := scriptResultToInt64(values[2])
+	if err != nil {
+		return multimodalProbeState{}, false, err
+	}
+	return multimodalProbeState{
+		mode:            mode,
+		nextInferenceAt: time.Unix(nextInferenceUnix, 0),
+	}, reserved == 1, nil
+}
+
+func durationSecondsOrDefault(value, defaultValue time.Duration) int {
+	seconds := int(value.Seconds())
+	if seconds <= 0 {
+		seconds = int(defaultValue.Seconds())
+	}
+	return seconds
 }
 
 func scriptResultToInt64(value any) (int64, error) {

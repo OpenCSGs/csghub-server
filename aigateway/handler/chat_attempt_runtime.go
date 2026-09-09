@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	responsespkg "opencsg.com/csghub-server/aigateway/handler/responses"
+	"opencsg.com/csghub-server/aigateway/types"
 	commonType "opencsg.com/csghub-server/common/types"
 
 	"opencsg.com/csghub-server/aigateway/component"
@@ -25,7 +26,7 @@ type llmLogModelConfigurator interface {
 	SetProvider(provider string)
 }
 
-func marshalChatRequestBody(chatReq *ChatCompletionRequest, modelName string) ([]byte, error) {
+func marshalChatRequestBody(chatReq *types.ChatCompletionRequest, modelName string) ([]byte, error) {
 	if chatReq == nil {
 		return nil, fmt.Errorf("chat request is nil")
 	}

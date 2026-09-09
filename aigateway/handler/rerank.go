@@ -13,6 +13,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/aigateway/token"
+	"opencsg.com/csghub-server/aigateway/types"
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/builder/proxy"
 	"opencsg.com/csghub-server/common/utils/trace"
@@ -33,7 +34,7 @@ func (h *OpenAIHandlerImpl) Rerank(c *gin.Context) {
 	})
 	c.Request = c.Request.WithContext(ctx)
 
-	var req RerankRequest
+	var req types.RerankRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		preflight.RecordError(err, "bad_request")
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
