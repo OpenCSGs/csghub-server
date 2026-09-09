@@ -59,22 +59,25 @@ if [ -z "${PIPELINE}" ]; then
     echo "The model repo must be a PaddleX pipeline bundle (pipeline.yaml + local model_dir subdirs)." >&2
     exit 1
   elif [ "${RUNTIME_MODE}" = "paddleocr-vl" ]; then
-    MODEL_NAME="$(basename "${REPO_ID}")"
-    case "${MODEL_NAME}" in
-      PaddleOCR-VL-1.6*)
-        PIPELINE_NAME="PaddleOCR-VL-1.6"
-        ;;
-      PaddleOCR-VL-1.5*)
-        PIPELINE_NAME="PaddleOCR-VL-1.5"
-        ;;
-      PaddleOCR-VL*)
-        PIPELINE_NAME="PaddleOCR-VL"
-        ;;
-      *)
-        echo "ERROR: unsupported PaddleOCR-VL model '${MODEL_NAME}'" >&2
-        exit 1
-        ;;
-    esac
+    # Repository names may contain flattened namespace prefixes, so use the
+    # model's own metadata as the authoritative identity for pipeline selection.
+    MODEL_METADATA="${MODEL_DIR}/inference.yml"
+    [ -f "${MODEL_METADATA}" ] || {
+      echo "ERROR: PaddleOCR-VL model metadata not found at ${MODEL_METADATA}" >&2
+      exit 1
+    }
+    MODEL_NAME="$(python /etc/csghub/model_metadata.py "${MODEL_METADATA}")" || {
+      echo "ERROR: failed to read model metadata from ${MODEL_METADATA}" >&2
+      exit 1
+    }
+    if [ "${MODEL_NAME}" = "PaddleOCR-VL-0.9B" ]; then
+      PIPELINE_NAME="PaddleOCR-VL"
+    elif [[ "${MODEL_NAME}" =~ ^(PaddleOCR-VL-[0-9]+(\.[0-9]+)*)-0\.9B$ ]]; then
+      PIPELINE_NAME="${BASH_REMATCH[1]}"
+    else
+      echo "ERROR: unsupported PaddleOCR-VL model '${MODEL_NAME}' from ${MODEL_METADATA}" >&2
+      exit 1
+    fi
     GEN_DIR="${MODEL_DIR}/.csghub"
     PIPELINE="${GEN_DIR}/${PIPELINE_NAME}.yaml"
     rm -f "${PIPELINE}"

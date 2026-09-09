@@ -1,9 +1,12 @@
-"""Patch a PaddleX OCR pipeline config to use the downloaded repo's weights.
+"""Patch PaddleX OCR pipeline configs for downloaded model repositories.
 
 The CSGHub repo is a single recognition model (e.g. PP-OCRv6_small_rec):
 TextRecognition is pointed at the local weights and TextDetection is switched
 to the matching-tier det model name (still resolved from the model sources).
 Language-prefixed rec repos (latin_/korean_/eslav_) map to the unprefixed det.
+
+PaddleOCR-VL points VLRecognition at the local repository and initializes the
+optional document-preprocessor models for per-request opt-in use.
 """
 
 import argparse
@@ -34,6 +37,28 @@ def patch_paddleocr_vl(cfg, model_name, model_dir):
     vl_recognition = sub_modules.get("VLRecognition")
     if vl_recognition is None:
         raise ValueError("PaddleOCR-VL pipeline config has no SubModules.VLRecognition")
+
+    sub_pipelines = cfg.get("SubPipelines", {})
+    doc_preprocessor = sub_pipelines.get("DocPreprocessor")
+    if doc_preprocessor is None:
+        raise ValueError(
+            "PaddleOCR-VL pipeline config has no SubPipelines.DocPreprocessor"
+        )
+
+    doc_preprocessor_modules = doc_preprocessor.get("SubModules", {})
+    required_modules = {"DocOrientationClassify", "DocUnwarping"}
+    missing_modules = required_modules - doc_preprocessor_modules.keys()
+    if missing_modules:
+        missing = ", ".join(sorted(missing_modules))
+        raise ValueError(
+            f"PaddleOCR-VL DocPreprocessor is missing required modules: {missing}"
+        )
+
+    # Load optional preprocessing models at startup; requests still decide
+    # whether either operation runs.
+    cfg["use_doc_preprocessor"] = True
+    doc_preprocessor["use_doc_orientation_classify"] = True
+    doc_preprocessor["use_doc_unwarping"] = True
 
     vl_recognition["model_name"] = model_name
     vl_recognition["model_dir"] = model_dir

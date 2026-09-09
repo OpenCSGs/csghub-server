@@ -302,6 +302,8 @@ func TestOpenAIHandler_OCRPaddleXVLPDF(t *testing.T) {
 	var payload map[string]any
 	require.NoError(t, json.Unmarshal(gotBody, &payload))
 	assert.EqualValues(t, 0, payload["fileType"])
+	assert.Equal(t, false, payload["useDocOrientationClassify"])
+	assert.Equal(t, false, payload["useDocUnwarping"])
 	assert.Equal(t, false, payload["returnMarkdownImages"])
 
 	require.Equal(t, http.StatusOK, w.Code)
@@ -311,6 +313,119 @@ func TestOpenAIHandler_OCRPaddleXVLPDF(t *testing.T) {
 	require.Len(t, resp.Pages, 1)
 	assert.Equal(t, "# Page text", resp.Pages[0].Markdown)
 	assert.Empty(t, resp.Pages[0].Lines)
+	wg.Wait()
+}
+
+func TestOpenAIHandler_OCRPaddleXVLReturnImages(t *testing.T) {
+	tester, c, w := setupTest(t)
+
+	var gotBody []byte
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotBody, _ = io.ReadAll(r.Body)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{
+          "errorCode": 0,
+          "result": {"layoutParsingResults": [{
+            "prunedResult": {"parsing_res_list": [{"block_content": "page text"}]},
+            "markdown": {
+              "text": "# Page text",
+              "images": {"imgs/figure_1.jpg": "aW1hZ2U="}
+            }
+          }]}
+        }`))
+	}))
+	defer upstream.Close()
+
+	c.Request = withCancelableContext(t, newMultipartOCRRequest(t, "model1", "pdf-bytes", "application/pdf", map[string]string{
+		"return_image": "true",
+	}, 1))
+	model := ocrTestModelWithRuntime("model1", "paddleocr-vl-model", upstream.URL, "paddleocr-vl")
+	tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "model1").Return(model, nil).Once()
+	tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil).Once()
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	tester.mocks.openAIComp.EXPECT().
+		RecordUsageFromTokenUsage(mock.Anything, "testuuid", model, "paddleocr-vl-model", mock.MatchedBy(func(usage *token.Usage) bool {
+			return usage != nil && usage.DataType == string(commontypes.DataTypeOCR) && usage.CompletionRC == 1
+		}), mock.Anything).
+		RunAndReturn(func(context.Context, string, *types.Model, string, *token.Usage, string) error {
+			wg.Done()
+			return nil
+		}).Once()
+
+	tester.handler.OCR(c)
+
+	var payload map[string]any
+	require.NoError(t, json.Unmarshal(gotBody, &payload))
+	assert.Equal(t, true, payload["returnMarkdownImages"])
+	assert.Equal(t, true, payload["visualize"])
+
+	require.Equal(t, http.StatusOK, w.Code)
+	var resp types.OCRResponse
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+	require.Len(t, resp.Pages, 1)
+	require.Len(t, resp.Pages[0].Images, 1)
+	assert.Equal(t, types.OCRImage{Name: "imgs/figure_1.jpg", Content: "aW1hZ2U="}, resp.Pages[0].Images[0])
+	wg.Wait()
+}
+
+func TestOpenAIHandler_OCRPaddleXVLRawResponseOmitsMarkdownImages(t *testing.T) {
+	tester, c, w := setupTest(t)
+
+	var gotBody []byte
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotBody, _ = io.ReadAll(r.Body)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{
+          "errorCode": 0,
+          "result": {"layoutParsingResults": [{
+            "prunedResult": {"parsing_res_list": [{"block_content": "page text"}]},
+            "markdown": {
+              "text": "# Page text",
+              "images": {"imgs/figure_1.jpg": "aW1hZ2U="}
+            }
+          }]}
+        }`))
+	}))
+	defer upstream.Close()
+
+	c.Request = withCancelableContext(t, newMultipartOCRRequest(t, "model1", "pdf-bytes", "application/pdf", map[string]string{
+		"raw_response": "true",
+	}, 1))
+	model := ocrTestModelWithRuntime("model1", "paddleocr-vl-model", upstream.URL, "paddleocr-vl")
+	tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "model1").Return(model, nil).Once()
+	tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil).Once()
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	tester.mocks.openAIComp.EXPECT().
+		RecordUsageFromTokenUsage(mock.Anything, "testuuid", model, "paddleocr-vl-model", mock.MatchedBy(func(usage *token.Usage) bool {
+			return usage != nil && usage.DataType == string(commontypes.DataTypeOCR) && usage.CompletionRC == 1
+		}), mock.Anything).
+		RunAndReturn(func(context.Context, string, *types.Model, string, *token.Usage, string) error {
+			wg.Done()
+			return nil
+		}).Once()
+
+	tester.handler.OCR(c)
+
+	var payload map[string]any
+	require.NoError(t, json.Unmarshal(gotBody, &payload))
+	assert.Equal(t, false, payload["returnMarkdownImages"])
+	assert.Equal(t, false, payload["visualize"])
+
+	require.Equal(t, http.StatusOK, w.Code)
+	var resp types.OCRResponse
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+	require.NotNil(t, resp.RawResult)
+	rawJSON, err := json.Marshal(resp.RawResult)
+	require.NoError(t, err)
+	assert.Contains(t, string(rawJSON), "imgs/figure_1.jpg")
+	require.Len(t, resp.Pages, 1)
+	assert.Empty(t, resp.Pages[0].Images)
 	wg.Wait()
 }
 

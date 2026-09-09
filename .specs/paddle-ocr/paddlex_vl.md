@@ -95,15 +95,22 @@ PaddleX registers the PaddleOCR-VL series as independent top-level pipelines. Th
 | `PaddleOCR-VL-1.5` | `PP-DocLayoutV3` | `PaddleOCR-VL-1.5-0.9B` |
 | `PaddleOCR-VL-1.6` | `PP-DocLayoutV3` | `PaddleOCR-VL-1.6-0.9B` |
 
-The runtime derives the pipeline from the downloaded repository basename:
+The runtime reads the canonical recognition name from `Global.model_name` in the downloaded repository's `inference.yml`. Repository paths and CSGHub-imported names whose source namespace is flattened into an underscore prefix are storage identities only and do not participate in pipeline selection.
 
-| Model basename pattern | Selected pipeline |
+| `inference.yml` model name | Selected pipeline |
 | --- | --- |
-| `PaddleOCR-VL-1.6*` | `PaddleOCR-VL-1.6` |
-| `PaddleOCR-VL-1.5*` | `PaddleOCR-VL-1.5` |
-| `PaddleOCR-VL*` | `PaddleOCR-VL` |
+| `PaddleOCR-VL-0.9B` | `PaddleOCR-VL` |
+| `PaddleOCR-VL-<version>-0.9B` | `PaddleOCR-VL-<version>` |
 
-The most specific patterns must be evaluated first. Names outside the PaddleOCR-VL family fail startup. The broad base-family fallback supports existing base-repository naming variants; a new version must receive an explicit mapping and validation before it is declared supported.
+For the currently supported repositories this produces:
+
+| Metadata model name | Selected pipeline |
+| --- | --- |
+| `PaddleOCR-VL-0.9B` | `PaddleOCR-VL` |
+| `PaddleOCR-VL-1.5-0.9B` | `PaddleOCR-VL-1.5` |
+| `PaddleOCR-VL-1.6-0.9B` | `PaddleOCR-VL-1.6` |
+
+Missing or invalid metadata and names outside the PaddleOCR-VL family fail startup. The discovered metadata value is written to `VLRecognition.model_name`, while the downloaded repository directory is written to `VLRecognition.model_dir`. PaddleX's pipeline-config lookup remains the final validation that the derived pipeline version exists in the pinned runtime.
 
 The pipeline version, rather than custom CSGHub logic, selects `PP-DocLayoutV2` or `PP-DocLayoutV3`. `gen_pipeline.py` patches only `SubModules.VLRecognition`; it must not replace `SubModules.LayoutDetection`.
 
@@ -138,6 +145,7 @@ The main implementation seams are:
 | Runtime registration | `configs/inference/paddleocr-vl.json` |
 | Runtime image | `docker/inference/Dockerfile.paddleocr` |
 | Repository download | `docker/inference/paddleocr/entry.py` |
+| Model metadata parsing | `docker/inference/paddleocr/model_metadata.py` |
 | Framework and pipeline selection | `docker/inference/paddleocr/serve.sh` |
 | Generated-config patching | `docker/inference/paddleocr/gen_pipeline.py` |
 | Adapter registry and shared contract | `aigateway/component/adapter/ocr/adapter.go` |
@@ -198,9 +206,11 @@ paddlex --get_pipeline_config PaddleOCR-VL-1.6 \
 
 PaddleX deterministically writes `PaddleOCR-VL-1.6.yaml`. The runtime removes a stale generated copy first because `/workspace` can persist across restarts and the PaddleX CLI otherwise prompts before overwriting.
 
-`gen_pipeline.py` then updates only the selected recognition module:
+`gen_pipeline.py` points the selected recognition module at the downloaded repository and enables the optional document-preprocessor sub-pipeline so its models are available at request time:
 
 ```yaml
+use_doc_preprocessor: true
+
 SubModules:
   LayoutDetection:
     model_name: PP-DocLayoutV3
@@ -209,9 +219,14 @@ SubModules:
   VLRecognition:
     model_name: PaddleOCR-VL-1.6-0.9B
     model_dir: /workspace/<REPO_ID>
+
+SubPipelines:
+  DocPreprocessor:
+    use_doc_orientation_classify: true
+    use_doc_unwarping: true
 ```
 
-Leaving the layout `model_dir` unset is intentional: it activates PaddleX's established submodel-resolution behavior, which is also used by classic OCR detection and optional preprocessing models.
+This initializes `PP-LCNet_x1_0_doc_ori` and `UVDoc` when the service starts but does not require either operation to run for every request. Leaving their model directories and the layout `model_dir` unset is intentional: it activates PaddleX's established submodel-resolution behavior, which is also used by classic OCR detection. A local-only or explicitly supplied pipeline configuration owns its complete model layout and must initialize the same preprocessing capabilities if it accepts these request options.
 
 ## Model Source Strategy
 
@@ -292,8 +307,13 @@ Optional fields:
 | `use_doc_unwarping` | forwarded | forwarded |
 | `use_textline_orientation` | forwarded | rejected |
 | `return_image` | maps to upstream `visualize` | maps to upstream `visualize` |
-| `raw_response` | includes raw result | includes raw result and requests Markdown images |
+| `raw_response` | includes raw result | includes raw result |
 | `page_ranges` | rejected when non-empty | rejected when non-empty |
+
+For `paddleocr-vl`, `return_image` additionally requests upstream Markdown
+images (`returnMarkdownImages=true`) and surfaces them in `pages[].images` as
+base64. `raw_response` only controls whether the complete upstream response is
+echoed in `raw_result`.
 
 ### PaddleX VL upstream request
 
@@ -303,12 +323,19 @@ AIGateway converts the multipart upload to PaddleX JSON:
 {
   "file": "<base64 file bytes>",
   "fileType": 1,
+  "useDocOrientationClassify": false,
+  "useDocUnwarping": false,
   "visualize": false,
   "returnMarkdownImages": false
 }
 ```
 
-`fileType` is `1` for images and `0` for PDFs. `returnMarkdownImages` is enabled only when `raw_response=true`, because the normalized response has no stable contract for provider-specific embedded image payloads.
+`fileType` is `1` for images and `0` for PDFs. The adapter always sends both preprocessing booleans: omitted client options become `false`, while explicit values are preserved. This keeps preprocessing off for ordinary requests even though the models are initialized. `returnMarkdownImages` is enabled when `return_image=true`, so the upstream `markdown.images` mapping is populated and the normalized response can carry it in `pages[].images`.
+
+Compatibility note: before this change, `raw_response=true` implicitly requested
+`returnMarkdownImages=true`, so `raw_result` carried `markdown.images`. Clients
+that relied on that must now pass `return_image=true` explicitly; `raw_response`
+only controls whether the complete upstream response is echoed in `raw_result`.
 
 The adapter proxies this request to `/layout-parsing`. A model-level endpoint path may override the adapter's default endpoint.
 
@@ -326,7 +353,13 @@ The adapter proxies this request to `/layout-parsing`. A model-level endpoint pa
       "index": 0,
       "text": "page plain text",
       "markdown": "page markdown",
-      "lines": []
+      "lines": [],
+      "images": [
+        {
+          "name": "imgs/img_in_image_box_755_185_1522_685.jpg",
+          "content": "<base64 image bytes>"
+        }
+      ]
     }
   ],
   "usage": {
@@ -342,15 +375,16 @@ Response mapping:
 | --- | --- |
 | `layoutParsingResults[i].markdown.text` | `pages[i].markdown` |
 | `layoutParsingResults[i].prunedResult.parsing_res_list[].block_content` | joined into `pages[i].text` |
+| `layoutParsingResults[i].markdown.images` | `pages[i].images`, only with `return_image=true` |
 | all page text | joined into top-level `text` |
 | number of layout parsing results | `usage.pages` |
 | complete PaddleX response | `raw_result`, only with `raw_response=true` |
 
-The upstream `markdown` field is an object, while `OCRPage.Markdown` is deliberately a string. Only `markdown.text` is placed in the normalized page. The complete Markdown object, including `markdown.images`, remains available through `raw_result` when requested.
+The upstream `markdown` field is an object, while `OCRPage.Markdown` is deliberately a string. Only `markdown.text` is placed in the normalized page. The `markdown.images` mapping (filename -> base64) is normalized into `pages[i].images` with a stable filename order when `return_image=true`; it is omitted otherwise.
 
-`outputImages` and `markdown.images` must not be mapped to `pages[].image_url`: PaddleX may return base64 data rather than stable URLs. AIGateway does not upload these payloads to object storage in this version.
+`outputImages` and `markdown.images` must not be mapped to `pages[].image_url`: PaddleX may return base64 data rather than stable URLs, and AIGateway does not upload these payloads to object storage in this version. `pages[].images` carries the raw base64 content so clients can resolve the Markdown references themselves.
 
-The normalized Markdown is not guaranteed to be self-contained when PaddleX emits relative image references. Clients that need provider-specific Markdown assets must request `raw_response=true` and consume the complete `markdown.images` mapping from `raw_result`.
+The normalized Markdown is not guaranteed to be self-contained when PaddleX emits relative image references. Clients that need these assets request `return_image=true` and resolve the Markdown references against `pages[].images`; the complete `markdown.images` mapping also remains available in `raw_result` with `raw_response=true`.
 
 VL results use Markdown and page text rather than classic `OCRLine` values. Tables, formulas, and layout blocks remain in Markdown or `raw_result` instead of being represented as ordinary OCR lines.
 
@@ -399,7 +433,7 @@ Runtime model downloads use the deployment access token. AIGateway applies the r
 | --- | --- |
 | Missing or unknown image runtime-mode argument | Container startup fails |
 | Unknown PaddleOCR model source | Container startup fails |
-| Model basename outside the PaddleOCR-VL family | Container startup fails |
+| Missing or unsupported `inference.yml` model identity | Container startup fails |
 | Missing offline pipeline bundle | Container startup fails |
 | PaddleX fails to generate the selected pipeline config | Container startup fails |
 | PDF sent to classic OCR | AIGateway returns a client error |
@@ -413,11 +447,12 @@ Runtime model downloads use the deployment access token. AIGateway applies the r
 ### Runtime
 
 - Verify all three supported PaddleOCR-VL pipeline names generate the expected YAML filename.
-- Verify each model basename selects its matching pipeline.
+- Verify each `inference.yml` model identity selects its matching pipeline.
 - Verify the base pipeline retains `PP-DocLayoutV2`.
 - Verify the 1.5 and 1.6 pipelines retain `PP-DocLayoutV3`.
-- Verify generated patching changes only `VLRecognition`.
-- Verify layout submodels download through the configured model source in hub mode.
+- Verify generated patching preserves layout-model selection, points only `VLRecognition` at the deployed repository, and enables `DocPreprocessor`.
+- Verify layout and preprocessing submodels download through the configured model source in hub mode.
+- Verify `PP-LCNet_x1_0_doc_ori` and `UVDoc` initialize before serving becomes ready.
 - Verify a complete local-only bundle starts without network access.
 - Verify missing local-only submodels fail clearly.
 - Verify missing or unknown image runtime modes and non-PaddleOCR-VL model names fail startup.
@@ -430,11 +465,16 @@ Runtime model downloads use the deployment access token. AIGateway applies the r
 - Multi-page PDF parsing and correct page count.
 - Reading-order, table, and formula fixtures.
 - Image/PDF `fileType` mapping.
+- Omitted preprocessing options serialize upstream as explicit `false` values.
+- Orientation and unwarping opt-ins independently preserve explicit `true` values.
 - Unsupported classic PDF and VL text-line-orientation errors.
 - Rejection of non-empty `page_ranges`.
 - `markdown.text` string normalization.
-- Populated, missing, and null `markdown.images` inside raw results.
+- Populated, missing, and null `markdown.images` become `pages[].images` only
+  with `return_image=true`, in stable filename order.
 - Complete raw-response gating.
+- `return_image=true` requests upstream `returnMarkdownImages` and surfaces
+  base64 images in the normalized response.
 - Upstream HTTP-error passthrough and invalid-success-response handling.
 - OCR usage and trace metadata.
 

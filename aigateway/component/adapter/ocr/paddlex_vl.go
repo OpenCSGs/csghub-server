@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -44,8 +45,8 @@ func (a *PaddleXVLAdapter) EndpointPath(_ *types.Model) string {
 type paddleXVLRequest struct {
 	File                      string `json:"file"`
 	FileType                  int    `json:"fileType"`
-	UseDocOrientationClassify *bool  `json:"useDocOrientationClassify,omitempty"`
-	UseDocUnwarping           *bool  `json:"useDocUnwarping,omitempty"`
+	UseDocOrientationClassify bool   `json:"useDocOrientationClassify"`
+	UseDocUnwarping           bool   `json:"useDocUnwarping"`
 	Visualize                 bool   `json:"visualize"`
 	ReturnMarkdownImages      bool   `json:"returnMarkdownImages"`
 }
@@ -63,8 +64,8 @@ func (a *PaddleXVLAdapter) BuildUpstreamRequest(in *UpstreamInput) ([]byte, erro
 	return json.Marshal(paddleXVLRequest{
 		File:                      base64.StdEncoding.EncodeToString(in.FileBytes),
 		FileType:                  in.FileType,
-		UseDocOrientationClassify: in.UseDocOrientationClassify,
-		UseDocUnwarping:           in.UseDocUnwarping,
+		UseDocOrientationClassify: in.UseDocOrientationClassify != nil && *in.UseDocOrientationClassify,
+		UseDocUnwarping:           in.UseDocUnwarping != nil && *in.UseDocUnwarping,
 		Visualize:                 in.Visualize,
 		ReturnMarkdownImages:      in.ReturnMarkdownImages,
 	})
@@ -95,7 +96,10 @@ type paddleXVLParsingResult struct {
 }
 
 type paddleXVLMarkdown struct {
-	Text   *string         `json:"text"`
+	Text *string `json:"text"`
+	// Images is the upstream filename -> base64 mapping for embedded figures.
+	// The upstream contract is a JSON object or null; raw JSON is kept so an
+	// unexpected shape degrades to absent images instead of failing the page.
 	Images json.RawMessage `json:"images"`
 }
 
@@ -138,12 +142,16 @@ func (a *PaddleXVLAdapter) TransformResponse(respBody []byte, opts *ResponseOpti
 		}
 		pageText := strings.Join(blocks, "\n")
 		pageTexts = append(pageTexts, pageText)
-		resp.Pages = append(resp.Pages, types.OCRPage{
+		page := types.OCRPage{
 			Index:    i,
 			Text:     pageText,
 			Markdown: *result.Markdown.Text,
 			Lines:    []types.OCRLine{},
-		})
+		}
+		if opts != nil && opts.ReturnImage {
+			page.Images = ocrImagesFromMarkdown(markdownImages(result.Markdown.Images))
+		}
+		resp.Pages = append(resp.Pages, page)
 	}
 
 	resp.Text = strings.Join(pageTexts, "\n")
@@ -155,4 +163,36 @@ func (a *PaddleXVLAdapter) TransformResponse(respBody []byte, opts *ResponseOpti
 		}
 	}
 	return resp, nil
+}
+
+// markdownImages decodes the upstream markdown.images mapping. Non-object
+// values (arrays, strings, numbers) are treated as absent so a changed
+// upstream contract never fails the whole OCR response.
+func markdownImages(raw json.RawMessage) map[string]string {
+	if len(raw) == 0 || string(raw) == "null" {
+		return nil
+	}
+	var images map[string]string
+	if err := json.Unmarshal(raw, &images); err != nil {
+		return nil
+	}
+	return images
+}
+
+// ocrImagesFromMarkdown converts the upstream markdown.images map
+// (filename -> base64) into the normalized OCRImage list with a stable order.
+func ocrImagesFromMarkdown(images map[string]string) []types.OCRImage {
+	if len(images) == 0 {
+		return nil
+	}
+	names := make([]string, 0, len(images))
+	for name := range images {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	out := make([]types.OCRImage, 0, len(names))
+	for _, name := range names {
+		out = append(out, types.OCRImage{Name: name, Content: images[name]})
+	}
+	return out
 }
