@@ -4,6 +4,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/aigateway/handler/anthropic"
 	"opencsg.com/csghub-server/aigateway/handler/plan"
+	_ "opencsg.com/csghub-server/aigateway/types"
 	"opencsg.com/csghub-server/api/httpbase"
 	commontrace "opencsg.com/csghub-server/common/utils/trace"
 )
