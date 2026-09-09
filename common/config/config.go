@@ -555,6 +555,13 @@ type Config struct {
 		MetricsCollectorLookbackMinutes int `env:"OPENCSG_AIGATEWAY_METRICS_COLLECTOR_LOOKBACK_MINUTES" default:"60"`
 
 		Metrics struct {
+			// Enabled controls whether the AIGateway metrics collection
+			// system (DBSink and MetricCollector) is active.  When set to
+			// false, per-request metrics events are discarded and the
+			// per-minute collector becomes a no-op.  Disable this on
+			// environments without TimescaleDB (e.g. AWS RDS) to avoid
+			// write errors against hypertables converted to regular tables.
+			Enabled bool `env:"OPENCSG_AIGATEWAY_METRICS_ENABLED" default:"true"`
 			// DBSinkBufferSize is the buffered channel capacity used by the
 			// AIGateway metrics DBSink (EE/SaaS).  When the channel is
 			// full, new events are dropped with a WARN log to avoid

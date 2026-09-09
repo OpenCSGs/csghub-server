@@ -7,23 +7,44 @@
 -- compression, retention policies) are intentionally omitted so the migration
 -- runs on the Apache 2 edition.
 --
--- Tables are created by the companion Go migration
--- 20260731060001_create_aigateway_metrics_tables.go.
+-- Tables are created by the companion SQL migration
+-- 20260731060001_create_aigateway_metrics_tables.up.sql.
+--
+-- Compatibility: TimescaleDB-specific statements (CREATE EXTENSION and
+-- create_hypertable) are wrapped in DO blocks that catch errors.  On systems
+-- without the timescaledb extension (e.g. AWS RDS), the migration succeeds
+-- gracefully — the base tables remain as regular PostgreSQL tables and all
+-- standard PostgreSQL objects (indexes, views, materialized views) are created
+-- normally.  Only the hypertable conversion is skipped.
 -- ===========================================================================
 
 -- 1. Enable TimescaleDB extension (Apache 2).
-CREATE EXTENSION IF NOT EXISTS timescaledb;
+-- Wrapped in a DO block so the migration succeeds on systems without
+-- TimescaleDB (e.g. AWS RDS).  The extension is required only for the
+-- hypertable conversion below; all other DDL in this migration is standard
+-- PostgreSQL and works regardless.
+DO $$
+BEGIN
+    CREATE EXTENSION IF NOT EXISTS timescaledb;
+EXCEPTION WHEN OTHERS THEN
+    RAISE NOTICE 'TimescaleDB extension not available on this PostgreSQL instance (e.g. AWS RDS). Skipping hypertable conversion. Base tables will remain as regular PostgreSQL tables. Error: %', SQLERRM;
+END $$;
 
 -- ===========================================================================
 -- 2. aigateway_metrics_minute hypertable
 -- ===========================================================================
 
-SELECT create_hypertable(
-    'aigateway_metrics_minute',
-    'bucket_time',
-    chunk_time_interval => INTERVAL '1 hour',
-    if_not_exists       => TRUE
-);
+DO $$
+BEGIN
+    PERFORM create_hypertable(
+        'aigateway_metrics_minute',
+        'bucket_time',
+        chunk_time_interval => INTERVAL '1 hour',
+        if_not_exists       => TRUE
+    );
+EXCEPTION WHEN undefined_function THEN
+    RAISE NOTICE 'Skipping create_hypertable for aigateway_metrics_minute (TimescaleDB not available): %', SQLERRM;
+END $$;
 
 -- Index for the most common dashboard query: filter by model+provider, order by time.
 CREATE INDEX IF NOT EXISTS idx_amm_model_provider_bucket
@@ -87,12 +108,17 @@ CREATE TABLE IF NOT EXISTS aigateway_metrics_events (
     created_at            timestamptz  NOT NULL DEFAULT current_timestamp
 );
 
-SELECT create_hypertable(
-    'aigateway_metrics_events',
-    'bucket_time',
-    chunk_time_interval => INTERVAL '1 hour',
-    if_not_exists       => TRUE
-);
+DO $$
+BEGIN
+    PERFORM create_hypertable(
+        'aigateway_metrics_events',
+        'bucket_time',
+        chunk_time_interval => INTERVAL '1 hour',
+        if_not_exists       => TRUE
+    );
+EXCEPTION WHEN undefined_function THEN
+    RAISE NOTICE 'Skipping create_hypertable for aigateway_metrics_events (TimescaleDB not available): %', SQLERRM;
+END $$;
 
 CREATE INDEX IF NOT EXISTS idx_ame_api_key_bucket
     ON aigateway_metrics_events (api_key_masked, bucket_time DESC);
