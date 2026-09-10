@@ -343,9 +343,9 @@ func (_c *MockOpenAIComponent_CommitUsageLimitFromUsage_Call) RunAndReturn(run f
 	return _c
 }
 
-// GetAvailableModels provides a mock function with given fields: c, user
-func (_m *MockOpenAIComponent) GetAvailableModels(c context.Context, user string) ([]types.Model, error) {
-	ret := _m.Called(c, user)
+// GetAvailableModels provides a mock function with given fields: c, nsUUID
+func (_m *MockOpenAIComponent) GetAvailableModels(c context.Context, nsUUID string) ([]types.Model, error) {
+	ret := _m.Called(c, nsUUID)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetAvailableModels")
@@ -354,10 +354,10 @@ func (_m *MockOpenAIComponent) GetAvailableModels(c context.Context, user string
 	var r0 []types.Model
 	var r1 error
 	if rf, ok := ret.Get(0).(func(context.Context, string) ([]types.Model, error)); ok {
-		return rf(c, user)
+		return rf(c, nsUUID)
 	}
 	if rf, ok := ret.Get(0).(func(context.Context, string) []types.Model); ok {
-		r0 = rf(c, user)
+		r0 = rf(c, nsUUID)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]types.Model)
@@ -365,7 +365,7 @@ func (_m *MockOpenAIComponent) GetAvailableModels(c context.Context, user string
 	}
 
 	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
-		r1 = rf(c, user)
+		r1 = rf(c, nsUUID)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -380,12 +380,12 @@ type MockOpenAIComponent_GetAvailableModels_Call struct {
 
 // GetAvailableModels is a helper method to define mock.On call
 //   - c context.Context
-//   - user string
-func (_e *MockOpenAIComponent_Expecter) GetAvailableModels(c interface{}, user interface{}) *MockOpenAIComponent_GetAvailableModels_Call {
-	return &MockOpenAIComponent_GetAvailableModels_Call{Call: _e.mock.On("GetAvailableModels", c, user)}
+//   - nsUUID string
+func (_e *MockOpenAIComponent_Expecter) GetAvailableModels(c interface{}, nsUUID interface{}) *MockOpenAIComponent_GetAvailableModels_Call {
+	return &MockOpenAIComponent_GetAvailableModels_Call{Call: _e.mock.On("GetAvailableModels", c, nsUUID)}
 }
 
-func (_c *MockOpenAIComponent_GetAvailableModels_Call) Run(run func(c context.Context, user string)) *MockOpenAIComponent_GetAvailableModels_Call {
+func (_c *MockOpenAIComponent_GetAvailableModels_Call) Run(run func(c context.Context, nsUUID string)) *MockOpenAIComponent_GetAvailableModels_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run(args[0].(context.Context), args[1].(string))
 	})
@@ -402,9 +402,9 @@ func (_c *MockOpenAIComponent_GetAvailableModels_Call) RunAndReturn(run func(con
 	return _c
 }
 
-// GetModelByID provides a mock function with given fields: c, username, modelID
-func (_m *MockOpenAIComponent) GetModelByID(c context.Context, username string, modelID string) (*types.Model, error) {
-	ret := _m.Called(c, username, modelID)
+// GetModelByID provides a mock function with given fields: c, nsUUID, modelID
+func (_m *MockOpenAIComponent) GetModelByID(c context.Context, nsUUID string, modelID string) (*types.Model, error) {
+	ret := _m.Called(c, nsUUID, modelID)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetModelByID")
@@ -413,10 +413,10 @@ func (_m *MockOpenAIComponent) GetModelByID(c context.Context, username string, 
 	var r0 *types.Model
 	var r1 error
 	if rf, ok := ret.Get(0).(func(context.Context, string, string) (*types.Model, error)); ok {
-		return rf(c, username, modelID)
+		return rf(c, nsUUID, modelID)
 	}
 	if rf, ok := ret.Get(0).(func(context.Context, string, string) *types.Model); ok {
-		r0 = rf(c, username, modelID)
+		r0 = rf(c, nsUUID, modelID)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*types.Model)
@@ -424,7 +424,7 @@ func (_m *MockOpenAIComponent) GetModelByID(c context.Context, username string, 
 	}
 
 	if rf, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
-		r1 = rf(c, username, modelID)
+		r1 = rf(c, nsUUID, modelID)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -439,13 +439,13 @@ type MockOpenAIComponent_GetModelByID_Call struct {
 
 // GetModelByID is a helper method to define mock.On call
 //   - c context.Context
-//   - username string
+//   - nsUUID string
 //   - modelID string
-func (_e *MockOpenAIComponent_Expecter) GetModelByID(c interface{}, username interface{}, modelID interface{}) *MockOpenAIComponent_GetModelByID_Call {
-	return &MockOpenAIComponent_GetModelByID_Call{Call: _e.mock.On("GetModelByID", c, username, modelID)}
+func (_e *MockOpenAIComponent_Expecter) GetModelByID(c interface{}, nsUUID interface{}, modelID interface{}) *MockOpenAIComponent_GetModelByID_Call {
+	return &MockOpenAIComponent_GetModelByID_Call{Call: _e.mock.On("GetModelByID", c, nsUUID, modelID)}
 }
 
-func (_c *MockOpenAIComponent_GetModelByID_Call) Run(run func(c context.Context, username string, modelID string)) *MockOpenAIComponent_GetModelByID_Call {
+func (_c *MockOpenAIComponent_GetModelByID_Call) Run(run func(c context.Context, nsUUID string, modelID string)) *MockOpenAIComponent_GetModelByID_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run(args[0].(context.Context), args[1].(string), args[2].(string))
 	})
@@ -462,9 +462,9 @@ func (_c *MockOpenAIComponent_GetModelByID_Call) RunAndReturn(run func(context.C
 	return _c
 }
 
-// ListModels provides a mock function with given fields: c, user, req
-func (_m *MockOpenAIComponent) ListModels(c context.Context, user string, req types.ListModelsReq) (types.ModelList, error) {
-	ret := _m.Called(c, user, req)
+// ListModels provides a mock function with given fields: c, nsUUID, req
+func (_m *MockOpenAIComponent) ListModels(c context.Context, nsUUID string, req types.ListModelsReq) (types.ModelList, error) {
+	ret := _m.Called(c, nsUUID, req)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ListModels")
@@ -473,16 +473,16 @@ func (_m *MockOpenAIComponent) ListModels(c context.Context, user string, req ty
 	var r0 types.ModelList
 	var r1 error
 	if rf, ok := ret.Get(0).(func(context.Context, string, types.ListModelsReq) (types.ModelList, error)); ok {
-		return rf(c, user, req)
+		return rf(c, nsUUID, req)
 	}
 	if rf, ok := ret.Get(0).(func(context.Context, string, types.ListModelsReq) types.ModelList); ok {
-		r0 = rf(c, user, req)
+		r0 = rf(c, nsUUID, req)
 	} else {
 		r0 = ret.Get(0).(types.ModelList)
 	}
 
 	if rf, ok := ret.Get(1).(func(context.Context, string, types.ListModelsReq) error); ok {
-		r1 = rf(c, user, req)
+		r1 = rf(c, nsUUID, req)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -497,13 +497,13 @@ type MockOpenAIComponent_ListModels_Call struct {
 
 // ListModels is a helper method to define mock.On call
 //   - c context.Context
-//   - user string
+//   - nsUUID string
 //   - req types.ListModelsReq
-func (_e *MockOpenAIComponent_Expecter) ListModels(c interface{}, user interface{}, req interface{}) *MockOpenAIComponent_ListModels_Call {
-	return &MockOpenAIComponent_ListModels_Call{Call: _e.mock.On("ListModels", c, user, req)}
+func (_e *MockOpenAIComponent_Expecter) ListModels(c interface{}, nsUUID interface{}, req interface{}) *MockOpenAIComponent_ListModels_Call {
+	return &MockOpenAIComponent_ListModels_Call{Call: _e.mock.On("ListModels", c, nsUUID, req)}
 }
 
-func (_c *MockOpenAIComponent_ListModels_Call) Run(run func(c context.Context, user string, req types.ListModelsReq)) *MockOpenAIComponent_ListModels_Call {
+func (_c *MockOpenAIComponent_ListModels_Call) Run(run func(c context.Context, nsUUID string, req types.ListModelsReq)) *MockOpenAIComponent_ListModels_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run(args[0].(context.Context), args[1].(string), args[2].(types.ListModelsReq))
 	})

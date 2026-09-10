@@ -327,6 +327,7 @@ func TestDeployTaskStore_RunningVisibleToUser(t *testing.T) {
 		SvcName:     "svc1",
 		RepoID:      1,
 		UserID:      1,
+		UserUUID:    "uuid-1",
 		Type:        1,
 		SecureLevel: 1,
 		Status:      common.Running,
@@ -338,6 +339,7 @@ func TestDeployTaskStore_RunningVisibleToUser(t *testing.T) {
 		SvcName:     "svc2",
 		RepoID:      2,
 		UserID:      2,
+		UserUUID:    "uuid-2",
 		Type:        2,
 		SecureLevel: 1,
 		Status:      common.Running,
@@ -349,6 +351,7 @@ func TestDeployTaskStore_RunningVisibleToUser(t *testing.T) {
 		SvcName:     "svc3",
 		RepoID:      3,
 		UserID:      1,
+		UserUUID:    "uuid-1",
 		Type:        1,
 		SecureLevel: 2, //private
 		Status:      common.Running,
@@ -360,6 +363,7 @@ func TestDeployTaskStore_RunningVisibleToUser(t *testing.T) {
 		SvcName:     "svc4",
 		RepoID:      4,
 		UserID:      2,
+		UserUUID:    "uuid-2",
 		Type:        1,
 		SecureLevel: 1,
 		Status:      common.Running,
@@ -371,6 +375,7 @@ func TestDeployTaskStore_RunningVisibleToUser(t *testing.T) {
 		SvcName:     "svc5",
 		RepoID:      5,
 		UserID:      3,
+		UserUUID:    "uuid-3",
 		Type:        3,
 		SecureLevel: 1,
 		Status:      common.Running,
@@ -382,9 +387,22 @@ func TestDeployTaskStore_RunningVisibleToUser(t *testing.T) {
 		SvcName:     "svc6",
 		RepoID:      6,
 		UserID:      3,
+		UserUUID:    "uuid-3",
 		Type:        3,
 		SecureLevel: 1,
 		Status:      common.Stopped,
+	}
+	// deploy with empty user_uuid, private — must not be visible to anonymous users
+	deploy7 := database.Deploy{
+		ID:          7,
+		DeployName:  "deploy7",
+		SvcName:     "svc7",
+		RepoID:      7,
+		UserID:      0,
+		UserUUID:    "",
+		Type:        1,
+		SecureLevel: 2, // private
+		Status:      common.Running,
 	}
 
 	// Insert test data into the database
@@ -400,9 +418,11 @@ func TestDeployTaskStore_RunningVisibleToUser(t *testing.T) {
 	require.Nil(t, err)
 	err = store.CreateDeploy(ctx, &deploy6)
 	require.Nil(t, err)
+	err = store.CreateDeploy(ctx, &deploy7)
+	require.Nil(t, err)
 
-	// Test RunningVisibleToUser with user ID 1
-	deploys, err := store.RunningVisibleToUser(ctx, 1)
+	// Test RunningVisibleToUser with user UUID 1
+	deploys, err := store.RunningVisibleToUser(ctx, "uuid-1")
 	require.Nil(t, err)
 	require.Len(t, deploys, 4)
 
@@ -413,8 +433,8 @@ func TestDeployTaskStore_RunningVisibleToUser(t *testing.T) {
 	}
 	require.ElementsMatch(t, expected, actual)
 
-	// Test RunningVisibleToUser with user ID 2
-	deploys, err = store.RunningVisibleToUser(ctx, 2)
+	// Test RunningVisibleToUser with user UUID 2
+	deploys, err = store.RunningVisibleToUser(ctx, "uuid-2")
 	require.Nil(t, err)
 	require.Len(t, deploys, 3)
 	expected = []int64{deploy1.ID, deploy4.ID, deploy5.ID}
@@ -424,8 +444,8 @@ func TestDeployTaskStore_RunningVisibleToUser(t *testing.T) {
 	}
 	require.ElementsMatch(t, expected, actual)
 
-	// Test RunningVisibleToUser with user ID 3
-	deploys, err = store.RunningVisibleToUser(ctx, 3)
+	// Test RunningVisibleToUser with user UUID 3
+	deploys, err = store.RunningVisibleToUser(ctx, "uuid-3")
 	require.Nil(t, err)
 	require.Len(t, deploys, 3)
 	expected = []int64{deploy1.ID, deploy4.ID, deploy5.ID}
@@ -435,6 +455,23 @@ func TestDeployTaskStore_RunningVisibleToUser(t *testing.T) {
 	}
 	require.ElementsMatch(t, expected, actual)
 
+	// Test RunningVisibleToUser with empty nsUUID (anonymous access)
+	// Should only return public running inference/serverless deploys,
+	// not the private deploy7 with empty user_uuid
+	deploys, err = store.RunningVisibleToUser(ctx, "")
+	require.Nil(t, err)
+	require.Len(t, deploys, 3) // deploy1, deploy4, deploy5 are public, running, inference/serverless
+	expected = []int64{deploy1.ID, deploy4.ID, deploy5.ID}
+	actual = []int64{}
+	for _, d := range deploys {
+		actual = append(actual, d.ID)
+	}
+	require.ElementsMatch(t, expected, actual)
+
+	// Verify deploy7 (private, empty user_uuid) is NOT included
+	for _, d := range deploys {
+		require.NotEqual(t, deploy7.ID, d.ID, "private deploy with empty user_uuid should not be visible to anonymous users")
+	}
 }
 
 func TestDeployTaskStore_ListAllDeploys(t *testing.T) {
@@ -1422,17 +1459,17 @@ func TestDeployTaskStore_CountRunningDeploysByNodeName(t *testing.T) {
 			Template:    "test",
 		},
 		{
-			DeployName: "deploy-no-cluster-node",
-			SvcName:    "svc-no-cluster-node",
-			RepoID:     6,
-			UserID:     1,
-			ClusterID:  "cluster-1",
+			DeployName:  "deploy-no-cluster-node",
+			SvcName:     "svc-no-cluster-node",
+			RepoID:      6,
+			UserID:      1,
+			ClusterID:   "cluster-1",
 			ClusterNode: "",
-			Status:     common.Running,
-			Type:       types.InferenceType,
-			GitPath:    "test",
-			GitBranch:  "main",
-			Template:   "test",
+			Status:      common.Running,
+			Type:        types.InferenceType,
+			GitPath:     "test",
+			GitBranch:   "main",
+			Template:    "test",
 		},
 	}
 

@@ -18,8 +18,8 @@ type modelResolverAdapter struct {
 	handler *OpenAIHandlerImpl
 }
 
-func (a *modelResolverAdapter) ResolveModelTarget(ctx context.Context, username, modelID string, headers http.Header, opts plan.ResolveOptions) (*types.ModelTarget, error) {
-	resolved, err := a.handler.resolveModelTargetWithOptions(ctx, username, modelID, headers, modelTargetResolveOptions{
+func (a *modelResolverAdapter) ResolveModelTarget(ctx context.Context, nsUUID, modelID string, headers http.Header, opts plan.ResolveOptions) (*types.ModelTarget, error) {
+	resolved, err := a.handler.resolveModelTargetWithOptions(ctx, nsUUID, modelID, headers, modelTargetResolveOptions{
 		RequiredUpstreamID: opts.RequiredUpstreamID,
 	})
 	if err != nil {
@@ -36,7 +36,7 @@ type contentSafetyAdapter struct {
 	policy component.SensitivePolicy
 }
 
-func (a *contentSafetyAdapter) Check(ctx context.Context, model *types.Model, promptText, tenantID, task string, streaming bool, provider string) (bool, string, error) {
+func (a *contentSafetyAdapter) Check(ctx context.Context, model *types.Model, promptText, nsUUID, task string, streaming bool, provider string) (bool, string, error) {
 	// Only token-generating protocols (chat/responses/messages) go through
 	// the SensitivePolicy gate here.  Other tasks (text-to-image,
 	// text-to-video, audio, ocr, embedding, rerank) either skip content
@@ -49,7 +49,7 @@ func (a *contentSafetyAdapter) Check(ctx context.Context, model *types.Model, pr
 		return false, "", nil
 	}
 
-	shouldCheck, result, err := a.policy.CheckResponsesSensitive(ctx, model, promptText, tenantID, streaming, provider)
+	shouldCheck, result, err := a.policy.CheckResponsesSensitive(ctx, model, promptText, nsUUID, streaming, provider)
 	if err != nil {
 		return false, "", err
 	}

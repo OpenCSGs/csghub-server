@@ -24,7 +24,7 @@ type mockModelResolver struct {
 	err    error
 }
 
-func (m *mockModelResolver) ResolveModelTarget(ctx context.Context, username, modelID string, headers http.Header, opts ResolveOptions) (*types.ModelTarget, error) {
+func (m *mockModelResolver) ResolveModelTarget(ctx context.Context, nsUUID, modelID string, headers http.Header, opts ResolveOptions) (*types.ModelTarget, error) {
 	return m.target, m.err
 }
 
@@ -50,7 +50,7 @@ type mockContentSafetyChecker struct {
 	err         error
 }
 
-func (m *mockContentSafetyChecker) Check(ctx context.Context, model *types.Model, promptText, tenantID, task string, streaming bool, provider string) (bool, string, error) {
+func (m *mockContentSafetyChecker) Check(ctx context.Context, model *types.Model, promptText, nsUUID, task string, streaming bool, provider string) (bool, string, error) {
 	// Mirror the real adapter: non-token tasks skip safety entirely.
 	switch task {
 	case "chat", "responses", "messages":
@@ -65,7 +65,7 @@ type codedErrStub struct {
 	code string
 }
 
-func (e *codedErrStub) Error() string         { return e.code }
+func (e *codedErrStub) Error() string          { return e.code }
 func (e *codedErrStub) ModelErrorCode() string { return e.code }
 
 func makeResolvedTarget(targetURL, upstreamProtocol string) *types.ModelTarget {
@@ -183,7 +183,7 @@ func TestPlan_Success_Native(t *testing.T) {
 		&mockBalanceChecker{},
 		&mockUsageLimitChecker{},
 		&mockContentSafetyChecker{},
-			nil,
+		nil,
 	)
 
 	meta := &types.RequestMetadata{
@@ -212,7 +212,7 @@ func TestPlan_Success_NoPromptText_SkipsSafety(t *testing.T) {
 		&mockBalanceChecker{},
 		&mockUsageLimitChecker{},
 		&mockContentSafetyChecker{isSensitive: true, message: "blocked"},
-			nil,
+		nil,
 	)
 
 	meta := &types.RequestMetadata{
@@ -235,7 +235,7 @@ func TestPlan_Sensitive_Flagged(t *testing.T) {
 		&mockBalanceChecker{},
 		&mockUsageLimitChecker{},
 		&mockContentSafetyChecker{isSensitive: true, message: "blocked content"},
-			nil,
+		nil,
 	)
 
 	meta := &types.RequestMetadata{
@@ -263,7 +263,7 @@ func TestPlan_SafetyCheckError_DoesNotBlock(t *testing.T) {
 		&mockBalanceChecker{},
 		&mockUsageLimitChecker{},
 		&mockContentSafetyChecker{err: errors.New("moderation unavailable")},
-			nil,
+		nil,
 	)
 
 	meta := &types.RequestMetadata{
@@ -288,7 +288,7 @@ func TestPlan_ModelNotFound(t *testing.T) {
 		&mockBalanceChecker{},
 		&mockUsageLimitChecker{},
 		&mockContentSafetyChecker{},
-			nil,
+		nil,
 	)
 
 	meta := &types.RequestMetadata{
@@ -310,7 +310,7 @@ func TestPlan_ModelNilResolution(t *testing.T) {
 		&mockBalanceChecker{},
 		&mockUsageLimitChecker{},
 		&mockContentSafetyChecker{},
-			nil,
+		nil,
 	)
 
 	meta := &types.RequestMetadata{
@@ -331,7 +331,7 @@ func TestPlan_ModelUnavailable(t *testing.T) {
 		&mockBalanceChecker{},
 		&mockUsageLimitChecker{},
 		&mockContentSafetyChecker{},
-			nil,
+		nil,
 	)
 
 	meta := &types.RequestMetadata{
@@ -352,7 +352,7 @@ func TestPlan_InsufficientBalance(t *testing.T) {
 		&mockBalanceChecker{err: errorx.ErrInsufficientBalance},
 		&mockUsageLimitChecker{},
 		&mockContentSafetyChecker{},
-			nil,
+		nil,
 	)
 
 	meta := &types.RequestMetadata{
@@ -375,7 +375,7 @@ func TestPlan_UsageLimitExceeded(t *testing.T) {
 		&mockBalanceChecker{},
 		&mockUsageLimitChecker{err: &component.UsageLimitExceededError{Message: "quota exceeded"}},
 		&mockContentSafetyChecker{},
-			nil,
+		nil,
 	)
 
 	meta := &types.RequestMetadata{
@@ -414,7 +414,7 @@ func TestPlan_Disabled_ReturnsError(t *testing.T) {
 		&mockBalanceChecker{err: errors.New("balance should not be checked")},
 		&mockUsageLimitChecker{},
 		&mockContentSafetyChecker{},
-			nil,
+		nil,
 	)
 
 	meta := &types.RequestMetadata{
@@ -438,7 +438,7 @@ func TestPlan_BackendURLFallback(t *testing.T) {
 		&mockBalanceChecker{},
 		&mockUsageLimitChecker{},
 		&mockContentSafetyChecker{},
-			nil,
+		nil,
 	)
 
 	meta := &types.RequestMetadata{
@@ -461,7 +461,7 @@ func TestPlan_RoutingFieldsPopulated(t *testing.T) {
 		&mockBalanceChecker{},
 		&mockUsageLimitChecker{},
 		&mockContentSafetyChecker{},
-			nil,
+		nil,
 	)
 
 	meta := &types.RequestMetadata{
@@ -505,7 +505,7 @@ func TestPlan_NonTokenTask_SkipsUsageLimitAndSafety(t *testing.T) {
 		&mockUsageLimitChecker{err: &component.UsageLimitExceededError{Message: "should not be called"}},
 		// If safety were checked, this would flag sensitive.
 		&mockContentSafetyChecker{isSensitive: true, message: "should not be called"},
-			nil,
+		nil,
 	)
 
 	meta := &types.RequestMetadata{

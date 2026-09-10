@@ -167,7 +167,7 @@ func TestOpenAIHandler_ListModels(t *testing.T) {
 			TotalCount: 1,
 		}
 		tester.mocks.openAIComp.EXPECT().
-			ListModels(mock.Anything, "testuser", types.ListModelsReq{}).
+			ListModels(mock.Anything, "testuuid", types.ListModelsReq{}).
 			Return(expect, nil).Once()
 
 		tester.handler.ListModels(c)
@@ -189,7 +189,7 @@ func TestOpenAIHandler_ListModels(t *testing.T) {
 			WithQuery("page", "3")
 
 		tester.mocks.openAIComp.EXPECT().
-			ListModels(mock.Anything, "testuser", types.ListModelsReq{
+			ListModels(mock.Anything, "testuuid", types.ListModelsReq{
 				ModelID: "gpt",
 				Per:     2,
 				Page:    3,
@@ -209,7 +209,7 @@ func TestOpenAIHandler_ListModels(t *testing.T) {
 			WithQuery("page", "1")
 
 		tester.mocks.openAIComp.EXPECT().
-			ListModels(mock.Anything, "testuser", types.ListModelsReq{
+			ListModels(mock.Anything, "testuuid", types.ListModelsReq{
 				Task: "text-generation",
 				Per:  10,
 				Page: 1,
@@ -238,7 +238,7 @@ func TestOpenAIHandler_ListModels(t *testing.T) {
 		tester.WithQuery("has_associated_model", "true")
 
 		tester.mocks.openAIComp.EXPECT().
-			ListModels(mock.Anything, "testuser", types.ListModelsReq{
+			ListModels(mock.Anything, "testuuid", types.ListModelsReq{
 				HasAssociatedModel: &hasAssociatedModel,
 			}).
 			Return(types.ModelList{Object: "list", Data: []types.Model{}, HasMore: false, TotalCount: 0}, nil).Once()
@@ -255,7 +255,7 @@ func TestOpenAIHandler_ListModels(t *testing.T) {
 		tester.WithQuery("has_associated_model", "false")
 
 		tester.mocks.openAIComp.EXPECT().
-			ListModels(mock.Anything, "testuser", types.ListModelsReq{
+			ListModels(mock.Anything, "testuuid", types.ListModelsReq{
 				HasAssociatedModel: &hasAssociatedModel,
 			}).
 			Return(types.ModelList{Object: "list", Data: []types.Model{}, HasMore: false, TotalCount: 0}, nil).Once()
@@ -272,7 +272,7 @@ func TestOpenAIHandler_ListModels(t *testing.T) {
 		tester.WithQuery("has_associated_model", "TRUE")
 
 		tester.mocks.openAIComp.EXPECT().
-			ListModels(mock.Anything, "testuser", types.ListModelsReq{
+			ListModels(mock.Anything, "testuuid", types.ListModelsReq{
 				HasAssociatedModel: &hasAssociatedModel,
 			}).
 			Return(types.ModelList{Object: "list", Data: []types.Model{}, HasMore: false, TotalCount: 0}, nil).Once()
@@ -285,7 +285,7 @@ func TestOpenAIHandler_ListModels(t *testing.T) {
 	t.Run("component error", func(t *testing.T) {
 		tester, c, w := setupTest(t)
 		tester.mocks.openAIComp.EXPECT().
-			ListModels(mock.Anything, "testuser", types.ListModelsReq{}).
+			ListModels(mock.Anything, "testuuid", types.ListModelsReq{}).
 			Return(types.ModelList{}, errors.New("boom")).Once()
 
 		tester.handler.ListModels(c)
@@ -396,7 +396,7 @@ func TestOpenAIHandler_ListModels(t *testing.T) {
 		tester.WithQuery("llm_types", commontypes.ProviderTypeExternalLLM)
 
 		tester.mocks.openAIComp.EXPECT().
-			ListModels(mock.Anything, "testuser", types.ListModelsReq{LLMTypes: []string{commontypes.ProviderTypeExternalLLM}}).
+			ListModels(mock.Anything, "testuuid", types.ListModelsReq{LLMTypes: []string{commontypes.ProviderTypeExternalLLM}}).
 			Return(types.ModelList{Object: "list", Data: []types.Model{}, HasMore: false, TotalCount: 0}, nil).Once()
 
 		tester.handler.ListModels(c)
@@ -410,7 +410,7 @@ func TestOpenAIHandler_ListModels(t *testing.T) {
 		tester.WithQuery("llm_types", commontypes.ProviderTypeInference)
 
 		tester.mocks.openAIComp.EXPECT().
-			ListModels(mock.Anything, "testuser", types.ListModelsReq{LLMTypes: []string{commontypes.ProviderTypeServerless, commontypes.ProviderTypeInference}}).
+			ListModels(mock.Anything, "testuuid", types.ListModelsReq{LLMTypes: []string{commontypes.ProviderTypeServerless, commontypes.ProviderTypeInference}}).
 			Return(types.ModelList{Object: "list", Data: []types.Model{}, HasMore: false, TotalCount: 0}, nil).Once()
 
 		tester.handler.ListModels(c)
@@ -423,7 +423,7 @@ func TestOpenAIHandler_ListModels(t *testing.T) {
 		tester.WithQuery("llm_types", "SERVERLESS")
 
 		tester.mocks.openAIComp.EXPECT().
-			ListModels(mock.Anything, "testuser", types.ListModelsReq{LLMTypes: []string{"SERVERLESS"}}).
+			ListModels(mock.Anything, "testuuid", types.ListModelsReq{LLMTypes: []string{"SERVERLESS"}}).
 			Return(types.ModelList{Object: "list", Data: []types.Model{}, HasMore: false, TotalCount: 0}, nil).Once()
 
 		tester.handler.ListModels(c)
@@ -456,7 +456,7 @@ func TestOpenAIHandler_ListModels_OpenaiSDK(t *testing.T) {
 
 	// Set up mock expectation
 	tester.mocks.openAIComp.EXPECT().
-		ListModels(mock.Anything, "testuser", types.ListModelsReq{}).
+		ListModels(mock.Anything, "testuuid", types.ListModelsReq{}).
 		Return(types.ModelList{
 			Object:     "list",
 			Data:       models,
@@ -523,7 +523,7 @@ func TestOpenAIHandler_GetModel(t *testing.T) {
 			},
 		}
 		c.Params = []gin.Param{{Key: "model", Value: "model1:svc1"}}
-		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "model1:svc1").Return(model, nil)
+		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuuid", "model1:svc1").Return(model, nil)
 
 		tester.handler.GetModel(c)
 
@@ -537,7 +537,7 @@ func TestOpenAIHandler_GetModel(t *testing.T) {
 	t.Run("model not found", func(t *testing.T) {
 		tester, c, w := setupTest(t)
 		c.Params = []gin.Param{{Key: "model", Value: "nonexistent:svc"}}
-		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "nonexistent:svc").Return(nil, nil)
+		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuuid", "nonexistent:svc").Return(nil, nil)
 
 		tester.handler.GetModel(c)
 
@@ -555,7 +555,7 @@ func TestOpenAIHandler_GetModel(t *testing.T) {
 		}
 		// Wildcard route adds leading slash
 		c.Params = []gin.Param{{Key: "model", Value: "/xzgan001/gguf_model:fepjlx3v39xc"}}
-		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "xzgan001/gguf_model:fepjlx3v39xc").Return(model, nil)
+		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuuid", "xzgan001/gguf_model:fepjlx3v39xc").Return(model, nil)
 
 		tester.handler.GetModel(c)
 
@@ -576,7 +576,7 @@ func TestOpenAIHandler_GetModel(t *testing.T) {
 			},
 		}
 		c.Params = []gin.Param{{Key: "model", Value: "simple-model:svc1"}}
-		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "simple-model:svc1").Return(model, nil)
+		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuuid", "simple-model:svc1").Return(model, nil)
 
 		tester.handler.GetModel(c)
 
@@ -2544,7 +2544,7 @@ func TestOpenAIHandler_GetVideo(t *testing.T) {
 			{URL: downstream.URL + "/v1/videos", Enabled: true, ModelName: "video-model"},
 		},
 	}
-	tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "video-model").Return(model, nil).Once()
+	tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuuid", "video-model").Return(model, nil).Once()
 	tester.mocks.aiGenerationStore.EXPECT().FindByResourceID(mock.Anything, database.AIGenerationResourceTypeVideo, "video_gateway").Return(&generation, nil).Once()
 	tester.mocks.aiGenerationStore.EXPECT().UpdateWithStatus(mock.Anything, mock.MatchedBy(func(input database.AIGeneration) bool {
 		generation = input
@@ -2592,7 +2592,7 @@ func TestOpenAIHandler_GetVideo_PersistsLongCatDownloadURL(t *testing.T) {
 			{URL: downstream.URL, Enabled: true, ModelName: "longcat-model"},
 		},
 	}
-	tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "longcat-model").Return(model, nil).Once()
+	tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuuid", "longcat-model").Return(model, nil).Once()
 	tester.mocks.aiGenerationStore.EXPECT().FindByResourceID(mock.Anything, database.AIGenerationResourceTypeVideo, "video_gateway").Return(&generation, nil).Once()
 	tester.mocks.aiGenerationStore.EXPECT().UpdateWithStatus(mock.Anything, mock.MatchedBy(func(input database.AIGeneration) bool {
 		generation = input
@@ -2633,7 +2633,7 @@ func TestOpenAIHandler_GetVideo_ReturnsTerminalRowWithoutUpstreamFetch(t *testin
 			{URL: downstream.URL + "/v1/videos", Enabled: true, ModelName: "video-model"},
 		},
 	}
-	tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "video-model").Return(model, nil).Once()
+	tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuuid", "video-model").Return(model, nil).Once()
 	tester.mocks.aiGenerationStore.EXPECT().FindByResourceID(mock.Anything, database.AIGenerationResourceTypeVideo, "video_gateway").Return(&generation, nil).Once()
 
 	c.Request = httptest.NewRequest(http.MethodGet, "/v1/videos/video_gateway", nil)
@@ -2675,7 +2675,7 @@ func TestOpenAIHandler_GetVideoContent(t *testing.T) {
 			{URL: downstream.URL + "/v1/videos", Enabled: true, ModelName: "video-model"},
 		},
 	}
-	tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "video-model").Return(model, nil).Once()
+	tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuuid", "video-model").Return(model, nil).Once()
 	tester.mocks.aiGenerationStore.EXPECT().FindByResourceID(mock.Anything, database.AIGenerationResourceTypeVideo, "video_gateway").Return(&generation, nil).Once()
 
 	router := gin.New()
@@ -2723,7 +2723,7 @@ func TestOpenAIHandler_GetVideoContent_UsesPersistedDownloadURL(t *testing.T) {
 			{URL: "http://provider.invalid", Enabled: true, ModelName: "video-model"},
 		},
 	}
-	tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "video-model").Return(model, nil).Once()
+	tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuuid", "video-model").Return(model, nil).Once()
 	tester.mocks.aiGenerationStore.EXPECT().FindByResourceID(mock.Anything, database.AIGenerationResourceTypeVideo, "video_gateway").Return(&generation, nil).Once()
 
 	router := gin.New()
@@ -2771,7 +2771,7 @@ func TestOpenAIHandler_GetVideoContent_NotReadyDoesNotCallUpstream(t *testing.T)
 			{URL: downstream.URL + "/v1/videos", Enabled: true, ModelName: "video-model"},
 		},
 	}
-	tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "video-model").Return(model, nil).Once()
+	tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuuid", "video-model").Return(model, nil).Once()
 	tester.mocks.aiGenerationStore.EXPECT().FindByResourceID(mock.Anything, database.AIGenerationResourceTypeVideo, "video_gateway").Return(&generation, nil).Once()
 
 	router := gin.New()
@@ -2837,7 +2837,7 @@ func TestOpenAIHandler_GetVideoContent_MiniMaxResolvesDownloadURL(t *testing.T) 
 			{URL: downstream.URL + "/v1/video_generation", Enabled: true, ModelName: "video-model"},
 		},
 	}
-	tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "video-model").Return(model, nil).Once()
+	tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuuid", "video-model").Return(model, nil).Once()
 	tester.mocks.aiGenerationStore.EXPECT().FindByResourceID(mock.Anything, database.AIGenerationResourceTypeVideo, "video_gateway").Return(&generation, nil).Once()
 	tester.mocks.aiGenerationStore.EXPECT().UpdateProviderMetadata(mock.Anything, int64(1), mock.MatchedBy(func(providerMetadata map[string]any) bool {
 		generation.ProviderMetadata = providerMetadata
@@ -2889,7 +2889,7 @@ func TestOpenAIHandler_GetVideoContent_LightX2VStreamsDirectly(t *testing.T) {
 			{URL: downstream.URL, Enabled: true, ModelName: "video-model"},
 		},
 	}
-	tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "video-model").Return(model, nil).Once()
+	tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuuid", "video-model").Return(model, nil).Once()
 	tester.mocks.aiGenerationStore.EXPECT().FindByResourceID(mock.Anything, database.AIGenerationResourceTypeVideo, "video_gateway").Return(&generation, nil).Once()
 
 	router := gin.New()

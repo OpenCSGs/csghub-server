@@ -370,7 +370,7 @@ func TestResolveEndpointModelTarget_SameSessionKeyStableAcrossCalls(t *testing.T
 		result, err := tester.handler.resolveEndpointModelTarget(context.Background(), endpointTargetResolveInput{
 			Model:     model,
 			ModelID:   "model1",
-			Username:  "testuser",
+			NsUUID:    "testuser",
 			Headers:   headers,
 			TargetReq: &targetReq,
 		})

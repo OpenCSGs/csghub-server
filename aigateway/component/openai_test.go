@@ -356,10 +356,10 @@ func TestOpenAIComponentImpl_getCSGHubModels_SetsSupportFunctionCallFromEngineAr
 		deploys[i].CreatedAt = now
 	}
 
-	mockDeployStore.EXPECT().RunningVisibleToUser(mock.Anything, int64(1)).
+	mockDeployStore.EXPECT().RunningVisibleToUser(mock.Anything, "1").
 		Return(deploys, nil).Once()
 
-	models, err := comp.getCSGHubModels(context.Background(), 1)
+	models, err := comp.getCSGHubModels(context.Background(), "1")
 	require.NoError(t, err)
 	require.Len(t, models, 3)
 	assert.True(t, models[0].SupportFunctionCall)
@@ -426,10 +426,10 @@ func TestOpenAIComponentImpl_getCSGHubModels_SkipsDeploysWithMissingRelations(t 
 		deploys[i].CreatedAt = now
 	}
 
-	mockDeployStore.EXPECT().RunningVisibleToUser(mock.Anything, int64(1)).
+	mockDeployStore.EXPECT().RunningVisibleToUser(mock.Anything, "1").
 		Return(deploys, nil).Once()
 
-	models, err := comp.getCSGHubModels(context.Background(), 1)
+	models, err := comp.getCSGHubModels(context.Background(), "1")
 	require.NoError(t, err)
 	require.Len(t, models, 1)
 	assert.Equal(t, "valid-model:4", models[0].ID)

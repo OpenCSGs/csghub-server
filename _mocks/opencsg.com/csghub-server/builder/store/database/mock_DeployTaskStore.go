@@ -2048,9 +2048,9 @@ func (_c *MockDeployTaskStore_ListServerless_Call) RunAndReturn(run func(context
 	return _c
 }
 
-// RunningVisibleToUser provides a mock function with given fields: ctx, userID
-func (_m *MockDeployTaskStore) RunningVisibleToUser(ctx context.Context, userID int64) ([]database.Deploy, error) {
-	ret := _m.Called(ctx, userID)
+// RunningVisibleToUser provides a mock function with given fields: ctx, nsUUID
+func (_m *MockDeployTaskStore) RunningVisibleToUser(ctx context.Context, nsUUID string) ([]database.Deploy, error) {
+	ret := _m.Called(ctx, nsUUID)
 
 	if len(ret) == 0 {
 		panic("no return value specified for RunningVisibleToUser")
@@ -2058,19 +2058,19 @@ func (_m *MockDeployTaskStore) RunningVisibleToUser(ctx context.Context, userID 
 
 	var r0 []database.Deploy
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, int64) ([]database.Deploy, error)); ok {
-		return rf(ctx, userID)
+	if rf, ok := ret.Get(0).(func(context.Context, string) ([]database.Deploy, error)); ok {
+		return rf(ctx, nsUUID)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, int64) []database.Deploy); ok {
-		r0 = rf(ctx, userID)
+	if rf, ok := ret.Get(0).(func(context.Context, string) []database.Deploy); ok {
+		r0 = rf(ctx, nsUUID)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]database.Deploy)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, int64) error); ok {
-		r1 = rf(ctx, userID)
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, nsUUID)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -2085,14 +2085,14 @@ type MockDeployTaskStore_RunningVisibleToUser_Call struct {
 
 // RunningVisibleToUser is a helper method to define mock.On call
 //   - ctx context.Context
-//   - userID int64
-func (_e *MockDeployTaskStore_Expecter) RunningVisibleToUser(ctx interface{}, userID interface{}) *MockDeployTaskStore_RunningVisibleToUser_Call {
-	return &MockDeployTaskStore_RunningVisibleToUser_Call{Call: _e.mock.On("RunningVisibleToUser", ctx, userID)}
+//   - nsUUID string
+func (_e *MockDeployTaskStore_Expecter) RunningVisibleToUser(ctx interface{}, nsUUID interface{}) *MockDeployTaskStore_RunningVisibleToUser_Call {
+	return &MockDeployTaskStore_RunningVisibleToUser_Call{Call: _e.mock.On("RunningVisibleToUser", ctx, nsUUID)}
 }
 
-func (_c *MockDeployTaskStore_RunningVisibleToUser_Call) Run(run func(ctx context.Context, userID int64)) *MockDeployTaskStore_RunningVisibleToUser_Call {
+func (_c *MockDeployTaskStore_RunningVisibleToUser_Call) Run(run func(ctx context.Context, nsUUID string)) *MockDeployTaskStore_RunningVisibleToUser_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(int64))
+		run(args[0].(context.Context), args[1].(string))
 	})
 	return _c
 }
@@ -2102,7 +2102,7 @@ func (_c *MockDeployTaskStore_RunningVisibleToUser_Call) Return(_a0 []database.D
 	return _c
 }
 
-func (_c *MockDeployTaskStore_RunningVisibleToUser_Call) RunAndReturn(run func(context.Context, int64) ([]database.Deploy, error)) *MockDeployTaskStore_RunningVisibleToUser_Call {
+func (_c *MockDeployTaskStore_RunningVisibleToUser_Call) RunAndReturn(run func(context.Context, string) ([]database.Deploy, error)) *MockDeployTaskStore_RunningVisibleToUser_Call {
 	_c.Call.Return(run)
 	return _c
 }

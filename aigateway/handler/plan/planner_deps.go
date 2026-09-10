@@ -16,7 +16,7 @@ import (
 // that previous_response_id routing pins the request to the original
 // upstream).  Most protocols leave it zero-valued.
 type ModelResolver interface {
-	ResolveModelTarget(ctx context.Context, username, modelID string, headers http.Header, opts ResolveOptions) (*types.ModelTarget, error)
+	ResolveModelTarget(ctx context.Context, nsUUID, modelID string, headers http.Header, opts ResolveOptions) (*types.ModelTarget, error)
 }
 
 // ResolveOptions passes protocol-specific model resolution hints from
@@ -49,7 +49,7 @@ type UsageLimitChecker interface {
 // are skipped here because they use a separate CheckImagePrompts path
 // that bypasses the gate — those remain in each handler's Execute).
 type ContentSafetyChecker interface {
-	Check(ctx context.Context, model *types.Model, promptText, tenantID, task string, streaming bool, provider string) (bool, string, error)
+	Check(ctx context.Context, model *types.Model, promptText, nsUUID, task string, streaming bool, provider string) (bool, string, error)
 }
 
 // CodedError is implemented by errors that carry a structured error code.

@@ -307,7 +307,10 @@ type OpenAIHandlerImpl struct {
 // @Router       /v1/models [get]
 func (h *OpenAIHandlerImpl) ListModels(c *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(c)
-
+	nsUUID := httpbase.GetCurrentNamespaceUUID(c)
+	if len(nsUUID) < 1 {
+		nsUUID = httpbase.GetCurrentUserUUID(c)
+	}
 	// Validate llm_types parameter
 	llmTypes := c.QueryArray("llm_types")
 	for _, llmType := range llmTypes {
@@ -348,7 +351,7 @@ func (h *OpenAIHandlerImpl) ListModels(c *gin.Context) {
 		return
 	}
 
-	resp, err := h.openaiComponent.ListModels(c.Request.Context(), currentUser, types.ListModelsReq{
+	resp, err := h.openaiComponent.ListModels(c.Request.Context(), nsUUID, types.ListModelsReq{
 		ModelID:            c.Query("model_id"),
 		LLMTypes:           llmTypes,
 		Task:               c.Query("task"),
@@ -426,7 +429,10 @@ func parseListModelsPagination(c *gin.Context) (int, int, *types.Error) {
 // @Failure      500  {object}  error "Internal server error"
 // @Router       /v1/models/{model} [get]
 func (h *OpenAIHandlerImpl) GetModel(c *gin.Context) {
-	username := httpbase.GetCurrentUser(c)
+	nsUUID := httpbase.GetCurrentNamespaceUUID(c)
+	if len(nsUUID) < 1 {
+		nsUUID = httpbase.GetCurrentUserUUID(c)
+	}
 	modelID := c.Param("model")
 	modelID = strings.TrimPrefix(modelID, "/")
 	if modelID == "" {
@@ -439,7 +445,7 @@ func (h *OpenAIHandlerImpl) GetModel(c *gin.Context) {
 		return
 	}
 
-	model, err := h.openaiComponent.GetModelByID(c.Request.Context(), username, modelID)
+	model, err := h.openaiComponent.GetModelByID(c.Request.Context(), nsUUID, modelID)
 	if err != nil {
 		c.String(http.StatusInternalServerError, fmt.Errorf("failed to get model by id '%s',error:%w", modelID, err).Error())
 		return

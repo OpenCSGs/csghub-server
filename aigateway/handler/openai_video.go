@@ -428,12 +428,11 @@ func downstreamErrorPayload(body []byte) string {
 // @Failure      500 {object} types.Error "Internal server error"
 // @Router       /v1/video/generations/{video_id} [get]
 func (h *OpenAIHandlerImpl) GetVideo(c *gin.Context) {
-	username := httpbase.GetCurrentUser(c)
 	nsUUID := httpbase.GetCurrentNamespaceUUID(c)
 	videoID := c.Param("video_id")
 	ctx := c.Request.Context()
 
-	target, ok := h.resolveVideoGenerationRequest(c, ctx, username, nsUUID, videoID)
+	target, ok := h.resolveVideoGenerationRequest(c, ctx, nsUUID, videoID)
 	if !ok {
 		return
 	}
@@ -519,12 +518,11 @@ func videoObjectFromGeneration(generation *database.AIGeneration) types.VideoObj
 // @Failure      500 {object} types.Error "Internal server error"
 // @Router       /v1/video/generations/{video_id}/content [get]
 func (h *OpenAIHandlerImpl) GetVideoContent(c *gin.Context) {
-	username := httpbase.GetCurrentUser(c)
 	nsUUID := httpbase.GetCurrentNamespaceUUID(c)
 	videoID := c.Param("video_id")
 	ctx := c.Request.Context()
 
-	target, ok := h.resolveVideoGenerationRequest(c, ctx, username, nsUUID, videoID)
+	target, ok := h.resolveVideoGenerationRequest(c, ctx, nsUUID, videoID)
 	if !ok {
 		return
 	}
@@ -597,8 +595,8 @@ type videoGenerationTarget struct {
 	modelTarget *resolvedModelTarget
 }
 
-func (h *OpenAIHandlerImpl) resolveVideoGenerationRequest(c *gin.Context, ctx context.Context, username, nsUUID, videoID string) (*videoGenerationTarget, bool) {
-	generation, modelTarget, err := h.resolveAIGenerationTarget(ctx, username, nsUUID, videoID, c.Request.Header)
+func (h *OpenAIHandlerImpl) resolveVideoGenerationRequest(c *gin.Context, ctx context.Context, nsUUID, videoID string) (*videoGenerationTarget, bool) {
+	generation, modelTarget, err := h.resolveAIGenerationTarget(ctx, nsUUID, videoID, c.Request.Header)
 	if err != nil {
 		handleAIGenerationError(c, err)
 		return nil, false
@@ -919,7 +917,7 @@ func (e *aiGenerationError) Error() string {
 	return e.APIError.Message
 }
 
-func (h *OpenAIHandlerImpl) resolveAIGenerationTarget(ctx context.Context, username, nsUUID, videoID string, headers http.Header) (*database.AIGeneration, *resolvedModelTarget, error) {
+func (h *OpenAIHandlerImpl) resolveAIGenerationTarget(ctx context.Context, nsUUID, videoID string, headers http.Header) (*database.AIGeneration, *resolvedModelTarget, error) {
 	if strings.TrimSpace(videoID) == "" {
 		return nil, nil, &aiGenerationError{
 			Status: http.StatusBadRequest,
@@ -962,7 +960,7 @@ func (h *OpenAIHandlerImpl) resolveAIGenerationTarget(ctx context.Context, usern
 			},
 		}
 	}
-	target, err := h.resolveModelTarget(ctx, username, generation.ModelID, headers)
+	target, err := h.resolveModelTarget(ctx, nsUUID, generation.ModelID, headers)
 	if err != nil {
 		return nil, nil, err
 	}

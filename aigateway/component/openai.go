@@ -31,9 +31,9 @@ const (
 var apiKeyJSONFieldRegex = regexp.MustCompile(`"api_key"\s*:\s*"[^"]*"`)
 
 type OpenAIComponent interface {
-	GetAvailableModels(c context.Context, user string) ([]types.Model, error)
-	ListModels(c context.Context, user string, req types.ListModelsReq) (types.ModelList, error)
-	GetModelByID(c context.Context, username, modelID string) (*types.Model, error)
+	GetAvailableModels(c context.Context, nsUUID string) ([]types.Model, error)
+	ListModels(c context.Context, nsUUID string, req types.ListModelsReq) (types.ModelList, error)
+	GetModelByID(c context.Context, nsUUID, modelID string) (*types.Model, error)
 	RecordUsage(c context.Context, nsUUID string, model *types.Model, targetModelName string, tokenCounter token.Counter, apikey string) error
 	RecordUsageFromTokenUsage(c context.Context, nsUUID string, model *types.Model, targetModelName string, usage *token.Usage, apikey string) error
 	BuildUsageMeteringEvent(c context.Context, nsUUID string, model *types.Model, targetModelName string, usage *token.Usage, apikey string) (*commontypes.MeteringEvent, error)
@@ -74,21 +74,11 @@ func (m *openaiComponentImpl) getUsageLimiter() UsageLimiter {
 }
 
 // GetAvailableModels returns a list of running models
-func (m *openaiComponentImpl) GetAvailableModels(c context.Context, userName string) ([]types.Model, error) {
+func (m *openaiComponentImpl) GetAvailableModels(c context.Context, nsUUID string) ([]types.Model, error) {
 	var models []types.Model
-	var userID int64
-	var userUUID string
-	if strings.TrimSpace(userName) != "" {
-		user, err := m.userStore.FindByUsername(c, userName)
-		if err != nil {
-			return nil, fmt.Errorf("failed to find user by username in db,error:%w", err)
-		}
-		userID = user.ID
-		userUUID = user.UUID
-	}
 	var csghubModels []types.Model
 	var err error
-	csghubModels, err = m.getCSGHubModels(c, userID)
+	csghubModels, err = m.getCSGHubModels(c, nsUUID)
 	if err != nil {
 		return nil, err
 	}
@@ -109,9 +99,9 @@ func (m *openaiComponentImpl) GetAvailableModels(c context.Context, userName str
 		}
 	}(cacheModels)
 
-	if strings.TrimSpace(userUUID) != "" {
+	if strings.TrimSpace(nsUUID) != "" {
 		req := &types.UserPreferenceRequest{
-			UserUUID: userUUID,
+			UserUUID: nsUUID,
 			Models:   models,
 			Scenario: types.AgenticHubApp,
 		}
@@ -145,8 +135,8 @@ func cloneModelsForCache(models []types.Model) []types.Model {
 	return clonedModels
 }
 
-func (m *openaiComponentImpl) ListModels(c context.Context, userName string, req types.ListModelsReq) (types.ModelList, error) {
-	models, err := m.GetAvailableModels(c, userName)
+func (m *openaiComponentImpl) ListModels(c context.Context, nsUUID string, req types.ListModelsReq) (types.ModelList, error) {
+	models, err := m.GetAvailableModels(c, nsUUID)
 	if err != nil {
 		return types.ModelList{}, err
 	}
@@ -329,8 +319,8 @@ func providerTypeFromDeployType(t int) string {
 	}
 }
 
-func (c *openaiComponentImpl) getCSGHubModels(ctx context.Context, userID int64) ([]types.Model, error) {
-	runningDeploys, err := c.deployStore.RunningVisibleToUser(ctx, userID)
+func (c *openaiComponentImpl) getCSGHubModels(ctx context.Context, nsUUID string) ([]types.Model, error) {
+	runningDeploys, err := c.deployStore.RunningVisibleToUser(ctx, nsUUID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get running models visible to user,error:%w", err)
 	}
@@ -522,7 +512,7 @@ func (m *openaiComponentImpl) loadModelFromCache(ctx context.Context, modelID st
 	return &model, nil
 }
 
-func (m *openaiComponentImpl) GetModelByID(c context.Context, username, modelID string) (*types.Model, error) {
+func (m *openaiComponentImpl) GetModelByID(c context.Context, nsUUID, modelID string) (*types.Model, error) {
 	model, err := m.loadModelFromCache(c, modelID)
 	if err != nil {
 		return nil, err
@@ -531,7 +521,7 @@ func (m *openaiComponentImpl) GetModelByID(c context.Context, username, modelID 
 		return model, nil
 	}
 	// Cache miss or cache expired: fetch full list (which also triggers saveModelsToCache)
-	models, err := m.GetAvailableModels(c, username)
+	models, err := m.GetAvailableModels(c, nsUUID)
 	if err != nil {
 		return nil, err
 	}

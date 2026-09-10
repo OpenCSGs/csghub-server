@@ -67,7 +67,7 @@ func TestOpenAIHandler_ListVoices(t *testing.T) {
 
 		c.Request = httptest.NewRequest(http.MethodGet, "/v1/audio/voices?model=model1", nil)
 		model := newVoicesTestModel(server.URL)
-		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "model1").Return(model, nil).Once()
+		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuuid", "model1").Return(model, nil).Once()
 
 		tester.handler.ListVoices(c)
 
@@ -109,7 +109,7 @@ func TestOpenAIHandler_UploadVoice(t *testing.T) {
 
 		c.Request = newMultipartVoiceRequest(t, http.MethodPost, "model1")
 		model := newVoicesTestModel(server.URL)
-		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "model1").Return(model, nil).Once()
+		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuuid", "model1").Return(model, nil).Once()
 		tester.mocks.openAIComp.EXPECT().CanManageModel(mock.Anything, "testuser", "testuuid", model).Return(true, nil).Once()
 
 		tester.handler.UploadVoice(c)
@@ -122,7 +122,7 @@ func TestOpenAIHandler_UploadVoice(t *testing.T) {
 		tester, c, w := setupTest(t)
 		c.Request = newMultipartVoiceRequest(t, http.MethodPost, "model1")
 		model := newVoicesTestModel("https://api.example.com")
-		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "model1").Return(model, nil).Once()
+		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuuid", "model1").Return(model, nil).Once()
 		tester.mocks.openAIComp.EXPECT().CanManageModel(mock.Anything, "testuser", "testuuid", model).Return(false, nil).Once()
 
 		tester.handler.UploadVoice(c)
@@ -183,7 +183,7 @@ func TestOpenAIHandler_UpdateVoice(t *testing.T) {
 
 		c.Request = newMultipartVoiceRequest(t, http.MethodPut, "model1")
 		model := newVoicesTestModel(server.URL)
-		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "model1").Return(model, nil).Once()
+		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuuid", "model1").Return(model, nil).Once()
 		tester.mocks.openAIComp.EXPECT().CanManageModel(mock.Anything, "testuser", "testuuid", model).Return(true, nil).Once()
 
 		tester.handler.UpdateVoice(c)
@@ -207,7 +207,7 @@ func TestOpenAIHandler_DeleteVoice(t *testing.T) {
 		c.Request = httptest.NewRequest(http.MethodDelete, "/v1/audio/voices/my-voice?model=model1", nil)
 		c.Params = gin.Params{{Key: "name", Value: "my-voice"}}
 		model := newVoicesTestModel(server.URL)
-		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "model1").Return(model, nil).Once()
+		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuuid", "model1").Return(model, nil).Once()
 		tester.mocks.openAIComp.EXPECT().CanManageModel(mock.Anything, "testuser", "testuuid", model).Return(true, nil).Once()
 
 		tester.handler.DeleteVoice(c)
@@ -220,7 +220,7 @@ func TestOpenAIHandler_DeleteVoice(t *testing.T) {
 		c.Request = httptest.NewRequest(http.MethodDelete, "/v1/audio/voices/my-voice?model=model1", nil)
 		c.Params = gin.Params{{Key: "name", Value: "my-voice"}}
 		model := newVoicesTestModel("https://api.example.com")
-		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "model1").Return(model, nil).Once()
+		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuuid", "model1").Return(model, nil).Once()
 		tester.mocks.openAIComp.EXPECT().CanManageModel(mock.Anything, "testuser", "testuuid", model).Return(false, nil).Once()
 
 		tester.handler.DeleteVoice(c)
