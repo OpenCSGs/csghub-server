@@ -119,6 +119,8 @@ func (s *accountBillStoreImpl) ListByUserIDAndDate(ctx context.Context, req type
 	case types.SceneSpace, types.SceneModelInference, types.SceneModelFinetune:
 		q = q.ColumnExpr("d.created_at as created_at")
 		q = q.Join("LEFT JOIN deploys d ON customer_id = d.svc_name")
+	default:
+		q = q.ColumnExpr("min(created_at) as created_at")
 	}
 
 	q = q.Where("account_bill.bill_date >= ? and account_bill.bill_date <= ?", req.StartDate, req.EndDate).
@@ -158,14 +160,20 @@ func (s *accountBillStoreImpl) ListByUserIDAndDate(ctx context.Context, req type
 	if err != nil {
 		return AccountBillRes{}, errorx.HandleDBError(err, nil)
 	}
+
+	// Pagination: never touch q (the CTE source); clone it.
+	pageQ := q.Clone()
+
 	switch req.Scene {
 	case types.SceneEvaluation:
-		q = q.Order("d.submit_time DESC NULLS LAST")
+		pageQ = pageQ.Order("d.submit_time DESC NULLS LAST")
 	case types.SceneSpace, types.SceneModelInference, types.SceneModelFinetune:
-		q = q.Order("d.created_at DESC NULLS LAST")
+		pageQ = pageQ.Order("d.created_at DESC NULLS LAST")
+	default:
+		pageQ = pageQ.Order("created_at DESC NULLS LAST")
 	}
-	q = q.Order("customer_id")
-	err = q.Limit(req.Per).Offset((req.Page-1)*req.Per).Scan(ctx, &res)
+	pageQ = pageQ.Order("customer_id")
+	err = pageQ.Limit(req.Per).Offset((req.Page-1)*req.Per).Scan(ctx, &res)
 	if err != nil {
 		return AccountBillRes{}, errorx.HandleDBError(err, nil)
 	}
