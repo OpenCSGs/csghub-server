@@ -268,6 +268,10 @@ image_builder_git_image = "opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_p
 image_builder_kaniko_image = "opencsg-registry.cn-beijing.cr.aliyuncs.com/public/kaniko-project-executor:v1.23.2"
 image_builder_job_ttl = 120
 image_builder_status_ttl = 300
+# Container image used by the one-shot reclaim Job that deletes a sandbox's
+# PVC subPath directory when the sandbox is deleted. Only requirement: a POSIX
+# shell + rm. Default points to the internal registry.
+reclaim_image = "opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/busybox:1.36"
 # Kaniko arguments to configure logging and registry access.
 # See official flags: https://github.com/GoogleContainerTools/kaniko?tab=readme-ov-file#additional-flags
 # --log-format=json : Output logs in JSON format for structured parsing.

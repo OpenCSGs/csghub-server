@@ -726,6 +726,11 @@ type Config struct {
 		ImageBuilderStatusTTL   int      `env:"STARHUB_SERVER_RUNNER_IMAGE_BUILDER_STATUS_TTL" default:"300"`
 		ImageBuilderKanikoArgs  []string `env:"STARHUB_SERVER_RUNNER_IMAGE_BUILDER_KANIKO_ARGS"`
 		SystemCUDAVersion       string   `env:"STARHUB_SERVER_RUNNER_SYSTEM_CUDA_VERSION" default:""`
+		// ReclaimImage is the container image used by the one-shot reclaim Job that
+		// deletes a sandbox's PVC subPath directory when the sandbox is deleted.
+		// Only requirement: a POSIX shell + rm. Default points to the internal
+		// registry so offline clusters don't depend on Docker Hub.
+		ReclaimImage            string   `env:"STARHUB_SERVER_RUNNER_RECLAIM_IMAGE" default:"opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/busybox:1.36"`
 		// csghub server webhook endpoint
 		WebHookEndpoint    string `env:"STARHUB_SERVER_RUNNER_WEBHOOK_ENDPOINT" default:"http://localhost:8080"`
 		WatchConfigmapName string `env:"STARHUB_SERVER_RUNNER_WATCH_CONFIGMAP_NAME" default:"spaces-runner-config"`
