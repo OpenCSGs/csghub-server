@@ -90,10 +90,10 @@ func (h *Handler) Extract(c *gin.Context) (*types.RequestMetadata, error) {
 // If the adapt step fails the error is rendered inline and Execute returns nil.
 func (h *Handler) Execute(c *gin.Context, meta *types.RequestMetadata, p *types.RequestPlan) error {
 	// Record resolved model on the preflight span and end it.
-	if pt := GetPreflightTracer(c); pt != nil {
+	if pt := plan.GetPreflightTracer(c); pt != nil {
 		pt.SetTargetModel(meta.Model, p.ModelTarget)
 		pt.End()
-		SetPreflightTracer(c, nil)
+		plan.SetPreflightTracer(c, nil)
 	}
 
 	// Start LLM generation trace.
@@ -129,26 +129,21 @@ func (h *Handler) Execute(c *gin.Context, meta *types.RequestMetadata, p *types.
 		}
 	}
 
-	// 3. Record model target metrics (success path).
-	if h.MetricsRecorder != nil {
-		h.MetricsRecorder.SetModelTarget(c, meta.Model, p.ModelTarget, meta.Streaming)
-	}
-
-	// 4. Set SSE headers for streaming.
+	// 3. Set SSE headers for streaming.
 	if meta.Streaming {
 		c.Header("Content-Type", "text/event-stream")
 		c.Header("Cache-Control", "no-cache")
 		c.Header("Connection", "keep-alive")
 	}
 
-	// 5. Execute the proxy request.
+	// 4. Execute the proxy request.
 	host := ""
 	if p.ModelTarget != nil {
 		host = p.ModelTarget.Host
 	}
 	h.ProxyExecutor.ServeProxy(c, p.BackendURL, host, adapted.Writer)
 
-	// 6. Finalize the writer.
+	// 5. Finalize the writer.
 	if f, ok := adapted.Writer.(finalizer); ok {
 		if err := f.Finalize(); err != nil {
 			slog.WarnContext(c.Request.Context(), "response writer finalize error",
@@ -156,7 +151,7 @@ func (h *Handler) Execute(c *gin.Context, meta *types.RequestMetadata, p *types.
 		}
 	}
 
-	// 7. Extract usage.
+	// 6. Extract usage.
 	var usage tokenUsage
 	if up, ok := adapted.Writer.(usageProvider); ok {
 		usage = up.Usage()
@@ -379,19 +374,9 @@ func (h *Handler) adapt(c *gin.Context, meta *types.RequestMetadata, p *types.Re
 // rejection.  The RequestPlan's ErrorCode identifies the category.
 func (h *Handler) HandlePlanError(c *gin.Context, meta *types.RequestMetadata, p *types.RequestPlan, err error) {
 	// Record preflight error if the span is still open.
-	if pt := GetPreflightTracer(c); pt != nil {
+	if pt := plan.GetPreflightTracer(c); pt != nil {
 		pt.RecordError(err, "plan_error")
-		SetPreflightTracer(c, nil)
-	}
-
-	// Record metrics for the error path so the error is still attributed
-	// to the requested model.
-	if h.MetricsRecorder != nil {
-		var mt *types.ModelTarget
-		if p != nil {
-			mt = p.ModelTarget
-		}
-		h.MetricsRecorder.SetModelTarget(c, meta.Model, mt, meta.Streaming)
+		plan.SetPreflightTracer(c, nil)
 	}
 
 	if p != nil {

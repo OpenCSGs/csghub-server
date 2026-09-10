@@ -57,46 +57,15 @@ type UsageLimiter interface {
 	CommitUsageLimitFromUsage(ctx context.Context, nsUUID string, model *types.Model, inputTokens, outputTokens, cachedPromptTokens, cacheCreationPromptTokens int64) error
 }
 
-// MetricsRecorder records request-level metrics (model, provider, token usage).
+// MetricsRecorder records request-level token usage metrics.
 type MetricsRecorder interface {
-	SetModelTarget(c *gin.Context, modelID string, target *types.ModelTarget, isStream bool)
 	RecordTokenUsage(c *gin.Context, inputTokens, outputTokens, cachedPromptTokens int64)
 }
 
-// PreflightTracer records a preflight span that covers the full request
-// lifecycle.  The span is started by the entry-point handler (e.g.
-// AnthropicHandlerImpl.Messages) and stored in the gin.Context so the
-// protocol handler can record model-resolution attributes and errors
-// during Execute and HandlePlanError.
-type PreflightTracer interface {
-	// RecordError records an error on the preflight span and ends it.
-	RecordError(err error, errorType string)
-	// SetTargetModel records the resolved model target attributes.
-	SetTargetModel(requestModel string, target *types.ModelTarget)
-	// End ends the preflight span.
-	End()
-}
-
-// preflightTracerCtxKey is the gin.Context key for the per-request PreflightTracer.
-const preflightTracerCtxKey = "anthropic.preflight_tracer"
-
-// SetPreflightTracer stores a PreflightTracer in the gin.Context so that
-// Execute and HandlePlanError can access it.  Called by the entry-point
-// handler (AnthropicHandlerImpl.Messages) before Dispatch.
-func SetPreflightTracer(c *gin.Context, t PreflightTracer) {
-	c.Set(preflightTracerCtxKey, t)
-}
-
-// GetPreflightTracer retrieves the PreflightTracer from the gin.Context.
-// Returns nil if none was set.
-func GetPreflightTracer(c *gin.Context) PreflightTracer {
-	v, exists := c.Get(preflightTracerCtxKey)
-	if !exists {
-		return nil
-	}
-	t, _ := v.(PreflightTracer)
-	return t
-}
+// PreflightTracer is now defined in the plan package. The Orchestrator
+// starts the preflight span and stores the tracer in the gin context via
+// plan.SetPreflightTracer. Execute and HandlePlanError retrieve it via
+// plan.GetPreflightTracer.
 
 // LLMTracer starts an LLM generation trace.  The returned GenerationRecorder
 // captures usage, response, and error information for the trace.

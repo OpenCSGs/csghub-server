@@ -60,16 +60,10 @@ type OpenAIHandler interface {
 	EditImage(c *gin.Context)
 	// Create a video generation
 	CreateVideo(c *gin.Context)
-	// Create a video generation through the deprecated endpoint
-	CreateVideoDeprecated(c *gin.Context)
 	// Get a video generation
 	GetVideo(c *gin.Context)
-	// Get a video generation through the deprecated endpoint
-	GetVideoDeprecated(c *gin.Context)
 	// Download generated video content
 	GetVideoContent(c *gin.Context)
-	// Download generated video content through the deprecated endpoint
-	GetVideoContentDeprecated(c *gin.Context)
 	// Transcribe audio to text
 	Transcription(c *gin.Context)
 	// Translate audio to English text
@@ -933,158 +927,6 @@ func resolveFailureEventModelID(requestModelID string, model *types.Model) strin
 	return strings.TrimSpace(model.ID)
 }
 
-// Embedding godoc
-// @Security     ApiKey
-// @Summary      Get embedding for a text
-// @Description  Sends a text to the backend model and returns the embedding
-// @Tags         AIGateway
-// @Accept       json
-// @Produce      json
-// @Param        request body  types.EmbeddingRequest true "Embedding request"
-// @Success      200  {object}  types.Response{} "OK"
-// @Failure      400  {object}  error "Bad request or sensitive input"
-// @Failure      404  {object}  error "Model not found"
-// @Failure      500  {object}  error "Internal server error"
-// @Router       /v1/embeddings [post]
-func (h *OpenAIHandlerImpl) Embedding(c *gin.Context) {
-	ctx := c.Request.Context()
-	username := httpbase.GetCurrentUser(c)
-	nsUUID := httpbase.GetCurrentNamespaceUUID(c)
-	apikey := httpbase.GetAccessToken(c)
-	requestID := trace.GetTraceIDInGinContext(c)
-	ctx, preflight := startPreflightTrace(ctx, preflightTraceStart{
-		API:       c.FullPath(),
-		RequestID: requestID,
-		UserID:    nsUUID,
-	})
-	c.Request = c.Request.WithContext(ctx)
-
-	var req types.EmbeddingRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		preflight.RecordError(err, "bad_request")
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-	if req.Model == "" {
-		preflight.RecordError(fmt.Errorf("model cannot be empty"), "bad_request")
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Model cannot be empty"})
-		return
-	}
-	if req.Input.OfString.String() == "" &&
-		len(req.Input.OfArrayOfStrings) == 0 &&
-		len(req.Input.OfArrayOfTokenArrays) == 0 &&
-		len(req.Input.OfArrayOfTokens) == 0 {
-		preflight.RecordError(fmt.Errorf("input cannot be empty"), "bad_request")
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Input cannot be empty"})
-		return
-	}
-	modelID := req.Model
-	modelTarget, err := h.resolveModelTarget(ctx, username, modelID, c.Request.Header)
-	SetMetricsModelTarget(SetMetricsModelParams{
-		C:           c,
-		ModelID:     modelID,
-		ModelTarget: modelTarget,
-		IsStream:    false,
-	})
-	if err != nil {
-		preflight.RecordError(err, "model_resolve")
-		handleModelTargetError(c, ctx, modelID, "failed to get embedding target address", err)
-		return
-	}
-
-	preflight.SetTargetModel(modelID, modelTarget)
-	preflight.End()
-
-	traceCtx, embeddingRecorder := h.startEmbeddingTrace(
-		ctx,
-		modelID,
-		modelTarget,
-		&req,
-		requestID,
-		nsUUID,
-	)
-	c.Request = c.Request.WithContext(traceCtx)
-
-	// Check balance before processing request
-	if err := h.openaiComponent.CheckBalance(c.Request.Context(), nsUUID); err != nil {
-		finishEmbeddingTraceWithError(embeddingRecorder, err, types.TraceErrInsufficientBalance)
-		h.handleInsufficientBalance(c, false, nsUUID, modelID, err)
-		return
-	}
-
-	req.Model = modelTarget.ModelName
-	data, _ := json.Marshal(req)
-	c.Request.Body = io.NopCloser(bytes.NewReader(data))
-	c.Request.ContentLength = int64(len(data))
-	if err := applyModelAuthHeaders(c.Request.Header, modelTarget.Model); err != nil {
-		slog.WarnContext(c.Request.Context(), "invalid auth head", slog.String("model", modelTarget.ModelName), slog.Any("error", err))
-	}
-	slog.InfoContext(c, "proxy embedding request to model endpoint", slog.Any("target", modelTarget.Target), slog.Any("host", modelTarget.Host), slog.Any("user", username), slog.Any("model_id", modelID))
-	proxyToAPI := resolveProxyPathFromModelEndpoint(modelTarget.Model.Endpoint, modelTarget.ModelName)
-	rp, err := proxy.NewReverseProxy(modelTarget.Target, proxy.WithoutAcceptEncoding())
-	if err != nil {
-		finishEmbeddingTraceWithError(embeddingRecorder, err, types.TraceErrUpstreamUnavailable)
-		httpbase.ServerError(c, err)
-		return
-	}
-
-	tokenCounter := h.tokenCounterFactory.NewEmbedding(token.CreateParam{
-		Endpoint: modelTarget.Target,
-		Host:     modelTarget.Host,
-		Model:    modelTarget.ModelName,
-		ImageID:  modelTarget.Model.ImageID,
-		Provider: modelTarget.Model.Provider,
-	})
-	w := NewResponseWriterWrapperEmbedding(c.Writer, tokenCounter)
-	if req.Input.OfString.String() != "" {
-		tokenCounter.Input(req.Input.OfString.Value)
-	}
-
-	proxyStartTime := time.Now()
-	rp.ServeHTTP(w, c.Request, proxyToAPI, modelTarget.Host)
-
-	// Synchronously record proxy-level metrics before c.Next() returns.
-	// Capture usage first so the counter has token counts available for
-	// RecordMetrics to pre-fetch synchronously.  FinalWrite is nil because
-	// embedding is non-streaming — TTFT is not applicable.
-	w.CaptureEmbeddingUsage()
-	embeddingUsage := preComputeUsage(ctx, tokenCounter)
-	RecordMetrics(RecordMetricsParams{
-		C:              c,
-		Ctx:            ctx,
-		FinalWrite:     nil,
-		Counter:        tokenCounter,
-		ProxyStartTime: proxyStartTime,
-		Usage:          embeddingUsage,
-	})
-
-	go func() {
-		usageCtx, cancel := context.WithTimeout(context.WithoutCancel(c.Request.Context()), 3*time.Second)
-		defer cancel()
-
-		// Use the pre-computed usage from the sync path; fall back to a
-		// fresh counter.Usage() call only when sync pre-compute failed.
-		usage := embeddingUsage
-		if usage == nil && tokenCounter != nil {
-			var usageErr error
-			usage, usageErr = tokenCounter.Usage(usageCtx)
-			if usageErr != nil {
-				slog.ErrorContext(usageCtx, "failed to get embedding token usage", slog.Any("error", usageErr))
-			}
-		}
-		if embeddingRecorder != nil {
-			recordEmbeddingTraceCompletion(embeddingRecorder, &req, modelTarget.ModelName, usage, w.StatusCode())
-			embeddingRecorder.End()
-		}
-
-		if usage != nil && isSuccessfulStatus(w.StatusCode()) {
-			err := h.openaiComponent.RecordUsageFromTokenUsage(usageCtx, nsUUID, modelTarget.Model, modelTarget.ModelName, usage, apikey)
-			if err != nil {
-				slog.ErrorContext(c, "failed to record embedding token usage", "error", err)
-			}
-		}
-	}()
-}
 
 // retryWriterStatusCode safely extracts the status code from a chatRetryResponseWriter.
 // Returns 0 if the writer is nil (e.g., when an error occurs before any response is written).

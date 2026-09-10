@@ -10,8 +10,22 @@ import (
 // ModelResolver resolves a model ID to a concrete upstream target.
 // The handler package provides an adapter that wraps its private
 // resolveModelTarget and converts to *types.ModelTarget.
+//
+// ResolveOptions carries optional parameters that some protocols need
+// during model resolution (e.g. Responses passes RequiredUpstreamID so
+// that previous_response_id routing pins the request to the original
+// upstream).  Most protocols leave it zero-valued.
 type ModelResolver interface {
-	ResolveModelTarget(ctx context.Context, username, modelID string, headers http.Header) (*types.ModelTarget, error)
+	ResolveModelTarget(ctx context.Context, username, modelID string, headers http.Header, opts ResolveOptions) (*types.ModelTarget, error)
+}
+
+// ResolveOptions passes protocol-specific model resolution hints from
+// the Extract phase through the Planner to the ModelResolver adapter.
+type ResolveOptions struct {
+	// RequiredUpstreamID forces the resolver to select the upstream with
+	// this ID.  Used by the Responses protocol when the client supplies a
+	// previous_response_id whose original upstream must be reused.
+	RequiredUpstreamID int64
 }
 
 // BalanceChecker verifies that the tenant has sufficient balance.
@@ -28,8 +42,14 @@ type UsageLimitChecker interface {
 // Returns (isSensitive, message, error). The handler adapter converts
 // *rpc.CheckResult to this simplified contract so the Planner never
 // depends on the rpc package.
+//
+// The task parameter lets the adapter dispatch to the correct safety
+// policy path (e.g. "chat"/"responses"/"messages" go through the
+// SensitivePolicy gate, while "text-to-image"/"text-to-video" etc.
+// are skipped here because they use a separate CheckImagePrompts path
+// that bypasses the gate — those remain in each handler's Execute).
 type ContentSafetyChecker interface {
-	Check(ctx context.Context, model *types.Model, promptText, tenantID string, streaming bool, provider string) (bool, string, error)
+	Check(ctx context.Context, model *types.Model, promptText, tenantID, task string, streaming bool, provider string) (bool, string, error)
 }
 
 // CodedError is implemented by errors that carry a structured error code.

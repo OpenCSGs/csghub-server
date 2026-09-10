@@ -2,6 +2,7 @@ package types
 
 import (
 	"encoding/json"
+	"strings"
 
 	"github.com/openai/openai-go/v3"
 )
@@ -34,6 +35,45 @@ type ChatCompletionRequest struct {
 	StreamOptions *StreamOptions                        `json:"stream_options,omitempty"`
 	// RawJSON stores all unknown fields during unmarshaling
 	RawJSON json.RawMessage `json:"-"`
+}
+
+// PromptText extracts a plain-text representation of the user's prompt from
+// the chat messages, joining all message content with newlines.  This
+// satisfies types.PromptTextProvider so the Planner can perform
+// sensitive-content checks without depending on the concrete message type.
+// The extraction mirrors the logic in moderation.CheckChatPrompts.
+func (r *ChatCompletionRequest) PromptText() string {
+	if r == nil || len(r.Messages) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	for _, msg := range r.Messages {
+		switch rawContent := msg.GetContent().AsAny().(type) {
+		case string:
+			b.WriteString(rawContent)
+			b.WriteByte('\n')
+		case *string:
+			b.WriteString(*rawContent)
+			b.WriteByte('\n')
+		case []interface{}:
+			for _, item := range rawContent {
+				if itemMap, ok := item.(map[string]interface{}); ok {
+					if text, exists := itemMap["text"].(string); exists {
+						b.WriteString(text)
+						b.WriteByte(' ')
+					}
+				}
+			}
+			b.WriteByte('\n')
+		default:
+			contentBytes, _ := json.Marshal(rawContent)
+			if len(contentBytes) > 0 {
+				b.Write(contentBytes)
+				b.WriteByte('\n')
+			}
+		}
+	}
+	return strings.TrimSpace(b.String())
 }
 
 // UnmarshalJSON implements json.Unmarshaler interface
