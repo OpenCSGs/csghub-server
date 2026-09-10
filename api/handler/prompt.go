@@ -18,15 +18,20 @@ import (
 )
 
 type PromptHandler struct {
-	prompt    component.PromptComponent
-	sensitive component.SensitiveComponent
-	repo      component.RepoComponent
+	prompt        component.PromptComponent
+	promptVersion component.PromptVersionComponent
+	sensitive     component.SensitiveComponent
+	repo          component.RepoComponent
 }
 
 func NewPromptHandler(cfg *config.Config) (*PromptHandler, error) {
 	promptComp, err := component.NewPromptComponent(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create PromptComponent: %w", err)
+	}
+	promptVersionComp, ok := promptComp.(component.PromptVersionComponent)
+	if !ok {
+		return nil, errors.New("prompt component does not support prompt versions")
 	}
 	sc, err := component.NewSensitiveComponent(cfg)
 	if err != nil {
@@ -37,9 +42,10 @@ func NewPromptHandler(cfg *config.Config) (*PromptHandler, error) {
 		return nil, fmt.Errorf("failed to create repo component: %w", err)
 	}
 	return &PromptHandler{
-		prompt:    promptComp,
-		sensitive: sc,
-		repo:      repo,
+		prompt:        promptComp,
+		promptVersion: promptVersionComp,
+		sensitive:     sc,
+		repo:          repo,
 	}, nil
 }
 
@@ -421,6 +427,171 @@ func (h *PromptHandler) DeletePrompt(ctx *gin.Context) {
 		return
 	}
 	httpbase.OK(ctx, nil)
+}
+
+// CreatePromptVersion godoc
+// @Security     ApiKey
+// @Summary      Create an editable prompt version
+// @Tags         Prompt
+// @Accept       json
+// @Produce      json
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Param        file_path path string true "prompt file path"
+// @Param        body body types.CreatePromptVersionReq true "version"
+// @Success      200 {object} types.Response{data=types.PromptVersion}
+// @Failure      400 {object} types.APIBadRequest
+// @Failure      403 {object} types.APIForbidden
+// @Failure      404 {object} types.APINotFound
+// @Failure      409 {object} types.Response
+// @Failure      500 {object} types.APIInternalServerError
+// @Router       /prompts/{namespace}/{name}/prompt/versions/{file_path} [post]
+func (h *PromptHandler) CreatePromptVersion(ctx *gin.Context) {
+	req, ok := promptVersionRequestFromContext(ctx, false)
+	if !ok {
+		return
+	}
+	body := new(types.CreatePromptVersionReq)
+	if err := ctx.ShouldBindJSON(body); err != nil {
+		httpbase.BadRequestWithExt(ctx, errorx.ReqBodyFormat(err, nil))
+		return
+	}
+	result, err := h.promptVersion.CreatePromptVersion(ctx.Request.Context(), req, body)
+	if handlePromptVersionError(ctx, err) {
+		return
+	}
+	httpbase.OK(ctx, result)
+}
+
+// ListPromptVersions godoc
+// @Security     ApiKey
+// @Summary      List prompt versions
+// @Tags         Prompt
+// @Produce      json
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Param        file_path path string true "prompt file path"
+// @Success      200 {object} types.Response{data=[]types.PromptVersion}
+// @Failure      400 {object} types.APIBadRequest
+// @Failure      403 {object} types.APIForbidden
+// @Failure      404 {object} types.APINotFound
+// @Failure      500 {object} types.APIInternalServerError
+// @Router       /prompts/{namespace}/{name}/prompt/versions/{file_path} [get]
+func (h *PromptHandler) ListPromptVersions(ctx *gin.Context) {
+	req, ok := promptVersionRequestFromContext(ctx, false)
+	if !ok {
+		return
+	}
+	result, err := h.promptVersion.ListPromptVersions(ctx.Request.Context(), req)
+	if handlePromptVersionError(ctx, err) {
+		return
+	}
+	httpbase.OK(ctx, result)
+}
+
+// GetPromptVersion godoc
+// @Security     ApiKey
+// @Summary      Get a prompt version
+// @Tags         Prompt
+// @Produce      json
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Param        version path string true "version"
+// @Param        file_path path string true "prompt file path"
+// @Success      200 {object} types.Response{data=types.PromptVersionDetail}
+// @Failure      400 {object} types.APIBadRequest
+// @Failure      403 {object} types.APIForbidden
+// @Failure      404 {object} types.APINotFound
+// @Failure      500 {object} types.APIInternalServerError
+// @Router       /prompts/{namespace}/{name}/prompt/version/{version}/{file_path} [get]
+func (h *PromptHandler) GetPromptVersion(ctx *gin.Context) {
+	req, ok := promptVersionRequestFromContext(ctx, true)
+	if !ok {
+		return
+	}
+	result, err := h.promptVersion.GetPromptVersion(ctx.Request.Context(), req)
+	if handlePromptVersionError(ctx, err) {
+		return
+	}
+	httpbase.OK(ctx, result)
+}
+
+// UpdatePromptVersion godoc
+// @Security     ApiKey
+// @Summary      Save a prompt version
+// @Tags         Prompt
+// @Accept       json
+// @Produce      json
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Param        version path string true "version"
+// @Param        file_path path string true "prompt file path"
+// @Param        body body types.UpdatePromptReq true "prompt"
+// @Success      200 {object} types.Response{data=types.PromptVersionDetail}
+// @Failure      400 {object} types.APIBadRequest
+// @Failure      403 {object} types.APIForbidden
+// @Failure      404 {object} types.APINotFound
+// @Failure      500 {object} types.APIInternalServerError
+// @Router       /prompts/{namespace}/{name}/prompt/version/{version}/{file_path} [put]
+func (h *PromptHandler) UpdatePromptVersion(ctx *gin.Context) {
+	req, ok := promptVersionRequestFromContext(ctx, true)
+	if !ok {
+		return
+	}
+	body := new(types.UpdatePromptReq)
+	if err := ctx.ShouldBindJSON(body); err != nil {
+		httpbase.BadRequestWithExt(ctx, errorx.ReqBodyFormat(err, nil))
+		return
+	}
+	if _, err := h.sensitive.CheckRequestV2(ctx.Request.Context(), body); err != nil {
+		httpbase.BadRequestWithExt(ctx, errorx.ErrSensitiveInfoNotAllowed)
+		return
+	}
+	result, err := h.promptVersion.UpdatePromptVersion(ctx.Request.Context(), req, body)
+	if handlePromptVersionError(ctx, err) {
+		return
+	}
+	httpbase.OK(ctx, result)
+}
+
+func promptVersionRequestFromContext(ctx *gin.Context, requireVersion bool) (types.PromptVersionReq, bool) {
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		httpbase.BadRequestWithExt(ctx, err)
+		return types.PromptVersionReq{}, false
+	}
+	filePath := convertFilePathFromRoute(ctx.Param("file_path"))
+	if filePath == "" {
+		httpbase.BadRequestWithExt(ctx, errorx.ReqParamInvalid(errors.New("file path is required"), nil))
+		return types.PromptVersionReq{}, false
+	}
+	version := ctx.Param("version")
+	if requireVersion && version == "" {
+		httpbase.BadRequestWithExt(ctx, errorx.ReqParamInvalid(errors.New("version is required"), nil))
+		return types.PromptVersionReq{}, false
+	}
+	return types.PromptVersionReq{
+		Namespace: namespace, Name: name, CurrentUser: httpbase.GetCurrentUser(ctx), FilePath: filePath, Version: version,
+	}, true
+}
+
+func handlePromptVersionError(ctx *gin.Context, err error) bool {
+	if err == nil {
+		return false
+	}
+	switch {
+	case errors.Is(err, errorx.ErrForbidden), errors.Is(err, errorx.ErrUnauthorized):
+		httpbase.ForbiddenError(ctx, err)
+	case errors.Is(err, errorx.ErrDatabaseNoRows), errors.Is(err, errorx.ErrGitFileNotFound):
+		httpbase.NotFoundError(ctx, err)
+	case errors.Is(err, errorx.ErrDatabaseDuplicateKey):
+		httpbase.ConflictError(ctx, err)
+	case errors.Is(err, errorx.ErrReqParamInvalid), errors.Is(err, errorx.ErrReqBodyFormat):
+		httpbase.BadRequestWithExt(ctx, err)
+	default:
+		httpbase.ServerError(ctx, err)
+	}
+	return true
 }
 
 // PromptRelations      godoc

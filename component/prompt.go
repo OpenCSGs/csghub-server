@@ -32,21 +32,22 @@ var (
 )
 
 type promptComponentImpl struct {
-	config            *config.Config
-	userStore         database.UserStore
-	userLikeStore     database.UserLikesStore
-	userSvcClient     rpc.UserSvcClient
-	promptConvStore   database.PromptConversationStore
-	promptPrefixStore database.PromptPrefixStore
-	llmConfigStore    database.LLMConfigStore
-	promptStore       database.PromptStore
-	repoStore         database.RepoStore
-	repoComponent     RepoComponent
-	gitServer         gitserver.GitServer
-	namespaceStore    database.NamespaceStore
-	recomStore        database.RecomStore
-	llmClient         *llm.Client
-	maxPromptFS       int64
+	config             *config.Config
+	userStore          database.UserStore
+	userLikeStore      database.UserLikesStore
+	userSvcClient      rpc.UserSvcClient
+	promptConvStore    database.PromptConversationStore
+	promptPrefixStore  database.PromptPrefixStore
+	llmConfigStore     database.LLMConfigStore
+	promptStore        database.PromptStore
+	promptVersionStore database.PromptVersionStore
+	repoStore          database.RepoStore
+	repoComponent      RepoComponent
+	gitServer          gitserver.GitServer
+	namespaceStore     database.NamespaceStore
+	recomStore         database.RecomStore
+	llmClient          *llm.Client
+	maxPromptFS        int64
 }
 
 type PromptComponent interface {
@@ -90,21 +91,22 @@ func NewPromptComponent(cfg *config.Config) (PromptComponent, error) {
 	usc := rpc.NewUserSvcHttpClient(fmt.Sprintf("%s:%d", cfg.User.Host, cfg.User.Port),
 		rpc.AuthWithApiKey(cfg.APIToken))
 	return &promptComponentImpl{
-		config:            cfg,
-		userStore:         database.NewUserStore(),
-		userLikeStore:     database.NewUserLikesStore(),
-		userSvcClient:     usc,
-		promptConvStore:   database.NewPromptConversationStore(),
-		promptPrefixStore: database.NewPromptPrefixStore(cfg),
-		llmConfigStore:    database.NewLLMConfigStore(cfg),
-		promptStore:       database.NewPromptStore(),
-		llmClient:         llm.NewClient(),
-		repoStore:         database.NewRepoStore(),
-		repoComponent:     r,
-		gitServer:         gs,
-		maxPromptFS:       cfg.Dataset.PromptMaxJsonlFileSize,
-		namespaceStore:    database.NewNamespaceStore(),
-		recomStore:        database.NewRecomStore(),
+		config:             cfg,
+		userStore:          database.NewUserStore(),
+		userLikeStore:      database.NewUserLikesStore(),
+		userSvcClient:      usc,
+		promptConvStore:    database.NewPromptConversationStore(),
+		promptPrefixStore:  database.NewPromptPrefixStore(cfg),
+		llmConfigStore:     database.NewLLMConfigStore(cfg),
+		promptStore:        database.NewPromptStore(),
+		promptVersionStore: database.NewPromptVersionStore(),
+		llmClient:          llm.NewClient(),
+		repoStore:          database.NewRepoStore(),
+		repoComponent:      r,
+		gitServer:          gs,
+		maxPromptFS:        cfg.Dataset.PromptMaxJsonlFileSize,
+		namespaceStore:     database.NewNamespaceStore(),
+		recomStore:         database.NewRecomStore(),
 	}, nil
 }
 
@@ -276,10 +278,14 @@ func (c *promptComponentImpl) UpdatePrompt(ctx context.Context, req types.Prompt
 	if err != nil {
 		return nil, errorx.ErrForbiddenMsg("user do not allowed update prompt")
 	}
+	return c.updatePromptFile(ctx, req, body, types.MainBranch, u)
+}
+
+func (c *promptComponentImpl) updatePromptFile(ctx context.Context, req types.PromptReq, body *types.UpdatePromptReq, branch string, user *database.User) (*types.Prompt, error) {
 	if !strings.HasSuffix(req.Path, ".jsonl") {
 		return nil, fmt.Errorf("prompt name must be end with .jsonl")
 	}
-	exist, _ := c.checkFileExist(ctx, req)
+	exist, _ := c.checkFileExistAtRef(ctx, req, branch)
 	if !exist {
 		return nil, fmt.Errorf("prompt %s does not exist", req.Path)
 	}
@@ -292,13 +298,13 @@ func (c *promptComponentImpl) UpdatePrompt(ctx context.Context, req types.Prompt
 	fileReq := types.UpdateFileReq{
 		Namespace:   req.Namespace,
 		Name:        req.Name,
-		Branch:      types.MainBranch,
+		Branch:      branch,
 		FilePath:    req.Path,
 		Content:     promptJsonStr,
 		RepoType:    types.PromptRepo,
 		CurrentUser: req.CurrentUser,
 		Username:    req.CurrentUser,
-		Email:       u.Email,
+		Email:       user.Email,
 		Message:     fmt.Sprintf("update prompt %s", req.Path),
 	}
 	_, err = c.repoComponent.UpdateFile(ctx, &fileReq)
@@ -339,10 +345,14 @@ func (c *promptComponentImpl) DeletePrompt(ctx context.Context, req types.Prompt
 }
 
 func (c *promptComponentImpl) checkFileExist(ctx context.Context, req types.PromptReq) (bool, error) {
+	return c.checkFileExistAtRef(ctx, req, types.MainBranch)
+}
+
+func (c *promptComponentImpl) checkFileExistAtRef(ctx context.Context, req types.PromptReq, ref string) (bool, error) {
 	getFileRawReq := gitserver.GetRepoInfoByPathReq{
 		Namespace: req.Namespace,
 		Name:      req.Name,
-		Ref:       types.MainBranch,
+		Ref:       ref,
 		Path:      req.Path,
 		RepoType:  types.PromptRepo,
 	}
