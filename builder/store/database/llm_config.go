@@ -41,6 +41,37 @@ type LLMConfig struct {
 	times
 }
 
+// llmConfigTasksKey is the metadata key under which a model's pipeline tasks are
+// stored (a JSON array of strings).
+const llmConfigTasksKey = "tasks"
+
+// Tasks returns the pipeline tasks stored in the model metadata. The value is a
+// JSON array of strings, surfaced as either []any (after a JSONB round trip) or
+// []string (when set programmatically).
+func (c *LLMConfig) Tasks() []string {
+	if c == nil || c.Metadata == nil {
+		return nil
+	}
+	raw, ok := c.Metadata[llmConfigTasksKey]
+	if !ok {
+		return nil
+	}
+	switch value := raw.(type) {
+	case []any:
+		tasks := make([]string, 0, len(value))
+		for _, item := range value {
+			if task, ok := item.(string); ok {
+				tasks = append(tasks, task)
+			}
+		}
+		return tasks
+	case []string:
+		return value
+	default:
+		return nil
+	}
+}
+
 // LLM types
 const (
 	LLMTypeOptimization  = 1
@@ -118,6 +149,19 @@ func NewLLMConfigStoreWithDB(db *DB, cfg *config.Config) LLMConfigStore {
 		dbDriver:            cfg.Database.Driver,
 		searchConfiguration: cfg.Database.SearchConfiguration,
 	}
+}
+
+// ResolveLLMTasks returns the pipeline tasks of the LLM config identified by
+// llmConfigID, or nil when the store is nil or the config cannot be loaded.
+func ResolveLLMTasks(ctx context.Context, store LLMConfigStore, llmConfigID int64) []string {
+	if store == nil {
+		return nil
+	}
+	cfg, err := store.GetByID(ctx, llmConfigID)
+	if err != nil || cfg == nil {
+		return nil
+	}
+	return cfg.Tasks()
 }
 
 func (s *lLMConfigStoreImpl) GetOptimization(ctx context.Context) (*LLMConfig, error) {

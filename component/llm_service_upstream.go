@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	aigatewaytypes "opencsg.com/csghub-server/aigateway/types"
+	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
@@ -137,10 +138,19 @@ func appendRequestSummaryValue(summary map[string]any, key string, value any) {
 	summary[key] = value
 }
 
+// upstreamTestParams carries the sample-specific inputs for an upstream
+// connection test.
+type upstreamTestParams struct {
+	url         string
+	modelName   string
+	authHeaders map[string]string
+	tasks       []string
+}
+
 // doUpstreamTest performs the protocol-specific sample request against the
 // upstream and returns the test result. It applies the provider's inference
 // policy to both the request context and HTTP client.
-func doUpstreamTest(ctx context.Context, provider aigatewaytypes.SampleProvider, url, modelName string, authHeaders map[string]string) (*types.TestUpstreamResult, error) {
+func doUpstreamTest(ctx context.Context, provider aigatewaytypes.SampleProvider, params upstreamTestParams) (*types.TestUpstreamResult, error) {
 	policy, err := provider.ExecutionPolicy(aigatewaytypes.SampleKindInference)
 	if err != nil {
 		return nil, fmt.Errorf("get sample execution policy: %w", err)
@@ -152,16 +162,17 @@ func doUpstreamTest(ctx context.Context, provider aigatewaytypes.SampleProvider,
 	defer cancel()
 	client := &http.Client{Timeout: policy.Timeout}
 
-	headers := make(http.Header, len(authHeaders))
-	for k, v := range authHeaders {
+	headers := make(http.Header, len(params.authHeaders))
+	for k, v := range params.authHeaders {
 		headers.Set(k, v)
 	}
 
 	execution, err := provider.Execute(testCtx, aigatewaytypes.SampleKindInference, aigatewaytypes.SampleInput{
-		Endpoint: url,
+		Endpoint: params.url,
 		Headers:  headers,
-		Model:    modelName,
+		Model:    params.modelName,
 		Text:     "hi",
+		Tasks:    params.tasks,
 	}, client)
 	if err != nil {
 		return nil, err
@@ -241,12 +252,19 @@ func (s *llmServiceComponentImpl) TestUpstream(ctx context.Context, req *types.T
 		return nil, fmt.Errorf("invalid auth_header: %w", err)
 	}
 
+	tasks := database.ResolveLLMTasks(ctx, s.llmConfigStore, dbUp.LLMConfigID)
+
 	slog.InfoContext(ctx, "testing upstream connection",
 		slog.Int64("upstream_id", dbUp.ID),
 		slog.String("url", url),
 	)
 
-	return doUpstreamTest(ctx, provider, url, modelName, authHeaders)
+	return doUpstreamTest(ctx, provider, upstreamTestParams{
+		url:         url,
+		modelName:   modelName,
+		authHeaders: authHeaders,
+		tasks:       tasks,
+	})
 }
 
 func (s *llmServiceComponentImpl) validateHealthCheckEndpoint(url string, healthCheckEnabled bool) error {

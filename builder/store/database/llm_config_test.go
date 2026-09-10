@@ -2,9 +2,11 @@ package database_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	mockdatabase "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/tests"
@@ -638,4 +640,61 @@ func TestLLMConfig_PopulateDerivedFields_EmptyUpstreamModelName(t *testing.T) {
 	cfg.PopulateDerivedFields()
 	// Should keep original ModelName when upstream ModelName is empty
 	require.Equal(t, "config-model", cfg.ModelName)
+}
+
+func TestLLMConfig_Tasks(t *testing.T) {
+	tests := []struct {
+		name   string
+		config *database.LLMConfig
+		want   []string
+	}{
+		{name: "nil config", config: nil, want: nil},
+		{name: "nil metadata", config: &database.LLMConfig{}, want: nil},
+		{name: "no tasks key", config: &database.LLMConfig{Metadata: map[string]any{"other": "value"}}, want: nil},
+		{
+			name:   "jsonb round trip []any",
+			config: &database.LLMConfig{Metadata: map[string]any{"tasks": []any{"text-generation", "auto-speech-recognition"}}},
+			want:   []string{"text-generation", "auto-speech-recognition"},
+		},
+		{
+			name:   "programmatic []string",
+			config: &database.LLMConfig{Metadata: map[string]any{"tasks": []string{"text-to-image"}}},
+			want:   []string{"text-to-image"},
+		},
+		{name: "non slice value", config: &database.LLMConfig{Metadata: map[string]any{"tasks": "text-generation"}}, want: nil},
+		{name: "slice with non string entries", config: &database.LLMConfig{Metadata: map[string]any{"tasks": []any{"text-generation", 42}}}, want: []string{"text-generation"}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require.Equal(t, test.want, test.config.Tasks())
+		})
+	}
+}
+
+func TestResolveLLMTasks(t *testing.T) {
+	ctx := context.TODO()
+
+	t.Run("nil store", func(t *testing.T) {
+		require.Nil(t, database.ResolveLLMTasks(ctx, nil, 7))
+	})
+
+	t.Run("store error", func(t *testing.T) {
+		store := mockdatabase.NewMockLLMConfigStore(t)
+		store.EXPECT().GetByID(ctx, int64(7)).Return(nil, errors.New("boom")).Once()
+		require.Nil(t, database.ResolveLLMTasks(ctx, store, 7))
+	})
+
+	t.Run("config not found", func(t *testing.T) {
+		store := mockdatabase.NewMockLLMConfigStore(t)
+		store.EXPECT().GetByID(ctx, int64(7)).Return(nil, nil).Once()
+		require.Nil(t, database.ResolveLLMTasks(ctx, store, 7))
+	})
+
+	t.Run("resolves tasks", func(t *testing.T) {
+		store := mockdatabase.NewMockLLMConfigStore(t)
+		store.EXPECT().GetByID(ctx, int64(7)).Return(&database.LLMConfig{
+			Metadata: map[string]any{"tasks": []any{"auto-speech-recognition"}},
+		}, nil).Once()
+		require.Equal(t, []string{"auto-speech-recognition"}, database.ResolveLLMTasks(ctx, store, 7))
+	})
 }

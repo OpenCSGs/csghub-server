@@ -48,6 +48,7 @@ type healthCheckerImpl struct {
 	config           HealthCheckerConfig
 	healthStore      database.AIGatewayUpstreamHealthStateStore
 	upstreamStore    database.UpstreamStore
+	llmConfigStore   database.LLMConfigStore
 	stateCache       StateCache
 	httpClient       *http.Client
 	sampleRegistry   *sample.Registry
@@ -65,6 +66,7 @@ func NewHealthChecker(
 	cfg *config.Config,
 	healthStore database.AIGatewayUpstreamHealthStateStore,
 	upstreamStore database.UpstreamStore,
+	llmConfigStore database.LLMConfigStore,
 	redisClient cache.RedisClient,
 ) HealthChecker {
 	hostname, _ := os.Hostname()
@@ -108,6 +110,7 @@ func NewHealthChecker(
 		config:           healthConfig,
 		healthStore:      healthStore,
 		upstreamStore:    upstreamStore,
+		llmConfigStore:   llmConfigStore,
 		stateCache:       stateCache,
 		httpClient:       &http.Client{},
 		sampleRegistry:   sample.NewDefaultRegistry(),
@@ -586,11 +589,16 @@ func (h *healthCheckerImpl) performSampleCheck(ctx context.Context, upstream *da
 		result.Error = err.Error()
 		return outcome
 	}
+	var tasks []string
+	if kind == types.SampleKindInference {
+		tasks = database.ResolveLLMTasks(ctx, h.llmConfigStore, upstream.LLMConfigID)
+	}
 	execution, err := provider.Execute(checkCtx, kind, types.SampleInput{
 		Endpoint:             upstream.URL,
 		Headers:              headers,
 		Model:                upstream.ModelName,
 		Text:                 "hi",
+		Tasks:                tasks,
 		MaxResponseBodyBytes: 1024,
 	}, h.httpClient)
 	if err != nil {

@@ -30,6 +30,7 @@ func NewAvailabilityManagerFromConfig(cfg *config.Config) (AvailabilityManager, 
 	healthStore := database.NewAIGatewayUpstreamHealthStateStore()
 	circuitStore := database.NewAIGatewayUpstreamCircuitStateStore()
 	upstreamStore := database.NewUpstreamStore(cfg)
+	llmConfigStore := database.NewLLMConfigStore(cfg)
 
 	// Create Redis client
 	var redisClient cache.RedisClient
@@ -57,7 +58,7 @@ func NewAvailabilityManagerFromConfig(cfg *config.Config) (AvailabilityManager, 
 
 	// Create components
 	circuitBreaker := NewCircuitBreaker(circuitConfig, circuitStore, redisClient)
-	healthChecker := NewHealthChecker(circuitBreaker, cfg, healthStore, upstreamStore, redisClient)
+	healthChecker := NewHealthChecker(circuitBreaker, cfg, healthStore, upstreamStore, llmConfigStore, redisClient)
 
 	return &availabilityManagerImpl{
 		healthChecker:  healthChecker,
