@@ -36,6 +36,9 @@ type SpaceResourceComponent interface {
 	// from the space_resource_scenario_constraints table. Lets callers discover
 	// scenario codes dynamically instead of hardcoding them.
 	ListScenarios(ctx context.Context) ([]types.ScenarioInfo, error)
+	// UpdateScenarioConstraint updates the RequiredHardware, ExcludeHardware and
+	// MaxReplica fields of a scenario constraint by ID.
+	UpdateScenarioConstraint(ctx context.Context, req *types.UpdateScenarioConstraintReq) (*types.ScenarioInfo, error)
 }
 
 // validateResources checks that the Resources string is non-empty and valid
@@ -415,6 +418,7 @@ func (c *spaceResourceComponentImpl) ListScenarios(ctx context.Context) ([]types
 	result := make([]types.ScenarioInfo, 0, len(rows))
 	for _, r := range rows {
 		result = append(result, types.ScenarioInfo{
+			ID:               r.ID,
 			Code:             r.Code,
 			Name:             r.Scenario,
 			I18nKey:          r.I18nKey,
@@ -423,6 +427,41 @@ func (c *spaceResourceComponentImpl) ListScenarios(ctx context.Context) ([]types
 			ExcludeHardware:  r.ExcludeHardware,
 			MaxReplica:       r.MaxReplica,
 		})
+	}
+	return result, nil
+}
+
+func (c *spaceResourceComponentImpl) UpdateScenarioConstraint(ctx context.Context, req *types.UpdateScenarioConstraintReq) (*types.ScenarioInfo, error) {
+	existing, err := c.scenarioConstraintStore.FindByID(ctx, req.ID)
+	if err != nil {
+		return nil, fmt.Errorf("find scenario constraint failed: %w", err)
+	}
+	if existing == nil {
+		return nil, errorx.ErrNotFound
+	}
+
+	if req.RequiredHardware != nil {
+		existing.RequiredHardware = *req.RequiredHardware
+	}
+	if req.ExcludeHardware != nil {
+		existing.ExcludeHardware = *req.ExcludeHardware
+	}
+	if req.MaxReplica != nil {
+		existing.MaxReplica = *req.MaxReplica
+	}
+	updated, err := c.scenarioConstraintStore.Update(ctx, *existing)
+	if err != nil {
+		return nil, fmt.Errorf("update scenario constraint failed: %w", err)
+	}
+	result := &types.ScenarioInfo{
+		ID:               updated.ID,
+		Code:             updated.Code,
+		Name:             updated.Scenario,
+		I18nKey:          updated.I18nKey,
+		Category:         types.ScenarioCategory(updated.Category),
+		RequiredHardware: updated.RequiredHardware,
+		ExcludeHardware:  updated.ExcludeHardware,
+		MaxReplica:       updated.MaxReplica,
 	}
 	return result, nil
 }

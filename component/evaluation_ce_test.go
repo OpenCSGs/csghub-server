@@ -11,7 +11,7 @@ import (
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"opencsg.com/csghub-server/builder/git/membership"
+	"opencsg.com/csghub-server/builder/rebac"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
@@ -54,7 +54,7 @@ func TestEvaluationComponent_CreateEvaluation(t *testing.T) {
 		Token:    "foo",
 		Nodes:    []types.Node{{Name: "node1", EnableVXPU: false}},
 	}
-t.Run("create evaluation without resource id", func(t *testing.T) {
+	t.Run("create evaluation without resource id", func(t *testing.T) {
 		c := initializeTestEvaluationComponent(ctx, t)
 		c.config.Argo.QuotaGPUNumber = "1"
 		c.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, req.Username).Return(database.User{
@@ -120,7 +120,7 @@ t.Run("create evaluation without resource id", func(t *testing.T) {
 		}, nil)
 		resource, err := json.Marshal(req2.Hardware)
 		require.Nil(t, err)
-c.mocks.stores.SpaceResourceMock().EXPECT().FindByID(ctx, int64(1)).Return(&database.SpaceResource{
+		c.mocks.stores.SpaceResourceMock().EXPECT().FindByID(ctx, int64(1)).Return(&database.SpaceResource{
 			ID:        1,
 			Name:      "1 GPU · 4 vCPU · 32Gi",
 			Resources: string(resource),
@@ -252,7 +252,7 @@ c.mocks.stores.SpaceResourceMock().EXPECT().FindByID(ctx, int64(1)).Return(&data
 			UUID:     req.Username,
 			ID:       1,
 		}, nil).Once()
-		c.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "test", "org1", membership.RoleWrite).Return(false, errors.New("rpc error"))
+		c.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "test", "org1", rebac.NamespaceCanWrite).Return(false, errors.New("rpc error"))
 		_, err := c.CreateEvaluation(ctx, req)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "failed to check namespace permission")
@@ -274,7 +274,7 @@ c.mocks.stores.SpaceResourceMock().EXPECT().FindByID(ctx, int64(1)).Return(&data
 			UUID:     req.Username,
 			ID:       1,
 		}, nil).Once()
-		c.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "test", "org1", membership.RoleWrite).Return(false, nil)
+		c.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "test", "org1", rebac.NamespaceCanWrite).Return(false, nil)
 		_, err := c.CreateEvaluation(ctx, req)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "do not have permission to create evaluation in this namespace")
@@ -297,7 +297,7 @@ c.mocks.stores.SpaceResourceMock().EXPECT().FindByID(ctx, int64(1)).Return(&data
 			UUID:     "user-uuid",
 			ID:       1,
 		}, nil).Once()
-		c.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "testuser", "org1", membership.RoleWrite).Return(true, nil)
+		c.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "testuser", "org1", rebac.NamespaceCanWrite).Return(true, nil)
 		c.mocks.stores.ModelMock().EXPECT().FindByPath(ctx, "opencsg", "wukong").Return(
 			&database.Model{
 				ID: 1,
@@ -411,7 +411,7 @@ func TestEvaluationComponent_GetEvaluation_AccessControl(t *testing.T) {
 			TaskType: "evaluation",
 			Status:   "Succeed",
 		}, nil)
-		c.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "otheruser", "test", membership.RoleRead).Return(false, nil)
+		c.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "otheruser", "test", rebac.NamespaceCanRead).Return(false, nil)
 		e, err := c.GetEvaluation(ctx, req)
 		require.Equal(t, err, errorx.ErrForbidden)
 		require.Nil(t, e)
@@ -434,7 +434,7 @@ func TestEvaluationComponent_GetEvaluation_AccessControl(t *testing.T) {
 			TaskType: "evaluation",
 			Status:   "Succeed",
 		}, nil)
-		c.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "otheruser", "test", membership.RoleRead).Return(true, nil)
+		c.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "otheruser", "test", rebac.NamespaceCanRead).Return(true, nil)
 		c.mocks.stores.DatasetMock().EXPECT().FindByOriginPath(ctx, "Rowan/hellaswag").Return(&database.Dataset{
 			Repository: &database.Repository{
 				Path: "Rowan/hellaswag",
@@ -475,7 +475,7 @@ func TestEvaluationComponent_GetEvaluation_AccessControl(t *testing.T) {
 			TaskType: "evaluation",
 			Status:   "Succeed",
 		}, nil)
-		c.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "otheruser", "test", membership.RoleRead).Return(false, errors.New("rpc error"))
+		c.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "otheruser", "test", rebac.NamespaceCanRead).Return(false, errors.New("rpc error"))
 		e, err := c.GetEvaluation(ctx, req)
 		require.Nil(t, e)
 		require.Error(t, err)
@@ -499,7 +499,7 @@ func TestEvaluationComponent_GetEvaluation_AccessControl(t *testing.T) {
 			TaskType: "evaluation",
 			Status:   "Succeed",
 		}, nil)
-		c.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "orgmember", "org1", membership.RoleRead).Return(true, nil)
+		c.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "orgmember", "org1", rebac.NamespaceCanRead).Return(true, nil)
 		c.mocks.stores.DatasetMock().EXPECT().FindByOriginPath(ctx, "Rowan/hellaswag").Return(&database.Dataset{
 			Repository: &database.Repository{
 				Path: "Rowan/hellaswag",
@@ -529,7 +529,7 @@ func TestEvaluationComponent_GetEvaluation_AccessControl(t *testing.T) {
 			TaskType: "evaluation",
 			Status:   "Succeed",
 		}, nil)
-		c.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "outsider", "org1", membership.RoleRead).Return(false, nil)
+		c.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "outsider", "org1", rebac.NamespaceCanRead).Return(false, nil)
 		e, err := c.GetEvaluation(ctx, req)
 		require.Equal(t, err, errorx.ErrForbidden)
 		require.Nil(t, e)
@@ -580,7 +580,7 @@ func TestEvaluationComponent_DeleteEvaluation(t *testing.T) {
 			ClusterID: "cluster1",
 			Namespace: "ns1",
 		}, nil)
-		c.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "orgmember", "org1", membership.RoleWrite).Return(true, nil)
+		c.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "orgmember", "org1", rebac.NamespaceCanWrite).Return(true, nil)
 		req := types.EvaluationDelReq{
 			Username: "orgmember",
 			ID:       1,
@@ -604,7 +604,7 @@ func TestEvaluationComponent_DeleteEvaluation(t *testing.T) {
 			ClusterID: "cluster1",
 			Namespace: "ns1",
 		}, nil)
-		c.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "outsider", "org1", membership.RoleWrite).Return(false, nil)
+		c.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "outsider", "org1", rebac.NamespaceCanWrite).Return(false, nil)
 		req := types.EvaluationDelReq{
 			Username: "outsider",
 			ID:       1,
@@ -623,7 +623,7 @@ func TestEvaluationComponent_DeleteEvaluation(t *testing.T) {
 			Username: "org1",
 			TaskId:   "org-task-1",
 		}, nil)
-		c.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "orgmember", "org1", membership.RoleWrite).Return(false, errors.New("rpc error"))
+		c.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "orgmember", "org1", rebac.NamespaceCanWrite).Return(false, errors.New("rpc error"))
 		req := types.EvaluationDelReq{
 			Username: "orgmember",
 			ID:       1,
@@ -644,7 +644,7 @@ func TestEvaluationComponent_OrgEvaluations(t *testing.T) {
 			CurrentUser: "user1",
 			PageOpts:    types.PageOpts{Page: 1, PageSize: 10},
 		}
-		c.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "user1", "org1", membership.RoleRead).Return(true, nil)
+		c.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "user1", "org1", rebac.NamespaceCanRead).Return(true, nil)
 		c.mocks.stores.WorkflowMock().EXPECT().FindByUsernameWithTaskTypes(ctx, "org1", evaluationTaskTypes, 10, 1).Return([]database.ArgoWorkflow{
 			{ID: 1, TaskName: "ev1", Username: "org1", TaskType: "evaluation", Status: "Succeed"},
 		}, 1, nil)

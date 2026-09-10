@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 	mockdb "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/database"
 	mockcomponent "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
+	"opencsg.com/csghub-server/builder/rebac"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
@@ -47,7 +48,7 @@ func TestCreateDatasetApplication_NoPermission(t *testing.T) {
 	}
 	dsStore.On("FindByPath", ctx, "user", "d1").Return(dataset, nil)
 	userStore.On("FindByUsername", ctx, "u").Return(database.User{ID: 1, Username: "u"}, nil)
-	repoComp.On("GetUserRepoPermission", ctx, "u", dataset.Repository).Return(&types.UserRepoPermission{CanWrite: false}, nil)
+	repoComp.On("CheckUserRepoPermission", ctx, "u", dataset.Repository, rebac.RepositoryCanWrite).Return(false, nil)
 
 	req := &types.CreateDatasetApplicationReq{
 		Namespace:        "user",
@@ -73,7 +74,7 @@ func TestCreateDatasetApplication_PendingExists(t *testing.T) {
 	}
 	dsStore.On("FindByPath", ctx, "user", "d1").Return(dataset, nil)
 	userStore.On("FindByUsername", ctx, "u").Return(database.User{ID: 1, Username: "u"}, nil)
-	repoComp.On("GetUserRepoPermission", ctx, "u", dataset.Repository).Return(&types.UserRepoPermission{CanWrite: true}, nil)
+	repoComp.On("CheckUserRepoPermission", ctx, "u", dataset.Repository, rebac.RepositoryCanWrite).Return(true, nil)
 	appStore.On("FindPendingByDatasetID", ctx, int64(1)).Return(&database.DatasetApplication{ID: 99}, nil)
 
 	req := &types.CreateDatasetApplicationReq{
@@ -100,7 +101,7 @@ func TestCreateDatasetApplication_RelatedDatasetNotFound(t *testing.T) {
 	}
 	dsStore.On("FindByPath", ctx, "user", "d1").Return(dataset, nil)
 	userStore.On("FindByUsername", ctx, "u").Return(database.User{ID: 1, Username: "u"}, nil)
-	repoComp.On("GetUserRepoPermission", ctx, "u", dataset.Repository).Return(&types.UserRepoPermission{CanWrite: true}, nil)
+	repoComp.On("CheckUserRepoPermission", ctx, "u", dataset.Repository, rebac.RepositoryCanWrite).Return(true, nil)
 	appStore.On("FindPendingByDatasetID", ctx, int64(1)).Return(nil, errorx.HandleDBError(sql.ErrNoRows, nil))
 	dsStore.On("ByID", ctx, int64(999)).Return(nil, sql.ErrNoRows)
 
@@ -128,7 +129,7 @@ func TestCreateDatasetApplication_Success(t *testing.T) {
 	}
 	dsStore.On("FindByPath", ctx, "user", "d1").Return(dataset, nil)
 	userStore.On("FindByUsername", ctx, "u").Return(database.User{ID: 1, Username: "u"}, nil)
-	repoComp.On("GetUserRepoPermission", ctx, "u", dataset.Repository).Return(&types.UserRepoPermission{CanWrite: true}, nil)
+	repoComp.On("CheckUserRepoPermission", ctx, "u", dataset.Repository, rebac.RepositoryCanWrite).Return(true, nil)
 	appStore.On("FindPendingByDatasetID", ctx, int64(1)).Return(nil, errorx.HandleDBError(sql.ErrNoRows, nil))
 
 	relatedDs := &database.Dataset{
@@ -138,7 +139,7 @@ func TestCreateDatasetApplication_Success(t *testing.T) {
 	}
 	dsStore.On("ByID", ctx, int64(2)).Return(relatedDs, nil)
 	dsStore.On("FindByRelatedDatasetIDs", ctx, []int64{1, 2}).Return([]database.Dataset{}, nil)
-	repoComp.On("GetUserRepoPermission", ctx, "u", relatedDs.Repository).Return(&types.UserRepoPermission{CanWrite: true}, nil)
+	repoComp.On("CheckUserRepoPermission", ctx, "u", relatedDs.Repository, rebac.RepositoryCanWrite).Return(true, nil)
 
 	created := &database.DatasetApplication{
 		ID:               10,
@@ -178,7 +179,7 @@ func TestCreateDatasetApplication_RelatedDatasetAlreadyReferenced(t *testing.T) 
 	}
 	dsStore.On("FindByPath", ctx, "user", "d1").Return(dataset, nil)
 	userStore.On("FindByUsername", ctx, "u").Return(database.User{ID: 1, Username: "u"}, nil)
-	repoComp.On("GetUserRepoPermission", ctx, "u", dataset.Repository).Return(&types.UserRepoPermission{CanWrite: true}, nil)
+	repoComp.On("CheckUserRepoPermission", ctx, "u", dataset.Repository, rebac.RepositoryCanWrite).Return(true, nil)
 	appStore.On("FindPendingByDatasetID", ctx, int64(1)).Return(nil, errorx.HandleDBError(sql.ErrNoRows, nil))
 
 	relatedDs := &database.Dataset{
@@ -215,7 +216,7 @@ func TestCreateDatasetApplication_DatasetAlreadyReferencingAnother(t *testing.T)
 	}
 	dsStore.On("FindByPath", ctx, "user", "d1").Return(dataset, nil)
 	userStore.On("FindByUsername", ctx, "u").Return(database.User{ID: 1, Username: "u"}, nil)
-	repoComp.On("GetUserRepoPermission", ctx, "u", dataset.Repository).Return(&types.UserRepoPermission{CanWrite: true}, nil)
+	repoComp.On("CheckUserRepoPermission", ctx, "u", dataset.Repository, rebac.RepositoryCanWrite).Return(true, nil)
 	appStore.On("FindPendingByDatasetID", ctx, int64(1)).Return(nil, errorx.HandleDBError(sql.ErrNoRows, nil))
 
 	relatedDs := &database.Dataset{
@@ -251,7 +252,7 @@ func TestCreateDatasetApplication_SameDatasetAndRelatedDatasetID(t *testing.T) {
 	}
 	dsStore.On("FindByPath", ctx, "user", "d1").Return(dataset, nil)
 	userStore.On("FindByUsername", ctx, "u").Return(database.User{ID: 1, Username: "u"}, nil)
-	repoComp.On("GetUserRepoPermission", ctx, "u", dataset.Repository).Return(&types.UserRepoPermission{CanWrite: true}, nil)
+	repoComp.On("CheckUserRepoPermission", ctx, "u", dataset.Repository, rebac.RepositoryCanWrite).Return(true, nil)
 	appStore.On("FindPendingByDatasetID", ctx, int64(1)).Return(nil, errorx.HandleDBError(sql.ErrNoRows, nil))
 
 	req := &types.CreateDatasetApplicationReq{
@@ -277,7 +278,7 @@ func TestGetDatasetApplication_NotFound(t *testing.T) {
 		Repository:           &database.Repository{Path: "user/d1"},
 	}
 	dsStore.On("FindByPath", ctx, "user", "d1").Return(dataset, nil)
-	repoComp.On("GetUserRepoPermission", ctx, "u", dataset.Repository).Return(&types.UserRepoPermission{CanWrite: true}, nil)
+	repoComp.On("CheckUserRepoPermission", ctx, "u", dataset.Repository, rebac.RepositoryCanWrite).Return(true, nil)
 
 	_, err := c.GetDatasetApplication(ctx, "user", "d1", "u")
 	require.NotNil(t, err)
@@ -293,7 +294,7 @@ func TestGetDatasetApplication_Success(t *testing.T) {
 		Repository:           &database.Repository{Path: "user/d1"},
 	}
 	dsStore.On("FindByPath", ctx, "user", "d1").Return(dataset, nil)
-	repoComp.On("GetUserRepoPermission", ctx, "u", dataset.Repository).Return(&types.UserRepoPermission{CanWrite: true}, nil)
+	repoComp.On("CheckUserRepoPermission", ctx, "u", dataset.Repository, rebac.RepositoryCanWrite).Return(true, nil)
 
 	app := &database.DatasetApplication{
 		ID:     10,
@@ -317,7 +318,7 @@ func TestGetDatasetApplication_NoPermission(t *testing.T) {
 		Repository: &database.Repository{Path: "user/d1"},
 	}
 	dsStore.On("FindByPath", ctx, "user", "d1").Return(dataset, nil)
-	repoComp.On("GetUserRepoPermission", ctx, "u", dataset.Repository).Return(&types.UserRepoPermission{CanWrite: false}, nil)
+	repoComp.On("CheckUserRepoPermission", ctx, "u", dataset.Repository, rebac.RepositoryCanWrite).Return(false, nil)
 
 	_, err := c.GetDatasetApplication(ctx, "user", "d1", "u")
 	require.NotNil(t, err)

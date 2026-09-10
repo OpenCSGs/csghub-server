@@ -2,11 +2,14 @@ package component
 
 import (
 	"context"
+	"database/sql"
 	"testing"
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	multisync_mock "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/multisync"
+	mockrebac "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/rebac"
+	"opencsg.com/csghub-server/builder/rebac"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/types"
 )
@@ -29,6 +32,18 @@ func TestMultiSyncComponent_More(t *testing.T) {
 func TestMultiSyncComponent_SyncAsClient(t *testing.T) {
 	ctx := mock.Anything
 	mc := initializeTestMultiSyncComponent(context.TODO(), t)
+	authorizer := mc.rebac.(*mockrebac.MockAuthorizer)
+	authorizer.EXPECT().Check(mock.Anything, mock.Anything).Return(rebac.Decision{Allowed: false}, nil).Times(5)
+	var userObjectOwnerTupleWritten bool
+	authorizer.EXPECT().Write(mock.Anything, mock.Anything).Run(func(_ context.Context, relationships []rebac.Relationship) {
+		for _, relationship := range relationships {
+			if relationship.Subject == rebac.UserSubject("sync-user-uuid") &&
+				relationship.Relation == rebac.RelationOwner &&
+				relationship.Object == rebac.UserObject("sync-user-uuid") {
+				userObjectOwnerTupleWritten = true
+			}
+		}
+	}).Return(nil).Times(5)
 	mc.mocks.stores.MultiSyncMock().EXPECT().GetLatest(ctx).Return(database.SyncVersion{
 		Version: 1,
 	}, nil)
@@ -39,7 +54,7 @@ func TestMultiSyncComponent_SyncAsClient(t *testing.T) {
 			HasMore  bool                "json:\"has_more\""
 		}{
 			Versions: []types.SyncVersion{
-				{Version: 2, RepoPath: " Team/Repo "},
+				{Version: 2, RepoPath: " team/repo "},
 			},
 			HasMore: true,
 		},
@@ -113,9 +128,22 @@ func TestMultiSyncComponent_SyncAsClient(t *testing.T) {
 		}},
 	}, nil)
 	mockedClient.EXPECT().ReadMeData(ctx, svs[0]).Return("readme", nil)
+	mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "csg_ns").Return(database.User{}, sql.ErrNoRows).Once()
+	mc.mocks.stores.UserMock().EXPECT().Create(ctx, mock.Anything, mock.Anything).RunAndReturn(
+		func(ctx context.Context, u *database.User, n *database.Namespace) error {
+			require.Equal(t, u.NickName, "csg_ns")
+			require.Equal(t, u.Username, "csg_ns")
+			require.Equal(t, u.Email, "3073880722f93f34064c9adea9cbeea2")
+			require.Equal(t, n.Path, "csg_ns")
+			require.Equal(t, n.Mirrored, true)
+			u.ID = 1
+			u.UUID = "sync-user-uuid"
+			return nil
+		},
+	)
 	mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "csg_ns").Return(database.User{
-		ID: 1, Username: "csg_ns",
-	}, nil).Times(3)
+		ID: 1, Username: "csg_ns", UUID: "sync-user-uuid",
+	}, nil).Twice()
 	dbrepo := &database.Repository{
 		UserID:         1,
 		Path:           "csg_ns/user",
@@ -295,5 +323,6 @@ func TestMultiSyncComponent_SyncAsClient(t *testing.T) {
 
 	err := mc.SyncAsClient(context.TODO(), mockedClient)
 	require.Nil(t, err)
+	require.True(t, userObjectOwnerTupleWritten)
 
 }

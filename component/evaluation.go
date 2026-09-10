@@ -11,8 +11,9 @@ import (
 	v1alpha1 "github.com/argoproj/argo-workflows/v3/pkg/apis/workflow/v1alpha1"
 	"opencsg.com/csghub-server/builder/deploy"
 	"opencsg.com/csghub-server/builder/deploy/common"
-	"opencsg.com/csghub-server/builder/git/membership"
 	"opencsg.com/csghub-server/builder/loki"
+	"opencsg.com/csghub-server/builder/rebac"
+	rebacfactory "opencsg.com/csghub-server/builder/rebac/factory"
 	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
@@ -36,6 +37,7 @@ type evaluationComponentImpl struct {
 	repoComponent         RepoComponent
 	userSvcClient         rpc.UserSvcClient
 	clusterStore          database.ClusterInfoStore
+	rebac                 rebac.Authorizer
 }
 
 type EvaluationComponent interface {
@@ -71,6 +73,10 @@ func NewEvaluationComponent(config *config.Config) (EvaluationComponent, error) 
 	if err != nil {
 		return nil, fmt.Errorf("failed to create repo component, %w", err)
 	}
+	c.rebac, err = rebacfactory.NewAuthorizer()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create ReBAC authorizer, error: %w", err)
+	}
 	c.accountingComponent = ac
 	c.userSvcClient = rpc.NewUserSvcHttpClient(
 		fmt.Sprintf("%s:%d", config.User.Host, config.User.Port),
@@ -92,7 +98,7 @@ func (c *evaluationComponentImpl) CreateEvaluation(ctx context.Context, req type
 	}
 
 	if !user.CanAdmin() {
-		canWrite, err := c.repoComponent.CheckCurrentUserPermission(ctx, operatorUsername, req.OwnerNamespace, membership.RoleWrite)
+		canWrite, err := c.repoComponent.CheckCurrentUserPermission(ctx, operatorUsername, req.OwnerNamespace, rebac.NamespaceCanWrite)
 		if err != nil {
 			return nil, fmt.Errorf("failed to check namespace permission, error: %w", err)
 		}
@@ -270,7 +276,7 @@ func (c *evaluationComponentImpl) DeleteEvaluation(ctx context.Context, req type
 		return fmt.Errorf("fail to get evaluation result, %w", err)
 	}
 	if wf.Username != req.Username {
-		canWrite, err := c.repoComponent.CheckCurrentUserPermission(ctx, req.Username, wf.Username, membership.RoleWrite)
+		canWrite, err := c.repoComponent.CheckCurrentUserPermission(ctx, req.Username, wf.Username, rebac.NamespaceCanWrite)
 		if err != nil {
 			return fmt.Errorf("failed to check namespace permission, error: %w", err)
 		}
@@ -310,7 +316,7 @@ func (c *evaluationComponentImpl) GetEvaluation(ctx context.Context, req types.E
 		return nil, errorx.ErrForbiddenMsg("workflow is not an evaluation job")
 	}
 	if wf.Username != req.Username {
-		canRead, err := c.repoComponent.CheckCurrentUserPermission(ctx, req.Username, wf.Username, membership.RoleRead)
+		canRead, err := c.repoComponent.CheckCurrentUserPermission(ctx, req.Username, wf.Username, rebac.NamespaceCanRead)
 		if err != nil {
 			return nil, fmt.Errorf("failed to check namespace permission, error: %w", err)
 		}
@@ -388,7 +394,7 @@ func isEvaluationResultTaskType(taskType types.TaskType) bool {
 
 func (c *evaluationComponentImpl) OrgEvaluations(ctx context.Context, req *types.OrgEvaluationsReq) ([]types.ArgoWorkFlowRes, int, error) {
 	if req.CurrentUser != "" {
-		canRead, err := c.repoComponent.CheckCurrentUserPermission(ctx, req.CurrentUser, req.Namespace, membership.RoleRead)
+		canRead, err := c.repoComponent.CheckCurrentUserPermission(ctx, req.CurrentUser, req.Namespace, rebac.NamespaceCanRead)
 		if err != nil {
 			return nil, 0, fmt.Errorf("failed to check namespace permission, error: %w", err)
 		}
@@ -614,7 +620,7 @@ func (c *evaluationComponentImpl) checkEvaluationLogPermission(ctx context.Conte
 		return false, nil, errorx.ErrForbiddenMsg("workflow is not an evaluation job")
 	}
 
-	_, err = checkOwnerOrOrgMemberPermission(ctx, c.userSvcClient, req.CurrentUser, wf.UserUUID)
+	_, err = checkOwnerOrOrgMemberPermission(ctx, c.userSvcClient, c.rebac, req.CurrentUser, wf.UserUUID)
 	if err != nil {
 		return false, nil, errorx.ErrForbidden
 	}

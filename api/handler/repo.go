@@ -2186,6 +2186,7 @@ func (h *RepoHandler) ChangePath(ctx *gin.Context) {
 // TransferOwnership godoc
 // @Security     ApiKey
 // @Summary      Transfer repository ownership to another namespace
+// @Description  Requires administrator permission on both source and target namespaces.
 // @Tags         Repository
 // @Accept       json
 // @Produce      json

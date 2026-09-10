@@ -12,6 +12,7 @@ import (
 	mockdatabase "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/database"
 	mockcomponent "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
 	"opencsg.com/csghub-server/builder/git/gitserver"
+	"opencsg.com/csghub-server/builder/rebac"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
@@ -57,7 +58,7 @@ func TestSkillPublishComponent_Publish(t *testing.T) {
 		}
 
 		deps.skillStore.EXPECT().FindByPath(ctx, "u", "r").Return(skill, nil)
-		deps.repo.EXPECT().GetUserRepoPermission(ctx, "u", repo).Return(&types.UserRepoPermission{CanWrite: true}, nil)
+		deps.repo.EXPECT().CheckUserRepoPermission(ctx, "u", repo, rebac.RepositoryCanWrite).Return(true, nil)
 		deps.git.EXPECT().GetRepoLastCommit(ctx, gitserver.GetRepoLastCommitReq{
 			Namespace: "u",
 			Name:      "r",
@@ -97,7 +98,7 @@ func TestSkillPublishComponent_Publish(t *testing.T) {
 		skill := &database.Skill{ID: 11, RepositoryID: repo.ID, Repository: repo}
 
 		deps.skillStore.EXPECT().FindByPath(ctx, "u", "r").Return(skill, nil)
-		deps.repo.EXPECT().GetUserRepoPermission(ctx, "reader", repo).Return(&types.UserRepoPermission{CanWrite: false}, nil)
+		deps.repo.EXPECT().CheckUserRepoPermission(ctx, "reader", repo, rebac.RepositoryCanWrite).Return(false, nil)
 
 		resp, err := deps.component.Publish(ctx, &types.PublishSkillVersionReq{
 			Namespace: "u",
@@ -117,7 +118,7 @@ func TestSkillPublishComponent_Publish(t *testing.T) {
 		skill := &database.Skill{ID: 11, RepositoryID: repo.ID, Repository: repo}
 
 		deps.skillStore.EXPECT().FindByPath(ctx, "u", "r").Return(skill, nil)
-		deps.repo.EXPECT().GetUserRepoPermission(ctx, "u", repo).Return(&types.UserRepoPermission{CanWrite: true}, nil)
+		deps.repo.EXPECT().CheckUserRepoPermission(ctx, "u", repo, rebac.RepositoryCanWrite).Return(true, nil)
 		deps.git.EXPECT().GetRepoLastCommit(ctx, gitserver.GetRepoLastCommitReq{
 			Namespace: "u",
 			Name:      "r",

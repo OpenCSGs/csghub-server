@@ -20,7 +20,7 @@ import (
 	"github.com/minio/minio-go/v7"
 	"opencsg.com/csghub-server/builder/git"
 	"opencsg.com/csghub-server/builder/git/gitserver"
-	"opencsg.com/csghub-server/builder/git/membership"
+	"opencsg.com/csghub-server/builder/rebac"
 	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/store/s3"
@@ -589,17 +589,17 @@ func (c *codeComponentImpl) getRelations(ctx context.Context, repoID int64, curr
 func (c *codeComponentImpl) OrgCodes(ctx context.Context, req *types.OrgCodesReq) ([]types.Code, int, error) {
 	var resCodes []types.Code
 	var err error
-	r := membership.RoleUnknown
+	canRead := false
 	if req.CurrentUser != "" {
-		r, err = c.userSvcClient.GetMemberRole(ctx, req.Namespace, req.CurrentUser)
-		// log error, and treat user as unknown role in org
+		canRead, err = c.repoComponent.CheckCurrentUserPermission(ctx, req.CurrentUser, req.Namespace, rebac.NamespaceCanRead)
 		if err != nil {
-			slog.ErrorContext(ctx, "faild to get member role",
-				slog.String("org", req.Namespace), slog.String("user", req.CurrentUser),
-				slog.String("error", err.Error()))
+			slog.ErrorContext(ctx, "failed to check namespace permission",
+				slog.String("namespace", req.Namespace), slog.String("user", req.CurrentUser),
+				slog.Any("error", err))
+			canRead = false
 		}
 	}
-	onlyPublic := !r.CanRead()
+	onlyPublic := !canRead
 	codes, total, err := c.codeStore.ByOrgPath(ctx, req.Namespace, req.PageSize, req.Page, onlyPublic)
 	if err != nil {
 		newError := fmt.Errorf("failed to get org codes,error:%w", err)

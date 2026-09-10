@@ -71,17 +71,17 @@ func (_c *MockMemberStore_Add_Call) RunAndReturn(run func(context.Context, int64
 	return _c
 }
 
-// Delete provides a mock function with given fields: ctx, orgID, userID, role
-func (_m *MockMemberStore) Delete(ctx context.Context, orgID int64, userID int64, role string) error {
-	ret := _m.Called(ctx, orgID, userID, role)
+// Delete provides a mock function with given fields: ctx, orgID, userID
+func (_m *MockMemberStore) Delete(ctx context.Context, orgID int64, userID int64) error {
+	ret := _m.Called(ctx, orgID, userID)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Delete")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, int64, int64, string) error); ok {
-		r0 = rf(ctx, orgID, userID, role)
+	if rf, ok := ret.Get(0).(func(context.Context, int64, int64) error); ok {
+		r0 = rf(ctx, orgID, userID)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -98,14 +98,13 @@ type MockMemberStore_Delete_Call struct {
 //   - ctx context.Context
 //   - orgID int64
 //   - userID int64
-//   - role string
-func (_e *MockMemberStore_Expecter) Delete(ctx interface{}, orgID interface{}, userID interface{}, role interface{}) *MockMemberStore_Delete_Call {
-	return &MockMemberStore_Delete_Call{Call: _e.mock.On("Delete", ctx, orgID, userID, role)}
+func (_e *MockMemberStore_Expecter) Delete(ctx interface{}, orgID interface{}, userID interface{}) *MockMemberStore_Delete_Call {
+	return &MockMemberStore_Delete_Call{Call: _e.mock.On("Delete", ctx, orgID, userID)}
 }
 
-func (_c *MockMemberStore_Delete_Call) Run(run func(ctx context.Context, orgID int64, userID int64, role string)) *MockMemberStore_Delete_Call {
+func (_c *MockMemberStore_Delete_Call) Run(run func(ctx context.Context, orgID int64, userID int64)) *MockMemberStore_Delete_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(int64), args[2].(int64), args[3].(string))
+		run(args[0].(context.Context), args[1].(int64), args[2].(int64))
 	})
 	return _c
 }
@@ -115,7 +114,7 @@ func (_c *MockMemberStore_Delete_Call) Return(_a0 error) *MockMemberStore_Delete
 	return _c
 }
 
-func (_c *MockMemberStore_Delete_Call) RunAndReturn(run func(context.Context, int64, int64, string) error) *MockMemberStore_Delete_Call {
+func (_c *MockMemberStore_Delete_Call) RunAndReturn(run func(context.Context, int64, int64) error) *MockMemberStore_Delete_Call {
 	_c.Call.Return(run)
 	return _c
 }

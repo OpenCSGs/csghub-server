@@ -9,8 +9,9 @@ import (
 	"strings"
 
 	"opencsg.com/csghub-server/builder/deploy"
-	"opencsg.com/csghub-server/builder/git/membership"
 	"opencsg.com/csghub-server/builder/loki"
+	"opencsg.com/csghub-server/builder/rebac"
+	rebacfactory "opencsg.com/csghub-server/builder/rebac/factory"
 	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
@@ -35,6 +36,7 @@ type finetuneComponentImpl struct {
 	repoComponent         RepoComponent
 	userSvcClient         rpc.UserSvcClient
 	clusterStore          database.ClusterInfoStore
+	rebac                 rebac.Authorizer
 }
 
 type FinetuneComponent interface {
@@ -70,6 +72,10 @@ func NewFinetuneComponent(config *config.Config) (FinetuneComponent, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create repo component, %w", err)
 	}
+	c.rebac, err = rebacfactory.NewAuthorizer()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create ReBAC authorizer, error: %w", err)
+	}
 	c.accountingComponent = ac
 	userSvcAddr := fmt.Sprintf("%s:%d", config.User.Host, config.User.Port)
 	c.userSvcClient = rpc.NewUserSvcHttpClient(userSvcAddr, rpc.AuthWithApiKey(config.APIToken))
@@ -89,7 +95,7 @@ func (c *finetuneComponentImpl) CreateFinetuneJob(ctx context.Context, req types
 	}
 
 	if !user.CanAdmin() {
-		canWrite, err := c.repoComponent.CheckCurrentUserPermission(ctx, operatorUsername, req.Namespace, membership.RoleWrite)
+		canWrite, err := c.repoComponent.CheckCurrentUserPermission(ctx, operatorUsername, req.Namespace, rebac.NamespaceCanWrite)
 		if err != nil {
 			return nil, fmt.Errorf("failed to check namespace permission, error: %w", err)
 		}
@@ -263,7 +269,7 @@ func (c *finetuneComponentImpl) GetFinetuneJob(ctx context.Context, req types.Fi
 
 func (c *finetuneComponentImpl) OrgFinetuneInstances(ctx context.Context, req *types.OrgFinetunesReq) ([]types.DeployRequest, int, error) {
 	if req.CurrentUser != "" {
-		canRead, err := c.repoComponent.CheckCurrentUserPermission(ctx, req.CurrentUser, req.Namespace, membership.RoleRead)
+		canRead, err := c.repoComponent.CheckCurrentUserPermission(ctx, req.CurrentUser, req.Namespace, rebac.NamespaceCanRead)
 		if err != nil {
 			return nil, 0, fmt.Errorf("failed to check namespace permission, error: %w", err)
 		}
@@ -326,7 +332,7 @@ func (c *finetuneComponentImpl) OrgFinetuneInstances(ctx context.Context, req *t
 
 func (c *finetuneComponentImpl) OrgFinetuneJobs(ctx context.Context, req *types.OrgFinetunesReq) ([]types.ArgoWorkFlowRes, int, error) {
 	if req.CurrentUser != "" {
-		canRead, err := c.repoComponent.CheckCurrentUserPermission(ctx, req.CurrentUser, req.Namespace, membership.RoleRead)
+		canRead, err := c.repoComponent.CheckCurrentUserPermission(ctx, req.CurrentUser, req.Namespace, rebac.NamespaceCanRead)
 		if err != nil {
 			return nil, 0, fmt.Errorf("failed to check namespace permission, error: %w", err)
 		}
@@ -409,7 +415,7 @@ func (c *finetuneComponentImpl) CheckUserPermission(ctx context.Context, req typ
 			req.ID, req.TaskID, err)
 	}
 
-	_, err = checkOwnerOrOrgMemberPermission(ctx, c.userSvcClient, req.CurrentUser, wf.UserUUID)
+	_, err = checkOwnerOrOrgMemberPermission(ctx, c.userSvcClient, c.rebac, req.CurrentUser, wf.UserUUID)
 	if err != nil {
 		return false, nil, errorx.ErrForbidden
 	}

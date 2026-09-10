@@ -72,6 +72,55 @@ func (_c *MockOrgStore_Create_Call) RunAndReturn(run func(context.Context, *data
 	return _c
 }
 
+// CreateWithRelations provides a mock function with given fields: ctx, org, namepace, tagIDs
+func (_m *MockOrgStore) CreateWithRelations(ctx context.Context, org *database.Organization, namepace *database.Namespace, tagIDs []int64) error {
+	ret := _m.Called(ctx, org, namepace, tagIDs)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CreateWithRelations")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, *database.Organization, *database.Namespace, []int64) error); ok {
+		r0 = rf(ctx, org, namepace, tagIDs)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockOrgStore_CreateWithRelations_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateWithRelations'
+type MockOrgStore_CreateWithRelations_Call struct {
+	*mock.Call
+}
+
+// CreateWithRelations is a helper method to define mock.On call
+//   - ctx context.Context
+//   - org *database.Organization
+//   - namepace *database.Namespace
+//   - tagIDs []int64
+func (_e *MockOrgStore_Expecter) CreateWithRelations(ctx interface{}, org interface{}, namepace interface{}, tagIDs interface{}) *MockOrgStore_CreateWithRelations_Call {
+	return &MockOrgStore_CreateWithRelations_Call{Call: _e.mock.On("CreateWithRelations", ctx, org, namepace, tagIDs)}
+}
+
+func (_c *MockOrgStore_CreateWithRelations_Call) Run(run func(ctx context.Context, org *database.Organization, namepace *database.Namespace, tagIDs []int64)) *MockOrgStore_CreateWithRelations_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(*database.Organization), args[2].(*database.Namespace), args[3].([]int64))
+	})
+	return _c
+}
+
+func (_c *MockOrgStore_CreateWithRelations_Call) Return(err error) *MockOrgStore_CreateWithRelations_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockOrgStore_CreateWithRelations_Call) RunAndReturn(run func(context.Context, *database.Organization, *database.Namespace, []int64) error) *MockOrgStore_CreateWithRelations_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Delete provides a mock function with given fields: ctx, path
 func (_m *MockOrgStore) Delete(ctx context.Context, path string) error {
 	ret := _m.Called(ctx, path)
@@ -590,6 +639,63 @@ func (_c *MockOrgStore_GetUserOwnOrgs_Call) Return(orgs []database.Organization,
 }
 
 func (_c *MockOrgStore_GetUserOwnOrgs_Call) RunAndReturn(run func(context.Context, string) ([]database.Organization, int, error)) *MockOrgStore_GetUserOwnOrgs_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// IsLastOrganizationAdmin provides a mock function with given fields: ctx, username
+func (_m *MockOrgStore) IsLastOrganizationAdmin(ctx context.Context, username string) (bool, error) {
+	ret := _m.Called(ctx, username)
+
+	if len(ret) == 0 {
+		panic("no return value specified for IsLastOrganizationAdmin")
+	}
+
+	var r0 bool
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (bool, error)); ok {
+		return rf(ctx, username)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) bool); ok {
+		r0 = rf(ctx, username)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, username)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockOrgStore_IsLastOrganizationAdmin_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'IsLastOrganizationAdmin'
+type MockOrgStore_IsLastOrganizationAdmin_Call struct {
+	*mock.Call
+}
+
+// IsLastOrganizationAdmin is a helper method to define mock.On call
+//   - ctx context.Context
+//   - username string
+func (_e *MockOrgStore_Expecter) IsLastOrganizationAdmin(ctx interface{}, username interface{}) *MockOrgStore_IsLastOrganizationAdmin_Call {
+	return &MockOrgStore_IsLastOrganizationAdmin_Call{Call: _e.mock.On("IsLastOrganizationAdmin", ctx, username)}
+}
+
+func (_c *MockOrgStore_IsLastOrganizationAdmin_Call) Run(run func(ctx context.Context, username string)) *MockOrgStore_IsLastOrganizationAdmin_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockOrgStore_IsLastOrganizationAdmin_Call) Return(_a0 bool, _a1 error) *MockOrgStore_IsLastOrganizationAdmin_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockOrgStore_IsLastOrganizationAdmin_Call) RunAndReturn(run func(context.Context, string) (bool, error)) *MockOrgStore_IsLastOrganizationAdmin_Call {
 	_c.Call.Return(run)
 	return _c
 }

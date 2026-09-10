@@ -69,7 +69,7 @@ func TestClusterComponent_GetResourceByID_Success(t *testing.T) {
 	ctx := context.TODO()
 	pool := mockCluster.NewMockPool(t)
 
-	kubeClient := fake.NewSimpleClientset()
+	kubeClient := fake.NewClientset()
 	knativeClient := knativefake.NewSimpleClientset()
 
 	testCluster := &cluster.Cluster{
@@ -132,7 +132,7 @@ func TestClusterComponent_collectResourceByID_Success(t *testing.T) {
 		StorageClass:  "gp3",
 	}
 
-	kubeClient := fake.NewSimpleClientset()
+	kubeClient := fake.NewClientset()
 	knativeClient := knativefake.NewSimpleClientset()
 
 	testCluster := &cluster.Cluster{
@@ -242,7 +242,7 @@ func TestClusterComponent_collectAllClusters_Success(t *testing.T) {
 		StorageClass:  "standard",
 	}
 
-	kubeClient := fake.NewSimpleClientset()
+	kubeClient := fake.NewClientset()
 	knativeClient := knativefake.NewSimpleClientset()
 
 	testCluster1 := &cluster.Cluster{
@@ -300,7 +300,7 @@ func TestClusterComponent_collectAllClusters_ErrorContinue(t *testing.T) {
 		StorageClass:  "gp3",
 	}
 
-	kubeClient := fake.NewSimpleClientset()
+	kubeClient := fake.NewClientset()
 	knativeClient := knativefake.NewSimpleClientset()
 
 	testCluster1 := &cluster.Cluster{

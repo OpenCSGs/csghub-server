@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"opencsg.com/csghub-server/builder/git/membership"
-	"opencsg.com/csghub-server/builder/rpc"
+	"opencsg.com/csghub-server/builder/rebac"
+	rebacfactory "opencsg.com/csghub-server/builder/rebac/factory"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/errorx"
@@ -31,15 +31,20 @@ type CollectionComponent interface {
 	UpdateCollectionRepo(ctx context.Context, req types.UpdateCollectionRepoReq) error
 }
 
+// NewCollectionComponent creates a collection component with ReBAC-backed namespace authorization.
 func NewCollectionComponent(config *config.Config) (CollectionComponent, error) {
 	cc := &collectionComponentImpl{}
+	authorizer, err := rebacfactory.NewAuthorizer()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create ReBAC authorizer: %w", err)
+	}
 	cc.collectionStore = database.NewCollectionStore()
 	cc.repoStore = database.NewRepoStore()
 	cc.userStore = database.NewUserStore()
-	cc.orgStore = database.NewOrgStore()
+	cc.namespaceStore = database.NewNamespaceStore()
+	cc.orgStore = database.NewOrgStore(config)
 	cc.userLikesStore = database.NewUserLikesStore()
-	cc.userSvcClient = rpc.NewUserSvcHttpClient(fmt.Sprintf("%s:%d", config.User.Host, config.User.Port),
-		rpc.AuthWithApiKey(config.APIToken))
+	cc.rebac = authorizer
 	spaceComponent, err := NewSpaceComponent(config)
 	if err != nil {
 		return nil, err
@@ -53,9 +58,10 @@ type collectionComponentImpl struct {
 	orgStore        database.OrgStore
 	repoStore       database.RepoStore
 	userStore       database.UserStore
+	namespaceStore  database.NamespaceStore
 	userLikesStore  database.UserLikesStore
-	userSvcClient   rpc.UserSvcClient
 	spaceComponent  SpaceComponent
+	rebac           rebac.Authorizer
 }
 
 func (cc *collectionComponentImpl) GetCollections(ctx context.Context, filter *types.CollectionFilter, per, page int) ([]types.Collection, int, error) {
@@ -120,7 +126,7 @@ func (cc *collectionComponentImpl) GetCollection(ctx context.Context, currentUse
 
 	permission, err := cc.getUserCollectionPermission(ctx, currentUser, collection)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get user repo permission, error: %w", err)
+		return nil, fmt.Errorf("failed to get user collection permission: %w", err)
 	}
 
 	if !permission.CanRead {
@@ -270,9 +276,10 @@ func (cc *collectionComponentImpl) RemoveReposFromCollection(ctx context.Context
 	return cc.collectionStore.RemoveCollectionRepos(ctx, collectionRepos)
 }
 
+// getUserCollectionPermission resolves access from ownership, visibility, and namespace ReBAC permissions.
 func (cc *collectionComponentImpl) getUserCollectionPermission(ctx context.Context, userName string, collection *database.Collection) (*types.UserRepoPermission, error) {
 	if userName == "" {
-		//anonymous user only has read permission to public repo
+		// Anonymous users can only read public collections.
 		return &types.UserRepoPermission{CanRead: !collection.Private, CanWrite: false, CanAdmin: false}, nil
 	}
 
@@ -287,7 +294,7 @@ func (cc *collectionComponentImpl) getUserCollectionPermission(ctx context.Conte
 	}
 
 	if namespaceType == "user" {
-		//owner has full permission
+		// The owner has full permission.
 		if userName == namespace {
 			return &types.UserRepoPermission{
 				CanRead:  true,
@@ -295,38 +302,73 @@ func (cc *collectionComponentImpl) getUserCollectionPermission(ctx context.Conte
 				CanAdmin: true,
 			}, nil
 		} else {
-			//other user has read permission to pubic repo
+			// Other users can only read public collections.
 			return &types.UserRepoPermission{
 				CanRead: !collection.Private, CanWrite: false, CanAdmin: false,
 			}, nil
 		}
 	} else {
-		r, err := cc.userSvcClient.GetMemberRole(ctx, namespace, userName)
+		permissions, err := cc.getUserNamespacePermissions(ctx, userName, namespace,
+			rebac.NamespaceCanRead, rebac.NamespaceCanWrite, rebac.NamespaceCanAdmin)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get user '%s' member role of org '%s' when get user repo permission, error: %w", userName, namespace, err)
+			return nil, fmt.Errorf("failed to get user %q namespace permissions for %q: %w", userName, namespace, err)
 		}
 
 		return &types.UserRepoPermission{
-			CanRead:  r.CanRead() || !collection.Private,
-			CanWrite: r.CanWrite(),
-			CanAdmin: r.CanAdmin(),
+			CanRead:  permissions[rebac.NamespaceCanRead] || !collection.Private,
+			CanWrite: permissions[rebac.NamespaceCanWrite],
+			CanAdmin: permissions[rebac.NamespaceCanAdmin],
 		}, nil
 	}
 }
 
-func (c *collectionComponentImpl) OrgCollections(ctx context.Context, req *types.OrgCollectionsReq) ([]types.Collection, int, error) {
-	var err error
-	r := membership.RoleUnknown
-	if req.CurrentUser != "" {
-		r, err = c.userSvcClient.GetMemberRole(ctx, req.Namespace, req.CurrentUser)
-		// log error, and treat user as unknown role in org
+// getUserNamespacePermissions checks the collection user's namespace permissions through ReBAC.
+func (cc *collectionComponentImpl) getUserNamespacePermissions(
+	ctx context.Context, userName, namespace string, permissions ...rebac.Permission,
+) (map[rebac.Permission]bool, error) {
+	if cc.rebac == nil {
+		return nil, fmt.Errorf("namespace ReBAC authorizer is required")
+	}
+	user, err := cc.userStore.FindByUsername(ctx, userName)
+	if err != nil {
+		return nil, fmt.Errorf("find user %q: %w", userName, err)
+	}
+	ns, err := cc.namespaceStore.FindByPath(ctx, namespace)
+	if err != nil {
+		return nil, fmt.Errorf("find namespace %q: %w", namespace, err)
+	}
+
+	allowed := make(map[rebac.Permission]bool, len(permissions))
+	for _, permission := range permissions {
+		decision, err := cc.rebac.Check(ctx, rebac.CheckRequest{
+			Subject:  rebac.UserSubject(user.UUID),
+			Relation: permission,
+			Object:   rebac.NamespaceObject(ns.UUID),
+		})
 		if err != nil {
-			slog.Error("faild to get member role",
-				slog.String("org", req.Namespace), slog.String("user", req.CurrentUser),
-				slog.String("error", err.Error()))
+			return nil, fmt.Errorf("check namespace permission %q: %w", permission, err)
+		}
+		allowed[permission] = decision.Allowed
+	}
+
+	return allowed, nil
+}
+
+// OrgCollections lists organization collections visible to the current user.
+func (c *collectionComponentImpl) OrgCollections(ctx context.Context, req *types.OrgCollectionsReq) ([]types.Collection, int, error) {
+	canRead := false
+	if req.CurrentUser != "" {
+		permissions, err := c.getUserNamespacePermissions(ctx, req.CurrentUser, req.Namespace, rebac.NamespaceCanRead)
+		canRead = permissions[rebac.NamespaceCanRead]
+		// Log the error and only return public collections.
+		if err != nil {
+			slog.ErrorContext(ctx, "failed to check namespace permission",
+				slog.String("namespace", req.Namespace), slog.String("user", req.CurrentUser),
+				slog.Any("error", err))
 		}
 	}
-	onlyPublic := !r.CanRead()
+	onlyPublic := !canRead
+	var err error
 	collections, total, err := c.collectionStore.ByUserOrgs(ctx, req.Namespace, req.PageSize, req.Page, onlyPublic)
 	if err != nil {
 		return nil, 0, err

@@ -60,6 +60,12 @@ type Config struct {
 		Environment  string `env:"STARHUB_SERVER_POSTHOG_ENVIRONMENT" default:"development"`
 	}
 
+	// Organization controls optional hierarchy-backed organization membership.
+	Organization struct {
+		// EnableUnit selects the hierarchy organization APIs and hierarchy-aware organization Store.
+		EnableUnit bool `env:"STARHUB_SERVER_ORGANIZATION_ENABLE_UNIT" default:"false"`
+	}
+
 	APIServer struct {
 		Port         int    `env:"STARHUB_SERVER_SERVER_PORT" default:"8080"`
 		PublicDomain string `env:"STARHUB_SERVER_PUBLIC_DOMAIN" default:"http://localhost:8080"`

@@ -352,6 +352,80 @@ func TestSpaceResourceComponent_ListHardwareTypes(t *testing.T) {
 	})
 }
 
+func TestSpaceResourceComponent_UpdateScenarioConstraint(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		ctx := context.TODO()
+		sc := initializeTestSpaceResourceComponent(ctx, t)
+
+		existing := &database.ScenarioConstraint{
+			ID: 1, Scenario: "finetune", Code: 2, Category: "deploy", I18nKey: "scenario.finetune",
+			RequiredHardware: 0, ExcludeHardware: 0, MaxReplica: 1,
+		}
+		sc.mocks.stores.ScenarioConstraintMock().EXPECT().FindByID(ctx, int64(1)).Return(existing, nil)
+
+		requiredHW := int64(4)
+		excludeHW := int64(8)
+		maxReplica := 3
+		updated := &database.ScenarioConstraint{
+			ID: 1, Scenario: "finetune", Code: 2, Category: "deploy", I18nKey: "scenario.finetune",
+			RequiredHardware: requiredHW, ExcludeHardware: excludeHW, MaxReplica: maxReplica,
+		}
+		sc.mocks.stores.ScenarioConstraintMock().EXPECT().Update(ctx, *updated).Return(updated, nil)
+
+		result, err := sc.UpdateScenarioConstraint(ctx, &types.UpdateScenarioConstraintReq{
+			ID:               1,
+			RequiredHardware: &requiredHW,
+			ExcludeHardware:  &excludeHW,
+			MaxReplica:       &maxReplica,
+		})
+		require.Nil(t, err)
+		require.Equal(t, &types.ScenarioInfo{
+			ID: 1, Code: 2, Name: "finetune", I18nKey: "scenario.finetune",
+			Category: types.ScenarioCategoryDeploy, RequiredHardware: requiredHW,
+			ExcludeHardware: excludeHW, MaxReplica: maxReplica,
+		}, result)
+	})
+
+	t.Run("not found", func(t *testing.T) {
+		ctx := context.TODO()
+		sc := initializeTestSpaceResourceComponent(ctx, t)
+
+		sc.mocks.stores.ScenarioConstraintMock().EXPECT().FindByID(ctx, int64(999)).Return(nil, nil)
+
+		_, err := sc.UpdateScenarioConstraint(ctx, &types.UpdateScenarioConstraintReq{ID: 999})
+		require.True(t, errors.Is(err, errorx.ErrNotFound))
+	})
+
+	t.Run("find error", func(t *testing.T) {
+		ctx := context.TODO()
+		sc := initializeTestSpaceResourceComponent(ctx, t)
+
+		dbErr := errors.New("db error")
+		sc.mocks.stores.ScenarioConstraintMock().EXPECT().FindByID(ctx, int64(1)).Return(nil, dbErr)
+
+		_, err := sc.UpdateScenarioConstraint(ctx, &types.UpdateScenarioConstraintReq{ID: 1})
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "find scenario constraint failed")
+	})
+
+	t.Run("update error", func(t *testing.T) {
+		ctx := context.TODO()
+		sc := initializeTestSpaceResourceComponent(ctx, t)
+
+		existing := &database.ScenarioConstraint{
+			ID: 1, Scenario: "finetune", Code: 2, Category: "deploy", I18nKey: "scenario.finetune",
+		}
+		sc.mocks.stores.ScenarioConstraintMock().EXPECT().FindByID(ctx, int64(1)).Return(existing, nil)
+
+		dbErr := errors.New("db error")
+		sc.mocks.stores.ScenarioConstraintMock().EXPECT().Update(ctx, *existing).Return(nil, dbErr)
+
+		_, err := sc.UpdateScenarioConstraint(ctx, &types.UpdateScenarioConstraintReq{ID: 1})
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "update scenario constraint failed")
+	})
+}
+
 func TestSpaceResourceComponent_ListAll(t *testing.T) {
 	t.Run("list all resources", func(t *testing.T) {
 		ctx := context.TODO()

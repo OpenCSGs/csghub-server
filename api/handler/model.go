@@ -11,7 +11,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/api/httpbase"
-	"opencsg.com/csghub-server/builder/git/membership"
+	"opencsg.com/csghub-server/builder/rebac"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/utils/common"
@@ -729,7 +729,7 @@ func (h *ModelHandler) DeployDedicated(ctx *gin.Context) {
 
 	// Optional owner_namespace: create inference under this user/org (path namespace is still the model's).
 	if req.OwnerNamespace != "" {
-		canWrite, err := h.repo.CheckCurrentUserPermission(ctx.Request.Context(), currentUser, req.OwnerNamespace, membership.RoleWrite)
+		canWrite, err := h.repo.CheckCurrentUserPermission(ctx.Request.Context(), currentUser, req.OwnerNamespace, rebac.NamespaceCanWrite)
 		if err != nil {
 			slog.ErrorContext(ctx.Request.Context(), "failed to check owner_namespace permission", "error", err)
 			httpbase.ServerError(ctx, err)
@@ -858,7 +858,7 @@ func (h *ModelHandler) FinetuneCreate(ctx *gin.Context) {
 
 	// Optional owner_namespace: create finetune under this user/org (path namespace is still the model's).
 	if req.OwnerNamespace != "" {
-		canWrite, err := h.repo.CheckCurrentUserPermission(ctx.Request.Context(), currentUser, req.OwnerNamespace, membership.RoleWrite)
+		canWrite, err := h.repo.CheckCurrentUserPermission(ctx.Request.Context(), currentUser, req.OwnerNamespace, rebac.NamespaceCanWrite)
 		if err != nil {
 			slog.ErrorContext(ctx.Request.Context(), "failed to check owner_namespace permission", "error", err)
 			httpbase.ServerError(ctx, err)

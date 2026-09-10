@@ -7,7 +7,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	deployer "opencsg.com/csghub-server/builder/deploy"
-	"opencsg.com/csghub-server/builder/git/membership"
+	"opencsg.com/csghub-server/builder/rebac"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
@@ -107,7 +107,7 @@ func TestNotebookComponentImpl_CreateNotebook_NonAdminOwnerNamespace(t *testing.
 	t.Run("owner_namespace_permission_error", func(t *testing.T) {
 		nc := initializeTestNotebookComponent(ctx, t)
 		nc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "testuser").Return(database.User{ID: 1, Username: "testuser", RoleMask: ""}, nil)
-		nc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "testuser", "org1", membership.RoleWrite).Return(false, errors.New("rpc error"))
+		nc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "testuser", "org1", rebac.NamespaceCanWrite).Return(false, errors.New("rpc error"))
 		_, err := nc.CreateNotebook(ctx, &types.CreateNotebookReq{
 			CurrentUser:        "testuser",
 			OwnerNamespace:     "org1",
@@ -121,7 +121,7 @@ func TestNotebookComponentImpl_CreateNotebook_NonAdminOwnerNamespace(t *testing.
 	t.Run("owner_namespace_forbidden", func(t *testing.T) {
 		nc := initializeTestNotebookComponent(ctx, t)
 		nc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "testuser").Return(database.User{ID: 1, Username: "testuser", RoleMask: ""}, nil)
-		nc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "testuser", "org1", membership.RoleWrite).Return(false, nil)
+		nc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "testuser", "org1", rebac.NamespaceCanWrite).Return(false, nil)
 		_, err := nc.CreateNotebook(ctx, &types.CreateNotebookReq{
 			CurrentUser:        "testuser",
 			OwnerNamespace:     "org1",

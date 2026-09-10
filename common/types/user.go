@@ -3,7 +3,35 @@ package types
 import (
 	"strings"
 	"time"
+
+	"opencsg.com/csghub-server/builder/rebac"
 )
+
+// UserRole represents a user's permission level in an organization.
+type UserRole string
+
+const (
+	// UserAdmin grants organization administration permission.
+	UserAdmin UserRole = "admin"
+	// UserWrite grants organization write permission.
+	UserWrite UserRole = "write"
+	// UserRead grants organization read permission.
+	UserRead UserRole = "read"
+)
+
+// ReBACRelation maps the organization role to the corresponding direct ReBAC relation.
+func (role UserRole) ReBACRelation() (rebac.Relation, bool) {
+	switch role {
+	case UserAdmin:
+		return rebac.RelationAdmin, true
+	case UserWrite:
+		return rebac.RelationWriter, true
+	case UserRead:
+		return rebac.RelationReader, true
+	default:
+		return "", false
+	}
+}
 
 type CreateUserRequest struct {
 	// Display name of the user

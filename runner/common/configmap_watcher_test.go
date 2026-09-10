@@ -2,10 +2,11 @@ package common
 
 import (
 	"context"
-	"opencsg.com/csghub-server/common/config"
 	"sync"
 	"testing"
 	"time"
+
+	"opencsg.com/csghub-server/common/config"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -39,7 +40,7 @@ func (m *mockWebhookEndpointHandler) getCalledWith() []*corev1.ConfigMap {
 }
 
 func TestNewConfigmapWatcher(t *testing.T) {
-	client := fake.NewSimpleClientset()
+	client := fake.NewClientset()
 	handler := &mockWebhookEndpointHandler{}
 	config := new(config.Config)
 	config.Runner.RunnerNamespace = "test-ns"
@@ -91,7 +92,7 @@ func TestConfigmapWatcher_Watch(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	clientset := fake.NewSimpleClientset()
+	clientset := fake.NewClientset()
 	var wg sync.WaitGroup
 	handler := &mockWebhookEndpointHandler{
 		callback: func(cm *corev1.ConfigMap) {

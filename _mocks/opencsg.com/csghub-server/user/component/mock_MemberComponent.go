@@ -5,11 +5,7 @@ package component
 import (
 	context "context"
 
-	membership "opencsg.com/csghub-server/builder/git/membership"
-	database "opencsg.com/csghub-server/builder/store/database"
-
 	mock "github.com/stretchr/testify/mock"
-
 	types "opencsg.com/csghub-server/common/types"
 )
 
@@ -24,56 +20,6 @@ type MockMemberComponent_Expecter struct {
 
 func (_m *MockMemberComponent) EXPECT() *MockMemberComponent_Expecter {
 	return &MockMemberComponent_Expecter{mock: &_m.Mock}
-}
-
-// AddMember provides a mock function with given fields: ctx, orgName, userName, operatorName, role
-func (_m *MockMemberComponent) AddMember(ctx context.Context, orgName string, userName string, operatorName string, role string) error {
-	ret := _m.Called(ctx, orgName, userName, operatorName, role)
-
-	if len(ret) == 0 {
-		panic("no return value specified for AddMember")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, string) error); ok {
-		r0 = rf(ctx, orgName, userName, operatorName, role)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// MockMemberComponent_AddMember_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'AddMember'
-type MockMemberComponent_AddMember_Call struct {
-	*mock.Call
-}
-
-// AddMember is a helper method to define mock.On call
-//   - ctx context.Context
-//   - orgName string
-//   - userName string
-//   - operatorName string
-//   - role string
-func (_e *MockMemberComponent_Expecter) AddMember(ctx interface{}, orgName interface{}, userName interface{}, operatorName interface{}, role interface{}) *MockMemberComponent_AddMember_Call {
-	return &MockMemberComponent_AddMember_Call{Call: _e.mock.On("AddMember", ctx, orgName, userName, operatorName, role)}
-}
-
-func (_c *MockMemberComponent_AddMember_Call) Run(run func(ctx context.Context, orgName string, userName string, operatorName string, role string)) *MockMemberComponent_AddMember_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(string), args[4].(string))
-	})
-	return _c
-}
-
-func (_c *MockMemberComponent_AddMember_Call) Return(_a0 error) *MockMemberComponent_AddMember_Call {
-	_c.Call.Return(_a0)
-	return _c
-}
-
-func (_c *MockMemberComponent_AddMember_Call) RunAndReturn(run func(context.Context, string, string, string, string) error) *MockMemberComponent_AddMember_Call {
-	_c.Call.Return(run)
-	return _c
 }
 
 // AddMembers provides a mock function with given fields: ctx, orgName, users, operatorName, role
@@ -177,17 +123,17 @@ func (_c *MockMemberComponent_ChangeMemberRole_Call) RunAndReturn(run func(conte
 	return _c
 }
 
-// Delete provides a mock function with given fields: ctx, orgName, userName, operatorName, role
-func (_m *MockMemberComponent) Delete(ctx context.Context, orgName string, userName string, operatorName string, role string) error {
-	ret := _m.Called(ctx, orgName, userName, operatorName, role)
+// Delete provides a mock function with given fields: ctx, orgName, userName, operatorName
+func (_m *MockMemberComponent) Delete(ctx context.Context, orgName string, userName string, operatorName string) error {
+	ret := _m.Called(ctx, orgName, userName, operatorName)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Delete")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, string) error); ok {
-		r0 = rf(ctx, orgName, userName, operatorName, role)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string) error); ok {
+		r0 = rf(ctx, orgName, userName, operatorName)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -205,14 +151,13 @@ type MockMemberComponent_Delete_Call struct {
 //   - orgName string
 //   - userName string
 //   - operatorName string
-//   - role string
-func (_e *MockMemberComponent_Expecter) Delete(ctx interface{}, orgName interface{}, userName interface{}, operatorName interface{}, role interface{}) *MockMemberComponent_Delete_Call {
-	return &MockMemberComponent_Delete_Call{Call: _e.mock.On("Delete", ctx, orgName, userName, operatorName, role)}
+func (_e *MockMemberComponent_Expecter) Delete(ctx interface{}, orgName interface{}, userName interface{}, operatorName interface{}) *MockMemberComponent_Delete_Call {
+	return &MockMemberComponent_Delete_Call{Call: _e.mock.On("Delete", ctx, orgName, userName, operatorName)}
 }
 
-func (_c *MockMemberComponent_Delete_Call) Run(run func(ctx context.Context, orgName string, userName string, operatorName string, role string)) *MockMemberComponent_Delete_Call {
+func (_c *MockMemberComponent_Delete_Call) Run(run func(ctx context.Context, orgName string, userName string, operatorName string)) *MockMemberComponent_Delete_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(string), args[4].(string))
+		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(string))
 	})
 	return _c
 }
@@ -222,88 +167,28 @@ func (_c *MockMemberComponent_Delete_Call) Return(_a0 error) *MockMemberComponen
 	return _c
 }
 
-func (_c *MockMemberComponent_Delete_Call) RunAndReturn(run func(context.Context, string, string, string, string) error) *MockMemberComponent_Delete_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// GetMember provides a mock function with given fields: ctx, orgName, userName
-func (_m *MockMemberComponent) GetMember(ctx context.Context, orgName string, userName string) (*database.Member, error) {
-	ret := _m.Called(ctx, orgName, userName)
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetMember")
-	}
-
-	var r0 *database.Member
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string) (*database.Member, error)); ok {
-		return rf(ctx, orgName, userName)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, string) *database.Member); ok {
-		r0 = rf(ctx, orgName, userName)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*database.Member)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
-		r1 = rf(ctx, orgName, userName)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// MockMemberComponent_GetMember_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetMember'
-type MockMemberComponent_GetMember_Call struct {
-	*mock.Call
-}
-
-// GetMember is a helper method to define mock.On call
-//   - ctx context.Context
-//   - orgName string
-//   - userName string
-func (_e *MockMemberComponent_Expecter) GetMember(ctx interface{}, orgName interface{}, userName interface{}) *MockMemberComponent_GetMember_Call {
-	return &MockMemberComponent_GetMember_Call{Call: _e.mock.On("GetMember", ctx, orgName, userName)}
-}
-
-func (_c *MockMemberComponent_GetMember_Call) Run(run func(ctx context.Context, orgName string, userName string)) *MockMemberComponent_GetMember_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string))
-	})
-	return _c
-}
-
-func (_c *MockMemberComponent_GetMember_Call) Return(_a0 *database.Member, _a1 error) *MockMemberComponent_GetMember_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *MockMemberComponent_GetMember_Call) RunAndReturn(run func(context.Context, string, string) (*database.Member, error)) *MockMemberComponent_GetMember_Call {
+func (_c *MockMemberComponent_Delete_Call) RunAndReturn(run func(context.Context, string, string, string) error) *MockMemberComponent_Delete_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // GetMemberRole provides a mock function with given fields: ctx, orgName, userName
-func (_m *MockMemberComponent) GetMemberRole(ctx context.Context, orgName string, userName string) (membership.Role, error) {
+func (_m *MockMemberComponent) GetMemberRole(ctx context.Context, orgName string, userName string) (types.UserRole, error) {
 	ret := _m.Called(ctx, orgName, userName)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetMemberRole")
 	}
 
-	var r0 membership.Role
+	var r0 types.UserRole
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string) (membership.Role, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) (types.UserRole, error)); ok {
 		return rf(ctx, orgName, userName)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, string) membership.Role); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) types.UserRole); ok {
 		r0 = rf(ctx, orgName, userName)
 	} else {
-		r0 = ret.Get(0).(membership.Role)
+		r0 = ret.Get(0).(types.UserRole)
 	}
 
 	if rf, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
@@ -335,33 +220,33 @@ func (_c *MockMemberComponent_GetMemberRole_Call) Run(run func(ctx context.Conte
 	return _c
 }
 
-func (_c *MockMemberComponent_GetMemberRole_Call) Return(_a0 membership.Role, _a1 error) *MockMemberComponent_GetMemberRole_Call {
+func (_c *MockMemberComponent_GetMemberRole_Call) Return(_a0 types.UserRole, _a1 error) *MockMemberComponent_GetMemberRole_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockMemberComponent_GetMemberRole_Call) RunAndReturn(run func(context.Context, string, string) (membership.Role, error)) *MockMemberComponent_GetMemberRole_Call {
+func (_c *MockMemberComponent_GetMemberRole_Call) RunAndReturn(run func(context.Context, string, string) (types.UserRole, error)) *MockMemberComponent_GetMemberRole_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // GetMemberRoleByUUID provides a mock function with given fields: ctx, orgUUID, userName
-func (_m *MockMemberComponent) GetMemberRoleByUUID(ctx context.Context, orgUUID string, userName string) (membership.Role, error) {
+func (_m *MockMemberComponent) GetMemberRoleByUUID(ctx context.Context, orgUUID string, userName string) (types.UserRole, error) {
 	ret := _m.Called(ctx, orgUUID, userName)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetMemberRoleByUUID")
 	}
 
-	var r0 membership.Role
+	var r0 types.UserRole
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string) (membership.Role, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) (types.UserRole, error)); ok {
 		return rf(ctx, orgUUID, userName)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, string) membership.Role); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) types.UserRole); ok {
 		r0 = rf(ctx, orgUUID, userName)
 	} else {
-		r0 = ret.Get(0).(membership.Role)
+		r0 = ret.Get(0).(types.UserRole)
 	}
 
 	if rf, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
@@ -393,59 +278,12 @@ func (_c *MockMemberComponent_GetMemberRoleByUUID_Call) Run(run func(ctx context
 	return _c
 }
 
-func (_c *MockMemberComponent_GetMemberRoleByUUID_Call) Return(_a0 membership.Role, _a1 error) *MockMemberComponent_GetMemberRoleByUUID_Call {
+func (_c *MockMemberComponent_GetMemberRoleByUUID_Call) Return(_a0 types.UserRole, _a1 error) *MockMemberComponent_GetMemberRoleByUUID_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockMemberComponent_GetMemberRoleByUUID_Call) RunAndReturn(run func(context.Context, string, string) (membership.Role, error)) *MockMemberComponent_GetMemberRoleByUUID_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// InitRoles provides a mock function with given fields: ctx, org
-func (_m *MockMemberComponent) InitRoles(ctx context.Context, org *database.Organization) error {
-	ret := _m.Called(ctx, org)
-
-	if len(ret) == 0 {
-		panic("no return value specified for InitRoles")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, *database.Organization) error); ok {
-		r0 = rf(ctx, org)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// MockMemberComponent_InitRoles_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'InitRoles'
-type MockMemberComponent_InitRoles_Call struct {
-	*mock.Call
-}
-
-// InitRoles is a helper method to define mock.On call
-//   - ctx context.Context
-//   - org *database.Organization
-func (_e *MockMemberComponent_Expecter) InitRoles(ctx interface{}, org interface{}) *MockMemberComponent_InitRoles_Call {
-	return &MockMemberComponent_InitRoles_Call{Call: _e.mock.On("InitRoles", ctx, org)}
-}
-
-func (_c *MockMemberComponent_InitRoles_Call) Run(run func(ctx context.Context, org *database.Organization)) *MockMemberComponent_InitRoles_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(*database.Organization))
-	})
-	return _c
-}
-
-func (_c *MockMemberComponent_InitRoles_Call) Return(_a0 error) *MockMemberComponent_InitRoles_Call {
-	_c.Call.Return(_a0)
-	return _c
-}
-
-func (_c *MockMemberComponent_InitRoles_Call) RunAndReturn(run func(context.Context, *database.Organization) error) *MockMemberComponent_InitRoles_Call {
+func (_c *MockMemberComponent_GetMemberRoleByUUID_Call) RunAndReturn(run func(context.Context, string, string) (types.UserRole, error)) *MockMemberComponent_GetMemberRoleByUUID_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -515,54 +353,6 @@ func (_c *MockMemberComponent_OrgMembers_Call) Return(_a0 []types.Member, _a1 in
 }
 
 func (_c *MockMemberComponent_OrgMembers_Call) RunAndReturn(run func(context.Context, string, string, int, int) ([]types.Member, int, error)) *MockMemberComponent_OrgMembers_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// SetAdmin provides a mock function with given fields: ctx, org, user
-func (_m *MockMemberComponent) SetAdmin(ctx context.Context, org *database.Organization, user *database.User) error {
-	ret := _m.Called(ctx, org, user)
-
-	if len(ret) == 0 {
-		panic("no return value specified for SetAdmin")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, *database.Organization, *database.User) error); ok {
-		r0 = rf(ctx, org, user)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// MockMemberComponent_SetAdmin_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SetAdmin'
-type MockMemberComponent_SetAdmin_Call struct {
-	*mock.Call
-}
-
-// SetAdmin is a helper method to define mock.On call
-//   - ctx context.Context
-//   - org *database.Organization
-//   - user *database.User
-func (_e *MockMemberComponent_Expecter) SetAdmin(ctx interface{}, org interface{}, user interface{}) *MockMemberComponent_SetAdmin_Call {
-	return &MockMemberComponent_SetAdmin_Call{Call: _e.mock.On("SetAdmin", ctx, org, user)}
-}
-
-func (_c *MockMemberComponent_SetAdmin_Call) Run(run func(ctx context.Context, org *database.Organization, user *database.User)) *MockMemberComponent_SetAdmin_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(*database.Organization), args[2].(*database.User))
-	})
-	return _c
-}
-
-func (_c *MockMemberComponent_SetAdmin_Call) Return(_a0 error) *MockMemberComponent_SetAdmin_Call {
-	_c.Call.Return(_a0)
-	return _c
-}
-
-func (_c *MockMemberComponent_SetAdmin_Call) RunAndReturn(run func(context.Context, *database.Organization, *database.User) error) *MockMemberComponent_SetAdmin_Call {
 	_c.Call.Return(run)
 	return _c
 }

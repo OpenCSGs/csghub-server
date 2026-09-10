@@ -1,0 +1,8 @@
+{
+    "error.REBAC-ERR-0": {
+        "other": "创建命名空间权限关系失败。"
+    },
+    "error.REBAC-ERR-1": {
+        "other": "删除命名空间权限关系失败。"
+    }
+}

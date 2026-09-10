@@ -15,7 +15,7 @@ import (
 	"opencsg.com/csghub-server/builder/deploy"
 	"opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/builder/git/gitserver"
-	"opencsg.com/csghub-server/builder/git/membership"
+	"opencsg.com/csghub-server/builder/rebac"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
@@ -455,7 +455,7 @@ func TestSpaceComponent_OrgSpaces(t *testing.T) {
 	ctx := context.TODO()
 	sc := initializeTestSpaceComponent(ctx, t)
 
-	sc.mocks.userSvcClient.EXPECT().GetMemberRole(ctx, "ns", "user").Return(membership.RoleAdmin, nil)
+	sc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "user", "ns", rebac.NamespaceCanRead).Return(true, nil)
 	sc.mocks.stores.SpaceMock().EXPECT().ByOrgPath(ctx, "ns", 10, 1, false).Return(
 		[]database.Space{
 			{ID: 1, Repository: &database.Repository{ID: 11, Name: "r1"}},

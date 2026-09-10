@@ -40,6 +40,9 @@ var (
 	redis    cache.RedisClient
 )
 
+// historicalMigrationLockExpiration keeps the distributed lock alive during large data backfills.
+const historicalMigrationLockExpiration = 3 * time.Minute
+
 var Cmd = &cobra.Command{
 	Use:   "migration",
 	Short: "run database migrations",
@@ -96,8 +99,9 @@ var initCmd = &cobra.Command{
 	Use:   "init",
 	Short: "create migration tables",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return redis.RunWhileLocked(cmd.Context(), "migration_init", 1*time.Minute, func(ctx context.Context) error {
-			return migrator.Init(cmd.Context())
+		ctx := migrations.WithDatabase(cmd.Context(), db)
+		return redis.RunWhileLocked(ctx, "migration_init", 1*time.Minute, func(ctx context.Context) error {
+			return migrator.Init(ctx)
 		})
 	},
 }
@@ -106,8 +110,9 @@ var migrateCmd = &cobra.Command{
 	Use:   "migrate",
 	Short: "migrate database",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return redis.RunWhileLocked(cmd.Context(), "migration_migrate", 1*time.Minute, func(ctx context.Context) error {
-			group, err := migrator.Migrate(cmd.Context())
+		ctx := migrations.WithDatabase(cmd.Context(), db)
+		return redis.RunWhileLocked(ctx, "migration_migrate", historicalMigrationLockExpiration, func(ctx context.Context) error {
+			group, err := migrator.Migrate(ctx)
 			if err != nil {
 				return err
 			}
@@ -125,8 +130,9 @@ var rollbackCmd = &cobra.Command{
 	Use:   "rollback",
 	Short: "rollback the last migration group",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return redis.RunWhileLocked(cmd.Context(), "migration_rollback", 1*time.Minute, func(ctx context.Context) error {
-			group, err := migrator.Rollback(cmd.Context())
+		ctx := migrations.WithDatabase(cmd.Context(), db)
+		return redis.RunWhileLocked(ctx, "migration_rollback", 1*time.Minute, func(ctx context.Context) error {
+			group, err := migrator.Rollback(ctx)
 			if err != nil {
 				return err
 			}
@@ -192,7 +198,8 @@ var statusCmd = &cobra.Command{
 	Use:   "status",
 	Short: "print migrations status",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		ms, err := migrator.MigrationsWithStatus(cmd.Context())
+		ctx := migrations.WithDatabase(cmd.Context(), db)
+		ms, err := migrator.MigrationsWithStatus(ctx)
 		if err != nil {
 			return err
 		}
@@ -207,7 +214,8 @@ var markAppliedCmd = &cobra.Command{
 	Use:   "mark_applied",
 	Short: "mark migrations as applied without actually running them",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		group, err := migrator.Migrate(cmd.Context(), migrate.WithNopMigration())
+		ctx := migrations.WithDatabase(cmd.Context(), db)
+		group, err := migrator.Migrate(ctx, migrate.WithNopMigration())
 		if err != nil {
 			return err
 		}

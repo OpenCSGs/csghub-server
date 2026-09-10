@@ -9,7 +9,8 @@ import (
 	"github.com/google/uuid"
 	"opencsg.com/csghub-server/builder/git"
 	"opencsg.com/csghub-server/builder/git/gitserver"
-	"opencsg.com/csghub-server/builder/git/membership"
+	"opencsg.com/csghub-server/builder/rebac"
+	rebacfactory "opencsg.com/csghub-server/builder/rebac/factory"
 	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
@@ -18,7 +19,6 @@ import (
 )
 
 type OrganizationComponent interface {
-	FixOrgData(ctx context.Context, org *database.Organization) (*database.Organization, error)
 	Create(ctx context.Context, req *types.CreateOrgReq) (*types.Organization, error)
 	Index(ctx context.Context, search string, per, page int, orgType, verifyStatus, tag string) ([]types.Organization, int, error)
 	ListUserOrgs(ctx context.Context, req *types.ListUserOrgsReq) ([]types.Organization, int, error)
@@ -29,21 +29,20 @@ type OrganizationComponent interface {
 }
 
 func NewOrganizationComponent(config *config.Config) (OrganizationComponent, error) {
-	c := &organizationComponentImpl{}
-	c.orgStore = database.NewOrgStore()
+	c := &organizationComponentImpl{config: config}
+	authorizer, err := rebacfactory.NewAuthorizer()
+	if err != nil {
+		return nil, fmt.Errorf("fail to create ReBAC authorizer: %w", err)
+	}
+	c.rebac = authorizer
+	c.orgStore = database.NewOrgStore(config)
+	c.memberStore = database.NewMemberStore()
 	c.nsStore = database.NewNamespaceStore()
 	c.userStore = database.NewUserStore()
 	c.tagStore = database.NewTagStore()
-	var err error
 	c.gs, err = git.NewGitServer(config)
 	if err != nil {
 		newError := fmt.Errorf("fail to create git server,error:%w", err)
-		slog.Error(newError.Error())
-		return nil, newError
-	}
-	c.msc, err = NewMemberComponent(config)
-	if err != nil {
-		newError := fmt.Errorf("fail to create membership component,error:%w", err)
 		slog.Error(newError.Error())
 		return nil, newError
 	}
@@ -57,31 +56,29 @@ func NewOrganizationComponent(config *config.Config) (OrganizationComponent, err
 }
 
 type organizationComponentImpl struct {
-	orgStore  database.OrgStore
-	nsStore   database.NamespaceStore
-	userStore database.UserStore
-	tagStore  database.TagStore
-	gs        gitserver.GitServer
+	orgStore    database.OrgStore
+	memberStore database.MemberStore
+	nsStore     database.NamespaceStore
+	userStore   database.UserStore
+	tagStore    database.TagStore
+	gs          gitserver.GitServer
+	// rebac synchronizes the organization's namespace relationship tuple.
+	rebac rebac.Authorizer
 
-	msc MemberComponent
-	sso rpc.SSOInterface
+	sso    rpc.SSOInterface
+	config *config.Config
 }
 
-func (c *organizationComponentImpl) FixOrgData(ctx context.Context, org *database.Organization) (*database.Organization, error) {
-	user := org.User
-	req := new(types.CreateOrgReq)
-	req.Name = org.Name
-	req.Nickname = org.Nickname
-	req.Username = org.User.Username
-	req.Description = org.Description
-	// need to create roles for a new org before adding members
-	err := c.msc.InitRoles(ctx, org)
-	if err != nil {
-		slog.ErrorContext(ctx, "fix organization role has error", slog.String("error", err.Error()))
+// deleteOrganizationSSOUserBestEffort removes an organization identity from
+// SSO once. The database result remains authoritative when the remote cleanup
+// fails, so the error is logged instead of replacing the original result.
+func deleteOrganizationSSOUserBestEffort(ctx context.Context, sso rpc.SSOInterface, organizationUUID string) {
+	if sso == nil || organizationUUID == "" {
+		return
 	}
-	// org creator defaults to be admin role
-	err = c.msc.SetAdmin(ctx, org, user)
-	return org, err
+	if err := sso.DeleteUser(ctx, organizationUUID); err != nil {
+		slog.ErrorContext(ctx, "failed to delete organization from SSO", slog.String("organization_uuid", organizationUUID), slog.Any("error", err))
+	}
 }
 
 func (c *organizationComponentImpl) Create(ctx context.Context, req *types.CreateOrgReq) (*types.Organization, error) {
@@ -127,6 +124,8 @@ func (c *organizationComponentImpl) Create(ctx context.Context, req *types.Creat
 		Logo:        req.Logo,
 		OrgType:     req.OrgType,
 		Verified:    req.Verified,
+		IsRoot:      true,
+		IsUnit:      false,
 		User:        &user,
 		UserID:      user.ID,
 		UUID:        uuid.New(),
@@ -145,9 +144,10 @@ func (c *organizationComponentImpl) Create(ctx context.Context, req *types.Creat
 	}
 
 	namespace := &database.Namespace{
-		Path:   dbOrg.Name,
-		UserID: user.ID,
-		UUID:   newNSUUID,
+		Path:          dbOrg.Name,
+		UserID:        user.ID,
+		UUID:          newNSUUID,
+		NamespaceType: database.OrgNamespace,
 	}
 
 	// create sso user before db write, so if sso fails db stays clean
@@ -161,28 +161,22 @@ func (c *organizationComponentImpl) Create(ctx context.Context, req *types.Creat
 		return nil, fmt.Errorf("failed create sso user for organization, error: %w", err)
 	}
 
-	err = c.orgStore.Create(ctx, dbOrg, namespace)
+	err = c.orgStore.CreateWithRelations(ctx, dbOrg, namespace, req.TagIDs)
 	if err != nil {
-		return nil, fmt.Errorf("failed create database organization, error: %w", err)
+		deleteOrganizationSSOUserBestEffort(ctx, c.sso, dbOrg.UUID.String())
+		return nil, err
 	}
-
-	// Set organization tags if provided (validation already done before side-effectful operations)
-	if len(req.TagIDs) > 0 {
-		err = c.orgStore.SetOrganizationTags(ctx, dbOrg.ID, req.TagIDs)
-		if err != nil {
-			return nil, fmt.Errorf("failed set organization tags, error: %w", err)
-		}
+	if err := ensureNamespaceRelationship(ctx, c.rebac, *namespace, dbOrg.UUID.String()); err != nil {
+		return nil, fmt.Errorf("synchronize organization namespace to ReBAC: %w", err)
 	}
-
-	// need to create roles for a new org before adding members
-	err = c.msc.InitRoles(ctx, dbOrg)
-	if err != nil {
-		return nil, fmt.Errorf("failed init roles for organization, error: %w", err)
-	}
-	// org creator defaults to be admin role
-	err = c.msc.SetAdmin(ctx, dbOrg, &user)
-	if err != nil {
-		return nil, fmt.Errorf("failed set admin role for organization, error: %w", err)
+	if err := reconcileOrganizationMemberRelationships(
+		ctx,
+		c.rebac,
+		dbOrg.UUID.String(),
+		[]string{user.UUID},
+		desiredOrganizationMemberRoles([]string{user.UUID}, types.UserAdmin),
+	); err != nil {
+		return nil, fmt.Errorf("synchronize organization administrator to ReBAC: %w", err)
 	}
 
 	org := &types.Organization{
@@ -193,6 +187,8 @@ func (c *organizationComponentImpl) Create(ctx context.Context, req *types.Creat
 		Logo:        dbOrg.Logo,
 		OrgType:     dbOrg.OrgType,
 		Verified:    dbOrg.Verified,
+		IsRoot:      dbOrg.IsRoot,
+		IsUnit:      dbOrg.IsUnit,
 		UUID:        dbOrg.UUID,
 		Namespace: &types.Namespace{
 			Path: dbOrg.Name,
@@ -200,7 +196,7 @@ func (c *organizationComponentImpl) Create(ctx context.Context, req *types.Creat
 			UUID: namespace.UUID,
 		},
 	}
-	// Load tags for response — use separate variable to avoid shadowing.
+	// Load tags for the response using a separate variable to avoid shadowing.
 	if loadTags, loadErr := c.orgStore.GetOrganizationTags(ctx, dbOrg.ID); loadErr != nil {
 		slog.WarnContext(ctx, "failed to get organization tags", slog.String("error", loadErr.Error()))
 	} else {
@@ -274,6 +270,8 @@ func (c *organizationComponentImpl) toOrgList(ctx context.Context, dborgs []data
 			Logo:         dborg.Logo,
 			OrgType:      dborg.OrgType,
 			Verified:     dborg.Verified,
+			IsRoot:       dborg.IsRoot,
+			IsUnit:       dborg.IsUnit,
 			VerifyStatus: string(dborg.VerifyStatus),
 			UUID:         dborg.UUID,
 		}
@@ -305,6 +303,8 @@ func (c *organizationComponentImpl) Get(ctx context.Context, orgName string) (*t
 		Logo:        dborg.Logo,
 		OrgType:     dborg.OrgType,
 		Verified:    dborg.Verified,
+		IsRoot:      dborg.IsRoot,
+		IsUnit:      dborg.IsUnit,
 		UUID:        dborg.UUID,
 	}
 	if dborg.Namespace != nil {
@@ -339,6 +339,8 @@ func (c *organizationComponentImpl) GetByUUID(ctx context.Context, uuid string) 
 		Logo:        dborg.Logo,
 		OrgType:     dborg.OrgType,
 		Verified:    dborg.Verified,
+		IsRoot:      dborg.IsRoot,
+		IsUnit:      dborg.IsUnit,
 		UUID:        dborg.UUID,
 	}
 	if dborg.Namespace != nil {
@@ -358,30 +360,59 @@ func (c *organizationComponentImpl) GetByUUID(ctx context.Context, uuid string) 
 }
 
 func (c *organizationComponentImpl) Delete(ctx context.Context, req *types.DeleteOrgReq) error {
-	r, err := c.msc.GetMemberRole(ctx, req.Name, req.CurrentUser)
+	canAdmin, err := c.checkNamespaceAdminPermission(ctx, req.Name, req.CurrentUser)
 	if err != nil {
-		slog.ErrorContext(ctx, "faild to get member role",
-			slog.String("org", req.Name), slog.String("user", req.CurrentUser),
-			slog.String("error", err.Error()))
+		slog.ErrorContext(ctx, "failed to check namespace permission",
+			slog.String("namespace", req.Name), slog.String("user", req.CurrentUser),
+			slog.Any("error", err))
 	}
-	if !r.CanAdmin() {
+	if !canAdmin {
 		return fmt.Errorf("current user does not have permission to edit the organization, current user: %s", req.CurrentUser)
+	}
+	organization, err := c.orgStore.FindByPath(ctx, req.Name)
+	if err != nil {
+		return fmt.Errorf("failed to find database organization, error: %w", err)
+	}
+	if organization.IsUnit {
+		return errorx.ReqParamInvalid(
+			errors.New("hierarchy organizations must be deleted through the hierarchy organization API"),
+			nil,
+		)
+	}
+	if c.memberStore == nil {
+		return fmt.Errorf("organization member store is required")
+	}
+	userUUIDs, err := c.memberStore.UserUUIDsByOrganizationID(ctx, organization.ID)
+	if err != nil {
+		return fmt.Errorf("load organization members for ReBAC cleanup: %w", err)
+	}
+	if organization.Namespace == nil || organization.Namespace.UUID == "" {
+		return fmt.Errorf("organization %q namespace UUID is required for ReBAC cleanup", organization.Name)
+	}
+	cleanup := types.OrganizationReBACCleanup{
+		OrganizationUUID: organization.UUID.String(),
+		NamespaceUUID:    organization.Namespace.UUID,
+		UserUUIDs:        userUUIDs,
 	}
 	err = c.orgStore.Delete(ctx, req.Name)
 	if err != nil {
 		return fmt.Errorf("failed to delete database organizations, error: %w", err)
 	}
+	if err := deleteOrganizationReBACRelationships(ctx, c.rebac, []types.OrganizationReBACCleanup{cleanup}); err != nil {
+		return fmt.Errorf("sync deleted organization to ReBAC: %w", err)
+	}
+	deleteOrganizationSSOUserBestEffort(ctx, c.sso, organization.UUID.String())
 	return nil
 }
 
 func (c *organizationComponentImpl) Update(ctx context.Context, req *types.EditOrgReq) (*database.Organization, error) {
-	r, err := c.msc.GetMemberRole(ctx, req.Name, req.CurrentUser)
+	canAdmin, err := c.checkNamespaceAdminPermission(ctx, req.Name, req.CurrentUser)
 	if err != nil {
-		slog.ErrorContext(ctx, "failed to get member role",
-			slog.String("org", req.Name), slog.String("user", req.CurrentUser),
-			slog.String("error", err.Error()))
+		slog.ErrorContext(ctx, "failed to check namespace permission",
+			slog.String("namespace", req.Name), slog.String("user", req.CurrentUser),
+			slog.Any("error", err))
 	}
-	if !r.CanAdmin() {
+	if !canAdmin {
 		return nil, fmt.Errorf("current user does not have permission to edit the organization, current user: %s", req.CurrentUser)
 	}
 	org, err := c.orgStore.FindByPath(ctx, req.Name)
@@ -418,36 +449,6 @@ func (c *organizationComponentImpl) Update(ctx context.Context, req *types.EditO
 		}
 	}
 
-	if req.NewOwner != nil {
-		operator, err := c.userStore.FindByUsername(ctx, req.CurrentUser)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get operator user, error: %w", err)
-		}
-		if org.UserID != operator.ID && !operator.CanAdmin() {
-			return nil, errorx.ErrForbiddenMsg("current user does not have permission to edit the organization, ")
-		}
-		newOwner, err := c.userStore.FindByUsername(ctx, *req.NewOwner)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get newOwner user, error: %w", err)
-		}
-
-		if newOwner.ID == org.UserID {
-			return nil, fmt.Errorf("new owner is the same as the current owner")
-		}
-
-		member, err := c.msc.GetMember(ctx, req.Name, newOwner.Username)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get member role, error: %w", err)
-		}
-		if member.Role != string(membership.RoleAdmin) {
-			err := c.msc.ChangeMemberRole(ctx, req.Name, newOwner.Username, req.CurrentUser, member.Role, string(membership.RoleAdmin))
-			if err != nil {
-				return nil, fmt.Errorf("failed to change member role, error: %w", err)
-			}
-		}
-		org.UserID = newOwner.ID
-	}
-
 	err = c.orgStore.Update(ctx, &org)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update database organization, error: %w", err)
@@ -470,6 +471,28 @@ func (c *organizationComponentImpl) Update(ctx context.Context, req *types.EditO
 	gitEditReq.Nickname = &org.Nickname
 	gitEditReq.Description = &org.Description
 	return &org, err
+}
+
+// checkNamespaceAdminPermission checks whether a user can administer an organization namespace.
+func (c *organizationComponentImpl) checkNamespaceAdminPermission(ctx context.Context, namespacePath, userName string) (bool, error) {
+	user, err := c.userStore.FindByUsername(ctx, userName)
+	if err != nil {
+		return false, fmt.Errorf("find user %q for namespace permission: %w", userName, err)
+	}
+	namespace, err := c.nsStore.FindByPath(ctx, namespacePath)
+	if err != nil {
+		return false, fmt.Errorf("find namespace %q for permission: %w", namespacePath, err)
+	}
+	decision, err := c.rebac.Check(ctx, rebac.CheckRequest{
+		Subject:     rebac.UserSubject(user.UUID),
+		Relation:    rebac.NamespaceCanAdmin,
+		Object:      rebac.NamespaceObject(namespace.UUID),
+		Consistency: rebac.ConsistencyHigher,
+	})
+	if err != nil {
+		return false, fmt.Errorf("check namespace admin permission: %w", err)
+	}
+	return decision.Allowed, nil
 }
 
 // appendTags converts database.Tag slice to types.RepoTag and appends to dst.

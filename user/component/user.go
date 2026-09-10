@@ -17,6 +17,8 @@ import (
 	"opencsg.com/csghub-server/builder/analytics"
 	"opencsg.com/csghub-server/builder/git"
 	"opencsg.com/csghub-server/builder/git/gitserver"
+	"opencsg.com/csghub-server/builder/rebac"
+	rebacfactory "opencsg.com/csghub-server/builder/rebac/factory"
 	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/cache"
 	"opencsg.com/csghub-server/builder/store/database"
@@ -60,6 +62,8 @@ type userComponentImpl struct {
 	uts             database.UserTagStore
 	acctClient      accounting.AccountingClient
 	analytics       analytics.Publisher
+	// rebac synchronizes the user's personal namespace ownership tuple.
+	rebac rebac.Authorizer
 }
 
 type UserComponent interface {
@@ -83,7 +87,8 @@ type UserComponent interface {
 	GetInternal(ctx context.Context, userNameOrUUID string, useUUID bool) (*types.User, error)
 	Get(ctx context.Context, userNameOrUUID, visitorName string, useUUID bool) (*types.User, error)
 	CheckOperatorAndUser(ctx context.Context, operator, username string) (bool, error)
-	CheckIfUserHasOrgs(ctx context.Context, userName string) (bool, error)
+	// CheckIfUserIsLastOrgAdmin reports whether the user is the only active administrator of any organization.
+	CheckIfUserIsLastOrgAdmin(ctx context.Context, userName string) (bool, error)
 	CheckIfUserHasRunningOrBuildingDeployments(ctx context.Context, userName string) (bool, error)
 	CheckIfUserHasBills(ctx context.Context, userName string) (bool, error)
 	Index(ctx context.Context, req types.UserListReq) ([]*types.User, int, error)
@@ -110,8 +115,12 @@ type UserComponent interface {
 func NewUserComponent(config *config.Config) (UserComponent, error) {
 	var err error
 	c := &userComponentImpl{}
+	c.rebac, err = rebacfactory.NewAuthorizer()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create ReBAC authorizer: %w", err)
+	}
 	c.userStore = database.NewUserStore()
-	c.orgStore = database.NewOrgStore()
+	c.orgStore = database.NewOrgStore(config)
 	c.nsStore = database.NewNamespaceStore()
 	c.repo = database.NewRepoStore()
 	c.ds = database.NewDeployTaskStore()
@@ -242,8 +251,9 @@ func (c *userComponentImpl) createFromSSOUser(ctx context.Context, cu *rpc.SSOUs
 		newNSUUID = uuid.New().String()
 	}
 	namespace := &database.Namespace{
-		Path: userName,
-		UUID: newNSUUID,
+		Path:          userName,
+		UUID:          newNSUUID,
+		NamespaceType: database.UserNamespace,
 	}
 	user := &database.User{
 		Username:    userName,
@@ -274,8 +284,13 @@ func (c *userComponentImpl) createFromSSOUser(ctx context.Context, cu *rpc.SSOUs
 		newError := fmt.Errorf("failed to create user in db,error:%w", err)
 		return nil, newError
 	}
+	if err := ensureNamespaceRelationship(ctx, c.rebac, *namespace, user.UUID); err != nil {
+		return nil, fmt.Errorf("synchronize user namespace to ReBAC: %w", err)
+	}
+	if err := ensureUserObjectOwnerRelationship(ctx, c.rebac, user.UUID); err != nil {
+		return nil, fmt.Errorf("synchronize user object to ReBAC: %w", err)
+	}
 
-	namespace.NamespaceType = database.UserNamespace
 	user.Namespaces = []database.Namespace{*namespace}
 	c.processAwardSelfRegisterCredit(user)
 
@@ -598,36 +613,39 @@ func (c *userComponentImpl) Delete(ctx context.Context, operator, username strin
 		}
 	}
 
+	userNamespaceRelationship, err := loadUserNamespaceRelationship(ctx, c.nsStore, user)
+	if err != nil {
+		return fmt.Errorf("failed to load user namespace ReBAC relationship: %w", err)
+	}
+	userObjectRelationship, err := userObjectOwnerRelationship(user.UUID)
+	if err != nil {
+		return fmt.Errorf("failed to load user object ReBAC relationship: %w", err)
+	}
+	organizationReBACCleanups, err := loadUserOrganizationReBACCleanups(ctx, c.orgStore, user)
+	if err != nil {
+		return fmt.Errorf("failed to load user organization ReBAC relationships: %w", err)
+	}
+
+	var repositoryRelationships []rebac.Relationship
 	if !retainData.Repository {
-		var (
-			batchSize = 1000
-			batch     = 0
-		)
-		for {
-			repos, err := c.repo.ByUser(ctx, user.ID, batchSize, batch)
+		repositories, relationships, err := loadUserRepositoryRelationships(ctx, c.repo, c.nsStore, c.orgStore, user)
+		if err != nil {
+			slog.ErrorContext(ctx, "failed to load repository relationships for user", slog.String("username", user.Username), slog.Any("error", err))
+			return err
+		}
+		repositoryRelationships = relationships
+		for _, repo := range repositories {
+			if repo.Path == "" {
+				continue
+			}
+			err = c.pdStore.Create(ctx, &database.PendingDeletion{
+				TableName: database.PendingDeletionTableNameRepository,
+				Value:     repo.GitalyPath(),
+			})
 			if err != nil {
-				slog.ErrorContext(ctx, "failed to find all repos for user", slog.String("username", user.Username), slog.Any("error", err))
-				return fmt.Errorf("failed to find all repos for user: %v", err)
+				slog.ErrorContext(ctx, "failed to create pending deletion", slog.Any("error", err))
+				return fmt.Errorf("failed to create pending deletion: %w", err)
 			}
-
-			if len(repos) == 0 {
-				break
-			}
-
-			for _, repo := range repos {
-				if repo.Path == "" {
-					continue
-				}
-				err = c.pdStore.Create(ctx, &database.PendingDeletion{
-					TableName: database.PendingDeletionTableNameRepository,
-					Value:     repo.GitalyPath(),
-				})
-				if err != nil {
-					slog.ErrorContext(ctx, "failed to create pending deletion", slog.Any("error", err))
-					return fmt.Errorf("failed to create pending deletion: %w", err)
-				}
-			}
-			batch++
 		}
 	}
 	// generate audit log
@@ -647,6 +665,18 @@ func (c *userComponentImpl) Delete(ctx context.Context, operator, username strin
 	err = c.userStore.DeleteUserAndRelations(ctx, user, retainData)
 	if err != nil {
 		return fmt.Errorf("failed to delete user and user relations: %v", err)
+	}
+	if err := deleteUserOrganizationReBACRelationships(ctx, c.rebac, organizationReBACCleanups); err != nil {
+		return fmt.Errorf("failed to delete user organization ReBAC relationships: %w", err)
+	}
+	if err := deleteRepositoryNamespaceRelationships(ctx, c.rebac, repositoryRelationships); err != nil {
+		return fmt.Errorf("failed to delete user repository ReBAC relationships: %w", err)
+	}
+	if err := deleteNamespaceRelationship(ctx, c.rebac, userNamespaceRelationship); err != nil {
+		return fmt.Errorf("failed to delete user namespace ReBAC relationship: %w", err)
+	}
+	if err := deleteUserObjectOwnerRelationship(ctx, c.rebac, userObjectRelationship); err != nil {
+		return fmt.Errorf("failed to delete user object ReBAC relationship: %w", err)
 	}
 
 	// create audit log after delete user
@@ -757,15 +787,14 @@ func (c *userComponentImpl) CheckOperatorAndUser(ctx context.Context, operator, 
 	return false, nil
 }
 
-func (c *userComponentImpl) CheckIfUserHasOrgs(ctx context.Context, userName string) (bool, error) {
-	var (
-		err   error
-		total int
-	)
-	if _, total, err = c.orgStore.GetUserOwnOrgs(ctx, userName); err != nil {
-		return false, fmt.Errorf("failed to find orgs by username in db,error:%w", err)
+// CheckIfUserIsLastOrgAdmin reports whether the user is the only active administrator of any organization.
+func (c *userComponentImpl) CheckIfUserIsLastOrgAdmin(ctx context.Context, userName string) (bool, error) {
+	// Organization creator metadata does not grant ownership or permission.
+	isLastAdmin, err := c.orgStore.IsLastOrganizationAdmin(ctx, userName)
+	if err != nil {
+		return false, fmt.Errorf("failed to check the user's organization administrator memberships in db: %w", err)
 	}
-	return total > 0, nil
+	return isLastAdmin, nil
 }
 
 func (c *userComponentImpl) CheckIfUserHasRunningOrBuildingDeployments(ctx context.Context, userName string) (bool, error) {
@@ -870,6 +899,8 @@ func (c *userComponentImpl) buildUserInfo(ctx context.Context, dbuser *database.
 				Logo:     org.Logo,
 				OrgType:  org.OrgType,
 				Verified: org.Verified,
+				IsRoot:   org.IsRoot,
+				IsUnit:   org.IsUnit,
 				UserID:   org.UserID,
 				UUID:     org.UUID,
 			}
@@ -1156,9 +1187,42 @@ func (c *userComponentImpl) SoftDelete(ctx context.Context, operator, username s
 		Before:     before,
 	}
 
+	userNamespaceRelationship, err := loadUserNamespaceRelationship(ctx, c.nsStore, user)
+	if err != nil {
+		return fmt.Errorf("failed to load user namespace ReBAC relationship: %w", err)
+	}
+	userObjectRelationship, err := userObjectOwnerRelationship(user.UUID)
+	if err != nil {
+		return fmt.Errorf("failed to load user object ReBAC relationship: %w", err)
+	}
+	organizationReBACCleanups, err := loadUserOrganizationReBACCleanups(ctx, c.orgStore, user)
+	if err != nil {
+		return fmt.Errorf("failed to load user organization ReBAC relationships: %w", err)
+	}
+
+	var repositoryRelationships []rebac.Relationship
+	if req.Repository {
+		_, repositoryRelationships, err = loadUserRepositoryRelationships(ctx, c.repo, c.nsStore, c.orgStore, user)
+		if err != nil {
+			return fmt.Errorf("failed to load user repository ReBAC relationships: %w", err)
+		}
+	}
+
 	err = c.userStore.SoftDeleteUserAndRelations(ctx, user, req)
 	if err != nil {
 		return fmt.Errorf("failed to delete user in db,error:%w", err)
+	}
+	if err := deleteUserOrganizationReBACRelationships(ctx, c.rebac, organizationReBACCleanups); err != nil {
+		return fmt.Errorf("failed to delete user organization ReBAC relationships: %w", err)
+	}
+	if err := deleteRepositoryNamespaceRelationships(ctx, c.rebac, repositoryRelationships); err != nil {
+		return fmt.Errorf("failed to delete user repository ReBAC relationships: %w", err)
+	}
+	if err := deleteNamespaceRelationship(ctx, c.rebac, userNamespaceRelationship); err != nil {
+		return fmt.Errorf("failed to delete user namespace ReBAC relationship: %w", err)
+	}
+	if err := deleteUserObjectOwnerRelationship(ctx, c.rebac, userObjectRelationship); err != nil {
+		return fmt.Errorf("failed to delete user object ReBAC relationship: %w", err)
 	}
 
 	after, err := c.userStore.FindByUsernameWithDeleted(ctx, username)

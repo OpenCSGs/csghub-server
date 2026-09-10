@@ -16,8 +16,8 @@ import (
 	"gopkg.in/yaml.v3"
 	"opencsg.com/csghub-server/builder/git"
 	"opencsg.com/csghub-server/builder/git/gitserver"
-	"opencsg.com/csghub-server/builder/git/membership"
 	"opencsg.com/csghub-server/builder/llm"
+	"opencsg.com/csghub-server/builder/rebac"
 	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
@@ -354,8 +354,7 @@ func (c *promptComponentImpl) checkFileExist(ctx context.Context, req types.Prom
 }
 
 func (c *promptComponentImpl) checkPromptRepoPermission(ctx context.Context, req types.PromptReq) (*database.User, error) {
-	namespace, err := c.namespaceStore.FindByPath(ctx, req.Namespace)
-	if err != nil {
+	if _, err := c.namespaceStore.FindByPath(ctx, req.Namespace); err != nil {
 		return nil, errors.New("namespace does not exist")
 	}
 
@@ -365,18 +364,12 @@ func (c *promptComponentImpl) checkPromptRepoPermission(ctx context.Context, req
 	}
 
 	if !user.CanAdmin() {
-		if namespace.NamespaceType == database.OrgNamespace {
-			canWrite, err := c.repoComponent.CheckCurrentUserPermission(ctx, req.CurrentUser, req.Namespace, membership.RoleWrite)
-			if err != nil {
-				return nil, err
-			}
-			if !canWrite {
-				return nil, errors.New("user do not have permission to update repo in this organization")
-			}
-		} else {
-			if namespace.Path != user.Username {
-				return nil, errors.New("user do not have permission to update repo in this namespace")
-			}
+		canWrite, err := c.repoComponent.CheckCurrentUserPermission(ctx, req.CurrentUser, req.Namespace, rebac.NamespaceCanWrite)
+		if err != nil {
+			return nil, err
+		}
+		if !canWrite {
+			return nil, errors.New("user do not have permission to update repo in this namespace")
 		}
 	}
 	return &user, nil
@@ -393,12 +386,12 @@ func (c *promptComponentImpl) SetRelationModels(ctx context.Context, req types.R
 		return fmt.Errorf("failed to find prompt, error: %w", err)
 	}
 
-	permission, err := c.repoComponent.GetUserRepoPermission(ctx, req.CurrentUser, repo)
+	permission, err := c.repoComponent.CheckUserRepoPermission(ctx, req.CurrentUser, repo, rebac.RepositoryCanWrite)
 	if err != nil {
 		return fmt.Errorf("failed to get user repo permission, error: %w", err)
 	}
 
-	if !permission.CanWrite {
+	if !permission {
 		return errorx.ErrForbiddenMsg("user do not allowed to set relation models")
 	}
 
@@ -602,8 +595,7 @@ func (c *promptComponentImpl) CreatePromptRepo(ctx context.Context, req *types.C
 		tags     []types.RepoTag
 	)
 
-	namespace, err := c.namespaceStore.FindByPath(ctx, req.Namespace)
-	if err != nil {
+	if _, err := c.namespaceStore.FindByPath(ctx, req.Namespace); err != nil {
 		return nil, errors.New("namespace does not exist")
 	}
 
@@ -612,18 +604,12 @@ func (c *promptComponentImpl) CreatePromptRepo(ctx context.Context, req *types.C
 		return nil, errors.New("user does not exist")
 	}
 	if !user.CanAdmin() {
-		if namespace.NamespaceType == database.OrgNamespace {
-			canWrite, err := c.repoComponent.CheckCurrentUserPermission(ctx, req.Username, req.Namespace, membership.RoleWrite)
-			if err != nil {
-				return nil, err
-			}
-			if !canWrite {
-				return nil, errorx.ErrForbiddenMsg("users do not have permission to create prompt in this organization")
-			}
-		} else {
-			if namespace.Path != user.Username {
-				return nil, errorx.ErrForbiddenMsg("users do not have permission to create prompt in this namespace")
-			}
+		canWrite, err := c.repoComponent.CheckCurrentUserPermission(ctx, req.Username, req.Namespace, rebac.NamespaceCanWrite)
+		if err != nil {
+			return nil, err
+		}
+		if !canWrite {
+			return nil, errorx.ErrForbiddenMsg("users do not have permission to create prompt in this namespace")
 		}
 	}
 
@@ -1001,17 +987,17 @@ var _ types.SensitiveRequestV2 = (*types.Prompt)(nil)
 func (c *promptComponentImpl) OrgPrompts(ctx context.Context, req *types.OrgPromptsReq) ([]types.PromptRes, int, error) {
 	var resPrompts []types.PromptRes
 	var err error
-	r := membership.RoleUnknown
+	canRead := false
 	if req.CurrentUser != "" {
-		r, err = c.userSvcClient.GetMemberRole(ctx, req.Namespace, req.CurrentUser)
-		// log error, and treat user as unknown role in org
+		canRead, err = c.repoComponent.CheckCurrentUserPermission(ctx, req.CurrentUser, req.Namespace, rebac.NamespaceCanRead)
 		if err != nil {
-			slog.Error("faild to get member role",
-				slog.String("org", req.Namespace), slog.String("user", req.CurrentUser),
-				slog.String("error", err.Error()))
+			slog.ErrorContext(ctx, "failed to check namespace permission",
+				slog.String("namespace", req.Namespace), slog.String("user", req.CurrentUser),
+				slog.Any("error", err))
+			canRead = false
 		}
 	}
-	onlyPublic := !r.CanRead()
+	onlyPublic := !canRead
 	prompts, total, err := c.promptStore.ByOrgPath(ctx, req.Namespace, req.PageSize, req.Page, onlyPublic)
 	if err != nil {
 		newError := fmt.Errorf("failed to get user prompts,error:%w", err)

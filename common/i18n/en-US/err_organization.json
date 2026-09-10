@@ -1,0 +1,14 @@
+{
+    "error.ORG-ERR-0": {
+        "other": "Organization member not found"
+    },
+    "error.ORG-ERR-1": {
+        "other": "Organization not found"
+    },
+    "error.ORG-ERR-2": {
+        "other": "You do not have permission to manage this organization"
+    },
+    "error.ORG-ERR-3": {
+        "other": "You do not have permission to access this organization"
+    }
+}

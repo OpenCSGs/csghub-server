@@ -15,6 +15,9 @@ project_token = ""
 api_host = ""
 environment = "development"
 
+[organization]
+enable_unit = false
+
 [api_server]
 port = 8080
 public_domain = "http://localhost:8080"

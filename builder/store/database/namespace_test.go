@@ -71,3 +71,26 @@ func TestNamespaceStoreFindByPathCaseConflicts(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "AIWizards", ns.Path)
 }
+
+// TestNamespaceStore_FindByPathWithDeleted verifies soft-deleted namespaces remain available for tuple cleanup.
+func TestNamespaceStore_FindByPathWithDeleted(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+	store := database.NewNamespaceStoreWithDB(db)
+	namespace := database.Namespace{
+		Path: "deleted-user", UUID: "deleted-user-namespace-uuid", NamespaceType: database.UserNamespace,
+	}
+
+	_, err := db.Core.NewInsert().Model(&namespace).Exec(ctx)
+	require.NoError(t, err)
+	_, err = db.Core.NewDelete().Model(&namespace).WherePK().Exec(ctx)
+	require.NoError(t, err)
+
+	_, err = store.FindByPath(ctx, namespace.Path)
+	require.Error(t, err)
+	got, err := store.FindByPathWithDeleted(ctx, namespace.Path)
+	require.NoError(t, err)
+	require.Equal(t, namespace.UUID, got.UUID)
+	require.Equal(t, namespace.Path, got.Path)
+}

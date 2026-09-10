@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"opencsg.com/csghub-server/builder/git/membership"
+	"opencsg.com/csghub-server/builder/rebac"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/types"
 )
@@ -99,7 +99,7 @@ func TestUserComponent_ListDeploysByNamespace(t *testing.T) {
 		RepoType:   types.ModelRepo,
 		DeployType: types.InferenceType,
 	}
-	uc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "user", "org1", membership.RoleRead).Return(true, nil)
+	uc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "user", "org1", rebac.NamespaceCanRead).Return(true, nil)
 	uc.mocks.stores.DeployTaskMock().EXPECT().ListDeployByOwnerNamespace(ctx, "org1", deployReq).Return([]database.Deploy{
 		{
 			SvcName: "svc", ClusterID: "cluster", GitPath: "models_foo/bar", Hardware: `{"memory": "foo"}`,
@@ -137,7 +137,7 @@ func TestUserComponent_ListNotebooksByNamespace(t *testing.T) {
 		PageOpts:   types.PageOpts{Page: 1, PageSize: 10},
 		DeployType: types.NotebookType,
 	}
-	uc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "user", "org1", membership.RoleRead).Return(true, nil)
+	uc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "user", "org1", rebac.NamespaceCanRead).Return(true, nil)
 	uc.mocks.stores.DeployTaskMock().EXPECT().ListDeployByOwnerNamespace(ctx, "org1", deployReq).Return([]database.Deploy{
 		{
 			ID: 1, DeployName: "nb1", SvcName: "svc", ClusterID: "cluster",

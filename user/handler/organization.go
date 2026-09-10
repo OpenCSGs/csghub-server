@@ -186,6 +186,9 @@ func (h *OrganizationHandler) Index(ctx *gin.Context) {
 		return
 	}
 
+	if orgs == nil {
+		orgs = make([]types.Organization, 0)
+	}
 	respData := gin.H{
 		"data":  orgs,
 		"total": total,
@@ -198,7 +201,7 @@ func (h *OrganizationHandler) Index(ctx *gin.Context) {
 // ListUserOrganizations godoc
 // @Security     ApiKey
 // @Summary      Get organizations the user belongs to
-// @Description  get organizations the specified user belongs to, with optional role filter (all, owner, write, admin)
+// @Description  get organizations the specified user belongs to, with optional role filter (all, write, admin)
 // @Tags         Organization
 // @Accept       json
 // @Produce      json
@@ -206,7 +209,7 @@ func (h *OrganizationHandler) Index(ctx *gin.Context) {
 // @Param        search query string false "search keyword"
 // @Param        org_type query string false "org type filter"
 // @Param        verify_status query string false "verify status filter"
-// @Param        role query string false "role filter: all (any member), owner, write, admin"
+// @Param        role query string false "role filter: all (any member), write, admin"
 // @Param        tag query string false "filter by tag name"
 // @Param        per query int false "page size"
 // @Param        page query int false "page number"

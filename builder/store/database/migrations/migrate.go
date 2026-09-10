@@ -22,6 +22,24 @@ var migrationDir embed.FS
 
 var Migrations = migrate.NewMigrations()
 
+// databaseContextKey identifies the application database stored in a migration context.
+type databaseContextKey struct{}
+
+// WithDatabase adds the application database to a migration context.
+func WithDatabase(ctx context.Context, db *database.DB) context.Context {
+	return context.WithValue(ctx, databaseContextKey{}, db)
+}
+
+// DatabaseFromContext returns the application database stored in a migration context.
+func DatabaseFromContext(ctx context.Context) (*database.DB, bool) {
+	if ctx == nil {
+		return nil, false
+	}
+
+	db, ok := ctx.Value(databaseContextKey{}).(*database.DB)
+	return db, ok && db != nil
+}
+
 func init() {
 	if err := Migrations.Discover(migrationDir); err != nil {
 		err = fmt.Errorf("discovering database migrations: %w", err)

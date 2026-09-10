@@ -248,3 +248,81 @@ func TestSpaceResourceHandler_ListAll(t *testing.T) {
 		tester.ResponseEq(t, 500, "database error", nil)
 	})
 }
+
+func TestSpaceResourceHandler_UpdateScenarioConstraint(t *testing.T) {
+	rh := func(v int64) *int64 { return &v }
+	rm := func(v int) *int { return &v }
+	t.Run("200", func(t *testing.T) {
+		tester := NewSpaceResourceTester(t).WithHandleFunc(func(h *SpaceResourceHandler) gin.HandlerFunc {
+			return h.UpdateScenarioConstraint
+		})
+		tester.mocks.spaceResource.EXPECT().UpdateScenarioConstraint(tester.Ctx(), &types.UpdateScenarioConstraintReq{
+			ID:               1,
+			RequiredHardware: rh(2),
+			ExcludeHardware:  rh(4),
+			MaxReplica:       rm(3),
+		}).Return(
+			&types.ScenarioInfo{ID: 1, Code: 0, Name: "space", RequiredHardware: 2, ExcludeHardware: 4, MaxReplica: 3}, nil,
+		)
+		tester.WithBody(t, &types.UpdateScenarioConstraintReq{
+			RequiredHardware: rh(2),
+			ExcludeHardware:  rh(4),
+			MaxReplica:       rm(3),
+		}).WithUser().WithParam("id", "1").Execute()
+
+		tester.ResponseEq(t, 200, tester.OKText, &types.ScenarioInfo{ID: 1, Code: 0, Name: "space", RequiredHardware: 2, ExcludeHardware: 4, MaxReplica: 3})
+	})
+	t.Run("error", func(t *testing.T) {
+		tester := NewSpaceResourceTester(t).WithHandleFunc(func(h *SpaceResourceHandler) gin.HandlerFunc {
+			return h.UpdateScenarioConstraint
+		})
+		tester.mocks.spaceResource.EXPECT().UpdateScenarioConstraint(tester.Ctx(), &types.UpdateScenarioConstraintReq{
+			ID:               1,
+			RequiredHardware: rh(2),
+			ExcludeHardware:  rh(4),
+			MaxReplica:       rm(3),
+		}).Return(
+			nil, errors.New("database error"),
+		)
+		tester.WithBody(t, &types.UpdateScenarioConstraintReq{
+			RequiredHardware: rh(2),
+			ExcludeHardware:  rh(4),
+			MaxReplica:       rm(3),
+		}).WithUser().WithParam("id", "1").Execute()
+
+		tester.ResponseEq(t, 500, "database error", nil)
+	})
+	t.Run("negative required_hardware rejected", func(t *testing.T) {
+		tester := NewSpaceResourceTester(t).WithHandleFunc(func(h *SpaceResourceHandler) gin.HandlerFunc {
+			return h.UpdateScenarioConstraint
+		})
+		neg64 := int64(-1)
+		tester.WithBody(t, &types.UpdateScenarioConstraintReq{
+			RequiredHardware: &neg64,
+		}).WithUser().WithParam("id", "1").Execute()
+
+		tester.ResponseEq(t, 400, "required_hardware must be >= 0", nil)
+	})
+	t.Run("negative exclude_hardware rejected", func(t *testing.T) {
+		tester := NewSpaceResourceTester(t).WithHandleFunc(func(h *SpaceResourceHandler) gin.HandlerFunc {
+			return h.UpdateScenarioConstraint
+		})
+		neg64 := int64(-1)
+		tester.WithBody(t, &types.UpdateScenarioConstraintReq{
+			ExcludeHardware: &neg64,
+		}).WithUser().WithParam("id", "1").Execute()
+
+		tester.ResponseEq(t, 400, "exclude_hardware must be >= 0", nil)
+	})
+	t.Run("negative max_replica rejected", func(t *testing.T) {
+		tester := NewSpaceResourceTester(t).WithHandleFunc(func(h *SpaceResourceHandler) gin.HandlerFunc {
+			return h.UpdateScenarioConstraint
+		})
+		neg := -1
+		tester.WithBody(t, &types.UpdateScenarioConstraintReq{
+			MaxReplica: &neg,
+		}).WithUser().WithParam("id", "1").Execute()
+
+		tester.ResponseEq(t, 400, "max_replica must be >= 0", nil)
+	})
+}

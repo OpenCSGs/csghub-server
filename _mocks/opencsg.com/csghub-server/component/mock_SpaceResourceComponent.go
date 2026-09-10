@@ -428,6 +428,65 @@ func (_c *MockSpaceResourceComponent_Update_Call) RunAndReturn(run func(context.
 	return _c
 }
 
+// UpdateScenarioConstraint provides a mock function with given fields: ctx, req
+func (_m *MockSpaceResourceComponent) UpdateScenarioConstraint(ctx context.Context, req *types.UpdateScenarioConstraintReq) (*types.ScenarioInfo, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdateScenarioConstraint")
+	}
+
+	var r0 *types.ScenarioInfo
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *types.UpdateScenarioConstraintReq) (*types.ScenarioInfo, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *types.UpdateScenarioConstraintReq) *types.ScenarioInfo); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*types.ScenarioInfo)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *types.UpdateScenarioConstraintReq) error); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockSpaceResourceComponent_UpdateScenarioConstraint_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdateScenarioConstraint'
+type MockSpaceResourceComponent_UpdateScenarioConstraint_Call struct {
+	*mock.Call
+}
+
+// UpdateScenarioConstraint is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req *types.UpdateScenarioConstraintReq
+func (_e *MockSpaceResourceComponent_Expecter) UpdateScenarioConstraint(ctx interface{}, req interface{}) *MockSpaceResourceComponent_UpdateScenarioConstraint_Call {
+	return &MockSpaceResourceComponent_UpdateScenarioConstraint_Call{Call: _e.mock.On("UpdateScenarioConstraint", ctx, req)}
+}
+
+func (_c *MockSpaceResourceComponent_UpdateScenarioConstraint_Call) Run(run func(ctx context.Context, req *types.UpdateScenarioConstraintReq)) *MockSpaceResourceComponent_UpdateScenarioConstraint_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(*types.UpdateScenarioConstraintReq))
+	})
+	return _c
+}
+
+func (_c *MockSpaceResourceComponent_UpdateScenarioConstraint_Call) Return(_a0 *types.ScenarioInfo, _a1 error) *MockSpaceResourceComponent_UpdateScenarioConstraint_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockSpaceResourceComponent_UpdateScenarioConstraint_Call) RunAndReturn(run func(context.Context, *types.UpdateScenarioConstraintReq) (*types.ScenarioInfo, error)) *MockSpaceResourceComponent_UpdateScenarioConstraint_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // NewMockSpaceResourceComponent creates a new instance of MockSpaceResourceComponent. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func NewMockSpaceResourceComponent(t interface {

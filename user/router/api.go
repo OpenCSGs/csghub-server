@@ -37,7 +37,9 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error creating user controller:%w", err)
 	}
-	// Member
+	// The member handler is also used by the service-to-service role query
+	// endpoint, which remains available when public legacy membership APIs are
+	// disabled in hierarchy mode.
 	memberCtrl, err := handler.NewMemberHandler(config)
 	if err != nil {
 		return nil, fmt.Errorf("error creating user controller:%w", err)
@@ -54,6 +56,7 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 	tokenGroup := apiV1Group.Group("/token")
 	internalGroup := apiV1Group.Group("/internal", needAPIKey)
 	internalUserGroup := internalGroup.Group("/user")
+	internalOrganizationGroup := internalGroup.Group("/organization")
 
 	jwtHandler, err := handler.NewJWTHandler(config)
 	if err != nil {
@@ -76,7 +79,9 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 		apiV1Group.GET("/organizations", orgHandler.Index)
 		apiV1Group.GET("/organization/:namespace", orgHandler.Get)
 		apiV1Group.GET("/organization/uuid/:uuid", orgHandler.GetByUUID)
-		apiV1Group.GET("/organization/:namespace/members", memberCtrl.OrgMembers)
+		if !enableUnit(config) {
+			apiV1Group.GET("/organization/:namespace/members", memberCtrl.OrgMembers)
+		}
 	}
 
 	//internal only
@@ -96,6 +101,10 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 		userGroup.GET("/admin_emails", needAPIKey, userHandler.GetAdminEmails)
 
 		internalUserGroup.GET("/emails", userHandler.GetEmailsInternal)
+		// Role queries are internal facts used by other services for authorization.
+		// Public legacy membership mutations remain edition/config gated below.
+		internalOrganizationGroup.GET("/:namespace/members/:username", memberCtrl.GetMemberRole)
+		internalOrganizationGroup.GET("/uuid/:uuid/members/:username", memberCtrl.GetMemberRoleByUUID)
 	}
 
 	middlewareCollection := middleware.MiddlewareCollection{}
@@ -134,14 +143,11 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 		userGroup.PUT("/verify/:id", mustLogin(), userHandler.UpdateVerify)
 		userGroup.GET("/verify/:id", mustLogin(), userHandler.GetVerify)
 	}
-	// routers for organizations
-	{
+	// Legacy organization mutations and membership APIs are unavailable in hierarchy mode.
+	if !enableUnit(config) {
 		apiV1Group.POST("/organizations", orgHandler.Create)
 		apiV1Group.PUT("/organization/:namespace", orgHandler.Update)
 		apiV1Group.DELETE("/organization/:namespace", orgHandler.Delete)
-	}
-	// routers for members
-	{
 		apiV1Group.GET("/organization/:namespace/members/:username", userMatch, memberCtrl.GetMemberRole)
 		apiV1Group.GET("/organization/uuid/:uuid/members/:username", userMatch, memberCtrl.GetMemberRoleByUUID)
 		apiV1Group.POST("/organization/:namespace/members", memberCtrl.Create)

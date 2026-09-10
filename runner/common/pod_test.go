@@ -2,15 +2,16 @@ package common
 
 import (
 	"context"
-	"k8s.io/client-go/kubernetes"
 	"testing"
+
+	"k8s.io/client-go/kubernetes"
 
 	"github.com/stretchr/testify/assert"
 	"k8s.io/client-go/kubernetes/fake"
 )
 
 func TestGetPodLogValidation(t *testing.T) {
-	clientset := fake.NewSimpleClientset()
+	clientset := fake.NewClientset()
 
 	tests := []struct {
 		name      string

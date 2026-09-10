@@ -17,7 +17,7 @@ import (
 
 func TestVerifyPermissions(t *testing.T) {
 	t.Run("should return error when namespace does not exist", func(t *testing.T) {
-		clientset := fake.NewSimpleClientset()
+		clientset := fake.NewClientset()
 		// The function to create a clientset from config needs to be adapted for testing
 		// For this test, we'll assume verifyPermissions can accept a clientset directly
 		// or we mock the config to produce our fake clientset.
@@ -30,7 +30,7 @@ func TestVerifyPermissions(t *testing.T) {
 
 	t.Run("should succeed when namespace exists", func(t *testing.T) {
 		ns := &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "existing-ns"}}
-		clientset := fake.NewSimpleClientset(ns)
+		clientset := fake.NewClientset(ns)
 		config := &config.Config{}
 		config.Cluster.SpaceNamespace = "spaces"
 		err := verifyPermissions(clientset, config)
@@ -110,7 +110,7 @@ func TestGetCluster(t *testing.T) {
 			CID:        "test-cluster-1",
 			ID:         "cluster-1",
 			ConfigPath: "/path/to/kubeconfig",
-			Client:     fake.NewSimpleClientset(),
+			Client:     fake.NewClientset(),
 		}
 
 		pool := &pool{
@@ -149,7 +149,7 @@ func TestGetClusterByID(t *testing.T) {
 			CID:        "test-cluster-1",
 			ID:         "cluster-1",
 			ConfigPath: "/path/to/kubeconfig",
-			Client:     fake.NewSimpleClientset(),
+			Client:     fake.NewClientset(),
 		}
 
 		pool := &pool{
@@ -176,7 +176,7 @@ func TestGetAllCluster(t *testing.T) {
 		CID:        "test-cluster-1",
 		ID:         "cluster-1",
 		ConfigPath: "/path/to/kubeconfig",
-		Client:     fake.NewSimpleClientset(),
+		Client:     fake.NewClientset(),
 	}
 
 	pool := &pool{
