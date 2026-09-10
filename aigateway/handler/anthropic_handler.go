@@ -5,8 +5,6 @@ import (
 	"opencsg.com/csghub-server/aigateway/handler/anthropic"
 	"opencsg.com/csghub-server/aigateway/handler/plan"
 	_ "opencsg.com/csghub-server/aigateway/types"
-	"opencsg.com/csghub-server/api/httpbase"
-	commontrace "opencsg.com/csghub-server/common/utils/trace"
 )
 
 // AnthropicHandlerImpl extends OpenAIHandlerImpl to serve the Anthropic
@@ -36,8 +34,7 @@ func NewAnthropicHandler(openai *OpenAIHandlerImpl) *AnthropicHandlerImpl {
 	bridge := newMessagesHandlerBridge(openai)
 	h.messagesHandler = anthropic.New(bridge.toMessagesDeps())
 
-	mr, bc, ulc, cs := newPlannerDeps(openai)
-	h.orchestrator = plan.NewOrchestrator(plan.NewPlanner(mr, bc, ulc, cs))
+	h.orchestrator = newOrchestrator(openai)
 
 	return h
 }
@@ -58,28 +55,5 @@ func NewAnthropicHandler(openai *OpenAIHandlerImpl) *AnthropicHandlerImpl {
 // @Failure      503      {object}  types.Error
 // @Router       /v1/messages [post]
 func (h *AnthropicHandlerImpl) Messages(c *gin.Context) {
-	ctx := c.Request.Context()
-	nsUUID := httpbase.GetCurrentNamespaceUUID(c)
-	requestID := commontrace.GetTraceIDInGinContext(c)
-
-	// Start preflight trace span — covers Extract → Plan → Execute.
-	ctx, preflight := startPreflightTrace(ctx, preflightTraceStart{
-		API:       c.FullPath(),
-		RequestID: requestID,
-		UserID:    nsUUID,
-	})
-	c.Request = c.Request.WithContext(ctx)
-
-	// Store the preflight tracer in the gin context so the anthropic Handler
-	// can record model-resolution attributes (Execute) and errors
-	// (HandlePlanError) on the same span.
-	anthropic.SetPreflightTracer(c, &preflightTracerAdapter{trace: preflight})
-
-	// Ensure the preflight span is always ended, even if Extract fails
-	// (Orchestrator.Dispatch returns early on Extract error without calling
-	// Execute or HandlePlanError).  End() uses sync.Once so it's safe to call
-	// again if Execute or HandlePlanError already ended it.
-	defer preflight.End()
-
 	h.orchestrator.Dispatch(c, h.messagesHandler, h.messagesHandler)
 }

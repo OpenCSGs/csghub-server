@@ -1,7 +1,6 @@
 package plan
 
 import (
-	"context"
 	"errors"
 	"net/http/httptest"
 	"testing"
@@ -53,14 +52,14 @@ type stubPlanner struct {
 	err  error
 }
 
-func (s *stubPlanner) Plan(ctx context.Context, meta *types.RequestMetadata) (*types.RequestPlan, error) {
+func (s *stubPlanner) Plan(c *gin.Context, meta *types.RequestMetadata) (*types.RequestPlan, error) {
 	return s.plan, s.err
 }
 
 // --- Tests ---
 
 func TestOrchestrator_ExtractError_ShortCircuits(t *testing.T) {
-	orch := NewOrchestrator(&stubPlanner{plan: &types.RequestPlan{}})
+	orch := NewOrchestrator(&stubPlanner{plan: &types.RequestPlan{}}, nil)
 	extractor := &stubExtractor{err: errors.New("bad request")}
 	handler := &stubHandler{}
 
@@ -76,7 +75,7 @@ func TestOrchestrator_ExtractError_ShortCircuits(t *testing.T) {
 
 func TestOrchestrator_PlanError_CallsHandlePlanError(t *testing.T) {
 	plan := &types.RequestPlan{ErrorCode: types.PlanErrInsufficientBalance}
-	orch := NewOrchestrator(&stubPlanner{plan: plan, err: errors.New("insufficient balance")})
+	orch := NewOrchestrator(&stubPlanner{plan: plan, err: errors.New("insufficient balance")}, nil)
 	extractor := &stubExtractor{meta: &types.RequestMetadata{Model: "test"}}
 	handler := &stubHandler{}
 
@@ -94,7 +93,7 @@ func TestOrchestrator_PlanError_CallsHandlePlanError(t *testing.T) {
 
 func TestOrchestrator_Success_CallsExecute(t *testing.T) {
 	plan := &types.RequestPlan{ModelTarget: &types.ModelTarget{ModelName: "test"}}
-	orch := NewOrchestrator(&stubPlanner{plan: plan})
+	orch := NewOrchestrator(&stubPlanner{plan: plan}, nil)
 	extractor := &stubExtractor{meta: &types.RequestMetadata{Model: "test"}}
 	handler := &stubHandler{}
 
@@ -114,7 +113,7 @@ func TestOrchestrator_ExecuteError_DoesNotCallHandlePlanError(t *testing.T) {
 	// Execute errors are logged but not routed to HandlePlanError —
 	// the protocol handler should handle its own execute errors inline.
 	plan := &types.RequestPlan{ModelTarget: &types.ModelTarget{ModelName: "test"}}
-	orch := NewOrchestrator(&stubPlanner{plan: plan})
+	orch := NewOrchestrator(&stubPlanner{plan: plan}, nil)
 	extractor := &stubExtractor{meta: &types.RequestMetadata{Model: "test"}}
 	handler := &stubHandler{execErr: errors.New("proxy failed")}
 
@@ -136,7 +135,7 @@ func TestOrchestrator_PartialPlan_PassedToHandlePlanError(t *testing.T) {
 		ModelTarget: &types.ModelTarget{ModelName: "resolved-model"},
 		ErrorCode:   types.PlanErrInsufficientBalance,
 	}
-	orch := NewOrchestrator(&stubPlanner{plan: partialPlan, err: errors.New("insufficient balance")})
+	orch := NewOrchestrator(&stubPlanner{plan: partialPlan, err: errors.New("insufficient balance")}, nil)
 	extractor := &stubExtractor{meta: &types.RequestMetadata{Model: "test"}}
 	handler := &stubHandler{}
 

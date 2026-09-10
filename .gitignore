@@ -52,4 +52,4 @@ docs/swagger.yaml
 docs/docs.go
 pgdata15/
 .prd/
-/docker/finetune/local/
+/docker/finetune/local/aigateway/cmd/fake-upstream/main.go

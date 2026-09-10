@@ -1,7 +1,6 @@
 package plan
 
 import (
-	"context"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -26,7 +25,7 @@ func (s *stubExtractor2) Extract(c *gin.Context) (*types.RequestMetadata, error)
 
 type stubPlanner2 struct{}
 
-func (s *stubPlanner2) Plan(ctx context.Context, meta *types.RequestMetadata) (*types.RequestPlan, error) {
+func (s *stubPlanner2) Plan(c *gin.Context, meta *types.RequestMetadata) (*types.RequestPlan, error) {
 	return nil, nil
 }
 

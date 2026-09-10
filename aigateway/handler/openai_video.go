@@ -161,26 +161,6 @@ func (h *OpenAIHandlerImpl) CreateVideo(c *gin.Context) {
 	copyProxyResponse(c, capture.Header(), capture.StatusCode(), body)
 }
 
-// CreateVideoDeprecated godoc
-// @Security     ApiKey
-// @Summary      Create a video generation (deprecated)
-// @Description  Deprecated: use POST /v1/video/generations instead.
-// @Deprecated
-// @Tags         AIGateway
-// @Accept       json
-// @Accept       multipart/form-data
-// @Produce      json
-// @Param        request body types.VideoGenerationRequest true "Video generation request"
-// @Success      200 {object} types.VideoObject "OK"
-// @Failure      400 {object} types.Error "Bad request"
-// @Failure      404 {object} types.Error "Model not found"
-// @Failure      500 {object} types.Error "Internal server error"
-// @Router       /v1/videos [post]
-func (h *OpenAIHandlerImpl) CreateVideoDeprecated(c *gin.Context) {
-	markDeprecatedVideoAPI(c, "/v1/video/generations")
-	h.CreateVideo(c)
-}
-
 type createVideoInput struct {
 	adapterReq                 types.VideoGenerationRequest
 	form                       *multipart.Form
@@ -485,24 +465,6 @@ func (h *OpenAIHandlerImpl) GetVideo(c *gin.Context) {
 	copyProxyResponse(c, capture.Header(), capture.StatusCode(), normalizeVideoResponseBody(adapter, body, videoResp, target.generation.ResourceID))
 }
 
-// GetVideoDeprecated godoc
-// @Security     ApiKey
-// @Summary      Get a video generation (deprecated)
-// @Description  Deprecated: use GET /v1/video/generations/{video_id} instead.
-// @Deprecated
-// @Tags         AIGateway
-// @Produce      json
-// @Param        video_id path string true "Gateway video ID"
-// @Success      200 {object} types.VideoObject "OK"
-// @Failure      400 {object} types.Error "Bad request"
-// @Failure      404 {object} types.Error "Video not found"
-// @Failure      500 {object} types.Error "Internal server error"
-// @Router       /v1/videos/{video_id} [get]
-func (h *OpenAIHandlerImpl) GetVideoDeprecated(c *gin.Context) {
-	markDeprecatedVideoAPI(c, "/v1/video/generations/"+c.Param("video_id"))
-	h.GetVideo(c)
-}
-
 func (h *OpenAIHandlerImpl) asyncGenerationStatusRefreshInterval() time.Duration {
 	if h != nil && h.config != nil && h.config.AIGateway.AsyncGenerationStatusRefreshInterval > 0 {
 		return time.Duration(h.config.AIGateway.AsyncGenerationStatusRefreshInterval) * time.Second
@@ -596,30 +558,6 @@ func (h *OpenAIHandlerImpl) GetVideoContent(c *gin.Context) {
 		return
 	}
 	streamVideoDownloadURL(c, contentResp.DownloadURL)
-}
-
-// GetVideoContentDeprecated godoc
-// @Security     ApiKey
-// @Summary      Download generated video content (deprecated)
-// @Description  Deprecated: use GET /v1/video/generations/{video_id}/content instead.
-// @Deprecated
-// @Tags         AIGateway
-// @Produce      application/octet-stream
-// @Produce      video/mp4
-// @Param        video_id path string true "Gateway video ID"
-// @Success      200 {file} binary "Generated video content"
-// @Failure      400 {object} types.Error "Bad request"
-// @Failure      404 {object} types.Error "Video not found"
-// @Failure      500 {object} types.Error "Internal server error"
-// @Router       /v1/videos/{video_id}/content [get]
-func (h *OpenAIHandlerImpl) GetVideoContentDeprecated(c *gin.Context) {
-	markDeprecatedVideoAPI(c, "/v1/video/generations/"+c.Param("video_id")+"/content")
-	h.GetVideoContent(c)
-}
-
-func markDeprecatedVideoAPI(c *gin.Context, successorPath string) {
-	c.Header("Deprecation", "@1784851200")
-	c.Header("Link", fmt.Sprintf("<%s>; rel=\"successor-version\"", successorPath))
 }
 
 func ensureVideoContentReady(c *gin.Context, generation *database.AIGeneration) bool {
@@ -1194,8 +1132,6 @@ func (w videoStreamingWriter) Flush() {
 }
 
 func copyProxyResponse(c *gin.Context, header http.Header, statusCode int, body []byte) {
-	deprecation := c.Writer.Header().Get("Deprecation")
-	successorLink := c.Writer.Header().Get("Link")
 	for key := range c.Writer.Header() {
 		c.Writer.Header().Del(key)
 	}
@@ -1203,12 +1139,6 @@ func copyProxyResponse(c *gin.Context, header http.Header, statusCode int, body 
 		for _, value := range values {
 			c.Writer.Header().Add(key, value)
 		}
-	}
-	if deprecation != "" {
-		c.Writer.Header().Set("Deprecation", deprecation)
-	}
-	if successorLink != "" {
-		c.Writer.Header().Set("Link", successorLink)
 	}
 	c.Writer.Header().Del("Content-Length")
 	c.Status(statusCode)

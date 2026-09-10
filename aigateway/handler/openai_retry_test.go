@@ -136,13 +136,6 @@ func (r *testEmbeddingRecorderWithMutex) End() {
 	r.events = append(r.events, "end")
 }
 
-func (r *testEmbeddingRecorderWithMutex) snapshot() (*types.EmbeddingResult, string, bool, []string) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	events := append([]string(nil), r.events...)
-	return r.result, r.errorCode, r.ended, events
-}
-
 func (r *testGenerationRecorderWithMutex) SetUsage(usage types.TokenUsage) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
