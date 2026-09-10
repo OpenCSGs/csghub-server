@@ -1382,6 +1382,9 @@ func (c *repoComponentImpl) Branches(ctx context.Context, req *types.GetBranches
 		}
 		return nil, fmt.Errorf("failed to get git %s repository branches, error: %w", req.RepoType, err)
 	}
+	for i := range bs {
+		bs[i].IsDefault = bs[i].Name == repo.DefaultBranch
+	}
 	return bs, nil
 }
 

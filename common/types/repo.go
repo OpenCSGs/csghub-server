@@ -161,9 +161,10 @@ type ValidateYamlReq struct {
 }
 
 type Branch struct {
-	Name    string           `json:"name"`
-	Message string           `json:"message"`
-	Commit  RepoBranchCommit `json:"commit"`
+	Name      string           `json:"name"`
+	Message   string           `json:"message"`
+	Commit    RepoBranchCommit `json:"commit"`
+	IsDefault bool             `json:"is_default"`
 }
 
 type Tag struct {

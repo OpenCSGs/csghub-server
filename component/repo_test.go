@@ -2075,11 +2075,11 @@ func TestRepoComponent_DeployStatus(t *testing.T) {
 func TestRepoComponent_Branches(t *testing.T) {
 	ctx := context.TODO()
 	repo := initializeTestRepoComponent(ctx, t)
-	mockedRepo := &database.Repository{Source: types.HuggingfaceSource, Private: false}
+	mockedRepo := &database.Repository{Source: types.HuggingfaceSource, Private: false, DefaultBranch: "main"}
 	repo.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "ns", "n").Return(
 		mockedRepo, nil,
 	).Once()
-	expected := []types.Branch{{Name: "foo"}}
+	expected := []types.Branch{{Name: "main"}, {Name: "foo"}}
 	req := &types.GetBranchesReq{
 		Namespace: "ns",
 		Name:      "n",
@@ -2099,6 +2099,8 @@ func TestRepoComponent_Branches(t *testing.T) {
 	bs, err := repo.Branches(ctx, req)
 	require.Nil(t, err)
 	require.Equal(t, expected, bs)
+	require.True(t, bs[0].IsDefault)
+	require.False(t, bs[1].IsDefault)
 
 	// remote repo, err, return empty results
 	repo.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "ns", "n").Return(
