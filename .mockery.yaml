@@ -268,7 +268,11 @@ packages:
       all: true
   opencsg.com/csghub-server/aigateway/component/availability:
     config:
-      all: true        
+    interfaces:
+      AvailabilityManager:
+      CircuitBreaker:
+      HealthChecker:
+      StateCache:
   opencsg.com/csghub-server/notification/component:
     config:
     interfaces:
