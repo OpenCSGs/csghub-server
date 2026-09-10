@@ -437,7 +437,7 @@ func (c *finetuneComponentImpl) ReadJobLogsNonStream(ctx context.Context, req ty
 	req.SubmitTime = wf.SubmitTime
 
 	labels := map[string]string{
-		types.StreamKeyInstanceName: req.PodName,
+		types.StreamKeyDeployTypeID: req.PodName,
 	}
 
 	lokiResp, err := c.deployer.GetWorkflowLogsNonStream(ctx, req, labels)
@@ -461,7 +461,7 @@ func (c *finetuneComponentImpl) ReadJobLogsInStream(ctx context.Context, req typ
 	req.SubmitTime = wf.SubmitTime
 
 	labels := map[string]string{
-		types.StreamKeyInstanceName: req.PodName,
+		types.StreamKeyDeployTypeID: req.PodName,
 	}
 
 	return c.deployer.GetWorkflowLogsInStream(ctx, req, labels)

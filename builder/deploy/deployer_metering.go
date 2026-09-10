@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/argoproj/argo-workflows/v3/pkg/apis/workflow/v1alpha1"
 	"github.com/google/uuid"
 	"opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/builder/redis"
@@ -249,6 +250,17 @@ func (d *deployer) startAcctForEvaluations(ctx context.Context, clusterMap map[s
 			slog.Any("cluster_id", cluster.ClusterID), slog.Any("Region", cluster.Region))
 		return
 	}
+	if evaluation.TaskType == types.TaskTypeFinetune && evaluation.DagTasks != "" {
+		shouldMeter, err := shouldMeterFinetuneWorkflow(evaluation.DagTasks)
+		if err != nil {
+			slog.ErrorContext(ctx, "skip finetune metering for invalid stage status",
+				slog.Any("task_id", evaluation.TaskId), slog.Any("error", err))
+			return
+		}
+		if !shouldMeter {
+			return
+		}
+	}
 
 	event := types.MeteringEvent{
 		Uuid:         uuid.New(),
@@ -273,4 +285,20 @@ func (d *deployer) startAcctForEvaluations(ctx context.Context, clusterMap map[s
 	} else {
 		slog.DebugContext(ctx, "pub metering evaluation event success", slog.Any("data", string(str)))
 	}
+}
+
+func shouldMeterFinetuneWorkflow(dagTasks string) (bool, error) {
+	var statuses types.WorkflowStageStatuses
+	if err := json.Unmarshal([]byte(dagTasks), &statuses); err != nil {
+		return false, err
+	}
+	if len(statuses) == 0 {
+		return false, errors.New("workflow stage statuses are empty")
+	}
+	for _, status := range statuses {
+		if status.Billable && status.Phase == v1alpha1.NodeRunning {
+			return true, nil
+		}
+	}
+	return false, nil
 }

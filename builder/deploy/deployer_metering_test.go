@@ -405,3 +405,116 @@ func TestDeployer_startAcctMeteringRequest(t *testing.T) {
 		// Should use default replicaCount of 1
 	})
 }
+
+func TestShouldMeterFinetuneWorkflow(t *testing.T) {
+	tests := []struct {
+		name      string
+		dagTasks  string
+		wantMeter bool
+		wantErr   bool
+	}{
+		{
+			name:      "meter while an accelerator stage is running",
+			dagTasks:  `{"gpu-work":{"phase":"Running","billable":true}}`,
+			wantMeter: true,
+		},
+		{
+			name:     "skip while an accelerator stage is pending",
+			dagTasks: `{"gpu-work":{"phase":"Pending","billable":true}}`,
+		},
+		{
+			name:     "skip after an accelerator stage succeeds",
+			dagTasks: `{"gpu-work":{"phase":"Succeeded","billable":true}}`,
+		},
+		{
+			name:     "skip a running CPU stage",
+			dagTasks: `{"transfer":{"phase":"Running","billable":false}}`,
+		},
+		{
+			name:     "reject empty statuses",
+			dagTasks: `{}`,
+			wantErr:  true,
+		},
+		{
+			name:     "reject invalid status",
+			dagTasks: `{`,
+			wantErr:  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := shouldMeterFinetuneWorkflow(tt.dagTasks)
+			if tt.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, tt.wantMeter, got)
+		})
+	}
+}
+
+func TestStartAcctForEvaluations_FinetuneStages(t *testing.T) {
+	cluster := database.ClusterInfo{
+		ClusterID: "cluster1",
+		Status:    types.ClusterStatusRunning,
+	}
+	cluster.UpdatedAt = time.Now()
+	clusterMap := map[string]database.ClusterInfo{"cluster1": cluster}
+
+	tests := []struct {
+		name        string
+		dagTasks    string
+		wantPublish bool
+	}{
+		{
+			name:        "legacy finetune remains billed for whole workflow",
+			wantPublish: true,
+		},
+		{
+			name: "v2 download is not billed",
+			dagTasks: `{
+				"download":{"phase":"Running","billable":false},
+				"train":{"phase":"Pending","billable":true}
+			}`,
+		},
+		{
+			name:        "v2 training is billed",
+			dagTasks:    `{"train":{"phase":"Running","billable":true}}`,
+			wantPublish: true,
+		},
+		{
+			name: "v2 upload is not billed",
+			dagTasks: `{
+				"train":{"phase":"Succeeded","billable":true},
+				"upload":{"phase":"Running","billable":false}
+			}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockMQ := mockmq.NewMockMessageQueue(t)
+			if tt.wantPublish {
+				mockMQ.EXPECT().Publish(mock.Anything, mock.Anything).Return(nil)
+			}
+			d := &deployer{
+				eventPub: &event.EventPublisher{
+					SyncInterval: 5,
+					MQ:           mockMQ,
+				},
+				deployConfig: common.DeployConfig{HeartBeatTimeInSec: 300},
+			}
+			d.startAcctForEvaluations(context.Background(), clusterMap, database.ArgoWorkflow{
+				TaskId:       "finetune-task",
+				TaskType:     types.TaskTypeFinetune,
+				ClusterID:    "cluster1",
+				UserUUID:     "user1",
+				ResourceId:   1,
+				ResourceName: "gpu-sku",
+				DagTasks:     tt.dagTasks,
+			})
+		})
+	}
+}

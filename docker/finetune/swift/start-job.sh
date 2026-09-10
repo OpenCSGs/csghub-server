@@ -5,6 +5,10 @@ EPOCHS="${EPOCHS:-3}"
 LEARNING_RATE="${LEARNING_RATE:-0.0001}"
 SWIFT_COMMAND="${SWIFT_COMMAND:-sft}"
 DATASET_ARG="$DATASET_ID"
+MODEL_ARG="${MODEL_PATH:-$MODEL_ID}"
+if [ -n "${DATASET_PATH:-}" ]; then
+    DATASET_ARG="$DATASET_PATH"
+fi
 CUSTOM_DATASET_INFO_ARG=()
 
 case "$SWIFT_COMMAND" in
@@ -20,7 +24,7 @@ if [ -z "${NPROC_PER_NODE:-}" ] && [ -n "${GPU_NUM:-}" ] && [ "$GPU_NUM" != "0" 
     export NPROC_PER_NODE="$GPU_NUM"
 fi
 
-if [ -n "${DATASET_REVISION:-}" ]; then
+if [ -z "${DATASET_PATH:-}" ] && [ -n "${DATASET_REVISION:-}" ]; then
     CUSTOM_DATASET_NAME="${CUSTOM_DATASET_NAME:-csghub_finetune_dataset}"
     CUSTOM_DATASET_INFO="${CUSTOM_DATASET_INFO:-/tmp/csghub_dataset_info.json}"
     export CUSTOM_DATASET_NAME CUSTOM_DATASET_INFO DATASET_ID DATASET_REVISION
@@ -54,7 +58,7 @@ if [ -n "${NPROC_PER_NODE:-}" ]; then
     echo "Using NPROC_PER_NODE: $NPROC_PER_NODE"
 fi
 
-CMD=(swift "$SWIFT_COMMAND" --model "$MODEL_ID" "${CUSTOM_DATASET_INFO_ARG[@]}" --dataset "$DATASET_ARG" --use_hf true)
+CMD=(swift "$SWIFT_COMMAND" --model "$MODEL_ARG" "${CUSTOM_DATASET_INFO_ARG[@]}" --dataset "$DATASET_ARG" --use_hf true)
 
 case "$SWIFT_COMMAND" in
     sft|rlhf)
@@ -72,7 +76,7 @@ fi
 if [ $? -eq 0 ]; then
     echo "Fine-tuning completed successfully!"
 
-    if [ "${EXPORT_TO_HF:-false}" = "true" ]; then
+    if [ "${SKIP_EXPORT:-false}" != "true" ] && [ "${EXPORT_TO_HF:-false}" = "true" ]; then
         echo "Starting export to CSGHUB..."
         if /etc/csghub/export-to-csg.sh; then
             echo "Export to CSGHUB completed successfully!"
