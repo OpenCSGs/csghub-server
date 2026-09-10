@@ -29,6 +29,12 @@ func StartWorkflow(cfg *config.Config) error {
 	return workflowClient.Start()
 }
 
+// RegisterWorker registers notification channel workers on a shared temporal
+// client. The caller is responsible for starting the shared client.
+func RegisterWorker(cfg *config.Config, wfClient temporal.Client) {
+	createWorker(cfg, wfClient)
+}
+
 func GetWorkflowClient() temporal.Client {
 	return workflowClient
 }
