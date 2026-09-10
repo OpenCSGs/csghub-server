@@ -34,8 +34,8 @@ func TestOpenAIComponent_GetAvailableModels(t *testing.T) {
 	}
 
 	t.Run("user not found", func(t *testing.T) {
-		mockUserStore.EXPECT().FindByUsername(mock.Anything, "nonexistent").
-			Return(database.User{}, errors.New("user not exists")).Once()
+		mockDeployStore.EXPECT().RunningVisibleToUser(mock.Anything, "nonexistent").
+			Return(nil, errors.New("db error")).Once()
 
 		models, err := comp.GetAvailableModels(context.Background(), "nonexistent")
 		assert.Error(t, err)
@@ -83,7 +83,7 @@ func TestOpenAIComponent_GetAvailableModels(t *testing.T) {
 		deploys[0].CreatedAt = now
 		deploys[1].CreatedAt = now
 
-		mockDeployStore.EXPECT().RunningVisibleToUser(mock.Anything, int64(0)).
+		mockDeployStore.EXPECT().RunningVisibleToUser(mock.Anything, "").
 			Return(deploys, nil).Once()
 		mockLLMConfigStore.EXPECT().IndexWithRepo(mock.Anything, 50, 1, mock.Anything).
 			Return([]*database.LLMConfig{}, 0, nil)
@@ -113,13 +113,6 @@ func TestOpenAIComponent_GetAvailableModels(t *testing.T) {
 	})
 
 	t.Run("successful case", func(t *testing.T) {
-		user := &database.User{
-			ID:       1,
-			Username: "testuser",
-			UUID:     "testuser-uuid",
-		}
-		mockUserStore.EXPECT().FindByUsername(mock.Anything, "testuser").
-			Return(*user, nil).Once()
 		mockLLMConfigStore.EXPECT().IndexWithRepo(mock.Anything, 50, 1, mock.Anything).
 			Return([]*database.LLMConfig{}, 0, nil)
 		now := time.Now()
@@ -160,7 +153,7 @@ func TestOpenAIComponent_GetAvailableModels(t *testing.T) {
 		deploys[0].CreatedAt = now
 		deploys[1].CreatedAt = now
 
-		mockDeployStore.EXPECT().RunningVisibleToUser(mock.Anything, int64(1)).
+		mockDeployStore.EXPECT().RunningVisibleToUser(mock.Anything, "testuser").
 			Return(deploys, nil).Once()
 		var wg sync.WaitGroup
 		wg.Add(1)
@@ -195,13 +188,6 @@ func TestOpenAIComponent_GetAvailableModels(t *testing.T) {
 	})
 
 	t.Run("inference private should be marked private", func(t *testing.T) {
-		user := &database.User{
-			ID:       1,
-			Username: "testuser",
-			UUID:     "testuser-uuid",
-		}
-		mockUserStore.EXPECT().FindByUsername(mock.Anything, "testuser").
-			Return(*user, nil).Once()
 		mockLLMConfigStore.EXPECT().IndexWithRepo(mock.Anything, 50, 1, mock.Anything).
 			Return([]*database.LLMConfig{}, 0, nil)
 
@@ -226,7 +212,7 @@ func TestOpenAIComponent_GetAvailableModels(t *testing.T) {
 		}
 		deploys[0].CreatedAt = now
 
-		mockDeployStore.EXPECT().RunningVisibleToUser(mock.Anything, int64(1)).
+		mockDeployStore.EXPECT().RunningVisibleToUser(mock.Anything, "testuser").
 			Return(deploys, nil).Once()
 
 		var wg sync.WaitGroup
@@ -299,7 +285,7 @@ func TestOpenAIComponent_GetAvailableModels_CacheUsesModelSnapshot(t *testing.T)
 	deploys[0].CreatedAt = now
 	deploys[1].CreatedAt = now
 
-	mockDeployStore.EXPECT().RunningVisibleToUser(mock.Anything, int64(0)).
+	mockDeployStore.EXPECT().RunningVisibleToUser(mock.Anything, "").
 		Return(deploys, nil).Once()
 	mockLLMConfigStore.EXPECT().IndexWithRepo(mock.Anything, 50, 1, mock.Anything).
 		Return([]*database.LLMConfig{}, 0, nil).Once()
@@ -363,7 +349,7 @@ func TestOpenAIComponent_ListModels_CacheUsesOriginalID(t *testing.T) {
 		modelListCache: mockCache,
 	}
 
-	mockDeployStore.EXPECT().RunningVisibleToUser(mock.Anything, int64(0)).
+	mockDeployStore.EXPECT().RunningVisibleToUser(mock.Anything, "").
 		Return([]database.Deploy{}, nil).Once()
 
 	searchType := 16
@@ -461,13 +447,6 @@ func TestOpenAIComponent_GetModelByID(t *testing.T) {
 	}
 
 	t.Run("model cache expire", func(t *testing.T) {
-		user := &database.User{
-			ID:       1,
-			Username: "testuser",
-			UUID:     "testuser-uuid",
-		}
-		mockUserStore.EXPECT().FindByUsername(mock.Anything, "testuser").
-			Return(*user, nil)
 		mockCache.EXPECT().Exists(mock.Anything, modelCacheKey).
 			Return(0, nil).Once()
 		mockLLMConfigStore.EXPECT().IndexWithRepo(mock.Anything, 50, 1, mock.Anything).
@@ -498,7 +477,7 @@ func TestOpenAIComponent_GetModelByID(t *testing.T) {
 				wg.Done()
 				return nil
 			}).Once()
-		mockDeployStore.EXPECT().RunningVisibleToUser(mock.Anything, int64(1)).Return(deploys, nil).Once()
+		mockDeployStore.EXPECT().RunningVisibleToUser(mock.Anything, "testuser").Return(deploys, nil).Once()
 
 		model, err := comp.GetModelByID(context.Background(), "testuser", "model1:1")
 		assert.NoError(t, err)
@@ -508,18 +487,12 @@ func TestOpenAIComponent_GetModelByID(t *testing.T) {
 	})
 
 	t.Run("model not found", func(t *testing.T) {
-		user := &database.User{
-			ID:       1,
-			Username: "testuser",
-		}
-		mockUserStore.EXPECT().FindByUsername(mock.Anything, "testuser").
-			Return(*user, nil).Once()
 		mockCache.EXPECT().Exists(mock.Anything, modelCacheKey).
 			Return(1, nil).Once()
 		mockCache.EXPECT().HGet(mock.Anything, modelCacheKey, "nonexistent:svc").
 			Return("", redis.Nil).Once()
 		// Cache miss: GetModelByID falls through to GetAvailableModels, which calls getCSGHubModels and getExternalModels
-		mockDeployStore.EXPECT().RunningVisibleToUser(mock.Anything, int64(1)).Return([]database.Deploy{}, nil).Once()
+		mockDeployStore.EXPECT().RunningVisibleToUser(mock.Anything, "testuser").Return([]database.Deploy{}, nil).Once()
 		mockLLMConfigStore.EXPECT().IndexWithRepo(mock.Anything, 50, 1, mock.Anything).
 			Return([]*database.LLMConfig{}, 0, nil).Once()
 		model, err := comp.GetModelByID(context.Background(), "testuser", "nonexistent:svc")
@@ -528,17 +501,11 @@ func TestOpenAIComponent_GetModelByID(t *testing.T) {
 	})
 
 	t.Run("cache key exists but field miss should fallback to reload", func(t *testing.T) {
-		user := &database.User{
-			ID:       1,
-			Username: "testuser",
-		}
-		mockUserStore.EXPECT().FindByUsername(mock.Anything, "testuser").
-			Return(*user, nil).Once()
 		mockCache.EXPECT().Exists(mock.Anything, modelCacheKey).
 			Return(1, nil).Once()
 		mockCache.EXPECT().HGet(mock.Anything, modelCacheKey, "model-reload").
 			Return("", redis.Nil).Once()
-		mockDeployStore.EXPECT().RunningVisibleToUser(mock.Anything, int64(1)).Return([]database.Deploy{}, nil).Once()
+		mockDeployStore.EXPECT().RunningVisibleToUser(mock.Anything, "testuser").Return([]database.Deploy{}, nil).Once()
 		searchType := 16
 		enabled := true
 		search := &commontypes.SearchLLMConfig{
@@ -575,12 +542,6 @@ func TestOpenAIComponent_GetModelByID(t *testing.T) {
 	})
 
 	t.Run("model found", func(t *testing.T) {
-		user := &database.User{
-			ID:       1,
-			Username: "testuser",
-		}
-		mockUserStore.EXPECT().FindByUsername(mock.Anything, "testuser").
-			Return(*user, nil).Once()
 		mockCache.EXPECT().Exists(mock.Anything, modelCacheKey).
 			Return(1, nil).Once()
 
@@ -625,12 +586,6 @@ func TestOpenAIComponent_GetModelByID(t *testing.T) {
 	})
 
 	t.Run("legacy csg hub model id resolves after cache miss", func(t *testing.T) {
-		user := &database.User{
-			ID:       1,
-			Username: "testuser",
-		}
-		mockUserStore.EXPECT().FindByUsername(mock.Anything, "testuser").
-			Return(*user, nil).Once()
 		mockCache.EXPECT().Exists(mock.Anything, modelCacheKey).
 			Return(1, nil).Once()
 		mockCache.EXPECT().HGet(mock.Anything, modelCacheKey, "hf/model1:svc1").
@@ -655,7 +610,7 @@ func TestOpenAIComponent_GetModelByID(t *testing.T) {
 		}
 		deploys[0].CreatedAt = now
 
-		mockDeployStore.EXPECT().RunningVisibleToUser(mock.Anything, int64(1)).Return(deploys, nil).Once()
+		mockDeployStore.EXPECT().RunningVisibleToUser(mock.Anything, "testuser").Return(deploys, nil).Once()
 		mockLLMConfigStore.EXPECT().IndexWithRepo(mock.Anything, 50, 1, mock.Anything).
 			Return([]*database.LLMConfig{}, 0, nil).Once()
 
@@ -677,18 +632,12 @@ func TestOpenAIComponent_GetModelByID(t *testing.T) {
 	})
 
 	t.Run("formatted external model id can match precomputed key", func(t *testing.T) {
-		user := &database.User{
-			ID:       1,
-			Username: "testuser",
-		}
-		mockUserStore.EXPECT().FindByUsername(mock.Anything, "testuser").
-			Return(*user, nil).Once()
 		mockCache.EXPECT().Exists(mock.Anything, modelCacheKey).
 			Return(1, nil).Once()
 		mockCache.EXPECT().HGet(mock.Anything, modelCacheKey, "test-model-1").
 			Return("", redis.Nil).Once()
 
-		mockDeployStore.EXPECT().RunningVisibleToUser(mock.Anything, int64(1)).
+		mockDeployStore.EXPECT().RunningVisibleToUser(mock.Anything, "testuser").
 			Return([]database.Deploy{}, nil).Once()
 		searchType := 16
 		enabled := true
@@ -855,13 +804,7 @@ func TestOpenAIComponent_ExtGetAvailableModels_Error(t *testing.T) {
 	}
 	mockLLMConfigStore.EXPECT().IndexWithRepo(ctx, 50, 1, search).
 		Return(nil, 0, errors.New("test error")).Once()
-	user := &database.User{
-		ID:       1,
-		Username: "testuser",
-	}
-	mockUserStore.EXPECT().FindByUsername(mock.Anything, "testuser").
-		Return(*user, nil).Once()
-	mockDeployStore.EXPECT().RunningVisibleToUser(mock.Anything, user.ID).
+	mockDeployStore.EXPECT().RunningVisibleToUser(mock.Anything, "testuser").
 		Return([]database.Deploy{}, nil)
 
 	models, err := component.GetAvailableModels(ctx, "testuser")
@@ -901,13 +844,7 @@ func TestOpenAIComponent_ExtGetAvailableModels_SinglePage(t *testing.T) {
 			},
 		},
 	}
-	user := &database.User{
-		ID:       1,
-		Username: "testuser",
-	}
-	mockUserStore.EXPECT().FindByUsername(mock.Anything, "testuser").
-		Return(*user, nil).Once()
-	mockDeployStore.EXPECT().RunningVisibleToUser(mock.Anything, user.ID).
+	mockDeployStore.EXPECT().RunningVisibleToUser(mock.Anything, "testuser").
 		Return([]database.Deploy{}, nil)
 	searchType := 16
 	enabled := true

@@ -19,15 +19,15 @@ type fakeOpenAIComponent struct {
 	model *aigwtypes.Model
 }
 
-func (c *fakeOpenAIComponent) GetAvailableModels(ctx context.Context, user string) ([]aigwtypes.Model, error) {
+func (c *fakeOpenAIComponent) GetAvailableModels(ctx context.Context, nsUUID string) ([]aigwtypes.Model, error) {
 	return nil, nil
 }
 
-func (c *fakeOpenAIComponent) ListModels(ctx context.Context, user string, req aigwtypes.ListModelsReq) (aigwtypes.ModelList, error) {
+func (c *fakeOpenAIComponent) ListModels(ctx context.Context, nsUUID string, req aigwtypes.ListModelsReq) (aigwtypes.ModelList, error) {
 	return aigwtypes.ModelList{}, nil
 }
 
-func (c *fakeOpenAIComponent) GetModelByID(ctx context.Context, username, modelID string) (*aigwtypes.Model, error) {
+func (c *fakeOpenAIComponent) GetModelByID(ctx context.Context, nsUUID, modelID string) (*aigwtypes.Model, error) {
 	return c.model, nil
 }
 

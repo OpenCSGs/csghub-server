@@ -49,7 +49,7 @@ func (p *plannerImpl) Plan(c *gin.Context, meta *types.RequestMetadata) (*types.
 	pl := &types.RequestPlan{}
 
 	// 1. Model Resolution.
-	mt, err := p.modelResolver.ResolveModelTarget(ctx, meta.UserID, meta.Model, meta.Headers, ResolveOptions{
+	mt, err := p.modelResolver.ResolveModelTarget(ctx, meta.TenantID, meta.Model, meta.Headers, ResolveOptions{
 		RequiredUpstreamID: meta.RequiredUpstreamID,
 	})
 	// Enrich metrics with the resolved model target right after resolution,

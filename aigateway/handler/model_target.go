@@ -86,7 +86,7 @@ type modelTargetErrorParams struct {
 type endpointTargetResolveInput struct {
 	Model              *types.Model
 	ModelID            string
-	Username           string
+	NsUUID             string
 	Headers            http.Header
 	TargetReq          *commonType.EndpointReq
 	RequiredUpstreamID int64
@@ -152,12 +152,12 @@ func newServerModelTargetError(code, message string, options modelTargetErrorOpt
 	})
 }
 
-func (h *OpenAIHandlerImpl) resolveModelTarget(ctx context.Context, username, modelID string, headers http.Header) (*resolvedModelTarget, error) {
-	return h.resolveModelTargetWithOptions(ctx, username, modelID, headers, modelTargetResolveOptions{})
+func (h *OpenAIHandlerImpl) resolveModelTarget(ctx context.Context, nsUUID, modelID string, headers http.Header) (*resolvedModelTarget, error) {
+	return h.resolveModelTargetWithOptions(ctx, nsUUID, modelID, headers, modelTargetResolveOptions{})
 }
 
-func (h *OpenAIHandlerImpl) resolveModelTargetWithOptions(ctx context.Context, username, modelID string, headers http.Header, options modelTargetResolveOptions) (*resolvedModelTarget, error) {
-	model, err := h.openaiComponent.GetModelByID(ctx, username, modelID)
+func (h *OpenAIHandlerImpl) resolveModelTargetWithOptions(ctx context.Context, nsUUID, modelID string, headers http.Header, options modelTargetResolveOptions) (*resolvedModelTarget, error) {
+	model, err := h.openaiComponent.GetModelByID(ctx, nsUUID, modelID)
 	if err != nil {
 		return nil, newInternalModelTargetError(err)
 	}
@@ -196,7 +196,7 @@ func (h *OpenAIHandlerImpl) resolveModelTargetWithOptions(ctx context.Context, u
 		result, err := h.resolveEndpointModelTarget(ctx, endpointTargetResolveInput{
 			Model:              model,
 			ModelID:            modelID,
-			Username:           username,
+			NsUUID:             nsUUID,
 			Headers:            headers,
 			TargetReq:          &targetReq,
 			RequiredUpstreamID: options.RequiredUpstreamID,
@@ -252,7 +252,7 @@ func (h *OpenAIHandlerImpl) resolveEndpointModelTarget(
 	ctx context.Context,
 	input endpointTargetResolveInput,
 ) (*endpointTargetResolveResult, error) {
-	sessionKey := extractSessionKeyForModel(input.Model, input.Headers, input.Username)
+	sessionKey := extractSessionKeyForModel(input.Model, input.Headers, input.NsUUID)
 	// normalizedUpstreams filter enable upstream
 	normalizedUpstreams := router.NormalizeEnabledUpstreams(input.Model.Upstreams)
 	// filterAvailableUpstreams filter healthy statues upstream

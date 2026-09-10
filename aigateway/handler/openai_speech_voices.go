@@ -197,7 +197,7 @@ func (h *OpenAIHandlerImpl) resolveVoicesTarget(c *gin.Context, modelID string, 
 	nsUUID := httpbase.GetCurrentNamespaceUUID(c)
 	ctx := c.Request.Context()
 
-	modelTarget, err := h.resolveModelTarget(ctx, username, modelID, c.Request.Header)
+	modelTarget, err := h.resolveModelTarget(ctx, nsUUID, modelID, c.Request.Header)
 	if err != nil {
 		handleModelTargetError(c, ctx, modelID, "failed to get voices target address", err)
 		return nil, false

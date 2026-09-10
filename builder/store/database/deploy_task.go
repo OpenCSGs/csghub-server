@@ -125,7 +125,7 @@ type DeployTaskStore interface {
 	GetRunningDeployByUserUUID(ctx context.Context, userUUID string) ([]Deploy, error)
 	ListAllDeployByUID(ctx context.Context, userID int64) ([]Deploy, error)
 	ListAllDeploys(ctx context.Context, req types.DeployReq, isActive bool) ([]Deploy, int, error)
-	RunningVisibleToUser(ctx context.Context, userID int64) ([]Deploy, error)
+	RunningVisibleToUser(ctx context.Context, nsUUID string) ([]Deploy, error)
 	ListAllRunningDeploys(ctx context.Context) ([]Deploy, error)
 	GetLastTaskByType(ctx context.Context, deployID int64, taskType int) (*DeployTask, error)
 	GetClusterDeploys(ctx context.Context, req types.ClusterDeployReq) ([]Deploy, int, error)
@@ -605,19 +605,23 @@ func (s *deployTaskStoreImpl) ListAllDeployByUID(ctx context.Context, userID int
 	return result, err
 }
 
-func (s *deployTaskStoreImpl) RunningVisibleToUser(ctx context.Context, userID int64) ([]Deploy, error) {
+func (s *deployTaskStoreImpl) RunningVisibleToUser(ctx context.Context, nsUUID string) ([]Deploy, error) {
 	var result []Deploy
-	err := s.db.Operator.Core.NewSelect().
+	q := s.db.Operator.Core.NewSelect().
 		Model(&result).
 		Relation("Repository").
 		Relation("User").
 		// running dedicated and serverless model inference
-		Where("status = ? and type in (?)", common.Running, bun.In([]int64{types.InferenceType, types.ServerlessType})).
-		WhereGroup("AND", func(q *bun.SelectQuery) *bun.SelectQuery {
-			return q.WhereOr("deploy.user_id =?", userID). //user owned
-									WhereOr("secure_level =?", types.EndpointPublic) // other users owned but public
-		}).
-		Scan(ctx)
+		Where("status = ? and type in (?)", common.Running, bun.In([]int64{types.InferenceType, types.ServerlessType}))
+	if strings.TrimSpace(nsUUID) != "" {
+		q = q.WhereGroup("AND", func(q *bun.SelectQuery) *bun.SelectQuery {
+			return q.WhereOr("deploy.user_uuid = ?", nsUUID). // user owned
+										WhereOr("secure_level = ?", types.EndpointPublic) // other users owned but public
+		})
+	} else {
+		q = q.Where("secure_level = ?", types.EndpointPublic)
+	}
+	err := q.Scan(ctx)
 	if errors.Is(err, sql.ErrNoRows) {
 		return []Deploy{}, nil
 	}
