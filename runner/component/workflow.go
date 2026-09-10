@@ -3,6 +3,7 @@ package component
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -22,6 +23,8 @@ import (
 	"github.com/argoproj/argo-workflows/v3/pkg/client/informers/externalversions"
 	internalinterfaces "github.com/argoproj/argo-workflows/v3/pkg/client/informers/externalversions/internalinterfaces"
 	corev1 "k8s.io/api/core/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/cache"
@@ -86,31 +89,48 @@ func (wc *workFlowComponentImpl) CreateWorkflow(ctx context.Context, req types.A
 	}
 	clusterId := cluster.ID
 	argowf := &database.ArgoWorkflow{
-		Username:     req.Username,
-		UserUUID:     req.UserUUID,
-		TaskName:     req.TaskName,
-		TaskId:       req.TaskId,
-		TaskType:     req.TaskType,
-		RepoIds:      req.RepoIds,
-		TaskDesc:     req.TaskDesc,
-		Image:        req.Image,
-		Datasets:     req.Datasets,
-		ResourceId:   req.ResourceId,
-		ResourceName: req.ResourceName,
-		ClusterID:    clusterId,
-		RepoType:     req.RepoType,
-		Namespace:    namespace,
-		Status:       v1alpha1.WorkflowPhase(v1alpha1.NodePending),
+		Username:       req.Username,
+		UserUUID:       req.UserUUID,
+		TaskName:       req.TaskName,
+		TaskId:         req.TaskId,
+		TaskType:       req.TaskType,
+		RepoIds:        req.RepoIds,
+		TaskDesc:       req.TaskDesc,
+		Image:          req.Image,
+		Datasets:       req.Datasets,
+		ResourceId:     req.ResourceId,
+		ResourceName:   req.ResourceName,
+		ClusterID:      clusterId,
+		RepoType:       req.RepoType,
+		Namespace:      namespace,
+		Status:         v1alpha1.WorkflowPhase(v1alpha1.NodePending),
+		StatusUpdateAt: time.Now().UTC(),
 	}
 	if req.TaskType == types.TaskTypeFinetune {
 		argowf.ResultURL = req.Username + "/" + req.FinetunedModelName
 	}
 	// create workflow in argo
-	awf, err := generateWorkflow(req, wc.config)
+	pvcName := ""
+	if req.TaskType == types.TaskTypeFinetune && req.WorkflowVersion >= 2 && cluster.StorageClass != "" {
+		pvcName = utils.SafeName(req.UserUUID)
+		if pvcName == "" {
+			pvcName = utils.SafeName(req.Username)
+		}
+		if err := wc.ensureWorkflowPVC(ctx, cluster, namespace, pvcName, req); err != nil {
+			return nil, fmt.Errorf("failed to prepare finetune workflow storage: %w", err)
+		}
+	}
+	awf, err := generateWorkflow(req, wc.config, pvcName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate workflow: %v", err)
 	}
 	wc.setLabels(argowf, awf)
+	if req.TaskType == types.TaskTypeFinetune && req.WorkflowVersion >= 2 && pvcName != "" {
+		argowf.DagTasks = finetuneStageStatusesJSON(awf)
+	} else if req.TaskType == types.TaskTypeFinetune && req.WorkflowVersion >= 2 {
+		slog.WarnContext(ctx, "falling back to legacy finetune workflow because shared storage is unavailable",
+			slog.String("cluster_id", clusterId), slog.String("task_id", req.TaskId))
+	}
 	slog.InfoContext(ctx, "create workflow in runner",
 		slog.Any("namespace", namespace),
 		slog.Any("awf", awf),
@@ -146,6 +166,52 @@ func (wc *workFlowComponentImpl) CreateWorkflow(ctx context.Context, req types.A
 		},
 	})
 	return wf, nil
+}
+
+func (wc *workFlowComponentImpl) ensureWorkflowPVC(
+	ctx context.Context,
+	cluster *cluster.Cluster,
+	namespace string,
+	pvcName string,
+	req types.ArgoWorkFlowReq,
+) error {
+	if pvcName == "" {
+		return errors.New("workflow PVC name is empty")
+	}
+	_, err := cluster.Client.CoreV1().PersistentVolumeClaims(namespace).Get(ctx, pvcName, v1.GetOptions{})
+	if err == nil {
+		return nil
+	}
+	if !k8serrors.IsNotFound(err) {
+		return fmt.Errorf("get PVC %s: %w", pvcName, err)
+	}
+
+	storageSize := "50Gi"
+	for _, template := range req.Templates {
+		if template.Name == "finetune-train" && template.HardWare.EphemeralStorage != "" {
+			storageSize = template.HardWare.EphemeralStorage
+			break
+		}
+	}
+	storage, err := resource.ParseQuantity(storageSize)
+	if err != nil {
+		return fmt.Errorf("parse PVC size %s: %w", storageSize, err)
+	}
+	pvc := &corev1.PersistentVolumeClaim{
+		ObjectMeta: v1.ObjectMeta{Name: pvcName, Namespace: namespace},
+		Spec: corev1.PersistentVolumeClaimSpec{
+			AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteMany},
+			Resources: corev1.VolumeResourceRequirements{
+				Requests: corev1.ResourceList{corev1.ResourceStorage: storage},
+			},
+			StorageClassName: &cluster.StorageClass,
+		},
+	}
+	_, err = cluster.Client.CoreV1().PersistentVolumeClaims(namespace).Create(ctx, pvc, v1.CreateOptions{})
+	if k8serrors.IsAlreadyExists(err) {
+		return nil
+	}
+	return err
 }
 
 func (wc *workFlowComponentImpl) DeleteWorkflow(ctx context.Context, req *types.ArgoWorkFlowDeleteReq) error {
@@ -229,6 +295,10 @@ func (wc *workFlowComponentImpl) UpdateWorkflow(ctx context.Context, update *v1a
 			oldwf.ClusterNode = pod.Spec.NodeName
 		}
 	}
+	if oldwf.TaskType == types.TaskTypeFinetune && update.Annotations["WorkflowVersion"] != "" {
+		oldwf.DagTasks = finetuneStageStatusesJSON(update)
+	}
+	oldwf.StatusUpdateAt = time.Now().UTC()
 
 	slog.InfoContext(ctx, "UpdateWorkflow-report", slog.Any("name", oldwf.TaskId), slog.Any("result-url", oldwf.ResultURL))
 	wc.addKServiceWithEvent(ctx, types.RunnerWorkflowChange, oldwf)
@@ -250,6 +320,7 @@ func (wc *workFlowComponentImpl) DeleteWorkflowInargo(ctx context.Context, delet
 	if wf.Status == v1alpha1.WorkflowPending || wf.Status == v1alpha1.WorkflowRunning {
 		wf.Status = v1alpha1.WorkflowFailed
 		wf.Reason = "deleted by system, please check if your required resources are sufficient or if your account has enough credit"
+		wf.StatusUpdateAt = time.Now().UTC()
 		slog.InfoContext(ctx, "DeleteWorkflowInargo-report", slog.Any("name", wf.TaskId), slog.Any("result-url", wf.ResultURL))
 		_, err = wc.wf.UpdateWorkFlow(ctx, *wf)
 		if err != nil {
@@ -271,17 +342,33 @@ func (wc *workFlowComponentImpl) FindWorkFlows(ctx context.Context, username str
 }
 
 // create workflow in argo
-func generateWorkflow(req types.ArgoWorkFlowReq, config *config.Config) (*v1alpha1.Workflow, error) {
+func generateWorkflow(req types.ArgoWorkFlowReq, config *config.Config, pvcName string) (*v1alpha1.Workflow, error) {
 	applier := sched.NewApplier(req.Scheduler)
 	templates := []v1alpha1.Template{}
 	for _, v := range req.Templates {
+		if req.TaskType == types.TaskTypeFinetune && req.WorkflowVersion >= 2 {
+			if pvcName != "" && v.Name == "finetune" {
+				continue
+			}
+			if pvcName == "" && v.Name != "finetune" {
+				continue
+			}
+		}
 		deployExt := types.DeployExtend{
 			NodeAffinity: req.NodeAffinity,
 			Tolerations:  req.Tolerations,
 		}
+		nodes := req.Nodes
+		if req.WorkflowVersion >= 2 && (v.Name == "finetune-download" || v.Name == "finetune-upload") {
+			// Match the multi-node nginx workaround: transfer pods keep tolerations
+			// so they can run on tainted clusters, but do not inherit accelerator
+			// node affinity or selectors.
+			deployExt.NodeAffinity = nil
+			nodes = nil
+		}
 		genRes := common.GenerateResources(rtypes.ResourceGeneratorParams{
 			Hardware:  v.HardWare,
-			Nodes:     req.Nodes,
+			Nodes:     nodes,
 			DeployExt: deployExt,
 			Config:    config,
 		})
@@ -344,6 +431,11 @@ func generateWorkflow(req types.ArgoWorkFlowReq, config *config.Config) (*v1alph
 				NodeAffinity: nodeAffinity,
 			},
 		}
+		if pvcName != "" {
+			temp.Container.VolumeMounts = []corev1.VolumeMount{
+				{Name: "workspace", MountPath: "/workspace"},
+			}
+		}
 
 		// merge node affinity
 		utils.FillAffinity(&temp.Affinity, nodeAffinity)
@@ -373,9 +465,47 @@ func generateWorkflow(req types.ArgoWorkFlowReq, config *config.Config) (*v1alph
 		templates = append(templates, temp)
 	}
 
+	if req.TaskType == types.TaskTypeFinetune && req.WorkflowVersion >= 2 && pvcName != "" {
+		templates = append(templates, v1alpha1.Template{
+			Name: req.Entrypoint,
+			DAG: &v1alpha1.DAGTemplate{
+				Tasks: []v1alpha1.DAGTask{
+					{Name: "download", Template: "finetune-download"},
+					{Name: "train", Template: "finetune-train", Dependencies: []string{"download"}},
+					{Name: "upload", Template: "finetune-upload", Dependencies: []string{"train"}},
+				},
+			},
+		})
+	}
+
+	volumes := []corev1.Volume{}
+	if pvcName != "" {
+		volumes = append(volumes, corev1.Volume{
+			Name: "workspace",
+			VolumeSource: corev1.VolumeSource{
+				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+					ClaimName: pvcName,
+				},
+			},
+		})
+	}
+	entrypoint := req.Entrypoint
+	if req.TaskType == types.TaskTypeFinetune && req.WorkflowVersion >= 2 && pvcName == "" {
+		entrypoint = "finetune"
+	}
+	workflowAnnotations := map[string]string{}
+	if req.TaskType == types.TaskTypeFinetune && req.WorkflowVersion >= 2 {
+		workflowAnnotations["FinetuneWorkflowMode"] = "legacy-fallback"
+		if pvcName != "" {
+			workflowAnnotations["FinetuneWorkflowMode"] = "staged"
+			workflowAnnotations["WorkflowVersion"] = strconv.Itoa(req.WorkflowVersion)
+		}
+	}
+
 	workflowObject := &v1alpha1.Workflow{
 		ObjectMeta: v1.ObjectMeta{
-			Name: req.TaskId,
+			Name:        req.TaskId,
+			Annotations: workflowAnnotations,
 			Labels: map[string]string{
 				"workflow-scope": "csghub",
 			},
@@ -384,7 +514,8 @@ func generateWorkflow(req types.ArgoWorkFlowReq, config *config.Config) (*v1alph
 			Priority:           ptr.To(int32(3)),
 			ServiceAccountName: config.Argo.ServiceAccountName,
 			Templates:          templates,
-			Entrypoint:         req.Entrypoint,
+			Entrypoint:         entrypoint,
+			Volumes:            volumes,
 			TTLStrategy: &v1alpha1.TTLStrategy{
 				// Set TTL here
 				SecondsAfterCompletion: ptr.To(int32(config.Argo.JobTTL)),
@@ -460,7 +591,10 @@ func (wc *workFlowComponentImpl) RunArgoInformer(stopCh <-chan struct{}, namespa
 			if newWF.Status.Nodes == nil || oldWF.Status.Nodes == nil {
 				return
 			}
-			if oldWF.Status.Nodes[oldWF.Name].Phase != newWF.Status.Nodes[oldWF.Name].Phase {
+			rootPhaseChanged := oldWF.Status.Nodes[oldWF.Name].Phase != newWF.Status.Nodes[oldWF.Name].Phase
+			stageStatusesChanged := newWF.Annotations["WorkflowVersion"] != "" &&
+				finetuneStageStatusesJSON(oldWF) != finetuneStageStatusesJSON(newWF)
+			if rootPhaseChanged || stageStatusesChanged {
 				_, err := wc.UpdateWorkflow(bg, newWF, cluster)
 				if err != nil {
 					slog.Error("fail to update workflow", slog.Any("error", err), slog.Any("job id", newWF.Name))
@@ -578,8 +712,47 @@ func (wc *workFlowComponentImpl) getWorkflowFromLabels(ctx context.Context, awf 
 	}
 
 	wf.Status = awf.Status.Phase
+	wf.StatusUpdateAt = time.Now().UTC()
+	if wf.TaskType == types.TaskTypeFinetune && annotations["WorkflowVersion"] != "" {
+		wf.DagTasks = finetuneStageStatusesJSON(awf)
+	}
 
 	return wf
+}
+
+func finetuneStageStatusesJSON(awf *v1alpha1.Workflow) string {
+	statuses := make(types.WorkflowStageStatuses)
+	for _, template := range awf.Spec.Templates {
+		if template.Container == nil {
+			continue
+		}
+		statuses[template.Name] = types.WorkflowStageStatus{
+			Phase:    v1alpha1.NodePending,
+			Billable: templateRequestsAccelerator(template),
+		}
+	}
+	for _, node := range awf.Status.Nodes {
+		status, ok := statuses[node.TemplateName]
+		if !ok {
+			continue
+		}
+		status.Phase = node.Phase
+		statuses[node.TemplateName] = status
+	}
+	data, err := json.Marshal(statuses)
+	if err != nil {
+		return ""
+	}
+	return string(data)
+}
+
+func templateRequestsAccelerator(template v1alpha1.Template) bool {
+	for name, quantity := range template.Container.Resources.Requests {
+		if strings.Contains(string(name), "/") && quantity.Sign() > 0 {
+			return true
+		}
+	}
+	return false
 }
 
 func (wc *workFlowComponentImpl) addKServiceWithEvent(ctx context.Context, eventType types.WebHookEventType, wf *database.ArgoWorkflow) {
@@ -594,12 +767,10 @@ func (wc *workFlowComponentImpl) addKServiceWithEvent(ctx context.Context, event
 	}
 	slog.Info("report-workflow-event", slog.Any("event-type", eventType), slog.Any("name", wf.TaskId),
 		slog.Any("status", wf.Status), slog.Any("result-url", wf.ResultURL))
-	go func() {
-		err := common.Push(wc.config.Runner.WebHookEndpoint, wc.config.APIToken, event)
-		if err != nil {
-			slog.Error("failed to push workflow service status event", slog.Any("error", err))
-		}
-	}()
+	err := common.Push(wc.config.Runner.WebHookEndpoint, wc.config.APIToken, event)
+	if err != nil {
+		slog.Error("failed to push workflow service status event", slog.Any("error", err))
+	}
 }
 
 func (s *workFlowComponentImpl) reportWorFlowLog(msg string, wf *database.ArgoWorkflow) {

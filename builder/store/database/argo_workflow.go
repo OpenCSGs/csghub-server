@@ -164,7 +164,11 @@ func (s *argoWorkFlowStoreImpl) UpdateWorkFlow(ctx context.Context, workFlow Arg
 
 // UpdateWorkFlowByTaskID
 func (s *argoWorkFlowStoreImpl) UpdateWorkFlowByTaskID(ctx context.Context, workFlow ArgoWorkflow) (*ArgoWorkflow, error) {
-	_, err := s.db.Core.NewUpdate().Model(&workFlow).Where("task_id = ?", workFlow.TaskId).Exec(ctx)
+	query := s.db.Core.NewUpdate().Model(&workFlow).Where("task_id = ?", workFlow.TaskId)
+	if !workFlow.StatusUpdateAt.IsZero() {
+		query = query.Where("status_update_at <= ?", workFlow.StatusUpdateAt)
+	}
+	_, err := query.Exec(ctx)
 	return &workFlow, err
 }
 

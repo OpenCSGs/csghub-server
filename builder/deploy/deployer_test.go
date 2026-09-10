@@ -982,6 +982,42 @@ func TestDeployer_SubmitFinetune(t *testing.T) {
 	require.Equal(t, &types.ArgoWorkFlowRes{ID: 1}, resp)
 }
 
+func TestDeployer_SubmitFinetuneV2(t *testing.T) {
+	tester := newTestDeployer(t)
+	ctx := context.TODO()
+
+	tester.mocks.stores.ClusterInfoMock().EXPECT().ByClusterID(ctx, "").Return(database.ClusterInfo{}, nil)
+	tester.mocks.runner.EXPECT().SubmitFinetuneJob(ctx, mock.Anything).RunAndReturn(
+		func(_ context.Context, req *types.ArgoWorkFlowReq) (*types.ArgoWorkFlowRes, error) {
+			require.Equal(t, 2, req.WorkflowVersion)
+			require.Equal(t, "finetune-v2", req.Entrypoint)
+			require.Len(t, req.Templates, 4)
+			require.Equal(t, "finetune-download", req.Templates[1].Name)
+			require.Empty(t, req.Templates[1].HardWare.Gpu.Num)
+			require.Equal(t, "finetune-train", req.Templates[2].Name)
+			require.Equal(t, "1", req.Templates[2].HardWare.Gpu.Num)
+			require.Equal(t, "finetune-upload", req.Templates[3].Name)
+			require.Empty(t, req.Templates[3].HardWare.Gpu.Num)
+			require.Equal(t, "true", req.Templates[3].Env["KEEP_FINETUNE_WORK_DIR"])
+			return &types.ArgoWorkFlowRes{ID: 2}, nil
+		},
+	)
+
+	resp, err := tester.SubmitFinetuneJob(ctx, types.FinetuneReq{
+		WorkflowVersion: 2,
+		ModelId:         "org/model",
+		DatasetId:       "org/dataset",
+		KeepWorkDir:     true,
+		Hardware: types.HardWare{
+			Gpu:    types.Processor{Num: "1", ResourceName: "nvidia.com/gpu"},
+			Cpu:    types.CPU{Num: "4"},
+			Memory: "32Gi",
+		},
+	})
+	require.NoError(t, err)
+	require.Equal(t, int64(2), resp.ID)
+}
+
 func TestDeployer_DeleteFinetune(t *testing.T) {
 	tester := newTestDeployer(t)
 	ctx := context.TODO()

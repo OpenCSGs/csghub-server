@@ -640,6 +640,7 @@ func createEvaluationRoutes(apiGroup *gin.RouterGroup, middlewareCollection midd
 }
 
 func createFinetuneRoutes(apiGroup *gin.RouterGroup, middlewareCollection middleware.MiddlewareCollection, finetuneJobHandler *handler.FinetuneHandler) {
+	apiGroup.POST("/finetuneV2", middlewareCollection.Auth.NeedLogin, finetuneJobHandler.RunFinetuneJobV2)
 	ftGroup := apiGroup.Group("/finetunes")
 	ftGroup.Use(middlewareCollection.Auth.NeedLogin)
 	{

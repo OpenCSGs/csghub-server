@@ -36,6 +36,7 @@ func (c *FinetuneReq) GetSensitiveFields() []SensitiveField {
 type FinetuneReq struct {
 	Username         string   `json:"-"`
 	Namespace        string   `json:"namespace,omitempty"`
+	WorkflowVersion  int      `json:"-"`
 	Token            string   `json:"-"`
 	Hardware         HardWare `json:"-"`
 	UserUUID         string   `json:"-"`
@@ -60,6 +61,7 @@ type FinetuneReq struct {
 	CustomeArgs        string  `json:"custom_args"`
 	SwiftCommand       string  `json:"swift_command,omitempty"`
 	Agent              string  `json:"agent,omitempty"`
+	KeepWorkDir        bool    `json:"keep_work_dir,omitempty"`
 	Nodes              []Node  `json:"-"`
 
 	DeployExtend
