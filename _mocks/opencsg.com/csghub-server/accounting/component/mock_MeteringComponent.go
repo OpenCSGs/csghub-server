@@ -206,6 +206,63 @@ func (_c *MockMeteringComponent_GetMeteringStatByDate_Call) RunAndReturn(run fun
 	return _c
 }
 
+// GetStatisticsSummary provides a mock function with given fields: ctx, req
+func (_m *MockMeteringComponent) GetStatisticsSummary(ctx context.Context, req types.AcctBillsReq) (database.AccountStatisticsSummaryRes, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetStatisticsSummary")
+	}
+
+	var r0 database.AccountStatisticsSummaryRes
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.AcctBillsReq) (database.AccountStatisticsSummaryRes, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.AcctBillsReq) database.AccountStatisticsSummaryRes); ok {
+		r0 = rf(ctx, req)
+	} else {
+		r0 = ret.Get(0).(database.AccountStatisticsSummaryRes)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.AcctBillsReq) error); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockMeteringComponent_GetStatisticsSummary_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetStatisticsSummary'
+type MockMeteringComponent_GetStatisticsSummary_Call struct {
+	*mock.Call
+}
+
+// GetStatisticsSummary is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req types.AcctBillsReq
+func (_e *MockMeteringComponent_Expecter) GetStatisticsSummary(ctx interface{}, req interface{}) *MockMeteringComponent_GetStatisticsSummary_Call {
+	return &MockMeteringComponent_GetStatisticsSummary_Call{Call: _e.mock.On("GetStatisticsSummary", ctx, req)}
+}
+
+func (_c *MockMeteringComponent_GetStatisticsSummary_Call) Run(run func(ctx context.Context, req types.AcctBillsReq)) *MockMeteringComponent_GetStatisticsSummary_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.AcctBillsReq))
+	})
+	return _c
+}
+
+func (_c *MockMeteringComponent_GetStatisticsSummary_Call) Return(_a0 database.AccountStatisticsSummaryRes, _a1 error) *MockMeteringComponent_GetStatisticsSummary_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockMeteringComponent_GetStatisticsSummary_Call) RunAndReturn(run func(context.Context, types.AcctBillsReq) (database.AccountStatisticsSummaryRes, error)) *MockMeteringComponent_GetStatisticsSummary_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ListMeteringByUserIDAndDate provides a mock function with given fields: ctx, req
 func (_m *MockMeteringComponent) ListMeteringByUserIDAndDate(ctx context.Context, req types.ActStatementsReq) ([]database.AccountMetering, int, error) {
 	ret := _m.Called(ctx, req)
@@ -272,17 +329,131 @@ func (_c *MockMeteringComponent_ListMeteringByUserIDAndDate_Call) RunAndReturn(r
 	return _c
 }
 
-// SaveMeteringEventRecord provides a mock function with given fields: ctx, req
-func (_m *MockMeteringComponent) SaveMeteringEventRecord(ctx context.Context, req *types.MeteringEvent) error {
+// ListStatisticsByUserIDAndDate provides a mock function with given fields: ctx, req
+func (_m *MockMeteringComponent) ListStatisticsByUserIDAndDate(ctx context.Context, req types.AcctBillsReq) (database.AccountStatisticsRes, error) {
 	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListStatisticsByUserIDAndDate")
+	}
+
+	var r0 database.AccountStatisticsRes
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.AcctBillsReq) (database.AccountStatisticsRes, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.AcctBillsReq) database.AccountStatisticsRes); ok {
+		r0 = rf(ctx, req)
+	} else {
+		r0 = ret.Get(0).(database.AccountStatisticsRes)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.AcctBillsReq) error); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockMeteringComponent_ListStatisticsByUserIDAndDate_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListStatisticsByUserIDAndDate'
+type MockMeteringComponent_ListStatisticsByUserIDAndDate_Call struct {
+	*mock.Call
+}
+
+// ListStatisticsByUserIDAndDate is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req types.AcctBillsReq
+func (_e *MockMeteringComponent_Expecter) ListStatisticsByUserIDAndDate(ctx interface{}, req interface{}) *MockMeteringComponent_ListStatisticsByUserIDAndDate_Call {
+	return &MockMeteringComponent_ListStatisticsByUserIDAndDate_Call{Call: _e.mock.On("ListStatisticsByUserIDAndDate", ctx, req)}
+}
+
+func (_c *MockMeteringComponent_ListStatisticsByUserIDAndDate_Call) Run(run func(ctx context.Context, req types.AcctBillsReq)) *MockMeteringComponent_ListStatisticsByUserIDAndDate_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.AcctBillsReq))
+	})
+	return _c
+}
+
+func (_c *MockMeteringComponent_ListStatisticsByUserIDAndDate_Call) Return(_a0 database.AccountStatisticsRes, _a1 error) *MockMeteringComponent_ListStatisticsByUserIDAndDate_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockMeteringComponent_ListStatisticsByUserIDAndDate_Call) RunAndReturn(run func(context.Context, types.AcctBillsReq) (database.AccountStatisticsRes, error)) *MockMeteringComponent_ListStatisticsByUserIDAndDate_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ListStatisticsDetailByUserID provides a mock function with given fields: ctx, req
+func (_m *MockMeteringComponent) ListStatisticsDetailByUserID(ctx context.Context, req types.AcctBillsDetailReq) (database.AccountStatisticsDetailRes, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListStatisticsDetailByUserID")
+	}
+
+	var r0 database.AccountStatisticsDetailRes
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.AcctBillsDetailReq) (database.AccountStatisticsDetailRes, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.AcctBillsDetailReq) database.AccountStatisticsDetailRes); ok {
+		r0 = rf(ctx, req)
+	} else {
+		r0 = ret.Get(0).(database.AccountStatisticsDetailRes)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.AcctBillsDetailReq) error); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockMeteringComponent_ListStatisticsDetailByUserID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListStatisticsDetailByUserID'
+type MockMeteringComponent_ListStatisticsDetailByUserID_Call struct {
+	*mock.Call
+}
+
+// ListStatisticsDetailByUserID is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req types.AcctBillsDetailReq
+func (_e *MockMeteringComponent_Expecter) ListStatisticsDetailByUserID(ctx interface{}, req interface{}) *MockMeteringComponent_ListStatisticsDetailByUserID_Call {
+	return &MockMeteringComponent_ListStatisticsDetailByUserID_Call{Call: _e.mock.On("ListStatisticsDetailByUserID", ctx, req)}
+}
+
+func (_c *MockMeteringComponent_ListStatisticsDetailByUserID_Call) Run(run func(ctx context.Context, req types.AcctBillsDetailReq)) *MockMeteringComponent_ListStatisticsDetailByUserID_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.AcctBillsDetailReq))
+	})
+	return _c
+}
+
+func (_c *MockMeteringComponent_ListStatisticsDetailByUserID_Call) Return(_a0 database.AccountStatisticsDetailRes, _a1 error) *MockMeteringComponent_ListStatisticsDetailByUserID_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockMeteringComponent_ListStatisticsDetailByUserID_Call) RunAndReturn(run func(context.Context, types.AcctBillsDetailReq) (database.AccountStatisticsDetailRes, error)) *MockMeteringComponent_ListStatisticsDetailByUserID_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// SaveMeteringEventRecord provides a mock function with given fields: ctx, req, extra
+func (_m *MockMeteringComponent) SaveMeteringEventRecord(ctx context.Context, req *types.MeteringEvent, extra types.MeteringExtra) error {
+	ret := _m.Called(ctx, req, extra)
 
 	if len(ret) == 0 {
 		panic("no return value specified for SaveMeteringEventRecord")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, *types.MeteringEvent) error); ok {
-		r0 = rf(ctx, req)
+	if rf, ok := ret.Get(0).(func(context.Context, *types.MeteringEvent, types.MeteringExtra) error); ok {
+		r0 = rf(ctx, req, extra)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -298,13 +469,14 @@ type MockMeteringComponent_SaveMeteringEventRecord_Call struct {
 // SaveMeteringEventRecord is a helper method to define mock.On call
 //   - ctx context.Context
 //   - req *types.MeteringEvent
-func (_e *MockMeteringComponent_Expecter) SaveMeteringEventRecord(ctx interface{}, req interface{}) *MockMeteringComponent_SaveMeteringEventRecord_Call {
-	return &MockMeteringComponent_SaveMeteringEventRecord_Call{Call: _e.mock.On("SaveMeteringEventRecord", ctx, req)}
+//   - extra types.MeteringExtra
+func (_e *MockMeteringComponent_Expecter) SaveMeteringEventRecord(ctx interface{}, req interface{}, extra interface{}) *MockMeteringComponent_SaveMeteringEventRecord_Call {
+	return &MockMeteringComponent_SaveMeteringEventRecord_Call{Call: _e.mock.On("SaveMeteringEventRecord", ctx, req, extra)}
 }
 
-func (_c *MockMeteringComponent_SaveMeteringEventRecord_Call) Run(run func(ctx context.Context, req *types.MeteringEvent)) *MockMeteringComponent_SaveMeteringEventRecord_Call {
+func (_c *MockMeteringComponent_SaveMeteringEventRecord_Call) Run(run func(ctx context.Context, req *types.MeteringEvent, extra types.MeteringExtra)) *MockMeteringComponent_SaveMeteringEventRecord_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(*types.MeteringEvent))
+		run(args[0].(context.Context), args[1].(*types.MeteringEvent), args[2].(types.MeteringExtra))
 	})
 	return _c
 }
@@ -314,7 +486,7 @@ func (_c *MockMeteringComponent_SaveMeteringEventRecord_Call) Return(_a0 error) 
 	return _c
 }
 
-func (_c *MockMeteringComponent_SaveMeteringEventRecord_Call) RunAndReturn(run func(context.Context, *types.MeteringEvent) error) *MockMeteringComponent_SaveMeteringEventRecord_Call {
+func (_c *MockMeteringComponent_SaveMeteringEventRecord_Call) RunAndReturn(run func(context.Context, *types.MeteringEvent, types.MeteringExtra) error) *MockMeteringComponent_SaveMeteringEventRecord_Call {
 	_c.Call.Return(run)
 	return _c
 }

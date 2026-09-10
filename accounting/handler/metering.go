@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"log/slog"
 
 	"github.com/gin-gonic/gin"
@@ -101,4 +102,133 @@ func (mh *MeteringHandler) QueryMeteringStatByDate(ctx *gin.Context) {
 		return
 	}
 	httpbase.OK(ctx, res)
+}
+
+func (mh *MeteringHandler) QueryStatisticsByUserID(ctx *gin.Context) {
+	per, page, err := common.GetPerAndPageFromContext(ctx)
+	if err != nil {
+		httpbase.BadRequestWithExt(ctx, err)
+		return
+	}
+	scene, err := utils.GetSceneFromContext(ctx)
+	if err != nil {
+		httpbase.BadRequestWithExt(ctx, err)
+		return
+	}
+	userUUID := ctx.Param("id")
+	instanceName := ctx.Query("instance_name")
+	startDate := ctx.Query("start_date") // format: '2024-06-12'
+	endDate := ctx.Query("end_date")     // format: '2024-06-12'
+	if len(startDate) < 1 || len(endDate) < 1 || len(userUUID) < 1 {
+		httpbase.BadRequestWithExt(ctx, errors.New("bad data format"))
+		return
+	}
+
+	if !utils.ValidateDateTimeFormat(startDate, "2006-01-02") || !utils.ValidateDateTimeFormat(endDate, "2006-01-02") {
+		httpbase.BadRequestWithExt(ctx, errors.New("bad data format"))
+		return
+	}
+
+	req := types.AcctBillsReq{
+		TargetUUID:   userUUID,
+		Scene:        types.SceneType(scene),
+		StartDate:    startDate,
+		EndDate:      endDate,
+		Per:          per,
+		Page:         page,
+		InstanceName: instanceName,
+	}
+
+	respData, err := mh.amc.ListStatisticsByUserIDAndDate(ctx, req)
+	if err != nil {
+		slog.ErrorContext(ctx, "failed to query statistics by user",
+			slog.Any("userUUID", userUUID),
+			slog.Any("start_date", startDate),
+			slog.Any("end_date", endDate),
+			slog.Any("scene", scene),
+			slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	httpbase.OK(ctx, respData)
+}
+
+func (mh *MeteringHandler) QueryStatisticsDetailByUserID(ctx *gin.Context) {
+	per, page, err := common.GetPerAndPageFromContext(ctx)
+	if err != nil {
+		httpbase.BadRequestWithExt(ctx, err)
+		return
+	}
+	scene, err := utils.GetSceneFromContext(ctx)
+	if err != nil {
+		httpbase.BadRequestWithExt(ctx, err)
+		return
+	}
+
+	targetUUID := ctx.Param("id")
+	instanceName := ctx.Query("instance_name")
+	startDate := ctx.Query("start_date")
+	endDate := ctx.Query("end_date")
+	if len(startDate) < 1 || len(endDate) < 1 || len(targetUUID) < 1 {
+		httpbase.BadRequestWithExt(ctx, errors.New("bad data format"))
+		return
+	}
+
+	if !utils.ValidateDateTimeFormat(startDate, "2006-01-02") || !utils.ValidateDateTimeFormat(endDate, "2006-01-02") {
+		httpbase.BadRequestWithExt(ctx, errors.New("bad data format"))
+		return
+	}
+	req := types.AcctBillsDetailReq{
+		TargetUUID:   targetUUID,
+		Scene:        scene,
+		StartDate:    startDate,
+		EndDate:      endDate,
+		InstanceName: instanceName,
+		Per:          per,
+		Page:         page,
+	}
+
+	respData, err := mh.amc.ListStatisticsDetailByUserID(ctx, req)
+	if err != nil {
+		slog.ErrorContext(ctx, "failed to query statistics detail by user", slog.Any("req", req), slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	httpbase.OK(ctx, respData)
+}
+
+func (mh *MeteringHandler) QueryStatisticsSummary(ctx *gin.Context) {
+	scene, _ := utils.GetSceneFromContext(ctx)
+	userUUID := ctx.Param("id")
+	startDate := ctx.Query("start_date")
+	endDate := ctx.Query("end_date")
+	if len(startDate) < 1 || len(endDate) < 1 || len(userUUID) < 1 {
+		httpbase.BadRequestWithExt(ctx, errors.New("bad data format"))
+		return
+	}
+
+	if !utils.ValidateDateTimeFormat(startDate, "2006-01-02") || !utils.ValidateDateTimeFormat(endDate, "2006-01-02") {
+		httpbase.BadRequestWithExt(ctx, errors.New("bad data format"))
+		return
+	}
+
+	req := types.AcctBillsReq{
+		TargetUUID: userUUID,
+		Scene:      types.SceneType(scene),
+		StartDate:  startDate,
+		EndDate:    endDate,
+	}
+
+	respData, err := mh.amc.GetStatisticsSummary(ctx, req)
+	if err != nil {
+		slog.ErrorContext(ctx, "failed to query statistics summary",
+			slog.Any("userUUID", userUUID),
+			slog.Any("start_date", startDate),
+			slog.Any("end_date", endDate),
+			slog.Any("scene", scene),
+			slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	httpbase.OK(ctx, respData)
 }

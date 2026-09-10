@@ -28,17 +28,17 @@ func (_m *MockAccountMeteringStore) EXPECT() *MockAccountMeteringStore_Expecter 
 	return &MockAccountMeteringStore_Expecter{mock: &_m.Mock}
 }
 
-// Create provides a mock function with given fields: ctx, input
-func (_m *MockAccountMeteringStore) Create(ctx context.Context, input database.AccountMetering) error {
-	ret := _m.Called(ctx, input)
+// Create provides a mock function with given fields: ctx, input, extra
+func (_m *MockAccountMeteringStore) Create(ctx context.Context, input database.AccountMetering, extra types.MeteringExtra) error {
+	ret := _m.Called(ctx, input, extra)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Create")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, database.AccountMetering) error); ok {
-		r0 = rf(ctx, input)
+	if rf, ok := ret.Get(0).(func(context.Context, database.AccountMetering, types.MeteringExtra) error); ok {
+		r0 = rf(ctx, input, extra)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -54,13 +54,14 @@ type MockAccountMeteringStore_Create_Call struct {
 // Create is a helper method to define mock.On call
 //   - ctx context.Context
 //   - input database.AccountMetering
-func (_e *MockAccountMeteringStore_Expecter) Create(ctx interface{}, input interface{}) *MockAccountMeteringStore_Create_Call {
-	return &MockAccountMeteringStore_Create_Call{Call: _e.mock.On("Create", ctx, input)}
+//   - extra types.MeteringExtra
+func (_e *MockAccountMeteringStore_Expecter) Create(ctx interface{}, input interface{}, extra interface{}) *MockAccountMeteringStore_Create_Call {
+	return &MockAccountMeteringStore_Create_Call{Call: _e.mock.On("Create", ctx, input, extra)}
 }
 
-func (_c *MockAccountMeteringStore_Create_Call) Run(run func(ctx context.Context, input database.AccountMetering)) *MockAccountMeteringStore_Create_Call {
+func (_c *MockAccountMeteringStore_Create_Call) Run(run func(ctx context.Context, input database.AccountMetering, extra types.MeteringExtra)) *MockAccountMeteringStore_Create_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(database.AccountMetering))
+		run(args[0].(context.Context), args[1].(database.AccountMetering), args[2].(types.MeteringExtra))
 	})
 	return _c
 }
@@ -70,7 +71,7 @@ func (_c *MockAccountMeteringStore_Create_Call) Return(_a0 error) *MockAccountMe
 	return _c
 }
 
-func (_c *MockAccountMeteringStore_Create_Call) RunAndReturn(run func(context.Context, database.AccountMetering) error) *MockAccountMeteringStore_Create_Call {
+func (_c *MockAccountMeteringStore_Create_Call) RunAndReturn(run func(context.Context, database.AccountMetering, types.MeteringExtra) error) *MockAccountMeteringStore_Create_Call {
 	_c.Call.Return(run)
 	return _c
 }

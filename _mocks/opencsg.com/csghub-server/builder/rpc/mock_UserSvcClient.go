@@ -5,9 +5,8 @@ package rpc
 import (
 	context "context"
 
-	database "opencsg.com/csghub-server/builder/store/database"
-
 	mock "github.com/stretchr/testify/mock"
+	database "opencsg.com/csghub-server/builder/store/database"
 
 	rpc "opencsg.com/csghub-server/builder/rpc"
 

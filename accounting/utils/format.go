@@ -60,3 +60,15 @@ func ConvertDateRangeToGlobalTimeZone(start, end, layout string) (string, string
 	e = time.Date(e.Year(), e.Month(), e.Day()+1, 0, 0, 0, 0, e.Location())
 	return s.Format(timeLayoutWithOffset), e.Format(timeLayoutWithOffset), nil
 }
+
+// eventDateInLocalTZ converts the event time to the configured timezone and
+// extracts the date portion as a UTC zero-point time. This is necessary because
+// PostgreSQL's `date` type strips timezone info during serialization (pgx converts
+// to UTC first), which would yield the wrong calendar date for times between
+// midnight and the UTC+8 offset (e.g. 00:00–07:59 CST becomes the previous day
+// in UTC). By re-constructing the date in UTC we ensure the stored date matches
+// the intended local-calendar date.
+func EventDateInLocalTZ(t time.Time) time.Time {
+	local := t.In(config.GetGlobalTimeZone())
+	return time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, time.UTC)
+}

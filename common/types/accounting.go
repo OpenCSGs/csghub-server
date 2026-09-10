@@ -398,13 +398,26 @@ type MeteringEvent struct {
 	UserUUID     string          `json:"user_uuid"`  // user uuid
 	Value        int64           `json:"value"`      // time duration in minutes or token number
 	ValueType    ChargeValueType `json:"value_type"` // 0: duration, 1: token
-	Scene        int             `json:"scene"`
+	Scene        SceneType       `json:"scene"`
 	OpUID        string          `json:"op_uid"`        // operator uuid
 	ResourceID   string          `json:"resource_id"`   // resource id
 	ResourceName string          `json:"resource_name"` // resource name
 	CustomerID   string          `json:"customer_id"`   // customer_id will be shown in bill
 	CreatedAt    time.Time       `json:"created_at"`    // time of event happen
 	Extra        string          `json:"extra"`
+}
+
+type MeteringExtra struct {
+	EventDate         time.Time   `json:"event_date"`
+	PromptToken       float64     `json:"prompt_token"`
+	PromptCachedToken float64     `json:"prompt_cached_token"`
+	CompletionToken   float64     `json:"completion_token"`
+	TokenID           int64       `bun:",notnull,default:0" json:"token_id"`
+	DataType          string      `bun:",notnull,default:''" json:"data_type"`
+	Resolution        string      `bun:",notnull,default:''" json:"resolution"`
+	Duration          float64     `bun:",notnull,default:0" json:"duration"`
+	SkuUnitType       SkuUnitType `json:"sku_unit_type"`
+	APIKey            string      `json:"api_key"`
 }
 
 type AcctPriceCreateReq struct {
@@ -930,11 +943,11 @@ type SyncDeductResp struct {
 }
 
 type DeductionSummary struct {
-	UserUUID    string    `json:"user_uuid"`
-	Scene       SceneType `json:"scene"`
-	CustomerID  string    `json:"customer_id"`
-	TotalValue  float64   `json:"total_value"`
-	EventUUID   uuid.UUID `json:"event_uuid"`
+	UserUUID   string    `json:"user_uuid"`
+	Scene      SceneType `json:"scene"`
+	CustomerID string    `json:"customer_id"`
+	TotalValue float64   `json:"total_value"`
+	EventUUID  uuid.UUID `json:"event_uuid"`
 }
 
 type AcctStatementExtra struct {

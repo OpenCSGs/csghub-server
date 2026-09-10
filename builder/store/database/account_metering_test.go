@@ -24,7 +24,7 @@ func TestAccountMeteringStore_Create(t *testing.T) {
 		ValueType:    1,
 		ResourceName: "abc",
 	}
-	err := store.Create(ctx, am)
+	err := store.Create(ctx, am, types.MeteringExtra{})
 	require.Nil(t, err)
 	amn := &database.AccountMetering{}
 	err = db.Core.NewSelect().Model(amn).Where("user_uuid = ?", "foo").Scan(ctx)
@@ -97,7 +97,7 @@ func TestAccountMeteringStore_ListByUserIDAndTime(t *testing.T) {
 	}
 
 	for _, am := range ams {
-		err := store.Create(ctx, am)
+		err := store.Create(ctx, am, types.MeteringExtra{})
 		require.Nil(t, err)
 	}
 
@@ -196,7 +196,7 @@ func TestAccountMeteringStore_GetStatByDate(t *testing.T) {
 	}
 
 	for _, am := range ams {
-		err := store.Create(ctx, am)
+		err := store.Create(ctx, am, types.MeteringExtra{})
 		require.Nil(t, err)
 	}
 
@@ -248,7 +248,7 @@ func TestAccountMeteringStore_ListAllByUserUUID(t *testing.T) {
 	}
 
 	for _, am := range ams {
-		err := store.Create(ctx, am)
+		err := store.Create(ctx, am, types.MeteringExtra{})
 		require.Nil(t, err)
 	}
 	data, err := store.ListAllByUserUUID(ctx, "foo")
@@ -269,7 +269,7 @@ func TestAccountMeteringStore_GetByEventUUID(t *testing.T) {
 		EventUUID: uuid.New(),
 	}
 
-	err := store.Create(ctx, am)
+	err := store.Create(ctx, am, types.MeteringExtra{})
 	require.Nil(t, err)
 
 	data, err := store.GetByEventUUID(ctx, am.EventUUID)
@@ -293,7 +293,7 @@ func TestAccountMeteringStore_FindByCustomerIDAndRecordAtInMin(t *testing.T) {
 		EventUUID: uuid.New(), RecordedAt: ctime,
 	}
 
-	err := store.Create(ctx, am)
+	err := store.Create(ctx, am, types.MeteringExtra{})
 	require.Nil(t, err)
 
 	data, err := store.FindByCustomerIDAndRecordAtInMin(ctx, am.CustomerID, time.Now())
