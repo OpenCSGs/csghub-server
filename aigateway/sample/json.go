@@ -1,6 +1,7 @@
 package sample
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -55,6 +56,9 @@ func modelsL7Request(route string) requestFactory {
 }
 
 func chatCompletionsRequest(input types.SampleInput) (*types.SampleRequest, error) {
+	if types.IsAutoSpeechRecognition(input.Tasks) {
+		return chatCompletionsAudioRequest(input)
+	}
 	dto := types.ChatCompletionRequest{
 		Model: input.Model,
 		Messages: []openai.ChatCompletionMessageParamUnion{
@@ -62,6 +66,25 @@ func chatCompletionsRequest(input types.SampleInput) (*types.SampleRequest, erro
 		},
 		MaxTokens: 1,
 		Stream:    false,
+	}
+	return jsonRequest(input, dto)
+}
+
+// chatCompletionsAudioRequest builds a chat-completions sample whose user message
+// carries an input_audio content part (a tiny WAV as a data URL) instead of text,
+// used for automatic-speech-recognition models such as DashScope qwen3-asr-flash.
+func chatCompletionsAudioRequest(input types.SampleInput) (*types.SampleRequest, error) {
+	dataURL := "data:audio/wav;base64," + base64.StdEncoding.EncodeToString(sampleWAV)
+	dto := types.ChatCompletionRequest{
+		Model: input.Model,
+		Messages: []openai.ChatCompletionMessageParamUnion{
+			openai.UserMessage([]openai.ChatCompletionContentPartUnionParam{
+				openai.InputAudioContentPart(openai.ChatCompletionContentPartInputAudioInputAudioParam{
+					Data: dataURL,
+				}),
+			}),
+		},
+		Stream: false,
 	}
 	return jsonRequest(input, dto)
 }

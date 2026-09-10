@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"strings"
 	"sync"
 	"testing"
 
@@ -128,6 +129,53 @@ func TestConcurrentBuildsDoNotLeakState(t *testing.T) {
 		}()
 	}
 	waitGroup.Wait()
+}
+
+func TestChatCompletionsAudioRequestUsesInputAudio(t *testing.T) {
+	input := sampleInput("https://api.example.com/v1/chat/completions", "qwen3-asr-flash")
+	input.Tasks = []string{"auto-speech-recognition"}
+
+	request, err := chatCompletionsRequest(input)
+	require.NoError(t, err)
+	require.Equal(t, http.MethodPost, request.Method)
+	require.Equal(t, "application/json", request.Headers.Get("Content-Type"))
+
+	var body struct {
+		Model    string `json:"model"`
+		Messages []struct {
+			Role    string `json:"role"`
+			Content []struct {
+				Type       string         `json:"type"`
+				InputAudio map[string]any `json:"input_audio"`
+			} `json:"content"`
+		} `json:"messages"`
+	}
+	require.NoError(t, json.Unmarshal(request.Body, &body))
+	require.Equal(t, "qwen3-asr-flash", body.Model)
+	require.Len(t, body.Messages, 1)
+	require.Equal(t, "user", body.Messages[0].Role)
+	require.Len(t, body.Messages[0].Content, 1)
+
+	part := body.Messages[0].Content[0]
+	require.Equal(t, "input_audio", part.Type)
+	data, ok := part.InputAudio["data"].(string)
+	require.True(t, ok)
+	require.True(t, strings.HasPrefix(data, "data:audio/wav;base64,"), data)
+	_, hasFormat := part.InputAudio["format"]
+	require.False(t, hasFormat, "input_audio must not include a separate format field")
+}
+
+func TestChatCompletionsRequestRemainsTextForNonASR(t *testing.T) {
+	request, err := chatCompletionsRequest(sampleInput("https://api.example.com/v1/chat/completions", "text-model"))
+	require.NoError(t, err)
+	var body struct {
+		Messages []struct {
+			Content string `json:"content"`
+		} `json:"messages"`
+	}
+	require.NoError(t, json.Unmarshal(request.Body, &body))
+	require.Len(t, body.Messages, 1)
+	require.Equal(t, "hi", body.Messages[0].Content)
 }
 
 func sampleRequestBuilder(t *testing.T, provider types.SampleProvider) types.SampleRequestBuilder {

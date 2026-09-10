@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
@@ -136,7 +137,7 @@ func TestDoUpstreamTest_ChatCompletionsSuccess(t *testing.T) {
 	defer srv.Close()
 
 	url := srv.URL + "/v1/chat/completions"
-	result, err := doUpstreamTest(context.Background(), mustSampleProvider(t, url), url, "gpt-4", map[string]string{"Authorization": "Bearer secret"})
+	result, err := doUpstreamTest(context.Background(), mustSampleProvider(t, url), upstreamTestParams{url: url, modelName: "gpt-4", authHeaders: map[string]string{"Authorization": "Bearer secret"}})
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	require.True(t, result.OK)
@@ -162,7 +163,7 @@ func TestDoUpstreamTest_ResponsesSuccess(t *testing.T) {
 	defer srv.Close()
 
 	url := srv.URL + "/v1/responses"
-	result, err := doUpstreamTest(context.Background(), mustSampleProvider(t, url), url, "gpt-4o", map[string]string{})
+	result, err := doUpstreamTest(context.Background(), mustSampleProvider(t, url), upstreamTestParams{url: url, modelName: "gpt-4o"})
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	require.True(t, result.OK)
@@ -177,7 +178,7 @@ func TestDoUpstreamTest_MessagesPreservesVersionHeaderAndMasksAuth(t *testing.T)
 	}))
 	defer srv.Close()
 	url := srv.URL + "/v1/messages"
-	result, err := doUpstreamTest(context.Background(), mustSampleProvider(t, url), url, "claude-model", map[string]string{"x-api-key": "secret"})
+	result, err := doUpstreamTest(context.Background(), mustSampleProvider(t, url), upstreamTestParams{url: url, modelName: "claude-model", authHeaders: map[string]string{"x-api-key": "secret"}})
 	require.NoError(t, err)
 	var summary requestSummary
 	require.NoError(t, json.Unmarshal([]byte(result.Request), &summary))
@@ -193,7 +194,7 @@ func TestDoUpstreamTest_MultipartSummary(t *testing.T) {
 	}))
 	defer srv.Close()
 	url := srv.URL + "/v1/audio/transcriptions"
-	result, err := doUpstreamTest(context.Background(), mustSampleProvider(t, url), url, "audio-model", map[string]string{"Authorization": "secret"})
+	result, err := doUpstreamTest(context.Background(), mustSampleProvider(t, url), upstreamTestParams{url: url, modelName: "audio-model", authHeaders: map[string]string{"Authorization": "secret"}})
 	require.NoError(t, err)
 	var summary requestSummary
 	require.NoError(t, json.Unmarshal([]byte(result.Request), &summary))
@@ -212,7 +213,7 @@ func TestDoUpstreamTest_NonOKStatus(t *testing.T) {
 	defer srv.Close()
 
 	url := srv.URL + "/v1/chat/completions"
-	result, err := doUpstreamTest(context.Background(), mustSampleProvider(t, url), url, "gpt-4", map[string]string{})
+	result, err := doUpstreamTest(context.Background(), mustSampleProvider(t, url), upstreamTestParams{url: url, modelName: "gpt-4"})
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	require.False(t, result.OK)
@@ -227,7 +228,7 @@ func TestDoUpstreamTest_NetworkError(t *testing.T) {
 	srv.Close()
 
 	url := srv.URL + "/v1/chat/completions"
-	result, err := doUpstreamTest(context.Background(), mustSampleProvider(t, url), url, "gpt-4", map[string]string{})
+	result, err := doUpstreamTest(context.Background(), mustSampleProvider(t, url), upstreamTestParams{url: url, modelName: "gpt-4"})
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	require.False(t, result.OK)
@@ -236,7 +237,7 @@ func TestDoUpstreamTest_NetworkError(t *testing.T) {
 
 func TestDoUpstreamTestUsesProviderExecutionPolicy(t *testing.T) {
 	provider := &policyCapturingSampleProvider{policy: aigatewaytypes.SampleExecutionPolicy{Timeout: 2 * time.Minute}}
-	result, err := doUpstreamTest(context.Background(), provider, "https://api.example.com/v1/test", "model", nil)
+	result, err := doUpstreamTest(context.Background(), provider, upstreamTestParams{url: "https://api.example.com/v1/test", modelName: "model"})
 	require.NoError(t, err)
 	require.True(t, result.OK)
 	require.Equal(t, 2*time.Minute, provider.capturedClientTimeout)
@@ -245,8 +246,79 @@ func TestDoUpstreamTestUsesProviderExecutionPolicy(t *testing.T) {
 
 func TestDoUpstreamTestRejectsNonPositiveTimeout(t *testing.T) {
 	provider := &policyCapturingSampleProvider{}
-	_, err := doUpstreamTest(context.Background(), provider, "https://api.example.com/v1/test", "model", nil)
+	_, err := doUpstreamTest(context.Background(), provider, upstreamTestParams{url: "https://api.example.com/v1/test", modelName: "model"})
 	require.ErrorContains(t, err, "timeout must be positive")
+}
+
+func TestDoUpstreamTest_ASRUsesInputAudio(t *testing.T) {
+	var captured []byte
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		captured, _ = io.ReadAll(r.Body)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"choices":[]}`))
+	}))
+	defer srv.Close()
+
+	url := srv.URL + "/v1/chat/completions"
+	tasks := []string{"auto-speech-recognition"}
+	result, err := doUpstreamTest(context.Background(), mustSampleProvider(t, url), upstreamTestParams{url: url, modelName: "qwen3-asr-flash", tasks: tasks})
+	require.NoError(t, err)
+	require.True(t, result.OK)
+
+	var body struct {
+		Messages []struct {
+			Content []map[string]any `json:"content"`
+		} `json:"messages"`
+	}
+	require.NoError(t, json.Unmarshal(captured, &body))
+	require.Len(t, body.Messages, 1)
+	require.Len(t, body.Messages[0].Content, 1)
+	require.Equal(t, "input_audio", body.Messages[0].Content[0]["type"])
+}
+
+func TestLLMServiceComponent_TestUpstream_ASRResolvesTasks(t *testing.T) {
+	var captured []byte
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		captured, _ = io.ReadAll(r.Body)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"choices":[]}`))
+	}))
+	defer srv.Close()
+
+	ctx := context.TODO()
+	upstreamStore := mockdatabase.NewMockUpstreamStore(t)
+	upstreamStore.EXPECT().GetByID(ctx, int64(42)).Return(&database.Upstream{
+		ID:          42,
+		LLMConfigID: 7,
+		URL:         srv.URL + "/v1/chat/completions",
+		ModelName:   "qwen3-asr-flash",
+	}, nil)
+
+	llmConfigStore := mockdatabase.NewMockLLMConfigStore(t)
+	llmConfigStore.EXPECT().GetByID(ctx, int64(7)).Return(&database.LLMConfig{
+		ID:       7,
+		Metadata: map[string]any{"tasks": []any{"auto-speech-recognition"}},
+	}, nil)
+
+	mc := &llmServiceComponentImpl{
+		upstreamStore:  upstreamStore,
+		llmConfigStore: llmConfigStore,
+		sampleRegistry: sample.NewDefaultRegistry(),
+	}
+	result, err := mc.TestUpstream(ctx, &types.TestUpstreamReq{ID: 42})
+	require.NoError(t, err)
+	require.True(t, result.OK)
+
+	var body struct {
+		Messages []struct {
+			Content []map[string]any `json:"content"`
+		} `json:"messages"`
+	}
+	require.NoError(t, json.Unmarshal(captured, &body))
+	require.Len(t, body.Messages, 1)
+	require.Equal(t, "input_audio", body.Messages[0].Content[0]["type"])
 }
 
 func mustSampleProvider(t *testing.T, url string) aigatewaytypes.SampleProvider {

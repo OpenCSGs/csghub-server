@@ -1006,6 +1006,76 @@ func TestHealthChecker_PerformSampleCheck_UsesProviderExecution(t *testing.T) {
 	require.Equal(t, int64(25), result.LatencyMs)
 }
 
+func TestHealthChecker_PerformSampleCheck_ResolvesTasksForInference(t *testing.T) {
+	ctx := context.Background()
+	llmConfigStore := mockdatabase.NewMockLLMConfigStore(t)
+	llmConfigStore.EXPECT().GetByID(ctx, int64(7)).Return(&database.LLMConfig{
+		ID:       7,
+		Metadata: map[string]any{"tasks": []any{"auto-speech-recognition"}},
+	}, nil).Once()
+
+	var capturedTasks []string
+	provider := executingSampleProvider{
+		execute: func(_ context.Context, kind types.SampleKind, input types.SampleInput, _ types.HTTPDoer) (*types.SampleExecutionResult, error) {
+			require.Equal(t, types.SampleKindInference, kind)
+			capturedTasks = input.Tasks
+			return &types.SampleExecutionResult{
+				Request:    &types.SampleRequest{Endpoint: input.Endpoint},
+				StatusCode: http.StatusOK,
+				Status:     "200 OK",
+				Latency:    25 * time.Millisecond,
+			}, nil
+		},
+	}
+	checker := &healthCheckerImpl{
+		sampleRegistry: sample.NewRegistry(provider),
+		llmConfigStore: llmConfigStore,
+	}
+
+	result := checker.performInferenceCheck(ctx, &database.Upstream{
+		ID:          1,
+		URL:         "https://example.com/custom",
+		ModelName:   "test-model",
+		LLMConfigID: 7,
+	}, 10*time.Second)
+
+	require.True(t, result.Healthy)
+	require.Equal(t, []string{"auto-speech-recognition"}, capturedTasks)
+}
+
+func TestHealthChecker_PerformSampleCheck_DoesNotResolveTasksForL7(t *testing.T) {
+	ctx := context.Background()
+	// No GetByID expectation: the L7 path must not touch the LLMConfigStore.
+	llmConfigStore := mockdatabase.NewMockLLMConfigStore(t)
+
+	var capturedTasks []string
+	provider := executingSampleProvider{
+		execute: func(_ context.Context, kind types.SampleKind, input types.SampleInput, _ types.HTTPDoer) (*types.SampleExecutionResult, error) {
+			require.Equal(t, types.SampleKindL7API, kind)
+			capturedTasks = input.Tasks
+			return &types.SampleExecutionResult{
+				Request:    &types.SampleRequest{Endpoint: input.Endpoint},
+				StatusCode: http.StatusOK,
+				Status:     "200 OK",
+			}, nil
+		},
+	}
+	checker := &healthCheckerImpl{
+		sampleRegistry: sample.NewRegistry(provider),
+		llmConfigStore: llmConfigStore,
+	}
+
+	result := checker.performL7APICheck(ctx, &database.Upstream{
+		ID:          1,
+		URL:         "https://example.com/custom",
+		ModelName:   "test-model",
+		LLMConfigID: 7,
+	})
+
+	require.True(t, result.Healthy)
+	require.Nil(t, capturedTasks)
+}
+
 func TestHealthChecker_PerformResponsesChecks_Success(t *testing.T) {
 	requests := make([]*http.Request, 0, 2)
 	checker := &healthCheckerImpl{
@@ -1598,7 +1668,7 @@ func TestNewHealthChecker_HealthCheckIntervalDefaultsAndOverrides(t *testing.T) 
 			cfg.AIGateway.HealthCheckL7APIInterval = test.l7IntervalSeconds
 			cfg.AIGateway.HealthCheckL7APITimeout = test.l7TimeoutSeconds
 			cfg.AIGateway.HealthCheckModalInferenceInterval = test.modalSeconds
-			checker := NewHealthChecker(nil, cfg, nil, nil, nil).(*healthCheckerImpl)
+			checker := NewHealthChecker(nil, cfg, nil, nil, nil, nil).(*healthCheckerImpl)
 
 			require.Equal(t, test.expectedL7, checker.config.Config.L7APICheck.Interval)
 			require.Equal(t, test.expectedTimeout, checker.config.Config.L7APICheck.Timeout)
@@ -1612,7 +1682,7 @@ func TestNewHealthChecker_MapsLatencyThresholds(t *testing.T) {
 	cfg.AIGateway.HealthCheckLatencyDegradedMs = 10000
 	cfg.AIGateway.HealthCheckMultimodalLatencyDegradedMs = 120000
 
-	checker := NewHealthChecker(nil, cfg, nil, nil, nil).(*healthCheckerImpl)
+	checker := NewHealthChecker(nil, cfg, nil, nil, nil, nil).(*healthCheckerImpl)
 
 	require.Equal(t, 10*time.Second, checker.config.Config.HealthRules.LatencyThresholdForDegraded)
 	require.Equal(t, 2*time.Minute, checker.config.Config.HealthRules.MultimodalLatencyThresholdForDegraded)

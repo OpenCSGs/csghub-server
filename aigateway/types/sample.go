@@ -23,6 +23,9 @@ type SampleInput struct {
 	Text     string
 	Base64   string
 	Other    map[string]any
+	// Tasks holds the pipeline tasks of the model (from LLMConfig.Metadata["tasks"]),
+	// used by protocol providers to select the right sample shape (e.g. audio input).
+	Tasks []string
 	// MaxResponseBodyBytes limits the response body returned by Execute. A zero
 	// value reads the complete body.
 	MaxResponseBodyBytes int64
