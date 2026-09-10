@@ -30,6 +30,12 @@ type RequestMetadata struct {
 	// (e.g. *AnthropicMessagesRequest).  The Planner and Execute phase
 	// type-assert this field to access protocol-specific fields.
 	ParsedBody any
+	// RequiredUpstreamID, when non-zero, forces the Planner's model
+	// resolver to select the upstream with this ID.  Used by the
+	// Responses protocol when the client supplies a previous_response_id
+	// whose original upstream must be reused.  All other protocols leave
+	// this as zero.
+	RequiredUpstreamID int64
 }
 
 // PromptTextProvider is implemented by protocol-specific request types that

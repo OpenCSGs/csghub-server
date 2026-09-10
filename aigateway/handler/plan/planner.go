@@ -1,11 +1,11 @@
 package plan
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"log/slog"
 
+	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/aigateway/component"
 	"opencsg.com/csghub-server/aigateway/handler/protocol"
 	"opencsg.com/csghub-server/aigateway/types"
@@ -28,25 +28,36 @@ type plannerImpl struct {
 	balanceChecker    BalanceChecker
 	usageLimitChecker UsageLimitChecker
 	contentSafety     ContentSafetyChecker
+	metricsEnricher   MetricsEnricher
 }
 
 // NewPlanner constructs a Planner from its four dependency interfaces.
 // The handler package provides concrete adapters at the composition root.
-func NewPlanner(mr ModelResolver, bc BalanceChecker, ulc UsageLimitChecker, cs ContentSafetyChecker) Planner {
+func NewPlanner(mr ModelResolver, bc BalanceChecker, ulc UsageLimitChecker, cs ContentSafetyChecker, me MetricsEnricher) Planner {
 	return &plannerImpl{
 		modelResolver:     mr,
 		balanceChecker:    bc,
 		usageLimitChecker: ulc,
 		contentSafety:     cs,
+		metricsEnricher:   me,
 	}
 }
 
 // Plan produces a RequestPlan from the RequestMetadata.
-func (p *plannerImpl) Plan(ctx context.Context, meta *types.RequestMetadata) (*types.RequestPlan, error) {
+func (p *plannerImpl) Plan(c *gin.Context, meta *types.RequestMetadata) (*types.RequestPlan, error) {
+	ctx := c.Request.Context()
 	pl := &types.RequestPlan{}
 
 	// 1. Model Resolution.
-	mt, err := p.modelResolver.ResolveModelTarget(ctx, meta.UserID, meta.Model, meta.Headers)
+	mt, err := p.modelResolver.ResolveModelTarget(ctx, meta.UserID, meta.Model, meta.Headers, ResolveOptions{
+		RequiredUpstreamID: meta.RequiredUpstreamID,
+	})
+	// Enrich metrics with the resolved model target right after resolution,
+	// before error checking.  When resolution fails (mt == nil) the enricher
+	// falls back to the requested model ID so the error is still attributed.
+	if p.metricsEnricher != nil {
+		p.metricsEnricher.SetModelTarget(c, meta.Model, mt, meta.Streaming)
+	}
 	if err != nil {
 		pl.ErrorCode = categorizePlanError(err)
 		return pl, err
@@ -100,10 +111,15 @@ func (p *plannerImpl) Plan(ctx context.Context, meta *types.RequestMetadata) (*t
 		pl.BackendURL = mt.Target
 	}
 
-	// 6. Usage-limit check.
-	if err := p.usageLimitChecker.CheckUsageLimit(ctx, meta.TenantID, mt.Model, pl.BackendURL); err != nil {
-		pl.ErrorCode = categorizePlanError(err)
-		return pl, err
+	// 6. Usage-limit check — only for token-generating protocols.
+	// Non-token endpoints (image, video, audio, ocr, rerank, embedding,
+	// speech) have non-token billing models and do not participate in the
+	// token-window rate limiter.
+	if shouldCheckUsageLimit(meta.Task) {
+		if err := p.usageLimitChecker.CheckUsageLimit(ctx, meta.TenantID, mt.Model, pl.BackendURL); err != nil {
+			pl.ErrorCode = categorizePlanError(err)
+			return pl, err
+		}
 	}
 	pl.UsageLimitOK = true
 
@@ -111,7 +127,7 @@ func (p *plannerImpl) Plan(ctx context.Context, meta *types.RequestMetadata) (*t
 	promptText := meta.PromptText()
 	if promptText != "" {
 		isSensitive, message, checkErr := p.contentSafety.Check(
-			ctx, mt.Model, promptText, meta.TenantID, meta.Streaming, mt.Upstream.Provider,
+			ctx, mt.Model, promptText, meta.TenantID, meta.Task, meta.Streaming, mt.Upstream.Provider,
 		)
 		if checkErr != nil {
 			slog.WarnContext(ctx, "planner sensitive check error", slog.Any("error", checkErr))
@@ -159,4 +175,19 @@ func categorizePlanError(err error) types.PlanErrorCategory {
 	}
 
 	return types.PlanErrUnknown
+}
+
+// shouldCheckUsageLimit reports whether the task participates in the
+// token-window rate limiter (CheckUsageLimit / CommitUsageLimitFromUsage).
+// Only token-generating protocols (chat, responses, messages) are gated;
+// non-token endpoints (image, video, audio, ocr, rerank, embedding, speech)
+// consume tokens but use different billing models and are excluded from the
+// token-window limiter.
+func shouldCheckUsageLimit(task string) bool {
+	switch task {
+	case "chat", "responses", "messages":
+		return true
+	default:
+		return false
+	}
 }

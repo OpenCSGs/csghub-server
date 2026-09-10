@@ -2,14 +2,16 @@ package executors
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/argoproj/argo-workflows/v3/pkg/apis/workflow/v1alpha1"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
-	"time"
 	"opencsg.com/csghub-server/common/types"
 )
 
@@ -63,7 +65,23 @@ func (h *argoWorkflowExecutorImpl) ProcessEvent(ctx context.Context, event *type
 		if wf.Status == v1alpha1.WorkflowError {
 			// unify error
 			wf.Status = v1alpha1.WorkflowFailed
-			wf.StatusUpdateAt = time.Now()
+		}
+		if wf.StatusUpdateAt.IsZero() {
+			wf.StatusUpdateAt = time.Now().UTC()
+		}
+		oldwf, findErr := h.store.FindByTaskID(ctx, wf.TaskId)
+		if errors.Is(findErr, sql.ErrNoRows) {
+			if _, err = h.store.CreateWorkFlow(ctx, wf); err != nil {
+				return fmt.Errorf("failed to create missing argo workflow from change event: %w", err)
+			}
+		} else if findErr != nil {
+			return fmt.Errorf("failed to find argo workflow before update: %w", findErr)
+		} else if oldwf.StatusUpdateAt.After(wf.StatusUpdateAt) {
+			slog.WarnContext(ctx, "ignore stale workflow event",
+				slog.String("task_id", wf.TaskId),
+				slog.Time("event_time", wf.StatusUpdateAt),
+				slog.Time("stored_time", oldwf.StatusUpdateAt))
+			return nil
 		}
 		_, err := h.store.UpdateWorkFlowByTaskID(ctx, wf)
 		if err != nil {

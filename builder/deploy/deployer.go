@@ -1142,16 +1142,52 @@ func (d *deployer) SubmitFinetuneJob(ctx context.Context, req types.FinetuneReq)
 
 	common.UpdateEvaluationEnvHardware(env, req.Hardware)
 
-	templates := []types.ArgoFlowTemplate{}
-	templates = append(templates,
-		types.ArgoFlowTemplate{
+	uniqueFlowName := d.snowflakeNode.Generate().Base36()
+	templates := []types.ArgoFlowTemplate{
+		{
 			Name:     "finetune",
 			Env:      env,
 			HardWare: req.Hardware,
 			Image:    req.Image,
 		},
-	)
-	uniqueFlowName := d.snowflakeNode.Generate().Base36()
+	}
+	entrypoint := "finetune"
+	if req.WorkflowVersion >= 2 {
+		env["FINETUNE_WORK_DIR"] = "/workspace/finetune/" + uniqueFlowName
+		env["EXPORT_TO_HF"] = "true"
+		env["KEEP_FINETUNE_WORK_DIR"] = strconv.FormatBool(req.KeepWorkDir)
+		transferHardware := types.HardWare{
+			Cpu: types.CPU{
+				Num: req.Hardware.Cpu.Num,
+			},
+			Memory:           req.Hardware.Memory,
+			EphemeralStorage: req.Hardware.EphemeralStorage,
+		}
+		templates = append(templates,
+			types.ArgoFlowTemplate{
+				Name:     "finetune-download",
+				Env:      env,
+				HardWare: transferHardware,
+				Image:    req.Image,
+				Command:  []string{"/etc/csghub/download-job.sh"},
+			},
+			types.ArgoFlowTemplate{
+				Name:     "finetune-train",
+				Env:      env,
+				HardWare: req.Hardware,
+				Image:    req.Image,
+				Command:  []string{"/etc/csghub/train-job.sh"},
+			},
+			types.ArgoFlowTemplate{
+				Name:     "finetune-upload",
+				Env:      env,
+				HardWare: transferHardware,
+				Image:    req.Image,
+				Command:  []string{"/etc/csghub/upload-job.sh"},
+			},
+		)
+		entrypoint = "finetune-v2"
+	}
 	flowReq := &types.ArgoWorkFlowReq{
 		TaskName:           req.TaskName,
 		TaskId:             uniqueFlowName,
@@ -1160,8 +1196,9 @@ func (d *deployer) SubmitFinetuneJob(ctx context.Context, req types.FinetuneReq)
 		Image:              req.Image,
 		Username:           req.Username,
 		UserUUID:           req.UserUUID,
-		Entrypoint:         "finetune",
+		Entrypoint:         entrypoint,
 		ClusterID:          req.ClusterID,
+		WorkflowVersion:    req.WorkflowVersion,
 		Templates:          templates,
 		Datasets:           []string{req.DatasetId},
 		RepoIds:            []string{req.ModelId},

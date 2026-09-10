@@ -102,25 +102,6 @@ func (b *messagesHandlerBridge) CommitUsageLimitFromUsage(ctx context.Context, n
 
 // --- MetricsRecorder ---
 
-func (b *messagesHandlerBridge) SetModelTarget(c *gin.Context, modelID string, target *types.ModelTarget, isStream bool) {
-	var rt *resolvedModelTarget
-	if target != nil {
-		rt = &resolvedModelTarget{
-			Model:     target.Model,
-			Upstream:  target.Upstream,
-			Target:    target.Target,
-			Host:      target.Host,
-			ModelName: target.ModelName,
-		}
-	}
-	SetMetricsModelTarget(SetMetricsModelParams{
-		C:           c,
-		ModelID:     modelID,
-		ModelTarget: rt,
-		IsStream:    isStream,
-	})
-}
-
 func (b *messagesHandlerBridge) RecordTokenUsage(c *gin.Context, inputTokens, outputTokens, cachedPromptTokens int64) {
 	if inputTokens == 0 && outputTokens == 0 {
 		return
@@ -243,32 +224,5 @@ func (a *llmLogPublisherAdapter) PublishTrainingLog(message []byte) error {
 }
 
 // --- PreflightTracer ---
-
-// preflightTracerAdapter wraps the handler's *preflightTrace to satisfy
-// anthropic.PreflightTracer.  It converts *types.ModelTarget back to
-// *resolvedModelTarget for SetTargetModel.
-type preflightTracerAdapter struct {
-	trace *preflightTrace
-}
-
-func (a *preflightTracerAdapter) RecordError(err error, errorType string) {
-	a.trace.RecordError(err, errorType)
-}
-
-func (a *preflightTracerAdapter) SetTargetModel(requestModel string, target *types.ModelTarget) {
-	var rt *resolvedModelTarget
-	if target != nil {
-		rt = &resolvedModelTarget{
-			Model:     target.Model,
-			Upstream:  target.Upstream,
-			Target:    target.Target,
-			Host:      target.Host,
-			ModelName: target.ModelName,
-		}
-	}
-	a.trace.SetTargetModel(requestModel, rt)
-}
-
-func (a *preflightTracerAdapter) End() {
-	a.trace.End()
-}
+//
+// preflightTracerAdapter and related types are defined in preflight_tracer.go.

@@ -26,6 +26,26 @@ import (
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /finetunes [post]
 func (h *FinetuneHandler) RunFinetuneJob(ctx *gin.Context) {
+	h.runFinetuneJob(ctx, 1)
+}
+
+// RunFinetuneJobV2 creates a staged finetune workflow. Its request and response
+// contract intentionally matches RunFinetuneJob.
+// @Security     ApiKey
+// @Summary      run finetune with CPU transfer stages
+// @Tags         Finetune
+// @Accept       json
+// @Produce      json
+// @Param        body body types.FinetuneReq true "body setting of finetune"
+// @Success      200  {object}  types.ArgoWorkFlowRes "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /finetuneV2 [post]
+func (h *FinetuneHandler) RunFinetuneJobV2(ctx *gin.Context) {
+	h.runFinetuneJob(ctx, 2)
+}
+
+func (h *FinetuneHandler) runFinetuneJob(ctx *gin.Context, workflowVersion int) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 
 	var req types.FinetuneReq
@@ -50,6 +70,9 @@ func (h *FinetuneHandler) RunFinetuneJob(ctx *gin.Context) {
 	req.Username = currentUser
 	if req.Namespace == "" {
 		req.Namespace = currentUser
+	}
+	if workflowVersion > 1 {
+		req.WorkflowVersion = workflowVersion
 	}
 	finetune, err := h.ftComp.CreateFinetuneJob(ctx.Request.Context(), req)
 	if err != nil {

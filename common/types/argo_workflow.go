@@ -46,6 +46,13 @@ const (
 	TaskTypeDataflow    TaskType = "dataflow"
 )
 
+type WorkflowStageStatus struct {
+	Phase    v1alpha1.NodePhase `json:"phase"`
+	Billable bool               `json:"billable"`
+}
+
+type WorkflowStageStatuses map[string]WorkflowStageStatus
+
 type EvaluationReq struct {
 	Username           string   `json:"-"`
 	OwnerNamespace     string   `json:"owner_namespace,omitempty"`
@@ -107,6 +114,7 @@ type ArgoFlowTemplate struct {
 type ArgoWorkFlowReq struct {
 	ClusterID          string             `json:"cluster_id"`
 	RepoType           string             `json:"repo_type"`
+	WorkflowVersion    int                `json:"workflow_version,omitempty"`
 	Templates          []ArgoFlowTemplate `json:"templates,omitempty"`
 	Entrypoint         string             `json:"entrypoint"`
 	Username           string             `json:"username"`

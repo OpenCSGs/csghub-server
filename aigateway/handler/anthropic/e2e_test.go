@@ -34,7 +34,7 @@ type fakePlanner struct {
 	usageErr   error
 }
 
-func (f *fakePlanner) Plan(ctx context.Context, meta *types.RequestMetadata) (*types.RequestPlan, error) {
+func (f *fakePlanner) Plan(c *gin.Context, meta *types.RequestMetadata) (*types.RequestPlan, error) {
 	if f.target == nil && f.planErr != nil {
 		p := &types.RequestPlan{ErrorCode: f.errorCode}
 		return p, f.planErr
@@ -163,17 +163,10 @@ func (f *fakeUsageLimiter) CommitUsageLimitFromUsage(ctx context.Context, nsUUID
 }
 
 type fakeMetricsRecorder struct {
-	modelSet            bool
-	modelID             string
 	usageRecorded       bool
 	inputTokens         int64
 	outputTokens        int64
 	cachedPromptTokens  int64
-}
-
-func (f *fakeMetricsRecorder) SetModelTarget(c *gin.Context, modelID string, target *types.ModelTarget, isStream bool) {
-	f.modelSet = true
-	f.modelID = modelID
 }
 
 func (f *fakeMetricsRecorder) RecordTokenUsage(c *gin.Context, inputTokens, outputTokens, cachedPromptTokens int64) {
@@ -237,7 +230,7 @@ func dispatchWithTarget(t *testing.T, handler *Handler, body string, planner *fa
 	c, _ := gin.CreateTestContext(w)
 	c.Request = httptest.NewRequest("POST", "/v1/messages", strings.NewReader(body))
 	c.Request.Header.Set("Content-Type", "application/json")
-	orch := plan.NewOrchestrator(planner)
+	orch := plan.NewOrchestrator(planner, nil)
 	orch.Dispatch(c, handler, handler)
 	return w
 }

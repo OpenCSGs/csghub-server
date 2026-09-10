@@ -20,11 +20,12 @@ fi
 # Set default values for optional variables
 HF_COMMIT_MESSAGE="${HF_COMMIT_MESSAGE:-"Fine-tuned model exported from ms-swift"}"
 LATEST_CKP=`find output/*/v*/checkpoint-* -type d | grep -v 'merged' | sort -V | tail -n 1`
-EXPORT_DIR="${EXPORT_DIR:-/workspace/$LATEST_CKP}"
+EXPORT_DIR="${EXPORT_DIR:-${FINETUNE_WORK_DIR:-/workspace}/$LATEST_CKP}"
 
 # Create the full repository name
 CURRENT_TIME=$(date +%Y%m%d_%H%M%S)
-MODEL_NAME=$(echo "$MODEL_ID" | cut -d'/' -f2)
+SOURCE_MODEL_ID="${SOURCE_MODEL_ID:-$MODEL_ID}"
+MODEL_NAME=$(echo "$SOURCE_MODEL_ID" | cut -d'/' -f2)
 #use FINETUNED_MODEL_NAME if provided, otherwise use MODEL_ID
 REPO_NAME_DEFAULT="$MODEL_NAME-finetuned-$CURRENT_TIME"
 REPO_NAME="${FINETUNED_MODEL_NAME:-$REPO_NAME_DEFAULT}"
@@ -54,7 +55,7 @@ fi
 # Export the model using swift export command with API endpoint
 echo "Exporting model to CSGHUB ..."
 swift export \
-    --model "$MODEL_ID" \
+    --model "${MODEL_PATH:-$MODEL_ID}" \
     --adapters "$EXPORT_DIR" \
     "${MODEL_TYPE_ARG[@]}" \
     --merge_lora true \

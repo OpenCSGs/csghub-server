@@ -19,6 +19,13 @@ func ResponsesPromptText(req *ResponsesRequest) string {
 	return b.String()
 }
 
+// PromptText satisfies types.PromptTextProvider so the Planner can
+// extract prompt text for sensitive-content checking without depending
+// on the concrete ResponsesRequest type.
+func (r *ResponsesRequest) PromptText() string {
+	return ResponsesPromptText(r)
+}
+
 func ResponsesInstructionText(raw json.RawMessage) string {
 	if len(raw) == 0 {
 		return ""
