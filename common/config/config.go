@@ -179,6 +179,28 @@ type Config struct {
 		// ImageCheckScenario is the Aliyun Green scenario used for image moderation.
 		// Defaults to "baselineCheck" (ScenarioImageBaseLineCheck).
 		ImageCheckScenario string `env:"STARHUB_SERVER_SENSITIVE_CHECK_IMAGE_SCENARIO" default:"baselineCheck"`
+		// ImageCheckMaxRefsPerComment caps synchronous image checks per comment.
+		ImageCheckMaxRefsPerComment int `env:"STARHUB_SERVER_SENSITIVE_CHECK_IMAGE_MAX_REFS" default:"5"`
+		// CommentMediaMaxRefsPerComment caps all image/audio/video references before
+		// any external moderation service is called.
+		CommentMediaMaxRefsPerComment int `env:"STARHUB_SERVER_SENSITIVE_CHECK_COMMENT_MEDIA_MAX_REFS" default:"5"`
+
+		// MediaModerationEnable controls asynchronous audio/video moderation for
+		// discussion comments. When enabled, a comment referencing pending
+		// audio/video is created in a pending state (visible only to its author)
+		// and a temporal workflow polls the Aliyun result. It is effective only
+		// when SensitiveCheck.Enable is also true. Disabled by default.
+		MediaModerationEnable bool `env:"STARHUB_SERVER_SENSITIVE_CHECK_MEDIA_MODERATION_ENABLE" default:"false"`
+		// MediaModerationMaxRefsPerComment caps how many audio/video items a
+		// single comment may reference.
+		MediaModerationMaxRefsPerComment int `env:"STARHUB_SERVER_SENSITIVE_CHECK_MEDIA_MODERATION_MAX_REFS" default:"3"`
+		// MediaModerationPollInterval is how often the poll workflow queries the
+		// Aliyun result for each pending media task.
+		MediaModerationPollInterval time.Duration `env:"STARHUB_SERVER_SENSITIVE_CHECK_MEDIA_MODERATION_POLL_INTERVAL" default:"30s"`
+		// MediaModerationWorkflowTimeout bounds how long the poll workflow runs
+		// before it finalizes (and deletes the comment if media is still
+		// non-terminal).
+		MediaModerationWorkflowTimeout time.Duration `env:"STARHUB_SERVER_SENSITIVE_CHECK_MEDIA_MODERATION_WORKFLOW_TIMEOUT" default:"30m"`
 
 		LLM struct {
 			Enable       bool    `env:"STARHUB_SERVER_SENSITIVE_CHECK_LLM_ENABLE" default:"false"`

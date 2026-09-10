@@ -2,6 +2,7 @@ package component
 
 import (
 	"context"
+	"fmt"
 
 	gwtype "opencsg.com/csghub-server/aigateway/types"
 	"opencsg.com/csghub-server/builder/sensitive"
@@ -17,6 +18,11 @@ type SensitiveComponent interface {
 	PassStreamCheck(ctx context.Context, req *types.LLMCheckRequest) (*sensitive.CheckResult, error)
 	// PassLLMQueryCheck check LLM prompt text
 	PassLLMQueryCheck(ctx context.Context, req *types.LLMCheckRequest) (*sensitive.CheckResult, error)
+	// SubmitMediaModeration submits one audio/video URL for asynchronous
+	// moderation and returns the provider task handle.
+	SubmitMediaModeration(ctx context.Context, req types.MediaModerationRequest) (*types.MediaModerationSubmission, error)
+	// QueryMediaModerationResult polls a submitted media moderation task.
+	QueryMediaModerationResult(ctx context.Context, req types.MediaModerationRequest) (*types.MediaModerationResult, error)
 }
 
 type SensitiveComponentImpl struct {
@@ -57,4 +63,20 @@ func (c SensitiveComponentImpl) PassLLMQueryCheck(ctx context.Context, req *type
 
 func (c SensitiveComponentImpl) PassImageURLCheck(ctx context.Context, scenario types.SensitiveScenario, imageURL string) (*sensitive.CheckResult, error) {
 	return c.checker.PassImageURLCheck(ctx, scenario, imageURL)
+}
+
+func (c SensitiveComponentImpl) SubmitMediaModeration(ctx context.Context, req types.MediaModerationRequest) (*types.MediaModerationSubmission, error) {
+	mc, ok := c.checker.(sensitive.MediaSensitiveChecker)
+	if !ok {
+		return nil, fmt.Errorf("configured sensitive checker does not support media moderation")
+	}
+	return mc.SubmitMediaModeration(ctx, req)
+}
+
+func (c SensitiveComponentImpl) QueryMediaModerationResult(ctx context.Context, req types.MediaModerationRequest) (*types.MediaModerationResult, error) {
+	mc, ok := c.checker.(sensitive.MediaSensitiveChecker)
+	if !ok {
+		return nil, fmt.Errorf("configured sensitive checker does not support media moderation")
+	}
+	return mc.QueryMediaModerationResult(ctx, req)
 }

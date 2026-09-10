@@ -1,0 +1,8 @@
+{
+    "error.MEDIA-ERR-0": {
+        "other": "The comment is under media moderation and cannot be edited."
+    },
+    "error.MEDIA-ERR-1": {
+        "other": "The media moderation service is unavailable."
+    }
+}

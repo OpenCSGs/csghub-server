@@ -143,8 +143,9 @@ func TestDiscussionComponent_GetDiscussion(t *testing.T) {
 			},
 		},
 	}
-	// Updated to include pagination parameters: per=10, page=1
-	mockDiscussionStore.EXPECT().FindDiscussionComments(mock.Anything, int64(1), 10, 1).Return(comments, nil).Once()
+	mockDiscussionStore.EXPECT().FindVisibleDiscussionComments(mock.Anything, database.FindVisibleCommentsReq{
+		DiscussionID: 1, CurrentUser: "user", Per: 10, Page: 1,
+	}).Return(comments, 1, nil).Once()
 
 	// Updated to include pagination parameters
 	resp, err := comp.GetDiscussion(context.TODO(), "user", int64(1), 10, 1)
@@ -374,7 +375,7 @@ func TestDiscussionComponent_CreateDisussionComment(t *testing.T) {
 		CommentableID:   req.CommentableID,
 		CommentableType: req.CommentableType,
 	}
-	mockDiscussionStore.EXPECT().CreateComment(mock.Anything, comment).Return(&comment, nil).Once()
+	mockDiscussionStore.EXPECT().CreateCommentWithMedia(mock.Anything, comment, req.MediaItems).Return(&comment, nil).Once()
 
 	resp, err := comp.CreateDiscussionComment(context.TODO(), req)
 
@@ -383,6 +384,53 @@ func TestDiscussionComponent_CreateDisussionComment(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, int64(1), resp.CommentableID)
 	require.Equal(t, "user", resp.User.Username)
+}
+
+func TestDiscussionComponent_CreatePendingCommentDoesNotNotify(t *testing.T) {
+	mockRepoStore := mockdb.NewMockRepoStore(t)
+	mockUserStore := mockdb.NewMockUserStore(t)
+	mockDiscussionStore := mockdb.NewMockDiscussionStore(t)
+	mockRepoComponent := mockcomp.NewMockRepoComponent(t)
+	mockNotificationRPC := mockrpc.NewMockNotificationSvcClient(t)
+	notified := make(chan struct{}, 1)
+	mockNotificationRPC.EXPECT().Send(mock.Anything, mock.Anything).
+		Run(func(context.Context, *types.MessageRequest) { notified <- struct{}{} }).Return(nil).Maybe()
+
+	cfg := &config.Config{}
+	cfg.Notification.NotificationRetryCount = 1
+	comp := &discussionComponentImpl{
+		repoStore: mockRepoStore, userStore: mockUserStore, discussionStore: mockDiscussionStore,
+		repoCompo: mockRepoComponent, notificationSvcClient: mockNotificationRPC, config: cfg,
+	}
+	req := types.CreateCommentRequest{
+		Content: "pending", CommentableID: 1, CommentableType: database.CommentableTypeDiscussion,
+		CurrentUser: "author", MediaItems: []types.CommentMediaItem{{DataID: "d1", TaskID: "t1", MediaType: types.MediaTypeVideo}},
+	}
+	discussion := database.Discussion{
+		ID: 1, DiscussionableID: 1, DiscussionableType: database.DiscussionableTypeRepo,
+		User: &database.User{Username: "owner", UUID: "owner-uuid"},
+	}
+	mockDiscussionStore.EXPECT().FindByID(mock.Anything, int64(1)).Return(&discussion, nil)
+	repo := &database.Repository{ID: 1, Path: "repo/path"}
+	mockRepoStore.EXPECT().FindById(mock.Anything, int64(1)).Return(repo, nil)
+	mockRepoComponent.EXPECT().AllowReadAccessRepo(mock.Anything, repo, "author").Return(true, nil)
+	user := database.User{ID: 2, Username: "author", UUID: "author-uuid"}
+	mockUserStore.EXPECT().FindByUsername(mock.Anything, "author").Return(user, nil)
+	mockDiscussionStore.EXPECT().CreateCommentWithMedia(mock.Anything, mock.Anything, req.MediaItems).
+		Return(&database.Comment{ID: 9, CommentableID: 1}, nil)
+
+	resp, err := comp.CreateDiscussionComment(context.Background(), req)
+	require.NoError(t, err)
+	require.NotNil(t, resp.Notification)
+	require.Equal(t, int64(9), resp.Notification.CommentID)
+	require.Equal(t, "author-uuid", resp.Notification.SenderUUID)
+	require.Equal(t, "owner-uuid", resp.Notification.RecipientUUID)
+	require.NotEmpty(t, resp.Notification.MsgUUID)
+	select {
+	case <-notified:
+		t.Fatal("pending comment must not notify before moderation passes")
+	case <-time.After(100 * time.Millisecond):
+	}
 }
 
 func TestDiscussionComponent_UpdateComment(t *testing.T) {
@@ -518,7 +566,9 @@ func TestDiscussionComponent_ListDiscussionComments(t *testing.T) {
 	mockDiscussionStore.EXPECT().FindByID(mock.Anything, discussionID).Return(disc, nil).Once()
 	mockRepoStore.EXPECT().FindById(mock.Anything, int64(1)).Return(&database.Repository{ID: 1}, nil).Once()
 	mockRepoComponent.EXPECT().AllowReadAccessRepo(mock.Anything, &database.Repository{ID: 1}, "user").Return(true, nil).Once()
-	mockDiscussionStore.EXPECT().FindDiscussionComments(mock.Anything, discussionID, 10, 1).Return(comments, nil).Once()
+	mockDiscussionStore.EXPECT().FindVisibleDiscussionComments(mock.Anything, database.FindVisibleCommentsReq{
+		DiscussionID: discussionID, CurrentUser: "user", Per: 10, Page: 1,
+	}).Return(comments, 2, nil).Once()
 
 	resp, total, err := comp.ListDiscussionComments(context.TODO(), "user", discussionID, 10, 1)
 	require.Nil(t, err)
@@ -574,4 +624,152 @@ func TestUpdateCommentRequest_GetSensitiveFields(t *testing.T) {
 	require.Len(t, fields, 1)
 	require.Equal(t, "content", fields[0].Value())
 	require.Equal(t, types.ScenarioCommentDetection, fields[0].Scenario)
+}
+
+// TestDiscussionComponent_MediaModerationVisibility covers the bug where a
+// pending media comment was visible to everyone. A comment whose linked media
+// is still under moderation must be hidden from non-authors and visible only
+// to its author with PendingModeration=true. Two comments sharing one pending
+// resource must both be hidden independently.
+func TestDiscussionComponent_MediaModerationVisibility(t *testing.T) {
+	author := &database.User{ID: 1, Username: "author", Avatar: "a"}
+	other := &database.User{ID: 2, Username: "other", Avatar: "b"}
+
+	t.Run("pending hidden from non-author, visible to author", func(t *testing.T) {
+		mockMediaStore := mockdb.NewMockMediaModerationStore(t)
+		comp := &discussionComponentImpl{mediaStore: mockMediaStore}
+		comments := []database.Comment{
+			{ID: 10, Content: "pending", User: author},
+			{ID: 11, Content: "passed", User: other},
+		}
+		mockMediaStore.EXPECT().FindMediaByCommentIDs(mock.Anything, []int64{10, 11}).Return([]database.CommentMediaView{
+			{CommentID: 10, DataID: "d", Status: database.MediaModerationStatusPending, MediaType: types.MediaTypeVideo},
+			{CommentID: 11, DataID: "d2", Status: database.MediaModerationStatusPass, MediaType: types.MediaTypeAudio},
+		}, nil)
+
+		resp, err := comp.buildCommentResponses(context.TODO(), "author", comments)
+		require.NoError(t, err)
+		require.Len(t, resp, 2)
+		var pending, passed *types.DiscussionResponse_Comment
+		for _, c := range resp {
+			if c.ID == 10 {
+				pending = c
+			}
+			if c.ID == 11 {
+				passed = c
+			}
+		}
+		require.NotNil(t, pending)
+		require.True(t, pending.PendingModeration)
+		require.NotNil(t, passed)
+		require.False(t, passed.PendingModeration)
+	})
+
+	t.Run("pending hidden from a different user", func(t *testing.T) {
+		mockMediaStore := mockdb.NewMockMediaModerationStore(t)
+		comp := &discussionComponentImpl{mediaStore: mockMediaStore}
+		comments := []database.Comment{
+			{ID: 10, Content: "pending", User: author},
+			{ID: 11, Content: "passed", User: other},
+		}
+		mockMediaStore.EXPECT().FindMediaByCommentIDs(mock.Anything, []int64{10, 11}).Return([]database.CommentMediaView{
+			{CommentID: 10, DataID: "d", Status: database.MediaModerationStatusPending, MediaType: types.MediaTypeVideo},
+			{CommentID: 11, DataID: "d2", Status: database.MediaModerationStatusPass, MediaType: types.MediaTypeAudio},
+		}, nil)
+
+		resp, err := comp.buildCommentResponses(context.TODO(), "other", comments)
+		require.NoError(t, err)
+		require.Len(t, resp, 1)
+		require.Equal(t, int64(11), resp[0].ID)
+		require.False(t, resp[0].PendingModeration)
+	})
+
+	t.Run("two comments sharing one pending resource both hidden from non-authors", func(t *testing.T) {
+		mockMediaStore := mockdb.NewMockMediaModerationStore(t)
+		comp := &discussionComponentImpl{mediaStore: mockMediaStore}
+		comments := []database.Comment{
+			{ID: 20, Content: "first", User: author},
+			{ID: 21, Content: "second", User: other},
+		}
+		mockMediaStore.EXPECT().FindMediaByCommentIDs(mock.Anything, []int64{20, 21}).Return([]database.CommentMediaView{
+			{CommentID: 20, DataID: "shared", Status: database.MediaModerationStatusPending, MediaType: types.MediaTypeVideo},
+			{CommentID: 21, DataID: "shared", Status: database.MediaModerationStatusPending, MediaType: types.MediaTypeVideo},
+		}, nil)
+
+		resp, err := comp.buildCommentResponses(context.TODO(), "", comments)
+		require.NoError(t, err)
+		require.Empty(t, resp)
+	})
+
+	t.Run("passed media visible to everyone", func(t *testing.T) {
+		mockMediaStore := mockdb.NewMockMediaModerationStore(t)
+		comp := &discussionComponentImpl{mediaStore: mockMediaStore}
+		comments := []database.Comment{{ID: 30, Content: "passed", User: author}}
+		mockMediaStore.EXPECT().FindMediaByCommentIDs(mock.Anything, []int64{30}).Return([]database.CommentMediaView{
+			{CommentID: 30, DataID: "d", Status: database.MediaModerationStatusPass, MediaType: types.MediaTypeVideo},
+		}, nil)
+
+		resp, err := comp.buildCommentResponses(context.TODO(), "other", comments)
+		require.NoError(t, err)
+		require.Len(t, resp, 1)
+		require.False(t, resp[0].PendingModeration)
+	})
+
+	t.Run("errored media still hidden (under moderation)", func(t *testing.T) {
+		mockMediaStore := mockdb.NewMockMediaModerationStore(t)
+		comp := &discussionComponentImpl{mediaStore: mockMediaStore}
+		comments := []database.Comment{{ID: 40, Content: "errored", User: author}}
+		mockMediaStore.EXPECT().FindMediaByCommentIDs(mock.Anything, []int64{40}).Return([]database.CommentMediaView{
+			{CommentID: 40, DataID: "d", Status: database.MediaModerationStatusError, MediaType: types.MediaTypeVideo},
+		}, nil)
+
+		resp, err := comp.buildCommentResponses(context.TODO(), "other", comments)
+		require.NoError(t, err)
+		require.Empty(t, resp)
+	})
+
+	t.Run("rejected media stays hidden until comment is deleted", func(t *testing.T) {
+		mockMediaStore := mockdb.NewMockMediaModerationStore(t)
+		comp := &discussionComponentImpl{mediaStore: mockMediaStore}
+		comments := []database.Comment{{ID: 41, Content: "rejected", User: author}}
+		mockMediaStore.EXPECT().FindMediaByCommentIDs(mock.Anything, []int64{41}).Return([]database.CommentMediaView{
+			{CommentID: 41, DataID: "d", Status: database.MediaModerationStatusReject, MediaType: types.MediaTypeVideo},
+		}, nil)
+
+		resp, err := comp.buildCommentResponses(context.TODO(), "other", comments)
+		require.NoError(t, err)
+		require.Empty(t, resp)
+	})
+}
+
+func TestDiscussionComponent_CommentUnderModeration(t *testing.T) {
+	mockMediaStore := mockdb.NewMockMediaModerationStore(t)
+	comp := &discussionComponentImpl{mediaStore: mockMediaStore}
+
+	t.Run("pending returns true", func(t *testing.T) {
+		mockMediaStore.EXPECT().FindMediaByCommentIDs(mock.Anything, []int64{1}).Return([]database.CommentMediaView{
+			{CommentID: 1, Status: database.MediaModerationStatusPending},
+		}, nil)
+		ok, err := comp.CommentUnderModeration(context.TODO(), 1)
+		require.NoError(t, err)
+		require.True(t, ok)
+	})
+
+	t.Run("reject remains under moderation until deletion", func(t *testing.T) {
+		mockMediaStore.EXPECT().FindMediaByCommentIDs(mock.Anything, []int64{2}).Return([]database.CommentMediaView{
+			{CommentID: 2, Status: database.MediaModerationStatusPass},
+			{CommentID: 2, Status: database.MediaModerationStatusReject},
+		}, nil)
+		ok, err := comp.CommentUnderModeration(context.TODO(), 2)
+		require.NoError(t, err)
+		require.True(t, ok)
+	})
+}
+
+func TestDiscussionComponent_LinkCommentMedia(t *testing.T) {
+	mockMediaStore := mockdb.NewMockMediaModerationStore(t)
+	comp := &discussionComponentImpl{mediaStore: mockMediaStore}
+	items := []types.CommentMediaItem{{DataID: "d1", TaskID: "t1", MediaType: types.MediaTypeAudio}}
+	mockMediaStore.EXPECT().LinkCommentMedia(mock.Anything, int64(77), items).Return(nil)
+	require.NoError(t, comp.LinkCommentMedia(context.TODO(), 77, items))
 }

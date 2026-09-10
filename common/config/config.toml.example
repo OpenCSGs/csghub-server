@@ -98,6 +98,18 @@ endpoint = "oss-cn-beijing.aliyuncs.com"
 enable_ssl = true
 oss_bucket = "sensitive-check"
 image_check_scenario = "baselineCheck"
+# Asynchronous audio/video moderation for discussion comments. Requires the
+# top-level sensitive_check.enable setting. When enabled,
+# a comment referencing pending audio/video is created in a pending state
+# (visible only to its author) and a temporal workflow polls the Aliyun result.
+media_moderation_enable = false
+# Max audio/video items a single comment may reference.
+media_moderation_max_refs = 3
+# How often the poll workflow queries the Aliyun result for each pending task.
+media_moderation_poll_interval = "30s"
+# How long the poll workflow runs before it finalizes (and deletes the comment
+# if media is still non-terminal).
+media_moderation_workflow_timeout = "30m"
 # "ac_automaton", "mutable_ac_automaton", "aliyun_green", "guard_llm"]
 check_chain = ["ac_automaton", "mutable_ac_automaton", "aliyun_green"]
 stream_check_mode = "async"

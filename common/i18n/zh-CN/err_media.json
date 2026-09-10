@@ -1,0 +1,8 @@
+{
+    "error.MEDIA-ERR-0": {
+        "other": "评论正在审核中，无法编辑"
+    },
+    "error.MEDIA-ERR-1": {
+        "other": "媒体审核服务不可用"
+    }
+}

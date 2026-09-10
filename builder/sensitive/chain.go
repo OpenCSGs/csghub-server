@@ -221,3 +221,25 @@ func defaultCheckOpts(config *config.Config, provider string) []ChainOption {
 		return nil
 	}
 }
+
+// SubmitMediaModeration delegates to the first checker in the chain that
+// implements MediaSensitiveChecker (the Aliyun Green checker). AC-automaton
+// checkers do not implement it and are skipped.
+func (c *chainImpl) SubmitMediaModeration(ctx context.Context, req types.MediaModerationRequest) (*types.MediaModerationSubmission, error) {
+	for _, checker := range c.checkers {
+		if mc, ok := checker.(MediaSensitiveChecker); ok {
+			return mc.SubmitMediaModeration(ctx, req)
+		}
+	}
+	return nil, fmt.Errorf("no checker in the chain supports media moderation")
+}
+
+// QueryMediaModerationResult delegates to the first MediaSensitiveChecker.
+func (c *chainImpl) QueryMediaModerationResult(ctx context.Context, req types.MediaModerationRequest) (*types.MediaModerationResult, error) {
+	for _, checker := range c.checkers {
+		if mc, ok := checker.(MediaSensitiveChecker); ok {
+			return mc.QueryMediaModerationResult(ctx, req)
+		}
+	}
+	return nil, fmt.Errorf("no checker in the chain supports media moderation")
+}

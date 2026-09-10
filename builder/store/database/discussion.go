@@ -6,6 +6,7 @@ import (
 
 	"github.com/uptrace/bun"
 	"opencsg.com/csghub-server/common/errorx"
+	"opencsg.com/csghub-server/common/types"
 )
 
 type Discussion struct {
@@ -52,10 +53,19 @@ type DiscussionStore interface {
 	UpdateByID(ctx context.Context, id int64, title string) error
 	DeleteByID(ctx context.Context, id int64) error
 	FindDiscussionComments(ctx context.Context, discussionID int64, per int, page int) ([]Comment, error)
+	FindVisibleDiscussionComments(ctx context.Context, req FindVisibleCommentsReq) ([]Comment, int, error)
 	CreateComment(ctx context.Context, comment Comment) (*Comment, error)
+	CreateCommentWithMedia(ctx context.Context, comment Comment, items []types.CommentMediaItem) (*Comment, error)
 	UpdateComment(ctx context.Context, id int64, content string) error
 	FindCommentByID(ctx context.Context, id int64) (*Comment, error)
 	DeleteComment(ctx context.Context, id int64) error
+}
+
+type FindVisibleCommentsReq struct {
+	DiscussionID int64
+	CurrentUser  string
+	Per          int
+	Page         int
 }
 
 func NewDiscussionStore() DiscussionStore {
@@ -154,11 +164,49 @@ func (s *discussionStoreImpl) FindDiscussionComments(ctx context.Context, discus
 	return comments, nil
 }
 
+func (s *discussionStoreImpl) FindVisibleDiscussionComments(ctx context.Context, req FindVisibleCommentsReq) ([]Comment, int, error) {
+	comments := make([]Comment, 0)
+	visibility := `NOT EXISTS (
+		SELECT 1 FROM comment_media AS cm
+		LEFT JOIN media_moderations AS mm ON mm.data_id = cm.data_id
+		WHERE cm.comment_id = comment.id AND COALESCE(mm.status, '') <> ?
+	) OR EXISTS (
+		SELECT 1 FROM users AS u WHERE u.id = comment.user_id AND u.username = ?
+	)`
+	baseQuery := s.db.Core.NewSelect().Model(&comments).
+		Where("commentable_type = ? AND commentable_id = ?", CommentableTypeDiscussion, req.DiscussionID).
+		Where("("+visibility+")", MediaModerationStatusPass, req.CurrentUser)
+	total, err := baseQuery.Clone().Count(ctx)
+	if err != nil {
+		return nil, 0, errorx.HandleDBError(err, errorx.Ctx().Set("id", req.DiscussionID))
+	}
+	err = baseQuery.Relation("User").
+		Order("comment.created_at DESC").
+		Limit(req.Per).
+		Offset((req.Page - 1) * req.Per).
+		Scan(ctx)
+	if err != nil {
+		return nil, 0, errorx.HandleDBError(err, errorx.Ctx().Set("id", req.DiscussionID))
+	}
+	return comments, total, nil
+}
+
 func (s *discussionStoreImpl) CreateComment(ctx context.Context, comment Comment) (*Comment, error) {
+	return s.CreateCommentWithMedia(ctx, comment, nil)
+}
+
+// CreateCommentWithMedia creates a comment and its moderation links in one
+// transaction. Readers can therefore never observe a pending-media comment
+// without the links that make it author-only.
+func (s *discussionStoreImpl) CreateCommentWithMedia(ctx context.Context, comment Comment, items []types.CommentMediaItem) (*Comment, error) {
 	err := s.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		_, err := tx.NewInsert().Model(&comment).Exec(ctx)
 		if err != nil {
 			err := errorx.HandleDBError(err, nil)
+			return err
+		}
+
+		if err := insertCommentMedia(ctx, tx, comment.ID, items); err != nil {
 			return err
 		}
 
@@ -211,6 +259,10 @@ func (s *discussionStoreImpl) DeleteComment(ctx context.Context, id int64) error
 		if err != nil {
 			err := errorx.HandleDBError(err, nil)
 			return err
+		}
+
+		if _, err = tx.NewDelete().Model((*CommentMedia)(nil)).Where("comment_id = ?", id).Exec(ctx); err != nil {
+			return errorx.HandleDBError(err, nil)
 		}
 
 		_, err = tx.NewDelete().Model(&Comment{}).Where("id = ?", id).ForceDelete().Exec(ctx)

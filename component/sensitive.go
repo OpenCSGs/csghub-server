@@ -18,6 +18,7 @@ type sensitiveComponentImpl struct {
 type SensitiveComponent interface {
 	CheckText(ctx context.Context, scenario types.SensitiveScenario, text string) (bool, error)
 	CheckImage(ctx context.Context, scenario types.SensitiveScenario, ossBucketName, ossObjectName string) (bool, error)
+	CheckImageURL(ctx context.Context, scenario types.SensitiveScenario, imageURL string) (bool, error)
 	CheckRequestV2(ctx context.Context, req types.SensitiveRequestV2) (bool, error)
 }
 
@@ -42,6 +43,14 @@ func (c sensitiveComponentImpl) CheckText(ctx context.Context, scenario types.Se
 
 func (c sensitiveComponentImpl) CheckImage(ctx context.Context, scenario types.SensitiveScenario, ossBucketName, ossObjectName string) (bool, error) {
 	result, err := c.checker.PassImageCheck(ctx, scenario, ossBucketName, ossObjectName)
+	if err != nil {
+		return false, err
+	}
+	return !result.IsSensitive, nil
+}
+
+func (c sensitiveComponentImpl) CheckImageURL(ctx context.Context, scenario types.SensitiveScenario, imageURL string) (bool, error) {
+	result, err := c.checker.PassImageURLCheck(ctx, scenario, imageURL)
 	if err != nil {
 		return false, err
 	}
@@ -77,6 +86,10 @@ func (c *sensitiveComponentNoOpImpl) CheckText(ctx context.Context, scenario typ
 }
 
 func (c *sensitiveComponentNoOpImpl) CheckImage(ctx context.Context, scenario types.SensitiveScenario, ossBucketName, ossObjectName string) (bool, error) {
+	return true, nil
+}
+
+func (c *sensitiveComponentNoOpImpl) CheckImageURL(ctx context.Context, scenario types.SensitiveScenario, imageURL string) (bool, error) {
 	return true, nil
 }
 

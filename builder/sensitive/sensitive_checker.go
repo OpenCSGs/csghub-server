@@ -15,6 +15,15 @@ type SensitiveChecker interface {
 	PassLLMCheck(ctx context.Context, req *types.LLMCheckRequest) (*CheckResult, error)
 }
 
+// MediaSensitiveChecker is implemented by checkers that support asynchronous
+// audio/video moderation (submit + poll). AliyunGreenChecker implements it;
+// the AC-automaton checkers do not. The chain type-asserts each checker to
+// this interface so non-media checkers are unaffected.
+type MediaSensitiveChecker interface {
+	SubmitMediaModeration(ctx context.Context, req types.MediaModerationRequest) (*types.MediaModerationSubmission, error)
+	QueryMediaModerationResult(ctx context.Context, req types.MediaModerationRequest) (*types.MediaModerationResult, error)
+}
+
 type ImageCheckReq struct {
 	OSSBucketName string `json:"oss_bucket_name"`
 	OSSObjectName string `json:"oss_object_name"`
