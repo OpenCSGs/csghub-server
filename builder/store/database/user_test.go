@@ -371,6 +371,22 @@ func TestUserStore_CountUsers(t *testing.T) {
 		UUID:     "2",
 	}, &database.Namespace{Path: "u-foo-2"})
 	require.Nil(t, err)
+	// A mirrored user (imported via multi-sync) must be excluded from the count.
+	err = us.Create(ctx, &database.User{
+		GitID:    3321,
+		Username: "u-mirrored",
+		UUID:     "3",
+	}, &database.Namespace{Path: "u-mirrored", Mirrored: true})
+	require.Nil(t, err)
+	// An organization namespace (namespace_type=organization) must not be
+	// counted as a user, even though mirrored=false.
+	_, err = db.Core.NewInsert().Model(&database.Namespace{
+		Path:          "u-foo-org",
+		UserID:        1,
+		NamespaceType: database.OrgNamespace,
+		Mirrored:      false,
+	}).Exec(ctx)
+	require.Nil(t, err)
 
 	count, err := us.CountUsers(ctx)
 	require.Nil(t, err)
