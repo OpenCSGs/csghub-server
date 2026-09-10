@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -34,9 +33,7 @@ import (
 	"opencsg.com/csghub-server/builder/store/cache"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
-	"opencsg.com/csghub-server/common/errorx"
 	commonType "opencsg.com/csghub-server/common/types"
-	"opencsg.com/csghub-server/common/utils/trace"
 	apicomp "opencsg.com/csghub-server/component"
 )
 
@@ -46,40 +43,14 @@ type OpenAIHandler interface {
 	ListModels(c *gin.Context)
 	// Get model details
 	GetModel(c *gin.Context)
-	// Chat with backend model
-	Chat(c *gin.Context)
-	// Responses runs OpenAI-compatible Responses API requests.
-	Responses(c *gin.Context)
 	// Get embedding for a text
 	Embedding(c *gin.Context)
 	// Rerank documents against a query for a text-ranking model
 	Rerank(c *gin.Context)
-	// Generate image from text
-	GenerateImage(c *gin.Context)
-	// Edit image from prompt and input image
-	EditImage(c *gin.Context)
-	// Create a video generation
-	CreateVideo(c *gin.Context)
-	// Create a video generation through the deprecated endpoint
-	CreateVideoDeprecated(c *gin.Context)
 	// Get a video generation
 	GetVideo(c *gin.Context)
-	// Get a video generation through the deprecated endpoint
-	GetVideoDeprecated(c *gin.Context)
 	// Download generated video content
 	GetVideoContent(c *gin.Context)
-	// Download generated video content through the deprecated endpoint
-	GetVideoContentDeprecated(c *gin.Context)
-	// Transcribe audio to text
-	Transcription(c *gin.Context)
-	// Translate audio to English text
-	Translation(c *gin.Context)
-	// Extract text from an image with OCR
-	OCR(c *gin.Context)
-	// Generate speech audio from text
-	Speech(c *gin.Context)
-	// Generate speech audio for multiple texts in a single request
-	SpeechBatch(c *gin.Context)
 	// List available voices of a text-to-speech model
 	ListVoices(c *gin.Context)
 	// Upload a voice sample for voice cloning
@@ -193,32 +164,6 @@ func (h *OpenAIHandlerImpl) Shutdown(ctx context.Context) error {
 		return nil
 	}
 	return h.llmTracer.Shutdown(ctx)
-}
-
-// handleInsufficientBalance returns an HTTP error before any upstream response
-// stream starts. Streaming requests must also receive a non-2xx status so
-// clients can distinguish this preflight failure from a successful SSE stream.
-func (h *OpenAIHandlerImpl) handleInsufficientBalance(c *gin.Context, _ bool, nsUUID, modelID string, err error) {
-	// Check if the error is the standard insufficient balance error
-	if !errors.Is(err, errorx.ErrInsufficientBalance) {
-		// If it's a different error, log and return generic error
-		slog.ErrorContext(c.Request.Context(), "balance check failed", slog.Any("ns_uuid", nsUUID),
-			slog.Any("model", modelID), slog.Any("error", err))
-		httpbase.ServerError(c, err)
-		return
-	}
-
-	slog.WarnContext(c.Request.Context(), "insufficient balance for request",
-		slog.Any("ns_uuid", nsUUID), slog.Any("model", modelID))
-
-	c.Header("Content-Type", "application/json; charset=utf-8")
-	c.JSON(http.StatusPaymentRequired, gin.H{
-		"error": gin.H{
-			"code":    "insufficient_balance",
-			"message": insufficientBalanceMessage(h.config.Frontend.URL),
-			"type":    "insufficient_balance",
-		},
-	})
 }
 
 func insufficientBalanceMessage(frontendURL string) string {
@@ -465,192 +410,6 @@ func (h *OpenAIHandlerImpl) GetModel(c *gin.Context) {
 
 var _ openai.ChatCompletion
 var _ openai.ChatCompletionChunk
-
-// Chat godoc
-// @Security     ApiKey
-// @Summary      Chat with backend model
-// @Description  Sends a chat completion request to the backend model and returns the response
-// @Tags         AIGateway
-// @Accept       json
-// @Produce      json
-// @Param        request body types.ChatCompletionRequest true "Chat completion request"
-// @Success      200  {object}  openai.ChatCompletion "OK"
-// @Success      200  {object}  openai.ChatCompletionChunk "OK"
-// @Failure      400  {object}  error "Bad request"
-// @Failure      404  {object}  error "Model not found"
-// @Failure      500  {object}  error "Internal server error"
-// @Router       /v1/chat/completions [post]
-func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
-	/*
-		1.parse request body of types.ChatCompletionRequest
-		2.get model id from request body
-		3.find running model endpoint by model id
-		4.proxy request to running model endpoint
-	*/
-	ctx := c.Request.Context()
-	username := httpbase.GetCurrentUser(c)
-	nsUUID := httpbase.GetCurrentNamespaceUUID(c)
-	apikey := httpbase.GetAccessToken(c)
-	requestID := trace.GetTraceIDInGinContext(c)
-	ctx, preflight := startPreflightTrace(ctx, preflightTraceStart{
-		API:       c.FullPath(),
-		RequestID: requestID,
-		UserID:    nsUUID,
-	})
-	c.Request = c.Request.WithContext(ctx)
-
-	chatReq := &types.ChatCompletionRequest{}
-	if err := c.BindJSON(chatReq); err != nil {
-		slog.ErrorContext(ctx, "invalid chat completion request body", slog.Any("error", err))
-		preflight.RecordError(err, "bad_request")
-		c.String(http.StatusBadRequest, fmt.Errorf("invalid chat completion request body:%w", err).Error())
-		return
-	}
-	modelID := chatReq.Model
-
-	modelTarget, err := h.resolveModelTarget(ctx, username, modelID, c.Request.Header)
-	// Metrics key point 1: enrich business data on the RequestMetrics object.
-	// A single call covers both paths — when err != nil, modelTarget is nil
-	// and only the requested modelID is recorded so the error is still
-	// attributed to the right model.
-	SetMetricsModelTarget(SetMetricsModelParams{
-		C:           c,
-		ModelID:     modelID,
-		ModelTarget: modelTarget,
-		IsStream:    chatReq.Stream,
-	})
-	if err != nil {
-		preflight.RecordError(err, "model_resolve")
-		handleModelTargetError(c, ctx, modelID, "failed to get model target address", err)
-		return
-	}
-	applyChatCompletionsEndpointCompatibility(ctx, modelTarget)
-	preflight.SetTargetModel(modelID, modelTarget)
-	chatReq.Model = modelTarget.ModelName
-
-	if chatReq.Stream {
-		c.Writer.Header().Set("Content-Type", "text/event-stream")
-		if !strings.Contains(modelTarget.Model.ImageID, "vllm-cpu") {
-			chatReq.StreamOptions = &types.StreamOptions{
-				IncludeUsage: true,
-			}
-		}
-	}
-
-	preflight.End()
-
-	traceCtx, generationRecorder := h.startChatTrace(
-		ctx,
-		c.Request.Header,
-		modelID,
-		modelTarget,
-		chatReq,
-		requestID,
-		nsUUID,
-	)
-	ctx = traceCtx
-	c.Request = c.Request.WithContext(traceCtx)
-
-	// Check balance before processing request
-	if !modelTarget.Model.SkipBalance() {
-		if err := h.openaiComponent.CheckBalance(ctx, nsUUID); err != nil {
-			finishLLMTraceWithError(generationRecorder, err, types.TraceErrInsufficientBalance)
-			h.handleInsufficientBalance(c, chatReq.Stream, nsUUID, modelID, err)
-			return
-		}
-	}
-	var modComponent component.Moderation = nil
-	isCheck, result, err := h.sensitivePolicy.CheckChatSensitive(ctx, modelTarget.Model, chatReq.Messages, nsUUID, chatReq.Stream, modelTarget.Upstream.Provider)
-	if err != nil {
-		slog.ErrorContext(ctx, "failed to check sensitive",
-			slog.String("model_id", modelID),
-			slog.String("username", username),
-			slog.Any("error", err))
-	}
-	if isCheck {
-		modComponent = h.modComponent
-		if result != nil && result.IsSensitive {
-			finishLLMTraceWithError(generationRecorder, ErrSensitiveContent, types.TraceErrSensitivePrompt)
-			handleSensitiveResponse(c, chatReq.Stream, result)
-			return
-		}
-	}
-
-	chatCtx := h.setupChatContext(
-		ctx,
-		modelTarget,
-		chatReq,
-		modComponent,
-		c.Writer,
-		trace.GetTraceIDInGinContext(c),
-		nsUUID,
-	)
-	defer chatCtx.responseWriter.ClearBuffer()
-
-	chatCtx.tokenCounter.AppendPrompts(chatReq.Messages)
-
-	if err := applyModelAuthHeaders(c.Request.Header, modelTarget.Model); err != nil {
-		slog.WarnContext(ctx, "invalid auth head",
-			slog.String("model", modelTarget.ModelName),
-			slog.Any("error", err))
-	}
-
-	proxyStartTime := time.Now()
-	log := slog.With(
-		slog.String("proxy_start_time", proxyStartTime.Format(time.RFC3339)),
-		slog.Any("model_name", modelTarget.ModelName),
-		slog.Any("current_user", username),
-		slog.Any("target", modelTarget.Target),
-		slog.Any("host", modelTarget.Host),
-	)
-	primaryWriter, proxyErr := h.executeChatProxyAttempt(c, chatCtx.responseWriter, modelTarget, nsUUID, chatReq)
-	if proxyErr != nil {
-		finishLLMTraceWithError(generationRecorder, proxyErr, types.TraceErrUpstreamUnavailable)
-		h.handleProxyError(c, chatReq.Stream, username, modelID, proxyErr)
-		log.ErrorContext(ctx, "failed to execute chat proxy", slog.Int("status", retryWriterStatusCode(primaryWriter)), slog.Any("error", proxyErr))
-		return
-	}
-	log.InfoContext(ctx, "proxy chat request to model target", slog.Int("status", primaryWriter.statusCode), slog.Int64("proxy_latency(ms)", time.Since(proxyStartTime).Milliseconds()), slog.Int64("ttft(ms)", retryWriterTTFTMs(primaryWriter, proxyStartTime)))
-
-	finalWriter, err := h.executeChatWithFallback(c, chatCtx, modelTarget, nsUUID, chatReq, primaryWriter, username, modelID)
-	if err != nil {
-		finishLLMTraceWithError(generationRecorder, err, types.TraceErrUpstreamUnavailable)
-		h.handleProxyError(c, chatReq.Stream, username, modelID, err)
-		log.ErrorContext(ctx, "failed to execute chat fallback", slog.Int("status", retryWriterStatusCode(finalWriter)), slog.Any("error", err))
-		return
-	}
-	log.InfoContext(ctx, "fallback chat request to model target", slog.Int("status", retryWriterStatusCode(finalWriter)), slog.Int64("proxy_latency(ms)", time.Since(proxyStartTime).Milliseconds()), slog.Int64("ttft(ms)", retryWriterTTFTMs(finalWriter, proxyStartTime)))
-
-	// Synchronously record proxy-level metrics before c.Next() returns.
-	// Metrics middleware Finalize()es RequestMetrics as soon as the handler
-	// returns, so this MUST stay on the hot path — never move it to the
-	// async post-process goroutine or the write will race Finalize().
-	//
-	// Pre-compute usage once here and share the *Usage pointer with both
-	// RecordMetrics (sync) and runChatPostProcessAsync (async) to avoid
-	// calling counter.Usage() three times (metrics, trace, CommitUsageLimit).
-	chatUsage := preComputeUsage(ctx, chatCtx.tokenCounter)
-	RecordMetrics(RecordMetricsParams{
-		C:              c,
-		Ctx:            ctx,
-		FinalWrite:     finalWriter,
-		Counter:        chatCtx.tokenCounter,
-		ProxyStartTime: proxyStartTime,
-		Usage:          chatUsage,
-	})
-
-	h.runChatPostProcessAsync(ctx, chatPostProcessInput{
-		NSUUID:          nsUUID,
-		ApiKey:          apikey,
-		Model:           modelTarget.Model,
-		TargetModelName: modelTarget.ModelName,
-		TokenCounter:    chatCtx.tokenCounter,
-		Usage:           chatUsage,
-		LogCapture:      chatCtx.logCapture,
-		Trace:           newChatTracePostProcessInput(generationRecorder, chatReq, finalWriter),
-		StatusCode:      retryWriterStatusCode(finalWriter),
-	})
-}
 
 type chatPostProcessInput struct {
 	NSUUID          string
@@ -931,159 +690,6 @@ func resolveFailureEventModelID(requestModelID string, model *types.Model) strin
 		return ""
 	}
 	return strings.TrimSpace(model.ID)
-}
-
-// Embedding godoc
-// @Security     ApiKey
-// @Summary      Get embedding for a text
-// @Description  Sends a text to the backend model and returns the embedding
-// @Tags         AIGateway
-// @Accept       json
-// @Produce      json
-// @Param        request body  types.EmbeddingRequest true "Embedding request"
-// @Success      200  {object}  types.Response{} "OK"
-// @Failure      400  {object}  error "Bad request or sensitive input"
-// @Failure      404  {object}  error "Model not found"
-// @Failure      500  {object}  error "Internal server error"
-// @Router       /v1/embeddings [post]
-func (h *OpenAIHandlerImpl) Embedding(c *gin.Context) {
-	ctx := c.Request.Context()
-	username := httpbase.GetCurrentUser(c)
-	nsUUID := httpbase.GetCurrentNamespaceUUID(c)
-	apikey := httpbase.GetAccessToken(c)
-	requestID := trace.GetTraceIDInGinContext(c)
-	ctx, preflight := startPreflightTrace(ctx, preflightTraceStart{
-		API:       c.FullPath(),
-		RequestID: requestID,
-		UserID:    nsUUID,
-	})
-	c.Request = c.Request.WithContext(ctx)
-
-	var req types.EmbeddingRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		preflight.RecordError(err, "bad_request")
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-	if req.Model == "" {
-		preflight.RecordError(fmt.Errorf("model cannot be empty"), "bad_request")
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Model cannot be empty"})
-		return
-	}
-	if req.Input.OfString.String() == "" &&
-		len(req.Input.OfArrayOfStrings) == 0 &&
-		len(req.Input.OfArrayOfTokenArrays) == 0 &&
-		len(req.Input.OfArrayOfTokens) == 0 {
-		preflight.RecordError(fmt.Errorf("input cannot be empty"), "bad_request")
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Input cannot be empty"})
-		return
-	}
-	modelID := req.Model
-	modelTarget, err := h.resolveModelTarget(ctx, username, modelID, c.Request.Header)
-	SetMetricsModelTarget(SetMetricsModelParams{
-		C:           c,
-		ModelID:     modelID,
-		ModelTarget: modelTarget,
-		IsStream:    false,
-	})
-	if err != nil {
-		preflight.RecordError(err, "model_resolve")
-		handleModelTargetError(c, ctx, modelID, "failed to get embedding target address", err)
-		return
-	}
-
-	preflight.SetTargetModel(modelID, modelTarget)
-	preflight.End()
-
-	traceCtx, embeddingRecorder := h.startEmbeddingTrace(
-		ctx,
-		modelID,
-		modelTarget,
-		&req,
-		requestID,
-		nsUUID,
-	)
-	c.Request = c.Request.WithContext(traceCtx)
-
-	// Check balance before processing request
-	if err := h.openaiComponent.CheckBalance(c.Request.Context(), nsUUID); err != nil {
-		finishEmbeddingTraceWithError(embeddingRecorder, err, types.TraceErrInsufficientBalance)
-		h.handleInsufficientBalance(c, false, nsUUID, modelID, err)
-		return
-	}
-
-	req.Model = modelTarget.ModelName
-	data, _ := json.Marshal(req)
-	c.Request.Body = io.NopCloser(bytes.NewReader(data))
-	c.Request.ContentLength = int64(len(data))
-	if err := applyModelAuthHeaders(c.Request.Header, modelTarget.Model); err != nil {
-		slog.WarnContext(c.Request.Context(), "invalid auth head", slog.String("model", modelTarget.ModelName), slog.Any("error", err))
-	}
-	slog.InfoContext(c, "proxy embedding request to model endpoint", slog.Any("target", modelTarget.Target), slog.Any("host", modelTarget.Host), slog.Any("user", username), slog.Any("model_id", modelID))
-	proxyToAPI := resolveProxyPathFromModelEndpoint(modelTarget.Model.Endpoint, modelTarget.ModelName)
-	rp, err := proxy.NewReverseProxy(modelTarget.Target, proxy.WithoutAcceptEncoding())
-	if err != nil {
-		finishEmbeddingTraceWithError(embeddingRecorder, err, types.TraceErrUpstreamUnavailable)
-		httpbase.ServerError(c, err)
-		return
-	}
-
-	tokenCounter := h.tokenCounterFactory.NewEmbedding(token.CreateParam{
-		Endpoint: modelTarget.Target,
-		Host:     modelTarget.Host,
-		Model:    modelTarget.ModelName,
-		ImageID:  modelTarget.Model.ImageID,
-		Provider: modelTarget.Model.Provider,
-	})
-	w := NewResponseWriterWrapperEmbedding(c.Writer, tokenCounter)
-	if req.Input.OfString.String() != "" {
-		tokenCounter.Input(req.Input.OfString.Value)
-	}
-
-	proxyStartTime := time.Now()
-	rp.ServeHTTP(w, c.Request, proxyToAPI, modelTarget.Host)
-
-	// Synchronously record proxy-level metrics before c.Next() returns.
-	// Capture usage first so the counter has token counts available for
-	// RecordMetrics to pre-fetch synchronously.  FinalWrite is nil because
-	// embedding is non-streaming — TTFT is not applicable.
-	w.CaptureEmbeddingUsage()
-	embeddingUsage := preComputeUsage(ctx, tokenCounter)
-	RecordMetrics(RecordMetricsParams{
-		C:              c,
-		Ctx:            ctx,
-		FinalWrite:     nil,
-		Counter:        tokenCounter,
-		ProxyStartTime: proxyStartTime,
-		Usage:          embeddingUsage,
-	})
-
-	go func() {
-		usageCtx, cancel := context.WithTimeout(context.WithoutCancel(c.Request.Context()), 3*time.Second)
-		defer cancel()
-
-		// Use the pre-computed usage from the sync path; fall back to a
-		// fresh counter.Usage() call only when sync pre-compute failed.
-		usage := embeddingUsage
-		if usage == nil && tokenCounter != nil {
-			var usageErr error
-			usage, usageErr = tokenCounter.Usage(usageCtx)
-			if usageErr != nil {
-				slog.ErrorContext(usageCtx, "failed to get embedding token usage", slog.Any("error", usageErr))
-			}
-		}
-		if embeddingRecorder != nil {
-			recordEmbeddingTraceCompletion(embeddingRecorder, &req, modelTarget.ModelName, usage, w.StatusCode())
-			embeddingRecorder.End()
-		}
-
-		if usage != nil && isSuccessfulStatus(w.StatusCode()) {
-			err := h.openaiComponent.RecordUsageFromTokenUsage(usageCtx, nsUUID, modelTarget.Model, modelTarget.ModelName, usage, apikey)
-			if err != nil {
-				slog.ErrorContext(c, "failed to record embedding token usage", "error", err)
-			}
-		}
-	}()
 }
 
 // retryWriterStatusCode safely extracts the status code from a chatRetryResponseWriter.

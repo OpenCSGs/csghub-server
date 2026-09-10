@@ -1,11 +1,8 @@
 package handler
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -18,7 +15,6 @@ import (
 	"opencsg.com/csghub-server/aigateway/token"
 	"opencsg.com/csghub-server/aigateway/types"
 	"opencsg.com/csghub-server/builder/compress"
-	commontypes "opencsg.com/csghub-server/common/types"
 )
 
 func TestValidateResponsesAdapterRequestStoreFalseSucceeds(t *testing.T) {
@@ -208,88 +204,6 @@ func TestNormalizeChatRole(t *testing.T) {
 	}
 	for role, want := range cases {
 		require.Equal(t, want, normalizeChatRole(role))
-	}
-}
-
-func TestResponsesMalformedJSONReturnsOpenAIError(t *testing.T) {
-	tester, c, w := setupTest(t)
-	c.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", bytes.NewBufferString(`{"model":`))
-	c.Request.Header.Set("Content-Type", "application/json")
-
-	tester.handler.Responses(c)
-
-	require.Equal(t, http.StatusBadRequest, w.Code)
-	var body struct {
-		Error types.Error `json:"error"`
-	}
-	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &body))
-	require.Equal(t, "invalid_request_error", body.Error.Code)
-	require.Equal(t, "invalid_request_error", body.Error.Type)
-	require.Contains(t, body.Error.Message, "invalid responses request body")
-}
-
-func TestResponsesNativeDisablesAcceptEncoding(t *testing.T) {
-	for _, stream := range []bool{false, true} {
-		t.Run(fmt.Sprintf("stream_%t", stream), func(t *testing.T) {
-			tester, c, w := setupTest(t)
-			tester.mocks.openAIComp.ExpectedCalls = nil
-			tester.handler.config.AIGateway.ResponsesIDSecret = "responses-secret"
-
-			upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				require.Equal(t, "identity", r.Header.Get("Accept-Encoding"))
-				require.Equal(t, "/v1/responses", r.URL.Path)
-				w.Header().Set("Content-Type", "application/json")
-				if stream {
-					w.Header().Set("Content-Type", "text/event-stream")
-					_, _ = w.Write([]byte("event: response.completed\n" + `data: {"type":"response.completed","response":{"id":"resp_upstream","object":"response","status":"completed"}}` + "\n\n"))
-					return
-				}
-				_, _ = w.Write([]byte(`{"id":"resp_upstream","object":"response","status":"completed"}`))
-			}))
-			defer upstream.Close()
-
-			model := &types.Model{
-				BaseModel: types.BaseModel{ID: "native-model", Object: "model", OwnedBy: "testuser"},
-				Upstreams: []commontypes.UpstreamConfig{{
-					ID:        7,
-					URL:       upstream.URL + "/v1/responses",
-					Enabled:   true,
-					ModelName: "upstream-model",
-					Provider:  "openai",
-				}},
-			}
-			tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "native-model").Return(model, nil).Once()
-			tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil).Once()
-			tester.mocks.openAIComp.EXPECT().CheckUsageLimit(mock.Anything, "testuuid", model, upstream.URL+"/v1/responses").Return(nil).Once()
-			var wg sync.WaitGroup
-			wg.Add(2)
-			tester.mocks.openAIComp.EXPECT().
-				CommitUsageLimitFromUsage(mock.Anything, "testuuid", model, mock.Anything).
-				RunAndReturn(func(ctx context.Context, userUUID string, model *types.Model, usage *token.Usage) error {
-					wg.Done()
-					return nil
-				}).
-				Once()
-			tester.mocks.openAIComp.EXPECT().
-				RecordUsageFromTokenUsage(mock.Anything, "testuuid", model, "upstream-model", mock.MatchedBy(func(usage *token.Usage) bool {
-					return usage != nil && usage.PromptTokens > 0
-				}), "").
-				RunAndReturn(func(ctx context.Context, userUUID string, model *types.Model, targetModelName string, usage *token.Usage, apikey string) error {
-					wg.Done()
-					return nil
-				}).
-				Once()
-
-			reqBody := fmt.Sprintf(`{"model":"native-model","input":"hello","stream":%t}`, stream)
-			c.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", strings.NewReader(reqBody))
-			c.Request.Header.Set("Content-Type", "application/json")
-			c.Request.Header.Set("Accept-Encoding", "gzip")
-
-			tester.handler.Responses(c)
-			wg.Wait()
-
-			require.Equal(t, http.StatusOK, w.Code)
-		})
 	}
 }
 
@@ -1910,69 +1824,4 @@ func TestResponsesToChatRequestFunctionOnlyPathStillWorks(t *testing.T) {
 			}
 		}
 	]`, string(data))
-}
-
-func TestResponsesAdapterEndToEndNonFunctionToolsDropped(t *testing.T) {
-	tester, c, w := setupTest(t)
-	tester.mocks.openAIComp.ExpectedCalls = nil
-
-	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		require.Equal(t, "/v1/chat/completions", r.URL.Path)
-		body, _ := io.ReadAll(r.Body)
-		var parsed map[string]any
-		require.NoError(t, json.Unmarshal(body, &parsed))
-		tools, ok := parsed["tools"].([]any)
-		require.True(t, ok)
-		// Only function tools reach the upstream; code_interpreter is dropped
-		require.Len(t, tools, 1)
-		tool0 := tools[0].(map[string]any)
-		require.Equal(t, "function", tool0["type"])
-		fn := tool0["function"].(map[string]any)
-		require.Equal(t, "get_weather", fn["name"])
-
-		w.Header().Set("Content-Type", "application/json")
-		_, err := w.Write([]byte(`{
-			"id":"chatcmpl_1","created":123,"model":"upstream-model",
-			"choices":[{"message":{"role":"assistant","content":"ok"}}],
-			"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}
-		}`))
-		require.NoError(t, err)
-	}))
-	defer upstream.Close()
-
-	model := &types.Model{
-		BaseModel: types.BaseModel{ID: "adapter-tools-model", Object: "model", OwnedBy: "testuser"},
-		Upstreams: []commontypes.UpstreamConfig{{
-			ID:        9,
-			URL:       upstream.URL + "/v1/chat/completions",
-			Enabled:   true,
-			ModelName: "upstream-model",
-			Provider:  "openai",
-		}},
-	}
-	tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "adapter-tools-model").Return(model, nil).Once()
-	tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil).Once()
-	tester.mocks.openAIComp.EXPECT().CheckUsageLimit(mock.Anything, "testuuid", model, upstream.URL+"/v1/chat/completions").Return(nil).Once()
-	var wg sync.WaitGroup
-	wg.Add(2)
-	tester.mocks.openAIComp.EXPECT().
-		CommitUsageLimitFromUsage(mock.Anything, "testuuid", model, mock.Anything).
-		RunAndReturn(func(ctx context.Context, userUUID string, model *types.Model, usage *token.Usage) error {
-			wg.Done()
-			return nil
-		}).Once()
-	tester.mocks.openAIComp.EXPECT().
-		RecordUsageFromTokenUsage(mock.Anything, "testuuid", model, "upstream-model", mock.Anything, "").
-		RunAndReturn(func(ctx context.Context, userUUID string, model *types.Model, targetModelName string, usage *token.Usage, apikey string) error {
-			wg.Done()
-			return nil
-		}).Once()
-
-	reqBody := `{"model":"adapter-tools-model","input":"hello","tools":[{"type":"function","name":"get_weather","parameters":{"type":"object"}},{"type":"code_interpreter"}]}`
-	c.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", strings.NewReader(reqBody))
-	c.Request.Header.Set("Content-Type", "application/json")
-
-	tester.handler.Responses(c)
-	wg.Wait()
-	require.Equal(t, http.StatusOK, w.Code)
 }

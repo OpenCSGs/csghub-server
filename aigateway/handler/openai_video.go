@@ -25,161 +25,7 @@ import (
 	"opencsg.com/csghub-server/builder/proxy"
 	"opencsg.com/csghub-server/builder/store/database"
 	commontypes "opencsg.com/csghub-server/common/types"
-	"opencsg.com/csghub-server/common/utils/trace"
 )
-
-// CreateVideo godoc
-// @Security     ApiKey
-// @Summary      Create a video generation
-// @Description  Creates an OpenAI-compatible text-to-video or image-to-video generation request. Image input can be supplied by JSON input_reference or multipart input_reference.
-// @Tags         AIGateway
-// @Accept       json
-// @Accept       multipart/form-data
-// @Produce      json
-// @Param        request body types.VideoGenerationRequest true "Video generation request"
-// @Param        model formData string false "Model ID for multipart requests"
-// @Param        prompt formData string false "Video prompt for multipart requests"
-// @Param        size formData string false "Video size for multipart requests"
-// @Param        seconds formData int false "Video duration in seconds for multipart requests"
-// @Param        input_reference formData file false "Image input reference for multipart image-to-video requests"
-// @Param        audio formData file false "Audio reference; repeat once per speaker (maximum two)"
-// @Param        audio_type formData string false "Multi-speaker audio mode: para or add"
-// @Param        num_segments formData int false "Number of generated continuation segments"
-// @Param        ref_img_index formData int false "Reference image frame index for continuation"
-// @Param        mask_frame_range formData int false "Reference mask frame range for continuation"
-// @Param        bbox formData string false "Speaker bounding boxes as JSON using [ymin,xmin,ymax,xmax]"
-// @Success      200 {object} types.VideoObject "OK"
-// @Failure      400 {object} types.Error "Bad request"
-// @Failure      404 {object} types.Error "Model not found"
-// @Failure      500 {object} types.Error "Internal server error"
-// @Router       /v1/video/generations [post]
-func (h *OpenAIHandlerImpl) CreateVideo(c *gin.Context) {
-	username := httpbase.GetCurrentUser(c)
-	nsUUID := httpbase.GetCurrentNamespaceUUID(c)
-	apikey := httpbase.GetAccessToken(c)
-	ctx := c.Request.Context()
-	requestID := trace.GetTraceIDInGinContext(c)
-	ctx, preflight := startPreflightTrace(ctx, preflightTraceStart{
-		API:       c.FullPath(),
-		RequestID: requestID,
-		UserID:    nsUUID,
-	})
-	c.Request = c.Request.WithContext(ctx)
-
-	input, parseErr, ok := parseCreateVideoInput(c)
-	if !ok {
-		preflight.RecordError(parseErr, "bad_request")
-		return
-	}
-
-	modelTarget, err := h.resolveModelTarget(ctx, username, input.modelID, c.Request.Header)
-	SetMetricsModelTarget(SetMetricsModelParams{
-		C:           c,
-		ModelID:     input.modelID,
-		ModelTarget: modelTarget,
-		IsStream:    false,
-	})
-	if err != nil {
-		preflight.RecordError(err, "model_resolve")
-		handleModelTargetError(c, ctx, input.modelID, "failed to get video target address", err)
-		return
-	}
-	preflight.SetTargetModel(input.modelID, modelTarget)
-
-	if guardErr := checkModalRequestAllowed(modelTarget.Model, input.adapterReq.Size); guardErr != nil {
-		preflight.RecordError(guardErr, "modal_price_guard")
-		handleModelTargetError(c, ctx, input.modelID, "modal price guard rejected request", guardErr)
-		return
-	}
-	preflight.End()
-
-	traceCtx, generationRecorder := h.startModalGenerationTrace(ctx, modalTraceStartInput{
-		API:           c.FullPath(),
-		OperationName: modalTraceOperationGenerateContent,
-		OutputType:    modalTraceOutputVideo,
-		RequestID:     requestID,
-		NSUUID:        nsUUID,
-		ModelID:       input.modelID,
-		ModelTarget:   modelTarget,
-		Metadata: map[string]any{
-			llmtrace.TraceMetadataKeyVideoSize:    input.adapterReq.Size,
-			llmtrace.TraceMetadataKeyVideoSeconds: input.adapterReq.Seconds,
-		},
-	})
-	ctx = traceCtx
-	c.Request = c.Request.WithContext(traceCtx)
-
-	adapter := h.t2vRegistry.GetAdapter(modelTarget.Model)
-	if !validateCreateVideoAdapter(c, input, adapter, modelTarget.Model) {
-		finishModalGenerationTraceWithError(generationRecorder, fmt.Errorf("unsupported video model '%s'", input.modelID), types.TraceErrUpstreamUnavailable)
-		return
-	}
-
-	if !h.authorizeCreateVideo(c, ctx, nsUUID, input, modelTarget, generationRecorder) {
-		return
-	}
-
-	providerReq, ok := buildCreateVideoProviderRequest(c, ctx, input, adapter, modelTarget, generationRecorder)
-	if !ok {
-		return
-	}
-	capture, ok := proxyCreateVideoRequest(c, ctx, providerReq, modelTarget, generationRecorder)
-	if !ok {
-		return
-	}
-	body := capture.Body()
-	var videoResp *types.VideoObject
-	if isSuccessfulStatus(capture.StatusCode()) {
-		var videoProviderResp *text2video.ProviderResponse
-		videoProviderResp, ok = parseCreateVideoProviderResponse(c, ctx, adapter, body, generationRecorder)
-		if !ok {
-			return
-		}
-		videoResp = videoProviderResp.Video
-		if videoResp != nil && videoResp.ID != "" && h.aiGenerationStore != nil {
-			videoID, ok := h.createVideoGenerationTask(c, ctx, nsUUID, apikey, input, modelTarget, videoProviderResp, videoResp, generationRecorder)
-			if !ok {
-				return
-			}
-			normalized := *videoResp
-			normalized.ID = videoID
-			videoResp = &normalized
-			body = normalizeVideoResponseBody(adapter, body, videoProviderResp.Video, videoID)
-		}
-	}
-	if generationRecorder != nil {
-		recordModalGenerationTraceCompletion(modalTraceCompletionInput{
-			Recorder:   generationRecorder,
-			Provider:   modelTarget.Model.Provider,
-			Model:      modelTarget.ModelName,
-			StatusCode: capture.StatusCode(),
-			Metadata:   videoTraceCompletionMetadata(videoResp, input),
-		})
-		generationRecorder.End()
-	}
-
-	copyProxyResponse(c, capture.Header(), capture.StatusCode(), body)
-}
-
-// CreateVideoDeprecated godoc
-// @Security     ApiKey
-// @Summary      Create a video generation (deprecated)
-// @Description  Deprecated: use POST /v1/video/generations instead.
-// @Deprecated
-// @Tags         AIGateway
-// @Accept       json
-// @Accept       multipart/form-data
-// @Produce      json
-// @Param        request body types.VideoGenerationRequest true "Video generation request"
-// @Success      200 {object} types.VideoObject "OK"
-// @Failure      400 {object} types.Error "Bad request"
-// @Failure      404 {object} types.Error "Model not found"
-// @Failure      500 {object} types.Error "Internal server error"
-// @Router       /v1/videos [post]
-func (h *OpenAIHandlerImpl) CreateVideoDeprecated(c *gin.Context) {
-	markDeprecatedVideoAPI(c, "/v1/video/generations")
-	h.CreateVideo(c)
-}
 
 type createVideoInput struct {
 	adapterReq                 types.VideoGenerationRequest
@@ -273,29 +119,6 @@ func validateCreateVideoAdapter(c *gin.Context, input *createVideoInput, adapter
 	}
 	if err := validateVideoAdapterCompatibility(input.adapterReq, input.isMultipart, input.hasMultipartInputReference, input.multipartAudioCount, caps); err != nil {
 		writeVideoAPIError(c, http.StatusBadRequest, "invalid_request_error", err.Error(), "invalid_request_error")
-		return false
-	}
-	return true
-}
-
-func (h *OpenAIHandlerImpl) authorizeCreateVideo(c *gin.Context, ctx context.Context, nsUUID string, input *createVideoInput, modelTarget *resolvedModelTarget, recorder llmtrace.GenerationRecorder) bool {
-	if !modelTarget.Model.SkipBalance() {
-		if err := h.openaiComponent.CheckBalance(ctx, nsUUID); err != nil {
-			finishModalGenerationTraceWithError(recorder, err, types.TraceErrInsufficientBalance)
-			h.handleInsufficientBalance(c, false, nsUUID, input.modelID, err)
-			return false
-		}
-	}
-
-	result, err := h.modComponent.CheckImagePrompts(ctx, input.adapterReq.Prompt, nsUUID)
-	if err != nil {
-		finishModalGenerationTraceWithError(recorder, err, types.TraceErrUpstreamUnavailable)
-		writeVideoAPIError(c, http.StatusInternalServerError, "moderation_error", "failed to check video prompts: "+err.Error(), "internal_error")
-		return false
-	}
-	if result != nil && result.IsSensitive {
-		finishModalGenerationTraceWithError(recorder, ErrSensitiveContent, types.TraceErrSensitivePrompt)
-		writeVideoAPIError(c, http.StatusBadRequest, "content_policy_violation", "Input data may contain inappropriate content.", "invalid_request_error")
 		return false
 	}
 	return true
@@ -485,24 +308,6 @@ func (h *OpenAIHandlerImpl) GetVideo(c *gin.Context) {
 	copyProxyResponse(c, capture.Header(), capture.StatusCode(), normalizeVideoResponseBody(adapter, body, videoResp, target.generation.ResourceID))
 }
 
-// GetVideoDeprecated godoc
-// @Security     ApiKey
-// @Summary      Get a video generation (deprecated)
-// @Description  Deprecated: use GET /v1/video/generations/{video_id} instead.
-// @Deprecated
-// @Tags         AIGateway
-// @Produce      json
-// @Param        video_id path string true "Gateway video ID"
-// @Success      200 {object} types.VideoObject "OK"
-// @Failure      400 {object} types.Error "Bad request"
-// @Failure      404 {object} types.Error "Video not found"
-// @Failure      500 {object} types.Error "Internal server error"
-// @Router       /v1/videos/{video_id} [get]
-func (h *OpenAIHandlerImpl) GetVideoDeprecated(c *gin.Context) {
-	markDeprecatedVideoAPI(c, "/v1/video/generations/"+c.Param("video_id"))
-	h.GetVideo(c)
-}
-
 func (h *OpenAIHandlerImpl) asyncGenerationStatusRefreshInterval() time.Duration {
 	if h != nil && h.config != nil && h.config.AIGateway.AsyncGenerationStatusRefreshInterval > 0 {
 		return time.Duration(h.config.AIGateway.AsyncGenerationStatusRefreshInterval) * time.Second
@@ -596,30 +401,6 @@ func (h *OpenAIHandlerImpl) GetVideoContent(c *gin.Context) {
 		return
 	}
 	streamVideoDownloadURL(c, contentResp.DownloadURL)
-}
-
-// GetVideoContentDeprecated godoc
-// @Security     ApiKey
-// @Summary      Download generated video content (deprecated)
-// @Description  Deprecated: use GET /v1/video/generations/{video_id}/content instead.
-// @Deprecated
-// @Tags         AIGateway
-// @Produce      application/octet-stream
-// @Produce      video/mp4
-// @Param        video_id path string true "Gateway video ID"
-// @Success      200 {file} binary "Generated video content"
-// @Failure      400 {object} types.Error "Bad request"
-// @Failure      404 {object} types.Error "Video not found"
-// @Failure      500 {object} types.Error "Internal server error"
-// @Router       /v1/videos/{video_id}/content [get]
-func (h *OpenAIHandlerImpl) GetVideoContentDeprecated(c *gin.Context) {
-	markDeprecatedVideoAPI(c, "/v1/video/generations/"+c.Param("video_id")+"/content")
-	h.GetVideoContent(c)
-}
-
-func markDeprecatedVideoAPI(c *gin.Context, successorPath string) {
-	c.Header("Deprecation", "@1784851200")
-	c.Header("Link", fmt.Sprintf("<%s>; rel=\"successor-version\"", successorPath))
 }
 
 func ensureVideoContentReady(c *gin.Context, generation *database.AIGeneration) bool {
@@ -1194,8 +975,6 @@ func (w videoStreamingWriter) Flush() {
 }
 
 func copyProxyResponse(c *gin.Context, header http.Header, statusCode int, body []byte) {
-	deprecation := c.Writer.Header().Get("Deprecation")
-	successorLink := c.Writer.Header().Get("Link")
 	for key := range c.Writer.Header() {
 		c.Writer.Header().Del(key)
 	}
@@ -1203,12 +982,6 @@ func copyProxyResponse(c *gin.Context, header http.Header, statusCode int, body 
 		for _, value := range values {
 			c.Writer.Header().Add(key, value)
 		}
-	}
-	if deprecation != "" {
-		c.Writer.Header().Set("Deprecation", deprecation)
-	}
-	if successorLink != "" {
-		c.Writer.Header().Set("Link", successorLink)
 	}
 	c.Writer.Header().Del("Content-Length")
 	c.Status(statusCode)
