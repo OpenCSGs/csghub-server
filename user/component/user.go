@@ -893,16 +893,16 @@ func (c *userComponentImpl) buildUserInfo(ctx context.Context, dbuser *database.
 	if len(dborgs) > 0 {
 		for _, org := range dborgs {
 			o := types.Organization{
-				Name:     org.Name,
-				Nickname: org.Nickname,
-				Homepage: org.Homepage,
-				Logo:     org.Logo,
-				OrgType:  org.OrgType,
-				Verified: org.Verified,
-				IsRoot:   org.IsRoot,
-				IsUnit:   org.IsUnit,
-				UserID:   org.UserID,
-				UUID:     org.UUID,
+				Name:           org.Name,
+				Nickname:       org.Nickname,
+				Homepage:       org.Homepage,
+				Logo:           org.Logo,
+				OrgType:        org.OrgType,
+				Verified:       org.Verified,
+				IsRoot:         org.IsRoot,
+				IsHierarchical: org.IsHierarchical,
+				UserID:         org.UserID,
+				UUID:           org.UUID,
 			}
 			if !onlyBasicInfo {
 				o.Role = org.Role

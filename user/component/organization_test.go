@@ -247,7 +247,7 @@ func TestOrganizationComponent_DeleteRejectsHierarchyOrganization(t *testing.T) 
 	}).Return(rebac.Decision{Allowed: true}, nil).Once()
 	mockOrgStore := mockdb.NewMockOrgStore(t)
 	mockOrgStore.EXPECT().FindByPath(ctx, req.Name).Return(database.Organization{
-		ID: 1, Name: req.Name, UUID: organizationUUID, IsRoot: true, IsUnit: true,
+		ID: 1, Name: req.Name, UUID: organizationUUID, IsRoot: true, IsHierarchical: true,
 	}, nil).Once()
 
 	c := &organizationComponentImpl{

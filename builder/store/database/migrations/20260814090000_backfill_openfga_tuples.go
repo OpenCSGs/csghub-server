@@ -69,7 +69,10 @@ func backfillOpenFGATuples(ctx context.Context) error {
 		return fmt.Errorf("OpenFGA tuple backfill requires a PostgreSQL pgx pool")
 	}
 
-	provider, err := openfgaprovider.NewProviderWithPGXPool(pool)
+	provider, err := openfgaprovider.NewCustomProvider(
+		openfgaprovider.WithPGXPool(pool),
+		openfgaprovider.WithAuthorizationModelID(types.OpenFgaAuthorizationModelIDVer1_0),
+	)
 	if err != nil {
 		return fmt.Errorf("initialize OpenFGA provider for tuple backfill: %w", err)
 	}

@@ -32,7 +32,7 @@ func (s *hierarchyOrganizationStore) GetUserBelongOrgs(ctx context.Context, user
 		ColumnExpr("organization.*").
 		ColumnExpr("member.role AS role").
 		Join("JOIN members AS member ON member.organization_id = organization.id AND member.deleted_at IS NULL").
-		Where("member.user_id = ? AND organization.is_unit = TRUE", userID).
+		Where("member.user_id = ? AND organization.is_hierarchical = TRUE", userID).
 		Scan(ctx, &organizations)
 	return organizations, errorx.HandleDBError(err, nil)
 }
@@ -52,7 +52,7 @@ func (s *hierarchyOrganizationStore) SearchUserBelongOrgs(ctx context.Context, u
 		ColumnExpr("organization.*").
 		ColumnExpr("member.role AS role").
 		Join("JOIN members AS member ON member.organization_id = organization.id AND member.deleted_at IS NULL").
-		Where("member.user_id = ? AND organization.is_unit = TRUE", userID)
+		Where("member.user_id = ? AND organization.is_hierarchical = TRUE", userID)
 	switch types.UserRole(role) {
 	case types.UserWrite:
 		query = query.Where("member.role = ?", types.UserWrite)
@@ -107,7 +107,7 @@ func (s *hierarchyOrganizationStore) GetSharedOrgIDs(ctx context.Context, userID
 		Model((*Organization)(nil)).
 		Column("organization.id").
 		Join("JOIN members AS member ON member.organization_id = organization.id AND member.deleted_at IS NULL").
-		Where("member.user_id IN (?) AND organization.is_unit = TRUE", bun.In(userIDs)).
+		Where("member.user_id IN (?) AND organization.is_hierarchical = TRUE", bun.In(userIDs)).
 		Group("organization.id").
 		Having("COUNT(DISTINCT member.user_id) = ?", len(userIDs)).
 		Scan(ctx, &organizationIDs)
@@ -122,7 +122,7 @@ func (s *hierarchyOrganizationStore) Delete(ctx context.Context, path string) er
 	return s.db.BunDB.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		var organization Organization
 		if err := tx.NewSelect().Model(&organization).
-			Where("path = ? AND is_unit = TRUE AND deleted_at IS NULL", path).For("UPDATE").Scan(ctx); err != nil {
+			Where("path = ? AND is_hierarchical = TRUE AND deleted_at IS NULL", path).For("UPDATE").Scan(ctx); err != nil {
 			return err
 		}
 		if organization.IsRoot {

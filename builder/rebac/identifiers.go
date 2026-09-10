@@ -57,6 +57,11 @@ func OrganizationMembers(uuid string) Subject {
 	return NewUserset(ObjectTypeOrganization, uuid, RelationMember)
 }
 
+// OrganizationMembersFromChild creates the organization member userset including child organization members.
+func OrganizationMembersFromChild(uuid string) Subject {
+	return NewUserset(ObjectTypeOrganization, uuid, RelationMemberFromChild)
+}
+
 // NamespaceObject creates a namespace object.
 func NamespaceObject(uuid string) Object {
 	return NewObject(ObjectTypeNamespace, uuid)

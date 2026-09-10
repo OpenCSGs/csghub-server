@@ -32,6 +32,7 @@ func TestDirectRelationNamingConvention(t *testing.T) {
 		RelationWriter,
 		RelationReader,
 		RelationMember,
+		RelationMemberFromChild,
 		RelationParent,
 		RelationChild,
 		RelationOrganization,

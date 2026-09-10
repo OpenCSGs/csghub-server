@@ -8,7 +8,7 @@ import (
 
 // NewAuthorizer creates the ReBAC Authorizer backed by an in-process OpenFGA server.
 func NewAuthorizer() (rebac.Authorizer, error) {
-	provider, err := openfga.NewProvider()
+	provider, err := openfga.NewDefaultProvider()
 	if err != nil {
 		return nil, err
 	}

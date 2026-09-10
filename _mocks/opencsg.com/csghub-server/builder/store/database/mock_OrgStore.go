@@ -577,6 +577,65 @@ func (_c *MockOrgStore_GetUserBelongOrgs_Call) RunAndReturn(run func(context.Con
 	return _c
 }
 
+// GetUserRootOrganizations provides a mock function with given fields: ctx, userID
+func (_m *MockOrgStore) GetUserRootOrganizations(ctx context.Context, userID int64) ([]database.Organization, error) {
+	ret := _m.Called(ctx, userID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetUserRootOrganizations")
+	}
+
+	var r0 []database.Organization
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, int64) ([]database.Organization, error)); ok {
+		return rf(ctx, userID)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, int64) []database.Organization); ok {
+		r0 = rf(ctx, userID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]database.Organization)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, int64) error); ok {
+		r1 = rf(ctx, userID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockOrgStore_GetUserRootOrganizations_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetUserRootOrganizations'
+type MockOrgStore_GetUserRootOrganizations_Call struct {
+	*mock.Call
+}
+
+// GetUserRootOrganizations is a helper method to define mock.On call
+//   - ctx context.Context
+//   - userID int64
+func (_e *MockOrgStore_Expecter) GetUserRootOrganizations(ctx interface{}, userID interface{}) *MockOrgStore_GetUserRootOrganizations_Call {
+	return &MockOrgStore_GetUserRootOrganizations_Call{Call: _e.mock.On("GetUserRootOrganizations", ctx, userID)}
+}
+
+func (_c *MockOrgStore_GetUserRootOrganizations_Call) Run(run func(ctx context.Context, userID int64)) *MockOrgStore_GetUserRootOrganizations_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(int64))
+	})
+	return _c
+}
+
+func (_c *MockOrgStore_GetUserRootOrganizations_Call) Return(orgs []database.Organization, err error) *MockOrgStore_GetUserRootOrganizations_Call {
+	_c.Call.Return(orgs, err)
+	return _c
+}
+
+func (_c *MockOrgStore_GetUserRootOrganizations_Call) RunAndReturn(run func(context.Context, int64) ([]database.Organization, error)) *MockOrgStore_GetUserRootOrganizations_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetUserOwnOrgs provides a mock function with given fields: ctx, username
 func (_m *MockOrgStore) GetUserOwnOrgs(ctx context.Context, username string) ([]database.Organization, int, error) {
 	ret := _m.Called(ctx, username)

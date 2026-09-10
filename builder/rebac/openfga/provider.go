@@ -3,6 +3,7 @@ package openfga
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -26,8 +27,11 @@ type openFGAServer interface {
 
 // Provider owns an initialized in-process OpenFGA server.
 type Provider struct {
-	server    openFGAServer
-	closeOnce sync.Once
+	server               openFGAServer
+	storeID              string
+	authorizationModelID string
+	defaultProvider      bool
+	closeOnce            sync.Once
 }
 
 var _ rebac.Provider = (*Provider)(nil)
@@ -37,43 +41,102 @@ var (
 	openfgaProviderMu sync.Mutex
 )
 
-// NewProvider initializes the process-wide OpenFGA Provider using the application database.
-func NewProvider() (*Provider, error) {
+// providerOptions configures a standalone OpenFGA Provider.
+type providerOptions struct {
+	authorizationModelID string
+	pgxPool              *pgxpool.Pool
+}
+
+func defaultProviderOptions() providerOptions {
+	return providerOptions{
+		authorizationModelID: commontypes.OpenFgaAuthorizationModelIDLatest,
+	}
+}
+
+// ProviderOption customizes a Provider created by NewCustomProvider.
+type ProviderOption func(*providerOptions) error
+
+// WithAuthorizationModelID configures the authorization model used by a custom Provider.
+func WithAuthorizationModelID(authorizationModelID string) ProviderOption {
+	return func(options *providerOptions) error {
+		if strings.TrimSpace(authorizationModelID) == "" {
+			return errors.New("OpenFGA authorization model ID is empty")
+		}
+		options.authorizationModelID = authorizationModelID
+		return nil
+	}
+}
+
+// WithPGXPool configures the application-owned PostgreSQL pool used by a custom Provider.
+func WithPGXPool(pool *pgxpool.Pool) ProviderOption {
+	return func(options *providerOptions) error {
+		if pool == nil {
+			return errors.New("pgxpool is nil")
+		}
+		options.pgxPool = pool
+		return nil
+	}
+}
+
+// NewDefaultProvider initializes the process-wide OpenFGA Provider using the application database.
+// The returned Provider is cached and reused by subsequent calls.
+func NewDefaultProvider() (*Provider, error) {
 	openfgaProviderMu.Lock()
 	defer openfgaProviderMu.Unlock()
 	if openfgaProvider != nil {
 		return openfgaProvider, nil
 	}
 
-	provider, err := newProvider()
-	if err != nil {
-		return nil, err
-	}
-	openfgaProvider = provider
-	return provider, nil
-}
-
-// NewProviderWithPGXPool initializes a standalone Provider with an application-owned PostgreSQL pool.
-// The returned provider is not stored in the process-wide provider cache and must be closed by the caller.
-func NewProviderWithPGXPool(pool *pgxpool.Pool) (*Provider, error) {
-	server, err := newServerWithPGXPool(pool)
-	if err != nil {
-		return nil, err
-	}
-	return &Provider{server: server}, nil
-}
-
-func newProvider() (*Provider, error) {
+	options := defaultProviderOptions()
 	server, err := getServer()
 	if err != nil {
 		return nil, err
 	}
+	provider := newProvider(server, options, true)
+	openfgaProvider = provider
+	return provider, nil
+}
 
-	p := &Provider{
-		server: server,
+// NewCustomProvider initializes a standalone OpenFGA Provider with the supplied options.
+// When called without options, it delegates to NewDefaultProvider and returns the cached default Provider.
+// A custom Provider created with one or more options is never stored in the process-wide cache.
+func NewCustomProvider(opts ...ProviderOption) (*Provider, error) {
+	if len(opts) == 0 {
+		return NewDefaultProvider()
 	}
 
-	return p, nil
+	options := defaultProviderOptions()
+	for _, option := range opts {
+		if option == nil {
+			return nil, errors.New("OpenFGA provider option is nil")
+		}
+		if err := option(&options); err != nil {
+			return nil, err
+		}
+	}
+
+	var (
+		server openFGAServer
+		err    error
+	)
+	if options.pgxPool != nil {
+		server, err = newServerWithPGXPool(options.pgxPool)
+	} else {
+		server, err = newServer()
+	}
+	if err != nil {
+		return nil, err
+	}
+	return newProvider(server, options, false), nil
+}
+
+func newProvider(server openFGAServer, options providerOptions, isDefault bool) *Provider {
+	return &Provider{
+		server:               server,
+		storeID:              commontypes.OpenFgaStoreID,
+		authorizationModelID: options.authorizationModelID,
+		defaultProvider:      isDefault,
+	}
 }
 
 // Name returns the stable Provider name.
@@ -96,16 +159,23 @@ func (p *Provider) Close() {
 	if p == nil || p.server == nil {
 		return
 	}
-	p.closeOnce.Do(p.server.Close)
-
-	openfgaProviderMu.Lock()
-	defer openfgaProviderMu.Unlock()
-	openfgaProvider = nil
+	p.closeOnce.Do(func() {
+		p.server.Close()
+		if !p.defaultProvider {
+			return
+		}
+		openfgaProviderMu.Lock()
+		if openfgaProvider == p {
+			openfgaProvider = nil
+		}
+		openfgaProviderMu.Unlock()
+		clearCachedServer(p.server)
+	})
 }
 
 // Check evaluates one authorization request through OpenFGA's Check API.
 func (p *Provider) Check(ctx context.Context, request rebac.CheckRequest) (rebac.Decision, error) {
-	protoRequest, err := checkRequest(request)
+	protoRequest, err := p.checkRequest(request)
 	if err != nil {
 		return rebac.Decision{}, err
 	}
@@ -123,7 +193,7 @@ func (p *Provider) Check(ctx context.Context, request rebac.CheckRequest) (rebac
 func (p *Provider) BatchCheck(ctx context.Context, request rebac.BatchCheckRequest) (rebac.BatchCheckResult, error) {
 	checks := make([]*openfgav1.BatchCheckItem, 0, len(request.Checks))
 	for _, item := range request.Checks {
-		check, err := checkRequest(item.Check)
+		check, err := p.checkRequest(item.Check)
 		if err != nil {
 			return rebac.BatchCheckResult{}, err
 		}
@@ -135,8 +205,8 @@ func (p *Provider) BatchCheck(ctx context.Context, request rebac.BatchCheckReque
 		})
 	}
 	response, err := p.server.BatchCheck(ctx, &openfgav1.BatchCheckRequest{
-		StoreId:              commontypes.OpenFgaStoreID,
-		AuthorizationModelId: commontypes.OpenFgaAuthorizationModelID,
+		StoreId:              p.getStoreID(),
+		AuthorizationModelId: p.getAuthorizationModelID(),
 		Checks:               checks,
 		Consistency:          consistency(requestConsistency(request)),
 	})
@@ -180,8 +250,8 @@ func (p *Provider) ListObjects(ctx context.Context, request rebac.ListObjectsReq
 		return rebac.ListObjectsResult{}, err
 	}
 	response, err := p.server.ListObjects(ctx, &openfgav1.ListObjectsRequest{
-		StoreId:              commontypes.OpenFgaStoreID,
-		AuthorizationModelId: commontypes.OpenFgaAuthorizationModelID,
+		StoreId:              p.getStoreID(),
+		AuthorizationModelId: p.getAuthorizationModelID(),
 		Type:                 string(request.ObjectType),
 		Relation:             request.Relation.String(),
 		User:                 request.Subject.String(),
@@ -213,8 +283,8 @@ func (p *Provider) ListSubjects(ctx context.Context, request rebac.ListSubjectsR
 		return rebac.ListSubjectsResult{}, err
 	}
 	response, err := p.server.ListUsers(ctx, &openfgav1.ListUsersRequest{
-		StoreId:              commontypes.OpenFgaStoreID,
-		AuthorizationModelId: commontypes.OpenFgaAuthorizationModelID,
+		StoreId:              p.getStoreID(),
+		AuthorizationModelId: p.getAuthorizationModelID(),
 		Object:               &openfgav1.Object{Type: string(request.Object.Type), Id: request.Object.ID},
 		Relation:             request.Relation.String(),
 		UserFilters:          []*openfgav1.UserTypeFilter{{Type: string(request.SubjectType)}},
@@ -239,15 +309,29 @@ func (p *Provider) ListSubjects(ctx context.Context, request rebac.ListSubjectsR
 	return rebac.ListSubjectsResult{Subjects: subjects}, nil
 }
 
+func (p *Provider) getStoreID() string {
+	if p.storeID != "" {
+		return p.storeID
+	}
+	return commontypes.OpenFgaStoreID
+}
+
+func (p *Provider) getAuthorizationModelID() string {
+	if p.authorizationModelID != "" {
+		return p.authorizationModelID
+	}
+	return commontypes.OpenFgaAuthorizationModelIDLatest
+}
+
 // checkRequest converts the public check contract into an OpenFGA request.
-func checkRequest(request rebac.CheckRequest) (*openfgav1.CheckRequest, error) {
+func (p *Provider) checkRequest(request rebac.CheckRequest) (*openfgav1.CheckRequest, error) {
 	conditionContext, err := conditionContext(request.ConditionContext)
 	if err != nil {
 		return nil, err
 	}
 	return &openfgav1.CheckRequest{
-		StoreId:              commontypes.OpenFgaStoreID,
-		AuthorizationModelId: commontypes.OpenFgaAuthorizationModelID,
+		StoreId:              p.getStoreID(),
+		AuthorizationModelId: p.getAuthorizationModelID(),
 		TupleKey:             &openfgav1.CheckRequestTupleKey{User: request.Subject.String(), Relation: request.Relation.String(), Object: request.Object.String()},
 		ContextualTuples:     contextualTuples(request.ContextualRelationships),
 		Context:              conditionContext,
@@ -335,8 +419,8 @@ func parseUser(user *openfgav1.User) (rebac.Subject, error) {
 
 func (p *Provider) write(ctx context.Context, relationships []rebac.Relationship, deleting bool) error {
 	request := &openfgav1.WriteRequest{
-		StoreId:              commontypes.OpenFgaStoreID,
-		AuthorizationModelId: commontypes.OpenFgaAuthorizationModelID,
+		StoreId:              p.getStoreID(),
+		AuthorizationModelId: p.getAuthorizationModelID(),
 	}
 	if deleting {
 		tupleKeys := make([]*openfgav1.TupleKeyWithoutCondition, 0, len(relationships))

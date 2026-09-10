@@ -167,8 +167,8 @@ func TestOrganizationStore_ModeFilters(t *testing.T) {
 	var storedLegacy, storedHierarchy database.Organization
 	require.NoError(t, db.Core.NewSelect().Model(&storedLegacy).Where("id = ?", legacyOrganization.ID).Scan(ctx))
 	require.NoError(t, db.Core.NewSelect().Model(&storedHierarchy).Where("id = ?", hierarchyOrganization.ID).Scan(ctx))
-	require.False(t, storedLegacy.IsUnit)
-	require.True(t, storedHierarchy.IsUnit)
+	require.False(t, storedLegacy.IsHierarchical)
+	require.True(t, storedHierarchy.IsHierarchical)
 
 	_, err := legacyStore.FindByPath(ctx, hierarchyOrganization.Name)
 	require.ErrorIs(t, err, sql.ErrNoRows)
@@ -184,6 +184,49 @@ func TestOrganizationStore_ModeFilters(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 1, total)
 	require.Equal(t, hierarchyOrganization.Name, hierarchyOrganizations[0].Name)
+}
+
+// TestOrganizationStore_GetUserRootOrganizationsReturnsHierarchyRoots verifies descendant memberships resolve to the same top-level organization.
+func TestOrganizationStore_GetUserRootOrganizationsReturnsHierarchyRoots(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.Background()
+
+	root := createRootOrganization(t, ctx, db, "user-root-orgs")
+	unitStore := database.NewOrganizationUnitStoreWithDB(db)
+	research := createChild(t, ctx, unitStore, root, "user-root-orgs-research", nil, 1)
+	it := createChild(t, ctx, unitStore, root, "user-root-orgs-it", &research.UUID, 1)
+
+	users := []*database.User{
+		createOrganizationUnitMemberTestUser(t, ctx, db, "user-root-orgs-a"),
+		createOrganizationUnitMemberTestUser(t, ctx, db, "user-root-orgs-b"),
+		createOrganizationUnitMemberTestUser(t, ctx, db, "user-root-orgs-c"),
+		createOrganizationUnitMemberTestUser(t, ctx, db, "user-root-orgs-d"),
+	}
+	memberStore := database.NewMemberStoreWithDB(db)
+	researchOrganizationID := organizationIDForUnit(t, ctx, unitStore, research.UUID)
+	itOrganizationID := organizationIDForUnit(t, ctx, unitStore, it.UUID)
+	for _, membership := range []struct {
+		userID         int64
+		organizationID int64
+	}{
+		{users[0].ID, researchOrganizationID},
+		{users[1].ID, itOrganizationID},
+		{users[2].ID, root.ID},
+		{users[3].ID, researchOrganizationID},
+		{users[3].ID, itOrganizationID},
+	} {
+		require.NoError(t, memberStore.Add(ctx, membership.organizationID, membership.userID, string(types.UserRead)))
+	}
+
+	store := database.NewOrgStoreWithMode(db, true)
+	for _, user := range users {
+		organizations, err := store.GetUserRootOrganizations(ctx, user.ID)
+		require.NoError(t, err)
+		require.Len(t, organizations, 1)
+		require.Equal(t, root.ID, organizations[0].ID)
+		require.Equal(t, root.UUID, organizations[0].UUID)
+	}
 }
 
 // TestOrganizationStore_IsLastOrganizationAdmin verifies every organization is evaluated independently.
