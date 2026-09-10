@@ -88,11 +88,13 @@ func TestAccountBillStore_List(t *testing.T) {
 	})
 	require.Nil(t, err)
 	require.Equal(t, 2, len(res.Data))
-	expectedData := []types.ITEM{
-		{Consumption: 31, InstanceName: "c1", Value: 28, PromptToken: 0, CompletionToken: 0},
-		{Consumption: 21, InstanceName: "c2", Value: 20, PromptToken: 0, CompletionToken: 0},
-	}
-	require.Equal(t, expectedData, res.Data)
+	// CreatedAt is populated by min(created_at) from DB, so only check aggregate fields
+	require.Equal(t, float64(31), res.Data[0].Consumption)
+	require.Equal(t, "c1", res.Data[0].InstanceName)
+	require.Equal(t, float64(28), res.Data[0].Value)
+	require.Equal(t, float64(21), res.Data[1].Consumption)
+	require.Equal(t, "c2", res.Data[1].InstanceName)
+	require.Equal(t, float64(20), res.Data[1].Value)
 
 }
 
