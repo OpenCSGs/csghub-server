@@ -17,5 +17,7 @@ func TestTypedIdentifierConstructors(t *testing.T) {
 	require.Equal(t, Subject{Type: ObjectTypeOrganization, ID: "org-1", Relation: RelationMemberFromChild}, OrganizationMembersFromChild("org-1"))
 	require.Equal(t, Object{Type: ObjectTypeNamespace, ID: "namespace-1"}, NamespaceObject("namespace-1"))
 	require.Equal(t, Object{Type: ObjectTypeRepository, ID: "42"}, RepositoryObject(42))
+	require.Equal(t, Object{Type: ObjectTypeKnowledgeBase, ID: "42"}, KnowledgeBaseObject(42))
 	require.Empty(t, RepositoryObject(0).ID)
+	require.Empty(t, KnowledgeBaseObject(0).ID)
 }

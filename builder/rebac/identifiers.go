@@ -74,3 +74,11 @@ func RepositoryObject(id int64) Object {
 	}
 	return NewObject(ObjectTypeRepository, strconv.FormatInt(id, 10))
 }
+
+// KnowledgeBaseObject creates a knowledge base object from its immutable database ID.
+func KnowledgeBaseObject(id int64) Object {
+	if id <= 0 {
+		return NewObject(ObjectTypeKnowledgeBase, "")
+	}
+	return NewObject(ObjectTypeKnowledgeBase, strconv.FormatInt(id, 10))
+}

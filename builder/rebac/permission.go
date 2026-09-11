@@ -50,6 +50,10 @@ const (
 	RelationOrganization Relation = "organization"
 	// RelationOrganizationDirect identifies an organization association without parent inheritance.
 	RelationOrganizationDirect Relation = "organization_direct"
+	// RelationNamespace identifies the namespace associated with a resource.
+	RelationNamespace Relation = "namespace"
+	// RelationPublic identifies public read access for all user subjects.
+	RelationPublic Relation = "public"
 )
 
 const (
@@ -92,4 +96,11 @@ const (
 	RepositoryCanWrite = PermissionCanWrite
 	// RepositoryCanAdmin permits administering a repository.
 	RepositoryCanAdmin = PermissionCanAdmin
+
+	// KnowledgeBaseCanRead permits reading a knowledge base.
+	KnowledgeBaseCanRead = PermissionCanRead
+	// KnowledgeBaseCanWrite permits writing knowledge base content.
+	KnowledgeBaseCanWrite = PermissionCanWrite
+	// KnowledgeBaseCanAdmin permits administering a knowledge base record.
+	KnowledgeBaseCanAdmin = PermissionCanAdmin
 )

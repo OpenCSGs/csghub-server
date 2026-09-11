@@ -14,16 +14,19 @@ import (
 
 // AgentKnowledgeBase represents a knowledge base configuration for an agent
 type AgentKnowledgeBase struct {
-	ID          int64          `bun:",pk,autoincrement" json:"id"`
-	UserUUID    string         `bun:",notnull" json:"user_uuid"`
-	Name        string         `bun:",notnull" json:"name"`
-	Description string         `bun:",nullzero" json:"description"`
-	ContentID   string         `bun:",notnull,unique" json:"content_id"`    // Used to specify the unique id of the knowledge base resource
-	Public      bool           `bun:",notnull" json:"public"`               // Whether the knowledge base is public
-	Metadata    map[string]any `bun:",type:jsonb,nullzero" json:"metadata"` // Knowledge base metadata
-	User        *User          `bun:"rel:belongs-to,join:user_uuid=uuid" json:"user"`
-	IsPinned    bool           `bun:",scanonly" json:"is_pinned"` // Whether the knowledge base is pinned (from LEFT JOIN)
-	PinnedAt    *time.Time     `bun:",scanonly" json:"pinned_at"` // When the knowledge base was pinned (from LEFT JOIN)
+	ID            int64                        `bun:",pk,autoincrement" json:"id"`
+	UserUUID      string                       `bun:",notnull" json:"user_uuid"`
+	NsUUID        string                       `bun:",notnull" json:"ns_uuid"`
+	NamespaceType NamespaceType                `bun:",notnull,default:'user'" json:"namespace_type"`
+	Type          types.AgentKnowledgeBaseType `bun:",notnull,default:'langflow'" json:"type"`
+	Name          string                       `bun:",notnull" json:"name"`
+	Description   string                       `bun:",nullzero" json:"description"`
+	ContentID     string                       `bun:",notnull,unique" json:"content_id"`    // Used to specify the unique id of the knowledge base resource
+	Public        bool                         `bun:",notnull" json:"public"`               // Whether the knowledge base is public
+	Metadata      map[string]any               `bun:",type:jsonb,nullzero" json:"metadata"` // Knowledge base metadata
+	User          *User                        `bun:"rel:belongs-to,join:user_uuid=uuid" json:"user"`
+	IsPinned      bool                         `bun:",scanonly" json:"is_pinned"` // Whether the knowledge base is pinned (from LEFT JOIN)
+	PinnedAt      *time.Time                   `bun:",scanonly" json:"pinned_at"` // When the knowledge base was pinned (from LEFT JOIN)
 	times
 }
 
@@ -35,7 +38,7 @@ type AgentKnowledgeBaseStore interface {
 	Update(ctx context.Context, kb *AgentKnowledgeBase) error
 	Delete(ctx context.Context, id int64) error
 	List(ctx context.Context, filter types.AgentKnowledgeBaseFilter, per int, page int) ([]AgentKnowledgeBase, int, error)
-	Exists(ctx context.Context, userUUID string, name string) (bool, error)
+	Exists(ctx context.Context, nsUUID string, name string) (bool, error)
 	ExistsByContentID(ctx context.Context, contentID string) (bool, error)
 }
 
@@ -65,8 +68,8 @@ func (s *agentKnowledgeBaseStoreImpl) Create(ctx context.Context, kb *AgentKnowl
 	res, err := s.db.Core.NewInsert().Model(kb).Exec(ctx, kb)
 	if err = assertAffectedOneRow(res, err); err != nil {
 		return nil, errorx.HandleDBError(err, map[string]any{
-			"user_uuid": kb.UserUUID,
-			"name":      kb.Name,
+			"ns_uuid": kb.NsUUID,
+			"name":    kb.Name,
 		})
 	}
 	return kb, nil
@@ -135,21 +138,31 @@ func (s *agentKnowledgeBaseStoreImpl) Delete(ctx context.Context, id int64) erro
 
 // applyAgentKnowledgeBaseFilters applies filters to the query
 func (s *agentKnowledgeBaseStoreImpl) applyAgentKnowledgeBaseFilters(query *bun.SelectQuery, filter types.AgentKnowledgeBaseFilter) *bun.SelectQuery {
+	if filter.AuthorizedIDs != nil {
+		if len(filter.AuthorizedIDs) == 0 {
+			query = query.Where("FALSE")
+		} else {
+			query = query.Where("akb.id IN (?)", bun.In(filter.AuthorizedIDs))
+		}
+	}
 	filter.Search = strings.TrimSpace(filter.Search)
 	if filter.Search != "" {
 		searchPattern := "%" + filter.Search + "%"
 		query = query.Where("LOWER(akb.name) LIKE LOWER(?)", searchPattern)
+	}
+	if filter.Type != "" {
+		query = query.Where("akb.type = ?", filter.Type)
 	}
 
 	if filter.Public != nil {
 		query = query.Where("akb.public = ?", *filter.Public)
 	}
 
-	if filter.Editable != nil {
+	if filter.Editable != nil && filter.AuthorizedIDs == nil {
 		if *filter.Editable {
-			query = query.Where("akb.user_uuid = ?", filter.UserUUID)
+			query = query.Where("akb.ns_uuid = ?", filter.NsUUID)
 		} else {
-			query = query.Where("akb.user_uuid != ?", filter.UserUUID)
+			query = query.Where("akb.ns_uuid != ?", filter.NsUUID)
 		}
 	}
 
@@ -173,8 +186,10 @@ func (s *agentKnowledgeBaseStoreImpl) List(ctx context.Context, filter types.Age
           AND pin_pref.action = ?
           AND pin_pref.entity_type = ?
           AND pin_pref.entity_id = CAST(akb.id AS TEXT)
-     `, filter.UserUUID, types.AgentUserPreferenceActionPin, types.AgentUserPreferenceEntityTypeAgentKnowledgeBase).
-		Where("akb.user_uuid = ? OR akb.public = ?", filter.UserUUID, true)
+	`, filter.NsUUID, types.AgentUserPreferenceActionPin, types.AgentUserPreferenceEntityTypeAgentKnowledgeBase)
+	if filter.AuthorizedIDs == nil {
+		q = q.Where("akb.ns_uuid = ? OR akb.public = ?", filter.NsUUID, true)
+	}
 
 	q = s.applyAgentKnowledgeBaseFilters(q, filter)
 
@@ -186,7 +201,16 @@ func (s *agentKnowledgeBaseStoreImpl) List(ctx context.Context, filter types.Age
 	}
 
 	err = q.
-		OrderExpr("pin_pref.created_at DESC NULLS LAST, akb.updated_at DESC").
+		OrderExpr(`
+			(pin_pref.id IS NOT NULL) DESC,
+			CASE akb.type
+				WHEN ? THEN 0
+				WHEN ? THEN 1
+				ELSE 2
+			END,
+			akb.updated_at DESC,
+			akb.id DESC
+		`, types.AgentKnowledgeBaseTypeLLMWiki, types.AgentKnowledgeBaseTypeLangflow).
 		Limit(per).
 		Offset((page-1)*per).
 		Scan(ctx, &knowledgeBases)
@@ -200,15 +224,15 @@ func (s *agentKnowledgeBaseStoreImpl) List(ctx context.Context, filter types.Age
 }
 
 // Exists checks if an AgentKnowledgeBase exists
-func (s *agentKnowledgeBaseStoreImpl) Exists(ctx context.Context, userUUID string, name string) (bool, error) {
+func (s *agentKnowledgeBaseStoreImpl) Exists(ctx context.Context, nsUUID string, name string) (bool, error) {
 	exists, err := s.db.Core.NewSelect().
 		Model((*AgentKnowledgeBase)(nil)).
-		Where("user_uuid = ? AND name = ?", userUUID, name).
+		Where("ns_uuid = ? AND name = ?", nsUUID, name).
 		Exists(ctx)
 	if err != nil {
 		return false, errorx.HandleDBError(err, map[string]any{
-			"user_uuid": userUUID,
-			"name":      name,
+			"ns_uuid": nsUUID,
+			"name":    name,
 		})
 	}
 	return exists, nil

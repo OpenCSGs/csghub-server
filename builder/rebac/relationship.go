@@ -2,7 +2,7 @@ package rebac
 
 // Relationship represents the standard OpenFGA object#relation@subject tuple.
 // Only direct relations such as owner, admin, writer, reader, parent, child,
-// organization, and organization_direct can be persisted. Computed permissions such as can_read,
+// organization, organization_direct, namespace, and public can be persisted. Computed permissions such as can_read,
 // can_write, and can_admin are evaluated by OpenFGA and must not be written as
 // relationship tuples.
 //

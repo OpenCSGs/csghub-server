@@ -15,6 +15,7 @@ func TestDefaultSchemaContainsCommonTypes(t *testing.T) {
 		ObjectTypeOrganization,
 		ObjectTypeNamespace,
 		ObjectTypeRepository,
+		ObjectTypeKnowledgeBase,
 	} {
 		require.True(t, schema.HasObjectType(objectType), objectType)
 	}
@@ -31,6 +32,11 @@ func TestDefaultSchemaContainsCommonTypes(t *testing.T) {
 	require.ErrorIs(t, schema.ValidateDirectRelation(ObjectTypeOrganization, RelationMemberFromChild), ErrInvalidRelation)
 	require.NoError(t, schema.ValidateCheckRelation(ObjectTypeUser, PermissionCanRead))
 	require.NoError(t, schema.ValidateCheckRelation(ObjectTypeRepository, RepositoryCanRead))
+	require.NoError(t, schema.ValidateDirectRelation(ObjectTypeKnowledgeBase, RelationNamespace))
+	require.NoError(t, schema.ValidateDirectRelation(ObjectTypeKnowledgeBase, RelationPublic))
+	require.NoError(t, schema.ValidateCheckRelation(ObjectTypeKnowledgeBase, KnowledgeBaseCanRead))
+	require.NoError(t, schema.ValidateCheckRelation(ObjectTypeKnowledgeBase, KnowledgeBaseCanWrite))
+	require.NoError(t, schema.ValidateCheckRelation(ObjectTypeKnowledgeBase, KnowledgeBaseCanAdmin))
 	require.ErrorIs(t, schema.ValidateDirectRelation(ObjectTypeRepository, Relation(RepositoryCanRead)), ErrInvalidRelation)
 	require.ErrorIs(t, schema.ValidateRelation(ObjectTypeRepository, RelationMember), ErrUnsupportedRelation)
 	require.ErrorIs(t, schema.ValidateCheckRelation("unknown", RepositoryCanRead), ErrUnsupportedObjectType)

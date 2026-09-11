@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -47,6 +48,77 @@ func TestReverseProxy_AcceptEncodingDisabled(t *testing.T) {
 
 	require.Equal(t, http.StatusOK, resp.Code)
 	require.Equal(t, "identity", downstreamAcceptEncoding)
+}
+
+func TestReverseProxy_RemovesConfiguredRequestHeaders(t *testing.T) {
+	var authorization, cookie, preserved string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		authorization = r.Header.Get("Authorization")
+		cookie = r.Header.Get("Cookie")
+		preserved = r.Header.Get("X-Preserved")
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	rp, err := NewReverseProxy(server.URL, WithoutRequestHeaders("Authorization", "Cookie"))
+	require.NoError(t, err)
+
+	req := httptest.NewRequest(http.MethodPost, "/", nil)
+	req.Header.Set("Authorization", "Bearer user-token")
+	req.Header.Set("Cookie", "session=secret")
+	req.Header.Set("X-Preserved", "value")
+	resp := httptest.NewRecorder()
+	rp.ServeHTTP(resp, req, "", "")
+
+	require.Equal(t, http.StatusOK, resp.Code)
+	require.Empty(t, authorization)
+	require.Empty(t, cookie)
+	require.Equal(t, "value", preserved)
+}
+
+func TestReverseProxy_AppliesResponseModifiersInOrder(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("X-Value", "initial")
+		w.WriteHeader(http.StatusAccepted)
+	}))
+	defer server.Close()
+
+	rp, err := NewReverseProxy(server.URL,
+		WithResponseModifier(func(resp *http.Response) error {
+			resp.Header.Set("X-Value", resp.Header.Get("X-Value")+"-first")
+			return nil
+		}),
+		WithResponseModifier(func(resp *http.Response) error {
+			resp.Header.Set("X-Value", resp.Header.Get("X-Value")+"-second")
+			return nil
+		}),
+	)
+	require.NoError(t, err)
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	resp := httptest.NewRecorder()
+	rp.ServeHTTP(resp, req, "", "")
+
+	require.Equal(t, http.StatusAccepted, resp.Code)
+	require.Equal(t, "initial-first-second", resp.Header().Get("X-Value"))
+}
+
+func TestReverseProxy_ResponseModifierErrorWritesBadGateway(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusAccepted)
+	}))
+	defer server.Close()
+
+	rp, err := NewReverseProxy(server.URL, WithResponseModifier(func(*http.Response) error {
+		return errors.New("invalid upstream response")
+	}))
+	require.NoError(t, err)
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	resp := httptest.NewRecorder()
+	rp.ServeHTTP(resp, req, "", "")
+
+	require.Equal(t, http.StatusBadGateway, resp.Code)
 }
 
 func TestReverseProxy_ContextCanceledWritesClientClosed(t *testing.T) {
