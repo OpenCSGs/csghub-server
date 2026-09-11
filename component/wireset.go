@@ -274,7 +274,7 @@ func NewTestModelComponent(
 
 var ModelComponentSet = wire.NewSet(NewTestModelComponent)
 
-func NewTestAccountingComponent(stores *tests.MockStores, accountingClient accounting.AccountingClient) *accountingComponentImpl {
+func NewTestAccountingComponent(stores *tests.MockStores, accountingClient accounting.AccountingClient, userSvcClient rpc.UserSvcClient, authorizer rebac.Authorizer) *accountingComponentImpl {
 	return &accountingComponentImpl{
 		accountingClient: accountingClient,
 		userStore:        stores.User,
@@ -282,6 +282,8 @@ func NewTestAccountingComponent(stores *tests.MockStores, accountingClient accou
 		namespaceStore:   stores.Namespace,
 		memberStore:      stores.Member,
 		deployTaskStore:  stores.DeployTask,
+		userSvcClient:    userSvcClient,
+		rebac:            authorizer,
 	}
 }
 

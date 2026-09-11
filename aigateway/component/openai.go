@@ -730,7 +730,7 @@ func (m *openaiComponentImpl) BuildUsageMeteringEvent(c context.Context, nsUUID 
 		UserUUID:     nsUUID,
 		Value:        value,
 		ValueType:    valueType,
-		Scene:        int(meteringInfo.Scene),
+		Scene:        meteringInfo.Scene,
 		OpUID:        string(commontypes.AccessTokenAppAIGateway),
 		ResourceID:   meteringInfo.Resource.ResourceID,
 		ResourceName: meteringInfo.Resource.ResourceName,

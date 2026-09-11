@@ -1272,6 +1272,9 @@ func createMeteringRoutes(
 		meterGroup.Use(middlewareCollection.Auth.NeedLogin)
 		{
 			meterGroup.GET("/:id/statements", accountingHandler.QueryMeteringStatementByUserID)
+			meterGroup.GET("/:id/statistics", accountingHandler.QueryStatisticsByUserID)
+			meterGroup.GET("/:id/statistics/instance", accountingHandler.QueryStatisticsDetailByUserID)
+			meterGroup.GET("/:id/summary", accountingHandler.QueryStatisticsSummary)
 		}
 	}
 }

@@ -42,6 +42,9 @@ type AccountingClient interface {
 	GetOrderDetailByID(currentUser string, id int64) (any, error)
 	GetVoucherDashboard(req types.VoucherDashboardReq) (any, error)
 	OffLinePrice(req types.AcctPriceOffLineReq) (any, error)
+	QueryStatisticsByUserID(req types.AcctBillsReq) (any, error)
+	QueryStatisticsDetailByUserID(req types.AcctBillsDetailReq) (any, error)
+	GetStatisticsSummary(req types.AcctBillsReq) (any, error)
 }
 type accountingClientImpl struct {
 	remote    *url.URL

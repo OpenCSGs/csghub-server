@@ -29,7 +29,7 @@ func TestEventComponent_AddNewAccountingEvent(t *testing.T) {
 	event := &types.MeteringEvent{
 		Uuid:       uid,
 		UserUUID:   "test-user-uuid",
-		Scene:      int(types.SceneModelInference),
+		Scene:      types.SceneModelInference,
 		Value:      -10,
 		ValueType:  0,
 		CustomerID: "test-customer-id",

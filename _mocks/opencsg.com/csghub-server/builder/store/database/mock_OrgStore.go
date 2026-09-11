@@ -111,8 +111,8 @@ func (_c *MockOrgStore_CreateWithRelations_Call) Run(run func(ctx context.Contex
 	return _c
 }
 
-func (_c *MockOrgStore_CreateWithRelations_Call) Return(err error) *MockOrgStore_CreateWithRelations_Call {
-	_c.Call.Return(err)
+func (_c *MockOrgStore_CreateWithRelations_Call) Return(_a0 error) *MockOrgStore_CreateWithRelations_Call {
+	_c.Call.Return(_a0)
 	return _c
 }
 

@@ -358,8 +358,9 @@ func initializeTestAccountingComponent(ctx context.Context, t interface {
 }) *testAccountingWithMocks {
 	mockStores := tests.NewMockStores(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
-	componentAccountingComponentImpl := NewTestAccountingComponent(mockStores, mockAccountingClient)
-	componentAccountingComponentImpl.rebac = rebac.NewMockAuthorizer(t)
+	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
+	mockAuthorizer := rebac.NewMockAuthorizer(t)
+	componentAccountingComponentImpl := NewTestAccountingComponent(mockStores, mockAccountingClient, mockUserSvcClient, mockAuthorizer)
 	mockAccountingComponent := component.NewMockAccountingComponent(t)
 	mockRepoComponent := component.NewMockRepoComponent(t)
 	mockTagComponent := component.NewMockTagComponent(t)
@@ -377,7 +378,6 @@ func initializeTestAccountingComponent(ctx context.Context, t interface {
 		cluster:             mockClusterComponent,
 	}
 	mockGitServer := gitserver.NewMockGitServer(t)
-	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
 	mockXnetSvcClient := rpc.NewMockXnetSvcClient(t)
 	mockClient := s3.NewMockClient(t)
 	mockDeployer := deploy.NewMockDeployer(t)
@@ -676,7 +676,6 @@ func initializeTestCollectionComponent(ctx context.Context, t interface {
 	mock.TestingT
 }) *testCollectionWithMocks {
 	mockStores := tests.NewMockStores(t)
-	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
 	mockSpaceComponent := component.NewMockSpaceComponent(t)
 	mockAuthorizer := rebac.NewMockAuthorizer(t)
 	componentCollectionComponentImpl := NewTestCollectionComponent(mockStores, mockSpaceComponent, mockAuthorizer)
@@ -696,6 +695,7 @@ func initializeTestCollectionComponent(ctx context.Context, t interface {
 		cluster:             mockClusterComponent,
 	}
 	mockGitServer := gitserver.NewMockGitServer(t)
+	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
 	mockXnetSvcClient := rpc.NewMockXnetSvcClient(t)
 	mockClient := s3.NewMockClient(t)
 	mockDeployer := deploy.NewMockDeployer(t)
@@ -1450,7 +1450,6 @@ func initializeTestEvaluationComponent(ctx context.Context, t interface {
 	mockRepoComponent := component.NewMockRepoComponent(t)
 	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
 	componentEvaluationComponentImpl := NewTestEvaluationComponent(config, mockStores, mockDeployer, mockAccountingComponent, mockRepoComponent, mockUserSvcClient)
-	componentEvaluationComponentImpl.rebac = rebac.NewMockAuthorizer(t)
 	mockTagComponent := component.NewMockTagComponent(t)
 	mockSpaceComponent := component.NewMockSpaceComponent(t)
 	mockRuntimeArchitectureComponent := component.NewMockRuntimeArchitectureComponent(t)

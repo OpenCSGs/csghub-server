@@ -6,31 +6,35 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"opencsg.com/csghub-server/accounting/utils"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/types"
 )
 
 type meteringComponentImpl struct {
 	ams database.AccountMeteringStore
+	ass database.AccountStatisticsStore
 }
 
 type MeteringComponent interface {
-	SaveMeteringEventRecord(ctx context.Context, req *types.MeteringEvent) error
+	SaveMeteringEventRecord(ctx context.Context, req *types.MeteringEvent, extra types.MeteringExtra) error
 	ListMeteringByUserIDAndDate(ctx context.Context, req types.ActStatementsReq) ([]database.AccountMetering, int, error)
 	GetMeteringStatByDate(ctx context.Context, req types.ActStatementsReq) ([]map[string]interface{}, error)
 	GetMeteringByEventUUID(ctx context.Context, eventUUID uuid.UUID) (*database.AccountMetering, error)
 	FindMeteringByCustomerIDAndRecordAtInMin(ctx context.Context, customerID string, recordAt time.Time) (*database.AccountMetering, error)
+	ListStatisticsByUserIDAndDate(ctx context.Context, req types.AcctBillsReq) (database.AccountStatisticsRes, error)
+	ListStatisticsDetailByUserID(ctx context.Context, req types.AcctBillsDetailReq) (database.AccountStatisticsDetailRes, error)
+	GetStatisticsSummary(ctx context.Context, req types.AcctBillsReq) (database.AccountStatisticsSummaryRes, error)
 }
 
 func NewMeteringComponent() MeteringComponent {
 	ams := &meteringComponentImpl{
 		ams: database.NewAccountMeteringStore(),
+		ass: database.NewAccountStatisticsStore(),
 	}
 	return ams
 }
 
-func (mc *meteringComponentImpl) SaveMeteringEventRecord(ctx context.Context, req *types.MeteringEvent) error {
+func (mc *meteringComponentImpl) SaveMeteringEventRecord(ctx context.Context, req *types.MeteringEvent, extra types.MeteringExtra) error {
 	am := database.AccountMetering{
 		EventUUID:    req.Uuid,
 		UserUUID:     req.UserUUID,
@@ -43,9 +47,9 @@ func (mc *meteringComponentImpl) SaveMeteringEventRecord(ctx context.Context, re
 		CustomerID:   req.CustomerID,
 		RecordedAt:   req.CreatedAt,
 		Extra:        req.Extra,
-		SkuUnitType:  string(utils.GetSkuUnitTypeByScene(types.SceneType(req.Scene))),
+		SkuUnitType:  extra.SkuUnitType,
 	}
-	err := mc.ams.Create(ctx, am)
+	err := mc.ams.Create(ctx, am, extra)
 	if err != nil {
 		return fmt.Errorf("failed to save metering event record, error: %w", err)
 	}
@@ -82,4 +86,28 @@ func (mc *meteringComponentImpl) FindMeteringByCustomerIDAndRecordAtInMin(ctx co
 		return nil, fmt.Errorf("failed to find metering by customer id and record at, error: %w", err)
 	}
 	return metering, nil
+}
+
+func (mc *meteringComponentImpl) ListStatisticsByUserIDAndDate(ctx context.Context, req types.AcctBillsReq) (database.AccountStatisticsRes, error) {
+	res, err := mc.ass.ListByUserIDAndDate(ctx, req)
+	if err != nil {
+		return database.AccountStatisticsRes{}, fmt.Errorf("failed to list statistics by UserIDAndDate, error: %w", err)
+	}
+	return res, nil
+}
+
+func (mc *meteringComponentImpl) ListStatisticsDetailByUserID(ctx context.Context, req types.AcctBillsDetailReq) (database.AccountStatisticsDetailRes, error) {
+	res, err := mc.ass.ListStatisticsDetailByUserID(ctx, req)
+	if err != nil {
+		return database.AccountStatisticsDetailRes{}, fmt.Errorf("failed to list statistics detail by user, error: %w", err)
+	}
+	return res, nil
+}
+
+func (mc *meteringComponentImpl) GetStatisticsSummary(ctx context.Context, req types.AcctBillsReq) (database.AccountStatisticsSummaryRes, error) {
+	res, err := mc.ass.SummaryByUserIDAndDate(ctx, req)
+	if err != nil {
+		return database.AccountStatisticsSummaryRes{}, fmt.Errorf("failed to get statistics summary, error: %w", err)
+	}
+	return res, nil
 }
