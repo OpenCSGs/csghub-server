@@ -292,14 +292,31 @@ type AgentInstanceShareResponse struct {
 	Type      string `json:"type"`
 }
 
+// GuestUsageLimitMode describes how guest (anonymous) chat usage is limited on a
+// shared instance.
+type GuestUsageLimitMode string
+
+const (
+	GuestUsageLimitUnlimited GuestUsageLimitMode = "unlimited"
+	GuestUsageLimitLimited   GuestUsageLimitMode = "limited"
+)
+
+// GuestUsageLimit describes the guest chat usage policy surfaced on the shared page.
+type GuestUsageLimit struct {
+	Mode     GuestUsageLimitMode `json:"mode"`
+	MaxCount int64               `json:"max_count,omitempty"`
+}
+
 type AgentSharedInstanceResponse struct {
-	ID                int64  `json:"id"`
-	InstanceID        int64  `json:"instance_id"`
-	Type              string `json:"type"`
-	Name              string `json:"name"`
-	Description       string `json:"description"`
-	AgentName         string `json:"agent_name"`
-	SharedSandboxName string `json:"shared_sandbox_name"`
+	ID                int64             `json:"id"`
+	InstanceID        int64             `json:"instance_id"`
+	Type              string            `json:"type"`
+	Name              string            `json:"name"`
+	Description       string            `json:"description"`
+	AgentName         string            `json:"agent_name"`
+	SharedSandboxName string            `json:"shared_sandbox_name"`
+	CustomUI          map[string]string `json:"custom_ui,omitempty"`
+	GuestUsageLimit   *GuestUsageLimit  `json:"guest_usage_limit,omitempty"`
 }
 
 // AgentSharedSessionResponse represents the public shared session response.
