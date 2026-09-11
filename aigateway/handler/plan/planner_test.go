@@ -394,7 +394,7 @@ func TestPlan_UsageLimitExceeded(t *testing.T) {
 }
 
 func TestPlan_Disabled_ReturnsError(t *testing.T) {
-	// Chat → Responses has no adapter (AdapterNone), so routing resolves
+	// Responses → Messages has no adapter (AdapterNone), so routing resolves
 	// to "disabled".  The Planner should return an error with PlanErrDisabled
 	// and NOT check balance/quota/safety.
 	target := &types.ModelTarget{
@@ -402,10 +402,10 @@ func TestPlan_Disabled_ReturnsError(t *testing.T) {
 			BaseModel: types.BaseModel{ID: "test-model"},
 		},
 		Upstream: commonType.UpstreamConfig{
-			URL:      "http://upstream/v1/responses",
+			URL:      "http://upstream/v1/messages",
 			Provider: "test",
 		},
-		Target:    "http://upstream/v1/responses",
+		Target:    "http://upstream/v1/messages",
 		ModelName: "test-model",
 	}
 
@@ -418,7 +418,8 @@ func TestPlan_Disabled_ReturnsError(t *testing.T) {
 	)
 
 	meta := &types.RequestMetadata{
-		Protocol: string(types.ProtocolChat),
+		Protocol: string(types.ProtocolResponses),
+		Task:     "responses",
 		UserID:   "user1",
 		Model:    "test-model",
 		TenantID: "ns-123",
@@ -429,6 +430,60 @@ func TestPlan_Disabled_ReturnsError(t *testing.T) {
 	assert.Equal(t, types.PlanErrDisabled, plan.ErrorCode)
 	// Balance check should not have been called
 	assert.False(t, plan.BalanceOK)
+}
+
+// TestPlan_ChatFallback_RewritesBackendURL verifies that when the client
+// protocol is Chat and the upstream is configured as /responses or /messages,
+// the Planner does NOT reject the request.  Instead it resolves to native
+// mode and sets BackendURL to the /v1/chat/completions path so the proxy
+// forwards to the chat completions endpoint.
+func TestPlan_ChatFallback_RewritesBackendURL(t *testing.T) {
+	tests := []struct {
+		name        string
+		upstreamURL string
+	}{
+		{name: "chat to responses", upstreamURL: "http://upstream/v1/responses"},
+		{name: "chat to messages", upstreamURL: "http://upstream/v1/messages"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			target := &types.ModelTarget{
+				Model: &types.Model{
+					BaseModel: types.BaseModel{ID: "test-model"},
+				},
+				Upstream: commonType.UpstreamConfig{
+					URL:      tt.upstreamURL,
+					Provider: "test",
+				},
+				Target:    tt.upstreamURL,
+				ModelName: "test-model",
+			}
+
+			p := NewPlanner(
+				&mockModelResolver{target: target},
+				&mockBalanceChecker{},
+				&mockUsageLimitChecker{},
+				&mockContentSafetyChecker{},
+				nil,
+			)
+
+			meta := &types.RequestMetadata{
+				Protocol: string(types.ProtocolChat),
+				Task:     "chat",
+				UserID:   "user1",
+				Model:    "test-model",
+				TenantID: "ns-123",
+			}
+
+			plan, err := p.Plan(newTestGinContext(), meta)
+			require.NoError(t, err)
+			assert.NotEqual(t, types.PlanErrDisabled, plan.ErrorCode)
+			assert.Equal(t, "native", plan.RouteMode)
+			assert.Equal(t, "http://upstream/v1/chat/completions", plan.BackendURL)
+			assert.True(t, plan.BalanceOK)
+		})
+	}
 }
 
 func TestPlan_BackendURLFallback(t *testing.T) {

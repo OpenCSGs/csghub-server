@@ -165,16 +165,6 @@ func TestResolveRoutingDisabled(t *testing.T) {
 		target         RoutingTarget
 	}{
 		{
-			name:           "chat to messages - no adapter",
-			clientProtocol: types.ProtocolChat,
-			target:         RoutingTarget{Target: "https://api.anthropic.com/v1/messages"},
-		},
-		{
-			name:           "chat to responses - no adapter",
-			clientProtocol: types.ProtocolChat,
-			target:         RoutingTarget{Target: "https://example.com/v1/responses"},
-		},
-		{
 			name:           "responses to messages - no adapter",
 			clientProtocol: types.ProtocolResponses,
 			target:         RoutingTarget{Target: "https://api.anthropic.com/v1/messages"},
@@ -187,6 +177,77 @@ func TestResolveRoutingDisabled(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, ModeDisabled, decision.Mode)
 			assert.Contains(t, decision.Reason, "no_adapter")
+		})
+	}
+}
+
+// TestResolveRoutingChatFallback verifies that when the client protocol is
+// Chat (/v1/chat/completions) and the upstream is configured as Responses
+// (/v1/responses) or Messages (/v1/messages), the request is NOT rejected.
+// Instead the upstream URL path is rewritten to /v1/chat/completions and the
+// request is forwarded natively — Chat is the most widely compatible protocol
+// and most upstreams that expose /responses or /messages also accept
+// /chat/completions, so we proxy directly rather than disabling the endpoint.
+func TestResolveRoutingChatFallback(t *testing.T) {
+	tests := []struct {
+		name           string
+		clientProtocol types.Protocol
+		target         RoutingTarget
+		expectedURL    string
+	}{
+		{
+			name:           "chat to responses - rewrite path to chat/completions",
+			clientProtocol: types.ProtocolChat,
+			target:         RoutingTarget{Target: "https://example.com/v1/responses"},
+			expectedURL:    "https://example.com/v1/chat/completions",
+		},
+		{
+			name:           "chat to messages - rewrite path to chat/completions",
+			clientProtocol: types.ProtocolChat,
+			target:         RoutingTarget{Target: "https://api.anthropic.com/v1/messages"},
+			expectedURL:    "https://api.anthropic.com/v1/chat/completions",
+		},
+		{
+			name:           "chat to responses via metadata - rewrite path",
+			clientProtocol: types.ProtocolChat,
+			target:         RoutingTarget{Target: "https://example.com/v1/responses", UpstreamMetadata: map[string]any{"protocol": "responses"}},
+			expectedURL:    "https://example.com/v1/chat/completions",
+		},
+		{
+			name:           "chat to messages via metadata - rewrite path",
+			clientProtocol: types.ProtocolChat,
+			target:         RoutingTarget{Target: "https://api.anthropic.com/v1/messages", UpstreamMetadata: map[string]any{"protocol": "messages"}},
+			expectedURL:    "https://api.anthropic.com/v1/chat/completions",
+		},
+		{
+			name:           "chat to messages via /anthropic path - rewrite path",
+			clientProtocol: types.ProtocolChat,
+			target:         RoutingTarget{Target: "https://api.anthropic.com/v1/anthropic"},
+			expectedURL:    "https://api.anthropic.com/v1/chat/completions",
+		},
+		{
+			name:           "chat to responses with path prefix - preserve prefix",
+			clientProtocol: types.ProtocolChat,
+			target:         RoutingTarget{Target: "https://gateway.example.com/api/v1/responses"},
+			expectedURL:    "https://gateway.example.com/api/v1/chat/completions",
+		},
+		{
+			name:           "chat to messages with path prefix - preserve prefix",
+			clientProtocol: types.ProtocolChat,
+			target:         RoutingTarget{Target: "https://gateway.example.com/api/v1/messages"},
+			expectedURL:    "https://gateway.example.com/api/v1/chat/completions",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			decision, err := ResolveRouting(tt.clientProtocol, tt.target)
+			require.NoError(t, err)
+			assert.Equal(t, ModeNative, decision.Mode)
+			assert.Equal(t, AdapterNone, decision.AdapterKind)
+			assert.Equal(t, tt.expectedURL, decision.BackendURL)
+			// UpstreamProtocol should still reflect the actual upstream protocol.
+			assert.NotEqual(t, types.ProtocolChat, decision.UpstreamProtocol)
 		})
 	}
 }
