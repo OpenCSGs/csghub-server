@@ -87,6 +87,7 @@ func TestGenerateWorkflow_FinetuneV2(t *testing.T) {
 			{Name: "finetune-download", Image: "swift", HardWare: types.HardWare{Cpu: types.CPU{Num: "2"}}},
 			{Name: "finetune-train", Image: "swift", HardWare: types.HardWare{Gpu: types.Processor{Num: "1", ResourceName: "nvidia.com/gpu"}}},
 			{Name: "finetune-upload", Image: "swift", HardWare: types.HardWare{Cpu: types.CPU{Num: "2"}}},
+			{Name: "finetune-cleanup", Image: "swift", HardWare: types.HardWare{Cpu: types.CPU{Num: "2"}}, Command: []string{"/etc/csghub/cleanup-job.sh"}},
 		},
 	}
 
@@ -97,9 +98,9 @@ func TestGenerateWorkflow_FinetuneV2(t *testing.T) {
 		require.Equal(t, "staged", wf.Annotations["FinetuneWorkflowMode"])
 		require.Equal(t, "2", wf.Annotations["WorkflowVersion"])
 		require.Len(t, wf.Spec.Volumes, 1)
-		require.Len(t, wf.Spec.Templates, 4)
+		require.Len(t, wf.Spec.Templates, 5)
 
-		dag := wf.Spec.Templates[3].DAG
+		dag := wf.Spec.Templates[4].DAG
 		require.NotNil(t, dag)
 		require.Equal(t, []string{"download"}, dag.Tasks[1].Dependencies)
 		require.Equal(t, []string{"train"}, dag.Tasks[2].Dependencies)
@@ -107,6 +108,11 @@ func TestGenerateWorkflow_FinetuneV2(t *testing.T) {
 		require.NotContains(t, wf.Spec.Templates[0].Container.Resources.Requests, corev1.ResourceName("nvidia.com/gpu"))
 		require.Contains(t, wf.Spec.Templates[1].Container.Resources.Requests, corev1.ResourceName("nvidia.com/gpu"))
 		require.NotContains(t, wf.Spec.Templates[2].Container.Resources.Requests, corev1.ResourceName("nvidia.com/gpu"))
+		// cleanup template runs on CPU
+		require.NotContains(t, wf.Spec.Templates[3].Container.Resources.Requests, corev1.ResourceName("nvidia.com/gpu"))
+
+		// OnExit handler points to cleanup template
+		require.Equal(t, "finetune-cleanup", wf.Spec.OnExit)
 	})
 
 	t.Run("falls back to original single container without PVC", func(t *testing.T) {
@@ -118,6 +124,8 @@ func TestGenerateWorkflow_FinetuneV2(t *testing.T) {
 		require.Empty(t, wf.Spec.Volumes)
 		require.Len(t, wf.Spec.Templates, 1)
 		require.Equal(t, "finetune", wf.Spec.Templates[0].Name)
+		// No OnExit handler for legacy fallback
+		require.Empty(t, wf.Spec.OnExit)
 	})
 }
 

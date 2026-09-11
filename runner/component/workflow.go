@@ -359,7 +359,7 @@ func generateWorkflow(req types.ArgoWorkFlowReq, config *config.Config, pvcName 
 			Tolerations:  req.Tolerations,
 		}
 		nodes := req.Nodes
-		if req.WorkflowVersion >= 2 && (v.Name == "finetune-download" || v.Name == "finetune-upload") {
+		if req.WorkflowVersion >= 2 && (v.Name == "finetune-download" || v.Name == "finetune-upload" || v.Name == "finetune-cleanup") {
 			// Match the multi-node nginx workaround: transfer pods keep tolerations
 			// so they can run on tainted clusters, but do not inherit accelerator
 			// node affinity or selectors.
@@ -528,6 +528,10 @@ func generateWorkflow(req types.ArgoWorkFlowReq, config *config.Config, pvcName 
 				},
 			},
 		},
+	}
+
+	if req.TaskType == types.TaskTypeFinetune && req.WorkflowVersion >= 2 && pvcName != "" {
+		workflowObject.Spec.OnExit = "finetune-cleanup"
 	}
 
 	return workflowObject, nil

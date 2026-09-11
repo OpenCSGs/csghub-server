@@ -1185,6 +1185,13 @@ func (d *deployer) SubmitFinetuneJob(ctx context.Context, req types.FinetuneReq)
 				Image:    req.Image,
 				Command:  []string{"/etc/csghub/upload-job.sh"},
 			},
+			types.ArgoFlowTemplate{
+				Name:     "finetune-cleanup",
+				Env:      env,
+				HardWare: transferHardware,
+				Image:    req.Image,
+				Command:  []string{"/etc/csghub/cleanup-job.sh"},
+			},
 		)
 		entrypoint = "finetune-v2"
 	}
