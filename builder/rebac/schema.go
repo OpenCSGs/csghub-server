@@ -89,7 +89,7 @@ func CommonSchemaDefinitions() []ObjectTypeDefinition {
 				RelationParent,
 				RelationChild,
 			},
-			ComputedRelations: []Relation{RelationMember},
+			ComputedRelations: []Relation{RelationMember, RelationMemberFromChild},
 			Permissions: []Permission{
 				OrganizationCanRead,
 				OrganizationCanWrite,

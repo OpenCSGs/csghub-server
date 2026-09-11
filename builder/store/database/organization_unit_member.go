@@ -134,7 +134,7 @@ func validateOrganizationMembershipTarget(ctx context.Context, tx bun.Tx, rootOr
 		}
 		var isRoot bool
 		if err := tx.NewSelect().Model((*Organization)(nil)).Column("is_root").
-			Where("organization.id = ? AND organization.is_unit = TRUE AND organization.deleted_at IS NULL", organizationID).Scan(ctx, &isRoot); err != nil {
+			Where("organization.id = ? AND organization.is_hierarchical = TRUE AND organization.deleted_at IS NULL", organizationID).Scan(ctx, &isRoot); err != nil {
 			return err
 		}
 		if !isRoot {
@@ -367,7 +367,7 @@ func (s *organizationUnitMemberStoreImpl) ListMembers(ctx context.Context, input
 	base := s.db.Core.NewSelect().
 		Model((*Member)(nil)).
 		Join("JOIN users AS u ON u.id = member.user_id AND u.deleted_at IS NULL").
-		Join("JOIN organizations AS organization ON organization.id = member.organization_id AND organization.is_unit = TRUE AND organization.deleted_at IS NULL").
+		Join("JOIN organizations AS organization ON organization.id = member.organization_id AND organization.is_hierarchical = TRUE AND organization.deleted_at IS NULL").
 		Where("member.organization_id = ? AND member.deleted_at IS NULL", input.OrganizationID)
 	if input.Role != "" {
 		base = base.Where("member.role = ?", input.Role)

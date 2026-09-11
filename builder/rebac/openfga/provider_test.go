@@ -73,7 +73,7 @@ func TestProviderWriteAndDeleteUseOpenFGAWrite(t *testing.T) {
 
 	writeRequest := server.requests[0]
 	require.Equal(t, commontypes.OpenFgaStoreID, writeRequest.GetStoreId())
-	require.Equal(t, commontypes.OpenFgaAuthorizationModelID, writeRequest.GetAuthorizationModelId())
+	require.Equal(t, commontypes.OpenFgaAuthorizationModelIDLatest, writeRequest.GetAuthorizationModelId())
 	require.Nil(t, writeRequest.GetDeletes())
 	require.Len(t, writeRequest.GetWrites().GetTupleKeys(), 1)
 	require.Equal(t, "user:user-1", writeRequest.GetWrites().GetTupleKeys()[0].GetUser())
@@ -115,6 +115,8 @@ func TestProviderReadOperationsMapOpenFGARequests(t *testing.T) {
 	require.True(t, decision.Allowed)
 	require.Equal(t, "user:u-1", server.checkRequest.GetTupleKey().GetUser())
 	require.Equal(t, "can_read", server.checkRequest.GetTupleKey().GetRelation())
+	require.Equal(t, commontypes.OpenFgaStoreID, server.checkRequest.GetStoreId())
+	require.Equal(t, commontypes.OpenFgaAuthorizationModelIDLatest, server.checkRequest.GetAuthorizationModelId())
 	require.Equal(t, openfgav1.ConsistencyPreference_HIGHER_CONSISTENCY, server.checkRequest.GetConsistency())
 	require.Equal(t, "acme", server.checkRequest.GetContext().GetFields()["tenant"].GetStringValue())
 	require.Len(t, server.checkRequest.GetContextualTuples().GetTupleKeys(), 1)
@@ -153,6 +155,42 @@ func TestProviderReadOperationsMapOpenFGARequests(t *testing.T) {
 	require.Equal(t, "acme", server.listUsersRequest.GetContext().GetFields()["tenant"].GetStringValue())
 }
 
+// TestProviderUsesDefaultStoreAndConfiguredAuthorizationModel verifies request identifiers.
+func TestProviderUsesDefaultStoreAndConfiguredAuthorizationModel(t *testing.T) {
+	server := &fakeOpenFGAServer{checkResponse: &openfgav1.CheckResponse{Allowed: true}}
+	provider := &Provider{
+		server:               server,
+		authorizationModelID: "custom-model",
+	}
+	relationships := []rebac.Relationship{{
+		Subject:  rebac.UserSubject("user-1"),
+		Relation: rebac.RelationReader,
+		Object:   rebac.RepositoryObject(42),
+	}}
+
+	_, err := provider.Check(context.Background(), rebac.CheckRequest{
+		Subject:  rebac.UserSubject("user-1"),
+		Relation: rebac.RepositoryCanRead,
+		Object:   rebac.RepositoryObject(42),
+	})
+	require.NoError(t, err)
+	require.NoError(t, provider.Write(context.Background(), relationships))
+	require.Equal(t, commontypes.OpenFgaStoreID, server.checkRequest.GetStoreId())
+	require.Equal(t, "custom-model", server.checkRequest.GetAuthorizationModelId())
+	require.Equal(t, commontypes.OpenFgaStoreID, server.requests[0].GetStoreId())
+	require.Equal(t, "custom-model", server.requests[0].GetAuthorizationModelId())
+}
+
+// TestProviderOptions verifies custom Provider option validation and application.
+func TestProviderOptions(t *testing.T) {
+	options := defaultProviderOptions()
+	require.NoError(t, WithAuthorizationModelID("custom-model")(&options))
+	require.Equal(t, "custom-model", options.authorizationModelID)
+
+	require.Error(t, WithAuthorizationModelID("")(&options))
+	require.Error(t, WithPGXPool(nil)(&options))
+}
+
 // TestProviderReadOperationsRejectInvalidContext verifies protobuf context conversion errors.
 func TestProviderReadOperationsRejectInvalidContext(t *testing.T) {
 	provider := &Provider{server: &fakeOpenFGAServer{checkResponse: &openfgav1.CheckResponse{}}}
@@ -181,24 +219,42 @@ func TestGetServerInitializationFailureCanRetry(t *testing.T) {
 	require.Nil(t, server)
 }
 
-// TestNewProviderInitializationFailureCanRetry verifies failed provider initialization is not cached as success.
-func TestNewProviderInitializationFailureCanRetry(t *testing.T) {
+// TestNewDefaultProviderInitializationFailureCanRetry verifies failed provider initialization is not cached as success.
+func TestNewDefaultProviderInitializationFailureCanRetry(t *testing.T) {
 	previousDB := database.GetDB()
 	database.SetDB(nil)
 	t.Cleanup(func() { database.SetDB(previousDB) })
 
-	provider, err := NewProvider()
+	provider, err := NewDefaultProvider()
 	require.Error(t, err)
 	require.Nil(t, provider)
 
-	provider, err = NewProvider()
+	provider, err = NewDefaultProvider()
 	require.Error(t, err)
 	require.Nil(t, provider)
 }
 
-// TestNewProviderWithPGXPoolRejectsNil verifies the migration-specific provider entry point validates its dependency.
-func TestNewProviderWithPGXPoolRejectsNil(t *testing.T) {
-	provider, err := NewProviderWithPGXPool(nil)
+// TestNewCustomProviderWithNilPGXPoolRejectsOption verifies custom Provider option validation.
+func TestNewCustomProviderWithNilPGXPoolRejectsOption(t *testing.T) {
+	provider, err := NewCustomProvider(WithPGXPool(nil))
 	require.Error(t, err)
 	require.Nil(t, provider)
+}
+
+// TestNewCustomProviderWithoutOptionsUsesDefaultProvider verifies the no-option fallback.
+func TestNewCustomProviderWithoutOptionsUsesDefaultProvider(t *testing.T) {
+	openfgaProviderMu.Lock()
+	previousProvider := openfgaProvider
+	sentinel := &Provider{}
+	openfgaProvider = sentinel
+	openfgaProviderMu.Unlock()
+	t.Cleanup(func() {
+		openfgaProviderMu.Lock()
+		openfgaProvider = previousProvider
+		openfgaProviderMu.Unlock()
+	})
+
+	provider, err := NewCustomProvider()
+	require.NoError(t, err)
+	require.Same(t, sentinel, provider)
 }

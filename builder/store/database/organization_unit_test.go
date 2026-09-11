@@ -107,7 +107,7 @@ func TestOrganizationUnitStore_DeleteRoot(t *testing.T) {
 	member := createOrganizationUnitMemberTestUser(t, ctx, db, "root-delete-member")
 	rootUUID := uuid.New()
 	root, err := coredb.NewOrganizationUnitStoreWithDB(db).CreateRoot(ctx, coredb.CreateRootOrganizationInput{
-		Organization: &coredb.Organization{Name: "root-delete", Nickname: "Root Delete", UUID: rootUUID, UserID: creator.ID, IsRoot: true, IsUnit: true},
+		Organization: &coredb.Organization{Name: "root-delete", Nickname: "Root Delete", UUID: rootUUID, UserID: creator.ID, IsRoot: true, IsHierarchical: true},
 		Namespace:    &coredb.Namespace{Path: "root-delete", UUID: rootUUID.String()}, CreatorUserID: creator.ID,
 	})
 	require.NoError(t, err)

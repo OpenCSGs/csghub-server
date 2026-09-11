@@ -141,7 +141,7 @@ func (s *organizationUnitStoreImpl) CreateRoot(ctx context.Context, input Create
 		return nil, errorx.ReqParamInvalid(errors.New("root organization and namespace are required"), nil)
 	}
 	input.Organization.IsRoot = true
-	input.Organization.IsUnit = true
+	input.Organization.IsHierarchical = true
 	input.Namespace.NamespaceType = OrgNamespace
 	err := s.db.BunDB.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		if _, err := tx.NewInsert().Model(input.Organization).Exec(ctx); err != nil {
@@ -198,7 +198,7 @@ func (s *organizationUnitStoreImpl) DeleteRoot(ctx context.Context, input Delete
 	err := s.db.BunDB.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		var root Organization
 		if err := tx.NewSelect().Model(&root).WhereAllWithDeleted().
-			Where("organization.uuid = ? AND organization.is_unit = TRUE", input.OrganizationUUID).
+			Where("organization.uuid = ? AND organization.is_hierarchical = TRUE", input.OrganizationUUID).
 			For("UPDATE").Scan(ctx); err != nil {
 			return fmt.Errorf("lock root organization: %w", err)
 		}
@@ -213,7 +213,7 @@ func (s *organizationUnitStoreImpl) DeleteRoot(ctx context.Context, input Delete
 		if err := tx.NewSelect().Model((*Organization)(nil)).
 			ColumnExpr("CAST(organization.uuid AS TEXT)").
 			WhereAllWithDeleted().
-			Where("id IN (?) AND is_unit = TRUE", bun.In(allOrganizationIDs)).
+			Where("id IN (?) AND is_hierarchical = TRUE", bun.In(allOrganizationIDs)).
 			Order("id ASC").Scan(ctx, &result.DeletedOrganizationUUIDs); err != nil {
 			return errorx.HandleDBError(err, nil)
 		}
@@ -240,7 +240,7 @@ func (s *organizationUnitStoreImpl) DeleteRoot(ctx context.Context, input Delete
 		activeOrganizationIDs := uniqueOrganizationIDs(root.ID, activeUnits)
 		var namespaceIDs []int64
 		if err := tx.NewSelect().Model((*Organization)(nil)).Column("namespace_id").
-			Where("organization.id IN (?) AND organization.is_unit = TRUE AND organization.deleted_at IS NULL", bun.In(activeOrganizationIDs)).
+			Where("organization.id IN (?) AND organization.is_hierarchical = TRUE AND organization.deleted_at IS NULL", bun.In(activeOrganizationIDs)).
 			Scan(ctx, &namespaceIDs); err != nil {
 			return fmt.Errorf("load hierarchy organization namespaces: %w", err)
 		}
@@ -273,7 +273,7 @@ func (s *organizationUnitStoreImpl) DeleteRoot(ctx context.Context, input Delete
 		}
 		organizationResult, err := tx.NewUpdate().Model((*Organization)(nil)).
 			Set("deleted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP").
-			Where("organization.id IN (?) AND organization.is_unit = TRUE AND organization.deleted_at IS NULL", bun.In(activeOrganizationIDs)).Exec(ctx)
+			Where("organization.id IN (?) AND organization.is_hierarchical = TRUE AND organization.deleted_at IS NULL", bun.In(activeOrganizationIDs)).Exec(ctx)
 		if err != nil {
 			return fmt.Errorf("soft-delete hierarchy organizations: %w", err)
 		}
@@ -330,7 +330,7 @@ func uniqueOrganizationIDs(rootOrganizationID int64, units []OrganizationUnit) [
 func lockOrganization(ctx context.Context, tx bun.Tx, organizationID int64) error {
 	var id int64
 	err := tx.NewSelect().Model((*Organization)(nil)).Column("id").
-		Where("organization.id = ? AND organization.is_unit = TRUE AND organization.deleted_at IS NULL", organizationID).
+		Where("organization.id = ? AND organization.is_hierarchical = TRUE AND organization.deleted_at IS NULL", organizationID).
 		For("UPDATE").Scan(ctx, &id)
 	if err != nil {
 		return fmt.Errorf("lock organization %d: %w", organizationID, err)
@@ -379,10 +379,10 @@ func unitSelectQuery(db bun.IDB, model any) *bun.SelectQuery {
 		ColumnExpr("organization.user_id").
 		ColumnExpr("COALESCE(namespace.uuid, '') AS namespace_uuid").
 		ColumnExpr("COALESCE((SELECT MAX(c.depth) FROM organization_unit_closure AS c WHERE c.root_organization_id = ou.root_organization_id AND c.descendant_unit_id = ou.id), 0) AS depth").
-		Join("JOIN organizations AS organization ON organization.id = ou.organization_id AND organization.is_unit = TRUE AND organization.deleted_at IS NULL").
-		Join("JOIN organizations AS root_organization ON root_organization.id = ou.root_organization_id AND root_organization.is_unit = TRUE AND root_organization.deleted_at IS NULL").
+		Join("JOIN organizations AS organization ON organization.id = ou.organization_id AND organization.is_hierarchical = TRUE AND organization.deleted_at IS NULL").
+		Join("JOIN organizations AS root_organization ON root_organization.id = ou.root_organization_id AND root_organization.is_hierarchical = TRUE AND root_organization.deleted_at IS NULL").
 		Join("LEFT JOIN organization_units AS parent ON parent.id = ou.parent_unit_id AND parent.deleted_at IS NULL").
-		Join("LEFT JOIN organizations AS parent_organization ON parent_organization.id = parent.organization_id AND parent_organization.is_unit = TRUE AND parent_organization.deleted_at IS NULL").
+		Join("LEFT JOIN organizations AS parent_organization ON parent_organization.id = parent.organization_id AND parent_organization.is_hierarchical = TRUE AND parent_organization.deleted_at IS NULL").
 		Join("LEFT JOIN namespaces AS namespace ON namespace.id = organization.namespace_id AND namespace.deleted_at IS NULL")
 }
 
@@ -406,7 +406,7 @@ func toOrganizationUnit(unit *OrganizationUnit) types.OrganizationUnit {
 		Verified:             unit.Verified,
 		UserID:               unit.UserID,
 		IsRoot:               unit.OrganizationID == unit.RootOrganizationID,
-		IsUnit:               true,
+		IsHierarchical:       true,
 		Namespace:            &types.Namespace{Path: unit.Name, Type: string(OrgNamespace), UUID: unit.NamespaceUUID},
 		SortOrder:            unit.SortOrder,
 		Depth:                unit.Depth,
@@ -443,7 +443,7 @@ func (s *organizationUnitStoreImpl) Create(ctx context.Context, input CreateOrga
 		}
 		var rootIsRoot bool
 		if err := tx.NewSelect().Model((*Organization)(nil)).Column("is_root").
-			Where("organization.id = ? AND organization.is_unit = TRUE AND organization.deleted_at IS NULL", input.RootOrganizationID).
+			Where("organization.id = ? AND organization.is_hierarchical = TRUE AND organization.deleted_at IS NULL", input.RootOrganizationID).
 			Scan(ctx, &rootIsRoot); err != nil {
 			return fmt.Errorf("load root organization: %w", err)
 		}
@@ -454,7 +454,7 @@ func (s *organizationUnitStoreImpl) Create(ctx context.Context, input CreateOrga
 		if input.ParentUnitUUID != nil {
 			var parent OrganizationUnit
 			if err := tx.NewSelect().Model(&parent).
-				Join("JOIN organizations AS parent_organization ON parent_organization.id = ou.organization_id AND parent_organization.is_unit = TRUE AND parent_organization.deleted_at IS NULL").
+				Join("JOIN organizations AS parent_organization ON parent_organization.id = ou.organization_id AND parent_organization.is_hierarchical = TRUE AND parent_organization.deleted_at IS NULL").
 				Where("parent_organization.uuid = ? AND ou.root_organization_id = ?", *input.ParentUnitUUID, input.RootOrganizationID).
 				For("UPDATE").Scan(ctx); err != nil {
 				return fmt.Errorf("find parent organization unit: %w", err)
@@ -488,7 +488,7 @@ func (s *organizationUnitStoreImpl) Create(ctx context.Context, input CreateOrga
 		}
 
 		input.Organization.IsRoot = false
-		input.Organization.IsUnit = true
+		input.Organization.IsHierarchical = true
 		if _, err := tx.NewInsert().Model(input.Organization).Exec(ctx); err != nil {
 			return fmt.Errorf("create child organization: %w", err)
 		}
@@ -577,7 +577,7 @@ func (s *organizationUnitStoreImpl) Update(ctx context.Context, input UpdateOrga
 
 		organizationQuery := tx.NewUpdate().Model((*Organization)(nil)).
 			Set("updated_at = CURRENT_TIMESTAMP").
-			Where("organization.id = ? AND organization.is_unit = TRUE AND organization.deleted_at IS NULL", input.OrganizationID)
+			Where("organization.id = ? AND organization.is_hierarchical = TRUE AND organization.deleted_at IS NULL", input.OrganizationID)
 		if input.Nickname != nil {
 			organizationQuery = organizationQuery.Set("name = ?", *input.Nickname)
 		}
@@ -901,7 +901,7 @@ func (s *organizationUnitStoreImpl) ListChildren(ctx context.Context, input List
 func (s *organizationUnitStoreImpl) listSummaries(ctx context.Context, input ListOrganizationUnitInput, condition string, args []any) ([]types.OrganizationUnitSummary, int, error) {
 	var units []OrganizationUnit
 	query := s.db.Core.NewSelect().Model(&units).
-		Join("JOIN organizations AS organization ON organization.id = ou.organization_id AND organization.is_unit = TRUE AND organization.deleted_at IS NULL").
+		Join("JOIN organizations AS organization ON organization.id = ou.organization_id AND organization.is_hierarchical = TRUE AND organization.deleted_at IS NULL").
 		Where("ou.root_organization_id = ?", input.RootOrganizationID).
 		Where(condition, args...)
 	total, err := query.Count(ctx)

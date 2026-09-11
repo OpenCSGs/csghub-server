@@ -117,18 +117,18 @@ func (c *organizationComponentImpl) Create(ctx context.Context, req *types.Creat
 	}
 
 	dbOrg := &database.Organization{
-		Name:        req.Name,
-		Nickname:    req.Nickname,
-		Description: req.Description,
-		Homepage:    req.Homepage,
-		Logo:        req.Logo,
-		OrgType:     req.OrgType,
-		Verified:    req.Verified,
-		IsRoot:      true,
-		IsUnit:      false,
-		User:        &user,
-		UserID:      user.ID,
-		UUID:        uuid.New(),
+		Name:           req.Name,
+		Nickname:       req.Nickname,
+		Description:    req.Description,
+		Homepage:       req.Homepage,
+		Logo:           req.Logo,
+		OrgType:        req.OrgType,
+		Verified:       req.Verified,
+		IsRoot:         true,
+		IsHierarchical: false,
+		User:           &user,
+		UserID:         user.ID,
+		UUID:           uuid.New(),
 	}
 
 	exist, err := c.nsStore.ExistsByUUID(ctx, dbOrg.UUID.String())
@@ -180,16 +180,16 @@ func (c *organizationComponentImpl) Create(ctx context.Context, req *types.Creat
 	}
 
 	org := &types.Organization{
-		Name:        dbOrg.Name,
-		Nickname:    dbOrg.Nickname,
-		Description: dbOrg.Description,
-		Homepage:    dbOrg.Homepage,
-		Logo:        dbOrg.Logo,
-		OrgType:     dbOrg.OrgType,
-		Verified:    dbOrg.Verified,
-		IsRoot:      dbOrg.IsRoot,
-		IsUnit:      dbOrg.IsUnit,
-		UUID:        dbOrg.UUID,
+		Name:           dbOrg.Name,
+		Nickname:       dbOrg.Nickname,
+		Description:    dbOrg.Description,
+		Homepage:       dbOrg.Homepage,
+		Logo:           dbOrg.Logo,
+		OrgType:        dbOrg.OrgType,
+		Verified:       dbOrg.Verified,
+		IsRoot:         dbOrg.IsRoot,
+		IsHierarchical: dbOrg.IsHierarchical,
+		UUID:           dbOrg.UUID,
 		Namespace: &types.Namespace{
 			Path: dbOrg.Name,
 			Type: string(namespace.NamespaceType),
@@ -263,17 +263,17 @@ func (c *organizationComponentImpl) toOrgList(ctx context.Context, dborgs []data
 	var orgs []types.Organization
 	for _, dborg := range dborgs {
 		org := types.Organization{
-			Name:         dborg.Name,
-			Nickname:     dborg.Nickname,
-			Description:  dborg.Description,
-			Homepage:     dborg.Homepage,
-			Logo:         dborg.Logo,
-			OrgType:      dborg.OrgType,
-			Verified:     dborg.Verified,
-			IsRoot:       dborg.IsRoot,
-			IsUnit:       dborg.IsUnit,
-			VerifyStatus: string(dborg.VerifyStatus),
-			UUID:         dborg.UUID,
+			Name:           dborg.Name,
+			Nickname:       dborg.Nickname,
+			Description:    dborg.Description,
+			Homepage:       dborg.Homepage,
+			Logo:           dborg.Logo,
+			OrgType:        dborg.OrgType,
+			Verified:       dborg.Verified,
+			IsRoot:         dborg.IsRoot,
+			IsHierarchical: dborg.IsHierarchical,
+			VerifyStatus:   string(dborg.VerifyStatus),
+			UUID:           dborg.UUID,
 		}
 		if dborg.Namespace != nil {
 			org.Namespace = &types.Namespace{
@@ -296,16 +296,16 @@ func (c *organizationComponentImpl) Get(ctx context.Context, orgName string) (*t
 		return nil, fmt.Errorf("failed to get organizations by name, error: %w", err)
 	}
 	org := &types.Organization{
-		Name:        dborg.Name,
-		Nickname:    dborg.Nickname,
-		Description: dborg.Description,
-		Homepage:    dborg.Homepage,
-		Logo:        dborg.Logo,
-		OrgType:     dborg.OrgType,
-		Verified:    dborg.Verified,
-		IsRoot:      dborg.IsRoot,
-		IsUnit:      dborg.IsUnit,
-		UUID:        dborg.UUID,
+		Name:           dborg.Name,
+		Nickname:       dborg.Nickname,
+		Description:    dborg.Description,
+		Homepage:       dborg.Homepage,
+		Logo:           dborg.Logo,
+		OrgType:        dborg.OrgType,
+		Verified:       dborg.Verified,
+		IsRoot:         dborg.IsRoot,
+		IsHierarchical: dborg.IsHierarchical,
+		UUID:           dborg.UUID,
 	}
 	if dborg.Namespace != nil {
 		org.Namespace = &types.Namespace{
@@ -332,16 +332,16 @@ func (c *organizationComponentImpl) GetByUUID(ctx context.Context, uuid string) 
 		return nil, errorx.ErrDatabaseNoRows
 	}
 	org := &types.Organization{
-		Name:        dborg.Name,
-		Nickname:    dborg.Nickname,
-		Description: dborg.Description,
-		Homepage:    dborg.Homepage,
-		Logo:        dborg.Logo,
-		OrgType:     dborg.OrgType,
-		Verified:    dborg.Verified,
-		IsRoot:      dborg.IsRoot,
-		IsUnit:      dborg.IsUnit,
-		UUID:        dborg.UUID,
+		Name:           dborg.Name,
+		Nickname:       dborg.Nickname,
+		Description:    dborg.Description,
+		Homepage:       dborg.Homepage,
+		Logo:           dborg.Logo,
+		OrgType:        dborg.OrgType,
+		Verified:       dborg.Verified,
+		IsRoot:         dborg.IsRoot,
+		IsHierarchical: dborg.IsHierarchical,
+		UUID:           dborg.UUID,
 	}
 	if dborg.Namespace != nil {
 		org.Namespace = &types.Namespace{
@@ -373,7 +373,7 @@ func (c *organizationComponentImpl) Delete(ctx context.Context, req *types.Delet
 	if err != nil {
 		return fmt.Errorf("failed to find database organization, error: %w", err)
 	}
-	if organization.IsUnit {
+	if organization.IsHierarchical {
 		return errorx.ReqParamInvalid(
 			errors.New("hierarchy organizations must be deleted through the hierarchy organization API"),
 			nil,

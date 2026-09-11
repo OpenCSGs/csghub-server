@@ -20,24 +20,25 @@ type OrganizationUnit struct {
 	// RootOrganizationUUID identifies the top-level organization that owns the tree.
 	RootOrganizationUUID string `json:"root_organization_uuid"`
 	// OrganizationUUID identifies the real child organization represented by this unit.
-	OrganizationUUID string     `json:"organization_uuid"`
-	ParentUnitUUID   *string    `json:"parent_unit_uuid"`
-	Name             string     `json:"name"`
-	Nickname         string     `json:"nickname"`
-	Description      string     `json:"description"`
-	Homepage         string     `json:"homepage,omitempty"`
-	Logo             string     `json:"logo,omitempty"`
-	Verified         bool       `json:"verified"`
-	OrgType          string     `json:"org_type,omitempty"`
-	UserID           int64      `json:"user_id,omitempty"`
-	IsRoot           bool       `json:"is_root"`
-	IsUnit           bool       `json:"is_unit"`
-	Namespace        *Namespace `json:"namespace,omitempty"`
-	SortOrder        int        `json:"sort_order"`
-	Depth            int        `json:"depth"`
-	CreatedAt        time.Time  `json:"created_at"`
-	UpdatedAt        time.Time  `json:"updated_at"`
-	DeletedAt        *time.Time `json:"deleted_at,omitempty"`
+	OrganizationUUID string  `json:"organization_uuid"`
+	ParentUnitUUID   *string `json:"parent_unit_uuid"`
+	Name             string  `json:"name"`
+	Nickname         string  `json:"nickname"`
+	Description      string  `json:"description"`
+	Homepage         string  `json:"homepage,omitempty"`
+	Logo             string  `json:"logo,omitempty"`
+	Verified         bool    `json:"verified"`
+	OrgType          string  `json:"org_type,omitempty"`
+	UserID           int64   `json:"user_id,omitempty"`
+	IsRoot           bool    `json:"is_root"`
+	// IsHierarchical reports whether this organization belongs to a hierarchy.
+	IsHierarchical bool       `json:"is_hierarchical"`
+	Namespace      *Namespace `json:"namespace,omitempty"`
+	SortOrder      int        `json:"sort_order"`
+	Depth          int        `json:"depth"`
+	CreatedAt      time.Time  `json:"created_at"`
+	UpdatedAt      time.Time  `json:"updated_at"`
+	DeletedAt      *time.Time `json:"deleted_at,omitempty"`
 	// Tags contains the organization-scoped tags assigned to this hierarchy unit.
 	Tags []RepoTag `json:"tags"`
 }
@@ -391,14 +392,14 @@ type Organization struct {
 	Verified    bool   `json:"verified"`
 	// IsRoot reports whether this is a top-level organization.
 	IsRoot bool `json:"is_root"`
-	// IsUnit reports whether this organization belongs to the hierarchy model.
-	IsUnit       bool       `json:"is_unit"`
-	UserID       int64      `json:"user_id,omitempty"`
-	VerifyStatus string     `json:"verify_status,omitempty"`
-	UUID         uuid.UUID  `json:"uuid,omitempty"`
-	Namespace    *Namespace `json:"namespace,omitempty"`
-	Role         string     `json:"role,omitempty"`
-	Tags         []RepoTag  `json:"tags,omitempty"`
+	// IsHierarchical reports whether this organization belongs to the hierarchy model.
+	IsHierarchical bool       `json:"is_hierarchical"`
+	UserID         int64      `json:"user_id,omitempty"`
+	VerifyStatus   string     `json:"verify_status,omitempty"`
+	UUID           uuid.UUID  `json:"uuid,omitempty"`
+	Namespace      *Namespace `json:"namespace,omitempty"`
+	Role           string     `json:"role,omitempty"`
+	Tags           []RepoTag  `json:"tags,omitempty"`
 }
 
 type Member struct {

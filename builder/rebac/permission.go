@@ -40,6 +40,8 @@ const (
 	RelationReader Relation = "reader"
 	// RelationMember identifies membership in a group-like object.
 	RelationMember Relation = "member"
+	// RelationMemberFromChild identifies membership inherited from child organizations.
+	RelationMemberFromChild Relation = "member_from_child"
 	// RelationParent identifies the parent object used for permission inheritance.
 	RelationParent Relation = "parent"
 	// RelationChild identifies a direct child object in a hierarchy.

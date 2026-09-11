@@ -12,14 +12,6 @@ import (
 	"opencsg.com/csghub-server/builder/store/database"
 )
 
-// Config identifies the OpenFGA store and authorization model used by the Provider.
-type Config struct {
-	// StoreID identifies the OpenFGA store containing authorization data.
-	StoreID string `json:"store_id"`
-	// AuthorizationModelID identifies the authorization model used to evaluate requests.
-	AuthorizationModelID string `json:"authorization_model_id"`
-}
-
 var (
 	fgaServer   *fga.Server
 	fgaServerMu sync.Mutex
@@ -32,10 +24,20 @@ type borrowedDatastore struct {
 }
 
 // Close intentionally does nothing because the application owns the pool.
-func (d borrowedDatastore) Close() {
+func (d borrowedDatastore) Close() {}
+
+// clearCachedServer removes the default server from the cache when that server is closed.
+// Custom providers use standalone servers and must not invalidate the default server cache.
+func clearCachedServer(server openFGAServer) {
+	cachedServer, ok := server.(*fga.Server)
+	if !ok {
+		return
+	}
 	fgaServerMu.Lock()
 	defer fgaServerMu.Unlock()
-	fgaServer = nil
+	if fgaServer == cachedServer {
+		fgaServer = nil
+	}
 }
 
 // getServer initializes an OpenFGA server with the pgx pool owned by the application database.DB.
