@@ -18,8 +18,10 @@ type ReverseProxy interface {
 }
 
 type reverseProxyImpl struct {
-	target         *url.URL
-	acceptEncoding *string
+	target                 *url.URL
+	acceptEncoding         *string
+	requestHeadersToRemove []string
+	responseModifiers      []func(*http.Response) error
 }
 
 var DefaultResponseStreamContentType openai.ChatCompletionChunk
@@ -34,6 +36,21 @@ func WithAcceptEncoding(encoding string) ReverseProxyOption {
 
 func WithoutAcceptEncoding() ReverseProxyOption {
 	return WithAcceptEncoding("identity")
+}
+
+func WithoutRequestHeaders(headers ...string) ReverseProxyOption {
+	return func(rp *reverseProxyImpl) {
+		rp.requestHeadersToRemove = append(rp.requestHeadersToRemove, headers...)
+	}
+}
+
+func WithResponseModifier(modifier func(*http.Response) error) ReverseProxyOption {
+	return func(rp *reverseProxyImpl) {
+		if modifier != nil {
+			//nolint:bodyclose // modifier does not own the response; body lifecycle is managed by httputil.ReverseProxy
+			rp.responseModifiers = append(rp.responseModifiers, modifier)
+		}
+	}
 }
 
 func NewReverseProxy(target string, opts ...ReverseProxyOption) (ReverseProxy, error) {
@@ -68,6 +85,9 @@ func (rp *reverseProxyImpl) ServeHTTP(w http.ResponseWriter, r *http.Request, ap
 	}
 	//nolint:staticcheck // Director is deprecated since Go 1.26; migration to Rewrite pending validation
 	proxy.Director = func(req *http.Request) {
+		for _, header := range rp.requestHeadersToRemove {
+			req.Header.Del(header)
+		}
 		if len(svcHost) > 0 {
 			slog.Info("update reverse proxy header host", slog.Any("svc-host", svcHost))
 			req.Host = svcHost
@@ -117,6 +137,12 @@ func (rp *reverseProxyImpl) ServeHTTP(w http.ResponseWriter, r *http.Request, ap
 		// allow upstream pages to be embedded in iframes by the parent app
 		resp.Header.Del("X-Frame-Options")
 		resp.Header.Del("Content-Security-Policy")
+
+		for _, modifier := range rp.responseModifiers {
+			if err := modifier(resp); err != nil {
+				return err
+			}
+		}
 
 		return nil
 	}

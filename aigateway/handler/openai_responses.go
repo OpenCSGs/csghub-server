@@ -18,6 +18,14 @@ func isCSGHubHostedModel(model *types.Model) bool {
 }
 
 func withResponsesBackendURL(modelTarget *resolvedModelTarget, backendURL string) *resolvedModelTarget {
+	return withBackendURL(modelTarget, backendURL)
+}
+
+// withBackendURL returns a copy of modelTarget whose Target, Upstream.URL, and
+// Model.Endpoint fields are replaced by backendURL.  This is used by protocol
+// handlers to apply the Planner's resolved BackendURL (which may have a
+// rewritten path) before proxying the request upstream.
+func withBackendURL(modelTarget *resolvedModelTarget, backendURL string) *resolvedModelTarget {
 	backendURL = strings.TrimSpace(backendURL)
 	if modelTarget == nil || backendURL == "" {
 		return modelTarget

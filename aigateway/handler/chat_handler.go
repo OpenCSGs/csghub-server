@@ -132,6 +132,13 @@ func (h *chatPipelineHandler) Execute(c *gin.Context, meta *types.RequestMetadat
 
 	mt := modelTargetToResolved(p.ModelTarget)
 
+	// Apply the Planner-resolved BackendURL.  When the upstream is configured
+	// as /responses or /messages but the client requests /chat/completions,
+	// the routing layer rewrites the path to /v1/chat/completions (chat
+	// fallback).  Override the model target so the proxy uses the rewritten
+	// path instead of the original upstream URL.
+	mt = withBackendURL(mt, p.BackendURL)
+
 	// End the preflight span that was started by the entry handler.
 	if pt := plan.GetPreflightTracer(c); pt != nil {
 		pt.SetTargetModel(modelID, p.ModelTarget)
@@ -283,4 +290,3 @@ func (h *chatPipelineHandler) HandlePlanError(c *gin.Context, meta *types.Reques
 	}
 	handleOpenAIPlanError(c, meta, p, err, frontendURL)
 }
-
