@@ -2,134 +2,16 @@ package handler
 
 import (
 	"errors"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"opencsg.com/csghub-server/aigateway/component"
 	responsespkg "opencsg.com/csghub-server/aigateway/handler/responses"
 	"opencsg.com/csghub-server/aigateway/types"
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/common/utils/trace"
 )
-
-// Responses godoc
-// @Security     ApiKey
-// @Summary      Create a model response
-// @Description  Sends an OpenAI-compatible Responses API request to the backend model and returns the response. Streams Server-Sent Events when `stream: true`.
-// @Tags         AIGateway
-// @Accept       json
-// @Produce      json
-// @Param        request body types.ResponsesRequest true "Responses request"
-// @Success      200  {object}  types.ResponsesResponse "OK"
-// @Success      200  {object}  string "Server-Sent Events stream when stream=true"
-// @Failure      400  {object}  error "Bad request or unsupported feature"
-// @Failure      402  {object}  error "Insufficient balance or usage limit exceeded"
-// @Failure      404  {object}  error "Model not found"
-// @Failure      500  {object}  error "Internal server error"
-// @Failure      502  {object}  error "Upstream returned an invalid response"
-// @Router       /v1/responses [post]
-func (h *OpenAIHandlerImpl) Responses(c *gin.Context) {
-	ctx := c.Request.Context()
-	username := httpbase.GetCurrentUser(c)
-	nsUUID := httpbase.GetCurrentNamespaceUUID(c)
-	apikey := httpbase.GetAccessToken(c)
-	owner := responsesOwnerBinding(c)
-
-	req := &types.ResponsesRequest{}
-	if err := c.BindJSON(req); err != nil {
-		writeResponsesError(c, http.StatusBadRequest, "invalid_request_error", "invalid_request_error", fmt.Sprintf("invalid responses request body:%v", err))
-		return
-	}
-	if err := req.Validate(); err != nil {
-		writeResponsesError(c, http.StatusBadRequest, "invalid_request_error", "invalid_request_error", err.Error())
-		return
-	}
-
-	publicModelID := req.Model
-	publicPreviousResponseID := req.PreviousResponseID
-	previousResponse, ok := h.resolvePreviousResponseRoute(c, publicPreviousResponseID, owner)
-	if !ok {
-		return
-	}
-	if previousResponse.UpstreamResponseID != "" {
-		req.PreviousResponseID = previousResponse.UpstreamResponseID
-	}
-
-	modelTarget, ok := h.resolveResponsesModelTarget(c, username, publicModelID, previousResponse.RequiredUpstreamID)
-	// Metrics key point 1: enrich business data on the RequestMetrics object.
-	// When resolution fails (ok == false), modelTarget is nil and only the
-	// requested modelID is recorded.
-	SetMetricsModelTarget(SetMetricsModelParams{
-		C:           c,
-		ModelID:     publicModelID,
-		ModelTarget: modelTarget,
-		IsStream:    req.Stream,
-	})
-	if !ok {
-		return
-	}
-
-	decision, err := responsespkg.ResolveRouting(responsespkg.RoutingTarget{
-		ModelID:          modelTarget.Model.ID,
-		Target:           modelTarget.Target,
-		CSGHubHosted:     isCSGHubHostedModel(modelTarget.Model),
-		RuntimeFramework: modelTarget.Model.RuntimeFramework,
-		ImageID:          modelTarget.Model.ImageID,
-	})
-	if err != nil {
-		writeResponsesError(c, http.StatusBadRequest, "unsupported_feature", "invalid_request_error", err.Error())
-		return
-	}
-	if decision.Mode == responsespkg.ResponsesModeDisabled {
-		writeResponsesError(c, http.StatusBadRequest, "unsupported_feature", "invalid_request_error", "/v1/responses is disabled for this model")
-		return
-	}
-	requestID := trace.GetTraceIDInGinContext(c)
-	traceCtx, generationRecorder := h.startResponsesTrace(
-		ctx,
-		c.Request.Header,
-		publicModelID,
-		modelTarget,
-		req,
-		decision,
-		requestID,
-		nsUUID,
-	)
-	ctx = traceCtx
-	c.Request = c.Request.WithContext(traceCtx)
-	responseCapture := h.setupResponsesCapture(c, req, modelTarget, decision, nsUUID)
-
-	if !modelTarget.Model.SkipBalance() {
-		if err := h.openaiComponent.CheckBalance(ctx, nsUUID); err != nil {
-			finishLLMTraceWithError(generationRecorder, err, types.TraceErrInsufficientBalance)
-			h.handleInsufficientBalance(c, req.Stream, nsUUID, publicModelID, err)
-			return
-		}
-	}
-
-	var responsesModeration component.Moderation
-	if isCheck, result, err := h.sensitivePolicy.CheckResponsesSensitive(ctx, modelTarget.Model, types.ResponsesPromptText(req), nsUUID, req.Stream, modelTarget.Upstream.Provider); err != nil {
-		slog.WarnContext(ctx, "responses sensitive policy check error", slog.Any("error", err))
-	} else if isCheck && result != nil && result.IsSensitive {
-		finishLLMTraceWithError(generationRecorder, ErrSensitiveContent, types.TraceErrSensitivePrompt)
-		responsespkg.HandleSensitiveResponse(c, req.Stream, result)
-		return
-	} else if isCheck {
-		responsesModeration = h.modComponent
-	}
-
-	switch decision.Mode {
-	case responsespkg.ResponsesModeNative:
-		h.executeNativeResponses(c, req, withResponsesBackendURL(modelTarget, decision.BackendURL), decision, owner, nsUUID, apikey, publicModelID, publicPreviousResponseID, responsesModeration, responseCapture, generationRecorder)
-	case responsespkg.ResponsesModeChatAdapter:
-		h.executeAdapterResponses(c, req, withResponsesBackendURL(modelTarget, decision.BackendURL), nsUUID, apikey, publicModelID, responsesModeration, responseCapture, generationRecorder)
-	default:
-		writeResponsesError(c, http.StatusBadRequest, "unsupported_feature", "invalid_request_error", "unsupported responses execution mode")
-	}
-}
 
 func isCSGHubHostedModel(model *types.Model) bool {
 	return model != nil && model.SvcName != ""
@@ -207,24 +89,6 @@ func (h *OpenAIHandlerImpl) resolvePreviousResponseRoute(c *gin.Context, previou
 		RequiredUpstreamID: claims.UpstreamID,
 		UpstreamResponseID: claims.UpstreamResponseID,
 	}, true
-}
-
-func (h *OpenAIHandlerImpl) resolveResponsesModelTarget(c *gin.Context, username, publicModelID string, requiredUpstreamID int64) (*resolvedModelTarget, bool) {
-	ctx := c.Request.Context()
-	modelTarget, err := h.resolveModelTargetWithOptions(ctx, username, publicModelID, c.Request.Header, modelTargetResolveOptions{
-		RequiredUpstreamID: requiredUpstreamID,
-	})
-	if err == nil {
-		return modelTarget, true
-	}
-
-	var targetErr *modelTargetError
-	if requiredUpstreamID != 0 && errors.As(err, &targetErr) && targetErr.APIError.Code == "required_upstream_unavailable" {
-		writeResponsesError(c, http.StatusBadRequest, "response_route_unavailable", "invalid_request_error", "previous_response_id was created by an upstream that is no longer available")
-		return nil, false
-	}
-	handleModelTargetError(c, ctx, publicModelID, "failed to get responses target address", err)
-	return nil, false
 }
 
 func (h *OpenAIHandlerImpl) getResponsesIDMapper() (*responsespkg.IDMapper, error) {
