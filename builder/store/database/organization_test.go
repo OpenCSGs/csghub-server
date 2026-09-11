@@ -21,7 +21,7 @@ func TestOrganizationStore_CRUD(t *testing.T) {
 	ctx := context.TODO()
 	uuid := uuid.New()
 
-	store := database.NewOrgStoreWithDB(db)
+	store := database.NewOrgStoreWithDBAndDeletionJobClient(db, &testRepositoryDeletionJobClient{})
 	err := store.Create(ctx, &database.Organization{
 		Name:     "o1",
 		Nickname: "o1_nickname",
@@ -137,7 +137,7 @@ func TestOrganizationStore_CRUD(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, 1, len(orgs))
 
-	err = store.Delete(ctx, "o1")
+	_, err = store.Delete(ctx, "o1")
 	require.Nil(t, err)
 	membershipCount, err := db.Core.NewSelect().Model((*database.Member)(nil)).Where("member.organization_id = ?", org.ID).Count(ctx)
 	require.NoError(t, err)
@@ -153,7 +153,7 @@ func TestOrganizationStore_ModeFilters(t *testing.T) {
 	defer db.Close()
 	ctx := context.Background()
 
-	legacyStore := database.NewOrgStoreWithDB(db)
+	legacyStore := database.NewOrgStoreWithDBAndDeletionJobClient(db, &testRepositoryDeletionJobClient{})
 	hierarchyStore := database.NewOrgStoreWithMode(db, true)
 	legacyOrganization := &database.Organization{
 		Name: "mode-legacy", Nickname: "Legacy", UUID: uuid.New(),
@@ -193,7 +193,7 @@ func TestOrganizationStore_GetUserRootOrganizationsReturnsHierarchyRoots(t *test
 	ctx := context.Background()
 
 	root := createRootOrganization(t, ctx, db, "user-root-orgs")
-	unitStore := database.NewOrganizationUnitStoreWithDB(db)
+	unitStore := database.NewOrganizationUnitStoreWithDBAndDeletionJobClient(db, &testRepositoryDeletionJobClient{})
 	research := createChild(t, ctx, unitStore, root, "user-root-orgs-research", nil, 1)
 	it := createChild(t, ctx, unitStore, root, "user-root-orgs-it", &research.UUID, 1)
 
@@ -235,7 +235,7 @@ func TestOrganizationStore_IsLastOrganizationAdmin(t *testing.T) {
 	defer db.Close()
 	ctx := context.Background()
 
-	legacyStore := database.NewOrgStoreWithDB(db)
+	legacyStore := database.NewOrgStoreWithDBAndDeletionJobClient(db, &testRepositoryDeletionJobClient{})
 	hierarchyStore := database.NewOrgStoreWithMode(db, true)
 	organizations := map[string]*database.Organization{}
 	createOrganization := func(store database.OrgStore, name string) {
@@ -300,7 +300,7 @@ func TestOrganizationStore_CreateWithRelations(t *testing.T) {
 	owner, err := userStore.FindByUsername(ctx, "atomic-owner")
 	require.NoError(t, err)
 
-	store := database.NewOrgStoreWithDB(db)
+	store := database.NewOrgStoreWithDBAndDeletionJobClient(db, &testRepositoryDeletionJobClient{})
 
 	org := &database.Organization{
 		Name:     "atomic-org",
@@ -342,7 +342,7 @@ func TestOrganizationStore_CreateWithRelationsRollback(t *testing.T) {
 	owner, err := userStore.FindByUsername(ctx, "rollback-owner")
 	require.NoError(t, err)
 
-	store := database.NewOrgStoreWithDB(db)
+	store := database.NewOrgStoreWithDBAndDeletionJobClient(db, &testRepositoryDeletionJobClient{})
 
 	org := &database.Organization{
 		Name:     "rollback-org",
@@ -370,14 +370,14 @@ func TestOrganization_CreateWithForceDelete(t *testing.T) {
 	ctx := context.TODO()
 
 	nsStore := database.NewNamespaceStoreWithDB(db)
-	orgStore := database.NewOrgStoreWithDB(db)
+	orgStore := database.NewOrgStoreWithDBAndDeletionJobClient(db, &testRepositoryDeletionJobClient{})
 	err := orgStore.Create(ctx, &database.Organization{
 		Name:     "o1",
 		Nickname: "o1_nickname",
 	}, &database.Namespace{Path: "o1", DeletedAt: time.Now()})
 	require.Nil(t, err)
 
-	err = orgStore.Delete(ctx, "o1")
+	_, err = orgStore.Delete(ctx, "o1")
 	require.Nil(t, err)
 
 	orgs, total, err := orgStore.Search(ctx, "o1", 10, 1, "", "", "")
@@ -389,11 +389,34 @@ func TestOrganization_CreateWithForceDelete(t *testing.T) {
 	require.Equal(t, true, errors.Is(err, sql.ErrNoRows))
 }
 
+func TestOrganization_DeleteLocksAssociatedTombstoneWhenPathWasRecreated(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.Background()
+	orgStore := database.NewOrgStoreWithDBAndDeletionJobClient(db, &testRepositoryDeletionJobClient{})
+	org := &database.Organization{Name: "recreated-delete", Nickname: "recreated-delete", UUID: uuid.New()}
+	associated := &database.Namespace{Path: org.Name, UUID: uuid.NewString(), DeletedAt: time.Now()}
+	require.NoError(t, orgStore.Create(ctx, org, associated))
+	recreated := &database.Namespace{Path: org.Name, UUID: uuid.NewString()}
+	_, err := db.Core.NewInsert().Model(recreated).Exec(ctx)
+	require.NoError(t, err)
+
+	_, err = orgStore.Delete(ctx, org.Name)
+	require.NoError(t, err)
+
+	var retained database.Namespace
+	require.NoError(t, db.Core.NewSelect().Model(&retained).Where("id = ?", recreated.ID).Scan(ctx))
+	require.Equal(t, recreated.UUID, retained.UUID)
+	var tombstone database.Namespace
+	require.NoError(t, db.Core.NewSelect().Model(&tombstone).WhereAllWithDeleted().Where("id = ?", associated.ID).Scan(ctx))
+	require.False(t, tombstone.DeletedAt.IsZero())
+}
+
 func TestOrganizationStore_GetOrgByUserIDs(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
 	ctx := context.TODO()
-	store := database.NewOrgStoreWithDB(db)
+	store := database.NewOrgStoreWithDBAndDeletionJobClient(db, &testRepositoryDeletionJobClient{})
 
 	// Create organizations with explicit UUID values
 	err := store.Create(ctx, &database.Organization{
@@ -470,7 +493,7 @@ func TestOrganizationStore_FindByUUID(t *testing.T) {
 	defer db.Close()
 	ctx := context.TODO()
 
-	store := database.NewOrgStoreWithDB(db)
+	store := database.NewOrgStoreWithDBAndDeletionJobClient(db, &testRepositoryDeletionJobClient{})
 
 	// Test case 1: Find an existing organization by UUID
 	testUUID := uuid.New()
@@ -506,7 +529,7 @@ func TestOrganizationStore_SearchOrder(t *testing.T) {
 	defer db.Close()
 	ctx := context.TODO()
 
-	store := database.NewOrgStoreWithDB(db)
+	store := database.NewOrgStoreWithDBAndDeletionJobClient(db, &testRepositoryDeletionJobClient{})
 	orgsToCreate := []database.Organization{
 		{
 			Name:     "sss",
@@ -557,7 +580,7 @@ func TestOrganizationStore_Tags(t *testing.T) {
 	defer db.Close()
 	ctx := context.TODO()
 
-	store := database.NewOrgStoreWithDB(db)
+	store := database.NewOrgStoreWithDBAndDeletionJobClient(db, &testRepositoryDeletionJobClient{})
 
 	// Create an organization
 	err := store.Create(ctx, &database.Organization{
@@ -624,7 +647,7 @@ func TestOrganizationStore_SearchOrderCaseInsensitive(t *testing.T) {
 	defer db.Close()
 	ctx := context.TODO()
 
-	store := database.NewOrgStoreWithDB(db)
+	store := database.NewOrgStoreWithDBAndDeletionJobClient(db, &testRepositoryDeletionJobClient{})
 	err := store.Create(ctx, &database.Organization{
 		Name:     "SSS-Exact",
 		Nickname: "display",
@@ -654,7 +677,7 @@ func TestOrganizationStore_SearchUserBelongOrgs(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
 	ctx := context.TODO()
-	store := database.NewOrgStoreWithDB(db)
+	store := database.NewOrgStoreWithDBAndDeletionJobClient(db, &testRepositoryDeletionJobClient{})
 
 	// Create users
 	user1 := &database.User{Username: "belong_user1", UUID: uuid.New().String()}
@@ -745,7 +768,7 @@ func TestOrganizationStore_GetOrganizationTagsByOrgIDs(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
 	ctx := context.TODO()
-	store := database.NewOrgStoreWithDB(db)
+	store := database.NewOrgStoreWithDBAndDeletionJobClient(db, &testRepositoryDeletionJobClient{})
 
 	// Create two orgs
 	err := store.Create(ctx, &database.Organization{Name: "tag_batch_org1", Nickname: "Batch 1", UUID: uuid.New()}, &database.Namespace{Path: "tag_batch_org1"})
@@ -793,7 +816,7 @@ func TestOrganizationStore_Delete_CleansUpTags(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
 	ctx := context.TODO()
-	store := database.NewOrgStoreWithDB(db)
+	store := database.NewOrgStoreWithDBAndDeletionJobClient(db, &testRepositoryDeletionJobClient{})
 
 	err := store.Create(ctx, &database.Organization{Name: "del_org", Nickname: "Del Org", UUID: uuid.New()}, &database.Namespace{Path: "del_org"})
 	require.Nil(t, err)
@@ -815,7 +838,7 @@ func TestOrganizationStore_Delete_CleansUpTags(t *testing.T) {
 	require.Len(t, tags, 1)
 
 	// Delete the organization
-	err = store.Delete(ctx, "del_org")
+	_, err = store.Delete(ctx, "del_org")
 	require.Nil(t, err)
 
 	// Verify org is gone
@@ -833,4 +856,172 @@ func TestOrganizationStore_Delete_CleansUpTags(t *testing.T) {
 	tags, err = store.GetOrganizationTags(ctx, org2.ID)
 	require.Nil(t, err)
 	require.Len(t, tags, 0)
+}
+
+func TestOrgStore_DeleteOwnedRepositories(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.Background()
+	jobClient := &testRepositoryDeletionJobClient{}
+	store := database.NewOrgStoreWithDBAndDeletionJobClient(db, jobClient)
+	repoStore := database.NewRepoStoreWithDB(db)
+
+	for _, path := range []string{"delete-repos", "delete-repos-similar"} {
+		err := store.Create(ctx, &database.Organization{Name: path, Nickname: path, UUID: uuid.New()}, &database.Namespace{Path: path})
+		require.NoError(t, err)
+	}
+
+	modelRepo, err := repoStore.CreateRepo(ctx, database.Repository{
+		Name: "model", Path: "delete-repos/model", GitPath: "models_delete-repos/model", RepositoryType: types.ModelRepo,
+	})
+	require.NoError(t, err)
+	_, err = database.NewModelStoreWithDB(db).Create(ctx, database.Model{RepositoryID: modelRepo.ID})
+	require.NoError(t, err)
+	datasetRepo, err := repoStore.CreateRepo(ctx, database.Repository{
+		Name: "dataset", Path: "delete-repos/dataset", GitPath: "datasets_delete-repos/dataset", RepositoryType: types.DatasetRepo,
+	})
+	require.NoError(t, err)
+	_, err = database.NewDatasetStoreWithDB(db).Create(ctx, database.Dataset{RepositoryID: datasetRepo.ID})
+	require.NoError(t, err)
+	unrelatedRepo, err := repoStore.CreateRepo(ctx, database.Repository{
+		Name: "keep", Path: "delete-repos-similar/keep", GitPath: "codes_delete-repos-similar/keep", RepositoryType: types.CodeRepo,
+	})
+	require.NoError(t, err)
+	_, err = db.Core.NewInsert().Model(&database.Code{RepositoryID: unrelatedRepo.ID}).Exec(ctx)
+	require.NoError(t, err)
+
+	result, err := store.Delete(ctx, "delete-repos")
+	require.NoError(t, err)
+	require.ElementsMatch(t, []int64{modelRepo.ID, datasetRepo.ID}, []int64{
+		result.DeletedRepositories[0].ID, result.DeletedRepositories[1].ID,
+	})
+	var remaining []database.Repository
+	err = db.Core.NewSelect().Model(&remaining).Order("id ASC").Scan(ctx)
+	require.NoError(t, err)
+	require.Len(t, remaining, 1)
+	require.Equal(t, unrelatedRepo.ID, remaining[0].ID)
+
+	inputs := jobClient.recordedInputs()
+	require.Len(t, inputs, 2)
+	require.ElementsMatch(t, []int64{modelRepo.ID, datasetRepo.ID}, []int64{inputs[0].RepositoryID, inputs[1].RepositoryID})
+}
+
+func TestOrgStore_DeleteSerializesWithRepositoryCreation(t *testing.T) {
+	testOrgStoreDeleteSerializesWithRepositoryWrite(t, func(ctx context.Context, store database.RepoStore, repository database.Repository) error {
+		_, err := store.CreateRepo(ctx, repository)
+		return err
+	})
+}
+
+func TestOrgStore_DeleteSerializesWithRepositoryUpsert(t *testing.T) {
+	testOrgStoreDeleteSerializesWithRepositoryWrite(t, func(ctx context.Context, store database.RepoStore, repository database.Repository) error {
+		_, err := store.UpdateOrCreateRepo(ctx, repository)
+		return err
+	})
+}
+
+func testOrgStoreDeleteSerializesWithRepositoryWrite(
+	t *testing.T,
+	writeRepository func(context.Context, database.RepoStore, database.Repository) error,
+) {
+	db := tests.InitTransactionTestDB()
+	defer db.Close()
+	ctx := context.Background()
+	orgStore := database.NewOrgStoreWithDBAndDeletionJobClient(db, &testRepositoryDeletionJobClient{})
+	repoStore := database.NewRepoStoreWithDB(db)
+
+	err := orgStore.Create(ctx, &database.Organization{
+		Name: "concurrent-org", Nickname: "Concurrent Org", UUID: uuid.New(),
+	}, &database.Namespace{Path: "concurrent-org"})
+	require.NoError(t, err)
+
+	lockConnection, err := db.BunDB.DB.Conn(ctx)
+	require.NoError(t, err)
+	defer lockConnection.Close()
+	_, err = lockConnection.ExecContext(ctx, "BEGIN")
+	require.NoError(t, err)
+	_, err = lockConnection.ExecContext(ctx, "LOCK TABLE repositories IN ACCESS EXCLUSIVE MODE")
+	require.NoError(t, err)
+	lockReleased := false
+	defer func() {
+		if !lockReleased {
+			_, _ = lockConnection.ExecContext(ctx, "ROLLBACK")
+		}
+	}()
+
+	createResult := make(chan error, 1)
+	go func() {
+		createErr := writeRepository(ctx, repoStore, database.Repository{
+			Name: "new-repository", Path: "concurrent-org/new-repository",
+			GitPath: "models_concurrent-org/new-repository", RepositoryType: types.ModelRepo,
+		})
+		createResult <- createErr
+	}()
+	time.Sleep(200 * time.Millisecond)
+	select {
+	case createErr := <-createResult:
+		require.NoError(t, createErr)
+		require.FailNow(t, "repository creation finished before the trigger lock")
+	default:
+	}
+	deleteResult := make(chan error, 1)
+	go func() {
+		_, deleteErr := orgStore.Delete(ctx, "concurrent-org")
+		deleteResult <- deleteErr
+	}()
+	var earlyDeleteErr error
+	deleteCompletedBeforeCreate := false
+	select {
+	case earlyDeleteErr = <-deleteResult:
+		deleteCompletedBeforeCreate = true
+	case <-time.After(2 * time.Second):
+	}
+	_, err = lockConnection.ExecContext(ctx, "COMMIT")
+	require.NoError(t, err)
+	lockReleased = true
+
+	deleteErr := earlyDeleteErr
+	if !deleteCompletedBeforeCreate {
+		deleteErr = <-deleteResult
+	}
+	createErr := <-createResult
+	require.NoError(t, createErr)
+	require.NoError(t, deleteErr)
+	require.False(t, deleteCompletedBeforeCreate, "organization deletion must wait for in-flight repository creation")
+
+	exists, err := db.Core.NewSelect().Model((*database.Repository)(nil)).
+		Where("path = ?", "concurrent-org/new-repository").Exists(ctx)
+	require.NoError(t, err)
+	require.False(t, exists, "successful concurrent creation must be included in organization deletion")
+
+	_, err = repoStore.CreateRepo(ctx, database.Repository{
+		Name: "late-repository", Path: "concurrent-org/late-repository",
+		GitPath: "models_concurrent-org/late-repository", RepositoryType: types.ModelRepo,
+	})
+	require.ErrorContains(t, err, `repository namespace "concurrent-org" is deleted`)
+}
+
+func TestOrgStore_RecreatedNamespaceAllowsRepositoryCreation(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.Background()
+	orgStore := database.NewOrgStoreWithDBAndDeletionJobClient(db, &testRepositoryDeletionJobClient{})
+	repoStore := database.NewRepoStoreWithDB(db)
+
+	createOrganization := func() {
+		err := orgStore.Create(ctx, &database.Organization{
+			Name: "recreated-org", Nickname: "Recreated Org", UUID: uuid.New(),
+		}, &database.Namespace{Path: "recreated-org"})
+		require.NoError(t, err)
+	}
+	createOrganization()
+	_, err := orgStore.Delete(ctx, "recreated-org")
+	require.NoError(t, err)
+	createOrganization()
+
+	_, err = repoStore.CreateRepo(ctx, database.Repository{
+		Name: "repository", Path: "recreated-org/repository",
+		GitPath: "models_recreated-org/repository", RepositoryType: types.ModelRepo,
+	})
+	require.NoError(t, err)
 }

@@ -476,59 +476,9 @@ func (c *repoComponentImpl) DeleteRepo(ctx context.Context, req types.DeleteRepo
 		}
 	}
 
-	mirror, err := c.mirrorStore.FindByRepoID(ctx, repo.ID)
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return nil, fmt.Errorf("fail to find mirror, %w", err)
-	}
-
-	// If the repository is a mirror, cancel the mirror task before deletion
-	if mirror != nil {
-		err = c.mirrorSvcClient.CancelMirror(ctx, mirror.CurrentTaskID)
-		if err != nil {
-			return nil, fmt.Errorf("fail to cancel mirror, %w", err)
-		}
-	}
-
-	// fetch lfs metas before database deletion
-	lfsMetas, err := c.lfsMetaObjectStore.FindByRepoID(ctx, repo.ID)
-	if err != nil {
-		slog.Error("fail to fetch lfs metas for cleanup", slog.Int64("repo_id", repo.ID), slog.Any("error", err))
-	}
-
-	if c.repositoryPackageSyncer != nil {
-		if err := c.repositoryPackageSyncer.RemoveRepoPackages(ctx, req.RepoType, repo.ID); err != nil {
-			return nil, err
-		}
-	}
-
-	err = c.repoStore.CleanRelationsByRepoID(ctx, repo.ID)
-	if err != nil {
-		return nil, fmt.Errorf("fail to clean repo relations, %w", err)
-	}
-
-	err = c.git.DeleteRepo(ctx, repo.GitalyPath())
-	if err != nil && status.Code(err) != codes.NotFound {
-		slog.Error("fail to update repo in git ", slog.Any("req", req), slog.String("error", err.Error()))
-		return nil, fmt.Errorf("fail to delete repo in git, error: %w", err)
-	}
-
 	err = c.repoStore.DeleteRepo(ctx, *repo)
 	if err != nil {
-		slog.Error("fail to delete repo in database ", slog.Any("req", req), slog.String("error", err.Error()))
-		return nil, fmt.Errorf("fail to delete repo in database, error: %w", err)
-	}
-
-	if err := deleteRepositoryNamespaceRelationship(ctx, c.rebac, c.orgStore, namespace, repo.ID); err != nil {
-		return nil, fmt.Errorf("fail to delete repository namespace relationship: %w", err)
-	}
-
-	// trigger lfs cleanup asynchronously
-	if len(lfsMetas) > 0 {
-		go func() {
-			cleanupCtx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
-			defer cancel()
-			c.cleanLfsStorage(cleanupCtx, repo.ID, repo.Migrated, lfsMetas)
-		}()
+		return nil, fmt.Errorf("fail to schedule repository deletion: %w", err)
 	}
 
 	repo.User = user
@@ -638,46 +588,6 @@ func (c *repoComponentImpl) CreateFork(ctx context.Context, req types.CreateFork
 	}
 
 	return newDBRepo, nil
-}
-
-func (c *repoComponentImpl) cleanLfsStorage(ctx context.Context, repoID int64, migrated bool, lfsMetas []database.LfsMetaObject) {
-	defer func() {
-		if r := recover(); r != nil {
-			slog.Error("cleanLfsStorage recovered from panic",
-				slog.Any("panic", r), slog.Int64("repo_id", repoID))
-		}
-	}()
-
-	slog.InfoContext(ctx, "Cleaning LFS storage for repo", slog.Int64("repo_id", repoID), slog.Bool("migrated", migrated), slog.Int("file_count", len(lfsMetas)))
-
-	objectsCh := make(chan minio.ObjectInfo)
-	go func() {
-		defer close(objectsCh)
-		for _, meta := range lfsMetas {
-			if !migrated {
-				// For non-migrated (shared) storage, check if other repos use this OID
-				exists, err := c.lfsMetaObjectStore.ExistsByOidExclRepo(ctx, meta.Oid, repoID)
-				if err != nil {
-					slog.ErrorContext(ctx, "Failed to check OID references", slog.String("oid", meta.Oid), slog.Any("error", err))
-					continue
-				}
-				if exists {
-					slog.DebugContext(ctx, "Skipping shared LFS file", slog.String("oid", meta.Oid), slog.Int64("repo_id", repoID))
-					continue
-				}
-			}
-
-			objectKey := common.BuildLfsPath(repoID, meta.Oid, migrated)
-			objectsCh <- minio.ObjectInfo{
-				Key: objectKey,
-			}
-		}
-	}()
-
-	for rErr := range c.s3Client.RemoveObjects(ctx, c.config.S3.Bucket, objectsCh, minio.RemoveObjectsOptions{}) {
-		slog.ErrorContext(ctx, "Failed to remove LFS object", slog.String("key", rErr.ObjectName), slog.Any("error", rErr.Err))
-	}
-	slog.InfoContext(ctx, "Completed LFS storage cleanup for repo", slog.Int64("repo_id", repoID))
 }
 
 func (c *repoComponentImpl) copyLfsObjects(ctx context.Context, sourceRepoID, targetRepoID int64) error {

@@ -32,6 +32,7 @@ func TestWorkerForRegistryUsesOverride(t *testing.T) {
 func TestWorkerForRegistryUsesKindTimeout(t *testing.T) {
 	repoWorker := workerForRegistry[RepoArgs](nil, MirrorRepoQueue, MirrorRepoJobTimeout)
 	lfsWorker := workerForRegistry[LFSArgs](nil, MirrorLFSQueue, MirrorLFSJobTimeout)
+	deletionWorker := workerForRegistry[RepositoryDeletionArgs](nil, RepositoryDeletionQueue, RepositoryDeletionJobTimeout)
 
 	repoMaintenance, ok := repoWorker.(*maintenanceWorker[RepoArgs])
 	require.True(t, ok)
@@ -39,6 +40,9 @@ func TestWorkerForRegistryUsesKindTimeout(t *testing.T) {
 	require.True(t, ok)
 	require.Equal(t, MirrorRepoJobTimeout, repoMaintenance.Timeout(&river.Job[RepoArgs]{}))
 	require.Equal(t, MirrorLFSJobTimeout, lfsMaintenance.Timeout(&river.Job[LFSArgs]{}))
+	deletionMaintenance, ok := deletionWorker.(*maintenanceWorker[RepositoryDeletionArgs])
+	require.True(t, ok)
+	require.Equal(t, RepositoryDeletionJobTimeout, deletionMaintenance.Timeout(&river.Job[RepositoryDeletionArgs]{}))
 }
 
 // TestWorkClientRescueStuckJobsAfter verifies work clients use the shared rescue threshold.
@@ -63,7 +67,8 @@ func TestMaintenanceWorkerRejectsExecution(t *testing.T) {
 func TestNewWorkerRegistryBuildsAllKnownKinds(t *testing.T) {
 	require.NotNil(t, NewWorkerRegistry(WorkerOverrides{}))
 	require.NotNil(t, NewWorkerRegistry(WorkerOverrides{
-		MirrorRepo: &registryTestWorker[RepoArgs]{},
-		MirrorLFS:  &registryTestWorker[LFSArgs]{},
+		MirrorRepo:         &registryTestWorker[RepoArgs]{},
+		MirrorLFS:          &registryTestWorker[LFSArgs]{},
+		RepositoryDeletion: &registryTestWorker[RepositoryDeletionArgs]{},
 	}))
 }

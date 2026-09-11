@@ -17,8 +17,9 @@ import (
 )
 
 type orgStoreImpl struct {
-	db             *DB
-	isHierarchical bool
+	db                          *DB
+	isHierarchical              bool
+	repositoryDeletionJobClient RepositoryDeletionJobClient
 }
 
 type OrgStore interface {
@@ -28,7 +29,7 @@ type OrgStore interface {
 	GetUserOwnOrgs(ctx context.Context, username string) (orgs []Organization, total int, err error)
 	IsLastOrganizationAdmin(ctx context.Context, username string) (bool, error)
 	Update(ctx context.Context, org *Organization) (err error)
-	Delete(ctx context.Context, path string) (err error)
+	Delete(ctx context.Context, path string) (OrganizationDeleteResult, error)
 	FindByPath(ctx context.Context, path string) (org Organization, err error)
 	Exists(ctx context.Context, path string) (exists bool, err error)
 	GetUserBelongOrgs(ctx context.Context, userID int64) (orgs []Organization, err error)
@@ -56,10 +57,20 @@ func NewOrgStoreWithDB(db *DB) OrgStore {
 	return NewOrgStoreWithMode(db, false)
 }
 
+// NewOrgStoreWithDBAndDeletionJobClient creates a legacy organization Store with transactional repository deletion jobs.
+func NewOrgStoreWithDBAndDeletionJobClient(db *DB, jobClient RepositoryDeletionJobClient) OrgStore {
+	return NewOrgStoreWithModeAndDeletionJobClient(db, false, jobClient)
+}
+
 // NewOrgStoreWithMode creates an organization Store scoped to one organization model.
-// The unit flag is persisted on organizations and keeps single-level and hierarchy queries separate.
+// The hierarchy flag is persisted on organizations and keeps single-level and hierarchy queries separate.
 func NewOrgStoreWithMode(db *DB, isHierarchical bool) OrgStore {
-	return &orgStoreImpl{db: db, isHierarchical: isHierarchical}
+	return NewOrgStoreWithModeAndDeletionJobClient(db, isHierarchical, nil)
+}
+
+// NewOrgStoreWithModeAndDeletionJobClient creates an organization Store with transactional repository deletion jobs.
+func NewOrgStoreWithModeAndDeletionJobClient(db *DB, isHierarchical bool, jobClient RepositoryDeletionJobClient) OrgStore {
+	return &orgStoreImpl{db: db, isHierarchical: isHierarchical, repositoryDeletionJobClient: jobClient}
 }
 
 type Organization struct {
@@ -94,6 +105,11 @@ type OrganizationTag struct {
 	OrganizationID int64 `bun:",notnull" json:"organization_id"`
 	TagID          int64 `bun:",notnull" json:"tag_id"`
 	times
+}
+
+// OrganizationDeleteResult contains post-commit cleanup metadata for a deleted legacy organization.
+type OrganizationDeleteResult struct {
+	DeletedRepositories []DeletedRepository
 }
 
 func (s *orgStoreImpl) Create(ctx context.Context, org *Organization, namepace *Namespace) (err error) {
@@ -247,11 +263,29 @@ func (s *orgStoreImpl) Update(ctx context.Context, org *Organization) (err error
 	return errorx.HandleDBError(err, nil)
 }
 
-func (s *orgStoreImpl) Delete(ctx context.Context, path string) (err error) {
+func (s *orgStoreImpl) Delete(ctx context.Context, path string) (result OrganizationDeleteResult, err error) {
 	err = s.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		var org Organization
 		org.Nickname = path
 		if err = tx.NewSelect().Model(&org).Where("path = ? AND organization.is_hierarchical = ?", path, s.isHierarchical).Scan(ctx); err != nil {
+			return err
+		}
+		var namespace Namespace
+		namespaceQuery := tx.NewSelect().Model(&namespace).WhereAllWithDeleted().For("UPDATE")
+		if org.NamespaceID != 0 {
+			namespaceQuery.Where("id = ?", org.NamespaceID)
+		} else {
+			namespaceQuery.Where("path = ?", path)
+		}
+		if err = namespaceQuery.Scan(ctx); err != nil {
+			return err
+		}
+		repositoryIDs, err := findRepositoryIDsByNamespaces(ctx, tx, []string{path})
+		if err != nil {
+			return err
+		}
+		result.DeletedRepositories, err = deleteRepositoriesByIDs(ctx, tx, repositoryIDs, s.repositoryDeletionJobClient)
+		if err != nil {
 			return err
 		}
 		// Clean up organization_tags
@@ -277,17 +311,21 @@ func (s *orgStoreImpl) Delete(ctx context.Context, path string) (err error) {
 				Exec(ctx)); err != nil {
 			return err
 		}
-		if err = assertAffectedOneRow(
-			tx.NewDelete().
-				Model(&Namespace{}).
-				Where("path = ?", path).
-				ForceDelete().
-				Exec(ctx)); err != nil {
-			return err
+		if namespace.DeletedAt.IsZero() {
+			if err = assertAffectedOneRow(
+				tx.NewDelete().
+					Model(&Namespace{}).
+					Where("id = ?", namespace.ID).
+					Exec(ctx)); err != nil {
+				return err
+			}
 		}
 		return nil
 	})
-	return errorx.HandleDBError(err, nil)
+	if err != nil {
+		return OrganizationDeleteResult{}, errorx.HandleDBError(err, nil)
+	}
+	return result, nil
 }
 
 func (s *orgStoreImpl) FindByPath(ctx context.Context, path string) (org Organization, err error) {

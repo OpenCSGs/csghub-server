@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/uptrace/bun"
+	"github.com/uptrace/bun/dialect"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
@@ -110,6 +111,13 @@ type UpdateOrganizationUnitInput struct {
 type DeleteOrganizationUnitInput struct {
 	RootOrganizationID int64
 	UnitID             int64
+	UnitUUID           string
+}
+
+type organizationRepositoryNamespace struct {
+	ID               int64  `bun:"id"`
+	Path             string `bun:"path"`
+	OrganizationUUID string `bun:"organization_uuid"`
 }
 
 // ListOrganizationUnitInput contains one-level hierarchy filters and pagination.
@@ -122,7 +130,8 @@ type ListOrganizationUnitInput struct {
 
 // organizationUnitStoreImpl uses one database connection for all hierarchy transactions.
 type organizationUnitStoreImpl struct {
-	db *DB
+	db                          *DB
+	repositoryDeletionJobClient RepositoryDeletionJobClient
 }
 
 // NewOrganizationUnitStore creates an organization hierarchy Store.
@@ -132,7 +141,12 @@ func NewOrganizationUnitStore() OrganizationUnitStore {
 
 // NewOrganizationUnitStoreWithDB creates a hierarchy Store with an explicit database.
 func NewOrganizationUnitStoreWithDB(db *DB) OrganizationUnitStore {
-	return &organizationUnitStoreImpl{db: db}
+	return NewOrganizationUnitStoreWithDBAndDeletionJobClient(db, nil)
+}
+
+// NewOrganizationUnitStoreWithDBAndDeletionJobClient creates a hierarchy Store with transactional repository deletion jobs.
+func NewOrganizationUnitStoreWithDBAndDeletionJobClient(db *DB, jobClient RepositoryDeletionJobClient) OrganizationUnitStore {
+	return &organizationUnitStoreImpl{db: db, repositoryDeletionJobClient: jobClient}
 }
 
 // CreateRoot atomically creates a top-level organization, its root unit, closure self-row, and admin member.
@@ -238,12 +252,28 @@ func (s *organizationUnitStoreImpl) DeleteRoot(ctx context.Context, input Delete
 			return fmt.Errorf("load root organization units: %w", err)
 		}
 		activeOrganizationIDs := uniqueOrganizationIDs(root.ID, activeUnits)
-		var namespaceIDs []int64
-		if err := tx.NewSelect().Model((*Organization)(nil)).Column("namespace_id").
+		var namespaces []organizationRepositoryNamespace
+		if err := tx.NewSelect().Model((*Organization)(nil)).
+			ColumnExpr("organization.namespace_id AS id").ColumnExpr("namespace.path AS path").
+			ColumnExpr("CAST(organization.uuid AS TEXT) AS organization_uuid").
+			Join("JOIN namespaces AS namespace ON namespace.id = organization.namespace_id").
 			Where("organization.id IN (?) AND organization.is_hierarchical = TRUE AND organization.deleted_at IS NULL", bun.In(activeOrganizationIDs)).
-			Scan(ctx, &namespaceIDs); err != nil {
+			OrderExpr("namespace.path ASC").Scan(ctx, &namespaces); err != nil {
 			return fmt.Errorf("load hierarchy organization namespaces: %w", err)
 		}
+		namespaceIDs, namespacePaths := organizationNamespaceIDsAndPaths(namespaces)
+		if err := lockOrganizationRepositoryNamespaces(ctx, tx, namespacePaths); err != nil {
+			return err
+		}
+		repositoryIDs, err := findRepositoryIDsByNamespaces(ctx, tx, namespacePaths)
+		if err != nil {
+			return err
+		}
+		deletedRepositories, err := deleteRepositoriesByIDs(ctx, tx, repositoryIDs, s.repositoryDeletionJobClient)
+		if err != nil {
+			return err
+		}
+		result.DeletedRepositories = organizationDeletedRepositories(deletedRepositories, namespaces)
 		if err := tx.NewSelect().Model((*Member)(nil)).ColumnExpr("COUNT(DISTINCT member.user_id)").
 			Where("member.organization_id IN (?) AND member.deleted_at IS NULL", bun.In(allOrganizationIDs)).
 			Scan(ctx, &result.UsersAffected); err != nil {
@@ -324,6 +354,47 @@ func uniqueOrganizationIDs(rootOrganizationID int64, units []OrganizationUnit) [
 		organizationIDs = append(organizationIDs, unit.OrganizationID)
 	}
 	return organizationIDs
+}
+
+func lockOrganizationRepositoryNamespaces(ctx context.Context, tx bun.Tx, namespacePaths []string) error {
+	paths := canonicalNamespaceLockOrder(namespacePaths)
+	for _, path := range paths {
+		var namespace Namespace
+		query := tx.NewSelect().Model(&namespace).Where("path = ? AND deleted_at IS NULL", path).Limit(1)
+		if tx.Dialect().Name() == dialect.PG {
+			query.For("UPDATE")
+		}
+		if err := query.Scan(ctx); err != nil {
+			return fmt.Errorf("lock repository namespace %q for deletion: %w", path, err)
+		}
+	}
+	return nil
+}
+
+func organizationDeletedRepositories(repositories []DeletedRepository, namespaces []organizationRepositoryNamespace) []types.DeletedRepository {
+	organizationUUIDByPath := make(map[string]string, len(namespaces))
+	for _, namespace := range namespaces {
+		organizationUUIDByPath[namespace.Path] = namespace.OrganizationUUID
+	}
+	result := make([]types.DeletedRepository, 0, len(repositories))
+	for _, repository := range repositories {
+		namespacePath, _ := Repository{Path: repository.Path}.NamespaceAndName()
+		result = append(result, types.DeletedRepository{
+			ID: repository.ID, RepositoryType: repository.RepositoryType, Path: repository.Path,
+			OrganizationUUID: organizationUUIDByPath[namespacePath],
+		})
+	}
+	return result
+}
+
+func organizationNamespaceIDsAndPaths(namespaces []organizationRepositoryNamespace) ([]int64, []string) {
+	ids := make([]int64, 0, len(namespaces))
+	paths := make([]string, 0, len(namespaces))
+	for _, namespace := range namespaces {
+		ids = append(ids, namespace.ID)
+		paths = append(paths, namespace.Path)
+	}
+	return ids, paths
 }
 
 // lockOrganization serializes hierarchy writes for one organization.
@@ -745,11 +816,28 @@ func (s *organizationUnitStoreImpl) Delete(ctx context.Context, input DeleteOrga
 		if err != nil {
 			return fmt.Errorf("load subtree member and namespace relationships for ReBAC cleanup: %w", err)
 		}
-		var namespaceIDs []int64
-		if err := tx.NewSelect().Model((*Organization)(nil)).Column("namespace_id").
-			Where("organization.id IN (?) AND organization.deleted_at IS NULL", bun.In(organizationIDs)).Scan(ctx, &namespaceIDs); err != nil {
+		var namespaces []organizationRepositoryNamespace
+		if err := tx.NewSelect().Model((*Organization)(nil)).
+			ColumnExpr("organization.namespace_id AS id").ColumnExpr("namespace.path AS path").
+			ColumnExpr("CAST(organization.uuid AS TEXT) AS organization_uuid").
+			Join("JOIN namespaces AS namespace ON namespace.id = organization.namespace_id").
+			Where("organization.id IN (?) AND organization.deleted_at IS NULL", bun.In(organizationIDs)).
+			OrderExpr("namespace.path ASC").Scan(ctx, &namespaces); err != nil {
 			return fmt.Errorf("load child organization namespaces: %w", err)
 		}
+		namespaceIDs, namespacePaths := organizationNamespaceIDsAndPaths(namespaces)
+		if err := lockOrganizationRepositoryNamespaces(ctx, tx, namespacePaths); err != nil {
+			return err
+		}
+		repositoryIDs, err := findRepositoryIDsByNamespaces(ctx, tx, namespacePaths)
+		if err != nil {
+			return err
+		}
+		deletedRepositories, err := deleteRepositoriesByIDs(ctx, tx, repositoryIDs, s.repositoryDeletionJobClient)
+		if err != nil {
+			return err
+		}
+		result.DeletedRepositories = organizationDeletedRepositories(deletedRepositories, namespaces)
 		if err := tx.NewSelect().Model((*Member)(nil)).ColumnExpr("COUNT(DISTINCT member.user_id)").
 			Where("member.organization_id IN (?) AND member.deleted_at IS NULL", bun.In(organizationIDs)).
 			Scan(ctx, &result.UsersAffected); err != nil {

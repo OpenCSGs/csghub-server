@@ -201,7 +201,7 @@ func TestOrganizationComponent_Delete_CleansSSOBestEffort(t *testing.T) {
 	}, nil).Once()
 	mockMemberStore := mockdb.NewMockMemberStore(t)
 	mockMemberStore.EXPECT().UserUUIDsByOrganizationID(ctx, int64(17)).Return(cleanup.UserUUIDs, nil).Once()
-	mockOrgStore.EXPECT().Delete(ctx, req.Name).Return(nil).Once()
+	mockOrgStore.EXPECT().Delete(ctx, req.Name).Return(database.OrganizationDeleteResult{}, nil).Once()
 	mockAuthorizer := mockrebac.NewMockAuthorizer(t)
 	mockAuthorizer.EXPECT().Check(ctx, rebac.CheckRequest{
 		Subject:     rebac.UserSubject("admin-uuid"),
@@ -217,6 +217,44 @@ func TestOrganizationComponent_Delete_CleansSSOBestEffort(t *testing.T) {
 		userStore: mockUserStore, nsStore: mockNamespaceStore,
 		orgStore: mockOrgStore, memberStore: mockMemberStore,
 		rebac: mockAuthorizer, sso: mockSSO,
+	}
+	require.NoError(t, c.Delete(ctx, req))
+}
+
+func TestOrganizationComponent_Delete_LeavesRepositoryCleanupToWorker(t *testing.T) {
+	ctx := context.Background()
+	organizationUUID := uuid.New()
+	req := &types.DeleteOrgReq{Name: "org-repositories", CurrentUser: "admin"}
+	cleanup := types.OrganizationReBACCleanup{
+		OrganizationUUID: organizationUUID.String(), NamespaceUUID: "organization-namespace-uuid",
+	}
+	repository := database.DeletedRepository{ID: 42, RepositoryType: types.ModelRepo, Path: req.Name + "/model"}
+
+	mockOrgStore := mockdb.NewMockOrgStore(t)
+	mockOrgStore.EXPECT().FindByPath(ctx, req.Name).Return(database.Organization{
+		ID: 17, Name: req.Name, UUID: organizationUUID,
+		Namespace: &database.Namespace{UUID: cleanup.NamespaceUUID, NamespaceType: database.OrgNamespace},
+	}, nil).Once()
+	mockUserStore := mockdb.NewMockUserStore(t)
+	mockUserStore.EXPECT().FindByUsername(ctx, req.CurrentUser).Return(database.User{Username: req.CurrentUser, UUID: "admin-uuid"}, nil).Once()
+	mockNamespaceStore := mockdb.NewMockNamespaceStore(t)
+	mockNamespaceStore.EXPECT().FindByPath(ctx, req.Name).Return(database.Namespace{
+		Path: req.Name, UUID: cleanup.NamespaceUUID, NamespaceType: database.OrgNamespace,
+	}, nil).Once()
+	mockMemberStore := mockdb.NewMockMemberStore(t)
+	mockMemberStore.EXPECT().UserUUIDsByOrganizationID(ctx, int64(17)).Return(nil, nil).Once()
+	mockOrgStore.EXPECT().Delete(ctx, req.Name).Return(database.OrganizationDeleteResult{
+		DeletedRepositories: []database.DeletedRepository{repository},
+	}, nil).Once()
+	mockAuthorizer := mockrebac.NewMockAuthorizer(t)
+	mockAuthorizer.EXPECT().Check(ctx, mock.Anything).Return(rebac.Decision{Allowed: true}, nil).Once()
+	expectOrganizationReBACCleanup(t, mockAuthorizer, cleanup)
+	mockSSO := mockrpc.NewMockSSOInterface(t)
+	mockSSO.EXPECT().DeleteUser(ctx, organizationUUID.String()).Return(nil).Once()
+
+	c := &organizationComponentImpl{
+		userStore: mockUserStore, nsStore: mockNamespaceStore, orgStore: mockOrgStore,
+		memberStore: mockMemberStore, rebac: mockAuthorizer, sso: mockSSO,
 	}
 	require.NoError(t, c.Delete(ctx, req))
 }

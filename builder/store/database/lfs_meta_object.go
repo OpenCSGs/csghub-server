@@ -25,6 +25,7 @@ type LfsMetaObjectStore interface {
 	UpdateXnetUsed(ctx context.Context, repoID int64, oid string, xnetUsed bool) error
 	CheckIfAllMigratedToXnet(ctx context.Context, repoID int64) (bool, error)
 	ExistsByOidExclRepo(ctx context.Context, oid string, repoID int64) (bool, error)
+	ExistsByOidInActiveRepoExclRepo(ctx context.Context, oid string, repoID int64) (bool, error)
 }
 
 func NewLfsMetaObjectStore() LfsMetaObjectStore {
@@ -205,6 +206,23 @@ func (s *lfsMetaObjectStoreImpl) ExistsByOidExclRepo(ctx context.Context, oid st
 	exists, err := s.db.Operator.Core.NewSelect().
 		Model((*LfsMetaObject)(nil)).
 		Where("oid = ? AND repository_id != ?", oid, repoID).
+		Exists(ctx)
+	if err != nil {
+		return false, err
+	}
+	return exists, nil
+}
+
+// ExistsByOidInActiveRepoExclRepo reports whether an object is still referenced
+// by a repository that remains visible. Other repositories already awaiting
+// deletion must not keep a shared object alive forever.
+func (s *lfsMetaObjectStoreImpl) ExistsByOidInActiveRepoExclRepo(ctx context.Context, oid string, repoID int64) (bool, error) {
+	exists, err := s.db.Operator.Core.NewSelect().
+		Model((*LfsMetaObject)(nil)).
+		Join("JOIN repositories AS repository ON repository.id = lfs_meta_object.repository_id").
+		Where("lfs_meta_object.oid = ?", oid).
+		Where("lfs_meta_object.repository_id != ?", repoID).
+		Where("repository.deleted_at IS NULL").
 		Exists(ctx)
 	if err != nil {
 		return false, err

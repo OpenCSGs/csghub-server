@@ -31,7 +31,11 @@ func NewRepoComponent(config *config.Config) (RepoComponent, error) {
 	c.orgStore = database.NewOrgStore(config)
 	c.modelStore = database.NewModelStore()
 	c.tagStore = database.NewTagStore()
-	c.repoStore = database.NewRepoStore()
+	deletionJobClient, err := newRepositoryDeletionJobClient()
+	if err != nil {
+		return nil, err
+	}
+	c.repoStore = database.NewRepoStoreWithDBAndDeletionJobClient(database.GetDB(), deletionJobClient)
 	c.repoFileStore = database.NewRepoFileStore()
 	c.repoRelationsStore = database.NewRepoRelationsStore()
 	c.repoStatisticsStore = database.NewRepositoryStatisticsStore()
@@ -43,7 +47,6 @@ func NewRepoComponent(config *config.Config) (RepoComponent, error) {
 	c.syncClientSettingStore = database.NewSyncClientSettingStore()
 	c.fileStore = database.NewFileStore()
 	c.mirrorTaskStore = database.NewMirrorTaskStore()
-	var err error
 	c.git, err = git.NewGitServer(config)
 	if err != nil {
 		newError := fmt.Errorf("fail to create git server,error:%w", err)

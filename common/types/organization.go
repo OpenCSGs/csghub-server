@@ -152,6 +152,14 @@ type OrganizationReBACCleanup struct {
 	UserUUIDs        []string `json:"-"`
 }
 
+// DeletedRepository contains repository identity used for post-commit cleanup.
+type DeletedRepository struct {
+	ID               int64          `json:"-"`
+	RepositoryType   RepositoryType `json:"-"`
+	Path             string         `json:"-"`
+	OrganizationUUID string         `json:"-"`
+}
+
 // DeleteOrganizationUnitResp reports the impact of deleting a department subtree.
 type DeleteOrganizationUnitResp struct {
 	OrganizationsDeleted int `json:"organizations_deleted"`
@@ -164,6 +172,8 @@ type DeleteOrganizationUnitResp struct {
 	DeletedHierarchyRelationships []OrganizationHierarchyRelationship `json:"-"`
 	// DeletedReBACRelationships contains direct member and namespace tuples removed with this subtree.
 	DeletedReBACRelationships []OrganizationReBACCleanup `json:"-"`
+	// DeletedRepositories contains repositories removed with this subtree for post-commit ReBAC cleanup.
+	DeletedRepositories []DeletedRepository `json:"-"`
 }
 
 // DeleteRootOrganizationResp reports the impact of deleting an entire organization hierarchy.
@@ -178,6 +188,8 @@ type DeleteRootOrganizationResp struct {
 	DeletedHierarchyRelationships []OrganizationHierarchyRelationship `json:"-"`
 	// DeletedReBACRelationships contains direct member and namespace tuples removed with this hierarchy.
 	DeletedReBACRelationships []OrganizationReBACCleanup `json:"-"`
+	// DeletedRepositories contains repositories removed with this hierarchy for post-commit ReBAC cleanup.
+	DeletedRepositories []DeletedRepository `json:"-"`
 	// AlreadyDeleted makes repeated deletion idempotent and is not exposed by the API.
 	AlreadyDeleted bool `json:"-"`
 }

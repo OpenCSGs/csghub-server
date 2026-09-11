@@ -2,6 +2,7 @@ package database
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -10,6 +11,7 @@ import (
 	"time"
 
 	"github.com/uptrace/bun"
+	"github.com/uptrace/bun/dialect"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
@@ -48,8 +50,9 @@ type UserStore interface {
 
 // Implement the UserStore interface in UserStoreImpl
 type UserStoreImpl struct {
-	db                 *DB
-	transactionCleanup TransactionCleanup
+	db                          *DB
+	transactionCleanup          TransactionCleanup
+	repositoryDeletionJobClient RepositoryDeletionJobClient
 }
 
 // TransactionCleanup removes edition-specific user relationships inside an existing transaction.
@@ -67,6 +70,11 @@ func NewUserStoreWithDB(db *DB) UserStore {
 	}
 }
 
+// NewUserStoreWithDBAndDeletionJobClient creates a Store with transactional repository deletion jobs.
+func NewUserStoreWithDBAndDeletionJobClient(db *DB, jobClient RepositoryDeletionJobClient) UserStore {
+	return NewUserStoreWithDBCleanupAndDeletionJobClient(db, nil, jobClient)
+}
+
 // NewUserStoreWithCleanup creates a Store with an optional transactional relationship cleanup.
 func NewUserStoreWithCleanup(cleanup TransactionCleanup) UserStore {
 	return &UserStoreImpl{
@@ -77,9 +85,15 @@ func NewUserStoreWithCleanup(cleanup TransactionCleanup) UserStore {
 
 // NewUserStoreWithDBAndCleanup creates a Store with explicit database and cleanup dependencies.
 func NewUserStoreWithDBAndCleanup(db *DB, cleanup TransactionCleanup) UserStore {
+	return NewUserStoreWithDBCleanupAndDeletionJobClient(db, cleanup, nil)
+}
+
+// NewUserStoreWithDBCleanupAndDeletionJobClient creates a Store with explicit transactional dependencies.
+func NewUserStoreWithDBCleanupAndDeletionJobClient(db *DB, cleanup TransactionCleanup, jobClient RepositoryDeletionJobClient) UserStore {
 	return &UserStoreImpl{
-		db:                 db,
-		transactionCleanup: cleanup,
+		db:                          db,
+		transactionCleanup:          cleanup,
+		repositoryDeletionJobClient: jobClient,
 	}
 }
 
@@ -441,53 +455,23 @@ func (s *UserStoreImpl) DeleteUserAndRelations(ctx context.Context, input User, 
 		if err := s.ensureUserIsNotLastOrganizationAdmin(ctx, tx, input); err != nil {
 			return err
 		}
-		// Delete user
-		if err = assertAffectedOneRow(tx.NewDelete().Model(&input).Where("id = ?", input.ID).ForceDelete().Exec(ctx)); err != nil {
-			return fmt.Errorf("failed to delete user %d: %v", input.ID, err)
-		}
-
 		if !req.Repository {
-			// Get user's repository_ids
+			if err := lockAndSoftDeleteUserRepositoryNamespace(ctx, tx, input.ID); err != nil {
+				return err
+			}
 			var repoIDs []int64
-			if err := s.db.Operator.Core.NewSelect().Column("id").Model(&Repository{}).Where("user_id = ?", input.ID).Scan(ctx, &repoIDs); err != nil {
+			if err := tx.NewSelect().Column("id").Model(&Repository{}).Where("user_id = ?", input.ID).Scan(ctx, &repoIDs); err != nil {
 				return fmt.Errorf("failed to get user repo ids: %v", err)
 			}
-			// Delete user's model
-			if _, err := tx.NewDelete().Model(&Model{}).Where("repository_id IN (?)", bun.In(repoIDs)).ForceDelete().Exec(ctx); err != nil {
-				return fmt.Errorf("failed to delete user models for user ID %d: %v", input.ID, err)
+			if _, err := deleteRepositoriesByIDs(ctx, tx, repoIDs, s.repositoryDeletionJobClient); err != nil {
+				return fmt.Errorf("failed to delete user repositories for user ID %d: %w", input.ID, err)
 			}
-			// Delete user's dataset
-			if _, err := tx.NewDelete().Model(&Dataset{}).Where("repository_id IN (?)", bun.In(repoIDs)).ForceDelete().Exec(ctx); err != nil {
-				return fmt.Errorf("failed to delete user datasets for user ID %d: %v", input.ID, err)
-			}
-			// Delete user's code
-			if _, err := tx.NewDelete().Model(&Code{}).Where("repository_id IN (?)", bun.In(repoIDs)).ForceDelete().Exec(ctx); err != nil {
-				return fmt.Errorf("failed to delete user codes for user ID %d: %v", input.ID, err)
-			}
-			// Delete user's space
-			if _, err := tx.NewDelete().Model(&Space{}).Where("repository_id IN (?)", bun.In(repoIDs)).ForceDelete().Exec(ctx); err != nil {
-				return fmt.Errorf("failed to delete user spaces for user ID %d: %v", input.ID, err)
-			}
-			// Delete user's namespace
-			if _, err := tx.NewDelete().Model(&Namespace{}).Where("user_id = ?", input.ID).ForceDelete().Exec(ctx); err != nil {
-				return fmt.Errorf("failed to delete user namespace for user ID %d:  %v", input.ID, err)
-			}
-			// Delete user's prompts
-			if _, err := tx.NewDelete().Model(&Prompt{}).Where("repository_id IN  (?)", bun.In(repoIDs)).ForceDelete().Exec(ctx); err != nil {
-				return fmt.Errorf("failed to delete user prompts for user ID  %d:  %v", input.ID, err)
-			}
-			// Delete user's repositories runtime frameworks
-			if _, err := tx.NewDelete().Model(&RepositoriesRuntimeFramework{}).Where("repo_id IN (?)", bun.In(repoIDs)).ForceDelete().Exec(ctx); err != nil {
-				return fmt.Errorf("failed to delete user repositories runtime frameworks for user ID %d:  %v", input.ID, err)
-			}
-			// Delete user's mcp servers
-			if _, err := tx.NewDelete().Model(&MCPServer{}).Where("repository_id IN (?)", bun.In(repoIDs)).ForceDelete().Exec(ctx); err != nil {
-				return fmt.Errorf("failed to delete user mcp servers for user ID %d:  %v", input.ID, err)
-			}
-			// Delete user's repo
-			if _, err = tx.NewDelete().Model(&Repository{}).Where("user_id = ?", input.ID).ForceDelete().Exec(ctx); err != nil {
-				return fmt.Errorf("failed to delete user repos for user ID %d: %v", input.ID, err)
-			}
+		}
+
+		// Keep the user row until repository deletion jobs have snapshotted the
+		// stable user UUID used by Repository ReBAC.
+		if err = assertAffectedOneRow(tx.NewDelete().Model(&input).Where("id = ?", input.ID).ForceDelete().Exec(ctx)); err != nil {
+			return fmt.Errorf("failed to delete user %d: %v", input.ID, err)
 		}
 
 		if !req.Discussion {
@@ -529,6 +513,35 @@ func (s *UserStoreImpl) DeleteUserAndRelations(ctx context.Context, input User, 
 		return nil
 	})
 	return errorx.HandleDBError(err, nil)
+}
+
+// lockAndSoftDeleteUserRepositoryNamespace serializes repository creation and
+// ownership transfer with permanent user deletion. The tombstone is retained
+// so a writer that was waiting on the namespace lock cannot create an orphan
+// after the user row has been removed.
+func lockAndSoftDeleteUserRepositoryNamespace(ctx context.Context, tx bun.Tx, userID int64) error {
+	var namespace Namespace
+	query := tx.NewSelect().Model(&namespace).WhereAllWithDeleted().
+		Where("user_id = ?", userID).
+		OrderExpr("deleted_at IS NULL DESC").
+		Order("id ASC").
+		Limit(1)
+	if tx.Dialect().Name() == dialect.PG {
+		query.For("UPDATE")
+	}
+	if err := query.Scan(ctx); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil
+		}
+		return fmt.Errorf("lock user repository namespace for user ID %d: %w", userID, err)
+	}
+	if !namespace.DeletedAt.IsZero() {
+		return nil
+	}
+	if err := assertAffectedOneRow(tx.NewDelete().Model(&namespace).WherePK().Exec(ctx)); err != nil {
+		return fmt.Errorf("soft-delete user repository namespace for user ID %d: %w", userID, err)
+	}
+	return nil
 }
 
 // CountUsers counts users whose personal namespace is not mirrored, i.e.

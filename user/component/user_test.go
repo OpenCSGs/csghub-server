@@ -224,7 +224,6 @@ func TestUserComponent_Delete(t *testing.T) {
 	mockAuditStore := mockdb.NewMockAuditLogStore(t)
 	mockRepoStore := mockdb.NewMockRepoStore(t)
 	mockNamespaceStore := mockdb.NewMockNamespaceStore(t)
-	mockPendingDeletionStore := mockdb.NewMockPendingDeletionStore(t)
 	mockGitserver := mockgit.NewMockGitServer(t)
 	mockAuthorizer := mockrebac.NewMockAuthorizer(t)
 	user1 := database.User{
@@ -269,10 +268,6 @@ func TestUserComponent_Delete(t *testing.T) {
 	mockNamespaceStore.EXPECT().FindByPath(ctx, "foo").Return(database.Namespace{
 		Path: "foo", NamespaceType: database.UserNamespace, User: database.User{UUID: "foo-user-uuid"},
 	}, nil)
-	mockPendingDeletionStore.EXPECT().Create(ctx, &database.PendingDeletion{
-		TableName: "repositories",
-		Value:     "models_foo/bar.git",
-	}).Return(nil)
 	mockAuthorizer.EXPECT().BatchCheck(ctx, rebac.BatchCheckRequest{Checks: []rebac.BatchCheckItem{check}}).Return(
 		rebac.BatchCheckResult{Results: map[string]rebac.BatchCheckOutcome{
 			repositoryCorrelationID: {Decision: rebac.Decision{Allowed: true}},
@@ -313,7 +308,6 @@ func TestUserComponent_Delete(t *testing.T) {
 		repo:      mockRepoStore,
 		nsStore:   mockNamespaceStore,
 		gs:        mockGitserver,
-		pdStore:   mockPendingDeletionStore,
 		rebac:     mockAuthorizer,
 		config:    &config.Config{},
 	}

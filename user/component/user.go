@@ -41,7 +41,6 @@ type userComponentImpl struct {
 	asqs      database.AccountSyncQuotaStore
 	aus       database.AccountUserStore
 	audit     database.AuditLogStore
-	pdStore   database.PendingDeletionStore
 
 	gs          gitserver.GitServer
 	jwtc        JwtComponent
@@ -119,16 +118,19 @@ func NewUserComponent(config *config.Config) (UserComponent, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create ReBAC authorizer: %w", err)
 	}
-	c.userStore = database.NewUserStore()
+	deletionJobClient, err := newRepositoryDeletionJobClient()
+	if err != nil {
+		return nil, err
+	}
+	c.userStore = database.NewUserStoreWithDBAndDeletionJobClient(database.GetDB(), deletionJobClient)
 	c.orgStore = database.NewOrgStore(config)
 	c.nsStore = database.NewNamespaceStore()
-	c.repo = database.NewRepoStore()
+	c.repo = database.NewRepoStoreWithDBAndDeletionJobClient(database.GetDB(), deletionJobClient)
 	c.ds = database.NewDeployTaskStore()
 	c.ams = database.NewAccountMeteringStore()
 	c.asqs = database.NewAccountSyncQuotaStore()
 	c.aus = database.NewAccountUserStore()
 	c.audit = database.NewAuditLogStore()
-	c.pdStore = database.NewPendingDeletionStore()
 	c.jwtc = NewJwtComponent(config.JWT.SigningKey, config.JWT.ValidHour)
 	c.tokenc, err = NewAccessTokenComponent(config)
 	if err != nil {
@@ -628,25 +630,12 @@ func (c *userComponentImpl) Delete(ctx context.Context, operator, username strin
 
 	var repositoryRelationships []rebac.Relationship
 	if !retainData.Repository {
-		repositories, relationships, err := loadUserRepositoryRelationships(ctx, c.repo, c.nsStore, c.orgStore, user)
+		_, relationships, err := loadUserRepositoryRelationships(ctx, c.repo, c.nsStore, c.orgStore, user)
 		if err != nil {
 			slog.ErrorContext(ctx, "failed to load repository relationships for user", slog.String("username", user.Username), slog.Any("error", err))
 			return err
 		}
 		repositoryRelationships = relationships
-		for _, repo := range repositories {
-			if repo.Path == "" {
-				continue
-			}
-			err = c.pdStore.Create(ctx, &database.PendingDeletion{
-				TableName: database.PendingDeletionTableNameRepository,
-				Value:     repo.GitalyPath(),
-			})
-			if err != nil {
-				slog.ErrorContext(ctx, "failed to create pending deletion", slog.Any("error", err))
-				return fmt.Errorf("failed to create pending deletion: %w", err)
-			}
-		}
 	}
 	// generate audit log
 	before, err := json.Marshal(user)
