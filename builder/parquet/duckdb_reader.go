@@ -62,6 +62,9 @@ func NewS3Reader(ctx context.Context, cfg *config.Config) (Reader, error) {
 }
 
 func (r *duckdbReader) RowCount(ctx context.Context, objNames []string, req types.QueryReq, lfs bool) (int, error) {
+	if err := ValidateWhereClause(req.Where); err != nil {
+		return 0, err
+	}
 	multiFiles := r.genSelectMultiObjStr(objNames, lfs)
 	whereStr := ""
 	if len(req.Where) > 0 {
@@ -89,6 +92,12 @@ func (r *duckdbReader) TopN(ctx context.Context, objName string, count int) ([]s
 }
 
 func (r *duckdbReader) FetchRows(ctx context.Context, objNames []string, req types.QueryReq, lfs bool) ([]string, []string, [][]interface{}, error) {
+	if err := ValidateWhereClause(req.Where); err != nil {
+		return nil, nil, nil, err
+	}
+	if err := ValidateOrderByClause(req.Orderby); err != nil {
+		return nil, nil, nil, err
+	}
 	multiFiles := r.genSelectMultiObjStr(objNames, lfs)
 	offset := (req.PageIndex - 1) * req.PageSize
 	whereStr := ""

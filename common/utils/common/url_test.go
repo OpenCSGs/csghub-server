@@ -1,6 +1,7 @@
 package common
 
 import (
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -307,6 +308,36 @@ func TestValidateImageURL(t *testing.T) {
 				errorMsg:    "image url must not be a private or internal IP address",
 			},
 			{
+				name:        "NAT64 address embedding link-local metadata IP",
+				urlString:   "http://[64:ff9b::a9fe:a9fe]/avatar.jpg",
+				expectError: true,
+				errorMsg:    "image url must not be a private or internal IP address",
+			},
+			{
+				name:        "6to4 address embedding private IP",
+				urlString:   "http://[2002:ac10:fe01::]/avatar.jpg",
+				expectError: true,
+				errorMsg:    "image url must not be a private or internal IP address",
+			},
+			{
+				name:        "Teredo address embedding private client IP",
+				urlString:   "http://[2001:0:4136:e378:8000:63bf:3f57:fefe]/avatar.jpg",
+				expectError: true,
+				errorMsg:    "image url must not be a private or internal IP address",
+			},
+			{
+				name:        "IPv4-mapped IPv6 private address",
+				urlString:   "http://[::ffff:10.0.0.1]/avatar.jpg",
+				expectError: true,
+				errorMsg:    "image url must not be a private or internal IP address",
+			},
+			{
+				name:        "shared address space metadata endpoint",
+				urlString:   "http://100.100.200.200/latest/meta-data/",
+				expectError: true,
+				errorMsg:    "image url must not be a private or internal IP address",
+			},
+			{
 				name:        "blocked port 22",
 				urlString:   "http://203.0.113.1:22/avatar.jpg",
 				expectError: true,
@@ -603,4 +634,87 @@ func TestExtractHostname(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestIsPrivateIP(t *testing.T) {
+	tests := []struct {
+		name string
+		ip   string
+		want bool
+	}{
+		// Plain IPv4.
+		{name: "loopback IPv4", ip: "127.0.0.1", want: true},
+		{name: "private 10/8", ip: "10.1.2.3", want: true},
+		{name: "private 172.16/12", ip: "172.16.0.1", want: true},
+		{name: "private 192.168/16", ip: "192.168.1.1", want: true},
+		{name: "link-local metadata", ip: "169.254.169.254", want: true},
+		{name: "multicast IPv4", ip: "224.0.0.1", want: true},
+		{name: "this network 0.0.0.0", ip: "0.0.0.0", want: true},
+		{name: "this network 0.1.2.3", ip: "0.1.2.3", want: true},
+		{name: "shared address space CGNAT", ip: "100.64.0.1", want: true},
+		{name: "shared address space alibaba metadata", ip: "100.100.200.200", want: true},
+		{name: "shared address space boundary", ip: "100.127.255.255", want: true},
+		{name: "reserved 240/4", ip: "240.0.0.1", want: true},
+		{name: "broadcast", ip: "255.255.255.255", want: true},
+		{name: "public 8.8.8.8", ip: "8.8.8.8", want: false},
+		{name: "public 1.1.1.1", ip: "1.1.1.1", want: false},
+		{name: "public 100.128.0.1 outside CGNAT", ip: "100.128.0.1", want: false},
+
+		// IPv6 without embedded IPv4.
+		{name: "loopback IPv6", ip: "::1", want: true},
+		{name: "unique local fc00::/7", ip: "fc00::1", want: true},
+		{name: "unique local fd12::1", ip: "fd12::1", want: true},
+		{name: "link-local fe80::1", ip: "fe80::1", want: true},
+		{name: "multicast IPv6", ip: "ff02::1", want: true},
+		{name: "unspecified IPv6", ip: "::", want: true},
+		{name: "public IPv6", ip: "2606:4700::1111", want: false},
+
+		// IPv4-mapped IPv6 (::ffff:0:0/96).
+		{name: "IPv4-mapped loopback", ip: "::ffff:127.0.0.1", want: true},
+		{name: "IPv4-mapped private", ip: "::ffff:10.0.0.1", want: true},
+		{name: "IPv4-mapped link-local", ip: "::ffff:169.254.169.254", want: true},
+		{name: "IPv4-mapped public", ip: "::ffff:8.8.8.8", want: false},
+
+		// NAT64 (64:ff9b::/96).
+		{name: "NAT64 embedding metadata endpoint", ip: "64:ff9b::a9fe:a9fe", want: true},
+		{name: "NAT64 embedding 10.0.0.1", ip: "64:ff9b::a00:1", want: true},
+		{name: "NAT64 embedding 192.168.0.1", ip: "64:ff9b::c0a8:1", want: true},
+		{name: "NAT64 embedding 127.0.0.1", ip: "64:ff9b::7f00:1", want: true},
+		{name: "NAT64 embedding public IPv4", ip: "64:ff9b::808:808", want: false},
+		{name: "similar prefix not NAT64", ip: "64:ff9c::a9fe:a9fe", want: false},
+
+		// 6to4 (2002::/16).
+		{name: "6to4 embedding 10.0.0.1", ip: "2002:a00:1::", want: true},
+		{name: "6to4 embedding 172.16.254.1", ip: "2002:ac10:fe01::", want: true},
+		{name: "6to4 embedding 192.168.0.1", ip: "2002:c0a8:1::", want: true},
+		{name: "6to4 embedding metadata endpoint", ip: "2002:a9fe:a9fe::", want: true},
+		{name: "6to4 embedding public 8.8.8.8", ip: "2002:808:808::", want: false},
+
+		// Teredo (2001::/32).
+		{name: "Teredo with private client IPv4", ip: "2001:0:4136:e378:8000:63bf:3f57:fefe", want: true},
+		{name: "Teredo with loopback client IPv4", ip: "2001:0:4136:e378:8000:63bf:8080:8080", want: true},
+		{name: "Teredo with public server and client", ip: "2001:0:4136:e378:8000:63bf:3fff:fdd2", want: false},
+		{name: "Teredo with private server IPv4", ip: "2001:0:c0a8:1:8000:63bf:3fff:fdd2", want: true},
+
+		// Other 2001::/ reserved ranges must not be mistaken for Teredo.
+		{name: "documentation 2001:db8::", ip: "2001:db8::a9fe:a9fe", want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ip := net.ParseIP(tt.ip)
+			if ip == nil {
+				t.Fatalf("net.ParseIP(%q) failed", tt.ip)
+			}
+			if got := isPrivateIP(ip); got != tt.want {
+				t.Errorf("isPrivateIP(%s) = %v, want %v", tt.ip, got, tt.want)
+			}
+		})
+	}
+
+	t.Run("nil address is treated as private", func(t *testing.T) {
+		if !isPrivateIP(nil) {
+			t.Error("isPrivateIP(nil) = false, want true")
+		}
+	})
 }

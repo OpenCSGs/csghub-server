@@ -152,10 +152,84 @@ func validateImagePort(port string) error {
 }
 
 // isPrivateIP returns true if the IP is loopback, private, link-local,
-// or unspecified.
+// multicast, unspecified, or an IPv6 transition address whose embedded
+// IPv4 destination falls into any of those categories. Transition
+// mechanisms translate traffic to the embedded IPv4 address, so checking
+// only the IPv6 literal would miss private destinations hidden inside
+// NAT64, 6to4, and Teredo addresses.
 func isPrivateIP(ip net.IP) bool {
-	return ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() ||
-		ip.IsLinkLocalMulticast() || ip.IsUnspecified()
+	if ip == nil {
+		return true
+	}
+	if v4 := ip.To4(); v4 != nil {
+		// Plain IPv4 or IPv4-mapped IPv6 (::ffff:0:0/96).
+		return isPrivateIPv4(v4)
+	}
+	if ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() ||
+		ip.IsLinkLocalMulticast() || ip.IsMulticast() || ip.IsUnspecified() {
+		return true
+	}
+	for _, v4 := range transitionEmbeddedIPv4(ip) {
+		if isPrivateIPv4(v4) {
+			return true
+		}
+	}
+	return false
+}
+
+// isPrivateIPv4 returns true if the 4-byte IP is loopback, private,
+// link-local, multicast, unspecified, in the shared address space used by
+// some cloud metadata services, or in the "this network" / reserved
+// ranges which are not globally routable.
+func isPrivateIPv4(ip net.IP) bool {
+	if ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() ||
+		ip.IsLinkLocalMulticast() || ip.IsMulticast() || ip.IsUnspecified() {
+		return true
+	}
+	switch {
+	case ip[0] == 0:
+		// 0.0.0.0/8 ("this network").
+		return true
+	case ip[0] == 100 && ip[1]&0xc0 == 64:
+		// 100.64.0.0/10 shared address space (RFC 6598), e.g. the
+		// 100.100.200.200 metadata endpoint on Alibaba Cloud.
+		return true
+	case ip[0] >= 240:
+		// 240.0.0.0/4 reserved range including broadcast.
+		return true
+	}
+	return false
+}
+
+// transitionEmbeddedIPv4 returns the IPv4 destinations that traffic to the
+// IPv6 transition address ip is translated to: the NAT64 well-known prefix
+// (64:ff9b::/96) embeds it in the last 4 bytes, 6to4 (2002::/16) after the
+// prefix, and Teredo (2001::/32) as the Teredo server IPv4 plus the
+// obfuscated (bitwise NOT) client IPv4 in the last 4 bytes. It returns nil
+// for addresses that do not embed an IPv4 destination.
+func transitionEmbeddedIPv4(ip net.IP) []net.IP {
+	ip16 := ip.To16()
+	if ip16 == nil {
+		return nil
+	}
+	switch {
+	case ip16[0] == 0x00 && ip16[1] == 0x64 && ip16[2] == 0xff && ip16[3] == 0x9b:
+		for _, b := range ip16[4:12] {
+			if b != 0 {
+				return nil
+			}
+		}
+		return []net.IP{net.IP(ip16[12:16])}
+	case ip16[0] == 0x20 && ip16[1] == 0x02:
+		return []net.IP{net.IP(ip16[2:6])}
+	case ip16[0] == 0x20 && ip16[1] == 0x01 && ip16[2] == 0x00 && ip16[3] == 0x00:
+		client := make(net.IP, 4)
+		for i := 0; i < 4; i++ {
+			client[i] = ^ip16[12+i]
+		}
+		return []net.IP{net.IP(ip16[4:8]), client}
+	}
+	return nil
 }
 
 func ValidateURLFormat(urlString string) error {
