@@ -1,14 +1,12 @@
 package handler
 
 import (
-	"fmt"
 	"log/slog"
-	"regexp"
-	"strings"
 
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/builder/git/gitserver"
+	"opencsg.com/csghub-server/builder/parquet"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/utils/common"
@@ -19,18 +17,6 @@ import (
 type DatasetViewerHandler struct {
 	viewer component.DatasetViewerComponent
 }
-
-var (
-	queryInvalidSymbols = []string{
-		`'`, `"`, ";", "--", `/\*`, `\*/`,
-		`\bUNION\b`, `\bSELECT\b`, `\bINSERT\b`, `\bUPDATE\b`,
-		`\bDELETE\b`, `\bDROP\b`, `\bEXEC\b`, `\bCREATE\b`,
-		`\bALTER\b`, `\bTRUNCATE\b`,
-	}
-	sqlInvalidSymbolsPattern = regexp.MustCompile(fmt.Sprintf("(?:%s)", strings.Join(queryInvalidSymbols, "|")))
-
-	orderByPattern = regexp.MustCompile(`^[a-zA-Z0-9_\s]+(ASC|DESC)?(\s*,\s*[a-zA-Z0-9_\s]+(ASC|DESC)?)*$`)
-)
 
 func NewDatasetViewerHandler(cfg *config.Config, gs gitserver.GitServer) (*DatasetViewerHandler, error) {
 	dvc, err := component.NewDatasetViewerComponent(cfg, gs)
@@ -188,26 +174,22 @@ func (h *DatasetViewerHandler) Rows(ctx *gin.Context) {
 	req.Page = page
 
 	slog.Debug("hander.rows viewerReq", slog.Any("viewReq", viewReq))
-	err = validateQueryParameter(where, "where")
+	err = parquet.ValidateWhereClause(where)
 	if err != nil {
-		slog.Error("invalid character in parameter where", slog.Any("req", req), slog.Any("viewReq", viewReq), slog.Any("error", err))
+		slog.Error("invalid where clause", slog.Any("req", req), slog.Any("viewReq", viewReq), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
 
-	err = validateOrderBy(orderby, "orderby")
+	err = parquet.ValidateOrderByClause(orderby)
 	if err != nil {
-		slog.Error("invalid character in parameter orderby", slog.Any("req", req), slog.Any("viewReq", viewReq), slog.Any("error", err))
+		slog.Error("invalid order by clause", slog.Any("req", req), slog.Any("viewReq", viewReq), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
 
-	err = validateQueryParameter(search, "search")
-	if err != nil {
-		slog.Error("invalid character in parameter search", slog.Any("req", req), slog.Any("viewReq", viewReq), slog.Any("error", err))
-		httpbase.ServerError(ctx, err)
-		return
-	}
+	// search is not used in any server-side query; it is only echoed back
+	// in the response, so it needs no SQL-safety validation here.
 
 	var rows *dvCom.ViewParquetFileResp
 	// simple limit offset request, use the fast RowsLimited method
@@ -223,22 +205,4 @@ func (h *DatasetViewerHandler) Rows(ctx *gin.Context) {
 	}
 
 	httpbase.OK(ctx, rows)
-}
-
-func validateQueryParameter(parameterValue string, parameterName string) error {
-	if sqlInvalidSymbolsPattern.MatchString(parameterValue) {
-		return fmt.Errorf("invalid character in %s", parameterName)
-	}
-	return nil
-}
-
-func validateOrderBy(parameterValue string, parameterName string) error {
-	if parameterValue == "" {
-		return nil
-	}
-
-	if !orderByPattern.MatchString(parameterValue) {
-		return fmt.Errorf("invalid %s format", parameterName)
-	}
-	return nil
 }
