@@ -113,3 +113,15 @@ func (ac *accountingClientImpl) GetVoucherDashboard(req types.VoucherDashboardRe
 func (ac *accountingClientImpl) OffLinePrice(req types.AcctPriceOffLineReq) (any, error) {
 	return nil, nil
 }
+
+func (ac *accountingClientImpl) QueryStatisticsByUserID(req types.AcctBillsReq) (any, error) {
+	return nil, nil
+}
+
+func (ac *accountingClientImpl) QueryStatisticsDetailByUserID(req types.AcctBillsDetailReq) (any, error) {
+	return nil, nil
+}
+
+func (ac *accountingClientImpl) GetStatisticsSummary(req types.AcctBillsReq) (any, error) {
+	return nil, nil
+}

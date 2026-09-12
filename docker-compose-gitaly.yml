@@ -110,6 +110,38 @@ services:
     networks:
       - my_network
 
+  repository_deletion_worker:
+    image: "git-devops.opencsg.com:5050/product/starhub/starhub-server:latest"
+    entrypoint:
+      - /starhub-bin/starhub
+      - repository
+      - deletion-worker
+    depends_on:
+      - postgres
+      - gitaly
+      - minio
+      - mirror-lfs-sync
+    environment:
+      STARHUB_DATABASE_DSN: postgresql://postgres:postgres@postgres:5432/starhub_server?sslmode=disable
+      STARHUB_SERVER_API_TOKEN: ${STARHUB_SERVER_API_TOKEN}
+      STARHUB_SERVER_GITSERVER_TYPE: gitaly
+      STARHUB_SERVER_GITALY_SERVER_SOCKET: tcp://gitaly:8075
+      STARHUB_SERVER_GITALY_STORGE: default
+      STARHUB_SERVER_GITALY_TOKEN: abc123secret
+      STARHUB_SERVER_S3_ACCESS_KEY_ID: admin
+      STARHUB_SERVER_S3_ACCESS_KEY_SECRET: Password_123
+      STARHUB_SERVER_S3_ENDPOINT: minio:9000
+      STARHUB_SERVER_S3_INTERNAL_ENDPOINT: minio:9000
+      STARHUB_SERVER_S3_BUCKET: opencsg-server-lfs
+      STARHUB_SERVER_S3_REGION: cn-beijing
+      STARHUB_SERVER_S3_ENABLE_SSL: false
+      STARHUB_SERVER_LFS_SYNC_HOST: http://mirror-lfs-sync
+      STARHUB_SERVER_LFS_SYNC_PORT: 8092
+      STARHUB_SERVER_MIRROR_WORKER_NUMBER: 5
+    restart: always
+    networks:
+      - my_network
+
   user_server:
     image: git-devops.opencsg.com:5050/product/starhub/starhub-server:latest
     entrypoint:

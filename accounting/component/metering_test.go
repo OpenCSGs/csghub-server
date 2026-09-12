@@ -34,6 +34,10 @@ func TestMeteringComponent_SaveMeteringEventRecord(t *testing.T) {
 		ResourceID: "test-ID",
 	}
 
+	extra := types.MeteringExtra{
+		SkuUnitType: utils.GetSkuUnitTypeByScene(types.SceneType(req.Scene)),
+	}
+
 	data := database.AccountMetering{
 		EventUUID:    req.Uuid,
 		UserUUID:     req.UserUUID,
@@ -46,15 +50,15 @@ func TestMeteringComponent_SaveMeteringEventRecord(t *testing.T) {
 		CustomerID:   req.CustomerID,
 		RecordedAt:   req.CreatedAt,
 		Extra:        req.Extra,
-		SkuUnitType:  string(utils.GetSkuUnitTypeByScene(types.SceneType(req.Scene))),
+		SkuUnitType:  extra.SkuUnitType,
 	}
 
 	mockStore := mockdb.NewMockAccountMeteringStore(t)
-	mockStore.EXPECT().Create(ctx, data).Return(nil)
+	mockStore.EXPECT().Create(ctx, data, extra).Return(nil)
 
 	mockComp := NewTestMeteringComponent(mockStore)
 
-	err := mockComp.SaveMeteringEventRecord(ctx, &req)
+	err := mockComp.SaveMeteringEventRecord(ctx, &req, extra)
 
 	require.Nil(t, err)
 }
@@ -136,6 +140,76 @@ func TestMeteringComponent_GetMeteringByCustomerIDAndDate(t *testing.T) {
 
 	mockComp := NewTestMeteringComponent(mockStore)
 	res, err := mockComp.FindMeteringByCustomerIDAndRecordAtInMin(ctx, customerid, recordedat)
+	require.Nil(t, err)
+	require.NotNil(t, res)
+}
+
+func TestMeteringComponent_ListStatisticsByUserIDAndDate(t *testing.T) {
+	ctx := context.TODO()
+
+	req := types.AcctBillsReq{
+		TargetUUID: "test-user-uuid",
+		Scene:      types.SceneModelInference,
+		StartDate:  "2024-01-01",
+		EndDate:    "2024-12-31",
+		Per:        10,
+		Page:       1,
+	}
+
+	mockStatStore := mockdb.NewMockAccountStatisticsStore(t)
+	mockStatStore.EXPECT().ListByUserIDAndDate(ctx, req).Return(database.AccountStatisticsRes{}, nil)
+
+	comp := &meteringComponentImpl{
+		ass: mockStatStore,
+	}
+
+	res, err := comp.ListStatisticsByUserIDAndDate(ctx, req)
+	require.Nil(t, err)
+	require.NotNil(t, res)
+}
+
+func TestMeteringComponent_ListStatisticsDetailByUserID(t *testing.T) {
+	ctx := context.TODO()
+
+	req := types.AcctBillsDetailReq{
+		TargetUUID: "test-user-uuid",
+		Scene:      10,
+		StartDate:  "2024-01-01",
+		EndDate:    "2024-12-31",
+		Per:        10,
+		Page:       1,
+	}
+
+	mockStatStore := mockdb.NewMockAccountStatisticsStore(t)
+	mockStatStore.EXPECT().ListStatisticsDetailByUserID(ctx, req).Return(database.AccountStatisticsDetailRes{}, nil)
+
+	comp := &meteringComponentImpl{
+		ass: mockStatStore,
+	}
+
+	res, err := comp.ListStatisticsDetailByUserID(ctx, req)
+	require.Nil(t, err)
+	require.NotNil(t, res)
+}
+
+func TestMeteringComponent_GetStatisticsSummary(t *testing.T) {
+	ctx := context.TODO()
+
+	req := types.AcctBillsReq{
+		TargetUUID: "test-user-uuid",
+		Scene:      types.SceneModelInference,
+		StartDate:  "2024-01-01",
+		EndDate:    "2024-12-31",
+	}
+
+	mockStatStore := mockdb.NewMockAccountStatisticsStore(t)
+	mockStatStore.EXPECT().SummaryByUserIDAndDate(ctx, req).Return(database.AccountStatisticsSummaryRes{}, nil)
+
+	comp := &meteringComponentImpl{
+		ass: mockStatStore,
+	}
+
+	res, err := comp.GetStatisticsSummary(ctx, req)
 	require.Nil(t, err)
 	require.NotNil(t, res)
 }

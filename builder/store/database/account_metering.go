@@ -5,9 +5,12 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/uptrace/bun"
+	"opencsg.com/csghub-server/accounting/utils"
 	"opencsg.com/csghub-server/common/types"
 )
 
@@ -16,7 +19,7 @@ type accountMeteringStoreImpl struct {
 }
 
 type AccountMeteringStore interface {
-	Create(ctx context.Context, input AccountMetering) error
+	Create(ctx context.Context, input AccountMetering, extra types.MeteringExtra) error
 	ListByUserIDAndTime(ctx context.Context, req types.ActStatementsReq) ([]AccountMetering, int, error)
 	GetStatByDate(ctx context.Context, req types.ActStatementsReq) ([]map[string]interface{}, error)
 	ListAllByUserUUID(ctx context.Context, userUUID string) ([]AccountMetering, error)
@@ -50,15 +53,63 @@ type AccountMetering struct {
 	RecordedAt   time.Time             `bun:",notnull" json:"recorded_at"`
 	Extra        string                `json:"extra"`
 	CreatedAt    time.Time             `bun:",notnull,default:current_timestamp" json:"created_at"`
-	SkuUnitType  string                `json:"sku_unit_type"`
+	SkuUnitType  types.SkuUnitType     `json:"sku_unit_type"`
 }
 
-func (am *accountMeteringStoreImpl) Create(ctx context.Context, input AccountMetering) error {
-	res, err := am.db.Core.NewInsert().Model(&input).Exec(ctx, &input)
-	if err := assertAffectedOneRow(res, err); err != nil {
-		return fmt.Errorf("failed to save metering event, error: %w", err)
-	}
-	return nil
+func (am *accountMeteringStoreImpl) Create(ctx context.Context, input AccountMetering, extra types.MeteringExtra) error {
+	err := am.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		res, err := tx.NewInsert().Model(&input).Exec(ctx, &input)
+		if err := assertAffectedOneRow(res, err); err != nil {
+			return fmt.Errorf("failed to insert metering event, error: %w", err)
+		}
+
+		if utils.IsGetTokenID(input.Scene) && len(extra.APIKey) > 0 {
+			token, err := findByTokenValue(ctx, tx, extra.APIKey)
+			if err != nil {
+				slog.ErrorContext(ctx, "find token by value failed, error", slog.Any("error", err), slog.Any("input", input))
+			}
+			if token != nil {
+				extra.TokenID = token.ID
+			} else {
+				// token not found, set token_id to 0
+				slog.WarnContext(ctx, "token object not found, set token_id to 0", slog.Any("input", input))
+			}
+		}
+
+		stat := AccountStatistics{
+			EventDate:         extra.EventDate,
+			UserUUID:          input.UserUUID,
+			Scene:             input.Scene,
+			CustomerID:        input.CustomerID,
+			Consumption:       input.Value,
+			PromptToken:       extra.PromptToken,
+			PromptCachedToken: extra.PromptCachedToken,
+			CompletionToken:   extra.CompletionToken,
+			Count:             1,
+			TokenID:           extra.TokenID,
+			DataType:          extra.DataType,
+			Resolution:        extra.Resolution,
+			Duration:          extra.Duration,
+		}
+
+		_, err = tx.NewInsert().Model(&stat).
+			On("CONFLICT (event_date, user_uuid, scene, customer_id, token_id, data_type, resolution) DO UPDATE").
+			Set("consumption = account_statistics.consumption + ?", input.Value).
+			Set("prompt_token = account_statistics.prompt_token + ?", extra.PromptToken).
+			Set("prompt_cached_token = account_statistics.prompt_cached_token + ?", extra.PromptCachedToken).
+			Set("completion_token = account_statistics.completion_token + ?", extra.CompletionToken).
+			Set("duration = account_statistics.duration + ?", extra.Duration).
+			Set("count = account_statistics.count + ?", 1).
+			Set("updated_at = current_timestamp").
+			Exec(ctx)
+		if err != nil {
+			return fmt.Errorf("update account statistics for user %s, error: %w", input.UserUUID, err)
+		}
+
+		return nil
+	})
+
+	return err
 }
 
 func (am *accountMeteringStoreImpl) ListByUserIDAndTime(ctx context.Context, req types.ActStatementsReq) ([]AccountMetering, int, error) {

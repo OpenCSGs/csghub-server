@@ -40,7 +40,7 @@ func createTestMeteringEvent() *types.MeteringEvent {
 		UserUUID:     "test-user-uuid",
 		Value:        100,
 		ValueType:    types.TimeDurationMinType,
-		Scene:        int(types.SceneSpace),
+		Scene:        types.SceneSpace,
 		OpUID:        "test-op-uid",
 		ResourceID:   "test-resource-id",
 		ResourceName: "test-resource-name",
@@ -244,7 +244,7 @@ func TestMeteringImpl_HandleMsgData_Success(t *testing.T) {
 	mockMeterComp.EXPECT().GetMeteringByEventUUID(mock.Anything, mock.Anything).Return(nil, nil)
 	mockMeterComp.EXPECT().FindMeteringByCustomerIDAndRecordAtInMin(mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
 	mockAcctEvtComp.EXPECT().AddNewAccountingEvent(mock.Anything, mock.Anything, mock.Anything).Return(nil)
-	mockMeterComp.EXPECT().SaveMeteringEventRecord(ctx, mock.Anything).Return(nil)
+	mockMeterComp.EXPECT().SaveMeteringEventRecord(ctx, mock.Anything, mock.Anything).Return(nil)
 
 	result, err := metering.handleMsgData(ctx, data)
 
@@ -284,7 +284,7 @@ func TestMeteringImpl_HandleMsgData_SaveError(t *testing.T) {
 	mockMeterComp.EXPECT().GetMeteringByEventUUID(mock.Anything, mock.Anything).Return(nil, nil)
 	mockMeterComp.EXPECT().FindMeteringByCustomerIDAndRecordAtInMin(mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
 	mockAcctEvtComp.EXPECT().AddNewAccountingEvent(mock.Anything, mock.Anything, mock.Anything).Return(nil)
-	mockMeterComp.EXPECT().SaveMeteringEventRecord(ctx, mock.Anything).Return(testErr)
+	mockMeterComp.EXPECT().SaveMeteringEventRecord(ctx, mock.Anything, mock.Anything).Return(testErr)
 
 	_, err := metering.handleMsgData(ctx, data)
 
@@ -427,7 +427,7 @@ func TestMeteringImpl_HandleMsgWithRetry_Success(t *testing.T) {
 	mockMeterComp.EXPECT().GetMeteringByEventUUID(mock.Anything, mock.Anything).Return(nil, nil)
 	mockMeterComp.EXPECT().FindMeteringByCustomerIDAndRecordAtInMin(mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
 	mockAcctEvtComp.EXPECT().AddNewAccountingEvent(mock.Anything, mock.Anything, mock.Anything).Return(nil)
-	mockMeterComp.EXPECT().SaveMeteringEventRecord(mock.Anything, mock.Anything).Return(nil)
+	mockMeterComp.EXPECT().SaveMeteringEventRecord(mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	mockMQ.EXPECT().Publish(bldmq.FeeSendSubject, data).Return(nil)
 
 	err := metering.handleMsgWithRetry(data, meta)
@@ -480,7 +480,7 @@ func TestMeteringImpl_HandleMsgWithRetry_ChargingDisabled(t *testing.T) {
 	mockMeterComp.EXPECT().GetMeteringByEventUUID(mock.Anything, mock.Anything).Return(nil, nil)
 	mockMeterComp.EXPECT().FindMeteringByCustomerIDAndRecordAtInMin(mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
 	mockAcctEvtComp.EXPECT().AddNewAccountingEvent(mock.Anything, mock.Anything, mock.Anything).Return(nil)
-	mockMeterComp.EXPECT().SaveMeteringEventRecord(mock.Anything, mock.Anything).Return(nil)
+	mockMeterComp.EXPECT().SaveMeteringEventRecord(mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 	err := metering.handleMsgWithRetry(data, meta)
 
@@ -538,7 +538,7 @@ func TestMeteringImpl_HandleMsgWithRetry_PubFeeFailed(t *testing.T) {
 	mockMeterComp.EXPECT().GetMeteringByEventUUID(mock.Anything, mock.Anything).Return(nil, nil)
 	mockMeterComp.EXPECT().FindMeteringByCustomerIDAndRecordAtInMin(mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
 	mockAcctEvtComp.EXPECT().AddNewAccountingEvent(mock.Anything, mock.Anything, mock.Anything).Return(nil)
-	mockMeterComp.EXPECT().SaveMeteringEventRecord(mock.Anything, mock.Anything).Return(nil)
+	mockMeterComp.EXPECT().SaveMeteringEventRecord(mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	mockMQ.EXPECT().Publish(bldmq.FeeSendSubject, data).Return(testErr).Times(3)
 
 	err := metering.handleMsgWithRetry(data, meta)

@@ -16,6 +16,8 @@ type WorkerOverrides struct {
 	MirrorRepo river.Worker[RepoArgs]
 	// MirrorLFS is the real Git LFS mirror worker when this client owns that queue.
 	MirrorLFS river.Worker[LFSArgs]
+	// RepositoryDeletion is the real repository cleanup worker when this client owns that queue.
+	RepositoryDeletion river.Worker[RepositoryDeletionArgs]
 }
 
 // NewWorkerRegistry creates the complete worker registry required by River's
@@ -25,6 +27,7 @@ func NewWorkerRegistry(overrides WorkerOverrides) *river.Workers {
 	workers := river.NewWorkers()
 	river.AddWorker(workers, workerForRegistry(overrides.MirrorRepo, MirrorRepoQueue, MirrorRepoJobTimeout))
 	river.AddWorker(workers, workerForRegistry(overrides.MirrorLFS, MirrorLFSQueue, MirrorLFSJobTimeout))
+	river.AddWorker(workers, workerForRegistry(overrides.RepositoryDeletion, RepositoryDeletionQueue, RepositoryDeletionJobTimeout))
 	return workers
 }
 

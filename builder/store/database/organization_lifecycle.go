@@ -23,6 +23,11 @@ func NewHierarchyOrgStoreWithDB(db *DB) OrgStore {
 	return &hierarchyOrganizationStore{OrgStore: NewOrgStoreWithMode(db, true), db: db}
 }
 
+// NewHierarchyOrgStoreWithDBAndDeletionJobClient creates a hierarchy-aware Store with transactional repository deletion jobs.
+func NewHierarchyOrgStoreWithDBAndDeletionJobClient(db *DB, jobClient RepositoryDeletionJobClient) OrgStore {
+	return &hierarchyOrganizationStore{OrgStore: NewOrgStoreWithModeAndDeletionJobClient(db, true, jobClient), db: db}
+}
+
 // GetUserBelongOrgs returns organizations whose active hierarchy memberships include the user.
 func (s *hierarchyOrganizationStore) GetUserBelongOrgs(ctx context.Context, userID int64) ([]Organization, error) {
 	var organizations []Organization
@@ -118,8 +123,8 @@ func (s *hierarchyOrganizationStore) GetSharedOrgIDs(ctx context.Context, userID
 }
 
 // Delete removes a top-level organization or a child organization subtree.
-func (s *hierarchyOrganizationStore) Delete(ctx context.Context, path string) error {
-	return s.db.BunDB.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+func (s *hierarchyOrganizationStore) Delete(ctx context.Context, path string) (OrganizationDeleteResult, error) {
+	err := s.db.BunDB.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		var organization Organization
 		if err := tx.NewSelect().Model(&organization).
 			Where("path = ? AND is_hierarchical = TRUE AND deleted_at IS NULL", path).For("UPDATE").Scan(ctx); err != nil {
@@ -135,6 +140,7 @@ func (s *hierarchyOrganizationStore) Delete(ctx context.Context, path string) er
 		}
 		return deleteUnitSubtreeTx(ctx, tx, unit.RootOrganizationID, unit.ID)
 	})
+	return OrganizationDeleteResult{}, err
 }
 
 // deleteRootOrganizationTx removes hierarchy records before physically removing the root.

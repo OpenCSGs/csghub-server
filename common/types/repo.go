@@ -457,6 +457,11 @@ type CheckResourceAndAccountReq struct {
 	ClusterID     string `json:"cluster_id"`
 	OrderDetailID int64  `json:"order_detail_id"`
 	CurrentUser   string `json:"current_user"`
+	// SkipCapacityCheck suppresses the spare-capacity availability check while still
+	// performing account/balance and exclusive-resource authorization. Used when
+	// restarting a sandbox onto its current resource, whose existing allocation is not
+	// yet credited in the cluster's available-capacity calculation.
+	SkipCapacityCheck bool `json:"-"`
 }
 
 type DownloadRepoZipReq struct {

@@ -832,6 +832,74 @@ func TestMirrorTaskStore_CancelMirrorTaskByIDWithJobCancelSynchronizesMirrorAndR
 	require.Equal(t, types.SyncStatusCanceled, storedRepo.SyncStatus)
 }
 
+// TestMirrorTaskStore_CancelMirrorTaskByIDWithJobCancelSupportsSoftDeletedRepository verifies
+// asynchronous repository deletion can still cancel mirror work after the repository is hidden.
+func TestMirrorTaskStore_CancelMirrorTaskByIDWithJobCancelSupportsSoftDeletedRepository(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	taskStore := database.NewMirrorTaskJobStoreWithDB(db)
+	mirrorStore := database.NewMirrorStoreWithDB(db)
+	repoStore := database.NewRepoStoreWithDB(db)
+
+	repo, err := repoStore.CreateRepo(ctx, database.Repository{
+		UserID:        1,
+		Path:          "test/cancel-soft-deleted",
+		GitPath:       "test/cancel-soft-deleted.git",
+		Name:          "cancel-soft-deleted",
+		Nickname:      "Cancel Soft Deleted",
+		DefaultBranch: "main",
+		Private:       false,
+		SyncStatus:    types.SyncStatusInProgress,
+	})
+	require.NoError(t, err)
+
+	mirror, err := mirrorStore.Create(ctx, &database.Mirror{
+		SourceUrl:      "https://example.com/test/cancel-soft-deleted.git",
+		RepositoryID:   repo.ID,
+		MirrorSourceID: 1,
+		Status:         types.MirrorRepoSyncStart,
+	})
+	require.NoError(t, err)
+
+	task, err := taskStore.Create(ctx, database.MirrorTask{
+		MirrorID: mirror.ID,
+		Status:   types.MirrorRepoSyncStart,
+		Priority: types.HighMirrorPriority,
+	})
+	require.NoError(t, err)
+
+	_, err = db.Core.NewUpdate().
+		Model(&database.Mirror{}).
+		Set("current_task_id = ?", task.ID).
+		Where("id = ?", mirror.ID).
+		Exec(ctx)
+	require.NoError(t, err)
+	_, err = db.Core.NewDelete().Model(repo).WherePK().Exec(ctx)
+	require.NoError(t, err)
+
+	cancelled, err := taskStore.CancelMirrorTaskByIDWithJobCancel(ctx, task.ID, nil)
+	require.NoError(t, err)
+	require.True(t, cancelled)
+
+	var storedTask database.MirrorTask
+	err = db.Core.NewSelect().Model(&storedTask).Where("id = ?", task.ID).Scan(ctx)
+	require.NoError(t, err)
+	require.Equal(t, types.MirrorCanceled, storedTask.Status)
+
+	var storedMirror database.Mirror
+	err = db.Core.NewSelect().Model(&storedMirror).Where("id = ?", mirror.ID).Scan(ctx)
+	require.NoError(t, err)
+	require.Equal(t, types.MirrorCanceled, storedMirror.Status)
+	require.Equal(t, task.ID, storedMirror.CurrentTaskID)
+
+	var storedRepo database.Repository
+	err = db.Core.NewSelect().Model(&storedRepo).WhereAllWithDeleted().Where("id = ?", repo.ID).Scan(ctx)
+	require.NoError(t, err)
+	require.Equal(t, types.SyncStatusInProgress, storedRepo.SyncStatus)
+}
+
 // TestMirrorTaskStore_CancelMirrorTaskByIDWithJobCancelKeepsFinishedTask verifies cancel cannot overwrite completed sync results.
 func TestMirrorTaskStore_CancelMirrorTaskByIDWithJobCancelKeepsFinishedTask(t *testing.T) {
 	db := tests.InitTestDB()

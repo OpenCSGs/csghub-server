@@ -342,25 +342,7 @@ func TestRepoComponent_DeleteRepo(t *testing.T) {
 		Email:    "foo@bar.com",
 	}
 	repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(dbuser, nil)
-	repo.mocks.stores.RepoMock().EXPECT().CleanRelationsByRepoID(ctx, dbrepo.ID).Return(nil)
-	repo.mocks.stores.MirrorMock().EXPECT().FindByRepoID(ctx, dbrepo.ID).Return(nil, nil)
-	repo.mocks.stores.LfsMetaObjectMock().EXPECT().FindByRepoID(ctx, dbrepo.ID).Return([]database.LfsMetaObject{}, nil)
-
-	repo.mocks.gitServer.EXPECT().DeleteRepo(ctx, "models_ns/n.git").Return(nil)
-
 	repo.mocks.stores.RepoMock().EXPECT().DeleteRepo(ctx, *dbrepo).Return(nil)
-	relationship := rebac.Relationship{
-		Subject:  rebac.UserSubject("namespace-user-uuid"),
-		Relation: rebac.RelationOwner,
-		Object:   rebac.RepositoryObject(dbrepo.ID),
-	}
-	repoAuthorizerMock(repo).EXPECT().Check(ctx, rebac.CheckRequest{
-		Subject:     relationship.Subject,
-		Relation:    relationship.Relation,
-		Object:      relationship.Object,
-		Consistency: rebac.ConsistencyHigher,
-	}).Return(rebac.Decision{Allowed: true}, nil).Once()
-	repoAuthorizerMock(repo).EXPECT().Delete(ctx, []rebac.Relationship{relationship}).Return(nil).Once()
 
 	r1, err := repo.DeleteRepo(ctx, types.DeleteRepoReq{
 		Username:  "user",
@@ -371,6 +353,52 @@ func TestRepoComponent_DeleteRepo(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, dbrepo, r1)
 
+}
+
+type recordingMirrorSvcClient struct {
+	cancelCalls int
+}
+
+func (c *recordingMirrorSvcClient) CancelMirror(context.Context, int64) error {
+	c.cancelCalls++
+	return nil
+}
+
+func TestRepoComponent_DeleteRepoEnqueueFailureDoesNotCancelMirror(t *testing.T) {
+	ctx := context.Background()
+	repo := initializeTestRepoComponent(ctx, t)
+	canceler := &recordingMirrorSvcClient{}
+	repo.mirrorSvcClient = canceler
+
+	dbrepo := &database.Repository{
+		ID:             1,
+		UserID:         123,
+		Path:           "ns/n",
+		Name:           "n",
+		RepositoryType: types.ModelRepo,
+	}
+	repo.mocks.stores.RepoMock().EXPECT().Find(ctx, "ns", string(types.ModelRepo), "n").Return(dbrepo, nil)
+	repo.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "ns").Return(database.Namespace{
+		Path:          "ns",
+		NamespaceType: database.UserNamespace,
+	}, nil)
+	repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{
+		ID:       123,
+		RoleMask: "admin",
+	}, nil)
+	enqueueErr := errors.New("enqueue repository deletion job")
+	repo.mocks.stores.RepoMock().EXPECT().DeleteRepo(ctx, *dbrepo).Return(enqueueErr)
+
+	deletedRepo, err := repo.DeleteRepo(ctx, types.DeleteRepoReq{
+		Username:  "user",
+		Namespace: "ns",
+		Name:      "n",
+		RepoType:  types.ModelRepo,
+	})
+
+	require.ErrorIs(t, err, enqueueErr)
+	require.Nil(t, deletedRepo)
+	require.Zero(t, canceler.cancelCalls, "enqueue failure must not cause mirror side effects")
 }
 
 func TestRepoComponent_PublicToUser(t *testing.T) {

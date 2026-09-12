@@ -120,3 +120,15 @@ func (ac *accountingComponentImpl) GetVoucherDashboard(ctx context.Context, req 
 func (ac *accountingComponentImpl) OffLinePrice(ctx context.Context, req types.AcctPriceOffLineReq) (any, error) {
 	return nil, nil
 }
+
+func (ac *accountingComponentImpl) QueryStatisticsByUserID(ctx context.Context, req types.AcctBillsReq) (interface{}, error) {
+	return nil, nil
+}
+
+func (ac *accountingComponentImpl) QueryStatisticsDetailByUserID(ctx context.Context, req types.AcctBillsDetailReq) (interface{}, error) {
+	return nil, nil
+}
+
+func (ac *accountingComponentImpl) GetStatisticsSummary(ctx context.Context, req types.AcctBillsReq) (interface{}, error) {
+	return nil, nil
+}

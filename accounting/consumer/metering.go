@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"strconv"
+	"strings"
 	"time"
 
 	"opencsg.com/csghub-server/accounting/component"
@@ -50,6 +52,7 @@ func (m *MeteringImpl) Run() {
 			bldmq.MeterTokenSendSubject,
 			bldmq.MeterQuotaSendSubject,
 		},
+		MaxAge:   time.Duration(24*7) * time.Hour,
 		AutoACK:  true,
 		Callback: m.handleMsgWithRetry,
 	})
@@ -108,14 +111,75 @@ func (m *MeteringImpl) handleMsgData(ctx context.Context, raw []byte) (*types.Me
 		return nil, err
 	}
 
+	extraMap, err := m.parseMessageExtraData(event.Extra)
+	if err != nil {
+		return nil, fmt.Errorf("parse event extra data, %w", err)
+	}
+
 	err = m.logAndVerifyEvent(ctx, event)
 	if err != nil {
 		return nil, fmt.Errorf("failed to log and verify metering event, error: %w", err)
 	}
 
-	err = m.meterComp.SaveMeteringEventRecord(ctx, event)
+	promptNum := int64(0)
+	promptNumStr, promptOK := extraMap[types.PromptTokenNum]
+	if promptOK {
+		var parseErr error
+		promptNum, parseErr = strconv.ParseInt(strings.TrimSpace(promptNumStr), 10, 64)
+		if parseErr != nil || promptNum < 0 {
+			return nil, fmt.Errorf("metering consumer convert prompt token num %s to int64 error %w", promptNumStr, parseErr)
+		}
+	}
+
+	completionNum := int64(0)
+	completionNumStr, completionOK := extraMap[types.CompletionTokenNum]
+	if completionOK {
+		var parseErr error
+		completionNum, parseErr = strconv.ParseInt(strings.TrimSpace(completionNumStr), 10, 64)
+		if parseErr != nil || completionNum < 0 {
+			return nil, fmt.Errorf("metering consumer convert completion token num %s to int64 error %w", completionNumStr, err)
+		}
+	}
+
+	promptTokenCachedNum := int64(0)
+	promptTokenCacheNumStr, promptTokenCacheOK := extraMap[types.PromptTokenCacheNum]
+	if promptTokenCacheOK {
+		var parseErr error
+		promptTokenCachedNum, parseErr = strconv.ParseInt(strings.TrimSpace(promptTokenCacheNumStr), 10, 64)
+		if parseErr != nil || promptTokenCachedNum < 0 {
+			return nil, fmt.Errorf("metering consumer convert prompt token cache num %s to int64 error %w", promptTokenCacheNumStr, parseErr)
+		}
+	}
+
+	if promptTokenCachedNum > promptNum {
+		return nil, fmt.Errorf("metering consumer prompt token cache num %d is greater than prompt token num %d", promptTokenCachedNum, promptNum)
+	}
+
+	duration := float64(0)
+	durationStr, ok := extraMap[types.CompletionDuration]
+	if ok && len(strings.TrimSpace(durationStr)) > 0 {
+		var parseErr error
+		duration, parseErr = strconv.ParseFloat(strings.TrimSpace(durationStr), 64)
+		if parseErr != nil {
+			return nil, fmt.Errorf("metering consumer failed to parse completion duration %s to float64 error %w", durationStr, parseErr)
+		}
+	}
+
+	extra := types.MeteringExtra{
+		EventDate:         utils.EventDateInLocalTZ(event.CreatedAt),
+		PromptToken:       float64(promptNum),
+		PromptCachedToken: float64(promptTokenCachedNum),
+		CompletionToken:   float64(completionNum),
+		DataType:          extraMap[types.CompletionDataType],
+		Resolution:        extraMap[types.CompletionResolution],
+		Duration:          duration,
+		SkuUnitType:       utils.GetSkuUnitTypeByScene(types.SceneType(event.Scene)),
+		APIKey:            extraMap[types.ConsumeApiKey],
+	}
+
+	err = m.meterComp.SaveMeteringEventRecord(ctx, event, extra)
 	if err != nil {
-		return nil, fmt.Errorf("failed to save metering event, %v, %w", event, err)
+		return nil, fmt.Errorf("failed to record metering event, %v, error: %w", event, err)
 	}
 	return event, nil
 }
@@ -168,6 +232,18 @@ func (m *MeteringImpl) parseMessageData(raw []byte) (*types.MeteringEvent, error
 		return nil, fmt.Errorf("failed to unmarshal metering event, %v, %w", strData, err)
 	}
 	return &evt, nil
+}
+
+func (c *MeteringImpl) parseMessageExtraData(extra string) (map[string]string, error) {
+	extraMap := make(map[string]string, 0)
+	if len(strings.Trim(extra, " ")) == 0 {
+		return extraMap, nil
+	}
+	err := json.Unmarshal([]byte(extra), &extraMap)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal metering event extra json data, %v, %w", extra, err)
+	}
+	return extraMap, nil
 }
 
 func (m *MeteringImpl) pubFeeEventWithReTry(raw []byte, evt *types.MeteringEvent, limit int) error {

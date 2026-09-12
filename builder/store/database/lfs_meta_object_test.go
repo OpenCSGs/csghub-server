@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/tests"
+	"opencsg.com/csghub-server/common/types"
 )
 
 func TestLfsMetaStore_CRUD(t *testing.T) {
@@ -307,4 +308,41 @@ func TestLfsMetaStore_ExistsByOidExclRepo(t *testing.T) {
 	exists, err = store.ExistsByOidExclRepo(ctx, oid, repo1)
 	require.Nil(t, err)
 	require.True(t, exists)
+}
+
+func TestLfsMetaStore_ExistsByOidInActiveRepoExclRepoIgnoresSoftDeletedRepositories(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.Background()
+	repoStore := database.NewRepoStoreWithDB(db)
+	store := database.NewLfsMetaObjectStoreWithDB(db)
+
+	repo1, err := repoStore.CreateRepo(ctx, database.Repository{
+		RepositoryType: types.ModelRepo, Path: "ns/deleting-one", Name: "deleting-one", GitPath: "models_ns/deleting-one",
+	})
+	require.NoError(t, err)
+	repo2, err := repoStore.CreateRepo(ctx, database.Repository{
+		RepositoryType: types.ModelRepo, Path: "ns/deleting-two", Name: "deleting-two", GitPath: "models_ns/deleting-two",
+	})
+	require.NoError(t, err)
+	activeRepo, err := repoStore.CreateRepo(ctx, database.Repository{
+		RepositoryType: types.ModelRepo, Path: "ns/active", Name: "active", GitPath: "models_ns/active",
+	})
+	require.NoError(t, err)
+	for _, repoID := range []int64{repo1.ID, repo2.ID, activeRepo.ID} {
+		_, err = store.Create(ctx, database.LfsMetaObject{RepositoryID: repoID, Oid: "shared"})
+		require.NoError(t, err)
+	}
+
+	_, err = db.Core.NewDelete().Model((*database.Repository)(nil)).Where("id = ? OR id = ?", repo1.ID, repo2.ID).Exec(ctx)
+	require.NoError(t, err)
+	exists, err := store.ExistsByOidInActiveRepoExclRepo(ctx, "shared", repo1.ID)
+	require.NoError(t, err)
+	require.True(t, exists)
+
+	_, err = db.Core.NewDelete().Model(activeRepo).WherePK().Exec(ctx)
+	require.NoError(t, err)
+	exists, err = store.ExistsByOidInActiveRepoExclRepo(ctx, "shared", repo1.ID)
+	require.NoError(t, err)
+	require.False(t, exists, "another soft-deleted repository must not retain the shared object")
 }

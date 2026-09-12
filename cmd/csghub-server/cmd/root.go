@@ -21,6 +21,7 @@ import (
 	"opencsg.com/csghub-server/cmd/csghub-server/cmd/mirror"
 	"opencsg.com/csghub-server/cmd/csghub-server/cmd/moderation"
 	"opencsg.com/csghub-server/cmd/csghub-server/cmd/notification"
+	"opencsg.com/csghub-server/cmd/csghub-server/cmd/repository"
 	"opencsg.com/csghub-server/cmd/csghub-server/cmd/scaffold"
 	"opencsg.com/csghub-server/cmd/csghub-server/cmd/start"
 	"opencsg.com/csghub-server/cmd/csghub-server/cmd/sync"
@@ -76,6 +77,7 @@ func init() {
 		dataviewer.Cmd,
 		aigateway.Cmd,
 		notification.Cmd,
+		repository.Cmd,
 		scaffold.Cmd,
 		version.Cmd,
 		errorx.Cmd,

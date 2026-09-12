@@ -748,6 +748,7 @@ func lockMirrorTaskAggregateTx(ctx context.Context, tx bun.Tx, taskID int64) (Mi
 	var repo Repository
 	if err := tx.NewSelect().
 		Model(&repo).
+		WhereAllWithDeleted().
 		Where("repository.id = ?", mirror.RepositoryID).
 		For("UPDATE").
 		Scan(ctx); err != nil {

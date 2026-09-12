@@ -2,8 +2,12 @@ package database_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
@@ -13,6 +17,23 @@ import (
 	"opencsg.com/csghub-server/common/tests"
 	"opencsg.com/csghub-server/common/types"
 )
+
+type repositoryNamespaceLockHook struct {
+	path   string
+	locked chan struct{}
+	once   sync.Once
+}
+
+func (h *repositoryNamespaceLockHook) BeforeQuery(ctx context.Context, _ *bun.QueryEvent) context.Context {
+	return ctx
+}
+
+func (h *repositoryNamespaceLockHook) AfterQuery(_ context.Context, event *bun.QueryEvent) {
+	query := strings.ToUpper(event.Query)
+	if event.Err == nil && strings.Contains(query, "FOR KEY SHARE") && strings.Contains(event.Query, h.path) {
+		h.once.Do(func() { close(h.locked) })
+	}
+}
 
 // TestNewOrgStore_SelectsStoreByOrganizationMode verifies Store selection is centralized in the constructor.
 func TestNewOrgStore_SelectsStoreByOrganizationMode(t *testing.T) {
@@ -30,7 +51,7 @@ func TestOrganizationUnitStore_CreateRoot(t *testing.T) {
 	ctx := context.Background()
 	creator := createOrganizationUnitMemberTestUser(t, ctx, db, "root-creator")
 	organizationUUID := uuid.New()
-	store := coredb.NewOrganizationUnitStoreWithDB(db)
+	store := coredb.NewOrganizationUnitStoreWithDBAndDeletionJobClient(db, &testRepositoryDeletionJobClient{})
 	created, err := store.CreateRoot(ctx, coredb.CreateRootOrganizationInput{
 		Organization: &coredb.Organization{
 			Name: "root-created", Nickname: "Root Created", UUID: organizationUUID, UserID: creator.ID, IsRoot: true,
@@ -106,12 +127,12 @@ func TestOrganizationUnitStore_DeleteRoot(t *testing.T) {
 	creator := createOrganizationUnitMemberTestUser(t, ctx, db, "root-delete-creator")
 	member := createOrganizationUnitMemberTestUser(t, ctx, db, "root-delete-member")
 	rootUUID := uuid.New()
-	root, err := coredb.NewOrganizationUnitStoreWithDB(db).CreateRoot(ctx, coredb.CreateRootOrganizationInput{
+	root, err := coredb.NewOrganizationUnitStoreWithDBAndDeletionJobClient(db, &testRepositoryDeletionJobClient{}).CreateRoot(ctx, coredb.CreateRootOrganizationInput{
 		Organization: &coredb.Organization{Name: "root-delete", Nickname: "Root Delete", UUID: rootUUID, UserID: creator.ID, IsRoot: true, IsHierarchical: true},
 		Namespace:    &coredb.Namespace{Path: "root-delete", UUID: rootUUID.String()}, CreatorUserID: creator.ID,
 	})
 	require.NoError(t, err)
-	store := coredb.NewOrganizationUnitStoreWithDB(db)
+	store := coredb.NewOrganizationUnitStoreWithDBAndDeletionJobClient(db, &testRepositoryDeletionJobClient{})
 	child := createChild(t, ctx, store, root, "root-delete-child", nil, 1)
 	grandchild := createChild(t, ctx, store, root, "root-delete-grandchild", &child.UUID, 1)
 	childID := organizationIDForUnit(t, ctx, store, child.UUID)
@@ -168,6 +189,247 @@ func TestOrganizationUnitStore_DeleteRoot(t *testing.T) {
 	require.ElementsMatch(t, result.DeletedReBACRelationships, repeated.DeletedReBACRelationships)
 }
 
+func TestOrganizationUnitStore_DeleteRootRepositories(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.Background()
+	creator := createOrganizationUnitMemberTestUser(t, ctx, db, "root-repository-delete-creator")
+	jobClient := &testRepositoryDeletionJobClient{}
+	store := coredb.NewOrganizationUnitStoreWithDBAndDeletionJobClient(db, jobClient)
+	rootUUID := uuid.New()
+	root, err := store.CreateRoot(ctx, coredb.CreateRootOrganizationInput{
+		Organization: &coredb.Organization{Name: "root-repository-delete", UUID: rootUUID, UserID: creator.ID, IsRoot: true, IsHierarchical: true},
+		Namespace:    &coredb.Namespace{Path: "root-repository-delete", UUID: rootUUID.String()}, CreatorUserID: creator.ID,
+	})
+	require.NoError(t, err)
+	child := createChild(t, ctx, store, root, "root-repository-delete-child", nil, 1)
+	grandchild := createChild(t, ctx, store, root, "root-repository-delete-grandchild", &child.UUID, 1)
+
+	repositories := []coredb.Repository{
+		{UserID: creator.ID, Name: "root", Path: root.Name + "/root", GitPath: "models_" + root.Name + "/root", RepositoryType: types.ModelRepo},
+		{UserID: creator.ID, Name: "child", Path: child.Name + "/child", GitPath: "models_" + child.Name + "/child", RepositoryType: types.ModelRepo},
+		{UserID: creator.ID, Name: "grandchild", Path: grandchild.Name + "/grandchild", GitPath: "models_" + grandchild.Name + "/grandchild", RepositoryType: types.ModelRepo},
+		{UserID: creator.ID, Name: "similar", Path: root.Name + "-other/similar", GitPath: "models_" + root.Name + "-other/similar", RepositoryType: types.ModelRepo},
+	}
+	_, err = db.Core.NewInsert().Model(&repositories).Exec(ctx)
+	require.NoError(t, err)
+	models := make([]coredb.Model, 0, len(repositories))
+	for _, repository := range repositories {
+		models = append(models, coredb.Model{RepositoryID: repository.ID})
+	}
+	_, err = db.Core.NewInsert().Model(&models).Exec(ctx)
+	require.NoError(t, err)
+
+	result, err := store.DeleteRoot(ctx, coredb.DeleteRootOrganizationInput{OrganizationUUID: root.UUID.String()})
+	require.NoError(t, err)
+	require.ElementsMatch(t, []int64{repositories[0].ID, repositories[1].ID, repositories[2].ID}, deletedRepositoryIDs(result.DeletedRepositories))
+	repositoryOrganizations := deletedRepositoryOrganizations(result.DeletedRepositories)
+	require.Equal(t, root.UUID.String(), repositoryOrganizations[repositories[0].ID])
+	require.Equal(t, child.UUID, repositoryOrganizations[repositories[1].ID])
+	require.Equal(t, grandchild.UUID, repositoryOrganizations[repositories[2].ID])
+	require.NoError(t, db.Core.NewSelect().Model(&coredb.Repository{}).Where("id = ?", repositories[3].ID).Scan(ctx))
+	require.Len(t, jobClient.recordedInputs(), 3)
+
+	repeated, err := store.DeleteRoot(ctx, coredb.DeleteRootOrganizationInput{OrganizationUUID: root.UUID.String()})
+	require.NoError(t, err)
+	require.True(t, repeated.AlreadyDeleted)
+	require.Empty(t, repeated.DeletedRepositories)
+	require.Len(t, jobClient.recordedInputs(), 3)
+}
+
+func deletedRepositoryIDs(repositories []types.DeletedRepository) []int64 {
+	ids := make([]int64, 0, len(repositories))
+	for _, repository := range repositories {
+		ids = append(ids, repository.ID)
+	}
+	return ids
+}
+
+func deletedRepositoryOrganizations(repositories []types.DeletedRepository) map[int64]string {
+	organizations := make(map[int64]string, len(repositories))
+	for _, repository := range repositories {
+		organizations[repository.ID] = repository.OrganizationUUID
+	}
+	return organizations
+}
+
+func TestOrganizationUnitStore_DeleteRepositories(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.Background()
+	creator := createOrganizationUnitMemberTestUser(t, ctx, db, "subtree-repository-delete-creator")
+	jobClient := &testRepositoryDeletionJobClient{}
+	store := coredb.NewOrganizationUnitStoreWithDBAndDeletionJobClient(db, jobClient)
+	rootUUID := uuid.New()
+	root, err := store.CreateRoot(ctx, coredb.CreateRootOrganizationInput{
+		Organization: &coredb.Organization{Name: "subtree-repository-root", UUID: rootUUID, UserID: creator.ID, IsRoot: true, IsHierarchical: true},
+		Namespace:    &coredb.Namespace{Path: "subtree-repository-root", UUID: rootUUID.String()}, CreatorUserID: creator.ID,
+	})
+	require.NoError(t, err)
+	child := createChild(t, ctx, store, root, "subtree-repository-child", nil, 1)
+	grandchild := createChild(t, ctx, store, root, "subtree-repository-grandchild", &child.UUID, 1)
+	sibling := createChild(t, ctx, store, root, "subtree-repository-sibling", nil, 2)
+	childUnit, err := store.FindByUUID(ctx, child.UUID)
+	require.NoError(t, err)
+	repositories := []coredb.Repository{
+		{UserID: creator.ID, Name: "root", Path: root.Name + "/root", GitPath: "models_" + root.Name + "/root", RepositoryType: types.ModelRepo},
+		{UserID: creator.ID, Name: "child", Path: child.Name + "/child", GitPath: "models_" + child.Name + "/child", RepositoryType: types.ModelRepo},
+		{UserID: creator.ID, Name: "grandchild", Path: grandchild.Name + "/grandchild", GitPath: "models_" + grandchild.Name + "/grandchild", RepositoryType: types.ModelRepo},
+		{UserID: creator.ID, Name: "sibling", Path: sibling.Name + "/sibling", GitPath: "models_" + sibling.Name + "/sibling", RepositoryType: types.ModelRepo},
+	}
+	_, err = db.Core.NewInsert().Model(&repositories).Exec(ctx)
+	require.NoError(t, err)
+	models := make([]coredb.Model, 0, len(repositories))
+	for _, repository := range repositories {
+		models = append(models, coredb.Model{RepositoryID: repository.ID})
+	}
+	_, err = db.Core.NewInsert().Model(&models).Exec(ctx)
+	require.NoError(t, err)
+
+	result, err := store.Delete(ctx, coredb.DeleteOrganizationUnitInput{RootOrganizationID: root.ID, UnitID: childUnit.ID})
+	require.NoError(t, err)
+	require.ElementsMatch(t, []int64{repositories[1].ID, repositories[2].ID}, deletedRepositoryIDs(result.DeletedRepositories))
+	repositoryOrganizations := deletedRepositoryOrganizations(result.DeletedRepositories)
+	require.Equal(t, child.UUID, repositoryOrganizations[repositories[1].ID])
+	require.Equal(t, grandchild.UUID, repositoryOrganizations[repositories[2].ID])
+	require.Len(t, jobClient.recordedInputs(), 2)
+	for _, repository := range repositories[:1] {
+		require.NoError(t, db.Core.NewSelect().Model(&coredb.Repository{}).Where("id = ?", repository.ID).Scan(ctx))
+	}
+	require.NoError(t, db.Core.NewSelect().Model(&coredb.Repository{}).Where("id = ?", repositories[3].ID).Scan(ctx))
+}
+
+func TestOrganizationUnitStore_DeleteRepositoriesRollback(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.Background()
+	creator := createOrganizationUnitMemberTestUser(t, ctx, db, "subtree-repository-rollback-creator")
+	jobClient := &testRepositoryDeletionJobClient{err: errors.New("forced repository deletion enqueue failure")}
+	store := coredb.NewOrganizationUnitStoreWithDBAndDeletionJobClient(db, jobClient)
+	rootUUID := uuid.New()
+	root, err := store.CreateRoot(ctx, coredb.CreateRootOrganizationInput{
+		Organization: &coredb.Organization{Name: "subtree-repository-rollback-root", UUID: rootUUID, UserID: creator.ID, IsRoot: true, IsHierarchical: true},
+		Namespace:    &coredb.Namespace{Path: "subtree-repository-rollback-root", UUID: rootUUID.String()}, CreatorUserID: creator.ID,
+	})
+	require.NoError(t, err)
+	child := createChild(t, ctx, store, root, "subtree-repository-rollback-child", nil, 1)
+	grandchild := createChild(t, ctx, store, root, "subtree-repository-rollback-grandchild", &child.UUID, 1)
+	childUnit, err := store.FindByUUID(ctx, child.UUID)
+	require.NoError(t, err)
+	grandchildUnit, err := store.FindByUUID(ctx, grandchild.UUID)
+	require.NoError(t, err)
+	repository := coredb.Repository{
+		UserID: creator.ID, Name: "rollback", Path: child.Name + "/rollback",
+		GitPath: "models_" + child.Name + "/rollback", RepositoryType: types.ModelRepo,
+	}
+	_, err = db.Core.NewInsert().Model(&repository).Exec(ctx)
+	require.NoError(t, err)
+	_, err = db.Core.NewInsert().Model(&coredb.Model{RepositoryID: repository.ID}).Exec(ctx)
+	require.NoError(t, err)
+	closureCountBefore, err := db.Core.NewSelect().Model((*coredb.OrganizationUnitClosure)(nil)).
+		Where("root_organization_id = ?", root.ID).Count(ctx)
+	require.NoError(t, err)
+
+	result, err := store.Delete(ctx, coredb.DeleteOrganizationUnitInput{RootOrganizationID: root.ID, UnitID: childUnit.ID})
+	require.Nil(t, result)
+	require.ErrorContains(t, err, "forced repository deletion enqueue failure")
+
+	for _, organizationID := range []int64{childUnit.OrganizationID, grandchildUnit.OrganizationID} {
+		active, err := db.Core.NewSelect().Model((*coredb.Organization)(nil)).
+			Where("id = ? AND deleted_at IS NULL", organizationID).Exists(ctx)
+		require.NoError(t, err)
+		require.True(t, active)
+	}
+	for _, unitID := range []int64{childUnit.ID, grandchildUnit.ID} {
+		active, err := db.Core.NewSelect().Model((*coredb.OrganizationUnit)(nil)).
+			Where("id = ? AND deleted_at IS NULL", unitID).Exists(ctx)
+		require.NoError(t, err)
+		require.True(t, active)
+	}
+	for _, namespacePath := range []string{child.Name, grandchild.Name} {
+		active, err := db.Core.NewSelect().Model((*coredb.Namespace)(nil)).
+			Where("path = ? AND deleted_at IS NULL", namespacePath).Exists(ctx)
+		require.NoError(t, err)
+		require.True(t, active)
+	}
+	closureCountAfter, err := db.Core.NewSelect().Model((*coredb.OrganizationUnitClosure)(nil)).
+		Where("root_organization_id = ?", root.ID).Count(ctx)
+	require.NoError(t, err)
+	require.Equal(t, closureCountBefore, closureCountAfter)
+	require.NoError(t, db.Core.NewSelect().Model(&coredb.Repository{}).Where("id = ?", repository.ID).Scan(ctx))
+	require.Empty(t, jobClient.recordedInputs())
+}
+
+func TestOrganizationUnitStore_DeleteRootRepositoriesSerializesWithRepositoryCreation(t *testing.T) {
+	db := tests.InitTransactionTestDB()
+	defer db.Close()
+	ctx := context.Background()
+	creator := createOrganizationUnitMemberTestUser(t, ctx, db, "hierarchy-concurrent-delete-creator")
+	store := coredb.NewOrganizationUnitStoreWithDBAndDeletionJobClient(db, &testRepositoryDeletionJobClient{})
+	repoStore := coredb.NewRepoStoreWithDB(db)
+	rootUUID := uuid.New()
+	root, err := store.CreateRoot(ctx, coredb.CreateRootOrganizationInput{
+		Organization: &coredb.Organization{Name: "hierarchy-concurrent-root", UUID: rootUUID, UserID: creator.ID, IsRoot: true, IsHierarchical: true},
+		Namespace:    &coredb.Namespace{Path: "hierarchy-concurrent-root", UUID: rootUUID.String()}, CreatorUserID: creator.ID,
+	})
+	require.NoError(t, err)
+	child := createChild(t, ctx, store, root, "hierarchy-concurrent-child", nil, 1)
+	namespaceLocked := make(chan struct{})
+	db.BunDB.AddQueryHook(&repositoryNamespaceLockHook{path: child.Name, locked: namespaceLocked})
+
+	lockConnection, err := db.BunDB.DB.Conn(ctx)
+	require.NoError(t, err)
+	defer lockConnection.Close()
+	_, err = lockConnection.ExecContext(ctx, "BEGIN")
+	require.NoError(t, err)
+	_, err = lockConnection.ExecContext(ctx, "LOCK TABLE repositories IN ACCESS EXCLUSIVE MODE")
+	require.NoError(t, err)
+	lockReleased := false
+	defer func() {
+		if !lockReleased {
+			_, _ = lockConnection.ExecContext(ctx, "ROLLBACK")
+		}
+	}()
+
+	createResult := make(chan error, 1)
+	go func() {
+		_, createErr := repoStore.CreateRepo(ctx, coredb.Repository{
+			Name: "new-repository", Path: child.Name + "/new-repository",
+			GitPath: "models_" + child.Name + "/new-repository", RepositoryType: types.ModelRepo,
+		})
+		createResult <- createErr
+	}()
+	select {
+	case <-namespaceLocked:
+	case createErr := <-createResult:
+		require.NoError(t, createErr)
+		require.FailNow(t, "repository creation finished before acquiring the namespace lock")
+	case <-time.After(5 * time.Second):
+		require.FailNow(t, "repository creation did not acquire the namespace KEY SHARE lock")
+	}
+
+	deleteResult := make(chan error, 1)
+	go func() {
+		_, deleteErr := store.DeleteRoot(ctx, coredb.DeleteRootOrganizationInput{OrganizationUUID: root.UUID.String()})
+		deleteResult <- deleteErr
+	}()
+	select {
+	case deleteErr := <-deleteResult:
+		require.NoError(t, deleteErr)
+		require.FailNow(t, "hierarchy deletion completed before in-flight repository creation")
+	case <-time.After(2 * time.Second):
+	}
+	_, err = lockConnection.ExecContext(ctx, "COMMIT")
+	require.NoError(t, err)
+	lockReleased = true
+	require.NoError(t, <-createResult)
+	require.NoError(t, <-deleteResult)
+
+	exists, err := db.Core.NewSelect().Model((*coredb.Repository)(nil)).Where("path = ?", child.Name+"/new-repository").Exists(ctx)
+	require.NoError(t, err)
+	require.False(t, exists)
+}
+
 // TestOrganizationUnitStore_CreateRootDoesNotOverwriteNamespace verifies a conflicting namespace rolls back the hierarchy transaction.
 func TestOrganizationUnitStore_CreateRootDoesNotOverwriteNamespace(t *testing.T) {
 	db := tests.InitTestDB()
@@ -182,7 +444,7 @@ func TestOrganizationUnitStore_CreateRootDoesNotOverwriteNamespace(t *testing.T)
 	require.NoError(t, err)
 
 	organizationUUID := uuid.New()
-	_, err = coredb.NewOrganizationUnitStoreWithDB(db).CreateRoot(ctx, coredb.CreateRootOrganizationInput{
+	_, err = coredb.NewOrganizationUnitStoreWithDBAndDeletionJobClient(db, &testRepositoryDeletionJobClient{}).CreateRoot(ctx, coredb.CreateRootOrganizationInput{
 		Organization: &coredb.Organization{
 			Name: existingNamespace.Path, UUID: organizationUUID, UserID: creator.ID, IsRoot: true,
 		},
@@ -209,7 +471,7 @@ func TestOrganizationUnitStore_TreeLifecycle(t *testing.T) {
 	defer db.Close()
 	ctx := context.Background()
 	root := createRootOrganization(t, ctx, db, "tree")
-	store := coredb.NewOrganizationUnitStoreWithDB(db)
+	store := coredb.NewOrganizationUnitStoreWithDBAndDeletionJobClient(db, &testRepositoryDeletionJobClient{})
 
 	engineering := createChild(t, ctx, store, root, "engineering", nil, 10)
 	platform := createChild(t, ctx, store, root, "platform", &engineering.UUID, 20)
@@ -297,7 +559,7 @@ func TestOrganizationUnitStore_ChildOrganizationFields(t *testing.T) {
 	defer db.Close()
 	ctx := context.Background()
 	root := createRootOrganization(t, ctx, db, "fields")
-	store := coredb.NewOrganizationUnitStoreWithDB(db)
+	store := coredb.NewOrganizationUnitStoreWithDBAndDeletionJobClient(db, &testRepositoryDeletionJobClient{})
 	unit := createChild(t, ctx, store, root, "fields-child", nil, 1)
 	record, err := store.FindByUUID(ctx, unit.UUID)
 	require.NoError(t, err)
@@ -320,7 +582,7 @@ func TestOrganizationUnitStore_RootOrganizationFields(t *testing.T) {
 	defer db.Close()
 	ctx := context.Background()
 	root := createRootOrganization(t, ctx, db, "root-fields")
-	store := coredb.NewOrganizationUnitStoreWithDB(db)
+	store := coredb.NewOrganizationUnitStoreWithDBAndDeletionJobClient(db, &testRepositoryDeletionJobClient{})
 	record, err := store.FindByUUID(ctx, root.UUID.String())
 	require.NoError(t, err)
 	newNickname := "Updated Root"
@@ -345,7 +607,7 @@ func TestOrganizationUnitStore_CreatorIsRecordOnly(t *testing.T) {
 	ctx := context.Background()
 	root := createRootOrganization(t, ctx, db, "creator-record")
 	creator := createOrganizationUnitMemberTestUser(t, ctx, db, "child-creator")
-	store := coredb.NewOrganizationUnitStoreWithDB(db)
+	store := coredb.NewOrganizationUnitStoreWithDBAndDeletionJobClient(db, &testRepositoryDeletionJobClient{})
 	organizationUUID := uuid.New()
 	childOrganization := &coredb.Organization{
 		Name: "unit-creator-" + uuid.NewString()[:8], Nickname: "Creator Child", UUID: organizationUUID, UserID: creator.ID, IsRoot: false,
@@ -386,7 +648,7 @@ func TestOrganizationUnitStore_CreatorIsRecordOnly(t *testing.T) {
 func createRootOrganization(t *testing.T, ctx context.Context, db *coredb.DB, suffix string) *coredb.Organization {
 	t.Helper()
 	organization := &coredb.Organization{Name: "unit-root-" + suffix, Nickname: "Unit Root " + suffix, UUID: uuid.New(), IsRoot: true}
-	created, err := coredb.NewOrganizationUnitStoreWithDB(db).CreateRoot(ctx, coredb.CreateRootOrganizationInput{
+	created, err := coredb.NewOrganizationUnitStoreWithDBAndDeletionJobClient(db, &testRepositoryDeletionJobClient{}).CreateRoot(ctx, coredb.CreateRootOrganizationInput{
 		Organization: organization,
 		Namespace:    &coredb.Namespace{Path: organization.Name, UUID: organization.UUID.String()},
 	})

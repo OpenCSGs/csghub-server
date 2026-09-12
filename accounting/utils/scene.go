@@ -101,10 +101,10 @@ func IsNeedCheckMeteringInMinute(scene types.SceneType, valueType types.ChargeVa
 		types.SceneEvaluation,
 		types.SceneModelServerless:
 		switch valueType {
-		case types.TokenNumberType:
-			return false
-		default:
+		case types.TimeDurationMinType:
 			return true
+		default:
+			return false
 		}
 	default:
 		return false

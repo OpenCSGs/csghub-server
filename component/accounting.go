@@ -57,6 +57,9 @@ type AccountingComponent interface {
 	GetOrderDetailByID(ctx context.Context, currentUser string, id int64) (*database.AccountOrderDetail, error)
 	GetVoucherDashboard(ctx context.Context, req types.VoucherDashboardReq) (*types.VoucherDashboardStatusItem, error)
 	OffLinePrice(ctx context.Context, req types.AcctPriceOffLineReq) (any, error)
+	QueryStatisticsByUserID(ctx context.Context, req types.AcctBillsReq) (interface{}, error)
+	QueryStatisticsDetailByUserID(ctx context.Context, req types.AcctBillsDetailReq) (interface{}, error)
+	GetStatisticsSummary(ctx context.Context, req types.AcctBillsReq) (interface{}, error)
 }
 
 func NewAccountingComponent(config *config.Config) (AccountingComponent, error) {
@@ -115,7 +118,7 @@ func checkOwnerOrOrgMemberPermission(ctx context.Context, userSvcClient rpc.User
 	}
 
 	if ns.NSType != string(database.OrgNamespace) {
-		return ns, fmt.Errorf("do not have permission to query the target org's data")
+		return ns, fmt.Errorf("do not have permission to query the target user's data")
 	}
 
 	if authorizer == nil {

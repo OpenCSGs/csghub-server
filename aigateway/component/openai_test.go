@@ -794,7 +794,7 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 					require.Equal(t, "csghub://inference/test-model", evt.ResourceID)
 					require.Equal(t, "csghub://inference/test-model", evt.ResourceName)
 					require.Equal(t, "test-service", evt.CustomerID)
-					require.Equal(t, int(commontypes.SceneModelServerless), evt.Scene)
+					require.Equal(t, commontypes.SceneType(commontypes.SceneModelServerless), evt.Scene)
 					require.Equal(t, "test-user-uuid", evt.UserUUID)
 					require.Equal(t, commontypes.TokenNumberType, evt.ValueType)
 					require.Equal(t, int64(150), evt.Value)
@@ -878,7 +878,7 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 					err := json.Unmarshal(data, &evt)
 					require.NoError(t, err)
 					require.Equal(t, "csghub://inference/test-model", evt.ResourceID)
-					require.Equal(t, int(commontypes.SceneModelServerless), evt.Scene)
+					require.Equal(t, commontypes.SceneType(commontypes.SceneModelServerless), evt.Scene)
 
 					var tokenUsageExtra struct {
 						OwnerType commontypes.TokenUsageType `json:"owner_type"`
@@ -940,7 +940,7 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 					require.Equal(t, "csghub://inference/test-model", evt.ResourceID)
 					require.Equal(t, "csghub://inference/test-model", evt.ResourceName)
 					require.Equal(t, "test-service", evt.CustomerID)
-					require.Equal(t, int(commontypes.SceneModelServerless), evt.Scene)
+					require.Equal(t, commontypes.SceneType(commontypes.SceneModelServerless), evt.Scene)
 					require.Equal(t, "test-user-uuid", evt.UserUUID)
 					require.Equal(t, commontypes.TokenNumberType, evt.ValueType)
 					require.Equal(t, int64(150), evt.Value)
@@ -1010,7 +1010,7 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 					require.Equal(t, "csghub://serverless/test-model", evt.ResourceID)
 					require.Equal(t, "csghub://serverless/test-model", evt.ResourceName)
 					require.Equal(t, "test-service", evt.CustomerID)
-					require.Equal(t, int(commontypes.SceneModelServerless), evt.Scene)
+					require.Equal(t, commontypes.SceneType(commontypes.SceneModelServerless), evt.Scene)
 					require.Equal(t, "test-user-uuid", evt.UserUUID)
 					require.Equal(t, commontypes.TokenNumberType, evt.ValueType)
 					require.Equal(t, int64(150), evt.Value)
@@ -1297,7 +1297,7 @@ func TestOpenAIComponentImpl_RecordUsage_MultiModalImage(t *testing.T) {
 		var evt commontypes.MeteringEvent
 		err := json.Unmarshal(data, &evt)
 		require.NoError(t, err)
-		require.Equal(t, int(commontypes.SceneMultiModalServerless), evt.Scene)
+		require.Equal(t, commontypes.SceneType(commontypes.SceneMultiModalServerless), evt.Scene)
 		require.Equal(t, commontypes.CountNumberType, evt.ValueType)
 		require.Equal(t, int64(2), evt.Value)
 		var extra struct {
@@ -1489,7 +1489,7 @@ func TestOpenAIComponentImpl_RecordUsage_ExternalModel(t *testing.T) {
 					require.Equal(t, "test-user-uuid", evt.UserUUID)
 					require.Equal(t, commontypes.TokenNumberType, evt.ValueType)
 					require.Equal(t, int64(300), evt.Value)
-					require.Equal(t, int(commontypes.SceneModelServerless), evt.Scene)
+					require.Equal(t, commontypes.SceneType(commontypes.SceneModelServerless), evt.Scene)
 
 					var tokenUsageExtra struct {
 						PromptTokenNum     string                     `json:"prompt_token_num"`

@@ -47,6 +47,7 @@ func WithoutRequestHeaders(headers ...string) ReverseProxyOption {
 func WithResponseModifier(modifier func(*http.Response) error) ReverseProxyOption {
 	return func(rp *reverseProxyImpl) {
 		if modifier != nil {
+			//nolint:bodyclose // modifier does not own the response; body lifecycle is managed by httputil.ReverseProxy
 			rp.responseModifiers = append(rp.responseModifiers, modifier)
 		}
 	}

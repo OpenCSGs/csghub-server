@@ -48,6 +48,9 @@ func createMeteringRoutes(apiGroup *gin.RouterGroup, meterHandler *handler.Meter
 	{
 		meterGroup.GET("/:id/statements", meterHandler.QueryMeteringStatementByUserID)
 		meterGroup.GET("/stat", meterHandler.QueryMeteringStatByDate)
+		meterGroup.GET("/:id/statistics", meterHandler.QueryStatisticsByUserID)
+		meterGroup.GET("/:id/statistics/instance", meterHandler.QueryStatisticsDetailByUserID)
+		meterGroup.GET("/:id/summary", meterHandler.QueryStatisticsSummary)
 	}
 }
 

@@ -609,6 +609,64 @@ func (_c *MockAccountingClient_GetQuotaStatement_Call) RunAndReturn(run func(str
 	return _c
 }
 
+// GetStatisticsSummary provides a mock function with given fields: req
+func (_m *MockAccountingClient) GetStatisticsSummary(req types.AcctBillsReq) (any, error) {
+	ret := _m.Called(req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetStatisticsSummary")
+	}
+
+	var r0 any
+	var r1 error
+	if rf, ok := ret.Get(0).(func(types.AcctBillsReq) (any, error)); ok {
+		return rf(req)
+	}
+	if rf, ok := ret.Get(0).(func(types.AcctBillsReq) any); ok {
+		r0 = rf(req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(any)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(types.AcctBillsReq) error); ok {
+		r1 = rf(req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAccountingClient_GetStatisticsSummary_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetStatisticsSummary'
+type MockAccountingClient_GetStatisticsSummary_Call struct {
+	*mock.Call
+}
+
+// GetStatisticsSummary is a helper method to define mock.On call
+//   - req types.AcctBillsReq
+func (_e *MockAccountingClient_Expecter) GetStatisticsSummary(req interface{}) *MockAccountingClient_GetStatisticsSummary_Call {
+	return &MockAccountingClient_GetStatisticsSummary_Call{Call: _e.mock.On("GetStatisticsSummary", req)}
+}
+
+func (_c *MockAccountingClient_GetStatisticsSummary_Call) Run(run func(req types.AcctBillsReq)) *MockAccountingClient_GetStatisticsSummary_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(types.AcctBillsReq))
+	})
+	return _c
+}
+
+func (_c *MockAccountingClient_GetStatisticsSummary_Call) Return(_a0 any, _a1 error) *MockAccountingClient_GetStatisticsSummary_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAccountingClient_GetStatisticsSummary_Call) RunAndReturn(run func(types.AcctBillsReq) (any, error)) *MockAccountingClient_GetStatisticsSummary_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetVoucherDashboard provides a mock function with given fields: req
 func (_m *MockAccountingClient) GetVoucherDashboard(req types.VoucherDashboardReq) (any, error) {
 	ret := _m.Called(req)
@@ -1480,6 +1538,122 @@ func (_c *MockAccountingClient_QueryPricesBySkuTypeAndKinds_Call) Return(_a0 any
 }
 
 func (_c *MockAccountingClient_QueryPricesBySkuTypeAndKinds_Call) RunAndReturn(run func(string, types.AcctPriceListByKindsReq) (any, error)) *MockAccountingClient_QueryPricesBySkuTypeAndKinds_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// QueryStatisticsByUserID provides a mock function with given fields: req
+func (_m *MockAccountingClient) QueryStatisticsByUserID(req types.AcctBillsReq) (any, error) {
+	ret := _m.Called(req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for QueryStatisticsByUserID")
+	}
+
+	var r0 any
+	var r1 error
+	if rf, ok := ret.Get(0).(func(types.AcctBillsReq) (any, error)); ok {
+		return rf(req)
+	}
+	if rf, ok := ret.Get(0).(func(types.AcctBillsReq) any); ok {
+		r0 = rf(req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(any)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(types.AcctBillsReq) error); ok {
+		r1 = rf(req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAccountingClient_QueryStatisticsByUserID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'QueryStatisticsByUserID'
+type MockAccountingClient_QueryStatisticsByUserID_Call struct {
+	*mock.Call
+}
+
+// QueryStatisticsByUserID is a helper method to define mock.On call
+//   - req types.AcctBillsReq
+func (_e *MockAccountingClient_Expecter) QueryStatisticsByUserID(req interface{}) *MockAccountingClient_QueryStatisticsByUserID_Call {
+	return &MockAccountingClient_QueryStatisticsByUserID_Call{Call: _e.mock.On("QueryStatisticsByUserID", req)}
+}
+
+func (_c *MockAccountingClient_QueryStatisticsByUserID_Call) Run(run func(req types.AcctBillsReq)) *MockAccountingClient_QueryStatisticsByUserID_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(types.AcctBillsReq))
+	})
+	return _c
+}
+
+func (_c *MockAccountingClient_QueryStatisticsByUserID_Call) Return(_a0 any, _a1 error) *MockAccountingClient_QueryStatisticsByUserID_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAccountingClient_QueryStatisticsByUserID_Call) RunAndReturn(run func(types.AcctBillsReq) (any, error)) *MockAccountingClient_QueryStatisticsByUserID_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// QueryStatisticsDetailByUserID provides a mock function with given fields: req
+func (_m *MockAccountingClient) QueryStatisticsDetailByUserID(req types.AcctBillsDetailReq) (any, error) {
+	ret := _m.Called(req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for QueryStatisticsDetailByUserID")
+	}
+
+	var r0 any
+	var r1 error
+	if rf, ok := ret.Get(0).(func(types.AcctBillsDetailReq) (any, error)); ok {
+		return rf(req)
+	}
+	if rf, ok := ret.Get(0).(func(types.AcctBillsDetailReq) any); ok {
+		r0 = rf(req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(any)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(types.AcctBillsDetailReq) error); ok {
+		r1 = rf(req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAccountingClient_QueryStatisticsDetailByUserID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'QueryStatisticsDetailByUserID'
+type MockAccountingClient_QueryStatisticsDetailByUserID_Call struct {
+	*mock.Call
+}
+
+// QueryStatisticsDetailByUserID is a helper method to define mock.On call
+//   - req types.AcctBillsDetailReq
+func (_e *MockAccountingClient_Expecter) QueryStatisticsDetailByUserID(req interface{}) *MockAccountingClient_QueryStatisticsDetailByUserID_Call {
+	return &MockAccountingClient_QueryStatisticsDetailByUserID_Call{Call: _e.mock.On("QueryStatisticsDetailByUserID", req)}
+}
+
+func (_c *MockAccountingClient_QueryStatisticsDetailByUserID_Call) Run(run func(req types.AcctBillsDetailReq)) *MockAccountingClient_QueryStatisticsDetailByUserID_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(types.AcctBillsDetailReq))
+	})
+	return _c
+}
+
+func (_c *MockAccountingClient_QueryStatisticsDetailByUserID_Call) Return(_a0 any, _a1 error) *MockAccountingClient_QueryStatisticsDetailByUserID_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAccountingClient_QueryStatisticsDetailByUserID_Call) RunAndReturn(run func(types.AcctBillsDetailReq) (any, error)) *MockAccountingClient_QueryStatisticsDetailByUserID_Call {
 	_c.Call.Return(run)
 	return _c
 }

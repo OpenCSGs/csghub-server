@@ -2,11 +2,28 @@ package database
 
 import (
 	"context"
+	"sort"
+	"strings"
 	"time"
 
 	"github.com/uptrace/bun"
 	"opencsg.com/csghub-server/common/errorx"
 )
+
+// canonicalNamespaceLockOrder returns a stable namespace row-lock order shared
+// by repository writers and organization deleters. Namespace lookup is
+// case-insensitive, so the primary ordering must be case-insensitive as well.
+func canonicalNamespaceLockOrder(paths []string) []string {
+	ordered := append([]string(nil), paths...)
+	sort.Slice(ordered, func(i, j int) bool {
+		left, right := strings.ToLower(ordered[i]), strings.ToLower(ordered[j])
+		if left == right {
+			return ordered[i] < ordered[j]
+		}
+		return left < right
+	})
+	return ordered
+}
 
 // Define the NamespaceStore interface
 type NamespaceStore interface {

@@ -44,7 +44,7 @@ const (
 type RoutingDecision struct {
 	Mode             ExecutionMode
 	AdapterKind      AdapterKind
-	BackendURL       string       // the URL to send the upstream request to
+	BackendURL       string // the URL to send the upstream request to
 	UpstreamProtocol types.Protocol
 	Reason           string
 }
@@ -109,6 +109,23 @@ func ResolveRouting(clientProtocol types.Protocol, target RoutingTarget) (Routin
 			BackendURL:       adaptBackendURL(target, upstreamProtocol),
 			UpstreamProtocol: upstreamProtocol,
 			Reason:           "protocol_match",
+		}, nil
+	}
+
+	// Chat fallback: Chat (/v1/chat/completions) is the most widely compatible
+	// protocol.  When the client requests Chat but the upstream is configured
+	// as Responses or Messages, do not reject the request.  Instead rewrite
+	// the upstream URL path to /v1/chat/completions and forward natively.
+	// Most upstreams that expose /responses or /messages also accept
+	// /chat/completions, so a direct proxy is sufficient without protocol
+	// translation.
+	if clientProtocol == types.ProtocolChat &&
+		(upstreamProtocol == types.ProtocolResponses || upstreamProtocol == types.ProtocolMessages) {
+		return RoutingDecision{
+			Mode:             ModeNative,
+			BackendURL:       rewriteToChatPath(target),
+			UpstreamProtocol: upstreamProtocol,
+			Reason:           "chat_fallback",
 		}, nil
 	}
 
@@ -237,6 +254,40 @@ func adaptBackendURL(target RoutingTarget, upstreamProtocol types.Protocol) stri
 	}
 
 	return target.Target
+}
+
+// rewriteToChatPath replaces the path of the upstream URL with
+// /v1/chat/completions while preserving the scheme, host, port, query, and
+// fragment.  This is used by the Chat fallback so that a request to a
+// /responses or /messages upstream is proxied to the chat completions
+// endpoint instead.
+func rewriteToChatPath(target RoutingTarget) string {
+	rawURL := target.Target
+	if strings.TrimSpace(rawURL) == "" {
+		return rawURL
+	}
+	// url.Parse interprets a bare host:port/path as scheme=host, so
+	// prepend a scheme when absent to ensure the path is parsed correctly.
+	if !strings.Contains(rawURL, "://") {
+		rawURL = "http://" + rawURL
+	}
+	parsed, err := url.Parse(rawURL)
+	if err != nil || parsed.Host == "" {
+		return target.Target
+	}
+	// Replace only the terminal path segment so any prefix (e.g. /api/v1) is
+	// preserved: /api/v1/responses -> /api/v1/chat/completions, not
+	// /v1/chat/completions.
+	path := strings.TrimRight(parsed.Path, "/")
+	if path == "" {
+		parsed.Path = "/v1/chat/completions"
+	} else {
+		parts := strings.Split(path, "/")
+		parts[len(parts)-1] = "chat/completions"
+		parsed.Path = strings.Join(parts, "/")
+	}
+	parsed.RawPath = ""
+	return parsed.String()
 }
 
 func pickAdapter(clientProtocol, upstreamProtocol types.Protocol) AdapterKind {

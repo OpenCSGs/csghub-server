@@ -2,6 +2,7 @@ package component
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -35,7 +36,15 @@ func NewOrganizationComponent(config *config.Config) (OrganizationComponent, err
 		return nil, fmt.Errorf("fail to create ReBAC authorizer: %w", err)
 	}
 	c.rebac = authorizer
-	c.orgStore = database.NewOrgStore(config)
+	deletionJobClient, err := newRepositoryDeletionJobClient()
+	if err != nil {
+		return nil, err
+	}
+	if config != nil && config.Organization.EnableUnit {
+		c.orgStore = database.NewHierarchyOrgStoreWithDBAndDeletionJobClient(database.GetDB(), deletionJobClient)
+	} else {
+		c.orgStore = database.NewOrgStoreWithDBAndDeletionJobClient(database.GetDB(), deletionJobClient)
+	}
 	c.memberStore = database.NewMemberStore()
 	c.nsStore = database.NewNamespaceStore()
 	c.userStore = database.NewUserStore()
@@ -360,6 +369,13 @@ func (c *organizationComponentImpl) GetByUUID(ctx context.Context, uuid string) 
 }
 
 func (c *organizationComponentImpl) Delete(ctx context.Context, req *types.DeleteOrgReq) error {
+	organization, err := c.orgStore.FindByPath(ctx, req.Name)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) && !errors.Is(err, errorx.ErrDatabaseNoRows) {
+		return fmt.Errorf("failed to find database organization, error: %w", err)
+	}
+	if err != nil {
+		return fmt.Errorf("failed to find database organization, error: %w", err)
+	}
 	canAdmin, err := c.checkNamespaceAdminPermission(ctx, req.Name, req.CurrentUser)
 	if err != nil {
 		slog.ErrorContext(ctx, "failed to check namespace permission",
@@ -368,10 +384,6 @@ func (c *organizationComponentImpl) Delete(ctx context.Context, req *types.Delet
 	}
 	if !canAdmin {
 		return fmt.Errorf("current user does not have permission to edit the organization, current user: %s", req.CurrentUser)
-	}
-	organization, err := c.orgStore.FindByPath(ctx, req.Name)
-	if err != nil {
-		return fmt.Errorf("failed to find database organization, error: %w", err)
 	}
 	if organization.IsHierarchical {
 		return errorx.ReqParamInvalid(
@@ -394,7 +406,7 @@ func (c *organizationComponentImpl) Delete(ctx context.Context, req *types.Delet
 		NamespaceUUID:    organization.Namespace.UUID,
 		UserUUIDs:        userUUIDs,
 	}
-	err = c.orgStore.Delete(ctx, req.Name)
+	_, err = c.orgStore.Delete(ctx, req.Name)
 	if err != nil {
 		return fmt.Errorf("failed to delete database organizations, error: %w", err)
 	}
