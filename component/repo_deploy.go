@@ -18,6 +18,7 @@ import (
 	"opencsg.com/csghub-server/builder/deploy"
 	deployStatus "opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/builder/loki"
+	bldmq "opencsg.com/csghub-server/builder/mq"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
@@ -482,6 +483,9 @@ func (c *repoComponentImpl) DeleteDeploy(ctx context.Context, delReq types.Deplo
 	if err != nil {
 		return fmt.Errorf("failed to remove deploy instance %d error: %w", delReq.DeployID, err)
 	}
+
+	// Publish upstream sync delete event.
+	publishDeployUpstreamSyncEvent(ctx, bldmq.DeployUpstreamSyncDeleteSubject, delReq.DeployID)
 
 	if delReq.DeployType == types.ServerlessType {
 		llmID := fmt.Sprintf(types.CSGHubResourceFmt, types.ProviderTypeServerless, repoPath)
@@ -1164,4 +1168,11 @@ func (c *repoComponentImpl) DeployStart(ctx context.Context, startReq types.Depl
 	}
 
 	return err
+}
+
+// publishDeployUpstreamSyncEvent publishes a deploy upstream sync event to the
+// specified MQ subject. It is a fire-and-forget call — errors are logged but
+// not returned, since the Temporal cron reconciliation will catch up on failures.
+func publishDeployUpstreamSyncEvent(ctx context.Context, subject string, deployID int64) {
+	deploy.PublishDeployUpstreamSyncEvent(ctx, subject, deployID, nil)
 }

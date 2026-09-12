@@ -1,9 +1,9 @@
-package component
+package upstream
 
 import (
 	"fmt"
-	"strconv"
 
+	deploybuilder "opencsg.com/csghub-server/builder/deploy"
 	"opencsg.com/csghub-server/builder/store/database"
 	commontypes "opencsg.com/csghub-server/common/types"
 )
@@ -22,22 +22,13 @@ func NewModelIDBuilder() ModelIDBuilder {
 	return defaultModelIDBuilder{}
 }
 
+// To delegates to the shared BuildModelID so the trigger side
+// (BuildDeployUpstreamInfoWithDeploy) and the consumer side
+// (buildInternalModel) produce identical model IDs. For unknown deploy
+// types, BuildModelID returns "" and the consumer's buildInternalModel
+// falls back to LegacyModelID (pre-computed on the trigger side).
 func (b defaultModelIDBuilder) To(deploy database.Deploy) string {
-	if deploy.Repository == nil {
-		return ""
-	}
-
-	switch deploy.Type {
-	case commontypes.ServerlessType:
-		if deploy.Repository.HFPath != "" {
-			return deploy.Repository.HFPath
-		}
-		return deploy.Repository.Path
-	case commontypes.InferenceType:
-		return fmt.Sprintf("%s:%s", deploy.Repository.Name, strconv.FormatInt(deploy.ID, 36))
-	default:
-		return ""
-	}
+	return deploybuilder.BuildModelID(&deploy)
 }
 
 func (b defaultModelIDBuilder) ToLegacyCSGHubModelID(repo *database.Repository, svcName string) string {

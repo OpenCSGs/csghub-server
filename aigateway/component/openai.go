@@ -3,7 +3,6 @@ package component
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log/slog"
 	"maps"
@@ -13,19 +12,14 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/redis/go-redis/v9"
 	"opencsg.com/csghub-server/aigateway/component/router"
+	"opencsg.com/csghub-server/aigateway/component/upstream"
 	"opencsg.com/csghub-server/aigateway/token"
 	"opencsg.com/csghub-server/aigateway/types"
 	"opencsg.com/csghub-server/builder/event"
 	"opencsg.com/csghub-server/builder/store/cache"
 	"opencsg.com/csghub-server/builder/store/database"
 	commontypes "opencsg.com/csghub-server/common/types"
-)
-
-const (
-	modelCacheKey = "aigateway:models"
-	modelCacheTTL = 30 * time.Second
 )
 
 var apiKeyJSONFieldRegex = regexp.MustCompile(`"api_key"\s*:\s*"[^"]*"`)
@@ -55,13 +49,13 @@ type openaiComponentImpl struct {
 	extllmStore    database.LLMConfigStore
 	modelListCache cache.RedisClient
 	extendOpenai
-	modelIDBuilder ModelIDBuilder
+	modelIDBuilder upstream.ModelIDBuilder
 	usageLimiter   UsageLimiter
 }
 
-func (m *openaiComponentImpl) getModelIDBuilder() ModelIDBuilder {
+func (m *openaiComponentImpl) getModelIDBuilder() upstream.ModelIDBuilder {
 	if m.modelIDBuilder == nil {
-		return NewModelIDBuilder()
+		return upstream.NewModelIDBuilder()
 	}
 	return m.modelIDBuilder
 }
@@ -73,31 +67,18 @@ func (m *openaiComponentImpl) getUsageLimiter() UsageLimiter {
 	return m.usageLimiter
 }
 
-// GetAvailableModels returns a list of running models
+// GetAvailableModels returns all enabled models from the llm_config table.
+// Both internal (csghub deploy) and external models are served uniformly from
+// llm_config, which loads its upstreams as a relation. Visibility filtering
+// is applied per-model: internal non-serverless models are only visible to the
+// deploy owner; serverless and external models are visible to all users.
 func (m *openaiComponentImpl) GetAvailableModels(c context.Context, nsUUID string) ([]types.Model, error) {
-	var models []types.Model
-	var csghubModels []types.Model
-	var err error
-	csghubModels, err = m.getCSGHubModels(c, nsUUID)
+	models, err := m.getModelsFromLLMConfig(c, nsUUID)
 	if err != nil {
 		return nil, err
 	}
-	models = csghubModels
-	externalModels := m.getExternalModels(c)
-	models = append(externalModels, models...)
 
 	models = m.enrichModelsWithPrice(c, models)
-	cacheModels := cloneModelsForCache(models)
-	// Save models to cache asynchronously
-	go func(modelList []types.Model) {
-		if len(modelList) == 0 {
-			return
-		}
-		if err := m.saveModelsToCache(modelList); err != nil {
-			// Log error but don't affect the main request
-			slog.Error("failed to save models to cache", "error", err)
-		}
-	}(cacheModels)
 
 	if strings.TrimSpace(nsUUID) != "" {
 		req := &types.UserPreferenceRequest{
@@ -109,30 +90,10 @@ func (m *openaiComponentImpl) GetAvailableModels(c context.Context, nsUUID strin
 		models, prefErr = m.userPreference(c, req)
 		if prefErr != nil {
 			slog.Warn("failed to apply user preference", "error", prefErr)
-			// Continue with original models if user preference fails
 		}
 	}
 
 	return models, nil
-}
-
-func cloneModelsForCache(models []types.Model) []types.Model {
-	if len(models) == 0 {
-		return nil
-	}
-
-	clonedModels := slices.Clone(models)
-	for i := range clonedModels {
-		if clonedModels[i].Metadata != nil {
-			clonedModels[i].Metadata = maps.Clone(clonedModels[i].Metadata)
-		}
-		if clonedModels[i].IsPinned != nil {
-			isPinned := *clonedModels[i].IsPinned
-			clonedModels[i].IsPinned = &isPinned
-		}
-	}
-
-	return clonedModels
 }
 
 func (m *openaiComponentImpl) ListModels(c context.Context, nsUUID string, req types.ListModelsReq) (types.ModelList, error) {
@@ -307,79 +268,145 @@ func filterAndPaginateModels(models []types.Model, req types.ListModelsReq) type
 	}
 }
 
-// providerTypeFromDeployType maps a deploy type integer to the LLM type string (MetaKeyLLMType).
-func providerTypeFromDeployType(t int) string {
-	switch t {
-	case commontypes.ServerlessType:
-		return commontypes.ProviderTypeServerless
-	case commontypes.InferenceType:
-		return commontypes.ProviderTypeInference
-	default:
-		return commontypes.ProviderTypeInference
+// buildInternalModel converts a csghub-sourced llm_config into a types.Model.
+func (m *openaiComponentImpl) buildInternalModel(cfg *database.LLMConfig, info *commontypes.InternalModelInfo, upstreams []commontypes.UpstreamConfig) types.Model {
+	modelID := info.LegacyModelID
+
+	supportFunctionCall := commontypes.EngineArgToolCallingEnabled(info.EngineArgs, info.RuntimeFramework)
+	model := types.Model{
+		BaseModel: types.BaseModel{
+			Object:              "model",
+			ID:                  modelID,
+			Created:             info.CreatedAt,
+			SupportFunctionCall: supportFunctionCall,
+			Task:                info.Task,
+			Metadata: map[string]any{
+				types.MetaKeyLLMType:  commontypes.ProviderTypeFromDeployType(info.SvcType),
+				types.MetaKeyRepoPath: info.CSGHubModelID,
+			},
+		},
+		InternalModelInfo: types.InternalModelInfo{
+			CSGHubModelID:    info.CSGHubModelID,
+			LegacyModelID:    info.LegacyModelID,
+			OwnerUUID:        info.OwnerUUID,
+			OwnerUsername:    info.OwnerUsername,
+			OwnerNamespace:   info.OwnerNamespace,
+			OwnerType:        info.OwnerType,
+			ClusterID:        info.ClusterID,
+			SvcName:          info.SvcName,
+			SvcType:          info.SvcType,
+			ImageID:          info.ImageID,
+			RuntimeFramework: info.RuntimeFramework,
+			EngineArgs:       info.EngineArgs,
+			SourceDeployID:   info.SourceDeployID,
+			CreatedAt:        info.CreatedAt,
+			Host:             info.Host,
+		},
+		ExternalModelInfo: types.ExternalModelInfo{
+			NeedSensitiveCheck: cfg.NeedSensitiveCheck,
+		},
+		Endpoint:      router.FirstEnabledUpstream(upstreams),
+		Upstreams:     upstreams,
+		RoutingPolicy: cfg.RoutingPolicy,
 	}
+	model.OwnedBy = m.getModelIDBuilder().GetModelOwner(info.SvcType, info.OwnerUsername)
+	return model
 }
 
-func (c *openaiComponentImpl) getCSGHubModels(ctx context.Context, nsUUID string) ([]types.Model, error) {
-	runningDeploys, err := c.deployStore.RunningVisibleToUser(ctx, nsUUID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get running models visible to user,error:%w", err)
+// buildExternalModel converts an external llm_config into a types.Model.
+func (m *openaiComponentImpl) buildExternalModel(ctx context.Context, cfg *database.LLMConfig, upstreams []commontypes.UpstreamConfig) types.Model {
+	metadata := maps.Clone(cfg.Metadata)
+	if metadata == nil {
+		metadata = map[string]any{}
 	}
-	var models []types.Model
-	modelIDBuilder := c.getModelIDBuilder()
-	for _, deploy := range runningDeploys {
-		if deploy.Repository == nil {
-			slog.WarnContext(ctx, "skip deploy with nil repository", "deploy_id", deploy.ID, "svc_name", deploy.SvcName)
-			continue
-		}
-		if deploy.User == nil {
-			slog.WarnContext(ctx, "skip deploy with nil user", "deploy_id", deploy.ID, "svc_name", deploy.SvcName, "user_id", deploy.UserID)
-			continue
-		}
-		modelID := modelIDBuilder.To(deploy)
-		if modelID == "" {
-			slog.WarnContext(ctx, "skip deploy with empty model id", "deploy_id", deploy.ID, "svc_name", deploy.SvcName, "deploy_type", deploy.Type)
-			continue
-		}
-		supportFunctionCall := commontypes.EngineArgToolCallingEnabled(deploy.EngineArgs, deploy.RuntimeFramework)
-		m := types.Model{
-			BaseModel: types.BaseModel{
-				Object:              "model",
-				Created:             deploy.CreatedAt.Unix(),
-				SupportFunctionCall: supportFunctionCall,
-				Task:                string(deploy.Task),
-				Metadata: map[string]any{
-					types.MetaKeyLLMType:  providerTypeFromDeployType(deploy.Type),
-					types.MetaKeyRepoPath: deploy.Repository.Path,
-				},
-			},
-			InternalModelInfo: types.InternalModelInfo{
-				CSGHubModelID:    deploy.Repository.Path,
-				LegacyModelID:    modelIDBuilder.ToLegacyCSGHubModelID(deploy.Repository, deploy.SvcName),
-				OwnerUUID:        deploy.User.UUID,
-				ClusterID:        deploy.ClusterID,
-				SvcName:          deploy.SvcName,
-				SvcType:          deploy.Type,
-				ImageID:          deploy.ImageID,
-				RuntimeFramework: deploy.RuntimeFramework,
-			},
-			ExternalModelInfo: types.ExternalModelInfo{
-				NeedSensitiveCheck: true,
-			},
-		}
-		m.BaseModel.OwnedBy = modelIDBuilder.GetModelOwner(deploy.Type, deploy.User.Username)
 
-		m.ID = modelID
-		m.Endpoint = deploy.Endpoint
-		slog.Debug("running model", slog.Any("model", m), slog.Any("deploy", deploy))
-		models = append(models, m)
+	task := ""
+	if tasks, ok := metadata[types.MetaKeyTasks].([]any); ok && len(tasks) > 0 {
+		tasksStrings := make([]string, 0, len(tasks))
+		for _, t := range tasks {
+			if s, ok := t.(string); ok {
+				tasksStrings = append(tasksStrings, s)
+			}
+		}
+		task = strings.Join(tasksStrings, ",")
 	}
-	return models, nil
+
+	if cfg.RepoID != 0 {
+		if cfg.Repo != nil && cfg.Repo.Path != "" {
+			metadata[types.MetaKeyRepoPath] = cfg.Repo.Path
+		} else {
+			slog.WarnContext(ctx, "llm config repo relation unavailable", "llm_config_id", cfg.ID, "repo_id", cfg.RepoID)
+		}
+	}
+	metadata[types.MetaKeyLLMType] = commontypes.ProviderTypeExternalLLM
+
+	provider := cfg.PrimaryProvider()
+	model := types.Model{
+		BaseModel: types.BaseModel{
+			Object:   "model",
+			ID:       cfg.ModelName,
+			OwnedBy:  provider,
+			Metadata: metadata,
+			Task:     task,
+		},
+		Endpoint:      router.FirstEnabledUpstream(upstreams),
+		Upstreams:     upstreams,
+		RoutingPolicy: cfg.RoutingPolicy,
+		ExternalModelInfo: types.ExternalModelInfo{
+			Provider:           provider,
+			AuthHead:           cfg.PrimaryAuthHeader(),
+			NeedSensitiveCheck: cfg.NeedSensitiveCheck,
+		},
+	}
+	return model
 }
 
-func (m *openaiComponentImpl) getExternalModels(c context.Context) []types.Model {
+// llmConfigToModel converts a single LLMConfig into a types.Model.
+// The model type (internal vs external) is determined by the upstream's Source
+// field, not by the presence of InternalModelInfo.
+//
+// Returns (model, true) for a valid model, or (zero, false) to skip:
+//   - A csghub upstream without InternalModelInfo is skipped (with a warning).
+//   - When applyVisibility is true, internal non-serverless models whose
+//     OwnerUUID does not match callerUUID are skipped.
+func (m *openaiComponentImpl) llmConfigToModel(ctx context.Context, cfg *database.LLMConfig, callerUUID string, applyVisibility bool) (types.Model, bool) {
+	upstreams := dbUpstreamsToConfigs(cfg.Upstreams)
+
+	for _, u := range cfg.Upstreams {
+		if u.Source != commontypes.UpstreamSourceCSGHubDeploy {
+			continue
+		}
+		// Internal (csghub deploy) model.
+		if u.Metadata == nil || u.Metadata.InternalModelInfo == nil {
+			slog.WarnContext(ctx, "skip csghub upstream without internal model info", "upstream_id", u.ID)
+			return types.Model{}, false
+		}
+		info := u.Metadata.InternalModelInfo
+
+		if applyVisibility && info.SvcType != commontypes.ServerlessType && info.OwnerUUID != callerUUID {
+			return types.Model{}, false
+		}
+
+		return m.buildInternalModel(cfg, info, upstreams), true
+	}
+
+	// No csghub upstream found — external model.
+	return m.buildExternalModel(ctx, cfg, upstreams), true
+}
+
+// getModelsFromLLMConfig reads all enabled llm_configs from the database
+// and converts them to types.Model. This is the unified read path — both
+// internal (csghub deploy) and external models are stored in llm_config
+// with their upstreams as a relation.
+//
+// Visibility rules for internal (csghub-sourced) models:
+//   - Serverless deploys (SvcType == ServerlessType) are visible to all users.
+//   - Non-serverless deploys are only visible to the deploy owner (OwnerUUID == callerUUID).
+//
+// External models are always visible.
+func (m *openaiComponentImpl) getModelsFromLLMConfig(ctx context.Context, callerUUID string) ([]types.Model, error) {
 	enabled := true
 	search := &commontypes.SearchLLMConfig{
-		Types:     []int{database.LLMTypeAigatewayExternal},
 		Enabled:   &enabled,
 		SortBy:    "model_size_b",
 		SortOrder: "desc",
@@ -389,154 +416,53 @@ func (m *openaiComponentImpl) getExternalModels(c context.Context) []types.Model
 	page := 1
 	var models []types.Model
 	for {
-		extModels, _, err := m.extllmStore.IndexWithRepo(c, per, page, search)
+		configs, _, err := m.extllmStore.IndexWithRepo(ctx, per, page, search)
 		if err != nil {
-			slog.Error("failed to get external models", "error", err)
-			break
+			return nil, fmt.Errorf("failed to list llm configs: %w", err)
 		}
 
-		for _, extModel := range extModels {
-			metadata := maps.Clone(extModel.Metadata)
-			if metadata == nil {
-				metadata = map[string]any{}
-			}
-			task := ""
-			if tasks, ok := metadata[types.MetaKeyTasks].([]any); ok && len(tasks) > 0 {
-				tasksStrings := make([]string, 0, len(tasks))
-				for _, t := range tasks {
-					if s, ok := t.(string); ok {
-						tasksStrings = append(tasksStrings, s)
-					}
-				}
-				task = strings.Join(tasksStrings, ",")
-			}
-			if extModel.RepoID != 0 {
-				if extModel.Repo != nil && extModel.Repo.Path != "" {
-					metadata[types.MetaKeyRepoPath] = extModel.Repo.Path
-				} else {
-					slog.WarnContext(c, "llm config repo relation unavailable", "llm_config_id", extModel.ID, "repo_id", extModel.RepoID)
-				}
-			}
-			metadata[types.MetaKeyLLMType] = commontypes.ProviderTypeExternalLLM
-			// Convert relational upstreams to types.UpstreamConfig for routing
-			upstreams := dbUpstreamsToConfigs(extModel.Upstreams)
-			provider := extModel.PrimaryProvider()
-			model := types.Model{
-				BaseModel: types.BaseModel{
-					Object:   "model",
-					ID:       extModel.ModelName,
-					OwnedBy:  provider,
-					Metadata: metadata,
-					Task:     task,
-				},
-				Endpoint:      router.FirstEnabledUpstream(upstreams),
-				Upstreams:     upstreams,
-				RoutingPolicy: extModel.RoutingPolicy,
-				ExternalModelInfo: types.ExternalModelInfo{
-					Provider:           provider,
-					AuthHead:           extModel.PrimaryAuthHeader(),
-					NeedSensitiveCheck: extModel.NeedSensitiveCheck,
-				},
+		for _, cfg := range configs {
+			model, ok := m.llmConfigToModel(ctx, cfg, callerUUID, true)
+			if !ok {
+				continue
 			}
 			models = append(models, model)
 		}
-		if len(extModels) < per {
+
+		if len(configs) < per {
 			break
-		} else {
-			page++
 		}
+		page++
 	}
-	return models
+	return models, nil
 }
 
-func (m *openaiComponentImpl) saveModelsToCache(models []types.Model) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	// Use HSET to store each model as a field in a hash
-	for _, model := range models {
-		model := model.ForInternalUse()
-		jsonBytes, err := json.Marshal(model)
-		if err != nil {
-			return fmt.Errorf("failed to marshal model %s to JSON: %w", model.ID, err)
-		}
-		// Use model ID as the field name
-		err = m.modelListCache.HSet(ctx, modelCacheKey, model.ID, string(jsonBytes))
-		if err != nil {
-			return fmt.Errorf("failed to set model %s in cache hash for key %s: %w", model.ID, modelCacheKey, err)
-		}
-
-	}
-	// Set TTL for the entire hash
-	err := m.modelListCache.Expire(ctx, modelCacheKey, modelCacheTTL)
+// GetModelByID resolves a single model by its model ID from the llm_config table.
+// It queries extllmStore.GetByModelName which loads the llm_config with its
+// upstreams relation, then applies the same conversion logic as
+// getModelsFromLLMConfig. Visibility filtering is applied: serverless models
+// are visible to all users, non-serverless (private) models are only visible
+// to the deploy owner.
+func (m *openaiComponentImpl) GetModelByID(c context.Context, nsUUID, modelID string) (*types.Model, error) {
+	cfg, err := m.extllmStore.GetByModelName(c, modelID)
 	if err != nil {
-		return fmt.Errorf("failed to set TTL for cache hash key %s: %w", modelCacheKey, err)
+		return nil, fmt.Errorf("failed to get llm config by model name %q: %w", modelID, err)
 	}
-	slog.Debug("models saved to cache hash", "key", modelCacheKey, "modelCount", len(models))
-	return nil
-}
-
-// loadModelFromCache loads a model from cache by model ID
-//
-// if cache expire, return nil, nil
-// if not hint, return nil, redis.NIL
-func (m *openaiComponentImpl) loadModelFromCache(ctx context.Context, modelID string) (*types.Model, error) {
-	// First check if the hash key exists to distinguish between key not found and field not found
-	exists, err := m.modelListCache.Exists(ctx, modelCacheKey)
-	if err != nil {
-		return nil, fmt.Errorf("failed to check cache hash key existence: %w", err)
+	if cfg == nil {
+		return nil, nil
 	}
-
-	if exists == 0 {
-		// Hash key does not exist
+	if !cfg.Enabled {
 		return nil, nil
 	}
 
-	// Get model from Redis hash using HGET
-	modelJSON, err := m.modelListCache.HGet(ctx, modelCacheKey, modelID)
-	if err != nil {
-		if errors.Is(err, redis.Nil) {
-			// Hash exists but model field does not exist: treat as cache miss.
-			return nil, nil
-		}
-		return nil, fmt.Errorf("failed to get model %s from cache hash for key %s: %w", modelID, modelCacheKey, err)
+	model, ok := m.llmConfigToModel(c, cfg, nsUUID, true)
+	if !ok {
+		return nil, nil
 	}
 
-	// Unmarshal JSON to model
-	var model types.Model
-	err = json.Unmarshal([]byte(modelJSON), &model)
-	if err != nil {
-		return nil, fmt.Errorf("failed to unmarshal model %s from JSON: %w", modelID, err)
-	}
-	slog.Debug("model loaded from cache", "modelID", modelID)
-
-	return &model, nil
-}
-
-func (m *openaiComponentImpl) GetModelByID(c context.Context, nsUUID, modelID string) (*types.Model, error) {
-	model, err := m.loadModelFromCache(c, modelID)
-	if err != nil {
-		return nil, err
-	}
-	if model != nil {
-		return model, nil
-	}
-	// Cache miss or cache expired: fetch full list (which also triggers saveModelsToCache)
-	models, err := m.GetAvailableModels(c, nsUUID)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, model := range models {
-		if model.ID == modelID || m.isLegacyCSGHubModelID(model, modelID) {
-			return &model, nil
-		}
-	}
-
-	return nil, nil
-}
-
-func (m *openaiComponentImpl) isLegacyCSGHubModelID(model types.Model, modelID string) bool {
-	return model.LegacyModelID != "" && model.LegacyModelID == modelID
+	models := []types.Model{model}
+	models = m.enrichModelsWithPrice(c, models)
+	return &models[0], nil
 }
 
 // llmTypeFromModel returns metadata llm_type used to classify usage metering records.
@@ -805,6 +731,7 @@ func dbUpstreamsToConfigs(dbUpstreams []database.Upstream) []commontypes.Upstrea
 	for _, u := range dbUpstreams {
 		uc := commontypes.UpstreamConfig{
 			ID:                    u.ID,
+			Source:                u.Source,
 			URL:                   u.URL,
 			Weight:                u.Weight,
 			Enabled:               u.Enabled,

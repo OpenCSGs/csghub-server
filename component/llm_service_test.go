@@ -88,6 +88,7 @@ func TestLLMServiceComponent_CreateLLMConfig_TrimsWhitespace(t *testing.T) {
 		Enabled:     true,
 		ModelName:   "upstream-model", // trimmed
 		Provider:    "upstream-prov",  // trimmed
+		Source:      types.UpstreamSourceExternal,
 	}).Return(nil)
 	mc := &llmServiceComponentImpl{
 		llmConfigStore:    stores.LLMConfig,
@@ -486,6 +487,7 @@ func TestLLMServiceComponent_CreateUpstream_TrimsWhitespace(t *testing.T) {
 		Enabled:     true,
 		ModelName:   "upstream-model",
 		Provider:    "test-provider",
+		Source:      types.UpstreamSourceExternal,
 	}).Return(nil)
 	mc := &llmServiceComponentImpl{
 		llmConfigStore:    stores.LLMConfig,
@@ -521,6 +523,7 @@ func TestLLMServiceComponent_CreateUpstream_HealthCheckDefaultsFalseWhenNil(t *t
 		Enabled:               true,
 		HealthCheckEnabled:    false,
 		CircuitBreakerEnabled: false,
+		Source:                types.UpstreamSourceExternal,
 	}).Return(nil)
 	mc := &llmServiceComponentImpl{
 		llmConfigStore:    stores.LLMConfig,
@@ -556,6 +559,7 @@ func TestLLMServiceComponent_CreateUpstream_HealthCheckExplicitFalse(t *testing.
 		Enabled:               true,
 		HealthCheckEnabled:    false,
 		CircuitBreakerEnabled: false,
+		Source:                types.UpstreamSourceExternal,
 	}).Return(nil)
 	mc := &llmServiceComponentImpl{
 		llmConfigStore:    stores.LLMConfig,
@@ -592,6 +596,7 @@ func TestLLMServiceComponent_CreateUpstream_HealthCheckExplicitTrue(t *testing.T
 		Enabled:               true,
 		HealthCheckEnabled:    true,
 		CircuitBreakerEnabled: true,
+		Source:                types.UpstreamSourceExternal,
 	}).Return(nil)
 	mc := &llmServiceComponentImpl{
 		llmConfigStore:    stores.LLMConfig,
@@ -728,6 +733,7 @@ func TestLLMServiceComponent_CreateLLMConfig_HealthCheckPersistedFalse(t *testin
 		Enabled:               true,
 		HealthCheckEnabled:    false,
 		CircuitBreakerEnabled: false,
+		Source:                types.UpstreamSourceExternal,
 	}).Return(nil)
 	mc := &llmServiceComponentImpl{
 		llmConfigStore:    stores.LLMConfig,
@@ -772,6 +778,7 @@ func TestLLMServiceComponent_CreateLLMConfig_HealthCheckPersistedTrue(t *testing
 		Enabled:               true,
 		HealthCheckEnabled:    true,
 		CircuitBreakerEnabled: true,
+		Source:                types.UpstreamSourceExternal,
 	}).Return(nil)
 	mc := &llmServiceComponentImpl{
 		llmConfigStore:    stores.LLMConfig,

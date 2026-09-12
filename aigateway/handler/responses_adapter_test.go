@@ -15,6 +15,7 @@ import (
 	"opencsg.com/csghub-server/aigateway/token"
 	"opencsg.com/csghub-server/aigateway/types"
 	"opencsg.com/csghub-server/builder/compress"
+	commontypes "opencsg.com/csghub-server/common/types"
 )
 
 func TestValidateResponsesAdapterRequestStoreFalseSucceeds(t *testing.T) {
@@ -43,46 +44,38 @@ func TestValidateResponsesAdapterRequestAllowsReasoning(t *testing.T) {
 
 func TestApplyAdapterReasoningRequest(t *testing.T) {
 	ctx := context.Background()
-	deepSeekMetadata := map[string]any{
-		"responses": map[string]any{
-			"chat_adapter": map[string]any{
-				"reasoning_request": map[string]any{
-					"enabled":       true,
-					"effort_field":  "",
-					"enable_extra":  map[string]any{"thinking": map[string]any{"type": "enabled"}},
-					"disable_extra": map[string]any{"thinking": map[string]any{"type": "disabled"}},
-				},
+	deepSeekMetadata := &commontypes.UpstreamMetadata{
+		ResponsesChatAdapter: &commontypes.ResponsesChatAdapter{
+			ReasoningRequest: &commontypes.ReasoningRequestConfig{
+				Enabled:      true,
+				EffortField:  "",
+				EnableExtra:  map[string]any{"thinking": map[string]any{"type": "enabled"}},
+				DisableExtra: map[string]any{"thinking": map[string]any{"type": "disabled"}},
 			},
 		},
 	}
-	glmMetadata := map[string]any{
-		"responses": map[string]any{
-			"chat_adapter": map[string]any{
-				"reasoning_request": map[string]any{
-					"enabled":       true,
-					"effort_field":  "reasoning_effort",
-					"enable_extra":  map[string]any{"enable_thinking": true},
-					"disable_extra": map[string]any{"enable_thinking": false},
-				},
+	glmMetadata := &commontypes.UpstreamMetadata{
+		ResponsesChatAdapter: &commontypes.ResponsesChatAdapter{
+			ReasoningRequest: &commontypes.ReasoningRequestConfig{
+				Enabled:      true,
+				EffortField:  "reasoning_effort",
+				EnableExtra:  map[string]any{"enable_thinking": true},
+				DisableExtra: map[string]any{"enable_thinking": false},
 			},
 		},
 	}
-	disabledMetadata := map[string]any{
-		"responses": map[string]any{
-			"chat_adapter": map[string]any{
-				"reasoning_request": map[string]any{
-					"enabled": false,
-				},
+	disabledMetadata := &commontypes.UpstreamMetadata{
+		ResponsesChatAdapter: &commontypes.ResponsesChatAdapter{
+			ReasoningRequest: &commontypes.ReasoningRequestConfig{
+				Enabled: false,
 			},
 		},
 	}
-	genericMetadata := map[string]any{
-		"responses": map[string]any{
-			"chat_adapter": map[string]any{
-				"reasoning_request": map[string]any{
-					"enabled":      true,
-					"effort_field": "reasoning_effort",
-				},
+	genericMetadata := &commontypes.UpstreamMetadata{
+		ResponsesChatAdapter: &commontypes.ResponsesChatAdapter{
+			ReasoningRequest: &commontypes.ReasoningRequestConfig{
+				Enabled:      true,
+				EffortField: "reasoning_effort",
 			},
 		},
 	}

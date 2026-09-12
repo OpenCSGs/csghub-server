@@ -11,6 +11,7 @@ import (
 	responsespkg "opencsg.com/csghub-server/aigateway/handler/responses"
 
 	"github.com/openai/openai-go/v3"
+	commontypes "opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/aigateway/types"
 )
 
@@ -62,7 +63,7 @@ func normalizeChatRole(role string) string {
 	}
 }
 
-func responsesToChatRequest(ctx context.Context, req *types.ResponsesRequest, modelName string, upstreamMetadata map[string]any) (*types.ChatCompletionRequest, error) {
+func responsesToChatRequest(ctx context.Context, req *types.ResponsesRequest, modelName string, upstreamMetadata *commontypes.UpstreamMetadata) (*types.ChatCompletionRequest, error) {
 	messages, err := responsesInputToChatMessages(ctx, req)
 	if err != nil {
 		return nil, err
@@ -173,29 +174,31 @@ type adapterReasoningRequestConfig struct {
 	DisableExtra json.RawMessage `json:"disable_extra"`
 }
 
-func loadReasoningRequestConfig(metadata map[string]any) *adapterReasoningRequestConfig {
-	if len(metadata) == 0 {
+func loadReasoningRequestConfig(metadata *commontypes.UpstreamMetadata) *adapterReasoningRequestConfig {
+	if metadata == nil || metadata.ResponsesChatAdapter == nil {
 		return nil
 	}
-	responses, ok := metadata["responses"].(map[string]any)
-	if !ok {
+	rr := metadata.ResponsesChatAdapter.ReasoningRequest
+	if rr == nil {
 		return nil
 	}
-	chatAdapter, ok := responses["chat_adapter"].(map[string]any)
-	if !ok {
-		return nil
+	cfg := &adapterReasoningRequestConfig{
+		Enabled:     rr.Enabled,
+		EffortField: rr.EffortField,
 	}
-	reasoningRequest, ok := chatAdapter["reasoning_request"].(map[string]any)
-	if !ok {
-		return nil
+	if rr.EnableExtra != nil {
+		raw, err := json.Marshal(rr.EnableExtra)
+		if err != nil {
+			return nil
+		}
+		cfg.EnableExtra = raw
 	}
-	raw, err := json.Marshal(reasoningRequest)
-	if err != nil {
-		return nil
-	}
-	cfg := &adapterReasoningRequestConfig{}
-	if err := json.Unmarshal(raw, cfg); err != nil {
-		return nil
+	if rr.DisableExtra != nil {
+		raw, err := json.Marshal(rr.DisableExtra)
+		if err != nil {
+			return nil
+		}
+		cfg.DisableExtra = raw
 	}
 	return cfg
 }

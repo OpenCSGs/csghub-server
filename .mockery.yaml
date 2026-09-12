@@ -256,6 +256,9 @@ packages:
   opencsg.com/csghub-server/aigateway/component:
     config:
       all: true
+  opencsg.com/csghub-server/aigateway/component/upstream:
+    config:
+      all: true
   opencsg.com/csghub-server/aigateway/handler:
     config:
     interfaces:

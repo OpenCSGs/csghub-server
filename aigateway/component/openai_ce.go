@@ -5,6 +5,7 @@ package component
 import (
 	"context"
 
+	"opencsg.com/csghub-server/aigateway/component/upstream"
 	"opencsg.com/csghub-server/aigateway/types"
 	"opencsg.com/csghub-server/builder/event"
 	"opencsg.com/csghub-server/builder/store/cache"
@@ -31,7 +32,7 @@ func NewOpenAIComponentFromConfig(config *config.Config) (OpenAIComponent, error
 		extllmStore:    database.NewLLMConfigStore(config),
 		modelListCache: cacheClient,
 		extendOpenai:   extendOpenai{},
-		modelIDBuilder: NewModelIDBuilder(),
+		modelIDBuilder: upstream.NewModelIDBuilder(),
 	}, nil
 }
 

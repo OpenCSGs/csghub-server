@@ -5,82 +5,63 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/common/types"
 )
 
 func TestValidateUpstreamMetadataReasoningRequest(t *testing.T) {
-	valid := map[string]any{
-		"responses": map[string]any{
-			"chat_adapter": map[string]any{
-				"reasoning_request": map[string]any{
-					"enabled":      true,
-					"effort_field": "reasoning_effort",
-					"enable_extra": map[string]any{"enable_thinking": true},
-				},
+	valid := &types.UpstreamMetadata{
+		ResponsesChatAdapter: &types.ResponsesChatAdapter{
+			ReasoningRequest: &types.ReasoningRequestConfig{
+				Enabled:      true,
+				EffortField:  "reasoning_effort",
+				EnableExtra:  map[string]any{"enable_thinking": true},
 			},
 		},
 	}
 	require.NoError(t, validateUpstreamMetadata(valid))
 	require.NoError(t, validateUpstreamMetadata(nil))
-	require.NoError(t, validateUpstreamMetadata(map[string]any{}))
+	require.NoError(t, validateUpstreamMetadata(&types.UpstreamMetadata{}))
+	require.NoError(t, validateUpstreamMetadata(&types.UpstreamMetadata{
+		ResponsesChatAdapter: &types.ResponsesChatAdapter{},
+	}))
 
-	err := validateUpstreamMetadata(map[string]any{
-		"responses": map[string]any{
-			"chat_adapter": map[string]any{
-				"reasoning_request": map[string]any{
-					"enabled": "yes",
-				},
-			},
-		},
-	})
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "enabled must be a boolean")
-
-	err = validateUpstreamMetadata(map[string]any{
-		"responses": map[string]any{
-			"chat_adapter": map[string]any{
-				"reasoning_request": map[string]any{
-					"effort_field": 123,
-				},
-			},
-		},
-	})
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "effort_field must be a string")
-
-	err = validateUpstreamMetadata(map[string]any{
-		"responses": map[string]any{
-			"chat_adapter": map[string]any{
-				"reasoning_request": map[string]any{
-					"effort_field": "reasoning_effort",
-					"enable_extra": "bad",
-				},
-			},
-		},
-	})
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "enable_extra must be a JSON object")
-
-	err = validateUpstreamMetadata(map[string]any{
-		"responses": map[string]any{
-			"chat_adapter": map[string]any{
-				"reasoning_request": map[string]any{
-					"effort_field": "reasoning_effort",
-					"enable_extra": map[string]any{"reasoning_effort": "high"},
-				},
+	// effort_field must not also appear in enable_extra
+	err := validateUpstreamMetadata(&types.UpstreamMetadata{
+		ResponsesChatAdapter: &types.ResponsesChatAdapter{
+			ReasoningRequest: &types.ReasoningRequestConfig{
+				EffortField: "reasoning_effort",
+				EnableExtra: map[string]any{"reasoning_effort": "high"},
 			},
 		},
 	})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "must not also appear in enable_extra")
+
+	// effort_field must not also appear in disable_extra
+	err = validateUpstreamMetadata(&types.UpstreamMetadata{
+		ResponsesChatAdapter: &types.ResponsesChatAdapter{
+			ReasoningRequest: &types.ReasoningRequestConfig{
+				EffortField:  "reasoning_effort",
+				DisableExtra: map[string]any{"reasoning_effort": "low"},
+			},
+		},
+	})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "must not also appear in disable_extra")
+
+	// nil ReasoningRequest is valid
+	require.NoError(t, validateUpstreamMetadata(&types.UpstreamMetadata{
+		ResponsesChatAdapter: &types.ResponsesChatAdapter{
+			ReasoningRequest: nil,
+		},
+	}))
 }
 
 func TestBuildUpstreamConfigsMetadataPassthrough(t *testing.T) {
-	metadata := map[string]any{
-		"responses": map[string]any{
-			"chat_adapter": map[string]any{
-				"reasoning_request": map[string]any{
-					"enabled": true,
-				},
+	metadata := &types.UpstreamMetadata{
+		ResponsesChatAdapter: &types.ResponsesChatAdapter{
+			ReasoningRequest: &types.ReasoningRequestConfig{
+				Enabled: true,
 			},
 		},
 	}

@@ -117,6 +117,8 @@ type DeployTaskStore interface {
 	ListInstancesByUserID(ctx context.Context, userID int64, per, page int) ([]Deploy, int, error)
 	ListFinetunesByOwnerNamespace(ctx context.Context, ownerNamespace string, per, page int) ([]Deploy, int, error)
 	GetDeployByID(ctx context.Context, deployID int64) (*Deploy, error)
+	// GetDeployByIDWithRelations returns a deploy by ID with Repository and User relations loaded.
+	GetDeployByIDWithRelations(ctx context.Context, deployID int64) (*Deploy, error)
 	GetDeployBySvcName(ctx context.Context, svcName string) (*Deploy, error)
 	StopDeploy(ctx context.Context, repoType types.RepositoryType, repoID, userID int64, deployID int64) error
 	StopDeployByID(ctx context.Context, userID int64, deployID int64) error
@@ -127,6 +129,7 @@ type DeployTaskStore interface {
 	ListAllDeploys(ctx context.Context, req types.DeployReq, isActive bool) ([]Deploy, int, error)
 	RunningVisibleToUser(ctx context.Context, nsUUID string) ([]Deploy, error)
 	ListAllRunningDeploys(ctx context.Context) ([]Deploy, error)
+	ListRunningDeploysByTypes(ctx context.Context, deployTypes []int) ([]Deploy, error)
 	GetLastTaskByType(ctx context.Context, deployID int64, taskType int) (*DeployTask, error)
 	GetClusterDeploys(ctx context.Context, req types.ClusterDeployReq) ([]Deploy, int, error)
 	ListDeploysByTimeRange(ctx context.Context, req types.DeployTimeRangeReq) ([]Deploy, int, error)
@@ -431,6 +434,22 @@ func (s *deployTaskStoreImpl) GetDeployByID(ctx context.Context, deployID int64)
 	return deploy, err
 }
 
+func (s *deployTaskStoreImpl) GetDeployByIDWithRelations(ctx context.Context, deployID int64) (*Deploy, error) {
+	deploy := &Deploy{}
+	err := s.db.Operator.Core.NewSelect().Model(deploy).
+		Relation("Repository").
+		Relation("User").
+		Where("deploy.id = ?", deployID).
+		Scan(ctx, deploy)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, errorx.HandleDBError(err, errorx.Ctx().Set("deploy_id", deployID))
+	}
+	return deploy, nil
+}
+
 func (s *deployTaskStoreImpl) GetDeployBySvcName(ctx context.Context, svcName string) (*Deploy, error) {
 	deploy := &Deploy{}
 	err := s.db.Operator.Core.NewSelect().Model(deploy).Where("svc_name = ?", svcName).Scan(ctx, deploy)
@@ -653,7 +672,20 @@ func (s *deployTaskStoreImpl) ListAllDeploys(ctx context.Context, req types.Depl
 func (s *deployTaskStoreImpl) ListAllRunningDeploys(ctx context.Context) ([]Deploy, error) {
 	var result []Deploy
 	query := s.db.Operator.Core.NewSelect().Model(&result)
-	query = query.Where("status = ?", common.Running)
+	query = query.Where("status IN (?, ?)", common.Running, common.Sleeping)
+	_, err := query.Exec(ctx, &result)
+	if err != nil {
+		err = errorx.HandleDBError(err, nil)
+		return nil, err
+	}
+	return result, nil
+}
+
+func (s *deployTaskStoreImpl) ListRunningDeploysByTypes(ctx context.Context, deployTypes []int) ([]Deploy, error) {
+	var result []Deploy
+	query := s.db.Operator.Core.NewSelect().Model(&result)
+	query = query.Where("status IN (?, ?)", common.Running, common.Sleeping)
+	query = query.Where("type IN (?)", bun.In(deployTypes))
 	_, err := query.Exec(ctx, &result)
 	if err != nil {
 		err = errorx.HandleDBError(err, nil)

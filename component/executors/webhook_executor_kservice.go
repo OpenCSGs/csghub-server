@@ -13,6 +13,7 @@ import (
 
 	deploybuilder "opencsg.com/csghub-server/builder/deploy"
 	"opencsg.com/csghub-server/builder/deploy/common"
+	bldmq "opencsg.com/csghub-server/builder/mq"
 	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
@@ -26,6 +27,7 @@ type KServiceExecutor interface {
 type kserviceExecutorImpl struct {
 	cfg                   *config.Config
 	deployTaskStore       database.DeployTaskStore
+	namespaceStore        database.NamespaceStore
 	notificationSvcClient rpc.NotificationSvcClient
 }
 
@@ -37,6 +39,7 @@ func NewKServiceExecutor(config *config.Config) (KServiceExecutor, error) {
 	executor := &kserviceExecutorImpl{
 		cfg:                   config,
 		deployTaskStore:       database.NewDeployTaskStore(),
+		namespaceStore:        database.NewNamespaceStore(),
 		notificationSvcClient: notificationSvcClient,
 	}
 	// register the kservice executor for webhook callback func ProcessEvent
@@ -140,28 +143,74 @@ func (k *kserviceExecutorImpl) updateDeployStatus(ctx context.Context, event *ty
 		return fmt.Errorf("failed to update deploy %s status %d in webhook error: %w", event.ServiceName, event.Status, err)
 	}
 
-	if event.Status == common.Running && oldStatus != common.Running {
-		go k.handleDeployRunning(event.TaskID, deploy)
+	if (event.Status == common.Running || event.Status == common.Sleeping) && oldStatus != common.Running && oldStatus != common.Sleeping {
+		go k.handleDeployRunning(ctx, event.TaskID, deploy)
+	}
+
+	if event.Status == common.Stopped && oldStatus != common.Stopped {
+		go k.handleDeployStopped(ctx, deploy.ID)
+	}
+
+	if event.Status == common.Deleted && oldStatus != common.Deleted {
+		go k.handleDeployDeleted(ctx, deploy.ID)
 	}
 
 	return nil
 }
 
-func (k *kserviceExecutorImpl) handleDeployRunning(sourceDeployTaskID int64, deploy *database.Deploy) {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+func (k *kserviceExecutorImpl) handleDeployRunning(parentCtx context.Context, sourceDeployTaskID int64, deploy *database.Deploy) {
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(parentCtx), 30*time.Second)
 	defer cancel()
 
 	if err := k.sendNotification(ctx, deploy); err != nil {
 		slog.Error("failed to send notification", slog.Any("err", err))
 	}
 
-	if deploybuilder.DeployRunningCallback == nil {
+	// Run the deploy running callback first so upstream sync never blocks
+	// or interferes with the core deploy lifecycle.
+	if deploybuilder.DeployRunningCallback != nil {
+		if err := deploybuilder.DeployRunningCallback(ctx, deploy, sourceDeployTaskID); err != nil {
+			slog.Error("failed to execute deploy running callback", slog.Any("deploy_id", deploy.ID), slog.Any("source_task_id", sourceDeployTaskID), slog.Any("err", err))
+		}
+	}
+
+	k.syncDeployUpstream(ctx, deploy.ID)
+}
+
+// syncDeployUpstream loads the deploy with relations, builds the upstream
+// info, resolves the owner type, and publishes a running-sync event. It is
+// best-effort: errors are logged but never returned.
+func (k *kserviceExecutorImpl) syncDeployUpstream(ctx context.Context, deployID int64) {
+	fullDeploy, err := k.deployTaskStore.GetDeployByIDWithRelations(ctx, deployID)
+	if err != nil {
+		slog.Error("failed to load deploy with relations for upstream sync", slog.Any("deploy_id", deployID), slog.Any("err", err))
+		return
+	}
+	if fullDeploy == nil {
+		slog.Warn("deploy not found when loading relations for upstream sync", slog.Any("deploy_id", deployID))
 		return
 	}
 
-	if err := deploybuilder.DeployRunningCallback(ctx, deploy, sourceDeployTaskID); err != nil {
-		slog.Error("failed to execute deploy running callback", slog.Any("deploy_id", deploy.ID), slog.Any("source_task_id", sourceDeployTaskID), slog.Any("err", err))
+	info := deploybuilder.BuildDeployUpstreamInfoWithDeploy(ctx, fullDeploy, k.namespaceStore)
+	if info == nil {
+		slog.Warn("deploy has no repository, skipping upstream sync", slog.Any("deploy_id", deployID))
+		return
 	}
+	deploybuilder.PublishDeployUpstreamSyncEvent(ctx, bldmq.DeployUpstreamSyncRunningSubject, deployID, info)
+}
+
+func (k *kserviceExecutorImpl) handleDeployStopped(parentCtx context.Context, deployID int64) {
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(parentCtx), 10*time.Second)
+	defer cancel()
+
+	deploybuilder.PublishDeployUpstreamSyncEvent(ctx, bldmq.DeployUpstreamSyncStopSubject, deployID, nil)
+}
+
+func (k *kserviceExecutorImpl) handleDeployDeleted(parentCtx context.Context, deployID int64) {
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(parentCtx), 10*time.Second)
+	defer cancel()
+
+	deploybuilder.PublishDeployUpstreamSyncEvent(ctx, bldmq.DeployUpstreamSyncDeleteSubject, deployID, nil)
 }
 
 func (k *kserviceExecutorImpl) sendNotification(ctx context.Context, deploy *database.Deploy) error {

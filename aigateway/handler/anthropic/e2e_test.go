@@ -49,7 +49,7 @@ func (f *fakePlanner) Plan(c *gin.Context, meta *types.RequestMetadata) (*types.
 		CSGHubHosted:     isTestCSGHubHosted(f.target),
 		RuntimeFramework: f.target.Model.RuntimeFramework,
 		ImageID:          f.target.Model.ImageID,
-		UpstreamMetadata: f.target.Upstream.Metadata,
+		ProtocolOverride: f.target.Upstream.MetadataProtocol(),
 	})
 	if err != nil {
 		pl.ErrorCode = types.PlanErrUnknown
@@ -197,9 +197,9 @@ func makeTestHandlerWithPlannerAndFakes(planner *fakePlanner) (*Handler, *fakeUs
 }
 
 func makeMessagesTarget(upstreamURL, protocol string) *types.ModelTarget {
-	meta := map[string]any{}
+	var meta *commonType.UpstreamMetadata
 	if protocol != "" {
-		meta["protocol"] = protocol
+		meta = &commonType.UpstreamMetadata{Protocol: protocol}
 	}
 	return &types.ModelTarget{
 		Model: &types.Model{
@@ -649,7 +649,6 @@ func TestE2E_Disabled_NoAdapter(t *testing.T) {
 		Upstream: commonType.UpstreamConfig{
 			URL:      "http://127.0.0.1:1/v1/unknown",
 			Provider: "test",
-			Metadata: map[string]any{"protocol": "unknown"},
 		},
 		Target:    "http://127.0.0.1:1/v1/unknown",
 		ModelName: "test-model",

@@ -58,6 +58,9 @@ type RoutingTarget struct {
 	RuntimeFramework string
 	ImageID          string
 	UpstreamMetadata map[string]any
+	// ProtocolOverride is an explicit protocol declaration from upstream config.
+	// When non-empty, it takes priority over URL inference and defaults.
+	ProtocolOverride string
 }
 
 // adapterMatrix defines which adapter to use for each (client, upstream) pair.
@@ -156,14 +159,12 @@ func ResolveRouting(clientProtocol types.Protocol, target RoutingTarget) (Routin
 // protocol cannot be inferred from the URL is overridden in ResolveRouting,
 // which prefers the client protocol (native passthrough) in that case.
 func DetectUpstreamProtocol(target RoutingTarget) types.Protocol {
-	// 1. Explicit declaration in upstream metadata.
-	if target.UpstreamMetadata != nil {
-		if p, ok := target.UpstreamMetadata["protocol"].(string); ok {
-			p = strings.TrimSpace(strings.ToLower(p))
-			switch types.Protocol(p) {
-			case types.ProtocolChat, types.ProtocolResponses, types.ProtocolMessages:
-				return types.Protocol(p)
-			}
+	// 1. Explicit declaration via protocol override.
+	if target.ProtocolOverride != "" {
+		p := strings.TrimSpace(strings.ToLower(target.ProtocolOverride))
+		switch types.Protocol(p) {
+		case types.ProtocolChat, types.ProtocolResponses, types.ProtocolMessages:
+			return types.Protocol(p)
 		}
 	}
 
@@ -186,14 +187,10 @@ func DetectUpstreamProtocol(target RoutingTarget) types.Protocol {
 // explicit Chat declaration (which must be respected) from the Chat fallback
 // default (which can be overridden to prefer native passthrough).
 func hasExplicitProtocolMetadata(target RoutingTarget) bool {
-	if target.UpstreamMetadata == nil {
+	if target.ProtocolOverride == "" {
 		return false
 	}
-	p, ok := target.UpstreamMetadata["protocol"].(string)
-	if !ok {
-		return false
-	}
-	p = strings.TrimSpace(strings.ToLower(p))
+	p := strings.TrimSpace(strings.ToLower(target.ProtocolOverride))
 	switch types.Protocol(p) {
 	case types.ProtocolChat, types.ProtocolResponses, types.ProtocolMessages:
 		return true

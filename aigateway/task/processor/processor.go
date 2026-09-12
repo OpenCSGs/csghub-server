@@ -17,6 +17,7 @@ type GenerationRef struct {
 	ProviderMetadata   map[string]any
 	UpstreamID         int64
 	ModelID            string
+	OwnerUUID          string
 	Status             string
 	StartedAt          *time.Time
 	FinishedAt         *time.Time
