@@ -12,6 +12,7 @@ type UpstreamSource string
 const (
 	UpstreamSourceExternal     UpstreamSource = "external"
 	UpstreamSourceCSGHubDeploy UpstreamSource = "csghub"
+	UpstreamSourceMixed        UpstreamSource = "mixed"
 )
 
 // Resource ID format strings for external LLM (model ID) and CSGHub internal (path segment, repo path).
@@ -131,7 +132,6 @@ func (m *UpstreamMetadata) UnmarshalJSON(data []byte) error {
 	}
 	return nil
 }
-
 // nestedMetadata is the legacy nested JSON format used for API output:
 //
 //	{"responses": {"chat_adapter": {"reasoning_request": {...}}}}
@@ -183,6 +183,7 @@ type RepositoryLite struct {
 type UpstreamConfig struct {
 	ID                    int64          `json:"id,omitempty"`
 	Source                UpstreamSource `json:"source,omitempty"`
+	SourceID              int64          `json:"source_id,omitempty"`
 	URL                   string         `json:"url"`
 	Weight                int            `json:"weight,omitempty"`
 	Enabled               bool           `json:"enabled"`
@@ -239,6 +240,7 @@ type UsageLimitPolicy struct {
 type LLMConfig struct {
 	ID                 int64            `json:"id"`
 	ModelName          string           `json:"model_name"`
+	Source             UpstreamSource   `json:"source,omitempty"`
 	OfficialName       string           `json:"-"`     // deprecated: derived from upstream
 	ApiEndpoint        string           `json:"-"`     // deprecated: derived from upstream
 	AuthHeader         string           `json:"-"`     // deprecated: moved to upstream
