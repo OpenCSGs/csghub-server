@@ -3,11 +3,16 @@ package types
 const (
 	OpenCSGPrefix     = "CSG_"
 	HuggingfacePrefix = "HF_"
+
+	// UserNamespaceType identifies a namespace owned by an individual user.
+	UserNamespaceType = "user"
+	// OrganizationNamespaceType identifies a namespace owned by an organization.
+	OrganizationNamespaceType = "organization"
 )
 
 type Namespace struct {
 	Path string
-	// namespace types like 'user' for normal user, and 'school', 'company' for orgs etc.
+	// Type identifies whether the namespace belongs to a user or an organization.
 	Type   string
 	Avatar string
 	UUID   string

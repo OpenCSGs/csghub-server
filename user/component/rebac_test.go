@@ -159,6 +159,22 @@ func TestLoadUserRepositoryRelationshipsResolvesDeletedPersonalNamespace(t *test
 	}}, relationships)
 }
 
+// TestDeleteRepositoryNamespaceRelationshipsRemovesOrganizationDirect verifies repository cleanup removes both organization relations.
+func TestDeleteRepositoryNamespaceRelationshipsRemovesOrganizationDirect(t *testing.T) {
+	ctx := context.Background()
+	authorizer := mockrebac.NewMockAuthorizer(t)
+	organizationRelationship := rebac.Relationship{
+		Subject:  rebac.NewSubject(rebac.ObjectTypeOrganization, "organization-uuid"),
+		Relation: rebac.RelationOrganization,
+		Object:   rebac.RepositoryObject(42),
+	}
+	directRelationship := organizationRelationship
+	directRelationship.Relation = rebac.RelationOrganizationDirect
+	authorizer.EXPECT().Delete(ctx, []rebac.Relationship{organizationRelationship, directRelationship}).Return(nil).Once()
+
+	require.NoError(t, deleteRepositoryNamespaceRelationships(ctx, authorizer, []rebac.Relationship{organizationRelationship}))
+}
+
 // TestDeleteUserNamespaceRelationshipRemovesOwner verifies user deletion removes the personal namespace owner tuple.
 func TestDeleteUserNamespaceRelationshipRemovesOwner(t *testing.T) {
 	ctx := context.Background()

@@ -6,9 +6,11 @@ import (
 	"testing"
 
 	"github.com/riverqueue/river"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	mockdb "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/rebac"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/workhub"
@@ -41,11 +43,17 @@ type deletionAuthorizer struct {
 	checkRequests []rebac.CheckRequest
 	decision      rebac.Decision
 	err           error
+	deleteErrors  []error
 }
 
 func (a *deletionAuthorizer) Delete(_ context.Context, relationships []rebac.Relationship) error {
 	*a.steps = append(*a.steps, "rebac")
 	a.relationships = relationships
+	if len(a.deleteErrors) > 0 {
+		err := a.deleteErrors[0]
+		a.deleteErrors = a.deleteErrors[1:]
+		return err
+	}
 	return a.err
 }
 func (*deletionAuthorizer) Write(context.Context, []rebac.Relationship) error { return nil }
@@ -104,6 +112,7 @@ func TestRepositoryDeletionWorkerCleansResourcesBeforeDatabase(t *testing.T) {
 	mirrorCanceler := &deletionMirrorCanceler{steps: &steps}
 	worker := NewRepositoryDeletionWorker(
 		deletionStep{steps: &steps}, deletionResources{steps: &steps}, authorizer,
+		configuredDeletionAuthorizationStore(t, 42, nil, 1),
 		deletionFinalizer{steps: &steps}, deletionMirrorTaskFinder{steps: &steps, taskID: 88}, mirrorCanceler,
 	)
 	args := workhub.RepositoryDeletionArgs{
@@ -113,16 +122,15 @@ func TestRepositoryDeletionWorkerCleansResourcesBeforeDatabase(t *testing.T) {
 
 	err := worker.Work(context.Background(), &river.Job[workhub.RepositoryDeletionArgs]{Args: args})
 	require.NoError(t, err)
-	require.Equal(t, []string{"mirror-find", "mirror-cancel", "resources", "git", "rebac-check", "rebac", "database"}, steps)
+	require.Equal(t, []string{"mirror-find", "mirror-cancel", "resources", "git", "rebac", "database"}, steps)
 	require.Equal(t, []int64{88}, mirrorCanceler.taskIDs)
 	require.Equal(t, []rebac.Relationship{{
 		Subject: rebac.NewSubject(rebac.ObjectTypeOrganization, "org-uuid"), Relation: rebac.RelationOrganization,
 		Object: rebac.RepositoryObject(42),
+	}, {
+		Subject: rebac.NewSubject(rebac.ObjectTypeOrganization, "org-uuid"), Relation: rebac.RelationOrganizationDirect,
+		Object: rebac.RepositoryObject(42),
 	}}, authorizer.relationships)
-	require.Equal(t, []rebac.CheckRequest{{
-		Subject: rebac.NewSubject(rebac.ObjectTypeOrganization, "org-uuid"), Relation: rebac.RelationOrganization,
-		Object: rebac.RepositoryObject(42), Consistency: rebac.ConsistencyHigher,
-	}}, authorizer.checkRequests)
 }
 
 func TestRepositoryDeletionWorkerTreatsMissingGitRepositoryAsSuccess(t *testing.T) {
@@ -130,6 +138,7 @@ func TestRepositoryDeletionWorkerTreatsMissingGitRepositoryAsSuccess(t *testing.
 	worker := NewRepositoryDeletionWorker(
 		deletionStep{steps: &steps, err: status.Error(codes.NotFound, "missing")},
 		deletionResources{steps: &steps}, &deletionAuthorizer{steps: &steps},
+		configuredDeletionAuthorizationStore(t, 7, nil, 1),
 		deletionFinalizer{steps: &steps}, deletionMirrorTaskFinder{steps: &steps}, &deletionMirrorCanceler{steps: &steps},
 	)
 
@@ -137,14 +146,14 @@ func TestRepositoryDeletionWorkerTreatsMissingGitRepositoryAsSuccess(t *testing.
 		RepositoryID: 7, OwnerType: database.UserNamespace, OwnerUUID: "user-uuid",
 	}})
 	require.NoError(t, err)
-	require.Equal(t, []string{"mirror-find", "resources", "git", "rebac-check", "database"}, steps)
+	require.Equal(t, []string{"mirror-find", "resources", "git", "rebac", "database"}, steps)
 }
 
 func TestRepositoryDeletionWorkerStopsBeforeDatabaseOnExternalFailure(t *testing.T) {
 	steps := []string{}
 	worker := NewRepositoryDeletionWorker(
 		deletionStep{steps: &steps}, deletionResources{steps: &steps, err: errors.New("storage unavailable")},
-		&deletionAuthorizer{steps: &steps}, deletionFinalizer{steps: &steps},
+		&deletionAuthorizer{steps: &steps}, mockdb.NewMockRepositoryAuthorizationStore(t), deletionFinalizer{steps: &steps},
 		deletionMirrorTaskFinder{steps: &steps}, &deletionMirrorCanceler{steps: &steps},
 	)
 
@@ -158,6 +167,7 @@ func TestRepositoryDeletionWorkerRetriesAfterReBACDeleteWhenFinalizerFails(t *te
 	authorizer := &deletionAuthorizer{steps: &steps, decision: rebac.Decision{Allowed: true}}
 	worker := NewRepositoryDeletionWorker(
 		deletionStep{steps: &steps}, deletionResources{steps: &steps}, authorizer,
+		configuredDeletionAuthorizationStore(t, 42, nil, 2),
 		deletionFinalizer{steps: &steps, err: errors.New("database unavailable")},
 		deletionMirrorTaskFinder{steps: &steps}, &deletionMirrorCanceler{steps: &steps},
 	)
@@ -166,7 +176,6 @@ func TestRepositoryDeletionWorkerRetriesAfterReBACDeleteWhenFinalizerFails(t *te
 	}}
 
 	require.ErrorContains(t, worker.Work(context.Background(), job), "finalize repository database deletion")
-	authorizer.decision.Allowed = false
 	worker.finalizer = deletionFinalizer{steps: &steps}
 	require.NoError(t, worker.Work(context.Background(), job))
 	require.Len(t, authorizer.relationships, 1)
@@ -176,6 +185,7 @@ func TestRepositoryDeletionWorkerStopsBeforeResourcesWhenMirrorCancelFails(t *te
 	steps := []string{}
 	worker := NewRepositoryDeletionWorker(
 		deletionStep{steps: &steps}, deletionResources{steps: &steps}, &deletionAuthorizer{steps: &steps},
+		mockdb.NewMockRepositoryAuthorizationStore(t),
 		deletionFinalizer{steps: &steps}, deletionMirrorTaskFinder{steps: &steps, taskID: 99},
 		&deletionMirrorCanceler{steps: &steps, err: errors.New("mirror unavailable")},
 	)
@@ -183,4 +193,100 @@ func TestRepositoryDeletionWorkerStopsBeforeResourcesWhenMirrorCancelFails(t *te
 	err := worker.Work(context.Background(), &river.Job[workhub.RepositoryDeletionArgs]{Args: workhub.RepositoryDeletionArgs{RepositoryID: 9}})
 	require.ErrorContains(t, err, "cancel repository mirror task")
 	require.Equal(t, []string{"mirror-find", "mirror-cancel"}, steps)
+}
+
+// TestRepositoryDeletionWorkerStopsBeforeDatabaseWhenAuthorizationTupleCleanupFails verifies ReBAC failures are retryable.
+func TestRepositoryDeletionWorkerStopsBeforeDatabaseWhenAuthorizationTupleCleanupFails(t *testing.T) {
+	steps := []string{}
+	authorizer := &deletionAuthorizer{steps: &steps, deleteErrors: []error{nil, errors.New("ReBAC unavailable")}}
+	authorizations := []database.RepositoryAuthorization{{
+		RepositoryID: 42, SubjectType: types.RepoAuthSubjectUser, SubjectUUID: "user-uuid", Role: types.UserRead,
+	}}
+	store := mockdb.NewMockRepositoryAuthorizationStore(t)
+	store.EXPECT().ListByRepository(mock.Anything, int64(42)).Return(authorizations, nil).Once()
+	worker := NewRepositoryDeletionWorker(
+		deletionStep{steps: &steps}, deletionResources{steps: &steps}, authorizer,
+		store,
+		deletionFinalizer{steps: &steps}, deletionMirrorTaskFinder{steps: &steps}, &deletionMirrorCanceler{steps: &steps},
+	)
+
+	err := worker.Work(context.Background(), &river.Job[workhub.RepositoryDeletionArgs]{Args: workhub.RepositoryDeletionArgs{
+		RepositoryID: 42, OwnerType: database.UserNamespace, OwnerUUID: "user-uuid",
+	}})
+	require.ErrorContains(t, err, "clean repository authorizations")
+	require.Equal(t, []string{"mirror-find", "resources", "git", "rebac", "rebac"}, steps)
+}
+
+// TestRepositoryDeletionWorkerStopsBeforeDatabaseWhenAuthorizationRecordCleanupFails verifies record failures are retryable.
+func TestRepositoryDeletionWorkerStopsBeforeDatabaseWhenAuthorizationRecordCleanupFails(t *testing.T) {
+	ctx := context.Background()
+	steps := []string{}
+	authorizer := &deletionAuthorizer{steps: &steps}
+	store := mockdb.NewMockRepositoryAuthorizationStore(t)
+	store.EXPECT().ListByRepository(ctx, int64(42)).Return(nil, nil).Once()
+	store.EXPECT().DeleteByRepository(ctx, int64(42)).Return(errors.New("database unavailable")).Once()
+	worker := NewRepositoryDeletionWorker(
+		deletionStep{steps: &steps}, deletionResources{steps: &steps}, authorizer, store,
+		deletionFinalizer{steps: &steps}, deletionMirrorTaskFinder{steps: &steps}, &deletionMirrorCanceler{steps: &steps},
+	)
+
+	err := worker.Work(ctx, &river.Job[workhub.RepositoryDeletionArgs]{Args: workhub.RepositoryDeletionArgs{
+		RepositoryID: 42, OwnerType: database.UserNamespace, OwnerUUID: "user-uuid",
+	}})
+	require.ErrorContains(t, err, "delete repository authorization records")
+	require.Equal(t, []string{"mirror-find", "resources", "git", "rebac"}, steps)
+}
+
+// configuredDeletionAuthorizationStore configures the direct authorization cleanup calls for a worker test.
+func configuredDeletionAuthorizationStore(t *testing.T, repositoryID int64, authorizations []database.RepositoryAuthorization, calls int) *mockdb.MockRepositoryAuthorizationStore {
+	t.Helper()
+	store := mockdb.NewMockRepositoryAuthorizationStore(t)
+	store.EXPECT().ListByRepository(mock.Anything, repositoryID).Return(authorizations, nil).Times(calls)
+	store.EXPECT().DeleteByRepository(mock.Anything, repositoryID).Return(nil).Times(calls)
+	return store
+}
+
+// TestCleanRepositoryAuthorizations verifies direct user and organization tuples are removed before records.
+func TestCleanRepositoryAuthorizations(t *testing.T) {
+	ctx := context.Background()
+	store := mockdb.NewMockRepositoryAuthorizationStore(t)
+	steps := []string{}
+	authorizer := &deletionAuthorizer{steps: &steps}
+	authorizations := []database.RepositoryAuthorization{
+		{RepositoryID: 42, SubjectType: types.RepoAuthSubjectUser, SubjectUUID: "user-uuid", Role: types.UserWrite},
+		{RepositoryID: 42, SubjectType: types.RepoAuthSubjectOrganization, SubjectUUID: "organization-uuid", Role: types.UserRead},
+	}
+	store.EXPECT().ListByRepository(ctx, int64(42)).Return(authorizations, nil).Once()
+	store.EXPECT().DeleteByRepository(ctx, int64(42)).Return(nil).Once()
+
+	require.NoError(t, cleanRepositoryAuthorizations(ctx, store, authorizer, 42))
+	require.Equal(t, []rebac.Relationship{
+		{Subject: rebac.UserSubject("user-uuid"), Relation: rebac.RelationWriter, Object: rebac.RepositoryObject(42)},
+		{Subject: rebac.OrganizationMembers("organization-uuid"), Relation: rebac.RelationReader, Object: rebac.RepositoryObject(42)},
+	}, authorizer.relationships)
+}
+
+// TestCleanRepositoryAuthorizationsStopsWhenTupleDeletionFails verifies records remain when ReBAC cleanup fails.
+func TestCleanRepositoryAuthorizationsStopsWhenTupleDeletionFails(t *testing.T) {
+	ctx := context.Background()
+	store := mockdb.NewMockRepositoryAuthorizationStore(t)
+	store.EXPECT().ListByRepository(ctx, int64(42)).Return([]database.RepositoryAuthorization{{
+		RepositoryID: 42, SubjectType: types.RepoAuthSubjectUser, SubjectUUID: "user-uuid", Role: types.UserRead,
+	}}, nil).Once()
+	steps := []string{}
+	authorizer := &deletionAuthorizer{steps: &steps, err: errors.New("ReBAC unavailable")}
+
+	err := cleanRepositoryAuthorizations(ctx, store, authorizer, 42)
+	require.ErrorContains(t, err, "delete repository authorization tuples")
+}
+
+// TestCleanRepositoryAuthorizationsReturnsRecordDeletionError verifies database cleanup errors are returned.
+func TestCleanRepositoryAuthorizationsReturnsRecordDeletionError(t *testing.T) {
+	ctx := context.Background()
+	store := mockdb.NewMockRepositoryAuthorizationStore(t)
+	store.EXPECT().ListByRepository(ctx, int64(42)).Return(nil, nil).Once()
+	store.EXPECT().DeleteByRepository(ctx, int64(42)).Return(errors.New("database unavailable")).Once()
+
+	err := cleanRepositoryAuthorizations(ctx, store, &deletionAuthorizer{}, 42)
+	require.ErrorContains(t, err, "delete repository authorization records")
 }

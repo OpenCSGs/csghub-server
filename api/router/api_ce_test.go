@@ -34,5 +34,6 @@ func TestAddOrgRoutes_CE(t *testing.T) {
 
 	engine := gin.New()
 	require.NoError(t, addOrgRoutes(engine.Group("/api/v1"), middleware.MiddlewareCollection{}, config))
+	assertNoRoute(t, engine.Routes(), http.MethodGet, "/api/v1/:repo_type/:namespace/:name/authorization/inheritance")
 	require.Empty(t, engine.Routes())
 }

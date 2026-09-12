@@ -328,3 +328,9 @@ func Test_Err_ChangePathBlocked(t *testing.T) {
 	assert.Contains(t, err.Error(), "deploy tasks")
 	assert.Contains(t, err.Error(), "REPO-ERR-7")
 }
+
+// Test_Err_RepoAuthorizationNotFound verifies the repository authorization not-found error.
+func Test_Err_RepoAuthorizationNotFound(t *testing.T) {
+	assert.Equal(t, "REPO-ERR-10", ErrRepoAuthorizationNotFound.(CustomError).Code())
+	assert.True(t, errors.Is(ErrRepoAuthorizationNotFound, ErrRepoAuthorizationNotFound))
+}

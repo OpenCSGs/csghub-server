@@ -231,6 +231,7 @@ func (s *organizationUnitStoreImpl) DeleteRoot(ctx context.Context, input Delete
 			Order("id ASC").Scan(ctx, &result.DeletedOrganizationUUIDs); err != nil {
 			return errorx.HandleDBError(err, nil)
 		}
+		result.DeletedOrganizationIDs = append(result.DeletedOrganizationIDs, allOrganizationIDs...)
 		result.DeletedHierarchyRelationships, err = loadOrganizationHierarchyRelationships(ctx, tx, root.ID, nil, !root.DeletedAt.IsZero())
 		if err != nil {
 			return fmt.Errorf("load hierarchy relationships for ReBAC cleanup: %w", err)
@@ -812,6 +813,7 @@ func (s *organizationUnitStoreImpl) Delete(ctx context.Context, input DeleteOrga
 			Order("id ASC").Scan(ctx, &result.DeletedOrganizationUUIDs); err != nil {
 			return fmt.Errorf("load child organization UUIDs for SSO cleanup: %w", err)
 		}
+		result.DeletedOrganizationIDs = append(result.DeletedOrganizationIDs, organizationIDs...)
 		result.DeletedReBACRelationships, err = loadOrganizationReBACCleanup(ctx, tx, organizationIDs)
 		if err != nil {
 			return fmt.Errorf("load subtree member and namespace relationships for ReBAC cleanup: %w", err)

@@ -709,7 +709,7 @@ func (m *mcpServerComponentImpl) Deploy(ctx context.Context, req *types.DeployMC
 		return nil, fmt.Errorf("failed to create mcp space and repo %s/%s to deploy mcp server %s/%s, %w",
 			req.Namespace, req.Name, req.MCPRepo.Namespace, req.MCPRepo.Name, err)
 	}
-	if err := ensureRepositoryNamespaceRelationship(ctx, m.rebac, m.orgStore, namespace, dbRepo.ID); err != nil {
+	if err := ensureRepositoryNamespaceRelationship(ctx, m.rebac, m.orgStore, namespace, dbRepo.ID, dbRepo.OrgInheritBlocked); err != nil {
 		return nil, fmt.Errorf("failed to synchronize deployed repository namespace relationship: %w", err)
 	}
 

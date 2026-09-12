@@ -95,6 +95,7 @@ func buildRepositoryDeletionWorker(cfg *config.Config) (*component.RepositoryDel
 		gitServer,
 		resourceCleaner,
 		authorizer,
+		database.NewRepositoryAuthorizationStore(),
 		database.NewRepositoryDeletionFinalizer(),
 		database.NewRepositoryDeletionMirrorTaskStore(),
 		mirrorCanceler,

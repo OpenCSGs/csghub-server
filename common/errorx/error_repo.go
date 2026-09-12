@@ -13,6 +13,7 @@ const (
 	codeChangePathBlockedErr
 	codeSensitiveCheckNotPassedErr
 	codeRepoZipDownloadFailedErr
+	codeRepoAuthorizationNotFoundErr
 )
 
 var (
@@ -92,6 +93,17 @@ var (
 	//
 	// zh-HK: 下載倉庫 zip 歸檔失敗
 	ErrRepoZipDownloadFailed error = CustomError{prefix: errRepoPrefix, code: codeRepoZipDownloadFailedErr}
+
+	// Description: The repository authorization relationship does not exist.
+	//
+	// Description_ZH: 仓库授权关系不存在
+	//
+	// en-US: The repository authorization relationship does not exist.
+	//
+	// zh-CN: 仓库授权关系不存在
+	//
+	// zh-HK: 儲存庫授權關係不存在
+	ErrRepoAuthorizationNotFound error = CustomError{prefix: errRepoPrefix, code: codeRepoAuthorizationNotFoundErr}
 
 	// Description: Failed to batch get repository extra information.
 	//

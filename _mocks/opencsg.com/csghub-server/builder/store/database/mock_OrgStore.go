@@ -1107,6 +1107,83 @@ func (_c *MockOrgStore_UpdateVerifyStatus_Call) RunAndReturn(run func(context.Co
 	return _c
 }
 
+// SearchHierarchy provides a mock function with given fields: ctx, search, per, page
+func (_m *MockOrgStore) SearchHierarchy(ctx context.Context, search string, per int, page int) ([]database.Organization, int, error) {
+	ret := _m.Called(ctx, search, per, page)
+	if len(ret) == 0 {
+		panic("no return value specified for SearchHierarchy")
+	}
+	var r0 []database.Organization
+	if rf, ok := ret.Get(0).(func(context.Context, string, int, int) []database.Organization); ok {
+		r0 = rf(ctx, search, per, page)
+	} else if ret.Get(0) != nil {
+		r0 = ret.Get(0).([]database.Organization)
+	}
+	var r1 int
+	if rf, ok := ret.Get(1).(func(context.Context, string, int, int) int); ok {
+		r1 = rf(ctx, search, per, page)
+	} else {
+		r1 = ret.Int(1)
+	}
+	var r2 error
+	if rf, ok := ret.Get(2).(func(context.Context, string, int, int) error); ok {
+		r2 = rf(ctx, search, per, page)
+	} else {
+		r2 = ret.Error(2)
+	}
+	return r0, r1, r2
+}
+
+type MockOrgStore_SearchHierarchy_Call struct{ *mock.Call }
+
+func (_e *MockOrgStore_Expecter) SearchHierarchy(ctx interface{}, search interface{}, per interface{}, page interface{}) *MockOrgStore_SearchHierarchy_Call {
+	return &MockOrgStore_SearchHierarchy_Call{Call: _e.mock.On("SearchHierarchy", ctx, search, per, page)}
+}
+func (_c *MockOrgStore_SearchHierarchy_Call) Run(run func(context.Context, string, int, int)) *MockOrgStore_SearchHierarchy_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(int), args[3].(int))
+	})
+	return _c
+}
+func (_c *MockOrgStore_SearchHierarchy_Call) Return(_a0 []database.Organization, _a1 int, _a2 error) *MockOrgStore_SearchHierarchy_Call {
+	_c.Call.Return(_a0, _a1, _a2)
+	return _c
+}
+func (_c *MockOrgStore_SearchHierarchy_Call) RunAndReturn(run func(context.Context, string, int, int) ([]database.Organization, int, error)) *MockOrgStore_SearchHierarchy_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// SearchHierarchyExcludingID provides a mock function with given fields: ctx, search, excludedID, limit.
+func (_m *MockOrgStore) SearchHierarchyExcludingID(ctx context.Context, search string, excludedID int64, limit int) ([]database.Organization, error) {
+	ret := _m.Called(ctx, search, excludedID, limit)
+	var r0 []database.Organization
+	if ret.Get(0) != nil {
+		r0 = ret.Get(0).([]database.Organization)
+	}
+	return r0, ret.Error(1)
+}
+
+// SearchHierarchyExcludingID is a helper method to define mock.On call.
+func (_e *MockOrgStore_Expecter) SearchHierarchyExcludingID(ctx interface{}, search interface{}, excludedID interface{}, limit interface{}) *mock.Call {
+	return _e.mock.On("SearchHierarchyExcludingID", ctx, search, excludedID, limit)
+}
+
+// FindHierarchyByIDs provides a mock function with given fields: ctx, ids.
+func (_m *MockOrgStore) FindHierarchyByIDs(ctx context.Context, ids []int64) ([]database.Organization, error) {
+	ret := _m.Called(ctx, ids)
+	var r0 []database.Organization
+	if ret.Get(0) != nil {
+		r0 = ret.Get(0).([]database.Organization)
+	}
+	return r0, ret.Error(1)
+}
+
+// FindHierarchyByIDs is a helper method to define mock.On call.
+func (_e *MockOrgStore_Expecter) FindHierarchyByIDs(ctx interface{}, ids interface{}) *mock.Call {
+	return _e.mock.On("FindHierarchyByIDs", ctx, ids)
+}
+
 // NewMockOrgStore creates a new instance of MockOrgStore. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func NewMockOrgStore(t interface {

@@ -181,12 +181,14 @@ func TestUserComponent_SoftDelete(t *testing.T) {
 		Consistency: rebac.ConsistencyHigher,
 	}).Return(rebac.Decision{Allowed: true}, nil).Once()
 	mockAuthorizer.EXPECT().Delete(ctx, []rebac.Relationship{userObjectRelationship}).Return(nil).Once()
+	mockRepositoryAuthorizations := setupSoftDeleteRepositoryAuthorizationCleanup(t, ctx, mockAuthorizer, user)
 	uc := &userComponentImpl{
-		userStore: mockUserStore,
-		orgStore:  mockOrgStore,
-		nsStore:   mockNamespaceStore,
-		audit:     mockAuditStore,
-		rebac:     mockAuthorizer,
+		userStore:                mockUserStore,
+		orgStore:                 mockOrgStore,
+		nsStore:                  mockNamespaceStore,
+		audit:                    mockAuditStore,
+		rebac:                    mockAuthorizer,
+		repositoryAuthorizations: mockRepositoryAuthorizations,
 	}
 
 	err := uc.SoftDelete(ctx, "user1", "user2", types.CloseAccountReq{})
@@ -245,14 +247,6 @@ func TestUserComponent_Delete(t *testing.T) {
 	userNamespaceRelationship := rebac.Relationship{
 		Subject: rebac.UserSubject(user2.UUID), Relation: rebac.RelationOwner, Object: rebac.NamespaceObject(userNamespace.UUID),
 	}
-	repositoryCorrelationID := rebac.BatchCheckCorrelationID(0)
-	check := rebac.BatchCheckItem{
-		CorrelationID: repositoryCorrelationID,
-		Check: rebac.CheckRequest{
-			Subject: relationship.Subject, Relation: relationship.Relation, Object: relationship.Object,
-			Consistency: rebac.ConsistencyHigher,
-		},
-	}
 	mockAuditStore.EXPECT().Create(ctx, mock.Anything).Return(nil)
 	mockUserStore.EXPECT().DeleteUserAndRelations(ctx, user2, types.CloseAccountReq{}).Return(nil)
 	mockUserStore.EXPECT().FindByUsernameWithDeleted(ctx, user2.Username).Return(user2, nil)
@@ -268,11 +262,6 @@ func TestUserComponent_Delete(t *testing.T) {
 	mockNamespaceStore.EXPECT().FindByPath(ctx, "foo").Return(database.Namespace{
 		Path: "foo", NamespaceType: database.UserNamespace, User: database.User{UUID: "foo-user-uuid"},
 	}, nil)
-	mockAuthorizer.EXPECT().BatchCheck(ctx, rebac.BatchCheckRequest{Checks: []rebac.BatchCheckItem{check}}).Return(
-		rebac.BatchCheckResult{Results: map[string]rebac.BatchCheckOutcome{
-			repositoryCorrelationID: {Decision: rebac.Decision{Allowed: true}},
-		}}, nil,
-	)
 	mockAuthorizer.EXPECT().Delete(ctx, []rebac.Relationship{relationship}).Return(nil)
 	namespaceCorrelationID := rebac.BatchCheckCorrelationID(0)
 	mockAuthorizer.EXPECT().BatchCheck(ctx, rebac.BatchCheckRequest{Checks: []rebac.BatchCheckItem{{
@@ -301,15 +290,17 @@ func TestUserComponent_Delete(t *testing.T) {
 		Consistency: rebac.ConsistencyHigher,
 	}).Return(rebac.Decision{Allowed: true}, nil).Once()
 	mockAuthorizer.EXPECT().Delete(ctx, []rebac.Relationship{userObjectRelationship}).Return(nil).Once()
+	mockRepositoryAuthorizations := setupDeleteRepositoryAuthorizationCleanup(t, ctx, mockAuthorizer, user2)
 	uc := &userComponentImpl{
-		userStore: mockUserStore,
-		orgStore:  mockOrgStore,
-		audit:     mockAuditStore,
-		repo:      mockRepoStore,
-		nsStore:   mockNamespaceStore,
-		gs:        mockGitserver,
-		rebac:     mockAuthorizer,
-		config:    &config.Config{},
+		userStore:                mockUserStore,
+		orgStore:                 mockOrgStore,
+		audit:                    mockAuditStore,
+		repo:                     mockRepoStore,
+		nsStore:                  mockNamespaceStore,
+		gs:                       mockGitserver,
+		rebac:                    mockAuthorizer,
+		repositoryAuthorizations: mockRepositoryAuthorizations,
+		config:                   &config.Config{},
 	}
 
 	err := uc.Delete(ctx, "user1", "user2")

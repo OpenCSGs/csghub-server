@@ -600,7 +600,7 @@ func (m *mirrorComponentImpl) createMirrorRepoRecords(ctx context.Context, req t
 		if targetNamespace == nil {
 			return nil, fmt.Errorf("mirror repository namespace is required")
 		}
-		if err := ensureRepositoryNamespaceRelationship(ctx, m.rebac, m.orgStore, *targetNamespace, reqMirror.RepositoryID); err != nil {
+		if err := ensureRepositoryNamespaceRelationship(ctx, m.rebac, m.orgStore, *targetNamespace, reqMirror.RepositoryID, false); err != nil {
 			return nil, fmt.Errorf("failed to synchronize mirror repository namespace relationship: %w", err)
 		}
 	}

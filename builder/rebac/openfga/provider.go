@@ -431,7 +431,8 @@ func (p *Provider) write(ctx context.Context, relationships []rebac.Relationship
 				Object:   relationship.Object.String(),
 			})
 		}
-		request.Deletes = &openfgav1.WriteRequestDeletes{TupleKeys: tupleKeys}
+		// OpenFGA's ignore option makes tuple deletion safe for retries and partial cleanup.
+		request.Deletes = &openfgav1.WriteRequestDeletes{TupleKeys: tupleKeys, OnMissing: "ignore"}
 	} else {
 		tupleKeys := make([]*openfgav1.TupleKey, 0, len(relationships))
 		for _, relationship := range relationships {
