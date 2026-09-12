@@ -2,7 +2,9 @@ package handler
 
 import (
 	"bytes"
+	"log/slog"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -196,4 +198,148 @@ func TestRetryWriterTTFTMs(t *testing.T) {
 	ttftMs := retryWriterTTFTMs(writer, startTime)
 	require.Greater(t, ttftMs, int64(0))
 	require.Less(t, ttftMs, int64(1000)) // Should be less than 1 second
+}
+
+// TestResolveProxyPathFromModelEndpoint pins the proxy-path contract of the
+// locally modified resolveProxyPathFromModelEndpoint:
+//
+//   - The extracted endpoint path replaces the client request path in the
+//     reverse-proxy Director (builder/proxy/reverse_proxy.go only rewrites
+//     req.URL.Path when the returned api path is non-empty).
+//   - Storage contract: external upstream endpoints must be stored either as
+//     the full endpoint URL (path includes the terminal segment such as
+//     /v1/chat/completions, e.g.
+//     https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions) or
+//     as a bare host. A base URL with a path prefix but no terminal segment
+//     (e.g. https://host/v1) has its path replace the client path as-is,
+//     which drops /v1/chat/completions upstream — a documented limitation.
+//   - An endpoint that is non-empty but has no usable path logs the
+//     "endpoint has wrong struct" warning; empty/whitespace endpoints are
+//     silently ignored.
+func TestResolveProxyPathFromModelEndpoint(t *testing.T) {
+	tests := []struct {
+		name     string
+		endpoint string
+		wantPath string
+		wantWarn bool
+	}{
+		{
+			name:     "empty endpoint keeps client path",
+			endpoint: "",
+			wantPath: "",
+			wantWarn: false,
+		},
+		{
+			name:     "whitespace endpoint keeps client path without warning",
+			endpoint: "   ",
+			wantPath: "",
+			wantWarn: false,
+		},
+		{
+			name:     "bare host keeps client path and warns",
+			endpoint: "https://api.openai.com",
+			wantPath: "",
+			wantWarn: true,
+		},
+		{
+			name:     "host with port and no path keeps client path and warns",
+			endpoint: "http://127.0.0.1:8080",
+			wantPath: "",
+			wantWarn: true,
+		},
+		{
+			name:     "openai style base url extracts /v1",
+			endpoint: "https://api.openai.com/v1",
+			wantPath: "/v1",
+			wantWarn: false,
+		},
+		{
+			name:     "internal deploy target base url extracts /v1",
+			endpoint: "http://svc-e2e-running.svc.cluster.local:8080/v1",
+			wantPath: "/v1",
+			wantWarn: false,
+		},
+		{
+			// The fixed scenario: the upstream lives under a non-/v1 path
+			// prefix, so the client path /v1/chat/completions must NOT be
+			// forwarded as-is.
+			name:     "dashscope style full endpoint url extracts full prefix path",
+			endpoint: "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions",
+			wantPath: "/compatible-mode/v1/chat/completions",
+			wantWarn: false,
+		},
+		{
+			name:     "deep prefix full endpoint url extracts full prefix path",
+			endpoint: "https://host.example.com/api/v1/chat/completions",
+			wantPath: "/api/v1/chat/completions",
+			wantWarn: false,
+		},
+		{
+			// Documented limitation: this base-URL form replaces the client
+			// path with /compatible-mode/v1, dropping /chat/completions.
+			name:     "base url with non-v1 prefix and no terminal segment extracts prefix path",
+			endpoint: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+			wantPath: "/compatible-mode/v1",
+			wantWarn: false,
+		},
+		{
+			name:     "responses terminated endpoint extracts full path",
+			endpoint: "https://host.example.com/api/v1/responses",
+			wantPath: "/api/v1/responses",
+			wantWarn: false,
+		},
+		{
+			name:     "query string is not part of the path",
+			endpoint: "https://host.example.com/api/v1/chat/completions?api-version=2026-01-01",
+			wantPath: "/api/v1/chat/completions",
+			wantWarn: false,
+		},
+		{
+			name:     "trailing slash is preserved",
+			endpoint: "https://host.example.com/v1/chat/completions/",
+			wantPath: "/v1/chat/completions/",
+			wantWarn: false,
+		},
+		{
+			name:     "root path extracts slash",
+			endpoint: "https://host.example.com/",
+			wantPath: "/",
+			wantWarn: false,
+		},
+		{
+			name:     "invalid url keeps client path and warns",
+			endpoint: "://bad-url",
+			wantPath: "",
+			wantWarn: true,
+		},
+		{
+			name:     "scheme-less host with path is not a parseable endpoint and warns",
+			endpoint: "host.example.com/v1",
+			wantPath: "",
+			wantWarn: true,
+		},
+		{
+			name:     "scheme-less host port path has no url path and warns",
+			endpoint: "myhost:8080/v1",
+			wantPath: "",
+			wantWarn: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			previous := slog.Default()
+			slog.SetDefault(slog.New(slog.NewTextHandler(&buf, nil)))
+			t.Cleanup(func() { slog.SetDefault(previous) })
+
+			got := resolveProxyPathFromModelEndpoint(tt.endpoint, "test-model")
+
+			require.Equal(t, tt.wantPath, got)
+			require.Equal(t, tt.wantWarn, strings.Contains(buf.String(), "endpoint has wrong struct"))
+			if tt.wantWarn {
+				require.Contains(t, buf.String(), "model=test-model")
+			}
+		})
+	}
 }

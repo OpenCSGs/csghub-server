@@ -954,3 +954,242 @@ func TestRetryChatWithFallback_ReportsFallbackAttemptFailure(t *testing.T) {
 	require.Equal(t, http.StatusServiceUnavailable, events[0].StatusCode)
 	require.True(t, events[0].Retryable)
 }
+
+// TestExecuteChatProxyAttempt_ProxiesEndpointPathToUpstream pins how the chat
+// proxy combines the upstream endpoint URL with the client request path. The
+// reverse-proxy Director replaces req.URL.Path with the endpoint's own path
+// whenever the endpoint carries one, so an upstream stored under a non-/v1
+// prefix receives its own full path instead of the client's /v1/chat/completions.
+func TestExecuteChatProxyAttempt_ProxiesEndpointPathToUpstream(t *testing.T) {
+	tests := []struct {
+		name             string
+		endpointSuffix   string
+		wantReceivedPath string
+	}{
+		{
+			// The fixed 404 scenario: upstream lives under
+			// /compatible-mode/v1 (e.g. dashscope), so forwarding the client
+			// path /v1/chat/completions unchanged would 404 upstream.
+			name:             "full endpoint url with non-v1 prefix forwards endpoint path",
+			endpointSuffix:   "/compatible-mode/v1/chat/completions",
+			wantReceivedPath: "/compatible-mode/v1/chat/completions",
+		},
+		{
+			name:             "bare host endpoint forwards client path",
+			endpointSuffix:   "",
+			wantReceivedPath: "/v1/chat/completions",
+		},
+		{
+			// Documented limitation: a base URL without the terminal segment
+			// replaces the client path with its own prefix path, which a real
+			// upstream would 404. The endpoint must be stored as a full URL.
+			name:             "base url with prefix replaces client path",
+			endpointSuffix:   "/compatible-mode/v1",
+			wantReceivedPath: "/compatible-mode/v1",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tester, c, _ := setupTest(t)
+			tester.mocks.openAIComp.ExpectedCalls = nil
+
+			var receivedPath string
+			upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				receivedPath = r.URL.Path
+				w.WriteHeader(http.StatusOK)
+				_, err := w.Write([]byte(`{"status":"ok"}`))
+				require.NoError(t, err)
+			}))
+			defer upstream.Close()
+
+			targetURL := upstream.URL + tt.endpointSuffix
+			modelTarget := &resolvedModelTarget{
+				Model: &types.Model{
+					BaseModel: types.BaseModel{ID: "test-model"},
+					Endpoint:  targetURL,
+				},
+				Upstream:  commontypes.UpstreamConfig{ID: 1, URL: targetURL, Enabled: true},
+				ModelName: "provider-model",
+				Target:    targetURL,
+			}
+			tester.mocks.openAIComp.EXPECT().
+				CheckUsageLimit(mock.Anything, "user-1", modelTarget.Model, targetURL).
+				Return(nil).
+				Once()
+
+			requestBody := []byte(`{"message":"hello"}`)
+			c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewReader(requestBody))
+			writer := newTestCommonResponseWriter()
+			chatReq := &types.ChatCompletionRequest{Model: "test-model"}
+
+			retryWriter, err := tester.handler.executeChatProxyAttempt(c, writer, modelTarget, "user-1", chatReq)
+
+			require.NoError(t, err)
+			require.NotNil(t, retryWriter)
+			require.Equal(t, tt.wantReceivedPath, receivedPath)
+			require.Equal(t, http.StatusOK, retryWriter.StatusCode())
+			require.True(t, retryWriter.StreamStarted())
+		})
+	}
+}
+
+// TestExecuteChatProxyAttempt_Upstream404FlowsThroughRetryWriter pins the
+// failure signal of the original bug: an upstream that does not serve the
+// forwarded path answers 404, the retry writer buffers it (so a fallback can
+// still take over), and without fallbacks the 404 is replayed to the client
+// instead of being masked.
+func TestExecuteChatProxyAttempt_Upstream404FlowsThroughRetryWriter(t *testing.T) {
+	tester, c, _ := setupTest(t)
+	tester.mocks.openAIComp.ExpectedCalls = nil
+
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		_, err := w.Write([]byte(`{"error":"not found"}`))
+		require.NoError(t, err)
+	}))
+	defer upstream.Close()
+
+	targetURL := upstream.URL + "/compatible-mode/v1/chat/completions"
+	modelTarget := &resolvedModelTarget{
+		Model: &types.Model{
+			BaseModel: types.BaseModel{ID: "test-model"},
+			Endpoint:  targetURL,
+		},
+		Upstream:  commontypes.UpstreamConfig{ID: 1, URL: targetURL, Enabled: true},
+		ModelName: "provider-model",
+		Target:    targetURL,
+	}
+	tester.mocks.openAIComp.EXPECT().
+		CheckUsageLimit(mock.Anything, "user-1", modelTarget.Model, targetURL).
+		Return(nil).
+		Once()
+
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewReader([]byte(`{"message":"hello"}`)))
+	writer := newTestCommonResponseWriter()
+
+	retryWriter, err := tester.handler.executeChatProxyAttempt(c, writer, modelTarget, "user-1", &types.ChatCompletionRequest{Model: "test-model"})
+
+	require.NoError(t, err)
+	require.NotNil(t, retryWriter)
+	// The failed attempt stays buffered so a fallback attempt remains possible.
+	require.Equal(t, http.StatusNotFound, retryWriter.StatusCode())
+	require.False(t, retryWriter.StreamStarted())
+	require.Empty(t, writer.body.String())
+	require.Equal(t, 0, writer.statusCode)
+	// 404 is a retryable status, and with no fallback left the buffered
+	// response is replayed verbatim to the client.
+	require.True(t, shouldRetryChatAttempt(retryWriter.StatusCode(), retryWriter.StreamStarted()))
+	require.NoError(t, retryWriter.ReplayBufferedResponse())
+	require.Equal(t, http.StatusNotFound, writer.statusCode)
+	require.Equal(t, `{"error":"not found"}`, writer.body.String())
+}
+
+// TestRetryChatWithFallback_FallbackPathFollowsFallbackEndpoint pins that a
+// fallback upstream with a different path prefix receives its own endpoint
+// path: the proxy path is re-extracted from the fallback upstream URL, not
+// carried over from the primary attempt.
+func TestRetryChatWithFallback_FallbackPathFollowsFallbackEndpoint(t *testing.T) {
+	tester, c, _ := setupTest(t)
+	tester.mocks.openAIComp.ExpectedCalls = nil
+
+	var primaryPath, fallbackPath string
+	primary := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		primaryPath = r.URL.Path
+		w.WriteHeader(http.StatusBadGateway)
+		_, err := w.Write([]byte(`bad gateway`))
+		require.NoError(t, err)
+	}))
+	defer primary.Close()
+
+	fallback := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fallbackPath = r.URL.Path
+		w.WriteHeader(http.StatusOK)
+		_, err := w.Write([]byte(`ok from fallback`))
+		require.NoError(t, err)
+	}))
+	defer fallback.Close()
+
+	fallbackURL := fallback.URL + "/node-b/v1/chat/completions"
+	modelTarget := &resolvedModelTarget{
+		Model: &types.Model{
+			BaseModel: types.BaseModel{ID: "test-model"},
+			Endpoint:  primary.URL + "/v1/chat/completions",
+			Upstreams: []commontypes.UpstreamConfig{
+				{ID: 2, URL: fallbackURL, Enabled: true},
+			},
+		},
+		ModelName: "test-model",
+		Target:    primary.URL + "/v1/chat/completions",
+		AttemptTargets: []commontypes.UpstreamConfig{
+			{ID: 2, URL: fallbackURL, Enabled: true},
+		},
+	}
+	tester.mocks.openAIComp.EXPECT().
+		CheckUsageLimit(mock.Anything, "user-1", modelTarget.Model, fallbackURL).
+		Return(nil).
+		Once()
+
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewReader([]byte(`{"message":"hello"}`)))
+	writer := newTestCommonResponseWriter()
+
+	_, err := tester.handler.retryChatWithFallback(c, writer, modelTarget, "user-1", &types.ChatCompletionRequest{Model: "test-model"}, nil, nil)
+
+	require.NoError(t, err)
+	require.Equal(t, "/node-b/v1/chat/completions", fallbackPath)
+	// Only the fallback attempt runs here; the primary attempt belongs to the
+	// caller's first executeChatProxyAttempt.
+	require.Empty(t, primaryPath)
+	require.Equal(t, http.StatusOK, writer.statusCode)
+	require.Equal(t, `ok from fallback`, writer.body.String())
+	require.Equal(t, fallbackURL, modelTarget.Target)
+	require.Equal(t, fallbackURL, modelTarget.Model.Endpoint)
+}
+
+// TestExecuteChatProxyAttempt_ResponsesCompatRewritePreservesPrefix extends
+// the /responses compatibility rewrite to a prefix that no longer coincides
+// with the client path: /api/v1/responses must reach the upstream as
+// /api/v1/chat/completions, not /v1/chat/completions.
+func TestExecuteChatProxyAttempt_ResponsesCompatRewritePreservesPrefix(t *testing.T) {
+	tester, c, _ := setupTest(t)
+	tester.mocks.openAIComp.ExpectedCalls = nil
+
+	var receivedPath string
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		receivedPath = r.URL.Path
+		w.WriteHeader(http.StatusOK)
+		_, err := w.Write([]byte(`{"status":"ok"}`))
+		require.NoError(t, err)
+	}))
+	defer upstream.Close()
+
+	responsesURL := upstream.URL + "/api/v1/responses"
+	chatURL := upstream.URL + "/api/v1/chat/completions"
+	modelTarget := &resolvedModelTarget{
+		Model: &types.Model{
+			BaseModel: types.BaseModel{ID: "test-model"},
+			Endpoint:  responsesURL,
+		},
+		Upstream:  commontypes.UpstreamConfig{ID: 1, URL: responsesURL, Enabled: true},
+		ModelName: "provider-model",
+		Target:    responsesURL,
+	}
+	applyChatCompletionsEndpointCompatibility(c.Request.Context(), modelTarget)
+
+	tester.mocks.openAIComp.EXPECT().
+		CheckUsageLimit(mock.Anything, "user-1", modelTarget.Model, chatURL).
+		Return(nil).
+		Once()
+
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewReader([]byte(`{"message":"hello"}`)))
+	writer := newTestCommonResponseWriter()
+
+	retryWriter, err := tester.handler.executeChatProxyAttempt(c, writer, modelTarget, "user-1", &types.ChatCompletionRequest{Model: "test-model"})
+
+	require.NoError(t, err)
+	require.NotNil(t, retryWriter)
+	require.Equal(t, chatURL, modelTarget.Target)
+	require.Equal(t, chatURL, modelTarget.Model.Endpoint)
+	require.Equal(t, "/api/v1/chat/completions", receivedPath)
+	require.Equal(t, http.StatusOK, retryWriter.StatusCode())
+}

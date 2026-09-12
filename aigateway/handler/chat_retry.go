@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -11,6 +12,7 @@ import (
 	"opencsg.com/csghub-server/aigateway/types"
 
 	commontypes "opencsg.com/csghub-server/common/types"
+	commonutils "opencsg.com/csghub-server/common/utils/common"
 )
 
 const defaultChatMaxFallbackAttempts = 2
@@ -204,12 +206,9 @@ func buildChatAttemptTargets(primary commontypes.UpstreamConfig, upstreams []com
 }
 
 func resolveProxyPathFromModelEndpoint(endpoint string, modelName string) string {
-	// Return empty so the reverse proxy preserves the client's original
-	// request path (e.g. /v1/chat/completions). The upstream URL stored in
-	// model.Endpoint already contains any path prefix (e.g. /v1), and the
-	// proxy Director only replaces the path when api is non-empty. By
-	// returning empty we ensure the full client path reaches the upstream.
-	_ = endpoint
-	_ = modelName
-	return ""
+	proxyPath := commonutils.ExtractURLPath(endpoint)
+	if strings.TrimSpace(endpoint) != "" && proxyPath == "" {
+		slog.Warn("endpoint has wrong struct", slog.String("model", modelName))
+	}
+	return proxyPath
 }
