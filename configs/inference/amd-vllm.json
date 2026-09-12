@@ -6,9 +6,9 @@
   "engine_images": [
     {
       "compute_type": "gpu",
-      "image": "opencsghq/amd-vllm:rocm7.2.1_vllm_0.24.3",
+      "image": "opencsghq/amd-vllm:rocm7.2.1_vllm_0.28.0",
       "driver_version": "7.2.1",
-      "engine_version": "0.24.3"
+      "engine_version": "0.28.0"
     }
   ],
   "engine_args": [
@@ -202,6 +202,7 @@
     "Glm4MoeLiteForCausalLM",
     "Glm4vForConditionalGeneration",
     "Glm4vMoeForConditionalGeneration",
+    "Glm5NextForConditionalGeneration",
     "GlmAsrForConditionalGeneration",
     "GlmForCausalLM",
     "GlmMoeDsaForCausalLM",
@@ -331,6 +332,7 @@
     "Qwen3VLMoeForConditionalGeneration",
     "Qwen3_5ForConditionalGeneration",
     "Qwen3_5MoeForConditionalGeneration",
+    "Qwen4ExpForConditionalGeneration",
     "QwenVLForConditionalGeneration",
     "RForConditionalGeneration",
     "RWForCausalLM",
@@ -432,6 +434,7 @@
     "GlmMoeDsaForCausalLM": "glm47",
     "Glm4ForCausalLM": "glm47",
     "Glm4MoeForCausalLM": "glm45",
+    "Glm5NextForConditionalGeneration": "glm47",
     "GptOssForCausalLM": "openai",
     "GraniteForCausalLM": "granite",
     "HermesForCausalLM": "hermes",
@@ -463,6 +466,7 @@
     "Qwen3NextForCausalLM": "hermes",
     "Qwen3_5ForConditionalGeneration": "qwen3_coder",
     "Qwen3_5MoeForConditionalGeneration": "qwen3_coder",
+    "Qwen4ExpForConditionalGeneration": "qwen3_coder",
     "QwenForCausalLM": "hermes",
     "ToolACEForCausalLM": "pythonic",
     "UltravoxForCausalLM": "pythonic",

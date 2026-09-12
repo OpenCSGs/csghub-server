@@ -1,4 +1,4 @@
-"""Patch vLLM v0.24.0 to expose the decoded input audio duration.
+"""Patch vLLM v0.28.0 to expose the decoded input audio duration.
 
 The patch is intentionally version-locked. It must fail during the image build
 when vLLM changes, rather than silently producing an image without the header.
@@ -12,7 +12,7 @@ import vllm
 def replace_once(path: Path, old: str, new: str) -> None:
     content = path.read_text()
     if content.count(old) != 1:
-        raise RuntimeError(f"unexpected vLLM v0.24.0 source in {path}")
+        raise RuntimeError(f"unexpected vLLM v0.28.0 source in {path}")
     path.write_text(content.replace(old, new))
 
 
@@ -22,13 +22,21 @@ routerPath = vllmRoot / "entrypoints/speech_to_text/transcription/api_router.py"
 
 replace_once(
     servingPath,
-    """        engine_inputs, duration_s = await self._preprocess_speech_to_text(
+    """        (
+            engine_inputs,
+            duration_s,
+            chunk_start_offsets,
+        ) = await self._preprocess_speech_to_text(
             request=request,
             audio_data=audio_data,
             request_id=request_id,
         )
 """,
-    """        engine_inputs, duration_s = await self._preprocess_speech_to_text(
+    """        (
+            engine_inputs,
+            duration_s,
+            chunk_start_offsets,
+        ) = await self._preprocess_speech_to_text(
             request=request,
             audio_data=audio_data,
             request_id=request_id,

@@ -1,26 +1,27 @@
-"""Patch vLLM-Omni v0.24.0 to expose generated TTS duration.
+"""Patch vLLM-Omni v0.28.0 to expose generated TTS duration.
 
 The patch is intentionally version-locked. It must fail during the image
 build when vLLM-Omni changes, rather than silently producing an image without
 the duration field.
 """
 
+import importlib.util
 from pathlib import Path
-
-import vllm_omni
 
 
 def replace_once(path: Path, old: str, new: str) -> None:
     content = path.read_text()
     if content.count(old) != 1:
-        raise RuntimeError(f"unexpected vLLM-Omni v0.24.0 source in {path}")
+        raise RuntimeError(f"unexpected vLLM-Omni v0.28.0 source in {path}")
     path.write_text(content.replace(old, new))
 
 
-serving_path = (
-    Path(vllm_omni.__file__).resolve().parent
-    / "entrypoints/openai/serving_speech.py"
-)
+# Do not import vllm_omni: v0.28.0 loads CUDA libcudart at import time,
+# which is missing in the ROCm image.
+spec = importlib.util.find_spec("vllm_omni")
+if spec is None or spec.origin is None:
+    raise RuntimeError("vllm_omni is not installed")
+serving_path = Path(spec.origin).resolve().parent / "entrypoints/openai/serving_speech.py"
 
 replace_once(
     serving_path,
@@ -39,14 +40,12 @@ replace_once(
     serving_path,
     """                    if chunk_np.ndim > 1:
                         chunk_np = chunk_np.squeeze()
-                    # For WAV format, emit header before first audio chunk
 """,
     """                    if chunk_np.ndim > 1:
                         chunk_np = chunk_np.squeeze()
                     chunk_array = np.asarray(chunk_np)
                     chunk_channels = _infer_audio_num_channels(chunk_array)
                     total_audio_samples += int(chunk_array.size // max(chunk_channels, 1))
-                    # For WAV format, emit header before first audio chunk
 """,
 )
 
@@ -113,37 +112,29 @@ replace_once(
 replace_once(
     serving_path,
     """        usage_out: list[SpeechTokenUsage] | None = None,
+        has_inline_ref_audio: bool | None = None,
+        collect: dict | None = None,
     ) -> tuple[bytes | str, str]:
 """,
     """        raw_request: Request | None = None,
         usage_out: list[SpeechTokenUsage] | None = None,
+        has_inline_ref_audio: bool | None = None,
+        collect: dict | None = None,
     ) -> tuple[bytes | str, str]:
 """,
 )
 
 replace_once(
     serving_path,
-    """            if hasattr(audio_tensor, "float"):
-                audio_tensor = audio_tensor.float().detach().cpu().numpy()
-
-            if audio_tensor.ndim > 1:
-                audio_tensor = audio_tensor.squeeze()
-
-            audio_obj = CreateAudio(
+    """            audio_obj = CreateAudio(
                 audio_tensor=audio_tensor,
                 sample_rate=sample_rate,
                 response_format=request.response_format or "wav",
-                speed=request.speed or 1.0,
+                speed=self._audio_encode_speed(request),
                 base64_encode=base64_encode,
             )
 """,
-    """            if hasattr(audio_tensor, "float"):
-                audio_tensor = audio_tensor.float().detach().cpu().numpy()
-
-            if audio_tensor.ndim > 1:
-                audio_tensor = audio_tensor.squeeze()
-
-            audio_duration_s = None
+    """            audio_duration_s = None
             if sample_rate > 0:
                 audio_array = np.asarray(audio_tensor)
                 audio_channels = _infer_audio_num_channels(audio_array)
@@ -155,7 +146,7 @@ replace_once(
                 audio_tensor=audio_tensor,
                 sample_rate=sample_rate,
                 response_format=request.response_format or "wav",
-                speed=request.speed or 1.0,
+                speed=self._audio_encode_speed(request),
                 base64_encode=base64_encode,
             )
 """,
@@ -163,22 +154,42 @@ replace_once(
 
 replace_once(
     serving_path,
-    """            audio_bytes, media_type = await self._generate_audio_bytes(request, request_id=request_id)
+    """                audio_bytes, media_type = await self._generate_audio_bytes(
+                    request, request_id=request_id, usage_out=usage_box, collect=collect
+                )
 """,
-    """            audio_bytes, media_type = await self._generate_audio_bytes(
-                request,
-                request_id=request_id,
-                raw_request=raw_request,
-            )
+    """                audio_bytes, media_type = await self._generate_audio_bytes(
+                    request, request_id=request_id, usage_out=usage_box, collect=collect, raw_request=raw_request,
+                )
 """,
 )
 
 replace_once(
     serving_path,
-    """            return Response(content=audio_bytes, media_type=media_type)
+    """                audio_bytes, media_type = await self._generate_audio_bytes(
+                    retry_request,
+                    request_id=retry_request_id,
+                    usage_out=usage_box,
+                    collect=collect,
+                )
+""",
+    """                audio_bytes, media_type = await self._generate_audio_bytes(
+                    retry_request,
+                    request_id=retry_request_id,
+                    usage_out=usage_box,
+                    collect=collect,
+                    raw_request=raw_request,
+                )
+""",
+)
+
+replace_once(
+    serving_path,
+    """            return Response(content=audio_bytes, media_type=media_type, headers=headers)
 """,
     """            duration_s = getattr(raw_request.state, "audio_duration_s", None) if raw_request is not None else None
-            headers = {"Audio-Duration-Seconds": f"{duration_s:.3f}"} if duration_s is not None else None
+            if duration_s is not None:
+                headers["Audio-Duration-Seconds"] = f"{duration_s:.3f}"
             return Response(content=audio_bytes, media_type=media_type, headers=headers)
 """,
 )
