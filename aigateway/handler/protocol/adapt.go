@@ -275,12 +275,26 @@ func rewriteToChatPath(target RoutingTarget) string {
 	// Replace only the terminal path segment so any prefix (e.g. /api/v1) is
 	// preserved: /api/v1/responses -> /api/v1/chat/completions, not
 	// /v1/chat/completions.
+	//
+	// A trailing /anthropic namespace segment directly before the terminal
+	// /messages segment is dropped as well: providers such as DeepSeek expose
+	// their Anthropic-compatible API under an /anthropic prefix
+	// (https://api.deepseek.com/anthropic/messages) while the chat-completions
+	// counterpart lives outside that namespace, so replacing the terminal
+	// segment in place would yield /anthropic/chat/completions and 404.
 	path := strings.TrimRight(parsed.Path, "/")
 	if path == "" {
 		parsed.Path = "/v1/chat/completions"
 	} else {
 		parts := strings.Split(path, "/")
-		parts[len(parts)-1] = "chat/completions"
+		// parsed.Path always starts with "/" here, so parts[0] is the empty
+		// leading element and can never equal "anthropic"; two segments are
+		// enough to inspect the one preceding the terminal segment.
+		if n := len(parts); n >= 2 && parts[n-2] == "anthropic" && parts[n-1] == "messages" {
+			parts = append(parts[:n-2], "chat/completions")
+		} else {
+			parts[len(parts)-1] = "chat/completions"
+		}
 		parsed.Path = strings.Join(parts, "/")
 	}
 	parsed.RawPath = ""

@@ -208,6 +208,18 @@ func TestResolveRoutingChatFallback(t *testing.T) {
 			expectedURL:    "https://api.anthropic.com/v1/chat/completions",
 		},
 		{
+			name:           "chat to messages under /anthropic namespace - strip namespace",
+			clientProtocol: types.ProtocolChat,
+			target:         RoutingTarget{Target: "https://api.deepseek.com/anthropic/messages"},
+			expectedURL:    "https://api.deepseek.com/chat/completions",
+		},
+		{
+			name:           "chat to messages with path prefix under /anthropic namespace - strip namespace only",
+			clientProtocol: types.ProtocolChat,
+			target:         RoutingTarget{Target: "https://gateway.example.com/api/anthropic/messages"},
+			expectedURL:    "https://gateway.example.com/api/chat/completions",
+		},
+		{
 			name:           "chat to responses via metadata - rewrite path",
 			clientProtocol: types.ProtocolChat,
 			target:         RoutingTarget{Target: "https://example.com/v1/responses", UpstreamMetadata: map[string]any{"protocol": "responses"}},
@@ -248,6 +260,85 @@ func TestResolveRoutingChatFallback(t *testing.T) {
 			assert.Equal(t, tt.expectedURL, decision.BackendURL)
 			// UpstreamProtocol should still reflect the actual upstream protocol.
 			assert.NotEqual(t, types.ProtocolChat, decision.UpstreamProtocol)
+		})
+	}
+}
+
+// TestRewriteToChatPath pins the URL rewriting contract of the Chat fallback.
+// Only the terminal path segment is replaced so that any prefix is preserved
+// (/v1/messages -> /v1/chat/completions), with one exception: a trailing
+// /anthropic namespace segment directly before /messages is dropped, because
+// providers such as DeepSeek serve their Anthropic-compatible API under
+// /anthropic (https://api.deepseek.com/anthropic/messages) while the
+// chat-completions endpoint lives outside that namespace — rewriting the
+// terminal segment in place would produce /anthropic/chat/completions, which
+// upstreams answer with 404.
+func TestRewriteToChatPath(t *testing.T) {
+	tests := []struct {
+		name        string
+		target      string
+		expectedURL string
+	}{
+		{
+			name:        "anthropic namespace messages endpoint strips /anthropic",
+			target:      "https://api.deepseek.com/anthropic/messages",
+			expectedURL: "https://api.deepseek.com/chat/completions",
+		},
+		{
+			name:        "v1 messages endpoint keeps /v1 prefix",
+			target:      "https://api.anthropic.com/v1/messages",
+			expectedURL: "https://api.anthropic.com/v1/chat/completions",
+		},
+		{
+			name:        "generic path prefix messages endpoint keeps prefix",
+			target:      "https://gateway.example.com/api/v1/messages",
+			expectedURL: "https://gateway.example.com/api/v1/chat/completions",
+		},
+		{
+			name:        "path prefix with anthropic namespace strips namespace only",
+			target:      "https://gateway.example.com/api/anthropic/messages",
+			expectedURL: "https://gateway.example.com/api/chat/completions",
+		},
+		{
+			name:        "bare messages endpoint rewrites terminal segment",
+			target:      "https://example.com/messages",
+			expectedURL: "https://example.com/chat/completions",
+		},
+		{
+			name:        "anthropic namespace messages endpoint with trailing slash strips /anthropic",
+			target:      "https://api.deepseek.com/anthropic/messages/",
+			expectedURL: "https://api.deepseek.com/chat/completions",
+		},
+		{
+			name:        "anthropic terminal segment keeps old terminal replacement",
+			target:      "https://api.anthropic.com/v1/anthropic",
+			expectedURL: "https://api.anthropic.com/v1/chat/completions",
+		},
+		{
+			name:        "responses endpoint keeps old terminal replacement",
+			target:      "https://example.com/v1/responses",
+			expectedURL: "https://example.com/v1/chat/completions",
+		},
+		{
+			name:        "responses endpoint under anthropic namespace keeps namespace",
+			target:      "https://example.com/anthropic/responses",
+			expectedURL: "https://example.com/anthropic/chat/completions",
+		},
+		{
+			name:        "bare host appends default chat path",
+			target:      "https://example.com",
+			expectedURL: "https://example.com/v1/chat/completions",
+		},
+		{
+			name:        "empty target returns empty",
+			target:      "",
+			expectedURL: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expectedURL, rewriteToChatPath(RoutingTarget{Target: tt.target}))
 		})
 	}
 }
