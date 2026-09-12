@@ -2,6 +2,7 @@ package event
 
 import (
 	"fmt"
+	"log/slog"
 	"time"
 
 	bldmq "opencsg.com/csghub-server/builder/mq"
@@ -93,3 +94,33 @@ func (ec *EventPublisher) PublishLLMLogTrainingEvent(message []byte) error {
 
 	return nil
 }
+
+// PublishDeployUpstreamSyncEvent publishes a deploy upstream sync event to the
+// specified subject. It is fire-and-forget: publishing runs asynchronously so
+// the caller (deploy lifecycle callback) is never blocked. Retries up to 3
+// times with 1s delay inside the goroutine. The error return is always nil —
+// failures are logged but never surfaced, because the Temporal cron
+// reconciliation will catch up on any missed events.
+func (ec *EventPublisher) PublishDeployUpstreamSyncEvent(subject string, message []byte) error {
+	if ec.MQ == nil {
+		return nil
+	}
+	go func() {
+		var err error
+		for range 3 {
+			err = ec.MQ.Publish(subject, message)
+			if err == nil {
+				return
+			}
+			// Sleep before retrying. The fire-and-forget goroutine has no
+			// cancellable context available (the caller's ctx may already be
+			// done by the time this runs), so a plain timer is the simplest
+			// correct backoff. 3 attempts × 1s is bounded and short.
+			time.Sleep(1 * time.Second)
+		}
+		slog.Error("failed to publish deploy upstream sync event after 3 retries",
+			slog.String("subject", subject), slog.Any("error", err))
+	}()
+	return nil
+}
+

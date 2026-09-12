@@ -82,7 +82,7 @@ func (p *videoProcessor) resolveModel(ctx context.Context, ref taskprocessor.Gen
 	if p.openaiComponent == nil {
 		return nil, fmt.Errorf("aigateway async generation openai component is not configured")
 	}
-	model, err := p.openaiComponent.GetModelByID(ctx, "", ref.ModelID)
+	model, err := p.openaiComponent.GetModelByID(ctx, ref.OwnerUUID, ref.ModelID)
 	if err != nil {
 		return nil, err
 	}

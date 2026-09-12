@@ -10,6 +10,7 @@ bin
 .agents
 .codex
 .sisyphus
+.zcode
 
 .DS_Store
 .envrc
@@ -52,4 +53,4 @@ docs/swagger.yaml
 docs/docs.go
 pgdata15/
 .prd/
-/docker/finetune/local/aigateway/cmd/fake-upstream/main.go
+cmd/dev/

@@ -75,7 +75,7 @@ func (p *plannerImpl) Plan(c *gin.Context, meta *types.RequestMetadata) (*types.
 		CSGHubHosted:     mt.Model.SvcName != "",
 		RuntimeFramework: mt.Model.RuntimeFramework,
 		ImageID:          mt.Model.ImageID,
-		UpstreamMetadata: mt.Upstream.Metadata,
+		ProtocolOverride: mt.Upstream.MetadataProtocol(),
 	})
 	if err != nil {
 		pl.ErrorCode = types.PlanErrUnknown

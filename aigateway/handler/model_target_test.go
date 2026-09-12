@@ -15,7 +15,6 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"opencsg.com/csghub-server/aigateway/types"
-	"opencsg.com/csghub-server/builder/store/database"
 	commontypes "opencsg.com/csghub-server/common/types"
 )
 
@@ -263,46 +262,19 @@ func TestResolveModelTarget_CSGHubModel(t *testing.T) {
 			CSGHubModelID: "namespace/model",
 			ClusterID:     "cluster-1",
 			SvcName:       "svc-model",
+			Host:          "model.internal",
 		},
 		Endpoint: "https://model.internal/v1/chat/completions",
 	}
 	tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "model1").Return(model, nil).Once()
-	tester.mocks.mockClsComp.EXPECT().GetClusterByID(mock.Anything, "cluster-1").Return(&database.ClusterInfo{
-		ClusterID: "cluster-1",
-	}, nil).Once()
 
 	resolved, err := tester.handler.resolveModelTarget(context.Background(), "testuser", "model1", http.Header{})
 
 	require.NoError(t, err)
 	require.Equal(t, "https://model.internal/v1/chat/completions", resolved.Target)
-	require.Empty(t, resolved.Host)
+	require.Equal(t, "model.internal", resolved.Host)
 	require.Equal(t, "namespace/model", resolved.ModelName)
 	require.Empty(t, resolved.AttemptTargets)
-}
-
-func TestResolveModelTarget_CSGHubModelClusterNotFound(t *testing.T) {
-	tester, _, _ := setupTest(t)
-	model := &types.Model{
-		BaseModel: types.BaseModel{
-			ID: "raw-model-id",
-		},
-		InternalModelInfo: types.InternalModelInfo{
-			CSGHubModelID: "namespace/model",
-			ClusterID:     "cluster-1",
-			SvcName:       "svc-model",
-		},
-		Endpoint: "https://model.internal/v1/chat/completions",
-	}
-	tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "model1").Return(model, nil).Once()
-	tester.mocks.mockClsComp.EXPECT().GetClusterByID(mock.Anything, "cluster-1").Return(nil, errors.New("cluster missing")).Once()
-
-	_, err := tester.handler.resolveModelTarget(context.Background(), "testuser", "model1", http.Header{})
-
-	require.Error(t, err)
-	targetErr, ok := err.(*modelTargetError)
-	require.True(t, ok)
-	require.Equal(t, "cluster_not_found", targetErr.APIError.Code)
-	require.Equal(t, http.StatusBadRequest, targetErr.Status)
 }
 
 func TestResolveCSGHubModelTarget_StableAcrossCalls(t *testing.T) {
@@ -314,17 +286,15 @@ func TestResolveCSGHubModelTarget_StableAcrossCalls(t *testing.T) {
 		InternalModelInfo: types.InternalModelInfo{
 			CSGHubModelID: "namespace/model",
 			ClusterID:     "cluster-1",
+			Host:          "origin.internal",
 		},
+		Endpoint: "https://origin.internal/v1/chat/completions",
 	}
 	targetReq := commontypes.EndpointReq{
 		ClusterID: "cluster-1",
 		Target:    "https://origin.internal/v1/chat/completions",
 		Endpoint:  "https://origin.internal/v1/chat/completions",
 	}
-	tester.mocks.mockClsComp.EXPECT().GetClusterByID(mock.Anything, "cluster-1").Return(&database.ClusterInfo{
-		ClusterID:   "cluster-1",
-		AppEndpoint: "",
-	}, nil).Times(5)
 
 	var firstTarget string
 	var firstHost string
@@ -343,6 +313,32 @@ func TestResolveCSGHubModelTarget_StableAcrossCalls(t *testing.T) {
 		require.Equal(t, firstModelName, modelName)
 	}
 	require.Equal(t, "namespace/model", firstModelName)
+}
+
+func TestResolveCSGHubModelTarget_ReturnsMetadataDirectly(t *testing.T) {
+	tester, _, _ := setupTest(t)
+	model := &types.Model{
+		BaseModel: types.BaseModel{
+			ID: "ns/model:svc1",
+		},
+		InternalModelInfo: types.InternalModelInfo{
+			CSGHubModelID: "ns/model",
+			ClusterID:     "cluster-1",
+			Host:          "fty8n9msz6kg.default.svc.cluster.local",
+		},
+		Endpoint: "http://127.0.0.1:9099/v1",
+	}
+	targetReq := commontypes.EndpointReq{
+		ClusterID: "cluster-1",
+		Endpoint:  "http://fty8n9msz6kg.default.svc.cluster.local:8080/v1",
+	}
+
+	// No cluster query should happen — all data comes from the model metadata.
+	target, host, modelName, err := tester.handler.resolveCSGHubModelTarget(context.Background(), model, targetReq)
+	require.NoError(t, err)
+	require.Equal(t, "http://127.0.0.1:9099/v1", target)
+	require.Equal(t, "fty8n9msz6kg.default.svc.cluster.local", host)
+	require.Equal(t, "ns/model", modelName)
 }
 
 func TestResolveEndpointModelTarget_SameSessionKeyStableAcrossCalls(t *testing.T) {
@@ -448,9 +444,6 @@ func TestResolveModelTarget_InferenceWithoutPricingFlag(t *testing.T) {
 		Endpoint: "https://model.internal/v1/chat/completions",
 	}
 	tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "inference-model").Return(model, nil).Once()
-	tester.mocks.mockClsComp.EXPECT().GetClusterByID(mock.Anything, "cluster-1").Return(&database.ClusterInfo{
-		ClusterID: "cluster-1",
-	}, nil).Once()
 
 	resolved, err := tester.handler.resolveModelTarget(context.Background(), "testuser", "inference-model", http.Header{})
 

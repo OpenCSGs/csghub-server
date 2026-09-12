@@ -16,17 +16,17 @@ func TestDetectUpstreamProtocol(t *testing.T) {
 	}{
 		{
 			name:     "metadata explicit messages",
-			target:   RoutingTarget{Target: "https://api.anthropic.com/v1/messages", UpstreamMetadata: map[string]any{"protocol": "messages"}},
+			target:   RoutingTarget{Target: "https://api.anthropic.com/v1/messages", ProtocolOverride: "messages"},
 			expected: types.ProtocolMessages,
 		},
 		{
 			name:     "metadata explicit responses",
-			target:   RoutingTarget{Target: "https://api.openai.com/v1/responses", UpstreamMetadata: map[string]any{"protocol": "responses"}},
+			target:   RoutingTarget{Target: "https://api.openai.com/v1/responses", ProtocolOverride: "responses"},
 			expected: types.ProtocolResponses,
 		},
 		{
 			name:     "metadata explicit chat",
-			target:   RoutingTarget{Target: "https://example.com/v1/chat/completions", UpstreamMetadata: map[string]any{"protocol": "chat"}},
+			target:   RoutingTarget{Target: "https://example.com/v1/chat/completions", ProtocolOverride: "chat"},
 			expected: types.ProtocolChat,
 		},
 		{
@@ -56,12 +56,12 @@ func TestDetectUpstreamProtocol(t *testing.T) {
 		},
 		{
 			name:     "metadata overrides url path",
-			target:   RoutingTarget{Target: "https://example.com/v1/chat/completions", UpstreamMetadata: map[string]any{"protocol": "messages"}},
+			target:   RoutingTarget{Target: "https://example.com/v1/chat/completions", ProtocolOverride: "messages"},
 			expected: types.ProtocolMessages,
 		},
 		{
 			name:     "metadata invalid protocol falls through to url",
-			target:   RoutingTarget{Target: "https://example.com/v1/responses", UpstreamMetadata: map[string]any{"protocol": "invalid"}},
+			target:   RoutingTarget{Target: "https://example.com/v1/responses", ProtocolOverride: "invalid"},
 			expected: types.ProtocolResponses,
 		},
 	}
@@ -303,7 +303,7 @@ func TestResolveRoutingNativeFallback(t *testing.T) {
 		{
 			name:           "messages client, external url with metadata protocol=chat → chat adapter (metadata wins)",
 			clientProtocol: types.ProtocolMessages,
-			target:         RoutingTarget{Target: "https://external.example.com", UpstreamMetadata: map[string]any{"protocol": "chat"}},
+			target:         RoutingTarget{Target: "https://external.example.com", ProtocolOverride: "chat"},
 			expectedMode:   ModeAdapter,
 			expectedProto:  types.ProtocolChat,
 		},
@@ -341,7 +341,7 @@ func TestAdaptBackendURL(t *testing.T) {
 		decision, err := ResolveRouting(types.ProtocolMessages, RoutingTarget{
 			Target:           "http://model-svc:8080",
 			CSGHubHosted:     true,
-			UpstreamMetadata: map[string]any{"protocol": "responses"},
+			ProtocolOverride: "responses",
 		})
 		require.NoError(t, err)
 		assert.Equal(t, "http://model-svc:8080/v1/responses", decision.BackendURL)

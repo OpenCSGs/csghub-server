@@ -47,6 +47,7 @@ func generationRefFromGeneration(generation database.AIGeneration) taskprocessor
 		ProviderMetadata:   generation.ProviderMetadata,
 		UpstreamID:         generation.UpstreamID,
 		ModelID:            generation.ModelID,
+		OwnerUUID:          generation.OwnerUUID,
 		Status:             generation.Status,
 		StartedAt:          generation.StartedAt,
 		FinishedAt:         generation.FinishedAt,

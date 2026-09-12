@@ -39,12 +39,19 @@ type InternalModelInfo struct {
 	CSGHubModelID    string               `json:"-"` // the internal model id (repo path) in CSGHub
 	LegacyModelID    string               `json:"-"` // the previous public model id, used for backward-compatible lookup
 	OwnerUUID        string               `json:"-"` // the uuid of deploy owner
+	OwnerUsername    string               `json:"-"` // the username of deploy owner
+	OwnerNamespace   string               `json:"-"` // billing/listing namespace (username or org)
+	OwnerType        string               `json:"-"` // "user" or "organization"
 	ClusterID        string               `json:"-"` // the deployed cluster id in CSGHub
 	SvcName          string               `json:"-"` // the internal service name in CSGHub
 	SvcType          int                  `json:"-"` // the internal service type like dedicated or serverless in CSGHub
 	Hardware         commontypes.HardWare `json:"-"` // the deployed hardware
 	RuntimeFramework string               `json:"-"` // the deployed framework
 	ImageID          string               `json:"-"` // the deployed image id in CSGHub
+	EngineArgs       string               `json:"-"` // the engine args for function call detection
+	SourceDeployID   int64                `json:"-"` // the source deploy ID
+	CreatedAt        int64                `json:"-"` // the deploy creation timestamp (unix)
+	Host             string               `json:"-"` // k8s Host header override
 }
 
 // ExternalModelInfo represents the external model fields

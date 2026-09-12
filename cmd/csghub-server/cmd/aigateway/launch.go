@@ -8,6 +8,7 @@ import (
 	"opencsg.com/csghub-server/builder/instrumentation"
 
 	"github.com/spf13/cobra"
+	"opencsg.com/csghub-server/aigateway/component/upstream"
 	"opencsg.com/csghub-server/aigateway/router"
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/builder/event"
@@ -47,6 +48,13 @@ var cmdLaunch = &cobra.Command{
 			return fmt.Errorf("fail to initialize message queue, %w", err)
 		}
 
+		// Start the deploy→upstream sync consumer.
+		syncComp := upstream.NewAIGatewayUpstreamSyncComponentDefault(cfg)
+		upstreamSyncConsumer := upstream.NewUpstreamSyncConsumer(event.DefaultEventPublisher.MQ, syncComp)
+		if err := upstreamSyncConsumer.Start(); err != nil {
+			slog.Error("failed to start upstream sync consumer", slog.Any("error", err))
+		}
+
 		r, cleanup, err := router.NewRouter(cfg)
 		if err != nil {
 			return fmt.Errorf("failed to init router: %w", err)
@@ -60,6 +68,7 @@ var cmdLaunch = &cobra.Command{
 		if cleanup != nil {
 			server.RegisterOnShutdown(cleanup)
 		}
+		server.RegisterOnShutdown(upstreamSyncConsumer.Stop)
 		slog.Info("http server is running", slog.Any("port", cfg.AIGateway.Port))
 		server.Run()
 		_ = stopOtel(context.Background())

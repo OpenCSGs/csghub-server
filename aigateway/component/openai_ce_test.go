@@ -4,909 +4,777 @@ package component
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
-	"sync"
 	"testing"
-	"time"
 
-	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	mockcache "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/cache"
 	mockdb "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/aigateway/types"
 	"opencsg.com/csghub-server/builder/store/database"
 	commontypes "opencsg.com/csghub-server/common/types"
 )
 
-func TestOpenAIComponent_GetAvailableModels(t *testing.T) {
-	mockUserStore := &mockdb.MockUserStore{}
-	mockDeployStore := &mockdb.MockDeployTaskStore{}
+func TestOpenAIComponent_GetAvailableModels_ExternalModel(t *testing.T) {
 	mockLLMConfigStore := mockdb.NewMockLLMConfigStore(t)
-	mockCache := mockcache.NewMockRedisClient(t)
 	comp := &openaiComponentImpl{
-		userStore:      mockUserStore,
-		deployStore:    mockDeployStore,
-		extllmStore:    mockLLMConfigStore,
-		modelListCache: mockCache,
+		extllmStore: mockLLMConfigStore,
 	}
 
-	t.Run("user not found", func(t *testing.T) {
-		mockDeployStore.EXPECT().RunningVisibleToUser(mock.Anything, "nonexistent").
-			Return(nil, errors.New("db error")).Once()
-
-		models, err := comp.GetAvailableModels(context.Background(), "nonexistent")
-		assert.Error(t, err)
-		assert.Nil(t, models)
-	})
-
-	t.Run("anonymous user can see public CSGHub models", func(t *testing.T) {
-		now := time.Now()
-		deploys := []database.Deploy{
-			{
-				ID:          1,
-				SvcName:     "svc1",
-				Type:        commontypes.InferenceType,
-				UserID:      1,
-				SecureLevel: commontypes.EndpointPublic,
-				Repository: &database.Repository{
-					Name: "model1",
-					Path: "model1",
-				},
-				User: &database.User{
-					Username: "publicuser",
-					UUID:     "publicuser-uuid",
-				},
-				Endpoint: "endpoint1",
-				Task:     "text-generation",
-			},
-			{
-				ID:          2,
-				SvcName:     "svc2",
-				Type:        commontypes.ServerlessType,
-				UserID:      2,
-				SecureLevel: commontypes.EndpointPublic,
-				Repository: &database.Repository{
-					HFPath: "hf-model2",
-					Path:   "model2",
-				},
-				User: &database.User{
-					Username: "serverless-owner",
-					UUID:     "serverless-owner-uuid",
-				},
-				Endpoint: "endpoint2",
-				Task:     "text-to-image",
-			},
-		}
-		deploys[0].CreatedAt = now
-		deploys[1].CreatedAt = now
-
-		mockDeployStore.EXPECT().RunningVisibleToUser(mock.Anything, "").
-			Return(deploys, nil).Once()
-		mockLLMConfigStore.EXPECT().IndexWithRepo(mock.Anything, 50, 1, mock.Anything).
-			Return([]*database.LLMConfig{}, 0, nil)
-
-		var wg sync.WaitGroup
-		wg.Add(1)
-		mockCache.EXPECT().HSet(mock.Anything, modelCacheKey, "model1:1", mock.Anything).
-			Return(nil).Once()
-		mockCache.EXPECT().HSet(mock.Anything, modelCacheKey, "hf-model2", mock.Anything).
-			Return(nil).Once()
-		mockCache.EXPECT().Expire(mock.Anything, modelCacheKey, modelCacheTTL).
-			RunAndReturn(func(ctx context.Context, s string, d time.Duration) error {
-				wg.Done()
-				return nil
-			}).Once()
-
-		models, err := comp.GetAvailableModels(context.Background(), "")
-		require.NoError(t, err)
-		require.Len(t, models, 2)
-		assert.Equal(t, "model1:1", models[0].ID)
-		assert.Equal(t, "publicuser", models[0].OwnedBy)
-		assert.Equal(t, "model1", models[0].Metadata[types.MetaKeyRepoPath])
-		assert.Equal(t, "hf-model2", models[1].ID)
-		assert.Equal(t, "OpenCSG", models[1].OwnedBy)
-		assert.Equal(t, "model2", models[1].Metadata[types.MetaKeyRepoPath])
-		wg.Wait()
-	})
-
-	t.Run("successful case", func(t *testing.T) {
-		mockLLMConfigStore.EXPECT().IndexWithRepo(mock.Anything, 50, 1, mock.Anything).
-			Return([]*database.LLMConfig{}, 0, nil)
-		now := time.Now()
-		deploys := []database.Deploy{
-			{
-				ID:          1,
-				SvcName:     "svc1",
-				Type:        1,
-				UserID:      1,
-				SecureLevel: commontypes.EndpointPublic,
-				Repository: &database.Repository{
-					Name: "model1",
-					Path: "model1",
-				},
-				User: &database.User{
-					Username: "testuser",
-				},
-				Endpoint: "endpoint1",
-				Task:     "text-generation",
-			},
-			{
-				ID:          2,
-				SvcName:     "svc2",
-				Type:        3, // serverless
-				UserID:      1,
-				SecureLevel: commontypes.EndpointPublic,
-				Repository: &database.Repository{
-					HFPath: "hf-model2",
-					Path:   "model2",
-				},
-				User: &database.User{
-					Username: "testuser",
-				},
-				Endpoint: "endpoint2",
-				Task:     "text-to-image",
-			},
-		}
-		deploys[0].CreatedAt = now
-		deploys[1].CreatedAt = now
-
-		mockDeployStore.EXPECT().RunningVisibleToUser(mock.Anything, "testuser").
-			Return(deploys, nil).Once()
-		var wg sync.WaitGroup
-		wg.Add(1)
-		mockCache.EXPECT().HSet(mock.Anything, modelCacheKey, "model1:1", mock.Anything).
-			Return(nil).Once()
-		mockCache.EXPECT().HSet(mock.Anything, modelCacheKey, "hf-model2", mock.Anything).
-			Return(nil).Once()
-		mockCache.EXPECT().Expire(mock.Anything, modelCacheKey, modelCacheTTL).
-			RunAndReturn(func(ctx context.Context, s string, d time.Duration) error {
-				wg.Done()
-				return nil
-			}).Once()
-
-		models, err := comp.GetAvailableModels(context.Background(), "testuser")
-		assert.NoError(t, err)
-		assert.Len(t, models, 2)
-
-		// Verify first model
-		assert.Equal(t, "model1:1", models[0].ID)
-		assert.Equal(t, "testuser", models[0].OwnedBy)
-		assert.Equal(t, "endpoint1", models[0].Endpoint)
-		assert.Equal(t, "text-generation", models[0].Task)
-		assert.Equal(t, "model1", models[0].Metadata[types.MetaKeyRepoPath])
-
-		// Verify second model (serverless)
-		assert.Equal(t, "hf-model2", models[1].ID)
-		assert.Equal(t, "OpenCSG", models[1].OwnedBy)
-		assert.Equal(t, "endpoint2", models[1].Endpoint)
-		assert.Equal(t, "text-to-image", models[1].Task)
-		assert.Equal(t, "model2", models[1].Metadata[types.MetaKeyRepoPath])
-		wg.Wait()
-	})
-
-	t.Run("inference private should be marked private", func(t *testing.T) {
-		mockLLMConfigStore.EXPECT().IndexWithRepo(mock.Anything, 50, 1, mock.Anything).
-			Return([]*database.LLMConfig{}, 0, nil)
-
-		now := time.Now()
-		deploys := []database.Deploy{
-			{
-				ID:          3,
-				SvcName:     "svc3",
-				Type:        commontypes.InferenceType,
-				UserID:      1,
-				SecureLevel: commontypes.EndpointPrivate,
-				Repository: &database.Repository{
-					Name: "model3",
-					Path: "model3",
-				},
-				User: &database.User{
-					Username: "testuser",
-				},
-				Endpoint: "endpoint3",
-				Task:     "text-generation",
-			},
-		}
-		deploys[0].CreatedAt = now
-
-		mockDeployStore.EXPECT().RunningVisibleToUser(mock.Anything, "testuser").
-			Return(deploys, nil).Once()
-
-		var wg sync.WaitGroup
-		wg.Add(1)
-		mockCache.EXPECT().HSet(mock.Anything, modelCacheKey, "model3:3", mock.Anything).
-			Return(nil).Once()
-		mockCache.EXPECT().Expire(mock.Anything, modelCacheKey, modelCacheTTL).
-			RunAndReturn(func(ctx context.Context, s string, d time.Duration) error {
-				wg.Done()
-				return nil
-			}).Once()
-
-		models, err := comp.GetAvailableModels(context.Background(), "testuser")
-		assert.NoError(t, err)
-		assert.Len(t, models, 1)
-		assert.Equal(t, "model3:3", models[0].ID)
-		assert.Equal(t, "testuser", models[0].OwnedBy)
-		wg.Wait()
-	})
-
-}
-
-func TestOpenAIComponent_GetAvailableModels_CacheUsesModelSnapshot(t *testing.T) {
-	mockDeployStore := &mockdb.MockDeployTaskStore{}
-	mockLLMConfigStore := mockdb.NewMockLLMConfigStore(t)
-	mockCache := mockcache.NewMockRedisClient(t)
-	comp := &openaiComponentImpl{
-		deployStore:    mockDeployStore,
-		extllmStore:    mockLLMConfigStore,
-		modelListCache: mockCache,
-	}
-
-	now := time.Now()
-	deploys := []database.Deploy{
-		{
-			ID:          1,
-			SvcName:     "svc1",
-			Type:        commontypes.InferenceType,
-			UserID:      1,
-			SecureLevel: commontypes.EndpointPublic,
-			Repository: &database.Repository{
-				Name: "model1",
-				Path: "model1",
-			},
-			User: &database.User{
-				Username: "publicuser",
-				UUID:     "publicuser-uuid",
-			},
-			Endpoint: "endpoint1",
-			Task:     "text-generation",
-		},
-		{
-			ID:          2,
-			SvcName:     "svc2",
-			Type:        commontypes.ServerlessType,
-			UserID:      2,
-			SecureLevel: commontypes.EndpointPublic,
-			Repository: &database.Repository{
-				HFPath: "hf-model2",
-				Path:   "model2",
-			},
-			User: &database.User{
-				Username: "serverless-owner",
-				UUID:     "serverless-owner-uuid",
-			},
-			Endpoint: "endpoint2",
-			Task:     "text-to-image",
-		},
-	}
-	deploys[0].CreatedAt = now
-	deploys[1].CreatedAt = now
-
-	mockDeployStore.EXPECT().RunningVisibleToUser(mock.Anything, "").
-		Return(deploys, nil).Once()
 	mockLLMConfigStore.EXPECT().IndexWithRepo(mock.Anything, 50, 1, mock.Anything).
-		Return([]*database.LLMConfig{}, 0, nil).Once()
-
-	firstWriteStarted := make(chan struct{})
-	continueFirstWrite := make(chan struct{})
-	cacheCompleted := make(chan struct{})
-
-	mockCache.EXPECT().HSet(mock.Anything, modelCacheKey, "model1:1", mock.Anything).
-		RunAndReturn(func(ctx context.Context, key string, field string, value any) error {
-			close(firstWriteStarted)
-			<-continueFirstWrite
-			return nil
-		}).Once()
-	mockCache.EXPECT().HSet(mock.Anything, modelCacheKey, "hf-model2", mock.Anything).
-		RunAndReturn(func(ctx context.Context, key string, field string, value any) error {
-			valueString, ok := value.(string)
-			require.True(t, ok)
-
-			var cachedModel types.Model
-			require.NoError(t, json.Unmarshal([]byte(valueString), &cachedModel))
-			assert.Equal(t, "hf-model2", cachedModel.ID)
-			assert.Equal(t, commontypes.ProviderTypeServerless, cachedModel.Metadata[types.MetaKeyLLMType])
-			return nil
-		}).Once()
-	mockCache.EXPECT().Expire(mock.Anything, modelCacheKey, modelCacheTTL).
-		RunAndReturn(func(ctx context.Context, key string, ttl time.Duration) error {
-			close(cacheCompleted)
-			return nil
-		}).Once()
+		Return([]*database.LLMConfig{
+			{
+				ID:        1,
+				ModelName: "gpt-4",
+				Type:      database.LLMTypeAigatewayExternal,
+				Enabled:   true,
+				Provider:  "openai",
+				Metadata:  map[string]any{types.MetaKeyTasks: []any{"text-generation"}},
+				Upstreams: []database.Upstream{
+					{
+						ID:         1,
+						Source:     commontypes.UpstreamSourceExternal,
+						URL:        "http://openai-api/v1",
+						Enabled:    true,
+						Provider:   "openai",
+						AuthHeader: "Bearer sk-xxx",
+					},
+				},
+			},
+		}, 1, nil).Once()
 
 	models, err := comp.GetAvailableModels(context.Background(), "")
 	require.NoError(t, err)
-	require.Len(t, models, 2)
-
-	select {
-	case <-firstWriteStarted:
-	case <-time.After(time.Second):
-		t.Fatal("timed out waiting for async cache write to start")
-	}
-
-	models[1].ID = "mutated"
-	models[1].Metadata[types.MetaKeyLLMType] = "mutated"
-
-	close(continueFirstWrite)
-
-	select {
-	case <-cacheCompleted:
-	case <-time.After(time.Second):
-		t.Fatal("timed out waiting for async cache write to finish")
-	}
+	require.Len(t, models, 1)
+	assert.Equal(t, "gpt-4", models[0].ID)
+	assert.Equal(t, "openai", models[0].OwnedBy)
+	assert.Equal(t, "text-generation", models[0].Task)
+	assert.Equal(t, commontypes.ProviderTypeExternalLLM, models[0].Metadata[types.MetaKeyLLMType])
+	assert.Len(t, models[0].Upstreams, 1)
 }
 
-func TestOpenAIComponent_ListModels_CacheUsesOriginalID(t *testing.T) {
-	mockDeployStore := &mockdb.MockDeployTaskStore{}
+func TestOpenAIComponent_GetAvailableModels_ServerlessVisibleToAll(t *testing.T) {
 	mockLLMConfigStore := mockdb.NewMockLLMConfigStore(t)
-	mockCache := mockcache.NewMockRedisClient(t)
 	comp := &openaiComponentImpl{
-		deployStore:    mockDeployStore,
-		extllmStore:    mockLLMConfigStore,
-		modelListCache: mockCache,
+		extllmStore: mockLLMConfigStore,
 	}
 
-	mockDeployStore.EXPECT().RunningVisibleToUser(mock.Anything, "").
-		Return([]database.Deploy{}, nil).Once()
-
-	searchType := 16
-	enabled := true
-	search := &commontypes.SearchLLMConfig{
-		Types:     []int{searchType},
-		Enabled:   &enabled,
-		SortBy:    "model_size_b",
-		SortOrder: "desc",
+	internalInfo := &commontypes.InternalModelInfo{
+		CSGHubModelID:    "ns/serverless-model",
+		HFPath:           "ns/serverless-model",
+		LegacyModelID:    "ns/serverless-model",
+		OwnerUUID:        "owner-uuid",
+		OwnerUsername:    "owner",
+		SvcType:          commontypes.ServerlessType,
+		SvcName:          "svc1",
+		SourceDeployID:   1,
+		RuntimeFramework: "vllm",
 	}
-	mockLLMConfigStore.EXPECT().IndexWithRepo(mock.Anything, 50, 1, search).
+	mockLLMConfigStore.EXPECT().IndexWithRepo(mock.Anything, 50, 1, mock.Anything).
 		Return([]*database.LLMConfig{
 			{
-				ID:                 1,
-				ModelName:          "test-model-1",
-				Type:               16,
-				Enabled:            true,
-				Provider:           "OpenAI",
-				ApiEndpoint:        "http://test-endpoint-1.com",
-				AuthHeader:         "Bearer test-token-1",
-				Metadata:           map[string]any{types.MetaKeyTasks: []any{"text-generation"}},
-				NeedSensitiveCheck: true,
+				ID:        1,
+				ModelName: "ns/serverless-model",
+				Enabled:   true,
+				Upstreams: []database.Upstream{
+					{
+						ID:        1,
+						Source:    commontypes.UpstreamSourceCSGHubDeploy,
+						URL:       "http://serverless-endpoint/v1",
+						Enabled:   true,
+						ModelName: "ns/serverless-model",
+						Metadata: &commontypes.UpstreamMetadata{
+							InternalModelInfo: internalInfo,
+						},
+					},
+				},
+			},
+		}, 1, nil).Once()
+
+	// Any user can see serverless models
+	models, err := comp.GetAvailableModels(context.Background(), "any-user-uuid")
+	require.NoError(t, err)
+	require.Len(t, models, 1)
+	assert.Equal(t, "ns/serverless-model", models[0].ID)
+	assert.Equal(t, "OpenCSG", models[0].OwnedBy)
+	assert.Equal(t, commontypes.ProviderTypeServerless, models[0].Metadata[types.MetaKeyLLMType])
+	assert.Equal(t, "ns/serverless-model", models[0].Metadata[types.MetaKeyRepoPath])
+	assert.Equal(t, "owner-uuid", models[0].OwnerUUID)
+}
+
+func TestOpenAIComponent_GetAvailableModels_InferenceOnlyVisibleToOwner(t *testing.T) {
+	mockLLMConfigStore := mockdb.NewMockLLMConfigStore(t)
+	comp := &openaiComponentImpl{
+		extllmStore: mockLLMConfigStore,
+	}
+
+	internalInfo := &commontypes.InternalModelInfo{
+		CSGHubModelID:  "ns/inference-model",
+		LegacyModelID:  "ns/inference-model:2",
+		RepoName:       "ns/inference-model",
+		OwnerUUID:      "owner-uuid",
+		OwnerUsername:  "owner",
+		SvcType:        commontypes.InferenceType,
+		SvcName:        "svc2",
+		SourceDeployID: 2,
+	}
+	mockLLMConfigStore.EXPECT().IndexWithRepo(mock.Anything, 50, 1, mock.Anything).
+		Return([]*database.LLMConfig{
+			{
+				ID:        1,
+				ModelName: "ns/inference-model:2",
+				Enabled:   true,
+				Upstreams: []database.Upstream{
+					{
+						ID:        1,
+						Source:    commontypes.UpstreamSourceCSGHubDeploy,
+						URL:       "http://inference-endpoint/v1",
+						Enabled:   true,
+						ModelName: "ns/inference-model",
+						Metadata: &commontypes.UpstreamMetadata{
+							InternalModelInfo: internalInfo,
+						},
+					},
+				},
+			},
+		}, 1, nil).Once()
+
+	// Non-owner: should not see inference model
+	models, err := comp.GetAvailableModels(context.Background(), "other-user-uuid")
+	require.NoError(t, err)
+	assert.Empty(t, models)
+}
+
+func TestOpenAIComponent_GetAvailableModels_InferenceVisibleToOwner(t *testing.T) {
+	mockLLMConfigStore := mockdb.NewMockLLMConfigStore(t)
+	comp := &openaiComponentImpl{
+		extllmStore: mockLLMConfigStore,
+	}
+
+	internalInfo := &commontypes.InternalModelInfo{
+		CSGHubModelID:  "ns/inference-model",
+		LegacyModelID:  "ns/inference-model:2",
+		RepoName:       "ns/inference-model",
+		OwnerUUID:      "owner-uuid",
+		OwnerUsername:  "owner",
+		SvcType:        commontypes.InferenceType,
+		SvcName:        "svc2",
+		SourceDeployID: 2,
+	}
+	mockLLMConfigStore.EXPECT().IndexWithRepo(mock.Anything, 50, 1, mock.Anything).
+		Return([]*database.LLMConfig{
+			{
+				ID:        1,
+				ModelName: "ns/inference-model:2",
+				Enabled:   true,
+				Upstreams: []database.Upstream{
+					{
+						ID:        1,
+						Source:    commontypes.UpstreamSourceCSGHubDeploy,
+						URL:       "http://inference-endpoint/v1",
+						Enabled:   true,
+						ModelName: "ns/inference-model",
+						Metadata: &commontypes.UpstreamMetadata{
+							InternalModelInfo: internalInfo,
+						},
+					},
+				},
+			},
+		}, 1, nil).Once()
+
+	// Owner: should see inference model
+	models, err := comp.GetAvailableModels(context.Background(), "owner-uuid")
+	require.NoError(t, err)
+	require.Len(t, models, 1)
+	assert.Equal(t, "ns/inference-model:2", models[0].ID)
+	assert.Equal(t, "owner", models[0].OwnedBy)
+	assert.Equal(t, commontypes.ProviderTypeInference, models[0].Metadata[types.MetaKeyLLMType])
+}
+
+func TestOpenAIComponent_GetAvailableModels_MultiplePages(t *testing.T) {
+	mockLLMConfigStore := mockdb.NewMockLLMConfigStore(t)
+	comp := &openaiComponentImpl{
+		extllmStore: mockLLMConfigStore,
+	}
+
+	page1 := make([]*database.LLMConfig, 50)
+	for i := range page1 {
+		page1[i] = &database.LLMConfig{
+			ID:        int64(i + 1),
+			ModelName: "model-" + string(rune('a'+i)),
+			Enabled:   true,
+			Provider:  "openai",
+			Upstreams: []database.Upstream{
+				{
+					ID:         int64(i + 1),
+					Source:     commontypes.UpstreamSourceExternal,
+					URL:        "http://endpoint/v1",
+					Enabled:    true,
+					Provider:   "openai",
+					AuthHeader: "Bearer sk-xxx",
+				},
+			},
+		}
+	}
+	page2 := []*database.LLMConfig{
+		{
+			ID:        51,
+			ModelName: "model-z",
+			Enabled:   true,
+			Provider:  "anthropic",
+			Upstreams: []database.Upstream{
+				{
+					ID:         51,
+					Source:     commontypes.UpstreamSourceExternal,
+					URL:        "http://endpoint/v1",
+					Enabled:    true,
+					Provider:   "anthropic",
+					AuthHeader: "Bearer sk-yyy",
+				},
+			},
+		},
+	}
+
+	mockLLMConfigStore.EXPECT().IndexWithRepo(mock.Anything, 50, 1, mock.Anything).
+		Return(page1, 50, nil).Once()
+	mockLLMConfigStore.EXPECT().IndexWithRepo(mock.Anything, 50, 2, mock.Anything).
+		Return(page2, 1, nil).Once()
+
+	models, err := comp.GetAvailableModels(context.Background(), "")
+	require.NoError(t, err)
+	assert.Len(t, models, 51)
+}
+
+func TestOpenAIComponent_GetAvailableModels_RepoPathFromRelation(t *testing.T) {
+	mockLLMConfigStore := mockdb.NewMockLLMConfigStore(t)
+	comp := &openaiComponentImpl{
+		extllmStore: mockLLMConfigStore,
+	}
+
+	originalMetadata := map[string]any{types.MetaKeyTasks: []any{"text-generation"}}
+	mockLLMConfigStore.EXPECT().IndexWithRepo(mock.Anything, 50, 1, mock.Anything).
+		Return([]*database.LLMConfig{
+			{
+				ID:        1,
+				ModelName: "test-model-1",
+				Enabled:   true,
+				Provider:  "OpenAI",
+				Metadata:  originalMetadata,
+				RepoID:    100,
+				Repo: &database.Repository{
+					ID:      100,
+					Path:    "test-ns/test-model-1",
+					GitPath: "models/test-ns/test-model-1",
+				},
+				Upstreams: []database.Upstream{
+					{
+						ID:         1,
+						Source:     commontypes.UpstreamSourceExternal,
+						URL:        "http://openai-api/v1",
+						Enabled:    true,
+						Provider:   "OpenAI",
+						AuthHeader: "Bearer sk-xxx",
+					},
+				},
+			},
+		}, 1, nil).Once()
+
+	models, err := comp.GetAvailableModels(context.Background(), "")
+	require.NoError(t, err)
+	require.Len(t, models, 1)
+	require.Equal(t, "test-model-1", models[0].ID)
+	require.Equal(t, "test-ns/test-model-1", models[0].Metadata[types.MetaKeyRepoPath])
+	require.Equal(t, commontypes.ProviderTypeExternalLLM, models[0].Metadata[types.MetaKeyLLMType])
+	// Original metadata should not be mutated
+	require.NotContains(t, originalMetadata, types.MetaKeyRepoPath)
+	require.NotContains(t, originalMetadata, types.MetaKeyLLMType)
+}
+
+func TestOpenAIComponent_GetAvailableModels_DBError(t *testing.T) {
+	mockLLMConfigStore := mockdb.NewMockLLMConfigStore(t)
+	comp := &openaiComponentImpl{
+		extllmStore: mockLLMConfigStore,
+	}
+
+	mockLLMConfigStore.EXPECT().IndexWithRepo(mock.Anything, 50, 1, mock.Anything).
+		Return(nil, 0, errors.New("db error")).Once()
+
+	models, err := comp.GetAvailableModels(context.Background(), "")
+	require.Error(t, err)
+	assert.Nil(t, models)
+}
+
+func TestOpenAIComponent_GetAvailableModels_EmptyResult(t *testing.T) {
+	mockLLMConfigStore := mockdb.NewMockLLMConfigStore(t)
+	comp := &openaiComponentImpl{
+		extllmStore: mockLLMConfigStore,
+	}
+
+	mockLLMConfigStore.EXPECT().IndexWithRepo(mock.Anything, 50, 1, mock.Anything).
+		Return([]*database.LLMConfig{}, 0, nil).Once()
+
+	models, err := comp.GetAvailableModels(context.Background(), "")
+	require.NoError(t, err)
+	assert.Empty(t, models)
+}
+
+func TestOpenAIComponent_GetAvailableModels_SkipsCSGHubWithoutInternalInfo(t *testing.T) {
+	mockLLMConfigStore := mockdb.NewMockLLMConfigStore(t)
+	comp := &openaiComponentImpl{
+		extllmStore: mockLLMConfigStore,
+	}
+
+	mockLLMConfigStore.EXPECT().IndexWithRepo(mock.Anything, 50, 1, mock.Anything).
+		Return([]*database.LLMConfig{
+			{
+				ID:        1,
+				ModelName: "broken-model",
+				Enabled:   true,
+				Upstreams: []database.Upstream{
+					{
+						ID:        1,
+						Source:    commontypes.UpstreamSourceCSGHubDeploy,
+						URL:       "http://broken/v1",
+						Enabled:   true,
+						ModelName: "broken-model",
+						// Metadata is nil — should be skipped
+					},
+				},
+			},
+		}, 1, nil).Once()
+
+	models, err := comp.GetAvailableModels(context.Background(), "")
+	require.NoError(t, err)
+	assert.Empty(t, models)
+}
+
+func TestOpenAIComponent_GetAvailableModels_MixedInternalAndExternal(t *testing.T) {
+	mockLLMConfigStore := mockdb.NewMockLLMConfigStore(t)
+	comp := &openaiComponentImpl{
+		extllmStore: mockLLMConfigStore,
+	}
+
+	internalInfo := &commontypes.InternalModelInfo{
+		CSGHubModelID:  "ns/internal-model",
+		RepoName:       "ns/internal-model",
+		LegacyModelID:  "ns/internal-model:1",
+		OwnerUUID:      "owner-uuid",
+		OwnerUsername:  "owner",
+		SvcType:        commontypes.InferenceType,
+		SvcName:        "svc1",
+		SourceDeployID: 1,
+	}
+	mockLLMConfigStore.EXPECT().IndexWithRepo(mock.Anything, 50, 1, mock.Anything).
+		Return([]*database.LLMConfig{
+			{
+				ID:        1,
+				ModelName: "ns/internal-model:1",
+				Enabled:   true,
+				Upstreams: []database.Upstream{
+					{
+						ID:        1,
+						Source:    commontypes.UpstreamSourceCSGHubDeploy,
+						URL:       "http://internal/v1",
+						Enabled:   true,
+						ModelName: "ns/internal-model",
+						Metadata: &commontypes.UpstreamMetadata{
+							InternalModelInfo: internalInfo,
+						},
+					},
+				},
 			},
 			{
-				ID:                 2,
-				ModelName:          "test-model-2",
-				Type:               16,
-				Enabled:            true,
-				Provider:           "Anthropic",
-				ApiEndpoint:        "http://test-endpoint-2.com",
-				Metadata:           map[string]any{types.MetaKeyTasks: []any{"text-generation"}},
-				NeedSensitiveCheck: true,
+				ID:        2,
+				ModelName: "gpt-4",
+				Enabled:   true,
+				Provider:  "openai",
+				Metadata:  map[string]any{types.MetaKeyTasks: []any{"text-generation"}},
+				Upstreams: []database.Upstream{
+					{
+						ID:         2,
+						Source:     commontypes.UpstreamSourceExternal,
+						URL:        "http://openai/v1",
+						Enabled:    true,
+						Provider:   "openai",
+						AuthHeader: "Bearer sk-xxx",
+					},
+				},
 			},
 		}, 2, nil).Once()
 
-	firstWriteStarted := make(chan struct{})
-	continueFirstWrite := make(chan struct{})
-	cacheCompleted := make(chan struct{})
+	// Owner calling: should see both
+	models, err := comp.GetAvailableModels(context.Background(), "owner-uuid")
+	require.NoError(t, err)
+	require.Len(t, models, 2)
+	assert.Equal(t, "ns/internal-model:1", models[0].ID)
+	assert.Equal(t, "gpt-4", models[1].ID)
+}
 
-	mockCache.EXPECT().HSet(mock.Anything, modelCacheKey, "test-model-1", mock.Anything).
-		RunAndReturn(func(ctx context.Context, key string, field string, value any) error {
-			close(firstWriteStarted)
-			<-continueFirstWrite
-			return nil
-		}).Once()
-	mockCache.EXPECT().HSet(mock.Anything, modelCacheKey, "test-model-2", mock.Anything).
-		RunAndReturn(func(ctx context.Context, key string, field string, value any) error {
-			valueString, ok := value.(string)
-			require.True(t, ok)
+func TestOpenAIComponent_GetModelByID_ExternalModel(t *testing.T) {
+	mockLLMConfigStore := mockdb.NewMockLLMConfigStore(t)
+	comp := &openaiComponentImpl{
+		extllmStore: mockLLMConfigStore,
+	}
 
-			var cachedModel types.Model
-			require.NoError(t, json.Unmarshal([]byte(valueString), &cachedModel))
-			assert.Equal(t, "test-model-2", cachedModel.ID)
-			assert.Equal(t, "Anthropic", cachedModel.Provider)
-			assert.Equal(t, commontypes.ProviderTypeExternalLLM, cachedModel.Metadata[types.MetaKeyLLMType])
-			return nil
-		}).Once()
-	mockCache.EXPECT().Expire(mock.Anything, modelCacheKey, modelCacheTTL).
-		RunAndReturn(func(ctx context.Context, key string, ttl time.Duration) error {
-			close(cacheCompleted)
-			return nil
-		}).Once()
+	mockLLMConfigStore.EXPECT().GetByModelName(mock.Anything, "gpt-4").
+		Return(&database.LLMConfig{
+			ID:        1,
+			ModelName: "gpt-4",
+			Enabled:   true,
+			Provider:  "openai",
+			AuthHeader: "Bearer sk-xxx",
+			Metadata:  map[string]any{types.MetaKeyTasks: []any{"text-generation"}},
+			Upstreams: []database.Upstream{
+				{
+					ID:         1,
+					Source:     commontypes.UpstreamSourceExternal,
+					URL:        "http://openai-api/v1",
+					Enabled:    true,
+					Provider:   "openai",
+					AuthHeader: "Bearer sk-xxx",
+				},
+			},
+		}, nil).Once()
+
+	model, err := comp.GetModelByID(context.Background(), "user-uuid", "gpt-4")
+	require.NoError(t, err)
+	require.NotNil(t, model)
+	assert.Equal(t, "gpt-4", model.ID)
+	assert.Equal(t, "openai", model.OwnedBy)
+	assert.Equal(t, commontypes.ProviderTypeExternalLLM, model.Metadata[types.MetaKeyLLMType])
+	assert.Equal(t, "openai", model.Provider)
+	assert.Equal(t, "Bearer sk-xxx", model.AuthHead)
+	assert.Len(t, model.Upstreams, 1)
+}
+
+func TestOpenAIComponent_GetModelByID_InternalModel(t *testing.T) {
+	mockLLMConfigStore := mockdb.NewMockLLMConfigStore(t)
+	comp := &openaiComponentImpl{
+		extllmStore: mockLLMConfigStore,
+	}
+
+	internalInfo := &commontypes.InternalModelInfo{
+		CSGHubModelID:  "ns/internal-model",
+		RepoName:       "ns/internal-model",
+		LegacyModelID:  "ns/internal-model:a",
+		OwnerUUID:      "owner-uuid",
+		OwnerUsername:  "owner",
+		SvcType:        commontypes.InferenceType,
+		SvcName:        "svc1",
+		SourceDeployID: 10,
+	}
+	mockLLMConfigStore.EXPECT().GetByModelName(mock.Anything, "ns/internal-model:a").
+		Return(&database.LLMConfig{
+			ID:        1,
+			ModelName: "ns/internal-model:a",
+			Enabled:   true,
+			Upstreams: []database.Upstream{
+				{
+					ID:        1,
+					Source:    commontypes.UpstreamSourceCSGHubDeploy,
+					URL:       "http://internal-endpoint/v1",
+					Enabled:   true,
+					ModelName: "ns/internal-model",
+					Metadata: &commontypes.UpstreamMetadata{
+						InternalModelInfo: internalInfo,
+					},
+				},
+			},
+		}, nil).Once()
+
+	model, err := comp.GetModelByID(context.Background(), "owner-uuid", "ns/internal-model:a")
+	require.NoError(t, err)
+	require.NotNil(t, model)
+	assert.Equal(t, "ns/internal-model:a", model.ID) // base36(10) = "a"
+	assert.Equal(t, "owner", model.OwnedBy)
+	assert.Equal(t, commontypes.ProviderTypeInference, model.Metadata[types.MetaKeyLLMType])
+	assert.Equal(t, "ns/internal-model", model.Metadata[types.MetaKeyRepoPath])
+	assert.Equal(t, "owner-uuid", model.OwnerUUID)
+	assert.Equal(t, "svc1", model.SvcName)
+}
+
+func TestOpenAIComponent_GetModelByID_PrivateModel_OwnerCanAccess(t *testing.T) {
+	mockLLMConfigStore := mockdb.NewMockLLMConfigStore(t)
+	comp := &openaiComponentImpl{
+		extllmStore: mockLLMConfigStore,
+	}
+
+	internalInfo := &commontypes.InternalModelInfo{
+		CSGHubModelID:  "ns/private-model",
+		RepoName:       "ns/private-model",
+		LegacyModelID:  "ns/private-model:a",
+		OwnerUUID:      "owner-uuid",
+		OwnerUsername:  "owner",
+		SvcType:        commontypes.InferenceType,
+		SvcName:        "svc1",
+		SourceDeployID: 10,
+	}
+	mockLLMConfigStore.EXPECT().GetByModelName(mock.Anything, "ns/private-model:a").
+		Return(&database.LLMConfig{
+			ID:        1,
+			ModelName: "ns/private-model:a",
+			Enabled:   true,
+			Upstreams: []database.Upstream{
+				{
+					ID:        1,
+					Source:    commontypes.UpstreamSourceCSGHubDeploy,
+					URL:       "http://internal-endpoint/v1",
+					Enabled:   true,
+					ModelName: "ns/private-model",
+					Metadata: &commontypes.UpstreamMetadata{
+						InternalModelInfo: internalInfo,
+					},
+				},
+			},
+		}, nil).Once()
+
+	model, err := comp.GetModelByID(context.Background(), "owner-uuid", "ns/private-model:a")
+	require.NoError(t, err)
+	require.NotNil(t, model)
+	assert.Equal(t, "owner-uuid", model.OwnerUUID)
+}
+
+func TestOpenAIComponent_GetModelByID_PrivateModel_NonOwnerDenied(t *testing.T) {
+	mockLLMConfigStore := mockdb.NewMockLLMConfigStore(t)
+	comp := &openaiComponentImpl{
+		extllmStore: mockLLMConfigStore,
+	}
+
+	internalInfo := &commontypes.InternalModelInfo{
+		CSGHubModelID:  "ns/private-model",
+		RepoName:       "ns/private-model",
+		LegacyModelID:  "ns/private-model:a",
+		OwnerUUID:      "owner-uuid",
+		OwnerUsername:  "owner",
+		SvcType:        commontypes.InferenceType,
+		SvcName:        "svc1",
+		SourceDeployID: 10,
+	}
+	mockLLMConfigStore.EXPECT().GetByModelName(mock.Anything, "ns/private-model:a").
+		Return(&database.LLMConfig{
+			ID:        1,
+			ModelName: "ns/private-model:a",
+			Enabled:   true,
+			Upstreams: []database.Upstream{
+				{
+					ID:        1,
+					Source:    commontypes.UpstreamSourceCSGHubDeploy,
+					URL:       "http://internal-endpoint/v1",
+					Enabled:   true,
+					ModelName: "ns/private-model",
+					Metadata: &commontypes.UpstreamMetadata{
+						InternalModelInfo: internalInfo,
+					},
+				},
+			},
+		}, nil).Once()
+
+	model, err := comp.GetModelByID(context.Background(), "other-user-uuid", "ns/private-model:a")
+	require.NoError(t, err)
+	assert.Nil(t, model)
+}
+
+func TestOpenAIComponent_GetModelByID_ServerlessModel_AnyUserCanAccess(t *testing.T) {
+	mockLLMConfigStore := mockdb.NewMockLLMConfigStore(t)
+	comp := &openaiComponentImpl{
+		extllmStore: mockLLMConfigStore,
+	}
+
+	internalInfo := &commontypes.InternalModelInfo{
+		CSGHubModelID:  "ns/serverless-model",
+		HFPath:         "ns/serverless-model",
+		LegacyModelID:  "ns/serverless-model",
+		OwnerUUID:      "owner-uuid",
+		OwnerUsername:  "owner",
+		SvcType:        commontypes.ServerlessType,
+		SvcName:        "svc1",
+		SourceDeployID: 10,
+	}
+	mockLLMConfigStore.EXPECT().GetByModelName(mock.Anything, "ns/serverless-model").
+		Return(&database.LLMConfig{
+			ID:        1,
+			ModelName: "ns/serverless-model",
+			Enabled:   true,
+			Upstreams: []database.Upstream{
+				{
+					ID:        1,
+					Source:    commontypes.UpstreamSourceCSGHubDeploy,
+					URL:       "http://serverless-endpoint/v1",
+					Enabled:   true,
+					ModelName: "ns/serverless-model",
+					Metadata: &commontypes.UpstreamMetadata{
+						InternalModelInfo: internalInfo,
+					},
+				},
+			},
+		}, nil).Once()
+
+	model, err := comp.GetModelByID(context.Background(), "any-user-uuid", "ns/serverless-model")
+	require.NoError(t, err)
+	require.NotNil(t, model)
+	assert.Equal(t, "owner-uuid", model.OwnerUUID)
+}
+
+func TestOpenAIComponent_GetModelByID_NotFound(t *testing.T) {
+	mockLLMConfigStore := mockdb.NewMockLLMConfigStore(t)
+	comp := &openaiComponentImpl{
+		extllmStore: mockLLMConfigStore,
+	}
+
+	mockLLMConfigStore.EXPECT().GetByModelName(mock.Anything, "nonexistent").
+		Return(nil, nil).Once()
+
+	model, err := comp.GetModelByID(context.Background(), "user-uuid", "nonexistent")
+	require.NoError(t, err)
+	assert.Nil(t, model)
+}
+
+func TestOpenAIComponent_GetModelByID_DBError(t *testing.T) {
+	mockLLMConfigStore := mockdb.NewMockLLMConfigStore(t)
+	comp := &openaiComponentImpl{
+		extllmStore: mockLLMConfigStore,
+	}
+
+	mockLLMConfigStore.EXPECT().GetByModelName(mock.Anything, "error-model").
+		Return(nil, errors.New("db error")).Once()
+
+	model, err := comp.GetModelByID(context.Background(), "user-uuid", "error-model")
+	require.Error(t, err)
+	assert.Nil(t, model)
+}
+
+func TestOpenAIComponent_GetModelByID_DisabledConfigReturnsNil(t *testing.T) {
+	mockLLMConfigStore := mockdb.NewMockLLMConfigStore(t)
+	comp := &openaiComponentImpl{
+		extllmStore: mockLLMConfigStore,
+	}
+
+	// llm_config exists but is disabled (admin hasn't enabled it yet).
+	// GetModelByID should return nil — the model must not be accessible
+	// until the llm_config is explicitly enabled, even though the upstream
+	// itself is enabled.
+	mockLLMConfigStore.EXPECT().GetByModelName(mock.Anything, "ns/disabled-model:a").
+		Return(&database.LLMConfig{
+			ID:        1,
+			ModelName: "ns/disabled-model:a",
+			Enabled:   false,
+			Upstreams: []database.Upstream{
+				{
+					ID:        1,
+					Source:    commontypes.UpstreamSourceCSGHubDeploy,
+					URL:       "http://internal-endpoint/v1",
+					Enabled:   true,
+					Metadata: &commontypes.UpstreamMetadata{
+						InternalModelInfo: &commontypes.InternalModelInfo{
+							CSGHubModelID:  "ns/disabled-model",
+							RepoName:       "ns/disabled-model",
+							LegacyModelID:  "ns/disabled-model:a",
+							OwnerUUID:      "owner-uuid",
+							SvcType:        commontypes.InferenceType,
+							SourceDeployID: 10,
+						},
+					},
+				},
+			},
+		}, nil).Once()
+
+	model, err := comp.GetModelByID(context.Background(), "owner-uuid", "ns/disabled-model:a")
+	require.NoError(t, err)
+	assert.Nil(t, model, "disabled llm_config should not be accessible via GetModelByID")
+}
+
+func TestOpenAIComponent_GetModelByID_SetsSupportFunctionCallFromEngineArgs(t *testing.T) {
+	mockLLMConfigStore := mockdb.NewMockLLMConfigStore(t)
+	comp := &openaiComponentImpl{
+		extllmStore: mockLLMConfigStore,
+	}
+
+	internalInfoWithToolCall := &commontypes.InternalModelInfo{
+		CSGHubModelID:    "ns/tool-model",
+		RepoName:         "ns/tool-model",
+		LegacyModelID:    "ns/tool-model:1",
+		OwnerUUID:        "owner-uuid",
+		OwnerUsername:    "owner",
+		SvcType:          commontypes.InferenceType,
+		SvcName:          "svc1",
+		SourceDeployID:   1,
+		RuntimeFramework: "vllm",
+		EngineArgs:       `{"enable-tool-calling":"enable"}`,
+	}
+	mockLLMConfigStore.EXPECT().GetByModelName(mock.Anything, "ns/tool-model:1").
+		Return(&database.LLMConfig{
+			ID:        1,
+			ModelName: "ns/tool-model:1",
+			Enabled:   true,
+			Upstreams: []database.Upstream{
+				{
+					ID:        1,
+					Source:    commontypes.UpstreamSourceCSGHubDeploy,
+					URL:       "http://tool-endpoint/v1",
+					Enabled:   true,
+					Metadata: &commontypes.UpstreamMetadata{
+						InternalModelInfo: internalInfoWithToolCall,
+					},
+				},
+			},
+		}, nil).Once()
+
+	model, err := comp.GetModelByID(context.Background(), "owner-uuid", "ns/tool-model:1")
+	require.NoError(t, err)
+	require.NotNil(t, model)
+	assert.True(t, model.SupportFunctionCall)
+	assert.Equal(t, "ns/tool-model:1", model.ID) // base36(1) = "1"
+}
+
+func TestOpenAIComponent_ListModels(t *testing.T) {
+	mockLLMConfigStore := mockdb.NewMockLLMConfigStore(t)
+	comp := &openaiComponentImpl{
+		extllmStore: mockLLMConfigStore,
+	}
+
+	mockLLMConfigStore.EXPECT().IndexWithRepo(mock.Anything, 50, 1, mock.Anything).
+		Return([]*database.LLMConfig{
+			{
+				ID:        1,
+				ModelName: "gpt-4",
+				Enabled:   true,
+				Provider:  "openai",
+				Metadata:  map[string]any{types.MetaKeyTasks: []any{"text-generation"}},
+				Upstreams: []database.Upstream{
+					{
+						ID:         1,
+						Source:     commontypes.UpstreamSourceExternal,
+						URL:        "http://openai/v1",
+						Enabled:    true,
+						Provider:   "openai",
+						AuthHeader: "Bearer sk-xxx",
+					},
+				},
+			},
+			{
+				ID:        2,
+				ModelName: "claude-3",
+				Enabled:   true,
+				Provider:  "anthropic",
+				Metadata:  map[string]any{types.MetaKeyTasks: []any{"text-generation"}},
+				Upstreams: []database.Upstream{
+					{
+						ID:         2,
+						Source:     commontypes.UpstreamSourceExternal,
+						URL:        "http://anthropic/v1",
+						Enabled:    true,
+						Provider:   "anthropic",
+						AuthHeader: "Bearer sk-yyy",
+					},
+				},
+			},
+		}, 2, nil).Once()
 
 	modelList, err := comp.ListModels(context.Background(), "", types.ListModelsReq{})
 	require.NoError(t, err)
 	require.Len(t, modelList.Data, 2)
-	assert.Equal(t, "test-model-1", modelList.Data[0].ID)
-	assert.Equal(t, "test-model-2", modelList.Data[1].ID)
-
-	select {
-	case <-firstWriteStarted:
-	case <-time.After(time.Second):
-		t.Fatal("timed out waiting for async cache write to start")
-	}
-
-	close(continueFirstWrite)
-
-	select {
-	case <-cacheCompleted:
-	case <-time.After(time.Second):
-		t.Fatal("timed out waiting for async cache write to finish")
-	}
-}
-
-func TestOpenAIComponent_GetModelByID(t *testing.T) {
-	mockUserStore := &mockdb.MockUserStore{}
-	mockDeployStore := &mockdb.MockDeployTaskStore{}
-	mockLLMConfigStore := mockdb.NewMockLLMConfigStore(t)
-	mockCache := mockcache.NewMockRedisClient(t)
-	comp := &openaiComponentImpl{
-		userStore:      mockUserStore,
-		deployStore:    mockDeployStore,
-		extllmStore:    mockLLMConfigStore,
-		modelListCache: mockCache,
-	}
-
-	t.Run("model cache expire", func(t *testing.T) {
-		mockCache.EXPECT().Exists(mock.Anything, modelCacheKey).
-			Return(0, nil).Once()
-		mockLLMConfigStore.EXPECT().IndexWithRepo(mock.Anything, 50, 1, mock.Anything).
-			Return([]*database.LLMConfig{}, 0, nil).Once()
-		now := time.Now()
-		deploys := []database.Deploy{
-			{
-				ID:      1,
-				SvcName: "svc1",
-				Type:    1,
-				Repository: &database.Repository{
-					Name: "model1",
-					Path: "model1",
-				},
-				User: &database.User{
-					Username: "testuser",
-				},
-				Endpoint: "endpoint1",
-			},
-		}
-		deploys[0].CreatedAt = now
-		var wg sync.WaitGroup
-		wg.Add(1)
-		mockCache.EXPECT().HSet(mock.Anything, modelCacheKey, "model1:1", mock.Anything).
-			Return(nil).Once()
-		mockCache.EXPECT().Expire(mock.Anything, modelCacheKey, modelCacheTTL).
-			RunAndReturn(func(ctx context.Context, s string, d time.Duration) error {
-				wg.Done()
-				return nil
-			}).Once()
-		mockDeployStore.EXPECT().RunningVisibleToUser(mock.Anything, "testuser").Return(deploys, nil).Once()
-
-		model, err := comp.GetModelByID(context.Background(), "testuser", "model1:1")
-		assert.NoError(t, err)
-		assert.NotNil(t, model)
-		assert.Equal(t, "model1:1", model.ID)
-		wg.Wait()
-	})
-
-	t.Run("model not found", func(t *testing.T) {
-		mockCache.EXPECT().Exists(mock.Anything, modelCacheKey).
-			Return(1, nil).Once()
-		mockCache.EXPECT().HGet(mock.Anything, modelCacheKey, "nonexistent:svc").
-			Return("", redis.Nil).Once()
-		// Cache miss: GetModelByID falls through to GetAvailableModels, which calls getCSGHubModels and getExternalModels
-		mockDeployStore.EXPECT().RunningVisibleToUser(mock.Anything, "testuser").Return([]database.Deploy{}, nil).Once()
-		mockLLMConfigStore.EXPECT().IndexWithRepo(mock.Anything, 50, 1, mock.Anything).
-			Return([]*database.LLMConfig{}, 0, nil).Once()
-		model, err := comp.GetModelByID(context.Background(), "testuser", "nonexistent:svc")
-		assert.NoError(t, err)
-		assert.Nil(t, model)
-	})
-
-	t.Run("cache key exists but field miss should fallback to reload", func(t *testing.T) {
-		mockCache.EXPECT().Exists(mock.Anything, modelCacheKey).
-			Return(1, nil).Once()
-		mockCache.EXPECT().HGet(mock.Anything, modelCacheKey, "model-reload").
-			Return("", redis.Nil).Once()
-		mockDeployStore.EXPECT().RunningVisibleToUser(mock.Anything, "testuser").Return([]database.Deploy{}, nil).Once()
-		searchType := 16
-		enabled := true
-		search := &commontypes.SearchLLMConfig{
-			Types:     []int{searchType},
-			Enabled:   &enabled,
-			SortBy:    "model_size_b",
-			SortOrder: "desc",
-		}
-		mockLLMConfigStore.EXPECT().IndexWithRepo(mock.Anything, 50, 1, search).
-			Return([]*database.LLMConfig{
-				{
-					ID:        1,
-					ModelName: "model-reload",
-					Type:      16,
-					Enabled:   true,
-					Provider:  "OpenAI",
-				},
-			}, 1, nil).Once()
-		var wg sync.WaitGroup
-		wg.Add(1)
-		mockCache.EXPECT().HSet(mock.Anything, modelCacheKey, "model-reload", mock.Anything).
-			Return(nil).Once()
-		mockCache.EXPECT().Expire(mock.Anything, modelCacheKey, modelCacheTTL).
-			RunAndReturn(func(ctx context.Context, s string, d time.Duration) error {
-				wg.Done()
-				return nil
-			}).Once()
-
-		model, err := comp.GetModelByID(context.Background(), "testuser", "model-reload")
-		assert.NoError(t, err)
-		assert.NotNil(t, model)
-		assert.Equal(t, "model-reload", model.ID)
-		wg.Wait()
-	})
-
-	t.Run("model found", func(t *testing.T) {
-		mockCache.EXPECT().Exists(mock.Anything, modelCacheKey).
-			Return(1, nil).Once()
-
-		now := time.Now()
-		deploys := []database.Deploy{
-			{
-				ID:      1,
-				SvcName: "svc1",
-				Type:    1,
-				Repository: &database.Repository{
-					Name: "model1",
-					Path: "model1",
-				},
-				User: &database.User{
-					Username: "testuser",
-				},
-				Endpoint: "endpoint1",
-			},
-		}
-		deploys[0].CreatedAt = now
-		expectModel := types.Model{
-			BaseModel: types.BaseModel{
-				ID:      "model1:1",
-				OwnedBy: "testuser",
-				Object:  "model",
-				Created: deploys[0].CreatedAt.Unix(),
-				Task:    "text-generation",
-				Metadata: map[string]any{
-					types.MetaKeyLLMType: commontypes.ProviderTypeInference,
-				},
-			},
-			Endpoint: "endpoint1",
-		}
-		expectJson, _ := json.Marshal(expectModel)
-		mockCache.EXPECT().HGet(mock.Anything, modelCacheKey, expectModel.ID).
-			Return(string(expectJson), nil).Once()
-
-		model, err := comp.GetModelByID(context.Background(), "testuser", "model1:1")
-		assert.NoError(t, err)
-		assert.NotNil(t, model)
-		assert.Equal(t, "model1:1", model.ID)
-	})
-
-	t.Run("legacy csg hub model id resolves after cache miss", func(t *testing.T) {
-		mockCache.EXPECT().Exists(mock.Anything, modelCacheKey).
-			Return(1, nil).Once()
-		mockCache.EXPECT().HGet(mock.Anything, modelCacheKey, "hf/model1:svc1").
-			Return("", redis.Nil).Once()
-
-		now := time.Now()
-		deploys := []database.Deploy{
-			{
-				ID:      8765,
-				SvcName: "svc1",
-				Type:    commontypes.InferenceType,
-				Repository: &database.Repository{
-					Name:   "model1",
-					Path:   "namespace/model1",
-					HFPath: "hf/model1",
-				},
-				User: &database.User{
-					Username: "testuser",
-				},
-				Endpoint: "endpoint1",
-			},
-		}
-		deploys[0].CreatedAt = now
-
-		mockDeployStore.EXPECT().RunningVisibleToUser(mock.Anything, "testuser").Return(deploys, nil).Once()
-		mockLLMConfigStore.EXPECT().IndexWithRepo(mock.Anything, 50, 1, mock.Anything).
-			Return([]*database.LLMConfig{}, 0, nil).Once()
-
-		var wg sync.WaitGroup
-		wg.Add(1)
-		mockCache.EXPECT().HSet(mock.Anything, modelCacheKey, "model1:6rh", mock.Anything).
-			Return(nil).Once()
-		mockCache.EXPECT().Expire(mock.Anything, modelCacheKey, modelCacheTTL).
-			RunAndReturn(func(ctx context.Context, s string, d time.Duration) error {
-				wg.Done()
-				return nil
-			}).Once()
-
-		model, err := comp.GetModelByID(context.Background(), "testuser", "hf/model1:svc1")
-		assert.NoError(t, err)
-		assert.NotNil(t, model)
-		assert.Equal(t, "model1:6rh", model.ID)
-		wg.Wait()
-	})
-
-	t.Run("formatted external model id can match precomputed key", func(t *testing.T) {
-		mockCache.EXPECT().Exists(mock.Anything, modelCacheKey).
-			Return(1, nil).Once()
-		mockCache.EXPECT().HGet(mock.Anything, modelCacheKey, "test-model-1").
-			Return("", redis.Nil).Once()
-
-		mockDeployStore.EXPECT().RunningVisibleToUser(mock.Anything, "testuser").
-			Return([]database.Deploy{}, nil).Once()
-		searchType := 16
-		enabled := true
-		search := &commontypes.SearchLLMConfig{
-			Types:     []int{searchType},
-			Enabled:   &enabled,
-			SortBy:    "model_size_b",
-			SortOrder: "desc",
-		}
-		mockLLMConfigStore.EXPECT().IndexWithRepo(mock.Anything, 50, 1, search).
-			Return([]*database.LLMConfig{
-				{
-					ID:        1,
-					ModelName: "test-model-1",
-					Type:      16,
-					Enabled:   true,
-					Provider:  "OpenAI",
-				},
-			}, 1, nil).Once()
-
-		var wg sync.WaitGroup
-		wg.Add(1)
-		mockCache.EXPECT().HSet(mock.Anything, modelCacheKey, "test-model-1", mock.Anything).
-			Return(nil).Once()
-		mockCache.EXPECT().Expire(mock.Anything, modelCacheKey, modelCacheTTL).
-			RunAndReturn(func(ctx context.Context, s string, d time.Duration) error {
-				wg.Done()
-				return nil
-			}).Once()
-
-		model, err := comp.GetModelByID(context.Background(), "testuser", "test-model-1")
-		assert.NoError(t, err)
-		assert.NotNil(t, model)
-		assert.Equal(t, "test-model-1", model.ID)
-		wg.Wait()
-	})
-}
-
-func TestOpenAIComponent_saveModelsToCache(t *testing.T) {
-	t.Run("uses model id as hash field and sets ttl", func(t *testing.T) {
-		mockCache := mockcache.NewMockRedisClient(t)
-		comp := &openaiComponentImpl{modelListCache: mockCache}
-
-		models := []types.Model{
-			{
-				BaseModel: types.BaseModel{
-					ID:      "base-model-id",
-					Object:  "model",
-					OwnedBy: "openai",
-					Metadata: map[string]any{
-						types.MetaKeyLLMType: commontypes.ProviderTypeExternalLLM,
-					},
-				},
-				Endpoint: "http://test-endpoint",
-				ExternalModelInfo: types.ExternalModelInfo{
-					Provider:           "openai",
-					AuthHead:           "Bearer test-token",
-					NeedSensitiveCheck: true,
-				},
-			},
-		}
-
-		mockCache.EXPECT().HSet(mock.Anything, modelCacheKey, "base-model-id", mock.Anything).
-			RunAndReturn(func(ctx context.Context, key string, field string, value interface{}) error {
-				valueString, ok := value.(string)
-				require.True(t, ok)
-
-				var cachedModel types.Model
-				require.NoError(t, json.Unmarshal([]byte(valueString), &cachedModel))
-				assert.Equal(t, "base-model-id", cachedModel.ID)
-				assert.Equal(t, "openai", cachedModel.Provider)
-				assert.Equal(t, "Bearer test-token", cachedModel.AuthHead)
-				return nil
-			}).Once()
-		mockCache.EXPECT().Expire(mock.Anything, modelCacheKey, modelCacheTTL).
-			Return(nil).Once()
-
-		err := comp.saveModelsToCache(models)
-		require.NoError(t, err)
-	})
-}
-
-func TestOpenAIComponent_loadModelFromCache(t *testing.T) {
-	t.Run("cache key not exists returns nil model", func(t *testing.T) {
-		mockCache := mockcache.NewMockRedisClient(t)
-		comp := &openaiComponentImpl{modelListCache: mockCache}
-
-		mockCache.EXPECT().Exists(mock.Anything, modelCacheKey).Return(0, nil).Once()
-
-		model, err := comp.loadModelFromCache(context.Background(), "test-model")
-		require.NoError(t, err)
-		assert.Nil(t, model)
-	})
-
-	t.Run("load cached model by model id", func(t *testing.T) {
-		mockCache := mockcache.NewMockRedisClient(t)
-		comp := &openaiComponentImpl{modelListCache: mockCache}
-
-		cachedModel := types.Model{
-			BaseModel: types.BaseModel{
-				ID:      "test-model",
-				Object:  "model",
-				OwnedBy: "OpenAI",
-				Metadata: map[string]any{
-					types.MetaKeyLLMType: commontypes.ProviderTypeExternalLLM,
-				},
-			},
-			Endpoint: "http://test-endpoint",
-			ExternalModelInfo: types.ExternalModelInfo{
-				Provider:           "OpenAI",
-				AuthHead:           "Bearer test-token",
-				NeedSensitiveCheck: true,
-			},
-		}
-		cachedModel.ForInternalUse()
-		cachedJSON, err := json.Marshal(cachedModel)
-		require.NoError(t, err)
-
-		mockCache.EXPECT().Exists(mock.Anything, modelCacheKey).Return(1, nil).Once()
-		mockCache.EXPECT().HGet(mock.Anything, modelCacheKey, "test-model").
-			Return(string(cachedJSON), nil).Once()
-
-		model, err := comp.loadModelFromCache(context.Background(), "test-model")
-		require.NoError(t, err)
-		require.NotNil(t, model)
-		assert.Equal(t, "test-model", model.ID)
-		assert.Equal(t, "OpenAI", model.Provider)
-		assert.Equal(t, "Bearer test-token", model.AuthHead)
-	})
-
-	t.Run("hget redis nil returns cache miss without error", func(t *testing.T) {
-		mockCache := mockcache.NewMockRedisClient(t)
-		comp := &openaiComponentImpl{modelListCache: mockCache}
-
-		mockCache.EXPECT().Exists(mock.Anything, modelCacheKey).Return(1, nil).Once()
-		mockCache.EXPECT().HGet(mock.Anything, modelCacheKey, "test-model").
-			Return("", redis.Nil).Once()
-
-		model, err := comp.loadModelFromCache(context.Background(), "test-model")
-		require.NoError(t, err)
-		assert.Nil(t, model)
-	})
-}
-
-func TestOpenAIComponent_ExtGetAvailableModels_Error(t *testing.T) {
-	ctx := context.Background()
-	mockLLMConfigStore := mockdb.NewMockLLMConfigStore(t)
-	mockDeployStore := mockdb.NewMockDeployTaskStore(t)
-	mockUserStore := mockdb.NewMockUserStore(t)
-	mockCache := mockcache.NewMockRedisClient(t)
-	component := &openaiComponentImpl{
-		userStore:      mockUserStore,
-		deployStore:    mockDeployStore,
-		extllmStore:    mockLLMConfigStore,
-		modelListCache: mockCache,
-	}
-	searchType := 16
-	enabled := true
-	search := &commontypes.SearchLLMConfig{
-		Types:     []int{searchType},
-		Enabled:   &enabled,
-		SortBy:    "model_size_b",
-		SortOrder: "desc",
-	}
-	mockLLMConfigStore.EXPECT().IndexWithRepo(ctx, 50, 1, search).
-		Return(nil, 0, errors.New("test error")).Once()
-	mockDeployStore.EXPECT().RunningVisibleToUser(mock.Anything, "testuser").
-		Return([]database.Deploy{}, nil)
-
-	models, err := component.GetAvailableModels(ctx, "testuser")
-
-	require.Nil(t, err)
-	require.Nil(t, models)
-}
-
-func TestOpenAIComponent_ExtGetAvailableModels_SinglePage(t *testing.T) {
-	ctx := context.Background()
-	mockLLMConfigStore := mockdb.NewMockLLMConfigStore(t)
-	mockDeployStore := mockdb.NewMockDeployTaskStore(t)
-	mockUserStore := mockdb.NewMockUserStore(t)
-	mockCache := mockcache.NewMockRedisClient(t)
-	component := &openaiComponentImpl{
-		userStore:      mockUserStore,
-		deployStore:    mockDeployStore,
-		extllmStore:    mockLLMConfigStore,
-		modelListCache: mockCache,
-	}
-	originalMetadata := map[string]any{
-		types.MetaKeyTasks: []any{"text-generation", "text-to-image"},
-	}
-	mockModels := []*database.LLMConfig{
-		{
-			ID:        1,
-			ModelName: "test-model-1",
-			Type:      16,
-			Enabled:   true,
-			Provider:  "OpenAI",
-			Metadata:  originalMetadata,
-			RepoID:    100,
-			Repo: &database.Repository{
-				ID:      100,
-				Path:    "test-ns/test-model-1",
-				GitPath: "models/test-ns/test-model-1",
-			},
-		},
-	}
-	mockDeployStore.EXPECT().RunningVisibleToUser(mock.Anything, "testuser").
-		Return([]database.Deploy{}, nil)
-	searchType := 16
-	enabled := true
-	search := &commontypes.SearchLLMConfig{
-		Types:     []int{searchType},
-		Enabled:   &enabled,
-		SortBy:    "model_size_b",
-		SortOrder: "desc",
-	}
-	mockLLMConfigStore.EXPECT().IndexWithRepo(ctx, 50, 1, search).Return(mockModels, 1, nil)
-	mockCache.EXPECT().HSet(mock.Anything, modelCacheKey, "test-model-1", mock.Anything).
-		Return(nil).Once()
-	var wg sync.WaitGroup
-	wg.Add(1)
-	mockCache.EXPECT().Expire(mock.Anything, modelCacheKey, modelCacheTTL).
-		RunAndReturn(func(ctx context.Context, s string, d time.Duration) error {
-			wg.Done()
-			return nil
-		})
-	models, err := component.GetAvailableModels(ctx, "testuser")
-
-	require.Nil(t, err)
-	require.Len(t, models, 1)
-	require.Equal(t, "test-model-1", models[0].ID)
-	require.Equal(t, "text-generation,text-to-image", models[0].Task)
-	require.Equal(t, "test-ns/test-model-1", models[0].Metadata[types.MetaKeyRepoPath])
-	require.Equal(t, commontypes.ProviderTypeExternalLLM, models[0].Metadata[types.MetaKeyLLMType])
-	require.NotContains(t, originalMetadata, types.MetaKeyRepoPath)
-	require.NotContains(t, originalMetadata, types.MetaKeyLLMType)
-	wg.Wait()
-}
-
-func TestOpenAIComponent_GetExternalModelsWithoutRepoOmitsRepoPath(t *testing.T) {
-	ctx := context.Background()
-	mockLLMConfigStore := mockdb.NewMockLLMConfigStore(t)
-	component := &openaiComponentImpl{
-		extllmStore: mockLLMConfigStore,
-	}
-	searchType := 16
-	enabled := true
-	search := &commontypes.SearchLLMConfig{
-		Types:     []int{searchType},
-		Enabled:   &enabled,
-		SortBy:    "model_size_b",
-		SortOrder: "desc",
-	}
-	mockLLMConfigStore.EXPECT().IndexWithRepo(ctx, 50, 1, search).Return([]*database.LLMConfig{
-		{
-			ID:        1,
-			ModelName: "model-without-repo",
-			Type:      16,
-			Enabled:   true,
-			Provider:  "OpenAI",
-			Metadata:  map[string]any{"existing": "value"},
-		},
-	}, 1, nil).Once()
-
-	models := component.getExternalModels(ctx)
-
-	require.Len(t, models, 1)
-	require.Equal(t, "model-without-repo", models[0].ID)
-	require.Equal(t, "value", models[0].Metadata["existing"])
-	require.Equal(t, commontypes.ProviderTypeExternalLLM, models[0].Metadata[types.MetaKeyLLMType])
-	require.NotContains(t, models[0].Metadata, types.MetaKeyRepoPath)
+	assert.Equal(t, "gpt-4", modelList.Data[0].ID)
+	assert.Equal(t, "claude-3", modelList.Data[1].ID)
+	assert.Equal(t, 2, modelList.TotalCount)
 }

@@ -510,6 +510,19 @@ func TestKServiceExecutor_updateDeployStatus_triggerHandleDeployRunning(t *testi
 
 	dts.EXPECT().UpdateDeploy(ctx, mock.Anything).Return(nil)
 
+	// handleDeployRunning runs in a goroutine and calls GetDeployByIDWithRelations
+	// to build the upstream sync payload. The deploy has no Repository, so
+	// BuildDeployUpstreamInfoWithDeploy returns nil and no publish call is made.
+	var goroutineDone sync.WaitGroup
+	goroutineDone.Add(1)
+	dts.EXPECT().GetDeployByIDWithRelations(mock.Anything, int64(1)).Return(&database.Deploy{
+		ID:      int64(1),
+		SvcName: event.ServiceName,
+		Type:    types.SpaceType,
+	}, nil).Run(func(ctx context.Context, id int64) {
+		goroutineDone.Done()
+	})
+
 	executor := &kserviceExecutorImpl{
 		cfg:                   cfg,
 		deployTaskStore:       dts,
@@ -518,8 +531,113 @@ func TestKServiceExecutor_updateDeployStatus_triggerHandleDeployRunning(t *testi
 
 	err = executor.updateDeployStatus(ctx, event)
 	require.NoError(t, err)
-	// Wait for the goroutine handleDeployRunning to complete
+	// Wait for the notification goroutine to complete
 	wg.Wait()
+	// Wait for the handleDeployRunning goroutine to finish the GetDeployByIDWithRelations call
+	goroutineDone.Wait()
+}
+
+func TestKServiceExecutor_updateDeployStatus_triggerHandleDeployRunningOnSleeping(t *testing.T) {
+	ctx := context.TODO()
+	cfg, err := config.LoadConfig()
+	require.Nil(t, err)
+
+	event := &types.ServiceEvent{
+		ServiceName: "svc-test",
+		Status:      common.Sleeping,
+		TaskID:      100,
+	}
+
+	mockNotificationRpc := mockrpc.NewMockNotificationSvcClient(t)
+	var wg sync.WaitGroup
+	wg.Add(1)
+	mockNotificationRpc.EXPECT().Send(mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, req *types.MessageRequest) error {
+		defer wg.Done()
+		return nil
+	})
+
+	dts := mockdb.NewMockDeployTaskStore(t)
+
+	dts.EXPECT().GetDeployTask(ctx, event.TaskID).Return(&database.DeployTask{
+		ID:       int64(100),
+		DeployID: int64(1),
+		TaskType: common.TaskTypeDeploy,
+	}, nil)
+
+	dts.EXPECT().GetLastTaskByType(ctx, int64(1), common.TaskTypeDeploy).Return(&database.DeployTask{
+		ID: int64(100),
+	}, nil)
+
+	dts.EXPECT().GetDeployBySvcName(ctx, event.ServiceName).Return(&database.Deploy{
+		ID:         int64(1),
+		Status:     common.Deploying, // old status is Deploying, event status is Sleeping -> should trigger
+		SvcName:    event.ServiceName,
+		UserUUID:   "user1",
+		DeployName: "deploy1",
+		Type:       types.SpaceType,
+		GitPath:    "ns/n",
+	}, nil)
+
+	dts.EXPECT().UpdateDeploy(ctx, mock.Anything).Return(nil)
+
+	// handleDeployRunning runs in a goroutine and calls GetDeployByIDWithRelations
+	var goroutineDone sync.WaitGroup
+	goroutineDone.Add(1)
+	dts.EXPECT().GetDeployByIDWithRelations(mock.Anything, int64(1)).Return(&database.Deploy{
+		ID:      int64(1),
+		SvcName: event.ServiceName,
+		Type:    types.SpaceType,
+	}, nil).Run(func(ctx context.Context, id int64) {
+		goroutineDone.Done()
+	})
+
+	executor := &kserviceExecutorImpl{
+		cfg:                   cfg,
+		deployTaskStore:       dts,
+		notificationSvcClient: mockNotificationRpc,
+	}
+
+	err = executor.updateDeployStatus(ctx, event)
+	require.NoError(t, err)
+	wg.Wait()
+	goroutineDone.Wait()
+}
+
+func TestKServiceExecutor_updateDeployStatus_noHandleDeployRunningWhenAlreadySleeping(t *testing.T) {
+	ctx := context.TODO()
+	cfg, err := config.LoadConfig()
+	require.Nil(t, err)
+
+	event := &types.ServiceEvent{
+		ServiceName: "svc-test",
+		Status:      common.Sleeping,
+		TaskID:      100,
+	}
+
+	dts := mockdb.NewMockDeployTaskStore(t)
+
+	dts.EXPECT().GetDeployTask(ctx, event.TaskID).Return(&database.DeployTask{
+		ID:       int64(100),
+		DeployID: int64(1),
+		TaskType: common.TaskTypeDeploy,
+	}, nil)
+
+	dts.EXPECT().GetLastTaskByType(ctx, int64(1), common.TaskTypeDeploy).Return(&database.DeployTask{
+		ID: int64(100),
+	}, nil)
+
+	// Deploy is already Sleeping, event is also Sleeping -> should NOT trigger handleDeployRunning
+	dts.EXPECT().GetDeployBySvcName(ctx, event.ServiceName).Return(&database.Deploy{
+		ID:      int64(1),
+		Status:  common.Sleeping, // already sleeping
+		SvcName: event.ServiceName,
+	}, nil)
+
+	dts.EXPECT().UpdateDeploy(ctx, mock.Anything).Return(nil)
+
+	exec := NewTestKServiceExecutor(cfg, dts)
+	err = exec.updateDeployStatus(ctx, event)
+	require.NoError(t, err)
 }
 
 func TestKServiceExecutor_updateDeployStatus_noHandleDeployRunningWhenAlreadyRunning(t *testing.T) {
@@ -814,4 +932,105 @@ func TestKServiceExecutor_buildDeployNotification(t *testing.T) {
 		require.Equal(t, payload, map[string]any{})
 		require.Equal(t, url, "")
 	})
+}
+
+func TestKServiceExecutor_updateDeployStatus_triggerHandleDeployDeleted(t *testing.T) {
+	ctx := context.TODO()
+	cfg, err := config.LoadConfig()
+	require.Nil(t, err)
+
+	event := &types.ServiceEvent{
+		ServiceName: "svc-test",
+		Status:      common.Deleted,
+		TaskID:      100,
+	}
+
+	dts := mockdb.NewMockDeployTaskStore(t)
+
+	dts.EXPECT().GetDeployTask(ctx, event.TaskID).Return(&database.DeployTask{
+		ID:       int64(100),
+		DeployID: int64(1),
+		TaskType: common.TaskTypeDeploy,
+	}, nil)
+
+	dts.EXPECT().GetLastTaskByType(ctx, int64(1), common.TaskTypeDeploy).Return(&database.DeployTask{
+		ID: int64(100),
+	}, nil)
+
+	dts.EXPECT().GetDeployBySvcName(ctx, event.ServiceName).Return(&database.Deploy{
+		ID:      int64(1),
+		Status:  common.Running, // old status is Running, event is Deleted -> should trigger handleDeployDeleted
+		SvcName: event.ServiceName,
+	}, nil)
+
+	dts.EXPECT().UpdateDeploy(ctx, mock.MatchedBy(func(d *database.Deploy) bool {
+		return d.ID == int64(1) && d.Status == common.Deleted
+	})).Return(nil)
+
+	exec := NewTestKServiceExecutor(cfg, dts)
+	err = exec.updateDeployStatus(ctx, event)
+	require.NoError(t, err)
+	// handleDeployDeleted runs in a goroutine but only calls
+	// PublishDeployUpstreamSyncEvent which is a no-op when MQ is nil
+	// (test environment). No panic means success.
+}
+
+func TestKServiceExecutor_updateDeployStatus_noHandleDeployDeletedWhenAlreadyDeleted(t *testing.T) {
+	ctx := context.TODO()
+	cfg, err := config.LoadConfig()
+	require.Nil(t, err)
+
+	event := &types.ServiceEvent{
+		ServiceName: "svc-test",
+		Status:      common.Deleted,
+		TaskID:      100,
+	}
+
+	dts := mockdb.NewMockDeployTaskStore(t)
+
+	dts.EXPECT().GetDeployTask(ctx, event.TaskID).Return(&database.DeployTask{
+		ID:       int64(100),
+		DeployID: int64(1),
+		TaskType: common.TaskTypeDeploy,
+	}, nil)
+
+	dts.EXPECT().GetLastTaskByType(ctx, int64(1), common.TaskTypeDeploy).Return(&database.DeployTask{
+		ID: int64(100),
+	}, nil)
+
+	// Deploy is already Deleted, event is also Deleted -> should NOT trigger handleDeployDeleted
+	dts.EXPECT().GetDeployBySvcName(ctx, event.ServiceName).Return(&database.Deploy{
+		ID:      int64(1),
+		Status:  common.Deleted, // already deleted
+		SvcName: event.ServiceName,
+	}, nil)
+
+	exec := NewTestKServiceExecutor(cfg, dts)
+	err = exec.updateDeployStatus(ctx, event)
+	// Should be skipped early because deploy is already deleted
+	require.NoError(t, err)
+}
+
+func TestKServiceExecutor_syncDeployUpstream_skipsWhenRepositoryNil(t *testing.T) {
+	ctx := context.TODO()
+	cfg, err := config.LoadConfig()
+	require.Nil(t, err)
+
+	dts := mockdb.NewMockDeployTaskStore(t)
+
+	// Deploy loaded with relations but no Repository -> BuildDeployUpstreamInfoWithDeploy returns nil
+	dts.EXPECT().GetDeployByIDWithRelations(mock.Anything, int64(1)).Return(&database.Deploy{
+		ID:      int64(1),
+		SvcName: "svc-test",
+		Type:    types.InferenceType,
+		// Repository is nil
+	}, nil)
+
+	executor := &kserviceExecutorImpl{
+		cfg:             cfg,
+		deployTaskStore: dts,
+	}
+
+	// Should not panic and should return without publishing
+	executor.syncDeployUpstream(ctx, 1)
 }

@@ -41,6 +41,14 @@ const (
 	LfsResultSubject    string = "xnet.lfs.result"
 
 	ActivityLogSendSubject string = "activity.log.send"
+
+	// Deploy upstream sync subjects.
+	// Published by deploy lifecycle handlers (running/stop/delete) and
+	// consumed by the AIGateway upstream sync consumer to keep the
+	// ai_gateway_upstreams table in sync with deploys.
+	DeployUpstreamSyncRunningSubject string = "aigateway.upstream.sync.running"
+	DeployUpstreamSyncStopSubject   string = "aigateway.upstream.sync.stop"
+	DeployUpstreamSyncDeleteSubject string = "aigateway.upstream.sync.delete"
 )
 
 type MQGroup struct {
@@ -116,6 +124,10 @@ var (
 	ActivityLogGroup = MQGroup{
 		StreamName:   "activityLogStream",
 		ConsumerName: "activityLogConsumer",
+	}
+	DeployUpstreamSyncGroup = MQGroup{
+		StreamName:   "deployUpstreamSyncStream",
+		ConsumerName: "deployUpstreamSyncConsumer",
 	}
 )
 

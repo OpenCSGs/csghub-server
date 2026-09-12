@@ -323,6 +323,7 @@ func (s *llmServiceComponentImpl) CreateLLMConfig(ctx context.Context, req *type
 			Provider:              strings.TrimSpace(u.Provider),
 			HealthCheckEnabled:    u.HealthCheckEnabled,
 			CircuitBreakerEnabled: u.CircuitBreakerEnabled,
+			Source:                types.UpstreamSourceExternal,
 			Tags:                  u.Tags,
 			Metadata:              u.Metadata,
 			LimitPolicy:           u.LimitPolicy,
@@ -533,6 +534,7 @@ func (s *llmServiceComponentImpl) CreateUpstream(ctx context.Context, req *types
 		Provider:              strings.TrimSpace(req.Provider),
 		HealthCheckEnabled:    req.HealthCheckEnabled != nil && *req.HealthCheckEnabled,
 		CircuitBreakerEnabled: req.CircuitBreakerEnabled != nil && *req.CircuitBreakerEnabled,
+		Source:                types.UpstreamSourceExternal,
 		Tags:                  req.Tags,
 		Metadata:              req.Metadata,
 		LimitPolicy:           req.LimitPolicy,
@@ -568,23 +570,28 @@ func (s *llmServiceComponentImpl) UpdateUpstream(ctx context.Context, req *types
 	wasHealthCheckEnabled := dbUp.HealthCheckEnabled
 	wasCircuitBreakerEnabled := dbUp.CircuitBreakerEnabled
 
+	// Protect source-owned fields on internal (csghub) upstreams.
+	// These fields are managed by the deploy sync and must not be overwritten
+	// by admin API updates. Only UI-configured fields are editable.
+	isCSGHubSource := dbUp.Source == types.UpstreamSourceCSGHubDeploy
+
 	// Apply partial updates
-	if req.URL != nil {
+	if req.URL != nil && !isCSGHubSource {
 		dbUp.URL = strings.TrimSpace(*req.URL)
 	}
 	if req.Weight != nil {
 		dbUp.Weight = *req.Weight
 	}
-	if req.Enabled != nil {
+	if req.Enabled != nil && !isCSGHubSource {
 		dbUp.Enabled = *req.Enabled
 	}
-	if req.ModelName != nil {
+	if req.ModelName != nil && !isCSGHubSource {
 		dbUp.ModelName = strings.TrimSpace(*req.ModelName)
 	}
-	if req.AuthHeader != nil {
+	if req.AuthHeader != nil && !isCSGHubSource {
 		dbUp.AuthHeader = *req.AuthHeader
 	}
-	if req.Provider != nil {
+	if req.Provider != nil && !isCSGHubSource {
 		dbUp.Provider = strings.TrimSpace(*req.Provider)
 	}
 	if req.HealthCheckEnabled != nil {
@@ -600,10 +607,24 @@ func (s *llmServiceComponentImpl) UpdateUpstream(ctx context.Context, req *types
 		dbUp.Tags = *req.Tags
 	}
 	if req.Metadata != nil {
-		if err := validateUpstreamMetadata(*req.Metadata); err != nil {
+		if err := validateUpstreamMetadata(req.Metadata); err != nil {
 			return nil, err
 		}
-		dbUp.Metadata = *req.Metadata
+		if isCSGHubSource {
+			// For csghub upstreams, preserve sync-owned metadata fields
+			// (InternalModelInfo including Host, Protocol) and only apply
+			// UI-configurable metadata (ResponsesChatAdapter). If the existing
+			// row has no metadata yet (e.g. not yet synced), clear the
+			// sync-owned fields so client-supplied values cannot leak in.
+			if dbUp.Metadata != nil {
+				req.Metadata.InternalModelInfo = dbUp.Metadata.InternalModelInfo
+				req.Metadata.Protocol = dbUp.Metadata.Protocol
+			} else {
+				req.Metadata.InternalModelInfo = nil
+				req.Metadata.Protocol = ""
+			}
+		}
+		dbUp.Metadata = req.Metadata
 	}
 	if dbUp.Weight <= 0 {
 		dbUp.Weight = 1
@@ -682,6 +703,7 @@ func buildUpstreamConfigs(dbUpstreams []database.Upstream) []types.UpstreamConfi
 	for _, u := range dbUpstreams {
 		uc := types.UpstreamConfig{
 			ID:                    u.ID,
+			Source:                u.Source,
 			URL:                   u.URL,
 			Weight:                u.Weight,
 			Enabled:               u.Enabled,

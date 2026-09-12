@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -295,149 +294,6 @@ func TestSanitizeMeteringEventForLog(t *testing.T) {
 	require.True(t, strings.Contains(sanitized.Extra, `"completion_token_num":"8"`))
 }
 
-func TestOpenAIComponentImpl_getCSGHubModels_SetsSupportFunctionCallFromEngineArgs(t *testing.T) {
-	mockDeployStore := mockdb.NewMockDeployTaskStore(t)
-	comp := &openaiComponentImpl{
-		deployStore: mockDeployStore,
-	}
-
-	now := time.Now()
-	deploys := []database.Deploy{
-		{
-			ID:               1,
-			SvcName:          "vllm-svc",
-			Type:             commontypes.InferenceType,
-			RuntimeFramework: "vllm",
-			EngineArgs:       `{"enable-tool-calling":"enable"}`,
-			Repository: &database.Repository{
-				Name: "tool-model",
-				Path: "namespace/tool-model",
-			},
-			User: &database.User{
-				Username: "owner",
-				UUID:     "owner-uuid",
-			},
-			Endpoint: "vllm-endpoint",
-		},
-		{
-			ID:               2,
-			SvcName:          "plain-svc",
-			Type:             commontypes.InferenceType,
-			RuntimeFramework: "vllm",
-			EngineArgs:       `{"max-model-len":"8192"}`,
-			Repository: &database.Repository{
-				Name: "plain-model",
-				Path: "namespace/plain-model",
-			},
-			User: &database.User{
-				Username: "owner",
-				UUID:     "owner-uuid",
-			},
-			Endpoint: "plain-endpoint",
-		},
-		{
-			ID:               3,
-			SvcName:          "custom-options-svc",
-			Type:             commontypes.InferenceType,
-			RuntimeFramework: "vllm",
-			EngineArgs:       `{"max-model-len":"160000","custom-options":"--enable-auto-tool-choice --tool-call-parser deepseek_v31"}`,
-			Repository: &database.Repository{
-				Name: "custom-options-model",
-				Path: "namespace/custom-options-model",
-			},
-			User: &database.User{
-				Username: "owner",
-				UUID:     "owner-uuid",
-			},
-			Endpoint: "custom-options-endpoint",
-		},
-	}
-	for i := range deploys {
-		deploys[i].CreatedAt = now
-	}
-
-	mockDeployStore.EXPECT().RunningVisibleToUser(mock.Anything, "1").
-		Return(deploys, nil).Once()
-
-	models, err := comp.getCSGHubModels(context.Background(), "1")
-	require.NoError(t, err)
-	require.Len(t, models, 3)
-	assert.True(t, models[0].SupportFunctionCall)
-	assert.False(t, models[1].SupportFunctionCall)
-	assert.True(t, models[2].SupportFunctionCall)
-}
-
-func TestOpenAIComponentImpl_getCSGHubModels_SkipsDeploysWithMissingRelations(t *testing.T) {
-	mockDeployStore := mockdb.NewMockDeployTaskStore(t)
-	comp := &openaiComponentImpl{
-		deployStore: mockDeployStore,
-	}
-
-	now := time.Now()
-	deploys := []database.Deploy{
-		{
-			ID:      1,
-			SvcName: "missing-repo",
-			Type:    commontypes.InferenceType,
-			User: &database.User{
-				Username: "owner",
-				UUID:     "owner-uuid",
-			},
-		},
-		{
-			ID:      2,
-			SvcName: "missing-user",
-			Type:    commontypes.InferenceType,
-			UserID:  2,
-			Repository: &database.Repository{
-				Name: "model-without-user",
-				Path: "namespace/model-without-user",
-			},
-		},
-		{
-			ID:      3,
-			SvcName: "unknown-type",
-			Type:    999,
-			Repository: &database.Repository{
-				Name: "unknown-model",
-				Path: "namespace/unknown-model",
-			},
-			User: &database.User{
-				Username: "unknown-owner",
-				UUID:     "unknown-owner-uuid",
-			},
-		},
-		{
-			ID:      4,
-			SvcName: "valid-svc",
-			Type:    commontypes.InferenceType,
-			Repository: &database.Repository{
-				Name: "valid-model",
-				Path: "namespace/valid-model",
-			},
-			User: &database.User{
-				Username: "valid-owner",
-				UUID:     "valid-owner-uuid",
-			},
-			Endpoint: "valid-endpoint",
-		},
-	}
-	for i := range deploys {
-		deploys[i].CreatedAt = now
-	}
-
-	mockDeployStore.EXPECT().RunningVisibleToUser(mock.Anything, "1").
-		Return(deploys, nil).Once()
-
-	models, err := comp.getCSGHubModels(context.Background(), "1")
-	require.NoError(t, err)
-	require.Len(t, models, 1)
-	assert.Equal(t, "valid-model:4", models[0].ID)
-	assert.Equal(t, "valid-owner", models[0].OwnedBy)
-	assert.Equal(t, "valid-owner-uuid", models[0].OwnerUUID)
-	assert.Equal(t, "valid-endpoint", models[0].Endpoint)
-}
-
 func TestOpenAIComponent_CanManageModel(t *testing.T) {
 	ctx := context.Background()
 	model := &types.Model{
@@ -719,7 +575,6 @@ func TestOpenAIComponent_checkOrganization(t *testing.T) {
 
 func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 	mockUserStore := &mockdb.MockUserStore{}
-	mockDeployStore := &mockdb.MockDeployTaskStore{}
 	mockOrgStore := &mockdb.MockOrgStore{}
 
 	var mockCounter *mocktoken.MockCounter
@@ -766,7 +621,6 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 
 				comp = &openaiComponentImpl{
 					userStore:   mockUserStore,
-					deployStore: mockDeployStore,
 					eventPub:    eventPub,
 					organStore:  mockOrgStore,
 				}
@@ -851,7 +705,6 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 
 				comp = &openaiComponentImpl{
 					userStore:   mockUserStore,
-					deployStore: mockDeployStore,
 					eventPub:    eventPub,
 					organStore:  mockOrgStore,
 				}
@@ -924,7 +777,6 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 
 				comp = &openaiComponentImpl{
 					userStore:   mockUserStore,
-					deployStore: mockDeployStore,
 					eventPub:    eventPub,
 				}
 				mockCounter.EXPECT().Usage(mock.Anything).Return(&token.Usage{
@@ -994,7 +846,6 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 
 				comp = &openaiComponentImpl{
 					userStore:   mockUserStore,
-					deployStore: mockDeployStore,
 					eventPub:    eventPub,
 				}
 				mockCounter.EXPECT().Usage(mock.Anything).Return(&token.Usage{
@@ -1042,7 +893,6 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 				mockCounter = mocktoken.NewMockCounter(t)
 				comp = &openaiComponentImpl{
 					userStore:   mockUserStore,
-					deployStore: mockDeployStore,
 					eventPub: &event.EventPublisher{
 						SyncInterval: 1,
 						MQ:           mockbldmq.NewMockMessageQueue(t),
@@ -1067,7 +917,6 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 				mockCounter = mocktoken.NewMockCounter(t)
 				comp = &openaiComponentImpl{
 					userStore:   mockUserStore,
-					deployStore: mockDeployStore,
 					eventPub: &event.EventPublisher{
 						SyncInterval: 1,
 						MQ:           mockbldmq.NewMockMessageQueue(t),
@@ -1089,7 +938,6 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 				mockCounter = mocktoken.NewMockCounter(t)
 				comp = &openaiComponentImpl{
 					userStore:   mockUserStore,
-					deployStore: mockDeployStore,
 					eventPub: &event.EventPublisher{
 						SyncInterval: 1,
 						MQ:           mockbldmq.NewMockMessageQueue(t),
@@ -1119,7 +967,6 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 				mockCounter = mocktoken.NewMockCounter(t)
 				comp = &openaiComponentImpl{
 					userStore:   mockUserStore,
-					deployStore: mockDeployStore,
 					eventPub: &event.EventPublisher{
 						SyncInterval: 1,
 						MQ:           mockbldmq.NewMockMessageQueue(t),
@@ -1156,7 +1003,6 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 
 				comp = &openaiComponentImpl{
 					userStore:   mockUserStore,
-					deployStore: mockDeployStore,
 					eventPub:    eventPub,
 				}
 				mockCounter.EXPECT().Usage(mock.Anything).Return(nil, errors.New("counter error"))
@@ -1193,7 +1039,6 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 				mockCounter = mocktoken.NewMockCounter(t)
 				comp = &openaiComponentImpl{
 					userStore:   mockUserStore,
-					deployStore: mockDeployStore,
 					eventPub:    eventPub,
 				}
 				mockCounter.EXPECT().Usage(mock.Anything).Return(&token.Usage{
@@ -1431,7 +1276,6 @@ func TestOpenAIComponentImpl_RecordUsage_MultiModalAudio(t *testing.T) {
 
 func TestOpenAIComponentImpl_RecordUsage_ExternalModel(t *testing.T) {
 	mockUserStore := &mockdb.MockUserStore{}
-	mockDeployStore := &mockdb.MockDeployTaskStore{}
 
 	var mockCounter *mocktoken.MockCounter
 	var comp *openaiComponentImpl
@@ -1470,7 +1314,6 @@ func TestOpenAIComponentImpl_RecordUsage_ExternalModel(t *testing.T) {
 
 				comp = &openaiComponentImpl{
 					userStore:   mockUserStore,
-					deployStore: mockDeployStore,
 					eventPub:    eventPub,
 				}
 				mockCounter.EXPECT().Usage(mock.Anything).Return(&token.Usage{
@@ -1535,7 +1378,6 @@ func TestOpenAIComponentImpl_RecordUsage_ExternalModel(t *testing.T) {
 
 				comp = &openaiComponentImpl{
 					userStore:   mockUserStore,
-					deployStore: mockDeployStore,
 					eventPub:    eventPub,
 				}
 				mockCounter.EXPECT().Usage(mock.Anything).Return(nil, errors.New("counter error"))
@@ -1566,7 +1408,6 @@ func TestOpenAIComponentImpl_RecordUsage_ExternalModel(t *testing.T) {
 				mockCounter = mocktoken.NewMockCounter(t)
 				comp = &openaiComponentImpl{
 					userStore:   mockUserStore,
-					deployStore: mockDeployStore,
 					eventPub:    eventPub,
 				}
 				mockCounter.EXPECT().Usage(mock.Anything).Return(&token.Usage{
@@ -1604,7 +1445,6 @@ func TestOpenAIComponentImpl_RecordUsage_ExternalModel(t *testing.T) {
 
 				comp = &openaiComponentImpl{
 					userStore:   mockUserStore,
-					deployStore: mockDeployStore,
 					eventPub:    eventPub,
 				}
 				mockCounter.EXPECT().Usage(mock.Anything).Return(&token.Usage{
@@ -1657,12 +1497,10 @@ func TestOpenAIComponentImpl_RecordUsage_ExternalModel(t *testing.T) {
 }
 
 func TestDbUpstreamsToConfigsMetadataPassthrough(t *testing.T) {
-	metadata := map[string]any{
-		"responses": map[string]any{
-			"chat_adapter": map[string]any{
-				"reasoning_request": map[string]any{
-					"enabled": true,
-				},
+	metadata := &commontypes.UpstreamMetadata{
+		ResponsesChatAdapter: &commontypes.ResponsesChatAdapter{
+			ReasoningRequest: &commontypes.ReasoningRequestConfig{
+				Enabled: true,
 			},
 		},
 	}

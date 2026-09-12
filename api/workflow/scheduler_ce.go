@@ -104,6 +104,10 @@ func RegisterCronJobs(config *config.Config, temporalClient temporal.Client) err
 		return fmt.Errorf("unable to create deploy reconcile schedule, error:%w", err)
 	}
 
+	if err := createSchedule(scheduler, "upstream-sync-reconcile-schedule", config.CronJob.UpstreamSyncReconcileCronExpression, "upstream-sync-reconcile-workflow", UpstreamSyncReconcileWorkflow); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -117,4 +121,5 @@ func RegisterCronWorker(config *config.Config, temporalClient temporal.Client, a
 	wfWorker.RegisterWorkflow(DeletePendingDeletionWorkflow)
 	wfWorker.RegisterWorkflow(ProcessAIGatewayAsyncGenerationsWorkflow)
 	wfWorker.RegisterWorkflow(DeployReconcileWorkflow)
+	wfWorker.RegisterWorkflow(UpstreamSyncReconcileWorkflow)
 }

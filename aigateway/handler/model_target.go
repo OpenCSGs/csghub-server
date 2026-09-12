@@ -12,7 +12,6 @@ import (
 	"opencsg.com/csghub-server/aigateway/component/router"
 	"opencsg.com/csghub-server/aigateway/types"
 	commonType "opencsg.com/csghub-server/common/types"
-	"opencsg.com/csghub-server/common/utils/common"
 )
 
 // SetMetricsModelParams bundles inputs for SetMetricsModelTarget so the
@@ -95,6 +94,7 @@ type endpointTargetResolveInput struct {
 type endpointTargetResolveResult struct {
 	Upstream       commonType.UpstreamConfig
 	Target         string
+	Host           string
 	ModelName      string
 	AttemptTargets []commonType.UpstreamConfig
 }
@@ -187,7 +187,10 @@ func (h *OpenAIHandlerImpl) resolveModelTargetWithOptions(ctx context.Context, n
 		AttemptTargets: make([]commonType.UpstreamConfig, 0, h.chatMaxFallbackAttempts()+1),
 	}
 
-	if len(model.SvcName) > 0 {
+	// When the model has upstreams configured (the unified path), prefer the
+	// endpoint/upstream routing path. Only fall back to the legacy CSGHub
+	// cluster-deploy path for models that have SvcName but no upstreams.
+	if len(model.SvcName) > 0 && len(model.Upstreams) == 0 {
 		resolved.Target, resolved.Host, resolved.ModelName, err = h.resolveCSGHubModelTarget(ctx, model, targetReq)
 		if err != nil {
 			return nil, err
@@ -206,6 +209,7 @@ func (h *OpenAIHandlerImpl) resolveModelTargetWithOptions(ctx context.Context, n
 		}
 		resolved.Upstream = result.Upstream
 		resolved.Target = result.Target
+		resolved.Host = result.Host
 		resolved.ModelName = result.ModelName
 		resolved.AttemptTargets = result.AttemptTargets
 	}
@@ -228,24 +232,11 @@ func (h *OpenAIHandlerImpl) resolveModelTargetWithOptions(ctx context.Context, n
 }
 
 func (h *OpenAIHandlerImpl) resolveCSGHubModelTarget(
-	ctx context.Context,
+	_ context.Context,
 	model *types.Model,
-	targetReq commonType.EndpointReq,
+	_ commonType.EndpointReq,
 ) (string, string, string, error) {
-	cluster, err := h.clusterComp.GetClusterByID(ctx, targetReq.ClusterID)
-	if err != nil {
-		return "", "", "", newInvalidRequestModelTargetError(
-			"cluster_not_found",
-			fmt.Sprintf("cluster '%s' not found", model.ClusterID),
-			modelTargetErrorOptions{
-				Cause:     err,
-				Model:     model,
-				TargetReq: targetReq,
-			},
-		)
-	}
-	target, host, _ := common.ExtractDeployTargetAndHost(ctx, cluster, targetReq)
-	return target, host, model.CSGHubModelID, nil
+	return model.Endpoint, model.InternalModelInfo.Host, model.CSGHubModelID, nil
 }
 
 func (h *OpenAIHandlerImpl) resolveEndpointModelTarget(
@@ -276,6 +267,7 @@ func (h *OpenAIHandlerImpl) resolveEndpointModelTarget(
 			return &endpointTargetResolveResult{
 				Upstream:       upstream,
 				Target:         target,
+				Host:           upstreamHostOverride(upstream),
 				ModelName:      modelName,
 				AttemptTargets: []commonType.UpstreamConfig{upstream},
 			}, nil
@@ -335,6 +327,7 @@ func (h *OpenAIHandlerImpl) resolveEndpointModelTarget(
 	return &endpointTargetResolveResult{
 		Upstream:       upstream,
 		Target:         target,
+		Host:           upstreamHostOverride(upstream),
 		ModelName:      modelName,
 		AttemptTargets: attemptTargets,
 	}, nil
@@ -419,6 +412,27 @@ func applyEndpointOverrides(model *types.Model, upstream commonType.UpstreamConf
 		model.AuthHead = upstream.AuthHeader
 	}
 	model.Provider = upstream.Provider
+	// Apply host override from upstream metadata (used for internal csghub deploys
+	// that need a specific Host header to reach the correct service). The actual
+	// Host header is set later in resolveEndpointModelTarget via upstreamHostOverride().
+	if upstreamHostOverride(upstream) != "" {
+		model.Endpoint = upstream.URL
+	}
+}
+
+// upstreamHostOverride extracts the Host header override from upstream metadata.
+// This is set by the deploy sync for internal csghub upstreams and is needed
+// for k8s multi-tenant routing where the HTTP Host header must match the
+// deploy service hostname.
+func upstreamHostOverride(upstream commonType.UpstreamConfig) string {
+	if upstream.Metadata != nil && upstream.Metadata.InternalModelInfo != nil && upstream.Metadata.InternalModelInfo.Host != "" {
+		return upstream.Metadata.InternalModelInfo.Host
+	}
+	// Backward compat: fall back to legacy top-level HostOverride for old DB rows.
+	if upstream.Metadata != nil && upstream.Metadata.HostOverride != "" {
+		return upstream.Metadata.HostOverride
+	}
+	return ""
 }
 
 func extractSessionKeyForModel(model *types.Model, headers http.Header, fallbackSessionKey string) string {

@@ -16,7 +16,9 @@ import (
 )
 
 type fakeOpenAIComponent struct {
-	model *aigwtypes.Model
+	model          *aigwtypes.Model
+	lastNsUUID     string
+	getModelCalled bool
 }
 
 func (c *fakeOpenAIComponent) GetAvailableModels(ctx context.Context, nsUUID string) ([]aigwtypes.Model, error) {
@@ -28,6 +30,8 @@ func (c *fakeOpenAIComponent) ListModels(ctx context.Context, nsUUID string, req
 }
 
 func (c *fakeOpenAIComponent) GetModelByID(ctx context.Context, nsUUID, modelID string) (*aigwtypes.Model, error) {
+	c.getModelCalled = true
+	c.lastNsUUID = nsUUID
 	return c.model, nil
 }
 
@@ -88,32 +92,32 @@ func TestVideoProcessorRefreshUsesHTTPDoer(t *testing.T) {
 		wantURL:  "https://upstream.example/v1/videos/provider-id",
 		wantAuth: "Bearer token",
 	}
-	processor := NewProcessor(
-		&fakeOpenAIComponent{
-			model: &aigwtypes.Model{
-				BaseModel: aigwtypes.BaseModel{
-					ID:   "video-model",
-					Task: string(commontypes.Text2Video),
-				},
-				Endpoint: endpoint,
-				Upstreams: []commontypes.UpstreamConfig{
-					{ID: 7, URL: endpoint, AuthHeader: "Bearer token"},
-				},
+	openaiComp := &fakeOpenAIComponent{
+		model: &aigwtypes.Model{
+			BaseModel: aigwtypes.BaseModel{
+				ID:   "video-model",
+				Task: string(commontypes.Text2Video),
+			},
+			Endpoint: endpoint,
+			Upstreams: []commontypes.UpstreamConfig{
+				{ID: 7, URL: endpoint, AuthHeader: "Bearer token"},
 			},
 		},
-		nil,
-		doer,
-	)
+	}
+	processor := NewProcessor(openaiComp, nil, doer)
 
 	status, err := processor.Refresh(context.Background(), taskprocessor.GenerationRef{
 		ResourceID:         "gateway-id",
 		ProviderResourceID: "provider-id",
 		ModelID:            "video-model",
 		UpstreamID:         7,
+		OwnerUUID:          "owner-uuid-123",
 	})
 
 	require.NoError(t, err)
 	require.True(t, doer.called)
+	require.True(t, openaiComp.getModelCalled, "GetModelByID should have been called")
+	require.Equal(t, "owner-uuid-123", openaiComp.lastNsUUID, "GetModelByID should receive the task owner UUID")
 	require.Equal(t, string(commontypes.AIGatewayAsyncGenerationStatusCompleted), status.Status)
 	require.Equal(t, "completed", status.ProviderMetadata[text2video.ProviderStatusMetadataKey])
 }

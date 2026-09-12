@@ -2,6 +2,8 @@ package database
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -33,7 +35,7 @@ type LLMConfig struct {
 	// NeedSensitiveCheck controls whether requests for this model should go
 	// through sensitive content detection in aigateway. Set to false to skip
 	// the check (e.g. for guard models or trusted internal models).
-	NeedSensitiveCheck bool        `bun:",notnull,default:false" json:"need_sensitive_check"`
+	NeedSensitiveCheck bool        `bun:",notnull" json:"need_sensitive_check"`
 	RepoID             int64       `bun:",nullzero" json:"repo_id"`
 	Repo               *Repository `bun:"rel:belongs-to,join:repo_id=id" json:"repo,omitempty"`
 	// ModelSizeB is the parameter size of the model in billions. 0 means unknown.
@@ -252,8 +254,17 @@ func (s *lLMConfigStoreImpl) IndexWithRepo(ctx context.Context, per, page int, s
 }
 func (s *lLMConfigStoreImpl) GetByModelName(ctx context.Context, modelName string) (*LLMConfig, error) {
 	var config LLMConfig
-	err := s.db.Operator.Core.NewSelect().Model(&config).Relation("Upstreams").Where("model_name = ?", modelName).Limit(1).Scan(ctx)
+	err := s.db.Operator.Core.NewSelect().Model(&config).
+		Relation("Repo").
+		Relation("Upstreams.HealthState").
+		Relation("Upstreams.CircuitState").
+		Where("model_name = ?", modelName).
+		Limit(1).
+		Scan(ctx)
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
 		return nil, fmt.Errorf("select llm config by model_name %s: %w", modelName, err)
 	}
 	return &config, nil
