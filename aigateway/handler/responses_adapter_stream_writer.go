@@ -46,6 +46,7 @@ type responsesAdapterStreamWriter struct {
 	reasoningItemID    string
 	reasoning          strings.Builder
 	nextOutputIdx      int
+	nextSequenceNumber int64
 	responsesCounter   token.ResponsesTokenCounter
 	usage              *types.ResponsesUsage
 	toolCallItems      map[int]*responsesToolCallStreamState
@@ -597,6 +598,8 @@ func (w *responsesAdapterStreamWriter) finishToolCallItems() {
 			ResponseID:  w.respID,
 			ItemID:      state.CallID,
 			OutputIndex: state.OutputIndex,
+			Name:        state.Name,
+			Arguments:   state.Arguments.String(),
 		})
 		w.writeResponsesEvent("response.output_item.done", responsespkg.StreamOutputItemEvent{
 			Type:        "response.output_item.done",
@@ -738,20 +741,44 @@ func (w *responsesAdapterStreamWriter) orderedToolCallStates() []*responsesToolC
 }
 
 func (w *responsesAdapterStreamWriter) writeResponsesEvent(event string, payload any) {
-	w.captureResponsesCounterEvent(payload)
+	data, err := marshalResponsesAdapterStreamEvent(payload, w.nextSequenceNumber)
+	if err != nil {
+		return
+	}
+	w.nextSequenceNumber++
+	w.captureResponsesCounterData(data)
 	w.eventBuf.Reset()
 	w.eventBuf.WriteString("event: ")
 	w.eventBuf.WriteString(event)
 	w.eventBuf.WriteString("\n")
 	w.eventBuf.WriteString("data: ")
-	encoder := json.NewEncoder(&w.eventBuf)
-	encoder.SetEscapeHTML(false)
-	if err := encoder.Encode(payload); err != nil {
-		return
-	}
+	w.eventBuf.Write(data)
 	w.eventBuf.WriteByte('\n')
 	_, _ = w.ginWriter.Write(w.eventBuf.Bytes())
 	w.ginWriter.Flush()
+}
+
+func marshalResponsesAdapterStreamEvent(payload any, sequenceNumber int64) ([]byte, error) {
+	var encoded bytes.Buffer
+	encoder := json.NewEncoder(&encoded)
+	encoder.SetEscapeHTML(false)
+	if err := encoder.Encode(payload); err != nil {
+		return nil, err
+	}
+
+	fields := map[string]json.RawMessage{}
+	if err := json.Unmarshal(encoded.Bytes(), &fields); err != nil {
+		return nil, err
+	}
+	fields["sequence_number"] = json.RawMessage(fmt.Sprintf("%d", sequenceNumber))
+
+	encoded.Reset()
+	encoder = json.NewEncoder(&encoded)
+	encoder.SetEscapeHTML(false)
+	if err := encoder.Encode(fields); err != nil {
+		return nil, err
+	}
+	return encoded.Bytes(), nil
 }
 
 func (w *responsesAdapterStreamWriter) captureResponsesCounterEvent(payload any) {
@@ -760,6 +787,13 @@ func (w *responsesAdapterStreamWriter) captureResponsesCounterEvent(payload any)
 	}
 	data, err := json.Marshal(payload)
 	if err != nil {
+		return
+	}
+	w.captureResponsesCounterData(data)
+}
+
+func (w *responsesAdapterStreamWriter) captureResponsesCounterData(data []byte) {
+	if w.responsesCounter == nil || len(data) == 0 {
 		return
 	}
 	var event types.ResponsesStreamEvent

@@ -101,6 +101,8 @@ type StreamFunctionCallArgumentsDoneEvent struct {
 	ResponseID  string `json:"response_id"`
 	ItemID      string `json:"item_id"`
 	OutputIndex int    `json:"output_index"`
+	Name        string `json:"name"`
+	Arguments   string `json:"arguments"`
 }
 
 type StreamMessageItem struct {

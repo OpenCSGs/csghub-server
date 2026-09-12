@@ -247,6 +247,20 @@ event: response.completed
 data: [DONE]
 ```
 
+Every JSON event includes a zero-based, gap-free `sequence_number`. The final
+arguments event includes the complete function call:
+
+```json
+{
+  "type": "response.function_call_arguments.done",
+  "item_id": "call_...",
+  "name": "get_weather",
+  "arguments": "{\"city\":\"Tokyo\"}",
+  "output_index": 0,
+  "sequence_number": 7
+}
+```
+
 ## 9. Multiple Tools
 
 ```bash
