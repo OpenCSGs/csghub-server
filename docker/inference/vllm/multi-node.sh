@@ -4,6 +4,25 @@ set -euo pipefail
 
 export PYTHONPATH="$(pwd):${PYTHONPATH:-}"
 
+# Detect AMD GPU (ROCm) and configure environment for multi-node
+if [ -e /dev/kfd ] || command -v rocm-smi &>/dev/null; then
+    echo "AMD GPU detected, configuring ROCm multi-node environment"
+    # HIP_VISIBLE_DEVICES controls which AMD GPUs are visible to the runtime
+    # (analogous to CUDA_VISIBLE_DEVICES for NVIDIA). Build the device list
+    # from GPU_NUM so only the assigned GPUs are exposed.
+    if [ -z "${HIP_VISIBLE_DEVICES:-}" ] && [ -n "${GPU_NUM:-}" ]; then
+        HIP_DEVICES=$(python3 -c "print(','.join(str(i) for i in range($GPU_NUM)))")
+        export HIP_VISIBLE_DEVICES="$HIP_DEVICES"
+    fi
+    # Unset ROCR_VISIBLE_DEVICES: the runner sets it to "none" on non-AMD
+    # nodes to hide AMD GPUs. On AMD nodes we must clear it so the devices
+    # remain visible for multi-node RCCL communication.
+    unset ROCR_VISIBLE_DEVICES
+    # Enable P2P for multi-node; the Dockerfile sets NCCL_P2P_DISABLE=1 for
+    # single-node safety, but multi-node RCCL needs P2P enabled.
+    export NCCL_P2P_DISABLE=0
+fi
+
 : "${REPO_ID:?REPO_ID is required}"
 : "${GPU_NUM:?GPU_NUM is required}"
 : "${LWS_GROUP_SIZE:?LWS_GROUP_SIZE is required}"
