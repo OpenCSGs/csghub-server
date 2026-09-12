@@ -82,6 +82,7 @@ func TestProviderWriteAndDeleteUseOpenFGAWrite(t *testing.T) {
 
 	deleteRequest := server.requests[1]
 	require.Nil(t, deleteRequest.GetWrites())
+	require.Equal(t, "ignore", deleteRequest.GetDeletes().GetOnMissing())
 	require.Len(t, deleteRequest.GetDeletes().GetTupleKeys(), 1)
 	require.Equal(t, "user:user-1", deleteRequest.GetDeletes().GetTupleKeys()[0].GetUser())
 	require.Equal(t, "reader", deleteRequest.GetDeletes().GetTupleKeys()[0].GetRelation())

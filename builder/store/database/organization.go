@@ -36,6 +36,10 @@ type OrgStore interface {
 	GetUserRootOrganizations(ctx context.Context, userID int64) (orgs []Organization, err error)
 	SearchUserBelongOrgs(ctx context.Context, userID int64, search string, per int, page int, orgType string, verifyStatus string, role string, tag string) (orgs []Organization, total int, err error)
 	Search(ctx context.Context, search string, per, page int, orgType, verifyStatus, tag string) (orgs []Organization, total int, err error)
+	// SearchHierarchyExcludingID searches hierarchy organizations by name or path without pagination.
+	SearchHierarchyExcludingID(ctx context.Context, search string, excludedID int64, limit int) ([]Organization, error)
+	// FindHierarchyByIDs returns hierarchy organizations and their parent names in one query.
+	FindHierarchyByIDs(ctx context.Context, ids []int64) ([]Organization, error)
 	UpdateVerifyStatus(ctx context.Context, path string, status types.VerifyStatus) error
 	GetSharedOrgIDs(ctx context.Context, userIDs []int64) ([]int64, error)
 	FindByUUID(ctx context.Context, uuid string) (*Organization, error)
@@ -96,6 +100,8 @@ type Organization struct {
 	VerifyStatus   types.VerifyStatus `bun:",notnull,default:'none'" json:"verify_status"` // none, pending, approved, rejected
 	UUID           uuid.UUID          `bun:"type:uuid,notnull,unique" json:"uuid"`
 	Role           string             `bun:",scanonly" json:"role,omitempty"`
+	// ParentName is populated by hierarchy queries and is not persisted.
+	ParentName string `bun:",scanonly" json:"-"`
 	// DeletedAt hides soft-deleted child organizations from normal queries.
 	DeletedAt time.Time `bun:",soft_delete,nullzero" json:"deleted_at,omitempty"`
 	times
@@ -497,6 +503,46 @@ func (s *orgStoreImpl) Search(ctx context.Context, search string, per int, page 
 		return orgs, total, errorx.HandleDBError(err, nil)
 	}
 	return orgs, total, errorx.HandleDBError(err, nil)
+}
+
+// SearchHierarchyExcludingID searches active hierarchy organizations by name or path.
+func (s *orgStoreImpl) SearchHierarchyExcludingID(ctx context.Context, search string, excludedID int64, limit int) (orgs []Organization, err error) {
+	if limit <= 0 {
+		limit = 20
+	}
+	pattern := fmt.Sprintf("%%%s%%", strings.ToLower(search))
+	query := s.hierarchyQuery(&orgs).
+		Where("(LOWER(organization.name) LIKE ? OR LOWER(organization.path) LIKE ?)", pattern, pattern).
+		Where("organization.id <> ?", excludedID).
+		Order("organization.id ASC").Limit(limit)
+	err = query.Scan(ctx)
+	return orgs, errorx.HandleDBError(err, nil)
+}
+
+// FindHierarchyByIDs returns active hierarchy organizations and their parent names in one query.
+func (s *orgStoreImpl) FindHierarchyByIDs(ctx context.Context, ids []int64) (orgs []Organization, err error) {
+	orgs = make([]Organization, 0)
+	if len(ids) == 0 {
+		return orgs, nil
+	}
+	err = s.hierarchyQuery(&orgs).
+		Where("organization.id IN (?)", bun.In(ids)).
+		Order("organization.id ASC").
+		Scan(ctx)
+	return orgs, errorx.HandleDBError(err, nil)
+}
+
+// hierarchyQuery builds the shared hierarchy organization projection used by search and batch lookups.
+func (s *orgStoreImpl) hierarchyQuery(orgs *[]Organization) *bun.SelectQuery {
+	return s.db.Operator.Core.NewSelect().
+		Model(orgs).
+		Relation("Namespace").
+		ColumnExpr("organization.*").
+		ColumnExpr("COALESCE(parent_organization.name, '') AS parent_name").
+		Join("JOIN organization_units AS current_unit ON current_unit.organization_id = organization.id AND current_unit.deleted_at IS NULL").
+		Join("LEFT JOIN organization_units AS parent_unit ON parent_unit.id = current_unit.parent_unit_id AND parent_unit.deleted_at IS NULL").
+		Join("LEFT JOIN organizations AS parent_organization ON parent_organization.id = parent_unit.organization_id AND parent_organization.deleted_at IS NULL").
+		Where("organization.is_hierarchical = TRUE")
 }
 
 func (s *orgStoreImpl) UpdateVerifyStatus(ctx context.Context, path string, status types.VerifyStatus) error {

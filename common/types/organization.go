@@ -168,6 +168,8 @@ type DeleteOrganizationUnitResp struct {
 	UsersAffected        int `json:"users_affected"`
 	// DeletedOrganizationUUIDs is used internally for SSO cleanup and is not exposed by the API.
 	DeletedOrganizationUUIDs []string `json:"-"`
+	// DeletedOrganizationIDs is used internally to clean repository authorizations.
+	DeletedOrganizationIDs []int64 `json:"-"`
 	// DeletedHierarchyRelationships contains the direct edges removed with this subtree.
 	DeletedHierarchyRelationships []OrganizationHierarchyRelationship `json:"-"`
 	// DeletedReBACRelationships contains direct member and namespace tuples removed with this subtree.
@@ -184,6 +186,8 @@ type DeleteRootOrganizationResp struct {
 	UsersAffected        int `json:"users_affected"`
 	// DeletedOrganizationUUIDs is used internally for SSO cleanup and is not exposed by the API.
 	DeletedOrganizationUUIDs []string `json:"-"`
+	// DeletedOrganizationIDs is used internally to clean repository authorizations.
+	DeletedOrganizationIDs []int64 `json:"-"`
 	// DeletedHierarchyRelationships contains every direct edge removed with this hierarchy.
 	DeletedHierarchyRelationships []OrganizationHierarchyRelationship `json:"-"`
 	// DeletedReBACRelationships contains direct member and namespace tuples removed with this hierarchy.

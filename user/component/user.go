@@ -62,7 +62,8 @@ type userComponentImpl struct {
 	acctClient      accounting.AccountingClient
 	analytics       analytics.Publisher
 	// rebac synchronizes the user's personal namespace ownership tuple.
-	rebac rebac.Authorizer
+	rebac                    rebac.Authorizer
+	repositoryAuthorizations database.RepositoryAuthorizationStore
 }
 
 type UserComponent interface {
@@ -125,6 +126,7 @@ func NewUserComponent(config *config.Config) (UserComponent, error) {
 	c.userStore = database.NewUserStoreWithDBAndDeletionJobClient(database.GetDB(), deletionJobClient)
 	c.orgStore = database.NewOrgStore(config)
 	c.nsStore = database.NewNamespaceStore()
+	c.repositoryAuthorizations = database.NewRepositoryAuthorizationStore()
 	c.repo = database.NewRepoStoreWithDBAndDeletionJobClient(database.GetDB(), deletionJobClient)
 	c.ds = database.NewDeployTaskStore()
 	c.ams = database.NewAccountMeteringStore()
@@ -666,6 +668,9 @@ func (c *userComponentImpl) Delete(ctx context.Context, operator, username strin
 	}
 	if err := deleteUserObjectOwnerRelationship(ctx, c.rebac, userObjectRelationship); err != nil {
 		return fmt.Errorf("failed to delete user object ReBAC relationship: %w", err)
+	}
+	if err := deleteDirectRepositoryAuthorizations(ctx, c.repositoryAuthorizations, c.rebac, types.RepoAuthSubjectUser, user.ID); err != nil {
+		return fmt.Errorf("failed to delete user direct repository authorizations: %w", err)
 	}
 
 	// create audit log after delete user
@@ -1212,6 +1217,9 @@ func (c *userComponentImpl) SoftDelete(ctx context.Context, operator, username s
 	}
 	if err := deleteUserObjectOwnerRelationship(ctx, c.rebac, userObjectRelationship); err != nil {
 		return fmt.Errorf("failed to delete user object ReBAC relationship: %w", err)
+	}
+	if err := deleteDirectRepositoryAuthorizations(ctx, c.repositoryAuthorizations, c.rebac, types.RepoAuthSubjectUser, user.ID); err != nil {
+		return fmt.Errorf("failed to delete user direct repository authorizations: %w", err)
 	}
 
 	after, err := c.userStore.FindByUsernameWithDeleted(ctx, username)

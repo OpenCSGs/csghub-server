@@ -352,7 +352,6 @@ func TestRepoComponent_DeleteRepo(t *testing.T) {
 	})
 	require.Nil(t, err)
 	require.Equal(t, dbrepo, r1)
-
 }
 
 type recordingMirrorSvcClient struct {
@@ -4704,10 +4703,6 @@ func TestRepoComponent_ChangePath_RepoHashed(t *testing.T) {
 	newRelationship := rebac.Relationship{
 		Subject: rebac.UserSubject("target-user-uuid"), Relation: rebac.RelationOwner, Object: rebac.RepositoryObject(1),
 	}
-	repoAuthorizerMock(repoComp).EXPECT().Check(ctx, rebac.CheckRequest{
-		Subject: oldRelationship.Subject, Relation: oldRelationship.Relation, Object: oldRelationship.Object,
-		Consistency: rebac.ConsistencyHigher,
-	}).Return(rebac.Decision{Allowed: true}, nil).Once()
 	repoAuthorizerMock(repoComp).EXPECT().Delete(ctx, []rebac.Relationship{oldRelationship}).Return(nil).Once()
 	repoAuthorizerMock(repoComp).EXPECT().Check(ctx, rebac.CheckRequest{
 		Subject: newRelationship.Subject, Relation: newRelationship.Relation, Object: newRelationship.Object,
@@ -4822,10 +4817,6 @@ func TestRepoComponent_TransferOwnership_Success(t *testing.T) {
 		Subject:  rebac.NewSubject(rebac.ObjectTypeOrganization, organization.UUID.String()),
 		Relation: rebac.RelationOrganization, Object: rebac.RepositoryObject(1),
 	}
-	repoAuthorizerMock(repoComp).EXPECT().Check(ctx, rebac.CheckRequest{
-		Subject: oldRelationship.Subject, Relation: oldRelationship.Relation, Object: oldRelationship.Object,
-		Consistency: rebac.ConsistencyHigher,
-	}).Return(rebac.Decision{Allowed: true}, nil).Once()
 	repoAuthorizerMock(repoComp).EXPECT().Delete(ctx, []rebac.Relationship{oldRelationship}).Return(nil).Once()
 	repoAuthorizerMock(repoComp).EXPECT().Check(ctx, rebac.CheckRequest{
 		Subject: newRelationship.Subject, Relation: newRelationship.Relation, Object: newRelationship.Object,
@@ -5203,10 +5194,6 @@ func TestRepoComponent_ChangePath_DataviewerJobEmptyCardData(t *testing.T) {
 	newRelationship := rebac.Relationship{
 		Subject: rebac.UserSubject("target-user-uuid"), Relation: rebac.RelationOwner, Object: rebac.RepositoryObject(1),
 	}
-	repoAuthorizerMock(repoComp).EXPECT().Check(ctx, rebac.CheckRequest{
-		Subject: oldRelationship.Subject, Relation: oldRelationship.Relation, Object: oldRelationship.Object,
-		Consistency: rebac.ConsistencyHigher,
-	}).Return(rebac.Decision{Allowed: true}, nil).Once()
 	repoAuthorizerMock(repoComp).EXPECT().Delete(ctx, []rebac.Relationship{oldRelationship}).Return(nil).Once()
 	repoAuthorizerMock(repoComp).EXPECT().Check(ctx, rebac.CheckRequest{
 		Subject: newRelationship.Subject, Relation: newRelationship.Relation, Object: newRelationship.Object,

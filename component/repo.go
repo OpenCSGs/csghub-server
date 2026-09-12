@@ -292,7 +292,7 @@ func (c *repoComponentImpl) CreateRepo(ctx context.Context, req types.CreateRepo
 		return nil, nil, commitFilesReq, fmt.Errorf("fail to create database repo, error: %w", err)
 	}
 
-	if err := ensureRepositoryNamespaceRelationship(ctx, c.rebac, c.orgStore, namespace, newDBRepo.ID); err != nil {
+	if err := ensureRepositoryNamespaceRelationship(ctx, c.rebac, c.orgStore, namespace, newDBRepo.ID, newDBRepo.OrgInheritBlocked); err != nil {
 		return nil, nil, commitFilesReq, fmt.Errorf("failed to synchronize repository namespace relationship: %w", err)
 	}
 
@@ -550,7 +550,7 @@ func (c *repoComponentImpl) CreateFork(ctx context.Context, req types.CreateFork
 		return nil, fmt.Errorf("failed to create database repo, error: %w", err)
 	}
 
-	if err := ensureRepositoryNamespaceRelationship(ctx, c.rebac, c.orgStore, targetNamespace, newDBRepo.ID); err != nil {
+	if err := ensureRepositoryNamespaceRelationship(ctx, c.rebac, c.orgStore, targetNamespace, newDBRepo.ID, newDBRepo.OrgInheritBlocked); err != nil {
 		return nil, fmt.Errorf("failed to synchronize fork repository namespace relationship: %w", err)
 	}
 
@@ -3080,7 +3080,7 @@ func (c *repoComponentImpl) ChangePath(ctx context.Context, req types.ChangePath
 	if err := deleteRepositoryNamespaceRelationship(ctx, c.rebac, c.orgStore, sourceNamespace, repo.ID); err != nil {
 		return fmt.Errorf("failed to delete source repository namespace relationship: %w", err)
 	}
-	if err := ensureRepositoryNamespaceRelationship(ctx, c.rebac, c.orgStore, targetNamespace, repo.ID); err != nil {
+	if err := ensureRepositoryNamespaceRelationship(ctx, c.rebac, c.orgStore, targetNamespace, repo.ID, repo.OrgInheritBlocked); err != nil {
 		return fmt.Errorf("failed to create target repository namespace relationship: %w", err)
 	}
 
@@ -3155,7 +3155,7 @@ func (c *repoComponentImpl) TransferOwnership(ctx context.Context, req types.Tra
 	if err := deleteRepositoryNamespaceRelationship(ctx, c.rebac, c.orgStore, sourceNamespace, repo.ID); err != nil {
 		return fmt.Errorf("failed to delete source repository namespace relationship: %w", err)
 	}
-	if err := ensureRepositoryNamespaceRelationship(ctx, c.rebac, c.orgStore, targetNamespace, repo.ID); err != nil {
+	if err := ensureRepositoryNamespaceRelationship(ctx, c.rebac, c.orgStore, targetNamespace, repo.ID, repo.OrgInheritBlocked); err != nil {
 		return fmt.Errorf("failed to create target repository namespace relationship: %w", err)
 	}
 

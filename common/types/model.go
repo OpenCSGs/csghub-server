@@ -201,6 +201,7 @@ type Model struct {
 	License                 string                  `json:"license"`
 	CanWrite                bool                    `json:"can_write"`
 	CanManage               bool                    `json:"can_manage"`
+	IsOrganization          bool                    `json:"is_organization"`
 	Namespace               *Namespace              `json:"namespace"`
 	RecomOpWeight           int                     `json:"recom_op_weight,omitempty"`
 	Scores                  []WeightScore           `json:"scores"`

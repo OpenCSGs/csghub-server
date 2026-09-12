@@ -490,3 +490,108 @@ type RepoSizeResponse struct {
 	TotalSize      int64 `json:"total_size"`
 	LastCommitSize int64 `json:"last_commit_size"`
 }
+
+// RepoAuthSubjectType identifies the subject type of a direct repository grant.
+type RepoAuthSubjectType string
+
+const (
+	// RepoAuthSubjectUser identifies an individual user.
+	RepoAuthSubjectUser RepoAuthSubjectType = "user"
+	// RepoAuthSubjectOrganization identifies an organization.
+	RepoAuthSubjectOrganization RepoAuthSubjectType = "organization"
+)
+
+// IsValid reports whether the subject type is supported by repository authorization.
+func (subjectType RepoAuthSubjectType) IsValid() bool {
+	return subjectType == RepoAuthSubjectUser || subjectType == RepoAuthSubjectOrganization
+}
+
+// RepositoryAuthorizationRequest creates or updates one direct repository grant.
+type RepositoryAuthorizationRequest struct {
+	SubjectType RepoAuthSubjectType `json:"subject_type" binding:"required,oneof=user organization"`
+	SubjectID   int64               `json:"subject_id" binding:"required,gt=0" minimum:"1"`
+	Role        UserRole            `json:"role" binding:"required,oneof=read write"`
+}
+
+// RepositoryAuthorizationRoleRequest updates the role of an existing direct grant.
+type RepositoryAuthorizationRoleRequest struct {
+	Role UserRole `json:"role" binding:"required,oneof=read write"`
+}
+
+// RepositoryAuthorizationQuery contains the search filters for repository authorization candidates.
+type RepositoryAuthorizationQuery struct {
+	Keyword string `form:"keyword"`
+	Limit   int    `form:"limit"`
+}
+
+// RepositoryAuthorizationItem is a direct repository grant with its subject information.
+type RepositoryAuthorizationItem struct {
+	ID          int64               `json:"id"`
+	SubjectType RepoAuthSubjectType `json:"subject_type"`
+	SubjectID   int64               `json:"subject_id"`
+	SubjectUUID string              `json:"subject_uuid"`
+	Name        string              `json:"name"`
+	ParentName  string              `json:"parent_name,omitempty"`
+	Username    string              `json:"username,omitempty"`
+	Email       string              `json:"email,omitempty"`
+	Avatar      string              `json:"avatar,omitempty"`
+	Path        string              `json:"path,omitempty"`
+	Logo        *string             `json:"logo,omitempty"`
+	Homepage    *string             `json:"homepage,omitempty"`
+	OrgType     string              `json:"org_type,omitempty"`
+	Role        UserRole            `json:"role"`
+	CreatedAt   string              `json:"created_at,omitempty"`
+}
+
+// RepositoryAuthorizationSource identifies the source that provides a user's effective repository role.
+type RepositoryAuthorizationSource string
+
+const (
+	// RepositoryAuthorizationSourceDirect identifies a direct user grant on the repository.
+	RepositoryAuthorizationSourceDirect RepositoryAuthorizationSource = "direct"
+	// RepositoryAuthorizationSourceOrganization identifies permission provided through an organization.
+	RepositoryAuthorizationSourceOrganization RepositoryAuthorizationSource = "organization"
+	// RepositoryAuthorizationSourceOwner identifies the repository owner relationship.
+	RepositoryAuthorizationSourceOwner RepositoryAuthorizationSource = "owner"
+	// RepositoryAuthorizationSourcePlatform identifies the platform administrator bypass.
+	RepositoryAuthorizationSourcePlatform RepositoryAuthorizationSource = "platform"
+)
+
+// RepositoryAuthorizationSearchUser is a user candidate with effective and direct repository authorization details.
+type RepositoryAuthorizationSearchUser struct {
+	Name                string                        `json:"name"`
+	Username            string                        `json:"username"`
+	Email               string                        `json:"email"`
+	Avatar              string                        `json:"avatar"`
+	ID                  int64                         `json:"id"`
+	UUID                string                        `json:"uuid"`
+	Authorized          bool                          `json:"authorized"`
+	Role                UserRole                      `json:"role,omitempty"`
+	DirectAuthorized    bool                          `json:"direct_authorized"`
+	AuthorizationSource RepositoryAuthorizationSource `json:"authorization_source,omitempty" enums:"direct,organization,owner,platform"`
+}
+
+// RepositoryAuthorizationSearchOrganization is an organization candidate for direct authorization.
+type RepositoryAuthorizationSearchOrganization struct {
+	Name       string   `json:"name"`
+	ParentName string   `json:"parent_name"`
+	Path       string   `json:"path"`
+	Logo       string   `json:"logo"`
+	Homepage   string   `json:"homepage"`
+	OrgType    string   `json:"org_type"`
+	ID         int64    `json:"id"`
+	UUID       string   `json:"uuid"`
+	Authorized bool     `json:"authorized"`
+	Role       UserRole `json:"role,omitempty"`
+}
+
+// RepositoryInheritanceRequest changes whether parent organization permissions are inherited.
+type RepositoryInheritanceRequest struct {
+	Blocked *bool `json:"blocked" binding:"required"`
+}
+
+// RepositoryInheritanceResponse reports the current repository inheritance mode and whether it applies.
+type RepositoryInheritanceResponse struct {
+	Blocked bool `json:"blocked"`
+	Valid   bool `json:"valid"`
+}

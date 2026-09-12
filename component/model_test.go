@@ -305,7 +305,7 @@ func TestModelComponent_Show(t *testing.T) {
 	}).Return(
 		&types.UserRepoPermission{CanRead: true, CanAdmin: true}, nil,
 	)
-	mc.mocks.components.repo.EXPECT().GetNameSpaceInfo(ctx, "ns").Return(&types.Namespace{Path: "ns"}, nil)
+	mc.mocks.components.repo.EXPECT().GetNameSpaceInfo(ctx, "ns").Return(&types.Namespace{Path: "ns", Type: types.OrganizationNamespaceType}, nil)
 
 	mc.mocks.stores.UserLikesMock().EXPECT().IsExist(ctx, "user", int64(123)).Return(true, nil)
 	mc.mocks.stores.InferenceArchMock().EXPECT().IsAllowed(ctx, mock.Anything).Return(true, nil)
@@ -334,10 +334,11 @@ func TestModelComponent_Show(t *testing.T) {
 	require.Equal(t, &types.Model{
 		ID:                   1,
 		Name:                 "n",
-		Namespace:            &types.Namespace{Path: "ns"},
+		Namespace:            &types.Namespace{Path: "ns", Type: types.OrganizationNamespaceType},
 		UserLikes:            true,
 		RepositoryID:         123,
 		CanManage:            true,
+		IsOrganization:       true,
 		User:                 &types.User{},
 		Path:                 "foo/bar",
 		SensitiveCheckStatus: "Pending",
@@ -399,7 +400,7 @@ func TestModelComponent_Show_Syncing(t *testing.T) {
 	mc.mocks.components.repo.EXPECT().GetUserRepoPermission(ctx, "user", repository).Return(
 		&types.UserRepoPermission{CanRead: true, CanAdmin: true}, nil,
 	)
-	mc.mocks.components.repo.EXPECT().GetNameSpaceInfo(ctx, "ns").Return(&types.Namespace{Path: "ns"}, nil)
+	mc.mocks.components.repo.EXPECT().GetNameSpaceInfo(ctx, "ns").Return(&types.Namespace{Path: "ns", Type: types.OrganizationNamespaceType}, nil)
 
 	mc.mocks.components.repo.EXPECT().GetMirrorTaskStatus(repository).Return(
 		types.MirrorRepoSyncStart,
@@ -421,10 +422,11 @@ func TestModelComponent_Show_Syncing(t *testing.T) {
 	require.Equal(t, &types.Model{
 		ID:                   1,
 		Name:                 "n",
-		Namespace:            &types.Namespace{Path: "ns"},
+		Namespace:            &types.Namespace{Path: "ns", Type: types.OrganizationNamespaceType},
 		UserLikes:            true,
 		RepositoryID:         123,
 		CanManage:            true,
+		IsOrganization:       true,
 		User:                 &types.User{},
 		Path:                 "foo/bar",
 		SensitiveCheckStatus: "Pending",
@@ -473,7 +475,7 @@ func TestModelComponent_Show_Mirror(t *testing.T) {
 	mc.mocks.components.repo.EXPECT().GetUserRepoPermission(ctx, "user", repository).Return(
 		&types.UserRepoPermission{CanRead: true, CanAdmin: true}, nil,
 	)
-	mc.mocks.components.repo.EXPECT().GetNameSpaceInfo(ctx, "ns").Return(&types.Namespace{Path: "ns"}, nil)
+	mc.mocks.components.repo.EXPECT().GetNameSpaceInfo(ctx, "ns").Return(&types.Namespace{Path: "ns", Type: types.OrganizationNamespaceType}, nil)
 
 	mc.mocks.components.repo.EXPECT().GetMirrorTaskStatus(repository).Return(
 		"",
@@ -495,10 +497,11 @@ func TestModelComponent_Show_Mirror(t *testing.T) {
 	require.Equal(t, &types.Model{
 		ID:                   1,
 		Name:                 "n",
-		Namespace:            &types.Namespace{Path: "ns"},
+		Namespace:            &types.Namespace{Path: "ns", Type: types.OrganizationNamespaceType},
 		UserLikes:            true,
 		RepositoryID:         123,
 		CanManage:            true,
+		IsOrganization:       true,
 		User:                 &types.User{},
 		Path:                 "foo/bar",
 		SensitiveCheckStatus: "Pending",
@@ -549,7 +552,7 @@ func TestModelComponent_Show_Repository(t *testing.T) {
 	mc.mocks.components.repo.EXPECT().GetMirrorTaskStatus(repository).Return(
 		"",
 	)
-	mc.mocks.components.repo.EXPECT().GetNameSpaceInfo(ctx, "ns").Return(&types.Namespace{Path: "ns"}, nil)
+	mc.mocks.components.repo.EXPECT().GetNameSpaceInfo(ctx, "ns").Return(&types.Namespace{Path: "ns", Type: types.OrganizationNamespaceType}, nil)
 
 	mc.mocks.stores.UserLikesMock().EXPECT().IsExist(ctx, "user", int64(123)).Return(true, nil)
 	mc.mocks.stores.InferenceArchMock().EXPECT().IsAllowed(ctx, mock.Anything).Return(true, nil)
@@ -568,10 +571,11 @@ func TestModelComponent_Show_Repository(t *testing.T) {
 	require.Equal(t, &types.Model{
 		ID:                   1,
 		Name:                 "n",
-		Namespace:            &types.Namespace{Path: "ns"},
+		Namespace:            &types.Namespace{Path: "ns", Type: types.OrganizationNamespaceType},
 		UserLikes:            true,
 		RepositoryID:         123,
 		CanManage:            true,
+		IsOrganization:       true,
 		User:                 &types.User{},
 		Path:                 "foo/bar",
 		SensitiveCheckStatus: "Pending",

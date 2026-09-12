@@ -631,11 +631,14 @@ func TestMCPServerComponent_CleanupFailedMCPDeployRemovesRepositoryTuple(t *test
 	orgStore := mockdb.NewMockOrgStore(t)
 	authorizer := mockrebac.NewMockAuthorizer(t)
 	orgStore.EXPECT().FindByPath(ctx, namespace.Path).Return(organization, nil).Once()
-	authorizer.EXPECT().Check(ctx, rebac.CheckRequest{
-		Subject: relationship.Subject, Relation: relationship.Relation, Object: relationship.Object,
-		Consistency: rebac.ConsistencyHigher,
-	}).Return(rebac.Decision{Allowed: true}, nil).Once()
-	authorizer.EXPECT().Delete(ctx, []rebac.Relationship{relationship}).Return(nil).Once()
+	authorizer.EXPECT().Delete(ctx, []rebac.Relationship{
+		relationship,
+		{
+			Subject:  relationship.Subject,
+			Relation: rebac.RelationOrganizationDirect,
+			Object:   relationship.Object,
+		},
+	}).Return(nil).Once()
 
 	component := &mcpServerComponentImpl{
 		orgStore: orgStore,

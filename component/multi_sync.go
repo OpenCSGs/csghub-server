@@ -1194,7 +1194,7 @@ func (c *multiSyncComponentImpl) ensureLocalRepositoryOwner(ctx context.Context,
 		Path:          namespace,
 		NamespaceType: database.UserNamespace,
 		User:          user,
-	}, repositoryID); err != nil {
+	}, repositoryID, false); err != nil {
 		return fmt.Errorf("failed to synchronize multi-sync repository owner relationship: %w", err)
 	}
 	return nil

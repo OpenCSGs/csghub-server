@@ -35,7 +35,7 @@ func TestEnsureRepositoryNamespaceRelationshipWritesUserOwner(t *testing.T) {
 		Path:          "alice",
 		NamespaceType: database.UserNamespace,
 		User:          database.User{UUID: "user-uuid"},
-	}, 42)
+	}, 42, false)
 	require.NoError(t, err)
 }
 
@@ -62,7 +62,33 @@ func TestEnsureRepositoryNamespaceRelationshipWritesOrganization(t *testing.T) {
 	err := ensureRepositoryNamespaceRelationship(ctx, authorizer, orgStore, database.Namespace{
 		Path:          "acme",
 		NamespaceType: database.OrgNamespace,
-	}, 84)
+	}, 84, false)
+	require.NoError(t, err)
+}
+
+// TestEnsureRepositoryNamespaceRelationshipWritesDirectOrganization verifies blocked repositories use the direct organization tuple.
+func TestEnsureRepositoryNamespaceRelationshipWritesDirectOrganization(t *testing.T) {
+	ctx := context.Background()
+	authorizer := mockrebac.NewMockAuthorizer(t)
+	orgStore := mockdatabase.NewMockOrgStore(t)
+	organizationUUID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
+	orgStore.EXPECT().FindByPath(ctx, "acme").Return(database.Organization{UUID: organizationUUID}, nil).Once()
+	relationship := rebac.Relationship{
+		Subject:  rebac.NewSubject(rebac.ObjectTypeOrganization, organizationUUID.String()),
+		Relation: rebac.RelationOrganizationDirect,
+		Object:   rebac.RepositoryObject(84),
+	}
+	authorizer.EXPECT().Check(ctx, rebac.CheckRequest{
+		Subject:     relationship.Subject,
+		Relation:    relationship.Relation,
+		Object:      relationship.Object,
+		Consistency: rebac.ConsistencyHigher,
+	}).Return(rebac.Decision{Allowed: false}, nil).Once()
+	authorizer.EXPECT().Write(ctx, []rebac.Relationship{relationship}).Return(nil).Once()
+
+	err := ensureRepositoryNamespaceRelationship(ctx, authorizer, orgStore, database.Namespace{
+		Path: "acme", NamespaceType: database.OrgNamespace,
+	}, 84, true)
 	require.NoError(t, err)
 }
 
@@ -86,7 +112,7 @@ func TestEnsureRepositoryNamespaceRelationshipSkipsExistingTuple(t *testing.T) {
 		Path:          "alice",
 		NamespaceType: database.UserNamespace,
 		User:          database.User{UUID: "user-uuid"},
-	}, 42)
+	}, 42, false)
 	require.NoError(t, err)
 }
 
@@ -112,7 +138,7 @@ func TestEnsureRepositoryNamespaceRelationshipReturnsReBACError(t *testing.T) {
 		Path:          "alice",
 		NamespaceType: database.UserNamespace,
 		User:          database.User{UUID: "user-uuid"},
-	}, 42)
+	}, 42, false)
 	require.ErrorIs(t, err, errorx.ErrReBACNamespacePermissionCreateFailed)
 	require.ErrorIs(t, err, writeErr)
 }
@@ -147,12 +173,6 @@ func TestDeleteRepositoryNamespaceRelationshipDeletesUserOwner(t *testing.T) {
 		Relation: rebac.RelationOwner,
 		Object:   rebac.RepositoryObject(42),
 	}
-	authorizer.EXPECT().Check(ctx, rebac.CheckRequest{
-		Subject:     relationship.Subject,
-		Relation:    relationship.Relation,
-		Object:      relationship.Object,
-		Consistency: rebac.ConsistencyHigher,
-	}).Return(rebac.Decision{Allowed: true}, nil).Once()
 	authorizer.EXPECT().Delete(ctx, []rebac.Relationship{relationship}).Return(nil).Once()
 
 	err := deleteRepositoryNamespaceRelationship(ctx, authorizer, nil, database.Namespace{
@@ -163,7 +183,7 @@ func TestDeleteRepositoryNamespaceRelationshipDeletesUserOwner(t *testing.T) {
 	require.NoError(t, err)
 }
 
-// TestDeleteRepositoryNamespaceRelationshipDeletesOrganization verifies organization repository deletion removes its organization tuple.
+// TestDeleteRepositoryNamespaceRelationshipDeletesOrganization verifies organization repository deletion removes both organization tuples.
 func TestDeleteRepositoryNamespaceRelationshipDeletesOrganization(t *testing.T) {
 	ctx := context.Background()
 	authorizer := mockrebac.NewMockAuthorizer(t)
@@ -175,13 +195,9 @@ func TestDeleteRepositoryNamespaceRelationshipDeletesOrganization(t *testing.T) 
 		Relation: rebac.RelationOrganization,
 		Object:   rebac.RepositoryObject(84),
 	}
-	authorizer.EXPECT().Check(ctx, rebac.CheckRequest{
-		Subject:     relationship.Subject,
-		Relation:    relationship.Relation,
-		Object:      relationship.Object,
-		Consistency: rebac.ConsistencyHigher,
-	}).Return(rebac.Decision{Allowed: true}, nil).Once()
-	authorizer.EXPECT().Delete(ctx, []rebac.Relationship{relationship}).Return(nil).Once()
+	directRelationship := relationship
+	directRelationship.Relation = rebac.RelationOrganizationDirect
+	authorizer.EXPECT().Delete(ctx, []rebac.Relationship{relationship, directRelationship}).Return(nil).Once()
 
 	err := deleteRepositoryNamespaceRelationship(ctx, authorizer, orgStore, database.Namespace{
 		Path:          "acme",
@@ -190,8 +206,8 @@ func TestDeleteRepositoryNamespaceRelationshipDeletesOrganization(t *testing.T) 
 	require.NoError(t, err)
 }
 
-// TestDeleteRepositoryNamespaceRelationshipSkipsMissingTuple verifies deletion retries converge when the tuple is already absent.
-func TestDeleteRepositoryNamespaceRelationshipSkipsMissingTuple(t *testing.T) {
+// TestDeleteRepositoryNamespaceRelationshipIsIdempotent verifies deletion does not require a prior tuple check.
+func TestDeleteRepositoryNamespaceRelationshipIsIdempotent(t *testing.T) {
 	ctx := context.Background()
 	authorizer := mockrebac.NewMockAuthorizer(t)
 	relationship := rebac.Relationship{
@@ -199,12 +215,7 @@ func TestDeleteRepositoryNamespaceRelationshipSkipsMissingTuple(t *testing.T) {
 		Relation: rebac.RelationOwner,
 		Object:   rebac.RepositoryObject(42),
 	}
-	authorizer.EXPECT().Check(ctx, rebac.CheckRequest{
-		Subject:     relationship.Subject,
-		Relation:    relationship.Relation,
-		Object:      relationship.Object,
-		Consistency: rebac.ConsistencyHigher,
-	}).Return(rebac.Decision{Allowed: false}, nil).Once()
+	authorizer.EXPECT().Delete(ctx, []rebac.Relationship{relationship}).Return(nil).Once()
 
 	err := deleteRepositoryNamespaceRelationship(ctx, authorizer, nil, database.Namespace{
 		Path:          "alice",
@@ -224,12 +235,6 @@ func TestDeleteRepositoryNamespaceRelationshipReturnsReBACError(t *testing.T) {
 		Relation: rebac.RelationOwner,
 		Object:   rebac.RepositoryObject(42),
 	}
-	authorizer.EXPECT().Check(ctx, rebac.CheckRequest{
-		Subject:     relationship.Subject,
-		Relation:    relationship.Relation,
-		Object:      relationship.Object,
-		Consistency: rebac.ConsistencyHigher,
-	}).Return(rebac.Decision{Allowed: true}, nil).Once()
 	authorizer.EXPECT().Delete(ctx, []rebac.Relationship{relationship}).Return(deleteErr).Once()
 
 	err := deleteRepositoryNamespaceRelationship(ctx, authorizer, nil, database.Namespace{

@@ -20,6 +20,8 @@ import (
 type UserStore interface {
 	Index(ctx context.Context) ([]User, error)
 	IndexWithSearch(ctx context.Context, req types.UserListReq) ([]User, int, error)
+	// SearchByKeywordExcludingIDs searches users by name, username, or email while excluding the supplied user IDs.
+	SearchByKeywordExcludingIDs(ctx context.Context, search string, excludedIDs []int64, limit int) ([]User, error)
 	FindByUsername(ctx context.Context, username string) (User, error)
 	FindByEmail(ctx context.Context, email string) (User, error)
 	// Update write the user data back to db. odlUserName should not be empty if username changed
@@ -46,6 +48,8 @@ type UserStore interface {
 	UpdatePhone(ctx context.Context, userID int64, phone string, phoneArea string) error
 	IndexWithCursor(ctx context.Context, req types.UserIndexReq) (ch chan Wrapper, err error)
 	FindByID(ctx context.Context, userID int64) (User, error)
+	// FindByIDs returns active users for a set of IDs in one query.
+	FindByIDs(ctx context.Context, ids []int64) ([]User, error)
 }
 
 // Implement the UserStore interface in UserStoreImpl
@@ -289,6 +293,22 @@ func (s *UserStoreImpl) IndexWithSearch(ctx context.Context, req types.UserListR
 	return users, count, errorx.HandleDBError(err, nil)
 }
 
+// SearchByKeywordExcludingIDs searches users by display name, username, or email.
+func (s *UserStoreImpl) SearchByKeywordExcludingIDs(ctx context.Context, search string, excludedIDs []int64, limit int) (users []User, err error) {
+	if limit <= 0 {
+		limit = 20
+	}
+	pattern := fmt.Sprintf("%%%s%%", strings.ToLower(search))
+	query := s.db.Operator.Core.NewSelect().Model(&users).Where(
+		"LOWER(name) LIKE ? OR LOWER(username) LIKE ? OR LOWER(email) LIKE ?", pattern, pattern, pattern,
+	)
+	if len(excludedIDs) > 0 {
+		query = query.Where("id NOT IN (?)", bun.In(excludedIDs))
+	}
+	err = query.Order("id ASC").Limit(limit).Scan(ctx)
+	return users, errorx.HandleDBError(err, nil)
+}
+
 func (s *UserStoreImpl) FindByUsername(ctx context.Context, username string) (user User, err error) {
 	user.Username = username
 	err = s.db.Operator.Core.NewSelect().
@@ -309,6 +329,18 @@ func (s *UserStoreImpl) FindByID(ctx context.Context, id int64) (user User, err 
 	err = s.db.Operator.Core.NewSelect().Model(&user).WherePK().Scan(ctx)
 	err = errorx.HandleDBError(err, nil)
 	return
+}
+
+// FindByIDs returns active users for a set of IDs in one query.
+func (s *UserStoreImpl) FindByIDs(ctx context.Context, ids []int64) (users []User, err error) {
+	users = make([]User, 0)
+	if len(ids) == 0 {
+		return users, nil
+	}
+	err = s.db.Operator.Core.NewSelect().Model(&users).
+		Where("id IN (?)", bun.In(ids)).
+		Order("id ASC").Scan(ctx)
+	return users, errorx.HandleDBError(err, nil)
 }
 
 func (s *UserStoreImpl) Update(ctx context.Context, user *User, oldUserName string) (err error) {

@@ -615,6 +615,7 @@ func (c *modelComponentImpl) Show(ctx context.Context, namespace, name, currentU
 		MirrorLastUpdatedAt: model.Repository.Mirror.LastUpdatedAt,
 		CanWrite:            permission.CanWrite,
 		CanManage:           permission.CanAdmin,
+		IsOrganization:      ns != nil && ns.Type == types.OrganizationNamespaceType,
 		Namespace:           ns,
 		Metadata: types.Metadata{
 			ModelParams:       model.Repository.Metadata.ModelParams,

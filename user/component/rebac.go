@@ -555,7 +555,8 @@ func repositoryNamespaceGrantForDeletedUser(
 	}, nil
 }
 
-// deleteRepositoryNamespaceRelationships removes existing repository ownership tuples in bounded batches.
+// deleteRepositoryNamespaceRelationships removes repository namespace tuples in bounded batches.
+// Organization relationships are expanded to include organization_direct for retry-safe cleanup.
 func deleteRepositoryNamespaceRelationships(ctx context.Context, authorizer rebac.Authorizer, relationships []rebac.Relationship) error {
 	if len(relationships) == 0 {
 		return nil
@@ -564,45 +565,20 @@ func deleteRepositoryNamespaceRelationships(ctx context.Context, authorizer reba
 		return fmt.Errorf("ReBAC authorizer is nil")
 	}
 
-	for start := 0; start < len(relationships); start += rebac.DefaultMaxBatchSize {
-		end := min(start+rebac.DefaultMaxBatchSize, len(relationships))
-		batch := relationships[start:end]
-		checks := make([]rebac.BatchCheckItem, 0, len(batch))
-		for index, relationship := range batch {
-			checks = append(checks, rebac.BatchCheckItem{
-				CorrelationID: rebac.BatchCheckCorrelationID(index),
-				Check: rebac.CheckRequest{
-					Subject:     relationship.Subject,
-					Relation:    relationship.Relation,
-					Object:      relationship.Object,
-					Consistency: rebac.ConsistencyHigher,
-				},
-			})
+	expanded := make([]rebac.Relationship, 0, len(relationships))
+	for _, relationship := range relationships {
+		expanded = append(expanded, relationship)
+		if relationship.Relation == rebac.RelationOrganization {
+			directRelationship := relationship
+			directRelationship.Relation = rebac.RelationOrganizationDirect
+			expanded = append(expanded, directRelationship)
 		}
+	}
 
-		result, err := authorizer.BatchCheck(ctx, rebac.BatchCheckRequest{Checks: checks})
-		if err != nil {
-			return fmt.Errorf("check repository namespace relationships before deletion: %w", err)
-		}
-		deletes := make([]rebac.Relationship, 0, len(batch))
-		for index, relationship := range batch {
-			correlationID := rebac.BatchCheckCorrelationID(index)
-			outcome, exists := result.Results[correlationID]
-			if !exists {
-				return fmt.Errorf("missing ReBAC batch result %q for repository namespace relationship %q", correlationID, relationship.String())
-			}
-			if outcome.Err != nil {
-				return fmt.Errorf("check repository namespace relationship %q with correlation ID %q: %w", relationship.String(), correlationID, outcome.Err)
-			}
-			if outcome.Decision.Allowed {
-				deletes = append(deletes, relationship)
-			}
-		}
-		if len(deletes) == 0 {
-			continue
-		}
-		if err := authorizer.Delete(ctx, deletes); err != nil {
-			return errorx.ReBACNamespacePermissionDeleteFailed(err, errorx.Ctx().Set("repository_count", len(deletes)))
+	for start := 0; start < len(expanded); start += rebac.DefaultMaxBatchSize {
+		end := min(start+rebac.DefaultMaxBatchSize, len(expanded))
+		if err := authorizer.Delete(ctx, expanded[start:end]); err != nil {
+			return errorx.ReBACNamespacePermissionDeleteFailed(err, errorx.Ctx().Set("repository_count", end-start))
 		}
 	}
 	return nil
