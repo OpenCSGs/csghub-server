@@ -28,6 +28,8 @@ const (
 	csgclawTemplateNotFound
 	agentTemplateSensitiveCheckCreateAgentBlocked
 	agentTemplateSensitiveCheckMakePublicBlocked
+	agentTemplateSensitiveCheckCreateAgentPending
+	agentTemplateSensitiveCheckMakePublicPending
 )
 
 var (
@@ -335,6 +337,12 @@ var (
 
 	// agent template sensitive check blocks making a template public
 	ErrAgentTemplateSensitiveCheckMakePublicBlocked error = CustomError{prefix: errAgentPrefix, code: agentTemplateSensitiveCheckMakePublicBlocked}
+
+	// agent template sensitive check is pending - blocks creating an agent
+	ErrAgentTemplateSensitiveCheckCreateAgentPending error = CustomError{prefix: errAgentPrefix, code: agentTemplateSensitiveCheckCreateAgentPending}
+
+	// agent template sensitive check is pending - blocks making a template public
+	ErrAgentTemplateSensitiveCheckMakePublicPending error = CustomError{prefix: errAgentPrefix, code: agentTemplateSensitiveCheckMakePublicPending}
 )
 
 func InstanceQuotaExceeded(err error, ctx context) error {
@@ -537,5 +545,23 @@ func AgentTemplateSensitiveCheckMakePublicBlocked(err error, ctx context) error 
 		context: ctx,
 		err:     err,
 		code:    int(agentTemplateSensitiveCheckMakePublicBlocked),
+	}
+}
+
+func AgentTemplateSensitiveCheckCreateAgentPending(err error, ctx context) error {
+	return CustomError{
+		prefix:  errAgentPrefix,
+		context: ctx,
+		err:     err,
+		code:    int(agentTemplateSensitiveCheckCreateAgentPending),
+	}
+}
+
+func AgentTemplateSensitiveCheckMakePublicPending(err error, ctx context) error {
+	return CustomError{
+		prefix:  errAgentPrefix,
+		context: ctx,
+		err:     err,
+		code:    int(agentTemplateSensitiveCheckMakePublicPending),
 	}
 }
