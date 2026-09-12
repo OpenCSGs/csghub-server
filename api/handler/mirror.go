@@ -57,6 +57,7 @@ func (h *MirrorHandler) CreateMirrorRepo(ctx *gin.Context) {
 	}
 
 	req.CurrentUser = currentUser
+	req.AllowAutoCreateOrganization = true
 	m, err := h.mirror.CreateMirrorRepo(ctx.Request.Context(), req)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "failed to create mirror repo", slog.Any("error", err))

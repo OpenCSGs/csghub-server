@@ -361,6 +361,7 @@ func NewTestMirrorComponent(config *config.Config, stores *tests.MockStores, rep
 		namespaceStore:              stores.Namespace,
 		userStore:                   stores.User,
 		orgStore:                    stores.Org,
+		memberStore:                 stores.Member,
 		rebac:                       authorizer,
 		config:                      config,
 		mirrorNamespaceMappingStore: stores.MirrorNamespaceMapping,
