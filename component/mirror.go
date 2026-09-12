@@ -39,6 +39,7 @@ type mirrorComponentImpl struct {
 	namespaceStore      database.NamespaceStore
 	userStore           database.UserStore
 	orgStore            database.OrgStore
+	memberStore         database.MemberStore
 	rebac               rebac.Authorizer
 	config              *config.Config
 	// syncCache removes LFS sync cache after mirror deletion.
@@ -347,22 +348,27 @@ func NewMirrorComponent(config *config.Config) (MirrorComponent, error) {
 	c.syncVersionStore = database.NewSyncVersionStore()
 	c.namespaceStore = database.NewNamespaceStore()
 	c.userStore = database.NewUserStore()
+	c.memberStore = database.NewMemberStore()
 	c.config = config
 	c.mirrorNamespaceMappingStore = database.NewMirrorNamespaceMappingStore()
 	c.mirrorMetadataClientFactory = multisync.FromOpenCSG
 	return c, nil
 }
 
-// mapNamespaceAndName resolves a remote namespace while preserving the mapped target casing.
-func (m *mirrorComponentImpl) mapNamespaceAndName(sourceNamespace string) string {
+// mapNamespaceAndName resolves a remote namespace to its mapped target. Only a
+// missing mapping uses the caller-selected fallback; store failures propagate.
+func (m *mirrorComponentImpl) mapNamespaceAndName(sourceNamespace, fallbackNamespace string) (string, error) {
 	n, err := m.mirrorNamespaceMappingStore.FindBySourceNamespace(context.Background(), sourceNamespace)
-	if err != nil {
-		return "Aiwizards"
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return "", fmt.Errorf("failed to find mirror namespace mapping: %w", err)
 	}
-	if n.TargetNamespace == "" {
-		return "Aiwizards"
+	if errors.Is(err, sql.ErrNoRows) || n == nil {
+		return strings.TrimSpace(fallbackNamespace), nil
 	}
-	return strings.TrimSpace(n.TargetNamespace)
+	if target := strings.TrimSpace(n.TargetNamespace); target != "" {
+		return target, nil
+	}
+	return strings.TrimSpace(fallbackNamespace), nil
 }
 
 // CreateMirror creates a mirror configuration for an existing repository.

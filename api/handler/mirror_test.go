@@ -59,7 +59,8 @@ func TestMirrorHandler_CreateMirrorRepo(t *testing.T) {
 			!*req.Private &&
 			req.CreateTargetRepo != nil &&
 			*req.CreateTargetRepo &&
-			req.Priority == types.HighMirrorPriority
+			req.Priority == types.HighMirrorPriority &&
+			req.AllowAutoCreateOrganization
 	})).Return(&database.Mirror{}, nil)
 	tester.WithBody(t, &types.CreateMirrorRepoReq{
 		SourceNamespace:   "ns",

@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	mockrebac "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/rebac"
@@ -87,6 +88,14 @@ func expectMirrorRepositoryRelationship(mc *testMirrorWithMocks) {
 	authorizer := mc.rebac.(*mockrebac.MockAuthorizer)
 	authorizer.EXPECT().Check(mock.Anything, mock.Anything).Return(rebac.Decision{Allowed: false}, nil).Once()
 	authorizer.EXPECT().Write(mock.Anything, mock.Anything).Return(nil).Once()
+}
+
+// expectMirrorTargetNamespaceExists makes the namespace existence check used by
+// ensureMirrorOrgNamespace report the target namespace as already present, so
+// existing CreateMirrorRepo tests exercise their original paths without
+// triggering organization auto-creation.
+func expectMirrorTargetNamespaceExists(mc *testMirrorWithMocks) {
+	mc.mocks.stores.NamespaceMock().EXPECT().Exists(mock.Anything, mock.Anything).Return(true, nil).Maybe()
 }
 
 // expectMirrorRepoRequeue injects a mocked transactional requeue store for duplicate mirror sync tests.
@@ -775,6 +784,7 @@ func TestMirrorComponent_CreateMirrorRepoRejectsEmptyCurrentUser(t *testing.T) {
 func TestMirrorComponent_CreateMirrorRepoPreservesForkTargetCase(t *testing.T) {
 	ctx := context.TODO()
 	mc := initializeTestMirrorComponent(ctx, t)
+	expectMirrorTargetNamespaceExists(mc)
 	fakeStore := &fakeMirrorRepoStore{}
 	mc.mirrorRepoStore = fakeStore
 	expectMirrorRepositoryRelationship(mc)
@@ -817,6 +827,7 @@ func TestMirrorComponent_CreateMirrorRepoPreservesForkTargetCase(t *testing.T) {
 func TestMirrorComponent_CreateMirrorRepoRejectsCaseVariantExistingTarget(t *testing.T) {
 	ctx := context.TODO()
 	mc := initializeTestMirrorComponent(ctx, t)
+	expectMirrorTargetNamespaceExists(mc)
 	createTargetRepo := true
 	repo := &database.Repository{ID: 11, Path: "alice/MyName", Name: "MyName", RepositoryType: types.ModelRepo}
 
@@ -842,6 +853,7 @@ func TestMirrorComponent_CreateMirrorRepoRejectsCaseVariantExistingTarget(t *tes
 func TestMirrorComponent_CreateMirrorRepoPersistsNormalizedSourceAndCredentials(t *testing.T) {
 	ctx := context.TODO()
 	mc := initializeTestMirrorComponent(ctx, t)
+	expectMirrorTargetNamespaceExists(mc)
 	fakeStore := &fakeMirrorRepoStore{}
 	mc.mirrorRepoStore = fakeStore
 	expectMirrorRepositoryRelationship(mc)
@@ -886,6 +898,7 @@ func TestMirrorComponent_CreateMirrorRepoPersistsNormalizedSourceAndCredentials(
 func TestMirrorComponent_CreateMirrorRepoUsesExplicitVisibility(t *testing.T) {
 	ctx := context.TODO()
 	mc := initializeTestMirrorComponent(ctx, t)
+	expectMirrorTargetNamespaceExists(mc)
 	fakeStore := &fakeMirrorRepoStore{}
 	mc.mirrorRepoStore = fakeStore
 	expectMirrorRepositoryRelationship(mc)
@@ -1090,6 +1103,7 @@ func TestMirrorWriteEntrypointsValidateCredentials(t *testing.T) {
 func TestMirrorComponent_CreateMirrorRepoRequeuesSameTargetAndSource(t *testing.T) {
 	ctx := context.TODO()
 	mc := initializeTestMirrorComponent(ctx, t)
+	expectMirrorTargetNamespaceExists(mc)
 
 	req := types.CreateMirrorRepoReq{
 		SourceNamespace:   "upstream",
@@ -1121,6 +1135,7 @@ func TestMirrorComponent_CreateMirrorRepoRequeuesSameTargetAndSource(t *testing.
 func TestMirrorComponent_CreateMirrorRepoRequeuePreservesCredentials(t *testing.T) {
 	ctx := context.TODO()
 	mc := initializeTestMirrorComponent(ctx, t)
+	expectMirrorTargetNamespaceExists(mc)
 	req := types.CreateMirrorRepoReq{
 		SourceNamespace:   "upstream",
 		SourceName:        "repo",
@@ -1151,6 +1166,7 @@ func TestMirrorComponent_CreateMirrorRepoRequeuePreservesCredentials(t *testing.
 func TestMirrorComponent_CreateMirrorRepoAddsSourceToExistingTargetWithoutMirror(t *testing.T) {
 	ctx := context.TODO()
 	mc := initializeTestMirrorComponent(ctx, t)
+	expectMirrorTargetNamespaceExists(mc)
 	fakeStore := &fakeMirrorRepoStore{}
 	mc.mirrorRepoStore = fakeStore
 	createTargetRepo := false
@@ -1185,6 +1201,7 @@ func TestMirrorComponent_CreateMirrorRepoAddsSourceToExistingTargetWithoutMirror
 func TestMirrorComponent_CreateMirrorRepoRejectsExistingTargetWhenRequested(t *testing.T) {
 	ctx := context.TODO()
 	mc := initializeTestMirrorComponent(ctx, t)
+	expectMirrorTargetNamespaceExists(mc)
 	createTargetRepo := true
 
 	req := types.CreateMirrorRepoReq{
@@ -1212,6 +1229,7 @@ func TestMirrorComponent_CreateMirrorRepoRejectsExistingTargetWhenRequested(t *t
 func TestMirrorComponent_CreateMirrorRepoRejectsMissingTargetWhenCreationIsDisabled(t *testing.T) {
 	ctx := context.TODO()
 	mc := initializeTestMirrorComponent(ctx, t)
+	expectMirrorTargetNamespaceExists(mc)
 	createTargetRepo := false
 	req := types.CreateMirrorRepoReq{
 		SourceNamespace:   "upstream",
@@ -1236,6 +1254,7 @@ func TestMirrorComponent_CreateMirrorRepoRejectsMissingTargetWhenCreationIsDisab
 func TestMirrorComponent_CreateMirrorRepoRejectsExistingTargetWithDifferentSource(t *testing.T) {
 	ctx := context.TODO()
 	mc := initializeTestMirrorComponent(ctx, t)
+	expectMirrorTargetNamespaceExists(mc)
 
 	req := types.CreateMirrorRepoReq{
 		SourceNamespace:   "upstream",
@@ -1263,6 +1282,7 @@ func TestMirrorComponent_CreateMirrorRepoRejectsExistingTargetWithDifferentSourc
 func TestMirrorComponent_CreateMirrorRepoRejectsMissingWritePermission(t *testing.T) {
 	ctx := context.TODO()
 	mc := initializeTestMirrorComponent(ctx, t)
+	expectMirrorTargetNamespaceExists(mc)
 
 	req := types.CreateMirrorRepoReq{
 		SourceNamespace:   "upstream",
@@ -1296,6 +1316,7 @@ func TestMirrorComponent_CreateMirrorRepoCreatesAllMirrorRepoTypes(t *testing.T)
 		t.Run(string(repoType), func(t *testing.T) {
 			ctx := context.TODO()
 			mc := initializeTestMirrorComponent(ctx, t)
+			expectMirrorTargetNamespaceExists(mc)
 			fakeStore := &fakeMirrorRepoStore{}
 			mc.mirrorRepoStore = fakeStore
 			expectMirrorRepositoryRelationship(mc)
@@ -1391,6 +1412,7 @@ func TestMirrorComponent_CreateMirrorRepoCreatesAllMirrorRepoTypes(t *testing.T)
 func TestMirrorComponent_CreateMirrorRepoFetchesMCPMetadata(t *testing.T) {
 	ctx := context.TODO()
 	mc := initializeTestMirrorComponent(ctx, t)
+	expectMirrorTargetNamespaceExists(mc)
 	fakeStore := &fakeMirrorRepoStore{}
 	mc.mirrorRepoStore = fakeStore
 	createTargetRepo := true
@@ -1476,6 +1498,7 @@ func TestMirrorComponent_CreateMirrorRepoFetchesMCPMetadata(t *testing.T) {
 func TestMirrorComponent_CreateMirrorRepoFetchesSkillMetadata(t *testing.T) {
 	ctx := context.TODO()
 	mc := initializeTestMirrorComponent(ctx, t)
+	expectMirrorTargetNamespaceExists(mc)
 	fakeStore := &fakeMirrorRepoStore{}
 	mc.mirrorRepoStore = fakeStore
 	req := types.CreateMirrorRepoReq{
@@ -1595,6 +1618,7 @@ func TestMirrorComponent_CreateMirrorRepoRejectsUnsupportedMetadataSources(t *te
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.TODO()
 			mc := initializeTestMirrorComponent(ctx, t)
+			expectMirrorTargetNamespaceExists(mc)
 			fakeStore := &fakeMirrorRepoStore{}
 			mc.mirrorRepoStore = fakeStore
 			req := types.CreateMirrorRepoReq{
@@ -1632,6 +1656,7 @@ func TestMirrorComponent_CreateMirrorRepoRejectsUnsupportedMetadataSources(t *te
 func TestMirrorComponent_CreateMirrorRepoReturnsMetadataError(t *testing.T) {
 	ctx := context.TODO()
 	mc := initializeTestMirrorComponent(ctx, t)
+	expectMirrorTargetNamespaceExists(mc)
 	fakeStore := &fakeMirrorRepoStore{}
 	mc.mirrorRepoStore = fakeStore
 	req := types.CreateMirrorRepoReq{
@@ -1666,6 +1691,7 @@ func TestMirrorComponent_CreateMirrorRepoReturnsMetadataError(t *testing.T) {
 func TestMirrorComponent_CreateMirrorRepoSkipSourcePath(t *testing.T) {
 	ctx := context.TODO()
 	mc := initializeTestMirrorComponent(ctx, t)
+	expectMirrorTargetNamespaceExists(mc)
 	fakeStore := &fakeMirrorRepoStore{}
 	mc.mirrorRepoStore = fakeStore
 
@@ -1706,6 +1732,7 @@ func TestMirrorComponent_CreateMirrorRepoSkipSourcePath(t *testing.T) {
 func TestMirrorComponent_CreateMirrorRepoRefreshesMCPMetadataOnRequeue(t *testing.T) {
 	ctx := context.TODO()
 	mc := initializeTestMirrorComponent(ctx, t)
+	expectMirrorTargetNamespaceExists(mc)
 	req := types.CreateMirrorRepoReq{
 		SourceNamespace:   "upstream",
 		SourceName:        "server",
@@ -1768,6 +1795,7 @@ func TestMirrorComponent_CreateMirrorRepoRefreshesMCPMetadataOnRequeue(t *testin
 func TestMirrorComponent_CreateMirrorRepoRefreshesSkillMetadataOnRequeue(t *testing.T) {
 	ctx := context.TODO()
 	mc := initializeTestMirrorComponent(ctx, t)
+	expectMirrorTargetNamespaceExists(mc)
 	req := types.CreateMirrorRepoReq{
 		SourceNamespace:   "upstream",
 		SourceName:        "reviewer",
@@ -1828,6 +1856,7 @@ func TestMirrorComponent_CreateMirrorRepoRefreshesSkillMetadataOnRequeue(t *test
 func TestMirrorComponent_CreateMirrorRepoRefreshesSkillMetadataWhenBindingExistingTarget(t *testing.T) {
 	ctx := context.TODO()
 	mc := initializeTestMirrorComponent(ctx, t)
+	expectMirrorTargetNamespaceExists(mc)
 	fakeStore := &fakeMirrorRepoStore{}
 	mc.mirrorRepoStore = fakeStore
 	createTargetRepo := false
@@ -1911,4 +1940,503 @@ func TestMirrorComponent_SyncMirrorRefreshesSkillMetadata(t *testing.T) {
 		RepoType: types.SkillRepo, Namespace: "local", Name: "reviewer", CurrentUser: "admin",
 	})
 	require.NoError(t, err)
+}
+
+// TestEnsureMirrorOrgNamespaceNoopWhenExists verifies an existing user
+// namespace is left unchanged and is never converted into an organization.
+func TestEnsureMirrorOrgNamespaceNoopWhenExists(t *testing.T) {
+	ctx := context.TODO()
+	mc := initializeTestMirrorComponent(ctx, t)
+
+	mc.mocks.stores.NamespaceMock().EXPECT().Exists(ctx, "existing-org").Return(true, nil)
+	mc.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "existing-org").Return(database.Namespace{
+		Path: "existing-org", NamespaceType: database.UserNamespace,
+	}, nil)
+
+	err := mc.ensureMirrorOrgNamespace(ctx, "existing-org", "admin")
+	require.NoError(t, err)
+}
+
+// TestEnsureMirrorOrgNamespaceRepairsExistingRelationships verifies a retry
+// reconciles ReBAC after the database rows were committed by an earlier attempt.
+func TestEnsureMirrorOrgNamespaceRepairsExistingRelationships(t *testing.T) {
+	ctx := context.TODO()
+	mc := initializeTestMirrorComponent(ctx, t)
+	authorizer := mc.rebac.(*mockrebac.MockAuthorizer)
+	orgUUID := uuid.MustParse("00000000-0000-0000-0000-000000000011")
+
+	mc.mocks.stores.NamespaceMock().EXPECT().Exists(ctx, "existing-org").Return(true, nil)
+	mc.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "existing-org").Return(database.Namespace{
+		Path: "existing-org", UUID: "namespace-uuid", NamespaceType: database.OrgNamespace,
+	}, nil)
+	mc.mocks.stores.OrgMock().EXPECT().FindByPath(ctx, "existing-org").Return(database.Organization{
+		ID: 11, Name: "existing-org", UUID: orgUUID, UserID: 7,
+	}, nil)
+	mc.mocks.stores.MemberMock().EXPECT().Find(ctx, int64(11), int64(7)).Return(&database.Member{
+		OrganizationID: 11, UserID: 7, Role: string(types.UserAdmin),
+	}, nil)
+	mc.mocks.stores.UserMock().EXPECT().FindByID(ctx, int64(7)).Return(database.User{UUID: "owner-uuid"}, nil)
+	authorizer.EXPECT().Check(ctx, mock.MatchedBy(func(req rebac.CheckRequest) bool {
+		return req.Relation == rebac.RelationOrganization
+	})).Return(rebac.Decision{Allowed: false}, nil)
+	authorizer.EXPECT().Write(ctx, mock.Anything).Return(nil)
+	authorizer.EXPECT().Check(ctx, mock.MatchedBy(func(req rebac.CheckRequest) bool {
+		return req.Relation == rebac.RelationAdmin && req.Subject == rebac.UserSubject("owner-uuid")
+	})).Return(rebac.Decision{Allowed: false}, nil)
+	authorizer.EXPECT().Write(ctx, mock.Anything).Return(nil)
+
+	require.NoError(t, mc.ensureMirrorOrgNamespace(ctx, "existing-org", "retrying-admin"))
+}
+
+// TestEnsureMirrorOrgNamespaceDoesNotRestoreDemotedCreator verifies a mirror
+// retry never treats the historical organization creator as a current admin.
+func TestEnsureMirrorOrgNamespaceDoesNotRestoreDemotedCreator(t *testing.T) {
+	ctx := context.TODO()
+	mc := initializeTestMirrorComponent(ctx, t)
+	authorizer := mc.rebac.(*mockrebac.MockAuthorizer)
+	orgUUID := uuid.MustParse("00000000-0000-0000-0000-000000000013")
+
+	mc.mocks.stores.NamespaceMock().EXPECT().Exists(ctx, "demoted-org").Return(true, nil)
+	mc.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "demoted-org").Return(database.Namespace{
+		Path: "demoted-org", UUID: "namespace-uuid", NamespaceType: database.OrgNamespace,
+	}, nil)
+	mc.mocks.stores.OrgMock().EXPECT().FindByPath(ctx, "demoted-org").Return(database.Organization{
+		ID: 11, Name: "demoted-org", UUID: orgUUID, UserID: 7,
+	}, nil)
+	authorizer.EXPECT().Check(ctx, mock.MatchedBy(func(req rebac.CheckRequest) bool {
+		return req.Relation == rebac.RelationOrganization
+	})).Return(rebac.Decision{Allowed: true}, nil)
+	mc.mocks.stores.MemberMock().EXPECT().Find(ctx, int64(11), int64(7)).Return(&database.Member{
+		OrganizationID: 11, UserID: 7, Role: string(types.UserRead),
+	}, nil)
+
+	require.NoError(t, mc.ensureMirrorOrgNamespace(ctx, "demoted-org", "current-admin"))
+}
+
+// TestEnsureMirrorOrgNamespaceDoesNotRestoreRemovedCreator verifies a removed
+// creator is not granted an admin tuple by a later mirror request.
+func TestEnsureMirrorOrgNamespaceDoesNotRestoreRemovedCreator(t *testing.T) {
+	ctx := context.TODO()
+	mc := initializeTestMirrorComponent(ctx, t)
+	authorizer := mc.rebac.(*mockrebac.MockAuthorizer)
+	orgUUID := uuid.MustParse("00000000-0000-0000-0000-000000000014")
+
+	mc.mocks.stores.NamespaceMock().EXPECT().Exists(ctx, "removed-org").Return(true, nil)
+	mc.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "removed-org").Return(database.Namespace{
+		Path: "removed-org", UUID: "namespace-uuid", NamespaceType: database.OrgNamespace,
+	}, nil)
+	mc.mocks.stores.OrgMock().EXPECT().FindByPath(ctx, "removed-org").Return(database.Organization{
+		ID: 12, Name: "removed-org", UUID: orgUUID, UserID: 8,
+	}, nil)
+	authorizer.EXPECT().Check(ctx, mock.MatchedBy(func(req rebac.CheckRequest) bool {
+		return req.Relation == rebac.RelationOrganization
+	})).Return(rebac.Decision{Allowed: true}, nil)
+	mc.mocks.stores.MemberMock().EXPECT().Find(ctx, int64(12), int64(8)).Return(nil, sql.ErrNoRows)
+
+	require.NoError(t, mc.ensureMirrorOrgNamespace(ctx, "removed-org", "current-admin"))
+}
+
+// TestEnsureMirrorOrgNamespaceRetriesAfterReBACWriteFailure verifies a retry
+// repairs the admin relationship when database creation committed but the
+// final ReBAC write in the first attempt failed.
+func TestEnsureMirrorOrgNamespaceRetriesAfterReBACWriteFailure(t *testing.T) {
+	ctx := context.TODO()
+	mc := initializeTestMirrorComponent(ctx, t)
+	authorizer := mc.rebac.(*mockrebac.MockAuthorizer)
+	owner := database.User{
+		ID: 7, Username: "admin", Email: "admin@example.com", UUID: "owner-uuid",
+	}
+	var createdOrg database.Organization
+	var createdNamespace database.Namespace
+
+	// First attempt commits the database rows.
+	mc.mocks.stores.NamespaceMock().EXPECT().Exists(ctx, "retry-org").Return(false, nil).Once()
+	mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, owner.Username).Return(owner, nil).Once()
+	mc.mocks.stores.OrgMock().EXPECT().
+		CreateWithRelations(ctx, mock.Anything, mock.Anything, []int64(nil)).
+		Run(func(_ context.Context, org *database.Organization, namespace *database.Namespace, _ []int64) {
+			createdOrg = *org
+			createdNamespace = *namespace
+		}).
+		Return(nil).
+		Once()
+	authorizer.EXPECT().Check(ctx, mock.MatchedBy(func(req rebac.CheckRequest) bool {
+		return req.Relation == rebac.RelationOrganization
+	})).Return(rebac.Decision{Allowed: false}, nil).Once()
+	authorizer.EXPECT().Write(ctx, mock.MatchedBy(func(relationships []rebac.Relationship) bool {
+		return len(relationships) == 1 && relationships[0].Relation == rebac.RelationOrganization
+	})).Return(nil).Once()
+	authorizer.EXPECT().Check(ctx, mock.MatchedBy(func(req rebac.CheckRequest) bool {
+		return req.Relation == rebac.RelationAdmin
+	})).Return(rebac.Decision{Allowed: false}, nil).Once()
+	authorizer.EXPECT().Write(ctx, mock.MatchedBy(func(relationships []rebac.Relationship) bool {
+		return len(relationships) == 1 && relationships[0].Relation == rebac.RelationAdmin
+	})).Return(fmt.Errorf("openfga unavailable")).Once()
+
+	err := mc.ensureMirrorOrgNamespace(ctx, "retry-org", owner.Username)
+	require.ErrorContains(t, err, "synchronize mirror target organization admin to ReBAC")
+
+	// Second attempt observes the committed rows and reconciles with their
+	// persisted organization and owner identities.
+	mc.mocks.stores.NamespaceMock().EXPECT().Exists(ctx, "retry-org").Return(true, nil).Once()
+	mc.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "retry-org").
+		Return(createdNamespace, nil).Once()
+	mc.mocks.stores.OrgMock().EXPECT().FindByPath(ctx, "retry-org").
+		Return(createdOrg, nil).Once()
+	mc.mocks.stores.MemberMock().EXPECT().Find(ctx, createdOrg.ID, owner.ID).Return(&database.Member{
+		OrganizationID: createdOrg.ID, UserID: owner.ID, Role: string(types.UserAdmin),
+	}, nil).Once()
+	mc.mocks.stores.UserMock().EXPECT().FindByID(ctx, owner.ID).Return(owner, nil).Once()
+	authorizer.EXPECT().Check(ctx, mock.MatchedBy(func(req rebac.CheckRequest) bool {
+		return req.Relation == rebac.RelationOrganization
+	})).Return(rebac.Decision{Allowed: true}, nil).Once()
+	authorizer.EXPECT().Check(ctx, mock.MatchedBy(func(req rebac.CheckRequest) bool {
+		return req.Relation == rebac.RelationAdmin &&
+			req.Subject == rebac.UserSubject(owner.UUID) &&
+			req.Object == rebac.OrganizationObject(createdOrg.UUID.String())
+	})).Return(rebac.Decision{Allowed: false}, nil).Once()
+	authorizer.EXPECT().Write(ctx, mock.MatchedBy(func(relationships []rebac.Relationship) bool {
+		return len(relationships) == 1 &&
+			relationships[0].Subject == rebac.UserSubject(owner.UUID) &&
+			relationships[0].Relation == rebac.RelationAdmin &&
+			relationships[0].Object == rebac.OrganizationObject(createdOrg.UUID.String())
+	})).Return(nil).Once()
+
+	require.NoError(t, mc.ensureMirrorOrgNamespace(ctx, "retry-org", "different-retrying-admin"))
+}
+
+// TestEnsureMirrorOrgNamespaceCreatesOrg verifies the target organization, namespace, and admin ReBAC tuples are written when the namespace is missing.
+func TestEnsureMirrorOrgNamespaceCreatesOrg(t *testing.T) {
+	ctx := context.TODO()
+	mc := initializeTestMirrorComponent(ctx, t)
+	authorizer := mc.rebac.(*mockrebac.MockAuthorizer)
+
+	mc.mocks.stores.NamespaceMock().EXPECT().Exists(ctx, "new-org").Return(false, nil)
+	mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "admin").Return(database.User{
+		ID: 7, Username: "admin", Email: "admin@example.com", UUID: "admin-uuid",
+	}, nil)
+	mc.mocks.stores.OrgMock().EXPECT().CreateWithRelations(ctx, mock.Anything, mock.Anything, []int64(nil)).Return(nil)
+	// namespace owner tuple check returns denied so the write happens.
+	authorizer.EXPECT().Check(ctx, mock.MatchedBy(func(req rebac.CheckRequest) bool {
+		return req.Relation == rebac.RelationOrganization
+	})).Return(rebac.Decision{Allowed: false}, nil)
+	authorizer.EXPECT().Write(ctx, mock.Anything).Return(nil)
+	// admin membership tuple check returns denied so the write happens.
+	authorizer.EXPECT().Check(ctx, mock.MatchedBy(func(req rebac.CheckRequest) bool {
+		return req.Relation == rebac.RelationAdmin
+	})).Return(rebac.Decision{Allowed: false}, nil)
+	authorizer.EXPECT().Write(ctx, mock.Anything).Return(nil)
+
+	err := mc.ensureMirrorOrgNamespace(ctx, "new-org", "admin")
+	require.NoError(t, err)
+}
+
+// TestEnsureMirrorOrgNamespaceToleratesConcurrentCreation verifies a race that creates the namespace between the existence check and the insert is treated as success.
+func TestEnsureMirrorOrgNamespaceToleratesConcurrentCreation(t *testing.T) {
+	ctx := context.TODO()
+	mc := initializeTestMirrorComponent(ctx, t)
+
+	mc.mocks.stores.NamespaceMock().EXPECT().Exists(ctx, "raced-org").Return(false, nil).Once()
+	mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "admin").Return(database.User{
+		ID: 7, Username: "admin", Email: "admin@example.com", UUID: "admin-uuid",
+	}, nil)
+	mc.mocks.stores.OrgMock().EXPECT().CreateWithRelations(ctx, mock.Anything, mock.Anything, []int64(nil)).Return(fmt.Errorf("conflict"))
+	// re-check after the conflict reports the namespace now exists.
+	mc.mocks.stores.NamespaceMock().EXPECT().Exists(ctx, "raced-org").Return(true, nil).Once()
+	mc.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "raced-org").Return(database.Namespace{
+		Path: "raced-org", UUID: "raced-namespace-uuid", NamespaceType: database.OrgNamespace,
+	}, nil)
+	mc.mocks.stores.OrgMock().EXPECT().FindByPath(ctx, "raced-org").Return(database.Organization{
+		ID: 12, Name: "raced-org", UUID: uuid.MustParse("00000000-0000-0000-0000-000000000012"), UserID: 8,
+	}, nil)
+	mc.mocks.stores.MemberMock().EXPECT().Find(ctx, int64(12), int64(8)).Return(&database.Member{
+		OrganizationID: 12, UserID: 8, Role: string(types.UserAdmin),
+	}, nil)
+	mc.mocks.stores.UserMock().EXPECT().FindByID(ctx, int64(8)).Return(database.User{UUID: "actual-owner-uuid"}, nil)
+	authorizer := mc.rebac.(*mockrebac.MockAuthorizer)
+	authorizer.EXPECT().Check(ctx, mock.Anything).Return(rebac.Decision{Allowed: true}, nil).Twice()
+
+	err := mc.ensureMirrorOrgNamespace(ctx, "raced-org", "admin")
+	require.NoError(t, err)
+}
+
+// TestEnsureMirrorOrgNamespaceFailsWhenOwnerMissing verifies a missing owner user surfaces an error instead of falling back.
+func TestEnsureMirrorOrgNamespaceFailsWhenOwnerMissing(t *testing.T) {
+	ctx := context.TODO()
+	mc := initializeTestMirrorComponent(ctx, t)
+
+	mc.mocks.stores.NamespaceMock().EXPECT().Exists(ctx, "new-org").Return(false, nil)
+	mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "ghost").Return(database.User{}, sql.ErrNoRows)
+
+	err := mc.ensureMirrorOrgNamespace(ctx, "new-org", "ghost")
+	require.Error(t, err)
+	require.ErrorContains(t, err, "failed to find owner user")
+}
+
+// TestEnsureMirrorOrgNamespaceSkipsWhenArgsEmpty verifies empty namespace or owner short-circuits without store calls.
+func TestEnsureMirrorOrgNamespaceSkipsWhenArgsEmpty(t *testing.T) {
+	ctx := context.TODO()
+	mc := initializeTestMirrorComponent(ctx, t)
+
+	require.NoError(t, mc.ensureMirrorOrgNamespace(ctx, "", "admin"))
+	require.NoError(t, mc.ensureMirrorOrgNamespace(ctx, "new-org", ""))
+}
+
+// TestMapNamespaceAndNameReturnsMappedTarget verifies a configured mapping resolves to its trimmed target namespace.
+func TestMapNamespaceAndNameReturnsMappedTarget(t *testing.T) {
+	mc := initializeTestMirrorComponent(context.TODO(), t)
+	mc.mocks.stores.MirrorNamespaceMappingMock().EXPECT().
+		FindBySourceNamespace(context.Background(), "SourceTeam").
+		Return(&database.MirrorNamespaceMapping{TargetNamespace: "  Target-Team  "}, nil)
+
+	got, err := mc.mapNamespaceAndName("SourceTeam", "SourceTeam")
+	require.NoError(t, err)
+	require.Equal(t, "Target-Team", got)
+}
+
+// TestMapNamespaceAndNamePropagatesStoreError verifies infrastructure failures
+// are not interpreted as a missing mapping.
+func TestMapNamespaceAndNamePropagatesStoreError(t *testing.T) {
+	mc := initializeTestMirrorComponent(context.TODO(), t)
+	mc.mocks.stores.MirrorNamespaceMappingMock().EXPECT().
+		FindBySourceNamespace(context.Background(), "SourceTeam").
+		Return(nil, fmt.Errorf("store unavailable"))
+
+	got, err := mc.mapNamespaceAndName("SourceTeam", "SourceTeam")
+	require.Error(t, err)
+	require.Empty(t, got)
+}
+
+// TestResolveMirrorRepoTargetAutoCreateKeepsLegacyFallback verifies the
+// auto-create authorization flag does not let an external source namespace
+// choose a local organization when no explicit fork namespace is provided.
+func TestResolveMirrorRepoTargetAutoCreateKeepsLegacyFallback(t *testing.T) {
+	mc := initializeTestMirrorComponent(context.TODO(), t)
+	mc.mocks.stores.MirrorNamespaceMappingMock().EXPECT().
+		FindBySourceNamespace(context.Background(), "external-team").
+		Return(nil, sql.ErrNoRows)
+
+	namespace, name, err := mc.resolveMirrorRepoTarget(types.CreateMirrorRepoReq{
+		SourceNamespace:             "external-team",
+		SourceName:                  "source-repo",
+		AllowAutoCreateOrganization: true,
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, "Aiwizards", namespace)
+	require.Equal(t, "source-repo", name)
+}
+
+// TestCreateMirrorRepoDoesNotAutoCreateForSharedCallers verifies the shared
+// component entry point cannot grant organization ownership to non-admin callers.
+func TestCreateMirrorRepoDoesNotAutoCreateForSharedCallers(t *testing.T) {
+	ctx := context.TODO()
+	mc := initializeTestMirrorComponent(ctx, t)
+	createTargetRepo := false
+	mc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.CodeRepo, "remote-team", "repo").Return(nil, sql.ErrNoRows)
+	mc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(
+		ctx, "ordinary-user", "remote-team", rebac.NamespaceCanWrite,
+	).Return(false, nil)
+
+	got, err := mc.CreateMirrorRepo(ctx, types.CreateMirrorRepoReq{
+		SourceNamespace: "remote-team", SourceName: "repo", RepoType: types.CodeRepo,
+		SourceGitCloneUrl: "https://gitlab.example.com/remote-team/repo",
+		CurrentUser:       "ordinary-user", ForkNamespace: "remote-team", ForkName: "repo",
+		CreateTargetRepo: &createTargetRepo,
+	})
+	require.Error(t, err)
+	require.Nil(t, got)
+}
+
+// TestMapNamespaceAndNameFallsBackToSourceWhenTargetEmpty verifies a mapping with an empty or whitespace-only target falls back to the trimmed source namespace.
+func TestMapNamespaceAndNameFallsBackToSourceWhenTargetEmpty(t *testing.T) {
+	for _, target := range []string{"", "  ", "\t"} {
+		t.Run(fmt.Sprintf("target_%q", target), func(t *testing.T) {
+			mc := initializeTestMirrorComponent(context.TODO(), t)
+			mc.mocks.stores.MirrorNamespaceMappingMock().EXPECT().
+				FindBySourceNamespace(context.Background(), "SourceTeam").
+				Return(&database.MirrorNamespaceMapping{TargetNamespace: target}, nil)
+
+			got, err := mc.mapNamespaceAndName("SourceTeam", "SourceTeam")
+			require.NoError(t, err)
+			require.Equal(t, "SourceTeam", got)
+		})
+	}
+}
+
+// TestMapNamespaceAndNameFallsBackToSourceWhenMappingNil verifies a nil mapping with no error falls back to the source namespace.
+func TestMapNamespaceAndNameFallsBackToSourceWhenMappingNil(t *testing.T) {
+	mc := initializeTestMirrorComponent(context.TODO(), t)
+	mc.mocks.stores.MirrorNamespaceMappingMock().EXPECT().
+		FindBySourceNamespace(context.Background(), "SourceTeam").
+		Return(nil, nil)
+
+	got, err := mc.mapNamespaceAndName("SourceTeam", "SourceTeam")
+	require.NoError(t, err)
+	require.Equal(t, "SourceTeam", got)
+}
+
+// TestEnsureMirrorOrgAdminRelationshipSkipsWriteWhenAllowed verifies no ReBAC write happens when the admin tuple already exists.
+func TestEnsureMirrorOrgAdminRelationshipSkipsWriteWhenAllowed(t *testing.T) {
+	ctx := context.TODO()
+	mc := initializeTestMirrorComponent(ctx, t)
+	authorizer := mc.rebac.(*mockrebac.MockAuthorizer)
+
+	authorizer.EXPECT().Check(ctx, mock.MatchedBy(func(req rebac.CheckRequest) bool {
+		return req.Relation == rebac.RelationAdmin &&
+			req.Subject == rebac.UserSubject("user-uuid") &&
+			req.Object == rebac.OrganizationObject("org-uuid")
+	})).Return(rebac.Decision{Allowed: true}, nil)
+
+	require.NoError(t, mc.ensureMirrorOrgAdminRelationship(ctx, "org-uuid", "user-uuid"))
+}
+
+// TestEnsureMirrorOrgAdminRelationshipWritesWhenDenied verifies the admin tuple is written when the check denies it.
+func TestEnsureMirrorOrgAdminRelationshipWritesWhenDenied(t *testing.T) {
+	ctx := context.TODO()
+	mc := initializeTestMirrorComponent(ctx, t)
+	authorizer := mc.rebac.(*mockrebac.MockAuthorizer)
+
+	authorizer.EXPECT().Check(ctx, mock.MatchedBy(func(req rebac.CheckRequest) bool {
+		return req.Relation == rebac.RelationAdmin
+	})).Return(rebac.Decision{Allowed: false}, nil)
+	authorizer.EXPECT().Write(ctx, []rebac.Relationship{{
+		Subject:  rebac.UserSubject("user-uuid"),
+		Relation: rebac.RelationAdmin,
+		Object:   rebac.OrganizationObject("org-uuid"),
+	}}).Return(nil)
+
+	require.NoError(t, mc.ensureMirrorOrgAdminRelationship(ctx, "org-uuid", "user-uuid"))
+}
+
+// TestEnsureMirrorOrgAdminRelationshipFailsOnCheckError verifies a ReBAC check error surfaces instead of writing.
+func TestEnsureMirrorOrgAdminRelationshipFailsOnCheckError(t *testing.T) {
+	ctx := context.TODO()
+	mc := initializeTestMirrorComponent(ctx, t)
+	authorizer := mc.rebac.(*mockrebac.MockAuthorizer)
+
+	authorizer.EXPECT().Check(ctx, mock.Anything).Return(rebac.Decision{}, fmt.Errorf("openfga down"))
+
+	err := mc.ensureMirrorOrgAdminRelationship(ctx, "org-uuid", "user-uuid")
+	require.Error(t, err)
+	require.ErrorContains(t, err, "check organization admin relationship")
+}
+
+// TestEnsureMirrorOrgAdminRelationshipFailsOnWriteError verifies a ReBAC write error surfaces.
+func TestEnsureMirrorOrgAdminRelationshipFailsOnWriteError(t *testing.T) {
+	ctx := context.TODO()
+	mc := initializeTestMirrorComponent(ctx, t)
+	authorizer := mc.rebac.(*mockrebac.MockAuthorizer)
+
+	authorizer.EXPECT().Check(ctx, mock.Anything).Return(rebac.Decision{Allowed: false}, nil)
+	authorizer.EXPECT().Write(ctx, mock.Anything).Return(fmt.Errorf("write failed"))
+
+	err := mc.ensureMirrorOrgAdminRelationship(ctx, "org-uuid", "user-uuid")
+	require.Error(t, err)
+	require.ErrorContains(t, err, "write organization admin relationship")
+}
+
+// TestEnsureMirrorOrgAdminRelationshipRejectsEmptyArgs verifies empty UUIDs short-circuit without ReBAC calls.
+func TestEnsureMirrorOrgAdminRelationshipRejectsEmptyArgs(t *testing.T) {
+	ctx := context.TODO()
+	mc := initializeTestMirrorComponent(ctx, t)
+
+	err := mc.ensureMirrorOrgAdminRelationship(ctx, "", "user-uuid")
+	require.Error(t, err)
+	err = mc.ensureMirrorOrgAdminRelationship(ctx, "org-uuid", "")
+	require.Error(t, err)
+}
+
+// TestCreateMirrorRepoAutoCreatesTargetOrganization verifies CreateMirrorRepo creates the missing target
+// organization (org + namespace + admin ReBAC tuples) before creating the repository under it, instead of
+// failing at namespace lookup. This is the end-to-end path for issue #1410.
+func TestCreateMirrorRepoAutoCreatesTargetOrganization(t *testing.T) {
+	ctx := context.TODO()
+	mc := initializeTestMirrorComponent(ctx, t)
+	fakeStore := &fakeMirrorRepoStore{}
+	mc.mirrorRepoStore = fakeStore
+	authorizer := mc.rebac.(*mockrebac.MockAuthorizer)
+	expectMirrorRepositoryRelationship(mc)
+
+	// The explicit local fork namespace, not the external source namespace, is
+	// auto-created as an organization.
+	mc.mocks.stores.NamespaceMock().EXPECT().Exists(ctx, "imported-models").Return(false, nil)
+	mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "admin").Return(database.User{
+		ID: 1, Username: "admin", Email: "admin@example.com", UUID: "admin-uuid", RoleMask: "admin",
+	}, nil)
+	// Organization + namespace + admin membership created atomically.
+	mc.mocks.stores.OrgMock().EXPECT().CreateWithRelations(ctx, mock.MatchedBy(func(org *database.Organization) bool {
+		return org.Name == "imported-models" && org.IsRoot && org.UserID == 1
+	}), mock.MatchedBy(func(ns *database.Namespace) bool {
+		return ns.Path == "imported-models" && ns.NamespaceType == database.OrgNamespace
+	}), []int64(nil)).Return(nil)
+	// namespace owner tuple: check denied then write.
+	authorizer.EXPECT().Check(ctx, mock.MatchedBy(func(req rebac.CheckRequest) bool {
+		return req.Relation == rebac.RelationOrganization
+	})).Return(rebac.Decision{Allowed: false}, nil)
+	authorizer.EXPECT().Write(ctx, mock.Anything).Return(nil)
+	// admin membership tuple: check denied then write.
+	authorizer.EXPECT().Check(ctx, mock.MatchedBy(func(req rebac.CheckRequest) bool {
+		return req.Relation == rebac.RelationAdmin
+	})).Return(rebac.Decision{Allowed: false}, nil)
+	authorizer.EXPECT().Write(ctx, mock.Anything).Return(nil)
+
+	// After auto-creation, the namespace exists and the repo is created under it.
+	mc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "admin", "imported-models", rebac.NamespaceCanWrite).Return(true, nil)
+	mc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "imported-models", "phi").Return(nil, sql.ErrNoRows)
+	mc.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "imported-models").Return(database.Namespace{
+		Path: "imported-models", NamespaceType: database.OrgNamespace, User: database.User{UUID: "admin-uuid"},
+	}, nil)
+	// prepareMirrorRepository re-loads the operator user (needs non-empty email).
+	mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "admin").Return(database.User{
+		ID: 1, Username: "admin", Email: "admin@example.com", UUID: "admin-uuid", RoleMask: "admin",
+	}, nil)
+	// createMirrorRepoRecords (createRepository=true) reconciles the repository->namespace
+	// ReBAC tuple, which for an org namespace looks up the organization by path.
+	mc.mocks.stores.OrgMock().EXPECT().FindByPath(ctx, "imported-models").Return(database.Organization{
+		Name: "imported-models", UUID: uuid.MustParse("00000000-0000-0000-0000-000000000001"), UserID: 1,
+	}, nil)
+
+	got, err := mc.CreateMirrorRepo(ctx, types.CreateMirrorRepoReq{
+		SourceNamespace:             "microsoft",
+		SourceName:                  "phi",
+		RepoType:                    types.ModelRepo,
+		CurrentUser:                 "admin",
+		SourceGitCloneUrl:           "https://huggingface.co/microsoft/phi",
+		ForkNamespace:               "imported-models",
+		ForkName:                    "phi",
+		AllowAutoCreateOrganization: true,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, got)
+	require.Len(t, fakeStore.inputs, 1)
+	require.Equal(t, "imported-models/phi", fakeStore.inputs[0].Repository.Path)
+}
+
+// TestCreateMirrorRepoFailsWhenOrgAutoCreateFails verifies a failure to auto-create the target organization
+// aborts CreateMirrorRepo before repository creation, surfacing the wrapped error.
+func TestCreateMirrorRepoFailsWhenOrgAutoCreateFails(t *testing.T) {
+	ctx := context.TODO()
+	mc := initializeTestMirrorComponent(ctx, t)
+	fakeStore := &fakeMirrorRepoStore{}
+	mc.mirrorRepoStore = fakeStore
+
+	// ensureMirrorOrgNamespace: namespace does not exist, and the owner user lookup fails.
+	mc.mocks.stores.NamespaceMock().EXPECT().Exists(ctx, "imported-models").Return(false, nil)
+	mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "admin").Return(database.User{}, sql.ErrNoRows)
+
+	got, err := mc.CreateMirrorRepo(ctx, types.CreateMirrorRepoReq{
+		SourceNamespace:             "microsoft",
+		SourceName:                  "phi",
+		RepoType:                    types.ModelRepo,
+		CurrentUser:                 "admin",
+		SourceGitCloneUrl:           "https://huggingface.co/microsoft/phi",
+		ForkNamespace:               "imported-models",
+		ForkName:                    "phi",
+		AllowAutoCreateOrganization: true,
+	})
+	require.Error(t, err)
+	require.ErrorContains(t, err, "failed to ensure mirror target organization")
+	require.Nil(t, got)
+	require.Empty(t, fakeStore.inputs)
 }

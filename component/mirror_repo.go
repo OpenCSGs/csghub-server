@@ -134,7 +134,10 @@ func (m *mirrorComponentImpl) CreateMirrorRepo(ctx context.Context, req types.Cr
 	req.Username = username
 	req.AccessToken = accessToken
 
-	namespace, name := m.resolveMirrorRepoTarget(req)
+	namespace, name, err := m.resolveMirrorRepoTarget(req)
+	if err != nil {
+		return nil, err
+	}
 	if namespace == "" || name == "" {
 		err := fmt.Errorf("fork namespace and fork name are required")
 		return nil, errorx.BadRequest(err,
@@ -142,6 +145,15 @@ func (m *mirrorComponentImpl) CreateMirrorRepo(ctx context.Context, req types.Cr
 				Set("fork namespace", namespace).
 				Set("fork name", name),
 		)
+	}
+
+	// Only the admin-protected handler can request organization preparation.
+	// Existing organization namespaces are reconciled so retries repair any
+	// ReBAC write that failed after the database transaction committed.
+	if req.AllowAutoCreateOrganization {
+		if err := m.ensureMirrorOrgNamespace(ctx, namespace, req.CurrentUser); err != nil {
+			return nil, fmt.Errorf("failed to ensure mirror target organization: %w", err)
+		}
 	}
 
 	repo, err := m.repoStore.FindByPath(ctx, req.RepoType, namespace, name)
@@ -553,16 +565,20 @@ func normalizeMirrorSource(sourceURL, username, accessToken string) (string, str
 }
 
 // resolveMirrorRepoTarget chooses and trims the local mirror target path from fork fields or namespace mapping.
-func (m *mirrorComponentImpl) resolveMirrorRepoTarget(req types.CreateMirrorRepoReq) (string, string) {
+func (m *mirrorComponentImpl) resolveMirrorRepoTarget(req types.CreateMirrorRepoReq) (string, string, error) {
 	namespace := req.ForkNamespace
 	if namespace == "" {
-		namespace = m.mapNamespaceAndName(req.SourceNamespace)
+		var err error
+		namespace, err = m.mapNamespaceAndName(req.SourceNamespace, "Aiwizards")
+		if err != nil {
+			return "", "", err
+		}
 	}
 	name := req.ForkName
 	if name == "" {
 		name = req.SourceName
 	}
-	return strings.TrimSpace(namespace), strings.TrimSpace(name)
+	return strings.TrimSpace(namespace), strings.TrimSpace(name), nil
 }
 
 // createMirrorRepoRecords creates mirror rows transactionally, and optionally the target repo rows too.

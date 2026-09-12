@@ -266,6 +266,10 @@ type CreateMirrorRepoReq struct {
 	Description string `json:"description"`
 	License     string `json:"license"`
 	CurrentUser string `json:"current_user"`
+	// AllowAutoCreateOrganization is set only by the admin-protected mirror
+	// handler. It is intentionally excluded from JSON so external and shared
+	// component callers cannot grant themselves organization ownership.
+	AllowAutoCreateOrganization bool `json:"-"`
 
 	// MCPServerAttributes supplies metadata for internal crawler calls and is not accepted from JSON requests.
 	MCPServerAttributes MCPServerAttributes `json:"-"`
