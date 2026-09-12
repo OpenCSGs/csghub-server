@@ -258,7 +258,12 @@ func isValidAccessToken(c *gin.Context, userSvcClient rpc.UserSvcClient, token s
 		case types.AccessTokenAppCSGHub:
 			httpbase.SetCurrentUser(c, user.Username)
 			httpbase.SetCurrentUserUUID(c, user.UserUUID)
-			httpbase.SetCurrentNamespaceUUID(c, user.NSUUID)
+			nsUUID := user.NSUUID
+			if nsUUID == "" {
+				// user-scoped csghub token: personal namespace UUID equals the user UUID
+				nsUUID = user.UserUUID
+			}
+			httpbase.SetCurrentNamespaceUUID(c, nsUUID)
 			httpbase.SetAccessToken(c, token)
 			httpbase.SetAuthType(c, httpbase.AuthTypeAccessToken)
 			httpbase.SetCurrentTokenName(c, user.TokenName)
