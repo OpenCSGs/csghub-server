@@ -23,18 +23,23 @@ func TestAgentKnowledgeBaseStore_CRUD(t *testing.T) {
 	// Test Create
 	userUUID := uuid.New().String()
 	kb := &database.AgentKnowledgeBase{
-		UserUUID:    userUUID,
-		Name:        "Test Knowledge Base",
-		Description: "Test knowledge base description",
-		ContentID:   uuid.New().String(),
-		Public:      false,
-		Metadata:    map[string]any{"key": "value"},
+		UserUUID:      userUUID,
+		NsUUID:        userUUID,
+		NamespaceType: database.UserNamespace,
+		Name:          "Test Knowledge Base",
+		Description:   "Test knowledge base description",
+		ContentID:     uuid.New().String(),
+		Public:        false,
+		Metadata:      map[string]any{"key": "value"},
 	}
 
 	createdKB, err := store.Create(ctx, kb)
 	require.NoError(t, err)
 	require.NotZero(t, createdKB.ID)
 	require.Equal(t, kb.UserUUID, createdKB.UserUUID)
+	require.Equal(t, kb.NsUUID, createdKB.NsUUID)
+	require.Equal(t, database.UserNamespace, createdKB.NamespaceType)
+	require.Equal(t, types.AgentKnowledgeBaseTypeLangflow, createdKB.Type)
 	require.Equal(t, kb.Name, createdKB.Name)
 	require.Equal(t, kb.Description, createdKB.Description)
 	require.Equal(t, kb.ContentID, createdKB.ContentID)
@@ -48,6 +53,9 @@ func TestAgentKnowledgeBaseStore_CRUD(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, kb.ID, foundKB.ID)
 	require.Equal(t, kb.UserUUID, foundKB.UserUUID)
+	require.Equal(t, kb.NsUUID, foundKB.NsUUID)
+	require.Equal(t, database.UserNamespace, foundKB.NamespaceType)
+	require.Equal(t, types.AgentKnowledgeBaseTypeLangflow, foundKB.Type)
 	require.Equal(t, kb.Name, foundKB.Name)
 	require.Equal(t, kb.Description, foundKB.Description)
 	require.Equal(t, kb.ContentID, foundKB.ContentID)
@@ -97,7 +105,7 @@ func TestAgentKnowledgeBaseStore_List_WithPublicAndPrivate(t *testing.T) {
 
 	// Create private knowledge base for user1
 	privateKB := &database.AgentKnowledgeBase{
-		UserUUID:    userUUID1,
+		NsUUID:      userUUID1,
 		Name:        "Private Knowledge Base",
 		Description: "Private knowledge base description",
 		ContentID:   uuid.New().String(),
@@ -108,7 +116,7 @@ func TestAgentKnowledgeBaseStore_List_WithPublicAndPrivate(t *testing.T) {
 
 	// Create public knowledge base for user1
 	publicKB := &database.AgentKnowledgeBase{
-		UserUUID:    userUUID1,
+		NsUUID:      userUUID1,
 		Name:        "Public Knowledge Base",
 		Description: "Public knowledge base description",
 		ContentID:   uuid.New().String(),
@@ -119,7 +127,7 @@ func TestAgentKnowledgeBaseStore_List_WithPublicAndPrivate(t *testing.T) {
 
 	// Create private knowledge base for user2
 	user2KB := &database.AgentKnowledgeBase{
-		UserUUID:    userUUID2,
+		NsUUID:      userUUID2,
 		Name:        "User2 Knowledge Base",
 		Description: "User2 knowledge base description",
 		ContentID:   uuid.New().String(),
@@ -129,13 +137,13 @@ func TestAgentKnowledgeBaseStore_List_WithPublicAndPrivate(t *testing.T) {
 	require.NoError(t, err)
 
 	// Test List for user1 - should return both private and public knowledge bases from user1
-	knowledgeBases, total, err := store.List(ctx, types.AgentKnowledgeBaseFilter{UserUUID: userUUID1}, 10, 1)
+	knowledgeBases, total, err := store.List(ctx, types.AgentKnowledgeBaseFilter{NsUUID: userUUID1}, 10, 1)
 	require.NoError(t, err)
 	require.Len(t, knowledgeBases, 2)
 	require.Equal(t, 2, total)
 
 	// Test List for user2 - should return public knowledge base from user1 and private knowledge base from user2
-	knowledgeBases, total, err = store.List(ctx, types.AgentKnowledgeBaseFilter{UserUUID: userUUID2}, 10, 1)
+	knowledgeBases, total, err = store.List(ctx, types.AgentKnowledgeBaseFilter{NsUUID: userUUID2}, 10, 1)
 	require.NoError(t, err)
 	require.Len(t, knowledgeBases, 2) // public KB from user1 + private KB from user2
 	require.Equal(t, 2, total)
@@ -157,7 +165,7 @@ func TestAgentKnowledgeBaseStore_NotFound(t *testing.T) {
 	require.Error(t, err)
 
 	// Test List with non-existent user
-	knowledgeBases, total, err := store.List(ctx, types.AgentKnowledgeBaseFilter{UserUUID: "non-existent-user"}, 10, 1)
+	knowledgeBases, total, err := store.List(ctx, types.AgentKnowledgeBaseFilter{NsUUID: "non-existent-user"}, 10, 1)
 	require.NoError(t, err)
 	require.Len(t, knowledgeBases, 0)
 	require.Equal(t, 0, total)
@@ -173,7 +181,7 @@ func TestAgentKnowledgeBaseStore_Update_NonExistent(t *testing.T) {
 	// Test Update with non-existent knowledge base
 	nonExistentKB := &database.AgentKnowledgeBase{
 		ID:          99999,
-		UserUUID:    uuid.New().String(),
+		NsUUID:      uuid.New().String(),
 		Name:        "Non-existent Knowledge Base",
 		Description: "Non-existent knowledge base description",
 		ContentID:   uuid.New().String(),
@@ -207,7 +215,7 @@ func TestAgentKnowledgeBaseStore_List_WithFilters(t *testing.T) {
 
 	// Create knowledge bases with different names
 	kb1 := &database.AgentKnowledgeBase{
-		UserUUID:    userUUID,
+		NsUUID:      userUUID,
 		Name:        "Python Knowledge Base",
 		Description: "A knowledge base for Python programming",
 		ContentID:   uuid.New().String(),
@@ -217,17 +225,18 @@ func TestAgentKnowledgeBaseStore_List_WithFilters(t *testing.T) {
 	require.NoError(t, err)
 
 	kb2 := &database.AgentKnowledgeBase{
-		UserUUID:    userUUID,
+		NsUUID:      userUUID,
 		Name:        "Go Knowledge Base",
 		Description: "A knowledge base for Go programming",
 		ContentID:   uuid.New().String(),
 		Public:      true,
+		Type:        types.AgentKnowledgeBaseTypeLLMWiki,
 	}
 	_, err = store.Create(ctx, kb2)
 	require.NoError(t, err)
 
 	kb3 := &database.AgentKnowledgeBase{
-		UserUUID:    userUUID,
+		NsUUID:      userUUID,
 		Name:        "Another Python KB",
 		Description: "Another Python knowledge base",
 		ContentID:   uuid.New().String(),
@@ -236,11 +245,29 @@ func TestAgentKnowledgeBaseStore_List_WithFilters(t *testing.T) {
 	_, err = store.Create(ctx, kb3)
 	require.NoError(t, err)
 
+	// ReBAC object IDs replace the legacy namespace/public visibility predicate.
+	knowledgeBases, total, err := store.List(ctx, types.AgentKnowledgeBaseFilter{
+		NsUUID:        uuid.New().String(),
+		AuthorizedIDs: []int64{kb2.ID},
+	}, 10, 1)
+	require.NoError(t, err)
+	require.Equal(t, 1, total)
+	require.Len(t, knowledgeBases, 1)
+	require.Equal(t, kb2.ID, knowledgeBases[0].ID)
+
+	knowledgeBases, total, err = store.List(ctx, types.AgentKnowledgeBaseFilter{
+		NsUUID:        userUUID,
+		AuthorizedIDs: []int64{},
+	}, 10, 1)
+	require.NoError(t, err)
+	require.Zero(t, total)
+	require.Empty(t, knowledgeBases)
+
 	// Test search filter
 	publicTrue := true
-	knowledgeBases, total, err := store.List(ctx, types.AgentKnowledgeBaseFilter{
-		UserUUID: userUUID,
-		Search:   "Python",
+	knowledgeBases, total, err = store.List(ctx, types.AgentKnowledgeBaseFilter{
+		NsUUID: userUUID,
+		Search: "Python",
 	}, 10, 1)
 	require.NoError(t, err)
 	require.Len(t, knowledgeBases, 2) // Should find both Python knowledge bases
@@ -248,17 +275,27 @@ func TestAgentKnowledgeBaseStore_List_WithFilters(t *testing.T) {
 
 	// Test public filter
 	knowledgeBases, total, err = store.List(ctx, types.AgentKnowledgeBaseFilter{
-		UserUUID: userUUID,
-		Public:   &publicTrue,
+		NsUUID: userUUID,
+		Public: &publicTrue,
 	}, 10, 1)
 	require.NoError(t, err)
 	require.Len(t, knowledgeBases, 1) // Should find only the public knowledge base
 	require.Equal(t, 1, total)
 
+	// Test type filter
+	knowledgeBases, total, err = store.List(ctx, types.AgentKnowledgeBaseFilter{
+		NsUUID: userUUID,
+		Type:   types.AgentKnowledgeBaseTypeLLMWiki,
+	}, 10, 1)
+	require.NoError(t, err)
+	require.Len(t, knowledgeBases, 1)
+	require.Equal(t, types.AgentKnowledgeBaseTypeLLMWiki, knowledgeBases[0].Type)
+	require.Equal(t, 1, total)
+
 	// Test editable filter (true = owned by user)
 	editableTrue := true
 	knowledgeBases, total, err = store.List(ctx, types.AgentKnowledgeBaseFilter{
-		UserUUID: userUUID,
+		NsUUID:   userUUID,
 		Editable: &editableTrue,
 	}, 10, 1)
 	require.NoError(t, err)
@@ -268,7 +305,7 @@ func TestAgentKnowledgeBaseStore_List_WithFilters(t *testing.T) {
 	// Test editable filter (false = not owned by user)
 	editableFalse := false
 	knowledgeBases, total, err = store.List(ctx, types.AgentKnowledgeBaseFilter{
-		UserUUID: userUUID,
+		NsUUID:   userUUID,
 		Editable: &editableFalse,
 	}, 10, 1)
 	require.NoError(t, err)
@@ -277,9 +314,9 @@ func TestAgentKnowledgeBaseStore_List_WithFilters(t *testing.T) {
 
 	// Test combined filters
 	knowledgeBases, total, err = store.List(ctx, types.AgentKnowledgeBaseFilter{
-		UserUUID: userUUID,
-		Search:   "Go",
-		Public:   &publicTrue,
+		NsUUID: userUUID,
+		Search: "Go",
+		Public: &publicTrue,
 	}, 10, 1)
 	require.NoError(t, err)
 	require.Len(t, knowledgeBases, 1) // Should find only "Go Knowledge Base" (public and name contains "Go")
@@ -287,7 +324,7 @@ func TestAgentKnowledgeBaseStore_List_WithFilters(t *testing.T) {
 
 	// Test pagination
 	knowledgeBases, total, err = store.List(ctx, types.AgentKnowledgeBaseFilter{
-		UserUUID: userUUID,
+		NsUUID: userUUID,
 	}, 2, 1)
 	require.NoError(t, err)
 	require.Len(t, knowledgeBases, 2) // Should return only 2 knowledge bases due to limit
@@ -295,7 +332,7 @@ func TestAgentKnowledgeBaseStore_List_WithFilters(t *testing.T) {
 
 	// Test second page
 	knowledgeBases, total, err = store.List(ctx, types.AgentKnowledgeBaseFilter{
-		UserUUID: userUUID,
+		NsUUID: userUUID,
 	}, 2, 2)
 	require.NoError(t, err)
 	require.Len(t, knowledgeBases, 1) // Should return 1 knowledge base on second page
@@ -311,7 +348,7 @@ func TestAgentKnowledgeBaseStore_Create_WithEmptyDescription(t *testing.T) {
 
 	userUUID := uuid.New().String()
 	kb := &database.AgentKnowledgeBase{
-		UserUUID:  userUUID,
+		NsUUID:    userUUID,
 		Name:      "Knowledge Base Without Description",
 		ContentID: uuid.New().String(),
 		Public:    false,
@@ -332,7 +369,7 @@ func TestAgentKnowledgeBaseStore_Create_WithEmptyMetadata(t *testing.T) {
 
 	userUUID := uuid.New().String()
 	kb := &database.AgentKnowledgeBase{
-		UserUUID:    userUUID,
+		NsUUID:      userUUID,
 		Name:        "Knowledge Base Without Metadata",
 		Description: "Test description",
 		ContentID:   uuid.New().String(),
@@ -357,7 +394,7 @@ func TestAgentKnowledgeBaseStore_UniqueContentID(t *testing.T) {
 
 	// Create first knowledge base
 	kb1 := &database.AgentKnowledgeBase{
-		UserUUID:    userUUID,
+		NsUUID:      userUUID,
 		Name:        "First Knowledge Base",
 		Description: "First description",
 		ContentID:   contentID,
@@ -368,7 +405,7 @@ func TestAgentKnowledgeBaseStore_UniqueContentID(t *testing.T) {
 
 	// Try to create second knowledge base with same content ID
 	kb2 := &database.AgentKnowledgeBase{
-		UserUUID:    uuid.New().String(),
+		NsUUID:      uuid.New().String(),
 		Name:        "Second Knowledge Base",
 		Description: "Second description",
 		ContentID:   contentID, // Same content ID
@@ -389,8 +426,7 @@ func TestAgentKnowledgeBaseStore_List_OrderByUpdatedAt(t *testing.T) {
 
 	// Create knowledge bases
 	kb1 := &database.AgentKnowledgeBase{
-		ID:          1,
-		UserUUID:    userUUID,
+		NsUUID:      userUUID,
 		Name:        "First Knowledge Base",
 		Description: "First description",
 		ContentID:   uuid.New().String(),
@@ -400,8 +436,7 @@ func TestAgentKnowledgeBaseStore_List_OrderByUpdatedAt(t *testing.T) {
 	require.NoError(t, err)
 
 	kb2 := &database.AgentKnowledgeBase{
-		ID:          2,
-		UserUUID:    userUUID,
+		NsUUID:      userUUID,
 		Name:        "Second Knowledge Base",
 		Description: "Second description",
 		ContentID:   uuid.New().String(),
@@ -412,13 +447,12 @@ func TestAgentKnowledgeBaseStore_List_OrderByUpdatedAt(t *testing.T) {
 
 	// Update first knowledge base to change updated_at
 	createdKB1.Name = "Updated First Knowledge Base"
-	time.Sleep(time.Second)
 	err = store.Update(ctx, createdKB1)
 	require.NoError(t, err)
 
 	// List should return in order of updated_at DESC (most recently updated first)
 	knowledgeBases, total, err := store.List(ctx, types.AgentKnowledgeBaseFilter{
-		UserUUID: userUUID,
+		NsUUID: userUUID,
 	}, 10, 1)
 	require.NoError(t, err)
 	require.Len(t, knowledgeBases, 2)
@@ -448,7 +482,7 @@ func TestAgentKnowledgeBaseStore_ExistsByContentID(t *testing.T) {
 
 	// Test case 2: Create a knowledge base and verify it exists
 	kb := &database.AgentKnowledgeBase{
-		UserUUID:    userUUID,
+		NsUUID:      userUUID,
 		Name:        "Test Knowledge Base",
 		Description: "Test description",
 		ContentID:   contentID,
@@ -499,21 +533,21 @@ func TestAgentKnowledgeBaseStore_ExistsByContentID_MultipleKnowledgeBases(t *tes
 	// Create multiple knowledge bases with different content IDs
 	knowledgeBases := []*database.AgentKnowledgeBase{
 		{
-			UserUUID:    userUUID,
+			NsUUID:      userUUID,
 			Name:        "Knowledge Base 1",
 			Description: "Description 1",
 			ContentID:   uuid.New().String(),
 			Public:      false,
 		},
 		{
-			UserUUID:    userUUID,
+			NsUUID:      userUUID,
 			Name:        "Knowledge Base 2",
 			Description: "Description 2",
 			ContentID:   uuid.New().String(),
 			Public:      true,
 		},
 		{
-			UserUUID:    uuid.New().String(),
+			NsUUID:      uuid.New().String(),
 			Name:        "Knowledge Base 3",
 			Description: "Description 3",
 			ContentID:   uuid.New().String(),
@@ -552,7 +586,7 @@ func TestAgentKnowledgeBaseStore_List_WithPinned(t *testing.T) {
 
 	// Create knowledge bases
 	kb1 := &database.AgentKnowledgeBase{
-		UserUUID:    userUUID,
+		NsUUID:      userUUID,
 		Name:        "First Knowledge Base",
 		Description: "First description",
 		ContentID:   uuid.New().String(),
@@ -562,7 +596,7 @@ func TestAgentKnowledgeBaseStore_List_WithPinned(t *testing.T) {
 	require.NoError(t, err)
 
 	kb2 := &database.AgentKnowledgeBase{
-		UserUUID:    userUUID,
+		NsUUID:      userUUID,
 		Name:        "Second Knowledge Base",
 		Description: "Second description",
 		ContentID:   uuid.New().String(),
@@ -583,7 +617,7 @@ func TestAgentKnowledgeBaseStore_List_WithPinned(t *testing.T) {
 
 	// List knowledge bases - pinned should appear first
 	knowledgeBases, total, err := store.List(ctx, types.AgentKnowledgeBaseFilter{
-		UserUUID: userUUID,
+		NsUUID: userUUID,
 	}, 10, 1)
 	require.NoError(t, err)
 	require.Equal(t, 2, total)
@@ -622,6 +656,65 @@ func TestAgentKnowledgeBaseStore_List_WithPinned(t *testing.T) {
 	require.True(t, foundKB2, "KB2 should be in the list")
 }
 
+func TestAgentKnowledgeBaseStore_List_OrderByPinnedTypeAndUpdatedAt(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewAgentKnowledgeBaseStoreWithDB(db)
+	preferenceStore := database.NewAgentUserPreferenceStoreWithDB(db)
+	userUUID := uuid.New().String()
+	baseTime := time.Now().UTC().Add(-time.Hour)
+
+	createKnowledgeBase := func(name string, kbType types.AgentKnowledgeBaseType, updatedAt time.Time) *database.AgentKnowledgeBase {
+		t.Helper()
+		kb, err := store.Create(ctx, &database.AgentKnowledgeBase{
+			NsUUID:    userUUID,
+			Type:      kbType,
+			Name:      name,
+			ContentID: uuid.New().String(),
+		})
+		require.NoError(t, err)
+		_, err = db.BunDB.ExecContext(ctx, "UPDATE agent_knowledge_bases SET updated_at = ? WHERE id = ?", updatedAt, kb.ID)
+		require.NoError(t, err)
+		return kb
+	}
+	pinKnowledgeBase := func(kb *database.AgentKnowledgeBase) {
+		t.Helper()
+		err := preferenceStore.Create(ctx, &database.AgentUserPreference{
+			UserUUID:   userUUID,
+			EntityType: types.AgentUserPreferenceEntityTypeAgentKnowledgeBase,
+			EntityID:   fmt.Sprintf("%d", kb.ID),
+			Action:     types.AgentUserPreferenceActionPin,
+		})
+		require.NoError(t, err)
+	}
+
+	pinnedLLMWiki := createKnowledgeBase("Pinned LLM-Wiki", types.AgentKnowledgeBaseTypeLLMWiki, baseTime)
+	pinnedLangflow := createKnowledgeBase("Pinned Langflow", types.AgentKnowledgeBaseTypeLangflow, baseTime.Add(50*time.Minute))
+	newerLLMWiki := createKnowledgeBase("Newer LLM-Wiki", types.AgentKnowledgeBaseTypeLLMWiki, baseTime.Add(40*time.Minute))
+	olderLLMWiki := createKnowledgeBase("Older LLM-Wiki", types.AgentKnowledgeBaseTypeLLMWiki, baseTime.Add(10*time.Minute))
+	langflow := createKnowledgeBase("Langflow", types.AgentKnowledgeBaseTypeLangflow, baseTime.Add(30*time.Minute))
+	unknown := createKnowledgeBase("Unknown", types.AgentKnowledgeBaseType("future"), baseTime.Add(55*time.Minute))
+
+	// Pin LLM-Wiki first so pin time cannot accidentally produce the expected type order.
+	pinKnowledgeBase(pinnedLLMWiki)
+	pinKnowledgeBase(pinnedLangflow)
+
+	expectedPages := [][]int64{
+		{pinnedLLMWiki.ID, pinnedLangflow.ID},
+		{newerLLMWiki.ID, olderLLMWiki.ID},
+		{langflow.ID, unknown.ID},
+	}
+	for page, expectedIDs := range expectedPages {
+		knowledgeBases, total, err := store.List(ctx, types.AgentKnowledgeBaseFilter{NsUUID: userUUID}, 2, page+1)
+		require.NoError(t, err)
+		require.Equal(t, 6, total)
+		require.Len(t, knowledgeBases, 2)
+		require.Equal(t, expectedIDs, []int64{knowledgeBases[0].ID, knowledgeBases[1].ID})
+	}
+}
+
 func TestAgentKnowledgeBaseStore_Exists(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
@@ -639,7 +732,7 @@ func TestAgentKnowledgeBaseStore_Exists(t *testing.T) {
 
 	// Test case 2: Create a knowledge base and verify it exists
 	kb := &database.AgentKnowledgeBase{
-		UserUUID:    userUUID1,
+		NsUUID:      userUUID1,
 		Name:        "Test Knowledge Base",
 		Description: "Test description",
 		ContentID:   uuid.New().String(),

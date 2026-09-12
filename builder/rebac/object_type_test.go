@@ -13,6 +13,7 @@ func TestCommonObjectTypesAreStableAndUnique(t *testing.T) {
 		ObjectTypeOrganization,
 		ObjectTypeNamespace,
 		ObjectTypeRepository,
+		ObjectTypeKnowledgeBase,
 	}
 	seen := make(map[ObjectType]struct{}, len(types))
 	for _, objectType := range types {

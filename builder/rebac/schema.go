@@ -119,6 +119,11 @@ func CommonSchemaDefinitions() []ObjectTypeDefinition {
 			},
 			Permissions: []Permission{RepositoryCanRead, RepositoryCanWrite, RepositoryCanAdmin},
 		},
+		{
+			Type:            ObjectTypeKnowledgeBase,
+			DirectRelations: []Relation{RelationNamespace, RelationPublic},
+			Permissions:     []Permission{KnowledgeBaseCanRead, KnowledgeBaseCanWrite, KnowledgeBaseCanAdmin},
+		},
 	}
 }
 

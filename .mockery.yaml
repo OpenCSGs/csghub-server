@@ -84,6 +84,7 @@ packages:
       AgentHubSvcClient:
       XnetSvcClient:
       CsgbotSvcClient:
+      LLMWikiSvcClient:
   opencsg.com/csghub-server/builder/llm:
     config:
     interfaces:

@@ -15,6 +15,7 @@ func TestAuthorizationModelDSLVersions(t *testing.T) {
 	}{
 		{name: "version 1.0", dsl: AuthorizationModelVer1_0},
 		{name: "version 1.1", dsl: AuthorizationModelVer1_1},
+		{name: "version 1.2", dsl: AuthorizationModelVer1_2},
 	}
 
 	for _, tt := range tests {
@@ -28,4 +29,7 @@ func TestAuthorizationModelDSLVersions(t *testing.T) {
 
 	require.NotContains(t, AuthorizationModelVer1_0, "define member_from_child")
 	require.True(t, strings.Contains(AuthorizationModelVer1_1, "define member_from_child"))
+	require.True(t, strings.Contains(AuthorizationModelVer1_2, "define member_from_child"))
+	require.NotContains(t, AuthorizationModelVer1_1, "type knowledge_base")
+	require.Contains(t, AuthorizationModelVer1_2, "type knowledge_base")
 }

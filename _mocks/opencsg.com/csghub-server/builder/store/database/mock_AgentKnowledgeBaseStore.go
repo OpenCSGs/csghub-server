@@ -130,9 +130,9 @@ func (_c *MockAgentKnowledgeBaseStore_Delete_Call) RunAndReturn(run func(context
 	return _c
 }
 
-// Exists provides a mock function with given fields: ctx, userUUID, name
-func (_m *MockAgentKnowledgeBaseStore) Exists(ctx context.Context, userUUID string, name string) (bool, error) {
-	ret := _m.Called(ctx, userUUID, name)
+// Exists provides a mock function with given fields: ctx, nsUUID, name
+func (_m *MockAgentKnowledgeBaseStore) Exists(ctx context.Context, nsUUID string, name string) (bool, error) {
+	ret := _m.Called(ctx, nsUUID, name)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Exists")
@@ -141,16 +141,16 @@ func (_m *MockAgentKnowledgeBaseStore) Exists(ctx context.Context, userUUID stri
 	var r0 bool
 	var r1 error
 	if rf, ok := ret.Get(0).(func(context.Context, string, string) (bool, error)); ok {
-		return rf(ctx, userUUID, name)
+		return rf(ctx, nsUUID, name)
 	}
 	if rf, ok := ret.Get(0).(func(context.Context, string, string) bool); ok {
-		r0 = rf(ctx, userUUID, name)
+		r0 = rf(ctx, nsUUID, name)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
 
 	if rf, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
-		r1 = rf(ctx, userUUID, name)
+		r1 = rf(ctx, nsUUID, name)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -165,13 +165,13 @@ type MockAgentKnowledgeBaseStore_Exists_Call struct {
 
 // Exists is a helper method to define mock.On call
 //   - ctx context.Context
-//   - userUUID string
+//   - nsUUID string
 //   - name string
-func (_e *MockAgentKnowledgeBaseStore_Expecter) Exists(ctx interface{}, userUUID interface{}, name interface{}) *MockAgentKnowledgeBaseStore_Exists_Call {
-	return &MockAgentKnowledgeBaseStore_Exists_Call{Call: _e.mock.On("Exists", ctx, userUUID, name)}
+func (_e *MockAgentKnowledgeBaseStore_Expecter) Exists(ctx interface{}, nsUUID interface{}, name interface{}) *MockAgentKnowledgeBaseStore_Exists_Call {
+	return &MockAgentKnowledgeBaseStore_Exists_Call{Call: _e.mock.On("Exists", ctx, nsUUID, name)}
 }
 
-func (_c *MockAgentKnowledgeBaseStore_Exists_Call) Run(run func(ctx context.Context, userUUID string, name string)) *MockAgentKnowledgeBaseStore_Exists_Call {
+func (_c *MockAgentKnowledgeBaseStore_Exists_Call) Run(run func(ctx context.Context, nsUUID string, name string)) *MockAgentKnowledgeBaseStore_Exists_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run(args[0].(context.Context), args[1].(string), args[2].(string))
 	})

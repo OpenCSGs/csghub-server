@@ -14,6 +14,8 @@ const (
 	ObjectTypeNamespace ObjectType = "namespace"
 	// ObjectTypeRepository identifies the repository object shared by derived repository resources.
 	ObjectTypeRepository ObjectType = "repository"
+	// ObjectTypeKnowledgeBase identifies an agent knowledge base.
+	ObjectTypeKnowledgeBase ObjectType = "knowledge_base"
 )
 
 const (

@@ -2,6 +2,7 @@ package types
 
 import (
 	"encoding/json"
+	"regexp"
 	"time"
 )
 
@@ -13,6 +14,16 @@ const (
 	CSGBotHeaderAgentName = "X-CSG-Agent-Name"
 	CSGBotHeaderSessionID = "X-CSG-Session-Id"
 )
+
+// LLM-Wiki trust headers injected by CSGHub when proxying to llmservice.
+const HeaderCSGHubActorID = "X-CSGHub-Actor-ID"
+const HeaderCSGHubActorName = "X-CSGHub-Actor-Name"
+const HeaderCSGHubDecisionID = "X-CSGHub-Decision-ID"
+const HeaderCSGHubPolicyVersion = "X-CSGHub-Policy-Version"
+
+// AgentKnowledgeBaseIDPattern matches agent knowledge base content IDs used in
+// LLM-Wiki management proxy and MCP proxy paths.
+var AgentKnowledgeBaseIDPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$`)
 
 // AgentichubSkillsTagName is the tag name for platform/built-in agent skills.
 const AgentichubSkillsTagName = "agentichub-skills"
@@ -664,32 +675,83 @@ func (p AgentMCPServerIDPrefix) String() string {
 }
 
 // AgentKnowledgeBase represents a knowledge base configuration for an agent (API layer)
+type AgentKnowledgeBaseType string
+
+const (
+	AgentKnowledgeBaseTypeLangflow              AgentKnowledgeBaseType = "langflow"
+	AgentKnowledgeBaseTypeLLMWiki               AgentKnowledgeBaseType = "llmwiki"
+	AgentKnowledgeBaseMetadataResourceStateKey                         = "resource_state"
+	AgentKnowledgeBaseMetadataBaseURLKey                               = "base_url"
+	AgentKnowledgeBaseMetadataMCPEndpointURLKey                        = "mcp_endpoint_url"
+)
+
+type AgentKnowledgeBaseActor struct {
+	Username      string
+	UserUUID      string
+	NamespaceUUID string
+}
+
+type AgentKnowledgeBaseAccessMode string
+
+const (
+	AgentKnowledgeBaseAccessModeRead  AgentKnowledgeBaseAccessMode = "read"
+	AgentKnowledgeBaseAccessModeWrite AgentKnowledgeBaseAccessMode = "write"
+	AgentKnowledgeBaseAccessModeAdmin AgentKnowledgeBaseAccessMode = "admin"
+)
+
+type LLMWikiManagementAccessRequest struct {
+	KBID  string
+	Actor AgentKnowledgeBaseActor
+	Mode  AgentKnowledgeBaseAccessMode
+}
+
 type AgentKnowledgeBase struct {
-	ID          int64          `json:"id"`
-	Name        string         `json:"name" binding:"required,max=50"`
-	Description string         `json:"description,omitempty" binding:"omitempty,max=500"`
-	ContentID   string         `json:"content_id"` // Used to specify the unique id of the knowledge base resource
-	Public      bool           `json:"public"`     // Whether the knowledge base is public
-	Metadata    map[string]any `json:"metadata,omitempty"`
-	CreatedAt   time.Time      `json:"created_at"`
-	UpdatedAt   time.Time      `json:"updated_at"`
-	UserUUID    string         `json:"-"`
+	ID          int64                  `json:"id"`
+	Name        string                 `json:"name" binding:"required,max=50"`
+	Description string                 `json:"description,omitempty" binding:"omitempty,max=500"`
+	ContentID   string                 `json:"content_id"` // Used to specify the unique id of the knowledge base resource
+	Public      bool                   `json:"public"`     // Whether the knowledge base is public
+	Type        AgentKnowledgeBaseType `json:"type"`
+	Metadata    map[string]any         `json:"metadata,omitempty"`
+	CreatedAt   time.Time              `json:"created_at"`
+	UpdatedAt   time.Time              `json:"updated_at"`
+	UserUUID    string                 `json:"-"`
 }
 
 // CreateAgentKnowledgeBaseReq represents a request to create an agent knowledge base
 type CreateAgentKnowledgeBaseReq struct {
-	Name        string `json:"name" binding:"required,max=50"`
-	Description string `json:"description,omitempty" binding:"omitempty,max=500"`
-	Public      *bool  `json:"public,omitempty"`
-	UserUUID    string `json:"-"`
+	Name          string                 `json:"name" binding:"required,max=50"`
+	Description   string                 `json:"description,omitempty" binding:"omitempty,max=500"`
+	ContentID     string                 `json:"content_id,omitempty"`
+	Type          AgentKnowledgeBaseType `json:"type,omitempty"`
+	Namespace     string                 `json:"namespace,omitempty"`
+	Public        *bool                  `json:"public,omitempty"`
+	Metadata      map[string]any         `json:"metadata,omitempty"`
+	UserUUID      string                 `json:"-"`
+	NamespaceUUID string                 `json:"-"`
 }
+
+type AgentKnowledgeBaseCreationResult struct {
+	ContentID   string
+	Name        string
+	Description string
+	Metadata    map[string]any
+}
+
+type AgentKnowledgeBaseBackendTarget struct {
+	ContentID string
+}
+
+type AgentKnowledgeBaseResourceState map[string]json.RawMessage
 
 // AgentKnowledgeBaseFilter represents the filter for listing agent knowledge bases
 type AgentKnowledgeBaseFilter struct {
-	Search   string `json:"search,omitempty"`   // Search term for name field
-	UserUUID string `json:"user_uuido"`         // Filter by user UUID
-	Public   *bool  `json:"public,omitempty"`   // Filter by public status
-	Editable *bool  `json:"editable,omitempty"` // Filter by editable status (true = owned by user, false = not owned by user)
+	Search        string                 `json:"search,omitempty"`   // Search term for name field
+	Type          AgentKnowledgeBaseType `json:"type,omitempty"`     // Filter by knowledge base type
+	NsUUID        string                 `json:"-"`                  // Filter by namespace UUID
+	AuthorizedIDs []int64                `json:"-"`                  // ReBAC-authorized knowledge base IDs
+	Public        *bool                  `json:"public,omitempty"`   // Filter by public status
+	Editable      *bool                  `json:"editable,omitempty"` // Filter by editable status (true = owned by user, false = not owned by user)
 }
 
 // UpdateAgentKnowledgeBaseRequest represents a request to update an agent knowledge base
@@ -702,15 +764,29 @@ type UpdateAgentKnowledgeBaseRequest struct {
 
 // AgentKnowledgeBaseListItem represents a knowledge base in list responses
 type AgentKnowledgeBaseListItem struct {
-	ID          int64     `json:"id"`
-	Name        string    `json:"name"`
-	Description string    `json:"description"`
-	ContentID   string    `json:"content_id"`
-	Public      bool      `json:"public"`
-	Editable    bool      `json:"editable"`
-	IsPinned    bool      `json:"is_pinned"` // Whether the knowledge base is pinned by the user
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID          int64                  `json:"id"`
+	Name        string                 `json:"name"`
+	Description string                 `json:"description"`
+	ContentID   string                 `json:"content_id"`
+	Public      bool                   `json:"public"`
+	Type        AgentKnowledgeBaseType `json:"type"`
+	Editable    bool                   `json:"editable"`
+	// CanWrite reports whether the caller may write KB content through the
+	// management proxy (ReBAC can_write).
+	CanWrite bool `json:"can_write"`
+	// CanManage reports whether the caller may update or delete the KB record
+	// (ReBAC can_admin, same value as editable).
+	CanManage bool `json:"can_manage"`
+	IsPinned  bool `json:"is_pinned"` // Whether the knowledge base is pinned by the user
+	// Owner is the namespace path (username or organization path) that owns the KB.
+	Owner string `json:"owner"`
+	// NamespaceUUID is the personal or organization namespace that owns the KB.
+	NamespaceUUID string `json:"namespace_uuid"`
+	// NamespaceType is the trusted namespace type: "user" or "organization".
+	NamespaceType string         `json:"namespace_type"`
+	Metadata      map[string]any `json:"metadata,omitempty"`
+	CreatedAt     time.Time      `json:"created_at"`
+	UpdatedAt     time.Time      `json:"updated_at"`
 }
 
 // AgentPromptListItem represents a prompt in list responses
@@ -737,19 +813,30 @@ type AgentPromptOptimizeResponse struct {
 
 // AgentKnowledgeBaseDetail represents a complete knowledge base with all configuration details
 type AgentKnowledgeBaseDetail struct {
-	ID          int64          `json:"id"`
-	Name        string         `json:"name"`
-	Description string         `json:"description"`
-	UserUUID    string         `json:"user_uuid"`
-	Owner       string         `json:"owner"`
-	Avatar      string         `json:"avatar"`
-	ContentID   string         `json:"content_id"`
-	Public      bool           `json:"public"`
-	Editable    bool           `json:"editable"`
-	IsPinned    bool           `json:"is_pinned"` // Whether the knowledge base is pinned by the user
-	Metadata    map[string]any `json:"metadata,omitempty"`
-	CreatedAt   time.Time      `json:"created_at"`
-	UpdatedAt   time.Time      `json:"updated_at"`
+	ID          int64  `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	UserUUID    string `json:"user_uuid"`
+	Owner       string `json:"owner"`
+	Avatar      string `json:"avatar"`
+	// NamespaceUUID is the personal or organization namespace that owns the KB.
+	NamespaceUUID string `json:"namespace_uuid"`
+	// NamespaceType is the trusted namespace type: "user" or "organization".
+	NamespaceType string                 `json:"namespace_type"`
+	ContentID     string                 `json:"content_id"`
+	Public        bool                   `json:"public"`
+	Type          AgentKnowledgeBaseType `json:"type"`
+	Editable      bool                   `json:"editable"`
+	// CanWrite reports whether the caller may write KB content through the
+	// management proxy (ReBAC can_write).
+	CanWrite bool `json:"can_write"`
+	// CanManage reports whether the caller may update or delete the KB record
+	// (ReBAC can_admin, same value as editable).
+	CanManage bool           `json:"can_manage"`
+	IsPinned  bool           `json:"is_pinned"` // Whether the knowledge base is pinned by the user
+	Metadata  map[string]any `json:"metadata,omitempty"`
+	CreatedAt time.Time      `json:"created_at"`
+	UpdatedAt time.Time      `json:"updated_at"`
 }
 
 type LangflowTargetType string

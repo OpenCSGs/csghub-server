@@ -15,6 +15,10 @@ const (
 	// add organization.member_from_child
 	OpenFgaAuthorizationModelIDVer1_1 = "01M133C1NKPEV4GBGDXXCP2ET5"
 
+	// OpenFgaAuthorizationModelIDVer1_2 identifies authorization model version 1.2.
+	// add knowledge_base authorization
+	OpenFgaAuthorizationModelIDVer1_2 = "01M1BKMEH02QGKSXH0F45TVPPP"
+
 	// OpenFgaAuthorizationModelIDLatest identifies the authorization model used by runtime checks.
-	OpenFgaAuthorizationModelIDLatest = OpenFgaAuthorizationModelIDVer1_1
+	OpenFgaAuthorizationModelIDLatest = OpenFgaAuthorizationModelIDVer1_2
 )

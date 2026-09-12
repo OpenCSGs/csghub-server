@@ -28,6 +28,10 @@ responses_id_secret = "responses-id-secret"
 public_aigateway_url = "http://aigateway:8094/v1"
 metrics_collector_lookback_minutes = 60
 
+[llmwiki]
+host = "http://127.0.0.1"
+port = 8100
+
 [mirror]
 url = "http://localhost:8085"
 token = ""
