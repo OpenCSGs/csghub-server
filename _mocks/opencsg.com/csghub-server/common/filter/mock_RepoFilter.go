@@ -7,6 +7,7 @@ import (
 
 	database "opencsg.com/csghub-server/builder/store/database"
 	filter "opencsg.com/csghub-server/common/filter"
+	types "opencsg.com/csghub-server/common/types"
 
 	mock "github.com/stretchr/testify/mock"
 )
@@ -25,42 +26,33 @@ func (_m *MockRepoFilter) EXPECT() *MockRepoFilter_Expecter {
 }
 
 // BatchMatch provides a mock function with given fields: ctx, repos
-func (_m *MockRepoFilter) BatchMatch(ctx context.Context, repos []database.Repository) ([]string, []string, error) {
+func (_m *MockRepoFilter) BatchMatch(ctx context.Context, repos []database.Repository) (map[types.RepositoryType][]string, error) {
 	ret := _m.Called(ctx, repos)
 
 	if len(ret) == 0 {
 		panic("no return value specified for BatchMatch")
 	}
 
-	var r0 []string
-	var r1 []string
-	var r2 error
-	if rf, ok := ret.Get(0).(func(context.Context, []database.Repository) ([]string, []string, error)); ok {
+	var r0 map[types.RepositoryType][]string
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, []database.Repository) (map[types.RepositoryType][]string, error)); ok {
 		return rf(ctx, repos)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, []database.Repository) []string); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, []database.Repository) map[types.RepositoryType][]string); ok {
 		r0 = rf(ctx, repos)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]string)
+			r0 = ret.Get(0).(map[types.RepositoryType][]string)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, []database.Repository) []string); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, []database.Repository) error); ok {
 		r1 = rf(ctx, repos)
 	} else {
-		if ret.Get(1) != nil {
-			r1 = ret.Get(1).([]string)
-		}
+		r1 = ret.Error(1)
 	}
 
-	if rf, ok := ret.Get(2).(func(context.Context, []database.Repository) error); ok {
-		r2 = rf(ctx, repos)
-	} else {
-		r2 = ret.Error(2)
-	}
-
-	return r0, r1, r2
+	return r0, r1
 }
 
 // MockRepoFilter_BatchMatch_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'BatchMatch'
@@ -82,12 +74,12 @@ func (_c *MockRepoFilter_BatchMatch_Call) Run(run func(ctx context.Context, repo
 	return _c
 }
 
-func (_c *MockRepoFilter_BatchMatch_Call) Return(modelsMatched []string, datasetsMatched []string, err error) *MockRepoFilter_BatchMatch_Call {
-	_c.Call.Return(modelsMatched, datasetsMatched, err)
+func (_c *MockRepoFilter_BatchMatch_Call) Return(keepByType map[types.RepositoryType][]string, err error) *MockRepoFilter_BatchMatch_Call {
+	_c.Call.Return(keepByType, err)
 	return _c
 }
 
-func (_c *MockRepoFilter_BatchMatch_Call) RunAndReturn(run func(context.Context, []database.Repository) ([]string, []string, error)) *MockRepoFilter_BatchMatch_Call {
+func (_c *MockRepoFilter_BatchMatch_Call) RunAndReturn(run func(context.Context, []database.Repository) (map[types.RepositoryType][]string, error)) *MockRepoFilter_BatchMatch_Call {
 	_c.Call.Return(run)
 	return _c
 }
