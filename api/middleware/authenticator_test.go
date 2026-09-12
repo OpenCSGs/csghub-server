@@ -11,6 +11,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/assert"
 	mock "github.com/stretchr/testify/mock"
+	mock_rpc "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/cache"
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/common/config"
@@ -307,6 +308,52 @@ func TestUsesDelegatedAuth(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			assert.Equal(t, tt.want, usesDelegatedAuth(tt.path))
+		})
+	}
+}
+
+func TestIsValidAccessToken_CSGHubNamespaceUUID(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	const userUUID = "1413e7f5-5bf3-4614-bf35-0e8be73747ee"
+
+	tests := []struct {
+		name           string
+		tokenNSUUID    string
+		expectedNSUUID string
+	}{
+		{
+			name:           "csghub token with empty ns_uuid falls back to user uuid",
+			tokenNSUUID:    "",
+			expectedNSUUID: userUUID,
+		},
+		{
+			name:           "csghub token with ns_uuid keeps it",
+			tokenNSUUID:    "org-ns-uuid",
+			expectedNSUUID: "org-ns-uuid",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w := httptest.NewRecorder()
+			ctx, _ := gin.CreateTestContext(w)
+			ctx.Request = httptest.NewRequest(http.MethodGet, "/test", nil)
+
+			userSvcClient := mock_rpc.NewMockUserSvcClient(t)
+			userSvcClient.EXPECT().VerifyByAccessToken(mock.Anything, "csghub-token").Return(&types.CheckAccessTokenResp{
+				Application: types.AccessTokenAppCSGHub,
+				Username:    "jun",
+				UserUUID:    userUUID,
+				NSUUID:      tt.tokenNSUUID,
+				TokenName:   "test-token",
+			}, nil)
+
+			assert.True(t, isValidAccessToken(ctx, userSvcClient, "csghub-token"))
+			assert.Equal(t, "jun", httpbase.GetCurrentUser(ctx))
+			assert.Equal(t, userUUID, httpbase.GetCurrentUserUUID(ctx))
+			assert.Equal(t, tt.expectedNSUUID, httpbase.GetCurrentNamespaceUUID(ctx))
+			assert.Equal(t, httpbase.AuthTypeAccessToken, httpbase.GetAuthType(ctx))
 		})
 	}
 }
