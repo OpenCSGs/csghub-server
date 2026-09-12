@@ -101,6 +101,7 @@ func (s *llmServiceComponentImpl) IndexLLMConfig(ctx context.Context, per, page 
 		llmConfigs = append(llmConfigs, &types.LLMConfig{
 			ID:                 cfg.ID,
 			ModelName:          cfg.ModelName,
+			Source:             aggregateLLMSource(upstreams),
 			OfficialName:       cfg.PrimaryOfficialName(),
 			Upstreams:          upstreams,
 			Type:               cfg.Type,
@@ -582,7 +583,7 @@ func (s *llmServiceComponentImpl) UpdateUpstream(ctx context.Context, req *types
 	if req.Weight != nil {
 		dbUp.Weight = *req.Weight
 	}
-	if req.Enabled != nil && !isCSGHubSource {
+	if req.Enabled != nil {
 		dbUp.Enabled = *req.Enabled
 	}
 	if req.ModelName != nil && !isCSGHubSource {
@@ -704,6 +705,7 @@ func buildUpstreamConfigs(dbUpstreams []database.Upstream) []types.UpstreamConfi
 		uc := types.UpstreamConfig{
 			ID:                    u.ID,
 			Source:                u.Source,
+			SourceID:              u.SourceID,
 			URL:                   u.URL,
 			Weight:                u.Weight,
 			Enabled:               u.Enabled,
@@ -786,4 +788,21 @@ func computeLLMAvailability(upstreams []types.UpstreamConfig) (bool, string) {
 		}
 	}
 	return false, aigatewaytypes.ReasonAllUpstreamsUnavailable
+}
+
+// aggregateLLMSource computes a single source value for an LLM config from its
+// upstreams. If all upstreams share the same source, that source is returned.
+// If upstreams have different sources, UpstreamSourceMixed is returned.
+// If there are no upstreams, an empty string is returned.
+func aggregateLLMSource(upstreams []types.UpstreamConfig) types.UpstreamSource {
+	if len(upstreams) == 0 {
+		return ""
+	}
+	first := upstreams[0].Source
+	for _, u := range upstreams[1:] {
+		if u.Source != first {
+			return types.UpstreamSourceMixed
+		}
+	}
+	return first
 }

@@ -293,6 +293,151 @@ func TestLLMServiceComponent_IndexLLMConfig_RejectsInvalidTypes(t *testing.T) {
 	require.Contains(t, err.Error(), "invalid llm type 0")
 }
 
+func TestAggregateLLMSource(t *testing.T) {
+	tests := []struct {
+		name      string
+		upstreams []types.UpstreamConfig
+		want      types.UpstreamSource
+	}{
+		{
+			name:      "empty upstreams returns empty source",
+			upstreams: []types.UpstreamConfig{},
+			want:      "",
+		},
+		{
+			name: "single external upstream",
+			upstreams: []types.UpstreamConfig{
+				{Source: types.UpstreamSourceExternal},
+			},
+			want: types.UpstreamSourceExternal,
+		},
+		{
+			name: "single csghub upstream",
+			upstreams: []types.UpstreamConfig{
+				{Source: types.UpstreamSourceCSGHubDeploy},
+			},
+			want: types.UpstreamSourceCSGHubDeploy,
+		},
+		{
+			name: "multiple upstreams same external source",
+			upstreams: []types.UpstreamConfig{
+				{Source: types.UpstreamSourceExternal},
+				{Source: types.UpstreamSourceExternal},
+			},
+			want: types.UpstreamSourceExternal,
+		},
+		{
+			name: "multiple upstreams same csghub source",
+			upstreams: []types.UpstreamConfig{
+				{Source: types.UpstreamSourceCSGHubDeploy},
+				{Source: types.UpstreamSourceCSGHubDeploy},
+			},
+			want: types.UpstreamSourceCSGHubDeploy,
+		},
+		{
+			name: "mixed external and csghub sources",
+			upstreams: []types.UpstreamConfig{
+				{Source: types.UpstreamSourceExternal},
+				{Source: types.UpstreamSourceCSGHubDeploy},
+			},
+			want: types.UpstreamSourceMixed,
+		},
+		{
+			name: "mixed csghub and external sources (reverse order)",
+			upstreams: []types.UpstreamConfig{
+				{Source: types.UpstreamSourceCSGHubDeploy},
+				{Source: types.UpstreamSourceExternal},
+			},
+			want: types.UpstreamSourceMixed,
+		},
+		{
+			name: "three upstreams with mixed sources",
+			upstreams: []types.UpstreamConfig{
+				{Source: types.UpstreamSourceExternal},
+				{Source: types.UpstreamSourceCSGHubDeploy},
+				{Source: types.UpstreamSourceExternal},
+			},
+			want: types.UpstreamSourceMixed,
+		},
+		{
+			name: "upstreams with empty source treated as distinct",
+			upstreams: []types.UpstreamConfig{
+				{Source: ""},
+				{Source: types.UpstreamSourceExternal},
+			},
+			want: types.UpstreamSourceMixed,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := aggregateLLMSource(tt.upstreams)
+			require.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestLLMServiceComponent_IndexLLMConfig_WithSource(t *testing.T) {
+	ctx := context.TODO()
+	stores := tests.NewMockStores(t)
+	mc := &llmServiceComponentImpl{
+		llmConfigStore:    stores.LLMConfig,
+		promptPrefixStore: stores.PromptPrefix,
+	}
+	per := 10
+	page := 1
+	search := &types.SearchLLMConfig{Keyword: ""}
+
+	// LLM config with two external upstreams — aggregated source should be "external"
+	dbLLMConfig := &database.LLMConfig{
+		ID:        200,
+		ModelName: "ext-model",
+		Type:      666,
+		Enabled:   true,
+		Upstreams: []database.Upstream{
+			{ID: 1, Source: types.UpstreamSourceExternal, URL: "http://ext1", Enabled: true, Weight: 1},
+			{ID: 2, Source: types.UpstreamSourceExternal, URL: "http://ext2", Enabled: true, Weight: 1},
+		},
+	}
+	// LLM config with mixed source upstreams — aggregated source should be "mixed"
+	dbLLMConfigMixed := &database.LLMConfig{
+		ID:        201,
+		ModelName: "mixed-model",
+		Type:      666,
+		Enabled:   true,
+		Upstreams: []database.Upstream{
+			{ID: 3, Source: types.UpstreamSourceExternal, URL: "http://ext3", Enabled: true, Weight: 1},
+			{ID: 4, Source: types.UpstreamSourceCSGHubDeploy, URL: "http://csghub1", Enabled: true, Weight: 1},
+		},
+	}
+	// LLM config with all csghub upstreams — aggregated source should be "csghub"
+	dbLLMConfigCSGHub := &database.LLMConfig{
+		ID:        202,
+		ModelName: "csghub-model",
+		Type:      666,
+		Enabled:   true,
+		Upstreams: []database.Upstream{
+			{ID: 5, Source: types.UpstreamSourceCSGHubDeploy, URL: "http://csghub2", Enabled: true, Weight: 1},
+		},
+	}
+
+	stores.LLMConfigMock().EXPECT().Index(ctx, per, page, search).
+		Return([]*database.LLMConfig{dbLLMConfig, dbLLMConfigMixed, dbLLMConfigCSGHub}, 3, nil)
+
+	res, total, err := mc.IndexLLMConfig(ctx, per, page, search)
+	require.Nil(t, err)
+	require.NotNil(t, res)
+	require.Equal(t, 3, total)
+	require.Len(t, res, 3)
+
+	// First config: all external upstreams
+	require.Equal(t, types.UpstreamSourceExternal, res[0].Source)
+	// Second config: mixed sources
+	require.Equal(t, types.UpstreamSourceMixed, res[1].Source)
+	// Third config: all csghub upstreams
+	require.Equal(t, types.UpstreamSourceCSGHubDeploy, res[2].Source)
+}
+
 func TestLLMServiceComponent_IndexPromptPrefix(t *testing.T) {
 	ctx := context.TODO()
 	stores := tests.NewMockStores(t)
@@ -911,6 +1056,104 @@ func TestLLMServiceComponent_DeleteUpstream(t *testing.T) {
 	}
 	err := mc.DeleteUpstream(ctx, 10)
 	require.Nil(t, err)
+}
+
+func TestLLMServiceComponent_UpdateUpstream_CSGHubAllowsEnabledToggle(t *testing.T) {
+	ctx := context.TODO()
+	upstreamStore := mockdatabase.NewMockUpstreamStore(t)
+	healthStateStore := mockdatabase.NewMockAIGatewayUpstreamHealthStateStore(t)
+	circuitStateStore := mockdatabase.NewMockAIGatewayUpstreamCircuitStateStore(t)
+
+	dbUp := &database.Upstream{
+		ID:          65,
+		LLMConfigID: 74,
+		URL:         "http://original-csghub-url",
+		Weight:      1,
+		Enabled:     false,
+		ModelName:   "original-model",
+		AuthHeader:  "original-auth",
+		Provider:    "inference",
+		Source:      types.UpstreamSourceCSGHubDeploy,
+		SourceID:    964,
+	}
+	upstreamStore.EXPECT().GetByID(ctx, int64(65)).Return(dbUp, nil)
+	upstreamStore.EXPECT().Update(ctx, mock.Anything).Return(nil).Maybe()
+
+	mc := &llmServiceComponentImpl{
+		upstreamStore:    upstreamStore,
+		healthStateStore: healthStateStore,
+		circuitStateStore: circuitStateStore,
+	}
+
+	// User requests to enable the upstream
+	enabled := true
+	req := &types.UpdateUpstreamReq{
+		ID:      65,
+		Enabled: &enabled,
+	}
+	res, err := mc.UpdateUpstream(ctx, req)
+	require.Nil(t, err)
+	require.NotNil(t, res)
+	// Enabled should be updated to true
+	require.True(t, res.Enabled)
+	// Source-owned fields should remain unchanged
+	require.Equal(t, "http://original-csghub-url", res.URL)
+	require.Equal(t, "original-model", res.ModelName)
+	require.Equal(t, "original-auth", res.AuthHeader)
+	require.Equal(t, "inference", res.Provider)
+}
+
+func TestLLMServiceComponent_UpdateUpstream_CSGHubProtectsSourceOwnedFields(t *testing.T) {
+	ctx := context.TODO()
+	upstreamStore := mockdatabase.NewMockUpstreamStore(t)
+	healthStateStore := mockdatabase.NewMockAIGatewayUpstreamHealthStateStore(t)
+	circuitStateStore := mockdatabase.NewMockAIGatewayUpstreamCircuitStateStore(t)
+
+	dbUp := &database.Upstream{
+		ID:          65,
+		LLMConfigID: 74,
+		URL:         "http://original-csghub-url",
+		Weight:      1,
+		Enabled:     false,
+		ModelName:   "original-model",
+		AuthHeader:  "original-auth",
+		Provider:    "inference",
+		Source:      types.UpstreamSourceCSGHubDeploy,
+		SourceID:    964,
+	}
+	upstreamStore.EXPECT().GetByID(ctx, int64(65)).Return(dbUp, nil)
+	upstreamStore.EXPECT().Update(ctx, mock.Anything).Return(nil).Maybe()
+
+	mc := &llmServiceComponentImpl{
+		upstreamStore:    upstreamStore,
+		healthStateStore: healthStateStore,
+		circuitStateStore: circuitStateStore,
+	}
+
+	// User tries to change source-owned fields — they should be ignored
+	newURL := "http://hijacked-url"
+	newModelName := "hijacked-model"
+	newProvider := "hijacked-provider"
+	newAuthHeader := "hijacked-auth"
+	enabled := true
+	req := &types.UpdateUpstreamReq{
+		ID:        65,
+		URL:       &newURL,
+		ModelName: &newModelName,
+		Provider:  &newProvider,
+		AuthHeader: &newAuthHeader,
+		Enabled:   &enabled,
+	}
+	res, err := mc.UpdateUpstream(ctx, req)
+	require.Nil(t, err)
+	require.NotNil(t, res)
+	// Source-owned fields must NOT be updated
+	require.Equal(t, "http://original-csghub-url", res.URL)
+	require.Equal(t, "original-model", res.ModelName)
+	require.Equal(t, "original-auth", res.AuthHeader)
+	require.Equal(t, "inference", res.Provider)
+	// Enabled is NOT source-owned from the admin perspective — it should be updated
+	require.True(t, res.Enabled)
 }
 
 func TestLLMServiceComponent_validateLLMEndpointConfig(t *testing.T) {
