@@ -1116,6 +1116,40 @@ func TestResponsesAdapterStreamWriterCompletedResponseIncludesUsage(t *testing.T
 	require.Contains(t, body, `"usage":{"input_tokens":48,"output_tokens":116,"total_tokens":164}`)
 }
 
+func parseResponsesAdapterSSEEvents(t *testing.T, body string) []map[string]any {
+	t.Helper()
+	events := []map[string]any{}
+	for _, line := range strings.Split(body, "\n") {
+		data, ok := strings.CutPrefix(line, "data: ")
+		if !ok || data == "[DONE]" {
+			continue
+		}
+		var event map[string]any
+		require.NoError(t, json.Unmarshal([]byte(data), &event))
+		events = append(events, event)
+	}
+	return events
+}
+
+func TestResponsesAdapterStreamWriterAddsSequenceNumbers(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(w)
+	writer := newResponsesAdapterStreamWriter(ctx.Writer, "public-model", nil, nil, "")
+	writer.WriteHeader(200)
+
+	_, err := writer.Write([]byte(`data: {"id":"chatcmpl_1","choices":[{"delta":{"content":"hello"},"finish_reason":"stop","index":0}]}` + "\n\n"))
+	require.NoError(t, err)
+	_, err = writer.Write([]byte("data: [DONE]\n\n"))
+	require.NoError(t, err)
+
+	events := parseResponsesAdapterSSEEvents(t, w.Body.String())
+	require.NotEmpty(t, events)
+	for i, event := range events {
+		require.Equal(t, float64(i), event["sequence_number"], "event %d (%v)", i, event["type"])
+	}
+}
+
 func TestResponsesAdapterStreamWriterEmitsToolCallItemBeforeArguments(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	w := httptest.NewRecorder()
@@ -1163,10 +1197,37 @@ func TestResponsesAdapterStreamWriterToolOnlyStreamDoesNotEmitTextItem(t *testin
 	require.NotEqual(t, -1, doneIdx)
 	doneEnd := strings.Index(body[doneIdx:], "\n\n")
 	require.NotEqual(t, -1, doneEnd)
-	require.NotContains(t, body[doneIdx:doneIdx+doneEnd], `"arguments"`)
-	require.Contains(t, body[doneIdx:doneIdx+doneEnd], `"item_id":"call_1"`)
+	doneEvent := body[doneIdx : doneIdx+doneEnd]
+	require.Contains(t, doneEvent, `"arguments":"{\"city\":\"Tokyo\"}"`)
+	require.Contains(t, doneEvent, `"item_id":"call_1"`)
+	require.Contains(t, doneEvent, `"name":"get_weather"`)
+	require.Contains(t, doneEvent, `"sequence_number":`)
 	require.Contains(t, body, "event: response.output_item.done")
 	require.Contains(t, body, "event: response.completed")
+}
+
+func TestResponsesAdapterStreamWriterPreservesMalformedToolArguments(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(w)
+	writer := newResponsesAdapterStreamWriter(ctx.Writer, "public-model", nil, nil, "")
+	writer.WriteHeader(200)
+
+	_, err := writer.Write([]byte(`data: {"id":"chatcmpl_1","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"id":"call_1","type":"function","function":{"name":"lookup","arguments":"{\"broken\""}}]}}]}` + "\n\n"))
+	require.NoError(t, err)
+	_, err = writer.Write([]byte(`data: {"id":"chatcmpl_1","choices":[{"index":0,"delta":{},"finish_reason":"tool_calls"}]}` + "\n\n"))
+	require.NoError(t, err)
+
+	events := parseResponsesAdapterSSEEvents(t, w.Body.String())
+	for _, event := range events {
+		if event["type"] != "response.function_call_arguments.done" {
+			continue
+		}
+		require.Equal(t, "lookup", event["name"])
+		require.Equal(t, `{"broken"`, event["arguments"])
+		return
+	}
+	t.Fatal("response.function_call_arguments.done event not found")
 }
 
 func TestResponsesAdapterStreamWriterRestoresNamespaceToolCall(t *testing.T) {
@@ -1239,6 +1300,10 @@ func TestResponsesAdapterStreamWriterBuffersArgumentsUntilToolNameArrives(t *tes
 
 	_, err = writer.Write([]byte(`data: {"id":"chatcmpl_1","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"type":"function","function":{"name":"get_top_download_models"}}]}}]}` + "\n\n"))
 	require.NoError(t, err)
+	_, err = writer.Write([]byte(`data: {"id":"chatcmpl_1","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"type":"function","function":{"arguments":"20}"}}]}}]}` + "\n\n"))
+	require.NoError(t, err)
+	_, err = writer.Write([]byte(`data: {"id":"chatcmpl_1","choices":[{"index":0,"delta":{},"finish_reason":"tool_calls"}]}` + "\n\n"))
+	require.NoError(t, err)
 
 	body := w.Body.String()
 	added := strings.Index(body, "event: response.output_item.added")
@@ -1251,6 +1316,8 @@ func TestResponsesAdapterStreamWriterBuffersArgumentsUntilToolNameArrives(t *tes
 	require.Contains(t, body[added:added+addedEnd], `"name":"get_top_download_models"`)
 	require.Contains(t, body[added:added+addedEnd], `"namespace":"mcp__csghub_production"`)
 	require.Contains(t, body, `"delta":"{\"num\":"`)
+	require.Contains(t, body, `"arguments":"{\"num\":20}"`)
+	require.Contains(t, body, `"name":"get_top_download_models"`)
 }
 
 func TestResponsesAdapterStreamWriterEmitsRefusalEvents(t *testing.T) {

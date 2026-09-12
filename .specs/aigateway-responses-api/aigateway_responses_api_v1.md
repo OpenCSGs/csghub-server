@@ -287,9 +287,9 @@ Response support:
 
 Stream support:
 
-- The adapter owns the Responses SSE event sequence.
+- The adapter owns the Responses SSE event sequence and emits a zero-based, gap-free `sequence_number` on every synthesized event.
 - Text chunks emit `response.output_text.delta` and end with `response.output_text.done`.
-- Tool-call chunks emit `response.function_call_arguments.delta` and `response.function_call_arguments.done` when arguments are available.
+- Tool-call chunks emit `response.function_call_arguments.delta` and finish with `response.function_call_arguments.done` containing the function name and complete raw arguments.
 - Refusal chunks emit Responses refusal content-part events instead of being silently dropped.
 - The stream ends with `response.completed` followed by `data: [DONE]`.
 - Adapter mode requests chat stream usage with `stream_options.include_usage=true` for supported upstreams.
