@@ -234,6 +234,7 @@ func TestUserHandler_Casdoor(t *testing.T) {
 		mockSigninFailureRedirectURL       = "http://localhost:8080/signin/failure"
 		mockCodeSoulerVScodeRedirectURL    = "vscode://open"
 		mockCodeSoulerJetbrainsRedirectURL = "jetbrains://open"
+		mockLiteRedirectURL                = "http://127.0.0.1:11437/api/cloud/auth/callback"
 	)
 
 	cfg := &config.Config{
@@ -250,11 +251,13 @@ func TestUserHandler_Casdoor(t *testing.T) {
 			SigninSuccessRedirectURL       string `env:"OPENCSG_USER_SERVER_SIGNIN_SUCCESS_REDIRECT_URL" default:"http://localhost:3000/server/callback"`
 			CodeSoulerVScodeRedirectURL    string `env:"OPENCSG_USER_SERVER_CODESOULER_VSCODE_REDIRECT_URL" default:"http://127.0.0.1:37678/callback"`
 			CodeSoulerJetBrainsRedirectURL string `env:"OPENCSG_USER_SERVER_CODESOULER_JETBRAINS_REDIRECT_URL" default:"http://127.0.0.1:37679/callback"`
+			LiteRedirectURL                string `env:"OPENCSG_USER_SERVER_LITE_REDIRECT_URL" default:"http://127.0.0.1:11437/api/cloud/auth/callback"`
 			AwardSelfRegisterCredit        int    `env:"OPENCSG_USER_SERVER_AWARD_SELF_REGISTER_CREDIT" default:"5000"`
 		}{
 			SigninSuccessRedirectURL:       mockSigninSuccessRedirectURL,
 			CodeSoulerVScodeRedirectURL:    mockCodeSoulerVScodeRedirectURL,
 			CodeSoulerJetBrainsRedirectURL: mockCodeSoulerJetbrainsRedirectURL,
+			LiteRedirectURL:                mockLiteRedirectURL,
 			AwardSelfRegisterCredit:        5000,
 		},
 		ServerFailureRedirectURL: mockSigninFailureRedirectURL,
@@ -343,6 +346,38 @@ func TestUserHandler_Casdoor(t *testing.T) {
 		expectedURL := fmt.Sprintf("%s?apikey=%s&portal_url=%s&jwt=%s", mockCodeSoulerJetbrainsRedirectURL, "starship_token", mockSigninSuccessRedirectURL, "signed_token")
 		assert.Equal(t, expectedURL, w.Header().Get("Location"))
 		// Verify Content-Length is either empty or set to 0
+		contentLength := w.Header().Get("Content-Length")
+		assert.True(t, contentLength == "" || contentLength == "0", "Content-Length should be either empty or 0, got %s", contentLength)
+		mockUserComp.AssertExpectations(t)
+		mockAccessTokenComp.AssertExpectations(t)
+	})
+
+	t.Run("success signin with lite state", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request, _ = http.NewRequest(http.MethodGet, "/casdoor?code=123&state=lite", nil)
+
+		mockUserComp := component.NewMockUserComponent(t)
+		mockUserComp.On("Signin", mock.Anything, "123", LITE).Return(&types.JWTClaims{CurrentUser: "testuser"}, "signed_token", nil)
+		mockAccessTokenComp := new(component.MockAccessTokenComponent)
+		mockAccessTokenComp.On("GetOrCreateFirstAvaiToken", mock.Anything, "testuser", string(types.AccessTokenAppCSGHub), "csglite").Return("csghub_token", nil)
+
+		h := &UserHandler{
+			c:                              mockUserComp,
+			atc:                            mockAccessTokenComp,
+			signinSuccessRedirectURL:       mockSigninSuccessRedirectURL,
+			signinFailureRedirectURL:       mockSigninFailureRedirectURL,
+			codeSoulerVScodeRedirectURL:    mockCodeSoulerVScodeRedirectURL,
+			codeSoulerJetbrainsRedirectURL: mockCodeSoulerJetbrainsRedirectURL,
+			liteRedirectURL:                mockLiteRedirectURL,
+			config:                         cfg,
+		}
+
+		h.Casdoor(c)
+
+		assert.Equal(t, http.StatusFound, w.Code)
+		expectedURL := fmt.Sprintf("%s?token=%s&portal_url=%s&jwt=%s", mockLiteRedirectURL, "csghub_token", mockSigninSuccessRedirectURL, "signed_token")
+		assert.Equal(t, expectedURL, w.Header().Get("Location"))
 		contentLength := w.Header().Get("Content-Length")
 		assert.True(t, contentLength == "" || contentLength == "0", "Content-Length should be either empty or 0, got %s", contentLength)
 		mockUserComp.AssertExpectations(t)
