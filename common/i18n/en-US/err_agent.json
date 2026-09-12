@@ -73,5 +73,11 @@
     },
     "error.AGENT-ERR-24": {
         "other": "Cannot make this agent template public because it has not passed the sensitive-content check."
+    },
+    "error.AGENT-ERR-25": {
+        "other": "Cannot create an agent from this agent template because the sensitive-content check is still in progress."
+    },
+    "error.AGENT-ERR-26": {
+        "other": "Cannot make this agent template public because the sensitive-content check is still in progress."
     }
 }
