@@ -251,33 +251,44 @@ func TestSyncRunningDeploy_NoExistingUpstream_ReuseExistingLLMConfig(t *testing.
 	require.NoError(t, err)
 }
 
-// Verify that a newly created llm_config has Enabled=false. Internal models
-// created by the deploy sync must be invisible until an admin enables them.
-func TestSyncRunningDeploy_NewLLMConfigDisabledByDefault(t *testing.T) {
-	comp, _, mockUpstream, mockLLMConfig, _ := newSyncComponent(t)
-	ctx := context.TODO()
-	info := testInfo(300, "ns/model-d", "svc-300")
+// Verify that a newly created llm_config is always enabled, regardless of
+// deploy type. The deploy is a user-owned resource — a disabled llm_config
+// would make the user's own inference endpoint unreachable until an admin
+// intervenes. Admins can still disable it later via the admin API.
+func TestSyncRunningDeploy_NewLLMConfigEnabledByDefault(t *testing.T) {
+	deployTypes := []int{
+		commontypes.InferenceType,
+		commontypes.ServerlessType,
+	}
 
-	// No upstream exists.
-	mockUpstream.EXPECT().GetBySourceID(ctx, commontypes.UpstreamSourceCSGHubDeploy, int64(300)).Return(nil, nil)
+	for _, deployType := range deployTypes {
+		t.Run(strconv.Itoa(deployType), func(t *testing.T) {
+			comp, _, mockUpstream, mockLLMConfig, _ := newSyncComponent(t)
+			ctx := context.TODO()
+			info := testInfo(300, "ns/model-d", "svc-300")
+			info.DeployType = deployType
 
-	// llm_config does not exist → create with Enabled=false.
-	mockLLMConfig.EXPECT().GetByModelName(ctx, info.LegacyModelID).Return(nil, nil)
-	mockLLMConfig.EXPECT().Create(ctx, mock.MatchedBy(func(c database.LLMConfig) bool {
-		return c.ModelName == info.LegacyModelID &&
-			c.Type == database.LLMTypeAigatewayExternal &&
-			!c.Enabled && // must be disabled — admin enables later
-			!c.NeedSensitiveCheck
-	})).Return(&database.LLMConfig{ID: 55}, nil)
+			// No upstream exists.
+			mockUpstream.EXPECT().GetBySourceID(ctx, commontypes.UpstreamSourceCSGHubDeploy, int64(300)).Return(nil, nil)
 
-	// Upstream should still be enabled — the llm_config gates visibility,
-	// the upstream gates routing once the llm_config is enabled.
-	mockUpstream.EXPECT().UpsertInternalDeployTarget(ctx, mock.MatchedBy(func(u *database.Upstream) bool {
-		return u.LLMConfigID == 55 && u.SourceID == 300 && u.Enabled
-	})).Return(nil)
+			// llm_config does not exist → create with Enabled=true.
+			mockLLMConfig.EXPECT().GetByModelName(ctx, info.LegacyModelID).Return(nil, nil)
+			mockLLMConfig.EXPECT().Create(ctx, mock.MatchedBy(func(c database.LLMConfig) bool {
+				return c.ModelName == info.LegacyModelID &&
+					c.Type == database.LLMTypeAigatewayExternal &&
+					c.Enabled && // must be enabled — user-owned inference must be accessible
+					!c.NeedSensitiveCheck
+			})).Return(&database.LLMConfig{ID: 55}, nil)
 
-	err := comp.SyncRunningDeploy(ctx, info)
-	require.NoError(t, err)
+			// Upstream should be enabled as well.
+			mockUpstream.EXPECT().UpsertInternalDeployTarget(ctx, mock.MatchedBy(func(u *database.Upstream) bool {
+				return u.LLMConfigID == 55 && u.SourceID == 300 && u.Enabled
+			})).Return(nil)
+
+			err := comp.SyncRunningDeploy(ctx, info)
+			require.NoError(t, err)
+		})
+	}
 }
 
 // Verify that reusing an existing llm_config does not change its Enabled state.
@@ -343,6 +354,61 @@ func TestSyncRunningDeploy_GetByModelNameError(t *testing.T) {
 	assert.Contains(t, err.Error(), "connection refused")
 }
 
+// Verify that the deploy's SecureLevel is persisted on the upstream's
+// InternalModelInfo, both when the upstream is created and when an existing
+// upstream is updated in place (e.g. after a DeployUpdate changes
+// secure_level from private to public).
+func TestSyncRunningDeploy_PersistsSecureLevel(t *testing.T) {
+	ctx := context.TODO()
+
+	t.Run("create path stores secure level in upstream metadata", func(t *testing.T) {
+		comp, _, mockUpstream, mockLLMConfig, _ := newSyncComponent(t)
+		info := testInfo(600, "ns/model-f", "svc-600")
+		info.SecureLevel = commontypes.EndpointPrivate
+
+		mockUpstream.EXPECT().GetBySourceID(ctx, commontypes.UpstreamSourceCSGHubDeploy, int64(600)).Return(nil, nil)
+		mockLLMConfig.EXPECT().GetByModelName(ctx, info.LegacyModelID).Return(nil, nil)
+		mockLLMConfig.EXPECT().Create(ctx, mock.Anything).Return(&database.LLMConfig{ID: 61}, nil)
+
+		mockUpstream.EXPECT().UpsertInternalDeployTarget(ctx, mock.MatchedBy(func(u *database.Upstream) bool {
+			return u.SourceID == 600 &&
+				u.Metadata != nil &&
+				u.Metadata.InternalModelInfo != nil &&
+				u.Metadata.InternalModelInfo.SecureLevel == commontypes.EndpointPrivate
+		})).Return(nil)
+
+		err := comp.SyncRunningDeploy(ctx, info)
+		require.NoError(t, err)
+	})
+
+	t.Run("update-in-place path refreshes secure level in upstream metadata", func(t *testing.T) {
+		comp, _, mockUpstream, mockLLMConfig, _ := newSyncComponent(t)
+		info := testInfo(100, "ns/model-a", "svc-100")
+		info.SecureLevel = commontypes.EndpointPublic
+
+		existing := &database.Upstream{
+			ID:          999,
+			LLMConfigID: 42,
+			Source:      commontypes.UpstreamSourceCSGHubDeploy,
+			SourceID:    100,
+			Enabled:     true,
+		}
+		mockUpstream.EXPECT().GetBySourceID(ctx, commontypes.UpstreamSourceCSGHubDeploy, int64(100)).Return(existing, nil)
+		mockLLMConfig.EXPECT().GetByID(ctx, int64(42)).Return(&database.LLMConfig{ID: 42, ModelName: info.LegacyModelID}, nil)
+
+		mockUpstream.EXPECT().Update(ctx, mock.MatchedBy(func(u *database.Upstream) bool {
+			return u.ID == 999 &&
+				u.Metadata != nil &&
+				u.Metadata.InternalModelInfo != nil &&
+				u.Metadata.InternalModelInfo.SourceDeployID == 100 &&
+				u.Metadata.InternalModelInfo.SecureLevel == commontypes.EndpointPublic
+		})).Return(nil)
+
+		err := comp.SyncRunningDeploy(ctx, info)
+		require.NoError(t, err)
+	})
+}
+
 // =====================================================================
 // DisableDeployTarget / DeleteDeployTarget
 // =====================================================================
@@ -383,6 +449,52 @@ func TestDeleteDeployTarget_Success(t *testing.T) {
 	require.NoError(t, err)
 }
 
+// After deleting the deploy's upstream, an llm_config left with zero
+// upstreams is deleted as well so no unroutable orphan configs accumulate.
+func TestDeleteDeployTarget_DeletesEmptyLLMConfig(t *testing.T) {
+	comp, _, mockUpstream, mockLLMConfig, _ := newSyncComponent(t)
+	ctx := context.TODO()
+
+	existing := &database.Upstream{
+		ID:          601,
+		LLMConfigID: 42,
+		Source:      commontypes.UpstreamSourceCSGHubDeploy,
+		SourceID:    600,
+	}
+	mockUpstream.EXPECT().GetBySourceID(ctx, commontypes.UpstreamSourceCSGHubDeploy, int64(600)).Return(existing, nil)
+	mockUpstream.EXPECT().Delete(ctx, int64(601)).Return(nil)
+	// No upstreams remain under the llm_config → delete it.
+	mockUpstream.EXPECT().ListByLLMConfigID(ctx, int64(42)).Return([]*database.Upstream{}, nil)
+	mockLLMConfig.EXPECT().Delete(ctx, int64(42)).Return(nil)
+
+	err := comp.DeleteDeployTarget(ctx, 600)
+	require.NoError(t, err)
+}
+
+// An llm_config that still has other upstreams (e.g. admin-attached external
+// endpoints) must be kept.
+func TestDeleteDeployTarget_KeepsLLMConfigWithRemainingUpstreams(t *testing.T) {
+	comp, _, mockUpstream, _, _ := newSyncComponent(t)
+	ctx := context.TODO()
+
+	existing := &database.Upstream{
+		ID:          601,
+		LLMConfigID: 42,
+		Source:      commontypes.UpstreamSourceCSGHubDeploy,
+		SourceID:    600,
+	}
+	mockUpstream.EXPECT().GetBySourceID(ctx, commontypes.UpstreamSourceCSGHubDeploy, int64(600)).Return(existing, nil)
+	mockUpstream.EXPECT().Delete(ctx, int64(601)).Return(nil)
+	mockUpstream.EXPECT().ListByLLMConfigID(ctx, int64(42)).Return([]*database.Upstream{
+		{ID: 602, LLMConfigID: 42, Source: commontypes.UpstreamSourceExternal},
+	}, nil)
+	// No llmConfigStore.Delete expectation — the strict mock fails the test
+	// if the llm_config is wrongly deleted.
+
+	err := comp.DeleteDeployTarget(ctx, 600)
+	require.NoError(t, err)
+}
+
 func TestDeleteDeployTarget_NotFound(t *testing.T) {
 	comp, _, mockUpstream, _, _ := newSyncComponent(t)
 	ctx := context.TODO()
@@ -391,6 +503,45 @@ func TestDeleteDeployTarget_NotFound(t *testing.T) {
 
 	err := comp.DeleteDeployTarget(ctx, 404)
 	require.NoError(t, err, "should skip silently when upstream not found")
+}
+
+func TestDeleteDeployTarget_ListRemainingError(t *testing.T) {
+	comp, _, mockUpstream, _, _ := newSyncComponent(t)
+	ctx := context.TODO()
+
+	existing := &database.Upstream{
+		ID:          601,
+		LLMConfigID: 42,
+		Source:      commontypes.UpstreamSourceCSGHubDeploy,
+		SourceID:    600,
+	}
+	mockUpstream.EXPECT().GetBySourceID(ctx, commontypes.UpstreamSourceCSGHubDeploy, int64(600)).Return(existing, nil)
+	mockUpstream.EXPECT().Delete(ctx, int64(601)).Return(nil)
+	mockUpstream.EXPECT().ListByLLMConfigID(ctx, int64(42)).Return(nil, errors.New("connection refused"))
+
+	err := comp.DeleteDeployTarget(ctx, 600)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "connection refused")
+}
+
+func TestDeleteDeployTarget_LLMConfigDeleteError(t *testing.T) {
+	comp, _, mockUpstream, mockLLMConfig, _ := newSyncComponent(t)
+	ctx := context.TODO()
+
+	existing := &database.Upstream{
+		ID:          601,
+		LLMConfigID: 42,
+		Source:      commontypes.UpstreamSourceCSGHubDeploy,
+		SourceID:    600,
+	}
+	mockUpstream.EXPECT().GetBySourceID(ctx, commontypes.UpstreamSourceCSGHubDeploy, int64(600)).Return(existing, nil)
+	mockUpstream.EXPECT().Delete(ctx, int64(601)).Return(nil)
+	mockUpstream.EXPECT().ListByLLMConfigID(ctx, int64(42)).Return([]*database.Upstream{}, nil)
+	mockLLMConfig.EXPECT().Delete(ctx, int64(42)).Return(errors.New("fk constraint"))
+
+	err := comp.DeleteDeployTarget(ctx, 600)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "fk constraint")
 }
 
 // =====================================================================

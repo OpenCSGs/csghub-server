@@ -106,18 +106,18 @@ func createTestUserAndRepo(ctx context.Context, t *testing.T, env *e2eTestEnv, u
 func createTestDeploy(ctx context.Context, t *testing.T, env *e2eTestEnv, user *database.User, repo *database.Repository, deployType int, svcName string) *database.Deploy {
 	t.Helper()
 	deploy := &database.Deploy{
-		SpaceID:   0,
-		Status:    deploycommon.Running, // 23 — matches ListAllRunningDeploys filter
-		GitPath:   repo.Path,
-		GitBranch: "main",
-		Template:  "default",
-		Hardware:  "GPU",
-		UserID:    user.ID,
-		RepoID:    repo.ID,
-		Type:      deployType,
-		SvcName:   svcName,
-		Endpoint:  "http://" + svcName + ".svc.cluster.local:8080/v1",
-		ClusterID: "",
+		SpaceID:          0,
+		Status:           deploycommon.Running, // 23 — matches ListAllRunningDeploys filter
+		GitPath:          repo.Path,
+		GitBranch:        "main",
+		Template:         "default",
+		Hardware:         "GPU",
+		UserID:           user.ID,
+		RepoID:           repo.ID,
+		Type:             deployType,
+		SvcName:          svcName,
+		Endpoint:         "http://" + svcName + ".svc.cluster.local:8080/v1",
+		ClusterID:        "",
 		RuntimeFramework: "vllm",
 	}
 	err := env.deployStore.CreateDeploy(ctx, deploy)
@@ -146,12 +146,12 @@ func syncDeployByID(ctx context.Context, t *testing.T, env *e2eTestEnv, deployID
 func createExternalLLMConfig(ctx context.Context, t *testing.T, env *e2eTestEnv, modelName, provider, url string) *database.LLMConfig {
 	t.Helper()
 	cfg, err := env.llmConfigStore.Create(ctx, database.LLMConfig{
-		ModelName: modelName,
-		Type:      database.LLMTypeAigatewayExternal,
-		Enabled:   true,
-		Provider:  provider,
+		ModelName:  modelName,
+		Type:       database.LLMTypeAigatewayExternal,
+		Enabled:    true,
+		Provider:   provider,
 		AuthHeader: "Bearer ext-key",
-		Metadata:  map[string]any{types.MetaKeyTasks: []any{"text-generation"}},
+		Metadata:   map[string]any{types.MetaKeyTasks: []any{"text-generation"}},
 	})
 	require.NoError(t, err)
 
@@ -210,12 +210,13 @@ func TestE2E_DeploySync_RunningCreatesUpstream(t *testing.T) {
 	assert.Equal(t, deploy.ID, upstream.Metadata.InternalModelInfo.SourceDeployID)
 
 	// Verify an llm_config was also created with the legacy model ID.
-	// The llm_config is created disabled — admin must enable it via the API.
+	// The llm_config is created enabled — the deploy is user-owned and must
+	// be reachable by its owner without admin intervention.
 	legacyModelID := info.LegacyModelID
 	llmCfg, err := env.llmConfigStore.GetByModelName(ctx, legacyModelID)
 	require.NoError(t, err)
 	require.NotNil(t, llmCfg)
-	assert.False(t, llmCfg.Enabled, "llm_config should be disabled until admin enables it")
+	assert.True(t, llmCfg.Enabled, "llm_config should be enabled by default for user-owned deploys")
 }
 
 func TestE2E_DeploySync_StopDisablesUpstream(t *testing.T) {
@@ -256,12 +257,13 @@ func TestE2E_DeploySync_DeleteRemovesUpstream(t *testing.T) {
 	deploy := createTestDeploy(ctx, t, env, user, repo, commontypes.InferenceType, "svc-e2e-delete")
 
 	// Sync running first to create the upstream.
-	_, err := syncDeployByID(ctx, t, env, deploy.ID)
+	info, err := syncDeployByID(ctx, t, env, deploy.ID)
 	require.NoError(t, err)
 
 	upstream, err := env.upstreamStore.GetBySourceID(ctx, commontypes.UpstreamSourceCSGHubDeploy, deploy.ID)
 	require.NoError(t, err)
 	require.NotNil(t, upstream)
+	require.NotZero(t, upstream.LLMConfigID)
 
 	// Now simulate a "deploy deleted" event.
 	err = env.syncComp.DeleteDeployTarget(ctx, deploy.ID)
@@ -271,6 +273,11 @@ func TestE2E_DeploySync_DeleteRemovesUpstream(t *testing.T) {
 	deleted, err := env.upstreamStore.GetBySourceID(ctx, commontypes.UpstreamSourceCSGHubDeploy, deploy.ID)
 	require.NoError(t, err)
 	require.Nil(t, deleted)
+
+	// The llm_config had only this one upstream — it must be cascade-deleted.
+	llmCfg, err := env.llmConfigStore.GetByModelName(ctx, info.LegacyModelID)
+	require.NoError(t, err)
+	assert.Nil(t, llmCfg, "llm_config with no remaining upstreams should be deleted along with the upstream")
 }
 
 func TestE2E_DeploySync_ReSyncUpdatesUpstream(t *testing.T) {
@@ -326,8 +333,8 @@ func TestE2E_DeploySync_ServerlessDeploy(t *testing.T) {
 }
 
 // enableLLMConfig simulates an admin enabling an llm_config via the API.
-// Internal models created by the deploy sync start disabled; this helper
-// flips the llm_config to enabled so the model becomes visible/routable.
+// llm_configs created by the deploy sync are already enabled by default;
+// this helper keeps the admin-enable path exercised in the read-path tests.
 func enableLLMConfig(ctx context.Context, t *testing.T, env *e2eTestEnv, modelName string) {
 	t.Helper()
 	cfg, err := env.llmConfigStore.GetByModelName(ctx, modelName)
@@ -391,6 +398,85 @@ func TestE2E_ModelRead_InternalModelAfterSync(t *testing.T) {
 	for _, m := range otherModels {
 		assert.NotEqual(t, model.ID, m.ID, "non-owner should not see other's inference model")
 	}
+}
+
+// A public (SecureLevel == EndpointPublic) inference deploy is visible to any
+// user after sync, and the secure level is persisted on the upstream's
+// InternalModelInfo.
+func TestE2E_ModelRead_PublicInternalModelVisibleToAll(t *testing.T) {
+	env := newE2ETestEnv(t)
+	defer env.db.Close()
+	ctx := context.TODO()
+
+	user, repo := createTestUserAndRepo(ctx, t, env, "read-public-user", "e2e/read-public-model")
+	deploy := createTestDeploy(ctx, t, env, user, repo, commontypes.InferenceType, "svc-e2e-read-public")
+	deploy.SecureLevel = commontypes.EndpointPublic
+	require.NoError(t, env.deployStore.UpdateDeploy(ctx, deploy))
+
+	// Sync the deploy to create upstream + llm_config.
+	info, err := syncDeployByID(ctx, t, env, deploy.ID)
+	require.NoError(t, err)
+	legacyModelID := info.LegacyModelID
+
+	// The secure level must be persisted on the upstream metadata.
+	upstream, err := env.upstreamStore.GetBySourceID(ctx, commontypes.UpstreamSourceCSGHubDeploy, deploy.ID)
+	require.NoError(t, err)
+	require.NotNil(t, upstream)
+	require.NotNil(t, upstream.Metadata)
+	require.NotNil(t, upstream.Metadata.InternalModelInfo)
+	assert.Equal(t, commontypes.EndpointPublic, upstream.Metadata.InternalModelInfo.SecureLevel)
+
+	// GetModelByID should work for a non-owner without admin intervention.
+	model, err := env.openaiComp.GetModelByID(ctx, "any-other-user-uuid", legacyModelID)
+	require.NoError(t, err)
+	require.NotNil(t, model)
+	assert.Equal(t, legacyModelID, model.ID)
+
+	// GetAvailableModels: non-owner should see the public inference model.
+	models, err := env.openaiComp.GetAvailableModels(ctx, "any-other-user-uuid")
+	require.NoError(t, err)
+	var found bool
+	for _, m := range models {
+		if m.ID == model.ID {
+			found = true
+			break
+		}
+	}
+	assert.True(t, found, "public inference model should be visible to any user")
+}
+
+// A private (SecureLevel == EndpointPrivate) inference deploy stays
+// owner-only after sync.
+func TestE2E_ModelRead_PrivateInternalModelOwnerOnly(t *testing.T) {
+	env := newE2ETestEnv(t)
+	defer env.db.Close()
+	ctx := context.TODO()
+
+	user, repo := createTestUserAndRepo(ctx, t, env, "read-private-user", "e2e/read-private-model")
+	deploy := createTestDeploy(ctx, t, env, user, repo, commontypes.InferenceType, "svc-e2e-read-private")
+	deploy.SecureLevel = commontypes.EndpointPrivate
+	require.NoError(t, env.deployStore.UpdateDeploy(ctx, deploy))
+
+	info, err := syncDeployByID(ctx, t, env, deploy.ID)
+	require.NoError(t, err)
+	legacyModelID := info.LegacyModelID
+
+	upstream, err := env.upstreamStore.GetBySourceID(ctx, commontypes.UpstreamSourceCSGHubDeploy, deploy.ID)
+	require.NoError(t, err)
+	require.NotNil(t, upstream)
+	require.NotNil(t, upstream.Metadata)
+	require.NotNil(t, upstream.Metadata.InternalModelInfo)
+	assert.Equal(t, commontypes.EndpointPrivate, upstream.Metadata.InternalModelInfo.SecureLevel)
+
+	// Owner can access their private model.
+	ownerModel, err := env.openaiComp.GetModelByID(ctx, user.UUID, legacyModelID)
+	require.NoError(t, err)
+	require.NotNil(t, ownerModel)
+
+	// Non-owner cannot.
+	otherModel, err := env.openaiComp.GetModelByID(ctx, "any-other-user-uuid", legacyModelID)
+	require.NoError(t, err)
+	assert.Nil(t, otherModel, "private inference model must not be visible to a non-owner")
 }
 
 func TestE2E_ModelRead_ServerlessModelVisibleToAll(t *testing.T) {

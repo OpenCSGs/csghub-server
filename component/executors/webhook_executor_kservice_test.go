@@ -109,9 +109,9 @@ func TestKServiceExecutor_updateDeployStatus_success(t *testing.T) {
 	}, nil)
 
 	dts.EXPECT().GetDeployBySvcName(ctx, event.ServiceName).Return(&database.Deploy{
-		ID:         int64(1),
-		SvcName:    event.ServiceName,
-		Status:     common.Deploying,
+		ID:          int64(1),
+		SvcName:     event.ServiceName,
+		Status:      common.Deploying,
 		ClusterNode: "",
 	}, nil)
 
@@ -504,7 +504,7 @@ func TestKServiceExecutor_updateDeployStatus_triggerHandleDeployRunning(t *testi
 		SvcName:    event.ServiceName,
 		UserUUID:   "user1",
 		DeployName: "deploy1",
-		Type:       types.SpaceType,
+		Type:       types.InferenceType,
 		GitPath:    "ns/n",
 	}, nil)
 
@@ -518,7 +518,7 @@ func TestKServiceExecutor_updateDeployStatus_triggerHandleDeployRunning(t *testi
 	dts.EXPECT().GetDeployByIDWithRelations(mock.Anything, int64(1)).Return(&database.Deploy{
 		ID:      int64(1),
 		SvcName: event.ServiceName,
-		Type:    types.SpaceType,
+		Type:    types.InferenceType,
 	}, nil).Run(func(ctx context.Context, id int64) {
 		goroutineDone.Done()
 	})
@@ -574,7 +574,7 @@ func TestKServiceExecutor_updateDeployStatus_triggerHandleDeployRunningOnSleepin
 		SvcName:    event.ServiceName,
 		UserUUID:   "user1",
 		DeployName: "deploy1",
-		Type:       types.SpaceType,
+		Type:       types.InferenceType,
 		GitPath:    "ns/n",
 	}, nil)
 
@@ -586,7 +586,7 @@ func TestKServiceExecutor_updateDeployStatus_triggerHandleDeployRunningOnSleepin
 	dts.EXPECT().GetDeployByIDWithRelations(mock.Anything, int64(1)).Return(&database.Deploy{
 		ID:      int64(1),
 		SvcName: event.ServiceName,
-		Type:    types.SpaceType,
+		Type:    types.InferenceType,
 	}, nil).Run(func(ctx context.Context, id int64) {
 		goroutineDone.Done()
 	})
@@ -1033,4 +1033,105 @@ func TestKServiceExecutor_syncDeployUpstream_skipsWhenRepositoryNil(t *testing.T
 
 	// Should not panic and should return without publishing
 	executor.syncDeployUpstream(ctx, 1)
+}
+
+// =====================================================================
+// handleDeployRunning → upstream sync type filter
+// =====================================================================
+
+// Only serverless and inference deploys are synced to the AIGateway upstream
+// store; other deploy types (spaces, finetunes, evaluations, notebooks) must
+// not trigger the upstream sync at all.
+func TestKServiceExecutor_handleDeployRunning_skipsUpstreamSyncForNonSyncableTypes(t *testing.T) {
+	ctx := context.TODO()
+	cfg, err := config.LoadConfig()
+	require.Nil(t, err)
+
+	for _, deployType := range []int{types.SpaceType, types.FinetuneType, types.EvaluationType, types.NotebookType} {
+		t.Run(types2Name(deployType), func(t *testing.T) {
+			mockNotificationRpc := mockrpc.NewMockNotificationSvcClient(t)
+			mockNotificationRpc.EXPECT().Send(mock.Anything, mock.Anything).Return(nil).Once()
+
+			dts := mockdb.NewMockDeployTaskStore(t)
+			// Zero expectations: with the strict mock, any GetDeployByIDWithRelations
+			// call (i.e. a wrongly triggered upstream sync) fails the test.
+
+			executor := &kserviceExecutorImpl{
+				cfg:                   cfg,
+				deployTaskStore:       dts,
+				notificationSvcClient: mockNotificationRpc,
+			}
+
+			executor.handleDeployRunning(ctx, 1, &database.Deploy{
+				ID:         1,
+				Type:       deployType,
+				Status:     common.Running,
+				SvcName:    "svc-test",
+				DeployName: "deploy1",
+				UserUUID:   "user1",
+				GitPath:    "ns/n",
+			})
+		})
+	}
+}
+
+// Serverless and inference deploys still load the deploy with relations for
+// the upstream sync.
+func TestKServiceExecutor_handleDeployRunning_syncsUpstreamForSyncableTypes(t *testing.T) {
+	ctx := context.TODO()
+	cfg, err := config.LoadConfig()
+	require.Nil(t, err)
+
+	for _, deployType := range []int{types.ServerlessType, types.InferenceType} {
+		t.Run(types2Name(deployType), func(t *testing.T) {
+			mockNotificationRpc := mockrpc.NewMockNotificationSvcClient(t)
+			mockNotificationRpc.EXPECT().Send(mock.Anything, mock.Anything).Return(nil).Once()
+
+			dts := mockdb.NewMockDeployTaskStore(t)
+			dts.EXPECT().GetDeployByIDWithRelations(mock.Anything, int64(1)).Return(&database.Deploy{
+				ID:      int64(1),
+				SvcName: "svc-test",
+				Type:    deployType,
+				// Repository is nil — info build is skipped, publish no-op.
+			}, nil).Once()
+
+			executor := &kserviceExecutorImpl{
+				cfg:                   cfg,
+				deployTaskStore:       dts,
+				notificationSvcClient: mockNotificationRpc,
+			}
+
+			executor.handleDeployRunning(ctx, 1, &database.Deploy{
+				ID:         1,
+				Type:       deployType,
+				Status:     common.Running,
+				SvcName:    "svc-test",
+				DeployName: "deploy1",
+				UserUUID:   "user1",
+				GitPath:    "ns/n",
+			})
+
+			dts.AssertExpectations(t)
+		})
+	}
+}
+
+// types2Name maps a deploy type constant to a readable subtest name.
+func types2Name(deployType int) string {
+	switch deployType {
+	case types.SpaceType:
+		return "space"
+	case types.InferenceType:
+		return "inference"
+	case types.FinetuneType:
+		return "finetune"
+	case types.ServerlessType:
+		return "serverless"
+	case types.EvaluationType:
+		return "evaluation"
+	case types.NotebookType:
+		return "notebook"
+	default:
+		return "other"
+	}
 }

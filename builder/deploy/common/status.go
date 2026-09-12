@@ -47,3 +47,15 @@ const (
 
 	ResourceUnhealthy = 28 // cluster resource unhealthy
 )
+
+// IsRunnableDeployStatus reports whether a deploy status represents a live
+// deployment instance (running or sleeping). Pending, deploying, stopped,
+// deleted, and failed statuses are not runnable.
+func IsRunnableDeployStatus(status int) bool {
+	switch status {
+	case Running, Sleeping:
+		return true
+	default:
+		return false
+	}
+}

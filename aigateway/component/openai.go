@@ -367,9 +367,10 @@ func (m *openaiComponentImpl) buildExternalModel(ctx context.Context, cfg *datab
 //
 // Returns (model, true) for a valid model, or (zero, false) to skip:
 //   - A csghub upstream without InternalModelInfo is skipped (with a warning).
-//   - When applyVisibility is true, internal non-serverless models whose
-//     OwnerUUID does not match callerUUID are skipped.
-func (m *openaiComponentImpl) llmConfigToModel(ctx context.Context, cfg *database.LLMConfig, callerUUID string, applyVisibility bool) (types.Model, bool) {
+//   - When applyVisibility is true, internal non-serverless models that are
+//     not public (SecureLevel != EndpointPublic) and whose OwnerUUID does
+//     not match callerUUID are skipped.
+func (m *openaiComponentImpl) llmConfigToModel(ctx context.Context, cfg *database.LLMConfig, callerUUID string) (types.Model, bool) {
 	upstreams := dbUpstreamsToConfigs(cfg.Upstreams)
 
 	for _, u := range cfg.Upstreams {
@@ -383,7 +384,11 @@ func (m *openaiComponentImpl) llmConfigToModel(ctx context.Context, cfg *databas
 		}
 		info := u.Metadata.InternalModelInfo
 
-		if applyVisibility && info.SvcType != commontypes.ServerlessType && info.OwnerUUID != callerUUID {
+		// Visibility: public (SecureLevel == EndpointPublic) internal models
+		// are visible to any caller; private (and legacy zero-value) models
+		// are owner-only. Serverless models are always public.
+		if info.SvcType != commontypes.ServerlessType &&
+			info.SecureLevel != commontypes.EndpointPublic && info.OwnerUUID != callerUUID {
 			return types.Model{}, false
 		}
 
@@ -401,7 +406,10 @@ func (m *openaiComponentImpl) llmConfigToModel(ctx context.Context, cfg *databas
 //
 // Visibility rules for internal (csghub-sourced) models:
 //   - Serverless deploys (SvcType == ServerlessType) are visible to all users.
-//   - Non-serverless deploys are only visible to the deploy owner (OwnerUUID == callerUUID).
+//   - Non-serverless deploys with a public secure level
+//     (SecureLevel == EndpointPublic) are visible to all users.
+//   - Other non-serverless deploys (private or legacy unset secure level) are
+//     only visible to the deploy owner (OwnerUUID == callerUUID).
 //
 // External models are always visible.
 func (m *openaiComponentImpl) getModelsFromLLMConfig(ctx context.Context, callerUUID string) ([]types.Model, error) {
@@ -422,7 +430,7 @@ func (m *openaiComponentImpl) getModelsFromLLMConfig(ctx context.Context, caller
 		}
 
 		for _, cfg := range configs {
-			model, ok := m.llmConfigToModel(ctx, cfg, callerUUID, true)
+			model, ok := m.llmConfigToModel(ctx, cfg, callerUUID)
 			if !ok {
 				continue
 			}
@@ -441,8 +449,8 @@ func (m *openaiComponentImpl) getModelsFromLLMConfig(ctx context.Context, caller
 // It queries extllmStore.GetByModelName which loads the llm_config with its
 // upstreams relation, then applies the same conversion logic as
 // getModelsFromLLMConfig. Visibility filtering is applied: serverless models
-// are visible to all users, non-serverless (private) models are only visible
-// to the deploy owner.
+// and public (SecureLevel == EndpointPublic) models are visible to all users;
+// other non-serverless (private) models are only visible to the deploy owner.
 func (m *openaiComponentImpl) GetModelByID(c context.Context, nsUUID, modelID string) (*types.Model, error) {
 	cfg, err := m.extllmStore.GetByModelName(c, modelID)
 	if err != nil {
@@ -455,7 +463,7 @@ func (m *openaiComponentImpl) GetModelByID(c context.Context, nsUUID, modelID st
 		return nil, nil
 	}
 
-	model, ok := m.llmConfigToModel(c, cfg, nsUUID, true)
+	model, ok := m.llmConfigToModel(c, cfg, nsUUID)
 	if !ok {
 		return nil, nil
 	}

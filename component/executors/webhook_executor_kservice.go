@@ -174,7 +174,11 @@ func (k *kserviceExecutorImpl) handleDeployRunning(parentCtx context.Context, so
 		}
 	}
 
-	k.syncDeployUpstream(ctx, deploy.ID)
+	// Only serverless and inference deploys serve LLM traffic; other deploy
+	// types (spaces, finetunes, evaluations, notebooks) are not synced.
+	if types.DeployTypeSyncsUpstream(deploy.Type) {
+		k.syncDeployUpstream(ctx, deploy.ID)
+	}
 }
 
 // syncDeployUpstream loads the deploy with relations, builds the upstream

@@ -89,6 +89,28 @@ func TestBuildDeployUpstreamInfoWithDeploy_NilDeploy(t *testing.T) {
 	assert.Nil(t, info)
 }
 
+func TestBuildDeployUpstreamInfoWithDeploy_SecureLevel(t *testing.T) {
+	deploy := &database.Deploy{
+		ID: 1,
+		Repository: &database.Repository{
+			Path: "org/model",
+			Name: "model",
+		},
+		Type:        commontypes.InferenceType,
+		SvcName:     "svc1",
+		SecureLevel: commontypes.EndpointPrivate,
+	}
+
+	info := BuildDeployUpstreamInfoWithDeploy(context.Background(), deploy, nil)
+	require.NotNil(t, info)
+	assert.Equal(t, commontypes.EndpointPrivate, info.SecureLevel)
+
+	deploy.SecureLevel = commontypes.EndpointPublic
+	info = BuildDeployUpstreamInfoWithDeploy(context.Background(), deploy, nil)
+	require.NotNil(t, info)
+	assert.Equal(t, commontypes.EndpointPublic, info.SecureLevel)
+}
+
 func TestBuildDeployUpstreamInfoWithDeploy_NilRepository(t *testing.T) {
 	deploy := &database.Deploy{ID: 1}
 	info := BuildDeployUpstreamInfoWithDeploy(context.Background(), deploy, nil)
