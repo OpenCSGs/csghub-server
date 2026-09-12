@@ -10,7 +10,6 @@ import (
 	_ "github.com/argoproj/argo-workflows/v3/pkg/apis/workflow/v1alpha1" // K8s Argo client types
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"opencsg.com/csghub-server/builder/deploy/cluster"
 	"opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/common/config"
@@ -84,13 +83,21 @@ func (b *BatchComponent) BatchKsvcStatus(ctx context.Context, clusterID string, 
 }
 
 func ksvcCodeFromServiceAndPods(svc *v1.Service, pods *v1.PodList) int {
-	selector := labels.Set(svc.Spec.Selector).AsSelectorPreValidated()
 	readyCount := 0
 	totalCount := 0
 	if pods != nil {
 		for i := range pods.Items {
 			pod := &pods.Items[i]
-			if !selector.Matches(labels.Set(pod.Labels)) {
+			// The Knative Route Service (ExternalName type) has no spec.selector,
+			// so pods must be matched by the label Knative injects on every pod.
+			// Note: an empty label set is treated as Everything() by the K8s
+			// selector library, which would match ALL pods in the namespace and
+			// miscount readiness across services.
+			if pod.Labels[KeyServiceLabel] != svc.Name {
+				continue
+			}
+			// Skip terminating pods, mirroring GetServicePods.
+			if pod.DeletionTimestamp != nil {
 				continue
 			}
 			totalCount++
