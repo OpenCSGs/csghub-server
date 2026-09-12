@@ -99,7 +99,7 @@ func reconcileDeployCluster(ctx context.Context, a *Activities, cid string, depl
 					"deploy_id", d.ID, "svc_name", d.SvcName)
 				return
 			}
-			applyStatusUpdate(ctx, a, d, currentStatus, common.DeployFailed,
+			applyStatusUpdate(ctx, a, d, currentStatus, fallbackTargetStatus(currentStatus),
 				nil, "runner_unreachable")
 		},
 		// buildBatchItem
@@ -122,7 +122,7 @@ func reconcileDeployCluster(ctx context.Context, a *Activities, cid string, depl
 				return
 			}
 			if time.Since(d.StatusUpdateAt) > hardTimeout {
-				applyStatusUpdate(ctx, a, d, currentStatus, common.DeployFailed,
+				applyStatusUpdate(ctx, a, d, currentStatus, fallbackTargetStatus(currentStatus),
 					nil, "runner_unreachable")
 			}
 		},
@@ -173,9 +173,48 @@ func processBatchResult(ctx context.Context, a *Activities, deploy *database.Dep
 		a.getLogger(ctx).Warn("reconcile: unknown deploy type, skip", "deploy_id", deploy.ID, "type", deploy.Type)
 		return
 	}
-	if newStatus != 0 && newStatus != currentStatus {
-		applyStatusUpdate(ctx, a, deploy, currentStatus, newStatus, instances, "runner_status_sync")
+	if newStatus != 0 {
+		if newStatus == currentStatus {
+			// Running→Running (or other no-op transitions): only refresh
+			// StatusUpdateAt to reset the fallback timer. Do NOT touch
+			// Reason/Instances or overwrite fields that the informer may
+			// have updated since the scan snapshot.
+			refreshStatusTimestamp(ctx, a, deploy, currentStatus)
+		} else {
+			applyStatusUpdate(ctx, a, deploy, currentStatus, newStatus, instances, "runner_status_sync")
+		}
 	}
+}
+
+// refreshStatusTimestamp only bumps StatusUpdateAt, leaving all other
+// fields untouched. Used when reconcile confirms the deploy is still
+// in the same status (e.g. Running→Running) so that the fallback timer
+// does not accumulate stale time across successful BatchStatus calls.
+func refreshStatusTimestamp(ctx context.Context, a *Activities, deploy *database.Deploy, expectedStatus int) {
+	logger := log.With(a.getLogger(ctx),
+		"deploy_id", deploy.ID, "svc_name", deploy.SvcName,
+		"expected_status", statusName(expectedStatus),
+	)
+	current, err := a.stores.deployTask.GetDeployByID(ctx, deploy.ID)
+	if err != nil {
+		logger.Error("reconcile: re-read deploy failed, skip refresh", "error", err)
+		return
+	}
+	if current == nil {
+		logger.Warn("reconcile: deploy not found, skip refresh, may be deleted")
+		return
+	}
+	if current.Status != expectedStatus {
+		logger.Info("reconcile: status changed since scan, skip refresh",
+			"db_status", statusName(current.Status))
+		return
+	}
+	current.StatusUpdateAt = time.Now()
+	if err := a.stores.deployTask.UpdateDeploy(ctx, current); err != nil {
+		logger.Error("reconcile: refresh status timestamp failed", "error", err)
+		return
+	}
+	logger.Debug("reconcile: status timestamp refreshed")
 }
 
 // ==================== Workflow Reconcile ====================
@@ -446,6 +485,20 @@ func applyStatusUpdate(ctx context.Context, a *Activities, deploy *database.Depl
 		return
 	}
 	logger.Info("reconcile: deploy status updated")
+}
+
+// fallbackTargetStatus decides the target status when the runner is
+// unreachable and the deploy has been stuck beyond hardTimeout. For
+// Running deploys, scale-to-zero or transient runner unavailability
+// should surface as Stopped (recoverable) rather than DeployFailed
+// (terminal), matching the normal-mapping semantics in processBatchResult.
+// Deploying/Startup remain DeployFailed since a stuck deployment is
+// genuinely failed.
+func fallbackTargetStatus(currentStatus int) int {
+	if currentStatus == common.Running {
+		return common.Stopped
+	}
+	return common.DeployFailed
 }
 
 func reconcileReason(source string) string {
