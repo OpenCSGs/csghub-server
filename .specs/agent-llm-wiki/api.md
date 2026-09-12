@@ -83,7 +83,7 @@ GET /api/v1/agent/knowledge-bases/{id}
 Authorization: Bearer <user_access_token>
 ```
 
-The list API supports the `search`, `type` (`llmwiki` or `langflow`), `public`, `editable`, `per`, and `page` query parameters. Results are ordered by pinned state, then `llmwiki` before `langflow`, then `updated_at` descending.
+The list API supports the `search`, `type` (`llmwiki` or `langflow`), `public`, `editable`, `per`, and `page` query parameters. The `search` term matches the KB `name` and `description` (case-insensitive substring). Results are ordered by pinned state, then `llmwiki` before `langflow`, then `updated_at` descending.
 
 For an LLM-Wiki item, `metadata` includes two client entry points:
 
@@ -115,7 +115,7 @@ The example abbreviates `resource_state`; the API may return additional current 
 - `metadata.base_url` is the absolute base URL for LLM-Wiki management subresources. Its public API origin comes from `Model.DownloadEndpoint` (`STARHUB_SERVER_MODEL_DOWNLOAD_ENDPOINT`), the same configuration used for CSGClaw's `CSGHUB_API_BASE_URL`; it does not use `APIServer.PublicDomain`. The base URL itself is not an API operation.
 - `metadata.mcp_endpoint_url` is the public AIGateway MCP endpoint backed by the private URL stored during registration.
 - `metadata.resource_state` omits its upstream `mcp_endpoint_url` field to avoid duplicating the stable top-level client entry point.
-- Resource-state enrichment has a two-second timeout. If LLM-Wiki is unavailable or times out, CSGHub still returns the local KB record without `metadata.resource_state`.
+- Resource-state enrichment has a ten-second timeout. If LLM-Wiki is unavailable or times out, CSGHub still returns the local KB record without `metadata.resource_state`.
 - The list flow uses one batch resource-state request for the LLM-Wiki KBs on the current page.
 
 ## Management Proxy
@@ -143,7 +143,7 @@ CSGHub always removes a caller-supplied `X-CSGHub-Actor-Name`. Non-GET requests 
 
 Only paths bound to the selected `content_id` are exposed. The proxy does not expose an unscoped LLM-Wiki root API.
 
-The read-only evidence query subresource uses `POST` but requires only read permission: `/query` (LLMWiki #34).
+The read-only evidence query subresources use `POST` but require only read permission: `/query` (LLMWiki #34) and `/preview-queries` (LLMWiki #13 previewQuery).
 
 ## MCP Proxy
 
