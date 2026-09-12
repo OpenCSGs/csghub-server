@@ -148,7 +148,7 @@ func (s *agentKnowledgeBaseStoreImpl) applyAgentKnowledgeBaseFilters(query *bun.
 	filter.Search = strings.TrimSpace(filter.Search)
 	if filter.Search != "" {
 		searchPattern := "%" + filter.Search + "%"
-		query = query.Where("LOWER(akb.name) LIKE LOWER(?)", searchPattern)
+		query = query.Where("LOWER(akb.name) LIKE LOWER(?) OR LOWER(akb.description) LIKE LOWER(?)", searchPattern, searchPattern)
 	}
 	if filter.Type != "" {
 		query = query.Where("akb.type = ?", filter.Type)

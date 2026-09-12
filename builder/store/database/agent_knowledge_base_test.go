@@ -273,6 +273,15 @@ func TestAgentKnowledgeBaseStore_List_WithFilters(t *testing.T) {
 	require.Len(t, knowledgeBases, 2) // Should find both Python knowledge bases
 	require.Equal(t, 2, total)
 
+	// Test search filter also matches description when the term is not in the name
+	knowledgeBases, total, err = store.List(ctx, types.AgentKnowledgeBaseFilter{
+		NsUUID: userUUID,
+		Search: "programming",
+	}, 10, 1)
+	require.NoError(t, err)
+	require.Len(t, knowledgeBases, 2) // "programming" only appears in the descriptions of kb1 and kb2
+	require.Equal(t, 2, total)
+
 	// Test public filter
 	knowledgeBases, total, err = store.List(ctx, types.AgentKnowledgeBaseFilter{
 		NsUUID: userUUID,

@@ -126,7 +126,7 @@ For example:
 Before contacting llmservice, the handler loads the canonical `agent_knowledge_bases` row by `content_id` and requires `type=llmwiki`.
 
 - `GET` and `HEAD` require read permission: personal namespace ownership or an organization role for which `CanRead` is true.
-- All other methods require write permission: personal namespace ownership or an organization role for which `CanWrite` is true. Exception: the read-only evidence query subresource `/query` (LLMWiki internal #34 queryKnowledgeBase) requires read permission even though it uses `POST`.
+- All other methods require write permission: personal namespace ownership or an organization role for which `CanWrite` is true. Exceptions: the read-only evidence query subresources `/query` (LLMWiki internal #34 queryKnowledgeBase) and `/preview-queries` (LLMWiki internal #13 previewQuery) require read permission even though they use `POST`.
 - `CONNECT` and `TRACE` always return `405`.
 
 A missing or wrong-type target returns `404`; insufficient permission returns `403`. LLM-Wiki KBs are visible only to their personal owner or organization members, so the stored `public` value never bypasses this authorization check.
@@ -149,7 +149,7 @@ The proxy injects trusted platform headers:
 | --- | --- |
 | `X-Request-ID` | The current CSGHub trace request ID. |
 | `X-CSGHub-Actor-ID` | The authenticated user's UUID. |
-| `X-CSGHub-Actor-Name` | The authenticated user's login name. Sent on non-GET methods (`POST`/`PUT`/`PATCH`/`DELETE`, including the read-only `/query` POST) so LLM-Wiki can record the operator in its operation logs. |
+| `X-CSGHub-Actor-Name` | The authenticated user's login name. Sent on non-GET methods (`POST`/`PUT`/`PATCH`/`DELETE`, including the read-only `/query` and `/preview-queries` POSTs) so LLM-Wiki can record the operator in its operation logs. |
 
 Caller-supplied values for trusted platform headers must not override the platform-derived values. `X-CSGHub-Actor-Name` is always removed first; management requests set it again only for non-GET/HEAD methods.
 
