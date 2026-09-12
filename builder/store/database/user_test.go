@@ -2,18 +2,66 @@ package database_test
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"reflect"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+	"github.com/uptrace/bun"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/tests"
 	"opencsg.com/csghub-server/common/types"
 )
+
+type userDeletionJobClient struct {
+	inputs []database.RepositoryDeletionJobInput
+}
+
+func (c *userDeletionJobClient) InsertRepositoryDeletionJobTx(_ context.Context, _ *sql.Tx, input database.RepositoryDeletionJobInput) (int64, error) {
+	c.inputs = append(c.inputs, input)
+	return int64(len(c.inputs)), nil
+}
+
+type userRepositoryWriteHookContextKey struct{}
+type userDeletionHookContextKey struct{}
+
+type userDeletionNamespaceLockHook struct {
+	path                   string
+	writeNamespaceLocked   chan struct{}
+	resumeWrite            chan struct{}
+	deleteNamespaceAttempt chan struct{}
+	writeOnce              sync.Once
+	deleteOnce             sync.Once
+}
+
+func (h *userDeletionNamespaceLockHook) BeforeQuery(ctx context.Context, event *bun.QueryEvent) context.Context {
+	if ctx.Value(userDeletionHookContextKey{}) != true {
+		return ctx
+	}
+	query := strings.ToUpper(event.Query)
+	if strings.Contains(query, `DELETE FROM "NAMESPACES"`) ||
+		(strings.Contains(query, `FROM "NAMESPACES"`) && strings.Contains(query, "FOR UPDATE")) {
+		h.deleteOnce.Do(func() { close(h.deleteNamespaceAttempt) })
+	}
+	return ctx
+}
+
+func (h *userDeletionNamespaceLockHook) AfterQuery(ctx context.Context, event *bun.QueryEvent) {
+	if ctx.Value(userRepositoryWriteHookContextKey{}) != true || event.Err != nil {
+		return
+	}
+	query := strings.ToUpper(event.Query)
+	if strings.Contains(query, `FROM "NAMESPACES"`) && strings.Contains(query, "FOR KEY SHARE") && strings.Contains(event.Query, h.path) {
+		h.writeOnce.Do(func() { close(h.writeNamespaceLocked) })
+		<-h.resumeWrite
+	}
+}
 
 func TestUserStore_Roles(t *testing.T) {
 	type fields struct {
@@ -650,6 +698,218 @@ func TestUserStore_DeleteUserAndRelationsLastOrgAdmin(t *testing.T) {
 		Count(ctx)
 	require.NoError(t, err)
 	require.Equal(t, 1, memberCount)
+}
+
+func TestUserStore_DeleteUserAndRelationsDeletesRepositoriesOnce(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.Background()
+
+	jobClient := &userDeletionJobClient{}
+	us := database.NewUserStoreWithDBAndDeletionJobClient(db, jobClient)
+	user := &database.User{GitID: time.Now().UnixNano(), UUID: uuid.NewString(), Username: "delete-user-repositories"}
+	require.NoError(t, us.Create(ctx, user, &database.Namespace{Path: user.Username}))
+
+	repository := &database.Repository{
+		UserID: user.ID, Name: "model", Path: user.Username + "/model",
+		GitPath: "models_" + user.Username + "/model", RepositoryType: types.ModelRepo,
+	}
+	_, err := db.Core.NewInsert().Model(repository).Exec(ctx)
+	require.NoError(t, err)
+	_, err = db.Core.NewInsert().Model(&database.Model{RepositoryID: repository.ID}).Exec(ctx)
+	require.NoError(t, err)
+
+	require.NoError(t, us.DeleteUserAndRelations(ctx, *user, types.CloseAccountReq{}))
+
+	repositoryCount, err := db.Core.NewSelect().Model((*database.Repository)(nil)).WhereAllWithDeleted().
+		Where("id = ?", repository.ID).Count(ctx)
+	require.NoError(t, err)
+	require.Equal(t, 1, repositoryCount)
+	var deletedRepository database.Repository
+	require.NoError(t, db.Core.NewSelect().Model(&deletedRepository).WhereAllWithDeleted().
+		Where("id = ?", repository.ID).Scan(ctx))
+	require.False(t, deletedRepository.DeletedAt.IsZero())
+	pendingCount, err := db.Core.NewSelect().Model((*database.PendingDeletion)(nil)).
+		Where("table_name = ?", database.PendingDeletionTableNameRepository).
+		Where("value = ?", repository.GitalyPath()).Count(ctx)
+	require.NoError(t, err)
+	require.Zero(t, pendingCount)
+	require.Len(t, jobClient.inputs, 1)
+	require.Equal(t, user.UUID, jobClient.inputs[0].OwnerUUID)
+	require.Equal(t, database.UserNamespace, jobClient.inputs[0].OwnerType)
+}
+
+func TestUserStore_DeleteUserAndRelationsResolvesSoftDeletedUserOwner(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.Background()
+
+	jobClient := &userDeletionJobClient{}
+	us := database.NewUserStoreWithDBAndDeletionJobClient(db, jobClient)
+	user := &database.User{GitID: time.Now().UnixNano(), UUID: uuid.NewString(), Username: "delete-soft-user-repositories"}
+	require.NoError(t, us.Create(ctx, user, &database.Namespace{Path: user.Username}))
+	repository := &database.Repository{
+		UserID: user.ID, Name: "model", Path: user.Username + "/model",
+		GitPath: "models_" + user.Username + "/model", RepositoryType: types.ModelRepo,
+	}
+	_, err := db.Core.NewInsert().Model(repository).Exec(ctx)
+	require.NoError(t, err)
+
+	require.NoError(t, us.SoftDeleteUserAndRelations(ctx, *user, types.CloseAccountReq{}))
+	softDeletedUser, err := us.FindByUsernameWithDeleted(ctx, user.Username)
+	require.NoError(t, err)
+	require.NoError(t, us.DeleteUserAndRelations(ctx, softDeletedUser, types.CloseAccountReq{}))
+
+	require.Len(t, jobClient.inputs, 1)
+	require.Equal(t, user.UUID, jobClient.inputs[0].OwnerUUID)
+	require.Equal(t, database.UserNamespace, jobClient.inputs[0].OwnerType)
+}
+
+func TestUserStore_DeleteUserAndRelationsSerializesWithRepositoryCreation(t *testing.T) {
+	db := tests.InitTransactionTestDB()
+	defer db.Close()
+	ctx := context.Background()
+
+	jobClient := &userDeletionJobClient{}
+	userStore := database.NewUserStoreWithDBAndDeletionJobClient(db, jobClient)
+	repoStore := database.NewRepoStoreWithDB(db)
+	user := &database.User{GitID: time.Now().UnixNano(), UUID: uuid.NewString(), Username: "delete-user-concurrent-create"}
+	require.NoError(t, userStore.Create(ctx, user, &database.Namespace{Path: user.Username}))
+
+	hook := &userDeletionNamespaceLockHook{
+		path: user.Username, writeNamespaceLocked: make(chan struct{}), resumeWrite: make(chan struct{}),
+		deleteNamespaceAttempt: make(chan struct{}),
+	}
+	db.BunDB.AddQueryHook(hook)
+
+	createResult := make(chan error, 1)
+	go func() {
+		_, err := repoStore.CreateRepo(context.WithValue(ctx, userRepositoryWriteHookContextKey{}, true), database.Repository{
+			UserID: user.ID, Name: "new-repository", Path: user.Username + "/new-repository",
+			GitPath: "models_" + user.Username + "/new-repository", RepositoryType: types.ModelRepo,
+		})
+		createResult <- err
+	}()
+	select {
+	case <-hook.writeNamespaceLocked:
+	case <-time.After(5 * time.Second):
+		require.FailNow(t, "repository creation did not acquire the user namespace lock")
+	}
+
+	deleteResult := make(chan error, 1)
+	go func() {
+		deleteResult <- userStore.DeleteUserAndRelations(
+			context.WithValue(ctx, userDeletionHookContextKey{}, true), *user, types.CloseAccountReq{},
+		)
+	}()
+	select {
+	case <-hook.deleteNamespaceAttempt:
+	case <-time.After(5 * time.Second):
+		require.FailNow(t, "user deletion did not attempt to lock or delete the user namespace")
+	}
+	close(hook.resumeWrite)
+
+	require.NoError(t, <-createResult)
+	require.NoError(t, <-deleteResult)
+	active, err := db.Core.NewSelect().Model((*database.Repository)(nil)).
+		Where("path = ?", user.Username+"/new-repository").Exists(ctx)
+	require.NoError(t, err)
+	require.False(t, active, "repository committed before user deletion must be included in deletion")
+	require.Len(t, jobClient.inputs, 1)
+
+	_, err = repoStore.CreateRepo(ctx, database.Repository{
+		UserID: user.ID, Name: "late-repository", Path: user.Username + "/late-repository",
+		GitPath: "models_" + user.Username + "/late-repository", RepositoryType: types.ModelRepo,
+	})
+	require.ErrorContains(t, err, fmt.Sprintf("repository namespace %q is deleted", user.Username))
+}
+
+func TestUserStore_DeleteUserAndRelationsSerializesWithRepositoryTransfer(t *testing.T) {
+	db := tests.InitTransactionTestDB()
+	defer db.Close()
+	ctx := context.Background()
+
+	jobClient := &userDeletionJobClient{}
+	userStore := database.NewUserStoreWithDBAndDeletionJobClient(db, jobClient)
+	repoStore := database.NewRepoStoreWithDB(db)
+	source := &database.User{GitID: time.Now().UnixNano(), UUID: uuid.NewString(), Username: "a-delete-user-transfer"}
+	target := &database.User{GitID: time.Now().UnixNano() + 1, UUID: uuid.NewString(), Username: "b-target-user-transfer"}
+	require.NoError(t, userStore.Create(ctx, source, &database.Namespace{Path: source.Username}))
+	require.NoError(t, userStore.Create(ctx, target, &database.Namespace{Path: target.Username}))
+	repository, err := repoStore.CreateRepo(ctx, database.Repository{
+		UserID: source.ID, Name: "transferred-repository", Path: source.Username + "/transferred-repository",
+		GitPath: "models_" + source.Username + "/transferred-repository", RepositoryType: types.ModelRepo,
+	})
+	require.NoError(t, err)
+
+	hook := &userDeletionNamespaceLockHook{
+		path: source.Username, writeNamespaceLocked: make(chan struct{}), resumeWrite: make(chan struct{}),
+		deleteNamespaceAttempt: make(chan struct{}),
+	}
+	db.BunDB.AddQueryHook(hook)
+
+	transferResult := make(chan error, 1)
+	go func() {
+		moved := *repository
+		moved.UserID = target.ID
+		moved.Path = target.Username + "/transferred-repository"
+		moved.GitPath = "models_" + target.Username + "/transferred-repository"
+		_, updateErr := repoStore.UpdateRepo(context.WithValue(ctx, userRepositoryWriteHookContextKey{}, true), moved)
+		transferResult <- updateErr
+	}()
+	select {
+	case <-hook.writeNamespaceLocked:
+	case <-time.After(5 * time.Second):
+		require.FailNow(t, "repository transfer did not acquire the source namespace lock")
+	}
+
+	deleteResult := make(chan error, 1)
+	go func() {
+		deleteResult <- userStore.DeleteUserAndRelations(
+			context.WithValue(ctx, userDeletionHookContextKey{}, true), *source, types.CloseAccountReq{},
+		)
+	}()
+	select {
+	case <-hook.deleteNamespaceAttempt:
+	case <-time.After(5 * time.Second):
+		require.FailNow(t, "user deletion did not attempt to lock or delete the source namespace")
+	}
+	close(hook.resumeWrite)
+
+	require.NoError(t, <-transferResult)
+	require.NoError(t, <-deleteResult)
+	var stored database.Repository
+	require.NoError(t, db.Core.NewSelect().Model(&stored).Where("id = ?", repository.ID).Scan(ctx))
+	require.Equal(t, target.ID, stored.UserID)
+	require.Equal(t, target.Username+"/transferred-repository", stored.Path)
+	require.Empty(t, jobClient.inputs)
+}
+
+func TestUserStore_DeleteUserAndRelationsRetainsRepositories(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.Background()
+
+	us := database.NewUserStoreWithDB(db)
+	user := &database.User{GitID: time.Now().UnixNano(), UUID: uuid.NewString(), Username: "retain-user-repositories"}
+	require.NoError(t, us.Create(ctx, user, &database.Namespace{Path: user.Username}))
+	repository := &database.Repository{
+		UserID: user.ID, Name: "model", Path: user.Username + "/model",
+		GitPath: "models_" + user.Username + "/model", RepositoryType: types.ModelRepo,
+	}
+	_, err := db.Core.NewInsert().Model(repository).Exec(ctx)
+	require.NoError(t, err)
+
+	require.NoError(t, us.DeleteUserAndRelations(ctx, *user, types.CloseAccountReq{Repository: true}))
+
+	repositoryCount, err := db.Core.NewSelect().Model((*database.Repository)(nil)).WhereAllWithDeleted().
+		Where("id = ?", repository.ID).Count(ctx)
+	require.NoError(t, err)
+	require.Equal(t, 1, repositoryCount)
+	pendingCount, err := db.Core.NewSelect().Model((*database.PendingDeletion)(nil)).
+		Where("table_name = ?", database.PendingDeletionTableNameRepository).Count(ctx)
+	require.NoError(t, err)
+	require.Zero(t, pendingCount)
 }
 
 func TestUserStore_SoftDeleteUserAndRelationsLastOrgAdmin(t *testing.T) {

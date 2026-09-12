@@ -6,12 +6,14 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"github.com/uptrace/bun"
 	mockcache "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/cache"
 	deployCommon "opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/builder/store/cache"
@@ -20,6 +22,87 @@ import (
 	"opencsg.com/csghub-server/common/tests"
 	"opencsg.com/csghub-server/common/types"
 )
+
+type updateNamespaceLockHook struct {
+	path   string
+	locked chan struct{}
+	once   sync.Once
+}
+
+type moveOutDeleteHookContextKey struct{}
+type moveOutUpdateHookContextKey struct{}
+type mixedCaseUpdateHookContextKey struct{}
+type mixedCaseDeleteHookContextKey struct{}
+
+type moveOutDeleteHook struct {
+	namespaceLocked chan struct{}
+	resume          chan struct{}
+	updateRead      chan struct{}
+	updateAttempt   chan struct{}
+	once            sync.Once
+	updateOnce      sync.Once
+	attemptOnce     sync.Once
+}
+
+type mixedCaseNamespaceOrderHook struct {
+	firstPath     string
+	blockedPath   string
+	firstLocked   chan struct{}
+	deleteAttempt chan struct{}
+	resume        chan struct{}
+	firstOnce     sync.Once
+	attemptOnce   sync.Once
+}
+
+func (h *mixedCaseNamespaceOrderHook) BeforeQuery(ctx context.Context, event *bun.QueryEvent) context.Context {
+	if ctx.Value(mixedCaseDeleteHookContextKey{}) == true && strings.Contains(event.Query, `FROM "namespaces"`) && strings.Contains(event.Query, h.blockedPath) {
+		h.attemptOnce.Do(func() { close(h.deleteAttempt) })
+	}
+	return ctx
+}
+
+func (h *mixedCaseNamespaceOrderHook) AfterQuery(ctx context.Context, event *bun.QueryEvent) {
+	if event.Err == nil && ctx.Value(mixedCaseUpdateHookContextKey{}) == true && strings.Contains(strings.ToUpper(event.Query), "FOR KEY SHARE") && strings.Contains(event.Query, h.firstPath) {
+		h.firstOnce.Do(func() { close(h.firstLocked) })
+		<-h.resume
+	}
+}
+
+func (h *moveOutDeleteHook) BeforeQuery(ctx context.Context, event *bun.QueryEvent) context.Context {
+	if ctx.Value(moveOutUpdateHookContextKey{}) == true && strings.Contains(event.Query, `FROM "namespaces"`) {
+		h.attemptOnce.Do(func() { close(h.updateAttempt) })
+	}
+	if ctx.Value(moveOutDeleteHookContextKey{}) != true || !strings.Contains(event.Query, `FROM "repositories"`) {
+		return ctx
+	}
+	select {
+	case <-h.namespaceLocked:
+		<-h.resume
+	default:
+	}
+	return ctx
+}
+
+func (h *moveOutDeleteHook) AfterQuery(ctx context.Context, event *bun.QueryEvent) {
+	query := strings.ToUpper(event.Query)
+	if event.Err == nil && ctx.Value(moveOutUpdateHookContextKey{}) == true && strings.Contains(event.Query, `FROM "repositories"`) && !strings.Contains(query, "FOR UPDATE") {
+		h.updateOnce.Do(func() { close(h.updateRead) })
+	}
+	if event.Err == nil && ctx.Value(moveOutDeleteHookContextKey{}) == true && strings.Contains(query, "FOR UPDATE") && strings.Contains(event.Query, `FROM "namespaces"`) {
+		h.once.Do(func() { close(h.namespaceLocked) })
+	}
+}
+
+func (h *updateNamespaceLockHook) BeforeQuery(ctx context.Context, _ *bun.QueryEvent) context.Context {
+	return ctx
+}
+
+func (h *updateNamespaceLockHook) AfterQuery(_ context.Context, event *bun.QueryEvent) {
+	query := strings.ToUpper(event.Query)
+	if event.Err == nil && strings.Contains(query, "FOR KEY SHARE") && strings.Contains(event.Query, h.path) {
+		h.once.Do(func() { close(h.locked) })
+	}
+}
 
 // TestRepositoryGitalyPath verifies mirror workers derive both legacy and hashed storage paths from loaded metadata.
 func TestRepositoryGitalyPath(t *testing.T) {
@@ -121,13 +204,6 @@ func TestRepoStore_CRUD(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, "repo1-new", rp.Name)
 
-	err = store.DeleteRepo(ctx, database.Repository{
-		ID: rp.ID,
-	})
-	require.Nil(t, err)
-	err = db.Core.NewSelect().Model(rp).Where("user_id=?", 123).Scan(ctx)
-	require.NotNil(t, err)
-
 	_, err = store.UpdateOrCreateRepo(ctx, database.Repository{
 		Name:           "MyName",
 		Nickname:       "Original Name",
@@ -160,6 +236,235 @@ func TestRepoStore_CRUD(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, 1, cnt)
 
+}
+
+func TestRepoStore_UpdateRepoSerializesMoveWithOrganizationDeletion(t *testing.T) {
+	db := tests.InitTransactionTestDB()
+	defer db.Close()
+	ctx := context.Background()
+	user := createOrganizationUnitMemberTestUser(t, ctx, db, "repository-move-delete-user")
+	orgPath := "repository-move-delete-target"
+	orgUUID := uuid.New()
+	orgStore := database.NewOrgStoreWithDBAndDeletionJobClient(db, &testRepositoryDeletionJobClient{})
+	repoStore := database.NewRepoStoreWithDB(db)
+	require.NoError(t, orgStore.Create(ctx,
+		&database.Organization{Name: orgPath, Nickname: orgPath, UUID: orgUUID, UserID: user.ID},
+		&database.Namespace{Path: orgPath, UUID: orgUUID.String(), UserID: user.ID},
+	))
+	_, err := db.Core.NewInsert().Model(&database.Namespace{
+		Path: "repository-move-delete-source", UUID: uuid.NewString(), UserID: user.ID,
+	}).Exec(ctx)
+	require.NoError(t, err)
+	repo, err := repoStore.CreateRepo(ctx, database.Repository{
+		Name: "repo", Path: "repository-move-delete-source/repo",
+		GitPath: "models_repository-move-delete-source/repo", RepositoryType: types.ModelRepo, UserID: user.ID,
+	})
+	require.NoError(t, err)
+
+	locked := make(chan struct{})
+	db.BunDB.AddQueryHook(&updateNamespaceLockHook{path: orgPath, locked: locked})
+	blocker, err := db.BunDB.DB.Conn(ctx)
+	require.NoError(t, err)
+	defer blocker.Close()
+	_, err = blocker.ExecContext(ctx, "BEGIN")
+	require.NoError(t, err)
+	_, err = blocker.ExecContext(ctx, "LOCK TABLE sync_versions IN ACCESS EXCLUSIVE MODE")
+	require.NoError(t, err)
+	released := false
+	defer func() {
+		if !released {
+			_, _ = blocker.ExecContext(ctx, "ROLLBACK")
+		}
+	}()
+
+	repo.Path = orgPath + "/repo"
+	updateResult := make(chan error, 1)
+	go func() {
+		_, updateErr := repoStore.UpdateRepo(ctx, *repo)
+		updateResult <- updateErr
+	}()
+	select {
+	case <-locked:
+	case updateErr := <-updateResult:
+		require.NoError(t, updateErr)
+		require.FailNow(t, "repository update finished before locking the target namespace")
+	case <-time.After(5 * time.Second):
+		require.FailNow(t, "repository update did not lock the target namespace")
+	}
+
+	deleteResult := make(chan error, 1)
+	go func() {
+		_, deleteErr := orgStore.Delete(ctx, orgPath)
+		deleteResult <- deleteErr
+	}()
+	select {
+	case deleteErr := <-deleteResult:
+		require.NoError(t, deleteErr)
+		require.FailNow(t, "organization deletion completed while repository move held the namespace lock")
+	case <-time.After(500 * time.Millisecond):
+	}
+
+	_, err = blocker.ExecContext(ctx, "COMMIT")
+	require.NoError(t, err)
+	released = true
+	require.NoError(t, <-updateResult)
+	require.NoError(t, <-deleteResult)
+	exists, err := db.Core.NewSelect().Model((*database.Repository)(nil)).Where("id = ?", repo.ID).Exists(ctx)
+	require.NoError(t, err)
+	require.False(t, exists)
+
+	deletedPath := "repository-move-already-deleted-target"
+	deletedUUID := uuid.New()
+	require.NoError(t, orgStore.Create(ctx,
+		&database.Organization{Name: deletedPath, Nickname: deletedPath, UUID: deletedUUID, UserID: user.ID},
+		&database.Namespace{Path: deletedPath, UUID: deletedUUID.String(), UserID: user.ID},
+	))
+	repoAfterDelete, err := repoStore.CreateRepo(ctx, database.Repository{
+		Name: "repo-after-delete", Path: "repository-move-delete-source/repo-after-delete",
+		GitPath: "models_repository-move-delete-source/repo-after-delete", RepositoryType: types.ModelRepo, UserID: user.ID,
+	})
+	require.NoError(t, err)
+	_, err = orgStore.Delete(ctx, deletedPath)
+	require.NoError(t, err)
+	repoAfterDelete.Path = deletedPath + "/repo-after-delete"
+	_, err = repoStore.UpdateRepo(ctx, *repoAfterDelete)
+	require.ErrorContains(t, err, "repository namespace \""+deletedPath+"\" is deleted")
+	require.NoError(t, db.Core.NewSelect().Model(repoAfterDelete).Where("id = ?", repoAfterDelete.ID).Scan(ctx))
+	require.Equal(t, "repository-move-delete-source/repo-after-delete", repoAfterDelete.Path)
+}
+
+func TestRepoStore_UpdateRepoMoveOutUsesNamespaceBeforeRepositoryLockOrder(t *testing.T) {
+	db := tests.InitTransactionTestDB()
+	defer db.Close()
+	ctx := context.Background()
+	user := createOrganizationUnitMemberTestUser(t, ctx, db, "repository-move-out-user")
+	sourcePath := "repository-move-out-source"
+	targetPath := "repository-move-out-target"
+	orgUUID := uuid.New()
+	orgStore := database.NewOrgStoreWithDBAndDeletionJobClient(db, &testRepositoryDeletionJobClient{})
+	repoStore := database.NewRepoStoreWithDB(db)
+	require.NoError(t, orgStore.Create(ctx,
+		&database.Organization{Name: sourcePath, Nickname: sourcePath, UUID: orgUUID, UserID: user.ID},
+		&database.Namespace{Path: sourcePath, UUID: orgUUID.String(), UserID: user.ID},
+	))
+	_, err := db.Core.NewInsert().Model(&database.Namespace{
+		Path: targetPath, UUID: uuid.NewString(), UserID: user.ID,
+	}).Exec(ctx)
+	require.NoError(t, err)
+	repo, err := repoStore.CreateRepo(ctx, database.Repository{
+		Name: "repo", Path: sourcePath + "/repo", GitPath: "models_" + sourcePath + "/repo",
+		RepositoryType: types.ModelRepo, UserID: user.ID,
+	})
+	require.NoError(t, err)
+
+	hook := &moveOutDeleteHook{
+		namespaceLocked: make(chan struct{}), resume: make(chan struct{}),
+		updateRead: make(chan struct{}), updateAttempt: make(chan struct{}),
+	}
+	db.BunDB.AddQueryHook(hook)
+	deleteResult := make(chan error, 1)
+	go func() {
+		deleteCtx := context.WithValue(ctx, moveOutDeleteHookContextKey{}, true)
+		_, deleteErr := orgStore.Delete(deleteCtx, sourcePath)
+		deleteResult <- deleteErr
+	}()
+	select {
+	case <-hook.namespaceLocked:
+	case <-time.After(5 * time.Second):
+		require.FailNow(t, "organization deletion did not lock the source namespace")
+	}
+
+	repo.Path = targetPath + "/repo"
+	updateResult := make(chan error, 1)
+	go func() {
+		updateCtx := context.WithValue(ctx, moveOutUpdateHookContextKey{}, true)
+		_, updateErr := repoStore.UpdateRepo(updateCtx, *repo)
+		updateResult <- updateErr
+	}()
+	select {
+	case <-hook.updateRead:
+	case updateErr := <-updateResult:
+		require.Error(t, updateErr)
+		require.FailNow(t, "repository move finished before reaching namespace locking")
+	case <-time.After(5 * time.Second):
+		require.FailNow(t, "repository move did not read its current path")
+	}
+	select {
+	case <-hook.updateAttempt:
+	case <-time.After(5 * time.Second):
+		require.FailNow(t, "repository move did not attempt the source namespace lock")
+	}
+	close(hook.resume)
+
+	require.NoError(t, <-deleteResult)
+	updateErr := <-updateResult
+	require.Error(t, updateErr)
+	require.NotContains(t, strings.ToLower(updateErr.Error()), "deadlock")
+	exists, err := db.Core.NewSelect().Model((*database.Repository)(nil)).Where("id = ?", repo.ID).Exists(ctx)
+	require.NoError(t, err)
+	require.False(t, exists)
+}
+
+func TestRepoStore_MixedCaseCrossNamespaceMoveSerializesWithRootDeletion(t *testing.T) {
+	db := tests.InitTransactionTestDB()
+	defer db.Close()
+	ctx := context.Background()
+	creator := createOrganizationUnitMemberTestUser(t, ctx, db, "mixed-case-root-delete-user")
+	unitStore := database.NewOrganizationUnitStoreWithDBAndDeletionJobClient(db, &testRepositoryDeletionJobClient{})
+	repoStore := database.NewRepoStoreWithDB(db)
+	rootUUID := uuid.New()
+	root, err := unitStore.CreateRoot(ctx, database.CreateRootOrganizationInput{
+		Organization: &database.Organization{Name: "mixedCaseMiddle", UUID: rootUUID, UserID: creator.ID, IsRoot: true, IsHierarchical: true},
+		Namespace:    &database.Namespace{Path: "mixedCaseMiddle", UUID: rootUUID.String()}, CreatorUserID: creator.ID,
+	})
+	require.NoError(t, err)
+	source := createChild(t, ctx, unitStore, root, "alphaMixedCase", nil, 1)
+	target := createChild(t, ctx, unitStore, root, "ZooMixedCase", nil, 2)
+	repo, err := repoStore.CreateRepo(ctx, database.Repository{
+		Name: "repo", Path: source.Name + "/repo", GitPath: "models_" + source.Name + "/repo",
+		RepositoryType: types.ModelRepo, UserID: creator.ID,
+	})
+	require.NoError(t, err)
+
+	hook := &mixedCaseNamespaceOrderHook{
+		firstPath: source.Name, blockedPath: source.Name, firstLocked: make(chan struct{}),
+		deleteAttempt: make(chan struct{}), resume: make(chan struct{}),
+	}
+	db.BunDB.AddQueryHook(hook)
+	repo.Path = target.Name + "/repo"
+	updateResult := make(chan error, 1)
+	go func() {
+		updateCtx := context.WithValue(ctx, mixedCaseUpdateHookContextKey{}, true)
+		_, updateErr := repoStore.UpdateRepo(updateCtx, *repo)
+		updateResult <- updateErr
+	}()
+	select {
+	case <-hook.firstLocked:
+	case <-time.After(5 * time.Second):
+		require.FailNow(t, "repository move did not acquire its first canonical namespace lock")
+	}
+
+	deleteResult := make(chan error, 1)
+	go func() {
+		deleteCtx := context.WithValue(ctx, mixedCaseDeleteHookContextKey{}, true)
+		_, deleteErr := unitStore.DeleteRoot(deleteCtx, database.DeleteRootOrganizationInput{OrganizationUUID: root.UUID.String()})
+		deleteResult <- deleteErr
+	}()
+	select {
+	case <-hook.deleteAttempt:
+	case deleteErr := <-deleteResult:
+		require.NoError(t, deleteErr)
+		require.FailNow(t, "root deletion completed before contending on the first canonical namespace")
+	case <-time.After(5 * time.Second):
+		require.FailNow(t, "root deletion did not use the canonical namespace order")
+	}
+	close(hook.resume)
+
+	require.NoError(t, <-updateResult)
+	require.NoError(t, <-deleteResult)
+	exists, err := db.Core.NewSelect().Model((*database.Repository)(nil)).Where("id = ?", repo.ID).Exists(ctx)
+	require.NoError(t, err)
+	require.False(t, exists)
 }
 
 func TestRepoStore_UpdateRepoFileDownloads(t *testing.T) {

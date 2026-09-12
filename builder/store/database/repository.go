@@ -16,6 +16,7 @@ import (
 	"github.com/cespare/xxhash/v2"
 	"github.com/redis/go-redis/v9"
 	"github.com/uptrace/bun"
+	"github.com/uptrace/bun/dialect"
 	"opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/builder/store/cache"
 	"opencsg.com/csghub-server/common/config"
@@ -114,11 +115,12 @@ func applySpaceStatusFilter(q *bun.SelectQuery, status string) {
 }
 
 type repoStoreImpl struct {
-	config              *config.Config
-	db                  *DB
-	DbDriver            string
-	SearchConfiguration string
-	cache               cache.RedisClient
+	config                      *config.Config
+	db                          *DB
+	DbDriver                    string
+	SearchConfiguration         string
+	cache                       cache.RedisClient
+	repositoryDeletionJobClient RepositoryDeletionJobClient
 }
 
 type RepoStore interface {
@@ -223,6 +225,14 @@ func NewRepoStoreWithDB(db *DB) RepoStore {
 	return newRepoStoreInstance(db)
 }
 
+// NewRepoStoreWithDBAndDeletionJobClient creates a repository Store with
+// transactional repository deletion jobs.
+func NewRepoStoreWithDBAndDeletionJobClient(db *DB, jobClient RepositoryDeletionJobClient) RepoStore {
+	store := newRepoStoreInstance(db).(*repoStoreImpl)
+	store.repositoryDeletionJobClient = jobClient
+	return store
+}
+
 // for testing with mock cache
 func NewRepoStoreWithCache(config *config.Config, db *DB, cache cache.RedisClient) RepoStore {
 	return &repoStoreImpl{
@@ -279,6 +289,185 @@ type Repository struct {
 
 	// updated_at timestamp will be updated only if files changed
 	times
+}
+
+// DeletedRepository contains the repository metadata needed for cleanup that
+// must happen after the database transaction commits.
+type DeletedRepository struct {
+	ID             int64
+	RepositoryType types.RepositoryType
+	Path           string
+	GitalyPath     string
+}
+
+func findRepositoryIDsByNamespaces(ctx context.Context, db bun.IDB, namespaces []string) ([]int64, error) {
+	if len(namespaces) == 0 {
+		return nil, nil
+	}
+
+	var repositoryIDs []int64
+	query := db.NewSelect().Model((*Repository)(nil)).Column("id")
+	query.WhereGroup(" AND ", func(query *bun.SelectQuery) *bun.SelectQuery {
+		for _, namespace := range namespaces {
+			query.WhereOr("path LIKE ? ESCAPE '\\'", escapeLikePattern(namespace)+"/%")
+		}
+		return query
+	})
+	if err := query.Scan(ctx, &repositoryIDs); err != nil {
+		return nil, fmt.Errorf("find repository IDs by namespaces: %w", err)
+	}
+	return repositoryIDs, nil
+}
+
+func deleteRepositoriesByIDs(ctx context.Context, tx bun.Tx, repositoryIDs []int64, jobClient RepositoryDeletionJobClient) ([]DeletedRepository, error) {
+	if len(repositoryIDs) == 0 {
+		return nil, nil
+	}
+	if jobClient == nil {
+		return nil, errors.New("repository deletion job client is required")
+	}
+
+	var repositories []Repository
+	repositoryQuery := tx.NewSelect().Model(&repositories).Where("id IN (?)", bun.In(repositoryIDs)).Order("id ASC")
+	if tx.Dialect().Name() == dialect.PG {
+		repositoryQuery.For("UPDATE")
+	}
+	if err := repositoryQuery.Scan(ctx); err != nil {
+		return nil, fmt.Errorf("load repositories before deletion: %w", err)
+	}
+	if len(repositories) == 0 {
+		return nil, nil
+	}
+
+	namespacePaths := make([]string, 0, len(repositories))
+	for _, repository := range repositories {
+		separator := strings.LastIndex(repository.Path, "/")
+		if separator <= 0 {
+			return nil, fmt.Errorf("repository %d has invalid path %q", repository.ID, repository.Path)
+		}
+		namespacePaths = append(namespacePaths, repository.Path[:separator])
+	}
+	ownersByPath, err := loadRepositoryOwnersByNamespacePath(ctx, tx, namespacePaths)
+	if err != nil {
+		return nil, err
+	}
+
+	selectedIDs := make([]int64, 0, len(repositories))
+	deleted := make([]DeletedRepository, 0, len(repositories))
+	for _, repository := range repositories {
+		selectedIDs = append(selectedIDs, repository.ID)
+		gitalyPath := repository.GitalyPath()
+		deleted = append(deleted, DeletedRepository{
+			ID:             repository.ID,
+			RepositoryType: repository.RepositoryType,
+			Path:           repository.Path,
+			GitalyPath:     gitalyPath,
+		})
+	}
+
+	result, err := tx.NewDelete().Model((*Repository)(nil)).Where("id IN (?)", bun.In(selectedIDs)).Exec(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("soft-delete repositories: %w", err)
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return nil, fmt.Errorf("count soft-deleted repositories: %w", err)
+	}
+	if affected != int64(len(repositories)) {
+		return nil, fmt.Errorf("soft-delete repositories: expected %d affected rows, got %d", len(repositories), affected)
+	}
+	for _, repository := range repositories {
+		separator := strings.LastIndex(repository.Path, "/")
+		owner, ok := ownersByPath[repository.Path[:separator]]
+		if !ok {
+			return nil, fmt.Errorf("load repository namespace %q: %w", repository.Path[:separator], sql.ErrNoRows)
+		}
+		_, err := jobClient.InsertRepositoryDeletionJobTx(ctx, tx.Tx, RepositoryDeletionJobInput{
+			RepositoryID: repository.ID, RepositoryType: repository.RepositoryType,
+			Path: repository.Path, GitalyPath: repository.GitalyPath(), Migrated: repository.Migrated,
+			OwnerType: owner.Type, OwnerUUID: owner.UUID,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("enqueue repository %d deletion: %w", repository.ID, err)
+		}
+	}
+	return deleted, nil
+}
+
+type repositoryOwner struct {
+	Type NamespaceType
+	UUID string
+}
+
+// loadRepositoryOwnersByNamespacePath resolves authorization owners through
+// the namespace's entity relationship. Namespace.UUID is not the stable user
+// or organization UUID used by Repository ReBAC.
+func loadRepositoryOwnersByNamespacePath(ctx context.Context, tx bun.Tx, namespacePaths []string) (map[string]repositoryOwner, error) {
+	var namespaces []Namespace
+	if err := tx.NewSelect().Model(&namespaces).WhereAllWithDeleted().
+		Where("path IN (?)", bun.In(namespacePaths)).Order("id ASC").Scan(ctx); err != nil {
+		return nil, fmt.Errorf("load repository namespaces before deletion: %w", err)
+	}
+
+	userIDs := make([]int64, 0, len(namespaces))
+	organizationNamespaceIDs := make([]int64, 0, len(namespaces))
+	for _, namespace := range namespaces {
+		switch namespace.NamespaceType {
+		case UserNamespace:
+			userIDs = append(userIDs, namespace.UserID)
+		case OrgNamespace:
+			organizationNamespaceIDs = append(organizationNamespaceIDs, namespace.ID)
+		}
+	}
+
+	usersByID := make(map[int64]User)
+	if len(userIDs) > 0 {
+		var users []User
+		if err := tx.NewSelect().Model(&users).WhereAllWithDeleted().
+			Where("id IN (?)", bun.In(userIDs)).Scan(ctx); err != nil {
+			return nil, fmt.Errorf("load repository namespace users: %w", err)
+		}
+		for _, user := range users {
+			usersByID[user.ID] = user
+		}
+	}
+	organizationsByNamespaceID := make(map[int64]Organization)
+	if len(organizationNamespaceIDs) > 0 {
+		var organizations []Organization
+		if err := tx.NewSelect().Model(&organizations).
+			Where("namespace_id IN (?)", bun.In(organizationNamespaceIDs)).Scan(ctx); err != nil {
+			return nil, fmt.Errorf("load repository namespace organizations: %w", err)
+		}
+		for _, organization := range organizations {
+			organizationsByNamespaceID[organization.NamespaceID] = organization
+		}
+	}
+
+	ownersByPath := make(map[string]repositoryOwner, len(namespacePaths))
+	for _, namespace := range namespaces {
+		var owner repositoryOwner
+		switch namespace.NamespaceType {
+		case UserNamespace:
+			user, ok := usersByID[namespace.UserID]
+			if !ok {
+				continue
+			}
+			owner = repositoryOwner{Type: UserNamespace, UUID: user.UUID}
+		case OrgNamespace:
+			organization, ok := organizationsByNamespaceID[namespace.ID]
+			if !ok {
+				continue
+			}
+			owner = repositoryOwner{Type: OrgNamespace, UUID: organization.UUID.String()}
+		default:
+			continue
+		}
+		if _, exists := ownersByPath[namespace.Path]; exists {
+			return nil, fmt.Errorf("load repository namespace %q: multiple active owners", namespace.Path)
+		}
+		ownersByPath[namespace.Path] = owner
+	}
+	return ownersByPath, nil
 }
 
 // NamespaceAndName returns namespace and name by parsing repository path
@@ -435,8 +624,14 @@ func SHA256(s string) string {
 func (s *repoStoreImpl) CreateRepo(ctx context.Context, input Repository) (*Repository, error) {
 	input.Migrated = true
 	input.Hashed = true
-	res, err := s.db.Core.NewInsert().Model(&input).Exec(ctx, &input)
-	if err := assertAffectedOneRow(res, err); err != nil {
+	err := s.withLockedRepositoryNamespace(ctx, input, func(ctx context.Context, tx bun.Tx) error {
+		res, err := tx.NewInsert().Model(&input).Exec(ctx, &input)
+		if err := assertAffectedOneRow(res, err); err != nil {
+			return fmt.Errorf("insert repository: %w", err)
+		}
+		return nil
+	})
+	if err != nil {
 		err = errorx.HandleDBError(err, errorx.Ctx().Set("path", input.Path))
 		return nil, fmt.Errorf("create repository in tx failed,error:%w", err)
 	}
@@ -444,14 +639,75 @@ func (s *repoStoreImpl) CreateRepo(ctx context.Context, input Repository) (*Repo
 	return &input, nil
 }
 
+func (s *repoStoreImpl) withLockedRepositoryNamespace(
+	ctx context.Context,
+	repository Repository,
+	write func(context.Context, bun.Tx) error,
+) error {
+	return s.db.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		if err := lockRepositoryNamespaceForWrite(ctx, tx, repository); err != nil {
+			return err
+		}
+		return write(ctx, tx)
+	})
+}
+
+// lockRepositoryNamespaceForWrite serializes repository insertion and upsert with namespace deletion.
+// Missing namespaces remain accepted for legacy internal import paths, while a soft-deleted
+// namespace is rejected after a concurrent deleter releases its conflicting row lock.
+func lockRepositoryNamespaceForWrite(ctx context.Context, tx bun.Tx, repository Repository) error {
+	namespacePath, _ := repository.NamespaceAndName()
+	if namespacePath == "" {
+		return nil
+	}
+
+	var namespace Namespace
+	query := tx.NewSelect().Model(&namespace).
+		WhereAllWithDeleted().
+		Where("LOWER(path) = LOWER(?)", namespacePath).
+		OrderExpr("deleted_at IS NULL DESC").
+		OrderExpr("(path = ?) DESC", namespacePath).
+		OrderExpr("id ASC").
+		Limit(1)
+	if tx.Dialect().Name() == dialect.PG {
+		query.For("KEY SHARE")
+	}
+	if err := query.Scan(ctx); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil
+		}
+		return fmt.Errorf("lock repository namespace %q: %w", namespacePath, err)
+	}
+	if !namespace.DeletedAt.IsZero() {
+		return fmt.Errorf("repository namespace %q is deleted", namespacePath)
+	}
+	return nil
+}
+
 func (s *repoStoreImpl) UpdateRepo(ctx context.Context, input Repository) (*Repository, error) {
 	err := s.db.RunInTx(ctx, func(ctx context.Context, tx Operator) error {
-		// Fetch the existing repo within the tx to detect path changes
+		// Read the current path before taking locks so namespace locks can be acquired
+		// before the repository row lock, matching organization deletion's lock order.
 		var existing Repository
-		err := tx.Core.NewSelect().Model(&existing).Where("id = ?", input.ID).For("UPDATE").Scan(ctx)
+		err := tx.Core.NewSelect().Model(&existing).Where("id = ?", input.ID).Scan(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to find existing repo: %w", err)
 		}
+		bunTx, ok := tx.Core.(bun.Tx)
+		if !ok {
+			return fmt.Errorf("lock repository namespaces: transaction has unexpected type %T", tx.Core)
+		}
+		if err := lockRepositoryNamespacesForUpdate(ctx, bunTx, existing, input); err != nil {
+			return err
+		}
+		var locked Repository
+		if err := tx.Core.NewSelect().Model(&locked).Where("id = ?", input.ID).For("UPDATE").Scan(ctx); err != nil {
+			return fmt.Errorf("failed to lock existing repo: %w", err)
+		}
+		if locked.Path != existing.Path {
+			return fmt.Errorf("repository path changed concurrently from %q to %q", existing.Path, locked.Path)
+		}
+		existing = locked
 
 		// If path changed and new path is not empty, migrate sync version records
 		if existing.Path != input.Path && input.Path != "" {
@@ -471,6 +727,32 @@ func (s *repoStoreImpl) UpdateRepo(ctx context.Context, input Repository) (*Repo
 		return nil, errorx.HandleDBError(err, errorx.Ctx().Set("path", input.Path))
 	}
 	return &input, nil
+}
+
+func lockRepositoryNamespacesForUpdate(ctx context.Context, tx bun.Tx, repositories ...Repository) error {
+	byNamespace := make(map[string]Repository, len(repositories))
+	for _, repository := range repositories {
+		namespacePath, _ := repository.NamespaceAndName()
+		if namespacePath == "" {
+			continue
+		}
+		key := strings.ToLower(namespacePath)
+		if _, exists := byNamespace[key]; !exists {
+			byNamespace[key] = repository
+		}
+	}
+
+	paths := make([]string, 0, len(byNamespace))
+	for _, repository := range byNamespace {
+		namespacePath, _ := repository.NamespaceAndName()
+		paths = append(paths, namespacePath)
+	}
+	for _, path := range canonicalNamespaceLockOrder(paths) {
+		if err := lockRepositoryNamespaceForWrite(ctx, tx, byNamespace[strings.ToLower(path)]); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // migrateSyncVersion copies the latest sync_version record from oldPath to newPath
@@ -505,9 +787,11 @@ func (s *repoStoreImpl) migrateSyncVersion(ctx context.Context, tx Operator, old
 }
 
 func (s *repoStoreImpl) DeleteRepo(ctx context.Context, input Repository) error {
-	_, err := s.db.Core.NewDelete().Model(&input).WherePK().ForceDelete().Exec(ctx)
-	err = errorx.HandleDBError(err, errorx.Ctx().Set("path", input.Path))
-	return err
+	err := s.db.BunDB.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		_, err := deleteRepositoriesByIDs(ctx, tx, []int64{input.ID}, s.repositoryDeletionJobClient)
+		return err
+	})
+	return errorx.HandleDBError(err, errorx.Ctx().Set("path", input.Path))
 }
 
 func (s *repoStoreImpl) Find(ctx context.Context, owner, repoType, repoName string) (*Repository, error) {
@@ -1871,18 +2155,24 @@ func (s *repoStoreImpl) DeleteAllTags(ctx context.Context, repoID int64) error {
 // UpdateOrCreateRepo updates or creates a repository by its case-insensitive path.
 func (s *repoStoreImpl) UpdateOrCreateRepo(ctx context.Context, input Repository) (*Repository, error) {
 	input.UpdatedAt = time.Now()
-	_, err := s.db.Core.NewUpdate().
-		Model(&input).
-		Where("LOWER(path) = LOWER(?) and repository_type = ?", input.Path, input.RepositoryType).
-		Returning("*").
-		Exec(ctx, &input)
-	if err == nil {
-		return &input, nil
-	}
+	err := s.withLockedRepositoryNamespace(ctx, input, func(ctx context.Context, tx bun.Tx) error {
+		_, err := tx.NewUpdate().
+			Model(&input).
+			Where("LOWER(path) = LOWER(?) and repository_type = ?", input.Path, input.RepositoryType).
+			Returning("*").
+			Exec(ctx, &input)
+		if err == nil {
+			return nil
+		}
 
-	res, err := s.db.Core.NewInsert().Model(&input).Exec(ctx, &input)
-	if err := assertAffectedOneRow(res, err); err != nil {
-		return nil, fmt.Errorf("create repository in tx failed,error:%w", err)
+		res, err := tx.NewInsert().Model(&input).Exec(ctx, &input)
+		if err := assertAffectedOneRow(res, err); err != nil {
+			return fmt.Errorf("insert repository: %w", err)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("update or create repository in tx failed,error:%w", err)
 	}
 
 	return &input, nil
