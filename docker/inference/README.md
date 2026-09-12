@@ -12,15 +12,15 @@ echo "$OPENCSG_ACR_PASSWORD" | docker login $OPENCSG_ACR -u $OPENCSG_ACR_USERNAM
 ```bash
 export BUILDX_NO_DEFAULT_ATTESTATIONS=1
 
-# For vllm: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/vllm:v0.24.0
-export IMAGE_TAG=v0.24.0
+# For vllm: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/vllm:v0.28.0
+export IMAGE_TAG=v0.28.0
 docker buildx build --platform linux/amd64,linux/arm64 \
   -t ${OPENCSG_ACR}/opencsghq/vllm:${IMAGE_TAG} \
   -f Dockerfile.vllm \
   --push .
 
-# For amd-vllm: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/amd-vllm:rocm7.2.1_vllm_0.24.0
-export IMAGE_TAG=rocm7.2.1_vllm_0.24.0
+# For amd-vllm: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/amd-vllm:rocm7.2.1_vllm_0.28.0
+export IMAGE_TAG=rocm7.2.1_vllm_0.28.0
 docker buildx build --platform linux/amd64 \
   -t ${OPENCSG_ACR}/opencsghq/amd-vllm:${IMAGE_TAG} \
   -f Dockerfile.vllm-amd \
@@ -202,7 +202,7 @@ docker run -d \
   -e HF_ENDPOINT=https://hub.opencsg.com \
   --gpus device=1 \
   -p 8000:8000 \
-  ${OPENCSG_ACR}/opencsghq/vllm:v0.24.0
+  ${OPENCSG_ACR}/opencsghq/vllm:v0.28.0
 
 # Run TGI
 docker run -d \
@@ -291,7 +291,7 @@ docker run -d \
   -e HF_TASK=text-to-speech \
   --gpus device=0 \
   -p 8000:8000 \
-  ${OPENCSG_ACR}/opencsghq/vllm:v0.24.0
+  ${OPENCSG_ACR}/opencsghq/vllm:v0.28.0
 
 # Call OpenAI-compatible speech API
 curl --max-time 600 -X POST http://127.0.0.1:8000/v1/audio/speech \
@@ -373,8 +373,8 @@ ROCm-specific limits:
 ## inference image name, version and cuda version
 | Task| Image Name | Version | CUDA Version | Fix
 | --- | --- | --- | --- |--- |
-|text generation / embedding / reranking / text to speech| vllm | v0.24.0 | 13.0 |pooling runner support for embedding and reranking; vllm-omni 0.24.0 for text-to-speech (/v1/audio/speech)|
-|text generation / embedding / reranking| amd-vllm | rocm7.2.1_vllm_0.24.0 | - |ROCm 7.2.1, vLLM 0.24.0|
+|text generation / embedding / reranking / text to speech| vllm | v0.28.0 | 13.0 |pooling runner support for embedding and reranking; vllm-omni 0.28.0 for text-to-speech (/v1/audio/speech)|
+|text generation / embedding / reranking| amd-vllm | rocm7.2.1_vllm_0.28.0 | - |ROCm 7.2.1, vLLM 0.28.0|
 |text generation| vllm | v0.8.5 | 12.4 |fix hf hub timestamp|
 |text generation| vllm-cpu | v0.24.0 | - |vLLM 0.24.0, supports --enable-prompt-tokens-details|
 |text generation| tgi | 2.2 | 12.1 |- |
