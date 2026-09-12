@@ -620,9 +620,9 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 				mockCounter = mocktoken.NewMockCounter(t)
 
 				comp = &openaiComponentImpl{
-					userStore:   mockUserStore,
-					eventPub:    eventPub,
-					organStore:  mockOrgStore,
+					userStore:  mockUserStore,
+					eventPub:   eventPub,
+					organStore: mockOrgStore,
 				}
 				mockCounter.EXPECT().Usage(mock.Anything).Return(&token.Usage{
 					PromptTokens:       100,
@@ -704,9 +704,9 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 				mockCounter = mocktoken.NewMockCounter(t)
 
 				comp = &openaiComponentImpl{
-					userStore:   mockUserStore,
-					eventPub:    eventPub,
-					organStore:  mockOrgStore,
+					userStore:  mockUserStore,
+					eventPub:   eventPub,
+					organStore: mockOrgStore,
 				}
 				mockCounter.EXPECT().Usage(mock.Anything).Return(&token.Usage{
 					PromptTokens:     100,
@@ -776,8 +776,8 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 				mockCounter = mocktoken.NewMockCounter(t)
 
 				comp = &openaiComponentImpl{
-					userStore:   mockUserStore,
-					eventPub:    eventPub,
+					userStore: mockUserStore,
+					eventPub:  eventPub,
 				}
 				mockCounter.EXPECT().Usage(mock.Anything).Return(&token.Usage{
 					PromptTokens:     100,
@@ -845,8 +845,8 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 				mockCounter = mocktoken.NewMockCounter(t)
 
 				comp = &openaiComponentImpl{
-					userStore:   mockUserStore,
-					eventPub:    eventPub,
+					userStore: mockUserStore,
+					eventPub:  eventPub,
 				}
 				mockCounter.EXPECT().Usage(mock.Anything).Return(&token.Usage{
 					PromptTokens:     100,
@@ -892,7 +892,7 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 			setupMock: func() {
 				mockCounter = mocktoken.NewMockCounter(t)
 				comp = &openaiComponentImpl{
-					userStore:   mockUserStore,
+					userStore: mockUserStore,
 					eventPub: &event.EventPublisher{
 						SyncInterval: 1,
 						MQ:           mockbldmq.NewMockMessageQueue(t),
@@ -916,7 +916,7 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 			setupMock: func() {
 				mockCounter = mocktoken.NewMockCounter(t)
 				comp = &openaiComponentImpl{
-					userStore:   mockUserStore,
+					userStore: mockUserStore,
 					eventPub: &event.EventPublisher{
 						SyncInterval: 1,
 						MQ:           mockbldmq.NewMockMessageQueue(t),
@@ -937,7 +937,7 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 			setupMock: func() {
 				mockCounter = mocktoken.NewMockCounter(t)
 				comp = &openaiComponentImpl{
-					userStore:   mockUserStore,
+					userStore: mockUserStore,
 					eventPub: &event.EventPublisher{
 						SyncInterval: 1,
 						MQ:           mockbldmq.NewMockMessageQueue(t),
@@ -966,7 +966,7 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 			setupMock: func() {
 				mockCounter = mocktoken.NewMockCounter(t)
 				comp = &openaiComponentImpl{
-					userStore:   mockUserStore,
+					userStore: mockUserStore,
 					eventPub: &event.EventPublisher{
 						SyncInterval: 1,
 						MQ:           mockbldmq.NewMockMessageQueue(t),
@@ -1002,8 +1002,8 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 				mockCounter = mocktoken.NewMockCounter(t)
 
 				comp = &openaiComponentImpl{
-					userStore:   mockUserStore,
-					eventPub:    eventPub,
+					userStore: mockUserStore,
+					eventPub:  eventPub,
 				}
 				mockCounter.EXPECT().Usage(mock.Anything).Return(nil, errors.New("counter error"))
 			},
@@ -1038,8 +1038,8 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 				}
 				mockCounter = mocktoken.NewMockCounter(t)
 				comp = &openaiComponentImpl{
-					userStore:   mockUserStore,
-					eventPub:    eventPub,
+					userStore: mockUserStore,
+					eventPub:  eventPub,
 				}
 				mockCounter.EXPECT().Usage(mock.Anything).Return(&token.Usage{
 					PromptTokens:     100,
@@ -1313,8 +1313,8 @@ func TestOpenAIComponentImpl_RecordUsage_ExternalModel(t *testing.T) {
 				mockCounter = mocktoken.NewMockCounter(t)
 
 				comp = &openaiComponentImpl{
-					userStore:   mockUserStore,
-					eventPub:    eventPub,
+					userStore: mockUserStore,
+					eventPub:  eventPub,
 				}
 				mockCounter.EXPECT().Usage(mock.Anything).Return(&token.Usage{
 					PromptTokens:     200,
@@ -1377,8 +1377,8 @@ func TestOpenAIComponentImpl_RecordUsage_ExternalModel(t *testing.T) {
 				mockCounter = mocktoken.NewMockCounter(t)
 
 				comp = &openaiComponentImpl{
-					userStore:   mockUserStore,
-					eventPub:    eventPub,
+					userStore: mockUserStore,
+					eventPub:  eventPub,
 				}
 				mockCounter.EXPECT().Usage(mock.Anything).Return(nil, errors.New("counter error"))
 			},
@@ -1407,8 +1407,8 @@ func TestOpenAIComponentImpl_RecordUsage_ExternalModel(t *testing.T) {
 				}
 				mockCounter = mocktoken.NewMockCounter(t)
 				comp = &openaiComponentImpl{
-					userStore:   mockUserStore,
-					eventPub:    eventPub,
+					userStore: mockUserStore,
+					eventPub:  eventPub,
 				}
 				mockCounter.EXPECT().Usage(mock.Anything).Return(&token.Usage{
 					PromptTokens:     50,
@@ -1444,8 +1444,8 @@ func TestOpenAIComponentImpl_RecordUsage_ExternalModel(t *testing.T) {
 				mockCounter = mocktoken.NewMockCounter(t)
 
 				comp = &openaiComponentImpl{
-					userStore:   mockUserStore,
-					eventPub:    eventPub,
+					userStore: mockUserStore,
+					eventPub:  eventPub,
 				}
 				mockCounter.EXPECT().Usage(mock.Anything).Return(&token.Usage{
 					PromptTokens:     0,
@@ -1512,4 +1512,106 @@ func TestDbUpstreamsToConfigsMetadataPassthrough(t *testing.T) {
 	}})
 	require.Len(t, result, 1)
 	require.Equal(t, metadata, result[0].Metadata)
+}
+
+// buildInternalLLMConfigForVisibility builds an llm_config with a single
+// buildInternalLLMConfigForVisibility builds an llm_config with a single
+// csghub-sourced upstream carrying the given internal model info, for
+// llmConfigToModel visibility tests.
+func buildInternalLLMConfigForVisibility(info commontypes.InternalModelInfo) *database.LLMConfig {
+	return &database.LLMConfig{
+		ID:        1,
+		ModelName: info.LegacyModelID,
+		Enabled:   true,
+		Upstreams: []database.Upstream{
+			{
+				ID:      11,
+				URL:     "http://svc:8080/v1",
+				Enabled: true,
+				Source:  commontypes.UpstreamSourceCSGHubDeploy,
+				Metadata: &commontypes.UpstreamMetadata{
+					InternalModelInfo: &info,
+				},
+			},
+		},
+	}
+}
+
+// llmConfigToModel visibility: public (SecureLevel=EndpointPublic) internal
+// models skip the owner check and are visible to any caller; private and
+// unset (legacy zero-value) secure levels remain owner-only; serverless is
+// always visible; the owner always sees their own model.
+func TestLLMConfigToModel_VisibilityBySecureLevel(t *testing.T) {
+	ctx := context.Background()
+	callerUUID := "caller-uuid"
+	ownerUUID := "owner-uuid"
+
+	baseInfo := commontypes.InternalModelInfo{
+		CSGHubModelID:  "ns/model",
+		LegacyModelID:  "model:abc",
+		OwnerUUID:      ownerUUID,
+		OwnerUsername:  "owner",
+		OwnerNamespace: "owner",
+		SvcType:        commontypes.InferenceType,
+		SourceDeployID: 100,
+	}
+
+	t.Run("public inference model visible to non-owner", func(t *testing.T) {
+		comp := &openaiComponentImpl{}
+		info := baseInfo
+		info.SecureLevel = commontypes.EndpointPublic
+
+		model, ok := comp.llmConfigToModel(ctx, buildInternalLLMConfigForVisibility(info), callerUUID)
+		require.True(t, ok)
+		assert.Equal(t, info.LegacyModelID, model.ID)
+	})
+
+	t.Run("private inference model hidden from non-owner", func(t *testing.T) {
+		comp := &openaiComponentImpl{}
+		info := baseInfo
+		info.SecureLevel = commontypes.EndpointPrivate
+
+		_, ok := comp.llmConfigToModel(ctx, buildInternalLLMConfigForVisibility(info), callerUUID)
+		assert.False(t, ok, "private model must not be visible to a non-owner")
+	})
+
+	t.Run("unset secure level keeps owner-only visibility for backward compatibility", func(t *testing.T) {
+		comp := &openaiComponentImpl{}
+		info := baseInfo
+		info.SecureLevel = 0
+
+		_, ok := comp.llmConfigToModel(ctx, buildInternalLLMConfigForVisibility(info), callerUUID)
+		assert.False(t, ok, "legacy zero-value secure level must stay owner-only")
+	})
+
+	t.Run("owner sees their own private model", func(t *testing.T) {
+		comp := &openaiComponentImpl{}
+		info := baseInfo
+		info.SecureLevel = commontypes.EndpointPrivate
+
+		model, ok := comp.llmConfigToModel(ctx, buildInternalLLMConfigForVisibility(info), ownerUUID)
+		require.True(t, ok)
+		assert.Equal(t, info.LegacyModelID, model.ID)
+	})
+
+	t.Run("public serverless model visible to non-owner", func(t *testing.T) {
+		comp := &openaiComponentImpl{}
+		info := baseInfo
+		info.SecureLevel = commontypes.EndpointPublic
+		info.SvcType = commontypes.ServerlessType
+
+		model, ok := comp.llmConfigToModel(ctx, buildInternalLLMConfigForVisibility(info), callerUUID)
+		require.True(t, ok)
+		assert.Equal(t, info.LegacyModelID, model.ID)
+	})
+
+	t.Run("visibility check skipped when applyVisibility is false", func(t *testing.T) {
+		comp := &openaiComponentImpl{}
+		info := baseInfo
+		info.SecureLevel = commontypes.EndpointPrivate
+
+		model, ok := comp.llmConfigToModel(ctx, buildInternalLLMConfigForVisibility(info), callerUUID)
+		require.False(t, ok)
+		assert.Empty(t, model.ID)
+	})
 }

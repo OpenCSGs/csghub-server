@@ -34,12 +34,12 @@ type AIGatewayUpstreamSyncComponent interface {
 }
 
 type aiGatewayUpstreamSyncComponentImpl struct {
-	deployStore     database.DeployTaskStore
-	upstreamStore   database.UpstreamStore
-	llmConfigStore  database.LLMConfigStore
-	clusterStore    database.ClusterInfoStore
-	namespaceStore  database.NamespaceStore
-	modelIDBuilder  ModelIDBuilder
+	deployStore    database.DeployTaskStore
+	upstreamStore  database.UpstreamStore
+	llmConfigStore database.LLMConfigStore
+	clusterStore   database.ClusterInfoStore
+	namespaceStore database.NamespaceStore
+	modelIDBuilder ModelIDBuilder
 }
 
 type AIGatewayUpstreamSyncComponentConfig struct {
@@ -143,16 +143,14 @@ func (c *aiGatewayUpstreamSyncComponentImpl) SyncRunningDeploy(ctx context.Conte
 	if llmCfg != nil {
 		llmConfigID = llmCfg.ID
 	} else {
-		// Enabled ServerlessType to true, others to false : internal models created by the deploy
-		// sync are not visible/routable until an admin explicitly enables the
-		// llm_config via the admin API. The upstream's Enabled flag is still
-		// set to true (below) so that once the llm_config is enabled, the
-		// upstream is immediately routable.
-		llmEnabled := info.DeployType == commontypes.ServerlessType
+		// Always enable the llm_config at creation: the deploy is a user-owned
+		// resource, and a disabled llm_config would make the user's own
+		// inference endpoint unreachable until an admin intervenes. Admins can
+		// still disable individual llm_configs later via the admin API.
 		newCfg, err := c.llmConfigStore.Create(ctx, database.LLMConfig{
 			ModelName:          info.LegacyModelID,
 			Type:               database.LLMTypeAigatewayExternal,
-			Enabled:            llmEnabled,
+			Enabled:            true,
 			NeedSensitiveCheck: false,
 		})
 		if err != nil {
@@ -266,7 +264,9 @@ func (c *aiGatewayUpstreamSyncComponentImpl) DisableDeployTarget(ctx context.Con
 }
 
 // DeleteDeployTarget handles a "deploy deleted" event.
-// It finds and deletes the upstream by source+source_id.
+// It finds and deletes the upstream by source+source_id. When the upstream's
+// llm_config is left with no upstreams after the deletion, the llm_config is
+// deleted as well so no unroutable orphan configs accumulate.
 func (c *aiGatewayUpstreamSyncComponentImpl) DeleteDeployTarget(ctx context.Context, deployID int64) error {
 	upstream, err := c.upstreamStore.GetBySourceID(ctx, commontypes.UpstreamSourceCSGHubDeploy, deployID)
 	if err != nil {
@@ -280,6 +280,21 @@ func (c *aiGatewayUpstreamSyncComponentImpl) DeleteDeployTarget(ctx context.Cont
 		return fmt.Errorf("delete upstream for deploy %d: %w", deployID, err)
 	}
 	slog.InfoContext(ctx, "upstream sync: deleted deploy upstream", "deploy_id", deployID, "upstream_id", upstream.ID)
+
+	// Cascade: delete the llm_config when its last upstream is gone.
+	if upstream.LLMConfigID != 0 {
+		remaining, err := c.upstreamStore.ListByLLMConfigID(ctx, upstream.LLMConfigID)
+		if err != nil {
+			return fmt.Errorf("list remaining upstreams for llm_config %d after deploy %d delete: %w", upstream.LLMConfigID, deployID, err)
+		}
+		if len(remaining) == 0 {
+			if err := c.llmConfigStore.Delete(ctx, upstream.LLMConfigID); err != nil {
+				return fmt.Errorf("delete empty llm_config %d after deploy %d delete: %w", upstream.LLMConfigID, deployID, err)
+			}
+			slog.InfoContext(ctx, "upstream sync: deleted empty llm_config after upstream delete",
+				"deploy_id", deployID, "llm_config_id", upstream.LLMConfigID)
+		}
+	}
 	return nil
 }
 
@@ -359,5 +374,6 @@ func (c *aiGatewayUpstreamSyncComponentImpl) buildInternalModelInfo(info *common
 		SourceDeployID:   info.DeployID,
 		CreatedAt:        info.CreatedAt,
 		Host:             hostOverride,
+		SecureLevel:      info.SecureLevel,
 	}
 }

@@ -1054,7 +1054,58 @@ func (c *repoComponentImpl) DeployUpdate(ctx context.Context, updateReq types.De
 
 	// update inference service and keep deploy_id and svc_name unchanged
 	err = c.deployer.UpdateDeploy(ctx, req, deploy)
-	return err
+	if err != nil {
+		return err
+	}
+	// An update can change fields the AIGateway upstream carries (endpoint,
+	// cluster, secure level...). Re-sync the upstream without blocking the
+	// request; the periodic reconcile pass catches any missed event.
+	go c.publishUpstreamSyncAfterUpdate(ctx, deploy)
+	return nil
+}
+
+// publishUpstreamSyncAfterUpdate republishes a running-sync event for a
+// running serverless/inference deploy after an update. Non-syncable deploy
+// types (spaces, finetunes, evaluations, notebooks) and non-running deploys
+// are skipped: their upstream was already disabled by the stop event, and a
+// running event would wrongly re-enable it. The status is re-checked against
+// the reloaded DB row because the deploy may be stopped between the update
+// request and this async sync. Best-effort — errors are logged, never
+// returned, since the Temporal cron reconciliation will catch up.
+func (c *repoComponentImpl) publishUpstreamSyncAfterUpdate(parentCtx context.Context, updatedDeploy *database.Deploy) {
+	if updatedDeploy == nil || !types.DeployTypeSyncsUpstream(updatedDeploy.Type) {
+		return
+	}
+	if !deployStatus.IsRunnableDeployStatus(updatedDeploy.Status) {
+		return
+	}
+	deployID := updatedDeploy.ID
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(parentCtx), 30*time.Second)
+	defer cancel()
+
+	fullDeploy, err := c.deployTaskStore.GetDeployByIDWithRelations(ctx, deployID)
+	if err != nil {
+		slog.ErrorContext(ctx, "failed to load deploy with relations for upstream sync after update",
+			slog.Int64("deploy_id", deployID), slog.Any("error", err))
+		return
+	}
+	if fullDeploy == nil {
+		slog.WarnContext(ctx, "deploy not found for upstream sync after update", slog.Int64("deploy_id", deployID))
+		return
+	}
+	// Re-check against the persisted state: the deploy may have been stopped
+	// or deleted while this sync was pending.
+	if !deployStatus.IsRunnableDeployStatus(fullDeploy.Status) {
+		slog.InfoContext(ctx, "upstream sync after update: deploy no longer running, skipping",
+			slog.Int64("deploy_id", deployID), slog.Int("status", fullDeploy.Status))
+		return
+	}
+	info := deploy.BuildDeployUpstreamInfoWithDeploy(ctx, fullDeploy, c.namespaceStore)
+	if info == nil {
+		slog.WarnContext(ctx, "deploy has no repository, skipping upstream sync after update", slog.Int64("deploy_id", deployID))
+		return
+	}
+	deploy.PublishDeployUpstreamSyncEvent(ctx, bldmq.DeployUpstreamSyncRunningSubject, deployID, info)
 }
 
 // extractReplicaBounds extracts minReplica and maxReplica from the DeployUpdateReq

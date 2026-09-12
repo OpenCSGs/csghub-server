@@ -15,17 +15,30 @@ func ProviderTypeFromDeployType(t int) string {
 	}
 }
 
+// DeployTypeSyncsUpstream reports whether a deploy of the given type should
+// be synced to the AIGateway upstream store. Only serverless and inference
+// deploys serve LLM traffic — spaces, finetunes, evaluations, notebooks, and
+// other deploy types must not be pushed as upstreams.
+func DeployTypeSyncsUpstream(t int) bool {
+	switch t {
+	case ServerlessType, InferenceType:
+		return true
+	default:
+		return false
+	}
+}
+
 // DeployUpstreamInfo carries only the deploy fields that the upstream sync
 // consumer needs. It is built on the trigger side (API server) from a
 // deploy loaded with Repository and User relations, so the consumer
 // (AIGateway) does not need to query the server's deploy tables.
 type DeployUpstreamInfo struct {
 	DeployID         int64  `json:"deploy_id"`
-	RepoPath         string `json:"repo_path"`          // Repository.Path
-	RepoName         string `json:"repo_name"`          // Repository.Name
-	HFPath           string `json:"hf_path"`            // Repository.HFPath
-	DeployType       int    `json:"deploy_type"`        // deploy.Type
-	Provider         string `json:"provider"`           // pre-computed from DeployType
+	RepoPath         string `json:"repo_path"`   // Repository.Path
+	RepoName         string `json:"repo_name"`   // Repository.Name
+	HFPath           string `json:"hf_path"`     // Repository.HFPath
+	DeployType       int    `json:"deploy_type"` // deploy.Type
+	Provider         string `json:"provider"`    // pre-computed from DeployType
 	Endpoint         string `json:"endpoint"`
 	ClusterID        string `json:"cluster_id"`
 	SvcName          string `json:"svc_name"`
@@ -40,9 +53,11 @@ type DeployUpstreamInfo struct {
 	// OwnerType is "user" or "organization", resolved from the namespace table
 	// on the trigger side so the consumer can efficiently check membership
 	// without querying the server's namespace tables.
-	OwnerType     string `json:"owner_type"`
-	CreatedAt     int64  `json:"created_at"`         // unix timestamp
-	LegacyModelID string `json:"legacy_model_id"`    // pre-computed
+	OwnerType string `json:"owner_type"`
+	// 1-public, 2-private, 3-extension in future
+	SecureLevel   int    `json:"secure_level"`
+	CreatedAt     int64  `json:"created_at"`      // unix timestamp
+	LegacyModelID string `json:"legacy_model_id"` // pre-computed
 }
 
 // DeployUpstreamSyncEvent is the MQ message payload for deploy→upstream sync.

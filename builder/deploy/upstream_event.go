@@ -85,6 +85,7 @@ func BuildDeployUpstreamInfoWithDeploy(ctx context.Context, deploy *database.Dep
 		UserUUID:         userUUID,
 		OwnerUsername:    username,
 		OwnerNamespace:   deploy.OwnerNamespace,
+		SecureLevel:      deploy.SecureLevel,
 		CreatedAt:        deploy.CreatedAt.Unix(),
 		LegacyModelID:    legacyModelID,
 	}

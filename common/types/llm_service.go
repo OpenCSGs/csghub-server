@@ -49,6 +49,8 @@ type InternalModelInfo struct {
 	SourceDeployID   int64  `json:"source_deploy_id"`  // deploy.ID
 	CreatedAt        int64  `json:"created_at"`        // deploy.CreatedAt.Unix()
 	Host             string `json:"host,omitempty"`    // k8s Host header override (hostname from deploy endpoint)
+	// 1-public, 2-private, 3-extension in future
+	SecureLevel int `json:"secure_level"`
 }
 
 // ResponsesChatAdapter controls chat-completions adapter behavior for
@@ -132,6 +134,7 @@ func (m *UpstreamMetadata) UnmarshalJSON(data []byte) error {
 	}
 	return nil
 }
+
 // nestedMetadata is the legacy nested JSON format used for API output:
 //
 //	{"responses": {"chat_adapter": {"reasoning_request": {...}}}}
