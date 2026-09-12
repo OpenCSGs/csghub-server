@@ -73,6 +73,61 @@ func TestOrganizationComponent_Create(t *testing.T) {
 	require.NotEqual(t, uuid.Nil, org.UUID)
 }
 
+// TestOrganizationComponent_ListCurrentUserWritableNamespaces resolves OpenFGA namespace objects to display data.
+func TestOrganizationComponent_ListCurrentUserWritableNamespaces(t *testing.T) {
+	ctx := context.Background()
+	userUUID := "user-uuid"
+	organizationUUID := uuid.New()
+	actor := database.User{ID: 42, Username: "current-user", UUID: userUUID}
+	organizationNamespaceUUID := organizationUUID.String()
+	userNamespace := database.Namespace{Path: "alice", UUID: userUUID, NamespaceType: database.UserNamespace}
+	organizationNamespace := database.Namespace{Path: "engineering", UUID: organizationNamespaceUUID, NamespaceType: database.OrgNamespace}
+	organization := database.Organization{ID: 1, Name: "engineering", Nickname: "IT Department", UUID: organizationUUID}
+
+	userStore := mockdb.NewMockUserStore(t)
+	userStore.EXPECT().FindByUsername(mock.Anything, actor.Username).Return(actor, nil).Once()
+	userStore.EXPECT().FindByUUIDs(mock.Anything, []string{userUUID}).Return([]*database.User{{UUID: userUUID, Username: actor.Username, NickName: "Alice"}}, nil).Once()
+	orgStore := mockdb.NewMockOrgStore(t)
+	orgStore.EXPECT().FindByUUIDs(mock.Anything, []string{organizationNamespaceUUID}).Return([]database.Organization{organization}, nil).Once()
+	nsStore := mockdb.NewMockNamespaceStore(t)
+	nsStore.EXPECT().FindByUUIDs(mock.Anything, []string{userUUID, organizationNamespaceUUID}).Return([]database.Namespace{userNamespace, organizationNamespace}, nil).Once()
+	authorizer := mockrebac.NewMockAuthorizer(t)
+	authorizer.EXPECT().ListObjects(ctx, rebac.ListObjectsRequest{
+		Subject: rebac.UserSubject(userUUID), Relation: rebac.NamespaceCanWrite,
+		ObjectType: rebac.ObjectTypeNamespace, Consistency: rebac.ConsistencyHigher,
+	}).Return(rebac.ListObjectsResult{Objects: []rebac.Object{
+		rebac.NamespaceObject(userUUID), rebac.NamespaceObject(organizationNamespaceUUID),
+	}}, nil).Once()
+
+	component := &organizationComponentImpl{userStore: userStore, nsStore: nsStore, orgStore: orgStore, rebac: authorizer}
+	result, err := component.ListCurrentUserWritableNamespaces(ctx, actor.Username)
+
+	require.NoError(t, err)
+	require.Equal(t, []types.WritableNamespace{
+		{Path: "alice", Type: "user", Name: "Alice", UUID: userUUID},
+		{Path: "engineering", Type: "organization", Name: "IT Department", UUID: organizationNamespaceUUID},
+	}, result)
+}
+
+// TestOrganizationComponent_ListCurrentUserWritableNamespacesFallsBackToUsername uses username when a display name is empty.
+func TestOrganizationComponent_ListCurrentUserWritableNamespacesFallsBackToUsername(t *testing.T) {
+	ctx := context.Background()
+	actor := database.User{Username: "current-user", UUID: "user-uuid"}
+	userStore := mockdb.NewMockUserStore(t)
+	userStore.EXPECT().FindByUsername(mock.Anything, actor.Username).Return(actor, nil).Once()
+	userStore.EXPECT().FindByUUIDs(mock.Anything, []string{actor.UUID}).Return([]*database.User{{UUID: actor.UUID, Username: actor.Username}}, nil).Once()
+	nsStore := mockdb.NewMockNamespaceStore(t)
+	nsStore.EXPECT().FindByUUIDs(mock.Anything, []string{actor.UUID}).Return([]database.Namespace{{Path: actor.Username, UUID: actor.UUID, NamespaceType: database.UserNamespace}}, nil).Once()
+	authorizer := mockrebac.NewMockAuthorizer(t)
+	authorizer.EXPECT().ListObjects(mock.Anything, mock.Anything).Return(rebac.ListObjectsResult{Objects: []rebac.Object{rebac.NamespaceObject(actor.UUID)}}, nil).Once()
+
+	component := &organizationComponentImpl{userStore: userStore, nsStore: nsStore, orgStore: mockdb.NewMockOrgStore(t), rebac: authorizer}
+	result, err := component.ListCurrentUserWritableNamespaces(ctx, actor.Username)
+
+	require.NoError(t, err)
+	require.Equal(t, []types.WritableNamespace{{Path: actor.Username, Type: "user", Name: actor.Username, UUID: actor.UUID}}, result)
+}
+
 // TestOrganizationComponent_Create_UsesAtomicStore verifies the component creates organization records through the atomic Store path.
 func TestOrganizationComponent_Create_UsesAtomicStore(t *testing.T) {
 	req := &types.CreateOrgReq{

@@ -319,6 +319,57 @@ func (_c *MockOrganizationComponent_Index_Call) RunAndReturn(run func(context.Co
 	return _c
 }
 
+// ListCurrentUserWritableNamespaces provides a mock function with given fields: ctx, currentUser
+func (_m *MockOrganizationComponent) ListCurrentUserWritableNamespaces(ctx context.Context, currentUser string) ([]types.WritableNamespace, error) {
+	ret := _m.Called(ctx, currentUser)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListCurrentUserWritableNamespaces")
+	}
+
+	var r0 []types.WritableNamespace
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) ([]types.WritableNamespace, error)); ok {
+		return rf(ctx, currentUser)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) []types.WritableNamespace); ok {
+		r0 = rf(ctx, currentUser)
+	} else if ret.Get(0) != nil {
+		r0 = ret.Get(0).([]types.WritableNamespace)
+	}
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, currentUser)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockOrganizationComponent_ListCurrentUserWritableNamespaces_Call is a typed mock call for ListCurrentUserWritableNamespaces.
+type MockOrganizationComponent_ListCurrentUserWritableNamespaces_Call struct {
+	*mock.Call
+}
+
+// ListCurrentUserWritableNamespaces configures a mock call.
+func (_e *MockOrganizationComponent_Expecter) ListCurrentUserWritableNamespaces(ctx interface{}, currentUser interface{}) *MockOrganizationComponent_ListCurrentUserWritableNamespaces_Call {
+	return &MockOrganizationComponent_ListCurrentUserWritableNamespaces_Call{Call: _e.mock.On("ListCurrentUserWritableNamespaces", ctx, currentUser)}
+}
+
+func (_c *MockOrganizationComponent_ListCurrentUserWritableNamespaces_Call) Run(run func(context.Context, string)) *MockOrganizationComponent_ListCurrentUserWritableNamespaces_Call {
+	_c.Call.Run(func(args mock.Arguments) { run(args[0].(context.Context), args[1].(string)) })
+	return _c
+}
+
+func (_c *MockOrganizationComponent_ListCurrentUserWritableNamespaces_Call) Return(_a0 []types.WritableNamespace, _a1 error) *MockOrganizationComponent_ListCurrentUserWritableNamespaces_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockOrganizationComponent_ListCurrentUserWritableNamespaces_Call) RunAndReturn(run func(context.Context, string) ([]types.WritableNamespace, error)) *MockOrganizationComponent_ListCurrentUserWritableNamespaces_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ListUserOrgs provides a mock function with given fields: ctx, req
 func (_m *MockOrganizationComponent) ListUserOrgs(ctx context.Context, req *types.ListUserOrgsReq) ([]types.Organization, int, error) {
 	ret := _m.Called(ctx, req)

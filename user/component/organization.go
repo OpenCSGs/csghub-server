@@ -23,6 +23,8 @@ type OrganizationComponent interface {
 	Create(ctx context.Context, req *types.CreateOrgReq) (*types.Organization, error)
 	Index(ctx context.Context, search string, per, page int, orgType, verifyStatus, tag string) ([]types.Organization, int, error)
 	ListUserOrgs(ctx context.Context, req *types.ListUserOrgsReq) ([]types.Organization, int, error)
+	// ListCurrentUserWritableNamespaces returns namespaces where the current user can write.
+	ListCurrentUserWritableNamespaces(ctx context.Context, currentUser string) ([]types.WritableNamespace, error)
 	Get(ctx context.Context, orgName string) (*types.Organization, error)
 	GetByUUID(ctx context.Context, uuid string) (*types.Organization, error)
 	Delete(ctx context.Context, req *types.DeleteOrgReq) error
@@ -252,6 +254,129 @@ func (c *organizationComponentImpl) ListUserOrgs(ctx context.Context, req *types
 		return nil, 0, fmt.Errorf("failed to load organization tags, error: %w", err)
 	}
 	return orgs, total, nil
+}
+
+// ListCurrentUserWritableNamespaces returns namespaces authorized by OpenFGA with can_write.
+func (c *organizationComponentImpl) ListCurrentUserWritableNamespaces(ctx context.Context, currentUser string) ([]types.WritableNamespace, error) {
+	if currentUser == "" {
+		return nil, fmt.Errorf("current user is required")
+	}
+	if c.rebac == nil {
+		return nil, fmt.Errorf("ReBAC authorizer is nil")
+	}
+	user, err := c.userStore.FindByUsername(ctx, currentUser)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find current user, error: %w", err)
+	}
+
+	objects, err := c.rebac.ListObjects(ctx, rebac.ListObjectsRequest{
+		Subject:     rebac.UserSubject(user.UUID),
+		Relation:    rebac.NamespaceCanWrite,
+		ObjectType:  rebac.ObjectTypeNamespace,
+		Consistency: rebac.ConsistencyHigher,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to list current user writable namespaces, error: %w", err)
+	}
+
+	namespaceUUIDs := make([]string, 0, len(objects.Objects))
+	seen := make(map[string]struct{}, len(objects.Objects))
+	for _, object := range objects.Objects {
+		if object.Type != rebac.ObjectTypeNamespace || object.ID == "" {
+			continue
+		}
+		if _, exists := seen[object.ID]; exists {
+			continue
+		}
+		seen[object.ID] = struct{}{}
+		namespaceUUIDs = append(namespaceUUIDs, object.ID)
+	}
+	if len(namespaceUUIDs) == 0 {
+		return []types.WritableNamespace{}, nil
+	}
+
+	namespaces, err := c.nsStore.FindByUUIDs(ctx, namespaceUUIDs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load writable namespaces, error: %w", err)
+	}
+	namespaceByUUID := make(map[string]database.Namespace, len(namespaces))
+	userUUIDs := make([]string, 0, len(namespaces))
+	organizationUUIDs := make([]string, 0, len(namespaces))
+	for _, namespace := range namespaces {
+		if namespace.UUID == "" {
+			continue
+		}
+		namespaceByUUID[namespace.UUID] = namespace
+		switch namespace.NamespaceType {
+		case database.UserNamespace:
+			userUUIDs = append(userUUIDs, namespace.UUID)
+		case database.OrgNamespace:
+			organizationUUIDs = append(organizationUUIDs, namespace.UUID)
+		}
+	}
+
+	usersByUUID := make(map[string]*database.User, len(userUUIDs))
+	if len(userUUIDs) > 0 {
+		users, err := c.userStore.FindByUUIDs(ctx, userUUIDs)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load writable namespace users, error: %w", err)
+		}
+		for _, entity := range users {
+			if entity != nil {
+				usersByUUID[entity.UUID] = entity
+			}
+		}
+	}
+
+	organizationsByUUID := make(map[string]database.Organization, len(organizationUUIDs))
+	if len(organizationUUIDs) > 0 {
+		organizations, err := c.orgStore.FindByUUIDs(ctx, organizationUUIDs)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load writable namespace organizations, error: %w", err)
+		}
+		for _, organization := range organizations {
+			organizationsByUUID[organization.UUID.String()] = organization
+		}
+	}
+
+	result := make([]types.WritableNamespace, 0, len(namespaceByUUID))
+	for _, namespaceUUID := range namespaceUUIDs {
+		namespace, exists := namespaceByUUID[namespaceUUID]
+		if !exists {
+			continue
+		}
+		switch namespace.NamespaceType {
+		case database.UserNamespace:
+			entity, exists := usersByUUID[namespaceUUID]
+			if !exists {
+				continue
+			}
+			name := entity.NickName
+			if name == "" {
+				name = entity.Username
+			}
+			entityUUID := entity.UUID
+			if entityUUID == "" {
+				entityUUID = namespaceUUID
+			}
+			result = append(result, types.WritableNamespace{Path: namespace.Path, Type: string(database.UserNamespace), Name: name, UUID: entityUUID})
+		case database.OrgNamespace:
+			entity, exists := organizationsByUUID[namespaceUUID]
+			if !exists {
+				continue
+			}
+			name := entity.Nickname
+			if name == "" {
+				name = entity.Name
+			}
+			entityUUID := entity.UUID.String()
+			if entityUUID == uuid.Nil.String() {
+				entityUUID = namespaceUUID
+			}
+			result = append(result, types.WritableNamespace{Path: namespace.Path, Type: string(database.OrgNamespace), Name: name, UUID: entityUUID})
+		}
+	}
+	return result, nil
 }
 
 func (c *organizationComponentImpl) toOrgList(ctx context.Context, dborgs []database.Organization) ([]types.Organization, error) {

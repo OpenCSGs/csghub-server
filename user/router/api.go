@@ -113,6 +113,7 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 	if err := extendRoutes(apiV1Group, middlewareCollection, config, userHandler); err != nil {
 		return nil, fmt.Errorf("error extending routes:%w", err)
 	}
+	apiV1Group.GET("/namespaces/mine/writable", mustLogin(), orgHandler.ListCurrentUserWritableNamespaces)
 
 	apiV1Group.Use(mustLogin())
 	userMatch := userMatch()

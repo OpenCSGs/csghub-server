@@ -249,6 +249,35 @@ func (h *OrganizationHandler) ListUserOrgs(ctx *gin.Context) {
 	httpbase.OK(ctx, respData)
 }
 
+// ListCurrentUserWritableNamespaces godoc
+// @Security     ApiKey
+// @Summary      Get namespaces writable by the current user
+// @Description  Lists namespaces where the current user has can_write permission.
+// @Tags         Organization
+// @Produce      json
+// @Success      200  {object}  types.Response{data=[]types.WritableNamespace} "OK"
+// @Failure      401  {object}  types.APIUnauthorized "Unauthorized"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /namespaces/mine/writable [get]
+func (h *OrganizationHandler) ListCurrentUserWritableNamespaces(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+	if currentUser == "" {
+		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
+		return
+	}
+
+	namespaces, err := h.c.ListCurrentUserWritableNamespaces(ctx.Request.Context(), currentUser)
+	if err != nil {
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get current user writable namespaces", slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	if namespaces == nil {
+		namespaces = make([]types.WritableNamespace, 0)
+	}
+	httpbase.OK(ctx, namespaces)
+}
+
 // DeleteOrganization godoc
 // @Security     ApiKey
 // @Summary      Delete organization
