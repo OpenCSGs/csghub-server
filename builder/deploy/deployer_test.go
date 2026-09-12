@@ -991,13 +991,16 @@ func TestDeployer_SubmitFinetuneV2(t *testing.T) {
 		func(_ context.Context, req *types.ArgoWorkFlowReq) (*types.ArgoWorkFlowRes, error) {
 			require.Equal(t, 2, req.WorkflowVersion)
 			require.Equal(t, "finetune-v2", req.Entrypoint)
-			require.Len(t, req.Templates, 4)
+			require.Len(t, req.Templates, 5)
 			require.Equal(t, "finetune-download", req.Templates[1].Name)
 			require.Empty(t, req.Templates[1].HardWare.Gpu.Num)
 			require.Equal(t, "finetune-train", req.Templates[2].Name)
 			require.Equal(t, "1", req.Templates[2].HardWare.Gpu.Num)
 			require.Equal(t, "finetune-upload", req.Templates[3].Name)
 			require.Empty(t, req.Templates[3].HardWare.Gpu.Num)
+			require.Equal(t, "finetune-cleanup", req.Templates[4].Name)
+			require.Empty(t, req.Templates[4].HardWare.Gpu.Num)
+			require.Equal(t, []string{"/etc/csghub/cleanup-job.sh"}, req.Templates[4].Command)
 			require.Equal(t, "true", req.Templates[3].Env["KEEP_FINETUNE_WORK_DIR"])
 			return &types.ArgoWorkFlowRes{ID: 2}, nil
 		},
