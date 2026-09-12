@@ -6,9 +6,9 @@
   "engine_images": [
     {
       "compute_type": "gpu",
-      "image": "opencsghq/amd-vllm:rocm7.2.1_vllm_0.24.0",
+      "image": "opencsghq/amd-vllm:rocm7.2.1_vllm_0.24.3",
       "driver_version": "7.2.1",
-      "engine_version": "0.24.0"
+      "engine_version": "0.24.3"
     }
   ],
   "engine_args": [
