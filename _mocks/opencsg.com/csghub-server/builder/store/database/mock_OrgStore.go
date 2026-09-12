@@ -351,6 +351,57 @@ func (_c *MockOrgStore_FindByUUID_Call) RunAndReturn(run func(context.Context, s
 	return _c
 }
 
+// FindByUUIDs provides a mock function with given fields: ctx, uuids
+func (_m *MockOrgStore) FindByUUIDs(ctx context.Context, uuids []string) ([]database.Organization, error) {
+	ret := _m.Called(ctx, uuids)
+
+	if len(ret) == 0 {
+		panic("no return value specified for FindByUUIDs")
+	}
+
+	var r0 []database.Organization
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, []string) ([]database.Organization, error)); ok {
+		return rf(ctx, uuids)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, []string) []database.Organization); ok {
+		r0 = rf(ctx, uuids)
+	} else if ret.Get(0) != nil {
+		r0 = ret.Get(0).([]database.Organization)
+	}
+	if rf, ok := ret.Get(1).(func(context.Context, []string) error); ok {
+		r1 = rf(ctx, uuids)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockOrgStore_FindByUUIDs_Call is a typed mock call for FindByUUIDs.
+type MockOrgStore_FindByUUIDs_Call struct {
+	*mock.Call
+}
+
+// FindByUUIDs configures a mock call.
+func (_e *MockOrgStore_Expecter) FindByUUIDs(ctx interface{}, uuids interface{}) *MockOrgStore_FindByUUIDs_Call {
+	return &MockOrgStore_FindByUUIDs_Call{Call: _e.mock.On("FindByUUIDs", ctx, uuids)}
+}
+
+func (_c *MockOrgStore_FindByUUIDs_Call) Run(run func(context.Context, []string)) *MockOrgStore_FindByUUIDs_Call {
+	_c.Call.Run(func(args mock.Arguments) { run(args[0].(context.Context), args[1].([]string)) })
+	return _c
+}
+
+func (_c *MockOrgStore_FindByUUIDs_Call) Return(_a0 []database.Organization, _a1 error) *MockOrgStore_FindByUUIDs_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockOrgStore_FindByUUIDs_Call) RunAndReturn(run func(context.Context, []string) ([]database.Organization, error)) *MockOrgStore_FindByUUIDs_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetOrganizationTags provides a mock function with given fields: ctx, orgID
 func (_m *MockOrgStore) GetOrganizationTags(ctx context.Context, orgID int64) ([]database.Tag, error) {
 	ret := _m.Called(ctx, orgID)

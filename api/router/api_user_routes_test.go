@@ -282,6 +282,7 @@ func TestOrgRoutes_AnonymousWriteAccess_Returns401(t *testing.T) {
 		path   string
 	}{
 		{http.MethodPost, "/api/v1/organizations"},
+		{http.MethodGet, "/api/v1/namespaces/mine/writable"},
 		{http.MethodPut, "/api/v1/organization/testorg"},
 		{http.MethodDelete, "/api/v1/organization/testorg"},
 	}
@@ -308,6 +309,18 @@ func TestOrgRoutes_LoginUser_CreateOrg_PassesThrough(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, resp.Code,
 		"logged-in user POST /organizations should reach the proxy")
+}
+
+func TestOrgRoutes_LoginUser_ListWritableNamespaces_PassesThrough(t *testing.T) {
+	router := newOrgRoutesTestRouter(t)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/namespaces/mine/writable", nil)
+	req.Header.Set("X-Test-User", "testuser")
+	resp := httptest.NewRecorder()
+	router.ServeHTTP(resp, req)
+
+	assert.Equal(t, http.StatusOK, resp.Code,
+		"logged-in user GET writable organizations should reach the proxy")
 }
 
 func TestMemberRoutes_AnonymousWriteAccess_Returns401(t *testing.T) {

@@ -1457,6 +1457,7 @@ func createOrgRoutes(apiGroup *gin.RouterGroup, middlewareCollection middleware.
 		apiGroup.PUT("/organization/:namespace/members/:username", middlewareCollection.Auth.NeedLogin, userProxyHandler.ProxyToApi("/api/v1/organization/%s/members/%s", "namespace", "username"))
 		apiGroup.DELETE("/organization/:namespace/members/:username", middlewareCollection.Auth.NeedLogin, userProxyHandler.ProxyToApi("/api/v1/organization/%s/members/%s", "namespace", "username"))
 	}
+	apiGroup.GET("/namespaces/mine/writable", middlewareCollection.Auth.NeedLogin, userProxyHandler.Proxy)
 	{
 		apiGroup.POST("/organization/verify", middlewareCollection.Auth.NeedLogin, userProxyHandler.Proxy)
 		apiGroup.PUT("/organization/verify/:id", middlewareCollection.Auth.NeedAdmin, userProxyHandler.ProxyToApi("/api/v1/organization/verify/%s", "id"))

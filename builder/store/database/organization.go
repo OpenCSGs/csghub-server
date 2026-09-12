@@ -39,6 +39,7 @@ type OrgStore interface {
 	UpdateVerifyStatus(ctx context.Context, path string, status types.VerifyStatus) error
 	GetSharedOrgIDs(ctx context.Context, userIDs []int64) ([]int64, error)
 	FindByUUID(ctx context.Context, uuid string) (*Organization, error)
+	FindByUUIDs(ctx context.Context, uuids []string) ([]Organization, error)
 	// Tag operations
 	SetOrganizationTags(ctx context.Context, orgID int64, tagIDs []int64) error
 	GetOrganizationTags(ctx context.Context, orgID int64) ([]Tag, error)
@@ -546,6 +547,25 @@ func (s *orgStoreImpl) FindByUUID(ctx context.Context, uuid string) (*Organizati
 		return nil, nil
 	}
 	return nil, errorx.HandleDBError(err, nil)
+}
+
+// FindByUUIDs returns active organizations matching the supplied UUIDs across organization models.
+func (s *orgStoreImpl) FindByUUIDs(ctx context.Context, uuids []string) ([]Organization, error) {
+	organizations := make([]Organization, 0)
+	if len(uuids) == 0 {
+		return organizations, nil
+	}
+
+	err := s.db.Operator.Core.NewSelect().
+		Model(&organizations).
+		Relation("Namespace").
+		Where("organization.uuid IN (?)", bun.In(uuids)).
+		Where("organization.deleted_at IS NULL").
+		Scan(ctx)
+	if err != nil {
+		return nil, errorx.HandleDBError(err, errorx.Ctx().Set("uuids", uuids))
+	}
+	return organizations, nil
 }
 
 func (s *orgStoreImpl) SetOrganizationTags(ctx context.Context, orgID int64, tagIDs []int64) error {

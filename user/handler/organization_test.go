@@ -122,8 +122,8 @@ func TestOrganizationHandler_ListUserOrgs(t *testing.T) {
 		}
 		mockOrgComp := mockcomp.NewMockOrganizationComponent(t)
 		mockOrgComp.EXPECT().ListUserOrgs(mock.Anything, &types.ListUserOrgsReq{
-					Username: "user1", Search: "org", Per: 10, Page: 1,
-				}).Return(dborgs, 2, nil)
+			Username: "user1", Search: "org", Per: 10, Page: 1,
+		}).Return(dborgs, 2, nil)
 		h := &OrganizationHandler{
 			c: mockOrgComp,
 		}
@@ -145,14 +145,33 @@ func TestOrganizationHandler_ListUserOrgs(t *testing.T) {
 
 		mockOrgComp := mockcomp.NewMockOrganizationComponent(t)
 		mockOrgComp.EXPECT().ListUserOrgs(mock.Anything, &types.ListUserOrgsReq{
-					Username: "user1", Per: 50, Page: 1,
-				}).Return(nil, 0, errors.New("internal error"))
+			Username: "user1", Per: 50, Page: 1,
+		}).Return(nil, 0, errors.New("internal error"))
 		h := &OrganizationHandler{
 			c: mockOrgComp,
 		}
 		h.ListUserOrgs(ginc)
 		require.Equal(t, 500, response.Code)
 	})
+}
+
+// TestOrganizationHandler_ListCurrentUserWritableNamespaces returns writable namespaces for the authenticated user.
+func TestOrganizationHandler_ListCurrentUserWritableNamespaces(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	response := httptest.NewRecorder()
+	ginc, _ := gin.CreateTestContext(response)
+	ginc.Request = httptest.NewRequest("GET", "/api/v1/namespaces/mine/writable", nil)
+	httpbase.SetCurrentUser(ginc, "current-user")
+
+	mockOrgComp := mockcomp.NewMockOrganizationComponent(t)
+	mockOrgComp.EXPECT().ListCurrentUserWritableNamespaces(mock.Anything, "current-user").Return([]types.WritableNamespace{
+		{Path: "write-org", Type: "organization", Name: "Write Org", UUID: "write-org-uuid"},
+	}, nil).Once()
+	h := &OrganizationHandler{c: mockOrgComp}
+	h.ListCurrentUserWritableNamespaces(ginc)
+
+	require.Equal(t, 200, response.Code)
+	require.Contains(t, response.Body.String(), "write-org")
 }
 
 type orgsResponse struct {

@@ -59,6 +59,10 @@ func TestOrganizationStore_CRUD(t *testing.T) {
 	orgv, err := store.FindByPath(ctx, "o1")
 	require.Nil(t, err)
 	require.Equal(t, "o1", orgv.Name)
+	organizationsByUUID, err := store.FindByUUIDs(ctx, []string{uuid.String()})
+	require.Nil(t, err)
+	require.Len(t, organizationsByUUID, 1)
+	require.Equal(t, uuid, organizationsByUUID[0].UUID)
 
 	exist, err := store.Exists(ctx, "o1")
 	require.Nil(t, err)
@@ -146,6 +150,36 @@ func TestOrganizationStore_CRUD(t *testing.T) {
 	require.Nil(t, err)
 	require.False(t, exist)
 
+}
+
+// TestOrganizationStore_FindByUUIDsIncludesLegacyOrganizations verifies UUID lookups are not scoped to the active organization model.
+func TestOrganizationStore_FindByUUIDsIncludesLegacyOrganizations(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.Background()
+
+	legacyUUID := uuid.New()
+	legacyStore := database.NewOrgStoreWithDB(db)
+	require.NoError(t, legacyStore.Create(ctx, &database.Organization{
+		Name: "legacy-org", UUID: legacyUUID,
+	}, &database.Namespace{Path: "legacy-org", UUID: legacyUUID.String()}))
+
+	deletedUUID := uuid.New()
+	require.NoError(t, legacyStore.Create(ctx, &database.Organization{
+		Name: "deleted-org", UUID: deletedUUID,
+	}, &database.Namespace{Path: "deleted-org", UUID: deletedUUID.String()}))
+	_, err := db.Core.NewUpdate().
+		Model((*database.Organization)(nil)).
+		Set("deleted_at = ?", time.Now()).
+		Where("uuid = ?", deletedUUID).
+		Exec(ctx)
+	require.NoError(t, err)
+
+	hierarchyStore := database.NewOrgStoreWithMode(db, true)
+	organizations, err := hierarchyStore.FindByUUIDs(ctx, []string{legacyUUID.String(), deletedUUID.String()})
+	require.NoError(t, err)
+	require.Len(t, organizations, 1)
+	require.Equal(t, legacyUUID, organizations[0].UUID)
 }
 
 func TestOrganizationStore_ModeFilters(t *testing.T) {
