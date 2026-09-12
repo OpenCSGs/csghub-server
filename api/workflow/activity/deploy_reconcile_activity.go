@@ -36,6 +36,11 @@ func (a *Activities) getLogger(ctx context.Context) log.Logger {
 // ==================== Entry Point ====================
 
 func (a *Activities) ReconcileAllStatus(ctx context.Context) error {
+	if a.deployer == nil {
+		a.getLogger(ctx).Error("reconcile: deployer is nil, skip whole reconcile round; " +
+			"check worker startup log for NewDeployerForReconcile failure")
+		return nil
+	}
 	if err := a.ReconcileDeployStatus(ctx); err != nil {
 		a.getLogger(ctx).Error("reconcile: deploy status reconcile failed", "error", err)
 	}
@@ -71,6 +76,8 @@ func reconcileByStatus(ctx context.Context, a *Activities, status int, timeoutMi
 		return
 	}
 	if len(deploys) == 0 {
+		logger.Debug("reconcile(deploy): no stuck deploys",
+			"status", statusName(status), "timeout_min", timeoutMin)
 		return
 	}
 
@@ -134,6 +141,14 @@ func reconcileDeployCluster(ctx context.Context, a *Activities, cid string, depl
 }
 
 func processBatchResult(ctx context.Context, a *Activities, deploy *database.Deploy, r *runnerTypes.BatchStatusItemResult, currentStatus int) {
+	logger := a.getLogger(ctx)
+	logger.Debug("reconcile(deploy): process batch item result",
+		"deploy_id", deploy.ID, "svc_name", deploy.SvcName, "type", deploy.Type,
+		"current_status", statusName(currentStatus),
+		"result_code", r.Code, "result_status", r.Status,
+		"actual_replica", r.ActualReplica, "desired_replica", r.DesiredReplica,
+		"instances", len(r.Instances))
+
 	var newStatus int
 	var instances []types.Instance
 	switch deploy.Type {
@@ -148,6 +163,9 @@ func processBatchResult(ctx context.Context, a *Activities, deploy *database.Dep
 			} else if currentStatus == common.Running {
 				newStatus = common.Stopped
 			} else {
+				logger.Warn("reconcile(deploy): stopped result under unexpected status, skip",
+					"deploy_id", deploy.ID, "svc_name", deploy.SvcName,
+					"current_status", statusName(currentStatus))
 				return
 			}
 		case common.Running:
@@ -155,6 +173,9 @@ func processBatchResult(ctx context.Context, a *Activities, deploy *database.Dep
 			// with more accurate status mapping (Deploying/Sleeping/Running).
 			// Reconcile should only fix anomalies, not interfere.
 			if currentStatus == common.Deploying || currentStatus == common.Startup {
+				logger.Info("reconcile(deploy): runner already running, leave transition to informer",
+					"deploy_id", deploy.ID, "svc_name", deploy.SvcName,
+					"current_status", statusName(currentStatus))
 				return
 			}
 			newStatus = common.Running
@@ -163,14 +184,23 @@ func processBatchResult(ctx context.Context, a *Activities, deploy *database.Dep
 			// Service exists but not fully ready (Startup from batch API).
 			// Deploying/Startup: let informer handle the normal transition.
 			// Running: don't downgrade (scale-to-zero is normal).
-			if currentStatus == common.Deploying || currentStatus == common.Startup || currentStatus == common.Running {
+			if currentStatus == common.Deploying || currentStatus == common.Startup {
+				logger.Info("reconcile(deploy): runner not fully ready, leave transition to informer",
+					"deploy_id", deploy.ID, "svc_name", deploy.SvcName,
+					"current_status", statusName(currentStatus), "result_code", r.Code)
+				return
+			}
+			if currentStatus == common.Running {
+				// scale-to-zero is a normal Running state, do not downgrade
+				logger.Info("reconcile(deploy): runner not fully ready under Running, no downgrade (scale-to-zero)",
+					"deploy_id", deploy.ID, "svc_name", deploy.SvcName, "result_code", r.Code)
 				return
 			}
 			newStatus = common.Startup
 			instances = r.Instances
 		}
 	default:
-		a.getLogger(ctx).Warn("reconcile: unknown deploy type, skip", "deploy_id", deploy.ID, "type", deploy.Type)
+		logger.Warn("reconcile: unknown deploy type, skip", "deploy_id", deploy.ID, "type", deploy.Type)
 		return
 	}
 	if newStatus != 0 {
@@ -179,6 +209,9 @@ func processBatchResult(ctx context.Context, a *Activities, deploy *database.Dep
 			// StatusUpdateAt to reset the fallback timer. Do NOT touch
 			// Reason/Instances or overwrite fields that the informer may
 			// have updated since the scan snapshot.
+			logger.Info("reconcile(deploy): status unchanged, refresh timestamp only",
+				"deploy_id", deploy.ID, "svc_name", deploy.SvcName,
+				"status", statusName(newStatus))
 			refreshStatusTimestamp(ctx, a, deploy, currentStatus)
 		} else {
 			applyStatusUpdate(ctx, a, deploy, currentStatus, newStatus, instances, "runner_status_sync")
@@ -241,6 +274,8 @@ func reconcileWorkflowByPhase(ctx context.Context, a *Activities, phases []v1alp
 		return
 	}
 	if len(wfs) == 0 {
+		logger.Debug("reconcile(wf): no stuck workflows",
+			"timeout_min", timeoutMin)
 		return
 	}
 
@@ -269,6 +304,9 @@ func reconcileWorkflowCluster(ctx context.Context, a *Activities, cid string, wf
 			wf.StatusUpdateAt = time.Now()
 			if _, err := a.stores.argoWorkFlow.UpdateWorkFlow(ctx, *wf); err != nil {
 				a.getLogger(ctx).Error("reconcile(wf): mark failed error", "wf_id", wf.ID, "error", err)
+			} else {
+				a.getLogger(ctx).Info("reconcile(wf): workflow marked failed",
+					"wf_id", wf.ID, "cluster_id", cid)
 			}
 		},
 		func(wf *database.ArgoWorkflow) (string, runnerTypes.BatchStatusItem) {
@@ -279,14 +317,20 @@ func reconcileWorkflowCluster(ctx context.Context, a *Activities, cid string, wf
 			if lastUpdate.IsZero() {
 				lastUpdate = wf.SubmitTime
 			}
-			if time.Since(lastUpdate) > hardTimeout {
+			elapsed := time.Since(lastUpdate)
+			if elapsed > hardTimeout {
 				a.getLogger(ctx).Warn("reconcile(wf): batch error timeout, marking failed",
-					"wf_id", wf.ID, "hard_timeout", hardTimeout)
+					"wf_id", wf.ID, "hard_timeout", hardTimeout,
+					"elapsed", elapsed.Round(time.Second).String())
 				wf.Status = v1alpha1.WorkflowFailed
 				wf.StatusUpdateAt = time.Now()
 				if _, err := a.stores.argoWorkFlow.UpdateWorkFlow(ctx, *wf); err != nil {
 					a.getLogger(ctx).Error("reconcile(wf): mark failed error", "wf_id", wf.ID, "error", err)
 				}
+			} else {
+				a.getLogger(ctx).Info("reconcile(wf): batch error but within hard timeout, skip",
+					"wf_id", wf.ID, "elapsed", elapsed.Round(time.Second).String(),
+					"hard_timeout", hardTimeout)
 			}
 		},
 		func(wf *database.ArgoWorkflow, r *runnerTypes.BatchStatusItemResult) {
@@ -323,16 +367,24 @@ func clusterBatchDo[T any](
 	logger := a.getLogger(ctx)
 
 	// Cluster health check
-	timedOut, _ := a.deployer.CheckHeartbeatTimeout(ctx, cid)
-	if timedOut {
+	timedOut, err := a.deployer.CheckHeartbeatTimeout(ctx, cid)
+	if err != nil {
+		logger.Warn("reconcile: heartbeat check failed, skip timeout fallback and proceed batch",
+			"cluster_id", cid, "item_count", len(items), "error", err)
+	} else if timedOut {
+		marked := 0
 		for i := range items {
 			item := &items[i]
 			if time.Since(getLastUpdate(item)) > hardTimeout {
 				logger.Warn("reconcile: cluster unhealthy + hard timeout, marking failed",
 					"cluster_id", cid)
 				markFailed(item)
+				marked++
 			}
 		}
+		logger.Warn("reconcile: cluster heartbeat timeout, applied fallback",
+			"cluster_id", cid, "item_count", len(items),
+			"marked_failed", marked, "hard_timeout_min", int(hardTimeout.Minutes()))
 		return
 	}
 
@@ -345,7 +397,7 @@ func clusterBatchDo[T any](
 		idxMap[key] = i
 	}
 
-	logger.Debug("reconcile: calling BatchStatus",
+	logger.Info("reconcile: calling BatchStatus",
 		"cluster_id", cid, "item_count", len(batchItems))
 
 	resp, err := a.deployer.BatchStatus(ctx, &runnerTypes.BatchStatusRequest{ClusterID: cid, Items: batchItems})
@@ -365,14 +417,17 @@ func clusterBatchDo[T any](
 
 	for _, r := range resp.Items {
 		idx, ok := idxMap[r.Name]
-		if !ok || r.Error != "" {
-			if r.Error != "" {
-				logger.Warn("reconcile: batch item error",
-					"name", r.Name, "error", r.Error)
-			}
+		if !ok {
+			logger.Warn("reconcile: batch response item not in request, ignore",
+				"cluster_id", cid, "name", r.Name)
+			continue
+		}
+		if r.Error != "" {
+			logger.Warn("reconcile: batch item error",
+				"name", r.Name, "error", r.Error)
 			// Apply timeout fallback for individual errors,
 			// same as the whole-batch-failure path.
-			if ok && onBatchError != nil {
+			if onBatchError != nil {
 				onBatchError(&items[idx])
 			}
 			continue
