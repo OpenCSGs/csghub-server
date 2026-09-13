@@ -1552,9 +1552,9 @@ func TestModelUpstreamsAvailable(t *testing.T) {
 		want      bool
 	}{
 		{
-			name:      "empty upstreams defaults to available",
+			name:      "empty upstreams is unavailable",
 			upstreams: nil,
-			want:      true,
+			want:      false,
 		},
 		{
 			name:      "single healthy upstream",
@@ -1692,14 +1692,12 @@ func TestComputeModelListAvailability(t *testing.T) {
 		assert.True(t, result[1].Availability.IsAvailable)
 	})
 
-	t.Run("model with no upstreams is available", func(t *testing.T) {
+	t.Run("model with no upstreams is unavailable", func(t *testing.T) {
 		models := []types.Model{
 			makeModel("no-upstreams", nil),
 		}
 		result := computeModelListAvailability(models)
-		assert.Len(t, result, 1)
-		assert.Equal(t, "no-upstreams", result[0].ID)
-		assert.True(t, result[0].Availability.IsAvailable)
+		assert.Len(t, result, 0)
 	})
 
 	t.Run("model with mixed upstreams one healthy", func(t *testing.T) {
