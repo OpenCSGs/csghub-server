@@ -35,6 +35,7 @@ type UserHandler struct {
 	atc                            component.AccessTokenComponent
 	codeSoulerVScodeRedirectURL    string
 	codeSoulerJetbrainsRedirectURL string
+	liteRedirectURL                string
 	config                         *config.Config
 	uv                             component.UserVerifyComponent
 }
@@ -43,7 +44,7 @@ const (
 	VSCODE    = "vscode"
 	JETBRAINS = "jetbrains"
 	CASDOOR   = "casdoor"
-	MASKSTR   = "xxx"
+	LITE      = "lite"
 )
 
 func NewUserHandler(config *config.Config) (*UserHandler, error) {
@@ -72,6 +73,7 @@ func NewUserHandler(config *config.Config) (*UserHandler, error) {
 	h.signinFailureRedirectURL = config.ServerFailureRedirectURL
 	h.codeSoulerVScodeRedirectURL = config.User.CodeSoulerVScodeRedirectURL
 	h.codeSoulerJetbrainsRedirectURL = config.User.CodeSoulerJetBrainsRedirectURL
+	h.liteRedirectURL = config.User.LiteRedirectURL
 	h.config = config
 	h.uv, err = component.NewUserVerifyComponent(config)
 	if err != nil {
@@ -398,9 +400,8 @@ func (h *UserHandler) Casdoor(ctx *gin.Context) {
 	}
 
 	var (
-		targetUrl       string
-		targetUrlMasked string
-		starshipApiKey  string
+		targetUrl      string
+		starshipApiKey string
 	)
 
 	if state == VSCODE || state == JETBRAINS {
@@ -419,10 +420,20 @@ func (h *UserHandler) Casdoor(ctx *gin.Context) {
 			codeSoulerEndpoint = h.codeSoulerJetbrainsRedirectURL
 		}
 		targetUrl = fmt.Sprintf("%s?apikey=%s&portal_url=%s&jwt=%s", codeSoulerEndpoint, starshipApiKey, h.signinSuccessRedirectURL, signed)
-		targetUrlMasked = fmt.Sprintf("%s?apikey=%s&portal_url=%s&jwt=%s", codeSoulerEndpoint, MASKSTR, h.signinSuccessRedirectURL, MASKSTR)
+	} else if state == LITE {
+		liteToken, err := h.atc.GetOrCreateFirstAvaiToken(ctx, jwtToken.CurrentUser, string(types.AccessTokenAppCSGHub), "csglite")
+		if err != nil {
+			errMsg := fmt.Sprintf("failed to get user %s csghub access token for login from %s", jwtToken.CurrentUser, state)
+			slog.ErrorContext(ctx.Request.Context(), errMsg, slog.String("code", code), slog.Any("error", err))
+			errorMsg := url.QueryEscape(errMsg)
+			errorRedirectURL := fmt.Sprintf("%s?error_code=500&error_message=%s", h.signinFailureRedirectURL, errorMsg)
+			slog.InfoContext(ctx.Request.Context(), "redirecting to error page", slog.String("url", errorRedirectURL))
+			redirectWithoutBody(ctx, http.StatusFound, errorRedirectURL)
+			return
+		}
+		targetUrl = fmt.Sprintf("%s?token=%s&portal_url=%s&jwt=%s", h.liteRedirectURL, url.QueryEscape(liteToken), h.signinSuccessRedirectURL, signed)
 	} else if state == CASDOOR {
 		targetUrl = fmt.Sprintf("%s?jwt=%s", h.signinSuccessRedirectURL, signed)
-		targetUrlMasked = fmt.Sprintf("%s?jwt=%s", h.signinSuccessRedirectURL, MASKSTR)
 	} else {
 		// parse state as url and get host
 		var flowURL *url.URL
@@ -443,10 +454,9 @@ func (h *UserHandler) Casdoor(ctx *gin.Context) {
 		query.Set("jwt_token", signed)
 		flowURL.RawQuery = query.Encode()
 		targetUrl = flowURL.String()
-		targetUrlMasked = flowURL.String()
 	}
 
-	slog.InfoContext(ctx.Request.Context(), "generate login redirect url", slog.String("targetUrl", targetUrlMasked))
+	slog.InfoContext(ctx.Request.Context(), "generate login redirect url", slog.Any("targetUrl", targetUrl))
 	redirectWithoutBody(ctx, http.StatusFound, targetUrl)
 }
 
@@ -519,13 +529,12 @@ func (h *UserHandler) UpdateVerify(ctx *gin.Context) {
 	if req.Status != types.VerifyStatusRejected && req.Status != types.VerifyStatusApproved {
 		slog.ErrorContext(ctx.Request.Context(), "Bad request format", slog.String("err", "Not allowed status"))
 		httpbase.BadRequestWithExt(ctx, errorx.ReqParamInvalid(errors.New("not allowed status"), nil))
-		return
 	}
 
 	if req.Status == types.VerifyStatusRejected && req.Reason == "" {
 		slog.ErrorContext(ctx.Request.Context(), "Bad request format", slog.String("err", "rejected need reason"))
 		httpbase.BadRequestWithExt(ctx, errorx.ReqParamInvalid(errors.New("rejected need reason"), nil))
-		return
+
 	}
 
 	orgVerify, err := h.uv.Update(ctx, vID, req.Status, req.Reason)

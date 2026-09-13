@@ -209,6 +209,7 @@ port = 8088
 signin_success_redirect_url = "http://localhost:3000/server/callback"
 codesouler_vscode_redirect_url = "http://127.0.0.1:37678/callback"
 codesouler_jetbrains_redirect_url = "http://127.0.0.1:37679/callback"
+lite_redirect_url = "http://127.0.0.1:11437/api/cloud/auth/callback"
 
 [multi_sync]
 saasApiDomain = "https://hub.opencsg.com"
