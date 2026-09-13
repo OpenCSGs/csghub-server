@@ -53,7 +53,7 @@ type responsesAdapterStreamWriter struct {
 	moderation         component.Moderation
 	sessionID          string
 	logCapture         *responsespkg.LLMLogRecorder
-	toolNamespaces     map[string]string
+	toolAliases        *responsesToolAliases
 }
 
 type responsesToolCallStreamState struct {
@@ -284,38 +284,44 @@ func (w *responsesAdapterStreamWriter) writeToolCallDeltas(chunk types.ChatCompl
 }
 
 func (w *responsesAdapterStreamWriter) ensureToolCallItem(index int, callID, name string) *responsesToolCallStreamState {
-	if state := w.toolCallItems[index]; state != nil {
-		if state.CallID == "" && callID != "" {
-			state.CallID = callID
+	state := w.toolCallItems[index]
+	if state == nil {
+		itemID := callID
+		if itemID == "" {
+			itemID = fmt.Sprintf("fc_%d", index)
 		}
-		if state.Name == "" && name != "" {
-			state.Name = name
-			state.Namespace = w.toolNamespaces[name]
-			w.ensureToolCallItemAdded(state)
-			w.flushPendingToolCallArguments(state)
+		state = &responsesToolCallStreamState{
+			OutputIndex: w.nextOutputIndex(),
+			CallID:      itemID,
 		}
-		return state
+		w.toolCallItems[index] = state
+		if w.logCapture != nil {
+			w.logCapture.CaptureResponseID(w.respID)
+		}
+	} else if state.CallID == "" && callID != "" {
+		state.CallID = callID
 	}
-	itemID := callID
-	if itemID == "" {
-		itemID = fmt.Sprintf("fc_%d", index)
+	// The chat upstream may send the tool name after argument fragments already
+	// arrived. Buffer those fragments until the name is known, resolve it to the
+	// original Responses identity, then flush them in order.
+	if name != "" && state.Name == "" {
+		w.setResolvedToolCall(state, name)
+		if w.logCapture != nil {
+			w.logCapture.CaptureToolCallStart(state.CallID, state.Name, "")
+		}
+		w.ensureToolCallItemAdded(state)
+		w.flushPendingToolCallArguments(state)
 	}
-	state := &responsesToolCallStreamState{
-		OutputIndex: w.nextOutputIndex(),
-		CallID:      itemID,
-		Name:        name,
-		Namespace:   w.toolNamespaces[name],
-	}
-	w.toolCallItems[index] = state
-	if w.logCapture != nil {
-		w.logCapture.CaptureResponseID(w.respID)
-		w.logCapture.CaptureToolCallStart(itemID, name, "")
-	}
-	if name == "" {
-		return state
-	}
-	w.ensureToolCallItemAdded(state)
 	return state
+}
+
+// setResolvedToolCall stores the Responses-visible identity for a raw upstream
+// chat tool name. Names that are not among the request's tools pass through
+// unchanged.
+func (w *responsesAdapterStreamWriter) setResolvedToolCall(state *responsesToolCallStreamState, rawName string) {
+	identity := w.toolAliases.identity(rawName)
+	state.Name = identity.Name
+	state.Namespace = identity.Namespace
 }
 
 func (w *responsesAdapterStreamWriter) ensureToolCallItemAdded(state *responsesToolCallStreamState) {
