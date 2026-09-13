@@ -22,14 +22,15 @@ const (
 
 // tupleBackfillStats records the outcome of one backfill phase.
 type tupleBackfillStats struct {
-	phase       string
-	candidates  int
-	existing    int
-	written     int
+	phase      string
+	candidates int
+	// submitted counts tuples in successful requests, including ignored existing tuples.
+	submitted   int
 	skipped     int
 	skipReasons map[string]int
 }
 
+// newTupleBackfillStats initializes counters for one backfill phase.
 func newTupleBackfillStats(phase string) *tupleBackfillStats {
 	return &tupleBackfillStats{
 		phase:       phase,
@@ -37,6 +38,7 @@ func newTupleBackfillStats(phase string) *tupleBackfillStats {
 	}
 }
 
+// skip records an invalid business row and its reason.
 func (s *tupleBackfillStats) skip(reason string) {
 	s.skipped++
 	s.skipReasons[reason]++
@@ -118,8 +120,7 @@ func backfillOpenFGATuples(ctx context.Context) error {
 		attrs := []any{
 			"phase", stats.phase,
 			"candidates", stats.candidates,
-			"existing", stats.existing,
-			"written", stats.written,
+			"submitted", stats.submitted,
 			"skipped", stats.skipped,
 		}
 		if stats.skipped > 0 {
@@ -174,7 +175,7 @@ func backfillUsers(ctx context.Context, pool *pgxpool.Pool, authorizer rebac.Aut
 			return fmt.Errorf("read users for OpenFGA tuple backfill: %w", err)
 		}
 		rows.Close()
-		if err := writeMissingRelationships(ctx, pool, authorizer, relationships, stats); err != nil {
+		if err := writeBackfillRelationships(ctx, authorizer, relationships, stats); err != nil {
 			return fmt.Errorf("write user OpenFGA tuples: %w", err)
 		}
 		if rowCount < tupleBackfillQueryBatchSize {
@@ -265,7 +266,7 @@ func backfillNamespaces(ctx context.Context, pool *pgxpool.Pool, authorizer reba
 			return fmt.Errorf("read namespaces for OpenFGA tuple backfill: %w", err)
 		}
 		rows.Close()
-		if err := writeMissingRelationships(ctx, pool, authorizer, relationships, stats); err != nil {
+		if err := writeBackfillRelationships(ctx, authorizer, relationships, stats); err != nil {
 			return fmt.Errorf("write namespace OpenFGA tuples: %w", err)
 		}
 		if rowCount < tupleBackfillQueryBatchSize {
@@ -338,7 +339,7 @@ func backfillOrganizationMembers(ctx context.Context, pool *pgxpool.Pool, author
 			return fmt.Errorf("read organization members for OpenFGA tuple backfill: %w", err)
 		}
 		rows.Close()
-		if err := writeMissingRelationships(ctx, pool, authorizer, relationships, stats); err != nil {
+		if err := writeBackfillRelationships(ctx, authorizer, relationships, stats); err != nil {
 			return fmt.Errorf("write organization member OpenFGA tuples: %w", err)
 		}
 		if rowCount < tupleBackfillQueryBatchSize {
@@ -421,7 +422,7 @@ func backfillOrganizationCreators(ctx context.Context, pool *pgxpool.Pool, autho
 			return fmt.Errorf("read organization creators for OpenFGA tuple backfill: %w", err)
 		}
 		rows.Close()
-		if err := writeMissingRelationships(ctx, pool, authorizer, relationships, stats); err != nil {
+		if err := writeBackfillRelationships(ctx, authorizer, relationships, stats); err != nil {
 			return fmt.Errorf("write organization creator OpenFGA tuples: %w", err)
 		}
 		if rowCount < tupleBackfillQueryBatchSize {
@@ -509,7 +510,7 @@ func backfillRepositories(ctx context.Context, pool *pgxpool.Pool, authorizer re
 			return fmt.Errorf("read repositories for OpenFGA tuple backfill: %w", err)
 		}
 		rows.Close()
-		if err := writeMissingRelationships(ctx, pool, authorizer, relationships, stats); err != nil {
+		if err := writeBackfillRelationships(ctx, authorizer, relationships, stats); err != nil {
 			return fmt.Errorf("write repository OpenFGA tuples: %w", err)
 		}
 		if rowCount < tupleBackfillQueryBatchSize {
@@ -518,81 +519,23 @@ func backfillRepositories(ctx context.Context, pool *pgxpool.Pool, authorizer re
 	}
 }
 
-// writeMissingRelationships writes only tuples absent from the OpenFGA tuple table.
-func writeMissingRelationships(ctx context.Context, pool *pgxpool.Pool, authorizer rebac.Authorizer, relationships []rebac.Relationship, stats *tupleBackfillStats) error {
+// writeBackfillRelationships deduplicates candidates and submits bounded batches directly.
+// The OpenFGA Provider ignores existing tuples; other write errors still stop the backfill.
+func writeBackfillRelationships(ctx context.Context, authorizer rebac.Authorizer, relationships []rebac.Relationship, stats *tupleBackfillStats) error {
 	unique := deduplicateRelationships(relationships)
 	stats.candidates += len(unique)
 	for start := 0; start < len(unique); start += tupleBackfillWriteBatchSize {
-		end := start + tupleBackfillWriteBatchSize
-		if end > len(unique) {
-			end = len(unique)
-		}
+		end := min(start+tupleBackfillWriteBatchSize, len(unique))
 		batch := unique[start:end]
-		existing, err := existingRelationshipKeys(ctx, pool, batch)
-		if err != nil {
-			return err
+		if err := authorizer.Write(ctx, batch); err != nil {
+			return fmt.Errorf("write %d backfill relationships: %w", len(batch), err)
 		}
-		stats.existing += len(existing)
-		missing := make([]rebac.Relationship, 0, len(batch)-len(existing))
-		for _, relationship := range batch {
-			if _, ok := existing[relationshipKey(relationship)]; !ok {
-				missing = append(missing, relationship)
-			}
-		}
-		if len(missing) == 0 {
-			continue
-		}
-		if err := authorizer.Write(ctx, missing); err != nil {
-			return fmt.Errorf("write %d missing relationships: %w", len(missing), err)
-		}
-		stats.written += len(missing)
+		stats.submitted += len(batch)
 	}
 	return nil
 }
 
-func existingRelationshipKeys(ctx context.Context, pool *pgxpool.Pool, relationships []rebac.Relationship) (map[string]struct{}, error) {
-	existing := make(map[string]struct{}, len(relationships))
-	if len(relationships) == 0 {
-		return existing, nil
-	}
-
-	args := make([]any, 1, 1+len(relationships)*4)
-	args[0] = types.OpenFgaStoreID
-	placeholders := make([]string, 0, len(relationships))
-	for index, relationship := range relationships {
-		base := 2 + index*4
-		placeholders = append(placeholders, fmt.Sprintf("($%d, $%d, $%d, $%d)", base, base+1, base+2, base+3))
-		args = append(args,
-			string(relationship.Object.Type),
-			relationship.Object.ID,
-			string(relationship.Relation),
-			relationship.Subject.String(),
-		)
-	}
-
-	query := fmt.Sprintf(`
-		SELECT object_type, object_id, relation, _user
-		FROM tuple
-		WHERE store = $1
-		  AND (object_type, object_id, relation, _user) IN (%s)`, strings.Join(placeholders, ", "))
-	rows, err := pool.Query(ctx, query, args...)
-	if err != nil {
-		return nil, fmt.Errorf("query existing OpenFGA tuples: %w", err)
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var objectType, objectID, relation, subject string
-		if err := rows.Scan(&objectType, &objectID, &relation, &subject); err != nil {
-			return nil, fmt.Errorf("scan existing OpenFGA tuple: %w", err)
-		}
-		existing[tupleKey(objectType, objectID, relation, subject)] = struct{}{}
-	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("read existing OpenFGA tuples: %w", err)
-	}
-	return existing, nil
-}
-
+// deduplicateRelationships preserves the first occurrence of each direct relationship.
 func deduplicateRelationships(relationships []rebac.Relationship) []rebac.Relationship {
 	if len(relationships) < 2 {
 		return relationships

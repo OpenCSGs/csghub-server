@@ -75,6 +75,7 @@ func TestProviderWriteAndDeleteUseOpenFGAWrite(t *testing.T) {
 	require.Equal(t, commontypes.OpenFgaStoreID, writeRequest.GetStoreId())
 	require.Equal(t, commontypes.OpenFgaAuthorizationModelIDLatest, writeRequest.GetAuthorizationModelId())
 	require.Nil(t, writeRequest.GetDeletes())
+	require.Equal(t, "ignore", writeRequest.GetWrites().GetOnDuplicate())
 	require.Len(t, writeRequest.GetWrites().GetTupleKeys(), 1)
 	require.Equal(t, "user:user-1", writeRequest.GetWrites().GetTupleKeys()[0].GetUser())
 	require.Equal(t, "reader", writeRequest.GetWrites().GetTupleKeys()[0].GetRelation())

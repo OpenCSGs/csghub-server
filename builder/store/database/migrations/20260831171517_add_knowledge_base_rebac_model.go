@@ -69,8 +69,7 @@ func backfillKnowledgeBaseRelationships(ctx context.Context) error {
 	}
 	slog.InfoContext(ctx, "OpenFGA knowledge base tuple backfill completed",
 		"candidates", stats.candidates,
-		"existing", stats.existing,
-		"written", stats.written,
+		"submitted", stats.submitted,
 		"skipped", stats.skipped,
 	)
 	return nil
@@ -123,7 +122,7 @@ func backfillKnowledgeBases(ctx context.Context, pool *pgxpool.Pool, authorizer 
 			return fmt.Errorf("read knowledge bases for OpenFGA backfill: %w", err)
 		}
 		rows.Close()
-		if err := writeMissingRelationships(ctx, pool, authorizer, relationships, stats); err != nil {
+		if err := writeBackfillRelationships(ctx, authorizer, relationships, stats); err != nil {
 			return fmt.Errorf("write knowledge base OpenFGA tuples: %w", err)
 		}
 		if rowCount < tupleBackfillQueryBatchSize {
