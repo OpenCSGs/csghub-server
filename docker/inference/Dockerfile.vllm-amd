@@ -1,4 +1,4 @@
-FROM vllm/vllm-openai-rocm:v0.24.0
+FROM vllm/vllm-openai-rocm:v0.28.0
 RUN pip config set global.index-url https://mirrors.aliyun.com/pypi/simple
 RUN pip install --no-cache-dir csghub-sdk==0.7.3 ray supervisor
 RUN sed -i 's|http://archive.ubuntu.com/ubuntu|http://mirrors.aliyun.com/ubuntu|g' /etc/apt/sources.list && \
@@ -6,7 +6,7 @@ RUN sed -i 's|http://archive.ubuntu.com/ubuntu|http://mirrors.aliyun.com/ubuntu|
     apt-get update && apt-get install -y supervisor
 # Install optional audio dependencies for speech-to-text models and vLLM-Omni
 # for text-to-speech serving. Their versions must pair with the base vLLM.
-RUN pip install --no-cache-dir "vllm[audio]==0.24.0" vllm-omni==0.24.0
+RUN pip install --no-cache-dir "vllm[audio]==0.28.0" vllm-omni==0.28.0
 RUN mkdir -p /var/log/supervisord
 COPY ./supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 COPY ./vllm/ /etc/csghub/
