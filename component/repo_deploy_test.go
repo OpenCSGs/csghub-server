@@ -745,3 +745,162 @@ func TestPublishUpstreamSyncAfterUpdate(t *testing.T) {
 		require.True(t, mockDeploy.AssertExpectations(t))
 	})
 }
+
+// TestRepoComponent_DeployDetail_ResolvesLLMConfigID verifies that DeployDetail
+// attaches the llm_config resolved from the deploy's csghub upstream.
+func TestRepoComponent_DeployDetail_ResolvesLLMConfigID(t *testing.T) {
+	ctx := context.TODO()
+	repo := initializeTestRepoComponent(ctx, t)
+
+	req := types.DeployActReq{
+		RepoType:    types.ModelRepo,
+		Namespace:   "ns",
+		Name:        "repo",
+		CurrentUser: "owner-user",
+		DeployID:    1,
+		DeployType:  types.InferenceType,
+	}
+
+	dbUser := database.User{ID: 123, RoleMask: ""}
+	dbDeploy := &database.Deploy{
+		ID:          1,
+		UserID:      123,
+		SvcName:     "svc-1",
+		ClusterID:   "cluster-1",
+		SecureLevel: types.EndpointPublic,
+	}
+
+	repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "owner-user").Return(dbUser, nil)
+	repo.mocks.stores.DeployTaskMock().EXPECT().GetDeployByID(ctx, int64(1)).Return(dbDeploy, nil)
+	repo.mocks.stores.ClusterInfoMock().EXPECT().ByClusterID(ctx, "cluster-1").Return(database.ClusterInfo{}, nil)
+	repo.mocks.deployer.EXPECT().CheckClusterHealthy(ctx, "cluster-1").Return(false, nil)
+	repo.mocks.stores.UpstreamMock().EXPECT().
+		GetLLMConfigIDBySourceID(ctx, types.UpstreamSourceCSGHubDeploy, int64(1)).
+		Return(int64(76), nil)
+
+	result, err := repo.DeployDetail(ctx, req)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.Equal(t, int64(76), result.LLMConfigID)
+}
+
+// TestRepoComponent_DeployDetail_LLMConfigID_NoUpstream verifies a deploy
+// without a synced upstream returns no llm_config_id.
+func TestRepoComponent_DeployDetail_LLMConfigID_NoUpstream(t *testing.T) {
+	ctx := context.TODO()
+	repo := initializeTestRepoComponent(ctx, t)
+
+	req := types.DeployActReq{
+		RepoType:    types.ModelRepo,
+		Namespace:   "ns",
+		Name:        "repo",
+		CurrentUser: "owner-user",
+		DeployID:    2,
+		DeployType:  types.InferenceType,
+	}
+
+	dbUser := database.User{ID: 123, RoleMask: ""}
+	dbDeploy := &database.Deploy{
+		ID:          2,
+		UserID:      123,
+		SvcName:     "svc-2",
+		ClusterID:   "cluster-2",
+		SecureLevel: types.EndpointPublic,
+	}
+
+	repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "owner-user").Return(dbUser, nil)
+	repo.mocks.stores.DeployTaskMock().EXPECT().GetDeployByID(ctx, int64(2)).Return(dbDeploy, nil)
+	repo.mocks.stores.ClusterInfoMock().EXPECT().ByClusterID(ctx, "cluster-2").Return(database.ClusterInfo{}, nil)
+	repo.mocks.deployer.EXPECT().CheckClusterHealthy(ctx, "cluster-2").Return(false, nil)
+	repo.mocks.stores.UpstreamMock().EXPECT().
+		GetLLMConfigIDBySourceID(ctx, types.UpstreamSourceCSGHubDeploy, int64(2)).
+		Return(int64(0), nil)
+
+	result, err := repo.DeployDetail(ctx, req)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.Equal(t, int64(0), result.LLMConfigID)
+}
+
+// TestRepoComponent_DeployDetail_LLMConfigID_LookupErrorDegrades verifies a
+// lookup failure only degrades (id absent) instead of failing the request.
+func TestRepoComponent_DeployDetail_LLMConfigID_LookupErrorDegrades(t *testing.T) {
+	ctx := context.TODO()
+	repo := initializeTestRepoComponent(ctx, t)
+
+	req := types.DeployActReq{
+		RepoType:    types.ModelRepo,
+		Namespace:   "ns",
+		Name:        "repo",
+		CurrentUser: "owner-user",
+		DeployID:    3,
+		DeployType:  types.InferenceType,
+	}
+
+	dbUser := database.User{ID: 123, RoleMask: ""}
+	dbDeploy := &database.Deploy{
+		ID:          3,
+		UserID:      123,
+		SvcName:     "svc-3",
+		ClusterID:   "cluster-3",
+		SecureLevel: types.EndpointPublic,
+	}
+
+	repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "owner-user").Return(dbUser, nil)
+	repo.mocks.stores.DeployTaskMock().EXPECT().GetDeployByID(ctx, int64(3)).Return(dbDeploy, nil)
+	repo.mocks.stores.ClusterInfoMock().EXPECT().ByClusterID(ctx, "cluster-3").Return(database.ClusterInfo{}, nil)
+	repo.mocks.deployer.EXPECT().CheckClusterHealthy(ctx, "cluster-3").Return(false, nil)
+	repo.mocks.stores.UpstreamMock().EXPECT().
+		GetLLMConfigIDBySourceID(ctx, types.UpstreamSourceCSGHubDeploy, int64(3)).
+		Return(int64(0), errTestDeployer)
+
+	result, err := repo.DeployDetail(ctx, req)
+	require.NoError(t, err, "lookup failure should degrade, not fail the detail request")
+	require.NotNil(t, result)
+	require.Equal(t, int64(0), result.LLMConfigID)
+}
+
+// TestRepoComponent_AttachUpstreamLLMConfigID verifies the extracted
+// attachUpstreamLLMConfigID helper: type gate, pointer in/out mutation,
+// and error degradation.
+func TestRepoComponent_AttachUpstreamLLMConfigID(t *testing.T) {
+	ctx := context.TODO()
+
+	t.Run("serverless type with upstream hit fills LLMConfigID", func(t *testing.T) {
+		repo := initializeTestRepoComponent(ctx, t)
+		repo.mocks.stores.UpstreamMock().EXPECT().
+			GetLLMConfigIDBySourceID(ctx, types.UpstreamSourceCSGHubDeploy, int64(9)).
+			Return(int64(76), nil)
+		res := types.DeployRequest{DeployID: 9}
+		repo.attachUpstreamLLMConfigID(ctx, types.ServerlessType, &res)
+		require.Equal(t, int64(76), res.LLMConfigID)
+	})
+
+	t.Run("non-syncing deploy type never touches the store", func(t *testing.T) {
+		repo := initializeTestRepoComponent(ctx, t)
+		// Strict mock: any GetLLMConfigIDBySourceID call would fail the test.
+		res := types.DeployRequest{DeployID: 9, LLMConfigID: 5}
+		repo.attachUpstreamLLMConfigID(ctx, types.FinetuneType, &res)
+		require.Equal(t, int64(5), res.LLMConfigID, "must stay untouched")
+	})
+
+	t.Run("lookup error degrades without raising", func(t *testing.T) {
+		repo := initializeTestRepoComponent(ctx, t)
+		repo.mocks.stores.UpstreamMock().EXPECT().
+			GetLLMConfigIDBySourceID(ctx, types.UpstreamSourceCSGHubDeploy, int64(9)).
+			Return(int64(0), errTestDeployer)
+		res := types.DeployRequest{DeployID: 9}
+		repo.attachUpstreamLLMConfigID(ctx, types.InferenceType, &res)
+		require.Equal(t, int64(0), res.LLMConfigID)
+	})
+
+	t.Run("zero id (deleted config) is not attached", func(t *testing.T) {
+		repo := initializeTestRepoComponent(ctx, t)
+		repo.mocks.stores.UpstreamMock().EXPECT().
+			GetLLMConfigIDBySourceID(ctx, types.UpstreamSourceCSGHubDeploy, int64(9)).
+			Return(int64(0), nil)
+		res := types.DeployRequest{DeployID: 9}
+		repo.attachUpstreamLLMConfigID(ctx, types.InferenceType, &res)
+		require.Equal(t, int64(0), res.LLMConfigID)
+	})
+}

@@ -151,6 +151,7 @@ func NewTestRepoComponent(config *config.Config, stores *tests.MockStores, rpcUs
 		repoStatisticsStore:            stores.RepositoryStatistics,
 		modelStore:                     stores.Model,
 		tagStore:                       stores.Tag,
+		upstreamStore:                  stores.Upstream,
 		rebac:                          authorizer,
 	}
 }

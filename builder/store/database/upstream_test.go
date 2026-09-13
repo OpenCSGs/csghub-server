@@ -71,6 +71,49 @@ func TestUpstreamStore_GetBySourceID(t *testing.T) {
 	require.Nil(t, foundExt)
 }
 
+func TestUpstreamStore_GetLLMConfigIDBySourceID(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+	store := database.NewUpstreamStoreWithDB(db, nil)
+	cfg := createTestLLMConfigForUpstream(ctx, t, db, "test-get-llm-config-id-by-source")
+
+	// No upstream exists for this deploy initially.
+	found, err := store.GetLLMConfigIDBySourceID(ctx, types.UpstreamSourceCSGHubDeploy, 6001)
+	require.NoError(t, err)
+	require.Equal(t, int64(0), found)
+
+	// Create an upstream with csghub source pointing at the llm_config.
+	up := &database.Upstream{
+		LLMConfigID: cfg.ID,
+		URL:         "http://llm-config-id:8080/v1",
+		Weight:      1,
+		Enabled:     true,
+		ModelName:   "model-llm-config-id",
+		Source:      types.UpstreamSourceCSGHubDeploy,
+		SourceID:    6001,
+	}
+	err = store.Create(ctx, up)
+	require.NoError(t, err)
+
+	// Both upstream and llm_config exist — should resolve the llm_config_id.
+	found, err = store.GetLLMConfigIDBySourceID(ctx, types.UpstreamSourceCSGHubDeploy, 6001)
+	require.NoError(t, err)
+	require.Equal(t, cfg.ID, found)
+
+	// External source should not match the csghub upstream.
+	external, err := store.GetLLMConfigIDBySourceID(ctx, types.UpstreamSourceExternal, 6001)
+	require.NoError(t, err)
+	require.Equal(t, int64(0), external)
+
+	// Orphaned upstream (llm_config deleted) — the join should yield no row.
+	_, err = db.Core.NewDelete().Model((*database.LLMConfig)(nil)).Where("id = ?", cfg.ID).Exec(ctx)
+	require.NoError(t, err)
+	orphan, err := store.GetLLMConfigIDBySourceID(ctx, types.UpstreamSourceCSGHubDeploy, 6001)
+	require.NoError(t, err)
+	require.Equal(t, int64(0), orphan)
+}
+
 func TestUpstreamStore_UpsertInternalDeployTarget_Create(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
