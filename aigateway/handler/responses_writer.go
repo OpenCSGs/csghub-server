@@ -51,15 +51,15 @@ type responsesAdapterResponseWriter interface {
 	Finalize(statusCode int) error
 }
 
-func setResponsesAdapterToolNamespaces(w responsesAdapterResponseWriter, toolNamespaces map[string]string) {
-	if len(toolNamespaces) == 0 {
+func setResponsesAdapterToolResolver(w responsesAdapterResponseWriter, toolAliases *responsesToolAliases) {
+	if toolAliases == nil {
 		return
 	}
 	switch writer := w.(type) {
 	case *responsesAdapterStreamWriter:
-		writer.toolNamespaces = toolNamespaces
+		writer.toolAliases = toolAliases
 	case *responsesAdapterNonStreamWriter:
-		writer.toolNamespaces = toolNamespaces
+		writer.toolAliases = toolAliases
 	}
 }
 

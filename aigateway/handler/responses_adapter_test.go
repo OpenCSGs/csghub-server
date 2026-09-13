@@ -74,7 +74,7 @@ func TestApplyAdapterReasoningRequest(t *testing.T) {
 	genericMetadata := &commontypes.UpstreamMetadata{
 		ResponsesChatAdapter: &commontypes.ResponsesChatAdapter{
 			ReasoningRequest: &commontypes.ReasoningRequestConfig{
-				Enabled:      true,
+				Enabled:     true,
 				EffortField: "reasoning_effort",
 			},
 		},
@@ -859,12 +859,23 @@ func extractResponsesOutputItem(t *testing.T, data []byte, index int) []byte {
 	return body.Output[index]
 }
 
+// responsesToolAliasesForNamespacesTest builds a resolver for unambiguous
+// namespaced tools: each tool's upstream name equals its original function name.
+func responsesToolAliasesForNamespacesTest(t *testing.T, namespaces map[string]string) *responsesToolAliases {
+	t.Helper()
+	aliases := newResponsesToolAliases()
+	for functionName, namespaceName := range namespaces {
+		require.NoError(t, aliases.register(responsesToolIdentity{Name: functionName, Namespace: namespaceName}, functionName))
+	}
+	return aliases
+}
+
 func TestResponsesAdapterNonStreamWriterRestoresNamespaceToolCall(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	w := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(w)
 	writer := newResponsesAdapterNonStreamWriter(ctx.Writer, "public-model", nil, nil, "")
-	writer.toolNamespaces = map[string]string{"get_top_download_models": "mcp__csghub_production"}
+	writer.toolAliases = responsesToolAliasesForNamespacesTest(t, map[string]string{"get_top_download_models": "mcp__csghub_production"})
 	writer.WriteHeader(http.StatusOK)
 	_, err := writer.Write([]byte(`{
 		"id":"chatcmpl_1",
@@ -1228,7 +1239,7 @@ func TestResponsesAdapterStreamWriterRestoresNamespaceToolCall(t *testing.T) {
 	w := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(w)
 	writer := newResponsesAdapterStreamWriter(ctx.Writer, "public-model", nil, nil, "")
-	writer.toolNamespaces = map[string]string{"get_top_download_models": "mcp__csghub_production"}
+	writer.toolAliases = responsesToolAliasesForNamespacesTest(t, map[string]string{"get_top_download_models": "mcp__csghub_production"})
 	writer.WriteHeader(200)
 
 	_, err := writer.Write([]byte(`data: {"id":"chatcmpl_1","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"id":"call_1","type":"function","function":{"name":"get_top_download_models","arguments":"{\"num\":20}"}}]}}]}` + "\n\n"))
@@ -1253,7 +1264,7 @@ func TestResponsesAdapterStreamWriterRestoresNamespaceWhenToolNameArrivesLate(t 
 	w := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(w)
 	writer := newResponsesAdapterStreamWriter(ctx.Writer, "public-model", nil, nil, "")
-	writer.toolNamespaces = map[string]string{"get_top_download_models": "mcp__csghub_production"}
+	writer.toolAliases = responsesToolAliasesForNamespacesTest(t, map[string]string{"get_top_download_models": "mcp__csghub_production"})
 	writer.WriteHeader(200)
 
 	_, err := writer.Write([]byte(`data: {"id":"chatcmpl_1","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"id":"call_1","type":"function","function":{}}]}}]}` + "\n\n"))
@@ -1283,7 +1294,7 @@ func TestResponsesAdapterStreamWriterBuffersArgumentsUntilToolNameArrives(t *tes
 	w := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(w)
 	writer := newResponsesAdapterStreamWriter(ctx.Writer, "public-model", nil, nil, "")
-	writer.toolNamespaces = map[string]string{"get_top_download_models": "mcp__csghub_production"}
+	writer.toolAliases = responsesToolAliasesForNamespacesTest(t, map[string]string{"get_top_download_models": "mcp__csghub_production"})
 	writer.WriteHeader(200)
 
 	_, err := writer.Write([]byte(`data: {"id":"chatcmpl_1","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"id":"call_1","type":"function","function":{"arguments":"{\"num\":"}}]}}]}` + "\n\n"))
@@ -1532,9 +1543,9 @@ func TestResponsesToChatRequestFlattensNamespaceFunctionTools(t *testing.T) {
 			}
 		}
 	]`, string(data))
-	toolNamespaces, err := responsesNamespaceByFunctionName(req.Tools)
+	_, aliases, err := responsesToChatRequestResolved(context.Background(), req, "upstream-model", nil)
 	require.NoError(t, err)
-	require.Equal(t, map[string]string{"view_image": "mcp"}, toolNamespaces)
+	require.Equal(t, responsesToolIdentity{Name: "view_image", Namespace: "mcp"}, aliases.identity("view_image"))
 }
 
 func TestResponsesToChatRequestConvertsCallableNamespaceTool(t *testing.T) {
@@ -1554,7 +1565,7 @@ func TestResponsesToChatRequestConvertsCallableNamespaceTool(t *testing.T) {
 			}
 		]`),
 	}
-	chatReq, err := responsesToChatRequest(context.Background(), req, "upstream-model", nil)
+	chatReq, aliases, err := responsesToChatRequestResolved(context.Background(), req, "upstream-model", nil)
 	require.NoError(t, err)
 
 	require.Len(t, chatReq.Tools, 1)
@@ -1574,11 +1585,9 @@ func TestResponsesToChatRequestConvertsCallableNamespaceTool(t *testing.T) {
 			}
 		}
 	]`, string(data))
-	toolNamespaces, err := responsesNamespaceByFunctionName(req.Tools)
-	require.NoError(t, err)
-	require.Equal(t, map[string]string{"exec_command": "exec_command"}, toolNamespaces)
+	require.Equal(t, responsesToolIdentity{Name: "exec_command", Namespace: "exec_command"}, aliases.identity("exec_command"))
 
-	resp, err := chatResponseToResponsesWithToolNamespaces([]byte(`{
+	resp, err := chatResponseToResponsesWithToolAliases([]byte(`{
 		"id":"chatcmpl_1",
 		"created":123,
 		"model":"upstream-model",
@@ -1593,7 +1602,7 @@ func TestResponsesToChatRequestConvertsCallableNamespaceTool(t *testing.T) {
 			},
 			"finish_reason":"tool_calls"
 		}]
-	}`), "public-model", toolNamespaces)
+	}`), "public-model", aliases)
 	require.NoError(t, err)
 	require.Len(t, resp.Output, 1)
 	data, err = json.Marshal(resp.Output[0])
@@ -1609,7 +1618,7 @@ func TestResponsesToChatRequestConvertsCallableNamespaceTool(t *testing.T) {
 	}`, string(data))
 }
 
-func TestResponsesToChatRequestRejectsDuplicateNamespaceToolNames(t *testing.T) {
+func TestResponsesToChatRequestAcceptsDuplicateNamespaceToolNames(t *testing.T) {
 	req := &types.ResponsesRequest{
 		Model: "public",
 		Input: json.RawMessage(`"hello"`),
@@ -1631,13 +1640,31 @@ func TestResponsesToChatRequestRejectsDuplicateNamespaceToolNames(t *testing.T) 
 		]`),
 	}
 
-	_, err := responsesToChatRequest(context.Background(), req, "upstream-model", nil)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "duplicated tool name across namespaces: filesystem.read")
+	chatReq, aliases, err := responsesToChatRequestResolved(context.Background(), req, "upstream-model", nil)
+	require.NoError(t, err)
 
-	_, err = responsesNamespaceByFunctionName(req.Tools)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "duplicated tool name across namespaces: filesystem.read")
+	require.Len(t, chatReq.Tools, 2)
+	mcpAlias := responsesNamespacedToolAlias("mcp_filesystem", "filesystem.read")
+	codexAlias := responsesNamespacedToolAlias("codex_filesystem", "filesystem.read")
+	require.NotEqual(t, mcpAlias, codexAlias)
+
+	data, err := json.Marshal(chatReq.Tools)
+	require.NoError(t, err)
+	var decoded []struct {
+		Function struct {
+			Name string `json:"name"`
+		} `json:"function"`
+	}
+	require.NoError(t, json.Unmarshal(data, &decoded))
+	names := make([]string, 0, len(decoded))
+	for _, tool := range decoded {
+		names = append(names, tool.Function.Name)
+	}
+	require.ElementsMatch(t, []string{mcpAlias, codexAlias}, names)
+
+	require.Equal(t, responsesToolIdentity{Name: "filesystem.read", Namespace: "mcp_filesystem"}, aliases.identity(mcpAlias))
+	require.Equal(t, responsesToolIdentity{Name: "filesystem.read", Namespace: "codex_filesystem"}, aliases.identity(codexAlias))
+	require.Equal(t, responsesToolIdentity{Name: "filesystem.read"}, aliases.identity("filesystem.read"))
 }
 
 func TestResponsesToChatRequestFlattensNestedNamespaceFunctionTools(t *testing.T) {
@@ -1884,4 +1911,409 @@ func TestResponsesToChatRequestFunctionOnlyPathStillWorks(t *testing.T) {
 			}
 		}
 	]`, string(data))
+}
+
+func responsesChatToolNamesFromAny(t *testing.T, tools any) []string {
+	t.Helper()
+	data, err := json.Marshal(tools)
+	require.NoError(t, err)
+	var decoded []struct {
+		Function struct {
+			Name string `json:"name"`
+		} `json:"function"`
+	}
+	require.NoError(t, json.Unmarshal(data, &decoded))
+	names := make([]string, 0, len(decoded))
+	for _, tool := range decoded {
+		names = append(names, tool.Function.Name)
+	}
+	return names
+}
+
+// responsesChatAssistantToolCallName extracts the upstream function name of the
+// first tool call in the converted chat messages (via RawJSON["messages"]).
+func responsesChatAssistantToolCallName(t *testing.T, chatReq *types.ChatCompletionRequest) string {
+	t.Helper()
+	var raw map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(chatReq.RawJSON, &raw))
+	var msgs []struct {
+		Role      string `json:"role"`
+		ToolCalls []struct {
+			Function struct {
+				Name string `json:"name"`
+			} `json:"function"`
+		} `json:"tool_calls"`
+	}
+	require.NoError(t, json.Unmarshal(raw["messages"], &msgs))
+	for _, msg := range msgs {
+		if len(msg.ToolCalls) > 0 {
+			return msg.ToolCalls[0].Function.Name
+		}
+	}
+	return ""
+}
+
+func TestResponsesNamespacedToolAliasIsDeterministicChatSafeBounded(t *testing.T) {
+	short := responsesNamespacedToolAlias("mcp", "read_file")
+	require.Equal(t, short, responsesNamespacedToolAlias("mcp", "read_file"))
+	require.LessOrEqual(t, len(short), 64)
+	require.Regexp(t, `^[a-zA-Z0-9_-]+$`, short)
+	require.True(t, strings.HasPrefix(short, "mcp__read_file__"))
+
+	long := responsesNamespacedToolAlias(strings.Repeat("x", 80), strings.Repeat("y", 80))
+	require.LessOrEqual(t, len(long), 64)
+	require.Regexp(t, `^[a-zA-Z0-9_-]+$`, long)
+
+	// Two identities whose sanitized prefixes coincide (dot/slash collapse to
+	// underscore) still get distinct aliases because the hash covers the raw
+	// namespace and function.
+	require.NotEqual(t,
+		responsesNamespacedToolAlias("a/b", "c"),
+		responsesNamespacedToolAlias("a_b", "c"))
+}
+
+func TestResponsesToChatRequestRejectsDuplicateToolsWithinNamespace(t *testing.T) {
+	req := &types.ResponsesRequest{
+		Model: "public",
+		Input: json.RawMessage(`"hello"`),
+		Tools: json.RawMessage(`[
+			{
+				"type": "namespace",
+				"name": "mcp",
+				"tools": [
+					{"type": "function", "name": "dup", "parameters": {"type": "object"}},
+					{"type": "function", "name": "dup", "parameters": {"type": "object"}}
+				]
+			}
+		]`),
+	}
+	_, err := responsesToChatRequest(context.Background(), req, "upstream-model", nil)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "duplicated tool name within namespace mcp: dup")
+}
+
+func TestResponsesToChatRequestRejectsRepeatedTopLevelFunctionTool(t *testing.T) {
+	req := &types.ResponsesRequest{
+		Model: "public",
+		Input: json.RawMessage(`"hello"`),
+		Tools: json.RawMessage(`[
+			{"type": "function", "name": "dup", "parameters": {"type": "object"}},
+			{"type": "function", "name": "dup", "parameters": {"type": "object"}}
+		]`),
+	}
+	_, err := responsesToChatRequest(context.Background(), req, "upstream-model", nil)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "duplicated function tool name: dup")
+}
+
+func TestResponsesToChatRequestTopLevelAndNamespacedNameStayDistinct(t *testing.T) {
+	req := &types.ResponsesRequest{
+		Model: "public",
+		Input: json.RawMessage(`"hello"`),
+		Tools: json.RawMessage(`[
+			{"type": "function", "name": "read_file", "parameters": {"type": "object"}},
+			{
+				"type": "namespace",
+				"name": "mcp",
+				"tools": [
+					{"type": "function", "name": "read_file", "parameters": {"type": "object"}}
+				]
+			}
+		]`),
+	}
+	chatReq, aliases, err := responsesToChatRequestResolved(context.Background(), req, "upstream-model", nil)
+	require.NoError(t, err)
+	require.Len(t, chatReq.Tools, 2)
+
+	mcpAlias := responsesNamespacedToolAlias("mcp", "read_file")
+	names := responsesChatToolNamesFromAny(t, chatReq.Tools)
+	require.ElementsMatch(t, []string{"read_file", mcpAlias}, names)
+
+	// The top-level tool keeps its original name (empty namespace); only the
+	// namespaced copy is aliased.
+	require.Equal(t, responsesToolIdentity{Name: "read_file"}, aliases.identity("read_file"))
+	require.Equal(t, responsesToolIdentity{Name: "read_file", Namespace: "mcp"}, aliases.identity(mcpAlias))
+}
+
+func TestResponsesToChatRequestAliasDoesNotCollideWithClientFunctionName(t *testing.T) {
+	// A client may legitimately declare a top-level function whose name is exactly
+	// the alias of a colliding namespaced identity (aliases use the same charset
+	// as client function names). The occupant must be rewritten to its own alias
+	// instead of the request being rejected as a "tool alias collision".
+	topLevelName := responsesNamespacedToolAlias("mcp", "read_file")
+	req := &types.ResponsesRequest{
+		Model: "public",
+		Input: json.RawMessage(`"hello"`),
+		Tools: json.RawMessage(`[
+			{"type": "function", "name": "` + topLevelName + `", "parameters": {"type": "object"}},
+			{
+				"type": "namespace",
+				"name": "mcp",
+				"tools": [
+					{"type": "function", "name": "read_file", "parameters": {"type": "object"}}
+				]
+			},
+			{
+				"type": "namespace",
+				"name": "codex",
+				"tools": [
+					{"type": "function", "name": "read_file", "parameters": {"type": "object"}}
+				]
+			}
+		]`),
+	}
+
+	chatReq, aliases, err := responsesToChatRequestResolved(context.Background(), req, "upstream-model", nil)
+	require.NoError(t, err)
+	require.Len(t, chatReq.Tools, 3)
+
+	mcpChatName := responsesNamespacedToolAlias("mcp", "read_file") // == topLevelName, claimed by mcp
+	codexChatName := responsesNamespacedToolAlias("codex", "read_file")
+	topLevelChatName := responsesNamespacedToolAlias("", topLevelName) // the rewritten occupant
+
+	names := responsesChatToolNamesFromAny(t, chatReq.Tools)
+	require.ElementsMatch(t, []string{mcpChatName, codexChatName, topLevelChatName}, names)
+	seen := make(map[string]bool, len(names))
+	for _, name := range names {
+		require.False(t, seen[name], "duplicate upstream chat tool name %q", name)
+		seen[name] = true
+		require.LessOrEqual(t, len(name), 64)
+	}
+
+	require.Equal(t, responsesToolIdentity{Name: "read_file", Namespace: "mcp"}, aliases.identity(mcpChatName))
+	require.Equal(t, responsesToolIdentity{Name: "read_file", Namespace: "codex"}, aliases.identity(codexChatName))
+	require.Equal(t, responsesToolIdentity{Name: topLevelName}, aliases.identity(topLevelChatName))
+}
+
+func TestChatResponseToResponsesWithToolAliasesRestoresCollidedIdentities(t *testing.T) {
+	mcpAlias := responsesNamespacedToolAlias("mcp", "read_file")
+	codexAlias := responsesNamespacedToolAlias("codex", "read_file")
+	aliases := newResponsesToolAliases()
+	require.NoError(t, aliases.register(responsesToolIdentity{Name: "read_file", Namespace: "mcp"}, mcpAlias))
+	require.NoError(t, aliases.register(responsesToolIdentity{Name: "read_file", Namespace: "codex"}, codexAlias))
+
+	resp, err := chatResponseToResponsesWithToolAliases([]byte(`{
+		"id":"chatcmpl_1",
+		"created":123,
+		"model":"upstream-model",
+		"choices":[{
+			"message":{
+				"role":"assistant",
+				"tool_calls":[
+					{"id":"call_1","type":"function","function":{"name":"`+mcpAlias+`","arguments":"{\"p\":1}"}},
+					{"id":"call_2","type":"function","function":{"name":"`+codexAlias+`","arguments":"{\"p\":2}"}}
+				]
+			},
+			"finish_reason":"tool_calls"
+		}]
+	}`), "public-model", aliases)
+	require.NoError(t, err)
+	require.Len(t, resp.Output, 2)
+
+	data, err := json.Marshal(resp.Output[0])
+	require.NoError(t, err)
+	require.JSONEq(t, `{
+		"id": "call_1",
+		"type": "function_call",
+		"status": "completed",
+		"call_id": "call_1",
+		"name": "read_file",
+		"namespace": "mcp",
+		"arguments": "{\"p\":1}"
+	}`, string(data))
+
+	data, err = json.Marshal(resp.Output[1])
+	require.NoError(t, err)
+	require.JSONEq(t, `{
+		"id": "call_2",
+		"type": "function_call",
+		"status": "completed",
+		"call_id": "call_2",
+		"name": "read_file",
+		"namespace": "codex",
+		"arguments": "{\"p\":2}"
+	}`, string(data))
+}
+
+func TestResponsesAdapterStreamWriterRestoresCollidedAliasesWithLateName(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(w)
+	writer := newResponsesAdapterStreamWriter(ctx.Writer, "public-model", nil, nil, "")
+
+	mcpAlias := responsesNamespacedToolAlias("mcp", "read_file")
+	codexAlias := responsesNamespacedToolAlias("codex", "read_file")
+	writer.toolAliases = newResponsesToolAliases()
+	require.NoError(t, writer.toolAliases.register(responsesToolIdentity{Name: "read_file", Namespace: "mcp"}, mcpAlias))
+	require.NoError(t, writer.toolAliases.register(responsesToolIdentity{Name: "read_file", Namespace: "codex"}, codexAlias))
+	writer.WriteHeader(200)
+
+	// index 0 resolves immediately: added + first argument delta.
+	_, err := writer.Write([]byte(`data: {"id":"chatcmpl_1","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"id":"call_1","type":"function","function":{"name":"` + mcpAlias + `","arguments":"{\"p\":1}"}}]}}]}` + "\n\n"))
+	require.NoError(t, err)
+	// index 1 sends argument fragments before its (aliased) name arrives.
+	_, err = writer.Write([]byte(`data: {"id":"chatcmpl_1","choices":[{"index":0,"delta":{"tool_calls":[{"index":1,"id":"call_2","type":"function","function":{"arguments":"{\"p\":2}"}}]}}]}` + "\n\n"))
+	require.NoError(t, err)
+	// The alias arrives late: item is added (original identity) then buffered
+	// argument fragments flush in order.
+	_, err = writer.Write([]byte(`data: {"id":"chatcmpl_1","choices":[{"index":0,"delta":{"tool_calls":[{"index":1,"type":"function","function":{"name":"` + codexAlias + `"}}]}}]}` + "\n\n"))
+	require.NoError(t, err)
+	_, err = writer.Write([]byte(`data: {"id":"chatcmpl_1","choices":[{"index":0,"delta":{},"finish_reason":"tool_calls"}]}` + "\n\n"))
+	require.NoError(t, err)
+	_, err = writer.Write([]byte("data: [DONE]\n\n"))
+	require.NoError(t, err)
+
+	body := w.Body.String()
+	// Raw aliases must never leak to the Responses-visible stream.
+	require.NotContains(t, body, mcpAlias)
+	require.NotContains(t, body, codexAlias)
+	// Both collided identities are restored to their original name + namespace.
+	require.Contains(t, body, `"name":"read_file"`)
+	mcpAdded := strings.Index(body, `"namespace":"mcp"`)
+	codexAdded := strings.Index(body, `"namespace":"codex"`)
+	p1Delta := strings.Index(body, `"delta":"{\"p\":1}"`)
+	p2Delta := strings.Index(body, `"delta":"{\"p\":2}"`)
+	require.NotEqual(t, -1, mcpAdded)
+	require.NotEqual(t, -1, codexAdded)
+	require.NotEqual(t, -1, p1Delta)
+	require.NotEqual(t, -1, p2Delta)
+	// index 0 added+delta precede index 1; index 1's item is added before its
+	// previously buffered arguments flush.
+	require.Less(t, mcpAdded, codexAdded)
+	require.Less(t, p1Delta, codexAdded)
+	require.Less(t, codexAdded, p2Delta)
+	require.Contains(t, body, `"arguments":"{\"p\":1}"`)
+	require.Contains(t, body, `"arguments":"{\"p\":2}"`)
+}
+
+func TestResponsesToChatRequestHistoryRemapsFunctionCallNames(t *testing.T) {
+	collidedTools := json.RawMessage(`[
+		{
+			"type": "namespace",
+			"name": "mcp_filesystem",
+			"tools": [
+				{"type": "function", "name": "filesystem.read", "parameters": {"type": "object"}}
+			]
+		},
+		{
+			"type": "namespace",
+			"name": "codex_filesystem",
+			"tools": [
+				{"type": "function", "name": "filesystem.read", "parameters": {"type": "object"}}
+			]
+		}
+	]`)
+	singleTool := json.RawMessage(`[
+		{
+			"type": "namespace",
+			"name": "mcp",
+			"tools": [
+				{"type": "function", "name": "read_file", "parameters": {"type": "object"}}
+			]
+		}
+	]`)
+	mcpAlias := responsesNamespacedToolAlias("mcp_filesystem", "filesystem.read")
+
+	tests := []struct {
+		name     string
+		tools    json.RawMessage
+		input    json.RawMessage
+		wantName string
+	}{
+		{
+			name:  "aliased name remapped when namespace present",
+			tools: collidedTools,
+			input: json.RawMessage(`[
+				{"type": "function_call", "call_id": "call_1", "name": "filesystem.read", "arguments": "{}", "namespace": "mcp_filesystem"}
+			]`),
+			wantName: mcpAlias,
+		},
+		{
+			name:  "ambiguous duplicate name without namespace left unchanged",
+			tools: collidedTools,
+			input: json.RawMessage(`[
+				{"type": "function_call", "call_id": "call_1", "name": "filesystem.read", "arguments": "{}"}
+			]`),
+			wantName: "filesystem.read",
+		},
+		{
+			name:  "unambiguous namespaced tool keeps its name",
+			tools: singleTool,
+			input: json.RawMessage(`[
+				{"type": "function_call", "call_id": "call_1", "name": "read_file", "arguments": "{}", "namespace": "mcp"}
+			]`),
+			wantName: "read_file",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := &types.ResponsesRequest{
+				Model: "public",
+				Input: tt.input,
+				Tools: tt.tools,
+			}
+			chatReq, err := responsesToChatRequest(context.Background(), req, "upstream-model", nil)
+			require.NoError(t, err)
+			require.Equal(t, tt.wantName, responsesChatAssistantToolCallName(t, chatReq))
+		})
+	}
+}
+
+func TestResponsesToChatRequestToolChoiceHandlesCollisions(t *testing.T) {
+	collidedTools := json.RawMessage(`[
+		{
+			"type": "namespace",
+			"name": "mcp_filesystem",
+			"tools": [
+				{"type": "function", "name": "filesystem.read", "parameters": {"type": "object"}}
+			]
+		},
+		{
+			"type": "namespace",
+			"name": "codex_filesystem",
+			"tools": [
+				{"type": "function", "name": "filesystem.read", "parameters": {"type": "object"}}
+			]
+		}
+	]`)
+
+	t.Run("collided function name errors", func(t *testing.T) {
+		req := &types.ResponsesRequest{
+			Model:      "public",
+			Input:      json.RawMessage(`"hello"`),
+			ToolChoice: json.RawMessage(`{"type":"function","function":{"name":"filesystem.read"}}`),
+			Tools:      collidedTools,
+		}
+		_, err := responsesToChatRequest(context.Background(), req, "upstream-model", nil)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "ambiguous tool choice across namespaces: filesystem.read")
+	})
+
+	t.Run("unambiguous function name passes through", func(t *testing.T) {
+		req := &types.ResponsesRequest{
+			Model:      "public",
+			Input:      json.RawMessage(`"hello"`),
+			ToolChoice: json.RawMessage(`{"type":"function","function":{"name":"read_file"}}`),
+			Tools: json.RawMessage(`[
+				{
+					"type": "namespace",
+					"name": "mcp",
+					"tools": [
+						{"type": "function", "name": "read_file", "parameters": {"type": "object"}}
+					]
+				}
+			]`),
+		}
+		chatReq, err := responsesToChatRequest(context.Background(), req, "upstream-model", nil)
+		require.NoError(t, err)
+		var raw map[string]json.RawMessage
+		require.NoError(t, json.Unmarshal(chatReq.RawJSON, &raw))
+		var choice struct {
+			Function struct {
+				Name string `json:"name"`
+			} `json:"function"`
+		}
+		require.NoError(t, json.Unmarshal(raw["tool_choice"], &choice))
+		require.Equal(t, "read_file", choice.Function.Name)
+	})
 }

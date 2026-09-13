@@ -21,7 +21,7 @@ func (h *OpenAIHandlerImpl) executeAdapterResponses(c *gin.Context, req *types.R
 		writeResponsesError(c, http.StatusBadRequest, adapterErrorCode(err), "invalid_request_error", err.Error())
 		return
 	}
-	chatReq, err := responsesToChatRequest(c.Request.Context(), req, modelTarget.ModelName, modelTarget.Upstream.Metadata)
+	chatReq, toolAliases, err := responsesToChatRequestResolved(c.Request.Context(), req, modelTarget.ModelName, modelTarget.Upstream.Metadata)
 	if err != nil {
 		finishLLMTraceWithError(generationRecorder, err, types.TraceErrUpstreamError)
 		writeResponsesError(c, http.StatusBadRequest, adapterErrorCode(err), "invalid_request_error", err.Error())
@@ -38,13 +38,7 @@ func (h *OpenAIHandlerImpl) executeAdapterResponses(c *gin.Context, req *types.R
 		slog.WarnContext(c.Request.Context(), "invalid auth header", slog.String("model", modelTarget.ModelName), slog.Any("error", err))
 	}
 	writer := newResponsesAdapterResponseWriter(c.Writer, req.Stream, publicModelID, responsesCounter, moderation, newResponsesModerationSessionID(), logCapture)
-	toolNamespaces, err := responsesNamespaceByFunctionName(req.Tools)
-	if err != nil {
-		finishLLMTraceWithError(generationRecorder, err, types.TraceErrUpstreamError)
-		writeResponsesError(c, http.StatusBadRequest, adapterErrorCode(err), "invalid_request_error", err.Error())
-		return
-	}
-	setResponsesAdapterToolNamespaces(writer, toolNamespaces)
+	setResponsesAdapterToolResolver(writer, toolAliases)
 	proxyStartTime := time.Now()
 	primaryWriter, proxyErr := h.executeChatProxyAttempt(c, writer, modelTarget, nsUUID, chatReq)
 	if proxyErr != nil {
