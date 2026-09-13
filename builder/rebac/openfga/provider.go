@@ -442,7 +442,7 @@ func (p *Provider) write(ctx context.Context, relationships []rebac.Relationship
 				Object:   relationship.Object.String(),
 			})
 		}
-		request.Writes = &openfgav1.WriteRequestWrites{TupleKeys: tupleKeys}
+		request.Writes = &openfgav1.WriteRequestWrites{TupleKeys: tupleKeys, OnDuplicate: "ignore"}
 	}
 
 	if _, err := p.server.Write(ctx, request); err != nil {
