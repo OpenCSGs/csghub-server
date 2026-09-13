@@ -620,6 +620,113 @@ func TestLLMServiceComponent_CreateUpstream(t *testing.T) {
 	require.Equal(t, 2, res.Weight)
 }
 
+func TestLLMServiceComponent_CreateUpstream_WithCapacityPolicy(t *testing.T) {
+	ctx := context.TODO()
+	stores := tests.NewMockStores(t)
+	upstreamStore := mockdatabase.NewMockUpstreamStore(t)
+	stores.LLMConfigMock().EXPECT().GetByID(ctx, int64(100)).Return(&database.LLMConfig{ID: 100}, nil)
+	capacityPolicy := &types.CapacityPolicy{
+		Enabled:          true,
+		MaxConcurrency:   16,
+		MaxQueueDepth:    32,
+		MaxTPM:           200000,
+		MaxRPM:           120,
+		QueueWaitSeconds: 60,
+	}
+	upstreamStore.EXPECT().Create(ctx, &database.Upstream{
+		LLMConfigID:    100,
+		URL:            "http://upstream.example.com/v1",
+		Weight:         1,
+		Enabled:        true,
+		Source:         types.UpstreamSourceExternal,
+		CapacityPolicy: capacityPolicy,
+	}).Return(nil)
+	mc := &llmServiceComponentImpl{
+		llmConfigStore:    stores.LLMConfig,
+		promptPrefixStore: stores.PromptPrefix,
+		upstreamStore:     upstreamStore,
+	}
+	req := &types.CreateUpstreamReq{
+		LLMConfigID:    100,
+		URL:            "http://upstream.example.com/v1",
+		Enabled:        true,
+		CapacityPolicy: capacityPolicy,
+	}
+	res, err := mc.CreateUpstream(ctx, req)
+	require.Nil(t, err)
+	require.NotNil(t, res)
+	require.Equal(t, capacityPolicy, res.CapacityPolicy)
+}
+
+func TestValidateCapacityPolicy(t *testing.T) {
+	cases := []struct {
+		name    string
+		policy  *types.CapacityPolicy
+		wantErr bool
+	}{
+		{
+			name:   "nil policy is valid",
+			policy: nil,
+		},
+		{
+			name:   "disabled policy is stored as-is without validation",
+			policy: &types.CapacityPolicy{Enabled: false, MaxConcurrency: -5},
+		},
+		{
+			name:   "enabled policy with all limits unset (all zeros) is valid for default-fill",
+			policy: &types.CapacityPolicy{Enabled: true},
+		},
+		{
+			name:   "enabled policy with positive limits is valid",
+			policy: &types.CapacityPolicy{Enabled: true, MaxConcurrency: 16, MaxQueueDepth: 32, MaxTPM: 200000, MaxRPM: 120, QueueWaitSeconds: 60},
+		},
+		{
+			name:   "zero queue_wait_seconds means runtime default",
+			policy: &types.CapacityPolicy{Enabled: true, MaxConcurrency: 8, MaxRPM: 10},
+		},
+		{
+			name:   "zero max_tpm means unlimited",
+			policy: &types.CapacityPolicy{Enabled: true, MaxConcurrency: 8, MaxRPM: 10, MaxQueueDepth: 4},
+		},
+		{
+			name:    "negative max_concurrency is invalid",
+			policy:  &types.CapacityPolicy{Enabled: true, MaxConcurrency: -1},
+			wantErr: true,
+		},
+		{
+			name:    "negative max_queue_depth is invalid",
+			policy:  &types.CapacityPolicy{Enabled: true, MaxQueueDepth: -1},
+			wantErr: true,
+		},
+		{
+			name:    "negative max_tpm is invalid",
+			policy:  &types.CapacityPolicy{Enabled: true, MaxTPM: -1},
+			wantErr: true,
+		},
+		{
+			name:    "negative max_rpm is invalid",
+			policy:  &types.CapacityPolicy{Enabled: true, MaxRPM: -1},
+			wantErr: true,
+		},
+		{
+			name:    "negative queue_wait_seconds is invalid",
+			policy:  &types.CapacityPolicy{Enabled: true, QueueWaitSeconds: -1},
+			wantErr: true,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := validateCapacityPolicy(tc.policy)
+			if tc.wantErr {
+				require.Error(t, err)
+				require.ErrorIs(t, err, ErrInvalidLLMConfig)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
 func TestLLMServiceComponent_CreateUpstream_TrimsWhitespace(t *testing.T) {
 	ctx := context.TODO()
 	stores := tests.NewMockStores(t)
@@ -1045,6 +1152,108 @@ func TestLLMServiceComponent_UpdateUpstream(t *testing.T) {
 	require.Equal(t, int64(10), res.ID)
 	require.Equal(t, "http://new-endpoint", res.URL)
 	require.Equal(t, 3, res.Weight)
+}
+
+func TestLLMServiceComponent_UpdateUpstream_CapacityPolicy(t *testing.T) {
+	existingPolicy := &types.CapacityPolicy{Enabled: true, MaxConcurrency: 8}
+	newPolicy := &types.CapacityPolicy{
+		Enabled:          true,
+		MaxConcurrency:   32,
+		MaxQueueDepth:    16,
+		MaxTPM:           50000,
+		MaxRPM:           100,
+		QueueWaitSeconds: 60,
+	}
+	// The component contract for **CapacityPolicy is three-state: nil outer
+	// pointer = field omitted (keep existing), non-nil outer wrapping nil =
+	// clear, non-nil inner = replace. Note that encoding/json maps an explicit
+	// JSON null to a nil outer pointer (i.e. "omitted") for **T fields, so
+	// clearing a policy over HTTP requires sending a disabled policy payload;
+	// this test verifies the component-side handling of the inner nil case.
+	explicitNull := func() **types.CapacityPolicy {
+		var p *types.CapacityPolicy
+		return &p
+	}()
+
+	cases := []struct {
+		name          string
+		reqPolicy     **types.CapacityPolicy
+		initialPolicy *types.CapacityPolicy
+		wantPolicy    *types.CapacityPolicy
+	}{
+		{
+			name:          "field omitted keeps existing policy",
+			reqPolicy:     nil,
+			initialPolicy: existingPolicy,
+			wantPolicy:    existingPolicy,
+		},
+		{
+			name:          "explicit null clears policy",
+			reqPolicy:     explicitNull,
+			initialPolicy: existingPolicy,
+			wantPolicy:    nil,
+		},
+		{
+			name:          "value replaces policy",
+			reqPolicy:     &newPolicy,
+			initialPolicy: nil,
+			wantPolicy:    newPolicy,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.TODO()
+			stores := tests.NewMockStores(t)
+			upstreamStore := mockdatabase.NewMockUpstreamStore(t)
+			callCount := 0
+			upstreamStore.EXPECT().GetByID(ctx, int64(10)).RunAndReturn(func(ctx context.Context, id int64) (*database.Upstream, error) {
+				callCount++
+				if callCount == 1 {
+					return &database.Upstream{
+						ID:             10,
+						LLMConfigID:    100,
+						URL:            "http://old-endpoint",
+						Weight:         1,
+						Enabled:        true,
+						CapacityPolicy: tc.initialPolicy,
+					}, nil
+				}
+				return &database.Upstream{
+					ID:             10,
+					LLMConfigID:    100,
+					URL:            "http://old-endpoint",
+					Weight:         1,
+					Enabled:        true,
+					CapacityPolicy: tc.wantPolicy,
+				}, nil
+			}).Times(2)
+			upstreamStore.EXPECT().Update(ctx, &database.Upstream{
+				ID:             10,
+				LLMConfigID:    100,
+				URL:            "http://old-endpoint",
+				Weight:         1,
+				Enabled:        true,
+				CapacityPolicy: tc.wantPolicy,
+			}).Return(nil)
+			healthStateStore := mockdatabase.NewMockAIGatewayUpstreamHealthStateStore(t)
+			circuitStateStore := mockdatabase.NewMockAIGatewayUpstreamCircuitStateStore(t)
+			mc := &llmServiceComponentImpl{
+				llmConfigStore:    stores.LLMConfig,
+				promptPrefixStore: stores.PromptPrefix,
+				upstreamStore:     upstreamStore,
+				healthStateStore:  healthStateStore,
+				circuitStateStore: circuitStateStore,
+			}
+			req := &types.UpdateUpstreamReq{
+				ID:             10,
+				CapacityPolicy: tc.reqPolicy,
+			}
+			res, err := mc.UpdateUpstream(ctx, req)
+			require.Nil(t, err)
+			require.NotNil(t, res)
+			require.Equal(t, tc.wantPolicy, res.CapacityPolicy)
+		})
+	}
 }
 
 func TestLLMServiceComponent_DeleteUpstream(t *testing.T) {
