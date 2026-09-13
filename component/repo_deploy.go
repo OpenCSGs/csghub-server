@@ -596,7 +596,33 @@ func (c *repoComponentImpl) DeployDetail(ctx context.Context, detailReq types.De
 	}
 	resDeploy.PD = deploy.PD
 
+	// Attach the aigateway llm_config (if any) for serverless/inference detail
+	// pages. The lookup joins llm_configs so a deleted config yields no id.
+	c.attachUpstreamLLMConfigID(ctx, detailReq.DeployType, &resDeploy)
+
 	return &resDeploy, nil
+}
+
+// attachUpstreamLLMConfigID retrieves the upstream AI Gateway LLM configuration associated with the deployment
+// and populates the LLMConfigID into resDeploy (using an in-place pointer update). This applies only to
+// deployment types that synchronize with upstream services (e.g., serverless, inference).
+// It performs an INNER JOIN with llm_configs; deleted configurations are not populated.
+// Query failures trigger only a warning/degradation—this field is populated on a best-effort basis
+// to ensure the details request itself does not fail.
+func (c *repoComponentImpl) attachUpstreamLLMConfigID(ctx context.Context, deployType int, resDeploy *types.DeployRequest) {
+	if !types.DeployTypeSyncsUpstream(deployType) {
+		return
+	}
+	llmConfigID, err := c.upstreamStore.GetLLMConfigIDBySourceID(
+		ctx, types.UpstreamSourceCSGHubDeploy, resDeploy.DeployID)
+	if err != nil {
+		slog.WarnContext(ctx, "failed to resolve llm_config for deploy",
+			slog.Any("deployId", resDeploy.DeployID), slog.Any("error", err))
+		return
+	}
+	if llmConfigID > 0 {
+		resDeploy.LLMConfigID = llmConfigID
+	}
 }
 
 func (c *repoComponentImpl) queryDeployReplica(ctx context.Context, detailReq types.DeployActReq, deploy *database.Deploy) (int, int, []types.Instance) {

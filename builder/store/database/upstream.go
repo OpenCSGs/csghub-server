@@ -57,6 +57,11 @@ type UpstreamStore interface {
 	// GetBySourceID returns the upstream for a given source and source_id (e.g. csghub deploy).
 	// Returns (nil, nil) when no matching upstream exists.
 	GetBySourceID(ctx context.Context, source types.UpstreamSource, sourceID int64) (*Upstream, error)
+	// GetLLMConfigIDBySourceID resolves the llm_config_id for a csghub deploy
+	// upstream, verifying that the referenced llm_configs row still exists.
+	// The inner join guarantees consistency: orphaned upstreams whose
+	// llm_config has been deleted yield no row. Returns (0, nil) in that case.
+	GetLLMConfigIDBySourceID(ctx context.Context, source types.UpstreamSource, sourceID int64) (int64, error)
 	// UpsertInternalDeployTarget creates or updates an internal deploy upstream.
 	// It looks up an existing upstream by source + source_id; if found, only
 	// source-owned fields (URL, ModelName, Metadata, Enabled, etc.) are updated.
@@ -248,4 +253,27 @@ func (s *upstreamStoreImpl) ListEnabledByLogicalModelIDs(ctx context.Context, mo
 		return nil, errorx.HandleDBError(err, nil)
 	}
 	return upstreams, nil
+}
+
+// GetLLMConfigIDBySourceID resolves the llm_config_id for a csghub deploy
+// upstream, verifying that the referenced llm_configs row still exists.
+// The inner join guarantees consistency: orphaned upstreams whose
+// llm_config has been deleted yield no row. Returns (0, nil) in that case.
+func (s *upstreamStoreImpl) GetLLMConfigIDBySourceID(ctx context.Context, source types.UpstreamSource, sourceID int64) (int64, error) {
+	var id int64
+	err := s.db.Core.NewSelect().
+		TableExpr("ai_gateway_upstreams AS u").
+		Column("u.llm_config_id").
+		Join("JOIN llm_configs AS c ON c.id = u.llm_config_id").
+		Where("u.source = ?", source).
+		Where("u.source_id = ?", sourceID).
+		Limit(1).
+		Scan(ctx, &id)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return 0, nil
+		}
+		return 0, fmt.Errorf("get llm_config_id by source %q source_id %d: %w", source, sourceID, err)
+	}
+	return id, nil
 }

@@ -105,6 +105,7 @@ func NewRepoComponent(config *config.Config) (RepoComponent, error) {
 	c.dataviewerStore = database.NewDataviewerStore()
 	c.accountSyncQuotaStatementStore = database.NewAccountSyncQuotaStatementStore()
 	c.accountPriceStore = database.NewAccountPriceStore()
+	c.upstreamStore = database.NewUpstreamStore(config)
 	c.clusterComponent, err = NewClusterComponent(config)
 	if err != nil {
 		return nil, err

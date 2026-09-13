@@ -280,6 +280,7 @@ type DeployRequest struct {
 	Message             string     `json:"message,omitempty"`
 	SupportFunctionCall bool       `json:"support_function_call,omitempty"`
 	OwnerNamespace      string     `json:"owner_namespace,omitempty"`
+	LLMConfigID         int64      `json:"llm_config_id,omitempty"` // aigateway llm_config resolved from the deploy's upstream
 
 	Since    string `json:"since,omitempty"`
 	Limit    int    `json:"limit,omitempty"`

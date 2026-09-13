@@ -110,6 +110,7 @@ type repoComponentImpl struct {
 	clusterComponent               ClusterComponent
 	modelStore                     database.ModelStore
 	tagStore                       database.TagStore
+	upstreamStore                  database.UpstreamStore
 	packageReader                  func(ctx context.Context, repoType types.RepositoryType, repoID int64, branch, commitID string) ([]byte, bool)
 	packageWriter                  func(ctx context.Context, repoType types.RepositoryType, repoID int64, commitID string, archive []byte) error
 	rebac                          rebac.Authorizer
