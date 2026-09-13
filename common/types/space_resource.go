@@ -90,6 +90,11 @@ func HardwareToMask(hardware HardWare) HardwareType {
 //     (mask & exclude == 0). A zero exclude means nothing excluded. e.g. sandbox
 //     excludes all graphic accelerators to enforce "pure CPU" — required can only
 //     say "has CPU", not "only CPU", so exclude is what blocks a CPU+GPU resource.
+//     **Special case**: when exclude contains the CPU bit, it means "exclude pure
+//     CPU resources only" (resources that have CPU but no graphic accelerator).
+//     A resource with any graphic accelerator (GPU/NPU/GCU/...) is NOT excluded
+//     just because it also has CPU. This prevents the CPU exclude bit from
+//     incorrectly filtering out GPU-capable resources.
 //
 // Callers with no configured constraint pass required=0 and exclude=0, which
 // always satisfies.
@@ -100,8 +105,30 @@ func HardwareSatisfiesConstraint(required, exclude int64, hardware HardWare) boo
 		return false
 	}
 	// "none of" — zero exclude means nothing excluded.
-	if exclude != 0 && mask&exclude != 0 {
-		return false
+	if exclude != 0 {
+		// Special case: CPU exclusion means "exclude pure CPU resources only".
+		// A resource with a graphic accelerator should NOT be excluded just
+		// because it has CPU. This fixes the scenario where setting
+		// exclude_hardware to HardwareCPU incorrectly filtered out all
+		// resources (since every resource has CPU).
+		if exclude&int64(HardwareCPU) != 0 {
+			if mask&int64(HardwareMaskGraphic) != 0 {
+				// Resource has a graphic accelerator → CPU exclusion
+				// does not apply. But still check other non-CPU
+				// exclude bits.
+				remainingExclude := exclude &^ int64(HardwareCPU)
+				if remainingExclude != 0 && mask&remainingExclude != 0 {
+					return false
+				}
+				return true
+			}
+			// Pure CPU resource (no accelerator) → exclude
+			return false
+		}
+		// No CPU in exclude → standard bitwise check
+		if mask&exclude != 0 {
+			return false
+		}
 	}
 	return true
 }
