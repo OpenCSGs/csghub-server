@@ -40,13 +40,10 @@ func (a *HFInferenceToolkitAdapter) CanHandle(model *types.Model) bool {
 	if model == nil {
 		return false
 	}
-	if model.Provider != "" {
-		return slices.Contains(hfProviders, strings.ToLower(model.Provider))
+	if model.Task == string(commonTypes.Text2Image) && isHFInferenceToolkitFramework(model.RuntimeFramework) {
+		return true
 	}
-	if model.CSGHubModelID == "" {
-		return false
-	}
-	return model.Task == string(commonTypes.Text2Image) && isHFInferenceToolkitFramework(model.RuntimeFramework)
+	return slices.Contains(hfProviders, strings.ToLower(model.Provider))
 }
 
 func isHFInferenceToolkitFramework(runtimeFramework string) bool {

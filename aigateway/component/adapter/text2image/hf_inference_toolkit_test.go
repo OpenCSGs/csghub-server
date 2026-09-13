@@ -66,10 +66,36 @@ func TestHFInferenceToolkitAdapter_CanHandle(t *testing.T) {
 			want: false,
 		},
 		{
-			name: "reject missing csghub model id",
+			name: "accept serverless csghub deploy with hf inference toolkit",
 			model: &types.Model{
 				BaseModel:         types.BaseModel{Task: string(commonTypes.Text2Image)},
-				InternalModelInfo: types.InternalModelInfo{RuntimeFramework: frameworkAMDHfInferenceToolkit},
+				InternalModelInfo: types.InternalModelInfo{CSGHubModelID: "Qwen/Qwen-Image-2512", RuntimeFramework: frameworkHFInferenceToolkit},
+				ExternalModelInfo: types.ExternalModelInfo{Provider: commonTypes.ProviderTypeServerless},
+			},
+			want: true,
+		},
+		{
+			name: "accept inference csghub deploy with hf inference toolkit",
+			model: &types.Model{
+				BaseModel:         types.BaseModel{Task: string(commonTypes.Text2Image)},
+				InternalModelInfo: types.InternalModelInfo{CSGHubModelID: "namespace/model", RuntimeFramework: frameworkHFInferenceToolkit},
+				ExternalModelInfo: types.ExternalModelInfo{Provider: commonTypes.ProviderTypeInference},
+			},
+			want: true,
+		},
+		{
+			name: "accept opencsg provider without runtime framework",
+			model: &types.Model{
+				ExternalModelInfo: types.ExternalModelInfo{Provider: "opencsg"},
+			},
+			want: true,
+		},
+		{
+			name: "reject serverless provider without matching runtime framework",
+			model: &types.Model{
+				BaseModel:         types.BaseModel{Task: string(commonTypes.Text2Image)},
+				InternalModelInfo: types.InternalModelInfo{CSGHubModelID: "namespace/model", RuntimeFramework: "vllm"},
+				ExternalModelInfo: types.ExternalModelInfo{Provider: commonTypes.ProviderTypeServerless},
 			},
 			want: false,
 		},
