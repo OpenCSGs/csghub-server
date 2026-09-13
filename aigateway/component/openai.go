@@ -128,10 +128,11 @@ func computeModelListAvailability(models []types.Model) []types.Model {
 
 // modelUpstreamsAvailable returns true if at least one upstream is not unavailable
 // based on the inline health/circuit state carried on UpstreamConfig.
+// After unification, all llm_config records must have upstreams configured;
+// a model with no upstreams at all is not routable and should be filtered out.
 func modelUpstreamsAvailable(upstreams []commontypes.UpstreamConfig) bool {
 	if len(upstreams) == 0 {
-		// No upstreams configured: model is available (legacy behavior, uses model.Endpoint directly).
-		return true
+		return false
 	}
 	for _, u := range upstreams {
 		if unavailable, _ := types.IsUpstreamUnavailable(u); !unavailable {
