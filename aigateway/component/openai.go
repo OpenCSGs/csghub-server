@@ -101,24 +101,29 @@ func (m *openaiComponentImpl) ListModels(c context.Context, nsUUID string, req t
 	if err != nil {
 		return types.ModelList{}, err
 	}
+	models = computeModelListAvailability(models)
 	modelList := filterAndPaginateModels(models, req)
-	computeModelListAvailability(&modelList)
 	return modelList, nil
 }
 
 // computeModelListAvailability sets ModelAvailability.IsAvailable for each model
-// based on the already-loaded upstream health/circuit state (no extra DB call).
-func computeModelListAvailability(modelList *types.ModelList) {
-	if modelList == nil || len(modelList.Data) == 0 {
-		return
+// based on the already-loaded upstream health/circuit state (no extra DB call),
+// and returns only models whose IsAvailable is true.
+func computeModelListAvailability(models []types.Model) []types.Model {
+	if len(models) == 0 {
+		return models
 	}
-	for idx := range modelList.Data {
-		model := &modelList.Data[idx]
+	filtered := make([]types.Model, 0, len(models))
+	for _, model := range models {
 		available := modelUpstreamsAvailable(model.Upstreams)
 		model.Availability = &types.ModelAvailability{
 			IsAvailable: available,
 		}
+		if available {
+			filtered = append(filtered, model)
+		}
 	}
+	return filtered
 }
 
 // modelUpstreamsAvailable returns true if at least one upstream is not unavailable

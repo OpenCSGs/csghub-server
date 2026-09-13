@@ -1514,7 +1514,249 @@ func TestDbUpstreamsToConfigsMetadataPassthrough(t *testing.T) {
 	require.Equal(t, metadata, result[0].Metadata)
 }
 
-// buildInternalLLMConfigForVisibility builds an llm_config with a single
+func TestModelUpstreamsAvailable(t *testing.T) {
+	healthyUpstream := func() commontypes.UpstreamConfig {
+		return commontypes.UpstreamConfig{
+			Enabled:            true,
+			HealthCheckEnabled: true,
+			HealthState:        string(types.HealthStateHealthy),
+		}
+	}
+	disabledUpstream := func() commontypes.UpstreamConfig {
+		return commontypes.UpstreamConfig{Enabled: false}
+	}
+	circuitOpenUpstream := func() commontypes.UpstreamConfig {
+		return commontypes.UpstreamConfig{
+			Enabled:               true,
+			CircuitBreakerEnabled: true,
+			CircuitState:          string(types.CircuitStateOpen),
+		}
+	}
+	unhealthyUpstream := func() commontypes.UpstreamConfig {
+		return commontypes.UpstreamConfig{
+			Enabled:            true,
+			HealthCheckEnabled: true,
+			HealthState:        string(types.HealthStateUnhealthy),
+		}
+	}
+	unknownUpstream := func() commontypes.UpstreamConfig {
+		return commontypes.UpstreamConfig{
+			Enabled:     true,
+			HealthState: string(types.HealthStateUnknown),
+		}
+	}
+
+	tests := []struct {
+		name      string
+		upstreams []commontypes.UpstreamConfig
+		want      bool
+	}{
+		{
+			name:      "empty upstreams defaults to available",
+			upstreams: nil,
+			want:      true,
+		},
+		{
+			name:      "single healthy upstream",
+			upstreams: []commontypes.UpstreamConfig{healthyUpstream()},
+			want:      true,
+		},
+		{
+			name:      "single disabled upstream",
+			upstreams: []commontypes.UpstreamConfig{disabledUpstream()},
+			want:      false,
+		},
+		{
+			name:      "single circuit-open upstream",
+			upstreams: []commontypes.UpstreamConfig{circuitOpenUpstream()},
+			want:      false,
+		},
+		{
+			name:      "single unhealthy upstream",
+			upstreams: []commontypes.UpstreamConfig{unhealthyUpstream()},
+			want:      false,
+		},
+		{
+			name:      "all upstreams unavailable",
+			upstreams: []commontypes.UpstreamConfig{disabledUpstream(), circuitOpenUpstream(), unhealthyUpstream()},
+			want:      false,
+		},
+		{
+			name:      "at least one healthy among unavailable",
+			upstreams: []commontypes.UpstreamConfig{disabledUpstream(), healthyUpstream(), circuitOpenUpstream()},
+			want:      true,
+		},
+		{
+			name:      "unknown health state is available",
+			upstreams: []commontypes.UpstreamConfig{unknownUpstream()},
+			want:      true,
+		},
+		{
+			name: "health check disabled with healthy state",
+			upstreams: []commontypes.UpstreamConfig{
+				{Enabled: true, HealthState: string(types.HealthStateUnhealthy)},
+			},
+			want: true, // health check not enabled, so unhealthy state is ignored
+		},
+		{
+			name: "circuit breaker disabled with open state",
+			upstreams: []commontypes.UpstreamConfig{
+				{Enabled: true, CircuitState: string(types.CircuitStateOpen)},
+			},
+			want: true, // circuit breaker not enabled, so open state is ignored
+		},
+		{
+			name: "degraded health state",
+			upstreams: []commontypes.UpstreamConfig{
+				{Enabled: true, HealthCheckEnabled: true, HealthState: string(types.HealthStateDegraded)},
+			},
+			want: true, // degraded is not unhealthy
+		},
+		{
+			name: "circuit half-open",
+			upstreams: []commontypes.UpstreamConfig{
+				{Enabled: true, CircuitBreakerEnabled: true, CircuitState: string(types.CircuitStateHalfOpen)},
+			},
+			want: true, // half-open is not open
+		},
+		{
+			name: "circuit closed",
+			upstreams: []commontypes.UpstreamConfig{
+				{Enabled: true, CircuitBreakerEnabled: true, CircuitState: string(types.CircuitStateClosed)},
+			},
+			want: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := modelUpstreamsAvailable(tt.upstreams)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestComputeModelListAvailability(t *testing.T) {
+	makeModel := func(id string, upstreams []commontypes.UpstreamConfig) types.Model {
+		return types.Model{BaseModel: types.BaseModel{ID: id}, Upstreams: upstreams}
+	}
+	availableUpstream := commontypes.UpstreamConfig{
+		Enabled:            true,
+		HealthCheckEnabled: true,
+		HealthState:        string(types.HealthStateHealthy),
+	}
+	disabledUpstream := commontypes.UpstreamConfig{Enabled: false}
+
+	t.Run("nil input", func(t *testing.T) {
+		result := computeModelListAvailability(nil)
+		assert.Nil(t, result)
+	})
+
+	t.Run("empty input", func(t *testing.T) {
+		result := computeModelListAvailability([]types.Model{})
+		assert.Len(t, result, 0)
+	})
+
+	t.Run("all models available", func(t *testing.T) {
+		models := []types.Model{
+			makeModel("m1", []commontypes.UpstreamConfig{availableUpstream}),
+			makeModel("m2", []commontypes.UpstreamConfig{availableUpstream}),
+		}
+		result := computeModelListAvailability(models)
+		assert.Len(t, result, 2)
+		assert.Equal(t, "m1", result[0].ID)
+		assert.Equal(t, "m2", result[1].ID)
+		assert.True(t, result[0].Availability.IsAvailable)
+		assert.True(t, result[1].Availability.IsAvailable)
+	})
+
+	t.Run("all models unavailable", func(t *testing.T) {
+		models := []types.Model{
+			makeModel("m1", []commontypes.UpstreamConfig{disabledUpstream}),
+			makeModel("m2", []commontypes.UpstreamConfig{disabledUpstream}),
+		}
+		result := computeModelListAvailability(models)
+		assert.Len(t, result, 0)
+	})
+
+	t.Run("mixed available and unavailable", func(t *testing.T) {
+		models := []types.Model{
+			makeModel("m-available", []commontypes.UpstreamConfig{availableUpstream}),
+			makeModel("m-unavailable", []commontypes.UpstreamConfig{disabledUpstream}),
+			makeModel("m-available2", []commontypes.UpstreamConfig{availableUpstream}),
+		}
+		result := computeModelListAvailability(models)
+		assert.Len(t, result, 2)
+		assert.Equal(t, "m-available", result[0].ID)
+		assert.True(t, result[0].Availability.IsAvailable)
+		assert.Equal(t, "m-available2", result[1].ID)
+		assert.True(t, result[1].Availability.IsAvailable)
+	})
+
+	t.Run("model with no upstreams is available", func(t *testing.T) {
+		models := []types.Model{
+			makeModel("no-upstreams", nil),
+		}
+		result := computeModelListAvailability(models)
+		assert.Len(t, result, 1)
+		assert.Equal(t, "no-upstreams", result[0].ID)
+		assert.True(t, result[0].Availability.IsAvailable)
+	})
+
+	t.Run("model with mixed upstreams one healthy", func(t *testing.T) {
+		models := []types.Model{
+			makeModel("mixed", []commontypes.UpstreamConfig{disabledUpstream, availableUpstream}),
+		}
+		result := computeModelListAvailability(models)
+		assert.Len(t, result, 1)
+		assert.True(t, result[0].Availability.IsAvailable, "model with at least one healthy upstream should be available")
+	})
+
+	t.Run("circuit-open upstream makes model unavailable", func(t *testing.T) {
+		models := []types.Model{
+			makeModel("circuit-open", []commontypes.UpstreamConfig{{
+				Enabled:               true,
+				CircuitBreakerEnabled: true,
+				CircuitState:          string(types.CircuitStateOpen),
+			}}),
+		}
+		result := computeModelListAvailability(models)
+		assert.Len(t, result, 0)
+	})
+
+	t.Run("unhealthy upstream makes model unavailable", func(t *testing.T) {
+		models := []types.Model{
+			makeModel("unhealthy", []commontypes.UpstreamConfig{{
+				Enabled:            true,
+				HealthCheckEnabled: true,
+				HealthState:        string(types.HealthStateUnhealthy),
+			}}),
+		}
+		result := computeModelListAvailability(models)
+		assert.Len(t, result, 0)
+	})
+
+	t.Run("preserves model fields on kept models", func(t *testing.T) {
+		models := []types.Model{
+			{BaseModel: types.BaseModel{ID: "keep", OwnedBy: "owner1"}, Upstreams: []commontypes.UpstreamConfig{availableUpstream}},
+		}
+		result := computeModelListAvailability(models)
+		assert.Len(t, result, 1)
+		assert.Equal(t, "keep", result[0].ID)
+		assert.Equal(t, "owner1", result[0].OwnedBy)
+		assert.True(t, result[0].Availability.IsAvailable)
+	})
+
+	t.Run("does not mutate input slice", func(t *testing.T) {
+		models := []types.Model{
+			makeModel("a", []commontypes.UpstreamConfig{availableUpstream}),
+			makeModel("b", []commontypes.UpstreamConfig{disabledUpstream}),
+		}
+		originalLen := len(models)
+		_ = computeModelListAvailability(models)
+		assert.Len(t, models, originalLen, "input slice length must not change")
+	})
+}
+
 // buildInternalLLMConfigForVisibility builds an llm_config with a single
 // csghub-sourced upstream carrying the given internal model info, for
 // llmConfigToModel visibility tests.

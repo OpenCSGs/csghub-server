@@ -20,11 +20,11 @@ const (
 type UpstreamStatus string
 
 const (
-	UpstreamStatusUnknown    UpstreamStatus = "unknown"
-	UpstreamStatusDisabled   UpstreamStatus = "disabled"
+	UpstreamStatusUnknown     UpstreamStatus = "unknown"
+	UpstreamStatusDisabled    UpstreamStatus = "disabled"
 	UpstreamStatusUnavailable UpstreamStatus = "unavailable"
-	UpstreamStatusDegraded   UpstreamStatus = "degraded"
-	UpstreamStatusAvailable  UpstreamStatus = "available"
+	UpstreamStatusDegraded    UpstreamStatus = "degraded"
+	UpstreamStatusAvailable   UpstreamStatus = "available"
 )
 
 // Reason strings for upstream/LLM unavailability.
@@ -49,21 +49,21 @@ const (
 type HealthCheckType string
 
 const (
-	HealthCheckTypeL7API    HealthCheckType = "l7_api"    // /v1/models API check
+	HealthCheckTypeL7API     HealthCheckType = "l7_api"    // /v1/models API check
 	HealthCheckTypeInference HealthCheckType = "inference" // Light inference check
 )
 
 // ProviderHealthStatus represents the health status of a provider endpoint
 type ProviderHealthStatus struct {
-	UpstreamID          int64        `json:"upstream_id"`
-	Provider            string       `json:"provider,omitempty"`
-	ModelName           string       `json:"model_name,omitempty"`
-	Endpoint            string       `json:"endpoint,omitempty"`
-	HealthState         HealthState  `json:"health_state"`
-	LastCheckAt         time.Time    `json:"last_check_at"`
-	LastError           string       `json:"last_error,omitempty"`
-	ConsecutiveFailures int          `json:"consecutive_failures"`
-	LatencyMs           int64        `json:"latency_ms"`
+	UpstreamID          int64       `json:"upstream_id"`
+	Provider            string      `json:"provider,omitempty"`
+	ModelName           string      `json:"model_name,omitempty"`
+	Endpoint            string      `json:"endpoint,omitempty"`
+	HealthState         HealthState `json:"health_state"`
+	LastCheckAt         time.Time   `json:"last_check_at"`
+	LastError           string      `json:"last_error,omitempty"`
+	ConsecutiveFailures int         `json:"consecutive_failures"`
+	LatencyMs           int64       `json:"latency_ms"`
 }
 
 // ProviderCircuitStatus represents the circuit breaker status of a provider endpoint
@@ -73,10 +73,10 @@ type ProviderCircuitStatus struct {
 	ModelName       string       `json:"model_name,omitempty"`
 	Endpoint        string       `json:"endpoint,omitempty"`
 	CircuitState    CircuitState `json:"circuit_state"`
-	FailureCount    int           `json:"failure_count"`
-	SuccessCount    int           `json:"success_count"`
-	LastStateChange time.Time     `json:"last_state_change"`
-	NextRetryAt     *time.Time    `json:"next_retry_at,omitempty"`
+	FailureCount    int          `json:"failure_count"`
+	SuccessCount    int          `json:"success_count"`
+	LastStateChange time.Time    `json:"last_state_change"`
+	NextRetryAt     *time.Time   `json:"next_retry_at,omitempty"`
 }
 
 // HealthCheckConfig defines the configuration for health checking
@@ -97,17 +97,17 @@ type HealthCheckConfig struct {
 // L7APICheckConfig defines L7 API health check configuration
 type L7APICheckConfig struct {
 	Enabled  bool          `json:"enabled"`
-	Interval time.Duration `json:"interval"`  // Check interval, default 5-10s
-	Timeout  time.Duration `json:"timeout"`   // Request timeout
+	Interval time.Duration `json:"interval"` // Check interval, default 5-10s
+	Timeout  time.Duration `json:"timeout"`  // Request timeout
 }
 
 // InferenceCheckConfig defines inference health check configuration
 type InferenceCheckConfig struct {
-	Enabled    bool          `json:"enabled"`
-	Interval   time.Duration `json:"interval"`   // Check interval, default 30-60s
-	Timeout    time.Duration `json:"timeout"`    // Request timeout
-	MaxTokens  int           `json:"max_tokens"` // Max tokens for inference check, default 1
-	Prompt     string        `json:"prompt"`     // Prompt for inference check
+	Enabled   bool          `json:"enabled"`
+	Interval  time.Duration `json:"interval"`   // Check interval, default 30-60s
+	Timeout   time.Duration `json:"timeout"`    // Request timeout
+	MaxTokens int           `json:"max_tokens"` // Max tokens for inference check, default 1
+	Prompt    string        `json:"prompt"`     // Prompt for inference check
 }
 
 // HealthRulesConfig defines rules for determining health state
@@ -201,6 +201,9 @@ func IsUpstreamCircuitOpen(u commontypes.UpstreamConfig) bool {
 // UpstreamConfig (populated from DB at model-fetch time). Returns true and
 // a reason when the upstream should be excluded from routing.
 func IsUpstreamUnavailable(u commontypes.UpstreamConfig) (bool, string) {
+	if !u.Enabled {
+		return true, ReasonUpstreamDisabled
+	}
 	if IsUpstreamCircuitOpen(u) {
 		return true, ReasonCircuitBreakerOpen
 	}
