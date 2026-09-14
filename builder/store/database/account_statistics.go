@@ -19,6 +19,7 @@ type AccountStatistics struct {
 	PromptToken       float64         `bun:",notnull" json:"prompt_token"`
 	PromptCachedToken float64         `bun:",notnull" json:"prompt_cached_token"`
 	CompletionToken   float64         `bun:",notnull" json:"completion_token"`
+	ReasoningToken    float64         `bun:",notnull" json:"reasoning_token"`
 	Count             float64         `bun:",notnull,default:0" json:"count"`
 	TokenID           int64           `bun:",notnull,default:0" json:"token_id"`
 	DataType          string          `bun:",notnull,default:''" json:"data_type"`
@@ -32,6 +33,7 @@ type StatisticsTotalResult struct {
 	TotalPromptToken       float64 `bun:"total_prompt_token"`
 	TotalPromptCachedToken float64 `bun:"total_prompt_cached_token"`
 	TotalCompletionToken   float64 `bun:"total_completion_token"`
+	TotalReasoningToken    float64 `bun:"total_reasoning_token"`
 	TotalDuration          float64 `bun:"total_duration"`
 	TotalCount             float64 `bun:"total_count"`
 }
@@ -74,6 +76,7 @@ type SceneSummary struct {
 	TotalPromptToken       float64         `json:"total_prompt_token"`
 	TotalPromptCachedToken float64         `json:"total_prompt_cached_token"`
 	TotalCompletionToken   float64         `json:"total_completion_token"`
+	TotalReasoningToken    float64         `json:"total_reasoning_token"`
 	TotalCount             float64         `json:"total_count"`
 	TotalDuration          float64         `json:"total_duration"`
 }
@@ -93,6 +96,7 @@ func (s *accountStatisticsStoreImpl) ListByUserIDAndDate(ctx context.Context, re
 		ColumnExpr("sum(prompt_token) as prompt_token").
 		ColumnExpr("sum(prompt_cached_token) as prompt_cached_token").
 		ColumnExpr("sum(completion_token) as completion_token").
+		ColumnExpr("sum(reasoning_token) as reasoning_token").
 		ColumnExpr("sum(duration) as duration").
 		ColumnExpr("sum(count) as count")
 
@@ -133,6 +137,7 @@ func (s *accountStatisticsStoreImpl) ListByUserIDAndDate(ctx context.Context, re
 		ColumnExpr("SUM(prompt_token) as total_prompt_token").
 		ColumnExpr("SUM(prompt_cached_token) as total_prompt_cached_token").
 		ColumnExpr("SUM(completion_token) as total_completion_token").
+		ColumnExpr("SUM(reasoning_token) as total_reasoning_token").
 		ColumnExpr("SUM(duration) as total_duration").
 		ColumnExpr("SUM(count) as total_count").
 		Scan(ctx, &totalResult)
@@ -162,6 +167,7 @@ func (s *accountStatisticsStoreImpl) ListByUserIDAndDate(ctx context.Context, re
 			TotalPromptToken:       totalResult.TotalPromptToken,
 			TotalPromptCachedToken: totalResult.TotalPromptCachedToken,
 			TotalCompletionToken:   totalResult.TotalCompletionToken,
+			TotalReasoningToken:    totalResult.TotalReasoningToken,
 			TotalDuration:          totalResult.TotalDuration,
 			TotalCount:             totalResult.TotalCount,
 		},
@@ -203,6 +209,7 @@ func (s *accountStatisticsStoreImpl) SummaryByUserIDAndDate(ctx context.Context,
 		ColumnExpr("COALESCE(SUM(prompt_token), 0) as total_prompt_token").
 		ColumnExpr("COALESCE(SUM(prompt_cached_token), 0) as total_prompt_cached_token").
 		ColumnExpr("COALESCE(SUM(completion_token), 0) as total_completion_token").
+		ColumnExpr("COALESCE(SUM(reasoning_token), 0) as total_reasoning_token").
 		ColumnExpr("COALESCE(SUM(count), 0) as total_count").
 		ColumnExpr("COALESCE(SUM(duration), 0) as total_duration").
 		Where("event_date >= ? and event_date <= ?", req.StartDate, req.EndDate).

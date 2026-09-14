@@ -545,3 +545,65 @@ func TestMeteringImpl_HandleMsgWithRetry_PubFeeFailed(t *testing.T) {
 
 	require.Error(t, err)
 }
+
+func TestMeteringImpl_HandleMsgData_ReasoningToken(t *testing.T) {
+	cases := []struct {
+		name          string
+		extra         string
+		wantReasoning float64
+		wantError     bool
+	}{
+		{
+			name:          "valid reasoning token num",
+			extra:         `{"prompt_token_num":"100","completion_token_num":"50","reasoning_token_num":"30"}`,
+			wantReasoning: 30,
+		},
+		{
+			name:          "reasoning token num absent defaults to zero",
+			extra:         `{"prompt_token_num":"100","completion_token_num":"50"}`,
+			wantReasoning: 0,
+		},
+		{
+			name:      "invalid reasoning token num fails the event",
+			extra:     `{"prompt_token_num":"100","completion_token_num":"50","reasoning_token_num":"bad"}`,
+			wantError: true,
+		},
+		{
+			name:      "negative reasoning token num fails the event",
+			extra:     `{"prompt_token_num":"100","completion_token_num":"50","reasoning_token_num":"-5"}`,
+			wantError: true,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			mockMeterComp := mockacct.NewMockMeteringComponent(t)
+			mockAcctEvtComp := mockacct.NewMockAccountingEventComponent(t)
+			metering := &MeteringImpl{
+				meterComp:   mockMeterComp,
+				acctEvtComp: mockAcctEvtComp,
+			}
+
+			ctx := context.Background()
+			event := createTestMeteringEvent()
+			event.Extra = tc.extra
+			data, _ := json.Marshal(event)
+
+			mockMeterComp.EXPECT().GetMeteringByEventUUID(mock.Anything, mock.Anything).Return(nil, nil)
+			mockMeterComp.EXPECT().FindMeteringByCustomerIDAndRecordAtInMin(mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
+			mockAcctEvtComp.EXPECT().AddNewAccountingEvent(mock.Anything, mock.Anything, mock.Anything).Return(nil)
+			if !tc.wantError {
+				mockMeterComp.EXPECT().SaveMeteringEventRecord(mock.Anything, mock.Anything, mock.MatchedBy(func(extra types.MeteringExtra) bool {
+					return extra.ReasoningToken == tc.wantReasoning
+				})).Return(nil)
+			}
+
+			_, err := metering.handleMsgData(ctx, data)
+			if tc.wantError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}

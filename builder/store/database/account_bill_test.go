@@ -23,7 +23,7 @@ func TestAccountBillStore_List(t *testing.T) {
 			// included
 			UserUUID: "foo", Value: 3, Consumption: 4,
 			BillDate: dt.Add(-3 * 24 * time.Hour), CustomerID: "c1",
-			Scene: types.ScenePayOrder,
+			Scene: types.ScenePayOrder, ReasoningToken: 1,
 		},
 		{
 			// not included, date
@@ -35,7 +35,7 @@ func TestAccountBillStore_List(t *testing.T) {
 			// included
 			UserUUID: "foo", Value: 5, Consumption: 6,
 			BillDate: dt.Add(-1 * 24 * time.Hour), CustomerID: "c1",
-			Scene: types.ScenePayOrder,
+			Scene: types.ScenePayOrder, ReasoningToken: 2,
 		},
 		{
 			// not included, date
@@ -47,13 +47,13 @@ func TestAccountBillStore_List(t *testing.T) {
 			// included
 			UserUUID: "foo", Value: 20, Consumption: 21,
 			BillDate: dt.Add(2 * 24 * time.Hour), CustomerID: "c1",
-			Scene: types.ScenePayOrder,
+			Scene: types.ScenePayOrder, ReasoningToken: 3,
 		},
 		{
 			// included
 			UserUUID: "foo", Value: 20, Consumption: 21,
 			BillDate: dt.Add(3 * 24 * time.Hour), CustomerID: "c2",
-			Scene: types.ScenePayOrder,
+			Scene: types.ScenePayOrder, ReasoningToken: 4,
 		},
 		{
 			// not included, scene
@@ -92,9 +92,12 @@ func TestAccountBillStore_List(t *testing.T) {
 	require.Equal(t, float64(31), res.Data[0].Consumption)
 	require.Equal(t, "c1", res.Data[0].InstanceName)
 	require.Equal(t, float64(28), res.Data[0].Value)
+	require.Equal(t, float64(6), res.Data[0].ReasoningToken)
 	require.Equal(t, float64(21), res.Data[1].Consumption)
 	require.Equal(t, "c2", res.Data[1].InstanceName)
 	require.Equal(t, float64(20), res.Data[1].Value)
+	require.Equal(t, float64(4), res.Data[1].ReasoningToken)
+	require.Equal(t, float64(10), res.TotalReasoningToken)
 
 }
 

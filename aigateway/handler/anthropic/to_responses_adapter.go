@@ -58,19 +58,20 @@ type toResponsesResponseWriter struct {
 	header        http.Header
 
 	// Stream state machine.
-	msgID          string
-	started        bool
-	nextBlockIdx   int
-	textBlockIdx   int
-	textStarted    bool
-	thinkingBlockIdx int
-	thinkingStarted  bool
-	toolCallStates map[string]*toResponsesToolCallState
-	inputTokens     int64
-	outputTokens    int64
-	cacheReadTokens int64
+	msgID               string
+	started             bool
+	nextBlockIdx        int
+	textBlockIdx        int
+	textStarted         bool
+	thinkingBlockIdx    int
+	thinkingStarted     bool
+	toolCallStates      map[string]*toResponsesToolCallState
+	inputTokens         int64
+	outputTokens        int64
+	cacheReadTokens     int64
 	cacheCreationTokens int64
-	stopReason      string
+	reasoningTokens     int64
+	stopReason          string
 
 	// Stream error tracking.
 	streamFailed    bool
@@ -314,6 +315,11 @@ func (w *toResponsesResponseWriter) Finalize() error {
 	w.outputTokens = int64(result.Usage.OutputTokens)
 	w.cacheReadTokens = int64(result.Usage.CacheReadInputTokens)
 	w.cacheCreationTokens = int64(result.Usage.CacheCreationInputTokens)
+	// The converted Messages usage has no reasoning field — read it from
+	// the upstream Responses usage directly.
+	if resp.Usage != nil && resp.Usage.OutputTokensDetails != nil {
+		w.reasoningTokens = resp.Usage.OutputTokensDetails.ReasoningTokens
+	}
 	// Feed the recorder with a ChatCompletion built from the Responses response.
 	if w.recorder != nil {
 		w.recorder.Completion(buildChatCompletionFromResponsesResponse(&resp, w.upstreamModel))
@@ -339,6 +345,7 @@ func (w *toResponsesResponseWriter) Usage() tokenUsage {
 		TotalTokens:               w.inputTokens + w.outputTokens,
 		CachedPromptTokens:        w.cacheReadTokens,
 		CacheCreationPromptTokens: w.cacheCreationTokens,
+		ReasoningTokens:           w.reasoningTokens,
 	}
 }
 
@@ -514,12 +521,15 @@ func (w *toResponsesResponseWriter) handleResponsesStreamEvent(eventType string,
 			Response struct {
 				Status string `json:"status"`
 				Usage  *struct {
-					InputTokens  int64 `json:"input_tokens"`
-					OutputTokens int64 `json:"output_tokens"`
+					InputTokens        int64 `json:"input_tokens"`
+					OutputTokens       int64 `json:"output_tokens"`
 					InputTokensDetails *struct {
 						CachedTokens         int64 `json:"cached_tokens"`
 						CachedCreationTokens int64 `json:"cached_creation_tokens"`
 					} `json:"input_tokens_details"`
+					OutputTokensDetails *struct {
+						ReasoningTokens int64 `json:"reasoning_tokens"`
+					} `json:"output_tokens_details"`
 				} `json:"usage"`
 			} `json:"response"`
 		}
@@ -530,6 +540,9 @@ func (w *toResponsesResponseWriter) handleResponsesStreamEvent(eventType string,
 				if event.Response.Usage.InputTokensDetails != nil {
 					w.cacheReadTokens = event.Response.Usage.InputTokensDetails.CachedTokens
 					w.cacheCreationTokens = event.Response.Usage.InputTokensDetails.CachedCreationTokens
+				}
+				if event.Response.Usage.OutputTokensDetails != nil {
+					w.reasoningTokens = event.Response.Usage.OutputTokensDetails.ReasoningTokens
 				}
 			}
 			w.stopReason = responsesStatusToStopReason(event.Response.Status)

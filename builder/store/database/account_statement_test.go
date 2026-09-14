@@ -3,6 +3,7 @@ package database_test
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"sync"
 	"testing"
 	"time"
@@ -142,6 +143,55 @@ func TestAccountStatementStore_CreateSimple(t *testing.T) {
 
 		})
 	}
+}
+
+func TestAccountStatementStore_Create_BillUpsertReasoningToken(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	au := &database.AccountUser{
+		UserUUID:    "foo-bill-reasoning",
+		Balance:     100,
+		CashBalance: 100,
+	}
+	_, err := db.Core.NewInsert().Model(au).Exec(ctx)
+	require.Nil(t, err)
+
+	// SceneSpace triggers voucher deduction which requires a valid ResourceID and SpaceResource with XPU model
+	sr := &database.SpaceResource{
+		Name:      "test-resource",
+		Resources: `{"gpu": {"num": "1", "type": "A10"}}`,
+		ClusterID: "test-cluster",
+	}
+	_, err = db.Core.NewInsert().Model(sr).Exec(ctx, sr)
+	require.Nil(t, err)
+
+	store := database.NewAccountStatementStoreWithDB(db)
+	eventDate := time.Date(2024, 6, 15, 0, 0, 0, 0, time.UTC)
+	for _, reasoning := range []float64{30, 20} {
+		err = store.Create(ctx, database.AccountStatement{
+			EventUUID:       uuid.New(),
+			UserUUID:        "foo-bill-reasoning",
+			Scene:           types.SceneSpace,
+			Value:           -10,
+			EventDate:       eventDate,
+			Consumption:     100,
+			PromptToken:     100,
+			CompletionToken: 50,
+			ReasoningToken:  reasoning,
+			ResourceID:      strconv.FormatInt(sr.ID, 10),
+			CustomerID:      "svc-reasoning",
+		}, types.AcctStatementExtra{})
+		require.Nil(t, err)
+	}
+
+	bill := &database.AccountBill{}
+	err = db.Core.NewSelect().Model(bill).Where("user_uuid=?", "foo-bill-reasoning").Scan(ctx)
+	require.Nil(t, err)
+	require.Equal(t, float64(200), bill.PromptToken)
+	require.Equal(t, float64(100), bill.CompletionToken)
+	require.Equal(t, float64(50), bill.ReasoningToken)
 }
 
 func TestAccountStatementStore_DeductAccountFee(t *testing.T) {

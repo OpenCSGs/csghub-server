@@ -85,6 +85,7 @@ func (am *accountMeteringStoreImpl) Create(ctx context.Context, input AccountMet
 			PromptToken:       extra.PromptToken,
 			PromptCachedToken: extra.PromptCachedToken,
 			CompletionToken:   extra.CompletionToken,
+			ReasoningToken:    extra.ReasoningToken,
 			Count:             1,
 			TokenID:           extra.TokenID,
 			DataType:          extra.DataType,
@@ -98,6 +99,7 @@ func (am *accountMeteringStoreImpl) Create(ctx context.Context, input AccountMet
 			Set("prompt_token = account_statistics.prompt_token + ?", extra.PromptToken).
 			Set("prompt_cached_token = account_statistics.prompt_cached_token + ?", extra.PromptCachedToken).
 			Set("completion_token = account_statistics.completion_token + ?", extra.CompletionToken).
+			Set("reasoning_token = account_statistics.reasoning_token + ?", extra.ReasoningToken).
 			Set("duration = account_statistics.duration + ?", extra.Duration).
 			Set("count = account_statistics.count + ?", 1).
 			Set("updated_at = current_timestamp").

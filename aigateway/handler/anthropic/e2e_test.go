@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"opencsg.com/csghub-server/aigateway/handler/plan"
 	"opencsg.com/csghub-server/aigateway/handler/protocol"
+	"opencsg.com/csghub-server/aigateway/token"
 	"opencsg.com/csghub-server/aigateway/types"
 	commonType "opencsg.com/csghub-server/common/types"
 )
@@ -127,30 +128,32 @@ func (f *fakeProxyExecutor) ServeProxy(c *gin.Context, backendURL, host string, 
 }
 
 type fakeUsageRecorder struct {
-	recorded               bool
-	inputTokens            int64
-	outputTokens           int64
-	cachedPromptTokens     int64
-	cacheCreationTokens    int64
-	targetModelName        string
+	recorded            bool
+	inputTokens         int64
+	outputTokens        int64
+	cachedPromptTokens  int64
+	cacheCreationTokens int64
+	reasoningTokens     int64
+	targetModelName     string
 }
 
-func (f *fakeUsageRecorder) RecordUsage(ctx context.Context, nsUUID string, model *types.Model, targetModelName string, inputTokens, outputTokens, cachedPromptTokens, cacheCreationPromptTokens int64, apikey string) error {
+func (f *fakeUsageRecorder) RecordUsage(ctx context.Context, nsUUID string, model *types.Model, targetModelName string, usage *token.Usage, apikey string) error {
 	f.recorded = true
-	f.inputTokens = inputTokens
-	f.outputTokens = outputTokens
-	f.cachedPromptTokens = cachedPromptTokens
-	f.cacheCreationTokens = cacheCreationPromptTokens
+	f.inputTokens = usage.PromptTokens
+	f.outputTokens = usage.CompletionTokens
+	f.cachedPromptTokens = usage.CachedPromptTokens
+	f.cacheCreationTokens = usage.CacheCreationPromptTokens
+	f.reasoningTokens = usage.ReasoningTokens
 	f.targetModelName = targetModelName
 	return nil
 }
 
 type fakeUsageLimiter struct {
-	committed            bool
-	inputTokens          int64
-	outputTokens         int64
-	cachedPromptTokens   int64
-	cacheCreationTokens  int64
+	committed           bool
+	inputTokens         int64
+	outputTokens        int64
+	cachedPromptTokens  int64
+	cacheCreationTokens int64
 }
 
 func (f *fakeUsageLimiter) CommitUsageLimitFromUsage(ctx context.Context, nsUUID string, model *types.Model, inputTokens, outputTokens, cachedPromptTokens, cacheCreationPromptTokens int64) error {
@@ -163,10 +166,10 @@ func (f *fakeUsageLimiter) CommitUsageLimitFromUsage(ctx context.Context, nsUUID
 }
 
 type fakeMetricsRecorder struct {
-	usageRecorded       bool
-	inputTokens         int64
-	outputTokens        int64
-	cachedPromptTokens  int64
+	usageRecorded      bool
+	inputTokens        int64
+	outputTokens       int64
+	cachedPromptTokens int64
 }
 
 func (f *fakeMetricsRecorder) RecordTokenUsage(c *gin.Context, inputTokens, outputTokens, cachedPromptTokens int64) {
@@ -1181,6 +1184,9 @@ func TestE2E_Billing_TokensRecorded_Native_NonStream(t *testing.T) {
 	assert.Equal(t, int64(5), recorder.outputTokens)
 	assert.Equal(t, int64(3), recorder.cachedPromptTokens)
 	assert.Equal(t, int64(2), recorder.cacheCreationTokens)
+	// Native Anthropic usage has no reasoning field; it stays 0 even when
+	// the model produced thinking blocks.
+	assert.Equal(t, int64(0), recorder.reasoningTokens)
 
 	assert.Equal(t, int64(10), limiter.inputTokens)
 	assert.Equal(t, int64(5), limiter.outputTokens)
@@ -1252,7 +1258,8 @@ func TestE2E_Billing_TokensRecorded_ToChat_NonStream(t *testing.T) {
 				"prompt_tokens": 10,
 				"completion_tokens": 8,
 				"total_tokens": 18,
-				"prompt_tokens_details": {"cached_tokens": 3}
+				"prompt_tokens_details": {"cached_tokens": 3},
+				"completion_tokens_details": {"reasoning_tokens": 4}
 			}
 		}`)
 	}))
@@ -1272,6 +1279,7 @@ func TestE2E_Billing_TokensRecorded_ToChat_NonStream(t *testing.T) {
 	assert.Equal(t, int64(10), recorder.inputTokens)
 	assert.Equal(t, int64(8), recorder.outputTokens)
 	assert.Equal(t, int64(3), recorder.cachedPromptTokens)
+	assert.Equal(t, int64(4), recorder.reasoningTokens)
 	// Chat adapter doesn't track cache creation tokens.
 	assert.Equal(t, int64(0), recorder.cacheCreationTokens)
 
@@ -1285,7 +1293,7 @@ func TestE2E_Billing_TokensRecorded_ToChat_Stream(t *testing.T) {
 		flusher := w.(http.Flusher)
 		chunks := []string{
 			`data: {"id":"1","object":"chat.completion.chunk","model":"test","choices":[{"index":0,"delta":{"role":"assistant","content":"Hi"},"finish_reason":null}]}`,
-			`data: {"id":"1","object":"chat.completion.chunk","model":"test","choices":[{"index":0,"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":10,"completion_tokens":3,"total_tokens":13,"prompt_tokens_details":{"cached_tokens":5}}}`,
+			`data: {"id":"1","object":"chat.completion.chunk","model":"test","choices":[{"index":0,"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":10,"completion_tokens":3,"total_tokens":13,"prompt_tokens_details":{"cached_tokens":5},"completion_tokens_details":{"reasoning_tokens":2}}}`,
 			`data: [DONE]`,
 		}
 		for _, chunk := range chunks {
@@ -1310,6 +1318,7 @@ func TestE2E_Billing_TokensRecorded_ToChat_Stream(t *testing.T) {
 	assert.Equal(t, int64(10), recorder.inputTokens)
 	assert.Equal(t, int64(3), recorder.outputTokens)
 	assert.Equal(t, int64(5), recorder.cachedPromptTokens)
+	assert.Equal(t, int64(2), recorder.reasoningTokens)
 
 	assert.Equal(t, int64(5), limiter.cachedPromptTokens)
 }
@@ -1336,6 +1345,9 @@ func TestE2E_Billing_TokensRecorded_ToResponses_NonStream(t *testing.T) {
 				"input_tokens_details": {
 					"cached_tokens": 3,
 					"cached_creation_tokens": 2
+				},
+				"output_tokens_details": {
+					"reasoning_tokens": 5
 				}
 			}
 		}`)
@@ -1357,6 +1369,7 @@ func TestE2E_Billing_TokensRecorded_ToResponses_NonStream(t *testing.T) {
 	assert.Equal(t, int64(7), recorder.outputTokens)
 	assert.Equal(t, int64(3), recorder.cachedPromptTokens)
 	assert.Equal(t, int64(2), recorder.cacheCreationTokens)
+	assert.Equal(t, int64(5), recorder.reasoningTokens)
 
 	assert.Equal(t, int64(3), limiter.cachedPromptTokens)
 	assert.Equal(t, int64(2), limiter.cacheCreationTokens)
@@ -1370,7 +1383,7 @@ func TestE2E_Billing_TokensRecorded_ToResponses_Stream(t *testing.T) {
 		events := []string{
 			`event: response.created\ndata: {"type":"response.created","response":{"id":"resp_1","status":"in_progress","model":"test"}}`,
 			`event: response.output_text.delta\ndata: {"type":"response.output_text.delta","delta":"Hello"}`,
-			`event: response.completed\ndata: {"type":"response.completed","response":{"id":"resp_1","status":"completed","model":"test","usage":{"input_tokens":10,"output_tokens":2,"input_tokens_details":{"cached_tokens":6,"cached_creation_tokens":1}}}}`,
+			`event: response.completed\ndata: {"type":"response.completed","response":{"id":"resp_1","status":"completed","model":"test","usage":{"input_tokens":10,"output_tokens":2,"input_tokens_details":{"cached_tokens":6,"cached_creation_tokens":1},"output_tokens_details":{"reasoning_tokens":3}}}}`,
 		}
 		for _, e := range events {
 			e = strings.ReplaceAll(e, `\n`, "\n")
@@ -1396,6 +1409,7 @@ func TestE2E_Billing_TokensRecorded_ToResponses_Stream(t *testing.T) {
 	assert.Equal(t, int64(2), recorder.outputTokens)
 	assert.Equal(t, int64(6), recorder.cachedPromptTokens)
 	assert.Equal(t, int64(1), recorder.cacheCreationTokens)
+	assert.Equal(t, int64(3), recorder.reasoningTokens)
 
 	assert.Equal(t, int64(6), limiter.cachedPromptTokens)
 	assert.Equal(t, int64(1), limiter.cacheCreationTokens)

@@ -35,6 +35,48 @@ func TestAccountMeteringStore_Create(t *testing.T) {
 	require.Equal(t, "abc", amn.ResourceName)
 }
 
+func TestAccountMeteringStore_Create_UpsertStatisticsReasoningToken(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewAccountMeteringStoreWithDB(db)
+	eventDate := time.Date(2024, 6, 15, 0, 0, 0, 0, time.UTC)
+	extra := types.MeteringExtra{
+		EventDate:         eventDate,
+		PromptToken:       100,
+		PromptCachedToken: 10,
+		CompletionToken:   50,
+		ReasoningToken:    30,
+	}
+	am := database.AccountMetering{
+		EventUUID:    uuid.New(),
+		UserUUID:     "bar-reasoning",
+		Value:        150,
+		ValueType:    1,
+		ResourceName: "reasoning-model",
+	}
+	err := store.Create(ctx, am, extra)
+	require.Nil(t, err)
+
+	// Second event with the same statistics conflict key must accumulate.
+	extra.ReasoningToken = 20
+	am.EventUUID = uuid.New()
+	err = store.Create(ctx, am, extra)
+	require.Nil(t, err)
+
+	stat := &database.AccountStatistics{}
+	err = db.Core.NewSelect().Model(stat).
+		Where("user_uuid = ?", "bar-reasoning").
+		Where("event_date = ?", eventDate).
+		Scan(ctx)
+	require.Nil(t, err)
+	require.Equal(t, float64(200), stat.PromptToken)
+	require.Equal(t, float64(100), stat.CompletionToken)
+	require.Equal(t, float64(50), stat.ReasoningToken)
+	require.Equal(t, float64(2), stat.Count)
+}
+
 func TestAccountMeteringStore_ListByUserIDAndTime(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()

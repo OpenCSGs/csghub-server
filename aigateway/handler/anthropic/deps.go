@@ -9,6 +9,7 @@ import (
 	"github.com/openai/openai-go/v3"
 	"github.com/openai/openai-go/v3/packages/param"
 	"github.com/openai/openai-go/v3/shared"
+	"opencsg.com/csghub-server/aigateway/token"
 	"opencsg.com/csghub-server/aigateway/types"
 	commontypes "opencsg.com/csghub-server/common/types"
 )
@@ -49,7 +50,7 @@ type ProxyExecutor interface {
 
 // UsageRecorder records token usage for billing/metering.
 type UsageRecorder interface {
-	RecordUsage(ctx context.Context, nsUUID string, model *types.Model, targetModelName string, inputTokens, outputTokens, cachedPromptTokens, cacheCreationPromptTokens int64, apikey string) error
+	RecordUsage(ctx context.Context, nsUUID string, model *types.Model, targetModelName string, usage *token.Usage, apikey string) error
 }
 
 // UsageLimiter commits usage quota limits after the upstream response.
@@ -136,6 +137,22 @@ type tokenUsage struct {
 	TotalTokens               int64
 	CachedPromptTokens        int64
 	CacheCreationPromptTokens int64
+	// ReasoningTokens is display-only: already included in CompletionTokens.
+	ReasoningTokens int64
+}
+
+func (u *tokenUsage) toUsage() *token.Usage {
+	if u == nil {
+		return nil
+	}
+	return &token.Usage{
+		PromptTokens:              u.PromptTokens,
+		CompletionTokens:          u.CompletionTokens,
+		TotalTokens:               u.TotalTokens,
+		CachedPromptTokens:        u.CachedPromptTokens,
+		CacheCreationPromptTokens: u.CacheCreationPromptTokens,
+		ReasoningTokens:           u.ReasoningTokens,
+	}
 }
 
 // anthropicRequestToLLMLogRequest converts an AnthropicMessagesRequest into

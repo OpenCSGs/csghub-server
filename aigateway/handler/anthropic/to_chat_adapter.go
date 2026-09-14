@@ -115,12 +115,12 @@ func messagesToChatRequest(req *types.AnthropicMessagesRequest, modelName string
 // toChatResponseWriter converts Chat Completions responses (stream and
 // non-stream) to Anthropic Messages format on the fly.
 type toChatResponseWriter struct {
-	ginWriter    gin.ResponseWriter
-	stream       bool
-	publicModel  string // the model name the client sees
+	ginWriter     gin.ResponseWriter
+	stream        bool
+	publicModel   string // the model name the client sees
 	upstreamModel string
-	recorder     LLMLogRecorder
-	decoder      streamdecoder.Decoder
+	recorder      LLMLogRecorder
+	decoder       streamdecoder.Decoder
 
 	// Non-stream buffering.
 	bodyBuf       bytes.Buffer
@@ -129,19 +129,20 @@ type toChatResponseWriter struct {
 	header        http.Header
 
 	// Stream state machine.
-	msgID          string
-	started        bool
-	textBlockIdx   int
-	textStarted    bool
-	textDone       bool
+	msgID            string
+	started          bool
+	textBlockIdx     int
+	textStarted      bool
+	textDone         bool
 	thinkingBlockIdx int
 	thinkingStarted  bool
-	toolCallStates map[int]*toChatToolCallState
-	nextBlockIdx   int
-	inputTokens    int64
-	outputTokens   int64
-	cacheReadTokens int64
-	stopReason     string
+	toolCallStates   map[int]*toChatToolCallState
+	nextBlockIdx     int
+	inputTokens      int64
+	outputTokens     int64
+	cacheReadTokens  int64
+	reasoningTokens  int64
+	stopReason       string
 
 	// Stream error tracking.
 	streamFailed    bool
@@ -294,24 +295,24 @@ func (w *toChatResponseWriter) Finalize() error {
 					"type": "content_block_stop", "index": w.textBlockIdx,
 				})
 			}
-// Close any open tool call blocks in deterministic order.
-				// toolCallStates is a map — iteration order is random.
-				// Sort by blockIdx so content_block_stop events are emitted
-				// in the same order as content_block_start events.
-				var sortedToolCalls []*toChatToolCallState
-				for _, tc := range w.toolCallStates {
-					if tc.started {
-						sortedToolCalls = append(sortedToolCalls, tc)
-					}
+			// Close any open tool call blocks in deterministic order.
+			// toolCallStates is a map — iteration order is random.
+			// Sort by blockIdx so content_block_stop events are emitted
+			// in the same order as content_block_start events.
+			var sortedToolCalls []*toChatToolCallState
+			for _, tc := range w.toolCallStates {
+				if tc.started {
+					sortedToolCalls = append(sortedToolCalls, tc)
 				}
-				sort.Slice(sortedToolCalls, func(i, j int) bool {
-					return sortedToolCalls[i].blockIdx < sortedToolCalls[j].blockIdx
+			}
+			sort.Slice(sortedToolCalls, func(i, j int) bool {
+				return sortedToolCalls[i].blockIdx < sortedToolCalls[j].blockIdx
+			})
+			for _, tc := range sortedToolCalls {
+				writeSSEEventRaw(w.ginWriter, "content_block_stop", map[string]any{
+					"type": "content_block_stop", "index": tc.blockIdx,
 				})
-				for _, tc := range sortedToolCalls {
-					writeSSEEventRaw(w.ginWriter, "content_block_stop", map[string]any{
-						"type": "content_block_stop", "index": tc.blockIdx,
-					})
-				}
+			}
 			// message_delta with stop_reason and usage.
 			usageMap := map[string]any{
 				"input_tokens":  w.inputTokens,
@@ -367,10 +368,13 @@ func (w *toChatResponseWriter) Finalize() error {
 	w.inputTokens = int64(resp.Usage.InputTokens)
 	w.outputTokens = int64(resp.Usage.OutputTokens)
 	w.cacheReadTokens = int64(resp.Usage.CacheReadInputTokens)
-	// Feed the recorder with the full ChatCompletion before conversion.
-	if w.recorder != nil {
-		var chatResp types.ChatCompletion
-		if jsonErr := json.Unmarshal(w.bodyBuf.Bytes(), &chatResp); jsonErr == nil {
+	// The converted Messages usage has no reasoning field — read it from
+	// the upstream Chat body directly.
+	var chatResp types.ChatCompletion
+	if jsonErr := json.Unmarshal(w.bodyBuf.Bytes(), &chatResp); jsonErr == nil {
+		w.reasoningTokens = chatResp.Usage.CompletionTokensDetails.ReasoningTokens
+		// Feed the recorder with the full ChatCompletion before conversion.
+		if w.recorder != nil {
 			w.recorder.Completion(chatResp)
 		}
 	}
@@ -395,6 +399,7 @@ func (w *toChatResponseWriter) Usage() tokenUsage {
 		TotalTokens:               w.inputTokens + w.outputTokens,
 		CachedPromptTokens:        w.cacheReadTokens,
 		CacheCreationPromptTokens: 0,
+		ReasoningTokens:           w.reasoningTokens,
 	}
 }
 
@@ -408,13 +413,7 @@ func (w *toChatResponseWriter) handleChatStreamChunk(data []byte) {
 			Delta        map[string]interface{} `json:"delta"`
 			FinishReason *string                `json:"finish_reason"`
 		} `json:"choices"`
-		Usage *struct {
-			PromptTokens     int64 `json:"prompt_tokens"`
-			CompletionTokens int64 `json:"completion_tokens"`
-			PromptTokensDetails *struct {
-				CachedTokens int64 `json:"cached_tokens"`
-			} `json:"prompt_tokens_details"`
-		} `json:"usage"`
+		Usage *chatStreamUsage `json:"usage"`
 	}
 	if err := json.Unmarshal(data, &chunk); err != nil {
 		slog.Debug("chat stream chunk parse error", slog.String("error", err.Error()), slog.String("data", string(data)))
@@ -432,14 +431,14 @@ func (w *toChatResponseWriter) handleChatStreamChunk(data []byte) {
 		writeSSEEventRaw(w.ginWriter, "message_start", map[string]any{
 			"type": "message_start",
 			"message": map[string]any{
-				"id":    w.msgID,
-				"type":  "message",
-				"role":  "assistant",
-				"model": w.publicModel,
-				"content": []any{},
+				"id":            w.msgID,
+				"type":          "message",
+				"role":          "assistant",
+				"model":         w.publicModel,
+				"content":       []any{},
 				"stop_reason":   nil,
 				"stop_sequence": nil,
-				"usage": map[string]any{"input_tokens": 0, "output_tokens": 0},
+				"usage":         map[string]any{"input_tokens": 0, "output_tokens": 0},
 			},
 		})
 	}
@@ -450,6 +449,9 @@ func (w *toChatResponseWriter) handleChatStreamChunk(data []byte) {
 		w.outputTokens = chunk.Usage.CompletionTokens
 		if chunk.Usage.PromptTokensDetails != nil {
 			w.cacheReadTokens = chunk.Usage.PromptTokensDetails.CachedTokens
+		}
+		if chunk.Usage.CompletionTokensDetails != nil {
+			w.reasoningTokens = chunk.Usage.CompletionTokensDetails.ReasoningTokens
 		}
 	}
 
@@ -476,8 +478,8 @@ func (w *toChatResponseWriter) handleChatStreamChunk(data []byte) {
 			w.textBlockIdx = w.nextBlockIdx
 			w.nextBlockIdx++
 			writeSSEEventRaw(w.ginWriter, "content_block_start", map[string]any{
-				"type":  "content_block_start",
-				"index": w.textBlockIdx,
+				"type":          "content_block_start",
+				"index":         w.textBlockIdx,
 				"content_block": map[string]any{"type": "text", "text": ""},
 			})
 		}
@@ -538,9 +540,9 @@ func (w *toChatResponseWriter) handleChatStreamChunk(data []byte) {
 					"type":  "content_block_start",
 					"index": state.blockIdx,
 					"content_block": map[string]any{
-						"type": "tool_use",
-						"id":   state.id,
-						"name": state.name,
+						"type":  "tool_use",
+						"id":    state.id,
+						"name":  state.name,
 						"input": map[string]any{},
 					},
 				})
@@ -558,19 +560,25 @@ func (w *toChatResponseWriter) handleChatStreamChunk(data []byte) {
 	}
 }
 
+// chatStreamUsage is the usage payload of a Chat SSE chunk.
+type chatStreamUsage struct {
+	PromptTokens        int64 `json:"prompt_tokens"`
+	CompletionTokens    int64 `json:"completion_tokens"`
+	PromptTokensDetails *struct {
+		CachedTokens int64 `json:"cached_tokens"`
+	} `json:"prompt_tokens_details"`
+	CompletionTokensDetails *struct {
+		ReasoningTokens int64 `json:"reasoning_tokens"`
+	} `json:"completion_tokens_details"`
+}
+
 // buildChunkFromChatStreamData constructs a types.ChatCompletionChunk from
 // the loosely-typed parsed SSE data for the LLM log recorder.
 func buildChunkFromChatStreamData(id string, choices []struct {
 	Index        int                    `json:"index"`
 	Delta        map[string]interface{} `json:"delta"`
 	FinishReason *string                `json:"finish_reason"`
-}, usage *struct {
-	PromptTokens     int64 `json:"prompt_tokens"`
-	CompletionTokens int64 `json:"completion_tokens"`
-	PromptTokensDetails *struct {
-		CachedTokens int64 `json:"cached_tokens"`
-	} `json:"prompt_tokens_details"`
-}) types.ChatCompletionChunk {
+}, usage *chatStreamUsage) types.ChatCompletionChunk {
 	c := types.ChatCompletionChunk{
 		ID: id,
 	}

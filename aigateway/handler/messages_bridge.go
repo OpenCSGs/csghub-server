@@ -7,12 +7,12 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/aigateway/component"
-	"opencsg.com/csghub-server/aigateway/handler/anthropic"
 	llmtrace "opencsg.com/csghub-server/aigateway/component/trace"
+	"opencsg.com/csghub-server/aigateway/handler/anthropic"
 	"opencsg.com/csghub-server/aigateway/token"
 	"opencsg.com/csghub-server/aigateway/types"
-	commontypes "opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/builder/proxy"
+	commontypes "opencsg.com/csghub-server/common/types"
 )
 
 // messagesHandlerBridge adapts OpenAIHandlerImpl to the anthropic.Handler
@@ -76,14 +76,7 @@ func (b *messagesHandlerBridge) ServeProxy(c *gin.Context, backendURL, host stri
 
 // --- UsageRecorder ---
 
-func (b *messagesHandlerBridge) RecordUsage(ctx context.Context, nsUUID string, model *types.Model, targetModelName string, inputTokens, outputTokens, cachedPromptTokens, cacheCreationPromptTokens int64, apikey string) error {
-	usage := &token.Usage{
-		PromptTokens:              inputTokens,
-		CompletionTokens:          outputTokens,
-		TotalTokens:               inputTokens + outputTokens,
-		CachedPromptTokens:        cachedPromptTokens,
-		CacheCreationPromptTokens: cacheCreationPromptTokens,
-	}
+func (b *messagesHandlerBridge) RecordUsage(ctx context.Context, nsUUID string, model *types.Model, targetModelName string, usage *token.Usage, apikey string) error {
 	return b.handler.openaiComponent.RecordUsageFromTokenUsage(ctx, nsUUID, model, targetModelName, usage, apikey)
 }
 

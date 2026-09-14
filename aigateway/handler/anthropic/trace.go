@@ -104,6 +104,7 @@ func recordMessagesTraceCompletion(input tracePostProcessInput, model *types.Mod
 			TotalTokens:           usage.TotalTokens,
 			CacheReadInputTokens:  usage.CachedPromptTokens,
 			CacheWriteInputTokens: usage.CacheCreationPromptTokens,
+			ReasoningTokens:       usage.ReasoningTokens,
 		})
 	}
 }
