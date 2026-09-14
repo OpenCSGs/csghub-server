@@ -589,6 +589,20 @@ type Config struct {
 			Limit  int64 `env:"OPENCSG_AIGATEWAY_MODAL_API_RATE_LIMITER_LIMIT" default:"2"`
 			Window int64 `env:"OPENCSG_AIGATEWAY_MODAL_API_RATE_LIMITER_WINDOW" default:"60"`
 		}
+		// CapacityPolicyDefaults supplies fallback limits for per-upstream
+		// CapacityPolicy. When an admin enables CapacityPolicy on an upstream
+		// but leaves every limit unset (all zeros), the gateway applies these
+		// defaults wholesale on every read of upstream configs (not once at
+		// load time; the defaults themselves are read from the config when
+		// the gateway component is constructed). A default of <= 0 keeps
+		// "no limit" for that dimension.
+		CapacityPolicyDefaults struct {
+			MaxConcurrency   int   `env:"OPENCSG_AIGATEWAY_CAPACITY_POLICY_DEFAULT_MAX_CONCURRENCY" default:"32"`
+			MaxQueueDepth    int   `env:"OPENCSG_AIGATEWAY_CAPACITY_POLICY_DEFAULT_MAX_QUEUE_DEPTH" default:"16"`
+			MaxTPM           int64 `env:"OPENCSG_AIGATEWAY_CAPACITY_POLICY_DEFAULT_MAX_TPM" default:"10000000"`
+			MaxRPM           int   `env:"OPENCSG_AIGATEWAY_CAPACITY_POLICY_DEFAULT_MAX_RPM" default:"100"`
+			QueueWaitSeconds int   `env:"OPENCSG_AIGATEWAY_CAPACITY_POLICY_DEFAULT_QUEUE_WAIT_SECONDS" default:"60"`
+		}
 		MetricsCollectorLookbackMinutes int `env:"OPENCSG_AIGATEWAY_METRICS_COLLECTOR_LOOKBACK_MINUTES" default:"60"`
 
 		Metrics struct {
@@ -759,7 +773,7 @@ type Config struct {
 		// deletes a sandbox's PVC subPath directory when the sandbox is deleted.
 		// Only requirement: a POSIX shell + rm. Default points to the internal
 		// registry so offline clusters don't depend on Docker Hub.
-		ReclaimImage            string   `env:"STARHUB_SERVER_RUNNER_RECLAIM_IMAGE" default:"opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/busybox:1.36"`
+		ReclaimImage string `env:"STARHUB_SERVER_RUNNER_RECLAIM_IMAGE" default:"opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/busybox:1.36"`
 		// csghub server webhook endpoint
 		WebHookEndpoint    string `env:"STARHUB_SERVER_RUNNER_WEBHOOK_ENDPOINT" default:"http://localhost:8080"`
 		WatchConfigmapName string `env:"STARHUB_SERVER_RUNNER_WATCH_CONFIGMAP_NAME" default:"spaces-runner-config"`
