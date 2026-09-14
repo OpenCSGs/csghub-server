@@ -84,6 +84,7 @@ type AccountStatement struct {
 	PromptToken       float64               `json:"prompt_token"`
 	PromptCachedToken float64               `json:"prompt_cached_token"`
 	CompletionToken   float64               `json:"completion_token"`
+	ReasoningToken    float64               `json:"reasoning_token"`
 	APIKey            string                `bun:",notnull,default:''" json:"api_key"`
 	TokenID           int64                 `bun:",notnull,default:0" json:"token_id"`
 	Purpose           types.RechargePurpose `bun:",nullzero" json:"purpose"`
@@ -687,6 +688,7 @@ func updateFeeBill(ctx context.Context, tx bun.Tx, input AccountStatement, billV
 			PromptToken:       input.PromptToken,
 			PromptCachedToken: input.PromptCachedToken,
 			CompletionToken:   input.CompletionToken,
+			ReasoningToken:    input.ReasoningToken,
 			Count:             1,
 			TokenID:           input.TokenID,
 			DataType:          input.DataType,
@@ -710,6 +712,7 @@ func updateFeeBill(ctx context.Context, tx bun.Tx, input AccountStatement, billV
 			Set("prompt_token = account_bill.prompt_token + ?", input.PromptToken).
 			Set("prompt_cached_token = account_bill.prompt_cached_token + ?", input.PromptCachedToken).
 			Set("completion_token = account_bill.completion_token + ?", input.CompletionToken).
+			Set("reasoning_token = account_bill.reasoning_token + ?", input.ReasoningToken).
 			Set("duration = account_bill.duration + ?", input.Duration).
 			Set("count = account_bill.count + ?", 1).
 			Set("voucher_value = account_bill.voucher_value + ?", billValues.VoucherValue).

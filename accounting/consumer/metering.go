@@ -155,6 +155,21 @@ func (m *MeteringImpl) handleMsgData(ctx context.Context, raw []byte) (*types.Me
 		return nil, fmt.Errorf("metering consumer prompt token cache num %d is greater than prompt token num %d", promptTokenCachedNum, promptNum)
 	}
 
+	reasoningTokenNum := int64(0)
+	reasoningTokenNumStr, reasoningTokenOK := extraMap[types.ReasoningTokenNum]
+	if reasoningTokenOK {
+		var parseErr error
+		reasoningTokenNum, parseErr = strconv.ParseInt(strings.TrimSpace(reasoningTokenNumStr), 10, 64)
+		if parseErr != nil || reasoningTokenNum < 0 {
+			return nil, fmt.Errorf("metering consumer convert reasoning token num %s to int64 error %w", reasoningTokenNumStr, parseErr)
+		}
+	}
+	if reasoningTokenNum > completionNum {
+		slog.WarnContext(ctx, "metering consumer reasoning token num exceeds completion token num",
+			slog.Int64("reasoning_token_num", reasoningTokenNum),
+			slog.Int64("completion_token_num", completionNum))
+	}
+
 	duration := float64(0)
 	durationStr, ok := extraMap[types.CompletionDuration]
 	if ok && len(strings.TrimSpace(durationStr)) > 0 {
@@ -170,6 +185,7 @@ func (m *MeteringImpl) handleMsgData(ctx context.Context, raw []byte) (*types.Me
 		PromptToken:       float64(promptNum),
 		PromptCachedToken: float64(promptTokenCachedNum),
 		CompletionToken:   float64(completionNum),
+		ReasoningToken:    float64(reasoningTokenNum),
 		DataType:          extraMap[types.CompletionDataType],
 		Resolution:        extraMap[types.CompletionResolution],
 		Duration:          duration,

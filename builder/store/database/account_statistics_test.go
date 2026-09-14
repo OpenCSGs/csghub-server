@@ -22,22 +22,22 @@ func TestAccountStatisticsStore_SummaryByUserIDAndDate(t *testing.T) {
 		{
 			UserUUID: "user1", Scene: types.SceneModelInference, CustomerID: "c1",
 			EventDate: dt, Consumption: 10, PromptToken: 100, PromptCachedToken: 20,
-			CompletionToken: 50, Count: 5, Duration: 30,
+			CompletionToken: 50, ReasoningToken: 10, Count: 5, Duration: 30,
 		},
 		{
 			UserUUID: "user1", Scene: types.SceneModelInference, CustomerID: "c2",
 			EventDate: dt.Add(1 * 24 * time.Hour), Consumption: 20, PromptToken: 200,
-			PromptCachedToken: 40, CompletionToken: 100, Count: 10, Duration: 60,
+			PromptCachedToken: 40, CompletionToken: 100, ReasoningToken: 20, Count: 10, Duration: 60,
 		},
 		{
 			UserUUID: "user1", Scene: types.SceneSpace, CustomerID: "c3",
 			EventDate: dt, Consumption: 5, PromptToken: 0, PromptCachedToken: 0,
-			CompletionToken: 0, Count: 2, Duration: 15,
+			CompletionToken: 0, ReasoningToken: 0, Count: 2, Duration: 15,
 		},
 		{
 			UserUUID: "user2", Scene: types.SceneModelInference, CustomerID: "c4",
 			EventDate: dt, Consumption: 99, PromptToken: 999, PromptCachedToken: 999,
-			CompletionToken: 999, Count: 999, Duration: 999,
+			CompletionToken: 999, ReasoningToken: 99, Count: 999, Duration: 999,
 		},
 	}
 
@@ -65,6 +65,7 @@ func TestAccountStatisticsStore_SummaryByUserIDAndDate(t *testing.T) {
 		require.Equal(t, float64(300), inferenceSummary.TotalPromptToken)
 		require.Equal(t, float64(60), inferenceSummary.TotalPromptCachedToken)
 		require.Equal(t, float64(150), inferenceSummary.TotalCompletionToken)
+		require.Equal(t, float64(30), inferenceSummary.TotalReasoningToken)
 		require.Equal(t, float64(15), inferenceSummary.TotalCount)
 		require.Equal(t, float64(90), inferenceSummary.TotalDuration)
 
@@ -90,6 +91,7 @@ func TestAccountStatisticsStore_SummaryByUserIDAndDate(t *testing.T) {
 		require.Equal(t, float64(300), res.Data[0].TotalPromptToken)
 		require.Equal(t, float64(60), res.Data[0].TotalPromptCachedToken)
 		require.Equal(t, float64(150), res.Data[0].TotalCompletionToken)
+		require.Equal(t, float64(30), res.Data[0].TotalReasoningToken)
 		require.Equal(t, float64(15), res.Data[0].TotalCount)
 		require.Equal(t, float64(90), res.Data[0].TotalDuration)
 	})
@@ -128,11 +130,11 @@ func TestAccountStatisticsStore_ListByUserIDAndDate(t *testing.T) {
 	stats := []database.AccountStatistics{
 		{
 			UserUUID: "foo", Scene: types.SceneModelInference, CustomerID: "c1",
-			EventDate: dt, Consumption: 10, PromptToken: 100, CompletionToken: 50,
+			EventDate: dt, Consumption: 10, PromptToken: 100, CompletionToken: 50, ReasoningToken: 10,
 		},
 		{
 			UserUUID: "foo", Scene: types.SceneModelInference, CustomerID: "c2",
-			EventDate: dt.Add(1 * 24 * time.Hour), Consumption: 20, PromptToken: 200, CompletionToken: 100,
+			EventDate: dt.Add(1 * 24 * time.Hour), Consumption: 20, PromptToken: 200, CompletionToken: 100, ReasoningToken: 20,
 		},
 		{
 			UserUUID: "foo", Scene: types.SceneSpace, CustomerID: "c3",
@@ -160,6 +162,9 @@ func TestAccountStatisticsStore_ListByUserIDAndDate(t *testing.T) {
 		require.Equal(t, float64(30), res.TotalConsumption)
 		require.Equal(t, float64(300), res.TotalPromptToken)
 		require.Equal(t, float64(150), res.TotalCompletionToken)
+		require.Equal(t, float64(30), res.TotalReasoningToken)
+		require.Equal(t, float64(10), res.Data[0].ReasoningToken)
+		require.Equal(t, float64(20), res.Data[1].ReasoningToken)
 	})
 
 	t.Run("list statistics with wrong scene returns empty", func(t *testing.T) {
@@ -204,6 +209,7 @@ func TestAccountStatisticsStore_ListByUserIDAndDate(t *testing.T) {
 		require.Equal(t, page1.TotalPromptToken, page2.TotalPromptToken)
 		require.Equal(t, page1.TotalPromptCachedToken, page2.TotalPromptCachedToken)
 		require.Equal(t, page1.TotalCompletionToken, page2.TotalCompletionToken)
+		require.Equal(t, page1.TotalReasoningToken, page2.TotalReasoningToken)
 		require.Equal(t, page1.TotalCount, page2.TotalCount)
 		require.Equal(t, page1.TotalDuration, page2.TotalDuration)
 
@@ -212,6 +218,7 @@ func TestAccountStatisticsStore_ListByUserIDAndDate(t *testing.T) {
 		require.Equal(t, float64(30), page1.TotalConsumption)
 		require.Equal(t, float64(300), page1.TotalPromptToken)
 		require.Equal(t, float64(150), page1.TotalCompletionToken)
+		require.Equal(t, float64(30), page1.TotalReasoningToken)
 	})
 }
 

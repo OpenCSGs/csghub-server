@@ -1100,6 +1100,41 @@ func TestBuildUsageExtraDataIncludesCachedPromptTokens(t *testing.T) {
 	}
 }
 
+func TestBuildUsageExtraDataIncludesReasoningTokens(t *testing.T) {
+	meteringInfo := usageMeteringInfo{OwnerType: commontypes.ExternalInference}
+
+	for _, tt := range []struct {
+		name             string
+		reasoningTokens  int64
+		wantReasoningNum string
+	}{
+		{
+			name:             "reasoning tokens reported",
+			reasoningTokens:  86,
+			wantReasoningNum: "86",
+		},
+		{
+			name:             "reasoning tokens absent",
+			wantReasoningNum: "0",
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			extraData, err := buildUsageExtraData(&types.Model{}, "target-model", &token.Usage{
+				PromptTokens:     100,
+				CompletionTokens: 50,
+				ReasoningTokens:  tt.reasoningTokens,
+			}, "", meteringInfo)
+			require.NoError(t, err)
+
+			var extra usageMeteringExtra
+			require.NoError(t, json.Unmarshal([]byte(extraData), &extra))
+			require.Equal(t, "100", extra.PromptTokenNum)
+			require.Equal(t, "50", extra.CompletionTokenNum)
+			require.Equal(t, tt.wantReasoningNum, extra.ReasoningTokenNum)
+		})
+	}
+}
+
 func TestOpenAIComponentImpl_RecordUsage_MultiModalImage(t *testing.T) {
 	mockBLDMQ := mockbldmq.NewMockMessageQueue(t)
 	eventPub := &event.EventPublisher{

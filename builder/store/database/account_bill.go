@@ -45,6 +45,7 @@ type AccountBill struct {
 	PromptToken       float64           `bun:",notnull" json:"prompt_token"`
 	PromptCachedToken float64           `bun:",notnull" json:"prompt_cached_token"`
 	CompletionToken   float64           `bun:",notnull" json:"completion_token"`
+	ReasoningToken    float64           `bun:",notnull" json:"reasoning_token"`
 	APIKey            string            `bun:",notnull,default:''" json:"api_key"`
 	Count             float64           `bun:",notnull,default:0" json:"count"`
 	TokenID           int64             `bun:",notnull,default:0" json:"token_id"`
@@ -78,6 +79,7 @@ type TotalResult struct {
 	TotalPromptToken       float64 `bun:"total_prompt_token"`
 	TotalPromptCachedToken float64 `bun:"total_prompt_cached_token"`
 	TotalCompletionToken   float64 `bun:"total_completion_token"`
+	TotalReasoningToken    float64 `bun:"total_reasoning_token"`
 	TotalVoucherValue      float64 `bun:"total_voucher_value"`
 	TotalCashValue         float64 `bun:"total_cash_value"`
 	TotalDuration          float64 `bun:"total_duration"`
@@ -107,6 +109,7 @@ func (s *accountBillStoreImpl) ListByUserIDAndDate(ctx context.Context, req type
 		ColumnExpr("sum(prompt_token) as prompt_token").
 		ColumnExpr("sum(prompt_cached_token) as prompt_cached_token").
 		ColumnExpr("sum(completion_token) as completion_token").
+		ColumnExpr("sum(reasoning_token) as reasoning_token").
 		ColumnExpr("sum(voucher_value) as voucher_value").
 		ColumnExpr("sum(cash_value) as cash_value").
 		ColumnExpr("sum(duration) as duration").
@@ -152,6 +155,7 @@ func (s *accountBillStoreImpl) ListByUserIDAndDate(ctx context.Context, req type
 		ColumnExpr("SUM(prompt_token) as total_prompt_token").
 		ColumnExpr("SUM(prompt_cached_token) as total_prompt_cached_token").
 		ColumnExpr("SUM(completion_token) as total_completion_token").
+		ColumnExpr("SUM(reasoning_token) as total_reasoning_token").
 		ColumnExpr("SUM(voucher_value) as total_voucher_value").
 		ColumnExpr("SUM(cash_value) as total_cash_value").
 		ColumnExpr("SUM(duration) as total_duration").
@@ -186,6 +190,7 @@ func (s *accountBillStoreImpl) ListByUserIDAndDate(ctx context.Context, req type
 			TotalPromptToken:       totalResult.TotalPromptToken,
 			TotalPromptCachedToken: totalResult.TotalPromptCachedToken,
 			TotalCompletionToken:   totalResult.TotalCompletionToken,
+			TotalReasoningToken:    totalResult.TotalReasoningToken,
 			TotalVoucherValue:      totalResult.TotalVoucherValue,
 			TotalCashValue:         totalResult.TotalCashValue,
 			TotalDuration:          totalResult.TotalDuration,

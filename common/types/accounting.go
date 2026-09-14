@@ -23,6 +23,7 @@ const (
 	PromptTokenNum       = "prompt_token_num"
 	PromptTokenCacheNum  = "prompt_token_cache_num"
 	CompletionTokenNum   = "completion_token_num"
+	ReasoningTokenNum    = "reasoning_token_num"
 	OwnerType            = "owner_type"
 	ConsumeApiKey        = "api_key"
 	CompletionDataType   = "completion_data_type"
@@ -211,12 +212,14 @@ type AcctEventReq struct {
 	PromptToken       float64         `json:"prompt_token"`
 	PromptCachedToken float64         `json:"prompt_cached_token"`
 	CompletionToken   float64         `json:"completion_token"`
-	ApiKey            string          `json:"api_key"`
-	Purpose           RechargePurpose `json:"purpose"`
-	PurposeDesc       string          `json:"purpose_desc"`
-	DataType          string          `json:"data_type"`
-	Resolution        string          `json:"resolution"`
-	Duration          float64         `json:"duration"`
+	// ReasoningToken is display-only: already included in CompletionToken, never billed separately.
+	ReasoningToken float64         `json:"reasoning_token"`
+	ApiKey         string          `json:"api_key"`
+	Purpose        RechargePurpose `json:"purpose"`
+	PurposeDesc    string          `json:"purpose_desc"`
+	DataType       string          `json:"data_type"`
+	Resolution     string          `json:"resolution"`
+	Duration       float64         `json:"duration"`
 }
 
 // generate charge event from client
@@ -355,6 +358,7 @@ type AcctSummary struct {
 	TotalPromptToken       float64 `json:"total_prompt_token"`
 	TotalPromptCachedToken float64 `json:"total_prompt_cached_token"`
 	TotalCompletionToken   float64 `json:"total_completion_token"`
+	TotalReasoningToken    float64 `json:"total_reasoning_token"`
 	TotalVoucherValue      float64 `json:"total_voucher_value"`
 	TotalCashValue         float64 `json:"total_cash_value"`
 	TotalDuration          float64 `json:"total_duration"`
@@ -374,6 +378,7 @@ type ITEM struct {
 	PromptToken       float64     `json:"prompt_token"`
 	PromptCachedToken float64     `json:"prompt_cached_token"`
 	CompletionToken   float64     `json:"completion_token"`
+	ReasoningToken    float64     `json:"reasoning_token"`
 	VoucherValue      float64     `json:"voucher_value"`
 	CashValue         float64     `json:"cash_value"`
 	Duration          float64     `json:"duration"`
@@ -412,6 +417,7 @@ type MeteringExtra struct {
 	PromptToken       float64     `json:"prompt_token"`
 	PromptCachedToken float64     `json:"prompt_cached_token"`
 	CompletionToken   float64     `json:"completion_token"`
+	ReasoningToken    float64     `json:"reasoning_token"`
 	TokenID           int64       `bun:",notnull,default:0" json:"token_id"`
 	DataType          string      `bun:",notnull,default:''" json:"data_type"`
 	Resolution        string      `bun:",notnull,default:''" json:"resolution"`
