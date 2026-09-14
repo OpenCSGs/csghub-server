@@ -21,5 +21,5 @@ func (a SyncVersionFilterArgs) isRepoArgs() {}
 
 type RepoFilter interface {
 	Match(ctx context.Context, repoArgs RepoArgs) (bool, error)
-	BatchMatch(ctx context.Context, repos []database.Repository) (modelsMatched []string, datasetsMatched []string, err error)
+	BatchMatch(ctx context.Context, repos []database.Repository) (map[types.RepositoryType][]string, error)
 }
