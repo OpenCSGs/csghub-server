@@ -1080,8 +1080,8 @@ func TestLLMServiceComponent_UpdateUpstream_CSGHubAllowsEnabledToggle(t *testing
 	upstreamStore.EXPECT().Update(ctx, mock.Anything).Return(nil).Maybe()
 
 	mc := &llmServiceComponentImpl{
-		upstreamStore:    upstreamStore,
-		healthStateStore: healthStateStore,
+		upstreamStore:     upstreamStore,
+		healthStateStore:  healthStateStore,
 		circuitStateStore: circuitStateStore,
 	}
 
@@ -1125,8 +1125,8 @@ func TestLLMServiceComponent_UpdateUpstream_CSGHubProtectsSourceOwnedFields(t *t
 	upstreamStore.EXPECT().Update(ctx, mock.Anything).Return(nil).Maybe()
 
 	mc := &llmServiceComponentImpl{
-		upstreamStore:    upstreamStore,
-		healthStateStore: healthStateStore,
+		upstreamStore:     upstreamStore,
+		healthStateStore:  healthStateStore,
 		circuitStateStore: circuitStateStore,
 	}
 
@@ -1137,12 +1137,12 @@ func TestLLMServiceComponent_UpdateUpstream_CSGHubProtectsSourceOwnedFields(t *t
 	newAuthHeader := "hijacked-auth"
 	enabled := true
 	req := &types.UpdateUpstreamReq{
-		ID:        65,
-		URL:       &newURL,
-		ModelName: &newModelName,
-		Provider:  &newProvider,
+		ID:         65,
+		URL:        &newURL,
+		ModelName:  &newModelName,
+		Provider:   &newProvider,
 		AuthHeader: &newAuthHeader,
-		Enabled:   &enabled,
+		Enabled:    &enabled,
 	}
 	res, err := mc.UpdateUpstream(ctx, req)
 	require.Nil(t, err)
@@ -1741,6 +1741,39 @@ func TestComputeUpstreamAvailabilityStatus(t *testing.T) {
 				CircuitState:          string(aigatewaytypes.CircuitStateOpen),
 			},
 			wantStatus: string(aigatewaytypes.UpstreamStatusAvailable),
+		},
+		{
+			name: "healthy health + unknown circuit returns available (any known state is enough)",
+			upstream: types.UpstreamConfig{
+				Enabled:               true,
+				HealthCheckEnabled:    true,
+				CircuitBreakerEnabled: true,
+				HealthState:           string(aigatewaytypes.HealthStateHealthy),
+				CircuitState:          string(aigatewaytypes.CircuitStateUnknown),
+			},
+			wantStatus: string(aigatewaytypes.UpstreamStatusAvailable),
+		},
+		{
+			name: "unknown health + closed circuit returns available (any known state is enough)",
+			upstream: types.UpstreamConfig{
+				Enabled:               true,
+				HealthCheckEnabled:    true,
+				CircuitBreakerEnabled: true,
+				HealthState:           string(aigatewaytypes.HealthStateUnknown),
+				CircuitState:          string(aigatewaytypes.CircuitStateClosed),
+			},
+			wantStatus: string(aigatewaytypes.UpstreamStatusAvailable),
+		},
+		{
+			name: "degraded health + unknown circuit returns degraded (bad state takes priority over unknown)",
+			upstream: types.UpstreamConfig{
+				Enabled:               true,
+				HealthCheckEnabled:    true,
+				CircuitBreakerEnabled: true,
+				HealthState:           string(aigatewaytypes.HealthStateDegraded),
+				CircuitState:          string(aigatewaytypes.CircuitStateUnknown),
+			},
+			wantStatus: string(aigatewaytypes.UpstreamStatusDegraded),
 		},
 		{
 			name: "health unhealthy + circuit unknown -> unavailable (bad state takes priority over unknown)",

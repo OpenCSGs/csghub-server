@@ -767,13 +767,15 @@ func computeUpstreamAvailabilityStatus(u types.UpstreamConfig) string {
 	if u.HealthCheckEnabled && u.HealthState == string(aigatewaytypes.HealthStateDegraded) {
 		return string(aigatewaytypes.UpstreamStatusDegraded)
 	}
-	// No explicitly bad state — if any enabled check is still "unknown" (not
-	// yet probed), report unknown to reflect that we don't have full data.
-	if u.CircuitBreakerEnabled && u.CircuitState == string(aigatewaytypes.CircuitStateUnknown) {
-		return string(aigatewaytypes.UpstreamStatusUnknown)
-	}
-	if u.HealthCheckEnabled && u.HealthState == string(aigatewaytypes.HealthStateUnknown) {
-		return string(aigatewaytypes.UpstreamStatusUnknown)
+	// "unknown" means "not yet probed". Report unknown only when every
+	// enabled check still lacks data; any known state (e.g. healthy health
+	// check or closed circuit) is enough signal to report availability.
+	if u.HealthCheckEnabled || u.CircuitBreakerEnabled {
+		healthNotProbed := !u.HealthCheckEnabled || u.HealthState == string(aigatewaytypes.HealthStateUnknown)
+		circuitNotProbed := !u.CircuitBreakerEnabled || u.CircuitState == string(aigatewaytypes.CircuitStateUnknown)
+		if healthNotProbed && circuitNotProbed {
+			return string(aigatewaytypes.UpstreamStatusUnknown)
+		}
 	}
 	return string(aigatewaytypes.UpstreamStatusAvailable)
 }
