@@ -15,7 +15,9 @@ the task, and do not overwrite changes that were already present.
    editing.
 2. Preserve the dependency direction `handler -> component -> builder`.
 3. Make the smallest behaviorally complete change and reuse existing repository
-   patterns where practical.
+   patterns where practical. Apply the shared Code Smell checklist before extending
+   existing functions and again against the final diff; perform warranted local
+   refactoring during implementation rather than deferring it to code review.
 4. Run `gofmt` on changed Go files. Do not reformat unrelated files.
 5. Add or update tests for changed behavior.
 6. Run targeted tests first, followed by the relevant build-tag test and lint
@@ -80,6 +82,15 @@ types.
 - Add or update unit tests for new or changed behavior. Generated files,
   migrations, declaration-only files, and trivial wiring do not require a
   one-to-one `*_test.go` file.
+
+## Shared Code Smell Checks
+
+When generating, modifying, or reviewing code, MUST read and apply
+[the shared Code Smell checklist](docs/agent/code-smell-checks.md), resolved from
+the repository root. Use its common checks and the section for the current mode:
+implementation requires warranted local refactoring; review requires findings
+and does not authorize edits. Complete its checklist completeness check before the handoff.
+Keep the detailed rules in that document rather than duplicating them here.
 
 ## Testing and Validation
 
