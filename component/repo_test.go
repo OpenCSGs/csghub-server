@@ -4,11 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http/httptest"
 	"net/url"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -25,6 +25,7 @@ import (
 	"google.golang.org/grpc/status"
 	mockrebac "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/rebac"
 	mockrpc "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/rpc"
+	mockcache "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/cache"
 	"opencsg.com/csghub-server/builder/deploy"
 	deployStatus "opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/builder/git/gitserver"
@@ -406,6 +407,7 @@ func TestRepoComponent_PublicToUser(t *testing.T) {
 
 	repo.mocks.userSvcClient.EXPECT().GetUserInfo(ctx, "user", "user").Return(&rpc.User{
 		ID:       1,
+		UUID:     "user-uuid",
 		Username: "user",
 		Roles:    []string{"a", "b"},
 		Orgs: []rpc.Organization{
@@ -418,12 +420,34 @@ func TestRepoComponent_PublicToUser(t *testing.T) {
 	mrepos := []*database.Repository{
 		{Name: "foo"},
 	}
-	repo.mocks.stores.RepoMock().EXPECT().PublicToUser(ctx, types.ModelRepo, []string{"user", "org1", "org2"}, filter, 10, 1, false).Return(mrepos, 100, nil)
+	repoAuthorizerMock(repo).EXPECT().ListObjects(ctx, rebac.ListObjectsRequest{
+		Subject:     rebac.UserSubject("user-uuid"),
+		Relation:    rebac.RepositoryCanRead,
+		ObjectType:  rebac.ObjectTypeRepository,
+		Consistency: rebac.ConsistencyHigher,
+	}).Return(rebac.ListObjectsResult{Objects: []rebac.Object{rebac.RepositoryObject(42)}}, nil)
+	repo.mocks.stores.RepoMock().On("PublicToUserWithAccess", ctx, types.ModelRepo, mock.Anything, filter, 10, 1).Return(mrepos, 100, nil)
 
 	repos, count, err := repo.PublicToUser(ctx, types.ModelRepo, "user", &types.RepoFilter{}, 10, 1)
 	require.Equal(t, mrepos, repos)
 	require.Equal(t, 100, count)
 	require.Nil(t, err)
+}
+
+func TestRepoComponent_LoadRepositoryReadScopeFromCache(t *testing.T) {
+	ctx := context.Background()
+	repo := initializeTestRepoComponent(ctx, t)
+	repo.repoComponentImpl.repositoryAccessCache = mockcache.NewMockRedisClient(t)
+	repo.mocks.userSvcClient.EXPECT().GetUserInfo(ctx, "user", "user").Return(&rpc.User{
+		UUID: "user-uuid",
+	}, nil)
+	cache := repo.repoComponentImpl.repositoryAccessCache.(*mockcache.MockRedisClient)
+	cache.EXPECT().Get(ctx, "repo:access:read:v2:user-uuid").Return(fmt.Sprintf(`{"schema_version":1,"repository_ids":[5,3,5],"fetched_at":%q}`, time.Now().UTC().Format(time.RFC3339Nano)), nil)
+
+	scope, err := repo.loadRepositoryReadScope(ctx, "user")
+	require.NoError(t, err)
+	require.Equal(t, database.RepositoryAccessReadable, scope.Mode)
+	require.Equal(t, []int64{3, 5}, scope.ReadableRepositoryIDs)
 }
 
 func mockUserRepoAdminPermission(ctx context.Context, stores *tests.MockStores, userName string) {
@@ -456,6 +480,48 @@ func expectNamespacePermissionCheck(repo *testRepoWithMocks, permission rebac.Pe
 
 func repoAuthorizerMock(repo *testRepoWithMocks) *mockrebac.MockAuthorizer {
 	return repo.repoComponentImpl.rebac.(*mockrebac.MockAuthorizer)
+}
+
+func expectBatchRepositoryRead(repo *testRepoWithMocks, ctx context.Context, userUUID string, allowed map[int64]bool) {
+	repoAuthorizerMock(repo).EXPECT().BatchCheck(ctx, mock.MatchedBy(func(request rebac.BatchCheckRequest) bool {
+		return len(request.Checks) > 0 && request.Checks[0].Check.Subject == rebac.UserSubject(userUUID)
+	})).RunAndReturn(func(_ context.Context, request rebac.BatchCheckRequest) (rebac.BatchCheckResult, error) {
+		result := rebac.BatchCheckResult{Results: make(map[string]rebac.BatchCheckOutcome, len(request.Checks))}
+		for _, item := range request.Checks {
+			repoID, _ := strconv.ParseInt(item.Check.Object.ID, 10, 64)
+			result.Results[item.CorrelationID] = rebac.BatchCheckOutcome{
+				Decision: rebac.Decision{Allowed: allowed[repoID]},
+			}
+		}
+		return result, nil
+	}).Once()
+}
+
+func TestRepoComponent_BatchReadableRepositoriesAcrossBatches(t *testing.T) {
+	ctx := context.Background()
+	repoComp := initializeTestRepoComponent(ctx, t)
+	repoComp.mocks.userSvcClient.EXPECT().GetUserInfo(ctx, "user1", "user1").Return(&rpc.User{
+		UUID:  "user1-uuid",
+		Roles: []string{},
+	}, nil)
+
+	repos := make([]*database.Repository, 51)
+	for i := range repos {
+		repos[i] = &database.Repository{ID: int64(i + 1), Private: true}
+	}
+	repoAuthorizerMock(repoComp).EXPECT().BatchCheck(ctx, mock.MatchedBy(func(request rebac.BatchCheckRequest) bool {
+		return len(request.Checks) > 0 && len(request.Checks) <= rebac.DefaultMaxBatchSize
+	})).RunAndReturn(func(_ context.Context, request rebac.BatchCheckRequest) (rebac.BatchCheckResult, error) {
+		result := rebac.BatchCheckResult{Results: make(map[string]rebac.BatchCheckOutcome, len(request.Checks))}
+		for _, check := range request.Checks {
+			result.Results[check.CorrelationID] = rebac.BatchCheckOutcome{Decision: rebac.Decision{Allowed: true}}
+		}
+		return result, nil
+	}).Times(2)
+
+	readable, err := repoComp.batchReadableRepositories(ctx, repos, "user1")
+	require.NoError(t, err)
+	require.Len(t, readable, len(repos))
 }
 
 func TestRepoComponent_RelatedRepos(t *testing.T) {
@@ -3307,10 +3373,12 @@ func TestRepoComponent_BatchGetRepoExtra(t *testing.T) {
 
 		repoComp.mocks.userSvcClient.EXPECT().GetUserInfo(ctx, "user1", "user1").Return(&rpc.User{
 			ID:       1,
+			UUID:     "user1-uuid",
 			Username: "user1",
 			Roles:    []string{},
 			Orgs:     []rpc.Organization{{Name: "org1", UserID: 3}},
 		}, nil)
+		expectBatchRepositoryRead(repoComp, ctx, "user1-uuid", map[int64]bool{1: true, 2: true})
 
 		// Own repo, org repo, public repo, private unrelated repo
 		repos := []*database.Repository{
@@ -3347,10 +3415,12 @@ func TestRepoComponent_BatchGetRepoExtra(t *testing.T) {
 		// org member, even though its UserID matches the org's UserID.
 		repoComp.mocks.userSvcClient.EXPECT().GetUserInfo(ctx, "user1", "user1").Return(&rpc.User{
 			ID:       1,
+			UUID:     "user1-uuid",
 			Username: "user1",
 			Roles:    []string{},
 			Orgs:     []rpc.Organization{{Name: "org1", UserID: 3}},
 		}, nil)
+		expectBatchRepositoryRead(repoComp, ctx, "user1-uuid", map[int64]bool{1: true, 2: true})
 
 		repos := []*database.Repository{
 			{ID: 1, UserID: 1, Path: "user1/repo1", Private: true, DefaultBranch: "main"},
@@ -3407,10 +3477,12 @@ func TestRepoComponent_BatchGetRepoExtra(t *testing.T) {
 
 		repoComp.mocks.userSvcClient.EXPECT().GetUserInfo(ctx, "user1", "user1").Return(&rpc.User{
 			ID:       1,
+			UUID:     "user1-uuid",
 			Username: "user1",
 			Roles:    []string{},
 			Orgs:     []rpc.Organization{},
 		}, nil)
+		expectBatchRepositoryRead(repoComp, ctx, "user1-uuid", map[int64]bool{1: true})
 
 		repos := []*database.Repository{
 			{ID: 1, UserID: 1, Path: "user1/repo1", Private: true, DefaultBranch: ""},
@@ -3431,10 +3503,12 @@ func TestRepoComponent_BatchGetRepoExtra(t *testing.T) {
 
 		repoComp.mocks.userSvcClient.EXPECT().GetUserInfo(ctx, "user1", "user1").Return(&rpc.User{
 			ID:       1,
+			UUID:     "user1-uuid",
 			Username: "user1",
 			Roles:    []string{},
 			Orgs:     []rpc.Organization{},
 		}, nil)
+		expectBatchRepositoryRead(repoComp, ctx, "user1-uuid", map[int64]bool{1: true})
 
 		repos := []*database.Repository{
 			{ID: 1, UserID: 1, Path: "user1/repo1", Private: true, DefaultBranch: "main"},
@@ -3460,10 +3534,12 @@ func TestRepoComponent_BatchGetRepoExtra(t *testing.T) {
 
 		repoComp.mocks.userSvcClient.EXPECT().GetUserInfo(ctx, "user1", "user1").Return(&rpc.User{
 			ID:       1,
+			UUID:     "user1-uuid",
 			Username: "user1",
 			Roles:    []string{},
 			Orgs:     []rpc.Organization{},
 		}, nil)
+		expectBatchRepositoryRead(repoComp, ctx, "user1-uuid", map[int64]bool{})
 
 		repos := []*database.Repository{
 			{ID: 1, UserID: 99, Path: "other/repo1", Private: true, DefaultBranch: "main"},
@@ -3506,10 +3582,12 @@ func TestRepoComponent_BatchGetRepoExtra(t *testing.T) {
 
 		repoComp.mocks.userSvcClient.EXPECT().GetUserInfo(ctx, "user1", "user1").Return(&rpc.User{
 			ID:       1,
+			UUID:     "user1-uuid",
 			Username: "user1",
 			Roles:    []string{},
 			Orgs:     []rpc.Organization{},
 		}, nil)
+		expectBatchRepositoryRead(repoComp, ctx, "user1-uuid", map[int64]bool{1: true})
 
 		repos := []*database.Repository{
 			{ID: 1, UserID: 1, Path: "user1/repo1", Private: true, DefaultBranch: "main"},
@@ -4223,61 +4301,6 @@ func TestRepoComponent_CommitFiles(t *testing.T) {
 	require.Equal(t, nil, err)
 }
 
-func TestRepoComponent_CommitFilesRejectsOversizedNonLFSFile(t *testing.T) {
-	ctx := context.TODO()
-	repoComp := initializeTestRepoComponent(ctx, t)
-	repoComp.config.Git.MaxUnLfsFileSize = 4
-
-	user := database.User{Username: "user_name", UUID: "user-uuid"}
-	repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username).Return(user, nil)
-
-	ns := database.Namespace{NamespaceType: "user", Path: user.Username}
-
-	repo := &database.Repository{
-		ID:      1,
-		Name:    "repo_name",
-		Private: true,
-		User:    user,
-		Path:    fmt.Sprintf("%s/%s", ns.Path, "repo_name"),
-		Source:  types.OpenCSGSource,
-	}
-	repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(
-		mock.Anything, types.ModelRepo, ns.Path, repo.Name,
-	).Return(repo, nil)
-	expectReBACCheck(repoComp, true)
-	repoComp.mocks.gitServer.EXPECT().GetRepoAllFiles(ctx, gitserver.GetRepoAllFilesReq{
-		Namespace: ns.Path,
-		Name:      repo.Name,
-		Ref:       "main",
-		RepoType:  types.ModelRepo,
-	}).Return(nil, nil)
-
-	pointerPrefix := fmt.Sprintf(
-		"version https://git-lfs.github.com/spec/v1\noid sha256:%s\nsize 1\n",
-		strings.Repeat("a", 64),
-	)
-	err := repoComp.CommitFiles(ctx, types.CommitFilesReq{
-		Namespace:   ns.Path,
-		Name:        repo.Name,
-		RepoType:    types.ModelRepo,
-		Revision:    "main",
-		CurrentUser: user.Username,
-		Message:     "msg",
-		Files: []types.CommitFileReq{
-			{
-				Path:    "oversized.json",
-				Action:  types.CommitActionCreate,
-				Content: base64.StdEncoding.EncodeToString([]byte(pointerPrefix + "trailing content")),
-			},
-		},
-	})
-
-	require.ErrorContains(t, err, "exceeds the maximum allowed size for non-LFS files")
-	require.ErrorIs(t, err, errorx.ErrFileTooLarge)
-	repoComp.mocks.gitServer.AssertNotCalled(t, "CommitFiles", mock.Anything, mock.Anything)
-	repoComp.mocks.stores.LfsMetaObjectMock().AssertNotCalled(t, "UpdateOrCreate", mock.Anything, mock.Anything)
-}
-
 func TestRepoComponent_CommitFilesIgnoresPackageSyncFailure(t *testing.T) {
 	ctx := context.TODO()
 	repoComp := initializeTestRepoComponent(ctx, t)
@@ -4448,76 +4471,6 @@ func TestParseNDJson_AllKeyTypes(t *testing.T) {
 	assert.Equal(t, "old_dir/", result.Files[3].Path)
 	assert.Equal(t, "", result.Files[3].Content)
 	assert.Equal(t, types.CommitActionDelete, result.Files[3].Action)
-}
-
-func TestParseNDJson_AcceptsBase64ExpansionAtFileSizeLimit(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-
-	const maxUnLfsFileSize = 1 << 20
-	cfg := &config.Config{}
-	cfg.Git.MaxUnLfsFileSize = maxUnLfsFileSize
-
-	component := &repoComponentImpl{
-		config: cfg,
-	}
-
-	// HF sends regular file content as Base64. A file at the configured raw size
-	// limit therefore produces an NDJSON record larger than that limit.
-	largeContent := base64.StdEncoding.EncodeToString(
-		[]byte(strings.Repeat("a", maxUnLfsFileSize)),
-	)
-	largeFileJSON, err := json.Marshal(types.CommitFile{
-		Path:    "tokenizer.json",
-		Content: largeContent,
-	})
-	require.NoError(t, err)
-
-	requestBody := fmt.Sprintf(`{"key": "header", "value": {"summary": "Large file commit"}}
-{"key": "file", "value": %s}`, string(largeFileJSON))
-	require.Greater(t, len(requestBody), maxUnLfsFileSize)
-
-	req := httptest.NewRequest("POST", "/test", strings.NewReader(requestBody))
-	w := httptest.NewRecorder()
-	ctx, _ := gin.CreateTestContext(w)
-	ctx.Request = req
-
-	result, err := component.ParseNDJson(ctx)
-
-	require.NoError(t, err)
-	assert.Equal(t, "Large file commit", result.Message)
-	assert.Len(t, result.Files, 1)
-	assert.Equal(t, "tokenizer.json", result.Files[0].Path)
-	assert.Equal(t, largeContent, result.Files[0].Content)
-}
-
-func TestParseNDJson_RejectsOversizedRecord(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-
-	const maxUnLfsFileSize = 1 << 20
-	component := &repoComponentImpl{
-		config: &config.Config{},
-	}
-	component.config.Git.MaxUnLfsFileSize = maxUnLfsFileSize
-
-	oversizedContent := base64.StdEncoding.EncodeToString(
-		[]byte(strings.Repeat("a", 2*maxUnLfsFileSize)),
-	)
-	fileJSON, err := json.Marshal(types.CommitFile{
-		Path:    "oversized.json",
-		Content: oversizedContent,
-	})
-	require.NoError(t, err)
-
-	requestBody := fmt.Sprintf(`{"key":"file","value":%s}`, fileJSON)
-	req := httptest.NewRequest("POST", "/test", strings.NewReader(requestBody))
-	w := httptest.NewRecorder()
-	ctx, _ := gin.CreateTestContext(w)
-	ctx.Request = req
-
-	result, err := component.ParseNDJson(ctx)
-
-	require.Error(t, err)
-	assert.Nil(t, result)
 }
 
 func TestGetRepoUrl(t *testing.T) {

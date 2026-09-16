@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -17,6 +18,7 @@ import (
 	"github.com/redis/go-redis/v9"
 	"github.com/uptrace/bun"
 	"github.com/uptrace/bun/dialect"
+	"github.com/uptrace/bun/dialect/pgdialect"
 	"opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/builder/store/cache"
 	"opencsg.com/csghub-server/common/config"
@@ -49,71 +51,6 @@ func escapeLikePattern(value string) string {
 	return builder.String()
 }
 
-func repoListCountLimit(per, page int) int {
-	if per <= 0 {
-		return 0
-	}
-	return max(types.RepoListVisiblePageLimit+1, page+1) * per
-}
-
-func (s *repoStoreImpl) countRepoList(ctx context.Context, q *bun.SelectQuery, per, page int) (int, error) {
-	if per <= 0 {
-		return q.Count(ctx)
-	}
-	countQuery := q.Clone().Limit(repoListCountLimit(per, page))
-	return s.db.Operator.Core.NewSelect().
-		TableExpr("(?) AS limited_repositories", countQuery).
-		Count(ctx)
-}
-
-func applySpaceStatusFilter(q *bun.SelectQuery, status string) {
-	if status == "" {
-		return
-	}
-
-	const latestDeployStatus = `(SELECT d.status
-		FROM deploys AS d
-		WHERE d.space_id = spaces.id
-		ORDER BY d.created_at DESC
-		LIMIT 1)`
-
-	switch status {
-	case "NoAppFile":
-		q.Where("spaces.has_app_file = ? AND spaces.sdk <> ?", false, types.NGINX.Name)
-	case "NoNGINXConf":
-		q.Where("spaces.has_app_file = ? AND spaces.sdk = ?", false, types.NGINX.Name)
-	case "Pending":
-		q.Where("spaces.has_app_file = ?", true).
-			Where(latestDeployStatus+" = ?", common.Pending)
-	case "Building":
-		q.Where("spaces.has_app_file = ?", true).
-			Where(latestDeployStatus+" IN (?)", bun.In([]int{common.BuildInQueue, common.Building}))
-	case "BuildingFailed":
-		q.Where("spaces.has_app_file = ?", true).
-			Where(latestDeployStatus+" = ?", common.BuildFailed)
-	case "Deploying":
-		q.Where("spaces.has_app_file = ?", true).
-			Where(latestDeployStatus+" IN (?)", bun.In([]int{common.BuildSuccess, common.Deploying, common.Startup}))
-	case "DeployFailed":
-		q.Where("spaces.has_app_file = ?", true).
-			Where(latestDeployStatus+" = ?", common.DeployFailed)
-	case "Running":
-		q.Where("spaces.has_app_file = ?", true).
-			Where(latestDeployStatus+" = ?", common.Running)
-	case "RuntimeError":
-		q.Where("spaces.has_app_file = ?", true).
-			Where(latestDeployStatus+" = ?", common.RunTimeError)
-	case "Sleeping":
-		q.Where("spaces.has_app_file = ?", true).
-			Where(latestDeployStatus+" = ?", common.Sleeping)
-	case "Stopped":
-		q.Where("spaces.has_app_file = ?", true).
-			Where("COALESCE("+latestDeployStatus+", ?) = ?", common.Stopped, common.Stopped)
-	default:
-		q.Where("FALSE")
-	}
-}
-
 type repoStoreImpl struct {
 	config                      *config.Config
 	db                          *DB
@@ -144,9 +81,10 @@ type RepoStore interface {
 	// TagIDs get tag ids by repo id, if category is not empty, return only tags of the category
 	TagIDs(ctx context.Context, repoID int64, category string) (tagIDs []int64, err error)
 	SetUpdateTimeByPath(ctx context.Context, repoType types.RepositoryType, namespace, name string, update time.Time) error
-	PublicToUser(ctx context.Context, repoType types.RepositoryType, ownerNamespaces []string, filter *types.RepoFilter, per, page int, isAdmin bool) (repos []*Repository, count int, err error)
-	// PublicToUserV2 is like PublicToUser but skips eager-loading of Tags for faster list queries
-	PublicToUserV2(ctx context.Context, repoType types.RepositoryType, ownerNamespaces []string, filter *types.RepoFilter, per, page int, isAdmin bool) (repos []*Repository, count int, err error)
+	// PublicToUserWithAccess applies the ReBAC repository scope to a list query.
+	PublicToUserWithAccess(ctx context.Context, repoType types.RepositoryType, scope RepositoryAccessScope, filter *types.RepoFilter, per, page int) (repos []*Repository, count int, err error)
+	// PublicToUserV2WithAccess is the tag-light variant of PublicToUserWithAccess.
+	PublicToUserV2WithAccess(ctx context.Context, repoType types.RepositoryType, scope RepositoryAccessScope, filter *types.RepoFilter, per, page int) (repos []*Repository, count int, err error)
 	IsMirrorRepo(ctx context.Context, repoType types.RepositoryType, namespace, name string) (bool, error)
 	ListRepoByDeployType(ctx context.Context, repoType types.RepositoryType, userID int64, search, sort string, deployType, per, page int) (repos []*Repository, count int, err error)
 	WithMirror(ctx context.Context, per, page int) (repos []Repository, count int, err error)
@@ -1091,9 +1029,14 @@ func (s *repoStoreImpl) SetUpdateTimeByPath(ctx context.Context, repoType types.
 	return err
 }
 
-func (s *repoStoreImpl) PublicToUser(ctx context.Context, repoType types.RepositoryType, ownerNamespaces []string, filter *types.RepoFilter, per, page int, isAdmin bool) (repos []*Repository, count int, err error) {
+// PublicToUserWithAccess applies the ReBAC repository scope to a list query.
+func (s *repoStoreImpl) PublicToUserWithAccess(ctx context.Context, repoType types.RepositoryType, scope RepositoryAccessScope, filter *types.RepoFilter, per, page int) (repos []*Repository, count int, err error) {
+	return s.publicToUser(ctx, repoType, filter, per, page, &scope)
+}
+
+func (s *repoStoreImpl) publicToUser(ctx context.Context, repoType types.RepositoryType, filter *types.RepoFilter, per, page int, scope *RepositoryAccessScope) (repos []*Repository, count int, err error) {
 	if filter.Sort == "trending" && strings.TrimSpace(filter.Search) == "" {
-		return s.publicToUserTrending(ctx, repoType, ownerNamespaces, filter, per, page, isAdmin)
+		return s.publicToUserTrending(ctx, repoType, filter, per, page, scope)
 	}
 
 	q := s.db.Operator.Core.
@@ -1116,7 +1059,6 @@ func (s *repoStoreImpl) PublicToUser(ctx context.Context, repoType types.Reposit
 		q.Join("INNER JOIN codes ON codes.repository_id = repository.id")
 	case types.SpaceRepo:
 		q.Join("INNER JOIN spaces ON spaces.repository_id = repository.id")
-		applySpaceStatusFilter(q, filter.Status)
 	case types.PromptRepo:
 		q.Join("INNER JOIN prompts ON prompts.repository_id = repository.id")
 	case types.MCPServerRepo:
@@ -1125,20 +1067,10 @@ func (s *repoStoreImpl) PublicToUser(ctx context.Context, repoType types.Reposit
 		q.Join("INNER JOIN skills ON skills.repository_id = repository.id")
 	}
 
-	if !isAdmin {
-		if len(ownerNamespaces) > 0 {
-			// public repos, or private repos under the user's own namespace
-			// and the namespaces of orgs the user belongs to
-			q.WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
-				q = q.Where("repository.private = ?", false)
-				for _, namespace := range ownerNamespaces {
-					q = q.WhereOr("repository.path LIKE ? ESCAPE '\\'", fmt.Sprintf("%s/%%", escapeLikePattern(namespace)))
-				}
-				return q
-			})
-		} else {
-			q.Where("repository.private = ?", false)
-		}
+	if scope != nil {
+		applyRepositoryAccessFilter(q, "repository", *scope)
+	} else {
+		q.Where("repository.private = ?", false)
 	}
 
 	needDistinct := false
@@ -1234,7 +1166,14 @@ func (s *repoStoreImpl) PublicToUser(ctx context.Context, repoType types.Reposit
 	filter.Search = strings.TrimSpace(filter.Search)
 	if filter.Search != "" {
 		filter.Search = strings.ToLower(filter.Search)
-		repos, count, err = s.SearchRepoWithCache(ctx, q, repoType, filter, per, page)
+		if !filter.UserPurchased && scope != nil && (scope.Mode == RepositoryAccessReadable && len(scope.ReadableRepositoryIDs) == 0 || scope.Mode == RepositoryAccessPublic) {
+			repos, count, err = s.SearchRepoWithCache(ctx, q, repoType, filter, per, page)
+		} else {
+			repos, count, err = s.searchRepoWithoutCache(ctx, q, filter, per, page)
+		}
+		if err == nil && s.DbDriver == "pg" {
+			err = s.loadSearchResultTags(ctx, repos)
+		}
 		err = errorx.HandleDBError(err, errorx.Ctx().
 			Set("repo_type", repoType).
 			Set("filter", filter),
@@ -1242,9 +1181,9 @@ func (s *repoStoreImpl) PublicToUser(ctx context.Context, repoType types.Reposit
 		return
 	}
 
-	q.Order(sortBy[filter.Sort])
+	applyRepositorySort(q, filter.Sort)
 
-	count, err = s.countRepoList(ctx, q, per, page)
+	count, err = q.Count(ctx)
 	err = errorx.HandleDBError(err, errorx.Ctx().
 		Set("repo_type", repoType).
 		Set("filter", filter),
@@ -1258,7 +1197,7 @@ func (s *repoStoreImpl) PublicToUser(ctx context.Context, repoType types.Reposit
 	return
 }
 
-func (s *repoStoreImpl) publicToUserTrending(ctx context.Context, repoType types.RepositoryType, ownerNamespaces []string, filter *types.RepoFilter, per, page int, isAdmin bool) (repos []*Repository, count int, err error) {
+func (s *repoStoreImpl) publicToUserTrending(ctx context.Context, repoType types.RepositoryType, filter *types.RepoFilter, per, page int, scope *RepositoryAccessScope) (repos []*Repository, count int, err error) {
 	repoTypeTable := map[types.RepositoryType]string{
 		types.ModelRepo:     "models",
 		types.DatasetRepo:   "datasets",
@@ -1286,9 +1225,6 @@ func (s *repoStoreImpl) publicToUserTrending(ctx context.Context, repoType types
 
 	// Join with business table
 	q.Join(fmt.Sprintf("INNER JOIN %s ON %s.repository_id = r.id", bizTable, bizTable))
-	if repoType == types.SpaceRepo {
-		applySpaceStatusFilter(q, filter.Status)
-	}
 
 	// Filter by dataset type for dataset repo
 	if repoType == types.DatasetRepo && filter.DatasetType != "" {
@@ -1322,22 +1258,13 @@ func (s *repoStoreImpl) publicToUserTrending(ctx context.Context, repoType types
 		}
 	}
 
-	q.Where("r.deleted_at IS NULL")
+	q.Where("r.deleted_at IS NULL").
+		Where(fmt.Sprintf("EXISTS (SELECT 1 FROM %s m WHERE m.repository_id = r.id)", bizTable))
 
-	if !isAdmin {
-		if len(ownerNamespaces) > 0 {
-			// public repos, or private repos under the user's own namespace
-			// and the namespaces of orgs the user belongs to
-			q.WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
-				q = q.Where("r.private = ?", false)
-				for _, namespace := range ownerNamespaces {
-					q = q.WhereOr("r.path LIKE ? ESCAPE '\\'", fmt.Sprintf("%s/%%", escapeLikePattern(namespace)))
-				}
-				return q
-			})
-		} else {
-			q.Where("r.private = ?", false)
-		}
+	if scope != nil {
+		applyRepositoryAccessFilter(q, "r", *scope)
+	} else {
+		q.Where("r.private = ?", false)
 	}
 
 	if filter.Source != "" {
@@ -1395,10 +1322,7 @@ func (s *repoStoreImpl) publicToUserTrending(ctx context.Context, repoType types
 		q.Distinct()
 	}
 
-	// Repository lists only render the first 100 page numbers and use the next-page
-	// control afterwards. Count only far enough to keep that control accurate for
-	// the current page instead of scanning every matching repository.
-	count, err = s.countRepoList(ctx, q, per, page)
+	count, err = q.Count(ctx)
 	err = errorx.HandleDBError(err, errorx.Ctx().
 		Set("repo_type", repoType).
 		Set("filter", filter),
@@ -1407,7 +1331,7 @@ func (s *repoStoreImpl) publicToUserTrending(ctx context.Context, repoType types
 		return
 	}
 
-	err = q.OrderExpr("rrs.score DESC NULLS LAST").
+	err = q.OrderExpr("rrs.score DESC NULLS LAST, r.id DESC").
 		Limit(per).
 		Offset((page-1)*per).
 		Scan(ctx, &repos)
@@ -1450,11 +1374,26 @@ func (s *repoStoreImpl) publicToUserTrending(ctx context.Context, repoType types
 	return
 }
 
-// PublicToUserV2 is like PublicToUser but skips eager-loading of Tags.
-// Tags and mirror data are fetched separately via the enrichment API for better list performance.
-func (s *repoStoreImpl) PublicToUserV2(ctx context.Context, repoType types.RepositoryType, ownerNamespaces []string, filter *types.RepoFilter, per, page int, isAdmin bool) (repos []*Repository, count int, err error) {
+// PublicToUserV2WithAccess is the tag-light variant of PublicToUserWithAccess.
+func (s *repoStoreImpl) PublicToUserV2WithAccess(ctx context.Context, repoType types.RepositoryType, scope RepositoryAccessScope, filter *types.RepoFilter, per, page int) (repos []*Repository, count int, err error) {
+	// Monitor large repository ID lists for performance analysis
+	idCount := len(scope.ReadableRepositoryIDs)
+	if idCount > 500 {
+		slog.Warn("Large repository ID list in search query",
+			slog.Any("count", idCount),
+			slog.Any("repo_type", repoType),
+			slog.Any("mode", scope.Mode),
+			slog.Any("has_owner_filter", filter.Owner != ""),
+			slog.Any("has_source_filter", filter.Source != ""),
+		)
+	}
+
+	return s.publicToUserV2(ctx, repoType, filter, per, page, &scope)
+}
+
+func (s *repoStoreImpl) publicToUserV2(ctx context.Context, repoType types.RepositoryType, filter *types.RepoFilter, per, page int, scope *RepositoryAccessScope) (repos []*Repository, count int, err error) {
 	if filter.Sort == "trending" && strings.TrimSpace(filter.Search) == "" {
-		return s.publicToUserTrendingV2(ctx, repoType, ownerNamespaces, filter, per, page, isAdmin)
+		return s.publicToUserTrendingV2(ctx, repoType, filter, per, page, scope)
 	}
 
 	q := s.db.Operator.Core.
@@ -1485,18 +1424,10 @@ func (s *repoStoreImpl) PublicToUserV2(ctx context.Context, repoType types.Repos
 		q.Join("INNER JOIN skills ON skills.repository_id = repository.id")
 	}
 
-	if !isAdmin {
-		if len(ownerNamespaces) > 0 {
-			q.WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
-				q = q.Where("repository.private = ?", false)
-				for _, namespace := range ownerNamespaces {
-					q = q.WhereOr("repository.path LIKE ? ESCAPE '\\'", fmt.Sprintf("%s/%%", escapeLikePattern(namespace)))
-				}
-				return q
-			})
-		} else {
-			q.Where("repository.private = ?", false)
-		}
+	if scope != nil {
+		applyRepositoryAccessFilter(q, "repository", *scope)
+	} else {
+		q.Where("repository.private = ?", false)
 	}
 
 	needDistinct := false
@@ -1587,7 +1518,11 @@ func (s *repoStoreImpl) PublicToUserV2(ctx context.Context, repoType types.Repos
 	filter.Search = strings.TrimSpace(filter.Search)
 	if filter.Search != "" {
 		filter.Search = strings.ToLower(filter.Search)
-		repos, count, err = s.SearchRepoWithCache(ctx, q, repoType, filter, per, page)
+		if !filter.UserPurchased && scope != nil && (scope.Mode == RepositoryAccessReadable && len(scope.ReadableRepositoryIDs) == 0 || scope.Mode == RepositoryAccessPublic) {
+			repos, count, err = s.SearchRepoWithCache(ctx, q, repoType, filter, per, page)
+		} else {
+			repos, count, err = s.searchRepoWithoutCache(ctx, q, filter, per, page)
+		}
 		err = errorx.HandleDBError(err, errorx.Ctx().
 			Set("repo_type", repoType).
 			Set("filter", filter),
@@ -1595,7 +1530,7 @@ func (s *repoStoreImpl) PublicToUserV2(ctx context.Context, repoType types.Repos
 		return
 	}
 
-	q.Order(sortBy[filter.Sort])
+	applyRepositorySort(q, filter.Sort)
 
 	count, err = q.Count(ctx)
 	err = errorx.HandleDBError(err, errorx.Ctx().
@@ -1611,8 +1546,22 @@ func (s *repoStoreImpl) PublicToUserV2(ctx context.Context, repoType types.Repos
 	return
 }
 
+// applyRepositorySort applies stable, repository-qualified ordering to list queries.
+func applyRepositorySort(q *bun.SelectQuery, sort string) {
+	switch sort {
+	case "recently_update":
+		q.OrderExpr("repository.updated_at DESC NULLS LAST, repository.id DESC")
+	case "most_download":
+		q.OrderExpr("repository.download_count DESC NULLS LAST, repository.id DESC")
+	case "most_favorite":
+		q.OrderExpr("repository.likes DESC NULLS LAST, repository.id DESC")
+	case "most_star":
+		q.OrderExpr("repository.star_count DESC NULLS LAST, repository.id DESC")
+	}
+}
+
 // publicToUserTrendingV2 is like publicToUserTrending but skips post-hoc tag batch loading.
-func (s *repoStoreImpl) publicToUserTrendingV2(ctx context.Context, repoType types.RepositoryType, ownerNamespaces []string, filter *types.RepoFilter, per, page int, isAdmin bool) (repos []*Repository, count int, err error) {
+func (s *repoStoreImpl) publicToUserTrendingV2(ctx context.Context, repoType types.RepositoryType, filter *types.RepoFilter, per, page int, scope *RepositoryAccessScope) (repos []*Repository, count int, err error) {
 	repoTypeTable := map[types.RepositoryType]string{
 		types.ModelRepo:     "models",
 		types.DatasetRepo:   "datasets",
@@ -1670,18 +1619,10 @@ func (s *repoStoreImpl) publicToUserTrendingV2(ctx context.Context, repoType typ
 	q.Where("r.deleted_at IS NULL").
 		Where(fmt.Sprintf("EXISTS (SELECT 1 FROM %s m WHERE m.repository_id = r.id)", bizTable))
 
-	if !isAdmin {
-		if len(ownerNamespaces) > 0 {
-			q.WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
-				q = q.Where("r.private = ?", false)
-				for _, namespace := range ownerNamespaces {
-					q = q.WhereOr("r.path LIKE ? ESCAPE '\\'", fmt.Sprintf("%s/%%", escapeLikePattern(namespace)))
-				}
-				return q
-			})
-		} else {
-			q.Where("r.private = ?", false)
-		}
+	if scope != nil {
+		applyRepositoryAccessFilter(q, "r", *scope)
+	} else {
+		q.Where("r.private = ?", false)
 	}
 
 	if filter.Source != "" {
@@ -1748,7 +1689,7 @@ func (s *repoStoreImpl) publicToUserTrendingV2(ctx context.Context, repoType typ
 		return
 	}
 
-	err = q.OrderExpr("rrs.score DESC NULLS LAST").
+	err = q.OrderExpr("rrs.score DESC NULLS LAST, r.id DESC").
 		Limit(per).
 		Offset((page-1)*per).
 		Scan(ctx, &repos)
@@ -1761,6 +1702,65 @@ func (s *repoStoreImpl) publicToUserTrendingV2(ctx context.Context, repoType typ
 	return
 }
 
+// applyRepositoryAccessFilter applies the effective public-or-authorized-private predicate.
+func applyRepositoryAccessFilter(q *bun.SelectQuery, table string, scope RepositoryAccessScope) {
+	if scope.Mode == RepositoryAccessAdmin {
+		return
+	}
+
+	q.WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
+		q = q.Where(fmt.Sprintf("%s.private = ?", table), false)
+		if len(scope.ReadableRepositoryIDs) > 0 {
+			q.WhereOr(fmt.Sprintf("%s.id = ANY(?::bigint[])", table), pgdialect.Array(scope.ReadableRepositoryIDs))
+		}
+		return q
+	})
+}
+
+// loadSearchResultTags fills missing legacy search tags in one query for the current page.
+// Cache hits already load Tags through the original query; V2 never calls this helper.
+func (s *repoStoreImpl) loadSearchResultTags(ctx context.Context, repos []*Repository) error {
+	missing := make(map[int64]*Repository, len(repos))
+	ids := make([]int64, 0, len(repos))
+	for _, repo := range repos {
+		if repo.Tags == nil {
+			missing[repo.ID] = repo
+			ids = append(ids, repo.ID)
+		}
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	var links []RepositoryTag
+	if err := s.db.Operator.Core.NewSelect().Model(&links).Relation("Tag").
+		Where("repository_tag.repository_id IN (?)", bun.In(ids)).Scan(ctx); err != nil {
+		return err
+	}
+	for _, link := range links {
+		if link.Tag != nil {
+			missing[link.RepositoryID].Tags = append(missing[link.RepositoryID].Tags, *link.Tag)
+		}
+	}
+	return nil
+}
+
+// searchRepoWithoutCache executes a ranked search without storing user-specific results.
+func (s *repoStoreImpl) searchRepoWithoutCache(ctx context.Context, q *bun.SelectQuery, filter *types.RepoFilter, per, page int) ([]*Repository, int, error) {
+	rows := make([]*Repository, 0)
+	var err error
+	if s.DbDriver == "pg" {
+		q = buildVectorSearchQuery(q, filter, s.db.BunDB, s.SearchConfiguration, s.config.Search.RepoSearchLimit)
+		err = q.Scan(ctx, &rows)
+	} else {
+		buildLikeQuery(q, filter, s.config.Search.RepoSearchLimit)
+		err = q.Model(&rows).Scan(ctx)
+	}
+	if err != nil {
+		return nil, 0, errorx.HandleDBError(err, errorx.Ctx().Set("filter", filter))
+	}
+	return paginateRows(rows, per, page), len(rows), nil
+}
+
 func (s *repoStoreImpl) getCacheKey(q *bun.SelectQuery, repoType types.RepositoryType, filter *types.RepoFilter) (string, error) {
 	h := xxhash.New()
 	_, err := h.Write([]byte(q.String()))
@@ -1768,13 +1768,58 @@ func (s *repoStoreImpl) getCacheKey(q *bun.SelectQuery, repoType types.Repositor
 		slog.Error("failed to write query to hash", "error", err)
 		return "", err
 	}
-	filter.Sort = "" // sort in filter is useless in search, so we don't need to add it to the hash
-	_, err = fmt.Fprintf(h, "%+v", filter)
+	// Username is deliberately excluded: this cache is only used for the
+	// public scope, where it must be shared by users with different identities.
+	// UserPurchased searches are routed around this cache by publicToUser.
+	treeRepoID := int64(0)
+	treeRelation := types.ModelRelation("")
+	if filter.Tree != nil {
+		treeRepoID = filter.Tree.RepoId
+		treeRelation = filter.Tree.Relation
+	}
+	publicFilter := struct {
+		Tags                []types.TagReq
+		Search              string
+		Source              string
+		Owner               string
+		TreeRepoID          int64
+		TreeRelation        types.ModelRelation
+		ListServerless      bool
+		SpaceSDK            string
+		XnetMigrationStatus *types.XnetMigrationTaskStatus
+		Status              string
+		DatasetType         string
+		ModelParamsMin      *float64
+		ModelParamsMax      *float64
+		RepoSizeMin         *int64
+		RepoSizeMax         *int64
+	}{
+		Tags:                filter.Tags,
+		Search:              filter.Search,
+		Source:              filter.Source,
+		Owner:               filter.Owner,
+		TreeRepoID:          treeRepoID,
+		TreeRelation:        treeRelation,
+		ListServerless:      filter.ListServerless,
+		SpaceSDK:            filter.SpaceSDK,
+		XnetMigrationStatus: filter.XnetMigrationStatus,
+		Status:              filter.Status,
+		DatasetType:         filter.DatasetType,
+		ModelParamsMin:      filter.ModelParamsMin,
+		ModelParamsMax:      filter.ModelParamsMax,
+		RepoSizeMin:         filter.RepoSizeMin,
+		RepoSizeMax:         filter.RepoSizeMax,
+	}
+	serializedFilter, err := json.Marshal(publicFilter)
+	if err != nil {
+		return "", err
+	}
+	_, err = h.Write(serializedFilter)
 	if err != nil {
 		slog.Error("failed to write filter to hash", "error", err)
 		return "", err
 	}
-	return fmt.Sprintf("repo:search:%s:%x", repoType, h.Sum64()), nil
+	return fmt.Sprintf("repo:search:public:v2:%s:%x", repoType, h.Sum64()), nil
 }
 
 func paginateRows(rows []*Repository, per, page int) []*Repository {
@@ -1795,6 +1840,7 @@ func (s *repoStoreImpl) SearchRepoWithCache(ctx context.Context, q *bun.SelectQu
 	cacheExist, err := s.cache.Exists(ctx, cacheKey)
 	if err != nil {
 		slog.Warn("failed to check cache exist", "error", err)
+		return s.searchRepoWithoutCache(ctx, q, filter, per, page)
 	}
 
 	if cacheExist == 0 {
@@ -1817,34 +1863,31 @@ func (s *repoStoreImpl) SearchRepoWithCache(ctx context.Context, q *bun.SelectQu
 			return nil, 0, err
 		}
 		if len(rows) > 0 {
-			zMembers := make([]redis.Z, 0, len(rows))
+			members := make([]redis.Z, 0, len(rows))
 			for i, row := range rows {
-				// Use negative index to maintain DESC order (highest rank first)
-				zMembers = append(zMembers, redis.Z{
-					Score:  float64(-i),
-					Member: row.ID,
-				})
+				// Use negative index to maintain DESC order (highest rank first).
+				members = append(members, redis.Z{Score: float64(-i), Member: strconv.FormatInt(row.ID, 10)})
 			}
-			err = s.cache.ZAdd(ctx, cacheKey, zMembers...)
+			_, err = s.cache.Pipelined(ctx, func(pipe redis.Pipeliner) error {
+				pipe.Del(ctx, cacheKey)
+				pipe.ZAdd(ctx, cacheKey, members...)
+				pipe.Expire(ctx, cacheKey, time.Duration(s.config.Search.RepoSearchCacheTTL)*time.Second)
+				return nil
+			})
 			if err != nil {
-				slog.Warn("failed to add search result to cache", "error", err)
-				return paginateRows(rows, per, page), len(rows), nil
-			}
-			err = s.cache.Expire(ctx, cacheKey, time.Duration(s.config.Search.RepoSearchCacheTTL)*time.Second)
-			if err != nil {
-				slog.Warn("failed to expire cache", "error", err)
-				if err = s.cache.Del(ctx, cacheKey); err != nil {
-					slog.Warn("failed to delete cache", "error", err)
-				}
+				slog.Warn("failed to publish search result cache", "error", err)
 				return paginateRows(rows, per, page), len(rows), nil
 			}
 		}
+		// Return the database result directly on a miss. This avoids an
+		// unnecessary Redis round trip and keeps the ranked query intact.
+		return paginateRows(rows, per, page), len(rows), nil
 	}
 
 	total, err := s.cache.ZCard(ctx, cacheKey)
 	if err != nil {
 		slog.Error("failed to get cache card", "error", err)
-		return nil, 0, err
+		return s.searchRepoWithoutCache(ctx, q, filter, per, page)
 	}
 	count := int(total)
 	if count == 0 {
@@ -1856,7 +1899,7 @@ func (s *repoStoreImpl) SearchRepoWithCache(ctx context.Context, q *bun.SelectQu
 	idStrs, err := s.cache.ZRevRange(ctx, cacheKey, start, end)
 	if err != nil {
 		slog.Error("failed to get cache range", "error", err)
-		return nil, 0, err
+		return s.searchRepoWithoutCache(ctx, q, filter, per, page)
 	}
 
 	ids := make([]int64, 0, len(idStrs))
@@ -1864,23 +1907,29 @@ func (s *repoStoreImpl) SearchRepoWithCache(ctx context.Context, q *bun.SelectQu
 		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			slog.Error("failed to parse id", "error", err)
-			return nil, 0, err
+			_ = s.cache.Del(ctx, cacheKey)
+			return s.searchRepoWithoutCache(ctx, q, filter, per, page)
 		}
 		ids = append(ids, id)
 	}
 
 	repos := make([]*Repository, 0, len(ids))
 
-	err = s.db.Operator.Core.NewSelect().
-		Column("repository.*").
-		Model(&repos).
-		Relation("Tags").
-		Where("repository.id IN (?)", bun.In(ids)).
-		Scan(ctx)
+	// Reuse the original query so the cache hit is still constrained by the
+	// public visibility predicate and every business filter used to build it.
+	err = q.Clone().Where("repository.id IN (?)", bun.In(ids)).Model(&repos).Scan(ctx)
 	if err != nil {
 		slog.Error("failed to find repos", "error", err)
 		err = errorx.HandleDBError(err, errorx.Ctx().Set("ids", ids))
 		return nil, 0, err
+	}
+
+	if len(repos) != len(ids) {
+		// A cached ID can be deleted, made private, or otherwise stop matching
+		// the current public query. Discard the snapshot and execute a fresh DB
+		// search rather than returning a short or unauthorized page.
+		_ = s.cache.Del(ctx, cacheKey)
+		return s.searchRepoWithoutCache(ctx, q, filter, per, page)
 	}
 
 	repoMap := make(map[int64]*Repository, len(repos))

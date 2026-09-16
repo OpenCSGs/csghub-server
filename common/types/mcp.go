@@ -73,17 +73,16 @@ type MCPServer struct {
 	LaunchCmds       string           `json:"launch_cmds"`
 	AvatarURL        string           `json:"avatar_url"`
 	MirrorTaskStatus MirrorTaskStatus `json:"mirror_task_status"`
-	RepoSize         int64            `json:"repo_size"`
 }
 
 type MCPPropertyFilter struct {
-	CurrentUser      string          `json:"-"`
-	Kind             MCPPropertyKind `json:"kind"`
-	Search           string          `json:"search"`
-	Per              int             `json:"per"`
-	Page             int             `json:"page"`
-	IsAdmin          bool            `json:"-"`
-	OwnerNamespaces  []string        `json:"-"`
+	CurrentUser             string          `json:"-"`
+	Kind                    MCPPropertyKind `json:"kind"`
+	Search                  string          `json:"search"`
+	Per                     int             `json:"per"`
+	Page                    int             `json:"page"`
+	IsAdmin                 bool            `json:"-"`
+	AccessibleRepositoryIDs []int64         `json:"-"`
 }
 
 type MCPServerProperties struct {

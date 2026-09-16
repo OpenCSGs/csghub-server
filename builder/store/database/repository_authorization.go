@@ -2,11 +2,58 @@ package database
 
 import (
 	"context"
+	"slices"
 	"time"
 
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
+
+// RepositoryAccessMode identifies the source of a repository visibility scope.
+type RepositoryAccessMode string
+
+const (
+	// RepositoryAccessPublic exposes public repositories only.
+	RepositoryAccessPublic RepositoryAccessMode = "public"
+	// RepositoryAccessReadable exposes public repositories and the listed private repositories.
+	RepositoryAccessReadable RepositoryAccessMode = "readable"
+	// RepositoryAccessAdmin exposes all repositories to an administrator.
+	RepositoryAccessAdmin RepositoryAccessMode = "admin"
+)
+
+// RepositoryAccessScope carries the repository IDs returned by ReBAC for list queries.
+// Public repositories remain visible even when ReadableRepositoryIDs is empty.
+type RepositoryAccessScope struct {
+	Mode                    RepositoryAccessMode
+	ReadableRepositoryIDs   []int64
+	ReadableRepositoryIDSet map[int64]struct{}
+}
+
+// NewRepositoryAccessScope constructs a normalized readable scope from repository IDs.
+func NewRepositoryAccessScope(mode RepositoryAccessMode, ids []int64) RepositoryAccessScope {
+	if mode != RepositoryAccessReadable {
+		return RepositoryAccessScope{Mode: mode}
+	}
+
+	unique := make(map[int64]struct{}, len(ids))
+	normalized := make([]int64, 0, len(ids))
+	for _, id := range ids {
+		if id <= 0 {
+			continue
+		}
+		if _, exists := unique[id]; exists {
+			continue
+		}
+		unique[id] = struct{}{}
+		normalized = append(normalized, id)
+	}
+	slices.Sort(normalized)
+	return RepositoryAccessScope{
+		Mode:                    mode,
+		ReadableRepositoryIDs:   normalized,
+		ReadableRepositoryIDSet: unique,
+	}
+}
 
 // RepositoryAuthorization stores a direct repository grant for a user or organization.
 type RepositoryAuthorization struct {

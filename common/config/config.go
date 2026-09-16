@@ -66,6 +66,12 @@ type Config struct {
 		EnableUnit bool `env:"STARHUB_SERVER_ORGANIZATION_ENABLE_UNIT" default:"false"`
 	}
 
+	// ReBAC controls the embedded OpenFGA authorization service.
+	Rebac struct {
+		// OpenFGAListObjectMaxResult limits the number of objects returned by OpenFGA ListObjects.
+		OpenFGAListObjectMaxResult int `env:"STARHUB_SERVER_REBAC_OPENFGA_LIST_OBJECT_MAX_RESULT" default:"2000"`
+	}
+
 	APIServer struct {
 		Port         int    `env:"STARHUB_SERVER_SERVER_PORT" default:"8080"`
 		PublicDomain string `env:"STARHUB_SERVER_PUBLIC_DOMAIN" default:"http://localhost:8080"`
@@ -247,7 +253,10 @@ type Config struct {
 		InformerSyncPeriodInMin   int    `env:"STARHUB_SERVER_SPACE_INFORMER_SYNC_PERIOD_IN_MINUTES" default:"2"`
 		StatusCheckInterval       int    `env:"STARHUB_SERVER_SPACE_STATUS_CHECK_INTERVAL" default:"10"` // 10 seconds
 		SandboxPVCName            string `env:"STARHUB_SERVER_SANDBOX_PVC_NAME" default:"sandbox-storage"`
-		SandboxRuntimeClass       string `env:"STARHUB_SERVER_SANDBOX_RUNTIME_CLASS" default:"gvisor"`
+		// SandboxRuntimeClass is the Kubernetes RuntimeClass applied to sandbox pods.
+		// Empty means "use the cluster's default runtime" (typically runc); set it to a
+		// RuntimeClass name (e.g. "gvisor") to use a sandboxed runtime.
+		SandboxRuntimeClass string `env:"STARHUB_SERVER_SANDBOX_RUNTIME_CLASS"`
 		// SandboxFreeResourceMaxIdleTimeoutMin: the idle-reclaim timeout (in minutes) applied to
 		// sandboxes created on free resources (price == 0). It acts as BOTH the default (when the
 		// caller does not pass a timeout) and the upper bound (a larger caller-provided timeout is
@@ -276,8 +285,9 @@ type Config struct {
 	}
 
 	Search struct {
-		RepoSearchCacheTTL int `env:"STARHUB_SERVER_REPO_SEARCH_CACHE_TTL" default:"300"` // 5 min
-		RepoSearchLimit    int `env:"STARHUB_SERVER_REPO_SEARCH_LIMIT" default:"2000"`
+		RepoSearchCacheTTL           int `env:"STARHUB_SERVER_REPO_SEARCH_CACHE_TTL" default:"300"`            // 5 min
+		RepositoryAccessListCacheTTL int `env:"STARHUB_SERVER_REPOSITORY_ACCESS_LIST_CACHE_TTL" default:"300"` // 5 min
+		RepoSearchLimit              int `env:"STARHUB_SERVER_REPO_SEARCH_LIMIT" default:"2000"`
 	}
 
 	// send events
@@ -540,7 +550,6 @@ type Config struct {
 		OperationTimeout       int    `env:"STARHUB_SERVER_GIT_OPERATION_TIMEOUT" default:"10"`
 		CheckFileSizeEnabled   bool   `env:"STARHUB_SERVER_CHECK_FILE_SIZE_ENABLED" default:"true"`
 		MaxUnLfsFileSize       int64  `env:"STARHUB_SERVER_GIT_MAX_UN_LFS_FILE_SIZE" default:"20971520"`
-		MaxHFCommitBodySize    int64  `env:"STARHUB_SERVER_GIT_MAX_HF_COMMIT_BODY_SIZE" default:"268435456"`
 		SkipLfsFileValidation  bool   `env:"STARHUB_SERVER_SKIP_LFS_FILE_VALIDATION" default:"false"`
 		SignatureSecertKey     string `env:"STARHUB_SERVER_GIT_SIGNATURE_SECRET_KEY" default:"git-secret"`
 		MinMultipartSize       int64  `env:"STARHUB_SERVER_GIT_MIN_MULTIPART_SIZE" default:"52428800"`
@@ -588,6 +597,20 @@ type Config struct {
 			Enable bool  `env:"OPENCSG_AIGATEWAY_MODAL_API_RATE_LIMITER_ENABLE" default:"true"`
 			Limit  int64 `env:"OPENCSG_AIGATEWAY_MODAL_API_RATE_LIMITER_LIMIT" default:"2"`
 			Window int64 `env:"OPENCSG_AIGATEWAY_MODAL_API_RATE_LIMITER_WINDOW" default:"60"`
+		}
+		// CapacityPolicyDefaults supplies fallback limits for per-upstream
+		// CapacityPolicy. When an admin enables CapacityPolicy on an upstream
+		// but leaves every limit unset (all zeros), the gateway applies these
+		// defaults wholesale on every read of upstream configs (not once at
+		// load time; the defaults themselves are read from the config when
+		// the gateway component is constructed). A default of <= 0 keeps
+		// "no limit" for that dimension.
+		CapacityPolicyDefaults struct {
+			MaxConcurrency   int   `env:"OPENCSG_AIGATEWAY_CAPACITY_POLICY_DEFAULT_MAX_CONCURRENCY" default:"32"`
+			MaxQueueDepth    int   `env:"OPENCSG_AIGATEWAY_CAPACITY_POLICY_DEFAULT_MAX_QUEUE_DEPTH" default:"16"`
+			MaxTPM           int64 `env:"OPENCSG_AIGATEWAY_CAPACITY_POLICY_DEFAULT_MAX_TPM" default:"10000000"`
+			MaxRPM           int   `env:"OPENCSG_AIGATEWAY_CAPACITY_POLICY_DEFAULT_MAX_RPM" default:"100"`
+			QueueWaitSeconds int   `env:"OPENCSG_AIGATEWAY_CAPACITY_POLICY_DEFAULT_QUEUE_WAIT_SECONDS" default:"60"`
 		}
 		MetricsCollectorLookbackMinutes int `env:"OPENCSG_AIGATEWAY_METRICS_COLLECTOR_LOOKBACK_MINUTES" default:"60"`
 
@@ -759,7 +782,7 @@ type Config struct {
 		// deletes a sandbox's PVC subPath directory when the sandbox is deleted.
 		// Only requirement: a POSIX shell + rm. Default points to the internal
 		// registry so offline clusters don't depend on Docker Hub.
-		ReclaimImage            string   `env:"STARHUB_SERVER_RUNNER_RECLAIM_IMAGE" default:"opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/busybox:1.36"`
+		ReclaimImage string `env:"STARHUB_SERVER_RUNNER_RECLAIM_IMAGE" default:"opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/busybox:1.36"`
 		// csghub server webhook endpoint
 		WebHookEndpoint    string `env:"STARHUB_SERVER_RUNNER_WEBHOOK_ENDPOINT" default:"http://localhost:8080"`
 		WatchConfigmapName string `env:"STARHUB_SERVER_RUNNER_WATCH_CONFIGMAP_NAME" default:"spaces-runner-config"`

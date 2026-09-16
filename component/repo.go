@@ -25,8 +25,10 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/minio/minio-go/v7"
+	"github.com/redis/go-redis/v9"
 	ignore "github.com/sabhiram/go-gitignore"
 	"github.com/spf13/cast"
+	"golang.org/x/sync/singleflight"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"gopkg.in/yaml.v3"
@@ -37,6 +39,7 @@ import (
 	"opencsg.com/csghub-server/builder/multisync"
 	"opencsg.com/csghub-server/builder/rebac"
 	"opencsg.com/csghub-server/builder/rpc"
+	storecache "opencsg.com/csghub-server/builder/store/cache"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/store/s3"
 	"opencsg.com/csghub-server/common/config"
@@ -56,10 +59,6 @@ const (
 	MaxTreeLimit          = 10000
 	DefaultLogTreeLimit   = 25
 	MaxLogTreeLimit       = 100
-	// HF commit requests encode regular file content as Base64 inside one NDJSON
-	// record. Reserve room for the record envelope and path in addition to the
-	// configured maximum decoded file size.
-	maxNDJSONRecordOverhead = 64 * 1024
 )
 
 type repoComponentImpl struct {
@@ -114,6 +113,7 @@ type repoComponentImpl struct {
 	packageReader                  func(ctx context.Context, repoType types.RepositoryType, repoID int64, branch, commitID string) ([]byte, bool)
 	packageWriter                  func(ctx context.Context, repoType types.RepositoryType, repoID int64, commitID string, archive []byte) error
 	rebac                          rebac.Authorizer
+	repositoryAccessCache          storecache.RedisClient
 	extendRepoImpl
 }
 
@@ -123,9 +123,9 @@ type RepoComponent interface {
 	DeleteRepo(ctx context.Context, req types.DeleteRepoReq) (*database.Repository, error)
 	// CreateFork creates a fork of a repository
 	CreateFork(ctx context.Context, req types.CreateForkReq) (*database.Repository, error)
-	// PublicToUser gets visible repos of the given user and user's orgs
+	// PublicToUser gets repositories visible to the given user.
 	PublicToUser(ctx context.Context, repoType types.RepositoryType, userName string, filter *types.RepoFilter, per, page int) (repos []*database.Repository, count int, err error)
-	// PublicToUserV2 is like PublicToUser but skips Tag eager-loading for faster list queries
+	// PublicToUserV2 is like PublicToUser but skips Tag eager-loading for faster list queries.
 	PublicToUserV2(ctx context.Context, repoType types.RepositoryType, userName string, filter *types.RepoFilter, per, page int) (repos []*database.Repository, count int, err error)
 	CreateFile(ctx context.Context, req *types.CreateFileReq) (*types.CreateFileResp, error)
 	UpdateFile(ctx context.Context, req *types.UpdateFileReq) (*types.UpdateFileResp, error)
@@ -637,35 +637,130 @@ func (c *repoComponentImpl) copyLfsObjects(ctx context.Context, sourceRepoID, ta
 	return nil
 }
 
-// buildAccessibleNamespaces returns the namespace paths a user can read
-// private repos from, and whether the user is an admin (who can read all repos).
-func buildAccessibleNamespaces(u *rpc.User) (namespaces []string, isAdmin bool) {
-	dbUser := &database.User{RoleMask: strings.Join(u.Roles, ",")}
-	if dbUser.CanAdmin() {
-		return nil, true
-	}
-	// private repos under the user's own namespace and the namespaces
-	// of orgs the user belongs to are visible
-	namespaces = append(namespaces, u.Username)
-	for _, org := range u.Orgs {
-		namespaces = append(namespaces, org.Name)
-	}
-	return namespaces, false
+// repositoryAccessCacheKeyPrefix versions the per-user authorization snapshot format.
+const repositoryAccessCacheKeyPrefix = "repo:access:read:v2:"
+
+var repositoryAccessListFlight singleflight.Group
+
+// repositoryAccessSnapshot stores a validated OpenFGA ListObjects response.
+// Permission changes may remain stale until the configured TTL expires.
+type repositoryAccessSnapshot struct {
+	SchemaVersion int       `json:"schema_version"`
+	RepositoryIDs []int64   `json:"repository_ids"`
+	FetchedAt     time.Time `json:"fetched_at"`
 }
 
-// PublicToUser gets visible repos of the given user and user's orgs
-func (c *repoComponentImpl) PublicToUser(ctx context.Context, repoType types.RepositoryType, userName string, filter *types.RepoFilter, per, page int) (repos []*database.Repository, count int, err error) {
-	var ownerNamespaces []string
-	var isAdmin bool
+// loadRepositoryReadScope resolves the effective repository visibility for list queries.
+// Only the returned repository IDs are cached; search results remain user-specific database queries.
+func (c *repoComponentImpl) loadRepositoryReadScope(ctx context.Context, currentUser string) (database.RepositoryAccessScope, error) {
+	return loadRepositoryReadScope(ctx, currentUser, c.userSvcClient, c.rebac, c.repositoryAccessCache, c.config)
+}
 
-	if len(userName) > 0 {
-		user, err := c.userSvcClient.GetUserInfo(ctx, userName, userName)
-		if err != nil {
-			return nil, 0, fmt.Errorf("failed to get user info, error: %w", err)
-		}
-		ownerNamespaces, isAdmin = buildAccessibleNamespaces(user)
+// loadRepositoryReadScope resolves a user's list-query scope using the shared ReBAC and cache rules.
+// The per-user snapshot is intentionally TTL-only, so short-lived permission staleness is allowed.
+func loadRepositoryReadScope(ctx context.Context, currentUser string, userSvcClient rpc.UserSvcClient, authorizer rebac.Authorizer, accessCache storecache.RedisClient, cfg *config.Config) (database.RepositoryAccessScope, error) {
+	if currentUser == "" {
+		return database.NewRepositoryAccessScope(database.RepositoryAccessPublic, nil), nil
 	}
-	repos, count, err = c.repoStore.PublicToUser(ctx, repoType, ownerNamespaces, filter, per, page, isAdmin)
+
+	user, err := userSvcClient.GetUserInfo(ctx, currentUser, currentUser)
+	if err != nil {
+		return database.RepositoryAccessScope{}, fmt.Errorf("failed to get user info, error: %w", err)
+	}
+	if user == nil {
+		return database.RepositoryAccessScope{}, fmt.Errorf("user %q not found", currentUser)
+	}
+	if (&database.User{RoleMask: strings.Join(user.Roles, ",")}).CanAdmin() {
+		return database.NewRepositoryAccessScope(database.RepositoryAccessAdmin, nil), nil
+	}
+	if user.UUID == "" {
+		return database.RepositoryAccessScope{}, fmt.Errorf("user %q has no UUID", currentUser)
+	}
+
+	cacheKey := repositoryAccessCacheKeyPrefix + user.UUID
+	cacheTTL := 5 * time.Minute
+	if cfg != nil && cfg.Search.RepositoryAccessListCacheTTL > 0 {
+		cacheTTL = time.Duration(cfg.Search.RepositoryAccessListCacheTTL) * time.Second
+	}
+	if accessCache != nil {
+		cached, cacheErr := accessCache.Get(ctx, cacheKey)
+		if cacheErr == nil {
+			var snapshot repositoryAccessSnapshot
+			if json.Unmarshal([]byte(cached), &snapshot) == nil && snapshot.SchemaVersion == 1 && snapshot.FetchedAt.After(time.Time{}) && time.Since(snapshot.FetchedAt) < cacheTTL && validRepositoryAccessIDs(snapshot.RepositoryIDs) {
+				return database.NewRepositoryAccessScope(database.RepositoryAccessReadable, snapshot.RepositoryIDs), nil
+			}
+			slog.WarnContext(ctx, "invalid repository access cache value", "user_uuid", user.UUID)
+		} else if !errors.Is(cacheErr, redis.Nil) {
+			slog.WarnContext(ctx, "failed to read repository access cache", "user_uuid", user.UUID, "error", cacheErr)
+		}
+	}
+	if authorizer == nil {
+		return database.RepositoryAccessScope{}, errors.New("ReBAC authorizer is nil")
+	}
+
+	fetchedAt := time.Now()
+	flightResult, err, _ := repositoryAccessListFlight.Do(cacheKey, func() (any, error) {
+		return authorizer.ListObjects(ctx, rebac.ListObjectsRequest{
+			Subject:     rebac.UserSubject(user.UUID),
+			Relation:    rebac.RepositoryCanRead,
+			ObjectType:  rebac.ObjectTypeRepository,
+			Consistency: rebac.ConsistencyHigher,
+		})
+	})
+	if err != nil {
+		return database.RepositoryAccessScope{}, fmt.Errorf("failed to list readable repositories, error: %w", err)
+	}
+	result, ok := flightResult.(rebac.ListObjectsResult)
+	if !ok {
+		return database.RepositoryAccessScope{}, errors.New("invalid ReBAC ListObjects result")
+	}
+
+	ids := make([]int64, 0, len(result.Objects))
+	for _, object := range result.Objects {
+		if object.Type != rebac.ObjectTypeRepository {
+			return database.RepositoryAccessScope{}, fmt.Errorf("unexpected ReBAC object type %q", object.Type)
+		}
+		id, parseErr := strconv.ParseInt(object.ID, 10, 64)
+		if parseErr != nil || id <= 0 {
+			return database.RepositoryAccessScope{}, fmt.Errorf("invalid repository object ID %q", object.ID)
+		}
+		ids = append(ids, id)
+	}
+	scope := database.NewRepositoryAccessScope(database.RepositoryAccessReadable, ids)
+
+	if accessCache != nil {
+		remainingTTL := cacheTTL - time.Since(fetchedAt)
+		if remainingTTL > 0 {
+			snapshot := repositoryAccessSnapshot{SchemaVersion: 1, RepositoryIDs: scope.ReadableRepositoryIDs, FetchedAt: fetchedAt}
+			value, marshalErr := json.Marshal(snapshot)
+			if marshalErr == nil {
+				if setErr := accessCache.SetEx(ctx, cacheKey, string(value), remainingTTL); setErr != nil {
+					slog.WarnContext(ctx, "failed to write repository access cache", "user_uuid", user.UUID, "error", setErr)
+				}
+			}
+		}
+	}
+	return scope, nil
+}
+
+// validRepositoryAccessIDs rejects malformed permission snapshots before they
+// can widen or otherwise corrupt a repository list query.
+func validRepositoryAccessIDs(ids []int64) bool {
+	for _, id := range ids {
+		if id <= 0 {
+			return false
+		}
+	}
+	return true
+}
+
+// PublicToUser gets repositories visible to the authenticated user.
+func (c *repoComponentImpl) PublicToUser(ctx context.Context, repoType types.RepositoryType, userName string, filter *types.RepoFilter, per, page int) (repos []*database.Repository, count int, err error) {
+	scope, err := c.loadRepositoryReadScope(ctx, userName)
+	if err != nil {
+		return nil, 0, err
+	}
+	repos, count, err = c.repoStore.PublicToUserWithAccess(ctx, repoType, scope, filter, per, page)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to get user public repos, error: %w", err)
 	}
@@ -673,19 +768,13 @@ func (c *repoComponentImpl) PublicToUser(ctx context.Context, repoType types.Rep
 	return repos, count, nil
 }
 
-// PublicToUserV2 gets visible repos without eager-loading Tags for faster list queries.
+// PublicToUserV2 gets visible repositories without eager-loading Tags for faster list queries.
 func (c *repoComponentImpl) PublicToUserV2(ctx context.Context, repoType types.RepositoryType, userName string, filter *types.RepoFilter, per, page int) (repos []*database.Repository, count int, err error) {
-	var ownerNamespaces []string
-	var isAdmin bool
-
-	if len(userName) > 0 {
-		user, err := c.userSvcClient.GetUserInfo(ctx, userName, userName)
-		if err != nil {
-			return nil, 0, fmt.Errorf("failed to get user info, error: %w", err)
-		}
-		ownerNamespaces, isAdmin = buildAccessibleNamespaces(user)
+	scope, err := c.loadRepositoryReadScope(ctx, userName)
+	if err != nil {
+		return nil, 0, err
 	}
-	repos, count, err = c.repoStore.PublicToUserV2(ctx, repoType, ownerNamespaces, filter, per, page, isAdmin)
+	repos, count, err = c.repoStore.PublicToUserV2WithAccess(ctx, repoType, scope, filter, per, page)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to get user public repos v2, error: %w", err)
 	}
@@ -2619,26 +2708,21 @@ func (c *repoComponentImpl) CommitFiles(ctx context.Context, req types.CommitFil
 			return fmt.Errorf("invalid action: %s", file.Action)
 		}
 		cleanedContent := cleanBase64(file.Content)
-		content, err := base64.StdEncoding.DecodeString(cleanedContent)
-		if err != nil {
-			return fmt.Errorf("failed to decode content, err: %w", err)
-		}
-		pointer, isLFSPointer := parseCanonicalLFSPointer(content)
-		if !isLFSPointer && c.config.Git.MaxUnLfsFileSize > 0 && int64(len(content)) > c.config.Git.MaxUnLfsFileSize {
-			return fmt.Errorf(
-				"%w: file %s exceeds the maximum allowed size for non-LFS files: %d > %d",
-				errorx.ErrFileTooLarge, file.Path, len(content), c.config.Git.MaxUnLfsFileSize,
-			)
-		}
 
 		files = append(files, gitserver.CommitFile{
 			Path:    file.Path,
 			Content: cleanedContent,
 			Action:  action,
 		})
-		if isLFSPointer {
-			lfsFiles = append(lfsFiles, pointer)
+		content, err := base64.StdEncoding.DecodeString(cleanedContent)
+		if err != nil {
+			return fmt.Errorf("failed to decode content, err: %w", err)
 		}
+		p, err := gitaly.ReadPointerFromBuffer(content)
+		if err != nil {
+			continue
+		}
+		lfsFiles = append(lfsFiles, p)
 	}
 
 	for _, lfsFile := range lfsFiles {
@@ -2767,23 +2851,6 @@ func cleanBase64(input string) string {
 	return cleaned
 }
 
-func parseCanonicalLFSPointer(content []byte) (types.Pointer, bool) {
-	pointer, err := gitaly.ReadPointerFromBuffer(content)
-	if err != nil || !pointer.Valid() {
-		return types.Pointer{}, false
-	}
-
-	expected := fmt.Sprintf(
-		"%s\n%s%s\nsize %d",
-		gitaly.MetaFileIdentifier, gitaly.MetaFileOidPrefix, pointer.Oid, pointer.Size,
-	)
-	if !bytes.Equal(bytes.TrimSuffix(content, []byte("\n")), []byte(expected)) {
-		return types.Pointer{}, false
-	}
-
-	return pointer, true
-}
-
 func (c *repoComponentImpl) SendAssetManagementMsg(ctx context.Context, req types.RepoNotificationReq) error {
 	if req.RepoType == types.UnknownRepo {
 		return fmt.Errorf("unknown repository")
@@ -2892,37 +2959,45 @@ func metaText(readme string) string {
 
 func (c *repoComponentImpl) ParseNDJson(ctx *gin.Context) (*types.CommitFilesReq, error) {
 	req := &types.CommitFilesReq{}
-	maxRecordSize, err := maxNDJSONRecordSize(c.config.Git.MaxUnLfsFileSize)
-	if err != nil {
-		return nil, err
-	}
 	scanner := bufio.NewScanner(ctx.Request.Body)
-	scanner.Buffer(make([]byte, bufio.MaxScanTokenSize), maxRecordSize)
+	maxCapacity := int(c.config.Git.MaxUnLfsFileSize)
+	buf := make([]byte, maxCapacity)
+	scanner.Buffer(buf, maxCapacity)
 
 	lineNumber := 0
 	for scanner.Scan() {
 		lineNumber++
-		line := bytes.TrimSpace(scanner.Bytes())
-		if len(line) == 0 {
+		line := strings.TrimSpace(scanner.Text())
+		// Skip empty lines
+		if line == "" {
 			continue
 		}
-
 		var item types.FormField
-		if err := json.Unmarshal(line, &item); err != nil {
+		if err := json.Unmarshal([]byte(line), &item); err != nil {
 			return nil, fmt.Errorf("invalid JSON on line %d: %v", lineNumber, err)
 		}
 
 		// Parse based on key type
 		switch item.Key {
 		case "header":
+			headerBytes, err := json.Marshal(item.Value)
+			if err != nil {
+				return nil, fmt.Errorf("failed to marshal header value on line %d: %v", lineNumber, err)
+			}
+
 			var header types.CommitHeader
-			if err := json.Unmarshal(item.Value, &header); err != nil {
+			if err := json.Unmarshal(headerBytes, &header); err != nil {
 				return nil, fmt.Errorf("invalid header format on line %d: %v", lineNumber, err)
 			}
 			req.Message = header.Summary
 		case "file":
+			fileBytes, err := json.Marshal(item.Value)
+			if err != nil {
+				return nil, fmt.Errorf("failed to marshal file value on line %d: %v", lineNumber, err)
+			}
+
 			var file types.CommitFile
-			if err := json.Unmarshal(item.Value, &file); err != nil {
+			if err := json.Unmarshal(fileBytes, &file); err != nil {
 				return nil, fmt.Errorf("invalid file format on line %d: %v", lineNumber, err)
 			}
 			req.Files = append(req.Files, types.CommitFileReq{
@@ -2931,8 +3006,12 @@ func (c *repoComponentImpl) ParseNDJson(ctx *gin.Context) (*types.CommitFilesReq
 				Action:  types.CommitActionCreate,
 			})
 		case "lfsFile":
+			fileBytes, err := json.Marshal(item.Value)
+			if err != nil {
+				return nil, fmt.Errorf("failed to marshal file value on line %d: %v", lineNumber, err)
+			}
 			var file types.CommitLFSFile
-			if err := json.Unmarshal(item.Value, &file); err != nil {
+			if err := json.Unmarshal(fileBytes, &file); err != nil {
 				return nil, fmt.Errorf("invalid file format on line %d: %v", lineNumber, err)
 			}
 			oid := fmt.Sprintf("%s:%s", file.Algo, file.OID)
@@ -2947,8 +3026,13 @@ func (c *repoComponentImpl) ParseNDJson(ctx *gin.Context) (*types.CommitFilesReq
 			})
 
 		case "deletedFolder":
+			fileBytes, err := json.Marshal(item.Value)
+			if err != nil {
+				return nil, fmt.Errorf("failed to marshal file value on line %d: %v", lineNumber, err)
+			}
+
 			var file types.CommitFile
-			if err := json.Unmarshal(item.Value, &file); err != nil {
+			if err := json.Unmarshal(fileBytes, &file); err != nil {
 				return nil, fmt.Errorf("invalid file format on line %d: %v", lineNumber, err)
 			}
 			req.Files = append(req.Files, types.CommitFileReq{
@@ -2956,8 +3040,13 @@ func (c *repoComponentImpl) ParseNDJson(ctx *gin.Context) (*types.CommitFilesReq
 				Action: types.CommitActionDelete,
 			})
 		case "deletedFile":
+			fileBytes, err := json.Marshal(item.Value)
+			if err != nil {
+				return nil, fmt.Errorf("failed to marshal file value on line %d: %v", lineNumber, err)
+			}
+
 			var file types.CommitFile
-			if err := json.Unmarshal(item.Value, &file); err != nil {
+			if err := json.Unmarshal(fileBytes, &file); err != nil {
 				return nil, fmt.Errorf("invalid file format on line %d: %v", lineNumber, err)
 			}
 			req.Files = append(req.Files, types.CommitFileReq{
@@ -2970,24 +3059,9 @@ func (c *repoComponentImpl) ParseNDJson(ctx *gin.Context) (*types.CommitFilesReq
 		}
 	}
 	if err := scanner.Err(); err != nil {
-		return nil, fmt.Errorf("error reading NDJSON: %w", err)
+		return nil, fmt.Errorf("error reading NDJSON: %v", err)
 	}
 	return req, nil
-}
-
-func maxNDJSONRecordSize(maxUnLfsFileSize int64) (int, error) {
-	if maxUnLfsFileSize <= 0 {
-		return 0, fmt.Errorf("max non-LFS file size must be positive")
-	}
-
-	maxInt := int64(^uint(0) >> 1)
-	maxInputSize := ((maxInt - maxNDJSONRecordOverhead) / 4 * 3) - 2
-	if maxUnLfsFileSize > maxInputSize {
-		return 0, fmt.Errorf("max non-LFS file size is too large: %d", maxUnLfsFileSize)
-	}
-
-	encodedSize := ((maxUnLfsFileSize + 2) / 3) * 4
-	return int(encodedSize + maxNDJSONRecordOverhead), nil
 }
 
 func (c *repoComponentImpl) IsSyncing(ctx context.Context, repoType types.RepositoryType, namespace, name string) (bool, error) {
@@ -3345,33 +3419,9 @@ func (c *repoComponentImpl) BatchGetRepoExtra(ctx context.Context, repoIDs []int
 		return nil, errorx.BatchGetRepoExtraFailed(fmt.Errorf("failed to find repos by ids, error: %w", err))
 	}
 
-	// Determine which repos the user can read — same approach as PublicToUser:
-	// fetch user info once, then check ownership + privacy in-memory.
-	var isAdmin bool
-	var accessibleNamespaces map[string]bool
-	if currentUser != "" {
-		user, err := c.userSvcClient.GetUserInfo(ctx, currentUser, currentUser)
-		if err != nil {
-			return nil, errorx.BatchGetRepoExtraFailed(fmt.Errorf("failed to get user info, error: %w", err))
-		}
-		ns, admin := buildAccessibleNamespaces(user)
-		isAdmin = admin
-		if !isAdmin {
-			accessibleNamespaces = make(map[string]bool, len(ns))
-			for _, n := range ns {
-				accessibleNamespaces[n] = true
-			}
-		}
-	}
-
-	// Filter repos to those the user has read permission for
-	readableRepos := make([]*database.Repository, 0, len(repos))
-	for _, repo := range repos {
-		if isAdmin || !repo.Private {
-			readableRepos = append(readableRepos, repo)
-		} else if namespace, _, ok := strings.Cut(repo.Path, "/"); ok && accessibleNamespaces[namespace] {
-			readableRepos = append(readableRepos, repo)
-		}
+	readableRepos, err := c.batchReadableRepositories(ctx, repos, currentUser)
+	if err != nil {
+		return nil, errorx.BatchGetRepoExtraFailed(err)
 	}
 
 	// Collect readable repo IDs for enrichment queries
@@ -3480,6 +3530,75 @@ func (c *repoComponentImpl) BatchGetRepoExtra(ctx context.Context, repoIDs []int
 	})
 
 	return result, nil
+}
+
+// batchReadableRepositories checks exactly the requested repositories in one ReBAC batch.
+// Public repositories remain readable by the effective repository permission rule.
+func (c *repoComponentImpl) batchReadableRepositories(ctx context.Context, repos []*database.Repository, currentUser string) ([]*database.Repository, error) {
+	if len(repos) == 0 {
+		return nil, nil
+	}
+	if currentUser == "" {
+		readable := make([]*database.Repository, 0, len(repos))
+		for _, repo := range repos {
+			if !repo.Private {
+				readable = append(readable, repo)
+			}
+		}
+		return readable, nil
+	}
+
+	user, err := c.userSvcClient.GetUserInfo(ctx, currentUser, currentUser)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get user info, error: %w", err)
+	}
+	if user == nil {
+		return nil, fmt.Errorf("user %q not found", currentUser)
+	}
+	if (&database.User{RoleMask: strings.Join(user.Roles, ",")}).CanAdmin() {
+		return repos, nil
+	}
+	if user.UUID == "" {
+		return nil, fmt.Errorf("user %q has no UUID", currentUser)
+	}
+
+	checks := make([]rebac.BatchCheckItem, 0, len(repos))
+	for index, repo := range repos {
+		checks = append(checks, rebac.BatchCheckItem{
+			CorrelationID: rebac.BatchCheckCorrelationID(index),
+			Check: rebac.CheckRequest{
+				Subject:     rebac.UserSubject(user.UUID),
+				Relation:    rebac.RepositoryCanRead,
+				Object:      rebac.RepositoryObject(repo.ID),
+				Consistency: rebac.ConsistencyHigher,
+			},
+		})
+	}
+	readable := make([]*database.Repository, 0, len(repos))
+	for start := 0; start < len(checks); start += rebac.DefaultMaxBatchSize {
+		end := min(start+rebac.DefaultMaxBatchSize, len(checks))
+		result, batchErr := c.rebac.BatchCheck(ctx, rebac.BatchCheckRequest{Checks: checks[start:end]})
+		if batchErr != nil {
+			return nil, fmt.Errorf("batch check repository read permissions: %w", batchErr)
+		}
+		for index := start; index < end; index++ {
+			repo := repos[index]
+			// Correlation IDs are assigned when the complete request list is built.
+			// Preserve that global index when reading each chunk's response.
+			correlationID := rebac.BatchCheckCorrelationID(index)
+			outcome, exists := result.Results[correlationID]
+			if !exists {
+				return nil, fmt.Errorf("missing ReBAC batch result %q", correlationID)
+			}
+			if outcome.Err != nil {
+				return nil, fmt.Errorf("batch check repository %d: %w", repo.ID, outcome.Err)
+			}
+			if !repo.Private || outcome.Decision.Allowed {
+				readable = append(readable, repo)
+			}
+		}
+	}
+	return readable, nil
 }
 
 func (c *repoComponentImpl) SyncRepositoryPackage(ctx context.Context, repo *database.Repository, namespace, name, branch string) error {

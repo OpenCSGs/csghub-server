@@ -1,6 +1,9 @@
 package config
 
 import (
+	"fmt"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -25,6 +28,7 @@ func TestConfig_loadConfig(t *testing.T) {
 		require.Equal(t, "https://example.posthog.test", cfg.PostHog.APIHost)
 		require.Equal(t, "staging", cfg.PostHog.Environment)
 		require.False(t, cfg.Organization.EnableUnit)
+		require.Equal(t, 2000, cfg.Rebac.OpenFGAListObjectMaxResult)
 	})
 
 	t.Run("config file", func(t *testing.T) {
@@ -35,6 +39,14 @@ func TestConfig_loadConfig(t *testing.T) {
 		require.Equal(t, "bar", cfg.InstanceID)
 		require.Equal(t, 4321, cfg.APIServer.Port)
 		require.Equal(t, "ssh://git@localhost:2222", cfg.APIServer.SSHDomain)
+	})
+
+	t.Run("rebac list objects limit env", func(t *testing.T) {
+		SetConfigFile("")
+		t.Setenv("STARHUB_SERVER_REBAC_OPENFGA_LIST_OBJECT_MAX_RESULT", "1200")
+		cfg, err := loadConfig()
+		require.NoError(t, err)
+		require.Equal(t, 1200, cfg.Rebac.OpenFGAListObjectMaxResult)
 	})
 
 	t.Run("file and env", func(t *testing.T) {
@@ -62,4 +74,20 @@ func TestConfig_loadConfig(t *testing.T) {
 		require.Equal(t, 9101, cfg.FederationAdapter.Port)
 		require.Equal(t, "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=", cfg.Credential.MasterKeyBase64)
 	})
+}
+
+// TestConfigRebacTOML verifies the documented key and nonpositive values survive loading.
+func TestConfigRebacTOML(t *testing.T) {
+	previous := configFile
+	t.Cleanup(func() { SetConfigFile(previous) })
+	for _, value := range []string{"1200", "0", "-1"} {
+		t.Run(value, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "rebac.toml")
+			require.NoError(t, os.WriteFile(path, []byte("[rebac]\nopenfga_list_object_max_result = "+value+"\n"), 0600))
+			SetConfigFile(path)
+			cfg, err := loadConfig()
+			require.NoError(t, err)
+			require.Equal(t, value, fmt.Sprint(cfg.Rebac.OpenFGAListObjectMaxResult))
+		})
+	}
 }
