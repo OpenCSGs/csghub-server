@@ -19,6 +19,7 @@ import (
 	"opencsg.com/csghub-server/builder/rebac"
 	rebacfactory "opencsg.com/csghub-server/builder/rebac/factory"
 	"opencsg.com/csghub-server/builder/rpc"
+	storecache "opencsg.com/csghub-server/builder/store/cache"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/errorx"
@@ -38,26 +39,35 @@ type MCPServerComponent interface {
 }
 
 type mcpServerComponentImpl struct {
-	config             *config.Config
-	repoComponent      RepoComponent
-	repoStore          database.RepoStore
-	orgStore           database.OrgStore
-	gitServer          gitserver.GitServer
-	userSvcClient      rpc.UserSvcClient
-	mcpServerStore     database.MCPServerStore
-	userLikesStore     database.UserLikesStore
-	recomStore         database.RecomStore
-	spaceStore         database.SpaceStore
-	spaceResourceStore database.SpaceResourceStore
-	tokenStore         database.AccessTokenStore
-	namespaceStore     database.NamespaceStore
-	rebac              rebac.Authorizer
+	config                *config.Config
+	repoComponent         RepoComponent
+	repoStore             database.RepoStore
+	orgStore              database.OrgStore
+	gitServer             gitserver.GitServer
+	userSvcClient         rpc.UserSvcClient
+	mcpServerStore        database.MCPServerStore
+	userLikesStore        database.UserLikesStore
+	recomStore            database.RecomStore
+	spaceStore            database.SpaceStore
+	spaceResourceStore    database.SpaceResourceStore
+	tokenStore            database.AccessTokenStore
+	namespaceStore        database.NamespaceStore
+	rebac                 rebac.Authorizer
+	repositoryAccessCache storecache.RedisClient
 }
 
 func NewMCPServerComponent(config *config.Config) (MCPServerComponent, error) {
 	var err error
 	m := &mcpServerComponentImpl{}
 	m.config = config
+	m.repositoryAccessCache, err = storecache.NewCache(context.Background(), storecache.RedisConfig{
+		Addr:     config.Redis.Endpoint,
+		Username: config.Redis.User,
+		Password: config.Redis.Password,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize repository access cache: %w", err)
+	}
 	m.repoComponent, err = NewRepoComponentImpl(config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create repo component for mcp, error: %w", err)
@@ -488,22 +498,14 @@ func (m *mcpServerComponentImpl) Index(ctx context.Context, filter *types.RepoFi
 }
 
 func (m *mcpServerComponentImpl) Properties(ctx context.Context, req *types.MCPPropertyFilter) ([]types.MCPServerProperties, int, error) {
-	var (
-		isAdmin         bool
-		ownerNamespaces []string
-	)
-	if len(req.CurrentUser) > 0 {
-		user, err := m.userSvcClient.GetUserInfo(ctx, req.CurrentUser, req.CurrentUser)
-		if err != nil {
-			return nil, 0, fmt.Errorf("failed to get user info for list mcp tools, error: %w", err)
-		}
-		ownerNamespaces, isAdmin = buildAccessibleNamespaces(user)
+	scope, err := loadRepositoryReadScope(ctx, req.CurrentUser, m.userSvcClient, m.rebac, m.repositoryAccessCache, m.config)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to get repository access scope for list mcp tools, error: %w", err)
 	}
+	req.IsAdmin = scope.Mode == database.RepositoryAccessAdmin
+	req.AccessibleRepositoryIDs = scope.ReadableRepositoryIDs
 
-	req.IsAdmin = isAdmin
-	req.OwnerNamespaces = ownerNamespaces
-
-	slog.Debug("get user info to list tools", slog.Any("req", req), slog.Any("isadmin", req.IsAdmin), slog.Any("ownerNamespaces", req.OwnerNamespaces))
+	slog.Debug("get repository access scope to list tools", slog.Any("req", req), slog.Any("isadmin", req.IsAdmin), slog.Any("repositoryIDs", req.AccessibleRepositoryIDs))
 	res, total, err := m.mcpServerStore.ListProperties(ctx, req)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to list mcp tools, error: %w", err)

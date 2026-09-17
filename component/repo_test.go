@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net/http/httptest"
 	"net/url"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -25,6 +26,7 @@ import (
 	"google.golang.org/grpc/status"
 	mockrebac "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/rebac"
 	mockrpc "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/rpc"
+	mockcache "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/cache"
 	"opencsg.com/csghub-server/builder/deploy"
 	deployStatus "opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/builder/git/gitserver"
@@ -406,6 +408,7 @@ func TestRepoComponent_PublicToUser(t *testing.T) {
 
 	repo.mocks.userSvcClient.EXPECT().GetUserInfo(ctx, "user", "user").Return(&rpc.User{
 		ID:       1,
+		UUID:     "user-uuid",
 		Username: "user",
 		Roles:    []string{"a", "b"},
 		Orgs: []rpc.Organization{
@@ -418,12 +421,34 @@ func TestRepoComponent_PublicToUser(t *testing.T) {
 	mrepos := []*database.Repository{
 		{Name: "foo"},
 	}
-	repo.mocks.stores.RepoMock().EXPECT().PublicToUser(ctx, types.ModelRepo, []string{"user", "org1", "org2"}, filter, 10, 1, false).Return(mrepos, 100, nil)
+	repoAuthorizerMock(repo).EXPECT().ListObjects(ctx, rebac.ListObjectsRequest{
+		Subject:     rebac.UserSubject("user-uuid"),
+		Relation:    rebac.RepositoryCanRead,
+		ObjectType:  rebac.ObjectTypeRepository,
+		Consistency: rebac.ConsistencyHigher,
+	}).Return(rebac.ListObjectsResult{Objects: []rebac.Object{rebac.RepositoryObject(42)}}, nil)
+	repo.mocks.stores.RepoMock().On("PublicToUserWithAccess", ctx, types.ModelRepo, mock.Anything, filter, 10, 1).Return(mrepos, 100, nil)
 
 	repos, count, err := repo.PublicToUser(ctx, types.ModelRepo, "user", &types.RepoFilter{}, 10, 1)
 	require.Equal(t, mrepos, repos)
 	require.Equal(t, 100, count)
 	require.Nil(t, err)
+}
+
+func TestRepoComponent_LoadRepositoryReadScopeFromCache(t *testing.T) {
+	ctx := context.Background()
+	repo := initializeTestRepoComponent(ctx, t)
+	repo.repoComponentImpl.repositoryAccessCache = mockcache.NewMockRedisClient(t)
+	repo.mocks.userSvcClient.EXPECT().GetUserInfo(ctx, "user", "user").Return(&rpc.User{
+		UUID: "user-uuid",
+	}, nil)
+	cache := repo.repoComponentImpl.repositoryAccessCache.(*mockcache.MockRedisClient)
+	cache.EXPECT().Get(ctx, "repo:access:read:v2:user-uuid").Return(fmt.Sprintf(`{"schema_version":1,"repository_ids":[5,3,5],"fetched_at":%q}`, time.Now().UTC().Format(time.RFC3339Nano)), nil)
+
+	scope, err := repo.loadRepositoryReadScope(ctx, "user")
+	require.NoError(t, err)
+	require.Equal(t, database.RepositoryAccessReadable, scope.Mode)
+	require.Equal(t, []int64{3, 5}, scope.ReadableRepositoryIDs)
 }
 
 func mockUserRepoAdminPermission(ctx context.Context, stores *tests.MockStores, userName string) {
@@ -456,6 +481,48 @@ func expectNamespacePermissionCheck(repo *testRepoWithMocks, permission rebac.Pe
 
 func repoAuthorizerMock(repo *testRepoWithMocks) *mockrebac.MockAuthorizer {
 	return repo.repoComponentImpl.rebac.(*mockrebac.MockAuthorizer)
+}
+
+func expectBatchRepositoryRead(repo *testRepoWithMocks, ctx context.Context, userUUID string, allowed map[int64]bool) {
+	repoAuthorizerMock(repo).EXPECT().BatchCheck(ctx, mock.MatchedBy(func(request rebac.BatchCheckRequest) bool {
+		return len(request.Checks) > 0 && request.Checks[0].Check.Subject == rebac.UserSubject(userUUID)
+	})).RunAndReturn(func(_ context.Context, request rebac.BatchCheckRequest) (rebac.BatchCheckResult, error) {
+		result := rebac.BatchCheckResult{Results: make(map[string]rebac.BatchCheckOutcome, len(request.Checks))}
+		for _, item := range request.Checks {
+			repoID, _ := strconv.ParseInt(item.Check.Object.ID, 10, 64)
+			result.Results[item.CorrelationID] = rebac.BatchCheckOutcome{
+				Decision: rebac.Decision{Allowed: allowed[repoID]},
+			}
+		}
+		return result, nil
+	}).Once()
+}
+
+func TestRepoComponent_BatchReadableRepositoriesAcrossBatches(t *testing.T) {
+	ctx := context.Background()
+	repoComp := initializeTestRepoComponent(ctx, t)
+	repoComp.mocks.userSvcClient.EXPECT().GetUserInfo(ctx, "user1", "user1").Return(&rpc.User{
+		UUID:  "user1-uuid",
+		Roles: []string{},
+	}, nil)
+
+	repos := make([]*database.Repository, 51)
+	for i := range repos {
+		repos[i] = &database.Repository{ID: int64(i + 1), Private: true}
+	}
+	repoAuthorizerMock(repoComp).EXPECT().BatchCheck(ctx, mock.MatchedBy(func(request rebac.BatchCheckRequest) bool {
+		return len(request.Checks) > 0 && len(request.Checks) <= rebac.DefaultMaxBatchSize
+	})).RunAndReturn(func(_ context.Context, request rebac.BatchCheckRequest) (rebac.BatchCheckResult, error) {
+		result := rebac.BatchCheckResult{Results: make(map[string]rebac.BatchCheckOutcome, len(request.Checks))}
+		for _, check := range request.Checks {
+			result.Results[check.CorrelationID] = rebac.BatchCheckOutcome{Decision: rebac.Decision{Allowed: true}}
+		}
+		return result, nil
+	}).Times(2)
+
+	readable, err := repoComp.batchReadableRepositories(ctx, repos, "user1")
+	require.NoError(t, err)
+	require.Len(t, readable, len(repos))
 }
 
 func TestRepoComponent_RelatedRepos(t *testing.T) {
@@ -3307,10 +3374,12 @@ func TestRepoComponent_BatchGetRepoExtra(t *testing.T) {
 
 		repoComp.mocks.userSvcClient.EXPECT().GetUserInfo(ctx, "user1", "user1").Return(&rpc.User{
 			ID:       1,
+			UUID:     "user1-uuid",
 			Username: "user1",
 			Roles:    []string{},
 			Orgs:     []rpc.Organization{{Name: "org1", UserID: 3}},
 		}, nil)
+		expectBatchRepositoryRead(repoComp, ctx, "user1-uuid", map[int64]bool{1: true, 2: true})
 
 		// Own repo, org repo, public repo, private unrelated repo
 		repos := []*database.Repository{
@@ -3347,10 +3416,12 @@ func TestRepoComponent_BatchGetRepoExtra(t *testing.T) {
 		// org member, even though its UserID matches the org's UserID.
 		repoComp.mocks.userSvcClient.EXPECT().GetUserInfo(ctx, "user1", "user1").Return(&rpc.User{
 			ID:       1,
+			UUID:     "user1-uuid",
 			Username: "user1",
 			Roles:    []string{},
 			Orgs:     []rpc.Organization{{Name: "org1", UserID: 3}},
 		}, nil)
+		expectBatchRepositoryRead(repoComp, ctx, "user1-uuid", map[int64]bool{1: true, 2: true})
 
 		repos := []*database.Repository{
 			{ID: 1, UserID: 1, Path: "user1/repo1", Private: true, DefaultBranch: "main"},
@@ -3407,10 +3478,12 @@ func TestRepoComponent_BatchGetRepoExtra(t *testing.T) {
 
 		repoComp.mocks.userSvcClient.EXPECT().GetUserInfo(ctx, "user1", "user1").Return(&rpc.User{
 			ID:       1,
+			UUID:     "user1-uuid",
 			Username: "user1",
 			Roles:    []string{},
 			Orgs:     []rpc.Organization{},
 		}, nil)
+		expectBatchRepositoryRead(repoComp, ctx, "user1-uuid", map[int64]bool{1: true})
 
 		repos := []*database.Repository{
 			{ID: 1, UserID: 1, Path: "user1/repo1", Private: true, DefaultBranch: ""},
@@ -3431,10 +3504,12 @@ func TestRepoComponent_BatchGetRepoExtra(t *testing.T) {
 
 		repoComp.mocks.userSvcClient.EXPECT().GetUserInfo(ctx, "user1", "user1").Return(&rpc.User{
 			ID:       1,
+			UUID:     "user1-uuid",
 			Username: "user1",
 			Roles:    []string{},
 			Orgs:     []rpc.Organization{},
 		}, nil)
+		expectBatchRepositoryRead(repoComp, ctx, "user1-uuid", map[int64]bool{1: true})
 
 		repos := []*database.Repository{
 			{ID: 1, UserID: 1, Path: "user1/repo1", Private: true, DefaultBranch: "main"},
@@ -3460,10 +3535,12 @@ func TestRepoComponent_BatchGetRepoExtra(t *testing.T) {
 
 		repoComp.mocks.userSvcClient.EXPECT().GetUserInfo(ctx, "user1", "user1").Return(&rpc.User{
 			ID:       1,
+			UUID:     "user1-uuid",
 			Username: "user1",
 			Roles:    []string{},
 			Orgs:     []rpc.Organization{},
 		}, nil)
+		expectBatchRepositoryRead(repoComp, ctx, "user1-uuid", map[int64]bool{})
 
 		repos := []*database.Repository{
 			{ID: 1, UserID: 99, Path: "other/repo1", Private: true, DefaultBranch: "main"},
@@ -3506,10 +3583,12 @@ func TestRepoComponent_BatchGetRepoExtra(t *testing.T) {
 
 		repoComp.mocks.userSvcClient.EXPECT().GetUserInfo(ctx, "user1", "user1").Return(&rpc.User{
 			ID:       1,
+			UUID:     "user1-uuid",
 			Username: "user1",
 			Roles:    []string{},
 			Orgs:     []rpc.Organization{},
 		}, nil)
+		expectBatchRepositoryRead(repoComp, ctx, "user1-uuid", map[int64]bool{1: true})
 
 		repos := []*database.Repository{
 			{ID: 1, UserID: 1, Path: "user1/repo1", Private: true, DefaultBranch: "main"},

@@ -13,6 +13,7 @@ import (
 	"opencsg.com/csghub-server/builder/multisync"
 	rebacfactory "opencsg.com/csghub-server/builder/rebac/factory"
 	"opencsg.com/csghub-server/builder/rpc"
+	storecache "opencsg.com/csghub-server/builder/store/cache"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/store/s3"
 	"opencsg.com/csghub-server/common/config"
@@ -25,6 +26,15 @@ type advancedRepoInterface interface{}
 
 func NewRepoComponent(config *config.Config) (RepoComponent, error) {
 	c := &repoComponentImpl{}
+	repositoryAccessCache, err := storecache.NewCache(context.Background(), storecache.RedisConfig{
+		Addr:     config.Redis.Endpoint,
+		Username: config.Redis.User,
+		Password: config.Redis.Password,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize repository access cache: %w", err)
+	}
+	c.repositoryAccessCache = repositoryAccessCache
 	c.extendRepoImpl = extendRepoImpl{}
 	c.namespaceStore = database.NewNamespaceStore()
 	c.userStore = database.NewUserStore()

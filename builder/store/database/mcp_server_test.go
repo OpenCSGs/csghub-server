@@ -109,6 +109,47 @@ func TestMCPServerStore_CURD(t *testing.T) {
 	require.Equal(t, 0, total)
 }
 
+func TestMCPServerStore_ListPropertiesUsesRepositoryAccessIDs(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.Background()
+	store := database.NewMCPServerStoreWithDB(db)
+	repo, err := database.NewRepoStoreWithDB(db).CreateRepo(ctx, database.Repository{
+		UserID:         1,
+		Path:           "private/tools",
+		GitPath:        "private/tools",
+		Private:        true,
+		RepositoryType: types.MCPServerRepo,
+	})
+	require.NoError(t, err)
+	server, err := store.Create(ctx, database.MCPServer{RepositoryID: repo.ID})
+	require.NoError(t, err)
+	_, err = store.AddProperty(ctx, database.MCPServerProperty{
+		MCPServerID: server.ID,
+		Kind:        types.MCPPropTool,
+		Name:        "private-tool",
+	})
+	require.NoError(t, err)
+
+	allowed := &types.MCPPropertyFilter{
+		Kind:                    types.MCPPropTool,
+		Per:                     10,
+		Page:                    1,
+		AccessibleRepositoryIDs: []int64{repo.ID},
+	}
+	properties, total, err := store.ListProperties(ctx, allowed)
+	require.NoError(t, err)
+	require.Len(t, properties, 1)
+	require.Equal(t, 1, total)
+
+	denied := *allowed
+	denied.AccessibleRepositoryIDs = nil
+	properties, total, err = store.ListProperties(ctx, &denied)
+	require.NoError(t, err)
+	require.Empty(t, properties)
+	require.Zero(t, total)
+}
+
 func TestMCPServerStore_ByUsername(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
