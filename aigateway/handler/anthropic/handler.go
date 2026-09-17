@@ -312,7 +312,7 @@ func (h *Handler) runPostProcessAsync(ctx context.Context, input postProcessInpu
 
 		// Record usage (only on successful status).
 		if h.UsageRecorder != nil && input.Model != nil && input.Usage != nil && isSuccessfulStatus(input.StatusCode) {
-			if err := h.UsageRecorder.RecordUsage(usageCtx, input.NSUUID, input.Model, input.TargetModelName, input.Usage.PromptTokens, input.Usage.CompletionTokens, input.Usage.CachedPromptTokens, input.Usage.CacheCreationPromptTokens, input.ApiKey); err != nil {
+			if err := h.UsageRecorder.RecordUsage(usageCtx, input.NSUUID, input.Model, input.TargetModelName, input.Usage.toUsage(), input.ApiKey); err != nil {
 				slog.ErrorContext(usageCtx, "failed to record token usage", slog.Any("error", err))
 			}
 		}

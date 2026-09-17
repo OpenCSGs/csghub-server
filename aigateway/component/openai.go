@@ -593,6 +593,7 @@ type usageMeteringExtra struct {
 	PromptTokenNum      string                     `json:"prompt_token_num"`
 	PromptTokenCacheNum string                     `json:"prompt_token_cache_num"`
 	CompletionTokenNum  string                     `json:"completion_token_num"`
+	ReasoningTokenNum   string                     `json:"reasoning_token_num"`
 	OwnerType           commontypes.TokenUsageType `json:"owner_type"`
 	APIKey              string                     `json:"api_key"`
 	Provider            string                     `json:"provider"`
@@ -618,6 +619,7 @@ func buildUsageExtraData(usageModel *types.Model, upstreamModelName string, usag
 		PromptTokenNum:       fmt.Sprintf("%d", usage.PromptTokens),
 		PromptTokenCacheNum:  fmt.Sprintf("%d", usage.CachedPromptTokens),
 		CompletionTokenNum:   fmt.Sprintf("%d", usage.CompletionTokens),
+		ReasoningTokenNum:    fmt.Sprintf("%d", usage.ReasoningTokens),
 		OwnerType:            meteringInfo.OwnerType,
 		APIKey:               apikey,
 		Provider:             usageModel.Provider,
