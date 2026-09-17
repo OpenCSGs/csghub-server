@@ -82,14 +82,14 @@ var cmdClearSyncVersion = &cobra.Command{
 					return
 				}
 
-				mMatched, dMatched, err := repoFilter.BatchMatch(ctx, repos)
+				matchedByType, err := repoFilter.BatchMatch(ctx, repos)
 				if err != nil {
 					slog.Error("failed to find mismatch repos", slog.Any("error", err))
 					return
 				}
 
-				modelsToKeep = append(modelsToKeep, mMatched...)
-				datasetsToKeep = append(datasetsToKeep, dMatched...)
+				modelsToKeep = append(modelsToKeep, matchedByType[types.ModelRepo]...)
+				datasetsToKeep = append(datasetsToKeep, matchedByType[types.DatasetRepo]...)
 
 				batch++
 			}
