@@ -1509,9 +1509,131 @@ func TestDbUpstreamsToConfigsMetadataPassthrough(t *testing.T) {
 		URL:      "http://upstream.example.com/v1/chat/completions",
 		Enabled:  true,
 		Metadata: metadata,
-	}})
+	}}, commontypes.CapacityPolicy{})
 	require.Len(t, result, 1)
 	require.Equal(t, metadata, result[0].Metadata)
+}
+
+func TestDbUpstreamsToConfigsCapacityPolicyDefaults(t *testing.T) {
+	defaults := commontypes.CapacityPolicy{
+		MaxConcurrency: 16,
+		MaxQueueDepth:  32,
+		MaxTPM:         200000,
+		MaxRPM:         120,
+	}
+
+	t.Run("enabled policy with all limits unset uses defaults wholesale", func(t *testing.T) {
+		dbUpstreams := []database.Upstream{{
+			ID:  1,
+			URL: "http://upstream.example.com",
+			CapacityPolicy: &commontypes.CapacityPolicy{
+				Enabled: true,
+			},
+		}}
+		result := dbUpstreamsToConfigs(dbUpstreams, defaults)
+		require.Len(t, result, 1)
+		require.Equal(t, &commontypes.CapacityPolicy{
+			Enabled:        true,
+			MaxConcurrency: 16,
+			MaxQueueDepth:  32,
+			MaxTPM:         200000,
+			MaxRPM:         120,
+		}, result[0].CapacityPolicy)
+	})
+
+	t.Run("enabled policy with positive limits keeps its values", func(t *testing.T) {
+		dbUpstreams := []database.Upstream{{
+			ID:  1,
+			URL: "http://upstream.example.com",
+			CapacityPolicy: &commontypes.CapacityPolicy{
+				Enabled:        true,
+				MaxConcurrency: 4,
+				MaxQueueDepth:  8,
+				MaxTPM:         1000,
+				MaxRPM:         10,
+			},
+		}}
+		result := dbUpstreamsToConfigs(dbUpstreams, defaults)
+		require.Len(t, result, 1)
+		require.Equal(t, &commontypes.CapacityPolicy{
+			Enabled:        true,
+			MaxConcurrency: 4,
+			MaxQueueDepth:  8,
+			MaxTPM:         1000,
+			MaxRPM:         10,
+		}, result[0].CapacityPolicy)
+	})
+
+	t.Run("any limit set keeps the whole policy untouched", func(t *testing.T) {
+		dbUpstreams := []database.Upstream{{
+			ID:  1,
+			URL: "http://upstream.example.com",
+			CapacityPolicy: &commontypes.CapacityPolicy{
+				Enabled: true,
+				MaxTPM:  5000,
+			},
+		}}
+		result := dbUpstreamsToConfigs(dbUpstreams, defaults)
+		require.Len(t, result, 1)
+		// MaxTPM=0 is explicit unlimited; defaults must not leak in.
+		require.Equal(t, &commontypes.CapacityPolicy{
+			Enabled: true,
+			MaxTPM:  5000,
+		}, result[0].CapacityPolicy)
+	})
+
+	t.Run("disabled policy is left untouched", func(t *testing.T) {
+		dbUpstreams := []database.Upstream{{
+			ID:  1,
+			URL: "http://upstream.example.com",
+			CapacityPolicy: &commontypes.CapacityPolicy{
+				Enabled:        false,
+				MaxConcurrency: 0,
+				MaxRPM:         -1,
+			},
+		}}
+		result := dbUpstreamsToConfigs(dbUpstreams, defaults)
+		require.Len(t, result, 1)
+		require.Equal(t, &commontypes.CapacityPolicy{
+			Enabled:        false,
+			MaxConcurrency: 0,
+			MaxRPM:         -1,
+		}, result[0].CapacityPolicy)
+	})
+
+	t.Run("nil policy stays nil", func(t *testing.T) {
+		dbUpstreams := []database.Upstream{{
+			ID:  1,
+			URL: "http://upstream.example.com",
+		}}
+		result := dbUpstreamsToConfigs(dbUpstreams, defaults)
+		require.Len(t, result, 1)
+		require.Nil(t, result[0].CapacityPolicy)
+	})
+
+	t.Run("zero defaults keep no-limit semantics for enabled policy", func(t *testing.T) {
+		dbUpstreams := []database.Upstream{{
+			ID:  1,
+			URL: "http://upstream.example.com",
+			CapacityPolicy: &commontypes.CapacityPolicy{
+				Enabled: true,
+			},
+		}}
+		result := dbUpstreamsToConfigs(dbUpstreams, commontypes.CapacityPolicy{})
+		require.Len(t, result, 1)
+		require.Equal(t, &commontypes.CapacityPolicy{Enabled: true}, result[0].CapacityPolicy)
+	})
+
+	t.Run("database upstream policy is not mutated", func(t *testing.T) {
+		dbPolicy := &commontypes.CapacityPolicy{Enabled: true, MaxTPM: 0}
+		dbUpstreams := []database.Upstream{{
+			ID:             1,
+			URL:            "http://upstream.example.com",
+			CapacityPolicy: dbPolicy,
+		}}
+		_ = dbUpstreamsToConfigs(dbUpstreams, defaults)
+		require.Equal(t, &commontypes.CapacityPolicy{Enabled: true, MaxTPM: 0}, dbPolicy)
+	})
 }
 
 func TestModelUpstreamsAvailable(t *testing.T) {

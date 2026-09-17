@@ -424,3 +424,44 @@ func TestDeployTaskStore_GetDeployByIDWithRelations(t *testing.T) {
 	require.NoError(t, err)
 	require.Nil(t, notFound)
 }
+
+func TestUpstreamStore_CapacityPolicyRoundTrip(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+	store := database.NewUpstreamStoreWithDB(db, nil)
+	cfg := createTestLLMConfigForUpstream(ctx, t, db, "test-capacity-policy")
+
+	policy := &types.CapacityPolicy{
+		Enabled:        true,
+		MaxConcurrency: 16,
+		MaxQueueDepth:  32,
+		MaxTPM:         200000,
+		MaxRPM:         120,
+	}
+	up := &database.Upstream{
+		LLMConfigID:    cfg.ID,
+		URL:            "http://capacity-svc:8080/v1",
+		Weight:         1,
+		Enabled:        true,
+		Source:         types.UpstreamSourceExternal,
+		CapacityPolicy: policy,
+	}
+	err := store.Create(ctx, up)
+	require.NoError(t, err)
+
+	found, err := store.GetByID(ctx, up.ID)
+	require.NoError(t, err)
+	require.NotNil(t, found)
+	require.Equal(t, policy, found.CapacityPolicy)
+
+	// A policy can be cleared by updating the column to NULL.
+	up.CapacityPolicy = nil
+	err = store.Update(ctx, up)
+	require.NoError(t, err)
+
+	found, err = store.GetByID(ctx, up.ID)
+	require.NoError(t, err)
+	require.NotNil(t, found)
+	require.Nil(t, found.CapacityPolicy)
+}

@@ -328,6 +328,7 @@ func (s *llmServiceComponentImpl) CreateLLMConfig(ctx context.Context, req *type
 			Tags:                  u.Tags,
 			Metadata:              u.Metadata,
 			LimitPolicy:           u.LimitPolicy,
+			CapacityPolicy:        u.CapacityPolicy,
 		}
 		if dbUp.Weight <= 0 {
 			dbUp.Weight = 1
@@ -380,6 +381,35 @@ func validateOptionalLLMTypes(types []int) error {
 		if !database.IsValidLLMType(typ) {
 			return fmt.Errorf("%w: invalid llm type %d", ErrInvalidLLMConfig, typ)
 		}
+	}
+	return nil
+}
+
+// validateCapacityPolicy checks an admin-supplied CapacityPolicy. Disabled
+// policies are stored as-is; enabled policies accept limits >= 0, where 0
+// means "unset": an all-zero enabled policy is default-filled from
+// AIGateway.CapacityPolicyDefaults on every gateway read of the policy, and a
+// 0 on a partially configured policy means "no limit" for that dimension (TPM)
+// or "fall back to the runtime default" (QueueWaitSeconds). Negative values
+// are invalid.
+func validateCapacityPolicy(p *types.CapacityPolicy) error {
+	if p == nil || !p.Enabled {
+		return nil
+	}
+	if p.MaxConcurrency < 0 {
+		return fmt.Errorf("%w: capacity_policy.max_concurrency must be >= 0 (0 means unset)", ErrInvalidLLMConfig)
+	}
+	if p.MaxQueueDepth < 0 {
+		return fmt.Errorf("%w: capacity_policy.max_queue_depth must be >= 0 (0 means unset)", ErrInvalidLLMConfig)
+	}
+	if p.MaxTPM < 0 {
+		return fmt.Errorf("%w: capacity_policy.max_tpm must be >= 0 (0 means unlimited)", ErrInvalidLLMConfig)
+	}
+	if p.MaxRPM < 0 {
+		return fmt.Errorf("%w: capacity_policy.max_rpm must be >= 0 (0 means unset)", ErrInvalidLLMConfig)
+	}
+	if p.QueueWaitSeconds < 0 {
+		return fmt.Errorf("%w: capacity_policy.queue_wait_seconds must be >= 0 (0 means unset)", ErrInvalidLLMConfig)
 	}
 	return nil
 }
@@ -448,6 +478,9 @@ func (s *llmServiceComponentImpl) validateLLMEndpointConfig(upstreams []types.Up
 			return fmt.Errorf("%w: upstream url cannot be empty", ErrInvalidLLMConfig)
 		}
 		if err := validateUpstreamMetadata(upstream.Metadata); err != nil {
+			return err
+		}
+		if err := validateCapacityPolicy(upstream.CapacityPolicy); err != nil {
 			return err
 		}
 		if upstream.Enabled {
@@ -525,6 +558,9 @@ func (s *llmServiceComponentImpl) CreateUpstream(ctx context.Context, req *types
 	if err := validateUpstreamMetadata(req.Metadata); err != nil {
 		return nil, err
 	}
+	if err := validateCapacityPolicy(req.CapacityPolicy); err != nil {
+		return nil, err
+	}
 	dbUp := &database.Upstream{
 		LLMConfigID:           req.LLMConfigID,
 		URL:                   strings.TrimSpace(req.URL),
@@ -539,6 +575,7 @@ func (s *llmServiceComponentImpl) CreateUpstream(ctx context.Context, req *types
 		Tags:                  req.Tags,
 		Metadata:              req.Metadata,
 		LimitPolicy:           req.LimitPolicy,
+		CapacityPolicy:        req.CapacityPolicy,
 	}
 	if dbUp.Weight <= 0 {
 		dbUp.Weight = 1
@@ -603,6 +640,32 @@ func (s *llmServiceComponentImpl) UpdateUpstream(ctx context.Context, req *types
 	}
 	if req.LimitPolicy != nil {
 		dbUp.LimitPolicy = *req.LimitPolicy
+	}
+	if req.CapacityPolicy != nil {
+		if err := validateCapacityPolicy(*req.CapacityPolicy); err != nil {
+			return nil, err
+		}
+		if *req.CapacityPolicy == nil {
+			// Component-internal clear; not reachable over HTTP because
+			// encoding/json binds an explicit JSON null to a nil outer
+			// pointer (i.e. omitted). Admins turn the policy off with
+			// enabled=false instead.
+			dbUp.CapacityPolicy = nil
+		} else {
+			newPolicy := **req.CapacityPolicy
+			// An update without any limit values only toggles Enabled and
+			// keeps the stored limits, so a temporary disable (and a later
+			// re-enable) does not lose the admin's configuration. Any
+			// explicit limit replaces the stored policy wholesale.
+			if newPolicy.AllLimitsUnset() && dbUp.CapacityPolicy != nil {
+				newPolicy.MaxConcurrency = dbUp.CapacityPolicy.MaxConcurrency
+				newPolicy.MaxQueueDepth = dbUp.CapacityPolicy.MaxQueueDepth
+				newPolicy.MaxTPM = dbUp.CapacityPolicy.MaxTPM
+				newPolicy.MaxRPM = dbUp.CapacityPolicy.MaxRPM
+				newPolicy.QueueWaitSeconds = dbUp.CapacityPolicy.QueueWaitSeconds
+			}
+			dbUp.CapacityPolicy = &newPolicy
+		}
 	}
 	if req.Tags != nil {
 		dbUp.Tags = *req.Tags
@@ -717,6 +780,7 @@ func buildUpstreamConfigs(dbUpstreams []database.Upstream) []types.UpstreamConfi
 			Tags:                  u.Tags,
 			Metadata:              u.Metadata,
 			LimitPolicy:           u.LimitPolicy,
+			CapacityPolicy:        u.CapacityPolicy,
 		}
 		// Only use the real DB state when the feature is enabled AND a record exists.
 		// In all other cases (feature off, no record yet), the state is "unknown".

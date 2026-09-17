@@ -209,8 +209,10 @@ type UpstreamConfig struct {
 	Provider string `json:"provider"`
 	// LimitPolicy controls usage-based quota for this specific endpoint.
 	LimitPolicy *UsageLimitPolicy `json:"limit_policy,omitempty"`
-	Tags        map[string]string `json:"tags,omitempty"`
-	Metadata    *UpstreamMetadata `json:"metadata,omitempty"`
+	// CapacityPolicy controls per-upstream capacity limits (concurrency, RPM, TPM, queue).
+	CapacityPolicy *CapacityPolicy   `json:"capacity_policy,omitempty"`
+	Tags           map[string]string `json:"tags,omitempty"`
+	Metadata       *UpstreamMetadata `json:"metadata,omitempty"`
 }
 
 // MetadataProtocol returns the explicit protocol override from metadata, if set.
@@ -238,6 +240,66 @@ type UsageLimitPolicy struct {
 	MaxCompletionTokens  int64   `json:"max_completion_tokens,omitempty"`
 	CachedTokenCostRatio float64 `json:"cached_token_cost_ratio,omitempty"`
 	CacheCreateCostRatio float64 `json:"cache_create_cost_ratio,omitempty"`
+}
+
+// CapacityPolicy defines per-upstream capacity limits for admission control
+// and capacity-aware routing. When Enabled, the AIGateway will track and
+// enforce these limits before forwarding requests to the upstream.
+// A zero value means "no limit" for that dimension, except that an enabled
+// policy with every limit unset (AllLimitsUnset) is fully populated from the
+// configured defaults every time the gateway reads the policy (see
+// ApplyDefaults). Disabling a policy never clears the stored limits: admins
+// can re-enable later and keep the previous configuration.
+type CapacityPolicy struct {
+	// Enabled turns on capacity tracking and enforcement for this upstream.
+	Enabled bool `json:"enabled"`
+	// MaxConcurrency is the maximum number of in-flight requests.
+	MaxConcurrency int `json:"max_concurrency,omitempty"`
+	// MaxQueueDepth is the maximum number of requests waiting for a slot.
+	MaxQueueDepth int `json:"max_queue_depth,omitempty"`
+	// MaxTPM is the maximum number of tokens per minute. 0 = unlimited.
+	MaxTPM int64 `json:"max_tpm,omitempty"`
+	// MaxRPM is the maximum number of requests per minute.
+	MaxRPM int `json:"max_rpm,omitempty"`
+	// QueueWaitSeconds is how long a request may wait in the upstream queue
+	// before being rejected. 0 = unset (runtime falls back to the default).
+	QueueWaitSeconds int `json:"queue_wait_seconds,omitempty"`
+}
+
+// AllLimitsUnset reports whether every limit field of the policy is zero.
+func (p *CapacityPolicy) AllLimitsUnset() bool {
+	return p.MaxConcurrency == 0 &&
+		p.MaxQueueDepth == 0 &&
+		p.MaxTPM == 0 &&
+		p.MaxRPM == 0 &&
+		p.QueueWaitSeconds == 0
+}
+
+// ApplyDefaults populates an enabled policy only when every limit is unset:
+// an all-zero enabled policy is fully replaced by the configured defaults,
+// while a policy with any limit set is left untouched so explicit values
+// (including MaxTPM=0 meaning "unlimited") are never overridden by defaults.
+// Default fields that are <= 0 are ignored so operators can keep "no limit"
+// for a dimension. It is a no-op when p is nil or disabled.
+func (p *CapacityPolicy) ApplyDefaults(defaults CapacityPolicy) {
+	if p == nil || !p.Enabled || !p.AllLimitsUnset() {
+		return
+	}
+	if defaults.MaxConcurrency > 0 {
+		p.MaxConcurrency = defaults.MaxConcurrency
+	}
+	if defaults.MaxQueueDepth > 0 {
+		p.MaxQueueDepth = defaults.MaxQueueDepth
+	}
+	if defaults.MaxTPM > 0 {
+		p.MaxTPM = defaults.MaxTPM
+	}
+	if defaults.MaxRPM > 0 {
+		p.MaxRPM = defaults.MaxRPM
+	}
+	if defaults.QueueWaitSeconds > 0 {
+		p.QueueWaitSeconds = defaults.QueueWaitSeconds
+	}
 }
 
 type LLMConfig struct {
@@ -334,12 +396,20 @@ type CreateUpstreamReq struct {
 	HealthCheckEnabled    *bool             `json:"health_check_enabled"`
 	CircuitBreakerEnabled *bool             `json:"circuit_breaker_enabled"`
 	LimitPolicy           *UsageLimitPolicy `json:"limit_policy,omitempty"`
+	CapacityPolicy        *CapacityPolicy   `json:"capacity_policy,omitempty"`
 	Tags                  map[string]string `json:"tags,omitempty"`
 	Metadata              *UpstreamMetadata `json:"metadata,omitempty"`
 }
 
 // UpdateUpstreamReq is the request to update an existing upstream.
 // Only non-nil fields will be updated.
+//
+// Double-pointer policy fields (LimitPolicy, CapacityPolicy) follow a
+// three-state component contract: nil outer pointer = field omitted (keep the
+// stored value), non-nil outer pointer wrapping nil inner pointer = clear the
+// policy, non-nil inner pointer = replace the policy. Note that encoding/json
+// binds an explicit JSON null to the OMITTED state, so over HTTP the stored
+// policy can only be replaced or disabled (Enabled=false), never nulled.
 type UpdateUpstreamReq struct {
 	ID                    int64              `json:"id"`
 	URL                   *string            `json:"url"`
@@ -351,6 +421,7 @@ type UpdateUpstreamReq struct {
 	HealthCheckEnabled    *bool              `json:"health_check_enabled"`
 	CircuitBreakerEnabled *bool              `json:"circuit_breaker_enabled"`
 	LimitPolicy           **UsageLimitPolicy `json:"limit_policy"`
+	CapacityPolicy        **CapacityPolicy   `json:"capacity_policy"`
 	Tags                  *map[string]string `json:"tags"`
 	Metadata              *UpstreamMetadata  `json:"metadata"`
 }

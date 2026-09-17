@@ -19,6 +19,7 @@ import (
 	"opencsg.com/csghub-server/builder/event"
 	"opencsg.com/csghub-server/builder/store/cache"
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/common/config"
 	commontypes "opencsg.com/csghub-server/common/types"
 )
 
@@ -49,8 +50,9 @@ type openaiComponentImpl struct {
 	extllmStore    database.LLMConfigStore
 	modelListCache cache.RedisClient
 	extendOpenai
-	modelIDBuilder upstream.ModelIDBuilder
-	usageLimiter   UsageLimiter
+	modelIDBuilder         upstream.ModelIDBuilder
+	usageLimiter           UsageLimiter
+	capacityPolicyDefaults commontypes.CapacityPolicy
 }
 
 func (m *openaiComponentImpl) getModelIDBuilder() upstream.ModelIDBuilder {
@@ -377,7 +379,7 @@ func (m *openaiComponentImpl) buildExternalModel(ctx context.Context, cfg *datab
 //     not public (SecureLevel != EndpointPublic) and whose OwnerUUID does
 //     not match callerUUID are skipped.
 func (m *openaiComponentImpl) llmConfigToModel(ctx context.Context, cfg *database.LLMConfig, callerUUID string) (types.Model, bool) {
-	upstreams := dbUpstreamsToConfigs(cfg.Upstreams)
+	upstreams := dbUpstreamsToConfigs(cfg.Upstreams, m.capacityPolicyDefaults)
 
 	for _, u := range cfg.Upstreams {
 		if u.Source != commontypes.UpstreamSourceCSGHubDeploy {
@@ -739,8 +741,24 @@ func (m *openaiComponentImpl) checkOrganization(c context.Context, userUUID stri
 	return false, nil
 }
 
+// capacityPolicyDefaultsFromConfig maps the AIGateway CapacityPolicyDefaults
+// config into a CapacityPolicy usable by ApplyDefaults. Enabled stays false:
+// defaults only supply limit values, they never turn a policy on.
+func capacityPolicyDefaultsFromConfig(cfg *config.Config) commontypes.CapacityPolicy {
+	d := cfg.AIGateway.CapacityPolicyDefaults
+	return commontypes.CapacityPolicy{
+		MaxConcurrency:   d.MaxConcurrency,
+		MaxQueueDepth:    d.MaxQueueDepth,
+		MaxTPM:           d.MaxTPM,
+		MaxRPM:           d.MaxRPM,
+		QueueWaitSeconds: d.QueueWaitSeconds,
+	}
+}
+
 // dbUpstreamsToConfigs converts database.Upstream slice to types.UpstreamConfig slice for routing.
-func dbUpstreamsToConfigs(dbUpstreams []database.Upstream) []commontypes.UpstreamConfig {
+// capacityDefaults fully populates enabled CapacityPolicies whose limits are
+// all unset (see CapacityPolicy.ApplyDefaults).
+func dbUpstreamsToConfigs(dbUpstreams []database.Upstream, capacityDefaults commontypes.CapacityPolicy) []commontypes.UpstreamConfig {
 	result := make([]commontypes.UpstreamConfig, 0, len(dbUpstreams))
 	for _, u := range dbUpstreams {
 		uc := commontypes.UpstreamConfig{
@@ -757,6 +775,13 @@ func dbUpstreamsToConfigs(dbUpstreams []database.Upstream) []commontypes.Upstrea
 			Tags:                  u.Tags,
 			Metadata:              u.Metadata,
 			LimitPolicy:           u.LimitPolicy,
+		}
+		// Apply defaults on a copy so the shared database.Upstream row
+		// (also read by health checks and admin APIs) is not mutated.
+		if u.CapacityPolicy != nil {
+			capacity := *u.CapacityPolicy
+			capacity.ApplyDefaults(capacityDefaults)
+			uc.CapacityPolicy = &capacity
 		}
 		// Carry health/circuit state from DB so the proxy path can use
 		// inline availability checks without a separate cache call.

@@ -25,14 +25,15 @@ func NewOpenAIComponentFromConfig(config *config.Config) (OpenAIComponent, error
 		return nil, err
 	}
 	return &openaiComponentImpl{
-		userStore:      database.NewUserStore(),
-		organStore:     database.NewOrgStore(config),
-		deployStore:    database.NewDeployTaskStore(),
-		eventPub:       &event.DefaultEventPublisher,
-		extllmStore:    database.NewLLMConfigStore(config),
-		modelListCache: cacheClient,
-		extendOpenai:   extendOpenai{},
-		modelIDBuilder: upstream.NewModelIDBuilder(),
+		userStore:              database.NewUserStore(),
+		organStore:             database.NewOrgStore(config),
+		deployStore:            database.NewDeployTaskStore(),
+		eventPub:               &event.DefaultEventPublisher,
+		extllmStore:            database.NewLLMConfigStore(config),
+		modelListCache:         cacheClient,
+		extendOpenai:           extendOpenai{},
+		modelIDBuilder:         upstream.NewModelIDBuilder(),
+		capacityPolicyDefaults: capacityPolicyDefaultsFromConfig(config),
 	}, nil
 }
 

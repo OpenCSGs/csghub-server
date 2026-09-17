@@ -31,6 +31,7 @@ type Upstream struct {
 	Tags                  map[string]string              `bun:",type:jsonb,nullzero" json:"tags,omitempty"`
 	Metadata              *types.UpstreamMetadata        `bun:",type:jsonb,nullzero" json:"metadata,omitempty"`
 	LimitPolicy           *types.UsageLimitPolicy        `bun:",type:jsonb,nullzero" json:"limit_policy,omitempty"`
+	CapacityPolicy        *types.CapacityPolicy          `bun:",type:jsonb,nullzero" json:"capacity_policy,omitempty"`
 	HealthState           *AIGatewayUpstreamHealthState  `bun:"rel:has-one,join:id=upstream_id" json:"health_state,omitempty"`
 	CircuitState          *AIGatewayUpstreamCircuitState `bun:"rel:has-one,join:id=upstream_id" json:"circuit_state,omitempty"`
 	times
