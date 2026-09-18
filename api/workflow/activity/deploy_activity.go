@@ -577,11 +577,16 @@ func (a *DeployActivity) createDeployRequest(ctx context.Context, task *database
 
 	var engineArgsTemplates []types.EngineArg
 	var toolCallParsers map[string]string
+	var engineVersion string
 	if len(deployInfo.RuntimeFramework) > 0 {
 		framework, err := a.rfs.FindByImageID(ctx, deployInfo.ImageID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get runtime framework by name %s for deploy task id %d error: %w", deployInfo.RuntimeFramework, task.ID, err)
 		}
+		if framework == nil {
+			return nil, fmt.Errorf("runtime framework not found for image %s, deploy task id %d", deployInfo.ImageID, task.ID)
+		}
+		engineVersion = framework.FrameVersion
 		trimmedEngineArgs := strings.TrimSpace(framework.EngineArgs)
 		if len(trimmedEngineArgs) > 0 {
 			if err := json.Unmarshal([]byte(trimmedEngineArgs), &engineArgsTemplates); err != nil {
@@ -609,7 +614,7 @@ func (a *DeployActivity) createDeployRequest(ctx context.Context, task *database
 		return nil, fmt.Errorf("failed to parse deploy hardware for deploy task id %d error: %w", task.ID, err)
 	}
 
-	envMap, err := a.makeDeployEnv(ctx, hardware, accessToken, deployInfo, engineArgsTemplates, toolCallParsers, repoInfo)
+	envMap, err := a.makeDeployEnv(ctx, hardware, accessToken, deployInfo, engineArgsTemplates, toolCallParsers, repoInfo, engineVersion)
 	if err != nil {
 		return nil, fmt.Errorf("failed to make deploy env for deploy id %d task id %d error: %w", deployInfo.ID, task.ID, err)
 	}
@@ -660,9 +665,10 @@ func (a *DeployActivity) createDeployRequest(ctx context.Context, task *database
 		Nodes:         requestNodes,
 		Scheduler:     common.GenerateScheduler(cluster.VXPUConfig),
 		DeployExtend: types.DeployExtend{
-			NodeAffinity: deployInfo.NodeAffinity,
-			Tolerations:  deployInfo.Tolerations,
-			PD:           deployInfo.PD,
+			NodeAffinity:  deployInfo.NodeAffinity,
+			Tolerations:   deployInfo.Tolerations,
+			PD:            deployInfo.PD,
+			EngineVersion: engineVersion,
 		},
 	}, nil
 }
@@ -692,7 +698,7 @@ func (a *DeployActivity) stopBuild(buildTask *database.DeployTask, repoInfo comm
 }
 
 // makeDeployEnv
-func (a *DeployActivity) makeDeployEnv(ctx context.Context, hardware types.HardWare, accessToken *database.AccessToken, deployInfo *database.Deploy, engineArgsTemplates []types.EngineArg, toolCallParsers map[string]string, repoInfo common.RepoInfo) (map[string]string, error) {
+func (a *DeployActivity) makeDeployEnv(ctx context.Context, hardware types.HardWare, accessToken *database.AccessToken, deployInfo *database.Deploy, engineArgsTemplates []types.EngineArg, toolCallParsers map[string]string, repoInfo common.RepoInfo, engineVersion string) (map[string]string, error) {
 	logger := a.getLogger(ctx)
 
 	envMap, err := utilcommon.JsonStrToMap(deployInfo.Env)
@@ -820,6 +826,15 @@ func (a *DeployActivity) makeDeployEnv(ctx context.Context, hardware types.HardW
 		if vllmEnforceEagerEnabled(deployInfo.EngineArgs) {
 			envMap["VLLM_ENFORCE_EAGER"] = "1"
 		}
+		if asyncSchedulingDisabled(deployInfo.EngineArgs) {
+			envMap["ASYNC_SCHEDULING_DISABLED"] = "true"
+		}
+		if model := hardware.GetResXPUMode(); model != "" {
+			envMap["XPU_MODEL"] = model
+		}
+		if engineVersion != "" {
+			envMap["ENGINE_VERSION"] = engineVersion
+		}
 	}
 
 	if deployInfo.Type == types.FinetuneType {
@@ -876,7 +891,8 @@ func addLongCatVideoRuntimeEnv(envMap map[string]string, runtimeFramework, taskN
 }
 
 // vllmEnforceEagerEnabled reports whether single-node vLLM should run with --enforce-eager.
-// Disabled by default; set engine_args "enforce-eager" to enable/true/1 to turn it on.
+// Disabled by default; intended for debugging only — enabling increases decode latency 20-40%.
+// Set engine_args "enforce-eager" to enable/true/1 to turn it on.
 func vllmEnforceEagerEnabled(engineArgs string) bool {
 	if engineArgs == "" {
 		return false
@@ -891,6 +907,29 @@ func vllmEnforceEagerEnabled(engineArgs string) bool {
 	}
 	switch value {
 	case "enable", "true", "1":
+		return true
+	default:
+		return false
+	}
+}
+
+// asyncSchedulingDisabled reports whether the user explicitly set async-scheduling to disable.
+// When true, shell scripts must not auto-inject --async-scheduling even if the flag is absent
+// from ENGINE_ARGS (the Go boolean-arg path skips disable values, so the flag won't be present).
+func asyncSchedulingDisabled(engineArgs string) bool {
+	if engineArgs == "" {
+		return false
+	}
+	argValuesMap, err := utilcommon.JsonStrToMap(engineArgs)
+	if err != nil {
+		return false
+	}
+	value, ok := argValuesMap["async-scheduling"]
+	if !ok {
+		return false
+	}
+	switch value {
+	case "disable", "false", "0":
 		return true
 	default:
 		return false

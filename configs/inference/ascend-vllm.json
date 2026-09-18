@@ -23,7 +23,7 @@
     },
     {
       "name": "gpu-memory-utilization",
-      "value": "0.8",
+      "value": "0.9",
       "format": "--gpu-memory-utilization %s"
     },
     {
