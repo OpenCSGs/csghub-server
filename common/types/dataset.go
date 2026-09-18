@@ -52,6 +52,8 @@ type Dataset struct {
 	Source               RepositorySource     `json:"source"`
 	SyncStatus           RepositorySyncStatus `json:"sync_status"`
 	License              string               `json:"license"`
+	ComplianceStatus     ComplianceStatus     `json:"compliance_status"`
+	CommercialPermission CommercialPermission `json:"commercial_permission"`
 	CanWrite             bool                 `json:"can_write"`
 	CanManage            bool                 `json:"can_manage"`
 	Namespace            *Namespace           `json:"namespace"`

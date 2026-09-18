@@ -583,7 +583,7 @@ func TestRepoComponent_CreateFile(t *testing.T) {
 			ctx := context.TODO()
 			repo := initializeTestRepoComponent(ctx, t)
 
-			mockedRepo := &database.Repository{ID: 123}
+			mockedRepo := &database.Repository{ID: 123, DefaultBranch: "main"}
 			repo.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "ns", "n").Return(mockedRepo, nil)
 			mockUserRepoAdminPermission(ctx, repo.mocks.stores, "user")
 			repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "un").Return(database.User{
@@ -621,6 +621,13 @@ func TestRepoComponent_CreateFile(t *testing.T) {
 
 			repo.mocks.stores.RepoMock().EXPECT().SetUpdateTimeByPath(mock.Anything, types.ModelRepo, "ns", "n", mock.Anything).Return(nil)
 			if c.path == "README.md" {
+				repo.mocks.stores.RepoMock().EXPECT().UpdateLicenseCompliance(
+					mock.Anything,
+					int64(123),
+					(*string)(nil),
+					types.ComplianceStatusPendingReview,
+					types.CommercialPermissionCustomTerms,
+				).Return(nil)
 				repo.mocks.components.tag.EXPECT().UpdateMetaTags(mock.Anything, getTagScopeByRepoType(types.ModelRepo), "ns", "n", "").Return(nil, nil)
 			} else {
 				repo.mocks.components.tag.EXPECT().UpdateLibraryTags(mock.Anything, getTagScopeByRepoType(types.ModelRepo), "ns", "n", "", c.path).Return(nil)
@@ -676,7 +683,7 @@ func TestRepoComponent_UpdateFile(t *testing.T) {
 			ctx := context.TODO()
 			repo := initializeTestRepoComponent(ctx, t)
 
-			mockedRepo := &database.Repository{ID: 123}
+			mockedRepo := &database.Repository{ID: 123, DefaultBranch: "main"}
 			repo.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "ns", "n").Return(mockedRepo, nil)
 			mockUserRepoAdminPermission(ctx, repo.mocks.stores, "user")
 			repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "un").Return(database.User{
@@ -714,6 +721,13 @@ func TestRepoComponent_UpdateFile(t *testing.T) {
 
 			repo.mocks.stores.RepoMock().EXPECT().SetUpdateTimeByPath(mock.Anything, types.ModelRepo, "ns", "n", mock.Anything).Return(nil)
 			if c.path == "README.md" {
+				repo.mocks.stores.RepoMock().EXPECT().UpdateLicenseCompliance(
+					mock.Anything,
+					int64(123),
+					(*string)(nil),
+					types.ComplianceStatusPendingReview,
+					types.CommercialPermissionCustomTerms,
+				).Return(nil)
 				repo.mocks.components.tag.EXPECT().UpdateMetaTags(mock.Anything, getTagScopeByRepoType(types.ModelRepo), "ns", "n", "").Return(nil, nil)
 			} else {
 				repo.mocks.components.tag.EXPECT().UpdateLibraryTags(mock.Anything, getTagScopeByRepoType(types.ModelRepo), "ns", "n", "", c.path).Return(nil)
@@ -774,7 +788,7 @@ func TestRepoComponent_DeleteFile(t *testing.T) {
 			ctx := context.TODO()
 			repo := initializeTestRepoComponent(ctx, t)
 
-			mockedRepo := &database.Repository{ID: 123}
+			mockedRepo := &database.Repository{ID: 123, DefaultBranch: "main"}
 			repo.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "ns", "n").Return(mockedRepo, nil)
 			mockUserRepoAdminPermission(ctx, repo.mocks.stores, "user")
 			repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "un").Return(database.User{
@@ -784,6 +798,13 @@ func TestRepoComponent_DeleteFile(t *testing.T) {
 
 			repo.mocks.stores.RepoMock().EXPECT().SetUpdateTimeByPath(mock.Anything, types.ModelRepo, "ns", "n", mock.Anything).Return(nil)
 			if c.path == "README.md" {
+				repo.mocks.stores.RepoMock().EXPECT().UpdateLicenseCompliance(
+					mock.Anything,
+					int64(123),
+					(*string)(nil),
+					types.ComplianceStatusPendingReview,
+					types.CommercialPermissionCustomTerms,
+				).Return(nil)
 				repo.mocks.components.tag.EXPECT().UpdateMetaTags(mock.Anything, getTagScopeByRepoType(types.ModelRepo), "ns", "n", "").Return(nil, nil)
 			} else {
 				repo.mocks.components.tag.EXPECT().UpdateLibraryTags(mock.Anything, getTagScopeByRepoType(types.ModelRepo), "ns", "n", "", c.path).Return(nil)

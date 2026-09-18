@@ -23,9 +23,9 @@ type CreateModelReq struct {
 
 type UpdateModelReq struct {
 	BaseModel       *string `json:"base_model"`
-	ReportURL       string  `json:"report_url"`
-	MediumRiskCount int     `json:"medium_risk_count"`
-	HighRiskCount   int     `json:"high_risk_count"`
+	ReportURL       *string `json:"report_url"`
+	MediumRiskCount *int    `json:"medium_risk_count"`
+	HighRiskCount   *int    `json:"high_risk_count"`
 	UpdateRepoReq
 }
 
@@ -40,10 +40,11 @@ type UpdateRepoReq struct {
 	// The new description for the repository
 	Description *string `json:"description"`
 	// The new visibility of the repository
-	Private       *bool   `json:"private" example:"false"`
-	Admin         string  `json:"-"`
-	XnetEnabled   *bool   `json:"xnet_enabled"`
-	DefaultBranch *string `json:"default_branch"`
+	Private              *bool                 `json:"private" example:"false"`
+	Admin                string                `json:"-"`
+	XnetEnabled          *bool                 `json:"xnet_enabled"`
+	DefaultBranch        *string               `json:"default_branch"`
+	ComplianceStatus     *ComplianceStatus     `json:"compliance_status" binding:"omitempty,oneof=compliant pending_review non_compliant"`
 }
 
 // make sure UpdateModelReq implements SensitiveRequest interface
@@ -199,6 +200,8 @@ type Model struct {
 	DisableEvaluationReason string                  `json:"disable_evaluation_reason" i18n:"model.disable_evaluation_reason"`
 	BaseModel               string                  `json:"base_model"`
 	License                 string                  `json:"license"`
+	ComplianceStatus        ComplianceStatus        `json:"compliance_status"`
+	CommercialPermission    CommercialPermission    `json:"commercial_permission"`
 	CanWrite                bool                    `json:"can_write"`
 	CanManage               bool                    `json:"can_manage"`
 	IsOrganization          bool                    `json:"is_organization"`
