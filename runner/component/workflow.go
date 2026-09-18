@@ -20,12 +20,14 @@ import (
 
 	"github.com/argoproj/argo-workflows/v3/pkg/apis/workflow/v1alpha1"
 	versioned "github.com/argoproj/argo-workflows/v3/pkg/client/clientset/versioned"
+	argoclient "github.com/argoproj/argo-workflows/v3/pkg/client/clientset/versioned/typed/workflow/v1alpha1"
 	"github.com/argoproj/argo-workflows/v3/pkg/client/informers/externalversions"
 	internalinterfaces "github.com/argoproj/argo-workflows/v3/pkg/client/informers/externalversions/internalinterfaces"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	k8stypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/utils/ptr"
@@ -37,6 +39,19 @@ import (
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/runner/common"
 	sched "opencsg.com/csghub-server/runner/component/kube_scheduler"
+)
+
+const (
+	// finetuneWorkspaceVolume is the volume that mounts the user's shared
+	// finetune PVC into every staged finetune template.
+	finetuneWorkspaceVolume = "workspace"
+	// finetuneWorkspaceMountPath is where finetuneWorkspaceVolume is mounted.
+	finetuneWorkspaceMountPath = "/workspace"
+	// finetuneCleanupTemplate is the OnExit template that releases the task
+	// directory on the shared PVC.
+	finetuneCleanupTemplate = "finetune-cleanup"
+	// finetuneWorkDirEnv holds the task directory finetuneCleanupTemplate removes.
+	finetuneWorkDirEnv = "FINETUNE_WORK_DIR"
 )
 
 type workFlowComponentImpl struct {
@@ -215,15 +230,159 @@ func (wc *workFlowComponentImpl) ensureWorkflowPVC(
 }
 
 func (wc *workFlowComponentImpl) DeleteWorkflow(ctx context.Context, req *types.ArgoWorkFlowDeleteReq) error {
-	cluster, err := wc.clusterPool.GetClusterByID(ctx, req.ClusterID)
+	cls, err := wc.clusterPool.GetClusterByID(ctx, req.ClusterID)
 	if err != nil {
 		return fmt.Errorf("failed to get cluster by id: %v", err)
 	}
-	err = cluster.ArgoClient.ArgoprojV1alpha1().Workflows(req.Namespace).Delete(ctx, req.TaskID, v1.DeleteOptions{})
+	wfClient := cls.ArgoClient.ArgoprojV1alpha1().Workflows(req.Namespace)
+	awf, err := wfClient.Get(ctx, req.TaskID, v1.GetOptions{})
+	if err != nil {
+		if !k8serrors.IsNotFound(err) {
+			slog.WarnContext(ctx, "failed to read argo workflow before deleting it",
+				slog.Any("error", err), slog.String("task_id", req.TaskID))
+		}
+		return deleteWorkflowInArgo(ctx, wfClient, req.TaskID)
+	}
+	if isStoppingForExitCleanup(awf) {
+		// An earlier cancel already asked argo to stop; deleting the workflow
+		// now would abort the cleanup node that is still releasing the storage.
+		// This is decided before any evidence about what the workflow wrote, so
+		// that a repeated cancel cannot interrupt a cleanup that is under way.
+		slog.InfoContext(ctx, "argo workflow is already stopping for storage cleanup",
+			slog.String("task_id", req.TaskID))
+		return nil
+	}
+	if !wc.hasPendingExitCleanup(ctx, cls, req.Namespace, awf) {
+		return deleteWorkflowInArgo(ctx, wfClient, req.TaskID)
+	}
+	// Deleting or terminating the workflow skips spec.onExit, leaving the task
+	// directory behind on the shared PVC. "Stop" tears the running nodes down
+	// but still runs finetune-cleanup, and the workflow itself is reclaimed by
+	// its TTLStrategy once that cleanup finishes.
+	if err := stopWorkflowInArgo(ctx, wfClient, req.TaskID); err != nil {
+		slog.WarnContext(ctx, "failed to stop argo workflow for storage cleanup, deleting it instead",
+			slog.Any("error", err), slog.String("task_id", req.TaskID))
+		return deleteWorkflowInArgo(ctx, wfClient, req.TaskID)
+	}
+	slog.InfoContext(ctx, "stopped argo workflow so that finetune cleanup can release its storage",
+		slog.String("task_id", req.TaskID))
+	return nil
+}
+
+func deleteWorkflowInArgo(ctx context.Context, wfClient argoclient.WorkflowInterface, taskID string) error {
+	err := wfClient.Delete(ctx, taskID, v1.DeleteOptions{})
 	if err != nil {
 		slog.WarnContext(ctx, "Error deleting argo workflow", slog.Any("error", err))
 	}
 	return nil
+}
+
+func stopWorkflowInArgo(ctx context.Context, wfClient argoclient.WorkflowInterface, taskID string) error {
+	patch, err := json.Marshal(map[string]any{
+		"spec": map[string]any{
+			"shutdown": string(v1alpha1.ShutdownStrategyStop),
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("marshal shutdown patch: %w", err)
+	}
+	if _, err := wfClient.Patch(ctx, taskID, k8stypes.MergePatchType, patch, v1.PatchOptions{}); err != nil {
+		return fmt.Errorf("patch workflow shutdown: %w", err)
+	}
+	return nil
+}
+
+// hasPendingExitCleanup reports whether the workflow still owes a
+// finetune-cleanup run against the user's shared PVC. Only staged v2 finetune
+// workflows keep data outside the pod, so every other workflow (evaluation,
+// dataflow, legacy-fallback finetune) can be deleted right away.
+//
+// The decision deliberately reads spec, never status. Argo creates the pod
+// before it persists the node that describes it (executeContainer builds the
+// node in memory, createWorkflowPod calls the API server, and operate only
+// persists the status when it returns), and the controller may create a pod at
+// any point between this read and the delete that follows. Node status
+// therefore cannot prove that the task directory is absent, and a workflow that
+// merely could have written one is stopped so that the idempotent cleanup
+// decides.
+func (wc *workFlowComponentImpl) hasPendingExitCleanup(
+	ctx context.Context,
+	cls *cluster.Cluster,
+	namespace string,
+	awf *v1alpha1.Workflow,
+) bool {
+	if awf.Spec.OnExit != finetuneCleanupTemplate {
+		return false
+	}
+	if _, finished := types.WorkFlowFinished[awf.Status.Phase]; finished {
+		// argo already ran the exit handler for a finished workflow.
+		return false
+	}
+	if finetuneWorkDir(awf) == "" {
+		return false
+	}
+	pvcName := finetuneWorkspacePVCName(awf)
+	if pvcName == "" {
+		return false
+	}
+	_, err := cls.Client.CoreV1().PersistentVolumeClaims(namespace).Get(ctx, pvcName, v1.GetOptions{})
+	if k8serrors.IsNotFound(err) {
+		// The user has no shared PVC any more, nothing is left to release.
+		return false
+	}
+	if err != nil {
+		// Cleanup is idempotent, so prefer running it over leaking the task
+		// directory when the PVC state cannot be confirmed.
+		slog.WarnContext(ctx, "failed to check finetune workflow PVC before cleanup",
+			slog.Any("error", err), slog.String("pvc", pvcName), slog.String("task_id", awf.Name))
+	}
+	return true
+}
+
+// finetuneWorkDir returns the task directory finetuneCleanupTemplate would
+// remove, or an empty string when the workflow does not declare a directory
+// that belongs to this task alone.
+func finetuneWorkDir(awf *v1alpha1.Workflow) string {
+	for _, template := range awf.Spec.Templates {
+		if template.Name != finetuneCleanupTemplate || template.Container == nil {
+			continue
+		}
+		for _, env := range template.Container.Env {
+			if env.Name != finetuneWorkDirEnv {
+				continue
+			}
+			workDir := path.Clean(strings.TrimSpace(env.Value))
+			// Never stop a workflow to clean the shared mount root or a
+			// directory owned by another task.
+			if !strings.HasPrefix(workDir, finetuneWorkspaceMountPath+"/") || path.Base(workDir) != awf.Name {
+				return ""
+			}
+			return workDir
+		}
+	}
+	return ""
+}
+
+func finetuneWorkspacePVCName(awf *v1alpha1.Workflow) string {
+	for _, volume := range awf.Spec.Volumes {
+		if volume.Name == finetuneWorkspaceVolume && volume.PersistentVolumeClaim != nil {
+			return volume.PersistentVolumeClaim.ClaimName
+		}
+	}
+	return ""
+}
+
+// isStoppingForExitCleanup reports whether an earlier cancel already asked argo
+// to stop this workflow so that finetune-cleanup can release its storage. Argo
+// keeps the workflow out of a finished phase until the exit handler completes,
+// so a workflow that is still running under ShutdownStrategyStop owes a cleanup
+// that must not be aborted.
+func isStoppingForExitCleanup(awf *v1alpha1.Workflow) bool {
+	if awf.Spec.OnExit != finetuneCleanupTemplate || awf.Spec.Shutdown != v1alpha1.ShutdownStrategyStop {
+		return false
+	}
+	_, finished := types.WorkFlowFinished[awf.Status.Phase]
+	return !finished
 }
 
 func (wc *workFlowComponentImpl) GetWorkflow(ctx context.Context, id int64, username string) (*database.ArgoWorkflow, error) {
@@ -252,6 +411,18 @@ func (wc *workFlowComponentImpl) UpdateWorkflow(ctx context.Context, update *v1a
 	}
 	if err != nil {
 		return nil, err
+	}
+
+	if oldwf.Status == types.DFCancelled {
+		// The task was cancelled by its owner or an admin. Argo keeps reporting
+		// node changes while the onExit cleanup runs, but the cancelled status
+		// is final and must not be turned back into a failure.
+		if _, finished := types.WorkFlowFinished[update.Status.Phase]; finished {
+			slog.InfoContext(ctx, "cancelled workflow finished after cleanup",
+				slog.String("task_id", oldwf.TaskId), slog.Any("phase", update.Status.Phase),
+				slog.String("message", update.Status.Message))
+		}
+		return oldwf, nil
 	}
 
 	lastStatus := oldwf.Status
@@ -359,7 +530,7 @@ func generateWorkflow(req types.ArgoWorkFlowReq, config *config.Config, pvcName 
 			Tolerations:  req.Tolerations,
 		}
 		nodes := req.Nodes
-		if req.WorkflowVersion >= 2 && (v.Name == "finetune-download" || v.Name == "finetune-upload" || v.Name == "finetune-cleanup") {
+		if req.WorkflowVersion >= 2 && (v.Name == "finetune-download" || v.Name == "finetune-upload" || v.Name == finetuneCleanupTemplate) {
 			// Match the multi-node nginx workaround: transfer pods keep tolerations
 			// so they can run on tainted clusters, but do not inherit accelerator
 			// node affinity or selectors.
@@ -433,7 +604,7 @@ func generateWorkflow(req types.ArgoWorkFlowReq, config *config.Config, pvcName 
 		}
 		if pvcName != "" {
 			temp.Container.VolumeMounts = []corev1.VolumeMount{
-				{Name: "workspace", MountPath: "/workspace"},
+				{Name: finetuneWorkspaceVolume, MountPath: finetuneWorkspaceMountPath},
 			}
 		}
 
@@ -481,7 +652,7 @@ func generateWorkflow(req types.ArgoWorkFlowReq, config *config.Config, pvcName 
 	volumes := []corev1.Volume{}
 	if pvcName != "" {
 		volumes = append(volumes, corev1.Volume{
-			Name: "workspace",
+			Name: finetuneWorkspaceVolume,
 			VolumeSource: corev1.VolumeSource{
 				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
 					ClaimName: pvcName,
@@ -531,7 +702,7 @@ func generateWorkflow(req types.ArgoWorkFlowReq, config *config.Config, pvcName 
 	}
 
 	if req.TaskType == types.TaskTypeFinetune && req.WorkflowVersion >= 2 && pvcName != "" {
-		workflowObject.Spec.OnExit = "finetune-cleanup"
+		workflowObject.Spec.OnExit = finetuneCleanupTemplate
 	}
 
 	return workflowObject, nil

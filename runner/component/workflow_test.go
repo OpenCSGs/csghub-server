@@ -7,8 +7,10 @@ import (
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/fake"
 	knativefake "knative.dev/serving/pkg/client/clientset/versioned/fake"
 	mockReporter "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component/reporter"
@@ -287,6 +289,222 @@ func TestArgoComponent_DeleteWorkflow(t *testing.T) {
 	pool.EXPECT().GetClusterByID(mock.Anything, "test").Return(expectCluster, nil)
 	err := wfc.DeleteWorkflow(ctx, req)
 	require.Nil(t, err)
+}
+
+// stagedFinetuneWorkflow builds a running v2 finetune workflow that keeps its
+// data on the user shared PVC and cleans it up through spec.onExit.
+func stagedFinetuneWorkflow(taskID, pvcName, workDir string) *v1alpha1.Workflow {
+	return &v1alpha1.Workflow{
+		ObjectMeta: v1.ObjectMeta{Name: taskID, Namespace: "test"},
+		Spec: v1alpha1.WorkflowSpec{
+			Entrypoint: "finetune-v2",
+			OnExit:     finetuneCleanupTemplate,
+			Templates: []v1alpha1.Template{
+				{Name: "finetune-train", Container: &corev1.Container{Image: "swift"}},
+				{Name: finetuneCleanupTemplate, Container: &corev1.Container{
+					Image: "swift",
+					Env:   []corev1.EnvVar{{Name: finetuneWorkDirEnv, Value: workDir}},
+				}},
+			},
+			Volumes: []corev1.Volume{{
+				Name: finetuneWorkspaceVolume,
+				VolumeSource: corev1.VolumeSource{
+					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: pvcName},
+				},
+			}},
+		},
+		Status: v1alpha1.WorkflowStatus{
+			Phase: v1alpha1.WorkflowRunning,
+			Nodes: v1alpha1.Nodes{
+				taskID: {ID: taskID, Type: v1alpha1.NodeTypeDAG, Phase: v1alpha1.NodeRunning},
+				"download": {
+					ID:           "download",
+					Type:         v1alpha1.NodeTypePod,
+					TemplateName: "finetune-download",
+					Phase:        v1alpha1.NodeSucceeded,
+				},
+			},
+		},
+	}
+}
+
+func newDeleteWorkflowTester(t *testing.T, awf *v1alpha1.Workflow, kubeObjects ...k8sruntime.Object) (workFlowComponentImpl, *argofake.Clientset, *types.ArgoWorkFlowDeleteReq) {
+	t.Helper()
+	pool := mockCluster.NewMockPool(t)
+	argoClient := argofake.NewSimpleClientset(awf)
+	pool.EXPECT().GetClusterByID(mock.Anything, "test").Return(&cluster.Cluster{
+		CID:           "config",
+		ID:            "test",
+		Client:        fake.NewClientset(kubeObjects...),
+		KnativeClient: knativefake.NewSimpleClientset(),
+		ArgoClient:    argoClient,
+	}, nil)
+	wfc := workFlowComponentImpl{
+		wf:          mockdb.NewMockArgoWorkFlowStore(t),
+		clusterPool: pool,
+		config:      &config.Config{},
+		logReporter: mockReporter.NewMockLogCollector(t),
+	}
+	return wfc, argoClient, &types.ArgoWorkFlowDeleteReq{ID: 1, TaskID: awf.Name, ClusterID: "test", Namespace: "test"}
+}
+
+func userWorkspacePVC(name string) *corev1.PersistentVolumeClaim {
+	return &corev1.PersistentVolumeClaim{ObjectMeta: v1.ObjectMeta{Name: name, Namespace: "test"}}
+}
+
+func getWorkflow(t *testing.T, client *argofake.Clientset, name string) (*v1alpha1.Workflow, error) {
+	t.Helper()
+	return client.ArgoprojV1alpha1().Workflows("test").Get(context.Background(), name, v1.GetOptions{})
+}
+
+func TestArgoComponent_DeleteWorkflow_StagedFinetuneCleanup(t *testing.T) {
+	ctx := context.TODO()
+
+	t.Run("stops workflow so onExit cleanup can release the task directory", func(t *testing.T) {
+		awf := stagedFinetuneWorkflow("ft-v2", "user-pvc", "/workspace/finetune/ft-v2")
+		wfc, argoClient, req := newDeleteWorkflowTester(t, awf, userWorkspacePVC("user-pvc"))
+
+		require.NoError(t, wfc.DeleteWorkflow(ctx, req))
+
+		stopped, err := getWorkflow(t, argoClient, "ft-v2")
+		require.NoError(t, err)
+		require.Equal(t, v1alpha1.ShutdownStrategyStop, stopped.Spec.Shutdown)
+	})
+
+	t.Run("keeps a workflow that is already stopping", func(t *testing.T) {
+		awf := stagedFinetuneWorkflow("ft-v2", "user-pvc", "/workspace/finetune/ft-v2")
+		awf.Spec.Shutdown = v1alpha1.ShutdownStrategyStop
+		wfc, argoClient, req := newDeleteWorkflowTester(t, awf, userWorkspacePVC("user-pvc"))
+
+		require.NoError(t, wfc.DeleteWorkflow(ctx, req))
+
+		_, err := getWorkflow(t, argoClient, "ft-v2")
+		require.NoError(t, err)
+	})
+
+	t.Run("deletes directly when the user has no shared PVC", func(t *testing.T) {
+		awf := stagedFinetuneWorkflow("ft-v2", "user-pvc", "/workspace/finetune/ft-v2")
+		wfc, argoClient, req := newDeleteWorkflowTester(t, awf)
+
+		require.NoError(t, wfc.DeleteWorkflow(ctx, req))
+
+		_, err := getWorkflow(t, argoClient, "ft-v2")
+		require.True(t, k8serrors.IsNotFound(err))
+	})
+
+	t.Run("stops a workflow that reports no running pod", func(t *testing.T) {
+		// Node status cannot rule out a task directory: argo creates the pod
+		// before it persists the node describing it, it moves the node out of
+		// Pending only once the controller observes the pod, it may compress or
+		// offload the status out of the object, and it may create a pod between
+		// this read and the delete. The download container meanwhile creates the
+		// directory as its first statement, so every one of those shapes has to
+		// go through the idempotent cleanup.
+		for name, status := range map[string]v1alpha1.WorkflowStatus{
+			"pending pod node": {
+				Phase: v1alpha1.WorkflowPending,
+				Nodes: v1alpha1.Nodes{
+					"download": {ID: "download", Type: v1alpha1.NodeTypePod, Phase: v1alpha1.NodePending},
+				},
+			},
+			"no node persisted yet": {Phase: v1alpha1.WorkflowPending},
+			"node status offloaded": {
+				Phase:                    v1alpha1.WorkflowRunning,
+				OffloadNodeStatusVersion: "42",
+			},
+		} {
+			t.Run(name, func(t *testing.T) {
+				awf := stagedFinetuneWorkflow("ft-v2", "user-pvc", "/workspace/finetune/ft-v2")
+				awf.Status = status
+				wfc, argoClient, req := newDeleteWorkflowTester(t, awf, userWorkspacePVC("user-pvc"))
+
+				require.NoError(t, wfc.DeleteWorkflow(ctx, req))
+
+				stopped, err := getWorkflow(t, argoClient, "ft-v2")
+				require.NoError(t, err)
+				require.Equal(t, v1alpha1.ShutdownStrategyStop, stopped.Spec.Shutdown)
+			})
+		}
+	})
+
+	t.Run("keeps a stopping workflow whose node status is no longer readable", func(t *testing.T) {
+		// A repeated cancel must not delete a workflow whose cleanup node is
+		// still running, even when nothing about the run can be read back.
+		awf := stagedFinetuneWorkflow("ft-v2", "user-pvc", "/workspace/finetune/ft-v2")
+		awf.Spec.Shutdown = v1alpha1.ShutdownStrategyStop
+		awf.Status.Nodes = nil
+		wfc, argoClient, req := newDeleteWorkflowTester(t, awf, userWorkspacePVC("user-pvc"))
+
+		require.NoError(t, wfc.DeleteWorkflow(ctx, req))
+
+		_, err := getWorkflow(t, argoClient, "ft-v2")
+		require.NoError(t, err)
+	})
+
+	t.Run("deletes a stopped workflow once its cleanup has finished", func(t *testing.T) {
+		awf := stagedFinetuneWorkflow("ft-v2", "user-pvc", "/workspace/finetune/ft-v2")
+		awf.Spec.Shutdown = v1alpha1.ShutdownStrategyStop
+		awf.Status.Phase = v1alpha1.WorkflowFailed
+		wfc, argoClient, req := newDeleteWorkflowTester(t, awf, userWorkspacePVC("user-pvc"))
+
+		require.NoError(t, wfc.DeleteWorkflow(ctx, req))
+
+		_, err := getWorkflow(t, argoClient, "ft-v2")
+		require.True(t, k8serrors.IsNotFound(err))
+	})
+
+	t.Run("deletes directly when the workflow already ran its exit handler", func(t *testing.T) {
+		awf := stagedFinetuneWorkflow("ft-v2", "user-pvc", "/workspace/finetune/ft-v2")
+		awf.Status.Phase = v1alpha1.WorkflowSucceeded
+		wfc, argoClient, req := newDeleteWorkflowTester(t, awf, userWorkspacePVC("user-pvc"))
+
+		require.NoError(t, wfc.DeleteWorkflow(ctx, req))
+
+		_, err := getWorkflow(t, argoClient, "ft-v2")
+		require.True(t, k8serrors.IsNotFound(err))
+	})
+
+	t.Run("deletes directly when the cleanup directory is not owned by the task", func(t *testing.T) {
+		awf := stagedFinetuneWorkflow("ft-v2", "user-pvc", "/workspace/finetune/other-task")
+		wfc, argoClient, req := newDeleteWorkflowTester(t, awf, userWorkspacePVC("user-pvc"))
+
+		require.NoError(t, wfc.DeleteWorkflow(ctx, req))
+
+		_, err := getWorkflow(t, argoClient, "ft-v2")
+		require.True(t, k8serrors.IsNotFound(err))
+	})
+
+	t.Run("deletes directly when the workflow has no cleanup exit handler", func(t *testing.T) {
+		awf := stagedFinetuneWorkflow("ft-v2", "user-pvc", "/workspace/finetune/ft-v2")
+		awf.Spec.OnExit = ""
+		wfc, argoClient, req := newDeleteWorkflowTester(t, awf, userWorkspacePVC("user-pvc"))
+
+		require.NoError(t, wfc.DeleteWorkflow(ctx, req))
+
+		_, err := getWorkflow(t, argoClient, "ft-v2")
+		require.True(t, k8serrors.IsNotFound(err))
+	})
+}
+
+func TestFinetuneWorkDir(t *testing.T) {
+	cases := []struct {
+		name     string
+		workDir  string
+		expected string
+	}{
+		{name: "task directory", workDir: "/workspace/finetune/ft-v2", expected: "/workspace/finetune/ft-v2"},
+		{name: "trailing slash", workDir: "/workspace/finetune/ft-v2/", expected: "/workspace/finetune/ft-v2"},
+		{name: "mount root", workDir: "/workspace", expected: ""},
+		{name: "other task", workDir: "/workspace/finetune/other", expected: ""},
+		{name: "outside mount", workDir: "/data/finetune/ft-v2", expected: ""},
+		{name: "empty", workDir: "", expected: ""},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			awf := stagedFinetuneWorkflow("ft-v2", "user-pvc", c.workDir)
+			require.Equal(t, c.expected, finetuneWorkDir(awf))
+		})
+	}
 }
 
 func TestArgoComponent_UpdateWorkflow(t *testing.T) {
@@ -650,4 +868,42 @@ func TestArgoComponent_UpdateWorkflow(t *testing.T) {
 		require.NotNil(t, err)
 		require.Contains(t, err.Error(), "failed to create workflow in db")
 	})
+}
+
+func TestArgoComponent_UpdateWorkflow_KeepsCancelledStatus(t *testing.T) {
+	argoStore := mockdb.NewMockArgoWorkFlowStore(t)
+	wfc := workFlowComponentImpl{
+		wf:          argoStore,
+		config:      &config.Config{},
+		logReporter: mockReporter.NewMockLogCollector(t),
+	}
+	ctx := context.TODO()
+	cancelled := &database.ArgoWorkflow{
+		ID:       1,
+		TaskId:   "ft-v2",
+		TaskType: types.TaskTypeFinetune,
+		Status:   types.DFCancelled,
+	}
+	argoStore.EXPECT().FindByTaskID(ctx, "ft-v2").Return(cancelled, nil)
+
+	// argo reports the stopped workflow as failed once the cleanup node exits
+	update := &v1alpha1.Workflow{
+		ObjectMeta: v1.ObjectMeta{Name: "ft-v2", Namespace: "test"},
+		Status: v1alpha1.WorkflowStatus{
+			Phase:   v1alpha1.WorkflowFailed,
+			Message: "Stopped with strategy 'Stop'",
+			Nodes: v1alpha1.Nodes{
+				"ft-v2": {Phase: v1alpha1.NodeFailed},
+			},
+		},
+	}
+
+	result, err := wfc.UpdateWorkflow(ctx, update, &cluster.Cluster{
+		ID:            "test",
+		Client:        fake.NewClientset(),
+		KnativeClient: knativefake.NewSimpleClientset(),
+		ArgoClient:    argofake.NewSimpleClientset(),
+	})
+	require.NoError(t, err)
+	require.Equal(t, v1alpha1.WorkflowPhase(types.DFCancelled), result.Status)
 }
