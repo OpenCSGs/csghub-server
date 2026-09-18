@@ -347,8 +347,14 @@ func (c *repoComponentImpl) CheckDeployPermissionForUser(ctx context.Context, de
 			return &user, deploy, nil
 		}
 	case types.EndpointPrivate:
-		// Only creator is allowed for private endpoints;
-		// fall through to forbidden below
+		// space deploys (SpaceID > 0) derive secure level from repo visibility;
+		// org members keep deploy detail/logs access. Inference endpoints keep
+		// creator-only: there EndpointPrivate is a user-chosen setting. SpaceID
+		// is checked instead of Type because unset legacy types are 0, which
+		// collides with SpaceType.
+		if deploy.SpaceID > 0 && (c.IsAdminRole(user) || c.IsInSameOrg(ctx, user.ID, deploy.UserID)) {
+			return &user, deploy, nil
+		}
 	default:
 		// Default to public behavior for backward compatibility
 		// with existing deployments that have SecureLevel = 0 (unset)

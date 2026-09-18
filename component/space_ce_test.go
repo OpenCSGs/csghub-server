@@ -219,6 +219,7 @@ func TestSpaceComponent_Deploy(t *testing.T) {
 			ContainerPort:  8080,
 			SKU:            "1",
 			OwnerNamespace: "ns1",
+			SecureLevel:    types.EndpointPublic,
 		}).Return(123, nil)
 
 		id, err := sc.Deploy(ctx, "ns1", "n1", "user")
@@ -296,4 +297,143 @@ func TestSpaceComponent_Delete(t *testing.T) {
 	require.Nil(t, err)
 	wg.Wait()
 	wgstop.Wait()
+}
+
+func TestSpaceComponent_Deploy_SecureLevel(t *testing.T) {
+	cases := []struct {
+		name      string
+		private   bool
+		wantLevel int
+	}{
+		{name: "public repo maps to endpoint public", private: false, wantLevel: types.EndpointPublic},
+		{name: "private repo maps to endpoint private", private: true, wantLevel: types.EndpointPrivate},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.TODO()
+			sc := initializeTestSpaceComponent(ctx, t)
+
+			sc.mocks.stores.SpaceMock().EXPECT().FindByPath(ctx, "ns", "n").Return(&database.Space{
+				ID:         1,
+				HasAppFile: true,
+				Sdk:        types.MCPSERVER.Name,
+				SKU:        "1",
+				Repository: &database.Repository{
+					ID:            321,
+					UserID:        11,
+					Path:          "ns/n",
+					GitPath:       "spaces_ns/n",
+					DefaultBranch: "main",
+					Private:       tc.private,
+				},
+			}, nil)
+
+			sc.mocks.userSvcClient.EXPECT().GetNameSpaceInfo(ctx, "user").Return(&rpc.Namespace{
+				Path: "user",
+				UUID: "uuid",
+			}, nil)
+
+			sc.mocks.stores.SpaceResourceMock().EXPECT().FindByID(ctx, int64(1)).Return(&database.SpaceResource{
+				ID:        1,
+				ClusterID: "cluster",
+			}, nil)
+
+			sc.mocks.components.repo.EXPECT().CheckAccountAndResource(ctx, types.CheckResourceAndAccountReq{
+				UserName:      "ns",
+				ClusterID:     "cluster",
+				OrderDetailID: 0,
+				CurrentUser:   "user",
+			}, mock.Anything).Return(&types.CheckExclusiveResp{}, nil)
+
+			sc.mocks.stores.RuntimeFrameworkMock().EXPECT().FindSpaceLatestVersion(ctx, "space", "").Return(
+				&database.RuntimeFramework{FrameImage: "img"}, nil)
+
+			sc.mocks.deployer.EXPECT().Deploy(ctx, mock.MatchedBy(func(dr types.DeployRequest) bool {
+				return dr.SpaceID == 1 &&
+					dr.Type == types.SpaceType &&
+					dr.ContainerPort == types.MCPSERVER.Port &&
+					dr.SecureLevel == tc.wantLevel
+			})).Return(int64(1), nil)
+
+			deployID, err := sc.Deploy(ctx, "ns", "n", "user")
+			require.Nil(t, err)
+			require.Equal(t, int64(1), deployID)
+		})
+	}
+}
+
+func TestSpaceComponent_Update_SecureLevelSync(t *testing.T) {
+	newRepo := func(private bool) *database.Repository {
+		return &database.Repository{
+			ID:      321,
+			Name:    "n",
+			Path:    "ns/n",
+			Private: private,
+			User:    database.User{UUID: "uuid", Username: "user"},
+		}
+	}
+
+	t.Run("private space syncs endpoint private to deploy", func(t *testing.T) {
+		ctx := context.TODO()
+		sc := initializeTestSpaceComponent(ctx, t)
+
+		private := true
+		sc.mocks.components.repo.EXPECT().UpdateRepo(ctx, mock.Anything).Return(newRepo(true), nil)
+		sc.mocks.stores.SpaceMock().EXPECT().ByRepoID(ctx, int64(321)).Return(&database.Space{ID: 1, RepositoryID: 321}, nil)
+		sc.mocks.stores.DeployTaskMock().EXPECT().GetLatestDeployBySpaceID(ctx, int64(1)).Return(&database.Deploy{ID: 9}, nil)
+		sc.mocks.stores.SpaceMock().EXPECT().UpdateWithDeploySecureLevel(ctx, database.Space{ID: 1, RepositoryID: 321}, int64(9), types.EndpointPrivate).Return(nil)
+
+		space, err := sc.Update(ctx, &types.UpdateSpaceReq{
+			UpdateRepoReq: types.UpdateRepoReq{Namespace: "ns", Name: "n", Username: "user", Private: &private},
+		})
+		require.Nil(t, err)
+		require.True(t, space.Private)
+	})
+
+	t.Run("public space syncs endpoint public to deploy", func(t *testing.T) {
+		ctx := context.TODO()
+		sc := initializeTestSpaceComponent(ctx, t)
+
+		private := false
+		sc.mocks.components.repo.EXPECT().UpdateRepo(ctx, mock.Anything).Return(newRepo(false), nil)
+		sc.mocks.stores.SpaceMock().EXPECT().ByRepoID(ctx, int64(321)).Return(&database.Space{ID: 1, RepositoryID: 321}, nil)
+		sc.mocks.stores.DeployTaskMock().EXPECT().GetLatestDeployBySpaceID(ctx, int64(1)).Return(&database.Deploy{ID: 9}, nil)
+		sc.mocks.stores.SpaceMock().EXPECT().UpdateWithDeploySecureLevel(ctx, database.Space{ID: 1, RepositoryID: 321}, int64(9), types.EndpointPublic).Return(nil)
+
+		_, err := sc.Update(ctx, &types.UpdateSpaceReq{
+			UpdateRepoReq: types.UpdateRepoReq{Namespace: "ns", Name: "n", Username: "user", Private: &private},
+		})
+		require.Nil(t, err)
+	})
+
+	t.Run("space never deployed skips sync", func(t *testing.T) {
+		ctx := context.TODO()
+		sc := initializeTestSpaceComponent(ctx, t)
+
+		private := true
+		sc.mocks.components.repo.EXPECT().UpdateRepo(ctx, mock.Anything).Return(newRepo(true), nil)
+		sc.mocks.stores.SpaceMock().EXPECT().ByRepoID(ctx, int64(321)).Return(&database.Space{ID: 1, RepositoryID: 321}, nil)
+		sc.mocks.stores.SpaceMock().EXPECT().Update(ctx, mock.Anything).Return(nil)
+		sc.mocks.stores.DeployTaskMock().EXPECT().GetLatestDeployBySpaceID(ctx, int64(1)).Return(nil, errorx.ErrDatabaseNoRows)
+
+		_, err := sc.Update(ctx, &types.UpdateSpaceReq{
+			UpdateRepoReq: types.UpdateRepoReq{Namespace: "ns", Name: "n", Username: "user", Private: &private},
+		})
+		require.Nil(t, err)
+	})
+
+	t.Run("no privacy change skips sync", func(t *testing.T) {
+		ctx := context.TODO()
+		sc := initializeTestSpaceComponent(ctx, t)
+
+		sc.mocks.components.repo.EXPECT().UpdateRepo(ctx, mock.Anything).Return(newRepo(false), nil)
+		sc.mocks.stores.SpaceMock().EXPECT().ByRepoID(ctx, int64(321)).Return(&database.Space{ID: 1, RepositoryID: 321}, nil)
+		sc.mocks.stores.SpaceMock().EXPECT().Update(ctx, mock.Anything).Return(nil)
+
+		_, err := sc.Update(ctx, &types.UpdateSpaceReq{
+			UpdateRepoReq: types.UpdateRepoReq{Namespace: "ns", Name: "n", Username: "user"},
+		})
+		require.Nil(t, err)
+	})
 }

@@ -17,6 +17,7 @@ import (
 	"opencsg.com/csghub-server/builder/loki"
 	bldmq "opencsg.com/csghub-server/builder/mq"
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
 
@@ -320,6 +321,7 @@ func TestCheckDeployPermissionForUser_PrivateEndpoint_AdminForbidden(t *testing.
 		UserID:      123,
 		SvcName:     "svc-1",
 		ClusterID:   "cluster-1",
+		Type:        types.InferenceType,
 		SecureLevel: types.EndpointPrivate,
 	}
 
@@ -902,5 +904,61 @@ func TestRepoComponent_AttachUpstreamLLMConfigID(t *testing.T) {
 		res := types.DeployRequest{DeployID: 9}
 		repo.attachUpstreamLLMConfigID(ctx, types.InferenceType, &res)
 		require.Equal(t, int64(0), res.LLMConfigID)
+	})
+}
+
+func TestRepoComponent_CheckDeployPermissionForUser_SecureLevel(t *testing.T) {
+	ctx := context.TODO()
+
+	newDeploy := func(spaceID int64, deployType, secureLevel int) *database.Deploy {
+		return &database.Deploy{ID: 1, UserID: 100, SpaceID: spaceID, Type: deployType, SecureLevel: secureLevel}
+	}
+
+	t.Run("space deploy private allows same org member", func(t *testing.T) {
+		repo := initializeTestRepoComponent(ctx, t)
+		repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "u").Return(database.User{ID: 200}, nil)
+		repo.mocks.stores.DeployTaskMock().EXPECT().GetDeployByID(ctx, int64(1)).Return(newDeploy(11, types.SpaceType, types.EndpointPrivate), nil)
+		repo.mocks.stores.OrgMock().EXPECT().GetSharedOrgIDs(ctx, []int64{200, 100}).Return([]int64{1}, nil)
+
+		_, _, err := repo.CheckDeployPermissionForUser(ctx, types.DeployActReq{CurrentUser: "u", DeployID: 1})
+		require.NoError(t, err)
+	})
+
+	t.Run("space deploy private forbids unrelated user", func(t *testing.T) {
+		repo := initializeTestRepoComponent(ctx, t)
+		repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "u").Return(database.User{ID: 200}, nil)
+		repo.mocks.stores.DeployTaskMock().EXPECT().GetDeployByID(ctx, int64(1)).Return(newDeploy(11, types.SpaceType, types.EndpointPrivate), nil)
+		repo.mocks.stores.OrgMock().EXPECT().GetSharedOrgIDs(ctx, []int64{200, 100}).Return(nil, nil)
+
+		_, _, err := repo.CheckDeployPermissionForUser(ctx, types.DeployActReq{CurrentUser: "u", DeployID: 1})
+		require.ErrorIs(t, err, errorx.ErrForbidden)
+	})
+
+	t.Run("inference deploy private still creator only", func(t *testing.T) {
+		repo := initializeTestRepoComponent(ctx, t)
+		repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "u").Return(database.User{ID: 200}, nil)
+		repo.mocks.stores.DeployTaskMock().EXPECT().GetDeployByID(ctx, int64(1)).Return(newDeploy(0, types.InferenceType, types.EndpointPrivate), nil)
+
+		_, _, err := repo.CheckDeployPermissionForUser(ctx, types.DeployActReq{CurrentUser: "u", DeployID: 1})
+		require.ErrorIs(t, err, errorx.ErrForbidden)
+	})
+
+	t.Run("legacy untyped row with private level stays creator only", func(t *testing.T) {
+		repo := initializeTestRepoComponent(ctx, t)
+		repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "u").Return(database.User{ID: 200}, nil)
+		// unset Type is 0 which collides with SpaceType; SpaceID 0 marks non-space
+		repo.mocks.stores.DeployTaskMock().EXPECT().GetDeployByID(ctx, int64(1)).Return(newDeploy(0, 0, types.EndpointPrivate), nil)
+
+		_, _, err := repo.CheckDeployPermissionForUser(ctx, types.DeployActReq{CurrentUser: "u", DeployID: 1})
+		require.ErrorIs(t, err, errorx.ErrForbidden)
+	})
+
+	t.Run("creator always allowed", func(t *testing.T) {
+		repo := initializeTestRepoComponent(ctx, t)
+		repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "u").Return(database.User{ID: 100}, nil)
+		repo.mocks.stores.DeployTaskMock().EXPECT().GetDeployByID(ctx, int64(1)).Return(newDeploy(11, types.SpaceType, types.EndpointPrivate), nil)
+
+		_, _, err := repo.CheckDeployPermissionForUser(ctx, types.DeployActReq{CurrentUser: "u", DeployID: 1})
+		require.NoError(t, err)
 	})
 }
