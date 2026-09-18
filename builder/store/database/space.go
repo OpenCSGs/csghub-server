@@ -30,6 +30,9 @@ type SpaceStore interface {
 	ByOrgPath(ctx context.Context, namespace string, per, page int, onlyPublic bool) (spaces []Space, total int, err error)
 	ListByPath(ctx context.Context, paths []string) ([]Space, error)
 	CreateAndUpdateRepoPath(ctx context.Context, input Space, path string) (*Space, error)
+	// UpdateWithDeploySecureLevel updates the space row and the secure_level of
+	// its current deploy atomically, used when repo privacy changes
+	UpdateWithDeploySecureLevel(ctx context.Context, input Space, deployID int64, secureLevel int) error
 }
 
 func NewSpaceStore() SpaceStore {
@@ -74,6 +77,22 @@ func (s *spaceStoreImpl) Update(ctx context.Context, input Space) (err error) {
 	_, err = s.db.Core.NewUpdate().Model(&input).WherePK().Exec(ctx)
 	err = errorx.HandleDBError(err, nil)
 	return
+}
+
+func (s *spaceStoreImpl) UpdateWithDeploySecureLevel(ctx context.Context, input Space, deployID int64, secureLevel int) error {
+	err := s.db.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		if _, err := tx.NewUpdate().Model(&input).WherePK().Exec(ctx); err != nil {
+			return fmt.Errorf("failed to update space: %w", err)
+		}
+		if _, err := tx.NewUpdate().Model((*Deploy)(nil)).
+			Set("secure_level = ?", secureLevel).
+			Where("id = ?", deployID).
+			Exec(ctx); err != nil {
+			return fmt.Errorf("failed to update secure level of deploy %d: %w", deployID, err)
+		}
+		return nil
+	})
+	return errorx.HandleDBError(err, nil)
 }
 
 func (s *spaceStoreImpl) FindByPath(ctx context.Context, namespace, name string) (*Space, error) {

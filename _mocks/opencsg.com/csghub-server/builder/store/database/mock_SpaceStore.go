@@ -737,6 +737,55 @@ func (_c *MockSpaceStore_Update_Call) RunAndReturn(run func(context.Context, dat
 	return _c
 }
 
+// UpdateWithDeploySecureLevel provides a mock function with given fields: ctx, input, deployID, secureLevel
+func (_m *MockSpaceStore) UpdateWithDeploySecureLevel(ctx context.Context, input database.Space, deployID int64, secureLevel int) error {
+	ret := _m.Called(ctx, input, deployID, secureLevel)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdateWithDeploySecureLevel")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, database.Space, int64, int) error); ok {
+		r0 = rf(ctx, input, deployID, secureLevel)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockSpaceStore_UpdateWithDeploySecureLevel_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdateWithDeploySecureLevel'
+type MockSpaceStore_UpdateWithDeploySecureLevel_Call struct {
+	*mock.Call
+}
+
+// UpdateWithDeploySecureLevel is a helper method to define mock.On call
+//   - ctx context.Context
+//   - input database.Space
+//   - deployID int64
+//   - secureLevel int
+func (_e *MockSpaceStore_Expecter) UpdateWithDeploySecureLevel(ctx interface{}, input interface{}, deployID interface{}, secureLevel interface{}) *MockSpaceStore_UpdateWithDeploySecureLevel_Call {
+	return &MockSpaceStore_UpdateWithDeploySecureLevel_Call{Call: _e.mock.On("UpdateWithDeploySecureLevel", ctx, input, deployID, secureLevel)}
+}
+
+func (_c *MockSpaceStore_UpdateWithDeploySecureLevel_Call) Run(run func(ctx context.Context, input database.Space, deployID int64, secureLevel int)) *MockSpaceStore_UpdateWithDeploySecureLevel_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(database.Space), args[2].(int64), args[3].(int))
+	})
+	return _c
+}
+
+func (_c *MockSpaceStore_UpdateWithDeploySecureLevel_Call) Return(_a0 error) *MockSpaceStore_UpdateWithDeploySecureLevel_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockSpaceStore_UpdateWithDeploySecureLevel_Call) RunAndReturn(run func(context.Context, database.Space, int64, int) error) *MockSpaceStore_UpdateWithDeploySecureLevel_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // NewMockSpaceStore creates a new instance of MockSpaceStore. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func NewMockSpaceStore(t interface {

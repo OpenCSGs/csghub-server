@@ -514,13 +514,32 @@ func (c *spaceComponentImpl) Update(ctx context.Context, req *types.UpdateSpaceR
 		return nil, fmt.Errorf("failed to merge update space request, error: %w", err)
 	}
 
-	err = c.spaceStore.Update(ctx, *space)
-	if err != nil {
-		return nil, fmt.Errorf("failed to update database space, error: %w", err)
-	}
-
 	if req.Private != nil {
+		// space deploys derive endpoint secure level from repo visibility;
+		// sync the space's current deploy together with the space row update
+		secureLevel := types.EndpointPublic
+		if dbRepo.Private {
+			secureLevel = types.EndpointPrivate
+		}
+		deploy, err := c.deployTaskStore.GetLatestDeployBySpaceID(ctx, space.ID)
+		if err != nil && !errors.Is(err, errorx.ErrDatabaseNoRows) {
+			return nil, fmt.Errorf("failed to get space deploy to sync secure level, error: %w", err)
+		}
+		if deploy != nil && deploy.ID > 0 {
+			err = c.spaceStore.UpdateWithDeploySecureLevel(ctx, *space, deploy.ID, secureLevel)
+		} else {
+			err = c.spaceStore.Update(ctx, *space)
+		}
+		if err != nil {
+			return nil, fmt.Errorf("failed to update database space, error: %w", err)
+		}
+
 		c.syncCodeAgentIfExists(dbRepo.User.UUID, dbRepo.User.Username, dbRepo.Path, types.CodeAgentSyncOperationVisibility)
+	} else {
+		err = c.spaceStore.Update(ctx, *space)
+		if err != nil {
+			return nil, fmt.Errorf("failed to update database space, error: %w", err)
+		}
 	}
 
 	resDataset := &types.Space{
@@ -993,6 +1012,13 @@ func (c *spaceComponentImpl) Deploy(ctx context.Context, namespace, name, curren
 			imageID = frame.FrameImage
 		}
 	}
+	// map endpoint secure level from repo visibility so rproxy can allow
+	// public access to endpoints (e.g. mcp_server spaces) of public repos
+	secureLevel := types.EndpointPublic
+	if space.Repository.Private {
+		secureLevel = types.EndpointPrivate
+	}
+
 	// create deploy for space
 	dr := types.DeployRequest{
 		SpaceID:       space.ID,
@@ -1016,6 +1042,7 @@ func (c *spaceComponentImpl) Deploy(ctx context.Context, namespace, name, curren
 		ContainerPort: containerPort,
 		Variables:     space.Variables,
 		ClusterID:     space.ClusterID,
+		SecureLevel:   secureLevel,
 
 		OwnerNamespace: namespace,
 		DeployExtend: types.DeployExtend{
@@ -1439,8 +1466,10 @@ func (c *spaceComponentImpl) GetMCPServiceBySvcName(ctx context.Context, svcName
 		return nil, fmt.Errorf("failed to get space by id %d, error: %w", deploy.SpaceID, err)
 	}
 
-	spaceStatus, _ := c.status(ctx, space)
-	endpoint := c.getEndpoint(spaceStatus.SvcName, space)
+	// use the deploy record directly: this method is also called from the
+	// aigateway MCP proxy where the deployer is not initialized, and the
+	// svcName-scoped deploy is the exact instance being proxied
+	endpoint := c.getEndpoint(deploy.SvcName, space)
 
 	resSvc := &types.MCPService{
 		ID:           space.ID,
@@ -1452,9 +1481,9 @@ func (c *spaceComponentImpl) GetMCPServiceBySvcName(ctx context.Context, svcName
 		Private:      space.Repository.Private,
 		CreatedAt:    space.Repository.CreatedAt,
 		UpdatedAt:    space.Repository.UpdatedAt,
-		Status:       spaceStatus.Status,
+		Status:       deployStatusCodeToString(deploy.Status),
 		RepositoryID: space.Repository.ID,
-		SvcName:      spaceStatus.SvcName,
+		SvcName:      deploy.SvcName,
 		Endpoint:     endpoint,
 	}
 
