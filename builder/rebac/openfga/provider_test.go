@@ -2,13 +2,18 @@ package openfga
 
 import (
 	"context"
+	"fmt"
+	"math"
+	"strconv"
 	"testing"
 
 	openfgav1 "github.com/openfga/api/proto/openfga/v1"
+	"github.com/openfga/openfga/pkg/storage/memory"
 	"github.com/stretchr/testify/require"
 
 	"opencsg.com/csghub-server/builder/rebac"
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/common/config"
 	commontypes "opencsg.com/csghub-server/common/types"
 )
 
@@ -212,11 +217,11 @@ func TestGetServerInitializationFailureCanRetry(t *testing.T) {
 	database.SetDB(nil)
 	t.Cleanup(func() { database.SetDB(previousDB) })
 
-	server, err := getServer()
+	server, err := getServer(nil)
 	require.Error(t, err)
 	require.Nil(t, server)
 
-	server, err = getServer()
+	server, err = getServer(nil)
 	require.Error(t, err)
 	require.Nil(t, server)
 }
@@ -259,4 +264,83 @@ func TestNewCustomProviderWithoutOptionsUsesDefaultProvider(t *testing.T) {
 	provider, err := NewCustomProvider()
 	require.NoError(t, err)
 	require.Same(t, sentinel, provider)
+}
+
+// TestProviderListObjectsConfiguredLimit verifies application settings through the real OpenFGA API.
+func TestProviderListObjectsConfiguredLimit(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		limit     int
+		nilConfig bool
+		want      int
+	}{
+		{name: "positive", limit: 1, want: 1},
+		{name: "above default", limit: 1200, want: 1001},
+		{name: "application default", limit: 10000, want: 1001},
+		{name: "zero uses OpenFGA default", limit: 0, want: 1000},
+		{name: "negative uses OpenFGA default", limit: -1, want: 1000},
+		{name: "nil uses OpenFGA default", nilConfig: true, want: 1000},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg := &config.Config{}
+			cfg.Rebac.OpenFGAListObjectMaxResult = tc.limit
+			if tc.nilConfig {
+				cfg = nil
+			}
+			server, err := newServerWithDatastore(memory.New(), cfg)
+			require.NoError(t, err)
+			defer server.Close()
+			ctx := context.Background()
+			store, err := server.CreateStore(ctx, &openfgav1.CreateStoreRequest{Name: "limit-test"})
+			require.NoError(t, err)
+			model, err := server.WriteAuthorizationModel(ctx, &openfgav1.WriteAuthorizationModelRequest{
+				StoreId: store.Id, SchemaVersion: "1.1",
+				TypeDefinitions: []*openfgav1.TypeDefinition{
+					{Type: "user"},
+					{Type: "repository", Relations: map[string]*openfgav1.Userset{
+						"can_read": {Userset: &openfgav1.Userset_This{This: &openfgav1.DirectUserset{}}},
+					}, Metadata: &openfgav1.Metadata{Relations: map[string]*openfgav1.RelationMetadata{
+						"can_read": {DirectlyRelatedUserTypes: []*openfgav1.RelationReference{{Type: "user"}}},
+					}}},
+				},
+			})
+			require.NoError(t, err)
+			// More than 1000 objects distinguishes the configured limit from the OpenFGA default.
+			for start := 0; start < 1001; start += 100 {
+				tuples := make([]*openfgav1.TupleKey, 0, 100)
+				for id := start; id < min(start+100, 1001); id++ {
+					tuples = append(tuples, &openfgav1.TupleKey{
+						User: "user:alice", Relation: "can_read", Object: fmt.Sprintf("repository:%d", id+1),
+					})
+				}
+				_, err = server.Write(ctx, &openfgav1.WriteRequest{
+					StoreId: store.Id, AuthorizationModelId: model.AuthorizationModelId,
+					Writes: &openfgav1.WriteRequestWrites{TupleKeys: tuples},
+				})
+				require.NoError(t, err)
+			}
+			provider := &Provider{server: server, storeID: store.Id, authorizationModelID: model.AuthorizationModelId}
+			result, err := provider.ListObjects(ctx, rebac.ListObjectsRequest{
+				Subject: rebac.UserSubject("alice"), Relation: rebac.RepositoryCanRead,
+				ObjectType: rebac.ObjectTypeRepository, Consistency: rebac.ConsistencyHigher,
+			})
+			require.NoError(t, err)
+			require.Len(t, result.Objects, tc.want)
+		})
+	}
+}
+
+// TestProviderListObjectsLimitOverflow rejects values that would wrap during uint32 conversion.
+func TestProviderListObjectsLimitOverflow(t *testing.T) {
+	if strconv.IntSize < 64 {
+		t.Skip("int cannot represent values above uint32 on this platform")
+	}
+	limit := int64(math.MaxUint32) + 1
+	cfg := &config.Config{}
+	cfg.Rebac.OpenFGAListObjectMaxResult = int(limit)
+	datastore := memory.New()
+	defer datastore.Close()
+	server, err := newServerWithDatastore(datastore, cfg)
+	require.Nil(t, server)
+	require.EqualError(t, err, "rebac.openfga_list_object_max_result exceeds OpenFGA uint32 range")
 }

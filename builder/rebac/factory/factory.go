@@ -12,10 +12,5 @@ func NewAuthorizer() (rebac.Authorizer, error) {
 	if err != nil {
 		return nil, err
 	}
-	authorizer, err := rebac.NewAuthorizer(provider)
-	if err != nil {
-		return nil, err
-	}
-
-	return authorizer, nil
+	return rebac.NewAuthorizer(provider)
 }

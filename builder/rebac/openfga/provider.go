@@ -12,6 +12,7 @@ import (
 	openfgav1 "github.com/openfga/api/proto/openfga/v1"
 	"google.golang.org/protobuf/types/known/structpb"
 	"opencsg.com/csghub-server/builder/rebac"
+	"opencsg.com/csghub-server/common/config"
 	commontypes "opencsg.com/csghub-server/common/types"
 )
 
@@ -88,7 +89,11 @@ func NewDefaultProvider() (*Provider, error) {
 	}
 
 	options := defaultProviderOptions()
-	server, err := getServer()
+	cfg, err := config.LoadConfig()
+	if err != nil {
+		return nil, fmt.Errorf("load OpenFGA configuration: %w", err)
+	}
+	server, err := getServer(cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -119,10 +124,14 @@ func NewCustomProvider(opts ...ProviderOption) (*Provider, error) {
 		server openFGAServer
 		err    error
 	)
+	cfg, err := config.LoadConfig()
+	if err != nil {
+		return nil, fmt.Errorf("load OpenFGA configuration: %w", err)
+	}
 	if options.pgxPool != nil {
-		server, err = newServerWithPGXPool(options.pgxPool)
+		server, err = newServerWithPGXPool(options.pgxPool, cfg)
 	} else {
-		server, err = newServer()
+		server, err = newServer(cfg)
 	}
 	if err != nil {
 		return nil, err

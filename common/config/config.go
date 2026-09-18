@@ -66,6 +66,12 @@ type Config struct {
 		EnableUnit bool `env:"STARHUB_SERVER_ORGANIZATION_ENABLE_UNIT" default:"false"`
 	}
 
+	// ReBAC controls the embedded OpenFGA authorization service.
+	Rebac struct {
+		// OpenFGAListObjectMaxResult limits the number of objects returned by OpenFGA ListObjects.
+		OpenFGAListObjectMaxResult int `env:"STARHUB_SERVER_REBAC_OPENFGA_LIST_OBJECT_MAX_RESULT" default:"2000"`
+	}
+
 	APIServer struct {
 		Port         int    `env:"STARHUB_SERVER_SERVER_PORT" default:"8080"`
 		PublicDomain string `env:"STARHUB_SERVER_PUBLIC_DOMAIN" default:"http://localhost:8080"`
@@ -276,8 +282,9 @@ type Config struct {
 	}
 
 	Search struct {
-		RepoSearchCacheTTL int `env:"STARHUB_SERVER_REPO_SEARCH_CACHE_TTL" default:"300"` // 5 min
-		RepoSearchLimit    int `env:"STARHUB_SERVER_REPO_SEARCH_LIMIT" default:"2000"`
+		RepoSearchCacheTTL           int `env:"STARHUB_SERVER_REPO_SEARCH_CACHE_TTL" default:"300"`            // 5 min
+		RepositoryAccessListCacheTTL int `env:"STARHUB_SERVER_REPOSITORY_ACCESS_LIST_CACHE_TTL" default:"300"` // 5 min
+		RepoSearchLimit              int `env:"STARHUB_SERVER_REPO_SEARCH_LIMIT" default:"2000"`
 	}
 
 	// send events

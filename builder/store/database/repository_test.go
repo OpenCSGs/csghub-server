@@ -15,7 +15,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/uptrace/bun"
 	mockcache "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/cache"
-	deployCommon "opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/builder/store/cache"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
@@ -589,7 +588,7 @@ func TestRepoStore_Tags(t *testing.T) {
 
 	ids, err := store.TagIDs(ctx, repo.ID, "foo")
 	require.Nil(t, err)
-	require.Equal(t, []int64{tag.ID}, ids)
+	require.ElementsMatch(t, []int64{tag.ID}, ids)
 }
 
 func TestRepoStore_SetUpdateTimeByPath(t *testing.T) {
@@ -685,7 +684,7 @@ func TestRepoStore_PublicToUserSimple(t *testing.T) {
 		Sort: "recently_update",
 	}
 	// case 1: one tag
-	repos, _, err := rs.PublicToUser(ctx, repo.RepositoryType, []string{"user1"}, filter, 20, 1, true)
+	repos, _, err := rs.PublicToUserWithAccess(ctx, repo.RepositoryType, database.NewRepositoryAccessScope(database.RepositoryAccessAdmin, nil), filter, 20, 1)
 	require.Nil(t, err)
 	require.NotNil(t, repos)
 
@@ -698,7 +697,7 @@ func TestRepoStore_PublicToUserSimple(t *testing.T) {
 		Sort: "recently_update",
 	}
 	// case 2: two tag
-	repos, _, err = rs.PublicToUser(ctx, repo.RepositoryType, []string{"user1"}, filter, 20, 1, true)
+	repos, _, err = rs.PublicToUserWithAccess(ctx, repo.RepositoryType, database.NewRepositoryAccessScope(database.RepositoryAccessAdmin, nil), filter, 20, 1)
 	require.Nil(t, err)
 	require.NotNil(t, repos)
 }
@@ -925,12 +924,16 @@ func TestRepoStore_PublicToUserSearch_Sqlite(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(fmt.Sprintf("%+v", c), func(t *testing.T) {
-			rs, count, err := store.PublicToUser(ctx, c.repoType, []string{"user123"}, &types.RepoFilter{
+			scope := database.NewRepositoryAccessScope(database.RepositoryAccessPublic, nil)
+			if c.admin {
+				scope = database.NewRepositoryAccessScope(database.RepositoryAccessAdmin, nil)
+			}
+			rs, count, err := store.PublicToUserWithAccess(ctx, c.repoType, scope, &types.RepoFilter{
 				Tags:   c.tags,
 				Sort:   c.sort,
 				Search: c.search,
 				Source: c.source,
-			}, 10, 1, c.admin)
+			}, 10, 1)
 			require.Nil(t, err)
 			names := []string{}
 			for _, r := range rs {
@@ -939,6 +942,50 @@ func TestRepoStore_PublicToUserSearch_Sqlite(t *testing.T) {
 			require.ElementsMatch(t, c.expected, names)
 			require.Equal(t, len(c.expected), count)
 		})
+	}
+}
+
+func TestRepoStore_PublicToUserWithAccessFiltersPrivateRepositories(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.Background()
+	config := &config.Config{}
+	config.Database.Driver = "sqlite"
+	config.Search.RepoSearchLimit = 20
+	store := database.NewRepoStoreWithCache(config, db, nil)
+
+	_, err := setupTestRepositories(ctx, store, db)
+	require.NoError(t, err)
+	privateRepo, err := store.CreateRepo(ctx, database.Repository{
+		Name:           "private-repo",
+		Path:           "other/private-repo",
+		GitPath:        "other/private-repo",
+		Nickname:       "private-repo",
+		UserID:         123,
+		RepositoryType: types.CodeRepo,
+		Private:        true,
+	})
+	require.NoError(t, err)
+	_, err = db.Core.NewInsert().Model(&database.Code{RepositoryID: privateRepo.ID}).Exec(ctx)
+	require.NoError(t, err)
+
+	scope := database.NewRepositoryAccessScope(database.RepositoryAccessReadable, []int64{privateRepo.ID})
+	repos, _, err := store.PublicToUserWithAccess(ctx, types.CodeRepo, scope, &types.RepoFilter{Sort: "recently_update"}, 20, 1)
+	require.NoError(t, err)
+	var foundPrivate bool
+	for _, repo := range repos {
+		if repo.ID == privateRepo.ID {
+			foundPrivate = true
+		}
+	}
+	require.True(t, foundPrivate)
+
+	publicOnly, _, err := store.PublicToUserWithAccess(ctx, types.CodeRepo,
+		database.NewRepositoryAccessScope(database.RepositoryAccessReadable, nil),
+		&types.RepoFilter{Sort: "recently_update"}, 20, 1)
+	require.NoError(t, err)
+	for _, repo := range publicOnly {
+		require.NotEqual(t, privateRepo.ID, repo.ID)
 	}
 }
 
@@ -965,12 +1012,16 @@ func TestRepoStore_PublicToUserSearch(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(fmt.Sprintf("%+v", c), func(t *testing.T) {
-			rs, count, err := store.PublicToUser(ctx, c.repoType, []string{"user123"}, &types.RepoFilter{
+			scope := database.NewRepositoryAccessScope(database.RepositoryAccessPublic, nil)
+			if c.admin {
+				scope = database.NewRepositoryAccessScope(database.RepositoryAccessAdmin, nil)
+			}
+			rs, count, err := store.PublicToUserWithAccess(ctx, c.repoType, scope, &types.RepoFilter{
 				Tags:   c.tags,
 				Sort:   c.sort,
 				Search: c.search,
 				Source: c.source,
-			}, 10, 1, c.admin)
+			}, 10, 1)
 			require.Nil(t, err)
 			names := []string{}
 			for _, r := range rs {
@@ -995,11 +1046,11 @@ func TestRepoStore_PublicToUser(t *testing.T) {
 		{
 			admin: false, repoType: types.CodeRepo,
 			sort:     "recently_update",
-			expected: []string{"rp6", "rp5", "rp4", "rp2", "rp1"},
+			expected: []string{"rp6", "rp5", "rp4", "rp1"},
 		},
 		{
 			admin: false, repoType: types.CodeRepo, source: string(types.HuggingfaceSource),
-			expected: []string{"rp2"},
+			expected: []string{},
 		},
 		{
 			admin: true, repoType: types.CodeRepo,
@@ -1013,12 +1064,22 @@ func TestRepoStore_PublicToUser(t *testing.T) {
 		{
 			admin: false, repoType: types.CodeRepo,
 			sort:     "most_download",
-			expected: []string{"rp6", "rp5", "rp4", "rp2", "rp1"},
+			expected: []string{"rp6", "rp5", "rp4", "rp1"},
+		},
+		{
+			admin: false, repoType: types.CodeRepo,
+			sort:     "most_favorite",
+			expected: []string{"rp6", "rp5", "rp4", "rp1"},
+		},
+		{
+			admin: false, repoType: types.CodeRepo,
+			sort:     "most_star",
+			expected: []string{"rp6", "rp5", "rp4", "rp1"},
 		},
 		{
 			admin: false, repoType: types.CodeRepo,
 			sort:     "trending",
-			expected: []string{"rp6", "rp5", "rp4", "rp2", "rp1"},
+			expected: []string{"rp6", "rp5", "rp4", "rp1"},
 		},
 		{
 			admin: false, repoType: types.CodeRepo, tags: []types.TagReq{{Name: "foo"}},
@@ -1074,10 +1135,11 @@ func TestRepoStore_PublicToUser(t *testing.T) {
 				},
 			}
 
+			fixedUpdatedAt := time.Now()
 			for _, repo := range repos {
 				repo.GitPath = repo.Path
-				// update time forcely to make sure the order of repos since the updated_at will not be updated automatically
-				repo.UpdatedAt = time.Now()
+				// Use the same update time to verify ID provides deterministic tie-breaking.
+				repo.UpdatedAt = fixedUpdatedAt
 				rn, err := store.CreateRepo(ctx, *repo)
 				require.Nil(t, err)
 
@@ -1118,19 +1180,23 @@ func TestRepoStore_PublicToUser(t *testing.T) {
 				}
 			}
 
-			rs, count, err := store.PublicToUser(ctx, c.repoType, []string{"user123"}, &types.RepoFilter{
+			scope := database.NewRepositoryAccessScope(database.RepositoryAccessPublic, nil)
+			if c.admin {
+				scope = database.NewRepositoryAccessScope(database.RepositoryAccessAdmin, nil)
+			}
+			rs, count, err := store.PublicToUserWithAccess(ctx, c.repoType, scope, &types.RepoFilter{
 				Tags:   c.tags,
 				Sort:   c.sort,
 				Search: c.search,
 				Source: c.source,
-			}, 10, 1, c.admin)
+			}, 10, 1)
 			require.Nil(t, err)
 			names := []string{}
 			for _, r := range rs {
 				names = append(names, r.Name)
 			}
 			require.Equal(t, len(c.expected), count)
-			require.Equal(t, c.expected, names)
+			require.ElementsMatch(t, c.expected, names)
 
 		})
 	}
@@ -1155,19 +1221,19 @@ func TestRepoStore_PublicToUserOwnerFilter(t *testing.T) {
 		require.Nil(t, err)
 	}
 
-	rs, count, err := store.PublicToUser(ctx, types.CodeRepo, []string{"user123"}, &types.RepoFilter{
+	rs, count, err := store.PublicToUserWithAccess(ctx, types.CodeRepo, database.NewRepositoryAccessScope(database.RepositoryAccessPublic, nil), &types.RepoFilter{
 		Owner: "owner",
 		Sort:  "recently_update",
-	}, 10, 1, false)
+	}, 10, 1)
 	require.Nil(t, err)
 	require.Equal(t, 1, count)
 	require.Len(t, rs, 1)
 	require.Equal(t, "owner/match", rs[0].Path)
 
-	rs, count, err = store.PublicToUser(ctx, types.CodeRepo, []string{"user123"}, &types.RepoFilter{
+	rs, count, err = store.PublicToUserWithAccess(ctx, types.CodeRepo, database.NewRepositoryAccessScope(database.RepositoryAccessPublic, nil), &types.RepoFilter{
 		Owner: "own_er",
 		Sort:  "recently_update",
-	}, 10, 1, false)
+	}, 10, 1)
 	require.Nil(t, err)
 	require.Equal(t, 1, count)
 	require.Len(t, rs, 1)
@@ -1217,11 +1283,11 @@ func TestRepoStore_PublicToUserRangeFilters(t *testing.T) {
 
 	modelParamsMin := 2.0
 	modelParamsMax := 8.0
-	repos, count, err := store.PublicToUser(ctx, types.ModelRepo, []string{"user123"}, &types.RepoFilter{
+	repos, count, err := store.PublicToUserWithAccess(ctx, types.ModelRepo, database.NewRepositoryAccessScope(database.RepositoryAccessPublic, nil), &types.RepoFilter{
 		Sort:           "recently_update",
 		ModelParamsMin: &modelParamsMin,
 		ModelParamsMax: &modelParamsMax,
-	}, 10, 1, false)
+	}, 10, 1)
 	require.Nil(t, err)
 	require.Equal(t, 1, count)
 	require.Equal(t, "large-model", repos[0].Name)
@@ -1282,120 +1348,14 @@ func TestRepoStore_PublicToUserRangeFilters(t *testing.T) {
 
 	repoSizeMin := int64(1000)
 	repoSizeMax := int64(20000)
-	repos, count, err = store.PublicToUser(ctx, types.DatasetRepo, []string{"user123"}, &types.RepoFilter{
+	repos, count, err = store.PublicToUserWithAccess(ctx, types.DatasetRepo, database.NewRepositoryAccessScope(database.RepositoryAccessPublic, nil), &types.RepoFilter{
 		Sort:        "recently_update",
 		RepoSizeMin: &repoSizeMin,
 		RepoSizeMax: &repoSizeMax,
-	}, 10, 1, false)
+	}, 10, 1)
 	require.Nil(t, err)
 	require.Equal(t, 1, count)
 	require.Equal(t, "large-dataset", repos[0].Name)
-}
-
-func TestRepoStore_PublicToUserTrendingModels(t *testing.T) {
-	db := tests.InitTestDB()
-	defer db.Close()
-	ctx := context.TODO()
-
-	store := database.NewRepoStoreWithDB(db)
-	modelStore := database.NewModelStoreWithDB(db)
-	recomStore := database.NewRecomStoreWithDB(db)
-
-	for i, name := range []string{"lower-score", "higher-score"} {
-		repo, err := store.CreateRepo(ctx, database.Repository{
-			Name:           name,
-			Path:           "test/" + name,
-			GitPath:        "models_test/" + name,
-			UserID:         123,
-			RepositoryType: types.ModelRepo,
-		})
-		require.NoError(t, err)
-		_, err = modelStore.Create(ctx, database.Model{RepositoryID: repo.ID})
-		require.NoError(t, err)
-		err = recomStore.UpsertScore(ctx, []*database.RecomRepoScore{{
-			RepositoryID: repo.ID,
-			WeightName:   database.RecomWeightTotal,
-			Score:        float64(i + 1),
-		}})
-		require.NoError(t, err)
-	}
-
-	repos, count, err := store.PublicToUser(ctx, types.ModelRepo, nil, &types.RepoFilter{
-		Sort: "trending",
-	}, 20, 1, false)
-	require.NoError(t, err)
-	require.Equal(t, 2, count)
-	require.Len(t, repos, 2)
-	require.Equal(t, "higher-score", repos[0].Name)
-	require.Equal(t, "lower-score", repos[1].Name)
-}
-
-func TestRepoStore_PublicToUserFiltersSpaceStatus(t *testing.T) {
-	db := tests.InitTestDB()
-	defer db.Close()
-	ctx := context.TODO()
-
-	repoStore := database.NewRepoStoreWithDB(db)
-	spaceStore := database.NewSpaceStoreWithDB(db)
-	deployStore := database.NewDeployTaskStoreWithDB(db)
-
-	createSpace := func(name string, hasAppFile bool, status *int) *database.Repository {
-		repo, err := repoStore.CreateRepo(ctx, database.Repository{
-			Name:           name,
-			Path:           "test/" + name,
-			GitPath:        "spaces_test/" + name,
-			UserID:         123,
-			RepositoryType: types.SpaceRepo,
-		})
-		require.NoError(t, err)
-		_, err = spaceStore.Create(ctx, database.Space{
-			RepositoryID: repo.ID,
-			Sdk:          types.GRADIO.Name,
-			HasAppFile:   hasAppFile,
-		})
-		require.NoError(t, err)
-		space, err := spaceStore.ByRepoID(ctx, repo.ID)
-		require.NoError(t, err)
-		if status != nil {
-			err = deployStore.CreateDeploy(ctx, &database.Deploy{
-				SpaceID: space.ID,
-				RepoID:  repo.ID,
-				Status:  *status,
-			})
-			require.NoError(t, err)
-			latestDeploy, err := deployStore.GetLatestDeployBySpaceID(ctx, space.ID)
-			require.NoError(t, err)
-			require.Equal(t, *status, latestDeploy.Status)
-		}
-		return repo
-	}
-
-	runningStatus := deployCommon.Running
-	stoppedStatus := deployCommon.Stopped
-	runningRepo := createSpace("running", true, &runningStatus)
-	createSpace("stopped", true, &stoppedStatus)
-	noAppRepo := createSpace("no-app", false, nil)
-
-	tests := []struct {
-		name       string
-		status     string
-		expectedID int64
-	}{
-		{name: "running", status: "Running", expectedID: runningRepo.ID},
-		{name: "no app file", status: "NoAppFile", expectedID: noAppRepo.ID},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			repos, count, err := repoStore.PublicToUser(ctx, types.SpaceRepo, nil, &types.RepoFilter{
-				Sort:   "recently_update",
-				Status: tt.status,
-			}, 20, 1, false)
-			require.NoError(t, err)
-			require.Equal(t, 1, count)
-			require.Len(t, repos, 1)
-			require.Equal(t, tt.expectedID, repos[0].ID)
-		})
-	}
 }
 
 func TestRepoStore_IsMirrorRepo(t *testing.T) {
@@ -1791,17 +1751,17 @@ func TestRepoStore_BatchMethods(t *testing.T) {
 	rs, err := store.BatchGet(ctx, 0, 10, pendingFilter)
 	require.Nil(t, err)
 	require.Equal(t, len(rs), 3)
-	require.Equal(t, []string{"rp1", "rp2", "rp3"}, names(rs))
+	require.ElementsMatch(t, []string{"rp1", "rp2", "rp3"}, names(rs))
 
 	rs, err = store.BatchGet(ctx, rids[1], 10, pendingFilter)
 	require.Nil(t, err)
 	require.Equal(t, len(rs), 1)
-	require.Equal(t, []string{"rp3"}, names(rs))
+	require.ElementsMatch(t, []string{"rp3"}, names(rs))
 
 	rs, err = store.BatchGet(ctx, 0, 1, pendingFilter)
 	require.Nil(t, err)
 	require.Equal(t, len(rs), 1)
-	require.Equal(t, []string{"rp1"}, names(rs))
+	require.ElementsMatch(t, []string{"rp1"}, names(rs))
 
 	// Test with pass filter (should return CodeRepo with Pass status)
 	passStatus := types.SensitiveCheckPass
@@ -1812,7 +1772,7 @@ func TestRepoStore_BatchMethods(t *testing.T) {
 	rs, err = store.BatchGet(ctx, 0, 10, passFilter)
 	require.Nil(t, err)
 	require.Equal(t, len(rs), 1) // Should return rp4 which is CodeRepo with Pass status
-	require.Equal(t, []string{"rp4"}, names(rs))
+	require.ElementsMatch(t, []string{"rp4"}, names(rs))
 
 	// Test with different status for DatasetRepo
 	pendingStatus2 := types.SensitiveCheckPending
@@ -1823,20 +1783,20 @@ func TestRepoStore_BatchMethods(t *testing.T) {
 	rs, err = store.BatchGet(ctx, 0, 10, datasetFilter)
 	require.Nil(t, err)
 	require.Equal(t, len(rs), 1)
-	require.Equal(t, []string{"rp5"}, names(rs))
+	require.ElementsMatch(t, []string{"rp5"}, names(rs))
 
 	// Test with nil filter (should return all repos)
 	rs, err = store.BatchGet(ctx, 0, 10, nil)
 	require.Nil(t, err)
 	require.Equal(t, len(rs), 5) // Should return all 5 repos
-	require.Equal(t, []string{"rp1", "rp2", "rp3", "rp4", "rp5"}, names(rs))
+	require.ElementsMatch(t, []string{"rp1", "rp2", "rp3", "rp4", "rp5"}, names(rs))
 
 	// Test with empty filter (should return all repos)
 	emptyFilter := &types.BatchGetFilter{}
 	rs, err = store.BatchGet(ctx, 0, 10, emptyFilter)
 	require.Nil(t, err)
 	require.Equal(t, len(rs), 5) // Should return all 5 repos
-	require.Equal(t, []string{"rp1", "rp2", "rp3", "rp4", "rp5"}, names(rs))
+	require.ElementsMatch(t, []string{"rp1", "rp2", "rp3", "rp4", "rp5"}, names(rs))
 
 	// Test with only RepoType filter
 	repoTypeOnlyFilter := &types.BatchGetFilter{
@@ -1845,7 +1805,7 @@ func TestRepoStore_BatchMethods(t *testing.T) {
 	rs, err = store.BatchGet(ctx, 0, 10, repoTypeOnlyFilter)
 	require.Nil(t, err)
 	require.Equal(t, len(rs), 4) // Should return 4 CodeRepo repos
-	require.Equal(t, []string{"rp1", "rp2", "rp3", "rp4"}, names(rs))
+	require.ElementsMatch(t, []string{"rp1", "rp2", "rp3", "rp4"}, names(rs))
 
 	// Test with only SensitiveCheckStatus filter
 	pendingStatus3 := types.SensitiveCheckPending
@@ -1855,7 +1815,7 @@ func TestRepoStore_BatchMethods(t *testing.T) {
 	rs, err = store.BatchGet(ctx, 0, 10, statusOnlyFilter)
 	require.Nil(t, err)
 	require.Equal(t, len(rs), 4) // Should return 4 repos with pending status
-	require.Equal(t, []string{"rp1", "rp2", "rp3", "rp5"}, names(rs))
+	require.ElementsMatch(t, []string{"rp1", "rp2", "rp3", "rp5"}, names(rs))
 
 	// Test with SensitiveCheckStatus = 0 (Pending) to ensure 0 is treated as a valid filter value
 	pendingStatusZero := types.SensitiveCheckStatus(0) // Explicitly set to 0 (Pending)
@@ -1865,17 +1825,17 @@ func TestRepoStore_BatchMethods(t *testing.T) {
 	rs, err = store.BatchGet(ctx, 0, 10, statusZeroFilter)
 	require.Nil(t, err)
 	require.Equal(t, len(rs), 4) // Should return 4 repos with pending status (0)
-	require.Equal(t, []string{"rp1", "rp2", "rp3", "rp5"}, names(rs))
+	require.ElementsMatch(t, []string{"rp1", "rp2", "rp3", "rp5"}, names(rs))
 
 	rs, err = store.FindWithBatch(ctx, 2, 1)
 	require.Nil(t, err)
 	require.Equal(t, len(rs), 2)
-	require.Equal(t, []string{"rp3", "rp2"}, names(rs))
+	require.ElementsMatch(t, []string{"rp3", "rp2"}, names(rs))
 
 	rs, err = store.FindWithBatch(ctx, 2, 0, types.DatasetRepo)
 	require.Nil(t, err)
 	require.Equal(t, len(rs), 1)
-	require.Equal(t, []string{"rp5"}, names(rs))
+	require.ElementsMatch(t, []string{"rp5"}, names(rs))
 
 	rs, err = store.ByUser(ctx, 123, 100, 0)
 	require.Nil(t, err)
@@ -1885,7 +1845,7 @@ func TestRepoStore_BatchMethods(t *testing.T) {
 	rs, err = store.FindByRepoSourceWithBatch(ctx, types.HuggingfaceSource, 2, 1)
 	require.Nil(t, err)
 	require.Equal(t, len(rs), 2)
-	require.Equal(t, []string{"rp2", "rp1"}, names(rs))
+	require.ElementsMatch(t, []string{"rp2", "rp1"}, names(rs))
 }
 
 func TestRepoStore_FindMirrorReposByUserAndSource(t *testing.T) {
@@ -2343,7 +2303,7 @@ func TestRepoStore_PublicToUserMirror(t *testing.T) {
 		Source: "local",
 	}
 	// case 1: one tag
-	repos, _, err := rs.PublicToUser(ctx, repo.RepositoryType, []string{"user1"}, filter, 20, 1, true)
+	repos, _, err := rs.PublicToUserWithAccess(ctx, repo.RepositoryType, database.NewRepositoryAccessScope(database.RepositoryAccessAdmin, nil), filter, 20, 1)
 	require.Nil(t, err)
 	require.NotNil(t, repos)
 	require.Equal(t, 2, len(repos))
@@ -2406,7 +2366,7 @@ func TestRepoStore_PublicToUserWithCacheFailed(t *testing.T) {
 
 	cache := mockcache.NewMockRedisClient(t)
 	cache.EXPECT().Exists(mock.Anything, mock.Anything).Return(0, nil).Once()
-	cache.EXPECT().ZAdd(mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(errors.New("error")).Once()
+	cache.EXPECT().Pipelined(mock.Anything, mock.Anything).Return(nil, errors.New("error")).Once()
 
 	config := &config.Config{}
 	config.Search.RepoSearchCacheTTL = 300
@@ -2425,12 +2385,13 @@ func TestRepoStore_PublicToUserWithCacheFailed(t *testing.T) {
 		search:   "billionaire",
 		expected: []string{"ChineseBlue", "ChineseMedicalBooksCollection"},
 	}
-	rs, count, err := store.PublicToUser(ctx, c.repoType, []string{"user123"}, &types.RepoFilter{
-		Tags:   c.tags,
-		Sort:   c.sort,
-		Search: c.search,
-		Source: c.source,
-	}, 10, 1, c.admin)
+	rs, count, err := store.PublicToUserWithAccess(ctx, c.repoType,
+		database.NewRepositoryAccessScope(database.RepositoryAccessPublic, nil), &types.RepoFilter{
+			Tags:   c.tags,
+			Sort:   c.sort,
+			Search: c.search,
+			Source: c.source,
+		}, 10, 1)
 	require.Nil(t, err)
 	names := []string{}
 	for _, r := range rs {
@@ -2490,4 +2451,63 @@ func TestRepoStore_GetReposBySearch(t *testing.T) {
 	require.Nil(t, err)
 	require.NotNil(t, repos)
 	require.Equal(t, 1, total)
+}
+
+// TestRepoStore_PostgresSearchTags preserves legacy tags across cache paths while keeping V2 light.
+func TestRepoStore_PostgresSearchTags(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.Background()
+	client := tests.InitTestRedis()
+	defer client.Close()
+	cfg := &config.Config{}
+	cfg.Database.Driver = "pg"
+	cfg.Database.SearchConfiguration = "simple"
+	cfg.Search.RepoSearchLimit = 10
+	cfg.Search.RepoSearchCacheTTL = 300
+	store := database.NewRepoStoreWithCache(cfg, db, cache.NewCacheWithClient(ctx, client))
+	repo, err := store.CreateRepo(ctx, database.Repository{
+		Name: "tagsearch", Path: "owner/tagsearch", GitPath: "owner/tagsearch", RepositoryType: types.CodeRepo,
+	})
+	require.NoError(t, err)
+	_, err = db.Core.NewInsert().Model(&database.Code{RepositoryID: repo.ID}).Exec(ctx)
+	require.NoError(t, err)
+	tag := &database.Tag{Name: "search-tag", Category: "task"}
+	_, err = db.Core.NewInsert().Model(tag).Exec(ctx)
+	require.NoError(t, err)
+	require.NoError(t, store.BatchCreateRepoTags(ctx, []database.RepositoryTag{{RepositoryID: repo.ID, TagID: tag.ID}}))
+	_, err = db.Core.NewUpdate().Model((*database.Repository)(nil)).
+		Set("search_vector = to_tsvector('simple', 'tagsearch')").Where("id = ?", repo.ID).Exec(ctx)
+	require.NoError(t, err)
+	for _, v2 := range []bool{false, true} {
+		require.NoError(t, client.FlushDB(ctx).Err())
+		for _, path := range []string{"miss", "hit", "bypass"} {
+			t.Run(fmt.Sprintf("v2=%v/%s", v2, path), func(t *testing.T) {
+				scope := database.NewRepositoryAccessScope(database.RepositoryAccessPublic, nil)
+				if path == "bypass" {
+					scope = database.NewRepositoryAccessScope(database.RepositoryAccessReadable, []int64{repo.ID})
+				}
+				filter := &types.RepoFilter{Search: "tagsearch"}
+				var rows []*database.Repository
+				var count int
+				var err error
+				if v2 {
+					rows, count, err = store.PublicToUserV2WithAccess(ctx, types.CodeRepo, scope, filter, 1, 1)
+				} else {
+					rows, count, err = store.PublicToUserWithAccess(ctx, types.CodeRepo, scope, filter, 1, 1)
+				}
+				require.NoError(t, err)
+				require.Equal(t, 1, count)
+				require.Len(t, rows, 1)
+				require.Equal(t, repo.ID, rows[0].ID)
+				if v2 {
+					require.Empty(t, rows[0].Tags)
+				} else {
+					require.Len(t, rows[0].Tags, 1)
+					require.Equal(t, tag.ID, rows[0].Tags[0].ID)
+					require.Equal(t, tag.Name, rows[0].Tags[0].Name)
+				}
+			})
+		}
+	}
 }

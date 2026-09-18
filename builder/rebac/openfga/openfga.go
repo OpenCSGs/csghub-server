@@ -2,6 +2,7 @@ package openfga
 
 import (
 	"fmt"
+	"math"
 	"sync"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -10,6 +11,7 @@ import (
 	"github.com/openfga/openfga/pkg/storage/postgres"
 	"github.com/openfga/openfga/pkg/storage/sqlcommon"
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/common/config"
 )
 
 var (
@@ -41,14 +43,14 @@ func clearCachedServer(server openFGAServer) {
 }
 
 // getServer initializes an OpenFGA server with the pgx pool owned by the application database.DB.
-func getServer() (*fga.Server, error) {
+func getServer(cfg *config.Config) (*fga.Server, error) {
 	fgaServerMu.Lock()
 	defer fgaServerMu.Unlock()
 	if fgaServer != nil {
 		return fgaServer, nil
 	}
 
-	server, err := newServer()
+	server, err := newServer(cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -56,7 +58,8 @@ func getServer() (*fga.Server, error) {
 	return server, nil
 }
 
-func newServer() (*fga.Server, error) {
+// newServer initializes OpenFGA with the application database and configuration.
+func newServer(cfg *config.Config) (*fga.Server, error) {
 	db := database.GetDB()
 	if db == nil {
 		return nil, fmt.Errorf("database is not initialized")
@@ -65,11 +68,11 @@ func newServer() (*fga.Server, error) {
 	if !ok {
 		return nil, fmt.Errorf("unable to connect to postgres database, pgxpool not found")
 	}
-	return newServerWithPGXPool(pgx)
+	return newServerWithPGXPool(pgx, cfg)
 }
 
 // newServerWithPGXPool initializes an OpenFGA server using an application-owned pool.
-func newServerWithPGXPool(pgxpool *pgxpool.Pool) (*fga.Server, error) {
+func newServerWithPGXPool(pgxpool *pgxpool.Pool, cfg *config.Config) (*fga.Server, error) {
 	if pgxpool == nil {
 		return nil, fmt.Errorf("pgxpool is nil")
 	}
@@ -77,8 +80,16 @@ func newServerWithPGXPool(pgxpool *pgxpool.Pool) (*fga.Server, error) {
 	if err != nil {
 		return nil, fmt.Errorf("unable to connect to postgres database: %w", err)
 	}
-	server, err := fga.NewServerWithOpts(
-		fga.WithDatastore(borrowedDatastore{datastore}),
+	return newServerWithDatastore(borrowedDatastore{datastore}, cfg)
+}
+
+// newServerWithDatastore applies application settings to an OpenFGA datastore.
+func newServerWithDatastore(datastore storage.OpenFGADatastore, cfg *config.Config) (*fga.Server, error) {
+	if cfg != nil && int64(cfg.Rebac.OpenFGAListObjectMaxResult) > math.MaxUint32 {
+		return nil, fmt.Errorf("rebac.openfga_list_object_max_result exceeds OpenFGA uint32 range")
+	}
+	options := []fga.OpenFGAServiceV1Option{
+		fga.WithDatastore(datastore),
 		fga.WithContextPropagationToDatastore(true),
 		fga.WithContinuationTokenSerializer(
 			sqlcommon.NewSQLContinuationTokenSerializer(),
@@ -88,7 +99,11 @@ func newServerWithPGXPool(pgxpool *pgxpool.Pool) (*fga.Server, error) {
 		fga.WithMaxConcurrentReadsForCheck(8),
 		fga.WithMaxConcurrentReadsForListObjects(4),
 		fga.WithMaxConcurrentReadsForListUsers(4),
-	)
+	}
+	if cfg != nil && cfg.Rebac.OpenFGAListObjectMaxResult > 0 {
+		options = append(options, fga.WithListObjectsMaxResults(uint32(cfg.Rebac.OpenFGAListObjectMaxResult)))
+	}
+	server, err := fga.NewServerWithOpts(options...)
 	if err != nil {
 		return nil, fmt.Errorf("initialize OpenFGA server: %w", err)
 	}

@@ -18,6 +18,9 @@ environment = "development"
 [organization]
 enable_unit = false
 
+[rebac]
+openfga_list_object_max_result = 2000
+
 [api_server]
 port = 8080
 public_domain = "http://localhost:8080"
