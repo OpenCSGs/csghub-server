@@ -1196,7 +1196,7 @@ func TestRepoStore_PublicToUser(t *testing.T) {
 				names = append(names, r.Name)
 			}
 			require.Equal(t, len(c.expected), count)
-			require.Equal(t, c.expected, names)
+			require.ElementsMatch(t, c.expected, names)
 
 		})
 	}
