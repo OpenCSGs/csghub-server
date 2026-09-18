@@ -247,22 +247,24 @@ func (c *modelComponentImpl) Index(ctx context.Context, filter *types.RepoFilter
 			}
 		}
 		resModels = append(resModels, &types.Model{
-			ID:           model.ID,
-			Name:         repo.Name,
-			Nickname:     repo.Nickname,
-			Description:  repo.Description,
-			Likes:        repo.Likes,
-			Downloads:    repo.DownloadCount,
-			Path:         repo.Path,
-			RepositoryID: repo.ID,
-			Private:      repo.Private,
-			CreatedAt:    model.CreatedAt,
-			Tags:         tags,
-			UpdatedAt:    repo.UpdatedAt,
-			Source:       repo.Source,
-			SyncStatus:   repo.SyncStatus,
-			License:      repo.License,
-			Repository:   common.BuildCloneInfo(c.config, model.Repository),
+			ID:                   model.ID,
+			Name:                 repo.Name,
+			Nickname:             repo.Nickname,
+			Description:          repo.Description,
+			Likes:                repo.Likes,
+			Downloads:            repo.DownloadCount,
+			Path:                 repo.Path,
+			RepositoryID:         repo.ID,
+			Private:              repo.Private,
+			CreatedAt:            model.CreatedAt,
+			Tags:                 tags,
+			UpdatedAt:            repo.UpdatedAt,
+			Source:               repo.Source,
+			SyncStatus:           repo.SyncStatus,
+			License:              repo.License,
+			ComplianceStatus:     repo.ComplianceStatus,
+			CommercialPermission: repo.CommercialPermission,
+			Repository:           common.BuildCloneInfo(c.config, model.Repository),
 			MultiSource: types.MultiSource{
 				HFPath:  model.Repository.HFPath,
 				MSPath:  model.Repository.MSPath,
@@ -311,20 +313,22 @@ func (c *modelComponentImpl) IndexV2(ctx context.Context, filter *types.RepoFilt
 	for _, repo := range repos {
 		modelID := modelMap[repo.ID]
 		resModels = append(resModels, &types.Model{
-			ID:           modelID,
-			Name:         repo.Name,
-			Nickname:     repo.Nickname,
-			Description:  repo.Description,
-			Likes:        repo.Likes,
-			Downloads:    repo.DownloadCount,
-			Path:         repo.Path,
-			RepositoryID: repo.ID,
-			Private:      repo.Private,
-			CreatedAt:    repo.CreatedAt,
-			UpdatedAt:    repo.UpdatedAt,
-			Source:       repo.Source,
-			SyncStatus:   repo.SyncStatus,
-			License:      repo.License,
+			ID:                   modelID,
+			Name:                 repo.Name,
+			Nickname:             repo.Nickname,
+			Description:          repo.Description,
+			Likes:                repo.Likes,
+			Downloads:            repo.DownloadCount,
+			Path:                 repo.Path,
+			RepositoryID:         repo.ID,
+			Private:              repo.Private,
+			CreatedAt:            repo.CreatedAt,
+			UpdatedAt:            repo.UpdatedAt,
+			Source:               repo.Source,
+			SyncStatus:           repo.SyncStatus,
+			License:              repo.License,
+			ComplianceStatus:     repo.ComplianceStatus,
+			CommercialPermission: repo.CommercialPermission,
 		})
 	}
 
@@ -418,15 +422,17 @@ func (c *modelComponentImpl) Create(ctx context.Context, req *types.CreateModelR
 			Nickname: user.NickName,
 			Email:    user.Email,
 		},
-		Tags:            tags,
-		CreatedAt:       model.CreatedAt,
-		UpdatedAt:       model.UpdatedAt,
-		BaseModel:       model.BaseModel,
-		License:         model.Repository.License,
-		ReportURL:       model.ReportURL,
-		MediumRiskCount: model.MediumRiskCount,
-		HighRiskCount:   model.HighRiskCount,
-		URL:             model.Repository.Path,
+		Tags:                 tags,
+		CreatedAt:            model.CreatedAt,
+		UpdatedAt:            model.UpdatedAt,
+		BaseModel:            model.BaseModel,
+		License:              model.Repository.License,
+		ComplianceStatus:     model.Repository.ComplianceStatus,
+		CommercialPermission: model.Repository.CommercialPermission,
+		ReportURL:            model.ReportURL,
+		MediumRiskCount:      model.MediumRiskCount,
+		HighRiskCount:        model.HighRiskCount,
+		URL:                  model.Repository.Path,
 	}
 
 	go func() {
@@ -461,30 +467,39 @@ func (c *modelComponentImpl) Update(ctx context.Context, req *types.UpdateModelR
 	if req.BaseModel != nil {
 		model.BaseModel = *req.BaseModel
 	}
-	model.ReportURL = req.ReportURL
-	model.MediumRiskCount = req.MediumRiskCount
-	model.HighRiskCount = req.HighRiskCount
+	if req.ReportURL != nil {
+		model.ReportURL = *req.ReportURL
+	}
+	if req.MediumRiskCount != nil {
+		model.MediumRiskCount = *req.MediumRiskCount
+	}
+	if req.HighRiskCount != nil {
+		model.HighRiskCount = *req.HighRiskCount
+	}
 
 	model, err = c.modelStore.Update(ctx, *model)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update database model, error: %w", err)
 	}
 	resModel := &types.Model{
-		ID:              model.ID,
-		Name:            dbRepo.Name,
-		Nickname:        dbRepo.Nickname,
-		Description:     dbRepo.Description,
-		Likes:           dbRepo.Likes,
-		Downloads:       dbRepo.DownloadCount,
-		Path:            dbRepo.Path,
-		RepositoryID:    dbRepo.ID,
-		Private:         dbRepo.Private,
-		CreatedAt:       model.CreatedAt,
-		UpdatedAt:       model.UpdatedAt,
-		BaseModel:       model.BaseModel,
-		ReportURL:       model.ReportURL,
-		MediumRiskCount: model.MediumRiskCount,
-		HighRiskCount:   model.HighRiskCount,
+		ID:                   model.ID,
+		Name:                 dbRepo.Name,
+		Nickname:             dbRepo.Nickname,
+		Description:          dbRepo.Description,
+		Likes:                dbRepo.Likes,
+		Downloads:            dbRepo.DownloadCount,
+		Path:                 dbRepo.Path,
+		RepositoryID:         dbRepo.ID,
+		Private:              dbRepo.Private,
+		CreatedAt:            model.CreatedAt,
+		UpdatedAt:            model.UpdatedAt,
+		BaseModel:            model.BaseModel,
+		License:              dbRepo.License,
+		ComplianceStatus:     dbRepo.ComplianceStatus,
+		CommercialPermission: dbRepo.CommercialPermission,
+		ReportURL:            model.ReportURL,
+		MediumRiskCount:      model.MediumRiskCount,
+		HighRiskCount:        model.HighRiskCount,
 	}
 
 	return resModel, nil
@@ -606,17 +621,19 @@ func (c *modelComponentImpl) Show(ctx context.Context, namespace, name, currentU
 		CreatedAt: model.CreatedAt,
 		UpdatedAt: model.Repository.UpdatedAt,
 		// TODO:default to ModelWidgetTypeGeneration, need to config later
-		WidgetType:          types.ModelWidgetTypeGeneration,
-		UserLikes:           likeExists,
-		Source:              model.Repository.Source,
-		SyncStatus:          model.Repository.SyncStatus,
-		BaseModel:           model.BaseModel,
-		License:             model.Repository.License,
-		MirrorLastUpdatedAt: model.Repository.Mirror.LastUpdatedAt,
-		CanWrite:            permission.CanWrite,
-		CanManage:           permission.CanAdmin,
-		IsOrganization:      ns != nil && ns.Type == types.OrganizationNamespaceType,
-		Namespace:           ns,
+		WidgetType:           types.ModelWidgetTypeGeneration,
+		UserLikes:            likeExists,
+		Source:               model.Repository.Source,
+		SyncStatus:           model.Repository.SyncStatus,
+		BaseModel:            model.BaseModel,
+		License:              model.Repository.License,
+		ComplianceStatus:     model.Repository.ComplianceStatus,
+		CommercialPermission: model.Repository.CommercialPermission,
+		MirrorLastUpdatedAt:  model.Repository.Mirror.LastUpdatedAt,
+		CanWrite:             permission.CanWrite,
+		CanManage:            permission.CanAdmin,
+		IsOrganization:       ns != nil && ns.Type == types.OrganizationNamespaceType,
+		Namespace:            ns,
 		Metadata: types.Metadata{
 			ModelParams:       model.Repository.Metadata.ModelParams,
 			TensorType:        model.Repository.Metadata.TensorType,

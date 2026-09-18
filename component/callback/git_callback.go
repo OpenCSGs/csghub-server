@@ -230,20 +230,39 @@ func (c *gitCallbackComponentImpl) UpdateRepoInfos(ctx context.Context, req *typ
 	splits := strings.Split(req.Repository.FullName, "/")
 	fullNamespace, repoName := splits[0], splits[1]
 	repoType, namespace, _ := strings.Cut(fullNamespace, "_")
-
+	adjustedRepoType := types.RepositoryType(strings.TrimSuffix(repoType, "s"))
+	isDefaultBranch := true
+	if types.SupportsLicenseCompliance(adjustedRepoType) && containsLicenseComplianceChange(commits) {
+		repo, err := c.repoStore.FindByPath(ctx, adjustedRepoType, namespace, repoName)
+		if err != nil {
+			return err
+		}
+		isDefaultBranch = strings.TrimPrefix(ref, "refs/heads/") == repo.DefaultBranch
+		if isDefaultBranch {
+			if err := c.repoStore.UpdateLicenseCompliance(ctx, repo.ID, nil, types.ComplianceStatusPendingReview, types.CommercialPermissionCustomTerms); err != nil {
+				return err
+			}
+		}
+	}
 	var err error
 	for _, commit := range commits {
-		err = c.modifyFiles(ctx, repoType, namespace, repoName, ref, commit.Modified)
+		modified, removed, added := commit.Modified, commit.Removed, commit.Added
+		if types.SupportsLicenseCompliance(adjustedRepoType) && !isDefaultBranch {
+			modified = withoutRootReadme(modified)
+			removed = withoutRootReadme(removed)
+			added = withoutRootReadme(added)
+		}
+		err = c.modifyFiles(ctx, repoType, namespace, repoName, ref, modified)
 		if err != nil {
 			slog.Error("failed to update modified files", slog.Any("error", err), slog.Any("commit", commit))
 			return err
 		}
-		err = c.removeFiles(ctx, repoType, namespace, repoName, ref, commit.Removed)
+		err = c.removeFiles(ctx, repoType, namespace, repoName, ref, removed)
 		if err != nil {
 			slog.Error("failed to update removed files", slog.Any("error", err), slog.Any("commit", commit))
 			return err
 		}
-		err = c.addFiles(ctx, repoType, namespace, repoName, ref, commit.Added)
+		err = c.addFiles(ctx, repoType, namespace, repoName, ref, added)
 		if err != nil {
 			slog.Error("failed to update added files", slog.Any("error", err), slog.Any("commit", commit))
 			return err
@@ -253,8 +272,28 @@ func (c *gitCallbackComponentImpl) UpdateRepoInfos(ctx context.Context, req *typ
 	if err != nil {
 		return err
 	}
-
 	return err
+}
+
+func containsLicenseComplianceChange(commits []types.GiteaCallbackPushReq_Commit) bool {
+	for _, commit := range commits {
+		if containsLicenseComplianceFile(commit.Added) ||
+			containsLicenseComplianceFile(commit.Modified) ||
+			containsLicenseComplianceFile(commit.Removed) {
+			return true
+		}
+	}
+	return false
+}
+
+func containsLicenseComplianceFile(fileNames []string) bool {
+	return slices.ContainsFunc(fileNames, func(fileName string) bool {
+		return types.IsRootReadme(fileName) || types.IsRootLicenseDocument(fileName)
+	})
+}
+
+func withoutRootReadme(fileNames []string) []string {
+	return slices.DeleteFunc(slices.Clone(fileNames), types.IsRootReadme)
 }
 
 func (c *gitCallbackComponentImpl) SyncRepositoryPackage(ctx context.Context, req *types.GiteaCallbackPushReq) error {

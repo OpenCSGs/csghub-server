@@ -650,22 +650,25 @@ func (m *mirrorComponentImpl) prepareMirrorRepository(ctx context.Context, req t
 	if req.DefaultBranch == "" {
 		req.DefaultBranch = types.MainBranch
 	}
+	complianceStatus, commercialPermission := types.ClassifyRepositoryLicenseForType(req.RepoType, req.License)
 
 	repoPath := path.Join(namespace.Path, req.Name)
 	repo := &database.Repository{
-		UserID:         user.ID,
-		Path:           repoPath,
-		GitPath:        fmt.Sprintf("%ss_%s", string(req.RepoType), repoPath),
-		Name:           req.Name,
-		Nickname:       req.Nickname,
-		Description:    req.Description,
-		Private:        req.Private,
-		License:        req.License,
-		Readme:         req.Readme,
-		DefaultBranch:  req.DefaultBranch,
-		RepositoryType: req.RepoType,
-		StarCount:      req.StarCount,
-		User:           user,
+		UserID:               user.ID,
+		Path:                 repoPath,
+		GitPath:              fmt.Sprintf("%ss_%s", string(req.RepoType), repoPath),
+		Name:                 req.Name,
+		Nickname:             req.Nickname,
+		Description:          req.Description,
+		Private:              req.Private,
+		License:              req.License,
+		ComplianceStatus:     complianceStatus,
+		CommercialPermission: commercialPermission,
+		Readme:               req.Readme,
+		DefaultBranch:        req.DefaultBranch,
+		RepositoryType:       req.RepoType,
+		StarCount:            req.StarCount,
+		User:                 user,
 	}
 	applyMirrorRepositorySourcePath(repo, sourceType, sourcePath)
 	return repo, namespace, nil

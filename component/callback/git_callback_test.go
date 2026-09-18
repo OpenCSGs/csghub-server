@@ -251,10 +251,17 @@ func TestGitCallbackComponentImpl_UpdateRepoInfos(t *testing.T) {
 			},
 		},
 	}
-	repo := &database.Repository{ID: 1, Path: "namespace/repo"}
+	repo := &database.Repository{ID: 1, Path: "namespace/repo", DefaultBranch: "main"}
 
 	t.Run("should update repo infos successfully", func(t *testing.T) {
 		gc := initializeTestGitCallbackComponent(context.Background(), t)
+		gc.mocks.stores.RepoMock().EXPECT().UpdateLicenseCompliance(
+			ctx,
+			int64(1),
+			(*string)(nil),
+			types.ComplianceStatusPendingReview,
+			types.CommercialPermissionCustomTerms,
+		).Return(nil)
 		// Expectations for modifyFiles
 		gc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "namespace", "repo").Return(repo, nil)
 		modelInfo := &types.ModelInfo{}
@@ -307,6 +314,12 @@ func TestGitCallbackComponentImpl_UpdateRepoInfos(t *testing.T) {
 		err := gc.UpdateRepoInfos(context.Background(), req)
 		assert.NoError(t, err)
 	})
+}
+
+func TestContainsLicenseComplianceChange(t *testing.T) {
+	require.True(t, containsLicenseComplianceChange([]types.GiteaCallbackPushReq_Commit{{Added: []string{"LICENSE"}}}))
+	require.True(t, containsLicenseComplianceChange([]types.GiteaCallbackPushReq_Commit{{Modified: []string{"README.md"}}}))
+	require.False(t, containsLicenseComplianceChange([]types.GiteaCallbackPushReq_Commit{{Modified: []string{"docs/README.md"}}}))
 }
 
 func TestGitCallbackComponentImpl_SyncRepositoryPackage(t *testing.T) {

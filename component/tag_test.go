@@ -108,6 +108,10 @@ func TestTagComponent_ClearMetaTags(t *testing.T) {
 	tc.mocks.stores.TagMock().EXPECT().SetMetaTags(
 		ctx, types.ModelRepo, "ns", "n", []*database.Tag(nil),
 	).Return(nil, nil)
+	tc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "ns", "n").Return(
+		&database.Repository{ID: 1}, nil,
+	)
+	tc.mocks.stores.RepoMock().EXPECT().UpdateLicenseByTag(ctx, int64(1)).Return(nil)
 
 	err := tc.ClearMetaTags(ctx, types.ModelRepo, "ns", "n")
 	require.Nil(t, err)

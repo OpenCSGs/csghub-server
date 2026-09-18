@@ -92,22 +92,24 @@ func (c *datasetComponentImpl) commonIndex(ctx context.Context, filter *types.Re
 		}
 
 		resDatasets = append(resDatasets, &types.Dataset{
-			ID:           dataset.ID,
-			Name:         repo.Name,
-			Nickname:     repo.Nickname,
-			Description:  repo.Description,
-			Likes:        repo.Likes,
-			Downloads:    repo.DownloadCount,
-			Path:         repo.Path,
-			RepositoryID: repo.ID,
-			Private:      repo.Private,
-			Tags:         tags,
-			CreatedAt:    dataset.CreatedAt,
-			UpdatedAt:    repo.UpdatedAt,
-			Source:       repo.Source,
-			SyncStatus:   repo.SyncStatus,
-			License:      repo.License,
-			Repository:   common.BuildCloneInfo(c.config, dataset.Repository),
+			ID:                   dataset.ID,
+			Name:                 repo.Name,
+			Nickname:             repo.Nickname,
+			Description:          repo.Description,
+			Likes:                repo.Likes,
+			Downloads:            repo.DownloadCount,
+			Path:                 repo.Path,
+			RepositoryID:         repo.ID,
+			Private:              repo.Private,
+			Tags:                 tags,
+			CreatedAt:            dataset.CreatedAt,
+			UpdatedAt:            repo.UpdatedAt,
+			Source:               repo.Source,
+			SyncStatus:           repo.SyncStatus,
+			License:              repo.License,
+			ComplianceStatus:     repo.ComplianceStatus,
+			CommercialPermission: repo.CommercialPermission,
+			Repository:           common.BuildCloneInfo(c.config, dataset.Repository),
 			User: types.User{
 				Username: dataset.Repository.User.Username,
 				Nickname: dataset.Repository.User.NickName,
@@ -122,7 +124,7 @@ func (c *datasetComponentImpl) commonIndex(ctx context.Context, filter *types.Re
 			MirrorTaskStatus:      mirrorTaskStatus,
 			XnetMigrationStatus:   xnetMigrationStatus,
 			XnetMigrationProgress: xnetMigrationProgress,
-			Status:           dataset.Status,
+			Status:                dataset.Status,
 			// CE version doesn't support dataset purchase features
 			// So we don't set DatasetType, RelatedDatasetID, Price, Forked, IsForSale, UserPurchased fields
 		})
@@ -207,17 +209,19 @@ func (c *datasetComponentImpl) Show(ctx context.Context, namespace, name, curren
 			Email:    dataset.Repository.User.Email,
 			Avatar:   dataset.Repository.User.Avatar,
 		},
-		Private:             dataset.Repository.Private,
-		CreatedAt:           dataset.CreatedAt,
-		UpdatedAt:           dataset.Repository.UpdatedAt,
-		UserLikes:           likeExists,
-		Source:              dataset.Repository.Source,
-		SyncStatus:          dataset.Repository.SyncStatus,
-		License:             dataset.Repository.License,
-		MirrorLastUpdatedAt: dataset.Repository.Mirror.LastUpdatedAt,
-		CanWrite:            permission.CanWrite,
-		CanManage:           permission.CanAdmin,
-		Namespace:           ns,
+		Private:              dataset.Repository.Private,
+		CreatedAt:            dataset.CreatedAt,
+		UpdatedAt:            dataset.Repository.UpdatedAt,
+		UserLikes:            likeExists,
+		Source:               dataset.Repository.Source,
+		SyncStatus:           dataset.Repository.SyncStatus,
+		License:              dataset.Repository.License,
+		ComplianceStatus:     dataset.Repository.ComplianceStatus,
+		CommercialPermission: dataset.Repository.CommercialPermission,
+		MirrorLastUpdatedAt:  dataset.Repository.Mirror.LastUpdatedAt,
+		CanWrite:             permission.CanWrite,
+		CanManage:            permission.CanAdmin,
+		Namespace:            ns,
 		MultiSource: types.MultiSource{
 			HFPath:  dataset.Repository.HFPath,
 			MSPath:  dataset.Repository.MSPath,
@@ -279,7 +283,6 @@ func (c *datasetComponentImpl) ListDatasetApplications(ctx context.Context, req 
 	return nil, 0, nil
 }
 
-
 // NewDatasetComponent creates a new dataset component for CE version
 func NewDatasetComponent(config *config.Config) (DatasetComponent, error) {
 	c := &datasetComponentImpl{
@@ -291,8 +294,8 @@ func NewDatasetComponent(config *config.Config) (DatasetComponent, error) {
 		userLikesStore:         database.NewUserLikesStore(),
 		recomStore:             database.NewRecomStore(),
 		xnetMigrationTaskStore: database.NewXnetMigrationTaskStore(),
-		lfsMetaObjectStore:      database.NewLfsMetaObjectStore(),
-		extendDatasetImpl:       extendDatasetImpl{},
+		lfsMetaObjectStore:     database.NewLfsMetaObjectStore(),
+		extendDatasetImpl:      extendDatasetImpl{},
 	}
 	var err error
 	c.repoComponent, err = NewRepoComponentImpl(config)

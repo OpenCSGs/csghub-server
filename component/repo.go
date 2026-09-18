@@ -274,23 +274,26 @@ func (c *repoComponentImpl) CreateRepo(ctx context.Context, req types.CreateRepo
 	if req.DefaultBranch == "" {
 		req.DefaultBranch = types.MainBranch
 	}
+	complianceStatus, commercialPermission := types.ClassifyRepositoryLicenseForType(req.RepoType, req.License)
 
 	temPath := strings.SplitN(uuid.NewString(), "-", 2)
 	dbRepo := database.Repository{
 		UserID: user.ID,
 		// Path:           path.Join(req.Namespace, req.Name),
 		// GitPath:        fmt.Sprintf("%ss_%s/%s", string(req.RepoType), req.Namespace, req.Name),
-		Path:           path.Join(temPath[0], temPath[1]),
-		GitPath:        fmt.Sprintf("%ss_%s/%s", string(req.RepoType), temPath[0], temPath[1]),
-		Name:           req.Name,
-		Nickname:       req.Nickname,
-		Description:    req.Description,
-		Private:        req.Private,
-		License:        req.License,
-		DefaultBranch:  req.DefaultBranch,
-		RepositoryType: req.RepoType,
-		StarCount:      req.StarCount,
-		User:           user,
+		Path:                 path.Join(temPath[0], temPath[1]),
+		GitPath:              fmt.Sprintf("%ss_%s/%s", string(req.RepoType), temPath[0], temPath[1]),
+		Name:                 req.Name,
+		Nickname:             req.Nickname,
+		Description:          req.Description,
+		Private:              req.Private,
+		License:              req.License,
+		ComplianceStatus:     complianceStatus,
+		CommercialPermission: commercialPermission,
+		DefaultBranch:        req.DefaultBranch,
+		RepositoryType:       req.RepoType,
+		StarCount:            req.StarCount,
+		User:                 user,
 	}
 	newDBRepo, err := c.repoStore.CreateRepo(ctx, dbRepo)
 	if err != nil {
@@ -359,6 +362,8 @@ func (c *repoComponentImpl) UpdateRepo(ctx context.Context, req types.UpdateRepo
 	if err != nil {
 		return nil, errors.New("repository does not exist")
 	}
+	originalRepo := *repo
+	complianceUpdateRequested := req.ComplianceStatus != nil
 
 	namespace, err := c.namespaceStore.FindByPath(ctx, req.Namespace)
 	if err != nil {
@@ -372,6 +377,15 @@ func (c *repoComponentImpl) UpdateRepo(ctx context.Context, req types.UpdateRepo
 
 	// Admin users have full permissions.
 	if user.CanAdmin() {
+		if req.ComplianceStatus != nil {
+			if !types.SupportsLicenseCompliance(req.RepoType) {
+				return nil, errorx.BadRequest(errors.New("license compliance can only be updated for models and datasets"), nil)
+			}
+			if !req.ComplianceStatus.IsValid() {
+				return nil, errorx.BadRequest(errors.New("invalid compliance status"), nil)
+			}
+			repo.ComplianceStatus = *req.ComplianceStatus
+		}
 		if req.Private != nil {
 			repo.Private = *req.Private
 		}
@@ -379,6 +393,9 @@ func (c *repoComponentImpl) UpdateRepo(ctx context.Context, req types.UpdateRepo
 			repo.XnetEnabled = *req.XnetEnabled
 		}
 	} else {
+		if req.ComplianceStatus != nil {
+			return nil, errorx.ErrForbiddenMsg("only admins can update license compliance")
+		}
 		canWrite, err := c.CheckUserRepoPermission(ctx, req.Username, repo, rebac.RepositoryCanWrite)
 		if err != nil {
 			return nil, err
@@ -427,29 +444,86 @@ func (c *repoComponentImpl) UpdateRepo(ctx context.Context, req types.UpdateRepo
 	if req.DefaultBranch != nil {
 		repo.DefaultBranch = *req.DefaultBranch
 	}
-
-	gitRepoReq := gitserver.UpdateRepoReq{
-		Namespace:     req.Namespace,
-		Name:          req.Name,
-		Nickname:      repo.Nickname,
-		Description:   repo.Description,
-		DefaultBranch: repo.DefaultBranch,
-		Private:       repo.Private,
-		RepoType:      req.RepoType,
-	}
-	_, err = c.git.UpdateRepo(ctx, gitRepoReq)
-	if err != nil {
-		slog.Error("fail to update repo in git ", slog.Any("req", req), slog.String("error", err.Error()))
-		return nil, fmt.Errorf("fail to update repo in git, error: %w", err)
+	defaultBranchChanged := repo.DefaultBranch != originalRepo.DefaultBranch
+	if defaultBranchChanged && types.SupportsLicenseCompliance(req.RepoType) {
+		repo.License = ""
+		repo.ComplianceStatus = types.ComplianceStatusPendingReview
+		repo.CommercialPermission = types.CommercialPermissionCustomTerms
 	}
 
-	resRepo, err := c.repoStore.UpdateRepo(ctx, *repo)
-	if err != nil {
-		slog.Error("fail to update repo in git ", slog.Any("req", req), slog.String("error", err.Error()))
-		return nil, fmt.Errorf("fail to update repo in database, error: %w", err)
+	gitRepoChanged := repo.Nickname != originalRepo.Nickname ||
+		repo.Description != originalRepo.Description ||
+		repo.Private != originalRepo.Private ||
+		repo.DefaultBranch != originalRepo.DefaultBranch
+	repositoryUpdateRequired := !complianceUpdateRequested || gitRepoChanged || repo.XnetEnabled != originalRepo.XnetEnabled
+
+	if repositoryUpdateRequired {
+		gitRepoReq := gitserver.UpdateRepoReq{
+			Namespace:     req.Namespace,
+			Name:          req.Name,
+			Nickname:      repo.Nickname,
+			Description:   repo.Description,
+			DefaultBranch: repo.DefaultBranch,
+			Private:       repo.Private,
+			RepoType:      req.RepoType,
+		}
+		_, err = c.git.UpdateRepo(ctx, gitRepoReq)
+		if err != nil {
+			slog.Error("fail to update repo in git ", slog.Any("req", req), slog.String("error", err.Error()))
+			return nil, fmt.Errorf("fail to update repo in git, error: %w", err)
+		}
+	}
+
+	resRepo := repo
+	if repositoryUpdateRequired {
+		resRepo, err = c.repoStore.UpdateRepo(ctx, *repo)
+		if err != nil {
+			slog.Error("fail to update repo in database", slog.Any("req", req), slog.String("error", err.Error()))
+			return nil, fmt.Errorf("fail to update repo in database, error: %w", err)
+		}
+	}
+
+	if defaultBranchChanged && types.SupportsLicenseCompliance(req.RepoType) {
+		if err := c.repoStore.UpdateLicenseCompliance(ctx, repo.ID, &repo.License, repo.ComplianceStatus, repo.CommercialPermission); err != nil {
+			return nil, fmt.Errorf("fail to reset license compliance after default branch change: %w", err)
+		}
+		if err := c.refreshLicenseComplianceFromReadme(ctx, repo); err != nil {
+			return nil, err
+		}
+		resRepo, err = c.repoStore.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
+		if err != nil {
+			return nil, fmt.Errorf("fail to reload repo after default branch change: %w", err)
+		}
+	} else if complianceUpdateRequested {
+		if err := c.repoStore.UpdateLicenseCompliance(ctx, repo.ID, nil, repo.ComplianceStatus, repo.CommercialPermission); err != nil {
+			return nil, fmt.Errorf("fail to update license compliance: %w", err)
+		}
+		resRepo.ComplianceStatus = repo.ComplianceStatus
+		resRepo.CommercialPermission = repo.CommercialPermission
 	}
 
 	return resRepo, nil
+}
+
+func (c *repoComponentImpl) refreshLicenseComplianceFromReadme(ctx context.Context, repo *database.Repository) error {
+	namespace, name := repo.NamespaceAndName()
+	content, err := c.git.GetRepoFileRaw(ctx, gitserver.GetRepoInfoByPathReq{
+		Namespace: namespace,
+		Name:      name,
+		Ref:       repo.DefaultBranch,
+		Path:      types.ReadmeFileName,
+		RepoType:  repo.RepositoryType,
+	})
+	if err != nil {
+		if isRepositoryContentNotFound(err) {
+			return nil
+		}
+		return fmt.Errorf("fail to read README after default branch change: %w", err)
+	}
+	if _, err := c.tagComponent.UpdateMetaTags(ctx, getTagScopeByRepoType(repo.RepositoryType), namespace, name, content); err != nil {
+		return fmt.Errorf("fail to refresh license after default branch change: %w", err)
+	}
+	return nil
 }
 
 func (c *repoComponentImpl) DeleteRepo(ctx context.Context, req types.DeleteRepoReq) (*database.Repository, error) {
@@ -536,18 +610,20 @@ func (c *repoComponentImpl) CreateFork(ctx context.Context, req types.CreateFork
 
 	temPath := strings.SplitN(uuid.NewString(), "-", 2)
 	dbRepo := database.Repository{
-		UserID:         user.ID,
-		Path:           path.Join(temPath[0], temPath[1]),
-		GitPath:        fmt.Sprintf("%ss_%s/%s", string(req.SourceRepoType), temPath[0], temPath[1]),
-		Name:           req.TargetName,
-		Nickname:       sourceRepo.Nickname,
-		Description:    sourceRepo.Description,
-		Private:        sourceRepo.Private,
-		License:        sourceRepo.License,
-		DefaultBranch:  sourceRepo.DefaultBranch,
-		RepositoryType: req.SourceRepoType,
-		StarCount:      0,
-		User:           user,
+		UserID:               user.ID,
+		Path:                 path.Join(temPath[0], temPath[1]),
+		GitPath:              fmt.Sprintf("%ss_%s/%s", string(req.SourceRepoType), temPath[0], temPath[1]),
+		Name:                 req.TargetName,
+		Nickname:             sourceRepo.Nickname,
+		Description:          sourceRepo.Description,
+		Private:              sourceRepo.Private,
+		License:              sourceRepo.License,
+		ComplianceStatus:     sourceRepo.ComplianceStatus,
+		CommercialPermission: sourceRepo.CommercialPermission,
+		DefaultBranch:        sourceRepo.DefaultBranch,
+		RepositoryType:       req.SourceRepoType,
+		StarCount:            0,
+		User:                 user,
 	}
 
 	newDBRepo, err := c.repoStore.CreateRepo(ctx, dbRepo)
@@ -916,9 +992,18 @@ func (c *repoComponentImpl) CreateFile(ctx context.Context, req *types.CreateFil
 	}
 
 	// TODO:check sensitive content of file
-	fileName := filepath.Base(req.FilePath)
-	if fileName == "README.md" {
+	isDefaultBranch := req.Branch == repo.DefaultBranch
+	isRootReadme := types.IsRootReadme(req.FilePath)
+	refreshLicenseCompliance := types.SupportsLicenseCompliance(req.RepoType) && isDefaultBranch
+	if refreshLicenseCompliance && isRootReadme {
+		if err := c.markRepositoryLicenseForReview(ctx, repo.ID); err != nil {
+			return nil, err
+		}
+	}
+	if isRootReadme && isDefaultBranch {
 		err = c.createReadmeFile(ctx, req)
+	} else if isRootReadme {
+		err = c.git.CreateRepoFile(req)
 	} else {
 		err = c.createLibraryFile(ctx, req)
 	}
@@ -927,7 +1012,11 @@ func (c *repoComponentImpl) CreateFile(ctx context.Context, req *types.CreateFil
 		slog.Error("failed to create repo file", slog.String("file", req.FilePath), slog.Any("error", err), slog.String("namespace", req.Namespace), slog.String("name", req.Name))
 		return nil, err
 	}
-
+	if refreshLicenseCompliance && types.IsRootLicenseDocument(req.FilePath) {
+		if err := c.markRepositoryLicenseForReview(ctx, repo.ID); err != nil {
+			return nil, err
+		}
+	}
 	err = c.repoStore.SetUpdateTimeByPath(ctx, req.RepoType, req.Namespace, req.Name, time.Now())
 	if err != nil {
 		slog.Error("failed to set repo update time", slog.Any("error", err), slog.String("repo_type", string(req.RepoType)), slog.String("namespace", req.Namespace), slog.String("name", req.Name))
@@ -1038,18 +1127,31 @@ func (c *repoComponentImpl) UpdateFile(ctx context.Context, req *types.UpdateFil
 	}
 
 	// TODO:check sensitive content of file
-	fileName := filepath.Base(req.FilePath)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	if fileName == "README.md" {
+	isDefaultBranch := req.Branch == repo.DefaultBranch
+	isRootReadme := types.IsRootReadme(req.FilePath)
+	refreshLicenseCompliance := types.SupportsLicenseCompliance(req.RepoType) && isDefaultBranch
+	if isRootReadme && isDefaultBranch {
 		slog.Debug("file is readme", slog.String("content", req.Content))
+		if refreshLicenseCompliance {
+			if err := c.markRepositoryLicenseForReview(ctx, repo.ID); err != nil {
+				return nil, err
+			}
+		}
 		err = c.updateReadmeFile(ctx, req)
-	} else {
+	} else if !isRootReadme {
 		slog.Debug("file is not readme", slog.String("filePath", req.FilePath), slog.String("originPath", req.OriginPath))
 		err = c.updateLibraryFile(ctx, req)
 	}
 	if err != nil {
 		slog.Error("failed to update file", slog.String("file", req.FilePath), slog.Any("error", err), slog.String("namespace", req.Namespace), slog.String("name", req.Name))
+	}
+	if refreshLicenseCompliance &&
+		(types.IsRootLicenseDocument(req.FilePath) || types.IsRootLicenseDocument(req.OriginPath)) {
+		if err := c.markRepositoryLicenseForReview(ctx, repo.ID); err != nil {
+			return nil, err
+		}
 	}
 
 	err = c.repoStore.SetUpdateTimeByPath(ctx, req.RepoType, req.Namespace, req.Name, time.Now())
@@ -1102,19 +1204,32 @@ func (c *repoComponentImpl) DeleteFile(ctx context.Context, req *types.DeleteFil
 	}
 
 	// TODO:check sensitive content of file
-	fileName := filepath.Base(req.FilePath)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	if fileName == "README.md" {
+	isDefaultBranch := req.Branch == repo.DefaultBranch
+	isRootReadme := types.IsRootReadme(req.FilePath)
+	refreshLicenseCompliance := types.SupportsLicenseCompliance(req.RepoType) && isDefaultBranch
+	if refreshLicenseCompliance && isRootReadme {
+		if err := c.markRepositoryLicenseForReview(ctx, repo.ID); err != nil {
+			return nil, err
+		}
+	}
+	if isRootReadme && isDefaultBranch {
 		slog.Debug("file is readme", slog.String("content", req.Content))
 		err = c.deleteReadmeFile(ctx, req)
-	} else {
+	} else if !isRootReadme {
 		slog.Debug("file is not readme", slog.String("filePath", req.FilePath), slog.String("originPath", req.OriginPath))
 		err = c.deleteLibraryFile(ctx, req)
 	}
 
 	if err != nil {
 		slog.Error("failed to delete file", slog.String("file", req.FilePath), slog.Any("error", err), slog.String("namespace", req.Namespace), slog.String("name", req.Name))
+	}
+	if refreshLicenseCompliance &&
+		(types.IsRootLicenseDocument(req.FilePath) || types.IsRootLicenseDocument(req.OriginPath)) {
+		if err := c.markRepositoryLicenseForReview(ctx, repo.ID); err != nil {
+			return nil, err
+		}
 	}
 
 	err = c.repoStore.SetUpdateTimeByPath(ctx, req.RepoType, req.Namespace, req.Name, time.Now())
@@ -1190,6 +1305,19 @@ func (c *repoComponentImpl) changeReadmeFile(ctx context.Context, content, names
 		return fmt.Errorf("failed to update meta tags, cause: %w", err)
 	}
 	return err
+}
+
+func (c *repoComponentImpl) markRepositoryLicenseForReview(ctx context.Context, repoID int64) error {
+	if err := c.repoStore.UpdateLicenseCompliance(
+		ctx,
+		repoID,
+		nil,
+		types.ComplianceStatusPendingReview,
+		types.CommercialPermissionCustomTerms,
+	); err != nil {
+		return fmt.Errorf("failed to mark repository license for review: %w", err)
+	}
+	return nil
 }
 
 func (c *repoComponentImpl) Commits(ctx context.Context, req *types.GetCommitsReq) ([]types.Commit, *types.RepoPageOpts, error) {
