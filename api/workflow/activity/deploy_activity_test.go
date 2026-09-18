@@ -585,6 +585,60 @@ func TestDeploy(t *testing.T) {
 
 }
 
+func TestDeploy_RuntimeFrameworkNotFound(t *testing.T) {
+	tester := setupTest(t)
+
+	deploy := &database.Deploy{
+		ID:               1,
+		SpaceID:          1,
+		User:             &database.User{},
+		ImageID:          "test-image-id",
+		RuntimeFramework: "vllm",
+		Hardware:         `{}`,
+		Repository: &database.Repository{
+			User:      database.User{},
+			Path:      "test/test-repo",
+			GitPath:   "test/test-repo",
+			Name:      "test-repo",
+			LfsFiles:  []database.LfsFile{},
+			Downloads: []database.RepositoryDownload{},
+			Tags:      []database.Tag{},
+			Metadata:  database.Metadata{},
+			Mirror:    database.Mirror{},
+		},
+		SvcName: "aaa",
+	}
+
+	runTask := &database.DeployTask{
+		ID:       1,
+		TaskType: 0,
+		Status:   0,
+		DeployID: 1,
+		Deploy:   deploy,
+	}
+
+	tester.mockDeployTaskStore.EXPECT().GetDeployTask(mock.Anything, mock.Anything).Return(runTask, nil)
+	tester.mockLogReporter.EXPECT().Report(mock.Anything).Return().Maybe()
+	tester.mockSpaceStore.EXPECT().ByID(mock.Anything, mock.Anything).Return(&database.Space{
+		Repository:   deploy.Repository,
+		ID:           1,
+		Sdk:          "gradio",
+		RepositoryID: deploy.Repository.ID,
+	}, nil)
+	tester.mockClusterStore.EXPECT().ByClusterID(mock.Anything, mock.Anything).Return(database.ClusterInfo{}, nil)
+	tester.mockTokenStore.EXPECT().FindByUID(mock.Anything, mock.Anything).Return(&database.AccessToken{
+		Token: "test-token",
+		User:  &database.User{},
+	}, nil)
+	tester.mockDeployTaskStore.EXPECT().GetDeployByID(mock.Anything, mock.Anything).Return(deploy, nil)
+	tester.mockRuntimeFrameworks.EXPECT().FindByImageID(mock.Anything, mock.Anything).Return(nil, nil)
+
+	err := tester.activities.Deploy(tester.ctx, runTask.ID)
+
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "runtime framework not found")
+}
+
 func TestApplyToolCallParser(t *testing.T) {
 	parsers := map[string]string{
 		"Qwen3ForCausalLM":      "qwen",

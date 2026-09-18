@@ -269,7 +269,7 @@
     },
     {
       "name": "gpu-memory-utilization",
-      "value": "0.8",
+      "value": "0.9",
       "format": "--gpu-memory-utilization %s"
     },
     {
@@ -348,8 +348,13 @@
       "format": "--enforce-eager"
     },
     {
-      "name": "disable-custom-all-reduce",
+      "name": "async-scheduling",
       "value": "enable",
+      "format": "--async-scheduling"
+    },
+    {
+      "name": "disable-custom-all-reduce",
+      "value": "disable",
       "format": "--disable-custom-all-reduce"
     },
     {

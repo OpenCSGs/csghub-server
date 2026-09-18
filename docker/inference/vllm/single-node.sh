@@ -3,12 +3,47 @@
 export PYTHONPATH="$(pwd):$PYTHONPATH"
 
 python3 /etc/csghub/entry.py
+
+# Version gate: vLLM threshold 0.10
+ENGINE_VER_NUM=$(echo "${ENGINE_VERSION:-}" | sed 's/^[^0-9]*//' | cut -d. -f1-2)
+ENGINE_VER_OK=false
+if [[ "$ENGINE_VER_NUM" =~ ^[0-9]+\.[0-9]+$ ]]; then
+    ENGINE_MAJOR=${ENGINE_VER_NUM%.*}; ENGINE_MINOR=${ENGINE_VER_NUM#*.}
+    if (( ENGINE_MAJOR > 0 )) || { (( ENGINE_MAJOR == 0 )) && (( ENGINE_MINOR >= 10 )); }; then
+        ENGINE_VER_OK=true
+    fi
+fi
+
 if [ -z "$GPU_NUM" ]; then
     GPU_NUM=1
 fi
-#LimitedMaxToken is gpu_num multiplied by 4096
+#LimitedMaxToken is gpu_num multiplied by 5120
 LimitedMaxToken=$(($GPU_NUM * 5120))
 GPU_MEMORY_UTILIZATION=0.9
+MAX_NUM_BATCHED_TOKENS=4096
+if $ENGINE_VER_OK && [[ -n "${XPU_MODEL:-}" ]]; then
+    case "$(echo "$XPU_MODEL" | tr '[:upper:]' '[:lower:]')" in
+        *h100*|*h200*)
+            GPU_MEMORY_UTILIZATION=0.92
+            MAX_NUM_BATCHED_TOKENS=8192
+            ;;
+        *a100*)
+            GPU_MEMORY_UTILIZATION=0.90
+            MAX_NUM_BATCHED_TOKENS=8192
+            ;;
+        *h20*)
+            GPU_MEMORY_UTILIZATION=0.90
+            MAX_NUM_BATCHED_TOKENS=4096
+            ;;
+    esac
+fi
+# GPU model tiering for LimitedMaxToken
+if $ENGINE_VER_OK && [[ -n "${XPU_MODEL:-}" ]]; then
+    case "$(echo "$XPU_MODEL" | tr '[:upper:]' '[:lower:]')" in
+        *h100*|*h200*) LimitedMaxToken=$(($GPU_NUM * 16384)) ;;
+        *a100*)        LimitedMaxToken=$(($GPU_NUM * 10240)) ;;
+    esac
+fi
 
 # text-to-speech models are served by vLLM-Omni (vllm serve --omni), which
 # exposes the OpenAI-compatible speech API at /v1/audio/speech.
@@ -86,6 +121,31 @@ fi
 if [ "${VLLM_ENFORCE_EAGER}" = "true" ] || [ "${VLLM_ENFORCE_EAGER}" = "1" ]; then
     ENGINE_ARGS="$ENGINE_ARGS --enforce-eager"
     echo "Enabled --enforce-eager via env var."
+fi
+
+# Default async-scheduling (only for NVIDIA GPU + new vLLM + PP<=1, not explicitly disabled)
+if $ENGINE_VER_OK && [[ "${ASYNC_SCHEDULING_DISABLED:-}" != "true" ]] && [[ ! $ENGINE_ARGS == *"--async-scheduling"* ]]; then
+    PP_SIZE=1
+    if [[ "$ENGINE_ARGS" =~ --pipeline-parallel-size[=[:space:]]([0-9]+) ]]; then
+        PP_SIZE=${BASH_REMATCH[1]}
+    fi
+    if (( PP_SIZE <= 1 )) && [[ -n "${XPU_MODEL:-}" ]] && \
+       echo "$XPU_MODEL" | grep -iqE 'nvidia|h100|h200|a100|h20|a10|l4|l40|a800'; then
+        ENGINE_ARGS="$ENGINE_ARGS --async-scheduling"
+    fi
+fi
+
+# Default compilation-config (only for NVIDIA GPU + new vLLM)
+if $ENGINE_VER_OK && [[ ! $ENGINE_ARGS == *"--compilation-config"* ]]; then
+    if [[ -n "${XPU_MODEL:-}" ]] && \
+       echo "$XPU_MODEL" | grep -iqE 'nvidia|h100|h200|a100|h20|a10|l4|l40|a800'; then
+        ENGINE_ARGS="$ENGINE_ARGS --compilation-config {\"mode\":3}"
+    fi
+fi
+
+# Default max-num-batched-tokens (tiered by GPU model)
+if $ENGINE_VER_OK && [[ ! $ENGINE_ARGS == *"--max-num-batched-tokens"* ]]; then
+    ENGINE_ARGS="$ENGINE_ARGS --max-num-batched-tokens $MAX_NUM_BATCHED_TOKENS"
 fi
     
 python3 -m vllm.entrypoints.openai.api_server $ENGINE_ARGS

@@ -116,10 +116,11 @@ type VolumeMount struct {
 // DeployExtend Use common fields for storage deployment to simplify the process of adding a large number
 // of repetitive fields to the request structure for each different scenario.
 type DeployExtend struct {
-	NodeAffinity *corev1.NodeAffinity `json:"node_affinity,omitempty"`
-	Tolerations  []Toleration         `json:"tolerations,omitempty"`
-	PD           *PDConfig            `json:"pd,omitempty"`
-	VolumeMounts []VolumeMount        `json:"volume_mounts,omitempty"`
+	NodeAffinity  *corev1.NodeAffinity `json:"node_affinity,omitempty"`
+	Tolerations   []Toleration         `json:"tolerations,omitempty"`
+	PD            *PDConfig            `json:"pd,omitempty"`
+	VolumeMounts  []VolumeMount        `json:"volume_mounts,omitempty"`
+	EngineVersion string               `json:"engine_version,omitempty"`
 }
 
 type DeployTimeRangeReq struct {

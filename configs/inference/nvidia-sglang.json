@@ -51,6 +51,11 @@
       "name": "custom-options",
       "value": "",
       "format": "%s"
+    },
+    {
+      "name": "mem-fraction-static",
+      "value": "0.8",
+      "format": "--mem-fraction-static %s"
     }
   ],
   "supported_archs": [
