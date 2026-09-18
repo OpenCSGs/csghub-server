@@ -1,0 +1,11 @@
+{
+    "error.IMPORT-ERR-0": {
+        "other": "提供的地址不是有效的 GitLab 实例"
+    },
+    "error.IMPORT-ERR-1": {
+        "other": "无法访问 GitLab 实例"
+    },
+    "error.IMPORT-ERR-2": {
+        "other": "无权访问 GitLab 实例，请检查访问令牌"
+    }
+}

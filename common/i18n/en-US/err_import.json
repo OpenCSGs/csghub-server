@@ -1,0 +1,11 @@
+{
+    "error.IMPORT-ERR-0": {
+        "other": "The provided address is not a valid GitLab instance"
+    },
+    "error.IMPORT-ERR-1": {
+        "other": "The GitLab instance is unreachable"
+    },
+    "error.IMPORT-ERR-2": {
+        "other": "Unauthorized to access the GitLab instance, please check the access token"
+    }
+}
