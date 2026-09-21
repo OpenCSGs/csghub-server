@@ -71,6 +71,49 @@ func TestChatRetryResponseWriter_BuffersFailedAttemptUntilReplay(t *testing.T) {
 	require.Equal(t, `gateway error body`, downstream.body.String())
 }
 
+func TestChatRetryResponseWriter_RecordsPassthroughErrorBody(t *testing.T) {
+	downstream := newTestRetryResponseWriter()
+	writer := newChatRetryResponseWriter(downstream)
+
+	// 400 is a client-argument error: not buffered, streamed straight to the
+	// client, but its body must still be recorded for diagnostic logging.
+	writer.WriteHeader(http.StatusBadRequest)
+	_, err := writer.Write([]byte(`{"error":{"message":"bad request"}}`))
+	require.NoError(t, err)
+
+	require.Equal(t, http.StatusBadRequest, downstream.statusCode)
+	require.Equal(t, `{"error":{"message":"bad request"}}`, downstream.body.String())
+	require.Equal(t, `{"error":{"message":"bad request"}}`, writer.responseBodyForLog())
+}
+
+func TestChatRetryResponseWriter_ErrorBodyCaptureLimit(t *testing.T) {
+	downstream := newTestRetryResponseWriter()
+	writer := newChatRetryResponseWriter(downstream)
+
+	writer.WriteHeader(http.StatusBadRequest)
+	big := strings.Repeat("x", chatErrorBodyCaptureLimit+2048)
+	_, err := writer.Write([]byte(big))
+	require.NoError(t, err)
+
+	require.Equal(t, chatErrorBodyCaptureLimit, writer.errorBody.Len(),
+		"error body capture must stop at the capture limit")
+	require.Equal(t, big[:chatErrorBodyCaptureLimit], writer.responseBodyForLog())
+	// The client must still receive the original, untruncated response body.
+	require.Equal(t, big, downstream.body.String(),
+		"diagnostics capture must not truncate the passthrough response")
+}
+
+func TestChatRetryResponseWriter_DoesNotRecordSuccessBody(t *testing.T) {
+	downstream := newTestRetryResponseWriter()
+	writer := newChatRetryResponseWriter(downstream)
+
+	writer.WriteHeader(http.StatusOK)
+	_, err := writer.Write([]byte(`{"choices":[]}`))
+	require.NoError(t, err)
+
+	require.Empty(t, writer.responseBodyForLog())
+}
+
 func TestBuildChatAttemptTargets(t *testing.T) {
 	targets := buildChatAttemptTargets(
 		commontypes.UpstreamConfig{ID: 1, URL: "https://api.example.com/node-b/v1/chat/completions", Enabled: true, ModelName: "provider-model-b"},
