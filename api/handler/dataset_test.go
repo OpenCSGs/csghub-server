@@ -59,6 +59,7 @@ func TestDatasetHandler_Index(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(fmt.Sprintf("%+v", c), func(t *testing.T) {
+			complianceStatus := types.ComplianceStatusPendingReview
 
 			tester := NewDatasetTester(t).WithHandleFunc(func(h *DatasetHandler) gin.HandlerFunc {
 				return h.Index
@@ -66,9 +67,10 @@ func TestDatasetHandler_Index(t *testing.T) {
 
 			if !c.error {
 				tester.mocks.dataset.EXPECT().Index(tester.Ctx(), &types.RepoFilter{
-					Search: "foo",
-					Sort:   c.sort,
-					Source: c.source,
+					Search:           "foo",
+					Sort:             c.sort,
+					Source:           c.source,
+					ComplianceStatus: &complianceStatus,
 				}, 10, 1, true).Return([]*types.Dataset{{
 					Name: "cc",
 					Scores: []types.WeightScore{{
@@ -82,6 +84,7 @@ func TestDatasetHandler_Index(t *testing.T) {
 			tester.AddPagination(1, 10).WithQuery("search", "foo").
 				WithQuery("sort", c.sort).
 				WithQuery("source", c.source).
+				WithQuery("compliance_status", string(complianceStatus)).
 				WithQuery("need_op_weight", "true").Execute()
 
 			if c.error {

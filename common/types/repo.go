@@ -352,6 +352,7 @@ type RepoFilter struct {
 	ListServerless      bool
 	SpaceSDK            string
 	XnetMigrationStatus *XnetMigrationTaskStatus
+	ComplianceStatus    *ComplianceStatus
 	Status              string
 	DatasetType         string
 	UserPurchased       bool

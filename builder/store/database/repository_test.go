@@ -1202,6 +1202,60 @@ func TestRepoStore_PublicToUser(t *testing.T) {
 	}
 }
 
+func TestRepoStore_PublicToUserComplianceStatus(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewRepoStoreWithDB(db)
+	modelStore := database.NewModelStoreWithDB(db)
+	recomStore := database.NewRecomStoreWithDB(db)
+	repositories := []database.Repository{
+		{
+			Name:                 "pending-model",
+			Path:                 "compliance/pending-model",
+			GitPath:              "models_compliance/pending-model",
+			RepositoryType:       types.ModelRepo,
+			ComplianceStatus:     types.ComplianceStatusPendingReview,
+			CommercialPermission: types.CommercialPermissionCustomTerms,
+		},
+		{
+			Name:                 "compliant-model",
+			Path:                 "compliance/compliant-model",
+			GitPath:              "models_compliance/compliant-model",
+			RepositoryType:       types.ModelRepo,
+			ComplianceStatus:     types.ComplianceStatusCompliant,
+			CommercialPermission: types.CommercialPermissionAllowed,
+		},
+	}
+
+	for index, repository := range repositories {
+		repo, err := store.CreateRepo(ctx, repository)
+		require.NoError(t, err)
+		_, err = modelStore.Create(ctx, database.Model{RepositoryID: repo.ID})
+		require.NoError(t, err)
+		err = recomStore.UpsertScore(ctx, []*database.RecomRepoScore{{
+			RepositoryID: repo.ID,
+			WeightName:   database.RecomWeightTotal,
+			Score:        float64(index + 1),
+		}})
+		require.NoError(t, err)
+	}
+
+	status := types.ComplianceStatusPendingReview
+	repos, count, err := store.PublicToUserWithAccess(
+		ctx,
+		types.ModelRepo,
+		database.NewRepositoryAccessScope(database.RepositoryAccessPublic, nil),
+		&types.RepoFilter{Sort: "trending", ComplianceStatus: &status},
+		10,
+		1,
+	)
+	require.NoError(t, err)
+	require.Equal(t, 1, count)
+	require.Equal(t, "pending-model", repos[0].Name)
+}
+
 func TestRepoStore_PublicToUserOwnerFilter(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
