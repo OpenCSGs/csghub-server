@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 
+	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/aigateway/types"
 )
 
@@ -36,6 +37,32 @@ type BalanceChecker interface {
 // UsageLimitChecker verifies that the tenant has not exceeded usage quota.
 type UsageLimitChecker interface {
 	CheckUsageLimit(ctx context.Context, nsUUID string, model *types.Model, endpoint string) error
+}
+
+// AdmissionChecker enforces capacity admission (CapacityPolicy) for the
+// resolved model target. It runs BEFORE the content-safety check (step 7 vs
+// 8): the sensitive check is the expensive Plan-phase step (whitelist query
+// + moderation RPC) and should only be paid by requests that have the
+// capacity to run; and the safety gate's whitelist targets are built from
+// the upstream provider, so admission (which may re-select the upstream)
+// must settle the final target first.
+//
+// Boundary: the Router owns the candidate set ("where should this request
+// go"); the checker only evaluates feasibility within that set ("can it be
+// accepted"). When the preferred upstream is infeasible and re-selection is
+// allowed (no pinned upstream, no session affinity), the checker may return
+// an outcome whose ReSelectedTarget points at another candidate — it must
+// never build a candidate set of its own.
+type AdmissionChecker interface {
+	CheckAdmission(ctx context.Context, meta *types.RequestMetadata, mt *types.ModelTarget) (*types.AdmissionOutcome, error)
+}
+
+// AdmissionReleaser is the Orchestrator's safety net: it finalizes the
+// admission lease still recorded on the plan after the Execute phase returns
+// (including error/panic paths). The usage commit paths finalize the same
+// lease first with usage — both are idempotent.
+type AdmissionReleaser interface {
+	ReleaseAdmission(c *gin.Context, p *types.RequestPlan)
 }
 
 // ContentSafetyChecker checks prompt text for sensitive content.

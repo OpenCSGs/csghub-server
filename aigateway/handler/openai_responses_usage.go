@@ -32,7 +32,7 @@ func (h *OpenAIHandlerImpl) newResponsesTokenCounter(modelTarget *resolvedModelT
 	return token.NewResponsesTokenCounter(tokenizer)
 }
 
-func (h *OpenAIHandlerImpl) recordResponsesUsageWithTrace(c *gin.Context, counter token.ResponsesTokenCounter, preUsage *token.Usage, nsUUID string, modelTarget *resolvedModelTarget, apikey string, recorder *responsespkg.LLMLogRecorder, traceInput responsesTracePostProcessInput) {
+func (h *OpenAIHandlerImpl) recordResponsesUsageWithTrace(c *gin.Context, counter token.ResponsesTokenCounter, preUsage *token.Usage, nsUUID string, modelTarget *resolvedModelTarget, apikey string, recorder *responsespkg.LLMLogRecorder, traceInput responsesTracePostProcessInput, admissionLease *types.AdmissionLease) {
 	if modelTarget == nil || modelTarget.Model == nil {
 		return
 	}
@@ -92,6 +92,9 @@ func (h *OpenAIHandlerImpl) recordResponsesUsageWithTrace(c *gin.Context, counte
 					slog.String("model", modelTarget.ModelName),
 					slog.String("provider", modelTarget.Model.Provider),
 					slog.Any("error", err))
+			}
+			if admissionLease != nil {
+				h.openaiComponent.FinalizeCapacityAdmission(commitCtx, admissionLease, tokenUsage)
 			}
 			cancel()
 		}

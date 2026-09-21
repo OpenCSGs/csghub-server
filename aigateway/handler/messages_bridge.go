@@ -35,10 +35,11 @@ func newMessagesHandlerBridge(h *OpenAIHandlerImpl) *messagesHandlerBridge {
 // anthropic.New.  The bridge implements all required interfaces.
 func (b *messagesHandlerBridge) toMessagesDeps() anthropic.Deps {
 	deps := anthropic.Deps{
-		ProxyExecutor:   b,
-		UsageRecorder:   b,
-		UsageLimiter:    b,
-		MetricsRecorder: b,
+		ProxyExecutor:      b,
+		UsageRecorder:      b,
+		UsageLimiter:       b,
+		AdmissionFinalizer: b,
+		MetricsRecorder:    b,
 	}
 	if b.handler.llmTracer != nil {
 		deps.LLMTracer = &llmTracerAdapter{tracer: b.handler.llmTracer}
@@ -91,6 +92,20 @@ func (b *messagesHandlerBridge) CommitUsageLimitFromUsage(ctx context.Context, n
 		CacheCreationPromptTokens: cacheCreationPromptTokens,
 	}
 	return b.handler.openaiComponent.CommitUsageLimitFromUsage(ctx, nsUUID, model, usage)
+}
+
+// --- AdmissionFinalizer ---
+
+// FinalizeCapacityAdmission converts the anthropic-local usage into the
+// gateway token usage and closes the capacity admission lease.
+func (b *messagesHandlerBridge) FinalizeCapacityAdmission(ctx context.Context, lease *types.AdmissionLease, usage *types.AdmissionUsage) {
+	if usage == nil {
+		b.handler.openaiComponent.FinalizeCapacityAdmission(ctx, lease, nil)
+		return
+	}
+	b.handler.openaiComponent.FinalizeCapacityAdmission(ctx, lease, &token.Usage{
+		TotalTokens: usage.TotalTokens,
+	})
 }
 
 // --- MetricsRecorder ---

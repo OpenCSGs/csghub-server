@@ -28,6 +28,10 @@ type Deps struct {
 	UsageRecorder UsageRecorder
 	// UsageLimiter commits usage quota after the upstream response.
 	UsageLimiter UsageLimiter
+	// AdmissionFinalizer closes the capacity admission lease lifecycle after
+	// the upstream response (release + TPM correction with real usage).
+	// Optional: nil skips admission finalization (tests).
+	AdmissionFinalizer AdmissionFinalizer
 	// MetricsRecorder records request-level metrics.
 	MetricsRecorder MetricsRecorder
 
@@ -56,6 +60,13 @@ type UsageRecorder interface {
 // UsageLimiter commits usage quota limits after the upstream response.
 type UsageLimiter interface {
 	CommitUsageLimitFromUsage(ctx context.Context, nsUUID string, model *types.Model, inputTokens, outputTokens, cachedPromptTokens, cacheCreationPromptTokens int64) error
+}
+
+// AdmissionFinalizer closes the capacity admission lease after the upstream
+// response: it releases the lease and corrects the TPM reservation with the
+// real usage. usage == nil means no usable usage (full reservation reclaim).
+type AdmissionFinalizer interface {
+	FinalizeCapacityAdmission(ctx context.Context, lease *types.AdmissionLease, usage *types.AdmissionUsage)
 }
 
 // MetricsRecorder records request-level token usage metrics.
@@ -120,6 +131,9 @@ type postProcessInput struct {
 	LogCapture      LLMLogRecorder
 	Trace           tracePostProcessInput
 	StatusCode      int
+	// AdmissionLease finalizes the capacity admission lease with the
+	// real usage. Idempotent with the Orchestrator's safety-net release.
+	AdmissionLease *types.AdmissionLease
 }
 
 type tracePostProcessInput struct {

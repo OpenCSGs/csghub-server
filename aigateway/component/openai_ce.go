@@ -5,6 +5,7 @@ package component
 import (
 	"context"
 
+	"opencsg.com/csghub-server/aigateway/component/admission"
 	"opencsg.com/csghub-server/aigateway/component/upstream"
 	"opencsg.com/csghub-server/aigateway/types"
 	"opencsg.com/csghub-server/builder/event"
@@ -25,15 +26,16 @@ func NewOpenAIComponentFromConfig(config *config.Config) (OpenAIComponent, error
 		return nil, err
 	}
 	return &openaiComponentImpl{
-		userStore:              database.NewUserStore(),
-		organStore:             database.NewOrgStore(config),
-		deployStore:            database.NewDeployTaskStore(),
-		eventPub:               &event.DefaultEventPublisher,
-		extllmStore:            database.NewLLMConfigStore(config),
-		modelListCache:         cacheClient,
-		extendOpenai:           extendOpenai{},
-		modelIDBuilder:         upstream.NewModelIDBuilder(),
-		capacityPolicyDefaults: capacityPolicyDefaultsFromConfig(config),
+		userStore:                database.NewUserStore(),
+		organStore:               database.NewOrgStore(config),
+		deployStore:              database.NewDeployTaskStore(),
+		eventPub:                 &event.DefaultEventPublisher,
+		extllmStore:              database.NewLLMConfigStore(config),
+		modelListCache:           cacheClient,
+		extendOpenai:             extendOpenai{},
+		modelIDBuilder:           upstream.NewModelIDBuilder(),
+		capacityPolicyDefaults:   capacityPolicyDefaultsFromConfig(config),
+		capacityAdmissionOptions: admission.CapacityAdmissionOptionsFromConfig(config),
 	}, nil
 }
 

@@ -209,6 +209,9 @@ func (h *OpenAIHandlerImpl) handleProxyError(c *gin.Context, isStream bool, user
 		h.handleUsageLimitExceeded(c, isStream, username, modelID, err)
 		return
 	}
+	if h.handleAdmissionDenied(c, isStream, err) {
+		return
+	}
 	slog.ErrorContext(c.Request.Context(), "failed to create reverse proxy",
 		slog.Any("error", err))
 	httpbase.ServerError(c, err)
@@ -427,6 +430,10 @@ type chatPostProcessInput struct {
 	LogCapture      component.LLMLogRecorder
 	Trace           chatTracePostProcessInput
 	StatusCode      int
+	// AdmissionLease finalizes the capacity admission lease with the real
+	// usage (release + TPM correction). Idempotent with the Orchestrator's
+	// safety-net release.
+	AdmissionLease *types.AdmissionLease
 }
 
 type chatContext struct {
@@ -491,6 +498,7 @@ func (h *OpenAIHandlerImpl) executeChatWithFallback(
 	primaryWriter *chatRetryResponseWriter,
 	username string,
 	modelID string,
+	p *types.RequestPlan,
 ) (*chatRetryResponseWriter, error) {
 	primaryStatusCode := primaryWriter.StatusCode()
 	primaryStreamStarted := primaryWriter.StreamStarted()
@@ -524,9 +532,9 @@ func (h *OpenAIHandlerImpl) executeChatWithFallback(
 		slog.String("retry_reason", chatRetryReason(primaryStatusCode)),
 		slog.Int("status_code", primaryStatusCode))
 
-	retryWriter, retryErr := h.retryChatWithFallback(c, chatCtx.responseWriter, modelTarget, userUUID, chatReq, chatCtx.tokenCounter, chatCtx.logCapture)
+	retryWriter, retryErr := h.retryChatWithFallback(c, chatCtx.responseWriter, modelTarget, userUUID, chatReq, chatCtx.tokenCounter, chatCtx.logCapture, p)
 	if retryErr != nil {
-		if component.IsUsageLimitExceeded(retryErr) {
+		if component.IsUsageLimitExceeded(retryErr) || types.IsAdmissionDenied(retryErr) {
 			return nil, retryErr
 		}
 		slog.ErrorContext(c.Request.Context(), "fallback chat retry failed", slog.Any("error", retryErr))
@@ -601,6 +609,9 @@ func (h *OpenAIHandlerImpl) runChatPostProcessAsync(ctx context.Context, input c
 		if err := h.openaiComponent.CommitUsageLimitFromUsage(usageCtx, input.NSUUID, input.Model, usage); err != nil {
 			slog.ErrorContext(usageCtx, "failed to commit usage limit", slog.Any("error", err))
 		}
+		if input.AdmissionLease != nil {
+			h.openaiComponent.FinalizeCapacityAdmission(usageCtx, input.AdmissionLease, usage)
+		}
 
 		if usage != nil && isSuccessfulStatus(input.StatusCode) {
 			if err := h.openaiComponent.RecordUsageFromTokenUsage(usageCtx, input.NSUUID, input.Model, input.TargetModelName, usage, input.ApiKey); err != nil {
@@ -626,7 +637,12 @@ func (h *OpenAIHandlerImpl) runChatPostProcessAsync(ctx context.Context, input c
 	}()
 }
 
-func (h *OpenAIHandlerImpl) executeChatProxyAttempt(c *gin.Context, w CommonResponseWriter, modelTarget *resolvedModelTarget, userUUID string, chatReq *types.ChatCompletionRequest) (*chatRetryResponseWriter, error) {
+func (h *OpenAIHandlerImpl) executeChatProxyAttempt(c *gin.Context, w CommonResponseWriter, modelTarget *resolvedModelTarget, userUUID string, chatReq *types.ChatCompletionRequest, p *types.RequestPlan) (*chatRetryResponseWriter, error) {
+	// Capacity admission: reuse the plan-phase lease on the primary
+	// upstream, or rotate to a pinned lease for a fallback upstream.
+	if err := ensureAdmissionForAttempt(c.Request.Context(), h, p, modelTarget); err != nil {
+		return nil, err
+	}
 	if err := h.openaiComponent.CheckUsageLimit(c.Request.Context(), userUUID, modelTarget.Model, modelTarget.Target); err != nil {
 		return nil, err
 	}
@@ -646,7 +662,7 @@ func (h *OpenAIHandlerImpl) executeChatProxyAttempt(c *gin.Context, w CommonResp
 	return retryWriter, nil
 }
 
-func (h *OpenAIHandlerImpl) retryChatWithFallback(c *gin.Context, w CommonResponseWriter, modelTarget *resolvedModelTarget, userUUID string, chatReq *types.ChatCompletionRequest, tokenCounter token.ChatTokenCounter, logCapture component.LLMLogRecorder) (*chatRetryResponseWriter, error) {
+func (h *OpenAIHandlerImpl) retryChatWithFallback(c *gin.Context, w CommonResponseWriter, modelTarget *resolvedModelTarget, userUUID string, chatReq *types.ChatCompletionRequest, tokenCounter token.ChatTokenCounter, logCapture component.LLMLogRecorder, p *types.RequestPlan) (*chatRetryResponseWriter, error) {
 	if len(modelTarget.AttemptTargets) < 1 {
 		return nil, nil
 	}
@@ -657,7 +673,7 @@ func (h *OpenAIHandlerImpl) retryChatWithFallback(c *gin.Context, w CommonRespon
 			slog.String("model_id", modelTarget.Model.ID),
 			slog.String("retry_endpoint", modelTarget.Model.Endpoint),
 			slog.String("retry_model_name", modelTarget.ModelName))
-		retryWriter, err := h.executeChatProxyAttempt(c, w, modelTarget, userUUID, chatReq)
+		retryWriter, err := h.executeChatProxyAttempt(c, w, modelTarget, userUUID, chatReq, p)
 		if err != nil {
 			return nil, err
 		}

@@ -1425,7 +1425,7 @@ func TestRecordResponsesUsageFallsBackToTokenCounter(t *testing.T) {
 		}).
 		Once()
 
-	tester.handler.recordResponsesUsageWithTrace(c, counter, nil, "testuuid", modelTarget, "api-key", nil, responsesTracePostProcessInput{StatusCode: http.StatusOK})
+	tester.handler.recordResponsesUsageWithTrace(c, counter, nil, "testuuid", modelTarget, "api-key", nil, responsesTracePostProcessInput{StatusCode: http.StatusOK}, nil)
 	wg.Wait()
 }
 
@@ -1461,7 +1461,7 @@ func TestRecordResponsesUsagePrefersResponsesUsage(t *testing.T) {
 		}).
 		Once()
 
-	tester.handler.recordResponsesUsageWithTrace(c, counter, nil, "testuuid", modelTarget, "api-key", nil, responsesTracePostProcessInput{StatusCode: http.StatusOK})
+	tester.handler.recordResponsesUsageWithTrace(c, counter, nil, "testuuid", modelTarget, "api-key", nil, responsesTracePostProcessInput{StatusCode: http.StatusOK}, nil)
 	wg.Wait()
 }
 

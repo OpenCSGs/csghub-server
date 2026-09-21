@@ -78,11 +78,11 @@ var (
 // responsesParsedBody carries the parsed request plus protocol-specific
 // fields that the Execute phase needs but the Planner does not.
 type responsesParsedBody struct {
-	Req                   *types.ResponsesRequest
-	PublicModelID         string
-	PublicPreviousRespID  string
-	UpstreamResponseID    string
-	Owner                 string
+	Req                  *types.ResponsesRequest
+	PublicModelID        string
+	PublicPreviousRespID string
+	UpstreamResponseID   string
+	Owner                string
 }
 
 // PromptText satisfies types.PromptTextProvider so the Planner can extract
@@ -92,6 +92,16 @@ func (b *responsesParsedBody) PromptText() string {
 		return ""
 	}
 	return b.Req.PromptText()
+}
+
+// HasMultimodalContent implements types.MultimodalContentProvider so the
+// capacity admission adapter sees through this wrapper to the request's
+// multimodal content (image/audio parts skip the text-based TPM estimate).
+func (b *responsesParsedBody) HasMultimodalContent() bool {
+	if b == nil || b.Req == nil {
+		return false
+	}
+	return b.Req.HasMultimodalContent()
 }
 
 // --- Phase 1: Extract ---
@@ -133,14 +143,14 @@ func (h *responsesPipelineHandler) Extract(c *gin.Context) (*types.RequestMetada
 	}
 
 	return &types.RequestMetadata{
-		Protocol:           string(types.ProtocolResponses),
-		Task:               "responses",
-		Model:              publicModelID,
-		TenantID:           nsUUID,
-		UserID:             username,
-		APIKeyID:           apikey,
-		Streaming:          req.Stream,
-		Headers:            c.Request.Header,
+		Protocol:  string(types.ProtocolResponses),
+		Task:      "responses",
+		Model:     publicModelID,
+		TenantID:  nsUUID,
+		UserID:    username,
+		APIKeyID:  apikey,
+		Streaming: req.Stream,
+		Headers:   c.Request.Header,
 		ParsedBody: &responsesParsedBody{
 			Req:                  req,
 			PublicModelID:        publicModelID,
@@ -227,9 +237,9 @@ func (h *responsesPipelineHandler) Execute(c *gin.Context, meta *types.RequestMe
 
 	switch decision.Mode {
 	case responsespkg.ResponsesModeNative:
-		h.handler.executeNativeResponses(c, req, resolvedTarget, decision, pb.Owner, meta.TenantID, meta.APIKeyID, pb.PublicModelID, pb.PublicPreviousRespID, responsesModeration, responseCapture, generationRecorder)
+		h.handler.executeNativeResponses(c, req, resolvedTarget, decision, pb.Owner, meta.TenantID, meta.APIKeyID, pb.PublicModelID, pb.PublicPreviousRespID, responsesModeration, responseCapture, generationRecorder, p)
 	case responsespkg.ResponsesModeChatAdapter:
-		h.handler.executeAdapterResponses(c, req, resolvedTarget, meta.TenantID, meta.APIKeyID, pb.PublicModelID, responsesModeration, responseCapture, generationRecorder)
+		h.handler.executeAdapterResponses(c, req, resolvedTarget, meta.TenantID, meta.APIKeyID, pb.PublicModelID, responsesModeration, responseCapture, generationRecorder, p)
 	default:
 		writeResponsesError(c, http.StatusBadRequest, "unsupported_feature", "invalid_request_error", "unsupported responses execution mode")
 	}

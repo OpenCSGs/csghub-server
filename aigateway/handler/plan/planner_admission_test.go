@@ -1,0 +1,308 @@
+package plan
+
+import (
+	"context"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"opencsg.com/csghub-server/aigateway/types"
+	commonType "opencsg.com/csghub-server/common/types"
+)
+
+// --- test doubles recording call order ---
+
+type recordingSafetyChecker struct {
+	called bool
+	// afterAdmission is set when the admission checker reports it already
+	// ran — i.e. the sensitive check happened second.
+	afterAdmission bool
+	// checkedProvider records the upstream provider the sensitive check
+	// received (whitelist targets are built from it).
+	checkedProvider string
+}
+
+func (m *recordingSafetyChecker) Check(_ context.Context, _ *types.Model, _, _, _ string, _ bool, provider string) (bool, string, error) {
+	m.called = true
+	m.checkedProvider = provider
+	return false, "", nil
+}
+
+type recordingAdmissionChecker struct {
+	safety *recordingSafetyChecker
+	called bool
+	// decidedTarget records the model target this admission decision was
+	// made on (pinned or re-selected).
+	decidedTarget *types.ModelTarget
+	outcome       *types.AdmissionOutcome
+}
+
+func (m *recordingAdmissionChecker) CheckAdmission(_ context.Context, _ *types.RequestMetadata, mt *types.ModelTarget) (*types.AdmissionOutcome, error) {
+	m.called = true
+	m.decidedTarget = mt
+	// Admission runs first; the sensitive check runs after with the target
+	// admission decided on (asserted via the safety stub's observations).
+	m.safety.afterAdmission = true
+	return m.outcome, nil
+}
+
+func admissionPlanTestTarget() *types.ModelTarget {
+	return makeResolvedTarget("http://upstream/v1/messages", "")
+}
+
+// --- tests ---
+
+func TestPlan_AdmissionRunsAfterSensitive(t *testing.T) {
+	safety := &recordingSafetyChecker{}
+	admission := &recordingAdmissionChecker{safety: safety}
+	p := NewPlanner(
+		&mockModelResolver{target: admissionPlanTestTarget()},
+		&mockBalanceChecker{},
+		&mockUsageLimitChecker{},
+		safety,
+		admission,
+		nil,
+	)
+
+	meta := &types.RequestMetadata{
+		Protocol:   string(types.ProtocolMessages),
+		Task:       "messages",
+		UserID:     "user1",
+		Model:      "test-model",
+		TenantID:   "ns-123",
+		ParsedBody: &promptTextProvider{text: "hello"},
+	}
+
+	plan, err := p.Plan(newTestGinContext(), meta)
+	require.NoError(t, err)
+	require.NotNil(t, plan)
+	assert.True(t, admission.called)
+	assert.True(t, safety.afterAdmission, "the sensitive check must run after capacity admission")
+}
+
+func TestPlan_AdmissionSkippedForNonTokenTask(t *testing.T) {
+	safety := &recordingSafetyChecker{}
+	admission := &recordingAdmissionChecker{safety: safety}
+	p := NewPlanner(
+		&mockModelResolver{target: admissionPlanTestTarget()},
+		&mockBalanceChecker{},
+		&mockUsageLimitChecker{},
+		safety,
+		admission,
+		nil,
+	)
+
+	meta := &types.RequestMetadata{
+		Protocol: string(types.ProtocolChat),
+		Task:     "video",
+		UserID:   "user1",
+		Model:    "test-model",
+		TenantID: "ns-123",
+	}
+
+	_, err := p.Plan(newTestGinContext(), meta)
+	require.NoError(t, err)
+	assert.False(t, admission.called, "non-participating modal tasks bypass capacity admission")
+}
+
+func TestPlan_AdmissionRunsForImageTask(t *testing.T) {
+	// Image generation is capacity-admitted (concurrency + RPM) but without
+	// a TPM reservation — its parsed body reports multimodal content so the
+	// handler adapter passes EstimatedTokens <= 0.
+	safety := &recordingSafetyChecker{}
+	admission := &recordingAdmissionChecker{safety: safety}
+	p := NewPlanner(
+		&mockModelResolver{target: admissionPlanTestTarget()},
+		&mockBalanceChecker{},
+		&mockUsageLimitChecker{},
+		safety,
+		admission,
+		nil,
+	)
+
+	meta := &types.RequestMetadata{
+		Protocol: string(types.ProtocolChat),
+		Task:     "text-to-image",
+		UserID:   "user1",
+		Model:    "test-model",
+		TenantID: "ns-123",
+	}
+
+	_, err := p.Plan(newTestGinContext(), meta)
+	require.NoError(t, err)
+	assert.True(t, admission.called, "image generation participates in capacity admission")
+}
+
+func TestPlan_AdmissionReject_SetsCapacityErrorCategory(t *testing.T) {
+	decision := &types.AdmissionDecision{
+		Action:            types.AdmissionReject,
+		Reason:            types.AdmissionReasonConcurrencyExceeded,
+		RetryAfterSeconds: 5,
+	}
+	admission := &recordingAdmissionChecker{
+		safety:  &recordingSafetyChecker{},
+		outcome: &types.AdmissionOutcome{Decision: decision},
+	}
+	p := NewPlanner(
+		&mockModelResolver{target: admissionPlanTestTarget()},
+		&mockBalanceChecker{},
+		&mockUsageLimitChecker{},
+		&recordingSafetyChecker{},
+		admission,
+		nil,
+	)
+
+	meta := &types.RequestMetadata{
+		Protocol:   string(types.ProtocolMessages),
+		Task:       "messages",
+		UserID:     "user1",
+		Model:      "test-model",
+		TenantID:   "ns-123",
+		ParsedBody: &promptTextProvider{text: "hello"},
+	}
+
+	plan, err := p.Plan(newTestGinContext(), meta)
+	require.Error(t, err)
+	require.NotNil(t, plan)
+	assert.Equal(t, types.PlanErrCapacityExceeded, plan.ErrorCode)
+	assert.Same(t, decision, plan.Admission)
+
+	var denied *types.AdmissionDeniedError
+	assert.ErrorAs(t, err, &denied)
+	assert.Equal(t, decision, denied.Decision)
+}
+
+func TestPlan_AdmissionNilDecision_PassesThrough(t *testing.T) {
+	admission := &recordingAdmissionChecker{
+		safety:  &recordingSafetyChecker{},
+		outcome: nil, // admission did not apply
+	}
+	p := NewPlanner(
+		&mockModelResolver{target: admissionPlanTestTarget()},
+		&mockBalanceChecker{},
+		&mockUsageLimitChecker{},
+		&recordingSafetyChecker{},
+		admission,
+		nil,
+	)
+
+	meta := &types.RequestMetadata{
+		Protocol:   string(types.ProtocolMessages),
+		Task:       "messages",
+		UserID:     "user1",
+		Model:      "test-model",
+		TenantID:   "ns-123",
+		ParsedBody: &promptTextProvider{text: "hello"},
+	}
+
+	plan, err := p.Plan(newTestGinContext(), meta)
+	require.NoError(t, err)
+	require.NotNil(t, plan)
+	assert.Nil(t, plan.Admission)
+}
+
+func TestPlan_AdmissionReSelection_AppliesNewTarget(t *testing.T) {
+	primary := admissionPlanTestTarget()
+	reselected := &types.ModelTarget{
+		Model:     primary.Model,
+		Upstream:  primary.Upstream,
+		Target:    "http://other-upstream/v1/chat/completions",
+		Host:      "",
+		ModelName: "test-model",
+	}
+	admission := &recordingAdmissionChecker{
+		safety: &recordingSafetyChecker{},
+		outcome: &types.AdmissionOutcome{
+			Decision: &types.AdmissionDecision{
+				Action:             types.AdmissionAdmit,
+				SelectedUpstreamID: 2,
+				ReSelected:         true,
+			},
+			ReSelectedTarget: reselected,
+		},
+	}
+	p := NewPlanner(
+		&mockModelResolver{target: primary},
+		&mockBalanceChecker{},
+		&mockUsageLimitChecker{},
+		&recordingSafetyChecker{},
+		admission,
+		nil,
+	)
+
+	meta := &types.RequestMetadata{
+		Protocol:   string(types.ProtocolChat),
+		Task:       "chat",
+		UserID:     "user1",
+		Model:      "test-model",
+		TenantID:   "ns-123",
+		ParsedBody: &promptTextProvider{text: "hello"},
+	}
+
+	plan, err := p.Plan(newTestGinContext(), meta)
+	require.NoError(t, err)
+	require.NotNil(t, plan)
+	assert.Same(t, reselected, plan.ModelTarget)
+	assert.Equal(t, reselected.Target, plan.BackendURL)
+	assert.Equal(t, "native", plan.RouteMode)
+}
+
+func TestCategorizePlanError_AdmissionDenied(t *testing.T) {
+	// AdmissionDeniedError is categorized by the explicit ErrorCode on the
+	// plan; categorizePlanError must not misclassify it.
+	err := &types.AdmissionDeniedError{Decision: &types.AdmissionDecision{Reason: types.AdmissionReasonTPMExceeded}}
+	assert.Equal(t, types.PlanErrUnknown, categorizePlanError(err))
+}
+
+func TestPlan_SensitiveSeesReSelectedUpstream(t *testing.T) {
+	// Ordering correctness: capacity admission runs BEFORE the sensitive
+	// check, and a capacity re-selection must be applied to the plan before
+	// the sensitive check runs — the safety gate's whitelist targets are
+	// built from the upstream provider, so it must observe the FINAL
+	// upstream, never the router-picked one admission replaced.
+	primary := admissionPlanTestTarget()
+	reselected := &types.ModelTarget{
+		Model:     primary.Model,
+		Upstream:  commonType.UpstreamConfig{URL: "http://other-upstream/v1", Provider: "other-provider"},
+		Target:    "http://other-upstream/v1/chat/completions",
+		ModelName: "test-model",
+	}
+	admission := &recordingAdmissionChecker{
+		safety: &recordingSafetyChecker{},
+		outcome: &types.AdmissionOutcome{
+			Decision: &types.AdmissionDecision{
+				Action:             types.AdmissionAdmit,
+				SelectedUpstreamID: 2,
+				ReSelected:         true,
+			},
+			ReSelectedTarget: reselected,
+		},
+	}
+	safety := &recordingSafetyChecker{}
+	p := NewPlanner(
+		&mockModelResolver{target: primary},
+		&mockBalanceChecker{},
+		&mockUsageLimitChecker{},
+		safety,
+		admission,
+		nil,
+	)
+
+	meta := &types.RequestMetadata{
+		Protocol:   string(types.ProtocolChat),
+		Task:       "chat",
+		UserID:     "user1",
+		Model:      "test-model",
+		TenantID:   "ns-123",
+		ParsedBody: &promptTextProvider{text: "hello"},
+	}
+
+	pl, err := p.Plan(newTestGinContext(), meta)
+	require.NoError(t, err)
+	require.NotNil(t, pl)
+	require.True(t, safety.called, "the sensitive check must have run")
+	require.Equal(t, "other-provider", safety.checkedProvider,
+		"the sensitive check must receive the re-selected upstream's provider")
+	require.Same(t, reselected, pl.ModelTarget,
+		"the plan must carry the re-selected target")
+}

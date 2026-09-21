@@ -67,6 +67,25 @@ func (c *fakeOpenAIComponent) CommitUsageLimitFromUsage(ctx context.Context, use
 	return nil
 }
 
+func (c *fakeOpenAIComponent) CheckCapacityAdmission(ctx context.Context, model *aigwtypes.Model, preferredUpstreamID int64, allowSelect bool, estimatedTokens int64) *aigwtypes.AdmissionDecision {
+	return nil
+}
+
+func (c *fakeOpenAIComponent) AcquireCapacityAdmission(ctx context.Context, model *aigwtypes.Model, upstreamID int64, estimatedTokens int64) *aigwtypes.AdmissionDecision {
+	return nil
+}
+
+func (c *fakeOpenAIComponent) FinalizeCanceledCapacityAdmission(ctx context.Context, lease *aigwtypes.AdmissionLease, usage *token.Usage) {
+	c.FinalizeCapacityAdmission(ctx, lease, usage)
+}
+
+func (c *fakeOpenAIComponent) FinalizeCapacityAdmission(ctx context.Context, lease *aigwtypes.AdmissionLease, usage *token.Usage) {
+}
+
+func (c *fakeOpenAIComponent) EstimateAdmissionTokens(promptText string) int64 {
+	return 0
+}
+
 type fakeHTTPDoer struct {
 	t        *testing.T
 	wantURL  string

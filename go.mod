@@ -9,6 +9,7 @@ require (
 	github.com/alibabacloud-go/dysmsapi-20170525/v5 v5.1.2
 	github.com/alibabacloud-go/green-20220302/v2 v2.20.0
 	github.com/alibabacloud-go/tea v1.3.9
+	github.com/alicebob/miniredis/v2 v2.39.0
 	github.com/aliyun/alibaba-cloud-sdk-go v1.62.648
 	github.com/andybalholm/brotli v1.2.2
 	github.com/avast/retry-go/v4 v4.6.1
@@ -314,6 +315,7 @@ require (
 	github.com/vektra/mockery/v2 v2.53.6 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/yosida95/uritemplate/v3 v3.0.2 // indirect
+	github.com/yuin/gopher-lua v1.1.1 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 	github.com/zeebo/xxh3 v1.0.2 // indirect
 	gitlab.com/gitlab-org/go/reopen v1.0.0 // indirect

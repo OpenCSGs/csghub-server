@@ -23,20 +23,28 @@ func (s *stubExtractor) Extract(c *gin.Context) (*types.RequestMetadata, error) 
 }
 
 type stubHandler struct {
-	executed       bool
-	execErr        error
-	planErrorSeen  bool
-	planErrorErr   error
-	executeMeta    *types.RequestMetadata
-	executePlan    *types.RequestPlan
-	planErrorMeta  *types.RequestMetadata
-	planErrorPlan  *types.RequestPlan
+	executed        bool
+	execErr         error
+	panicInExecute  bool
+	executeOverride func(p *types.RequestPlan)
+	planErrorSeen   bool
+	planErrorErr    error
+	executeMeta     *types.RequestMetadata
+	executePlan     *types.RequestPlan
+	planErrorMeta   *types.RequestMetadata
+	planErrorPlan   *types.RequestPlan
 }
 
 func (s *stubHandler) Execute(c *gin.Context, meta *types.RequestMetadata, p *types.RequestPlan) error {
 	s.executed = true
 	s.executeMeta = meta
 	s.executePlan = p
+	if s.panicInExecute {
+		panic("execute exploded")
+	}
+	if s.executeOverride != nil {
+		s.executeOverride(p)
+	}
 	return s.execErr
 }
 

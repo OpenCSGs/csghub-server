@@ -98,6 +98,11 @@ type imageParsedBody struct {
 	Prompt string
 }
 
+// HasMultimodalContent implements types.MultimodalContentProvider: image
+// requests always carry non-text content, so capacity admission skips the
+// text-based TPM estimate entirely (concurrency and RPM still gate them).
+func (b *imageParsedBody) HasMultimodalContent() bool { return true }
+
 // --- Phase 1: Extract ---
 
 func (h *imagePipelineHandler) Extract(c *gin.Context) (*types.RequestMetadata, error) {
@@ -226,7 +231,7 @@ func (h *imagePipelineHandler) Execute(c *gin.Context, meta *types.RequestMetada
 		RequestID:     requestID,
 		NSUUID:        nsUUID,
 		ModelID:       meta.Model,
-		ModelTarget:   &resolvedModelTarget{
+		ModelTarget: &resolvedModelTarget{
 			Model: mt.Model, Upstream: mt.Upstream, Target: mt.Target, Host: mt.Host, ModelName: mt.ModelName,
 		},
 		Metadata: traceMetadata,
@@ -436,4 +441,3 @@ func (h *imagePipelineHandler) HandlePlanError(c *gin.Context, meta *types.Reque
 	}
 	handleOpenAIPlanError(c, meta, p, err, frontendURL)
 }
-

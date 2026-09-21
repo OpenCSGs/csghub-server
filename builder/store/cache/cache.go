@@ -42,6 +42,10 @@ type RedisClient interface {
 	Exists(ctx context.Context, key string) (int64, error)
 	Expire(ctx context.Context, key string, expiration time.Duration) error
 	RunScript(ctx context.Context, scriptStr string, key []string, args ...any) (any, error)
+	// LoadScript pre-loads a Lua script into the Redis script cache
+	// (SCRIPT LOAD), so subsequent RunScript calls hit EVALSHA without the
+	// first-call NOSCRIPT round trip. Implementations may no-op.
+	LoadScript(ctx context.Context, scriptStr string) error
 	Pipelined(ctx context.Context, fn func(redis.Pipeliner) error) ([]redis.Cmder, error)
 }
 
@@ -233,6 +237,10 @@ func (c *Cache) RunScript(ctx context.Context, scriptStr string, keys []string, 
 		return 0, err
 	}
 	return res, nil
+}
+
+func (c *Cache) LoadScript(ctx context.Context, scriptStr string) error {
+	return redis.NewScript(scriptStr).Load(ctx, c.core).Err()
 }
 
 func (c *Cache) Pipelined(ctx context.Context, fn func(redis.Pipeliner) error) ([]redis.Cmder, error) {

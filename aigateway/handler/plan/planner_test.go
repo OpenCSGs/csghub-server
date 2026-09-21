@@ -183,6 +183,7 @@ func TestPlan_Success_Native(t *testing.T) {
 		&mockBalanceChecker{},
 		&mockUsageLimitChecker{},
 		&mockContentSafetyChecker{},
+		nil, // admissionChecker: nil skips admission in these tests
 		nil,
 	)
 
@@ -212,6 +213,7 @@ func TestPlan_Success_NoPromptText_SkipsSafety(t *testing.T) {
 		&mockBalanceChecker{},
 		&mockUsageLimitChecker{},
 		&mockContentSafetyChecker{isSensitive: true, message: "blocked"},
+		nil, // admissionChecker: nil skips admission in these tests
 		nil,
 	)
 
@@ -235,6 +237,7 @@ func TestPlan_Sensitive_Flagged(t *testing.T) {
 		&mockBalanceChecker{},
 		&mockUsageLimitChecker{},
 		&mockContentSafetyChecker{isSensitive: true, message: "blocked content"},
+		nil, // admissionChecker: nil skips admission in these tests
 		nil,
 	)
 
@@ -263,6 +266,7 @@ func TestPlan_SafetyCheckError_DoesNotBlock(t *testing.T) {
 		&mockBalanceChecker{},
 		&mockUsageLimitChecker{},
 		&mockContentSafetyChecker{err: errors.New("moderation unavailable")},
+		nil, // admissionChecker: nil skips admission in these tests
 		nil,
 	)
 
@@ -288,6 +292,7 @@ func TestPlan_ModelNotFound(t *testing.T) {
 		&mockBalanceChecker{},
 		&mockUsageLimitChecker{},
 		&mockContentSafetyChecker{},
+		nil, // admissionChecker: nil skips admission in these tests
 		nil,
 	)
 
@@ -310,6 +315,7 @@ func TestPlan_ModelNilResolution(t *testing.T) {
 		&mockBalanceChecker{},
 		&mockUsageLimitChecker{},
 		&mockContentSafetyChecker{},
+		nil, // admissionChecker: nil skips admission in these tests
 		nil,
 	)
 
@@ -331,6 +337,7 @@ func TestPlan_ModelUnavailable(t *testing.T) {
 		&mockBalanceChecker{},
 		&mockUsageLimitChecker{},
 		&mockContentSafetyChecker{},
+		nil, // admissionChecker: nil skips admission in these tests
 		nil,
 	)
 
@@ -352,6 +359,7 @@ func TestPlan_InsufficientBalance(t *testing.T) {
 		&mockBalanceChecker{err: errorx.ErrInsufficientBalance},
 		&mockUsageLimitChecker{},
 		&mockContentSafetyChecker{},
+		nil, // admissionChecker: nil skips admission in these tests
 		nil,
 	)
 
@@ -375,6 +383,7 @@ func TestPlan_UsageLimitExceeded(t *testing.T) {
 		&mockBalanceChecker{},
 		&mockUsageLimitChecker{err: &component.UsageLimitExceededError{Message: "quota exceeded"}},
 		&mockContentSafetyChecker{},
+		nil, // admissionChecker: nil skips admission in these tests
 		nil,
 	)
 
@@ -414,6 +423,7 @@ func TestPlan_Disabled_ReturnsError(t *testing.T) {
 		&mockBalanceChecker{err: errors.New("balance should not be checked")},
 		&mockUsageLimitChecker{},
 		&mockContentSafetyChecker{},
+		nil, // admissionChecker: nil skips admission in these tests
 		nil,
 	)
 
@@ -466,6 +476,7 @@ func TestPlan_ChatFallback_RewritesBackendURL(t *testing.T) {
 				&mockUsageLimitChecker{},
 				&mockContentSafetyChecker{},
 				nil,
+				nil,
 			)
 
 			meta := &types.RequestMetadata{
@@ -493,6 +504,7 @@ func TestPlan_BackendURLFallback(t *testing.T) {
 		&mockBalanceChecker{},
 		&mockUsageLimitChecker{},
 		&mockContentSafetyChecker{},
+		nil, // admissionChecker: nil skips admission in these tests
 		nil,
 	)
 
@@ -516,6 +528,7 @@ func TestPlan_RoutingFieldsPopulated(t *testing.T) {
 		&mockBalanceChecker{},
 		&mockUsageLimitChecker{},
 		&mockContentSafetyChecker{},
+		nil, // admissionChecker: nil skips admission in these tests
 		nil,
 	)
 
@@ -560,6 +573,7 @@ func TestPlan_NonTokenTask_SkipsUsageLimitAndSafety(t *testing.T) {
 		&mockUsageLimitChecker{err: &component.UsageLimitExceededError{Message: "should not be called"}},
 		// If safety were checked, this would flag sensitive.
 		&mockContentSafetyChecker{isSensitive: true, message: "should not be called"},
+		nil, // admissionChecker: nil skips admission in these tests
 		nil,
 	)
 
@@ -590,6 +604,7 @@ func TestPlan_MetricsEnricher_CalledOnSuccess(t *testing.T) {
 		&mockBalanceChecker{},
 		&mockUsageLimitChecker{},
 		&mockContentSafetyChecker{},
+		nil,
 		enricher,
 	)
 
@@ -617,6 +632,7 @@ func TestPlan_MetricsEnricher_CalledOnResolveError(t *testing.T) {
 		&mockBalanceChecker{},
 		&mockUsageLimitChecker{},
 		&mockContentSafetyChecker{},
+		nil,
 		enricher,
 	)
 
