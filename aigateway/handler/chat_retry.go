@@ -17,6 +17,11 @@ import (
 
 const defaultChatMaxFallbackAttempts = 2
 
+// chatErrorBodyCaptureLimit caps how many bytes of a passthrough failed
+// response are recorded, so a huge upstream error page cannot balloon
+// gateway memory before the log-level truncation applies.
+const chatErrorBodyCaptureLimit = 4 * 1024
+
 type chatRetryResponseWriter struct {
 	downstream    CommonResponseWriter
 	headers       http.Header
@@ -26,6 +31,11 @@ type chatRetryResponseWriter struct {
 	streamStarted bool
 	firstWriteAt  time.Time
 	bufferedBody  bytes.Buffer
+	// errorBody records body bytes of failed responses that were streamed
+	// straight through to the client (client-argument errors such as 400
+	// are not retried and never enter bufferedBody), so they stay available
+	// for diagnostic logging after the attempt.
+	errorBody bytes.Buffer
 }
 
 func newChatRetryResponseWriter(downstream CommonResponseWriter) *chatRetryResponseWriter {
@@ -64,6 +74,15 @@ func (w *chatRetryResponseWriter) Write(data []byte) (int, error) {
 	}
 	if w.buffering {
 		return w.bufferedBody.Write(data)
+	}
+	// Record a bounded copy of the failed response body for diagnostics
+	// only; the client must still receive the original, untruncated data.
+	if w.statusCode >= http.StatusBadRequest && w.errorBody.Len() < chatErrorBodyCaptureLimit {
+		captured := data
+		if remaining := chatErrorBodyCaptureLimit - w.errorBody.Len(); len(captured) > remaining {
+			captured = captured[:remaining]
+		}
+		w.errorBody.Write(captured)
 	}
 	if len(data) > 0 {
 		w.streamStarted = true
@@ -106,6 +125,16 @@ func (w *chatRetryResponseWriter) ReplayBufferedResponse() error {
 	}
 	_, err := w.downstream.Write(w.bufferedBody.Bytes())
 	return err
+}
+
+// responseBodyForLog returns the upstream response body recorded for
+// diagnostics: buffered failure responses keep their body in bufferedBody,
+// while passthrough failure responses (e.g. 400) land in errorBody.
+func (w *chatRetryResponseWriter) responseBodyForLog() string {
+	if w.bufferedBody.Len() > 0 {
+		return w.bufferedBody.String()
+	}
+	return w.errorBody.String()
 }
 
 func (w *chatRetryResponseWriter) commit(statusCode int) {

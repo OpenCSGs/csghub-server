@@ -35,6 +35,28 @@ type ChatCompletionRequest struct {
 	StreamOptions *StreamOptions                        `json:"stream_options,omitempty"`
 	// RawJSON stores all unknown fields during unmarshaling
 	RawJSON json.RawMessage `json:"-"`
+	// RawBody keeps the client's original request bytes. The native chat
+	// completions path proxies this body with only the fields the gateway
+	// must override (model, streaming usage option), so vendor-specific
+	// fields inside messages or tools survive the round trip unchanged.
+	RawBody json.RawMessage `json:"-"`
+	// ClientModel is the model name exactly as the client sent it. The
+	// handler overwrites Model with the resolved upstream name, so this
+	// field is what tells the raw-body fast path whether a model rewrite
+	// is actually needed.
+	ClientModel string `json:"-"`
+	// ForceStreamUsage records that the gateway itself decided to force the
+	// stream_options.include_usage option on this streaming request, because
+	// usage metering depends on the final usage chunk. A client-provided
+	// stream_options value is forwarded verbatim when this is not set.
+	ForceStreamUsage bool `json:"-"`
+	// assistantReasoningContent keeps the `reasoning_content` value of
+	// assistant messages by their index in the messages array. The openai-go
+	// message param types do not model this field, so without it a client
+	// that correctly passes reasoning content back would lose it when the
+	// gateway re-serializes the request. Thinking-mode providers such as
+	// DeepSeek require the field on subsequent requests.
+	assistantReasoningContent map[int]string
 }
 
 // PromptText extracts a plain-text representation of the user's prompt from
@@ -125,6 +147,10 @@ func (r *ChatCompletionRequest) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
+	// Keep the raw messages array so unmodeled message fields (e.g.
+	// reasoning_content on assistant messages) can be restored on marshal.
+	messagesRaw := allFields["messages"]
+
 	// Remove known fields from the map
 	delete(allFields, "model")
 	delete(allFields, "messages")
@@ -149,7 +175,46 @@ func (r *ChatCompletionRequest) UnmarshalJSON(data []byte) error {
 	// Assign the temporary struct to the original and set RawJSON
 	*r = ChatCompletionRequest(temp)
 	r.RawJSON = rawJSON
+	// Copy the original bytes: the decoder may reuse its internal buffer,
+	// and the raw body is proxied to the upstream after the request body
+	// has been consumed.
+	r.RawBody = append(json.RawMessage(nil), data...)
+	// Model still holds the client's value here; the handler overwrites it
+	// with the resolved upstream name before proxying.
+	r.ClientModel = r.Model
+	r.assistantReasoningContent = collectAssistantReasoningContent(messagesRaw)
 	return nil
+}
+
+// collectAssistantReasoningContent extracts the `reasoning_content` value of
+// assistant messages from the raw messages array. It returns nil when no
+// assistant message carries the field or the payload has an unexpected shape.
+func collectAssistantReasoningContent(messagesRaw json.RawMessage) map[int]string {
+	if len(messagesRaw) == 0 {
+		return nil
+	}
+	var messages []json.RawMessage
+	if err := json.Unmarshal(messagesRaw, &messages); err != nil {
+		return nil
+	}
+	result := make(map[int]string)
+	for i, msgRaw := range messages {
+		var msg struct {
+			Role             string  `json:"role"`
+			ReasoningContent *string `json:"reasoning_content"`
+		}
+		if err := json.Unmarshal(msgRaw, &msg); err != nil {
+			continue
+		}
+		if msg.Role != "assistant" || msg.ReasoningContent == nil {
+			continue
+		}
+		result[i] = *msg.ReasoningContent
+	}
+	if len(result) == 0 {
+		return nil
+	}
+	return result
 }
 
 // MarshalJSON implements json.Marshaler interface
@@ -161,8 +226,8 @@ func (r ChatCompletionRequest) MarshalJSON() ([]byte, error) {
 		return nil, err
 	}
 
-	// If there are no raw JSON fields, just return the known fields
-	if len(r.RawJSON) == 0 {
+	// If there is nothing to merge back, just return the known fields
+	if len(r.RawJSON) == 0 && len(r.assistantReasoningContent) == 0 {
 		return data, nil
 	}
 
@@ -174,8 +239,10 @@ func (r ChatCompletionRequest) MarshalJSON() ([]byte, error) {
 
 	// Parse the raw JSON fields into a map
 	var rawFields map[string]json.RawMessage
-	if err := json.Unmarshal(r.RawJSON, &rawFields); err != nil {
-		return nil, err
+	if len(r.RawJSON) > 0 {
+		if err := json.Unmarshal(r.RawJSON, &rawFields); err != nil {
+			return nil, err
+		}
 	}
 
 	// Merge the raw fields into the known fields
@@ -183,8 +250,68 @@ func (r ChatCompletionRequest) MarshalJSON() ([]byte, error) {
 		knownFields[k] = v
 	}
 
+	restoreAssistantReasoningContent(knownFields, r.assistantReasoningContent)
+
 	// Marshal the merged map back into JSON
 	return json.Marshal(knownFields)
+}
+
+// restoreAssistantReasoningContent merges the `reasoning_content` values
+// captured during unmarshaling back onto the marshaled assistant messages,
+// by their index in the messages array. Messages are only re-serialized when
+// a value actually needs restoring. It relies on the messages array not
+// being reordered between unmarshal and marshal, which holds for the
+// gateway's chat completions path.
+func restoreAssistantReasoningContent(knownFields map[string]json.RawMessage, reasoning map[int]string) {
+	if len(reasoning) == 0 {
+		return
+	}
+	messagesRaw, ok := knownFields["messages"]
+	if !ok {
+		return
+	}
+	var messages []json.RawMessage
+	if err := json.Unmarshal(messagesRaw, &messages); err != nil {
+		return
+	}
+	changed := false
+	for i, msgRaw := range messages {
+		value, ok := reasoning[i]
+		if !ok {
+			continue
+		}
+		var msg map[string]json.RawMessage
+		if err := json.Unmarshal(msgRaw, &msg); err != nil {
+			continue
+		}
+		if _, exists := msg["reasoning_content"]; exists {
+			continue
+		}
+		var role string
+		if roleRaw, ok := msg["role"]; ok {
+			_ = json.Unmarshal(roleRaw, &role)
+		}
+		if role != "assistant" {
+			continue
+		}
+		valueJSON, err := json.Marshal(value)
+		if err != nil {
+			continue
+		}
+		msg["reasoning_content"] = valueJSON
+		updated, err := json.Marshal(msg)
+		if err != nil {
+			continue
+		}
+		messages[i] = updated
+		changed = true
+	}
+	if !changed {
+		return
+	}
+	if merged, err := json.Marshal(messages); err == nil {
+		knownFields["messages"] = merged
+	}
 }
 
 type StreamOptions struct {

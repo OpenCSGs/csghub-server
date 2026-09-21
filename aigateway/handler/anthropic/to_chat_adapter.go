@@ -32,14 +32,37 @@ func (h *Handler) adaptToChat(c *gin.Context, req *types.AnthropicMessagesReques
 	}
 
 	// Marshal the chat request body.
-	body, err := json.Marshal(chatReq)
+	body, err := marshalToChatRequestBody(chatReq, p.ModelTarget.ModelName, len(req.Tools) > 0, chatThinkingDisabled(req))
 	if err != nil {
-		return nil, fmt.Errorf("marshal chat request: %w", err)
+		return nil, err
 	}
 
 	// Create the response writer.
 	writer := newToChatResponseWriter(c.Writer, req.Stream, req.Model, p.ModelTarget.ModelName, logCapture)
 	return &types.AdaptResult{Body: body, Writer: writer}, nil
+}
+
+// chatThinkingDisabled reports whether the client explicitly disabled
+// extended thinking, mirroring the native chat path's `thinking:
+// {"type": "disabled"}` check.
+func chatThinkingDisabled(req *types.AnthropicMessagesRequest) bool {
+	return req.Thinking != nil && req.Thinking.Type == "disabled"
+}
+
+// marshalToChatRequestBody serializes the converted chat request and applies
+// the tool-call reasoning content fixup: DeepSeek-family thinking models
+// reject a request that carries tools when an assistant message with
+// tool_calls has no reasoning_content field. Requests with thinking
+// explicitly disabled are skipped to mirror the native chat path.
+func marshalToChatRequestBody(chatReq map[string]any, modelName string, hasTools bool, thinkingDisabled bool) ([]byte, error) {
+	body, err := json.Marshal(chatReq)
+	if err != nil {
+		return nil, fmt.Errorf("marshal chat request: %w", err)
+	}
+	if hasTools && !thinkingDisabled && types.ModelRequiresToolCallReasoningContent(modelName) {
+		body = types.InjectToolCallReasoningContent(body)
+	}
+	return body, nil
 }
 
 // messagesToChatRequest builds a ChatCompletionRequest-compatible map from

@@ -164,6 +164,137 @@ func TestChatCompletionRequest_EmptyRawJSON(t *testing.T) {
 	assert.Empty(t, req4Unmarshaled.RawJSON)
 }
 
+func TestChatCompletionRequest_AssistantReasoningContentRoundTrip(t *testing.T) {
+	raw := []byte(`{
+		"model": "deepseek-v4-flash",
+		"thinking": {"type": "enabled"},
+		"messages": [
+			{"role": "user", "content": "hi"},
+			{"role": "assistant", "content": "", "reasoning_content": "thinking hard", "tool_calls": [{"id": "call_1", "type": "function", "function": {"name": "get_weather", "arguments": "{}"}}]},
+			{"role": "tool", "tool_call_id": "call_1", "content": "sunny"}
+		],
+		"tools": [{"type": "function", "function": {"name": "get_weather"}}]
+	}`)
+
+	var req ChatCompletionRequest
+	require.NoError(t, json.Unmarshal(raw, &req))
+
+	data, err := json.Marshal(&req)
+	require.NoError(t, err)
+
+	var result map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(data, &result))
+
+	// reasoning_content on assistant messages must survive the round trip:
+	// thinking-mode providers require it on subsequent requests.
+	var messages []map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(result["messages"], &messages))
+	require.Len(t, messages, 3)
+
+	var reasoning string
+	require.NoError(t, json.Unmarshal(messages[1]["reasoning_content"], &reasoning))
+	assert.Equal(t, "thinking hard", reasoning)
+
+	// the tool message must not gain a reasoning_content field
+	assert.NotContains(t, string(result["messages"][2]), "reasoning_content")
+
+	// the top-level thinking field must survive as well
+	assert.JSONEq(t, `{"type": "enabled"}`, string(result["thinking"]))
+}
+
+func TestChatCompletionRequest_RoundTripWithoutReasoningContent(t *testing.T) {
+	raw := []byte(`{
+		"model": "deepseek-v4-flash",
+		"messages": [
+			{"role": "assistant", "content": "answer"}
+		]
+	}`)
+
+	var req ChatCompletionRequest
+	require.NoError(t, json.Unmarshal(raw, &req))
+
+	data, err := json.Marshal(&req)
+	require.NoError(t, err)
+
+	var result map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(data, &result))
+	assert.NotContains(t, string(result["messages"]), "reasoning_content")
+}
+
+func TestModelRequiresToolCallReasoningContent(t *testing.T) {
+	assert.True(t, ModelRequiresToolCallReasoningContent("deepseek-v4-flash"))
+	assert.True(t, ModelRequiresToolCallReasoningContent("DeepSeek-Flash"))
+	assert.True(t, ModelRequiresToolCallReasoningContent("kimi-k2-0905-preview"))
+	assert.True(t, ModelRequiresToolCallReasoningContent("moonshot-v1-8k"))
+	assert.False(t, ModelRequiresToolCallReasoningContent("gpt-4o"))
+	assert.False(t, ModelRequiresToolCallReasoningContent(""))
+}
+
+func TestInjectToolCallReasoningContent(t *testing.T) {
+	t.Run("InjectsEmptyReasoningContentOnToolCallMessages", func(t *testing.T) {
+		body := []byte(`{
+			"model": "deepseek-flash",
+			"messages": [
+				{"role": "user", "content": "hi"},
+				{"role": "assistant", "content": "Checking.", "tool_calls": [{"id": "call_1", "type": "function", "function": {"name": "f"}}]},
+				{"role": "assistant", "content": "final answer", "tool_calls": null}
+			]
+		}`)
+		out := InjectToolCallReasoningContent(body)
+
+		var payload struct {
+			Messages []struct {
+				Role             string  `json:"role"`
+				ReasoningContent *string `json:"reasoning_content"`
+			} `json:"messages"`
+		}
+		require.NoError(t, json.Unmarshal(out, &payload))
+		require.Len(t, payload.Messages, 3)
+		require.NotNil(t, payload.Messages[1].ReasoningContent)
+		assert.Empty(t, *payload.Messages[1].ReasoningContent)
+		assert.Nil(t, payload.Messages[0].ReasoningContent, "user messages must not be modified")
+		assert.Nil(t, payload.Messages[2].ReasoningContent, "tool_calls: null must not be modified")
+	})
+
+	t.Run("KeepsExistingReasoningContent", func(t *testing.T) {
+		body := []byte(`{"messages": [{"role": "assistant", "reasoning_content": "real reasoning", "tool_calls": [{"id": "call_1"}]}]}`)
+		out := InjectToolCallReasoningContent(body)
+		var payload struct {
+			Messages []struct {
+				ReasoningContent string `json:"reasoning_content"`
+			} `json:"messages"`
+		}
+		require.NoError(t, json.Unmarshal(out, &payload))
+		assert.Equal(t, "real reasoning", payload.Messages[0].ReasoningContent)
+	})
+
+	t.Run("OverwritesNullReasoningContentWithEmptyString", func(t *testing.T) {
+		body := []byte(`{"messages": [{"role": "assistant", "reasoning_content": null, "tool_calls": [{"id": "call_1"}]}]}`)
+		out := InjectToolCallReasoningContent(body)
+		var payload struct {
+			Messages []struct {
+				ReasoningContent *string `json:"reasoning_content"`
+			} `json:"messages"`
+		}
+		require.NoError(t, json.Unmarshal(out, &payload))
+		require.NotNil(t, payload.Messages[0].ReasoningContent,
+			"explicit null must be treated as missing and replaced with an empty string")
+		assert.Empty(t, *payload.Messages[0].ReasoningContent)
+	})
+
+	t.Run("Idempotent", func(t *testing.T) {
+		body := []byte(`{"messages": [{"role": "assistant", "tool_calls": [{"id": "call_1"}]}]}`)
+		once := InjectToolCallReasoningContent(body)
+		twice := InjectToolCallReasoningContent(once)
+		assert.JSONEq(t, string(once), string(twice))
+	})
+
+	t.Run("NoMessagesKeyReturnsBodyUnchanged", func(t *testing.T) {
+		body := []byte(`{"model": "deepseek-flash"}`)
+		assert.Equal(t, body, InjectToolCallReasoningContent(body))
+	})
+}
+
 func TestEmbeddingRequest_MarshalUnmarshal(t *testing.T) {
 	// Test case 1: Only known fields
 	req1 := &EmbeddingRequest{

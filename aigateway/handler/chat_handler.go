@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/gin-gonic/gin"
 	"log/slog"
@@ -162,9 +163,11 @@ func (h *chatPipelineHandler) Execute(c *gin.Context, meta *types.RequestMetadat
 	if chatReq.Stream {
 		c.Writer.Header().Set("Content-Type", "text/event-stream")
 		if !strings.Contains(mt.Model.ImageID, "vllm-cpu") {
-			chatReq.StreamOptions = &types.StreamOptions{
-				IncludeUsage: true,
-			}
+			// Usage metering needs the final usage chunk. The raw-body proxy
+			// path patches stream_options only when the gateway itself made
+			// this decision; a client-provided stream_options value is
+			// forwarded verbatim otherwise (e.g. vllm-cpu targets).
+			chatReq.ForceStreamUsage = true
 		}
 	}
 
@@ -243,7 +246,17 @@ func (h *chatPipelineHandler) Execute(c *gin.Context, meta *types.RequestMetadat
 		log.ErrorContext(ctx, "failed to execute chat fallback", slog.Int("status", retryWriterStatusCode(finalWriter)), slog.Any("error", err))
 		return nil
 	}
-	log.InfoContext(ctx, "fallback chat request to model target", slog.Int("status", retryWriterStatusCode(finalWriter)), slog.Int64("proxy_latency(ms)", time.Since(proxyStartTime).Milliseconds()), slog.Int64("ttft(ms)", retryWriterTTFTMs(finalWriter, proxyStartTime)))
+	log.InfoContext(ctx, "fallback chat request to model target", slog.Int("status", retryWriterStatusCode(finalWriter)), slog.Int64("proxy_latency(ms)", time.Since(proxyStartTime).Milliseconds()),
+		slog.Int64("ttft(ms)", retryWriterTTFTMs(finalWriter, proxyStartTime)))
+
+	// Surface upstream error bodies for troubleshooting: the retry writer
+	// records the response body of failed attempts, truncated here to keep
+	// large payloads out of the logs.
+	if status := retryWriterStatusCode(finalWriter); status != http.StatusOK {
+		log.ErrorContext(ctx, "chat upstream returned non-200 response",
+			slog.Int("status", status),
+			slog.String("response_body", truncateChatResponseBodyForLog(finalWriter.responseBodyForLog())))
+	}
 
 	// Synchronously record proxy-level metrics before c.Next() returns.
 	chatUsage := preComputeUsage(ctx, chatCtx.tokenCounter)
@@ -273,6 +286,25 @@ func (h *chatPipelineHandler) Execute(c *gin.Context, meta *types.RequestMetadat
 }
 
 // --- Error handling ---
+
+// chatResponseBodyLogLimit caps how much of an upstream response body is
+// written into logs for troubleshooting.
+const chatResponseBodyLogLimit = 4 * 1024
+
+// truncateChatResponseBodyForLog truncates an upstream response body so
+// error diagnostics stay readable without flooding the log. The cut point
+// backs off to a valid UTF-8 rune start so multibyte characters are not
+// split mid-sequence.
+func truncateChatResponseBodyForLog(body string) string {
+	if len(body) <= chatResponseBodyLogLimit {
+		return body
+	}
+	cut := chatResponseBodyLogLimit
+	for cut > 0 && !utf8.RuneStart(body[cut]) {
+		cut--
+	}
+	return body[:cut] + "...(truncated)"
+}
 
 func (h *chatPipelineHandler) HandlePlanError(c *gin.Context, meta *types.RequestMetadata, p *types.RequestPlan, err error) {
 	if pt := plan.GetPreflightTracer(c); pt != nil {
