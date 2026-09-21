@@ -453,10 +453,15 @@ func TestAgentKnowledgeBaseStore_List_OrderByUpdatedAt(t *testing.T) {
 	}
 	createdKB2, err := store.Create(ctx, kb2)
 	require.NoError(t, err)
+	baseTime := time.Now().UTC().Add(-time.Hour)
+	_, err = db.BunDB.ExecContext(ctx, "UPDATE agent_knowledge_bases SET updated_at = ? WHERE id = ?", baseTime, createdKB2.ID)
+	require.NoError(t, err)
 
-	// Update first knowledge base to change updated_at
+	// Update first knowledge base and give it a later timestamp.
 	createdKB1.Name = "Updated First Knowledge Base"
 	err = store.Update(ctx, createdKB1)
+	require.NoError(t, err)
+	_, err = db.BunDB.ExecContext(ctx, "UPDATE agent_knowledge_bases SET updated_at = ? WHERE id = ?", baseTime.Add(time.Minute), createdKB1.ID)
 	require.NoError(t, err)
 
 	// List should return in order of updated_at DESC (most recently updated first)

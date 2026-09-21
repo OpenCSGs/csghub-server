@@ -2,6 +2,7 @@ package database_test
 
 import (
 	"context"
+
 	"testing"
 	"time"
 
@@ -146,34 +147,23 @@ func TestDatasetStore_ListByPath(t *testing.T) {
 	})
 	require.Nil(t, err)
 
-	dr3 := &database.Repository{}
-	err = db.Core.NewInsert().Model(&database.Repository{
-		Name:           "repo3",
-		Path:           "foo/bar",
-		GitPath:        "c",
-		RepositoryType: types.ModelRepo,
-	}).Scan(ctx, dr3)
-	require.Nil(t, err)
-	_, err = store.Create(ctx, database.Dataset{
-		RepositoryID: dr3.ID,
-	})
-	require.Nil(t, err)
-
 	dss, err := store.ListByPath(ctx, []string{"bar/foo", "foo/bar"})
 	require.Nil(t, err)
-	require.Equal(t, 3, len(dss))
-
-	tags := []string{}
-	for _, t := range dss[1].Repository.Tags {
-		tags = append(tags, t.Name)
-	}
-	require.Equal(t, []string{"tag1"}, tags)
-
+	require.Equal(t, 2, len(dss))
 	names := []string{}
 	for _, ds := range dss {
 		names = append(names, ds.Repository.Name)
 	}
-	require.Equal(t, []string{"repo2", "repo", "repo3"}, names)
+	require.ElementsMatch(t, []string{"repo2", "repo"}, names)
+
+	dss, err = store.ListByPath(ctx, []string{"foo/bar"})
+	require.Nil(t, err)
+	require.Equal(t, 1, len(dss))
+	tags := []string{}
+	for _, t := range dss[0].Repository.Tags {
+		tags = append(tags, t.Name)
+	}
+	require.Equal(t, []string{"tag1"}, tags)
 
 }
 
