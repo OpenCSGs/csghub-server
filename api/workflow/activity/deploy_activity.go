@@ -614,7 +614,17 @@ func (a *DeployActivity) createDeployRequest(ctx context.Context, task *database
 		return nil, fmt.Errorf("failed to parse deploy hardware for deploy task id %d error: %w", task.ID, err)
 	}
 
-	envMap, err := a.makeDeployEnv(ctx, hardware, accessToken, deployInfo, engineArgsTemplates, toolCallParsers, repoInfo, engineVersion)
+	envMap, err := a.makeDeployEnv(ctx, makeDeployEnvRequest{
+		Hardware:    hardware,
+		AccessToken: accessToken,
+		DeployInfo:  deployInfo,
+		Runtime: runtimeConfig{
+			EngineArgsTemplates: engineArgsTemplates,
+			ToolCallParsers:     toolCallParsers,
+			EngineVersion:       engineVersion,
+		},
+		RepoInfo: repoInfo,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to make deploy env for deploy id %d task id %d error: %w", deployInfo.ID, task.ID, err)
 	}
@@ -697,19 +707,34 @@ func (a *DeployActivity) stopBuild(buildTask *database.DeployTask, repoInfo comm
 	}
 }
 
-// makeDeployEnv
-func (a *DeployActivity) makeDeployEnv(ctx context.Context, hardware types.HardWare, accessToken *database.AccessToken, deployInfo *database.Deploy, engineArgsTemplates []types.EngineArg, toolCallParsers map[string]string, repoInfo common.RepoInfo, engineVersion string) (map[string]string, error) {
+// runtimeConfig aggregates engine metadata resolved from the runtime framework lookup.
+type runtimeConfig struct {
+	EngineArgsTemplates []types.EngineArg
+	ToolCallParsers     map[string]string
+	EngineVersion       string
+}
+
+// makeDeployEnvRequest consolidates all inputs to makeDeployEnv except context.
+type makeDeployEnvRequest struct {
+	Hardware    types.HardWare
+	AccessToken *database.AccessToken
+	DeployInfo  *database.Deploy
+	Runtime     runtimeConfig
+	RepoInfo    common.RepoInfo
+}
+
+func (a *DeployActivity) makeDeployEnv(ctx context.Context, req makeDeployEnvRequest) (map[string]string, error) {
 	logger := a.getLogger(ctx)
 
-	envMap, err := utilcommon.JsonStrToMap(deployInfo.Env)
+	envMap, err := utilcommon.JsonStrToMap(req.DeployInfo.Env)
 	if err != nil {
-		logger.Error("Deploy env is invalid json data", "deploy", deployInfo, "error", err)
+		logger.Error("Deploy env is invalid json data", "deploy", req.DeployInfo, "error", err)
 		envMap = make(map[string]string)
 	}
 
-	varMap, err := utilcommon.JsonStrToMap(deployInfo.Variables)
+	varMap, err := utilcommon.JsonStrToMap(req.DeployInfo.Variables)
 	if err != nil {
-		logger.Error("Deploy variables is invalid json data", "deploy", deployInfo, "error", err)
+		logger.Error("Deploy variables is invalid json data", "deploy", req.DeployInfo, "error", err)
 	} else {
 		for key, value := range varMap {
 			envMap[key] = value
@@ -717,151 +742,206 @@ func (a *DeployActivity) makeDeployEnv(ctx context.Context, hardware types.HardW
 	}
 
 	envMap["S3_INTERNAL"] = fmt.Sprintf("%v", a.cfg.S3Internal)
-	envMap["ACCESS_TOKEN"] = accessToken.Token
-	addLongCatVideoRuntimeEnv(envMap, deployInfo.RuntimeFramework, deployInfo.SvcName, a.cfg)
+	envMap["ACCESS_TOKEN"] = req.AccessToken.Token
+	addLongCatVideoRuntimeEnv(envMap, req.DeployInfo.RuntimeFramework, req.DeployInfo.SvcName, a.cfg)
 
+	if err := a.setGitEnv(ctx, envMap, gitEnvInput{
+		DeployInfo:  req.DeployInfo,
+		RepoInfo:    req.RepoInfo,
+		AccessToken: req.AccessToken,
+		VarMap:      varMap,
+	}); err != nil {
+		return nil, err
+	}
+
+	a.setEngineArgs(ctx, logger, envMap, req.DeployInfo, req.Runtime)
+
+	common.UpdateEvaluationEnvHardware(envMap, req.Hardware)
+
+	a.setSpaceEnv(envMap, req.DeployInfo, req.RepoInfo)
+	a.setInferenceEnv(envMap, req.DeployInfo, req.Hardware, req.Runtime.EngineVersion)
+	a.setFinetuneEnv(envMap, req.DeployInfo, req.AccessToken)
+	a.setNotebookEnv(envMap, req.DeployInfo)
+	a.setContextPathEnv(envMap, req.DeployInfo)
+
+	return envMap, nil
+}
+
+// gitEnvInput aggregates the inputs needed for git environment preparation.
+type gitEnvInput struct {
+	DeployInfo  *database.Deploy
+	RepoInfo    common.RepoInfo
+	AccessToken *database.AccessToken
+	VarMap      map[string]string
+}
+
+func (a *DeployActivity) setGitEnv(ctx context.Context, envMap map[string]string, in gitEnvInput) error {
+	deployInfo := in.DeployInfo
 	// Notebook has no git repo; skip GetRepoLastCommit and use empty git-related env
-	if deployInfo.Type != types.NotebookType {
-		pathParts := strings.Split(repoInfo.Path, "/")
-		commit, err := a.gs.GetRepoLastCommit(ctx, gitserver.GetRepoLastCommitReq{
-			Namespace: pathParts[0],
-			Name:      pathParts[1],
-			Ref:       deployInfo.GitBranch,
-			RepoType:  types.RepositoryType(repoInfo.RepoType),
-		})
-		if err != nil {
-			return nil, err
-		}
-		revision := strings.TrimSpace(varMap["REVISION"])
-		if revision == "" {
-			revision, err = utilcommon.ShortenCommitID7(commit.ID)
-			if err != nil {
-				return nil, errorx.ErrInvalidCommitID
-			}
-		}
-		envMap["HTTPCloneURL"] = a.getHttpCloneURLWithToken(repoInfo.HTTPCloneURL, accessToken.User.Username, accessToken.Token)
-		envMap["REPO_ID"] = repoInfo.Path // "namespace/name"
-		envMap["REVISION"] = revision     // branch
-	} else {
+	if deployInfo.Type == types.NotebookType {
 		envMap["HTTPCloneURL"] = ""
 		envMap["REPO_ID"] = ""
 		envMap["REVISION"] = ""
+		return nil
 	}
 
-	if len(engineArgsTemplates) > 0 {
-		var engineArgs strings.Builder
-		argValuesMap, err := utilcommon.JsonStrToMap(deployInfo.EngineArgs)
+	pathParts := strings.Split(in.RepoInfo.Path, "/")
+	commit, err := a.gs.GetRepoLastCommit(ctx, gitserver.GetRepoLastCommitReq{
+		Namespace: pathParts[0],
+		Name:      pathParts[1],
+		Ref:       deployInfo.GitBranch,
+		RepoType:  types.RepositoryType(in.RepoInfo.RepoType),
+	})
+	if err != nil {
+		return err
+	}
+
+	revision := strings.TrimSpace(in.VarMap["REVISION"])
+	if revision == "" {
+		revision, err = utilcommon.ShortenCommitID7(commit.ID)
 		if err != nil {
-			logger.Error("Deploy engine args is invalid json data", "deploy", *deployInfo, "error", err)
-		} else {
-			for _, arg := range engineArgsTemplates {
-				if value, ok := argValuesMap[arg.Name]; ok {
-					if arg.Value != "" && value == arg.Value {
+			return errorx.ErrInvalidCommitID
+		}
+	}
+
+	envMap["HTTPCloneURL"] = a.getHttpCloneURLWithToken(in.RepoInfo.HTTPCloneURL, in.AccessToken.User.Username, in.AccessToken.Token)
+	envMap["REPO_ID"] = in.RepoInfo.Path // "namespace/name"
+	envMap["REVISION"] = revision        // branch
+	return nil
+}
+
+func (a *DeployActivity) setEngineArgs(ctx context.Context, logger log.Logger, envMap map[string]string, deployInfo *database.Deploy, rc runtimeConfig) {
+	if len(rc.EngineArgsTemplates) == 0 {
+		return
+	}
+
+	var engineArgs strings.Builder
+	argValuesMap, err := utilcommon.JsonStrToMap(deployInfo.EngineArgs)
+	if err != nil {
+		logger.Error("Deploy engine args is invalid json data", "deploy", *deployInfo, "error", err)
+	} else {
+		for _, arg := range rc.EngineArgsTemplates {
+			if value, ok := argValuesMap[arg.Name]; ok {
+				if arg.Value != "" && value == arg.Value {
+					continue
+				}
+				// handle boolean value
+				if !strings.Contains(arg.Format, "%") {
+					if value == "false" || value == "0" || value == "" || value == "disable" {
 						continue
 					}
-					// handle boolean value
-					if !strings.Contains(arg.Format, "%") {
-						if value == "false" || value == "0" || value == "" || value == "disable" {
-							continue
-						}
-						engineArgs.WriteString(" ")
-						engineArgs.WriteString(arg.Format)
-					} else {
-						engineArgs.WriteString(" ")
-						fmt.Fprintf(&engineArgs, arg.Format, value)
-					}
+					engineArgs.WriteString(" ")
+					engineArgs.WriteString(arg.Format)
+				} else {
+					engineArgs.WriteString(" ")
+					fmt.Fprintf(&engineArgs, arg.Format, value)
 				}
 			}
 		}
-
-		// Process tool-calling arguments
-		engineArgsStr := engineArgs.String()
-		if len(toolCallParsers) > 0 &&
-			(strings.Contains(engineArgsStr, vllmToolChoiceFlag) || strings.Contains(engineArgsStr, sglangToolParserAuto)) {
-			modelArch := a.getModelArchitecture(ctx, deployInfo.RepoID)
-			engineArgsStr = applyToolCallParser(logger, engineArgsStr, modelArch, toolCallParsers)
-		}
-
-		logger.Debug("makeDeployEnv", "ENGINE_ARGS", engineArgsStr)
-		envMap["ENGINE_ARGS"] = engineArgsStr
 	}
 
-	common.UpdateEvaluationEnvHardware(envMap, hardware)
-
-	if deployInfo.SpaceID > 0 {
-		// SDK port for space
-		switch repoInfo.Sdk {
-		case types.GRADIO.Name:
-			envMap["port"] = strconv.Itoa(types.GRADIO.Port)
-			envMap["SDK"] = types.GRADIO.Name
-			envMap["HF_ENDPOINT"] = a.cfg.ModelDownloadEndpoint
-		case types.STREAMLIT.Name:
-			envMap["port"] = strconv.Itoa(types.STREAMLIT.Port)
-			envMap["SDK"] = types.STREAMLIT.Name
-			envMap["HF_ENDPOINT"] = a.cfg.ModelDownloadEndpoint
-		case types.NGINX.Name:
-			envMap["port"] = strconv.Itoa(types.NGINX.Port)
-			envMap["SDK"] = types.NGINX.Name
-			envMap["HF_ENDPOINT"] = a.cfg.ModelDownloadEndpoint
-		case types.STREAMLIT.Name:
-		case types.DOCKER.Name:
-			envMap["SDK"] = types.DOCKER.Name
-			envMap["port"] = strconv.Itoa(deployInfo.ContainerPort)
-			envMap["HF_ENDPOINT"] = a.cfg.ModelDownloadEndpoint
-		case types.MCPSERVER.Name:
-			envMap["port"] = strconv.Itoa(types.MCPSERVER.Port)
-			envMap["SDK"] = types.MCPSERVER.Name
-			envMap["HF_ENDPOINT"] = a.cfg.ModelDownloadEndpoint
-		default:
-			envMap["port"] = strconv.Itoa(types.DefaultContainerPort)
-		}
+	// Process tool-calling arguments
+	engineArgsStr := engineArgs.String()
+	if len(rc.ToolCallParsers) > 0 &&
+		(strings.Contains(engineArgsStr, vllmToolChoiceFlag) || strings.Contains(engineArgsStr, sglangToolParserAuto)) {
+		modelArch := a.getModelArchitecture(ctx, deployInfo.RepoID)
+		engineArgsStr = applyToolCallParser(logger, engineArgsStr, modelArch, rc.ToolCallParsers)
 	}
 
-	if deployInfo.Type == types.InferenceType || deployInfo.Type == types.ServerlessType {
-		// Runtime framework port for model
+	logger.Debug("makeDeployEnv", "ENGINE_ARGS", engineArgsStr)
+	envMap["ENGINE_ARGS"] = engineArgsStr
+}
+
+func (a *DeployActivity) setSpaceEnv(envMap map[string]string, deployInfo *database.Deploy, repoInfo common.RepoInfo) {
+	if deployInfo.SpaceID <= 0 {
+		return
+	}
+
+	// SDK port for space
+	switch repoInfo.Sdk {
+	case types.GRADIO.Name:
+		envMap["port"] = strconv.Itoa(types.GRADIO.Port)
+		envMap["SDK"] = types.GRADIO.Name
+		envMap["HF_ENDPOINT"] = a.cfg.ModelDownloadEndpoint
+	case types.STREAMLIT.Name:
+		envMap["port"] = strconv.Itoa(types.STREAMLIT.Port)
+		envMap["SDK"] = types.STREAMLIT.Name
+		envMap["HF_ENDPOINT"] = a.cfg.ModelDownloadEndpoint
+	case types.NGINX.Name:
+		envMap["port"] = strconv.Itoa(types.NGINX.Port)
+		envMap["SDK"] = types.NGINX.Name
+		envMap["HF_ENDPOINT"] = a.cfg.ModelDownloadEndpoint
+	case types.DOCKER.Name:
+		envMap["SDK"] = types.DOCKER.Name
 		envMap["port"] = strconv.Itoa(deployInfo.ContainerPort)
-		envMap["HF_ENDPOINT"] = a.cfg.ModelDownloadEndpoint // "https://hub.opencsg-stg.com/"
-		envMap["HF_HUB_OFFLINE"] = "1"
-		envMap["HF_TASK"] = string(deployInfo.Task)
-		if vllmEnforceEagerEnabled(deployInfo.EngineArgs) {
-			envMap["VLLM_ENFORCE_EAGER"] = "1"
-		}
-		if asyncSchedulingDisabled(deployInfo.EngineArgs) {
-			envMap["ASYNC_SCHEDULING_DISABLED"] = "true"
-		}
-		if model := hardware.GetResXPUMode(); model != "" {
-			envMap["XPU_MODEL"] = model
-		}
-		if engineVersion != "" {
-			envMap["ENGINE_VERSION"] = engineVersion
-		}
+		envMap["HF_ENDPOINT"] = a.cfg.ModelDownloadEndpoint
+	case types.MCPSERVER.Name:
+		envMap["port"] = strconv.Itoa(types.MCPSERVER.Port)
+		envMap["SDK"] = types.MCPSERVER.Name
+		envMap["HF_ENDPOINT"] = a.cfg.ModelDownloadEndpoint
+	default:
+		envMap["port"] = strconv.Itoa(types.DefaultContainerPort)
+	}
+}
+
+func (a *DeployActivity) setInferenceEnv(envMap map[string]string, deployInfo *database.Deploy, hardware types.HardWare, engineVersion string) {
+	if deployInfo.Type != types.InferenceType && deployInfo.Type != types.ServerlessType {
+		return
 	}
 
-	if deployInfo.Type == types.FinetuneType {
-		envMap["port"] = strconv.Itoa(deployInfo.ContainerPort)
-		envMap["HF_ENDPOINT"], _ = url.JoinPath(a.cfg.ModelDownloadEndpoint, "csg")
-		envMap["HF_TOKEN"] = accessToken.Token
-		envMap["USE_CSGHUB_MODEL"] = "1"
-		envMap["USE_CSGHUB_DATASET"] = "1"
-		envMap["JUPYTER_ENABLE_LAB"] = "yes"
-		envMap["TERM"] = "xterm-256color"
+	// Runtime framework port for model
+	envMap["port"] = strconv.Itoa(deployInfo.ContainerPort)
+	envMap["HF_ENDPOINT"] = a.cfg.ModelDownloadEndpoint // "https://hub.opencsg-stg.com/"
+	envMap["HF_HUB_OFFLINE"] = "1"
+	envMap["HF_TASK"] = string(deployInfo.Task)
+	if vllmEnforceEagerEnabled(deployInfo.EngineArgs) {
+		envMap["VLLM_ENFORCE_EAGER"] = "1"
+	}
+	if asyncSchedulingDisabled(deployInfo.EngineArgs) {
+		envMap["ASYNC_SCHEDULING_DISABLED"] = "true"
+	}
+	if model := hardware.GetResXPUMode(); model != "" {
+		envMap["XPU_MODEL"] = model
+	}
+	if engineVersion != "" {
+		envMap["ENGINE_VERSION"] = engineVersion
+	}
+}
+
+func (a *DeployActivity) setFinetuneEnv(envMap map[string]string, deployInfo *database.Deploy, accessToken *database.AccessToken) {
+	if deployInfo.Type != types.FinetuneType {
+		return
 	}
 
-	if deployInfo.Type == types.NotebookType {
-		envMap["port"] = strconv.Itoa(deployInfo.ContainerPort)
+	envMap["port"] = strconv.Itoa(deployInfo.ContainerPort)
+	envMap["HF_ENDPOINT"], _ = url.JoinPath(a.cfg.ModelDownloadEndpoint, "csg")
+	envMap["HF_TOKEN"] = accessToken.Token
+	envMap["USE_CSGHUB_MODEL"] = "1"
+	envMap["USE_CSGHUB_DATASET"] = "1"
+	envMap["JUPYTER_ENABLE_LAB"] = "yes"
+	envMap["TERM"] = "xterm-256color"
+}
+
+func (a *DeployActivity) setNotebookEnv(envMap map[string]string, deployInfo *database.Deploy) {
+	if deployInfo.Type != types.NotebookType {
+		return
 	}
 
-	if a.cfg.PublicRootDomain == "" {
-		if deployInfo.Type == types.FinetuneType || deployInfo.Type == types.NotebookType {
-			envMap["CONTEXT_PATH"] = "/endpoint/" + deployInfo.SvcName
-		}
-		if deployInfo.Type == types.SpaceType {
-			envMap["GRADIO_ROOT_PATH"] = "/endpoint/" + deployInfo.SvcName
-			envMap["STREAMLIT_SERVER_BASE_URL_PATH"] = "/endpoint/" + deployInfo.SvcName
-		}
+	envMap["port"] = strconv.Itoa(deployInfo.ContainerPort)
+}
+
+func (a *DeployActivity) setContextPathEnv(envMap map[string]string, deployInfo *database.Deploy) {
+	if a.cfg.PublicRootDomain != "" {
+		return
 	}
 
-	return envMap, nil
+	if deployInfo.Type == types.FinetuneType || deployInfo.Type == types.NotebookType {
+		envMap["CONTEXT_PATH"] = "/endpoint/" + deployInfo.SvcName
+	}
+	if deployInfo.Type == types.SpaceType {
+		envMap["GRADIO_ROOT_PATH"] = "/endpoint/" + deployInfo.SvcName
+		envMap["STREAMLIT_SERVER_BASE_URL_PATH"] = "/endpoint/" + deployInfo.SvcName
+	}
 }
 
 func isLongCatVideoRuntime(runtimeFramework string) bool {
