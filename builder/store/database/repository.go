@@ -1181,6 +1181,7 @@ func (s *repoStoreImpl) publicToUser(ctx context.Context, repoType types.Reposit
 			Where("xnet_migration_tasks.status = ?", *filter.XnetMigrationStatus)
 		needDistinct = true
 	}
+	applyRepoComplianceFilter(q, "repository", filter)
 
 	if filter.Tree != nil {
 		q.Where("repository.id IN (SELECT target_repo_id FROM model_trees WHERE source_repo_id = ? and relation = ?)", filter.Tree.RepoId, filter.Tree.Relation)
@@ -1377,6 +1378,7 @@ func (s *repoStoreImpl) publicToUserTrending(ctx context.Context, repoType types
 			  AND xmt.status = ?
 		)`, *filter.XnetMigrationStatus)
 	}
+	applyRepoComplianceFilter(q, "r", filter)
 
 	if filter.Tree != nil {
 		q.Where("r.id IN (SELECT target_repo_id FROM model_trees WHERE source_repo_id = ? AND relation = ?)", filter.Tree.RepoId, filter.Tree.Relation)
@@ -1541,6 +1543,7 @@ func (s *repoStoreImpl) publicToUserV2(ctx context.Context, repoType types.Repos
 			Where("xnet_migration_tasks.status = ?", *filter.XnetMigrationStatus)
 		needDistinct = true
 	}
+	applyRepoComplianceFilter(q, "repository", filter)
 
 	if filter.Tree != nil {
 		q.Where("repository.id IN (SELECT target_repo_id FROM model_trees WHERE source_repo_id = ? and relation = ?)", filter.Tree.RepoId, filter.Tree.Relation)
@@ -1722,6 +1725,7 @@ func (s *repoStoreImpl) publicToUserTrendingV2(ctx context.Context, repoType typ
 			  AND xmt.status = ?
 		)`, *filter.XnetMigrationStatus)
 	}
+	applyRepoComplianceFilter(q, "r", filter)
 
 	if filter.Tree != nil {
 		q.Where("r.id IN (SELECT target_repo_id FROM model_trees WHERE source_repo_id = ? AND relation = ?)", filter.Tree.RepoId, filter.Tree.Relation)
@@ -1861,6 +1865,7 @@ func (s *repoStoreImpl) getCacheKey(q *bun.SelectQuery, repoType types.Repositor
 		ListServerless      bool
 		SpaceSDK            string
 		XnetMigrationStatus *types.XnetMigrationTaskStatus
+		ComplianceStatus    *types.ComplianceStatus
 		Status              string
 		DatasetType         string
 		ModelParamsMin      *float64
@@ -1877,6 +1882,7 @@ func (s *repoStoreImpl) getCacheKey(q *bun.SelectQuery, repoType types.Repositor
 		ListServerless:      filter.ListServerless,
 		SpaceSDK:            filter.SpaceSDK,
 		XnetMigrationStatus: filter.XnetMigrationStatus,
+		ComplianceStatus:    filter.ComplianceStatus,
 		Status:              filter.Status,
 		DatasetType:         filter.DatasetType,
 		ModelParamsMin:      filter.ModelParamsMin,
@@ -2019,6 +2025,12 @@ func (s *repoStoreImpl) SearchRepoWithCache(ctx context.Context, q *bun.SelectQu
 	}
 
 	return orderedRepos, count, nil
+}
+
+func applyRepoComplianceFilter(q *bun.SelectQuery, repoAlias string, filter *types.RepoFilter) {
+	if filter.ComplianceStatus != nil {
+		q.Where(repoAlias+".compliance_status = ?", *filter.ComplianceStatus)
+	}
 }
 
 func applyRepoRangeFilters(q *bun.SelectQuery, repoType types.RepositoryType, repoAlias string, filter *types.RepoFilter) {

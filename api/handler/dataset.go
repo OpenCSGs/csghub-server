@@ -114,6 +114,7 @@ func (h *DatasetHandler) Create(ctx *gin.Context) {
 // @Param        sort query string false "sort by"
 // @Param        source query string false "source" Enums(opencsg, huggingface, local)
 // @Param        xnet_migration_status query string false "filter by xnet migration status" Enums(pending, running, completed, failed)
+// @Param        compliance_status query string false "filter by compliance status" Enums(compliant, pending_review, non_compliant)
 // @Param        dataset_type query string false "filter by dataset type" Enums(commercial, normal)
 // @Param        user_purchased query bool false "filter by user purchased" default(false)
 // @Param        repo_size_min query int false "minimum repository size in bytes"
@@ -367,6 +368,11 @@ func getFilterFromContext(ctx *gin.Context, filter *types.RepoFilter) *types.Rep
 			status == types.XnetMigrationTaskStatusFailed {
 			filter.XnetMigrationStatus = &status
 		}
+	}
+
+	complianceStatus := types.ComplianceStatus(ctx.Query("compliance_status"))
+	if complianceStatus.IsValid() {
+		filter.ComplianceStatus = &complianceStatus
 	}
 
 	// Add dataset type filter
