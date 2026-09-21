@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"strconv"
 	"testing"
 	"time"
 
@@ -40,6 +41,7 @@ type testEnv struct {
 	mockImageRunner       *mockrunner.MockRunner
 	mockGitServer         *mock_git.MockGitServer
 	mockLogReporter       *mockReporter.MockLogCollector
+	mockMetadataStore     *mockdb.MockMetadataStore
 	mockConfig            *config.Config
 	mockDeployCfg         common.DeployConfig
 	mockClusterStore      *mockdb.MockClusterInfoStore
@@ -60,6 +62,7 @@ func setupTest(t *testing.T) *testEnv {
 	mockImageRunner := mockrunner.NewMockRunner(t)
 	mockGitServer := mock_git.NewMockGitServer(t)
 	mockLogReporter := mockReporter.NewMockLogCollector(t)
+	mockMetadataStore := mockdb.NewMockMetadataStore(t)
 	mockConfig := &config.Config{}
 	mockDeployCfg := common.BuildDeployConfig(mockConfig)
 	mockClusterStore := mockdb.NewMockClusterInfoStore(t)
@@ -77,6 +80,7 @@ func setupTest(t *testing.T) *testEnv {
 		ms:  mockModelStore,
 		rfs: mockRuntimeFrameworks,
 		urs: mockUrsStore,
+		mds: mockMetadataStore,
 		cls: mockClusterStore,
 	}
 
@@ -93,6 +97,7 @@ func setupTest(t *testing.T) *testEnv {
 		mockImageRunner:       mockImageRunner,
 		mockGitServer:         mockGitServer,
 		mockLogReporter:       mockLogReporter,
+		mockMetadataStore:     mockMetadataStore,
 		mockConfig:            mockConfig,
 		mockDeployCfg:         mockDeployCfg,
 		mockClusterStore:      mockClusterStore,
@@ -765,4 +770,306 @@ func TestAddLongCatVideoRuntimeEnv(t *testing.T) {
 		addLongCatVideoRuntimeEnv(envMap, "vllm", "vllm-service", cfg)
 		require.Empty(t, envMap)
 	})
+}
+
+func TestMakeDeployEnv_Space(t *testing.T) {
+	tests := []struct {
+		name          string
+		sdk           string
+		wantSDK       string
+		wantPort      string
+		containerPort int
+	}{
+		{name: "gradio", sdk: types.GRADIO.Name, wantSDK: types.GRADIO.Name, wantPort: strconv.Itoa(types.GRADIO.Port)},
+		{name: "streamlit", sdk: types.STREAMLIT.Name, wantSDK: types.STREAMLIT.Name, wantPort: strconv.Itoa(types.STREAMLIT.Port)},
+		{name: "nginx", sdk: types.NGINX.Name, wantSDK: types.NGINX.Name, wantPort: strconv.Itoa(types.NGINX.Port)},
+		{name: "docker", sdk: types.DOCKER.Name, wantSDK: types.DOCKER.Name, wantPort: "8080", containerPort: 8080},
+		{name: "mcp_server", sdk: types.MCPSERVER.Name, wantSDK: types.MCPSERVER.Name, wantPort: strconv.Itoa(types.MCPSERVER.Port)},
+		{name: "default", sdk: "unknown", wantSDK: "", wantPort: strconv.Itoa(types.DefaultContainerPort)},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tester := setupTest(t)
+			deployInfo := &database.Deploy{
+				ID:            1,
+				SpaceID:       1,
+				Type:          types.SpaceType,
+				SvcName:       "test-space",
+				ContainerPort: tt.containerPort,
+				Hardware:      `{}`,
+				Env:           `{}`,
+				Variables:     `{}`,
+			}
+			repoInfo := common.RepoInfo{
+				Path:         "org/repo",
+				Sdk:          tt.sdk,
+				HTTPCloneURL: "https://git.example.com/org/repo.git",
+				RepoType:     "space",
+			}
+			accessToken := &database.AccessToken{
+				Token: "tok",
+				User:  &database.User{Username: "user"},
+			}
+
+			tester.mockGitServer.EXPECT().GetRepoLastCommit(mock.Anything, mock.Anything).Return(&types.Commit{ID: "abc1234"}, nil)
+
+			envMap, err := tester.activities.makeDeployEnv(tester.ctx, makeDeployEnvRequest{
+				Hardware:    types.HardWare{},
+				AccessToken: accessToken,
+				DeployInfo:  deployInfo,
+				RepoInfo:    repoInfo,
+			})
+			require.NoError(t, err)
+			require.Equal(t, tt.wantSDK, envMap["SDK"])
+			require.Equal(t, tt.wantPort, envMap["port"])
+			require.Equal(t, tester.mockDeployCfg.ModelDownloadEndpoint, envMap["HF_ENDPOINT"])
+			require.Equal(t, "tok", envMap["ACCESS_TOKEN"])
+			require.Equal(t, "org/repo", envMap["REPO_ID"])
+			require.Equal(t, "abc1234", envMap["REVISION"])
+		})
+	}
+}
+
+func TestMakeDeployEnv_Inference(t *testing.T) {
+	tester := setupTest(t)
+	deployInfo := &database.Deploy{
+		ID:            1,
+		ModelID:       1,
+		Type:          types.InferenceType,
+		SvcName:       "test-infer",
+		ContainerPort: 9000,
+		Hardware:      `{"gpu":{"num":"1","type":"nvidia","resource_name":"nvidia.com/gpu"}}`,
+		Env:           `{}`,
+		Variables:     `{}`,
+		EngineArgs:    `{"enforce-eager":"enable","async-scheduling":"disable"}`,
+		Task:          "text-generation",
+	}
+	repoInfo := common.RepoInfo{
+		Path:         "org/model",
+		HTTPCloneURL: "https://git.example.com/org/model.git",
+		RepoType:     "model",
+	}
+	accessToken := &database.AccessToken{
+		Token: "tok",
+		User:  &database.User{Username: "user"},
+	}
+
+	tester.mockGitServer.EXPECT().GetRepoLastCommit(mock.Anything, mock.Anything).Return(&types.Commit{ID: "abc1234"}, nil)
+
+	envMap, err := tester.activities.makeDeployEnv(tester.ctx, makeDeployEnvRequest{
+		Hardware:    types.HardWare{Gpu: types.Processor{Num: "1", Type: "nvidia", ResourceName: "nvidia.com/gpu"}},
+		AccessToken: accessToken,
+		DeployInfo:  deployInfo,
+		Runtime: runtimeConfig{
+			EngineVersion: "0.10.0",
+		},
+		RepoInfo: repoInfo,
+	})
+	require.NoError(t, err)
+	require.Equal(t, "9000", envMap["port"])
+	require.Equal(t, "1", envMap["HF_HUB_OFFLINE"])
+	require.Equal(t, "text-generation", envMap["HF_TASK"])
+	require.Equal(t, "1", envMap["VLLM_ENFORCE_EAGER"])
+	require.Equal(t, "true", envMap["ASYNC_SCHEDULING_DISABLED"])
+	require.Equal(t, "0.10.0", envMap["ENGINE_VERSION"])
+}
+
+func TestMakeDeployEnv_Finetune(t *testing.T) {
+	tester := setupTest(t)
+	deployInfo := &database.Deploy{
+		ID:            1,
+		Type:          types.FinetuneType,
+		SvcName:       "test-ft",
+		ContainerPort: 8888,
+		Hardware:      `{}`,
+		Env:           `{}`,
+		Variables:     `{}`,
+	}
+	repoInfo := common.RepoInfo{
+		Path:         "org/dataset",
+		HTTPCloneURL: "https://git.example.com/org/dataset.git",
+		RepoType:     "dataset",
+	}
+	accessToken := &database.AccessToken{
+		Token: "ft-token",
+		User:  &database.User{Username: "user"},
+	}
+
+	tester.mockGitServer.EXPECT().GetRepoLastCommit(mock.Anything, mock.Anything).Return(&types.Commit{ID: "abc1234"}, nil)
+
+	envMap, err := tester.activities.makeDeployEnv(tester.ctx, makeDeployEnvRequest{
+		Hardware:    types.HardWare{},
+		AccessToken: accessToken,
+		DeployInfo:  deployInfo,
+		RepoInfo:    repoInfo,
+	})
+	require.NoError(t, err)
+	require.Equal(t, "8888", envMap["port"])
+	require.Contains(t, envMap["HF_ENDPOINT"], "csg")
+	require.Equal(t, "ft-token", envMap["HF_TOKEN"])
+	require.Equal(t, "1", envMap["USE_CSGHUB_MODEL"])
+	require.Equal(t, "1", envMap["USE_CSGHUB_DATASET"])
+	require.Equal(t, "yes", envMap["JUPYTER_ENABLE_LAB"])
+	require.Equal(t, "xterm-256color", envMap["TERM"])
+}
+
+func TestMakeDeployEnv_Notebook(t *testing.T) {
+	tester := setupTest(t)
+	deployInfo := &database.Deploy{
+		ID:            1,
+		Type:          types.NotebookType,
+		SvcName:       "test-nb",
+		ContainerPort: 8888,
+		Hardware:      `{}`,
+		Env:           `{}`,
+		Variables:     `{}`,
+	}
+	repoInfo := common.RepoInfo{
+		Path: "org/notebook",
+	}
+	accessToken := &database.AccessToken{
+		Token: "nb-token",
+		User:  &database.User{Username: "user"},
+	}
+
+	// Notebook should NOT call GetRepoLastCommit
+	envMap, err := tester.activities.makeDeployEnv(tester.ctx, makeDeployEnvRequest{
+		Hardware:    types.HardWare{},
+		AccessToken: accessToken,
+		DeployInfo:  deployInfo,
+		RepoInfo:    repoInfo,
+	})
+	require.NoError(t, err)
+	require.Equal(t, "8888", envMap["port"])
+	require.Empty(t, envMap["HTTPCloneURL"])
+	require.Empty(t, envMap["REPO_ID"])
+	require.Empty(t, envMap["REVISION"])
+}
+
+func TestMakeDeployEnv_EngineArgs(t *testing.T) {
+	tests := []struct {
+		name                string
+		deployType          int
+		deployEngineArgs    string
+		engineArgsTemplates []types.EngineArg
+		toolCallParsers     map[string]string
+		repoID              int64
+		wantContains        []string
+		wantNotContains     []string
+		wantEnvKey          string
+		wantEnvValue        string
+	}{
+		{
+			name:             "parameter priority and boolean skip",
+			deployType:       types.SpaceType,
+			deployEngineArgs: `{"max-model-len":"8192","enforce-eager":"true","enable-feature":"false"}`,
+			engineArgsTemplates: []types.EngineArg{
+				{Name: "max-model-len", Format: "--max-model-len %s"},
+				{Name: "enforce-eager", Format: "--enforce-eager"},
+				{Name: "enable-feature", Format: "--enable-feature"},
+				{Name: "async-scheduling", Format: "--async-scheduling"},
+			},
+			wantContains:    []string{"--max-model-len 8192", "--enforce-eager"},
+			wantNotContains: []string{"--async-scheduling", "--enable-feature"},
+		},
+		{
+			name:             "tool-call parser injection",
+			deployType:       types.InferenceType,
+			deployEngineArgs: `{"enable-auto-tool-choice":"enable"}`,
+			engineArgsTemplates: []types.EngineArg{
+				{Name: "enable-auto-tool-choice", Format: "--enable-auto-tool-choice"},
+			},
+			toolCallParsers: map[string]string{"Qwen3ForCausalLM": "qwen"},
+			repoID:          42,
+			wantContains:    []string{"--enable-auto-tool-choice", "--tool-call-parser qwen"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tester := setupTest(t)
+			deployInfo := &database.Deploy{
+				ID:            1,
+				SpaceID:       1,
+				Type:          tt.deployType,
+				RepoID:        tt.repoID,
+				SvcName:       "test-svc",
+				Hardware:      `{}`,
+				Env:           `{}`,
+				Variables:     `{}`,
+				EngineArgs:    tt.deployEngineArgs,
+				ContainerPort: 9000,
+			}
+			repoInfo := common.RepoInfo{
+				Path:         "org/repo",
+				HTTPCloneURL: "https://git.example.com/org/repo.git",
+				RepoType:     "model",
+			}
+			accessToken := &database.AccessToken{
+				Token: "tok",
+				User:  &database.User{Username: "user"},
+			}
+
+			tester.mockGitServer.EXPECT().GetRepoLastCommit(mock.Anything, mock.Anything).Return(&types.Commit{ID: "abc1234"}, nil)
+			if tt.repoID > 0 && len(tt.toolCallParsers) > 0 {
+				tester.mockMetadataStore.EXPECT().FindByRepoID(mock.Anything, tt.repoID).Return(&database.Metadata{
+					Architecture: "Qwen3ForCausalLM",
+				}, nil)
+			}
+
+			envMap, err := tester.activities.makeDeployEnv(tester.ctx, makeDeployEnvRequest{
+				Hardware:    types.HardWare{},
+				AccessToken: accessToken,
+				DeployInfo:  deployInfo,
+				Runtime: runtimeConfig{
+					EngineArgsTemplates: tt.engineArgsTemplates,
+					ToolCallParsers:     tt.toolCallParsers,
+				},
+				RepoInfo: repoInfo,
+			})
+			require.NoError(t, err)
+			for _, s := range tt.wantContains {
+				require.Contains(t, envMap["ENGINE_ARGS"], s)
+			}
+			for _, s := range tt.wantNotContains {
+				require.NotContains(t, envMap["ENGINE_ARGS"], s)
+			}
+		})
+	}
+}
+
+func TestMakeDeployEnv_VariablesMerge(t *testing.T) {
+	tester := setupTest(t)
+	deployInfo := &database.Deploy{
+		ID:        1,
+		SpaceID:   1,
+		Type:      types.SpaceType,
+		SvcName:   "test-space",
+		Hardware:  `{}`,
+		Env:       `{"ENV_KEY":"env_value"}`,
+		Variables: `{"VAR_KEY":"var_value","ENV_KEY":"overridden"}`,
+	}
+	repoInfo := common.RepoInfo{
+		Path:         "org/repo",
+		HTTPCloneURL: "https://git.example.com/org/repo.git",
+		RepoType:     "space",
+	}
+	accessToken := &database.AccessToken{
+		Token: "tok",
+		User:  &database.User{Username: "user"},
+	}
+
+	tester.mockGitServer.EXPECT().GetRepoLastCommit(mock.Anything, mock.Anything).Return(&types.Commit{ID: "abc1234"}, nil)
+
+	envMap, err := tester.activities.makeDeployEnv(tester.ctx, makeDeployEnvRequest{
+		Hardware:    types.HardWare{},
+		AccessToken: accessToken,
+		DeployInfo:  deployInfo,
+		RepoInfo:    repoInfo,
+	})
+	require.NoError(t, err)
+	// Variables should override env
+	require.Equal(t, "overridden", envMap["ENV_KEY"])
+	require.Equal(t, "var_value", envMap["VAR_KEY"])
 }
