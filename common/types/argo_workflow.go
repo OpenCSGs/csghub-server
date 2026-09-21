@@ -53,31 +53,54 @@ type WorkflowStageStatus struct {
 
 type WorkflowStageStatuses map[string]WorkflowStageStatus
 
+// EvaluationFrameworkConfig is the contract for the evaluation knobs a caller may
+// set. Only fields declared here are accepted, and only frameworks that can act on
+// them accept a non-empty configuration, so a configuration that is recorded in the
+// task snapshot is also a configuration that produced the scores.
+type EvaluationFrameworkConfig struct {
+	// GenerationConfig is passed to the framework verbatim as its generation config.
+	GenerationConfig map[string]any `json:"generation_config,omitempty"`
+	// Limit caps how many samples of each dataset are evaluated. It is a pointer so
+	// that a caller omitting it is distinguishable from one asking for zero samples.
+	Limit *int `json:"limit,omitempty"`
+}
+
+// EvaluationModelRef identifies one model version to evaluate. Revision accepts a
+// branch, tag or commit SHA; an empty Revision means the repository default branch.
+// The same RepoId may appear more than once with different revisions.
+type EvaluationModelRef struct {
+	RepoId   string `json:"repo_id"`
+	Revision string `json:"revision,omitempty"`
+}
+
 type EvaluationReq struct {
-	Username           string   `json:"-"`
-	OwnerNamespace     string   `json:"owner_namespace,omitempty"`
-	TaskName           string   `json:"task_name"`
-	TaskDesc           string   `json:"task_desc"`
-	RuntimeFrameworkId int64    `json:"runtime_framework_id"` // ArgoWorkFlow framework
-	Datasets           []string `json:"datasets,omitempty"`
-	ResourceId         int64    `json:"resource_id"`
-	ModelId            string   `json:"model_id"`
-	ModelIds           []string `json:"model_ids,omitempty"` // for comparison
-	ShareMode          bool     `json:"share_mode"`
-	CustomDataSets     []string `json:"custom_datasets,omitempty"` // custom datasets
-	Token              string   `json:"-"`
-	Hardware           HardWare `json:"-"`
-	UserUUID           string   `json:"-"`
-	ClusterID          string   `json:"-"`
-	Image              string   `json:"-"`
-	RepoType           string   `json:"-"`
-	TaskType           TaskType `json:"-"`
-	DownloadEndpoint   string   `json:"-"`
-	ResourceName       string   `json:"-"`
-	Revisions          []string `json:"-"`
-	DatasetRevisions   []string `json:"-"`
-	UseCustomDataset   bool     `json:"-"`
-	Nodes              []Node   `json:"-"`
+	Username           string               `json:"-"`
+	OwnerNamespace     string               `json:"owner_namespace,omitempty"`
+	TaskName           string               `json:"task_name"`
+	TaskDesc           string               `json:"task_desc"`
+	RuntimeFrameworkId int64                `json:"runtime_framework_id"` // ArgoWorkFlow framework
+	Datasets           []string             `json:"datasets,omitempty"`
+	ResourceId         int64                `json:"resource_id"`
+	ModelId            string               `json:"model_id"`
+	ModelIds           []string             `json:"model_ids,omitempty"` // for comparison
+	Models             []EvaluationModelRef `json:"models,omitempty"`    // model versions to evaluate, takes precedence over ModelId/ModelIds
+	FrameworkConfig    string               `json:"framework_config,omitempty"`
+	ShareMode          bool                 `json:"share_mode"`
+	CustomDataSets     []string             `json:"custom_datasets,omitempty"` // custom datasets
+	Token              string               `json:"-"`
+	Hardware           HardWare             `json:"-"`
+	UserUUID           string               `json:"-"`
+	ClusterID          string               `json:"-"`
+	Image              string               `json:"-"`
+	RepoType           string               `json:"-"`
+	TaskType           TaskType             `json:"-"`
+	DownloadEndpoint   string               `json:"-"`
+	ResourceName       string               `json:"-"`
+	Revisions          []string             `json:"-"` // resolved model revisions, index-aligned with ModelIds
+	DatasetRevisions   []string             `json:"-"`
+	DatasetCommits     []string             `json:"-"` // resolved dataset commit SHAs, index-aligned with Datasets
+	UseCustomDataset   bool                 `json:"-"`
+	Nodes              []Node               `json:"-"`
 	DeployExtend
 
 	// claw-eval fields
@@ -132,6 +155,10 @@ type ArgoWorkFlowReq struct {
 	FinetunedModelName string             `json:"finetuned_model_name,omitempty"`
 	Nodes              []Node             `json:"nodes"`
 	Scheduler          *Scheduler         `json:"scheduler,omitempty"`
+	RepoRevisions      []string           `json:"repo_revisions,omitempty"`
+	DatasetRevisions   []string           `json:"dataset_revisions,omitempty"`
+	FrameworkConfig    string             `json:"framework_config,omitempty"`
+	Hardware           *HardWare          `json:"hardware,omitempty"`
 
 	DeployExtend
 }
@@ -164,6 +191,11 @@ type ArgoWorkFlowRes struct {
 	DownloadURL  string                 `json:"download_url"`
 	FailuresURL  string                 `json:"failures_url"`
 	PayMode      PayMode                `json:"pay_mode,omitempty"`
+	// RepoRevisions is index-aligned with RepoIds; DatasetRevisions with Datasets.
+	RepoRevisions    []string  `json:"repo_revisions,omitempty"`
+	DatasetRevisions []string  `json:"dataset_revisions,omitempty"`
+	FrameworkConfig  string    `json:"framework_config,omitempty"`
+	Hardware         *HardWare `json:"hardware,omitempty"`
 }
 
 type RepoTags struct {
@@ -194,6 +226,11 @@ type EvaluationRes struct {
 	DownloadURL  string           `json:"download_url"`
 	FailuresURL  string           `json:"failures_url"`
 	Summary      *ClawEvalSummary `json:"summary,omitempty"`
+	// RepoRevisions is index-aligned with RepoIds; DatasetRevisions with Datasets.
+	RepoRevisions    []string  `json:"repo_revisions,omitempty"`
+	DatasetRevisions []string  `json:"dataset_revisions,omitempty"`
+	FrameworkConfig  string    `json:"framework_config,omitempty"`
+	Hardware         *HardWare `json:"hardware,omitempty"`
 }
 
 type (

@@ -1,4 +1,4 @@
-# LLM evalution docker image
+# CSGHUB Nginx Images Building
 
 ## Login Container Registry
 
@@ -20,30 +20,22 @@ docker buildx build --platform linux/amd64,linux/arm64 \
   -t ${OPENCSG_ACR}/public/opencompass:latest \
   -f Dockerfile.opencompass \
   --push .
-#opencsg-registry.cn-beijing.cr.aliyuncs.com/public/lm-evaluation-harness:0.4.9
-export IMAGE_TAG=0.4.9
-docker buildx build --platform linux/amd64,linux/arm64 \
-  -t ${OPENCSG_ACR}/public/lm-evaluation-harness:${IMAGE_TAG} \
-  -t ${OPENCSG_ACR}/public/lm-evaluation-harness:latest \
-  -f Dockerfile.lm-evaluation-harness \
-  --push .
-
-#opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/evalscope:1.10.0-cu124
-export IMAGE_TAG=1.10.0-cu124
+#opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/evalscope:1.11.1-cu124
+export IMAGE_TAG=1.11.1-cu124
 docker buildx build --platform linux/amd64 \
   -t ${OPENCSG_ACR}/opencsghq/evalscope:${IMAGE_TAG} \
   -t ${OPENCSG_ACR}/opencsghq/evalscope:latest \
   -f Dockerfile.evalscope-gpu \
   --push .
-#opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/evalscope:1.10.0-cpu
-export IMAGE_TAG=1.10.0-cpu
+#opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/evalscope:1.11.1-cpu
+export IMAGE_TAG=1.11.1-cpu
 docker buildx build --platform linux/amd64 \
   -t ${OPENCSG_ACR}/opencsghq/evalscope:${IMAGE_TAG} \
   -t ${OPENCSG_ACR}/opencsghq/evalscope:latest \
   -f Dockerfile.evalscope-cpu \
   --push .
-#opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/evalscope-amd:1.10.0-rocm7.2.2
-export IMAGE_TAG=1.10.0-rocm7.2.2
+#opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/evalscope-amd:1.11.1-rocm7.2.2
+export IMAGE_TAG=1.11.1-rocm7.2.2
 docker buildx build --platform linux/amd64 \
   -t ${OPENCSG_ACR}/opencsghq/evalscope-amd:${IMAGE_TAG} \
   -f Dockerfile.evalscope-amd \
@@ -81,30 +73,11 @@ docker run \
   ${OPENCSG_ACR}/public/opencompass:${IMAGE_TAG}
 ```
 
-## Test the lm-evaluation-harness Image
-
-```bash
-export IMAGE_TAG=0.4.6
-docker run \
-  --gpus device=1 \
-  -e ACCESS_TOKEN=xxxx  \
-  -e MODEL_ID="OpenCSG/csg-wukong-1B" \
-  -e DATASET_IDS="Rowan/hellaswag" \
-  -e HF_ENDPOINT=https://hub.opencsg.com\
-  -e S3_ACCESS_ID="xxx" \
-  -e S3_ACCESS_SECRET="xxx" \
-  -e S3_BUCKET="xxx" \
-  -e S3_ENDPOINT="xxx" \
-  -e S3_SSL_ENABLED="true" \
-  ${OPENCSG_ACR}/public/lm-evaluation-harness:${IMAGE_TAG}
-```
-
 ## inference image name, version and cuda version
 
 | Latest Image          | Version | CUDA Version |
 | --------------------- | ------- | ------------ |
 | opencompass           | 0.4.2   | 12.1         |
-| lm-evaluation-harness | 0.4.9   | 12.1         |
 | claw-eval             | 1.0.0   | N/A (CPU)    |
 
 ## Test the claw-eval Image

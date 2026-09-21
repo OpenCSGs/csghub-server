@@ -1,5 +1,5 @@
 {
-  "version": "1.10.0",
+  "version": "1.11.1",
   "runtime_framework": "evalscope",
   "compatible_runtime_frameworks": [
     "amd-evalscope"
@@ -857,6 +857,303 @@
       "repo_name": "WorldVQA",
       "category": "evaluation",
       "tag_name": "understanding",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "ai4bharat",
+      "repo_name": "hellaswag-translated",
+      "category": "evaluation",
+      "tag_name": "reasoning",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "ai4bharat",
+      "repo_name": "MILU",
+      "category": "evaluation",
+      "tag_name": "knowledge",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "bharatgenai",
+      "repo_name": "BhashaBench-Ayur",
+      "category": "evaluation",
+      "tag_name": "knowledge",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "bharatgenai",
+      "repo_name": "BhashaBench-Finance",
+      "category": "evaluation",
+      "tag_name": "knowledge",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "bharatgenai",
+      "repo_name": "BhashaBench-Krishi",
+      "category": "evaluation",
+      "tag_name": "knowledge",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "bharatgenai",
+      "repo_name": "BhashaBench-Legal",
+      "category": "evaluation",
+      "tag_name": "knowledge",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "bharatgenai",
+      "repo_name": "BhashaBench-Multi",
+      "category": "evaluation",
+      "tag_name": "knowledge",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "bharatgenai",
+      "repo_name": "IndicParam",
+      "category": "evaluation",
+      "tag_name": "knowledge",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "evalscope",
+      "repo_name": "CC-OCR-V2",
+      "category": "evaluation",
+      "tag_name": "understanding",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "evalscope",
+      "repo_name": "CountQA",
+      "category": "evaluation",
+      "tag_name": "understanding",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "evalscope",
+      "repo_name": "HiPhO",
+      "category": "evaluation",
+      "tag_name": "understanding",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "evalscope",
+      "repo_name": "hmmt_nov_2025",
+      "category": "evaluation",
+      "tag_name": "examination",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "evalscope",
+      "repo_name": "LogicVista",
+      "category": "evaluation",
+      "tag_name": "understanding",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "evalscope",
+      "repo_name": "MedXpertQA",
+      "category": "evaluation",
+      "tag_name": "understanding",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "evalscope",
+      "repo_name": "olmOCR-Bench",
+      "category": "evaluation",
+      "tag_name": "understanding",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "evalscope",
+      "repo_name": "OneMillion-Bench",
+      "category": "evaluation",
+      "tag_name": "reasoning",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "evalscope",
+      "repo_name": "PhyX",
+      "category": "evaluation",
+      "tag_name": "understanding",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "evalscope",
+      "repo_name": "PLawBench",
+      "category": "evaluation",
+      "tag_name": "knowledge",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "evalscope",
+      "repo_name": "PMC-VQA",
+      "category": "evaluation",
+      "tag_name": "understanding",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "evalscope",
+      "repo_name": "ref-adv-s",
+      "category": "evaluation",
+      "tag_name": "understanding",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "evalscope",
+      "repo_name": "Sanskriti",
+      "category": "evaluation",
+      "tag_name": "knowledge",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "evalscope",
+      "repo_name": "SLAKE",
+      "category": "evaluation",
+      "tag_name": "understanding",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "evalscope",
+      "repo_name": "SURDS_eval",
+      "category": "evaluation",
+      "tag_name": "understanding",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "evalscope",
+      "repo_name": "vlms-are-biased",
+      "category": "evaluation",
+      "tag_name": "understanding",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "lmms-lab-encoder",
+      "repo_name": "visfactor",
+      "category": "evaluation",
+      "tag_name": "understanding",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "lmms-lab",
+      "repo_name": "ScreenSpot-Pro",
+      "category": "evaluation",
+      "tag_name": "understanding",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "MLLM-CL",
+      "repo_name": "VTCBench",
+      "category": "evaluation",
+      "tag_name": "understanding",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "moonshotai",
+      "repo_name": "PerceptionBench",
+      "category": "evaluation",
+      "tag_name": "understanding",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "sarvamai",
+      "repo_name": "arc-challenge-indic",
+      "category": "evaluation",
+      "tag_name": "examination",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "sarvamai",
+      "repo_name": "boolq-indic",
+      "category": "evaluation",
+      "tag_name": "knowledge",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "sarvamai",
+      "repo_name": "gsm8k-indic",
+      "category": "evaluation",
+      "tag_name": "examination",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "sarvamai",
+      "repo_name": "trivia-qa-indic-mcq",
+      "category": "evaluation",
+      "tag_name": "knowledge",
+      "repo_type": "dataset",
+      "runtime_framework": "evalscope",
+      "source": "ms"
+    },
+    {
+      "namespace": "ScaleAI",
+      "repo_name": "PRBench",
+      "category": "evaluation",
+      "tag_name": "knowledge",
       "repo_type": "dataset",
       "runtime_framework": "evalscope",
       "source": "ms"

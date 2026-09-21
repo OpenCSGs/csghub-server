@@ -910,6 +910,11 @@ func (c *userComponentImpl) Evaluations(ctx context.Context, req *types.UserEval
 			DownloadURL:  evaluation.DownloadURL,
 			ResultURL:    evaluation.ResultURL,
 			Image:        evaluation.Image,
+
+			RepoRevisions:    evaluation.RepoRevisions,
+			DatasetRevisions: evaluation.DatasetRevisions,
+			FrameworkConfig:  evaluation.FrameworkConfig,
+			Hardware:         evaluation.Hardware,
 		})
 	}
 	return res, total, nil

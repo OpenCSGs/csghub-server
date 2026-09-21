@@ -95,7 +95,7 @@ func TestEvaluationDatasetsConfigFile(t *testing.T) {
 
 	var config EvaluationDatasetsConfig
 	require.NoError(t, json.Unmarshal(data, &config))
-	require.Equal(t, "1.10.0", config.Version)
+	require.Equal(t, "1.11.1", config.Version)
 	require.Equal(t, "evalscope", config.RuntimeFramework)
 	require.Equal(t, []string{"evalscope", "amd-evalscope"}, config.RuntimeFrameworkNames())
 	require.True(t, config.Prune)

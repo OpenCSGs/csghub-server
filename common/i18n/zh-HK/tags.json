@@ -362,9 +362,6 @@
     "Tag.I18nKey.OpenCompass": {
         "other": "OpenCompass"
     },
-    "Tag.I18nKey.lm-evaluation-harness": {
-        "other": "lm-evaluation-harness"
-    },
     "Tag.I18nKey.Benchmark": {
         "other": "基準測試"
     },

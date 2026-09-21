@@ -124,7 +124,27 @@ if [ -z "$GPU_NUM" ]; then
 fi
 #LimitedMaxToken is gpu_num multiplied by 4096
 LimitedMaxToken=$(($GPU_NUM * 4096))
+# A task may evaluate several versions of one model, and two repositories in
+# different namespaces can share both a basename and a commit, so neither the model
+# name nor the revision identifies a run on its own. Every run therefore gets its own
+# directory, indexed by its position in MODEL_IDS: the model is staged under it and
+# opencompass writes its work directory under it. Results are then located by path.
+EVAL_MODELS_DIR=/workspace/eval-models
+run_dir() {
+    echo "/workspace/output/run$1"
+}
+staged_model_dir() {
+    echo "$EVAL_MODELS_DIR/run$1/$(basename $2)"
+}
+stage_model() {
+    modelID=$1
+    staged=$2
+    rm -rf "$staged"
+    mkdir -p "$(dirname $staged)"
+    mv "/workspace/$modelID" "$staged"
+}
 jsonFiles=""
+runMap=""
 IFS=',' read -r -a model_repos <<< "$MODEL_IDS"
 IFS=',' read -r -a model_revisions <<< "$REVISIONS"
 for index in "${!model_repos[@]}"; do
@@ -135,23 +155,37 @@ for index in "${!model_repos[@]}"; do
         echo "Download model $modelID failed."
         exit 1
     fi
-    model_name=`basename $modelID`
-    echo "Start evaluating model $model_name, dataset $dataset_tasks"
-    if [ "$USE_CUSTOM_DATASETS" = "true" ]; then
-        opencompass --custom-dataset-path $custom_datasets_path  --work-dir /workspace/output  --hf-type chat --hf-path /workspace/$modelID -a vllm --max-out-len 100 --max-seq-len $LimitedMaxToken --batch-size 8 --hf-num-gpus $GPU_NUM --max-num-workers $GPU_NUM --work-dir /workspace/output/$modelID
+    runDir=`run_dir $index`
+    staged=`staged_model_dir $index $modelID`
+    # The run directory is this run's identity: record which repository and which
+    # commit it holds for the summary.
+    if [ -z "$runMap" ]; then
+        runMap="$runDir=$modelID@$revision"
     else
-        opencompass --datasets $dataset_tasks --work-dir /workspace/output  --hf-type chat --hf-path /workspace/$modelID -a vllm --max-out-len 100 --max-seq-len $LimitedMaxToken --batch-size 8 --hf-num-gpus $GPU_NUM --max-num-workers $GPU_NUM --work-dir /workspace/output/$modelID
+        runMap="$runMap,$runDir=$modelID@$revision"
     fi
+    stage_model $modelID $staged
     if [ $? -ne 0 ]; then
-        echo "Evaluation failed for model $model_name."
+        echo "Staging model $modelID at revision $revision failed."
         exit 1
     fi
-    csv_file=`ls -dt /workspace/output/$modelID/**/summary/*.csv |head -n 1`
+    echo "Start evaluating model $modelID revision $revision, dataset $dataset_tasks"
+    if [ "$USE_CUSTOM_DATASETS" = "true" ]; then
+        opencompass --custom-dataset-path $custom_datasets_path --hf-type chat --hf-path $staged -a vllm --max-out-len 100 --max-seq-len $LimitedMaxToken --batch-size 8 --hf-num-gpus $GPU_NUM --max-num-workers $GPU_NUM --work-dir $runDir
+    else
+        opencompass --datasets $dataset_tasks --hf-type chat --hf-path $staged -a vllm --max-out-len 100 --max-seq-len $LimitedMaxToken --batch-size 8 --hf-num-gpus $GPU_NUM --max-num-workers $GPU_NUM --work-dir $runDir
+    fi
+    if [ $? -ne 0 ]; then
+        echo "Evaluation failed for model $modelID revision $revision."
+        exit 1
+    fi
+    # This run's results can only be under its own directory, so no name matching.
+    csv_file=`ls -dt $runDir/*/summary/*.csv | head -n 1`
     python /etc/csghub/upload_files.py convert "$csv_file"
-    json_file=`ls -dt /workspace/output/$modelID/**/summary/*.json | head -n 1`
+    json_file=`ls -dt $runDir/*/summary/*.json | head -n 1`
     jsonFiles="$jsonFiles $json_file"
     # remove model to save space
-    rm -rf /workspace/$modelID
+    rm -rf $staged
 done
 
 if [ $? -eq 0 ]; then
@@ -163,8 +197,8 @@ fi
 
 # upload result to mino server
 mkdir -p /workspace/output/final
-echo "python /etc/csghub/upload_files.py summary --file $jsonFiles --tasks $dataset_tasks_ori"
-python /etc/csghub/upload_files.py summary --file $jsonFiles --tasks $dataset_tasks_ori
+echo "python /etc/csghub/upload_files.py summary --file $jsonFiles --tasks $dataset_tasks_ori --run-map "$runMap""
+python /etc/csghub/upload_files.py summary --file $jsonFiles --tasks $dataset_tasks_ori --run-map "$runMap"
 upload_json_file=`ls -d /workspace/output/final/upload.json`
 upload_xlsx_file=`ls -d /workspace/output/final/upload.xlsx`
 python /etc/csghub/upload_files.py upload "$upload_json_file,$upload_xlsx_file"

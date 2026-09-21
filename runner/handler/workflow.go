@@ -155,6 +155,11 @@ func (a *ArgoHandler) GetWorkflow(ctx *gin.Context) {
 		ResourceId:   wf.ResourceId,
 		ResourceName: wf.ResourceName,
 		Namespace:    wf.Namespace,
+
+		RepoRevisions:    wf.RepoRevisions,
+		DatasetRevisions: wf.DatasetRevisions,
+		FrameworkConfig:  wf.FrameworkConfig,
+		Hardware:         wf.Hardware,
 	}
 	ctx.JSON(http.StatusOK, res)
 }
