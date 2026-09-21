@@ -97,9 +97,18 @@ func (tc *tagComponentImpl) AllTagsWithPagination(ctx context.Context, filter *t
 }
 
 func (c *tagComponentImpl) ClearMetaTags(ctx context.Context, repoType types.RepositoryType, namespace, name string) error {
-
 	_, err := c.tagStore.SetMetaTags(ctx, repoType, namespace, name, nil)
-	return err
+	if err != nil || !types.SupportsLicenseCompliance(repoType) {
+		return err
+	}
+	repo, err := c.repoStore.FindByPath(ctx, repoType, namespace, name)
+	if err != nil {
+		return fmt.Errorf("failed to find repo after clearing meta tags, cause: %w", err)
+	}
+	if err := c.repoStore.UpdateLicenseByTag(ctx, repo.ID); err != nil {
+		return fmt.Errorf("failed to clear repo license after clearing meta tags, cause: %w", err)
+	}
+	return nil
 }
 
 func (c *tagComponentImpl) UpdateMetaTags(ctx context.Context, tagScope types.TagScope, namespace, name, content string) ([]*database.RepositoryTag, error) {
@@ -173,6 +182,9 @@ func (c *tagComponentImpl) UpdateMetaTags(ctx context.Context, tagScope types.Ta
 	err = c.repoStore.UpdateLicenseByTag(ctx, repo.ID)
 	if err != nil {
 		slog.Error("failed to update repo license tags", slog.Any("error", err))
+		if types.SupportsLicenseCompliance(repoType) {
+			return nil, fmt.Errorf("failed to update repo license tags, cause: %w", err)
+		}
 	}
 
 	return repoTags, nil
@@ -236,7 +248,15 @@ func (c *tagComponentImpl) UpdateRepoTagsByCategory(ctx context.Context, tagScop
 			}
 		}
 	}
-	return c.ReplaceRepoTagsByCategoryAndSource(ctx, tagScope, repoID, category, types.TagSourceManual, tagNames)
+	if err := c.ReplaceRepoTagsByCategoryAndSource(ctx, tagScope, repoID, category, types.TagSourceManual, tagNames); err != nil {
+		return err
+	}
+	if category == "license" && (tagScope == types.ModelTagScope || tagScope == types.DatasetTagScope) {
+		if err := c.repoStore.UpdateLicenseByTag(ctx, repoID); err != nil {
+			return fmt.Errorf("failed to update repository license classification, error: %w", err)
+		}
+	}
+	return nil
 }
 
 func (c *tagComponentImpl) ReplaceRepoTagsByCategoryAndSource(ctx context.Context, tagScope types.TagScope, repoID int64, category string, source types.TagSource, tagNames []string) error {

@@ -159,6 +159,7 @@ type RepoStore interface {
 	DeleteAllTags(ctx context.Context, repoID int64) error
 	UpdateOrCreateRepo(ctx context.Context, input Repository) (*Repository, error)
 	UpdateLicenseByTag(ctx context.Context, repoID int64) error
+	UpdateLicenseCompliance(ctx context.Context, repoID int64, license *string, status types.ComplianceStatus, permission types.CommercialPermission) error
 	CountByRepoType(ctx context.Context, repoType types.RepositoryType) (int, error)
 	GetRepoWithoutRuntimeByID(ctx context.Context, rfID int64, paths []string, batchSize, batch int) ([]Repository, error)
 	GetRepoWithRuntimeByID(ctx context.Context, rfID int64, paths []string) ([]Repository, error)
@@ -258,8 +259,10 @@ type Repository struct {
 	Description string `bun:",nullzero" json:"description"`
 	Private     bool   `bun:",notnull" json:"private"`
 	// Depreated
-	Labels  string `bun:",nullzero" json:"labels"`
-	License string `bun:",nullzero" json:"license"`
+	Labels               string                     `bun:",nullzero" json:"labels"`
+	License              string                     `bun:",nullzero" json:"license"`
+	ComplianceStatus     types.ComplianceStatus     `bun:",nullzero,notnull,default:'pending_review'" json:"compliance_status"`
+	CommercialPermission types.CommercialPermission `bun:",nullzero,notnull,default:'custom_terms'" json:"commercial_permission"`
 	// Depreated
 	Readme               string                     `bun:",nullzero" json:"readme"`
 	DefaultBranch        string                     `bun:",notnull" json:"default_branch"`
@@ -629,6 +632,10 @@ func SHA256(s string) string {
 func (s *repoStoreImpl) CreateRepo(ctx context.Context, input Repository) (*Repository, error) {
 	input.Migrated = true
 	input.Hashed = true
+	if types.SupportsLicenseCompliance(input.RepositoryType) &&
+		(!input.ComplianceStatus.IsValid() || !input.CommercialPermission.IsValid()) {
+		input.ComplianceStatus, input.CommercialPermission = types.ClassifyRepositoryLicense(input.License)
+	}
 	err := s.withLockedRepositoryNamespace(ctx, input, func(ctx context.Context, tx bun.Tx) error {
 		res, err := tx.NewInsert().Model(&input).Exec(ctx, &input)
 		if err := assertAffectedOneRow(res, err); err != nil {
@@ -721,10 +728,24 @@ func (s *repoStoreImpl) UpdateRepo(ctx context.Context, input Repository) (*Repo
 			}
 		}
 
-		// Update the repository
-		_, err = tx.Core.NewUpdate().Model(&input).WherePK().Exec(ctx)
+		// Compliance fields are managed by dedicated, column-scoped updates so
+		// unrelated repository edits cannot overwrite a concurrent review. The
+		// same applies to the model/dataset license value because it is updated
+		// atomically with the classification derived from it.
+		updateQuery := tx.Core.NewUpdate().
+			Model(&input).
+			ExcludeColumn("compliance_status", "commercial_permission")
+		if types.SupportsLicenseCompliance(input.RepositoryType) {
+			updateQuery.ExcludeColumn("license")
+		}
+		_, err = updateQuery.WherePK().Exec(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to update repo: %w", err)
+		}
+		input.ComplianceStatus = existing.ComplianceStatus
+		input.CommercialPermission = existing.CommercialPermission
+		if types.SupportsLicenseCompliance(input.RepositoryType) {
+			input.License = existing.License
 		}
 		return nil
 	})
@@ -1114,7 +1135,6 @@ func (s *repoStoreImpl) publicToUser(ctx context.Context, repoType types.Reposit
 	if filter.Owner != "" {
 		q.Where("repository.path LIKE ? ESCAPE '\\'", fmt.Sprintf("%s/%%", escapeLikePattern(filter.Owner)))
 	}
-
 	switch repoType {
 	case types.ModelRepo:
 		q.Join("INNER JOIN models ON models.repository_id = repository.id")
@@ -1288,7 +1308,6 @@ func (s *repoStoreImpl) publicToUserTrending(ctx context.Context, repoType types
 	if filter.Owner != "" {
 		q.Where("r.path LIKE ? ESCAPE '\\'", fmt.Sprintf("%s/%%", escapeLikePattern(filter.Owner)))
 	}
-
 	// Join with business table
 	q.Join(fmt.Sprintf("INNER JOIN %s ON %s.repository_id = r.id", bizTable, bizTable))
 	if repoType == types.SpaceRepo {
@@ -1477,7 +1496,6 @@ func (s *repoStoreImpl) publicToUserV2(ctx context.Context, repoType types.Repos
 	if filter.Owner != "" {
 		q.Where("repository.path LIKE ? ESCAPE '\\'", fmt.Sprintf("%s/%%", escapeLikePattern(filter.Owner)))
 	}
-
 	switch repoType {
 	case types.ModelRepo:
 		q.Join("INNER JOIN models ON models.repository_id = repository.id")
@@ -1643,7 +1661,6 @@ func (s *repoStoreImpl) publicToUserTrendingV2(ctx context.Context, repoType typ
 	if filter.Owner != "" {
 		q.Where("r.path LIKE ? ESCAPE '\\'", fmt.Sprintf("%s/%%", escapeLikePattern(filter.Owner)))
 	}
-
 	q.Join(fmt.Sprintf("INNER JOIN %s ON %s.repository_id = r.id", bizTable, bizTable))
 
 	if repoType == types.DatasetRepo && filter.DatasetType != "" {
@@ -2264,6 +2281,9 @@ func (s *repoStoreImpl) DeleteAllTags(ctx context.Context, repoID int64) error {
 func (s *repoStoreImpl) UpdateOrCreateRepo(ctx context.Context, input Repository) (*Repository, error) {
 	input.UpdatedAt = time.Now()
 	err := s.withLockedRepositoryNamespace(ctx, input, func(ctx context.Context, tx bun.Tx) error {
+		if err := prepareRepositoryComplianceForUpsert(ctx, tx, &input); err != nil {
+			return err
+		}
 		_, err := tx.NewUpdate().
 			Model(&input).
 			Where("LOWER(path) = LOWER(?) and repository_type = ?", input.Path, input.RepositoryType).
@@ -2286,29 +2306,85 @@ func (s *repoStoreImpl) UpdateOrCreateRepo(ctx context.Context, input Repository
 	return &input, nil
 }
 
+func prepareRepositoryComplianceForUpsert(ctx context.Context, tx bun.Tx, input *Repository) error {
+	var existing Repository
+	query := tx.NewSelect().
+		Model(&existing).
+		Column("license", "compliance_status", "commercial_permission").
+		Where("LOWER(path) = LOWER(?) and repository_type = ?", input.Path, input.RepositoryType)
+	if tx.Dialect().Name() == dialect.PG {
+		query.For("UPDATE")
+	}
+	err := query.Scan(ctx)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return fmt.Errorf("get existing repository compliance: %w", err)
+	}
+	licenseUnchanged := types.NormalizeRepositoryLicense(existing.License) == types.NormalizeRepositoryLicense(input.License)
+	if err == nil && (!types.SupportsLicenseCompliance(input.RepositoryType) || licenseUnchanged) &&
+		existing.ComplianceStatus.IsValid() && existing.CommercialPermission.IsValid() {
+		input.ComplianceStatus = existing.ComplianceStatus
+		input.CommercialPermission = existing.CommercialPermission
+		return nil
+	}
+
+	input.ComplianceStatus, input.CommercialPermission = types.ClassifyRepositoryLicenseForType(input.RepositoryType, input.License)
+	return nil
+}
+
 func (s *repoStoreImpl) UpdateLicenseByTag(ctx context.Context, repoID int64) error {
-	var tag Tag
-	err := s.db.Core.NewSelect().
-		Model(&tag).
-		Join("join repository_tags on tag.id = repository_tags.tag_id").
-		Join("join repositories on repositories.id = repository_tags.repository_id").
-		Where("repository_tags.repository_id = ? and tag.category = ?", repoID, "license").
-		Scan(ctx)
+	repo, err := s.FindById(ctx, repoID)
 	if err != nil {
 		return err
 	}
-	if tag.Name != "" {
-		repo, err := s.FindById(ctx, repoID)
-		if err != nil {
-			return err
-		}
-		repo.License = tag.Name
-		_, err = s.UpdateRepo(ctx, *repo)
-		if err != nil {
-			return err
-		}
+
+	var tag Tag
+	err = s.db.Core.NewSelect().
+		Model(&tag).
+		Join("join repository_tags on tag.id = repository_tags.tag_id").
+		Where("repository_tags.repository_id = ? and tag.category = ?", repoID, "license").
+		Scan(ctx)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return err
 	}
-	return nil
+
+	license := tag.Name
+	if !types.SupportsLicenseCompliance(repo.RepositoryType) {
+		if license == "" {
+			return nil
+		}
+		repo.License = license
+		_, err = s.UpdateRepo(ctx, *repo)
+		return err
+	}
+	if types.NormalizeRepositoryLicense(repo.License) == types.NormalizeRepositoryLicense(license) {
+		return nil
+	}
+	status, permission := types.ClassifyRepositoryLicense(license)
+	return s.UpdateLicenseCompliance(ctx, repoID, &license, status, permission)
+}
+
+func (s *repoStoreImpl) UpdateLicenseCompliance(
+	ctx context.Context,
+	repoID int64,
+	license *string,
+	status types.ComplianceStatus,
+	permission types.CommercialPermission,
+) error {
+	if !status.IsValid() || !permission.IsValid() {
+		return fmt.Errorf("invalid repository license compliance values: status=%q permission=%q", status, permission)
+	}
+	query := s.db.Operator.Core.NewUpdate().Model((*Repository)(nil)).
+		Set("compliance_status = ?", status).
+		Set("commercial_permission = ?", permission).
+		Where("id = ?", repoID)
+	if license != nil {
+		query.Set("license = ?", *license)
+	}
+	result, err := query.Exec(ctx)
+	if err == nil {
+		err = assertAffectedOneRow(result, nil)
+	}
+	return errorx.HandleDBError(err, errorx.Ctx().Set("id", repoID))
 }
 
 func (s *repoStoreImpl) CountByRepoType(ctx context.Context, repoType types.RepositoryType) (int, error) {
