@@ -1163,14 +1163,15 @@ func (h *RepoHandler) ServerlessUpdate(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "failed to get namespace and name from context", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
+		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 
 	var req *types.DeployUpdateReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err, slog.Any("request.body", ctx.Request.Body))
-		httpbase.BadRequest(ctx, err.Error())
+		httpbase.BadRequestWithExt(ctx, errorx.ServerlessUpdateFailed(err,
+			errorx.Ctx().Set("param", "request body")))
 		return
 	}
 
@@ -1178,7 +1179,8 @@ func (h *RepoHandler) ServerlessUpdate(ctx *gin.Context) {
 		err = Validate.Struct(req)
 		if err != nil {
 			slog.ErrorContext(ctx.Request.Context(), "Bad request setting for serverless", slog.Any("req", *req), slog.Any("err", err))
-			httpbase.BadRequest(ctx, fmt.Sprintf("Bad request setting for serverless, %v", err))
+			httpbase.BadRequestWithExt(ctx, errorx.ServerlessUpdateFailed(err,
+				errorx.Ctx().Set("param", "replica settings")))
 			return
 		}
 	}
@@ -1186,7 +1188,8 @@ func (h *RepoHandler) ServerlessUpdate(ctx *gin.Context) {
 	deployID, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "Bad request format", slog.Any("error", err), slog.Any("id", ctx.Param("id")))
-		httpbase.BadRequest(ctx, err.Error())
+		httpbase.BadRequestWithExt(ctx, errorx.ServerlessUpdateFailed(err,
+			errorx.Ctx().Set("param", "deploy id")))
 		return
 	}
 	updateReq := types.DeployActReq{
@@ -1205,8 +1208,14 @@ func (h *RepoHandler) ServerlessUpdate(ctx *gin.Context) {
 			return
 		}
 
+		// Wrap every non-forbidden failure into a single Serverless update
+		// error so clients get a stable, translatable SERVERLESS-ERR-9 code.
+		// Specific errors deeper in the chain keep their own CustomError code
+		// because response helpers unwrap to the innermost CustomError; the
+		// original message is preserved in the error context for debugging.
 		slog.ErrorContext(ctx.Request.Context(), "failed to update serverless", slog.Any("error", err), slog.Any("req", updateReq))
-		httpbase.ServerError(ctx, fmt.Errorf("failed to update serverless, %w", err))
+		httpbase.ServerError(ctx, errorx.ServerlessUpdateFailed(err,
+			errorx.Ctx().Set("reason", err.Error())))
 		return
 	}
 

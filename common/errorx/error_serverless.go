@@ -12,6 +12,7 @@ const (
 	codeCommitIDEmptyErr
 	codeTrafficInvalidErr
 	codeInvalidCommitIDErr
+	codeUpdateFailedErr
 )
 
 var (
@@ -125,3 +126,16 @@ var (
 	//zh-HK: 沒有其他有效修訂版本
 	ErrNoOtherValidRevision error = CustomError{prefix: errServerlessPrefix, code: codeTrafficInvalidErr}
 )
+
+// ServerlessUpdateFailed wraps an error raised while updating a Serverless
+// deploy so the API layer returns a stable SERVERLESS-ERR-9 code. The
+// original error is kept both in the wrapped error chain (for logging and
+// errors.Is) and in the error context (for the response payload).
+func ServerlessUpdateFailed(originErr error, ext context) error {
+	return CustomError{
+		prefix:  errServerlessPrefix,
+		code:    codeUpdateFailedErr,
+		err:     originErr,
+		context: ext,
+	}
+}

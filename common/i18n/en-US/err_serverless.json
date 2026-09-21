@@ -25,5 +25,8 @@
     },
     "error.SERVERLESS-ERR-8": {
         "other": "The commit id is invalid."
+    },
+    "error.SERVERLESS-ERR-9": {
+        "other": "Failed to update the Serverless deploy. Please try again later or contact support if the problem persists."
     }
 }
