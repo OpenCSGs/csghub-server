@@ -25,5 +25,8 @@
     },
     "error.SERVERLESS-ERR-8": {
         "other": "无效的commitId"
+    },
+    "error.SERVERLESS-ERR-9": {
+        "other": "Serverless 部署更新失败，请稍后重试；若持续出现请联系支持人员"
     }
 }

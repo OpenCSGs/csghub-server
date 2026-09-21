@@ -2348,6 +2348,109 @@ func TestRepoHandler_ServelessUpdate(t *testing.T) {
 	tester.ResponseEq(t, 200, tester.OKText, nil)
 }
 
+func TestRepoHandler_ServelessUpdate_ComponentError(t *testing.T) {
+	tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
+		return rp.ServerlessUpdate
+	})
+	tester.WithUser()
+
+	tester.WithKV("repo_type", types.ModelRepo)
+	tester.WithParam("id", "1")
+	tester.WithBody(t, &types.DeployUpdateReq{
+		MinReplica: tea.Int(1),
+		MaxReplica: tea.Int(5),
+	})
+	componentErr := errors.New("boom from component")
+	tester.mocks.repo.EXPECT().DeployUpdate(tester.Ctx(), types.DeployActReq{
+		RepoType:    types.ModelRepo,
+		Namespace:   "u",
+		Name:        "r",
+		CurrentUser: "u",
+		DeployID:    1,
+		DeployType:  types.ServerlessType,
+	}, &types.DeployUpdateReq{
+		MinReplica: tea.Int(1),
+		MaxReplica: tea.Int(5),
+	}).Return(componentErr)
+	tester.Execute()
+
+	require.Equal(t, 500, tester.Response().Code)
+	var resp httpbase.R
+	require.NoError(t, json.Unmarshal(tester.Response().Body.Bytes(), &resp))
+	// plain component errors are wrapped into the stable SERVERLESS-ERR-9
+	// code, with the original message preserved in the error context
+	require.Equal(t, "SERVERLESS-ERR-9", resp.Code)
+	require.Contains(t, resp.Msg, "SERVERLESS-ERR-9")
+	require.Contains(t, resp.Context["reason"], "boom from component")
+	// errors.Is must still find the original component error through the chain
+	wrapped := errorx.ServerlessUpdateFailed(componentErr, nil)
+	require.True(t, errors.Is(wrapped, componentErr))
+}
+
+func TestRepoHandler_ServelessUpdate_SpecificCustomErrorKept(t *testing.T) {
+	tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
+		return rp.ServerlessUpdate
+	})
+	tester.WithUser()
+
+	tester.WithKV("repo_type", types.ModelRepo)
+	tester.WithParam("id", "1")
+	tester.WithBody(t, &types.DeployUpdateReq{
+		MinReplica: tea.Int(1),
+		MaxReplica: tea.Int(5),
+	})
+	tester.mocks.repo.EXPECT().DeployUpdate(tester.Ctx(), types.DeployActReq{
+		RepoType:    types.ModelRepo,
+		Namespace:   "u",
+		Name:        "r",
+		CurrentUser: "u",
+		DeployID:    1,
+		DeployType:  types.ServerlessType,
+	}, &types.DeployUpdateReq{
+		MinReplica: tea.Int(1),
+		MaxReplica: tea.Int(5),
+	}).Return(errorx.ErrDeployStopFirst)
+	tester.Execute()
+
+	require.Equal(t, 500, tester.Response().Code)
+	var resp httpbase.R
+	require.NoError(t, json.Unmarshal(tester.Response().Body.Bytes(), &resp))
+	// specific errors deeper in the chain keep their own code, which carries
+	// the localized message (DEPLOY-ERR-1 = deploy is running, stop first)
+	require.Equal(t, "DEPLOY-ERR-1", resp.Code)
+}
+
+func TestRepoHandler_ServelessUpdate_Forbidden(t *testing.T) {
+	tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
+		return rp.ServerlessUpdate
+	})
+	tester.WithUser()
+
+	tester.WithKV("repo_type", types.ModelRepo)
+	tester.WithParam("id", "1")
+	tester.WithBody(t, &types.DeployUpdateReq{
+		MinReplica: tea.Int(1),
+		MaxReplica: tea.Int(5),
+	})
+	tester.mocks.repo.EXPECT().DeployUpdate(tester.Ctx(), types.DeployActReq{
+		RepoType:    types.ModelRepo,
+		Namespace:   "u",
+		Name:        "r",
+		CurrentUser: "u",
+		DeployID:    1,
+		DeployType:  types.ServerlessType,
+	}, &types.DeployUpdateReq{
+		MinReplica: tea.Int(1),
+		MaxReplica: tea.Int(5),
+	}).Return(errorx.ErrForbidden)
+	tester.Execute()
+
+	require.Equal(t, 403, tester.Response().Code)
+	var resp httpbase.R
+	require.NoError(t, json.Unmarshal(tester.Response().Body.Bytes(), &resp))
+	require.Equal(t, "AUTH-ERR-2", resp.Code)
+}
+
 func TestRepoHandler_TreeV2(t *testing.T) {
 	t.Run("returns tree without checking mirror status", func(t *testing.T) {
 		tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
