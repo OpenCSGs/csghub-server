@@ -26,6 +26,71 @@ func (r *ResponsesRequest) PromptText() string {
 	return ResponsesPromptText(r)
 }
 
+// HasMultimodalContent reports whether the request input carries non-text
+// content parts (images, audio, files). It satisfies
+// types.MultimodalContentProvider so capacity admission can skip the
+// text-based TPM estimate: a text-only estimate is fiction for such requests.
+func (r *ResponsesRequest) HasMultimodalContent() bool {
+	if r == nil || len(r.Input) == 0 {
+		return false
+	}
+	return responsesRawHasMultimodal(r.Input)
+}
+
+func responsesRawHasMultimodal(raw json.RawMessage) bool {
+	if len(raw) == 0 || string(raw) == "null" {
+		return false
+	}
+	var asString string
+	if err := json.Unmarshal(raw, &asString); err == nil {
+		return false // plain text input
+	}
+	var items []map[string]any
+	if err := json.Unmarshal(raw, &items); err != nil {
+		return false
+	}
+	for _, item := range items {
+		if responsesValueHasMultimodal(item) {
+			return true
+		}
+	}
+	return false
+}
+
+func responsesValueHasMultimodal(v any) bool {
+	switch t := v.(type) {
+	case map[string]any:
+		if s, _ := t["type"].(string); isResponsesMultimodalType(s) {
+			return true
+		}
+		// Content parts live under "content"; "parts" covers the reasoning
+		// item shape for safety.
+		for _, key := range []string{"content", "parts"} {
+			if child, ok := t[key]; ok && responsesValueHasMultimodal(child) {
+				return true
+			}
+		}
+		return false
+	case []any:
+		for _, item := range t {
+			if responsesValueHasMultimodal(item) {
+				return true
+			}
+		}
+		return false
+	default:
+		return false
+	}
+}
+
+func isResponsesMultimodalType(s string) bool {
+	switch s {
+	case "input_image", "input_audio", "input_file", "image", "audio", "file":
+		return true
+	}
+	return false
+}
+
 func ResponsesInstructionText(raw json.RawMessage) string {
 	if len(raw) == 0 {
 		return ""

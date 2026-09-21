@@ -12,17 +12,26 @@ import (
 // it calls preProcess → Extract → Plan → Execute in sequence and delegates
 // error rendering to the protocol handler.  All admission decisions
 // (balance, quota, safety, routing) live inside the Planner; the Orchestrator
-// never inspects plan fields.
+// never inspects plan fields — with one deliberate exception: the capacity
+// admission lease lifecycle. When the Planner acquired a Redis lease, the
+// Orchestrator guarantees it is finalized (released) after Execute returns,
+// on every path including errors and panics.
 type Orchestrator struct {
-	planner          Planner
-	preflightStarter PreflightStarter // nil = preflight tracing disabled (test scenarios)
+	planner           Planner
+	preflightStarter  PreflightStarter // nil = preflight tracing disabled (test scenarios)
+	admissionReleaser AdmissionReleaser
 }
 
 // NewOrchestrator creates an Orchestrator backed by the given shared Planner.
 // The preflightStarter starts the preflight trace span; pass nil to disable
-// preflight tracing (useful in unit tests).
-func NewOrchestrator(planner Planner, preflightStarter PreflightStarter) *Orchestrator {
-	return &Orchestrator{planner: planner, preflightStarter: preflightStarter}
+// preflight tracing (useful in unit tests). The optional admissionReleaser
+// enables the admission lease safety net; pass nil to skip it.
+func NewOrchestrator(planner Planner, preflightStarter PreflightStarter, admissionReleaser ...AdmissionReleaser) *Orchestrator {
+	o := &Orchestrator{planner: planner, preflightStarter: preflightStarter}
+	if len(admissionReleaser) > 0 {
+		o.admissionReleaser = admissionReleaser[0]
+	}
+	return o
 }
 
 // preProcess runs before Extract.  It starts the preflight trace span and
@@ -70,6 +79,19 @@ func (o *Orchestrator) Dispatch(c *gin.Context, extractor MetadataExtractor, han
 	}
 
 	p, err := o.planner.Plan(c, meta)
+	if o.admissionReleaser != nil && p != nil {
+		// Capacity admission lease safety net. The lease is read from the
+		// plan at DEFER EXECUTION time, not registration time: a lease
+		// acquired later (e.g. the availability fallback re-acquiring a
+		// pinned lease in the attempt loop after a fail-open Plan) must be
+		// released too, otherwise the renewer would keep it alive forever.
+		// Execute blocks until the response is fully written, so this defer
+		// runs after the upstream attempt finished — covering success,
+		// execute errors and panics. The release is ownership-guarded and
+		// idempotent: when the protocol's async usage commit already
+		// finalized the lease (with real usage), this is a Redis no-op.
+		defer o.admissionReleaser.ReleaseAdmission(c, p)
+	}
 	if err != nil {
 		handler.HandlePlanError(c, meta, p, err)
 		return

@@ -91,6 +91,16 @@ func (b *chatParsedBody) PromptText() string {
 	return b.Req.PromptText()
 }
 
+// HasMultimodalContent implements types.MultimodalContentProvider so the
+// capacity admission adapter sees through this wrapper to the request's
+// multimodal content (image/audio parts skip the text-based TPM estimate).
+func (b *chatParsedBody) HasMultimodalContent() bool {
+	if b == nil || b.Req == nil {
+		return false
+	}
+	return b.Req.HasMultimodalContent()
+}
+
 // --- Phase 1: Extract ---
 
 func (h *chatPipelineHandler) Extract(c *gin.Context) (*types.RequestMetadata, error) {
@@ -217,7 +227,7 @@ func (h *chatPipelineHandler) Execute(c *gin.Context, meta *types.RequestMetadat
 		slog.Any("target", mt.Target),
 		slog.Any("host", mt.Host),
 	)
-	primaryWriter, proxyErr := h.handler.executeChatProxyAttempt(c, chatCtx.responseWriter, mt, nsUUID, chatReq)
+	primaryWriter, proxyErr := h.handler.executeChatProxyAttempt(c, chatCtx.responseWriter, mt, nsUUID, chatReq, p)
 	if proxyErr != nil {
 		finishLLMTraceWithError(generationRecorder, proxyErr, types.TraceErrUpstreamUnavailable)
 		h.handler.handleProxyError(c, chatReq.Stream, username, modelID, proxyErr)
@@ -226,7 +236,7 @@ func (h *chatPipelineHandler) Execute(c *gin.Context, meta *types.RequestMetadat
 	}
 	log.InfoContext(ctx, "proxy chat request to model target", slog.Int("status", primaryWriter.statusCode), slog.Int64("proxy_latency(ms)", time.Since(proxyStartTime).Milliseconds()), slog.Int64("ttft(ms)", retryWriterTTFTMs(primaryWriter, proxyStartTime)))
 
-	finalWriter, err := h.handler.executeChatWithFallback(c, chatCtx, mt, nsUUID, chatReq, primaryWriter, username, modelID)
+	finalWriter, err := h.handler.executeChatWithFallback(c, chatCtx, mt, nsUUID, chatReq, primaryWriter, username, modelID, p)
 	if err != nil {
 		finishLLMTraceWithError(generationRecorder, err, types.TraceErrUpstreamUnavailable)
 		h.handler.handleProxyError(c, chatReq.Stream, username, modelID, err)
@@ -256,6 +266,7 @@ func (h *chatPipelineHandler) Execute(c *gin.Context, meta *types.RequestMetadat
 		LogCapture:      chatCtx.logCapture,
 		Trace:           newChatTracePostProcessInput(generationRecorder, chatReq, finalWriter),
 		StatusCode:      retryWriterStatusCode(finalWriter),
+		AdmissionLease:  admissionLeaseFromPlan(p),
 	})
 
 	return nil

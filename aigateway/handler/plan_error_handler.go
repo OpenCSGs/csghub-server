@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/aigateway/types"
@@ -42,6 +43,25 @@ func handleOpenAIPlanError(c *gin.Context, meta *types.RequestMetadata, p *types
 			c.JSON(http.StatusTooManyRequests, gin.H{"error": gin.H{
 				"code":    "rate_limit_exceeded",
 				"message": "Usage quota exceeded for current window",
+				"type":    "rate_limit_error",
+			}})
+			return
+		case types.PlanErrCapacityExceeded:
+			message := "model capacity exceeded, please retry later"
+			retryAfter := int64(1)
+			if p.Admission != nil {
+				if p.Admission.Reason != "" {
+					message = "model capacity exceeded: " + p.Admission.Reason
+				}
+				if p.Admission.RetryAfterSeconds > 0 {
+					retryAfter = p.Admission.RetryAfterSeconds
+				}
+			}
+			// Retry-After is a retry hint, not a capacity guarantee.
+			c.Header("Retry-After", strconv.FormatInt(retryAfter, 10))
+			c.JSON(http.StatusTooManyRequests, gin.H{"error": gin.H{
+				"code":    "capacity_exceeded",
+				"message": message,
 				"type":    "rate_limit_error",
 			}})
 			return

@@ -76,6 +76,38 @@ func (r *ChatCompletionRequest) PromptText() string {
 	return strings.TrimSpace(b.String())
 }
 
+// HasMultimodalContent reports whether any message carries non-text content
+// parts (images, audio, files). It satisfies types.MultimodalContentProvider
+// so capacity admission can skip the text-based TPM estimate: a text-only
+// estimate is fiction for such requests.
+func (r *ChatCompletionRequest) HasMultimodalContent() bool {
+	if r == nil {
+		return false
+	}
+	for _, msg := range r.Messages {
+		switch content := msg.GetContent().AsAny().(type) {
+		case *[]openai.ChatCompletionContentPartUnionParam:
+			for _, part := range *content {
+				if part.OfImageURL != nil || part.OfInputAudio != nil || part.OfFile != nil {
+					return true
+				}
+			}
+		case []interface{}:
+			// Generic decode path: content parts are raw maps.
+			for _, part := range content {
+				partMap, ok := part.(map[string]interface{})
+				if !ok {
+					continue
+				}
+				if partType, _ := partMap["type"].(string); partType != "" && partType != "text" {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
 // UnmarshalJSON implements json.Unmarshaler interface
 func (r *ChatCompletionRequest) UnmarshalJSON(data []byte) error {
 	// Create a temporary struct to hold the known fields

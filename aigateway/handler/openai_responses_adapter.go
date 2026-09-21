@@ -15,7 +15,7 @@ import (
 	"opencsg.com/csghub-server/builder/compress"
 )
 
-func (h *OpenAIHandlerImpl) executeAdapterResponses(c *gin.Context, req *types.ResponsesRequest, modelTarget *resolvedModelTarget, nsUUID, apikey, publicModelID string, moderation component.Moderation, logCapture *responsespkg.LLMLogRecorder, generationRecorder llmtrace.GenerationRecorder) {
+func (h *OpenAIHandlerImpl) executeAdapterResponses(c *gin.Context, req *types.ResponsesRequest, modelTarget *resolvedModelTarget, nsUUID, apikey, publicModelID string, moderation component.Moderation, logCapture *responsespkg.LLMLogRecorder, generationRecorder llmtrace.GenerationRecorder, p *types.RequestPlan) {
 	if err := validateResponsesAdapterRequest(req); err != nil {
 		finishLLMTraceWithError(generationRecorder, err, types.TraceErrUpstreamError)
 		writeResponsesError(c, http.StatusBadRequest, adapterErrorCode(err), "invalid_request_error", err.Error())
@@ -40,13 +40,13 @@ func (h *OpenAIHandlerImpl) executeAdapterResponses(c *gin.Context, req *types.R
 	writer := newResponsesAdapterResponseWriter(c.Writer, req.Stream, publicModelID, responsesCounter, moderation, newResponsesModerationSessionID(), logCapture)
 	setResponsesAdapterToolResolver(writer, toolAliases)
 	proxyStartTime := time.Now()
-	primaryWriter, proxyErr := h.executeChatProxyAttempt(c, writer, modelTarget, nsUUID, chatReq)
+	primaryWriter, proxyErr := h.executeChatProxyAttempt(c, writer, modelTarget, nsUUID, chatReq, p)
 	if proxyErr != nil {
 		finishLLMTraceWithError(generationRecorder, proxyErr, types.TraceErrUpstreamUnavailable)
 		h.handleProxyError(c, req.Stream, nsUUID, publicModelID, proxyErr)
 		return
 	}
-	finalWriter, fallbackErr := h.executeChatWithFallback(c, &chatContext{responseWriter: writer}, modelTarget, nsUUID, chatReq, primaryWriter, nsUUID, publicModelID)
+	finalWriter, fallbackErr := h.executeChatWithFallback(c, &chatContext{responseWriter: writer}, modelTarget, nsUUID, chatReq, primaryWriter, nsUUID, publicModelID, p)
 	if fallbackErr != nil {
 		finishLLMTraceWithError(generationRecorder, fallbackErr, types.TraceErrUpstreamUnavailable)
 		h.handleProxyError(c, req.Stream, nsUUID, publicModelID, fallbackErr)
@@ -72,7 +72,7 @@ func (h *OpenAIHandlerImpl) executeAdapterResponses(c *gin.Context, req *types.R
 	})
 
 	traceInput := newResponsesTracePostProcessInput(generationRecorder, req, retryWriterStatusCode(finalWriter), finalWriter.FirstWriteAt())
-	h.recordResponsesUsageWithTrace(c, responsesCounter, responsesUsage, nsUUID, modelTarget, apikey, logCapture, traceInput)
+	h.recordResponsesUsageWithTrace(c, responsesCounter, responsesUsage, nsUUID, modelTarget, apikey, logCapture, traceInput, admissionLeaseFromPlan(p))
 }
 
 func decodeResponsesAdapterChatBody(bufferWriter *bufferCommonResponseWriter) ([]byte, error) {

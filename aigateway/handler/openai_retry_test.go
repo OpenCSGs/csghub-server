@@ -308,7 +308,7 @@ func TestExecuteChatProxyAttempt_ReturnsUsageLimitError(t *testing.T) {
 	writer := newTestCommonResponseWriter()
 	chatReq := &types.ChatCompletionRequest{Model: "test-model"}
 
-	retryWriter, err := tester.handler.executeChatProxyAttempt(c, writer, modelTarget, "user-1", chatReq)
+	retryWriter, err := tester.handler.executeChatProxyAttempt(c, writer, modelTarget, "user-1", chatReq, nil)
 
 	require.Nil(t, retryWriter)
 	require.ErrorIs(t, err, expectedErr)
@@ -354,7 +354,7 @@ func TestExecuteChatProxyAttempt_ProxiesRequestAfterUsageLimitCheck(t *testing.T
 		Model: "test-model",
 	}
 
-	retryWriter, err := tester.handler.executeChatProxyAttempt(c, writer, modelTarget, "user-1", chatReq)
+	retryWriter, err := tester.handler.executeChatProxyAttempt(c, writer, modelTarget, "user-1", chatReq, nil)
 
 	require.NoError(t, err)
 	require.NotNil(t, retryWriter)
@@ -407,7 +407,7 @@ func TestExecuteChatProxyAttempt_RewritesResponsesURLForChatRequest(t *testing.T
 		Model: "test-model",
 	}
 
-	retryWriter, err := tester.handler.executeChatProxyAttempt(c, writer, modelTarget, "user-1", chatReq)
+	retryWriter, err := tester.handler.executeChatProxyAttempt(c, writer, modelTarget, "user-1", chatReq, nil)
 
 	require.NoError(t, err)
 	require.NotNil(t, retryWriter)
@@ -436,7 +436,7 @@ func TestRetryChatWithFallback_ReturnsNilWithoutFallbackTargets(t *testing.T) {
 		AttemptTargets: nil,
 	}
 
-	_, err := tester.handler.retryChatWithFallback(c, newTestCommonResponseWriter(), modelTarget, "user-1", &types.ChatCompletionRequest{Model: "test-model"}, nil, nil)
+	_, err := tester.handler.retryChatWithFallback(c, newTestCommonResponseWriter(), modelTarget, "user-1", &types.ChatCompletionRequest{Model: "test-model"}, nil, nil, nil)
 
 	require.NoError(t, err)
 }
@@ -476,7 +476,7 @@ func TestRetryChatWithFallback_ReplaysLastRetryableFallbackResponse(t *testing.T
 	c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewReader(body))
 	writer := newTestCommonResponseWriter()
 
-	_, err := tester.handler.retryChatWithFallback(c, writer, modelTarget, "user-1", &types.ChatCompletionRequest{Model: "test-model"}, nil, nil)
+	_, err := tester.handler.retryChatWithFallback(c, writer, modelTarget, "user-1", &types.ChatCompletionRequest{Model: "test-model"}, nil, nil, nil)
 
 	require.NoError(t, err)
 	require.Equal(t, http.StatusServiceUnavailable, writer.statusCode)
@@ -532,7 +532,7 @@ func TestRetryChatWithFallback_ContinuesUntilNextFallbackSucceeds(t *testing.T) 
 	c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewReader(body))
 	writer := newTestCommonResponseWriter()
 
-	_, err := tester.handler.retryChatWithFallback(c, writer, modelTarget, "user-1", &types.ChatCompletionRequest{Model: "test-model"}, nil, nil)
+	_, err := tester.handler.retryChatWithFallback(c, writer, modelTarget, "user-1", &types.ChatCompletionRequest{Model: "test-model"}, nil, nil, nil)
 
 	require.NoError(t, err)
 	require.Equal(t, http.StatusOK, writer.statusCode)
@@ -579,7 +579,7 @@ func TestRetryChatWithFallback_RewritesResponsesFallbackURLForChatRequest(t *tes
 	c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewReader(body))
 	writer := newTestCommonResponseWriter()
 
-	_, err := tester.handler.retryChatWithFallback(c, writer, modelTarget, "user-1", &types.ChatCompletionRequest{Model: "test-model"}, nil, nil)
+	_, err := tester.handler.retryChatWithFallback(c, writer, modelTarget, "user-1", &types.ChatCompletionRequest{Model: "test-model"}, nil, nil, nil)
 
 	require.NoError(t, err)
 	require.Equal(t, http.StatusOK, writer.statusCode)
@@ -640,6 +640,7 @@ func TestRetryChatWithFallback_UsesFallbackModelName(t *testing.T) {
 		modelTarget,
 		"user-1",
 		&types.ChatCompletionRequest{Model: "logical-model"},
+		nil,
 		nil,
 		nil,
 	)
@@ -942,6 +943,7 @@ func TestRetryChatWithFallback_ReportsFallbackAttemptFailure(t *testing.T) {
 		&types.ChatCompletionRequest{Model: "logical-model"},
 		nil,
 		nil,
+		nil,
 	)
 
 	require.NoError(t, err)
@@ -1023,7 +1025,7 @@ func TestExecuteChatProxyAttempt_ProxiesEndpointPathToUpstream(t *testing.T) {
 			writer := newTestCommonResponseWriter()
 			chatReq := &types.ChatCompletionRequest{Model: "test-model"}
 
-			retryWriter, err := tester.handler.executeChatProxyAttempt(c, writer, modelTarget, "user-1", chatReq)
+			retryWriter, err := tester.handler.executeChatProxyAttempt(c, writer, modelTarget, "user-1", chatReq, nil)
 
 			require.NoError(t, err)
 			require.NotNil(t, retryWriter)
@@ -1068,7 +1070,7 @@ func TestExecuteChatProxyAttempt_Upstream404FlowsThroughRetryWriter(t *testing.T
 	c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewReader([]byte(`{"message":"hello"}`)))
 	writer := newTestCommonResponseWriter()
 
-	retryWriter, err := tester.handler.executeChatProxyAttempt(c, writer, modelTarget, "user-1", &types.ChatCompletionRequest{Model: "test-model"})
+	retryWriter, err := tester.handler.executeChatProxyAttempt(c, writer, modelTarget, "user-1", &types.ChatCompletionRequest{Model: "test-model"}, nil)
 
 	require.NoError(t, err)
 	require.NotNil(t, retryWriter)
@@ -1133,7 +1135,7 @@ func TestRetryChatWithFallback_FallbackPathFollowsFallbackEndpoint(t *testing.T)
 	c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewReader([]byte(`{"message":"hello"}`)))
 	writer := newTestCommonResponseWriter()
 
-	_, err := tester.handler.retryChatWithFallback(c, writer, modelTarget, "user-1", &types.ChatCompletionRequest{Model: "test-model"}, nil, nil)
+	_, err := tester.handler.retryChatWithFallback(c, writer, modelTarget, "user-1", &types.ChatCompletionRequest{Model: "test-model"}, nil, nil, nil)
 
 	require.NoError(t, err)
 	require.Equal(t, "/node-b/v1/chat/completions", fallbackPath)
@@ -1184,7 +1186,7 @@ func TestExecuteChatProxyAttempt_ResponsesCompatRewritePreservesPrefix(t *testin
 	c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewReader([]byte(`{"message":"hello"}`)))
 	writer := newTestCommonResponseWriter()
 
-	retryWriter, err := tester.handler.executeChatProxyAttempt(c, writer, modelTarget, "user-1", &types.ChatCompletionRequest{Model: "test-model"})
+	retryWriter, err := tester.handler.executeChatProxyAttempt(c, writer, modelTarget, "user-1", &types.ChatCompletionRequest{Model: "test-model"}, nil)
 
 	require.NoError(t, err)
 	require.NotNil(t, retryWriter)

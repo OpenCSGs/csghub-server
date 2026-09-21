@@ -16,8 +16,15 @@ import (
 	"opencsg.com/csghub-server/builder/proxy"
 )
 
-func (h *OpenAIHandlerImpl) executeNativeResponses(c *gin.Context, req *types.ResponsesRequest, modelTarget *resolvedModelTarget, decision responsespkg.RoutingDecision, owner, nsUUID, apikey, publicModelID, publicPreviousResponseID string, moderation component.Moderation, logCapture *responsespkg.LLMLogRecorder, generationRecorder llmtrace.GenerationRecorder) {
+func (h *OpenAIHandlerImpl) executeNativeResponses(c *gin.Context, req *types.ResponsesRequest, modelTarget *resolvedModelTarget, decision responsespkg.RoutingDecision, owner, nsUUID, apikey, publicModelID, publicPreviousResponseID string, moderation component.Moderation, logCapture *responsespkg.LLMLogRecorder, generationRecorder llmtrace.GenerationRecorder, p *types.RequestPlan) {
 	backendURL := decision.BackendURL
+	// Capacity admission: the plan-phase lease covers the pinned primary
+	// upstream; rotate when this execution resolves a different upstream.
+	if err := ensureAdmissionForAttempt(c.Request.Context(), h, p, modelTarget); err != nil {
+		finishLLMTraceWithError(generationRecorder, err, types.TraceErrUpstreamError)
+		h.handleAdmissionDenied(c, req.Stream, err)
+		return
+	}
 	if err := h.openaiComponent.CheckUsageLimit(c.Request.Context(), nsUUID, modelTarget.Model, backendURL); err != nil {
 		finishLLMTraceWithError(generationRecorder, err, types.TraceErrInsufficientBalance)
 		h.handleUsageLimitExceeded(c, req.Stream, nsUUID, publicModelID, err)
@@ -92,5 +99,5 @@ func (h *OpenAIHandlerImpl) executeNativeResponses(c *gin.Context, req *types.Re
 		Usage:          responsesUsage,
 	})
 	traceInput := newResponsesTracePostProcessInput(generationRecorder, req, writer.StatusCode(), writer.FirstWriteAt())
-	h.recordResponsesUsageWithTrace(c, responsesCounter, responsesUsage, nsUUID, modelTarget, apikey, logCapture, traceInput)
+	h.recordResponsesUsageWithTrace(c, responsesCounter, responsesUsage, nsUUID, modelTarget, apikey, logCapture, traceInput, admissionLeaseFromPlan(p))
 }

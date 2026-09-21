@@ -985,6 +985,53 @@ func (_c *MockRedisClient_LPush_Call) RunAndReturn(run func(context.Context, str
 	return _c
 }
 
+// LoadScript provides a mock function with given fields: ctx, scriptStr
+func (_m *MockRedisClient) LoadScript(ctx context.Context, scriptStr string) error {
+	ret := _m.Called(ctx, scriptStr)
+
+	if len(ret) == 0 {
+		panic("no return value specified for LoadScript")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) error); ok {
+		r0 = rf(ctx, scriptStr)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockRedisClient_LoadScript_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'LoadScript'
+type MockRedisClient_LoadScript_Call struct {
+	*mock.Call
+}
+
+// LoadScript is a helper method to define mock.On call
+//   - ctx context.Context
+//   - scriptStr string
+func (_e *MockRedisClient_Expecter) LoadScript(ctx interface{}, scriptStr interface{}) *MockRedisClient_LoadScript_Call {
+	return &MockRedisClient_LoadScript_Call{Call: _e.mock.On("LoadScript", ctx, scriptStr)}
+}
+
+func (_c *MockRedisClient_LoadScript_Call) Run(run func(ctx context.Context, scriptStr string)) *MockRedisClient_LoadScript_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockRedisClient_LoadScript_Call) Return(_a0 error) *MockRedisClient_LoadScript_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockRedisClient_LoadScript_Call) RunAndReturn(run func(context.Context, string) error) *MockRedisClient_LoadScript_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Pipelined provides a mock function with given fields: ctx, fn
 func (_m *MockRedisClient) Pipelined(ctx context.Context, fn func(redis.Pipeliner) error) ([]redis.Cmder, error) {
 	ret := _m.Called(ctx, fn)

@@ -20,6 +20,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -181,7 +182,8 @@ func (h *Handler) Execute(c *gin.Context, meta *types.RequestMetadata, p *types.
 			Stream:     meta.Streaming,
 			StatusCode: statusCode,
 		},
-		StatusCode: statusCode,
+		StatusCode:     statusCode,
+		AdmissionLease: admissionLeaseFromMessagesPlan(p),
 	})
 
 	return nil
@@ -310,6 +312,16 @@ func (h *Handler) runPostProcessAsync(ctx context.Context, input postProcessInpu
 			}
 		}
 
+		// Finalize the capacity admission lease with the real usage
+		// (idempotent with the Orchestrator's safety-net release).
+		if h.AdmissionFinalizer != nil && input.AdmissionLease != nil {
+			var admissionUsage *types.AdmissionUsage
+			if input.Usage != nil {
+				admissionUsage = &types.AdmissionUsage{TotalTokens: input.Usage.TotalTokens}
+			}
+			h.AdmissionFinalizer.FinalizeCapacityAdmission(usageCtx, input.AdmissionLease, admissionUsage)
+		}
+
 		// Record usage (only on successful status).
 		if h.UsageRecorder != nil && input.Model != nil && input.Usage != nil && isSuccessfulStatus(input.StatusCode) {
 			if err := h.UsageRecorder.RecordUsage(usageCtx, input.NSUUID, input.Model, input.TargetModelName, input.Usage.toUsage(), input.ApiKey); err != nil {
@@ -344,6 +356,15 @@ func (h *Handler) runPostProcessAsync(ctx context.Context, input postProcessInpu
 
 func (h *Handler) commitUsageLimitSync(ctx context.Context, nsUUID string, model *types.Model, usage *tokenUsage) error {
 	return h.UsageLimiter.CommitUsageLimitFromUsage(ctx, nsUUID, model, usage.PromptTokens, usage.CompletionTokens, usage.CachedPromptTokens, usage.CacheCreationPromptTokens)
+}
+
+// admissionLeaseFromMessagesPlan extracts the current capacity admission
+// lease from the plan (nil when admission did not run).
+func admissionLeaseFromMessagesPlan(p *types.RequestPlan) *types.AdmissionLease {
+	if p == nil || p.Admission == nil {
+		return nil
+	}
+	return p.Admission.Lease
 }
 
 // adapt transforms the request for the upstream protocol and creates the
@@ -394,6 +415,21 @@ func (h *Handler) HandlePlanError(c *gin.Context, meta *types.RequestMetadata, p
 		case types.PlanErrUsageLimitExceeded:
 			writeError(c, http.StatusTooManyRequests, ErrTypeRateLimit,
 				"usage quota exceeded for current window")
+			return
+		case types.PlanErrCapacityExceeded:
+			message := "model capacity exceeded, please retry later"
+			retryAfter := int64(1)
+			if p.Admission != nil {
+				if p.Admission.Reason != "" {
+					message = "model capacity exceeded: " + p.Admission.Reason
+				}
+				if p.Admission.RetryAfterSeconds > 0 {
+					retryAfter = p.Admission.RetryAfterSeconds
+				}
+			}
+			// Retry-After is a retry hint, not a capacity guarantee.
+			c.Header("Retry-After", strconv.FormatInt(retryAfter, 10))
+			writeError(c, http.StatusTooManyRequests, ErrTypeRateLimit, message)
 			return
 		case types.PlanErrDisabled:
 			writeError(c, http.StatusBadRequest, ErrTypeUnsupported,

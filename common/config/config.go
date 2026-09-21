@@ -610,6 +610,34 @@ type Config struct {
 			MaxRPM           int   `env:"OPENCSG_AIGATEWAY_CAPACITY_POLICY_DEFAULT_MAX_RPM" default:"100"`
 			QueueWaitSeconds int   `env:"OPENCSG_AIGATEWAY_CAPACITY_POLICY_DEFAULT_QUEUE_WAIT_SECONDS" default:"60"`
 		}
+		// CapacityAdmission configures the request admission control that
+		// enforces per-upstream CapacityPolicy limits (concurrency, RPM and
+		// TPM with pre-reservation) in Redis before requests are forwarded
+		// to the runtime. All state is shared across gateway replicas.
+		CapacityAdmission struct {
+			// LeaseTTLSeconds is the lease expiry used for the distributed
+			// concurrency/TPM reservation. Active requests renew the lease
+			// every TTL/3; leases left by crashed replicas are reclaimed
+			// (together with their TPM reservation) within TTL.
+			LeaseTTLSeconds int `env:"OPENCSG_AIGATEWAY_CAPACITY_ADMISSION_LEASE_TTL" default:"60"`
+			// FailOpen admits requests without a lease when Redis is
+			// unavailable (protection degrades instead of blocking traffic).
+			FailOpen bool `env:"OPENCSG_AIGATEWAY_CAPACITY_ADMISSION_FAIL_OPEN" default:"true"`
+			// EstimatePromptCharsPerToken converts prompt text length into
+			// an estimated token count for the TPM pre-reservation (soft
+			// heuristic; corrected with real usage after the response).
+			EstimatePromptCharsPerToken int `env:"OPENCSG_AIGATEWAY_CAPACITY_ADMISSION_ESTIMATE_CHARS_PER_TOKEN" default:"4"`
+			// EstimateCompletionTokens is the per-request completion token
+			// reserve added on top of the prompt estimate.
+			EstimateCompletionTokens int64 `env:"OPENCSG_AIGATEWAY_CAPACITY_ADMISSION_ESTIMATE_COMPLETION_TOKENS" default:"1000"`
+			// EstimateMaxTokens caps the per-request TPM reservation so an
+			// oversized prompt cannot exhaust the whole TPM window.
+			EstimateMaxTokens int64 `env:"OPENCSG_AIGATEWAY_CAPACITY_ADMISSION_ESTIMATE_MAX_TOKENS" default:"32768"`
+			// RetryAfterHintSeconds is the Retry-After hint returned when a
+			// request is rejected because concurrency is exhausted. It is a
+			// hint, not a capacity guarantee.
+			RetryAfterHintSeconds int `env:"OPENCSG_AIGATEWAY_CAPACITY_ADMISSION_RETRY_AFTER_HINT" default:"5"`
+		}
 		MetricsCollectorLookbackMinutes int `env:"OPENCSG_AIGATEWAY_METRICS_COLLECTOR_LOOKBACK_MINUTES" default:"60"`
 
 		Metrics struct {

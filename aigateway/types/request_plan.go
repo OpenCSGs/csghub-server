@@ -83,6 +83,12 @@ type RequestPlan struct {
 	Safety *SafetyDecision
 	// UsageLimitOK indicates whether the usage-limit check passed.
 	UsageLimitOK bool
+	// Admission holds the capacity-admission decision (nil when admission
+	// did not apply, e.g. no upstream has an enabled CapacityPolicy). When
+	// present, Decision.Lease identifies the acquired Redis lease; the
+	// lease is released/finalized by the Orchestrator's safety-net defer and
+	// the per-protocol usage commit path.
+	Admission *AdmissionDecision
 	// ErrorCode categorizes a Plan-phase error so the protocol handler can
 	// choose the appropriate error response format.  It is only meaningful
 	// when Plan returns an error.  See PlanErrorCategory constants.
@@ -100,6 +106,7 @@ const (
 	PlanErrUsageLimitExceeded
 	PlanErrDisabled
 	PlanErrSensitive
+	PlanErrCapacityExceeded
 	PlanErrInternal
 )
 

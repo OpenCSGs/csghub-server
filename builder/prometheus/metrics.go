@@ -28,6 +28,24 @@ var (
 	AIGatewayTTFT            *prometheus.HistogramVec
 	AIGatewayTokensTotal     *prometheus.CounterVec
 	AIGatewayActiveRequests  prometheus.Gauge
+
+	// AIGateway capacity admission metrics. The admission totals counter is
+	// the single source for admission_requests_total /
+	// admission_accepted_total / admission_queued_total /
+	// admission_rejected_total / admission_rejection_reason (all derivable
+	// from the decision/reason label dimensions).
+	AIGatewayAdmissionTotal           *prometheus.CounterVec
+	AIGatewayAdmissionDecisionLatency *prometheus.HistogramVec
+	AIGatewayAdmissionRedisErrors     *prometheus.CounterVec
+
+	// AIGateway upstream capacity state metrics, refreshed from the
+	// admission check / observation path. Observational only: gauges reflect
+	// the state at the last check (request-path freshness varies; the
+	// selected upstream's values include its own reservation).
+	AIGatewayUpstreamCapacityCurrent *prometheus.GaugeVec
+	// Count of admission checks where the candidate was blocked, per
+	// dimension — the primary saturation alarm signal.
+	AIGatewayUpstreamCapacityBlockedTotal *prometheus.CounterVec
 )
 
 func InitMetrics() {
@@ -93,8 +111,8 @@ func InitMetrics() {
 	// inference requests land, so histogram_quantile() produces accurate P50/P90
 	// values.  Long-tail buckets (2m–1h) cover slow batch/long-generation requests.
 	AIGatewayRequestDuration = promauto.NewHistogramVec(prometheus.HistogramOpts{
-		Name:    "csghub_aigateway_request_duration_ms",
-		Help:    "AIGateway request total latency in milliseconds",
+		Name: "csghub_aigateway_request_duration_ms",
+		Help: "AIGateway request total latency in milliseconds",
 		Buckets: []float64{
 			50, 100, 200, 300, 500, 750, 1000, 1500, 2000, 3000, 5000, 10000, 30000, 60000,
 			120000, 300000, 600000, 1200000, 1800000, 3600000, // 2m, 5m, 10m, 20m, 30m, 1h
@@ -106,8 +124,8 @@ func InitMetrics() {
 	// TTFT is more latency-sensitive than total duration, so extra density is
 	// added in the 600–4000 ms range where streaming first-token typically lands.
 	AIGatewayTTFT = promauto.NewHistogramVec(prometheus.HistogramOpts{
-		Name:    "csghub_aigateway_ttft_ms",
-		Help:    "AIGateway time to first token in milliseconds (streaming only)",
+		Name: "csghub_aigateway_ttft_ms",
+		Help: "AIGateway time to first token in milliseconds (streaming only)",
 		Buckets: []float64{
 			50, 100, 200, 300, 500, 600, 700, 800, 900, 1000, 1200, 1500, 2000, 2500, 3000, 4000, 5000, 10000, 30000, 60000,
 		},
@@ -125,4 +143,46 @@ func InitMetrics() {
 		Name: "csghub_aigateway_active_requests",
 		Help: "Number of active AIGateway requests being processed",
 	})
+
+	// AIGateway capacity admission decisions.
+	// Labels: decision (admit/reject/fail_open), reason (empty for admit,
+	// otherwise concurrency_exceeded/rpm_exceeded/tpm_exceeded/
+	// capacity_exceeded), model, provider.
+	// decision=fail_open counts requests admitted because Redis was
+	// unavailable — keep it out of the "accepted" series when monitoring
+	// protection health.
+	AIGatewayAdmissionTotal = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "csghub_aigateway_admission_requests_total",
+		Help: "Total AIGateway capacity admission decisions (accepted/queued/rejected derivable from the decision label; rejection reason from the reason label)",
+	}, []string{"decision", "reason", "model", "provider"})
+
+	// AIGateway admission decision latency (single Redis round trip).
+	AIGatewayAdmissionDecisionLatency = promauto.NewHistogramVec(prometheus.HistogramOpts{
+		Name:    "csghub_aigateway_admission_decision_latency_ms",
+		Help:    "AIGateway capacity admission decision latency in milliseconds",
+		Buckets: []float64{0.5, 1, 2, 5, 10, 20, 50, 100, 200, 500, 1000},
+	}, []string{"model"})
+
+	// AIGateway admission Redis operation failures (per operation:
+	// check/finalize/renew). These degrade to fail-open behavior.
+	AIGatewayAdmissionRedisErrors = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "csghub_aigateway_admission_redis_errors_total",
+		Help: "Total AIGateway capacity admission Redis operation errors",
+	}, []string{"operation"})
+
+	// AIGateway upstream capacity state (post expired-lease cleanup).
+	// Labels: model, upstream_id, dimension (concurrency/rpm/tpm).
+	// Values are the Redis-side counters as of the last observation; the
+	// selected upstream of an admitted request reports post-acquire values.
+	AIGatewayUpstreamCapacityCurrent = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "csghub_aigateway_upstream_capacity_current",
+		Help: "Current upstream capacity usage observed by admission (observational, refreshed at check/observation time)",
+	}, []string{"model", "upstream_id", "dimension"})
+
+	// AIGateway upstream capacity blocked events per dimension — a nonzero
+	// rate means the upstream saturates that dimension.
+	AIGatewayUpstreamCapacityBlockedTotal = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "csghub_aigateway_upstream_capacity_blocked_total",
+		Help: "Total admission checks where an upstream was blocked on a capacity dimension",
+	}, []string{"model", "upstream_id", "dimension"})
 }

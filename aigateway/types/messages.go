@@ -10,25 +10,25 @@ import (
 // following the Anthropic Messages API specification.
 // Unknown fields are preserved in ExtraFields for native passthrough.
 type AnthropicMessagesRequest struct {
-	Model          string                 `json:"model"`
-	Messages       []AnthropicMessage     `json:"messages"`
-	System         json.RawMessage        `json:"system,omitempty"` // string or []AnthropicContentBlock
-	MaxTokens      int                    `json:"max_tokens"`
-	Metadata       *AnthropicMetadata     `json:"metadata,omitempty"`
-	StopSequences  []string               `json:"stop_sequences,omitempty"`
-	Stream         bool                   `json:"stream,omitempty"`
-	Temperature    *float64               `json:"temperature,omitempty"`
-	TopP           *float64               `json:"top_p,omitempty"`
-	TopK           *int                   `json:"top_k,omitempty"`
-	Tools          []AnthropicTool        `json:"tools,omitempty"`
-	ToolChoice     json.RawMessage        `json:"tool_choice,omitempty"`
-	Thinking       *AnthropicThinking     `json:"thinking,omitempty"`
-	ExtraFields    map[string]json.RawMessage `json:"-"`
+	Model         string                     `json:"model"`
+	Messages      []AnthropicMessage         `json:"messages"`
+	System        json.RawMessage            `json:"system,omitempty"` // string or []AnthropicContentBlock
+	MaxTokens     int                        `json:"max_tokens"`
+	Metadata      *AnthropicMetadata         `json:"metadata,omitempty"`
+	StopSequences []string                   `json:"stop_sequences,omitempty"`
+	Stream        bool                       `json:"stream,omitempty"`
+	Temperature   *float64                   `json:"temperature,omitempty"`
+	TopP          *float64                   `json:"top_p,omitempty"`
+	TopK          *int                       `json:"top_k,omitempty"`
+	Tools         []AnthropicTool            `json:"tools,omitempty"`
+	ToolChoice    json.RawMessage            `json:"tool_choice,omitempty"`
+	Thinking      *AnthropicThinking         `json:"thinking,omitempty"`
+	ExtraFields   map[string]json.RawMessage `json:"-"`
 }
 
 // AnthropicMessage is a single message in the messages array.
 type AnthropicMessage struct {
-	Role    string          `json:"role"` // "user" | "assistant"
+	Role    string          `json:"role"`    // "user" | "assistant"
 	Content json.RawMessage `json:"content"` // string or []AnthropicContentBlock
 }
 
@@ -74,9 +74,9 @@ type AnthropicThinking struct {
 // It supports both the native Anthropic format (name / description / input_schema)
 // and the OpenAI Chat Completions format (type: "function", function: {name, description, parameters}).
 type AnthropicTool struct {
-	Name        string          `json:"name"`
-	Description string          `json:"description,omitempty"`
-	InputSchema json.RawMessage `json:"input_schema"`
+	Name         string                 `json:"name"`
+	Description  string                 `json:"description,omitempty"`
+	InputSchema  json.RawMessage        `json:"input_schema"`
 	CacheControl *AnthropicCacheControl `json:"cache_control,omitempty"`
 }
 
@@ -179,7 +179,7 @@ func (r AnthropicMessagesRequest) MarshalJSON() ([]byte, error) {
 
 // AnthropicMessagesResponse is the non-streaming response for POST /v1/messages.
 type AnthropicMessagesResponse struct {
-	ID           string                  `json:"id"` // "msg_xxx"
+	ID           string                  `json:"id"`   // "msg_xxx"
 	Type         string                  `json:"type"` // "message"
 	Role         string                  `json:"role"` // "assistant"
 	Content      []AnthropicContentBlock `json:"content"`
@@ -345,4 +345,39 @@ func (r *AnthropicMessagesRequest) PromptText() string {
 		}
 	}
 	return strings.Join(parts, "\n")
+}
+
+// HasMultimodalContent reports whether the request carries non-text content
+// blocks (images, documents, including nested inside tool_result). It
+// satisfies types.MultimodalContentProvider so capacity admission can skip
+// the text-based TPM estimate: a text-only estimate is fiction for such
+// requests.
+func (r *AnthropicMessagesRequest) HasMultimodalContent() bool {
+	if len(r.System) > 0 && anthropicRawHasMultimodal(r.System) {
+		return true
+	}
+	for _, msg := range r.Messages {
+		if anthropicRawHasMultimodal(msg.Content) {
+			return true
+		}
+	}
+	return false
+}
+
+func anthropicRawHasMultimodal(raw json.RawMessage) bool {
+	blocks, err := ParseAnthropicContentBlocks(raw)
+	if err != nil {
+		return false
+	}
+	for _, b := range blocks {
+		switch b.Type {
+		case "image", "document":
+			return true
+		case "tool_result":
+			if anthropicRawHasMultimodal(b.Content) {
+				return true
+			}
+		}
+	}
+	return false
 }

@@ -27,6 +27,57 @@ func (_m *MockOpenAIComponent) EXPECT() *MockOpenAIComponent_Expecter {
 	return &MockOpenAIComponent_Expecter{mock: &_m.Mock}
 }
 
+// AcquireCapacityAdmission provides a mock function with given fields: ctx, model, upstreamID, estimatedTokens
+func (_m *MockOpenAIComponent) AcquireCapacityAdmission(ctx context.Context, model *types.Model, upstreamID int64, estimatedTokens int64) *types.AdmissionDecision {
+	ret := _m.Called(ctx, model, upstreamID, estimatedTokens)
+
+	if len(ret) == 0 {
+		panic("no return value specified for AcquireCapacityAdmission")
+	}
+
+	var r0 *types.AdmissionDecision
+	if rf, ok := ret.Get(0).(func(context.Context, *types.Model, int64, int64) *types.AdmissionDecision); ok {
+		r0 = rf(ctx, model, upstreamID, estimatedTokens)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*types.AdmissionDecision)
+		}
+	}
+
+	return r0
+}
+
+// MockOpenAIComponent_AcquireCapacityAdmission_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'AcquireCapacityAdmission'
+type MockOpenAIComponent_AcquireCapacityAdmission_Call struct {
+	*mock.Call
+}
+
+// AcquireCapacityAdmission is a helper method to define mock.On call
+//   - ctx context.Context
+//   - model *types.Model
+//   - upstreamID int64
+//   - estimatedTokens int64
+func (_e *MockOpenAIComponent_Expecter) AcquireCapacityAdmission(ctx interface{}, model interface{}, upstreamID interface{}, estimatedTokens interface{}) *MockOpenAIComponent_AcquireCapacityAdmission_Call {
+	return &MockOpenAIComponent_AcquireCapacityAdmission_Call{Call: _e.mock.On("AcquireCapacityAdmission", ctx, model, upstreamID, estimatedTokens)}
+}
+
+func (_c *MockOpenAIComponent_AcquireCapacityAdmission_Call) Run(run func(ctx context.Context, model *types.Model, upstreamID int64, estimatedTokens int64)) *MockOpenAIComponent_AcquireCapacityAdmission_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(*types.Model), args[2].(int64), args[3].(int64))
+	})
+	return _c
+}
+
+func (_c *MockOpenAIComponent_AcquireCapacityAdmission_Call) Return(_a0 *types.AdmissionDecision) *MockOpenAIComponent_AcquireCapacityAdmission_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockOpenAIComponent_AcquireCapacityAdmission_Call) RunAndReturn(run func(context.Context, *types.Model, int64, int64) *types.AdmissionDecision) *MockOpenAIComponent_AcquireCapacityAdmission_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // BuildUsageMeteringEvent provides a mock function with given fields: c, nsUUID, model, targetModelName, usage, apikey
 func (_m *MockOpenAIComponent) BuildUsageMeteringEvent(c context.Context, nsUUID string, model *types.Model, targetModelName string, usage *token.Usage, apikey string) (*commontypes.MeteringEvent, error) {
 	ret := _m.Called(c, nsUUID, model, targetModelName, usage, apikey)
@@ -196,6 +247,58 @@ func (_c *MockOpenAIComponent_CheckBalance_Call) RunAndReturn(run func(context.C
 	return _c
 }
 
+// CheckCapacityAdmission provides a mock function with given fields: ctx, model, preferredUpstreamID, allowSelect, estimatedTokens
+func (_m *MockOpenAIComponent) CheckCapacityAdmission(ctx context.Context, model *types.Model, preferredUpstreamID int64, allowSelect bool, estimatedTokens int64) *types.AdmissionDecision {
+	ret := _m.Called(ctx, model, preferredUpstreamID, allowSelect, estimatedTokens)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CheckCapacityAdmission")
+	}
+
+	var r0 *types.AdmissionDecision
+	if rf, ok := ret.Get(0).(func(context.Context, *types.Model, int64, bool, int64) *types.AdmissionDecision); ok {
+		r0 = rf(ctx, model, preferredUpstreamID, allowSelect, estimatedTokens)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*types.AdmissionDecision)
+		}
+	}
+
+	return r0
+}
+
+// MockOpenAIComponent_CheckCapacityAdmission_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CheckCapacityAdmission'
+type MockOpenAIComponent_CheckCapacityAdmission_Call struct {
+	*mock.Call
+}
+
+// CheckCapacityAdmission is a helper method to define mock.On call
+//   - ctx context.Context
+//   - model *types.Model
+//   - preferredUpstreamID int64
+//   - allowSelect bool
+//   - estimatedTokens int64
+func (_e *MockOpenAIComponent_Expecter) CheckCapacityAdmission(ctx interface{}, model interface{}, preferredUpstreamID interface{}, allowSelect interface{}, estimatedTokens interface{}) *MockOpenAIComponent_CheckCapacityAdmission_Call {
+	return &MockOpenAIComponent_CheckCapacityAdmission_Call{Call: _e.mock.On("CheckCapacityAdmission", ctx, model, preferredUpstreamID, allowSelect, estimatedTokens)}
+}
+
+func (_c *MockOpenAIComponent_CheckCapacityAdmission_Call) Run(run func(ctx context.Context, model *types.Model, preferredUpstreamID int64, allowSelect bool, estimatedTokens int64)) *MockOpenAIComponent_CheckCapacityAdmission_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(*types.Model), args[2].(int64), args[3].(bool), args[4].(int64))
+	})
+	return _c
+}
+
+func (_c *MockOpenAIComponent_CheckCapacityAdmission_Call) Return(_a0 *types.AdmissionDecision) *MockOpenAIComponent_CheckCapacityAdmission_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockOpenAIComponent_CheckCapacityAdmission_Call) RunAndReturn(run func(context.Context, *types.Model, int64, bool, int64) *types.AdmissionDecision) *MockOpenAIComponent_CheckCapacityAdmission_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // CheckUsageLimit provides a mock function with given fields: ctx, userUUID, model, endpoint
 func (_m *MockOpenAIComponent) CheckUsageLimit(ctx context.Context, userUUID string, model *types.Model, endpoint string) error {
 	ret := _m.Called(ctx, userUUID, model, endpoint)
@@ -340,6 +443,122 @@ func (_c *MockOpenAIComponent_CommitUsageLimitFromUsage_Call) Return(_a0 error) 
 
 func (_c *MockOpenAIComponent_CommitUsageLimitFromUsage_Call) RunAndReturn(run func(context.Context, string, *types.Model, *token.Usage) error) *MockOpenAIComponent_CommitUsageLimitFromUsage_Call {
 	_c.Call.Return(run)
+	return _c
+}
+
+// EstimateAdmissionTokens provides a mock function with given fields: promptText
+func (_m *MockOpenAIComponent) EstimateAdmissionTokens(promptText string) int64 {
+	ret := _m.Called(promptText)
+
+	if len(ret) == 0 {
+		panic("no return value specified for EstimateAdmissionTokens")
+	}
+
+	var r0 int64
+	if rf, ok := ret.Get(0).(func(string) int64); ok {
+		r0 = rf(promptText)
+	} else {
+		r0 = ret.Get(0).(int64)
+	}
+
+	return r0
+}
+
+// MockOpenAIComponent_EstimateAdmissionTokens_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'EstimateAdmissionTokens'
+type MockOpenAIComponent_EstimateAdmissionTokens_Call struct {
+	*mock.Call
+}
+
+// EstimateAdmissionTokens is a helper method to define mock.On call
+//   - promptText string
+func (_e *MockOpenAIComponent_Expecter) EstimateAdmissionTokens(promptText interface{}) *MockOpenAIComponent_EstimateAdmissionTokens_Call {
+	return &MockOpenAIComponent_EstimateAdmissionTokens_Call{Call: _e.mock.On("EstimateAdmissionTokens", promptText)}
+}
+
+func (_c *MockOpenAIComponent_EstimateAdmissionTokens_Call) Run(run func(promptText string)) *MockOpenAIComponent_EstimateAdmissionTokens_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(string))
+	})
+	return _c
+}
+
+func (_c *MockOpenAIComponent_EstimateAdmissionTokens_Call) Return(_a0 int64) *MockOpenAIComponent_EstimateAdmissionTokens_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockOpenAIComponent_EstimateAdmissionTokens_Call) RunAndReturn(run func(string) int64) *MockOpenAIComponent_EstimateAdmissionTokens_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// FinalizeCanceledCapacityAdmission provides a mock function with given fields: ctx, lease, usage
+func (_m *MockOpenAIComponent) FinalizeCanceledCapacityAdmission(ctx context.Context, lease *types.AdmissionLease, usage *token.Usage) {
+	_m.Called(ctx, lease, usage)
+}
+
+// MockOpenAIComponent_FinalizeCanceledCapacityAdmission_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FinalizeCanceledCapacityAdmission'
+type MockOpenAIComponent_FinalizeCanceledCapacityAdmission_Call struct {
+	*mock.Call
+}
+
+// FinalizeCanceledCapacityAdmission is a helper method to define mock.On call
+//   - ctx context.Context
+//   - lease *types.AdmissionLease
+//   - usage *token.Usage
+func (_e *MockOpenAIComponent_Expecter) FinalizeCanceledCapacityAdmission(ctx interface{}, lease interface{}, usage interface{}) *MockOpenAIComponent_FinalizeCanceledCapacityAdmission_Call {
+	return &MockOpenAIComponent_FinalizeCanceledCapacityAdmission_Call{Call: _e.mock.On("FinalizeCanceledCapacityAdmission", ctx, lease, usage)}
+}
+
+func (_c *MockOpenAIComponent_FinalizeCanceledCapacityAdmission_Call) Run(run func(ctx context.Context, lease *types.AdmissionLease, usage *token.Usage)) *MockOpenAIComponent_FinalizeCanceledCapacityAdmission_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(*types.AdmissionLease), args[2].(*token.Usage))
+	})
+	return _c
+}
+
+func (_c *MockOpenAIComponent_FinalizeCanceledCapacityAdmission_Call) Return() *MockOpenAIComponent_FinalizeCanceledCapacityAdmission_Call {
+	_c.Call.Return()
+	return _c
+}
+
+func (_c *MockOpenAIComponent_FinalizeCanceledCapacityAdmission_Call) RunAndReturn(run func(context.Context, *types.AdmissionLease, *token.Usage)) *MockOpenAIComponent_FinalizeCanceledCapacityAdmission_Call {
+	_c.Run(run)
+	return _c
+}
+
+// FinalizeCapacityAdmission provides a mock function with given fields: ctx, lease, usage
+func (_m *MockOpenAIComponent) FinalizeCapacityAdmission(ctx context.Context, lease *types.AdmissionLease, usage *token.Usage) {
+	_m.Called(ctx, lease, usage)
+}
+
+// MockOpenAIComponent_FinalizeCapacityAdmission_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FinalizeCapacityAdmission'
+type MockOpenAIComponent_FinalizeCapacityAdmission_Call struct {
+	*mock.Call
+}
+
+// FinalizeCapacityAdmission is a helper method to define mock.On call
+//   - ctx context.Context
+//   - lease *types.AdmissionLease
+//   - usage *token.Usage
+func (_e *MockOpenAIComponent_Expecter) FinalizeCapacityAdmission(ctx interface{}, lease interface{}, usage interface{}) *MockOpenAIComponent_FinalizeCapacityAdmission_Call {
+	return &MockOpenAIComponent_FinalizeCapacityAdmission_Call{Call: _e.mock.On("FinalizeCapacityAdmission", ctx, lease, usage)}
+}
+
+func (_c *MockOpenAIComponent_FinalizeCapacityAdmission_Call) Run(run func(ctx context.Context, lease *types.AdmissionLease, usage *token.Usage)) *MockOpenAIComponent_FinalizeCapacityAdmission_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(*types.AdmissionLease), args[2].(*token.Usage))
+	})
+	return _c
+}
+
+func (_c *MockOpenAIComponent_FinalizeCapacityAdmission_Call) Return() *MockOpenAIComponent_FinalizeCapacityAdmission_Call {
+	_c.Call.Return()
+	return _c
+}
+
+func (_c *MockOpenAIComponent_FinalizeCapacityAdmission_Call) RunAndReturn(run func(context.Context, *types.AdmissionLease, *token.Usage)) *MockOpenAIComponent_FinalizeCapacityAdmission_Call {
+	_c.Run(run)
 	return _c
 }
 

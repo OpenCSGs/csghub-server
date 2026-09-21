@@ -127,7 +127,7 @@ func TestRecordResponsesUsageHappyPathCallsComponent(t *testing.T) {
 			return nil
 		}).Once()
 
-		tester.handler.recordResponsesUsageWithTrace(c, counter, nil, "testuuid", modelTarget, "apikey", nil, responsesTracePostProcessInput{StatusCode: http.StatusOK})
+		tester.handler.recordResponsesUsageWithTrace(c, counter, nil, "testuuid", modelTarget, "apikey", nil, responsesTracePostProcessInput{StatusCode: http.StatusOK}, nil)
 
 		synctest.Wait()
 		require.NotNil(t, seenUsage)
@@ -193,7 +193,7 @@ func TestRecordResponsesUsagePublishesLLMLog(t *testing.T) {
 			wg.Done()
 		}
 
-		tester.handler.recordResponsesUsageWithTrace(c, counter, nil, "testuuid", modelTarget, "apikey", recorder, responsesTracePostProcessInput{StatusCode: http.StatusOK})
+		tester.handler.recordResponsesUsageWithTrace(c, counter, nil, "testuuid", modelTarget, "apikey", recorder, responsesTracePostProcessInput{StatusCode: http.StatusOK}, nil)
 
 		synctest.Wait()
 		require.NotNil(t, publisher.payload)
@@ -253,7 +253,7 @@ func TestRecordResponsesUsageRecordsLLMTrace(t *testing.T) {
 			return nil
 		}).Once()
 
-		tester.handler.recordResponsesUsageWithTrace(c, counter, nil, "testuuid", modelTarget, "apikey", recorder, traceInput)
+		tester.handler.recordResponsesUsageWithTrace(c, counter, nil, "testuuid", modelTarget, "apikey", recorder, traceInput, nil)
 
 		synctest.Wait()
 		usage, usageEnded, usageEvents := traceRecorder.snapshot()
@@ -302,7 +302,7 @@ func TestRecordResponsesUsageSkipsBillingOnErrorStatus(t *testing.T) {
 
 		tester.handler.recordResponsesUsageWithTrace(c, counter, nil, "testuuid", modelTarget, "apikey", nil, responsesTracePostProcessInput{
 			StatusCode: http.StatusInternalServerError,
-		})
+		}, nil)
 
 		// synctest.Wait blocks until the async post-processing goroutine has
 		// fully completed, so the billing flag is settled.
@@ -338,7 +338,7 @@ func TestRecordResponsesUsageSkipsBillingOnRedirectStatus(t *testing.T) {
 
 		tester.handler.recordResponsesUsageWithTrace(c, counter, nil, "testuuid", modelTarget, "apikey", nil, responsesTracePostProcessInput{
 			StatusCode: http.StatusFound,
-		})
+		}, nil)
 
 		// synctest.Wait blocks until the async post-processing goroutine has
 		// fully completed, so the billing flag is settled.

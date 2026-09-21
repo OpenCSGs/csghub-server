@@ -9,9 +9,11 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
+	"opencsg.com/csghub-server/aigateway/component/admission"
 	"opencsg.com/csghub-server/aigateway/component/router"
 	"opencsg.com/csghub-server/aigateway/component/upstream"
 	"opencsg.com/csghub-server/aigateway/token"
@@ -36,6 +38,27 @@ type OpenAIComponent interface {
 	CheckUsageLimit(ctx context.Context, userUUID string, model *types.Model, endpoint string) error
 	CommitUsageLimit(ctx context.Context, userUUID string, model *types.Model, tokenCounter token.Counter) error
 	CommitUsageLimitFromUsage(ctx context.Context, userUUID string, model *types.Model, usage *token.Usage) error
+	// CheckCapacityAdmission evaluates per-upstream CapacityPolicy admission
+	// for the router-owned candidate set (initial admission: selection +
+	// occupation). Returns nil when admission does not apply (no candidate
+	// upstream has an enabled CapacityPolicy).
+	CheckCapacityAdmission(ctx context.Context, model *types.Model, preferredUpstreamID int64, allowSelect bool, estimatedTokens int64) *types.AdmissionDecision
+	// AcquireCapacityAdmission pins a specific upstream and atomically
+	// check+acquires its lease (fallback operation: no re-selection).
+	AcquireCapacityAdmission(ctx context.Context, model *types.Model, upstreamID int64, estimatedTokens int64) *types.AdmissionDecision
+	// FinalizeCapacityAdmission closes the lease lifecycle: releases the
+	// lease and, when usage is non-nil, commits actual token usage to the
+	// TPM window. Idempotent; safe to call from multiple paths.
+	FinalizeCapacityAdmission(ctx context.Context, lease *types.AdmissionLease, usage *token.Usage)
+	// FinalizeCanceledCapacityAdmission finalizes a lease whose CLIENT
+	// aborted the attempt (HTTP 499 / context canceled): releases the lease
+	// and also removes its RPM window entry, so the aborted attempt does not
+	// rate-lock a legitimate client retry for the rest of the sliding
+	// window.
+	FinalizeCanceledCapacityAdmission(ctx context.Context, lease *types.AdmissionLease, usage *token.Usage)
+	// EstimateAdmissionTokens returns the TPM pre-reservation estimate for
+	// a prompt text.
+	EstimateAdmissionTokens(promptText string) int64
 	// CanManageModel reports whether the user can manage the given model
 	// (e.g. upload or delete voices of a TTS deployment): only the deploy
 	// owner and platform admins are allowed.
@@ -53,6 +76,13 @@ type openaiComponentImpl struct {
 	modelIDBuilder         upstream.ModelIDBuilder
 	usageLimiter           UsageLimiter
 	capacityPolicyDefaults commontypes.CapacityPolicy
+	capacityAdmission      admission.CapacityAdmissionController
+	// capacityAdmissionOnce memoizes the lazily-built admission controller:
+	// the controller (and its per-pod lease renewer goroutine) must be a
+	// singleton, never per-request. Tests may inject capacityAdmission
+	// directly instead.
+	capacityAdmissionOnce    sync.Once
+	capacityAdmissionOptions admission.CapacityAdmissionOptions
 }
 
 func (m *openaiComponentImpl) getModelIDBuilder() upstream.ModelIDBuilder {
@@ -758,8 +788,8 @@ func capacityPolicyDefaultsFromConfig(cfg *config.Config) commontypes.CapacityPo
 }
 
 // dbUpstreamsToConfigs converts database.Upstream slice to types.UpstreamConfig slice for routing.
-// capacityDefaults fully populates enabled CapacityPolicies whose limits are
-// all unset (see CapacityPolicy.ApplyDefaults).
+// capacityDefaults fills non-positive limits of enabled CapacityPolicies
+// (see CapacityPolicy.ApplyDefaults).
 func dbUpstreamsToConfigs(dbUpstreams []database.Upstream, capacityDefaults commontypes.CapacityPolicy) []commontypes.UpstreamConfig {
 	result := make([]commontypes.UpstreamConfig, 0, len(dbUpstreams))
 	for _, u := range dbUpstreams {
