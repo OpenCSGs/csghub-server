@@ -69,6 +69,17 @@ var (
 	_ plan.ProtocolHandler   = (*audioPipelineHandler)(nil)
 )
 
+// audioParsedBody wraps the transcription multipart form so the pipeline can
+// report multimodal content for capacity admission.
+type audioParsedBody struct {
+	Form *multipart.Form
+}
+
+// HasMultimodalContent implements types.MultimodalContentProvider:
+// transcription requests carry audio files, so capacity admission skips the
+// text-based TPM estimate (concurrency and RPM still gate them).
+func (b *audioParsedBody) HasMultimodalContent() bool { return true }
+
 // --- Phase 1: Extract ---
 
 func (h *audioPipelineHandler) Extract(c *gin.Context) (*types.RequestMetadata, error) {
@@ -114,7 +125,7 @@ func (h *audioPipelineHandler) Extract(c *gin.Context) (*types.RequestMetadata, 
 		APIKeyID:   httpbase.GetAccessToken(c),
 		Streaming:  isStream,
 		Headers:    c.Request.Header,
-		ParsedBody: form,
+		ParsedBody: &audioParsedBody{Form: form},
 	}, nil
 }
 
@@ -133,7 +144,7 @@ func (h *audioPipelineHandler) Execute(c *gin.Context, meta *types.RequestMetada
 	}
 
 	mt := p.ModelTarget
-	form := meta.ParsedBody.(*multipart.Form)
+	form := meta.ParsedBody.(*audioParsedBody).Form
 	isStream := meta.Streaming
 
 	traceCtx, generationRecorder := h.handler.startModalGenerationTrace(ctx, modalTraceStartInput{

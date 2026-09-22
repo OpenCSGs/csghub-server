@@ -364,6 +364,21 @@ type EmbeddingRequest struct {
 	RawJSON json.RawMessage `json:"-"`
 }
 
+// PromptText extracts the text input for moderation and the capacity
+// admission TPM estimate. It satisfies types.PromptTextProvider. Token-array
+// inputs carry no text and contribute nothing.
+func (r *EmbeddingRequest) PromptText() string {
+	if r == nil {
+		return ""
+	}
+	parts := make([]string, 0, len(r.Input.OfArrayOfStrings)+1)
+	if r.Input.OfString.Value != "" {
+		parts = append(parts, r.Input.OfString.Value)
+	}
+	parts = append(parts, r.Input.OfArrayOfStrings...)
+	return strings.Join(parts, "\n")
+}
+
 func (r *EmbeddingRequest) UnmarshalJSON(data []byte) error {
 	// Create a temporary struct to hold the known fields
 	type TempEmbeddingRequest EmbeddingRequest
@@ -445,6 +460,20 @@ type RerankRequest struct {
 	ReturnDocuments *bool    `json:"return_documents,omitempty"`
 	// RawJSON stores all unknown fields during unmarshaling
 	RawJSON json.RawMessage `json:"-"`
+}
+
+// PromptText extracts the query and documents for moderation and the
+// capacity admission TPM estimate. It satisfies types.PromptTextProvider.
+func (r *RerankRequest) PromptText() string {
+	if r == nil {
+		return ""
+	}
+	parts := make([]string, 0, len(r.Documents)+1)
+	if r.Query != "" {
+		parts = append(parts, r.Query)
+	}
+	parts = append(parts, r.Documents...)
+	return strings.Join(parts, "\n")
 }
 
 func (r *RerankRequest) UnmarshalJSON(data []byte) error {

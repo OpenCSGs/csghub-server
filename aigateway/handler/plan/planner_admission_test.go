@@ -80,7 +80,7 @@ func TestPlan_AdmissionRunsAfterSensitive(t *testing.T) {
 	assert.True(t, safety.afterAdmission, "the sensitive check must run after capacity admission")
 }
 
-func TestPlan_AdmissionSkippedForNonTokenTask(t *testing.T) {
+func TestPlan_AdmissionSkippedForUnknownTask(t *testing.T) {
 	safety := &recordingSafetyChecker{}
 	admission := &recordingAdmissionChecker{safety: safety}
 	p := NewPlanner(
@@ -94,7 +94,7 @@ func TestPlan_AdmissionSkippedForNonTokenTask(t *testing.T) {
 
 	meta := &types.RequestMetadata{
 		Protocol: string(types.ProtocolChat),
-		Task:     "video",
+		Task:     "unknown-task",
 		UserID:   "user1",
 		Model:    "test-model",
 		TenantID: "ns-123",
@@ -102,7 +102,41 @@ func TestPlan_AdmissionSkippedForNonTokenTask(t *testing.T) {
 
 	_, err := p.Plan(newTestGinContext(), meta)
 	require.NoError(t, err)
-	assert.False(t, admission.called, "non-participating modal tasks bypass capacity admission")
+	assert.False(t, admission.called, "unknown tasks bypass capacity admission")
+}
+
+func TestPlan_AdmissionCoversAllModalTasks(t *testing.T) {
+	// Every known modality participates in capacity admission; media tasks
+	// are admitted without a TPM reservation (their parsed bodies report
+	// multimodal content), text tasks reserve from the text estimate.
+	for _, task := range []string{
+		"text-to-image", "audio", "speech", "embedding", "rerank", "ocr", "text-to-video",
+	} {
+		t.Run(task, func(t *testing.T) {
+			safety := &recordingSafetyChecker{}
+			admission := &recordingAdmissionChecker{safety: safety}
+			p := NewPlanner(
+				&mockModelResolver{target: admissionPlanTestTarget()},
+				&mockBalanceChecker{},
+				&mockUsageLimitChecker{},
+				safety,
+				admission,
+				nil,
+			)
+
+			meta := &types.RequestMetadata{
+				Protocol: string(types.ProtocolChat),
+				Task:     task,
+				UserID:   "user1",
+				Model:    "test-model",
+				TenantID: "ns-123",
+			}
+
+			_, err := p.Plan(newTestGinContext(), meta)
+			require.NoError(t, err)
+			assert.True(t, admission.called, "task %q must participate in capacity admission", task)
+		})
+	}
 }
 
 func TestPlan_AdmissionRunsForImageTask(t *testing.T) {

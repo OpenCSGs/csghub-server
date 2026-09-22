@@ -93,6 +93,25 @@ type speechParsedBody struct {
 	BatchReq *types.BatchSpeechRequest
 }
 
+// PromptText extracts the TTS input text for the capacity admission TPM
+// estimate (satisfies types.PromptTextProvider). Speech content moderation
+// runs in Execute via CheckImagePrompts and does NOT use this method. The
+// input is plain text, so speech requests reserve like text generation (the
+// reservation is reclaimed at finalize because speech upstreams report no
+// token usage).
+func (b *speechParsedBody) PromptText() string {
+	if b == nil {
+		return ""
+	}
+	if b.Req != nil {
+		return b.Req.Input
+	}
+	if b.BatchReq != nil {
+		return strings.Join(b.BatchReq.InputTexts(), "\n")
+	}
+	return ""
+}
+
 // --- Phase 1: Extract ---
 
 func (h *speechPipelineHandler) Extract(c *gin.Context) (*types.RequestMetadata, error) {
