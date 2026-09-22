@@ -5,6 +5,30 @@
     "error.AGENT-ERR-1": {
         "other": "You have a instance with the same name: {{.instance_name}}"
     },
+    "error.AGENT-ERR-2": {
+        "other": "You have a knowledge base with the same name: {{.knowledge_base_name}}"
+    },
+    "error.AGENT-ERR-3": {
+        "other": "You have an MCP server with the same name: {{.server_name}}"
+    },
+    "error.AGENT-ERR-4": {
+        "other": "Pin limit exceeded. Maximum 5 items can be pinned per entity type."
+    },
+    "error.AGENT-ERR-5": {
+        "other": "Invalid share session uuid"
+    },
+    "error.AGENT-ERR-6": {
+        "other": "Share session UUID expired"
+    },
+    "error.AGENT-ERR-7": {
+        "other": "You have created {{.scheduler_count}} scheduled tasks, which has reached the limit. Please delete unused scheduled tasks to free up slots before creating new ones."
+    },
+    "error.AGENT-ERR-8": {
+        "other": "Agent instance does not support scheduling"
+    },
+    "error.AGENT-ERR-9": {
+        "other": "Scheduler start time is in the past; use a future date/time for one-time schedules"
+    },
     "error.AGENT-ERR-10": {
         "other": "You have a credential with the same name: {{.credential_name}}"
     },
@@ -35,35 +59,11 @@
     "error.AGENT-ERR-19": {
         "other": "{{.instance_type}} provision request field {{.field}} has an invalid type"
     },
-    "error.AGENT-ERR-2": {
-        "other": "You have a knowledge base with the same name: {{.knowledge_base_name}}"
-    },
     "error.AGENT-ERR-20": {
         "other": "{{.instance_type}} provision request field {{.field}} must not be empty"
     },
     "error.AGENT-ERR-21": {
         "other": "llm model {{.model}} is not available for {{.instance_type}}"
-    },
-    "error.AGENT-ERR-3": {
-        "other": "You have an MCP server with the same name: {{.server_name}}"
-    },
-    "error.AGENT-ERR-4": {
-        "other": "Pin limit exceeded. Maximum 5 items can be pinned per entity type."
-    },
-    "error.AGENT-ERR-5": {
-        "other": "Invalid share session uuid"
-    },
-    "error.AGENT-ERR-6": {
-        "other": "Share session UUID expired"
-    },
-    "error.AGENT-ERR-7": {
-        "other": "You have created {{.scheduler_count}} scheduled tasks, which has reached the limit. Please delete unused scheduled tasks to free up slots before creating new ones."
-    },
-    "error.AGENT-ERR-8": {
-        "other": "Agent instance does not support scheduling"
-    },
-    "error.AGENT-ERR-9": {
-        "other": "Scheduler start time is in the past; use a future date/time for one-time schedules"
     },
     "error.AGENT-ERR-22": {
         "other": "csgclaw template not found for repository path {{.repo_path}}"
@@ -79,5 +79,11 @@
     },
     "error.AGENT-ERR-26": {
         "other": "Cannot make this agent template public because the sensitive-content check is still in progress."
+    },
+    "error.AGENT-ERR-27": {
+        "other": "A knowledge base with the same content ID already exists: {{.content_id}}"
+    },
+    "error.AGENT-ERR-28": {
+        "other": "Invalid knowledge base content ID: {{.content_id}}"
     }
 }

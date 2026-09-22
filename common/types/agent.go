@@ -683,6 +683,10 @@ const (
 	AgentKnowledgeBaseMetadataResourceStateKey                         = "resource_state"
 	AgentKnowledgeBaseMetadataBaseURLKey                               = "base_url"
 	AgentKnowledgeBaseMetadataMCPEndpointURLKey                        = "mcp_endpoint_url"
+	// AgentKnowledgeBaseMetadataManagedKey marks a knowledge base whose
+	// lifecycle is owned by the backend (auto-provisioned), as opposed to a
+	// manually registered MCP endpoint.
+	AgentKnowledgeBaseMetadataManagedKey = "backend_managed"
 )
 
 type AgentKnowledgeBaseActor struct {
@@ -740,6 +744,9 @@ type AgentKnowledgeBaseCreationResult struct {
 
 type AgentKnowledgeBaseBackendTarget struct {
 	ContentID string
+	// BackendManaged is true when the knowledge base backend owns the resource
+	// lifecycle (auto-provisioned), false for manually registered backends.
+	BackendManaged bool
 }
 
 type AgentKnowledgeBaseResourceState map[string]json.RawMessage

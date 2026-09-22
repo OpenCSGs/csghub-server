@@ -5,6 +5,30 @@
     "error.AGENT-ERR-1": {
         "other": "您已存在相同名称的实例: {{.instance_name}}"
     },
+    "error.AGENT-ERR-2": {
+        "other": "您已存在相同名称的知识库: {{.knowledge_base_name}}"
+    },
+    "error.AGENT-ERR-3": {
+        "other": "您已存在相同名称的MCP服务器: {{.server_name}}"
+    },
+    "error.AGENT-ERR-4": {
+        "other": "置顶数量超出限制。每种实体类型最多可置顶 5 个项目。"
+    },
+    "error.AGENT-ERR-5": {
+        "other": "分享会话UUID无效"
+    },
+    "error.AGENT-ERR-6": {
+        "other": "分享会话UUID已过期"
+    },
+    "error.AGENT-ERR-7": {
+        "other": "你当前已创建 {{.scheduler_count}} 个定时任务，已达到创建上限，暂时无法创建新的定时任务。 请先删除不再使用的定时任务，释放名额后即可继续创建。"
+    },
+    "error.AGENT-ERR-8": {
+        "other": "该智能体实例不支持定时任务"
+    },
+    "error.AGENT-ERR-9": {
+        "other": "定时任务开始时间已过去，一次性任务请使用未来的日期/时间"
+    },
     "error.AGENT-ERR-10": {
         "other": "您已存在相同名称的凭证: {{.credential_name}}"
     },
@@ -35,35 +59,11 @@
     "error.AGENT-ERR-19": {
         "other": "{{.instance_type}} 部署请求字段 {{.field}} 类型无效"
     },
-    "error.AGENT-ERR-2": {
-        "other": "您已存在相同名称的知识库: {{.knowledge_base_name}}"
-    },
     "error.AGENT-ERR-20": {
         "other": "{{.instance_type}} 部署请求字段 {{.field}} 不能为空"
     },
     "error.AGENT-ERR-21": {
         "other": "llm 模型 {{.model}} 不适用于 {{.instance_type}}"
-    },
-    "error.AGENT-ERR-3": {
-        "other": "您已存在相同名称的MCP服务器: {{.server_name}}"
-    },
-    "error.AGENT-ERR-4": {
-        "other": "置顶数量超出限制。每种实体类型最多可置顶 5 个项目。"
-    },
-    "error.AGENT-ERR-5": {
-        "other": "分享会话UUID无效"
-    },
-    "error.AGENT-ERR-6": {
-        "other": "分享会话UUID已过期"
-    },
-    "error.AGENT-ERR-7": {
-        "other": "你当前已创建 {{.scheduler_count}} 个定时任务，已达到创建上限，暂时无法创建新的定时任务。 请先删除不再使用的定时任务，释放名额后即可继续创建。"
-    },
-    "error.AGENT-ERR-8": {
-        "other": "该智能体实例不支持定时任务"
-    },
-    "error.AGENT-ERR-9": {
-        "other": "定时任务开始时间已过去，一次性任务请使用未来的日期/时间"
     },
     "error.AGENT-ERR-22": {
         "other": "仓库路径 {{.repo_path}} 未找到对应的 csgclaw 模板"
@@ -79,5 +79,11 @@
     },
     "error.AGENT-ERR-26": {
         "other": "该智能体模板的敏感内容检查仍在进行中，无法设为公开。"
+    },
+    "error.AGENT-ERR-27": {
+        "other": "已存在相同内容ID的知识库: {{.content_id}}"
+    },
+    "error.AGENT-ERR-28": {
+        "other": "无效的知识库内容ID: {{.content_id}}"
     }
 }

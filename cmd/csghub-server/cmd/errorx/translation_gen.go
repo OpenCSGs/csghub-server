@@ -304,9 +304,42 @@ type TranslationEntry struct {
 	Other string `json:"other"`
 }
 
+// orderedTranslations marshals as a JSON object with keys in numeric error
+// code order (infos are sorted by code in docGen) instead of the lexicographic
+// order json.MarshalIndent would impose on a plain map.
+type orderedTranslations struct {
+	keys   []string
+	values map[string]TranslationEntry
+}
+
+func (o orderedTranslations) MarshalJSON() ([]byte, error) {
+	var b bytes.Buffer
+	b.WriteByte('{')
+	for i, k := range o.keys {
+		if i > 0 {
+			b.WriteByte(',')
+		}
+		keyJSON, err := json.Marshal(k)
+		if err != nil {
+			return nil, err
+		}
+		valueJSON, err := json.Marshal(o.values[k])
+		if err != nil {
+			return nil, err
+		}
+		b.Write(keyJSON)
+		b.WriteByte(':')
+		b.Write(valueJSON)
+	}
+	b.WriteByte('}')
+	return b.Bytes(), nil
+}
+
 func generateTranslationJSONs(infosByFile map[string][]ErrorInfo, outputDir string) error {
 	for goFileName, infos := range infosByFile {
 		// 1. for current file
+		// map[langCode][]jsonKey, in numeric code order
+		keysByLang := make(map[string][]string)
 		// map[langCode]map[jsonKey]TranslationEntry
 		translationsByLang := make(map[string]map[string]TranslationEntry)
 
@@ -315,6 +348,9 @@ func generateTranslationJSONs(infosByFile map[string][]ErrorInfo, outputDir stri
 			for langCode, translationText := range info.Translations {
 				if _, ok := translationsByLang[langCode]; !ok {
 					translationsByLang[langCode] = make(map[string]TranslationEntry)
+				}
+				if _, exists := translationsByLang[langCode][jsonKey]; !exists {
+					keysByLang[langCode] = append(keysByLang[langCode], jsonKey)
 				}
 				translationsByLang[langCode][jsonKey] = TranslationEntry{Other: translationText}
 			}
@@ -333,11 +369,13 @@ func generateTranslationJSONs(infosByFile map[string][]ErrorInfo, outputDir stri
 			//  e.g., "common/i18n/en-US/error_auth.json"
 			filePath := filepath.Join(langDir, jsonFileName)
 
-			jsonData, err := json.MarshalIndent(translationMap, "", "    ")
+			ordered := orderedTranslations{keys: keysByLang[langCode], values: translationMap}
+			jsonData, err := json.MarshalIndent(ordered, "", "    ")
 			if err != nil {
 				log.Printf("WARN: Failed to marshal JSON for %s in language %s: %v", goFileName, langCode, err)
 				continue
 			}
+			jsonData = append(jsonData, '\n')
 
 			if err := os.WriteFile(filePath, jsonData, 0644); err != nil {
 				log.Printf("WARN: Failed to write translation file %s: %v", filePath, err)

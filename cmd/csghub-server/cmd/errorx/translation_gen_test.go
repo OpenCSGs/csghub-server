@@ -1,10 +1,60 @@
 package errorx
 
 import (
+	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
+
+func TestGenerateTranslationJSONsNumericKeyOrder(t *testing.T) {
+	// docGen sorts infos by numeric code; the JSON keys must follow that order
+	// rather than lexicographic string order (ERR-1, ERR-2, ERR-10).
+	infosByFile := map[string][]ErrorInfo{
+		"error_agent.go": {
+			{Code: 1, FullCode: "AGENT-ERR-1", Translations: map[string]string{"en-US": "one"}},
+			{Code: 2, FullCode: "AGENT-ERR-2", Translations: map[string]string{"en-US": "two"}},
+			{Code: 10, FullCode: "AGENT-ERR-10", Translations: map[string]string{"en-US": "ten"}},
+		},
+	}
+
+	dir := t.TempDir()
+	if err := generateTranslationJSONs(infosByFile, dir); err != nil {
+		t.Fatalf("generateTranslationJSONs() error: %v", err)
+	}
+
+	raw, err := os.ReadFile(filepath.Join(dir, "en-US", "err_agent.json"))
+	if err != nil {
+		t.Fatalf("read generated file: %v", err)
+	}
+	if !strings.HasSuffix(string(raw), "}\n") {
+		t.Errorf("generated file must end with a newline, got %q", raw[len(raw)-8:])
+	}
+	want := `{
+    "error.AGENT-ERR-1": {
+        "other": "one"
+    },
+    "error.AGENT-ERR-2": {
+        "other": "two"
+    },
+    "error.AGENT-ERR-10": {
+        "other": "ten"
+    }
+}`
+	if strings.TrimRight(string(raw), "\n") != want {
+		t.Errorf("key order mismatch.\n--- GOT ---\n%s\n--- WANT ---\n%s", raw, want)
+	}
+
+	var parsed map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &parsed); err != nil {
+		t.Fatalf("generated file is not valid JSON: %v", err)
+	}
+	if len(parsed) != 3 {
+		t.Errorf("expected 3 entries, got %d", len(parsed))
+	}
+}
 
 func TestGenerateMarkdownDoc(t *testing.T) {
 	// --- Test Data Setup ---
