@@ -30,6 +30,8 @@ const (
 	agentTemplateSensitiveCheckMakePublicBlocked
 	agentTemplateSensitiveCheckCreateAgentPending
 	agentTemplateSensitiveCheckMakePublicPending
+	knowledgeBaseContentIDAlreadyExists
+	knowledgeBaseContentIDInvalid
 )
 
 var (
@@ -333,16 +335,66 @@ var (
 	ErrCSGClawTemplateNotFound error = CustomError{prefix: errAgentPrefix, code: csgclawTemplateNotFound}
 
 	// agent template sensitive check blocks creating an agent
+	//
+	// en-US: Cannot create an agent from this agent template because it has not passed the sensitive-content check.
+	//
+	// zh-CN: 该智能体模板未通过敏感内容检查，无法创建智能体。
+	//
+	// zh-HK: 該智能體模板未通過敏感內容檢查，無法建立智能體。
 	ErrAgentTemplateSensitiveCheckCreateAgentBlocked error = CustomError{prefix: errAgentPrefix, code: agentTemplateSensitiveCheckCreateAgentBlocked}
 
 	// agent template sensitive check blocks making a template public
+	//
+	// en-US: Cannot make this agent template public because it has not passed the sensitive-content check.
+	//
+	// zh-CN: 该智能体模板未通过敏感内容检查，无法设为公开。
+	//
+	// zh-HK: 該智能體模板未通過敏感內容檢查，無法設為公開。
 	ErrAgentTemplateSensitiveCheckMakePublicBlocked error = CustomError{prefix: errAgentPrefix, code: agentTemplateSensitiveCheckMakePublicBlocked}
 
 	// agent template sensitive check is pending - blocks creating an agent
+	//
+	// en-US: Cannot create an agent from this agent template because the sensitive-content check is still in progress.
+	//
+	// zh-CN: 该智能体模板的敏感内容检查仍在进行中，无法创建智能体。
+	//
+	// zh-HK: 該智能體模板的敏感內容檢查仍在進行中，無法建立智能體。
 	ErrAgentTemplateSensitiveCheckCreateAgentPending error = CustomError{prefix: errAgentPrefix, code: agentTemplateSensitiveCheckCreateAgentPending}
 
 	// agent template sensitive check is pending - blocks making a template public
+	//
+	// en-US: Cannot make this agent template public because the sensitive-content check is still in progress.
+	//
+	// zh-CN: 该智能体模板的敏感内容检查仍在进行中，无法设为公开。
+	//
+	// zh-HK: 該智能體模板的敏感內容檢查仍在進行中，無法設為公開。
 	ErrAgentTemplateSensitiveCheckMakePublicPending error = CustomError{prefix: errAgentPrefix, code: agentTemplateSensitiveCheckMakePublicPending}
+
+	// a knowledge base with the same content ID already exists
+	//
+	// Description: A knowledge base with the same content ID already exists. Content IDs are globally unique across knowledge bases.
+	//
+	// Description_ZH: 已存在相同内容ID的知识库。内容ID在所有知识库中全局唯一。
+	//
+	// en-US: A knowledge base with the same content ID already exists: {{.content_id}}
+	//
+	// zh-CN: 已存在相同内容ID的知识库: {{.content_id}}
+	//
+	// zh-HK: 已存在相同內容ID的知識庫: {{.content_id}}
+	ErrKnowledgeBaseContentIDAlreadyExists error = CustomError{prefix: errAgentPrefix, code: knowledgeBaseContentIDAlreadyExists}
+
+	// knowledge base content ID has an invalid format
+	//
+	// Description: The knowledge base content ID is missing or has an invalid format. It is also used as the knowledge base's MCP server name, so it must start with a letter or digit, contain only letters, digits, underscores, or hyphens, and be at most 32 characters. The error message includes the offending value.
+	//
+	// Description_ZH: 知识库内容ID缺失或格式无效。该ID同时用作知识库的MCP服务器名称，必须以字母或数字开头，只能包含字母、数字、下划线和短横线，最长32个字符。错误消息中包含出错的值。
+	//
+	// en-US: Invalid knowledge base content ID: {{.content_id}}
+	//
+	// zh-CN: 无效的知识库内容ID: {{.content_id}}
+	//
+	// zh-HK: 無效的知識庫內容ID: {{.content_id}}
+	ErrKnowledgeBaseContentIDInvalid error = CustomError{prefix: errAgentPrefix, code: knowledgeBaseContentIDInvalid}
 )
 
 func InstanceQuotaExceeded(err error, ctx context) error {
@@ -373,6 +425,24 @@ func KnowledgeBaseNameAlreadyExists(err error, ctx context) error {
 		code:    int(knowledgeBaseNameAlreadyExists),
 	}
 	return customErr
+}
+
+func KnowledgeBaseContentIDAlreadyExists(err error, ctx context) error {
+	return CustomError{
+		prefix:  errAgentPrefix,
+		context: ctx,
+		err:     err,
+		code:    int(knowledgeBaseContentIDAlreadyExists),
+	}
+}
+
+func KnowledgeBaseContentIDInvalid(err error, ctx context) error {
+	return CustomError{
+		prefix:  errAgentPrefix,
+		context: ctx,
+		err:     err,
+		code:    int(knowledgeBaseContentIDInvalid),
+	}
 }
 
 func MCPServerNameAlreadyExists(err error, ctx context) error {
