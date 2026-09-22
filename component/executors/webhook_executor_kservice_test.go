@@ -705,6 +705,7 @@ func TestKServiceExecutor_updateDeployStatus_appendClusterNode(t *testing.T) {
 		ID:          int64(1),
 		Status:      common.Deploying,
 		SvcName:     event.ServiceName,
+		Type:        types.InferenceType,
 		ClusterNode: "node1",
 	}, nil)
 
@@ -748,11 +749,54 @@ func TestKServiceExecutor_updateDeployStatus_skipDuplicateClusterNode(t *testing
 		ID:          int64(1),
 		Status:      common.Deploying,
 		SvcName:     event.ServiceName,
+		Type:        types.InferenceType,
 		ClusterNode: "node1",
 	}, nil)
 
 	dts.EXPECT().UpdateDeploy(ctx, mock.MatchedBy(func(d *database.Deploy) bool {
 		return d.ID == int64(1) && d.ClusterNode == "node1"
+	})).Return(nil)
+
+	exec := NewTestKServiceExecutor(cfg, dts)
+	err = exec.updateDeployStatus(ctx, event)
+	require.NoError(t, err)
+}
+
+// Non-inference deploy types overwrite the ClusterNode instead of appending.
+func TestKServiceExecutor_updateDeployStatus_overwriteClusterNodeForNonInference(t *testing.T) {
+	ctx := context.TODO()
+	cfg, err := config.LoadConfig()
+	require.Nil(t, err)
+
+	event := &types.ServiceEvent{
+		ServiceName: "svc-test",
+		Status:      common.Deploying,
+		TaskID:      100,
+		ClusterNode: "node2",
+	}
+
+	dts := mockdb.NewMockDeployTaskStore(t)
+
+	dts.EXPECT().GetDeployTask(ctx, event.TaskID).Return(&database.DeployTask{
+		ID:       int64(100),
+		DeployID: int64(1),
+		TaskType: common.TaskTypeDeploy,
+	}, nil)
+
+	dts.EXPECT().GetLastTaskByType(ctx, int64(1), common.TaskTypeDeploy).Return(&database.DeployTask{
+		ID: int64(100),
+	}, nil)
+
+	dts.EXPECT().GetDeployBySvcName(ctx, event.ServiceName).Return(&database.Deploy{
+		ID:          int64(1),
+		Status:      common.Deploying,
+		SvcName:     event.ServiceName,
+		Type:        types.SpaceType,
+		ClusterNode: "node1",
+	}, nil)
+
+	dts.EXPECT().UpdateDeploy(ctx, mock.MatchedBy(func(d *database.Deploy) bool {
+		return d.ID == int64(1) && d.ClusterNode == "node2"
 	})).Return(nil)
 
 	exec := NewTestKServiceExecutor(cfg, dts)
