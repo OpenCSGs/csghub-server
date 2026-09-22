@@ -22,19 +22,20 @@ type DeployConfig struct {
 	RedisLocker             *redis.DistributedLocker
 	UniqueServiceName       string
 	//download lfs object from internal s3 address
-	S3Internal           bool
-	S3AccessID           string
-	S3AccessSecret       string
-	S3Endpoint           string
-	S3PublicBucket       string
-	S3SSLEnabled         bool
-	APIToken             string
-	APIKey               string
-	HeartBeatTimeInSec   int
-	PublicDomain         string
-	SSHDomain            string
-	StuckTimeoutMin      int
-	RunningReconcileHour int
+	S3Internal            bool
+	S3AccessID            string
+	S3AccessSecret        string
+	S3Endpoint            string
+	S3PublicBucket        string
+	S3SSLEnabled          bool
+	APIToken              string
+	APIKey                string
+	HeartBeatTimeInSec    int
+	PublicDomain          string
+	SSHDomain             string
+	StuckTimeoutMin       int
+	RunningReconcileHour  int
+	UnhealthyReconcileMin int
 }
 
 func BuildDeployConfig(cfg *config.Config) DeployConfig {
@@ -66,5 +67,6 @@ func BuildDeployConfig(cfg *config.Config) DeployConfig {
 		RedisLocker:             redisLocker,
 		StuckTimeoutMin:         cfg.DeployReconcile.StuckTimeoutMin,
 		RunningReconcileHour:    cfg.DeployReconcile.RunningReconcileHour,
+		UnhealthyReconcileMin:   cfg.DeployReconcile.UnhealthyReconcileMin,
 	}
 }

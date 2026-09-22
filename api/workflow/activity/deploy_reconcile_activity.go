@@ -2,6 +2,7 @@ package activity
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"sync"
 	"time"
@@ -18,7 +19,7 @@ import (
 
 const (
 	maxReconcilePerRun    = 100
-	hardTimeoutMultiplier = 3
+	hardTimeoutMultiplier = 4
 )
 
 var (
@@ -59,6 +60,7 @@ func (a *Activities) ReconcileDeployStatus(ctx context.Context) error {
 	reconcileByStatus(ctx, a, common.Deploying, a.deployConfig.StuckTimeoutMin)
 	reconcileByStatus(ctx, a, common.Startup, a.deployConfig.StuckTimeoutMin)
 	reconcileByStatus(ctx, a, common.Running, a.deployConfig.RunningReconcileHour*60)
+	reconcileByStatus(ctx, a, common.ResourceUnhealthy, a.deployConfig.UnhealthyReconcileMin)
 
 	a.getLogger(ctx).Info("reconcile(deploy): completed", "elapsed_seconds", time.Since(startTime).Seconds())
 	return nil
@@ -96,126 +98,226 @@ func reconcileByStatus(ctx context.Context, a *Activities, status int, timeoutMi
 }
 
 func reconcileDeployCluster(ctx context.Context, a *Activities, cid string, deploys []database.Deploy, currentStatus int, hardTimeout time.Duration) {
-	clusterBatchDo(ctx, a, cid, deploys, hardTimeout,
-		// getLastUpdate
-		func(d *database.Deploy) time.Time { return d.StatusUpdateAt },
-		// markFailed
-		func(d *database.Deploy) {
-			if hasPendingInstance(d) {
-				a.getLogger(ctx).Info("reconcile: skip fallback, pod still pending",
-					"deploy_id", d.ID, "svc_name", d.SvcName)
+	logger := log.With(a.getLogger(ctx),
+		"cluster_id", cid,
+		"current_status", statusName(currentStatus),
+		"deploy_count", len(deploys),
+		"hard_timeout", hardTimeout.String(),
+	)
+
+	// 1. Heartbeat check — if the cluster is down, apply timeout fallback.
+	// The cluster is unreachable, so we cannot verify any deploy's real
+	// status — mark all timed-out deploys as ResourceUnhealthy regardless
+	// of currentStatus (Running, Deploying, or Startup).
+	// Skip for ResourceUnhealthy recovery: the deploy is already unhealthy,
+	// re-marking it is a no-op.
+	if currentStatus != common.ResourceUnhealthy && checkHeartbeatForCluster(ctx, a, cid) {
+		logger.Warn("reconcile(deploy): cluster heartbeat timed out, applying fallback")
+		marked := 0
+		for i := range deploys {
+			elapsed := time.Since(deploys[i].StatusUpdateAt)
+			if elapsed > hardTimeout {
+				logger.Warn("reconcile(deploy): deploy exceeded hard timeout, falling back",
+					"deploy_id", deploys[i].ID, "svc_name", deploys[i].SvcName,
+					"last_status_update", deploys[i].StatusUpdateAt.Format(time.RFC3339),
+					"elapsed", elapsed.Round(time.Second).String(),
+					"target_status", statusName(common.ResourceUnhealthy))
+				applyFallback(ctx, a, &deploys[i], currentStatus, common.ResourceUnhealthy)
+				marked++
+			} else {
+				logger.Info("reconcile(deploy): deploy within hard timeout, skip",
+					"deploy_id", deploys[i].ID, "svc_name", deploys[i].SvcName,
+					"last_status_update", deploys[i].StatusUpdateAt.Format(time.RFC3339),
+					"elapsed", elapsed.Round(time.Second).String())
+			}
+		}
+		logger.Warn("reconcile(deploy): heartbeat timeout fallback done",
+			"marked", marked, "skipped", len(deploys)-marked)
+		return
+	}
+
+	// 2. Query runner and process results.
+	logger.Info("reconcile(deploy): cluster healthy, querying runner")
+	clusterBatchDo(ctx, a, cid, deploys,
+		buildDeployBatchItem,
+		func(d *database.Deploy, r *runnerTypes.BatchStatusItemResult, err error) {
+			// ResourceUnhealthy recovery: the deploy is already at the worst
+			// fallback status, so there is no hardTimeout fallback. Distinguish
+			// a real RPC failure (r == nil → runner unreachable, stay unhealthy)
+			// from a per-item Error (r != nil → runner was reachable; for ksvc
+			// the result still carries a valid Code, e.g. Stopped for a deleted
+			// service, which is a definitive recovery status).
+			if currentStatus == common.ResourceUnhealthy {
+				if r == nil {
+					logger.Info("reconcile(deploy): unhealthy deploy runner unreachable, skip",
+						"deploy_id", d.ID, "svc_name", d.SvcName, "error", err)
+					return
+				}
+				processUnhealthyResult(ctx, a, d, r)
 				return
 			}
-			applyStatusUpdate(ctx, a, d, currentStatus, fallbackTargetStatus(currentStatus),
-				nil, "runner_unreachable")
-		},
-		// buildBatchItem
-		func(d *database.Deploy) (key string, item runnerTypes.BatchStatusItem) {
-			switch d.Type {
-			case types.SandboxType:
-				return d.SvcName, runnerTypes.BatchStatusItem{Type: runnerTypes.ResourceTypeSandbox, Name: d.SvcName}
-			case types.SpaceType, types.InferenceType, types.FinetuneType,
-				types.ServerlessType, types.NotebookType:
-				return d.SvcName, runnerTypes.BatchStatusItem{Type: runnerTypes.ResourceTypeKsvc, Name: d.SvcName}
-			default:
-				return d.SvcName, runnerTypes.BatchStatusItem{Type: runnerTypes.ResourceTypeKsvc, Name: d.SvcName}
-			}
-		},
-		// onBatchError
-		func(d *database.Deploy) {
-			if hasPendingInstance(d) {
-				a.getLogger(ctx).Info("reconcile: skip fallback, pod still pending",
-					"deploy_id", d.ID, "svc_name", d.SvcName)
+			if err != nil {
+				// BatchStatus failed or item error — apply fallback only if
+				// the deploy has been stuck beyond hardTimeout. We cannot
+				// verify the deploy's real status, so mark it ResourceUnhealthy
+				// regardless of currentStatus.
+				elapsed := time.Since(d.StatusUpdateAt)
+				if elapsed > hardTimeout {
+					logger.Warn("reconcile(deploy): batch error + hard timeout, falling back",
+						"deploy_id", d.ID, "svc_name", d.SvcName,
+						"last_status_update", d.StatusUpdateAt.Format(time.RFC3339),
+						"elapsed", elapsed.Round(time.Second).String(),
+						"target_status", statusName(common.ResourceUnhealthy),
+						"error", err)
+					applyFallback(ctx, a, d, currentStatus, common.ResourceUnhealthy)
+				} else {
+					logger.Info("reconcile(deploy): batch error but within hard timeout, skip",
+						"deploy_id", d.ID, "svc_name", d.SvcName,
+						"last_status_update", d.StatusUpdateAt.Format(time.RFC3339),
+						"elapsed", elapsed.Round(time.Second).String(),
+						"error", err)
+				}
 				return
 			}
-			if time.Since(d.StatusUpdateAt) > hardTimeout {
-				applyStatusUpdate(ctx, a, d, currentStatus, fallbackTargetStatus(currentStatus),
-					nil, "runner_unreachable")
-			}
-		},
-		// processResult
-		func(d *database.Deploy, r *runnerTypes.BatchStatusItemResult) {
 			processBatchResult(ctx, a, d, r, currentStatus)
 		},
 	)
 }
 
 func processBatchResult(ctx context.Context, a *Activities, deploy *database.Deploy, r *runnerTypes.BatchStatusItemResult, currentStatus int) {
-	logger := a.getLogger(ctx)
-	logger.Debug("reconcile(deploy): process batch item result",
-		"deploy_id", deploy.ID, "svc_name", deploy.SvcName, "type", deploy.Type,
+	logger := log.With(a.getLogger(ctx),
+		"deploy_id", deploy.ID, "svc_name", deploy.SvcName,
 		"current_status", statusName(currentStatus),
+		"type", deploy.Type,
+	)
+	logger.Debug("reconcile(deploy): process batch item result",
 		"result_code", r.Code, "result_status", r.Status,
 		"actual_replica", r.ActualReplica, "desired_replica", r.DesiredReplica,
 		"instances", len(r.Instances))
 
-	var newStatus int
-	var instances []types.Instance
+	// Step 1: Map the runner result to the deploy status the runner observes.
+	runnerStatus, instances, ok := mapRunnerResultToStatus(deploy, r, currentStatus)
+	if !ok {
+		logger.Warn("reconcile(deploy): unknown deploy type, skip", "type", deploy.Type)
+		return
+	}
+
+	// Step 2: If the runner agrees with the current DB status, the deploy is
+	// healthy — just refresh StatusUpdateAt to reset the fallback timer.
+	if runnerStatus == currentStatus {
+		logger.Info("reconcile(deploy): status unchanged, refresh timestamp",
+			"runner_status", statusName(runnerStatus))
+		refreshStatusTimestamp(ctx, a, deploy, currentStatus)
+		return
+	}
+
+	// Step 3: The runner disagrees. For ksvc deploys, reconcile only fixes
+	// anomalies (a Running deploy whose service vanished, or a deploying
+	// deploy that failed); normal transitions are left to the informer.
+	// Sandbox deploys have no separate informer, so the mapped status is
+	// applied directly.
+	if deploy.Type == types.SandboxType {
+		applyStatusUpdate(ctx, a, deploy, currentStatus, runnerStatus, instances, "runner_sandbox_sync")
+		return
+	}
+
+	// Ksvc: only apply the anomaly transitions, skip the rest.
+	applyStatus, targetStatus := shouldApplyKsvcTransition(currentStatus, runnerStatus)
+	if !applyStatus {
+		logger.Info("reconcile(deploy): runner status differs, leave to informer",
+			"runner_status", statusName(runnerStatus))
+		return
+	}
+
+	applyStatusUpdate(ctx, a, deploy, currentStatus, targetStatus, instances, "runner_status_sync")
+}
+
+// processUnhealthyResult handles the recovery path for deploys stuck in
+// ResourceUnhealthy. Unlike processBatchResult, it accepts any definitive
+// status the runner reports — the deploy is already abnormal, so any clear
+// runner status is a recovery. If the runner has no definitive status (e.g.
+// sandbox default case returns currentStatus), the deploy stays unhealthy.
+func processUnhealthyResult(ctx context.Context, a *Activities, deploy *database.Deploy, r *runnerTypes.BatchStatusItemResult) {
+	logger := log.With(a.getLogger(ctx),
+		"deploy_id", deploy.ID, "svc_name", deploy.SvcName,
+		"current_status", statusName(common.ResourceUnhealthy),
+	)
+	logger.Debug("reconcile(deploy): process unhealthy result",
+		"result_code", r.Code, "result_status", r.Status,
+		"instances", len(r.Instances))
+
+	runnerStatus, instances, ok := mapRunnerResultToStatus(deploy, r, common.ResourceUnhealthy)
+	if !ok {
+		logger.Warn("reconcile(deploy): unknown deploy type, skip", "type", deploy.Type)
+		return
+	}
+	// mapRunnerResultToStatus returns currentStatus (ResourceUnhealthy) when
+	// the runner has no definitive status (e.g. sandbox default case) — skip.
+	if runnerStatus == common.ResourceUnhealthy {
+		logger.Info("reconcile(deploy): runner has no definitive status, stay unhealthy",
+			"runner_status", statusName(runnerStatus))
+		return
+	}
+	applyStatusUpdate(ctx, a, deploy, common.ResourceUnhealthy, runnerStatus, instances, "runner_status_sync")
+}
+
+// mapRunnerResultToStatus converts a runner BatchStatusItemResult into the
+// deploy status the runner observes, independent of the DB's currentStatus
+// (except for sandbox, whose mapping itself depends on currentStatus).
+//
+// Ksvc (Space/Inference/Finetune/Serverless/Notebook): the runner returns
+// Code ∈ {Running, Stopped, Startup}. Stopped means the Knative service is
+// gone from the cluster; the caller decides whether that maps to Stopped or
+// DeployFailed based on currentStatus.
+//
+// Sandbox: the runner returns Status via mapSandboxStatusToDeployStatus,
+// which already encodes the full sandbox condition mapping including the
+// Stopped→DeployFailed decision under Deploying/Startup.
+func mapRunnerResultToStatus(deploy *database.Deploy, r *runnerTypes.BatchStatusItemResult, currentStatus int) (status int, instances []types.Instance, ok bool) {
 	switch deploy.Type {
 	case types.SandboxType:
-		newStatus = mapSandboxStatusToDeployStatus(r.Status, currentStatus)
+		return mapSandboxStatusToDeployStatus(r.Status, currentStatus), nil, true
 	case types.SpaceType, types.InferenceType, types.FinetuneType,
 		types.ServerlessType, types.NotebookType:
 		switch r.Code {
-		case common.Stopped:
-			if currentStatus == common.Deploying || currentStatus == common.Startup {
-				newStatus = common.DeployFailed
-			} else if currentStatus == common.Running {
-				newStatus = common.Stopped
-			} else {
-				logger.Warn("reconcile(deploy): stopped result under unexpected status, skip",
-					"deploy_id", deploy.ID, "svc_name", deploy.SvcName,
-					"current_status", statusName(currentStatus))
-				return
-			}
 		case common.Running:
-			// For Deploying/Startup, the informer handles normal flow
-			// with more accurate status mapping (Deploying/Sleeping/Running).
-			// Reconcile should only fix anomalies, not interfere.
-			if currentStatus == common.Deploying || currentStatus == common.Startup {
-				logger.Info("reconcile(deploy): runner already running, leave transition to informer",
-					"deploy_id", deploy.ID, "svc_name", deploy.SvcName,
-					"current_status", statusName(currentStatus))
-				return
-			}
-			newStatus = common.Running
-			instances = r.Instances
-		default:
-			// Service exists but not fully ready (Startup from batch API).
-			// Deploying/Startup: let informer handle the normal transition.
-			// Running: don't downgrade (scale-to-zero is normal).
-			if currentStatus == common.Deploying || currentStatus == common.Startup {
-				logger.Info("reconcile(deploy): runner not fully ready, leave transition to informer",
-					"deploy_id", deploy.ID, "svc_name", deploy.SvcName,
-					"current_status", statusName(currentStatus), "result_code", r.Code)
-				return
-			}
-			if currentStatus == common.Running {
-				// scale-to-zero is a normal Running state, do not downgrade
-				logger.Info("reconcile(deploy): runner not fully ready under Running, no downgrade (scale-to-zero)",
-					"deploy_id", deploy.ID, "svc_name", deploy.SvcName, "result_code", r.Code)
-				return
-			}
-			newStatus = common.Startup
-			instances = r.Instances
+			return common.Running, r.Instances, true
+		case common.Stopped:
+			return common.Stopped, nil, true
+		default: // Startup or any other code
+			return common.Startup, r.Instances, true
 		}
 	default:
-		logger.Warn("reconcile: unknown deploy type, skip", "deploy_id", deploy.ID, "type", deploy.Type)
-		return
+		return 0, nil, false
 	}
-	if newStatus != 0 {
-		if newStatus == currentStatus {
-			// Running→Running (or other no-op transitions): only refresh
-			// StatusUpdateAt to reset the fallback timer. Do NOT touch
-			// Reason/Instances or overwrite fields that the informer may
-			// have updated since the scan snapshot.
-			logger.Info("reconcile(deploy): status unchanged, refresh timestamp only",
-				"deploy_id", deploy.ID, "svc_name", deploy.SvcName,
-				"status", statusName(newStatus))
-			refreshStatusTimestamp(ctx, a, deploy, currentStatus)
-		} else {
-			applyStatusUpdate(ctx, a, deploy, currentStatus, newStatus, instances, "runner_status_sync")
+}
+
+// shouldApplyKsvcTransition decides whether reconcile should write a status
+// transition when the runner disagrees with the DB for a ksvc deploy. Reconcile
+// only fixes anomalies; normal transitions are left to the informer.
+//
+//	Running:   accept Stopped (service genuinely gone); skip Startup
+//	           (scale-to-zero is a normal Running state).
+//	Deploying: accept DeployFailed (service vanished before ready);
+//	           skip Running/Startup (informer owns the transition).
+//	Startup:  accept DeployFailed (service vanished before ready);
+//	           skip Running/Startup (informer owns the transition).
+func shouldApplyKsvcTransition(currentStatus, runnerStatus int) (apply bool, target int) {
+	switch currentStatus {
+	case common.Running:
+		if runnerStatus == common.Stopped {
+			return true, common.Stopped
 		}
+		return false, 0
+	case common.Deploying, common.Startup:
+		if runnerStatus == common.Stopped {
+			return true, common.DeployFailed
+		}
+		return false, 0
+	default:
+		// Reconcile only scans Deploying/Startup/Running; any other
+		// currentStatus is unexpected — skip to be safe.
+		return false, 0
 	}
 }
 
@@ -292,73 +394,115 @@ func reconcileWorkflowByPhase(ctx context.Context, a *Activities, phases []v1alp
 }
 
 func reconcileWorkflowCluster(ctx context.Context, a *Activities, cid string, wfs []database.ArgoWorkflow, hardTimeout time.Duration) {
-	clusterBatchDo(ctx, a, cid, wfs, hardTimeout,
-		func(wf *database.ArgoWorkflow) time.Time {
-			if wf.StatusUpdateAt.IsZero() {
-				return wf.SubmitTime
-			}
-			return wf.StatusUpdateAt
-		},
-		func(wf *database.ArgoWorkflow) {
-			wf.Status = v1alpha1.WorkflowFailed
-			wf.StatusUpdateAt = time.Now()
-			if _, err := a.stores.argoWorkFlow.UpdateWorkFlow(ctx, *wf); err != nil {
-				a.getLogger(ctx).Error("reconcile(wf): mark failed error", "wf_id", wf.ID, "error", err)
-			} else {
-				a.getLogger(ctx).Info("reconcile(wf): workflow marked failed",
-					"wf_id", wf.ID, "cluster_id", cid)
-			}
-		},
-		func(wf *database.ArgoWorkflow) (string, runnerTypes.BatchStatusItem) {
-			return wf.TaskId, runnerTypes.BatchStatusItem{Type: runnerTypes.ResourceTypeWorkflow, Name: wf.TaskId}
-		},
-		func(wf *database.ArgoWorkflow) {
-			lastUpdate := wf.StatusUpdateAt
+	logger := log.With(a.getLogger(ctx),
+		"cluster_id", cid,
+		"wf_count", len(wfs),
+		"hard_timeout", hardTimeout.String(),
+	)
+
+	// 1. Heartbeat check — if the cluster is down, apply timeout fallback.
+	if checkHeartbeatForCluster(ctx, a, cid) {
+		logger.Warn("reconcile(wf): cluster heartbeat timed out, applying fallback")
+		marked := 0
+		for i := range wfs {
+			lastUpdate := wfs[i].StatusUpdateAt
 			if lastUpdate.IsZero() {
-				lastUpdate = wf.SubmitTime
+				lastUpdate = wfs[i].SubmitTime
 			}
 			elapsed := time.Since(lastUpdate)
 			if elapsed > hardTimeout {
-				a.getLogger(ctx).Warn("reconcile(wf): batch error timeout, marking failed",
-					"wf_id", wf.ID, "hard_timeout", hardTimeout,
+				logger.Warn("reconcile(wf): workflow exceeded hard timeout, marking failed",
+					"wf_id", wfs[i].ID,
+					"last_status_update", lastUpdate.Format(time.RFC3339),
 					"elapsed", elapsed.Round(time.Second).String())
-				wf.Status = v1alpha1.WorkflowFailed
-				wf.StatusUpdateAt = time.Now()
-				if _, err := a.stores.argoWorkFlow.UpdateWorkFlow(ctx, *wf); err != nil {
-					a.getLogger(ctx).Error("reconcile(wf): mark failed error", "wf_id", wf.ID, "error", err)
-				}
+				markWorkflowFailed(ctx, a, &wfs[i], cid)
+				marked++
 			} else {
-				a.getLogger(ctx).Info("reconcile(wf): batch error but within hard timeout, skip",
-					"wf_id", wf.ID, "elapsed", elapsed.Round(time.Second).String(),
-					"hard_timeout", hardTimeout)
+				logger.Info("reconcile(wf): workflow within hard timeout, skip",
+					"wf_id", wfs[i].ID,
+					"last_status_update", lastUpdate.Format(time.RFC3339),
+					"elapsed", elapsed.Round(time.Second).String())
 			}
+		}
+		logger.Warn("reconcile(wf): heartbeat timeout fallback done",
+			"marked", marked, "skipped", len(wfs)-marked)
+		return
+	}
+
+	// 2. Query runner and process results.
+	logger.Info("reconcile(wf): cluster healthy, querying runner")
+	clusterBatchDo(ctx, a, cid, wfs,
+		func(wf *database.ArgoWorkflow) (string, runnerTypes.BatchStatusItem) {
+			return wf.TaskId, runnerTypes.BatchStatusItem{Type: runnerTypes.ResourceTypeWorkflow, Name: wf.TaskId}
 		},
-		func(wf *database.ArgoWorkflow, r *runnerTypes.BatchStatusItemResult) {
+		func(wf *database.ArgoWorkflow, r *runnerTypes.BatchStatusItemResult, err error) {
+			if err != nil {
+				// BatchStatus failed or item error — apply fallback only if
+				// the workflow has been stuck beyond hardTimeout.
+				lastUpdate := wf.StatusUpdateAt
+				if lastUpdate.IsZero() {
+					lastUpdate = wf.SubmitTime
+				}
+				elapsed := time.Since(lastUpdate)
+				if elapsed > hardTimeout {
+					logger.Warn("reconcile(wf): batch error + hard timeout, marking failed",
+						"wf_id", wf.ID,
+						"last_status_update", lastUpdate.Format(time.RFC3339),
+						"elapsed", elapsed.Round(time.Second).String(),
+						"error", err)
+					markWorkflowFailed(ctx, a, wf, cid)
+				} else {
+					logger.Info("reconcile(wf): batch error but within hard timeout, skip",
+						"wf_id", wf.ID,
+						"last_status_update", lastUpdate.Format(time.RFC3339),
+						"elapsed", elapsed.Round(time.Second).String(),
+						"error", err)
+				}
+				return
+			}
 			if string(wf.Status) != r.Phase && len(r.Phase) > 0 {
 				wf.Status = v1alpha1.WorkflowPhase(r.Phase)
 				wf.StatusUpdateAt = time.Now()
 				if _, err := a.stores.argoWorkFlow.UpdateWorkFlow(ctx, *wf); err != nil {
-					a.getLogger(ctx).Error("reconcile(wf): update failed", "wf_id", wf.ID, "error", err)
+					logger.Error("reconcile(wf): update failed", "wf_id", wf.ID, "error", err)
 				} else {
-					a.getLogger(ctx).Info("reconcile(wf): status synced", "wf_id", wf.ID, "phase", r.Phase)
+					logger.Info("reconcile(wf): status synced", "wf_id", wf.ID, "phase", r.Phase)
 				}
 			}
 		},
 	)
 }
 
+// markWorkflowFailed sets a workflow to WorkflowFailed and persists it.
+func markWorkflowFailed(ctx context.Context, a *Activities, wf *database.ArgoWorkflow, cid string) {
+	wf.Status = v1alpha1.WorkflowFailed
+	wf.StatusUpdateAt = time.Now()
+	if _, err := a.stores.argoWorkFlow.UpdateWorkFlow(ctx, *wf); err != nil {
+		a.getLogger(ctx).Error("reconcile(wf): mark failed error", "wf_id", wf.ID, "error", err)
+	} else {
+		a.getLogger(ctx).Info("reconcile(wf): workflow marked failed",
+			"wf_id", wf.ID, "cluster_id", cid)
+	}
+}
+
 // ==================== Shared Cluster Batch Pattern ====================
 
-// clusterBatchDo is the shared pattern for per-cluster reconciliation.
-// It handles: nil deployer check → cluster health check → hardTimeout →
-// batch API call → result processing.
+// clusterBatchDo calls BatchStatus for the given items and dispatches each
+// result back to processResult. It does NOT handle heartbeat or timeout
+// fallback — the caller owns that, so the flow stays linear and readable.
+//
+// processResult receives (item, result, err):
+//   - err != nil && r == nil → the whole BatchStatus call failed; the runner
+//     is unreachable. The caller decides whether to apply timeout fallback.
+//   - err != nil && r != nil → this item had an Error field, but the runner
+//     was reachable and r may still carry a valid status (e.g. ksvc
+//     "service not found" carries Code: Stopped). The caller decides whether
+//     the Error is a definitive status or a fallback signal.
+//   - err == nil → a normal status result to map and apply.
 func clusterBatchDo[T any](
-	ctx context.Context, a *Activities, cid string, items []T, hardTimeout time.Duration,
-	getLastUpdate func(*T) time.Time,
-	markFailed func(*T),
+	ctx context.Context, a *Activities, cid string, items []T,
 	buildItem func(*T) (key string, item runnerTypes.BatchStatusItem),
-	onBatchError func(*T),
-	processResult func(*T, *runnerTypes.BatchStatusItemResult),
+	processResult func(*T, *runnerTypes.BatchStatusItemResult, error),
 ) {
 	if a.deployer == nil {
 		return
@@ -366,29 +510,6 @@ func clusterBatchDo[T any](
 
 	logger := a.getLogger(ctx)
 
-	// Cluster health check
-	timedOut, err := a.deployer.CheckHeartbeatTimeout(ctx, cid)
-	if err != nil {
-		logger.Warn("reconcile: heartbeat check failed, skip timeout fallback and proceed batch",
-			"cluster_id", cid, "item_count", len(items), "error", err)
-	} else if timedOut {
-		marked := 0
-		for i := range items {
-			item := &items[i]
-			if time.Since(getLastUpdate(item)) > hardTimeout {
-				logger.Warn("reconcile: cluster unhealthy + hard timeout, marking failed",
-					"cluster_id", cid)
-				markFailed(item)
-				marked++
-			}
-		}
-		logger.Warn("reconcile: cluster heartbeat timeout, applied fallback",
-			"cluster_id", cid, "item_count", len(items),
-			"marked_failed", marked, "hard_timeout_min", int(hardTimeout.Minutes()))
-		return
-	}
-
-	// Build batch request
 	batchItems := make([]runnerTypes.BatchStatusItem, 0, len(items))
 	idxMap := make(map[string]int, len(items))
 	for i := range items {
@@ -404,10 +525,8 @@ func clusterBatchDo[T any](
 	if err != nil {
 		logger.Warn("reconcile: BatchStatus failed",
 			"cluster_id", cid, "count", len(items), "error", err)
-		if onBatchError != nil {
-			for i := range items {
-				onBatchError(&items[i])
-			}
+		for i := range items {
+			processResult(&items[i], nil, err)
 		}
 		return
 	}
@@ -425,14 +544,10 @@ func clusterBatchDo[T any](
 		if r.Error != "" {
 			logger.Warn("reconcile: batch item error",
 				"name", r.Name, "error", r.Error)
-			// Apply timeout fallback for individual errors,
-			// same as the whole-batch-failure path.
-			if onBatchError != nil {
-				onBatchError(&items[idx])
-			}
+			processResult(&items[idx], &r, fmt.Errorf("%s", r.Error))
 			continue
 		}
-		processResult(&items[idx], &r)
+		processResult(&items[idx], &r, nil)
 	}
 }
 
@@ -463,6 +578,46 @@ func hasPendingInstance(d *database.Deploy) bool {
 		}
 	}
 	return false
+}
+
+// checkHeartbeatForCluster reports whether the cluster heartbeat has timed out.
+// On check error it returns false (proceed to BatchStatus) and logs a warning.
+func checkHeartbeatForCluster(ctx context.Context, a *Activities, cid string) bool {
+	timedOut, err := a.deployer.CheckHeartbeatTimeout(ctx, cid)
+	if err != nil {
+		a.getLogger(ctx).Warn("reconcile: heartbeat check failed, proceed batch",
+			"cluster_id", cid, "error", err)
+		return false
+	}
+	return timedOut
+}
+
+// applyFallback marks a deploy as ResourceUnhealthy when the runner is
+// unreachable and the deploy has been stuck beyond hardTimeout. It skips
+// deploys that still have a Pending pod, since "service not found" during
+// scheduling is transient. Both fallback paths (heartbeat timeout and
+// batch error) use ResourceUnhealthy — we cannot verify the deploy's real
+// status, so we do not assert DeployFailed.
+func applyFallback(ctx context.Context, a *Activities, d *database.Deploy, expectedStatus, targetStatus int) {
+	if hasPendingInstance(d) {
+		a.getLogger(ctx).Info("reconcile: skip fallback, pod still pending",
+			"deploy_id", d.ID, "svc_name", d.SvcName)
+		return
+	}
+	applyStatusUpdate(ctx, a, d, expectedStatus, targetStatus, nil, "runner_unreachable")
+}
+
+// buildDeployBatchItem converts a deploy to a runner BatchStatusItem.
+func buildDeployBatchItem(d *database.Deploy) (key string, item runnerTypes.BatchStatusItem) {
+	switch d.Type {
+	case types.SandboxType:
+		return d.SvcName, runnerTypes.BatchStatusItem{Type: runnerTypes.ResourceTypeSandbox, Name: d.SvcName}
+	case types.SpaceType, types.InferenceType, types.FinetuneType,
+		types.ServerlessType, types.NotebookType:
+		return d.SvcName, runnerTypes.BatchStatusItem{Type: runnerTypes.ResourceTypeKsvc, Name: d.SvcName}
+	default:
+		return d.SvcName, runnerTypes.BatchStatusItem{Type: runnerTypes.ResourceTypeKsvc, Name: d.SvcName}
+	}
 }
 
 func groupByCluster(deploys []database.Deploy) map[string][]database.Deploy {
@@ -540,20 +695,6 @@ func applyStatusUpdate(ctx context.Context, a *Activities, deploy *database.Depl
 		return
 	}
 	logger.Info("reconcile: deploy status updated")
-}
-
-// fallbackTargetStatus decides the target status when the runner is
-// unreachable and the deploy has been stuck beyond hardTimeout. For
-// Running deploys, scale-to-zero or transient runner unavailability
-// should surface as Stopped (recoverable) rather than DeployFailed
-// (terminal), matching the normal-mapping semantics in processBatchResult.
-// Deploying/Startup remain DeployFailed since a stuck deployment is
-// genuinely failed.
-func fallbackTargetStatus(currentStatus int) int {
-	if currentStatus == common.Running {
-		return common.Stopped
-	}
-	return common.DeployFailed
 }
 
 func reconcileReason(source string) string {
