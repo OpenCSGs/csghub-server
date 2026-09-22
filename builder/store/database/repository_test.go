@@ -22,6 +22,33 @@ import (
 	"opencsg.com/csghub-server/common/types"
 )
 
+func TestRepoStore_UpdateDescriptionIfEmpty(t *testing.T) {
+	ctx := context.Background()
+	db := tests.InitTestDB()
+	store := database.NewRepoStoreWithDB(db)
+	repo, err := store.CreateRepo(ctx, database.Repository{
+		UserID:         123,
+		Path:           "description-owner/description-repo",
+		GitPath:        "models_description-owner/description-repo",
+		Name:           "description-repo",
+		RepositoryType: types.ModelRepo,
+	})
+	require.NoError(t, err)
+
+	descriptionStore := store.(database.RepoDescriptionStore)
+	updated, err := descriptionStore.UpdateDescriptionIfEmpty(ctx, repo.ID, "generated description")
+	require.NoError(t, err)
+	require.True(t, updated)
+
+	updated, err = descriptionStore.UpdateDescriptionIfEmpty(ctx, repo.ID, "replacement description")
+	require.NoError(t, err)
+	require.False(t, updated)
+
+	got, err := store.FindById(ctx, repo.ID)
+	require.NoError(t, err)
+	require.Equal(t, "generated description", got.Description)
+}
+
 type updateNamespaceLockHook struct {
 	path   string
 	locked chan struct{}
@@ -1844,6 +1871,17 @@ func TestRepoStore_BatchMethods(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, len(rs), 5) // Should return all 5 repos
 	require.ElementsMatch(t, []string{"rp1", "rp2", "rp3", "rp4", "rp5"}, names(rs))
+
+	// Test descending keyset pagination. The cursor is the last (smallest) ID
+	// returned by the previous page.
+	descendingFilter := &types.BatchGetFilter{OrderByIDDesc: true}
+	rs, err = store.BatchGet(ctx, 0, 2, descendingFilter)
+	require.Nil(t, err)
+	require.Equal(t, []string{"rp5", "rp4"}, names(rs))
+
+	rs, err = store.BatchGet(ctx, rids[3], 2, descendingFilter)
+	require.Nil(t, err)
+	require.Equal(t, []string{"rp3", "rp2"}, names(rs))
 
 	// Test with empty filter (should return all repos)
 	emptyFilter := &types.BatchGetFilter{}

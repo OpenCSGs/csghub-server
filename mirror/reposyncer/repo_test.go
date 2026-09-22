@@ -33,6 +33,15 @@ type MockMessageSender struct {
 	mock.Mock
 }
 
+type testRepoDescriptionStore struct {
+	database.RepoStore
+}
+
+func (s testRepoDescriptionStore) UpdateDescriptionIfEmpty(ctx context.Context, repoID int64, description string) (bool, error) {
+	_, err := s.UpdateRepo(ctx, database.Repository{ID: repoID, Description: description})
+	return err == nil, err
+}
+
 func (m *MockMessageSender) Send(ctx context.Context, message types.MessageRequest) (hook.Response, error) {
 	args := m.Called(ctx, message)
 	return args.Get(0).(hook.Response), args.Error(1)
@@ -160,7 +169,7 @@ func TestRepoSyncWorker_SyncRepo(t *testing.T) {
 			git:               mockGit,
 			msgSender:         mockSender,
 			mirrorTaskStore:   mockTaskStore,
-			repoStore:         mockRepoStore,
+			repoStore:         testRepoDescriptionStore{RepoStore: mockRepoStore},
 			promptPrefixStore: mockPromptPrefixStore,
 			llmConfigStore:    mockLLMConfigStore,
 			config:            cfg,
@@ -228,7 +237,7 @@ func TestRepoSyncWorker_SyncRepo(t *testing.T) {
 			git:               mockGit,
 			msgSender:         mockSender,
 			mirrorTaskStore:   mockTaskStore,
-			repoStore:         mockRepoStore,
+			repoStore:         testRepoDescriptionStore{RepoStore: mockRepoStore},
 			promptPrefixStore: mockPromptPrefixStore,
 			llmConfigStore:    mockLLMConfigStore,
 			config:            cfg,
@@ -295,7 +304,7 @@ func TestRepoSyncWorker_SyncRepo(t *testing.T) {
 			git:               mockGit,
 			msgSender:         mockSender,
 			mirrorTaskStore:   mockTaskStore,
-			repoStore:         mockRepoStore,
+			repoStore:         testRepoDescriptionStore{RepoStore: mockRepoStore},
 			promptPrefixStore: mockPromptPrefixStore,
 			llmConfigStore:    mockLLMConfigStore,
 			config:            cfg,
@@ -391,7 +400,7 @@ func TestRepoSyncWorker_SyncRepo(t *testing.T) {
 			git:               mockGit,
 			msgSender:         mockSender,
 			mirrorTaskStore:   mockTaskStore,
-			repoStore:         mockRepoStore,
+			repoStore:         testRepoDescriptionStore{RepoStore: mockRepoStore},
 			promptPrefixStore: mockPromptPrefixStore,
 			llmConfigStore:    mockLLMConfigStore,
 			workflowClient:    mockWorkflowClient,

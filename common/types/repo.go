@@ -365,6 +365,7 @@ type RepoFilter struct {
 type BatchGetFilter struct {
 	RepoType             RepositoryType        `json:"repo_type"`
 	SensitiveCheckStatus *SensitiveCheckStatus `json:"sensitive_check_status"`
+	OrderByIDDesc        bool                  `json:"order_by_id_desc"`
 }
 
 type TagReq struct {

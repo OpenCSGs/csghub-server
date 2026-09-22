@@ -19,7 +19,7 @@ const (
 // If the schedule already exists (AlreadyScheduledMessage), the error is
 // treated as success. This helper is shared across CE/EE/SaaS variants to
 // avoid duplicating the boilerplate scheduler.Create + error-check code.
-func createSchedule(scheduler temporal.ScheduleClient, id, cronExpr, workflowID string, workflow interface{}) error {
+func createSchedule(scheduler temporal.ScheduleClient, id, cronExpr, workflowID string, workflow interface{}, args ...interface{}) error {
 	_, err := scheduler.Create(context.Background(), client.ScheduleOptions{
 		ID: id,
 		Spec: client.ScheduleSpec{
@@ -30,7 +30,7 @@ func createSchedule(scheduler temporal.ScheduleClient, id, cronExpr, workflowID 
 			ID:        workflowID,
 			TaskQueue: CronJobQueueName,
 			Workflow:  workflow,
-			Args:      []interface{}{},
+			Args:      args,
 		},
 	})
 	if err != nil && err.Error() != types.AlreadyScheduledMessage {

@@ -16,3 +16,10 @@ type UpdateRepoDescriptionFromReadmeReq struct {
 	Name              string
 	Ref               string
 }
+
+type RepoDescriptionUpdateStatus string
+
+const (
+	RepoDescriptionSkipped RepoDescriptionUpdateStatus = "skipped"
+	RepoDescriptionUpdated RepoDescriptionUpdateStatus = "updated"
+)
