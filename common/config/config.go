@@ -530,6 +530,7 @@ type Config struct {
 		TokenReportDailySummaryCronExpression    string `env:"STARHUB_SERVER_CRON_JOB_TOKEN_REPORT_DAILY_SUMMARY_CRON_EXPRESSION" default:"23 3 * * *"` // 03:23 daily, after statement daily summary
 		HistoryArchiveCronExpression             string `env:"STARHUB_SERVER_CRON_JOB_HISTORY_ARCHIVE_CRON_EXPRESSION" default:"30 2 * * *"`            // 02:30 daily (Asia/Shanghai, applied via ScheduleSpec.TimeZoneName)
 		UpstreamSyncReconcileCronExpression      string `env:"STARHUB_SERVER_CRON_JOB_UPSTREAM_SYNC_RECONCILE_CRON_EXPRESSION" default:"*/10 * * * *"`  // every 10 minutes
+		RepoDescriptionReconcileCronExpression   string `env:"STARHUB_SERVER_CRON_JOB_REPO_DESCRIPTION_RECONCILE_CRON_EXPRESSION" default:"0 18 * * *"` // 02:00 daily (UTC+8)
 	}
 
 	HistoryArchive struct {

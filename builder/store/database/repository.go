@@ -184,6 +184,14 @@ type RepoStore interface {
 	GetRepositoriesWithoutStatistics(ctx context.Context, limit, offset int) ([]*Repository, error)
 }
 
+// RepoDescriptionStore exposes the conditional write used by asynchronous
+// description generators without widening RepoStore for unrelated consumers.
+type RepoDescriptionStore interface {
+	UpdateDescriptionIfEmpty(ctx context.Context, repoID int64, description string) (bool, error)
+}
+
+var _ RepoDescriptionStore = (*repoStoreImpl)(nil)
+
 func (s *repoStoreImpl) UpdateRepoSensitiveCheckStatus(ctx context.Context, repoID int64, status types.SensitiveCheckStatus) error {
 	_, err := s.db.Operator.Core.NewUpdate().
 		Model(&Repository{}).
@@ -2439,7 +2447,13 @@ func (s *repoStoreImpl) GetRepoWithRuntimeByID(ctx context.Context, rfID int64, 
 func (s *repoStoreImpl) BatchGet(ctx context.Context, lastRepoID int64, batch int, filter *types.BatchGetFilter) ([]Repository, error) {
 	var res []Repository
 	q := s.db.Operator.Core.NewSelect().Model(&res)
-	if lastRepoID > 0 {
+	orderByID := "id ASC"
+	if filter != nil && filter.OrderByIDDesc {
+		orderByID = "id DESC"
+		if lastRepoID > 0 {
+			q.Where("id < ?", lastRepoID)
+		}
+	} else if lastRepoID > 0 {
 		q.Where("id > ?", lastRepoID)
 	}
 
@@ -2456,13 +2470,33 @@ func (s *repoStoreImpl) BatchGet(ctx context.Context, lastRepoID int64, batch in
 		}
 	}
 
-	err := q.Order("id ASC").
+	err := q.Order(orderByID).
 		Limit(batch).
 		Scan(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("select repos failed, last_repo_id: %d, batch: %d, %w", lastRepoID, batch, err)
 	}
 	return res, nil
+}
+
+// UpdateDescriptionIfEmpty stores a generated description only while the
+// repository still has no description. This prevents a delayed generator from
+// overwriting a value written concurrently by a user or another job.
+func (s *repoStoreImpl) UpdateDescriptionIfEmpty(ctx context.Context, repoID int64, description string) (bool, error) {
+	result, err := s.db.Operator.Core.NewUpdate().
+		Model((*Repository)(nil)).
+		Set("description = ?", description).
+		Where("id = ?", repoID).
+		Where("COALESCE(description, '') = ''").
+		Exec(ctx)
+	if err != nil {
+		return false, fmt.Errorf("update empty repository description for id %d: %w", repoID, err)
+	}
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return false, fmt.Errorf("get updated repository description row count for id %d: %w", repoID, err)
+	}
+	return rowsAffected == 1, nil
 }
 
 func (s *repoStoreImpl) FindWithBatch(ctx context.Context, batchSize, batch int, repoTypes ...types.RepositoryType) ([]Repository, error) {
