@@ -164,6 +164,52 @@ func TestChatCompletionRequest_EmptyRawJSON(t *testing.T) {
 	assert.Empty(t, req4Unmarshaled.RawJSON)
 }
 
+func TestChatCompletionRequest_HasNullMessageContent(t *testing.T) {
+	tests := []struct {
+		name     string
+		raw      string
+		expected bool
+	}{
+		{
+			name:     "assistant message with explicit null content",
+			raw:      `{"messages": [{"role": "assistant", "content": null, "tool_calls": [{"id": "call_1"}]}]}`,
+			expected: true,
+		},
+		{
+			name:     "user message with explicit null content",
+			raw:      `{"messages": [{"role": "user", "content": null}]}`,
+			expected: true,
+		},
+		{
+			name:     "missing content key does not count",
+			raw:      `{"messages": [{"role": "assistant", "tool_calls": [{"id": "call_1"}]}]}`,
+			expected: false,
+		},
+		{
+			name:     "string content does not count",
+			raw:      `{"messages": [{"role": "user", "content": "hello"}]}`,
+			expected: false,
+		},
+		{
+			name:     "null in other fields does not count",
+			raw:      `{"messages": [{"role": "user", "content": "hello"}], "tool_choice": null}`,
+			expected: false,
+		},
+		{
+			name:     "no messages",
+			raw:      `{"model": "m"}`,
+			expected: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var req ChatCompletionRequest
+			require.NoError(t, json.Unmarshal([]byte(tt.raw), &req))
+			assert.Equal(t, tt.expected, req.HasNullMessageContent())
+		})
+	}
+}
+
 func TestChatCompletionRequest_AssistantReasoningContentRoundTrip(t *testing.T) {
 	raw := []byte(`{
 		"model": "deepseek-v4-flash",

@@ -68,6 +68,15 @@ func TestLocalizedErrorMiddleware(t *testing.T) {
 		c.Data(http.StatusPartialContent, "application/octet-stream", body)
 	})
 
+	// Test case 9: SSE error stream (e.g. an upstream error inside a
+	// streaming response) — not JSON, must be forwarded untouched.
+	router.GET("/sse-error", func(c *gin.Context) {
+		c.Header("Content-Type", "text/event-stream")
+		c.Status(http.StatusBadRequest)
+		_, _ = c.Writer.Write([]byte(`data: {"error":{"code":"invalid_parameter_error","message":"'response_format.json_schema' is required","type":"invalid_request_error"}}`))
+		_, _ = c.Writer.Write([]byte("\n\n"))
+	})
+
 	router.GET("/mirror-sync-cancelled", func(c *gin.Context) {
 		httpbase.ConflictError(c, errorx.MirrorRepoSyncCanceled(
 			errors.New("repository synchronization was canceled"),
@@ -205,6 +214,18 @@ func TestLocalizedErrorMiddleware(t *testing.T) {
 		// Body must be delivered intact — not silently discarded by the middleware
 		expected := []byte{0xe0, 0x8a, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
 		assert.Equal(t, expected, w.Body.Bytes())
+	})
+
+	t.Run("SSEErrorResponseForwardedIntact", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", "/sse-error", nil)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+		// The SSE body must be delivered byte-for-byte; the middleware must
+		// not attempt to parse it as a JSON httpbase.R envelope.
+		expected := `data: {"error":{"code":"invalid_parameter_error","message":"'response_format.json_schema' is required","type":"invalid_request_error"}}` + "\n\n"
+		assert.Equal(t, expected, w.Body.String())
 	})
 
 	t.Run("LocalizedCancelledMirrorSync", func(t *testing.T) {

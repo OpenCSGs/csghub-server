@@ -29,7 +29,9 @@ func TestDefaultProtocolCapabilities(t *testing.T) {
 		assert.True(t, cap.Tools)
 		assert.True(t, cap.Vision)
 		assert.True(t, cap.Thinking)
-		assert.False(t, cap.PromptCaching)
+		// Chat upstreams cache prompts automatically, so the Anthropic
+		// cache_control hint counts as satisfied.
+		assert.True(t, cap.PromptCaching)
 		assert.True(t, cap.StructuredOutput)
 	})
 
@@ -39,7 +41,8 @@ func TestDefaultProtocolCapabilities(t *testing.T) {
 		assert.True(t, cap.Tools)
 		assert.True(t, cap.Vision)
 		assert.True(t, cap.Thinking)
-		assert.False(t, cap.PromptCaching)
+		// Responses upstreams cache prompts automatically as well.
+		assert.True(t, cap.PromptCaching)
 		assert.True(t, cap.StructuredOutput)
 	})
 

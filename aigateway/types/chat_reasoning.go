@@ -82,6 +82,11 @@ func isJSONString(raw json.RawMessage) bool {
 	return len(trimmed) >= 2 && trimmed[0] == '"' && trimmed[len(trimmed)-1] == '"'
 }
 
+// IsJSONNull reports whether the raw JSON value is a literal null.
+func IsJSONNull(raw json.RawMessage) bool {
+	return string(bytes.TrimSpace(raw)) == "null"
+}
+
 // isAssistantToolCallMessage reports whether the message is an assistant
 // message that actually carries tool calls (a `tool_calls: null` value does
 // not count).

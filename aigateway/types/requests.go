@@ -57,6 +57,11 @@ type ChatCompletionRequest struct {
 	// gateway re-serializes the request. Thinking-mode providers such as
 	// DeepSeek require the field on subsequent requests.
 	assistantReasoningContent map[int]string
+	// hasNullMessageContent records whether any message carries an explicit
+	// `"content": null` (a common SDK idiom on assistant tool-call turns).
+	// Strict upstreams reject the field, so the raw-body proxy path must
+	// rewrite those messages instead of taking the zero-cost fast path.
+	hasNullMessageContent bool
 }
 
 // PromptText extracts a plain-text representation of the user's prompt from
@@ -183,7 +188,41 @@ func (r *ChatCompletionRequest) UnmarshalJSON(data []byte) error {
 	// with the resolved upstream name before proxying.
 	r.ClientModel = r.Model
 	r.assistantReasoningContent = collectAssistantReasoningContent(messagesRaw)
+	r.hasNullMessageContent = hasNullMessageContent(messagesRaw)
 	return nil
+}
+
+// hasNullMessageContent reports whether any message carries an explicit
+// `"content": null`. Some SDKs send it on assistant messages that only carry
+// tool calls; strict upstreams (e.g. DeepSeek) reject the field and expect
+// the key to be absent instead, so the raw-body proxy path must rewrite
+// those messages. A missing content key does not count.
+func hasNullMessageContent(messagesRaw json.RawMessage) bool {
+	if len(messagesRaw) == 0 {
+		return false
+	}
+	var messages []json.RawMessage
+	if err := json.Unmarshal(messagesRaw, &messages); err != nil {
+		return false
+	}
+	for _, msgRaw := range messages {
+		var msg map[string]json.RawMessage
+		if err := json.Unmarshal(msgRaw, &msg); err != nil {
+			continue
+		}
+		// A JSON null decodes into a *json.RawMessage pointer the same way a
+		// missing key does, so presence must be checked on the raw map.
+		if content, ok := msg["content"]; ok && IsJSONNull(content) {
+			return true
+		}
+	}
+	return false
+}
+
+// HasNullMessageContent reports whether any message in the parsed request
+// carries an explicit `"content": null` value.
+func (r *ChatCompletionRequest) HasNullMessageContent() bool {
+	return r.hasNullMessageContent
 }
 
 // collectAssistantReasoningContent extracts the `reasoning_content` value of

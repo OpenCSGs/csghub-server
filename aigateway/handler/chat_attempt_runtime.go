@@ -36,16 +36,21 @@ func marshalChatRequestBody(chatReq *types.ChatCompletionRequest, modelName stri
 	// survive the round trip unchanged.
 	if len(chatReq.RawBody) > 0 {
 		// Fast path: the client's model name already matches the upstream
-		// target, the gateway forces no usage option, and no reasoning
-		// fixup applies — forward the client's bytes without any JSON
-		// round trip.
+		// target, the gateway forces no usage option, and no fixup applies —
+		// forward the client's bytes without any JSON round trip.
 		if chatReq.ClientModel == modelName && !chatReq.ForceStreamUsage &&
+			!chatReq.HasNullMessageContent() &&
 			!chatRequiresToolCallReasoningContent(modelName, chatReq) {
 			return chatReq.RawBody, nil
 		}
 		body, err := patchChatRawBody(chatReq.RawBody, modelName, chatReq.ForceStreamUsage)
 		if err != nil {
 			return nil, err
+		}
+		// HasNullMessageContent was computed once at parse time, so requests
+		// without explicit null content skip the extra body round trip here.
+		if chatReq.HasNullMessageContent() {
+			body = dropNullMessageContent(body)
 		}
 		if chatRequiresToolCallReasoningContent(modelName, chatReq) {
 			body = types.InjectToolCallReasoningContent(body)
@@ -94,6 +99,58 @@ func patchChatRawBody(rawBody []byte, modelName string, addStreamUsage bool) ([]
 		}
 	}
 	return json.Marshal(payload)
+}
+
+// dropNullMessageContent removes explicit `"content": null` values from
+// messages. Some SDKs send them on assistant messages that only carry tool
+// calls; null and an absent key are semantically identical for an optional
+// field, but strict upstreams (e.g. DeepSeek) reject the null form, so the
+// raw-body path canonicalizes it. The body is returned unchanged when no
+// message carries a null content.
+func dropNullMessageContent(body []byte) []byte {
+	var payload map[string]json.RawMessage
+	if err := json.Unmarshal(body, &payload); err != nil {
+		return body
+	}
+	messagesRaw, ok := payload["messages"]
+	if !ok {
+		return body
+	}
+	var messages []json.RawMessage
+	if err := json.Unmarshal(messagesRaw, &messages); err != nil {
+		return body
+	}
+	changed := false
+	for i, msgRaw := range messages {
+		var msg map[string]json.RawMessage
+		if err := json.Unmarshal(msgRaw, &msg); err != nil {
+			continue
+		}
+		content, exists := msg["content"]
+		if !exists || !types.IsJSONNull(content) {
+			continue
+		}
+		delete(msg, "content")
+		updated, err := json.Marshal(msg)
+		if err != nil {
+			continue
+		}
+		messages[i] = updated
+		changed = true
+	}
+	if !changed {
+		return body
+	}
+	mergedMessages, err := json.Marshal(messages)
+	if err != nil {
+		return body
+	}
+	payload["messages"] = mergedMessages
+	merged, err := json.Marshal(payload)
+	if err != nil {
+		return body
+	}
+	return merged
 }
 
 // chatRequiresToolCallReasoningContent reports whether the outgoing body
