@@ -3,282 +3,66 @@ package executors
 import (
 	"context"
 	"encoding/json"
-	"strconv"
 	"testing"
-	"time"
 
 	"github.com/argoproj/argo-workflows/v3/pkg/apis/workflow/v1alpha1"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	mockdb "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/builder/store/database"
-	"opencsg.com/csghub-server/common/tests"
 	"opencsg.com/csghub-server/common/types"
 )
 
 func TestImageBuilderExecutor_ProcessEvent(t *testing.T) {
-	deployId := int64(1)
-	taskId := int64(1)
-	lastCommitID := "812e1575865e1bc394351b38ff16f00737ef0bb5"
+	const taskID int64 = 1
+	const imagePath = "812e1575865e1bc394351b38ff16f00737ef0bb5"
 
-	t.Run("WorkflowPending", func(t *testing.T) {
-		db := tests.InitTransactionTestDB()
-		defer db.Close()
-		mockDb := database.NewDeployTaskStoreWithDB(db)
-		executor := imagebuilderExecutorImpl{
-			store: mockDb,
-		}
-		err := mockDb.CreateDeploy(context.Background(), &database.Deploy{
-			ID: deployId,
+	tests := []struct {
+		name         string
+		workflow     v1alpha1.WorkflowPhase
+		deployStatus int
+		taskStatus   int
+		wantDeploy   int
+		wantTask     int
+		wantWrite    bool
+	}{
+		{"WorkflowPending", v1alpha1.WorkflowPending, 0, common.TaskStatusBuildPending, 0, common.TaskStatusBuildPending, false},
+		{"WorkflowRunning", v1alpha1.WorkflowRunning, common.BuildInQueue, common.TaskStatusBuildInQueue, common.Building, common.TaskStatusBuildInProgress, true},
+		{"WorkflowSucceeded", v1alpha1.WorkflowSucceeded, common.Building, 0, common.BuildSuccess, common.TaskStatusBuildSucceed, true},
+		{"WorkflowFailed", v1alpha1.WorkflowFailed, common.Building, 0, common.BuildFailed, common.TaskStatusBuildFailed, true},
+		{"WorkflowSucceeded not building", v1alpha1.WorkflowSucceeded, 0, 0, 0, 0, false},
+		{"WorkflowFailed not building", v1alpha1.WorkflowFailed, 0, 0, 0, 0, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			ctx := context.Background()
+			deploy := &database.Deploy{ID: taskID, Status: tt.deployStatus}
+			task := &database.DeployTask{ID: taskID, DeployID: taskID, Status: tt.taskStatus, Deploy: deploy}
+			store := mockdb.NewMockDeployTaskStore(t)
+			store.EXPECT().GetDeployTask(ctx, taskID).Return(task, nil)
+			store.EXPECT().GetLastTaskByType(ctx, taskID, task.TaskType).Return(task, nil)
+			if tt.wantWrite {
+				store.EXPECT().UpdateInTx(mock.Anything, []string{"status", "image_id"}, []string{"status", "message"}, deploy, task).Return(nil).Once()
+			}
+
+			data, err := json.Marshal(types.ImageBuilderEvent{
+				DeployId: "1", TaskId: taskID, Status: string(tt.workflow), ImagetPath: imagePath,
+			})
+			require.NoError(t, err)
+			event := &types.WebHookRecvEvent{
+				WebHookHeader: types.WebHookHeader{EventType: types.RunnerBuilderChange},
+				Data:          data,
+			}
+			err = (&imagebuilderExecutorImpl{store: store}).ProcessEvent(ctx, event)
+			require.NoError(t, err)
+			require.Equal(t, tt.wantTask, task.Status)
+			require.Equal(t, tt.wantDeploy, deploy.Status)
+			if tt.workflow == v1alpha1.WorkflowSucceeded && tt.wantWrite {
+				require.Equal(t, imagePath, deploy.ImageID)
+			}
 		})
-		require.Nil(t, err)
-		err = mockDb.CreateDeployTask(context.Background(), &database.DeployTask{
-			ID:       taskId,
-			DeployID: deployId,
-			Status:   common.TaskStatusBuildPending,
-		})
-		require.Nil(t, err)
-		data := types.ImageBuilderEvent{
-			DeployId:   strconv.FormatInt(deployId, 10),
-			TaskId:     taskId,
-			Status:     string(v1alpha1.WorkflowPending),
-			Message:    "",
-			ImagetPath: lastCommitID,
-		}
-		jsonData, err := json.Marshal(data)
-		require.Nil(t, err)
-
-		event := &types.WebHookRecvEvent{
-			WebHookHeader: types.WebHookHeader{
-				EventType: types.RunnerBuilderChange,
-				EventTime: time.Now().Unix(),
-				DataType:  types.WebHookDataTypeObject,
-			},
-			Data: jsonData,
-		}
-		err = executor.ProcessEvent(context.Background(), event)
-		require.Nil(t, err)
-
-		task, err := mockDb.GetDeployTask(context.Background(), taskId)
-		require.Nil(t, err)
-		require.Equal(t, common.TaskStatusBuildPending, task.Status)
-	})
-
-	t.Run("WorkflowRunning", func(t *testing.T) {
-		db := tests.InitTransactionTestDB()
-		defer db.Close()
-		mockDb := database.NewDeployTaskStoreWithDB(db)
-		executor := imagebuilderExecutorImpl{
-			store: mockDb,
-		}
-		err := mockDb.CreateDeploy(context.Background(), &database.Deploy{
-			Status: common.BuildInQueue,
-			ID:     deployId,
-		})
-		require.Nil(t, err)
-		err = mockDb.CreateDeployTask(context.Background(), &database.DeployTask{
-			ID:       taskId,
-			DeployID: deployId,
-			Status:   common.TaskStatusBuildInQueue,
-		})
-		require.Nil(t, err)
-		data := types.ImageBuilderEvent{
-			DeployId:   strconv.FormatInt(deployId, 10),
-			TaskId:     taskId,
-			Status:     string(v1alpha1.WorkflowRunning),
-			Message:    "",
-			ImagetPath: lastCommitID,
-		}
-		jsonData, err := json.Marshal(data)
-		require.Nil(t, err)
-
-		event := &types.WebHookRecvEvent{
-			WebHookHeader: types.WebHookHeader{
-				EventType: types.RunnerBuilderChange,
-				EventTime: time.Now().Unix(),
-				DataType:  types.WebHookDataTypeObject,
-			},
-			Data: jsonData,
-		}
-		err = executor.ProcessEvent(context.Background(), event)
-		require.Nil(t, err)
-
-		task, err := mockDb.GetDeployTask(context.Background(), taskId)
-		require.Nil(t, err)
-		require.Equal(t, common.TaskStatusBuildInProgress, task.Status)
-	})
-
-	t.Run("WorkflowSucceeded", func(t *testing.T) {
-		db := tests.InitTransactionTestDB()
-		defer db.Close()
-		mockDb := database.NewDeployTaskStoreWithDB(db)
-		executor := imagebuilderExecutorImpl{
-			store: mockDb,
-		}
-		err := mockDb.CreateDeploy(context.Background(), &database.Deploy{
-			ID:     deployId,
-			Status: common.Building,
-		})
-		require.Nil(t, err)
-		err = mockDb.CreateDeployTask(context.Background(), &database.DeployTask{
-			ID:       taskId,
-			DeployID: deployId,
-		})
-		require.Nil(t, err)
-		data := types.ImageBuilderEvent{
-			DeployId:   strconv.FormatInt(deployId, 10),
-			TaskId:     taskId,
-			Status:     string(v1alpha1.WorkflowSucceeded),
-			Message:    "",
-			ImagetPath: lastCommitID,
-		}
-		jsonData, err := json.Marshal(data)
-		require.Nil(t, err)
-
-		event := &types.WebHookRecvEvent{
-			WebHookHeader: types.WebHookHeader{
-				EventType: types.RunnerBuilderChange,
-				EventTime: time.Now().Unix(),
-				DataType:  types.WebHookDataTypeObject,
-			},
-			Data: jsonData,
-		}
-		err = executor.ProcessEvent(context.Background(), event)
-		require.Nil(t, err)
-
-		task, err := mockDb.GetDeployTask(context.Background(), taskId)
-		require.Nil(t, err)
-		require.Equal(t, common.TaskStatusBuildSucceed, task.Status)
-		require.Equal(t, common.BuildSuccess, task.Deploy.Status)
-	})
-
-	t.Run("WorkflowFailed", func(t *testing.T) {
-		db := tests.InitTransactionTestDB()
-		defer db.Close()
-		mockDb := database.NewDeployTaskStoreWithDB(db)
-		executor := imagebuilderExecutorImpl{
-			store: mockDb,
-		}
-		err := mockDb.CreateDeploy(context.Background(), &database.Deploy{
-			ID:     deployId,
-			Status: common.Building,
-		})
-		require.Nil(t, err)
-		err = mockDb.CreateDeployTask(context.Background(), &database.DeployTask{
-			ID:       taskId,
-			DeployID: deployId,
-		})
-		require.Nil(t, err)
-		data := types.ImageBuilderEvent{
-			DeployId:   strconv.FormatInt(deployId, 10),
-			TaskId:     taskId,
-			Status:     string(v1alpha1.WorkflowFailed),
-			Message:    "",
-			ImagetPath: lastCommitID,
-		}
-		jsonData, err := json.Marshal(data)
-		require.Nil(t, err)
-
-		event := &types.WebHookRecvEvent{
-			WebHookHeader: types.WebHookHeader{
-				EventType: types.RunnerBuilderChange,
-				EventTime: time.Now().Unix(),
-				DataType:  types.WebHookDataTypeObject,
-			},
-			Data: jsonData,
-		}
-		err = executor.ProcessEvent(context.Background(), event)
-		require.Nil(t, err)
-
-		task, err := mockDb.GetDeployTask(context.Background(), taskId)
-		require.Nil(t, err)
-		require.Equal(t, common.TaskStatusBuildFailed, task.Status)
-		require.Equal(t, common.BuildFailed, task.Deploy.Status)
-	})
-
-	t.Run("WorkflowSucceeded not building", func(t *testing.T) {
-		db := tests.InitTransactionTestDB()
-		defer db.Close()
-		mockDb := database.NewDeployTaskStoreWithDB(db)
-		executor := imagebuilderExecutorImpl{
-			store: mockDb,
-		}
-		err := mockDb.CreateDeploy(context.Background(), &database.Deploy{
-			ID: deployId,
-		})
-		require.Nil(t, err)
-		err = mockDb.CreateDeployTask(context.Background(), &database.DeployTask{
-			ID:       taskId,
-			DeployID: deployId,
-		})
-		require.Nil(t, err)
-		data := types.ImageBuilderEvent{
-			DeployId:   strconv.FormatInt(deployId, 10),
-			TaskId:     taskId,
-			Status:     string(v1alpha1.WorkflowSucceeded),
-			Message:    "",
-			ImagetPath: lastCommitID,
-		}
-		jsonData, err := json.Marshal(data)
-		require.Nil(t, err)
-
-		event := &types.WebHookRecvEvent{
-			WebHookHeader: types.WebHookHeader{
-				EventType: types.RunnerBuilderChange,
-				EventTime: time.Now().Unix(),
-				DataType:  types.WebHookDataTypeObject,
-			},
-			Data: jsonData,
-		}
-		err = executor.ProcessEvent(context.Background(), event)
-		require.Nil(t, err)
-
-		task, err := mockDb.GetDeployTask(context.Background(), taskId)
-		require.Nil(t, err)
-		require.NotEqual(t, common.TaskStatusBuildSucceed, task.Status)
-		require.NotEqual(t, common.BuildSuccess, task.Deploy.Status)
-	})
-
-	t.Run("WorkflowFailed not building", func(t *testing.T) {
-		db := tests.InitTransactionTestDB()
-		defer db.Close()
-		mockDb := database.NewDeployTaskStoreWithDB(db)
-		executor := imagebuilderExecutorImpl{
-			store: mockDb,
-		}
-		err := mockDb.CreateDeploy(context.Background(), &database.Deploy{
-			ID: deployId,
-		})
-		require.Nil(t, err)
-		err = mockDb.CreateDeployTask(context.Background(), &database.DeployTask{
-			ID:       taskId,
-			DeployID: deployId,
-		})
-		require.Nil(t, err)
-		data := types.ImageBuilderEvent{
-			DeployId:   strconv.FormatInt(deployId, 10),
-			TaskId:     taskId,
-			Status:     string(v1alpha1.WorkflowFailed),
-			Message:    "",
-			ImagetPath: lastCommitID,
-		}
-		jsonData, err := json.Marshal(data)
-		require.Nil(t, err)
-
-		event := &types.WebHookRecvEvent{
-			WebHookHeader: types.WebHookHeader{
-				EventType: types.RunnerBuilderChange,
-				EventTime: time.Now().Unix(),
-				DataType:  types.WebHookDataTypeObject,
-			},
-			Data: jsonData,
-		}
-		err = executor.ProcessEvent(context.Background(), event)
-		require.Nil(t, err)
-
-		task, err := mockDb.GetDeployTask(context.Background(), taskId)
-		require.Nil(t, err)
-		require.NotEqual(t, common.TaskStatusBuildFailed, task.Status)
-		require.NotEqual(t, common.BuildFailed, task.Deploy.Status)
-	})
-
+	}
 }
