@@ -16,6 +16,7 @@ import (
 	"opencsg.com/csghub-server/builder/event"
 	"opencsg.com/csghub-server/builder/loki"
 	bldmq "opencsg.com/csghub-server/builder/mq"
+	"opencsg.com/csghub-server/builder/rebac"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
@@ -259,6 +260,7 @@ func TestCheckDeployPermissionForUser_ZeroSecureLevel_NonOwnerForbidden(t *testi
 		ID:       456,
 		RoleMask: "",
 	}
+	// legacy deploy without owner_namespace stays creator-only
 	dbDeploy := &database.Deploy{
 		ID:          1,
 		UserID:      123,
@@ -269,7 +271,6 @@ func TestCheckDeployPermissionForUser_ZeroSecureLevel_NonOwnerForbidden(t *testi
 
 	repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "other-user").Return(dbUser, nil)
 	repo.mocks.stores.DeployTaskMock().EXPECT().GetDeployByID(ctx, int64(1)).Return(dbDeploy, nil)
-	repo.mocks.stores.OrgMock().EXPECT().GetSharedOrgIDs(ctx, []int64{456, 123}).Return([]int64{}, nil)
 
 	user, deploy, err := repo.CheckDeployPermissionForUser(ctx, types.DeployActReq{
 		CurrentUser: "other-user",
@@ -366,7 +367,9 @@ func TestCheckDeployPermissionForUser_PublicEndpoint_OwnerAllowed(t *testing.T) 
 	require.Equal(t, int64(123), user.ID)
 }
 
-func TestCheckDeployPermissionForUser_PublicEndpoint_AdminAllowed(t *testing.T) {
+func TestCheckDeployPermissionForUser_PublicEndpoint_AdminForbidden(t *testing.T) {
+	// issue csghub-portal#3416: system administrators have no implicit access
+	// to other users' dedicated instances
 	ctx := context.TODO()
 	repo := initializeTestRepoComponent(ctx, t)
 
@@ -389,31 +392,36 @@ func TestCheckDeployPermissionForUser_PublicEndpoint_AdminAllowed(t *testing.T) 
 		CurrentUser: "admin-user",
 		DeployID:    1,
 	})
-	require.NoError(t, err)
-	require.NotNil(t, user)
-	require.NotNil(t, deploy)
+	require.Error(t, err)
+	require.Nil(t, user)
+	require.Nil(t, deploy)
 }
 
-func TestCheckDeployPermissionForUser_PublicEndpoint_SameOrgAllowed(t *testing.T) {
+func TestCheckDeployPermissionForUser_PublicEndpoint_OwnerNamespaceReadMemberAllowed(t *testing.T) {
+	// issue csghub-portal#3416: org members of the owner namespace can view the instance
 	ctx := context.TODO()
 	repo := initializeTestRepoComponent(ctx, t)
-	repo.orgStore = repo.mocks.stores.Org
 
 	dbUser := database.User{
 		ID:       456,
 		RoleMask: "",
 	}
 	dbDeploy := &database.Deploy{
-		ID:          1,
-		UserID:      123,
-		SvcName:     "svc-1",
-		ClusterID:   "cluster-1",
-		SecureLevel: types.EndpointPublic,
+		ID:             1,
+		UserID:         123,
+		SvcName:        "svc-1",
+		ClusterID:      "cluster-1",
+		SecureLevel:    types.EndpointPublic,
+		OwnerNamespace: "org1",
 	}
 
 	repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "org-member").Return(dbUser, nil)
+	repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "org-member").Return(dbUser, nil)
 	repo.mocks.stores.DeployTaskMock().EXPECT().GetDeployByID(ctx, int64(1)).Return(dbDeploy, nil)
-	repo.mocks.stores.OrgMock().EXPECT().GetSharedOrgIDs(ctx, []int64{456, 123}).Return([]int64{10}, nil)
+	repo.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "org1").Return(database.Namespace{
+		UUID: "ns-uuid-1",
+	}, nil)
+	expectNamespacePermissionCheck(repo, rebac.NamespaceCanRead, true)
 
 	user, deploy, err := repo.CheckDeployPermissionForUser(ctx, types.DeployActReq{
 		CurrentUser: "org-member",
@@ -433,6 +441,7 @@ func TestCheckDeployPermissionForUser_PublicEndpoint_DifferentOrgForbidden(t *te
 		ID:       456,
 		RoleMask: "",
 	}
+	// legacy deploy without owner_namespace stays creator-only
 	dbDeploy := &database.Deploy{
 		ID:          1,
 		UserID:      123,
@@ -443,7 +452,6 @@ func TestCheckDeployPermissionForUser_PublicEndpoint_DifferentOrgForbidden(t *te
 
 	repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "other-user").Return(dbUser, nil)
 	repo.mocks.stores.DeployTaskMock().EXPECT().GetDeployByID(ctx, int64(1)).Return(dbDeploy, nil)
-	repo.mocks.stores.OrgMock().EXPECT().GetSharedOrgIDs(ctx, []int64{456, 123}).Return([]int64{}, nil)
 
 	user, deploy, err := repo.CheckDeployPermissionForUser(ctx, types.DeployActReq{
 		CurrentUser: "other-user",
@@ -553,12 +561,12 @@ func TestRepoComponent_DeployUpdate_PublishesUpstreamSyncEventForRunningDeploy(t
 			return fullDeploy, nil
 		}).Once()
 
-	newLevel := types.EndpointPublic
+	// a running deploy: keep the update restart-free (no SecureLevel change)
 	err := repo.DeployUpdate(ctx, types.DeployActReq{
 		CurrentUser: "owner-user",
 		DeployID:    1,
 		DeployType:  types.InferenceType,
-	}, &types.DeployUpdateReq{SecureLevel: &newLevel})
+	}, &types.DeployUpdateReq{})
 	require.NoError(t, err)
 
 	// The sync runs in a goroutine — wait for the relations load, which is
@@ -959,6 +967,201 @@ func TestRepoComponent_CheckDeployPermissionForUser_SecureLevel(t *testing.T) {
 		repo.mocks.stores.DeployTaskMock().EXPECT().GetDeployByID(ctx, int64(1)).Return(newDeploy(11, types.SpaceType, types.EndpointPrivate), nil)
 
 		_, _, err := repo.CheckDeployPermissionForUser(ctx, types.DeployActReq{CurrentUser: "u", DeployID: 1})
+		require.NoError(t, err)
+	})
+}
+
+// Issue csghub-portal#3416: read access (view detail/logs/status) vs operate
+// access (start/stop/delete/public switch) on dedicated instances.
+func TestRepoComponent_DeployAccessOrgInstance(t *testing.T) {
+	ctx := context.TODO()
+
+	newOrgDeploy := func() *database.Deploy {
+		return &database.Deploy{
+			ID:             1,
+			UserID:         100,
+			SvcName:        "svc-1",
+			ClusterID:      "cluster-1",
+			SecureLevel:    types.EndpointPublic,
+			OwnerNamespace: "org1",
+		}
+	}
+
+	t.Run("org member with read permission can view", func(t *testing.T) {
+		repo := initializeTestRepoComponent(ctx, t)
+		repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "member").Return(database.User{ID: 200, UUID: "member-uuid"}, nil)
+		repo.mocks.stores.DeployTaskMock().EXPECT().GetDeployByID(ctx, int64(1)).Return(newOrgDeploy(), nil)
+		repo.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "org1").Return(database.Namespace{UUID: "ns-uuid-1"}, nil)
+		expectNamespacePermissionCheck(repo, rebac.NamespaceCanRead, true)
+
+		user, _, err := repo.CheckDeployPermissionForUser(ctx, types.DeployActReq{CurrentUser: "member", DeployID: 1})
+		require.NoError(t, err)
+		require.NotNil(t, user)
+	})
+
+	t.Run("org member without read permission cannot view", func(t *testing.T) {
+		repo := initializeTestRepoComponent(ctx, t)
+		repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "member").Return(database.User{ID: 200, UUID: "member-uuid"}, nil)
+		repo.mocks.stores.DeployTaskMock().EXPECT().GetDeployByID(ctx, int64(1)).Return(newOrgDeploy(), nil)
+		repo.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "org1").Return(database.Namespace{UUID: "ns-uuid-1"}, nil)
+		expectNamespacePermissionCheck(repo, rebac.NamespaceCanRead, false)
+
+		_, _, err := repo.CheckDeployPermissionForUser(ctx, types.DeployActReq{CurrentUser: "member", DeployID: 1})
+		require.ErrorIs(t, err, errorx.ErrForbidden)
+	})
+
+	t.Run("org member with only read permission cannot stop", func(t *testing.T) {
+		repo := initializeTestRepoComponent(ctx, t)
+		repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "member").Return(database.User{ID: 200, UUID: "member-uuid"}, nil)
+		repo.mocks.stores.DeployTaskMock().EXPECT().GetDeployByID(ctx, int64(1)).Return(newOrgDeploy(), nil)
+		repo.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "org1").Return(database.Namespace{UUID: "ns-uuid-1"}, nil)
+		expectNamespacePermissionCheck(repo, rebac.NamespaceCanWrite, false)
+
+		err := repo.DeployStop(ctx, types.DeployActReq{
+			CurrentUser: "member",
+			DeployID:    1,
+			DeployType:  types.InferenceType,
+		})
+		require.ErrorIs(t, err, errorx.ErrForbidden)
+	})
+
+	t.Run("org member with write permission can stop", func(t *testing.T) {
+		repo := initializeTestRepoComponent(ctx, t)
+		repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "member").Return(database.User{ID: 200, UUID: "member-uuid"}, nil)
+		repo.mocks.stores.DeployTaskMock().EXPECT().GetDeployByID(ctx, int64(1)).Return(newOrgDeploy(), nil)
+		repo.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "org1").Return(database.Namespace{UUID: "ns-uuid-1"}, nil)
+		expectNamespacePermissionCheck(repo, rebac.NamespaceCanWrite, true)
+		repo.mocks.stores.DeployTaskMock().EXPECT().StopDeploy(ctx, types.RepositoryType(""), int64(0), int64(1)).Return(nil)
+		repo.mocks.deployer.EXPECT().Stop(ctx, mock.Anything).Return(nil)
+		repo.mocks.deployer.EXPECT().Exist(ctx, mock.Anything).Return(false, nil)
+
+		err := repo.DeployStop(ctx, types.DeployActReq{
+			CurrentUser: "member",
+			DeployID:    1,
+			DeployType:  types.InferenceType,
+		})
+		require.NoError(t, err)
+	})
+
+	t.Run("personal instance is owner only for operate", func(t *testing.T) {
+		repo := initializeTestRepoComponent(ctx, t)
+		repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "other").Return(database.User{ID: 200}, nil)
+		// legacy personal deploy without owner namespace
+		repo.mocks.stores.DeployTaskMock().EXPECT().GetDeployByID(ctx, int64(1)).Return(&database.Deploy{
+			ID:          1,
+			UserID:      100,
+			SecureLevel: types.EndpointPublic,
+		}, nil)
+
+		err := repo.DeployStop(ctx, types.DeployActReq{
+			CurrentUser: "other",
+			DeployID:    1,
+			DeployType:  types.InferenceType,
+		})
+		require.ErrorIs(t, err, errorx.ErrForbidden)
+	})
+}
+
+// Regression test for the org-member delete path: CheckDeployOperateAccess
+// returns the OPERATOR (an org write member, not the deploy creator), and
+// DeleteDeploy must match the deploy by id and repo only so the delete
+// succeeds. The old implementation passed the operator's user.ID into a store
+// query filtered by user_id (the creator), which affected zero rows and failed
+// the delete.
+func TestRepoComponent_DeleteDeploy_OrgMemberOperator(t *testing.T) {
+	ctx := context.TODO()
+	repo := initializeTestRepoComponent(ctx, t)
+	// operator is an org member with write permission, creator is user 100
+	repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "member").Return(database.User{ID: 200, UUID: "member-uuid"}, nil)
+	repo.mocks.stores.DeployTaskMock().EXPECT().GetDeployByID(ctx, int64(1)).Return(&database.Deploy{
+		ID:             1,
+		UserID:         100,
+		RepoID:         1,
+		SvcName:        "svc-1",
+		ClusterID:      "cluster-1",
+		SecureLevel:    types.EndpointPublic,
+		OwnerNamespace: "org1",
+	}, nil)
+	repo.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "org1").Return(database.Namespace{UUID: "ns-uuid-1"}, nil)
+	expectNamespacePermissionCheck(repo, rebac.NamespaceCanWrite, true)
+
+	dr := types.DeployRequest{
+		SpaceID:   0,
+		DeployID:  1,
+		Namespace: "ns",
+		Name:      "n",
+		SvcName:   "svc-1",
+		ClusterID: "cluster-1",
+	}
+	repo.mocks.deployer.EXPECT().Purge(ctx, dr).Return(nil)
+	repo.mocks.deployer.EXPECT().Exist(ctx, dr).Return(false, nil)
+	// the store expectation omits any user id: matching is by deploy id and
+	// repo only
+	repo.mocks.stores.DeployTaskMock().EXPECT().DeleteDeploy(
+		ctx, types.ModelRepo, int64(1), int64(1),
+	).Return(nil)
+
+	err := repo.DeleteDeploy(ctx, types.DeployActReq{
+		RepoType:    types.ModelRepo,
+		Namespace:   "ns",
+		Name:        "n",
+		CurrentUser: "member",
+		DeployID:    1,
+		DeployType:  types.InferenceType,
+	})
+	require.NoError(t, err)
+}
+
+// Issue csghub-portal#3416: switching the endpoint visibility operates the
+// instance, so it is rejected while the deploy is running and allowed when it
+// is stopped.
+func TestRepoComponent_DeployUpdateSecureLevel(t *testing.T) {
+	ctx := context.TODO()
+
+	t.Run("running deploy rejects secure level switch", func(t *testing.T) {
+		repo := initializeTestRepoComponent(ctx, t)
+		dbUser := database.User{ID: 123}
+		dbDeploy := &database.Deploy{
+			ID:          1,
+			UserID:      123,
+			SvcName:     "svc-1",
+			ClusterID:   "cluster-1",
+			Status:      deployStatus.Running,
+			SecureLevel: types.EndpointPublic,
+		}
+		repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "owner-user").Return(dbUser, nil)
+		repo.mocks.stores.DeployTaskMock().EXPECT().GetDeployByID(ctx, int64(1)).Return(dbDeploy, nil)
+
+		newLevel := types.EndpointPrivate
+		err := repo.DeployUpdate(ctx, types.DeployActReq{
+			CurrentUser: "owner-user",
+			DeployID:    1,
+			DeployType:  types.InferenceType,
+		}, &types.DeployUpdateReq{SecureLevel: &newLevel})
+		require.ErrorIs(t, err, errorx.ErrDeployStopFirst)
+	})
+
+	t.Run("stopped deploy accepts secure level switch", func(t *testing.T) {
+		repo := initializeTestRepoComponent(ctx, t)
+		dbUser := database.User{ID: 123}
+		dbDeploy := &database.Deploy{
+			ID:          1,
+			UserID:      123,
+			SvcName:     "svc-1",
+			ClusterID:   "cluster-1",
+			Status:      deployStatus.Stopped,
+			SecureLevel: types.EndpointPublic,
+		}
+		repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "owner-user").Return(dbUser, nil)
+		repo.mocks.stores.DeployTaskMock().EXPECT().GetDeployByID(ctx, int64(1)).Return(dbDeploy, nil)
+		repo.mocks.deployer.EXPECT().UpdateDeploy(ctx, mock.Anything, dbDeploy).Return(nil)
+
+		newLevel := types.EndpointPrivate
+		err := repo.DeployUpdate(ctx, types.DeployActReq{
+			CurrentUser: "owner-user",
+			DeployID:    1,
+			DeployType:  types.InferenceType,
+		}, &types.DeployUpdateReq{SecureLevel: &newLevel})
 		require.NoError(t, err)
 	})
 }

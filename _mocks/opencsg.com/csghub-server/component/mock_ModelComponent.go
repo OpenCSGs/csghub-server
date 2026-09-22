@@ -1491,17 +1491,17 @@ func (_c *MockModelComponent_UpdateInferenceVersionTraffic_Call) RunAndReturn(ru
 	return _c
 }
 
-// Wakeup provides a mock function with given fields: ctx, namespace, name, id
-func (_m *MockModelComponent) Wakeup(ctx context.Context, namespace string, name string, id int64) error {
-	ret := _m.Called(ctx, namespace, name, id)
+// Wakeup provides a mock function with given fields: ctx, namespace, name, id, currentUser
+func (_m *MockModelComponent) Wakeup(ctx context.Context, namespace string, name string, id int64, currentUser string) error {
+	ret := _m.Called(ctx, namespace, name, id, currentUser)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Wakeup")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, int64) error); ok {
-		r0 = rf(ctx, namespace, name, id)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, int64, string) error); ok {
+		r0 = rf(ctx, namespace, name, id, currentUser)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -1519,13 +1519,14 @@ type MockModelComponent_Wakeup_Call struct {
 //   - namespace string
 //   - name string
 //   - id int64
-func (_e *MockModelComponent_Expecter) Wakeup(ctx interface{}, namespace interface{}, name interface{}, id interface{}) *MockModelComponent_Wakeup_Call {
-	return &MockModelComponent_Wakeup_Call{Call: _e.mock.On("Wakeup", ctx, namespace, name, id)}
+//   - currentUser string
+func (_e *MockModelComponent_Expecter) Wakeup(ctx interface{}, namespace interface{}, name interface{}, id interface{}, currentUser interface{}) *MockModelComponent_Wakeup_Call {
+	return &MockModelComponent_Wakeup_Call{Call: _e.mock.On("Wakeup", ctx, namespace, name, id, currentUser)}
 }
 
-func (_c *MockModelComponent_Wakeup_Call) Run(run func(ctx context.Context, namespace string, name string, id int64)) *MockModelComponent_Wakeup_Call {
+func (_c *MockModelComponent_Wakeup_Call) Run(run func(ctx context.Context, namespace string, name string, id int64, currentUser string)) *MockModelComponent_Wakeup_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(int64))
+		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(int64), args[4].(string))
 	})
 	return _c
 }
@@ -1535,7 +1536,7 @@ func (_c *MockModelComponent_Wakeup_Call) Return(_a0 error) *MockModelComponent_
 	return _c
 }
 
-func (_c *MockModelComponent_Wakeup_Call) RunAndReturn(run func(context.Context, string, string, int64) error) *MockModelComponent_Wakeup_Call {
+func (_c *MockModelComponent_Wakeup_Call) RunAndReturn(run func(context.Context, string, string, int64, string) error) *MockModelComponent_Wakeup_Call {
 	_c.Call.Return(run)
 	return _c
 }

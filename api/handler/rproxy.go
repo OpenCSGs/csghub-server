@@ -116,6 +116,10 @@ func (r *RProxyHandler) checkAccessPermission(ctx *gin.Context, deploy *database
 		err   error
 		space *database.Space
 	)
+	authType := httpbase.GetAuthType(ctx)
+	if authType == httpbase.AuthTypeUserOrgApiKey || authType == httpbase.AuthTypeMultiSyncToken {
+		return false, ErrUnauthorized
+	}
 
 	if deploy.SpaceID < 1 {
 		// check endpoint for non-space deploy
@@ -137,7 +141,6 @@ func (r *RProxyHandler) checkAccessPermission(ctx *gin.Context, deploy *database
 	}
 
 	// user must login to visit space
-	authType := httpbase.GetAuthType(ctx)
 	if authType != httpbase.AuthTypeJwt && authType != httpbase.AuthTypeAccessToken {
 		slog.ErrorContext(ctx.Request.Context(), "invalid auth type in proxy", slog.Any("AuthType(ctx)", authType), slog.Any("URI", ctx.Request.RequestURI))
 		return false, ErrUnauthorized

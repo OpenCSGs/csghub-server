@@ -266,19 +266,20 @@ func TestModelHandler_DeployDedicated(t *testing.T) {
 
 		tester.mocks.repo.EXPECT().AllowReadAccess(tester.Ctx(), types.ModelRepo, "u", "r", "u").Return(true, nil)
 		tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.Ctx(), &types.ModelRunReq{
-			DeployName: "test",
-			MinReplica: 1,
-			MaxReplica: 2,
-			Revision:   "main",
+			DeployName:  "test",
+			MinReplica:  1,
+			MaxReplica:  2,
+			Revision:    "main",
+			SecureLevel: types.EndpointPublic,
 		}).Return(true, nil)
 		tester.mocks.model.EXPECT().Deploy(tester.Ctx(), types.DeployActReq{
 			Namespace:   "u",
 			Name:        "r",
 			CurrentUser: "u",
 			DeployType:  types.InferenceType,
-		}, types.ModelRunReq{DeployName: "test", MinReplica: 1, MaxReplica: 2, Revision: "main"}).Return(123, nil)
+		}, types.ModelRunReq{DeployName: "test", MinReplica: 1, MaxReplica: 2, Revision: "main", SecureLevel: types.EndpointPublic}).Return(123, nil)
 
-		tester.WithBody(t, &types.ModelRunReq{DeployName: "test", MinReplica: 1, MaxReplica: 2, Revision: "main"}).Execute()
+		tester.WithBody(t, &types.ModelRunReq{DeployName: "test", MinReplica: 1, MaxReplica: 2, Revision: "main", SecureLevel: types.EndpointPublic}).Execute()
 
 		tester.ResponseEq(t, 200, tester.OKText, types.DeployRequest{DeployID: 123})
 	})
@@ -292,18 +293,13 @@ func TestModelHandler_DeployDedicated(t *testing.T) {
 		tester.mocks.repo.EXPECT().IsSyncing(tester.Ctx(), types.ModelRepo, "u", "r").Return(false, nil)
 
 		tester.mocks.repo.EXPECT().AllowReadAccess(tester.Ctx(), types.ModelRepo, "u", "r", "u").Return(true, nil)
-		tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.Ctx(), &types.ModelRunReq{
-			MinReplica: 1,
-			MaxReplica: 2,
-			Revision:   "main",
-		}).Return(true, nil)
 
 		tester.WithBody(t, &types.ModelRunReq{MinReplica: 1, MaxReplica: 2, Revision: "main"}).Execute()
 
 		tester.ResponseEqSimple(t, http.StatusBadRequest, httpbase.R{
-			Code:    errorx.ErrBadRequest.Error(),
-			Msg:     errorx.ErrBadRequest.Error() + ": Length must be between 2 and 64 characters.",
-			Context: errorx.Ctx().Set("detail", "Length must be between 2 and 64 characters.").Set("name", ""),
+			Code:    errorx.ErrReqBodyFormat.Error(),
+			Msg:     errorx.ErrReqBodyFormat.Error() + ": secure_level must be 1 (public) or 2 (private)",
+			Context: errorx.Ctx().Set("body", "secure_level"),
 		})
 	})
 	t.Run("success_with_engine_args", func(t *testing.T) {
@@ -316,20 +312,21 @@ func TestModelHandler_DeployDedicated(t *testing.T) {
 
 		tester.mocks.repo.EXPECT().AllowReadAccess(tester.Ctx(), types.ModelRepo, "u", "r", "u").Return(true, nil)
 		tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.Ctx(), &types.ModelRunReq{
-			DeployName: "test",
-			MinReplica: 1,
-			MaxReplica: 2,
-			Revision:   "main",
-			EngineArgs: "{\"sss\":\"sss\"}",
+			DeployName:  "test",
+			MinReplica:  1,
+			MaxReplica:  2,
+			Revision:    "main",
+			SecureLevel: types.EndpointPublic,
+			EngineArgs:  "{\"sss\":\"sss\"}",
 		}).Return(true, nil)
 		tester.mocks.model.EXPECT().Deploy(tester.Ctx(), types.DeployActReq{
 			Namespace:   "u",
 			Name:        "r",
 			CurrentUser: "u",
 			DeployType:  types.InferenceType,
-		}, types.ModelRunReq{DeployName: "test", MinReplica: 1, MaxReplica: 2, Revision: "main", EngineArgs: "{\"sss\":\"sss\"}"}).Return(123, nil)
+		}, types.ModelRunReq{DeployName: "test", MinReplica: 1, MaxReplica: 2, Revision: "main", SecureLevel: types.EndpointPublic, EngineArgs: "{\"sss\":\"sss\"}"}).Return(123, nil)
 
-		tester.WithBody(t, &types.ModelRunReq{DeployName: "test", MinReplica: 1, MaxReplica: 2, Revision: "main", EngineArgs: "{\"sss\":\"sss\"}"}).Execute()
+		tester.WithBody(t, &types.ModelRunReq{DeployName: "test", MinReplica: 1, MaxReplica: 2, Revision: "main", SecureLevel: types.EndpointPublic, EngineArgs: "{\"sss\":\"sss\"}"}).Execute()
 
 		tester.ResponseEq(t, http.StatusOK, tester.OKText, types.DeployRequest{DeployID: 123})
 	})
@@ -343,14 +340,15 @@ func TestModelHandler_DeployDedicated(t *testing.T) {
 
 		tester.mocks.repo.EXPECT().AllowReadAccess(tester.Ctx(), types.ModelRepo, "u", "r", "u").Return(true, nil)
 		tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.Ctx(), &types.ModelRunReq{
-			DeployName: "test",
-			MinReplica: 1,
-			MaxReplica: 2,
-			Revision:   "main",
-			EngineArgs: "sss",
+			DeployName:  "test",
+			MinReplica:  1,
+			MaxReplica:  2,
+			Revision:    "main",
+			SecureLevel: types.EndpointPublic,
+			EngineArgs:  "sss",
 		}).Return(true, nil)
 
-		tester.WithBody(t, &types.ModelRunReq{DeployName: "test", MinReplica: 1, MaxReplica: 2, Revision: "main", EngineArgs: "sss"}).Execute()
+		tester.WithBody(t, &types.ModelRunReq{DeployName: "test", MinReplica: 1, MaxReplica: 2, Revision: "main", SecureLevel: types.EndpointPublic, EngineArgs: "sss"}).Execute()
 
 		tester.ResponseEqSimple(t, http.StatusBadRequest, httpbase.R{
 			Code: errorx.ErrInternalServerError.Error(),
@@ -371,6 +369,7 @@ func TestModelHandler_DeployDedicated(t *testing.T) {
 			MinReplica:     1,
 			MaxReplica:     2,
 			Revision:       "main",
+			SecureLevel:    types.EndpointPublic,
 			OwnerNamespace: "org1",
 		}).Return(true, nil)
 		tester.mocks.model.EXPECT().Deploy(tester.Ctx(), types.DeployActReq{
@@ -378,9 +377,9 @@ func TestModelHandler_DeployDedicated(t *testing.T) {
 			Name:        "r",
 			CurrentUser: "u",
 			DeployType:  types.InferenceType,
-		}, types.ModelRunReq{DeployName: "test", MinReplica: 1, MaxReplica: 2, Revision: "main", OwnerNamespace: "org1"}).Return(int64(123), nil)
+		}, types.ModelRunReq{DeployName: "test", MinReplica: 1, MaxReplica: 2, Revision: "main", SecureLevel: types.EndpointPublic, OwnerNamespace: "org1"}).Return(int64(123), nil)
 
-		tester.WithBody(t, &types.ModelRunReq{DeployName: "test", MinReplica: 1, MaxReplica: 2, Revision: "main", OwnerNamespace: "org1"}).Execute()
+		tester.WithBody(t, &types.ModelRunReq{DeployName: "test", MinReplica: 1, MaxReplica: 2, Revision: "main", SecureLevel: types.EndpointPublic, OwnerNamespace: "org1"}).Execute()
 		tester.ResponseEq(t, 200, tester.OKText, types.DeployRequest{DeployID: 123})
 	})
 	t.Run("owner_namespace_permission_error", func(t *testing.T) {

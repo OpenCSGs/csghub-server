@@ -375,7 +375,7 @@ func TestNotebookHandler_Wakeup_Success(t *testing.T) {
 	tester.WithUser()
 	tester.WithParam("id", "123")
 
-	tester.mocks.component.EXPECT().Wakeup(tester.Ctx(), int64(123)).Return(nil)
+	tester.mocks.component.EXPECT().Wakeup(tester.Ctx(), "u", int64(123)).Return(nil)
 
 	tester.Execute()
 	tester.ResponseEq(t, 200, tester.OKText, nil)
@@ -401,7 +401,7 @@ func TestNotebookHandler_Wakeup_ErrorFromComponent(t *testing.T) {
 	tester.WithUser()
 	tester.WithParam("id", "123")
 
-	tester.mocks.component.EXPECT().Wakeup(tester.Ctx(), int64(123)).Return(assert.AnError)
+	tester.mocks.component.EXPECT().Wakeup(tester.Ctx(), "u", int64(123)).Return(assert.AnError)
 
 	tester.Execute()
 	tester.ResponseEqCode(t, 500)

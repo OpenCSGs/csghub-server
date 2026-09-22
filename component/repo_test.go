@@ -1743,12 +1743,12 @@ func TestRepoComponent_ListDeploy(t *testing.T) {
 	repo.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "ns", "n").Return(&database.Repository{
 		ID: 123,
 	}, nil)
-	repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{ID: 123}, nil)
+	repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{ID: 123, Username: "user"}, nil)
 
 	deploys := []database.Deploy{
 		{ID: 123, DeployName: "foo", RepoID: 123, GitBranch: "main"},
 	}
-	repo.mocks.stores.DeployTaskMock().EXPECT().ListDeploy(ctx, types.ModelRepo, int64(123), int64(123)).Return(deploys, nil)
+	repo.mocks.stores.DeployTaskMock().EXPECT().ListDeploy(ctx, types.ModelRepo, int64(123), int64(123), "user").Return(deploys, nil)
 
 	ds, err := repo.ListDeploy(ctx, types.ModelRepo, "ns", "n", "user")
 	require.Nil(t, err)
@@ -1783,7 +1783,7 @@ func TestRepoComponent_DeleteDeploy(t *testing.T) {
 		SecureLevel:   types.EndpointPublic,
 	}, nil)
 	repo.mocks.stores.DeployTaskMock().EXPECT().DeleteDeploy(
-		ctx, types.ModelRepo, int64(1), int64(0), int64(3),
+		ctx, types.ModelRepo, int64(1), int64(3),
 	).Return(nil)
 	ur := &database.UserResources{}
 	repo.mocks.stores.UserResourcesMock().EXPECT().FindUserResourcesByOrderDetailId(ctx, "uuid", int64(11)).Return(ur, nil)
@@ -1962,7 +1962,7 @@ func TestRepoComponent_DeployStop_WithForce(t *testing.T) {
 	repo.mocks.deployer.EXPECT().Stop(ctx, dr).Return(nil)
 	// Force=true should NOT call Exist
 	repo.mocks.stores.DeployTaskMock().EXPECT().StopDeploy(
-		ctx, types.ModelRepo, int64(0), int64(2), int64(3),
+		ctx, types.ModelRepo, int64(0), int64(3),
 	).Return(nil)
 	repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{
 		ID: 2,
@@ -1994,7 +1994,7 @@ func TestRepoComponent_DeployStop_ForceFalse_CallsExist(t *testing.T) {
 	// Force=false must still call Exist
 	repo.mocks.deployer.EXPECT().Exist(ctx, dr).Return(false, nil)
 	repo.mocks.stores.DeployTaskMock().EXPECT().StopDeploy(
-		ctx, types.ModelRepo, int64(0), int64(2), int64(3),
+		ctx, types.ModelRepo, int64(0), int64(3),
 	).Return(nil)
 	repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{
 		ID: 2,
@@ -2037,14 +2037,73 @@ func TestRepoComponent_AllowAccessByRepoID(t *testing.T) {
 func TestRepoComponent_AllowAccessEndpoint(t *testing.T) {
 	ctx := context.TODO()
 	repo := initializeTestRepoComponent(ctx, t)
-	repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{
-		ID: 123,
+	repo.mocks.stores.UserMock().EXPECT().FindByID(ctx, int64(123)).Return(database.User{
+		ID:       123,
+		Username: "user",
 	}, nil)
 
 	allow, err := repo.AllowAccessEndpoint(ctx, "user", &database.Deploy{
 		SecureLevel: types.EndpointPrivate,
 		UserID:      123,
 		RepoID:      456,
+	})
+	require.Nil(t, err)
+	require.True(t, allow)
+}
+
+func TestRepoComponent_AllowAccessEndpoint_PublicRequiresLogin(t *testing.T) {
+	// issue csghub-portal#3416: public endpoints require an authenticated user
+	ctx := context.TODO()
+	repo := initializeTestRepoComponent(ctx, t)
+
+	allow, err := repo.AllowAccessEndpoint(ctx, "", &database.Deploy{
+		SecureLevel: types.EndpointPublic,
+		UserID:      123,
+		RepoID:      456,
+	})
+	require.Nil(t, err)
+	require.False(t, allow)
+}
+
+func TestRepoComponent_AllowAccessEndpoint_PrivateForbidden(t *testing.T) {
+	ctx := context.TODO()
+	repo := initializeTestRepoComponent(ctx, t)
+	repo.mocks.stores.UserMock().EXPECT().FindByID(ctx, int64(123)).Return(database.User{
+		ID:       123,
+		Username: "owner",
+	}, nil)
+
+	// legacy deploy without owner_namespace stays creator-only
+	allow, err := repo.AllowAccessEndpoint(ctx, "other", &database.Deploy{
+		SecureLevel: types.EndpointPrivate,
+		UserID:      123,
+		RepoID:      456,
+	})
+	require.Nil(t, err)
+	require.False(t, allow)
+}
+
+func TestRepoComponent_AllowAccessEndpoint_PrivateOrgMemberAllowed(t *testing.T) {
+	ctx := context.TODO()
+	repo := initializeTestRepoComponent(ctx, t)
+	repo.mocks.stores.UserMock().EXPECT().FindByID(ctx, int64(123)).Return(database.User{
+		ID:       123,
+		Username: "owner",
+	}, nil)
+	repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "member").Return(database.User{
+		ID:   456,
+		UUID: "member-uuid",
+	}, nil)
+	repo.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "org1").Return(database.Namespace{
+		UUID: "ns-uuid-1",
+	}, nil)
+	expectNamespacePermissionCheck(repo, rebac.NamespaceCanRead, true)
+
+	allow, err := repo.AllowAccessEndpoint(ctx, "member", &database.Deploy{
+		SecureLevel:    types.EndpointPrivate,
+		UserID:         123,
+		RepoID:         456,
+		OwnerNamespace: "org1",
 	})
 	require.Nil(t, err)
 	require.True(t, allow)
@@ -2086,7 +2145,7 @@ func TestRepoComponent_DeployStop(t *testing.T) {
 	repo.mocks.deployer.EXPECT().Stop(ctx, dr).Return(nil)
 	repo.mocks.deployer.EXPECT().Exist(ctx, dr).Return(false, nil)
 	repo.mocks.stores.DeployTaskMock().EXPECT().StopDeploy(
-		ctx, types.ModelRepo, int64(0), int64(2), int64(3),
+		ctx, types.ModelRepo, int64(0), int64(3),
 	).Return(nil)
 	repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{
 		ID: 2,
@@ -2117,7 +2176,7 @@ func TestRepoComponent_DeployStop_ErrNoRows(t *testing.T) {
 	repo.mocks.deployer.EXPECT().Stop(ctx, dr).Return(nil)
 	repo.mocks.deployer.EXPECT().Exist(ctx, dr).Return(false, sql.ErrNoRows)
 	repo.mocks.stores.DeployTaskMock().EXPECT().StopDeploy(
-		ctx, types.ModelRepo, int64(0), int64(2), int64(3),
+		ctx, types.ModelRepo, int64(0), int64(3),
 	).Return(nil)
 	repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{
 		ID: 2,

@@ -446,17 +446,17 @@ func (_c *MockNotebookComponent_UpdateNotebook_Call) RunAndReturn(run func(conte
 	return _c
 }
 
-// Wakeup provides a mock function with given fields: ctx, id
-func (_m *MockNotebookComponent) Wakeup(ctx context.Context, id int64) error {
-	ret := _m.Called(ctx, id)
+// Wakeup provides a mock function with given fields: ctx, currentUser, id
+func (_m *MockNotebookComponent) Wakeup(ctx context.Context, currentUser string, id int64) error {
+	ret := _m.Called(ctx, currentUser, id)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Wakeup")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, int64) error); ok {
-		r0 = rf(ctx, id)
+	if rf, ok := ret.Get(0).(func(context.Context, string, int64) error); ok {
+		r0 = rf(ctx, currentUser, id)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -471,14 +471,15 @@ type MockNotebookComponent_Wakeup_Call struct {
 
 // Wakeup is a helper method to define mock.On call
 //   - ctx context.Context
+//   - currentUser string
 //   - id int64
-func (_e *MockNotebookComponent_Expecter) Wakeup(ctx interface{}, id interface{}) *MockNotebookComponent_Wakeup_Call {
-	return &MockNotebookComponent_Wakeup_Call{Call: _e.mock.On("Wakeup", ctx, id)}
+func (_e *MockNotebookComponent_Expecter) Wakeup(ctx interface{}, currentUser interface{}, id interface{}) *MockNotebookComponent_Wakeup_Call {
+	return &MockNotebookComponent_Wakeup_Call{Call: _e.mock.On("Wakeup", ctx, currentUser, id)}
 }
 
-func (_c *MockNotebookComponent_Wakeup_Call) Run(run func(ctx context.Context, id int64)) *MockNotebookComponent_Wakeup_Call {
+func (_c *MockNotebookComponent_Wakeup_Call) Run(run func(ctx context.Context, currentUser string, id int64)) *MockNotebookComponent_Wakeup_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(int64))
+		run(args[0].(context.Context), args[1].(string), args[2].(int64))
 	})
 	return _c
 }
@@ -488,7 +489,7 @@ func (_c *MockNotebookComponent_Wakeup_Call) Return(_a0 error) *MockNotebookComp
 	return _c
 }
 
-func (_c *MockNotebookComponent_Wakeup_Call) RunAndReturn(run func(context.Context, int64) error) *MockNotebookComponent_Wakeup_Call {
+func (_c *MockNotebookComponent_Wakeup_Call) RunAndReturn(run func(context.Context, string, int64) error) *MockNotebookComponent_Wakeup_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -107,11 +107,18 @@ type DeployTaskStore interface {
 	// GetNewTaskFirst returns the first task which has  not end
 	GetNewTaskFirst(ctx context.Context) (*DeployTask, error)
 	UpdateInTx(ctx context.Context, deployColumns, deployTaskColumns []string, deploy *Deploy, deployTasks ...*DeployTask) error
-	ListDeploy(ctx context.Context, repoType types.RepositoryType, repoID, userID int64) ([]Deploy, error)
+	// ListDeploy returns deploys of the repo visible to the user: the ones the
+	// user created plus the ones owned by a namespace the user belongs to
+	// (username is used to resolve the namespace membership).
+	ListDeploy(ctx context.Context, repoType types.RepositoryType, repoID, userID int64, username string) ([]Deploy, error)
 	ListDeployByType(ctx context.Context, req types.DeployReq) ([]Deploy, int, error)
-	DeleteDeploy(ctx context.Context, repoType types.RepositoryType, repoID, userID int64, deployID int64) error
+	// DeleteDeploy marks one deploy of a repo as deleted. Permission checks
+	// happen in the component layer, so it matches by deploy id and repo only.
+	DeleteDeploy(ctx context.Context, repoType types.RepositoryType, repoID, deployID int64) error
 	DeleteDeployNow(ctx context.Context, deployID int64) error
-	DeleteDeployByID(ctx context.Context, userID int64, deployID int64) error
+	// DeleteDeployByID marks one deploy as deleted by ID. Permission checks
+	// happen in the component layer, so it matches by deploy id only.
+	DeleteDeployByID(ctx context.Context, deployID int64) error
 	ListDeployByUserID(ctx context.Context, userID int64, req *types.DeployReq) ([]Deploy, int, error)
 	ListDeployByOwnerNamespace(ctx context.Context, ownerNamespace string, req *types.DeployReq) ([]Deploy, int, error)
 	ListInstancesByUserID(ctx context.Context, userID int64, per, page int) ([]Deploy, int, error)
@@ -120,8 +127,12 @@ type DeployTaskStore interface {
 	// GetDeployByIDWithRelations returns a deploy by ID with Repository and User relations loaded.
 	GetDeployByIDWithRelations(ctx context.Context, deployID int64) (*Deploy, error)
 	GetDeployBySvcName(ctx context.Context, svcName string) (*Deploy, error)
-	StopDeploy(ctx context.Context, repoType types.RepositoryType, repoID, userID int64, deployID int64) error
-	StopDeployByID(ctx context.Context, userID int64, deployID int64) error
+	// StopDeploy marks one deploy of a repo as stopped. Permission checks
+	// happen in the component layer, so it matches by deploy id and repo only.
+	StopDeploy(ctx context.Context, repoType types.RepositoryType, repoID, deployID int64) error
+	// StopDeploy marks one deploy as stopped by ID. Permission checks happen
+	// in the component layer, so it matches by deploy id only.
+	StopDeployByID(ctx context.Context, deployID int64) error
 	GetServerlessDeployByRepID(ctx context.Context, repoID int64) (*Deploy, error)
 	ListServerless(ctx context.Context, req types.DeployReq) ([]Deploy, int, error)
 	GetRunningDeployByUserUUID(ctx context.Context, userUUID string) ([]Deploy, error)
@@ -296,9 +307,27 @@ func (s *deployTaskStoreImpl) UpdateInTx(ctx context.Context, deployColumns, dep
 	return tx.Commit()
 }
 
-func (s *deployTaskStoreImpl) ListDeploy(ctx context.Context, repoType types.RepositoryType, repoID, userID int64) ([]Deploy, error) {
+// ListDeploy returns the deploys of a repo visible to the user: the deploys
+// the user created plus the deploys whose owner namespace is a namespace the
+// user belongs to (user namespace or an organization the user is a member of).
+// Organization instances stay visible to every member per issue
+// csghub-portal#3416, while other users' personal instances stay hidden.
+func (s *deployTaskStoreImpl) ListDeploy(ctx context.Context, repoType types.RepositoryType, repoID, userID int64, username string) ([]Deploy, error) {
 	var result []Deploy
-	query := s.db.Operator.Core.NewSelect().Model(&result).Where("user_id = ? and repo_id = ?", userID, repoID)
+	query := s.db.Operator.Core.NewSelect().Model(&result).
+		Where("repo_id = ?", repoID).
+		WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
+			return q.
+				WhereOr("user_id = ?", userID).
+				WhereOr("owner_namespace = ? OR owner_namespace IN (?)",
+					username,
+					s.db.Operator.Core.NewSelect().
+						Model((*Organization)(nil)).
+						Column("organization.path").
+						Join("JOIN members AS member ON member.organization_id = organization.id AND member.deleted_at IS NULL").
+						Where("member.user_id = ?", userID),
+				)
+		})
 	if repoType == types.ModelRepo {
 		query = query.Where("status != ?", common.Deleted)
 	}
@@ -322,17 +351,19 @@ func (s *deployTaskStoreImpl) DeleteDeployNow(ctx context.Context, deployID int6
 	return err
 }
 
-func (s *deployTaskStoreImpl) DeleteDeploy(ctx context.Context, repoType types.RepositoryType, repoID, userID int64, deployID int64) error {
-	// only delete the deploy of specific repo was triggered by current login user
-	res, err := s.db.BunDB.Exec("Update deploys set status = ? where id = ? and repo_id = ? and user_id = ?", common.Deleted, deployID, repoID, userID)
+// DeleteDeploy marks one deploy of a repo as deleted. Permission checks happen
+// in the component layer, so it matches by deploy id and repo only.
+func (s *deployTaskStoreImpl) DeleteDeploy(ctx context.Context, repoType types.RepositoryType, repoID, deployID int64) error {
+	res, err := s.db.BunDB.Exec("Update deploys set status = ? where id = ? and repo_id = ?", common.Deleted, deployID, repoID)
 	err = assertAffectedOneRow(res, err)
 	err = errorx.HandleDBError(err, nil)
 	return err
 }
 
-func (s *deployTaskStoreImpl) DeleteDeployByID(ctx context.Context, userID int64, deployID int64) error {
-	// only delete the deploy of specific repo was triggered by current login user
-	res, err := s.db.BunDB.Exec("Update deploys set status = ? where id = ? and user_id = ?", common.Deleted, deployID, userID)
+// DeleteDeployByID marks one deploy as deleted by ID. Permission checks happen
+// in the component layer, so it matches by deploy id only.
+func (s *deployTaskStoreImpl) DeleteDeployByID(ctx context.Context, deployID int64) error {
+	res, err := s.db.BunDB.Exec("Update deploys set status = ? where id = ?", common.Deleted, deployID)
 	err = assertAffectedOneRow(res, err)
 	err = errorx.HandleDBError(err, nil)
 	return err
@@ -457,16 +488,17 @@ func (s *deployTaskStoreImpl) GetDeployBySvcName(ctx context.Context, svcName st
 	return deploy, err
 }
 
-func (s *deployTaskStoreImpl) StopDeploy(ctx context.Context, repoType types.RepositoryType, repoID, userID int64, deployID int64) error {
-	// only stop the deploy of specific repo was triggered by current login user
-	res, err := s.db.BunDB.Exec("Update deploys set status=?,status_update_at=current_timestamp,updated_at=current_timestamp,instances='[]'::jsonb where id = ? and repo_id = ? and user_id = ?", common.Stopped, deployID, repoID, userID)
+func (s *deployTaskStoreImpl) StopDeploy(ctx context.Context, repoType types.RepositoryType, repoID, deployID int64) error {
+	res, err := s.db.BunDB.Exec("Update deploys set status=?,status_update_at=current_timestamp,updated_at=current_timestamp,instances='[]'::jsonb where id = ? and repo_id = ?", common.Stopped, deployID, repoID)
 	err = assertAffectedOneRow(res, err)
 	err = errorx.HandleDBError(err, nil)
 	return err
 }
-func (s *deployTaskStoreImpl) StopDeployByID(ctx context.Context, userID int64, deployID int64) error {
-	// only stop the deploy of specific repo was triggered by current login user
-	res, err := s.db.BunDB.Exec("Update deploys set status=?,status_update_at=current_timestamp,updated_at=current_timestamp,instances='[]'::jsonb where id = ? and user_id = ?", common.Stopped, deployID, userID)
+
+// StopDeployByID marks one deploy as stopped by ID. Permission checks happen
+// in the component layer, so it matches by deploy id only.
+func (s *deployTaskStoreImpl) StopDeployByID(ctx context.Context, deployID int64) error {
+	res, err := s.db.BunDB.Exec("Update deploys set status=?,status_update_at=current_timestamp,updated_at=current_timestamp,instances='[]'::jsonb where id = ?", common.Stopped, deployID)
 	err = assertAffectedOneRow(res, err)
 	err = errorx.HandleDBError(err, nil)
 	return err

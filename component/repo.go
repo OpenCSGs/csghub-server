@@ -214,6 +214,10 @@ type RepoComponent interface {
 	BatchMigrateRepoToHashedPath(ctx context.Context, auto bool, batchSize int, lastID int64) (int64, error)
 	GetMirrorTaskStatus(repo *database.Repository) types.MirrorTaskStatus
 	CheckDeployPermissionForUser(ctx context.Context, deployReq types.DeployActReq) (*database.User, *database.Deploy, error)
+	// CheckDeployReadAccess verifies view access on a deploy instance.
+	CheckDeployReadAccess(ctx context.Context, deployReq types.DeployActReq) (*database.User, *database.Deploy, error)
+	// CheckDeployOperateAccess verifies operate access (start/stop/delete/public switch) on a deploy instance.
+	CheckDeployOperateAccess(ctx context.Context, deployReq types.DeployActReq) (*database.User, *database.Deploy, error)
 	GetNamespaceBillingUUID(ctx context.Context, namespace string) (string, error)
 	DeletePendingDeletion(ctx context.Context) error
 	GetRepos(ctx context.Context, search, currentUser string, repoType types.RepositoryType) ([]string, error)

@@ -634,7 +634,7 @@ func TestSpaceComponent_Stop(t *testing.T) {
 			SvcName:   "svc",
 		}).Return(nil)
 		sc.mocks.stores.DeployTaskMock().EXPECT().StopDeploy(
-			ctx, types.SpaceRepo, int64(1), int64(2), int64(3),
+			ctx, types.SpaceRepo, int64(1), int64(3),
 		).Return(nil)
 
 		err := sc.Stop(ctx, "ns", "n", false)

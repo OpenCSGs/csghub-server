@@ -126,6 +126,11 @@ func (h *NotebookHandler) Start(ctx *gin.Context) {
 	}
 	err = h.nc.StartNotebook(ctx.Request.Context(), req)
 	if err != nil {
+		if errors.Is(err, errorx.ErrForbidden) {
+			slog.Info("not allowed to start notebook", slog.Any("error", err), slog.Any("req", req))
+			httpbase.ForbiddenError(ctx, err)
+			return
+		}
 		slog.ErrorContext(ctx.Request.Context(), "Failed to start notebook", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
@@ -159,6 +164,11 @@ func (h *NotebookHandler) Stop(ctx *gin.Context) {
 	}
 	err = h.nc.StopNotebook(ctx.Request.Context(), req)
 	if err != nil {
+		if errors.Is(err, errorx.ErrForbidden) {
+			slog.Info("not allowed to stop notebook", slog.Any("error", err), slog.Any("req", req))
+			httpbase.ForbiddenError(ctx, err)
+			return
+		}
 		slog.ErrorContext(ctx.Request.Context(), "Failed to stop notebook", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
@@ -189,9 +199,19 @@ func (h *NotebookHandler) Wakeup(ctx *gin.Context) {
 		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
-	err = h.nc.Wakeup(ctx.Request.Context(), id)
+	currentUser := httpbase.GetCurrentUser(ctx)
+	err = h.nc.Wakeup(ctx.Request.Context(), currentUser, id)
 	if err != nil {
-		slog.ErrorContext(ctx.Request.Context(), "failed to wakeup notebook", slog.String("id", string(rune(id))), slog.Any("error", err))
+		if errors.Is(err, errorx.ErrForbidden) {
+			slog.Info("not allowed to wakeup notebook", slog.Any("error", err), slog.Any("id", id))
+			httpbase.ForbiddenError(ctx, err)
+			return
+		}
+		slog.ErrorContext(ctx.Request.Context(), "failed to wakeup notebook", slog.Int64("id", id), slog.Any("error", err))
+		if errors.Is(err, errorx.ErrForbidden) {
+			httpbase.ForbiddenError(ctx, err)
+			return
+		}
 		httpbase.ServerError(ctx, errors.New("failed to wakeup notebook"))
 		return
 	}
@@ -224,6 +244,11 @@ func (h *NotebookHandler) Delete(ctx *gin.Context) {
 	}
 	err = h.nc.DeleteNotebook(ctx.Request.Context(), req)
 	if err != nil {
+		if errors.Is(err, errorx.ErrForbidden) {
+			slog.Info("not allowed to delete notebook", slog.Any("error", err), slog.Any("req", req))
+			httpbase.ForbiddenError(ctx, err)
+			return
+		}
 		slog.ErrorContext(ctx.Request.Context(), "Failed to delete notebook", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
@@ -263,6 +288,11 @@ func (h *NotebookHandler) Update(ctx *gin.Context) {
 	req.CurrentUser = currentUser
 	err = h.nc.UpdateNotebook(ctx.Request.Context(), &req)
 	if err != nil {
+		if errors.Is(err, errorx.ErrForbidden) {
+			slog.Info("not allowed to update notebook", slog.Any("error", err), slog.Any("req", req))
+			httpbase.ForbiddenError(ctx, err)
+			return
+		}
 		slog.ErrorContext(ctx.Request.Context(), "Failed to update notebook", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return

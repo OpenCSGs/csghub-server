@@ -19,6 +19,7 @@ import (
 	deployStatus "opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/builder/loki"
 	bldmq "opencsg.com/csghub-server/builder/mq"
+	"opencsg.com/csghub-server/builder/rebac"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
@@ -291,13 +292,40 @@ func (c *repoComponentImpl) AllowAccessByRepoID(ctx context.Context, repoID int6
 	return c.AllowReadAccess(ctx, r.RepositoryType, fields[0], fields[1], username)
 }
 
-// check access endpoint for rproxy
+// check access endpoint for rproxy. Public endpoints require an authenticated
+// user (any valid user access token per issue csghub-portal#3416). Private
+// endpoints require the owner, an organization member, or a caller identified
+// by an organization token for the owner namespace.
 func (c *repoComponentImpl) AllowAccessEndpoint(ctx context.Context, currentUser string, deploy *database.Deploy) (bool, error) {
+	if currentUser == "" {
+		return false, nil
+	}
 	if deploy.SecureLevel == types.EndpointPublic {
-		// public endpoint
+		// public endpoint, any authenticated user
 		return true, nil
 	}
-	return c.checkAccessDeployForUser(ctx, deploy.RepoID, currentUser, deploy)
+	if deploy.UserID == 0 {
+		return false, fmt.Errorf("deploy %d has no owner", deploy.ID)
+	}
+	owner, err := c.userStore.FindByID(ctx, deploy.UserID)
+	if err != nil {
+		return false, fmt.Errorf("failed to find deploy owner %d, %w", deploy.UserID, err)
+	}
+	if owner.Username == currentUser {
+		return true, nil
+	}
+	if deploy.OwnerNamespace == "" {
+		return false, nil
+	}
+	allowed, err := c.CheckCurrentUserPermission(ctx, currentUser, deploy.OwnerNamespace, rebac.NamespaceCanRead)
+	slog.InfoContext(ctx, "check endpoint can read access",
+		slog.String("namespace", deploy.OwnerNamespace),
+		slog.Any("currentUser", currentUser),
+		slog.Bool("allowed", allowed), slog.Any("err", err))
+	if err != nil {
+		return false, fmt.Errorf("failed to check namespace read permission, %w", err)
+	}
+	return allowed, nil
 }
 
 // check access deploy permission
@@ -323,47 +351,14 @@ func (c *repoComponentImpl) AllowAccessDeploy(ctx context.Context, req types.Dep
 	}
 }
 
+// CheckDeployPermissionForUser verifies read access on a deploy and returns
+// the acting user together with the deploy. Dedicated instances follow the
+// issue csghub-portal#3416 rules: the owner and organization members with read
+// permission may view an instance; system administrators and unrelated users
+// have no implicit access. Legacy deploys without owner_namespace keep the
+// creator/admin/same-org fallback.
 func (c *repoComponentImpl) CheckDeployPermissionForUser(ctx context.Context, deployReq types.DeployActReq) (*database.User, *database.Deploy, error) {
-	user, err := c.userStore.FindByUsername(ctx, deployReq.CurrentUser)
-	if err != nil {
-		return nil, nil, fmt.Errorf("deploy permission check user failed, %w", err)
-	}
-	deploy, err := c.deployTaskStore.GetDeployByID(ctx, deployReq.DeployID)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get user deploy %v, %w", deployReq.DeployID, err)
-	}
-	if deploy == nil {
-		return nil, nil, fmt.Errorf("do not found user deploy %v", deployReq.DeployID)
-	}
-
-	// Creator is always allowed, regardless of SecureLevel for backward compatibility.
-	if deploy.UserID == user.ID {
-		return &user, deploy, nil
-	}
-
-	switch deploy.SecureLevel {
-	case types.EndpointPublic:
-		if c.IsAdminRole(user) || c.IsInSameOrg(ctx, user.ID, deploy.UserID) {
-			return &user, deploy, nil
-		}
-	case types.EndpointPrivate:
-		// space deploys (SpaceID > 0) derive secure level from repo visibility;
-		// org members keep deploy detail/logs access. Inference endpoints keep
-		// creator-only: there EndpointPrivate is a user-chosen setting. SpaceID
-		// is checked instead of Type because unset legacy types are 0, which
-		// collides with SpaceType.
-		if deploy.SpaceID > 0 && (c.IsAdminRole(user) || c.IsInSameOrg(ctx, user.ID, deploy.UserID)) {
-			return &user, deploy, nil
-		}
-	default:
-		// Default to public behavior for backward compatibility
-		// with existing deployments that have SecureLevel = 0 (unset)
-		if c.IsAdminRole(user) || c.IsInSameOrg(ctx, user.ID, deploy.UserID) {
-			return &user, deploy, nil
-		}
-	}
-
-	return nil, nil, errorx.ErrForbiddenMsg("deploy was not created by user")
+	return c.getDeployForAccess(ctx, deployReq.CurrentUser, deployReq.DeployID, types.DeployAccessRead)
 }
 
 func (c *repoComponentImpl) checkDeployPermissionForServerless(ctx context.Context, deployReq types.DeployActReq) (*database.User, *database.Deploy, error) {
@@ -399,7 +394,7 @@ func (c *repoComponentImpl) ListDeploy(ctx context.Context, repoType types.Repos
 		slog.Error("nothing found for deploys", slog.Any("repotype", repoType), slog.Any("namespace", namespace), slog.Any("name", name))
 		return nil, errors.New("nothing found for deploys")
 	}
-	deploys, err := c.deployTaskStore.ListDeploy(ctx, repoType, repo.ID, user.ID)
+	deploys, err := c.deployTaskStore.ListDeploy(ctx, repoType, repo.ID, user.ID, user.Username)
 	if err != nil {
 		return nil, errors.New("fail to list user deploys")
 	}
@@ -447,7 +442,7 @@ func (c *repoComponentImpl) DeleteDeploy(ctx context.Context, delReq types.Deplo
 			return fmt.Errorf("no deploy found for serverless type")
 		}
 	}
-	user, deploy, err := c.CheckDeployPermissionForUser(ctx, delReq)
+	_, deploy, err := c.getDeployForAccess(ctx, delReq.CurrentUser, delReq.DeployID, types.DeployAccessOperate)
 	if err != nil {
 		return err
 	}
@@ -479,11 +474,13 @@ func (c *repoComponentImpl) DeleteDeploy(ctx context.Context, delReq types.Deplo
 		return errors.New("failed to delete service")
 	}
 
-	// update database deploy
+	// update database deploy. The store matches the deploy by id and repo
+	// only, so organization write members can delete instances they did not
+	// create
 	if delReq.DeployType == types.ServerlessType {
 		err = c.deployTaskStore.DeleteDeployNow(ctx, delReq.DeployID)
 	} else {
-		err = c.deployTaskStore.DeleteDeploy(ctx, types.RepositoryType(delReq.RepoType), deploy.RepoID, user.ID, delReq.DeployID)
+		err = c.deployTaskStore.DeleteDeploy(ctx, types.RepositoryType(delReq.RepoType), deploy.RepoID, delReq.DeployID)
 	}
 
 	if err != nil {
@@ -800,10 +797,26 @@ func (c *repoComponentImpl) checkAccessDeployForUser(ctx context.Context, repoID
 	if deploy.RepoID != repoID {
 		return false, errors.New("invalid deploy found")
 	}
-	if deploy.UserID == user.ID || c.IsAdminRole(user) || c.IsInSameOrg(ctx, user.ID, deploy.UserID) {
+	if deploy.UserID == user.ID {
 		return true, nil
 	}
-	return false, errorx.ErrForbiddenMsg("deploy was not created by user")
+	if deploy.OwnerNamespace == "" {
+		// space deploys (SpaceID > 0) derive visibility from the repo; keep the
+		// legacy same-org fallback for them. Non-space legacy deploys stay
+		// creator-only.
+		if deploy.SpaceID > 0 && c.IsInSameOrg(ctx, user.ID, deploy.UserID) {
+			return true, nil
+		}
+		return false, errorx.ErrForbiddenMsg("deploy was not created by user")
+	}
+	allowed, err := c.CheckCurrentUserPermission(ctx, currentUser, deploy.OwnerNamespace, rebac.NamespaceCanRead)
+	if err != nil {
+		return false, fmt.Errorf("failed to check namespace read permission, %w", err)
+	}
+	if !allowed {
+		return false, errorx.ErrForbiddenMsg("deploy was not created by user")
+	}
+	return true, nil
 }
 
 func (c *repoComponentImpl) checkAccessDeployForServerless(ctx context.Context, repoID int64, currentUser string, deploy *database.Deploy) (bool, error) {
@@ -824,14 +837,13 @@ func (c *repoComponentImpl) checkAccessDeployForServerless(ctx context.Context, 
 
 func (c *repoComponentImpl) DeployStop(ctx context.Context, stopReq types.DeployActReq) error {
 	var (
-		user   *database.User
 		deploy *database.Deploy
 		err    error
 	)
 	if stopReq.DeployType == types.ServerlessType {
-		user, deploy, err = c.checkDeployPermissionForServerless(ctx, stopReq)
+		_, deploy, err = c.checkDeployPermissionForServerless(ctx, stopReq)
 	} else {
-		user, deploy, err = c.CheckDeployPermissionForUser(ctx, stopReq)
+		_, deploy, err = c.getDeployForAccess(ctx, stopReq.CurrentUser, stopReq.DeployID, types.DeployAccessOperate)
 	}
 	if err != nil {
 		return fmt.Errorf("failed to check permission for stop deploy, %w", err)
@@ -847,7 +859,9 @@ func (c *repoComponentImpl) DeployStop(ctx context.Context, stopReq types.Deploy
 		SvcName:       deploy.SvcName,
 		ClusterID:     deploy.ClusterID,
 		OrderDetailID: deploy.OrderDetailID,
-		UserUUID:      user.UUID,
+		// use the billing subject recorded on the deploy, not the operator:
+		// the operator may be an org member without an order on this instance
+		UserUUID: deploy.UserUUID,
 	}
 	err = c.deployer.Stop(ctx, deployRepo)
 	if err != nil {
@@ -872,8 +886,10 @@ func (c *repoComponentImpl) DeployStop(ctx context.Context, stopReq types.Deploy
 		}
 	}
 
-	// update database deploy to stopped
-	err = c.deployTaskStore.StopDeploy(ctx, stopReq.RepoType, deploy.RepoID, deploy.UserID, stopReq.DeployID)
+	// update database deploy to stopped. The store matches the deploy by id
+	// and repo only, so organization write members can stop instances they did
+	// not create.
+	err = c.deployTaskStore.StopDeploy(ctx, stopReq.RepoType, deploy.RepoID, stopReq.DeployID)
 	if err != nil {
 		return fmt.Errorf("failed to stop deploy instance, %w", err)
 	}
@@ -955,7 +971,7 @@ func (c *repoComponentImpl) DeployUpdate(ctx context.Context, updateReq types.De
 	if updateReq.DeployType == types.ServerlessType {
 		_, deploy, err = c.checkDeployPermissionForServerless(ctx, updateReq)
 	} else {
-		_, deploy, err = c.CheckDeployPermissionForUser(ctx, updateReq)
+		_, deploy, err = c.getDeployForAccess(ctx, updateReq.CurrentUser, updateReq.DeployID, types.DeployAccessOperate)
 	}
 	if err != nil {
 		return fmt.Errorf("failed to check permission for update deploy, %w", err)
@@ -1165,6 +1181,10 @@ func needRestartDeploy(req *types.DeployUpdateReq) bool {
 		req.PD != nil {
 		return true
 	}
+	// switching endpoint visibility takes effect on the running service
+	if req.SecureLevel != nil {
+		return true
+	}
 	return false
 }
 
@@ -1176,7 +1196,7 @@ func (c *repoComponentImpl) DeployStart(ctx context.Context, startReq types.Depl
 	if startReq.DeployType == types.ServerlessType {
 		_, deploy, err = c.checkDeployPermissionForServerless(ctx, startReq)
 	} else {
-		_, deploy, err = c.CheckDeployPermissionForUser(ctx, startReq)
+		_, deploy, err = c.getDeployForAccess(ctx, startReq.CurrentUser, startReq.DeployID, types.DeployAccessOperate)
 	}
 
 	if err != nil {

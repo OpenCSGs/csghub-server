@@ -366,29 +366,37 @@ func (_m *MockOrgStore) FindByUUIDs(ctx context.Context, uuids []string) ([]data
 	}
 	if rf, ok := ret.Get(0).(func(context.Context, []string) []database.Organization); ok {
 		r0 = rf(ctx, uuids)
-	} else if ret.Get(0) != nil {
-		r0 = ret.Get(0).([]database.Organization)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]database.Organization)
+		}
 	}
+
 	if rf, ok := ret.Get(1).(func(context.Context, []string) error); ok {
 		r1 = rf(ctx, uuids)
 	} else {
 		r1 = ret.Error(1)
 	}
+
 	return r0, r1
 }
 
-// MockOrgStore_FindByUUIDs_Call is a typed mock call for FindByUUIDs.
+// MockOrgStore_FindByUUIDs_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FindByUUIDs'
 type MockOrgStore_FindByUUIDs_Call struct {
 	*mock.Call
 }
 
-// FindByUUIDs configures a mock call.
+// FindByUUIDs is a helper method to define mock.On call
+//   - ctx context.Context
+//   - uuids []string
 func (_e *MockOrgStore_Expecter) FindByUUIDs(ctx interface{}, uuids interface{}) *MockOrgStore_FindByUUIDs_Call {
 	return &MockOrgStore_FindByUUIDs_Call{Call: _e.mock.On("FindByUUIDs", ctx, uuids)}
 }
 
-func (_c *MockOrgStore_FindByUUIDs_Call) Run(run func(context.Context, []string)) *MockOrgStore_FindByUUIDs_Call {
-	_c.Call.Run(func(args mock.Arguments) { run(args[0].(context.Context), args[1].([]string)) })
+func (_c *MockOrgStore_FindByUUIDs_Call) Run(run func(ctx context.Context, uuids []string)) *MockOrgStore_FindByUUIDs_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].([]string))
+	})
 	return _c
 }
 
@@ -398,6 +406,65 @@ func (_c *MockOrgStore_FindByUUIDs_Call) Return(_a0 []database.Organization, _a1
 }
 
 func (_c *MockOrgStore_FindByUUIDs_Call) RunAndReturn(run func(context.Context, []string) ([]database.Organization, error)) *MockOrgStore_FindByUUIDs_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// FindHierarchyByIDs provides a mock function with given fields: ctx, ids
+func (_m *MockOrgStore) FindHierarchyByIDs(ctx context.Context, ids []int64) ([]database.Organization, error) {
+	ret := _m.Called(ctx, ids)
+
+	if len(ret) == 0 {
+		panic("no return value specified for FindHierarchyByIDs")
+	}
+
+	var r0 []database.Organization
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, []int64) ([]database.Organization, error)); ok {
+		return rf(ctx, ids)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, []int64) []database.Organization); ok {
+		r0 = rf(ctx, ids)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]database.Organization)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, []int64) error); ok {
+		r1 = rf(ctx, ids)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockOrgStore_FindHierarchyByIDs_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FindHierarchyByIDs'
+type MockOrgStore_FindHierarchyByIDs_Call struct {
+	*mock.Call
+}
+
+// FindHierarchyByIDs is a helper method to define mock.On call
+//   - ctx context.Context
+//   - ids []int64
+func (_e *MockOrgStore_Expecter) FindHierarchyByIDs(ctx interface{}, ids interface{}) *MockOrgStore_FindHierarchyByIDs_Call {
+	return &MockOrgStore_FindHierarchyByIDs_Call{Call: _e.mock.On("FindHierarchyByIDs", ctx, ids)}
+}
+
+func (_c *MockOrgStore_FindHierarchyByIDs_Call) Run(run func(ctx context.Context, ids []int64)) *MockOrgStore_FindHierarchyByIDs_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].([]int64))
+	})
+	return _c
+}
+
+func (_c *MockOrgStore_FindHierarchyByIDs_Call) Return(_a0 []database.Organization, _a1 error) *MockOrgStore_FindHierarchyByIDs_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockOrgStore_FindHierarchyByIDs_Call) RunAndReturn(run func(context.Context, []int64) ([]database.Organization, error)) *MockOrgStore_FindHierarchyByIDs_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -638,65 +705,6 @@ func (_c *MockOrgStore_GetUserBelongOrgs_Call) RunAndReturn(run func(context.Con
 	return _c
 }
 
-// GetUserRootOrganizations provides a mock function with given fields: ctx, userID
-func (_m *MockOrgStore) GetUserRootOrganizations(ctx context.Context, userID int64) ([]database.Organization, error) {
-	ret := _m.Called(ctx, userID)
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetUserRootOrganizations")
-	}
-
-	var r0 []database.Organization
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, int64) ([]database.Organization, error)); ok {
-		return rf(ctx, userID)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, int64) []database.Organization); ok {
-		r0 = rf(ctx, userID)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]database.Organization)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, int64) error); ok {
-		r1 = rf(ctx, userID)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// MockOrgStore_GetUserRootOrganizations_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetUserRootOrganizations'
-type MockOrgStore_GetUserRootOrganizations_Call struct {
-	*mock.Call
-}
-
-// GetUserRootOrganizations is a helper method to define mock.On call
-//   - ctx context.Context
-//   - userID int64
-func (_e *MockOrgStore_Expecter) GetUserRootOrganizations(ctx interface{}, userID interface{}) *MockOrgStore_GetUserRootOrganizations_Call {
-	return &MockOrgStore_GetUserRootOrganizations_Call{Call: _e.mock.On("GetUserRootOrganizations", ctx, userID)}
-}
-
-func (_c *MockOrgStore_GetUserRootOrganizations_Call) Run(run func(ctx context.Context, userID int64)) *MockOrgStore_GetUserRootOrganizations_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(int64))
-	})
-	return _c
-}
-
-func (_c *MockOrgStore_GetUserRootOrganizations_Call) Return(orgs []database.Organization, err error) *MockOrgStore_GetUserRootOrganizations_Call {
-	_c.Call.Return(orgs, err)
-	return _c
-}
-
-func (_c *MockOrgStore_GetUserRootOrganizations_Call) RunAndReturn(run func(context.Context, int64) ([]database.Organization, error)) *MockOrgStore_GetUserRootOrganizations_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // GetUserOwnOrgs provides a mock function with given fields: ctx, username
 func (_m *MockOrgStore) GetUserOwnOrgs(ctx context.Context, username string) ([]database.Organization, int, error) {
 	ret := _m.Called(ctx, username)
@@ -759,6 +767,65 @@ func (_c *MockOrgStore_GetUserOwnOrgs_Call) Return(orgs []database.Organization,
 }
 
 func (_c *MockOrgStore_GetUserOwnOrgs_Call) RunAndReturn(run func(context.Context, string) ([]database.Organization, int, error)) *MockOrgStore_GetUserOwnOrgs_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetUserRootOrganizations provides a mock function with given fields: ctx, userID
+func (_m *MockOrgStore) GetUserRootOrganizations(ctx context.Context, userID int64) ([]database.Organization, error) {
+	ret := _m.Called(ctx, userID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetUserRootOrganizations")
+	}
+
+	var r0 []database.Organization
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, int64) ([]database.Organization, error)); ok {
+		return rf(ctx, userID)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, int64) []database.Organization); ok {
+		r0 = rf(ctx, userID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]database.Organization)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, int64) error); ok {
+		r1 = rf(ctx, userID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockOrgStore_GetUserRootOrganizations_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetUserRootOrganizations'
+type MockOrgStore_GetUserRootOrganizations_Call struct {
+	*mock.Call
+}
+
+// GetUserRootOrganizations is a helper method to define mock.On call
+//   - ctx context.Context
+//   - userID int64
+func (_e *MockOrgStore_Expecter) GetUserRootOrganizations(ctx interface{}, userID interface{}) *MockOrgStore_GetUserRootOrganizations_Call {
+	return &MockOrgStore_GetUserRootOrganizations_Call{Call: _e.mock.On("GetUserRootOrganizations", ctx, userID)}
+}
+
+func (_c *MockOrgStore_GetUserRootOrganizations_Call) Run(run func(ctx context.Context, userID int64)) *MockOrgStore_GetUserRootOrganizations_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(int64))
+	})
+	return _c
+}
+
+func (_c *MockOrgStore_GetUserRootOrganizations_Call) Return(orgs []database.Organization, err error) *MockOrgStore_GetUserRootOrganizations_Call {
+	_c.Call.Return(orgs, err)
+	return _c
+}
+
+func (_c *MockOrgStore_GetUserRootOrganizations_Call) RunAndReturn(run func(context.Context, int64) ([]database.Organization, error)) *MockOrgStore_GetUserRootOrganizations_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -887,6 +954,67 @@ func (_c *MockOrgStore_Search_Call) Return(orgs []database.Organization, total i
 }
 
 func (_c *MockOrgStore_Search_Call) RunAndReturn(run func(context.Context, string, int, int, string, string, string) ([]database.Organization, int, error)) *MockOrgStore_Search_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// SearchHierarchyExcludingID provides a mock function with given fields: ctx, search, excludedID, limit
+func (_m *MockOrgStore) SearchHierarchyExcludingID(ctx context.Context, search string, excludedID int64, limit int) ([]database.Organization, error) {
+	ret := _m.Called(ctx, search, excludedID, limit)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SearchHierarchyExcludingID")
+	}
+
+	var r0 []database.Organization
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, int64, int) ([]database.Organization, error)); ok {
+		return rf(ctx, search, excludedID, limit)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, int64, int) []database.Organization); ok {
+		r0 = rf(ctx, search, excludedID, limit)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]database.Organization)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, int64, int) error); ok {
+		r1 = rf(ctx, search, excludedID, limit)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockOrgStore_SearchHierarchyExcludingID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SearchHierarchyExcludingID'
+type MockOrgStore_SearchHierarchyExcludingID_Call struct {
+	*mock.Call
+}
+
+// SearchHierarchyExcludingID is a helper method to define mock.On call
+//   - ctx context.Context
+//   - search string
+//   - excludedID int64
+//   - limit int
+func (_e *MockOrgStore_Expecter) SearchHierarchyExcludingID(ctx interface{}, search interface{}, excludedID interface{}, limit interface{}) *MockOrgStore_SearchHierarchyExcludingID_Call {
+	return &MockOrgStore_SearchHierarchyExcludingID_Call{Call: _e.mock.On("SearchHierarchyExcludingID", ctx, search, excludedID, limit)}
+}
+
+func (_c *MockOrgStore_SearchHierarchyExcludingID_Call) Run(run func(ctx context.Context, search string, excludedID int64, limit int)) *MockOrgStore_SearchHierarchyExcludingID_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(int64), args[3].(int))
+	})
+	return _c
+}
+
+func (_c *MockOrgStore_SearchHierarchyExcludingID_Call) Return(_a0 []database.Organization, _a1 error) *MockOrgStore_SearchHierarchyExcludingID_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockOrgStore_SearchHierarchyExcludingID_Call) RunAndReturn(run func(context.Context, string, int64, int) ([]database.Organization, error)) *MockOrgStore_SearchHierarchyExcludingID_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -1105,83 +1233,6 @@ func (_c *MockOrgStore_UpdateVerifyStatus_Call) Return(_a0 error) *MockOrgStore_
 func (_c *MockOrgStore_UpdateVerifyStatus_Call) RunAndReturn(run func(context.Context, string, types.VerifyStatus) error) *MockOrgStore_UpdateVerifyStatus_Call {
 	_c.Call.Return(run)
 	return _c
-}
-
-// SearchHierarchy provides a mock function with given fields: ctx, search, per, page
-func (_m *MockOrgStore) SearchHierarchy(ctx context.Context, search string, per int, page int) ([]database.Organization, int, error) {
-	ret := _m.Called(ctx, search, per, page)
-	if len(ret) == 0 {
-		panic("no return value specified for SearchHierarchy")
-	}
-	var r0 []database.Organization
-	if rf, ok := ret.Get(0).(func(context.Context, string, int, int) []database.Organization); ok {
-		r0 = rf(ctx, search, per, page)
-	} else if ret.Get(0) != nil {
-		r0 = ret.Get(0).([]database.Organization)
-	}
-	var r1 int
-	if rf, ok := ret.Get(1).(func(context.Context, string, int, int) int); ok {
-		r1 = rf(ctx, search, per, page)
-	} else {
-		r1 = ret.Int(1)
-	}
-	var r2 error
-	if rf, ok := ret.Get(2).(func(context.Context, string, int, int) error); ok {
-		r2 = rf(ctx, search, per, page)
-	} else {
-		r2 = ret.Error(2)
-	}
-	return r0, r1, r2
-}
-
-type MockOrgStore_SearchHierarchy_Call struct{ *mock.Call }
-
-func (_e *MockOrgStore_Expecter) SearchHierarchy(ctx interface{}, search interface{}, per interface{}, page interface{}) *MockOrgStore_SearchHierarchy_Call {
-	return &MockOrgStore_SearchHierarchy_Call{Call: _e.mock.On("SearchHierarchy", ctx, search, per, page)}
-}
-func (_c *MockOrgStore_SearchHierarchy_Call) Run(run func(context.Context, string, int, int)) *MockOrgStore_SearchHierarchy_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(int), args[3].(int))
-	})
-	return _c
-}
-func (_c *MockOrgStore_SearchHierarchy_Call) Return(_a0 []database.Organization, _a1 int, _a2 error) *MockOrgStore_SearchHierarchy_Call {
-	_c.Call.Return(_a0, _a1, _a2)
-	return _c
-}
-func (_c *MockOrgStore_SearchHierarchy_Call) RunAndReturn(run func(context.Context, string, int, int) ([]database.Organization, int, error)) *MockOrgStore_SearchHierarchy_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// SearchHierarchyExcludingID provides a mock function with given fields: ctx, search, excludedID, limit.
-func (_m *MockOrgStore) SearchHierarchyExcludingID(ctx context.Context, search string, excludedID int64, limit int) ([]database.Organization, error) {
-	ret := _m.Called(ctx, search, excludedID, limit)
-	var r0 []database.Organization
-	if ret.Get(0) != nil {
-		r0 = ret.Get(0).([]database.Organization)
-	}
-	return r0, ret.Error(1)
-}
-
-// SearchHierarchyExcludingID is a helper method to define mock.On call.
-func (_e *MockOrgStore_Expecter) SearchHierarchyExcludingID(ctx interface{}, search interface{}, excludedID interface{}, limit interface{}) *mock.Call {
-	return _e.mock.On("SearchHierarchyExcludingID", ctx, search, excludedID, limit)
-}
-
-// FindHierarchyByIDs provides a mock function with given fields: ctx, ids.
-func (_m *MockOrgStore) FindHierarchyByIDs(ctx context.Context, ids []int64) ([]database.Organization, error) {
-	ret := _m.Called(ctx, ids)
-	var r0 []database.Organization
-	if ret.Get(0) != nil {
-		r0 = ret.Get(0).([]database.Organization)
-	}
-	return r0, ret.Error(1)
-}
-
-// FindHierarchyByIDs is a helper method to define mock.On call.
-func (_e *MockOrgStore_Expecter) FindHierarchyByIDs(ctx interface{}, ids interface{}) *mock.Call {
-	return _e.mock.On("FindHierarchyByIDs", ctx, ids)
 }
 
 // NewMockOrgStore creates a new instance of MockOrgStore. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.

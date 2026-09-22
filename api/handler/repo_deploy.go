@@ -726,6 +726,12 @@ func (h *RepoHandler) DeployUpdate(ctx *gin.Context) {
 		}
 	}
 
+	// issue csghub-portal#3416: secure_level must be a known endpoint visibility
+	if req.SecureLevel != nil && *req.SecureLevel != types.EndpointPublic && *req.SecureLevel != types.EndpointPrivate {
+		httpbase.BadRequest(ctx, "secure_level must be 1 (public) or 2 (private)")
+		return
+	}
+
 	repoType := common.RepoTypeFromContext(ctx)
 	deployID, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
 	if err != nil {

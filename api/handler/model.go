@@ -749,6 +749,12 @@ func (h *ModelHandler) DeployDedicated(ctx *gin.Context) {
 		httpbase.BadRequestWithExt(ctx, errorx.ReqBodyFormat(err, ext))
 		return
 	}
+	// issue csghub-portal#3416: secure_level must be a known endpoint visibility
+	if req.SecureLevel != types.EndpointPublic && req.SecureLevel != types.EndpointPrivate {
+		ext := errorx.Ctx().Set("body", "secure_level")
+		httpbase.BadRequestWithExt(ctx, errorx.ReqBodyFormat(errors.New("secure_level must be 1 (public) or 2 (private)"), ext))
+		return
+	}
 	// for reserved resource,no scaling
 	if req.OrderDetailID != 0 {
 		req.MinReplica = 1
@@ -1242,6 +1248,7 @@ func (h *ModelHandler) DeployStart(ctx *gin.Context) {
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /models/{namespace}/{name}/run/{id}/wakeup [put]
 func (h *ModelHandler) DeployWakeup(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
 	var (
 		id  int64
 		err error
@@ -1259,8 +1266,13 @@ func (h *ModelHandler) DeployWakeup(ctx *gin.Context) {
 		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
-	err = h.model.Wakeup(ctx.Request.Context(), namespace, name, id)
+	err = h.model.Wakeup(ctx.Request.Context(), namespace, name, id, currentUser)
 	if err != nil {
+		if errors.Is(err, errorx.ErrForbidden) {
+			slog.Info("not allowed to wakeup inference", slog.Any("error", err), slog.Any("id", id))
+			httpbase.ForbiddenError(ctx, err)
+			return
+		}
 		slog.ErrorContext(ctx.Request.Context(), "failed to wakeup inference", slog.String("namespace", namespace),
 			slog.String("name", name), slog.Any("error", err))
 		httpbase.ServerError(ctx, errors.New("failed to wakeup inference"))
