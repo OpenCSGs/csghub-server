@@ -357,6 +357,9 @@ func (c *repoComponentImpl) CreateRepo(ctx context.Context, req types.CreateRepo
 			Files:     gitCommitFiles,
 		}
 	}
+	if newDBRepo.Private {
+		c.clearRepositoryAccessCache(ctx, user.UUID)
+	}
 
 	return gitRepo, newDBRepo, commitFilesReq, nil
 }
@@ -563,6 +566,9 @@ func (c *repoComponentImpl) DeleteRepo(ctx context.Context, req types.DeleteRepo
 	if err != nil {
 		return nil, fmt.Errorf("fail to schedule repository deletion: %w", err)
 	}
+	if repo.Private {
+		c.clearRepositoryAccessCache(ctx, user.UUID)
+	}
 
 	repo.User = user
 	return repo, nil
@@ -734,6 +740,22 @@ type repositoryAccessSnapshot struct {
 	FetchedAt     time.Time `json:"fetched_at"`
 }
 
+// clearRepositoryAccessCache removes one user's cached readable repository snapshot.
+// Cache failures are logged without changing the repository operation result.
+func (c *repoComponentImpl) clearRepositoryAccessCache(ctx context.Context, userUUID string) {
+	if c.repositoryAccessCache == nil || userUUID == "" {
+		return
+	}
+	cacheKey := repositoryAccessCacheKeyPrefix + userUUID
+	if err := c.repositoryAccessCache.Del(ctx, cacheKey); err != nil {
+		slog.ErrorContext(ctx, "failed to clear repository access cache",
+			"user_uuid", userUUID,
+			"cache_key", cacheKey,
+			"error", err,
+		)
+	}
+}
+
 // loadRepositoryReadScope resolves the effective repository visibility for list queries.
 // Only the returned repository IDs are cached; search results remain user-specific database queries.
 func (c *repoComponentImpl) loadRepositoryReadScope(ctx context.Context, currentUser string) (database.RepositoryAccessScope, error) {
@@ -762,7 +784,7 @@ func loadRepositoryReadScope(ctx context.Context, currentUser string, userSvcCli
 	}
 
 	cacheKey := repositoryAccessCacheKeyPrefix + user.UUID
-	cacheTTL := 5 * time.Minute
+	cacheTTL := time.Minute
 	if cfg != nil && cfg.Search.RepositoryAccessListCacheTTL > 0 {
 		cacheTTL = time.Duration(cfg.Search.RepositoryAccessListCacheTTL) * time.Second
 	}
@@ -2338,6 +2360,9 @@ func (c *repoComponentImpl) CheckUserRepoPermission(ctx context.Context, userNam
 	}
 	if permission == rebac.RepositoryCanRead && !repo.Private {
 		return true, nil
+	}
+	if permission == rebac.RepositoryCanRead && repo.Private && !decision.Allowed {
+		c.clearRepositoryAccessCache(ctx, user.UUID)
 	}
 	return decision.Allowed, nil
 }

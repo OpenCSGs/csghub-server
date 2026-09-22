@@ -19,7 +19,7 @@ environment = "development"
 enable_unit = false
 
 [rebac]
-openfga_list_object_max_result = 2000
+openfga_list_object_max_result = 1000
 
 [api_server]
 port = 8080
@@ -188,6 +188,7 @@ nim_ngc_secret_name = "nvidia-nim-secrets"
 
 [search]
 repo_search_cache_ttl = 300
+repository_access_list_cache_ttl = 60
 repo_search_limit = 2000
 
 [event]

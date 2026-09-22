@@ -99,7 +99,7 @@ type Config struct {
 	// ReBAC controls the embedded OpenFGA authorization service.
 	Rebac struct {
 		// OpenFGAListObjectMaxResult limits the number of objects returned by OpenFGA ListObjects.
-		OpenFGAListObjectMaxResult int `env:"STARHUB_SERVER_REBAC_OPENFGA_LIST_OBJECT_MAX_RESULT" default:"2000"`
+		OpenFGAListObjectMaxResult int `env:"STARHUB_SERVER_REBAC_OPENFGA_LIST_OBJECT_MAX_RESULT" default:"1000"`
 	}
 
 	APIServer struct {
@@ -321,8 +321,8 @@ type Config struct {
 	}
 
 	Search struct {
-		RepoSearchCacheTTL           int `env:"STARHUB_SERVER_REPO_SEARCH_CACHE_TTL" default:"300"`            // 5 min
-		RepositoryAccessListCacheTTL int `env:"STARHUB_SERVER_REPOSITORY_ACCESS_LIST_CACHE_TTL" default:"300"` // 5 min
+		RepoSearchCacheTTL           int `env:"STARHUB_SERVER_REPO_SEARCH_CACHE_TTL" default:"300"`           // 5 min
+		RepositoryAccessListCacheTTL int `env:"STARHUB_SERVER_REPOSITORY_ACCESS_LIST_CACHE_TTL" default:"60"` // 1 min
 		RepoSearchLimit              int `env:"STARHUB_SERVER_REPO_SEARCH_LIMIT" default:"2000"`
 	}
 

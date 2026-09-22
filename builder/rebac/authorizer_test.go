@@ -7,6 +7,10 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/codes"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 )
 
 func TestNewAuthorizerValidatesDependenciesAndOptions(t *testing.T) {
@@ -56,6 +60,78 @@ func TestAuthorizerCheckAndAuthorize(t *testing.T) {
 	require.True(t, observations[1].DecisionMade)
 	require.False(t, observations[1].Allowed)
 	require.Equal(t, ErrorClassDenied, observations[1].ErrorClass)
+}
+
+// TestAuthorizerTracePreservesParentAndProviderChild verifies facade spans connect caller and provider spans.
+func TestAuthorizerTracePreservesParentAndProviderChild(t *testing.T) {
+	exporter := tracetest.NewInMemoryExporter()
+	traceProvider := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exporter))
+	previousProvider := otel.GetTracerProvider()
+	otel.SetTracerProvider(traceProvider)
+	t.Cleanup(func() {
+		otel.SetTracerProvider(previousProvider)
+		require.NoError(t, traceProvider.Shutdown(context.Background()))
+	})
+
+	provider := &mockProvider{
+		name: "openfga",
+		check: func(ctx context.Context, _ CheckRequest) (Decision, error) {
+			_, providerSpan := traceProvider.Tracer("test-provider").Start(ctx, "provider.check")
+			providerSpan.End()
+			return Decision{Allowed: true}, nil
+		},
+	}
+	authorizer, err := NewAuthorizer(provider)
+	require.NoError(t, err)
+	ctx, parentSpan := traceProvider.Tracer("test-caller").Start(context.Background(), "caller")
+	decision, err := authorizer.Check(ctx, validCheckRequest())
+	require.NoError(t, err)
+	require.True(t, decision.Allowed)
+	parentSpan.End()
+
+	spans := exporter.GetSpans()
+	require.Len(t, spans, 3)
+	byName := make(map[string]tracetest.SpanStub, len(spans))
+	for _, span := range spans {
+		byName[span.Name] = span
+	}
+	require.Equal(t, byName["caller"].SpanContext.SpanID(), byName["rebac.check"].Parent.SpanID())
+	require.Equal(t, byName["rebac.check"].SpanContext.SpanID(), byName["provider.check"].Parent.SpanID())
+
+	attributeKeys := make([]string, 0, len(byName["rebac.check"].Attributes))
+	for _, spanAttribute := range byName["rebac.check"].Attributes {
+		attributeKeys = append(attributeKeys, string(spanAttribute.Key))
+	}
+	require.ElementsMatch(t, []string{
+		"rebac.operation", "rebac.provider", "rebac.object_type", "rebac.relation", "rebac.error_class", "rebac.allowed",
+	}, attributeKeys)
+}
+
+// TestAuthorizerTraceRecordsErrorStatus verifies enforced denials are marked as span errors.
+func TestAuthorizerTraceRecordsErrorStatus(t *testing.T) {
+	exporter := tracetest.NewInMemoryExporter()
+	traceProvider := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exporter))
+	previousProvider := otel.GetTracerProvider()
+	otel.SetTracerProvider(traceProvider)
+	t.Cleanup(func() {
+		otel.SetTracerProvider(previousProvider)
+		require.NoError(t, traceProvider.Shutdown(context.Background()))
+	})
+
+	authorizer, err := NewAuthorizer(&mockProvider{
+		name: "openfga",
+		check: func(context.Context, CheckRequest) (Decision, error) {
+			return Decision{Allowed: false}, nil
+		},
+	})
+	require.NoError(t, err)
+	require.ErrorIs(t, authorizer.Authorize(context.Background(), validCheckRequest()), ErrDenied)
+
+	spans := exporter.GetSpans()
+	require.Len(t, spans, 1)
+	require.Equal(t, "rebac.authorize", spans[0].Name)
+	require.Equal(t, codes.Error, spans[0].Status.Code)
+	require.Empty(t, spans[0].Events)
 }
 
 func TestAuthorizerWriteAndDelete(t *testing.T) {
@@ -227,7 +303,10 @@ func TestAuthorizerListObjectsAndSubjects(t *testing.T) {
 			return ListSubjectsResult{Subjects: []Subject{UserSubject("user-1"), UserSubject("user-2")}}, nil
 		},
 	}
-	authorizer, err := NewAuthorizer(provider)
+	observations := make([]Observation, 0, 2)
+	authorizer, err := NewAuthorizer(provider, WithObserver(ObserverFunc(func(_ context.Context, observation Observation) {
+		observations = append(observations, observation)
+	})))
 	require.NoError(t, err)
 
 	objects, err := authorizer.ListObjects(context.Background(), ListObjectsRequest{
@@ -247,6 +326,8 @@ func TestAuthorizerListObjectsAndSubjects(t *testing.T) {
 	require.Len(t, subjects.Subjects, 2)
 	require.Equal(t, 1, provider.listObjectCalls)
 	require.Equal(t, 1, provider.listSubjectCalls)
+	require.Equal(t, 2, observations[0].ResultCount)
+	require.Equal(t, 2, observations[1].ResultCount)
 }
 
 func TestAuthorizerRejectsInvalidListProviderResponses(t *testing.T) {

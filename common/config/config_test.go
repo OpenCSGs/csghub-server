@@ -28,7 +28,16 @@ func TestConfig_loadConfig(t *testing.T) {
 		require.Equal(t, "https://example.posthog.test", cfg.PostHog.APIHost)
 		require.Equal(t, "staging", cfg.PostHog.Environment)
 		require.False(t, cfg.Organization.EnableUnit)
-		require.Equal(t, 2000, cfg.Rebac.OpenFGAListObjectMaxResult)
+		require.Equal(t, 1000, cfg.Rebac.OpenFGAListObjectMaxResult)
+		require.Equal(t, 60, cfg.Search.RepositoryAccessListCacheTTL)
+	})
+
+	t.Run("repository access cache TTL env", func(t *testing.T) {
+		SetConfigFile("")
+		t.Setenv("STARHUB_SERVER_REPOSITORY_ACCESS_LIST_CACHE_TTL", "90")
+		cfg, err := loadConfig()
+		require.NoError(t, err)
+		require.Equal(t, 90, cfg.Search.RepositoryAccessListCacheTTL)
 	})
 
 	t.Run("config file", func(t *testing.T) {
@@ -90,4 +99,16 @@ func TestConfigRebacTOML(t *testing.T) {
 			require.Equal(t, value, fmt.Sprint(cfg.Rebac.OpenFGAListObjectMaxResult))
 		})
 	}
+}
+
+// TestConfigRepositoryAccessCacheTTLTOML verifies the documented search cache key is loaded.
+func TestConfigRepositoryAccessCacheTTLTOML(t *testing.T) {
+	previous := configFile
+	t.Cleanup(func() { SetConfigFile(previous) })
+	path := filepath.Join(t.TempDir(), "search.toml")
+	require.NoError(t, os.WriteFile(path, []byte("[search]\nrepository_access_list_cache_ttl = 75\n"), 0600))
+	SetConfigFile(path)
+	cfg, err := loadConfig()
+	require.NoError(t, err)
+	require.Equal(t, 75, cfg.Search.RepositoryAccessListCacheTTL)
 }
