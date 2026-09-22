@@ -15,7 +15,7 @@ import (
 func main() {
 	logger := hclog.New(&hclog.LoggerOptions{
 		Name:   fmt.Sprintf("plugin_%s", aliyunchecker.PluginName),
-		Output: os.Stdout,
+		Output: os.Stderr,
 		Level:  hclog.Debug,
 	})
 
