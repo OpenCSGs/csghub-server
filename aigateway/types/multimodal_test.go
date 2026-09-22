@@ -125,3 +125,37 @@ func TestResponsesRequest_HasMultimodalContent(t *testing.T) {
 	var nilRequest *ResponsesRequest
 	require.False(t, nilRequest.HasMultimodalContent())
 }
+
+func TestEmbeddingRequest_PromptText(t *testing.T) {
+	var _ PromptTextProvider = (*EmbeddingRequest)(nil)
+
+	req := &EmbeddingRequest{}
+	require.NoError(t, json.Unmarshal([]byte(`{
+		"model": "text-embedding-3",
+		"input": ["hello", "world"]
+	}`), req))
+	require.Equal(t, "hello\nworld", req.PromptText())
+
+	single := &EmbeddingRequest{}
+	require.NoError(t, json.Unmarshal([]byte(`{
+		"model": "text-embedding-3",
+		"input": "just text"
+	}`), single))
+	require.Equal(t, "just text", single.PromptText())
+
+	var nilRequest *EmbeddingRequest
+	require.Equal(t, "", nilRequest.PromptText())
+}
+
+func TestRerankRequest_PromptText(t *testing.T) {
+	var _ PromptTextProvider = (*RerankRequest)(nil)
+
+	req := &RerankRequest{
+		Query:     "what is go",
+		Documents: []string{"go is a language", "rust too"},
+	}
+	require.Equal(t, "what is go\ngo is a language\nrust too", req.PromptText())
+
+	var nilRequest *RerankRequest
+	require.Equal(t, "", nilRequest.PromptText())
+}

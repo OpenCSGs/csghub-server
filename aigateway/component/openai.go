@@ -9,11 +9,9 @@ import (
 	"regexp"
 	"slices"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/google/uuid"
-	"opencsg.com/csghub-server/aigateway/component/admission"
 	"opencsg.com/csghub-server/aigateway/component/router"
 	"opencsg.com/csghub-server/aigateway/component/upstream"
 	"opencsg.com/csghub-server/aigateway/token"
@@ -77,13 +75,6 @@ type openaiComponentImpl struct {
 	usageLimiter           UsageLimiter
 	capacityPolicyDefaults commontypes.CapacityPolicy
 	quotaRateComponent     QuotaRateComponent
-	capacityAdmission      admission.CapacityAdmissionController
-	// capacityAdmissionOnce memoizes the lazily-built admission controller:
-	// the controller (and its per-pod lease renewer goroutine) must be a
-	// singleton, never per-request. Tests may inject capacityAdmission
-	// directly instead.
-	capacityAdmissionOnce    sync.Once
-	capacityAdmissionOptions admission.CapacityAdmissionOptions
 }
 
 func (m *openaiComponentImpl) getModelIDBuilder() upstream.ModelIDBuilder {

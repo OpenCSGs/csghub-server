@@ -266,15 +266,17 @@ func shouldCheckUsageLimit(task string) bool {
 }
 
 // shouldAdmitCapacity reports whether the task participates in capacity
-// admission. Token-generating protocols (chat, responses, messages) are
-// gated by all CapacityPolicy dimensions; image generation is gated too but
-// always without a TPM reservation (its parsed body reports multimodal
-// content, so the checker passes EstimatedTokens <= 0 and only concurrency
-// and RPM bind). Other modal endpoints (video, audio, ocr, rerank,
-// embedding, speech) bypass admission in v1.
+// admission. Token-generating protocols (chat, responses, messages) and
+// text-estimatable endpoints (embedding, rerank, speech) are gated by all
+// CapacityPolicy dimensions; media endpoints (image, audio, ocr,
+// text-to-video) are gated too but always without a TPM reservation (their
+// parsed bodies report multimodal content, so the checker passes
+// EstimatedTokens <= 0 and only concurrency and RPM bind).
 func shouldAdmitCapacity(task string) bool {
 	switch task {
-	case "chat", "responses", "messages", "text-to-image":
+	case "chat", "responses", "messages", "text-to-image",
+		"embedding", "rerank", "speech",
+		"audio", "ocr", "text-to-video":
 		return true
 	default:
 		return false

@@ -147,6 +147,33 @@ sliding window at finalize, so the window sum always stays the true total
 usage. The fallback's pinned `Acquire` re-acquires with
 `ReservedTokens=0`, automatically staying in no-reservation mode.
 
+**Task coverage**: every known modality participates in capacity admission —
+text-estimatable endpoints (chat/responses/messages, embedding/rerank/speech
+TTS) reserve from the text estimate; media endpoints (image/audio/ocr/
+text-to-video) never reserve (gated by concurrency + RPM only).
+text-to-video gates the submission request synchronously (an async task's own
+lease lifecycle is a separate future MR).
+
+**TPM accounting per modality class** — the multimodal decision means
+"computing TPM for media requests is meaningless", so the two classes differ
+deliberately:
+
+- **Media endpoints (est ≤ 0)**: nothing enters the TPM window — no
+  reservation at acquire, and their `actual` usage is never committed
+  (these handlers' async usage goroutines do not finalize the admission
+  lease). The window stays "true total usage" because media contributes
+  nothing, by design.
+- **Text-estimatable endpoints (embedding/rerank/speech)**: reserve `est`
+  for the in-flight request (chat-like in-flight occupancy), but their
+  `actual` usage is NOT committed — the Orchestrator safety net releases the
+  lease with a full reservation reclaim, so the net window effect is zero
+  (speech's Decision 2 generalizes here). For an embedding-dominated
+  upstream, MaxTPM therefore behaves as a per-request occupancy limit
+  (≈ concurrency × est), not a strict tokens/min meter. Use
+  `EstimatePromptCharsPerToken`/`EstimateCompletionTokens` to size `est` if
+  a tighter tokens/min bound is needed; true usage accounting for these
+  modalities is future work.
+
 ## Normal request flow
 
 ```mermaid

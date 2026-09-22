@@ -79,6 +79,11 @@ type ocrParsedBody struct {
 	FileHeader *multipart.FileHeader
 }
 
+// HasMultimodalContent implements types.MultimodalContentProvider: OCR
+// requests carry image files, so capacity admission skips the text-based TPM
+// estimate (concurrency and RPM still gate them).
+func (b *ocrParsedBody) HasMultimodalContent() bool { return true }
+
 // --- Phase 1: Extract ---
 
 func (h *ocrPipelineHandler) Extract(c *gin.Context) (*types.RequestMetadata, error) {

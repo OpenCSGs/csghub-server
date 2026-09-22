@@ -36,6 +36,12 @@ type createVideoInput struct {
 	multipartAudioCount        int
 }
 
+// HasMultimodalContent implements types.MultimodalContentProvider: video
+// generation costs are driven by the generated clip, not the prompt text, so
+// capacity admission skips the text-based TPM estimate (concurrency and RPM
+// still gate the submission request).
+func (in *createVideoInput) HasMultimodalContent() bool { return true }
+
 func parseCreateVideoInput(c *gin.Context) (*createVideoInput, error, bool) {
 	input := &createVideoInput{
 		isMultipart: strings.HasPrefix(c.ContentType(), "multipart/form-data"),

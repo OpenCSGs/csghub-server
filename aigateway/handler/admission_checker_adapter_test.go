@@ -1,3 +1,5 @@
+//go:build ee || saas
+
 package handler
 
 import (
@@ -199,4 +201,132 @@ func TestAdmissionCheckerAdapter_ResponsesWrapper_MultimodalSkipsTPMEstimate(t *
 	outcome, err := adapter.CheckAdmission(context.Background(), meta, mt)
 	require.NoError(t, err)
 	require.Nil(t, outcome)
+}
+
+func TestAdmissionCheckerAdapter_TextEstimatableModalities_UsePromptEstimate(t *testing.T) {
+	// embedding / rerank / speech carry plain-text input: the text-based
+	// estimate is meaningful, so they reserve like text generation.
+	tester, _, _ := setupTest(t)
+	adapter := &admissionCheckerAdapter{handler: tester.handler}
+	mt := admissionAdapterTarget()
+
+	cases := map[string]types.PromptTextProvider{
+		"embedding": &types.EmbeddingRequest{},
+		"rerank":    &types.RerankRequest{Query: "what is go", Documents: []string{"go is a language"}},
+		"speech":    &speechParsedBody{Req: &types.SpeechRequest{Input: "hello there"}},
+	}
+	for name, body := range cases {
+		t.Run(name, func(t *testing.T) {
+			meta := &types.RequestMetadata{ParsedBody: body}
+			tester.mocks.openAIComp.EXPECT().EstimateAdmissionTokens(body.PromptText()).Return(int64(1064)).Once()
+			tester.mocks.openAIComp.EXPECT().CheckCapacityAdmission(
+				mock.Anything, mt.Model, int64(7), true, int64(1064),
+			).Return(nil).Once()
+
+			outcome, err := adapter.CheckAdmission(context.Background(), meta, mt)
+			require.NoError(t, err)
+			require.Nil(t, outcome)
+		})
+	}
+}
+
+func TestAdmissionCheckerAdapter_MediaModalities_SkipTPMEstimate(t *testing.T) {
+	// audio / ocr / text-to-video carry media content: no text-based
+	// estimate, admitted without a TPM reservation.
+	tester, _, _ := setupTest(t)
+	adapter := &admissionCheckerAdapter{handler: tester.handler}
+	mt := admissionAdapterTarget()
+
+	cases := map[string]types.MultimodalContentProvider{
+		"audio": &audioParsedBody{},
+		"ocr":   &ocrParsedBody{},
+		"video": &createVideoInput{},
+	}
+	for name, body := range cases {
+		t.Run(name, func(t *testing.T) {
+			require.True(t, body.HasMultimodalContent(), "%s must report multimodal content", name)
+			meta := &types.RequestMetadata{ParsedBody: body}
+			// EstimateAdmissionTokens must NOT be called (no EXPECT on it).
+			tester.mocks.openAIComp.EXPECT().CheckCapacityAdmission(
+				mock.Anything, mt.Model, int64(7), true, types.AdmissionNoTPMEstimate,
+			).Return(nil).Once()
+
+			outcome, err := adapter.CheckAdmission(context.Background(), meta, mt)
+			require.NoError(t, err)
+			require.Nil(t, outcome)
+		})
+	}
+}
+
+func TestSpeechParsedBody_PromptText(t *testing.T) {
+	// Batch branch: valid items join with "\n"; malformed JSON items and
+	// empty inputs are skipped (mirrors BatchSpeechRequest.InputTexts()).
+	batch := &speechParsedBody{BatchReq: &types.BatchSpeechRequest{
+		Items: []json.RawMessage{
+			json.RawMessage(`{"input":"first item"}`),
+			json.RawMessage(`{not valid json}`),  // skipped: unparseable
+			json.RawMessage(`{"input":""}`),      // skipped: empty input
+			json.RawMessage(`{"voice":"alloy"}`), // skipped: no input field
+			json.RawMessage(`{"input":"second item"}`),
+		},
+	}}
+	require.Equal(t, "first item\nsecond item", batch.PromptText())
+
+	single := &speechParsedBody{Req: &types.SpeechRequest{Input: "plain text"}}
+	require.Equal(t, "plain text", single.PromptText())
+
+	var nilBody *speechParsedBody
+	require.Equal(t, "", nilBody.PromptText())
+}
+
+func TestAdmissionCheckerAdapter_DefensiveDeny_CarriesLease(t *testing.T) {
+	// When admission admits but the re-selected upstream has vanished from
+	// the candidate set, the defensive deny MUST carry the acquired lease:
+	// the planner stores outcome.Decision on the plan, so the Orchestrator
+	// safety net releases that lease. Dropping it would orphan a
+	// renewer-registered lease (renewed forever; slot leaked until
+	// expired-lease cleanup).
+	tester, _, _ := setupTest(t)
+	adapter := &admissionCheckerAdapter{handler: tester.handler}
+
+	mt := &types.ModelTarget{
+		Model: &types.Model{
+			BaseModel: types.BaseModel{ID: "test-model"},
+			Upstreams: []commontypes.UpstreamConfig{{
+				ID:             7,
+				URL:            "https://upstream.example.com/v1",
+				CapacityPolicy: &commontypes.CapacityPolicy{Enabled: true, MaxConcurrency: 10, MaxRPM: 100, MaxTPM: 100000},
+			}},
+		},
+		// Candidate set WITHOUT the ghost upstream (admission's pick is
+		// missing from it → rebuild lookup fails → defensive deny).
+		Upstream: commontypes.UpstreamConfig{ID: 7, URL: "https://upstream.example.com/v1"},
+	}
+	acquired := &types.AdmissionDecision{
+		Action:             types.AdmissionAdmit,
+		SelectedUpstreamID: 999,
+		ReSelected:         true,
+		Lease:              &types.AdmissionLease{ModelID: "test-model", UpstreamID: 999, Token: "orphan-candidate"},
+	}
+
+	tester.mocks.openAIComp.EXPECT().CheckCapacityAdmission(
+		mock.Anything, mt.Model, int64(7), true, int64(1064),
+	).Return(acquired).Once()
+	tester.mocks.openAIComp.EXPECT().EstimateAdmissionTokens(mock.Anything).Return(int64(1064)).Once()
+
+	meta := &types.RequestMetadata{
+		ParsedBody: chatRequestBody(t, `{
+			"model": "test-model",
+			"messages": [{"role": "user", "content": "text"}]
+		}`),
+	}
+
+	outcome, err := adapter.CheckAdmission(context.Background(), meta, mt)
+	require.NoError(t, err)
+	require.NotNil(t, outcome)
+	require.NotNil(t, outcome.Decision)
+	require.Equal(t, types.AdmissionReject, outcome.Decision.Action)
+	require.NotNil(t, outcome.Decision.Lease, "defensive deny must carry the acquired lease")
+	require.Equal(t, "orphan-candidate", outcome.Decision.Lease.Token)
+	require.Nil(t, outcome.ReSelectedTarget, "no rebuild target on deny")
 }
