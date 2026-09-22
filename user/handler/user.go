@@ -40,6 +40,11 @@ type UserHandler struct {
 	uv                             component.UserVerifyComponent
 }
 
+// CanAdmin reports whether the specified user has platform administrator privileges.
+func (h *UserHandler) CanAdmin(ctx context.Context, username string) (bool, error) {
+	return h.c.CanAdmin(ctx, username)
+}
+
 const (
 	VSCODE    = "vscode"
 	JETBRAINS = "jetbrains"

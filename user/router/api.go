@@ -111,6 +111,7 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 	middlewareCollection := middleware.MiddlewareCollection{}
 	middlewareCollection.Auth.NeedAPIKey = needAPIKey
 	middlewareCollection.Auth.NeedLogin = mustLogin()
+	middlewareCollection.Auth.NeedAdmin = needAdmin(userHandler)
 	if err := extendRoutes(apiV1Group, middlewareCollection, config, userHandler); err != nil {
 		return nil, fmt.Errorf("error extending routes:%w", err)
 	}
@@ -188,6 +189,30 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 	}
 
 	return r, nil
+}
+
+// needAdmin allows only authenticated users with platform administrator privileges.
+func needAdmin(userHandler *handler.UserHandler) gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		currentUser := httpbase.GetCurrentUser(ctx)
+		if currentUser == "" {
+			httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
+			ctx.Abort()
+			return
+		}
+		isAdmin, err := userHandler.CanAdmin(ctx.Request.Context(), currentUser)
+		if err != nil {
+			httpbase.ServerError(ctx, fmt.Errorf("failed to check administrator privileges: %w", err))
+			ctx.Abort()
+			return
+		}
+		if !isAdmin {
+			httpbase.ForbiddenError(ctx, errorx.ErrUserNotAdmin)
+			ctx.Abort()
+			return
+		}
+		ctx.Next()
+	}
 }
 
 func userMatch() gin.HandlerFunc {
