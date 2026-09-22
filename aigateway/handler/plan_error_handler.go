@@ -46,12 +46,38 @@ func handleOpenAIPlanError(c *gin.Context, meta *types.RequestMetadata, p *types
 				"type":    "rate_limit_error",
 			}})
 			return
+		case types.PlanErrQueueTimeout:
+			// The client's queue-wait tolerance expired, not the capacity
+			// gate: 408, no Retry-After (the retry decision is the
+			// client's; the queue position is already released).
+			c.JSON(http.StatusRequestTimeout, gin.H{"error": gin.H{
+				"code":    "queue_timeout",
+				"message": "queued request exceeded its queue wait time for model capacity",
+				"type":    "timeout_error",
+			}})
+			return
+		case types.PlanErrQueueCancelled:
+			// The request left the queue because the CLIENT went away
+			// (mid-queue disconnect): keep the same 408 shape as the
+			// admission_lease rendering for consistency. In practice the
+			// response rarely reaches the client; this covers the race
+			// where the disconnect is observed only after the plan phase.
+			c.JSON(http.StatusRequestTimeout, gin.H{"error": gin.H{
+				"code":    "queue_cancelled",
+				"message": "request left the admission queue before being served",
+				"type":    "timeout_error",
+			}})
+			return
 		case types.PlanErrCapacityExceeded:
 			message := "model capacity exceeded, please retry later"
 			retryAfter := int64(1)
+			code := "capacity_exceeded"
 			if p.Admission != nil {
 				if p.Admission.Reason != "" {
 					message = "model capacity exceeded: " + p.Admission.Reason
+				}
+				if p.Admission.Reason == types.AdmissionReasonQueueFull {
+					code = "queue_full"
 				}
 				if p.Admission.RetryAfterSeconds > 0 {
 					retryAfter = p.Admission.RetryAfterSeconds
@@ -60,7 +86,7 @@ func handleOpenAIPlanError(c *gin.Context, meta *types.RequestMetadata, p *types
 			// Retry-After is a retry hint, not a capacity guarantee.
 			c.Header("Retry-After", strconv.FormatInt(retryAfter, 10))
 			c.JSON(http.StatusTooManyRequests, gin.H{"error": gin.H{
-				"code":    "capacity_exceeded",
+				"code":    code,
 				"message": message,
 				"type":    "rate_limit_error",
 			}})

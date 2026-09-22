@@ -154,15 +154,16 @@ func (h *speechPipelineHandler) Extract(c *gin.Context) (*types.RequestMetadata,
 		}
 
 		return &types.RequestMetadata{
-			Protocol:   string(types.ProtocolChat),
-			Task:       "speech",
-			Model:      req.Model,
-			TenantID:   nsUUID,
-			UserID:     username,
-			APIKeyID:   httpbase.GetAccessToken(c),
-			Streaming:  false,
-			Headers:    c.Request.Header,
-			ParsedBody: &speechParsedBody{IsBatch: true, BatchReq: &req},
+			Protocol:      string(types.ProtocolChat),
+			Task:          "speech",
+			Model:         req.Model,
+			TenantID:      nsUUID,
+			UserID:        username,
+			APIKeyID:      httpbase.GetAccessToken(c),
+			PriorityScope: httpbase.GetAPIKeyPriorityScope(c),
+			Streaming:     false,
+			Headers:       c.Request.Header,
+			ParsedBody:    &speechParsedBody{IsBatch: true, BatchReq: &req},
 		}, nil
 	}
 
@@ -183,15 +184,16 @@ func (h *speechPipelineHandler) Extract(c *gin.Context) (*types.RequestMetadata,
 	isSSE := req.Stream || strings.EqualFold(req.StreamFormat, "sse")
 
 	return &types.RequestMetadata{
-		Protocol:   string(types.ProtocolChat),
-		Task:       "speech",
-		Model:      req.Model,
-		TenantID:   nsUUID,
-		UserID:     username,
-		APIKeyID:   httpbase.GetAccessToken(c),
-		Streaming:  isSSE,
-		Headers:    c.Request.Header,
-		ParsedBody: &speechParsedBody{IsBatch: false, Req: &req},
+		Protocol:      string(types.ProtocolChat),
+		Task:          "speech",
+		Model:         req.Model,
+		TenantID:      nsUUID,
+		UserID:        username,
+		APIKeyID:      httpbase.GetAccessToken(c),
+		PriorityScope: httpbase.GetAPIKeyPriorityScope(c),
+		Streaming:     isSSE,
+		Headers:       c.Request.Header,
+		ParsedBody:    &speechParsedBody{IsBatch: false, Req: &req},
 	}, nil
 }
 

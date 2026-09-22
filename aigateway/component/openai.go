@@ -38,10 +38,12 @@ type OpenAIComponent interface {
 	CommitUsageLimit(ctx context.Context, userUUID string, model *types.Model, tokenCounter token.Counter) error
 	CommitUsageLimitFromUsage(ctx context.Context, userUUID string, model *types.Model, usage *token.Usage) error
 	// CheckCapacityAdmission evaluates per-upstream CapacityPolicy admission
-	// for the router-owned candidate set (initial admission: selection +
-	// occupation). Returns nil when admission does not apply (no candidate
+	// for the router-owned candidate set carried in the request (initial
+	// admission: selection + occupation, or waiting in the upstream's
+	// admission reservation queue when capacity is exhausted and queueing is
+	// configured). Returns nil when admission does not apply (no candidate
 	// upstream has an enabled CapacityPolicy).
-	CheckCapacityAdmission(ctx context.Context, model *types.Model, preferredUpstreamID int64, allowSelect bool, estimatedTokens int64) *types.AdmissionDecision
+	CheckCapacityAdmission(ctx context.Context, req types.CapacityAdmissionRequest) *types.AdmissionDecision
 	// AcquireCapacityAdmission pins a specific upstream and atomically
 	// check+acquires its lease (fallback operation: no re-selection).
 	AcquireCapacityAdmission(ctx context.Context, model *types.Model, upstreamID int64, estimatedTokens int64) *types.AdmissionDecision
@@ -58,6 +60,13 @@ type OpenAIComponent interface {
 	// EstimateAdmissionTokens returns the TPM pre-reservation estimate for
 	// a prompt text.
 	EstimateAdmissionTokens(promptText string) int64
+	// SetCapacityAdmissionAvailabilitySource injects the live circuit-state
+	// source used by the admission reservation queue to detect an upstream
+	// that turned unavailable while a request waits (reroute signal).
+	SetCapacityAdmissionAvailabilitySource(src types.UpstreamCircuitStateSource)
+	// ShutdownCapacityAdmission stops controller-owned background
+	// goroutines (queue wake subscription). Call once at service shutdown.
+	ShutdownCapacityAdmission()
 	// CanManageModel reports whether the user can manage the given model
 	// (e.g. upload or delete voices of a TTS deployment): only the deploy
 	// owner and platform admins are allowed.

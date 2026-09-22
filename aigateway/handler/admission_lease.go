@@ -130,9 +130,28 @@ func admissionLeaseFromPlan(p *types.RequestPlan) *types.AdmissionLease {
 	return p.Admission.Lease
 }
 
-// handleAdmissionDenied renders a capacity admission rejection as a 429
-// response (stream-aware, matching the usage-limit rendering). The
-// Retry-After header is a retry hint, not a capacity guarantee. Returns
+// admissionStatusForReason maps an admission rejection reason to its HTTP
+// status and error code. Queue timeout and client cancellation are 408s —
+// the capacity gate did not reject the request, the wait did — while
+// queue_full is a bounded-backpressure 429. Everything else keeps the
+// capacity_exceeded 429.
+func admissionStatusForReason(reason string) (int, string) {
+	switch reason {
+	case types.AdmissionReasonQueueTimeout:
+		return http.StatusRequestTimeout, "queue_timeout"
+	case types.AdmissionReasonQueueCancelled:
+		return http.StatusRequestTimeout, "queue_cancelled"
+	case types.AdmissionReasonQueueFull:
+		return http.StatusTooManyRequests, "queue_full"
+	default:
+		return http.StatusTooManyRequests, "capacity_exceeded"
+	}
+}
+
+// handleAdmissionDenied renders a capacity admission rejection as a 429/408
+// response (stream-aware, matching the usage-limit rendering). The status
+// comes from admissionStatusForReason; the Retry-After header is a retry
+// hint, not a capacity guarantee, and is only set on 429 responses. Returns
 // false when err is not an admission denial.
 func (h *OpenAIHandlerImpl) handleAdmissionDenied(c *gin.Context, isStream bool, err error) bool {
 	var denied *types.AdmissionDeniedError
@@ -141,13 +160,21 @@ func (h *OpenAIHandlerImpl) handleAdmissionDenied(c *gin.Context, isStream bool,
 	}
 	message := "model capacity exceeded, please retry later"
 	retryAfter := int64(1)
+	reason := ""
 	if denied.Decision != nil {
-		if denied.Decision.Reason != "" {
-			message = "model capacity exceeded: " + denied.Decision.Reason
+		reason = denied.Decision.Reason
+		if reason != "" {
+			message = "model capacity exceeded: " + reason
 		}
 		if denied.Decision.RetryAfterSeconds > 0 {
 			retryAfter = denied.Decision.RetryAfterSeconds
 		}
+	}
+	status, code := admissionStatusForReason(reason)
+	if reason == types.AdmissionReasonQueueTimeout {
+		message = "queued request exceeded its queue wait time for model capacity"
+	} else if reason == types.AdmissionReasonQueueCancelled {
+		message = "request left the admission queue before being served"
 	}
 	slog.WarnContext(c.Request.Context(), "capacity admission denied",
 		slog.String("model", c.Param("model")),
@@ -155,13 +182,18 @@ func (h *OpenAIHandlerImpl) handleAdmissionDenied(c *gin.Context, isStream bool,
 		slog.Int64("retry_after", retryAfter),
 		admissionTokenAttr(denied.Decision))
 
-	c.Header("Retry-After", strconv.FormatInt(retryAfter, 10))
 	payload := gin.H{
 		"error": gin.H{
-			"code":    "capacity_exceeded",
+			"code":    code,
 			"message": message,
 			"type":    "rate_limit_error",
 		},
+	}
+	if code == "queue_timeout" || code == "queue_cancelled" {
+		payload["error"].(gin.H)["type"] = "timeout_error"
+	}
+	if status == http.StatusTooManyRequests {
+		c.Header("Retry-After", strconv.FormatInt(retryAfter, 10))
 	}
 	if isStream {
 		errorChunkJSON, _ := json.Marshal(payload)
@@ -171,6 +203,6 @@ func (h *OpenAIHandlerImpl) handleAdmissionDenied(c *gin.Context, isStream bool,
 		c.Writer.Flush()
 		return true
 	}
-	c.JSON(http.StatusTooManyRequests, payload)
+	c.JSON(status, payload)
 	return true
 }

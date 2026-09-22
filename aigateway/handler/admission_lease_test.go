@@ -141,3 +141,47 @@ func TestHandleAdmissionDenied_IgnoresOtherErrors(t *testing.T) {
 	handled := tester.handler.handleAdmissionDenied(c, false, context.DeadlineExceeded)
 	require.False(t, handled)
 }
+
+func TestHandleAdmissionDenied_QueueTimeout_Renders408(t *testing.T) {
+	tester, c, w := setupTest(t)
+
+	err := &types.AdmissionDeniedError{Decision: &types.AdmissionDecision{
+		Action: types.AdmissionReject,
+		Reason: types.AdmissionReasonQueueTimeout,
+	}}
+	handled := tester.handler.handleAdmissionDenied(c, false, err)
+	require.True(t, handled)
+	require.Equal(t, http.StatusRequestTimeout, w.Code)
+	// 408 carries no Retry-After: the retry decision is the client's.
+	require.Empty(t, w.Header().Get("Retry-After"))
+	require.Contains(t, w.Body.String(), "queue_timeout")
+	require.Contains(t, w.Body.String(), "timeout_error")
+}
+
+func TestHandleAdmissionDenied_QueueCancelled_Renders408(t *testing.T) {
+	tester, c, w := setupTest(t)
+
+	err := &types.AdmissionDeniedError{Decision: &types.AdmissionDecision{
+		Action: types.AdmissionReject,
+		Reason: types.AdmissionReasonQueueCancelled,
+	}}
+	handled := tester.handler.handleAdmissionDenied(c, false, err)
+	require.True(t, handled)
+	require.Equal(t, http.StatusRequestTimeout, w.Code)
+	require.Contains(t, w.Body.String(), "queue_cancelled")
+}
+
+func TestHandleAdmissionDenied_QueueFull_Renders429QueueFull(t *testing.T) {
+	tester, c, w := setupTest(t)
+
+	err := &types.AdmissionDeniedError{Decision: &types.AdmissionDecision{
+		Action:            types.AdmissionReject,
+		Reason:            types.AdmissionReasonQueueFull,
+		RetryAfterSeconds: 5,
+	}}
+	handled := tester.handler.handleAdmissionDenied(c, false, err)
+	require.True(t, handled)
+	require.Equal(t, http.StatusTooManyRequests, w.Code)
+	require.Equal(t, "5", w.Header().Get("Retry-After"))
+	require.Contains(t, w.Body.String(), "queue_full")
+}

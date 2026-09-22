@@ -27,17 +27,18 @@ func TestCapacityPolicy_ApplyDefaults(t *testing.T) {
 		require.Equal(t, &CapacityPolicy{Enabled: false, MaxConcurrency: -1}, p)
 	})
 
-	t.Run("enabled policy with all limits unset is fully populated", func(t *testing.T) {
+	t.Run("enabled policy with all limits unset is default-filled as queue mode", func(t *testing.T) {
 		p := &CapacityPolicy{Enabled: true}
 		p.ApplyDefaults(defaults)
+		// Queue mode: only concurrency + queue fields are filled; TPM/RPM
+		// stay unset because they are not enforceable in queue mode.
 		require.Equal(t, &CapacityPolicy{
 			Enabled:          true,
 			MaxConcurrency:   32,
 			MaxQueueDepth:    16,
-			MaxTPM:           10000000,
-			MaxRPM:           100,
 			QueueWaitSeconds: 60,
 		}, p)
+		require.True(t, p.QueueEnabled())
 	})
 
 	t.Run("any limit set keeps the whole policy untouched", func(t *testing.T) {
@@ -66,6 +67,15 @@ func TestCapacityPolicy_ApplyDefaults(t *testing.T) {
 		p.ApplyDefaults(CapacityPolicy{MaxConcurrency: 0, MaxQueueDepth: -1, MaxTPM: 0, MaxRPM: -1, QueueWaitSeconds: 0})
 		require.Equal(t, &CapacityPolicy{Enabled: true}, p)
 	})
+}
+
+func TestCapacityPolicy_QueueEnabled(t *testing.T) {
+	require.False(t, (&CapacityPolicy{}).QueueEnabled())
+	require.False(t, (&CapacityPolicy{MaxQueueDepth: 16}).QueueEnabled())
+	require.False(t, (&CapacityPolicy{QueueWaitSeconds: 60}).QueueEnabled())
+	require.False(t, (&CapacityPolicy{MaxQueueDepth: 16, QueueWaitSeconds: 0}).QueueEnabled())
+	require.False(t, (&CapacityPolicy{MaxQueueDepth: 0, QueueWaitSeconds: 60}).QueueEnabled())
+	require.True(t, (&CapacityPolicy{MaxQueueDepth: 16, QueueWaitSeconds: 60}).QueueEnabled())
 }
 
 func TestCapacityPolicy_AllLimitsUnset(t *testing.T) {

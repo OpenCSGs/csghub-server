@@ -69,15 +69,16 @@ func (h *Handler) Extract(c *gin.Context) (*types.RequestMetadata, error) {
 	}
 
 	return &types.RequestMetadata{
-		Protocol:   string(types.ProtocolMessages),
-		Task:       "messages",
-		Model:      req.Model,
-		TenantID:   nsUUID,
-		UserID:     username,
-		APIKeyID:   httpbase.GetAccessToken(c),
-		Streaming:  req.Stream,
-		Headers:    c.Request.Header,
-		ParsedBody: req,
+		Protocol:      string(types.ProtocolMessages),
+		Task:          "messages",
+		Model:         req.Model,
+		TenantID:      nsUUID,
+		UserID:        username,
+		APIKeyID:      httpbase.GetAccessToken(c),
+		PriorityScope: httpbase.GetAPIKeyPriorityScope(c),
+		Streaming:     req.Stream,
+		Headers:       c.Request.Header,
+		ParsedBody:    req,
 	}, nil
 }
 
@@ -416,6 +417,21 @@ func (h *Handler) HandlePlanError(c *gin.Context, meta *types.RequestMetadata, p
 		case types.PlanErrUsageLimitExceeded:
 			writeError(c, http.StatusTooManyRequests, ErrTypeRateLimit,
 				"usage quota exceeded for current window")
+			return
+		case types.PlanErrQueueTimeout:
+			// The client's queue-wait tolerance expired, not the capacity
+			// gate: 408, no Retry-After.
+			writeError(c, http.StatusRequestTimeout, ErrTypeAPI,
+				"queued request exceeded its queue wait time for model capacity")
+			return
+		case types.PlanErrQueueCancelled:
+			// The request left the queue because the CLIENT went away
+			// (mid-queue disconnect): same 408 shape as queue_timeout for
+			// consistency with the OpenAI path. The response rarely reaches
+			// a disconnected client; this covers the race where the
+			// disconnect is only observed after the plan phase.
+			writeError(c, http.StatusRequestTimeout, ErrTypeAPI,
+				"request left the admission queue before being served")
 			return
 		case types.PlanErrCapacityExceeded:
 			message := "model capacity exceeded, please retry later"

@@ -385,31 +385,37 @@ func validateOptionalLLMTypes(types []int) error {
 	return nil
 }
 
-// validateCapacityPolicy checks an admin-supplied CapacityPolicy. Disabled
-// policies are stored as-is; enabled policies accept limits >= 0, where 0
-// means "unset": an all-zero enabled policy is default-filled from
-// AIGateway.CapacityPolicyDefaults on every gateway read of the policy, and a
-// 0 on a partially configured policy means "no limit" for that dimension (TPM)
-// or "fall back to the runtime default" (QueueWaitSeconds). Negative values
-// are invalid.
+// validateCapacityPolicy checks an admin-supplied CapacityPolicy against the
+// queue-mode semantics. Disabled policies are stored as-is; enabled policies
+// must set every limit to a positive value except:
+//   - MaxTPM: >= 0 allowed (0 = unlimited, meaningful in rate mode)
+//   - queue fields: MaxQueueDepth and QueueWaitSeconds must be both positive
+//     (queue mode) or both zero (rate mode); a half-configured queue is
+//     rejected
+//   - queue mode requires MaxTPM and MaxRPM to be unset (0): they are not
+//     enforced when the queue is active, so storing them would be misleading
 func validateCapacityPolicy(p *types.CapacityPolicy) error {
 	if p == nil || !p.Enabled {
 		return nil
 	}
-	if p.MaxConcurrency < 0 {
-		return fmt.Errorf("%w: capacity_policy.max_concurrency must be >= 0 (0 means unset)", ErrInvalidLLMConfig)
+	if p.MaxConcurrency < 1 {
+		return fmt.Errorf("%w: capacity_policy.max_concurrency must be >= 1", ErrInvalidLLMConfig)
 	}
-	if p.MaxQueueDepth < 0 {
-		return fmt.Errorf("%w: capacity_policy.max_queue_depth must be >= 0 (0 means unset)", ErrInvalidLLMConfig)
+	if (p.MaxQueueDepth > 0) != (p.QueueWaitSeconds > 0) {
+		return fmt.Errorf(
+			"%w: capacity_policy.max_queue_depth and queue_wait_seconds must be both set (queue mode) or both zero (rate mode)",
+			ErrInvalidLLMConfig)
+	}
+	if p.QueueEnabled() && (p.MaxTPM > 0 || p.MaxRPM > 0) {
+		return fmt.Errorf(
+			"%w: capacity_policy.max_tpm and max_rpm must be unset (0) in queue mode: they are not enforced while the queue is active",
+			ErrInvalidLLMConfig)
 	}
 	if p.MaxTPM < 0 {
 		return fmt.Errorf("%w: capacity_policy.max_tpm must be >= 0 (0 means unlimited)", ErrInvalidLLMConfig)
 	}
 	if p.MaxRPM < 0 {
-		return fmt.Errorf("%w: capacity_policy.max_rpm must be >= 0 (0 means unset)", ErrInvalidLLMConfig)
-	}
-	if p.QueueWaitSeconds < 0 {
-		return fmt.Errorf("%w: capacity_policy.queue_wait_seconds must be >= 0 (0 means unset)", ErrInvalidLLMConfig)
+		return fmt.Errorf("%w: capacity_policy.max_rpm must be >= 0 (0 means unlimited)", ErrInvalidLLMConfig)
 	}
 	return nil
 }
@@ -655,9 +661,6 @@ func (s *llmServiceComponentImpl) UpdateUpstream(ctx context.Context, req *types
 		dbUp.LimitPolicy = *req.LimitPolicy
 	}
 	if req.CapacityPolicy != nil {
-		if err := validateCapacityPolicy(*req.CapacityPolicy); err != nil {
-			return nil, err
-		}
 		if *req.CapacityPolicy == nil {
 			// Component-internal clear; not reachable over HTTP because
 			// encoding/json binds an explicit JSON null to a nil outer
@@ -676,6 +679,11 @@ func (s *llmServiceComponentImpl) UpdateUpstream(ctx context.Context, req *types
 				newPolicy.MaxTPM = dbUp.CapacityPolicy.MaxTPM
 				newPolicy.MaxRPM = dbUp.CapacityPolicy.MaxRPM
 				newPolicy.QueueWaitSeconds = dbUp.CapacityPolicy.QueueWaitSeconds
+			}
+			// Validate the effective (merged) policy: whatever ends up stored
+			// must satisfy the queue-mode semantics.
+			if err := validateCapacityPolicy(&newPolicy); err != nil {
+				return nil, err
 			}
 			dbUp.CapacityPolicy = &newPolicy
 		}

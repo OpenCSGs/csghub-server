@@ -1,10 +1,20 @@
 package types
 
 import (
+	"context"
 	"time"
 
 	commontypes "opencsg.com/csghub-server/common/types"
 )
+
+// UpstreamCircuitStateSource provides the live circuit-breaker state of an
+// upstream endpoint. It is satisfied by the availability manager and consumed
+// by the admission reservation queue (an upstream whose circuit opens while
+// requests are queued triggers a bounded planner re-route). Declared in types
+// so producers and consumers share the contract without importing each other.
+type UpstreamCircuitStateSource interface {
+	GetCircuitState(ctx context.Context, upstreamID int64) (*ProviderCircuitStatus, error)
+}
 
 // HealthState represents the health state of a provider/model/endpoint
 type HealthState string

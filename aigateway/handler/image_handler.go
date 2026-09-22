@@ -135,15 +135,16 @@ func (h *imagePipelineHandler) Extract(c *gin.Context) (*types.RequestMetadata, 
 		}
 
 		return &types.RequestMetadata{
-			Protocol:   string(types.ProtocolChat),
-			Task:       "text-to-image",
-			Model:      modelID,
-			TenantID:   nsUUID,
-			UserID:     username,
-			APIKeyID:   httpbase.GetAccessToken(c),
-			Streaming:  false,
-			Headers:    c.Request.Header,
-			ParsedBody: &imageParsedBody{IsEdit: true, Form: c.Request.MultipartForm, Model: modelID, Prompt: prompt},
+			Protocol:      string(types.ProtocolChat),
+			Task:          "text-to-image",
+			Model:         modelID,
+			TenantID:      nsUUID,
+			UserID:        username,
+			APIKeyID:      httpbase.GetAccessToken(c),
+			PriorityScope: httpbase.GetAPIKeyPriorityScope(c),
+			Streaming:     false,
+			Headers:       c.Request.Header,
+			ParsedBody:    &imageParsedBody{IsEdit: true, Form: c.Request.MultipartForm, Model: modelID, Prompt: prompt},
 		}, nil
 	}
 
@@ -162,15 +163,16 @@ func (h *imagePipelineHandler) Extract(c *gin.Context) (*types.RequestMetadata, 
 	}
 
 	return &types.RequestMetadata{
-		Protocol:   string(types.ProtocolChat),
-		Task:       "text-to-image",
-		Model:      req.Model,
-		TenantID:   nsUUID,
-		UserID:     username,
-		APIKeyID:   httpbase.GetAccessToken(c),
-		Streaming:  false,
-		Headers:    c.Request.Header,
-		ParsedBody: &imageParsedBody{IsEdit: false, GenerateReq: &req},
+		Protocol:      string(types.ProtocolChat),
+		Task:          "text-to-image",
+		Model:         req.Model,
+		TenantID:      nsUUID,
+		UserID:        username,
+		APIKeyID:      httpbase.GetAccessToken(c),
+		PriorityScope: httpbase.GetAPIKeyPriorityScope(c),
+		Streaming:     false,
+		Headers:       c.Request.Header,
+		ParsedBody:    &imageParsedBody{IsEdit: false, GenerateReq: &req},
 	}, nil
 }
 

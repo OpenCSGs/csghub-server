@@ -100,15 +100,16 @@ func (h *rerankPipelineHandler) Extract(c *gin.Context) (*types.RequestMetadata,
 	}
 
 	return &types.RequestMetadata{
-		Protocol:   string(types.ProtocolChat),
-		Task:       "rerank",
-		Model:      req.Model,
-		TenantID:   nsUUID,
-		UserID:     username,
-		APIKeyID:   httpbase.GetAccessToken(c),
-		Streaming:  false,
-		Headers:    c.Request.Header,
-		ParsedBody: &req,
+		Protocol:      string(types.ProtocolChat),
+		Task:          "rerank",
+		Model:         req.Model,
+		TenantID:      nsUUID,
+		UserID:        username,
+		APIKeyID:      httpbase.GetAccessToken(c),
+		PriorityScope: httpbase.GetAPIKeyPriorityScope(c),
+		Streaming:     false,
+		Headers:       c.Request.Header,
+		ParsedBody:    &req,
 	}, nil
 }
 

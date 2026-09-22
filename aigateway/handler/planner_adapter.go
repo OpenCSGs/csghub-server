@@ -93,12 +93,22 @@ func (metricsEnricherAdapter) SetModelTarget(c *gin.Context, modelID string, tar
 // boilerplate.
 func newOrchestrator(h *OpenAIHandlerImpl) *plan.Orchestrator {
 	mr, bc, ulc, cs, ac := newPlannerDeps(h)
-	planner := plan.NewPlanner(mr, bc, ulc, cs, ac, metricsEnricherAdapter{})
+	planner := plan.NewPlanner(mr, bc, ulc, cs, ac, metricsEnricherAdapter{},
+		plan.WithQueueMaxRePlans(h.queueMaxRePlans()))
 	if releaser := newAdmissionReleaser(h); releaser != nil {
 		return plan.NewOrchestrator(planner, &preflightStarterAdapter{}, releaser)
 	}
 	// CE: no admission, no lease-release safety net needed.
 	return plan.NewOrchestrator(planner, &preflightStarterAdapter{})
+}
+
+// queueMaxRePlans returns the configured bound for admission-queue reroute
+// re-plans.
+func (h *OpenAIHandlerImpl) queueMaxRePlans() int {
+	if h.config == nil {
+		return 1
+	}
+	return h.config.AIGateway.CapacityAdmission.QueueMaxRePlans
 }
 
 // toTypesModelTarget converts the handler-package-private resolvedModelTarget

@@ -119,15 +119,16 @@ func (h *chatPipelineHandler) Extract(c *gin.Context) (*types.RequestMetadata, e
 	}
 
 	return &types.RequestMetadata{
-		Protocol:   string(types.ProtocolChat),
-		Task:       "chat",
-		Model:      chatReq.Model,
-		TenantID:   nsUUID,
-		UserID:     username,
-		APIKeyID:   apikey,
-		Streaming:  chatReq.Stream,
-		Headers:    c.Request.Header,
-		ParsedBody: &chatParsedBody{Req: chatReq},
+		Protocol:      string(types.ProtocolChat),
+		Task:          "chat",
+		Model:         chatReq.Model,
+		TenantID:      nsUUID,
+		UserID:        username,
+		APIKeyID:      apikey,
+		PriorityScope: httpbase.GetAPIKeyPriorityScope(c),
+		Streaming:     chatReq.Stream,
+		Headers:       c.Request.Header,
+		ParsedBody:    &chatParsedBody{Req: chatReq},
 	}, nil
 }
 

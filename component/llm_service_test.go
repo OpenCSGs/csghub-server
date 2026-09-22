@@ -625,12 +625,11 @@ func TestLLMServiceComponent_CreateUpstream_WithCapacityPolicy(t *testing.T) {
 	stores := tests.NewMockStores(t)
 	upstreamStore := mockdatabase.NewMockUpstreamStore(t)
 	stores.LLMConfigMock().EXPECT().GetByID(ctx, int64(100)).Return(&database.LLMConfig{ID: 100}, nil)
+	// Queue mode: TPM/RPM must be unset because they are not enforced.
 	capacityPolicy := &types.CapacityPolicy{
 		Enabled:          true,
 		MaxConcurrency:   16,
 		MaxQueueDepth:    32,
-		MaxTPM:           200000,
-		MaxRPM:           120,
 		QueueWaitSeconds: 60,
 	}
 	upstreamStore.EXPECT().Create(ctx, &database.Upstream{
@@ -673,20 +672,41 @@ func TestValidateCapacityPolicy(t *testing.T) {
 			policy: &types.CapacityPolicy{Enabled: false, MaxConcurrency: -5},
 		},
 		{
-			name:   "enabled policy with all limits unset (all zeros) is valid for default-fill",
-			policy: &types.CapacityPolicy{Enabled: true},
+			name:    "enabled policy with all limits unset is invalid (mode must be explicit)",
+			policy:  &types.CapacityPolicy{Enabled: true},
+			wantErr: true,
 		},
 		{
-			name:   "enabled policy with positive limits is valid",
-			policy: &types.CapacityPolicy{Enabled: true, MaxConcurrency: 16, MaxQueueDepth: 32, MaxTPM: 200000, MaxRPM: 120, QueueWaitSeconds: 60},
+			name:   "queue mode is valid",
+			policy: &types.CapacityPolicy{Enabled: true, MaxConcurrency: 16, MaxQueueDepth: 32, QueueWaitSeconds: 60},
 		},
 		{
-			name:   "zero queue_wait_seconds means runtime default",
+			name:   "rate mode is valid",
+			policy: &types.CapacityPolicy{Enabled: true, MaxConcurrency: 16, MaxTPM: 200000, MaxRPM: 120},
+		},
+		{
+			name:   "rate mode with max_tpm zero means unlimited",
 			policy: &types.CapacityPolicy{Enabled: true, MaxConcurrency: 8, MaxRPM: 10},
 		},
 		{
-			name:   "zero max_tpm means unlimited",
-			policy: &types.CapacityPolicy{Enabled: true, MaxConcurrency: 8, MaxRPM: 10, MaxQueueDepth: 4},
+			name:    "half-configured queue (depth without wait) is invalid",
+			policy:  &types.CapacityPolicy{Enabled: true, MaxConcurrency: 8, MaxQueueDepth: 4},
+			wantErr: true,
+		},
+		{
+			name:    "half-configured queue (wait without depth) is invalid",
+			policy:  &types.CapacityPolicy{Enabled: true, MaxConcurrency: 8, QueueWaitSeconds: 30},
+			wantErr: true,
+		},
+		{
+			name:    "queue mode with max_tpm set is invalid (not enforced in queue mode)",
+			policy:  &types.CapacityPolicy{Enabled: true, MaxConcurrency: 8, MaxQueueDepth: 4, QueueWaitSeconds: 30, MaxTPM: 1000},
+			wantErr: true,
+		},
+		{
+			name:    "queue mode with max_rpm set is invalid (not enforced in queue mode)",
+			policy:  &types.CapacityPolicy{Enabled: true, MaxConcurrency: 8, MaxQueueDepth: 4, QueueWaitSeconds: 30, MaxRPM: 10},
+			wantErr: true,
 		},
 		{
 			name:    "negative max_concurrency is invalid",
@@ -700,12 +720,12 @@ func TestValidateCapacityPolicy(t *testing.T) {
 		},
 		{
 			name:    "negative max_tpm is invalid",
-			policy:  &types.CapacityPolicy{Enabled: true, MaxTPM: -1},
+			policy:  &types.CapacityPolicy{Enabled: true, MaxConcurrency: 8, MaxTPM: -1},
 			wantErr: true,
 		},
 		{
 			name:    "negative max_rpm is invalid",
-			policy:  &types.CapacityPolicy{Enabled: true, MaxRPM: -1},
+			policy:  &types.CapacityPolicy{Enabled: true, MaxConcurrency: 8, MaxRPM: -1},
 			wantErr: true,
 		},
 		{
@@ -1156,12 +1176,11 @@ func TestLLMServiceComponent_UpdateUpstream(t *testing.T) {
 
 func TestLLMServiceComponent_UpdateUpstream_CapacityPolicy(t *testing.T) {
 	existingPolicy := &types.CapacityPolicy{Enabled: true, MaxConcurrency: 8}
+	// Queue mode replacement policy: TPM/RPM must be unset in queue mode.
 	newPolicy := &types.CapacityPolicy{
 		Enabled:          true,
 		MaxConcurrency:   32,
 		MaxQueueDepth:    16,
-		MaxTPM:           50000,
-		MaxRPM:           100,
 		QueueWaitSeconds: 60,
 	}
 	// The component contract for **CapacityPolicy is three-state: nil outer

@@ -22,6 +22,11 @@ type RequestMetadata struct {
 	UserID string
 	// APIKeyID is the API key identifier.
 	APIKeyID string
+	// PriorityScope is the server-side queue priority scope assigned to the
+	// API key by its quota configuration ("high"/"low"; empty = unset). It
+	// is populated by the Extract phase from the request context and is the
+	// sole source of the queue priority in the admission reservation queue.
+	PriorityScope string
 	// Streaming indicates whether the client requested a streaming response.
 	Streaming bool
 	// Headers are the HTTP request headers.
@@ -107,6 +112,15 @@ const (
 	PlanErrDisabled
 	PlanErrSensitive
 	PlanErrCapacityExceeded
+	// PlanErrQueueTimeout marks a request that gave up waiting in an
+	// upstream's admission reservation queue (QueueWaitSeconds exceeded).
+	// Rendered as HTTP 408 rather than 429: the capacity did not reject the
+	// request, the client's tolerance for waiting did.
+	PlanErrQueueTimeout
+	// PlanErrQueueCancelled marks a request that left the queue because the
+	// CLIENT disconnected (mid-queue cancel). Rendered as the same 408 shape
+	// as the admission_lease path; the response rarely reaches the client.
+	PlanErrQueueCancelled
 	PlanErrInternal
 )
 

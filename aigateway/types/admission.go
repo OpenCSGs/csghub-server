@@ -3,6 +3,7 @@ package types
 import (
 	"errors"
 	"fmt"
+	"strings"
 )
 
 // AdmissionAction is the outcome of a capacity admission decision.
@@ -17,6 +18,10 @@ const (
 	AdmissionAdmit AdmissionAction = "admit"
 	// AdmissionReject means the request must not proceed.
 	AdmissionReject AdmissionAction = "reject"
+	// AdmissionReroute means the waiting request was cancelled because its
+	// upstream became unavailable during the queue wait. The planner must
+	// re-run model resolution and admission against a fresh candidate set.
+	AdmissionReroute AdmissionAction = "reroute"
 )
 
 // Admission rejection reasons. The empty reason means "not rejected".
@@ -30,7 +35,53 @@ const (
 	// AdmissionReasonCapacityExceeded is used when more than one capacity
 	// dimension blocked the request and no single reason applies.
 	AdmissionReasonCapacityExceeded = "capacity_exceeded"
+	// AdmissionReasonQueueFull means the admission reservation queue of the
+	// selected upstream was full (bounded backpressure): the request was
+	// rejected immediately without waiting.
+	AdmissionReasonQueueFull = "queue_full"
+	// AdmissionReasonQueueTimeout means the request waited in the queue
+	// longer than CapacityPolicy.QueueWaitSeconds and gave up. Rendered as
+	// HTTP 408.
+	AdmissionReasonQueueTimeout = "queue_timeout"
+	// AdmissionReasonQueueCancelled means the request left the queue without
+	// being promoted and without a queue timeout: the client disconnected
+	// (context cancelled). The ticket (or an already-granted lease) was
+	// cleaned up; there is no meaningful response to render.
+	AdmissionReasonQueueCancelled = "queue_cancelled"
 )
+
+// AdmissionPriority is the scheduling priority of one request inside the
+// admission reservation queue. Lower numeric values are promoted first
+// (high before low); within one priority the queue is FIFO by enqueue time.
+//
+// The queue discipline is "unified": once an upstream's queue is non-empty,
+// every new request enqueues and is scheduled by (priority, enqueue time) —
+// a fresh high-priority request does not bypass already-waiting requests.
+// Sustained high-priority traffic can therefore starve low-priority
+// requests; aging (promoting long-waiting tickets) is a deliberate v2
+// non-goal.
+type AdmissionPriority int
+
+const (
+	// AdmissionPriorityHigh is promoted before AdmissionPriorityLow.
+	AdmissionPriorityHigh AdmissionPriority = 0
+	// AdmissionPriorityLow is the default for requests that declare no
+	// priority.
+	AdmissionPriorityLow AdmissionPriority = 1
+)
+
+// AdmissionPriorityFromSource resolves the queue priority from the API
+// key's server-side priority scope, set by the quota middleware from the
+// key's quota configuration (the ONLY source: clients cannot influence
+// queue scheduling). Unrecognized or missing scope values default to low.
+func AdmissionPriorityFromSource(priorityScope string) AdmissionPriority {
+	switch strings.ToLower(strings.TrimSpace(priorityScope)) {
+	case "high":
+		return AdmissionPriorityHigh
+	default:
+		return AdmissionPriorityLow
+	}
+}
 
 // AdmissionLease identifies the Redis lease held by one upstream attempt.
 //
@@ -135,6 +186,9 @@ const AdmissionNoTPMEstimate int64 = 0
 
 // CapacityAdmissionRequest carries the admission inputs for one request.
 type CapacityAdmissionRequest struct {
+	// NSUUID is the tenant namespace UUID (billing identity), carried for
+	// admission logging.
+	NSUUID string
 	// Model is the resolved model; Model.Upstreams is the router-owned
 	// candidate set (already availability-filtered).
 	Model *Model
@@ -148,6 +202,10 @@ type CapacityAdmissionRequest struct {
 	// <= AdmissionNoTPMEstimate (0) means the request does not participate
 	// in the TPM dimension (multimodal requests).
 	EstimatedTokens int64
+	// Priority is the queue scheduling priority used when the request must
+	// wait in an upstream's admission reservation queue. It has no effect
+	// on immediate admission.
+	Priority AdmissionPriority
 }
 
 // MultimodalContentProvider reports whether a request body carries non-text

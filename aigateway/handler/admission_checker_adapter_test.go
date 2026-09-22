@@ -66,7 +66,9 @@ func TestAdmissionCheckerAdapter_Multimodal_SkipsTPMEstimate(t *testing.T) {
 	// EstimateAdmissionTokens must NOT be called for multimodal bodies (no
 	// EXPECT on it); admission runs without a TPM reservation.
 	tester.mocks.openAIComp.EXPECT().CheckCapacityAdmission(
-		mock.Anything, mt.Model, int64(7), true, types.AdmissionNoTPMEstimate,
+		mock.Anything, mock.MatchedBy(func(req types.CapacityAdmissionRequest) bool {
+			return req.PreferredUpstreamID == 7 && req.AllowSelect == true && req.EstimatedTokens == types.AdmissionNoTPMEstimate
+		}),
 	).Return(nil).Once()
 
 	outcome, err := adapter.CheckAdmission(context.Background(), meta, mt)
@@ -90,7 +92,9 @@ func TestAdmissionCheckerAdapter_Text_UsesPromptEstimate(t *testing.T) {
 
 	tester.mocks.openAIComp.EXPECT().EstimateAdmissionTokens("please summarize this").Return(int64(1064)).Once()
 	tester.mocks.openAIComp.EXPECT().CheckCapacityAdmission(
-		mock.Anything, mt.Model, int64(7), true, int64(1064),
+		mock.Anything, mock.MatchedBy(func(req types.CapacityAdmissionRequest) bool {
+			return req.PreferredUpstreamID == 7 && req.AllowSelect == true && req.EstimatedTokens == int64(1064)
+		}),
 	).Return(nil).Once()
 
 	outcome, err := adapter.CheckAdmission(context.Background(), meta, mt)
@@ -120,7 +124,9 @@ func TestAdmissionCheckerAdapter_NoTPMPolicy_SkipsEstimate(t *testing.T) {
 
 	// EstimateAdmissionTokens must NOT be called (no EXPECT on it).
 	tester.mocks.openAIComp.EXPECT().CheckCapacityAdmission(
-		mock.Anything, mt.Model, int64(7), true, types.AdmissionNoTPMEstimate,
+		mock.Anything, mock.MatchedBy(func(req types.CapacityAdmissionRequest) bool {
+			return req.PreferredUpstreamID == 7 && req.AllowSelect == true && req.EstimatedTokens == types.AdmissionNoTPMEstimate
+		}),
 	).Return(nil).Once()
 
 	outcome, err := adapter.CheckAdmission(context.Background(), meta, mt)
@@ -149,7 +155,9 @@ func TestAdmissionCheckerAdapter_ChatWrapper_MultimodalSkipsTPMEstimate(t *testi
 
 	// EstimateAdmissionTokens must NOT be called for multimodal bodies.
 	tester.mocks.openAIComp.EXPECT().CheckCapacityAdmission(
-		mock.Anything, mt.Model, int64(7), true, types.AdmissionNoTPMEstimate,
+		mock.Anything, mock.MatchedBy(func(req types.CapacityAdmissionRequest) bool {
+			return req.PreferredUpstreamID == 7 && req.AllowSelect == true && req.EstimatedTokens == types.AdmissionNoTPMEstimate
+		}),
 	).Return(nil).Once()
 
 	outcome, err := adapter.CheckAdmission(context.Background(), meta, mt)
@@ -170,7 +178,9 @@ func TestAdmissionCheckerAdapter_ChatWrapper_TextUsesPromptEstimate(t *testing.T
 
 	tester.mocks.openAIComp.EXPECT().EstimateAdmissionTokens("text via wrapper").Return(int64(1064)).Once()
 	tester.mocks.openAIComp.EXPECT().CheckCapacityAdmission(
-		mock.Anything, mt.Model, int64(7), true, int64(1064),
+		mock.Anything, mock.MatchedBy(func(req types.CapacityAdmissionRequest) bool {
+			return req.PreferredUpstreamID == 7 && req.AllowSelect == true && req.EstimatedTokens == int64(1064)
+		}),
 	).Return(nil).Once()
 
 	outcome, err := adapter.CheckAdmission(context.Background(), meta, mt)
@@ -195,7 +205,9 @@ func TestAdmissionCheckerAdapter_ResponsesWrapper_MultimodalSkipsTPMEstimate(t *
 	mt := admissionAdapterTarget()
 
 	tester.mocks.openAIComp.EXPECT().CheckCapacityAdmission(
-		mock.Anything, mt.Model, int64(7), true, types.AdmissionNoTPMEstimate,
+		mock.Anything, mock.MatchedBy(func(req types.CapacityAdmissionRequest) bool {
+			return req.PreferredUpstreamID == 7 && req.AllowSelect == true && req.EstimatedTokens == types.AdmissionNoTPMEstimate
+		}),
 	).Return(nil).Once()
 
 	outcome, err := adapter.CheckAdmission(context.Background(), meta, mt)
@@ -220,7 +232,9 @@ func TestAdmissionCheckerAdapter_TextEstimatableModalities_UsePromptEstimate(t *
 			meta := &types.RequestMetadata{ParsedBody: body}
 			tester.mocks.openAIComp.EXPECT().EstimateAdmissionTokens(body.PromptText()).Return(int64(1064)).Once()
 			tester.mocks.openAIComp.EXPECT().CheckCapacityAdmission(
-				mock.Anything, mt.Model, int64(7), true, int64(1064),
+				mock.Anything, mock.MatchedBy(func(req types.CapacityAdmissionRequest) bool {
+					return req.PreferredUpstreamID == 7 && req.AllowSelect == true && req.EstimatedTokens == int64(1064)
+				}),
 			).Return(nil).Once()
 
 			outcome, err := adapter.CheckAdmission(context.Background(), meta, mt)
@@ -248,7 +262,9 @@ func TestAdmissionCheckerAdapter_MediaModalities_SkipTPMEstimate(t *testing.T) {
 			meta := &types.RequestMetadata{ParsedBody: body}
 			// EstimateAdmissionTokens must NOT be called (no EXPECT on it).
 			tester.mocks.openAIComp.EXPECT().CheckCapacityAdmission(
-				mock.Anything, mt.Model, int64(7), true, types.AdmissionNoTPMEstimate,
+				mock.Anything, mock.MatchedBy(func(req types.CapacityAdmissionRequest) bool {
+					return req.PreferredUpstreamID == 7 && req.AllowSelect == true && req.EstimatedTokens == types.AdmissionNoTPMEstimate
+				}),
 			).Return(nil).Once()
 
 			outcome, err := adapter.CheckAdmission(context.Background(), meta, mt)
@@ -310,7 +326,9 @@ func TestAdmissionCheckerAdapter_DefensiveDeny_CarriesLease(t *testing.T) {
 	}
 
 	tester.mocks.openAIComp.EXPECT().CheckCapacityAdmission(
-		mock.Anything, mt.Model, int64(7), true, int64(1064),
+		mock.Anything, mock.MatchedBy(func(req types.CapacityAdmissionRequest) bool {
+			return req.PreferredUpstreamID == 7 && req.AllowSelect == true && req.EstimatedTokens == int64(1064)
+		}),
 	).Return(acquired).Once()
 	tester.mocks.openAIComp.EXPECT().EstimateAdmissionTokens(mock.Anything).Return(int64(1064)).Once()
 
@@ -329,4 +347,39 @@ func TestAdmissionCheckerAdapter_DefensiveDeny_CarriesLease(t *testing.T) {
 	require.NotNil(t, outcome.Decision.Lease, "defensive deny must carry the acquired lease")
 	require.Equal(t, "orphan-candidate", outcome.Decision.Lease.Token)
 	require.Nil(t, outcome.ReSelectedTarget, "no rebuild target on deny")
+}
+
+func TestAdmissionCheckerAdapter_CarriesNSUUID(t *testing.T) {
+	// The admission request carries the tenant namespace UUID for logging.
+	tester, _, _ := setupTest(t)
+	adapter := &admissionCheckerAdapter{handler: tester.handler}
+
+	meta := &types.RequestMetadata{
+		TenantID:   "ns-uuid-123",
+		ParsedBody: chatRequestBody(t, `{"model":"test-model","messages":[{"role":"user","content":"hi"}]}`),
+	}
+	// mt.Upstream carries the policy too: without it the adapter's pinned
+	// fast-path (session key falls back to the tenant ID) would skip
+	// admission entirely before reaching the checker.
+	mt := &types.ModelTarget{
+		Model:    admissionAdapterTarget().Model,
+		Upstream: admissionAdapterTarget().Model.Upstreams[0],
+	}
+
+	var got types.CapacityAdmissionRequest
+	tester.mocks.openAIComp.EXPECT().EstimateAdmissionTokens("hi").Return(int64(1064)).Once()
+	tester.mocks.openAIComp.EXPECT().
+		CheckCapacityAdmission(mock.Anything, mock.Anything).
+		Run(func(_ context.Context, req types.CapacityAdmissionRequest) {
+			got = req
+		}).
+		Return(nil).Once()
+
+	outcome, err := adapter.CheckAdmission(context.Background(), meta, mt)
+	require.NoError(t, err)
+	require.Nil(t, outcome)
+	t.Logf("DEBUG got: %+v", got)
+	require.Same(t, tester.mocks.openAIComp, adapter.handler.openaiComponent, "the adapter must use the mocked component")
+	require.Equal(t, "ns-uuid-123", got.NSUUID, "the tenant UUID must reach the admission request")
+	require.Equal(t, int64(7), got.PreferredUpstreamID)
 }

@@ -91,15 +91,16 @@ func (h *embeddingPipelineHandler) Extract(c *gin.Context) (*types.RequestMetada
 	}
 
 	return &types.RequestMetadata{
-		Protocol:   string(types.ProtocolChat),
-		Task:       "embedding",
-		Model:      req.Model,
-		TenantID:   nsUUID,
-		UserID:     username,
-		APIKeyID:   httpbase.GetAccessToken(c),
-		Streaming:  false,
-		Headers:    c.Request.Header,
-		ParsedBody: &req,
+		Protocol:      string(types.ProtocolChat),
+		Task:          "embedding",
+		Model:         req.Model,
+		TenantID:      nsUUID,
+		UserID:        username,
+		APIKeyID:      httpbase.GetAccessToken(c),
+		PriorityScope: httpbase.GetAPIKeyPriorityScope(c),
+		Streaming:     false,
+		Headers:       c.Request.Header,
+		ParsedBody:    &req,
 	}, nil
 }
 
