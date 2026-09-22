@@ -10,6 +10,21 @@ import (
 )
 
 func TestConfig_loadConfig(t *testing.T) {
+	t.Run("frontend URL has no default", func(t *testing.T) {
+		SetConfigFile("")
+		previous, wasSet := os.LookupEnv("STARHUB_SERVER_FRONTEND_URL")
+		require.NoError(t, os.Unsetenv("STARHUB_SERVER_FRONTEND_URL"))
+		t.Cleanup(func() {
+			if wasSet {
+				_ = os.Setenv("STARHUB_SERVER_FRONTEND_URL", previous)
+			}
+		})
+
+		cfg, err := loadConfig()
+		require.NoError(t, err)
+		require.Empty(t, cfg.Frontend.URL)
+	})
+
 	t.Run("config env", func(t *testing.T) {
 		SetConfigFile("")
 		t.Setenv("STARHUB_SERVER_INSTANCE_ID", "foo")

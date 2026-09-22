@@ -172,7 +172,7 @@ type Config struct {
 	}
 
 	Frontend struct {
-		URL string `env:"STARHUB_SERVER_FRONTEND_URL" default:"https://opencsg.com"`
+		URL string `env:"STARHUB_SERVER_FRONTEND_URL"`
 	}
 
 	S3 struct {
