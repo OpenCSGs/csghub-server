@@ -17,16 +17,18 @@ import (
 )
 
 type EmailChannel struct {
-	config       *config.Config
-	emailService emailclient.EmailService
+	config        *config.Config
+	emailService  emailclient.EmailService
+	subjectPrefix string
 }
 
 const individualEmailMaxAttempts = 2
 
 func NewChannel(conf *config.Config, emailService emailclient.EmailService) notifychannel.Notifier {
 	return &EmailChannel{
-		config:       conf,
-		emailService: emailService,
+		config:        conf,
+		emailService:  emailService,
+		subjectPrefix: emailSubjectPrefix(conf.Frontend.URL),
 	}
 }
 
@@ -53,6 +55,9 @@ func (s *EmailChannel) Send(ctx context.Context, req *notifychannel.NotifyReques
 	if req.FormattedData != nil {
 		emailReq.Subject = req.FormattedData.Title
 		emailReq.Body = req.FormattedData.Content
+	}
+	if s.subjectPrefix != "" {
+		emailReq.Subject = s.subjectPrefix + emailReq.Subject
 	}
 
 	if emailReq.ContentType == "" {

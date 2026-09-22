@@ -14,9 +14,11 @@ import (
 type recordingEmailService struct {
 	attempts              map[string]int
 	failuresBeforeSuccess map[string]int
+	subjects              []string
 }
 
 func (s *recordingEmailService) Send(req types.EmailReq) error {
+	s.subjects = append(s.subjects, req.Subject)
 	email := req.To[0]
 	s.attempts[email]++
 	if s.attempts[email] <= s.failuresBeforeSuccess[email] {
