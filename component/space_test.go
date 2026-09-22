@@ -585,6 +585,7 @@ func TestSpaceComponent_Wakeup(t *testing.T) {
 		sc.mocks.stores.SpaceMock().EXPECT().FindByPath(ctx, "ns", "n").Return(&database.Space{
 			ID:         1,
 			HasAppFile: true,
+			Repository: &database.Repository{User: database.User{Username: "user"}},
 		}, nil)
 
 		sc.mocks.stores.DeployTaskMock().EXPECT().GetLatestDeployBySpaceID(ctx, int64(1)).Return(
@@ -598,16 +599,17 @@ func TestSpaceComponent_Wakeup(t *testing.T) {
 			SvcName:   "svc",
 		}).Return(nil)
 
-		err := sc.Wakeup(ctx, "ns", "n")
+		err := sc.Wakeup(ctx, "ns", "n", "user")
 		require.Nil(t, err)
 	})
 	t.Run("WakeupWithoutAppFile", func(t *testing.T) {
 		sc.mocks.stores.SpaceMock().EXPECT().FindByPath(ctx, "ns2", "n2").Return(&database.Space{
 			ID:         1,
 			HasAppFile: false,
+			Repository: &database.Repository{User: database.User{Username: "user"}},
 		}, nil)
 
-		err := sc.Wakeup(ctx, "ns2", "n2")
+		err := sc.Wakeup(ctx, "ns2", "n2", "user")
 		require.Equal(t, true, errors.Is(err, errorx.ErrNoEntryFile))
 	})
 
@@ -621,6 +623,7 @@ func TestSpaceComponent_Stop(t *testing.T) {
 		sc.mocks.stores.SpaceMock().EXPECT().FindByPath(ctx, "ns", "n").Return(&database.Space{
 			ID:         1,
 			HasAppFile: true,
+			Repository: &database.Repository{User: database.User{Username: "user"}},
 		}, nil)
 
 		sc.mocks.stores.DeployTaskMock().EXPECT().GetLatestDeployBySpaceID(ctx, int64(1)).Return(
@@ -637,18 +640,119 @@ func TestSpaceComponent_Stop(t *testing.T) {
 			ctx, types.SpaceRepo, int64(1), int64(3),
 		).Return(nil)
 
-		err := sc.Stop(ctx, "ns", "n", false)
+		err := sc.Stop(ctx, "ns", "n", "user")
 		require.Nil(t, err)
 	})
 	t.Run("StopWithoutAppFile", func(t *testing.T) {
 		sc.mocks.stores.SpaceMock().EXPECT().FindByPath(ctx, "ns2", "n2").Return(&database.Space{
 			ID:         1,
 			HasAppFile: false,
+			Repository: &database.Repository{User: database.User{Username: "user"}},
 		}, nil)
 
-		err := sc.Stop(ctx, "ns2", "n2", false)
+		err := sc.Stop(ctx, "ns2", "n2", "user")
 		require.Equal(t, true, errors.Is(err, errorx.ErrNoEntryFile))
 	})
+	t.Run("StopByNonCreator", func(t *testing.T) {
+		sc.mocks.stores.SpaceMock().EXPECT().FindByPath(ctx, "ns", "n").Return(&database.Space{
+			ID:         1,
+			HasAppFile: true,
+			Repository: &database.Repository{User: database.User{Username: "creator"}},
+		}, nil)
+		sc.mocks.components.repo.EXPECT().GetNameSpaceInfo(ctx, "ns").Return(&types.Namespace{
+			Path: "ns",
+			Type: types.UserNamespaceType,
+		}, nil)
+
+		err := sc.Stop(ctx, "ns", "n", "operator")
+		require.ErrorIs(t, err, errorx.ErrForbidden)
+	})
+}
+
+func TestSpaceComponent_DeployByNonCreator(t *testing.T) {
+	ctx := context.TODO()
+	sc := initializeTestSpaceComponent(ctx, t)
+
+	sc.mocks.components.repo.EXPECT().GetNameSpaceInfo(ctx, "ns").Return(&types.Namespace{
+		Path: "ns",
+		Type: types.UserNamespaceType,
+	}, nil)
+	sc.mocks.stores.SpaceMock().EXPECT().FindByPath(ctx, "ns", "n").Return(&database.Space{
+		ID:         1,
+		HasAppFile: true,
+		Repository: &database.Repository{User: database.User{Username: "creator"}},
+	}, nil)
+
+	_, err := sc.Deploy(ctx, "ns", "n", "operator")
+	require.ErrorIs(t, err, errorx.ErrForbidden)
+}
+
+func TestSpaceComponent_StopByOrgAdminOrWriter(t *testing.T) {
+	ctx := context.TODO()
+	tests := []struct {
+		name       string
+		operator   string
+		adminAllow bool
+		writeAllow bool
+	}{
+		{name: "OrgAdmin", operator: "admin", adminAllow: true, writeAllow: false},
+		{name: "OrgWriter", operator: "writer", adminAllow: false, writeAllow: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sc := initializeTestSpaceComponent(ctx, t)
+			sc.mocks.components.repo.EXPECT().GetNameSpaceInfo(ctx, "org1").Return(&types.Namespace{
+				Path: "org1",
+				Type: types.OrganizationNamespaceType,
+			}, nil)
+			sc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, tt.operator, "org1", rebac.NamespaceCanAdmin).
+				Return(tt.adminAllow, nil)
+			sc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, tt.operator, "org1", rebac.NamespaceCanWrite).
+				Return(tt.writeAllow, nil).Maybe()
+			sc.mocks.stores.SpaceMock().EXPECT().FindByPath(ctx, "org1", "n").Return(&database.Space{
+				ID:         1,
+				HasAppFile: true,
+				Repository: &database.Repository{User: database.User{Username: "creator"}},
+			}, nil)
+			sc.mocks.stores.DeployTaskMock().EXPECT().GetLatestDeployBySpaceID(ctx, int64(1)).Return(
+				&database.Deploy{SvcName: "svc", RepoID: 1, UserID: 2, ID: 3}, nil,
+			)
+			sc.mocks.deployer.EXPECT().Stop(ctx, types.DeployRequest{
+				SpaceID:   1,
+				Namespace: "org1",
+				Name:      "n",
+				SvcName:   "svc",
+			}).Return(nil)
+			sc.mocks.stores.DeployTaskMock().EXPECT().StopDeploy(
+				ctx, types.SpaceRepo, int64(1), int64(3),
+			).Return(nil)
+
+			require.Nil(t, sc.Stop(ctx, "org1", "n", tt.operator))
+		})
+	}
+}
+
+func TestSpaceComponent_StopByOrgUserWithoutPermission(t *testing.T) {
+	ctx := context.TODO()
+	sc := initializeTestSpaceComponent(ctx, t)
+
+	sc.mocks.components.repo.EXPECT().GetNameSpaceInfo(ctx, "org1").Return(&types.Namespace{
+		Path: "org1",
+		Type: types.OrganizationNamespaceType,
+	}, nil)
+	sc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "member", "org1", rebac.NamespaceCanAdmin).
+		Return(false, nil)
+	sc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "member", "org1", rebac.NamespaceCanWrite).
+		Return(false, nil)
+	sc.mocks.stores.SpaceMock().EXPECT().FindByPath(ctx, "org1", "n").Return(&database.Space{
+		ID:         1,
+		HasAppFile: true,
+		Repository: &database.Repository{User: database.User{Username: "creator"}},
+	}, nil)
+
+	err := sc.Stop(ctx, "org1", "n", "member")
+	require.ErrorIs(t, err, errorx.ErrForbidden)
 }
 
 func TestSpaceComponent_FixHasEntryFile(t *testing.T) {

@@ -1035,17 +1035,17 @@ func (_c *MockSpaceComponent_StatusByPaths_Call) RunAndReturn(run func(context.C
 	return _c
 }
 
-// Stop provides a mock function with given fields: ctx, namespace, name, deleteSpace
-func (_m *MockSpaceComponent) Stop(ctx context.Context, namespace string, name string, deleteSpace bool) error {
-	ret := _m.Called(ctx, namespace, name, deleteSpace)
+// Stop provides a mock function with given fields: ctx, namespace, name, currentUser
+func (_m *MockSpaceComponent) Stop(ctx context.Context, namespace string, name string, currentUser string) error {
+	ret := _m.Called(ctx, namespace, name, currentUser)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Stop")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, bool) error); ok {
-		r0 = rf(ctx, namespace, name, deleteSpace)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string) error); ok {
+		r0 = rf(ctx, namespace, name, currentUser)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -1062,14 +1062,14 @@ type MockSpaceComponent_Stop_Call struct {
 //   - ctx context.Context
 //   - namespace string
 //   - name string
-//   - deleteSpace bool
-func (_e *MockSpaceComponent_Expecter) Stop(ctx interface{}, namespace interface{}, name interface{}, deleteSpace interface{}) *MockSpaceComponent_Stop_Call {
-	return &MockSpaceComponent_Stop_Call{Call: _e.mock.On("Stop", ctx, namespace, name, deleteSpace)}
+//   - currentUser string
+func (_e *MockSpaceComponent_Expecter) Stop(ctx interface{}, namespace interface{}, name interface{}, currentUser interface{}) *MockSpaceComponent_Stop_Call {
+	return &MockSpaceComponent_Stop_Call{Call: _e.mock.On("Stop", ctx, namespace, name, currentUser)}
 }
 
-func (_c *MockSpaceComponent_Stop_Call) Run(run func(ctx context.Context, namespace string, name string, deleteSpace bool)) *MockSpaceComponent_Stop_Call {
+func (_c *MockSpaceComponent_Stop_Call) Run(run func(ctx context.Context, namespace string, name string, currentUser string)) *MockSpaceComponent_Stop_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(bool))
+		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(string))
 	})
 	return _c
 }
@@ -1079,7 +1079,7 @@ func (_c *MockSpaceComponent_Stop_Call) Return(_a0 error) *MockSpaceComponent_St
 	return _c
 }
 
-func (_c *MockSpaceComponent_Stop_Call) RunAndReturn(run func(context.Context, string, string, bool) error) *MockSpaceComponent_Stop_Call {
+func (_c *MockSpaceComponent_Stop_Call) RunAndReturn(run func(context.Context, string, string, string) error) *MockSpaceComponent_Stop_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -1276,17 +1276,17 @@ func (_c *MockSpaceComponent_UserSpaces_Call) RunAndReturn(run func(context.Cont
 	return _c
 }
 
-// Wakeup provides a mock function with given fields: ctx, namespace, name
-func (_m *MockSpaceComponent) Wakeup(ctx context.Context, namespace string, name string) error {
-	ret := _m.Called(ctx, namespace, name)
+// Wakeup provides a mock function with given fields: ctx, namespace, name, currentUser
+func (_m *MockSpaceComponent) Wakeup(ctx context.Context, namespace string, name string, currentUser string) error {
+	ret := _m.Called(ctx, namespace, name, currentUser)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Wakeup")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string) error); ok {
-		r0 = rf(ctx, namespace, name)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string) error); ok {
+		r0 = rf(ctx, namespace, name, currentUser)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -1303,13 +1303,14 @@ type MockSpaceComponent_Wakeup_Call struct {
 //   - ctx context.Context
 //   - namespace string
 //   - name string
-func (_e *MockSpaceComponent_Expecter) Wakeup(ctx interface{}, namespace interface{}, name interface{}) *MockSpaceComponent_Wakeup_Call {
-	return &MockSpaceComponent_Wakeup_Call{Call: _e.mock.On("Wakeup", ctx, namespace, name)}
+//   - currentUser string
+func (_e *MockSpaceComponent_Expecter) Wakeup(ctx interface{}, namespace interface{}, name interface{}, currentUser interface{}) *MockSpaceComponent_Wakeup_Call {
+	return &MockSpaceComponent_Wakeup_Call{Call: _e.mock.On("Wakeup", ctx, namespace, name, currentUser)}
 }
 
-func (_c *MockSpaceComponent_Wakeup_Call) Run(run func(ctx context.Context, namespace string, name string)) *MockSpaceComponent_Wakeup_Call {
+func (_c *MockSpaceComponent_Wakeup_Call) Run(run func(ctx context.Context, namespace string, name string, currentUser string)) *MockSpaceComponent_Wakeup_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string))
+		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(string))
 	})
 	return _c
 }
@@ -1319,7 +1320,7 @@ func (_c *MockSpaceComponent_Wakeup_Call) Return(_a0 error) *MockSpaceComponent_
 	return _c
 }
 
-func (_c *MockSpaceComponent_Wakeup_Call) RunAndReturn(run func(context.Context, string, string) error) *MockSpaceComponent_Wakeup_Call {
+func (_c *MockSpaceComponent_Wakeup_Call) RunAndReturn(run func(context.Context, string, string, string) error) *MockSpaceComponent_Wakeup_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -313,24 +313,14 @@ func (h *SpaceHandler) Run(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	allow, err := h.repo.AllowAdminAccess(ctx.Request.Context(), types.SpaceRepo, namespace, name, currentUser)
-	if err != nil {
-		slog.ErrorContext(ctx.Request.Context(), "failed to check user permission", "error", err)
-		httpbase.ServerError(ctx, errors.New("failed to check user permission"))
-		return
-	}
-	if !allow {
-		slog.Warn("user not allowed to run space", slog.String("namespace", namespace),
-			slog.String("name", name), slog.Any("username", currentUser))
-		httpbase.ForbiddenError(ctx, errors.New("user not allowed to run space"))
-		return
-	}
 	deployID, err := h.space.Deploy(ctx.Request.Context(), namespace, name, currentUser)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "failed to deploy space", slog.String("namespace", namespace),
 			slog.String("name", name), slog.Any("error", err))
 		if errors.Is(err, errorx.ErrNoEntryFile) {
 			httpbase.BadRequestWithExt(ctx, err)
+		} else if errors.Is(err, errorx.ErrForbidden) {
+			httpbase.ForbiddenError(ctx, err)
 		} else {
 			httpbase.ServerError(ctx, err)
 		}
@@ -354,13 +344,14 @@ func (h *SpaceHandler) Run(ctx *gin.Context) {
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /spaces/{namespace}/{name}/wakeup [post]
 func (h *SpaceHandler) Wakeup(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "failed to get namespace from context", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	err = h.space.Wakeup(ctx.Request.Context(), namespace, name)
+	err = h.space.Wakeup(ctx.Request.Context(), namespace, name, currentUser)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "failed to wakeup space", slog.String("namespace", namespace),
 			slog.String("name", name), slog.Any("error", err))
@@ -397,20 +388,7 @@ func (h *SpaceHandler) Stop(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	allow, err := h.repo.AllowAdminAccess(ctx.Request.Context(), types.SpaceRepo, namespace, name, currentUser)
-	if err != nil {
-		slog.ErrorContext(ctx.Request.Context(), "failed to check user permission", "error", err)
-		httpbase.ServerError(ctx, errors.New("failed to check user permission"))
-		return
-	}
-	if !allow {
-		slog.Warn("user not allowed to stop space", slog.String("namespace", namespace),
-			slog.String("name", name), slog.Any("username", currentUser))
-		httpbase.ForbiddenError(ctx, errors.New("user not allowed to stop space"))
-		return
-	}
-
-	err = h.space.Stop(ctx.Request.Context(), namespace, name, false)
+	err = h.space.Stop(ctx.Request.Context(), namespace, name, currentUser)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "failed to stop space", slog.String("namespace", namespace),
 			slog.String("name", name), slog.Any("error", err))
@@ -418,6 +396,8 @@ func (h *SpaceHandler) Stop(ctx *gin.Context) {
 			httpbase.NotFoundError(ctx, err)
 		} else if errors.Is(err, errorx.ErrNoEntryFile) {
 			httpbase.BadRequestWithExt(ctx, err)
+		} else if errors.Is(err, errorx.ErrForbidden) {
+			httpbase.ForbiddenError(ctx, err)
 		} else {
 			httpbase.ServerError(ctx, err)
 		}

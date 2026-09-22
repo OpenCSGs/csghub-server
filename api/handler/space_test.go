@@ -12,6 +12,7 @@ import (
 	mockcomponent "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
 	"opencsg.com/csghub-server/builder/deploy"
 	"opencsg.com/csghub-server/builder/testutil"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
 
@@ -239,11 +240,26 @@ func TestSpaceHandler_Run(t *testing.T) {
 	})
 	tester.WithUser()
 
-	tester.mocks.repo.EXPECT().AllowAdminAccess(tester.Ctx(), types.SpaceRepo, "u", "r", "u").Return(true, nil)
 	tester.mocks.space.EXPECT().Deploy(tester.Ctx(), "u", "r", "u").Return(123, nil)
 	tester.Execute()
 
 	tester.ResponseEq(t, 200, tester.OKText, nil)
+}
+
+func TestSpaceHandler_Run_Forbidden(t *testing.T) {
+	tester := NewSpaceTester(t).WithHandleFunc(func(h *SpaceHandler) gin.HandlerFunc {
+		return h.Run
+	})
+	tester.WithUser()
+
+	tester.mocks.space.EXPECT().Deploy(tester.Ctx(), "u", "r", "u").
+		Return(0, errorx.ErrForbiddenMsg("only the space creator or namespace admin/writer can operate this space"))
+	tester.Execute()
+
+	tester.ResponseEqSimple(t, 403, gin.H{
+		"code": "AUTH-ERR-2",
+		"msg":  "AUTH-ERR-2: only the space creator or namespace admin/writer can operate this space",
+	})
 }
 
 func TestSpaceHandler_Wakeup(t *testing.T) {
@@ -251,7 +267,7 @@ func TestSpaceHandler_Wakeup(t *testing.T) {
 		return h.Wakeup
 	})
 
-	tester.mocks.space.EXPECT().Wakeup(tester.Ctx(), "u", "r").Return(nil)
+	tester.mocks.space.EXPECT().Wakeup(tester.Ctx(), "u", "r", "").Return(nil)
 	tester.Execute()
 
 	tester.ResponseEq(t, 200, tester.OKText, nil)
@@ -263,11 +279,26 @@ func TestSpaceHandler_Stop(t *testing.T) {
 	})
 	tester.WithUser()
 
-	tester.mocks.repo.EXPECT().AllowAdminAccess(tester.Ctx(), types.SpaceRepo, "u", "r", "u").Return(true, nil)
-	tester.mocks.space.EXPECT().Stop(tester.Ctx(), "u", "r", false).Return(nil)
+	tester.mocks.space.EXPECT().Stop(tester.Ctx(), "u", "r", "u").Return(nil)
 	tester.Execute()
 
 	tester.ResponseEq(t, 200, tester.OKText, nil)
+}
+
+func TestSpaceHandler_Stop_Forbidden(t *testing.T) {
+	tester := NewSpaceTester(t).WithHandleFunc(func(h *SpaceHandler) gin.HandlerFunc {
+		return h.Stop
+	})
+	tester.WithUser()
+
+	tester.mocks.space.EXPECT().Stop(tester.Ctx(), "u", "r", "u").
+		Return(errorx.ErrForbiddenMsg("only the space creator or namespace admin/writer can operate this space"))
+	tester.Execute()
+
+	tester.ResponseEqSimple(t, 403, gin.H{
+		"code": "AUTH-ERR-2",
+		"msg":  "AUTH-ERR-2: only the space creator or namespace admin/writer can operate this space",
+	})
 }
 
 func TestSpaceHandler_Status(t *testing.T) {
