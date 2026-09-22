@@ -2380,6 +2380,10 @@ func (c *repoComponentImpl) CheckCurrentUserPermission(ctx context.Context, user
 		return false, fmt.Errorf("find user %q: %w", userName, err)
 	}
 
+	if user.CanAdmin() {
+		return true, nil
+	}
+
 	ns, err := c.namespaceStore.FindByPath(ctx, namespace)
 	if err != nil {
 		return false, fmt.Errorf("find namespace %q: %w", namespace, err)

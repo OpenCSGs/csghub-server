@@ -2705,30 +2705,21 @@ func TestRepoComponent_checkCurrentUserPermission(t *testing.T) {
 		ctx := context.TODO()
 		repoComp := initializeTestRepoComponent(ctx, t)
 
-		ns := database.Namespace{}
-		ns.NamespaceType = "organization"
-		ns.Path = "org_name"
-		ns.UUID = "namespace-uuid"
-		repoComp.mocks.stores.NamespaceMock().EXPECT().FindByPath(mock.Anything, ns.Path).Return(ns, nil)
-
 		user := database.User{}
 		user.Username = "user_name_admin"
 		user.RoleMask = "admin"
 		user.UUID = "user-uuid"
-		repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username).Return(user, nil)
+		repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username).Return(user, nil).Times(3)
 
-		expectNamespaceCheck(repoComp, user.UUID, ns.UUID, rebac.NamespaceCanRead, true)
-		yes, err := repoComp.CheckCurrentUserPermission(context.Background(), user.Username, ns.Path, rebac.NamespaceCanRead)
+		yes, err := repoComp.CheckCurrentUserPermission(context.Background(), user.Username, "org_name", rebac.NamespaceCanRead)
 		require.True(t, yes)
 		require.NoError(t, err)
 
-		expectNamespaceCheck(repoComp, user.UUID, ns.UUID, rebac.NamespaceCanWrite, true)
-		yes, err = repoComp.CheckCurrentUserPermission(context.Background(), user.Username, ns.Path, rebac.NamespaceCanWrite)
+		yes, err = repoComp.CheckCurrentUserPermission(context.Background(), user.Username, "org_name", rebac.NamespaceCanWrite)
 		require.True(t, yes)
 		require.NoError(t, err)
 
-		expectNamespaceCheck(repoComp, user.UUID, ns.UUID, rebac.NamespaceCanAdmin, true)
-		yes, err = repoComp.CheckCurrentUserPermission(context.Background(), user.Username, ns.Path, rebac.NamespaceCanAdmin)
+		yes, err = repoComp.CheckCurrentUserPermission(context.Background(), user.Username, "org_name", rebac.NamespaceCanAdmin)
 		require.True(t, yes)
 		require.NoError(t, err)
 	})
@@ -2737,30 +2728,21 @@ func TestRepoComponent_checkCurrentUserPermission(t *testing.T) {
 		ctx := context.TODO()
 		repoComp := initializeTestRepoComponent(ctx, t)
 
-		ns := database.Namespace{}
-		ns.NamespaceType = "user"
-		ns.Path = "user_name"
-		ns.UUID = "namespace-uuid"
-		repoComp.mocks.stores.NamespaceMock().EXPECT().FindByPath(mock.Anything, ns.Path).Return(ns, nil)
-
 		user := database.User{}
 		user.Username = "user_name_admin"
 		user.RoleMask = "admin"
 		user.UUID = "user-uuid"
-		repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username).Return(user, nil)
+		repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username).Return(user, nil).Times(3)
 
-		expectNamespaceCheck(repoComp, user.UUID, ns.UUID, rebac.NamespaceCanRead, true)
-		yes, err := repoComp.CheckCurrentUserPermission(context.Background(), user.Username, ns.Path, rebac.NamespaceCanRead)
+		yes, err := repoComp.CheckCurrentUserPermission(context.Background(), user.Username, "missing-namespace", rebac.NamespaceCanRead)
 		require.True(t, yes)
 		require.NoError(t, err)
 
-		expectNamespaceCheck(repoComp, user.UUID, ns.UUID, rebac.NamespaceCanWrite, true)
-		yes, err = repoComp.CheckCurrentUserPermission(context.Background(), user.Username, ns.Path, rebac.NamespaceCanWrite)
+		yes, err = repoComp.CheckCurrentUserPermission(context.Background(), user.Username, "missing-namespace", rebac.NamespaceCanWrite)
 		require.True(t, yes)
 		require.NoError(t, err)
 
-		expectNamespaceCheck(repoComp, user.UUID, ns.UUID, rebac.NamespaceCanAdmin, true)
-		yes, err = repoComp.CheckCurrentUserPermission(context.Background(), user.Username, ns.Path, rebac.NamespaceCanAdmin)
+		yes, err = repoComp.CheckCurrentUserPermission(context.Background(), user.Username, "missing-namespace", rebac.NamespaceCanAdmin)
 		require.True(t, yes)
 		require.NoError(t, err)
 	})
