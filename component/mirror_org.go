@@ -14,10 +14,10 @@ import (
 	"opencsg.com/csghub-server/common/types"
 )
 
-// ensureMirrorOrgNamespace creates the target organization when it does not
+// ensureMirrorOrgNamespace creates a single-level target organization when it does not
 // exist yet, so a mirrored repository can land under the resolved source
-// namespace instead of a hardcoded fallback. It is a no-op when the namespace
-// already exists.
+// namespace instead of a hardcoded fallback, regardless of the runtime organization mode.
+// Existing namespaces retain their organization type and have their ReBAC relationships reconciled.
 //
 // The organization is owned by the admin user that initiated the mirror
 // request. Only the rows required for repository creation are written:

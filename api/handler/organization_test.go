@@ -2,12 +2,14 @@ package handler
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"testing"
 
 	"github.com/gin-gonic/gin"
 	mockcomponent "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
 	"opencsg.com/csghub-server/builder/testutil"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
 
@@ -450,7 +452,7 @@ func TestOrganizationHandler_Codes_ComponentError(t *testing.T) {
 		return h.Codes
 	})
 	tester.mocks.code.EXPECT().OrgCodes(tester.Ctx(), &types.OrgCodesReq{
-		PageOpts: types.PageOpts{Page: 1, PageSize: 10},
+		PageOpts:  types.PageOpts{Page: 1, PageSize: 10},
 		Namespace: "u", CurrentUser: "u",
 	}).Return(nil, 0, errors.New("db error"))
 	tester.WithUser().AddPagination(1, 10).Execute()
@@ -462,7 +464,7 @@ func TestOrganizationHandler_Spaces_ComponentError(t *testing.T) {
 		return h.Spaces
 	})
 	tester.mocks.space.EXPECT().OrgSpaces(tester.Ctx(), &types.OrgSpacesReq{
-		PageOpts: types.PageOpts{Page: 1, PageSize: 10},
+		PageOpts:  types.PageOpts{Page: 1, PageSize: 10},
 		Namespace: "u", CurrentUser: "u",
 	}).Return(nil, 0, errors.New("db error"))
 	tester.WithUser().AddPagination(1, 10).Execute()
@@ -474,7 +476,7 @@ func TestOrganizationHandler_Collections_ComponentError(t *testing.T) {
 		return h.Collections
 	})
 	tester.mocks.collection.EXPECT().OrgCollections(tester.Ctx(), &types.OrgCollectionsReq{
-		PageOpts: types.PageOpts{Page: 1, PageSize: 10},
+		PageOpts:  types.PageOpts{Page: 1, PageSize: 10},
 		Namespace: "u", CurrentUser: "u",
 	}).Return(nil, 0, errors.New("db error"))
 	tester.WithUser().AddPagination(1, 10).Execute()
@@ -486,7 +488,7 @@ func TestOrganizationHandler_Prompts_ComponentError(t *testing.T) {
 		return h.Prompts
 	})
 	tester.mocks.prompt.EXPECT().OrgPrompts(tester.Ctx(), &types.OrgPromptsReq{
-		PageOpts: types.PageOpts{Page: 1, PageSize: 10},
+		PageOpts:  types.PageOpts{Page: 1, PageSize: 10},
 		Namespace: "u", CurrentUser: "u",
 	}).Return(nil, 0, errors.New("db error"))
 	tester.WithUser().AddPagination(1, 10).Execute()
@@ -498,7 +500,7 @@ func TestOrganizationHandler_MCPServers_ComponentError(t *testing.T) {
 		return h.MCPServers
 	})
 	tester.mocks.mcp.EXPECT().OrgMCPServers(tester.Ctx(), &types.OrgMCPsReq{
-		PageOpts: types.PageOpts{Page: 1, PageSize: 10},
+		PageOpts:  types.PageOpts{Page: 1, PageSize: 10},
 		Namespace: "u", CurrentUser: "u",
 	}).Return(nil, 0, errors.New("db error"))
 	tester.WithUser().AddPagination(1, 10).Execute()
@@ -510,7 +512,7 @@ func TestOrganizationHandler_Models_ComponentError(t *testing.T) {
 		return h.Models
 	})
 	tester.mocks.model.EXPECT().OrgModels(tester.Ctx(), &types.OrgModelsReq{
-		PageOpts: types.PageOpts{Page: 1, PageSize: 10},
+		PageOpts:  types.PageOpts{Page: 1, PageSize: 10},
 		Namespace: "u", CurrentUser: "u",
 	}).Return(nil, 0, errors.New("db error"))
 	tester.WithUser().AddPagination(1, 10).Execute()
@@ -522,7 +524,7 @@ func TestOrganizationHandler_Datasets_ComponentError(t *testing.T) {
 		return h.Datasets
 	})
 	tester.mocks.dataset.EXPECT().OrgDatasets(tester.Ctx(), &types.OrgDatasetsReq{
-		PageOpts: types.PageOpts{Page: 1, PageSize: 10},
+		PageOpts:  types.PageOpts{Page: 1, PageSize: 10},
 		Namespace: "u", CurrentUser: "u",
 	}).Return(nil, 0, errors.New("db error"))
 	tester.WithUser().AddPagination(1, 10).Execute()
@@ -534,11 +536,28 @@ func TestOrganizationHandler_FinetuneInstances_ComponentError(t *testing.T) {
 		return h.FinetuneInstances
 	})
 	tester.mocks.finetune.EXPECT().OrgFinetuneInstances(tester.Ctx(), &types.OrgFinetunesReq{
-		PageOpts: types.PageOpts{Page: 1, PageSize: 10},
+		PageOpts:  types.PageOpts{Page: 1, PageSize: 10},
 		Namespace: "u", CurrentUser: "u",
 	}).Return(nil, 0, errors.New("backend error"))
 	tester.WithUser().AddPagination(1, 10).Execute()
 	tester.ResponseEqCode(t, http.StatusInternalServerError)
+}
+
+// TestOrganizationHandler_FinetuneInstances_Forbidden verifies denied access returns 403 with the original error code.
+func TestOrganizationHandler_FinetuneInstances_Forbidden(t *testing.T) {
+	forbiddenErr := errorx.ErrForbiddenMsg("permission denied")
+	tester := NewOrganizationTester(t).WithHandleFunc(func(h *OrganizationHandler) gin.HandlerFunc {
+		return h.FinetuneInstances
+	})
+	tester.mocks.finetune.EXPECT().OrgFinetuneInstances(tester.Ctx(), &types.OrgFinetunesReq{
+		PageOpts:  types.PageOpts{Page: 1, PageSize: 10},
+		Namespace: "u", CurrentUser: "u",
+	}).Return(nil, 0, forbiddenErr)
+	tester.WithUser().AddPagination(1, 10).Execute()
+	tester.ResponseEqSimple(t, http.StatusForbidden, gin.H{
+		"code": "AUTH-ERR-2",
+		"msg":  forbiddenErr.Error(),
+	})
 }
 
 func TestOrganizationHandler_Evaluations_ComponentError(t *testing.T) {
@@ -546,11 +565,28 @@ func TestOrganizationHandler_Evaluations_ComponentError(t *testing.T) {
 		return h.Evaluations
 	})
 	tester.mocks.evaluation.EXPECT().OrgEvaluations(tester.Ctx(), &types.OrgEvaluationsReq{
-		PageOpts: types.PageOpts{Page: 1, PageSize: 10},
+		PageOpts:  types.PageOpts{Page: 1, PageSize: 10},
 		Namespace: "u", CurrentUser: "u",
 	}).Return(nil, 0, errors.New("backend error"))
 	tester.WithUser().AddPagination(1, 10).Execute()
 	tester.ResponseEqCode(t, http.StatusInternalServerError)
+}
+
+// TestOrganizationHandler_Evaluations_Forbidden verifies denied access returns 403 with the original error code.
+func TestOrganizationHandler_Evaluations_Forbidden(t *testing.T) {
+	forbiddenErr := errorx.ErrForbiddenMsg("permission denied")
+	tester := NewOrganizationTester(t).WithHandleFunc(func(h *OrganizationHandler) gin.HandlerFunc {
+		return h.Evaluations
+	})
+	tester.mocks.evaluation.EXPECT().OrgEvaluations(tester.Ctx(), &types.OrgEvaluationsReq{
+		PageOpts:  types.PageOpts{Page: 1, PageSize: 10},
+		Namespace: "u", CurrentUser: "u",
+	}).Return(nil, 0, forbiddenErr)
+	tester.WithUser().AddPagination(1, 10).Execute()
+	tester.ResponseEqSimple(t, http.StatusForbidden, gin.H{
+		"code": "AUTH-ERR-2",
+		"msg":  forbiddenErr.Error(),
+	})
 }
 
 func TestOrganizationHandler_Notebooks_ComponentError(t *testing.T) {
@@ -558,11 +594,28 @@ func TestOrganizationHandler_Notebooks_ComponentError(t *testing.T) {
 		return h.Notebooks
 	})
 	tester.mocks.user.EXPECT().ListNotebooksByNamespace(tester.Ctx(), &types.OrgNotebooksReq{
-		PageOpts: types.PageOpts{Page: 1, PageSize: 10},
+		PageOpts:  types.PageOpts{Page: 1, PageSize: 10},
 		Namespace: "u", CurrentUser: "u",
 	}).Return(nil, 0, errors.New("backend error"))
 	tester.WithUser().AddPagination(1, 10).Execute()
 	tester.ResponseEqCode(t, http.StatusInternalServerError)
+}
+
+// TestOrganizationHandler_Notebooks_Forbidden verifies denied access returns 403 with the original error code.
+func TestOrganizationHandler_Notebooks_Forbidden(t *testing.T) {
+	forbiddenErr := errorx.ErrForbiddenMsg("permission denied")
+	tester := NewOrganizationTester(t).WithHandleFunc(func(h *OrganizationHandler) gin.HandlerFunc {
+		return h.Notebooks
+	})
+	tester.mocks.user.EXPECT().ListNotebooksByNamespace(tester.Ctx(), &types.OrgNotebooksReq{
+		PageOpts:  types.PageOpts{Page: 1, PageSize: 10},
+		Namespace: "u", CurrentUser: "u",
+	}).Return(nil, 0, forbiddenErr)
+	tester.WithUser().AddPagination(1, 10).Execute()
+	tester.ResponseEqSimple(t, http.StatusForbidden, gin.H{
+		"code": "AUTH-ERR-2",
+		"msg":  forbiddenErr.Error(),
+	})
 }
 
 func TestOrganizationHandler_RunDeploys_InvalidDeployType(t *testing.T) {
@@ -624,9 +677,28 @@ func TestOrganizationHandler_Skills_ComponentError(t *testing.T) {
 		return h.Skills
 	})
 	tester.mocks.skill.EXPECT().OrgSkills(tester.Ctx(), &types.OrgSkillsReq{
-		PageOpts: types.PageOpts{Page: 1, PageSize: 10},
+		PageOpts:  types.PageOpts{Page: 1, PageSize: 10},
 		Namespace: "u", CurrentUser: "u",
 	}).Return(nil, 0, errors.New("db error"))
 	tester.WithUser().AddPagination(1, 10).Execute()
 	tester.ResponseEqCode(t, http.StatusInternalServerError)
+}
+
+// TestOrganizationHandler_RunDeploys_Forbidden verifies denied access returns 403 with the original error code.
+func TestOrganizationHandler_RunDeploys_Forbidden(t *testing.T) {
+	forbiddenErr := errorx.ErrForbiddenMsg("permission denied")
+	tester := NewOrganizationTester(t).WithHandleFunc(func(h *OrganizationHandler) gin.HandlerFunc {
+		return h.RunDeploys
+	})
+	tester.WithParam("repo_type", "model")
+	tester.mocks.user.EXPECT().ListDeploysByNamespace(tester.Ctx(), &types.OrgRunDeploysReq{
+		Namespace: "u", CurrentUser: "u",
+		RepoType: types.ModelRepo, DeployType: types.InferenceType,
+		PageOpts: types.PageOpts{Page: 1, PageSize: 10},
+	}).Return(nil, 0, fmt.Errorf("list organization deploys: %w", forbiddenErr))
+	tester.WithUser().AddPagination(1, 10).Execute()
+	tester.ResponseEqSimple(t, http.StatusForbidden, gin.H{
+		"code": "AUTH-ERR-2",
+		"msg":  forbiddenErr.Error(),
+	})
 }

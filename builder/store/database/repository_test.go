@@ -267,11 +267,12 @@ func TestRepoStore_CRUD(t *testing.T) {
 func TestRepoStore_UpdateRepoSerializesMoveWithOrganizationDeletion(t *testing.T) {
 	db := tests.InitTransactionTestDB()
 	defer db.Close()
+	setOrgStoreTestDB(t, db)
 	ctx := context.Background()
 	user := createOrganizationUnitMemberTestUser(t, ctx, db, "repository-move-delete-user")
 	orgPath := "repository-move-delete-target"
 	orgUUID := uuid.New()
-	orgStore := database.NewOrgStoreWithDBAndDeletionJobClient(db, &testRepositoryDeletionJobClient{})
+	orgStore := database.NewOrgStore(false, &testRepositoryDeletionJobClient{})
 	repoStore := database.NewRepoStoreWithDB(db)
 	require.NoError(t, orgStore.Create(ctx,
 		&database.Organization{Name: orgPath, Nickname: orgPath, UUID: orgUUID, UserID: user.ID},
@@ -362,12 +363,13 @@ func TestRepoStore_UpdateRepoSerializesMoveWithOrganizationDeletion(t *testing.T
 func TestRepoStore_UpdateRepoMoveOutUsesNamespaceBeforeRepositoryLockOrder(t *testing.T) {
 	db := tests.InitTransactionTestDB()
 	defer db.Close()
+	setOrgStoreTestDB(t, db)
 	ctx := context.Background()
 	user := createOrganizationUnitMemberTestUser(t, ctx, db, "repository-move-out-user")
 	sourcePath := "repository-move-out-source"
 	targetPath := "repository-move-out-target"
 	orgUUID := uuid.New()
-	orgStore := database.NewOrgStoreWithDBAndDeletionJobClient(db, &testRepositoryDeletionJobClient{})
+	orgStore := database.NewOrgStore(false, &testRepositoryDeletionJobClient{})
 	repoStore := database.NewRepoStoreWithDB(db)
 	require.NoError(t, orgStore.Create(ctx,
 		&database.Organization{Name: sourcePath, Nickname: sourcePath, UUID: orgUUID, UserID: user.ID},

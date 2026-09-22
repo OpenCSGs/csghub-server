@@ -1050,6 +1050,7 @@ func createUserRoutes(apiGroup *gin.RouterGroup, middlewareCollection middleware
 		apiGroup.PUT("/user/:username", middlewareCollection.Auth.NeedLogin, userProxyHandler.Proxy)
 		apiGroup.DELETE("/user/:username", middlewareCollection.Auth.NeedAdmin, userProxyHandler.Proxy)
 		apiGroup.PUT("/user/labels", middlewareCollection.Auth.NeedAdmin, userProxyHandler.Proxy)
+		// Deprecated: remove this proxy route after all clients migrate away from the user organization list API.
 		apiGroup.GET("/user/:username/organizations", userProxyHandler.Proxy)
 	}
 
@@ -1446,7 +1447,7 @@ func createOrgRoutes(apiGroup *gin.RouterGroup, middlewareCollection middleware.
 		apiGroup.GET("/organization/:namespace/skills", orgHandler.Skills)
 	}
 
-	if !enableUnit(config) {
+	if !config.IsHierarchicalOrganization() {
 		apiGroup.POST("/organizations", middlewareCollection.Auth.NeedLogin, userProxyHandler.Proxy)
 		apiGroup.PUT("/organization/:namespace", middlewareCollection.Auth.NeedLogin, userProxyHandler.ProxyToApi("/api/v1/organization/%s", "namespace"))
 		apiGroup.DELETE("/organization/:namespace", middlewareCollection.Auth.NeedLogin, userProxyHandler.ProxyToApi("/api/v1/organization/%s", "namespace"))

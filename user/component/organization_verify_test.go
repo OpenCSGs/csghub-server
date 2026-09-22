@@ -13,6 +13,7 @@ import (
 	mockdb "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
 
@@ -29,6 +30,7 @@ func TestOrganizationVerifyComponent_Create(t *testing.T) {
 
 	mockVerifyStore := mockdb.NewMockOrganizationVerifyStore(t)
 	mockOrgStore := mockdb.NewMockOrgStore(t)
+	mockOrgStore.EXPECT().FindByPath(mock.Anything, req.Name).Return(database.Organization{IsHierarchical: false}, nil).Once()
 
 	expected := &database.OrganizationVerify{
 		Name:               req.Name,
@@ -53,11 +55,27 @@ func TestOrganizationVerifyComponent_Create(t *testing.T) {
 	c := &OrganizationVerifyComponentImpl{
 		orgVerifyStore: mockVerifyStore,
 		orgStore:       mockOrgStore,
+		config:         &config.Config{},
 	}
 
 	orgVerify, err := c.Create(context.Background(), req)
 	require.NoError(t, err)
 	require.EqualValues(t, expected, orgVerify)
+}
+
+func TestOrganizationVerifyComponent_CreateRejectsMismatchedMode(t *testing.T) {
+	mockVerifyStore := mockdb.NewMockOrganizationVerifyStore(t)
+	mockOrgStore := mockdb.NewMockOrgStore(t)
+	mockOrgStore.EXPECT().FindByPath(mock.Anything, "hierarchy-org").Return(database.Organization{IsHierarchical: true}, nil).Once()
+
+	c := &OrganizationVerifyComponentImpl{
+		orgVerifyStore: mockVerifyStore,
+		orgStore:       mockOrgStore,
+		config:         &config.Config{},
+	}
+
+	_, err := c.Create(context.Background(), &types.OrgVerifyReq{Name: "hierarchy-org"})
+	require.ErrorIs(t, err, errorx.ErrOrganizationModeIncompatible)
 }
 
 func TestOrganizationVerifyComponent_Update(t *testing.T) {

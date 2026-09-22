@@ -14,6 +14,10 @@ const (
 	organizationManageForbidden
 	// organizationAccessForbidden is returned when the user cannot access the organization.
 	organizationAccessForbidden
+	// organizationModeIncompatible is returned when the current architecture does not support viewing the organization.
+	organizationModeIncompatible
+	// organizationAlreadyExists is returned when the organization cannot be created because it already exists.
+	organizationAlreadyExists
 )
 
 var (
@@ -68,6 +72,32 @@ var (
 	//
 	// zh-HK: 無權訪問該組織
 	ErrOrganizationAccessForbidden error = CustomError{prefix: errOrganizationPrefix, code: organizationAccessForbidden}
+
+	// ErrOrganizationModeIncompatible indicates that the organization cannot be viewed in the current architecture.
+	//
+	// Description: The current organization architecture does not support viewing this organization. Please migrate the organization.
+	//
+	// Description_ZH: 当前架构不支持查看该组织，请迁移组织。
+	//
+	// en-US: The current architecture does not support viewing this organization. Please migrate the organization.
+	//
+	// zh-CN: 当前架构不支持查看该组织，请迁移组织
+	//
+	// zh-HK: 當前架構不支持查看該組織，請遷移組織
+	ErrOrganizationModeIncompatible error = CustomError{prefix: errOrganizationPrefix, code: organizationModeIncompatible}
+
+	// ErrOrganizationAlreadyExists indicates that the system already has an organization and cannot create another one.
+	//
+	// Description: The system already has an organization and cannot create another one.
+	//
+	// Description_ZH: 当前系统已存在组织，不能再创建新的组织。
+	//
+	// en-US: The system already has an organization and cannot create another one
+	//
+	// zh-CN: 当前系统已存在组织，不能再创建新的组织
+	//
+	// zh-HK: 當前系統已存在組織，不能再建立新的組織
+	ErrOrganizationAlreadyExists error = CustomError{prefix: errOrganizationPrefix, code: organizationAlreadyExists}
 )
 
 // OrganizationMemberNotFound creates an organization member error with the target identifiers.

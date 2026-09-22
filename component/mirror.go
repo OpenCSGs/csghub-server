@@ -327,7 +327,8 @@ func NewMirrorComponent(config *config.Config) (MirrorComponent, error) {
 		return nil, fmt.Errorf("fail to create repo component,error:%w", err)
 	}
 	c.repoComp = repoComponent
-	c.orgStore = repoComponent.orgStore
+	// Mirror targets are standalone organizations and must not claim the hierarchy root slot.
+	c.orgStore = database.NewOrgStore(false, nil)
 	c.rebac = repoComponent.rebac
 	c.accessTokenStore = database.NewAccessTokenStore()
 	c.modelStore = database.NewModelStore()

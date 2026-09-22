@@ -77,7 +77,7 @@ func NewAccountingComponent(config *config.Config) (AccountingComponent, error) 
 	return &accountingComponentImpl{
 		accountingClient: c,
 		userStore:        database.NewUserStore(),
-		orgStore:         database.NewOrgStore(config),
+		orgStore:         database.NewOrgStore(config.IsHierarchicalOrganization(), nil),
 		memberStore:      database.NewMemberStore(),
 		deployTaskStore:  database.NewDeployTaskStore(),
 		userSvcClient:    userRpcClient,

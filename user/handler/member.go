@@ -109,7 +109,11 @@ func (h *MemberHandler) Update(ctx *gin.Context) {
 				slog.String("op_user", currentUser),
 			),
 		)
-		httpbase.ServerError(ctx, err)
+		if errors.Is(err, errorx.ErrOrganizationModeIncompatible) {
+			httpbase.BadRequestWithExt(ctx, err)
+		} else {
+			httpbase.ServerError(ctx, err)
+		}
 		return
 	}
 
@@ -155,7 +159,11 @@ func (h *MemberHandler) Create(ctx *gin.Context) {
 				slog.String("org", org), slog.String("user", req.Users), slog.String("role", req.Role), slog.String("op_user", currentUser),
 			),
 		)
-		httpbase.ServerError(ctx, err)
+		if errors.Is(err, errorx.ErrOrganizationModeIncompatible) {
+			httpbase.BadRequestWithExt(ctx, err)
+		} else {
+			httpbase.ServerError(ctx, err)
+		}
 		return
 	}
 
@@ -187,7 +195,7 @@ func (h *MemberHandler) Delete(ctx *gin.Context) {
 				slog.String("op_user", currentUser),
 			),
 		)
-		if errors.Is(err, errorx.ErrReqParamInvalid) {
+		if errors.Is(err, errorx.ErrOrganizationModeIncompatible) || errors.Is(err, errorx.ErrReqParamInvalid) {
 			httpbase.BadRequestWithExt(ctx, err)
 		} else if errors.Is(err, errorx.ErrLastOrgAdmin) {
 			httpbase.ConflictError(ctx, err)

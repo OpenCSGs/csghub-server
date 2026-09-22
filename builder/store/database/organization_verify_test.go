@@ -13,11 +13,12 @@ import (
 func TestOrganizationVerifyStore(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
+	setOrgStoreTestDB(t, db)
 	ctx := context.TODO()
 
 	store := database.NewOrganizationVerifyStoreWithDB(db)
 
-	orgStore := database.NewOrgStoreWithDB(db)
+	orgStore := database.NewOrgStore(false, nil)
 	err := orgStore.Create(ctx, &database.Organization{
 		Name:     "verify_test_org",
 		Nickname: "verify_test_nick",

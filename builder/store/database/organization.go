@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 
@@ -34,6 +33,8 @@ type OrgStore interface {
 	Exists(ctx context.Context, path string) (exists bool, err error)
 	GetUserBelongOrgs(ctx context.Context, userID int64) (orgs []Organization, err error)
 	GetUserRootOrganizations(ctx context.Context, userID int64) (orgs []Organization, err error)
+	// SearchUserBelongOrgs searches organizations belonging to a user with filters and pagination.
+	// Deprecated: this method only supports the deprecated user organization list endpoint.
 	SearchUserBelongOrgs(ctx context.Context, userID int64, search string, per int, page int, orgType string, verifyStatus string, role string, tag string) (orgs []Organization, total int, err error)
 	Search(ctx context.Context, search string, per, page int, orgType, verifyStatus, tag string) (orgs []Organization, total int, err error)
 	// SearchHierarchyExcludingID searches hierarchy organizations by name or path without pagination.
@@ -50,32 +51,10 @@ type OrgStore interface {
 	GetOrganizationTagsByOrgIDs(ctx context.Context, orgIDs []int64) (map[int64][]Tag, error)
 }
 
-// NewOrgStore selects the legacy or hierarchy-aware organization Store according to configuration.
-func NewOrgStore(cfg *config.Config) OrgStore {
-	if cfg != nil && cfg.Organization.EnableUnit {
-		return NewHierarchyOrgStoreWithDB(defaultDB)
-	}
-	return NewOrgStoreWithMode(defaultDB, false)
-}
-
-func NewOrgStoreWithDB(db *DB) OrgStore {
-	return NewOrgStoreWithMode(db, false)
-}
-
-// NewOrgStoreWithDBAndDeletionJobClient creates a legacy organization Store with transactional repository deletion jobs.
-func NewOrgStoreWithDBAndDeletionJobClient(db *DB, jobClient RepositoryDeletionJobClient) OrgStore {
-	return NewOrgStoreWithModeAndDeletionJobClient(db, false, jobClient)
-}
-
-// NewOrgStoreWithMode creates an organization Store scoped to one organization model.
-// The hierarchy flag is persisted on organizations and keeps single-level and hierarchy queries separate.
-func NewOrgStoreWithMode(db *DB, isHierarchical bool) OrgStore {
-	return NewOrgStoreWithModeAndDeletionJobClient(db, isHierarchical, nil)
-}
-
-// NewOrgStoreWithModeAndDeletionJobClient creates an organization Store with transactional repository deletion jobs.
-func NewOrgStoreWithModeAndDeletionJobClient(db *DB, isHierarchical bool, jobClient RepositoryDeletionJobClient) OrgStore {
-	return &orgStoreImpl{db: db, isHierarchical: isHierarchical, repositoryDeletionJobClient: jobClient}
+// NewOrgStore uses the initialized default database and the supplied organization mode.
+// A nil jobClient is allowed unless repository deletion jobs need to be enqueued.
+func NewOrgStore(isHierarchical bool, jobClient RepositoryDeletionJobClient) OrgStore {
+	return &orgStoreImpl{db: defaultDB, isHierarchical: isHierarchical, repositoryDeletionJobClient: jobClient}
 }
 
 type Organization struct {
@@ -215,8 +194,7 @@ func (s *orgStoreImpl) GetUserOwnOrgs(ctx context.Context, username string) (org
 		NewSelect().
 		Model(&orgs).
 		Relation("Namespace").
-		Relation("User").
-		Where("organization.is_hierarchical = ?", s.isHierarchical)
+		Relation("User")
 	if username != "" {
 		query = query.
 			Join("JOIN users AS u ON u.id = organization.user_id").
@@ -244,7 +222,6 @@ func (s *orgStoreImpl) IsLastOrganizationAdmin(ctx context.Context, username str
 		Where("target_user.username = ?", username).
 		Where("member.deleted_at IS NULL").
 		Where("member.role = ?", types.UserAdmin).
-		Where("organization.is_hierarchical = ?", s.isHierarchical).
 		Where(`NOT EXISTS (
 			SELECT 1
 			FROM members AS other_member
@@ -341,7 +318,6 @@ func (s *orgStoreImpl) FindByPath(ctx context.Context, path string) (org Organiz
 		NewSelect().
 		Model(&org).Relation("Namespace").
 		Where("organization.path =?", path).
-		Where("organization.is_hierarchical = ?", s.isHierarchical).
 		Scan(ctx)
 	return org, errorx.HandleDBError(err, nil)
 }
@@ -352,7 +328,6 @@ func (s *orgStoreImpl) Exists(ctx context.Context, path string) (exists bool, er
 		NewSelect().
 		Model(&org).
 		Where("path =?", path).
-		Where("organization.is_hierarchical = ?", s.isHierarchical).
 		Exists(ctx)
 	if err != nil {
 		return exists, errorx.HandleDBError(err, nil)
@@ -360,32 +335,58 @@ func (s *orgStoreImpl) Exists(ctx context.Context, path string) (exists bool, er
 	return
 }
 
-// GetUserRootOrganizations returns active top-level organizations containing the user's membership.
+// GetUserRootOrganizations returns active roots in the current mode for direct members.
+// Hierarchy mode also includes roots reached through descendant memberships.
 func (s *orgStoreImpl) GetUserRootOrganizations(ctx context.Context, userID int64) (orgs []Organization, err error) {
+	if !s.isHierarchical {
+		err := s.db.Operator.Core.NewSelect().
+			Model(&orgs).
+			Relation("Namespace").
+			ColumnExpr("organization.*").
+			ColumnExpr("member.role AS role").
+			Join("JOIN members AS member ON member.organization_id = organization.id AND member.deleted_at IS NULL").
+			Where("member.user_id = ?", userID).
+			Where("organization.is_root = TRUE").
+			Where("organization.is_hierarchical = FALSE").
+			Where("organization.deleted_at IS NULL").
+			Order("organization.id ASC").
+			Scan(ctx, &orgs)
+		return orgs, errorx.HandleDBError(err, nil)
+	}
+
 	query := s.db.Operator.Core.
 		NewSelect().
 		Model(&orgs).
 		Relation("Namespace").
 		ColumnExpr("organization.*").
-		Where("organization.is_hierarchical = ? AND organization.is_root = TRUE", s.isHierarchical).
-		Order("organization.id ASC")
-
-	if s.isHierarchical {
-		query = query.Where(`EXISTS (
-			SELECT 1
-			FROM members AS member
-			INNER JOIN organization_units AS unit
-				ON unit.organization_id = member.organization_id
-				AND unit.root_organization_id = organization.id
-				AND unit.deleted_at IS NULL
-			WHERE member.user_id = ?
-				AND member.deleted_at IS NULL
-		)`, userID)
-	} else {
-		query = query.
-			Join("INNER JOIN members ON members.organization_id = organization.id").
-			Where("members.user_id = ? AND members.deleted_at IS NULL", userID)
-	}
+		Where("organization.is_root = TRUE").
+		Where("organization.is_hierarchical = TRUE").
+		Where("organization.deleted_at IS NULL").
+		Limit(1)
+	query = query.WhereGroup("AND", func(q *bun.SelectQuery) *bun.SelectQuery {
+		q = q.Where(`EXISTS (
+		SELECT 1
+		FROM members AS direct_member
+		WHERE direct_member.organization_id = organization.id
+			AND direct_member.user_id = ?
+			AND direct_member.deleted_at IS NULL
+	)`, userID)
+		q = q.WhereOr(`EXISTS (
+		SELECT 1
+		FROM members AS hierarchy_member
+		INNER JOIN organizations AS hierarchy_member_organization
+			ON hierarchy_member_organization.id = hierarchy_member.organization_id
+			AND hierarchy_member_organization.is_hierarchical = TRUE
+			AND hierarchy_member_organization.deleted_at IS NULL
+		INNER JOIN organization_units AS unit
+			ON unit.organization_id = hierarchy_member.organization_id
+			AND unit.root_organization_id = organization.id
+			AND unit.deleted_at IS NULL
+		WHERE hierarchy_member.user_id = ?
+			AND hierarchy_member.deleted_at IS NULL
+	)`, userID)
+		return q
+	})
 
 	err = query.Scan(ctx, &orgs)
 	return orgs, errorx.HandleDBError(err, nil)
@@ -397,30 +398,38 @@ func (s *orgStoreImpl) GetUserBelongOrgs(ctx context.Context, userID int64) (org
 		Model(&orgs).
 		Relation("Namespace").
 		ColumnExpr("organization.*").
-		ColumnExpr("members.role AS role").
-		Join("join members on members.organization_id = organization.id").
-		Where("members.user_id = ? and members.deleted_at is null", userID).
-		Where("organization.is_hierarchical = ?", s.isHierarchical).
+		ColumnExpr("member.role AS role").
+		Join("JOIN members AS member ON member.organization_id = organization.id AND member.deleted_at IS NULL").
+		Where("member.user_id = ?", userID).
 		Scan(ctx, &orgs)
 	return orgs, errorx.HandleDBError(err, nil)
 }
 
+// SearchUserBelongOrgs searches active direct memberships in the current mode's root organizations.
+// Deprecated: this method only supports the deprecated user organization list endpoint.
 func (s *orgStoreImpl) SearchUserBelongOrgs(ctx context.Context, userID int64, search string, per int, page int, orgType string, verifyStatus string, role string, tag string) (orgs []Organization, total int, err error) {
+	orgs = make([]Organization, 0)
 	search = strings.ToLower(search)
 	query := s.db.Operator.Core.NewSelect().
 		Model(&orgs).Relation("Namespace")
 
-	// Orgs the user belongs to as a member.
+	// Keep the legacy owner filter as an alias for the administrator role.
+	if role == "owner" {
+		role = string(types.UserAdmin)
+	}
 	query = query.
 		ColumnExpr("organization.*").
-		Join("join members on members.organization_id = organization.id").
-		Where("members.user_id = ? and members.deleted_at is null", userID).
-		Where("organization.is_hierarchical = ?", s.isHierarchical)
+		ColumnExpr("member.role AS role").
+		Join("JOIN members AS member ON member.organization_id = organization.id AND member.deleted_at IS NULL").
+		Where("member.user_id = ?", userID).
+		Where("organization.is_root = TRUE").
+		Where("organization.is_hierarchical = ?", s.isHierarchical).
+		Where("organization.deleted_at IS NULL")
 	switch types.UserRole(role) {
 	case types.UserWrite:
-		query = query.Where("members.role = ?", types.UserWrite)
+		query = query.Where("member.role = ?", types.UserWrite)
 	case types.UserAdmin:
-		query = query.Where("members.role = ?", types.UserAdmin)
+		query = query.Where("member.role = ?", types.UserAdmin)
 	default:
 		// "all" or empty - no additional role filter.
 	}
@@ -454,7 +463,7 @@ func (s *orgStoreImpl) SearchUserBelongOrgs(ctx context.Context, userID int64, s
 	if err != nil {
 		return orgs, total, errorx.HandleDBError(err, nil)
 	}
-	query.Order("id asc").Limit(per).Offset((page - 1) * per)
+	query.Order("organization.id ASC").Limit(per).Offset((page - 1) * per)
 	err = query.Scan(ctx, &orgs)
 	if err != nil {
 		return orgs, total, errorx.HandleDBError(err, nil)
@@ -466,8 +475,9 @@ func (s *orgStoreImpl) Search(ctx context.Context, search string, per int, page 
 	search = strings.ToLower(search)
 	query := s.db.Operator.Core.NewSelect().
 		Model(&orgs).Relation("Namespace").
+		Where("organization.is_root = TRUE").
 		Where("organization.is_hierarchical = ?", s.isHierarchical).
-		Where("organization.is_root = TRUE")
+		Where("organization.deleted_at IS NULL")
 	if search != "" {
 		query.Where("LOWER(organization.name) like ? OR LOWER(organization.path) like ?", fmt.Sprintf("%%%s%%", search), fmt.Sprintf("%%%s%%", search))
 		query.OrderExpr(`
@@ -559,19 +569,19 @@ func (s *orgStoreImpl) UpdateVerifyStatus(ctx context.Context, path string, stat
 	return nil
 }
 
+// GetSharedOrgIDs returns active organizations that contain every user.
 func (s *orgStoreImpl) GetSharedOrgIDs(ctx context.Context, userIDs []int64) ([]int64, error) {
-	var orgIDs []int64
+	orgIDs := make([]int64, 0)
 	if len(userIDs) == 0 {
 		return orgIDs, nil
 	}
 	query := s.db.Operator.Core.NewSelect().
 		Model(&Organization{}).
 		Column("organization.id").
-		Join("join members on members.organization_id = organization.id").
-		Where("members.user_id IN (?)", bun.In(userIDs)).
-		Where("organization.is_hierarchical = ?", s.isHierarchical).
+		Join("JOIN members AS member ON member.organization_id = organization.id AND member.deleted_at IS NULL").
+		Where("member.user_id IN (?)", bun.In(userIDs)).
 		Group("organization.id").
-		Having("COUNT(DISTINCT members.user_id) = ?", len(userIDs))
+		Having("COUNT(DISTINCT member.user_id) = ?", len(userIDs))
 	err := query.Scan(ctx, &orgIDs)
 	if err != nil {
 		return nil, errorx.HandleDBError(err, nil)
@@ -584,7 +594,6 @@ func (s *orgStoreImpl) FindByUUID(ctx context.Context, uuid string) (*Organizati
 	err := s.db.Operator.Core.NewSelect().
 		Model(&org).Relation("Namespace").
 		Where("organization.uuid = ?", uuid).
-		Where("organization.is_hierarchical = ?", s.isHierarchical).
 		Scan(ctx)
 	if err == nil {
 		return &org, nil
@@ -595,19 +604,24 @@ func (s *orgStoreImpl) FindByUUID(ctx context.Context, uuid string) (*Organizati
 	return nil, errorx.HandleDBError(err, nil)
 }
 
-// FindByUUIDs returns active organizations matching the supplied UUIDs across organization models.
+// FindByUUIDs returns active organizations in the current mode. Legacy mode only exposes root organizations.
 func (s *orgStoreImpl) FindByUUIDs(ctx context.Context, uuids []string) ([]Organization, error) {
 	organizations := make([]Organization, 0)
 	if len(uuids) == 0 {
 		return organizations, nil
 	}
 
-	err := s.db.Operator.Core.NewSelect().
+	query := s.db.Operator.Core.NewSelect().
 		Model(&organizations).
 		Relation("Namespace").
 		Where("organization.uuid IN (?)", bun.In(uuids)).
-		Where("organization.deleted_at IS NULL").
-		Scan(ctx)
+		Where("organization.is_hierarchical = ?", s.isHierarchical).
+		Where("organization.deleted_at IS NULL")
+	if !s.isHierarchical {
+		// Legacy organizations are always top-level; hierarchy mode also includes child organizations.
+		query = query.Where("organization.is_root = TRUE")
+	}
+	err := query.Scan(ctx)
 	if err != nil {
 		return nil, errorx.HandleDBError(err, errorx.Ctx().Set("uuids", uuids))
 	}

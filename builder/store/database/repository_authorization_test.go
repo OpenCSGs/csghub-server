@@ -16,6 +16,7 @@ import (
 func TestRepositoryAuthorizationStore_CRUD(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
+	setOrgStoreTestDB(t, db)
 
 	ctx := context.Background()
 	store := database.NewRepositoryAuthorizationStoreWithDB(db)
@@ -24,7 +25,7 @@ func TestRepositoryAuthorizationStore_CRUD(t *testing.T) {
 	user := &database.User{Username: "repo-auth-user", UUID: "repo-auth-user"}
 	require.NoError(t, database.NewUserStoreWithDB(db).Create(ctx, user, &database.Namespace{Path: "repo-auth-user"}))
 	organization := &database.Organization{Nickname: "repo-auth-org", Name: "repo-auth-org", UUID: uuid.New()}
-	require.NoError(t, database.NewOrgStoreWithDB(db).Create(ctx, organization, &database.Namespace{Path: "repo-auth-org"}))
+	require.NoError(t, database.NewOrgStore(false, nil).Create(ctx, organization, &database.Namespace{Path: "repo-auth-org"}))
 
 	organizationGrant := &database.RepositoryAuthorization{
 		RepositoryID: repositoryID,

@@ -26,7 +26,7 @@ func NewOpenAIComponentFromConfig(config *config.Config) (OpenAIComponent, error
 	}
 	return &openaiComponentImpl{
 		userStore:              database.NewUserStore(),
-		organStore:             database.NewOrgStore(config),
+		organStore:             database.NewOrgStore(config.IsHierarchicalOrganization(), nil),
 		deployStore:            database.NewDeployTaskStore(),
 		eventPub:               &event.DefaultEventPublisher,
 		extllmStore:            database.NewLLMConfigStore(config),

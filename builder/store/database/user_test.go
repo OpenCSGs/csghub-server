@@ -680,10 +680,11 @@ func TestUserStore_IndexWithCursor1(t *testing.T) {
 func TestUserStore_DeleteUserAndRelationsLastOrgAdmin(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
+	setOrgStoreTestDB(t, db)
 	ctx := context.Background()
 
 	us := database.NewUserStoreWithDB(db)
-	os := database.NewOrgStoreWithDB(db)
+	os := database.NewOrgStore(false, nil)
 	user := createDeleteUserTestFixtures(t, ctx, db, us, os, "delete-last-admin")
 
 	err := us.DeleteUserAndRelations(ctx, *user, types.CloseAccountReq{})
@@ -915,10 +916,11 @@ func TestUserStore_DeleteUserAndRelationsRetainsRepositories(t *testing.T) {
 func TestUserStore_SoftDeleteUserAndRelationsLastOrgAdmin(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
+	setOrgStoreTestDB(t, db)
 	ctx := context.Background()
 
 	us := database.NewUserStoreWithDB(db)
-	os := database.NewOrgStoreWithDB(db)
+	os := database.NewOrgStore(false, nil)
 	user := createDeleteUserTestFixtures(t, ctx, db, us, os, "soft-delete-last-admin")
 
 	err := us.SoftDeleteUserAndRelations(ctx, *user, types.CloseAccountReq{})

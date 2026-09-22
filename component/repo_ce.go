@@ -38,7 +38,7 @@ func NewRepoComponent(config *config.Config) (RepoComponent, error) {
 	c.extendRepoImpl = extendRepoImpl{}
 	c.namespaceStore = database.NewNamespaceStore()
 	c.userStore = database.NewUserStore()
-	c.orgStore = database.NewOrgStore(config)
+	c.orgStore = database.NewOrgStore(config.IsHierarchicalOrganization(), nil)
 	c.modelStore = database.NewModelStore()
 	c.tagStore = database.NewTagStore()
 	deletionJobClient, err := newRepositoryDeletionJobClient()

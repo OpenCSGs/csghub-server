@@ -1239,7 +1239,7 @@ func TestUserComponent_Get_WithFullInfo(t *testing.T) {
 
 	mockUserStore.EXPECT().FindByUsername(mock.Anything, "testuser").Return(dbUser, nil)
 	mockUserTagStore.EXPECT().GetUserTags(mock.Anything, dbUser.ID).Return([]*database.Tag{}, nil)
-	mockOrgStore.EXPECT().GetUserBelongOrgs(mock.Anything, dbUser.ID).Return([]database.Organization{}, nil)
+	mockOrgStore.EXPECT().GetUserRootOrganizations(mock.Anything, dbUser.ID).Return([]database.Organization{}, nil)
 
 	uc := &userComponentImpl{
 		userStore: mockUserStore,
@@ -1291,7 +1291,7 @@ func TestUserComponent_Get_WithAnonymousVisitor(t *testing.T) {
 
 	mockUserStore.EXPECT().FindByUsername(mock.Anything, "testuser").Return(dbUser, nil)
 	mockUserTagStore.EXPECT().GetUserTags(mock.Anything, dbUser.ID).Return([]*database.Tag{}, nil)
-	mockOrgStore.EXPECT().GetUserBelongOrgs(mock.Anything, dbUser.ID).Return([]database.Organization{}, nil)
+	mockOrgStore.EXPECT().GetUserRootOrganizations(mock.Anything, dbUser.ID).Return([]database.Organization{}, nil)
 
 	uc := &userComponentImpl{
 		userStore: mockUserStore,
@@ -1342,7 +1342,7 @@ func TestUserComponent_Get_WithOnlyBasicInfo(t *testing.T) {
 	mockUserStore.EXPECT().FindByUsername(mock.Anything, "testuser").Return(dbUser, nil)
 	mockUserStore.EXPECT().FindByUsername(mock.Anything, "otheruser").Return(database.User{Username: "otheruser"}, nil)
 	mockUserTagStore.EXPECT().GetUserTags(mock.Anything, dbUser.ID).Return([]*database.Tag{}, nil)
-	mockOrgStore.EXPECT().GetUserBelongOrgs(mock.Anything, dbUser.ID).Return([]database.Organization{}, nil)
+	mockOrgStore.EXPECT().GetUserRootOrganizations(mock.Anything, dbUser.ID).Return([]database.Organization{}, nil)
 
 	uc := &userComponentImpl{
 		userStore: mockUserStore,
@@ -1412,7 +1412,7 @@ func TestUserComponent_Get_WithOrgs(t *testing.T) {
 
 	mockUserStore.EXPECT().FindByUsername(mock.Anything, "testuser").Return(dbUser, nil)
 	mockUserTagStore.EXPECT().GetUserTags(mock.Anything, dbUser.ID).Return([]*database.Tag{}, nil)
-	mockOrgStore.EXPECT().GetUserBelongOrgs(mock.Anything, dbUser.ID).Return(dbOrgs, nil)
+	mockOrgStore.EXPECT().GetUserRootOrganizations(mock.Anything, dbUser.ID).Return(dbOrgs, nil)
 
 	uc := &userComponentImpl{
 		userStore: mockUserStore,
@@ -1453,7 +1453,7 @@ func TestUserComponent_Get_WithTags(t *testing.T) {
 
 	mockUserStore.EXPECT().FindByUsername(mock.Anything, "testuser").Return(dbUser, nil)
 	mockUserTagStore.EXPECT().GetUserTags(mock.Anything, dbUser.ID).Return(tags, nil)
-	mockOrgStore.EXPECT().GetUserBelongOrgs(mock.Anything, dbUser.ID).Return([]database.Organization{}, nil)
+	mockOrgStore.EXPECT().GetUserRootOrganizations(mock.Anything, dbUser.ID).Return([]database.Organization{}, nil)
 
 	uc := &userComponentImpl{
 		userStore: mockUserStore,
@@ -1519,7 +1519,7 @@ func TestUserComponent_Get_RoleVisibility(t *testing.T) {
 
 		mockUserStore.EXPECT().FindByUsername(mock.Anything, "testuser").Return(dbUser, nil)
 		mockUserTagStore.EXPECT().GetUserTags(mock.Anything, dbUser.ID).Return([]*database.Tag{}, nil)
-		mockOrgStore.EXPECT().GetUserBelongOrgs(mock.Anything, dbUser.ID).Return(dbOrgs, nil)
+		mockOrgStore.EXPECT().GetUserRootOrganizations(mock.Anything, dbUser.ID).Return(dbOrgs, nil)
 
 		uc := &userComponentImpl{
 			userStore: mockUserStore,
@@ -1576,7 +1576,7 @@ func TestUserComponent_Get_RoleVisibility(t *testing.T) {
 		mockUserStore.EXPECT().FindByUsername(mock.Anything, "testuser").Return(dbUser, nil)
 		mockUserStore.EXPECT().FindByUsername(mock.Anything, "adminuser").Return(adminUser, nil)
 		mockUserTagStore.EXPECT().GetUserTags(mock.Anything, dbUser.ID).Return([]*database.Tag{}, nil)
-		mockOrgStore.EXPECT().GetUserBelongOrgs(mock.Anything, dbUser.ID).Return(dbOrgs, nil)
+		mockOrgStore.EXPECT().GetUserRootOrganizations(mock.Anything, dbUser.ID).Return(dbOrgs, nil)
 
 		uc := &userComponentImpl{
 			userStore: mockUserStore,
@@ -1632,7 +1632,7 @@ func TestUserComponent_Get_RoleVisibility(t *testing.T) {
 		mockUserStore.EXPECT().FindByUsername(mock.Anything, "testuser").Return(dbUser, nil)
 		mockUserStore.EXPECT().FindByUsername(mock.Anything, "otheruser").Return(otherUser, nil)
 		mockUserTagStore.EXPECT().GetUserTags(mock.Anything, dbUser.ID).Return([]*database.Tag{}, nil)
-		mockOrgStore.EXPECT().GetUserBelongOrgs(mock.Anything, dbUser.ID).Return(dbOrgs, nil)
+		mockOrgStore.EXPECT().GetUserRootOrganizations(mock.Anything, dbUser.ID).Return(dbOrgs, nil)
 
 		uc := &userComponentImpl{
 			userStore: mockUserStore,
