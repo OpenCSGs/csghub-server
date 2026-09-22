@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/avast/retry-go/v4"
-	"opencsg.com/csghub-server/builder/sensitive"
 	"opencsg.com/csghub-server/common/types"
+	ss_type "opencsg.com/csghub-server/common/types/sensitive"
 )
 
 var knownTextFileExts = []string{".md", ".txt", ".csv", ".json", ".jsonl", ".html",
@@ -73,7 +73,7 @@ func GetFileChecker(fileType string, filePath, lfsRelativePath string) FileCheck
 // The enable flag and scenario are injected at construction time to avoid
 // global state and ensure test isolation.
 type ImageFileChecker struct {
-	checker  sensitive.SensitiveChecker
+	checker  ss_type.SensitiveChecker
 	enabled  bool
 	scenario types.SensitiveScenario
 }
@@ -114,7 +114,7 @@ func (c *ImageFileChecker) checkByURL(ctx context.Context, imageURL string) (typ
 	// is a Temporal activity with no hard 30s limit, and concurrency is
 	// bounded by concurrencyLimit in the repo component.
 	res, err := retry.DoWithData(
-		func() (*sensitive.CheckResult, error) {
+		func() (*ss_type.CheckResult, error) {
 			reqCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 			defer cancel()
 			return c.checker.PassImageURLCheck(reqCtx, c.scenario, imageURL)
@@ -152,7 +152,7 @@ func (c *ImageFileChecker) checkByStream(ctx context.Context, reader io.Reader) 
 	_, seekable := reader.(io.ReadSeeker)
 
 	res, err := retry.DoWithData(
-		func() (*sensitive.CheckResult, error) {
+		func() (*ss_type.CheckResult, error) {
 			reqCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 			defer cancel()
 			return c.checker.PassImageStreamCheck(reqCtx, c.scenario, reader)

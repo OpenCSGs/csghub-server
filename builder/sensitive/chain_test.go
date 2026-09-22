@@ -9,10 +9,11 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/mock"
-	mockgreen "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/sensitive"
+	mockgreen "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/common/types/sensitive"
 	"opencsg.com/csghub-server/builder/sensitive"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
+	ss_type "opencsg.com/csghub-server/common/types/sensitive"
 )
 
 func TestChainImpl_AliYun_PassTextCheck(t *testing.T) {
@@ -22,7 +23,7 @@ func TestChainImpl_AliYun_PassTextCheck(t *testing.T) {
 	ctx := context.Background()
 	scenario := types.ScenarioCommentDetection
 	text := "test text"
-	checker.EXPECT().PassTextCheck(ctx, scenario, text).Return(&sensitive.CheckResult{IsSensitive: false}, nil)
+	checker.EXPECT().PassTextCheck(ctx, scenario, text).Return(&ss_type.CheckResult{IsSensitive: false}, nil)
 
 	result, err := chain.PassTextCheck(ctx, scenario, text)
 	if err != nil {
@@ -47,7 +48,7 @@ func TestChainImpl_AliYun_PassTextCheck_Sensitive(t *testing.T) {
 	labels := "politics"
 	requestId := "test-request-id"
 	expectedReason := fmt.Sprintf("label:%s,reason:%s,requestId:%s", labels, reason, requestId)
-	checker.EXPECT().PassTextCheck(ctx, scenario, text).Return(&sensitive.CheckResult{
+	checker.EXPECT().PassTextCheck(ctx, scenario, text).Return(&ss_type.CheckResult{
 		IsSensitive: true,
 		Reason:      expectedReason,
 	}, nil)
@@ -76,7 +77,7 @@ func TestChainImpl_AliYun_PassImageCheck(t *testing.T) {
 	ossBucketName := "test-bucket"
 	ossObjectName := "test-image.jpg"
 	checker.EXPECT().PassImageCheck(ctx, scenario, ossBucketName, ossObjectName).
-		Return(&sensitive.CheckResult{IsSensitive: false}, nil)
+		Return(&ss_type.CheckResult{IsSensitive: false}, nil)
 
 	result, err := chain.PassImageCheck(ctx, scenario, ossBucketName, ossObjectName)
 	if err != nil {
@@ -99,7 +100,7 @@ func TestChainImpl_AliYun_PassImageCheck_Sensitive(t *testing.T) {
 	ossBucketName := "test-bucket"
 	ossObjectName := "test-image.jpg"
 	checker.EXPECT().PassImageCheck(ctx, scenario, ossBucketName, ossObjectName).
-		Return(&sensitive.CheckResult{IsSensitive: true, Reason: "politics"}, nil)
+		Return(&ss_type.CheckResult{IsSensitive: true, Reason: "politics"}, nil)
 
 	result, err := chain.PassImageCheck(ctx, scenario, ossBucketName, ossObjectName)
 	if err != nil {
@@ -124,7 +125,7 @@ func TestChainImpl_AliYun_PassImageURLCheck(t *testing.T) {
 	scenario := types.ScenarioImageBaseLineCheck
 	imageURL := "https://example.com/normal-image.jpg"
 
-	checker.EXPECT().PassImageURLCheck(ctx, scenario, imageURL).Return(&sensitive.CheckResult{
+	checker.EXPECT().PassImageURLCheck(ctx, scenario, imageURL).Return(&ss_type.CheckResult{
 		IsSensitive: false,
 	}, nil)
 
@@ -151,7 +152,7 @@ func TestChainImpl_AliYun_PassImageURLCheck_Sensitive(t *testing.T) {
 	confidence := 95.0
 	requestId := "test-request-id"
 
-	checker.EXPECT().PassImageURLCheck(ctx, scenario, imageURL).Return(&sensitive.CheckResult{
+	checker.EXPECT().PassImageURLCheck(ctx, scenario, imageURL).Return(&ss_type.CheckResult{
 		IsSensitive: true,
 		Reason:      fmt.Sprintf("label:%s,confidence:%f,requestId:%s", labels, confidence, requestId),
 	}, nil)
@@ -180,7 +181,7 @@ func TestChainImpl_AliYun_PassLLMCheck(t *testing.T) {
 	text := "test llm text"
 	sessionId := "test-session-id"
 	req := &types.LLMCheckRequest{Scenario: scenario, Text: text, SessionId: sessionId}
-	checker.EXPECT().PassLLMCheck(ctx, req).Return(&sensitive.CheckResult{IsSensitive: false}, nil)
+	checker.EXPECT().PassLLMCheck(ctx, req).Return(&ss_type.CheckResult{IsSensitive: false}, nil)
 
 	result, err := chain.PassLLMCheck(ctx, req)
 	if err != nil {
@@ -206,7 +207,7 @@ func TestChainImpl_AliYun_PassLLMCheck_Sensitive(t *testing.T) {
 	riskWords := "risk words"
 	expectedReason := fmt.Sprintf("label:%s,reason:%s,requestId:%s", labels, riskWords, "test-request-id")
 	req := &types.LLMCheckRequest{Scenario: scenario, Text: text, SessionId: sessionId}
-	checker.EXPECT().PassLLMCheck(ctx, req).Return(&sensitive.CheckResult{
+	checker.EXPECT().PassLLMCheck(ctx, req).Return(&ss_type.CheckResult{
 		IsSensitive: true,
 		Reason:      expectedReason,
 	}, nil)
@@ -317,21 +318,21 @@ func TestChainImpl_PassImageStreamCheck_SeekableReader(t *testing.T) {
 	var contents []string
 
 	checker1.EXPECT().PassImageStreamCheck(mock.Anything, scenario, mock.Anything).
-		RunAndReturn(func(ctx context.Context, s types.SensitiveScenario, r io.Reader) (*sensitive.CheckResult, error) {
+		RunAndReturn(func(ctx context.Context, s types.SensitiveScenario, r io.Reader) (*ss_type.CheckResult, error) {
 			b, _ := io.ReadAll(r)
 			mu.Lock()
 			contents = append(contents, string(b))
 			mu.Unlock()
-			return &sensitive.CheckResult{IsSensitive: false}, nil
+			return &ss_type.CheckResult{IsSensitive: false}, nil
 		}).Once()
 
 	checker2.EXPECT().PassImageStreamCheck(mock.Anything, scenario, mock.Anything).
-		RunAndReturn(func(ctx context.Context, s types.SensitiveScenario, r io.Reader) (*sensitive.CheckResult, error) {
+		RunAndReturn(func(ctx context.Context, s types.SensitiveScenario, r io.Reader) (*ss_type.CheckResult, error) {
 			b, _ := io.ReadAll(r)
 			mu.Lock()
 			contents = append(contents, string(b))
 			mu.Unlock()
-			return &sensitive.CheckResult{IsSensitive: false}, nil
+			return &ss_type.CheckResult{IsSensitive: false}, nil
 		}).Once()
 
 	result, err := chain.PassImageStreamCheck(ctx, scenario, strings.NewReader(imageContent))
@@ -368,9 +369,9 @@ func TestChainImpl_PassImageStreamCheck_SeekableReader_ShortCircuit(t *testing.T
 	scenario := types.ScenarioImageBaseLineCheck
 
 	checker1.EXPECT().PassImageStreamCheck(mock.Anything, scenario, mock.Anything).
-		RunAndReturn(func(ctx context.Context, s types.SensitiveScenario, r io.Reader) (*sensitive.CheckResult, error) {
+		RunAndReturn(func(ctx context.Context, s types.SensitiveScenario, r io.Reader) (*ss_type.CheckResult, error) {
 			_, _ = io.ReadAll(r) // consume the stream
-			return &sensitive.CheckResult{IsSensitive: true, Reason: "porn"}, nil
+			return &ss_type.CheckResult{IsSensitive: true, Reason: "porn"}, nil
 		}).Once()
 	// checker2 must NOT be called
 	checker2.AssertNotCalled(t, "PassImageStreamCheck", mock.Anything, mock.Anything, mock.Anything)
@@ -405,21 +406,21 @@ func TestChainImpl_PassImageStreamCheck_NonSeekableReader(t *testing.T) {
 	var contents []string
 
 	checker1.EXPECT().PassImageStreamCheck(mock.Anything, scenario, mock.Anything).
-		RunAndReturn(func(ctx context.Context, s types.SensitiveScenario, r io.Reader) (*sensitive.CheckResult, error) {
+		RunAndReturn(func(ctx context.Context, s types.SensitiveScenario, r io.Reader) (*ss_type.CheckResult, error) {
 			b, _ := io.ReadAll(r)
 			mu.Lock()
 			contents = append(contents, string(b))
 			mu.Unlock()
-			return &sensitive.CheckResult{IsSensitive: false}, nil
+			return &ss_type.CheckResult{IsSensitive: false}, nil
 		}).Once()
 
 	checker2.EXPECT().PassImageStreamCheck(mock.Anything, scenario, mock.Anything).
-		RunAndReturn(func(ctx context.Context, s types.SensitiveScenario, r io.Reader) (*sensitive.CheckResult, error) {
+		RunAndReturn(func(ctx context.Context, s types.SensitiveScenario, r io.Reader) (*ss_type.CheckResult, error) {
 			b, _ := io.ReadAll(r)
 			mu.Lock()
 			contents = append(contents, string(b))
 			mu.Unlock()
-			return &sensitive.CheckResult{IsSensitive: false}, nil
+			return &ss_type.CheckResult{IsSensitive: false}, nil
 		}).Once()
 
 	// Wrap in a struct that only exposes Read, hiding Seek.
@@ -460,12 +461,12 @@ func TestChainImpl_PassImageStreamCheck_SingleChecker(t *testing.T) {
 	scenario := types.ScenarioImageBaseLineCheck
 
 	checker1.EXPECT().PassImageStreamCheck(mock.Anything, scenario, mock.Anything).
-		RunAndReturn(func(ctx context.Context, s types.SensitiveScenario, r io.Reader) (*sensitive.CheckResult, error) {
+		RunAndReturn(func(ctx context.Context, s types.SensitiveScenario, r io.Reader) (*ss_type.CheckResult, error) {
 			b, _ := io.ReadAll(r)
 			if string(b) != imageContent {
 				t.Fatalf("expected %q, got %q", imageContent, string(b))
 			}
-			return &sensitive.CheckResult{IsSensitive: false}, nil
+			return &ss_type.CheckResult{IsSensitive: false}, nil
 		}).Once()
 
 	result, err := chain.PassImageStreamCheck(ctx, scenario, strings.NewReader(imageContent))

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"sort"
 	"strings"
 	"sync"
 
@@ -106,7 +105,7 @@ func (m *Manager) Close() error {
 func startClient(def Definition) (*Client, error) {
 	logger := hclog.New(&hclog.LoggerOptions{
 		Name:   fmt.Sprintf("plugin_%s", def.Name),
-		Output: os.Stdout,
+		Output: os.Stderr,
 		Level:  hclog.Debug,
 	})
 
@@ -145,12 +144,6 @@ func definitionKey(def Definition) (string, error) {
 			return "", fmt.Errorf("plugin command for %s contains an empty argument", def.Name)
 		}
 	}
-
-	env := make([]string, len(def.Env))
-	copy(env, def.Env)
-	sort.Strings(env)
-	command := make([]string, len(def.Command))
-	copy(command, def.Command)
 	return strings.Join([]string{
 		def.Name,
 		def.HandshakeConfig.MagicCookieKey,

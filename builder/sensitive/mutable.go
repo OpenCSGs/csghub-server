@@ -4,14 +4,15 @@ import (
 	"log/slog"
 
 	"opencsg.com/csghub-server/builder/sensitive/internal"
+	ss_type "opencsg.com/csghub-server/common/types/sensitive"
 )
 
 type Mutable struct {
-	NewChecker func(data *internal.SensitiveWordData) SensitiveChecker
-	SensitiveChecker
+	NewChecker func(data *internal.SensitiveWordData) ss_type.SensitiveChecker
+	ss_type.SensitiveChecker
 }
 
-func NewMutableACAutomation(loader internal.Loader) SensitiveChecker {
+func NewMutableACAutomation(loader internal.Loader) ss_type.SensitiveChecker {
 	data, err := loader.Load()
 	if err != nil {
 		slog.Error("Failed to load sensitive data",

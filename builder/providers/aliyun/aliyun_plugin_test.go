@@ -1,4 +1,4 @@
-package sensitive
+package aliyun
 
 import (
 	"testing"
@@ -25,5 +25,5 @@ func TestPluginAliyunCheckerSensitiveCheckEnv(t *testing.T) {
 		"STARHUB_SERVER_SENSITIVE_CHECK_ENDPOINT=oss-cn-beijing.aliyuncs.com",
 		"STARHUB_SERVER_SENSITIVE_CHECK_OSS_BUCKET=sensitive-check",
 		"STARHUB_SERVER_SENSITIVE_CHECK_ENABLE_SSL=true",
-	}, checker.SensitiveCheckEnv())
+	}, checker.sensitiveCheckEnv())
 }

@@ -12,10 +12,10 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	mockio "opencsg.com/csghub-server/_mocks/io"
-	mocksens "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/sensitive"
-	"opencsg.com/csghub-server/builder/sensitive"
+	mocksens "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/common/types/sensitive"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
+	ss_type "opencsg.com/csghub-server/common/types/sensitive"
 )
 
 func TestUnkownFileChecker_Run(t *testing.T) {
@@ -55,7 +55,7 @@ func TestUnkownFileChecker_Run(t *testing.T) {
 
 		const testURL = "http://example.com/image.png"
 		mockChecker.EXPECT().PassImageURLCheck(mock.Anything, types.ScenarioImageBaseLineCheck, testURL).
-			Return(&sensitive.CheckResult{IsSensitive: false}, nil)
+			Return(&ss_type.CheckResult{IsSensitive: false}, nil)
 
 		c := &UnkownFileChecker{}
 		status, msg := c.Run(context.Background(), FileCheckContext{Reader: &pngBuf, ImageURL: testURL})
@@ -75,7 +75,7 @@ func TestUnkownFileChecker_Run(t *testing.T) {
 		require.NoError(t, err)
 
 		mockChecker.EXPECT().PassImageStreamCheck(mock.Anything, types.ScenarioImageBaseLineCheck, mock.Anything).
-			Return(&sensitive.CheckResult{IsSensitive: false}, nil)
+			Return(&ss_type.CheckResult{IsSensitive: false}, nil)
 
 		// bytes.Reader implements io.ReadSeeker so rewindReader can seek it back.
 		c := &UnkownFileChecker{}
@@ -96,7 +96,7 @@ func TestUnkownFileChecker_Run(t *testing.T) {
 		require.NoError(t, err)
 
 		mockChecker.EXPECT().PassImageStreamCheck(mock.Anything, types.ScenarioImageBaseLineCheck, mock.Anything).
-			Return(&sensitive.CheckResult{IsSensitive: true, Reason: "label:porn"}, nil)
+			Return(&ss_type.CheckResult{IsSensitive: true, Reason: "label:porn"}, nil)
 
 		c := &UnkownFileChecker{}
 		status, msg := c.Run(context.Background(), FileCheckContext{Reader: bytes.NewReader(pngBuf.Bytes())})
@@ -125,9 +125,9 @@ func TestUnkownFileChecker_Run(t *testing.T) {
 
 		var readContent []byte
 		mockChecker.EXPECT().PassImageStreamCheck(mock.Anything, types.ScenarioImageBaseLineCheck, mock.Anything).
-			RunAndReturn(func(ctx context.Context, scenario types.SensitiveScenario, r io.Reader) (*sensitive.CheckResult, error) {
+			RunAndReturn(func(ctx context.Context, scenario types.SensitiveScenario, r io.Reader) (*ss_type.CheckResult, error) {
 				readContent, _ = io.ReadAll(r)
-				return &sensitive.CheckResult{IsSensitive: false}, nil
+				return &ss_type.CheckResult{IsSensitive: false}, nil
 			}).Once()
 
 		// bytes.Reader implements io.ReadSeeker

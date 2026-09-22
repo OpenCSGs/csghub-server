@@ -1,15 +1,13 @@
 package sensitive
 
 import (
-	"context"
-	"fmt"
-	"io"
 	"log/slog"
 	"strings"
 
+	"opencsg.com/csghub-server/builder/providers/aliyun"
 	"opencsg.com/csghub-server/builder/sensitive/internal"
 	"opencsg.com/csghub-server/common/config"
-	"opencsg.com/csghub-server/common/types"
+	ss_type "opencsg.com/csghub-server/common/types/sensitive"
 )
 
 // ProviderName constants for consistency
@@ -21,7 +19,7 @@ const (
 )
 
 type chainImpl struct {
-	checkers []SensitiveChecker
+	checkers []ss_type.SensitiveChecker
 }
 
 type ChainOption func(*config.Config, *chainImpl)
@@ -31,7 +29,7 @@ type ChainOption func(*config.Config, *chainImpl)
 // also used for short-lived activities.
 func WithAliYunPluginChecker() ChainOption {
 	return func(config *config.Config, c *chainImpl) {
-		c.checkers = append(c.checkers, newPluginAliyunChecker(config))
+		c.checkers = append(c.checkers, aliyun.NewPluginAliyunChecker(config))
 	}
 }
 
@@ -60,7 +58,7 @@ func WithMutableACAutomaton(loader internal.Loader) ChainOption {
 // NewChainChecker create a chain sensitive checker
 //
 // It will run all checkers in order by the options provided
-func NewChainChecker(config *config.Config, opts ...ChainOption) SensitiveChecker {
+func NewChainChecker(config *config.Config, opts ...ChainOption) ss_type.SensitiveChecker {
 	c := &chainImpl{}
 	for _, opt := range opts {
 		opt(config, c)
@@ -68,90 +66,10 @@ func NewChainChecker(config *config.Config, opts ...ChainOption) SensitiveChecke
 	return c
 }
 
-func NewChainCheckerWithCheckers(checkers ...SensitiveChecker) SensitiveChecker {
+func NewChainCheckerWithCheckers(checkers ...ss_type.SensitiveChecker) ss_type.SensitiveChecker {
 	return &chainImpl{
 		checkers: checkers,
 	}
-}
-
-func (c *chainImpl) PassTextCheck(ctx context.Context, scenario types.SensitiveScenario, text string) (*CheckResult, error) {
-	for _, checker := range c.checkers {
-		res, err := checker.PassTextCheck(ctx, scenario, text)
-		if err != nil {
-			return nil, err
-		}
-		if res.IsSensitive {
-			// If any checker detects sensitivity, return immediately
-			return res, nil
-		}
-	}
-	return &CheckResult{IsSensitive: false}, nil
-}
-
-func (c *chainImpl) PassImageCheck(ctx context.Context, scenario types.SensitiveScenario, ossBucketName, ossObjectName string) (*CheckResult, error) {
-	for _, checker := range c.checkers {
-		res, err := checker.PassImageCheck(ctx, scenario, ossBucketName, ossObjectName)
-		if err != nil {
-			return nil, err
-		}
-		if res.IsSensitive {
-			// If any checker detects sensitivity, return immediately
-			return res, nil
-		}
-	}
-	return &CheckResult{IsSensitive: false}, nil
-}
-
-func (c *chainImpl) PassImageURLCheck(ctx context.Context, scenario types.SensitiveScenario, imageURL string) (*CheckResult, error) {
-	for _, checker := range c.checkers {
-		res, err := checker.PassImageURLCheck(ctx, scenario, imageURL)
-		if err != nil {
-			return nil, err
-		}
-		if res.IsSensitive {
-			// If any checker detects sensitivity, return immediately
-			return res, nil
-		}
-	}
-	return &CheckResult{IsSensitive: false}, nil
-}
-
-func (c *chainImpl) PassImageStreamCheck(ctx context.Context, scenario types.SensitiveScenario, reader io.Reader) (*CheckResult, error) {
-	// If the reader is seekable, rewind it before each checker so every
-	// checker receives the full, identical content. Without this, the first
-	// checker consumes the stream and subsequent checkers read empty content.
-	seeker, canSeek := reader.(io.Seeker)
-
-	for _, checker := range c.checkers {
-		if canSeek {
-			if _, err := seeker.Seek(0, io.SeekStart); err != nil {
-				return nil, fmt.Errorf("failed to seek image reader before checker: %w", err)
-			}
-		}
-		res, err := checker.PassImageStreamCheck(ctx, scenario, reader)
-		if err != nil {
-			return nil, err
-		}
-		if res.IsSensitive {
-			// If any checker detects sensitivity, return immediately
-			return res, nil
-		}
-	}
-	return &CheckResult{IsSensitive: false}, nil
-}
-
-func (c *chainImpl) PassLLMCheck(ctx context.Context, req *types.LLMCheckRequest) (*CheckResult, error) {
-	for _, checker := range c.checkers {
-		res, err := checker.PassLLMCheck(ctx, req)
-		if err != nil {
-			return nil, err
-		}
-		if res.IsSensitive {
-			// If any checker detects sensitivity, return immediately
-			return res, nil
-		}
-	}
-	return &CheckResult{IsSensitive: false}, nil
 }
 
 // AdvanceOptionsFunc allows external packages (e.g., EE versions) to register
@@ -172,7 +90,7 @@ func RegisterAdvanceOptions(fn AdvanceOptionsFunc) {
 // For each provider in the check chain, it first consults the registered AdvanceOptionsFunc.
 // If the advanced function returns non-nil options, those are used and the built-in
 // defaults are skipped (continue). Otherwise, the built-in default provider switch is applied.
-func NewChainCheckerFromConfig(config *config.Config) SensitiveChecker {
+func NewChainCheckerFromConfig(config *config.Config) ss_type.SensitiveChecker {
 	var opts []ChainOption
 
 	for _, provider := range config.SensitiveCheck.CheckChain {
@@ -214,26 +132,4 @@ func defaultCheckOpts(config *config.Config, provider string) []ChainOption {
 		}
 		return nil
 	}
-}
-
-// SubmitMediaModeration delegates to the first checker in the chain that
-// implements MediaSensitiveChecker (the Aliyun Green checker). AC-automaton
-// checkers do not implement it and are skipped.
-func (c *chainImpl) SubmitMediaModeration(ctx context.Context, req types.MediaModerationRequest) (*types.MediaModerationSubmission, error) {
-	for _, checker := range c.checkers {
-		if mc, ok := checker.(MediaSensitiveChecker); ok {
-			return mc.SubmitMediaModeration(ctx, req)
-		}
-	}
-	return nil, fmt.Errorf("no checker in the chain supports media moderation")
-}
-
-// QueryMediaModerationResult delegates to the first MediaSensitiveChecker.
-func (c *chainImpl) QueryMediaModerationResult(ctx context.Context, req types.MediaModerationRequest) (*types.MediaModerationResult, error) {
-	for _, checker := range c.checkers {
-		if mc, ok := checker.(MediaSensitiveChecker); ok {
-			return mc.QueryMediaModerationResult(ctx, req)
-		}
-	}
-	return nil, fmt.Errorf("no checker in the chain supports media moderation")
 }

@@ -8,12 +8,12 @@ import (
 	"time"
 
 	"github.com/avast/retry-go/v4"
-	"opencsg.com/csghub-server/builder/sensitive"
 	"opencsg.com/csghub-server/common/types"
+	ss_type "opencsg.com/csghub-server/common/types/sensitive"
 )
 
 type TextFileChecker struct {
-	sensitive.SensitiveChecker
+	ss_type.SensitiveChecker
 }
 
 func NewTextFileChecker() *TextFileChecker {
@@ -54,13 +54,13 @@ func (c *TextFileChecker) Run(ctx context.Context, fctx FileCheckContext) (types
 			}
 		}
 		for _, buf := range bufs {
-			var res *sensitive.CheckResult
+			var res *ss_type.CheckResult
 			var err error
 			slog.Debug("check text", slog.String("scenario", string(types.ScenarioCommentDetection)), slog.String("text", buf.String()))
 			txt := buf.String()
 			//call remote checker
 			res, err = retry.DoWithData(
-				func() (*sensitive.CheckResult, error) {
+				func() (*ss_type.CheckResult, error) {
 					reqCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 					res, err = c.PassTextCheck(reqCtx, types.ScenarioCommentDetection, txt)
 					cancel()

@@ -89,7 +89,7 @@ packages:
     config:
     interfaces:
       LLMSvcClient:
-  opencsg.com/csghub-server/builder/sensitive:
+  opencsg.com/csghub-server/common/types/sensitive:
     config:
     interfaces:
       SensitiveChecker:

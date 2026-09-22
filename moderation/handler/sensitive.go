@@ -5,9 +5,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/api/httpbase"
-	"opencsg.com/csghub-server/builder/sensitive"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
+	ss_type "opencsg.com/csghub-server/common/types/sensitive"
 	utils "opencsg.com/csghub-server/common/utils/common"
 	"opencsg.com/csghub-server/moderation/component"
 )
@@ -67,7 +67,7 @@ func (h *SensitiveHandler) Image(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	var result *sensitive.CheckResult
+	var result *ss_type.CheckResult
 	if r.ImageURL != "" {
 		result, err = h.c.PassImageURLCheck(ctx, r.Scenario, r.ImageURL)
 	} else if r.OssBucketName != "" && r.OssObjectName != "" {
