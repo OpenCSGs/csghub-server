@@ -92,9 +92,14 @@ packages:
   opencsg.com/csghub-server/builder/sensitive:
     config:
     interfaces:
+      SensitiveChecker:
+  opencsg.com/csghub-server/plugins/aliyun_checker/internal/aliyun:
+    config:
+      dir: "plugins/aliyun_checker/internal/alymocks"
+      outpkg: "alymocks"
+    interfaces:
       GreenClient:
       Green2022Client:
-      SensitiveChecker:
   opencsg.com/csghub-server/builder/proxy:
     config:
     interfaces:

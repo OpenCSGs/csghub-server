@@ -1,4 +1,4 @@
-package sensitive_test
+package aliyun_test
 
 import (
 	"context"
@@ -15,16 +15,16 @@ import (
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/green"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	mockgreen "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/sensitive"
-	"opencsg.com/csghub-server/builder/sensitive"
 	"opencsg.com/csghub-server/common/types"
+	"opencsg.com/csghub-server/plugins/aliyun_checker/internal/aliyun"
+	mockgreen "opencsg.com/csghub-server/plugins/aliyun_checker/internal/alymocks"
 )
 
 func TestSensitiveChecker_SplitTasks(t *testing.T) {
-	c := new(sensitive.AliyunGreenChecker)
+	c := new(aliyun.AliyunGreenChecker)
 	largeText := strings.Repeat("a", 50000)
 	tasks := c.SplitTasks(largeText)
-	taskCount := math.Round(float64(len(largeText)) / float64(sensitive.LargeTextSize))
+	taskCount := math.Round(float64(len(largeText)) / float64(aliyun.LargeTextSize))
 	fmt.Println(taskCount, len(tasks))
 	if len(tasks) != int(taskCount) {
 		t.Logf("task count mismatch, expected: %d, got: %d", int(taskCount), len(tasks))
@@ -35,7 +35,7 @@ func TestSensitiveChecker_SplitTasks(t *testing.T) {
 func TestSensitiveChecker_PassImageURLCheck(t *testing.T) {
 	gc := mockgreen.NewMockGreenClient(t)
 	g2c := mockgreen.NewMockGreen2022Client(t)
-	checker := sensitive.NewAliyunChecker(gc, g2c)
+	checker := aliyun.NewAliyunChecker(gc, g2c)
 
 	imageURL := "https://example.com/image.jpg"
 
@@ -179,11 +179,11 @@ func TestSensitiveChecker_PassImageURLCheck(t *testing.T) {
 
 func TestSensitiveChecker_PassLargeTextCheck(t *testing.T) {
 	gc := mockgreen.NewMockGreenClient(t)
-	checker := sensitive.NewAliyunChecker(gc, nil)
+	checker := aliyun.NewAliyunChecker(gc, nil)
 
 	t.Run("text too long", func(t *testing.T) {
 		_, err := checker.PassLargeTextCheck(
-			context.Background(), strings.Repeat("a", 150*sensitive.LargeTextSize),
+			context.Background(), strings.Repeat("a", 150*aliyun.LargeTextSize),
 		)
 		require.NotNil(t, err)
 	})
@@ -205,7 +205,7 @@ func TestSensitiveChecker_PassLargeTextCheck(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			text := strings.Repeat("a", sensitive.LargeTextSize+10)
+			text := strings.Repeat("a", aliyun.LargeTextSize+10)
 			tasks := checker.SplitTasks(text)
 			content, _ := json.Marshal(
 				map[string]interface{}{
@@ -217,10 +217,10 @@ func TestSensitiveChecker_PassLargeTextCheck(t *testing.T) {
 			textScanRequest := green.CreateTextScanRequest()
 			textScanRequest.SetContent(content)
 
-			gc.EXPECT().TextScan(textScanRequest).Return(&sensitive.TextScanResponse{
-				Data: []sensitive.TextScanResponseDataItem{
+			gc.EXPECT().TextScan(textScanRequest).Return(&aliyun.TextScanResponse{
+				Data: []aliyun.TextScanResponseDataItem{
 					{
-						Results: []sensitive.TextScanResponseDataItemResult{
+						Results: []aliyun.TextScanResponseDataItemResult{
 							{Label: c.label, Rate: c.rate, Suggestion: c.suggestion},
 						},
 						TaskId: "task_id_1",
@@ -228,7 +228,7 @@ func TestSensitiveChecker_PassLargeTextCheck(t *testing.T) {
 				},
 				RequestID: "request_id_1",
 			}, nil).Once()
-			result, err := checker.PassLargeTextCheck(context.Background(), strings.Repeat("a", sensitive.LargeTextSize+10))
+			result, err := checker.PassLargeTextCheck(context.Background(), strings.Repeat("a", aliyun.LargeTextSize+10))
 			require.Nil(t, err)
 			require.Equal(t, c.isSensitive, result.IsSensitive)
 			require.Equal(t, c.wantReason, result.Reason)
@@ -240,16 +240,16 @@ func TestSensitiveChecker_PassLargeTextCheck(t *testing.T) {
 func TestSensitiveChecker_PassTextCheck(t *testing.T) {
 	gc := mockgreen.NewMockGreenClient(t)
 	g2c := mockgreen.NewMockGreen2022Client(t)
-	checker := sensitive.NewAliyunChecker(gc, g2c)
+	checker := aliyun.NewAliyunChecker(gc, g2c)
 
 	t.Run("large text", func(t *testing.T) {
-		gc.EXPECT().TextScan(mock.Anything).Return(&sensitive.TextScanResponse{
-			Data: []sensitive.TextScanResponseDataItem{
-				{Results: []sensitive.TextScanResponseDataItemResult{
+		gc.EXPECT().TextScan(mock.Anything).Return(&aliyun.TextScanResponse{
+			Data: []aliyun.TextScanResponseDataItem{
+				{Results: []aliyun.TextScanResponseDataItemResult{
 					{Label: "foo", Rate: 0.7, Suggestion: "pass"},
 				}},
 			}}, nil).Once()
-		_, err := checker.PassLargeTextCheck(context.Background(), strings.Repeat("a", sensitive.LargeTextSize+10))
+		_, err := checker.PassLargeTextCheck(context.Background(), strings.Repeat("a", aliyun.LargeTextSize+10))
 		require.Nil(t, err)
 	})
 
@@ -300,7 +300,7 @@ func TestSensitiveChecker_PassTextCheck(t *testing.T) {
 func TestSensitiveChecker_PassLLMCheck(t *testing.T) {
 	gc := mockgreen.NewMockGreenClient(t)
 	g2c := mockgreen.NewMockGreen2022Client(t)
-	checker := sensitive.NewAliyunChecker(gc, g2c)
+	checker := aliyun.NewAliyunChecker(gc, g2c)
 
 	cases := []struct {
 		labels      string

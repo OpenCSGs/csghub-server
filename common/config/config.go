@@ -81,7 +81,8 @@ type Config struct {
 	NeedPhoneVerify          bool              `env:"STARHUB_SERVER_NEED_PHONE_VERIFY" default:"false"`
 	// TimeZone is the application-wide timezone used for formatting
 	// timestamps (e.g. Loki log timestamps).
-	TimeZone string `env:"STARHUB_SERVER_TIMEZONE" default:"Asia/Shanghai"`
+	TimeZone   string `env:"STARHUB_SERVER_TIMEZONE" default:"Asia/Shanghai"`
+	PluginPath string `env:"STARHUB_SERVER_PLUGIN_PATH" default:"/starhub-bin/plugins"`
 
 	PostHog struct {
 		Enabled      bool   `env:"STARHUB_SERVER_POSTHOG_ENABLED" default:"false"`

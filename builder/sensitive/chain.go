@@ -26,19 +26,12 @@ type chainImpl struct {
 
 type ChainOption func(*config.Config, *chainImpl)
 
-// WithAliYunChecker adds an AliYun sensitive checker to the chain
-// if the configuration is provided
-func WithAliYunChecker() ChainOption {
+// WithAliYunPluginChecker adds a checker backed by the Aliyun checker plugin.
+// The plugin process is started lazily because NewChainCheckerFromConfig is
+// also used for short-lived activities.
+func WithAliYunPluginChecker() ChainOption {
 	return func(config *config.Config, c *chainImpl) {
-		if config.SensitiveCheck.AccessKeyID != "" &&
-			config.SensitiveCheck.AccessKeySecret != "" &&
-			config.SensitiveCheck.Region != "" {
-			checker := NewAliyunGreenCheckerFromConfig(config)
-			checker.initS3Client(config)
-			c.checkers = append(c.checkers, checker)
-		} else {
-			slog.Warn("sensitive config for AliYun modereation service not set")
-		}
+		c.checkers = append(c.checkers, newPluginAliyunChecker(config))
 	}
 }
 
@@ -183,6 +176,7 @@ func NewChainCheckerFromConfig(config *config.Config) SensitiveChecker {
 	var opts []ChainOption
 
 	for _, provider := range config.SensitiveCheck.CheckChain {
+		slog.Info("sensitive check provider", slog.String("provider", provider))
 		p := strings.TrimSpace(provider)
 		if advanceOpts := loadAdvanceCheckOpts(config, p); advanceOpts != nil {
 			opts = append(opts, advanceOpts...)
@@ -213,7 +207,7 @@ func defaultCheckOpts(config *config.Config, provider string) []ChainOption {
 	case ProviderMutableACAutomaton:
 		return []ChainOption{WithMutableACAutomaton(LoadFromDB())}
 	case ProviderAliyunGreen:
-		return []ChainOption{WithAliYunChecker()}
+		return []ChainOption{WithAliYunPluginChecker()}
 	default:
 		if provider != "" {
 			slog.Warn("unknown sensitive check provider ignored", slog.String("provider", provider))

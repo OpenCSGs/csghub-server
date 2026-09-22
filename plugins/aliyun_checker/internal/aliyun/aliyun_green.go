@@ -1,4 +1,4 @@
-package sensitive
+package aliyun
 
 import (
 	"context"
@@ -24,6 +24,11 @@ import (
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
 )
+
+type CheckResult struct {
+	IsSensitive bool
+	Reason      string
+}
 
 // copy from common/utils/common to avoid cycle import
 func truncString(s string, limit int) string {
@@ -149,10 +154,16 @@ func NewAliyunCheckerWithS3(green GreenClient, green2022 Green2022Client, s3Cli 
 	}
 }
 
-var _ SensitiveChecker = (*AliyunGreenChecker)(nil)
-
 const smallTextSize = 500
 const LargeTextSize = 9000
+
+// NewAliyunCheckerFromConfig creates an Aliyun checker with its temporary OSS
+// client configured. It is intended for the standalone Aliyun checker plugin.
+func NewAliyunCheckerFromConfig(config *config.Config) *AliyunGreenChecker {
+	checker := NewAliyunGreenCheckerFromConfig(config)
+	checker.initS3Client(config)
+	return checker
+}
 
 // NewAliyunGreenCheckerFromConfig creates a new AliyunGreenChecker
 func NewAliyunGreenCheckerFromConfig(config *config.Config) *AliyunGreenChecker {
@@ -171,11 +182,13 @@ func NewAliyunGreenCheckerFromConfig(config *config.Config) *AliyunGreenChecker 
 	}
 	cip, err := green20220302.NewClient(aliyunConfig)
 	if err != nil {
+		slog.Error("NewAliyunGreenChecker client enhanced failed:", slog.Any("err", err))
 		log.Fatalf("NewAliyunGreenChecker client enhanced failed: %v", err)
 	}
 
 	c, err := green.NewClientWithAccessKey(region, accessKeyID, accessKeySecret)
 	if err != nil {
+		slog.Error("NewAliyunGreenChecker client failed:", slog.Any("err", err))
 		log.Fatalf("NewAliyunGreenChecker client failed: %v", err)
 	}
 
@@ -354,8 +367,8 @@ func (c *AliyunGreenChecker) PassLLMCheck(ctx context.Context, req *types.LLMChe
 	}
 	resp, err := c.green2022.TextModerationPlusWithOptions(request, options)
 	if err != nil {
-		slog.Error("fail to call aliyun TextModerationPlusWithOptions", slog.String("content", req.Text), slog.Any("error", err))
-		return nil, fmt.Errorf("fail to call aliyun TextModerationPlusWithOptions: %w", err)
+		slog.Error("failed to call aliyun TextModerationPlusWithOptions", slog.String("content", req.Text), slog.Any("error", err))
+		return nil, fmt.Errorf("failed to call aliyun TextModerationPlusWithOptions: %w", err)
 	}
 
 	if *resp.StatusCode != http.StatusOK {

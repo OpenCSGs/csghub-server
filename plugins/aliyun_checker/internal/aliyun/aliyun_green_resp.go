@@ -1,4 +1,4 @@
-package sensitive
+package aliyun
 
 type TextScanResponseDataItemResult struct {
 	Scene string `json:"scene"`
