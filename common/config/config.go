@@ -93,7 +93,8 @@ type Config struct {
 
 	// Organization controls optional hierarchy-backed organization membership.
 	Organization struct {
-		// EnableUnit selects the hierarchy organization APIs and hierarchy-aware organization Store.
+		// EnableUnit requests hierarchy mode in EE/SaaS; CE always uses single-level organizations.
+		// Consumers must use IsHierarchicalOrganization to resolve the effective mode.
 		EnableUnit bool `env:"STARHUB_SERVER_ORGANIZATION_ENABLE_UNIT" default:"false"`
 	}
 

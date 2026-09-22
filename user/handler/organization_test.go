@@ -108,6 +108,48 @@ func TestOrganizationHandler_Index(t *testing.T) {
 	require.Equal(t, 1, r.Data.Total)
 }
 
+// TestOrganizationHandler_Get verifies detail mode validation through the HTTP route.
+func TestOrganizationHandler_Get(t *testing.T) {
+	newGetTestContext := func(t *testing.T) (*httptest.ResponseRecorder, *gin.Engine) {
+		t.Helper()
+		gin.SetMode(gin.TestMode)
+		response := httptest.NewRecorder()
+		return response, gin.New()
+	}
+
+	for _, test := range []struct {
+		name                     string
+		currentHierarchical      bool
+		organizationHierarchical bool
+		status                   int
+	}{
+		{name: "single mode reads single organization", status: 200},
+		{name: "single mode rejects hierarchical organization", organizationHierarchical: true, status: 400},
+		{name: "hierarchical mode reads hierarchical organization", currentHierarchical: true, organizationHierarchical: true, status: 200},
+		{name: "hierarchical mode rejects single organization", currentHierarchical: true, status: 400},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			response, router := newGetTestContext(t)
+			mockOrgComp := mockcomp.NewMockOrganizationComponent(t)
+			mockOrgComp.EXPECT().Get(mock.Anything, "org1").Return(&types.Organization{
+				Name:           "org1",
+				IsHierarchical: test.organizationHierarchical,
+			}, nil)
+			h := &OrganizationHandler{c: mockOrgComp, isHierarchical: test.currentHierarchical}
+
+			router.GET("/api/v1/organization/:namespace", h.Get)
+			router.ServeHTTP(response, httptest.NewRequest("GET", "/api/v1/organization/org1", nil))
+
+			require.Equal(t, test.status, response.Code)
+			if test.status == 400 {
+				var result httpbase.R
+				require.NoError(t, json.Unmarshal(response.Body.Bytes(), &result))
+				require.Equal(t, "ORG-ERR-4", result.Code)
+			}
+		})
+	}
+}
+
 func TestOrganizationHandler_ListUserOrgs(t *testing.T) {
 	t.Run("list user orgs successfully", func(t *testing.T) {
 		gin.SetMode(gin.TestMode)
@@ -125,7 +167,8 @@ func TestOrganizationHandler_ListUserOrgs(t *testing.T) {
 			Username: "user1", Search: "org", Per: 10, Page: 1,
 		}).Return(dborgs, 2, nil)
 		h := &OrganizationHandler{
-			c: mockOrgComp,
+			c:              mockOrgComp,
+			isHierarchical: true,
 		}
 		h.ListUserOrgs(ginc)
 		require.Equal(t, 200, response.Code)
@@ -194,13 +237,15 @@ func TestOrganizationHandler_GetByUUID(t *testing.T) {
 		ginc.Params = gin.Params{{Key: "uuid", Value: "test-uuid-123"}}
 
 		dborg := types.Organization{
-			Name:     "org1",
-			Nickname: "Organization 1",
+			Name:           "org1",
+			Nickname:       "Organization 1",
+			IsHierarchical: true,
 		}
 		mockOrgComp := mockcomp.NewMockOrganizationComponent(t)
 		mockOrgComp.EXPECT().GetByUUID(mock.Anything, "test-uuid-123").Return(&dborg, nil)
 		h := &OrganizationHandler{
-			c: mockOrgComp,
+			c:              mockOrgComp,
+			isHierarchical: true,
 		}
 		h.GetByUUID(ginc)
 		require.Equal(t, 200, response.Code)
@@ -208,6 +253,27 @@ func TestOrganizationHandler_GetByUUID(t *testing.T) {
 		err := json.Unmarshal(response.Body.Bytes(), &r)
 		require.Nil(t, err)
 		require.NotNil(t, r.Data)
+	})
+
+	t.Run("reject mismatched organization mode", func(t *testing.T) {
+		gin.SetMode(gin.TestMode)
+		response := httptest.NewRecorder()
+		ginc, _ := gin.CreateTestContext(response)
+		ginc.Request = httptest.NewRequest("GET", "/api/v1/organization/uuid/hierarchy-uuid", nil)
+		ginc.Params = gin.Params{{Key: "uuid", Value: "hierarchy-uuid"}}
+
+		mockOrgComp := mockcomp.NewMockOrganizationComponent(t)
+		mockOrgComp.EXPECT().GetByUUID(mock.Anything, "hierarchy-uuid").Return(&types.Organization{
+			Name:           "hierarchy-org",
+			IsHierarchical: true,
+		}, nil)
+		h := &OrganizationHandler{c: mockOrgComp, isHierarchical: false}
+		h.GetByUUID(ginc)
+
+		require.Equal(t, 400, response.Code)
+		var result httpbase.R
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &result))
+		require.Equal(t, "ORG-ERR-4", result.Code)
 	})
 
 	t.Run("get organization by uuid with empty uuid", func(t *testing.T) {

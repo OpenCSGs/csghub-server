@@ -42,7 +42,7 @@ func NewCollectionComponent(config *config.Config) (CollectionComponent, error) 
 	cc.repoStore = database.NewRepoStore()
 	cc.userStore = database.NewUserStore()
 	cc.namespaceStore = database.NewNamespaceStore()
-	cc.orgStore = database.NewOrgStore(config)
+	cc.orgStore = database.NewOrgStore(config.IsHierarchicalOrganization(), nil)
 	cc.userLikesStore = database.NewUserLikesStore()
 	cc.rebac = authorizer
 	spaceComponent, err := NewSpaceComponent(config)

@@ -22,6 +22,8 @@ import (
 type OrganizationComponent interface {
 	Create(ctx context.Context, req *types.CreateOrgReq) (*types.Organization, error)
 	Index(ctx context.Context, search string, per, page int, orgType, verifyStatus, tag string) ([]types.Organization, int, error)
+	// ListUserOrgs returns organizations belonging to a user.
+	// Deprecated: the user organization list endpoint is being retired; use the current organization APIs instead.
 	ListUserOrgs(ctx context.Context, req *types.ListUserOrgsReq) ([]types.Organization, int, error)
 	// ListCurrentUserWritableNamespaces returns namespaces where the current user can write.
 	ListCurrentUserWritableNamespaces(ctx context.Context, currentUser string) ([]types.WritableNamespace, error)
@@ -31,6 +33,7 @@ type OrganizationComponent interface {
 	Update(ctx context.Context, req *types.EditOrgReq) (*database.Organization, error)
 }
 
+// NewOrganizationComponent uses the effective edition mode for organization lists and writes.
 func NewOrganizationComponent(config *config.Config) (OrganizationComponent, error) {
 	c := &organizationComponentImpl{config: config}
 	authorizer, err := rebacfactory.NewAuthorizer()
@@ -42,11 +45,7 @@ func NewOrganizationComponent(config *config.Config) (OrganizationComponent, err
 	if err != nil {
 		return nil, err
 	}
-	if config != nil && config.Organization.EnableUnit {
-		c.orgStore = database.NewHierarchyOrgStoreWithDBAndDeletionJobClient(database.GetDB(), deletionJobClient)
-	} else {
-		c.orgStore = database.NewOrgStoreWithDBAndDeletionJobClient(database.GetDB(), deletionJobClient)
-	}
+	c.orgStore = database.NewOrgStore(config.IsHierarchicalOrganization(), deletionJobClient)
 	c.memberStore = database.NewMemberStore()
 	c.nsStore = database.NewNamespaceStore()
 	c.userStore = database.NewUserStore()
@@ -228,6 +227,8 @@ func (c *organizationComponentImpl) Index(ctx context.Context, search string, pe
 	return orgs, total, nil
 }
 
+// ListUserOrgs returns organizations belonging to the requested user.
+// Deprecated: the user organization list endpoint is being retired; use the current organization APIs instead.
 func (c *organizationComponentImpl) ListUserOrgs(ctx context.Context, req *types.ListUserOrgsReq) ([]types.Organization, int, error) {
 	var (
 		err    error

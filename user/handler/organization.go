@@ -16,7 +16,8 @@ import (
 	"opencsg.com/csghub-server/user/component"
 )
 
-func NewOrganizationHandler(config *config.Config) (*OrganizationHandler, error) {
+// NewOrganizationHandler uses the effective organization mode supplied by the router.
+func NewOrganizationHandler(config *config.Config, isHierarchical bool) (*OrganizationHandler, error) {
 	oc, err := component.NewOrganizationComponent(config)
 	if err != nil {
 		return nil, err
@@ -30,16 +31,18 @@ func NewOrganizationHandler(config *config.Config) (*OrganizationHandler, error)
 		return nil, err
 	}
 	return &OrganizationHandler{
-		c:  oc,
-		sc: sc,
-		ov: ov,
+		c:              oc,
+		sc:             sc,
+		ov:             ov,
+		isHierarchical: isHierarchical,
 	}, nil
 }
 
 type OrganizationHandler struct {
-	c  component.OrganizationComponent
-	sc apicomponent.SensitiveComponent
-	ov component.OrganizationVerifyComponent
+	c              component.OrganizationComponent
+	sc             apicomponent.SensitiveComponent
+	ov             component.OrganizationVerifyComponent
+	isHierarchical bool
 }
 
 // CreateOrganization godoc
@@ -115,6 +118,10 @@ func (h *OrganizationHandler) Get(ctx *gin.Context) {
 		}
 		return
 	}
+	if org.IsHierarchical != h.isHierarchical {
+		httpbase.BadRequestWithExt(ctx, errorx.ErrOrganizationModeIncompatible)
+		return
+	}
 
 	slog.InfoContext(ctx.Request.Context(), "Get organization succeed", slog.String("org_path", org.Name))
 	httpbase.OK(ctx, org)
@@ -146,6 +153,10 @@ func (h *OrganizationHandler) GetByUUID(ctx *gin.Context) {
 		} else {
 			httpbase.ServerError(ctx, err)
 		}
+		return
+	}
+	if org.IsHierarchical != h.isHierarchical {
+		httpbase.BadRequestWithExt(ctx, errorx.ErrOrganizationModeIncompatible)
 		return
 	}
 
@@ -202,6 +213,7 @@ func (h *OrganizationHandler) Index(ctx *gin.Context) {
 // @Security     ApiKey
 // @Summary      Get organizations the user belongs to
 // @Description  get organizations the specified user belongs to, with optional role filter (all, write, admin)
+// @Deprecated   true
 // @Tags         Organization
 // @Accept       json
 // @Produce      json
@@ -216,6 +228,8 @@ func (h *OrganizationHandler) Index(ctx *gin.Context) {
 // @Success      200  {object}  types.Response{data=[]types.Organization} "OK"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /user/{username}/organizations [get]
+// ListUserOrgs handles the deprecated user organization list endpoint.
+// Deprecated: the endpoint is being retired after its Portal consumer is removed.
 func (h *OrganizationHandler) ListUserOrgs(ctx *gin.Context) {
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
@@ -392,6 +406,10 @@ func (h *OrganizationHandler) CreateVerify(ctx *gin.Context) {
 	orgVerify, err := h.ov.Create(ctx, &req)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "Failed to create organization Verify", slog.Any("error", err))
+		if errors.Is(err, errorx.ErrOrganizationModeIncompatible) {
+			httpbase.BadRequestWithExt(ctx, err)
+			return
+		}
 		httpbase.ServerError(ctx, err)
 		return
 	}

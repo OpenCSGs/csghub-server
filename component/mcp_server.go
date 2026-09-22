@@ -73,7 +73,7 @@ func NewMCPServerComponent(config *config.Config) (MCPServerComponent, error) {
 		return nil, fmt.Errorf("failed to create repo component for mcp, error: %w", err)
 	}
 	m.repoStore = database.NewRepoStore()
-	m.orgStore = database.NewOrgStore(config)
+	m.orgStore = database.NewOrgStore(config.IsHierarchicalOrganization(), nil)
 	m.rebac, err = rebacfactory.NewAuthorizer()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create ReBAC authorizer for mcp, error: %w", err)

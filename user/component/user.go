@@ -112,6 +112,7 @@ type UserComponent interface {
 	VerifyFederationToken(ctx context.Context, token string) (*types.JWTClaims, string, error)
 }
 
+// NewUserComponent uses the effective edition mode for user organization lists.
 func NewUserComponent(config *config.Config) (UserComponent, error) {
 	var err error
 	c := &userComponentImpl{}
@@ -124,7 +125,7 @@ func NewUserComponent(config *config.Config) (UserComponent, error) {
 		return nil, err
 	}
 	c.userStore = database.NewUserStoreWithDBAndDeletionJobClient(database.GetDB(), deletionJobClient)
-	c.orgStore = database.NewOrgStore(config)
+	c.orgStore = database.NewOrgStore(config.IsHierarchicalOrganization(), nil)
 	c.nsStore = database.NewNamespaceStore()
 	c.repositoryAuthorizations = database.NewRepositoryAuthorizationStore()
 	c.repo = database.NewRepoStoreWithDBAndDeletionJobClient(database.GetDB(), deletionJobClient)
@@ -879,7 +880,7 @@ func (c *userComponentImpl) buildUserInfo(ctx context.Context, dbuser *database.
 		u.CreatedAt = dbuser.CreatedAt
 	}
 
-	dborgs, err := c.orgStore.GetUserBelongOrgs(ctx, dbuser.ID)
+	dborgs, err := c.orgStore.GetUserRootOrganizations(ctx, dbuser.ID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get orgs for user %s,error:%w", dbuser.Username, err)
 	}

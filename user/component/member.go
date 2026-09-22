@@ -56,13 +56,21 @@ func NewMemberComponent(config *config.Config) (MemberComponent, error) {
 	}
 	return &memberComponentImpl{
 		memberStore:           database.NewMemberStore(),
-		orgStore:              database.NewOrgStore(config),
+		orgStore:              database.NewOrgStore(config.IsHierarchicalOrganization(), nil),
 		userStore:             database.NewUserStore(),
 		gitServer:             gs,
 		config:                config,
 		notificationSvcClient: notificationSvcClient,
 		rebac:                 authorizer,
 	}, nil
+}
+
+// ensureOrganizationMode rejects member mutations against an organization from another mode.
+func (c *memberComponentImpl) ensureOrganizationMode(org database.Organization) error {
+	if org.IsHierarchical != c.config.IsHierarchicalOrganization() {
+		return errorx.ErrOrganizationModeIncompatible
+	}
+	return nil
 }
 
 func (c *memberComponentImpl) OrgMembers(ctx context.Context, orgName, currentUser string, pageSize, page int) ([]types.Member, int, error) {
@@ -124,6 +132,9 @@ func (c *memberComponentImpl) ChangeMemberRole(ctx context.Context, orgName, use
 	org, err = c.orgStore.FindByPath(ctx, orgName)
 	if err != nil {
 		return fmt.Errorf("failed to find org,org:%s,caused by:%w", orgName, err)
+	}
+	if err := c.ensureOrganizationMode(org); err != nil {
+		return err
 	}
 	op, err = c.userStore.FindByUsername(ctx, operatorName)
 	if err != nil {
@@ -236,6 +247,9 @@ func (c *memberComponentImpl) AddMembers(ctx context.Context, orgName string, us
 	if err != nil {
 		return fmt.Errorf("failed to find org,org:%s,caused by:%w", orgName, err)
 	}
+	if err := c.ensureOrganizationMode(org); err != nil {
+		return err
+	}
 	op, err = c.userStore.FindByUsername(ctx, operatorName)
 	if err != nil {
 		return fmt.Errorf("failed to find op user,user:%s,caused by:%w", operatorName, err)
@@ -316,6 +330,9 @@ func (c *memberComponentImpl) Delete(ctx context.Context, orgName, userName, ope
 	org, err = c.orgStore.FindByPath(ctx, orgName)
 	if err != nil {
 		return fmt.Errorf("failed to find org,caused by:%w", err)
+	}
+	if err := c.ensureOrganizationMode(org); err != nil {
+		return err
 	}
 	op, err = c.userStore.FindByUsername(ctx, operatorName)
 	if err != nil {

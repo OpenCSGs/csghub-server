@@ -21,3 +21,10 @@ CSGHub also supports configuration through environment variables. The relevant e
 ### Combining Config File with Environment Variables
 
 You can use config file together with environment variables. When both are used, environment variables take **higher priority** than the config file. For example, if you have a `Port` setting, and you specify it in the TOML file as `port=1234` and in an environment variable as `export PORT=5678`, the environment variable value (5678) will be used for the port configuration.
+
+### Organization Mode
+
+`STARHUB_SERVER_ORGANIZATION_ENABLE_UNIT` enables hierarchy mode in EE/SaaS.
+CE always uses single-level organizations, even when this setting is `true`.
+Routes and organization stores use `Config.IsHierarchicalOrganization()` to
+resolve the effective mode consistently. A nil configuration uses single-level mode.

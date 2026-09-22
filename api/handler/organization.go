@@ -406,6 +406,7 @@ func (h *OrganizationHandler) MCPServers(ctx *gin.Context) {
 // @Param        page query int false "current page number"
 // @Success      200  {object}  types.ResponseWithTotal{data=[]types.ArgoWorkFlowRes,total=int} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      403  {object}  types.APIForbidden "Forbidden"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /organization/{namespace}/finetune/instances [get]
 func (h *OrganizationHandler) FinetuneInstances(ctx *gin.Context) {
@@ -424,6 +425,10 @@ func (h *OrganizationHandler) FinetuneInstances(ctx *gin.Context) {
 	data, total, err := h.finetune.OrgFinetuneInstances(ctx.Request.Context(), &req)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "Failed to get org finetunes", slog.Any("error", err))
+		if errors.Is(err, errorx.ErrForbidden) {
+			httpbase.ForbiddenError(ctx, err)
+			return
+		}
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -488,6 +493,7 @@ func (h *OrganizationHandler) FinetuneJobs(ctx *gin.Context) {
 // @Param        page query int false "current page number"
 // @Success      200  {object}  types.ResponseWithTotal{data=[]types.ArgoWorkFlowRes,total=int} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      403  {object}  types.APIForbidden "Forbidden"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /organization/{namespace}/evaluations [get]
 func (h *OrganizationHandler) Evaluations(ctx *gin.Context) {
@@ -506,6 +512,10 @@ func (h *OrganizationHandler) Evaluations(ctx *gin.Context) {
 	data, total, err := h.evaluation.OrgEvaluations(ctx.Request.Context(), &req)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "Failed to get org evaluations", slog.Any("error", err))
+		if errors.Is(err, errorx.ErrForbidden) {
+			httpbase.ForbiddenError(ctx, err)
+			return
+		}
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -531,6 +541,7 @@ func (h *OrganizationHandler) Evaluations(ctx *gin.Context) {
 // @Param        page query int false "current page number"
 // @Success      200  {object}  types.ResponseWithTotal{data=[]types.DeployRequest,total=int} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      403  {object}  types.APIForbidden "Forbidden"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /organization/{namespace}/run/{repo_type} [get]
 func (h *OrganizationHandler) RunDeploys(ctx *gin.Context) {
@@ -566,6 +577,10 @@ func (h *OrganizationHandler) RunDeploys(ctx *gin.Context) {
 	data, total, err := h.user.ListDeploysByNamespace(ctx.Request.Context(), &req)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "Failed to get org run deploys", slog.Any("error", err))
+		if errors.Is(err, errorx.ErrForbidden) {
+			httpbase.ForbiddenError(ctx, err)
+			return
+		}
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -588,6 +603,7 @@ func (h *OrganizationHandler) RunDeploys(ctx *gin.Context) {
 // @Param        page query int false "current page number"
 // @Success      200  {object}  types.ResponseWithTotal{data=[]types.NotebookRes,total=int} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      403  {object}  types.APIForbidden "Forbidden"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /organization/{namespace}/notebooks [get]
 func (h *OrganizationHandler) Notebooks(ctx *gin.Context) {
@@ -605,6 +621,10 @@ func (h *OrganizationHandler) Notebooks(ctx *gin.Context) {
 	data, total, err := h.user.ListNotebooksByNamespace(ctx.Request.Context(), &req)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "Failed to get org notebooks", slog.Any("error", err))
+		if errors.Is(err, errorx.ErrForbidden) {
+			httpbase.ForbiddenError(ctx, err)
+			return
+		}
 		httpbase.ServerError(ctx, err)
 		return
 	}

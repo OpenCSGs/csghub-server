@@ -30,7 +30,7 @@ var fixOrgCasdoorUserCmd = &cobra.Command{
 			return err
 		}
 
-		orgStore := database.NewOrgStore(cfg)
+		orgStore := database.NewOrgStore(cfg.IsHierarchicalOrganization(), nil)
 		orgs, _, err := orgStore.GetUserOwnOrgs(ctx, "")
 		if err != nil {
 			return err

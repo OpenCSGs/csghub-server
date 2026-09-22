@@ -139,6 +139,14 @@ func TestMemberComponent_GetMemberRole(t *testing.T) {
 	})
 }
 
+func TestMemberComponent_EnsureOrganizationMode(t *testing.T) {
+	config := &config.Config{}
+	mc := &memberComponentImpl{config: config}
+
+	require.NoError(t, mc.ensureOrganizationMode(database.Organization{IsHierarchical: false}))
+	require.ErrorIs(t, mc.ensureOrganizationMode(database.Organization{IsHierarchical: true}), errorx.ErrOrganizationModeIncompatible)
+}
+
 func TestMemberComponent_Delete(t *testing.T) {
 
 	t.Run("delete admin member", func(t *testing.T) {

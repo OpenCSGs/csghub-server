@@ -10,18 +10,29 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+	"github.com/uptrace/bun"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/tests"
 	"opencsg.com/csghub-server/common/types"
 )
 
+// setOrgStoreTestDB selects the test database for constructor calls and restores the previous default.
+// Callers must not run in parallel because the default database is shared within the test process.
+func setOrgStoreTestDB(t *testing.T, db *database.DB) {
+	t.Helper()
+	previousDB := database.GetDB()
+	database.SetDB(db)
+	t.Cleanup(func() { database.SetDB(previousDB) })
+}
+
 func TestOrganizationStore_CRUD(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
+	setOrgStoreTestDB(t, db)
 	ctx := context.TODO()
 	uuid := uuid.New()
 
-	store := database.NewOrgStoreWithDBAndDeletionJobClient(db, &testRepositoryDeletionJobClient{})
+	store := database.NewOrgStore(false, &testRepositoryDeletionJobClient{})
 	err := store.Create(ctx, &database.Organization{
 		Name:     "o1",
 		Nickname: "o1_nickname",
@@ -152,43 +163,66 @@ func TestOrganizationStore_CRUD(t *testing.T) {
 
 }
 
-// TestOrganizationStore_FindByUUIDsIncludesLegacyOrganizations verifies UUID lookups are not scoped to the active organization model.
-func TestOrganizationStore_FindByUUIDsIncludesLegacyOrganizations(t *testing.T) {
+// TestOrganizationStore_FindByUUIDsFiltersByModeAndActiveRoot verifies UUID lookups follow the active organization mode and root state.
+func TestOrganizationStore_FindByUUIDsFiltersByModeAndActiveRoot(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
+	setOrgStoreTestDB(t, db)
 	ctx := context.Background()
 
 	legacyUUID := uuid.New()
-	legacyStore := database.NewOrgStoreWithDB(db)
+	legacyStore := database.NewOrgStore(false, nil)
 	require.NoError(t, legacyStore.Create(ctx, &database.Organization{
 		Name: "legacy-org", UUID: legacyUUID,
 	}, &database.Namespace{Path: "legacy-org", UUID: legacyUUID.String()}))
+	childUUID := uuid.New()
+	child := &database.Organization{Name: "legacy-child", UUID: childUUID}
+	require.NoError(t, legacyStore.Create(ctx, child, &database.Namespace{Path: "legacy-child", UUID: childUUID.String()}))
+	_, err := db.Core.NewUpdate().Model((*database.Organization)(nil)).
+		Set("is_root = FALSE").Where("id = ?", child.ID).Exec(ctx)
+	require.NoError(t, err)
 
 	deletedUUID := uuid.New()
 	require.NoError(t, legacyStore.Create(ctx, &database.Organization{
 		Name: "deleted-org", UUID: deletedUUID,
 	}, &database.Namespace{Path: "deleted-org", UUID: deletedUUID.String()}))
-	_, err := db.Core.NewUpdate().
+	_, err = db.Core.NewUpdate().
 		Model((*database.Organization)(nil)).
 		Set("deleted_at = ?", time.Now()).
 		Where("uuid = ?", deletedUUID).
 		Exec(ctx)
 	require.NoError(t, err)
 
-	hierarchyStore := database.NewOrgStoreWithMode(db, true)
-	organizations, err := hierarchyStore.FindByUUIDs(ctx, []string{legacyUUID.String(), deletedUUID.String()})
+	organizations, err := legacyStore.FindByUUIDs(ctx, []string{legacyUUID.String(), childUUID.String(), deletedUUID.String()})
 	require.NoError(t, err)
 	require.Len(t, organizations, 1)
 	require.Equal(t, legacyUUID, organizations[0].UUID)
+
+	hierarchyStore := database.NewOrgStore(true, nil)
+	hierarchyUUID := uuid.New()
+	hierarchyOrganization := &database.Organization{Name: "hierarchy-child", UUID: hierarchyUUID}
+	require.NoError(t, hierarchyStore.Create(ctx, hierarchyOrganization, &database.Namespace{Path: "hierarchy-child", UUID: hierarchyUUID.String()}))
+	_, err = db.Core.NewUpdate().Model((*database.Organization)(nil)).
+		Set("is_root = FALSE").Where("id = ?", hierarchyOrganization.ID).Exec(ctx)
+	require.NoError(t, err)
+	organizations, err = hierarchyStore.FindByUUIDs(ctx, []string{legacyUUID.String()})
+	require.NoError(t, err)
+	require.Empty(t, organizations)
+	organizations, err = hierarchyStore.FindByUUIDs(ctx, []string{hierarchyUUID.String()})
+	require.NoError(t, err)
+	require.Len(t, organizations, 1)
+	require.Equal(t, hierarchyUUID, organizations[0].UUID)
 }
 
+// TestOrganizationStore_ModeFilters verifies that list queries follow the mode while direct lookups remain unrestricted.
 func TestOrganizationStore_ModeFilters(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
+	setOrgStoreTestDB(t, db)
 	ctx := context.Background()
 
-	legacyStore := database.NewOrgStoreWithDBAndDeletionJobClient(db, &testRepositoryDeletionJobClient{})
-	hierarchyStore := database.NewOrgStoreWithMode(db, true)
+	legacyStore := database.NewOrgStore(false, &testRepositoryDeletionJobClient{})
+	hierarchyStore := database.NewOrgStore(true, nil)
 	legacyOrganization := &database.Organization{
 		Name: "mode-legacy", Nickname: "Legacy", UUID: uuid.New(),
 	}
@@ -197,6 +231,14 @@ func TestOrganizationStore_ModeFilters(t *testing.T) {
 	}
 	require.NoError(t, legacyStore.Create(ctx, legacyOrganization, &database.Namespace{Path: legacyOrganization.Name}))
 	require.NoError(t, hierarchyStore.Create(ctx, hierarchyOrganization, &database.Namespace{Path: hierarchyOrganization.Name}))
+	user := &database.User{Username: "mode-filter-user", UUID: uuid.New().String()}
+	require.NoError(t, db.Core.NewInsert().Model(user).Scan(ctx, user))
+	for _, member := range []*database.Member{
+		{OrganizationID: legacyOrganization.ID, UserID: user.ID, Role: string(types.UserAdmin)},
+		{OrganizationID: hierarchyOrganization.ID, UserID: user.ID, Role: string(types.UserAdmin)},
+	} {
+		require.NoError(t, db.Core.NewInsert().Model(member).Scan(ctx, member))
+	}
 
 	var storedLegacy, storedHierarchy database.Organization
 	require.NoError(t, db.Core.NewSelect().Model(&storedLegacy).Where("id = ?", legacyOrganization.ID).Scan(ctx))
@@ -204,26 +246,58 @@ func TestOrganizationStore_ModeFilters(t *testing.T) {
 	require.False(t, storedLegacy.IsHierarchical)
 	require.True(t, storedHierarchy.IsHierarchical)
 
-	_, err := legacyStore.FindByPath(ctx, hierarchyOrganization.Name)
-	require.ErrorIs(t, err, sql.ErrNoRows)
-	_, err = hierarchyStore.FindByPath(ctx, legacyOrganization.Name)
-	require.ErrorIs(t, err, sql.ErrNoRows)
+	legacyResult, err := legacyStore.FindByPath(ctx, hierarchyOrganization.Name)
+	require.NoError(t, err)
+	require.Equal(t, hierarchyOrganization.UUID, legacyResult.UUID)
+	hierarchyResult, err := hierarchyStore.FindByPath(ctx, legacyOrganization.Name)
+	require.NoError(t, err)
+	require.Equal(t, legacyOrganization.UUID, hierarchyResult.UUID)
 
 	legacyOrganizations, total, err := legacyStore.Search(ctx, "mode-", 20, 1, "", "", "")
 	require.NoError(t, err)
 	require.Equal(t, 1, total)
+	require.Len(t, legacyOrganizations, 1)
 	require.Equal(t, legacyOrganization.Name, legacyOrganizations[0].Name)
 
 	hierarchyOrganizations, total, err := hierarchyStore.Search(ctx, "mode-", 20, 1, "", "", "")
 	require.NoError(t, err)
 	require.Equal(t, 1, total)
+	require.Len(t, hierarchyOrganizations, 1)
+	require.Equal(t, hierarchyOrganization.Name, hierarchyOrganizations[0].Name)
+
+	legacyOrganizations, total, err = legacyStore.SearchUserBelongOrgs(ctx, user.ID, "mode-", 20, 1, "", "", "", "")
+	require.NoError(t, err)
+	require.Equal(t, 1, total)
+	require.Len(t, legacyOrganizations, 1)
+	require.Equal(t, legacyOrganization.Name, legacyOrganizations[0].Name)
+
+	hierarchyOrganizations, total, err = hierarchyStore.SearchUserBelongOrgs(ctx, user.ID, "mode-", 20, 1, "", "", "", "")
+	require.NoError(t, err)
+	require.Equal(t, 1, total)
+	require.Len(t, hierarchyOrganizations, 1)
 	require.Equal(t, hierarchyOrganization.Name, hierarchyOrganizations[0].Name)
 }
 
-// TestOrganizationStore_GetUserRootOrganizationsReturnsHierarchyRoots verifies descendant memberships resolve to the same top-level organization.
+// rootOrganizationQueryRecorder captures executed SQL to verify mode-specific table access.
+type rootOrganizationQueryRecorder struct {
+	queries []string
+}
+
+// BeforeQuery preserves the query context.
+func (h *rootOrganizationQueryRecorder) BeforeQuery(ctx context.Context, _ *bun.QueryEvent) context.Context {
+	return ctx
+}
+
+// AfterQuery records the statement executed by the organization lookup.
+func (h *rootOrganizationQueryRecorder) AfterQuery(_ context.Context, event *bun.QueryEvent) {
+	h.queries = append(h.queries, event.Query)
+}
+
+// TestOrganizationStore_GetUserRootOrganizationsReturnsHierarchyRoots verifies membership resolution and mode-specific queries.
 func TestOrganizationStore_GetUserRootOrganizationsReturnsHierarchyRoots(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
+	setOrgStoreTestDB(t, db)
 	ctx := context.Background()
 
 	root := createRootOrganization(t, ctx, db, "user-root-orgs")
@@ -237,7 +311,20 @@ func TestOrganizationStore_GetUserRootOrganizationsReturnsHierarchyRoots(t *test
 		createOrganizationUnitMemberTestUser(t, ctx, db, "user-root-orgs-c"),
 		createOrganizationUnitMemberTestUser(t, ctx, db, "user-root-orgs-d"),
 	}
+	legacyStore := database.NewOrgStore(false, nil)
+	legacyOrganization := &database.Organization{
+		Name:     "user-root-orgs-legacy",
+		Nickname: "Legacy organization",
+		UUID:     uuid.New(),
+		UserID:   users[0].ID,
+		IsRoot:   true,
+	}
+	require.NoError(t, legacyStore.Create(ctx, legacyOrganization, &database.Namespace{
+		Path: legacyOrganization.Name,
+		UUID: legacyOrganization.UUID.String(),
+	}))
 	memberStore := database.NewMemberStoreWithDB(db)
+	require.NoError(t, memberStore.Add(ctx, legacyOrganization.ID, users[0].ID, string(types.UserRead)))
 	researchOrganizationID := organizationIDForUnit(t, ctx, unitStore, research.UUID)
 	itOrganizationID := organizationIDForUnit(t, ctx, unitStore, it.UUID)
 	for _, membership := range []struct {
@@ -253,24 +340,48 @@ func TestOrganizationStore_GetUserRootOrganizationsReturnsHierarchyRoots(t *test
 		require.NoError(t, memberStore.Add(ctx, membership.organizationID, membership.userID, string(types.UserRead)))
 	}
 
-	store := database.NewOrgStoreWithMode(db, true)
+	recorder := &rootOrganizationQueryRecorder{}
+	db.BunDB.AddQueryHook(recorder)
+	store := database.NewOrgStore(true, nil)
 	for _, user := range users {
 		organizations, err := store.GetUserRootOrganizations(ctx, user.ID)
 		require.NoError(t, err)
 		require.Len(t, organizations, 1)
 		require.Equal(t, root.ID, organizations[0].ID)
 		require.Equal(t, root.UUID, organizations[0].UUID)
+		require.Empty(t, organizations[0].Role)
 	}
+	require.Len(t, recorder.queries, len(users))
+	for _, query := range recorder.queries {
+		require.Contains(t, query, "organization_units")
+		require.Contains(t, query, "hierarchy_member_organization.is_hierarchical = TRUE")
+	}
+
+	recorder.queries = nil
+	legacyOrganizations, err := legacyStore.GetUserRootOrganizations(ctx, users[0].ID)
+	require.NoError(t, err)
+	require.Len(t, legacyOrganizations, 1)
+	require.Equal(t, legacyOrganization.ID, legacyOrganizations[0].ID)
+	require.Equal(t, string(types.UserRead), legacyOrganizations[0].Role)
+	require.Len(t, recorder.queries, 1)
+	require.NotContains(t, recorder.queries[0], "organization_units")
+	require.NotContains(t, recorder.queries[0], "hierarchy_member")
+
+	// A descendant membership alone must not match a legacy organization.
+	legacyOrganizations, err = legacyStore.GetUserRootOrganizations(ctx, users[1].ID)
+	require.NoError(t, err)
+	require.Empty(t, legacyOrganizations)
 }
 
 // TestOrganizationStore_IsLastOrganizationAdmin verifies every organization is evaluated independently.
 func TestOrganizationStore_IsLastOrganizationAdmin(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
+	setOrgStoreTestDB(t, db)
 	ctx := context.Background()
 
-	legacyStore := database.NewOrgStoreWithDBAndDeletionJobClient(db, &testRepositoryDeletionJobClient{})
-	hierarchyStore := database.NewOrgStoreWithMode(db, true)
+	legacyStore := database.NewOrgStore(false, &testRepositoryDeletionJobClient{})
+	hierarchyStore := database.NewOrgStore(true, nil)
 	organizations := map[string]*database.Organization{}
 	createOrganization := func(store database.OrgStore, name string) {
 		organization := &database.Organization{Name: name, Nickname: name, UUID: uuid.New()}
@@ -279,8 +390,9 @@ func TestOrganizationStore_IsLastOrganizationAdmin(t *testing.T) {
 	}
 	createOrganization(legacyStore, "last-admin-kng")
 	createOrganization(hierarchyStore, "last-admin-dep")
-	createOrganization(hierarchyStore, "last-admin-qa")
-	createOrganization(hierarchyStore, "last-admin-ci")
+	// Keep one hierarchy root because the schema allows only one active hierarchical root.
+	createOrganization(legacyStore, "last-admin-qa")
+	createOrganization(legacyStore, "last-admin-ci")
 
 	users := map[string]*database.User{}
 	for _, username := range []string{"last-admin-test", "last-admin-backup-one", "last-admin-backup-two"} {
@@ -307,7 +419,7 @@ func TestOrganizationStore_IsLastOrganizationAdmin(t *testing.T) {
 
 	isLastAdmin, err := legacyStore.IsLastOrganizationAdmin(ctx, "last-admin-test")
 	require.NoError(t, err)
-	require.False(t, isLastAdmin)
+	require.True(t, isLastAdmin)
 
 	isLastAdmin, err = hierarchyStore.IsLastOrganizationAdmin(ctx, "last-admin-test")
 	require.NoError(t, err)
@@ -322,6 +434,7 @@ func TestOrganizationStore_IsLastOrganizationAdmin(t *testing.T) {
 func TestOrganizationStore_CreateWithRelations(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
+	setOrgStoreTestDB(t, db)
 	ctx := context.Background()
 
 	userStore := database.NewUserStoreWithDB(db)
@@ -334,7 +447,7 @@ func TestOrganizationStore_CreateWithRelations(t *testing.T) {
 	owner, err := userStore.FindByUsername(ctx, "atomic-owner")
 	require.NoError(t, err)
 
-	store := database.NewOrgStoreWithDBAndDeletionJobClient(db, &testRepositoryDeletionJobClient{})
+	store := database.NewOrgStore(false, &testRepositoryDeletionJobClient{})
 
 	org := &database.Organization{
 		Name:     "atomic-org",
@@ -364,6 +477,7 @@ func TestOrganizationStore_CreateWithRelations(t *testing.T) {
 func TestOrganizationStore_CreateWithRelationsRollback(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
+	setOrgStoreTestDB(t, db)
 	ctx := context.Background()
 
 	userStore := database.NewUserStoreWithDB(db)
@@ -376,7 +490,7 @@ func TestOrganizationStore_CreateWithRelationsRollback(t *testing.T) {
 	owner, err := userStore.FindByUsername(ctx, "rollback-owner")
 	require.NoError(t, err)
 
-	store := database.NewOrgStoreWithDBAndDeletionJobClient(db, &testRepositoryDeletionJobClient{})
+	store := database.NewOrgStore(false, &testRepositoryDeletionJobClient{})
 
 	org := &database.Organization{
 		Name:     "rollback-org",
@@ -401,10 +515,11 @@ func TestOrganizationStore_CreateWithRelationsRollback(t *testing.T) {
 func TestOrganization_CreateWithForceDelete(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
+	setOrgStoreTestDB(t, db)
 	ctx := context.TODO()
 
 	nsStore := database.NewNamespaceStoreWithDB(db)
-	orgStore := database.NewOrgStoreWithDBAndDeletionJobClient(db, &testRepositoryDeletionJobClient{})
+	orgStore := database.NewOrgStore(false, &testRepositoryDeletionJobClient{})
 	err := orgStore.Create(ctx, &database.Organization{
 		Name:     "o1",
 		Nickname: "o1_nickname",
@@ -426,8 +541,9 @@ func TestOrganization_CreateWithForceDelete(t *testing.T) {
 func TestOrganization_DeleteLocksAssociatedTombstoneWhenPathWasRecreated(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
+	setOrgStoreTestDB(t, db)
 	ctx := context.Background()
-	orgStore := database.NewOrgStoreWithDBAndDeletionJobClient(db, &testRepositoryDeletionJobClient{})
+	orgStore := database.NewOrgStore(false, &testRepositoryDeletionJobClient{})
 	org := &database.Organization{Name: "recreated-delete", Nickname: "recreated-delete", UUID: uuid.New()}
 	associated := &database.Namespace{Path: org.Name, UUID: uuid.NewString(), DeletedAt: time.Now()}
 	require.NoError(t, orgStore.Create(ctx, org, associated))
@@ -449,8 +565,9 @@ func TestOrganization_DeleteLocksAssociatedTombstoneWhenPathWasRecreated(t *test
 func TestOrganizationStore_GetOrgByUserIDs(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
+	setOrgStoreTestDB(t, db)
 	ctx := context.TODO()
-	store := database.NewOrgStoreWithDBAndDeletionJobClient(db, &testRepositoryDeletionJobClient{})
+	store := database.NewOrgStore(false, &testRepositoryDeletionJobClient{})
 
 	// Create organizations with explicit UUID values
 	err := store.Create(ctx, &database.Organization{
@@ -525,9 +642,10 @@ func TestOrganizationStore_GetOrgByUserIDs(t *testing.T) {
 func TestOrganizationStore_FindByUUID(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
+	setOrgStoreTestDB(t, db)
 	ctx := context.TODO()
 
-	store := database.NewOrgStoreWithDBAndDeletionJobClient(db, &testRepositoryDeletionJobClient{})
+	store := database.NewOrgStore(false, &testRepositoryDeletionJobClient{})
 
 	// Test case 1: Find an existing organization by UUID
 	testUUID := uuid.New()
@@ -561,9 +679,10 @@ func TestOrganizationStore_FindByUUID(t *testing.T) {
 func TestOrganizationStore_SearchOrder(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
+	setOrgStoreTestDB(t, db)
 	ctx := context.TODO()
 
-	store := database.NewOrgStoreWithDBAndDeletionJobClient(db, &testRepositoryDeletionJobClient{})
+	store := database.NewOrgStore(false, &testRepositoryDeletionJobClient{})
 	orgsToCreate := []database.Organization{
 		{
 			Name:     "sss",
@@ -609,12 +728,51 @@ func TestOrganizationStore_SearchOrder(t *testing.T) {
 	require.Equal(t, []string{"sss", "sss-team", "team-01", "team-02", "team-03"}, gotNames)
 }
 
+// TestOrganizationStore_SearchFiltersByModeAndActiveState verifies that the public organization search
+// only returns active root organizations from the store's configured organization mode.
+func TestOrganizationStore_SearchFiltersByModeAndActiveState(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	setOrgStoreTestDB(t, db)
+	ctx := context.TODO()
+
+	legacyStore := database.NewOrgStore(false, nil)
+	hierarchyStore := database.NewOrgStore(true, nil)
+	require.NoError(t, legacyStore.Create(ctx, &database.Organization{
+		Name: "legacy-search", Nickname: "legacy-search", UUID: uuid.New(),
+	}, &database.Namespace{Path: "legacy-search"}))
+	require.NoError(t, hierarchyStore.Create(ctx, &database.Organization{
+		Name: "hierarchy-search", Nickname: "hierarchy-search", UUID: uuid.New(),
+	}, &database.Namespace{Path: "hierarchy-search"}))
+
+	legacyOrgs, legacyTotal, err := legacyStore.Search(ctx, "", 10, 1, "", "", "")
+	require.NoError(t, err)
+	require.Equal(t, 1, legacyTotal)
+	require.Equal(t, "legacy-search", legacyOrgs[0].Name)
+
+	hierarchyOrgs, hierarchyTotal, err := hierarchyStore.Search(ctx, "", 10, 1, "", "", "")
+	require.NoError(t, err)
+	require.Equal(t, 1, hierarchyTotal)
+	require.Equal(t, "hierarchy-search", hierarchyOrgs[0].Name)
+
+	_, err = db.Core.NewUpdate().Model((*database.Organization)(nil)).
+		Set("deleted_at = CURRENT_TIMESTAMP").
+		Where("path = ?", "legacy-search").Exec(ctx)
+	require.NoError(t, err)
+
+	legacyOrgs, legacyTotal, err = legacyStore.Search(ctx, "", 10, 1, "", "", "")
+	require.NoError(t, err)
+	require.Empty(t, legacyOrgs)
+	require.Zero(t, legacyTotal)
+}
+
 func TestOrganizationStore_Tags(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
+	setOrgStoreTestDB(t, db)
 	ctx := context.TODO()
 
-	store := database.NewOrgStoreWithDBAndDeletionJobClient(db, &testRepositoryDeletionJobClient{})
+	store := database.NewOrgStore(false, &testRepositoryDeletionJobClient{})
 
 	// Create an organization
 	err := store.Create(ctx, &database.Organization{
@@ -679,9 +837,10 @@ func TestOrganizationStore_Tags(t *testing.T) {
 func TestOrganizationStore_SearchOrderCaseInsensitive(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
+	setOrgStoreTestDB(t, db)
 	ctx := context.TODO()
 
-	store := database.NewOrgStoreWithDBAndDeletionJobClient(db, &testRepositoryDeletionJobClient{})
+	store := database.NewOrgStore(false, &testRepositoryDeletionJobClient{})
 	err := store.Create(ctx, &database.Organization{
 		Name:     "SSS-Exact",
 		Nickname: "display",
@@ -707,11 +866,13 @@ func TestOrganizationStore_SearchOrderCaseInsensitive(t *testing.T) {
 	require.True(t, slices.Equal([]string{"SSS-Exact", "other"}, []string{orgs[0].Name, orgs[1].Name}))
 }
 
+// TestOrganizationStore_SearchUserBelongOrgs verifies direct membership filters and shared Store behavior.
 func TestOrganizationStore_SearchUserBelongOrgs(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
+	setOrgStoreTestDB(t, db)
 	ctx := context.TODO()
-	store := database.NewOrgStoreWithDBAndDeletionJobClient(db, &testRepositoryDeletionJobClient{})
+	store := database.NewOrgStore(false, &testRepositoryDeletionJobClient{})
 
 	// Create users
 	user1 := &database.User{Username: "belong_user1", UUID: uuid.New().String()}
@@ -796,13 +957,63 @@ func TestOrganizationStore_SearchUserBelongOrgs(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, 1, total)
 	require.Equal(t, "belong_org1", orgs[0].Name)
+
+	// Both Store constructors must preserve roles, owner compatibility, and pagination.
+	stores := map[string]database.OrgStore{
+		"legacy":    store,
+		"hierarchy": database.NewOrgStore(true, nil),
+	}
+	for name, candidate := range stores {
+		t.Run(name, func(t *testing.T) {
+			organizations, count, err := candidate.SearchUserBelongOrgs(ctx, user1.ID, "", 10, 1, "", "", "owner", "")
+			require.NoError(t, err)
+			if name == "hierarchy" {
+				require.Zero(t, count)
+				require.Empty(t, organizations)
+				return
+			}
+			require.Equal(t, 1, count)
+			require.Len(t, organizations, 1)
+			require.Equal(t, org1.ID, organizations[0].ID)
+			require.Equal(t, string(types.UserAdmin), organizations[0].Role)
+
+			organizations, count, err = candidate.SearchUserBelongOrgs(ctx, user1.ID, "", 1, 2, "", "", "", "")
+			require.NoError(t, err)
+			require.Equal(t, 2, count)
+			require.Len(t, organizations, 1)
+			require.Equal(t, org2.ID, organizations[0].ID)
+			require.Equal(t, string(types.UserWrite), organizations[0].Role)
+
+			organizations, count, err = candidate.SearchUserBelongOrgs(ctx, user2.ID, "", 10, 1, "", "", "owner", "")
+			require.NoError(t, err)
+			require.Zero(t, count)
+			require.NotNil(t, organizations)
+			require.Empty(t, organizations)
+		})
+	}
+
+	// Removed memberships must not appear in either the result or its total count.
+	require.NoError(t, database.NewMemberStoreWithDB(db).Delete(ctx, org2.ID, user1.ID))
+	for _, candidate := range stores {
+		organizations, count, err := candidate.SearchUserBelongOrgs(ctx, user1.ID, "", 10, 1, "", "", "", "")
+		require.NoError(t, err)
+		if candidate == stores["hierarchy"] {
+			require.Zero(t, count)
+			require.Empty(t, organizations)
+			continue
+		}
+		require.Equal(t, 1, count)
+		require.Len(t, organizations, 1)
+		require.Equal(t, org1.ID, organizations[0].ID)
+	}
 }
 
 func TestOrganizationStore_GetOrganizationTagsByOrgIDs(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
+	setOrgStoreTestDB(t, db)
 	ctx := context.TODO()
-	store := database.NewOrgStoreWithDBAndDeletionJobClient(db, &testRepositoryDeletionJobClient{})
+	store := database.NewOrgStore(false, &testRepositoryDeletionJobClient{})
 
 	// Create two orgs
 	err := store.Create(ctx, &database.Organization{Name: "tag_batch_org1", Nickname: "Batch 1", UUID: uuid.New()}, &database.Namespace{Path: "tag_batch_org1"})
@@ -849,8 +1060,9 @@ func TestOrganizationStore_GetOrganizationTagsByOrgIDs(t *testing.T) {
 func TestOrganizationStore_Delete_CleansUpTags(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
+	setOrgStoreTestDB(t, db)
 	ctx := context.TODO()
-	store := database.NewOrgStoreWithDBAndDeletionJobClient(db, &testRepositoryDeletionJobClient{})
+	store := database.NewOrgStore(false, &testRepositoryDeletionJobClient{})
 
 	err := store.Create(ctx, &database.Organization{Name: "del_org", Nickname: "Del Org", UUID: uuid.New()}, &database.Namespace{Path: "del_org"})
 	require.Nil(t, err)
@@ -895,9 +1107,10 @@ func TestOrganizationStore_Delete_CleansUpTags(t *testing.T) {
 func TestOrgStore_DeleteOwnedRepositories(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
+	setOrgStoreTestDB(t, db)
 	ctx := context.Background()
 	jobClient := &testRepositoryDeletionJobClient{}
-	store := database.NewOrgStoreWithDBAndDeletionJobClient(db, jobClient)
+	store := database.NewOrgStore(false, jobClient)
 	repoStore := database.NewRepoStoreWithDB(db)
 
 	for _, path := range []string{"delete-repos", "delete-repos-similar"} {
@@ -960,8 +1173,9 @@ func testOrgStoreDeleteSerializesWithRepositoryWrite(
 ) {
 	db := tests.InitTransactionTestDB()
 	defer db.Close()
+	setOrgStoreTestDB(t, db)
 	ctx := context.Background()
-	orgStore := database.NewOrgStoreWithDBAndDeletionJobClient(db, &testRepositoryDeletionJobClient{})
+	orgStore := database.NewOrgStore(false, &testRepositoryDeletionJobClient{})
 	repoStore := database.NewRepoStoreWithDB(db)
 
 	err := orgStore.Create(ctx, &database.Organization{
@@ -1038,8 +1252,9 @@ func testOrgStoreDeleteSerializesWithRepositoryWrite(
 func TestOrgStore_RecreatedNamespaceAllowsRepositoryCreation(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
+	setOrgStoreTestDB(t, db)
 	ctx := context.Background()
-	orgStore := database.NewOrgStoreWithDBAndDeletionJobClient(db, &testRepositoryDeletionJobClient{})
+	orgStore := database.NewOrgStore(false, &testRepositoryDeletionJobClient{})
 	repoStore := database.NewRepoStoreWithDB(db)
 
 	createOrganization := func() {

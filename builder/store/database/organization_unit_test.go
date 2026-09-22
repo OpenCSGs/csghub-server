@@ -3,7 +3,6 @@ package database_test
 import (
 	"context"
 	"errors"
-	"fmt"
 	"strings"
 	"sync"
 	"testing"
@@ -13,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/uptrace/bun"
 	coredb "opencsg.com/csghub-server/builder/store/database"
-	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/tests"
 	"opencsg.com/csghub-server/common/types"
 )
@@ -35,13 +34,29 @@ func (h *repositoryNamespaceLockHook) AfterQuery(_ context.Context, event *bun.Q
 	}
 }
 
-// TestNewOrgStore_SelectsStoreByOrganizationMode verifies Store selection is centralized in the constructor.
-func TestNewOrgStore_SelectsStoreByOrganizationMode(t *testing.T) {
-	cfg := &config.Config{}
-	require.IsType(t, coredb.NewOrgStore(&config.Config{}), coredb.NewOrgStore(cfg))
-
-	cfg.Organization.EnableUnit = true
-	require.NotEqual(t, fmt.Sprintf("%T", coredb.NewOrgStore(&config.Config{})), fmt.Sprintf("%T", coredb.NewOrgStore(cfg)))
+// TestNewOrgStore_UsesDefaultDBAndMode verifies that the constructor persists the supplied mode in the default database.
+func TestNewOrgStore_UsesDefaultDBAndMode(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	setOrgStoreTestDB(t, db)
+	ctx := context.Background()
+	for _, tc := range []struct {
+		name         string
+		hierarchical bool
+	}{
+		{name: "constructor-legacy", hierarchical: false},
+		{name: "constructor-hierarchy", hierarchical: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			store := coredb.NewOrgStore(tc.hierarchical, nil)
+			organization := &coredb.Organization{Name: tc.name, Nickname: tc.name, UUID: uuid.New()}
+			require.NoError(t, store.Create(ctx, organization, &coredb.Namespace{Path: tc.name}))
+			var persisted coredb.Organization
+			require.NoError(t, db.Core.NewSelect().Model(&persisted).Where("organization.id = ?", organization.ID).Scan(ctx))
+			require.True(t, persisted.IsRoot)
+			require.Equal(t, tc.hierarchical, persisted.IsHierarchical)
+		})
+	}
 }
 
 // TestOrganizationUnitStore_CreateRoot verifies root hierarchy initialization and administrator membership.
@@ -117,6 +132,38 @@ func TestOrganizationUnitStore_CreateRoot(t *testing.T) {
 		Where("id = ? AND deleted_at IS NULL", created.ID).Exists(ctx)
 	require.NoError(t, err)
 	require.True(t, active)
+}
+
+// TestOrganizationUnitStore_CreateRootAllowsOnlyOneActiveHierarchyRoot verifies root uniqueness.
+func TestOrganizationUnitStore_CreateRootAllowsOnlyOneActiveHierarchyRoot(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.Background()
+	creator := createOrganizationUnitMemberTestUser(t, ctx, db, "root-unique-creator")
+	store := coredb.NewOrganizationUnitStoreWithDB(db)
+
+	firstUUID := uuid.New()
+	_, err := store.CreateRoot(ctx, coredb.CreateRootOrganizationInput{
+		Organization:  &coredb.Organization{Name: "unique-hierarchy-root", UUID: firstUUID, UserID: creator.ID},
+		Namespace:     &coredb.Namespace{Path: "unique-hierarchy-root", UUID: firstUUID.String(), UserID: creator.ID},
+		CreatorUserID: creator.ID,
+	})
+	require.NoError(t, err)
+
+	secondUUID := uuid.New()
+	_, err = store.CreateRoot(ctx, coredb.CreateRootOrganizationInput{
+		Organization:  &coredb.Organization{Name: "second-hierarchy-root", UUID: secondUUID, UserID: creator.ID},
+		Namespace:     &coredb.Namespace{Path: "second-hierarchy-root", UUID: secondUUID.String(), UserID: creator.ID},
+		CreatorUserID: creator.ID,
+	})
+	require.Error(t, err)
+	require.ErrorIs(t, err, errorx.ErrOrganizationAlreadyExists)
+
+	var activeRoots int
+	activeRoots, err = db.Core.NewSelect().Model((*coredb.Organization)(nil)).
+		Where("is_root = TRUE AND is_hierarchical = TRUE AND deleted_at IS NULL").Count(ctx)
+	require.NoError(t, err)
+	require.Equal(t, 1, activeRoots)
 }
 
 // TestOrganizationUnitStore_DeleteRoot removes the complete hierarchy in one transaction and is idempotent.
@@ -643,6 +690,36 @@ func TestOrganizationUnitStore_CreatorIsRecordOnly(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, creator.ID, updatedOrganization.UserID)
 	require.Equal(t, newNickname, updatedOrganization.Nickname)
+}
+
+// TestOrganizationUnitStore_FindActiveHierarchicalRoot excludes legacy, child, and deleted organizations.
+func TestOrganizationUnitStore_FindActiveHierarchicalRoot(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	setOrgStoreTestDB(t, db)
+	ctx := context.Background()
+	store := coredb.NewOrganizationUnitStoreWithDBAndDeletionJobClient(db, &testRepositoryDeletionJobClient{})
+	legacy := &coredb.Organization{Name: "legacy-root-lookup", UUID: uuid.New(), IsRoot: true}
+	require.NoError(t, coredb.NewOrgStore(false, nil).Create(ctx, legacy, &coredb.Namespace{Path: legacy.Name}))
+
+	root, err := store.FindActiveHierarchicalRoot(ctx)
+	require.ErrorIs(t, err, errorx.ErrDatabaseNoRows)
+	require.Nil(t, root)
+
+	expected := createRootOrganization(t, ctx, db, "active-root-lookup")
+	createChild(t, ctx, store, expected, "root-lookup-child", nil, 1)
+	root, err = store.FindActiveHierarchicalRoot(ctx)
+	require.NoError(t, err)
+	require.NotNil(t, root)
+	require.Equal(t, expected.ID, root.ID)
+	require.NotNil(t, root.Namespace)
+	require.Equal(t, expected.Name, root.Namespace.Path)
+
+	_, err = db.Core.NewDelete().Model(expected).WherePK().Exec(ctx)
+	require.NoError(t, err)
+	root, err = store.FindActiveHierarchicalRoot(ctx)
+	require.ErrorIs(t, err, errorx.ErrDatabaseNoRows)
+	require.Nil(t, root)
 }
 
 func createRootOrganization(t *testing.T, ctx context.Context, db *coredb.DB, suffix string) *coredb.Organization {

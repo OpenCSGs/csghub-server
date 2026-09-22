@@ -10,5 +10,11 @@
     },
     "error.ORG-ERR-3": {
         "other": "You do not have permission to access this organization"
+    },
+    "error.ORG-ERR-4": {
+        "other": "The current architecture does not support viewing this organization. Please migrate the organization."
+    },
+    "error.ORG-ERR-5": {
+        "other": "The system already has an organization and cannot create another one"
     }
 }

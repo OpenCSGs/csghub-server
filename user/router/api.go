@@ -33,7 +33,7 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error creating token handler:%w", err)
 	}
-	orgHandler, err := handler.NewOrganizationHandler(config)
+	orgHandler, err := handler.NewOrganizationHandler(config, config.IsHierarchicalOrganization())
 	if err != nil {
 		return nil, fmt.Errorf("error creating user controller:%w", err)
 	}
@@ -74,12 +74,13 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 		apiV1Group.GET("/users/by-uuids", userHandler.FindByUUIDs)
 		userGroup.DELETE("/:username/close_account", userHandler.CloseAccount)
 		// user's organizations
+		// Deprecated: remove this route after all clients migrate away from the user organization list API.
 		userGroup.GET("/:username/organizations", orgHandler.ListUserOrgs)
 		// org and members
 		apiV1Group.GET("/organizations", orgHandler.Index)
 		apiV1Group.GET("/organization/:namespace", orgHandler.Get)
 		apiV1Group.GET("/organization/uuid/:uuid", orgHandler.GetByUUID)
-		if !enableUnit(config) {
+		if !config.IsHierarchicalOrganization() {
 			apiV1Group.GET("/organization/:namespace/members", memberCtrl.OrgMembers)
 		}
 	}
@@ -145,7 +146,7 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 		userGroup.GET("/verify/:id", mustLogin(), userHandler.GetVerify)
 	}
 	// Legacy organization mutations and membership APIs are unavailable in hierarchy mode.
-	if !enableUnit(config) {
+	if !config.IsHierarchicalOrganization() {
 		apiV1Group.POST("/organizations", orgHandler.Create)
 		apiV1Group.PUT("/organization/:namespace", orgHandler.Update)
 		apiV1Group.DELETE("/organization/:namespace", orgHandler.Delete)

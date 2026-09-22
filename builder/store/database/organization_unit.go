@@ -10,6 +10,7 @@ import (
 
 	"github.com/uptrace/bun"
 	"github.com/uptrace/bun/dialect"
+	"github.com/uptrace/bun/driver/pgdriver"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
@@ -57,6 +58,10 @@ type OrganizationUnitClosure struct {
 
 // OrganizationUnitStore persists hierarchy organizations and their relationships atomically.
 type OrganizationUnitStore interface {
+	// FindActiveHierarchicalRoot returns the active hierarchy root, or errorx.ErrDatabaseNoRows when none exists.
+	FindActiveHierarchicalRoot(ctx context.Context) (*Organization, error)
+	// HasActiveHierarchicalRoot reports whether an active top-level hierarchy organization exists.
+	HasActiveHierarchicalRoot(ctx context.Context) (bool, error)
 	CreateRoot(ctx context.Context, input CreateRootOrganizationInput) (*Organization, error)
 	DeleteRoot(ctx context.Context, input DeleteRootOrganizationInput) (*types.DeleteRootOrganizationResp, error)
 	Create(ctx context.Context, input CreateOrganizationUnitInput) (*types.OrganizationUnit, error)
@@ -134,6 +139,13 @@ type organizationUnitStoreImpl struct {
 	repositoryDeletionJobClient RepositoryDeletionJobClient
 }
 
+// isHierarchicalRootOrganizationConflict identifies the database uniqueness fallback.
+func isHierarchicalRootOrganizationConflict(err error) bool {
+	const hierarchicalRootOrganizationIndex = "organizations_single_hierarchical_root_idx"
+	var pgErr pgdriver.Error
+	return errors.As(err, &pgErr) && pgErr.Field('n') == hierarchicalRootOrganizationIndex
+}
+
 // NewOrganizationUnitStore creates an organization hierarchy Store.
 func NewOrganizationUnitStore() OrganizationUnitStore {
 	return NewOrganizationUnitStoreWithDB(GetDB())
@@ -149,8 +161,30 @@ func NewOrganizationUnitStoreWithDBAndDeletionJobClient(db *DB, jobClient Reposi
 	return &organizationUnitStoreImpl{db: db, repositoryDeletionJobClient: jobClient}
 }
 
+// FindActiveHierarchicalRoot loads the unique active hierarchy root independently of user membership.
+func (s *organizationUnitStoreImpl) FindActiveHierarchicalRoot(ctx context.Context) (*Organization, error) {
+	organization := new(Organization)
+	err := s.db.Core.NewSelect().Model(organization).Relation("Namespace").
+		Where("organization.is_root = TRUE AND organization.is_hierarchical = TRUE AND organization.deleted_at IS NULL").
+		Limit(1).Scan(ctx)
+	if err != nil {
+		return nil, errorx.HandleDBError(err, nil)
+	}
+	return organization, nil
+}
+
+// HasActiveHierarchicalRoot reports whether an active top-level hierarchy organization exists.
+func (s *organizationUnitStoreImpl) HasActiveHierarchicalRoot(ctx context.Context) (bool, error) {
+	exists, err := s.db.Core.NewSelect().Model((*Organization)(nil)).
+		Where("is_root = TRUE AND is_hierarchical = TRUE AND deleted_at IS NULL").
+		Exists(ctx)
+	return exists, errorx.HandleDBError(err, nil)
+}
+
 // CreateRoot atomically creates a top-level organization, its root unit, closure self-row, and admin member.
 func (s *organizationUnitStoreImpl) CreateRoot(ctx context.Context, input CreateRootOrganizationInput) (*Organization, error) {
+	const hierarchicalRootOrganizationLockKey int64 = 0x6f72675f726f6f74
+
 	if input.Organization == nil || input.Namespace == nil {
 		return nil, errorx.ReqParamInvalid(errors.New("root organization and namespace are required"), nil)
 	}
@@ -158,6 +192,20 @@ func (s *organizationUnitStoreImpl) CreateRoot(ctx context.Context, input Create
 	input.Organization.IsHierarchical = true
 	input.Namespace.NamespaceType = OrgNamespace
 	err := s.db.BunDB.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		if tx.Dialect().Name() == dialect.PG {
+			if _, err := tx.NewRaw("SELECT pg_advisory_xact_lock(?)", hierarchicalRootOrganizationLockKey).Exec(ctx); err != nil {
+				return fmt.Errorf("lock hierarchical root organization creation: %w", err)
+			}
+		}
+		exists, err := tx.NewSelect().Model((*Organization)(nil)).
+			Where("is_root = TRUE AND is_hierarchical = TRUE AND deleted_at IS NULL").
+			Exists(ctx)
+		if err != nil {
+			return fmt.Errorf("check hierarchical root organization: %w", err)
+		}
+		if exists {
+			return errorx.ErrOrganizationAlreadyExists
+		}
 		if _, err := tx.NewInsert().Model(input.Organization).Exec(ctx); err != nil {
 			return fmt.Errorf("create root organization: %w", err)
 		}
@@ -194,6 +242,9 @@ func (s *organizationUnitStoreImpl) CreateRoot(ctx context.Context, input Create
 		return nil
 	})
 	if err != nil {
+		if errors.Is(err, errorx.ErrOrganizationAlreadyExists) || isHierarchicalRootOrganizationConflict(err) {
+			return nil, errorx.ErrOrganizationAlreadyExists
+		}
 		return nil, errorx.HandleDBError(err, nil)
 	}
 	var organization Organization

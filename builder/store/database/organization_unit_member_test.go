@@ -404,6 +404,7 @@ func TestOrganizationUnitMemberStore_ListMembersFiltersByRole(t *testing.T) {
 func TestOrganizationStore_HierarchyMembershipQueries(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
+	setOrgStoreTestDB(t, db)
 	ctx := context.Background()
 
 	root := createRootOrganization(t, ctx, db, "hierarchy-membership-query")
@@ -421,7 +422,7 @@ func TestOrganizationStore_HierarchyMembershipQueries(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	organizationStore := coredb.NewHierarchyOrgStoreWithDB(db)
+	organizationStore := coredb.NewOrgStore(true, nil)
 	organizations, err := organizationStore.GetUserBelongOrgs(ctx, firstUser.ID)
 	require.NoError(t, err)
 	require.Len(t, organizations, 1)

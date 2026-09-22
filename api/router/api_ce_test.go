@@ -30,7 +30,7 @@ func TestAddOrgRoutes_CE(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	config := &config.Config{}
 	config.Organization.EnableUnit = true
-	require.False(t, enableUnit(config))
+	require.False(t, config.IsHierarchicalOrganization())
 
 	engine := gin.New()
 	require.NoError(t, addOrgRoutes(engine.Group("/api/v1"), middleware.MiddlewareCollection{}, config))

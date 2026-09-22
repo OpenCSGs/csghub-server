@@ -11,6 +11,7 @@ import (
 	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
 
@@ -31,7 +32,7 @@ type OrganizationVerifyComponentImpl struct {
 func NewOrganizationVerifyComponent(config *config.Config) (OrganizationVerifyComponent, error) {
 	c := &OrganizationVerifyComponentImpl{}
 	c.orgVerifyStore = database.NewOrganizationVerifyStore()
-	c.orgStore = database.NewOrgStore(config)
+	c.orgStore = database.NewOrgStore(config.IsHierarchicalOrganization(), nil)
 	c.config = config
 	c.notificationSvcClient = rpc.NewNotificationSvcHttpClient(fmt.Sprintf("%s:%d", config.Notification.Host, config.Notification.Port),
 		rpc.AuthWithApiKey(config.APIToken))
@@ -39,6 +40,14 @@ func NewOrganizationVerifyComponent(config *config.Config) (OrganizationVerifyCo
 }
 
 func (o *OrganizationVerifyComponentImpl) Create(ctx context.Context, req *types.OrgVerifyReq) (*database.OrganizationVerify, error) {
+	organization, err := o.orgStore.FindByPath(ctx, req.Name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find organization, error: %w", err)
+	}
+	if organization.IsHierarchical != o.config.IsHierarchicalOrganization() {
+		return nil, errorx.ErrOrganizationModeIncompatible
+	}
+
 	orgVerify, err := o.orgVerifyStore.CreateOrganizationVerify(ctx, &database.OrganizationVerify{
 		Name:               req.Name,
 		CompanyName:        req.CompanyName,

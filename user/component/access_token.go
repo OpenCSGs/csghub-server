@@ -51,7 +51,7 @@ func NewAccessTokenComponent(config *config.Config) (AccessTokenComponent, error
 	if err != nil {
 		return nil, fmt.Errorf("failed to create ReBAC authorizer: %w", err)
 	}
-	c.orgStore = database.NewOrgStore(config)
+	c.orgStore = database.NewOrgStore(config.IsHierarchicalOrganization(), nil)
 	c.gs, err = git.NewGitServer(config)
 	if err != nil {
 		return nil, fmt.Errorf("fail to create git server,error:%w", err)
