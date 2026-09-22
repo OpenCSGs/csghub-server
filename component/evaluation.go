@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"time"
 
 	v1alpha1 "github.com/argoproj/argo-workflows/v3/pkg/apis/workflow/v1alpha1"
 	"opencsg.com/csghub-server/builder/deploy"
@@ -42,6 +43,14 @@ type evaluationComponentImpl struct {
 	clusterStore          database.ClusterInfoStore
 	rebac                 rebac.Authorizer
 	git                   gitserver.GitServer
+	presigner             presignURLer
+}
+
+// presignURLer is the minimal interface needed by evaluationComponentImpl
+// to generate presigned URLs. StorageGatewayComponent implements this interface
+// in ee/saas builds. In CE builds, it is nil (no-op).
+type presignURLer interface {
+	PresignURL(ctx context.Context, bucket, key string, method string, expiration time.Duration) (string, error)
 }
 
 type EvaluationComponent interface {
@@ -91,6 +100,7 @@ func NewEvaluationComponent(config *config.Config) (EvaluationComponent, error) 
 	if err != nil {
 		return nil, fmt.Errorf("failed to create git server, error: %w", err)
 	}
+	c.presigner = initPresigner(config)
 	return c, nil
 }
 
@@ -535,7 +545,14 @@ func (c *evaluationComponentImpl) GetEvaluation(ctx context.Context, req types.E
 		FrameworkConfig:  wf.FrameworkConfig,
 		Hardware:         wf.Hardware,
 	}
+	// Fetch claw-eval summary using original (OSS direct) URLs before rewriting
+	// to gateway presigned URLs. The rewritten URLs point to PublicDomain which
+	// may cause self-referencing HTTP calls that time out in network-isolated envs.
 	attachClawEvalSummary(ctx, res)
+	// Rewrite URLs to presigned gateway URLs after summary fetch
+	res.ResultURL = c.rewriteURLViaGateway(ctx, wf.ResultURL)
+	res.DownloadURL = c.rewriteURLViaGateway(ctx, wf.DownloadURL)
+	res.FailuresURL = c.rewriteURLViaGateway(ctx, wf.FailuresURL)
 	return res, nil
 }
 
@@ -583,8 +600,8 @@ func (c *evaluationComponentImpl) OrgEvaluations(ctx context.Context, req *types
 			SubmitTime:   wf.SubmitTime,
 			StartTime:    wf.StartTime,
 			EndTime:      wf.EndTime,
-			DownloadURL:  wf.DownloadURL,
-			ResultURL:    wf.ResultURL,
+			DownloadURL:  c.rewriteURLViaGateway(ctx, wf.DownloadURL),
+			ResultURL:    c.rewriteURLViaGateway(ctx, wf.ResultURL),
 			Image:        wf.Image,
 
 			RepoRevisions:    wf.RepoRevisions,

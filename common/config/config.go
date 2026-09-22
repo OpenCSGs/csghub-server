@@ -956,6 +956,7 @@ type Config struct {
 	StorageGateway struct {
 		PartSize                int64 `env:"STARHUB_SERVER_STORAGE_GATEWAY_PART_SIZE" default:"67108864"`              // 64MB
 		EnablePresignedURLProxy bool  `env:"STARHUB_SERVER_STORAGE_GATEWAY_ENABLE_PRESIGNED_URL_PROXY" default:"true"` // Enable presigned URL proxy through gateway
+		EnableUploadViaGateway  bool  `env:"STARHUB_SERVER_STORAGE_GATEWAY_ENABLE_UPLOAD_VIA_GATEWAY" default:"false"` // Enable file uploads through storage gateway proxy in evaluation containers
 	}
 
 	AuditLog struct {

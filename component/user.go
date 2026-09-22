@@ -98,6 +98,8 @@ func NewUserComponent(config *config.Config) (UserComponent, error) {
 	c.workflowStore = database.NewArgoWorkFlowStore()
 	c.mcpServerStore = database.NewMCPServerStore()
 	c.skillStore = database.NewSkillStore()
+	c.config = config
+	c.presigner = initPresigner(config)
 	return c, nil
 }
 
@@ -123,6 +125,8 @@ type userComponentImpl struct {
 	workflowStore       database.ArgoWorkFlowStore
 	mcpServerStore      database.MCPServerStore
 	skillStore          database.SkillStore
+	config              *config.Config
+	presigner           presignURLer
 }
 
 func (c *userComponentImpl) filteredUserRepos(ctx context.Context, repoType types.RepositoryType, owner, currentUser string, filter *types.RepoFilter, per, page int) ([]*database.Repository, int, error) {
@@ -907,8 +911,8 @@ func (c *userComponentImpl) Evaluations(ctx context.Context, req *types.UserEval
 			SubmitTime:   evaluation.SubmitTime,
 			StartTime:    evaluation.StartTime,
 			EndTime:      evaluation.EndTime,
-			DownloadURL:  evaluation.DownloadURL,
-			ResultURL:    evaluation.ResultURL,
+			DownloadURL:  c.rewriteURLViaGateway(ctx, evaluation.DownloadURL),
+			ResultURL:    c.rewriteURLViaGateway(ctx, evaluation.ResultURL),
 			Image:        evaluation.Image,
 
 			RepoRevisions:    evaluation.RepoRevisions,
@@ -1210,8 +1214,8 @@ func (c *userComponentImpl) ListFinetunes(ctx context.Context, req *types.UserEv
 			SubmitTime:   evaluation.SubmitTime,
 			StartTime:    evaluation.StartTime,
 			EndTime:      evaluation.EndTime,
-			DownloadURL:  evaluation.DownloadURL,
-			ResultURL:    evaluation.ResultURL,
+			DownloadURL:  c.rewriteURLViaGateway(ctx, evaluation.DownloadURL),
+			ResultURL:    c.rewriteURLViaGateway(ctx, evaluation.ResultURL),
 			Image:        evaluation.Image,
 		})
 	}
