@@ -764,6 +764,7 @@ func TestSpaceComponent_GetMCPServiceBySvcName(t *testing.T) {
 	ctx := context.Background()
 	sc := initializeTestSpaceComponent(ctx, t)
 	svcName := "test-svc"
+	currentUser := "testuser"
 
 	deploy := &database.Deploy{
 		ID:      1,
@@ -791,11 +792,86 @@ func TestSpaceComponent_GetMCPServiceBySvcName(t *testing.T) {
 		Env:          "{}",
 	}
 
-	t.Run("success", func(t *testing.T) {
+	t.Run("success with deploy endpoint", func(t *testing.T) {
+		deployWithEndpoint := *deploy
+		deployWithEndpoint.Endpoint = "http://test-svc.spaces.stg.internal"
+		sc.mocks.stores.DeployTaskMock().EXPECT().GetDeployBySvcName(ctx, svcName).Return(&deployWithEndpoint, nil).Once()
+		sc.mocks.stores.SpaceMock().EXPECT().ByID(ctx, deployWithEndpoint.SpaceID).Return(space, nil).Once()
+		sc.mocks.components.repo.EXPECT().AllowAccessEndpoint(ctx, currentUser, &deployWithEndpoint).Return(true, nil).Once()
+
+		mcpService, err := sc.GetMCPServiceBySvcName(ctx, svcName, currentUser)
+
+		require.NoError(t, err)
+		require.NotNil(t, mcpService)
+		require.Equal(t, space.ID, mcpService.ID)
+		require.Equal(t, "test-space", mcpService.Name)
+		require.Equal(t, "test/test-space", mcpService.Path)
+		require.Equal(t, "test-svc", mcpService.SvcName)
+		require.Equal(t, "Running", mcpService.Status)
+		require.Equal(t, "http://test-svc.spaces.stg.internal", mcpService.Endpoint)
+		require.Empty(t, mcpService.ProxyHost)
+	})
+
+	t.Run("success with cluster AppEndpoint rewrite", func(t *testing.T) {
+		deployWithEndpoint := *deploy
+		deployWithEndpoint.Endpoint = "http://test-svc.spaces.remote.internal"
+		deployWithEndpoint.ClusterID = "cluster-remote"
+		sc.mocks.stores.DeployTaskMock().EXPECT().GetDeployBySvcName(ctx, svcName).Return(&deployWithEndpoint, nil).Once()
+		sc.mocks.stores.SpaceMock().EXPECT().ByID(ctx, deployWithEndpoint.SpaceID).Return(space, nil).Once()
+		sc.mocks.components.repo.EXPECT().AllowAccessEndpoint(ctx, currentUser, &deployWithEndpoint).Return(true, nil).Once()
+		sc.mocks.stores.ClusterInfoMock().EXPECT().ByClusterID(ctx, "cluster-remote").Return(database.ClusterInfo{
+			ClusterID:   "cluster-remote",
+			AppEndpoint: "http://remote-app.example.com",
+		}, nil).Once()
+
+		mcpService, err := sc.GetMCPServiceBySvcName(ctx, svcName, currentUser)
+
+		require.NoError(t, err)
+		require.NotNil(t, mcpService)
+		require.Equal(t, "http://remote-app.example.com", mcpService.Endpoint)
+		require.Equal(t, "test-svc.spaces.remote.internal", mcpService.ProxyHost)
+	})
+
+	t.Run("success with empty AppEndpoint keeps deploy endpoint", func(t *testing.T) {
+		deployWithEndpoint := *deploy
+		deployWithEndpoint.Endpoint = "http://test-svc.spaces.stg.internal"
+		deployWithEndpoint.ClusterID = "cluster-local"
+		sc.mocks.stores.DeployTaskMock().EXPECT().GetDeployBySvcName(ctx, svcName).Return(&deployWithEndpoint, nil).Once()
+		sc.mocks.stores.SpaceMock().EXPECT().ByID(ctx, deployWithEndpoint.SpaceID).Return(space, nil).Once()
+		sc.mocks.components.repo.EXPECT().AllowAccessEndpoint(ctx, currentUser, &deployWithEndpoint).Return(true, nil).Once()
+		sc.mocks.stores.ClusterInfoMock().EXPECT().ByClusterID(ctx, "cluster-local").Return(database.ClusterInfo{
+			ClusterID:   "cluster-local",
+			AppEndpoint: "",
+		}, nil).Once()
+
+		mcpService, err := sc.GetMCPServiceBySvcName(ctx, svcName, currentUser)
+
+		require.NoError(t, err)
+		require.NotNil(t, mcpService)
+		require.Equal(t, "http://test-svc.spaces.stg.internal", mcpService.Endpoint)
+		require.Empty(t, mcpService.ProxyHost)
+	})
+
+	t.Run("cluster lookup error", func(t *testing.T) {
+		deployWithEndpoint := *deploy
+		deployWithEndpoint.Endpoint = "http://test-svc.spaces.remote.internal"
+		deployWithEndpoint.ClusterID = "cluster-missing"
+		sc.mocks.stores.DeployTaskMock().EXPECT().GetDeployBySvcName(ctx, svcName).Return(&deployWithEndpoint, nil).Once()
+		sc.mocks.stores.SpaceMock().EXPECT().ByID(ctx, deployWithEndpoint.SpaceID).Return(space, nil).Once()
+		sc.mocks.components.repo.EXPECT().AllowAccessEndpoint(ctx, currentUser, &deployWithEndpoint).Return(true, nil).Once()
+		sc.mocks.stores.ClusterInfoMock().EXPECT().ByClusterID(ctx, "cluster-missing").Return(database.ClusterInfo{}, errors.New("cluster not found")).Once()
+
+		_, err := sc.GetMCPServiceBySvcName(ctx, svcName, currentUser)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "failed to get cluster by id")
+	})
+
+	t.Run("success falls back to public endpoint", func(t *testing.T) {
 		sc.mocks.stores.DeployTaskMock().EXPECT().GetDeployBySvcName(ctx, svcName).Return(deploy, nil).Once()
 		sc.mocks.stores.SpaceMock().EXPECT().ByID(ctx, deploy.SpaceID).Return(space, nil).Once()
+		sc.mocks.components.repo.EXPECT().AllowAccessEndpoint(ctx, currentUser, deploy).Return(true, nil).Once()
 
-		mcpService, err := sc.GetMCPServiceBySvcName(ctx, svcName)
+		mcpService, err := sc.GetMCPServiceBySvcName(ctx, svcName, currentUser)
 
 		require.NoError(t, err)
 		require.NotNil(t, mcpService)
@@ -805,12 +881,52 @@ func TestSpaceComponent_GetMCPServiceBySvcName(t *testing.T) {
 		require.Equal(t, "test-svc", mcpService.SvcName)
 		require.Equal(t, "Running", mcpService.Status)
 		require.Equal(t, "endpoint/test-svc", mcpService.Endpoint)
+		require.Empty(t, mcpService.ProxyHost)
+	})
+
+	t.Run("anonymous user denied", func(t *testing.T) {
+		deployWithEndpoint := *deploy
+		deployWithEndpoint.Endpoint = "http://test-svc.spaces.stg.internal"
+		deployWithEndpoint.SecureLevel = types.EndpointPublic
+		sc.mocks.stores.DeployTaskMock().EXPECT().GetDeployBySvcName(ctx, svcName).Return(&deployWithEndpoint, nil).Once()
+		sc.mocks.stores.SpaceMock().EXPECT().ByID(ctx, deployWithEndpoint.SpaceID).Return(space, nil).Once()
+		sc.mocks.components.repo.EXPECT().AllowAccessEndpoint(ctx, "", &deployWithEndpoint).Return(false, nil).Once()
+
+		_, err := sc.GetMCPServiceBySvcName(ctx, svcName, "")
+		require.Error(t, err)
+		require.ErrorIs(t, err, errorx.ErrForbidden)
+	})
+
+	t.Run("private endpoint denied for non-member", func(t *testing.T) {
+		deployWithEndpoint := *deploy
+		deployWithEndpoint.Endpoint = "http://test-svc.spaces.stg.internal"
+		deployWithEndpoint.SecureLevel = types.EndpointPrivate
+		sc.mocks.stores.DeployTaskMock().EXPECT().GetDeployBySvcName(ctx, svcName).Return(&deployWithEndpoint, nil).Once()
+		sc.mocks.stores.SpaceMock().EXPECT().ByID(ctx, deployWithEndpoint.SpaceID).Return(space, nil).Once()
+		sc.mocks.components.repo.EXPECT().AllowAccessEndpoint(ctx, "outsider", &deployWithEndpoint).Return(false, nil).Once()
+
+		_, err := sc.GetMCPServiceBySvcName(ctx, svcName, "outsider")
+		require.Error(t, err)
+		require.ErrorIs(t, err, errorx.ErrForbidden)
+	})
+
+	t.Run("private endpoint allowed for owner", func(t *testing.T) {
+		deployWithEndpoint := *deploy
+		deployWithEndpoint.Endpoint = "http://test-svc.spaces.stg.internal"
+		deployWithEndpoint.SecureLevel = types.EndpointPrivate
+		sc.mocks.stores.DeployTaskMock().EXPECT().GetDeployBySvcName(ctx, svcName).Return(&deployWithEndpoint, nil).Once()
+		sc.mocks.stores.SpaceMock().EXPECT().ByID(ctx, deployWithEndpoint.SpaceID).Return(space, nil).Once()
+		sc.mocks.components.repo.EXPECT().AllowAccessEndpoint(ctx, "owner", &deployWithEndpoint).Return(true, nil).Once()
+
+		mcpService, err := sc.GetMCPServiceBySvcName(ctx, svcName, "owner")
+		require.NoError(t, err)
+		require.Equal(t, "http://test-svc.spaces.stg.internal", mcpService.Endpoint)
 	})
 
 	t.Run("deploy not found", func(t *testing.T) {
 		sc.mocks.stores.DeployTaskMock().EXPECT().GetDeployBySvcName(ctx, svcName).Return(nil, errors.New("not found")).Once()
 
-		_, err := sc.GetMCPServiceBySvcName(ctx, svcName)
+		_, err := sc.GetMCPServiceBySvcName(ctx, svcName, currentUser)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "failed to get deploy by svcName")
 	})
@@ -819,7 +935,7 @@ func TestSpaceComponent_GetMCPServiceBySvcName(t *testing.T) {
 		sc.mocks.stores.DeployTaskMock().EXPECT().GetDeployBySvcName(ctx, svcName).Return(deploy, nil).Once()
 		sc.mocks.stores.SpaceMock().EXPECT().ByID(ctx, deploy.SpaceID).Return(nil, errors.New("not found")).Once()
 
-		_, err := sc.GetMCPServiceBySvcName(ctx, svcName)
+		_, err := sc.GetMCPServiceBySvcName(ctx, svcName, currentUser)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "failed to get space by id")
 	})

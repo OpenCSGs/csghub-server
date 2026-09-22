@@ -47,6 +47,7 @@ func NewSpaceComponent(config *config.Config) (SpaceComponent, error) {
 	}
 	c.templateStore = database.NewSpaceTemplateStore()
 	c.rfs = database.NewRuntimeFrameworksStore()
+	c.clusterInfoStore = database.NewClusterInfoStore()
 	return c, nil
 }
 
@@ -69,6 +70,7 @@ type spaceComponentImpl struct {
 	recomStore          database.RecomStore
 	templateStore       database.SpaceTemplateStore
 	rfs                 database.RuntimeFrameworksStore
+	clusterInfoStore    database.ClusterInfoStore
 }
 
 func (c *spaceComponentImpl) checkResourcePurchasableForUpdate(ctx context.Context, req types.UpdateSpaceReq, resource *database.SpaceResource) error {
