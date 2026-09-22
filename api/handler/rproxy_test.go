@@ -97,13 +97,15 @@ func TestRProxyHandler_CheckAccessPermission(t *testing.T) {
 			repoError:      false,
 		},
 		{
+			// AuthTypeUserOrgApiKey and AuthTypeMultiSyncToken are rejected
+			// before any component call, so no space lookup happens.
 			name:           "Non-MCP space with MultiSyncToken auth",
 			hasSpace:       true,
 			spaceSDK:       "gradio",
 			authType:       httpbase.AuthTypeMultiSyncToken,
 			expectedAllow:  false,
 			expectedError:  true,
-			expectSpaceGet: true,
+			expectSpaceGet: false,
 			expectRepoCall: false,
 			repoAllow:      false,
 			repoError:      false,
@@ -218,6 +220,10 @@ func TestRProxyHandler_CheckAccessPermission(t *testing.T) {
 							}
 						}
 					}
+				} else if tt.expectedError && tt.repoError == false && tt.authType == httpbase.AuthTypeMultiSyncToken {
+					// AuthTypeUserOrgApiKey and AuthTypeMultiSyncToken are
+					// rejected before any component call, so no space lookup
+					// happens and no mock expectation is needed.
 				} else {
 					tester.mocks.space.EXPECT().GetByID(tester.ctx.Request.Context(), int64(1)).Return(nil, errors.New("space get error"))
 				}

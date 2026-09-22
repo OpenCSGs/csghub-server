@@ -14,7 +14,7 @@ func (c *modelComponentImpl) CreateInferenceVersion(ctx context.Context, req typ
 		CurrentUser: req.CurrentUser,
 		DeployID:    req.DeployId,
 	}
-	_, deploy, err := c.repoComponent.CheckDeployPermissionForUser(ctx, verReq)
+	_, deploy, err := c.repoComponent.CheckDeployOperateAccess(ctx, verReq)
 	if err != nil {
 		return err
 	}
@@ -74,7 +74,7 @@ func (c *modelComponentImpl) ListInferenceVersions(ctx context.Context, verReq t
 }
 
 func (c *modelComponentImpl) UpdateInferenceVersionTraffic(ctx context.Context, verReq types.DeployActReq, req []types.UpdateInferenceVersionTrafficReq) error {
-	_, deploy, err := c.repoComponent.CheckDeployPermissionForUser(ctx, verReq)
+	_, deploy, err := c.repoComponent.CheckDeployOperateAccess(ctx, verReq)
 	if err != nil {
 		return err
 	}
@@ -99,7 +99,7 @@ func (c *modelComponentImpl) UpdateInferenceVersionTraffic(ctx context.Context, 
 }
 
 func (c *modelComponentImpl) DeleteInferenceVersion(ctx context.Context, verReq types.DeployActReq, commitID string) error {
-	_, deploy, err := c.repoComponent.CheckDeployPermissionForUser(ctx, verReq)
+	_, deploy, err := c.repoComponent.CheckDeployOperateAccess(ctx, verReq)
 	if err != nil {
 		return err
 	}

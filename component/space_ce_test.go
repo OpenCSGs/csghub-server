@@ -276,7 +276,7 @@ func TestSpaceComponent_Delete(t *testing.T) {
 			return nil
 		}).Once()
 	sc.mocks.stores.DeployTaskMock().EXPECT().StopDeploy(
-		mock.Anything, types.SpaceRepo, int64(2), int64(3), int64(4),
+		mock.Anything, types.SpaceRepo, int64(2), int64(4),
 	).Return(nil)
 
 	var wg sync.WaitGroup

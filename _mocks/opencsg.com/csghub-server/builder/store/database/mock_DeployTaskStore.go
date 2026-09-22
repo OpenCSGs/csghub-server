@@ -232,17 +232,17 @@ func (_c *MockDeployTaskStore_CreateDeployTask_Call) RunAndReturn(run func(conte
 	return _c
 }
 
-// DeleteDeploy provides a mock function with given fields: ctx, repoType, repoID, userID, deployID
-func (_m *MockDeployTaskStore) DeleteDeploy(ctx context.Context, repoType types.RepositoryType, repoID int64, userID int64, deployID int64) error {
-	ret := _m.Called(ctx, repoType, repoID, userID, deployID)
+// DeleteDeploy provides a mock function with given fields: ctx, repoType, repoID, deployID
+func (_m *MockDeployTaskStore) DeleteDeploy(ctx context.Context, repoType types.RepositoryType, repoID int64, deployID int64) error {
+	ret := _m.Called(ctx, repoType, repoID, deployID)
 
 	if len(ret) == 0 {
 		panic("no return value specified for DeleteDeploy")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, types.RepositoryType, int64, int64, int64) error); ok {
-		r0 = rf(ctx, repoType, repoID, userID, deployID)
+	if rf, ok := ret.Get(0).(func(context.Context, types.RepositoryType, int64, int64) error); ok {
+		r0 = rf(ctx, repoType, repoID, deployID)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -259,15 +259,14 @@ type MockDeployTaskStore_DeleteDeploy_Call struct {
 //   - ctx context.Context
 //   - repoType types.RepositoryType
 //   - repoID int64
-//   - userID int64
 //   - deployID int64
-func (_e *MockDeployTaskStore_Expecter) DeleteDeploy(ctx interface{}, repoType interface{}, repoID interface{}, userID interface{}, deployID interface{}) *MockDeployTaskStore_DeleteDeploy_Call {
-	return &MockDeployTaskStore_DeleteDeploy_Call{Call: _e.mock.On("DeleteDeploy", ctx, repoType, repoID, userID, deployID)}
+func (_e *MockDeployTaskStore_Expecter) DeleteDeploy(ctx interface{}, repoType interface{}, repoID interface{}, deployID interface{}) *MockDeployTaskStore_DeleteDeploy_Call {
+	return &MockDeployTaskStore_DeleteDeploy_Call{Call: _e.mock.On("DeleteDeploy", ctx, repoType, repoID, deployID)}
 }
 
-func (_c *MockDeployTaskStore_DeleteDeploy_Call) Run(run func(ctx context.Context, repoType types.RepositoryType, repoID int64, userID int64, deployID int64)) *MockDeployTaskStore_DeleteDeploy_Call {
+func (_c *MockDeployTaskStore_DeleteDeploy_Call) Run(run func(ctx context.Context, repoType types.RepositoryType, repoID int64, deployID int64)) *MockDeployTaskStore_DeleteDeploy_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(types.RepositoryType), args[2].(int64), args[3].(int64), args[4].(int64))
+		run(args[0].(context.Context), args[1].(types.RepositoryType), args[2].(int64), args[3].(int64))
 	})
 	return _c
 }
@@ -277,22 +276,22 @@ func (_c *MockDeployTaskStore_DeleteDeploy_Call) Return(_a0 error) *MockDeployTa
 	return _c
 }
 
-func (_c *MockDeployTaskStore_DeleteDeploy_Call) RunAndReturn(run func(context.Context, types.RepositoryType, int64, int64, int64) error) *MockDeployTaskStore_DeleteDeploy_Call {
+func (_c *MockDeployTaskStore_DeleteDeploy_Call) RunAndReturn(run func(context.Context, types.RepositoryType, int64, int64) error) *MockDeployTaskStore_DeleteDeploy_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// DeleteDeployByID provides a mock function with given fields: ctx, userID, deployID
-func (_m *MockDeployTaskStore) DeleteDeployByID(ctx context.Context, userID int64, deployID int64) error {
-	ret := _m.Called(ctx, userID, deployID)
+// DeleteDeployByID provides a mock function with given fields: ctx, deployID
+func (_m *MockDeployTaskStore) DeleteDeployByID(ctx context.Context, deployID int64) error {
+	ret := _m.Called(ctx, deployID)
 
 	if len(ret) == 0 {
 		panic("no return value specified for DeleteDeployByID")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, int64, int64) error); ok {
-		r0 = rf(ctx, userID, deployID)
+	if rf, ok := ret.Get(0).(func(context.Context, int64) error); ok {
+		r0 = rf(ctx, deployID)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -307,15 +306,14 @@ type MockDeployTaskStore_DeleteDeployByID_Call struct {
 
 // DeleteDeployByID is a helper method to define mock.On call
 //   - ctx context.Context
-//   - userID int64
 //   - deployID int64
-func (_e *MockDeployTaskStore_Expecter) DeleteDeployByID(ctx interface{}, userID interface{}, deployID interface{}) *MockDeployTaskStore_DeleteDeployByID_Call {
-	return &MockDeployTaskStore_DeleteDeployByID_Call{Call: _e.mock.On("DeleteDeployByID", ctx, userID, deployID)}
+func (_e *MockDeployTaskStore_Expecter) DeleteDeployByID(ctx interface{}, deployID interface{}) *MockDeployTaskStore_DeleteDeployByID_Call {
+	return &MockDeployTaskStore_DeleteDeployByID_Call{Call: _e.mock.On("DeleteDeployByID", ctx, deployID)}
 }
 
-func (_c *MockDeployTaskStore_DeleteDeployByID_Call) Run(run func(ctx context.Context, userID int64, deployID int64)) *MockDeployTaskStore_DeleteDeployByID_Call {
+func (_c *MockDeployTaskStore_DeleteDeployByID_Call) Run(run func(ctx context.Context, deployID int64)) *MockDeployTaskStore_DeleteDeployByID_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(int64), args[2].(int64))
+		run(args[0].(context.Context), args[1].(int64))
 	})
 	return _c
 }
@@ -325,7 +323,7 @@ func (_c *MockDeployTaskStore_DeleteDeployByID_Call) Return(_a0 error) *MockDepl
 	return _c
 }
 
-func (_c *MockDeployTaskStore_DeleteDeployByID_Call) RunAndReturn(run func(context.Context, int64, int64) error) *MockDeployTaskStore_DeleteDeployByID_Call {
+func (_c *MockDeployTaskStore_DeleteDeployByID_Call) RunAndReturn(run func(context.Context, int64) error) *MockDeployTaskStore_DeleteDeployByID_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -1517,9 +1515,9 @@ func (_c *MockDeployTaskStore_ListAllRunningDeploys_Call) RunAndReturn(run func(
 	return _c
 }
 
-// ListDeploy provides a mock function with given fields: ctx, repoType, repoID, userID
-func (_m *MockDeployTaskStore) ListDeploy(ctx context.Context, repoType types.RepositoryType, repoID int64, userID int64) ([]database.Deploy, error) {
-	ret := _m.Called(ctx, repoType, repoID, userID)
+// ListDeploy provides a mock function with given fields: ctx, repoType, repoID, userID, username
+func (_m *MockDeployTaskStore) ListDeploy(ctx context.Context, repoType types.RepositoryType, repoID int64, userID int64, username string) ([]database.Deploy, error) {
+	ret := _m.Called(ctx, repoType, repoID, userID, username)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ListDeploy")
@@ -1527,19 +1525,19 @@ func (_m *MockDeployTaskStore) ListDeploy(ctx context.Context, repoType types.Re
 
 	var r0 []database.Deploy
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, types.RepositoryType, int64, int64) ([]database.Deploy, error)); ok {
-		return rf(ctx, repoType, repoID, userID)
+	if rf, ok := ret.Get(0).(func(context.Context, types.RepositoryType, int64, int64, string) ([]database.Deploy, error)); ok {
+		return rf(ctx, repoType, repoID, userID, username)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, types.RepositoryType, int64, int64) []database.Deploy); ok {
-		r0 = rf(ctx, repoType, repoID, userID)
+	if rf, ok := ret.Get(0).(func(context.Context, types.RepositoryType, int64, int64, string) []database.Deploy); ok {
+		r0 = rf(ctx, repoType, repoID, userID, username)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]database.Deploy)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, types.RepositoryType, int64, int64) error); ok {
-		r1 = rf(ctx, repoType, repoID, userID)
+	if rf, ok := ret.Get(1).(func(context.Context, types.RepositoryType, int64, int64, string) error); ok {
+		r1 = rf(ctx, repoType, repoID, userID, username)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -1557,13 +1555,14 @@ type MockDeployTaskStore_ListDeploy_Call struct {
 //   - repoType types.RepositoryType
 //   - repoID int64
 //   - userID int64
-func (_e *MockDeployTaskStore_Expecter) ListDeploy(ctx interface{}, repoType interface{}, repoID interface{}, userID interface{}) *MockDeployTaskStore_ListDeploy_Call {
-	return &MockDeployTaskStore_ListDeploy_Call{Call: _e.mock.On("ListDeploy", ctx, repoType, repoID, userID)}
+//   - username string
+func (_e *MockDeployTaskStore_Expecter) ListDeploy(ctx interface{}, repoType interface{}, repoID interface{}, userID interface{}, username interface{}) *MockDeployTaskStore_ListDeploy_Call {
+	return &MockDeployTaskStore_ListDeploy_Call{Call: _e.mock.On("ListDeploy", ctx, repoType, repoID, userID, username)}
 }
 
-func (_c *MockDeployTaskStore_ListDeploy_Call) Run(run func(ctx context.Context, repoType types.RepositoryType, repoID int64, userID int64)) *MockDeployTaskStore_ListDeploy_Call {
+func (_c *MockDeployTaskStore_ListDeploy_Call) Run(run func(ctx context.Context, repoType types.RepositoryType, repoID int64, userID int64, username string)) *MockDeployTaskStore_ListDeploy_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(types.RepositoryType), args[2].(int64), args[3].(int64))
+		run(args[0].(context.Context), args[1].(types.RepositoryType), args[2].(int64), args[3].(int64), args[4].(string))
 	})
 	return _c
 }
@@ -1573,7 +1572,7 @@ func (_c *MockDeployTaskStore_ListDeploy_Call) Return(_a0 []database.Deploy, _a1
 	return _c
 }
 
-func (_c *MockDeployTaskStore_ListDeploy_Call) RunAndReturn(run func(context.Context, types.RepositoryType, int64, int64) ([]database.Deploy, error)) *MockDeployTaskStore_ListDeploy_Call {
+func (_c *MockDeployTaskStore_ListDeploy_Call) RunAndReturn(run func(context.Context, types.RepositoryType, int64, int64, string) ([]database.Deploy, error)) *MockDeployTaskStore_ListDeploy_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -2225,17 +2224,17 @@ func (_c *MockDeployTaskStore_RunningVisibleToUser_Call) RunAndReturn(run func(c
 	return _c
 }
 
-// StopDeploy provides a mock function with given fields: ctx, repoType, repoID, userID, deployID
-func (_m *MockDeployTaskStore) StopDeploy(ctx context.Context, repoType types.RepositoryType, repoID int64, userID int64, deployID int64) error {
-	ret := _m.Called(ctx, repoType, repoID, userID, deployID)
+// StopDeploy provides a mock function with given fields: ctx, repoType, repoID, deployID
+func (_m *MockDeployTaskStore) StopDeploy(ctx context.Context, repoType types.RepositoryType, repoID int64, deployID int64) error {
+	ret := _m.Called(ctx, repoType, repoID, deployID)
 
 	if len(ret) == 0 {
 		panic("no return value specified for StopDeploy")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, types.RepositoryType, int64, int64, int64) error); ok {
-		r0 = rf(ctx, repoType, repoID, userID, deployID)
+	if rf, ok := ret.Get(0).(func(context.Context, types.RepositoryType, int64, int64) error); ok {
+		r0 = rf(ctx, repoType, repoID, deployID)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -2252,15 +2251,14 @@ type MockDeployTaskStore_StopDeploy_Call struct {
 //   - ctx context.Context
 //   - repoType types.RepositoryType
 //   - repoID int64
-//   - userID int64
 //   - deployID int64
-func (_e *MockDeployTaskStore_Expecter) StopDeploy(ctx interface{}, repoType interface{}, repoID interface{}, userID interface{}, deployID interface{}) *MockDeployTaskStore_StopDeploy_Call {
-	return &MockDeployTaskStore_StopDeploy_Call{Call: _e.mock.On("StopDeploy", ctx, repoType, repoID, userID, deployID)}
+func (_e *MockDeployTaskStore_Expecter) StopDeploy(ctx interface{}, repoType interface{}, repoID interface{}, deployID interface{}) *MockDeployTaskStore_StopDeploy_Call {
+	return &MockDeployTaskStore_StopDeploy_Call{Call: _e.mock.On("StopDeploy", ctx, repoType, repoID, deployID)}
 }
 
-func (_c *MockDeployTaskStore_StopDeploy_Call) Run(run func(ctx context.Context, repoType types.RepositoryType, repoID int64, userID int64, deployID int64)) *MockDeployTaskStore_StopDeploy_Call {
+func (_c *MockDeployTaskStore_StopDeploy_Call) Run(run func(ctx context.Context, repoType types.RepositoryType, repoID int64, deployID int64)) *MockDeployTaskStore_StopDeploy_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(types.RepositoryType), args[2].(int64), args[3].(int64), args[4].(int64))
+		run(args[0].(context.Context), args[1].(types.RepositoryType), args[2].(int64), args[3].(int64))
 	})
 	return _c
 }
@@ -2270,22 +2268,22 @@ func (_c *MockDeployTaskStore_StopDeploy_Call) Return(_a0 error) *MockDeployTask
 	return _c
 }
 
-func (_c *MockDeployTaskStore_StopDeploy_Call) RunAndReturn(run func(context.Context, types.RepositoryType, int64, int64, int64) error) *MockDeployTaskStore_StopDeploy_Call {
+func (_c *MockDeployTaskStore_StopDeploy_Call) RunAndReturn(run func(context.Context, types.RepositoryType, int64, int64) error) *MockDeployTaskStore_StopDeploy_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// StopDeployByID provides a mock function with given fields: ctx, userID, deployID
-func (_m *MockDeployTaskStore) StopDeployByID(ctx context.Context, userID int64, deployID int64) error {
-	ret := _m.Called(ctx, userID, deployID)
+// StopDeployByID provides a mock function with given fields: ctx, deployID
+func (_m *MockDeployTaskStore) StopDeployByID(ctx context.Context, deployID int64) error {
+	ret := _m.Called(ctx, deployID)
 
 	if len(ret) == 0 {
 		panic("no return value specified for StopDeployByID")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, int64, int64) error); ok {
-		r0 = rf(ctx, userID, deployID)
+	if rf, ok := ret.Get(0).(func(context.Context, int64) error); ok {
+		r0 = rf(ctx, deployID)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -2300,15 +2298,14 @@ type MockDeployTaskStore_StopDeployByID_Call struct {
 
 // StopDeployByID is a helper method to define mock.On call
 //   - ctx context.Context
-//   - userID int64
 //   - deployID int64
-func (_e *MockDeployTaskStore_Expecter) StopDeployByID(ctx interface{}, userID interface{}, deployID interface{}) *MockDeployTaskStore_StopDeployByID_Call {
-	return &MockDeployTaskStore_StopDeployByID_Call{Call: _e.mock.On("StopDeployByID", ctx, userID, deployID)}
+func (_e *MockDeployTaskStore_Expecter) StopDeployByID(ctx interface{}, deployID interface{}) *MockDeployTaskStore_StopDeployByID_Call {
+	return &MockDeployTaskStore_StopDeployByID_Call{Call: _e.mock.On("StopDeployByID", ctx, deployID)}
 }
 
-func (_c *MockDeployTaskStore_StopDeployByID_Call) Run(run func(ctx context.Context, userID int64, deployID int64)) *MockDeployTaskStore_StopDeployByID_Call {
+func (_c *MockDeployTaskStore_StopDeployByID_Call) Run(run func(ctx context.Context, deployID int64)) *MockDeployTaskStore_StopDeployByID_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(int64), args[2].(int64))
+		run(args[0].(context.Context), args[1].(int64))
 	})
 	return _c
 }
@@ -2318,7 +2315,7 @@ func (_c *MockDeployTaskStore_StopDeployByID_Call) Return(_a0 error) *MockDeploy
 	return _c
 }
 
-func (_c *MockDeployTaskStore_StopDeployByID_Call) RunAndReturn(run func(context.Context, int64, int64) error) *MockDeployTaskStore_StopDeployByID_Call {
+func (_c *MockDeployTaskStore_StopDeployByID_Call) RunAndReturn(run func(context.Context, int64) error) *MockDeployTaskStore_StopDeployByID_Call {
 	_c.Call.Return(run)
 	return _c
 }

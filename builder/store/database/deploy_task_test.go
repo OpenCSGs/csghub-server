@@ -47,7 +47,7 @@ func TestDeployTaskStore_CRUD(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, dp.DeployName, "foo")
 
-	err = store.StopDeploy(ctx, types.ModelRepo, 123, 456, dp.ID)
+	err = store.StopDeploy(ctx, types.ModelRepo, 123, dp.ID)
 	require.Nil(t, err)
 	dp, err = store.GetDeployByID(ctx, dp.ID)
 	require.Nil(t, err)
@@ -79,7 +79,9 @@ func TestDeployTaskStore_CRUD(t *testing.T) {
 	require.Equal(t, 1, total)
 	require.Equal(t, dps[0].SvcName, "s1")
 
-	err = store.DeleteDeploy(ctx, types.ModelRepo, 123, 456, dp.ID)
+	// delete matches by id and repo only; the creator userID (456) is not
+	// part of the filter since permission checks happen in the component layer
+	err = store.DeleteDeploy(ctx, types.ModelRepo, 123, dp.ID)
 	require.Nil(t, err)
 	dp, err = store.GetDeployByID(ctx, dp.ID)
 	require.Nil(t, err)
@@ -735,8 +737,10 @@ func TestDeployTaskStore_DeleteDeployByID(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, "delete-by-id", got.DeployName)
 
-	// Delete the deploy by ID and userID
-	err = store.DeleteDeployByID(ctx, 100, got.ID)
+	// Delete the deploy by ID. The store matches by id only since permission
+	// checks happen in the component layer, so a different caller id (999)
+	// still deletes the row.
+	err = store.DeleteDeployByID(ctx, got.ID)
 	require.Nil(t, err)
 
 	// The status should now be Deleted
@@ -744,12 +748,8 @@ func TestDeployTaskStore_DeleteDeployByID(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, common.Deleted, got.Status)
 
-	// Try deleting with wrong userID, should get error
-	err = store.DeleteDeployByID(ctx, 999, got.ID)
-	require.NotNil(t, err)
-
 	// Try deleting a non-existent deploy
-	err = store.DeleteDeployByID(ctx, 100, 999999)
+	err = store.DeleteDeployByID(ctx, 999999)
 	require.NotNil(t, err)
 }
 

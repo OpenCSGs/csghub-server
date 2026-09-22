@@ -1144,6 +1144,14 @@ func TestModelComponent_Wakeup(t *testing.T) {
 	sc := initializeTestModelComponent(ctx, t)
 	sc.mocks.stores.ModelMock().EXPECT().FindByPath(ctx, "ns", "n").Return(nil, nil)
 
+	sc.mocks.components.repo.EXPECT().CheckDeployOperateAccess(ctx, types.DeployActReq{
+		CurrentUser: "u",
+		Namespace:   "ns",
+		Name:        "n",
+		DeployID:    1,
+		DeployType:  types.InferenceType,
+	}).Return(&database.User{}, &database.Deploy{}, nil)
+
 	sc.mocks.stores.DeployTaskMock().EXPECT().GetDeployByID(ctx, int64(1)).Return(
 		&database.Deploy{SvcName: "svc"}, nil,
 	)
@@ -1155,7 +1163,7 @@ func TestModelComponent_Wakeup(t *testing.T) {
 		SvcName:   "svc",
 	}).Return(nil)
 
-	err := sc.Wakeup(ctx, "ns", "n", 1)
+	err := sc.Wakeup(ctx, "ns", "n", 1, "u")
 	require.Nil(t, err)
 
 }

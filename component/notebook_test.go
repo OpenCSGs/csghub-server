@@ -177,7 +177,7 @@ func TestNotebookComponentImpl_DeleteNotebook_Success(t *testing.T) {
 	}
 
 	nc.mocks.components.repo.EXPECT().
-		CheckDeployPermissionForUser(ctx, types.DeployActReq{
+		CheckDeployOperateAccess(ctx, types.DeployActReq{
 			DeployID:    10,
 			CurrentUser: "testuser",
 		}).
@@ -193,7 +193,7 @@ func TestNotebookComponentImpl_DeleteNotebook_Success(t *testing.T) {
 		Return(nil)
 
 	nc.mocks.stores.DeployTaskMock().EXPECT().
-		DeleteDeployByID(ctx, user.ID, deploy.ID).
+		DeleteDeployByID(ctx, deploy.ID).
 		Return(nil)
 
 	err := nc.DeleteNotebook(ctx, &types.DeleteNotebookReq{
@@ -208,7 +208,7 @@ func TestNotebookComponentImpl_DeleteNotebook_PermissionDenied(t *testing.T) {
 	nc := initializeTestNotebookComponent(ctx, t)
 
 	nc.mocks.components.repo.EXPECT().
-		CheckDeployPermissionForUser(ctx, types.DeployActReq{
+		CheckDeployOperateAccess(ctx, types.DeployActReq{
 			DeployID:    10,
 			CurrentUser: "testuser",
 		}).
@@ -233,7 +233,7 @@ func TestNotebookComponentImpl_DeleteNotebook_PurgeFails(t *testing.T) {
 	}
 
 	nc.mocks.components.repo.EXPECT().
-		CheckDeployPermissionForUser(ctx, types.DeployActReq{
+		CheckDeployOperateAccess(ctx, types.DeployActReq{
 			DeployID:    10,
 			CurrentUser: "testuser",
 		}).
@@ -249,7 +249,7 @@ func TestNotebookComponentImpl_DeleteNotebook_PurgeFails(t *testing.T) {
 		Return(errors.New("purge error"))
 
 	nc.mocks.stores.DeployTaskMock().EXPECT().
-		DeleteDeployByID(ctx, user.ID, deploy.ID).
+		DeleteDeployByID(ctx, deploy.ID).
 		Return(nil)
 
 	err := nc.DeleteNotebook(ctx, &types.DeleteNotebookReq{
@@ -270,7 +270,7 @@ func TestNotebookComponentImpl_DeleteNotebook_DeleteDeployFails(t *testing.T) {
 	}
 
 	nc.mocks.components.repo.EXPECT().
-		CheckDeployPermissionForUser(ctx, types.DeployActReq{
+		CheckDeployOperateAccess(ctx, types.DeployActReq{
 			DeployID:    10,
 			CurrentUser: "testuser",
 		}).
@@ -286,7 +286,7 @@ func TestNotebookComponentImpl_DeleteNotebook_DeleteDeployFails(t *testing.T) {
 		Return(nil)
 
 	nc.mocks.stores.DeployTaskMock().EXPECT().
-		DeleteDeployByID(ctx, user.ID, deploy.ID).
+		DeleteDeployByID(ctx, deploy.ID).
 		Return(errors.New("delete error"))
 
 	err := nc.DeleteNotebook(ctx, &types.DeleteNotebookReq{
@@ -314,7 +314,7 @@ func TestNotebookComponentImpl_UpdateNotebook_Success(t *testing.T) {
 	}
 
 	nc.mocks.components.repo.EXPECT().
-		CheckDeployPermissionForUser(ctx, types.DeployActReq{
+		CheckDeployOperateAccess(ctx, types.DeployActReq{
 			DeployID:    20,
 			CurrentUser: "testuser",
 		}).
@@ -405,7 +405,7 @@ func TestNotebookComponentImpl_UpdateNotebook_PermissionDenied(t *testing.T) {
 	nc := initializeTestNotebookComponent(ctx, t)
 
 	nc.mocks.components.repo.EXPECT().
-		CheckDeployPermissionForUser(ctx, types.DeployActReq{
+		CheckDeployOperateAccess(ctx, types.DeployActReq{
 			DeployID:    21,
 			CurrentUser: "testuser",
 		}).
@@ -431,7 +431,7 @@ func TestNotebookComponentImpl_UpdateNotebook_DeployRunning(t *testing.T) {
 	}
 
 	nc.mocks.components.repo.EXPECT().
-		CheckDeployPermissionForUser(ctx, types.DeployActReq{
+		CheckDeployOperateAccess(ctx, types.DeployActReq{
 			DeployID:    22,
 			CurrentUser: "testuser",
 		}).
@@ -465,7 +465,7 @@ func TestNotebookComponentImpl_UpdateNotebook_ResourceNotFound(t *testing.T) {
 	}
 
 	nc.mocks.components.repo.EXPECT().
-		CheckDeployPermissionForUser(ctx, types.DeployActReq{
+		CheckDeployOperateAccess(ctx, types.DeployActReq{
 			DeployID:    23,
 			CurrentUser: "testuser",
 		}).
@@ -509,7 +509,7 @@ func TestNotebookComponentImpl_UpdateNotebook_ResourceUnavailable(t *testing.T) 
 	}
 
 	nc.mocks.components.repo.EXPECT().
-		CheckDeployPermissionForUser(ctx, types.DeployActReq{
+		CheckDeployOperateAccess(ctx, types.DeployActReq{
 			DeployID:    24,
 			CurrentUser: "testuser",
 		}).
@@ -557,7 +557,7 @@ func TestNotebookComponentImpl_UpdateNotebook_MultiHostNotSupported(t *testing.T
 	}
 
 	nc.mocks.components.repo.EXPECT().
-		CheckDeployPermissionForUser(ctx, types.DeployActReq{
+		CheckDeployOperateAccess(ctx, types.DeployActReq{
 			DeployID:    25,
 			CurrentUser: "testuser",
 		}).
@@ -604,7 +604,7 @@ func TestNotebookComponentImpl_UpdateNotebook_UpdateDeployFails(t *testing.T) {
 	}
 
 	nc.mocks.components.repo.EXPECT().
-		CheckDeployPermissionForUser(ctx, types.DeployActReq{
+		CheckDeployOperateAccess(ctx, types.DeployActReq{
 			DeployID:    26,
 			CurrentUser: "testuser",
 		}).
@@ -652,7 +652,7 @@ func TestNotebookComponentImpl_StartNotebook_Success(t *testing.T) {
 	}
 
 	nc.mocks.components.repo.EXPECT().
-		CheckDeployPermissionForUser(ctx, types.DeployActReq{
+		CheckDeployOperateAccess(ctx, types.DeployActReq{
 			DeployID:    30,
 			CurrentUser: "testuser",
 		}).
@@ -682,7 +682,7 @@ func TestNotebookComponentImpl_StartNotebook_PermissionDenied(t *testing.T) {
 	nc := initializeTestNotebookComponent(ctx, t)
 
 	nc.mocks.components.repo.EXPECT().
-		CheckDeployPermissionForUser(ctx, types.DeployActReq{
+		CheckDeployOperateAccess(ctx, types.DeployActReq{
 			DeployID:    31,
 			CurrentUser: "testuser",
 		}).
@@ -707,7 +707,7 @@ func TestNotebookComponentImpl_StartNotebook_AlreadyStarted(t *testing.T) {
 	}
 
 	nc.mocks.components.repo.EXPECT().
-		CheckDeployPermissionForUser(ctx, types.DeployActReq{
+		CheckDeployOperateAccess(ctx, types.DeployActReq{
 			DeployID:    32,
 			CurrentUser: "testuser",
 		}).
@@ -740,7 +740,7 @@ func TestNotebookComponentImpl_StartNotebook_ExistCheckFails(t *testing.T) {
 	}
 
 	nc.mocks.components.repo.EXPECT().
-		CheckDeployPermissionForUser(ctx, types.DeployActReq{
+		CheckDeployOperateAccess(ctx, types.DeployActReq{
 			DeployID:    33,
 			CurrentUser: "testuser",
 		}).
@@ -773,7 +773,7 @@ func TestNotebookComponentImpl_StartNotebook_StartDeployFails(t *testing.T) {
 	}
 
 	nc.mocks.components.repo.EXPECT().
-		CheckDeployPermissionForUser(ctx, types.DeployActReq{
+		CheckDeployOperateAccess(ctx, types.DeployActReq{
 			DeployID:    34,
 			CurrentUser: "testuser",
 		}).
@@ -809,7 +809,7 @@ func TestNotebookComponentImpl_StopNotebook_Success(t *testing.T) {
 	}
 
 	nc.mocks.components.repo.EXPECT().
-		CheckDeployPermissionForUser(ctx, types.DeployActReq{
+		CheckDeployOperateAccess(ctx, types.DeployActReq{
 			DeployID:    40,
 			CurrentUser: "testuser",
 		}).
@@ -830,7 +830,7 @@ func TestNotebookComponentImpl_StopNotebook_Success(t *testing.T) {
 		Return(false, nil)
 
 	nc.mocks.stores.DeployTaskMock().EXPECT().
-		StopDeployByID(ctx, user.ID, deploy.ID).
+		StopDeployByID(ctx, deploy.ID).
 		Return(nil)
 
 	err := nc.StopNotebook(ctx, &types.StopNotebookReq{
@@ -845,7 +845,7 @@ func TestNotebookComponentImpl_StopNotebook_PermissionDenied(t *testing.T) {
 	nc := initializeTestNotebookComponent(ctx, t)
 
 	nc.mocks.components.repo.EXPECT().
-		CheckDeployPermissionForUser(ctx, types.DeployActReq{
+		CheckDeployOperateAccess(ctx, types.DeployActReq{
 			DeployID:    41,
 			CurrentUser: "testuser",
 		}).
@@ -870,7 +870,7 @@ func TestNotebookComponentImpl_StopNotebook_StopFails(t *testing.T) {
 	}
 
 	nc.mocks.components.repo.EXPECT().
-		CheckDeployPermissionForUser(ctx, types.DeployActReq{
+		CheckDeployOperateAccess(ctx, types.DeployActReq{
 			DeployID:    42,
 			CurrentUser: "testuser",
 		}).
@@ -905,7 +905,7 @@ func TestNotebookComponentImpl_StopNotebook_ExistCheckFails(t *testing.T) {
 	}
 
 	nc.mocks.components.repo.EXPECT().
-		CheckDeployPermissionForUser(ctx, types.DeployActReq{
+		CheckDeployOperateAccess(ctx, types.DeployActReq{
 			DeployID:    43,
 			CurrentUser: "testuser",
 		}).
@@ -944,7 +944,7 @@ func TestNotebookComponentImpl_StopNotebook_StillExistsAfterStop(t *testing.T) {
 	}
 
 	nc.mocks.components.repo.EXPECT().
-		CheckDeployPermissionForUser(ctx, types.DeployActReq{
+		CheckDeployOperateAccess(ctx, types.DeployActReq{
 			DeployID:    44,
 			CurrentUser: "testuser",
 		}).
@@ -983,7 +983,7 @@ func TestNotebookComponentImpl_StopNotebook_StopDeployByIDFails(t *testing.T) {
 	}
 
 	nc.mocks.components.repo.EXPECT().
-		CheckDeployPermissionForUser(ctx, types.DeployActReq{
+		CheckDeployOperateAccess(ctx, types.DeployActReq{
 			DeployID:    45,
 			CurrentUser: "testuser",
 		}).
@@ -1004,7 +1004,7 @@ func TestNotebookComponentImpl_StopNotebook_StopDeployByIDFails(t *testing.T) {
 		Return(false, nil)
 
 	nc.mocks.stores.DeployTaskMock().EXPECT().
-		StopDeployByID(ctx, user.ID, deploy.ID).
+		StopDeployByID(ctx, deploy.ID).
 		Return(errors.New("db error"))
 
 	err := nc.StopNotebook(ctx, &types.StopNotebookReq{
@@ -1066,4 +1066,92 @@ func TestNotebookComponentImpl_LogsNotebook(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.NotNil(t, reader)
+}
+
+// Regression test for the org-member operate path: CheckDeployOperateAccess
+// returns the OPERATOR (an org write member, not the deploy creator), and the
+// store must match the deploy by id only so the delete succeeds. The old
+// implementation passed the operator's user.ID into a store query filtered by
+// user_id (the creator), which affected zero rows and failed the delete.
+func TestNotebookComponentImpl_DeleteNotebook_OrgMemberOperator(t *testing.T) {
+	ctx := context.TODO()
+	nc := initializeTestNotebookComponent(ctx, t)
+	// operator is an org member, not the creator (creator user.ID would be 1)
+	operator := &database.User{ID: 777, Username: "orgmember"}
+	deploy := &database.Deploy{
+		ID:        60,
+		SvcName:   "notebook-svc",
+		ClusterID: "1",
+		UserID:    1,
+	}
+
+	nc.mocks.components.repo.EXPECT().
+		CheckDeployOperateAccess(ctx, types.DeployActReq{
+			DeployID:    60,
+			CurrentUser: "orgmember",
+		}).
+		Return(operator, deploy, nil)
+
+	nc.mocks.deployer.EXPECT().
+		Purge(ctx, types.DeployRequest{
+			SpaceID:   0,
+			DeployID:  deploy.ID,
+			SvcName:   deploy.SvcName,
+			ClusterID: deploy.ClusterID,
+		}).
+		Return(nil)
+
+	nc.mocks.stores.DeployTaskMock().EXPECT().
+		DeleteDeployByID(ctx, deploy.ID).
+		Return(nil)
+
+	err := nc.DeleteNotebook(ctx, &types.DeleteNotebookReq{
+		ID:          60,
+		CurrentUser: "orgmember",
+	})
+	require.NoError(t, err)
+}
+
+// Regression test for the org-member operate path on stop: the operator (an
+// org write member, not the creator) must be able to stop the instance because
+// the store matches by deploy id only.
+func TestNotebookComponentImpl_StopNotebook_OrgMemberOperator(t *testing.T) {
+	ctx := context.TODO()
+	nc := initializeTestNotebookComponent(ctx, t)
+	operator := &database.User{ID: 777, Username: "orgmember"}
+	deploy := &database.Deploy{
+		ID:        61,
+		SvcName:   "notebook-svc",
+		ClusterID: "1",
+		UserID:    1,
+	}
+
+	nc.mocks.components.repo.EXPECT().
+		CheckDeployOperateAccess(ctx, types.DeployActReq{
+			DeployID:    61,
+			CurrentUser: "orgmember",
+		}).
+		Return(operator, deploy, nil)
+
+	deployRepo := types.DeployRequest{
+		DeployID:  deploy.ID,
+		SvcName:   deploy.SvcName,
+		ClusterID: deploy.ClusterID,
+	}
+
+	nc.mocks.deployer.EXPECT().
+		Stop(ctx, deployRepo).
+		Return(nil)
+	nc.mocks.deployer.EXPECT().
+		Exist(ctx, deployRepo).
+		Return(false, nil)
+	nc.mocks.stores.DeployTaskMock().EXPECT().
+		StopDeployByID(ctx, deploy.ID).
+		Return(nil)
+
+	err := nc.StopNotebook(ctx, &types.StopNotebookReq{
+		ID:          61,
+		CurrentUser: "orgmember",
+	})
+	require.NoError(t, err)
 }

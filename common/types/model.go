@@ -278,7 +278,7 @@ type ModelRunReq struct {
 	MinReplica         int    `json:"min_replica"`
 	MaxReplica         int    `json:"max_replica"`
 	Revision           string `json:"revision"`
-	SecureLevel        int    `json:"secure_level"`
+	SecureLevel        int    `json:"secure_level" validate:"omitempty,oneof=1 2"`
 	OrderDetailID      int64  `json:"order_detail_id"`
 	Entrypoint         string `json:"entrypoint"` // model file name for gguf model
 	EngineArgs         string `json:"engine_args"`
@@ -389,6 +389,17 @@ func IsSandboxType(t int) bool {
 	return t == SandboxType || t == SandboxEphemeralType
 }
 
+// DeployAccessMode distinguishes view access from operate access
+// (start/stop/delete/public switch) on a deploy instance.
+type DeployAccessMode string
+
+const (
+	// DeployAccessRead allows viewing deploy detail, status and logs.
+	DeployAccessRead DeployAccessMode = "read"
+	// DeployAccessOperate allows operating the deploy instance.
+	DeployAccessOperate DeployAccessMode = "operate"
+)
+
 type DeployActReq struct {
 	RepoType     RepositoryType `json:"repo_type"`
 	Namespace    string         `json:"namespace"`
@@ -414,7 +425,7 @@ type DeployUpdateReq struct {
 	MinReplica         *int    `json:"min_replica" validate:"min=0"`
 	MaxReplica         *int    `json:"max_replica" validate:"min=1,gtefield=MinReplica"`
 	Revision           *string `json:"revision"`
-	SecureLevel        *int    `json:"secure_level"`
+	SecureLevel        *int    `json:"secure_level" validate:"omitempty,oneof=1 2"`
 	Entrypoint         *string `json:"entrypoint"`
 	Variables          *string `json:"variables"`
 	EngineArgs         *string `json:"engine_args"`

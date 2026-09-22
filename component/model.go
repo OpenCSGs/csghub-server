@@ -84,7 +84,7 @@ type ModelComponent interface {
 	DelRelationDataset(ctx context.Context, req types.RelationDataset) error
 	// create model deploy as inference/serverless
 	Deploy(ctx context.Context, deployReq types.DeployActReq, req types.ModelRunReq) (int64, error)
-	Wakeup(ctx context.Context, namespace, name string, id int64) error
+	Wakeup(ctx context.Context, namespace, name string, id int64, currentUser string) error
 	ListModelsByRuntimeFrameworkID(ctx context.Context, currentUser string, per, page int, id int64, deployType int) ([]types.Model, int, error)
 	ListAllByRuntimeFramework(ctx context.Context, currentUser string, deployType int) ([]database.RuntimeFramework, error)
 	SetRuntimeFrameworkModes(ctx context.Context, deployType int, id int64, paths []string) ([]string, error)
@@ -1369,10 +1369,21 @@ func (c *modelComponentImpl) Deploy(ctx context.Context, deployReq types.DeployA
 	return c.deployer.Deploy(ctx, dp)
 }
 
-func (c *modelComponentImpl) Wakeup(ctx context.Context, namespace, name string, deployId int64) error {
+func (c *modelComponentImpl) Wakeup(ctx context.Context, namespace, name string, deployId int64, currentUser string) error {
 	_, err := c.modelStore.FindByPath(ctx, namespace, name)
 	if err != nil {
 		slog.Error("can't wakeup inference", slog.Any("error", err), slog.String("namespace", namespace), slog.String("name", name))
+		return err
+	}
+	// wake up operates the instance, so the caller needs operate access
+	_, _, err = c.repoComponent.CheckDeployOperateAccess(ctx, types.DeployActReq{
+		CurrentUser: currentUser,
+		Namespace:   namespace,
+		Name:        name,
+		DeployID:    deployId,
+		DeployType:  types.InferenceType,
+	})
+	if err != nil {
 		return err
 	}
 	// get Deploy for inference

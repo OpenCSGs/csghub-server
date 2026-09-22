@@ -913,6 +913,74 @@ func (_c *MockRepoComponent_CheckCurrentUserPermission_Call) RunAndReturn(run fu
 	return _c
 }
 
+// CheckDeployOperateAccess provides a mock function with given fields: ctx, deployReq
+func (_m *MockRepoComponent) CheckDeployOperateAccess(ctx context.Context, deployReq types.DeployActReq) (*database.User, *database.Deploy, error) {
+	ret := _m.Called(ctx, deployReq)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CheckDeployOperateAccess")
+	}
+
+	var r0 *database.User
+	var r1 *database.Deploy
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.DeployActReq) (*database.User, *database.Deploy, error)); ok {
+		return rf(ctx, deployReq)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.DeployActReq) *database.User); ok {
+		r0 = rf(ctx, deployReq)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*database.User)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.DeployActReq) *database.Deploy); ok {
+		r1 = rf(ctx, deployReq)
+	} else {
+		if ret.Get(1) != nil {
+			r1 = ret.Get(1).(*database.Deploy)
+		}
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, types.DeployActReq) error); ok {
+		r2 = rf(ctx, deployReq)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
+// MockRepoComponent_CheckDeployOperateAccess_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CheckDeployOperateAccess'
+type MockRepoComponent_CheckDeployOperateAccess_Call struct {
+	*mock.Call
+}
+
+// CheckDeployOperateAccess is a helper method to define mock.On call
+//   - ctx context.Context
+//   - deployReq types.DeployActReq
+func (_e *MockRepoComponent_Expecter) CheckDeployOperateAccess(ctx interface{}, deployReq interface{}) *MockRepoComponent_CheckDeployOperateAccess_Call {
+	return &MockRepoComponent_CheckDeployOperateAccess_Call{Call: _e.mock.On("CheckDeployOperateAccess", ctx, deployReq)}
+}
+
+func (_c *MockRepoComponent_CheckDeployOperateAccess_Call) Run(run func(ctx context.Context, deployReq types.DeployActReq)) *MockRepoComponent_CheckDeployOperateAccess_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.DeployActReq))
+	})
+	return _c
+}
+
+func (_c *MockRepoComponent_CheckDeployOperateAccess_Call) Return(_a0 *database.User, _a1 *database.Deploy, _a2 error) *MockRepoComponent_CheckDeployOperateAccess_Call {
+	_c.Call.Return(_a0, _a1, _a2)
+	return _c
+}
+
+func (_c *MockRepoComponent_CheckDeployOperateAccess_Call) RunAndReturn(run func(context.Context, types.DeployActReq) (*database.User, *database.Deploy, error)) *MockRepoComponent_CheckDeployOperateAccess_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // CheckDeployPermissionForUser provides a mock function with given fields: ctx, deployReq
 func (_m *MockRepoComponent) CheckDeployPermissionForUser(ctx context.Context, deployReq types.DeployActReq) (*database.User, *database.Deploy, error) {
 	ret := _m.Called(ctx, deployReq)
@@ -977,6 +1045,74 @@ func (_c *MockRepoComponent_CheckDeployPermissionForUser_Call) Return(_a0 *datab
 }
 
 func (_c *MockRepoComponent_CheckDeployPermissionForUser_Call) RunAndReturn(run func(context.Context, types.DeployActReq) (*database.User, *database.Deploy, error)) *MockRepoComponent_CheckDeployPermissionForUser_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// CheckDeployReadAccess provides a mock function with given fields: ctx, deployReq
+func (_m *MockRepoComponent) CheckDeployReadAccess(ctx context.Context, deployReq types.DeployActReq) (*database.User, *database.Deploy, error) {
+	ret := _m.Called(ctx, deployReq)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CheckDeployReadAccess")
+	}
+
+	var r0 *database.User
+	var r1 *database.Deploy
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.DeployActReq) (*database.User, *database.Deploy, error)); ok {
+		return rf(ctx, deployReq)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.DeployActReq) *database.User); ok {
+		r0 = rf(ctx, deployReq)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*database.User)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.DeployActReq) *database.Deploy); ok {
+		r1 = rf(ctx, deployReq)
+	} else {
+		if ret.Get(1) != nil {
+			r1 = ret.Get(1).(*database.Deploy)
+		}
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, types.DeployActReq) error); ok {
+		r2 = rf(ctx, deployReq)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
+// MockRepoComponent_CheckDeployReadAccess_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CheckDeployReadAccess'
+type MockRepoComponent_CheckDeployReadAccess_Call struct {
+	*mock.Call
+}
+
+// CheckDeployReadAccess is a helper method to define mock.On call
+//   - ctx context.Context
+//   - deployReq types.DeployActReq
+func (_e *MockRepoComponent_Expecter) CheckDeployReadAccess(ctx interface{}, deployReq interface{}) *MockRepoComponent_CheckDeployReadAccess_Call {
+	return &MockRepoComponent_CheckDeployReadAccess_Call{Call: _e.mock.On("CheckDeployReadAccess", ctx, deployReq)}
+}
+
+func (_c *MockRepoComponent_CheckDeployReadAccess_Call) Run(run func(ctx context.Context, deployReq types.DeployActReq)) *MockRepoComponent_CheckDeployReadAccess_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.DeployActReq))
+	})
+	return _c
+}
+
+func (_c *MockRepoComponent_CheckDeployReadAccess_Call) Return(_a0 *database.User, _a1 *database.Deploy, _a2 error) *MockRepoComponent_CheckDeployReadAccess_Call {
+	_c.Call.Return(_a0, _a1, _a2)
+	return _c
+}
+
+func (_c *MockRepoComponent_CheckDeployReadAccess_Call) RunAndReturn(run func(context.Context, types.DeployActReq) (*database.User, *database.Deploy, error)) *MockRepoComponent_CheckDeployReadAccess_Call {
 	_c.Call.Return(run)
 	return _c
 }

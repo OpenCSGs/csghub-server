@@ -397,6 +397,65 @@ func (_c *MockUserStore_FindByID_Call) RunAndReturn(run func(context.Context, in
 	return _c
 }
 
+// FindByIDs provides a mock function with given fields: ctx, ids
+func (_m *MockUserStore) FindByIDs(ctx context.Context, ids []int64) ([]database.User, error) {
+	ret := _m.Called(ctx, ids)
+
+	if len(ret) == 0 {
+		panic("no return value specified for FindByIDs")
+	}
+
+	var r0 []database.User
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, []int64) ([]database.User, error)); ok {
+		return rf(ctx, ids)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, []int64) []database.User); ok {
+		r0 = rf(ctx, ids)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]database.User)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, []int64) error); ok {
+		r1 = rf(ctx, ids)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockUserStore_FindByIDs_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FindByIDs'
+type MockUserStore_FindByIDs_Call struct {
+	*mock.Call
+}
+
+// FindByIDs is a helper method to define mock.On call
+//   - ctx context.Context
+//   - ids []int64
+func (_e *MockUserStore_Expecter) FindByIDs(ctx interface{}, ids interface{}) *MockUserStore_FindByIDs_Call {
+	return &MockUserStore_FindByIDs_Call{Call: _e.mock.On("FindByIDs", ctx, ids)}
+}
+
+func (_c *MockUserStore_FindByIDs_Call) Run(run func(ctx context.Context, ids []int64)) *MockUserStore_FindByIDs_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].([]int64))
+	})
+	return _c
+}
+
+func (_c *MockUserStore_FindByIDs_Call) Return(_a0 []database.User, _a1 error) *MockUserStore_FindByIDs_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockUserStore_FindByIDs_Call) RunAndReturn(run func(context.Context, []int64) ([]database.User, error)) *MockUserStore_FindByIDs_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // FindByUUID provides a mock function with given fields: ctx, uuid
 func (_m *MockUserStore) FindByUUID(ctx context.Context, uuid string) (*database.User, error) {
 	ret := _m.Called(ctx, uuid)
@@ -1291,6 +1350,67 @@ func (_c *MockUserStore_IsExistWithDeleted_Call) RunAndReturn(run func(context.C
 	return _c
 }
 
+// SearchByKeywordExcludingIDs provides a mock function with given fields: ctx, search, excludedIDs, limit
+func (_m *MockUserStore) SearchByKeywordExcludingIDs(ctx context.Context, search string, excludedIDs []int64, limit int) ([]database.User, error) {
+	ret := _m.Called(ctx, search, excludedIDs, limit)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SearchByKeywordExcludingIDs")
+	}
+
+	var r0 []database.User
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, []int64, int) ([]database.User, error)); ok {
+		return rf(ctx, search, excludedIDs, limit)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, []int64, int) []database.User); ok {
+		r0 = rf(ctx, search, excludedIDs, limit)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]database.User)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, []int64, int) error); ok {
+		r1 = rf(ctx, search, excludedIDs, limit)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockUserStore_SearchByKeywordExcludingIDs_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SearchByKeywordExcludingIDs'
+type MockUserStore_SearchByKeywordExcludingIDs_Call struct {
+	*mock.Call
+}
+
+// SearchByKeywordExcludingIDs is a helper method to define mock.On call
+//   - ctx context.Context
+//   - search string
+//   - excludedIDs []int64
+//   - limit int
+func (_e *MockUserStore_Expecter) SearchByKeywordExcludingIDs(ctx interface{}, search interface{}, excludedIDs interface{}, limit interface{}) *MockUserStore_SearchByKeywordExcludingIDs_Call {
+	return &MockUserStore_SearchByKeywordExcludingIDs_Call{Call: _e.mock.On("SearchByKeywordExcludingIDs", ctx, search, excludedIDs, limit)}
+}
+
+func (_c *MockUserStore_SearchByKeywordExcludingIDs_Call) Run(run func(ctx context.Context, search string, excludedIDs []int64, limit int)) *MockUserStore_SearchByKeywordExcludingIDs_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].([]int64), args[3].(int))
+	})
+	return _c
+}
+
+func (_c *MockUserStore_SearchByKeywordExcludingIDs_Call) Return(_a0 []database.User, _a1 error) *MockUserStore_SearchByKeywordExcludingIDs_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockUserStore_SearchByKeywordExcludingIDs_Call) RunAndReturn(run func(context.Context, string, []int64, int) ([]database.User, error)) *MockUserStore_SearchByKeywordExcludingIDs_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // SoftDeleteUserAndRelations provides a mock function with given fields: ctx, input, req
 func (_m *MockUserStore) SoftDeleteUserAndRelations(ctx context.Context, input database.User, req types.CloseAccountReq) error {
 	ret := _m.Called(ctx, input, req)
@@ -1530,83 +1650,6 @@ func (_c *MockUserStore_UpdateVerifyStatus_Call) Return(_a0 error) *MockUserStor
 func (_c *MockUserStore_UpdateVerifyStatus_Call) RunAndReturn(run func(context.Context, string, types.VerifyStatus) error) *MockUserStore_UpdateVerifyStatus_Call {
 	_c.Call.Return(run)
 	return _c
-}
-
-// SearchByKeyword provides a mock function with given fields: ctx, search, per, page
-func (_m *MockUserStore) SearchByKeyword(ctx context.Context, search string, per int, page int) ([]database.User, int, error) {
-	ret := _m.Called(ctx, search, per, page)
-	if len(ret) == 0 {
-		panic("no return value specified for SearchByKeyword")
-	}
-	var r0 []database.User
-	if rf, ok := ret.Get(0).(func(context.Context, string, int, int) []database.User); ok {
-		r0 = rf(ctx, search, per, page)
-	} else if ret.Get(0) != nil {
-		r0 = ret.Get(0).([]database.User)
-	}
-	var r1 int
-	if rf, ok := ret.Get(1).(func(context.Context, string, int, int) int); ok {
-		r1 = rf(ctx, search, per, page)
-	} else {
-		r1 = ret.Int(1)
-	}
-	var r2 error
-	if rf, ok := ret.Get(2).(func(context.Context, string, int, int) error); ok {
-		r2 = rf(ctx, search, per, page)
-	} else {
-		r2 = ret.Error(2)
-	}
-	return r0, r1, r2
-}
-
-type MockUserStore_SearchByKeyword_Call struct{ *mock.Call }
-
-func (_e *MockUserStore_Expecter) SearchByKeyword(ctx interface{}, search interface{}, per interface{}, page interface{}) *MockUserStore_SearchByKeyword_Call {
-	return &MockUserStore_SearchByKeyword_Call{Call: _e.mock.On("SearchByKeyword", ctx, search, per, page)}
-}
-func (_c *MockUserStore_SearchByKeyword_Call) Run(run func(context.Context, string, int, int)) *MockUserStore_SearchByKeyword_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(int), args[3].(int))
-	})
-	return _c
-}
-func (_c *MockUserStore_SearchByKeyword_Call) Return(_a0 []database.User, _a1 int, _a2 error) *MockUserStore_SearchByKeyword_Call {
-	_c.Call.Return(_a0, _a1, _a2)
-	return _c
-}
-func (_c *MockUserStore_SearchByKeyword_Call) RunAndReturn(run func(context.Context, string, int, int) ([]database.User, int, error)) *MockUserStore_SearchByKeyword_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// FindByIDs provides a mock function with given fields: ctx, ids.
-func (_m *MockUserStore) FindByIDs(ctx context.Context, ids []int64) ([]database.User, error) {
-	ret := _m.Called(ctx, ids)
-	var r0 []database.User
-	if ret.Get(0) != nil {
-		r0 = ret.Get(0).([]database.User)
-	}
-	return r0, ret.Error(1)
-}
-
-// FindByIDs is a helper method to define mock.On call.
-func (_e *MockUserStore_Expecter) FindByIDs(ctx interface{}, ids interface{}) *mock.Call {
-	return _e.mock.On("FindByIDs", ctx, ids)
-}
-
-// SearchByKeywordExcludingIDs provides a mock function with given fields: ctx, search, excludedIDs, limit.
-func (_m *MockUserStore) SearchByKeywordExcludingIDs(ctx context.Context, search string, excludedIDs []int64, limit int) ([]database.User, error) {
-	ret := _m.Called(ctx, search, excludedIDs, limit)
-	var r0 []database.User
-	if ret.Get(0) != nil {
-		r0 = ret.Get(0).([]database.User)
-	}
-	return r0, ret.Error(1)
-}
-
-// SearchByKeywordExcludingIDs is a helper method to define mock.On call.
-func (_e *MockUserStore_Expecter) SearchByKeywordExcludingIDs(ctx interface{}, search interface{}, excludedIDs interface{}, limit interface{}) *mock.Call {
-	return _e.mock.On("SearchByKeywordExcludingIDs", ctx, search, excludedIDs, limit)
 }
 
 // NewMockUserStore creates a new instance of MockUserStore. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.

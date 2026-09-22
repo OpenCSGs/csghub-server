@@ -25,7 +25,7 @@ type NotebookComponent interface {
 	UpdateNotebook(ctx context.Context, req *types.UpdateNotebookReq) error
 	StartNotebook(ctx context.Context, req *types.StartNotebookReq) error
 	StopNotebook(ctx context.Context, req *types.StopNotebookReq) error
-	Wakeup(ctx context.Context, id int64) error
+	Wakeup(ctx context.Context, currentUser string, id int64) error
 	StatusNotebook(ctx context.Context, req *types.StatusNotebookReq) (string, error)
 	LogsNotebook(ctx context.Context, req *types.StatusNotebookReq) (*deploy.MultiLogReader, error)
 }
@@ -247,7 +247,7 @@ func (c *notebookComponentImpl) DeleteNotebook(ctx context.Context, req *types.D
 		DeployID:    req.ID,
 		CurrentUser: req.CurrentUser,
 	}
-	user, deploy, err := c.repoComponent.CheckDeployPermissionForUser(ctx, *deployReq)
+	_, deploy, err := c.repoComponent.CheckDeployOperateAccess(ctx, *deployReq)
 	if err != nil {
 		return err
 	}
@@ -263,7 +263,9 @@ func (c *notebookComponentImpl) DeleteNotebook(ctx context.Context, req *types.D
 	if err != nil {
 		slog.Warn("faile to purge notebook instance", slog.Any("error", err))
 	}
-	err = c.deployTaskStore.DeleteDeployByID(ctx, user.ID, deploy.ID)
+	// the store matches by deploy id only; authorization happened above, so
+	// organization write members can delete instances they did not create
+	err = c.deployTaskStore.DeleteDeployByID(ctx, deploy.ID)
 	if err != nil {
 		return fmt.Errorf("cannot delete notebook, %w", err)
 	}
@@ -276,7 +278,7 @@ func (c *notebookComponentImpl) UpdateNotebook(ctx context.Context, req *types.U
 		DeployID:    req.ID,
 		CurrentUser: req.CurrentUser,
 	}
-	_, deploy, err := c.repoComponent.CheckDeployPermissionForUser(ctx, *deployReq)
+	_, deploy, err := c.repoComponent.CheckDeployOperateAccess(ctx, *deployReq)
 	if err != nil {
 		return fmt.Errorf("cannot find deploy for notebook, %w", err)
 	}
@@ -347,7 +349,7 @@ func (c *notebookComponentImpl) StartNotebook(ctx context.Context, req *types.St
 		DeployID:    req.ID,
 		CurrentUser: req.CurrentUser,
 	}
-	_, deploy, err := c.repoComponent.CheckDeployPermissionForUser(ctx, *deployReq)
+	_, deploy, err := c.repoComponent.CheckDeployOperateAccess(ctx, *deployReq)
 	if err != nil {
 		return fmt.Errorf("cannot find deploy for notebook, %w", err)
 	}
@@ -381,7 +383,7 @@ func (c *notebookComponentImpl) StopNotebook(ctx context.Context, req *types.Sto
 		DeployID:    req.ID,
 		CurrentUser: req.CurrentUser,
 	}
-	user, deploy, err := c.repoComponent.CheckDeployPermissionForUser(ctx, *deployReq)
+	_, deploy, err := c.repoComponent.CheckDeployOperateAccess(ctx, *deployReq)
 	if err != nil {
 		return err
 	}
@@ -407,15 +409,25 @@ func (c *notebookComponentImpl) StopNotebook(ctx context.Context, req *types.Sto
 		// fail to delete service
 		return errors.New("fail to stop notebook instance")
 	}
-	// update database deploy to stopped
-	err = c.deployTaskStore.StopDeployByID(ctx, user.ID, deploy.ID)
+	// update database deploy to stopped. The store matches the deploy by id
+	// only, so organization write members can stop instances they did not
+	// create
+	err = c.deployTaskStore.StopDeployByID(ctx, deploy.ID)
 	if err != nil {
 		return fmt.Errorf("fail to stop notebook instance, %w", err)
 	}
 	return nil
 }
 
-func (c *notebookComponentImpl) Wakeup(ctx context.Context, deployId int64) error {
+func (c *notebookComponentImpl) Wakeup(ctx context.Context, currentUser string, deployId int64) error {
+	// wake up operates the instance, so the caller needs operate access
+	_, _, err := c.repoComponent.CheckDeployOperateAccess(ctx, types.DeployActReq{
+		DeployID:    deployId,
+		CurrentUser: currentUser,
+	})
+	if err != nil {
+		return err
+	}
 	// get Deploy for inference
 	deploy, err := c.deployTaskStore.GetDeployByID(ctx, deployId)
 	if err != nil {
