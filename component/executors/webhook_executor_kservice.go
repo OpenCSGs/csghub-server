@@ -123,11 +123,19 @@ func (k *kserviceExecutorImpl) updateDeployStatus(ctx context.Context, event *ty
 	deploy.Message = event.Message
 	deploy.Reason = event.Reason
 	deploy.Endpoint = event.Endpoint
-	if len(event.ClusterNode) > 0 && !slices.Contains(strings.Split(deploy.ClusterNode, ","), event.ClusterNode) {
-		if len(deploy.ClusterNode) > 0 {
-			deploy.ClusterNode += ","
+	if len(event.ClusterNode) > 0 {
+		if deploy.Type == types.InferenceType {
+			// Append for inference type, dedup
+			if !slices.Contains(strings.Split(deploy.ClusterNode, ","), event.ClusterNode) {
+				if len(deploy.ClusterNode) > 0 {
+					deploy.ClusterNode += ","
+				}
+				deploy.ClusterNode += event.ClusterNode
+			}
+		} else {
+			// Overwrite for other deploy types
+			deploy.ClusterNode = event.ClusterNode
 		}
-		deploy.ClusterNode += fmt.Sprintf("%s%s", deploy.ClusterNode, event.ClusterNode)
 	}
 	if len(event.QueueName) > 0 {
 		deploy.QueueName = event.QueueName
