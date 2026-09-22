@@ -559,6 +559,7 @@ func NewTestEvaluationComponent(
 	accountingComponent AccountingComponent,
 	repoComponent RepoComponent,
 	userSvcClient rpc.UserSvcClient,
+	gitServer gitserver.GitServer,
 ) *evaluationComponentImpl {
 	return &evaluationComponentImpl{
 		deployer:              deployer,
@@ -576,6 +577,7 @@ func NewTestEvaluationComponent(
 		repoComponent:         repoComponent,
 		userSvcClient:         userSvcClient,
 		clusterStore:          stores.ClusterInfo,
+		git:                   gitServer,
 	}
 }
 

@@ -11,11 +11,31 @@ import (
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/rebac"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
+
+// evalModelCommit and evalDatasetCommit are the commits every repository lookup in these
+// tests resolves to, standing in for the head of the default branch at submit time.
+const (
+	evalModelCommit   = "1111111111111111111111111111111111111111"
+	evalDatasetCommit = "2222222222222222222222222222222222222222"
+)
+
+// expectEvaluationCommitLookups pins the model and dataset revisions an evaluation
+// request resolves to. Expectations are optional because the error cases below fail
+// before every lookup is reached.
+func expectEvaluationCommitLookups(c *testEvaluationWithMocks, ctx context.Context) {
+	c.mocks.gitServer.EXPECT().GetRepoLastCommit(ctx, gitserver.GetRepoLastCommitReq{
+		Namespace: "opencsg", Name: "wukong", Ref: "main", RepoType: types.ModelRepo,
+	}).Return(&types.Commit{ID: evalModelCommit}, nil).Maybe()
+	c.mocks.gitServer.EXPECT().GetRepoLastCommit(ctx, gitserver.GetRepoLastCommitReq{
+		Namespace: "opencsg", Name: "hellaswag", Ref: "main", RepoType: types.DatasetRepo,
+	}).Return(&types.Commit{ID: evalDatasetCommit}, nil).Maybe()
+}
 
 func TestEvaluationComponent_CreateEvaluation(t *testing.T) {
 	req := types.EvaluationReq{
@@ -36,8 +56,9 @@ func TestEvaluationComponent_CreateEvaluation(t *testing.T) {
 		ResourceId:         0,
 		Datasets:           []string{"Rowan/hellaswag"},
 		DatasetRevisions:   []string{"main"},
+		DatasetCommits:     []string{evalDatasetCommit},
 		RuntimeFrameworkId: 1,
-		Revisions:          []string{"main"},
+		Revisions:          []string{evalModelCommit},
 		Hardware: types.HardWare{
 			Gpu: types.Processor{
 				Num:          "1",
@@ -48,7 +69,7 @@ func TestEvaluationComponent_CreateEvaluation(t *testing.T) {
 			},
 			Memory: "32Gi",
 		},
-		Image:    "lm-evaluation-harness:0.4.6",
+		Image:    "evalscope:1.11.1-cu130",
 		RepoType: "model",
 		TaskType: "evaluation",
 		Token:    "foo",
@@ -56,6 +77,7 @@ func TestEvaluationComponent_CreateEvaluation(t *testing.T) {
 	}
 	t.Run("create evaluation without resource id", func(t *testing.T) {
 		c := initializeTestEvaluationComponent(ctx, t)
+		expectEvaluationCommitLookups(c, ctx)
 		c.config.Argo.QuotaGPUNumber = "1"
 		c.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, req.Username).Return(database.User{
 			RoleMask: "admin",
@@ -79,7 +101,7 @@ func TestEvaluationComponent_CreateEvaluation(t *testing.T) {
 		c.mocks.stores.AccessTokenMock().EXPECT().FindByUID(ctx, int64(1)).Return(&database.AccessToken{Token: "foo"}, nil)
 		c.mocks.stores.RuntimeFrameworkMock().EXPECT().FindEnabledByID(ctx, int64(1)).Return(&database.RuntimeFramework{
 			ID:          1,
-			FrameImage:  "lm-evaluation-harness:0.4.6",
+			FrameImage:  "evalscope:1.11.1-cu130",
 			ComputeType: string(types.ResourceTypeGPU),
 		}, nil)
 
@@ -92,6 +114,7 @@ func TestEvaluationComponent_CreateEvaluation(t *testing.T) {
 		req.ResourceId = 1
 		req2.ResourceId = 1
 		c := initializeTestEvaluationComponent(ctx, t)
+		expectEvaluationCommitLookups(c, ctx)
 		c.config.Argo.QuotaGPUNumber = "1"
 		c.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, req.Username).Return(database.User{
 			RoleMask: "admin",
@@ -115,7 +138,8 @@ func TestEvaluationComponent_CreateEvaluation(t *testing.T) {
 		c.mocks.stores.AccessTokenMock().EXPECT().FindByUID(ctx, int64(1)).Return(&database.AccessToken{Token: "foo"}, nil)
 		c.mocks.stores.RuntimeFrameworkMock().EXPECT().FindEnabledByID(ctx, int64(1)).Return(&database.RuntimeFramework{
 			ID:          1,
-			FrameImage:  "lm-evaluation-harness:0.4.6",
+			FrameName:   "evalscope",
+			FrameImage:  "evalscope:1.11.1-cu130",
 			ComputeType: string(types.ResourceTypeGPU),
 		}, nil)
 		resource, err := json.Marshal(req2.Hardware)
@@ -133,7 +157,10 @@ func TestEvaluationComponent_CreateEvaluation(t *testing.T) {
 			},
 		}, nil)
 		c.mocks.deployer.EXPECT().SubmitEvaluation(ctx, mock.MatchedBy(func(r types.EvaluationReq) bool {
-			return r.ResourceName == "1 GPU · 4 vCPU · 32Gi" && r.ClusterID == "c1"
+			// the caller sent no configuration, so what reaches the deployer - and is
+			// recorded - must be the effective one rather than an empty string
+			return r.ResourceName == "1 GPU · 4 vCPU · 32Gi" && r.ClusterID == "c1" &&
+				r.FrameworkConfig == `{"generation_config":{"do_sample":false,"max_tokens":30000},"limit":10}`
 		})).Return(&types.ArgoWorkFlowRes{
 			ID:       1,
 			TaskName: "test",
@@ -147,6 +174,7 @@ func TestEvaluationComponent_CreateEvaluation(t *testing.T) {
 
 	t.Run("create evaluation with invalid model id", func(t *testing.T) {
 		c := initializeTestEvaluationComponent(ctx, t)
+		expectEvaluationCommitLookups(c, ctx)
 		invalidReq := types.EvaluationReq{
 			TaskName:           "test",
 			ModelIds:           []string{"badmodelid"},
@@ -162,7 +190,7 @@ func TestEvaluationComponent_CreateEvaluation(t *testing.T) {
 			ID:       1,
 		}, nil).Once()
 		c.mocks.stores.RuntimeFrameworkMock().EXPECT().FindEnabledByID(ctx, int64(1)).Return(&database.RuntimeFramework{
-			FrameName: "lm-evaluation-harness",
+			FrameName: "evalscope",
 		}, nil).Once()
 		_, err := c.CreateEvaluation(ctx, invalidReq)
 		require.Error(t, err)
@@ -171,6 +199,7 @@ func TestEvaluationComponent_CreateEvaluation(t *testing.T) {
 
 	t.Run("create evaluation with invalid dataset", func(t *testing.T) {
 		c := initializeTestEvaluationComponent(ctx, t)
+		expectEvaluationCommitLookups(c, ctx)
 		invalidReq := types.EvaluationReq{
 			TaskName:           "test",
 			ModelIds:           []string{"opencsg/wukong"},
@@ -186,7 +215,7 @@ func TestEvaluationComponent_CreateEvaluation(t *testing.T) {
 			ID:       1,
 		}, nil).Once()
 		c.mocks.stores.RuntimeFrameworkMock().EXPECT().FindEnabledByID(ctx, int64(1)).Return(&database.RuntimeFramework{
-			FrameName: "lm-evaluation-harness",
+			FrameName: "evalscope",
 		}, nil).Once()
 		c.mocks.stores.ModelMock().EXPECT().FindByPath(ctx, "opencsg", "wukong").Return(
 			&database.Model{
@@ -204,6 +233,7 @@ func TestEvaluationComponent_CreateEvaluation(t *testing.T) {
 
 	t.Run("create evaluation with invalid custom dataset", func(t *testing.T) {
 		c := initializeTestEvaluationComponent(ctx, t)
+		expectEvaluationCommitLookups(c, ctx)
 		invalidReq := types.EvaluationReq{
 			TaskName:           "test",
 			ModelIds:           []string{"opencsg/wukong"},
@@ -219,7 +249,7 @@ func TestEvaluationComponent_CreateEvaluation(t *testing.T) {
 			ID:       1,
 		}, nil).Once()
 		c.mocks.stores.RuntimeFrameworkMock().EXPECT().FindEnabledByID(ctx, int64(1)).Return(&database.RuntimeFramework{
-			FrameName: "lm-evaluation-harness",
+			FrameName: "evalscope",
 		}, nil).Once()
 		c.mocks.stores.ModelMock().EXPECT().FindByPath(ctx, "opencsg", "wukong").Return(
 			&database.Model{
@@ -237,6 +267,7 @@ func TestEvaluationComponent_CreateEvaluation(t *testing.T) {
 
 	t.Run("non_admin_namespace_permission_error", func(t *testing.T) {
 		c := initializeTestEvaluationComponent(ctx, t)
+		expectEvaluationCommitLookups(c, ctx)
 		req := types.EvaluationReq{
 			TaskName:           "test",
 			ModelIds:           []string{"opencsg/wukong"},
@@ -259,6 +290,7 @@ func TestEvaluationComponent_CreateEvaluation(t *testing.T) {
 	})
 	t.Run("non_admin_namespace_forbidden", func(t *testing.T) {
 		c := initializeTestEvaluationComponent(ctx, t)
+		expectEvaluationCommitLookups(c, ctx)
 		req := types.EvaluationReq{
 			TaskName:           "test",
 			ModelIds:           []string{"opencsg/wukong"},
@@ -281,6 +313,7 @@ func TestEvaluationComponent_CreateEvaluation(t *testing.T) {
 	})
 	t.Run("create evaluation under org uses org billing UUID", func(t *testing.T) {
 		c := initializeTestEvaluationComponent(ctx, t)
+		expectEvaluationCommitLookups(c, ctx)
 		c.config.Argo.QuotaGPUNumber = "1"
 		orgReq := types.EvaluationReq{
 			TaskName:           "org-eval",
@@ -314,7 +347,7 @@ func TestEvaluationComponent_CreateEvaluation(t *testing.T) {
 		}, nil)
 		c.mocks.stores.RuntimeFrameworkMock().EXPECT().FindEnabledByID(ctx, int64(1)).Return(&database.RuntimeFramework{
 			ID:          1,
-			FrameImage:  "lm-evaluation-harness:0.4.6",
+			FrameImage:  "evalscope:1.11.1-cu130",
 			ComputeType: string(types.ResourceTypeGPU),
 		}, nil)
 
@@ -368,6 +401,7 @@ func TestEvaluationComponent_GetEvaluation_AccessControl(t *testing.T) {
 	t.Run("owner is req user", func(t *testing.T) {
 		ctx := context.TODO()
 		c := initializeTestEvaluationComponent(ctx, t)
+		expectEvaluationCommitLookups(c, ctx)
 		c.config.Argo.QuotaGPUNumber = "1"
 		req := types.EvaluationGetReq{
 			Username: "test",
@@ -396,6 +430,7 @@ func TestEvaluationComponent_GetEvaluation_AccessControl(t *testing.T) {
 	t.Run("owner is different from req user and req user has no read permission", func(t *testing.T) {
 		ctx := context.TODO()
 		c := initializeTestEvaluationComponent(ctx, t)
+		expectEvaluationCommitLookups(c, ctx)
 		req := types.EvaluationGetReq{
 			Username: "otheruser",
 			ID:       1,
@@ -419,6 +454,7 @@ func TestEvaluationComponent_GetEvaluation_AccessControl(t *testing.T) {
 	t.Run("owner is different from req user and req user has read permission", func(t *testing.T) {
 		ctx := context.TODO()
 		c := initializeTestEvaluationComponent(ctx, t)
+		expectEvaluationCommitLookups(c, ctx)
 		req := types.EvaluationGetReq{
 			Username: "otheruser",
 			ID:       1,
@@ -460,6 +496,7 @@ func TestEvaluationComponent_GetEvaluation_AccessControl(t *testing.T) {
 	t.Run("owner is different from req user and permission check fails", func(t *testing.T) {
 		ctx := context.TODO()
 		c := initializeTestEvaluationComponent(ctx, t)
+		expectEvaluationCommitLookups(c, ctx)
 		req := types.EvaluationGetReq{
 			Username: "otheruser",
 			ID:       1,
@@ -484,6 +521,7 @@ func TestEvaluationComponent_GetEvaluation_AccessControl(t *testing.T) {
 	t.Run("org member can view org evaluation", func(t *testing.T) {
 		ctx := context.TODO()
 		c := initializeTestEvaluationComponent(ctx, t)
+		expectEvaluationCommitLookups(c, ctx)
 		req := types.EvaluationGetReq{
 			Username: "orgmember",
 			ID:       1,
@@ -514,6 +552,7 @@ func TestEvaluationComponent_GetEvaluation_AccessControl(t *testing.T) {
 	t.Run("non org member cannot view org evaluation", func(t *testing.T) {
 		ctx := context.TODO()
 		c := initializeTestEvaluationComponent(ctx, t)
+		expectEvaluationCommitLookups(c, ctx)
 		req := types.EvaluationGetReq{
 			Username: "outsider",
 			ID:       1,
@@ -540,6 +579,7 @@ func TestEvaluationComponent_DeleteEvaluation(t *testing.T) {
 	t.Run("owner can delete own evaluation", func(t *testing.T) {
 		ctx := context.TODO()
 		c := initializeTestEvaluationComponent(ctx, t)
+		expectEvaluationCommitLookups(c, ctx)
 
 		c.mocks.stores.WorkflowMock().EXPECT().FindByID(ctx, int64(1)).Return(database.ArgoWorkflow{
 			ID:        1,
@@ -570,6 +610,7 @@ func TestEvaluationComponent_DeleteEvaluation(t *testing.T) {
 	t.Run("org member with write permission can delete org evaluation", func(t *testing.T) {
 		ctx := context.TODO()
 		c := initializeTestEvaluationComponent(ctx, t)
+		expectEvaluationCommitLookups(c, ctx)
 
 		c.mocks.stores.WorkflowMock().EXPECT().FindByID(ctx, int64(1)).Return(database.ArgoWorkflow{
 			ID:        1,
@@ -594,6 +635,7 @@ func TestEvaluationComponent_DeleteEvaluation(t *testing.T) {
 	t.Run("user without write permission cannot delete org evaluation", func(t *testing.T) {
 		ctx := context.TODO()
 		c := initializeTestEvaluationComponent(ctx, t)
+		expectEvaluationCommitLookups(c, ctx)
 
 		c.mocks.stores.WorkflowMock().EXPECT().FindByID(ctx, int64(1)).Return(database.ArgoWorkflow{
 			ID:        1,
@@ -617,6 +659,7 @@ func TestEvaluationComponent_DeleteEvaluation(t *testing.T) {
 	t.Run("delete permission check error", func(t *testing.T) {
 		ctx := context.TODO()
 		c := initializeTestEvaluationComponent(ctx, t)
+		expectEvaluationCommitLookups(c, ctx)
 
 		c.mocks.stores.WorkflowMock().EXPECT().FindByID(ctx, int64(1)).Return(database.ArgoWorkflow{
 			ID:       1,
@@ -639,6 +682,7 @@ func TestEvaluationComponent_OrgEvaluations(t *testing.T) {
 
 	t.Run("with current user and read permission", func(t *testing.T) {
 		c := initializeTestEvaluationComponent(ctx, t)
+		expectEvaluationCommitLookups(c, ctx)
 		req := &types.OrgEvaluationsReq{
 			Namespace:   "org1",
 			CurrentUser: "user1",
@@ -658,6 +702,7 @@ func TestEvaluationComponent_OrgEvaluations(t *testing.T) {
 
 	t.Run("without current user skips permission check", func(t *testing.T) {
 		c := initializeTestEvaluationComponent(ctx, t)
+		expectEvaluationCommitLookups(c, ctx)
 		req := &types.OrgEvaluationsReq{
 			Namespace:   "org1",
 			CurrentUser: "",

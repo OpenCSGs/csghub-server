@@ -120,6 +120,11 @@ func (wc *workFlowComponentImpl) CreateWorkflow(ctx context.Context, req types.A
 		Namespace:      namespace,
 		Status:         v1alpha1.WorkflowPhase(v1alpha1.NodePending),
 		StatusUpdateAt: time.Now().UTC(),
+
+		RepoRevisions:    req.RepoRevisions,
+		DatasetRevisions: req.DatasetRevisions,
+		FrameworkConfig:  req.FrameworkConfig,
+		Hardware:         req.Hardware,
 	}
 	if req.TaskType == types.TaskTypeFinetune {
 		argowf.ResultURL = req.Username + "/" + req.FinetunedModelName

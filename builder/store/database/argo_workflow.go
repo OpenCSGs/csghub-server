@@ -76,6 +76,12 @@ type ArgoWorkflow struct {
 	QueueName      string                 `bun:"," json:"queue_name"`
 	DagTasks       string                 `bun:"," json:"dag_tasks"`
 	DeletedAt      time.Time              `bun:",soft_delete,nullzero" json:"deleted_at"`
+	// Snapshot of the versions and settings the task was submitted with.
+	// RepoRevisions is index-aligned with RepoIds, DatasetRevisions with Datasets.
+	RepoRevisions    []string        `bun:",type:jsonb,nullzero" json:"repo_revisions"`
+	DatasetRevisions []string        `bun:",type:jsonb,nullzero" json:"dataset_revisions"`
+	FrameworkConfig  string          `bun:",nullzero" json:"framework_config"`
+	Hardware         *types.HardWare `bun:",type:jsonb,nullzero" json:"hardware"`
 }
 
 func (s *argoWorkFlowStoreImpl) FindByID(ctx context.Context, id int64) (WorkFlow ArgoWorkflow, err error) {

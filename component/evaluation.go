@@ -6,11 +6,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 
 	v1alpha1 "github.com/argoproj/argo-workflows/v3/pkg/apis/workflow/v1alpha1"
 	"opencsg.com/csghub-server/builder/deploy"
 	"opencsg.com/csghub-server/builder/deploy/common"
+	"opencsg.com/csghub-server/builder/git"
+	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/loki"
 	"opencsg.com/csghub-server/builder/rebac"
 	rebacfactory "opencsg.com/csghub-server/builder/rebac/factory"
@@ -38,6 +41,7 @@ type evaluationComponentImpl struct {
 	userSvcClient         rpc.UserSvcClient
 	clusterStore          database.ClusterInfoStore
 	rebac                 rebac.Authorizer
+	git                   gitserver.GitServer
 }
 
 type EvaluationComponent interface {
@@ -83,6 +87,10 @@ func NewEvaluationComponent(config *config.Config) (EvaluationComponent, error) 
 		rpc.AuthWithApiKey(config.APIToken),
 	)
 	c.clusterStore = database.NewClusterInfoStore()
+	c.git, err = git.NewGitServer(config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create git server, error: %w", err)
+	}
 	return c, nil
 }
 
@@ -115,41 +123,32 @@ func (c *evaluationComponentImpl) CreateEvaluation(ctx context.Context, req type
 		return c.createClawEvaluation(ctx, req, user, frame)
 	}
 
-	if req.ModelIds == nil {
-		req.ModelIds = []string{}
+	if err := c.resolveModelVersions(ctx, &req); err != nil {
+		return nil, err
 	}
-	if req.ModelId != "" {
-		req.ModelIds = append(req.ModelIds, req.ModelId)
-	}
-	for _, modelId := range req.ModelIds {
-		result := strings.Split(modelId, "/")
-		if len(result) != 2 {
-			return nil, fmt.Errorf("invalid model id format: %s", modelId)
-		}
-		m, err := c.modelStore.FindByPath(ctx, result[0], result[1])
-		if err != nil {
-			return nil, fmt.Errorf("cannot find model, %w", err)
-		}
-		req.Revisions = append(req.Revisions, m.Repository.DefaultBranch)
+
+	req.FrameworkConfig, err = normalizeFrameworkConfig(frame.FrameName, req.FrameworkConfig)
+	if err != nil {
+		return nil, err
 	}
 
 	token, err := c.tokenStore.FindByUID(ctx, user.ID)
 	if err != nil {
 		return nil, fmt.Errorf("cant get git access token:%w", err)
 	}
-	var mirrorRepos []string
-	var datasetRevisions []string
+	var datasets datasetVersions
 	if req.CustomDataSets != nil {
-		mirrorRepos, datasetRevisions, err = c.generateDatasetsAndTasks(ctx, req.CustomDataSets)
+		datasets, err = c.generateDatasetsAndTasks(ctx, req.CustomDataSets)
 		req.UseCustomDataset = true
 	} else {
-		mirrorRepos, datasetRevisions, err = c.GenerateMirrorRepoIds(ctx, req.Datasets)
+		datasets, err = c.GenerateMirrorRepoIds(ctx, req.Datasets)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate mirror repo ids, %w", err)
 	}
-	req.Datasets = mirrorRepos
-	req.DatasetRevisions = datasetRevisions
+	req.Datasets = datasets.Paths
+	req.DatasetRevisions = datasets.Revisions
+	req.DatasetCommits = datasets.Commits
 	req.Token = token.Token
 	var hardware types.HardWare
 	if req.ResourceId != 0 {
@@ -229,45 +228,197 @@ func (c *evaluationComponentImpl) CreateEvaluation(ctx context.Context, req type
 	return c.deployer.SubmitEvaluation(ctx, req)
 }
 
+// frameworkConfigSupported lists the frameworks whose images act on a framework
+// configuration. A framework absent from this list rejects a non-empty configuration
+// rather than accepting one it would silently ignore.
+var frameworkConfigSupported = map[string]struct{}{
+	"evalscope":     {},
+	"amd-evalscope": {},
+}
+
+// The evalscope images carry their own defaults for these two knobs. The server fills
+// them in and sends both on every task, so the configuration recorded in the snapshot
+// is always the configuration that produced the scores, and the image defaults are
+// never the ones in force. Keep these in step with docker/evaluation/evalscope/start.sh.
+const (
+	defaultEvaluationLimit            = 10
+	defaultEvaluationGenerationConfig = `{"max_tokens":30000,"do_sample":false}`
+)
+
+// normalizeFrameworkConfig turns the caller's configuration into the one that will
+// actually run. It rejects a configuration the chosen framework cannot act on and one
+// carrying fields outside the declared contract, then fills in the effective defaults
+// so that recording the result is the same as recording what ran. A framework that
+// cannot act on a configuration yields an empty one.
+func normalizeFrameworkConfig(frameName, raw string) (string, error) {
+	_, supported := frameworkConfigSupported[frameName]
+	if !supported {
+		if strings.TrimSpace(raw) != "" {
+			return "", fmt.Errorf("runtime framework %s does not support framework_config", frameName)
+		}
+		return "", nil
+	}
+
+	var cfg types.EvaluationFrameworkConfig
+	if strings.TrimSpace(raw) != "" {
+		decoder := json.NewDecoder(strings.NewReader(raw))
+		decoder.DisallowUnknownFields()
+		if err := decoder.Decode(&cfg); err != nil {
+			return "", fmt.Errorf("invalid framework_config: %w", err)
+		}
+	}
+	if cfg.Limit != nil && *cfg.Limit < 1 {
+		return "", fmt.Errorf("invalid framework_config: limit must be at least 1")
+	}
+
+	if cfg.Limit == nil {
+		limit := defaultEvaluationLimit
+		cfg.Limit = &limit
+	}
+	if len(cfg.GenerationConfig) == 0 {
+		if err := json.Unmarshal([]byte(defaultEvaluationGenerationConfig), &cfg.GenerationConfig); err != nil {
+			return "", fmt.Errorf("invalid default generation config: %w", err)
+		}
+	}
+	normalized, err := json.Marshal(cfg)
+	if err != nil {
+		return "", fmt.Errorf("invalid framework_config: %w", err)
+	}
+	return string(normalized), nil
+}
+
+// maxEvaluationModelVersions caps how many model versions a single task may evaluate.
+const maxEvaluationModelVersions = 10
+
+// resolveModelVersions normalizes the model input of an evaluation request into
+// index-aligned ModelIds and Revisions. Every entry is pinned to the commit it resolves
+// to at submit time, so a task stays reproducible even after the branch moves on.
+// Models takes precedence when present; ModelId and ModelIds keep their previous
+// meaning and resolve to the head commit of the repository default branch. The same
+// model may be listed more than once as long as the revisions differ.
+func (c *evaluationComponentImpl) resolveModelVersions(ctx context.Context, req *types.EvaluationReq) error {
+	refs := req.Models
+	if len(refs) == 0 {
+		modelIds := req.ModelIds
+		if req.ModelId != "" {
+			modelIds = append(modelIds, req.ModelId)
+		}
+		for _, modelId := range modelIds {
+			refs = append(refs, types.EvaluationModelRef{RepoId: modelId})
+		}
+	}
+	if len(refs) == 0 {
+		return fmt.Errorf("at least one model is required")
+	}
+	if len(refs) > maxEvaluationModelVersions {
+		return fmt.Errorf("at most %d model versions can be evaluated in one task", maxEvaluationModelVersions)
+	}
+
+	modelIds := make([]string, 0, len(refs))
+	revisions := make([]string, 0, len(refs))
+	seen := make(map[string]struct{}, len(refs))
+	for _, ref := range refs {
+		parts := strings.Split(ref.RepoId, "/")
+		if len(parts) != 2 {
+			return fmt.Errorf("invalid model id format: %s", ref.RepoId)
+		}
+		m, err := c.modelStore.FindByPath(ctx, parts[0], parts[1])
+		if err != nil {
+			return fmt.Errorf("cannot find model, %w", err)
+		}
+		wanted := ref.Revision
+		if wanted == "" {
+			if m.Repository == nil {
+				return fmt.Errorf("model %s has no repository", ref.RepoId)
+			}
+			wanted = m.Repository.DefaultBranch
+		}
+		revision, err := c.resolveRepoRevision(ctx, types.ModelRepo, parts[0], parts[1], wanted)
+		if err != nil {
+			return err
+		}
+		key := ref.RepoId + "@" + revision
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		modelIds = append(modelIds, ref.RepoId)
+		revisions = append(revisions, revision)
+	}
+
+	req.ModelIds = modelIds
+	req.Revisions = revisions
+	return nil
+}
+
+// resolveRepoRevision turns a branch, tag or commit SHA into the full commit SHA it
+// points at. Gitaly reports an unknown revision as an empty commit rather than an
+// error, so an empty ID is treated as not found.
+func (c *evaluationComponentImpl) resolveRepoRevision(ctx context.Context, repoType types.RepositoryType, namespace, name, ref string) (string, error) {
+	commit, err := c.git.GetRepoLastCommit(ctx, gitserver.GetRepoLastCommitReq{
+		Namespace: namespace,
+		Name:      name,
+		Ref:       ref,
+		RepoType:  repoType,
+	})
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve revision %s of %s %s/%s, error: %w", ref, repoType, namespace, name, err)
+	}
+	if commit == nil || commit.ID == "" {
+		return "", fmt.Errorf("revision %s does not exist in %s/%s", ref, namespace, name)
+	}
+	return commit.ID, nil
+}
+
+// datasetVersions holds the dataset paths handed to the evaluation image, the revisions
+// used to download them, and the commits pinned into the task snapshot.
+type datasetVersions struct {
+	Paths     []string
+	Revisions []string
+	Commits   []string
+}
+
 // generate mirror repo ids
-func (c *evaluationComponentImpl) GenerateMirrorRepoIds(ctx context.Context, datasets []string) ([]string, []string, error) {
-	var mirrorRepos []string
-	var revisions []string
+func (c *evaluationComponentImpl) GenerateMirrorRepoIds(ctx context.Context, datasets []string) (datasetVersions, error) {
+	return c.resolveDatasetVersions(ctx, datasets, func(repo *database.Repository) string {
+		return repo.OriginPath()
+	})
+}
+
+func (c *evaluationComponentImpl) generateDatasetsAndTasks(ctx context.Context, customDataSets []string) (datasetVersions, error) {
+	return c.resolveDatasetVersions(ctx, customDataSets, func(repo *database.Repository) string {
+		return repo.Path
+	})
+}
+
+// resolveDatasetVersions looks up each dataset repo and records both the branch used for
+// download and the commit that branch pointed at when the task was submitted. A commit
+// that cannot be resolved is left empty instead of failing the submission, because the
+// commit is snapshot metadata and the download still uses the branch.
+func (c *evaluationComponentImpl) resolveDatasetVersions(ctx context.Context, datasets []string, pathOf func(*database.Repository) string) (datasetVersions, error) {
+	var res datasetVersions
 	for _, ds := range datasets {
 		parts := strings.Split(ds, "/")
 		if len(parts) != 2 {
-			return nil, nil, fmt.Errorf("invalid dataset path: %s", ds)
+			return datasetVersions{}, fmt.Errorf("invalid dataset path: %s", ds)
 		}
 		namespace := parts[0]
 		name := parts[1]
 		repo, err := c.repoStore.FindByPath(ctx, types.DatasetRepo, namespace, name)
 		if err != nil {
-			return nil, nil, fmt.Errorf("failed to find dataset repo, %w", err)
+			return datasetVersions{}, fmt.Errorf("failed to find dataset repo, %w", err)
 		}
-		mirrorRepos = append(mirrorRepos, repo.OriginPath())
-		revisions = append(revisions, repo.DefaultBranch)
-	}
-	return mirrorRepos, revisions, nil
-}
-
-func (c *evaluationComponentImpl) generateDatasetsAndTasks(ctx context.Context, customDataSets []string) ([]string, []string, error) {
-	var mirrorRepos []string
-	var revisions []string
-	for _, cds := range customDataSets {
-		parts := strings.Split(cds, "/")
-		if len(parts) != 2 {
-			return nil, nil, fmt.Errorf("invalid dataset path: %s", cds)
-		}
-		namespace := parts[0]
-		name := parts[1]
-		repo, err := c.repoStore.FindByPath(ctx, types.DatasetRepo, namespace, name)
+		commit, err := c.resolveRepoRevision(ctx, types.DatasetRepo, namespace, name, repo.DefaultBranch)
 		if err != nil {
-			return nil, nil, fmt.Errorf("failed to find dataset repo, %w", err)
+			slog.WarnContext(ctx, "failed to pin dataset commit for evaluation",
+				slog.String("dataset", ds), slog.Any("error", err))
+			commit = ""
 		}
-		mirrorRepos = append(mirrorRepos, repo.Path)
-		revisions = append(revisions, repo.DefaultBranch)
+		res.Paths = append(res.Paths, pathOf(repo))
+		res.Revisions = append(res.Revisions, repo.DefaultBranch)
+		res.Commits = append(res.Commits, commit)
 	}
-	return mirrorRepos, revisions, nil
+	return res, nil
 }
 
 func (c *evaluationComponentImpl) DeleteEvaluation(ctx context.Context, req types.ArgoWorkFlowDeleteReq) error {
@@ -378,6 +529,11 @@ func (c *evaluationComponentImpl) GetEvaluation(ctx context.Context, req types.E
 		ResultURL:    wf.ResultURL,
 		DownloadURL:  wf.DownloadURL,
 		FailuresURL:  wf.FailuresURL,
+
+		RepoRevisions:    wf.RepoRevisions,
+		DatasetRevisions: wf.DatasetRevisions,
+		FrameworkConfig:  wf.FrameworkConfig,
+		Hardware:         wf.Hardware,
 	}
 	attachClawEvalSummary(ctx, res)
 	return res, nil
@@ -430,6 +586,11 @@ func (c *evaluationComponentImpl) OrgEvaluations(ctx context.Context, req *types
 			DownloadURL:  wf.DownloadURL,
 			ResultURL:    wf.ResultURL,
 			Image:        wf.Image,
+
+			RepoRevisions:    wf.RepoRevisions,
+			DatasetRevisions: wf.DatasetRevisions,
+			FrameworkConfig:  wf.FrameworkConfig,
+			Hardware:         wf.Hardware,
 		})
 	}
 	return res, total, nil

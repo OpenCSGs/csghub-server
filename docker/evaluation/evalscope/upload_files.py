@@ -1,5 +1,6 @@
 import os
 import argparse
+import re
 from datetime import datetime
 from minio import Minio
 from minio.error import S3Error
@@ -75,6 +76,47 @@ def upload(files):
         print(f"Error writing to file: {e}")
 
 
+
+# Every run of a model version writes into its own directory, and start.sh passes
+# "<run dir>=<namespace>/<name>@<commit>" for each of them. A report is attributed by
+# the directory its file sits under, so two repositories that share a basename and a
+# commit stay distinct and nothing depends on how the framework named anything.
+def parse_run_map(raw):
+    runs = []
+    for entry in (raw or "").split(","):
+        run_dir, sep, target = entry.strip().partition("=")
+        if not sep or not run_dir or not target:
+            continue
+        repo_id, _, revision = target.partition("@")
+        if repo_id:
+            runs.append((run_dir.rstrip("/") + "/", repo_id, revision))
+    # longest first so /run1 never matches a path under /run10
+    runs.sort(key=lambda r: len(r[0]), reverse=True)
+    return runs
+
+
+def run_of(runs, report_path):
+    path = str(report_path)
+    for prefix, repo_id, revision in runs:
+        if path.startswith(prefix):
+            return repo_id, revision
+    return "", ""
+
+
+# evalscope 1.11 reshaped its report: a metric no longer carries a plain "name"
+# but an identity plus a legacy name, and the report itself no longer has a
+# top-level score. Read both shapes so one script works across image versions.
+def metric_name(metric):
+    identity = metric.get("identity") or {}
+    return metric.get("legacy_name") or identity.get("name") or metric.get("name") or ""
+
+
+def report_score(report):
+    if "score" in report:
+        return report["score"]
+    metrics = report.get("metrics") or []
+    return metrics[0].get("score") if metrics else None
+
 column = [
     {
         "title": {
@@ -96,11 +138,29 @@ column = [
     },
     {
         "title": {
+            "zh-CN": "模型仓库",
+            "en-US": "Repository"
+        },
+        "width": 260,
+        "key": "repo_id",
+        "fixed": "left"
+    },
+    {
+        "title": {
             "zh-CN": "模型",
             "en-US": "Model"
         },
         "width": 220,
         "key": "model",
+        "fixed": "left"
+    },
+    {
+        "title": {
+            "zh-CN": "版本",
+            "en-US": "Revision"
+        },
+        "width": 120,
+        "key": "revision",
         "fixed": "left"
     },
     {
@@ -115,7 +175,8 @@ column = [
 ]
 
 
-def json_to_summary(jsonPath, tasks):
+def json_to_summary(jsonPath, tasks, run_map_raw=''):
+    runs = parse_run_map(run_map_raw)
     summary_data = []
     xlsx_json = {}
     final_json={}
@@ -124,12 +185,18 @@ def json_to_summary(jsonPath, tasks):
             jsonObj = json.load(f)
         # generate summary data
         item_new={}
-        model_name = jsonObj['model_name']
+        repo_id, revision = run_of(runs, jsonPath)
+        # the repository is the source of truth for the display name; fall back to
+        # what the framework reported only when a run cannot be attributed
+        model_display = repo_id.rsplit('/', 1)[-1] if repo_id else jsonObj.get('model_name', '')
         task = jsonObj['dataset_name']
-        item_new['model']=model_name
+        item_new['repo_id']=repo_id
+        item_new['model']=model_display
+        item_new['revision']=revision
         item_new['dataset']=task
-        item_new['metric']=jsonObj['metrics'][0]['name']
-        item_new['score']=jsonObj['score']
+        metrics = jsonObj.get('metrics') or []
+        item_new['metric']=metric_name(metrics[0]) if metrics else ''
+        item_new['score']=report_score(jsonObj)
         summary_data.append(item_new)
         summary = {
             "column": column,
@@ -139,13 +206,15 @@ def json_to_summary(jsonPath, tasks):
         xlsx_json['summary'] = summary_data
         # generate detail data
         sub_data = []
-        for metric in jsonObj['metrics']:
-            for category in metric['categories']:
-                for subset in category['subsets']:
+        for metric in (jsonObj.get('metrics') or []):
+            for category in (metric.get('categories') or []):
+                for subset in (category.get('subsets') or []):
                     subset_data={}
-                    subset_data['model']=model_name
+                    subset_data['repo_id']=repo_id
+                    subset_data['model']=model_display
+                    subset_data['revision']=revision
                     subset_data['dataset']=subset['name']
-                    subset_data['metric']=metric['name']
+                    subset_data['metric']=metric_name(metric)
                     subset_data['score']=subset['score']
                     sub_data.append(subset_data)
         if task in xlsx_json:
@@ -180,10 +249,12 @@ if __name__ == "__main__":
     parser_c = subparsers.add_parser('summary', help='Convert json to json summary')
     parser_c.add_argument('--file',nargs='+', type=str, help='Convert json to json summary')
     parser_c.add_argument('--tasks', nargs='+', type=str, help='task list')
+    parser_c.add_argument('--run-map', dest='run_map', type=str, default='',
+                          help='comma separated <run dir>=<namespace>/<name>@<commit> entries')
 
     args = parser.parse_args()
 
     if args.command == 'upload':
         upload(args.files)
     elif args.command == 'summary':
-        json_to_summary(args.file, args.tasks)
+        json_to_summary(args.file, args.tasks, args.run_map)

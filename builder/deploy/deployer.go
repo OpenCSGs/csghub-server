@@ -930,6 +930,22 @@ func (d *deployer) SubmitEvaluation(ctx context.Context, req types.EvaluationReq
 	env["MODEL_IDS"] = strings.Join(req.ModelIds, ",")
 	env["DATASET_IDS"] = strings.Join(req.Datasets, ",")
 	env["USE_CUSTOM_DATASETS"] = strconv.FormatBool(req.UseCustomDataset)
+	// The configuration arrives normalized, so both knobs are always present and the
+	// image defaults never apply: what is sent here is what the snapshot records.
+	if cfg := req.FrameworkConfig; cfg != "" {
+		var parsed types.EvaluationFrameworkConfig
+		if err := json.Unmarshal([]byte(cfg), &parsed); err != nil {
+			return nil, fmt.Errorf("invalid framework_config: %w", err)
+		}
+		generation, err := json.Marshal(parsed.GenerationConfig)
+		if err != nil {
+			return nil, fmt.Errorf("invalid framework_config generation_config: %w", err)
+		}
+		env["EVALSCOPE_GENERATION_CONFIG"] = string(generation)
+		if parsed.Limit != nil {
+			env["EVALUATION_LIMIT"] = strconv.Itoa(*parsed.Limit)
+		}
+	}
 	env["ACCESS_TOKEN"] = req.Token
 	env["HF_ENDPOINT"] = req.DownloadEndpoint
 	env["HF_HUB_DOWNLOAD_TIMEOUT"] = "30"
@@ -967,6 +983,13 @@ func (d *deployer) SubmitEvaluation(ctx context.Context, req types.EvaluationReq
 			NodeAffinity: req.NodeAffinity,
 			Tolerations:  req.Tolerations,
 		},
+		// Snapshot of what the task was submitted with, persisted by the runner.
+		// Models are pinned to the commits the image downloads, datasets record the
+		// commit their branch pointed at while the image still downloads by branch.
+		RepoRevisions:    req.Revisions,
+		DatasetRevisions: req.DatasetCommits,
+		FrameworkConfig:  req.FrameworkConfig,
+		Hardware:         &req.Hardware,
 	}
 	if req.ResourceId == 0 {
 		flowReq.ShareMode = true

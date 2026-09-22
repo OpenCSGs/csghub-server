@@ -9,6 +9,26 @@ download_model() {
         exit 1
     fi
 }
+# A task may evaluate several versions of one model, and two repositories in
+# different namespaces can share both a basename and a commit, so neither the model
+# name nor the revision identifies a run on its own. Every run therefore gets its own
+# directory, indexed by its position in MODEL_IDS: the model is staged under it and
+# the framework writes its reports under it. Reports are then located by path, never
+# by matching a name the framework may have rewritten.
+EVAL_MODELS_DIR=/workspace/eval-models
+run_dir() {
+    echo "/workspace/outputs/run$1"
+}
+staged_model_dir() {
+    echo "$EVAL_MODELS_DIR/run$1/$(basename $2)"
+}
+stage_model() {
+    modelID=$1
+    staged=$2
+    rm -rf "$staged"
+    mkdir -p "$(dirname $staged)"
+    mv "/workspace/$modelID" "$staged"
+}
 get_subset_and_task() {
     repo=$1
     # repo is the dataset_id (e.g., xzgan001/civil_comments)
@@ -158,6 +178,7 @@ if [ -z "$EVALUATION_LIMIT" ]; then
     EVALUATION_LIMIT=10
 fi
 jsonFiles=""
+runMap=""
 IFS=',' read -r -a model_repos <<< "$MODEL_IDS"
 IFS=',' read -r -a model_revisions <<< "$REVISIONS"
 for index in "${!model_repos[@]}"; do
@@ -168,23 +189,39 @@ for index in "${!model_repos[@]}"; do
         echo "Download model $modelID failed."
         exit 1
     fi
-    model_name=`basename $modelID`
-    echo "Start evaluating model $model_name, dataset $dataset_tasks"
+    runDir=`run_dir $index`
+    staged=`staged_model_dir $index $modelID`
+    # The run directory is this run's identity: record which repository and which
+    # commit it holds, so the summary reports them without depending on any name the
+    # framework derives.
+    if [ -z "$runMap" ]; then
+        runMap="$runDir=$modelID@$revision"
+    else
+        runMap="$runMap,$runDir=$modelID@$revision"
+    fi
+    stage_model $modelID $staged
+    if [ $? -ne 0 ]; then
+        echo "Staging model $modelID at revision $revision failed."
+        exit 1
+    fi
+    echo "Start evaluating model $modelID revision $revision, dataset $dataset_tasks"
     # Use wrapper script to ensure custom datasets are registered
     python /etc/csghub/evalscope_wrapper.py eval \
-        --model /workspace/$modelID \
+        --model $staged \
+        --work-dir $runDir \
         --datasets $dataset_tasks \
         --dataset-args "$dataset_tasks_args" \
         --generation-config "$EVALSCOPE_GENERATION_CONFIG" \
         --limit "$EVALUATION_LIMIT"
     if [ $? -ne 0 ]; then
-        echo "Evaluation failed for model $model_name."
+        echo "Evaluation failed for model $modelID revision $revision."
         exit 1
     fi
-    json_file=`find /workspace/outputs/**/reports/${model_name}/ -type f -name "*.json" | tr '\n' ' '`
+    # This run's reports can only be under its own directory, so no name matching.
+    json_file=`find $runDir -type f -name "*.json" -path "*/reports/*" | tr '\n' ' '`
     jsonFiles="$jsonFiles $json_file"
     # remove model to save space
-    rm -rf /workspace/$modelID
+    rm -rf $staged
 done
 
 if [ $? -eq 0 ]; then
@@ -196,8 +233,8 @@ fi
 
 # upload result to mino server
 mkdir -p /workspace/output/final
-echo "python /etc/csghub/upload_files.py summary --file $jsonFiles --tasks $dataset_tasks"
-python /etc/csghub/upload_files.py summary --file $jsonFiles --tasks $dataset_tasks
+echo "python /etc/csghub/upload_files.py summary --file $jsonFiles --tasks $dataset_tasks --run-map $runMap"
+python /etc/csghub/upload_files.py summary --file $jsonFiles --tasks $dataset_tasks --run-map "$runMap"
 upload_json_file=`ls -d /workspace/output/final/upload.json`
 upload_xlsx_file=`ls -d /workspace/output/final/upload.xlsx`
 python /etc/csghub/upload_files.py upload "$upload_json_file,$upload_xlsx_file"

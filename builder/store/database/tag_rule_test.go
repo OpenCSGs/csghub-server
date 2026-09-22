@@ -63,7 +63,7 @@ func TestTagRuleStore_SyncEvaluationDatasets(t *testing.T) {
 			RepoType:         "dataset",
 			Category:         "evaluation",
 			TagName:          "other",
-			RuntimeFramework: "lm-evaluation-harness",
+			RuntimeFramework: "opencompass",
 			Source:           "hf",
 		},
 		{
@@ -97,7 +97,7 @@ func TestTagRuleStore_SyncEvaluationDatasets(t *testing.T) {
 		rulesByFramework[rule.RuntimeFramework] = rule
 	}
 	require.Equal(t, "examination", rulesByFramework["evalscope"].TagName)
-	require.Equal(t, "other", rulesByFramework["lm-evaluation-harness"].TagName)
+	require.Equal(t, "other", rulesByFramework["opencompass"].TagName)
 
 	var staleCount int
 	staleCount, err = db.Core.NewSelect().

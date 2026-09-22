@@ -1,19 +1,19 @@
 """
-Custom dataset registration for EvalScope v1.10.0.
+Custom dataset registration for EvalScope v1.11.1.
 This module registers custom datasets that are not included in EvalScope by default.
 """
 
 try:
-    # EvalScope v1.10.0 API
+    # EvalScope v1.11.1 API
     from evalscope.api.benchmark import DefaultDataAdapter
     from evalscope.api.benchmark.meta import BenchmarkMeta
     from evalscope.api.registry import BENCHMARK_REGISTRY, register_benchmark
     from evalscope.api.dataset import Sample  # Correct import path
     EVALSCOPE_AVAILABLE = True
-    print("[DEBUG] Successfully imported EvalScope v1.10.0 API")
+    print("[DEBUG] Successfully imported EvalScope v1.11.1 API")
 except ImportError as e:
     print(f"[ERROR] Failed to import evalscope: {e}")
-    print("[ERROR] Make sure EvalScope v1.10.0 is installed in the container")
+    print("[ERROR] Make sure EvalScope v1.11.1 is installed in the container")
     print("[ERROR] Custom datasets will not be registered")
     EVALSCOPE_AVAILABLE = False
     import traceback

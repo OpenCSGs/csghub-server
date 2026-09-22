@@ -1,5 +1,6 @@
 import os
 import argparse
+import re
 from datetime import datetime
 from minio import Minio
 from minio.error import S3Error
@@ -90,6 +91,33 @@ def csv_to_json(csv_file_path):
     print(f'Successfully converted {csv_file_path} to {json_file_path}')
 
 
+
+# Every run of a model version writes into its own directory, and start.sh passes
+# "<run dir>=<namespace>/<name>@<commit>" for each of them. A result is attributed by
+# the directory its file sits under, so two repositories that share a basename and a
+# commit stay distinct and nothing depends on how the framework named anything.
+def parse_run_map(raw):
+    runs = []
+    for entry in (raw or "").split(","):
+        run_dir, sep, target = entry.strip().partition("=")
+        if not sep or not run_dir or not target:
+            continue
+        repo_id, _, revision = target.partition("@")
+        if repo_id:
+            runs.append((run_dir.rstrip("/") + "/", repo_id, revision))
+    # longest first so /run1 never matches a path under /run10
+    runs.sort(key=lambda r: len(r[0]), reverse=True)
+    return runs
+
+
+def run_of(runs, report_path):
+    path = str(report_path)
+    for prefix, repo_id, revision in runs:
+        if path.startswith(prefix):
+            return repo_id, revision
+    return "", ""
+
+
 column = [
     {
         "title": {
@@ -129,6 +157,15 @@ column = [
     },
     {
         "title": {
+            "zh-CN": "版本",
+            "en-US": "Revision"
+        },
+        "width": 120,
+        "key": "revision",
+        "fixed": "left"
+    },
+    {
+        "title": {
             "zh-CN": "评分",
             "en-US": "Score"
         },
@@ -139,13 +176,15 @@ column = [
 ]
 
 
-def json_to_summary(jsonPath, tasks):
+def json_to_summary(jsonPath, tasks, run_map_raw=''):
+    runs = parse_run_map(run_map_raw)
     summary_data = []
     xlsx_json = {}
     final_json={}
     for index, jsonPath in enumerate(jsonPath):
         with open(jsonPath, 'r', encoding='utf-8') as f:
             jsonObj = json.load(f)
+        repo_id, revision = run_of(runs, jsonPath)
         keywords = tasks
         # generate summary data
         for item in jsonObj:
@@ -154,8 +193,10 @@ def json_to_summary(jsonPath, tasks):
                 keys = list(item_new.keys())
                 model_name = keys[-1]
                 item_new['id'] = len(summary_data) + 1
-                item_new['model']=model_name
                 item_new['score']= item_new[model_name]
+                item_new['repo_id']=repo_id
+                item_new['model']=repo_id.rsplit('/', 1)[-1] if repo_id else model_name
+                item_new['revision']=revision
                 summary_data.append(item_new)
         summary = {
             "column": column,
@@ -172,8 +213,10 @@ def json_to_summary(jsonPath, tasks):
                     keys = list(item_new.keys())
                     model_name = keys[-1]
                     item_new['id'] = len(sub_data) + 1
-                    item_new['model']=model_name
                     item_new['score']= item_new[model_name]
+                    item_new['repo_id']=repo_id
+                    item_new['model']=repo_id.rsplit('/', 1)[-1] if repo_id else model_name
+                    item_new['revision']=revision
                     sub_data.append(item_new)
             if item in xlsx_json:
                 xlsx_json[item].extend(sub_data)
@@ -207,6 +250,8 @@ if __name__ == "__main__":
     parser_c = subparsers.add_parser('summary', help='Convert json to json summary')
     parser_c.add_argument('--file',nargs='+', type=str, help='Convert json to json summary')
     parser_c.add_argument('--tasks', nargs='+', type=str, help='task list')
+    parser_c.add_argument('--run-map', dest='run_map', default='', type=str,
+                          help='comma separated <run dir>=<namespace>/<name>@<commit> entries')
 
     args = parser.parse_args()
 
@@ -215,4 +260,4 @@ if __name__ == "__main__":
     elif args.command == 'convert':
         csv_to_json(args.file)
     elif args.command == 'summary':
-        json_to_summary(args.file, args.tasks)
+        json_to_summary(args.file, args.tasks, args.run_map)
