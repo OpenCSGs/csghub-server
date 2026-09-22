@@ -92,6 +92,7 @@ func NewTestSpaceComponent(
 		userSvcClient:       userSvcClient,
 		deployTaskStore:     stores.DeployTask,
 		rfs:                 stores.RuntimeFramework,
+		clusterInfoStore:    stores.ClusterInfo,
 	}
 }
 

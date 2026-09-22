@@ -60,6 +60,7 @@ type MCPService struct {
 	Secrets       string    `json:"secrets,omitempty"`
 	Variables     string    `json:"variables,omitempty"`
 	Endpoint      string    `json:"endpoint,omitempty" example:"https://localhost/spaces/myname/mymcp"`
+	ProxyHost     string    `json:"-"` // reverse-proxy Host override; not a public API field
 	Status        string    `json:"status"`
 	RepositoryID  int64     `json:"repository_id,omitempty"`
 	SvcName       string    `json:"svc_name,omitempty"`

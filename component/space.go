@@ -67,7 +67,7 @@ type SpaceComponent interface {
 	HasEntryFile(ctx context.Context, space *database.Space) bool
 	GetByID(ctx context.Context, spaceID int64) (*database.Space, error)
 	MCPIndex(ctx context.Context, repoFilter *types.RepoFilter, per, page int) ([]*types.MCPService, int, error)
-	GetMCPServiceBySvcName(ctx context.Context, svcName string) (*types.MCPService, error)
+	GetMCPServiceBySvcName(ctx context.Context, svcName, currentUser string) (*types.MCPService, error)
 	GetSupportedCUDAVersions(ctx context.Context, resourceType string) ([]string, error)
 }
 
@@ -1455,7 +1455,7 @@ func (c *spaceComponentImpl) MCPIndex(ctx context.Context, repoFilter *types.Rep
 	return resSpaces, total, nil
 }
 
-func (c *spaceComponentImpl) GetMCPServiceBySvcName(ctx context.Context, svcName string) (*types.MCPService, error) {
+func (c *spaceComponentImpl) GetMCPServiceBySvcName(ctx context.Context, svcName, currentUser string) (*types.MCPService, error) {
 	deploy, err := c.deployTaskStore.GetDeployBySvcName(ctx, svcName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get deploy by svcName %s, error: %w", svcName, err)
@@ -1466,10 +1466,40 @@ func (c *spaceComponentImpl) GetMCPServiceBySvcName(ctx context.Context, svcName
 		return nil, fmt.Errorf("failed to get space by id %d, error: %w", deploy.SpaceID, err)
 	}
 
-	// use the deploy record directly: this method is also called from the
-	// aigateway MCP proxy where the deployer is not initialized, and the
-	// svcName-scoped deploy is the exact instance being proxied
-	endpoint := c.getEndpoint(deploy.SvcName, space)
+	// Match rproxy MCP Space auth: public requires a logged-in user;
+	// private requires owner or namespace read permission.
+	allow, err := c.repoComponent.AllowAccessEndpoint(ctx, currentUser, deploy)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check mcp endpoint access for svc %s, error: %w", svcName, err)
+	}
+	if !allow {
+		return nil, errorx.ErrForbiddenMsg(fmt.Sprintf("no permission to access mcp service '%s'", svcName))
+	}
+
+	// Prefer the in-cluster deploy endpoint for aigateway MCP proxy so
+	// requests reach the pod directly instead of bouncing through rproxy.
+	// Fall back to the public Space URL when the deploy has no endpoint yet.
+	endpoint := deploy.Endpoint
+	proxyHost := ""
+	if endpoint == "" {
+		endpoint = c.getEndpoint(deploy.SvcName, space)
+	} else if deploy.ClusterID != "" {
+		cluster, err := c.clusterInfoStore.ByClusterID(ctx, deploy.ClusterID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get cluster by id %s, error: %w", deploy.ClusterID, err)
+		}
+		target, host, err := common.ExtractDeployTargetAndHost(ctx, &cluster, types.EndpointReq{
+			ClusterID: deploy.ClusterID,
+			Target:    deploy.Endpoint,
+			Endpoint:  deploy.Endpoint,
+			SvcName:   deploy.SvcName,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to resolve mcp proxy target for svc %s, error: %w", svcName, err)
+		}
+		endpoint = target
+		proxyHost = host
+	}
 
 	resSvc := &types.MCPService{
 		ID:           space.ID,
@@ -1485,6 +1515,7 @@ func (c *spaceComponentImpl) GetMCPServiceBySvcName(ctx context.Context, svcName
 		RepositoryID: space.Repository.ID,
 		SvcName:      deploy.SvcName,
 		Endpoint:     endpoint,
+		ProxyHost:    proxyHost,
 	}
 
 	return resSvc, nil

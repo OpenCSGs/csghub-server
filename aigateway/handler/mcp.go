@@ -43,12 +43,27 @@ func NewMCPProxyHandler(config *config.Config) (MCPProxyHandler, error) {
 // proxy to mcp service
 func (m *MCPProxyHandlerImpl) ProxyToApi(api string) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
+		authType := httpbase.GetAuthType(ctx)
+		if authType == httpbase.AuthTypeUserOrgApiKey || authType == httpbase.AuthTypeMultiSyncToken {
+			httpbase.UnauthorizedError(ctx, errors.New("unsupported auth type, please access with jwt or access token"))
+			return
+		}
+		currentUser := httpbase.GetCurrentUser(ctx)
+		if currentUser == "" {
+			httpbase.UnauthorizedError(ctx, errors.New("user not found in session, please access with jwt or access token"))
+			return
+		}
+
 		svcName := ctx.Param("servicename")
 		slog.Debug("mcp proxy", slog.Any("svcName", svcName))
-		mcpService, err := m.spaceComp.GetMCPServiceBySvcName(ctx.Request.Context(), svcName)
+		mcpService, err := m.spaceComp.GetMCPServiceBySvcName(ctx.Request.Context(), svcName, currentUser)
 		if err != nil {
 			if errors.Is(err, errorx.ErrNotFound) {
 				httpbase.NotFoundError(ctx, fmt.Errorf("mcp service '%s' not found", svcName))
+				return
+			}
+			if errors.Is(err, errorx.ErrForbidden) {
+				httpbase.ForbiddenError(ctx, err)
 				return
 			}
 			slog.Error("fail to get mcp space", slog.Any("err", err), slog.String("svcName", svcName))
@@ -67,13 +82,14 @@ func (m *MCPProxyHandlerImpl) ProxyToApi(api string) gin.HandlerFunc {
 		if !strings.HasPrefix(target, "https://") && !strings.HasPrefix(target, "http://") {
 			target = "https://" + target
 		}
+		slog.Debug("mcp proxy target", slog.String("svcName", svcName), slog.String("target", target), slog.String("api", api), slog.String("proxyHost", mcpService.ProxyHost))
 		rp, err := proxy.NewReverseProxy(target)
 		if err != nil {
 			slog.Error("fail to create mcp reverse proxy", slog.Any("err", err))
 			httpbase.ServerError(ctx, err)
 			return
 		}
-		rp.ServeHTTP(ctx.Writer, ctx.Request, api, "")
+		rp.ServeHTTP(ctx.Writer, ctx.Request, api, mcpService.ProxyHost)
 	}
 }
 

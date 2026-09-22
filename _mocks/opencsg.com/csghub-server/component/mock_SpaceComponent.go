@@ -359,9 +359,9 @@ func (_c *MockSpaceComponent_GetByID_Call) RunAndReturn(run func(context.Context
 	return _c
 }
 
-// GetMCPServiceBySvcName provides a mock function with given fields: ctx, svcName
-func (_m *MockSpaceComponent) GetMCPServiceBySvcName(ctx context.Context, svcName string) (*types.MCPService, error) {
-	ret := _m.Called(ctx, svcName)
+// GetMCPServiceBySvcName provides a mock function with given fields: ctx, svcName, currentUser
+func (_m *MockSpaceComponent) GetMCPServiceBySvcName(ctx context.Context, svcName string, currentUser string) (*types.MCPService, error) {
+	ret := _m.Called(ctx, svcName, currentUser)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetMCPServiceBySvcName")
@@ -369,19 +369,19 @@ func (_m *MockSpaceComponent) GetMCPServiceBySvcName(ctx context.Context, svcNam
 
 	var r0 *types.MCPService
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string) (*types.MCPService, error)); ok {
-		return rf(ctx, svcName)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) (*types.MCPService, error)); ok {
+		return rf(ctx, svcName, currentUser)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string) *types.MCPService); ok {
-		r0 = rf(ctx, svcName)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) *types.MCPService); ok {
+		r0 = rf(ctx, svcName, currentUser)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*types.MCPService)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
-		r1 = rf(ctx, svcName)
+	if rf, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
+		r1 = rf(ctx, svcName, currentUser)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -397,13 +397,14 @@ type MockSpaceComponent_GetMCPServiceBySvcName_Call struct {
 // GetMCPServiceBySvcName is a helper method to define mock.On call
 //   - ctx context.Context
 //   - svcName string
-func (_e *MockSpaceComponent_Expecter) GetMCPServiceBySvcName(ctx interface{}, svcName interface{}) *MockSpaceComponent_GetMCPServiceBySvcName_Call {
-	return &MockSpaceComponent_GetMCPServiceBySvcName_Call{Call: _e.mock.On("GetMCPServiceBySvcName", ctx, svcName)}
+//   - currentUser string
+func (_e *MockSpaceComponent_Expecter) GetMCPServiceBySvcName(ctx interface{}, svcName interface{}, currentUser interface{}) *MockSpaceComponent_GetMCPServiceBySvcName_Call {
+	return &MockSpaceComponent_GetMCPServiceBySvcName_Call{Call: _e.mock.On("GetMCPServiceBySvcName", ctx, svcName, currentUser)}
 }
 
-func (_c *MockSpaceComponent_GetMCPServiceBySvcName_Call) Run(run func(ctx context.Context, svcName string)) *MockSpaceComponent_GetMCPServiceBySvcName_Call {
+func (_c *MockSpaceComponent_GetMCPServiceBySvcName_Call) Run(run func(ctx context.Context, svcName string, currentUser string)) *MockSpaceComponent_GetMCPServiceBySvcName_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string))
+		run(args[0].(context.Context), args[1].(string), args[2].(string))
 	})
 	return _c
 }
@@ -413,7 +414,7 @@ func (_c *MockSpaceComponent_GetMCPServiceBySvcName_Call) Return(_a0 *types.MCPS
 	return _c
 }
 
-func (_c *MockSpaceComponent_GetMCPServiceBySvcName_Call) RunAndReturn(run func(context.Context, string) (*types.MCPService, error)) *MockSpaceComponent_GetMCPServiceBySvcName_Call {
+func (_c *MockSpaceComponent_GetMCPServiceBySvcName_Call) RunAndReturn(run func(context.Context, string, string) (*types.MCPService, error)) *MockSpaceComponent_GetMCPServiceBySvcName_Call {
 	_c.Call.Return(run)
 	return _c
 }
