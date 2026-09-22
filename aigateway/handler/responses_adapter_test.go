@@ -379,6 +379,158 @@ func TestResponsesToChatRequestAttachesReasoningInputToFunctionCall(t *testing.T
 	}`, string(body))
 }
 
+func TestResponsesToChatRequestMergesParallelFunctionCallsIntoOneAssistantMessage(t *testing.T) {
+	req := &types.ResponsesRequest{
+		Model: "public",
+		Input: json.RawMessage(`[
+			{"type":"message","role":"user","content":"run both"},
+			{"type":"function_call","call_id":"call_1","name":"lookup","arguments":"{\"q\":\"x\"}"},
+			{"type":"function_call","call_id":"call_2","name":"fetch","arguments":"{\"u\":\"y\"}"},
+			{"type":"function_call_output","call_id":"call_1","output":"r1"},
+			{"type":"function_call_output","call_id":"call_2","output":"r2"}
+		]`),
+	}
+	chatReq, err := responsesToChatRequest(context.Background(), req, "upstream-model", nil)
+	require.NoError(t, err)
+
+	body, err := marshalChatRequestBody(chatReq, "upstream-model")
+	require.NoError(t, err)
+	require.JSONEq(t, `{
+		"model": "upstream-model",
+		"messages": [
+			{"role": "user", "content": "run both"},
+			{
+				"role": "assistant",
+				"content": "",
+				"tool_calls": [
+					{"id": "call_1", "type": "function", "function": {"name": "lookup", "arguments": "{\"q\":\"x\"}"}},
+					{"id": "call_2", "type": "function", "function": {"name": "fetch", "arguments": "{\"u\":\"y\"}"}}
+				]
+			},
+			{"role": "tool", "tool_call_id": "call_1", "content": "r1"},
+			{"role": "tool", "tool_call_id": "call_2", "content": "r2"}
+		],
+		"parallel_tool_calls": true
+	}`, string(body))
+}
+
+func TestResponsesToChatRequestDoesNotMergeFunctionCallsAcrossToolReplies(t *testing.T) {
+	req := &types.ResponsesRequest{
+		Model: "public",
+		Input: json.RawMessage(`[
+			{"type":"function_call","call_id":"call_1","name":"lookup","arguments":"{\"q\":\"x\"}"},
+			{"type":"function_call_output","call_id":"call_1","output":"r1"},
+			{"type":"function_call","call_id":"call_2","name":"fetch","arguments":"{\"u\":\"y\"}"},
+			{"type":"function_call_output","call_id":"call_2","output":"r2"}
+		]`),
+	}
+	chatReq, err := responsesToChatRequest(context.Background(), req, "upstream-model", nil)
+	require.NoError(t, err)
+
+	body, err := marshalChatRequestBody(chatReq, "upstream-model")
+	require.NoError(t, err)
+	require.JSONEq(t, `{
+		"model": "upstream-model",
+		"messages": [
+			{
+				"role": "assistant",
+				"content": "",
+				"tool_calls": [
+					{"id": "call_1", "type": "function", "function": {"name": "lookup", "arguments": "{\"q\":\"x\"}"}}
+				]
+			},
+			{"role": "tool", "tool_call_id": "call_1", "content": "r1"},
+			{
+				"role": "assistant",
+				"content": "",
+				"tool_calls": [
+					{"id": "call_2", "type": "function", "function": {"name": "fetch", "arguments": "{\"u\":\"y\"}"}}
+				]
+			},
+			{"role": "tool", "tool_call_id": "call_2", "content": "r2"}
+		],
+		"parallel_tool_calls": true
+	}`, string(body))
+}
+
+func TestResponsesToChatRequestAttachesReasoningRecordedAfterFunctionCall(t *testing.T) {
+	req := &types.ResponsesRequest{
+		Model: "public",
+		Input: json.RawMessage(`[
+			{"type":"message","role":"user","content":"go"},
+			{"type":"function_call","call_id":"call_1","name":"lookup","arguments":"{\"q\":\"x\"}"},
+			{"type":"reasoning","summary":[{"type":"summary_text","text":"why lookup"}]},
+			{"type":"function_call_output","call_id":"call_1","output":"ok"},
+			{"type":"function_call","call_id":"call_2","name":"save","arguments":"{}"},
+			{"type":"function_call_output","call_id":"call_2","output":"saved"}
+		]`),
+	}
+	chatReq, err := responsesToChatRequest(context.Background(), req, "upstream-model", nil)
+	require.NoError(t, err)
+
+	body, err := marshalChatRequestBody(chatReq, "upstream-model")
+	require.NoError(t, err)
+	require.JSONEq(t, `{
+		"model": "upstream-model",
+		"messages": [
+			{"role": "user", "content": "go"},
+			{
+				"role": "assistant",
+				"content": "",
+				"reasoning_content": "why lookup",
+				"tool_calls": [
+					{"id": "call_1", "type": "function", "function": {"name": "lookup", "arguments": "{\"q\":\"x\"}"}}
+				]
+			},
+			{"role": "tool", "tool_call_id": "call_1", "content": "ok"},
+			{
+				"role": "assistant",
+				"content": "",
+				"tool_calls": [
+					{"id": "call_2", "type": "function", "function": {"name": "save", "arguments": "{}"}}
+				]
+			},
+			{"role": "tool", "tool_call_id": "call_2", "content": "saved"}
+		],
+		"parallel_tool_calls": true
+	}`, string(body))
+}
+
+func TestResponsesToChatRequestMergesParallelCallsWithReasoningBeforeOutputs(t *testing.T) {
+	req := &types.ResponsesRequest{
+		Model: "public",
+		Input: json.RawMessage(`[
+			{"type":"function_call","call_id":"call_1","name":"lookup","arguments":"{\"q\":\"x\"}"},
+			{"type":"function_call","call_id":"call_2","name":"fetch","arguments":"{\"u\":\"y\"}"},
+			{"type":"reasoning","summary":[{"type":"summary_text","text":"planned both"}]},
+			{"type":"function_call_output","call_id":"call_1","output":"r1"},
+			{"type":"function_call_output","call_id":"call_2","output":"r2"}
+		]`),
+	}
+	chatReq, err := responsesToChatRequest(context.Background(), req, "upstream-model", nil)
+	require.NoError(t, err)
+
+	body, err := marshalChatRequestBody(chatReq, "upstream-model")
+	require.NoError(t, err)
+	require.JSONEq(t, `{
+		"model": "upstream-model",
+		"messages": [
+			{
+				"role": "assistant",
+				"content": "",
+				"reasoning_content": "planned both",
+				"tool_calls": [
+					{"id": "call_1", "type": "function", "function": {"name": "lookup", "arguments": "{\"q\":\"x\"}"}},
+					{"id": "call_2", "type": "function", "function": {"name": "fetch", "arguments": "{\"u\":\"y\"}"}}
+				]
+			},
+			{"role": "tool", "tool_call_id": "call_1", "content": "r1"},
+			{"role": "tool", "tool_call_id": "call_2", "content": "r2"}
+		],
+		"parallel_tool_calls": true
+	}`, string(body))
+}
+
 func TestResponsesToChatRequestDropsOrphanReasoningWithNoAssistantTarget(t *testing.T) {
 	req := &types.ResponsesRequest{
 		Model: "public",

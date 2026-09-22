@@ -788,17 +788,29 @@ func responsesInputToChatMessages(ctx context.Context, req *types.ResponsesReque
 				lastAssistantIdx = len(messages) - 1
 			}
 		case "function_call":
+			toolCall := map[string]any{
+				"id":   item["call_id"],
+				"type": "function",
+				"function": map[string]any{
+					"name":      responsesFunctionCallChatName(item, toolAliases),
+					"arguments": item["arguments"],
+				},
+			}
+			// Same-turn parallel function calls share one assistant message;
+			// strict chat upstreams require each tool reply to follow the
+			// single message that carries its tool_call.
+			if open, ok := responsesOpenToolCallMessage(messages); ok {
+				responsesAppendToolCall(open, toolCall)
+				if pendingReasoning != "" {
+					appendMessageReasoning(open, pendingReasoning)
+					pendingReasoning = ""
+				}
+				break
+			}
 			message := map[string]any{
-				"role":    "assistant",
-				"content": "",
-				"tool_calls": []map[string]any{{
-					"id":   item["call_id"],
-					"type": "function",
-					"function": map[string]any{
-						"name":      responsesFunctionCallChatName(item, toolAliases),
-						"arguments": item["arguments"],
-					},
-				}},
+				"role":       "assistant",
+				"content":    "",
+				"tool_calls": []map[string]any{toolCall},
 			}
 			if pendingReasoning != "" {
 				message["reasoning_content"] = pendingReasoning
@@ -817,12 +829,21 @@ func responsesInputToChatMessages(ctx context.Context, req *types.ResponsesReque
 				"content":      content,
 			})
 		case "reasoning":
-			if reasoning := responsesReasoningItemText(item); reasoning != "" {
-				if pendingReasoning == "" {
-					pendingReasoning = reasoning
-				} else {
-					pendingReasoning += "\n" + reasoning
-				}
+			reasoning := responsesReasoningItemText(item)
+			if reasoning == "" {
+				break
+			}
+			// Replayed history may record reasoning after the function_call
+			// item it produced; attach it to that still-open tool-call
+			// message instead of leaking it into the next turn.
+			if open, ok := responsesOpenToolCallMessage(messages); ok {
+				appendMessageReasoning(open, reasoning)
+				break
+			}
+			if pendingReasoning == "" {
+				pendingReasoning = reasoning
+			} else {
+				pendingReasoning += "\n" + reasoning
 			}
 		default:
 			return nil, unsupportedResponsesFeature("input." + itemType)
@@ -830,17 +851,48 @@ func responsesInputToChatMessages(ctx context.Context, req *types.ResponsesReque
 	}
 	if pendingReasoning != "" {
 		if lastAssistantIdx >= 0 {
-			if existing, _ := messages[lastAssistantIdx]["reasoning_content"].(string); existing != "" {
-				messages[lastAssistantIdx]["reasoning_content"] = existing + "\n" + pendingReasoning
-			} else {
-				messages[lastAssistantIdx]["reasoning_content"] = pendingReasoning
-			}
+			appendMessageReasoning(messages[lastAssistantIdx], pendingReasoning)
 		} else {
 			slog.DebugContext(ctx, "drop orphan reasoning input with no assistant target",
 				slog.String("api", "/v1/responses"))
 		}
 	}
 	return messages, nil
+}
+
+// responsesOpenToolCallMessage returns the most recent message when it is an
+// assistant message holding only tool calls, i.e. a tool turn whose outputs
+// have not been recorded yet. Same-turn parallel function_call items must
+// share that message, and reasoning recorded right after a function_call
+// belongs to it.
+func responsesOpenToolCallMessage(messages []map[string]any) (map[string]any, bool) {
+	if len(messages) == 0 {
+		return nil, false
+	}
+	message := messages[len(messages)-1]
+	if role, _ := message["role"].(string); role != "assistant" {
+		return nil, false
+	}
+	if content, _ := message["content"].(string); content != "" {
+		return nil, false
+	}
+	if _, ok := message["tool_calls"]; !ok {
+		return nil, false
+	}
+	return message, true
+}
+
+func responsesAppendToolCall(message map[string]any, toolCall map[string]any) {
+	calls, _ := message["tool_calls"].([]map[string]any)
+	message["tool_calls"] = append(calls, toolCall)
+}
+
+func appendMessageReasoning(message map[string]any, reasoning string) {
+	if existing, _ := message["reasoning_content"].(string); existing != "" {
+		message["reasoning_content"] = existing + "\n" + reasoning
+		return
+	}
+	message["reasoning_content"] = reasoning
 }
 
 // responsesFunctionCallChatName maps a historical function_call name to the chat
