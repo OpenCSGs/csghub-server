@@ -1,0 +1,81 @@
+syntax = "proto3";
+
+package csghub.plugins.aliyun_checker.v1;
+
+option go_package = "opencsg.com/csghub-server/plugins/aliyun_checker/v1;aliyuncheckerv1";
+
+service AliyunChecker {
+  rpc PassTextCheck(PassTextCheckRequest) returns (CheckResult);
+  rpc PassImageCheck(PassImageCheckRequest) returns (CheckResult);
+  rpc PassImageURLCheck(PassImageURLCheckRequest) returns (CheckResult);
+  rpc PassImageStreamCheck(stream ImageStreamFrame) returns (CheckResult);
+  rpc PassLLMCheck(PassLLMCheckRequest) returns (CheckResult);
+  rpc SubmitMediaModeration(MediaModerationRequest) returns (MediaModerationSubmission);
+  rpc QueryMediaModerationResult(MediaModerationRequest) returns (MediaModerationResult);
+}
+
+message CheckResult {
+  bool is_sensitive = 1;
+  string reason = 2;
+}
+
+message PassTextCheckRequest {
+  string scenario = 1;
+  string text = 2;
+}
+
+message PassImageCheckRequest {
+  string scenario = 1;
+  string oss_bucket_name = 2;
+  string oss_object_name = 3;
+}
+
+message PassImageURLCheckRequest {
+  string scenario = 1;
+  string image_url = 2;
+}
+
+message ImageStreamHeader {
+  string scenario = 1;
+}
+
+message ImageStreamFrame {
+  oneof frame {
+    ImageStreamHeader header = 1;
+    bytes chunk = 2;
+  }
+}
+
+message PassLLMCheckRequest {
+  string scenario = 1;
+  string text = 2;
+  string session_id = 3;
+  string account_id = 4;
+  int64 max_tokens = 5;
+  string raw_json = 6;
+  bool resumable = 7;
+  string model_name = 8;
+  string role = 9;
+  bool stream = 10;
+  bool append_system_promot = 11;
+}
+
+message MediaModerationRequest {
+  string url = 1;
+  string type = 2;
+  string data_id = 3;
+  string seed = 4;
+  string task_id = 5;
+}
+
+message MediaModerationSubmission {
+  string data_id = 1;
+  string seed = 2;
+  string task_id = 3;
+}
+
+message MediaModerationResult {
+  string data_id = 1;
+  string status = 2;
+  string reason = 3;
+}
