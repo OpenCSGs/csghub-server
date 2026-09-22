@@ -35,6 +35,15 @@ unsafe_rules = [
     { level = "Controversial", category = "Politically Sensitive Topics" }
 ]
 
+# Automatic model selection.  Leave server_url empty to disable: the
+# virtual model is then not published and every request must name a
+# concrete model.
+[aigateway.semantic_router]
+server_url = ""
+model_id = "auto"
+timeout_seconds = 5
+health_ttl_seconds = 300
+
 [llmwiki]
 host = "http://127.0.0.1"
 port = 8100

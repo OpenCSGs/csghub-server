@@ -81,6 +81,9 @@ type RequestPlan struct {
 	UpstreamProtocol string
 	// UpstreamCap describes the capabilities of the upstream protocol.
 	UpstreamCap ProtocolCapability
+	// AutoRoute records the automatic model selection when the client
+	// requested the virtual model, and is nil for every other request.
+	AutoRoute *AutoRouteDecision
 	// BalanceOK indicates whether the balance check passed.
 	BalanceOK bool
 	// Safety holds the sensitive-content check result.  nil means no check

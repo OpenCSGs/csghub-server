@@ -164,6 +164,17 @@ func (h *OpenAIHandlerImpl) resolveModelTargetWithOptions(ctx context.Context, n
 	if model == nil {
 		return nil, newInvalidRequestModelTargetError("model_not_found", fmt.Sprintf("model '%s' not found", modelID), modelTargetErrorOptions{})
 	}
+	// The virtual automatic-routing model is replaced with a real model by
+	// the Planner before resolution.  Reaching here means an endpoint that
+	// does not support automatic routing was asked for it, so say that
+	// rather than failing later with a confusing "model not running".
+	if model.AutoRoute {
+		return nil, newInvalidRequestModelTargetError(
+			"auto_routing_unsupported",
+			fmt.Sprintf("model '%s' selects automatic routing, which this endpoint does not support", modelID),
+			modelTargetErrorOptions{Model: model},
+		)
+	}
 	requiresSKUPrice, hasConfiguredSKUPrice := modelSKUPriceStatus(model)
 	if requiresSKUPrice && !hasConfiguredSKUPrice {
 		return nil, newServerModelTargetError(
