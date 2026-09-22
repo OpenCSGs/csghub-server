@@ -490,11 +490,13 @@ func TestApplyEndpointOverrides(t *testing.T) {
 	}
 
 	applyEndpointOverrides(model, commontypes.UpstreamConfig{
+		ID:         42,
 		Provider:   "endpoint-provider",
 		AuthHeader: "endpoint-token",
 	})
 	require.Equal(t, "endpoint-provider", model.Provider)
 	require.Equal(t, "endpoint-token", model.AuthHead)
+	require.Equal(t, int64(42), model.UpstreamID)
 
 	applyEndpointOverrides(model, commontypes.UpstreamConfig{})
 	require.Equal(t, "", model.Provider)

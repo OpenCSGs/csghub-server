@@ -3,6 +3,8 @@ package types
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -19,7 +21,32 @@ const (
 const (
 	ExternalLLMResourceFmt = "thirdparty://%s"
 	CSGHubResourceFmt      = "csghub://%s/%s"
+	// UpstreamCostResourceFmt scopes an upstream procurement-cost SKU
+	// (SKUUpstreamCost) to one upstream by its immutable ai_gateway_upstreams.id,
+	// so an LLM model rename never orphans cost rows.
+	UpstreamCostResourceFmt = "upstream://%d"
 )
+
+const upstreamCostResourcePrefix = "upstream://"
+
+// UpstreamCostResourceID builds the account_price resource_id for an upstream
+// cost SKU.
+func UpstreamCostResourceID(upstreamID int64) string {
+	return fmt.Sprintf(UpstreamCostResourceFmt, upstreamID)
+}
+
+// ParseUpstreamCostResourceID extracts the upstream id from a resource_id built
+// by UpstreamCostResourceID.
+func ParseUpstreamCostResourceID(resourceID string) (upstreamID int64, err error) {
+	if !strings.HasPrefix(resourceID, upstreamCostResourcePrefix) {
+		return 0, fmt.Errorf("invalid upstream cost resource id %q: missing %q prefix", resourceID, upstreamCostResourcePrefix)
+	}
+	upstreamID, err = strconv.ParseInt(strings.TrimPrefix(resourceID, upstreamCostResourcePrefix), 10, 64)
+	if err != nil || upstreamID <= 0 {
+		return 0, fmt.Errorf("invalid upstream cost resource id %q: expected 'upstream://{upstream_id}'", resourceID)
+	}
+	return upstreamID, nil
+}
 
 // Provider type values for Metadata[MetaKeyLLMType].
 const (

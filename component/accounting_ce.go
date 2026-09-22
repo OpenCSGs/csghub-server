@@ -105,6 +105,10 @@ func (ac *accountingComponentImpl) StatementsIndex(ctx context.Context, req type
 	return nil, 0, nil
 }
 
+func (ac *accountingComponentImpl) TokenReportIndex(ctx context.Context, req types.TokenReportReq) (*types.TokenReportResp, error) {
+	return nil, nil
+}
+
 func (ac *accountingComponentImpl) ListPresents(ctx context.Context, req types.PresentsIndexReq) ([]*types.PresentIndexResp, int, error) {
 	return nil, 0, nil
 }

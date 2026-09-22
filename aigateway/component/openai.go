@@ -8,6 +8,7 @@ import (
 	"maps"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -620,6 +621,10 @@ type usageMeteringExtra struct {
 	APIKey              string                     `json:"api_key"`
 	Provider            string                     `json:"provider"`
 	ModelName           string                     `json:"model_name"`
+	// UpstreamID is the ai_gateway_upstreams.id that served the request, as a
+	// string like the other extra fields; empty/0 means unattributed (e.g.
+	// events before this field existed) and is excluded from cost lookup.
+	UpstreamID string `json:"upstream_id,omitempty"`
 	// multiModalMeteringExtra is serialized into MeteringEvent.Extra for multi-modal billing.
 	CompletionDataType   string `json:"completion_data_type"`
 	CompletionResolution string `json:"completion_resolution"`
@@ -636,6 +641,15 @@ func sanitizeMeteringEventForLog(event commontypes.MeteringEvent) commontypes.Me
 	return sanitized
 }
 
+// upstreamIDExtraValue formats the serving upstream id for the metering extra;
+// 0/unattributed stays empty so the field is omitted from the JSON.
+func upstreamIDExtraValue(upstreamID int64) string {
+	if upstreamID <= 0 {
+		return ""
+	}
+	return strconv.FormatInt(upstreamID, 10)
+}
+
 func buildUsageExtraData(usageModel *types.Model, upstreamModelName string, usage *token.Usage, apikey string, meteringInfo usageMeteringInfo) (string, error) {
 	extra := usageMeteringExtra{
 		PromptTokenNum:       fmt.Sprintf("%d", usage.PromptTokens),
@@ -646,6 +660,7 @@ func buildUsageExtraData(usageModel *types.Model, upstreamModelName string, usag
 		APIKey:               apikey,
 		Provider:             usageModel.Provider,
 		ModelName:            upstreamModelName,
+		UpstreamID:           upstreamIDExtraValue(usageModel.UpstreamID),
 		CompletionDataType:   usage.DataType,
 		CompletionResolution: usage.Resolution,
 		CompletionDuration:   fmt.Sprintf("%.2f", usage.Duration),

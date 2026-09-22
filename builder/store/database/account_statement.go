@@ -93,6 +93,13 @@ type AccountStatement struct {
 	Resolution        string                `bun:",notnull,default:''" json:"resolution"`
 	Duration          float64               `bun:",notnull,default:0" json:"duration"`
 	VoucherNo         string                `bun:",nullzero" json:"voucher_no"`
+	// Cost snapshot for aigateway token usage (scenes 15/16), frozen at charge
+	// time from SKUUpstreamCost prices; cents, >= 0. Sku ids are audit-only.
+	CostAmount          float64 `bun:",notnull,default:0" json:"cost_amount"`
+	CostPromptSkuID     *int64  `bun:",nullzero" json:"cost_prompt_sku_id"`
+	CostCompletionSkuID *int64  `bun:",nullzero" json:"cost_completion_sku_id"`
+	Provider            string  `bun:",notnull,default:''" json:"provider"`
+	UpstreamID          int64   `bun:",notnull,default:0" json:"upstream_id"`
 }
 
 type AccountStatementRes struct {

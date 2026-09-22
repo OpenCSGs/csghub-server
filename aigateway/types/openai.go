@@ -74,6 +74,10 @@ type Model struct {
 	Availability           *ModelAvailability           `json:"availability,omitempty"`
 	UpstreamAvailabilities []UpstreamAvailability       `json:"upstream_availabilities,omitempty"`
 	InternalUse            bool                         `json:"-"` // control whether the model is for internal use
+	// UpstreamID is the ai_gateway_upstreams.id of the upstream that served the
+	// request (set by applyEndpointOverrides); used for cost attribution in
+	// metering, never exposed on /v1/models.
+	UpstreamID int64 `json:"-"`
 }
 
 type UpstreamAvailability struct {

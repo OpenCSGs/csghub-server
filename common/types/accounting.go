@@ -29,6 +29,11 @@ const (
 	CompletionDataType   = "completion_data_type"
 	CompletionResolution = "completion_resolution"
 	CompletionDuration   = "completion_duration"
+	// MeterUpstreamID is the ai_gateway_upstreams.id that served the request;
+	// it keys the upstream procurement-cost lookup at charge time.
+	MeterUpstreamID = "upstream_id"
+	// MeterProvider is the serving upstream's provider (服务商) display string.
+	MeterProvider = "provider"
 )
 
 type DataType string
@@ -90,9 +95,10 @@ var (
 type SKUType int
 
 var (
-	SKUReserve  SKUType = 0 // system reserve
-	SKUCSGHub   SKUType = 1 // csghub server
-	SKUStarship SKUType = 2 // starship is deprecated
+	SKUReserve      SKUType = 0 // system reserve
+	SKUCSGHub       SKUType = 1 // csghub server
+	SKUStarship     SKUType = 2 // starship is deprecated
+	SKUUpstreamCost SKUType = 3 // upstream procurement cost; never used to charge users
 )
 
 type SKUKind int
@@ -220,6 +226,13 @@ type AcctEventReq struct {
 	DataType       string          `json:"data_type"`
 	Resolution     string          `json:"resolution"`
 	Duration       float64         `json:"duration"`
+	// Cost/procurement snapshot for aigateway token usage (scenes 15/16),
+	// computed at charge time from SKUUpstreamCost prices; cents, >= 0.
+	CostAmount          float64 `json:"cost_amount"`
+	CostPromptSkuID     *int64  `json:"cost_prompt_sku_id"`
+	CostCompletionSkuID *int64  `json:"cost_completion_sku_id"`
+	Provider            string  `json:"provider"`
+	UpstreamID          int64   `json:"upstream_id"`
 }
 
 // generate charge event from client
@@ -427,7 +440,7 @@ type MeteringExtra struct {
 }
 
 type AcctPriceCreateReq struct {
-	SkuType          SKUType     `json:"sku_type" binding:"required,oneof=1 2"`
+	SkuType          SKUType     `json:"sku_type" binding:"required,oneof=1 2 3"`
 	SkuPrice         int64       `json:"sku_price"`
 	SkuUnit          int64       `json:"sku_unit" binding:"required,min=1"`
 	SkuDesc          string      `json:"sku_desc" binding:"required"`
@@ -464,6 +477,49 @@ type AcctPriceUpdateReq struct {
 	Resolution       *string      `json:"resolution"`
 	SkuStatus        *SkuStatus   `json:"sku_status"`
 	SkuCachedPrice   *int64       `json:"sku_cached_price"`
+}
+
+// TokenReportReq is the admin token report query (issue #3404): a date range
+// ([start_time, end_time), YYYY-MM-DD) over the daily rollup, filtered by
+// namespace, API key, model (selling resource id) and provider.
+type TokenReportReq struct {
+	StartTime  string `json:"start_time" form:"start_time"`
+	EndTime    string `json:"end_time" form:"end_time"`
+	NsUUID     string `json:"ns_uuid" form:"ns_uuid"`
+	UserName   string `json:"user_name" form:"user_name"`
+	ResourceID string `json:"resource_id" form:"resource_id"`
+	Provider   string `json:"provider" form:"provider"`
+	TokenID    int64  `json:"token_id" form:"token_id"`
+	Page       int    `json:"page" form:"page"`
+	Per        int    `json:"per" form:"per"`
+}
+
+// TokenReportItem is one report row (date × namespace × API key × model ×
+// provider). Money is yuan; rates are 0 when the denominator is 0.
+type TokenReportItem struct {
+	Date            string  `json:"date"`
+	UserName        string  `json:"user_name"`
+	NsUUID          string  `json:"ns_uuid"`
+	TokenID         int64   `json:"token_id"`
+	APIKeyName      string  `json:"api_key_name"`
+	Model           string  `json:"model"`
+	Provider        string  `json:"provider"`
+	CallCount       int64   `json:"call_count"`
+	PromptToken     float64 `json:"prompt_token"`
+	CompletionToken float64 `json:"completion_token"`
+	CachedToken     float64 `json:"cached_token"`
+	CacheHitRate    float64 `json:"cache_hit_rate"`
+	Revenue         float64 `json:"revenue"`
+	Cost            float64 `json:"cost"`
+	Margin          float64 `json:"margin"`
+	MarginRate      float64 `json:"margin_rate"`
+}
+
+// TokenReportResp is the paged report plus the 合计 (totals) row.
+type TokenReportResp struct {
+	Data    []TokenReportItem `json:"data"`
+	Total   int               `json:"total"`
+	Summary TokenReportItem   `json:"summary"`
 }
 
 type AcctPriceResp struct {

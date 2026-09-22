@@ -525,9 +525,10 @@ type Config struct {
 		AIGatewayAsyncGenerationCronExpression   string `env:"STARHUB_SERVER_CRON_JOB_AIGATEWAY_ASYNC_GENERATION_CRON_EXPRESSION" default:"*/1 * * * *"`
 		AIGatewayMetricsCollectorCronExpression  string `env:"STARHUB_SERVER_CRON_JOB_AIGATEWAY_METRICS_COLLECTOR_CRON_EXPRESSION" default:"* * * * *"` // every minute
 		SyncLLMLogsToDatasetCronExpression       string `env:"STARHUB_SERVER_SYNC_LLMLOGS_TO_DATASET_CRON_EXPRESSION" default:"0 1 * * *"`
-		StatementDailySummaryCronExpression      string `env:"STARHUB_SERVER_CRON_JOB_STATEMENT_DAILY_SUMMARY_CRON_EXPRESSION" default:"17 2 * * *"`   // 02:17 daily
-		HistoryArchiveCronExpression             string `env:"STARHUB_SERVER_CRON_JOB_HISTORY_ARCHIVE_CRON_EXPRESSION" default:"30 2 * * *"`           // 02:30 daily (Asia/Shanghai, applied via ScheduleSpec.TimeZoneName)
-		UpstreamSyncReconcileCronExpression      string `env:"STARHUB_SERVER_CRON_JOB_UPSTREAM_SYNC_RECONCILE_CRON_EXPRESSION" default:"*/10 * * * *"` // every 10 minutes
+		StatementDailySummaryCronExpression      string `env:"STARHUB_SERVER_CRON_JOB_STATEMENT_DAILY_SUMMARY_CRON_EXPRESSION" default:"17 2 * * *"`    // 02:17 daily
+		TokenReportDailySummaryCronExpression    string `env:"STARHUB_SERVER_CRON_JOB_TOKEN_REPORT_DAILY_SUMMARY_CRON_EXPRESSION" default:"23 3 * * *"` // 03:23 daily, after statement daily summary
+		HistoryArchiveCronExpression             string `env:"STARHUB_SERVER_CRON_JOB_HISTORY_ARCHIVE_CRON_EXPRESSION" default:"30 2 * * *"`            // 02:30 daily (Asia/Shanghai, applied via ScheduleSpec.TimeZoneName)
+		UpstreamSyncReconcileCronExpression      string `env:"STARHUB_SERVER_CRON_JOB_UPSTREAM_SYNC_RECONCILE_CRON_EXPRESSION" default:"*/10 * * * *"`  // every 10 minutes
 	}
 
 	HistoryArchive struct {
