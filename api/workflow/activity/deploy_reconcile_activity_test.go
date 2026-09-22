@@ -8,13 +8,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	corev1 "k8s.io/api/core/v1"
 	mock_deploy "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/deploy"
 	mockdb "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/types"
 	runnerTypes "opencsg.com/csghub-server/runner/types"
-	corev1 "k8s.io/api/core/v1"
 )
 
 func newTestActivities(t *testing.T) *Activities {
@@ -25,8 +25,9 @@ func newTestActivities(t *testing.T) *Activities {
 		},
 		deployer: mock_deploy.NewMockDeployer(t),
 		deployConfig: common.DeployConfig{
-			StuckTimeoutMin:      15,
-			RunningReconcileHour: 2,
+			StuckTimeoutMin:       15,
+			RunningReconcileHour:  2,
+			UnhealthyReconcileMin: 10,
 		},
 	}
 }
@@ -121,7 +122,7 @@ func TestReconcileDeployCluster_BatchSuccess(t *testing.T) {
 		return req.ClusterID == "c1" && len(req.Items) == 2
 	})).Return(&runnerTypes.BatchStatusResponse{
 		Items: []runnerTypes.BatchStatusItemResult{
-			{Type: runnerTypes.ResourceTypeKsvc, Name: "s1", Code: common.Running},    // Deploying KSVC → skipped
+			{Type: runnerTypes.ResourceTypeKsvc, Name: "s1", Code: common.Running},      // Deploying KSVC → skipped
 			{Type: runnerTypes.ResourceTypeSandbox, Name: "s2", Status: common.Running}, // Deploying Sandbox → processed
 		},
 	}, nil).Once()
@@ -143,14 +144,15 @@ func TestReconcileAllStatus(t *testing.T) {
 	a := newTestActivities(t)
 	ds := a.stores.deployTask.(*mockdb.MockDeployTaskStore)
 	wfs := a.stores.argoWorkFlow.(*mockdb.MockArgoWorkFlowStore)
-	ds.EXPECT().ListDeploysNeedingReconcile(mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, nil).Times(3)
+	ds.EXPECT().ListDeploysNeedingReconcile(mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, nil).Times(4)
 	wfs.EXPECT().ListWorkflowsNeedingReconcile(mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, nil).Times(2)
 	require.NoError(t, a.ReconcileAllStatus(context.WithValue(context.Background(), "test", "test")))
 }
 
 func TestReconcileDeployCluster_BatchItemError_TimeoutFallback(t *testing.T) {
 	// When individual batch items have errors and are past hardTimeout,
-	// onBatchError should mark them as DeployFailed.
+	// the deploy is marked ResourceUnhealthy — we cannot verify its real
+	// status, so we do not assert DeployFailed.
 	a := newTestActivities(t)
 	ds := a.stores.deployTask.(*mockdb.MockDeployTaskStore)
 	md := a.deployer.(*mock_deploy.MockDeployer)
@@ -165,10 +167,10 @@ func TestReconcileDeployCluster_BatchItemError_TimeoutFallback(t *testing.T) {
 		},
 	}, nil).Once()
 
-	// onBatchError will re-read the deploy, then update to DeployFailed
+	// fallback re-reads the deploy, then updates to ResourceUnhealthy
 	ds.EXPECT().GetDeployByID(mock.Anything, int64(1)).Return(&database.Deploy{ID: 1, Status: common.Deploying}, nil).Once()
 	ds.EXPECT().UpdateDeploy(mock.Anything, mock.MatchedBy(func(d *database.Deploy) bool {
-		return d.Status == common.DeployFailed && d.ID == int64(1)
+		return d.Status == common.ResourceUnhealthy && d.ID == int64(1)
 	})).Return(nil).Once()
 
 	// Set StatusUpdateAt far in the past so hardTimeout is exceeded
@@ -340,6 +342,77 @@ func TestReconcileDeployCluster_BatchItemError_PendingSkipsFallback(t *testing.T
 	reconcileDeployCluster(context.WithValue(context.Background(), "test", "test"), a, "c1", deploys, common.Deploying, 30*time.Minute)
 }
 
+func TestReconcileDeployCluster_RunningFallbackToResourceUnhealthy(t *testing.T) {
+	// When a Running deploy has a batch error past hardTimeout,
+	// onBatchError should mark it as ResourceUnhealthy (not Stopped).
+	a := newTestActivities(t)
+	ds := a.stores.deployTask.(*mockdb.MockDeployTaskStore)
+	md := a.deployer.(*mock_deploy.MockDeployer)
+
+	md.EXPECT().CheckHeartbeatTimeout(mock.Anything, "c1").Return(false, nil).Once()
+	md.EXPECT().BatchStatus(mock.Anything, mock.Anything).Return(&runnerTypes.BatchStatusResponse{
+		Items: []runnerTypes.BatchStatusItemResult{
+			{Type: runnerTypes.ResourceTypeKsvc, Name: "s1", Error: "service not found in cluster"},
+		},
+	}, nil).Once()
+
+	// onBatchError checks hardTimeout and updates to ResourceUnhealthy
+	ds.EXPECT().GetDeployByID(mock.Anything, int64(1)).Return(&database.Deploy{ID: 1, Status: common.Running}, nil).Once()
+	ds.EXPECT().UpdateDeploy(mock.Anything, mock.MatchedBy(func(d *database.Deploy) bool {
+		return d.Status == common.ResourceUnhealthy && d.ID == int64(1)
+	})).Return(nil).Once()
+
+	pastTime := time.Now().Add(-2 * time.Hour)
+	deploys := []database.Deploy{
+		{ID: 1, Type: types.SpaceType, SvcName: "s1", ClusterID: "c1", Status: common.Running, StatusUpdateAt: pastTime},
+	}
+	reconcileDeployCluster(context.WithValue(context.Background(), "test", "test"), a, "c1", deploys, common.Running, 30*time.Minute)
+}
+
+func TestReconcileDeployCluster_HeartbeatTimeout_RunningToResourceUnhealthy(t *testing.T) {
+	// When the cluster heartbeat times out (markFailed path) for a Running deploy,
+	// it should be marked as ResourceUnhealthy.
+	a := newTestActivities(t)
+	ds := a.stores.deployTask.(*mockdb.MockDeployTaskStore)
+	md := a.deployer.(*mock_deploy.MockDeployer)
+
+	// Heartbeat timed out → clusterBatchDo takes the markFailed path
+	md.EXPECT().CheckHeartbeatTimeout(mock.Anything, "c1").Return(true, nil).Once()
+
+	// markFailed calls applyStatusUpdate which re-reads and updates
+	ds.EXPECT().GetDeployByID(mock.Anything, int64(1)).Return(&database.Deploy{ID: 1, Status: common.Running}, nil).Once()
+	ds.EXPECT().UpdateDeploy(mock.Anything, mock.MatchedBy(func(d *database.Deploy) bool {
+		return d.Status == common.ResourceUnhealthy && d.ID == int64(1)
+	})).Return(nil).Once()
+
+	pastTime := time.Now().Add(-2 * time.Hour)
+	deploys := []database.Deploy{
+		{ID: 1, Type: types.SpaceType, SvcName: "s1", ClusterID: "c1", Status: common.Running, StatusUpdateAt: pastTime},
+	}
+	reconcileDeployCluster(context.WithValue(context.Background(), "test", "test"), a, "c1", deploys, common.Running, 30*time.Minute)
+}
+
+func TestReconcileDeployCluster_HeartbeatTimeout_DeployingToResourceUnhealthy(t *testing.T) {
+	// When the cluster heartbeat times out, even a Deploying deploy should be
+	// marked ResourceUnhealthy (not DeployFailed) — the cluster is unreachable,
+	// so we cannot verify whether the deployment actually failed.
+	a := newTestActivities(t)
+	ds := a.stores.deployTask.(*mockdb.MockDeployTaskStore)
+	md := a.deployer.(*mock_deploy.MockDeployer)
+
+	md.EXPECT().CheckHeartbeatTimeout(mock.Anything, "c1").Return(true, nil).Once()
+	ds.EXPECT().GetDeployByID(mock.Anything, int64(1)).Return(&database.Deploy{ID: 1, Status: common.Deploying}, nil).Once()
+	ds.EXPECT().UpdateDeploy(mock.Anything, mock.MatchedBy(func(d *database.Deploy) bool {
+		return d.Status == common.ResourceUnhealthy && d.ID == int64(1)
+	})).Return(nil).Once()
+
+	pastTime := time.Now().Add(-2 * time.Hour)
+	deploys := []database.Deploy{
+		{ID: 1, Type: types.SpaceType, SvcName: "s1", ClusterID: "c1", Status: common.Deploying, StatusUpdateAt: pastTime},
+	}
+	reconcileDeployCluster(context.WithValue(context.Background(), "test", "test"), a, "c1", deploys, common.Deploying, 30*time.Minute)
+}
+
 func TestReconcileDeployCluster_HeartbeatTimeout_PendingSkipsFallback(t *testing.T) {
 	// When the cluster heartbeat times out (markFailed path), a deploy with a
 	// Pending pod must still be skipped — the pod may schedule once the cluster
@@ -359,4 +432,163 @@ func TestReconcileDeployCluster_HeartbeatTimeout_PendingSkipsFallback(t *testing
 			Instances: []types.Instance{{Name: "s1-00001-pod", Status: "Pending"}}},
 	}
 	reconcileDeployCluster(context.WithValue(context.Background(), "test", "test"), a, "c1", deploys, common.Deploying, 30*time.Minute)
+}
+
+// ==================== Unhealthy Recovery Tests ====================
+
+func TestReconcileUnhealthy_RecoveredToRunning(t *testing.T) {
+	// A ResourceUnhealthy ksvc deploy whose runner reports Running should
+	// recover to Running.
+	a := newTestActivities(t)
+	ds := a.stores.deployTask.(*mockdb.MockDeployTaskStore)
+	md := a.deployer.(*mock_deploy.MockDeployer)
+
+	// ResourceUnhealthy skips heartbeat check — no CheckHeartbeatTimeout call.
+	md.EXPECT().BatchStatus(mock.Anything, mock.Anything).Return(&runnerTypes.BatchStatusResponse{
+		Items: []runnerTypes.BatchStatusItemResult{
+			{Type: runnerTypes.ResourceTypeKsvc, Name: "s1", Code: common.Running},
+		},
+	}, nil).Once()
+	ds.EXPECT().GetDeployByID(mock.Anything, int64(1)).
+		Return(&database.Deploy{ID: 1, Status: common.ResourceUnhealthy}, nil).Once()
+	ds.EXPECT().UpdateDeploy(mock.Anything, mock.MatchedBy(func(d *database.Deploy) bool {
+		return d.Status == common.Running && d.ID == int64(1)
+	})).Return(nil).Once()
+
+	pastTime := time.Now().Add(-2 * time.Hour)
+	deploys := []database.Deploy{
+		{ID: 1, Type: types.SpaceType, SvcName: "s1", ClusterID: "c1", Status: common.ResourceUnhealthy, StatusUpdateAt: pastTime},
+	}
+	reconcileDeployCluster(context.WithValue(context.Background(), "test", "test"), a, "c1", deploys, common.ResourceUnhealthy, 40*time.Minute)
+}
+
+func TestReconcileUnhealthy_RecoveredToStopped(t *testing.T) {
+	// A ResourceUnhealthy ksvc deploy whose runner reports Stopped should
+	// recover to Stopped. The real runner contract (BatchKsvcStatus) returns
+	// Code: Stopped WITH Error: "service not found in cluster" when the
+	// Knative service is gone from the cluster — that Error is informational,
+	// the Code is the definitive status. The callback must distinguish a
+	// per-item Error (r != nil, runner reachable) from a real RPC failure
+	// (r == nil, runner unreachable) so this recovery is not skipped.
+	a := newTestActivities(t)
+	ds := a.stores.deployTask.(*mockdb.MockDeployTaskStore)
+	md := a.deployer.(*mock_deploy.MockDeployer)
+
+	md.EXPECT().BatchStatus(mock.Anything, mock.Anything).Return(&runnerTypes.BatchStatusResponse{
+		Items: []runnerTypes.BatchStatusItemResult{
+			{Type: runnerTypes.ResourceTypeKsvc, Name: "s1", Code: common.Stopped, Error: "service not found in cluster"},
+		},
+	}, nil).Once()
+	ds.EXPECT().GetDeployByID(mock.Anything, int64(1)).
+		Return(&database.Deploy{ID: 1, Status: common.ResourceUnhealthy}, nil).Once()
+	ds.EXPECT().UpdateDeploy(mock.Anything, mock.MatchedBy(func(d *database.Deploy) bool {
+		return d.Status == common.Stopped && d.ID == int64(1)
+	})).Return(nil).Once()
+
+	pastTime := time.Now().Add(-2 * time.Hour)
+	deploys := []database.Deploy{
+		{ID: 1, Type: types.SpaceType, SvcName: "s1", ClusterID: "c1", Status: common.ResourceUnhealthy, StatusUpdateAt: pastTime},
+	}
+	reconcileDeployCluster(context.WithValue(context.Background(), "test", "test"), a, "c1", deploys, common.ResourceUnhealthy, 40*time.Minute)
+}
+
+func TestReconcileUnhealthy_RecoveredToStartup(t *testing.T) {
+	// A ResourceUnhealthy ksvc deploy whose runner reports Startup should
+	// recover to Startup.
+	a := newTestActivities(t)
+	ds := a.stores.deployTask.(*mockdb.MockDeployTaskStore)
+	md := a.deployer.(*mock_deploy.MockDeployer)
+
+	md.EXPECT().BatchStatus(mock.Anything, mock.Anything).Return(&runnerTypes.BatchStatusResponse{
+		Items: []runnerTypes.BatchStatusItemResult{
+			{Type: runnerTypes.ResourceTypeKsvc, Name: "s1", Code: common.Startup},
+		},
+	}, nil).Once()
+	ds.EXPECT().GetDeployByID(mock.Anything, int64(1)).
+		Return(&database.Deploy{ID: 1, Status: common.ResourceUnhealthy}, nil).Once()
+	ds.EXPECT().UpdateDeploy(mock.Anything, mock.MatchedBy(func(d *database.Deploy) bool {
+		return d.Status == common.Startup && d.ID == int64(1)
+	})).Return(nil).Once()
+
+	pastTime := time.Now().Add(-2 * time.Hour)
+	deploys := []database.Deploy{
+		{ID: 1, Type: types.SpaceType, SvcName: "s1", ClusterID: "c1", Status: common.ResourceUnhealthy, StatusUpdateAt: pastTime},
+	}
+	reconcileDeployCluster(context.WithValue(context.Background(), "test", "test"), a, "c1", deploys, common.ResourceUnhealthy, 40*time.Minute)
+}
+
+func TestReconcileUnhealthy_RunnerUnreachable(t *testing.T) {
+	// A ResourceUnhealthy sandbox deploy whose runner reports "sandbox not
+	// found in cluster" (Status=0, no definitive status) should stay
+	// unhealthy — the runner was reachable but has no status to recover to.
+	// The real runner contract (BatchSandboxStatus) returns Error with
+	// Status unset for a missing sandbox.
+	a := newTestActivities(t)
+	md := a.deployer.(*mock_deploy.MockDeployer)
+
+	md.EXPECT().BatchStatus(mock.Anything, mock.Anything).Return(&runnerTypes.BatchStatusResponse{
+		Items: []runnerTypes.BatchStatusItemResult{
+			{Type: runnerTypes.ResourceTypeSandbox, Name: "s1", Error: "sandbox not found in cluster"},
+		},
+	}, nil).Once()
+	// No GetDeployByID/UpdateDeploy expected — stay unhealthy.
+
+	pastTime := time.Now().Add(-2 * time.Hour)
+	deploys := []database.Deploy{
+		{ID: 1, Type: types.SandboxType, SvcName: "s1", ClusterID: "c1", Status: common.ResourceUnhealthy, StatusUpdateAt: pastTime},
+	}
+	reconcileDeployCluster(context.WithValue(context.Background(), "test", "test"), a, "c1", deploys, common.ResourceUnhealthy, 40*time.Minute)
+}
+
+func TestReconcileUnhealthy_BatchStatusFails(t *testing.T) {
+	// A ResourceUnhealthy deploy whose BatchStatus RPC fails should stay
+	// unhealthy — no DB write.
+	a := newTestActivities(t)
+	md := a.deployer.(*mock_deploy.MockDeployer)
+
+	md.EXPECT().BatchStatus(mock.Anything, mock.Anything).Return(nil, assert.AnError).Once()
+	// No GetDeployByID/UpdateDeploy expected — stay unhealthy.
+
+	pastTime := time.Now().Add(-2 * time.Hour)
+	deploys := []database.Deploy{
+		{ID: 1, Type: types.SpaceType, SvcName: "s1", ClusterID: "c1", Status: common.ResourceUnhealthy, StatusUpdateAt: pastTime},
+	}
+	reconcileDeployCluster(context.WithValue(context.Background(), "test", "test"), a, "c1", deploys, common.ResourceUnhealthy, 40*time.Minute)
+}
+
+func TestReconcileUnhealthy_SandboxRecovered(t *testing.T) {
+	// A ResourceUnhealthy sandbox deploy whose runner reports Running should
+	// recover to Running.
+	a := newTestActivities(t)
+	ds := a.stores.deployTask.(*mockdb.MockDeployTaskStore)
+	md := a.deployer.(*mock_deploy.MockDeployer)
+
+	md.EXPECT().BatchStatus(mock.Anything, mock.Anything).Return(&runnerTypes.BatchStatusResponse{
+		Items: []runnerTypes.BatchStatusItemResult{
+			{Type: runnerTypes.ResourceTypeSandbox, Name: "s1", Status: common.Running},
+		},
+	}, nil).Once()
+	ds.EXPECT().GetDeployByID(mock.Anything, int64(1)).
+		Return(&database.Deploy{ID: 1, Status: common.ResourceUnhealthy}, nil).Once()
+	ds.EXPECT().UpdateDeploy(mock.Anything, mock.MatchedBy(func(d *database.Deploy) bool {
+		return d.Status == common.Running && d.ID == int64(1)
+	})).Return(nil).Once()
+
+	pastTime := time.Now().Add(-2 * time.Hour)
+	deploys := []database.Deploy{
+		{ID: 1, Type: types.SandboxType, SvcName: "s1", ClusterID: "c1", Status: common.ResourceUnhealthy, StatusUpdateAt: pastTime},
+	}
+	reconcileDeployCluster(context.WithValue(context.Background(), "test", "test"), a, "c1", deploys, common.ResourceUnhealthy, 40*time.Minute)
+}
+
+func TestReconcileUnhealthy_NoUnhealthyDeploys(t *testing.T) {
+	// When there are no ResourceUnhealthy deploys, no BatchStatus call.
+	a := newTestActivities(t)
+	ds := a.stores.deployTask.(*mockdb.MockDeployTaskStore)
+
+	ds.EXPECT().ListDeploysNeedingReconcile(mock.Anything, []int{common.ResourceUnhealthy}, 10, 100).
+		Return(nil, nil).Once()
+	// No BatchStatus, GetDeployByID, or UpdateDeploy expected.
+
+	reconcileByStatus(context.WithValue(context.Background(), "test", "test"), a, common.ResourceUnhealthy, 10)
 }

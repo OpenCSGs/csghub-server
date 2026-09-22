@@ -540,9 +540,10 @@ type Config struct {
 	}
 
 	DeployReconcile struct {
-		CronExpression       string `env:"STARHUB_SERVER_DEPLOY_RECONCILE_CRON_EXPRESSION" default:"*/10 * * * *"`
-		StuckTimeoutMin      int    `env:"STARHUB_SERVER_DEPLOY_RECONCILE_STUCK_TIMEOUT_MIN" default:"15"`
-		RunningReconcileHour int    `env:"STARHUB_SERVER_DEPLOY_RECONCILE_RUNNING_HOUR" default:"2"`
+		CronExpression        string `env:"STARHUB_SERVER_DEPLOY_RECONCILE_CRON_EXPRESSION" default:"*/10 * * * *"`
+		StuckTimeoutMin       int    `env:"STARHUB_SERVER_DEPLOY_RECONCILE_STUCK_TIMEOUT_MIN" default:"15"`
+		RunningReconcileHour  int    `env:"STARHUB_SERVER_DEPLOY_RECONCILE_RUNNING_HOUR" default:"2"`
+		UnhealthyReconcileMin int    `env:"STARHUB_SERVER_DEPLOY_RECONCILE_UNHEALTHY_MIN" default:"10"`
 	}
 
 	Agent struct {
