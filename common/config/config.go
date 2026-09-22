@@ -551,6 +551,11 @@ type Config struct {
 		ShareSessionTokenValidDay int    `env:"STARHUB_SERVER_AGENT_SHARE_SESSION_TOKEN_VALIDATE_Day" default:"365"` // 1 year
 		BalanceThreshold          int    `env:"OPENCSG_AGENT_BALANCE_THRESHOLD" default:"5000"`
 		BalanceCheckCacheTTL      int    `env:"OPENCSG_AGENT_BALANCE_CHECK_CACHE_TTL" default:"86400"`
+		// UseLatestImage replaces the csgclaw runtime profile image tag with :latest;
+		// Kubernetes then defaults the sandbox container's imagePullPolicy to Always.
+		// Intended for staging environments where images are updated frequently;
+		// defaults to false.
+		UseLatestImage bool `env:"OPENCSG_AGENT_USE_LATEST_IMAGE" default:"false"`
 	}
 
 	DataViewer struct {
