@@ -999,11 +999,6 @@ func (c *repoComponentImpl) CreateFile(ctx context.Context, req *types.CreateFil
 	isDefaultBranch := req.Branch == repo.DefaultBranch
 	isRootReadme := types.IsRootReadme(req.FilePath)
 	refreshLicenseCompliance := types.SupportsLicenseCompliance(req.RepoType) && isDefaultBranch
-	if refreshLicenseCompliance && isRootReadme {
-		if err := c.markRepositoryLicenseForReview(ctx, repo.ID); err != nil {
-			return nil, err
-		}
-	}
 	if isRootReadme && isDefaultBranch {
 		err = c.createReadmeFile(ctx, req)
 	} else if isRootReadme {
@@ -1138,11 +1133,6 @@ func (c *repoComponentImpl) UpdateFile(ctx context.Context, req *types.UpdateFil
 	refreshLicenseCompliance := types.SupportsLicenseCompliance(req.RepoType) && isDefaultBranch
 	if isRootReadme && isDefaultBranch {
 		slog.Debug("file is readme", slog.String("content", req.Content))
-		if refreshLicenseCompliance {
-			if err := c.markRepositoryLicenseForReview(ctx, repo.ID); err != nil {
-				return nil, err
-			}
-		}
 		err = c.updateReadmeFile(ctx, req)
 	} else if !isRootReadme {
 		slog.Debug("file is not readme", slog.String("filePath", req.FilePath), slog.String("originPath", req.OriginPath))
@@ -1213,11 +1203,6 @@ func (c *repoComponentImpl) DeleteFile(ctx context.Context, req *types.DeleteFil
 	isDefaultBranch := req.Branch == repo.DefaultBranch
 	isRootReadme := types.IsRootReadme(req.FilePath)
 	refreshLicenseCompliance := types.SupportsLicenseCompliance(req.RepoType) && isDefaultBranch
-	if refreshLicenseCompliance && isRootReadme {
-		if err := c.markRepositoryLicenseForReview(ctx, repo.ID); err != nil {
-			return nil, err
-		}
-	}
 	if isRootReadme && isDefaultBranch {
 		slog.Debug("file is readme", slog.String("content", req.Content))
 		err = c.deleteReadmeFile(ctx, req)

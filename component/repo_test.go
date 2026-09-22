@@ -574,6 +574,7 @@ func TestRepoComponent_CreateFile(t *testing.T) {
 	}{
 		{false, "test.go", false},
 		{false, "README.md", false},
+		{false, "LICENSE", false},
 		{true, "test.go", false},
 		{false, "test.go", true},
 	}
@@ -621,6 +622,11 @@ func TestRepoComponent_CreateFile(t *testing.T) {
 
 			repo.mocks.stores.RepoMock().EXPECT().SetUpdateTimeByPath(mock.Anything, types.ModelRepo, "ns", "n", mock.Anything).Return(nil)
 			if c.path == "README.md" {
+				repo.mocks.components.tag.EXPECT().UpdateMetaTags(mock.Anything, getTagScopeByRepoType(types.ModelRepo), "ns", "n", "").Return(nil, nil)
+			} else {
+				repo.mocks.components.tag.EXPECT().UpdateLibraryTags(mock.Anything, getTagScopeByRepoType(types.ModelRepo), "ns", "n", "", c.path).Return(nil)
+			}
+			if c.path == "LICENSE" {
 				repo.mocks.stores.RepoMock().EXPECT().UpdateLicenseCompliance(
 					mock.Anything,
 					int64(123),
@@ -628,9 +634,6 @@ func TestRepoComponent_CreateFile(t *testing.T) {
 					types.ComplianceStatusPendingReview,
 					types.CommercialPermissionCustomTerms,
 				).Return(nil)
-				repo.mocks.components.tag.EXPECT().UpdateMetaTags(mock.Anything, getTagScopeByRepoType(types.ModelRepo), "ns", "n", "").Return(nil, nil)
-			} else {
-				repo.mocks.components.tag.EXPECT().UpdateLibraryTags(mock.Anything, getTagScopeByRepoType(types.ModelRepo), "ns", "n", "", c.path).Return(nil)
 			}
 			req := &types.CreateFileReq{
 				RepoType:        types.ModelRepo,
@@ -674,6 +677,7 @@ func TestRepoComponent_UpdateFile(t *testing.T) {
 	}{
 		{false, "test.go", false},
 		{false, "README.md", false},
+		{false, "LICENSE", false},
 		{true, "test.go", false},
 		{false, "test.go", true},
 	}
@@ -721,6 +725,11 @@ func TestRepoComponent_UpdateFile(t *testing.T) {
 
 			repo.mocks.stores.RepoMock().EXPECT().SetUpdateTimeByPath(mock.Anything, types.ModelRepo, "ns", "n", mock.Anything).Return(nil)
 			if c.path == "README.md" {
+				repo.mocks.components.tag.EXPECT().UpdateMetaTags(mock.Anything, getTagScopeByRepoType(types.ModelRepo), "ns", "n", "").Return(nil, nil)
+			} else {
+				repo.mocks.components.tag.EXPECT().UpdateLibraryTags(mock.Anything, getTagScopeByRepoType(types.ModelRepo), "ns", "n", "", c.path).Return(nil)
+			}
+			if c.path == "LICENSE" {
 				repo.mocks.stores.RepoMock().EXPECT().UpdateLicenseCompliance(
 					mock.Anything,
 					int64(123),
@@ -728,9 +737,6 @@ func TestRepoComponent_UpdateFile(t *testing.T) {
 					types.ComplianceStatusPendingReview,
 					types.CommercialPermissionCustomTerms,
 				).Return(nil)
-				repo.mocks.components.tag.EXPECT().UpdateMetaTags(mock.Anything, getTagScopeByRepoType(types.ModelRepo), "ns", "n", "").Return(nil, nil)
-			} else {
-				repo.mocks.components.tag.EXPECT().UpdateLibraryTags(mock.Anything, getTagScopeByRepoType(types.ModelRepo), "ns", "n", "", c.path).Return(nil)
 			}
 			req := &types.UpdateFileReq{
 				RepoType:        types.ModelRepo,
@@ -781,6 +787,7 @@ func TestRepoComponent_DeleteFile(t *testing.T) {
 	}{
 		{"test.go"},
 		{"README.md"},
+		{"LICENSE"},
 	}
 
 	for _, c := range cases {
@@ -798,6 +805,11 @@ func TestRepoComponent_DeleteFile(t *testing.T) {
 
 			repo.mocks.stores.RepoMock().EXPECT().SetUpdateTimeByPath(mock.Anything, types.ModelRepo, "ns", "n", mock.Anything).Return(nil)
 			if c.path == "README.md" {
+				repo.mocks.components.tag.EXPECT().UpdateMetaTags(mock.Anything, getTagScopeByRepoType(types.ModelRepo), "ns", "n", "").Return(nil, nil)
+			} else {
+				repo.mocks.components.tag.EXPECT().UpdateLibraryTags(mock.Anything, getTagScopeByRepoType(types.ModelRepo), "ns", "n", "", c.path).Return(nil)
+			}
+			if c.path == "LICENSE" {
 				repo.mocks.stores.RepoMock().EXPECT().UpdateLicenseCompliance(
 					mock.Anything,
 					int64(123),
@@ -805,9 +817,6 @@ func TestRepoComponent_DeleteFile(t *testing.T) {
 					types.ComplianceStatusPendingReview,
 					types.CommercialPermissionCustomTerms,
 				).Return(nil)
-				repo.mocks.components.tag.EXPECT().UpdateMetaTags(mock.Anything, getTagScopeByRepoType(types.ModelRepo), "ns", "n", "").Return(nil, nil)
-			} else {
-				repo.mocks.components.tag.EXPECT().UpdateLibraryTags(mock.Anything, getTagScopeByRepoType(types.ModelRepo), "ns", "n", "", c.path).Return(nil)
 			}
 			req := &types.DeleteFileReq{
 				RepoType:        types.ModelRepo,

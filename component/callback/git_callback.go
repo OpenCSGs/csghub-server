@@ -232,6 +232,9 @@ func (c *gitCallbackComponentImpl) UpdateRepoInfos(ctx context.Context, req *typ
 	repoType, namespace, _ := strings.Cut(fullNamespace, "_")
 	adjustedRepoType := types.RepositoryType(strings.TrimSuffix(repoType, "s"))
 	isDefaultBranch := true
+	var complianceRepoID int64
+	rootLicenseChanged := false
+	rootReadmeChanged := containsRootReadmeChange(commits)
 	if types.SupportsLicenseCompliance(adjustedRepoType) && containsLicenseComplianceChange(commits) {
 		repo, err := c.repoStore.FindByPath(ctx, adjustedRepoType, namespace, repoName)
 		if err != nil {
@@ -239,9 +242,26 @@ func (c *gitCallbackComponentImpl) UpdateRepoInfos(ctx context.Context, req *typ
 		}
 		isDefaultBranch = strings.TrimPrefix(ref, "refs/heads/") == repo.DefaultBranch
 		if isDefaultBranch {
-			if err := c.repoStore.UpdateLicenseCompliance(ctx, repo.ID, nil, types.ComplianceStatusPendingReview, types.CommercialPermissionCustomTerms); err != nil {
-				return err
-			}
+			complianceRepoID = repo.ID
+			rootLicenseChanged = containsRootLicenseDocumentChange(commits)
+		}
+	}
+	markLicenseForReview := func() error {
+		if complianceRepoID == 0 {
+			return nil
+		}
+		return c.repoStore.UpdateLicenseCompliance(ctx, complianceRepoID, nil, types.ComplianceStatusPendingReview, types.CommercialPermissionCustomTerms)
+	}
+	fileProcessingError := func(processingErr error) error {
+		if !rootLicenseChanged {
+			return processingErr
+		}
+		// README processing may reclassify the license before a later file fails.
+		return errors.Join(processingErr, markLicenseForReview())
+	}
+	if rootLicenseChanged {
+		if err := markLicenseForReview(); err != nil {
+			return err
 		}
 	}
 	var err error
@@ -255,16 +275,21 @@ func (c *gitCallbackComponentImpl) UpdateRepoInfos(ctx context.Context, req *typ
 		err = c.modifyFiles(ctx, repoType, namespace, repoName, ref, modified)
 		if err != nil {
 			slog.Error("failed to update modified files", slog.Any("error", err), slog.Any("commit", commit))
-			return err
+			return fileProcessingError(err)
 		}
 		err = c.removeFiles(ctx, repoType, namespace, repoName, ref, removed)
 		if err != nil {
 			slog.Error("failed to update removed files", slog.Any("error", err), slog.Any("commit", commit))
-			return err
+			return fileProcessingError(err)
 		}
 		err = c.addFiles(ctx, repoType, namespace, repoName, ref, added)
 		if err != nil {
 			slog.Error("failed to update added files", slog.Any("error", err), slog.Any("commit", commit))
+			return fileProcessingError(err)
+		}
+	}
+	if rootLicenseChanged && rootReadmeChanged {
+		if err := markLicenseForReview(); err != nil {
 			return err
 		}
 	}
@@ -284,6 +309,36 @@ func containsLicenseComplianceChange(commits []types.GiteaCallbackPushReq_Commit
 		}
 	}
 	return false
+}
+
+func containsRootLicenseDocumentChange(commits []types.GiteaCallbackPushReq_Commit) bool {
+	for _, commit := range commits {
+		if containsRootLicenseDocument(commit.Added) ||
+			containsRootLicenseDocument(commit.Modified) ||
+			containsRootLicenseDocument(commit.Removed) {
+			return true
+		}
+	}
+	return false
+}
+
+func containsRootLicenseDocument(fileNames []string) bool {
+	return slices.ContainsFunc(fileNames, types.IsRootLicenseDocument)
+}
+
+func containsRootReadmeChange(commits []types.GiteaCallbackPushReq_Commit) bool {
+	for _, commit := range commits {
+		if containsRootReadme(commit.Added) ||
+			containsRootReadme(commit.Modified) ||
+			containsRootReadme(commit.Removed) {
+			return true
+		}
+	}
+	return false
+}
+
+func containsRootReadme(fileNames []string) bool {
+	return slices.ContainsFunc(fileNames, types.IsRootReadme)
 }
 
 func containsLicenseComplianceFile(fileNames []string) bool {
@@ -340,8 +395,10 @@ func (c *gitCallbackComponentImpl) SensitiveCheck(ctx context.Context, req *type
 // modifyFiles method handles modified files, skip if not modify README.md
 func (c *gitCallbackComponentImpl) modifyFiles(ctx context.Context, repoType, namespace, repoName, ref string, fileNames []string) error {
 	//update repo tags firstly
-	if slices.Contains(fileNames, types.ReadmeFileName) {
-		content, err := c.getFileRaw(repoType, namespace, repoName, ref, types.ReadmeFileName)
+	readmeIndex := slices.IndexFunc(fileNames, types.IsRootReadme)
+	if readmeIndex >= 0 {
+		readmeFile := fileNames[readmeIndex]
+		content, err := c.getFileRaw(repoType, namespace, repoName, ref, readmeFile)
 		if err != nil {
 			return err
 		}
@@ -367,7 +424,7 @@ func (c *gitCallbackComponentImpl) removeFiles(ctx context.Context, repoType, na
 	for _, fileName := range fileNames {
 		slog.Debug("remove file", slog.String("file", fileName))
 		// only care about readme file under root directory
-		if fileName == types.ReadmeFileName {
+		if types.IsRootReadme(fileName) {
 			// use empty content to clear all the meta tags
 			const content string = ""
 			adjustedRepoType := types.RepositoryType(strings.TrimSuffix(repoType, "s"))
@@ -429,7 +486,7 @@ func (c *gitCallbackComponentImpl) updateRepoTags(ctx context.Context, repoType,
 	for _, fileName := range fileNames {
 		slog.Debug("add file", slog.String("file", fileName))
 		// only care about readme file under root directory
-		if fileName == types.ReadmeFileName {
+		if types.IsRootReadme(fileName) {
 			content, err := c.getFileRaw(repoType, namespace, repoName, ref, fileName)
 			if err != nil {
 				return err
