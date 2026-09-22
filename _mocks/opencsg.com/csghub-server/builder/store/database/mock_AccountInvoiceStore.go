@@ -22,53 +22,6 @@ func (_m *MockAccountInvoiceStore) EXPECT() *MockAccountInvoiceStore_Expecter {
 	return &MockAccountInvoiceStore_Expecter{mock: &_m.Mock}
 }
 
-// CreateInvoice provides a mock function with given fields: ctx, invoice
-func (_m *MockAccountInvoiceStore) CreateInvoice(ctx context.Context, invoice *database.AccountInvoice) error {
-	ret := _m.Called(ctx, invoice)
-
-	if len(ret) == 0 {
-		panic("no return value specified for CreateInvoice")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, *database.AccountInvoice) error); ok {
-		r0 = rf(ctx, invoice)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// MockAccountInvoiceStore_CreateInvoice_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateInvoice'
-type MockAccountInvoiceStore_CreateInvoice_Call struct {
-	*mock.Call
-}
-
-// CreateInvoice is a helper method to define mock.On call
-//   - ctx context.Context
-//   - invoice *database.AccountInvoice
-func (_e *MockAccountInvoiceStore_Expecter) CreateInvoice(ctx interface{}, invoice interface{}) *MockAccountInvoiceStore_CreateInvoice_Call {
-	return &MockAccountInvoiceStore_CreateInvoice_Call{Call: _e.mock.On("CreateInvoice", ctx, invoice)}
-}
-
-func (_c *MockAccountInvoiceStore_CreateInvoice_Call) Run(run func(ctx context.Context, invoice *database.AccountInvoice)) *MockAccountInvoiceStore_CreateInvoice_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(*database.AccountInvoice))
-	})
-	return _c
-}
-
-func (_c *MockAccountInvoiceStore_CreateInvoice_Call) Return(_a0 error) *MockAccountInvoiceStore_CreateInvoice_Call {
-	_c.Call.Return(_a0)
-	return _c
-}
-
-func (_c *MockAccountInvoiceStore_CreateInvoice_Call) RunAndReturn(run func(context.Context, *database.AccountInvoice) error) *MockAccountInvoiceStore_CreateInvoice_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // CreateInvoiceTitle provides a mock function with given fields: ctx, title
 func (_m *MockAccountInvoiceStore) CreateInvoiceTitle(ctx context.Context, title *database.AccountInvoiceTitle) error {
 	ret := _m.Called(ctx, title)
@@ -112,6 +65,54 @@ func (_c *MockAccountInvoiceStore_CreateInvoiceTitle_Call) Return(_a0 error) *Mo
 }
 
 func (_c *MockAccountInvoiceStore_CreateInvoiceTitle_Call) RunAndReturn(run func(context.Context, *database.AccountInvoiceTitle) error) *MockAccountInvoiceStore_CreateInvoiceTitle_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// CreateInvoiceWithRecharges provides a mock function with given fields: ctx, invoice, recharges
+func (_m *MockAccountInvoiceStore) CreateInvoiceWithRecharges(ctx context.Context, invoice *database.AccountInvoice, recharges []*database.AccountRecharge) error {
+	ret := _m.Called(ctx, invoice, recharges)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CreateInvoiceWithRecharges")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, *database.AccountInvoice, []*database.AccountRecharge) error); ok {
+		r0 = rf(ctx, invoice, recharges)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockAccountInvoiceStore_CreateInvoiceWithRecharges_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateInvoiceWithRecharges'
+type MockAccountInvoiceStore_CreateInvoiceWithRecharges_Call struct {
+	*mock.Call
+}
+
+// CreateInvoiceWithRecharges is a helper method to define mock.On call
+//   - ctx context.Context
+//   - invoice *database.AccountInvoice
+//   - recharges []*database.AccountRecharge
+func (_e *MockAccountInvoiceStore_Expecter) CreateInvoiceWithRecharges(ctx interface{}, invoice interface{}, recharges interface{}) *MockAccountInvoiceStore_CreateInvoiceWithRecharges_Call {
+	return &MockAccountInvoiceStore_CreateInvoiceWithRecharges_Call{Call: _e.mock.On("CreateInvoiceWithRecharges", ctx, invoice, recharges)}
+}
+
+func (_c *MockAccountInvoiceStore_CreateInvoiceWithRecharges_Call) Run(run func(ctx context.Context, invoice *database.AccountInvoice, recharges []*database.AccountRecharge)) *MockAccountInvoiceStore_CreateInvoiceWithRecharges_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(*database.AccountInvoice), args[2].([]*database.AccountRecharge))
+	})
+	return _c
+}
+
+func (_c *MockAccountInvoiceStore_CreateInvoiceWithRecharges_Call) Return(_a0 error) *MockAccountInvoiceStore_CreateInvoiceWithRecharges_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockAccountInvoiceStore_CreateInvoiceWithRecharges_Call) RunAndReturn(run func(context.Context, *database.AccountInvoice, []*database.AccountRecharge) error) *MockAccountInvoiceStore_CreateInvoiceWithRecharges_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -210,64 +211,6 @@ func (_c *MockAccountInvoiceStore_DeleteInvoiceTitle_Call) RunAndReturn(run func
 	return _c
 }
 
-// GetBillAmount provides a mock function with given fields: ctx, uid, billMonth
-func (_m *MockAccountInvoiceStore) GetBillAmount(ctx context.Context, uid string, billMonth string) (float64, error) {
-	ret := _m.Called(ctx, uid, billMonth)
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetBillAmount")
-	}
-
-	var r0 float64
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string) (float64, error)); ok {
-		return rf(ctx, uid, billMonth)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, string) float64); ok {
-		r0 = rf(ctx, uid, billMonth)
-	} else {
-		r0 = ret.Get(0).(float64)
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
-		r1 = rf(ctx, uid, billMonth)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// MockAccountInvoiceStore_GetBillAmount_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetBillAmount'
-type MockAccountInvoiceStore_GetBillAmount_Call struct {
-	*mock.Call
-}
-
-// GetBillAmount is a helper method to define mock.On call
-//   - ctx context.Context
-//   - uid string
-//   - billMonth string
-func (_e *MockAccountInvoiceStore_Expecter) GetBillAmount(ctx interface{}, uid interface{}, billMonth interface{}) *MockAccountInvoiceStore_GetBillAmount_Call {
-	return &MockAccountInvoiceStore_GetBillAmount_Call{Call: _e.mock.On("GetBillAmount", ctx, uid, billMonth)}
-}
-
-func (_c *MockAccountInvoiceStore_GetBillAmount_Call) Run(run func(ctx context.Context, uid string, billMonth string)) *MockAccountInvoiceStore_GetBillAmount_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string))
-	})
-	return _c
-}
-
-func (_c *MockAccountInvoiceStore_GetBillAmount_Call) Return(_a0 float64, _a1 error) *MockAccountInvoiceStore_GetBillAmount_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *MockAccountInvoiceStore_GetBillAmount_Call) RunAndReturn(run func(context.Context, string, string) (float64, error)) *MockAccountInvoiceStore_GetBillAmount_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // GetBillingSummary provides a mock function with given fields: ctx, params
 func (_m *MockAccountInvoiceStore) GetBillingSummary(ctx context.Context, params database.BillingSummaryParams) (*database.BillingSummary, error) {
 	ret := _m.Called(ctx, params)
@@ -327,35 +270,35 @@ func (_c *MockAccountInvoiceStore_GetBillingSummary_Call) RunAndReturn(run func(
 	return _c
 }
 
-// GetInvoicableList provides a mock function with given fields: ctx, params
-func (_m *MockAccountInvoiceStore) GetInvoicableList(ctx context.Context, params database.PagedRequest) ([]database.Invoicable, int, error) {
+// GetInvoicableRecharges provides a mock function with given fields: ctx, params
+func (_m *MockAccountInvoiceStore) GetInvoicableRecharges(ctx context.Context, params database.InvoicableRechargeFilter) ([]*database.AccountRecharge, int, error) {
 	ret := _m.Called(ctx, params)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetInvoicableList")
+		panic("no return value specified for GetInvoicableRecharges")
 	}
 
-	var r0 []database.Invoicable
+	var r0 []*database.AccountRecharge
 	var r1 int
 	var r2 error
-	if rf, ok := ret.Get(0).(func(context.Context, database.PagedRequest) ([]database.Invoicable, int, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, database.InvoicableRechargeFilter) ([]*database.AccountRecharge, int, error)); ok {
 		return rf(ctx, params)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, database.PagedRequest) []database.Invoicable); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, database.InvoicableRechargeFilter) []*database.AccountRecharge); ok {
 		r0 = rf(ctx, params)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]database.Invoicable)
+			r0 = ret.Get(0).([]*database.AccountRecharge)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, database.PagedRequest) int); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, database.InvoicableRechargeFilter) int); ok {
 		r1 = rf(ctx, params)
 	} else {
 		r1 = ret.Get(1).(int)
 	}
 
-	if rf, ok := ret.Get(2).(func(context.Context, database.PagedRequest) error); ok {
+	if rf, ok := ret.Get(2).(func(context.Context, database.InvoicableRechargeFilter) error); ok {
 		r2 = rf(ctx, params)
 	} else {
 		r2 = ret.Error(2)
@@ -364,31 +307,31 @@ func (_m *MockAccountInvoiceStore) GetInvoicableList(ctx context.Context, params
 	return r0, r1, r2
 }
 
-// MockAccountInvoiceStore_GetInvoicableList_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetInvoicableList'
-type MockAccountInvoiceStore_GetInvoicableList_Call struct {
+// MockAccountInvoiceStore_GetInvoicableRecharges_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetInvoicableRecharges'
+type MockAccountInvoiceStore_GetInvoicableRecharges_Call struct {
 	*mock.Call
 }
 
-// GetInvoicableList is a helper method to define mock.On call
+// GetInvoicableRecharges is a helper method to define mock.On call
 //   - ctx context.Context
-//   - params database.PagedRequest
-func (_e *MockAccountInvoiceStore_Expecter) GetInvoicableList(ctx interface{}, params interface{}) *MockAccountInvoiceStore_GetInvoicableList_Call {
-	return &MockAccountInvoiceStore_GetInvoicableList_Call{Call: _e.mock.On("GetInvoicableList", ctx, params)}
+//   - params database.InvoicableRechargeFilter
+func (_e *MockAccountInvoiceStore_Expecter) GetInvoicableRecharges(ctx interface{}, params interface{}) *MockAccountInvoiceStore_GetInvoicableRecharges_Call {
+	return &MockAccountInvoiceStore_GetInvoicableRecharges_Call{Call: _e.mock.On("GetInvoicableRecharges", ctx, params)}
 }
 
-func (_c *MockAccountInvoiceStore_GetInvoicableList_Call) Run(run func(ctx context.Context, params database.PagedRequest)) *MockAccountInvoiceStore_GetInvoicableList_Call {
+func (_c *MockAccountInvoiceStore_GetInvoicableRecharges_Call) Run(run func(ctx context.Context, params database.InvoicableRechargeFilter)) *MockAccountInvoiceStore_GetInvoicableRecharges_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(database.PagedRequest))
+		run(args[0].(context.Context), args[1].(database.InvoicableRechargeFilter))
 	})
 	return _c
 }
 
-func (_c *MockAccountInvoiceStore_GetInvoicableList_Call) Return(_a0 []database.Invoicable, _a1 int, _a2 error) *MockAccountInvoiceStore_GetInvoicableList_Call {
+func (_c *MockAccountInvoiceStore_GetInvoicableRecharges_Call) Return(_a0 []*database.AccountRecharge, _a1 int, _a2 error) *MockAccountInvoiceStore_GetInvoicableRecharges_Call {
 	_c.Call.Return(_a0, _a1, _a2)
 	return _c
 }
 
-func (_c *MockAccountInvoiceStore_GetInvoicableList_Call) RunAndReturn(run func(context.Context, database.PagedRequest) ([]database.Invoicable, int, error)) *MockAccountInvoiceStore_GetInvoicableList_Call {
+func (_c *MockAccountInvoiceStore_GetInvoicableRecharges_Call) RunAndReturn(run func(context.Context, database.InvoicableRechargeFilter) ([]*database.AccountRecharge, int, error)) *MockAccountInvoiceStore_GetInvoicableRecharges_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -448,66 +391,6 @@ func (_c *MockAccountInvoiceStore_GetInvoice_Call) Return(_a0 *database.AccountI
 }
 
 func (_c *MockAccountInvoiceStore_GetInvoice_Call) RunAndReturn(run func(context.Context, int64) (*database.AccountInvoice, error)) *MockAccountInvoiceStore_GetInvoice_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// GetInvoiceByBillCycle provides a mock function with given fields: ctx, billCycle, userUUID
-func (_m *MockAccountInvoiceStore) GetInvoiceByBillCycle(ctx context.Context, billCycle string, userUUID string) (*database.AccountInvoice, error) {
-	ret := _m.Called(ctx, billCycle, userUUID)
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetInvoiceByBillCycle")
-	}
-
-	var r0 *database.AccountInvoice
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string) (*database.AccountInvoice, error)); ok {
-		return rf(ctx, billCycle, userUUID)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, string) *database.AccountInvoice); ok {
-		r0 = rf(ctx, billCycle, userUUID)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*database.AccountInvoice)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
-		r1 = rf(ctx, billCycle, userUUID)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// MockAccountInvoiceStore_GetInvoiceByBillCycle_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetInvoiceByBillCycle'
-type MockAccountInvoiceStore_GetInvoiceByBillCycle_Call struct {
-	*mock.Call
-}
-
-// GetInvoiceByBillCycle is a helper method to define mock.On call
-//   - ctx context.Context
-//   - billCycle string
-//   - userUUID string
-func (_e *MockAccountInvoiceStore_Expecter) GetInvoiceByBillCycle(ctx interface{}, billCycle interface{}, userUUID interface{}) *MockAccountInvoiceStore_GetInvoiceByBillCycle_Call {
-	return &MockAccountInvoiceStore_GetInvoiceByBillCycle_Call{Call: _e.mock.On("GetInvoiceByBillCycle", ctx, billCycle, userUUID)}
-}
-
-func (_c *MockAccountInvoiceStore_GetInvoiceByBillCycle_Call) Run(run func(ctx context.Context, billCycle string, userUUID string)) *MockAccountInvoiceStore_GetInvoiceByBillCycle_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string))
-	})
-	return _c
-}
-
-func (_c *MockAccountInvoiceStore_GetInvoiceByBillCycle_Call) Return(_a0 *database.AccountInvoice, _a1 error) *MockAccountInvoiceStore_GetInvoiceByBillCycle_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *MockAccountInvoiceStore_GetInvoiceByBillCycle_Call) RunAndReturn(run func(context.Context, string, string) (*database.AccountInvoice, error)) *MockAccountInvoiceStore_GetInvoiceByBillCycle_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -627,6 +510,124 @@ func (_c *MockAccountInvoiceStore_GetInvoiceTitleByTaxID_Call) Return(_a0 *datab
 }
 
 func (_c *MockAccountInvoiceStore_GetInvoiceTitleByTaxID_Call) RunAndReturn(run func(context.Context, string, string) (*database.AccountInvoiceTitle, error)) *MockAccountInvoiceStore_GetInvoiceTitleByTaxID_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ListInvoiceRecharges provides a mock function with given fields: ctx, invoiceID
+func (_m *MockAccountInvoiceStore) ListInvoiceRecharges(ctx context.Context, invoiceID int64) ([]database.AccountInvoiceRecharge, error) {
+	ret := _m.Called(ctx, invoiceID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListInvoiceRecharges")
+	}
+
+	var r0 []database.AccountInvoiceRecharge
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, int64) ([]database.AccountInvoiceRecharge, error)); ok {
+		return rf(ctx, invoiceID)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, int64) []database.AccountInvoiceRecharge); ok {
+		r0 = rf(ctx, invoiceID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]database.AccountInvoiceRecharge)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, int64) error); ok {
+		r1 = rf(ctx, invoiceID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAccountInvoiceStore_ListInvoiceRecharges_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListInvoiceRecharges'
+type MockAccountInvoiceStore_ListInvoiceRecharges_Call struct {
+	*mock.Call
+}
+
+// ListInvoiceRecharges is a helper method to define mock.On call
+//   - ctx context.Context
+//   - invoiceID int64
+func (_e *MockAccountInvoiceStore_Expecter) ListInvoiceRecharges(ctx interface{}, invoiceID interface{}) *MockAccountInvoiceStore_ListInvoiceRecharges_Call {
+	return &MockAccountInvoiceStore_ListInvoiceRecharges_Call{Call: _e.mock.On("ListInvoiceRecharges", ctx, invoiceID)}
+}
+
+func (_c *MockAccountInvoiceStore_ListInvoiceRecharges_Call) Run(run func(ctx context.Context, invoiceID int64)) *MockAccountInvoiceStore_ListInvoiceRecharges_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(int64))
+	})
+	return _c
+}
+
+func (_c *MockAccountInvoiceStore_ListInvoiceRecharges_Call) Return(_a0 []database.AccountInvoiceRecharge, _a1 error) *MockAccountInvoiceStore_ListInvoiceRecharges_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAccountInvoiceStore_ListInvoiceRecharges_Call) RunAndReturn(run func(context.Context, int64) ([]database.AccountInvoiceRecharge, error)) *MockAccountInvoiceStore_ListInvoiceRecharges_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ListInvoiceRechargesByInvoiceIDs provides a mock function with given fields: ctx, invoiceIDs
+func (_m *MockAccountInvoiceStore) ListInvoiceRechargesByInvoiceIDs(ctx context.Context, invoiceIDs []int64) ([]database.AccountInvoiceRecharge, error) {
+	ret := _m.Called(ctx, invoiceIDs)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListInvoiceRechargesByInvoiceIDs")
+	}
+
+	var r0 []database.AccountInvoiceRecharge
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, []int64) ([]database.AccountInvoiceRecharge, error)); ok {
+		return rf(ctx, invoiceIDs)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, []int64) []database.AccountInvoiceRecharge); ok {
+		r0 = rf(ctx, invoiceIDs)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]database.AccountInvoiceRecharge)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, []int64) error); ok {
+		r1 = rf(ctx, invoiceIDs)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAccountInvoiceStore_ListInvoiceRechargesByInvoiceIDs_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListInvoiceRechargesByInvoiceIDs'
+type MockAccountInvoiceStore_ListInvoiceRechargesByInvoiceIDs_Call struct {
+	*mock.Call
+}
+
+// ListInvoiceRechargesByInvoiceIDs is a helper method to define mock.On call
+//   - ctx context.Context
+//   - invoiceIDs []int64
+func (_e *MockAccountInvoiceStore_Expecter) ListInvoiceRechargesByInvoiceIDs(ctx interface{}, invoiceIDs interface{}) *MockAccountInvoiceStore_ListInvoiceRechargesByInvoiceIDs_Call {
+	return &MockAccountInvoiceStore_ListInvoiceRechargesByInvoiceIDs_Call{Call: _e.mock.On("ListInvoiceRechargesByInvoiceIDs", ctx, invoiceIDs)}
+}
+
+func (_c *MockAccountInvoiceStore_ListInvoiceRechargesByInvoiceIDs_Call) Run(run func(ctx context.Context, invoiceIDs []int64)) *MockAccountInvoiceStore_ListInvoiceRechargesByInvoiceIDs_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].([]int64))
+	})
+	return _c
+}
+
+func (_c *MockAccountInvoiceStore_ListInvoiceRechargesByInvoiceIDs_Call) Return(_a0 []database.AccountInvoiceRecharge, _a1 error) *MockAccountInvoiceStore_ListInvoiceRechargesByInvoiceIDs_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAccountInvoiceStore_ListInvoiceRechargesByInvoiceIDs_Call) RunAndReturn(run func(context.Context, []int64) ([]database.AccountInvoiceRecharge, error)) *MockAccountInvoiceStore_ListInvoiceRechargesByInvoiceIDs_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -806,6 +807,63 @@ func (_c *MockAccountInvoiceStore_UpdateInvoice_Call) Return(_a0 error) *MockAcc
 }
 
 func (_c *MockAccountInvoiceStore_UpdateInvoice_Call) RunAndReturn(run func(context.Context, *database.AccountInvoice) error) *MockAccountInvoiceStore_UpdateInvoice_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// UpdateInvoiceNotFailed provides a mock function with given fields: ctx, invoice
+func (_m *MockAccountInvoiceStore) UpdateInvoiceNotFailed(ctx context.Context, invoice *database.AccountInvoice) (bool, error) {
+	ret := _m.Called(ctx, invoice)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdateInvoiceNotFailed")
+	}
+
+	var r0 bool
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *database.AccountInvoice) (bool, error)); ok {
+		return rf(ctx, invoice)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *database.AccountInvoice) bool); ok {
+		r0 = rf(ctx, invoice)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *database.AccountInvoice) error); ok {
+		r1 = rf(ctx, invoice)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAccountInvoiceStore_UpdateInvoiceNotFailed_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdateInvoiceNotFailed'
+type MockAccountInvoiceStore_UpdateInvoiceNotFailed_Call struct {
+	*mock.Call
+}
+
+// UpdateInvoiceNotFailed is a helper method to define mock.On call
+//   - ctx context.Context
+//   - invoice *database.AccountInvoice
+func (_e *MockAccountInvoiceStore_Expecter) UpdateInvoiceNotFailed(ctx interface{}, invoice interface{}) *MockAccountInvoiceStore_UpdateInvoiceNotFailed_Call {
+	return &MockAccountInvoiceStore_UpdateInvoiceNotFailed_Call{Call: _e.mock.On("UpdateInvoiceNotFailed", ctx, invoice)}
+}
+
+func (_c *MockAccountInvoiceStore_UpdateInvoiceNotFailed_Call) Run(run func(ctx context.Context, invoice *database.AccountInvoice)) *MockAccountInvoiceStore_UpdateInvoiceNotFailed_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(*database.AccountInvoice))
+	})
+	return _c
+}
+
+func (_c *MockAccountInvoiceStore_UpdateInvoiceNotFailed_Call) Return(_a0 bool, _a1 error) *MockAccountInvoiceStore_UpdateInvoiceNotFailed_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAccountInvoiceStore_UpdateInvoiceNotFailed_Call) RunAndReturn(run func(context.Context, *database.AccountInvoice) (bool, error)) *MockAccountInvoiceStore_UpdateInvoiceNotFailed_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -109,10 +109,20 @@ var (
 )
 
 // Init a test db, must call `defer db.Close()` in the test
+// testDBDSN keeps the DSN of the last container created by InitTestDB.
+var testDBDSN string
+
+// TestDBDSN returns the DSN of the test container created by InitTestDB, so
+// tests that need additional real (non-txdb) connections can open them. The
+// txdb-wrapped DB returned by InitTestDB multiplexes all queries through a
+// single backend session, which cannot exercise cross-session locking.
+func TestDBDSN() string {
+	return testDBDSN
+}
+
 func InitTestDB() *database.DB {
 	ctx := context.TODO()
 	cname := "csghub_test_" + dbSuffix()
-
 	// reuse the container, so we don't need to recreate the db for each test
 	// https://github.com/testcontainers/testcontainers-go/issues/2726
 	reuse := testcontainers.WithReuseByName(cname)
@@ -134,6 +144,7 @@ func InitTestDB() *database.DB {
 	if err != nil {
 		panic(err)
 	}
+	testDBDSN = dsn
 	chProjectRoot()
 	dbConfig := database.DBConfig{
 		Dialect: database.DialectPostgres,

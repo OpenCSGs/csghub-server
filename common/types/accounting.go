@@ -917,6 +917,10 @@ type AccInvoiceResp struct {
 	Email          string    `json:"email"`           // Email address
 	CreatedAt      time.Time `json:"created_at"`      // Creation time
 	UpdatedAt      time.Time `json:"updated_at"`      // Update time
+
+	// Recharge orders invoiced together. Empty for legacy bill-cycle invoices
+	// (bill_cycle is non-empty there) and populated for recharge-based invoices.
+	RechargeOrders []AccInvoiceRechargeOrder `json:"recharge_orders"`
 }
 
 type AccInvoiceDashboardResp struct {
@@ -934,11 +938,10 @@ type AccInvoiceDashboardReq struct {
 }
 
 type AccInvoiceCreateReq struct {
-	TargetUUID    string  `json:"-"`
-	CurrentUser   string  `json:"-"` // current user for permission check
-	TitleID       int64   `json:"title_id" binding:"required"`
-	BillCycle     string  `json:"bill_cycle" binding:"required"`
-	InvoiceAmount float64 `json:"invoice_amount" binding:"required"`
+	TargetUUID       string   `json:"-"`
+	CurrentUser      string   `json:"-"` // current user for permission check
+	TitleID          int64    `json:"title_id" binding:"required"`
+	RechargeOrderNos []string `json:"recharge_order_nos" binding:"required,min=1"`
 }
 
 type AccInvoicableReq struct {
@@ -955,8 +958,17 @@ type AccInvoicableResp struct {
 }
 
 type AccInvoicable struct {
-	BillCycle string  `json:"bill_cycle"`
-	Amount    float64 `json:"amount"`
+	OrderNo      string    `json:"order_no"`
+	RechargeTime time.Time `json:"recharge_time"`
+	Amount       float64   `json:"amount"` // Actual paid amount in yuan
+}
+
+// AccInvoiceRechargeOrder is a recharge order included in an invoice.
+type AccInvoiceRechargeOrder struct {
+	OrderNo      string    `json:"order_no"`
+	RechargeTime time.Time `json:"recharge_time"`
+	PaymentType  string    `json:"payment_type"`
+	Amount       float64   `json:"amount"` // Actual paid amount in yuan
 }
 
 type AdminUpdateInvoiceReq struct {

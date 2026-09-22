@@ -3,10 +3,17 @@ package database
 import (
 	"context"
 	"database/sql"
+	"errors"
+	"fmt"
 	"time"
 
 	"github.com/uptrace/bun"
 )
+
+// ErrRechargeNotInvoicable is returned when some recharge orders are not in a
+// state that allows them to be invoiced, e.g. already attached to another
+// non-failed invoice.
+var ErrRechargeNotInvoicable = errors.New("some recharge orders are not invoicable")
 
 // Invoice status constants
 const (
@@ -39,14 +46,16 @@ type InvoiceListParams struct {
 
 // AccountInvoiceStore defines the interface for invoice operations.
 type AccountInvoiceStore interface {
-	// CreateInvoice creates a new invoice record.
-	CreateInvoice(ctx context.Context, invoice *AccountInvoice) error
+	// CreateInvoiceWithRecharges creates an invoice record and its recharge-order
+	// associations in a single transaction.
+	CreateInvoiceWithRecharges(ctx context.Context, invoice *AccountInvoice, recharges []*AccountRecharge) error
 	// GetInvoice retrieves a single invoice by its ID.
 	GetInvoice(ctx context.Context, id int64) (*AccountInvoice, error)
-	// GetInvoiceByBillCycle retrieves an invoice by its bill cycle and user UUID.
-	GetInvoiceByBillCycle(ctx context.Context, billCycle, userUUID string) (*AccountInvoice, error)
 	// UpdateInvoice updates an existing invoice record.
 	UpdateInvoice(ctx context.Context, invoice *AccountInvoice) error
+	// UpdateInvoiceNotFailed updates an existing invoice record only if its
+	// current status is not failed. It reports whether a row was updated.
+	UpdateInvoiceNotFailed(ctx context.Context, invoice *AccountInvoice) (bool, error)
 	// DeleteInvoice deletes an invoice record by its ID.
 	DeleteInvoice(ctx context.Context, id int64) error
 	// ListInvoices lists invoices with pagination.
@@ -65,12 +74,16 @@ type AccountInvoiceStore interface {
 	GetInvoiceTitleByTaxID(ctx context.Context, userUUID, taxID string) (*AccountInvoiceTitle, error)
 	// DeleteInvoiceTitle deletes an existing invoice title record.
 	DeleteInvoiceTitle(ctx context.Context, titleID int64) error
-	// GetBillingSummary retrieves the billing summary.
+	// GetBillingSummary retrieves the invoice dashboard summary.
 	GetBillingSummary(ctx context.Context, params BillingSummaryParams) (*BillingSummary, error)
-	// GetInvoicableList retrieves the list of invoicable items.
-	GetInvoicableList(ctx context.Context, params PagedRequest) ([]Invoicable, int, error)
-	// GetBillAmount retrieves the bill amount for a specific user and bill month.
-	GetBillAmount(ctx context.Context, uid string, billMonth string) (float64, error)
+	// GetInvoicableRecharges retrieves paid recharges of a user that are not
+	// attached to any non-failed invoice.
+	GetInvoicableRecharges(ctx context.Context, params InvoicableRechargeFilter) ([]*AccountRecharge, int, error)
+	// ListInvoiceRecharges retrieves the recharge orders associated with an invoice.
+	ListInvoiceRecharges(ctx context.Context, invoiceID int64) ([]AccountInvoiceRecharge, error)
+	// ListInvoiceRechargesByInvoiceIDs retrieves the recharge orders associated
+	// with the given invoices.
+	ListInvoiceRechargesByInvoiceIDs(ctx context.Context, invoiceIDs []int64) ([]AccountInvoiceRecharge, error)
 }
 
 type accountInvoiceImpl struct {
@@ -87,31 +100,67 @@ func NewAccountInvoiceStoreWithDB(db *DB) AccountInvoiceStore {
 	return &accountInvoiceImpl{db: db}
 }
 
-// CreateInvoice implements the method to create a new invoice.
-func (a *accountInvoiceImpl) CreateInvoice(ctx context.Context, invoice *AccountInvoice) error {
-	res, err := a.db.Core.NewInsert().Model(invoice).Exec(ctx)
-	if assertAffectedOneRow(res, err) != nil {
-		return err
+// CreateInvoiceWithRecharges creates an invoice and links it to the given
+// recharge orders in one transaction.
+func (a *accountInvoiceImpl) CreateInvoiceWithRecharges(ctx context.Context, invoice *AccountInvoice, recharges []*AccountRecharge) error {
+	if len(recharges) == 0 {
+		return fmt.Errorf("create invoice with recharges: no recharge orders given")
 	}
-	return nil
-}
+	return a.db.Core.RunInTx(ctx, &sql.TxOptions{}, func(ctx context.Context, tx bun.Tx) error {
+		// Serialize concurrent invoice applications of the same user. Under
+		// READ COMMITTED the invoicability re-check below is a single
+		// statement whose snapshot may not see links committed by a
+		// concurrent transaction after its row lock wait ends, so locking
+		// rows alone cannot prevent double-invoicing. The per-user
+		// transaction-scoped advisory lock guarantees the re-check runs only
+		// after any earlier invoice creation of this user has committed or
+		// rolled back.
+		if _, err := tx.NewRaw("SELECT pg_advisory_xact_lock(hashtextextended(?, 0))", invoice.UserUUID).Exec(ctx); err != nil {
+			return fmt.Errorf("acquire invoice lock of user %s, error: %w", invoice.UserUUID, err)
+		}
+		// Lock the recharge rows and re-check their invoicability inside the
+		// transaction so that concurrent applications for the same orders are
+		// serialized instead of double-invoicing them.
+		orderNos := make([]string, 0, len(recharges))
+		for _, recharge := range recharges {
+			orderNos = append(orderNos, recharge.OrderNo)
+		}
+		var locked []*AccountRecharge
+		err := invoicableRechargeQuery(tx, InvoicableRechargeFilter{
+			UserUUID: invoice.UserUUID,
+			OrderNos: orderNos,
+		}).For("UPDATE").Scan(ctx, &locked)
+		if err != nil {
+			return fmt.Errorf("lock invoicable recharges of user %s, error: %w", invoice.UserUUID, err)
+		}
+		if len(locked) != len(recharges) {
+			return ErrRechargeNotInvoicable
+		}
 
-// GetInvoiceByBillCycle retrieves an invoice by its bill cycle and user UUID.
-func (a *accountInvoiceImpl) GetInvoiceByBillCycle(ctx context.Context, billCycle, userUUID string) (*AccountInvoice, error) {
-	var invoice AccountInvoice
-	err := a.db.Core.NewSelect().
-		Model(&invoice).
-		Where("bill_cycle = ?", billCycle).
-		Where("user_uuid =?", userUUID).
-		Where("status != ?", InvoiceStatusFailed).
-		Scan(ctx)
-	if err == sql.ErrNoRows {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	return &invoice, nil
+		res, err := tx.NewInsert().Model(invoice).Exec(ctx)
+		if assertAffectedOneRow(res, err) != nil {
+			return err
+		}
+
+		links := make([]AccountInvoiceRecharge, 0, len(recharges))
+		for _, recharge := range recharges {
+			links = append(links, AccountInvoiceRecharge{
+				InvoiceID:      int64(invoice.ID),
+				RechargeUUID:   recharge.RechargeUUID,
+				UserUUID:       recharge.UserUUID,
+				AmountCents:    recharge.Amount,
+				Currency:       recharge.Currency,
+				OrderNo:        recharge.OrderNo,
+				RechargeTime:   bun.NullTime{Time: recharge.TimeSucceeded},
+				PaymentChannel: string(recharge.Channel),
+			})
+		}
+		res, err = tx.NewInsert().Model(&links).Exec(ctx)
+		if assertAffectedXRows(int64(len(links)), res, err) != nil {
+			return err
+		}
+		return nil
+	})
 }
 
 // UpdateInvoice implements the method to update an existing invoice.
@@ -125,6 +174,28 @@ func (a *accountInvoiceImpl) UpdateInvoice(ctx context.Context, invoice *Account
 		return err
 	}
 	return nil
+}
+
+// UpdateInvoiceNotFailed updates an existing invoice record only when its
+// stored status is not failed, and reports whether a row was updated. The
+// condition is evaluated atomically inside the UPDATE against the latest
+// committed row version, so a concurrent update that moved the invoice to
+// the terminal failed state between the caller's read and this write
+// reliably yields false instead of reviving it.
+func (a *accountInvoiceImpl) UpdateInvoiceNotFailed(ctx context.Context, invoice *AccountInvoice) (bool, error) {
+	res, err := a.db.Core.NewUpdate().
+		Model(invoice).
+		Where("id = ?", invoice.ID).
+		Where("status != ?", InvoiceStatusFailed).
+		Exec(ctx)
+	if err != nil {
+		return false, fmt.Errorf("update invoice %d, error: %w", invoice.ID, err)
+	}
+	affected, err := res.RowsAffected()
+	if err != nil {
+		return false, fmt.Errorf("retrieving affected row count of invoice %d update: %w", invoice.ID, err)
+	}
+	return affected == 1, nil
 }
 
 // ListInvoices implements the method to list invoices with pagination.
@@ -330,55 +401,106 @@ type AccountInvoiceTitle struct {
 	times
 }
 
-type Invoicable struct {
-	BillCycle     string
-	InvoiceAmount float64
+// AccountInvoiceRecharge is the snapshot of a recharge order included in an invoice.
+type AccountInvoiceRecharge struct {
+	ID             int64  `bun:",pk,autoincrement"`
+	InvoiceID      int64  `bun:"invoice_id,notnull"`
+	RechargeUUID   string `bun:"recharge_uuid,notnull"`
+	UserUUID       string `bun:"user_uuid,notnull"`
+	AmountCents    int64  `bun:"amount_cents,notnull"`
+	Currency       string `bun:"currency,notnull,default:'CNY'"`
+	OrderNo        string `bun:"order_no,notnull"`
+	RechargeTime   bun.NullTime
+	PaymentChannel string `bun:"payment_channel,notnull,default:''"`
+
+	times
 }
 
-type PagedRequest struct {
-	UserUUID   string `json:"user_uuid"` // Specify the user's UUID
-	Page       int    `json:"page"`      // Current page number
-	PageSize   int    `json:"page_size"` // Number of items per page
-	Search     string `json:"search"`    // Search field
-	Sort       string `json:"sort"`      // e.g., "ASC" or "DESC"
-	StartMonth string
-	EndMonth   string
+// InvoicableRechargeFilter selects the paid recharges of a user that are not
+// invoiced yet.
+type InvoicableRechargeFilter struct {
+	UserUUID   string
+	OrderNos   []string
+	StartMonth string // inclusive, format "YYYY-MM"
+	EndMonth   string // exclusive, format "YYYY-MM"
+	Page       int
+	PageSize   int
 }
 
-// GetInvoicableList implements the method to list invoicable items.
-func (a *accountInvoiceImpl) GetInvoicableList(ctx context.Context, params PagedRequest) ([]Invoicable, int, error) {
-	var invoicables []Invoicable
-	subQuery := a.db.Core.NewSelect().
-		Model((*AccountBill)(nil)).
-		ColumnExpr("TO_CHAR(bill_date, 'YYYY-MM') AS bill_cycle").
-		ColumnExpr("COALESCE(SUM(ABS(cash_value)), 0) AS invoice_amount").
-		Where("user_uuid = ?", params.UserUUID).
-		Where("bill_date >= ?", params.StartMonth+"-01").
-		Where("bill_date < ?", params.EndMonth+"-01").
-		GroupExpr("TO_CHAR(bill_date, 'YYYY-MM')")
+// invoicableRechargeQuery builds the base query for paid recharges that are not
+// attached to any non-failed invoice.
+func invoicableRechargeQuery(idb bun.IDB, params InvoicableRechargeFilter) *bun.SelectQuery {
+	query := idb.NewSelect().
+		Model((*AccountRecharge)(nil)).
+		Where("account_recharge.user_uuid = ?", params.UserUUID).
+		Where("succeeded = ?", true).
+		Where("closed = ?", false).
+		Where("NOT EXISTS (SELECT 1 FROM account_invoice_recharges AS air JOIN account_invoices AS ai ON ai.id = air.invoice_id WHERE air.recharge_uuid = account_recharge.recharge_uuid AND ai.status != ?)", InvoiceStatusFailed)
+	if len(params.OrderNos) > 0 {
+		query = query.Where("order_no IN (?)", bun.In(params.OrderNos))
+	}
+	if params.StartMonth != "" {
+		query = query.Where("time_succeeded >= ?", params.StartMonth+"-01")
+	}
+	if params.EndMonth != "" {
+		query = query.Where("time_succeeded < ?", params.EndMonth+"-01")
+	}
+	return query
+}
 
-	query := a.db.Core.NewSelect().
-		With("mb", subQuery).
-		Column("mb.bill_cycle", "mb.invoice_amount").
-		Table("mb").
-		Where("NOT EXISTS (SELECT 1 FROM account_invoices AS account_invoice WHERE account_invoice.bill_cycle = mb.bill_cycle AND account_invoice.user_uuid = ? AND account_invoice.status != ?)", params.UserUUID, InvoiceStatusFailed).
-		Order("mb.bill_cycle DESC")
+// GetInvoicableRecharges implements the method to list paid recharges that are
+// not invoiced yet.
+func (a *accountInvoiceImpl) GetInvoicableRecharges(ctx context.Context, params InvoicableRechargeFilter) ([]*AccountRecharge, int, error) {
+	query := invoicableRechargeQuery(a.db.Core, params).Order("time_succeeded DESC")
+
+	count, err := query.Count(ctx)
+	if err != nil {
+		return nil, 0, fmt.Errorf("count invoicable recharges for user %s, error: %w", params.UserUUID, err)
+	}
 
 	if params.Page > 0 && params.PageSize > 0 {
 		query = query.Offset((params.Page - 1) * params.PageSize).Limit(params.PageSize)
 	}
 
-	count, err := query.Count(ctx)
+	var recharges []*AccountRecharge
+	err = query.Scan(ctx, &recharges)
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, fmt.Errorf("list invoicable recharges for user %s, error: %w", params.UserUUID, err)
 	}
 
-	err = query.Scan(ctx, &invoicables)
-	if err != nil {
-		return nil, 0, err
-	}
+	return recharges, count, nil
+}
 
-	return invoicables, count, nil
+// ListInvoiceRecharges implements the method to list the recharge orders of an invoice.
+func (a *accountInvoiceImpl) ListInvoiceRecharges(ctx context.Context, invoiceID int64) ([]AccountInvoiceRecharge, error) {
+	var links []AccountInvoiceRecharge
+	err := a.db.Core.NewSelect().
+		Model(&links).
+		Where("invoice_id = ?", invoiceID).
+		Order("id ASC").
+		Scan(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("list recharges of invoice %d, error: %w", invoiceID, err)
+	}
+	return links, nil
+}
+
+// ListInvoiceRechargesByInvoiceIDs implements the method to list the recharge
+// orders of the given invoices in one query, ordered by link id.
+func (a *accountInvoiceImpl) ListInvoiceRechargesByInvoiceIDs(ctx context.Context, invoiceIDs []int64) ([]AccountInvoiceRecharge, error) {
+	if len(invoiceIDs) == 0 {
+		return nil, nil
+	}
+	var links []AccountInvoiceRecharge
+	err := a.db.Core.NewSelect().
+		Model(&links).
+		Where("invoice_id IN (?)", bun.In(invoiceIDs)).
+		Order("id ASC").
+		Scan(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("list recharges of invoices %v, error: %w", invoiceIDs, err)
+	}
+	return links, nil
 }
 
 // BillingSummary defines the structure of the billing summary result.
@@ -395,93 +517,46 @@ type BillingSummaryParams struct {
 }
 
 func (a *accountInvoiceImpl) GetBillingSummary(ctx context.Context, params BillingSummaryParams) (*BillingSummary, error) {
-	now := time.Now()
-	currentMonth := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
-	nextMonth := currentMonth.AddDate(0, 1, 0)
-
-	// Calculate the total value of the current month, i.e., the temporarily non-invoicable amount
-	var currentMonthNonInvoicable float64
-	err := a.db.Core.NewSelect().
-		Model((*AccountBill)(nil)).
-		ColumnExpr("COALESCE(SUM(ABS(cash_value)), 0)").
-		Where("user_uuid = ?", params.UserUUID).
-		Where("bill_date >= ?", currentMonth.Format("2006-01-02")).
-		Where("bill_date < ?", nextMonth.Format("2006-01-02")).
-		Scan(ctx, &currentMonthNonInvoicable)
+	// Sum the paid recharges in the range that are not attached to a
+	// non-failed invoice. Current-month recharges are invoicable right away,
+	// so there is no non-invoicable amount anymore.
+	invoicableFilter := InvoicableRechargeFilter{
+		UserUUID:   params.UserUUID,
+		StartMonth: params.StartMonth,
+		EndMonth:   params.EndMonth,
+	}
+	var uninvoicedCents int64
+	err := invoicableRechargeQuery(a.db.Core, invoicableFilter).
+		ColumnExpr("COALESCE(SUM(amount), 0)").
+		Scan(ctx, &uninvoicedCents)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("sum uninvoiced recharge amount for user %s, error: %w", params.UserUUID, err)
 	}
 
-	// Calculate the total bill amount within the specified time range
-	var totalBillAmount float64
-	billQuery := a.db.Core.NewSelect().
-		Model((*AccountBill)(nil)).
-		ColumnExpr("COALESCE(SUM(ABS(cash_value)), 0)").
-		Where("user_uuid = ?", params.UserUUID)
-
-	if params.StartMonth != "" {
-		billQuery = billQuery.Where("date_trunc('month', bill_date) >= date_trunc('month', ?::timestamp)", params.StartMonth+"-01")
-	}
-	if params.EndMonth != "" {
-		billQuery = billQuery.Where("date_trunc('month', bill_date) < date_trunc('month', ?::timestamp) ", params.EndMonth+"-01")
-	}
-
-	// Exclude the bills of the current month
-	billQuery = billQuery.Where("bill_date < ?", currentMonth)
-
-	err = billQuery.Scan(ctx, &totalBillAmount)
-	if err != nil {
-		return nil, err
-	}
-
-	// Calculate the invoiced amount within the specified time range
-	var invoicedAmount float64
+	// Sum the invoices applied within the range, excluding failed ones.
+	// apply_time covers both legacy bill-cycle invoices and recharge-based ones.
 	invoiceQuery := a.db.Core.NewSelect().
 		Model((*AccountInvoice)(nil)).
-		ColumnExpr("SUM(invoice_amount)").
+		ColumnExpr("COALESCE(SUM(invoice_amount), 0)").
 		Where("user_uuid = ?", params.UserUUID).
 		Where("status != ?", InvoiceStatusFailed)
-
 	if params.StartMonth != "" {
-		invoiceQuery = invoiceQuery.Where("bill_cycle >= ?", params.StartMonth)
+		invoiceQuery = invoiceQuery.Where("apply_time >= ?", params.StartMonth+"-01")
 	}
 	if params.EndMonth != "" {
-		invoiceQuery = invoiceQuery.Where("bill_cycle < ?", params.EndMonth)
+		invoiceQuery = invoiceQuery.Where("apply_time < ?", params.EndMonth+"-01")
 	}
 
+	var invoicedAmount float64
 	err = invoiceQuery.Scan(ctx, &invoicedAmount)
 	if err != nil {
-		return nil, err
-	}
-
-	// Calculate the uninvoiced amount, ensure it never goes negative.
-	// Historical invoices created before the cash_value fix may have larger amounts
-	// than the current cash_value-based calculation, causing a negative result.
-	uninvoicedAmount := totalBillAmount - invoicedAmount
-	if uninvoicedAmount < 0 {
-		uninvoicedAmount = 0
+		return nil, fmt.Errorf("sum invoiced amount for user %s, error: %w", params.UserUUID, err)
 	}
 
 	return &BillingSummary{
-		CurrentMonthNonInvoicable: currentMonthNonInvoicable,
-		InvoicedAmount:            invoicedAmount,
-		UninvoicedAmount:          uninvoicedAmount,
+		InvoicedAmount:   invoicedAmount,
+		UninvoicedAmount: float64(uninvoicedCents) / 100.0,
 	}, nil
-}
-
-func (a *accountInvoiceImpl) GetBillAmount(ctx context.Context, uid string, billMonth string) (float64, error) {
-	var totalBillAmount float64
-	query := a.db.Core.NewSelect().
-		Model((*AccountBill)(nil)).
-		ColumnExpr("COALESCE(SUM(ABS(cash_value)), 0)").
-		Where("user_uuid =?", uid).
-		Where("to_char(bill_date, 'YYYY-MM') = ?", billMonth)
-
-	err := query.Scan(ctx, &totalBillAmount)
-	if err != nil {
-		return 0, err
-	}
-	return totalBillAmount, nil
 }
 
 func (a *accountInvoiceImpl) DeleteInvoice(ctx context.Context, id int64) error {
