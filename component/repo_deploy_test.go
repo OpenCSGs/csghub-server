@@ -338,6 +338,78 @@ func TestCheckDeployPermissionForUser_PrivateEndpoint_AdminForbidden(t *testing.
 	require.Nil(t, deploy)
 }
 
+func TestCheckDeployPermissionForUser_PrivateInference_AdminForbiddenWithOwnerNamespace(t *testing.T) {
+	// New inference deploys always have OwnerNamespace. A platform admin must
+	// not bypass namespace ReBAC for another user's private instance.
+	ctx := context.TODO()
+	repo := initializeTestRepoComponent(ctx, t)
+
+	dbUser := database.User{
+		ID:       456,
+		UUID:     "admin-uuid",
+		RoleMask: "admin",
+	}
+	dbDeploy := &database.Deploy{
+		ID:             1,
+		UserID:         123,
+		SvcName:        "svc-1",
+		ClusterID:      "cluster-1",
+		Type:           types.InferenceType,
+		SecureLevel:    types.EndpointPrivate,
+		OwnerNamespace: "user1",
+	}
+
+	repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "admin-user").Return(dbUser, nil)
+	repo.mocks.stores.DeployTaskMock().EXPECT().GetDeployByID(ctx, int64(1)).Return(dbDeploy, nil)
+	repo.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "user1").Return(database.Namespace{
+		UUID: "user1-uuid",
+	}, nil)
+	expectNamespacePermissionCheck(repo, rebac.NamespaceCanRead, false)
+
+	user, deploy, err := repo.CheckDeployPermissionForUser(ctx, types.DeployActReq{
+		CurrentUser: "admin-user",
+		DeployID:    1,
+	})
+	require.ErrorIs(t, err, errorx.ErrForbidden)
+	require.Nil(t, user)
+	require.Nil(t, deploy)
+}
+
+func TestCheckDeployPermissionForUser_PrivateInference_AdminWithNamespaceReadAllowed(t *testing.T) {
+	ctx := context.TODO()
+	repo := initializeTestRepoComponent(ctx, t)
+
+	dbUser := database.User{
+		ID:       456,
+		UUID:     "admin-uuid",
+		RoleMask: "admin",
+	}
+	dbDeploy := &database.Deploy{
+		ID:             1,
+		UserID:         123,
+		SvcName:        "svc-1",
+		ClusterID:      "cluster-1",
+		Type:           types.InferenceType,
+		SecureLevel:    types.EndpointPrivate,
+		OwnerNamespace: "user1",
+	}
+
+	repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "admin-user").Return(dbUser, nil)
+	repo.mocks.stores.DeployTaskMock().EXPECT().GetDeployByID(ctx, int64(1)).Return(dbDeploy, nil)
+	repo.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "user1").Return(database.Namespace{
+		UUID: "user1-uuid",
+	}, nil)
+	expectNamespacePermissionCheck(repo, rebac.NamespaceCanRead, true)
+
+	user, deploy, err := repo.CheckDeployPermissionForUser(ctx, types.DeployActReq{
+		CurrentUser: "admin-user",
+		DeployID:    1,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, user)
+	require.NotNil(t, deploy)
+}
+
 func TestCheckDeployPermissionForUser_PublicEndpoint_OwnerAllowed(t *testing.T) {
 	ctx := context.TODO()
 	repo := initializeTestRepoComponent(ctx, t)
