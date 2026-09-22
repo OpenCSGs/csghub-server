@@ -505,6 +505,10 @@ func collectNodeResource(node v1.Node, config *config.Config) types.NodeResource
 			if !found {
 				continue
 			}
+			// MetaX operator uses GB (decimal) instead of GiB (binary)
+			if memLabel == "metax-tech.com/gpu.memory" && strings.HasSuffix(val, "GB") && !strings.HasSuffix(val, "GiB") {
+				val = strings.TrimSuffix(val, "GB") + "GiB"
+			}
 			ulimit, err := units.ParseBigBytes(val + getXPUMemUnit(val, memLabel))
 			if err == nil {
 				bigXPUMem = units.BigIBytes(ulimit)
@@ -513,7 +517,12 @@ func collectNodeResource(node v1.Node, config *config.Config) types.NodeResource
 		}
 	}
 
-	gpuModelVendor, gpuModel := getGpuTypeAndVendor(node.Labels[xpuLabelRes.TypeLabel], xpuLabelRes.CapacityLabel)
+	typeLabelValue := node.Labels[xpuLabelRes.TypeLabel]
+	// MetaX operator label MXC600-A → MX-C600-A for correct vendor/model splitting
+	if xpuLabelRes.TypeLabel == "metax-tech.com/gpu.product" && strings.HasPrefix(typeLabelValue, "MX") {
+		typeLabelValue = "MX-" + strings.TrimPrefix(typeLabelValue, "MX")
+	}
+	gpuModelVendor, gpuModel := getGpuTypeAndVendor(typeLabelValue, xpuLabelRes.CapacityLabel)
 	vXPUs := collectNodeVXPU(node, config)
 	nodeResourceInfo := types.NodeResourceInfo{
 		NodeName:   node.Name,
@@ -736,6 +745,24 @@ func getXPULabel(labels map[string]string, config *config.Config, nodeName strin
 			TypeLabel:     "chipltech.com/tpu.product",
 			MemLabels:     []string{"chipltech.com/tpu.mem"},
 			XPUType:       "tpu",
+		}
+	}
+	if _, found := labels["metax.com/gpu.product"]; found {
+		//for metax gpu (manually added labels)
+		return types.XPULabelResult{
+			CapacityLabel: "metax-tech.com/gpu",
+			TypeLabel:     "metax.com/gpu.product",
+			MemLabels:     []string{"metax.com/gpu.memory"},
+			XPUType:       "gpgpu",
+		}
+	}
+	if _, found := labels["metax-tech.com/gpu.product"]; found {
+		//for metax gpu (operator labels)
+		return types.XPULabelResult{
+			CapacityLabel: "metax-tech.com/gpu",
+			TypeLabel:     "metax-tech.com/gpu.product",
+			MemLabels:     []string{"metax-tech.com/gpu.memory"},
+			XPUType:       "gpgpu",
 		}
 	}
 	return types.XPULabelResult{

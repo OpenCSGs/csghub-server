@@ -1,0 +1,33 @@
+FROM cr.metax-tech.com/public-ai-release/maca/ms-swift:4.2.3-maca.ai3.7.1.7-torch2.8-py312-ubuntu22.04-amd64
+
+ENV SHELL=/bin/bash \
+    PATH=/opt/conda/bin:$PATH \
+    JUPYTERHUB_SERVICE_PREFIX=/proxy/ \
+    GRADIO_ROOT_PATH=/proxy/7860/ \
+    TZ=Asia/Shanghai \
+    NCCL_IB_DISABLE=1 NCCL_P2P_DISABLE=1 \
+    HF_HOME=/workspace/.cache \
+    DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y \
+    supervisor && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
+RUN pip config set global.index-url https://mirrors.aliyun.com/pypi/simple && \
+    pip install --no-cache-dir jupyterlab jupyter-server-proxy==4.4.0 && \
+    pip uninstall -y gradio && \
+    pip install --no-cache-dir https://git-devops.opencsg.com/opensource/gradio/-/raw/main/gradio-5.31.0-py3-none-any.whl
+
+RUN mkdir -p /var/log/supervisord
+COPY swift/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+COPY swift/jupyter_notebook_config.py /root/.jupyter/jupyter_notebook_config.py
+COPY swift/ /etc/csghub/
+RUN chmod +x /etc/csghub/*.sh /etc/csghub/*.py
+RUN mkdir -p /root/.jupyter/lab/user-settings/@jupyterlab/apputils-extension && \
+        echo '{"theme":"JupyterLab Dark"}' > /root/.jupyter/lab/user-settings/@jupyterlab/apputils-extension/themes.jupyterlab-settings && \
+        mkdir -p /root/.jupyter/lab/user-settings/@jupyterlab/notebook-extension && \
+        echo '{"codeCellConfig":{"lineNumbers":true }}' > /root/.jupyter/lab/user-settings/@jupyterlab/notebook-extension/tracker.jupyterlab-settings
+
+WORKDIR /workspace/
+ENTRYPOINT ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
+EXPOSE 8000
