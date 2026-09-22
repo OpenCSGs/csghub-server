@@ -2,24 +2,31 @@ import os
 import argparse
 import re
 from datetime import datetime
-from minio import Minio
-from minio.error import S3Error
 from pathlib import Path
 import pandas as pd
 import json
-import oss2
 import csv
 
-access_key_id = os.environ['S3_ACCESS_ID']
-access_key_secret = os.environ['S3_ACCESS_SECRET']
-bucket_name = os.environ['S3_BUCKET']
-endpoint = os.environ['S3_ENDPOINT']
-s3_ssl_enabled = json.loads(os.environ['S3_SSL_ENABLED'])
-if endpoint.find("aliyuncs.com") == -1:
-    client = Minio(endpoint, access_key=access_key_id, secret_key=access_key_secret, secure=s3_ssl_enabled)
-else:
-    auth = oss2.Auth(access_key_id, access_key_secret)
-    bucket = oss2.Bucket(auth, endpoint, bucket_name)
+access_key_id = os.environ.get("S3_ACCESS_ID", "")
+access_key_secret = os.environ.get("S3_ACCESS_SECRET", "")
+bucket_name = os.environ["S3_BUCKET"]
+endpoint = os.environ["S3_ENDPOINT"]
+s3_ssl_enabled = json.loads(os.environ.get("S3_SSL_ENABLED", "false"))
+
+# Gateway upload configuration
+upload_via_gateway = os.environ.get("UPLOAD_VIA_GATEWAY", "false").lower() == "true"
+gateway_url = os.environ.get("STARHUB_SERVER_PUBLIC_DOMAIN", "").rstrip("/")
+access_token = os.environ.get("ACCESS_TOKEN", "")
+
+if not upload_via_gateway:
+    from minio import Minio
+    from minio.error import S3Error
+    import oss2
+    if endpoint.find("aliyuncs.com") == -1:
+        client = Minio(endpoint, access_key=access_key_id, secret_key=access_key_secret, secure=s3_ssl_enabled)
+    else:
+        auth = oss2.Auth(access_key_id, access_key_secret)
+        bucket = oss2.Bucket(auth, endpoint, bucket_name)
 
 
 def generate_file_name(name):
@@ -52,21 +59,45 @@ def upload_to_ali(object_name, location_file):
     bucket.put_object_from_file(object_name, location_file)
 
 
+def upload_via_gateway_func(object_name, location_file):
+    if not gateway_url:
+        raise ValueError("STARHUB_SERVER_PUBLIC_DOMAIN is not set but UPLOAD_VIA_GATEWAY=true")
+    if not access_token:
+        raise ValueError("ACCESS_TOKEN is not set but UPLOAD_VIA_GATEWAY=true")
+    import requests
+    url = f"{gateway_url}/api/v1/storage/{bucket_name}/{object_name}"
+    with open(location_file, "rb") as f:
+        resp = requests.put(
+            url, data=f,
+            headers={"Authorization": f"Bearer {access_token}", "Content-Type": "application/octet-stream"},
+            timeout=300,
+        )
+        resp.raise_for_status()
+    print(f"Uploaded {location_file} to gateway: {url}")
+    return url
+
+
 def upload(files):
     output = []
-    # get schema based on s3_ssl_enabled
-    schema = "https" if s3_ssl_enabled else "http"
     fileName = generate_file_name("result")
+    if upload_via_gateway:
+        upload_fn = upload_via_gateway_func
+        print("Using storageGateway proxy mode for upload")
+    else:
+        schema = "https" if s3_ssl_enabled else "http"
+        def upload_fn(object_name, location_file):
+            if endpoint.find("aliyuncs.com") != -1:
+                upload_to_ali(object_name, location_file)
+                return f"https://{bucket_name}.{endpoint}/{object_name}"
+            else:
+                upload_to_minio(object_name, location_file)
+                return f"{schema}://{endpoint}/{bucket_name}/{object_name}"
+        print("Using direct S3/OSS upload")
+
     for file in files.split(','):
         suffix = Path(file).suffix
         object_name = f"evaluation/{fileName}{suffix}"
-        # check if the endpoint is aliyun oss
-        if endpoint.find("aliyuncs.com") != -1:
-            upload_to_ali(object_name, file)
-            file_url = f"https://{bucket_name}.{endpoint}/{object_name}"
-        else:
-            upload_to_minio(object_name, file)
-            file_url = f"{schema}://{endpoint}/{bucket_name}/{object_name}"
+        file_url = upload_fn(object_name, file)
         output.append(file_url)
     try:
         with open('/tmp/output.txt', 'w') as file:

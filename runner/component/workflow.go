@@ -553,11 +553,26 @@ func generateWorkflow(req types.ArgoWorkFlowReq, config *config.Config, pvcName 
 		for key, value := range v.Env {
 			environments = append(environments, corev1.EnvVar{Name: key, Value: value})
 		}
-		environments = append(environments, corev1.EnvVar{Name: "S3_ACCESS_ID", Value: config.S3.AccessKeyID})
-		environments = append(environments, corev1.EnvVar{Name: "S3_ACCESS_SECRET", Value: config.S3.AccessKeySecret})
+		// S3 credentials are always injected, but set to empty when gateway
+		// upload mode is enabled. In gateway mode, upload_files.py uses
+		// ACCESS_TOKEN + gateway proxy, so S3_ACCESS_ID/SECRET should not be exposed.
+		uploadViaGateway := config.StorageGateway.EnableUploadViaGateway
+		s3AccessID := config.S3.AccessKeyID
+		s3AccessSecret := config.S3.AccessKeySecret
+		if uploadViaGateway {
+			s3AccessID = ""
+			s3AccessSecret = ""
+		}
+		environments = append(environments, corev1.EnvVar{Name: "S3_ACCESS_ID", Value: s3AccessID})
+		environments = append(environments, corev1.EnvVar{Name: "S3_ACCESS_SECRET", Value: s3AccessSecret})
 		environments = append(environments, corev1.EnvVar{Name: "S3_BUCKET", Value: config.Argo.S3PublicBucket})
 		environments = append(environments, corev1.EnvVar{Name: "S3_ENDPOINT", Value: config.S3.Endpoint})
 		environments = append(environments, corev1.EnvVar{Name: "S3_SSL_ENABLED", Value: strconv.FormatBool(config.S3.EnableSSL)})
+		// Storage gateway upload configuration
+		// STARHUB_SERVER_PUBLIC_DOMAIN is used by upload_files.py as the gateway URL
+		// UPLOAD_VIA_GATEWAY toggles gateway proxy mode for file uploads
+		environments = append(environments, corev1.EnvVar{Name: "STARHUB_SERVER_PUBLIC_DOMAIN", Value: config.Model.DownloadEndpoint})
+		environments = append(environments, corev1.EnvVar{Name: "UPLOAD_VIA_GATEWAY", Value: strconv.FormatBool(uploadViaGateway)})
 		// fix no gpu request case
 		if v.HardWare.Gpu.ResourceName == "" || v.HardWare.Gpu.Num == "" {
 			environments = append(environments, corev1.EnvVar{Name: "NVIDIA_VISIBLE_DEVICES", Value: "none"})
