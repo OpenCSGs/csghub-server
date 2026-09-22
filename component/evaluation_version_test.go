@@ -195,7 +195,7 @@ func TestEvaluationComponent_resolveDatasetVersions(t *testing.T) {
 }
 
 func TestNormalizeFrameworkConfig(t *testing.T) {
-	const defaultGen = `"generation_config":{"do_sample":false,"max_tokens":30000}`
+	const defaultGen = `"generation_config":{"do_sample":false,"max_tokens":8192}`
 	cases := []struct {
 		name      string
 		frameName string
