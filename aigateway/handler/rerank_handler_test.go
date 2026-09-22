@@ -88,7 +88,7 @@ func TestRerankPipelineExecute_ProxiesEndpointPathToUpstream(t *testing.T) {
 				NewEmbedding(token.CreateParam{Endpoint: targetURL, Model: "provider-model"}).
 				Return(mockCounter).Once()
 			tester.mocks.openAIComp.EXPECT().
-				RecordUsageFromTokenUsage(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+				RecordUsageFromTokenUsage(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 				Maybe().
 				Return(nil)
 

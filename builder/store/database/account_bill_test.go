@@ -484,3 +484,140 @@ func TestAccountBillStore_SumValueByAPIKeyBetween(t *testing.T) {
 		require.Equal(t, float64(0), result)
 	})
 }
+
+func TestAccountBillStore_SumConsumptionByAPIKey(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	dt := time.Date(2024, 3, 15, 0, 0, 0, 0, time.UTC)
+	bills := []database.AccountBill{
+		{
+			UserUUID: "user1", Consumption: 20,
+			BillDate: dt, CustomerID: "c1",
+			Scene:   types.SceneModelServerless,
+			TokenID: 1,
+		},
+		{
+			UserUUID: "user1", Consumption: 30,
+			BillDate: dt.Add(1 * 24 * time.Hour), CustomerID: "c1",
+			Scene:   types.SceneModelServerless,
+			TokenID: 1,
+		},
+		{
+			UserUUID: "user1", Consumption: 40,
+			BillDate: dt.Add(2 * 24 * time.Hour), CustomerID: "c2",
+			Scene:   types.SceneModelServerless,
+			TokenID: 1,
+		},
+		{
+			UserUUID: "user1", Consumption: 10,
+			BillDate: dt, CustomerID: "c1",
+			Scene:   types.SceneModelServerless,
+			TokenID: 2,
+		},
+		{
+			UserUUID: "user1", Consumption: 200,
+			BillDate: dt, CustomerID: "c1",
+			Scene:   types.ScenePayOrder,
+			TokenID: 1,
+		},
+	}
+
+	_, err := db.Operator.Core.NewInsert().Model(&bills).Exec(ctx)
+	require.Nil(t, err)
+
+	store := database.NewAccountBillStoreWithDB(db)
+
+	t.Run("sum all consumption for api key 1", func(t *testing.T) {
+		result, err := store.SumConsumptionByAPIKey(ctx, 1)
+		require.Nil(t, err)
+		require.Equal(t, float64(90), result)
+	})
+
+	t.Run("sum all consumption for api key 2", func(t *testing.T) {
+		result, err := store.SumConsumptionByAPIKey(ctx, 2)
+		require.Nil(t, err)
+		require.Equal(t, float64(10), result)
+	})
+
+	t.Run("sum consumption for non-existent api key", func(t *testing.T) {
+		result, err := store.SumConsumptionByAPIKey(ctx, 3)
+		require.Nil(t, err)
+		require.Equal(t, float64(0), result)
+	})
+}
+
+func TestAccountBillStore_SumConsumptionByAPIKeyBetween(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	dt := time.Date(2024, 3, 15, 0, 0, 0, 0, time.UTC)
+	bills := []database.AccountBill{
+		{
+			UserUUID: "user1", Consumption: 20,
+			BillDate: dt.Add(-5 * 24 * time.Hour), CustomerID: "c1",
+			Scene:   types.SceneModelServerless,
+			TokenID: 1,
+		},
+		{
+			UserUUID: "user1", Consumption: 30,
+			BillDate: dt, CustomerID: "c1",
+			Scene:   types.SceneModelServerless,
+			TokenID: 1,
+		},
+		{
+			UserUUID: "user1", Consumption: 40,
+			BillDate: dt.Add(3 * 24 * time.Hour), CustomerID: "c2",
+			Scene:   types.SceneModelServerless,
+			TokenID: 1,
+		},
+		{
+			UserUUID: "user1", Consumption: 50,
+			BillDate: dt.Add(5 * 24 * time.Hour), CustomerID: "c2",
+			Scene:   types.SceneModelServerless,
+			TokenID: 1,
+		},
+		{
+			UserUUID: "user1", Consumption: 60,
+			BillDate: dt.Add(10 * 24 * time.Hour), CustomerID: "c2",
+			Scene:   types.SceneModelServerless,
+			TokenID: 1,
+		},
+		{
+			UserUUID: "user1", Consumption: 200,
+			BillDate: dt, CustomerID: "c1",
+			Scene:   types.ScenePayOrder,
+			TokenID: 1,
+		},
+	}
+
+	_, err := db.Operator.Core.NewInsert().Model(&bills).Exec(ctx)
+	require.Nil(t, err)
+
+	store := database.NewAccountBillStoreWithDB(db)
+
+	startDate := dt.Add(-1 * 24 * time.Hour)
+	endDate := dt.Add(5 * 24 * time.Hour)
+
+	t.Run("sum consumption within date range", func(t *testing.T) {
+		result, err := store.SumConsumptionByAPIKeyBetween(ctx, 1, startDate, endDate)
+		require.Nil(t, err)
+		require.Equal(t, float64(120), result)
+	})
+
+	t.Run("sum consumption for different api key", func(t *testing.T) {
+		result, err := store.SumConsumptionByAPIKeyBetween(ctx, 2, startDate, endDate)
+		require.Nil(t, err)
+		require.Equal(t, float64(0), result)
+	})
+
+	t.Run("sum consumption in range", func(t *testing.T) {
+		inRangeStart := dt.Add(-3 * 24 * time.Hour)
+		inRangeEnd := dt.Add(3 * 24 * time.Hour)
+		result, err := store.SumConsumptionByAPIKeyBetween(ctx, 1, inRangeStart, inRangeEnd)
+		require.Nil(t, err)
+		require.Equal(t, float64(70), result)
+	})
+}

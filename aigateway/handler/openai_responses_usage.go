@@ -7,6 +7,7 @@ import (
 	"time"
 
 	responsespkg "opencsg.com/csghub-server/aigateway/handler/responses"
+	"opencsg.com/csghub-server/api/httpbase"
 
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/aigateway/token"
@@ -100,7 +101,8 @@ func (h *OpenAIHandlerImpl) recordResponsesUsageWithTrace(c *gin.Context, counte
 		}
 		if tokenUsage != nil && isSuccessfulStatus(traceInput.StatusCode) {
 			recordCtx, cancel := context.WithTimeout(baseCtx, time.Second)
-			if err := h.openaiComponent.RecordUsageFromTokenUsage(recordCtx, nsUUID, modelTarget.Model, modelTarget.ModelName, tokenUsage, apikey); err != nil {
+			tokenID := httpbase.GetCurrentTokenID(c)
+			if err := h.openaiComponent.RecordUsageFromTokenUsage(recordCtx, nsUUID, modelTarget.Model, modelTarget.ModelName, tokenUsage, apikey, tokenID); err != nil {
 				slog.ErrorContext(baseCtx, "failed to record responses usage",
 					slog.String("step", "record_usage"),
 					slog.String("model", modelTarget.ModelName),

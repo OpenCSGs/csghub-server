@@ -137,7 +137,7 @@ type fakeUsageRecorder struct {
 	targetModelName     string
 }
 
-func (f *fakeUsageRecorder) RecordUsage(ctx context.Context, nsUUID string, model *types.Model, targetModelName string, usage *token.Usage, apikey string) error {
+func (f *fakeUsageRecorder) RecordUsage(ctx context.Context, nsUUID string, model *types.Model, targetModelName string, usage *token.Usage, apikey string, tokenID int64) error {
 	f.recorded = true
 	f.inputTokens = usage.PromptTokens
 	f.outputTokens = usage.CompletionTokens

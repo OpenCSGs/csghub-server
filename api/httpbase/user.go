@@ -5,16 +5,19 @@ import (
 )
 
 const (
-	CurrentUserCtxVar       = "currentUser"
-	CurrentUserUUIDCtxVar   = "currentUserUUID"
-	CurrentNamespaceUUIDVar = "currentNamespaceUUID"
-	AccessTokenCtxVar       = "accessToken"
-	AuthTypeCtxVar          = "authType"
-	CurrentUserQueryVar     = "current_user"
-	CurrentUserUUIDQueryVar = "current_user_uuid"
-	HeaderLanguageKey       = "Accept-Language"
-	AccessTokenNameCtxVar   = "accessTokenName"
-	IPctxVar                = "ip_address"
+	CurrentUserCtxVar         = "currentUser"
+	CurrentUserUUIDCtxVar     = "currentUserUUID"
+	CurrentNamespaceUUIDVar   = "currentNamespaceUUID"
+	AccessTokenCtxVar         = "accessToken"
+	AuthTypeCtxVar            = "authType"
+	CurrentUserQueryVar       = "current_user"
+	CurrentUserUUIDQueryVar   = "current_user_uuid"
+	HeaderLanguageKey         = "Accept-Language"
+	AccessTokenNameCtxVar     = "accessTokenName"
+	IPctxVar                  = "ip_address"
+	APIKeyModelScopeCtxVar    = "ApiKeyModelScope"
+	APIKeyPriorityScopeCtxVar = "ApiKeyPriorityScope"
+	AccessTokenIDCtxVar       = "accessTokenID"
 )
 
 type AuthType string
@@ -89,4 +92,28 @@ func SetIPAddress(ctx *gin.Context, ip string) {
 
 func GetIPAddress(ctx *gin.Context) string {
 	return ctx.GetString(IPctxVar)
+}
+
+func SetAPIKeyModelScope(ctx *gin.Context, scope string) {
+	ctx.Set(APIKeyModelScopeCtxVar, scope)
+}
+
+func GetAPIKeyModelScope(ctx *gin.Context) string {
+	return ctx.GetString(APIKeyModelScopeCtxVar)
+}
+
+func SetAPIKeyPriorityScope(ctx *gin.Context, scope string) {
+	ctx.Set(APIKeyPriorityScopeCtxVar, scope)
+}
+
+func GetAPIKeyPriorityScope(ctx *gin.Context) string {
+	return ctx.GetString(APIKeyPriorityScopeCtxVar)
+}
+
+func GetCurrentTokenID(ctx *gin.Context) int64 {
+	return ctx.GetInt64(AccessTokenIDCtxVar)
+}
+
+func SetCurrentTokenID(ctx *gin.Context, id int64) {
+	ctx.Set(AccessTokenIDCtxVar, id)
 }

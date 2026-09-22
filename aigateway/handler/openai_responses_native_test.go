@@ -79,7 +79,7 @@ func TestExecuteNativeResponses_ProxiesBackendURLPathToUpstream(t *testing.T) {
 				Maybe().
 				Return(nil)
 			tester.mocks.openAIComp.EXPECT().
-				RecordUsageFromTokenUsage(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+				RecordUsageFromTokenUsage(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 				Maybe().
 				Return(nil)
 

@@ -9,10 +9,11 @@ import (
 	"time"
 
 	"encoding/json"
-	"github.com/gin-gonic/gin"
 	"log/slog"
 	"net/http"
 	"net/url"
+
+	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/aigateway/handler/plan"
 	"opencsg.com/csghub-server/aigateway/token"
 	"opencsg.com/csghub-server/aigateway/types"
@@ -229,7 +230,7 @@ func (h *speechPipelineHandler) Execute(c *gin.Context, meta *types.RequestMetad
 		RequestID:     requestID,
 		NSUUID:        nsUUID,
 		ModelID:       meta.Model,
-		ModelTarget:   &resolvedModelTarget{
+		ModelTarget: &resolvedModelTarget{
 			Model: mt.Model, Upstream: mt.Upstream, Target: mt.Target, Host: mt.Host, ModelName: mt.ModelName,
 		},
 		Metadata: traceMetadata,
@@ -352,7 +353,8 @@ func (h *speechPipelineHandler) Execute(c *gin.Context, meta *types.RequestMetad
 		}
 
 		if isSuccessfulStatus(statusCode) && usage != nil {
-			if err := h.handler.openaiComponent.RecordUsageFromTokenUsage(usageCtx, nsUUID, mt.Model, mt.ModelName, usage, apikey); err != nil {
+			tokenID := httpbase.GetCurrentTokenID(c)
+			if err := h.handler.openaiComponent.RecordUsageFromTokenUsage(usageCtx, nsUUID, mt.Model, mt.ModelName, usage, apikey, tokenID); err != nil {
 				slog.ErrorContext(usageCtx, "failed to record audio speech usage", slog.Any("error", err))
 			}
 		}
@@ -376,4 +378,3 @@ func (h *speechPipelineHandler) HandlePlanError(c *gin.Context, meta *types.Requ
 	}
 	handleOpenAIPlanError(c, meta, p, err, frontendURL)
 }
-

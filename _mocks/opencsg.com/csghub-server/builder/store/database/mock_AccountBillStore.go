@@ -199,6 +199,122 @@ func (_c *MockAccountBillStore_ListByUserIDAndDate_Call) RunAndReturn(run func(c
 	return _c
 }
 
+// SumConsumptionByAPIKey provides a mock function with given fields: ctx, tokenID
+func (_m *MockAccountBillStore) SumConsumptionByAPIKey(ctx context.Context, tokenID int64) (float64, error) {
+	ret := _m.Called(ctx, tokenID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SumConsumptionByAPIKey")
+	}
+
+	var r0 float64
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, int64) (float64, error)); ok {
+		return rf(ctx, tokenID)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, int64) float64); ok {
+		r0 = rf(ctx, tokenID)
+	} else {
+		r0 = ret.Get(0).(float64)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, int64) error); ok {
+		r1 = rf(ctx, tokenID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAccountBillStore_SumConsumptionByAPIKey_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SumConsumptionByAPIKey'
+type MockAccountBillStore_SumConsumptionByAPIKey_Call struct {
+	*mock.Call
+}
+
+// SumConsumptionByAPIKey is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tokenID int64
+func (_e *MockAccountBillStore_Expecter) SumConsumptionByAPIKey(ctx interface{}, tokenID interface{}) *MockAccountBillStore_SumConsumptionByAPIKey_Call {
+	return &MockAccountBillStore_SumConsumptionByAPIKey_Call{Call: _e.mock.On("SumConsumptionByAPIKey", ctx, tokenID)}
+}
+
+func (_c *MockAccountBillStore_SumConsumptionByAPIKey_Call) Run(run func(ctx context.Context, tokenID int64)) *MockAccountBillStore_SumConsumptionByAPIKey_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(int64))
+	})
+	return _c
+}
+
+func (_c *MockAccountBillStore_SumConsumptionByAPIKey_Call) Return(_a0 float64, _a1 error) *MockAccountBillStore_SumConsumptionByAPIKey_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAccountBillStore_SumConsumptionByAPIKey_Call) RunAndReturn(run func(context.Context, int64) (float64, error)) *MockAccountBillStore_SumConsumptionByAPIKey_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// SumConsumptionByAPIKeyBetween provides a mock function with given fields: ctx, tokenID, start, end
+func (_m *MockAccountBillStore) SumConsumptionByAPIKeyBetween(ctx context.Context, tokenID int64, start time.Time, end time.Time) (float64, error) {
+	ret := _m.Called(ctx, tokenID, start, end)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SumConsumptionByAPIKeyBetween")
+	}
+
+	var r0 float64
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, int64, time.Time, time.Time) (float64, error)); ok {
+		return rf(ctx, tokenID, start, end)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, int64, time.Time, time.Time) float64); ok {
+		r0 = rf(ctx, tokenID, start, end)
+	} else {
+		r0 = ret.Get(0).(float64)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, int64, time.Time, time.Time) error); ok {
+		r1 = rf(ctx, tokenID, start, end)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAccountBillStore_SumConsumptionByAPIKeyBetween_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SumConsumptionByAPIKeyBetween'
+type MockAccountBillStore_SumConsumptionByAPIKeyBetween_Call struct {
+	*mock.Call
+}
+
+// SumConsumptionByAPIKeyBetween is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tokenID int64
+//   - start time.Time
+//   - end time.Time
+func (_e *MockAccountBillStore_Expecter) SumConsumptionByAPIKeyBetween(ctx interface{}, tokenID interface{}, start interface{}, end interface{}) *MockAccountBillStore_SumConsumptionByAPIKeyBetween_Call {
+	return &MockAccountBillStore_SumConsumptionByAPIKeyBetween_Call{Call: _e.mock.On("SumConsumptionByAPIKeyBetween", ctx, tokenID, start, end)}
+}
+
+func (_c *MockAccountBillStore_SumConsumptionByAPIKeyBetween_Call) Run(run func(ctx context.Context, tokenID int64, start time.Time, end time.Time)) *MockAccountBillStore_SumConsumptionByAPIKeyBetween_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(int64), args[2].(time.Time), args[3].(time.Time))
+	})
+	return _c
+}
+
+func (_c *MockAccountBillStore_SumConsumptionByAPIKeyBetween_Call) Return(_a0 float64, _a1 error) *MockAccountBillStore_SumConsumptionByAPIKeyBetween_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAccountBillStore_SumConsumptionByAPIKeyBetween_Call) RunAndReturn(run func(context.Context, int64, time.Time, time.Time) (float64, error)) *MockAccountBillStore_SumConsumptionByAPIKeyBetween_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // SumValueByAPIKey provides a mock function with given fields: ctx, tokenID
 func (_m *MockAccountBillStore) SumValueByAPIKey(ctx context.Context, tokenID int64) (float64, error) {
 	ret := _m.Called(ctx, tokenID)

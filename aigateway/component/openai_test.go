@@ -1055,7 +1055,7 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.setupMock()
 
-			err := comp.RecordUsage(context.Background(), tt.userUUID, tt.model, "target-model-name", mockCounter, "")
+			err := comp.RecordUsage(context.Background(), tt.userUUID, tt.model, "target-model-name", mockCounter, "", 0)
 			if tt.wantError {
 				assert.Error(t, err)
 			} else {
@@ -1193,7 +1193,7 @@ func TestOpenAIComponentImpl_RecordUsage_MultiModalImage(t *testing.T) {
 		return nil
 	})
 
-	err := comp.RecordUsage(context.Background(), "test-user-uuid", model, "dall-e-3", mockCounter, "")
+	err := comp.RecordUsage(context.Background(), "test-user-uuid", model, "dall-e-3", mockCounter, "", 0)
 	require.NoError(t, err)
 }
 
@@ -1252,7 +1252,7 @@ func TestOpenAIComponentImpl_RecordUsage_MultiModalVideo(t *testing.T) {
 		return nil
 	})
 
-	err := comp.RecordUsage(context.Background(), "test-user-uuid", model, "sora", mockCounter, "")
+	err := comp.RecordUsage(context.Background(), "test-user-uuid", model, "sora", mockCounter, "", 0)
 	require.NoError(t, err)
 }
 
@@ -1305,7 +1305,7 @@ func TestOpenAIComponentImpl_RecordUsage_MultiModalAudio(t *testing.T) {
 		return nil
 	})
 
-	err := comp.RecordUsage(context.Background(), "test-user-uuid", model, "whisper-1", mockCounter, "")
+	err := comp.RecordUsage(context.Background(), "test-user-uuid", model, "whisper-1", mockCounter, "", 0)
 	require.NoError(t, err)
 }
 
@@ -1521,7 +1521,7 @@ func TestOpenAIComponentImpl_RecordUsage_ExternalModel(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.setupMock()
 
-			err := comp.RecordUsage(context.Background(), tt.userUUID, tt.model, "target-model-name", mockCounter, "")
+			err := comp.RecordUsage(context.Background(), tt.userUUID, tt.model, "target-model-name", mockCounter, "", 0)
 			if tt.wantError {
 				assert.Error(t, err)
 			} else {

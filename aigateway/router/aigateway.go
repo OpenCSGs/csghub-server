@@ -15,6 +15,7 @@ import (
 	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/aigateway/handler"
+	gwmw "opencsg.com/csghub-server/aigateway/middleware"
 	"opencsg.com/csghub-server/api/middleware"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/i18n"
@@ -87,19 +88,25 @@ func NewRouter(config *config.Config) (*gin.Engine, func(), error) {
 	// Returns a no-op handler + cleanup when the metrics feature is not
 	// compiled in (ce build).
 	metricsMw, metricsCleanup := newMetricsMiddleware(config)
+	// quota limit middleware
+	quotaMW := gwmw.NewApiKeyQuotaMiddleware(config)
+
+	// text token routes
 	// Also mount the Anthropic Messages API under /anthropic/v1 to match the
 	// official Anthropic API path layout. Both /v1/messages and
 	// /anthropic/v1/messages are supported.
 	anthropicGroup := r.Group("/anthropic/v1")
-	anthropicGroup.POST("/messages", middlewareCollection.Auth.MustUserOrgApiKey, metricsMw, anthropicHandler.Messages)
+	anthropicGroup.POST("/messages", middlewareCollection.Auth.MustUserOrgApiKey, quotaMW, metricsMw, anthropicHandler.Messages)
 
 	v1Group.GET("/models", openAIhandler.ListModels)
 	v1Group.GET("/models/*model", openAIhandler.GetModel)
-	v1Group.POST("/responses", middlewareCollection.Auth.MustUserOrgApiKey, metricsMw, responsesHandler.Responses)
-	v1Group.POST("/chat/completions", middlewareCollection.Auth.MustUserOrgApiKey, metricsMw, chatHandler.Chat)
-	v1Group.POST("/messages", middlewareCollection.Auth.MustUserOrgApiKey, metricsMw, anthropicHandler.Messages)
-	v1Group.POST("/embeddings", middlewareCollection.Auth.MustUserOrgApiKey, metricsMw, embeddingHandler.Embedding)
-	v1Group.POST("/rerank", middlewareCollection.Auth.MustUserOrgApiKey, metricsMw, rerankHandler.Rerank)
+	v1Group.POST("/responses", middlewareCollection.Auth.MustUserOrgApiKey, quotaMW, metricsMw, responsesHandler.Responses)
+	v1Group.POST("/chat/completions", middlewareCollection.Auth.MustUserOrgApiKey, quotaMW, metricsMw, chatHandler.Chat)
+	v1Group.POST("/messages", middlewareCollection.Auth.MustUserOrgApiKey, quotaMW, metricsMw, anthropicHandler.Messages)
+	v1Group.POST("/embeddings", middlewareCollection.Auth.MustUserOrgApiKey, quotaMW, metricsMw, embeddingHandler.Embedding)
+	v1Group.POST("/rerank", middlewareCollection.Auth.MustUserOrgApiKey, quotaMW, metricsMw, rerankHandler.Rerank)
+
+	// image and audio and video routes
 	v1Group.POST("/images/generations", middlewareCollection.Auth.MustUserOrgApiKey, metricsMw, modalAPIRateLimiter, imageHandler.GenerateImage)
 	v1Group.POST("/images/edits", middlewareCollection.Auth.MustUserOrgApiKey, metricsMw, modalAPIRateLimiter, imageHandler.EditImage)
 	v1Group.POST("/audio/transcriptions", middlewareCollection.Auth.MustUserOrgApiKey, metricsMw, audioHandler.Transcription)

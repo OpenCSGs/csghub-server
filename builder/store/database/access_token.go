@@ -31,6 +31,9 @@ type AccessTokenStore interface {
 	IsExistByUUID(ctx context.Context, uuid string, tkName, app string) (exists bool, err error)
 	// UpdateAPIKey updates a gateway API key by id, only works for app=apikey
 	UpdateTokenAndQuota(ctx context.Context, key *AccessToken, quota *AccountAccessTokenQuota) (*AccessToken, error)
+	// UpdateTokenAndQuotas updates a gateway API key and its multiple quota
+	// records in a single transaction.
+	UpdateTokenAndQuotas(ctx context.Context, key *AccessToken, quotas []*AccountAccessTokenQuota) (*AccessToken, error)
 	// DeleteByID deletes a  API key by id
 	DeleteByID(ctx context.Context, id int64) error
 	// FindByNsUUID finds gateway API keys by namespace uuid
@@ -80,6 +83,12 @@ func (s *accessTokenStoreImpl) Create(ctx context.Context, token *AccessToken, q
 
 		// Insert quota records
 		if len(quotas) > 0 {
+			// token.ID is populated by the insert above; backfill it into
+			// each quota so token_id is written instead of falling back to
+			// the column DEFAULT 0.
+			for i := range quotas {
+				quotas[i].TokenID = token.ID
+			}
 			err = tx.NewInsert().Model(&quotas).Scan(ctx)
 			if err != nil {
 				return fmt.Errorf("failed to create access token quota, err:%w", err)
@@ -299,6 +308,56 @@ func (s *accessTokenStoreImpl) UpdateTokenAndQuota(ctx context.Context, key *Acc
 	return key, errorx.HandleDBError(err, nil)
 }
 
+// UpdateTokenAndQuotas updates an access token and multiple quota records in
+// a single transaction. Each quota must carry its own primary key (ID).
+func (s *accessTokenStoreImpl) UpdateTokenAndQuotas(ctx context.Context, key *AccessToken, quotas []*AccountAccessTokenQuota) (*AccessToken, error) {
+	err := s.db.Core.RunInTx(ctx, &sql.TxOptions{}, func(ctx context.Context, tx bun.Tx) error {
+		// Update access token
+		_, err := tx.NewUpdate().Model(key).WherePK().Exec(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to update api key, err:%w", err)
+		}
+
+		for _, quota := range quotas {
+			if quota == nil {
+				continue
+			}
+			if quota.ID == 0 {
+				if err := tx.NewInsert().Model(quota).Scan(ctx); err != nil {
+					return fmt.Errorf("failed to create api key quota, err:%w", err)
+				}
+			} else {
+				_, err = tx.NewUpdate().Model(quota).WherePK().Exec(ctx)
+				if err != nil {
+					return fmt.Errorf("failed to update api key quota, err:%w", err)
+				}
+			}
+		}
+		var tokenQuotas []AccountAccessTokenQuota
+		err = tx.NewSelect().Model(&tokenQuotas).Where("token_id = ?", key.ID).Scan(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to get api key quotas, err:%w", err)
+		}
+		if len(tokenQuotas) < 1 {
+			return nil
+		}
+		var quotaItems []types.UpdateAPIKeyQuotaItem
+		for _, quota := range tokenQuotas {
+			quotaItems = append(quotaItems, types.UpdateAPIKeyQuotaItem{
+				QuotaType: types.AccountingQuotaType(quota.QuotaType),
+				ValueType: types.AccountingQuotaValueType(quota.ValueType),
+			})
+		}
+		if err := types.CheckQuotaSet(quotaItems); err != nil {
+			return err
+		}
+
+		return nil
+	})
+
+	return key, errorx.HandleDBError(err, nil)
+}
+
 // DeleteByID soft deletes a access token by id
 func (s *accessTokenStoreImpl) DeleteByID(ctx context.Context, id int64) error {
 	_, err := s.db.Operator.Core.
@@ -351,12 +410,31 @@ func (s *accessTokenStoreImpl) FindBuiltinByNsUUID(ctx context.Context, nsUUID s
 	return &token, nil
 }
 
-// UpdateToken updates a gateway API key token value
+// UpdateToken updates a gateway API key token value. The access token row is
+// updated in the same transaction as the matching account_access_token_quota
+// rows' api_key, so that a builtin key refresh keeps the quota records joined
+// to the new key value atomically — otherwise the stale api_key would detach
+// the quotas from the refreshed key (FindByAPIKey would miss them and the
+// updateAccessTokenQuota path would rebuild a quota=0 orphan).
 func (s *accessTokenStoreImpl) UpdateToken(ctx context.Context, token *AccessToken) error {
-	_, err := s.db.Operator.Core.
-		NewUpdate().
-		Model(token).
-		WherePK().
-		Exec(ctx)
+	err := s.db.Core.RunInTx(ctx, &sql.TxOptions{}, func(ctx context.Context, tx bun.Tx) error {
+		_, err := tx.NewUpdate().Model(token).WherePK().Exec(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to update access token, err:%w", err)
+		}
+
+		// Sync the api_key on quota rows so they stay joined to the refreshed
+		// key value. token_id is the stable join key and never changes here.
+		_, err = tx.NewUpdate().
+			Model((*AccountAccessTokenQuota)(nil)).
+			Set("api_key = ?", token.Token).
+			Where("token_id = ?", token.ID).
+			Exec(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to sync api_key on access token quota, err:%w", err)
+		}
+
+		return nil
+	})
 	return errorx.HandleDBError(err, nil)
 }

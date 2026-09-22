@@ -69,123 +69,29 @@ func (_c *MockAccountAccessTokenQuotaStore_Create_Call) RunAndReturn(run func(co
 	return _c
 }
 
-// DeleteByAPIKey provides a mock function with given fields: ctx, apiKey
-func (_m *MockAccountAccessTokenQuotaStore) DeleteByAPIKey(ctx context.Context, apiKey string) error {
-	ret := _m.Called(ctx, apiKey)
+// FindByTokenID provides a mock function with given fields: ctx, tokenID
+func (_m *MockAccountAccessTokenQuotaStore) FindByTokenID(ctx context.Context, tokenID int64) ([]database.AccountAccessTokenQuota, error) {
+	ret := _m.Called(ctx, tokenID)
 
 	if len(ret) == 0 {
-		panic("no return value specified for DeleteByAPIKey")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string) error); ok {
-		r0 = rf(ctx, apiKey)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// MockAccountAccessTokenQuotaStore_DeleteByAPIKey_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteByAPIKey'
-type MockAccountAccessTokenQuotaStore_DeleteByAPIKey_Call struct {
-	*mock.Call
-}
-
-// DeleteByAPIKey is a helper method to define mock.On call
-//   - ctx context.Context
-//   - apiKey string
-func (_e *MockAccountAccessTokenQuotaStore_Expecter) DeleteByAPIKey(ctx interface{}, apiKey interface{}) *MockAccountAccessTokenQuotaStore_DeleteByAPIKey_Call {
-	return &MockAccountAccessTokenQuotaStore_DeleteByAPIKey_Call{Call: _e.mock.On("DeleteByAPIKey", ctx, apiKey)}
-}
-
-func (_c *MockAccountAccessTokenQuotaStore_DeleteByAPIKey_Call) Run(run func(ctx context.Context, apiKey string)) *MockAccountAccessTokenQuotaStore_DeleteByAPIKey_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string))
-	})
-	return _c
-}
-
-func (_c *MockAccountAccessTokenQuotaStore_DeleteByAPIKey_Call) Return(_a0 error) *MockAccountAccessTokenQuotaStore_DeleteByAPIKey_Call {
-	_c.Call.Return(_a0)
-	return _c
-}
-
-func (_c *MockAccountAccessTokenQuotaStore_DeleteByAPIKey_Call) RunAndReturn(run func(context.Context, string) error) *MockAccountAccessTokenQuotaStore_DeleteByAPIKey_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// DeleteByID provides a mock function with given fields: ctx, id
-func (_m *MockAccountAccessTokenQuotaStore) DeleteByID(ctx context.Context, id int64) error {
-	ret := _m.Called(ctx, id)
-
-	if len(ret) == 0 {
-		panic("no return value specified for DeleteByID")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, int64) error); ok {
-		r0 = rf(ctx, id)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// MockAccountAccessTokenQuotaStore_DeleteByID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteByID'
-type MockAccountAccessTokenQuotaStore_DeleteByID_Call struct {
-	*mock.Call
-}
-
-// DeleteByID is a helper method to define mock.On call
-//   - ctx context.Context
-//   - id int64
-func (_e *MockAccountAccessTokenQuotaStore_Expecter) DeleteByID(ctx interface{}, id interface{}) *MockAccountAccessTokenQuotaStore_DeleteByID_Call {
-	return &MockAccountAccessTokenQuotaStore_DeleteByID_Call{Call: _e.mock.On("DeleteByID", ctx, id)}
-}
-
-func (_c *MockAccountAccessTokenQuotaStore_DeleteByID_Call) Run(run func(ctx context.Context, id int64)) *MockAccountAccessTokenQuotaStore_DeleteByID_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(int64))
-	})
-	return _c
-}
-
-func (_c *MockAccountAccessTokenQuotaStore_DeleteByID_Call) Return(_a0 error) *MockAccountAccessTokenQuotaStore_DeleteByID_Call {
-	_c.Call.Return(_a0)
-	return _c
-}
-
-func (_c *MockAccountAccessTokenQuotaStore_DeleteByID_Call) RunAndReturn(run func(context.Context, int64) error) *MockAccountAccessTokenQuotaStore_DeleteByID_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// FindByAPIKey provides a mock function with given fields: ctx, apiKey
-func (_m *MockAccountAccessTokenQuotaStore) FindByAPIKey(ctx context.Context, apiKey string) ([]database.AccountAccessTokenQuota, error) {
-	ret := _m.Called(ctx, apiKey)
-
-	if len(ret) == 0 {
-		panic("no return value specified for FindByAPIKey")
+		panic("no return value specified for FindByTokenID")
 	}
 
 	var r0 []database.AccountAccessTokenQuota
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string) ([]database.AccountAccessTokenQuota, error)); ok {
-		return rf(ctx, apiKey)
+	if rf, ok := ret.Get(0).(func(context.Context, int64) ([]database.AccountAccessTokenQuota, error)); ok {
+		return rf(ctx, tokenID)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string) []database.AccountAccessTokenQuota); ok {
-		r0 = rf(ctx, apiKey)
+	if rf, ok := ret.Get(0).(func(context.Context, int64) []database.AccountAccessTokenQuota); ok {
+		r0 = rf(ctx, tokenID)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]database.AccountAccessTokenQuota)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
-		r1 = rf(ctx, apiKey)
+	if rf, ok := ret.Get(1).(func(context.Context, int64) error); ok {
+		r1 = rf(ctx, tokenID)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -193,31 +99,31 @@ func (_m *MockAccountAccessTokenQuotaStore) FindByAPIKey(ctx context.Context, ap
 	return r0, r1
 }
 
-// MockAccountAccessTokenQuotaStore_FindByAPIKey_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FindByAPIKey'
-type MockAccountAccessTokenQuotaStore_FindByAPIKey_Call struct {
+// MockAccountAccessTokenQuotaStore_FindByTokenID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FindByTokenID'
+type MockAccountAccessTokenQuotaStore_FindByTokenID_Call struct {
 	*mock.Call
 }
 
-// FindByAPIKey is a helper method to define mock.On call
+// FindByTokenID is a helper method to define mock.On call
 //   - ctx context.Context
-//   - apiKey string
-func (_e *MockAccountAccessTokenQuotaStore_Expecter) FindByAPIKey(ctx interface{}, apiKey interface{}) *MockAccountAccessTokenQuotaStore_FindByAPIKey_Call {
-	return &MockAccountAccessTokenQuotaStore_FindByAPIKey_Call{Call: _e.mock.On("FindByAPIKey", ctx, apiKey)}
+//   - tokenID int64
+func (_e *MockAccountAccessTokenQuotaStore_Expecter) FindByTokenID(ctx interface{}, tokenID interface{}) *MockAccountAccessTokenQuotaStore_FindByTokenID_Call {
+	return &MockAccountAccessTokenQuotaStore_FindByTokenID_Call{Call: _e.mock.On("FindByTokenID", ctx, tokenID)}
 }
 
-func (_c *MockAccountAccessTokenQuotaStore_FindByAPIKey_Call) Run(run func(ctx context.Context, apiKey string)) *MockAccountAccessTokenQuotaStore_FindByAPIKey_Call {
+func (_c *MockAccountAccessTokenQuotaStore_FindByTokenID_Call) Run(run func(ctx context.Context, tokenID int64)) *MockAccountAccessTokenQuotaStore_FindByTokenID_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string))
+		run(args[0].(context.Context), args[1].(int64))
 	})
 	return _c
 }
 
-func (_c *MockAccountAccessTokenQuotaStore_FindByAPIKey_Call) Return(_a0 []database.AccountAccessTokenQuota, _a1 error) *MockAccountAccessTokenQuotaStore_FindByAPIKey_Call {
+func (_c *MockAccountAccessTokenQuotaStore_FindByTokenID_Call) Return(_a0 []database.AccountAccessTokenQuota, _a1 error) *MockAccountAccessTokenQuotaStore_FindByTokenID_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockAccountAccessTokenQuotaStore_FindByAPIKey_Call) RunAndReturn(run func(context.Context, string) ([]database.AccountAccessTokenQuota, error)) *MockAccountAccessTokenQuotaStore_FindByAPIKey_Call {
+func (_c *MockAccountAccessTokenQuotaStore_FindByTokenID_Call) RunAndReturn(run func(context.Context, int64) ([]database.AccountAccessTokenQuota, error)) *MockAccountAccessTokenQuotaStore_FindByTokenID_Call {
 	_c.Call.Return(run)
 	return _c
 }

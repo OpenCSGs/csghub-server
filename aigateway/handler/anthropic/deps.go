@@ -54,7 +54,7 @@ type ProxyExecutor interface {
 
 // UsageRecorder records token usage for billing/metering.
 type UsageRecorder interface {
-	RecordUsage(ctx context.Context, nsUUID string, model *types.Model, targetModelName string, usage *token.Usage, apikey string) error
+	RecordUsage(ctx context.Context, nsUUID string, model *types.Model, targetModelName string, usage *token.Usage, apikey string, tokenID int64) error
 }
 
 // UsageLimiter commits usage quota limits after the upstream response.
@@ -125,6 +125,7 @@ type SensitiveResult struct {
 type postProcessInput struct {
 	NSUUID          string
 	ApiKey          string
+	TokenID         int64
 	Model           *types.Model
 	TargetModelName string
 	Usage           *tokenUsage

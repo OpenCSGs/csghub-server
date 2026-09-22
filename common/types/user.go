@@ -178,11 +178,10 @@ type CreateUserTokenRequest struct {
 	// default to csghub
 	Application AccessTokenApp `json:"application,omitempty"`
 	// default to empty, means full permission
-	Permission string                   `json:"permission,omitempty"`
-	ExpiredAt  time.Time                `json:"expired_at"`
-	QuotaType  AccountingQuotaType      `json:"quota_type"`
-	ValueType  AccountingQuotaValueType `json:"quota_value_type"`
-	Quota      float64                  `json:"quota"`
+	Permission string    `json:"permission,omitempty"`
+	ExpiredAt  time.Time `json:"expired_at"`
+	// Quotas supports submitting multiple quota records in one create request.
+	Quotas []UpdateAPIKeyQuotaItem `json:"quotas"`
 }
 
 // CreateUserTokenRequest implements SensitiveRequestV2
@@ -213,18 +212,28 @@ type CheckAccessTokenResp struct {
 	Application AccessTokenApp `json:"application"`
 	Permission  string         `json:"permission,omitempty"`
 	// the login name
-	Username       string                   `json:"user_name"`
-	UserUUID       string                   `json:"user_uuid"`
-	ExpireAt       time.Time                `json:"expire_at"`
-	NSUUID         string                   `json:"ns_uuid"`
+	Username  string                        `json:"user_name"`
+	UserUUID  string                        `json:"user_uuid"`
+	ExpireAt  time.Time                     `json:"expire_at"`
+	NSUUID    string                        `json:"ns_uuid"`
+	Quotas    []AccountAccessTokenQuotaResp `json:"quotas"`
+	CreatedAt time.Time                     `json:"created_at"`
+	UpdatedAt time.Time                     `json:"updated_at"`
+	TokenType string                        `json:"token_type"`
+}
+
+// AccountAccessTokenQuotaResp is the response representation of a single quota
+// record for an API key.
+type AccountAccessTokenQuotaResp struct {
+	ID             int64                    `json:"id"`
 	QuotaType      AccountingQuotaType      `json:"quota_type"`
 	QuotaValueType AccountingQuotaValueType `json:"quota_value_type"`
 	Usage          float64                  `json:"usage"`
 	Quota          float64                  `json:"quota"`
+	PeriodStart    int64                    `json:"period_start"`
+	PeriodEnd      int64                    `json:"period_end"`
+	Allocation     string                   `json:"allocation"`
 	LastUsedAt     *time.Time               `json:"last_used_at"`
-	CreatedAt      time.Time                `json:"created_at"`
-	UpdatedAt      time.Time                `json:"updated_at"`
-	TokenType      string                   `json:"token_type"`
 }
 
 type GetAccessTokenRequest struct {
@@ -235,23 +244,30 @@ type GetAccessTokenRequest struct {
 }
 
 type CreateAPIKeyRequest struct {
-	KeyName   string                   `json:"name" binding:"required"`
-	ExpiredAt *time.Time               `json:"expired_at"`
-	QuotaType AccountingQuotaType      `json:"quota_type" binding:"required"`
-	ValueType AccountingQuotaValueType `json:"quota_value_type" binding:"required"`
-	Quota     float64                  `json:"quota" binding:"min=0"`
+	KeyName   string     `json:"name" binding:"required"`
+	ExpiredAt *time.Time `json:"expired_at"`
+	// Quotas supports submitting multiple quota records in one request.
+	Quotas []UpdateAPIKeyQuotaItem `json:"quotas" binding:"required,min=1,dive"`
 }
 
 type UpdateAPIKeyRequest struct {
-	CurrentUser string                    `json:"-"`
-	OpUUID      string                    `json:"-"`
-	NSUUID      string                    `json:"-"`
-	ID          int64                     `json:"-"`
-	KeyName     *string                   `json:"name"`
-	ExpiredAt   *time.Time                `json:"expired_at"`
-	QuotaType   *AccountingQuotaType      `json:"quota_type"`
-	ValueType   *AccountingQuotaValueType `json:"quota_value_type"`
-	Quota       *float64                  `json:"quota"`
+	CurrentUser string     `json:"-"`
+	OpUUID      string     `json:"-"`
+	NSUUID      string     `json:"-"`
+	ID          int64      `json:"-"`
+	KeyName     *string    `json:"name"`
+	ExpiredAt   *time.Time `json:"expired_at"`
+	// Quotas supports submitting multiple quota records in one request.
+	Quotas []UpdateAPIKeyQuotaItem `json:"quotas"`
+}
+
+// UpdateAPIKeyQuotaItem describes a single quota entry within a batch update.
+type UpdateAPIKeyQuotaItem struct {
+	ID         int64                    `json:"id"`
+	QuotaType  AccountingQuotaType      `json:"quota_type"`
+	ValueType  AccountingQuotaValueType `json:"quota_value_type"`
+	Quota      float64                  `json:"quota"`
+	Allocation string                   `json:"allocation"`
 }
 
 type UserDatasetsReq struct {
