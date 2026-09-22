@@ -14,16 +14,16 @@ import (
 	"go.temporal.io/sdk/client"
 	tmocks "go.temporal.io/sdk/mocks"
 	mockgit "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/git/gitserver"
-	mockSensit "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/sensitive"
 	mockdb "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/database"
 	mocktemporal "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/temporal"
 	mocktypes "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/common/types"
+	mockSensit "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/common/types/sensitive"
 	"opencsg.com/csghub-server/builder/git/gitserver"
-	"opencsg.com/csghub-server/builder/sensitive"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/temporal"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
+	ss_type "opencsg.com/csghub-server/common/types/sensitive"
 	"opencsg.com/csghub-server/moderation/checker"
 	wfCommon "opencsg.com/csghub-server/moderation/workflow/common"
 )
@@ -80,10 +80,10 @@ func TestRepoComponent_CheckRequestV2(t *testing.T) {
 		mockSensitiveChecker := mockSensit.NewMockSensitiveChecker(t)
 
 		mockSensitiveChecker.EXPECT().PassTextCheck(context.Background(), fields[0].Scenario, fields[0].Value()).
-			Return(&sensitive.CheckResult{IsSensitive: false}, nil).Once()
+			Return(&ss_type.CheckResult{IsSensitive: false}, nil).Once()
 		// not pass
 		mockSensitiveChecker.EXPECT().PassTextCheck(context.Background(), fields[1].Scenario, fields[1].Value()).
-			Return(&sensitive.CheckResult{IsSensitive: true}, nil).Once()
+			Return(&ss_type.CheckResult{IsSensitive: true}, nil).Once()
 
 		mockRequest := mocktypes.NewMockSensitiveRequestV2(t)
 		mockRequest.EXPECT().GetSensitiveFields().Return(fields)
@@ -117,10 +117,10 @@ func TestRepoComponent_CheckRequestV2(t *testing.T) {
 		mockSensitiveChecker := mockSensit.NewMockSensitiveChecker(t)
 
 		mockSensitiveChecker.EXPECT().PassTextCheck(context.Background(), fields[0].Scenario, fields[0].Value()).
-			Return(&sensitive.CheckResult{IsSensitive: false}, nil).Once()
+			Return(&ss_type.CheckResult{IsSensitive: false}, nil).Once()
 		// not pass
 		mockSensitiveChecker.EXPECT().PassTextCheck(context.Background(), fields[1].Scenario, fields[1].Value()).
-			Return(&sensitive.CheckResult{IsSensitive: false}, nil).Once()
+			Return(&ss_type.CheckResult{IsSensitive: false}, nil).Once()
 
 		mockRequest := mocktypes.NewMockSensitiveRequestV2(t)
 		mockRequest.EXPECT().GetSensitiveFields().Return(fields)
@@ -316,9 +316,9 @@ func TestRepoComponent_CheckRepoFiles(t *testing.T) {
 	cfg.SensitiveCheck.Enable = true
 	mockSensitiveChecker := mockSensit.NewMockSensitiveChecker(t)
 	mockSensitiveChecker.EXPECT().PassTextCheck(mock.Anything, types.ScenarioCommentDetection, "test string").
-		Return(&sensitive.CheckResult{IsSensitive: false}, nil).Once()
+		Return(&ss_type.CheckResult{IsSensitive: false}, nil).Once()
 	mockSensitiveChecker.EXPECT().PassTextCheck(mock.Anything, types.ScenarioCommentDetection, "sensitive word").
-		Return(&sensitive.CheckResult{IsSensitive: true}, nil).Once()
+		Return(&ss_type.CheckResult{IsSensitive: true}, nil).Once()
 	checker.InitWithContentChecker(cfg, mockSensitiveChecker)
 
 	repoToUpdate := new(database.Repository)
@@ -472,7 +472,7 @@ func TestRepoComponent_CheckRepoFiles_ImageByStream(t *testing.T) {
 			// presigned URL). The mock does not read from the reader, so the
 			// lazy git reader (GetRepoFileReader) is never opened.
 			mockSensitiveChecker.EXPECT().PassImageStreamCheck(mock.Anything, types.ScenarioImageBaseLineCheck, mock.Anything).
-				Return(&sensitive.CheckResult{IsSensitive: false}, nil).Once()
+				Return(&ss_type.CheckResult{IsSensitive: false}, nil).Once()
 			// URL check must never be called — this is the core of the
 			// regression, for both public and private repos.
 			mockSensitiveChecker.AssertNotCalled(t, "PassImageURLCheck", mock.Anything, mock.Anything, mock.Anything)
@@ -539,11 +539,11 @@ func TestRepoComponent_CheckRepoFiles_ImageByStream(t *testing.T) {
 		// The mock actually reads the stream and verifies the content matches
 		// what GetRepoFileReader returned.
 		mockSensitiveChecker.EXPECT().PassImageStreamCheck(mock.Anything, types.ScenarioImageBaseLineCheck, mock.Anything).
-			RunAndReturn(func(ctx context.Context, scenario types.SensitiveScenario, r io.Reader) (*sensitive.CheckResult, error) {
+			RunAndReturn(func(ctx context.Context, scenario types.SensitiveScenario, r io.Reader) (*ss_type.CheckResult, error) {
 				b, err := io.ReadAll(r)
 				require.NoError(t, err)
 				require.Equal(t, imageContent, string(b))
-				return &sensitive.CheckResult{IsSensitive: false}, nil
+				return &ss_type.CheckResult{IsSensitive: false}, nil
 			}).Once()
 		mockSensitiveChecker.AssertNotCalled(t, "PassImageURLCheck", mock.Anything, mock.Anything, mock.Anything)
 		checker.InitWithContentChecker(cfg, mockSensitiveChecker)
@@ -615,7 +615,7 @@ func TestRepoComponent_CheckRepoFiles_ImageByStream(t *testing.T) {
 		var contents []string
 		var mu sync.Mutex
 		mockSensitiveChecker.EXPECT().PassImageStreamCheck(mock.Anything, types.ScenarioImageBaseLineCheck, mock.Anything).
-			RunAndReturn(func(ctx context.Context, scenario types.SensitiveScenario, r io.Reader) (*sensitive.CheckResult, error) {
+			RunAndReturn(func(ctx context.Context, scenario types.SensitiveScenario, r io.Reader) (*ss_type.CheckResult, error) {
 				// Simulate chain layer: seek to start before reading. This
 				// triggers RepoFileContentReader.Seek(0) which reopens the
 				// git stream, so the retry gets full content.
@@ -630,7 +630,7 @@ func TestRepoComponent_CheckRepoFiles_ImageByStream(t *testing.T) {
 				if len(contents) == 1 {
 					return nil, errors.New("transient upload error")
 				}
-				return &sensitive.CheckResult{IsSensitive: false}, nil
+				return &ss_type.CheckResult{IsSensitive: false}, nil
 			}).Twice()
 		mockSensitiveChecker.AssertNotCalled(t, "PassImageURLCheck", mock.Anything, mock.Anything, mock.Anything)
 		checker.InitWithContentChecker(cfg, mockSensitiveChecker)

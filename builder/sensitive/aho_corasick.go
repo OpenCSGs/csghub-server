@@ -9,6 +9,7 @@ import (
 	"opencsg.com/csghub-server/builder/sensitive/internal"
 	"opencsg.com/csghub-server/builder/sensitive/internal/ahocorasick"
 	"opencsg.com/csghub-server/common/types"
+	ss_type "opencsg.com/csghub-server/common/types/sensitive"
 )
 
 // TextModerationResponseData refer to aliyun green text moderation response item
@@ -37,7 +38,7 @@ type ACAutomation struct {
 
 // NewACAutomation creates a new immutable AC automaton with initial data
 // It returns a new instance every time it's called
-func NewACAutomation(data *internal.SensitiveWordData) SensitiveChecker {
+func NewACAutomation(data *internal.SensitiveWordData) ss_type.SensitiveChecker {
 	return &ACAutomation{
 		tagMap:  data.TagMap,
 		words:   data.Words,
@@ -46,50 +47,50 @@ func NewACAutomation(data *internal.SensitiveWordData) SensitiveChecker {
 }
 
 // PassTextCheck implements the SensitiveChecker interface for ImmutableAC
-func (iac *ACAutomation) PassTextCheck(ctx context.Context, scenario types.SensitiveScenario, text string) (*CheckResult, error) {
+func (iac *ACAutomation) PassTextCheck(ctx context.Context, scenario types.SensitiveScenario, text string) (*ss_type.CheckResult, error) {
 	detectResult := iac.detect(text)
 	if detectResult != nil {
 		slog.InfoContext(ctx, "ACAutomation PassTextCheck detected sensitive word",
 			slog.String("reason", *detectResult.Reason))
-		return &CheckResult{
+		return &ss_type.CheckResult{
 			IsSensitive: true,
 			Reason:      *detectResult.Reason,
 		}, nil
 	}
-	return &CheckResult{
+	return &ss_type.CheckResult{
 		IsSensitive: false,
 	}, nil
 }
 
 // PassImageCheck implements the SensitiveChecker interface for ImmutableAC
-func (iac *ACAutomation) PassImageCheck(ctx context.Context, scenario types.SensitiveScenario, ossBucketName, ossObjectName string) (*CheckResult, error) {
+func (iac *ACAutomation) PassImageCheck(ctx context.Context, scenario types.SensitiveScenario, ossBucketName, ossObjectName string) (*ss_type.CheckResult, error) {
 	slog.WarnContext(ctx, "PassImageCheck not implemented in Immutable AC checker")
-	return &CheckResult{
+	return &ss_type.CheckResult{
 		IsSensitive: false,
 	}, nil
 }
 
 // PassImageURLCheck implements the SensitiveChecker interface for ImmutableAC
-func (iac *ACAutomation) PassImageURLCheck(ctx context.Context, scenario types.SensitiveScenario, imageURL string) (*CheckResult, error) {
+func (iac *ACAutomation) PassImageURLCheck(ctx context.Context, scenario types.SensitiveScenario, imageURL string) (*ss_type.CheckResult, error) {
 	slog.WarnContext(ctx, "PassImageURLCheck not implemented in Immutable AC checker")
-	return &CheckResult{
+	return &ss_type.CheckResult{
 		IsSensitive: false,
 	}, nil
 }
 
 // PassImageStreamCheck implements the SensitiveChecker interface for ImmutableAC
-func (iac *ACAutomation) PassImageStreamCheck(ctx context.Context, scenario types.SensitiveScenario, reader io.Reader) (*CheckResult, error) {
+func (iac *ACAutomation) PassImageStreamCheck(ctx context.Context, scenario types.SensitiveScenario, reader io.Reader) (*ss_type.CheckResult, error) {
 	slog.WarnContext(ctx, "PassImageStreamCheck not implemented in Immutable AC checker")
-	return &CheckResult{
+	return &ss_type.CheckResult{
 		IsSensitive: false,
 	}, nil
 }
 
 // PassLLMCheck implements the SensitiveChecker interface for ImmutableAC
-func (iac *ACAutomation) PassLLMCheck(ctx context.Context, req *types.LLMCheckRequest) (*CheckResult, error) {
+func (iac *ACAutomation) PassLLMCheck(ctx context.Context, req *types.LLMCheckRequest) (*ss_type.CheckResult, error) {
 	if req.Scenario != types.ScenarioLLMQueryModeration && req.Scenario != types.ScenarioLLMResModeration {
 		slog.WarnContext(ctx, "PassLLMCheck received unsupported scenario", slog.String("scenario", string(req.Scenario)))
-		return &CheckResult{
+		return &ss_type.CheckResult{
 			IsSensitive: false,
 		}, nil
 	}
@@ -97,12 +98,12 @@ func (iac *ACAutomation) PassLLMCheck(ctx context.Context, req *types.LLMCheckRe
 	if detectResult != nil {
 		slog.InfoContext(ctx, "ACAutomation PassLLMCheck detected sensitive word",
 			slog.String("reason", *detectResult.Reason))
-		return &CheckResult{
+		return &ss_type.CheckResult{
 			IsSensitive: true,
 			Reason:      *detectResult.Reason,
 		}, nil
 	}
-	return &CheckResult{
+	return &ss_type.CheckResult{
 		IsSensitive: false,
 	}, nil
 }

@@ -11,8 +11,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	mock_sensitive "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/moderation/component"
-	"opencsg.com/csghub-server/builder/sensitive"
 	"opencsg.com/csghub-server/common/types"
+	ss_type "opencsg.com/csghub-server/common/types/sensitive"
 )
 
 func TestSensitiveHandler_Image(t *testing.T) {
@@ -28,7 +28,7 @@ func TestSensitiveHandler_Image(t *testing.T) {
 	router.POST("/api/v1/moderation/image", handler.Image)
 
 	// Create a test CheckResult
-	successResult := &sensitive.CheckResult{
+	successResult := &ss_type.CheckResult{
 		IsSensitive: false,
 		Reason:      "",
 	}
@@ -59,7 +59,7 @@ func TestSensitiveHandler_Image(t *testing.T) {
 		// Verify result
 		assert.Equal(t, http.StatusOK, w.Code)
 		var response struct {
-			Data *sensitive.CheckResult `json:"data"`
+			Data *ss_type.CheckResult `json:"data"`
 		}
 		err := json.Unmarshal(w.Body.Bytes(), &response)
 		assert.NoError(t, err)
@@ -94,7 +94,7 @@ func TestSensitiveHandler_Image(t *testing.T) {
 		// Verify result
 		assert.Equal(t, http.StatusOK, w.Code)
 		var response struct {
-			Data *sensitive.CheckResult `json:"data"`
+			Data *ss_type.CheckResult `json:"data"`
 		}
 		err := json.Unmarshal(w.Body.Bytes(), &response)
 		assert.NoError(t, err)
@@ -173,7 +173,7 @@ func TestSensitiveHandler_Image(t *testing.T) {
 		reqBodyBytes, _ := json.Marshal(reqBody)
 
 		// Create result for sensitive content
-		sensitiveResult := &sensitive.CheckResult{
+		sensitiveResult := &ss_type.CheckResult{
 			IsSensitive: true,
 			Reason:      "contains sensitive content",
 		}
@@ -196,7 +196,7 @@ func TestSensitiveHandler_Image(t *testing.T) {
 		// Verify result
 		assert.Equal(t, http.StatusOK, w.Code)
 		var response struct {
-			Data *sensitive.CheckResult `json:"data"`
+			Data *ss_type.CheckResult `json:"data"`
 		}
 		err := json.Unmarshal(w.Body.Bytes(), &response)
 		assert.NoError(t, err)
@@ -217,7 +217,7 @@ func TestSensitiveHandler_LlmResp(t *testing.T) {
 	router.POST("/api/v1/moderation/llm_resp", handler.LlmResp)
 
 	// Create a test CheckResult
-	successResult := &sensitive.CheckResult{
+	successResult := &ss_type.CheckResult{
 		IsSensitive: false,
 		Reason:      "",
 	}
@@ -254,7 +254,7 @@ func TestSensitiveHandler_LlmResp(t *testing.T) {
 		// Verify result
 		assert.Equal(t, http.StatusOK, w.Code)
 		var response struct {
-			Data *sensitive.CheckResult `json:"data"`
+			Data *ss_type.CheckResult `json:"data"`
 		}
 		err := json.Unmarshal(w.Body.Bytes(), &response)
 		assert.NoError(t, err)
@@ -322,7 +322,7 @@ func TestSensitiveHandler_LlmResp(t *testing.T) {
 		reqBodyBytes, _ := json.Marshal(reqBody)
 
 		// Create result for sensitive content
-		sensitiveResult := &sensitive.CheckResult{
+		sensitiveResult := &ss_type.CheckResult{
 			IsSensitive: true,
 			Reason:      "contains sensitive content",
 		}
@@ -350,7 +350,7 @@ func TestSensitiveHandler_LlmResp(t *testing.T) {
 		// Verify result
 		assert.Equal(t, http.StatusOK, w.Code)
 		var response struct {
-			Data *sensitive.CheckResult `json:"data"`
+			Data *ss_type.CheckResult `json:"data"`
 		}
 		err := json.Unmarshal(w.Body.Bytes(), &response)
 		assert.NoError(t, err)
@@ -371,7 +371,7 @@ func TestSensitiveHandler_LlmPrompt(t *testing.T) {
 	router.POST("/api/v1/moderation/llm_prompt", handler.LlmPrompt)
 
 	// Create a test CheckResult
-	successResult := &sensitive.CheckResult{
+	successResult := &ss_type.CheckResult{
 		IsSensitive: false,
 		Reason:      "",
 	}
@@ -408,7 +408,7 @@ func TestSensitiveHandler_LlmPrompt(t *testing.T) {
 		// Verify result
 		assert.Equal(t, http.StatusOK, w.Code)
 		var response struct {
-			Data *sensitive.CheckResult `json:"data"`
+			Data *ss_type.CheckResult `json:"data"`
 		}
 		err := json.Unmarshal(w.Body.Bytes(), &response)
 		assert.NoError(t, err)
@@ -475,7 +475,7 @@ func TestSensitiveHandler_LlmPrompt(t *testing.T) {
 		reqBodyBytes, _ := json.Marshal(reqBody)
 
 		// Create result for sensitive content
-		sensitiveResult := &sensitive.CheckResult{
+		sensitiveResult := &ss_type.CheckResult{
 			IsSensitive: true,
 			Reason:      "contains sensitive content",
 		}
@@ -503,7 +503,7 @@ func TestSensitiveHandler_LlmPrompt(t *testing.T) {
 		// Verify result
 		assert.Equal(t, http.StatusOK, w.Code)
 		var response struct {
-			Data *sensitive.CheckResult `json:"data"`
+			Data *ss_type.CheckResult `json:"data"`
 		}
 		err := json.Unmarshal(w.Body.Bytes(), &response)
 		assert.NoError(t, err)
@@ -524,7 +524,7 @@ func TestSensitiveHandler_Text(t *testing.T) {
 	router.POST("/api/v1/moderation/text", handler.Text)
 
 	// Create a test CheckResult
-	successResult := &sensitive.CheckResult{
+	successResult := &ss_type.CheckResult{
 		IsSensitive: false,
 		Reason:      "",
 	}
@@ -555,7 +555,7 @@ func TestSensitiveHandler_Text(t *testing.T) {
 		// Verify result
 		assert.Equal(t, http.StatusOK, w.Code)
 		var response struct {
-			Data *sensitive.CheckResult `json:"data"`
+			Data *ss_type.CheckResult `json:"data"`
 		}
 		err := json.Unmarshal(w.Body.Bytes(), &response)
 		assert.NoError(t, err)
@@ -615,7 +615,7 @@ func TestSensitiveHandler_Text(t *testing.T) {
 		reqBodyBytes, _ := json.Marshal(reqBody)
 
 		// Create result for sensitive content
-		sensitiveResult := &sensitive.CheckResult{
+		sensitiveResult := &ss_type.CheckResult{
 			IsSensitive: true,
 			Reason:      "contains sensitive content",
 		}
@@ -638,7 +638,7 @@ func TestSensitiveHandler_Text(t *testing.T) {
 		// Verify result
 		assert.Equal(t, http.StatusOK, w.Code)
 		var response struct {
-			Data *sensitive.CheckResult `json:"data"`
+			Data *ss_type.CheckResult `json:"data"`
 		}
 		err := json.Unmarshal(w.Body.Bytes(), &response)
 		assert.NoError(t, err)

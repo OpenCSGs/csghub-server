@@ -10,9 +10,9 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/mock"
-	mocksens "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/sensitive"
-	"opencsg.com/csghub-server/builder/sensitive"
+	mocksens "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/common/types/sensitive"
 	"opencsg.com/csghub-server/common/types"
+	ss_type "opencsg.com/csghub-server/common/types/sensitive"
 )
 
 func TestGetFileChecker(t *testing.T) {
@@ -72,7 +72,7 @@ func TestImageFileChecker_Run(t *testing.T) {
 
 	// newEnabledChecker creates an ImageFileChecker with the given enable flag
 	// and mock sensitive checker, avoiding global state mutation.
-	newEnabledChecker := func(enabled bool, mockChecker sensitive.SensitiveChecker) *ImageFileChecker {
+	newEnabledChecker := func(enabled bool, mockChecker ss_type.SensitiveChecker) *ImageFileChecker {
 		return &ImageFileChecker{checker: mockChecker, enabled: enabled, scenario: types.ScenarioImageBaseLineCheck}
 	}
 
@@ -91,7 +91,7 @@ func TestImageFileChecker_Run(t *testing.T) {
 	t.Run("sensitive image detected", func(t *testing.T) {
 		mockChecker := mocksens.NewMockSensitiveChecker(t)
 		mockChecker.EXPECT().PassImageURLCheck(mock.Anything, types.ScenarioImageBaseLineCheck, testImageURL).
-			Return(&sensitive.CheckResult{IsSensitive: true, Reason: "label:porn,confidence:0.95"}, nil)
+			Return(&ss_type.CheckResult{IsSensitive: true, Reason: "label:porn,confidence:0.95"}, nil)
 
 		c := newEnabledChecker(true, mockChecker)
 		status, message := c.Run(context.Background(), FileCheckContext{Reader: strings.NewReader(""), ImageURL: testImageURL})
@@ -106,7 +106,7 @@ func TestImageFileChecker_Run(t *testing.T) {
 	t.Run("image passes check", func(t *testing.T) {
 		mockChecker := mocksens.NewMockSensitiveChecker(t)
 		mockChecker.EXPECT().PassImageURLCheck(mock.Anything, types.ScenarioImageBaseLineCheck, testImageURL).
-			Return(&sensitive.CheckResult{IsSensitive: false}, nil)
+			Return(&ss_type.CheckResult{IsSensitive: false}, nil)
 
 		c := newEnabledChecker(true, mockChecker)
 		status, message := c.Run(context.Background(), FileCheckContext{Reader: strings.NewReader(""), ImageURL: testImageURL})
@@ -121,7 +121,7 @@ func TestImageFileChecker_Run(t *testing.T) {
 	t.Run("empty image url with reader falls back to stream check", func(t *testing.T) {
 		mockChecker := mocksens.NewMockSensitiveChecker(t)
 		mockChecker.EXPECT().PassImageStreamCheck(mock.Anything, types.ScenarioImageBaseLineCheck, mock.Anything).
-			Return(&sensitive.CheckResult{IsSensitive: false}, nil)
+			Return(&ss_type.CheckResult{IsSensitive: false}, nil)
 
 		c := newEnabledChecker(true, mockChecker)
 		status, message := c.Run(context.Background(), FileCheckContext{Reader: strings.NewReader("image-bytes")})
@@ -152,7 +152,7 @@ func TestImageFileChecker_Run(t *testing.T) {
 		mockChecker.EXPECT().PassImageURLCheck(mock.Anything, types.ScenarioImageBaseLineCheck, testImageURL).Once().
 			Return(nil, errors.New("network error"))
 		mockChecker.EXPECT().PassImageURLCheck(mock.Anything, types.ScenarioImageBaseLineCheck, testImageURL).Once().
-			Return(&sensitive.CheckResult{IsSensitive: false}, nil)
+			Return(&ss_type.CheckResult{IsSensitive: false}, nil)
 
 		c := newEnabledChecker(true, mockChecker)
 		status, _ := c.Run(context.Background(), FileCheckContext{Reader: strings.NewReader(""), ImageURL: testImageURL})
@@ -180,12 +180,12 @@ func TestImageFileChecker_Run(t *testing.T) {
 		mockChecker := mocksens.NewMockSensitiveChecker(t)
 		// mock a slow call that will be interrupted by context cancellation
 		mockChecker.EXPECT().PassImageURLCheck(mock.Anything, types.ScenarioImageBaseLineCheck, testImageURL).
-			RunAndReturn(func(ctx context.Context, scenario types.SensitiveScenario, imageURL string) (*sensitive.CheckResult, error) {
+			RunAndReturn(func(ctx context.Context, scenario types.SensitiveScenario, imageURL string) (*ss_type.CheckResult, error) {
 				select {
 				case <-ctx.Done():
 					return nil, ctx.Err()
 				case <-time.After(5 * time.Second):
-					return &sensitive.CheckResult{IsSensitive: false}, nil
+					return &ss_type.CheckResult{IsSensitive: false}, nil
 				}
 			})
 
@@ -205,7 +205,7 @@ func TestImageFileChecker_Run(t *testing.T) {
 	t.Run("stream check sensitive image detected", func(t *testing.T) {
 		mockChecker := mocksens.NewMockSensitiveChecker(t)
 		mockChecker.EXPECT().PassImageStreamCheck(mock.Anything, types.ScenarioImageBaseLineCheck, mock.Anything).
-			Return(&sensitive.CheckResult{IsSensitive: true, Reason: "label:porn,confidence:0.95"}, nil)
+			Return(&ss_type.CheckResult{IsSensitive: true, Reason: "label:porn,confidence:0.95"}, nil)
 
 		c := newEnabledChecker(true, mockChecker)
 		status, message := c.Run(context.Background(), FileCheckContext{Reader: strings.NewReader("image-bytes")})
@@ -247,7 +247,7 @@ func TestImageFileChecker_Run(t *testing.T) {
 		var contents []string
 		var mu sync.Mutex
 		mockChecker.EXPECT().PassImageStreamCheck(mock.Anything, types.ScenarioImageBaseLineCheck, mock.Anything).
-			RunAndReturn(func(ctx context.Context, scenario types.SensitiveScenario, r io.Reader) (*sensitive.CheckResult, error) {
+			RunAndReturn(func(ctx context.Context, scenario types.SensitiveScenario, r io.Reader) (*ss_type.CheckResult, error) {
 				// Simulate chain layer: seek to start before reading.
 				if seeker, ok := r.(io.Seeker); ok {
 					_, _ = seeker.Seek(0, io.SeekStart)
@@ -260,7 +260,7 @@ func TestImageFileChecker_Run(t *testing.T) {
 				if len(contents) == 1 {
 					return nil, errors.New("transient upload error")
 				}
-				return &sensitive.CheckResult{IsSensitive: false}, nil
+				return &ss_type.CheckResult{IsSensitive: false}, nil
 			}).Twice()
 
 		c := newEnabledChecker(true, mockChecker)

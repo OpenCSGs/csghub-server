@@ -6,10 +6,10 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	mock_sensitive "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/sensitive"
-	"opencsg.com/csghub-server/builder/sensitive"
+	mock_sensitive "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/common/types/sensitive"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
+	ss_type "opencsg.com/csghub-server/common/types/sensitive"
 	"opencsg.com/csghub-server/moderation/checker"
 )
 
@@ -22,7 +22,7 @@ func TestSensitiveComponentImpl_PassTextCheck(t *testing.T) {
 	cfg.SensitiveCheck.Enable = true
 	checker.InitWithContentChecker(cfg, mockSensitive)
 	mockSensitive.EXPECT().PassTextCheck(mock.Anything, types.ScenarioNicknameDetection, "你好").
-		Return(&sensitive.CheckResult{
+		Return(&ss_type.CheckResult{
 			IsSensitive: false,
 		}, nil)
 	result, err := component.PassTextCheck(context.Background(),
@@ -37,7 +37,7 @@ func TestSensitiveComponentImpl_PassImageURLCheck(t *testing.T) {
 		checker: mockSensitive,
 	}
 	mockSensitive.EXPECT().PassImageURLCheck(mock.Anything, types.ScenarioNicknameDetection, "你好").
-		Return(&sensitive.CheckResult{
+		Return(&ss_type.CheckResult{
 			IsSensitive: false,
 		}, nil)
 	result, err := component.PassImageURLCheck(context.Background(),
@@ -61,7 +61,7 @@ func TestSensitiveComponentImpl_PassLLMQueryCheck(t *testing.T) {
 		RawJSON:   "",
 		Role:      "user",
 	}).
-		Return(&sensitive.CheckResult{
+		Return(&ss_type.CheckResult{
 			IsSensitive: false,
 		}, nil)
 	result, err := component.PassLLMQueryCheck(context.Background(), &types.LLMCheckRequest{
@@ -92,7 +92,7 @@ func TestSensitiveComponentImpl_PassLLMQueryCheck_Stream(t *testing.T) {
 		IsAppendSystemPromot: true,
 		Role:                 "user",
 	}).
-		Return(&sensitive.CheckResult{
+		Return(&ss_type.CheckResult{
 			IsSensitive: false,
 		}, nil)
 	result, err := component.PassLLMQueryCheck(context.Background(), &types.LLMCheckRequest{
@@ -123,7 +123,7 @@ func TestSensitiveComponentImpl_PassStreamCheck(t *testing.T) {
 		Stream:    true,
 		Role:      "assistant",
 	}).
-		Return(&sensitive.CheckResult{
+		Return(&ss_type.CheckResult{
 			IsSensitive: false,
 		}, nil)
 	result, err := component.PassStreamCheck(context.Background(), &types.LLMCheckRequest{

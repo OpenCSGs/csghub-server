@@ -6,7 +6,7 @@ import (
 	context "context"
 
 	mock "github.com/stretchr/testify/mock"
-	sensitive "opencsg.com/csghub-server/builder/sensitive"
+	sensitive "opencsg.com/csghub-server/common/types/sensitive"
 
 	types "opencsg.com/csghub-server/common/types"
 )

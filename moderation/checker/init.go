@@ -4,9 +4,10 @@ import (
 	"opencsg.com/csghub-server/builder/sensitive"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
+	ss_type "opencsg.com/csghub-server/common/types/sensitive"
 )
 
-var contentChecker sensitive.SensitiveChecker
+var contentChecker ss_type.SensitiveChecker
 
 // imageCheckEnabled controls whether image files are sent to the remote
 // moderation service. It is set from config during Init.
@@ -26,7 +27,7 @@ func Init(config *config.Config) {
 }
 
 // InitWithContentChecker supports custom sensitive checker, this func mostly used in unit test
-func InitWithContentChecker(config *config.Config, checker sensitive.SensitiveChecker) {
+func InitWithContentChecker(config *config.Config, checker ss_type.SensitiveChecker) {
 	if !config.SensitiveCheck.Enable {
 		panic("SensitiveCheck is not enable")
 	}

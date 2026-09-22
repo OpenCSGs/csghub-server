@@ -1,4 +1,4 @@
-package sensitive
+package aliyun
 
 import (
 	"context"
@@ -8,6 +8,7 @@ import (
 	pluginmanager "opencsg.com/csghub-server/builder/plugins_manager"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
+	ss_type "opencsg.com/csghub-server/common/types/sensitive"
 	aliyunchecker "opencsg.com/csghub-server/plugins/aliyun_checker"
 )
 
@@ -19,10 +20,10 @@ type pluginAliyunChecker struct {
 	config     *config.Config
 }
 
-var _ SensitiveChecker = (*pluginAliyunChecker)(nil)
-var _ MediaSensitiveChecker = (*pluginAliyunChecker)(nil)
+var _ ss_type.SensitiveChecker = (*pluginAliyunChecker)(nil)
+var _ ss_type.MediaSensitiveChecker = (*pluginAliyunChecker)(nil)
 
-func newPluginAliyunChecker(cfg *config.Config) SensitiveChecker {
+func NewPluginAliyunChecker(cfg *config.Config) ss_type.SensitiveChecker {
 	checker := &pluginAliyunChecker{
 		path:       cfg.PluginPath,
 		pluginName: aliyunchecker.PluginName,
@@ -33,7 +34,7 @@ func newPluginAliyunChecker(cfg *config.Config) SensitiveChecker {
 	return checker
 }
 
-func (c *pluginAliyunChecker) SensitiveCheckEnv() []string {
+func (c *pluginAliyunChecker) sensitiveCheckEnv() []string {
 	return []string{
 		"STARHUB_SERVER_SENSITIVE_CHECK_ACCESS_KEY_ID=" + c.config.SensitiveCheck.AccessKeyID,
 		"STARHUB_SERVER_SENSITIVE_CHECK_ACCESS_KEY_SECRET=" + c.config.SensitiveCheck.AccessKeySecret,
@@ -50,7 +51,7 @@ func (c *pluginAliyunChecker) pluginChecker(ctx context.Context) (aliyunchecker.
 		Command:         []string{fmt.Sprintf("%s/%s/%s/%s", c.path, c.pluginName, c.version, c.pluginName)},
 		HandshakeConfig: aliyunchecker.HandshakeConfig,
 		Plugin:          aliyunchecker.NewPlugin(nil),
-		Env:             c.SensitiveCheckEnv(),
+		Env:             c.sensitiveCheckEnv(),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("get aliyun checker plugin: %w", err)
@@ -67,7 +68,7 @@ func (c *pluginAliyunChecker) checker(ctx context.Context) (aliyunchecker.Checke
 	return c.checkerFor(ctx)
 }
 
-func (c *pluginAliyunChecker) PassTextCheck(ctx context.Context, scenario types.SensitiveScenario, text string) (*CheckResult, error) {
+func (c *pluginAliyunChecker) PassTextCheck(ctx context.Context, scenario types.SensitiveScenario, text string) (*ss_type.CheckResult, error) {
 	checker, err := c.checker(ctx)
 	if err != nil {
 		return nil, err
@@ -76,7 +77,7 @@ func (c *pluginAliyunChecker) PassTextCheck(ctx context.Context, scenario types.
 	return checkResultFromAliyunPlugin(result), err
 }
 
-func (c *pluginAliyunChecker) PassImageCheck(ctx context.Context, scenario types.SensitiveScenario, ossBucketName, ossObjectName string) (*CheckResult, error) {
+func (c *pluginAliyunChecker) PassImageCheck(ctx context.Context, scenario types.SensitiveScenario, ossBucketName, ossObjectName string) (*ss_type.CheckResult, error) {
 	checker, err := c.checker(ctx)
 	if err != nil {
 		return nil, err
@@ -85,7 +86,7 @@ func (c *pluginAliyunChecker) PassImageCheck(ctx context.Context, scenario types
 	return checkResultFromAliyunPlugin(result), err
 }
 
-func (c *pluginAliyunChecker) PassImageURLCheck(ctx context.Context, scenario types.SensitiveScenario, imageURL string) (*CheckResult, error) {
+func (c *pluginAliyunChecker) PassImageURLCheck(ctx context.Context, scenario types.SensitiveScenario, imageURL string) (*ss_type.CheckResult, error) {
 	checker, err := c.checker(ctx)
 	if err != nil {
 		return nil, err
@@ -94,7 +95,7 @@ func (c *pluginAliyunChecker) PassImageURLCheck(ctx context.Context, scenario ty
 	return checkResultFromAliyunPlugin(result), err
 }
 
-func (c *pluginAliyunChecker) PassImageStreamCheck(ctx context.Context, scenario types.SensitiveScenario, reader io.Reader) (*CheckResult, error) {
+func (c *pluginAliyunChecker) PassImageStreamCheck(ctx context.Context, scenario types.SensitiveScenario, reader io.Reader) (*ss_type.CheckResult, error) {
 	checker, err := c.checker(ctx)
 	if err != nil {
 		return nil, err
@@ -103,7 +104,7 @@ func (c *pluginAliyunChecker) PassImageStreamCheck(ctx context.Context, scenario
 	return checkResultFromAliyunPlugin(result), err
 }
 
-func (c *pluginAliyunChecker) PassLLMCheck(ctx context.Context, req *types.LLMCheckRequest) (*CheckResult, error) {
+func (c *pluginAliyunChecker) PassLLMCheck(ctx context.Context, req *types.LLMCheckRequest) (*ss_type.CheckResult, error) {
 	if req == nil {
 		return nil, fmt.Errorf("llm check request is required")
 	}
@@ -163,9 +164,9 @@ func (c *pluginAliyunChecker) QueryMediaModerationResult(ctx context.Context, re
 	}, nil
 }
 
-func checkResultFromAliyunPlugin(result *aliyunchecker.CheckResult) *CheckResult {
+func checkResultFromAliyunPlugin(result *aliyunchecker.CheckResult) *ss_type.CheckResult {
 	if result == nil {
-		return &CheckResult{}
+		return &ss_type.CheckResult{}
 	}
-	return &CheckResult{IsSensitive: result.IsSensitive, Reason: result.Reason}
+	return &ss_type.CheckResult{IsSensitive: result.IsSensitive, Reason: result.Reason}
 }

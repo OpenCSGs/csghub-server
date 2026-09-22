@@ -16,12 +16,13 @@ import (
 	"opencsg.com/csghub-server/builder/temporal"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
+	ss_type "opencsg.com/csghub-server/common/types/sensitive"
 	"opencsg.com/csghub-server/moderation/checker"
 	wfCommon "opencsg.com/csghub-server/moderation/workflow/common"
 )
 
 type repoComponentImpl struct {
-	checker          sensitive.SensitiveChecker
+	checker          ss_type.SensitiveChecker
 	rs               database.RepoStore
 	rfs              database.RepoFileStore
 	rfcs             database.RepoFileCheckStore

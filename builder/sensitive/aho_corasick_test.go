@@ -8,9 +8,10 @@ import (
 	"opencsg.com/csghub-server/builder/sensitive"
 	"opencsg.com/csghub-server/builder/sensitive/internal"
 	"opencsg.com/csghub-server/common/types"
+	ss_type "opencsg.com/csghub-server/common/types/sensitive"
 )
 
-func initTestACAutomaton() sensitive.SensitiveChecker {
+func initTestACAutomaton() ss_type.SensitiveChecker {
 	tagMap := map[int]string{
 		0: "porn",
 		1: "violence",

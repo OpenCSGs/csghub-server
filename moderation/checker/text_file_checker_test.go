@@ -10,10 +10,10 @@ import (
 
 	"github.com/stretchr/testify/mock"
 	mockio "opencsg.com/csghub-server/_mocks/io"
-	mocksens "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/sensitive"
-	"opencsg.com/csghub-server/builder/sensitive"
+	mocksens "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/common/types/sensitive"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
+	ss_type "opencsg.com/csghub-server/common/types/sensitive"
 )
 
 func TestTextFileChecker_Run(t *testing.T) {
@@ -24,7 +24,7 @@ func TestTextFileChecker_Run(t *testing.T) {
 		cfg.SensitiveCheck.Enable = true
 		InitWithContentChecker(cfg, mockChecker)
 		mockChecker.EXPECT().PassTextCheck(mock.Anything, types.ScenarioCommentDetection, "This text contains sensitive word.").
-			Return(&sensitive.CheckResult{IsSensitive: true, Reason: "contains sensitive word"}, nil)
+			Return(&ss_type.CheckResult{IsSensitive: true, Reason: "contains sensitive word"}, nil)
 		checker := NewTextFileChecker()
 
 		reader1 := bytes.NewReader([]byte("This text contains sensitive word."))
@@ -38,7 +38,7 @@ func TestTextFileChecker_Run(t *testing.T) {
 	t.Run("no sensitive words", func(t *testing.T) {
 		mockContentChecker := mocksens.NewMockSensitiveChecker(t)
 		contentChecker = mockContentChecker
-		mockContentChecker.EXPECT().PassTextCheck(mock.Anything, mock.Anything, mock.Anything).Return(&sensitive.CheckResult{
+		mockContentChecker.EXPECT().PassTextCheck(mock.Anything, mock.Anything, mock.Anything).Return(&ss_type.CheckResult{
 			IsSensitive: false,
 			Reason:      "",
 		}, nil)
@@ -86,7 +86,7 @@ func TestTextFileChecker_Run(t *testing.T) {
 		mockContentChecker := mocksens.NewMockSensitiveChecker(t)
 		contentChecker = mockContentChecker
 		mockContentChecker.EXPECT().PassTextCheck(mock.Anything, mock.Anything, mock.Anything).Once().Return(nil, errors.New("network error"))
-		mockContentChecker.EXPECT().PassTextCheck(mock.Anything, mock.Anything, mock.Anything).Once().Return(&sensitive.CheckResult{
+		mockContentChecker.EXPECT().PassTextCheck(mock.Anything, mock.Anything, mock.Anything).Once().Return(&ss_type.CheckResult{
 			IsSensitive: false,
 			Reason:      "",
 		}, nil)
@@ -103,7 +103,7 @@ func TestTextFileChecker_Run(t *testing.T) {
 	t.Run("call remote check sensitive", func(t *testing.T) {
 		mockContentChecker := mocksens.NewMockSensitiveChecker(t)
 		contentChecker = mockContentChecker
-		mockContentChecker.EXPECT().PassTextCheck(mock.Anything, mock.Anything, mock.Anything).Once().Return(&sensitive.CheckResult{
+		mockContentChecker.EXPECT().PassTextCheck(mock.Anything, mock.Anything, mock.Anything).Once().Return(&ss_type.CheckResult{
 			IsSensitive: true,
 			Reason:      "",
 		}, nil)
