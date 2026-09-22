@@ -419,15 +419,37 @@ func (h *AccessTokenHandler) CreateAPIKey(ctx *gin.Context) {
 		return
 	}
 
+	for i, q := range req.Quotas {
+		if !types.IsValidQuotaType(q.QuotaType) || !types.IsValidQuotaValueType(q.ValueType) {
+			httpbase.BadRequestWithExt(ctx, errorx.ReqParamInvalid(fmt.Errorf("quotas[%d].quota_type or value_type is invalid", i), nil))
+			return
+		}
+		if q.Quota < 0 {
+			httpbase.BadRequestWithExt(ctx, errorx.ReqParamInvalid(fmt.Errorf("quotas[%d].quota must be non-negative", i), nil))
+			return
+		}
+		if q.ValueType == types.AccountingQuotaValueTypePriority &&
+			q.QuotaType == types.AccountingQuotaTypeScope &&
+			!types.IsValidRequestPriority(q.Allocation) {
+			httpbase.BadRequestWithExt(ctx, errorx.ReqParamInvalid(fmt.Errorf("quotas[%d].priority is invalid", i), nil))
+			return
+		}
+	}
+
+	// Rejects quota_type × value_type combinations the system would accept
+	// but never enforce, plus set-level value type cardinality.
+	if err := types.CheckQuotaItems(req.Quotas, true); err != nil {
+		httpbase.BadRequestWithExt(ctx, errorx.ReqParamInvalid(err, nil))
+		return
+	}
+
 	apikeyReq := types.CreateUserTokenRequest{
 		Username:    currentUser,
 		OpUUID:      userUUID,
 		NSUUID:      nsUUID,
 		TokenName:   req.KeyName,
 		Application: types.AccessTokenAppAIGateway,
-		QuotaType:   req.QuotaType,
-		ValueType:   req.ValueType,
-		Quota:       req.Quota,
+		Quotas:      req.Quotas,
 	}
 
 	if req.ExpiredAt != nil {
@@ -527,11 +549,28 @@ func (h *AccessTokenHandler) UpdateAPIKey(ctx *gin.Context) {
 		return
 	}
 
-	if req.Quota != nil {
-		if *req.Quota < 0 {
-			httpbase.BadRequestWithExt(ctx, errorx.ReqParamInvalid(errors.New("quota must be non-negative"), nil))
+	for i, q := range req.Quotas {
+		if !types.IsValidQuotaType(q.QuotaType) || !types.IsValidQuotaValueType(q.ValueType) {
+			httpbase.BadRequestWithExt(ctx, errorx.ReqParamInvalid(fmt.Errorf("quotas[%d].quota_type or value_type is invalid", i), nil))
 			return
 		}
+		if q.Quota < 0 || q.ID < 0 {
+			httpbase.BadRequestWithExt(ctx, errorx.ReqParamInvalid(fmt.Errorf("quotas[%d].quota must be non-negative and id must be non-negative (0 creates a new quota)", i), nil))
+			return
+		}
+		if q.ValueType == types.AccountingQuotaValueTypePriority &&
+			q.QuotaType == types.AccountingQuotaTypeScope &&
+			!types.IsValidRequestPriority(q.Allocation) {
+			httpbase.BadRequestWithExt(ctx, errorx.ReqParamInvalid(fmt.Errorf("quotas[%d].priority is invalid", i), nil))
+			return
+		}
+	}
+
+	// Rejects quota_type × value_type combinations the system would accept
+	// but never enforce, plus set-level value type cardinality.
+	if err := types.CheckQuotaItems(req.Quotas, false); err != nil {
+		httpbase.BadRequestWithExt(ctx, errorx.ReqParamInvalid(err, nil))
+		return
 	}
 
 	req.ID = idInt

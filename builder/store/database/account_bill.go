@@ -19,6 +19,8 @@ type AccountBillStore interface {
 	ListBillsDetailByUserID(ctx context.Context, req types.AcctBillsDetailReq) (AccountBillDetailRes, error)
 	SumValueByAPIKey(ctx context.Context, tokenID int64) (float64, error)
 	SumValueByAPIKeyBetween(ctx context.Context, tokenID int64, start, end time.Time) (float64, error)
+	SumConsumptionByAPIKey(ctx context.Context, tokenID int64) (float64, error)
+	SumConsumptionByAPIKeyBetween(ctx context.Context, tokenID int64, start, end time.Time) (float64, error)
 	GetVoucherBills(ctx context.Context, req types.VoucherBillReq) ([]VoucherBillGroupedResult, error)
 }
 
@@ -258,6 +260,39 @@ func (s *accountBillStoreImpl) SumValueByAPIKeyBetween(ctx context.Context, toke
 		return 0, errorx.HandleDBError(err, nil)
 	}
 	return result.TotalValue, nil
+}
+
+func (s *accountBillStoreImpl) SumConsumptionByAPIKey(ctx context.Context, tokenID int64) (float64, error) {
+	var result struct {
+		TotalConsumption float64 `bun:"total_consumption"`
+	}
+	err := s.db.Operator.Core.NewSelect().
+		Table("account_bills").
+		ColumnExpr("SUM(consumption) AS total_consumption").
+		Where("token_id = ?", tokenID).
+		Where("scene = ?", types.SceneModelServerless).
+		Scan(ctx, &result)
+	if err != nil {
+		return 0, errorx.HandleDBError(err, nil)
+	}
+	return result.TotalConsumption, nil
+}
+
+func (s *accountBillStoreImpl) SumConsumptionByAPIKeyBetween(ctx context.Context, tokenID int64, start, end time.Time) (float64, error) {
+	var result struct {
+		TotalConsumption float64 `bun:"total_consumption"`
+	}
+	err := s.db.Operator.Core.NewSelect().
+		Table("account_bills").
+		ColumnExpr("SUM(consumption) AS total_consumption").
+		Where("token_id = ?", tokenID).
+		Where("scene = ?", types.SceneModelServerless).
+		Where("bill_date >= ? AND bill_date <= ?", start, end).
+		Scan(ctx, &result)
+	if err != nil {
+		return 0, errorx.HandleDBError(err, nil)
+	}
+	return result.TotalConsumption, nil
 }
 
 type VoucherBillGroupedResult struct {

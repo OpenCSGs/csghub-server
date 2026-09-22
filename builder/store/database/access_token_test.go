@@ -266,6 +266,9 @@ func TestAccessTokenStore_UpdateTokenAndQuota(t *testing.T) {
 
 	err := atStore.Create(ctx, token, quotas)
 	require.Nil(t, err)
+	// token.ID is backfilled into each quota inside Create's transaction.
+	require.NotZero(t, token.ID)
+	require.Equal(t, token.ID, quotas[0].TokenID)
 
 	// Update token name
 	newName := "updated-token-name"
@@ -279,10 +282,112 @@ func TestAccessTokenStore_UpdateTokenAndQuota(t *testing.T) {
 	require.Equal(t, newName, updatedToken.Name)
 
 	// Verify quota updated
-	savedQuotas, err := quotaStore.FindByAPIKey(ctx, token.Token)
+	savedQuotas, err := quotaStore.FindByTokenID(ctx, token.ID)
 	require.Nil(t, err)
 	require.Len(t, savedQuotas, 1)
 	require.Equal(t, 200.0, savedQuotas[0].Quota)
+}
+
+func TestAccessTokenStore_UpdateToken_SyncsQuotaAPIKey(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+
+	ctx := context.TODO()
+	atStore := database.NewAccessTokenStoreWithDB(db)
+	quotaStore := database.NewAccountAccessTokenQuotaStoreWithDB(db)
+
+	token := &database.AccessToken{
+		GitID:       1234,
+		Name:        "refresh-builtin-token",
+		Token:       "old-key-value",
+		UserID:      1,
+		Application: types.AccessTokenAppAIGateway,
+		NsUUID:      "refresh-ns-uuid",
+		IsActive:    true,
+	}
+
+	quotas := []database.AccountAccessTokenQuota{
+		{
+			APIKey:    token.Token,
+			QuotaType: types.AccountingQuotaTypeMonthly,
+			ValueType: types.AccountingQuotaValueTypeFee,
+			Quota:     100.0,
+		},
+	}
+
+	err := atStore.Create(ctx, token, quotas)
+	require.Nil(t, err)
+	require.NotZero(t, token.ID)
+
+	// Refresh the token value, like RefreshToken's builtin branch does.
+	newKeyValue := "new-key-value"
+	token.Token = newKeyValue
+	err = atStore.UpdateToken(ctx, token)
+	require.Nil(t, err)
+
+	// The quota rows should now be joined to the new key value via token_id,
+	// so lookups by the old token id still find the row with the new api_key.
+	newQuotas, err := quotaStore.FindByTokenID(ctx, token.ID)
+	require.Nil(t, err)
+	require.Len(t, newQuotas, 1)
+	require.Equal(t, newKeyValue, newQuotas[0].APIKey)
+	require.Equal(t, 100.0, newQuotas[0].Quota)
+}
+
+func TestAccessTokenStore_UpdateTokenAndQuotas_InsertsMissingQuotas(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+
+	ctx := context.TODO()
+	atStore := database.NewAccessTokenStoreWithDB(db)
+	quotaStore := database.NewAccountAccessTokenQuotaStoreWithDB(db)
+
+	token := &database.AccessToken{
+		GitID:       1234,
+		Name:        "update-missing-quota-token",
+		Token:       "update-missing-quota-token-value",
+		UserID:      1,
+		Application: types.AccessTokenAppAIGateway,
+		NsUUID:      "update-missing-quota-ns-uuid",
+		IsActive:    true,
+	}
+
+	err := atStore.Create(ctx, token, nil)
+	require.Nil(t, err)
+	require.NotZero(t, token.ID)
+
+	existingQuota := &database.AccountAccessTokenQuota{
+		APIKey:    token.Token,
+		TokenID:   token.ID,
+		QuotaType: types.AccountingQuotaTypeMonthly,
+		ValueType: types.AccountingQuotaValueTypeFee,
+		Quota:     100.0,
+	}
+	require.Nil(t, quotaStore.Create(ctx, existingQuota))
+
+	existingQuota.Quota = 150.0
+	// The value types must differ because CheckQuotaSet allows at most one
+	// record per value type (token allows two) within a token's quota set.
+	missingQuota := &database.AccountAccessTokenQuota{
+		APIKey:    token.Token,
+		TokenID:   token.ID,
+		QuotaType: types.AccountingQuotaTotal,
+		ValueType: types.AccountingQuotaValueTypeToken,
+		Quota:     300.0,
+	}
+	token.Name = "updated-missing-quota-token"
+
+	updatedToken, err := atStore.UpdateTokenAndQuotas(ctx, token, []*database.AccountAccessTokenQuota{existingQuota, missingQuota})
+	require.Nil(t, err)
+	require.NotNil(t, updatedToken)
+	require.Equal(t, token.Name, updatedToken.Name)
+	require.NotZero(t, missingQuota.ID)
+
+	savedQuotas, err := quotaStore.FindByTokenID(ctx, token.ID)
+	require.Nil(t, err)
+	require.Len(t, savedQuotas, 2)
+	require.Equal(t, 150.0, savedQuotas[1].Quota)
+	require.Equal(t, 300.0, savedQuotas[0].Quota)
 }
 
 func TestAccessTokenStore_DeleteByID(t *testing.T) {

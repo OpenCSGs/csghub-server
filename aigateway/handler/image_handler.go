@@ -7,11 +7,12 @@ import (
 	"io"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"log/slog"
 	"mime/multipart"
 	"net/http"
 	"net/url"
+
+	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/aigateway/component/adapter/text2image"
 	llmtrace "opencsg.com/csghub-server/aigateway/component/trace"
 	"opencsg.com/csghub-server/aigateway/handler/plan"
@@ -420,7 +421,8 @@ func (h *imagePipelineHandler) finishImageTrace(c *gin.Context, ctx context.Cont
 			generationRecorder.End()
 		}
 		if isSuccessfulStatus(imageWrapper.StatusCode()) && usage != nil {
-			if err := h.handler.openaiComponent.RecordUsageFromTokenUsage(usageCtx, nsUUID, mt.Model, mt.ModelName, usage, apikey); err != nil {
+			tokenID := httpbase.GetCurrentTokenID(c)
+			if err := h.handler.openaiComponent.RecordUsageFromTokenUsage(usageCtx, nsUUID, mt.Model, mt.ModelName, usage, apikey, tokenID); err != nil {
 				slog.ErrorContext(usageCtx, "failed to record image usage", slog.Any("error", err))
 			}
 		}

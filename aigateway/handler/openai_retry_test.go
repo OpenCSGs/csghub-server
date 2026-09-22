@@ -664,8 +664,8 @@ func TestRetryChatWithFallback_UsesFallbackModelName(t *testing.T) {
 		}).
 		Once()
 	tester.mocks.openAIComp.EXPECT().
-		RecordUsageFromTokenUsage(mock.Anything, "user-1", modelTarget.Model, "provider-fallback-model", mock.Anything, "api-key").
-		RunAndReturn(func(ctx context.Context, userUUID string, model *types.Model, targetModelName string, usage *token.Usage, apikey string) error {
+		RecordUsageFromTokenUsage(mock.Anything, "user-1", modelTarget.Model, "provider-fallback-model", mock.Anything, "api-key", mock.Anything).
+		RunAndReturn(func(ctx context.Context, userUUID string, model *types.Model, targetModelName string, usage *token.Usage, apikey string, _ int64) error {
 			wg.Done()
 			return nil
 		}).
@@ -724,8 +724,8 @@ func TestRunChatPostProcessAsync_RecordsTraceUsageBeforeAccounting(t *testing.T)
 		}).
 		Once()
 	tester.mocks.openAIComp.EXPECT().
-		RecordUsageFromTokenUsage(mock.Anything, "user-1", model, "target-model", mock.Anything, "api-key").
-		RunAndReturn(func(ctx context.Context, userUUID string, model *types.Model, targetModelName string, usage *token.Usage, apikey string) error {
+		RecordUsageFromTokenUsage(mock.Anything, "user-1", model, "target-model", mock.Anything, "api-key", mock.Anything).
+		RunAndReturn(func(ctx context.Context, userUUID string, model *types.Model, targetModelName string, usage *token.Usage, apikey string, _ int64) error {
 			wg.Done()
 			return nil
 		}).
@@ -775,7 +775,7 @@ func TestRunChatPostProcessAsync_RecordsTraceCompletionBeforeUsage(t *testing.T)
 			Return(nil).
 			Once()
 		tester.mocks.openAIComp.EXPECT().
-			RecordUsageFromTokenUsage(mock.Anything, "user-1", model, "target-model", mock.Anything, "api-key").
+			RecordUsageFromTokenUsage(mock.Anything, "user-1", model, "target-model", mock.Anything, "api-key", mock.Anything).
 			Return(nil).
 			Once()
 
@@ -838,8 +838,8 @@ func TestRunChatPostProcessAsync_SkipsBillingOnErrorStatus(t *testing.T) {
 			Return(nil).
 			Once()
 		tester.mocks.openAIComp.EXPECT().
-			RecordUsageFromTokenUsage(mock.Anything, "user-1", model, "target-model", mock.Anything, "api-key").
-			Run(func(context.Context, string, *types.Model, string, *token.Usage, string) {
+			RecordUsageFromTokenUsage(mock.Anything, "user-1", model, "target-model", mock.Anything, "api-key", mock.Anything).
+			Run(func(context.Context, string, *types.Model, string, *token.Usage, string, int64) {
 				billingCalled.Store(true)
 			}).
 			Maybe()
@@ -883,8 +883,8 @@ func TestRunChatPostProcessAsync_SkipsBillingOnRedirectStatus(t *testing.T) {
 			Return(nil).
 			Once()
 		tester.mocks.openAIComp.EXPECT().
-			RecordUsageFromTokenUsage(mock.Anything, "user-1", model, "target-model", mock.Anything, "api-key").
-			Run(func(context.Context, string, *types.Model, string, *token.Usage, string) {
+			RecordUsageFromTokenUsage(mock.Anything, "user-1", model, "target-model", mock.Anything, "api-key", mock.Anything).
+			Run(func(context.Context, string, *types.Model, string, *token.Usage, string, int64) {
 				billingCalled.Store(true)
 			}).
 			Maybe()

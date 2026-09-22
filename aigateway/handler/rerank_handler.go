@@ -201,7 +201,8 @@ func (h *rerankPipelineHandler) Execute(c *gin.Context, meta *types.RequestMetad
 		}
 
 		if usage != nil && isSuccessfulStatus(w.StatusCode()) {
-			if err := h.handler.openaiComponent.RecordUsageFromTokenUsage(usageCtx, nsUUID, mt.Model, mt.ModelName, usage, apikey); err != nil {
+			tokenID := httpbase.GetCurrentTokenID(c)
+			if err := h.handler.openaiComponent.RecordUsageFromTokenUsage(usageCtx, nsUUID, mt.Model, mt.ModelName, usage, apikey, tokenID); err != nil {
 				slog.ErrorContext(usageCtx, "failed to record rerank token usage", "error", err)
 			}
 		}
@@ -224,4 +225,3 @@ func (h *rerankPipelineHandler) HandlePlanError(c *gin.Context, meta *types.Requ
 	}
 	handleOpenAIPlanError(c, meta, p, err, frontendURL)
 }
-

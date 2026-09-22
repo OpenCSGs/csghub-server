@@ -284,6 +284,7 @@ func isValidAccessToken(c *gin.Context, userSvcClient rpc.UserSvcClient, token s
 			httpbase.SetCurrentNamespaceUUID(c, user.NSUUID)
 			httpbase.SetAuthType(c, httpbase.AuthTypeUserOrgApiKey)
 			httpbase.SetCurrentTokenName(c, user.TokenName)
+			httpbase.SetCurrentTokenID(c, user.ID)
 			return true
 		}
 	}

@@ -244,6 +244,121 @@ func TestAccessTokenHandler_CreateAPIKey(t *testing.T) {
 
 		tester.ResponseEqCode(t, 400)
 	})
+
+	t.Run("multiple quotas are passed to component", func(t *testing.T) {
+		tester := NewAccessTokenTester(t).WithHandleFunc(func(h *AccessTokenHandler) gin.HandlerFunc {
+			return h.CreateAPIKey
+		})
+
+		body := types.CreateAPIKeyRequest{
+			KeyName: "my-key",
+			Quotas: []types.UpdateAPIKeyQuotaItem{
+				{QuotaType: types.AccountingQuotaTypeMonthly, ValueType: types.AccountingQuotaValueTypeFee, Quota: 100},
+				{QuotaType: types.AccountingQuotaTypeDaily, ValueType: types.AccountingQuotaValueTypeToken, Quota: 50},
+			},
+		}
+
+		expectedReq := types.CreateUserTokenRequest{
+			Username:    "u",
+			OpUUID:      "user-uuid",
+			NSUUID:      "namespace-uuid",
+			TokenName:   "my-key",
+			Application: types.AccessTokenAppAIGateway,
+			Quotas:      body.Quotas,
+		}
+
+		tester.mocks.token.EXPECT().Create(tester.Gctx(), &expectedReq).
+			Return(&database.AccessToken{ID: 1, Name: "my-key"}, nil).Once()
+
+		tester.WithUserAndUUID().
+			WithParam("uuid", "namespace-uuid").
+			WithBody(t, body).
+			Execute()
+
+		tester.ResponseEqCode(t, 200)
+	})
+
+	t.Run("invalid quota type returns 400", func(t *testing.T) {
+		tester := NewAccessTokenTester(t).WithHandleFunc(func(h *AccessTokenHandler) gin.HandlerFunc {
+			return h.CreateAPIKey
+		})
+
+		body := types.CreateAPIKeyRequest{
+			KeyName: "my-key",
+			Quotas: []types.UpdateAPIKeyQuotaItem{
+				{QuotaType: types.AccountingQuotaType("bogus"), ValueType: types.AccountingQuotaValueTypeFee, Quota: 100},
+			},
+		}
+
+		tester.WithUserAndUUID().
+			WithParam("uuid", "namespace-uuid").
+			WithBody(t, body).
+			Execute()
+
+		tester.ResponseEqCode(t, 400)
+	})
+
+	t.Run("negative quota returns 400", func(t *testing.T) {
+		tester := NewAccessTokenTester(t).WithHandleFunc(func(h *AccessTokenHandler) gin.HandlerFunc {
+			return h.CreateAPIKey
+		})
+
+		body := types.CreateAPIKeyRequest{
+			KeyName: "my-key",
+			Quotas: []types.UpdateAPIKeyQuotaItem{
+				{QuotaType: types.AccountingQuotaTypeMonthly, ValueType: types.AccountingQuotaValueTypeFee, Quota: -1},
+			},
+		}
+
+		tester.WithUserAndUUID().
+			WithParam("uuid", "namespace-uuid").
+			WithBody(t, body).
+			Execute()
+
+		tester.ResponseEqCode(t, 400)
+	})
+
+	t.Run("unenforceable quota combination returns 400", func(t *testing.T) {
+		tester := NewAccessTokenTester(t).WithHandleFunc(func(h *AccessTokenHandler) gin.HandlerFunc {
+			return h.CreateAPIKey
+		})
+
+		// monthly+request passes the enum check but is never enforced by the
+		// quota middleware or usage accounting, so it must be rejected.
+		body := types.CreateAPIKeyRequest{
+			KeyName: "my-key",
+			Quotas: []types.UpdateAPIKeyQuotaItem{
+				{QuotaType: types.AccountingQuotaTypeMonthly, ValueType: types.AccountingQuotaValueTypeRequest, Quota: 1000},
+			},
+		}
+
+		tester.WithUserAndUUID().
+			WithParam("uuid", "namespace-uuid").
+			WithBody(t, body).
+			Execute()
+
+		tester.ResponseEqCode(t, 400)
+	})
+
+	t.Run("per-minute fee combination returns 400", func(t *testing.T) {
+		tester := NewAccessTokenTester(t).WithHandleFunc(func(h *AccessTokenHandler) gin.HandlerFunc {
+			return h.CreateAPIKey
+		})
+
+		body := types.CreateAPIKeyRequest{
+			KeyName: "my-key",
+			Quotas: []types.UpdateAPIKeyQuotaItem{
+				{QuotaType: types.AccountingQuotaTypePerMinute, ValueType: types.AccountingQuotaValueTypeFee, Quota: 100},
+			},
+		}
+
+		tester.WithUserAndUUID().
+			WithParam("uuid", "namespace-uuid").
+			WithBody(t, body).
+			Execute()
+
+		tester.ResponseEqCode(t, 400)
+	})
 }
 
 func TestAccessTokenHandler_GetAPIKeyQuotas(t *testing.T) {

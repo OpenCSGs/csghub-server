@@ -7,11 +7,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"log/slog"
 	"mime/multipart"
 	"net/http"
 	"net/url"
+
+	"github.com/gin-gonic/gin"
 	llmtrace "opencsg.com/csghub-server/aigateway/component/trace"
 	"opencsg.com/csghub-server/aigateway/handler/plan"
 	"opencsg.com/csghub-server/aigateway/token"
@@ -142,7 +143,7 @@ func (h *audioPipelineHandler) Execute(c *gin.Context, meta *types.RequestMetada
 		RequestID:     requestID,
 		NSUUID:        nsUUID,
 		ModelID:       meta.Model,
-		ModelTarget:   &resolvedModelTarget{
+		ModelTarget: &resolvedModelTarget{
 			Model: mt.Model, Upstream: mt.Upstream, Target: mt.Target, Host: mt.Host, ModelName: mt.ModelName,
 		},
 		Metadata: map[string]any{
@@ -229,7 +230,8 @@ func (h *audioPipelineHandler) Execute(c *gin.Context, meta *types.RequestMetada
 		}
 
 		if isSuccessfulStatus(w.StatusCode()) && usage != nil {
-			if err := h.handler.openaiComponent.RecordUsageFromTokenUsage(usageCtx, nsUUID, mt.Model, mt.ModelName, usage, apikey); err != nil {
+			tokenID := httpbase.GetCurrentTokenID(c)
+			if err := h.handler.openaiComponent.RecordUsageFromTokenUsage(usageCtx, nsUUID, mt.Model, mt.ModelName, usage, apikey, tokenID); err != nil {
 				slog.ErrorContext(usageCtx, "failed to record audio transcription usage", slog.Any("error", err))
 			}
 		}
@@ -252,4 +254,3 @@ func (h *audioPipelineHandler) HandlePlanError(c *gin.Context, meta *types.Reque
 	}
 	handleOpenAIPlanError(c, meta, p, err, frontendURL)
 }
-

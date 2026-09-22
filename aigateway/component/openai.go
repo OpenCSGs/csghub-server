@@ -31,8 +31,8 @@ type OpenAIComponent interface {
 	GetAvailableModels(c context.Context, nsUUID string) ([]types.Model, error)
 	ListModels(c context.Context, nsUUID string, req types.ListModelsReq) (types.ModelList, error)
 	GetModelByID(c context.Context, nsUUID, modelID string) (*types.Model, error)
-	RecordUsage(c context.Context, nsUUID string, model *types.Model, targetModelName string, tokenCounter token.Counter, apikey string) error
-	RecordUsageFromTokenUsage(c context.Context, nsUUID string, model *types.Model, targetModelName string, usage *token.Usage, apikey string) error
+	RecordUsage(c context.Context, nsUUID string, model *types.Model, targetModelName string, tokenCounter token.Counter, apikey string, tokenID int64) error
+	RecordUsageFromTokenUsage(c context.Context, nsUUID string, model *types.Model, targetModelName string, usage *token.Usage, apikey string, tokenID int64) error
 	BuildUsageMeteringEvent(c context.Context, nsUUID string, model *types.Model, targetModelName string, usage *token.Usage, apikey string) (*commontypes.MeteringEvent, error)
 	CheckBalance(ctx context.Context, nsUUID string) error
 	CheckUsageLimit(ctx context.Context, userUUID string, model *types.Model, endpoint string) error
@@ -76,6 +76,7 @@ type openaiComponentImpl struct {
 	modelIDBuilder         upstream.ModelIDBuilder
 	usageLimiter           UsageLimiter
 	capacityPolicyDefaults commontypes.CapacityPolicy
+	quotaRateComponent     QuotaRateComponent
 	capacityAdmission      admission.CapacityAdmissionController
 	// capacityAdmissionOnce memoizes the lazily-built admission controller:
 	// the controller (and its per-pod lease renewer goroutine) must be a
@@ -666,12 +667,12 @@ func buildUsageExtraData(usageModel *types.Model, upstreamModelName string, usag
 	return string(extraData), nil
 }
 
-func (m *openaiComponentImpl) RecordUsage(c context.Context, nsUUID string, model *types.Model, targetModelName string, counter token.Counter, apikey string) error {
+func (m *openaiComponentImpl) RecordUsage(c context.Context, nsUUID string, model *types.Model, targetModelName string, counter token.Counter, apikey string, tokenID int64) error {
 	usage, err := counter.Usage(c)
 	if err != nil {
 		return fmt.Errorf("failed to get token usage from counter: %w", err)
 	}
-	return m.RecordUsageFromTokenUsage(c, nsUUID, model, targetModelName, usage, apikey)
+	return m.RecordUsageFromTokenUsage(c, nsUUID, model, targetModelName, usage, apikey, tokenID)
 }
 
 func (m *openaiComponentImpl) BuildUsageMeteringEvent(c context.Context, nsUUID string, model *types.Model, targetModelName string, usage *token.Usage, apikey string) (*commontypes.MeteringEvent, error) {
@@ -715,7 +716,7 @@ func (m *openaiComponentImpl) BuildUsageMeteringEvent(c context.Context, nsUUID 
 	return &event, nil
 }
 
-func (m *openaiComponentImpl) RecordUsageFromTokenUsage(c context.Context, nsUUID string, model *types.Model, targetModelName string, usage *token.Usage, apikey string) error {
+func (m *openaiComponentImpl) RecordUsageFromTokenUsage(c context.Context, nsUUID string, model *types.Model, targetModelName string, usage *token.Usage, apikey string, tokenID int64) error {
 	event, err := m.BuildUsageMeteringEvent(c, nsUUID, model, targetModelName, usage, apikey)
 	if err != nil {
 		return err
@@ -724,6 +725,14 @@ func (m *openaiComponentImpl) RecordUsageFromTokenUsage(c context.Context, nsUUI
 	if err != nil {
 		return fmt.Errorf("failed to marshal metering event: %w", err)
 	}
+
+	if m.quotaRateComponent != nil {
+		err = m.quotaRateComponent.RecordUsage(c, tokenID, int64(usage.TotalTokens))
+		if err != nil {
+			slog.ErrorContext(c, "failed to record token rate usage", slog.Any("tokenID", tokenID), slog.Any("error", err))
+		}
+	}
+
 	err = m.eventPub.PublishMeteringEvent(eventData)
 	if err != nil {
 		slog.ErrorContext(c, "failed to publish token usage event", slog.Any("event", sanitizeMeteringEventForLog(*event)), slog.Any("error", err))

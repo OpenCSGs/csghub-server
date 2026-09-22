@@ -115,7 +115,7 @@ func (c *accessTokenComponentImpl) Create(ctx context.Context, req *types.Create
 	}
 
 	var token *database.AccessToken
-	var quota *database.AccountAccessTokenQuota
+	var quotas []*database.AccountAccessTokenQuota
 	// csghub token is shared with git server
 	switch req.Application {
 	case types.AccessTokenAppGit:
@@ -147,9 +147,9 @@ func (c *accessTokenComponentImpl) Create(ctx context.Context, req *types.Create
 			UserID:      user.ID,
 			TokenType:   types.AccessTokenTypeOwner,
 		}
-		quota, err = c.buildNewAccessTokenQuota(ctx, token, req)
+		quotas, err = c.buildNewAccessTokenQuotas(token, req)
 		if err != nil {
-			return nil, fmt.Errorf("failed to build API key quota, error: %w", err)
+			return nil, fmt.Errorf("failed to build API key quotas, error: %w", err)
 		}
 	default:
 		tokenValue := c.genUnique()
@@ -168,15 +168,15 @@ func (c *accessTokenComponentImpl) Create(ctx context.Context, req *types.Create
 		token.ExpiredAt = req.ExpiredAt
 	}
 
-	err = c.createUserToken(ctx, token, user, quota)
+	err = c.createUserToken(ctx, token, user, quotas)
 	if err != nil {
-		return nil, fmt.Errorf("fail to create database user access token,error:%w", err)
+		return nil, fmt.Errorf("failed to create database user access token,error:%w", err)
 	}
 
 	if req.Application == types.AccessTokenAppMirror {
 		quota, err := c.acctClient.GetQuotaByID(req.Username)
 		if err != nil {
-			return nil, fmt.Errorf("fail to get quota by username,error:%w", err)
+			return nil, fmt.Errorf("failed to get quota by username,error:%w", err)
 		}
 		if quota == nil {
 			_, err := c.acctClient.CreateOrUpdateQuota(req.Username, types.AcctQuotaReq{
@@ -185,7 +185,7 @@ func (c *accessTokenComponentImpl) Create(ctx context.Context, req *types.Create
 				TrafficLimit:   c.config.MultiSync.DefaultTrafficLimit,
 			})
 			if err != nil {
-				return nil, fmt.Errorf("fail to create quota for new mirror token,error:%w", err)
+				return nil, fmt.Errorf("failed to create quota for new mirror token,error:%w", err)
 			}
 		}
 	}
@@ -259,6 +259,7 @@ func (c *accessTokenComponentImpl) Check(ctx context.Context, req *types.CheckAc
 		return resp, err
 	}
 
+	resp.ID = t.ID
 	resp.Token = t.Token
 	resp.TokenName = t.Name
 	resp.Application = t.Application
@@ -332,16 +333,24 @@ func (c *accessTokenComponentImpl) GetTokens(ctx context.Context, req *types.Get
 		resp.UpdatedAt = t.UpdatedAt
 		resp.TokenType = string(t.TokenType)
 
-		quotas, err := c.tokenQuotaStore.FindByAPIKey(ctx, t.Token)
+		quotas, err := c.tokenQuotaStore.FindByTokenID(ctx, t.ID)
 		if err != nil {
-			slog.ErrorContext(ctx, "failed to find access token quota for API key %s, error: %w", t.Token, err)
-		}
-		if len(quotas) > 0 {
-			resp.QuotaType = quotas[0].QuotaType
-			resp.QuotaValueType = quotas[0].ValueType
-			resp.Usage = quotas[0].Usage
-			resp.Quota = quotas[0].Quota
-			resp.LastUsedAt = quotas[0].LastUsedAt
+			slog.ErrorContext(ctx, "failed to find access token quota for tokenID",
+				slog.Any("tokenID", t.ID), slog.Any("error", err))
+		} else {
+			for _, q := range quotas {
+				resp.Quotas = append(resp.Quotas, types.AccountAccessTokenQuotaResp{
+					ID:             q.ID,
+					QuotaType:      q.QuotaType,
+					QuotaValueType: q.ValueType,
+					Usage:          q.Usage,
+					Quota:          q.Quota,
+					PeriodStart:    q.PeriodStart,
+					PeriodEnd:      q.PeriodEnd,
+					Allocation:     q.Allocation,
+					LastUsedAt:     q.LastUsedAt,
+				})
+			}
 		}
 		resps = append(resps, resp)
 	}
@@ -355,6 +364,7 @@ func (c *accessTokenComponentImpl) RefreshToken(ctx context.Context, refreshReq 
 	var err error
 
 	if len(refreshReq.NSUUID) > 0 {
+		// support api key refresh
 		checkReq := &types.CreateUserTokenRequest{
 			Username: refreshReq.Username,
 			OpUUID:   refreshReq.OpUUID,
@@ -390,7 +400,8 @@ func (c *accessTokenComponentImpl) RefreshToken(ctx context.Context, refreshReq 
 		Permission:  t.Permission,
 	}
 	// csghub token is shared with git server
-	if req.Application == "" || req.Application == types.AccessTokenAppCSGHub {
+	switch req.Application {
+	case "", types.AccessTokenAppCSGHub:
 		newToken := &database.AccessToken{
 			Name:        req.TokenName,
 			Permission:  req.Permission,
@@ -400,13 +411,13 @@ func (c *accessTokenComponentImpl) RefreshToken(ctx context.Context, refreshReq 
 		}
 
 		newTokenValue = newToken.Token
-	} else if req.Application == types.AccessTokenAppAIGateway {
+	case types.AccessTokenAppAIGateway:
 		keyValue, err := generateOrgAPIKey("gk", 32)
 		if err != nil {
 			return types.CheckAccessTokenResp{}, fmt.Errorf("failed to generate builtin api key, error: %w", err)
 		}
 		newTokenValue = keyValue
-	} else {
+	default:
 		newTokenValue = c.genUnique()
 	}
 
@@ -468,19 +479,24 @@ func (c *accessTokenComponentImpl) GetOrCreateFirstAvaiToken(ctx context.Context
 	return token.Token, nil
 }
 
-func (c *accessTokenComponentImpl) createUserToken(ctx context.Context, newToken *database.AccessToken, user database.User, quota *database.AccountAccessTokenQuota) error {
-	var quotas []database.AccountAccessTokenQuota
-	if quota != nil {
-		quotas = []database.AccountAccessTokenQuota{*quota}
+func (c *accessTokenComponentImpl) createUserToken(ctx context.Context, newToken *database.AccessToken, user database.User, quotas []*database.AccountAccessTokenQuota) error {
+	// Convert slice of pointers to slice of values for the store.
+	var quotaValues []database.AccountAccessTokenQuota
+	if len(quotas) > 0 {
+		for _, q := range quotas {
+			if q != nil {
+				quotaValues = append(quotaValues, *q)
+			}
+		}
 	}
-	err := c.ts.Create(ctx, newToken, quotas)
+	err := c.ts.Create(ctx, newToken, quotaValues)
 	if err != nil {
-		return fmt.Errorf("fail to create user %s new %s token, error: %w", user.Username, newToken.Application, err)
+		return fmt.Errorf("failed to create user %s new %s token, error: %w", user.Username, newToken.Application, err)
 	}
 
 	if newToken.Application == types.AccessTokenAppStarship {
 		// charge 100 credit for create starship token by call accounting service
-		err = c.presentForNewAccessToken(user)
+		err := c.presentForNewAccessToken(user)
 		if err != nil {
 			slog.ErrorContext(ctx, "fail to charge for new starship user with retry 3 times", slog.Any("user.uuid", user.UUID), slog.Any("err", err))
 		}
@@ -597,31 +613,44 @@ func (c *accessTokenComponentImpl) Update(ctx context.Context, req *types.Update
 		}
 	}
 
-	quota, err := c.updateAccessTokenQuota(ctx, token, req)
+	quotaPtrs, err := c.updateAccessTokenQuotas(ctx, token, req.Quotas)
 	if err != nil {
-		return nil, fmt.Errorf("failed to build API key quota, error: %w", err)
+		return nil, fmt.Errorf("failed to update API key quotas, error: %w", err)
 	}
 
-	result, err := c.ts.UpdateTokenAndQuota(ctx, token, quota)
+	result, err := c.ts.UpdateTokenAndQuotas(ctx, token, quotaPtrs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update token, error: %w", err)
 	}
 
+	quotas, err := c.tokenQuotaStore.FindByTokenID(ctx, result.ID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find token quotas, error: %w", err)
+	}
+
 	resp := types.CheckAccessTokenResp{
-		ID:             result.ID,
-		Token:          maskToken(result.Token),
-		TokenName:      result.Name,
-		Application:    result.Application,
-		ExpireAt:       result.ExpiredAt,
-		NSUUID:         result.NsUUID,
-		QuotaType:      quota.QuotaType,
-		QuotaValueType: quota.ValueType,
-		Usage:          quota.Usage,
-		Quota:          quota.Quota,
-		LastUsedAt:     quota.LastUsedAt,
-		CreatedAt:      result.CreatedAt,
-		UpdatedAt:      result.UpdatedAt,
-		TokenType:      string(result.TokenType),
+		ID:          result.ID,
+		Token:       maskToken(result.Token),
+		TokenName:   result.Name,
+		Application: result.Application,
+		ExpireAt:    result.ExpiredAt,
+		NSUUID:      result.NsUUID,
+		CreatedAt:   result.CreatedAt,
+		UpdatedAt:   result.UpdatedAt,
+		TokenType:   string(result.TokenType),
+	}
+	for _, q := range quotas {
+		resp.Quotas = append(resp.Quotas, types.AccountAccessTokenQuotaResp{
+			ID:             q.ID,
+			QuotaType:      q.QuotaType,
+			QuotaValueType: q.ValueType,
+			Usage:          q.Usage,
+			Quota:          q.Quota,
+			PeriodStart:    q.PeriodStart,
+			PeriodEnd:      q.PeriodEnd,
+			Allocation:     q.Allocation,
+			LastUsedAt:     q.LastUsedAt,
+		})
 	}
 
 	return &resp, nil
@@ -686,20 +715,19 @@ func (c *accessTokenComponentImpl) checkOrCreateBuiltinAPIKey(ctx context.Contex
 		UserID:      user.ID,
 		TokenType:   types.AccessTokenTypeBuiltIn,
 	}
-	quotaReq := &types.CreateUserTokenRequest{
-		QuotaType: types.AccountingQuotaTypeUnlimited,
-		ValueType: types.AccountingQuotaValueTypeFee,
-		Quota:     0,
-	}
-	quota, err := c.buildNewAccessTokenQuota(ctx, newToken, quotaReq)
+	quotas, err := c.buildNewAccessTokenQuotas(newToken, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build API key quota, error: %w", err)
 	}
-	var quotas []database.AccountAccessTokenQuota
-	if quota != nil {
-		quotas = []database.AccountAccessTokenQuota{*quota}
+	var quotaValues []database.AccountAccessTokenQuota
+	if len(quotas) > 0 {
+		for _, q := range quotas {
+			if q != nil {
+				quotaValues = append(quotaValues, *q)
+			}
+		}
 	}
-	err = c.ts.Create(ctx, newToken, quotas)
+	err = c.ts.Create(ctx, newToken, quotaValues)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create builtin api key, error: %w", err)
 	}

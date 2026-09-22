@@ -35,11 +35,11 @@ func (c *fakeOpenAIComponent) GetModelByID(ctx context.Context, nsUUID, modelID 
 	return c.model, nil
 }
 
-func (c *fakeOpenAIComponent) RecordUsage(ctx context.Context, nsUUID string, model *aigwtypes.Model, targetModelName string, tokenCounter token.Counter, apikey string) error {
+func (c *fakeOpenAIComponent) RecordUsage(ctx context.Context, nsUUID string, model *aigwtypes.Model, targetModelName string, tokenCounter token.Counter, apikey string, tokenID int64) error {
 	return nil
 }
 
-func (c *fakeOpenAIComponent) RecordUsageFromTokenUsage(ctx context.Context, nsUUID string, model *aigwtypes.Model, targetModelName string, usage *token.Usage, apikey string) error {
+func (c *fakeOpenAIComponent) RecordUsageFromTokenUsage(ctx context.Context, nsUUID string, model *aigwtypes.Model, targetModelName string, usage *token.Usage, apikey string, tokenID int64) error {
 	return nil
 }
 

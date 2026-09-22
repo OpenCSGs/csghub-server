@@ -172,6 +172,7 @@ func (h *Handler) Execute(c *gin.Context, meta *types.RequestMetadata, p *types.
 	h.runPostProcessAsync(c.Request.Context(), postProcessInput{
 		NSUUID:          meta.TenantID,
 		ApiKey:          httpbase.GetAccessToken(c),
+		TokenID:         httpbase.GetCurrentTokenID(c),
 		Model:           p.ModelTarget.Model,
 		TargetModelName: p.ModelTarget.ModelName,
 		Usage:           &usage,
@@ -324,7 +325,7 @@ func (h *Handler) runPostProcessAsync(ctx context.Context, input postProcessInpu
 
 		// Record usage (only on successful status).
 		if h.UsageRecorder != nil && input.Model != nil && input.Usage != nil && isSuccessfulStatus(input.StatusCode) {
-			if err := h.UsageRecorder.RecordUsage(usageCtx, input.NSUUID, input.Model, input.TargetModelName, input.Usage.toUsage(), input.ApiKey); err != nil {
+			if err := h.UsageRecorder.RecordUsage(usageCtx, input.NSUUID, input.Model, input.TargetModelName, input.Usage.toUsage(), input.ApiKey, input.TokenID); err != nil {
 				slog.ErrorContext(usageCtx, "failed to record token usage", slog.Any("error", err))
 			}
 		}

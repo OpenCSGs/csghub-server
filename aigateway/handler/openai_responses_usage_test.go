@@ -120,8 +120,8 @@ func TestRecordResponsesUsageHappyPathCallsComponent(t *testing.T) {
 				return nil
 			}).Once()
 		tester.mocks.openAIComp.EXPECT().RecordUsageFromTokenUsage(
-			mock.Anything, "testuuid", model, "upstream", mock.Anything, "apikey",
-		).RunAndReturn(func(_ context.Context, _ string, _ *types.Model, _ string, usage *token.Usage, _ string) error {
+			mock.Anything, "testuuid", model, "upstream", mock.Anything, "apikey", mock.Anything,
+		).RunAndReturn(func(_ context.Context, _ string, _ *types.Model, _ string, usage *token.Usage, _ string, _ int64) error {
 			seenUsage = usage
 			wg.Done()
 			return nil
@@ -184,8 +184,8 @@ func TestRecordResponsesUsagePublishesLLMLog(t *testing.T) {
 				return nil
 			}).Once()
 		tester.mocks.openAIComp.EXPECT().RecordUsageFromTokenUsage(
-			mock.Anything, "testuuid", model, "upstream", mock.Anything, "apikey",
-		).RunAndReturn(func(_ context.Context, _ string, _ *types.Model, _ string, _ *token.Usage, _ string) error {
+			mock.Anything, "testuuid", model, "upstream", mock.Anything, "apikey", mock.Anything,
+		).RunAndReturn(func(_ context.Context, _ string, _ *types.Model, _ string, _ *token.Usage, _ string, _ int64) error {
 			wg.Done()
 			return nil
 		}).Once()
@@ -247,8 +247,8 @@ func TestRecordResponsesUsageRecordsLLMTrace(t *testing.T) {
 				return nil
 			}).Once()
 		tester.mocks.openAIComp.EXPECT().RecordUsageFromTokenUsage(
-			mock.Anything, "testuuid", model, "upstream", mock.Anything, "apikey",
-		).RunAndReturn(func(_ context.Context, _ string, _ *types.Model, _ string, _ *token.Usage, _ string) error {
+			mock.Anything, "testuuid", model, "upstream", mock.Anything, "apikey", mock.Anything,
+		).RunAndReturn(func(_ context.Context, _ string, _ *types.Model, _ string, _ *token.Usage, _ string, _ int64) error {
 			wg.Done()
 			return nil
 		}).Once()
@@ -294,8 +294,8 @@ func TestRecordResponsesUsageSkipsBillingOnErrorStatus(t *testing.T) {
 			Return(nil).
 			Once()
 		tester.mocks.openAIComp.EXPECT().
-			RecordUsageFromTokenUsage(mock.Anything, "testuuid", model, "upstream", mock.Anything, "apikey").
-			Run(func(context.Context, string, *types.Model, string, *token.Usage, string) {
+			RecordUsageFromTokenUsage(mock.Anything, "testuuid", model, "upstream", mock.Anything, "apikey", mock.Anything).
+			Run(func(context.Context, string, *types.Model, string, *token.Usage, string, int64) {
 				billingCalled.Store(true)
 			}).
 			Maybe()
@@ -330,8 +330,8 @@ func TestRecordResponsesUsageSkipsBillingOnRedirectStatus(t *testing.T) {
 			Return(nil).
 			Once()
 		tester.mocks.openAIComp.EXPECT().
-			RecordUsageFromTokenUsage(mock.Anything, "testuuid", model, "upstream", mock.Anything, "apikey").
-			Run(func(context.Context, string, *types.Model, string, *token.Usage, string) {
+			RecordUsageFromTokenUsage(mock.Anything, "testuuid", model, "upstream", mock.Anything, "apikey", mock.Anything).
+			Run(func(context.Context, string, *types.Model, string, *token.Usage, string, int64) {
 				billingCalled.Store(true)
 			}).
 			Maybe()

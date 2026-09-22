@@ -8,9 +8,10 @@ import (
 	"time"
 
 	"encoding/json"
-	"github.com/gin-gonic/gin"
 	"log/slog"
 	"net/http"
+
+	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/aigateway/handler/plan"
 	"opencsg.com/csghub-server/aigateway/token"
 	"opencsg.com/csghub-server/aigateway/types"
@@ -212,7 +213,8 @@ func (h *embeddingPipelineHandler) Execute(c *gin.Context, meta *types.RequestMe
 		}
 
 		if usage != nil && isSuccessfulStatus(w.StatusCode()) {
-			if err := h.handler.openaiComponent.RecordUsageFromTokenUsage(usageCtx, nsUUID, mt.Model, mt.ModelName, usage, apikey); err != nil {
+			tokenID := httpbase.GetCurrentTokenID(c)
+			if err := h.handler.openaiComponent.RecordUsageFromTokenUsage(usageCtx, nsUUID, mt.Model, mt.ModelName, usage, apikey, tokenID); err != nil {
 				slog.ErrorContext(usageCtx, "failed to record embedding token usage", "error", err)
 			}
 		}
@@ -235,4 +237,3 @@ func (h *embeddingPipelineHandler) HandlePlanError(c *gin.Context, meta *types.R
 	}
 	handleOpenAIPlanError(c, meta, p, err, frontendURL)
 }
-

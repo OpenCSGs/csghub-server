@@ -332,6 +332,7 @@ type Config struct {
 		RetryLimit                   int    `env:"OPENCSG_ACCOUNTING_RETRY_LIMIT" default:"1"`
 		MaxExportPages               int    `env:"OPENCSG_ACCOUNTING_MAX_EXPORT_PAGES" default:"1000"`
 		AllowedSyncDeductScenes      string `env:"OPENCSG_ACCOUNTING_ALLOWED_SYNC_DEDUCT_SCENES" default:"30"`
+		AccessQuotaTTLInHours        int    `env:"OPENCSG_ACCOUNTING_ACCESS_QUOTA_TTL_IN_HOURS" default:"8"`
 	}
 
 	User struct {

@@ -9,11 +9,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"log/slog"
 	"mime/multipart"
 	"net/http"
 	"net/url"
+
+	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/aigateway/component/adapter/ocr"
 	"opencsg.com/csghub-server/aigateway/handler/plan"
 	"opencsg.com/csghub-server/aigateway/http/response/wrapper"
@@ -209,7 +210,7 @@ func (h *ocrPipelineHandler) Execute(c *gin.Context, meta *types.RequestMetadata
 		RequestID:     requestID,
 		NSUUID:        nsUUID,
 		ModelID:       meta.Model,
-		ModelTarget:   &resolvedModelTarget{
+		ModelTarget: &resolvedModelTarget{
 			Model: mt.Model, Upstream: mt.Upstream, Target: mt.Target, Host: mt.Host, ModelName: mt.ModelName,
 		},
 		Metadata: map[string]any{
@@ -335,7 +336,8 @@ func (h *ocrPipelineHandler) Execute(c *gin.Context, meta *types.RequestMetadata
 		}
 
 		if isSuccessfulStatus(w.StatusCode()) && usage != nil {
-			if err := h.handler.openaiComponent.RecordUsageFromTokenUsage(usageCtx, nsUUID, mt.Model, mt.ModelName, usage, apikey); err != nil {
+			tokenID := httpbase.GetCurrentTokenID(c)
+			if err := h.handler.openaiComponent.RecordUsageFromTokenUsage(usageCtx, nsUUID, mt.Model, mt.ModelName, usage, apikey, tokenID); err != nil {
 				slog.ErrorContext(usageCtx, "failed to record ocr usage", slog.Any("error", err))
 			}
 		}
@@ -358,4 +360,3 @@ func (h *ocrPipelineHandler) HandlePlanError(c *gin.Context, meta *types.Request
 	}
 	handleOpenAIPlanError(c, meta, p, err, frontendURL)
 }
-

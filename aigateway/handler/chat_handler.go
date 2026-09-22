@@ -6,9 +6,10 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/gin-gonic/gin"
 	"log/slog"
 	"net/http"
+
+	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/aigateway/component"
 	"opencsg.com/csghub-server/aigateway/handler/plan"
 	"opencsg.com/csghub-server/aigateway/types"
@@ -140,6 +141,7 @@ func (h *chatPipelineHandler) Execute(c *gin.Context, meta *types.RequestMetadat
 	nsUUID := meta.TenantID
 	apikey := meta.APIKeyID
 	modelID := meta.Model
+	tokenID := httpbase.GetCurrentTokenID(c)
 
 	mt := modelTargetToResolved(p.ModelTarget)
 
@@ -272,6 +274,7 @@ func (h *chatPipelineHandler) Execute(c *gin.Context, meta *types.RequestMetadat
 	h.handler.runChatPostProcessAsync(ctx, chatPostProcessInput{
 		NSUUID:          nsUUID,
 		ApiKey:          apikey,
+		TokenID:         tokenID,
 		Model:           mt.Model,
 		TargetModelName: mt.ModelName,
 		TokenCounter:    chatCtx.tokenCounter,
