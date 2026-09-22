@@ -21,7 +21,7 @@ func TestCheckAdapterCapabilities(t *testing.T) {
 		assert.Empty(t, missing)
 	})
 
-	t.Run("cache_control not supported", func(t *testing.T) {
+	t.Run("cache_control satisfied by default chat capability", func(t *testing.T) {
 		req := &types.AnthropicMessagesRequest{
 			Messages: []types.AnthropicMessage{
 				{Role: "user", Content: json.RawMessage(`[{"type":"text","text":"hi","cache_control":{"type":"ephemeral"}}]`)},
@@ -29,22 +29,35 @@ func TestCheckAdapterCapabilities(t *testing.T) {
 		}
 		cap := types.CapabilityFor(types.ProtocolChat)
 		missing := checkAdapterCapabilities(req, cap)
-		assert.Contains(t, missing, "prompt_caching")
+		assert.Empty(t, missing,
+			"chat upstreams cache prompts automatically, so the cache_control hint counts as satisfied")
 	})
 
-t.Run("thinking not supported", func(t *testing.T) {
-			req := &types.AnthropicMessagesRequest{
-				Thinking: &types.AnthropicThinking{Type: "enabled", BudgetTokens: 5000},
-				Messages: []types.AnthropicMessage{
-					{Role: "user", Content: json.RawMessage(`"hello"`)},
-				},
-			}
-			// Use a custom capability with Thinking disabled — the default
-			// ProtocolChat capability now supports thinking via reasoning_effort.
-			cap := types.ProtocolCapability{Thinking: false}
-			missing := checkAdapterCapabilities(req, cap)
-			assert.Contains(t, missing, "thinking")
-		})
+	t.Run("cache_control still gated when capability explicitly disables it", func(t *testing.T) {
+		req := &types.AnthropicMessagesRequest{
+			Messages: []types.AnthropicMessage{
+				{Role: "user", Content: json.RawMessage(`[{"type":"text","text":"hi","cache_control":{"type":"ephemeral"}}]`)},
+			},
+		}
+		cap := types.ProtocolCapability{PromptCaching: false}
+		missing := checkAdapterCapabilities(req, cap)
+		assert.Contains(t, missing, "prompt_caching",
+			"an upstream that explicitly declares no prompt caching must still gate the hint")
+	})
+
+	t.Run("thinking not supported", func(t *testing.T) {
+		req := &types.AnthropicMessagesRequest{
+			Thinking: &types.AnthropicThinking{Type: "enabled", BudgetTokens: 5000},
+			Messages: []types.AnthropicMessage{
+				{Role: "user", Content: json.RawMessage(`"hello"`)},
+			},
+		}
+		// Use a custom capability with Thinking disabled — the default
+		// ProtocolChat capability now supports thinking via reasoning_effort.
+		cap := types.ProtocolCapability{Thinking: false}
+		missing := checkAdapterCapabilities(req, cap)
+		assert.Contains(t, missing, "thinking")
+	})
 
 	t.Run("vision not supported", func(t *testing.T) {
 		req := &types.AnthropicMessagesRequest{
@@ -89,15 +102,15 @@ func TestMessagesToChatMessages(t *testing.T) {
 		req := &types.AnthropicMessagesRequest{
 			Messages: []types.AnthropicMessage{
 				{
-					Role: "user",
+					Role:    "user",
 					Content: json.RawMessage(`"What's the weather?"`),
 				},
 				{
-					Role: "assistant",
+					Role:    "assistant",
 					Content: json.RawMessage(`[{"type":"tool_use","id":"tool_1","name":"get_weather","input":{"city":"SF"}}]`),
 				},
 				{
-					Role: "user",
+					Role:    "user",
 					Content: json.RawMessage(`[{"type":"tool_result","tool_use_id":"tool_1","content":"72°F sunny"}]`),
 				},
 			},
@@ -128,7 +141,7 @@ func TestMessagesToChatMessages(t *testing.T) {
 		req := &types.AnthropicMessagesRequest{
 			Messages: []types.AnthropicMessage{
 				{
-					Role: "assistant",
+					Role:    "assistant",
 					Content: json.RawMessage(`[{"type":"thinking","thinking":"Let me think..."},{"type":"text","text":"The answer is 42"}]`),
 				},
 			},

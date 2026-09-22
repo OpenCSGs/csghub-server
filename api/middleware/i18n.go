@@ -88,6 +88,19 @@ func LocalizedErrorMiddleware() gin.HandlerFunc {
 			}
 			return
 		}
+		// Only JSON bodies can carry the localizable httpbase.R envelope.
+		// Anything else — e.g. an SSE stream that carries an upstream error
+		// event — is forwarded untouched; parsing it as JSON would produce
+		// nothing but spurious error logs.
+		if !strings.Contains(bw.Header().Get("Content-Type"), "application/json") {
+			if _, err := bw.writeInternal(respBytes); err != nil {
+				slog.ErrorContext(c.Request.Context(), "write original non-json resp error, LocalizedErrorMiddleware",
+					slog.String("url", c.Request.URL.Path),
+					slog.String("err", err.Error()),
+				)
+			}
+			return
+		}
 		var respObj httpbase.R
 		err := json.Unmarshal(respBytes, &respObj)
 		if err != nil {

@@ -26,26 +26,34 @@ type ProtocolCapability struct {
 	StructuredOutput bool // JSON schema / response_format
 }
 
-// DefaultProtocolCapabilities returns the built-in capability profile for each
-// protocol.  These defaults can be overridden at runtime by upstream metadata
-// (see handler/protocol/adapt.go).
+// DefaultProtocolCapabilities returns the built-in capability profile for
+// each protocol. These are protocol-level defaults: the planner applies them
+// by upstream protocol (see handler/plan/planner.go) and there is currently
+// no per-upstream metadata override on top of them.
 var DefaultProtocolCapabilities = map[Protocol]ProtocolCapability{
-ProtocolChat: {
-			Protocol:         ProtocolChat,
-			Streaming:        true,
-			Tools:            true,
-			Vision:           true,
-			Thinking:         true, // support via reasoning_effort translation
-			PromptCaching:    false,
-			StructuredOutput: true,
-		},
+	ProtocolChat: {
+		Protocol:  ProtocolChat,
+		Streaming: true,
+		Tools:     true,
+		Vision:    true,
+		Thinking:  true, // support via reasoning_effort translation
+		// Chat upstreams cache prompts automatically (DeepSeek reports
+		// prompt_cache_hit_tokens, OpenAI caches implicitly), so the
+		// Anthropic cache_control hint counts as satisfied: the
+		// messages→chat conversion drops the markers and the upstream
+		// caches implicitly.
+		PromptCaching:    true,
+		StructuredOutput: true,
+	},
 	ProtocolResponses: {
-		Protocol:         ProtocolResponses,
-		Streaming:        true,
-		Tools:            true,
-		Vision:           true,
-		Thinking:         true,
-		PromptCaching:    false,
+		Protocol:  ProtocolResponses,
+		Streaming: true,
+		Tools:     true,
+		Vision:    true,
+		Thinking:  true,
+		// The Responses upstream caches prompts automatically as well; the
+		// messages→responses conversion drops cache_control markers.
+		PromptCaching:    true,
 		StructuredOutput: true,
 	},
 	ProtocolMessages: {

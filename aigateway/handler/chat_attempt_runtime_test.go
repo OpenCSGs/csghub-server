@@ -311,4 +311,48 @@ func TestMarshalChatRequestBodyRawFastPath(t *testing.T) {
 		require.NoError(t, err)
 		assert.Contains(t, string(body), `"reasoning_content":""`)
 	})
+
+	t.Run("null message content forces the patch path", func(t *testing.T) {
+		// Some SDKs send content:null on assistant tool-call turns; the
+		// fast path must not forward it verbatim (strict upstreams reject
+		// the null form).
+		rawWithNull := []byte(`{"model": "served-model", "messages": [{"role": "assistant", "content": null, "tool_calls": [{"id": "call_1", "type": "function", "function": {"name": "f"}}]}]}`)
+		chatReqWithNull := &types.ChatCompletionRequest{}
+		require.NoError(t, json.Unmarshal(rawWithNull, chatReqWithNull))
+		require.True(t, chatReqWithNull.HasNullMessageContent())
+
+		body, err := marshalChatRequestBody(chatReqWithNull, "served-model")
+		require.NoError(t, err)
+		assert.NotEqual(t, rawWithNull, body)
+		assert.NotContains(t, string(body), `"content":null`,
+			"explicit null content must be canonicalized to an absent key")
+		assert.Contains(t, string(body), `"tool_calls"`)
+	})
+}
+
+func TestMarshalChatRequestBodyDropsNullContentOnModelRewrite(t *testing.T) {
+	// Mirrors the production failure: client model name differs from the
+	// upstream name, and the SDK-style assistant message carries
+	// content:null alongside tool_calls. DeepSeek rejects the null form
+	// with "messages[0]: content should be a string or a list".
+	raw := []byte(`{
+		"model": "deepseek-v4-flash",
+		"messages": [
+			{"role": "user", "content": "What is the weather in Beijing?"},
+			{"role": "assistant", "content": null, "tool_calls": [{"id": "call_1", "type": "function", "function": {"name": "get_weather", "arguments": "{\"city\":\"Beijing\"}"}}]},
+			{"role": "tool", "tool_call_id": "call_1", "content": "sunny"}
+		],
+		"tools": [{"type": "function", "function": {"name": "get_weather"}}]
+	}`)
+	chatReq := &types.ChatCompletionRequest{}
+	require.NoError(t, json.Unmarshal(raw, chatReq))
+
+	body, err := marshalChatRequestBody(chatReq, "deepseek-flash")
+	require.NoError(t, err)
+
+	assert.NotContains(t, string(body), `"content":null`,
+		"null content must be canonicalized to an absent key")
+	assert.Contains(t, string(body), `"model":"deepseek-flash"`)
+	// the reasoning fixup still applies on the rewritten body
+	assert.Contains(t, string(body), `"reasoning_content":""`)
 }

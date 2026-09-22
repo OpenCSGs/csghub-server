@@ -664,28 +664,43 @@ func TestE2E_Disabled_NoAdapter(t *testing.T) {
 }
 
 func TestE2E_UnsupportedCapability_CacheControl(t *testing.T) {
+	// Chat upstreams cache prompts automatically, so the cache_control hint
+	// counts as satisfied: the adapter accepts the request, drops the
+	// markers, and proxies to the upstream.
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		t.Fatal("upstream should not be called")
+		body := readBody(r.Body)
+		assert.NotContains(t, body, "cache_control",
+			"cache_control markers must not leak into the chat body")
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(200)
+		fmt.Fprint(w, `{
+			"id": "chatcmpl-1",
+			"object": "chat.completion",
+			"created": 1234567890,
+			"model": "test-model",
+			"choices": [{"index": 0, "message": {"role": "assistant", "content": "hello"}, "finish_reason": "stop"}],
+			"usage": {"prompt_tokens": 5, "completion_tokens": 2, "total_tokens": 7}
+		}`)
 	}))
 	defer upstream.Close()
 
 	body := `{
 		"model": "test-model",
 		"max_tokens": 1024,
-		"messages": [{"role": "user", "content": [{"type": "text", "text": "hello", "cache_control": {"type": "ephemeral"}}]}]
+		"system": [{"type": "text", "text": "be nice", "cache_control": {"type": "ephemeral"}}],
+		"messages": [{"role": "user", "content": [{"type": "text", "text": "hello", "cache_control": {"type": "ephemeral"}}]}],
+		"tools": [{"name": "get_weather", "description": "weather", "input_schema": {"type": "object", "properties": {}}, "cache_control": {"type": "ephemeral"}}]
 	}`
 	target := makeMessagesTarget(upstream.URL+"/v1/chat/completions", "")
 	planner := &fakePlanner{target: target}
 	handler := makeTestHandlerWithPlanner(planner)
 	w := dispatchWithTarget(t, handler, body, planner)
 
-	assert.Equal(t, 400, w.Code)
-	var errResp map[string]any
-	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &errResp))
-	errObj, ok := errResp["error"].(map[string]any)
-	require.True(t, ok)
-	assert.Equal(t, "unsupported_capability", errObj["type"])
-	assert.Contains(t, errObj["message"], "prompt_caching")
+	require.Equal(t, 200, w.Code)
+	var resp types.AnthropicMessagesResponse
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+	assert.Equal(t, "hello", resp.Content[0].Text)
 }
 
 func TestE2E_UnsupportedCapability_Thinking(t *testing.T) {
