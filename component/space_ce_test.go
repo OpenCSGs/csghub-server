@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/base64"
 	"errors"
+	"strings"
 	"sync"
 	"testing"
 
@@ -13,7 +14,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"opencsg.com/csghub-server/builder/git/gitserver"
-	"opencsg.com/csghub-server/builder/rpc"
+	"opencsg.com/csghub-server/builder/rebac"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
@@ -194,15 +195,13 @@ func TestSpaceComponent_Deploy(t *testing.T) {
 	ctx := context.TODO()
 	sc := initializeTestSpaceComponent(ctx, t)
 
-	sc.mocks.userSvcClient.EXPECT().GetNameSpaceInfo(ctx, "user").Return(&rpc.Namespace{
-		Path: "ns1",
-	}, nil)
+	sc.mocks.components.repo.EXPECT().GetNamespaceBillingUUID(ctx, "ns1").Return("ns1-billing-uuid", nil)
 	sc.mocks.stores.RuntimeFrameworkMock().EXPECT().FindSpaceLatestVersion(ctx, mock.Anything, mock.Anything).Return(&database.RuntimeFramework{}, nil)
 
 	t.Run("Deploy", func(t *testing.T) {
 		sc.mocks.stores.SpaceMock().EXPECT().FindByPath(ctx, "ns1", "n1").Return(&database.Space{
 			ID:         1,
-			Repository: &database.Repository{Path: "foo1/bar1"},
+			Repository: &database.Repository{Path: "foo1/bar1", User: database.User{Username: "user"}},
 			SKU:        "1",
 			HasAppFile: true,
 		}, nil)
@@ -218,6 +217,7 @@ func TestSpaceComponent_Deploy(t *testing.T) {
 			Annotation:     "{\"hub-deploy-user\":\"user\",\"hub-res-name\":\"ns1/n1\",\"hub-res-type\":\"space\"}",
 			ContainerPort:  8080,
 			SKU:            "1",
+			UserUUID:       "ns1-billing-uuid",
 			OwnerNamespace: "ns1",
 			SecureLevel:    types.EndpointPublic,
 		}).Return(123, nil)
@@ -229,7 +229,7 @@ func TestSpaceComponent_Deploy(t *testing.T) {
 	t.Run("DeployWithoutAppFile", func(t *testing.T) {
 		sc.mocks.stores.SpaceMock().EXPECT().FindByPath(ctx, "ns2", "n2").Return(&database.Space{
 			ID:         1,
-			Repository: &database.Repository{Path: "foo2/bar2"},
+			Repository: &database.Repository{Path: "foo2/bar2", User: database.User{Username: "user"}},
 			SKU:        "1",
 			HasAppFile: false,
 		}, nil)
@@ -237,6 +237,80 @@ func TestSpaceComponent_Deploy(t *testing.T) {
 		require.Equal(t, true, errors.Is(err, errorx.ErrNoEntryFile))
 		require.Equal(t, int64(-1), id)
 	})
+}
+
+func TestSpaceComponent_DeployUsesOwnerNamespaceBilling(t *testing.T) {
+	ctx := context.TODO()
+	sc := initializeTestSpaceComponent(ctx, t)
+
+	sc.mocks.components.repo.EXPECT().GetNamespaceBillingUUID(ctx, "org1").Return("org-billing-uuid", nil)
+	sc.mocks.stores.RuntimeFrameworkMock().EXPECT().FindSpaceLatestVersion(ctx, mock.Anything, mock.Anything).
+		Return(&database.RuntimeFramework{}, nil)
+	sc.mocks.stores.SpaceMock().EXPECT().FindByPath(ctx, "org1", "n1").Return(&database.Space{
+		ID: 1,
+		Repository: &database.Repository{
+			Path: "foo1/bar1",
+			User: database.User{Username: "creator"},
+		},
+		SKU:        "1",
+		HasAppFile: true,
+	}, nil)
+	sc.mocks.stores.SpaceResourceMock().EXPECT().FindByID(ctx, int64(1)).Return(&database.SpaceResource{
+		ID: 1,
+	}, nil)
+	sc.mocks.components.repo.EXPECT().CheckAccountAndResource(ctx, types.CheckResourceAndAccountReq{
+		UserName:    "org1",
+		CurrentUser: "creator",
+	}, mock.Anything).Return(&types.CheckExclusiveResp{}, nil)
+	sc.mocks.deployer.EXPECT().Deploy(ctx, mock.MatchedBy(func(dr types.DeployRequest) bool {
+		return dr.UserUUID == "org-billing-uuid" &&
+			dr.OwnerNamespace == "org1" &&
+			strings.Contains(dr.Annotation, `"hub-deploy-user":"creator"`)
+	})).Return(int64(123), nil)
+
+	id, err := sc.Deploy(ctx, "org1", "n1", "creator")
+	require.Nil(t, err)
+	require.Equal(t, int64(123), id)
+}
+
+func TestSpaceComponent_DeployByOrgAdmin(t *testing.T) {
+	ctx := context.TODO()
+	sc := initializeTestSpaceComponent(ctx, t)
+
+	sc.mocks.components.repo.EXPECT().GetNameSpaceInfo(ctx, "org1").Return(&types.Namespace{
+		Path: "org1",
+		Type: types.OrganizationNamespaceType,
+	}, nil)
+	sc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "admin", "org1", rebac.NamespaceCanAdmin).
+		Return(true, nil)
+	sc.mocks.components.repo.EXPECT().GetNamespaceBillingUUID(ctx, "org1").Return("org-billing-uuid", nil)
+	sc.mocks.stores.RuntimeFrameworkMock().EXPECT().FindSpaceLatestVersion(ctx, mock.Anything, mock.Anything).
+		Return(&database.RuntimeFramework{}, nil)
+	sc.mocks.stores.SpaceMock().EXPECT().FindByPath(ctx, "org1", "n1").Return(&database.Space{
+		ID: 1,
+		Repository: &database.Repository{
+			Path: "foo1/bar1",
+			User: database.User{Username: "creator"},
+		},
+		SKU:        "1",
+		HasAppFile: true,
+	}, nil)
+	sc.mocks.stores.SpaceResourceMock().EXPECT().FindByID(ctx, int64(1)).Return(&database.SpaceResource{
+		ID: 1,
+	}, nil)
+	sc.mocks.components.repo.EXPECT().CheckAccountAndResource(ctx, types.CheckResourceAndAccountReq{
+		UserName:    "org1",
+		CurrentUser: "admin",
+	}, mock.Anything).Return(&types.CheckExclusiveResp{}, nil)
+	sc.mocks.deployer.EXPECT().Deploy(ctx, mock.MatchedBy(func(dr types.DeployRequest) bool {
+		return dr.UserUUID == "org-billing-uuid" &&
+			dr.OwnerNamespace == "org1" &&
+			strings.Contains(dr.Annotation, `"hub-deploy-user":"admin"`)
+	})).Return(int64(123), nil)
+
+	id, err := sc.Deploy(ctx, "org1", "n1", "admin")
+	require.Nil(t, err)
+	require.Equal(t, int64(123), id)
 }
 
 func TestSpaceComponent_Delete(t *testing.T) {
@@ -326,13 +400,11 @@ func TestSpaceComponent_Deploy_SecureLevel(t *testing.T) {
 					GitPath:       "spaces_ns/n",
 					DefaultBranch: "main",
 					Private:       tc.private,
+					User:          database.User{Username: "user"},
 				},
 			}, nil)
 
-			sc.mocks.userSvcClient.EXPECT().GetNameSpaceInfo(ctx, "user").Return(&rpc.Namespace{
-				Path: "user",
-				UUID: "uuid",
-			}, nil)
+			sc.mocks.components.repo.EXPECT().GetNamespaceBillingUUID(ctx, "ns").Return("ns-billing-uuid", nil)
 
 			sc.mocks.stores.SpaceResourceMock().EXPECT().FindByID(ctx, int64(1)).Return(&database.SpaceResource{
 				ID:        1,

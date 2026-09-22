@@ -969,7 +969,7 @@ func createSpaceRoutes(config *config.Config,
 		// depoly and start running the space
 		spaces.POST("/:namespace/:name/run", middlewareCollection.Auth.NeedLogin, spaceHandler.Run)
 		// wake a sleeping space
-		spaces.POST("/:namespace/:name/wakeup", spaceHandler.Wakeup)
+		spaces.POST("/:namespace/:name/wakeup", middlewareCollection.Auth.NeedLogin, spaceHandler.Wakeup)
 		// stop running space
 		spaces.POST("/:namespace/:name/stop", middlewareCollection.Auth.NeedLogin, spaceHandler.Stop)
 		// pull space running status

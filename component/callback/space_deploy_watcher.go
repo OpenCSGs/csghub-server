@@ -46,7 +46,7 @@ func WatchSpaceChange(req *types.GiteaCallbackPushReq, ss database.SpaceStore, s
 
 	// username = namespace in fullname of repo
 	slog.Info("[git_callback] create space deploy tasks", slog.Any("namespace", namespace), slog.Any("repoName", repoName))
-	watcher.deploy(namespace, repoName, namespace)
+	watcher.deploy(namespace, repoName)
 	return watcher
 }
 
@@ -58,7 +58,7 @@ func (w *spaceDeployWatcher) Run() error {
 	return err
 }
 
-func (w *spaceDeployWatcher) deploy(namespace string, repoName string, currentUser string) *spaceDeployWatcher {
+func (w *spaceDeployWatcher) deploy(namespace string, repoName string) *spaceDeployWatcher {
 	w.ops = append(w.ops,
 		func() error {
 			ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
@@ -74,8 +74,8 @@ func (w *spaceDeployWatcher) deploy(namespace string, repoName string, currentUs
 				slog.Warn("[git_callback] no app file found and skip space deploy", slog.Any("namespace", namespace), slog.Any("repoName", repoName))
 				return nil
 			}
-			// trigger space deployment by git callback
-			_, err = w.sc.Deploy(ctx, namespace, repoName, currentUser)
+			// trigger space deployment by git callback as the repository creator
+			_, err = w.sc.Deploy(ctx, namespace, repoName, space.Repository.User.Username)
 			if err != nil {
 				return fmt.Errorf("[git_callback] failed to trigger space %s/%s deploy error: %w", namespace, repoName, err)
 			} else {

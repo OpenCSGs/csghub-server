@@ -56,8 +56,8 @@ type SpaceComponent interface {
 	AllowCallApi(ctx context.Context, spaceID int64, username string) (bool, error)
 	Delete(ctx context.Context, namespace, name, currentUser string) error
 	Deploy(ctx context.Context, namespace, name, currentUser string) (int64, error)
-	Wakeup(ctx context.Context, namespace, name string) error
-	Stop(ctx context.Context, namespace, name string, deleteSpace bool) error
+	Wakeup(ctx context.Context, namespace, name, currentUser string) error
+	Stop(ctx context.Context, namespace, name, currentUser string) error
 	// FixHasEntryFile checks whether git repo has entry point file and update space's HasAppFile property in db
 	FixHasEntryFile(ctx context.Context, s *database.Space) *database.Space
 	Status(ctx context.Context, namespace, name string) (string, string, error)
@@ -919,6 +919,9 @@ func (c *spaceComponentImpl) Deploy(ctx context.Context, namespace, name, curren
 		slog.Error("can't find space to deploy", slog.Any("error", err), slog.String("namespace", namespace), slog.String("name", name))
 		return -1, err
 	}
+	if err := c.requireSpaceOperationPermission(ctx, namespace, space, currentUser); err != nil {
+		return -1, err
+	}
 	if !space.HasAppFile {
 		return -1, errorx.NoEntryFile(errors.New("no app file"),
 			errorx.Ctx().
@@ -926,11 +929,10 @@ func (c *spaceComponentImpl) Deploy(ctx context.Context, namespace, name, curren
 		)
 	}
 
-	// found namespace by org or user path
-	ns, err := c.userSvcClient.GetNameSpaceInfo(ctx, currentUser)
+	// The namespace is the billing owner.
+	billingUUID, err := c.repoComponent.GetNamespaceBillingUUID(ctx, namespace)
 	if err != nil {
-		slog.Error("can't find namespace for deploy space", slog.Any("error", err), slog.String("ns", currentUser))
-		return -1, err
+		return -1, fmt.Errorf("failed to resolve billing namespace %s, error: %w", namespace, err)
 	}
 
 	userID := space.Repository.UserID
@@ -1037,7 +1039,7 @@ func (c *spaceComponentImpl) Deploy(ctx context.Context, namespace, name, curren
 		Annotation:    string(annoStr),
 		ImageID:       imageID,
 		Type:          types.SpaceType,
-		UserUUID:      ns.UUID, // user or org uuid
+		UserUUID:      billingUUID,
 		SKU:           space.SKU,
 		ContainerPort: containerPort,
 		Variables:     space.Variables,
@@ -1057,11 +1059,11 @@ func (c *spaceComponentImpl) Deploy(ctx context.Context, namespace, name, curren
 		return -1, err
 	}
 
-	c.syncCodeAgentIfExists(ns.UUID, ns.Path, space.Repository.Path, types.CodeAgentSyncOperationUpdate)
+	c.syncCodeAgentIfExists(billingUUID, namespace, space.Repository.Path, types.CodeAgentSyncOperationUpdate)
 	return deployID, nil
 }
 
-func (c *spaceComponentImpl) Wakeup(ctx context.Context, namespace, name string) error {
+func (c *spaceComponentImpl) Wakeup(ctx context.Context, namespace, name, currentUser string) error {
 	s, err := c.spaceStore.FindByPath(ctx, namespace, name)
 	if err != nil {
 		slog.ErrorContext(ctx, "No space found", slog.Any("error", err), slog.String("namespace", namespace), slog.String("name", name))
@@ -1088,10 +1090,13 @@ func (c *spaceComponentImpl) Wakeup(ctx context.Context, namespace, name string)
 	})
 }
 
-func (c *spaceComponentImpl) Stop(ctx context.Context, namespace, name string, deleteSpace bool) error {
+func (c *spaceComponentImpl) Stop(ctx context.Context, namespace, name, currentUser string) error {
 	s, err := c.spaceStore.FindByPath(ctx, namespace, name)
 	if err != nil {
 		slog.Error("can't stop space", slog.Any("error", err), slog.String("namespace", namespace), slog.String("name", name))
+		return err
+	}
+	if err := c.requireSpaceOperationPermission(ctx, namespace, s, currentUser); err != nil {
 		return err
 	}
 	if !s.HasAppFile {
@@ -1106,6 +1111,41 @@ func (c *spaceComponentImpl) Stop(ctx context.Context, namespace, name string, d
 		return fmt.Errorf("fail stop space %s/%s deploy error: %w", namespace, name, err)
 	}
 	return nil
+}
+
+func (c *spaceComponentImpl) requireSpaceOperationPermission(ctx context.Context, namespace string, space *database.Space, currentUser string) error {
+	forbidden := errorx.ErrForbiddenMsg("only the space creator or namespace admin/writer can operate this space")
+	if currentUser == "" || space.Repository == nil {
+		return forbidden
+	}
+	if space.Repository.User.Username == currentUser {
+		return nil
+	}
+
+	namespaceInfo, err := c.repoComponent.GetNameSpaceInfo(ctx, namespace)
+	if err != nil {
+		return fmt.Errorf("failed to get namespace %s, error: %w", namespace, err)
+	}
+	if namespaceInfo == nil || namespaceInfo.Type != types.OrganizationNamespaceType {
+		return forbidden
+	}
+
+	canAdmin, err := c.repoComponent.CheckCurrentUserPermission(ctx, currentUser, namespace, rebac.NamespaceCanAdmin)
+	if err != nil {
+		return fmt.Errorf("failed to check namespace admin permission, error: %w", err)
+	}
+	if canAdmin {
+		return nil
+	}
+
+	canWrite, err := c.repoComponent.CheckCurrentUserPermission(ctx, currentUser, namespace, rebac.NamespaceCanWrite)
+	if err != nil {
+		return fmt.Errorf("failed to check namespace write permission, error: %w", err)
+	}
+	if canWrite {
+		return nil
+	}
+	return forbidden
 }
 
 func (c *spaceComponentImpl) stopSpaceDeploy(ctx context.Context, namespace, name string, s *database.Space) error {

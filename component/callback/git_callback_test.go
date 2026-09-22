@@ -127,12 +127,12 @@ func TestGitCallbackComponent_WatchSpaceChange(t *testing.T) {
 	ctx := mock.Anything
 	gc := initializeTestGitCallbackComponent(context.TODO(), t)
 
-	gc.mocks.stores.SpaceMock().EXPECT().FindByPath(ctx, "b", "c").Return(
-		&database.Space{HasAppFile: true}, nil,
-	)
-	gc.mocks.spaceComponent.EXPECT().FixHasEntryFile(ctx, &database.Space{
+	space := &database.Space{
 		HasAppFile: true,
-	}).Return(nil)
+		Repository: &database.Repository{User: database.User{Username: "b"}},
+	}
+	gc.mocks.stores.SpaceMock().EXPECT().FindByPath(ctx, "b", "c").Return(space, nil)
+	gc.mocks.spaceComponent.EXPECT().FixHasEntryFile(ctx, space).Return(nil)
 	gc.mocks.spaceComponent.EXPECT().Deploy(ctx, "b", "c", "b").Return(100, nil)
 
 	err := gc.WatchSpaceChange(context.TODO(), &types.GiteaCallbackPushReq{
