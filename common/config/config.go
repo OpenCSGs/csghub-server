@@ -686,6 +686,27 @@ type Config struct {
 			// request is rejected because concurrency is exhausted. It is a
 			// hint, not a capacity guarantee.
 			RetryAfterHintSeconds int `env:"OPENCSG_AIGATEWAY_CAPACITY_ADMISSION_RETRY_AFTER_HINT" default:"5"`
+			// QueueFallbackPollMs is the per-waiter fallback polling interval
+			// for the admission reservation queue. Redis Pub/Sub wake-ups are
+			// only an acceleration; this poll guarantees eventual progress
+			// when a wake-up message is lost. Each tick also drives the
+			// scheduler (promote-ready) so slots freed by expired-lease
+			// cleanup (crashed replicas) make progress without a release
+			// event.
+			QueueFallbackPollMs int `env:"OPENCSG_AIGATEWAY_CAPACITY_ADMISSION_QUEUE_FALLBACK_POLL_MS" default:"1000"`
+			// QueueClaimDeadlineSeconds bounds the window between the
+			// scheduler granting a queued ticket its admission lease and the
+			// waiting request goroutine taking ownership of it (claim). A
+			// grant that is never claimed (crashed replica, lost wake-up
+			// beyond the poll interval) expires within this window and the
+			// slot is reclaimed by the expired-lease cleanup.
+			QueueClaimDeadlineSeconds int `env:"OPENCSG_AIGATEWAY_CAPACITY_ADMISSION_QUEUE_CLAIM_DEADLINE" default:"5"`
+			// QueueMaxRePlans bounds how many times the planner re-runs
+			// Router→Admission when a queued ticket is cancelled because its
+			// upstream turned unavailable while waiting. The queue never
+			// picks another upstream itself; the full plan restart does. The
+			// final failure renders as model_unavailable (503).
+			QueueMaxRePlans int `env:"OPENCSG_AIGATEWAY_CAPACITY_ADMISSION_QUEUE_MAX_REPLANS" default:"1"`
 		}
 		MetricsCollectorLookbackMinutes int `env:"OPENCSG_AIGATEWAY_METRICS_COLLECTOR_LOOKBACK_MINUTES" default:"60"`
 

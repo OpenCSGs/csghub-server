@@ -272,11 +272,20 @@ type UsageLimitPolicy struct {
 // CapacityPolicy defines per-upstream capacity limits for admission control
 // and capacity-aware routing. When Enabled, the AIGateway will track and
 // enforce these limits before forwarding requests to the upstream.
-// A zero value means "no limit" for that dimension, except that an enabled
-// policy with every limit unset (AllLimitsUnset) is fully populated from the
-// configured defaults every time the gateway reads the policy (see
-// ApplyDefaults). Disabling a policy never clears the stored limits: admins
-// can re-enable later and keep the previous configuration.
+//
+// An enabled policy is in exactly one of two mutually exclusive modes:
+//
+//   - Rate mode: QueueEnabled() is false. Requests beyond MaxConcurrency are
+//     rejected immediately. MaxTPM/MaxRPM are enforced.
+//   - Queue mode: QueueEnabled() is true (MaxQueueDepth > 0 AND
+//     QueueWaitSeconds > 0). Requests beyond MaxConcurrency enter a bounded
+//     queue and wait up to QueueWaitSeconds. MaxTPM/MaxRPM are NOT enforced
+//     in queue mode, so a queue-mode policy must have them unset (0).
+//
+// A policy with every limit unset (AllLimitsUnset) is fully populated from
+// the configured defaults as a queue-mode policy every time the gateway reads
+// it (see ApplyDefaults). Disabling a policy never clears the stored limits:
+// admins can re-enable later and keep the previous configuration.
 type CapacityPolicy struct {
 	// Enabled turns on capacity tracking and enforcement for this upstream.
 	Enabled bool `json:"enabled"`
@@ -285,11 +294,13 @@ type CapacityPolicy struct {
 	// MaxQueueDepth is the maximum number of requests waiting for a slot.
 	MaxQueueDepth int `json:"max_queue_depth,omitempty"`
 	// MaxTPM is the maximum number of tokens per minute. 0 = unlimited.
+	// Ignored (and required to be 0) in queue mode.
 	MaxTPM int64 `json:"max_tpm,omitempty"`
-	// MaxRPM is the maximum number of requests per minute.
+	// MaxRPM is the maximum number of requests per minute. 0 = unlimited.
+	// Ignored (and required to be 0) in queue mode.
 	MaxRPM int `json:"max_rpm,omitempty"`
 	// QueueWaitSeconds is how long a request may wait in the upstream queue
-	// before being rejected. 0 = unset (runtime falls back to the default).
+	// before being rejected.
 	QueueWaitSeconds int `json:"queue_wait_seconds,omitempty"`
 }
 
@@ -302,12 +313,21 @@ func (p *CapacityPolicy) AllLimitsUnset() bool {
 		p.QueueWaitSeconds == 0
 }
 
+// QueueEnabled reports whether the bounded queue is active: it requires both
+// MaxQueueDepth and QueueWaitSeconds to be positive. With either at zero the
+// upstream is in rate mode and excess requests are rejected immediately.
+func (p *CapacityPolicy) QueueEnabled() bool {
+	return p != nil && p.MaxQueueDepth > 0 && p.QueueWaitSeconds > 0
+}
+
 // ApplyDefaults populates an enabled policy only when every limit is unset:
-// an all-zero enabled policy is fully replaced by the configured defaults,
-// while a policy with any limit set is left untouched so explicit values
-// (including MaxTPM=0 meaning "unlimited") are never overridden by defaults.
-// Default fields that are <= 0 are ignored so operators can keep "no limit"
-// for a dimension. It is a no-op when p is nil or disabled.
+// an all-zero enabled policy is replaced by the configured defaults as a
+// queue-mode policy (concurrency + queue depth + queue wait; TPM/RPM stay
+// unset because they are not enforceable in queue mode), while a policy with
+// any limit set is left untouched so explicit values (including MaxTPM=0
+// meaning "unlimited") are never overridden by defaults. Default fields that
+// are <= 0 are ignored so operators can keep "no limit" for a dimension.
+// It is a no-op when p is nil or disabled.
 func (p *CapacityPolicy) ApplyDefaults(defaults CapacityPolicy) {
 	if p == nil || !p.Enabled || !p.AllLimitsUnset() {
 		return
@@ -317,12 +337,6 @@ func (p *CapacityPolicy) ApplyDefaults(defaults CapacityPolicy) {
 	}
 	if defaults.MaxQueueDepth > 0 {
 		p.MaxQueueDepth = defaults.MaxQueueDepth
-	}
-	if defaults.MaxTPM > 0 {
-		p.MaxTPM = defaults.MaxTPM
-	}
-	if defaults.MaxRPM > 0 {
-		p.MaxRPM = defaults.MaxRPM
 	}
 	if defaults.QueueWaitSeconds > 0 {
 		p.QueueWaitSeconds = defaults.QueueWaitSeconds

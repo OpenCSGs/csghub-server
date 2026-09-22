@@ -47,6 +47,14 @@ type RedisClient interface {
 	// first-call NOSCRIPT round trip. Implementations may no-op.
 	LoadScript(ctx context.Context, scriptStr string) error
 	Pipelined(ctx context.Context, fn func(redis.Pipeliner) error) ([]redis.Cmder, error)
+	// Publish sends a message to a Redis Pub/Sub channel. Pub/Sub is used
+	// as a best-effort wake-up acceleration (e.g. the admission reservation
+	// queue); correctness never depends on message delivery.
+	Publish(ctx context.Context, channel string, message interface{}) error
+	// PSubscribe subscribes to the given channel glob patterns. Messages
+	// arrive on the returned subscription's Channel() until Close or
+	// context cancellation; the caller must Close it.
+	PSubscribe(ctx context.Context, patterns ...string) (*redis.PubSub, error)
 }
 
 type RedisConfig struct {
@@ -245,4 +253,19 @@ func (c *Cache) LoadScript(ctx context.Context, scriptStr string) error {
 
 func (c *Cache) Pipelined(ctx context.Context, fn func(redis.Pipeliner) error) ([]redis.Cmder, error) {
 	return c.core.Pipelined(ctx, fn)
+}
+
+func (c *Cache) Publish(ctx context.Context, channel string, message interface{}) error {
+	return c.core.Publish(ctx, channel, message).Err()
+}
+
+func (c *Cache) PSubscribe(ctx context.Context, patterns ...string) (*redis.PubSub, error) {
+	sub := c.core.PSubscribe(ctx, patterns...)
+	// Surface an early subscription failure (e.g. connection refused) so the
+	// caller can degrade instead of silently waiting on an empty channel.
+	if _, err := sub.Receive(ctx); err != nil {
+		_ = sub.Close()
+		return nil, err
+	}
+	return sub, nil
 }

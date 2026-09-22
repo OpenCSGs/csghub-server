@@ -51,8 +51,8 @@ func TestLLMServiceComponent_UpdateUpstream_CapacityPolicy_DBPersistence(t *test
 	}
 	require.NoError(t, upstreamStore.Create(ctx, dbUp))
 
-	t.Run("frontend payload with queue_wait_seconds persists to DB", func(t *testing.T) {
-		payload := `{"capacity_policy":{"enabled":true,"max_concurrency":5,"max_queue_depth":10,"max_tpm":1000,"max_rpm":20,"queue_wait_seconds":30}}`
+	t.Run("frontend payload with queue mode persists to DB", func(t *testing.T) {
+		payload := `{"capacity_policy":{"enabled":true,"max_concurrency":5,"max_queue_depth":10,"queue_wait_seconds":30}}`
 		var req *types.UpdateUpstreamReq
 		require.NoError(t, json.Unmarshal([]byte(payload), &req))
 		req.ID = dbUp.ID
@@ -61,6 +61,7 @@ func TestLLMServiceComponent_UpdateUpstream_CapacityPolicy_DBPersistence(t *test
 		require.NoError(t, err)
 		require.NotNil(t, res.CapacityPolicy)
 		require.Equal(t, 30, res.CapacityPolicy.QueueWaitSeconds)
+		require.True(t, res.CapacityPolicy.QueueEnabled())
 
 		persisted, err := upstreamStore.GetByID(ctx, dbUp.ID)
 		require.NoError(t, err)
@@ -77,7 +78,7 @@ func TestLLMServiceComponent_UpdateUpstream_CapacityPolicy_DBPersistence(t *test
 		require.Equal(t, 30, shown.Upstreams[0].CapacityPolicy.QueueWaitSeconds)
 	})
 
-	t.Run("enabled policy with queue_wait_seconds omitted (0) is accepted as unset", func(t *testing.T) {
+	t.Run("rate mode policy with queue fields zero is accepted", func(t *testing.T) {
 		payload := `{"capacity_policy":{"enabled":true,"max_concurrency":8,"max_rpm":10}}`
 		var req *types.UpdateUpstreamReq
 		require.NoError(t, json.Unmarshal([]byte(payload), &req))
@@ -88,6 +89,7 @@ func TestLLMServiceComponent_UpdateUpstream_CapacityPolicy_DBPersistence(t *test
 		require.NotNil(t, res.CapacityPolicy)
 		require.Equal(t, 8, res.CapacityPolicy.MaxConcurrency)
 		require.Equal(t, 0, res.CapacityPolicy.QueueWaitSeconds)
+		require.False(t, res.CapacityPolicy.QueueEnabled())
 
 		persisted, err := upstreamStore.GetByID(ctx, dbUp.ID)
 		require.NoError(t, err)
@@ -95,21 +97,48 @@ func TestLLMServiceComponent_UpdateUpstream_CapacityPolicy_DBPersistence(t *test
 		require.Equal(t, 8, persisted.CapacityPolicy.MaxConcurrency)
 	})
 
-	t.Run("enabled policy with all limits unset (all zeros) is accepted for default-fill", func(t *testing.T) {
+	t.Run("enabled policy with all limits unset is rejected (mode must be explicit)", func(t *testing.T) {
+		// A dedicated row with no stored policy: an all-zero incoming policy
+		// cannot be merged with stored limits, so the mode must be explicit.
+		up := &database.Upstream{
+			LLMConfigID: cfg.ID,
+			URL:         "http://allzero.example.com/v1",
+			Weight:      1,
+			Enabled:     true,
+			Source:      types.UpstreamSourceExternal,
+		}
+		require.NoError(t, upstreamStore.Create(ctx, up))
+
 		payload := `{"capacity_policy":{"enabled":true}}`
+		var req *types.UpdateUpstreamReq
+		require.NoError(t, json.Unmarshal([]byte(payload), &req))
+		req.ID = up.ID
+
+		_, err := mc.UpdateUpstream(ctx, req)
+		require.Error(t, err)
+		require.ErrorIs(t, err, ErrInvalidLLMConfig)
+	})
+
+	t.Run("half-configured queue is rejected", func(t *testing.T) {
+		payload := `{"capacity_policy":{"enabled":true,"max_concurrency":8,"queue_wait_seconds":30}}`
 		var req *types.UpdateUpstreamReq
 		require.NoError(t, json.Unmarshal([]byte(payload), &req))
 		req.ID = dbUp.ID
 
-		res, err := mc.UpdateUpstream(ctx, req)
-		require.NoError(t, err)
-		require.NotNil(t, res.CapacityPolicy)
-		require.Equal(t, true, res.CapacityPolicy.Enabled)
+		_, err := mc.UpdateUpstream(ctx, req)
+		require.Error(t, err)
+		require.ErrorIs(t, err, ErrInvalidLLMConfig)
+	})
 
-		persisted, err := upstreamStore.GetByID(ctx, dbUp.ID)
-		require.NoError(t, err)
-		require.NotNil(t, persisted.CapacityPolicy)
-		require.Equal(t, true, persisted.CapacityPolicy.Enabled)
+	t.Run("queue mode with rate limits is rejected", func(t *testing.T) {
+		payload := `{"capacity_policy":{"enabled":true,"max_concurrency":8,"max_queue_depth":10,"queue_wait_seconds":30,"max_tpm":1000}}`
+		var req *types.UpdateUpstreamReq
+		require.NoError(t, json.Unmarshal([]byte(payload), &req))
+		req.ID = dbUp.ID
+
+		_, err := mc.UpdateUpstream(ctx, req)
+		require.Error(t, err)
+		require.ErrorIs(t, err, ErrInvalidLLMConfig)
 	})
 
 	t.Run("negative limits are rejected", func(t *testing.T) {
@@ -150,7 +179,7 @@ func TestLLMServiceComponent_UpdateUpstream_CapacityPolicy_DBPersistence(t *test
 		}
 		require.NoError(t, upstreamStore.Create(ctx, up))
 
-		seed := `{"capacity_policy":{"enabled":true,"max_concurrency":5,"max_rpm":20,"queue_wait_seconds":30}}`
+		seed := `{"capacity_policy":{"enabled":true,"max_concurrency":5,"max_rpm":20}}`
 		var seedReq *types.UpdateUpstreamReq
 		require.NoError(t, json.Unmarshal([]byte(seed), &seedReq))
 		seedReq.ID = up.ID
@@ -165,7 +194,7 @@ func TestLLMServiceComponent_UpdateUpstream_CapacityPolicy_DBPersistence(t *test
 		require.NotNil(t, res.CapacityPolicy)
 		require.Equal(t, true, res.CapacityPolicy.Enabled)
 		require.Equal(t, 5, res.CapacityPolicy.MaxConcurrency)
-		require.Equal(t, 30, res.CapacityPolicy.QueueWaitSeconds)
+		require.Equal(t, 20, res.CapacityPolicy.MaxRPM)
 
 		var offReq *types.UpdateUpstreamReq
 		require.NoError(t, json.Unmarshal([]byte(`{"capacity_policy":{"enabled":false}}`), &offReq))
@@ -176,7 +205,6 @@ func TestLLMServiceComponent_UpdateUpstream_CapacityPolicy_DBPersistence(t *test
 		require.Equal(t, false, res.CapacityPolicy.Enabled)
 		require.Equal(t, 5, res.CapacityPolicy.MaxConcurrency)
 		require.Equal(t, 20, res.CapacityPolicy.MaxRPM)
-		require.Equal(t, 30, res.CapacityPolicy.QueueWaitSeconds)
 
 		persisted, err := upstreamStore.GetByID(ctx, up.ID)
 		require.NoError(t, err)
@@ -193,10 +221,9 @@ func TestLLMServiceComponent_UpdateUpstream_CapacityPolicy_DBPersistence(t *test
 		require.Equal(t, true, res.CapacityPolicy.Enabled)
 		require.Equal(t, 5, res.CapacityPolicy.MaxConcurrency)
 		require.Equal(t, 20, res.CapacityPolicy.MaxRPM)
-		require.Equal(t, 30, res.CapacityPolicy.QueueWaitSeconds)
 
 		var replaceReq *types.UpdateUpstreamReq
-		require.NoError(t, json.Unmarshal([]byte(`{"capacity_policy":{"enabled":true,"max_concurrency":9}}`), &replaceReq))
+		require.NoError(t, json.Unmarshal([]byte(`{"capacity_policy":{"enabled":true,"max_concurrency":9,"max_queue_depth":7,"queue_wait_seconds":25}}`), &replaceReq))
 		replaceReq.ID = up.ID
 		res, err = mc.UpdateUpstream(ctx, replaceReq)
 		require.NoError(t, err)
@@ -204,6 +231,7 @@ func TestLLMServiceComponent_UpdateUpstream_CapacityPolicy_DBPersistence(t *test
 		require.Equal(t, true, res.CapacityPolicy.Enabled)
 		require.Equal(t, 9, res.CapacityPolicy.MaxConcurrency)
 		require.Equal(t, 0, res.CapacityPolicy.MaxRPM)
-		require.Equal(t, 0, res.CapacityPolicy.QueueWaitSeconds)
+		require.Equal(t, 25, res.CapacityPolicy.QueueWaitSeconds)
+		require.True(t, res.CapacityPolicy.QueueEnabled())
 	})
 }

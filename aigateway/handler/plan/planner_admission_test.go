@@ -340,3 +340,86 @@ func TestPlan_SensitiveSeesReSelectedUpstream(t *testing.T) {
 	require.Same(t, reselected, pl.ModelTarget,
 		"the plan must carry the re-selected target")
 }
+
+// rerouteAdmissionChecker returns a reroute decision for the first
+// CheckAdmission call and the configured outcome afterwards, recording how
+// many times admission ran.
+type rerouteAdmissionChecker struct {
+	calls     int
+	afterCall *types.AdmissionOutcome
+}
+
+func (m *rerouteAdmissionChecker) CheckAdmission(_ context.Context, _ *types.RequestMetadata, _ *types.ModelTarget) (*types.AdmissionOutcome, error) {
+	m.calls++
+	if m.calls == 1 || m.afterCall == nil {
+		return &types.AdmissionOutcome{Decision: &types.AdmissionDecision{
+			Action: types.AdmissionReroute,
+		}}, nil
+	}
+	return m.afterCall, nil
+}
+
+func TestPlan_QueueReroute_RePlansAdmission(t *testing.T) {
+	// A queued ticket whose upstream turned unavailable cancels itself and
+	// hands routing back to the planner: the full plan (resolution included)
+	// must re-run against a fresh candidate set.
+	safety := &recordingSafetyChecker{}
+	resolver := &mockModelResolver{target: admissionPlanTestTarget()}
+	admission := &rerouteAdmissionChecker{
+		afterCall: &types.AdmissionOutcome{Decision: &types.AdmissionDecision{
+			Action:             types.AdmissionAdmit,
+			SelectedUpstreamID: 1,
+		}},
+	}
+	p := NewPlanner(
+		resolver,
+		&mockBalanceChecker{},
+		&mockUsageLimitChecker{},
+		safety,
+		admission,
+		nil,
+	)
+
+	meta := &types.RequestMetadata{
+		Protocol: string(types.ProtocolMessages),
+		Task:     "messages",
+		Model:    "test-model",
+		TenantID: "ns-123",
+	}
+
+	plan, err := p.Plan(newTestGinContext(), meta)
+	require.NoError(t, err)
+	require.NotNil(t, plan)
+	require.Equal(t, 2, admission.calls, "admission must re-run after a reroute")
+	require.Equal(t, 2, resolver.resolutionCalls(), "model resolution must re-run after a reroute")
+	require.Equal(t, types.AdmissionAdmit, plan.Admission.Action)
+}
+
+func TestPlan_QueueReroute_Exhausted_RendersModelUnavailable(t *testing.T) {
+	safety := &recordingSafetyChecker{}
+	resolver := &mockModelResolver{target: admissionPlanTestTarget()}
+	// Always reroutes: the re-plan budget must bound the loop and render 503.
+	admission := &rerouteAdmissionChecker{}
+	p := NewPlanner(
+		resolver,
+		&mockBalanceChecker{},
+		&mockUsageLimitChecker{},
+		safety,
+		admission,
+		nil,
+		WithQueueMaxRePlans(2),
+	)
+
+	meta := &types.RequestMetadata{
+		Protocol: string(types.ProtocolMessages),
+		Task:     "messages",
+		Model:    "test-model",
+		TenantID: "ns-123",
+	}
+
+	plan, err := p.Plan(newTestGinContext(), meta)
+	require.Error(t, err)
+	require.Equal(t, types.PlanErrModelUnavailable, plan.ErrorCode)
+	// Initial plan + exactly queueMaxRePlans re-plans.
+	require.Equal(t, 3, admission.calls)
+}

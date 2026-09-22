@@ -46,6 +46,15 @@ var (
 	// Count of admission checks where the candidate was blocked, per
 	// dimension — the primary saturation alarm signal.
 	AIGatewayUpstreamCapacityBlockedTotal *prometheus.CounterVec
+
+	// AIGateway admission reservation queue metrics. Queue depth is the
+	// number of VALID tickets in the Redis queue after expired-ticket
+	// cleanup (not the number of waiting HTTP requests: disconnected or
+	// crashed waiters are removed by cleanup). The wait histogram is
+	// labeled by outcome (admitted/timeout/disconnected/reroute).
+	AIGatewayAdmissionQueueDepth  *prometheus.GaugeVec
+	AIGatewayAdmissionQueueWait   *prometheus.HistogramVec
+	AIGatewayAdmissionQueueEvents *prometheus.CounterVec
 )
 
 func InitMetrics() {
@@ -185,4 +194,30 @@ func InitMetrics() {
 		Name: "csghub_aigateway_upstream_capacity_blocked_total",
 		Help: "Total admission checks where an upstream was blocked on a capacity dimension",
 	}, []string{"model", "upstream_id", "dimension"})
+
+	// AIGateway admission reservation queue depth (valid tickets after
+	// expired-ticket cleanup, per upstream).
+	AIGatewayAdmissionQueueDepth = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "csghub_aigateway_admission_queue_depth",
+		Help: "Current number of valid tickets waiting in an upstream's admission reservation queue (observational)",
+	}, []string{"model", "upstream_id"})
+
+	// AIGateway admission queue wait duration in milliseconds, labeled by
+	// outcome: admitted (promoted to a lease), timeout (QueueWait exceeded,
+	// HTTP 408), disconnected (client gone), reroute (upstream unavailable).
+	AIGatewayAdmissionQueueWait = promauto.NewHistogramVec(prometheus.HistogramOpts{
+		Name: "csghub_aigateway_admission_queue_wait_ms",
+		Help: "Time a request spent waiting in the admission reservation queue, by outcome",
+		Buckets: []float64{
+			10, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 20000, 30000, 60000, 120000, 300000,
+		},
+	}, []string{"model", "outcome"})
+
+	// AIGateway admission reservation queue lifecycle events:
+	// enqueued / promoted / queue_full / queue_timeout / queue_disconnect /
+	// queue_reroute / claim_lost / cancel.
+	AIGatewayAdmissionQueueEvents = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "csghub_aigateway_admission_queue_events_total",
+		Help: "Total admission reservation queue lifecycle events",
+	}, []string{"model", "event"})
 }

@@ -1,12 +1,17 @@
 package anthropic
 
 import (
+	"bytes"
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
+	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"opencsg.com/csghub-server/aigateway/types"
+	"opencsg.com/csghub-server/api/httpbase"
 )
 
 func TestCheckAdapterCapabilities(t *testing.T) {
@@ -566,4 +571,34 @@ func TestConvertToolChoiceForResponses(t *testing.T) {
 			assert.JSONEq(t, tt.expected, string(result))
 		})
 	}
+}
+
+func TestExtractCarriesPriorityScope(t *testing.T) {
+	// The quota middleware sets the API key's server-side priority scope in
+	// the request context BEFORE the handler runs; the Extract phase must
+	// copy it onto the metadata so the admission reservation queue resolves
+	// the queue priority from the trusted source (scope wins over anything
+	// else; without this line the anthropic /v1/messages path silently
+	// degrades every key to low priority).
+	gin.SetMode(gin.TestMode)
+	c, _ := gin.CreateTestContext(httptest.NewRecorder())
+	httpbase.SetCurrentUser(c, "tester")
+	httpbase.SetCurrentNamespaceUUID(c, "ns-uuid")
+	httpbase.SetAccessToken(c, "k")
+	httpbase.SetAPIKeyPriorityScope(c, "high")
+
+	req := &types.AnthropicMessagesRequest{
+		Model:     "fake-chat",
+		MaxTokens: 16,
+		Messages:  []types.AnthropicMessage{{Role: "user", Content: json.RawMessage(`"hi"`)}},
+	}
+	body, err := json.Marshal(req)
+	require.NoError(t, err)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/messages", bytes.NewReader(body))
+
+	h := New(Deps{})
+	meta, err := h.Extract(c)
+	require.NoError(t, err)
+	require.NotNil(t, meta)
+	require.Equal(t, "high", meta.PriorityScope, "the Extract phase must carry the server-side priority scope")
 }

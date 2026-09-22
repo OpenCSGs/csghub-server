@@ -16,7 +16,7 @@ import (
 // and the finalize paths are no-ops. The plan phase skips admission entirely
 // because newPlannerDeps wires a nil AdmissionChecker on CE.
 
-func (m *openaiComponentImpl) CheckCapacityAdmission(_ context.Context, _ *types.Model, _ int64, _ bool, _ int64) *types.AdmissionDecision {
+func (m *openaiComponentImpl) CheckCapacityAdmission(_ context.Context, _ types.CapacityAdmissionRequest) *types.AdmissionDecision {
 	return nil
 }
 
@@ -32,4 +32,13 @@ func (m *openaiComponentImpl) FinalizeCanceledCapacityAdmission(_ context.Contex
 
 func (m *openaiComponentImpl) EstimateAdmissionTokens(_ string) int64 {
 	return 0
+}
+
+// SetCapacityAdmissionAvailabilitySource is a no-op on CE: the admission
+// reservation queue (like all admission control) is an EE/SaaS capability.
+func (m *openaiComponentImpl) SetCapacityAdmissionAvailabilitySource(_ types.UpstreamCircuitStateSource) {
+}
+
+// ShutdownCapacityAdmission is a no-op on CE: no controller goroutines exist.
+func (m *openaiComponentImpl) ShutdownCapacityAdmission() {
 }

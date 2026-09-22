@@ -1571,13 +1571,14 @@ func TestDbUpstreamsToConfigsMetadataPassthrough(t *testing.T) {
 
 func TestDbUpstreamsToConfigsCapacityPolicyDefaults(t *testing.T) {
 	defaults := commontypes.CapacityPolicy{
-		MaxConcurrency: 16,
-		MaxQueueDepth:  32,
-		MaxTPM:         200000,
-		MaxRPM:         120,
+		MaxConcurrency:   16,
+		MaxQueueDepth:    32,
+		MaxTPM:           200000,
+		MaxRPM:           120,
+		QueueWaitSeconds: 60,
 	}
 
-	t.Run("enabled policy with all limits unset uses defaults wholesale", func(t *testing.T) {
+	t.Run("enabled policy with all limits unset is default-filled as queue mode", func(t *testing.T) {
 		dbUpstreams := []database.Upstream{{
 			ID:  1,
 			URL: "http://upstream.example.com",
@@ -1587,13 +1588,14 @@ func TestDbUpstreamsToConfigsCapacityPolicyDefaults(t *testing.T) {
 		}}
 		result := dbUpstreamsToConfigs(dbUpstreams, defaults)
 		require.Len(t, result, 1)
+		// Queue-mode fill: TPM/RPM stay unset — not enforceable in queue mode.
 		require.Equal(t, &commontypes.CapacityPolicy{
-			Enabled:        true,
-			MaxConcurrency: 16,
-			MaxQueueDepth:  32,
-			MaxTPM:         200000,
-			MaxRPM:         120,
+			Enabled:          true,
+			MaxConcurrency:   16,
+			MaxQueueDepth:    32,
+			QueueWaitSeconds: 60,
 		}, result[0].CapacityPolicy)
+		require.True(t, result[0].CapacityPolicy.QueueEnabled())
 	})
 
 	t.Run("enabled policy with positive limits keeps its values", func(t *testing.T) {

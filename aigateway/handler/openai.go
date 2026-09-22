@@ -120,6 +120,10 @@ func NewOpenAIHandlerFromConfig(config *config.Config) (*OpenAIHandlerImpl, erro
 		slog.Warn("failed to start availability manager", "error", startErr)
 	} else {
 		handler.availabilityManager = availabilityManager
+		// The admission reservation queue consults live circuit state while
+		// a request waits: an upstream that opens its circuit cancels the
+		// queued ticket and triggers a bounded planner re-route.
+		modelService.SetCapacityAdmissionAvailabilitySource(availabilityManager)
 	}
 	return handler, nil
 }
@@ -160,6 +164,13 @@ func newOpenAIHandler(
 }
 
 func (h *OpenAIHandlerImpl) Shutdown(ctx context.Context) error {
+	// Stop the admission controller's background queue subscription before
+	// the process exits (idempotent; a no-op when queueing never started).
+	if h != nil {
+		if comp, ok := h.openaiComponent.(interface{ ShutdownCapacityAdmission() }); ok {
+			comp.ShutdownCapacityAdmission()
+		}
+	}
 	if h == nil || h.llmTracer == nil {
 		return nil
 	}

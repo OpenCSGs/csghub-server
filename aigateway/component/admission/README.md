@@ -337,10 +337,66 @@ When no upstream has an enabled CapacityPolicy, zero Redis calls are made
 go test ./aigateway/component/admission/ -count=1
 ```
 
+## v2: admission reservation queue (implemented)
+
+Waiting is not a new execution model — it turns an admission reservation from
+"occupy immediately" into "occupy after waiting". Full semantics live in
+[queue.md](queue.md) and the `capacity_queue.go` header comment; highlights:
+
+- **Configuration edge (documented)**: in queue mode `MaxConcurrency <= 0`
+  means "unlimited execution slots" — the gate always passes, the queue
+  never triggers, and the upstream behaves as if queueing were off. This
+  can only arise from `CapacityPolicyDefaults.MaxConcurrency <= 0` (the
+  admin update path validates `>= 1`); it is self-consistent, never a
+  capacity leak, but operators should keep the default `> 0`.
+- **Queue Mode Invariant (concurrency-only scheduling).** With queueing
+  enabled (`MaxQueueDepth > 0 && QueueWaitSeconds > 0`), execution admission —
+  direct admit, enqueue, dequeue, promote — depends ONLY on
+  `currentConcurrency < MaxConcurrency`. RPM/TPM MUST NOT block enqueue,
+  dequeue or promote; in queue mode they are accounting and observability
+  dimensions (and the promote script structurally cannot read them: the
+  ticket metadata only carries `maxConc`). Quota protection, if ever needed,
+  is an admission-time input BEFORE the queue (the reserved
+  `budget_exceeded` reason) — never a dequeue condition. Queue-OFF upstreams
+  keep the v1 three-dimension semantics byte for byte.
+- **Data structure**: one ZSET per upstream (`…:u:<id>:queue`),
+  member = ticket uuid, score = `priority*1e13 + enqueue_ms` (high=0 first,
+  FIFO within a priority); ticket metadata HASH carries
+  `<prio>:<est>:<enqueueMs>:<waitDeadlineMs>:<maxConc>` (est is only used for
+  the TPM pre-reservation written at promotion, never a gate; the claim
+  deadline arrives as ARGV), so promote needs no policy lookup.
+- **Unified queue discipline**: empty queue and feasible → direct admit;
+  non-empty queue → everyone enqueues. **Starvation semantics**: sustained
+  high-priority traffic can starve low-priority tickets — accepted and
+  documented; aging is a deliberate non-goal.
+- **Bounded HOL**: the promote gate is a single comparison (concurrency <
+  max), so every slot release promotes the head; leases reclaimed by the
+  expired-lease cleanup (crashed replicas) are picked up by the same script.
+- **Three ownership transitions** (same ZREM guard invariant as v1):
+  `Ticket→Lease` (promote grants a real lease with the claim-deadline TTL),
+  `Lease→Finalize` (release+promote merged atomically — the freed slot goes
+  straight to the head), `Ticket→Cancel` (timeout / disconnect / reroute
+  share one idempotent dual-state script; the granted-lease branch also
+  drops the RPM entry and reclaims the TPM reservation).
+- **Multi-replica wake-ups**: promote PUBLISHes on the queue key (pattern
+  subscription `aigateway:capacity:*:queue`) — point-to-point, no herd;
+  Pub/Sub is acceleration only, correctness comes from the per-waiter
+  fallback poll (each tick also drives one scheduler step, so slots freed
+  without a release event still progress). A dropped subscription
+  resubscribes with backoff (1s doubling to 30s).
+- **Availability boundary**: the queue does not understand health; the
+  waiter polls an injected availability checker while waiting — an
+  unavailable upstream cancels the ticket and the planner re-runs
+  Router→Admission (bounded re-plans, default 1, exhaustion → 503).
+  fallback/Acquire NEVER queues — it rejects immediately.
+- **HTTP semantics**: queue full → 429 `queue_full` (with Retry-After);
+  QueueWait exceeded → 408 `queue_timeout`; disconnect → 408
+  `queue_cancelled` (response rarely reaches the client). Queuing happens
+  before any SSE header is written, so both reuse the existing error
+  rendering.
+
 ## v2 evolution
 
-- Queue dimension (the controller comments mark the integration point; v1 has
-  no Queue action constant).
 - Periodic all-model capacity collector (`Observe` is ready; only a scheduler
   is missing).
 - lease_active collection on the Redis side, SLO/Budget/health admission

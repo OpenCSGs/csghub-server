@@ -161,15 +161,16 @@ func (h *ocrPipelineHandler) Extract(c *gin.Context) (*types.RequestMetadata, er
 	}
 
 	return &types.RequestMetadata{
-		Protocol:   string(types.ProtocolChat),
-		Task:       "ocr",
-		Model:      modelID,
-		TenantID:   nsUUID,
-		UserID:     username,
-		APIKeyID:   httpbase.GetAccessToken(c),
-		Streaming:  false,
-		Headers:    c.Request.Header,
-		ParsedBody: &ocrParsedBody{Req: ocrReq, FileHeader: fileHeader},
+		Protocol:      string(types.ProtocolChat),
+		Task:          "ocr",
+		Model:         modelID,
+		TenantID:      nsUUID,
+		UserID:        username,
+		APIKeyID:      httpbase.GetAccessToken(c),
+		PriorityScope: httpbase.GetAPIKeyPriorityScope(c),
+		Streaming:     false,
+		Headers:       c.Request.Header,
+		ParsedBody:    &ocrParsedBody{Req: ocrReq, FileHeader: fileHeader},
 	}, nil
 }
 

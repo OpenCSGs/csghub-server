@@ -247,17 +247,17 @@ func (_c *MockOpenAIComponent_CheckBalance_Call) RunAndReturn(run func(context.C
 	return _c
 }
 
-// CheckCapacityAdmission provides a mock function with given fields: ctx, model, preferredUpstreamID, allowSelect, estimatedTokens
-func (_m *MockOpenAIComponent) CheckCapacityAdmission(ctx context.Context, model *types.Model, preferredUpstreamID int64, allowSelect bool, estimatedTokens int64) *types.AdmissionDecision {
-	ret := _m.Called(ctx, model, preferredUpstreamID, allowSelect, estimatedTokens)
+// CheckCapacityAdmission provides a mock function with given fields: ctx, req
+func (_m *MockOpenAIComponent) CheckCapacityAdmission(ctx context.Context, req types.CapacityAdmissionRequest) *types.AdmissionDecision {
+	ret := _m.Called(ctx, req)
 
 	if len(ret) == 0 {
 		panic("no return value specified for CheckCapacityAdmission")
 	}
 
 	var r0 *types.AdmissionDecision
-	if rf, ok := ret.Get(0).(func(context.Context, *types.Model, int64, bool, int64) *types.AdmissionDecision); ok {
-		r0 = rf(ctx, model, preferredUpstreamID, allowSelect, estimatedTokens)
+	if rf, ok := ret.Get(0).(func(context.Context, types.CapacityAdmissionRequest) *types.AdmissionDecision); ok {
+		r0 = rf(ctx, req)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*types.AdmissionDecision)
@@ -274,17 +274,14 @@ type MockOpenAIComponent_CheckCapacityAdmission_Call struct {
 
 // CheckCapacityAdmission is a helper method to define mock.On call
 //   - ctx context.Context
-//   - model *types.Model
-//   - preferredUpstreamID int64
-//   - allowSelect bool
-//   - estimatedTokens int64
-func (_e *MockOpenAIComponent_Expecter) CheckCapacityAdmission(ctx interface{}, model interface{}, preferredUpstreamID interface{}, allowSelect interface{}, estimatedTokens interface{}) *MockOpenAIComponent_CheckCapacityAdmission_Call {
-	return &MockOpenAIComponent_CheckCapacityAdmission_Call{Call: _e.mock.On("CheckCapacityAdmission", ctx, model, preferredUpstreamID, allowSelect, estimatedTokens)}
+//   - req types.CapacityAdmissionRequest
+func (_e *MockOpenAIComponent_Expecter) CheckCapacityAdmission(ctx interface{}, req interface{}) *MockOpenAIComponent_CheckCapacityAdmission_Call {
+	return &MockOpenAIComponent_CheckCapacityAdmission_Call{Call: _e.mock.On("CheckCapacityAdmission", ctx, req)}
 }
 
-func (_c *MockOpenAIComponent_CheckCapacityAdmission_Call) Run(run func(ctx context.Context, model *types.Model, preferredUpstreamID int64, allowSelect bool, estimatedTokens int64)) *MockOpenAIComponent_CheckCapacityAdmission_Call {
+func (_c *MockOpenAIComponent_CheckCapacityAdmission_Call) Run(run func(ctx context.Context, req types.CapacityAdmissionRequest)) *MockOpenAIComponent_CheckCapacityAdmission_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(*types.Model), args[2].(int64), args[3].(bool), args[4].(int64))
+		run(args[0].(context.Context), args[1].(types.CapacityAdmissionRequest))
 	})
 	return _c
 }
@@ -294,7 +291,7 @@ func (_c *MockOpenAIComponent_CheckCapacityAdmission_Call) Return(_a0 *types.Adm
 	return _c
 }
 
-func (_c *MockOpenAIComponent_CheckCapacityAdmission_Call) RunAndReturn(run func(context.Context, *types.Model, int64, bool, int64) *types.AdmissionDecision) *MockOpenAIComponent_CheckCapacityAdmission_Call {
+func (_c *MockOpenAIComponent_CheckCapacityAdmission_Call) RunAndReturn(run func(context.Context, types.CapacityAdmissionRequest) *types.AdmissionDecision) *MockOpenAIComponent_CheckCapacityAdmission_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -840,6 +837,71 @@ func (_c *MockOpenAIComponent_RecordUsageFromTokenUsage_Call) Return(_a0 error) 
 
 func (_c *MockOpenAIComponent_RecordUsageFromTokenUsage_Call) RunAndReturn(run func(context.Context, string, *types.Model, string, *token.Usage, string, int64) error) *MockOpenAIComponent_RecordUsageFromTokenUsage_Call {
 	_c.Call.Return(run)
+	return _c
+}
+
+// SetCapacityAdmissionAvailabilitySource provides a mock function with given fields: src
+func (_m *MockOpenAIComponent) SetCapacityAdmissionAvailabilitySource(src types.UpstreamCircuitStateSource) {
+	_m.Called(src)
+}
+
+// MockOpenAIComponent_SetCapacityAdmissionAvailabilitySource_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SetCapacityAdmissionAvailabilitySource'
+type MockOpenAIComponent_SetCapacityAdmissionAvailabilitySource_Call struct {
+	*mock.Call
+}
+
+// SetCapacityAdmissionAvailabilitySource is a helper method to define mock.On call
+//   - src types.UpstreamCircuitStateSource
+func (_e *MockOpenAIComponent_Expecter) SetCapacityAdmissionAvailabilitySource(src interface{}) *MockOpenAIComponent_SetCapacityAdmissionAvailabilitySource_Call {
+	return &MockOpenAIComponent_SetCapacityAdmissionAvailabilitySource_Call{Call: _e.mock.On("SetCapacityAdmissionAvailabilitySource", src)}
+}
+
+func (_c *MockOpenAIComponent_SetCapacityAdmissionAvailabilitySource_Call) Run(run func(src types.UpstreamCircuitStateSource)) *MockOpenAIComponent_SetCapacityAdmissionAvailabilitySource_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(types.UpstreamCircuitStateSource))
+	})
+	return _c
+}
+
+func (_c *MockOpenAIComponent_SetCapacityAdmissionAvailabilitySource_Call) Return() *MockOpenAIComponent_SetCapacityAdmissionAvailabilitySource_Call {
+	_c.Call.Return()
+	return _c
+}
+
+func (_c *MockOpenAIComponent_SetCapacityAdmissionAvailabilitySource_Call) RunAndReturn(run func(types.UpstreamCircuitStateSource)) *MockOpenAIComponent_SetCapacityAdmissionAvailabilitySource_Call {
+	_c.Run(run)
+	return _c
+}
+
+// ShutdownCapacityAdmission provides a mock function with no fields
+func (_m *MockOpenAIComponent) ShutdownCapacityAdmission() {
+	_m.Called()
+}
+
+// MockOpenAIComponent_ShutdownCapacityAdmission_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ShutdownCapacityAdmission'
+type MockOpenAIComponent_ShutdownCapacityAdmission_Call struct {
+	*mock.Call
+}
+
+// ShutdownCapacityAdmission is a helper method to define mock.On call
+func (_e *MockOpenAIComponent_Expecter) ShutdownCapacityAdmission() *MockOpenAIComponent_ShutdownCapacityAdmission_Call {
+	return &MockOpenAIComponent_ShutdownCapacityAdmission_Call{Call: _e.mock.On("ShutdownCapacityAdmission")}
+}
+
+func (_c *MockOpenAIComponent_ShutdownCapacityAdmission_Call) Run(run func()) *MockOpenAIComponent_ShutdownCapacityAdmission_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockOpenAIComponent_ShutdownCapacityAdmission_Call) Return() *MockOpenAIComponent_ShutdownCapacityAdmission_Call {
+	_c.Call.Return()
+	return _c
+}
+
+func (_c *MockOpenAIComponent_ShutdownCapacityAdmission_Call) RunAndReturn(run func()) *MockOpenAIComponent_ShutdownCapacityAdmission_Call {
+	_c.Run(run)
 	return _c
 }
 

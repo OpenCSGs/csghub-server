@@ -22,11 +22,17 @@ import (
 type mockModelResolver struct {
 	target *types.ModelTarget
 	err    error
+	// resolveCalls counts resolution invocations (re-plan assertions).
+	resolveCalls int
 }
 
 func (m *mockModelResolver) ResolveModelTarget(ctx context.Context, nsUUID, modelID string, headers http.Header, opts ResolveOptions) (*types.ModelTarget, error) {
+	m.resolveCalls++
 	return m.target, m.err
 }
+
+// resolutionCalls exposes the resolution invocation count.
+func (m *mockModelResolver) resolutionCalls() int { return m.resolveCalls }
 
 type mockBalanceChecker struct {
 	err error

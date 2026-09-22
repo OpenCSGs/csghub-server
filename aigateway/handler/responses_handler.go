@@ -143,14 +143,15 @@ func (h *responsesPipelineHandler) Extract(c *gin.Context) (*types.RequestMetada
 	}
 
 	return &types.RequestMetadata{
-		Protocol:  string(types.ProtocolResponses),
-		Task:      "responses",
-		Model:     publicModelID,
-		TenantID:  nsUUID,
-		UserID:    username,
-		APIKeyID:  apikey,
-		Streaming: req.Stream,
-		Headers:   c.Request.Header,
+		Protocol:      string(types.ProtocolResponses),
+		Task:          "responses",
+		Model:         publicModelID,
+		TenantID:      nsUUID,
+		UserID:        username,
+		APIKeyID:      apikey,
+		PriorityScope: httpbase.GetAPIKeyPriorityScope(c),
+		Streaming:     req.Stream,
+		Headers:       c.Request.Header,
 		ParsedBody: &responsesParsedBody{
 			Req:                  req,
 			PublicModelID:        publicModelID,

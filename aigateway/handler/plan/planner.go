@@ -30,26 +30,70 @@ type plannerImpl struct {
 	contentSafety     ContentSafetyChecker
 	admissionChecker  AdmissionChecker
 	metricsEnricher   MetricsEnricher
+	// queueMaxRePlans bounds the re-plans triggered by an admission reroute
+	// (an upstream turned unavailable while the request waited in its
+	// reservation queue). The queue never picks another upstream itself;
+	// the re-plan re-runs the full Router→Admission sequence against a
+	// fresh candidate set.
+	queueMaxRePlans int
+}
+
+// PlannerOption customizes optional planner behavior.
+type PlannerOption func(*plannerImpl)
+
+// WithQueueMaxRePlans sets how many times the planner re-runs the plan when
+// admission signals a reroute (queued request's upstream went unavailable).
+// Values <= 0 keep the default of 1.
+func WithQueueMaxRePlans(n int) PlannerOption {
+	return func(p *plannerImpl) {
+		if n > 0 {
+			p.queueMaxRePlans = n
+		}
+	}
 }
 
 // NewPlanner constructs a Planner from its dependency interfaces.
 // The handler package provides concrete adapters at the composition root.
 // admissionChecker may be nil in tests; admission is then skipped.
-func NewPlanner(mr ModelResolver, bc BalanceChecker, ulc UsageLimitChecker, cs ContentSafetyChecker, ac AdmissionChecker, me MetricsEnricher) Planner {
-	return &plannerImpl{
+func NewPlanner(mr ModelResolver, bc BalanceChecker, ulc UsageLimitChecker, cs ContentSafetyChecker, ac AdmissionChecker, me MetricsEnricher, opts ...PlannerOption) Planner {
+	p := &plannerImpl{
 		modelResolver:     mr,
 		balanceChecker:    bc,
 		usageLimitChecker: ulc,
 		contentSafety:     cs,
 		admissionChecker:  ac,
 		metricsEnricher:   me,
+		queueMaxRePlans:   1,
 	}
+	for _, opt := range opts {
+		opt(p)
+	}
+	return p
 }
 
 // Plan produces a RequestPlan from the RequestMetadata.
 func (p *plannerImpl) Plan(c *gin.Context, meta *types.RequestMetadata) (*types.RequestPlan, error) {
+	for attempt := 0; ; attempt++ {
+		pl, err, reroute := p.planOnce(c, meta)
+		if !reroute {
+			return pl, err
+		}
+		// Admission reroute: the upstream the ticket was queued on turned
+		// unavailable while waiting. Re-run the whole plan against a fresh
+		// candidate set (resolution re-filters by availability); the
+		// ticket was already cancelled by the queue.
+		slog.InfoContext(c.Request.Context(), "admission queue reroute, re-planning",
+			slog.String("model", meta.Model), slog.Int("attempt", attempt+1))
+		if attempt >= p.queueMaxRePlans {
+			pl.ErrorCode = types.PlanErrModelUnavailable
+			return pl, fmt.Errorf("model upstream became unavailable while the request was queued")
+		}
+	}
+}
+
+func (p *plannerImpl) planOnce(c *gin.Context, meta *types.RequestMetadata) (pl *types.RequestPlan, err error, reroute bool) {
 	ctx := c.Request.Context()
-	pl := &types.RequestPlan{}
+	pl = &types.RequestPlan{}
 
 	// 1. Model Resolution.
 	mt, err := p.modelResolver.ResolveModelTarget(ctx, meta.TenantID, meta.Model, meta.Headers, ResolveOptions{
@@ -63,11 +107,11 @@ func (p *plannerImpl) Plan(c *gin.Context, meta *types.RequestMetadata) (*types.
 	}
 	if err != nil {
 		pl.ErrorCode = categorizePlanError(err)
-		return pl, err
+		return pl, err, false
 	}
 	if mt == nil {
 		pl.ErrorCode = types.PlanErrModelNotFound
-		return pl, fmt.Errorf("model '%s' not found", meta.Model)
+		return pl, fmt.Errorf("model '%s' not found", meta.Model), false
 	}
 	pl.ModelTarget = mt
 
@@ -76,17 +120,17 @@ func (p *plannerImpl) Plan(c *gin.Context, meta *types.RequestMetadata) (*types.
 	// original inline flow).
 	if err := applyProtocolRouting(pl, meta, mt); err != nil {
 		if pl.ErrorCode == types.PlanErrDisabled {
-			return pl, err
+			return pl, err, false
 		}
 		pl.ErrorCode = types.PlanErrUnknown
-		return pl, err
+		return pl, err, false
 	}
 
 	// 4. Balance check (respects SkipBalance).
 	if !mt.Model.SkipBalance() {
 		if err := p.balanceChecker.CheckBalance(ctx, meta.TenantID); err != nil {
 			pl.ErrorCode = categorizePlanError(err)
-			return pl, err
+			return pl, err, false
 		}
 	}
 	pl.BalanceOK = true
@@ -98,7 +142,7 @@ func (p *plannerImpl) Plan(c *gin.Context, meta *types.RequestMetadata) (*types.
 	if shouldCheckUsageLimit(meta.Task) {
 		if err := p.usageLimitChecker.CheckUsageLimit(ctx, meta.TenantID, mt.Model, pl.BackendURL); err != nil {
 			pl.ErrorCode = categorizePlanError(err)
-			return pl, err
+			return pl, err, false
 		}
 	}
 	pl.UsageLimitOK = true
@@ -108,7 +152,7 @@ func (p *plannerImpl) Plan(c *gin.Context, meta *types.RequestMetadata) (*types.
 	// reasons:
 	//   - The sensitive check is the expensive step (whitelist query +
 	//     moderation RPC): requests that have no capacity to run should not
-	//     pay for it ("no资格执行就别审").
+	//     pay for it.
 	//   - A capacity re-selection MUST happen before the sensitive check:
 	//     the check's whitelist targets are built from the upstream
 	//     provider, so it must observe the FINAL upstream, not the
@@ -124,32 +168,17 @@ func (p *plannerImpl) Plan(c *gin.Context, meta *types.RequestMetadata) (*types.
 			// Checker programming errors surface as internal errors; the
 			// checker itself never fails on Redis issues (fail-open).
 			pl.ErrorCode = types.PlanErrInternal
-			return pl, admissionErr
+			return pl, admissionErr, false
 		}
 		if outcome != nil && outcome.Decision != nil {
-			decision := outcome.Decision
-			// Record the decision on the plan for both observability and
-			// the Orchestrator's lease-release safety net.
-			pl.Admission = decision
-			if decision.Action != types.AdmissionAdmit {
-				pl.ErrorCode = types.PlanErrCapacityExceeded
-				return pl, &types.AdmissionDeniedError{Decision: decision}
+			var reroute bool
+			var admissionErr error
+			pl, mt, admissionErr, reroute = p.applyAdmissionOutcome(pl, meta, mt, outcome)
+			if reroute {
+				return pl, nil, true
 			}
-			// Capacity-aware fallback: the admission layer re-selected a
-			// different upstream of the same candidate set. Re-apply the
-			// protocol routing for the new target and update the plan —
-			// BEFORE the sensitive check below, so the safety gate sees the
-			// final upstream (its provider feeds the whitelist targets).
-			if outcome.ReSelectedTarget != nil {
-				if err := applyProtocolRouting(pl, meta, outcome.ReSelectedTarget); err != nil {
-					pl.ErrorCode = types.PlanErrModelUnavailable
-					return pl, err
-				}
-				pl.ModelTarget = outcome.ReSelectedTarget
-				pl.BackendURL = outcome.ReSelectedTarget.Target
-				// The sensitive check must run against the re-selected
-				// target; mt is the local the rest of the plan uses.
-				mt = outcome.ReSelectedTarget
+			if admissionErr != nil {
+				return pl, admissionErr, false
 			}
 		}
 	}
@@ -169,11 +198,81 @@ func (p *plannerImpl) Plan(c *gin.Context, meta *types.RequestMetadata) (*types.
 		} else if isSensitive {
 			pl.Safety = &types.SafetyDecision{IsSensitive: true, Message: message}
 			pl.ErrorCode = types.PlanErrSensitive
-			return pl, fmt.Errorf("content blocked due to safety policy")
+			return pl, fmt.Errorf("content blocked due to safety policy"), false
 		}
 	}
 
-	return pl, nil
+	return pl, nil, false
+}
+
+// applyAdmissionOutcome folds one admission decision into the plan. It
+// returns the (plan, effective model target, error, reroute) tuple for
+// planOnce:
+//
+//   - reroute: the queued ticket was cancelled because its upstream turned
+//     unavailable while waiting — planOnce re-runs the whole plan (bounded).
+//   - denied: the request must not proceed (queue full / queue timeout /
+//     capacity), with the plan ErrorCode chosen per rejection reason.
+//   - admitted: the plan carries the lease; when admission re-selected a
+//     different upstream, protocol routing is re-applied for the new target
+//     and the returned target pointer is advanced so the content-safety
+//     check in the caller sees the FINAL upstream (its provider feeds the
+//     whitelist targets).
+func (p *plannerImpl) applyAdmissionOutcome(pl *types.RequestPlan, meta *types.RequestMetadata, mt *types.ModelTarget, outcome *types.AdmissionOutcome) (*types.RequestPlan, *types.ModelTarget, error, bool) {
+	decision := outcome.Decision
+	// Record the decision on the plan for both observability and the
+	// Orchestrator's lease-release safety net.
+	pl.Admission = decision
+	if decision.Action == types.AdmissionReroute {
+		// The queued ticket was cancelled because its upstream turned
+		// unavailable while waiting; the planner re-runs the plan (bounded
+		// by queueMaxRePlans). No lease is held.
+		return pl, mt, nil, true
+	}
+	if decision.Action != types.AdmissionAdmit {
+		switch decision.Reason {
+		case types.AdmissionReasonQueueTimeout:
+			pl.ErrorCode = types.PlanErrQueueTimeout
+		case types.AdmissionReasonQueueCancelled:
+			pl.ErrorCode = types.PlanErrQueueCancelled
+		default:
+			pl.ErrorCode = types.PlanErrCapacityExceeded
+		}
+		return pl, mt, &types.AdmissionDeniedError{Decision: decision}, false
+	}
+	// Capacity-aware fallback: the admission layer re-selected a different
+	// upstream of the same candidate set. Re-apply the protocol routing for
+	// the new target and update the plan — BEFORE the sensitive check below,
+	// so the safety gate sees the final upstream (its provider feeds the
+	// whitelist targets).
+	if outcome.ReSelectedTarget != nil {
+		if err := applyProtocolRouting(pl, meta, outcome.ReSelectedTarget); err != nil {
+			pl.ErrorCode = types.PlanErrModelUnavailable
+			return pl, mt, err, false
+		}
+		pl.ModelTarget = outcome.ReSelectedTarget
+		// BackendURL is already set by applyProtocolRouting above; do not
+		// overwrite it with the raw upstream URL.
+		return pl, outcome.ReSelectedTarget, nil, false
+	}
+	return pl, mt, nil, false
+}
+
+// shouldAdmitCapacity reports whether the task participates in capacity
+// admission. All known token-generating and modal tasks are gated (the
+// all-modalities rollout): text tasks reserve from the text estimate, media
+// tasks are admitted without a TPM reservation (their parsed bodies report
+// multimodal content). Unknown tasks bypass admission — they have no
+// modality-specific eligibility review yet.
+func shouldAdmitCapacity(task string) bool {
+	switch task {
+	case "chat", "responses", "messages", "text-to-image",
+		"embedding", "rerank", "speech",
+		"audio", "ocr", "text-to-video":
+		return true
+	default:
+		return false
+	}
 }
 
 // applyProtocolRouting resolves the client protocol against the upstream,
@@ -259,24 +358,6 @@ func categorizePlanError(err error) types.PlanErrorCategory {
 func shouldCheckUsageLimit(task string) bool {
 	switch task {
 	case "chat", "responses", "messages":
-		return true
-	default:
-		return false
-	}
-}
-
-// shouldAdmitCapacity reports whether the task participates in capacity
-// admission. Token-generating protocols (chat, responses, messages) and
-// text-estimatable endpoints (embedding, rerank, speech) are gated by all
-// CapacityPolicy dimensions; media endpoints (image, audio, ocr,
-// text-to-video) are gated too but always without a TPM reservation (their
-// parsed bodies report multimodal content, so the checker passes
-// EstimatedTokens <= 0 and only concurrency and RPM bind).
-func shouldAdmitCapacity(task string) bool {
-	switch task {
-	case "chat", "responses", "messages", "text-to-image",
-		"embedding", "rerank", "speech",
-		"audio", "ocr", "text-to-video":
 		return true
 	default:
 		return false

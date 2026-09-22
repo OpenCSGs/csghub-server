@@ -79,15 +79,16 @@ func (h *videoPipelineHandler) Extract(c *gin.Context) (*types.RequestMetadata, 
 	}
 
 	return &types.RequestMetadata{
-		Protocol:   string(types.ProtocolChat),
-		Task:       "text-to-video",
-		Model:      input.modelID,
-		TenantID:   nsUUID,
-		UserID:     username,
-		APIKeyID:   httpbase.GetAccessToken(c),
-		Streaming:  false,
-		Headers:    c.Request.Header,
-		ParsedBody: input,
+		Protocol:      string(types.ProtocolChat),
+		Task:          "text-to-video",
+		Model:         input.modelID,
+		TenantID:      nsUUID,
+		UserID:        username,
+		APIKeyID:      httpbase.GetAccessToken(c),
+		PriorityScope: httpbase.GetAPIKeyPriorityScope(c),
+		Streaming:     false,
+		Headers:       c.Request.Header,
+		ParsedBody:    input,
 	}, nil
 }
 
@@ -126,7 +127,7 @@ func (h *videoPipelineHandler) Execute(c *gin.Context, meta *types.RequestMetada
 		ModelID:       input.modelID,
 		ModelTarget:   resolvedMT,
 		Metadata: map[string]any{
-			llmtrace.TraceMetadataKeyVideoSize:     input.adapterReq.Size,
+			llmtrace.TraceMetadataKeyVideoSize:    input.adapterReq.Size,
 			llmtrace.TraceMetadataKeyVideoSeconds: input.adapterReq.Seconds,
 		},
 	})
@@ -210,4 +211,3 @@ func (h *videoPipelineHandler) HandlePlanError(c *gin.Context, meta *types.Reque
 	}
 	handleOpenAIPlanError(c, meta, p, err, frontendURL)
 }
-

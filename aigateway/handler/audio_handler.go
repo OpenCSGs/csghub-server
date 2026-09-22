@@ -117,15 +117,16 @@ func (h *audioPipelineHandler) Extract(c *gin.Context) (*types.RequestMetadata, 
 	isStream := strings.EqualFold(firstMultipartValue(form, "stream"), "true")
 
 	return &types.RequestMetadata{
-		Protocol:   string(types.ProtocolChat),
-		Task:       "audio",
-		Model:      modelID,
-		TenantID:   nsUUID,
-		UserID:     username,
-		APIKeyID:   httpbase.GetAccessToken(c),
-		Streaming:  isStream,
-		Headers:    c.Request.Header,
-		ParsedBody: &audioParsedBody{Form: form},
+		Protocol:      string(types.ProtocolChat),
+		Task:          "audio",
+		Model:         modelID,
+		TenantID:      nsUUID,
+		UserID:        username,
+		APIKeyID:      httpbase.GetAccessToken(c),
+		PriorityScope: httpbase.GetAPIKeyPriorityScope(c),
+		Streaming:     isStream,
+		Headers:       c.Request.Header,
+		ParsedBody:    &audioParsedBody{Form: form},
 	}, nil
 }
 

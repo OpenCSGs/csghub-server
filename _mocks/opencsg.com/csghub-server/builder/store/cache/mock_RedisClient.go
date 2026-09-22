@@ -1032,6 +1032,79 @@ func (_c *MockRedisClient_LoadScript_Call) RunAndReturn(run func(context.Context
 	return _c
 }
 
+// PSubscribe provides a mock function with given fields: ctx, patterns
+func (_m *MockRedisClient) PSubscribe(ctx context.Context, patterns ...string) (*redis.PubSub, error) {
+	_va := make([]interface{}, len(patterns))
+	for _i := range patterns {
+		_va[_i] = patterns[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for PSubscribe")
+	}
+
+	var r0 *redis.PubSub
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, ...string) (*redis.PubSub, error)); ok {
+		return rf(ctx, patterns...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, ...string) *redis.PubSub); ok {
+		r0 = rf(ctx, patterns...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*redis.PubSub)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, ...string) error); ok {
+		r1 = rf(ctx, patterns...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockRedisClient_PSubscribe_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PSubscribe'
+type MockRedisClient_PSubscribe_Call struct {
+	*mock.Call
+}
+
+// PSubscribe is a helper method to define mock.On call
+//   - ctx context.Context
+//   - patterns ...string
+func (_e *MockRedisClient_Expecter) PSubscribe(ctx interface{}, patterns ...interface{}) *MockRedisClient_PSubscribe_Call {
+	return &MockRedisClient_PSubscribe_Call{Call: _e.mock.On("PSubscribe",
+		append([]interface{}{ctx}, patterns...)...)}
+}
+
+func (_c *MockRedisClient_PSubscribe_Call) Run(run func(ctx context.Context, patterns ...string)) *MockRedisClient_PSubscribe_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		variadicArgs := make([]string, len(args)-1)
+		for i, a := range args[1:] {
+			if a != nil {
+				variadicArgs[i] = a.(string)
+			}
+		}
+		run(args[0].(context.Context), variadicArgs...)
+	})
+	return _c
+}
+
+func (_c *MockRedisClient_PSubscribe_Call) Return(_a0 *redis.PubSub, _a1 error) *MockRedisClient_PSubscribe_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockRedisClient_PSubscribe_Call) RunAndReturn(run func(context.Context, ...string) (*redis.PubSub, error)) *MockRedisClient_PSubscribe_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Pipelined provides a mock function with given fields: ctx, fn
 func (_m *MockRedisClient) Pipelined(ctx context.Context, fn func(redis.Pipeliner) error) ([]redis.Cmder, error) {
 	ret := _m.Called(ctx, fn)
@@ -1087,6 +1160,54 @@ func (_c *MockRedisClient_Pipelined_Call) Return(_a0 []redis.Cmder, _a1 error) *
 }
 
 func (_c *MockRedisClient_Pipelined_Call) RunAndReturn(run func(context.Context, func(redis.Pipeliner) error) ([]redis.Cmder, error)) *MockRedisClient_Pipelined_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// Publish provides a mock function with given fields: ctx, channel, message
+func (_m *MockRedisClient) Publish(ctx context.Context, channel string, message interface{}) error {
+	ret := _m.Called(ctx, channel, message)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Publish")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, interface{}) error); ok {
+		r0 = rf(ctx, channel, message)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockRedisClient_Publish_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Publish'
+type MockRedisClient_Publish_Call struct {
+	*mock.Call
+}
+
+// Publish is a helper method to define mock.On call
+//   - ctx context.Context
+//   - channel string
+//   - message interface{}
+func (_e *MockRedisClient_Expecter) Publish(ctx interface{}, channel interface{}, message interface{}) *MockRedisClient_Publish_Call {
+	return &MockRedisClient_Publish_Call{Call: _e.mock.On("Publish", ctx, channel, message)}
+}
+
+func (_c *MockRedisClient_Publish_Call) Run(run func(ctx context.Context, channel string, message interface{})) *MockRedisClient_Publish_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(interface{}))
+	})
+	return _c
+}
+
+func (_c *MockRedisClient_Publish_Call) Return(_a0 error) *MockRedisClient_Publish_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockRedisClient_Publish_Call) RunAndReturn(run func(context.Context, string, interface{}) error) *MockRedisClient_Publish_Call {
 	_c.Call.Return(run)
 	return _c
 }
