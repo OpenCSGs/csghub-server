@@ -2,11 +2,13 @@ package config
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net"
 	"os"
 	"reflect"
+	"strings"
 	"sync"
 	"time"
 
@@ -32,6 +34,34 @@ type ModelConfig struct {
 	//   - "X-Custom-Header": any other custom header required by the upstream service
 	// Note: "Host" is set via req.Host (not req.Header) to comply with Go's HTTP client behavior.
 	Headers map[string]string `env:"HEADERS" default:""`
+}
+
+// LLMUnsafeRule is a single guard LLM sensitive rule. Level is the risk level
+// to match (case-insensitive, e.g. "Unsafe" or "Controversial"). Category is
+// optional: when empty, every category of that level matches; otherwise the
+// response category labels must contain it.
+type LLMUnsafeRule struct {
+	Level    string `json:"level" toml:"level"`
+	Category string `json:"category" toml:"category"`
+}
+
+// LLMUnsafeRules is a list of LLMUnsafeRule entries; any matching rule marks
+// the content sensitive.
+type LLMUnsafeRules []LLMUnsafeRule
+
+// UnmarshalJSON lets envconfig load the rules from a JSON array env var and
+// keeps entries trimmed.
+func (r *LLMUnsafeRules) UnmarshalJSON(data []byte) error {
+	var rules []LLMUnsafeRule
+	if err := json.Unmarshal(data, &rules); err != nil {
+		return err
+	}
+	for i := range rules {
+		rules[i].Level = strings.TrimSpace(rules[i].Level)
+		rules[i].Category = strings.TrimSpace(rules[i].Category)
+	}
+	*r = rules
+	return nil
 }
 
 type Config struct {
@@ -215,6 +245,15 @@ type Config struct {
 			Temperature  float64 `env:"STARHUB_SERVER_SENSITIVE_CHECK_LLM_TEMPERATURE" default:"0"`
 			ResponseMode string  `env:"STARHUB_SERVER_SENSITIVE_CHECK_LLM_RESPONSE_MODE" default:"json_or_text"`
 			SafetyRegex  string  `env:"STARHUB_SERVER_SENSITIVE_CHECK_LLM_SAFETY_REGEX" default:"Safety:\\s*(Safe|Unsafe|Controversial)"`
+			// UnsafeRules defines when a guard LLM verdict marks content as
+			// sensitive. The content is sensitive when ANY rule matches: the
+			// response risk level equals the rule level (case-insensitive) and
+			// either the rule category is empty (any category of that level
+			// matches) or the response categories include the rule category.
+			// Rules are OR-combined. An empty list disables sensitive blocking
+			// for guard LLM responses. Configured as a JSON array, e.g.
+			// [{"level":"Unsafe"},{"level":"Controversial","category":"Politically Sensitive Topics"}]
+			UnsafeRules LLMUnsafeRules `env:"STARHUB_SERVER_SENSITIVE_CHECK_LLM_UNSAFE_RULES,default=[{\"level\":\"Unsafe\"},{\"level\":\"Controversial\",\"category\":\"Politically Sensitive Topics\"}]"`
 			// Guard is the model config for non-stream sensitive checks.
 			// Each must have a Model and Endpoint. Headers (including Authorization) are per-model.
 			Guard ModelConfig `env:",prefix=STARHUB_SERVER_SENSITIVE_CHECK_LLM_GUARD_"`
