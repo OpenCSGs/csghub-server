@@ -39,6 +39,7 @@ type Observation struct {
 	AllowedCount int
 	DeniedCount  int
 	ErrorCount   int
+	ResultCount  int
 	ErrorClass   ErrorClass
 }
 

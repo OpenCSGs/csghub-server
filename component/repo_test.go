@@ -19,6 +19,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/minio/minio-go/v7"
+	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -42,6 +43,9 @@ import (
 func TestRepoComponent_CreateRepo(t *testing.T) {
 	ctx := context.TODO()
 	repo := initializeTestRepoComponent(ctx, t)
+	repo.repoComponentImpl.repositoryAccessCache = mockcache.NewMockRedisClient(t)
+	accessCache := repo.repoComponentImpl.repositoryAccessCache.(*mockcache.MockRedisClient)
+	accessCache.EXPECT().Del(ctx, "repo:access:read:v2:user-uuid").Return(errors.New("redis unavailable")).Once()
 
 	repo.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "ns").Return(database.Namespace{
 		Path:          "ns",
@@ -340,11 +344,15 @@ func TestRepoComponent_DeleteRepo(t *testing.T) {
 	}, nil)
 	dbuser := database.User{
 		ID:       123,
+		UUID:     "user-uuid",
 		RoleMask: "admin",
 		Email:    "foo@bar.com",
 	}
 	repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(dbuser, nil)
 	repo.mocks.stores.RepoMock().EXPECT().DeleteRepo(ctx, *dbrepo).Return(nil)
+	repo.repoComponentImpl.repositoryAccessCache = mockcache.NewMockRedisClient(t)
+	accessCache := repo.repoComponentImpl.repositoryAccessCache.(*mockcache.MockRedisClient)
+	accessCache.EXPECT().Del(ctx, "repo:access:read:v2:user-uuid").Return(errors.New("redis unavailable")).Once()
 
 	r1, err := repo.DeleteRepo(ctx, types.DeleteRepoReq{
 		Username:  "user",
@@ -449,6 +457,32 @@ func TestRepoComponent_LoadRepositoryReadScopeFromCache(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, database.RepositoryAccessReadable, scope.Mode)
 	require.Equal(t, []int64{3, 5}, scope.ReadableRepositoryIDs)
+}
+
+// TestRepoComponentLoadRepositoryReadScopeUsesOneMinuteFallback verifies cache writes use the code fallback TTL.
+func TestRepoComponentLoadRepositoryReadScopeUsesOneMinuteFallback(t *testing.T) {
+	ctx := context.Background()
+	repo := initializeTestRepoComponent(ctx, t)
+	repo.config = nil
+	repo.repoComponentImpl.repositoryAccessCache = mockcache.NewMockRedisClient(t)
+	repo.mocks.userSvcClient.EXPECT().GetUserInfo(ctx, "user", "user").Return(&rpc.User{
+		UUID: "fallback-ttl-user-uuid",
+	}, nil).Once()
+	cache := repo.repoComponentImpl.repositoryAccessCache.(*mockcache.MockRedisClient)
+	cache.EXPECT().Get(ctx, "repo:access:read:v2:fallback-ttl-user-uuid").Return("", redis.Nil).Once()
+	repoAuthorizerMock(repo).EXPECT().ListObjects(ctx, rebac.ListObjectsRequest{
+		Subject:     rebac.UserSubject("fallback-ttl-user-uuid"),
+		Relation:    rebac.RepositoryCanRead,
+		ObjectType:  rebac.ObjectTypeRepository,
+		Consistency: rebac.ConsistencyHigher,
+	}).Return(rebac.ListObjectsResult{Objects: []rebac.Object{rebac.RepositoryObject(42)}}, nil).Once()
+	cache.EXPECT().SetEx(ctx, "repo:access:read:v2:fallback-ttl-user-uuid", mock.AnythingOfType("string"), mock.MatchedBy(func(ttl time.Duration) bool {
+		return ttl > 59*time.Second && ttl <= time.Minute
+	})).Return(nil).Once()
+
+	scope, err := repo.loadRepositoryReadScope(ctx, "user")
+	require.NoError(t, err)
+	require.Equal(t, []int64{42}, scope.ReadableRepositoryIDs)
 }
 
 func mockUserRepoAdminPermission(ctx context.Context, stores *tests.MockStores, userName string) {
@@ -2429,6 +2463,53 @@ func TestRepoComponent_CheckUserRepoPermissionUsesRepository(t *testing.T) {
 	allowed, err := repoComp.CheckUserRepoPermission(ctx, user.Username, repository, rebac.RepositoryCanWrite)
 	require.NoError(t, err)
 	require.True(t, allowed)
+}
+
+// TestRepoComponentCheckUserRepoPermissionInvalidatesPrivateReadDenial verifies only explicit private read denials clear the cache.
+func TestRepoComponentCheckUserRepoPermissionInvalidatesPrivateReadDenial(t *testing.T) {
+	t.Run("private read denial", func(t *testing.T) {
+		ctx := context.Background()
+		repoComp := initializeTestRepoComponent(ctx, t)
+		repoComp.repositoryAccessCache = mockcache.NewMockRedisClient(t)
+		cache := repoComp.repositoryAccessCache.(*mockcache.MockRedisClient)
+		user := database.User{Username: "member", UUID: "private-denied-user-uuid"}
+		repository := &database.Repository{ID: 42, Private: true}
+		repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, user.Username).Return(user, nil).Once()
+		repoAuthorizerMock(repoComp).EXPECT().Check(ctx, mock.AnythingOfType("rebac.CheckRequest")).Return(rebac.Decision{Allowed: false}, nil).Once()
+		cache.EXPECT().Del(ctx, "repo:access:read:v2:private-denied-user-uuid").Return(errors.New("redis unavailable")).Once()
+
+		allowed, err := repoComp.CheckUserRepoPermission(ctx, user.Username, repository, rebac.RepositoryCanRead)
+		require.NoError(t, err)
+		require.False(t, allowed)
+	})
+
+	t.Run("public read denial", func(t *testing.T) {
+		ctx := context.Background()
+		repoComp := initializeTestRepoComponent(ctx, t)
+		repoComp.repositoryAccessCache = mockcache.NewMockRedisClient(t)
+		user := database.User{Username: "member", UUID: "public-user-uuid"}
+		repository := &database.Repository{ID: 42, Private: false}
+		repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, user.Username).Return(user, nil).Once()
+		repoAuthorizerMock(repoComp).EXPECT().Check(ctx, mock.AnythingOfType("rebac.CheckRequest")).Return(rebac.Decision{Allowed: false}, nil).Once()
+
+		allowed, err := repoComp.CheckUserRepoPermission(ctx, user.Username, repository, rebac.RepositoryCanRead)
+		require.NoError(t, err)
+		require.True(t, allowed)
+	})
+
+	t.Run("provider error", func(t *testing.T) {
+		ctx := context.Background()
+		repoComp := initializeTestRepoComponent(ctx, t)
+		repoComp.repositoryAccessCache = mockcache.NewMockRedisClient(t)
+		user := database.User{Username: "member", UUID: "error-user-uuid"}
+		repository := &database.Repository{ID: 42, Private: true}
+		repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, user.Username).Return(user, nil).Once()
+		repoAuthorizerMock(repoComp).EXPECT().Check(ctx, mock.AnythingOfType("rebac.CheckRequest")).Return(rebac.Decision{}, errors.New("rebac unavailable")).Once()
+
+		allowed, err := repoComp.CheckUserRepoPermission(ctx, user.Username, repository, rebac.RepositoryCanRead)
+		require.Error(t, err)
+		require.False(t, allowed)
+	})
 }
 
 func TestRepoComponent_checkCurrentUserPermission(t *testing.T) {

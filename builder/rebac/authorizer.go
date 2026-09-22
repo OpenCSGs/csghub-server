@@ -5,7 +5,15 @@ import (
 	"errors"
 	"fmt"
 	"time"
+
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	oteltrace "go.opentelemetry.io/otel/trace"
 )
+
+// authorizerInstrumentationName identifies spans emitted by the ReBAC facade.
+const authorizerInstrumentationName = "opencsg.com/csghub-server/builder/rebac"
 
 // Authorizer is the stable application-facing ReBAC facade.
 type Authorizer interface {
@@ -71,6 +79,7 @@ type authorizer struct {
 	observer     Observer
 	timeout      time.Duration
 	maxBatchSize int
+	tracer       oteltrace.Tracer
 }
 
 // NewAuthorizer creates an authorization facade independent of a concrete Provider.
@@ -113,6 +122,7 @@ func NewAuthorizer(provider Provider, options ...Option) (Authorizer, error) {
 		observer:     config.observer,
 		timeout:      config.timeout,
 		maxBatchSize: config.maxBatchSize,
+		tracer:       otel.Tracer(authorizerInstrumentationName),
 	}, nil
 }
 
@@ -185,19 +195,25 @@ func (a *authorizer) Authorize(ctx context.Context, request CheckRequest) error 
 // BatchCheck validates and executes a bounded set of independent authorization checks.
 func (a *authorizer) BatchCheck(ctx context.Context, request BatchCheckRequest) (result BatchCheckResult, err error) {
 	started := time.Now()
+	objectType, relation := homogeneousBatchCheckScope(request.Checks)
 	observation := Observation{
 		Operation:  OperationBatchCheck,
 		Provider:   a.providerName,
+		ObjectType: objectType,
+		Relation:   relation,
 		BatchSize:  len(request.Checks),
 		ErrorClass: ErrorClassNone,
 	}
+	inputCtx := ctx
+	ctx, span := a.startSpan(ctx, observation)
 	defer func() {
 		observation.Duration = time.Since(started)
 		observation.ErrorClass = ClassifyError(err)
-		a.observer.Observe(observerContext(ctx), observation)
+		a.finishSpan(span, observation, err)
+		a.observer.Observe(ctx, observation)
 	}()
 
-	if ctx == nil {
+	if inputCtx == nil {
 		return BatchCheckResult{}, fmt.Errorf("%w: context is nil", ErrInvalidRequest)
 	}
 	if err := a.validator.ValidateBatchCheckRequest(request, a.maxBatchSize); err != nil {
@@ -213,24 +229,29 @@ func (a *authorizer) BatchCheck(ctx context.Context, request BatchCheckRequest) 
 	if err := validateBatchProviderResult(request, result, &observation); err != nil {
 		return BatchCheckResult{}, err
 	}
+	observation.ResultCount = len(result.Results)
 	return result, nil
 }
 
 // ListObjects validates and executes an object listing query with authorization constraints.
 func (a *authorizer) ListObjects(ctx context.Context, request ListObjectsRequest) (result ListObjectsResult, err error) {
 	started := time.Now()
+	observation := Observation{
+		Operation:  OperationListObjects,
+		Provider:   a.providerName,
+		ObjectType: request.ObjectType,
+		Relation:   request.Relation,
+	}
+	inputCtx := ctx
+	ctx, span := a.startSpan(ctx, observation)
 	defer func() {
-		a.observe(ctx, Observation{
-			Operation:  OperationListObjects,
-			Provider:   a.providerName,
-			ObjectType: request.ObjectType,
-			Relation:   request.Relation,
-			Duration:   time.Since(started),
-			ErrorClass: ClassifyError(err),
-		})
+		observation.Duration = time.Since(started)
+		observation.ErrorClass = ClassifyError(err)
+		a.finishSpan(span, observation, err)
+		a.observer.Observe(ctx, observation)
 	}()
 
-	if ctx == nil {
+	if inputCtx == nil {
 		return ListObjectsResult{}, fmt.Errorf("%w: context is nil", ErrInvalidRequest)
 	}
 	if err := a.validator.ValidateListObjectsRequest(request); err != nil {
@@ -245,24 +266,29 @@ func (a *authorizer) ListObjects(ctx context.Context, request ListObjectsRequest
 	if err := a.validateObjectResult(request.ObjectType, result.Objects); err != nil {
 		return ListObjectsResult{}, err
 	}
+	observation.ResultCount = len(result.Objects)
 	return result, nil
 }
 
 // ListSubjects validates and executes a subject listing query with authorization constraints.
 func (a *authorizer) ListSubjects(ctx context.Context, request ListSubjectsRequest) (result ListSubjectsResult, err error) {
 	started := time.Now()
+	observation := Observation{
+		Operation:  OperationListSubjects,
+		Provider:   a.providerName,
+		ObjectType: request.Object.Type,
+		Relation:   request.Relation,
+	}
+	inputCtx := ctx
+	ctx, span := a.startSpan(ctx, observation)
 	defer func() {
-		a.observe(ctx, Observation{
-			Operation:  OperationListSubjects,
-			Provider:   a.providerName,
-			ObjectType: request.Object.Type,
-			Relation:   request.Relation,
-			Duration:   time.Since(started),
-			ErrorClass: ClassifyError(err),
-		})
+		observation.Duration = time.Since(started)
+		observation.ErrorClass = ClassifyError(err)
+		a.finishSpan(span, observation, err)
+		a.observer.Observe(ctx, observation)
 	}()
 
-	if ctx == nil {
+	if inputCtx == nil {
 		return ListSubjectsResult{}, fmt.Errorf("%w: context is nil", ErrInvalidRequest)
 	}
 	if err := a.validator.ValidateListSubjectsRequest(request); err != nil {
@@ -277,6 +303,7 @@ func (a *authorizer) ListSubjects(ctx context.Context, request ListSubjectsReque
 	if err := a.validateSubjectResult(request.SubjectType, result.Subjects); err != nil {
 		return ListSubjectsResult{}, err
 	}
+	observation.ResultCount = len(result.Subjects)
 	return result, nil
 }
 
@@ -287,21 +314,23 @@ func (a *authorizer) check(
 	enforce bool,
 ) (decision Decision, err error) {
 	started := time.Now()
-	decisionMade := false
+	observation := Observation{
+		Operation:  operation,
+		Provider:   a.providerName,
+		ObjectType: request.Object.Type,
+		Relation:   request.Relation,
+	}
+	inputCtx := ctx
+	ctx, span := a.startSpan(ctx, observation)
 	defer func() {
-		a.observe(ctx, Observation{
-			Operation:    operation,
-			Provider:     a.providerName,
-			ObjectType:   request.Object.Type,
-			Relation:     request.Relation,
-			Duration:     time.Since(started),
-			DecisionMade: decisionMade,
-			Allowed:      decisionMade && decision.Allowed,
-			ErrorClass:   ClassifyError(err),
-		})
+		observation.Duration = time.Since(started)
+		observation.Allowed = observation.DecisionMade && decision.Allowed
+		observation.ErrorClass = ClassifyError(err)
+		a.finishSpan(span, observation, err)
+		a.observer.Observe(ctx, observation)
 	}()
 
-	if ctx == nil {
+	if inputCtx == nil {
 		return Decision{}, fmt.Errorf("%w: context is nil", ErrInvalidRequest)
 	}
 	if err := a.validator.ValidateCheckRequest(request); err != nil {
@@ -316,7 +345,7 @@ func (a *authorizer) check(
 		}
 		return Decision{}, err
 	}
-	decisionMade = true
+	observation.DecisionMade = true
 	if enforce && !decision.Allowed {
 		return decision, fmt.Errorf("%w: %s on %s", ErrDenied, request.Relation, request.Object.Type)
 	}
@@ -325,17 +354,24 @@ func (a *authorizer) check(
 
 func (a *authorizer) mutateRelationships(ctx context.Context, operation Operation, relationships []Relationship, mutate func(context.Context, []Relationship) error) (err error) {
 	started := time.Now()
+	objectType, relation := homogeneousRelationshipScope(relationships)
+	observation := Observation{
+		Operation:  operation,
+		Provider:   a.providerName,
+		ObjectType: objectType,
+		Relation:   relation,
+		BatchSize:  len(relationships),
+	}
+	inputCtx := ctx
+	ctx, span := a.startSpan(ctx, observation)
 	defer func() {
-		a.observe(ctx, Observation{
-			Operation:  operation,
-			Provider:   a.providerName,
-			Duration:   time.Since(started),
-			BatchSize:  len(relationships),
-			ErrorClass: ClassifyError(err),
-		})
+		observation.Duration = time.Since(started)
+		observation.ErrorClass = ClassifyError(err)
+		a.finishSpan(span, observation, err)
+		a.observer.Observe(ctx, observation)
 	}()
 
-	if ctx == nil {
+	if inputCtx == nil {
 		return fmt.Errorf("%w: context is nil", ErrInvalidRequest)
 	}
 	if err := a.validator.ValidateRelationships(relationships); err != nil {
@@ -343,7 +379,11 @@ func (a *authorizer) mutateRelationships(ctx context.Context, operation Operatio
 	}
 	providerCtx, cancel := a.providerContext(ctx)
 	defer cancel()
-	return normalizeProviderError(providerCtx, mutate(providerCtx, relationships))
+	err = normalizeProviderError(providerCtx, mutate(providerCtx, relationships))
+	if err == nil {
+		observation.ResultCount = len(relationships)
+	}
+	return err
 }
 
 func (a *authorizer) providerContext(ctx context.Context) (context.Context, context.CancelFunc) {
@@ -353,8 +393,77 @@ func (a *authorizer) providerContext(ctx context.Context) (context.Context, cont
 	return context.WithTimeout(ctx, a.timeout)
 }
 
-func (a *authorizer) observe(ctx context.Context, observation Observation) {
-	a.observer.Observe(observerContext(ctx), observation)
+// startSpan creates a low-cardinality span and preserves the caller's trace context.
+func (a *authorizer) startSpan(ctx context.Context, observation Observation) (context.Context, oteltrace.Span) {
+	attributes := []attribute.KeyValue{
+		attribute.String("rebac.operation", string(observation.Operation)),
+		attribute.String("rebac.provider", observation.Provider),
+	}
+	if observation.ObjectType != "" {
+		attributes = append(attributes, attribute.String("rebac.object_type", string(observation.ObjectType)))
+	}
+	if observation.Relation != nil {
+		attributes = append(attributes, attribute.String("rebac.relation", observation.Relation.String()))
+	}
+	if observation.BatchSize > 0 {
+		attributes = append(attributes, attribute.Int("rebac.batch_size", observation.BatchSize))
+	}
+	return a.tracer.Start(observerContext(ctx), "rebac."+string(observation.Operation), oteltrace.WithAttributes(attributes...))
+}
+
+// finishSpan records the operation outcome without adding subject or object identifiers.
+func (a *authorizer) finishSpan(span oteltrace.Span, observation Observation, err error) {
+	attributes := []attribute.KeyValue{
+		attribute.String("rebac.error_class", string(observation.ErrorClass)),
+	}
+	if observation.Operation != OperationCheck && observation.Operation != OperationAuthorize {
+		attributes = append(attributes, attribute.Int("rebac.result_count", observation.ResultCount))
+	}
+	if observation.DecisionMade {
+		attributes = append(attributes, attribute.Bool("rebac.allowed", observation.Allowed))
+	}
+	if observation.Operation == OperationBatchCheck {
+		attributes = append(attributes,
+			attribute.Int("rebac.allowed_count", observation.AllowedCount),
+			attribute.Int("rebac.denied_count", observation.DeniedCount),
+			attribute.Int("rebac.error_count", observation.ErrorCount),
+		)
+	}
+	span.SetAttributes(attributes...)
+	if err != nil {
+		span.SetStatus(codes.Error, string(observation.ErrorClass))
+	}
+	span.End()
+}
+
+// homogeneousBatchCheckScope returns shared scope attributes for a homogeneous batch.
+func homogeneousBatchCheckScope(checks []BatchCheckItem) (ObjectType, CheckRelation) {
+	if len(checks) == 0 {
+		return "", nil
+	}
+	objectType := checks[0].Check.Object.Type
+	relation := checks[0].Check.Relation
+	for _, item := range checks[1:] {
+		if item.Check.Object.Type != objectType || relation == nil || item.Check.Relation == nil || item.Check.Relation.String() != relation.String() {
+			return "", nil
+		}
+	}
+	return objectType, relation
+}
+
+// homogeneousRelationshipScope returns shared scope attributes for homogeneous relationship mutations.
+func homogeneousRelationshipScope(relationships []Relationship) (ObjectType, CheckRelation) {
+	if len(relationships) == 0 {
+		return "", nil
+	}
+	objectType := relationships[0].Object.Type
+	relation := relationships[0].Relation
+	for _, relationship := range relationships[1:] {
+		if relationship.Object.Type != objectType || relationship.Relation != relation {
+			return "", nil
+		}
+	}
+	return objectType, relation
 }
 
 func (a *authorizer) validateObjectResult(objectType ObjectType, objects []Object) error {

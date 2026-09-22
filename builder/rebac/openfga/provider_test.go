@@ -275,8 +275,8 @@ func TestProviderListObjectsConfiguredLimit(t *testing.T) {
 		want      int
 	}{
 		{name: "positive", limit: 1, want: 1},
+		{name: "application default", limit: 1000, want: 1000},
 		{name: "above default", limit: 1200, want: 1001},
-		{name: "application default", limit: 10000, want: 1001},
 		{name: "zero uses OpenFGA default", limit: 0, want: 1000},
 		{name: "negative uses OpenFGA default", limit: -1, want: 1000},
 		{name: "nil uses OpenFGA default", nilConfig: true, want: 1000},
