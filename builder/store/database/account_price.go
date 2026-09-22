@@ -35,6 +35,9 @@ type AccountPriceStore interface {
 	ListPricesByGroupKey(ctx context.Context, req types.AcctPriceGroupKeyReq) ([]AccountPrice, error)
 	OffLineBySkuTypeAndResourceID(ctx context.Context, req types.AcctPriceOffLineReq) error
 	CountByResourceIDs(ctx context.Context, resourceIDs []string) (int, error)
+	// CountEnabledUpstreamCostByResourceIDs counts enabled SKUUpstreamCost
+	// prices for the given upstream cost resource ids.
+	CountEnabledUpstreamCostByResourceIDs(ctx context.Context, resourceIDs []string) (int, error)
 }
 
 func NewAccountPriceStore() AccountPriceStore {
@@ -74,17 +77,29 @@ type PriceResp struct {
 	Total  int            `json:"total"`
 }
 
+// disablePreviousPrice disables the enabled predecessor of a price being
+// created. For upstream cost SKUs the version key includes resolution, so
+// multimodal cost tiers (one row per resolution) coexist; text cost rows have
+// empty resolution and still replace their predecessor.
+func disablePreviousPrice(ctx context.Context, tx bun.Tx, p AccountPrice) error {
+	q := tx.NewUpdate().Model(&AccountPrice{}).
+		Where("sku_type = ?", p.SkuType).
+		Where("sku_kind = ?", p.SkuKind).
+		Where("resource_id = ?", p.ResourceID).
+		Where("sku_status = ?", types.SkuStatusEnabled).
+		Set("sku_status = ?", types.SkuStatusDisabled)
+	if p.SkuType == types.SKUUpstreamCost {
+		q = q.Where("resolution = ?", p.Resolution)
+	}
+	_, err := q.Exec(ctx)
+	return errorx.HandleDBError(err, nil)
+}
+
 func (a *accountPriceStoreImpl) Create(ctx context.Context, input AccountPrice) (*AccountPrice, error) {
 	err := a.db.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		_, err := tx.NewUpdate().Model(&AccountPrice{}).
-			Where("sku_type = ?", input.SkuType).
-			Where("sku_kind = ?", input.SkuKind).
-			Where("resource_id = ?", input.ResourceID).
-			Where("sku_status = ?", types.SkuStatusEnabled).
-			Set("sku_status = ?", types.SkuStatusDisabled).
-			Exec(ctx)
+		err := disablePreviousPrice(ctx, tx, input)
 		if err != nil {
-			return errorx.HandleDBError(err, nil)
+			return err
 		}
 
 		res, err := tx.NewInsert().Model(&input).Exec(ctx, &input)
@@ -108,15 +123,9 @@ func (a *accountPriceStoreImpl) BatchCreate(ctx context.Context, prices []Accoun
 
 	err := a.db.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		for _, p := range prices {
-			_, err := tx.NewUpdate().Model(&AccountPrice{}).
-				Where("sku_type = ?", p.SkuType).
-				Where("sku_kind = ?", p.SkuKind).
-				Where("resource_id = ?", p.ResourceID).
-				Where("sku_status = ?", types.SkuStatusEnabled).
-				Set("sku_status = ?", types.SkuStatusDisabled).
-				Exec(ctx)
+			err := disablePreviousPrice(ctx, tx, p)
 			if err != nil {
-				return errorx.HandleDBError(err, nil)
+				return err
 			}
 		}
 
@@ -343,6 +352,19 @@ func (a *accountPriceStoreImpl) OffLineBySkuTypeAndResourceID(ctx context.Contex
 func (a *accountPriceStoreImpl) CountByResourceIDs(ctx context.Context, resourceIDs []string) (int, error) {
 	count, err := a.db.Core.NewSelect().
 		Model((*AccountPrice)(nil)).
+		Where("resource_id IN (?)", bun.In(resourceIDs)).
+		Count(ctx)
+	return count, errorx.HandleDBError(err, nil)
+}
+
+func (a *accountPriceStoreImpl) CountEnabledUpstreamCostByResourceIDs(ctx context.Context, resourceIDs []string) (int, error) {
+	if len(resourceIDs) == 0 {
+		return 0, nil
+	}
+	count, err := a.db.Core.NewSelect().
+		Model((*AccountPrice)(nil)).
+		Where("sku_type = ?", types.SKUUpstreamCost).
+		Where("sku_status = ?", types.SkuStatusEnabled).
 		Where("resource_id IN (?)", bun.In(resourceIDs)).
 		Count(ctx)
 	return count, errorx.HandleDBError(err, nil)

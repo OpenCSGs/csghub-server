@@ -38,6 +38,7 @@ type AccountingClient interface {
 	ListRecharge(req types.AcctRechargeListReq) (any, error)
 	ListRecharges(req types.RechargesIndexReq) (any, error)
 	StatementsIndex(req types.ActStatementsReq) (any, error)
+	TokenReportIndex(req types.TokenReportReq) (any, error)
 	ListPresents(req types.PresentsIndexReq) (any, error)
 	GetOrderDetailByID(currentUser string, id int64) (any, error)
 	GetVoucherDashboard(req types.VoucherDashboardReq) (any, error)

@@ -127,5 +127,47 @@
     },
     "handler.config": {
         "other": "config"
+    },
+    "handler.token_report.date": {
+        "other": "Date"
+    },
+    "handler.token_report.user_org": {
+        "other": "User/Org"
+    },
+    "handler.token_report.api_key": {
+        "other": "API Key"
+    },
+    "handler.token_report.model": {
+        "other": "Model"
+    },
+    "handler.token_report.provider": {
+        "other": "Provider"
+    },
+    "handler.token_report.call_count": {
+        "other": "Total Calls"
+    },
+    "handler.token_report.prompt_token": {
+        "other": "Input Tokens"
+    },
+    "handler.token_report.completion_token": {
+        "other": "Output/Reasoning Tokens"
+    },
+    "handler.token_report.cache_hit_rate": {
+        "other": "Cache Hit Rate"
+    },
+    "handler.token_report.revenue": {
+        "other": "Revenue"
+    },
+    "handler.token_report.cost": {
+        "other": "Cost"
+    },
+    "handler.token_report.margin": {
+        "other": "Margin"
+    },
+    "handler.token_report.margin_rate": {
+        "other": "Margin Rate"
+    },
+    "handler.token_report.total": {
+        "other": "Total"
     }
 }

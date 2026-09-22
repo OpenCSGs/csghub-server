@@ -140,6 +140,63 @@ func (_c *MockAccountPriceStore_CountByResourceIDs_Call) RunAndReturn(run func(c
 	return _c
 }
 
+// CountEnabledUpstreamCostByResourceIDs provides a mock function with given fields: ctx, resourceIDs
+func (_m *MockAccountPriceStore) CountEnabledUpstreamCostByResourceIDs(ctx context.Context, resourceIDs []string) (int, error) {
+	ret := _m.Called(ctx, resourceIDs)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CountEnabledUpstreamCostByResourceIDs")
+	}
+
+	var r0 int
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, []string) (int, error)); ok {
+		return rf(ctx, resourceIDs)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, []string) int); ok {
+		r0 = rf(ctx, resourceIDs)
+	} else {
+		r0 = ret.Get(0).(int)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, []string) error); ok {
+		r1 = rf(ctx, resourceIDs)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAccountPriceStore_CountEnabledUpstreamCostByResourceIDs_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CountEnabledUpstreamCostByResourceIDs'
+type MockAccountPriceStore_CountEnabledUpstreamCostByResourceIDs_Call struct {
+	*mock.Call
+}
+
+// CountEnabledUpstreamCostByResourceIDs is a helper method to define mock.On call
+//   - ctx context.Context
+//   - resourceIDs []string
+func (_e *MockAccountPriceStore_Expecter) CountEnabledUpstreamCostByResourceIDs(ctx interface{}, resourceIDs interface{}) *MockAccountPriceStore_CountEnabledUpstreamCostByResourceIDs_Call {
+	return &MockAccountPriceStore_CountEnabledUpstreamCostByResourceIDs_Call{Call: _e.mock.On("CountEnabledUpstreamCostByResourceIDs", ctx, resourceIDs)}
+}
+
+func (_c *MockAccountPriceStore_CountEnabledUpstreamCostByResourceIDs_Call) Run(run func(ctx context.Context, resourceIDs []string)) *MockAccountPriceStore_CountEnabledUpstreamCostByResourceIDs_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].([]string))
+	})
+	return _c
+}
+
+func (_c *MockAccountPriceStore_CountEnabledUpstreamCostByResourceIDs_Call) Return(_a0 int, _a1 error) *MockAccountPriceStore_CountEnabledUpstreamCostByResourceIDs_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAccountPriceStore_CountEnabledUpstreamCostByResourceIDs_Call) RunAndReturn(run func(context.Context, []string) (int, error)) *MockAccountPriceStore_CountEnabledUpstreamCostByResourceIDs_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Create provides a mock function with given fields: ctx, input
 func (_m *MockAccountPriceStore) Create(ctx context.Context, input database.AccountPrice) (*database.AccountPrice, error) {
 	ret := _m.Called(ctx, input)

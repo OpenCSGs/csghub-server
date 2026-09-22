@@ -1775,6 +1775,64 @@ func (_c *MockAccountingClient_StatementsIndex_Call) RunAndReturn(run func(types
 	return _c
 }
 
+// TokenReportIndex provides a mock function with given fields: req
+func (_m *MockAccountingClient) TokenReportIndex(req types.TokenReportReq) (any, error) {
+	ret := _m.Called(req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for TokenReportIndex")
+	}
+
+	var r0 any
+	var r1 error
+	if rf, ok := ret.Get(0).(func(types.TokenReportReq) (any, error)); ok {
+		return rf(req)
+	}
+	if rf, ok := ret.Get(0).(func(types.TokenReportReq) any); ok {
+		r0 = rf(req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(any)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(types.TokenReportReq) error); ok {
+		r1 = rf(req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAccountingClient_TokenReportIndex_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'TokenReportIndex'
+type MockAccountingClient_TokenReportIndex_Call struct {
+	*mock.Call
+}
+
+// TokenReportIndex is a helper method to define mock.On call
+//   - req types.TokenReportReq
+func (_e *MockAccountingClient_Expecter) TokenReportIndex(req interface{}) *MockAccountingClient_TokenReportIndex_Call {
+	return &MockAccountingClient_TokenReportIndex_Call{Call: _e.mock.On("TokenReportIndex", req)}
+}
+
+func (_c *MockAccountingClient_TokenReportIndex_Call) Run(run func(req types.TokenReportReq)) *MockAccountingClient_TokenReportIndex_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(types.TokenReportReq))
+	})
+	return _c
+}
+
+func (_c *MockAccountingClient_TokenReportIndex_Call) Return(_a0 any, _a1 error) *MockAccountingClient_TokenReportIndex_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAccountingClient_TokenReportIndex_Call) RunAndReturn(run func(types.TokenReportReq) (any, error)) *MockAccountingClient_TokenReportIndex_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // UpdatePrice provides a mock function with given fields: currentUser, req, id
 func (_m *MockAccountingClient) UpdatePrice(currentUser string, req types.AcctPriceUpdateReq, id int64) (any, error) {
 	ret := _m.Called(currentUser, req, id)

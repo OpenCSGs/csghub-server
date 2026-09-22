@@ -1818,6 +1818,65 @@ func (_c *MockAccountingComponent_StatementsIndex_Call) RunAndReturn(run func(co
 	return _c
 }
 
+// TokenReportIndex provides a mock function with given fields: ctx, req
+func (_m *MockAccountingComponent) TokenReportIndex(ctx context.Context, req types.TokenReportReq) (*types.TokenReportResp, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for TokenReportIndex")
+	}
+
+	var r0 *types.TokenReportResp
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.TokenReportReq) (*types.TokenReportResp, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.TokenReportReq) *types.TokenReportResp); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*types.TokenReportResp)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.TokenReportReq) error); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAccountingComponent_TokenReportIndex_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'TokenReportIndex'
+type MockAccountingComponent_TokenReportIndex_Call struct {
+	*mock.Call
+}
+
+// TokenReportIndex is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req types.TokenReportReq
+func (_e *MockAccountingComponent_Expecter) TokenReportIndex(ctx interface{}, req interface{}) *MockAccountingComponent_TokenReportIndex_Call {
+	return &MockAccountingComponent_TokenReportIndex_Call{Call: _e.mock.On("TokenReportIndex", ctx, req)}
+}
+
+func (_c *MockAccountingComponent_TokenReportIndex_Call) Run(run func(ctx context.Context, req types.TokenReportReq)) *MockAccountingComponent_TokenReportIndex_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.TokenReportReq))
+	})
+	return _c
+}
+
+func (_c *MockAccountingComponent_TokenReportIndex_Call) Return(_a0 *types.TokenReportResp, _a1 error) *MockAccountingComponent_TokenReportIndex_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAccountingComponent_TokenReportIndex_Call) RunAndReturn(run func(context.Context, types.TokenReportReq) (*types.TokenReportResp, error)) *MockAccountingComponent_TokenReportIndex_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // UpdatePrice provides a mock function with given fields: currentUser, req, id
 func (_m *MockAccountingComponent) UpdatePrice(currentUser string, req types.AcctPriceUpdateReq, id int64) (interface{}, error) {
 	ret := _m.Called(currentUser, req, id)

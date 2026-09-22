@@ -412,6 +412,7 @@ func applyEndpointOverrides(model *types.Model, upstream commonType.UpstreamConf
 		model.AuthHead = upstream.AuthHeader
 	}
 	model.Provider = upstream.Provider
+	model.UpstreamID = upstream.ID
 	// Apply host override from upstream metadata (used for internal csghub deploys
 	// that need a specific Host header to reach the correct service). The actual
 	// Host header is set later in resolveEndpointModelTarget via upstreamHostOverride().

@@ -20,6 +20,9 @@ type AccessTokenStore interface {
 	// Refresh will disable existing access token, and then generate new one
 	Refresh(ctx context.Context, token *AccessToken, newTokenValue string, newExpiredAt time.Time) (*AccessToken, error)
 	FindByID(ctx context.Context, id int64) (token *AccessToken, err error)
+	// FindByIDs returns the tokens for the given ids, keyed by id; unknown ids
+	// are simply absent from the map.
+	FindByIDs(ctx context.Context, ids []int64) (map[int64]AccessToken, error)
 	Delete(ctx context.Context, username, tkName, app string) (err error)
 	IsExist(ctx context.Context, username, tkName, app string) (exists bool, err error)
 	FindByUID(ctx context.Context, uid int64) (token *AccessToken, err error)
@@ -151,6 +154,28 @@ func (s *accessTokenStoreImpl) FindByID(ctx context.Context, id int64) (*AccessT
 		return nil, errorx.HandleDBError(err, nil)
 	}
 	return &token, nil
+}
+
+// FindByIDs returns the tokens for the given ids, keyed by id; unknown ids are
+// simply absent from the map.
+func (s *accessTokenStoreImpl) FindByIDs(ctx context.Context, ids []int64) (map[int64]AccessToken, error) {
+	result := make(map[int64]AccessToken, len(ids))
+	if len(ids) == 0 {
+		return result, nil
+	}
+	var tokens []AccessToken
+	err := s.db.Operator.Core.
+		NewSelect().
+		Model(&tokens).
+		Where("access_token.id IN (?)", bun.In(ids)).
+		Scan(ctx)
+	if err != nil {
+		return nil, errorx.HandleDBError(err, nil)
+	}
+	for _, token := range tokens {
+		result[token.ID] = token
+	}
+	return result, nil
 }
 
 func (s *accessTokenStoreImpl) Delete(ctx context.Context, username, tkName, app string) (err error) {

@@ -127,5 +127,47 @@
     },
     "handler.config": {
         "other": "配置"
+    },
+    "handler.token_report.date": {
+        "other": "日期"
+    },
+    "handler.token_report.user_org": {
+        "other": "用戶/組織"
+    },
+    "handler.token_report.api_key": {
+        "other": "API Key"
+    },
+    "handler.token_report.model": {
+        "other": "模型"
+    },
+    "handler.token_report.provider": {
+        "other": "服務商"
+    },
+    "handler.token_report.call_count": {
+        "other": "總調用量"
+    },
+    "handler.token_report.prompt_token": {
+        "other": "輸入 Token"
+    },
+    "handler.token_report.completion_token": {
+        "other": "輸出/推理 Token"
+    },
+    "handler.token_report.cache_hit_rate": {
+        "other": "緩存命中率"
+    },
+    "handler.token_report.revenue": {
+        "other": "銷售收入"
+    },
+    "handler.token_report.cost": {
+        "other": "採購成本"
+    },
+    "handler.token_report.margin": {
+        "other": "毛利額"
+    },
+    "handler.token_report.margin_rate": {
+        "other": "毛利率"
+    },
+    "handler.token_report.total": {
+        "other": "合計"
     }
 }

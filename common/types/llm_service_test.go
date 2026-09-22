@@ -75,3 +75,31 @@ func TestCapacityPolicy_AllLimitsUnset(t *testing.T) {
 	require.False(t, (&CapacityPolicy{MaxTPM: -1}).AllLimitsUnset())
 	require.False(t, (&CapacityPolicy{QueueWaitSeconds: -1}).AllLimitsUnset())
 }
+
+func TestUpstreamCostResourceID_RoundTrip(t *testing.T) {
+	for _, id := range []int64{1, 42, 1001} {
+		resourceID := UpstreamCostResourceID(id)
+		gotID, err := ParseUpstreamCostResourceID(resourceID)
+		require.NoError(t, err)
+		require.Equal(t, id, gotID)
+	}
+}
+
+func TestParseUpstreamCostResourceID_Invalid(t *testing.T) {
+	tests := []string{
+		"",
+		"thirdparty://42",
+		"upstream://",
+		"upstream://abc",
+		"upstream://1.5",
+		"upstream://0",
+		"upstream://-3",
+		"upstream://deepseek-r1/42",
+	}
+	for _, resourceID := range tests {
+		t.Run(resourceID, func(t *testing.T) {
+			_, err := ParseUpstreamCostResourceID(resourceID)
+			require.Error(t, err)
+		})
+	}
+}

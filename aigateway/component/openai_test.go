@@ -1100,6 +1100,26 @@ func TestBuildUsageExtraDataIncludesCachedPromptTokens(t *testing.T) {
 	}
 }
 
+func TestBuildUsageExtraDataUpstreamID(t *testing.T) {
+	meteringInfo := usageMeteringInfo{OwnerType: commontypes.ExternalInference}
+	usage := &token.Usage{PromptTokens: 100, CompletionTokens: 50}
+
+	t.Run("upstream id reported", func(t *testing.T) {
+		extraData, err := buildUsageExtraData(&types.Model{UpstreamID: 42}, "target-model", usage, "", meteringInfo)
+		require.NoError(t, err)
+		var extra usageMeteringExtra
+		require.NoError(t, json.Unmarshal([]byte(extraData), &extra))
+		require.Equal(t, "42", extra.UpstreamID)
+	})
+
+	t.Run("zero upstream id omitted", func(t *testing.T) {
+		extraData, err := buildUsageExtraData(&types.Model{}, "target-model", usage, "", meteringInfo)
+		require.NoError(t, err)
+		require.NotContains(t, extraData, "upstream_id")
+	})
+
+}
+
 func TestBuildUsageExtraDataIncludesReasoningTokens(t *testing.T) {
 	meteringInfo := usageMeteringInfo{OwnerType: commontypes.ExternalInference}
 

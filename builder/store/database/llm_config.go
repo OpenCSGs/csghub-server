@@ -135,6 +135,9 @@ type LLMConfigStore interface {
 	Create(ctx context.Context, config LLMConfig) (*LLMConfig, error)
 	Delete(ctx context.Context, id int64) error
 	GetByModelName(ctx context.Context, modelName string) (*LLMConfig, error)
+	// GetByRepoPath finds the LLM config whose linked repository has the given
+	// path (e.g. "ns/name"); returns (nil, nil) when none exists.
+	GetByRepoPath(ctx context.Context, repoPath string) (*LLMConfig, error)
 }
 
 func NewLLMConfigStore(cfg *config.Config) LLMConfigStore {
@@ -266,6 +269,24 @@ func (s *lLMConfigStoreImpl) GetByModelName(ctx context.Context, modelName strin
 			return nil, nil
 		}
 		return nil, fmt.Errorf("select llm config by model_name %s: %w", modelName, err)
+	}
+	return &config, nil
+}
+
+// GetByRepoPath finds the LLM config whose linked repository has the given
+// path (e.g. "ns/name"); returns (nil, nil) when none exists.
+func (s *lLMConfigStoreImpl) GetByRepoPath(ctx context.Context, repoPath string) (*LLMConfig, error) {
+	var config LLMConfig
+	err := s.db.Operator.Core.NewSelect().Model(&config).
+		Join("JOIN repositories r ON r.id = llm_config.repo_id").
+		Where("r.path = ?", repoPath).
+		Limit(1).
+		Scan(ctx)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("select llm config by repo path %s: %w", repoPath, err)
 	}
 	return &config, nil
 }

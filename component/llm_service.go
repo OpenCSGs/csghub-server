@@ -457,6 +457,19 @@ func (s *llmServiceComponentImpl) DeleteLLMConfig(ctx context.Context, id int64)
 			slog.Any("err", err), slog.Any("llmConfig", llmConfig), slog.Any("delReq", delReq))
 	}
 
+	// Off-line upstream procurement-cost prices of every upstream of this config
+	for _, up := range llmConfig.Upstreams {
+		costReq := types.AcctPriceOffLineReq{
+			SkuType:    types.SKUUpstreamCost,
+			ResourceID: types.UpstreamCostResourceID(up.ID),
+		}
+		_, err = s.accountComponent.OffLinePrice(ctx, costReq)
+		if err != nil {
+			slog.WarnContext(ctx, "off-line upstream cost price failed for delete llm config",
+				slog.Any("err", err), slog.Any("upstreamID", up.ID), slog.Any("costReq", costReq))
+		}
+	}
+
 	return nil
 }
 
@@ -749,7 +762,25 @@ func (s *llmServiceComponentImpl) resetCircuitStateToUnknown(ctx context.Context
 }
 
 func (s *llmServiceComponentImpl) DeleteUpstream(ctx context.Context, id int64) error {
-	return s.upstreamStore.Delete(ctx, id)
+	upstream, err := s.upstreamStore.GetByID(ctx, id)
+	if err != nil {
+		return err
+	}
+	if err := s.upstreamStore.Delete(ctx, id); err != nil {
+		return err
+	}
+
+	// Off-line the upstream's procurement-cost prices
+	costReq := types.AcctPriceOffLineReq{
+		SkuType:    types.SKUUpstreamCost,
+		ResourceID: types.UpstreamCostResourceID(id),
+	}
+	_, err = s.accountComponent.OffLinePrice(ctx, costReq)
+	if err != nil {
+		slog.WarnContext(ctx, "off-line upstream cost price failed for delete upstream",
+			slog.Any("err", err), slog.Any("upstreamID", id), slog.Any("llmConfigID", upstream.LLMConfigID), slog.Any("costReq", costReq))
+	}
+	return nil
 }
 
 // upstreamPtrsToValues converts a slice of upstream pointers to a slice of values.

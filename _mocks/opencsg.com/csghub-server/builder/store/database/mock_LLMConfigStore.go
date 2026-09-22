@@ -248,6 +248,65 @@ func (_c *MockLLMConfigStore_GetByModelName_Call) RunAndReturn(run func(context.
 	return _c
 }
 
+// GetByRepoPath provides a mock function with given fields: ctx, repoPath
+func (_m *MockLLMConfigStore) GetByRepoPath(ctx context.Context, repoPath string) (*database.LLMConfig, error) {
+	ret := _m.Called(ctx, repoPath)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetByRepoPath")
+	}
+
+	var r0 *database.LLMConfig
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*database.LLMConfig, error)); ok {
+		return rf(ctx, repoPath)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) *database.LLMConfig); ok {
+		r0 = rf(ctx, repoPath)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*database.LLMConfig)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, repoPath)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockLLMConfigStore_GetByRepoPath_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetByRepoPath'
+type MockLLMConfigStore_GetByRepoPath_Call struct {
+	*mock.Call
+}
+
+// GetByRepoPath is a helper method to define mock.On call
+//   - ctx context.Context
+//   - repoPath string
+func (_e *MockLLMConfigStore_Expecter) GetByRepoPath(ctx interface{}, repoPath interface{}) *MockLLMConfigStore_GetByRepoPath_Call {
+	return &MockLLMConfigStore_GetByRepoPath_Call{Call: _e.mock.On("GetByRepoPath", ctx, repoPath)}
+}
+
+func (_c *MockLLMConfigStore_GetByRepoPath_Call) Run(run func(ctx context.Context, repoPath string)) *MockLLMConfigStore_GetByRepoPath_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockLLMConfigStore_GetByRepoPath_Call) Return(_a0 *database.LLMConfig, _a1 error) *MockLLMConfigStore_GetByRepoPath_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockLLMConfigStore_GetByRepoPath_Call) RunAndReturn(run func(context.Context, string) (*database.LLMConfig, error)) *MockLLMConfigStore_GetByRepoPath_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetByType provides a mock function with given fields: ctx, llmType
 func (_m *MockLLMConfigStore) GetByType(ctx context.Context, llmType int) (*database.LLMConfig, error) {
 	ret := _m.Called(ctx, llmType)

@@ -711,3 +711,48 @@ func TestAccountPriceStore_CountByResourceIDs(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, 0, count)
 }
+
+func TestAccountPriceStore_Create_UpstreamCostResolutionTiersCoexist(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewAccountPriceStoreWithDB(db)
+	newCost := func(resolution string, price int64) database.AccountPrice {
+		return database.AccountPrice{
+			SkuType:     types.SKUUpstreamCost,
+			SkuKind:     types.SKUCompletionMultiModal,
+			SkuUnitType: types.UnitCount,
+			ResourceID:  "upstream://36",
+			Resolution:  resolution,
+			SkuPrice:    price,
+			SkuUnit:     1,
+			SkuDesc:     "tier",
+			SkuStatus:   types.SkuStatusEnabled,
+		}
+	}
+
+	// two resolution tiers of the same kind must stay enabled together
+	t1, err := store.Create(ctx, newCost("1024", 60))
+	require.Nil(t, err)
+	t2, err := store.Create(ctx, newCost("2048", 80))
+	require.Nil(t, err)
+
+	var tiers []database.AccountPrice
+	err = db.Core.NewSelect().Model(&tiers).
+		Where("resource_id = ?", "upstream://36").
+		Where("sku_status = ?", types.SkuStatusEnabled).
+		Scan(ctx)
+	require.Nil(t, err)
+	require.Len(t, tiers, 2)
+
+	// re-creating a tier versions only that tier
+	_, err = store.Create(ctx, newCost("1024", 70))
+	require.Nil(t, err)
+	t1After := &database.AccountPrice{}
+	require.Nil(t, db.Core.NewSelect().Model(t1After).Where("id=?", t1.ID).Scan(ctx))
+	require.Equal(t, types.SkuStatusDisabled, t1After.SkuStatus)
+	t2After := &database.AccountPrice{}
+	require.Nil(t, db.Core.NewSelect().Model(t2After).Where("id=?", t2.ID).Scan(ctx))
+	require.Equal(t, types.SkuStatusEnabled, t2After.SkuStatus)
+}

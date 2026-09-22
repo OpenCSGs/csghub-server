@@ -270,6 +270,7 @@ func TestApplyChatFallbackTarget(t *testing.T) {
 
 	applyChatFallbackTarget(context.Background(), headers, modelTarget,
 		commontypes.UpstreamConfig{
+			ID:         77,
 			URL:        "https://fallback.example.com/v1/chat/completions",
 			Enabled:    true,
 			Provider:   "fallback-provider",
@@ -280,6 +281,7 @@ func TestApplyChatFallbackTarget(t *testing.T) {
 	require.Equal(t, "https://fallback.example.com/v1/chat/completions", modelTarget.Target)
 	require.Equal(t, "https://fallback.example.com/v1/chat/completions", modelTarget.Model.Endpoint)
 	require.Equal(t, "https://fallback.example.com/v1/chat/completions", modelTarget.Upstream.URL)
+	require.Equal(t, int64(77), modelTarget.Model.UpstreamID)
 	require.Equal(t, "fallback-model", modelTarget.ModelName)
 	require.Equal(t, "fallback-provider", modelTarget.Model.Provider)
 	require.Equal(t, `{"Authorization":"Bearer fallback-token"}`, modelTarget.Model.AuthHead)

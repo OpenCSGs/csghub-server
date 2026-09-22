@@ -1258,10 +1258,36 @@ func TestLLMServiceComponent_UpdateUpstream_CapacityPolicy(t *testing.T) {
 
 func TestLLMServiceComponent_DeleteUpstream(t *testing.T) {
 	ctx := context.TODO()
+	stores := tests.NewMockStores(t)
 	upstreamStore := mockdatabase.NewMockUpstreamStore(t)
+	mockAcct := mockComps.NewMockAccountingComponent(t)
+	upstreamStore.EXPECT().GetByID(ctx, int64(10)).Return(&database.Upstream{ID: 10, LLMConfigID: 74}, nil)
 	upstreamStore.EXPECT().Delete(ctx, int64(10)).Return(nil)
+	mockAcct.EXPECT().OffLinePrice(ctx, types.AcctPriceOffLineReq{
+		SkuType:    types.SKUUpstreamCost,
+		ResourceID: types.UpstreamCostResourceID(10),
+	}).Return(nil, nil)
 	mc := &llmServiceComponentImpl{
-		upstreamStore: upstreamStore,
+		upstreamStore:    upstreamStore,
+		llmConfigStore:   stores.LLMConfig,
+		accountComponent: mockAcct,
+	}
+	err := mc.DeleteUpstream(ctx, 10)
+	require.Nil(t, err)
+}
+
+func TestLLMServiceComponent_DeleteUpstream_CostOfflineFailureIgnored(t *testing.T) {
+	ctx := context.TODO()
+	stores := tests.NewMockStores(t)
+	upstreamStore := mockdatabase.NewMockUpstreamStore(t)
+	mockAcct := mockComps.NewMockAccountingComponent(t)
+	upstreamStore.EXPECT().GetByID(ctx, int64(10)).Return(&database.Upstream{ID: 10, LLMConfigID: 74}, nil)
+	upstreamStore.EXPECT().Delete(ctx, int64(10)).Return(nil)
+	mockAcct.EXPECT().OffLinePrice(ctx, mock.Anything).Return(nil, fmt.Errorf("accounting unreachable"))
+	mc := &llmServiceComponentImpl{
+		upstreamStore:    upstreamStore,
+		llmConfigStore:   stores.LLMConfig,
+		accountComponent: mockAcct,
 	}
 	err := mc.DeleteUpstream(ctx, 10)
 	require.Nil(t, err)
@@ -1464,12 +1490,23 @@ func TestLLMServiceComponent_DeleteLLMConfig(t *testing.T) {
 		upstreamStore:     upstreamStore,
 		accountComponent:  mockAcct,
 	}
-	stores.LLMConfigMock().EXPECT().GetByID(ctx, int64(123)).Return(&database.LLMConfig{ModelName: "test-model"}, nil)
+	stores.LLMConfigMock().EXPECT().GetByID(ctx, int64(123)).Return(&database.LLMConfig{
+		ModelName: "test-model",
+		Upstreams: []database.Upstream{{ID: 10}, {ID: 11}},
+	}, nil)
 	stores.LLMConfigMock().EXPECT().Delete(ctx, int64(123)).Return(nil)
 	mockAcct.EXPECT().OffLinePrice(ctx, types.AcctPriceOffLineReq{
 		SkuType:    types.SKUCSGHub,
 		ResourceID: fmt.Sprintf(types.ExternalLLMResourceFmt, "test-model"),
 	}).Return(nil, nil)
+	mockAcct.EXPECT().OffLinePrice(ctx, types.AcctPriceOffLineReq{
+		SkuType:    types.SKUUpstreamCost,
+		ResourceID: types.UpstreamCostResourceID(10),
+	}).Return(nil, nil)
+	mockAcct.EXPECT().OffLinePrice(ctx, types.AcctPriceOffLineReq{
+		SkuType:    types.SKUUpstreamCost,
+		ResourceID: types.UpstreamCostResourceID(11),
+	}).Return(nil, fmt.Errorf("accounting unreachable")) // failure is warn-only
 	err := mc.DeleteLLMConfig(ctx, int64(123))
 	require.Nil(t, err)
 }

@@ -98,6 +98,10 @@ func (ac *accountingClientImpl) StatementsIndex(req types.ActStatementsReq) (any
 	return nil, nil
 }
 
+func (ac *accountingClientImpl) TokenReportIndex(req types.TokenReportReq) (any, error) {
+	return nil, nil
+}
+
 func (ac *accountingClientImpl) ListPresents(req types.PresentsIndexReq) (any, error) {
 	return nil, nil
 }
