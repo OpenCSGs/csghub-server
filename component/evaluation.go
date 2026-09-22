@@ -249,10 +249,15 @@ var frameworkConfigSupported = map[string]struct{}{
 // The evalscope images carry their own defaults for these two knobs. The server fills
 // them in and sends both on every task, so the configuration recorded in the snapshot
 // is always the configuration that produced the scores, and the image defaults are
-// never the ones in force. Keep these in step with docker/evaluation/evalscope/start.sh.
+// never the ones in force.
+//
+// The generation length is the server's own choice rather than a copy of the image
+// default of 30000, which is a chat-sized budget that costs a reasoning model a great
+// deal of time on the samples where it never emits a stop token. A caller that needs a
+// longer budget raises it through framework_config.
 const (
 	defaultEvaluationLimit            = 10
-	defaultEvaluationGenerationConfig = `{"max_tokens":30000,"do_sample":false}`
+	defaultEvaluationGenerationConfig = `{"max_tokens":8192,"do_sample":false}`
 )
 
 // normalizeFrameworkConfig turns the caller's configuration into the one that will

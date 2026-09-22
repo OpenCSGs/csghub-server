@@ -160,7 +160,7 @@ func TestEvaluationComponent_CreateEvaluation(t *testing.T) {
 			// the caller sent no configuration, so what reaches the deployer - and is
 			// recorded - must be the effective one rather than an empty string
 			return r.ResourceName == "1 GPU · 4 vCPU · 32Gi" && r.ClusterID == "c1" &&
-				r.FrameworkConfig == `{"generation_config":{"do_sample":false,"max_tokens":30000},"limit":10}`
+				r.FrameworkConfig == `{"generation_config":{"do_sample":false,"max_tokens":8192},"limit":10}`
 		})).Return(&types.ArgoWorkFlowRes{
 			ID:       1,
 			TaskName: "test",
