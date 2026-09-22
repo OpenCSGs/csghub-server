@@ -255,13 +255,6 @@ func TestGitCallbackComponentImpl_UpdateRepoInfos(t *testing.T) {
 
 	t.Run("should update repo infos successfully", func(t *testing.T) {
 		gc := initializeTestGitCallbackComponent(context.Background(), t)
-		gc.mocks.stores.RepoMock().EXPECT().UpdateLicenseCompliance(
-			ctx,
-			int64(1),
-			(*string)(nil),
-			types.ComplianceStatusPendingReview,
-			types.CommercialPermissionCustomTerms,
-		).Return(nil)
 		// Expectations for modifyFiles
 		gc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "namespace", "repo").Return(repo, nil)
 		modelInfo := &types.ModelInfo{}
@@ -314,12 +307,103 @@ func TestGitCallbackComponentImpl_UpdateRepoInfos(t *testing.T) {
 		err := gc.UpdateRepoInfos(context.Background(), req)
 		assert.NoError(t, err)
 	})
+
+	t.Run("should mark root license document changes for review", func(t *testing.T) {
+		gc := initializeTestGitCallbackComponent(context.Background(), t)
+		req := &types.GiteaCallbackPushReq{
+			Ref: "refs/heads/main",
+			Repository: types.GiteaCallbackPushReq_Repository{
+				FullName: "models_namespace/repo",
+			},
+			Commits: []types.GiteaCallbackPushReq_Commit{
+				{Modified: []string{"LICENSE"}},
+			},
+		}
+
+		gc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "namespace", "repo").Return(repo, nil)
+		gc.mocks.stores.RepoMock().EXPECT().UpdateLicenseCompliance(
+			ctx,
+			int64(1),
+			(*string)(nil),
+			types.ComplianceStatusPendingReview,
+			types.CommercialPermissionCustomTerms,
+		).Return(nil).Once()
+
+		err := gc.UpdateRepoInfos(context.Background(), req)
+		assert.NoError(t, err)
+	})
+
+	t.Run("should keep root license changes pending when readme also changes", func(t *testing.T) {
+		gc := initializeTestGitCallbackComponent(context.Background(), t)
+		req := &types.GiteaCallbackPushReq{
+			Ref: "refs/heads/main",
+			Repository: types.GiteaCallbackPushReq_Repository{
+				FullName: "models_namespace/repo",
+			},
+			Commits: []types.GiteaCallbackPushReq_Commit{
+				{Modified: []string{"readme.md", "LICENSE"}},
+			},
+		}
+		content := "---\nlicense: apache-2.0\n---\nreadme content"
+
+		gc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "namespace", "repo").Return(repo, nil)
+		gc.mocks.stores.RepoMock().EXPECT().UpdateLicenseCompliance(
+			ctx,
+			int64(1),
+			(*string)(nil),
+			types.ComplianceStatusPendingReview,
+			types.CommercialPermissionCustomTerms,
+		).Return(nil).Twice()
+		gc.mocks.gitServer.EXPECT().GetRepoFileRaw(ctx, gitserver.GetRepoInfoByPathReq{
+			Namespace: "namespace",
+			Name:      "repo",
+			Ref:       "refs/heads/main",
+			Path:      "readme.md",
+			RepoType:  types.ModelRepo,
+		}).Return(content, nil).Once()
+		gc.mocks.tagComponent.EXPECT().UpdateMetaTags(ctx, types.ModelTagScope, "namespace", "repo", content).Return(nil, nil)
+
+		err := gc.UpdateRepoInfos(context.Background(), req)
+		assert.NoError(t, err)
+	})
+
+	t.Run("should update lowercase root readme metadata", func(t *testing.T) {
+		gc := initializeTestGitCallbackComponent(context.Background(), t)
+		req := &types.GiteaCallbackPushReq{
+			Ref: "refs/heads/main",
+			Repository: types.GiteaCallbackPushReq_Repository{
+				FullName: "models_namespace/repo",
+			},
+			Commits: []types.GiteaCallbackPushReq_Commit{
+				{Modified: []string{"readme.md"}},
+			},
+		}
+		content := "---\nlicense: mit\n---\nreadme content"
+
+		gc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "namespace", "repo").Return(repo, nil)
+		gc.mocks.gitServer.EXPECT().GetRepoFileRaw(ctx, gitserver.GetRepoInfoByPathReq{
+			Namespace: "namespace",
+			Name:      "repo",
+			Ref:       "refs/heads/main",
+			Path:      "readme.md",
+			RepoType:  types.ModelRepo,
+		}).Return(content, nil).Once()
+		gc.mocks.tagComponent.EXPECT().UpdateMetaTags(ctx, types.ModelTagScope, "namespace", "repo", content).Return(nil, nil)
+
+		err := gc.UpdateRepoInfos(context.Background(), req)
+		assert.NoError(t, err)
+	})
+
 }
 
 func TestContainsLicenseComplianceChange(t *testing.T) {
 	require.True(t, containsLicenseComplianceChange([]types.GiteaCallbackPushReq_Commit{{Added: []string{"LICENSE"}}}))
 	require.True(t, containsLicenseComplianceChange([]types.GiteaCallbackPushReq_Commit{{Modified: []string{"README.md"}}}))
 	require.False(t, containsLicenseComplianceChange([]types.GiteaCallbackPushReq_Commit{{Modified: []string{"docs/README.md"}}}))
+	require.True(t, containsRootLicenseDocumentChange([]types.GiteaCallbackPushReq_Commit{{Modified: []string{"LICENSE.txt"}}}))
+	require.False(t, containsRootLicenseDocumentChange([]types.GiteaCallbackPushReq_Commit{{Modified: []string{"README.md"}}}))
+	require.True(t, containsRootReadmeChange([]types.GiteaCallbackPushReq_Commit{{Modified: []string{"readme.md"}}}))
+	require.False(t, containsRootReadmeChange([]types.GiteaCallbackPushReq_Commit{{Modified: []string{"docs/README.md"}}}))
 }
 
 func TestGitCallbackComponentImpl_SyncRepositoryPackage(t *testing.T) {

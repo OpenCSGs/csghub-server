@@ -9,6 +9,8 @@ func TestClassifyRepositoryLicensePatterns(t *testing.T) {
 		status     ComplianceStatus
 		permission CommercialPermission
 	}{
+		{name: "MIT", license: "mit", status: ComplianceStatusCompliant, permission: CommercialPermissionAllowed},
+		{name: "Apache 2.0", license: "apache-2.0", status: ComplianceStatusCompliant, permission: CommercialPermissionAllowed},
 		{name: "GPL or later", license: "gpl-3.0-or-later", status: ComplianceStatusCompliant, permission: CommercialPermissionCopyleft},
 		{name: "GPL only", license: " GPL-2.0-ONLY ", status: ComplianceStatusCompliant, permission: CommercialPermissionCopyleft},
 		{name: "LGPL version", license: "lgpl-2.0", status: ComplianceStatusCompliant, permission: CommercialPermissionCopyleft},
