@@ -253,6 +253,24 @@ func TestGetXPULabel(t *testing.T) {
 			wantTypeLabel: "chipltech.com/tpu.product",
 		},
 		{
+			name: "metax.com/gpu.product label",
+			labels: map[string]string{
+				"metax.com/gpu.product": "MX-C600-A",
+			},
+			config:        &config.Config{},
+			wantCapacity:  "metax-tech.com/gpu",
+			wantTypeLabel: "metax.com/gpu.product",
+		},
+		{
+			name: "metax-tech.com/gpu.product label (operator)",
+			labels: map[string]string{
+				"metax-tech.com/gpu.product": "MXC600-A",
+			},
+			config:        &config.Config{},
+			wantCapacity:  "metax-tech.com/gpu",
+			wantTypeLabel: "metax-tech.com/gpu.product",
+		},
+		{
 			name:          "no matching label",
 			labels:        map[string]string{},
 			config:        &config.Config{},
@@ -448,6 +466,88 @@ func TestCollectNodeResource(t *testing.T) {
 		assert.Equal(t, "SXM4-40GB", result.XPUModel)
 		assert.Equal(t, int64(8), result.TotalXPU)
 		assert.Equal(t, int64(8), result.AvailableXPU)
+	})
+
+	t.Run("should return correct GPU info with metax.com/gpu.product label", func(t *testing.T) {
+		node := &v1.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "metax-node",
+				Labels: map[string]string{
+					"metax.com/gpu.product": "MX-C600-A",
+					"metax.com/gpu.memory":  "72GiB",
+				},
+			},
+			Status: v1.NodeStatus{
+				Conditions: []v1.NodeCondition{
+					{
+						Type:   v1.NodeReady,
+						Status: v1.ConditionTrue,
+					},
+				},
+				Capacity: v1.ResourceList{
+					v1.ResourceCPU:                        *resource.NewMilliQuantity(16000, resource.DecimalSI),
+					v1.ResourceMemory:                     *resource.NewQuantity(128*1024*1024*1024, resource.DecimalSI),
+					v1.ResourceName("metax-tech.com/gpu"): *resource.NewQuantity(16, resource.DecimalSI),
+				},
+				Allocatable: v1.ResourceList{
+					v1.ResourceCPU:                        *resource.NewMilliQuantity(15000, resource.DecimalSI),
+					v1.ResourceMemory:                     *resource.NewQuantity(120*1024*1024*1024, resource.DecimalSI),
+					v1.ResourceName("metax-tech.com/gpu"): *resource.NewQuantity(16, resource.DecimalSI),
+				},
+			},
+		}
+
+		result := collectNodeResource(*node, cfg)
+
+		assert.Equal(t, "metax-node", result.NodeName)
+		assert.Equal(t, "MX", result.GPUVendor)
+		assert.Equal(t, "C600-A", result.XPUModel)
+		assert.Equal(t, "metax-tech.com/gpu", result.XPUCapacityLabel)
+		assert.Equal(t, "gpgpu", result.XPUType)
+		assert.Equal(t, int64(16), result.TotalXPU)
+		assert.Equal(t, int64(16), result.AvailableXPU)
+		assert.Equal(t, "72 GiB", result.XPUMem)
+	})
+
+	t.Run("should return correct GPU info with metax-tech.com/gpu.product label (operator)", func(t *testing.T) {
+		node := &v1.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "metax-operator-node",
+				Labels: map[string]string{
+					"metax-tech.com/gpu.product": "MXC600-A",
+					"metax-tech.com/gpu.memory":  "72GB",
+				},
+			},
+			Status: v1.NodeStatus{
+				Conditions: []v1.NodeCondition{
+					{
+						Type:   v1.NodeReady,
+						Status: v1.ConditionTrue,
+					},
+				},
+				Capacity: v1.ResourceList{
+					v1.ResourceCPU:                        *resource.NewMilliQuantity(16000, resource.DecimalSI),
+					v1.ResourceMemory:                     *resource.NewQuantity(128*1024*1024*1024, resource.DecimalSI),
+					v1.ResourceName("metax-tech.com/gpu"): *resource.NewQuantity(16, resource.DecimalSI),
+				},
+				Allocatable: v1.ResourceList{
+					v1.ResourceCPU:                        *resource.NewMilliQuantity(15000, resource.DecimalSI),
+					v1.ResourceMemory:                     *resource.NewQuantity(120*1024*1024*1024, resource.DecimalSI),
+					v1.ResourceName("metax-tech.com/gpu"): *resource.NewQuantity(16, resource.DecimalSI),
+				},
+			},
+		}
+
+		result := collectNodeResource(*node, cfg)
+
+		assert.Equal(t, "metax-operator-node", result.NodeName)
+		assert.Equal(t, "MX", result.GPUVendor)
+		assert.Equal(t, "C600-A", result.XPUModel)
+		assert.Equal(t, "metax-tech.com/gpu", result.XPUCapacityLabel)
+		assert.Equal(t, "gpgpu", result.XPUType)
+		assert.Equal(t, int64(16), result.TotalXPU)
+		assert.Equal(t, int64(16), result.AvailableXPU)
+		assert.Equal(t, "72 GiB", result.XPUMem)
 	})
 
 	t.Run("should return node with multiple ready conditions", func(t *testing.T) {
