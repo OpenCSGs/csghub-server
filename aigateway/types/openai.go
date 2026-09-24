@@ -78,6 +78,10 @@ type Model struct {
 	// request (set by applyEndpointOverrides); used for cost attribution in
 	// metering, never exposed on /v1/models.
 	UpstreamID int64 `json:"-"`
+	// AutoRoute marks the virtual model that stands for automatic model
+	// selection.  It has no upstream of its own and must be replaced with
+	// a real model before any upstream is resolved.
+	AutoRoute bool `json:"-"`
 }
 
 type UpstreamAvailability struct {

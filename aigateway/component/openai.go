@@ -30,6 +30,15 @@ type OpenAIComponent interface {
 	GetAvailableModels(c context.Context, nsUUID string) ([]types.Model, error)
 	ListModels(c context.Context, nsUUID string, req types.ListModelsReq) (types.ModelList, error)
 	GetModelByID(c context.Context, nsUUID, modelID string) (*types.Model, error)
+	// AutoModelID returns the virtual model ID that selects automatic
+	// routing, or "" when automatic routing is not configured.
+	AutoModelID() string
+	// ResolveAutoModel picks the concrete model that should serve one
+	// turn requested against the virtual model.  The returned decision
+	// always names a model: it may be one a real model of the caller's
+	// already owns the virtual ID for, or the one a pinned conversation
+	// is bound to, and the decision says which.
+	ResolveAutoModel(c context.Context, req types.AutoRouteRequest) (*types.AutoRouteDecision, error)
 	RecordUsage(c context.Context, nsUUID string, model *types.Model, targetModelName string, tokenCounter token.Counter, apikey string, tokenID int64) error
 	RecordUsageFromTokenUsage(c context.Context, nsUUID string, model *types.Model, targetModelName string, usage *token.Usage, apikey string, tokenID int64) error
 	BuildUsageMeteringEvent(c context.Context, nsUUID string, model *types.Model, targetModelName string, usage *token.Usage, apikey string) (*commontypes.MeteringEvent, error)
@@ -85,6 +94,7 @@ type openaiComponentImpl struct {
 	usageLimiter           UsageLimiter
 	capacityPolicyDefaults commontypes.CapacityPolicy
 	quotaRateComponent     QuotaRateComponent
+	autoRouter             AutoModelRouter
 }
 
 func (m *openaiComponentImpl) getModelIDBuilder() upstream.ModelIDBuilder {
@@ -135,9 +145,138 @@ func (m *openaiComponentImpl) ListModels(c context.Context, nsUUID string, req t
 	if err != nil {
 		return types.ModelList{}, err
 	}
+	// Whether a real model owns the virtual ID must not depend on how
+	// healthy it is, or the listing and the request path would disagree
+	// about what that ID means.  The check therefore runs against the
+	// caller's full visible list, before unhealthy models are dropped.
+	auto, publishAuto := m.autoModel(c)
+	if publishAuto {
+		if shadow, found := findModelByID(models, auto.ID); found {
+			// Two entries with one ID would make the listing ambiguous, and
+			// the real model is the one the caller can actually name.
+			slog.WarnContext(c, "a real model owns the automatic routing model ID, not publishing the virtual one",
+				slog.String("model_id", shadow.ID))
+			publishAuto = false
+		}
+	}
+
 	models = computeModelListAvailability(models)
+	// The virtual model is added after availability is computed because it
+	// has no upstreams of its own and would otherwise be filtered out.  It
+	// is published only while the ranking service is answering, so a
+	// client never sees a model ID it cannot actually use.
+	if publishAuto {
+		models = append([]types.Model{auto}, models...)
+	}
 	modelList := filterAndPaginateModels(models, req)
 	return modelList, nil
+}
+
+// autoModel returns the virtual model entry when automatic routing is
+// configured and the ranking service is currently reachable.
+func (m *openaiComponentImpl) autoModel(c context.Context) (types.Model, bool) {
+	if m.autoRouter == nil || !m.autoRouter.Available(c) {
+		return types.Model{}, false
+	}
+	return autoModelEntry(m.autoRouter.ModelID()), true
+}
+
+// AutoModelID reports the virtual model ID, or "" when automatic routing
+// is not configured.
+func (m *openaiComponentImpl) AutoModelID() string {
+	if m.autoRouter == nil {
+		return ""
+	}
+	return m.autoRouter.ModelID()
+}
+
+// ResolveAutoModel picks the model that serves one turn requested against
+// the virtual model.  Candidates are the caller's own visible, available
+// models narrowed by the same edition filters the model list applies, so
+// automatic routing can never land on a model the caller could not have
+// named directly.
+func (m *openaiComponentImpl) ResolveAutoModel(c context.Context, req types.AutoRouteRequest) (*types.AutoRouteDecision, error) {
+	if m.autoRouter == nil {
+		return nil, fmt.Errorf("automatic model routing is not configured")
+	}
+	models, err := m.GetAvailableModels(c, req.TenantID)
+	if err != nil {
+		return nil, err
+	}
+	visible := applyFilters(models, modelListDefaultFilters())
+
+	// A real model owning this ID wins, healthy or not: the virtual model
+	// shares a public namespace with real ones, and whether an ID belongs
+	// to a real model cannot depend on how that model happens to be
+	// feeling.  The listing applies the same rule, so both agree.
+	if real, found := findModelByID(visible, m.autoRouter.ModelID()); found {
+		slog.WarnContext(c, "a real model owns the automatic routing model ID, serving it directly",
+			slog.String("model_id", real.ID))
+		return &types.AutoRouteDecision{ModelID: real.ID, Shadowed: true}, nil
+	}
+
+	// A conversation already bound to one upstream must stay on the model
+	// that owns it.  Ranking a fresh model here would pick one that does
+	// not have that upstream, and resolution would then fail outright.
+	if req.RequiredUpstreamID != 0 {
+		return pinnedAutoModel(c, visible, req.RequiredUpstreamID)
+	}
+
+	// Availability is annotated rather than filtered out, so that a model
+	// which is only unhealthy right now can be told apart from one this
+	// caller cannot use at all.  The two produce different HTTP statuses.
+	for i := range visible {
+		visible[i].Availability = &types.ModelAvailability{
+			IsAvailable: modelUpstreamsAvailable(visible[i].Upstreams),
+		}
+	}
+	return m.autoRouter.Select(c, req.Input, visible)
+}
+
+// pinnedAutoModel returns the model owning the upstream a conversation is
+// bound to.  The upstream must still be usable, judged exactly as the
+// ordinary resolution path judges it: a disabled, circuit-broken or
+// unhealthy upstream is dropped there too, and picking it here would only
+// move the failure one step later under a different error.
+func pinnedAutoModel(c context.Context, visible []types.Model, upstreamID int64) (*types.AutoRouteDecision, error) {
+	for _, model := range visible {
+		for _, upstream := range model.Upstreams {
+			if upstream.ID != upstreamID {
+				continue
+			}
+			if unavailable, reason := types.IsUpstreamUnavailable(upstream); unavailable {
+				slog.WarnContext(c, "the upstream this conversation is bound to can no longer serve it",
+					slog.String("model", model.ID),
+					slog.Int64("required_upstream_id", upstreamID),
+					slog.String("reason", reason))
+				return nil, newAutoRouteError(autoRouteCodeRequiredUpstream,
+					"the upstream this conversation is bound to (%d) is %s", upstreamID, reason)
+			}
+			slog.InfoContext(c, "automatic routing reused the model this conversation is bound to",
+				slog.String("model", model.ID),
+				slog.Int64("required_upstream_id", upstreamID))
+			return &types.AutoRouteDecision{ModelID: model.ID, Pinned: true}, nil
+		}
+	}
+	return nil, newAutoRouteError(autoRouteCodeRequiredUpstream,
+		"the upstream this conversation is bound to (%d) no longer exists", upstreamID)
+}
+
+// findModelByID looks a model up by its exact ID.  Model identity is
+// exact everywhere else in the gateway — the catalogue is queried with a
+// plain equality on model_name — so the virtual ID is owned only by a
+// model spelled exactly the same way, and every path agrees on that.
+func findModelByID(models []types.Model, modelID string) (types.Model, bool) {
+	wanted := strings.TrimSpace(modelID)
+	if wanted == "" {
+		return types.Model{}, false
+	}
+	for _, model := range models {
+		if strings.TrimSpace(model.ID) == wanted {
+			return model, true
+		}
+	}
+	return types.Model{}, false
 }
 
 // computeModelListAvailability sets ModelAvailability.IsAvailable for each model
@@ -496,21 +635,22 @@ func (m *openaiComponentImpl) GetModelByID(c context.Context, nsUUID, modelID st
 	if err != nil {
 		return nil, fmt.Errorf("failed to get llm config by model name %q: %w", modelID, err)
 	}
-	if cfg == nil {
-		return nil, nil
-	}
-	if !cfg.Enabled {
-		return nil, nil
-	}
-
-	model, ok := m.llmConfigToModel(c, cfg, nsUUID)
-	if !ok {
-		return nil, nil
+	if cfg != nil && cfg.Enabled {
+		if model, ok := m.llmConfigToModel(c, cfg, nsUUID); ok {
+			models := m.enrichModelsWithPrice(c, []types.Model{model})
+			return &models[0], nil
+		}
 	}
 
-	models := []types.Model{model}
-	models = m.enrichModelsWithPrice(c, models)
-	return &models[0], nil
+	// No real model owns this ID, so it may be the virtual one.  The
+	// lookup is in this order, not the reverse, so that a real model can
+	// never be shadowed by automatic routing.
+	if autoID := m.AutoModelID(); autoID != "" && strings.TrimSpace(modelID) == autoID {
+		if auto, ok := m.autoModel(c); ok {
+			return &auto, nil
+		}
+	}
+	return nil, nil
 }
 
 // llmTypeFromModel returns metadata llm_type used to classify usage metering records.
@@ -639,6 +779,44 @@ type usageMeteringExtra struct {
 	CompletionResolution string `json:"completion_resolution"`
 	CompletionDuration   string `json:"completion_duration"`
 	CompletionDesc       string `json:"completion_desc"`
+	// AutoRoute records that the caller asked for the virtual model and
+	// which model automatic routing chose, so the spend a routing decision
+	// produced can be reconstructed from the billing record alone.  The
+	// whole object is absent for a request that named a model directly.
+	AutoRoute *autoRouteMeteringExtra `json:"auto_route,omitempty"`
+}
+
+// autoRouteMeteringExtra is the automatic-routing part of the billing
+// record.  RequestedModel is the virtual ID the caller sent, which is
+// what makes these rows separable from ordinary ones; Rank and
+// IndexVersion are what the ranking was, so a decision can be reviewed
+// against the index it came from.
+type autoRouteMeteringExtra struct {
+	RequestedModel string `json:"requested_model"`
+	Candidate      string `json:"candidate,omitempty"`
+	Rank           int    `json:"rank,omitempty"`
+	IndexVersion   string `json:"index_version,omitempty"`
+	PolicyVersion  string `json:"policy_version,omitempty"`
+	// Pinned marks a turn that reused the model its conversation was
+	// already bound to rather than being ranked.
+	Pinned bool `json:"pinned,omitempty"`
+}
+
+// autoRouteExtra converts the Planner's decision into its billing form.
+// A shadowed decision is not automatic routing at all — a real model owned
+// the virtual ID — so it is recorded as an ordinary request.
+func autoRouteExtra(requestedModel string, decision *types.AutoRouteDecision) *autoRouteMeteringExtra {
+	if decision == nil || decision.Shadowed {
+		return nil
+	}
+	return &autoRouteMeteringExtra{
+		RequestedModel: requestedModel,
+		Candidate:      decision.BenchmarkID,
+		Rank:           decision.Rank,
+		IndexVersion:   decision.IndexVersion,
+		PolicyVersion:  decision.PolicyVersion,
+		Pinned:         decision.Pinned,
+	}
 }
 
 func sanitizeMeteringEventForLog(event commontypes.MeteringEvent) commontypes.MeteringEvent {
@@ -659,7 +837,7 @@ func upstreamIDExtraValue(upstreamID int64) string {
 	return strconv.FormatInt(upstreamID, 10)
 }
 
-func buildUsageExtraData(usageModel *types.Model, upstreamModelName string, usage *token.Usage, apikey string, meteringInfo usageMeteringInfo) (string, error) {
+func buildUsageExtraData(usageModel *types.Model, upstreamModelName string, usage *token.Usage, apikey string, meteringInfo usageMeteringInfo, autoRoute *autoRouteMeteringExtra) (string, error) {
 	extra := usageMeteringExtra{
 		PromptTokenNum:       fmt.Sprintf("%d", usage.PromptTokens),
 		PromptTokenCacheNum:  fmt.Sprintf("%d", usage.CachedPromptTokens),
@@ -674,6 +852,7 @@ func buildUsageExtraData(usageModel *types.Model, upstreamModelName string, usag
 		CompletionResolution: usage.Resolution,
 		CompletionDuration:   fmt.Sprintf("%.2f", usage.Duration),
 		CompletionDesc:       usage.CompletionDesc,
+		AutoRoute:            autoRoute,
 	}
 	extraData, err := json.Marshal(extra)
 	if err != nil {
@@ -711,7 +890,8 @@ func (m *openaiComponentImpl) BuildUsageMeteringEvent(c context.Context, nsUUID 
 		valueType = commontypes.CountNumberType
 		value = usage.CompletionRC
 	}
-	extraData, err := buildUsageExtraData(model, targetModelName, usage, apikey, meteringInfo)
+	extraData, err := buildUsageExtraData(model, targetModelName, usage, apikey, meteringInfo,
+		autoRouteExtra(m.AutoModelID(), types.AutoRouteDecisionFromContext(c)))
 	if err != nil {
 		return nil, err
 	}

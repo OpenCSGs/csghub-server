@@ -1088,7 +1088,7 @@ func TestBuildUsageExtraDataIncludesCachedPromptTokens(t *testing.T) {
 				PromptTokens:       100,
 				CachedPromptTokens: tt.cachedPromptTokens,
 				CompletionTokens:   50,
-			}, "", meteringInfo)
+			}, "", meteringInfo, nil)
 			require.NoError(t, err)
 
 			var extra usageMeteringExtra
@@ -1105,7 +1105,7 @@ func TestBuildUsageExtraDataUpstreamID(t *testing.T) {
 	usage := &token.Usage{PromptTokens: 100, CompletionTokens: 50}
 
 	t.Run("upstream id reported", func(t *testing.T) {
-		extraData, err := buildUsageExtraData(&types.Model{UpstreamID: 42}, "target-model", usage, "", meteringInfo)
+		extraData, err := buildUsageExtraData(&types.Model{UpstreamID: 42}, "target-model", usage, "", meteringInfo, nil)
 		require.NoError(t, err)
 		var extra usageMeteringExtra
 		require.NoError(t, json.Unmarshal([]byte(extraData), &extra))
@@ -1113,7 +1113,7 @@ func TestBuildUsageExtraDataUpstreamID(t *testing.T) {
 	})
 
 	t.Run("zero upstream id omitted", func(t *testing.T) {
-		extraData, err := buildUsageExtraData(&types.Model{}, "target-model", usage, "", meteringInfo)
+		extraData, err := buildUsageExtraData(&types.Model{}, "target-model", usage, "", meteringInfo, nil)
 		require.NoError(t, err)
 		require.NotContains(t, extraData, "upstream_id")
 	})
@@ -1143,7 +1143,7 @@ func TestBuildUsageExtraDataIncludesReasoningTokens(t *testing.T) {
 				PromptTokens:     100,
 				CompletionTokens: 50,
 				ReasoningTokens:  tt.reasoningTokens,
-			}, "", meteringInfo)
+			}, "", meteringInfo, nil)
 			require.NoError(t, err)
 
 			var extra usageMeteringExtra

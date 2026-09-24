@@ -104,6 +104,15 @@ func (b *responsesParsedBody) HasMultimodalContent() bool {
 	return b.Req.HasMultimodalContent()
 }
 
+// AutoRouteContext satisfies types.AutoRouteContextProvider so the Planner
+// can describe the turn to the model ranking service.
+func (b *responsesParsedBody) AutoRouteContext() types.AutoRouteInput {
+	if b == nil || b.Req == nil {
+		return types.AutoRouteInput{}
+	}
+	return b.Req.AutoRouteContext()
+}
+
 // --- Phase 1: Extract ---
 
 func (h *responsesPipelineHandler) Extract(c *gin.Context) (*types.RequestMetadata, error) {

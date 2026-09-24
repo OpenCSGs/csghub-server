@@ -49,6 +49,23 @@ func TestResolveModelTarget_ModelNotFound(t *testing.T) {
 	require.Equal(t, "model_not_found", targetErr.APIError.Code)
 }
 
+// The virtual automatic-routing model has no upstream of its own.  The
+// Planner replaces it before resolution, so reaching the resolver means an
+// endpoint that cannot route automatically was asked to.
+func TestResolveModelTarget_VirtualAutoModelIsRejected(t *testing.T) {
+	tester, _, _ := setupTest(t)
+	tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "auto").
+		Return(&types.Model{BaseModel: types.BaseModel{ID: "auto"}, AutoRoute: true}, nil).Once()
+
+	_, err := tester.handler.resolveModelTarget(context.Background(), "testuser", "auto", http.Header{})
+
+	require.Error(t, err)
+	targetErr, ok := err.(*modelTargetError)
+	require.True(t, ok)
+	require.Equal(t, "auto_routing_unsupported", targetErr.APIError.Code)
+	require.Contains(t, targetErr.APIError.Message, "automatic routing")
+}
+
 func TestResolveModelTargetWithOptionsRequiredUpstreamID(t *testing.T) {
 	tester, _, _ := setupTest(t)
 	model := &types.Model{

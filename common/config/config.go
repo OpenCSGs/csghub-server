@@ -711,6 +711,23 @@ type Config struct {
 		}
 		MetricsCollectorLookbackMinutes int `env:"OPENCSG_AIGATEWAY_METRICS_COLLECTOR_LOOKBACK_MINUTES" default:"60"`
 
+		// SemanticRouter configures automatic model selection.  When
+		// ServerURL is set and the service answers its health check, the
+		// gateway publishes an extra virtual model (ModelID) that clients
+		// can request instead of naming a concrete model; the service then
+		// ranks the real candidates for each turn and the highest ranked
+		// available one serves the request.  Leaving ServerURL empty
+		// disables the feature entirely and the virtual model is not
+		// published.
+		SemanticRouter struct {
+			ServerURL      string `env:"OPENCSG_AIGATEWAY_SEMANTIC_ROUTER_SERVER" default:""`
+			ModelID        string `env:"OPENCSG_AIGATEWAY_SEMANTIC_ROUTER_MODEL_ID" default:"auto"`
+			TimeoutSeconds int    `env:"OPENCSG_AIGATEWAY_SEMANTIC_ROUTER_TIMEOUT_SECONDS" default:"5"`
+			// HealthTTLSeconds is how long a readiness probe result is
+			// reused before the next model listing re-probes the service.
+			HealthTTLSeconds int `env:"OPENCSG_AIGATEWAY_SEMANTIC_ROUTER_HEALTH_TTL_SECONDS" default:"300"`
+		}
+
 		Metrics struct {
 			// Enabled controls whether the AIGateway metrics collection
 			// system (DBSink and MetricCollector) is active.  When set to
