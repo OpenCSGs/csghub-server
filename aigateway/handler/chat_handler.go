@@ -103,6 +103,15 @@ func (b *chatParsedBody) HasMultimodalContent() bool {
 	return b.Req.HasMultimodalContent()
 }
 
+// AutoRouteContext satisfies types.AutoRouteContextProvider so the Planner
+// can describe the turn to the model ranking service.
+func (b *chatParsedBody) AutoRouteContext() types.AutoRouteInput {
+	if b == nil || b.Req == nil {
+		return types.AutoRouteInput{}
+	}
+	return b.Req.AutoRouteContext()
+}
+
 // --- Phase 1: Extract ---
 
 func (h *chatPipelineHandler) Extract(c *gin.Context) (*types.RequestMetadata, error) {

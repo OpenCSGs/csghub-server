@@ -24,6 +24,11 @@ func NewOpenAIComponentFromConfig(config *config.Config) (OpenAIComponent, error
 	if err != nil {
 		return nil, err
 	}
+	autoRouter, err := NewAutoModelRouter(config)
+	if err != nil {
+		return nil, err
+	}
+
 	return &openaiComponentImpl{
 		userStore:              database.NewUserStore(),
 		organStore:             database.NewOrgStore(config.IsHierarchicalOrganization(), nil),
@@ -34,6 +39,7 @@ func NewOpenAIComponentFromConfig(config *config.Config) (OpenAIComponent, error
 		extendOpenai:           extendOpenai{},
 		modelIDBuilder:         upstream.NewModelIDBuilder(),
 		capacityPolicyDefaults: capacityPolicyDefaultsFromConfig(config),
+		autoRouter:             autoRouter,
 	}, nil
 }
 

@@ -35,6 +35,14 @@ func (c *fakeOpenAIComponent) GetModelByID(ctx context.Context, nsUUID, modelID 
 	return c.model, nil
 }
 
+func (c *fakeOpenAIComponent) AutoModelID() string {
+	return ""
+}
+
+func (c *fakeOpenAIComponent) ResolveAutoModel(ctx context.Context, req aigwtypes.AutoRouteRequest) (*aigwtypes.AutoRouteDecision, error) {
+	return nil, nil
+}
+
 func (c *fakeOpenAIComponent) RecordUsage(ctx context.Context, nsUUID string, model *aigwtypes.Model, targetModelName string, tokenCounter token.Counter, apikey string, tokenID int64) error {
 	return nil
 }
