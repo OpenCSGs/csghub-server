@@ -78,6 +78,51 @@ func (_c *MockOpenAIComponent_AcquireCapacityAdmission_Call) RunAndReturn(run fu
 	return _c
 }
 
+// AutoModelID provides a mock function with no fields
+func (_m *MockOpenAIComponent) AutoModelID() string {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for AutoModelID")
+	}
+
+	var r0 string
+	if rf, ok := ret.Get(0).(func() string); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	return r0
+}
+
+// MockOpenAIComponent_AutoModelID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'AutoModelID'
+type MockOpenAIComponent_AutoModelID_Call struct {
+	*mock.Call
+}
+
+// AutoModelID is a helper method to define mock.On call
+func (_e *MockOpenAIComponent_Expecter) AutoModelID() *MockOpenAIComponent_AutoModelID_Call {
+	return &MockOpenAIComponent_AutoModelID_Call{Call: _e.mock.On("AutoModelID")}
+}
+
+func (_c *MockOpenAIComponent_AutoModelID_Call) Run(run func()) *MockOpenAIComponent_AutoModelID_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockOpenAIComponent_AutoModelID_Call) Return(_a0 string) *MockOpenAIComponent_AutoModelID_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockOpenAIComponent_AutoModelID_Call) RunAndReturn(run func() string) *MockOpenAIComponent_AutoModelID_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // BuildUsageMeteringEvent provides a mock function with given fields: c, nsUUID, model, targetModelName, usage, apikey
 func (_m *MockOpenAIComponent) BuildUsageMeteringEvent(c context.Context, nsUUID string, model *types.Model, targetModelName string, usage *token.Usage, apikey string) (*commontypes.MeteringEvent, error) {
 	ret := _m.Called(c, nsUUID, model, targetModelName, usage, apikey)
@@ -836,6 +881,65 @@ func (_c *MockOpenAIComponent_RecordUsageFromTokenUsage_Call) Return(_a0 error) 
 }
 
 func (_c *MockOpenAIComponent_RecordUsageFromTokenUsage_Call) RunAndReturn(run func(context.Context, string, *types.Model, string, *token.Usage, string, int64) error) *MockOpenAIComponent_RecordUsageFromTokenUsage_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ResolveAutoModel provides a mock function with given fields: c, req
+func (_m *MockOpenAIComponent) ResolveAutoModel(c context.Context, req types.AutoRouteRequest) (*types.AutoRouteDecision, error) {
+	ret := _m.Called(c, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ResolveAutoModel")
+	}
+
+	var r0 *types.AutoRouteDecision
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.AutoRouteRequest) (*types.AutoRouteDecision, error)); ok {
+		return rf(c, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.AutoRouteRequest) *types.AutoRouteDecision); ok {
+		r0 = rf(c, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*types.AutoRouteDecision)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.AutoRouteRequest) error); ok {
+		r1 = rf(c, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockOpenAIComponent_ResolveAutoModel_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ResolveAutoModel'
+type MockOpenAIComponent_ResolveAutoModel_Call struct {
+	*mock.Call
+}
+
+// ResolveAutoModel is a helper method to define mock.On call
+//   - c context.Context
+//   - req types.AutoRouteRequest
+func (_e *MockOpenAIComponent_Expecter) ResolveAutoModel(c interface{}, req interface{}) *MockOpenAIComponent_ResolveAutoModel_Call {
+	return &MockOpenAIComponent_ResolveAutoModel_Call{Call: _e.mock.On("ResolveAutoModel", c, req)}
+}
+
+func (_c *MockOpenAIComponent_ResolveAutoModel_Call) Run(run func(c context.Context, req types.AutoRouteRequest)) *MockOpenAIComponent_ResolveAutoModel_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.AutoRouteRequest))
+	})
+	return _c
+}
+
+func (_c *MockOpenAIComponent_ResolveAutoModel_Call) Return(_a0 *types.AutoRouteDecision, _a1 error) *MockOpenAIComponent_ResolveAutoModel_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockOpenAIComponent_ResolveAutoModel_Call) RunAndReturn(run func(context.Context, types.AutoRouteRequest) (*types.AutoRouteDecision, error)) *MockOpenAIComponent_ResolveAutoModel_Call {
 	_c.Call.Return(run)
 	return _c
 }

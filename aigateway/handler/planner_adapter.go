@@ -59,14 +59,19 @@ func (a *contentSafetyAdapter) Check(ctx context.Context, model *types.Model, pr
 	return shouldCheck && result.IsSensitive, result.Reason, nil
 }
 
-// newPlannerDeps builds the dependency interfaces needed by plan.NewPlanner
-// from an OpenAIHandlerImpl.
-func newPlannerDeps(h *OpenAIHandlerImpl) (plan.ModelResolver, plan.BalanceChecker, plan.UsageLimitChecker, plan.ContentSafetyChecker, plan.AdmissionChecker) {
-	return &modelResolverAdapter{handler: h},
-		h.openaiComponent,
-		h.openaiComponent,
-		&contentSafetyAdapter{policy: h.sensitivePolicy},
-		newAdmissionChecker(h)
+// newPlannerDeps builds the dependency set needed by plan.NewPlanner from
+// an OpenAIHandlerImpl.  The openai component satisfies several of the
+// interfaces directly, including automatic model selection.
+func newPlannerDeps(h *OpenAIHandlerImpl) plan.PlannerDeps {
+	return plan.PlannerDeps{
+		ModelResolver:     &modelResolverAdapter{handler: h},
+		BalanceChecker:    h.openaiComponent,
+		UsageLimitChecker: h.openaiComponent,
+		ContentSafety:     &contentSafetyAdapter{policy: h.sensitivePolicy},
+		AdmissionChecker:  newAdmissionChecker(h),
+		MetricsEnricher:   metricsEnricherAdapter{},
+		AutoModelSelector: h.openaiComponent,
+	}
 }
 
 // metricsEnricherAdapter implements plan.MetricsEnricher by delegating to the
@@ -92,9 +97,7 @@ func (metricsEnricherAdapter) SetModelTarget(c *gin.Context, modelID string, tar
 // capacity admission) and preflight tracing so protocol handlers don't repeat
 // boilerplate.
 func newOrchestrator(h *OpenAIHandlerImpl) *plan.Orchestrator {
-	mr, bc, ulc, cs, ac := newPlannerDeps(h)
-	planner := plan.NewPlanner(mr, bc, ulc, cs, ac, metricsEnricherAdapter{},
-		plan.WithQueueMaxRePlans(h.queueMaxRePlans()))
+	planner := plan.NewPlanner(newPlannerDeps(h), plan.WithQueueMaxRePlans(h.queueMaxRePlans()))
 	if releaser := newAdmissionReleaser(h); releaser != nil {
 		return plan.NewOrchestrator(planner, &preflightStarterAdapter{}, releaser)
 	}

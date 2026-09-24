@@ -184,14 +184,14 @@ func TestCategorizePlanError_WrappedCodedError(t *testing.T) {
 // --- Plan orchestration tests ---
 
 func TestPlan_Success_Native(t *testing.T) {
-	p := NewPlanner(
-		&mockModelResolver{target: makeResolvedTarget("http://upstream/v1/messages", "")},
-		&mockBalanceChecker{},
-		&mockUsageLimitChecker{},
-		&mockContentSafetyChecker{},
-		nil, // admissionChecker: nil skips admission in these tests
-		nil,
-	)
+	p := NewPlanner(PlannerDeps{
+		ModelResolver:     &mockModelResolver{target: makeResolvedTarget("http://upstream/v1/messages", "")},
+		BalanceChecker:    &mockBalanceChecker{},
+		UsageLimitChecker: &mockUsageLimitChecker{},
+		ContentSafety:     &mockContentSafetyChecker{},
+		AdmissionChecker:  nil, // admissionChecker: nil skips admission in these tests
+		MetricsEnricher:   nil,
+	})
 
 	meta := &types.RequestMetadata{
 		Protocol:   string(types.ProtocolMessages),
@@ -214,14 +214,14 @@ func TestPlan_Success_Native(t *testing.T) {
 }
 
 func TestPlan_Success_NoPromptText_SkipsSafety(t *testing.T) {
-	p := NewPlanner(
-		&mockModelResolver{target: makeResolvedTarget("http://upstream/v1/messages", "")},
-		&mockBalanceChecker{},
-		&mockUsageLimitChecker{},
-		&mockContentSafetyChecker{isSensitive: true, message: "blocked"},
-		nil, // admissionChecker: nil skips admission in these tests
-		nil,
-	)
+	p := NewPlanner(PlannerDeps{
+		ModelResolver:     &mockModelResolver{target: makeResolvedTarget("http://upstream/v1/messages", "")},
+		BalanceChecker:    &mockBalanceChecker{},
+		UsageLimitChecker: &mockUsageLimitChecker{},
+		ContentSafety:     &mockContentSafetyChecker{isSensitive: true, message: "blocked"},
+		AdmissionChecker:  nil, // admissionChecker: nil skips admission in these tests
+		MetricsEnricher:   nil,
+	})
 
 	meta := &types.RequestMetadata{
 		Protocol:   string(types.ProtocolMessages),
@@ -238,14 +238,14 @@ func TestPlan_Success_NoPromptText_SkipsSafety(t *testing.T) {
 }
 
 func TestPlan_Sensitive_Flagged(t *testing.T) {
-	p := NewPlanner(
-		&mockModelResolver{target: makeResolvedTarget("http://upstream/v1/messages", "")},
-		&mockBalanceChecker{},
-		&mockUsageLimitChecker{},
-		&mockContentSafetyChecker{isSensitive: true, message: "blocked content"},
-		nil, // admissionChecker: nil skips admission in these tests
-		nil,
-	)
+	p := NewPlanner(PlannerDeps{
+		ModelResolver:     &mockModelResolver{target: makeResolvedTarget("http://upstream/v1/messages", "")},
+		BalanceChecker:    &mockBalanceChecker{},
+		UsageLimitChecker: &mockUsageLimitChecker{},
+		ContentSafety:     &mockContentSafetyChecker{isSensitive: true, message: "blocked content"},
+		AdmissionChecker:  nil, // admissionChecker: nil skips admission in these tests
+		MetricsEnricher:   nil,
+	})
 
 	meta := &types.RequestMetadata{
 		Protocol:   string(types.ProtocolMessages),
@@ -267,14 +267,14 @@ func TestPlan_Sensitive_Flagged(t *testing.T) {
 }
 
 func TestPlan_SafetyCheckError_DoesNotBlock(t *testing.T) {
-	p := NewPlanner(
-		&mockModelResolver{target: makeResolvedTarget("http://upstream/v1/messages", "")},
-		&mockBalanceChecker{},
-		&mockUsageLimitChecker{},
-		&mockContentSafetyChecker{err: errors.New("moderation unavailable")},
-		nil, // admissionChecker: nil skips admission in these tests
-		nil,
-	)
+	p := NewPlanner(PlannerDeps{
+		ModelResolver:     &mockModelResolver{target: makeResolvedTarget("http://upstream/v1/messages", "")},
+		BalanceChecker:    &mockBalanceChecker{},
+		UsageLimitChecker: &mockUsageLimitChecker{},
+		ContentSafety:     &mockContentSafetyChecker{err: errors.New("moderation unavailable")},
+		AdmissionChecker:  nil, // admissionChecker: nil skips admission in these tests
+		MetricsEnricher:   nil,
+	})
 
 	meta := &types.RequestMetadata{
 		Protocol:   string(types.ProtocolMessages),
@@ -293,14 +293,14 @@ func TestPlan_SafetyCheckError_DoesNotBlock(t *testing.T) {
 }
 
 func TestPlan_ModelNotFound(t *testing.T) {
-	p := NewPlanner(
-		&mockModelResolver{err: &codedErrStub{code: "model_not_found"}},
-		&mockBalanceChecker{},
-		&mockUsageLimitChecker{},
-		&mockContentSafetyChecker{},
-		nil, // admissionChecker: nil skips admission in these tests
-		nil,
-	)
+	p := NewPlanner(PlannerDeps{
+		ModelResolver:     &mockModelResolver{err: &codedErrStub{code: "model_not_found"}},
+		BalanceChecker:    &mockBalanceChecker{},
+		UsageLimitChecker: &mockUsageLimitChecker{},
+		ContentSafety:     &mockContentSafetyChecker{},
+		AdmissionChecker:  nil, // admissionChecker: nil skips admission in these tests
+		MetricsEnricher:   nil,
+	})
 
 	meta := &types.RequestMetadata{
 		Protocol: string(types.ProtocolMessages),
@@ -316,14 +316,14 @@ func TestPlan_ModelNotFound(t *testing.T) {
 }
 
 func TestPlan_ModelNilResolution(t *testing.T) {
-	p := NewPlanner(
-		&mockModelResolver{target: nil, err: nil},
-		&mockBalanceChecker{},
-		&mockUsageLimitChecker{},
-		&mockContentSafetyChecker{},
-		nil, // admissionChecker: nil skips admission in these tests
-		nil,
-	)
+	p := NewPlanner(PlannerDeps{
+		ModelResolver:     &mockModelResolver{target: nil, err: nil},
+		BalanceChecker:    &mockBalanceChecker{},
+		UsageLimitChecker: &mockUsageLimitChecker{},
+		ContentSafety:     &mockContentSafetyChecker{},
+		AdmissionChecker:  nil, // admissionChecker: nil skips admission in these tests
+		MetricsEnricher:   nil,
+	})
 
 	meta := &types.RequestMetadata{
 		Protocol: string(types.ProtocolMessages),
@@ -338,14 +338,14 @@ func TestPlan_ModelNilResolution(t *testing.T) {
 }
 
 func TestPlan_ModelUnavailable(t *testing.T) {
-	p := NewPlanner(
-		&mockModelResolver{err: &codedErrStub{code: "model_unavailable"}},
-		&mockBalanceChecker{},
-		&mockUsageLimitChecker{},
-		&mockContentSafetyChecker{},
-		nil, // admissionChecker: nil skips admission in these tests
-		nil,
-	)
+	p := NewPlanner(PlannerDeps{
+		ModelResolver:     &mockModelResolver{err: &codedErrStub{code: "model_unavailable"}},
+		BalanceChecker:    &mockBalanceChecker{},
+		UsageLimitChecker: &mockUsageLimitChecker{},
+		ContentSafety:     &mockContentSafetyChecker{},
+		AdmissionChecker:  nil, // admissionChecker: nil skips admission in these tests
+		MetricsEnricher:   nil,
+	})
 
 	meta := &types.RequestMetadata{
 		Protocol: string(types.ProtocolMessages),
@@ -360,14 +360,14 @@ func TestPlan_ModelUnavailable(t *testing.T) {
 }
 
 func TestPlan_InsufficientBalance(t *testing.T) {
-	p := NewPlanner(
-		&mockModelResolver{target: makeResolvedTarget("http://upstream/v1/messages", "")},
-		&mockBalanceChecker{err: errorx.ErrInsufficientBalance},
-		&mockUsageLimitChecker{},
-		&mockContentSafetyChecker{},
-		nil, // admissionChecker: nil skips admission in these tests
-		nil,
-	)
+	p := NewPlanner(PlannerDeps{
+		ModelResolver:     &mockModelResolver{target: makeResolvedTarget("http://upstream/v1/messages", "")},
+		BalanceChecker:    &mockBalanceChecker{err: errorx.ErrInsufficientBalance},
+		UsageLimitChecker: &mockUsageLimitChecker{},
+		ContentSafety:     &mockContentSafetyChecker{},
+		AdmissionChecker:  nil, // admissionChecker: nil skips admission in these tests
+		MetricsEnricher:   nil,
+	})
 
 	meta := &types.RequestMetadata{
 		Protocol: string(types.ProtocolMessages),
@@ -384,14 +384,14 @@ func TestPlan_InsufficientBalance(t *testing.T) {
 }
 
 func TestPlan_UsageLimitExceeded(t *testing.T) {
-	p := NewPlanner(
-		&mockModelResolver{target: makeResolvedTarget("http://upstream/v1/messages", "")},
-		&mockBalanceChecker{},
-		&mockUsageLimitChecker{err: &component.UsageLimitExceededError{Message: "quota exceeded"}},
-		&mockContentSafetyChecker{},
-		nil, // admissionChecker: nil skips admission in these tests
-		nil,
-	)
+	p := NewPlanner(PlannerDeps{
+		ModelResolver:     &mockModelResolver{target: makeResolvedTarget("http://upstream/v1/messages", "")},
+		BalanceChecker:    &mockBalanceChecker{},
+		UsageLimitChecker: &mockUsageLimitChecker{err: &component.UsageLimitExceededError{Message: "quota exceeded"}},
+		ContentSafety:     &mockContentSafetyChecker{},
+		AdmissionChecker:  nil, // admissionChecker: nil skips admission in these tests
+		MetricsEnricher:   nil,
+	})
 
 	meta := &types.RequestMetadata{
 		Protocol: string(types.ProtocolMessages),
@@ -424,14 +424,14 @@ func TestPlan_Disabled_ReturnsError(t *testing.T) {
 		ModelName: "test-model",
 	}
 
-	p := NewPlanner(
-		&mockModelResolver{target: target},
-		&mockBalanceChecker{err: errors.New("balance should not be checked")},
-		&mockUsageLimitChecker{},
-		&mockContentSafetyChecker{},
-		nil, // admissionChecker: nil skips admission in these tests
-		nil,
-	)
+	p := NewPlanner(PlannerDeps{
+		ModelResolver:     &mockModelResolver{target: target},
+		BalanceChecker:    &mockBalanceChecker{err: errors.New("balance should not be checked")},
+		UsageLimitChecker: &mockUsageLimitChecker{},
+		ContentSafety:     &mockContentSafetyChecker{},
+		AdmissionChecker:  nil, // admissionChecker: nil skips admission in these tests
+		MetricsEnricher:   nil,
+	})
 
 	meta := &types.RequestMetadata{
 		Protocol: string(types.ProtocolResponses),
@@ -476,14 +476,14 @@ func TestPlan_ChatFallback_RewritesBackendURL(t *testing.T) {
 				ModelName: "test-model",
 			}
 
-			p := NewPlanner(
-				&mockModelResolver{target: target},
-				&mockBalanceChecker{},
-				&mockUsageLimitChecker{},
-				&mockContentSafetyChecker{},
-				nil,
-				nil,
-			)
+			p := NewPlanner(PlannerDeps{
+				ModelResolver:     &mockModelResolver{target: target},
+				BalanceChecker:    &mockBalanceChecker{},
+				UsageLimitChecker: &mockUsageLimitChecker{},
+				ContentSafety:     &mockContentSafetyChecker{},
+				AdmissionChecker:  nil,
+				MetricsEnricher:   nil,
+			})
 
 			meta := &types.RequestMetadata{
 				Protocol: string(types.ProtocolChat),
@@ -505,14 +505,14 @@ func TestPlan_ChatFallback_RewritesBackendURL(t *testing.T) {
 
 func TestPlan_BackendURLFallback(t *testing.T) {
 	target := makeResolvedTarget("http://upstream/v1/messages", "")
-	p := NewPlanner(
-		&mockModelResolver{target: target},
-		&mockBalanceChecker{},
-		&mockUsageLimitChecker{},
-		&mockContentSafetyChecker{},
-		nil, // admissionChecker: nil skips admission in these tests
-		nil,
-	)
+	p := NewPlanner(PlannerDeps{
+		ModelResolver:     &mockModelResolver{target: target},
+		BalanceChecker:    &mockBalanceChecker{},
+		UsageLimitChecker: &mockUsageLimitChecker{},
+		ContentSafety:     &mockContentSafetyChecker{},
+		AdmissionChecker:  nil, // admissionChecker: nil skips admission in these tests
+		MetricsEnricher:   nil,
+	})
 
 	meta := &types.RequestMetadata{
 		Protocol: string(types.ProtocolMessages),
@@ -529,14 +529,14 @@ func TestPlan_BackendURLFallback(t *testing.T) {
 
 func TestPlan_RoutingFieldsPopulated(t *testing.T) {
 	target := makeResolvedTarget("http://upstream/v1/chat/completions", "")
-	p := NewPlanner(
-		&mockModelResolver{target: target},
-		&mockBalanceChecker{},
-		&mockUsageLimitChecker{},
-		&mockContentSafetyChecker{},
-		nil, // admissionChecker: nil skips admission in these tests
-		nil,
-	)
+	p := NewPlanner(PlannerDeps{
+		ModelResolver:     &mockModelResolver{target: target},
+		BalanceChecker:    &mockBalanceChecker{},
+		UsageLimitChecker: &mockUsageLimitChecker{},
+		ContentSafety:     &mockContentSafetyChecker{},
+		AdmissionChecker:  nil, // admissionChecker: nil skips admission in these tests
+		MetricsEnricher:   nil,
+	})
 
 	meta := &types.RequestMetadata{
 		Protocol: string(types.ProtocolMessages),
@@ -572,16 +572,16 @@ func TestPlan_NonTokenTask_SkipsUsageLimitAndSafety(t *testing.T) {
 		ModelName: "test-model",
 	}
 
-	p := NewPlanner(
-		&mockModelResolver{target: target},
-		&mockBalanceChecker{},
+	p := NewPlanner(PlannerDeps{
+		ModelResolver:  &mockModelResolver{target: target},
+		BalanceChecker: &mockBalanceChecker{},
 		// If usage limit were checked, this would return an error.
-		&mockUsageLimitChecker{err: &component.UsageLimitExceededError{Message: "should not be called"}},
+		UsageLimitChecker: &mockUsageLimitChecker{err: &component.UsageLimitExceededError{Message: "should not be called"}},
 		// If safety were checked, this would flag sensitive.
-		&mockContentSafetyChecker{isSensitive: true, message: "should not be called"},
-		nil, // admissionChecker: nil skips admission in these tests
-		nil,
-	)
+		ContentSafety:    &mockContentSafetyChecker{isSensitive: true, message: "should not be called"},
+		AdmissionChecker: nil, // admissionChecker: nil skips admission in these tests
+		MetricsEnricher:  nil,
+	})
 
 	meta := &types.RequestMetadata{
 		Protocol:   string(types.ProtocolChat),
@@ -605,14 +605,14 @@ func TestPlan_NonTokenTask_SkipsUsageLimitAndSafety(t *testing.T) {
 func TestPlan_MetricsEnricher_CalledOnSuccess(t *testing.T) {
 	enricher := &stubMetricsEnricher{}
 	target := makeResolvedTarget("http://upstream/v1/messages", "")
-	p := NewPlanner(
-		&mockModelResolver{target: target},
-		&mockBalanceChecker{},
-		&mockUsageLimitChecker{},
-		&mockContentSafetyChecker{},
-		nil,
-		enricher,
-	)
+	p := NewPlanner(PlannerDeps{
+		ModelResolver:     &mockModelResolver{target: target},
+		BalanceChecker:    &mockBalanceChecker{},
+		UsageLimitChecker: &mockUsageLimitChecker{},
+		ContentSafety:     &mockContentSafetyChecker{},
+		AdmissionChecker:  nil,
+		MetricsEnricher:   enricher,
+	})
 
 	meta := &types.RequestMetadata{
 		Protocol:  string(types.ProtocolMessages),
@@ -633,14 +633,14 @@ func TestPlan_MetricsEnricher_CalledOnSuccess(t *testing.T) {
 
 func TestPlan_MetricsEnricher_CalledOnResolveError(t *testing.T) {
 	enricher := &stubMetricsEnricher{}
-	p := NewPlanner(
-		&mockModelResolver{err: &codedErrStub{code: "model_not_found"}},
-		&mockBalanceChecker{},
-		&mockUsageLimitChecker{},
-		&mockContentSafetyChecker{},
-		nil,
-		enricher,
-	)
+	p := NewPlanner(PlannerDeps{
+		ModelResolver:     &mockModelResolver{err: &codedErrStub{code: "model_not_found"}},
+		BalanceChecker:    &mockBalanceChecker{},
+		UsageLimitChecker: &mockUsageLimitChecker{},
+		ContentSafety:     &mockContentSafetyChecker{},
+		AdmissionChecker:  nil,
+		MetricsEnricher:   enricher,
+	})
 
 	meta := &types.RequestMetadata{
 		Protocol: string(types.ProtocolMessages),
