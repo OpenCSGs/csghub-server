@@ -1114,28 +1114,23 @@ func (c *spaceComponentImpl) Stop(ctx context.Context, namespace, name, currentU
 }
 
 func (c *spaceComponentImpl) requireSpaceOperationPermission(ctx context.Context, namespace string, space *database.Space, currentUser string) error {
-	forbidden := errorx.ErrForbiddenMsg("only the space creator or namespace admin/writer can operate this space")
 	if currentUser == "" || space.Repository == nil {
-		return forbidden
+		return errorx.ErrForbiddenMsg(fmt.Sprintf("invalid user or space %s", namespace))
 	}
 	if space.Repository.User.Username == currentUser {
 		return nil
 	}
 
-	namespaceInfo, err := c.repoComponent.GetNameSpaceInfo(ctx, namespace)
+	namespaceInfo, err := c.userSvcClient.GetNameSpaceInfo(ctx, namespace)
 	if err != nil {
 		return fmt.Errorf("failed to get namespace %s, error: %w", namespace, err)
 	}
-	if namespaceInfo == nil || namespaceInfo.Type != types.OrganizationNamespaceType {
-		return forbidden
+	if namespaceInfo == nil {
+		return errorx.ErrForbiddenMsg(fmt.Sprintf("do not have namespace %s", namespace))
 	}
-
-	canAdmin, err := c.repoComponent.CheckCurrentUserPermission(ctx, currentUser, namespace, rebac.NamespaceCanAdmin)
-	if err != nil {
-		return fmt.Errorf("failed to check namespace admin permission, error: %w", err)
-	}
-	if canAdmin {
-		return nil
+	if namespaceInfo.NSType != types.OrganizationNamespaceType {
+		return errorx.ErrForbiddenMsg(fmt.Sprintf("namespace %s is not organization namespace, type: %s",
+			namespace, namespaceInfo.NSType))
 	}
 
 	canWrite, err := c.repoComponent.CheckCurrentUserPermission(ctx, currentUser, namespace, rebac.NamespaceCanWrite)
@@ -1145,7 +1140,8 @@ func (c *spaceComponentImpl) requireSpaceOperationPermission(ctx context.Context
 	if canWrite {
 		return nil
 	}
-	return forbidden
+
+	return errorx.ErrForbiddenMsg("only the space creator or namespace admin/writer can operate this space")
 }
 
 func (c *spaceComponentImpl) stopSpaceDeploy(ctx context.Context, namespace, name string, s *database.Space) error {

@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/rebac"
+	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
@@ -277,11 +278,11 @@ func TestSpaceComponent_DeployByOrgAdmin(t *testing.T) {
 	ctx := context.TODO()
 	sc := initializeTestSpaceComponent(ctx, t)
 
-	sc.mocks.components.repo.EXPECT().GetNameSpaceInfo(ctx, "org1").Return(&types.Namespace{
-		Path: "org1",
-		Type: types.OrganizationNamespaceType,
+	sc.mocks.userSvcClient.EXPECT().GetNameSpaceInfo(ctx, "org1").Return(&rpc.Namespace{
+		Path:   "org1",
+		NSType: types.OrganizationNamespaceType,
 	}, nil)
-	sc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "admin", "org1", rebac.NamespaceCanAdmin).
+	sc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "admin", "org1", rebac.NamespaceCanWrite).
 		Return(true, nil)
 	sc.mocks.components.repo.EXPECT().GetNamespaceBillingUUID(ctx, "org1").Return("org-billing-uuid", nil)
 	sc.mocks.stores.RuntimeFrameworkMock().EXPECT().FindSpaceLatestVersion(ctx, mock.Anything, mock.Anything).

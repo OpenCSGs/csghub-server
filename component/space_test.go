@@ -16,6 +16,7 @@ import (
 	"opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/rebac"
+	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
@@ -659,9 +660,9 @@ func TestSpaceComponent_Stop(t *testing.T) {
 			HasAppFile: true,
 			Repository: &database.Repository{User: database.User{Username: "creator"}},
 		}, nil)
-		sc.mocks.components.repo.EXPECT().GetNameSpaceInfo(ctx, "ns").Return(&types.Namespace{
-			Path: "ns",
-			Type: types.UserNamespaceType,
+		sc.mocks.userSvcClient.EXPECT().GetNameSpaceInfo(ctx, "ns").Return(&rpc.Namespace{
+			Path:   "ns",
+			NSType: types.UserNamespaceType,
 		}, nil)
 
 		err := sc.Stop(ctx, "ns", "n", "operator")
@@ -673,9 +674,9 @@ func TestSpaceComponent_DeployByNonCreator(t *testing.T) {
 	ctx := context.TODO()
 	sc := initializeTestSpaceComponent(ctx, t)
 
-	sc.mocks.components.repo.EXPECT().GetNameSpaceInfo(ctx, "ns").Return(&types.Namespace{
-		Path: "ns",
-		Type: types.UserNamespaceType,
+	sc.mocks.userSvcClient.EXPECT().GetNameSpaceInfo(ctx, "ns").Return(&rpc.Namespace{
+		Path:   "ns",
+		NSType: types.UserNamespaceType,
 	}, nil)
 	sc.mocks.stores.SpaceMock().EXPECT().FindByPath(ctx, "ns", "n").Return(&database.Space{
 		ID:         1,
@@ -692,24 +693,21 @@ func TestSpaceComponent_StopByOrgAdminOrWriter(t *testing.T) {
 	tests := []struct {
 		name       string
 		operator   string
-		adminAllow bool
 		writeAllow bool
 	}{
-		{name: "OrgAdmin", operator: "admin", adminAllow: true, writeAllow: false},
-		{name: "OrgWriter", operator: "writer", adminAllow: false, writeAllow: true},
+		{name: "OrgAdmin", operator: "admin", writeAllow: true},
+		{name: "OrgWriter", operator: "writer", writeAllow: true},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			sc := initializeTestSpaceComponent(ctx, t)
-			sc.mocks.components.repo.EXPECT().GetNameSpaceInfo(ctx, "org1").Return(&types.Namespace{
-				Path: "org1",
-				Type: types.OrganizationNamespaceType,
+			sc.mocks.userSvcClient.EXPECT().GetNameSpaceInfo(ctx, "org1").Return(&rpc.Namespace{
+				Path:   "org1",
+				NSType: types.OrganizationNamespaceType,
 			}, nil)
-			sc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, tt.operator, "org1", rebac.NamespaceCanAdmin).
-				Return(tt.adminAllow, nil)
 			sc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, tt.operator, "org1", rebac.NamespaceCanWrite).
-				Return(tt.writeAllow, nil).Maybe()
+				Return(tt.writeAllow, nil)
 			sc.mocks.stores.SpaceMock().EXPECT().FindByPath(ctx, "org1", "n").Return(&database.Space{
 				ID:         1,
 				HasAppFile: true,
@@ -737,12 +735,10 @@ func TestSpaceComponent_StopByOrgUserWithoutPermission(t *testing.T) {
 	ctx := context.TODO()
 	sc := initializeTestSpaceComponent(ctx, t)
 
-	sc.mocks.components.repo.EXPECT().GetNameSpaceInfo(ctx, "org1").Return(&types.Namespace{
-		Path: "org1",
-		Type: types.OrganizationNamespaceType,
+	sc.mocks.userSvcClient.EXPECT().GetNameSpaceInfo(ctx, "org1").Return(&rpc.Namespace{
+		Path:   "org1",
+		NSType: types.OrganizationNamespaceType,
 	}, nil)
-	sc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "member", "org1", rebac.NamespaceCanAdmin).
-		Return(false, nil)
 	sc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "member", "org1", rebac.NamespaceCanWrite).
 		Return(false, nil)
 	sc.mocks.stores.SpaceMock().EXPECT().FindByPath(ctx, "org1", "n").Return(&database.Space{
