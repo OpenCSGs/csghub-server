@@ -85,5 +85,11 @@
     },
     "error.AGENT-ERR-28": {
         "other": "無效的知識庫內容ID: {{.content_id}}"
+    },
+    "error.AGENT-ERR-29": {
+        "other": "CSGClaw 子網域無效。須為 1-63 位小寫字母、數字或連字號，且必須以字母或數字開頭和結尾。"
+    },
+    "error.AGENT-ERR-30": {
+        "other": "CSGClaw 智能體名稱無效。只能使用字母、數字、句點、底線或連字號。"
     }
 }

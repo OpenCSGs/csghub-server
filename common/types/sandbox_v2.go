@@ -16,20 +16,24 @@ const SandboxV2RuntimeFramework = "sandbox-v2"
 // ClusterID, SKU): those are resolved inside SandboxV2Component.Create from
 // ResourceID, or auto-allocated from a free sandbox resource when ResourceID is 0.
 type SandboxV2CreateRequest struct {
-	DeployName     string                 `json:"deploy_name,omitempty"`
-	SvcName        string                 `json:"svc_name,omitempty"`
-	ImageID        string                 `json:"image_id,omitempty"`
-	Env            string                 `json:"env,omitempty"` // JSON-encoded map[string]string
-	ContainerPort  int                    `json:"container_port,omitempty"`
-	UserUUID       string                 `json:"user_uuid,omitempty"`
-	ResourceID     int64                  `json:"resource_id,omitempty"`     // 0 = auto-allocate a free sandbox resource
-	MinCPU         string                 `json:"min_cpu,omitempty"`         // lower bound for auto-allocation, e.g. "500m"
-	MinMemory      string                 `json:"min_memory,omitempty"`      // lower bound for auto-allocation, e.g. "512Mi"
-	ReadinessProbe *SandboxReadinessProbe `json:"readiness_probe,omitempty"` // app-level readiness (persistent only)
-	Timeout        int                    `json:"timeout,omitempty"`         // idle-reclaim timeout in minutes; 0 = permanent (paid resources only)
-	VolumeMounts   []VolumeMount          `json:"volume_mounts,omitempty"`
-	MinReplica     int                    `json:"min_replica,omitempty"`
-	MaxReplica     int                    `json:"max_replica,omitempty"`
+	DeployName    string `json:"deploy_name,omitempty"`
+	SvcName       string `json:"svc_name,omitempty"`
+	ImageID       string `json:"image_id,omitempty"`
+	Env           string `json:"env,omitempty"` // JSON-encoded map[string]string
+	ContainerPort int    `json:"container_port,omitempty"`
+	UserUUID      string `json:"user_uuid,omitempty"`
+	SecureLevel   int    `json:"secure_level,omitempty"`
+	// CheckDeployName enables the global active deploy name check for callers
+	// that expose SvcName as a public hostname, such as CSGClaw agents.
+	CheckDeployName bool                   `json:"-"`
+	ResourceID      int64                  `json:"resource_id,omitempty"`     // 0 = auto-allocate a free sandbox resource
+	MinCPU          string                 `json:"min_cpu,omitempty"`         // lower bound for auto-allocation, e.g. "500m"
+	MinMemory       string                 `json:"min_memory,omitempty"`      // lower bound for auto-allocation, e.g. "512Mi"
+	ReadinessProbe  *SandboxReadinessProbe `json:"readiness_probe,omitempty"` // app-level readiness (persistent only)
+	Timeout         int                    `json:"timeout,omitempty"`         // idle-reclaim timeout in minutes; 0 = permanent (paid resources only)
+	VolumeMounts    []VolumeMount          `json:"volume_mounts,omitempty"`
+	MinReplica      int                    `json:"min_replica,omitempty"`
+	MaxReplica      int                    `json:"max_replica,omitempty"`
 }
 
 type SandboxV2Type string

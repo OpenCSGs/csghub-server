@@ -85,5 +85,11 @@
     },
     "error.AGENT-ERR-28": {
         "other": "无效的知识库内容ID: {{.content_id}}"
+    },
+    "error.AGENT-ERR-29": {
+        "other": "CSGClaw 子域名无效。需为 1-63 位小写字母、数字或连字符，且必须以字母或数字开头和结尾。"
+    },
+    "error.AGENT-ERR-30": {
+        "other": "CSGClaw 智能体名称无效。只能使用字母、数字、句点、下划线或连字符。"
     }
 }

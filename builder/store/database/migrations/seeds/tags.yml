@@ -755,3 +755,10 @@ tags:
   scope: skill
   show_name: AgenticHub Skills
   built_in: true
+- name: agent-ui
+  category: task
+  group: ""
+  scope: space
+  show_name: Agent UI
+  i18n_key: agent-ui
+  built_in: true
