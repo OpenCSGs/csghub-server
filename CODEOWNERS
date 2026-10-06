@@ -1,22 +1,21 @@
-* @hhwang @zhzhang @dlei @james @rbqin @bhqin @Cemeng
+* @HaiHui886 @pulltheflower @Rader @ganisback @phantom-rabbit @CementZhang
 
-/accounting/ @hhwang
-/payment/ @hhwang
-/dataviewer/ @hhwang
-/builder/mq @hhwang
-/builder/parquet @hhwang
-/mq @hhwang
+/accounting/ @HaiHui886
+/payment/ @HaiHui886
+/dataviewer/ @HaiHui886
+/builder/mq @HaiHui886
+/builder/parquet @HaiHui886
+/mq @HaiHui886
 
-/multisync/ @zhzhang
-/mirror/ @zhzhang
-/builder/git/ @zhzhang
+/multisync/ @pulltheflower
+/mirror/ @pulltheflower @monkey92t
+/builder/git/ @pulltheflower
 
-/runner/ @james @rbqin @hhwang
-/builder/deploy/ @james @rbqin @hhwang
-/api/handler/collection.go @james
-/component/collection.go @james
+/runner/ @ganisback @phantom-rabbit @HaiHui886
+/builder/deploy/ @ganisback @phantom-rabbit @HaiHui886
 
-/user/ @dlei
-/moderation/ @dlei
+/user/ @phantom-rabbit @monkey92t
+/moderation/ @CementZhang
 
-/logcollector @Cemeng
+/logcollector @CementZhang
+/aigateway @CementZhang
