@@ -39,13 +39,6 @@ func handleOpenAIPlanError(c *gin.Context, meta *types.RequestMetadata, p *types
 				"type":    "insufficient_balance",
 			}})
 			return
-		case types.PlanErrUsageLimitExceeded:
-			c.JSON(http.StatusTooManyRequests, gin.H{"error": gin.H{
-				"code":    "rate_limit_exceeded",
-				"message": "Usage quota exceeded for current window",
-				"type":    "rate_limit_error",
-			}})
-			return
 		case types.PlanErrQueueTimeout:
 			// The client's queue-wait tolerance expired, not the capacity
 			// gate: 408, no Retry-After (the retry decision is the

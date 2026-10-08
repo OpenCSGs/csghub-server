@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -288,37 +287,7 @@ func TestApplyChatFallbackTarget(t *testing.T) {
 	require.Equal(t, "Bearer fallback-token", headers.Get("Authorization"))
 }
 
-func TestExecuteChatProxyAttempt_ReturnsUsageLimitError(t *testing.T) {
-	tester, c, _ := setupTest(t)
-	tester.mocks.openAIComp.ExpectedCalls = nil
-
-	expectedErr := errors.New("usage limited")
-	modelTarget := &resolvedModelTarget{
-		Model: &types.Model{
-			BaseModel: types.BaseModel{ID: "test-model"},
-			Endpoint:  "https://primary.example.com/v1/chat/completions",
-		},
-		ModelName: "test-model",
-		Target:    "https://primary.example.com/v1/chat/completions",
-	}
-	tester.mocks.openAIComp.EXPECT().
-		CheckUsageLimit(mock.Anything, "user-1", modelTarget.Model, modelTarget.Target).
-		Return(expectedErr).
-		Once()
-
-	c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewReader([]byte(`{"message":"hello"}`)))
-	writer := newTestCommonResponseWriter()
-	chatReq := &types.ChatCompletionRequest{Model: "test-model"}
-
-	retryWriter, err := tester.handler.executeChatProxyAttempt(c, writer, modelTarget, "user-1", chatReq, nil)
-
-	require.Nil(t, retryWriter)
-	require.ErrorIs(t, err, expectedErr)
-	require.Equal(t, 0, writer.statusCode)
-	require.Empty(t, writer.body.String())
-}
-
-func TestExecuteChatProxyAttempt_ProxiesRequestAfterUsageLimitCheck(t *testing.T) {
+func TestExecuteChatProxyAttempt_ProxiesRequest(t *testing.T) {
 	tester, c, _ := setupTest(t)
 	tester.mocks.openAIComp.ExpectedCalls = nil
 
@@ -344,10 +313,6 @@ func TestExecuteChatProxyAttempt_ProxiesRequestAfterUsageLimitCheck(t *testing.T
 		ModelName: "test-model",
 		Target:    targetURL,
 	}
-	tester.mocks.openAIComp.EXPECT().
-		CheckUsageLimit(mock.Anything, "user-1", modelTarget.Model, targetURL).
-		Return(nil).
-		Once()
 
 	requestBody := []byte(`{"message":"hello"}`)
 	c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewReader(requestBody))
@@ -356,7 +321,7 @@ func TestExecuteChatProxyAttempt_ProxiesRequestAfterUsageLimitCheck(t *testing.T
 		Model: "test-model",
 	}
 
-	retryWriter, err := tester.handler.executeChatProxyAttempt(c, writer, modelTarget, "user-1", chatReq, nil)
+	retryWriter, err := tester.handler.executeChatProxyAttempt(c, writer, modelTarget, chatReq, nil)
 
 	require.NoError(t, err)
 	require.NotNil(t, retryWriter)
@@ -398,18 +363,13 @@ func TestExecuteChatProxyAttempt_RewritesResponsesURLForChatRequest(t *testing.T
 	}
 	applyChatCompletionsEndpointCompatibility(c.Request.Context(), modelTarget)
 
-	tester.mocks.openAIComp.EXPECT().
-		CheckUsageLimit(mock.Anything, "user-1", modelTarget.Model, chatURL).
-		Return(nil).
-		Once()
-
 	c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewReader([]byte(`{"message":"hello"}`)))
 	writer := newTestCommonResponseWriter()
 	chatReq := &types.ChatCompletionRequest{
 		Model: "test-model",
 	}
 
-	retryWriter, err := tester.handler.executeChatProxyAttempt(c, writer, modelTarget, "user-1", chatReq, nil)
+	retryWriter, err := tester.handler.executeChatProxyAttempt(c, writer, modelTarget, chatReq, nil)
 
 	require.NoError(t, err)
 	require.NotNil(t, retryWriter)
@@ -438,7 +398,7 @@ func TestRetryChatWithFallback_ReturnsNilWithoutFallbackTargets(t *testing.T) {
 		AttemptTargets: nil,
 	}
 
-	_, err := tester.handler.retryChatWithFallback(c, newTestCommonResponseWriter(), modelTarget, "user-1", &types.ChatCompletionRequest{Model: "test-model"}, nil, nil, nil)
+	_, err := tester.handler.retryChatWithFallback(c, newTestCommonResponseWriter(), modelTarget, &types.ChatCompletionRequest{Model: "test-model"}, nil, nil, nil)
 
 	require.NoError(t, err)
 }
@@ -469,16 +429,12 @@ func TestRetryChatWithFallback_ReplaysLastRetryableFallbackResponse(t *testing.T
 			{URL: lastFallbackURL, Enabled: true},
 		},
 	}
-	tester.mocks.openAIComp.EXPECT().
-		CheckUsageLimit(mock.Anything, "user-1", modelTarget.Model, lastFallbackURL).
-		Return(nil).
-		Once()
 
 	body := []byte(`{"message":"hello"}`)
 	c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewReader(body))
 	writer := newTestCommonResponseWriter()
 
-	_, err := tester.handler.retryChatWithFallback(c, writer, modelTarget, "user-1", &types.ChatCompletionRequest{Model: "test-model"}, nil, nil, nil)
+	_, err := tester.handler.retryChatWithFallback(c, writer, modelTarget, &types.ChatCompletionRequest{Model: "test-model"}, nil, nil, nil)
 
 	require.NoError(t, err)
 	require.Equal(t, http.StatusServiceUnavailable, writer.statusCode)
@@ -521,20 +477,12 @@ func TestRetryChatWithFallback_ContinuesUntilNextFallbackSucceeds(t *testing.T) 
 			{URL: secondFallbackURL, Enabled: true},
 		},
 	}
-	tester.mocks.openAIComp.EXPECT().
-		CheckUsageLimit(mock.Anything, "user-1", modelTarget.Model, firstFallbackURL).
-		Return(nil).
-		Once()
-	tester.mocks.openAIComp.EXPECT().
-		CheckUsageLimit(mock.Anything, "user-1", modelTarget.Model, secondFallbackURL).
-		Return(nil).
-		Once()
 
 	body := []byte(`{"message":"hello"}`)
 	c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewReader(body))
 	writer := newTestCommonResponseWriter()
 
-	_, err := tester.handler.retryChatWithFallback(c, writer, modelTarget, "user-1", &types.ChatCompletionRequest{Model: "test-model"}, nil, nil, nil)
+	_, err := tester.handler.retryChatWithFallback(c, writer, modelTarget, &types.ChatCompletionRequest{Model: "test-model"}, nil, nil, nil)
 
 	require.NoError(t, err)
 	require.Equal(t, http.StatusOK, writer.statusCode)
@@ -572,16 +520,12 @@ func TestRetryChatWithFallback_RewritesResponsesFallbackURLForChatRequest(t *tes
 			{ID: 2, URL: responsesURL, Enabled: true, ModelName: "fallback-model"},
 		},
 	}
-	tester.mocks.openAIComp.EXPECT().
-		CheckUsageLimit(mock.Anything, "user-1", modelTarget.Model, chatURL).
-		Return(nil).
-		Once()
 
 	body := []byte(`{"message":"hello"}`)
 	c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewReader(body))
 	writer := newTestCommonResponseWriter()
 
-	_, err := tester.handler.retryChatWithFallback(c, writer, modelTarget, "user-1", &types.ChatCompletionRequest{Model: "test-model"}, nil, nil, nil)
+	_, err := tester.handler.retryChatWithFallback(c, writer, modelTarget, &types.ChatCompletionRequest{Model: "test-model"}, nil, nil, nil)
 
 	require.NoError(t, err)
 	require.Equal(t, http.StatusOK, writer.statusCode)
@@ -630,17 +574,12 @@ func TestRetryChatWithFallback_UsesFallbackModelName(t *testing.T) {
 			{URL: fallbackURL, Enabled: true, ModelName: "provider-fallback-model"},
 		},
 	}
-	tester.mocks.openAIComp.EXPECT().
-		CheckUsageLimit(mock.Anything, "user-1", modelTarget.Model, fallbackURL).
-		Return(nil).
-		Once()
 
 	c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewReader([]byte(`{}`)))
 	_, err := tester.handler.retryChatWithFallback(
 		c,
 		newTestCommonResponseWriter(),
 		modelTarget,
-		"user-1",
 		&types.ChatCompletionRequest{Model: "logical-model"},
 		nil,
 		nil,
@@ -657,14 +596,7 @@ func TestRetryChatWithFallback_UsesFallbackModelName(t *testing.T) {
 		Return(&token.Usage{}, nil).
 		Once()
 	var wg sync.WaitGroup
-	wg.Add(2)
-	tester.mocks.openAIComp.EXPECT().
-		CommitUsageLimitFromUsage(mock.Anything, "user-1", modelTarget.Model, mock.Anything).
-		RunAndReturn(func(ctx context.Context, userUUID string, model *types.Model, usage *token.Usage) error {
-			wg.Done()
-			return nil
-		}).
-		Once()
+	wg.Add(1)
 	tester.mocks.openAIComp.EXPECT().
 		RecordUsageFromTokenUsage(mock.Anything, "user-1", modelTarget.Model, "provider-fallback-model", mock.Anything, "api-key", mock.Anything).
 		RunAndReturn(func(ctx context.Context, userUUID string, model *types.Model, targetModelName string, usage *token.Usage, apikey string, _ int64) error {
@@ -709,22 +641,7 @@ func TestRunChatPostProcessAsync_RecordsTraceUsageBeforeAccounting(t *testing.T)
 
 	recorder := &testGenerationRecorderWithMutex{}
 	var wg sync.WaitGroup
-	wg.Add(2)
-	tester.mocks.openAIComp.EXPECT().
-		CommitUsageLimitFromUsage(mock.Anything, "user-1", model, mock.Anything).
-		RunAndReturn(func(ctx context.Context, userUUID string, model *types.Model, usage *token.Usage) error {
-			usageSnapshot, ended, events := recorder.snapshot()
-			require.True(t, ended)
-			require.Equal(t, []string{"usage", "end"}, events)
-			require.NotNil(t, usageSnapshot)
-			require.Equal(t, int64(11), usageSnapshot.InputTokens)
-			require.Equal(t, int64(7), usageSnapshot.OutputTokens)
-			require.Equal(t, int64(18), usageSnapshot.TotalTokens)
-			require.Equal(t, int64(3), usageSnapshot.ReasoningTokens)
-			wg.Done()
-			return nil
-		}).
-		Once()
+	wg.Add(1)
 	tester.mocks.openAIComp.EXPECT().
 		RecordUsageFromTokenUsage(mock.Anything, "user-1", model, "target-model", mock.Anything, "api-key", mock.Anything).
 		RunAndReturn(func(ctx context.Context, userUUID string, model *types.Model, targetModelName string, usage *token.Usage, apikey string, _ int64) error {
@@ -773,10 +690,6 @@ func TestRunChatPostProcessAsync_RecordsTraceCompletionBeforeUsage(t *testing.T)
 		recorder := &testGenerationRecorderWithMutex{}
 		firstWriteAt := time.Now()
 		tester.mocks.openAIComp.EXPECT().
-			CommitUsageLimitFromUsage(mock.Anything, "user-1", model, mock.Anything).
-			Return(nil).
-			Once()
-		tester.mocks.openAIComp.EXPECT().
 			RecordUsageFromTokenUsage(mock.Anything, "user-1", model, "target-model", mock.Anything, "api-key", mock.Anything).
 			Return(nil).
 			Once()
@@ -799,7 +712,7 @@ func TestRunChatPostProcessAsync_RecordsTraceCompletionBeforeUsage(t *testing.T)
 
 		// synctest.Wait blocks until all goroutines in the bubble are durably
 		// blocked. This ensures the async post-processing goroutine has finished
-		// all its work (including CommitUsageLimit and RecordUsageFromTokenUsage
+		// all its work (including RecordUsageFromTokenUsage
 		// which run after recorder.End), avoiding the race where the test checks
 		// mock expectations before the goroutine completes.
 		synctest.Wait()
@@ -835,10 +748,6 @@ func TestRunChatPostProcessAsync_SkipsBillingOnErrorStatus(t *testing.T) {
 			Once()
 
 		var billingCalled atomic.Bool
-		tester.mocks.openAIComp.EXPECT().
-			CommitUsageLimitFromUsage(mock.Anything, "user-1", model, mock.Anything).
-			Return(nil).
-			Once()
 		tester.mocks.openAIComp.EXPECT().
 			RecordUsageFromTokenUsage(mock.Anything, "user-1", model, "target-model", mock.Anything, "api-key", mock.Anything).
 			Run(func(context.Context, string, *types.Model, string, *token.Usage, string, int64) {
@@ -880,10 +789,6 @@ func TestRunChatPostProcessAsync_SkipsBillingOnRedirectStatus(t *testing.T) {
 			Once()
 
 		var billingCalled atomic.Bool
-		tester.mocks.openAIComp.EXPECT().
-			CommitUsageLimitFromUsage(mock.Anything, "user-1", model, mock.Anything).
-			Return(nil).
-			Once()
 		tester.mocks.openAIComp.EXPECT().
 			RecordUsageFromTokenUsage(mock.Anything, "user-1", model, "target-model", mock.Anything, "api-key", mock.Anything).
 			Run(func(context.Context, string, *types.Model, string, *token.Usage, string, int64) {
@@ -931,17 +836,12 @@ func TestRetryChatWithFallback_ReportsFallbackAttemptFailure(t *testing.T) {
 			{URL: fallbackURL, Enabled: true},
 		},
 	}
-	tester.mocks.openAIComp.EXPECT().
-		CheckUsageLimit(mock.Anything, "user-1", modelTarget.Model, fallbackURL).
-		Return(nil).
-		Once()
 
 	c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewReader([]byte(`{}`)))
 	_, err := tester.handler.retryChatWithFallback(
 		c,
 		newTestCommonResponseWriter(),
 		modelTarget,
-		"user-1",
 		&types.ChatCompletionRequest{Model: "logical-model"},
 		nil,
 		nil,
@@ -1017,17 +917,13 @@ func TestExecuteChatProxyAttempt_ProxiesEndpointPathToUpstream(t *testing.T) {
 				ModelName: "provider-model",
 				Target:    targetURL,
 			}
-			tester.mocks.openAIComp.EXPECT().
-				CheckUsageLimit(mock.Anything, "user-1", modelTarget.Model, targetURL).
-				Return(nil).
-				Once()
 
 			requestBody := []byte(`{"message":"hello"}`)
 			c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewReader(requestBody))
 			writer := newTestCommonResponseWriter()
 			chatReq := &types.ChatCompletionRequest{Model: "test-model"}
 
-			retryWriter, err := tester.handler.executeChatProxyAttempt(c, writer, modelTarget, "user-1", chatReq, nil)
+			retryWriter, err := tester.handler.executeChatProxyAttempt(c, writer, modelTarget, chatReq, nil)
 
 			require.NoError(t, err)
 			require.NotNil(t, retryWriter)
@@ -1064,15 +960,11 @@ func TestExecuteChatProxyAttempt_Upstream404FlowsThroughRetryWriter(t *testing.T
 		ModelName: "provider-model",
 		Target:    targetURL,
 	}
-	tester.mocks.openAIComp.EXPECT().
-		CheckUsageLimit(mock.Anything, "user-1", modelTarget.Model, targetURL).
-		Return(nil).
-		Once()
 
 	c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewReader([]byte(`{"message":"hello"}`)))
 	writer := newTestCommonResponseWriter()
 
-	retryWriter, err := tester.handler.executeChatProxyAttempt(c, writer, modelTarget, "user-1", &types.ChatCompletionRequest{Model: "test-model"}, nil)
+	retryWriter, err := tester.handler.executeChatProxyAttempt(c, writer, modelTarget, &types.ChatCompletionRequest{Model: "test-model"}, nil)
 
 	require.NoError(t, err)
 	require.NotNil(t, retryWriter)
@@ -1129,15 +1021,11 @@ func TestRetryChatWithFallback_FallbackPathFollowsFallbackEndpoint(t *testing.T)
 			{ID: 2, URL: fallbackURL, Enabled: true},
 		},
 	}
-	tester.mocks.openAIComp.EXPECT().
-		CheckUsageLimit(mock.Anything, "user-1", modelTarget.Model, fallbackURL).
-		Return(nil).
-		Once()
 
 	c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewReader([]byte(`{"message":"hello"}`)))
 	writer := newTestCommonResponseWriter()
 
-	_, err := tester.handler.retryChatWithFallback(c, writer, modelTarget, "user-1", &types.ChatCompletionRequest{Model: "test-model"}, nil, nil, nil)
+	_, err := tester.handler.retryChatWithFallback(c, writer, modelTarget, &types.ChatCompletionRequest{Model: "test-model"}, nil, nil, nil)
 
 	require.NoError(t, err)
 	require.Equal(t, "/node-b/v1/chat/completions", fallbackPath)
@@ -1180,15 +1068,10 @@ func TestExecuteChatProxyAttempt_ResponsesCompatRewritePreservesPrefix(t *testin
 	}
 	applyChatCompletionsEndpointCompatibility(c.Request.Context(), modelTarget)
 
-	tester.mocks.openAIComp.EXPECT().
-		CheckUsageLimit(mock.Anything, "user-1", modelTarget.Model, chatURL).
-		Return(nil).
-		Once()
-
 	c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewReader([]byte(`{"message":"hello"}`)))
 	writer := newTestCommonResponseWriter()
 
-	retryWriter, err := tester.handler.executeChatProxyAttempt(c, writer, modelTarget, "user-1", &types.ChatCompletionRequest{Model: "test-model"}, nil)
+	retryWriter, err := tester.handler.executeChatProxyAttempt(c, writer, modelTarget, &types.ChatCompletionRequest{Model: "test-model"}, nil)
 
 	require.NoError(t, err)
 	require.NotNil(t, retryWriter)

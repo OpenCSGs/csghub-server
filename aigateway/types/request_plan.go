@@ -86,8 +86,6 @@ type RequestPlan struct {
 	// Safety holds the sensitive-content check result.  nil means no check
 	// was performed.
 	Safety *SafetyDecision
-	// UsageLimitOK indicates whether the usage-limit check passed.
-	UsageLimitOK bool
 	// Admission holds the capacity-admission decision (nil when admission
 	// did not apply, e.g. no upstream has an enabled CapacityPolicy). When
 	// present, Decision.Lease identifies the acquired Redis lease; the
@@ -108,7 +106,6 @@ const (
 	PlanErrModelNotFound
 	PlanErrModelUnavailable
 	PlanErrInsufficientBalance
-	PlanErrUsageLimitExceeded
 	PlanErrDisabled
 	PlanErrSensitive
 	PlanErrCapacityExceeded

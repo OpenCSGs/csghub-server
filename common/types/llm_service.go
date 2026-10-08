@@ -234,8 +234,6 @@ type UpstreamConfig struct {
 	AuthHeader string `json:"auth_header"`
 	// Provider identifies upstream provider for this specific endpoint.
 	Provider string `json:"provider"`
-	// LimitPolicy controls usage-based quota for this specific endpoint.
-	LimitPolicy *UsageLimitPolicy `json:"limit_policy,omitempty"`
 	// CapacityPolicy controls per-upstream capacity limits (concurrency, RPM, TPM, queue).
 	CapacityPolicy *CapacityPolicy   `json:"capacity_policy,omitempty"`
 	Tags           map[string]string `json:"tags,omitempty"`
@@ -255,18 +253,6 @@ type RoutingPolicy struct {
 	Strategy      string `json:"strategy"`
 	SessionHeader string `json:"session_header,omitempty"`
 	HashReplicas  int    `json:"hash_replicas,omitempty"`
-}
-
-// UsageLimitPolicy controls usage-based quota within one fixed time window.
-// WindowSeconds should be greater than 0, typical values are 60 or 3600.
-type UsageLimitPolicy struct {
-	Enabled              bool    `json:"enabled"`
-	WindowSeconds        int64   `json:"window_seconds,omitempty"`
-	MaxTotalTokens       int64   `json:"max_total_tokens,omitempty"`
-	MaxPromptTokens      int64   `json:"max_prompt_tokens,omitempty"`
-	MaxCompletionTokens  int64   `json:"max_completion_tokens,omitempty"`
-	CachedTokenCostRatio float64 `json:"cached_token_cost_ratio,omitempty"`
-	CacheCreateCostRatio float64 `json:"cache_create_cost_ratio,omitempty"`
 }
 
 // CapacityPolicy defines per-upstream capacity limits for admission control
@@ -436,7 +422,6 @@ type CreateUpstreamReq struct {
 	Provider              string            `json:"provider,omitempty"`
 	HealthCheckEnabled    *bool             `json:"health_check_enabled"`
 	CircuitBreakerEnabled *bool             `json:"circuit_breaker_enabled"`
-	LimitPolicy           *UsageLimitPolicy `json:"limit_policy,omitempty"`
 	CapacityPolicy        *CapacityPolicy   `json:"capacity_policy,omitempty"`
 	Tags                  map[string]string `json:"tags,omitempty"`
 	Metadata              *UpstreamMetadata `json:"metadata,omitempty"`
@@ -445,7 +430,7 @@ type CreateUpstreamReq struct {
 // UpdateUpstreamReq is the request to update an existing upstream.
 // Only non-nil fields will be updated.
 //
-// Double-pointer policy fields (LimitPolicy, CapacityPolicy) follow a
+// Double-pointer policy fields (CapacityPolicy) follow a
 // three-state component contract: nil outer pointer = field omitted (keep the
 // stored value), non-nil outer pointer wrapping nil inner pointer = clear the
 // policy, non-nil inner pointer = replace the policy. Note that encoding/json
@@ -461,7 +446,6 @@ type UpdateUpstreamReq struct {
 	Provider              *string            `json:"provider"`
 	HealthCheckEnabled    *bool              `json:"health_check_enabled"`
 	CircuitBreakerEnabled *bool              `json:"circuit_breaker_enabled"`
-	LimitPolicy           **UsageLimitPolicy `json:"limit_policy"`
 	CapacityPolicy        **CapacityPolicy   `json:"capacity_policy"`
 	Tags                  *map[string]string `json:"tags"`
 	Metadata              *UpstreamMetadata  `json:"metadata"`

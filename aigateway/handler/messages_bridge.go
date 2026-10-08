@@ -37,7 +37,6 @@ func (b *messagesHandlerBridge) toMessagesDeps() anthropic.Deps {
 	deps := anthropic.Deps{
 		ProxyExecutor:      b,
 		UsageRecorder:      b,
-		UsageLimiter:       b,
 		AdmissionFinalizer: b,
 		MetricsRecorder:    b,
 	}
@@ -79,19 +78,6 @@ func (b *messagesHandlerBridge) ServeProxy(c *gin.Context, backendURL, host stri
 
 func (b *messagesHandlerBridge) RecordUsage(ctx context.Context, nsUUID string, model *types.Model, targetModelName string, usage *token.Usage, apikey string, tokenID int64) error {
 	return b.handler.openaiComponent.RecordUsageFromTokenUsage(ctx, nsUUID, model, targetModelName, usage, apikey, tokenID)
-}
-
-// --- UsageLimiter (commit only) ---
-
-func (b *messagesHandlerBridge) CommitUsageLimitFromUsage(ctx context.Context, nsUUID string, model *types.Model, inputTokens, outputTokens, cachedPromptTokens, cacheCreationPromptTokens int64) error {
-	usage := &token.Usage{
-		PromptTokens:              inputTokens,
-		CompletionTokens:          outputTokens,
-		TotalTokens:               inputTokens + outputTokens,
-		CachedPromptTokens:        cachedPromptTokens,
-		CacheCreationPromptTokens: cacheCreationPromptTokens,
-	}
-	return b.handler.openaiComponent.CommitUsageLimitFromUsage(ctx, nsUUID, model, usage)
 }
 
 // --- AdmissionFinalizer ---

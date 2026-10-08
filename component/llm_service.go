@@ -327,7 +327,6 @@ func (s *llmServiceComponentImpl) CreateLLMConfig(ctx context.Context, req *type
 			Source:                types.UpstreamSourceExternal,
 			Tags:                  u.Tags,
 			Metadata:              u.Metadata,
-			LimitPolicy:           u.LimitPolicy,
 			CapacityPolicy:        u.CapacityPolicy,
 		}
 		if dbUp.Weight <= 0 {
@@ -593,7 +592,6 @@ func (s *llmServiceComponentImpl) CreateUpstream(ctx context.Context, req *types
 		Source:                types.UpstreamSourceExternal,
 		Tags:                  req.Tags,
 		Metadata:              req.Metadata,
-		LimitPolicy:           req.LimitPolicy,
 		CapacityPolicy:        req.CapacityPolicy,
 	}
 	if dbUp.Weight <= 0 {
@@ -656,9 +654,6 @@ func (s *llmServiceComponentImpl) UpdateUpstream(ctx context.Context, req *types
 	}
 	if req.CircuitBreakerEnabled != nil {
 		dbUp.CircuitBreakerEnabled = *req.CircuitBreakerEnabled
-	}
-	if req.LimitPolicy != nil {
-		dbUp.LimitPolicy = *req.LimitPolicy
 	}
 	if req.CapacityPolicy != nil {
 		if *req.CapacityPolicy == nil {
@@ -818,7 +813,6 @@ func buildUpstreamConfigs(dbUpstreams []database.Upstream) []types.UpstreamConfi
 			CircuitBreakerEnabled: u.CircuitBreakerEnabled,
 			Tags:                  u.Tags,
 			Metadata:              u.Metadata,
-			LimitPolicy:           u.LimitPolicy,
 			CapacityPolicy:        u.CapacityPolicy,
 		}
 		// Only use the real DB state when the feature is enabled AND a record exists.

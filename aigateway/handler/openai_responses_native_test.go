@@ -69,16 +69,6 @@ func TestExecuteNativeResponses_ProxiesBackendURLPathToUpstream(t *testing.T) {
 				BackendURL: backendURL,
 			}
 			tester.mocks.openAIComp.EXPECT().
-				CheckUsageLimit(mock.Anything, "testuuid", modelTarget.Model, backendURL).
-				Return(nil).
-				Once()
-			// The usage post-process goroutine commits the usage window even
-			// for zero-token usage.
-			tester.mocks.openAIComp.EXPECT().
-				CommitUsageLimitFromUsage(mock.Anything, mock.Anything, mock.Anything, mock.Anything).
-				Maybe().
-				Return(nil)
-			tester.mocks.openAIComp.EXPECT().
 				RecordUsageFromTokenUsage(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 				Maybe().
 				Return(nil)
@@ -130,14 +120,6 @@ func TestExecuteNativeResponses_BackendURL404Passthrough(t *testing.T) {
 		Mode:       responsespkg.ResponsesModeNative,
 		BackendURL: backendURL,
 	}
-	tester.mocks.openAIComp.EXPECT().
-		CheckUsageLimit(mock.Anything, "testuuid", modelTarget.Model, backendURL).
-		Return(nil).
-		Once()
-	tester.mocks.openAIComp.EXPECT().
-		CommitUsageLimitFromUsage(mock.Anything, mock.Anything, mock.Anything, mock.Anything).
-		Maybe().
-		Return(nil)
 
 	req := &types.ResponsesRequest{
 		Model: "provider-model",

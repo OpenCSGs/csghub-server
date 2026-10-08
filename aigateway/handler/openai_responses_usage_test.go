@@ -112,13 +112,8 @@ func TestRecordResponsesUsageHappyPathCallsComponent(t *testing.T) {
 		})
 
 		var wg sync.WaitGroup
-		wg.Add(2)
+		wg.Add(1)
 		var seenUsage *token.Usage
-		tester.mocks.openAIComp.EXPECT().CommitUsageLimitFromUsage(mock.Anything, "testuuid", model, mock.Anything).
-			RunAndReturn(func(_ context.Context, _ string, _ *types.Model, _ *token.Usage) error {
-				wg.Done()
-				return nil
-			}).Once()
 		tester.mocks.openAIComp.EXPECT().RecordUsageFromTokenUsage(
 			mock.Anything, "testuuid", model, "upstream", mock.Anything, "apikey", mock.Anything,
 		).RunAndReturn(func(_ context.Context, _ string, _ *types.Model, _ string, usage *token.Usage, _ string, _ int64) error {
@@ -177,12 +172,7 @@ func TestRecordResponsesUsagePublishesLLMLog(t *testing.T) {
 		})
 
 		var wg sync.WaitGroup
-		wg.Add(3)
-		tester.mocks.openAIComp.EXPECT().CommitUsageLimitFromUsage(mock.Anything, "testuuid", model, mock.Anything).
-			RunAndReturn(func(_ context.Context, _ string, _ *types.Model, _ *token.Usage) error {
-				wg.Done()
-				return nil
-			}).Once()
+		wg.Add(2)
 		tester.mocks.openAIComp.EXPECT().RecordUsageFromTokenUsage(
 			mock.Anything, "testuuid", model, "upstream", mock.Anything, "apikey", mock.Anything,
 		).RunAndReturn(func(_ context.Context, _ string, _ *types.Model, _ string, _ *token.Usage, _ string, _ int64) error {
@@ -240,12 +230,7 @@ func TestRecordResponsesUsageRecordsLLMTrace(t *testing.T) {
 		}
 
 		var wg sync.WaitGroup
-		wg.Add(2)
-		tester.mocks.openAIComp.EXPECT().CommitUsageLimitFromUsage(mock.Anything, "testuuid", model, mock.Anything).
-			RunAndReturn(func(_ context.Context, _ string, _ *types.Model, _ *token.Usage) error {
-				wg.Done()
-				return nil
-			}).Once()
+		wg.Add(1)
 		tester.mocks.openAIComp.EXPECT().RecordUsageFromTokenUsage(
 			mock.Anything, "testuuid", model, "upstream", mock.Anything, "apikey", mock.Anything,
 		).RunAndReturn(func(_ context.Context, _ string, _ *types.Model, _ string, _ *token.Usage, _ string, _ int64) error {
@@ -290,10 +275,6 @@ func TestRecordResponsesUsageSkipsBillingOnErrorStatus(t *testing.T) {
 
 		var billingCalled atomic.Bool
 		tester.mocks.openAIComp.EXPECT().
-			CommitUsageLimitFromUsage(mock.Anything, "testuuid", model, mock.Anything).
-			Return(nil).
-			Once()
-		tester.mocks.openAIComp.EXPECT().
 			RecordUsageFromTokenUsage(mock.Anything, "testuuid", model, "upstream", mock.Anything, "apikey", mock.Anything).
 			Run(func(context.Context, string, *types.Model, string, *token.Usage, string, int64) {
 				billingCalled.Store(true)
@@ -325,10 +306,6 @@ func TestRecordResponsesUsageSkipsBillingOnRedirectStatus(t *testing.T) {
 		counter.Response(&types.ResponsesResponse{OutputText: "world"})
 
 		var billingCalled atomic.Bool
-		tester.mocks.openAIComp.EXPECT().
-			CommitUsageLimitFromUsage(mock.Anything, "testuuid", model, mock.Anything).
-			Return(nil).
-			Once()
 		tester.mocks.openAIComp.EXPECT().
 			RecordUsageFromTokenUsage(mock.Anything, "testuuid", model, "upstream", mock.Anything, "apikey", mock.Anything).
 			Run(func(context.Context, string, *types.Model, string, *token.Usage, string, int64) {

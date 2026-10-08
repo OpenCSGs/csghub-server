@@ -51,20 +51,8 @@ func (c *fakeOpenAIComponent) CheckBalance(ctx context.Context, nsUUID string) e
 	return nil
 }
 
-func (c *fakeOpenAIComponent) CheckUsageLimit(ctx context.Context, userUUID string, model *aigwtypes.Model, endpoint string) error {
-	return nil
-}
-
 func (c *fakeOpenAIComponent) CanManageModel(ctx context.Context, username, nsUUID string, model *aigwtypes.Model) (bool, error) {
 	return false, nil
-}
-
-func (c *fakeOpenAIComponent) CommitUsageLimit(ctx context.Context, userUUID string, model *aigwtypes.Model, tokenCounter token.Counter) error {
-	return nil
-}
-
-func (c *fakeOpenAIComponent) CommitUsageLimitFromUsage(ctx context.Context, userUUID string, model *aigwtypes.Model, usage *token.Usage) error {
-	return nil
 }
 
 func (c *fakeOpenAIComponent) CheckCapacityAdmission(ctx context.Context, req aigwtypes.CapacityAdmissionRequest) *aigwtypes.AdmissionDecision {

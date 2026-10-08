@@ -34,9 +34,6 @@ type OpenAIComponent interface {
 	RecordUsageFromTokenUsage(c context.Context, nsUUID string, model *types.Model, targetModelName string, usage *token.Usage, apikey string, tokenID int64) error
 	BuildUsageMeteringEvent(c context.Context, nsUUID string, model *types.Model, targetModelName string, usage *token.Usage, apikey string) (*commontypes.MeteringEvent, error)
 	CheckBalance(ctx context.Context, nsUUID string) error
-	CheckUsageLimit(ctx context.Context, userUUID string, model *types.Model, endpoint string) error
-	CommitUsageLimit(ctx context.Context, userUUID string, model *types.Model, tokenCounter token.Counter) error
-	CommitUsageLimitFromUsage(ctx context.Context, userUUID string, model *types.Model, usage *token.Usage) error
 	// CheckCapacityAdmission evaluates per-upstream CapacityPolicy admission
 	// for the router-owned candidate set carried in the request (initial
 	// admission: selection + occupation, or waiting in the upstream's
@@ -82,7 +79,6 @@ type openaiComponentImpl struct {
 	modelListCache cache.RedisClient
 	extendOpenai
 	modelIDBuilder         upstream.ModelIDBuilder
-	usageLimiter           UsageLimiter
 	capacityPolicyDefaults commontypes.CapacityPolicy
 	quotaRateComponent     QuotaRateComponent
 }
@@ -92,13 +88,6 @@ func (m *openaiComponentImpl) getModelIDBuilder() upstream.ModelIDBuilder {
 		return upstream.NewModelIDBuilder()
 	}
 	return m.modelIDBuilder
-}
-
-func (m *openaiComponentImpl) getUsageLimiter() UsageLimiter {
-	if m.usageLimiter == nil {
-		return NewUsageLimiter(m.modelListCache)
-	}
-	return m.usageLimiter
 }
 
 // GetAvailableModels returns all enabled models from the llm_config table.
@@ -830,7 +819,6 @@ func dbUpstreamsToConfigs(dbUpstreams []database.Upstream, capacityDefaults comm
 			CircuitBreakerEnabled: u.CircuitBreakerEnabled,
 			Tags:                  u.Tags,
 			Metadata:              u.Metadata,
-			LimitPolicy:           u.LimitPolicy,
 		}
 		// Apply defaults on a copy so the shared database.Upstream row
 		// (also read by health checks and admin APIs) is not mutated.

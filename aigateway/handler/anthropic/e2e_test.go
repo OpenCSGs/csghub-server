@@ -32,7 +32,6 @@ type fakePlanner struct {
 	errorCode  types.PlanErrorCategory
 	sensitive  *types.SafetyDecision
 	balanceErr error
-	usageErr   error
 }
 
 func (f *fakePlanner) Plan(c *gin.Context, meta *types.RequestMetadata) (*types.RequestPlan, error) {
@@ -80,13 +79,6 @@ func (f *fakePlanner) Plan(c *gin.Context, meta *types.RequestMetadata) (*types.
 	if pl.BackendURL == "" {
 		pl.BackendURL = f.target.Target
 	}
-
-	// Usage-limit check.
-	if f.usageErr != nil {
-		pl.ErrorCode = types.PlanErrUsageLimitExceeded
-		return pl, f.usageErr
-	}
-	pl.UsageLimitOK = true
 
 	// Sensitive check.
 	if f.sensitive != nil && f.sensitive.IsSensitive {
@@ -148,23 +140,6 @@ func (f *fakeUsageRecorder) RecordUsage(ctx context.Context, nsUUID string, mode
 	return nil
 }
 
-type fakeUsageLimiter struct {
-	committed           bool
-	inputTokens         int64
-	outputTokens        int64
-	cachedPromptTokens  int64
-	cacheCreationTokens int64
-}
-
-func (f *fakeUsageLimiter) CommitUsageLimitFromUsage(ctx context.Context, nsUUID string, model *types.Model, inputTokens, outputTokens, cachedPromptTokens, cacheCreationPromptTokens int64) error {
-	f.committed = true
-	f.inputTokens = inputTokens
-	f.outputTokens = outputTokens
-	f.cachedPromptTokens = cachedPromptTokens
-	f.cacheCreationTokens = cacheCreationPromptTokens
-	return nil
-}
-
 type fakeMetricsRecorder struct {
 	usageRecorded      bool
 	inputTokens        int64
@@ -182,21 +157,19 @@ func (f *fakeMetricsRecorder) RecordTokenUsage(c *gin.Context, inputTokens, outp
 // --- Test helpers ---
 
 func makeTestHandlerWithPlanner(planner *fakePlanner) *Handler {
-	h, _, _, _ := makeTestHandlerWithPlannerAndFakes(planner)
+	h, _, _ := makeTestHandlerWithPlannerAndFakes(planner)
 	return h
 }
 
-func makeTestHandlerWithPlannerAndFakes(planner *fakePlanner) (*Handler, *fakeUsageRecorder, *fakeUsageLimiter, *fakeMetricsRecorder) {
+func makeTestHandlerWithPlannerAndFakes(planner *fakePlanner) (*Handler, *fakeUsageRecorder, *fakeMetricsRecorder) {
 	recorder := &fakeUsageRecorder{}
-	limiter := &fakeUsageLimiter{}
 	metrics := &fakeMetricsRecorder{}
 	h := New(Deps{
 		ProxyExecutor:   &fakeProxyExecutor{},
 		UsageRecorder:   recorder,
-		UsageLimiter:    limiter,
 		MetricsRecorder: metrics,
 	})
-	return h, recorder, limiter, metrics
+	return h, recorder, metrics
 }
 
 func makeMessagesTarget(upstreamURL, protocol string) *types.ModelTarget {
@@ -845,25 +818,6 @@ func readBody(r io.Reader) []byte {
 
 // --- New tests for review fixes ---
 
-// TestE2E_UsageLimitExceeded verifies that a usage limit error is returned
-// as a 429 rate_limit_error in Anthropic format.
-func TestE2E_UsageLimitExceeded(t *testing.T) {
-	planner := &fakePlanner{
-		target:   makeMessagesTarget("http://upstream/v1/messages", ""),
-		usageErr: fmt.Errorf("quota exceeded"),
-	}
-	handler := makeTestHandlerWithPlanner(planner)
-	w := dispatchWithTarget(t, handler, validMessagesBody("test-model"), planner)
-
-	assert.Equal(t, 429, w.Code)
-	var errResp map[string]any
-	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &errResp))
-	assert.Equal(t, "error", errResp["type"])
-	errObj, ok := errResp["error"].(map[string]any)
-	require.True(t, ok)
-	assert.Equal(t, "rate_limit_error", errObj["type"])
-}
-
 // TestE2E_StopSequences_MappedInResponsesAdapter verifies that stop_sequences
 // are mapped to the Responses API "stop" field (via ExtraFields) rather than
 // being silently dropped or rejected.
@@ -1184,7 +1138,7 @@ func TestE2E_Billing_TokensRecorded_Native_NonStream(t *testing.T) {
 
 	target := makeMessagesTarget(upstream.URL+"/v1/messages", "")
 	planner := &fakePlanner{target: target}
-	handler, recorder, limiter, metrics := makeTestHandlerWithPlannerAndFakes(planner)
+	handler, recorder, metrics := makeTestHandlerWithPlannerAndFakes(planner)
 	w := dispatchWithTarget(t, handler, validMessagesBody("test-model"), planner)
 
 	require.Equal(t, 200, w.Code)
@@ -1192,21 +1146,14 @@ func TestE2E_Billing_TokensRecorded_Native_NonStream(t *testing.T) {
 	// Billing runs in a goroutine; wait for it.
 	// Since runPostProcessAsync is async, we need to poll for a short time.
 	require.Eventually(t, func() bool {
-		return recorder.recorded && limiter.committed
+		return recorder.recorded
 	}, 2*time.Second, 10*time.Millisecond)
 
 	assert.Equal(t, int64(10), recorder.inputTokens)
 	assert.Equal(t, int64(5), recorder.outputTokens)
 	assert.Equal(t, int64(3), recorder.cachedPromptTokens)
 	assert.Equal(t, int64(2), recorder.cacheCreationTokens)
-	// Native Anthropic usage has no reasoning field; it stays 0 even when
-	// the model produced thinking blocks.
 	assert.Equal(t, int64(0), recorder.reasoningTokens)
-
-	assert.Equal(t, int64(10), limiter.inputTokens)
-	assert.Equal(t, int64(5), limiter.outputTokens)
-	assert.Equal(t, int64(3), limiter.cachedPromptTokens)
-	assert.Equal(t, int64(2), limiter.cacheCreationTokens)
 
 	assert.True(t, metrics.usageRecorded)
 	assert.Equal(t, int64(10), metrics.inputTokens)
@@ -1237,13 +1184,13 @@ func TestE2E_Billing_TokensRecorded_Native_Stream(t *testing.T) {
 	body := strings.Replace(validMessagesBody("test-model"), `"max_tokens": 1024`, `"max_tokens": 1024, "stream": true`, 1)
 	target := makeMessagesTarget(upstream.URL+"/v1/messages", "")
 	planner := &fakePlanner{target: target}
-	handler, recorder, limiter, _ := makeTestHandlerWithPlannerAndFakes(planner)
+	handler, recorder, _ := makeTestHandlerWithPlannerAndFakes(planner)
 	w := dispatchWithTarget(t, handler, body, planner)
 
 	require.Equal(t, 200, w.Code)
 
 	require.Eventually(t, func() bool {
-		return recorder.recorded && limiter.committed
+		return recorder.recorded
 	}, 2*time.Second, 10*time.Millisecond)
 
 	assert.Equal(t, int64(10), recorder.inputTokens)
@@ -1251,8 +1198,6 @@ func TestE2E_Billing_TokensRecorded_Native_Stream(t *testing.T) {
 	assert.Equal(t, int64(4), recorder.cachedPromptTokens)
 	assert.Equal(t, int64(1), recorder.cacheCreationTokens)
 
-	assert.Equal(t, int64(4), limiter.cachedPromptTokens)
-	assert.Equal(t, int64(1), limiter.cacheCreationTokens)
 }
 
 func TestE2E_Billing_TokensRecorded_ToChat_NonStream(t *testing.T) {
@@ -1282,13 +1227,13 @@ func TestE2E_Billing_TokensRecorded_ToChat_NonStream(t *testing.T) {
 
 	target := makeMessagesTarget(upstream.URL+"/v1/chat/completions", "")
 	planner := &fakePlanner{target: target}
-	handler, recorder, limiter, _ := makeTestHandlerWithPlannerAndFakes(planner)
+	handler, recorder, _ := makeTestHandlerWithPlannerAndFakes(planner)
 	w := dispatchWithTarget(t, handler, validMessagesBody("test-model"), planner)
 
 	require.Equal(t, 200, w.Code)
 
 	require.Eventually(t, func() bool {
-		return recorder.recorded && limiter.committed
+		return recorder.recorded
 	}, 2*time.Second, 10*time.Millisecond)
 
 	assert.Equal(t, int64(10), recorder.inputTokens)
@@ -1298,7 +1243,6 @@ func TestE2E_Billing_TokensRecorded_ToChat_NonStream(t *testing.T) {
 	// Chat adapter doesn't track cache creation tokens.
 	assert.Equal(t, int64(0), recorder.cacheCreationTokens)
 
-	assert.Equal(t, int64(3), limiter.cachedPromptTokens)
 }
 
 func TestE2E_Billing_TokensRecorded_ToChat_Stream(t *testing.T) {
@@ -1321,13 +1265,13 @@ func TestE2E_Billing_TokensRecorded_ToChat_Stream(t *testing.T) {
 	body := strings.Replace(validMessagesBody("test-model"), `"max_tokens": 1024`, `"max_tokens": 1024, "stream": true`, 1)
 	target := makeMessagesTarget(upstream.URL+"/v1/chat/completions", "")
 	planner := &fakePlanner{target: target}
-	handler, recorder, limiter, _ := makeTestHandlerWithPlannerAndFakes(planner)
+	handler, recorder, _ := makeTestHandlerWithPlannerAndFakes(planner)
 	w := dispatchWithTarget(t, handler, body, planner)
 
 	require.Equal(t, 200, w.Code)
 
 	require.Eventually(t, func() bool {
-		return recorder.recorded && limiter.committed
+		return recorder.recorded
 	}, 2*time.Second, 10*time.Millisecond)
 
 	assert.Equal(t, int64(10), recorder.inputTokens)
@@ -1335,7 +1279,6 @@ func TestE2E_Billing_TokensRecorded_ToChat_Stream(t *testing.T) {
 	assert.Equal(t, int64(5), recorder.cachedPromptTokens)
 	assert.Equal(t, int64(2), recorder.reasoningTokens)
 
-	assert.Equal(t, int64(5), limiter.cachedPromptTokens)
 }
 
 func TestE2E_Billing_TokensRecorded_ToResponses_NonStream(t *testing.T) {
@@ -1371,13 +1314,13 @@ func TestE2E_Billing_TokensRecorded_ToResponses_NonStream(t *testing.T) {
 
 	target := makeMessagesTarget(upstream.URL+"/v1/responses", "")
 	planner := &fakePlanner{target: target}
-	handler, recorder, limiter, _ := makeTestHandlerWithPlannerAndFakes(planner)
+	handler, recorder, _ := makeTestHandlerWithPlannerAndFakes(planner)
 	w := dispatchWithTarget(t, handler, validMessagesBody("test-model"), planner)
 
 	require.Equal(t, 200, w.Code)
 
 	require.Eventually(t, func() bool {
-		return recorder.recorded && limiter.committed
+		return recorder.recorded
 	}, 2*time.Second, 10*time.Millisecond)
 
 	assert.Equal(t, int64(10), recorder.inputTokens)
@@ -1386,8 +1329,6 @@ func TestE2E_Billing_TokensRecorded_ToResponses_NonStream(t *testing.T) {
 	assert.Equal(t, int64(2), recorder.cacheCreationTokens)
 	assert.Equal(t, int64(5), recorder.reasoningTokens)
 
-	assert.Equal(t, int64(3), limiter.cachedPromptTokens)
-	assert.Equal(t, int64(2), limiter.cacheCreationTokens)
 }
 
 func TestE2E_Billing_TokensRecorded_ToResponses_Stream(t *testing.T) {
@@ -1411,13 +1352,13 @@ func TestE2E_Billing_TokensRecorded_ToResponses_Stream(t *testing.T) {
 	body := strings.Replace(validMessagesBody("test-model"), `"max_tokens": 1024`, `"max_tokens": 1024, "stream": true`, 1)
 	target := makeMessagesTarget(upstream.URL+"/v1/responses", "")
 	planner := &fakePlanner{target: target}
-	handler, recorder, limiter, _ := makeTestHandlerWithPlannerAndFakes(planner)
+	handler, recorder, _ := makeTestHandlerWithPlannerAndFakes(planner)
 	w := dispatchWithTarget(t, handler, body, planner)
 
 	require.Equal(t, 200, w.Code)
 
 	require.Eventually(t, func() bool {
-		return recorder.recorded && limiter.committed
+		return recorder.recorded
 	}, 2*time.Second, 10*time.Millisecond)
 
 	assert.Equal(t, int64(10), recorder.inputTokens)
@@ -1426,8 +1367,6 @@ func TestE2E_Billing_TokensRecorded_ToResponses_Stream(t *testing.T) {
 	assert.Equal(t, int64(1), recorder.cacheCreationTokens)
 	assert.Equal(t, int64(3), recorder.reasoningTokens)
 
-	assert.Equal(t, int64(6), limiter.cachedPromptTokens)
-	assert.Equal(t, int64(1), limiter.cacheCreationTokens)
 }
 
 func TestE2E_Billing_NotRecorded_OnError(t *testing.T) {
@@ -1439,16 +1378,12 @@ func TestE2E_Billing_NotRecorded_OnError(t *testing.T) {
 
 	target := makeMessagesTarget(upstream.URL+"/v1/messages", "")
 	planner := &fakePlanner{target: target}
-	handler, recorder, limiter, _ := makeTestHandlerWithPlannerAndFakes(planner)
+	handler, recorder, _ := makeTestHandlerWithPlannerAndFakes(planner)
 	w := dispatchWithTarget(t, handler, validMessagesBody("test-model"), planner)
 
 	assert.Equal(t, 529, w.Code)
 
 	// Usage recording should NOT fire on error status.
-	// But the usage limiter DOES commit (even on error, to prevent abuse).
-	require.Eventually(t, func() bool {
-		return limiter.committed
-	}, 2*time.Second, 10*time.Millisecond)
 	assert.False(t, recorder.recorded, "usage should not be recorded on error status")
 }
 

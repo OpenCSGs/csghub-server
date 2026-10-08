@@ -26,8 +26,6 @@ type Deps struct {
 	ProxyExecutor ProxyExecutor
 	// UsageRecorder records token usage for billing/metering.
 	UsageRecorder UsageRecorder
-	// UsageLimiter commits usage quota after the upstream response.
-	UsageLimiter UsageLimiter
 	// AdmissionFinalizer closes the capacity admission lease lifecycle after
 	// the upstream response (release + TPM correction with real usage).
 	// Optional: nil skips admission finalization (tests).
@@ -55,11 +53,6 @@ type ProxyExecutor interface {
 // UsageRecorder records token usage for billing/metering.
 type UsageRecorder interface {
 	RecordUsage(ctx context.Context, nsUUID string, model *types.Model, targetModelName string, usage *token.Usage, apikey string, tokenID int64) error
-}
-
-// UsageLimiter commits usage quota limits after the upstream response.
-type UsageLimiter interface {
-	CommitUsageLimitFromUsage(ctx context.Context, nsUUID string, model *types.Model, inputTokens, outputTokens, cachedPromptTokens, cacheCreationPromptTokens int64) error
 }
 
 // AdmissionFinalizer closes the capacity admission lease after the upstream

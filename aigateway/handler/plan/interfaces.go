@@ -100,7 +100,7 @@ type MetricsEnricher interface {
 // ProtocolHandler is the protocol-specific third phase.  It receives the
 // RequestPlan and is responsible for:
 //   - Adapting the request for the upstream protocol (request body transform
-//     + response writer creation).
+//   - response writer creation).
 //   - Executing the reverse proxy.
 //   - Finalizing the response and recording usage/metrics.
 //   - Rendering protocol-specific error responses when the Plan phase

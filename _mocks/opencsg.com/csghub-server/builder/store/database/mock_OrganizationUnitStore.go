@@ -7,6 +7,7 @@ import (
 
 	mock "github.com/stretchr/testify/mock"
 	database "opencsg.com/csghub-server/builder/store/database"
+
 	types "opencsg.com/csghub-server/common/types"
 )
 

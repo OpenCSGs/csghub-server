@@ -6,7 +6,6 @@ import (
 	"log/slog"
 
 	"github.com/gin-gonic/gin"
-	"opencsg.com/csghub-server/aigateway/component"
 	"opencsg.com/csghub-server/aigateway/handler/protocol"
 	"opencsg.com/csghub-server/aigateway/types"
 	"opencsg.com/csghub-server/common/errorx"
@@ -18,7 +17,7 @@ import (
 // checks.
 //
 // If the Planner decides a request must not proceed (model not found,
-// insufficient balance, quota exceeded, protocol disabled, sensitive content),
+// insufficient balance, protocol disabled, sensitive content),
 // it returns a non-nil error together with a partially populated RequestPlan
 // whose ErrorCode identifies the category.  The Orchestrator passes this to
 // the protocol handler's HandlePlanError so it can render the correct
@@ -26,7 +25,6 @@ import (
 type plannerImpl struct {
 	modelResolver     ModelResolver
 	balanceChecker    BalanceChecker
-	usageLimitChecker UsageLimitChecker
 	contentSafety     ContentSafetyChecker
 	admissionChecker  AdmissionChecker
 	metricsEnricher   MetricsEnricher
@@ -36,6 +34,16 @@ type plannerImpl struct {
 	// the re-plan re-runs the full Router→Admission sequence against a
 	// fresh candidate set.
 	queueMaxRePlans int
+}
+
+// PlannerDeps bundles the Planner's dependencies so the set can grow
+// without breaking every call site. AdmissionChecker is optional.
+type PlannerDeps struct {
+	ModelResolver     ModelResolver
+	BalanceChecker    BalanceChecker
+	ContentSafety     ContentSafetyChecker
+	AdmissionChecker  AdmissionChecker
+	MetricsEnricher   MetricsEnricher
 }
 
 // PlannerOption customizes optional planner behavior.
@@ -52,17 +60,15 @@ func WithQueueMaxRePlans(n int) PlannerOption {
 	}
 }
 
-// NewPlanner constructs a Planner from its dependency interfaces.
-// The handler package provides concrete adapters at the composition root.
-// admissionChecker may be nil in tests; admission is then skipped.
-func NewPlanner(mr ModelResolver, bc BalanceChecker, ulc UsageLimitChecker, cs ContentSafetyChecker, ac AdmissionChecker, me MetricsEnricher, opts ...PlannerOption) Planner {
+// NewPlanner constructs a Planner from its dependencies.  The handler
+// package provides concrete adapters at the composition root.
+func NewPlanner(deps PlannerDeps, opts ...PlannerOption) Planner {
 	p := &plannerImpl{
-		modelResolver:     mr,
-		balanceChecker:    bc,
-		usageLimitChecker: ulc,
-		contentSafety:     cs,
-		admissionChecker:  ac,
-		metricsEnricher:   me,
+		modelResolver:     deps.ModelResolver,
+		balanceChecker:    deps.BalanceChecker,
+		contentSafety:     deps.ContentSafety,
+		admissionChecker:  deps.AdmissionChecker,
+		metricsEnricher:   deps.MetricsEnricher,
 		queueMaxRePlans:   1,
 	}
 	for _, opt := range opts {
@@ -95,7 +101,9 @@ func (p *plannerImpl) planOnce(c *gin.Context, meta *types.RequestMetadata) (pl 
 	ctx := c.Request.Context()
 	pl = &types.RequestPlan{}
 
-	// 1. Model Resolution.
+	// 1. Model Resolution.  Automatic model selection already ran in Plan,
+	// so meta.Model names a concrete model here and ctx carries whichever
+	// decision produced it.
 	mt, err := p.modelResolver.ResolveModelTarget(ctx, meta.TenantID, meta.Model, meta.Headers, ResolveOptions{
 		RequiredUpstreamID: meta.RequiredUpstreamID,
 	})
@@ -134,18 +142,6 @@ func (p *plannerImpl) planOnce(c *gin.Context, meta *types.RequestMetadata) (pl 
 		}
 	}
 	pl.BalanceOK = true
-
-	// 6. Usage-limit check — only for token-generating protocols.
-	// Non-token endpoints (image, video, audio, ocr, rerank, embedding,
-	// speech) have non-token billing models and do not participate in the
-	// token-window rate limiter.
-	if shouldCheckUsageLimit(meta.Task) {
-		if err := p.usageLimitChecker.CheckUsageLimit(ctx, meta.TenantID, mt.Model, pl.BackendURL); err != nil {
-			pl.ErrorCode = categorizePlanError(err)
-			return pl, err, false
-		}
-	}
-	pl.UsageLimitOK = true
 
 	// 7. Capacity admission control — the first backpressure layer in front
 	// of the runtimes. It runs BEFORE the content-safety check for two
@@ -341,25 +337,5 @@ func categorizePlanError(err error) types.PlanErrorCategory {
 		return types.PlanErrInsufficientBalance
 	}
 
-	// Check for usage limit exceeded.
-	if component.IsUsageLimitExceeded(err) {
-		return types.PlanErrUsageLimitExceeded
-	}
-
 	return types.PlanErrUnknown
-}
-
-// shouldCheckUsageLimit reports whether the task participates in the
-// token-window rate limiter (CheckUsageLimit / CommitUsageLimitFromUsage).
-// Only token-generating protocols (chat, responses, messages) are gated;
-// non-token endpoints (image, video, audio, ocr, rerank, embedding, speech)
-// consume tokens but use different billing models and are excluded from the
-// token-window limiter.
-func shouldCheckUsageLimit(task string) bool {
-	switch task {
-	case "chat", "responses", "messages":
-		return true
-	default:
-		return false
-	}
 }

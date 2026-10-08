@@ -641,11 +641,6 @@ type Config struct {
 		AsyncGenerationStatusRefreshInterval   int    `env:"OPENCSG_AIGATEWAY_ASYNC_GENERATION_STATUS_REFRESH_INTERVAL" default:"60"`
 		AsyncGenerationMeteringBatchSize       int    `env:"OPENCSG_AIGATEWAY_ASYNC_GENERATION_METERING_BATCH_SIZE" default:"100"`
 		AsyncGenerationMaxAge                  int    `env:"OPENCSG_AIGATEWAY_ASYNC_GENERATION_MAX_AGE_SECONDS" default:"86400"`
-		ModalAPIRateLimiter                    struct {
-			Enable bool  `env:"OPENCSG_AIGATEWAY_MODAL_API_RATE_LIMITER_ENABLE" default:"true"`
-			Limit  int64 `env:"OPENCSG_AIGATEWAY_MODAL_API_RATE_LIMITER_LIMIT" default:"2"`
-			Window int64 `env:"OPENCSG_AIGATEWAY_MODAL_API_RATE_LIMITER_WINDOW" default:"60"`
-		}
 		// CapacityPolicyDefaults supplies fallback limits for per-upstream
 		// CapacityPolicy. When an admin enables CapacityPolicy on an upstream
 		// but leaves every limit unset (all zeros), the gateway applies these

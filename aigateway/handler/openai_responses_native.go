@@ -25,11 +25,6 @@ func (h *OpenAIHandlerImpl) executeNativeResponses(c *gin.Context, req *types.Re
 		h.handleAdmissionDenied(c, req.Stream, err)
 		return
 	}
-	if err := h.openaiComponent.CheckUsageLimit(c.Request.Context(), nsUUID, modelTarget.Model, backendURL); err != nil {
-		finishLLMTraceWithError(generationRecorder, err, types.TraceErrInsufficientBalance)
-		h.handleUsageLimitExceeded(c, req.Stream, nsUUID, publicModelID, err)
-		return
-	}
 	responsesCounter := h.newResponsesTokenCounter(modelTarget)
 	responsesCounter.Request(req)
 	mapper, err := h.getResponsesIDMapper()
@@ -52,7 +47,7 @@ func (h *OpenAIHandlerImpl) executeNativeResponses(c *gin.Context, req *types.Re
 	rp, err := proxy.NewReverseProxy(backendURL, proxy.WithoutAcceptEncoding())
 	if err != nil {
 		finishLLMTraceWithError(generationRecorder, err, types.TraceErrUpstreamUnavailable)
-		h.handleProxyError(c, req.Stream, nsUUID, publicModelID, err)
+		h.handleProxyError(c, req.Stream, err)
 		return
 	}
 	c.Request.Body = io.NopCloser(bytes.NewReader(body))
