@@ -127,6 +127,7 @@ type DeployTaskStore interface {
 	// GetDeployByIDWithRelations returns a deploy by ID with Repository and User relations loaded.
 	GetDeployByIDWithRelations(ctx context.Context, deployID int64) (*Deploy, error)
 	GetDeployBySvcName(ctx context.Context, svcName string) (*Deploy, error)
+	FindActiveDeployByName(ctx context.Context, name string) (*Deploy, error)
 	// StopDeploy marks one deploy of a repo as stopped. Permission checks
 	// happen in the component layer, so it matches by deploy id and repo only.
 	StopDeploy(ctx context.Context, repoType types.RepositoryType, repoID, deployID int64) error
@@ -152,11 +153,25 @@ type DeployTaskStore interface {
 	CountByRepoID(ctx context.Context, repoID int64) (int, error)
 }
 
+// LatestDeployBySvcNameStore provides RProxy's latest-lifecycle lookup without
+// changing the shared GetDeployBySvcName contract.
+type LatestDeployBySvcNameStore interface {
+	GetLatestDeployBySvcName(ctx context.Context, svcName string) (*Deploy, error)
+}
+
 func NewDeployTaskStore() DeployTaskStore {
 	return &deployTaskStoreImpl{db: defaultDB}
 }
 
 func NewDeployTaskStoreWithDB(db *DB) DeployTaskStore {
+	return &deployTaskStoreImpl{db: db}
+}
+
+func NewLatestDeployBySvcNameStore() LatestDeployBySvcNameStore {
+	return &deployTaskStoreImpl{db: defaultDB}
+}
+
+func NewLatestDeployBySvcNameStoreWithDB(db *DB) LatestDeployBySvcNameStore {
 	return &deployTaskStoreImpl{db: db}
 }
 
@@ -486,6 +501,35 @@ func (s *deployTaskStoreImpl) GetDeployBySvcName(ctx context.Context, svcName st
 	err := s.db.Operator.Core.NewSelect().Model(deploy).Where("svc_name = ?", svcName).Scan(ctx, deploy)
 	err = errorx.HandleDBError(err, nil)
 	return deploy, err
+}
+
+// GetLatestDeployBySvcName returns the newest lifecycle row for a service
+// name. This lookup is intentionally reserved for RProxy, where names may be
+// reclaimed after deletion and routing must honor the latest row.
+func (s *deployTaskStoreImpl) GetLatestDeployBySvcName(ctx context.Context, svcName string) (*Deploy, error) {
+	deploy := &Deploy{}
+	err := s.db.Operator.Core.NewSelect().Model(deploy).
+		Where("svc_name = ?", svcName).
+		Order("id DESC").Limit(1).
+		Scan(ctx, deploy)
+	err = errorx.HandleDBError(err, nil)
+	return deploy, err
+}
+
+// FindActiveDeployByName reserves public service names across every deploy type.
+func (s *deployTaskStoreImpl) FindActiveDeployByName(ctx context.Context, name string) (*Deploy, error) {
+	var deploy Deploy
+	err := s.db.Core.NewSelect().Model(&deploy).
+		Where("(svc_name = ? OR deploy_name = ?) AND status != ?", name, name, common.Deleted).
+		Order("id DESC").Limit(1).Scan(ctx, &deploy)
+	if err != nil {
+		err = errorx.HandleDBError(err, nil)
+		if errors.Is(err, errorx.ErrDatabaseNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &deploy, nil
 }
 
 func (s *deployTaskStoreImpl) StopDeploy(ctx context.Context, repoType types.RepositoryType, repoID, deployID int64) error {

@@ -89,6 +89,25 @@ func TestDeployTaskStore_CRUD(t *testing.T) {
 
 }
 
+func TestDeployTaskStore_GetLatestDeployBySvcNameReturnsLatest(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+	store := database.NewDeployTaskStoreWithDB(db)
+
+	for _, deploy := range []*database.Deploy{
+		{SvcName: "reused-svc", DeployName: "older", RepoID: 11, UserID: 21, Type: types.SandboxType},
+		{SvcName: "reused-svc", DeployName: "newer", RepoID: 12, UserID: 22, Type: types.SandboxType},
+	} {
+		require.NoError(t, store.CreateDeploy(ctx, deploy))
+	}
+
+	latestStore := database.NewLatestDeployBySvcNameStoreWithDB(db)
+	got, err := latestStore.GetLatestDeployBySvcName(ctx, "reused-svc")
+	require.NoError(t, err)
+	require.Equal(t, "newer", got.DeployName)
+}
+
 func TestDeployTaskStore_DeleteNow(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
@@ -1706,4 +1725,29 @@ func TestDeployTaskStore_FindActiveDeployByNameAndType(t *testing.T) {
 	dp, err = store.FindActiveDeployByNameAndType(ctx, "uuid-999", "my-inference", types.InferenceType)
 	require.Nil(t, err)
 	require.Nil(t, dp)
+}
+
+func TestDeployTaskStore_FindActiveDeployByName(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+	store := database.NewDeployTaskStoreWithDB(db)
+	deploys := []database.Deploy{
+		{UserID: 1, Type: types.InferenceType, Status: common.Running, DeployName: "inference-name", SvcName: "inference-svc", RepoID: 1},
+		{UserID: 2, Type: types.SpaceType, Status: common.Stopped, DeployName: "space-name", SvcName: "space-svc", RepoID: 2},
+		{UserID: 3, Type: types.InferenceType, Status: common.Deleted, DeployName: "deleted-name", SvcName: "deleted-svc", RepoID: 3},
+	}
+	for i := range deploys {
+		require.NoError(t, store.CreateDeploy(ctx, &deploys[i]))
+	}
+	for _, name := range []string{"inference-name", "inference-svc", "space-name", "space-svc"} {
+		found, err := store.FindActiveDeployByName(ctx, name)
+		require.NoError(t, err)
+		require.NotNil(t, found)
+	}
+	for _, name := range []string{"deleted-name", "deleted-svc", "missing"} {
+		found, err := store.FindActiveDeployByName(ctx, name)
+		require.NoError(t, err)
+		require.Nil(t, found)
+	}
 }

@@ -32,9 +32,26 @@ const (
 	agentTemplateSensitiveCheckMakePublicPending
 	knowledgeBaseContentIDAlreadyExists
 	knowledgeBaseContentIDInvalid
+	csgclawSubdomainInvalid
+	csgclawAgentNameInvalid
 )
 
 var (
+	// CSGClaw subdomain is invalid. Subdomains must be 1-63 lowercase letters,
+	// digits, or hyphens and start/end with a letter or digit.
+	ErrCSGClawSubdomainInvalid error = CustomError{prefix: errAgentPrefix, code: csgclawSubdomainInvalid}
+
+	// CSGClaw manifest agent name is invalid. Names may contain only ASCII letters,
+	// digits, periods, underscores, and hyphens.
+	//
+	// Description: The CSGClaw manifest agent name is invalid.
+	// Description_ZH: CSGClaw 清单中的智能体名称无效。
+	//
+	// en-US: Invalid CSGClaw agent name. Use only letters, digits, periods, underscores, or hyphens.
+	// zh-CN: CSGClaw 智能体名称无效。只能使用字母、数字、句点、下划线或连字符。
+	// zh-HK: CSGClaw 智能體名稱無效。只能使用字母、數字、句點、底線或連字號。
+	ErrCSGClawAgentNameInvalid error = CustomError{prefix: errAgentPrefix, code: csgclawAgentNameInvalid}
+
 	// instance quota exceeded
 	//
 	// Description: The instance quota exceeded. Includes agent type, instance count, and quota in the error message.

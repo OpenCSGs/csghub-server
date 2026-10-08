@@ -10,10 +10,12 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/api/httpbase"
+	deploycommon "opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/builder/proxy"
 	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/utils/common"
 	"opencsg.com/csghub-server/component"
@@ -25,6 +27,8 @@ type RProxyHandler struct {
 	clusterComp  component.ClusterComponent
 	spaceComp    component.SpaceComponent
 	repoComp     component.RepoComponent
+	rproxyDeploy component.RProxyDeployComponent
+	customUIComp component.AgentCustomUIProxyComponent
 	modSvcClient rpc.ModerationSvcClient
 	cfg          *config.Config
 }
@@ -49,13 +53,16 @@ func NewRProxyHandler(config *config.Config) (*RProxyHandler, error) {
 		return nil, fmt.Errorf("failed to create cluster component,%w", err)
 	}
 
-	return &RProxyHandler{
+	r := &RProxyHandler{
 		clusterComp:  clusterComp,
 		spaceComp:    spaceComp,
 		repoComp:     repoComp,
+		rproxyDeploy: component.NewRProxyDeployComponent(),
 		modSvcClient: modSvcClient,
 		cfg:          config,
-	}, nil
+	}
+	r.initCustomUIComponent()
+	return r, nil
 }
 
 func (r *RProxyHandler) Proxy(ctx *gin.Context) {
@@ -66,11 +73,19 @@ func (r *RProxyHandler) Proxy(ctx *gin.Context) {
 
 	slog.Debug("http request proxy", slog.Any("request", ctx.Request.URL), slog.Any("header", ctx.Request.Header))
 	appSvcName := r.getSvcName(ctx)
-
-	deploy, err := r.repoComp.GetDeployBySvcName(ctx.Request.Context(), appSvcName)
+	deploy, err := r.rproxyDeploy.GetDeployBySvcName(ctx.Request.Context(), appSvcName)
+	isSandboxDeploy := err == nil && deploy != nil && types.IsSandboxType(deploy.Type)
+	isDeletedDeploy := err == nil && deploy != nil && deploy.Status == deploycommon.Deleted
+	if (errors.Is(err, errorx.ErrDatabaseNoRows) || isSandboxDeploy || isDeletedDeploy) && r.tryCustomUI(ctx, appSvcName) {
+		return
+	}
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "failed to get deploy in rproxy", slog.Any("error", err), slog.Any("appSrvName", appSvcName), slog.Any("request", ctx.Request.URL), slog.Any("header", ctx.Request.Header))
 		httpbase.ServerError(ctx, fmt.Errorf("failed to get deploy, %w", err))
+		return
+	}
+	if deploy.Status == deploycommon.Deleted {
+		ctx.Status(http.StatusNotFound)
 		return
 	}
 	username := httpbase.GetCurrentUser(ctx)
@@ -103,11 +118,19 @@ func (r *RProxyHandler) Proxy(ctx *gin.Context) {
 			contextPath := fmt.Sprintf("/%s/%s", "endpoint", appSvcName)
 			apiname = strings.TrimPrefix(apiname, contextPath)
 		}
-		rp.ServeHTTP(ctx.Writer, ctx.Request, apiname, host)
+		request := ctx.Request.Clone(ctx.Request.Context())
+		stripAgentProxyContextHeaders(request.Header)
+		rp.ServeHTTP(ctx.Writer, request, apiname, host)
 	} else {
 		slog.Warn("user not allowed to call endpoint api", slog.String("svc_name", appSvcName), slog.Any("user_name", username), slog.Any("deployID", deploy.ID))
 		ctx.Status(http.StatusForbidden)
 	}
+}
+
+func stripAgentProxyContextHeaders(header http.Header) {
+	header.Del(types.CSGHubAgentBaseURLHeader)
+	header.Del(types.CSGHubAgentAuthModeHeader)
+	header.Del(types.CSGBotHeaderAgentName)
 }
 
 func (r *RProxyHandler) checkAccessPermission(ctx *gin.Context, deploy *database.Deploy, username string) (bool, error) {
@@ -154,10 +177,10 @@ func (r *RProxyHandler) checkAccessPermission(ctx *gin.Context, deploy *database
 
 // get service name based on request
 func (r *RProxyHandler) getSvcName(ctx *gin.Context) string {
-	URI := ctx.Request.RequestURI
+	path := ctx.Request.URL.Path
 	host := ctx.Request.Host
 	//check if request is from internal endpoint
-	if strings.HasPrefix(URI, "/endpoint/") {
+	if strings.HasPrefix(path, "/endpoint/") {
 		//for case: http://127.0.0.1:8080/endpoint/dx1jpfny9hq8
 		parts := strings.SplitN(ctx.Request.URL.Path, "/", 5)
 		return parts[2]
@@ -170,25 +193,27 @@ func (r *RProxyHandler) getSvcName(ctx *gin.Context) string {
 }
 
 func (r *RProxyHandler) getSvcTargetAddress(ctx context.Context, appSvcName string, deploy *database.Deploy) (string, string, error) {
-	target := ""
+	return r.getSvcTargetAddressForFields(ctx, appSvcName, deploy.Endpoint, deploy.ClusterID)
+}
+
+func (r *RProxyHandler) getSvcTargetAddressForFields(ctx context.Context, appSvcName, endpoint, clusterID string) (string, string, error) {
+	target := fmt.Sprintf("http://%s.%s", appSvcName, r.cfg.Space.InternalRootDomain)
+	if endpoint != "" {
+		//support multi-cluster
+		target = endpoint
+	}
 	host := ""
 
-	target = fmt.Sprintf("http://%s.%s", appSvcName, r.cfg.Space.InternalRootDomain)
-	if len(deploy.Endpoint) > 0 {
-		//support multi-cluster
-		target = deploy.Endpoint
-	}
-
-	if len(deploy.ClusterID) < 1 {
+	if len(clusterID) < 1 {
 		slog.Warn("cluster id of deploy svc is empty", slog.Any("svc", appSvcName))
 		return target, host, nil
 	}
 
 	req := types.EndpointReq{
-		ClusterID: deploy.ClusterID,
+		ClusterID: clusterID,
 		Target:    target,
 		Host:      host,
-		Endpoint:  deploy.Endpoint,
+		Endpoint:  endpoint,
 		SvcName:   appSvcName,
 	}
 

@@ -1558,24 +1558,28 @@ func (c *spaceComponentImpl) GetMCPServiceBySvcName(ctx context.Context, svcName
 }
 
 func (c *spaceComponentImpl) getEndpoint(svcName string, space *database.Space) string {
-	endpoint := ""
-	if len(svcName) < 1 {
-		return endpoint
+	if space == nil {
+		return ""
 	}
+	return buildSpaceEndpoint(svcName, space.Sdk, c.publicRootDomain, c.serverBaseUrl)
+}
 
-	if c.publicRootDomain == "" {
-		if space.Sdk == types.STREAMLIT.Name || space.Sdk == types.GRADIO.Name {
-			// if endpoint not ends with /, fastapi based app (gradio and streamlit) will redirect with http 307
-			// see issue: https://stackoverflow.com/questions/70351360/keep-getting-307-temporary-redirect-before-returning-status-200-hosted-on-fast
-			endpoint, _ = url.JoinPath(c.serverBaseUrl, "endpoint", svcName, "/")
-		} else {
-			endpoint, _ = url.JoinPath(c.serverBaseUrl, "endpoint", svcName)
-		}
-		endpoint = strings.Replace(endpoint, "http://", "", 1)
-		endpoint = strings.Replace(endpoint, "https://", "", 1)
-	} else {
-		endpoint = fmt.Sprintf("%s.%s", svcName, c.publicRootDomain)
+func buildSpaceEndpoint(svcName, sdk, publicRootDomain, serverBaseURL string) string {
+	if len(svcName) < 1 {
+		return ""
 	}
+	if publicRootDomain != "" {
+		return fmt.Sprintf("%s.%s", svcName, publicRootDomain)
+	}
+	var endpoint string
+	if sdk == types.STREAMLIT.Name || sdk == types.GRADIO.Name {
+		// FastAPI-based apps redirect with HTTP 307 if the endpoint lacks a trailing slash.
+		endpoint, _ = url.JoinPath(serverBaseURL, "endpoint", svcName, "/")
+	} else {
+		endpoint, _ = url.JoinPath(serverBaseURL, "endpoint", svcName)
+	}
+	endpoint = strings.Replace(endpoint, "http://", "", 1)
+	endpoint = strings.Replace(endpoint, "https://", "", 1)
 
 	return endpoint
 }

@@ -232,6 +232,18 @@ type RepoComponent interface {
 	advancedRepoInterface
 }
 
+type AgentUIOptionRepository interface {
+	ListAgentUIOptions(ctx context.Context, currentUser string, per, page int) ([]types.AgentUIOption, int, error)
+}
+
+func (c *repoComponentImpl) ListAgentUIOptions(ctx context.Context, currentUser string, per, page int) ([]types.AgentUIOption, int, error) {
+	scope, err := c.loadRepositoryReadScope(ctx, currentUser)
+	if err != nil {
+		return nil, 0, err
+	}
+	return database.NewAgentUIOptionStore().List(ctx, scope, per, page)
+}
+
 func NewRepoComponentImpl(config *config.Config) (*repoComponentImpl, error) {
 	r, err := NewRepoComponent(config)
 	if err != nil {

@@ -375,6 +375,65 @@ func (_c *MockDeployTaskStore_DeleteDeployNow_Call) RunAndReturn(run func(contex
 	return _c
 }
 
+// FindActiveDeployByName provides a mock function with given fields: ctx, name
+func (_m *MockDeployTaskStore) FindActiveDeployByName(ctx context.Context, name string) (*database.Deploy, error) {
+	ret := _m.Called(ctx, name)
+
+	if len(ret) == 0 {
+		panic("no return value specified for FindActiveDeployByName")
+	}
+
+	var r0 *database.Deploy
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*database.Deploy, error)); ok {
+		return rf(ctx, name)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) *database.Deploy); ok {
+		r0 = rf(ctx, name)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*database.Deploy)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, name)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockDeployTaskStore_FindActiveDeployByName_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FindActiveDeployByName'
+type MockDeployTaskStore_FindActiveDeployByName_Call struct {
+	*mock.Call
+}
+
+// FindActiveDeployByName is a helper method to define mock.On call
+//   - ctx context.Context
+//   - name string
+func (_e *MockDeployTaskStore_Expecter) FindActiveDeployByName(ctx interface{}, name interface{}) *MockDeployTaskStore_FindActiveDeployByName_Call {
+	return &MockDeployTaskStore_FindActiveDeployByName_Call{Call: _e.mock.On("FindActiveDeployByName", ctx, name)}
+}
+
+func (_c *MockDeployTaskStore_FindActiveDeployByName_Call) Run(run func(ctx context.Context, name string)) *MockDeployTaskStore_FindActiveDeployByName_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockDeployTaskStore_FindActiveDeployByName_Call) Return(_a0 *database.Deploy, _a1 error) *MockDeployTaskStore_FindActiveDeployByName_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockDeployTaskStore_FindActiveDeployByName_Call) RunAndReturn(run func(context.Context, string) (*database.Deploy, error)) *MockDeployTaskStore_FindActiveDeployByName_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // FindActiveDeployByNameAndType provides a mock function with given fields: ctx, userUUID, deployName, deployType
 func (_m *MockDeployTaskStore) FindActiveDeployByNameAndType(ctx context.Context, userUUID string, deployName string, deployType int) (*database.Deploy, error) {
 	ret := _m.Called(ctx, userUUID, deployName, deployType)

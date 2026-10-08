@@ -60,6 +60,10 @@ categories:
   - name: industry
     scope: space
     enabled: false
+  - name: task
+    scope: space
+    show_name: Task
+    enabled: true
   - name: resource
     scope: model
     enabled: false

@@ -2,9 +2,91 @@ package types
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"regexp"
 	"time"
 )
+
+var ErrCSGClawAgentNameInvalid = errors.New("invalid CSGClaw manifest agent name")
+
+func CSGClawAutomaticShareName(instanceID int64) string {
+	return fmt.Sprintf("s-a-%d", instanceID)
+}
+
+// CSGClawAgentName reads the manifest agent name used in CSGClaw API paths.
+func CSGClawAgentName(metadata *map[string]any) (string, error) {
+	if metadata == nil {
+		return "", fmt.Errorf("csgclaw agent template metadata is required")
+	}
+	templateMetadata, ok := (*metadata)["template_metadata"].(map[string]any)
+	if !ok {
+		return "", fmt.Errorf("csgclaw instance template metadata is required")
+	}
+	agentFile, ok := templateMetadata["agent_file"].(map[string]any)
+	if !ok {
+		return "", fmt.Errorf("csgclaw template metadata.agent_file is required")
+	}
+	name, ok := agentFile["name"].(string)
+	if !ok || name == "." || name == ".." || !csgClawAgentNamePattern.MatchString(name) {
+		return "", ErrCSGClawAgentNameInvalid
+	}
+	return name, nil
+}
+
+var csgClawAgentNamePattern = regexp.MustCompile(`^[A-Za-z0-9._-]+$`)
+
+// CSGClawCustomUISpaceID reads the selected UI Space from CSGClaw provisioning metadata.
+func CSGClawCustomUISpaceID(metadata *map[string]any) (int64, error) {
+	if metadata == nil {
+		return 0, fmt.Errorf("provision_request.custom_ui_space_id is required")
+	}
+	provisionRequest, ok := (*metadata)["provision_request"].(map[string]any)
+	if !ok {
+		return 0, fmt.Errorf("provision_request.custom_ui_space_id is required")
+	}
+	value, ok := provisionRequest["custom_ui_space_id"]
+	if !ok {
+		return 0, fmt.Errorf("provision_request.custom_ui_space_id is required")
+	}
+	encoded, err := json.Marshal(map[string]any{"custom_ui_space_id": value})
+	if err != nil {
+		return 0, fmt.Errorf("invalid provision_request.custom_ui_space_id: %w", err)
+	}
+	var request struct {
+		SpaceID int64 `json:"custom_ui_space_id"`
+	}
+	if err := json.Unmarshal(encoded, &request); err != nil || request.SpaceID < 1 {
+		return 0, fmt.Errorf("invalid provision_request.custom_ui_space_id")
+	}
+	return request.SpaceID, nil
+}
+
+// CSGClawHasCustomUI reports whether a custom UI Space is selected.
+func CSGClawHasCustomUI(metadata *map[string]any) (bool, error) {
+	if metadata == nil {
+		return false, nil
+	}
+	request, ok := (*metadata)["provision_request"].(map[string]any)
+	if !ok {
+		return false, nil
+	}
+	value, exists := request["custom_ui_space_id"]
+	if !exists {
+		return false, nil
+	}
+	encoded, err := json.Marshal(map[string]any{"custom_ui_space_id": value})
+	if err != nil {
+		return false, fmt.Errorf("invalid provision_request.custom_ui_space_id: %w", err)
+	}
+	var requestValue struct {
+		SpaceID int64 `json:"custom_ui_space_id"`
+	}
+	if err := json.Unmarshal(encoded, &requestValue); err != nil || requestValue.SpaceID < 1 {
+		return false, fmt.Errorf("invalid provision_request.custom_ui_space_id")
+	}
+	return true, nil
+}
 
 const (
 	CSGBotHeaderUserUUID  = "X-CSG-User-UUID"
@@ -13,6 +95,12 @@ const (
 	CSGBotHeaderRequestID = "X-CSG-Request-Id"
 	CSGBotHeaderAgentName = "X-CSG-Agent-Name"
 	CSGBotHeaderSessionID = "X-CSG-Session-Id"
+
+	// Custom UI invocation context is set by RProxy after resolving the public agent.
+	CSGHubAgentBaseURLHeader     = "X-CSGHub-Agent-Base-URL"
+	CSGHubAgentAuthModeHeader    = "X-CSGHub-Agent-Auth-Mode"
+	CSGHubAgentAuthModeAnonymous = "anonymous"
+	CSGHubAgentAuthModeUserToken = "user-token"
 )
 
 // LLM-Wiki trust headers injected by CSGHub when proxying to llmservice.
@@ -135,6 +223,17 @@ type AgentInstanceFilter struct {
 	BuiltIn    *bool  `json:"built_in"`
 	Public     *bool  `json:"public"`
 	Editable   *bool  `json:"editable"`
+}
+
+type AgentUIOption struct {
+	SpaceID  int64  `json:"space_id" bun:"space_id"`
+	Path     string `json:"path"`
+	Name     string `json:"name"`
+	Private  bool   `json:"private"`
+	SDK      string `json:"sdk"`
+	Status   string `json:"status"`
+	Endpoint string `json:"endpoint"`
+	SvcName  string `json:"-" bun:"svc_name"`
 }
 
 type UpdateAgentInstanceRequest struct {

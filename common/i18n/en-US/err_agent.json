@@ -85,5 +85,11 @@
     },
     "error.AGENT-ERR-28": {
         "other": "Invalid knowledge base content ID: {{.content_id}}"
+    },
+    "error.AGENT-ERR-29": {
+        "other": "Invalid CSGClaw subdomain. Use 1-63 lowercase letters, digits, or hyphens; it must start and end with a letter or digit."
+    },
+    "error.AGENT-ERR-30": {
+        "other": "Invalid CSGClaw agent name. Use only letters, digits, periods, underscores, or hyphens."
     }
 }

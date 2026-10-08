@@ -554,6 +554,9 @@
   "Tag.I18nKey.agentichub-skills": {
     "other": "AgenticHub 技能"
   },
+  "Tag.I18nKey.agent-ui": {
+    "other": "Agent UI"
+  },
   "Tag.I18nKey.org_industry_internet": {
     "other": "互联网"
   },
