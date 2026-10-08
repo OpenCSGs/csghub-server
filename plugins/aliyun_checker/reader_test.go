@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	v1 "opencsg.com/csghub-server/plugins/aliyun_checker/v1"
+	v1 "opencsg.com/csghub-server/plugins/protocol/content_checker/v1"
 )
 
 func TestStreamReaderConcatenatesChunks(t *testing.T) {

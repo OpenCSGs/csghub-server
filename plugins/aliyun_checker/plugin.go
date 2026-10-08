@@ -8,7 +8,7 @@ import (
 	"github.com/hashicorp/go-plugin"
 	"google.golang.org/grpc"
 
-	v1 "opencsg.com/csghub-server/plugins/aliyun_checker/v1"
+	v1 "opencsg.com/csghub-server/plugins/protocol/content_checker/v1"
 )
 
 const PluginName = "csghub_aliyun_checker"
@@ -36,10 +36,10 @@ func (p *Plugin) Client(*plugin.MuxBroker, *rpc.Client) (any, error) {
 }
 
 func (p *Plugin) GRPCServer(_ *plugin.GRPCBroker, server *grpc.Server) error {
-	v1.RegisterAliyunCheckerServer(server, NewServer(p.checker))
+	v1.RegisterContentCheckerServer(server, NewServer(p.checker))
 	return nil
 }
 
 func (p *Plugin) GRPCClient(_ context.Context, _ *plugin.GRPCBroker, conn *grpc.ClientConn) (any, error) {
-	return NewClient(v1.NewAliyunCheckerClient(conn)), nil
+	return NewClient(v1.NewContentCheckerClient(conn)), nil
 }

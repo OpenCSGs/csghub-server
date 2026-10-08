@@ -9,7 +9,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
-	v1 "opencsg.com/csghub-server/plugins/aliyun_checker/v1"
+	v1 "opencsg.com/csghub-server/plugins/protocol/content_checker/v1"
 )
 
 type fakeChecker struct {

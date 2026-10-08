@@ -7,20 +7,20 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
-	v1 "opencsg.com/csghub-server/plugins/aliyun_checker/v1"
+	v1 "opencsg.com/csghub-server/plugins/protocol/content_checker/v1"
 )
 
-type fakeAliyunCheckerClient struct {
-	v1.AliyunCheckerClient
+type fakeContentCheckerClient struct {
+	v1.ContentCheckerClient
 	stream *fakeImageClientStream
 	llmReq *v1.PassLLMCheckRequest
 }
 
-func (f *fakeAliyunCheckerClient) PassImageStreamCheck(ctx context.Context, opts ...grpc.CallOption) (grpc.ClientStreamingClient[v1.ImageStreamFrame, v1.CheckResult], error) {
+func (f *fakeContentCheckerClient) PassImageStreamCheck(ctx context.Context, opts ...grpc.CallOption) (grpc.ClientStreamingClient[v1.ImageStreamFrame, v1.CheckResult], error) {
 	return f.stream, nil
 }
 
-func (f *fakeAliyunCheckerClient) PassLLMCheck(ctx context.Context, req *v1.PassLLMCheckRequest, opts ...grpc.CallOption) (*v1.CheckResult, error) {
+func (f *fakeContentCheckerClient) PassLLMCheck(ctx context.Context, req *v1.PassLLMCheckRequest, opts ...grpc.CallOption) (*v1.CheckResult, error) {
 	f.llmReq = req
 	return &v1.CheckResult{IsSensitive: true, Reason: "politics"}, nil
 }
@@ -47,7 +47,7 @@ func (f *fakeImageClientStream) Context() context.Context {
 
 func TestClientPassImageStreamCheck(t *testing.T) {
 	stream := &fakeImageClientStream{}
-	client := NewClient(&fakeAliyunCheckerClient{stream: stream})
+	client := NewClient(&fakeContentCheckerClient{stream: stream})
 
 	result, err := client.PassImageStreamCheck(context.Background(), "baselineCheck", strings.NewReader("abcdef"))
 	require.NoError(t, err)
@@ -59,7 +59,7 @@ func TestClientPassImageStreamCheck(t *testing.T) {
 }
 
 func TestClientPassLLMCheck(t *testing.T) {
-	pbClient := &fakeAliyunCheckerClient{}
+	pbClient := &fakeContentCheckerClient{}
 	client := NewClient(pbClient)
 
 	result, err := client.PassLLMCheck(context.Background(), &LLMCheckRequest{
