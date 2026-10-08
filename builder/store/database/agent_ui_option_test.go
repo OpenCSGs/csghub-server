@@ -37,9 +37,9 @@ func TestAgentUIOptionStore_ListFiltersAndPaginates(t *testing.T) {
 		}
 		insertErr := db.Core.NewInsert().Model(repo).Scan(ctx, repo)
 		require.NoError(t, insertErr)
-		space, createErr := spaceStore.Create(ctx, database.Space{RepositoryID: repo.ID, Sdk: types.GRADIO.Name})
+		_, createErr := spaceStore.Create(ctx, database.Space{RepositoryID: repo.ID, Sdk: types.GRADIO.Name})
 		require.NoError(t, createErr)
-		space, createErr = spaceStore.ByRepoID(ctx, repo.ID)
+		space, createErr := spaceStore.ByRepoID(ctx, repo.ID)
 		require.NoError(t, createErr)
 		if withTag {
 			_, insertErr = db.Core.NewInsert().Model(&database.RepositoryTag{RepositoryID: repo.ID, TagID: tag.ID, Count: 1}).Exec(ctx)
@@ -94,9 +94,9 @@ func TestAgentUIOptionStore_HasAgentUITag(t *testing.T) {
 	repo := &database.Repository{UserID: 1, Path: "ui-tag/" + uniqueName, GitPath: "ui-tag/" + uniqueName, Name: uniqueName, Nickname: uniqueName, DefaultBranch: "main", RepositoryType: types.SpaceRepo}
 	err := db.Core.NewInsert().Model(repo).Scan(ctx, repo)
 	require.NoError(t, err)
-	space, err := database.NewSpaceStoreWithDB(db).Create(ctx, database.Space{RepositoryID: repo.ID, Sdk: types.GRADIO.Name})
+	_, err = database.NewSpaceStoreWithDB(db).Create(ctx, database.Space{RepositoryID: repo.ID, Sdk: types.GRADIO.Name})
 	require.NoError(t, err)
-	space, err = database.NewSpaceStoreWithDB(db).ByRepoID(ctx, repo.ID)
+	space, err := database.NewSpaceStoreWithDB(db).ByRepoID(ctx, repo.ID)
 	require.NoError(t, err)
 	_, err = db.Core.NewInsert().Model(&database.RepositoryTag{RepositoryID: repo.ID, TagID: tag.ID, Count: 1}).Exec(ctx)
 	require.NoError(t, err)
