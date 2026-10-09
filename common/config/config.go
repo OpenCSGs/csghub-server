@@ -621,6 +621,7 @@ type Config struct {
 		PresignExpirySeconds                   int    `env:"OPENCSG_AIGATEWAY_PRESIGN_EXPIRY" default:"86400"`
 		ResponsesIDSecret                      string `env:"OPENCSG_AIGATEWAY_RESPONSES_ID_SECRET" default:"responses-id-secret"`
 		EnableLLMLog                           bool   `env:"OPENCSG_AIGATEWAY_LLMLOG_ENABLE" default:"true"`
+		EnableLLMLogCompress                   bool   `env:"OPENCSG_AIGATEWAY_LLMLOG_COMPRESS_ENABLE" default:"false"`
 		EnableLLMTrace                         bool   `env:"OPENCSG_AIGATEWAY_LLM_TRACE_ENABLE" default:"true"`
 		LLMTraceContentCapture                 string `env:"OPENCSG_AIGATEWAY_LLM_TRACE_CONTENT_CAPTURE" default:"metadata_only"`
 		LLMTraceMaxContentLength               int    `env:"OPENCSG_AIGATEWAY_LLM_TRACE_MAX_CONTENT_LENGTH" default:"256"`
@@ -744,8 +745,8 @@ type Config struct {
 		UploadTimeoutSeconds int    `env:"OPENCSG_LLMLOG_UPLOAD_TIMEOUT_SECONDS" default:"30"`
 		AckWaitSeconds       int    `env:"OPENCSG_LLMLOG_ACK_WAIT_SECONDS" default:"180"`
 		MaxDeliver           int    `env:"OPENCSG_LLMLOG_MAX_DELIVER" default:"6"`
-		StreamMaxBytes       int64  `env:"OPENCSG_LLMLOG_STREAM_MAX_BYTES" default:"8589934592"`    // 8 GiB
-		StreamMaxAgeSeconds  int    `env:"OPENCSG_LLMLOG_STREAM_MAX_AGE_SECONDS" default:"1209600"` // 14 days
+		StreamMaxBytes       int64  `env:"OPENCSG_LLMLOG_STREAM_MAX_BYTES" default:"2147483648"`   // 2 GiB
+		StreamMaxAgeSeconds  int    `env:"OPENCSG_LLMLOG_STREAM_MAX_AGE_SECONDS" default:"604800"` // 7 days
 		Sync                 struct {
 			Enable             bool     `env:"STARHUB_SERVER_LLMLOG_SYNC_ENABLE" default:"false"`
 			Username           string   `env:"STARHUB_SERVER_LLMLOG_SYNC_USERNAME" default:""`

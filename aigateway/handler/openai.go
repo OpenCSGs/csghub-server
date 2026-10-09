@@ -157,7 +157,7 @@ func newOpenAIHandler(
 		aiGenerationStore:          aiGenerationStore,
 		sensitivePolicy:            component.NewSensitivePolicy(modComponent, whitelistRule),
 		ocrRegistry:                ocradapter.NewRegistry(),
-		llmLogPublisher:            component.NewLLMLogPublisher(),
+		llmLogPublisher:            component.NewLLMLogPublisher(config.AIGateway.EnableLLMLogCompress),
 		sessionRouter:              router.NewSessionRouter(),
 		chatAttemptFailureReporter: noopChatAttemptFailureReporter{},
 	}
