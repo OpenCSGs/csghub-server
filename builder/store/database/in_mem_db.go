@@ -103,6 +103,17 @@ func createIndexes(ctx context.Context, db *bun.DB) error {
 	}
 
 	_, err = db.NewCreateIndex().
+		Model((*ArgoWorkflow)(nil)).
+		Index("unique_argo_workflow_taskid").
+		Column("task_id").
+		Unique().
+		IfNotExists().
+		Exec(ctx)
+	if err != nil {
+		return fmt.Errorf("fail to create index unique_argo_workflow_taskid: %w", err)
+	}
+
+	_, err = db.NewCreateIndex().
 		Model((*KnativeServiceRevision)(nil)).
 		Index("idx_knative_service_revision_revision_name").
 		Unique().
