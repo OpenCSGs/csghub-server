@@ -219,6 +219,9 @@ func (p *plannerImpl) applyAdmissionOutcome(pl *types.RequestPlan, meta *types.R
 	// Record the decision on the plan for both observability and the
 	// Orchestrator's lease-release safety net.
 	pl.Admission = decision
+	// Accumulate the queue wait across plan rounds (reroute re-plans run
+	// admission again; the per-request event must carry the TOTAL wait).
+	meta.QueueWaitMs += decision.QueueWaitMs
 	if decision.Action == types.AdmissionReroute {
 		// The queued ticket was cancelled because its upstream turned
 		// unavailable while waiting; the planner re-runs the plan (bounded

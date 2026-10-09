@@ -536,6 +536,72 @@ func (_c *MockLLMServiceComponent_ListExternalLLMs_Call) RunAndReturn(run func(c
 	return _c
 }
 
+// ListMetricEvents provides a mock function with given fields: ctx, query
+func (_m *MockLLMServiceComponent) ListMetricEvents(ctx context.Context, query types.AIGatewayMetricEventQuery) ([]*types.AIGatewayMetricEventLog, int, error) {
+	ret := _m.Called(ctx, query)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListMetricEvents")
+	}
+
+	var r0 []*types.AIGatewayMetricEventLog
+	var r1 int
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.AIGatewayMetricEventQuery) ([]*types.AIGatewayMetricEventLog, int, error)); ok {
+		return rf(ctx, query)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.AIGatewayMetricEventQuery) []*types.AIGatewayMetricEventLog); ok {
+		r0 = rf(ctx, query)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]*types.AIGatewayMetricEventLog)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.AIGatewayMetricEventQuery) int); ok {
+		r1 = rf(ctx, query)
+	} else {
+		r1 = ret.Get(1).(int)
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, types.AIGatewayMetricEventQuery) error); ok {
+		r2 = rf(ctx, query)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
+// MockLLMServiceComponent_ListMetricEvents_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListMetricEvents'
+type MockLLMServiceComponent_ListMetricEvents_Call struct {
+	*mock.Call
+}
+
+// ListMetricEvents is a helper method to define mock.On call
+//   - ctx context.Context
+//   - query types.AIGatewayMetricEventQuery
+func (_e *MockLLMServiceComponent_Expecter) ListMetricEvents(ctx interface{}, query interface{}) *MockLLMServiceComponent_ListMetricEvents_Call {
+	return &MockLLMServiceComponent_ListMetricEvents_Call{Call: _e.mock.On("ListMetricEvents", ctx, query)}
+}
+
+func (_c *MockLLMServiceComponent_ListMetricEvents_Call) Run(run func(ctx context.Context, query types.AIGatewayMetricEventQuery)) *MockLLMServiceComponent_ListMetricEvents_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.AIGatewayMetricEventQuery))
+	})
+	return _c
+}
+
+func (_c *MockLLMServiceComponent_ListMetricEvents_Call) Return(_a0 []*types.AIGatewayMetricEventLog, _a1 int, _a2 error) *MockLLMServiceComponent_ListMetricEvents_Call {
+	_c.Call.Return(_a0, _a1, _a2)
+	return _c
+}
+
+func (_c *MockLLMServiceComponent_ListMetricEvents_Call) RunAndReturn(run func(context.Context, types.AIGatewayMetricEventQuery) ([]*types.AIGatewayMetricEventLog, int, error)) *MockLLMServiceComponent_ListMetricEvents_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ShowLLMConfig provides a mock function with given fields: ctx, id
 func (_m *MockLLMServiceComponent) ShowLLMConfig(ctx context.Context, id int64) (*types.LLMConfig, error) {
 	ret := _m.Called(ctx, id)

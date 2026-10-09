@@ -39,6 +39,11 @@ func SetMetricsModelTarget(p SetMetricsModelParams) {
 func SetMetricsTTFT(c *gin.Context, ttftMs int64) {
 }
 
+// SetMetricsError is a CE no-op: there is no metrics middleware to record
+// error categories or messages.
+func SetMetricsError(c *gin.Context, errorType, errorMessage string) {
+}
+
 func SetMetricsUsageFromCounter(c *gin.Context, ctx context.Context, counter token.Counter) {
 }
 

@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"math"
 	"strings"
+	"time"
 
 	"opencsg.com/csghub-server/aigateway/sample"
 	aigatewaytypes "opencsg.com/csghub-server/aigateway/types"
@@ -44,6 +45,10 @@ type LLMServiceComponent interface {
 	// upstream URL (supporting /chat/completions and /responses endpoints), and
 	// returns the masked request summary, response status, body and content.
 	TestUpstream(ctx context.Context, req *types.TestUpstreamReq) (*types.TestUpstreamResult, error)
+	// ListMetricEvents returns a page of raw AI Gateway metric events (model
+	// request logs) matching the query, with llm_config_id resolved from the
+	// event's upstream_id.
+	ListMetricEvents(ctx context.Context, query types.AIGatewayMetricEventQuery) ([]*types.AIGatewayMetricEventLog, int, error)
 }
 
 type llmServiceComponentImpl struct {
@@ -53,6 +58,7 @@ type llmServiceComponentImpl struct {
 	repoStore         database.RepoStore
 	healthStateStore  database.AIGatewayUpstreamHealthStateStore
 	circuitStateStore database.AIGatewayUpstreamCircuitStateStore
+	metricEventStore  database.AIGatewayMetricEventStore
 	accountComponent  AccountingComponent
 	sampleRegistry    *sample.Registry
 }
@@ -66,6 +72,7 @@ func NewLLMServiceComponent(config *config.Config) (LLMServiceComponent, error) 
 	upstreamStore := database.NewUpstreamStore(config)
 	healthStateStore := database.NewAIGatewayUpstreamHealthStateStore()
 	circuitStateStore := database.NewAIGatewayUpstreamCircuitStateStore()
+	metricEventStore := database.NewAIGatewayMetricEventStore()
 	ac, err := NewAccountingComponent(config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create accounting component: %w", err)
@@ -77,6 +84,7 @@ func NewLLMServiceComponent(config *config.Config) (LLMServiceComponent, error) 
 		repoStore:         repoStore,
 		healthStateStore:  healthStateStore,
 		circuitStateStore: circuitStateStore,
+		metricEventStore:  metricEventStore,
 		accountComponent:  ac,
 		sampleRegistry:    sample.NewDefaultRegistry(),
 	}
@@ -128,6 +136,71 @@ func (s *llmServiceComponentImpl) IndexPromptPrefix(ctx context.Context, per, pa
 		return nil, 0, err
 	}
 	return promptPrefixes, total, nil
+}
+
+// ListMetricEvents lists raw AI Gateway metric events (model request logs)
+// within a mandatory time range. When query.LlmConfigID is set, it is first
+// resolved to the IDs of its upstreams so the store can filter by upstream_id.
+// Every returned row carries the llm_config_id resolved from its upstream_id,
+// which the frontend uses to link to the llm config detail page.
+func (s *llmServiceComponentImpl) ListMetricEvents(ctx context.Context, query types.AIGatewayMetricEventQuery) ([]*types.AIGatewayMetricEventLog, int, error) {
+	if query.LlmConfigID > 0 {
+		upstreams, err := s.upstreamStore.ListByLLMConfigID(ctx, query.LlmConfigID)
+		if err != nil {
+			return nil, 0, fmt.Errorf("failed to resolve upstreams of llm config %d: %w", query.LlmConfigID, err)
+		}
+		query.UpstreamIDs = make([]int64, 0, len(upstreams))
+		for _, u := range upstreams {
+			query.UpstreamIDs = append(query.UpstreamIDs, u.ID)
+		}
+	}
+	dbEvents, total, err := s.metricEventStore.List(ctx, query)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	upstreamIDs := make([]int64, 0, len(dbEvents))
+	for _, e := range dbEvents {
+		if e.UpstreamID > 0 {
+			upstreamIDs = append(upstreamIDs, e.UpstreamID)
+		}
+	}
+	upstreamToConfig, err := s.upstreamStore.MapUpstreamIDsToLLMConfigIDs(ctx, upstreamIDs)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	logs := make([]*types.AIGatewayMetricEventLog, 0, len(dbEvents))
+	for _, e := range dbEvents {
+		var startTime *time.Time
+		if !e.StartTime.IsZero() {
+			startTime = &e.StartTime
+		}
+		logs = append(logs, &types.AIGatewayMetricEventLog{
+			RequestID:           e.RequestID,
+			StartTime:           startTime,
+			CreatedAt:           e.CreatedAt,
+			Model:               e.Model,
+			Provider:            e.Provider,
+			APIKeyMasked:        e.APIKeyMasked,
+			Username:            e.Username,
+			StatusCode:          e.StatusCode,
+			IsStream:            e.IsStream,
+			ErrorType:           e.ErrorType,
+			ErrorMessage:        e.ErrorMessage,
+			LatencyMs:           e.LatencyMs,
+			TTFTMs:              e.TTFTMs,
+			QueueWaitMs:         e.QueueWaitMs,
+			PromptTokens:        e.PromptTokens,
+			CompletionTokens:    e.CompletionTokens,
+			TotalTokens:         e.TotalTokens,
+			CachedTokens:        e.CachedTokens,
+			CacheCreationTokens: e.CacheCreationTokens,
+			UpstreamID:          e.UpstreamID,
+			LlmConfigID:         upstreamToConfig[e.UpstreamID],
+		})
+	}
+	return logs, int(total), nil
 }
 
 func (s *llmServiceComponentImpl) ShowLLMConfig(ctx context.Context, id int64) (*types.LLMConfig, error) {

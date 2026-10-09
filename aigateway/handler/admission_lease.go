@@ -176,6 +176,7 @@ func (h *OpenAIHandlerImpl) handleAdmissionDenied(c *gin.Context, isStream bool,
 	} else if reason == types.AdmissionReasonQueueCancelled {
 		message = "request left the admission queue before being served"
 	}
+	SetMetricsError(c, reason, message)
 	slog.WarnContext(c.Request.Context(), "capacity admission denied",
 		slog.String("model", c.Param("model")),
 		slog.String("reason", message),

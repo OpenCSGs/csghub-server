@@ -374,6 +374,57 @@ type SearchLLMConfig struct {
 	SortOrder string `json:"sort_order"` // ASC | DESC
 }
 
+// AIGatewayMetricEventQuery is the filter/pagination parameters for listing
+// raw AI Gateway metric events (model request logs). StartTime/EndTime are
+// mandatory and filter on the minute-truncated bucket_time hypertable
+// dimension so queries stay chunk-pruned.
+type AIGatewayMetricEventQuery struct {
+	StartTime    time.Time `json:"start_time"`     // required, bucket_time >= StartTime
+	EndTime      time.Time `json:"end_time"`       // required, bucket_time <= EndTime
+	Model        string    `json:"model"`          // optional exact match
+	StatusCode   int       `json:"status_code"`    // optional exact match, 0 means all
+	Username     string    `json:"username"`       // optional exact match
+	APIKeyMasked string    `json:"api_key_masked"` // optional exact match
+	RequestID    string    `json:"request_id"`     // optional exact match
+	// LlmConfigID optionally restricts events to upstreams belonging to this
+	// llm config (resolved via upstream_id).
+	LlmConfigID int64 `json:"llm_config_id"`
+	// UpstreamIDs is filled by the component layer when LlmConfigID is set.
+	UpstreamIDs []int64 `json:"-"`
+	Per         int     `json:"-"`
+	Page        int     `json:"-"`
+}
+
+// AIGatewayMetricEventLog is the API representation of one AI Gateway model
+// request log row. LlmConfigID is resolved from UpstreamID so the frontend
+// can link to the llm config detail page.
+type AIGatewayMetricEventLog struct {
+	RequestID string `json:"request_id"`
+	// StartTime is the full-precision request start time; nil (omitted in
+	// JSON) for rows written before the diagnostics columns existed, so the
+	// frontend can fall back to CreatedAt.
+	StartTime           *time.Time `json:"start_time,omitempty"`
+	CreatedAt           time.Time  `json:"created_at"`
+	Model               string     `json:"model"`
+	Provider            string     `json:"provider"`
+	APIKeyMasked        string     `json:"api_key_masked"`
+	Username            string     `json:"username"`
+	StatusCode          int        `json:"status_code"`
+	IsStream            bool       `json:"is_stream"`
+	ErrorType           string     `json:"error_type"`
+	ErrorMessage        string     `json:"error_message"`
+	LatencyMs           int64      `json:"latency_ms"`
+	TTFTMs              int64      `json:"ttft_ms"`
+	QueueWaitMs         int64      `json:"queue_wait_ms"`
+	PromptTokens        int64      `json:"prompt_tokens"`
+	CompletionTokens    int64      `json:"completion_tokens"`
+	TotalTokens         int64      `json:"total_tokens"`
+	CachedTokens        int64      `json:"cached_tokens"`
+	CacheCreationTokens int64      `json:"cache_creation_tokens"`
+	UpstreamID          int64      `json:"upstream_id"`
+	LlmConfigID         int64      `json:"llm_config_id"`
+}
+
 type SearchPromptPrefix struct {
 	Keyword string `json:"keyword"` // Search keyword
 	Kind    string `json:"kind"`    // Kind of prompt prefix
