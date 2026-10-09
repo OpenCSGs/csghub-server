@@ -22,7 +22,8 @@ type Collection struct {
 	Likes        int64                  `json:"likes"`
 	UserLikes    bool                   `json:"user_likes"`
 	CanWrite     bool                   `json:"can_write"`
-	CanManage    bool                   `json:"can_manage"`
+	CanRead      bool                   `json:"can_read"`
+	CanAdmin     bool                   `json:"can_admin"`
 	Avatar       string                 `json:"avatar"`
 }
 

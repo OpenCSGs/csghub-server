@@ -203,7 +203,8 @@ type Model struct {
 	ComplianceStatus        ComplianceStatus        `json:"compliance_status"`
 	CommercialPermission    CommercialPermission    `json:"commercial_permission"`
 	CanWrite                bool                    `json:"can_write"`
-	CanManage               bool                    `json:"can_manage"`
+	CanRead                 bool                    `json:"can_read"`
+	CanAdmin                bool                    `json:"can_admin"`
 	IsOrganization          bool                    `json:"is_organization"`
 	Namespace               *Namespace              `json:"namespace"`
 	RecomOpWeight           int                     `json:"recom_op_weight,omitempty"`
@@ -464,6 +465,7 @@ type ModelInfo struct {
 	TotalParams int64 `json:"total_params"`
 	// 1b, 7b, 13b
 	ParamsBillions float32 `json:"params_billions"`
+	ParamsValid    bool    `json:"-"`
 	//fp16, fp32, int8
 	TensorType      string  `json:"tensor_type"`
 	MiniGPUMemoryGB float32 `json:"mini_gpu_memory_gb"`

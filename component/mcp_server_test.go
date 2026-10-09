@@ -257,7 +257,8 @@ func TestMCPServerComponent_Show(t *testing.T) {
 	}, nil)
 
 	mc.mocks.components.repo.EXPECT().GetUserRepoPermission(ctx, "user", dbrepo).Return(&types.UserRepoPermission{
-		CanRead: true,
+		CanRead:  true,
+		CanWrite: true,
 	}, nil)
 	mc.mocks.components.repo.EXPECT().GetMirrorTaskStatus(dbrepo).Return(
 		types.MirrorRepoSyncStart,
@@ -274,6 +275,9 @@ func TestMCPServerComponent_Show(t *testing.T) {
 	require.Equal(t, res.Path, "ns/n")
 	require.Equal(t, res.MirrorTaskStatus, types.MirrorRepoSyncStart)
 	require.Equal(t, res.SyncStatus, types.SyncStatusInProgress)
+	require.True(t, res.CanWrite)
+	require.True(t, res.CanRead)
+	require.False(t, res.CanAdmin)
 }
 
 func TestMCPServerComponent_Index(t *testing.T) {

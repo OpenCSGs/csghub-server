@@ -263,7 +263,7 @@ func TestCodeComponent_Show(t *testing.T) {
 	}}
 	cc.mocks.stores.CodeMock().EXPECT().FindByPath(ctx, "ns", "n").Return(code, nil)
 	cc.mocks.components.repo.EXPECT().GetUserRepoPermission(ctx, "user", code.Repository).Return(
-		&types.UserRepoPermission{CanRead: true, CanAdmin: true}, nil,
+		&types.UserRepoPermission{CanRead: true, CanWrite: true}, nil,
 	)
 	cc.mocks.stores.UserLikesMock().EXPECT().IsExist(ctx, "user", int64(11)).Return(true, nil)
 	cc.mocks.components.repo.EXPECT().GetNameSpaceInfo(ctx, "ns").Return(&types.Namespace{}, nil)
@@ -279,15 +279,15 @@ func TestCodeComponent_Show(t *testing.T) {
 			HTTPCloneURL: "/s/.git",
 			SSHCloneURL:  ":s/.git",
 		},
-		RepositoryID:         11,
-		Namespace:            &types.Namespace{},
-		Name:                 "name",
-		User:                 types.User{Username: "user"},
-		CanManage:            true,
-		UserLikes:            true,
-		SensitiveCheckStatus: "Pending",
-		MirrorTaskStatus:     types.MirrorRepoSyncStart,
-		SyncStatus:           types.SyncStatusInProgress,
+		RepositoryID:     11,
+		Namespace:        &types.Namespace{},
+		Name:             "name",
+		User:             types.User{Username: "user"},
+		CanWrite:         true,
+		CanRead:          true,
+		UserLikes:        true,
+		MirrorTaskStatus: types.MirrorRepoSyncStart,
+		SyncStatus:       types.SyncStatusInProgress,
 	}, data)
 }
 

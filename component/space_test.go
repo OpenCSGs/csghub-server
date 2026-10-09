@@ -197,7 +197,7 @@ func TestSpaceComponent_Show(t *testing.T) {
 
 	sc.mocks.stores.SpaceMock().EXPECT().FindByPath(ctx, "ns", "n").Return(dbSpace, nil)
 	sc.mocks.components.repo.EXPECT().GetUserRepoPermission(ctx, "user", dbRepo).Return(
-		&types.UserRepoPermission{CanRead: true, CanAdmin: true}, nil,
+		&types.UserRepoPermission{CanRead: true, CanWrite: true}, nil,
 	)
 	sc.mocks.components.repo.EXPECT().GetNameSpaceInfo(ctx, "ns").Return(&types.Namespace{Path: "ns"}, nil)
 
@@ -220,16 +220,16 @@ func TestSpaceComponent_Show(t *testing.T) {
 	space, err := sc.Show(ctx, "ns", "n", "user", false)
 	require.Nil(t, err)
 	require.Equal(t, &types.Space{
-		ID:                   1,
-		Name:                 "n",
-		Namespace:            &types.Namespace{Path: "ns"},
-		UserLikes:            true,
-		RepositoryID:         123,
-		Status:               "Stopped",
-		CanManage:            true,
-		User:                 &types.User{},
-		Path:                 "foo/bar",
-		SensitiveCheckStatus: "Pending",
+		ID:           1,
+		Name:         "n",
+		Namespace:    &types.Namespace{Path: "ns"},
+		UserLikes:    true,
+		RepositoryID: 123,
+		Status:       "Stopped",
+		CanWrite:     true,
+		CanRead:      true,
+		User:         &types.User{},
+		Path:         "foo/bar",
 		Repository: &types.Repository{
 			HTTPCloneURL: "/s/foo/bar.git",
 			SSHCloneURL:  ":s/foo/bar.git",

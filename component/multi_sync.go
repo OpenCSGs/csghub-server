@@ -584,6 +584,7 @@ func (c *multiSyncComponentImpl) createLocalModel(ctx context.Context, m *types.
 	err = c.metadataStore.Upsert(ctx, &database.Metadata{
 		RepositoryID:      newDBRepo.ID,
 		ModelParams:       m.Metadata.ModelParams,
+		ModelParamsValid:  modelParamsValidFromSync(m.Metadata.ModelParamsValid, m.Metadata.ModelParams),
 		TensorType:        m.Metadata.TensorType,
 		MiniGPUMemoryGB:   m.Metadata.MiniGPUMemoryGB,
 		MiniGPUFinetuneGB: m.Metadata.MiniGPUFinetuneGB,
@@ -606,6 +607,13 @@ func (c *multiSyncComponentImpl) createLocalModel(ctx context.Context, m *types.
 	}
 
 	return nil
+}
+
+func modelParamsValidFromSync(valid *bool, modelParams float32) bool {
+	if valid != nil {
+		return *valid
+	}
+	return modelParams > 0
 }
 
 // createLocalCode creates or updates a code repository under a canonical local path.

@@ -207,7 +207,8 @@ func (c *promptComponentImpl) GetPrompt(ctx context.Context, req types.PromptReq
 		return nil, fmt.Errorf("failed to parse jsonl %s, error: %w", req.Path, err)
 	}
 	p.CanWrite = permission.CanWrite
-	p.CanManage = permission.CanAdmin
+	p.CanRead = permission.CanRead
+	p.CanAdmin = permission.CanAdmin
 	return p, nil
 }
 
@@ -917,7 +918,8 @@ func (c *promptComponentImpl) Show(ctx context.Context, namespace, name, current
 		SyncStatus: prompt.Repository.SyncStatus,
 		License:    prompt.Repository.License,
 		CanWrite:   permission.CanWrite,
-		CanManage:  permission.CanAdmin,
+		CanRead:    permission.CanRead,
+		CanAdmin:   permission.CanAdmin,
 		Namespace:  ns,
 		MultiSource: types.MultiSource{
 			HFPath:  prompt.Repository.HFPath,

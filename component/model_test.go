@@ -303,7 +303,7 @@ func TestModelComponent_Show(t *testing.T) {
 			Architecture: "llama",
 		},
 	}).Return(
-		&types.UserRepoPermission{CanRead: true, CanAdmin: true}, nil,
+		&types.UserRepoPermission{CanRead: true, CanWrite: true}, nil,
 	)
 	mc.mocks.components.repo.EXPECT().GetNameSpaceInfo(ctx, "ns").Return(&types.Namespace{Path: "ns", Type: types.OrganizationNamespaceType}, nil)
 
@@ -332,22 +332,23 @@ func TestModelComponent_Show(t *testing.T) {
 	model, err := mc.Show(ctx, "ns", "n", "user", false, false)
 	require.Nil(t, err)
 	require.Equal(t, &types.Model{
-		ID:                   1,
-		Name:                 "n",
-		Namespace:            &types.Namespace{Path: "ns", Type: types.OrganizationNamespaceType},
-		UserLikes:            true,
-		RepositoryID:         123,
-		CanManage:            true,
-		IsOrganization:       true,
-		User:                 &types.User{},
-		Path:                 "foo/bar",
-		SensitiveCheckStatus: "Pending",
+		ID:             1,
+		Name:           "n",
+		Namespace:      &types.Namespace{Path: "ns", Type: types.OrganizationNamespaceType},
+		UserLikes:      true,
+		RepositoryID:   123,
+		CanWrite:       true,
+		CanRead:        true,
+		IsOrganization: true,
+		User:           &types.User{},
+		Path:           "foo/bar",
 		Repository: types.Repository{
 			HTTPCloneURL: "https://foo.com/s/foo/bar.git",
 			SSHCloneURL:  "test@127.0.0.1:s/foo/bar.git",
 		},
 		Metadata: types.Metadata{
-			Architecture: "llama",
+			Architecture:     "llama",
+			ModelParamsValid: new(bool),
 		},
 		Tags:             []types.RepoTag{{Name: "safetensors", Category: "framework"}},
 		EnableInference:  true,
@@ -425,7 +426,8 @@ func TestModelComponent_Show_Syncing(t *testing.T) {
 		Namespace:            &types.Namespace{Path: "ns", Type: types.OrganizationNamespaceType},
 		UserLikes:            true,
 		RepositoryID:         123,
-		CanManage:            true,
+		CanRead:              true,
+		CanAdmin:             true,
 		IsOrganization:       true,
 		User:                 &types.User{},
 		Path:                 "foo/bar",
@@ -435,7 +437,8 @@ func TestModelComponent_Show_Syncing(t *testing.T) {
 			SSHCloneURL:  "test@127.0.0.1:s/foo/bar.git",
 		},
 		Metadata: types.Metadata{
-			Architecture: "llama",
+			Architecture:     "llama",
+			ModelParamsValid: new(bool),
 		},
 		Tags:             []types.RepoTag{{Name: "safetensors", Category: "framework"}},
 		EnableInference:  true,
@@ -500,7 +503,8 @@ func TestModelComponent_Show_Mirror(t *testing.T) {
 		Namespace:            &types.Namespace{Path: "ns", Type: types.OrganizationNamespaceType},
 		UserLikes:            true,
 		RepositoryID:         123,
-		CanManage:            true,
+		CanRead:              true,
+		CanAdmin:             true,
 		IsOrganization:       true,
 		User:                 &types.User{},
 		Path:                 "foo/bar",
@@ -510,7 +514,8 @@ func TestModelComponent_Show_Mirror(t *testing.T) {
 			SSHCloneURL:  "test@127.0.0.1:s/foo/bar.git",
 		},
 		Metadata: types.Metadata{
-			Architecture: "llama",
+			Architecture:     "llama",
+			ModelParamsValid: new(bool),
 		},
 		Tags:             []types.RepoTag{{Name: "safetensors", Category: "framework"}},
 		EnableInference:  true,
@@ -574,7 +579,8 @@ func TestModelComponent_Show_Repository(t *testing.T) {
 		Namespace:            &types.Namespace{Path: "ns", Type: types.OrganizationNamespaceType},
 		UserLikes:            true,
 		RepositoryID:         123,
-		CanManage:            true,
+		CanRead:              true,
+		CanAdmin:             true,
 		IsOrganization:       true,
 		User:                 &types.User{},
 		Path:                 "foo/bar",
@@ -584,7 +590,8 @@ func TestModelComponent_Show_Repository(t *testing.T) {
 			SSHCloneURL:  "test@127.0.0.1:s/foo/bar.git",
 		},
 		Metadata: types.Metadata{
-			Architecture: "llama",
+			Architecture:     "llama",
+			ModelParamsValid: new(bool),
 		},
 		Tags:             []types.RepoTag{{Name: "safetensors", Category: "framework"}},
 		EnableInference:  true,
@@ -1212,8 +1219,8 @@ func TestModelComponent_IndexV2(t *testing.T) {
 	filter := &types.RepoFilter{Username: "user"}
 	mc.mocks.components.repo.EXPECT().PublicToUserV2(ctx, types.ModelRepo, "user", filter, 10, 1).Return(
 		[]*database.Repository{
-			{ID: 10, Name: "model1", Nickname: "Model 1", Description: "desc1", Likes: 10, DownloadCount: 100, Path: "u/model1", Private: false, Source: "local", SyncStatus: "completed", License: "MIT"},
-			{ID: 20, Name: "model2", Nickname: "Model 2", Description: "desc2", Likes: 20, DownloadCount: 200, Path: "u/model2", Private: true, Source: "opencsg", SyncStatus: "completed", License: "Apache-2.0"},
+			{ID: 10, Name: "model1", Nickname: "Model 1", Description: "desc1", Likes: 10, DownloadCount: 100, Path: "u/model1", Private: false, Source: "local", SyncStatus: "completed", License: "MIT", HFPath: "hf/model1", MSPath: "ms/model1", CSGPath: "csg/model1"},
+			{ID: 20, Name: "model2", Nickname: "Model 2", Description: "desc2", Likes: 20, DownloadCount: 200, Path: "u/model2", Private: true, Source: "opencsg", SyncStatus: "completed", License: "Apache-2.0", HFPath: "hf/model2", MSPath: "ms/model2", CSGPath: "csg/model2"},
 		}, 200, nil,
 	)
 
@@ -1233,11 +1240,13 @@ func TestModelComponent_IndexV2(t *testing.T) {
 			ID: 110, Name: "model1", Nickname: "Model 1", Description: "desc1",
 			Likes: 10, Downloads: 100, Path: "u/model1", RepositoryID: 10,
 			Private: false, Source: "local", SyncStatus: "completed", License: "MIT",
+			MultiSource: expectedIndexMultiSource(types.MultiSource{HFPath: "hf/model1", MSPath: "ms/model1", CSGPath: "csg/model1"}),
 		},
 		{
 			ID: 220, Name: "model2", Nickname: "Model 2", Description: "desc2",
 			Likes: 20, Downloads: 200, Path: "u/model2", RepositoryID: 20,
 			Private: true, Source: "opencsg", SyncStatus: "completed", License: "Apache-2.0",
+			MultiSource: expectedIndexMultiSource(types.MultiSource{HFPath: "hf/model2", MSPath: "ms/model2", CSGPath: "csg/model2"}),
 		},
 	}, data)
 }

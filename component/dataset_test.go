@@ -109,8 +109,8 @@ func TestDatasetCompnent_Index(t *testing.T) {
 	filter := &types.RepoFilter{Username: "user"}
 	dc.mocks.components.repo.EXPECT().PublicToUser(ctx, types.DatasetRepo, "user", filter, 10, 1).Return(
 		[]*database.Repository{
-			{ID: 1, Tags: []database.Tag{{Name: "t1"}}},
-			{ID: 2},
+			{ID: 1, Tags: []database.Tag{{Name: "t1"}}, HFPath: "hf/dataset1", MSPath: "ms/dataset1", CSGPath: "csg/dataset1"},
+			{ID: 2, HFPath: "hf/dataset2", MSPath: "ms/dataset2", CSGPath: "csg/dataset2"},
 		}, 100, nil,
 	)
 	dc.mocks.stores.DatasetMock().EXPECT().ByRepoIDs(ctx, []int64{1, 2}).Return([]database.Dataset{
@@ -138,12 +138,14 @@ func TestDatasetCompnent_Index(t *testing.T) {
 			HTTPCloneURL: "/s/user1/dataset1.git",
 			SSHCloneURL:  ":s/user1/dataset1.git",
 		}, User: types.User{Username: "user1"},
-			Tags: []types.RepoTag{{Name: "t1"}},
+			Tags:        []types.RepoTag{{Name: "t1"}},
+			MultiSource: expectedIndexMultiSource(types.MultiSource{HFPath: "hf/dataset1", MSPath: "ms/dataset1", CSGPath: "csg/dataset1"}),
 		},
 		{ID: 11, RepositoryID: 2, Repository: types.Repository{
 			HTTPCloneURL: "/s/user2/dataset2.git",
 			SSHCloneURL:  ":s/user2/dataset2.git",
 		}, User: types.User{Username: "user2"},
+			MultiSource: expectedIndexMultiSource(types.MultiSource{HFPath: "hf/dataset2", MSPath: "ms/dataset2", CSGPath: "csg/dataset2"}),
 		},
 	}, data)
 
@@ -314,6 +316,7 @@ func TestDatasetCompnent_Show(t *testing.T) {
 		User:             types.User{Username: "user"},
 		UserLikes:        true,
 		Namespace:        &types.Namespace{},
+		CanRead:          true,
 		MirrorTaskStatus: types.MirrorRepoSyncStart,
 		SyncStatus:       types.SyncStatusInProgress,
 		/*Scores: []types.WeightScore{{
@@ -380,6 +383,7 @@ func TestDatasetCompnent_Show_Mirror(t *testing.T) {
 		User:       types.User{Username: "user"},
 		UserLikes:  true,
 		Namespace:  &types.Namespace{},
+		CanRead:    true,
 		SyncStatus: types.SyncStatusCompleted,
 	}, d)
 }
@@ -429,6 +433,7 @@ func TestDatasetCompnent_Show_Repository(t *testing.T) {
 		User:       types.User{Username: "user"},
 		UserLikes:  true,
 		Namespace:  &types.Namespace{},
+		CanRead:    true,
 		SyncStatus: types.SyncStatusPending,
 	}, d)
 }

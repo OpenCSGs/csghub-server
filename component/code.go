@@ -522,7 +522,8 @@ func (c *codeComponentImpl) Show(ctx context.Context, namespace, name, currentUs
 		SyncStatus: code.Repository.SyncStatus,
 		License:    code.Repository.License,
 		CanWrite:   permission.CanWrite,
-		CanManage:  permission.CanAdmin,
+		CanRead:    permission.CanRead,
+		CanAdmin:   permission.CanAdmin,
 		Namespace:  ns,
 		MultiSource: types.MultiSource{
 			HFPath:  code.Repository.HFPath,

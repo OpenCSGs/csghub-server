@@ -1343,8 +1343,9 @@ func TestRepoStore_PublicToUserRangeFilters(t *testing.T) {
 	_, err = modelStore.Create(ctx, database.Model{RepositoryID: smallModel.ID})
 	require.Nil(t, err)
 	_, err = db.Core.NewInsert().Model(&database.Metadata{
-		RepositoryID: smallModel.ID,
-		ModelParams:  1.5,
+		RepositoryID:     smallModel.ID,
+		ModelParams:      1.5,
+		ModelParamsValid: true,
 	}).Exec(ctx)
 	require.Nil(t, err)
 
@@ -1359,14 +1360,71 @@ func TestRepoStore_PublicToUserRangeFilters(t *testing.T) {
 	_, err = modelStore.Create(ctx, database.Model{RepositoryID: largeModel.ID})
 	require.Nil(t, err)
 	_, err = db.Core.NewInsert().Model(&database.Metadata{
-		RepositoryID: largeModel.ID,
-		ModelParams:  7,
+		RepositoryID:     largeModel.ID,
+		ModelParams:      7,
+		ModelParamsValid: true,
 	}).Exec(ctx)
 	require.Nil(t, err)
 
+	validZeroModel, err := store.CreateRepo(ctx, database.Repository{
+		Name:           "valid-zero-model",
+		Path:           "test/valid-zero-model",
+		GitPath:        "models_test/valid-zero-model",
+		UserID:         123,
+		RepositoryType: types.ModelRepo,
+	})
+	require.Nil(t, err)
+	_, err = modelStore.Create(ctx, database.Model{RepositoryID: validZeroModel.ID})
+	require.Nil(t, err)
+	_, err = db.Core.NewInsert().Model(&database.Metadata{
+		RepositoryID:     validZeroModel.ID,
+		ModelParams:      0,
+		ModelParamsValid: true,
+	}).Exec(ctx)
+	require.Nil(t, err)
+
+	invalidZeroModel, err := store.CreateRepo(ctx, database.Repository{
+		Name:           "invalid-zero-model",
+		Path:           "test/invalid-zero-model",
+		GitPath:        "models_test/invalid-zero-model",
+		UserID:         123,
+		RepositoryType: types.ModelRepo,
+	})
+	require.Nil(t, err)
+	_, err = modelStore.Create(ctx, database.Model{RepositoryID: invalidZeroModel.ID})
+	require.Nil(t, err)
+	_, err = db.Core.NewInsert().Model(&database.Metadata{
+		RepositoryID:     invalidZeroModel.ID,
+		ModelParams:      0,
+		ModelParamsValid: false,
+	}).Exec(ctx)
+	require.Nil(t, err)
+
+	noMetadataModel, err := store.CreateRepo(ctx, database.Repository{
+		Name:           "no-metadata-model",
+		Path:           "test/no-metadata-model",
+		GitPath:        "models_test/no-metadata-model",
+		UserID:         123,
+		RepositoryType: types.ModelRepo,
+	})
+	require.Nil(t, err)
+	_, err = modelStore.Create(ctx, database.Model{RepositoryID: noMetadataModel.ID})
+	require.Nil(t, err)
+
+	zero := 0.0
+	repos, count, err := store.PublicToUserWithAccess(ctx, types.ModelRepo, database.NewRepositoryAccessScope(database.RepositoryAccessPublic, nil), &types.RepoFilter{
+		Sort:           "recently_update",
+		ModelParamsMin: &zero,
+		ModelParamsMax: &zero,
+	}, 10, 1)
+	require.Nil(t, err)
+	require.Equal(t, 1, count)
+	require.Len(t, repos, 1)
+	require.Equal(t, "valid-zero-model", repos[0].Name)
+
 	modelParamsMin := 2.0
 	modelParamsMax := 8.0
-	repos, count, err := store.PublicToUserWithAccess(ctx, types.ModelRepo, database.NewRepositoryAccessScope(database.RepositoryAccessPublic, nil), &types.RepoFilter{
+	repos, count, err = store.PublicToUserWithAccess(ctx, types.ModelRepo, database.NewRepositoryAccessScope(database.RepositoryAccessPublic, nil), &types.RepoFilter{
 		Sort:           "recently_update",
 		ModelParamsMin: &modelParamsMin,
 		ModelParamsMax: &modelParamsMax,

@@ -780,6 +780,7 @@ func TestPromptComponent_Show(t *testing.T) {
 		},
 		Tags:      []types.RepoTag{{Name: "t1"}},
 		UserLikes: true,
+		CanRead:   true,
 		Namespace: &types.Namespace{},
 	}, *res)
 

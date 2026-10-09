@@ -311,6 +311,7 @@ func (c *runtimeArchitectureComponentImpl) UpdateModelMetadata(ctx context.Conte
 	metadata := &database.Metadata{
 		RepositoryID:      repo.ID,
 		ModelParams:       modelInfo.ParamsBillions,
+		ModelParamsValid:  modelInfo.ParamsValid,
 		TensorType:        modelInfo.TensorType,
 		MiniGPUMemoryGB:   modelInfo.MiniGPUMemoryGB,
 		MiniGPUFinetuneGB: modelInfo.MiniGPUFinetuneGB,
@@ -499,6 +500,7 @@ func (c *runtimeArchitectureComponentImpl) GetMetadataFromGGUF(ctx context.Conte
 				lme := fs.EstimateLLaMACppRun(opts...)
 				emi := lme.SummarizeItem(true, 2*1024*1024, 2*1024*1024)
 				modelInfo.ParamsBillions = float32(math.Round(float64(metadata.Parameters)/1e9*100) / 100)
+				modelInfo.ParamsValid = true
 				modelInfo.Architecture = metadata.Architecture
 				quantization := types.Quantization{
 					VERSION: c.GetBitFromFileType(metadata.FileType.String()),
