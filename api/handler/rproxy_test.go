@@ -18,7 +18,6 @@ import (
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
-	"opencsg.com/csghub-server/component"
 )
 
 type RProxyTester struct {
@@ -46,7 +45,7 @@ func NewRProxyTester(t *testing.T) *RProxyTester {
 }
 
 type customUIProxyComponentStub struct {
-	info    *component.AgentCustomUIProxyInfo
+	info    *types.AgentCustomUIProxyInfo
 	matched bool
 	err     error
 }
@@ -60,7 +59,7 @@ func (s *rproxyDeployComponentStub) GetDeployBySvcName(context.Context, string) 
 	return s.deploy, s.err
 }
 
-func (s *customUIProxyComponentStub) Resolve(context.Context, string) (*component.AgentCustomUIProxyInfo, bool, error) {
+func (s *customUIProxyComponentStub) Resolve(context.Context, string) (*types.AgentCustomUIProxyInfo, bool, error) {
 	return s.info, s.matched, s.err
 }
 
@@ -304,7 +303,7 @@ func TestRProxyHandler_CustomUI(t *testing.T) {
 		repoComp:     repos,
 		rproxyDeploy: &rproxyDeployComponentStub{deploy: &database.Deploy{Type: types.SandboxType, Status: deploycommon.Running}},
 		cfg:          cfg,
-		customUIComp: &customUIProxyComponentStub{matched: true, info: &component.AgentCustomUIProxyInfo{
+		customUIComp: &customUIProxyComponentStub{matched: true, info: &types.AgentCustomUIProxyInfo{
 			AgentContentID: "my-agent", AgentName: "generic-assistant-lj1", ShareName: "s-a-11",
 			SpaceSvcName: "ui-space", SpaceEndpoint: upstream.URL, Available: true,
 		}},

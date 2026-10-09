@@ -10,6 +10,18 @@ import (
 
 var ErrCSGClawAgentNameInvalid = errors.New("invalid CSGClaw manifest agent name")
 
+// AgentCustomUIProxyInfo contains the trusted routing context needed by RProxy.
+type AgentCustomUIProxyInfo struct {
+	AgentContentID string
+	AgentName      string
+	ShareName      string
+	SpaceID        int64
+	SpaceSvcName   string
+	SpaceEndpoint  string
+	SpaceClusterID string
+	Available      bool
+}
+
 func CSGClawAutomaticShareName(instanceID int64) string {
 	return fmt.Sprintf("s-a-%d", instanceID)
 }
