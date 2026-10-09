@@ -22,3 +22,20 @@ func newRepositoryDeletionJobClientWithDB(db *database.DB) (database.RepositoryD
 	}
 	return workhub.NewRepositoryDeletionJobClient(client), nil
 }
+
+// newOrganizationDeletionJobClient creates the transactional River adapter
+// used by organization stores.
+func newOrganizationDeletionJobClient() (database.OrganizationDeletionJobClient, error) {
+	return newOrganizationDeletionJobClientWithDB(database.GetDB())
+}
+
+func newOrganizationDeletionJobClientWithDB(db *database.DB) (database.OrganizationDeletionJobClient, error) {
+	if db == nil || db.BunDB == nil {
+		return nil, nil
+	}
+	client, err := workhub.NewJobClient(context.Background(), db.BunDB)
+	if err != nil {
+		return nil, fmt.Errorf("create organization deletion job client: %w", err)
+	}
+	return workhub.NewOrganizationDeletionJobClient(client), nil
+}

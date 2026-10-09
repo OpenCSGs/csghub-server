@@ -176,6 +176,10 @@ type DeleteOrganizationUnitResp struct {
 	DeletedReBACRelationships []OrganizationReBACCleanup `json:"-"`
 	// DeletedRepositories contains repositories removed with this subtree for post-commit ReBAC cleanup.
 	DeletedRepositories []DeletedRepository `json:"-"`
+	// OrganizationJobID identifies the durable external cleanup job.
+	OrganizationJobID int64 `json:"-"`
+	// AlreadyDeleted indicates that an earlier request already scheduled cleanup.
+	AlreadyDeleted bool `json:"-"`
 }
 
 // DeleteRootOrganizationResp reports the impact of deleting an entire organization hierarchy.
@@ -194,6 +198,8 @@ type DeleteRootOrganizationResp struct {
 	DeletedReBACRelationships []OrganizationReBACCleanup `json:"-"`
 	// DeletedRepositories contains repositories removed with this hierarchy for post-commit ReBAC cleanup.
 	DeletedRepositories []DeletedRepository `json:"-"`
+	// OrganizationJobID identifies the durable external cleanup job.
+	OrganizationJobID int64 `json:"-"`
 	// AlreadyDeleted makes repeated deletion idempotent and is not exposed by the API.
 	AlreadyDeleted bool `json:"-"`
 }

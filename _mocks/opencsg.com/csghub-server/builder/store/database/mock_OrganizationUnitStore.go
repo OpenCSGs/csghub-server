@@ -377,6 +377,65 @@ func (_c *MockOrganizationUnitStore_FindByUUID_Call) RunAndReturn(run func(conte
 	return _c
 }
 
+// FindByUUIDWithDeleted provides a mock function with given fields: ctx, unitUUID
+func (_m *MockOrganizationUnitStore) FindByUUIDWithDeleted(ctx context.Context, unitUUID string) (*database.OrganizationUnit, error) {
+	ret := _m.Called(ctx, unitUUID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for FindByUUIDWithDeleted")
+	}
+
+	var r0 *database.OrganizationUnit
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*database.OrganizationUnit, error)); ok {
+		return rf(ctx, unitUUID)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) *database.OrganizationUnit); ok {
+		r0 = rf(ctx, unitUUID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*database.OrganizationUnit)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, unitUUID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockOrganizationUnitStore_FindByUUIDWithDeleted_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FindByUUIDWithDeleted'
+type MockOrganizationUnitStore_FindByUUIDWithDeleted_Call struct {
+	*mock.Call
+}
+
+// FindByUUIDWithDeleted is a helper method to define mock.On call
+//   - ctx context.Context
+//   - unitUUID string
+func (_e *MockOrganizationUnitStore_Expecter) FindByUUIDWithDeleted(ctx interface{}, unitUUID interface{}) *MockOrganizationUnitStore_FindByUUIDWithDeleted_Call {
+	return &MockOrganizationUnitStore_FindByUUIDWithDeleted_Call{Call: _e.mock.On("FindByUUIDWithDeleted", ctx, unitUUID)}
+}
+
+func (_c *MockOrganizationUnitStore_FindByUUIDWithDeleted_Call) Run(run func(ctx context.Context, unitUUID string)) *MockOrganizationUnitStore_FindByUUIDWithDeleted_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockOrganizationUnitStore_FindByUUIDWithDeleted_Call) Return(_a0 *database.OrganizationUnit, _a1 error) *MockOrganizationUnitStore_FindByUUIDWithDeleted_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockOrganizationUnitStore_FindByUUIDWithDeleted_Call) RunAndReturn(run func(context.Context, string) (*database.OrganizationUnit, error)) *MockOrganizationUnitStore_FindByUUIDWithDeleted_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // HasActiveHierarchicalRoot provides a mock function with given fields: ctx
 func (_m *MockOrganizationUnitStore) HasActiveHierarchicalRoot(ctx context.Context) (bool, error) {
 	ret := _m.Called(ctx)

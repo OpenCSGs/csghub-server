@@ -136,6 +136,11 @@ func (c *casdoorClientImpl) DeleteUser(ctx context.Context, uuid string) error {
 	if err != nil {
 		return err
 	}
+	// Casdoor may return nil for an already removed user. Treat that state as
+	// success so organization deletion can be retried safely.
+	if id == nil {
+		return nil
+	}
 	_, err = c.casClient.DeleteUser(id)
 	if err != nil {
 		slog.Error("DeleteUser failed from casdoor", "err", err, "uuid", uuid)

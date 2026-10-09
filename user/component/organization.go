@@ -6,18 +6,23 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/google/uuid"
+	"github.com/riverqueue/river"
 	"opencsg.com/csghub-server/builder/git"
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/rebac"
 	rebacfactory "opencsg.com/csghub-server/builder/rebac/factory"
 	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/builder/workhub"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
+
+const organizationDeletionBestEffortTimeout = 5 * time.Second
 
 type OrganizationComponent interface {
 	Create(ctx context.Context, req *types.CreateOrgReq) (*types.Organization, error)
@@ -45,11 +50,16 @@ func NewOrganizationComponent(config *config.Config) (OrganizationComponent, err
 	if err != nil {
 		return nil, err
 	}
-	c.orgStore = database.NewOrgStore(config.IsHierarchicalOrganization(), deletionJobClient)
+	organizationDeletionJobClient, err := newOrganizationDeletionJobClient()
+	if err != nil {
+		return nil, err
+	}
+	c.orgStore = database.NewOrgStoreWithDeletionJobClients(config.IsHierarchicalOrganization(), deletionJobClient, organizationDeletionJobClient)
 	c.memberStore = database.NewMemberStore()
 	c.nsStore = database.NewNamespaceStore()
 	c.userStore = database.NewUserStore()
 	c.tagStore = database.NewTagStore()
+	c.repositoryAuthorizations = database.NewRepositoryAuthorizationStore()
 	c.gs, err = git.NewGitServer(config)
 	if err != nil {
 		newError := fmt.Errorf("fail to create git server,error:%w", err)
@@ -77,17 +87,205 @@ type organizationComponentImpl struct {
 
 	sso    rpc.SSOInterface
 	config *config.Config
+	// repositoryAuthorizations stores direct grants that use an organization as subject.
+	repositoryAuthorizations database.RepositoryAuthorizationStore
 }
 
-// deleteOrganizationSSOUserBestEffort removes an organization identity from
-// SSO once. The database result remains authoritative when the remote cleanup
-// fails, so the error is logged instead of replacing the original result.
-func deleteOrganizationSSOUserBestEffort(ctx context.Context, sso rpc.SSOInterface, organizationUUID string) {
+// OrganizationDeletionWorker retries external organization cleanup after the
+// database deletion transaction has committed.
+type OrganizationDeletionWorker struct {
+	river.WorkerDefaults[workhub.OrganizationDeletionArgs]
+	sso                      rpc.SSOInterface
+	rebac                    rebac.Authorizer
+	repositoryAuthorizations database.RepositoryAuthorizationStore
+}
+
+// NewOrganizationDeletionWorker creates the durable organization cleanup worker.
+func NewOrganizationDeletionWorker(sso rpc.SSOInterface, authorizer rebac.Authorizer, authorizations database.RepositoryAuthorizationStore) *OrganizationDeletionWorker {
+	return &OrganizationDeletionWorker{sso: sso, rebac: authorizer, repositoryAuthorizations: authorizations}
+}
+
+// NewOrganizationDeletionWorkClient creates a work client for asynchronous organization deletion cleanup.
+func NewOrganizationDeletionWorkClient(
+	ctx context.Context,
+	dsn string,
+	sso rpc.SSOInterface,
+	authorizer rebac.Authorizer,
+	authorizations database.RepositoryAuthorizationStore,
+	maxWorkers int,
+) (workhub.WorkClient, error) {
+	if maxWorkers <= 0 {
+		maxWorkers = 2
+	}
+	worker := NewOrganizationDeletionWorker(sso, authorizer, authorizations)
+	riverConfig := &river.Config{
+		Queues: map[string]river.QueueConfig{
+			workhub.OrganizationDeletionQueue: {MaxWorkers: maxWorkers},
+		},
+		Workers: workhub.NewWorkerRegistry(workhub.WorkerOverrides{
+			OrganizationDeletion: worker,
+		}),
+	}
+	return workhub.NewWorkClient(ctx, dsn, riverConfig)
+}
+
+// Work performs an idempotent cleanup attempt. Every independent cleanup stage
+// is attempted so one unavailable dependency does not prevent the others.
+func (w *OrganizationDeletionWorker) Work(ctx context.Context, job *river.Job[workhub.OrganizationDeletionArgs]) error {
+	if job == nil || len(job.Args.OrganizationUUIDs) == 0 {
+		return fmt.Errorf("organization deletion job requires organization UUIDs")
+	}
+	if w.rebac == nil {
+		return fmt.Errorf("organization deletion worker ReBAC authorizer is required")
+	}
+	var jobID int64
+	var attempt, maxAttempts int
+	if job.JobRow != nil {
+		jobID = job.ID
+		attempt = job.Attempt
+		maxAttempts = job.MaxAttempts
+	}
+	slog.InfoContext(ctx, "starting organization deletion worker job",
+		slog.Int64("job_id", jobID),
+		slog.Int("attempt", attempt),
+		slog.Int("max_attempts", maxAttempts),
+		slog.Any("organization_ids", job.Args.OrganizationIDs),
+		slog.Any("organization_uuids", job.Args.OrganizationUUIDs),
+		slog.Int("hierarchy_relationships_count", len(job.Args.DeletedHierarchyRelationships)),
+		slog.Int("rebac_cleanups_count", len(job.Args.DeletedReBACRelationships)),
+	)
+	err := cleanupDeletedOrganization(ctx, w.sso, w.rebac, w.repositoryAuthorizations, job.Args)
+	if err != nil {
+		slog.ErrorContext(ctx, "organization deletion worker job failed",
+			slog.Int64("job_id", jobID),
+			slog.Int("attempt", attempt),
+			slog.Any("organization_uuids", job.Args.OrganizationUUIDs),
+			slog.Any("error", err),
+		)
+		return err
+	}
+	slog.InfoContext(ctx, "completed organization deletion worker job successfully",
+		slog.Int64("job_id", jobID),
+		slog.Int("attempt", attempt),
+		slog.Any("organization_uuids", job.Args.OrganizationUUIDs),
+	)
+	return nil
+}
+
+// Timeout bounds one River cleanup attempt.
+func (w *OrganizationDeletionWorker) Timeout(*river.Job[workhub.OrganizationDeletionArgs]) time.Duration {
+	return workhub.OrganizationDeletionJobTimeout
+}
+
+// cleanupDeletedOrganization removes all external identities and relationships
+// represented by one immutable deletion snapshot.
+func cleanupDeletedOrganization(
+	ctx context.Context,
+	sso rpc.SSOInterface,
+	authorizer rebac.Authorizer,
+	authorizations database.RepositoryAuthorizationStore,
+	args workhub.OrganizationDeletionArgs,
+) error {
+	var cleanupErrors []error
+	for _, organizationID := range args.OrganizationIDs {
+		if err := deleteDirectRepositoryAuthorizations(ctx, authorizations, authorizer, types.RepoAuthSubjectOrganization, organizationID); err != nil {
+			cleanupErrors = append(cleanupErrors, fmt.Errorf("delete organization %d repository authorizations: %w", organizationID, err))
+		}
+	}
+	for _, organizationUUID := range args.OrganizationUUIDs {
+		if err := deleteOrganizationSSOUser(ctx, sso, organizationUUID); err != nil {
+			cleanupErrors = append(cleanupErrors, fmt.Errorf("delete organization %s from SSO: %w", organizationUUID, err))
+		}
+	}
+	hierarchyRelationships := make([]types.OrganizationHierarchyRelationship, 0, len(args.DeletedHierarchyRelationships))
+	for _, relationship := range args.DeletedHierarchyRelationships {
+		hierarchyRelationships = append(hierarchyRelationships, types.OrganizationHierarchyRelationship{
+			ParentOrganizationUUID: relationship.ParentOrganizationUUID,
+			ChildOrganizationUUID:  relationship.ChildOrganizationUUID,
+		})
+	}
+	if err := deleteOrganizationHierarchyRelationshipsForDeletion(ctx, authorizer, hierarchyRelationships); err != nil {
+		cleanupErrors = append(cleanupErrors, fmt.Errorf("delete organization hierarchy relationships: %w", err))
+	}
+	rebacCleanups := make([]types.OrganizationReBACCleanup, 0, len(args.DeletedReBACRelationships))
+	for _, cleanup := range args.DeletedReBACRelationships {
+		rebacCleanups = append(rebacCleanups, types.OrganizationReBACCleanup{
+			OrganizationUUID: cleanup.OrganizationUUID,
+			NamespaceUUID:    cleanup.NamespaceUUID,
+			UserUUIDs:        cleanup.UserUUIDs,
+		})
+	}
+	if err := deleteOrganizationReBACRelationships(ctx, authorizer, rebacCleanups); err != nil {
+		cleanupErrors = append(cleanupErrors, fmt.Errorf("delete organization member and namespace relationships: %w", err))
+	}
+	return errors.Join(cleanupErrors...)
+}
+
+// newOrganizationDeletionArgs converts database cleanup metadata into the
+// stable River payload shared by the fast path and durable worker.
+func newOrganizationDeletionArgs(
+	organizationIDs []int64,
+	organizationUUIDs []string,
+	hierarchyRelationships []types.OrganizationHierarchyRelationship,
+	rebacCleanups []types.OrganizationReBACCleanup,
+) workhub.OrganizationDeletionArgs {
+	args := workhub.OrganizationDeletionArgs{
+		OrganizationIDs:   organizationIDs,
+		OrganizationUUIDs: organizationUUIDs,
+	}
+	for _, relationship := range hierarchyRelationships {
+		args.DeletedHierarchyRelationships = append(args.DeletedHierarchyRelationships, workhub.OrganizationHierarchyRelationshipArgs{
+			ParentOrganizationUUID: relationship.ParentOrganizationUUID,
+			ChildOrganizationUUID:  relationship.ChildOrganizationUUID,
+		})
+	}
+	for _, cleanup := range rebacCleanups {
+		args.DeletedReBACRelationships = append(args.DeletedReBACRelationships, workhub.OrganizationReBACCleanupArgs{
+			OrganizationUUID: cleanup.OrganizationUUID,
+			NamespaceUUID:    cleanup.NamespaceUUID,
+			UserUUIDs:        cleanup.UserUUIDs,
+		})
+	}
+	return args
+}
+
+// cleanupDeletedOrganizationBestEffort runs the low-latency cleanup path after
+// commit. River remains responsible for eventual completion regardless of the result.
+func cleanupDeletedOrganizationBestEffort(
+	ctx context.Context,
+	sso rpc.SSOInterface,
+	authorizer rebac.Authorizer,
+	authorizations database.RepositoryAuthorizationStore,
+	jobID int64,
+	args workhub.OrganizationDeletionArgs,
+) {
+	cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), organizationDeletionBestEffortTimeout)
+	defer cancel()
+	if err := cleanupDeletedOrganization(cleanupCtx, sso, authorizer, authorizations, args); err != nil {
+		slog.WarnContext(ctx, "organization external cleanup deferred to River",
+			slog.Int64("job_id", jobID),
+			slog.Any("organization_uuids", args.OrganizationUUIDs),
+			slog.Any("error", err))
+	}
+}
+
+// deleteOrganizationSSOUser removes an organization identity from SSO.
+func deleteOrganizationSSOUser(ctx context.Context, sso rpc.SSOInterface, organizationUUID string) error {
 	if sso == nil || organizationUUID == "" {
-		return
+		return nil
 	}
 	if err := sso.DeleteUser(ctx, organizationUUID); err != nil {
 		slog.ErrorContext(ctx, "failed to delete organization from SSO", slog.String("organization_uuid", organizationUUID), slog.Any("error", err))
+		return err
+	}
+	return nil
+}
+
+// deleteOrganizationSSOUserBestEffort compensates a failed organization
+// creation without masking the original database error.
+func deleteOrganizationSSOUserBestEffort(ctx context.Context, sso rpc.SSOInterface, organizationUUID string) {
+	if err := deleteOrganizationSSOUser(ctx, sso, organizationUUID); err != nil {
+		slog.ErrorContext(ctx, "failed to compensate organization SSO user", slog.Any("error", err))
 	}
 }
 
@@ -494,52 +692,37 @@ func (c *organizationComponentImpl) GetByUUID(ctx context.Context, uuid string) 
 	return org, nil
 }
 
+// Delete soft-deletes a legacy organization, durably schedules external
+// cleanup, and performs one best-effort cleanup attempt after commit.
 func (c *organizationComponentImpl) Delete(ctx context.Context, req *types.DeleteOrgReq) error {
-	organization, err := c.orgStore.FindByPath(ctx, req.Name)
-	if err != nil && !errors.Is(err, sql.ErrNoRows) && !errors.Is(err, errorx.ErrDatabaseNoRows) {
-		return fmt.Errorf("failed to find database organization, error: %w", err)
+	organization, err := c.orgStore.FindForDeletion(ctx, database.OrganizationDeletionLookup{Path: req.Name})
+	if errors.Is(err, sql.ErrNoRows) || errors.Is(err, errorx.ErrDatabaseNoRows) {
+		return nil
 	}
 	if err != nil {
-		return fmt.Errorf("failed to find database organization, error: %w", err)
+		return fmt.Errorf("find organization for deletion: %w", err)
+	}
+	if organization.IsHierarchical {
+		return errorx.ReqParamInvalid(errors.New("hierarchy organizations must be deleted through the hierarchy organization API"), nil)
+	}
+	if !organization.DeletedAt.IsZero() {
+		return nil
 	}
 	canAdmin, err := c.checkNamespaceAdminPermission(ctx, req.Name, req.CurrentUser)
 	if err != nil {
-		slog.ErrorContext(ctx, "failed to check namespace permission",
-			slog.String("namespace", req.Name), slog.String("user", req.CurrentUser),
-			slog.Any("error", err))
+		return err
 	}
 	if !canAdmin {
-		return fmt.Errorf("current user does not have permission to edit the organization, current user: %s", req.CurrentUser)
+		return errorx.ErrOrganizationManageForbidden
 	}
-	if organization.IsHierarchical {
-		return errorx.ReqParamInvalid(
-			errors.New("hierarchy organizations must be deleted through the hierarchy organization API"),
-			nil,
-		)
-	}
-	if c.memberStore == nil {
-		return fmt.Errorf("organization member store is required")
-	}
-	userUUIDs, err := c.memberStore.UserUUIDsByOrganizationID(ctx, organization.ID)
+	result, err := c.orgStore.Delete(ctx, req.Name)
 	if err != nil {
-		return fmt.Errorf("load organization members for ReBAC cleanup: %w", err)
+		return fmt.Errorf("failed to delete database organizations: %w", err)
 	}
-	if organization.Namespace == nil || organization.Namespace.UUID == "" {
-		return fmt.Errorf("organization %q namespace UUID is required for ReBAC cleanup", organization.Name)
+	if !result.AlreadyDeleted {
+		cleanupDeletedOrganizationBestEffort(ctx, c.sso, c.rebac, c.repositoryAuthorizations, result.OrganizationJobID,
+			newOrganizationDeletionArgs([]int64{organization.ID}, []string{organization.UUID.String()}, nil, result.DeletedReBACRelationships))
 	}
-	cleanup := types.OrganizationReBACCleanup{
-		OrganizationUUID: organization.UUID.String(),
-		NamespaceUUID:    organization.Namespace.UUID,
-		UserUUIDs:        userUUIDs,
-	}
-	_, err = c.orgStore.Delete(ctx, req.Name)
-	if err != nil {
-		return fmt.Errorf("failed to delete database organizations, error: %w", err)
-	}
-	if err := deleteOrganizationReBACRelationships(ctx, c.rebac, []types.OrganizationReBACCleanup{cleanup}); err != nil {
-		return fmt.Errorf("sync deleted organization to ReBAC: %w", err)
-	}
-	deleteOrganizationSSOUserBestEffort(ctx, c.sso, organization.UUID.String())
 	return nil
 }
 

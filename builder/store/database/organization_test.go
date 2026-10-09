@@ -8,10 +8,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/uptrace/bun"
+	"github.com/uptrace/bun/dialect/pgdialect"
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/tests"
 	"opencsg.com/csghub-server/common/types"
 )
@@ -637,6 +640,44 @@ func TestOrganizationStore_GetOrgByUserIDs(t *testing.T) {
 	orgs, err = store.GetSharedOrgIDs(ctx, []int64{})
 	require.Nil(t, err)
 	require.Empty(t, orgs)
+}
+
+// TestOrganizationStore_GetSharedOrgIDsQueryError verifies database failures are not treated as an empty result.
+func TestOrganizationStore_GetSharedOrgIDsQueryError(t *testing.T) {
+	sqlDB, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	bunDB := bun.NewDB(sqlDB, pgdialect.New())
+	t.Cleanup(func() { _ = bunDB.Close() })
+	setOrgStoreTestDB(t, &database.DB{Operator: database.Operator{Core: bunDB}, BunDB: bunDB})
+	store := database.NewOrgStore(false, nil)
+	queryErr := errors.New("organization query failed")
+	mock.ExpectQuery(`SELECT .* FROM "organizations"`).WillReturnError(queryErr)
+
+	orgIDs, err := store.GetSharedOrgIDs(context.Background(), []int64{101, 102})
+
+	require.ErrorIs(t, err, errorx.ErrDatabaseFailure)
+	require.ErrorIs(t, err, queryErr)
+	require.Nil(t, orgIDs)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+// TestOrganizationStore_GetOrganizationTagsQueryError verifies tag query failures retain their cause.
+func TestOrganizationStore_GetOrganizationTagsQueryError(t *testing.T) {
+	sqlDB, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	bunDB := bun.NewDB(sqlDB, pgdialect.New())
+	t.Cleanup(func() { _ = bunDB.Close() })
+	setOrgStoreTestDB(t, &database.DB{Operator: database.Operator{Core: bunDB}, BunDB: bunDB})
+	store := database.NewOrgStore(false, nil)
+	queryErr := errors.New("organization tag query failed")
+	mock.ExpectQuery(`SELECT .* FROM "tags"`).WillReturnError(queryErr)
+
+	tags, err := store.GetOrganizationTags(context.Background(), 1)
+
+	require.ErrorIs(t, err, errorx.ErrDatabaseFailure)
+	require.ErrorIs(t, err, queryErr)
+	require.Nil(t, tags)
+	require.NoError(t, mock.ExpectationsWereMet())
 }
 
 func TestOrganizationStore_FindByUUID(t *testing.T) {
@@ -1272,5 +1313,128 @@ func TestOrgStore_RecreatedNamespaceAllowsRepositoryCreation(t *testing.T) {
 		Name: "repository", Path: "recreated-org/repository",
 		GitPath: "models_recreated-org/repository", RepositoryType: types.ModelRepo,
 	})
+	require.NoError(t, err)
+}
+
+// TestOrgStore_DeleteRetainsRecords verifies index predicates, retained cleanup data, and namespace retry cleanup.
+func TestOrgStore_DeleteRetainsRecords(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	setOrgStoreTestDB(t, db)
+	ctx := context.Background()
+	for _, index := range []string{"idx_organizations_path", "idx_namespaces_path"} {
+		var definition string
+		require.NoError(t, db.Core.NewRaw("SELECT indexdef FROM pg_indexes WHERE schemaname = current_schema() AND indexname = ?", index).Scan(ctx, &definition))
+		require.Contains(t, definition, "UNIQUE INDEX")
+		require.Contains(t, definition, "deleted_at IS NULL")
+	}
+	admin := &database.User{Username: "retained-admin", UUID: uuid.NewString()}
+	_, err := db.Core.NewInsert().Model(admin).Exec(ctx)
+	require.NoError(t, err)
+	org := &database.Organization{Name: "retained-org", UUID: uuid.New(), UserID: admin.ID}
+	ns := &database.Namespace{Path: org.Name, UUID: uuid.NewString()}
+	jobClient := &testRepositoryDeletionJobClient{}
+	store := database.NewOrgStoreWithDeletionJobClients(false, jobClient, jobClient)
+	require.NoError(t, store.CreateWithRelations(ctx, org, ns, nil))
+	// A revoked administrator must not regain deletion permission through a historical membership.
+	revoked := &database.Member{OrganizationID: org.ID, UserID: admin.ID + 100, Role: string(types.UserAdmin), DeletedAt: time.Now().Add(-time.Hour)}
+	_, err = db.Core.NewInsert().Model(revoked).Exec(ctx)
+	require.NoError(t, err)
+	first, err := store.Delete(ctx, org.Name)
+	require.NoError(t, err)
+	require.NotZero(t, first.OrganizationJobID)
+	require.Len(t, jobClient.recordedOrganizationInputs(), 1)
+	require.Len(t, first.DeletedReBACRelationships, 1)
+	require.Contains(t, first.DeletedReBACRelationships[0].UserUUIDs, admin.UUID)
+	_, err = store.FindByPath(ctx, org.Name)
+	require.Error(t, err)
+	_, err = database.NewNamespaceStoreWithDB(db).FindByPath(ctx, org.Name)
+	require.Error(t, err)
+	retained, err := store.FindForDeletion(ctx, database.OrganizationDeletionLookup{Path: org.Name})
+	require.NoError(t, err)
+	require.False(t, retained.DeletedAt.IsZero())
+	require.NotNil(t, retained.Namespace)
+	require.False(t, retained.Namespace.DeletedAt.IsZero())
+	repeated, err := store.Delete(ctx, org.Name)
+	require.NoError(t, err)
+	require.True(t, repeated.AlreadyDeleted)
+	require.Len(t, jobClient.recordedOrganizationInputs(), 1)
+	require.Equal(t, first.DeletedReBACRelationships, repeated.DeletedReBACRelationships)
+	require.Empty(t, repeated.DeletedRepositories)
+	// A retry still finishes namespace cleanup even when the organization was already soft-deleted.
+	_, err = db.Core.NewUpdate().Model((*database.Namespace)(nil)).WhereAllWithDeleted().Set("deleted_at = NULL").Where("id = ?", ns.ID).Exec(ctx)
+	require.NoError(t, err)
+	_, err = store.Delete(ctx, org.Name)
+	require.NoError(t, err)
+	after, err := store.FindForDeletion(ctx, database.OrganizationDeletionLookup{UUID: org.UUID.String()})
+	require.NoError(t, err)
+	require.Equal(t, retained.DeletedAt, after.DeletedAt)
+	require.False(t, after.Namespace.DeletedAt.IsZero())
+	// New identities may reuse the path at the database level; the original lookup stays bound to its namespace ID.
+	replacement := &database.Organization{Name: org.Name, UUID: uuid.New()}
+	require.NoError(t, store.Create(ctx, replacement, &database.Namespace{Path: org.Name, UUID: uuid.NewString()}))
+	old, err := store.FindForDeletion(ctx, database.OrganizationDeletionLookup{UUID: org.UUID.String()})
+	require.NoError(t, err)
+	require.Equal(t, ns.ID, old.Namespace.ID)
+}
+
+// TestOrgStore_DeleteRollsBackWhenOrganizationJobEnqueueFails verifies the
+// organization tombstone and durable cleanup job share one transaction.
+func TestOrgStore_DeleteRollsBackWhenOrganizationJobEnqueueFails(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	setOrgStoreTestDB(t, db)
+	ctx := context.Background()
+	jobClient := &testRepositoryDeletionJobClient{organizationErr: errors.New("river unavailable")}
+	store := database.NewOrgStoreWithDeletionJobClients(false, jobClient, jobClient)
+	organization := &database.Organization{Name: "organization-job-rollback", UUID: uuid.New()}
+	require.NoError(t, store.Create(ctx, organization, &database.Namespace{Path: organization.Name, UUID: uuid.NewString()}))
+
+	_, err := store.Delete(ctx, organization.Name)
+	require.ErrorContains(t, err, "enqueue organization deletion")
+
+	active, err := store.FindByPath(ctx, organization.Name)
+	require.NoError(t, err)
+	require.Equal(t, organization.ID, active.ID)
+	require.True(t, active.DeletedAt.IsZero())
+}
+
+// TestOrganizationUnitStore_DeleteSubtreeRetry verifies retries after closure removal include previously deleted descendants.
+func TestOrganizationUnitStore_DeleteSubtreeRetry(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	setOrgStoreTestDB(t, db)
+	ctx := context.Background()
+	root := createRootOrganization(t, ctx, db, "retained-subtree")
+	jobClient := &testRepositoryDeletionJobClient{}
+	store := database.NewOrganizationUnitStoreWithDBAndDeletionJobClients(db, jobClient, jobClient)
+	child := createChild(t, ctx, store, root, "child", nil, 1)
+	grandchild := createChild(t, ctx, store, root, "grandchild", &child.UUID, 1)
+	sibling := createChild(t, ctx, store, root, "sibling", nil, 2)
+	childUnit, err := store.FindByUUID(ctx, child.UUID)
+	require.NoError(t, err)
+	grandchildUnit, err := store.FindByUUID(ctx, grandchild.UUID)
+	require.NoError(t, err)
+	_, err = store.Delete(ctx, database.DeleteOrganizationUnitInput{RootOrganizationID: root.ID, UnitID: grandchildUnit.ID, UnitUUID: grandchild.UUID})
+	require.NoError(t, err)
+	input := database.DeleteOrganizationUnitInput{RootOrganizationID: root.ID, UnitID: childUnit.ID, UnitUUID: child.UUID}
+	first, err := store.Delete(ctx, input)
+	require.NoError(t, err)
+	require.NotZero(t, first.OrganizationJobID)
+	require.Len(t, jobClient.recordedOrganizationInputs(), 2)
+	require.ElementsMatch(t, []string{child.UUID, grandchild.UUID}, first.DeletedOrganizationUUIDs)
+	_, err = store.FindByUUID(ctx, child.UUID)
+	require.Error(t, err)
+	retained, err := store.FindByUUIDWithDeleted(ctx, child.UUID)
+	require.NoError(t, err)
+	require.NotNil(t, retained.DeletedAt)
+	repeated, err := store.Delete(ctx, input)
+	require.NoError(t, err)
+	require.True(t, repeated.AlreadyDeleted)
+	require.Len(t, jobClient.recordedOrganizationInputs(), 2)
+	require.Equal(t, first.DeletedOrganizationUUIDs, repeated.DeletedOrganizationUUIDs)
+	require.Equal(t, first.DeletedReBACRelationships, repeated.DeletedReBACRelationships)
+	require.Equal(t, first.DeletedHierarchyRelationships, repeated.DeletedHierarchyRelationships)
+	_, err = store.FindByUUID(ctx, sibling.UUID)
 	require.NoError(t, err)
 }

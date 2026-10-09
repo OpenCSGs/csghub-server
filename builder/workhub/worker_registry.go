@@ -18,6 +18,8 @@ type WorkerOverrides struct {
 	MirrorLFS river.Worker[LFSArgs]
 	// RepositoryDeletion is the real repository cleanup worker when this client owns that queue.
 	RepositoryDeletion river.Worker[RepositoryDeletionArgs]
+	// OrganizationDeletion is the real organization cleanup worker when this client owns that queue.
+	OrganizationDeletion river.Worker[OrganizationDeletionArgs]
 }
 
 // NewWorkerRegistry creates the complete worker registry required by River's
@@ -28,6 +30,7 @@ func NewWorkerRegistry(overrides WorkerOverrides) *river.Workers {
 	river.AddWorker(workers, workerForRegistry(overrides.MirrorRepo, MirrorRepoQueue, MirrorRepoJobTimeout))
 	river.AddWorker(workers, workerForRegistry(overrides.MirrorLFS, MirrorLFSQueue, MirrorLFSJobTimeout))
 	river.AddWorker(workers, workerForRegistry(overrides.RepositoryDeletion, RepositoryDeletionQueue, RepositoryDeletionJobTimeout))
+	river.AddWorker(workers, workerForRegistry(overrides.OrganizationDeletion, OrganizationDeletionQueue, OrganizationDeletionJobTimeout))
 	return workers
 }
 
