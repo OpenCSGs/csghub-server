@@ -4,7 +4,7 @@ package component
 
 type logPublisherImpl struct{}
 
-func NewLLMLogPublisher() LLMLogPublisher {
+func NewLLMLogPublisher(_ bool) LLMLogPublisher {
 	return &logPublisherImpl{}
 }
 
