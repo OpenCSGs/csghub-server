@@ -5,15 +5,15 @@ import (
 	"errors"
 	"io"
 
-	v1 "opencsg.com/csghub-server/plugins/aliyun_checker/v1"
+	v1 "opencsg.com/csghub-server/plugins/protocol/content_checker/v1"
 )
 
 type server struct {
-	v1.UnimplementedAliyunCheckerServer
+	v1.UnimplementedContentCheckerServer
 	checker Checker
 }
 
-func NewServer(checker Checker) v1.AliyunCheckerServer {
+func NewServer(checker Checker) v1.ContentCheckerServer {
 	return &server{checker: checker}
 }
 
@@ -23,7 +23,7 @@ func (s *server) PassTextCheck(ctx context.Context, req *v1.PassTextCheckRequest
 }
 
 func (s *server) PassImageCheck(ctx context.Context, req *v1.PassImageCheckRequest) (*v1.CheckResult, error) {
-	result, err := s.checker.PassImageCheck(ctx, req.GetScenario(), req.GetOssBucketName(), req.GetOssObjectName())
+	result, err := s.checker.PassImageCheck(ctx, req.GetScenario(), req.GetBucketName(), req.GetObjectName())
 	return checkResultToProto(result), err
 }
 
@@ -32,7 +32,7 @@ func (s *server) PassImageURLCheck(ctx context.Context, req *v1.PassImageURLChec
 	return checkResultToProto(result), err
 }
 
-func (s *server) PassImageStreamCheck(stream v1.AliyunChecker_PassImageStreamCheckServer) error {
+func (s *server) PassImageStreamCheck(stream v1.ContentChecker_PassImageStreamCheckServer) error {
 	first, err := stream.Recv()
 	if err != nil {
 		return err
@@ -77,7 +77,7 @@ func (s *server) QueryMediaModerationResult(ctx context.Context, req *v1.MediaMo
 }
 
 type streamReader struct {
-	stream v1.AliyunChecker_PassImageStreamCheckServer
+	stream v1.ContentChecker_PassImageStreamCheckServer
 	buf    []byte
 }
 
@@ -98,7 +98,7 @@ func (r *streamReader) Read(p []byte) (int, error) {
 	return n, nil
 }
 
-func sendCheckResult(stream v1.AliyunChecker_PassImageStreamCheckServer, result *CheckResult, err error) error {
+func sendCheckResult(stream v1.ContentChecker_PassImageStreamCheckServer, result *CheckResult, err error) error {
 	if err != nil {
 		return err
 	}

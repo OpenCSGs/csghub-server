@@ -1,10 +1,10 @@
 syntax = "proto3";
 
-package csghub.plugins.aliyun_checker.v1;
+package csghub.plugins.content_checker.v1;
 
-option go_package = "opencsg.com/csghub-server/plugins/aliyun_checker/v1;aliyuncheckerv1";
+option go_package = "opencsg.com/csghub-server/plugins/protocol/content_checker/v1;contentcheckerv1";
 
-service AliyunChecker {
+service ContentChecker {
   rpc PassTextCheck(PassTextCheckRequest) returns (CheckResult);
   rpc PassImageCheck(PassImageCheckRequest) returns (CheckResult);
   rpc PassImageURLCheck(PassImageURLCheckRequest) returns (CheckResult);
@@ -26,8 +26,8 @@ message PassTextCheckRequest {
 
 message PassImageCheckRequest {
   string scenario = 1;
-  string oss_bucket_name = 2;
-  string oss_object_name = 3;
+  string bucket_name = 2;
+  string object_name = 3;
 }
 
 message PassImageURLCheckRequest {

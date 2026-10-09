@@ -5,16 +5,16 @@ import (
 	"errors"
 	"io"
 
-	v1 "opencsg.com/csghub-server/plugins/aliyun_checker/v1"
+	v1 "opencsg.com/csghub-server/plugins/protocol/content_checker/v1"
 )
 
 const streamChunkSize = 64 * 1024
 
 type Client struct {
-	checker v1.AliyunCheckerClient
+	checker v1.ContentCheckerClient
 }
 
-func NewClient(checker v1.AliyunCheckerClient) *Client {
+func NewClient(checker v1.ContentCheckerClient) *Client {
 	return &Client{checker: checker}
 }
 
@@ -25,9 +25,9 @@ func (c *Client) PassTextCheck(ctx context.Context, scenario, text string) (*Che
 
 func (c *Client) PassImageCheck(ctx context.Context, scenario, ossBucketName, ossObjectName string) (*CheckResult, error) {
 	result, err := c.checker.PassImageCheck(ctx, &v1.PassImageCheckRequest{
-		Scenario:      scenario,
-		OssBucketName: ossBucketName,
-		OssObjectName: ossObjectName,
+		Scenario:   scenario,
+		BucketName: ossBucketName,
+		ObjectName: ossObjectName,
 	})
 	return checkResultFromProto(result), err
 }

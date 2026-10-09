@@ -2,17 +2,16 @@
 // versions:
 // 	protoc-gen-go v1.36.12
 // 	protoc        v6.33.4
-// source: plugins/aliyun_checker/v1/aliyun_checker.proto
+// source: plugins/protocol/content_checker/v1/content_checker.proto
 
-package aliyuncheckerv1
+package contentcheckerv1
 
 import (
+	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
+	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
-
-	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
-	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 )
 
 const (
@@ -32,7 +31,7 @@ type CheckResult struct {
 
 func (x *CheckResult) Reset() {
 	*x = CheckResult{}
-	mi := &file_plugins_aliyun_checker_v1_aliyun_checker_proto_msgTypes[0]
+	mi := &file_plugins_protocol_content_checker_v1_content_checker_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -44,7 +43,7 @@ func (x *CheckResult) String() string {
 func (*CheckResult) ProtoMessage() {}
 
 func (x *CheckResult) ProtoReflect() protoreflect.Message {
-	mi := &file_plugins_aliyun_checker_v1_aliyun_checker_proto_msgTypes[0]
+	mi := &file_plugins_protocol_content_checker_v1_content_checker_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -57,7 +56,7 @@ func (x *CheckResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CheckResult.ProtoReflect.Descriptor instead.
 func (*CheckResult) Descriptor() ([]byte, []int) {
-	return file_plugins_aliyun_checker_v1_aliyun_checker_proto_rawDescGZIP(), []int{0}
+	return file_plugins_protocol_content_checker_v1_content_checker_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *CheckResult) GetIsSensitive() bool {
@@ -84,7 +83,7 @@ type PassTextCheckRequest struct {
 
 func (x *PassTextCheckRequest) Reset() {
 	*x = PassTextCheckRequest{}
-	mi := &file_plugins_aliyun_checker_v1_aliyun_checker_proto_msgTypes[1]
+	mi := &file_plugins_protocol_content_checker_v1_content_checker_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -96,7 +95,7 @@ func (x *PassTextCheckRequest) String() string {
 func (*PassTextCheckRequest) ProtoMessage() {}
 
 func (x *PassTextCheckRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_plugins_aliyun_checker_v1_aliyun_checker_proto_msgTypes[1]
+	mi := &file_plugins_protocol_content_checker_v1_content_checker_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -109,7 +108,7 @@ func (x *PassTextCheckRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PassTextCheckRequest.ProtoReflect.Descriptor instead.
 func (*PassTextCheckRequest) Descriptor() ([]byte, []int) {
-	return file_plugins_aliyun_checker_v1_aliyun_checker_proto_rawDescGZIP(), []int{1}
+	return file_plugins_protocol_content_checker_v1_content_checker_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *PassTextCheckRequest) GetScenario() string {
@@ -129,15 +128,15 @@ func (x *PassTextCheckRequest) GetText() string {
 type PassImageCheckRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Scenario      string                 `protobuf:"bytes,1,opt,name=scenario,proto3" json:"scenario,omitempty"`
-	OssBucketName string                 `protobuf:"bytes,2,opt,name=oss_bucket_name,json=ossBucketName,proto3" json:"oss_bucket_name,omitempty"`
-	OssObjectName string                 `protobuf:"bytes,3,opt,name=oss_object_name,json=ossObjectName,proto3" json:"oss_object_name,omitempty"`
+	BucketName    string                 `protobuf:"bytes,2,opt,name=bucket_name,json=bucketName,proto3" json:"bucket_name,omitempty"`
+	ObjectName    string                 `protobuf:"bytes,3,opt,name=object_name,json=objectName,proto3" json:"object_name,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *PassImageCheckRequest) Reset() {
 	*x = PassImageCheckRequest{}
-	mi := &file_plugins_aliyun_checker_v1_aliyun_checker_proto_msgTypes[2]
+	mi := &file_plugins_protocol_content_checker_v1_content_checker_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -149,7 +148,7 @@ func (x *PassImageCheckRequest) String() string {
 func (*PassImageCheckRequest) ProtoMessage() {}
 
 func (x *PassImageCheckRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_plugins_aliyun_checker_v1_aliyun_checker_proto_msgTypes[2]
+	mi := &file_plugins_protocol_content_checker_v1_content_checker_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -162,7 +161,7 @@ func (x *PassImageCheckRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PassImageCheckRequest.ProtoReflect.Descriptor instead.
 func (*PassImageCheckRequest) Descriptor() ([]byte, []int) {
-	return file_plugins_aliyun_checker_v1_aliyun_checker_proto_rawDescGZIP(), []int{2}
+	return file_plugins_protocol_content_checker_v1_content_checker_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *PassImageCheckRequest) GetScenario() string {
@@ -172,16 +171,16 @@ func (x *PassImageCheckRequest) GetScenario() string {
 	return ""
 }
 
-func (x *PassImageCheckRequest) GetOssBucketName() string {
+func (x *PassImageCheckRequest) GetBucketName() string {
 	if x != nil {
-		return x.OssBucketName
+		return x.BucketName
 	}
 	return ""
 }
 
-func (x *PassImageCheckRequest) GetOssObjectName() string {
+func (x *PassImageCheckRequest) GetObjectName() string {
 	if x != nil {
-		return x.OssObjectName
+		return x.ObjectName
 	}
 	return ""
 }
@@ -196,7 +195,7 @@ type PassImageURLCheckRequest struct {
 
 func (x *PassImageURLCheckRequest) Reset() {
 	*x = PassImageURLCheckRequest{}
-	mi := &file_plugins_aliyun_checker_v1_aliyun_checker_proto_msgTypes[3]
+	mi := &file_plugins_protocol_content_checker_v1_content_checker_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -208,7 +207,7 @@ func (x *PassImageURLCheckRequest) String() string {
 func (*PassImageURLCheckRequest) ProtoMessage() {}
 
 func (x *PassImageURLCheckRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_plugins_aliyun_checker_v1_aliyun_checker_proto_msgTypes[3]
+	mi := &file_plugins_protocol_content_checker_v1_content_checker_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -221,7 +220,7 @@ func (x *PassImageURLCheckRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PassImageURLCheckRequest.ProtoReflect.Descriptor instead.
 func (*PassImageURLCheckRequest) Descriptor() ([]byte, []int) {
-	return file_plugins_aliyun_checker_v1_aliyun_checker_proto_rawDescGZIP(), []int{3}
+	return file_plugins_protocol_content_checker_v1_content_checker_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *PassImageURLCheckRequest) GetScenario() string {
@@ -247,7 +246,7 @@ type ImageStreamHeader struct {
 
 func (x *ImageStreamHeader) Reset() {
 	*x = ImageStreamHeader{}
-	mi := &file_plugins_aliyun_checker_v1_aliyun_checker_proto_msgTypes[4]
+	mi := &file_plugins_protocol_content_checker_v1_content_checker_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -259,7 +258,7 @@ func (x *ImageStreamHeader) String() string {
 func (*ImageStreamHeader) ProtoMessage() {}
 
 func (x *ImageStreamHeader) ProtoReflect() protoreflect.Message {
-	mi := &file_plugins_aliyun_checker_v1_aliyun_checker_proto_msgTypes[4]
+	mi := &file_plugins_protocol_content_checker_v1_content_checker_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -272,7 +271,7 @@ func (x *ImageStreamHeader) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ImageStreamHeader.ProtoReflect.Descriptor instead.
 func (*ImageStreamHeader) Descriptor() ([]byte, []int) {
-	return file_plugins_aliyun_checker_v1_aliyun_checker_proto_rawDescGZIP(), []int{4}
+	return file_plugins_protocol_content_checker_v1_content_checker_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *ImageStreamHeader) GetScenario() string {
@@ -295,7 +294,7 @@ type ImageStreamFrame struct {
 
 func (x *ImageStreamFrame) Reset() {
 	*x = ImageStreamFrame{}
-	mi := &file_plugins_aliyun_checker_v1_aliyun_checker_proto_msgTypes[5]
+	mi := &file_plugins_protocol_content_checker_v1_content_checker_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -307,7 +306,7 @@ func (x *ImageStreamFrame) String() string {
 func (*ImageStreamFrame) ProtoMessage() {}
 
 func (x *ImageStreamFrame) ProtoReflect() protoreflect.Message {
-	mi := &file_plugins_aliyun_checker_v1_aliyun_checker_proto_msgTypes[5]
+	mi := &file_plugins_protocol_content_checker_v1_content_checker_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -320,7 +319,7 @@ func (x *ImageStreamFrame) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ImageStreamFrame.ProtoReflect.Descriptor instead.
 func (*ImageStreamFrame) Descriptor() ([]byte, []int) {
-	return file_plugins_aliyun_checker_v1_aliyun_checker_proto_rawDescGZIP(), []int{5}
+	return file_plugins_protocol_content_checker_v1_content_checker_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *ImageStreamFrame) GetFrame() isImageStreamFrame_Frame {
@@ -383,7 +382,7 @@ type PassLLMCheckRequest struct {
 
 func (x *PassLLMCheckRequest) Reset() {
 	*x = PassLLMCheckRequest{}
-	mi := &file_plugins_aliyun_checker_v1_aliyun_checker_proto_msgTypes[6]
+	mi := &file_plugins_protocol_content_checker_v1_content_checker_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -395,7 +394,7 @@ func (x *PassLLMCheckRequest) String() string {
 func (*PassLLMCheckRequest) ProtoMessage() {}
 
 func (x *PassLLMCheckRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_plugins_aliyun_checker_v1_aliyun_checker_proto_msgTypes[6]
+	mi := &file_plugins_protocol_content_checker_v1_content_checker_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -408,7 +407,7 @@ func (x *PassLLMCheckRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PassLLMCheckRequest.ProtoReflect.Descriptor instead.
 func (*PassLLMCheckRequest) Descriptor() ([]byte, []int) {
-	return file_plugins_aliyun_checker_v1_aliyun_checker_proto_rawDescGZIP(), []int{6}
+	return file_plugins_protocol_content_checker_v1_content_checker_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *PassLLMCheckRequest) GetScenario() string {
@@ -501,7 +500,7 @@ type MediaModerationRequest struct {
 
 func (x *MediaModerationRequest) Reset() {
 	*x = MediaModerationRequest{}
-	mi := &file_plugins_aliyun_checker_v1_aliyun_checker_proto_msgTypes[7]
+	mi := &file_plugins_protocol_content_checker_v1_content_checker_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -513,7 +512,7 @@ func (x *MediaModerationRequest) String() string {
 func (*MediaModerationRequest) ProtoMessage() {}
 
 func (x *MediaModerationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_plugins_aliyun_checker_v1_aliyun_checker_proto_msgTypes[7]
+	mi := &file_plugins_protocol_content_checker_v1_content_checker_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -526,7 +525,7 @@ func (x *MediaModerationRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MediaModerationRequest.ProtoReflect.Descriptor instead.
 func (*MediaModerationRequest) Descriptor() ([]byte, []int) {
-	return file_plugins_aliyun_checker_v1_aliyun_checker_proto_rawDescGZIP(), []int{7}
+	return file_plugins_protocol_content_checker_v1_content_checker_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *MediaModerationRequest) GetUrl() string {
@@ -575,7 +574,7 @@ type MediaModerationSubmission struct {
 
 func (x *MediaModerationSubmission) Reset() {
 	*x = MediaModerationSubmission{}
-	mi := &file_plugins_aliyun_checker_v1_aliyun_checker_proto_msgTypes[8]
+	mi := &file_plugins_protocol_content_checker_v1_content_checker_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -587,7 +586,7 @@ func (x *MediaModerationSubmission) String() string {
 func (*MediaModerationSubmission) ProtoMessage() {}
 
 func (x *MediaModerationSubmission) ProtoReflect() protoreflect.Message {
-	mi := &file_plugins_aliyun_checker_v1_aliyun_checker_proto_msgTypes[8]
+	mi := &file_plugins_protocol_content_checker_v1_content_checker_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -600,7 +599,7 @@ func (x *MediaModerationSubmission) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MediaModerationSubmission.ProtoReflect.Descriptor instead.
 func (*MediaModerationSubmission) Descriptor() ([]byte, []int) {
-	return file_plugins_aliyun_checker_v1_aliyun_checker_proto_rawDescGZIP(), []int{8}
+	return file_plugins_protocol_content_checker_v1_content_checker_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *MediaModerationSubmission) GetDataId() string {
@@ -635,7 +634,7 @@ type MediaModerationResult struct {
 
 func (x *MediaModerationResult) Reset() {
 	*x = MediaModerationResult{}
-	mi := &file_plugins_aliyun_checker_v1_aliyun_checker_proto_msgTypes[9]
+	mi := &file_plugins_protocol_content_checker_v1_content_checker_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -647,7 +646,7 @@ func (x *MediaModerationResult) String() string {
 func (*MediaModerationResult) ProtoMessage() {}
 
 func (x *MediaModerationResult) ProtoReflect() protoreflect.Message {
-	mi := &file_plugins_aliyun_checker_v1_aliyun_checker_proto_msgTypes[9]
+	mi := &file_plugins_protocol_content_checker_v1_content_checker_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -660,7 +659,7 @@ func (x *MediaModerationResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MediaModerationResult.ProtoReflect.Descriptor instead.
 func (*MediaModerationResult) Descriptor() ([]byte, []int) {
-	return file_plugins_aliyun_checker_v1_aliyun_checker_proto_rawDescGZIP(), []int{9}
+	return file_plugins_protocol_content_checker_v1_content_checker_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *MediaModerationResult) GetDataId() string {
@@ -684,28 +683,30 @@ func (x *MediaModerationResult) GetReason() string {
 	return ""
 }
 
-var File_plugins_aliyun_checker_v1_aliyun_checker_proto protoreflect.FileDescriptor
+var File_plugins_protocol_content_checker_v1_content_checker_proto protoreflect.FileDescriptor
 
-const file_plugins_aliyun_checker_v1_aliyun_checker_proto_rawDesc = "" +
+const file_plugins_protocol_content_checker_v1_content_checker_proto_rawDesc = "" +
 	"\n" +
-	".plugins/aliyun_checker/v1/aliyun_checker.proto\x12 csghub.plugins.aliyun_checker.v1\"H\n" +
+	"9plugins/protocol/content_checker/v1/content_checker.proto\x12!csghub.plugins.content_checker.v1\"H\n" +
 	"\vCheckResult\x12!\n" +
 	"\fis_sensitive\x18\x01 \x01(\bR\visSensitive\x12\x16\n" +
 	"\x06reason\x18\x02 \x01(\tR\x06reason\"F\n" +
 	"\x14PassTextCheckRequest\x12\x1a\n" +
 	"\bscenario\x18\x01 \x01(\tR\bscenario\x12\x12\n" +
-	"\x04text\x18\x02 \x01(\tR\x04text\"\x83\x01\n" +
+	"\x04text\x18\x02 \x01(\tR\x04text\"u\n" +
 	"\x15PassImageCheckRequest\x12\x1a\n" +
-	"\bscenario\x18\x01 \x01(\tR\bscenario\x12&\n" +
-	"\x0foss_bucket_name\x18\x02 \x01(\tR\rossBucketName\x12&\n" +
-	"\x0foss_object_name\x18\x03 \x01(\tR\rossObjectName\"S\n" +
+	"\bscenario\x18\x01 \x01(\tR\bscenario\x12\x1f\n" +
+	"\vbucket_name\x18\x02 \x01(\tR\n" +
+	"bucketName\x12\x1f\n" +
+	"\vobject_name\x18\x03 \x01(\tR\n" +
+	"objectName\"S\n" +
 	"\x18PassImageURLCheckRequest\x12\x1a\n" +
 	"\bscenario\x18\x01 \x01(\tR\bscenario\x12\x1b\n" +
 	"\timage_url\x18\x02 \x01(\tR\bimageUrl\"/\n" +
 	"\x11ImageStreamHeader\x12\x1a\n" +
-	"\bscenario\x18\x01 \x01(\tR\bscenario\"\x82\x01\n" +
-	"\x10ImageStreamFrame\x12M\n" +
-	"\x06header\x18\x01 \x01(\v23.csghub.plugins.aliyun_checker.v1.ImageStreamHeaderH\x00R\x06header\x12\x16\n" +
+	"\bscenario\x18\x01 \x01(\tR\bscenario\"\x83\x01\n" +
+	"\x10ImageStreamFrame\x12N\n" +
+	"\x06header\x18\x01 \x01(\v24.csghub.plugins.content_checker.v1.ImageStreamHeaderH\x00R\x06header\x12\x16\n" +
 	"\x05chunk\x18\x02 \x01(\fH\x00R\x05chunkB\a\n" +
 	"\x05frame\"\xd8\x02\n" +
 	"\x13PassLLMCheckRequest\x12\x1a\n" +
@@ -738,57 +739,57 @@ const file_plugins_aliyun_checker_v1_aliyun_checker_proto_rawDesc = "" +
 	"\x15MediaModerationResult\x12\x17\n" +
 	"\adata_id\x18\x01 \x01(\tR\x06dataId\x12\x16\n" +
 	"\x06status\x18\x02 \x01(\tR\x06status\x12\x16\n" +
-	"\x06reason\x18\x03 \x01(\tR\x06reason2\x97\a\n" +
-	"\rAliyunChecker\x12v\n" +
-	"\rPassTextCheck\x126.csghub.plugins.aliyun_checker.v1.PassTextCheckRequest\x1a-.csghub.plugins.aliyun_checker.v1.CheckResult\x12x\n" +
-	"\x0ePassImageCheck\x127.csghub.plugins.aliyun_checker.v1.PassImageCheckRequest\x1a-.csghub.plugins.aliyun_checker.v1.CheckResult\x12~\n" +
-	"\x11PassImageURLCheck\x12:.csghub.plugins.aliyun_checker.v1.PassImageURLCheckRequest\x1a-.csghub.plugins.aliyun_checker.v1.CheckResult\x12{\n" +
-	"\x14PassImageStreamCheck\x122.csghub.plugins.aliyun_checker.v1.ImageStreamFrame\x1a-.csghub.plugins.aliyun_checker.v1.CheckResult(\x01\x12t\n" +
-	"\fPassLLMCheck\x125.csghub.plugins.aliyun_checker.v1.PassLLMCheckRequest\x1a-.csghub.plugins.aliyun_checker.v1.CheckResult\x12\x8e\x01\n" +
-	"\x15SubmitMediaModeration\x128.csghub.plugins.aliyun_checker.v1.MediaModerationRequest\x1a;.csghub.plugins.aliyun_checker.v1.MediaModerationSubmission\x12\x8f\x01\n" +
-	"\x1aQueryMediaModerationResult\x128.csghub.plugins.aliyun_checker.v1.MediaModerationRequest\x1a7.csghub.plugins.aliyun_checker.v1.MediaModerationResultBEZCopencsg.com/csghub-server/plugins/aliyun_checker/v1;aliyuncheckerv1b\x06proto3"
+	"\x06reason\x18\x03 \x01(\tR\x06reason2\xa7\a\n" +
+	"\x0eContentChecker\x12x\n" +
+	"\rPassTextCheck\x127.csghub.plugins.content_checker.v1.PassTextCheckRequest\x1a..csghub.plugins.content_checker.v1.CheckResult\x12z\n" +
+	"\x0ePassImageCheck\x128.csghub.plugins.content_checker.v1.PassImageCheckRequest\x1a..csghub.plugins.content_checker.v1.CheckResult\x12\x80\x01\n" +
+	"\x11PassImageURLCheck\x12;.csghub.plugins.content_checker.v1.PassImageURLCheckRequest\x1a..csghub.plugins.content_checker.v1.CheckResult\x12}\n" +
+	"\x14PassImageStreamCheck\x123.csghub.plugins.content_checker.v1.ImageStreamFrame\x1a..csghub.plugins.content_checker.v1.CheckResult(\x01\x12v\n" +
+	"\fPassLLMCheck\x126.csghub.plugins.content_checker.v1.PassLLMCheckRequest\x1a..csghub.plugins.content_checker.v1.CheckResult\x12\x90\x01\n" +
+	"\x15SubmitMediaModeration\x129.csghub.plugins.content_checker.v1.MediaModerationRequest\x1a<.csghub.plugins.content_checker.v1.MediaModerationSubmission\x12\x91\x01\n" +
+	"\x1aQueryMediaModerationResult\x129.csghub.plugins.content_checker.v1.MediaModerationRequest\x1a8.csghub.plugins.content_checker.v1.MediaModerationResultBPZNopencsg.com/csghub-server/plugins/protocol/content_checker/v1;contentcheckerv1b\x06proto3"
 
 var (
-	file_plugins_aliyun_checker_v1_aliyun_checker_proto_rawDescOnce sync.Once
-	file_plugins_aliyun_checker_v1_aliyun_checker_proto_rawDescData []byte
+	file_plugins_protocol_content_checker_v1_content_checker_proto_rawDescOnce sync.Once
+	file_plugins_protocol_content_checker_v1_content_checker_proto_rawDescData []byte
 )
 
-func file_plugins_aliyun_checker_v1_aliyun_checker_proto_rawDescGZIP() []byte {
-	file_plugins_aliyun_checker_v1_aliyun_checker_proto_rawDescOnce.Do(func() {
-		file_plugins_aliyun_checker_v1_aliyun_checker_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_plugins_aliyun_checker_v1_aliyun_checker_proto_rawDesc), len(file_plugins_aliyun_checker_v1_aliyun_checker_proto_rawDesc)))
+func file_plugins_protocol_content_checker_v1_content_checker_proto_rawDescGZIP() []byte {
+	file_plugins_protocol_content_checker_v1_content_checker_proto_rawDescOnce.Do(func() {
+		file_plugins_protocol_content_checker_v1_content_checker_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_plugins_protocol_content_checker_v1_content_checker_proto_rawDesc), len(file_plugins_protocol_content_checker_v1_content_checker_proto_rawDesc)))
 	})
-	return file_plugins_aliyun_checker_v1_aliyun_checker_proto_rawDescData
+	return file_plugins_protocol_content_checker_v1_content_checker_proto_rawDescData
 }
 
-var file_plugins_aliyun_checker_v1_aliyun_checker_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
-var file_plugins_aliyun_checker_v1_aliyun_checker_proto_goTypes = []any{
-	(*CheckResult)(nil),               // 0: csghub.plugins.aliyun_checker.v1.CheckResult
-	(*PassTextCheckRequest)(nil),      // 1: csghub.plugins.aliyun_checker.v1.PassTextCheckRequest
-	(*PassImageCheckRequest)(nil),     // 2: csghub.plugins.aliyun_checker.v1.PassImageCheckRequest
-	(*PassImageURLCheckRequest)(nil),  // 3: csghub.plugins.aliyun_checker.v1.PassImageURLCheckRequest
-	(*ImageStreamHeader)(nil),         // 4: csghub.plugins.aliyun_checker.v1.ImageStreamHeader
-	(*ImageStreamFrame)(nil),          // 5: csghub.plugins.aliyun_checker.v1.ImageStreamFrame
-	(*PassLLMCheckRequest)(nil),       // 6: csghub.plugins.aliyun_checker.v1.PassLLMCheckRequest
-	(*MediaModerationRequest)(nil),    // 7: csghub.plugins.aliyun_checker.v1.MediaModerationRequest
-	(*MediaModerationSubmission)(nil), // 8: csghub.plugins.aliyun_checker.v1.MediaModerationSubmission
-	(*MediaModerationResult)(nil),     // 9: csghub.plugins.aliyun_checker.v1.MediaModerationResult
+var file_plugins_protocol_content_checker_v1_content_checker_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
+var file_plugins_protocol_content_checker_v1_content_checker_proto_goTypes = []any{
+	(*CheckResult)(nil),               // 0: csghub.plugins.content_checker.v1.CheckResult
+	(*PassTextCheckRequest)(nil),      // 1: csghub.plugins.content_checker.v1.PassTextCheckRequest
+	(*PassImageCheckRequest)(nil),     // 2: csghub.plugins.content_checker.v1.PassImageCheckRequest
+	(*PassImageURLCheckRequest)(nil),  // 3: csghub.plugins.content_checker.v1.PassImageURLCheckRequest
+	(*ImageStreamHeader)(nil),         // 4: csghub.plugins.content_checker.v1.ImageStreamHeader
+	(*ImageStreamFrame)(nil),          // 5: csghub.plugins.content_checker.v1.ImageStreamFrame
+	(*PassLLMCheckRequest)(nil),       // 6: csghub.plugins.content_checker.v1.PassLLMCheckRequest
+	(*MediaModerationRequest)(nil),    // 7: csghub.plugins.content_checker.v1.MediaModerationRequest
+	(*MediaModerationSubmission)(nil), // 8: csghub.plugins.content_checker.v1.MediaModerationSubmission
+	(*MediaModerationResult)(nil),     // 9: csghub.plugins.content_checker.v1.MediaModerationResult
 }
-var file_plugins_aliyun_checker_v1_aliyun_checker_proto_depIdxs = []int32{
-	4, // 0: csghub.plugins.aliyun_checker.v1.ImageStreamFrame.header:type_name -> csghub.plugins.aliyun_checker.v1.ImageStreamHeader
-	1, // 1: csghub.plugins.aliyun_checker.v1.AliyunChecker.PassTextCheck:input_type -> csghub.plugins.aliyun_checker.v1.PassTextCheckRequest
-	2, // 2: csghub.plugins.aliyun_checker.v1.AliyunChecker.PassImageCheck:input_type -> csghub.plugins.aliyun_checker.v1.PassImageCheckRequest
-	3, // 3: csghub.plugins.aliyun_checker.v1.AliyunChecker.PassImageURLCheck:input_type -> csghub.plugins.aliyun_checker.v1.PassImageURLCheckRequest
-	5, // 4: csghub.plugins.aliyun_checker.v1.AliyunChecker.PassImageStreamCheck:input_type -> csghub.plugins.aliyun_checker.v1.ImageStreamFrame
-	6, // 5: csghub.plugins.aliyun_checker.v1.AliyunChecker.PassLLMCheck:input_type -> csghub.plugins.aliyun_checker.v1.PassLLMCheckRequest
-	7, // 6: csghub.plugins.aliyun_checker.v1.AliyunChecker.SubmitMediaModeration:input_type -> csghub.plugins.aliyun_checker.v1.MediaModerationRequest
-	7, // 7: csghub.plugins.aliyun_checker.v1.AliyunChecker.QueryMediaModerationResult:input_type -> csghub.plugins.aliyun_checker.v1.MediaModerationRequest
-	0, // 8: csghub.plugins.aliyun_checker.v1.AliyunChecker.PassTextCheck:output_type -> csghub.plugins.aliyun_checker.v1.CheckResult
-	0, // 9: csghub.plugins.aliyun_checker.v1.AliyunChecker.PassImageCheck:output_type -> csghub.plugins.aliyun_checker.v1.CheckResult
-	0, // 10: csghub.plugins.aliyun_checker.v1.AliyunChecker.PassImageURLCheck:output_type -> csghub.plugins.aliyun_checker.v1.CheckResult
-	0, // 11: csghub.plugins.aliyun_checker.v1.AliyunChecker.PassImageStreamCheck:output_type -> csghub.plugins.aliyun_checker.v1.CheckResult
-	0, // 12: csghub.plugins.aliyun_checker.v1.AliyunChecker.PassLLMCheck:output_type -> csghub.plugins.aliyun_checker.v1.CheckResult
-	8, // 13: csghub.plugins.aliyun_checker.v1.AliyunChecker.SubmitMediaModeration:output_type -> csghub.plugins.aliyun_checker.v1.MediaModerationSubmission
-	9, // 14: csghub.plugins.aliyun_checker.v1.AliyunChecker.QueryMediaModerationResult:output_type -> csghub.plugins.aliyun_checker.v1.MediaModerationResult
+var file_plugins_protocol_content_checker_v1_content_checker_proto_depIdxs = []int32{
+	4, // 0: csghub.plugins.content_checker.v1.ImageStreamFrame.header:type_name -> csghub.plugins.content_checker.v1.ImageStreamHeader
+	1, // 1: csghub.plugins.content_checker.v1.ContentChecker.PassTextCheck:input_type -> csghub.plugins.content_checker.v1.PassTextCheckRequest
+	2, // 2: csghub.plugins.content_checker.v1.ContentChecker.PassImageCheck:input_type -> csghub.plugins.content_checker.v1.PassImageCheckRequest
+	3, // 3: csghub.plugins.content_checker.v1.ContentChecker.PassImageURLCheck:input_type -> csghub.plugins.content_checker.v1.PassImageURLCheckRequest
+	5, // 4: csghub.plugins.content_checker.v1.ContentChecker.PassImageStreamCheck:input_type -> csghub.plugins.content_checker.v1.ImageStreamFrame
+	6, // 5: csghub.plugins.content_checker.v1.ContentChecker.PassLLMCheck:input_type -> csghub.plugins.content_checker.v1.PassLLMCheckRequest
+	7, // 6: csghub.plugins.content_checker.v1.ContentChecker.SubmitMediaModeration:input_type -> csghub.plugins.content_checker.v1.MediaModerationRequest
+	7, // 7: csghub.plugins.content_checker.v1.ContentChecker.QueryMediaModerationResult:input_type -> csghub.plugins.content_checker.v1.MediaModerationRequest
+	0, // 8: csghub.plugins.content_checker.v1.ContentChecker.PassTextCheck:output_type -> csghub.plugins.content_checker.v1.CheckResult
+	0, // 9: csghub.plugins.content_checker.v1.ContentChecker.PassImageCheck:output_type -> csghub.plugins.content_checker.v1.CheckResult
+	0, // 10: csghub.plugins.content_checker.v1.ContentChecker.PassImageURLCheck:output_type -> csghub.plugins.content_checker.v1.CheckResult
+	0, // 11: csghub.plugins.content_checker.v1.ContentChecker.PassImageStreamCheck:output_type -> csghub.plugins.content_checker.v1.CheckResult
+	0, // 12: csghub.plugins.content_checker.v1.ContentChecker.PassLLMCheck:output_type -> csghub.plugins.content_checker.v1.CheckResult
+	8, // 13: csghub.plugins.content_checker.v1.ContentChecker.SubmitMediaModeration:output_type -> csghub.plugins.content_checker.v1.MediaModerationSubmission
+	9, // 14: csghub.plugins.content_checker.v1.ContentChecker.QueryMediaModerationResult:output_type -> csghub.plugins.content_checker.v1.MediaModerationResult
 	8, // [8:15] is the sub-list for method output_type
 	1, // [1:8] is the sub-list for method input_type
 	1, // [1:1] is the sub-list for extension type_name
@@ -796,12 +797,12 @@ var file_plugins_aliyun_checker_v1_aliyun_checker_proto_depIdxs = []int32{
 	0, // [0:1] is the sub-list for field type_name
 }
 
-func init() { file_plugins_aliyun_checker_v1_aliyun_checker_proto_init() }
-func file_plugins_aliyun_checker_v1_aliyun_checker_proto_init() {
-	if File_plugins_aliyun_checker_v1_aliyun_checker_proto != nil {
+func init() { file_plugins_protocol_content_checker_v1_content_checker_proto_init() }
+func file_plugins_protocol_content_checker_v1_content_checker_proto_init() {
+	if File_plugins_protocol_content_checker_v1_content_checker_proto != nil {
 		return
 	}
-	file_plugins_aliyun_checker_v1_aliyun_checker_proto_msgTypes[5].OneofWrappers = []any{
+	file_plugins_protocol_content_checker_v1_content_checker_proto_msgTypes[5].OneofWrappers = []any{
 		(*ImageStreamFrame_Header)(nil),
 		(*ImageStreamFrame_Chunk)(nil),
 	}
@@ -809,17 +810,17 @@ func file_plugins_aliyun_checker_v1_aliyun_checker_proto_init() {
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_plugins_aliyun_checker_v1_aliyun_checker_proto_rawDesc), len(file_plugins_aliyun_checker_v1_aliyun_checker_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_plugins_protocol_content_checker_v1_content_checker_proto_rawDesc), len(file_plugins_protocol_content_checker_v1_content_checker_proto_rawDesc)),
 			NumEnums:      0,
 			NumMessages:   10,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
-		GoTypes:           file_plugins_aliyun_checker_v1_aliyun_checker_proto_goTypes,
-		DependencyIndexes: file_plugins_aliyun_checker_v1_aliyun_checker_proto_depIdxs,
-		MessageInfos:      file_plugins_aliyun_checker_v1_aliyun_checker_proto_msgTypes,
+		GoTypes:           file_plugins_protocol_content_checker_v1_content_checker_proto_goTypes,
+		DependencyIndexes: file_plugins_protocol_content_checker_v1_content_checker_proto_depIdxs,
+		MessageInfos:      file_plugins_protocol_content_checker_v1_content_checker_proto_msgTypes,
 	}.Build()
-	File_plugins_aliyun_checker_v1_aliyun_checker_proto = out.File
-	file_plugins_aliyun_checker_v1_aliyun_checker_proto_goTypes = nil
-	file_plugins_aliyun_checker_v1_aliyun_checker_proto_depIdxs = nil
+	File_plugins_protocol_content_checker_v1_content_checker_proto = out.File
+	file_plugins_protocol_content_checker_v1_content_checker_proto_goTypes = nil
+	file_plugins_protocol_content_checker_v1_content_checker_proto_depIdxs = nil
 }
