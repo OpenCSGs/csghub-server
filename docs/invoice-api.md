@@ -1,7 +1,8 @@
 # 开票模块接口文档（充值开票）
 
-> 适用版本：`feat/recharge-invoice` 分支。开票模式从「按账单周期」改为「按充值订单」：
+> 适用版本：`fix/invoice-remove-month-scope` 分支。开票模式从「按账单周期」改为「按充值订单」：
 > 可开票金额 = 已支付、未关闭、未开过票的充值订单实付金额合计（不含代金券、活动赠送）。
+> 仪表盘与可开票列表不再区分月份区间，统计范围为全部时间。
 > 接口路由不变，仅出入参有调整，见各节说明。
 
 ## 通用约定
@@ -14,7 +15,6 @@
 | `:id` | 发票 ID，即数据库自增 id（路径参数） |
 | 金额单位 | 元（`amount`、`invoice_amount` 等） |
 | 时间格式 | RFC3339，如 `2026-09-01T08:30:00Z` |
-| 月份格式 | `YYYY-MM` |
 | 成功响应 | `{"msg": "OK", "data": ...}`，HTTP 200 |
 | 参数错误 | `{"msg": "..."}`，HTTP 400 |
 | 业务/系统错误 | `{"msg": "..."}`（或含 `code`/`context`），HTTP 500 |
@@ -35,13 +35,9 @@ CT="Content-Type: application/json"
 
 `POST /api/v1/accounting/invoice/:uuid/dashboard`
 
-开票管理页顶部的金额汇总。统计范围为请求的月份区间（闭区间，含首尾月）。
+开票管理页顶部的金额汇总。统计范围为该主体的**全部时间**，无需（也不再支持）传月份区间。
 
-**请求体**（`start_month`、`end_month` 必填；`end_month` 不能晚于当前月，且不能早于 `start_month`）：
-
-```json
-{ "start_month": "2026-01", "end_month": "2026-09" }
-```
+**请求体**：`{}`（字段全部移除，传空对象即可）
 
 **响应**：
 
@@ -49,7 +45,6 @@ CT="Content-Type: application/json"
 {
   "msg": "OK",
   "data": {
-    "current_month_non_invoicable": 0,
     "invoiced_amount": 1200.0,
     "uninvoiced_amount": 355.0
   }
@@ -58,16 +53,14 @@ CT="Content-Type: application/json"
 
 | 字段 | 说明 |
 |---|---|
-| `uninvoiced_amount` | 可开票金额：区间内已支付、未关闭、未开票的**充值订单**实付合计。不含代金券、活动赠送（两者不产生充值订单，天然被排除） |
-| `invoiced_amount` | 区间内申请开票（`apply_time`）且非失败状态的发票金额合计 |
-| `current_month_non_invoicable` | 兼容保留字段，恒为 `0`（充值成功当月即可开票） |
+| `uninvoiced_amount` | 可开票金额：已支付、未关闭、未开票的**充值订单**实付合计（全部时间）。不含代金券、活动赠送（两者不产生充值订单，天然被排除） |
+| `invoiced_amount` | 申请开票且非失败状态的发票金额合计（全部时间，含历史账单周期发票） |
 
-> 统计口径沿用历史账单周期的月度区间：`end_month` 当月的充值订单不计入 `uninvoiced_amount`/`invoiced_amount`（下月才会进入统计）。当月可开票金额以「可开票订单列表」为准。
+> 已移除 `current_month_non_invoicable` 字段：充值成功即可开票，不存在不可开票金额。
 
 ```bash
 curl -s -X POST "$BASE/api/v1/accounting/invoice/$UUID/dashboard" \
-  -H "$AUTH" -H "$CT" \
-  -d '{"start_month":"2026-01","end_month":"2026-09"}'
+  -H "$AUTH" -H "$CT" -d '{}'
 ```
 
 ---
@@ -76,7 +69,7 @@ curl -s -X POST "$BASE/api/v1/accounting/invoice/$UUID/dashboard" \
 
 `POST /api/v1/accounting/invoice/:uuid/invoicable`
 
-列出可申请开票的充值订单，前端渲染为勾选列表。
+列出可申请开票的充值订单，前端渲染为勾选列表。返回该主体全部未开票的已支付订单，按充值成功时间倒序。
 
 **请求体**：
 
@@ -84,10 +77,9 @@ curl -s -X POST "$BASE/api/v1/accounting/invoice/$UUID/dashboard" \
 |---|---|---|
 | `page` | 是 | ≥ 1 |
 | `page_size` | 是 | 1–100 |
-| `start_month` / `end_month` | 否 | 按 `time_succeeded` 过滤；**两者都传才生效**，校验规则同仪表盘 |
 
 ```json
-{ "page": 1, "page_size": 10, "start_month": "2026-08", "end_month": "2026-09" }
+{ "page": 1, "page_size": 10 }
 ```
 
 **响应**：
@@ -389,8 +381,8 @@ VALUES ('r-test-1', 'ord-test-1', '<目标用户uuid>', '<同上>', 10000,
 
 | 接口 | 变化 |
 |---|---|
-| 仪表盘 | 响应结构不变；`current_month_non_invoicable` 恒为 0，`uninvoiced_amount` 改为可开票充值订单合计 |
-| 可开票列表 | 行结构改为 `{order_no, recharge_time, amount}` |
+| 仪表盘 | 移除 `start_month`/`end_month` 入参与 `current_month_non_invoicable` 出参；统计范围改为全部时间，`uninvoiced_amount` 为可开票充值订单合计、`invoiced_amount` 为全部非失败发票合计 |
+| 可开票列表 | 行结构改为 `{order_no, recharge_time, amount}`；移除 `start_month`/`end_month` 过滤 |
 | 申请开票 | 请求改为 `{title_id, recharge_order_nos[]}`，金额服务端计算；订单不可开票（含重复/并发申请）返回 400；事务内加锁防一单多票 |
 | 记录列表 / 详情 / 管理员详情与改状态 | 响应新增 `recharge_orders` |
 | `failed` / 删除后的订单 | 自动回到可开票列表，可重新申请开一张新发票 |

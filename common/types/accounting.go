@@ -924,17 +924,13 @@ type AccInvoiceResp struct {
 }
 
 type AccInvoiceDashboardResp struct {
-	CurrentMonthNonInvoicable float64 `json:"current_month_non_invoicable"`
-	InvoicedAmount            float64 `json:"invoiced_amount"`
-	UninvoicedAmount          float64 `json:"uninvoiced_amount"`
+	InvoicedAmount   float64 `json:"invoiced_amount"`
+	UninvoicedAmount float64 `json:"uninvoiced_amount"`
 }
 
 type AccInvoiceDashboardReq struct {
 	TargetUUID  string `json:"-"`
 	CurrentUser string `json:"-"` // current user for permission check
-
-	StartMonth string `json:"start_month" binding:"required"`
-	EndMonth   string `json:"end_month" binding:"required"`
 }
 
 type AccInvoiceCreateReq struct {
@@ -949,8 +945,6 @@ type AccInvoicableReq struct {
 	CurrentUser string `json:"-"`                                 // current user for permission check
 	Page        int    `json:"page" binding:"min=1"`              // Current page number
 	PageSize    int    `json:"page_size" binding:"min=1,max=100"` // Number of items per page
-	StartMonth  string `json:"start_month"`
-	EndMonth    string `json:"end_month"`
 }
 type AccInvoicableResp struct {
 	Data  []AccInvoicable `json:"data"`
