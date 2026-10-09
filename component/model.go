@@ -329,6 +329,7 @@ func (c *modelComponentImpl) IndexV2(ctx context.Context, filter *types.RepoFilt
 			License:              repo.License,
 			ComplianceStatus:     repo.ComplianceStatus,
 			CommercialPermission: repo.CommercialPermission,
+			MultiSource:          indexMultiSource(repo.HFPath, repo.MSPath, repo.CSGPath),
 		})
 	}
 
@@ -600,6 +601,7 @@ func (c *modelComponentImpl) Show(ctx context.Context, namespace, name, currentU
 		}
 	}
 
+	modelParamsValid := model.Repository.Metadata.ModelParamsValid
 	resModel := &types.Model{
 		ID:            model.ID,
 		Name:          model.Repository.Name,
@@ -631,11 +633,13 @@ func (c *modelComponentImpl) Show(ctx context.Context, namespace, name, currentU
 		CommercialPermission: model.Repository.CommercialPermission,
 		MirrorLastUpdatedAt:  model.Repository.Mirror.LastUpdatedAt,
 		CanWrite:             permission.CanWrite,
-		CanManage:            permission.CanAdmin,
+		CanRead:              permission.CanRead,
+		CanAdmin:             permission.CanAdmin,
 		IsOrganization:       ns != nil && ns.Type == types.OrganizationNamespaceType,
 		Namespace:            ns,
 		Metadata: types.Metadata{
 			ModelParams:       model.Repository.Metadata.ModelParams,
+			ModelParamsValid:  &modelParamsValid,
 			TensorType:        model.Repository.Metadata.TensorType,
 			MiniGPUMemoryGB:   model.Repository.Metadata.MiniGPUMemoryGB,
 			Architecture:      model.Repository.Metadata.Architecture,

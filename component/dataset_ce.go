@@ -117,9 +117,9 @@ func (c *datasetComponentImpl) commonIndex(ctx context.Context, filter *types.Re
 				Avatar:   dataset.Repository.User.Avatar,
 			},
 			MultiSource: types.MultiSource{
-				HFPath:  dataset.Repository.HFPath,
-				MSPath:  dataset.Repository.MSPath,
-				CSGPath: dataset.Repository.CSGPath,
+				HFPath:  repo.HFPath,
+				MSPath:  repo.MSPath,
+				CSGPath: repo.CSGPath,
 			},
 			MirrorTaskStatus:      mirrorTaskStatus,
 			XnetMigrationStatus:   xnetMigrationStatus,
@@ -220,7 +220,8 @@ func (c *datasetComponentImpl) Show(ctx context.Context, namespace, name, curren
 		CommercialPermission: dataset.Repository.CommercialPermission,
 		MirrorLastUpdatedAt:  dataset.Repository.Mirror.LastUpdatedAt,
 		CanWrite:             permission.CanWrite,
-		CanManage:            permission.CanAdmin,
+		CanRead:              permission.CanRead,
+		CanAdmin:             permission.CanAdmin,
 		Namespace:            ns,
 		MultiSource: types.MultiSource{
 			HFPath:  dataset.Repository.HFPath,

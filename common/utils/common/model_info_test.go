@@ -138,6 +138,9 @@ func TestGetModelInfo_Success(t *testing.T) {
 	if got.ParamsBillions != float32(math.Round(float64(wantParams)/1e9*100)/100) {
 		t.Errorf("ParamsBillions = %v, want %v", got.ParamsBillions, float32(math.Round(float64(wantParams)/1e9*100)/100))
 	}
+	if !got.ParamsValid {
+		t.Error("ParamsValid = false, want true after parsing safetensors headers")
+	}
 	if got.ModelWeightsGB != wantModelWeightsGB {
 		t.Errorf("ModelWeightsGB = %v, want %v", got.ModelWeightsGB, wantModelWeightsGB)
 	}
@@ -154,6 +157,24 @@ func TestGetModelInfo_Success(t *testing.T) {
 	// Since map iteration order is not guaranteed, we just check it's valid
 	if got.BytesPerParam != 8 && got.BytesPerParam != 4 {
 		t.Errorf("BytesPerParam = %v, want 2 or 4", got.BytesPerParam)
+	}
+}
+
+func TestGetModelInfo_ValidZeroParams(t *testing.T) {
+	restore := patchFetchSafetensorsMetadata(func(string) (map[string]any, error) {
+		return map[string]any{"__metadata__": map[string]any{}}, nil
+	})
+	defer restore()
+
+	got, err := GetModelInfo([]string{"empty.safetensors"}, 128)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.ParamsBillions != 0 {
+		t.Fatalf("ParamsBillions = %v, want 0", got.ParamsBillions)
+	}
+	if !got.ParamsValid {
+		t.Fatal("ParamsValid = false, want true after parsing an empty safetensors header")
 	}
 }
 

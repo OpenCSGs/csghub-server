@@ -106,7 +106,8 @@ func TestCollectionComponent_GetCollection(t *testing.T) {
 		Namespace: "user",
 		UserLikes: true,
 		CanWrite:  true,
-		CanManage: true,
+		CanRead:   true,
+		CanAdmin:  true,
 		Avatar:    "aaa",
 		Repositories: []types.CollectionRepository{
 			{ID: 1, RepositoryType: types.SpaceRepo, Path: "r1/foo", Status: "go", Remark: "Test remark"},
@@ -118,7 +119,8 @@ func TestCollectionComponent_GetCollection(t *testing.T) {
 		Namespace: "ns",
 		UserLikes: true,
 		CanWrite:  true,
-		CanManage: true,
+		CanRead:   true,
+		CanAdmin:  true,
 		Avatar:    "logo",
 		Repositories: []types.CollectionRepository{
 			{ID: 1, RepositoryType: types.SpaceRepo, Path: "r1/foo", Status: "go", Remark: "Another remark"},

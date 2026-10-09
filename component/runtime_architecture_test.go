@@ -252,6 +252,7 @@ func TestGetMetadataFromSafetensors_className(t *testing.T) {
 	})
 	require.Nil(t, err)
 	require.NotNil(t, modelInfo)
+	require.False(t, modelInfo.ParamsValid)
 }
 
 const paddleInferTestConfig = `Global:
@@ -306,6 +307,7 @@ func TestRuntimeArchComponent_GetMetadataFromPaddleStatic(t *testing.T) {
 
 	require.NoError(t, err)
 	require.Equal(t, "PP-OCRv6_medium_rec", modelInfo.ModelName)
+	require.False(t, modelInfo.ParamsValid)
 }
 
 func TestRuntimeArchComponent_UpdateModelMetadata_PaddleStatic(t *testing.T) {
@@ -320,7 +322,7 @@ func TestRuntimeArchComponent_UpdateModelMetadata_PaddleStatic(t *testing.T) {
 	}
 	rc.mocks.gitServer.EXPECT().GetRepoFileRaw(ctx, mock.Anything).Return(paddleInferTestConfig, nil).Once()
 	rc.mocks.stores.MetadataMock().EXPECT().Upsert(ctx, mock.MatchedBy(func(m *database.Metadata) bool {
-		return m.RepositoryID == 1 && m.ModelType == ""
+		return m.RepositoryID == 1 && m.ModelType == "" && m.ModelParams == 0 && !m.ModelParamsValid
 	})).Return(nil).Once()
 	expectUpdateModelArchType(ctx, rc)
 

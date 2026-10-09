@@ -394,6 +394,11 @@ func (c *repoComponentImpl) UpdateRepo(ctx context.Context, req types.UpdateRepo
 		return nil, errors.New("user does not exist")
 	}
 
+	// Dataset visibility changes are restricted to platform administrators.
+	if req.Private != nil && req.RepoType == types.DatasetRepo && !user.CanAdmin() {
+		return nil, errorx.ErrForbiddenMsg("only platform administrators can change dataset visibility")
+	}
+
 	// Admin users have full permissions.
 	if user.CanAdmin() {
 		if req.ComplianceStatus != nil {
@@ -428,9 +433,13 @@ func (c *repoComponentImpl) UpdateRepo(ctx context.Context, req types.UpdateRepo
 
 		// Preserve the edition-independent privacy rules for non-platform administrators.
 		if namespace.NamespaceType == database.OrgNamespace {
-			// Non-admins cannot change the privacy of an organization's repository.
 			if req.Private != nil {
-				return nil, errorx.ErrForbiddenMsg("only admins can change the privacy of an organization repository")
+				if !*req.Private {
+					if err := c.allowPublic(repo); err != nil {
+						return nil, err
+					}
+				}
+				repo.Private = *req.Private
 			}
 		} else {
 			// Repository administrators can change the privacy of personal repositories.

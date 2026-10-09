@@ -5549,22 +5549,30 @@ func TestRepoComponent_UpdateRepo_PermissionChecks(t *testing.T) {
 		expectedErrorMsg string
 	}{
 		{
-			name: "Non-admin fails to change privacy of org repo",
+			name: "Org writer changes privacy successfully",
 			req: types.UpdateRepoReq{
 				Username:  "test-user",
 				Namespace: "org-ns",
 				Name:      "test-repo",
 				RepoType:  types.ModelRepo,
-				Private:   tea.Bool(true),
+				Private:   tea.Bool(false),
 			},
 			setupMocks: func(repo *testRepoWithMocks, req types.UpdateRepoReq) {
-				repo.mocks.stores.RepoMock().EXPECT().Find(ctx, req.Namespace, string(req.RepoType), req.Name).Return(&database.Repository{}, nil)
+				repo.mocks.stores.RepoMock().EXPECT().Find(ctx, req.Namespace, string(req.RepoType), req.Name).Return(&database.Repository{
+					Private:              true,
+					SensitiveCheckStatus: types.SensitiveCheckPass,
+				}, nil)
 				repo.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, req.Namespace).Return(database.Namespace{Path: req.Namespace, NamespaceType: database.OrgNamespace}, nil)
 				repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, req.Username).Return(database.User{Username: "test-user"}, nil)
 				expectReBACCheck(repo, true)
+				repo.mocks.gitServer.EXPECT().UpdateRepo(ctx, mock.MatchedBy(func(updateReq gitserver.UpdateRepoReq) bool {
+					return !updateReq.Private
+				})).Return(&gitserver.CreateRepoResp{}, nil)
+				repo.mocks.stores.RepoMock().EXPECT().UpdateRepo(ctx, mock.MatchedBy(func(updated database.Repository) bool {
+					return !updated.Private
+				})).Return(&database.Repository{Private: false}, nil)
 			},
-			expectError:      true,
-			expectedErrorMsg: "only admins can change the privacy of an organization repository",
+			expectError: false,
 		},
 		{
 			name: "Non-admin with write access updates org repo successfully without changing privacy",
@@ -5638,6 +5646,49 @@ func TestRepoComponent_UpdateRepo_PermissionChecks(t *testing.T) {
 				expectReBACCheckTimes(repo, true, 2)
 				repo.mocks.gitServer.EXPECT().UpdateRepo(ctx, mock.Anything).Return(&gitserver.CreateRepoResp{}, nil)
 				repo.mocks.stores.RepoMock().EXPECT().UpdateRepo(ctx, mock.Anything).Return(&database.Repository{}, nil)
+			},
+			expectError: false,
+		},
+		{
+			name: "Non-admin cannot change dataset visibility",
+			req: types.UpdateRepoReq{
+				Username:  "test-user",
+				Namespace: "org-ns",
+				Name:      "test-repo",
+				RepoType:  types.DatasetRepo,
+				Private:   tea.Bool(false),
+			},
+			setupMocks: func(repo *testRepoWithMocks, req types.UpdateRepoReq) {
+				repo.mocks.stores.RepoMock().EXPECT().Find(ctx, req.Namespace, string(req.RepoType), req.Name).Return(&database.Repository{
+					Private: true,
+				}, nil)
+				repo.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, req.Namespace).Return(database.Namespace{Path: req.Namespace, NamespaceType: database.OrgNamespace}, nil)
+				repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, req.Username).Return(database.User{Username: "test-user"}, nil)
+			},
+			expectError:      true,
+			expectedErrorMsg: "only platform administrators can change dataset visibility",
+		},
+		{
+			name: "Platform admin changes dataset visibility",
+			req: types.UpdateRepoReq{
+				Username:  "admin-user",
+				Namespace: "org-ns",
+				Name:      "test-repo",
+				RepoType:  types.DatasetRepo,
+				Private:   tea.Bool(false),
+			},
+			setupMocks: func(repo *testRepoWithMocks, req types.UpdateRepoReq) {
+				repo.mocks.stores.RepoMock().EXPECT().Find(ctx, req.Namespace, string(req.RepoType), req.Name).Return(&database.Repository{
+					Private: true,
+				}, nil)
+				repo.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, req.Namespace).Return(database.Namespace{Path: req.Namespace, NamespaceType: database.OrgNamespace}, nil)
+				repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, req.Username).Return(database.User{Username: "admin-user", RoleMask: "admin"}, nil)
+				repo.mocks.gitServer.EXPECT().UpdateRepo(ctx, mock.MatchedBy(func(updateReq gitserver.UpdateRepoReq) bool {
+					return !updateReq.Private
+				})).Return(&gitserver.CreateRepoResp{}, nil)
+				repo.mocks.stores.RepoMock().EXPECT().UpdateRepo(ctx, mock.MatchedBy(func(updated database.Repository) bool {
+					return !updated.Private
+				})).Return(&database.Repository{Private: false}, nil)
 			},
 			expectError: false,
 		},

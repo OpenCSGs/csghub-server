@@ -37,6 +37,7 @@ func GetModelInfo(fileList []string, minContext int) (*types.ModelInfo, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to fetch metadata: %v, url: %s", err, file)
 		}
+		modelInfo.ParamsValid = true
 		delete(header, "__metadata__")
 
 		for _, value := range header {

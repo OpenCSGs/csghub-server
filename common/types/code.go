@@ -12,9 +12,9 @@ type CreateCodeReq struct {
 	CreateRepoReq
 	// Code package SHA256 hash
 	CodePackageSHA256 string `json:"code_file"`
-	GitURL             string `json:"git_url"`
-	GitUsername        string `json:"git_username"`
-	GitPassword        string `json:"git_password"`
+	GitURL            string `json:"git_url"`
+	GitUsername       string `json:"git_username"`
+	GitPassword       string `json:"git_password"`
 }
 
 type UpdateCodeReq struct {
@@ -42,7 +42,8 @@ type Code struct {
 	SyncStatus           RepositorySyncStatus `json:"sync_status"`
 	License              string               `json:"license"`
 	CanWrite             bool                 `json:"can_write"`
-	CanManage            bool                 `json:"can_manage"`
+	CanRead              bool                 `json:"can_read"`
+	CanAdmin             bool                 `json:"can_admin"`
 	Namespace            *Namespace           `json:"namespace"`
 	SensitiveCheckStatus string               `json:"sensitive_check_status"`
 	RecomOpWeight        int                  `json:"recom_op_weight,omitempty"`

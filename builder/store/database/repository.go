@@ -2044,6 +2044,7 @@ func applyRepoComplianceFilter(q *bun.SelectQuery, repoAlias string, filter *typ
 func applyRepoRangeFilters(q *bun.SelectQuery, repoType types.RepositoryType, repoAlias string, filter *types.RepoFilter) {
 	if repoType == types.ModelRepo && (filter.ModelParamsMin != nil || filter.ModelParamsMax != nil) {
 		q.Join(fmt.Sprintf("INNER JOIN metadata AS range_metadata ON range_metadata.repository_id = %s.id", repoAlias))
+		q.Where("range_metadata.model_params_valid = TRUE")
 		if filter.ModelParamsMin != nil {
 			q.Where("range_metadata.model_params >= ?", *filter.ModelParamsMin)
 		}

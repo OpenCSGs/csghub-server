@@ -170,7 +170,8 @@ func (cc *collectionComponentImpl) GetCollection(ctx context.Context, currentUse
 	}
 	newCollection.UserLikes = likeExists
 	newCollection.CanWrite = permission.CanWrite
-	newCollection.CanManage = permission.CanAdmin
+	newCollection.CanRead = permission.CanRead
+	newCollection.CanAdmin = permission.CanAdmin
 	newCollection.Avatar = avatar
 	return &newCollection, nil
 }

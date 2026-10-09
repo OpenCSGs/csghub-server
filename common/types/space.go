@@ -121,7 +121,8 @@ type Space struct {
 	SKU                  string               `json:"sku,omitempty"`
 	SvcName              string               `json:"svc_name,omitempty"`
 	CanWrite             bool                 `json:"can_write"`
-	CanManage            bool                 `json:"can_manage"`
+	CanRead              bool                 `json:"can_read"`
+	CanAdmin             bool                 `json:"can_admin"`
 	Namespace            *Namespace           `json:"namespace"`
 	SensitiveCheckStatus string               `json:"sensitive_check_status"`
 	RecomOpWeight        int                  `json:"recom_op_weight,omitempty"`

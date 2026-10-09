@@ -31,6 +31,7 @@ func TestMultiSyncComponent_More(t *testing.T) {
 
 func TestMultiSyncComponent_SyncAsClient(t *testing.T) {
 	ctx := mock.Anything
+	modelParamsValid := true
 	mc := initializeTestMultiSyncComponent(context.TODO(), t)
 	authorizer := mc.rebac.(*mockrebac.MockAuthorizer)
 	authorizer.EXPECT().Check(mock.Anything, mock.Anything).Return(rebac.Decision{Allowed: false}, nil).Times(5)
@@ -109,6 +110,10 @@ func TestMultiSyncComponent_SyncAsClient(t *testing.T) {
 	mockedClient.EXPECT().ModelInfo(ctx, svs[0]).Return(&types.Model{
 		User: &types.User{Nickname: "nn"},
 		Path: "Ns/User",
+		Metadata: types.Metadata{
+			ModelParams:      0,
+			ModelParamsValid: &modelParamsValid,
+		},
 		Tags: []types.RepoTag{{Name: "t1"}},
 		Scores: []types.WeightScore{{
 			WeightName: string(database.RecomWeightOp),
@@ -178,7 +183,9 @@ func TestMultiSyncComponent_SyncAsClient(t *testing.T) {
 		Repository:   dbrepo,
 	}).Return(nil, nil)
 	mc.mocks.stores.MetadataMock().EXPECT().Upsert(ctx, &database.Metadata{
-		RepositoryID: 1,
+		RepositoryID:     1,
+		ModelParams:      0,
+		ModelParamsValid: true,
 	}).Return(nil)
 	mc.mocks.stores.RecomMock().EXPECT().UpsertScore(ctx, []*database.RecomRepoScore{
 		{RepositoryID: 1, WeightName: database.RecomWeightOp, Score: 40},
@@ -325,4 +332,25 @@ func TestMultiSyncComponent_SyncAsClient(t *testing.T) {
 	require.Nil(t, err)
 	require.True(t, userObjectOwnerTupleWritten)
 
+}
+
+func TestModelParamsValidFromSync(t *testing.T) {
+	explicitTrue := true
+	explicitFalse := false
+	tests := []struct {
+		name        string
+		valid       *bool
+		modelParams float32
+		want        bool
+	}{
+		{name: "explicit valid zero", valid: &explicitTrue, modelParams: 0, want: true},
+		{name: "explicit invalid positive", valid: &explicitFalse, modelParams: 7, want: false},
+		{name: "legacy positive", modelParams: 7, want: true},
+		{name: "legacy zero", modelParams: 0, want: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.want, modelParamsValidFromSync(tt.valid, tt.modelParams))
+		})
+	}
 }

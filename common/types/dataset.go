@@ -55,7 +55,8 @@ type Dataset struct {
 	ComplianceStatus     ComplianceStatus     `json:"compliance_status"`
 	CommercialPermission CommercialPermission `json:"commercial_permission"`
 	CanWrite             bool                 `json:"can_write"`
-	CanManage            bool                 `json:"can_manage"`
+	CanRead              bool                 `json:"can_read"`
+	CanAdmin             bool                 `json:"can_admin"`
 	Namespace            *Namespace           `json:"namespace"`
 	Scores               []WeightScore        `json:"scores"`
 	SensitiveCheckStatus string               `json:"sensitive_check_status"`
