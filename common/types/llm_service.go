@@ -27,6 +27,12 @@ const (
 	UpstreamCostResourceFmt = "upstream://%d"
 )
 
+// Resource ID scheme prefixes, for prefix checks without fmt.
+const (
+	ExternalLLMResourcePrefix = "thirdparty://"
+	CSGHubResourcePrefix      = "csghub://"
+)
+
 const upstreamCostResourcePrefix = "upstream://"
 
 // UpstreamCostResourceID builds the account_price resource_id for an upstream
