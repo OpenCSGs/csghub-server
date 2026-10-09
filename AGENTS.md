@@ -144,6 +144,15 @@ The repository uses `.mockery.yaml`, `.mockery_ee.yaml`, and
 `.mockery_saas.yaml` for edition-specific mocks. Review generated diffs and run
 the affected tests after regeneration.
 
+Run `make mock_gen` whenever you add or change an interface in a package
+covered by a mockery config. Missing mocks cause no build error, so skipping
+this step hides the problem.
+
+Do not use types declared in the mocked package itself in its interface
+signatures; put such DTOs in `common/types`. Mocks import the types they
+reference, and `_mocks/opencsg.com/csghub-server/component` is imported back by
+`component/wireset.go`, so a same-package type creates an import cycle.
+
 When Wire output must be refreshed, use `make mock_wire` rather than editing its
 generated files.
 

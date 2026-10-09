@@ -34,7 +34,7 @@ func TestAgentCustomUIProxyComponent_Resolve(t *testing.T) {
 	info, matched, err := comp.Resolve(ctx, "agent-host")
 	require.NoError(t, err)
 	require.True(t, matched)
-	require.Equal(t, &AgentCustomUIProxyInfo{
+	require.Equal(t, &types.AgentCustomUIProxyInfo{
 		AgentContentID: "agent-host", AgentName: "agent-name", ShareName: "s-a-12", SpaceID: 7,
 		SpaceSvcName: "ui-svc", SpaceEndpoint: "https://ui.example", SpaceClusterID: "cluster-1", Available: true,
 	}, info)

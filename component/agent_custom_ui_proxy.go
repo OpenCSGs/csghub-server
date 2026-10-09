@@ -11,20 +11,8 @@ import (
 	"opencsg.com/csghub-server/common/types"
 )
 
-// AgentCustomUIProxyInfo contains the trusted routing context needed by RProxy.
-type AgentCustomUIProxyInfo struct {
-	AgentContentID string
-	AgentName      string
-	ShareName      string
-	SpaceID        int64
-	SpaceSvcName   string
-	SpaceEndpoint  string
-	SpaceClusterID string
-	Available      bool
-}
-
 type AgentCustomUIProxyComponent interface {
-	Resolve(ctx context.Context, agentContentID string) (*AgentCustomUIProxyInfo, bool, error)
+	Resolve(ctx context.Context, agentContentID string) (*types.AgentCustomUIProxyInfo, bool, error)
 }
 
 type agentCustomUIProxyComponent struct {
@@ -43,7 +31,7 @@ func NewAgentCustomUIProxyComponent() AgentCustomUIProxyComponent {
 	}
 }
 
-func (c *agentCustomUIProxyComponent) Resolve(ctx context.Context, agentContentID string) (*AgentCustomUIProxyInfo, bool, error) {
+func (c *agentCustomUIProxyComponent) Resolve(ctx context.Context, agentContentID string) (*types.AgentCustomUIProxyInfo, bool, error) {
 	agent, err := c.agentStore.FindByContentID(ctx, "csgclaw", agentContentID)
 	if err != nil {
 		if errors.Is(err, errorx.ErrDatabaseNoRows) {
@@ -92,7 +80,7 @@ func (c *agentCustomUIProxyComponent) Resolve(ctx context.Context, agentContentI
 	if space.Repository.Private {
 		return nil, true, errorx.ErrForbidden
 	}
-	info := &AgentCustomUIProxyInfo{
+	info := &types.AgentCustomUIProxyInfo{
 		AgentContentID: agent.ContentID,
 		AgentName:      agentName,
 		ShareName:      share.ShareName,
