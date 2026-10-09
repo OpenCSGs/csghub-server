@@ -14,8 +14,12 @@ import (
 
 	"github.com/spf13/cobra"
 	"opencsg.com/csghub-server/api/httpbase"
+	"opencsg.com/csghub-server/builder/rebac/factory"
+	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/builder/workhub"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/user/component"
 	"opencsg.com/csghub-server/user/router"
 )
 
@@ -72,6 +76,37 @@ var cmdLaunch = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("unable to create workflow client, error:%w", err)
 		}
+
+		ssoClient, err := rpc.NewSSOClient(cfg)
+		if err != nil {
+			return fmt.Errorf("create sso client: %w", err)
+		}
+		authorizer, err := factory.NewAuthorizer()
+		if err != nil {
+			return fmt.Errorf("create rebac authorizer: %w", err)
+		}
+		orgWorkClient, err := component.NewOrganizationDeletionWorkClient(
+			cmd.Context(),
+			cfg.Database.DSN,
+			ssoClient,
+			authorizer,
+			database.NewRepositoryAuthorizationStore(),
+			4, // magic number
+		)
+		if err != nil {
+			return fmt.Errorf("create organization deletion work client: %w", err)
+		}
+		if err := orgWorkClient.Start(cmd.Context()); err != nil {
+			return fmt.Errorf("start organization deletion work client: %w", err)
+		}
+		slog.Info("organization deletion worker started", slog.String("queue", workhub.OrganizationDeletionQueue))
+		defer func() {
+			stopCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			if err := orgWorkClient.Stop(stopCtx); err != nil {
+				slog.Error("failed to stop organization deletion work client", slog.Any("error", err))
+			}
+		}()
 
 		r, err := router.NewRouter(cfg)
 		if err != nil {

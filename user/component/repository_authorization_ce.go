@@ -14,3 +14,9 @@ import (
 func deleteDirectRepositoryAuthorizations(context.Context, database.RepositoryAuthorizationStore, rebac.Authorizer, types.RepoAuthSubjectType, int64) error {
 	return nil
 }
+
+// deleteOrganizationHierarchyRelationshipsForDeletion is a no-op in CE,
+// which does not expose hierarchical organizations.
+func deleteOrganizationHierarchyRelationshipsForDeletion(context.Context, rebac.Authorizer, []types.OrganizationHierarchyRelationship) error {
+	return nil
+}

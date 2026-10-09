@@ -12,3 +12,10 @@ func TestNewRepositoryDeletionJobClientWithDBAllowsUninitializedDatabase(t *test
 	require.NoError(t, err)
 	require.Nil(t, client)
 }
+
+func TestNewOrganizationDeletionJobClientWithDBAllowsUninitializedDatabase(t *testing.T) {
+	client, err := newOrganizationDeletionJobClientWithDB(nil)
+
+	require.NoError(t, err)
+	require.Nil(t, client)
+}

@@ -16,9 +16,25 @@ import (
 )
 
 type orgStoreImpl struct {
-	db                          *DB
-	isHierarchical              bool
-	repositoryDeletionJobClient RepositoryDeletionJobClient
+	db                            *DB
+	isHierarchical                bool
+	repositoryDeletionJobClient   RepositoryDeletionJobClient
+	organizationDeletionJobClient OrganizationDeletionJobClient
+}
+
+// OrganizationDeletionJobClient inserts organization cleanup jobs in the same
+// transaction that soft-deletes the organization records.
+type OrganizationDeletionJobClient interface {
+	InsertOrganizationDeletionJobTx(ctx context.Context, tx *sql.Tx, input OrganizationDeletionJobInput) (int64, error)
+}
+
+// OrganizationDeletionJobInput is the immutable cleanup snapshot consumed
+// after an organization deletion transaction commits.
+type OrganizationDeletionJobInput struct {
+	OrganizationIDs               []int64
+	OrganizationUUIDs             []string
+	DeletedHierarchyRelationships []types.OrganizationHierarchyRelationship
+	DeletedReBACRelationships     []types.OrganizationReBACCleanup
 }
 
 type OrgStore interface {
@@ -29,6 +45,8 @@ type OrgStore interface {
 	IsLastOrganizationAdmin(ctx context.Context, username string) (bool, error)
 	Update(ctx context.Context, org *Organization) (err error)
 	Delete(ctx context.Context, path string) (OrganizationDeleteResult, error)
+	// FindForDeletion resolves an organization and namespace including soft-deleted rows.
+	FindForDeletion(ctx context.Context, lookup OrganizationDeletionLookup) (Organization, error)
 	FindByPath(ctx context.Context, path string) (org Organization, err error)
 	Exists(ctx context.Context, path string) (exists bool, err error)
 	GetUserBelongOrgs(ctx context.Context, userID int64) (orgs []Organization, err error)
@@ -57,6 +75,15 @@ func NewOrgStore(isHierarchical bool, jobClient RepositoryDeletionJobClient) Org
 	return &orgStoreImpl{db: defaultDB, isHierarchical: isHierarchical, repositoryDeletionJobClient: jobClient}
 }
 
+// NewOrgStoreWithDeletionJobClients creates an organization store with both
+// transactional repository and organization cleanup job clients.
+func NewOrgStoreWithDeletionJobClients(isHierarchical bool, repositoryJobClient RepositoryDeletionJobClient, organizationJobClient OrganizationDeletionJobClient) OrgStore {
+	return &orgStoreImpl{
+		db: defaultDB, isHierarchical: isHierarchical,
+		repositoryDeletionJobClient: repositoryJobClient, organizationDeletionJobClient: organizationJobClient,
+	}
+}
+
 type Organization struct {
 	ID       int64  `bun:",pk,autoincrement" json:"id"`
 	Nickname string `bun:"name,notnull" json:"name"`
@@ -81,7 +108,7 @@ type Organization struct {
 	Role           string             `bun:",scanonly" json:"role,omitempty"`
 	// ParentName is populated by hierarchy queries and is not persisted.
 	ParentName string `bun:",scanonly" json:"-"`
-	// DeletedAt hides soft-deleted child organizations from normal queries.
+	// DeletedAt retains deleted identities for cleanup retries and hides them from normal queries.
 	DeletedAt time.Time `bun:",soft_delete,nullzero" json:"deleted_at,omitempty"`
 	times
 }
@@ -95,7 +122,10 @@ type OrganizationTag struct {
 
 // OrganizationDeleteResult contains post-commit cleanup metadata for a deleted legacy organization.
 type OrganizationDeleteResult struct {
-	DeletedRepositories []DeletedRepository
+	DeletedRepositories       []DeletedRepository
+	DeletedReBACRelationships []types.OrganizationReBACCleanup
+	OrganizationJobID         int64
+	AlreadyDeleted            bool
 }
 
 func (s *orgStoreImpl) Create(ctx context.Context, org *Organization, namepace *Namespace) (err error) {
@@ -247,13 +277,17 @@ func (s *orgStoreImpl) Update(ctx context.Context, org *Organization) (err error
 	return errorx.HandleDBError(err, nil)
 }
 
+// Delete soft-deletes the organization and namespace and returns retained cleanup data.
 func (s *orgStoreImpl) Delete(ctx context.Context, path string) (result OrganizationDeleteResult, err error) {
 	err = s.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		var org Organization
 		org.Nickname = path
-		if err = tx.NewSelect().Model(&org).Where("path = ? AND organization.is_hierarchical = ?", path, s.isHierarchical).Scan(ctx); err != nil {
+		if err = tx.NewSelect().Model(&org).WhereAllWithDeleted().
+			Where("path = ? AND organization.is_hierarchical = ?", path, s.isHierarchical).
+			OrderExpr("organization.deleted_at IS NULL DESC, organization.id DESC").Limit(1).For("UPDATE").Scan(ctx); err != nil {
 			return err
 		}
+		alreadyDeleted := !org.DeletedAt.IsZero()
 		var namespace Namespace
 		namespaceQuery := tx.NewSelect().Model(&namespace).WhereAllWithDeleted().For("UPDATE")
 		if org.NamespaceID != 0 {
@@ -261,16 +295,19 @@ func (s *orgStoreImpl) Delete(ctx context.Context, path string) (result Organiza
 		} else {
 			namespaceQuery.Where("path = ?", path)
 		}
-		if err = namespaceQuery.Scan(ctx); err != nil {
+		if err = namespaceQuery.Scan(ctx); err != nil && !errors.Is(err, sql.ErrNoRows) {
 			return err
 		}
-		repositoryIDs, err := findRepositoryIDsByNamespaces(ctx, tx, []string{path})
-		if err != nil {
-			return err
-		}
-		result.DeletedRepositories, err = deleteRepositoriesByIDs(ctx, tx, repositoryIDs, s.repositoryDeletionJobClient)
-		if err != nil {
-			return err
+		// Repository deletion jobs are committed with the first soft deletion; retries only repeat external cleanup.
+		if org.DeletedAt.IsZero() {
+			repositoryIDs, err := findRepositoryIDsByNamespaces(ctx, tx, []string{path})
+			if err != nil {
+				return err
+			}
+			result.DeletedRepositories, err = deleteRepositoriesByIDs(ctx, tx, repositoryIDs, s.repositoryDeletionJobClient)
+			if err != nil {
+				return err
+			}
 		}
 		// Clean up organization_tags
 		if _, err = tx.NewDelete().
@@ -279,29 +316,37 @@ func (s *orgStoreImpl) Delete(ctx context.Context, path string) (result Organiza
 			Exec(ctx); err != nil {
 			return err
 		}
-		// Memberships have no database foreign key and must be removed in this transaction.
-		if _, err = tx.NewDelete().
-			Model((*Member)(nil)).
-			Where("organization_id = ?", org.ID).
-			ForceDelete().
-			Exec(ctx); err != nil {
+		// Retain memberships for authorization and ReBAC cleanup on retries.
+		if _, err = tx.NewUpdate().Model((*Member)(nil)).
+			Set("deleted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP").Where("organization_id = ? AND deleted_at IS NULL", org.ID).Exec(ctx); err != nil {
 			return err
 		}
-		if err = assertAffectedOneRow(
-			tx.NewDelete().
-				Model(&Organization{}).
-				Where("path = ?", path).
-				ForceDelete().
-				Exec(ctx)); err != nil {
+		if _, err = tx.NewUpdate().Model((*Organization)(nil)).
+			Set("deleted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP").Where("id = ? AND deleted_at IS NULL", org.ID).Exec(ctx); err != nil {
 			return err
 		}
-		if namespace.DeletedAt.IsZero() {
-			if err = assertAffectedOneRow(
-				tx.NewDelete().
-					Model(&Namespace{}).
-					Where("id = ?", namespace.ID).
-					Exec(ctx)); err != nil {
+		if namespace.ID != 0 && namespace.DeletedAt.IsZero() {
+			if _, err = tx.NewUpdate().Model((*Namespace)(nil)).
+				Set("deleted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP").Where("id = ? AND deleted_at IS NULL", namespace.ID).Exec(ctx); err != nil {
 				return err
+			}
+		}
+		result.DeletedReBACRelationships, err = loadOrganizationReBACCleanup(ctx, tx, []int64{org.ID})
+		if err != nil {
+			return err
+		}
+		if alreadyDeleted {
+			result.AlreadyDeleted = true
+			return nil
+		}
+		if s.organizationDeletionJobClient != nil {
+			result.OrganizationJobID, err = s.organizationDeletionJobClient.InsertOrganizationDeletionJobTx(ctx, tx.Tx, OrganizationDeletionJobInput{
+				OrganizationIDs:           []int64{org.ID},
+				OrganizationUUIDs:         []string{org.UUID.String()},
+				DeletedReBACRelationships: result.DeletedReBACRelationships,
+			})
+			if err != nil {
+				return fmt.Errorf("enqueue organization deletion: %w", err)
 			}
 		}
 		return nil
@@ -634,6 +679,7 @@ func (s *orgStoreImpl) SetOrganizationTags(ctx context.Context, orgID int64, tag
 	})
 }
 
+// GetOrganizationTags returns organization tags in ID order and propagates query failures.
 func (s *orgStoreImpl) GetOrganizationTags(ctx context.Context, orgID int64) ([]Tag, error) {
 	var tags []Tag
 	err := s.db.Operator.Core.NewSelect().
@@ -676,4 +722,50 @@ func (s *orgStoreImpl) GetOrganizationTagsByOrgIDs(ctx context.Context, orgIDs [
 		result[row.OrganizationID] = append(result[row.OrganizationID], row.Tag)
 	}
 	return result, nil
+}
+
+// OrganizationDeletionLookup selects a legacy path or an immutable hierarchy UUID.
+type OrganizationDeletionLookup struct {
+	Path string
+	UUID string
+}
+
+// FindForDeletion includes tombstones only for deletion and binds the namespace by ID.
+func (s *orgStoreImpl) FindForDeletion(ctx context.Context, lookup OrganizationDeletionLookup) (Organization, error) {
+	var result Organization
+	query := s.db.Core.NewSelect().Model(&result).WhereAllWithDeleted()
+	if lookup.UUID != "" {
+		query.Where("organization.uuid = ?", lookup.UUID)
+	} else if lookup.Path != "" {
+		query.Where("organization.path = ? AND organization.is_hierarchical = ?", lookup.Path, s.isHierarchical).
+			OrderExpr("organization.deleted_at IS NULL DESC, organization.id DESC")
+	} else {
+		return Organization{}, errors.New("organization deletion identity is required")
+	}
+	if err := query.Limit(1).Scan(ctx); err != nil {
+		return Organization{}, errorx.HandleDBError(err, nil)
+	}
+	org := &result
+	var ns Namespace
+	if org.NamespaceID != 0 {
+		err := s.db.Core.NewSelect().Model(&ns).WhereAllWithDeleted().Where("id = ?", org.NamespaceID).Scan(ctx)
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			return Organization{}, errorx.HandleDBError(err, nil)
+		}
+		if err == nil {
+			org.Namespace = &ns
+		}
+	}
+
+	return result, nil
+}
+
+// softDeleteOrganizationNamespaces also handles retries whose organization is already deleted.
+func softDeleteOrganizationNamespaces(ctx context.Context, tx bun.Tx, ids []int64) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	_, err := tx.NewUpdate().Model((*Namespace)(nil)).Set("deleted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP").
+		Where("id IN (SELECT namespace_id FROM organizations WHERE id IN (?)) AND deleted_at IS NULL", bun.In(ids)).Exec(ctx)
+	return err
 }

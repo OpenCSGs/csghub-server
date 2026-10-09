@@ -66,6 +66,8 @@ type OrganizationUnitStore interface {
 	DeleteRoot(ctx context.Context, input DeleteRootOrganizationInput) (*types.DeleteRootOrganizationResp, error)
 	Create(ctx context.Context, input CreateOrganizationUnitInput) (*types.OrganizationUnit, error)
 	FindByUUID(ctx context.Context, unitUUID string) (*OrganizationUnit, error)
+	// FindByUUIDWithDeleted resolves retained unit identities for deletion retries.
+	FindByUUIDWithDeleted(ctx context.Context, unitUUID string) (*OrganizationUnit, error)
 	Update(ctx context.Context, input UpdateOrganizationUnitInput) (*types.OrganizationUnit, error)
 	Delete(ctx context.Context, input DeleteOrganizationUnitInput) (*types.DeleteOrganizationUnitResp, error)
 	ListRoots(ctx context.Context, input ListOrganizationUnitInput) ([]types.OrganizationUnitSummary, int, error)
@@ -135,8 +137,9 @@ type ListOrganizationUnitInput struct {
 
 // organizationUnitStoreImpl uses one database connection for all hierarchy transactions.
 type organizationUnitStoreImpl struct {
-	db                          *DB
-	repositoryDeletionJobClient RepositoryDeletionJobClient
+	db                            *DB
+	repositoryDeletionJobClient   RepositoryDeletionJobClient
+	organizationDeletionJobClient OrganizationDeletionJobClient
 }
 
 // isHierarchicalRootOrganizationConflict identifies the database uniqueness fallback.
@@ -159,6 +162,15 @@ func NewOrganizationUnitStoreWithDB(db *DB) OrganizationUnitStore {
 // NewOrganizationUnitStoreWithDBAndDeletionJobClient creates a hierarchy Store with transactional repository deletion jobs.
 func NewOrganizationUnitStoreWithDBAndDeletionJobClient(db *DB, jobClient RepositoryDeletionJobClient) OrganizationUnitStore {
 	return &organizationUnitStoreImpl{db: db, repositoryDeletionJobClient: jobClient}
+}
+
+// NewOrganizationUnitStoreWithDBAndDeletionJobClients creates a hierarchy
+// store with transactional repository and organization cleanup jobs.
+func NewOrganizationUnitStoreWithDBAndDeletionJobClients(db *DB, repositoryJobClient RepositoryDeletionJobClient, organizationJobClient OrganizationDeletionJobClient) OrganizationUnitStore {
+	return &organizationUnitStoreImpl{
+		db: db, repositoryDeletionJobClient: repositoryJobClient,
+		organizationDeletionJobClient: organizationJobClient,
+	}
 }
 
 // FindActiveHierarchicalRoot loads the unique active hierarchy root independently of user membership.
@@ -283,7 +295,7 @@ func (s *organizationUnitStoreImpl) DeleteRoot(ctx context.Context, input Delete
 			return errorx.HandleDBError(err, nil)
 		}
 		result.DeletedOrganizationIDs = append(result.DeletedOrganizationIDs, allOrganizationIDs...)
-		result.DeletedHierarchyRelationships, err = loadOrganizationHierarchyRelationships(ctx, tx, root.ID, nil, !root.DeletedAt.IsZero())
+		result.DeletedHierarchyRelationships, err = loadOrganizationHierarchyRelationships(ctx, tx, root.ID, nil, true)
 		if err != nil {
 			return fmt.Errorf("load hierarchy relationships for ReBAC cleanup: %w", err)
 		}
@@ -293,7 +305,7 @@ func (s *organizationUnitStoreImpl) DeleteRoot(ctx context.Context, input Delete
 		}
 		if !root.DeletedAt.IsZero() {
 			result.AlreadyDeleted = true
-			return nil
+			return softDeleteOrganizationNamespaces(ctx, tx, allOrganizationIDs)
 		}
 
 		activeUnits := make([]OrganizationUnit, 0)
@@ -372,6 +384,17 @@ func (s *organizationUnitStoreImpl) DeleteRoot(ctx context.Context, input Delete
 		if _, err := tx.NewDelete().Model((*OrganizationTag)(nil)).
 			Where("organization_id IN (?)", bun.In(allOrganizationIDs)).Exec(ctx); err != nil {
 			return fmt.Errorf("delete hierarchy organization tags: %w", err)
+		}
+		if s.organizationDeletionJobClient != nil {
+			result.OrganizationJobID, err = s.organizationDeletionJobClient.InsertOrganizationDeletionJobTx(ctx, tx.Tx, OrganizationDeletionJobInput{
+				OrganizationIDs:               result.DeletedOrganizationIDs,
+				OrganizationUUIDs:             result.DeletedOrganizationUUIDs,
+				DeletedHierarchyRelationships: result.DeletedHierarchyRelationships,
+				DeletedReBACRelationships:     result.DeletedReBACRelationships,
+			})
+			if err != nil {
+				return fmt.Errorf("enqueue hierarchy organization deletion: %w", err)
+			}
 		}
 		return nil
 	})
@@ -810,16 +833,25 @@ func loadOrganizationHierarchyRelationships(
 func (s *organizationUnitStoreImpl) Delete(ctx context.Context, input DeleteOrganizationUnitInput) (*types.DeleteOrganizationUnitResp, error) {
 	result := &types.DeleteOrganizationUnitResp{}
 	err := s.db.BunDB.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		if err := lockOrganization(ctx, tx, input.RootOrganizationID); err != nil {
+		// Retain the hierarchy write lock even when retrying after root deletion.
+		var root Organization
+		if err := tx.NewSelect().Model(&root).WhereAllWithDeleted().
+			Where("id = ? AND is_hierarchical = TRUE", input.RootOrganizationID).For("UPDATE").Scan(ctx); err != nil {
 			return err
 		}
-		unit, err := selectUnitForUpdate(ctx, tx, input.RootOrganizationID, input.UnitID)
-		if err != nil {
+		unit := &OrganizationUnit{}
+		if err := tx.NewSelect().Model(unit).WhereAllWithDeleted().
+			Where("id = ? AND root_organization_id = ?", input.UnitID, input.RootOrganizationID).For("UPDATE").Scan(ctx); err != nil {
 			return err
 		}
 		if unit.OrganizationID == input.RootOrganizationID {
 			return errorx.ReqParamInvalid(errors.New("top-level organization cannot be deleted through the organization unit API"), nil)
 		}
+		if unit.DeletedAt != nil {
+			result.AlreadyDeleted = true
+			return s.loadDeletedSubtree(ctx, tx, unit, result)
+		}
+		var err error
 		var closureIDs []int64
 		if err := tx.NewSelect().Model((*OrganizationUnitClosure)(nil)).
 			Column("descendant_unit_id").
@@ -933,6 +965,20 @@ func (s *organizationUnitStoreImpl) Delete(ctx context.Context, input DeleteOrga
 		if _, err := tx.NewDelete().Model((*OrganizationTag)(nil)).
 			Where("organization_id IN (?)", bun.In(organizationIDs)).Exec(ctx); err != nil {
 			return fmt.Errorf("delete child organization tags: %w", err)
+		}
+		if err := s.loadDeletedSubtree(ctx, tx, unit, result); err != nil {
+			return err
+		}
+		if s.organizationDeletionJobClient != nil {
+			result.OrganizationJobID, err = s.organizationDeletionJobClient.InsertOrganizationDeletionJobTx(ctx, tx.Tx, OrganizationDeletionJobInput{
+				OrganizationIDs:               result.DeletedOrganizationIDs,
+				OrganizationUUIDs:             result.DeletedOrganizationUUIDs,
+				DeletedHierarchyRelationships: result.DeletedHierarchyRelationships,
+				DeletedReBACRelationships:     result.DeletedReBACRelationships,
+			})
+			if err != nil {
+				return fmt.Errorf("enqueue organization subtree deletion: %w", err)
+			}
 		}
 		return nil
 	})
@@ -1082,4 +1128,49 @@ func convertOrganizationUnitSummaries(units []OrganizationUnit) []types.Organiza
 		result = append(result, toOrganizationUnitSummary(&units[index]))
 	}
 	return result
+}
+
+// FindByUUIDWithDeleted includes deleted structural rows without the active-only joins of normal reads.
+func (s *organizationUnitStoreImpl) FindByUUIDWithDeleted(ctx context.Context, unitUUID string) (*OrganizationUnit, error) {
+	unit := &OrganizationUnit{}
+	err := s.db.Core.NewSelect().Model(unit).WhereAllWithDeleted().ColumnExpr("ou.*").
+		ColumnExpr("CAST(organization.uuid AS TEXT) AS organization_uuid").
+		Join("JOIN organizations AS organization ON organization.id = ou.organization_id").
+		Where("organization.uuid = ? AND organization.is_hierarchical = TRUE", unitUUID).Scan(ctx)
+	if err != nil {
+		return nil, errorx.HandleDBError(err, nil)
+	}
+	return unit, nil
+}
+
+// loadDeletedSubtree recovers cleanup identities from retained parent links after closure rows are removed.
+// It includes earlier deleted descendants and never deletes repositories by a potentially reused path.
+func (s *organizationUnitStoreImpl) loadDeletedSubtree(ctx context.Context, tx bun.Tx, unit *OrganizationUnit, result *types.DeleteOrganizationUnitResp) error {
+	var unitIDs []int64
+	if err := tx.NewRaw(`WITH RECURSIVE subtree AS (
+  SELECT id FROM organization_units WHERE id = ? AND root_organization_id = ? AND deleted_at IS NOT NULL
+  UNION
+  SELECT child.id FROM organization_units child JOIN subtree parent ON child.parent_unit_id = parent.id
+  WHERE child.root_organization_id = ? AND child.deleted_at IS NOT NULL
+ ) SELECT id FROM subtree ORDER BY id`, unit.ID, unit.RootOrganizationID, unit.RootOrganizationID).Scan(ctx, &unitIDs); err != nil {
+		return err
+	}
+	if err := tx.NewSelect().Model((*OrganizationUnit)(nil)).WhereAllWithDeleted().Column("organization_id").
+		Where("id IN (?)", bun.In(unitIDs)).Order("id ASC").Scan(ctx, &result.DeletedOrganizationIDs); err != nil {
+		return err
+	}
+	if err := tx.NewSelect().Model((*Organization)(nil)).WhereAllWithDeleted().ColumnExpr("CAST(uuid AS TEXT)").
+		Where("id IN (?)", bun.In(result.DeletedOrganizationIDs)).Order("id ASC").Scan(ctx, &result.DeletedOrganizationUUIDs); err != nil {
+		return err
+	}
+	var err error
+	result.DeletedHierarchyRelationships, err = loadOrganizationHierarchyRelationships(ctx, tx, unit.RootOrganizationID, unitIDs, true)
+	if err != nil {
+		return err
+	}
+	result.DeletedReBACRelationships, err = loadOrganizationReBACCleanup(ctx, tx, result.DeletedOrganizationIDs)
+	if err != nil {
+		return err
+	}
+	return softDeleteOrganizationNamespaces(ctx, tx, result.DeletedOrganizationIDs)
 }
