@@ -1006,8 +1006,9 @@ func (c *runtimeArchitectureComponentImpl) UpdateRuntimeFrameworkAndArch(ctx con
 		rf.ComputeType = string(image.ComputeType)
 		rf.ContainerPort = engineConfig.ContainerPort
 		rf.FrameVersion = image.EngineVersion
-		if engineConfig.EngineArgs != nil {
-			args, err := json.Marshal(engineConfig.EngineArgs)
+		mergedArgs := mergeEngineArgs(engineConfig.EngineArgs, image.ExtraEngineArgs)
+		if mergedArgs != nil {
+			args, err := json.Marshal(mergedArgs)
 			if err != nil {
 				return fmt.Errorf("failed to marshal engine args: %w", err)
 			}
@@ -1088,6 +1089,30 @@ func (c *runtimeArchitectureComponentImpl) UpdateRuntimeFrameworkAndArch(ctx con
 	}
 
 	return nil
+}
+
+// mergeEngineArgs combines the engine args shared by all images of an engine
+// with the ones only supported by a specific image. An image arg with the same
+// name replaces the shared one in place.
+func mergeEngineArgs(shared, extra []types.EngineArg) []types.EngineArg {
+	if shared == nil && len(extra) == 0 {
+		return nil
+	}
+	merged := make([]types.EngineArg, 0, len(shared)+len(extra))
+	positions := make(map[string]int, len(shared)+len(extra))
+	for _, arg := range shared {
+		positions[arg.Name] = len(merged)
+		merged = append(merged, arg)
+	}
+	for _, arg := range extra {
+		if pos, ok := positions[arg.Name]; ok {
+			merged[pos] = arg
+			continue
+		}
+		positions[arg.Name] = len(merged)
+		merged = append(merged, arg)
+	}
+	return merged
 }
 
 func (c *runtimeArchitectureComponentImpl) removeFrameAndArchByVersion(ctx context.Context, frameName, minVersion string) error {

@@ -57,11 +57,6 @@
       "format": "--pipeline-parallel-size %s"
     },
     {
-      "name": "swap-space",
-      "value": "4",
-      "format": "--swap-space %s"
-    },
-    {
       "name": "max-num-batched-tokens",
       "value": "4096",
       "format": "--max-num-batched-tokens %s"
@@ -90,16 +85,6 @@
       "name": "enable-expert-parallel",
       "value": "disable",
       "format": "--enable-expert-parallel"
-    },
-    {
-      "name": "quantization",
-      "value": "",
-      "format": "--quantization %s"
-    },
-    {
-      "name": "limit-mm-per-prompt",
-      "value": "image=5,video=5",
-      "format": "--limit-mm-per-prompt %s"
     },
     {
       "name": "custom-options",

@@ -87,16 +87,6 @@
       "format": "--enable-expert-parallel"
     },
     {
-      "name": "quantization",
-      "value": "",
-      "format": "--quantization %s"
-    },
-    {
-      "name": "limit-mm-per-prompt",
-      "value": "image=5,video=5",
-      "format": "--limit-mm-per-prompt %s"
-    },
-    {
       "name": "custom-options",
       "value": "",
       "format": "%s"

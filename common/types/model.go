@@ -40,11 +40,11 @@ type UpdateRepoReq struct {
 	// The new description for the repository
 	Description *string `json:"description"`
 	// The new visibility of the repository
-	Private              *bool                 `json:"private" example:"false"`
-	Admin                string                `json:"-"`
-	XnetEnabled          *bool                 `json:"xnet_enabled"`
-	DefaultBranch        *string               `json:"default_branch"`
-	ComplianceStatus     *ComplianceStatus     `json:"compliance_status" binding:"omitempty,oneof=compliant pending_review non_compliant"`
+	Private          *bool             `json:"private" example:"false"`
+	Admin            string            `json:"-"`
+	XnetEnabled      *bool             `json:"xnet_enabled"`
+	DefaultBranch    *string           `json:"default_branch"`
+	ComplianceStatus *ComplianceStatus `json:"compliance_status" binding:"omitempty,oneof=compliant pending_review non_compliant"`
 }
 
 // make sure UpdateModelReq implements SensitiveRequest interface
@@ -575,12 +575,13 @@ const (
 
 // Image represents an engine image with a specific computing power type
 type Image struct {
-	ComputeType   ComputeType `json:"compute_type"`
-	Image         string      `json:"image"`
-	DriverVersion string      `json:"driver_version"`
-	EngineVersion string      `json:"engine_version"`
-	ExtraArchs    []string    `json:"extra_archs"`
-	ExtraModels   []string    `json:"extra_models"`
+	ComputeType     ComputeType `json:"compute_type"`
+	Image           string      `json:"image"`
+	DriverVersion   string      `json:"driver_version"`
+	EngineVersion   string      `json:"engine_version"`
+	ExtraArchs      []string    `json:"extra_archs"`
+	ExtraModels     []string    `json:"extra_models"`
+	ExtraEngineArgs []EngineArg `json:"extra_engine_args"`
 }
 
 type CreateInferenceVersionReq struct {

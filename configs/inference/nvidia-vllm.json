@@ -63,16 +63,6 @@
       "format": "--pipeline-parallel-size %s"
     },
     {
-      "name": "guided-decoding-backend",
-      "value": "xgrammar",
-      "format": "--guided-decoding-backend %s"
-    },
-    {
-      "name": "swap-space",
-      "value": "4",
-      "format": "--swap-space %s"
-    },
-    {
       "name": "load-format",
       "value": "auto",
       "format": "--load-format %s"
@@ -121,11 +111,6 @@
       "name": "enable-expert-parallel",
       "value": "disable",
       "format": "--enable-expert-parallel"
-    },
-    {
-      "name": "limit-mm-per-prompt",
-      "value": "image=5,video=5",
-      "format": "--limit-mm-per-prompt %s"
     },
     {
       "name": "custom-options",
