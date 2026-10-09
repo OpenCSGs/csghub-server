@@ -3,7 +3,7 @@ package database
 import (
 	"context"
 	"database/sql"
-	"fmt"
+	"errors"
 	"time"
 
 	"github.com/argoproj/argo-workflows/v3/pkg/apis/workflow/v1alpha1"
@@ -149,14 +149,23 @@ func (s *argoWorkFlowStoreImpl) FindByUsernameWithTaskTypes(ctx context.Context,
 }
 
 func (s *argoWorkFlowStoreImpl) CreateWorkFlow(ctx context.Context, workFlow ArgoWorkflow) (*ArgoWorkflow, error) {
-	wf, err := s.FindByTaskID(ctx, workFlow.TaskId)
-	if err == nil && wf.ID != 0 {
-		// already exists
-		return wf, nil
+	taskID := workFlow.TaskId
+	result, err := s.db.Core.NewInsert().Model(&workFlow).
+		On("CONFLICT (task_id) DO NOTHING").
+		Exec(ctx, &workFlow)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return s.FindByTaskID(ctx, taskID)
+		}
+		return nil, errorx.HandleDBError(err, nil)
 	}
-	res, err := s.db.Core.NewInsert().Model(&workFlow).Exec(ctx, &workFlow)
-	if err := assertAffectedOneRow(res, err); err != nil {
-		return nil, fmt.Errorf("failed to save WorkFlow in db, error:%w", err)
+
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return nil, errorx.HandleDBError(err, nil)
+	}
+	if affected == 0 {
+		return s.FindByTaskID(ctx, taskID)
 	}
 
 	return &workFlow, nil
