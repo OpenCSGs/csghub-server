@@ -40,16 +40,16 @@ func (h *OpenAIHandlerImpl) executeAdapterResponses(c *gin.Context, req *types.R
 	writer := newResponsesAdapterResponseWriter(c.Writer, req.Stream, publicModelID, responsesCounter, moderation, newResponsesModerationSessionID(), logCapture)
 	setResponsesAdapterToolResolver(writer, toolAliases)
 	proxyStartTime := time.Now()
-	primaryWriter, proxyErr := h.executeChatProxyAttempt(c, writer, modelTarget, nsUUID, chatReq, p)
+	primaryWriter, proxyErr := h.executeChatProxyAttempt(c, writer, modelTarget, chatReq, p)
 	if proxyErr != nil {
 		finishLLMTraceWithError(generationRecorder, proxyErr, types.TraceErrUpstreamUnavailable)
-		h.handleProxyError(c, req.Stream, nsUUID, publicModelID, proxyErr)
+		h.handleProxyError(c, req.Stream, proxyErr)
 		return
 	}
-	finalWriter, fallbackErr := h.executeChatWithFallback(c, &chatContext{responseWriter: writer}, modelTarget, nsUUID, chatReq, primaryWriter, nsUUID, publicModelID, p)
+	finalWriter, fallbackErr := h.executeChatWithFallback(c, &chatContext{responseWriter: writer}, modelTarget, chatReq, primaryWriter, nsUUID, publicModelID, p)
 	if fallbackErr != nil {
 		finishLLMTraceWithError(generationRecorder, fallbackErr, types.TraceErrUpstreamUnavailable)
-		h.handleProxyError(c, req.Stream, nsUUID, publicModelID, fallbackErr)
+		h.handleProxyError(c, req.Stream, fallbackErr)
 		return
 	}
 	if err := writer.Finalize(retryWriterStatusCode(finalWriter)); err != nil {

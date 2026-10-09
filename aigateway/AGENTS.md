@@ -126,7 +126,7 @@ The bridge between them: `handler/anthropic_handler.go`'s `AnthropicHandlerImpl`
 
 ## 5. Route → Handler Method → Key File Quick Reference
 
-All routes are registered in `router/aigateway.go`'s `NewRouter()`. Middleware chain: `MustUserOrgApiKey` (auth) + `metricsMw` (metrics, EE) + optional `modalAPIRateLimiter` (rate limiting).
+All routes are registered in `router/aigateway.go`'s `NewRouter()`. Middleware chain: `MustUserOrgApiKey` (auth) + `metricsMw` (metrics, EE).
 
 | Route | Handler Method | Implementation File |
 |---|---|---|

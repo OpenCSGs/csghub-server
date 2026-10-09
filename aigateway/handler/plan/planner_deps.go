@@ -34,11 +34,6 @@ type BalanceChecker interface {
 	CheckBalance(ctx context.Context, nsUUID string) error
 }
 
-// UsageLimitChecker verifies that the tenant has not exceeded usage quota.
-type UsageLimitChecker interface {
-	CheckUsageLimit(ctx context.Context, nsUUID string, model *types.Model, endpoint string) error
-}
-
 // AdmissionChecker enforces capacity admission (CapacityPolicy) for the
 // resolved model target. It runs BEFORE the content-safety check (step 7 vs
 // 8): the sensitive check is the expensive Plan-phase step (whitelist query

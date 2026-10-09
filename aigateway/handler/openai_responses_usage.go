@@ -87,13 +87,6 @@ func (h *OpenAIHandlerImpl) recordResponsesUsageWithTrace(c *gin.Context, counte
 		}
 		if tokenUsage != nil {
 			commitCtx, cancel := context.WithTimeout(baseCtx, time.Second)
-			if err := h.openaiComponent.CommitUsageLimitFromUsage(commitCtx, nsUUID, modelTarget.Model, tokenUsage); err != nil {
-				slog.ErrorContext(baseCtx, "failed to commit responses usage limit",
-					slog.String("step", "commit_usage_limit"),
-					slog.String("model", modelTarget.ModelName),
-					slog.String("provider", modelTarget.Model.Provider),
-					slog.Any("error", err))
-			}
 			if admissionLease != nil {
 				h.openaiComponent.FinalizeCapacityAdmission(commitCtx, admissionLease, tokenUsage)
 			}

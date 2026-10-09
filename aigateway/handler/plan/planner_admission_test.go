@@ -55,14 +55,13 @@ func admissionPlanTestTarget() *types.ModelTarget {
 func TestPlan_AdmissionRunsAfterSensitive(t *testing.T) {
 	safety := &recordingSafetyChecker{}
 	admission := &recordingAdmissionChecker{safety: safety}
-	p := NewPlanner(
-		&mockModelResolver{target: admissionPlanTestTarget()},
-		&mockBalanceChecker{},
-		&mockUsageLimitChecker{},
-		safety,
-		admission,
-		nil,
-	)
+	p := NewPlanner(PlannerDeps{
+		ModelResolver:    &mockModelResolver{target: admissionPlanTestTarget()},
+		BalanceChecker:   &mockBalanceChecker{},
+		ContentSafety:    safety,
+		AdmissionChecker: admission,
+		MetricsEnricher:  nil,
+	})
 
 	meta := &types.RequestMetadata{
 		Protocol:   string(types.ProtocolMessages),
@@ -83,14 +82,13 @@ func TestPlan_AdmissionRunsAfterSensitive(t *testing.T) {
 func TestPlan_AdmissionSkippedForUnknownTask(t *testing.T) {
 	safety := &recordingSafetyChecker{}
 	admission := &recordingAdmissionChecker{safety: safety}
-	p := NewPlanner(
-		&mockModelResolver{target: admissionPlanTestTarget()},
-		&mockBalanceChecker{},
-		&mockUsageLimitChecker{},
-		safety,
-		admission,
-		nil,
-	)
+	p := NewPlanner(PlannerDeps{
+		ModelResolver:    &mockModelResolver{target: admissionPlanTestTarget()},
+		BalanceChecker:   &mockBalanceChecker{},
+		ContentSafety:    safety,
+		AdmissionChecker: admission,
+		MetricsEnricher:  nil,
+	})
 
 	meta := &types.RequestMetadata{
 		Protocol: string(types.ProtocolChat),
@@ -115,14 +113,13 @@ func TestPlan_AdmissionCoversAllModalTasks(t *testing.T) {
 		t.Run(task, func(t *testing.T) {
 			safety := &recordingSafetyChecker{}
 			admission := &recordingAdmissionChecker{safety: safety}
-			p := NewPlanner(
-				&mockModelResolver{target: admissionPlanTestTarget()},
-				&mockBalanceChecker{},
-				&mockUsageLimitChecker{},
-				safety,
-				admission,
-				nil,
-			)
+			p := NewPlanner(PlannerDeps{
+				ModelResolver:    &mockModelResolver{target: admissionPlanTestTarget()},
+				BalanceChecker:   &mockBalanceChecker{},
+				ContentSafety:    safety,
+				AdmissionChecker: admission,
+				MetricsEnricher:  nil,
+			})
 
 			meta := &types.RequestMetadata{
 				Protocol: string(types.ProtocolChat),
@@ -145,14 +142,13 @@ func TestPlan_AdmissionRunsForImageTask(t *testing.T) {
 	// handler adapter passes EstimatedTokens <= 0.
 	safety := &recordingSafetyChecker{}
 	admission := &recordingAdmissionChecker{safety: safety}
-	p := NewPlanner(
-		&mockModelResolver{target: admissionPlanTestTarget()},
-		&mockBalanceChecker{},
-		&mockUsageLimitChecker{},
-		safety,
-		admission,
-		nil,
-	)
+	p := NewPlanner(PlannerDeps{
+		ModelResolver:    &mockModelResolver{target: admissionPlanTestTarget()},
+		BalanceChecker:   &mockBalanceChecker{},
+		ContentSafety:    safety,
+		AdmissionChecker: admission,
+		MetricsEnricher:  nil,
+	})
 
 	meta := &types.RequestMetadata{
 		Protocol: string(types.ProtocolChat),
@@ -177,14 +173,13 @@ func TestPlan_AdmissionReject_SetsCapacityErrorCategory(t *testing.T) {
 		safety:  &recordingSafetyChecker{},
 		outcome: &types.AdmissionOutcome{Decision: decision},
 	}
-	p := NewPlanner(
-		&mockModelResolver{target: admissionPlanTestTarget()},
-		&mockBalanceChecker{},
-		&mockUsageLimitChecker{},
-		&recordingSafetyChecker{},
-		admission,
-		nil,
-	)
+	p := NewPlanner(PlannerDeps{
+		ModelResolver:    &mockModelResolver{target: admissionPlanTestTarget()},
+		BalanceChecker:   &mockBalanceChecker{},
+		ContentSafety:    &recordingSafetyChecker{},
+		AdmissionChecker: admission,
+		MetricsEnricher:  nil,
+	})
 
 	meta := &types.RequestMetadata{
 		Protocol:   string(types.ProtocolMessages),
@@ -211,14 +206,13 @@ func TestPlan_AdmissionNilDecision_PassesThrough(t *testing.T) {
 		safety:  &recordingSafetyChecker{},
 		outcome: nil, // admission did not apply
 	}
-	p := NewPlanner(
-		&mockModelResolver{target: admissionPlanTestTarget()},
-		&mockBalanceChecker{},
-		&mockUsageLimitChecker{},
-		&recordingSafetyChecker{},
-		admission,
-		nil,
-	)
+	p := NewPlanner(PlannerDeps{
+		ModelResolver:    &mockModelResolver{target: admissionPlanTestTarget()},
+		BalanceChecker:   &mockBalanceChecker{},
+		ContentSafety:    &recordingSafetyChecker{},
+		AdmissionChecker: admission,
+		MetricsEnricher:  nil,
+	})
 
 	meta := &types.RequestMetadata{
 		Protocol:   string(types.ProtocolMessages),
@@ -255,14 +249,13 @@ func TestPlan_AdmissionReSelection_AppliesNewTarget(t *testing.T) {
 			ReSelectedTarget: reselected,
 		},
 	}
-	p := NewPlanner(
-		&mockModelResolver{target: primary},
-		&mockBalanceChecker{},
-		&mockUsageLimitChecker{},
-		&recordingSafetyChecker{},
-		admission,
-		nil,
-	)
+	p := NewPlanner(PlannerDeps{
+		ModelResolver:    &mockModelResolver{target: primary},
+		BalanceChecker:   &mockBalanceChecker{},
+		ContentSafety:    &recordingSafetyChecker{},
+		AdmissionChecker: admission,
+		MetricsEnricher:  nil,
+	})
 
 	meta := &types.RequestMetadata{
 		Protocol:   string(types.ProtocolChat),
@@ -313,14 +306,13 @@ func TestPlan_SensitiveSeesReSelectedUpstream(t *testing.T) {
 		},
 	}
 	safety := &recordingSafetyChecker{}
-	p := NewPlanner(
-		&mockModelResolver{target: primary},
-		&mockBalanceChecker{},
-		&mockUsageLimitChecker{},
-		safety,
-		admission,
-		nil,
-	)
+	p := NewPlanner(PlannerDeps{
+		ModelResolver:    &mockModelResolver{target: primary},
+		BalanceChecker:   &mockBalanceChecker{},
+		ContentSafety:    safety,
+		AdmissionChecker: admission,
+		MetricsEnricher:  nil,
+	})
 
 	meta := &types.RequestMetadata{
 		Protocol:   string(types.ProtocolChat),
@@ -371,14 +363,13 @@ func TestPlan_QueueReroute_RePlansAdmission(t *testing.T) {
 			SelectedUpstreamID: 1,
 		}},
 	}
-	p := NewPlanner(
-		resolver,
-		&mockBalanceChecker{},
-		&mockUsageLimitChecker{},
-		safety,
-		admission,
-		nil,
-	)
+	p := NewPlanner(PlannerDeps{
+		ModelResolver:    resolver,
+		BalanceChecker:   &mockBalanceChecker{},
+		ContentSafety:    safety,
+		AdmissionChecker: admission,
+		MetricsEnricher:  nil,
+	})
 
 	meta := &types.RequestMetadata{
 		Protocol: string(types.ProtocolMessages),
@@ -400,15 +391,13 @@ func TestPlan_QueueReroute_Exhausted_RendersModelUnavailable(t *testing.T) {
 	resolver := &mockModelResolver{target: admissionPlanTestTarget()}
 	// Always reroutes: the re-plan budget must bound the loop and render 503.
 	admission := &rerouteAdmissionChecker{}
-	p := NewPlanner(
-		resolver,
-		&mockBalanceChecker{},
-		&mockUsageLimitChecker{},
-		safety,
-		admission,
-		nil,
-		WithQueueMaxRePlans(2),
-	)
+	p := NewPlanner(PlannerDeps{
+		ModelResolver:    resolver,
+		BalanceChecker:   &mockBalanceChecker{},
+		ContentSafety:    safety,
+		AdmissionChecker: admission,
+		MetricsEnricher:  nil,
+	}, WithQueueMaxRePlans(2))
 
 	meta := &types.RequestMetadata{
 		Protocol: string(types.ProtocolMessages),

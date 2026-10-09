@@ -1556,14 +1556,7 @@ func TestRecordResponsesUsageFallsBackToTokenCounter(t *testing.T) {
 	tokenUsage := &token.Usage{PromptTokens: 3, CompletionTokens: 4, TotalTokens: 7}
 
 	var wg sync.WaitGroup
-	wg.Add(2)
-	tester.mocks.openAIComp.EXPECT().
-		CommitUsageLimitFromUsage(mock.Anything, "testuuid", model, mock.Anything).
-		RunAndReturn(func(ctx context.Context, userUUID string, model *types.Model, usage *token.Usage) error {
-			wg.Done()
-			return nil
-		}).
-		Once()
+	wg.Add(1)
 	tester.mocks.openAIComp.EXPECT().
 		RecordUsageFromTokenUsage(mock.Anything, "testuuid", model, "upstream-model", mock.MatchedBy(func(usage *token.Usage) bool {
 			return usage != nil &&
@@ -1592,14 +1585,7 @@ func TestRecordResponsesUsagePrefersResponsesUsage(t *testing.T) {
 	counter.Response(&types.ResponsesResponse{Usage: responsesUsage})
 
 	var wg sync.WaitGroup
-	wg.Add(2)
-	tester.mocks.openAIComp.EXPECT().
-		CommitUsageLimitFromUsage(mock.Anything, "testuuid", model, mock.Anything).
-		RunAndReturn(func(ctx context.Context, userUUID string, model *types.Model, usage *token.Usage) error {
-			wg.Done()
-			return nil
-		}).
-		Once()
+	wg.Add(1)
 	tester.mocks.openAIComp.EXPECT().
 		RecordUsageFromTokenUsage(mock.Anything, "testuuid", model, "upstream-model", mock.MatchedBy(func(usage *token.Usage) bool {
 			return usage != nil &&

@@ -54,16 +54,6 @@ func NewRouter(config *config.Config) (*gin.Engine, func(), error) {
 	middlewareCollection.License.Check = middleware.CheckLicense(config)
 	middlewareCollection.Auth.MustUserOrgApiKey = middleware.MustUserOrgApiKey(config)
 
-	modalAPIRateLimiter := middleware.RateLimiter(config,
-		middleware.WithSlidingWindowRateLimter(config),
-		middleware.WithRateLimitConfig(
-			config.AIGateway.ModalAPIRateLimiter.Enable,
-			config.AIGateway.ModalAPIRateLimiter.Limit,
-			config.AIGateway.ModalAPIRateLimiter.Window,
-		),
-		middleware.WithOnLimitExceeded(aigatewayRateLimitHandler),
-	)
-
 	v1Group := r.Group("/v1")
 
 	openAIhandler, err := handler.NewOpenAIHandlerFromConfig(config)
@@ -107,22 +97,22 @@ func NewRouter(config *config.Config) (*gin.Engine, func(), error) {
 	v1Group.POST("/rerank", middlewareCollection.Auth.MustUserOrgApiKey, quotaMW, metricsMw, rerankHandler.Rerank)
 
 	// image and audio and video routes
-	v1Group.POST("/images/generations", middlewareCollection.Auth.MustUserOrgApiKey, metricsMw, modalAPIRateLimiter, imageHandler.GenerateImage)
-	v1Group.POST("/images/edits", middlewareCollection.Auth.MustUserOrgApiKey, metricsMw, modalAPIRateLimiter, imageHandler.EditImage)
+	v1Group.POST("/images/generations", middlewareCollection.Auth.MustUserOrgApiKey, metricsMw, imageHandler.GenerateImage)
+	v1Group.POST("/images/edits", middlewareCollection.Auth.MustUserOrgApiKey, metricsMw, imageHandler.EditImage)
 	v1Group.POST("/audio/transcriptions", middlewareCollection.Auth.MustUserOrgApiKey, metricsMw, audioHandler.Transcription)
-	v1Group.POST("/audio/speech", middlewareCollection.Auth.MustUserOrgApiKey, metricsMw, modalAPIRateLimiter, speechHandler.Speech)
-	v1Group.POST("/audio/speech/batch", middlewareCollection.Auth.MustUserOrgApiKey, metricsMw, modalAPIRateLimiter, speechHandler.SpeechBatch)
-	v1Group.GET("/audio/voices", middlewareCollection.Auth.MustUserOrgApiKey, modalAPIRateLimiter, openAIhandler.ListVoices)
-	v1Group.POST("/audio/voices", middlewareCollection.Auth.MustUserOrgApiKey, modalAPIRateLimiter, openAIhandler.UploadVoice)
-	v1Group.PUT("/audio/voices", middlewareCollection.Auth.MustUserOrgApiKey, modalAPIRateLimiter, openAIhandler.UpdateVoice)
-	v1Group.DELETE("/audio/voices/:name", middlewareCollection.Auth.MustUserOrgApiKey, modalAPIRateLimiter, openAIhandler.DeleteVoice)
-	v1Group.POST("/videos", middlewareCollection.Auth.MustUserOrgApiKey, metricsMw, modalAPIRateLimiter, videoHandler.CreateVideo)
+	v1Group.POST("/audio/speech", middlewareCollection.Auth.MustUserOrgApiKey, metricsMw, speechHandler.Speech)
+	v1Group.POST("/audio/speech/batch", middlewareCollection.Auth.MustUserOrgApiKey, metricsMw, speechHandler.SpeechBatch)
+	v1Group.GET("/audio/voices", middlewareCollection.Auth.MustUserOrgApiKey, openAIhandler.ListVoices)
+	v1Group.POST("/audio/voices", middlewareCollection.Auth.MustUserOrgApiKey, openAIhandler.UploadVoice)
+	v1Group.PUT("/audio/voices", middlewareCollection.Auth.MustUserOrgApiKey, openAIhandler.UpdateVoice)
+	v1Group.DELETE("/audio/voices/:name", middlewareCollection.Auth.MustUserOrgApiKey, openAIhandler.DeleteVoice)
+	v1Group.POST("/videos", middlewareCollection.Auth.MustUserOrgApiKey, metricsMw, videoHandler.CreateVideo)
 	v1Group.GET("/videos/:video_id", middlewareCollection.Auth.MustUserOrgApiKey, metricsMw, videoHandler.GetVideo)
-	v1Group.GET("/videos/:video_id/content", middlewareCollection.Auth.MustUserOrgApiKey, metricsMw, modalAPIRateLimiter, videoHandler.GetVideoContent)
-	v1Group.POST("/video/generations", middlewareCollection.Auth.MustUserOrgApiKey, metricsMw, modalAPIRateLimiter, videoHandler.CreateVideo)
+	v1Group.GET("/videos/:video_id/content", middlewareCollection.Auth.MustUserOrgApiKey, metricsMw, videoHandler.GetVideoContent)
+	v1Group.POST("/video/generations", middlewareCollection.Auth.MustUserOrgApiKey, metricsMw, videoHandler.CreateVideo)
 	v1Group.GET("/video/generations/:video_id", middlewareCollection.Auth.MustUserOrgApiKey, metricsMw, videoHandler.GetVideo)
-	v1Group.GET("/video/generations/:video_id/content", middlewareCollection.Auth.MustUserOrgApiKey, metricsMw, modalAPIRateLimiter, videoHandler.GetVideoContent)
-	v1Group.POST("/ocr", middlewareCollection.Auth.MustUserOrgApiKey, metricsMw, modalAPIRateLimiter, ocrHandler.OCR)
+	v1Group.GET("/video/generations/:video_id/content", middlewareCollection.Auth.MustUserOrgApiKey, metricsMw, videoHandler.GetVideoContent)
+	v1Group.POST("/ocr", middlewareCollection.Auth.MustUserOrgApiKey, metricsMw, ocrHandler.OCR)
 
 	apiV1Group := r.Group("/api/v1")
 	adminGroup := apiV1Group.Group("/admin", middlewareCollection.Auth.NeedAdmin)

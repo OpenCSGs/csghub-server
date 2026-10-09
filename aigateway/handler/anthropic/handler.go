@@ -307,13 +307,6 @@ func (h *Handler) runPostProcessAsync(ctx context.Context, input postProcessInpu
 			input.Trace.Recorder.End()
 		}
 
-		// Commit usage limit.
-		if h.UsageLimiter != nil && input.Model != nil {
-			if err := h.commitUsageLimitSync(usageCtx, input.NSUUID, input.Model, input.Usage); err != nil {
-				slog.ErrorContext(usageCtx, "failed to commit usage limit", slog.Any("error", err))
-			}
-		}
-
 		// Finalize the capacity admission lease with the real usage
 		// (idempotent with the Orchestrator's safety-net release).
 		if h.AdmissionFinalizer != nil && input.AdmissionLease != nil {
@@ -354,10 +347,6 @@ func (h *Handler) runPostProcessAsync(ctx context.Context, input postProcessInpu
 			}
 		}
 	}()
-}
-
-func (h *Handler) commitUsageLimitSync(ctx context.Context, nsUUID string, model *types.Model, usage *tokenUsage) error {
-	return h.UsageLimiter.CommitUsageLimitFromUsage(ctx, nsUUID, model, usage.PromptTokens, usage.CompletionTokens, usage.CachedPromptTokens, usage.CacheCreationPromptTokens)
 }
 
 // admissionLeaseFromMessagesPlan extracts the current capacity admission
@@ -413,10 +402,6 @@ func (h *Handler) HandlePlanError(c *gin.Context, meta *types.RequestMetadata, p
 		case types.PlanErrInsufficientBalance:
 			writeError(c, http.StatusPaymentRequired, ErrTypeInvalidRequest,
 				fmt.Sprintf("insufficient balance: %v", err))
-			return
-		case types.PlanErrUsageLimitExceeded:
-			writeError(c, http.StatusTooManyRequests, ErrTypeRateLimit,
-				"usage quota exceeded for current window")
 			return
 		case types.PlanErrQueueTimeout:
 			// The client's queue-wait tolerance expired, not the capacity

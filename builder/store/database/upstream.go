@@ -30,7 +30,6 @@ type Upstream struct {
 	SourceID              int64                          `bun:",notnull,default:0" json:"source_id"`
 	Tags                  map[string]string              `bun:",type:jsonb,nullzero" json:"tags,omitempty"`
 	Metadata              *types.UpstreamMetadata        `bun:",type:jsonb,nullzero" json:"metadata,omitempty"`
-	LimitPolicy           *types.UsageLimitPolicy        `bun:",type:jsonb,nullzero" json:"limit_policy,omitempty"`
 	CapacityPolicy        *types.CapacityPolicy          `bun:",type:jsonb,nullzero" json:"capacity_policy,omitempty"`
 	HealthState           *AIGatewayUpstreamHealthState  `bun:"rel:has-one,join:id=upstream_id" json:"health_state,omitempty"`
 	CircuitState          *AIGatewayUpstreamCircuitState `bun:"rel:has-one,join:id=upstream_id" json:"circuit_state,omitempty"`
@@ -178,7 +177,7 @@ func (s *upstreamStoreImpl) GetBySourceID(ctx context.Context, source types.Upst
 
 // sourceOwnedColumns are the columns that the deploy sync is allowed to
 // overwrite when updating an existing internal upstream. UI-configured fields
-// (health_check_enabled, circuit_breaker_enabled, limit_policy, tags, etc.)
+// (health_check_enabled, circuit_breaker_enabled, capacity_policy, tags, etc.)
 // are deliberately excluded so that admin settings survive re-syncs.
 var sourceOwnedColumns = []string{
 	"url", "model_name", "provider", "enabled",

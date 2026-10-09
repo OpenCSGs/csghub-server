@@ -233,19 +233,19 @@ func (h *chatPipelineHandler) Execute(c *gin.Context, meta *types.RequestMetadat
 		slog.Any("target", mt.Target),
 		slog.Any("host", mt.Host),
 	)
-	primaryWriter, proxyErr := h.handler.executeChatProxyAttempt(c, chatCtx.responseWriter, mt, nsUUID, chatReq, p)
+	primaryWriter, proxyErr := h.handler.executeChatProxyAttempt(c, chatCtx.responseWriter, mt, chatReq, p)
 	if proxyErr != nil {
 		finishLLMTraceWithError(generationRecorder, proxyErr, types.TraceErrUpstreamUnavailable)
-		h.handler.handleProxyError(c, chatReq.Stream, username, modelID, proxyErr)
+		h.handler.handleProxyError(c, chatReq.Stream, proxyErr)
 		log.ErrorContext(ctx, "failed to execute chat proxy", slog.Int("status", retryWriterStatusCode(primaryWriter)), slog.Any("error", proxyErr))
 		return nil
 	}
 	log.InfoContext(ctx, "proxy chat request to model target", slog.Int("status", primaryWriter.statusCode), slog.Int64("proxy_latency(ms)", time.Since(proxyStartTime).Milliseconds()), slog.Int64("ttft(ms)", retryWriterTTFTMs(primaryWriter, proxyStartTime)))
 
-	finalWriter, err := h.handler.executeChatWithFallback(c, chatCtx, mt, nsUUID, chatReq, primaryWriter, username, modelID, p)
+	finalWriter, err := h.handler.executeChatWithFallback(c, chatCtx, mt, chatReq, primaryWriter, username, modelID, p)
 	if err != nil {
 		finishLLMTraceWithError(generationRecorder, err, types.TraceErrUpstreamUnavailable)
-		h.handler.handleProxyError(c, chatReq.Stream, username, modelID, err)
+		h.handler.handleProxyError(c, chatReq.Stream, err)
 		log.ErrorContext(ctx, "failed to execute chat fallback", slog.Int("status", retryWriterStatusCode(finalWriter)), slog.Any("error", err))
 		return nil
 	}
