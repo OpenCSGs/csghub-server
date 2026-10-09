@@ -2,10 +2,14 @@ package component
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -687,4 +691,290 @@ func chdirToServerCommand(t *testing.T) {
 	_, testFile, _, ok := runtime.Caller(0)
 	require.True(t, ok)
 	t.Chdir(filepath.Join(filepath.Dir(testFile), "..", "cmd", "csghub-server"))
+}
+
+func TestMergeEngineArgs(t *testing.T) {
+	shared := []types.EngineArg{
+		{Name: "max-model-len", Value: "8192", Format: "--max-model-len %s"},
+		{Name: "enforce-eager", Value: "disable", Format: "--enforce-eager"},
+	}
+
+	t.Run("no args at all returns nil", func(t *testing.T) {
+		require.Nil(t, mergeEngineArgs(nil, nil))
+	})
+
+	t.Run("shared args are returned unchanged", func(t *testing.T) {
+		require.Equal(t, shared, mergeEngineArgs(shared, nil))
+	})
+
+	t.Run("image only args are returned when no shared args", func(t *testing.T) {
+		extra := []types.EngineArg{
+			{Name: "async-scheduling", Value: "enable", Format: "--async-scheduling"},
+		}
+		require.Equal(t, extra, mergeEngineArgs(nil, extra))
+	})
+
+	t.Run("image only args are appended after shared args", func(t *testing.T) {
+		extra := []types.EngineArg{
+			{Name: "async-scheduling", Value: "enable", Format: "--async-scheduling"},
+		}
+		require.Equal(t, []types.EngineArg{
+			{Name: "max-model-len", Value: "8192", Format: "--max-model-len %s"},
+			{Name: "enforce-eager", Value: "disable", Format: "--enforce-eager"},
+			{Name: "async-scheduling", Value: "enable", Format: "--async-scheduling"},
+		}, mergeEngineArgs(shared, extra))
+	})
+
+	t.Run("same name replaces the shared arg in place", func(t *testing.T) {
+		extra := []types.EngineArg{
+			{Name: "max-model-len", Value: "4096", Format: "--max-model-len %s"},
+		}
+		require.Equal(t, []types.EngineArg{
+			{Name: "max-model-len", Value: "4096", Format: "--max-model-len %s"},
+			{Name: "enforce-eager", Value: "disable", Format: "--enforce-eager"},
+		}, mergeEngineArgs(shared, extra))
+	})
+
+	t.Run("shared args are not mutated", func(t *testing.T) {
+		extra := []types.EngineArg{
+			{Name: "max-model-len", Value: "4096", Format: "--max-model-len %s"},
+		}
+		mergeEngineArgs(shared, extra)
+		require.Equal(t, "8192", shared[0].Value)
+	})
+
+	t.Run("empty shared args stay an empty list", func(t *testing.T) {
+		require.NotNil(t, mergeEngineArgs([]types.EngineArg{}, nil))
+	})
+
+	t.Run("nil shared args with no image args keep the stored value", func(t *testing.T) {
+		require.Nil(t, mergeEngineArgs(nil, []types.EngineArg{}))
+	})
+}
+
+func TestUpdateRuntimeFrameworkAndArchMergesEngineArgsPerImage(t *testing.T) {
+	ctx := context.TODO()
+	rc := initializeTestRuntimeArchComponent(ctx, t)
+
+	engineConfig := types.EngineConfig{
+		EngineName:     "vllm",
+		ContainerPort:  8000,
+		ModelFormat:    "pytorch",
+		SupportedArchs: []string{"Qwen2ForCausalLM"},
+		EngineArgs: []types.EngineArg{
+			{Name: "max-model-len", Value: "8192", Format: "--max-model-len %s"},
+			{Name: "async-scheduling", Value: "enable", Format: "--async-scheduling"},
+		},
+		UpdatedAt: time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC),
+		EngineImages: []types.Image{
+			{
+				ComputeType:   types.GPU_TYPE,
+				Image:         "opencsghq/vllm:v0.24.0",
+				EngineVersion: "v0.24.0",
+			},
+			{
+				ComputeType:   types.GPU_TYPE,
+				Image:         "opencsghq/vllm:v0.9.2",
+				EngineVersion: "v0.9.2",
+				ExtraEngineArgs: []types.EngineArg{
+					{Name: "guided-decoding-backend", Value: "xgrammar", Format: "--guided-decoding-backend %s"},
+				},
+			},
+		},
+	}
+	lastSync := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	stored := func(id int64) *database.RuntimeFramework {
+		rf := &database.RuntimeFramework{ID: id}
+		rf.UpdatedAt = lastSync
+		return rf
+	}
+
+	rc.mocks.stores.RuntimeFrameworkMock().EXPECT().
+		FindByFrameImageAndComputeType(ctx, "opencsghq/vllm:v0.24.0", "gpu").
+		Return(stored(11), nil)
+	rc.mocks.stores.RuntimeFrameworkMock().EXPECT().
+		FindByFrameImageAndComputeType(ctx, "opencsghq/vllm:v0.9.2", "gpu").
+		Return(stored(12), nil)
+
+	written := make(map[string]string)
+	rc.mocks.stores.RuntimeFrameworkMock().EXPECT().
+		Update(ctx, mock.Anything).
+		Run(func(_ context.Context, frame database.RuntimeFramework) {
+			written[frame.FrameImage] = frame.EngineArgs
+		}).
+		Times(2).
+		Return(&database.RuntimeFramework{}, nil)
+
+	rc.mocks.stores.RuntimeArchMock().EXPECT().DeleteByRuntimeID(ctx, int64(11)).Return(nil)
+	rc.mocks.stores.RuntimeArchMock().EXPECT().DeleteByRuntimeID(ctx, int64(12)).Return(nil)
+	rc.mocks.stores.RuntimeArchMock().EXPECT().BatchAdd(ctx, mock.Anything).Return(nil).Times(2)
+
+	require.NoError(t, rc.UpdateRuntimeFrameworkAndArch(ctx, types.InferenceType, engineConfig))
+	require.Len(t, written, 2)
+	require.Equal(t, []string{"max-model-len", "async-scheduling"},
+		engineArgNames(t, written["opencsghq/vllm:v0.24.0"]))
+	require.Equal(t, []string{"max-model-len", "async-scheduling", "guided-decoding-backend"},
+		engineArgNames(t, written["opencsghq/vllm:v0.9.2"]))
+}
+
+func engineArgNames(t *testing.T, raw string) []string {
+	t.Helper()
+	var args []types.EngineArg
+	require.NoError(t, json.Unmarshal([]byte(raw), &args))
+	return engineArgNameList(args)
+}
+
+func engineArgNameList(args []types.EngineArg) []string {
+	names := make([]string, 0, len(args))
+	for _, arg := range args {
+		names = append(names, arg.Name)
+	}
+	return names
+}
+
+// engineArgsUnsupportedByVersion lists, per inference config file and declared
+// engine version, the flags that version does not accept. Passing an
+// unsupported flag makes the engine exit on startup, so no image may declare
+// one.
+var engineArgsUnsupportedByVersion = map[string]map[string][]string{
+	"vllm.json": {
+		"v0.8.5":  {"async-scheduling"},
+		"v0.9.2":  {"async-scheduling"},
+		"v0.24.0": {"swap-space", "guided-decoding-backend"},
+		"v0.28.0": {"swap-space", "guided-decoding-backend"},
+	},
+	"amd-vllm.json": {
+		"0.28.0": {"swap-space", "guided-decoding-backend"},
+	},
+	"ascend-vllm.json": {
+		"v0.25.1rc": {"swap-space"},
+	},
+	"sglang.json": {
+		"v0.5.14": {"enable-ep-moe"},
+	},
+}
+
+// engineArgsSupportedByVersion pins flags that the declared engine versions do
+// accept, so that a supported flag is not dropped by mistake.
+var engineArgsSupportedByVersion = map[string]map[string][]string{
+	"vllm.json": {
+		"v0.8.5":  {"swap-space", "guided-decoding-backend"},
+		"v0.9.2":  {"swap-space", "guided-decoding-backend"},
+		"v0.24.0": {"async-scheduling"},
+		"v0.28.0": {"async-scheduling"},
+	},
+	"nvidia-sglang.json": {
+		// sglang 0.5.3rc1 still accepts --enable-ep-moe as a deprecated shim
+		// that sets ep_size to tp_size. sglang 0.5.5 removed the flag, so
+		// moving this image to a newer tag means using --ep-size instead.
+		"25.10-py3": {"enable-ep-moe"},
+	},
+}
+
+func TestEngineConfigEngineArgsPerVersion(t *testing.T) {
+	chdirToServerCommand(t)
+
+	configFiles, err := getJsonfiles("inference")
+	require.NoError(t, err)
+
+	configPaths := make(map[string]string, len(configFiles))
+	for _, path := range configFiles {
+		configPaths[filepath.Base(path)] = path
+	}
+
+	for configFile, unsupportedByVersion := range engineArgsUnsupportedByVersion {
+		t.Run("unsupported/"+configFile, func(t *testing.T) {
+			argsByVersion := readEngineArgsByVersion(t, configPaths[configFile])
+			require.Len(t, argsByVersion, len(unsupportedByVersion))
+			for version, unsupported := range unsupportedByVersion {
+				names, ok := engineArgNameSet(argsByVersion, version)
+				require.Truef(t, ok, "%s: engine version %s not configured", configFile, version)
+				for _, name := range unsupported {
+					require.Falsef(t, names[name],
+						"%s: %s does not accept --%s", configFile, version, name)
+				}
+			}
+		})
+	}
+
+	for configFile, supportedByVersion := range engineArgsSupportedByVersion {
+		t.Run("supported/"+configFile, func(t *testing.T) {
+			argsByVersion := readEngineArgsByVersion(t, configPaths[configFile])
+			for version, supported := range supportedByVersion {
+				names, ok := engineArgNameSet(argsByVersion, version)
+				require.Truef(t, ok, "%s: engine version %s not configured", configFile, version)
+				for _, name := range supported {
+					require.Truef(t, names[name],
+						"%s: %s should accept --%s", configFile, version, name)
+				}
+			}
+		})
+	}
+}
+
+// TestEngineConfigValueTakingArgsHaveDefaults guards a footgun in setEngineArgs:
+// a template whose format contains "%" is rendered as "--flag <value>" as soon
+// as the deploy request carries that key, and a blank value renders the flag
+// with no value at all, which makes the engine exit on startup. The template
+// default is skipped only when the deploy request repeats it verbatim, so an
+// empty default cannot protect against a blank value. Such templates therefore
+// stay out of the configs. custom-options is the deliberate exception: its
+// format is the bare "%s", so a blank value renders nothing.
+func TestEngineConfigValueTakingArgsHaveDefaults(t *testing.T) {
+	chdirToServerCommand(t)
+
+	configFiles, err := getJsonfiles("inference")
+	require.NoError(t, err)
+	require.NotEmpty(t, configFiles)
+
+	for _, configPath := range configFiles {
+		t.Run(filepath.Base(configPath), func(t *testing.T) {
+			for version, args := range readEngineArgsByVersion(t, configPath) {
+				for _, arg := range args {
+					if arg.Name == types.EngineArgCustomOptions || !strings.Contains(arg.Format, "%") {
+						continue
+					}
+					require.NotEmptyf(t, arg.Value,
+						"%s: %s ships an empty default, so a blank deploy value would render %q without one",
+						version, arg.Name, arg.Format)
+				}
+			}
+		})
+	}
+}
+
+func readEngineArgsByVersion(t *testing.T, configPath string) map[string][]types.EngineArg {
+	t.Helper()
+	require.NotEmpty(t, configPath)
+
+	content, err := os.ReadFile(configPath)
+	require.NoError(t, err)
+
+	var engineConfig types.EngineConfig
+	require.NoError(t, json.Unmarshal(content, &engineConfig))
+	require.NotEmpty(t, engineConfig.EngineImages)
+
+	argsByVersion := make(map[string][]types.EngineArg, len(engineConfig.EngineImages))
+	for _, image := range engineConfig.EngineImages {
+		merged := mergeEngineArgs(engineConfig.EngineArgs, image.ExtraEngineArgs)
+		seen := make(map[string]bool, len(merged))
+		for _, arg := range merged {
+			require.Falsef(t, seen[arg.Name], "%s: duplicate engine arg %s", image.EngineVersion, arg.Name)
+			seen[arg.Name] = true
+			argsByVersion[image.EngineVersion] = append(argsByVersion[image.EngineVersion], arg)
+		}
+	}
+	return argsByVersion
+}
+
+func engineArgNameSet(argsByVersion map[string][]types.EngineArg, version string) (map[string]bool, bool) {
+	args, ok := argsByVersion[version]
+	if !ok {
+		return nil, false
+	}
+	names := make(map[string]bool, len(args))
+	for _, arg := range args {
+		names[arg.Name] = true
+	}
+	return names, true
 }

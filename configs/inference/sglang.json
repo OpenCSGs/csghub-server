@@ -176,11 +176,6 @@
       "format": "--enable-dp-attention"
     },
     {
-      "name": "enable-ep-moe",
-      "value": "enable",
-      "format": "--enable-ep-moe"
-    },
-    {
       "name": "enable-tool-calling",
       "value": "enable",
       "format": "--tool-call-parser auto"

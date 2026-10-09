@@ -229,6 +229,13 @@
         "OmniVoiceModel",
         "VoxCPM2TalkerForConditionalGeneration",
         "MossTTSNanoForCausalLM"
+      ],
+      "extra_engine_args": [
+        {
+          "name": "async-scheduling",
+          "value": "enable",
+          "format": "--async-scheduling"
+        }
       ]
     },
     {
@@ -242,18 +249,49 @@
         "HunYuanDenseV1ForCausalLM",
         "HunYuanMoEV1ForCausalLM",
         "MiMoForCausalLM"
+      ],
+      "extra_engine_args": [
+        {
+          "name": "guided-decoding-backend",
+          "value": "xgrammar",
+          "format": "--guided-decoding-backend %s"
+        },
+        {
+          "name": "swap-space",
+          "value": "4",
+          "format": "--swap-space %s"
+        }
       ]
     },
     {
       "compute_type": "dcu",
       "image": "opencsghq/vllm:v0.8.5-dtk25.04",
       "driver_version": "25.04",
-      "engine_version": "v0.8.5"
+      "engine_version": "v0.8.5",
+      "extra_engine_args": [
+        {
+          "name": "guided-decoding-backend",
+          "value": "xgrammar",
+          "format": "--guided-decoding-backend %s"
+        },
+        {
+          "name": "swap-space",
+          "value": "4",
+          "format": "--swap-space %s"
+        }
+      ]
     },
     {
       "compute_type": "cpu",
       "image": "opencsghq/vllm-cpu:v0.24.0",
-      "engine_version": "v0.24.0"
+      "engine_version": "v0.24.0",
+      "extra_engine_args": [
+        {
+          "name": "async-scheduling",
+          "value": "enable",
+          "format": "--async-scheduling"
+        }
+      ]
     }
   ],
   "engine_args": [
@@ -308,16 +346,6 @@
       "format": "--pipeline-parallel-size %s"
     },
     {
-      "name": "guided-decoding-backend",
-      "value": "xgrammar",
-      "format": "--guided-decoding-backend %s"
-    },
-    {
-      "name": "swap-space",
-      "value": "4",
-      "format": "--swap-space %s"
-    },
-    {
       "name": "load-format",
       "value": "auto",
       "format": "--load-format %s"
@@ -348,11 +376,6 @@
       "format": "--enforce-eager"
     },
     {
-      "name": "async-scheduling",
-      "value": "enable",
-      "format": "--async-scheduling"
-    },
-    {
       "name": "disable-custom-all-reduce",
       "value": "disable",
       "format": "--disable-custom-all-reduce"
@@ -366,11 +389,6 @@
       "name": "enable-expert-parallel",
       "value": "disable",
       "format": "--enable-expert-parallel"
-    },
-    {
-      "name": "limit-mm-per-prompt",
-      "value": "image=5,video=5",
-      "format": "--limit-mm-per-prompt %s"
     },
     {
       "name": "custom-options",
