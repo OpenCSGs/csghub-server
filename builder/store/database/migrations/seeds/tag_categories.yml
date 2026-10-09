@@ -66,9 +66,11 @@ categories:
     enabled: true
   - name: resource
     scope: model
+    show_name: resource
     enabled: false
   - name: runtime_framework
     scope: model
+    show_name: runtime_framework
     enabled: false
   - name: task
     scope: skill

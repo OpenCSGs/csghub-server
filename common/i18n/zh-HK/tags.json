@@ -392,6 +392,15 @@
     "Tag.I18nKey.audio-text-to-text": {
         "other": "音訊转文本"
     },
+    "Tag.I18nKey.audio-text-to-video": {
+        "other": "音訊文本生成視頻"
+    },
+    "Tag.I18nKey.audio-image-text-to-video": {
+        "other": "音訊圖像文本生成視頻"
+    },
+    "Tag.I18nKey.audio-driven-video-continuation": {
+        "other": "音訊驅動視頻續寫"
+    },
     "Tag.I18nKey.English": {
         "other": "英文"
     },

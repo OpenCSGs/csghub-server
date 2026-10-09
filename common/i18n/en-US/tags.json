@@ -392,6 +392,15 @@
   "Tag.I18nKey.audio-text-to-text": {
     "other": "audio text to text"
   },
+  "Tag.I18nKey.audio-text-to-video": {
+    "other": "audio text to video"
+  },
+  "Tag.I18nKey.audio-image-text-to-video": {
+    "other": "audio image text to video"
+  },
+  "Tag.I18nKey.audio-driven-video-continuation": {
+    "other": "audio driven video continuation"
+  },
   "Tag.I18nKey.English": {
     "other": "english"
   },

@@ -1595,7 +1595,7 @@ func TestRepoHandler_CreateMirror(t *testing.T) {
 	tester.WithUser()
 	tester.WithKV("repo_type", types.ModelRepo)
 	tester.WithBody(t, &types.CreateMirrorReq{
-		SourceUrl:      "https://foo.com",
+		SourceUrl:      "  https://foo.com  ",
 		MirrorSourceID: 12,
 	})
 	tester.mocks.mirror.EXPECT().CreateMirror(
@@ -1636,6 +1636,24 @@ func TestRepoHandler_CreateMirrorSourceConflict(t *testing.T) {
 	})
 }
 
+// TestRepoHandler_CreateMirrorSourceURLInvalid verifies a malformed source URL returns HTTP 400 with MIRROR-ERR-8.
+func TestRepoHandler_CreateMirrorSourceURLInvalid(t *testing.T) {
+	tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
+		return rp.CreateMirror
+	})
+	tester.WithUser().WithKV("repo_type", types.ModelRepo).WithBody(t, &types.CreateMirrorReq{
+		SourceUrl: "://nohost",
+	})
+
+	tester.Execute()
+
+	tester.ResponseEqSimple(t, http.StatusBadRequest, httpbase.R{
+		Code:    "MIRROR-ERR-8",
+		Msg:     "MIRROR-ERR-8: failed to parse mirror source url: parse \"://nohost\": missing protocol scheme",
+		Context: errorx.Ctx().Set("source url", "://nohost"),
+	})
+}
+
 func TestRepoHandler_GetMirror(t *testing.T) {
 	tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
 		return rp.GetMirror
@@ -1665,7 +1683,7 @@ func TestRepoHandler_UpdateMirror(t *testing.T) {
 	tester.WithKV("repo_type", types.ModelRepo)
 	tester.WithBody(t, &types.UpdateMirrorReq{
 		MirrorSourceID: 123,
-		SourceUrl:      "foo",
+		SourceUrl:      "  foo  ",
 	})
 	tester.mocks.mirror.EXPECT().UpdateMirror(
 		tester.Ctx(), types.UpdateMirrorReq{
@@ -1681,6 +1699,24 @@ func TestRepoHandler_UpdateMirror(t *testing.T) {
 
 	tester.Execute()
 	tester.ResponseEq(t, 200, tester.OKText, &database.Mirror{ID: 11})
+}
+
+// TestRepoHandler_UpdateMirrorSourceURLInvalid verifies a malformed source URL returns HTTP 400 with MIRROR-ERR-8.
+func TestRepoHandler_UpdateMirrorSourceURLInvalid(t *testing.T) {
+	tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
+		return rp.UpdateMirror
+	})
+	tester.WithUser().WithKV("repo_type", types.ModelRepo).WithBody(t, &types.UpdateMirrorReq{
+		SourceUrl: "://nohost",
+	})
+
+	tester.Execute()
+
+	tester.ResponseEqSimple(t, http.StatusBadRequest, httpbase.R{
+		Code:    "MIRROR-ERR-8",
+		Msg:     "MIRROR-ERR-8: failed to parse mirror source url: parse \"://nohost\": missing protocol scheme",
+		Context: errorx.Ctx().Set("source url", "://nohost"),
+	})
 }
 
 func TestRepoHandler_MirrorSourceRepoAuthInvalid(t *testing.T) {
