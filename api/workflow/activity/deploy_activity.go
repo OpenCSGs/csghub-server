@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -810,6 +811,8 @@ func (a *DeployActivity) setGitEnv(ctx context.Context, envMap map[string]string
 	return nil
 }
 
+var booleanValues = []string{"false", "0", "", "disable"}
+
 func (a *DeployActivity) setEngineArgs(ctx context.Context, logger log.Logger, envMap map[string]string, deployInfo *database.Deploy, rc runtimeConfig) {
 	if len(rc.EngineArgsTemplates) == 0 {
 		return
@@ -821,21 +824,26 @@ func (a *DeployActivity) setEngineArgs(ctx context.Context, logger log.Logger, e
 		logger.Error("Deploy engine args is invalid json data", "deploy", *deployInfo, "error", err)
 	} else {
 		for _, arg := range rc.EngineArgsTemplates {
-			if value, ok := argValuesMap[arg.Name]; ok {
-				if arg.Value != "" && value == arg.Value {
+			paramValue := arg.Value
+			value, ok := argValuesMap[arg.Name]
+			if ok {
+				// use user input value if its value has changed by user
+				paramValue = value
+			}
+
+			if !strings.Contains(arg.Format, "%") {
+				// handle boolean value to do not include this arg
+				if slices.Contains(booleanValues, strings.ToLower(strings.TrimSpace(paramValue))) {
 					continue
 				}
-				// handle boolean value
-				if !strings.Contains(arg.Format, "%") {
-					if value == "false" || value == "0" || value == "" || value == "disable" {
-						continue
-					}
-					engineArgs.WriteString(" ")
-					engineArgs.WriteString(arg.Format)
-				} else {
-					engineArgs.WriteString(" ")
-					fmt.Fprintf(&engineArgs, arg.Format, value)
+				engineArgs.WriteString(" ")
+				engineArgs.WriteString(arg.Format)
+			} else {
+				if strings.TrimSpace(paramValue) == "" {
+					continue
 				}
+				engineArgs.WriteString(" ")
+				fmt.Fprintf(&engineArgs, arg.Format, paramValue)
 			}
 		}
 	}
@@ -848,7 +856,8 @@ func (a *DeployActivity) setEngineArgs(ctx context.Context, logger log.Logger, e
 		engineArgsStr = applyToolCallParser(logger, engineArgsStr, modelArch, rc.ToolCallParsers)
 	}
 
-	logger.Debug("makeDeployEnv", "ENGINE_ARGS", engineArgsStr)
+	logger.Info("makeDeployEnv", "ENGINE_ARGS", engineArgsStr, "ENGINE_ARGS.length", len(engineArgsStr),
+		"deployName", deployInfo.DeployName, "deployID", deployInfo.ID)
 	envMap["ENGINE_ARGS"] = engineArgsStr
 }
 

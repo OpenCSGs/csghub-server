@@ -1073,3 +1073,197 @@ func TestMakeDeployEnv_VariablesMerge(t *testing.T) {
 	require.Equal(t, "overridden", envMap["ENV_KEY"])
 	require.Equal(t, "var_value", envMap["VAR_KEY"])
 }
+
+func TestSetEngineArgs(t *testing.T) {
+	ctx := context.WithValue(context.Background(), "test", "test")
+	logger := slog.Default()
+
+	vllmTemplates := []types.EngineArg{
+		{Name: "enforce-eager", Value: "enable", Format: "--enforce-eager"},
+		{Name: "gpu-memory-utilization", Value: "0.8", Format: "--gpu-memory-utilization %s"},
+		{Name: "max-model-len", Value: "", Format: "--max-model-len %s"},
+		{Name: "async-scheduling", Value: "enable", Format: "--async-scheduling"},
+	}
+
+	tests := []struct {
+		name              string
+		templates         []types.EngineArg
+		deployEngineArgs  string
+		wantEngineArgs    string
+		wantEngineArgsSet bool
+	}{
+		{
+			name:              "empty templates produces no engine args",
+			templates:         nil,
+			deployEngineArgs:  `{"max-model-len":"8192"}`,
+			wantEngineArgs:    "",
+			wantEngineArgsSet: false,
+		},
+		{
+			name:              "empty user engine args uses template defaults",
+			templates:         vllmTemplates,
+			deployEngineArgs:  "",
+			wantEngineArgs:    " --enforce-eager --gpu-memory-utilization 0.8 --async-scheduling",
+			wantEngineArgsSet: true,
+		},
+		{
+			name: "empty value template default is skipped",
+			templates: []types.EngineArg{
+				{Name: "quantization", Value: "", Format: "--quantization %s"},
+			},
+			deployEngineArgs:  "",
+			wantEngineArgs:    "",
+			wantEngineArgsSet: true,
+		},
+		{
+			name: "whitespace value template default is skipped",
+			templates: []types.EngineArg{
+				{Name: "quantization", Value: " ", Format: "--quantization %s"},
+			},
+			deployEngineArgs:  "",
+			wantEngineArgs:    "",
+			wantEngineArgsSet: true,
+		},
+		{
+			name: "empty user value is skipped",
+			templates: []types.EngineArg{
+				{Name: "quantization", Value: "auto", Format: "--quantization %s"},
+			},
+			deployEngineArgs:  `{"quantization":""}`,
+			wantEngineArgs:    "",
+			wantEngineArgsSet: true,
+		},
+		{
+			name: "whitespace user value is skipped",
+			templates: []types.EngineArg{
+				{Name: "quantization", Value: "auto", Format: "--quantization %s"},
+			},
+			deployEngineArgs:  `{"quantization":" "}`,
+			wantEngineArgs:    "",
+			wantEngineArgsSet: true,
+		},
+		{
+			name:              "invalid json user engine args produces empty string",
+			templates:         vllmTemplates,
+			deployEngineArgs:  "not-json",
+			wantEngineArgs:    "",
+			wantEngineArgsSet: true,
+		},
+		{
+			name:              "value matching template default is skipped",
+			templates:         vllmTemplates,
+			deployEngineArgs:  `{"gpu-memory-utilization":"0.8"}`,
+			wantEngineArgs:    " --enforce-eager --gpu-memory-utilization 0.8 --async-scheduling",
+			wantEngineArgsSet: true,
+		},
+		{
+			name:              "boolean disable is skipped",
+			templates:         vllmTemplates,
+			deployEngineArgs:  `{"enforce-eager":"disable"}`,
+			wantEngineArgs:    " --gpu-memory-utilization 0.8 --async-scheduling",
+			wantEngineArgsSet: true,
+		},
+		{
+			name:              "boolean false is skipped",
+			templates:         vllmTemplates,
+			deployEngineArgs:  `{"enforce-eager":"false"}`,
+			wantEngineArgs:    " --gpu-memory-utilization 0.8 --async-scheduling",
+			wantEngineArgsSet: true,
+		},
+		{
+			name:              "boolean zero is skipped",
+			templates:         vllmTemplates,
+			deployEngineArgs:  `{"enforce-eager":"0"}`,
+			wantEngineArgs:    " --gpu-memory-utilization 0.8 --async-scheduling",
+			wantEngineArgsSet: true,
+		},
+		{
+			name:              "boolean empty string is skipped",
+			templates:         vllmTemplates,
+			deployEngineArgs:  `{"enforce-eager":""}`,
+			wantEngineArgs:    " --gpu-memory-utilization 0.8 --async-scheduling",
+			wantEngineArgsSet: true,
+		},
+		{
+			name:              "boolean disable is case insensitive and trimmed",
+			templates:         vllmTemplates,
+			deployEngineArgs:  `{"enforce-eager":" Disable "}`,
+			wantEngineArgs:    " --gpu-memory-utilization 0.8 --async-scheduling",
+			wantEngineArgsSet: true,
+		},
+		{
+			name:              "boolean enable is case insensitive and trimmed",
+			templates:         vllmTemplates,
+			deployEngineArgs:  `{"enforce-eager":" Enable "}`,
+			wantEngineArgs:    " --enforce-eager --gpu-memory-utilization 0.8 --async-scheduling",
+			wantEngineArgsSet: true,
+		},
+		{
+			name:              "boolean enable adds flag",
+			templates:         vllmTemplates,
+			deployEngineArgs:  `{"enforce-eager":"enable"}`,
+			wantEngineArgs:    " --enforce-eager --gpu-memory-utilization 0.8 --async-scheduling",
+			wantEngineArgsSet: true,
+		},
+		{
+			name:              "boolean true adds flag",
+			templates:         vllmTemplates,
+			deployEngineArgs:  `{"enforce-eager":"true"}`,
+			wantEngineArgs:    " --enforce-eager --gpu-memory-utilization 0.8 --async-scheduling",
+			wantEngineArgsSet: true,
+		},
+		{
+			name:              "value flag with custom value is formatted",
+			templates:         vllmTemplates,
+			deployEngineArgs:  `{"max-model-len":"8192"}`,
+			wantEngineArgs:    " --enforce-eager --gpu-memory-utilization 0.8 --max-model-len 8192 --async-scheduling",
+			wantEngineArgsSet: true,
+		},
+		{
+			name:              "value flag different from default is not skipped",
+			templates:         vllmTemplates,
+			deployEngineArgs:  `{"gpu-memory-utilization":"0.9"}`,
+			wantEngineArgs:    " --enforce-eager --gpu-memory-utilization 0.9 --async-scheduling",
+			wantEngineArgsSet: true,
+		},
+		{
+			name:              "mixed args with disabled and changed values",
+			templates:         vllmTemplates,
+			deployEngineArgs:  `{"enforce-eager":"disable","gpu-memory-utilization":"0.9","max-model-len":"4096","async-scheduling":"disable"}`,
+			wantEngineArgs:    " --gpu-memory-utilization 0.9 --max-model-len 4096",
+			wantEngineArgsSet: true,
+		},
+		{
+			name:              "user args not in templates are ignored",
+			templates:         vllmTemplates,
+			deployEngineArgs:  `{"unknown-flag":"value"}`,
+			wantEngineArgs:    " --enforce-eager --gpu-memory-utilization 0.8 --async-scheduling",
+			wantEngineArgsSet: true,
+		},
+		{
+			name:              "template default matching user enable skips flag",
+			templates:         vllmTemplates,
+			deployEngineArgs:  `{"enforce-eager":"enable","async-scheduling":"enable"}`,
+			wantEngineArgs:    " --enforce-eager --gpu-memory-utilization 0.8 --async-scheduling",
+			wantEngineArgsSet: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			activity := &DeployActivity{}
+			envMap := make(map[string]string)
+			deployInfo := &database.Deploy{EngineArgs: tt.deployEngineArgs}
+			rc := runtimeConfig{EngineArgsTemplates: tt.templates}
+
+			activity.setEngineArgs(ctx, logger, envMap, deployInfo, rc)
+
+			if tt.wantEngineArgsSet {
+				require.Contains(t, envMap, "ENGINE_ARGS")
+				require.Equal(t, tt.wantEngineArgs, envMap["ENGINE_ARGS"])
+			} else {
+				require.NotContains(t, envMap, "ENGINE_ARGS")
+			}
+		})
+	}
+}
