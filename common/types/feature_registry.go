@@ -38,7 +38,61 @@ var (
 	FeatureAuditLog = featureAuditLog
 )
 
-var featureCatalog = []FeatureDefinition{featureAuditLog}
+// CSGLite feature flags and limits.
+// CSGLite (github.com/opencsgs/csglite) verifies licenses signed by this
+// issuer with Product "CSGLite". Its keys carry a "lite." product segment so
+// they cannot collide with CSGHub's own flags in this flat namespace, and they
+// must match internal/license/features.go in the csglite repository verbatim.
+var (
+	FeatureLiteProviderPools = FeatureDefinition{
+		Key:          "feature.lite.provider_pools",
+		Type:         FeatureTypeBoolean,
+		DefaultValue: true,
+	}
+	FeatureLiteObservability = FeatureDefinition{
+		Key:          "feature.lite.observability",
+		Type:         FeatureTypeBoolean,
+		DefaultValue: true,
+	}
+	FeatureLiteRemoteAPIKeys = FeatureDefinition{
+		Key:          "feature.lite.remote_api_keys",
+		Type:         FeatureTypeBoolean,
+		DefaultValue: true,
+	}
+	FeatureLiteAIApps = FeatureDefinition{
+		Key:          "feature.lite.ai_apps",
+		Type:         FeatureTypeBoolean,
+		DefaultValue: true,
+	}
+	FeatureLiteRealtimeVoice = FeatureDefinition{
+		Key:          "feature.lite.realtime_voice",
+		Type:         FeatureTypeBoolean,
+		DefaultValue: true,
+	}
+	FeatureLiteImageGeneration = FeatureDefinition{
+		Key:          "feature.lite.image_generation",
+		Type:         FeatureTypeBoolean,
+		DefaultValue: true,
+	}
+	// QuotaLiteMaxProviderPools caps configured provider pools; 0 means unlimited.
+	QuotaLiteMaxProviderPools = FeatureDefinition{
+		Key:          "quota.lite.max_provider_pools",
+		Type:         FeatureTypeInt,
+		DefaultValue: 0,
+	}
+)
+
+var csgliteFeatureCatalog = []FeatureDefinition{
+	FeatureLiteProviderPools,
+	FeatureLiteObservability,
+	FeatureLiteRemoteAPIKeys,
+	FeatureLiteAIApps,
+	FeatureLiteRealtimeVoice,
+	FeatureLiteImageGeneration,
+	QuotaLiteMaxProviderPools,
+}
+
+var featureCatalog = append([]FeatureDefinition{featureAuditLog}, csgliteFeatureCatalog...)
 
 // FeatureDefinitions returns all registered feature flags and limits. It is
 // useful for validation, documentation generation, and SaaS license issuer UI.

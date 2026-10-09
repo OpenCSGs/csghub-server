@@ -4,5 +4,47 @@
     },
     "license.feature.audit_log.description": {
         "other": "Allow access to audit log functionality."
+    },
+    "license.feature.lite.provider_pools.name": {
+        "other": "Provider pools and semantic routing"
+    },
+    "license.feature.lite.provider_pools.description": {
+        "other": "Allow CSGLite to group third-party model providers into pools with semantic routing."
+    },
+    "license.feature.lite.observability.name": {
+        "other": "Observability"
+    },
+    "license.feature.lite.observability.description": {
+        "other": "Allow CSGLite request tracing, trace inspection and dataset export from observed requests."
+    },
+    "license.feature.lite.remote_api_keys.name": {
+        "other": "Remote API key authentication"
+    },
+    "license.feature.lite.remote_api_keys.description": {
+        "other": "Allow CSGLite to enforce API keys for remote callers and report per-key usage."
+    },
+    "license.feature.lite.ai_apps.name": {
+        "other": "AI Apps"
+    },
+    "license.feature.lite.ai_apps.description": {
+        "other": "Allow CSGLite to install and manage enterprise agent applications."
+    },
+    "license.feature.lite.realtime_voice.name": {
+        "other": "Realtime voice"
+    },
+    "license.feature.lite.realtime_voice.description": {
+        "other": "Allow the CSGLite realtime speech (ASR + TTS) API."
+    },
+    "license.feature.lite.image_generation.name": {
+        "other": "Image generation"
+    },
+    "license.feature.lite.image_generation.description": {
+        "other": "Allow CSGLite image generation and editing."
+    },
+    "license.quota.lite.max_provider_pools.name": {
+        "other": "Maximum provider pools"
+    },
+    "license.quota.lite.max_provider_pools.description": {
+        "other": "Maximum number of provider pools a CSGLite instance may configure; 0 means unlimited."
     }
 }

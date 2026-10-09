@@ -121,3 +121,39 @@ func TestParseLicenseExtra_KnownKeyInWrongSectionErrors(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "feature.audit_log")
 }
+
+func TestValidateLicenseExtraForIssue_AcceptsCSGLiteKeys(t *testing.T) {
+	extra := `{"features": {"feature.lite.observability": false, "feature.lite.ai_apps": true}, "limits": {"quota.lite.max_provider_pools": 3}}`
+	require.NoError(t, ValidateLicenseExtraForIssue(extra))
+
+	parsed, err := ParseLicenseExtra(extra)
+	require.NoError(t, err)
+	require.False(t, parsed.Features["feature.lite.observability"])
+	require.True(t, parsed.Features["feature.lite.ai_apps"])
+	require.Equal(t, 3, parsed.Limits["quota.lite.max_provider_pools"])
+}
+
+func TestValidateLicenseExtraForIssue_AcceptsUnregisteredCSGLiteKeys(t *testing.T) {
+	// CSGLite's catalog is the source of truth for the "lite." segment, so a
+	// key added there can be signed before this registry learns about it.
+	extra := `{"features": {"feature.lite.brand_new": true}, "limits": {"quota.lite.brand_new_limit": 5}}`
+	require.NoError(t, ValidateLicenseExtraForIssue(extra))
+
+	warnings, err := ValidateLicenseExtraForImport(extra)
+	require.NoError(t, err)
+	require.Empty(t, warnings)
+}
+
+func TestValidateLicenseExtraForIssue_TypeChecksUnregisteredCSGLiteKeys(t *testing.T) {
+	require.Error(t, ValidateLicenseExtraForIssue(`{"features": {"feature.lite.brand_new": "yes"}}`))
+	require.Error(t, ValidateLicenseExtraForIssue(`{"limits": {"quota.lite.brand_new": true}}`))
+	// Wrong section for the prefix is rejected even on import.
+	_, err := ValidateLicenseExtraForImport(`{"limits": {"feature.lite.brand_new": 1}}`)
+	require.Error(t, err)
+	_, err = ValidateLicenseExtraForImport(`{"features": {"quota.lite.brand_new": true}}`)
+	require.Error(t, err)
+	// A bare prefix is not a key.
+	require.Error(t, ValidateLicenseExtraForIssue(`{"features": {"feature.lite.": true}}`))
+	// Other products' unknown keys are still rejected by the issuer.
+	require.Error(t, ValidateLicenseExtraForIssue(`{"features": {"feature.hub.brand_new": true}}`))
+}

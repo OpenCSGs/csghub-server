@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+	"strings"
 )
 
 // LicenseExtra defines the structured content that can be stored in
@@ -71,9 +72,31 @@ func ParseLicenseExtra(extra string) (LicenseExtra, error) {
 	return le, nil
 }
 
+// CSGLite owns the "lite." product segment of the flag namespace. Its
+// catalog (internal/license/features.go in github.com/opencsgs/csglite) is the
+// source of truth for those keys, so the issuer accepts any well-formed key in
+// that segment without requiring it to be registered here first: the type is
+// fixed by the prefix ("feature.lite.*" is boolean, "quota.lite.*" is an
+// integer limit). Registered lite keys additionally get names in the
+// management UI.
+const (
+	csgliteFeaturePrefix = "feature.lite."
+	csgliteQuotaPrefix   = "quota.lite."
+)
+
+func isCSGLiteFeatureKey(key string) bool {
+	return len(key) > len(csgliteFeaturePrefix) && strings.HasPrefix(key, csgliteFeaturePrefix)
+}
+
+func isCSGLiteQuotaKey(key string) bool {
+	return len(key) > len(csgliteQuotaPrefix) && strings.HasPrefix(key, csgliteQuotaPrefix)
+}
+
 // ValidateLicenseExtraForIssue validates Extra before a license is signed.
 // Issuers must reject unknown fields and keys so a typo cannot produce a
 // signed license whose effective entitlements differ from the issuer input.
+// Keys in CSGLite's "lite." segment are exempt from the registration check
+// but are still type-checked by prefix.
 func ValidateLicenseExtraForIssue(extra string) error {
 	_, err := validateLicenseExtra(extra, true)
 	return err
@@ -136,6 +159,16 @@ func validateLicenseExtra(extra string, strict bool) ([]string, error) {
 		case FeatureTypeInt:
 			return nil, fmt.Errorf("feature flag %q in license extra is not a boolean feature flag", key)
 		default:
+			if isCSGLiteFeatureKey(key) {
+				var parsed bool
+				if err := json.Unmarshal(value, &parsed); err != nil {
+					return nil, fmt.Errorf("CSGLite feature flag %q in license extra is not a boolean: %w", key, err)
+				}
+				continue
+			}
+			if isCSGLiteQuotaKey(key) {
+				return nil, fmt.Errorf("CSGLite limit %q must be listed under \"limits\", not \"features\"", key)
+			}
 			if strict {
 				return nil, fmt.Errorf("unknown feature flag %q in license extra", key)
 			}
@@ -153,6 +186,16 @@ func validateLicenseExtra(extra string, strict bool) ([]string, error) {
 		case FeatureTypeBoolean:
 			return nil, fmt.Errorf("limit %q in license extra is not an integer limit", key)
 		default:
+			if isCSGLiteQuotaKey(key) {
+				var parsed int
+				if err := json.Unmarshal(value, &parsed); err != nil {
+					return nil, fmt.Errorf("CSGLite limit %q in license extra is not an integer: %w", key, err)
+				}
+				continue
+			}
+			if isCSGLiteFeatureKey(key) {
+				return nil, fmt.Errorf("CSGLite feature flag %q must be listed under \"features\", not \"limits\"", key)
+			}
 			if strict {
 				return nil, fmt.Errorf("unknown limit %q in license extra", key)
 			}
