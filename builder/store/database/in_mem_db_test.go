@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"opencsg.com/csghub-server/common/types"
 )
 
 func TestInitInMemoryDB(t *testing.T) {
@@ -122,6 +123,13 @@ func TestCreateTables(t *testing.T) {
 				isUnique:    false,
 				description: "index on ArgoWorkflow (username, task_id)",
 			},
+			{
+				name:        "unique_argo_workflow_taskid",
+				tableName:   "argo_workflows",
+				columns:     []string{"task_id"},
+				isUnique:    true,
+				description: "unique index on ArgoWorkflow (task_id)",
+			},
 		}
 
 		// Query SQLite system table to get index information
@@ -150,7 +158,11 @@ func TestCreateTables(t *testing.T) {
 							err = db.BunDB.NewRaw("EXPLAIN QUERY PLAN SELECT * FROM image_builder_works WHERE build_id = ?", "test").Scan(ctx, &queryResult)
 						}
 					case "argo_workflows":
-						err = db.BunDB.NewRaw("EXPLAIN QUERY PLAN SELECT * FROM argo_workflows WHERE username = ? AND task_id = ?", "test", "test").Scan(ctx, &queryResult)
+						if expectedIndex.name == "idx_workflow_user_uuid" {
+							err = db.BunDB.NewRaw("EXPLAIN QUERY PLAN SELECT * FROM argo_workflows WHERE username = ? AND task_id = ?", "test", "test").Scan(ctx, &queryResult)
+						} else {
+							err = db.BunDB.NewRaw("EXPLAIN QUERY PLAN SELECT * FROM argo_workflows WHERE task_id = ?", "test").Scan(ctx, &queryResult)
+						}
 					}
 					assert.NoError(t, err, "should be able to explain query plan for index %s", expectedIndex.name)
 				}
@@ -198,6 +210,24 @@ func TestCreateTables(t *testing.T) {
 			}
 			_, err = db.BunDB.NewInsert().Model(log2).On("CONFLICT(cluster_id, svc_name, pod_name) DO UPDATE").Set("deploy_id = EXCLUDED.deploy_id").Exec(ctx)
 			assert.NoError(t, err, "should handle conflict on unique index for DeployLog")
+
+			workflow1 := &ArgoWorkflow{
+				Username: "test-user",
+				TaskName: "test-task",
+				TaskId:   "test-task-id",
+				TaskType: types.TaskTypeEvaluation,
+			}
+			_, err = db.BunDB.NewInsert().Model(workflow1).Exec(ctx)
+			assert.NoError(t, err, "should be able to insert first ArgoWorkflow")
+
+			workflow2 := &ArgoWorkflow{
+				Username: "test-user",
+				TaskName: "duplicate-task",
+				TaskId:   "test-task-id",
+				TaskType: types.TaskTypeEvaluation,
+			}
+			_, err = db.BunDB.NewInsert().Model(workflow2).On("CONFLICT(task_id) DO NOTHING").Exec(ctx)
+			assert.NoError(t, err, "should handle conflict on unique index for ArgoWorkflow")
 		})
 	})
 }
