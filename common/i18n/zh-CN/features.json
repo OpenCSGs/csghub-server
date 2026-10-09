@@ -4,5 +4,47 @@
     },
     "license.feature.audit_log.description": {
         "other": "允许访问审计日志功能。"
+    },
+    "license.feature.lite.provider_pools.name": {
+        "other": "Provider 池与语义路由"
+    },
+    "license.feature.lite.provider_pools.description": {
+        "other": "允许 CSGLite 将第三方模型 Provider 组成池并启用语义路由。"
+    },
+    "license.feature.lite.observability.name": {
+        "other": "可观测性"
+    },
+    "license.feature.lite.observability.description": {
+        "other": "允许 CSGLite 记录请求追踪、查看 Trace 并从请求记录导出数据集。"
+    },
+    "license.feature.lite.remote_api_keys.name": {
+        "other": "远程 API Key 鉴权"
+    },
+    "license.feature.lite.remote_api_keys.description": {
+        "other": "允许 CSGLite 对远程调用强制 API Key 鉴权并统计每个 Key 的用量。"
+    },
+    "license.feature.lite.ai_apps.name": {
+        "other": "AI 应用"
+    },
+    "license.feature.lite.ai_apps.description": {
+        "other": "允许 CSGLite 安装和管理企业 Agent 应用。"
+    },
+    "license.feature.lite.realtime_voice.name": {
+        "other": "实时语音"
+    },
+    "license.feature.lite.realtime_voice.description": {
+        "other": "允许 CSGLite 的实时语音（ASR + TTS）接口。"
+    },
+    "license.feature.lite.image_generation.name": {
+        "other": "图像生成"
+    },
+    "license.feature.lite.image_generation.description": {
+        "other": "允许 CSGLite 的图像生成与编辑功能。"
+    },
+    "license.quota.lite.max_provider_pools.name": {
+        "other": "Provider 池数量上限"
+    },
+    "license.quota.lite.max_provider_pools.description": {
+        "other": "单个 CSGLite 实例可配置的 Provider 池数量上限，0 表示不限。"
     }
 }

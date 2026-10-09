@@ -1,6 +1,7 @@
 package types
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -10,7 +11,20 @@ import (
 func TestFeatureCatalogIsValid(t *testing.T) {
 	definitions := FeatureDefinitions()
 	require.NoError(t, ValidateFeatureCatalog(definitions))
-	require.Equal(t, []FeatureDefinition{FeatureAuditLog}, definitions)
+	require.Equal(t, append([]FeatureDefinition{FeatureAuditLog}, csgliteFeatureCatalog...), definitions)
+}
+
+func TestCSGLiteFeatureCatalogUsesProductNamespace(t *testing.T) {
+	require.Len(t, csgliteFeatureCatalog, 7)
+	for _, def := range csgliteFeatureCatalog {
+		switch def.Type {
+		case FeatureTypeBoolean:
+			require.True(t, strings.HasPrefix(def.Key, "feature.lite."), "%s must use the feature.lite.* namespace", def.Key)
+		case FeatureTypeInt:
+			require.True(t, strings.HasPrefix(def.Key, "quota.lite."), "%s must use the quota.lite.* namespace", def.Key)
+		}
+		require.NoError(t, ValidateRegisteredDefinition(def))
+	}
 }
 
 func TestFeatureCatalogTranslations(t *testing.T) {
