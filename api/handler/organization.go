@@ -397,7 +397,7 @@ func (h *OrganizationHandler) MCPServers(ctx *gin.Context) {
 // GetOrganizationFinetunes godoc
 // @Security     ApiKey
 // @Summary      Get organization finetune instances
-// @Description  get organization finetune instances
+// @Description  get organization finetune instances; returns an empty list when access is denied.
 // @Tags         Organization
 // @Accept       json
 // @Produce      json
@@ -406,7 +406,6 @@ func (h *OrganizationHandler) MCPServers(ctx *gin.Context) {
 // @Param        page query int false "current page number"
 // @Success      200  {object}  types.ResponseWithTotal{data=[]types.ArgoWorkFlowRes,total=int} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
-// @Failure      403  {object}  types.APIForbidden "Forbidden"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /organization/{namespace}/finetune/instances [get]
 func (h *OrganizationHandler) FinetuneInstances(ctx *gin.Context) {
@@ -424,11 +423,11 @@ func (h *OrganizationHandler) FinetuneInstances(ctx *gin.Context) {
 	req.PageSize = per
 	data, total, err := h.finetune.OrgFinetuneInstances(ctx.Request.Context(), &req)
 	if err != nil {
-		slog.ErrorContext(ctx.Request.Context(), "Failed to get org finetunes", slog.Any("error", err))
 		if errors.Is(err, errorx.ErrForbidden) {
-			httpbase.ForbiddenError(ctx, err)
+			httpbase.OK(ctx, gin.H{"data": []types.DeployRequest{}, "total": 0})
 			return
 		}
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get org finetunes", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -484,7 +483,7 @@ func (h *OrganizationHandler) FinetuneJobs(ctx *gin.Context) {
 // GetOrganizationEvaluations godoc
 // @Security     ApiKey
 // @Summary      Get organization evaluation jobs
-// @Description  get organization evaluation jobs
+// @Description  get organization evaluation jobs; returns an empty list when access is denied.
 // @Tags         Organization
 // @Accept       json
 // @Produce      json
@@ -493,7 +492,6 @@ func (h *OrganizationHandler) FinetuneJobs(ctx *gin.Context) {
 // @Param        page query int false "current page number"
 // @Success      200  {object}  types.ResponseWithTotal{data=[]types.ArgoWorkFlowRes,total=int} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
-// @Failure      403  {object}  types.APIForbidden "Forbidden"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /organization/{namespace}/evaluations [get]
 func (h *OrganizationHandler) Evaluations(ctx *gin.Context) {
@@ -511,11 +509,11 @@ func (h *OrganizationHandler) Evaluations(ctx *gin.Context) {
 	req.PageSize = per
 	data, total, err := h.evaluation.OrgEvaluations(ctx.Request.Context(), &req)
 	if err != nil {
-		slog.ErrorContext(ctx.Request.Context(), "Failed to get org evaluations", slog.Any("error", err))
 		if errors.Is(err, errorx.ErrForbidden) {
-			httpbase.ForbiddenError(ctx, err)
+			httpbase.OK(ctx, gin.H{"data": []types.ArgoWorkFlowRes{}, "total": 0})
 			return
 		}
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get org evaluations", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -530,7 +528,7 @@ func (h *OrganizationHandler) Evaluations(ctx *gin.Context) {
 // RunDeploys godoc
 // @Security     ApiKey
 // @Summary      Get organization run deploys (e.g. inference)
-// @Description  get organization run deploys by deploy type (0-space, 1-inference, 2-finetune)
+// @Description  get organization run deploys by deploy type (0-space, 1-inference, 2-finetune); returns an empty list when access is denied.
 // @Tags         Organization
 // @Accept       json
 // @Produce      json
@@ -541,7 +539,6 @@ func (h *OrganizationHandler) Evaluations(ctx *gin.Context) {
 // @Param        page query int false "current page number"
 // @Success      200  {object}  types.ResponseWithTotal{data=[]types.DeployRequest,total=int} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
-// @Failure      403  {object}  types.APIForbidden "Forbidden"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /organization/{namespace}/run/{repo_type} [get]
 func (h *OrganizationHandler) RunDeploys(ctx *gin.Context) {
@@ -576,11 +573,11 @@ func (h *OrganizationHandler) RunDeploys(ctx *gin.Context) {
 	req.DeployType = deployType
 	data, total, err := h.user.ListDeploysByNamespace(ctx.Request.Context(), &req)
 	if err != nil {
-		slog.ErrorContext(ctx.Request.Context(), "Failed to get org run deploys", slog.Any("error", err))
 		if errors.Is(err, errorx.ErrForbidden) {
-			httpbase.ForbiddenError(ctx, err)
+			httpbase.OK(ctx, gin.H{"data": []types.DeployRequest{}, "total": 0})
 			return
 		}
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get org run deploys", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -594,7 +591,7 @@ func (h *OrganizationHandler) RunDeploys(ctx *gin.Context) {
 // Notebooks godoc
 // @Security     ApiKey
 // @Summary      Get organization notebooks
-// @Description  get organization notebooks
+// @Description  get organization notebooks; returns an empty list when access is denied.
 // @Tags         Organization
 // @Accept       json
 // @Produce      json
@@ -603,7 +600,6 @@ func (h *OrganizationHandler) RunDeploys(ctx *gin.Context) {
 // @Param        page query int false "current page number"
 // @Success      200  {object}  types.ResponseWithTotal{data=[]types.NotebookRes,total=int} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
-// @Failure      403  {object}  types.APIForbidden "Forbidden"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /organization/{namespace}/notebooks [get]
 func (h *OrganizationHandler) Notebooks(ctx *gin.Context) {
@@ -620,11 +616,11 @@ func (h *OrganizationHandler) Notebooks(ctx *gin.Context) {
 	req.PageSize = per
 	data, total, err := h.user.ListNotebooksByNamespace(ctx.Request.Context(), &req)
 	if err != nil {
-		slog.ErrorContext(ctx.Request.Context(), "Failed to get org notebooks", slog.Any("error", err))
 		if errors.Is(err, errorx.ErrForbidden) {
-			httpbase.ForbiddenError(ctx, err)
+			httpbase.OK(ctx, gin.H{"data": []types.NotebookRes{}, "total": 0})
 			return
 		}
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get org notebooks", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
