@@ -100,6 +100,37 @@ func TestArgoWorkflowStore_CRUD(t *testing.T) {
 
 }
 
+func TestArgoWorkflowStore_CreateWorkFlow_Conflict(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewArgoWorkFlowStoreWithDB(db)
+	existing := database.ArgoWorkflow{
+		Username:   "user",
+		Namespace:  "ns",
+		TaskName:   "task",
+		TaskId:     "conflict-tid",
+		TaskType:   types.TaskTypeEvaluation,
+		SubmitTime: time.Date(2022, 1, 1, 1, 1, 0, 0, time.UTC),
+	}
+	_, err := db.Core.NewInsert().Model(&existing).Exec(ctx, &existing)
+	require.Nil(t, err)
+
+	duplicate := existing
+	duplicate.TaskName = "duplicate-task"
+	result, err := store.CreateWorkFlow(ctx, duplicate)
+	require.Nil(t, err)
+	require.Equal(t, existing.ID, result.ID)
+	require.Equal(t, existing.TaskName, result.TaskName)
+
+	flows := []database.ArgoWorkflow{}
+	err = db.Core.NewSelect().Model(&flows).Where("task_id = ?", existing.TaskId).Scan(ctx)
+	require.Nil(t, err)
+	require.Len(t, flows, 1)
+	require.Equal(t, existing.TaskName, flows[0].TaskName)
+}
+
 func TestArgoWorkflowStore_GetClusterWorkflows(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
