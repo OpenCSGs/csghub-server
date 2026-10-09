@@ -105,6 +105,7 @@ func (w *webHookComponentImpl) DispatchWebHookEvent() error {
 		Topics:   []string{WebHookEventRunnerSubject},
 		AutoACK:  true,
 		Callback: w.dispatchMsgWithRetry,
+		MaxAge:   time.Duration(w.cfg.StreamMaxAgeSeconds) * time.Second,
 	})
 
 	if err != nil {

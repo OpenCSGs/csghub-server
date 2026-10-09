@@ -25,13 +25,19 @@ func NewTestConsumerMetering(
 	config *config.Config,
 	mq bldmq.MessageQueue) Metering {
 	meter := &MeteringImpl{
-		meterComp:      meterComp,
-		acctEvtComp:    acctEvtComp,
-		chargingEnable: config.Accounting.ChargingEnable,
-		bldMQ:          mq,
-		retryLimit:     config.Accounting.RetryLimit,
+		meterComp:   meterComp,
+		acctEvtComp: acctEvtComp,
+		bldMQ:       mq,
+		config:      config,
 	}
 	return meter
+}
+
+func newTestMeteringConfig(chargingEnable bool) *config.Config {
+	cfg := &config.Config{}
+	cfg.Accounting.RetryLimit = 3
+	cfg.Accounting.ChargingEnable = chargingEnable
+	return cfg
 }
 
 func createTestMeteringEvent() *types.MeteringEvent {
@@ -411,11 +417,10 @@ func TestMeteringImpl_HandleMsgWithRetry_Success(t *testing.T) {
 	mockAcctEvtComp := mockacct.NewMockAccountingEventComponent(t)
 	mockMQ := mockmq.NewMockMessageQueue(t)
 	metering := &MeteringImpl{
-		meterComp:      mockMeterComp,
-		acctEvtComp:    mockAcctEvtComp,
-		chargingEnable: true,
-		bldMQ:          mockMQ,
-		retryLimit:     1,
+		meterComp:   mockMeterComp,
+		acctEvtComp: mockAcctEvtComp,
+		bldMQ:       mockMQ,
+		config:      newTestMeteringConfig(true),
 	}
 
 	event := createTestMeteringEvent()
@@ -440,11 +445,10 @@ func TestMeteringImpl_HandleMsgWithRetry_ParseError(t *testing.T) {
 	mockAcctEvtComp := mockacct.NewMockAccountingEventComponent(t)
 	mockMQ := mockmq.NewMockMessageQueue(t)
 	metering := &MeteringImpl{
-		meterComp:      mockMeterComp,
-		acctEvtComp:    mockAcctEvtComp,
-		chargingEnable: true,
-		bldMQ:          mockMQ,
-		retryLimit:     1,
+		meterComp:   mockMeterComp,
+		acctEvtComp: mockAcctEvtComp,
+		bldMQ:       mockMQ,
+		config:      newTestMeteringConfig(true),
 	}
 
 	invalidData := []byte(`{invalid json`)
@@ -464,11 +468,10 @@ func TestMeteringImpl_HandleMsgWithRetry_ChargingDisabled(t *testing.T) {
 	mockAcctEvtComp := mockacct.NewMockAccountingEventComponent(t)
 	mockMQ := mockmq.NewMockMessageQueue(t)
 	metering := &MeteringImpl{
-		meterComp:      mockMeterComp,
-		acctEvtComp:    mockAcctEvtComp,
-		chargingEnable: false,
-		bldMQ:          mockMQ,
-		retryLimit:     1,
+		meterComp:   mockMeterComp,
+		acctEvtComp: mockAcctEvtComp,
+		bldMQ:       mockMQ,
+		config:      newTestMeteringConfig(false),
 	}
 
 	event := createTestMeteringEvent()
@@ -492,11 +495,10 @@ func TestMeteringImpl_HandleMsgWithRetry_HandleFailed(t *testing.T) {
 	mockAcctEvtComp := mockacct.NewMockAccountingEventComponent(t)
 	mockMQ := mockmq.NewMockMessageQueue(t)
 	metering := &MeteringImpl{
-		meterComp:      mockMeterComp,
-		acctEvtComp:    mockAcctEvtComp,
-		chargingEnable: true,
-		bldMQ:          mockMQ,
-		retryLimit:     1,
+		meterComp:   mockMeterComp,
+		acctEvtComp: mockAcctEvtComp,
+		bldMQ:       mockMQ,
+		config:      newTestMeteringConfig(true),
 	}
 
 	event := createTestMeteringEvent()
@@ -506,9 +508,9 @@ func TestMeteringImpl_HandleMsgWithRetry_HandleFailed(t *testing.T) {
 	}
 	testErr := errors.New("handle error")
 
-	mockMeterComp.EXPECT().GetMeteringByEventUUID(mock.Anything, mock.Anything).Return(nil, nil)
-	mockMeterComp.EXPECT().FindMeteringByCustomerIDAndRecordAtInMin(mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
-	mockAcctEvtComp.EXPECT().AddNewAccountingEvent(mock.Anything, mock.Anything, mock.Anything).Return(testErr)
+	mockMeterComp.EXPECT().GetMeteringByEventUUID(mock.Anything, mock.Anything).Return(nil, nil).Times(3)
+	mockMeterComp.EXPECT().FindMeteringByCustomerIDAndRecordAtInMin(mock.Anything, mock.Anything, mock.Anything).Return(nil, nil).Times(3)
+	mockAcctEvtComp.EXPECT().AddNewAccountingEvent(mock.Anything, mock.Anything, mock.Anything).Return(testErr).Times(3)
 	mockMQ.EXPECT().Publish(bldmq.DLQMeterSubject, data).Return(nil)
 
 	err := metering.handleMsgWithRetry(data, meta)
@@ -521,11 +523,10 @@ func TestMeteringImpl_HandleMsgWithRetry_PubFeeFailed(t *testing.T) {
 	mockAcctEvtComp := mockacct.NewMockAccountingEventComponent(t)
 	mockMQ := mockmq.NewMockMessageQueue(t)
 	metering := &MeteringImpl{
-		meterComp:      mockMeterComp,
-		acctEvtComp:    mockAcctEvtComp,
-		chargingEnable: true,
-		bldMQ:          mockMQ,
-		retryLimit:     3,
+		meterComp:   mockMeterComp,
+		acctEvtComp: mockAcctEvtComp,
+		bldMQ:       mockMQ,
+		config:      newTestMeteringConfig(true),
 	}
 
 	event := createTestMeteringEvent()

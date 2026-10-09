@@ -29,6 +29,7 @@ type activityLogComponentImpl struct {
 	logCh       chan *database.ActivityLog
 	logBuffer   []database.ActivityLog
 	flushTicker *time.Ticker
+	config      *config.Config
 }
 
 var defaultActivityLogComponent ActivityLogComponent
@@ -49,6 +50,7 @@ func NewActivityLogComponent(config *config.Config, mqFactory bldmq.MessageQueue
 		logCh:       make(chan *database.ActivityLog, 200),
 		logBuffer:   make([]database.ActivityLog, 0, activityLogBatchSize),
 		flushTicker: time.NewTicker(activityLogFlushInterval),
+		config:      config,
 	}
 
 	go c.runBatchWriter()
@@ -70,6 +72,7 @@ func (c *activityLogComponentImpl) StartConsuming() error {
 		Topics:   []string{bldmq.ActivityLogSendSubject},
 		AutoACK:  true,
 		Callback: c.handleActivityLogMsg,
+		MaxAge:   time.Duration(c.config.StreamMaxAgeSeconds) * time.Second,
 	})
 }
 

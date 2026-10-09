@@ -22,11 +22,10 @@ type Metering interface {
 }
 
 type MeteringImpl struct {
-	meterComp      component.MeteringComponent
-	acctEvtComp    component.AccountingEventComponent
-	chargingEnable bool
-	bldMQ          bldmq.MessageQueue
-	retryLimit     int
+	meterComp   component.MeteringComponent
+	acctEvtComp component.AccountingEventComponent
+	bldMQ       bldmq.MessageQueue
+	config      *config.Config
 }
 
 func NewMetering(config *config.Config, mqFactory bldmq.MessageQueueFactory) (Metering, error) {
@@ -35,11 +34,10 @@ func NewMetering(config *config.Config, mqFactory bldmq.MessageQueueFactory) (Me
 		return nil, fmt.Errorf("failed to get message queue factory instance error: %w", err)
 	}
 	meter := &MeteringImpl{
-		meterComp:      component.NewMeteringComponent(),
-		acctEvtComp:    component.NewAccountingEventComponent(),
-		chargingEnable: config.Accounting.ChargingEnable,
-		bldMQ:          mq,
-		retryLimit:     config.Accounting.RetryLimit,
+		meterComp:   component.NewMeteringComponent(),
+		acctEvtComp: component.NewAccountingEventComponent(),
+		bldMQ:       mq,
+		config:      config,
 	}
 	return meter, nil
 }
@@ -52,9 +50,9 @@ func (m *MeteringImpl) Run() {
 			bldmq.MeterTokenSendSubject,
 			bldmq.MeterQuotaSendSubject,
 		},
-		MaxAge:   time.Duration(24*7) * time.Hour,
 		AutoACK:  true,
 		Callback: m.handleMsgWithRetry,
+		MaxAge:   time.Duration(m.config.StreamMaxAgeSeconds) * time.Second,
 	})
 	if err != nil {
 		slog.Error("failed to subscribe metering event", slog.Any("error", err))
@@ -68,7 +66,7 @@ func (m *MeteringImpl) handleMsgWithRetry(raw []byte, meta bldmq.MessageMeta) er
 	strData := string(raw)
 	slog.DebugContext(ctx, "Meter->received", slog.Any("msg.subject", meta.Topic), slog.Any("msg.data", strData))
 	// A maximum of 3 attempts
-	retryLimit := m.retryLimit
+	retryLimit := m.config.Accounting.RetryLimit
 	var (
 		err error                = nil
 		evt *types.MeteringEvent = nil
@@ -92,7 +90,7 @@ func (m *MeteringImpl) handleMsgWithRetry(raw []byte, meta bldmq.MessageMeta) er
 		return err
 	}
 
-	if m.chargingEnable {
+	if m.config.Accounting.ChargingEnable {
 		err = m.pubFeeEventWithReTry(raw, evt, retryLimit)
 		if err != nil {
 			tip := fmt.Sprintf("failed to pub fee event msg with %d retries in metering consumer", retryLimit)
