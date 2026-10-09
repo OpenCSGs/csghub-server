@@ -419,12 +419,10 @@ type AccountInvoiceRecharge struct {
 // InvoicableRechargeFilter selects the paid recharges of a user that are not
 // invoiced yet.
 type InvoicableRechargeFilter struct {
-	UserUUID   string
-	OrderNos   []string
-	StartMonth string // inclusive, format "YYYY-MM"
-	EndMonth   string // exclusive, format "YYYY-MM"
-	Page       int
-	PageSize   int
+	UserUUID string
+	OrderNos []string
+	Page     int
+	PageSize int
 }
 
 // invoicableRechargeQuery builds the base query for paid recharges that are not
@@ -438,12 +436,6 @@ func invoicableRechargeQuery(idb bun.IDB, params InvoicableRechargeFilter) *bun.
 		Where("NOT EXISTS (SELECT 1 FROM account_invoice_recharges AS air JOIN account_invoices AS ai ON ai.id = air.invoice_id WHERE air.recharge_uuid = account_recharge.recharge_uuid AND ai.status != ?)", InvoiceStatusFailed)
 	if len(params.OrderNos) > 0 {
 		query = query.Where("order_no IN (?)", bun.In(params.OrderNos))
-	}
-	if params.StartMonth != "" {
-		query = query.Where("time_succeeded >= ?", params.StartMonth+"-01")
-	}
-	if params.EndMonth != "" {
-		query = query.Where("time_succeeded < ?", params.EndMonth+"-01")
 	}
 	return query
 }
@@ -505,25 +497,19 @@ func (a *accountInvoiceImpl) ListInvoiceRechargesByInvoiceIDs(ctx context.Contex
 
 // BillingSummary defines the structure of the billing summary result.
 type BillingSummary struct {
-	CurrentMonthNonInvoicable float64 `json:"current_month_non_invoicable"`
-	InvoicedAmount            float64 `json:"invoiced_amount"`
-	UninvoicedAmount          float64 `json:"uninvoiced_amount"`
+	InvoicedAmount   float64 `json:"invoiced_amount"`
+	UninvoicedAmount float64 `json:"uninvoiced_amount"`
 }
 
 type BillingSummaryParams struct {
-	UserUUID   string
-	StartMonth string
-	EndMonth   string
+	UserUUID string
 }
 
 func (a *accountInvoiceImpl) GetBillingSummary(ctx context.Context, params BillingSummaryParams) (*BillingSummary, error) {
-	// Sum the paid recharges in the range that are not attached to a
-	// non-failed invoice. Current-month recharges are invoicable right away,
-	// so there is no non-invoicable amount anymore.
+	// Sum the paid recharges that are not attached to a non-failed invoice.
+	// Recharges are invoicable right away, so the summary covers all time.
 	invoicableFilter := InvoicableRechargeFilter{
-		UserUUID:   params.UserUUID,
-		StartMonth: params.StartMonth,
-		EndMonth:   params.EndMonth,
+		UserUUID: params.UserUUID,
 	}
 	var uninvoicedCents int64
 	err := invoicableRechargeQuery(a.db.Core, invoicableFilter).
@@ -533,30 +519,31 @@ func (a *accountInvoiceImpl) GetBillingSummary(ctx context.Context, params Billi
 		return nil, fmt.Errorf("sum uninvoiced recharge amount for user %s, error: %w", params.UserUUID, err)
 	}
 
-	// Sum the invoices applied within the range, excluding failed ones.
-	// apply_time covers both legacy bill-cycle invoices and recharge-based ones.
-	invoiceQuery := a.db.Core.NewSelect().
-		Model((*AccountInvoice)(nil)).
-		ColumnExpr("COALESCE(SUM(invoice_amount), 0)").
-		Where("user_uuid = ?", params.UserUUID).
-		Where("status != ?", InvoiceStatusFailed)
-	if params.StartMonth != "" {
-		invoiceQuery = invoiceQuery.Where("apply_time >= ?", params.StartMonth+"-01")
-	}
-	if params.EndMonth != "" {
-		invoiceQuery = invoiceQuery.Where("apply_time < ?", params.EndMonth+"-01")
-	}
-
-	var invoicedAmount float64
-	err = invoiceQuery.Scan(ctx, &invoicedAmount)
+	// Sum all invoices of the user, excluding failed ones. invoice_amount is
+	// stored in yuan.
+	invoicedAmount, err := a.sumInvoicedAmount(ctx, params.UserUUID)
 	if err != nil {
-		return nil, fmt.Errorf("sum invoiced amount for user %s, error: %w", params.UserUUID, err)
+		return nil, err
 	}
 
 	return &BillingSummary{
 		InvoicedAmount:   invoicedAmount,
 		UninvoicedAmount: float64(uninvoicedCents) / 100.0,
 	}, nil
+}
+
+func (a *accountInvoiceImpl) sumInvoicedAmount(ctx context.Context, userUUID string) (float64, error) {
+	var invoicedAmount float64
+	err := a.db.Core.NewSelect().
+		Model((*AccountInvoice)(nil)).
+		ColumnExpr("COALESCE(SUM(invoice_amount), 0)").
+		Where("user_uuid = ?", userUUID).
+		Where("status != ?", InvoiceStatusFailed).
+		Scan(ctx, &invoicedAmount)
+	if err != nil {
+		return 0, fmt.Errorf("sum invoiced amount for user %s, error: %w", userUUID, err)
+	}
+	return invoicedAmount, nil
 }
 
 func (a *accountInvoiceImpl) DeleteInvoice(ctx context.Context, id int64) error {

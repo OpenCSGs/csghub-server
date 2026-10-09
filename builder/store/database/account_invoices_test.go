@@ -392,18 +392,6 @@ func TestGetInvoicableRecharges(t *testing.T) {
 		require.Equal(t, "order-r-paid", rows[0].OrderNo)
 	})
 
-	t.Run("Filter by month range", func(t *testing.T) {
-		rows, count, err := invoiceStore.GetInvoicableRecharges(ctx, database.InvoicableRechargeFilter{
-			UserUUID:   "test-user",
-			StartMonth: "2024-04",
-			EndMonth:   "2024-05",
-		})
-		require.Nil(t, err)
-		require.Equal(t, 1, count)
-		require.Len(t, rows, 1)
-		require.Equal(t, "order-r-failed", rows[0].OrderNo)
-	})
-
 	t.Run("Paginate", func(t *testing.T) {
 		rows, count, err := invoiceStore.GetInvoicableRecharges(ctx, database.InvoicableRechargeFilter{
 			UserUUID: "test-user",
@@ -414,6 +402,59 @@ func TestGetInvoicableRecharges(t *testing.T) {
 		require.Equal(t, 2, count)
 		require.Len(t, rows, 1)
 	})
+}
+
+func TestGetBillingSummary(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	invoiceStore := database.NewAccountInvoiceStoreWithDB(db)
+	rechargeStore := database.NewAccountRechargeStoreWithDB(db)
+
+	// paid recharges without an invoice: 100 + 250 = 350 yuan uninvoiced
+	paid1 := createTestRecharge("r-sum-paid1")
+	paid2 := createTestRecharge("r-sum-paid2")
+	paid2.Amount = 25000
+	// excluded from the uninvoiced sum: unpaid, closed, the one attached to the
+	// issued invoice, and another user's recharge. The recharge attached to the
+	// failed invoice is released and still counts: 100 + 250 + 100 = 450 yuan.
+	unpaid := createTestRecharge("r-sum-unpaid")
+	unpaid.Succeeded = false
+	closed := createTestRecharge("r-sum-closed")
+	closed.Closed = true
+	onFailedInvoice := createTestRecharge("r-sum-failedinv")
+	otherUser := createTestRecharge("r-sum-other")
+	otherUser.UserUUID = "other-user"
+	recharges := []*database.AccountRecharge{paid1, paid2, unpaid, closed, onFailedInvoice, otherUser}
+	for _, recharge := range recharges {
+		require.Nil(t, rechargeStore.CreateRecharge(ctx, recharge))
+	}
+
+	// issued invoice of 100 yuan keeps its recharge out of the uninvoiced sum
+	invoicedRecharge := createTestRecharge("r-sum-invoiced")
+	require.Nil(t, rechargeStore.CreateRecharge(ctx, invoicedRecharge))
+	issued := createTestInvoice()
+	issued.Status = database.InvoiceStatusIssued
+	issued.BillCycle = ""
+	require.Nil(t, invoiceStore.CreateInvoiceWithRecharges(ctx, issued, []*database.AccountRecharge{invoicedRecharge}))
+
+	// failed invoices are excluded from the invoiced sum
+	failed := createTestInvoice()
+	failed.Status = database.InvoiceStatusFailed
+	failed.InvoiceAmount = 50.0
+	failed.BillCycle = ""
+	require.Nil(t, invoiceStore.CreateInvoiceWithRecharges(ctx, failed, []*database.AccountRecharge{onFailedInvoice}))
+
+	summary, err := invoiceStore.GetBillingSummary(ctx, database.BillingSummaryParams{UserUUID: "test-user"})
+	require.Nil(t, err)
+	require.Equal(t, 450.0, summary.UninvoicedAmount)
+	require.Equal(t, 100.0, summary.InvoicedAmount)
+
+	otherSummary, err := invoiceStore.GetBillingSummary(ctx, database.BillingSummaryParams{UserUUID: "other-user"})
+	require.Nil(t, err)
+	require.Equal(t, 100.0, otherSummary.UninvoicedAmount)
+	require.Equal(t, 0.0, otherSummary.InvoicedAmount)
 }
 
 func TestListInvoiceRechargesByInvoiceIDs(t *testing.T) {
