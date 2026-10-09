@@ -41,6 +41,12 @@ type RequestMetadata struct {
 	// whose original upstream must be reused.  All other protocols leave
 	// this as zero.
 	RequiredUpstreamID int64
+	// QueueWaitMs accumulates the time spent waiting in upstream admission
+	// reservation queues across ALL plan rounds (including re-plans after a
+	// reroute). The Planner fills it; the Orchestrator copies it onto the
+	// RequestMetrics after the Plan phase so it lands in the per-request
+	// metrics event.
+	QueueWaitMs int64
 }
 
 // PromptTextProvider is implemented by protocol-specific request types that

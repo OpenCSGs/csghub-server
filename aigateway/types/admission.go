@@ -144,6 +144,12 @@ type AdmissionDecision struct {
 	Action AdmissionAction
 	// Reason is a rejection reason constant; empty when admitted.
 	Reason string
+	// QueueWaitMs is the time this request spent waiting in the upstream's
+	// admission reservation queue during THIS admission check, in
+	// milliseconds. 0 when the request was admitted (or rejected) without
+	// queueing. Callers that re-plan after a reroute accumulate the wait
+	// across rounds themselves.
+	QueueWaitMs int64
 	// RetryAfterSeconds is a retry hint for rejected requests. It is NOT a
 	// capacity guarantee: for RPM/TPM it is the seconds until the current
 	// window ends; for concurrency it is a configured hint.

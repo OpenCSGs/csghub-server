@@ -412,3 +412,48 @@ func TestPlan_QueueReroute_Exhausted_RendersModelUnavailable(t *testing.T) {
 	// Initial plan + exactly queueMaxRePlans re-plans.
 	require.Equal(t, 3, admission.calls)
 }
+
+func TestPlan_QueueWaitAccumulatesAcrossRePlans(t *testing.T) {
+	// The per-request metrics event must carry the TOTAL queue wait: each
+	// admission round's QueueWaitMs is accumulated onto the metadata,
+	// including rounds that ended in a reroute.
+	safety := &recordingSafetyChecker{}
+	resolver := &mockModelResolver{target: admissionPlanTestTarget()}
+	admission := &waitRerouteAdmissionChecker{}
+	p := NewPlanner(
+		PlannerDeps{
+			ModelResolver:    resolver,
+			BalanceChecker:   &mockBalanceChecker{},
+			ContentSafety:    safety,
+			AdmissionChecker: admission,
+			MetricsEnricher:  nil,
+		},
+		WithQueueMaxRePlans(2),
+	)
+
+	meta := &types.RequestMetadata{
+		Protocol: string(types.ProtocolMessages),
+		Task:     "messages",
+		Model:    "test-model",
+		TenantID: "ns-123",
+	}
+
+	_, err := p.Plan(newTestGinContext(), meta)
+	require.Error(t, err)
+	// 3 rounds × 500 ms each.
+	require.Equal(t, int64(1500), meta.QueueWaitMs)
+}
+
+// waitRerouteAdmissionChecker always reroutes and reports a 500 ms queue wait
+// per round.
+type waitRerouteAdmissionChecker struct {
+	calls int
+}
+
+func (m *waitRerouteAdmissionChecker) CheckAdmission(_ context.Context, _ *types.RequestMetadata, _ *types.ModelTarget) (*types.AdmissionOutcome, error) {
+	m.calls++
+	return &types.AdmissionOutcome{Decision: &types.AdmissionDecision{
+		Action:      types.AdmissionReroute,
+		QueueWaitMs: 500,
+	}}, nil
+}

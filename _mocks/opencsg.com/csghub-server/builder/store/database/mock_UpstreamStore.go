@@ -635,6 +635,65 @@ func (_c *MockUpstreamStore_ListHealthCheckEnabled_Call) RunAndReturn(run func(c
 	return _c
 }
 
+// MapUpstreamIDsToLLMConfigIDs provides a mock function with given fields: ctx, upstreamIDs
+func (_m *MockUpstreamStore) MapUpstreamIDsToLLMConfigIDs(ctx context.Context, upstreamIDs []int64) (map[int64]int64, error) {
+	ret := _m.Called(ctx, upstreamIDs)
+
+	if len(ret) == 0 {
+		panic("no return value specified for MapUpstreamIDsToLLMConfigIDs")
+	}
+
+	var r0 map[int64]int64
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, []int64) (map[int64]int64, error)); ok {
+		return rf(ctx, upstreamIDs)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, []int64) map[int64]int64); ok {
+		r0 = rf(ctx, upstreamIDs)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(map[int64]int64)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, []int64) error); ok {
+		r1 = rf(ctx, upstreamIDs)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockUpstreamStore_MapUpstreamIDsToLLMConfigIDs_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'MapUpstreamIDsToLLMConfigIDs'
+type MockUpstreamStore_MapUpstreamIDsToLLMConfigIDs_Call struct {
+	*mock.Call
+}
+
+// MapUpstreamIDsToLLMConfigIDs is a helper method to define mock.On call
+//   - ctx context.Context
+//   - upstreamIDs []int64
+func (_e *MockUpstreamStore_Expecter) MapUpstreamIDsToLLMConfigIDs(ctx interface{}, upstreamIDs interface{}) *MockUpstreamStore_MapUpstreamIDsToLLMConfigIDs_Call {
+	return &MockUpstreamStore_MapUpstreamIDsToLLMConfigIDs_Call{Call: _e.mock.On("MapUpstreamIDsToLLMConfigIDs", ctx, upstreamIDs)}
+}
+
+func (_c *MockUpstreamStore_MapUpstreamIDsToLLMConfigIDs_Call) Run(run func(ctx context.Context, upstreamIDs []int64)) *MockUpstreamStore_MapUpstreamIDsToLLMConfigIDs_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].([]int64))
+	})
+	return _c
+}
+
+func (_c *MockUpstreamStore_MapUpstreamIDsToLLMConfigIDs_Call) Return(_a0 map[int64]int64, _a1 error) *MockUpstreamStore_MapUpstreamIDsToLLMConfigIDs_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockUpstreamStore_MapUpstreamIDsToLLMConfigIDs_Call) RunAndReturn(run func(context.Context, []int64) (map[int64]int64, error)) *MockUpstreamStore_MapUpstreamIDsToLLMConfigIDs_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Update provides a mock function with given fields: ctx, upstream
 func (_m *MockUpstreamStore) Update(ctx context.Context, upstream *database.Upstream) error {
 	ret := _m.Called(ctx, upstream)

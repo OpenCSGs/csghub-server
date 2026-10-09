@@ -191,6 +191,7 @@ func (h *OpenAIHandlerImpl) handleProxyError(c *gin.Context, isStream bool, err 
 	}
 	slog.ErrorContext(c.Request.Context(), "failed to create reverse proxy",
 		slog.Any("error", err))
+	SetMetricsError(c, "proxy_error", err.Error())
 	httpbase.ServerError(c, err)
 }
 

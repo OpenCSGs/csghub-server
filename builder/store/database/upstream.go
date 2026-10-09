@@ -72,6 +72,10 @@ type UpstreamStore interface {
 	// ListEnabledByLogicalModelIDs returns all enabled upstreams whose
 	// llm_config_id is in the given set of logical model IDs.
 	ListEnabledByLogicalModelIDs(ctx context.Context, modelIDs []int64) ([]*Upstream, error)
+	// MapUpstreamIDsToLLMConfigIDs resolves llm_config_id for the given
+	// upstream IDs. Upstream IDs that do not exist (or whose llm_config was
+	// deleted) are simply absent from the returned map.
+	MapUpstreamIDsToLLMConfigIDs(ctx context.Context, upstreamIDs []int64) (map[int64]int64, error)
 }
 
 type upstreamStoreImpl struct {
@@ -253,6 +257,26 @@ func (s *upstreamStoreImpl) ListEnabledByLogicalModelIDs(ctx context.Context, mo
 		return nil, errorx.HandleDBError(err, nil)
 	}
 	return upstreams, nil
+}
+
+func (s *upstreamStoreImpl) MapUpstreamIDsToLLMConfigIDs(ctx context.Context, upstreamIDs []int64) (map[int64]int64, error) {
+	result := make(map[int64]int64, len(upstreamIDs))
+	if len(upstreamIDs) == 0 {
+		return result, nil
+	}
+	var rows []Upstream
+	err := s.db.Core.NewSelect().
+		Column("id", "llm_config_id").
+		Model(&rows).
+		Where("id IN (?)", bun.In(upstreamIDs)).
+		Scan(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("map upstream ids to llm_config ids: %w", err)
+	}
+	for _, r := range rows {
+		result[r.ID] = r.LLMConfigID
+	}
+	return result, nil
 }
 
 // GetLLMConfigIDBySourceID resolves the llm_config_id for a csghub deploy

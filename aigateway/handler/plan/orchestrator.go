@@ -79,18 +79,10 @@ func (o *Orchestrator) Dispatch(c *gin.Context, extractor MetadataExtractor, han
 	}
 
 	p, err := o.planner.Plan(c, meta)
-	if o.admissionReleaser != nil && p != nil {
-		// Capacity admission lease safety net. The lease is read from the
-		// plan at DEFER EXECUTION time, not registration time: a lease
-		// acquired later (e.g. the availability fallback re-acquiring a
-		// pinned lease in the attempt loop after a fail-open Plan) must be
-		// released too, otherwise the renewer would keep it alive forever.
-		// Execute blocks until the response is fully written, so this defer
-		// runs after the upstream attempt finished — covering success,
-		// execute errors and panics. The release is ownership-guarded and
-		// idempotent: when the protocol's async usage commit already
-		// finalized the lease (with real usage), this is a Redis no-op.
-		defer o.admissionReleaser.ReleaseAdmission(c, p)
+	// Post-Plan housekeeping (queue-wait metrics + admission-lease safety
+	// net); see finalizePlan for the defer-execution-time semantics.
+	if release := o.finalizePlan(c, meta, p); release != nil {
+		defer release()
 	}
 	if err != nil {
 		handler.HandlePlanError(c, meta, p, err)

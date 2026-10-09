@@ -254,11 +254,14 @@ func (h *chatPipelineHandler) Execute(c *gin.Context, meta *types.RequestMetadat
 
 	// Surface upstream error bodies for troubleshooting: the retry writer
 	// records the response body of failed attempts, truncated here to keep
-	// large payloads out of the logs.
+	// large payloads out of the logs. The same excerpt lands on the
+	// per-request metrics event (error_message column).
 	if status := retryWriterStatusCode(finalWriter); status != http.StatusOK {
+		responseBody := truncateChatResponseBodyForLog(finalWriter.responseBodyForLog())
 		log.ErrorContext(ctx, "chat upstream returned non-200 response",
 			slog.Int("status", status),
-			slog.String("response_body", truncateChatResponseBodyForLog(finalWriter.responseBodyForLog())))
+			slog.String("response_body", responseBody))
+		SetMetricsError(c, "upstream_error", fmt.Sprintf("upstream returned %d: %s", status, responseBody))
 	}
 
 	// Synchronously record proxy-level metrics before c.Next() returns.
