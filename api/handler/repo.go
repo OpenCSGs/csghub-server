@@ -1523,9 +1523,14 @@ func (h *RepoHandler) CreateMirror(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
+	mirrorReq.SourceUrl = strings.TrimSpace(mirrorReq.SourceUrl)
 	sourceRepoPath, err := getSourceRepoPathFromSourceUrl(mirrorReq.SourceUrl)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
+		if errors.Is(err, errorx.ErrMirrorSourceURLInvalid) {
+			httpbase.BadRequestWithExt(ctx, err)
+			return
+		}
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -1615,9 +1620,14 @@ func (h *RepoHandler) UpdateMirror(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
+	mirrorReq.SourceUrl = strings.TrimSpace(mirrorReq.SourceUrl)
 	sourceRepoPath, err := getSourceRepoPathFromSourceUrl(mirrorReq.SourceUrl)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
+		if errors.Is(err, errorx.ErrMirrorSourceURLInvalid) {
+			httpbase.BadRequestWithExt(ctx, err)
+			return
+		}
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -1677,7 +1687,10 @@ func (h *RepoHandler) DeleteMirror(ctx *gin.Context) {
 func getSourceRepoPathFromSourceUrl(sourceUrl string) (string, error) {
 	parsedURL, err := url.Parse(sourceUrl)
 	if err != nil {
-		return "", err
+		return "", errorx.MirrorSourceURLInvalid(
+			fmt.Errorf("failed to parse mirror source url: %w", err),
+			errorx.Ctx().Set("source url", sourceUrl),
+		)
 	}
 
 	// Remove leading and trailing slashes
