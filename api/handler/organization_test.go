@@ -543,7 +543,7 @@ func TestOrganizationHandler_FinetuneInstances_ComponentError(t *testing.T) {
 	tester.ResponseEqCode(t, http.StatusInternalServerError)
 }
 
-// TestOrganizationHandler_FinetuneInstances_Forbidden verifies denied access returns 403 with the original error code.
+// TestOrganizationHandler_FinetuneInstances_Forbidden verifies denied access returns a successful empty list.
 func TestOrganizationHandler_FinetuneInstances_Forbidden(t *testing.T) {
 	forbiddenErr := errorx.ErrForbiddenMsg("permission denied")
 	tester := NewOrganizationTester(t).WithHandleFunc(func(h *OrganizationHandler) gin.HandlerFunc {
@@ -554,9 +554,9 @@ func TestOrganizationHandler_FinetuneInstances_Forbidden(t *testing.T) {
 		Namespace: "u", CurrentUser: "u",
 	}).Return(nil, 0, forbiddenErr)
 	tester.WithUser().AddPagination(1, 10).Execute()
-	tester.ResponseEqSimple(t, http.StatusForbidden, gin.H{
-		"code": "AUTH-ERR-2",
-		"msg":  forbiddenErr.Error(),
+	tester.ResponseEq(t, http.StatusOK, tester.OKText, gin.H{
+		"data":  []types.DeployRequest{},
+		"total": 0,
 	})
 }
 
@@ -572,7 +572,7 @@ func TestOrganizationHandler_Evaluations_ComponentError(t *testing.T) {
 	tester.ResponseEqCode(t, http.StatusInternalServerError)
 }
 
-// TestOrganizationHandler_Evaluations_Forbidden verifies denied access returns 403 with the original error code.
+// TestOrganizationHandler_Evaluations_Forbidden verifies denied access returns a successful empty list.
 func TestOrganizationHandler_Evaluations_Forbidden(t *testing.T) {
 	forbiddenErr := errorx.ErrForbiddenMsg("permission denied")
 	tester := NewOrganizationTester(t).WithHandleFunc(func(h *OrganizationHandler) gin.HandlerFunc {
@@ -583,9 +583,9 @@ func TestOrganizationHandler_Evaluations_Forbidden(t *testing.T) {
 		Namespace: "u", CurrentUser: "u",
 	}).Return(nil, 0, forbiddenErr)
 	tester.WithUser().AddPagination(1, 10).Execute()
-	tester.ResponseEqSimple(t, http.StatusForbidden, gin.H{
-		"code": "AUTH-ERR-2",
-		"msg":  forbiddenErr.Error(),
+	tester.ResponseEq(t, http.StatusOK, tester.OKText, gin.H{
+		"data":  []types.ArgoWorkFlowRes{},
+		"total": 0,
 	})
 }
 
@@ -601,7 +601,7 @@ func TestOrganizationHandler_Notebooks_ComponentError(t *testing.T) {
 	tester.ResponseEqCode(t, http.StatusInternalServerError)
 }
 
-// TestOrganizationHandler_Notebooks_Forbidden verifies denied access returns 403 with the original error code.
+// TestOrganizationHandler_Notebooks_Forbidden verifies denied access returns a successful empty list.
 func TestOrganizationHandler_Notebooks_Forbidden(t *testing.T) {
 	forbiddenErr := errorx.ErrForbiddenMsg("permission denied")
 	tester := NewOrganizationTester(t).WithHandleFunc(func(h *OrganizationHandler) gin.HandlerFunc {
@@ -612,9 +612,9 @@ func TestOrganizationHandler_Notebooks_Forbidden(t *testing.T) {
 		Namespace: "u", CurrentUser: "u",
 	}).Return(nil, 0, forbiddenErr)
 	tester.WithUser().AddPagination(1, 10).Execute()
-	tester.ResponseEqSimple(t, http.StatusForbidden, gin.H{
-		"code": "AUTH-ERR-2",
-		"msg":  forbiddenErr.Error(),
+	tester.ResponseEq(t, http.StatusOK, tester.OKText, gin.H{
+		"data":  []types.NotebookRes{},
+		"total": 0,
 	})
 }
 
@@ -684,7 +684,7 @@ func TestOrganizationHandler_Skills_ComponentError(t *testing.T) {
 	tester.ResponseEqCode(t, http.StatusInternalServerError)
 }
 
-// TestOrganizationHandler_RunDeploys_Forbidden verifies denied access returns 403 with the original error code.
+// TestOrganizationHandler_RunDeploys_Forbidden verifies denied access returns a successful empty list.
 func TestOrganizationHandler_RunDeploys_Forbidden(t *testing.T) {
 	forbiddenErr := errorx.ErrForbiddenMsg("permission denied")
 	tester := NewOrganizationTester(t).WithHandleFunc(func(h *OrganizationHandler) gin.HandlerFunc {
@@ -697,8 +697,8 @@ func TestOrganizationHandler_RunDeploys_Forbidden(t *testing.T) {
 		PageOpts: types.PageOpts{Page: 1, PageSize: 10},
 	}).Return(nil, 0, fmt.Errorf("list organization deploys: %w", forbiddenErr))
 	tester.WithUser().AddPagination(1, 10).Execute()
-	tester.ResponseEqSimple(t, http.StatusForbidden, gin.H{
-		"code": "AUTH-ERR-2",
-		"msg":  forbiddenErr.Error(),
+	tester.ResponseEq(t, http.StatusOK, tester.OKText, gin.H{
+		"data":  []types.DeployRequest{},
+		"total": 0,
 	})
 }
