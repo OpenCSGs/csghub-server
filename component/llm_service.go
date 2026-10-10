@@ -40,11 +40,11 @@ type LLMServiceComponent interface {
 	UpdateUpstream(ctx context.Context, req *types.UpdateUpstreamReq) (*types.UpstreamConfig, error)
 	// DeleteUpstream deletes an upstream by ID.
 	DeleteUpstream(ctx context.Context, id int64) error
-	// TestUpstream tests connectivity to an upstream endpoint by ID. It fetches
+	// CheckUpstream tests connectivity to an upstream endpoint by ID. It fetches
 	// the upstream config from the database, sends a simple "hi" prompt to the
 	// upstream URL (supporting /chat/completions and /responses endpoints), and
 	// returns the masked request summary, response status, body and content.
-	TestUpstream(ctx context.Context, req *types.TestUpstreamReq) (*types.TestUpstreamResult, error)
+	CheckUpstream(ctx context.Context, req *types.CheckUpstreamReq) (*types.CheckUpstreamResult, error)
 	// ListMetricEvents returns a page of raw AI Gateway metric events (model
 	// request logs) matching the query, with llm_config_id resolved from the
 	// event's upstream_id.

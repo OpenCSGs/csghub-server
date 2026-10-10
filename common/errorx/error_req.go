@@ -25,7 +25,7 @@ const (
 	errTransferSameNamespace
 	errTransferTargetExists
 	errTransferNotSupported
-	errUpstreamConnectionTestNotSupported
+	errUpstreamConnectionCheckNotSupported
 	errUpstreamHealthCheckNotSupported
 )
 
@@ -214,7 +214,7 @@ var (
 	// zh-CN: 当前上游 API 不支持连接测试
 	//
 	// zh-HK: 目前上游 API 不支援連線測試
-	ErrUpstreamConnectionTestNotSupported = CustomError{prefix: errReqPrefix, code: errUpstreamConnectionTestNotSupported}
+	ErrUpstreamConnectionCheckNotSupported = CustomError{prefix: errReqPrefix, code: errUpstreamConnectionCheckNotSupported}
 	// the upstream endpoint does not support health checks
 	//
 	// Description: The configured upstream endpoint does not support health checks.
