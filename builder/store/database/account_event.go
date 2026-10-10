@@ -2,7 +2,6 @@ package database
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -43,9 +42,5 @@ func (s *accountEventStoreImpl) GetByEventID(ctx context.Context, eventID uuid.U
 }
 
 func (s *accountEventStoreImpl) Create(ctx context.Context, input AccountEvent) error {
-	res, err := s.db.Core.NewInsert().Model(&input).Exec(ctx)
-	if err := assertAffectedOneRow(res, err); err != nil {
-		return fmt.Errorf("insert event log failed, error:%w", err)
-	}
-	return nil
+	return createAccountEvent(ctx, s.db, input)
 }
