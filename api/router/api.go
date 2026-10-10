@@ -1042,6 +1042,7 @@ func createUserRoutes(apiGroup *gin.RouterGroup, middlewareCollection middleware
 		keysGroup.POST("/:uuid/apikeys", userProxyHandler.Proxy)
 		keysGroup.PUT("/:uuid/apikeys/:id", userProxyHandler.Proxy)
 		keysGroup.DELETE("/:uuid/apikeys/:id", userProxyHandler.Proxy)
+		keysGroup.PUT("/:uuid/apikeys/:id/status", userProxyHandler.Proxy)
 		keysGroup.PUT("/:uuid/apikeys/builtin/refresh", userProxyHandler.Proxy)
 	}
 

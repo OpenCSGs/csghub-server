@@ -943,6 +943,54 @@ func (_c *MockAccessTokenStore_Refresh_Call) RunAndReturn(run func(context.Conte
 	return _c
 }
 
+// SetActiveByID provides a mock function with given fields: ctx, id, active
+func (_m *MockAccessTokenStore) SetActiveByID(ctx context.Context, id int64, active bool) error {
+	ret := _m.Called(ctx, id, active)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SetActiveByID")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, int64, bool) error); ok {
+		r0 = rf(ctx, id, active)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockAccessTokenStore_SetActiveByID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SetActiveByID'
+type MockAccessTokenStore_SetActiveByID_Call struct {
+	*mock.Call
+}
+
+// SetActiveByID is a helper method to define mock.On call
+//   - ctx context.Context
+//   - id int64
+//   - active bool
+func (_e *MockAccessTokenStore_Expecter) SetActiveByID(ctx interface{}, id interface{}, active interface{}) *MockAccessTokenStore_SetActiveByID_Call {
+	return &MockAccessTokenStore_SetActiveByID_Call{Call: _e.mock.On("SetActiveByID", ctx, id, active)}
+}
+
+func (_c *MockAccessTokenStore_SetActiveByID_Call) Run(run func(ctx context.Context, id int64, active bool)) *MockAccessTokenStore_SetActiveByID_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(int64), args[2].(bool))
+	})
+	return _c
+}
+
+func (_c *MockAccessTokenStore_SetActiveByID_Call) Return(_a0 error) *MockAccessTokenStore_SetActiveByID_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockAccessTokenStore_SetActiveByID_Call) RunAndReturn(run func(context.Context, int64, bool) error) *MockAccessTokenStore_SetActiveByID_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // UpdateToken provides a mock function with given fields: ctx, token
 func (_m *MockAccessTokenStore) UpdateToken(ctx context.Context, token *database.AccessToken) error {
 	ret := _m.Called(ctx, token)

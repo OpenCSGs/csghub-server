@@ -39,6 +39,8 @@ type AccessTokenStore interface {
 	UpdateTokenAndQuotas(ctx context.Context, key *AccessToken, quotas []*AccountAccessTokenQuota) (*AccessToken, error)
 	// DeleteByID deletes a  API key by id
 	DeleteByID(ctx context.Context, id int64) error
+	// SetActiveByID enables or disables an API key by id without deleting it.
+	SetActiveByID(ctx context.Context, id int64, active bool) error
 	// FindByNsUUID finds gateway API keys by namespace uuid
 	FindByNsUUID(ctx context.Context, nsUUID string, app string) ([]AccessToken, error)
 	// FindBuiltinByNsUUID finds first builtin API key by namespace uuid
@@ -395,13 +397,26 @@ func (s *accessTokenStoreImpl) DeleteByID(ctx context.Context, id int64) error {
 	return errorx.HandleDBError(err, nil)
 }
 
+// SetActiveByID enables (active=true) or disables (active=false) an API key by
+// id. Disabled keys are kept but rejected by FindByToken, so they can be
+// re-enabled later; this is distinct from DeleteByID, which soft-deletes the row.
+func (s *accessTokenStoreImpl) SetActiveByID(ctx context.Context, id int64, active bool) error {
+	_, err := s.db.Operator.Core.
+		NewUpdate().
+		Model(&AccessToken{}).
+		Set("is_active = ?", active).
+		Where("id = ?", id).
+		Exec(ctx)
+	return errorx.HandleDBError(err, nil)
+}
+
 // FindAPIKeyByNsUUID finds gateway API keys by namespace uuid
 func (s *accessTokenStoreImpl) FindByNsUUID(ctx context.Context, nsUUID string, app string) ([]AccessToken, error) {
 	var tokens []AccessToken
 	err := s.db.Operator.Core.
 		NewSelect().
 		Model(&tokens).
-		Where("app = ? and ns_uuid = ? and is_active = true", app, nsUUID).
+		Where("app = ? and ns_uuid = ?", app, nsUUID).
 		Order("token_type ASC").
 		Order("id DESC").
 		Scan(ctx)
