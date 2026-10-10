@@ -219,9 +219,11 @@ type CreateAgentInstanceRequest struct {
 type AgentType string
 
 const (
-	AgentTypeLangflow AgentType = "langflow"
-	AgentTypeCode     AgentType = "code"
-	AgentTypeOpenClaw AgentType = "openclaw"
+	AgentTypeLangflow         AgentType = "langflow"
+	AgentTypeCode             AgentType = "code"
+	AgentTypeOpenClaw         AgentType = "openclaw"
+	AgentTypeCSGClaw          AgentType = "csgclaw"
+	AgentTypeCSGClawWorkspace AgentType = "csgclaw-workspace"
 )
 
 func (t AgentType) String() string {
