@@ -40,6 +40,7 @@ type AgentFile struct {
 // as sandboxes from code repo pushes. Extend when new runtimes are supported.
 var SupportedSandboxRuntimeKinds = map[string]bool{
 	"codex": true,
+	"dsh":   true,
 }
 
 func ParseAgentFile(content string) (*AgentFile, error) {
