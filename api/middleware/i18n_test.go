@@ -102,7 +102,7 @@ func TestLocalizedErrorMiddleware(t *testing.T) {
 		))
 	})
 	router.GET("/upstream-connection-test-not-supported", func(c *gin.Context) {
-		httpbase.UnprocessableEntityWithExt(c, errorx.ErrUpstreamConnectionTestNotSupported)
+		httpbase.UnprocessableEntityWithExt(c, errorx.ErrUpstreamConnectionCheckNotSupported)
 	})
 	router.GET("/upstream-health-check-not-supported", func(c *gin.Context) {
 		httpbase.UnprocessableEntityWithExt(c, errorx.ErrUpstreamHealthCheckNotSupported)
@@ -276,7 +276,7 @@ func TestLocalizedErrorMiddleware(t *testing.T) {
 		assert.Equal(t, "MIRROR-ERR-7: 源命名空间映射关系不存在。", resp.Msg)
 	})
 
-	t.Run("LocalizedUpstreamConnectionTestNotSupported", func(t *testing.T) {
+	t.Run("LocalizedUpstreamConnectionCheckNotSupported", func(t *testing.T) {
 		req, _ := http.NewRequest("GET", "/upstream-connection-test-not-supported", nil)
 		req.Header.Set("Accept-Language", "en-US")
 		w := httptest.NewRecorder()

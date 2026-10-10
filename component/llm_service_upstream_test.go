@@ -137,7 +137,7 @@ func TestDoUpstreamTest_ChatCompletionsSuccess(t *testing.T) {
 	defer srv.Close()
 
 	url := srv.URL + "/v1/chat/completions"
-	result, err := doUpstreamTest(context.Background(), mustSampleProvider(t, url), upstreamTestParams{url: url, modelName: "gpt-4", authHeaders: map[string]string{"Authorization": "Bearer secret"}})
+	result, err := doUpstreamCheck(context.Background(), mustSampleProvider(t, url), upstreamCheckParams{url: url, modelName: "gpt-4", authHeaders: map[string]string{"Authorization": "Bearer secret"}})
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	require.True(t, result.OK)
@@ -163,7 +163,7 @@ func TestDoUpstreamTest_ResponsesSuccess(t *testing.T) {
 	defer srv.Close()
 
 	url := srv.URL + "/v1/responses"
-	result, err := doUpstreamTest(context.Background(), mustSampleProvider(t, url), upstreamTestParams{url: url, modelName: "gpt-4o"})
+	result, err := doUpstreamCheck(context.Background(), mustSampleProvider(t, url), upstreamCheckParams{url: url, modelName: "gpt-4o"})
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	require.True(t, result.OK)
@@ -178,7 +178,7 @@ func TestDoUpstreamTest_MessagesPreservesVersionHeaderAndMasksAuth(t *testing.T)
 	}))
 	defer srv.Close()
 	url := srv.URL + "/v1/messages"
-	result, err := doUpstreamTest(context.Background(), mustSampleProvider(t, url), upstreamTestParams{url: url, modelName: "claude-model", authHeaders: map[string]string{"x-api-key": "secret"}})
+	result, err := doUpstreamCheck(context.Background(), mustSampleProvider(t, url), upstreamCheckParams{url: url, modelName: "claude-model", authHeaders: map[string]string{"x-api-key": "secret"}})
 	require.NoError(t, err)
 	var summary requestSummary
 	require.NoError(t, json.Unmarshal([]byte(result.Request), &summary))
@@ -194,7 +194,7 @@ func TestDoUpstreamTest_MultipartSummary(t *testing.T) {
 	}))
 	defer srv.Close()
 	url := srv.URL + "/v1/audio/transcriptions"
-	result, err := doUpstreamTest(context.Background(), mustSampleProvider(t, url), upstreamTestParams{url: url, modelName: "audio-model", authHeaders: map[string]string{"Authorization": "secret"}})
+	result, err := doUpstreamCheck(context.Background(), mustSampleProvider(t, url), upstreamCheckParams{url: url, modelName: "audio-model", authHeaders: map[string]string{"Authorization": "secret"}})
 	require.NoError(t, err)
 	var summary requestSummary
 	require.NoError(t, json.Unmarshal([]byte(result.Request), &summary))
@@ -213,7 +213,7 @@ func TestDoUpstreamTest_NonOKStatus(t *testing.T) {
 	defer srv.Close()
 
 	url := srv.URL + "/v1/chat/completions"
-	result, err := doUpstreamTest(context.Background(), mustSampleProvider(t, url), upstreamTestParams{url: url, modelName: "gpt-4"})
+	result, err := doUpstreamCheck(context.Background(), mustSampleProvider(t, url), upstreamCheckParams{url: url, modelName: "gpt-4"})
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	require.False(t, result.OK)
@@ -228,7 +228,7 @@ func TestDoUpstreamTest_NetworkError(t *testing.T) {
 	srv.Close()
 
 	url := srv.URL + "/v1/chat/completions"
-	result, err := doUpstreamTest(context.Background(), mustSampleProvider(t, url), upstreamTestParams{url: url, modelName: "gpt-4"})
+	result, err := doUpstreamCheck(context.Background(), mustSampleProvider(t, url), upstreamCheckParams{url: url, modelName: "gpt-4"})
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	require.False(t, result.OK)
@@ -237,7 +237,7 @@ func TestDoUpstreamTest_NetworkError(t *testing.T) {
 
 func TestDoUpstreamTestUsesProviderExecutionPolicy(t *testing.T) {
 	provider := &policyCapturingSampleProvider{policy: aigatewaytypes.SampleExecutionPolicy{Timeout: 2 * time.Minute}}
-	result, err := doUpstreamTest(context.Background(), provider, upstreamTestParams{url: "https://api.example.com/v1/test", modelName: "model"})
+	result, err := doUpstreamCheck(context.Background(), provider, upstreamCheckParams{url: "https://api.example.com/v1/test", modelName: "model"})
 	require.NoError(t, err)
 	require.True(t, result.OK)
 	require.Equal(t, 2*time.Minute, provider.capturedClientTimeout)
@@ -246,7 +246,7 @@ func TestDoUpstreamTestUsesProviderExecutionPolicy(t *testing.T) {
 
 func TestDoUpstreamTestRejectsNonPositiveTimeout(t *testing.T) {
 	provider := &policyCapturingSampleProvider{}
-	_, err := doUpstreamTest(context.Background(), provider, upstreamTestParams{url: "https://api.example.com/v1/test", modelName: "model"})
+	_, err := doUpstreamCheck(context.Background(), provider, upstreamCheckParams{url: "https://api.example.com/v1/test", modelName: "model"})
 	require.ErrorContains(t, err, "timeout must be positive")
 }
 
@@ -262,7 +262,7 @@ func TestDoUpstreamTest_ASRUsesInputAudio(t *testing.T) {
 
 	url := srv.URL + "/v1/chat/completions"
 	tasks := []string{"auto-speech-recognition"}
-	result, err := doUpstreamTest(context.Background(), mustSampleProvider(t, url), upstreamTestParams{url: url, modelName: "qwen3-asr-flash", tasks: tasks})
+	result, err := doUpstreamCheck(context.Background(), mustSampleProvider(t, url), upstreamCheckParams{url: url, modelName: "qwen3-asr-flash", tasks: tasks})
 	require.NoError(t, err)
 	require.True(t, result.OK)
 
@@ -277,7 +277,7 @@ func TestDoUpstreamTest_ASRUsesInputAudio(t *testing.T) {
 	require.Equal(t, "input_audio", body.Messages[0].Content[0]["type"])
 }
 
-func TestLLMServiceComponent_TestUpstream_ASRResolvesTasks(t *testing.T) {
+func TestLLMServiceComponent_CheckUpstream_ASRResolvesTasks(t *testing.T) {
 	var captured []byte
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		captured, _ = io.ReadAll(r.Body)
@@ -307,7 +307,7 @@ func TestLLMServiceComponent_TestUpstream_ASRResolvesTasks(t *testing.T) {
 		llmConfigStore: llmConfigStore,
 		sampleRegistry: sample.NewDefaultRegistry(),
 	}
-	result, err := mc.TestUpstream(ctx, &types.TestUpstreamReq{ID: 42})
+	result, err := mc.CheckUpstream(ctx, &types.CheckUpstreamReq{ID: 42})
 	require.NoError(t, err)
 	require.True(t, result.OK)
 
@@ -328,7 +328,7 @@ func mustSampleProvider(t *testing.T, url string) aigatewaytypes.SampleProvider 
 	return provider
 }
 
-func TestLLMServiceComponent_TestUpstream_ChatCompletions(t *testing.T) {
+func TestLLMServiceComponent_CheckUpstream_ChatCompletions(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
@@ -349,14 +349,14 @@ func TestLLMServiceComponent_TestUpstream_ChatCompletions(t *testing.T) {
 		upstreamStore:  upstreamStore,
 		sampleRegistry: sample.NewDefaultRegistry(),
 	}
-	result, err := mc.TestUpstream(ctx, &types.TestUpstreamReq{ID: 42})
+	result, err := mc.CheckUpstream(ctx, &types.CheckUpstreamReq{ID: 42})
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	require.True(t, result.OK)
 	require.Contains(t, result.Content, "ok")
 }
 
-func TestLLMServiceComponent_TestUpstream_Responses(t *testing.T) {
+func TestLLMServiceComponent_CheckUpstream_Responses(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
@@ -377,14 +377,14 @@ func TestLLMServiceComponent_TestUpstream_Responses(t *testing.T) {
 		upstreamStore:  upstreamStore,
 		sampleRegistry: sample.NewDefaultRegistry(),
 	}
-	result, err := mc.TestUpstream(ctx, &types.TestUpstreamReq{ID: 43})
+	result, err := mc.CheckUpstream(ctx, &types.CheckUpstreamReq{ID: 43})
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	require.True(t, result.OK)
 	require.Contains(t, result.Content, "resp")
 }
 
-func TestLLMServiceComponent_TestUpstream_UnsupportedEndpoint(t *testing.T) {
+func TestLLMServiceComponent_CheckUpstream_UnsupportedEndpoint(t *testing.T) {
 	ctx := context.TODO()
 	upstreamStore := mockdatabase.NewMockUpstreamStore(t)
 	upstreamStore.EXPECT().GetByID(ctx, int64(44)).Return(&database.Upstream{
@@ -397,16 +397,16 @@ func TestLLMServiceComponent_TestUpstream_UnsupportedEndpoint(t *testing.T) {
 		upstreamStore:  upstreamStore,
 		sampleRegistry: sample.NewDefaultRegistry(),
 	}
-	_, err := mc.TestUpstream(ctx, &types.TestUpstreamReq{ID: 44})
+	_, err := mc.CheckUpstream(ctx, &types.CheckUpstreamReq{ID: 44})
 	require.Error(t, err)
 	// The unsupported endpoint error must be an errorx custom error so the
 	// handler can map it to a 422 response instead of 500.
 	customErr, ok := errorx.GetFirstCustomError(err)
 	require.True(t, ok, "expected an errorx custom error for unsupported endpoint")
-	require.ErrorIs(t, customErr, errorx.ErrUpstreamConnectionTestNotSupported)
+	require.ErrorIs(t, customErr, errorx.ErrUpstreamConnectionCheckNotSupported)
 }
 
-func TestLLMServiceComponent_TestUpstreamUsesComponentRegistry(t *testing.T) {
+func TestLLMServiceComponent_CheckUpstreamUsesComponentRegistry(t *testing.T) {
 	ctx := context.Background()
 	upstreamStore := mockdatabase.NewMockUpstreamStore(t)
 	upstreamStore.EXPECT().GetByID(ctx, int64(47)).Return(&database.Upstream{
@@ -422,12 +422,12 @@ func TestLLMServiceComponent_TestUpstreamUsesComponentRegistry(t *testing.T) {
 		sampleRegistry: sample.NewRegistry(provider),
 	}
 
-	result, err := mc.TestUpstream(ctx, &types.TestUpstreamReq{ID: 47})
+	result, err := mc.CheckUpstream(ctx, &types.CheckUpstreamReq{ID: 47})
 	require.NoError(t, err)
 	require.True(t, result.OK)
 }
 
-func TestLLMServiceComponent_TestUpstream_EmptyURL(t *testing.T) {
+func TestLLMServiceComponent_CheckUpstream_EmptyURL(t *testing.T) {
 	ctx := context.TODO()
 	upstreamStore := mockdatabase.NewMockUpstreamStore(t)
 	upstreamStore.EXPECT().GetByID(ctx, int64(45)).Return(&database.Upstream{
@@ -439,11 +439,11 @@ func TestLLMServiceComponent_TestUpstream_EmptyURL(t *testing.T) {
 	mc := &llmServiceComponentImpl{
 		upstreamStore: upstreamStore,
 	}
-	_, err := mc.TestUpstream(ctx, &types.TestUpstreamReq{ID: 45})
+	_, err := mc.CheckUpstream(ctx, &types.CheckUpstreamReq{ID: 45})
 	require.Error(t, err)
 }
 
-func TestLLMServiceComponent_TestUpstream_EmptyModelName(t *testing.T) {
+func TestLLMServiceComponent_CheckUpstream_EmptyModelName(t *testing.T) {
 	ctx := context.TODO()
 	upstreamStore := mockdatabase.NewMockUpstreamStore(t)
 	upstreamStore.EXPECT().GetByID(ctx, int64(46)).Return(&database.Upstream{
@@ -455,11 +455,11 @@ func TestLLMServiceComponent_TestUpstream_EmptyModelName(t *testing.T) {
 	mc := &llmServiceComponentImpl{
 		upstreamStore: upstreamStore,
 	}
-	_, err := mc.TestUpstream(ctx, &types.TestUpstreamReq{ID: 46})
+	_, err := mc.CheckUpstream(ctx, &types.CheckUpstreamReq{ID: 46})
 	require.Error(t, err)
 }
 
-func TestLLMServiceComponent_TestUpstream_NotFound(t *testing.T) {
+func TestLLMServiceComponent_CheckUpstream_NotFound(t *testing.T) {
 	ctx := context.TODO()
 	upstreamStore := mockdatabase.NewMockUpstreamStore(t)
 	upstreamStore.EXPECT().GetByID(ctx, int64(99)).Return(nil, fmt.Errorf("record not found"))
@@ -467,6 +467,6 @@ func TestLLMServiceComponent_TestUpstream_NotFound(t *testing.T) {
 	mc := &llmServiceComponentImpl{
 		upstreamStore: upstreamStore,
 	}
-	_, err := mc.TestUpstream(ctx, &types.TestUpstreamReq{ID: 99})
+	_, err := mc.CheckUpstream(ctx, &types.CheckUpstreamReq{ID: 99})
 	require.Error(t, err)
 }

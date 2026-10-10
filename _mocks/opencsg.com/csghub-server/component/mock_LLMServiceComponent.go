@@ -24,6 +24,65 @@ func (_m *MockLLMServiceComponent) EXPECT() *MockLLMServiceComponent_Expecter {
 	return &MockLLMServiceComponent_Expecter{mock: &_m.Mock}
 }
 
+// CheckUpstream provides a mock function with given fields: ctx, req
+func (_m *MockLLMServiceComponent) CheckUpstream(ctx context.Context, req *types.CheckUpstreamReq) (*types.CheckUpstreamResult, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CheckUpstream")
+	}
+
+	var r0 *types.CheckUpstreamResult
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *types.CheckUpstreamReq) (*types.CheckUpstreamResult, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *types.CheckUpstreamReq) *types.CheckUpstreamResult); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*types.CheckUpstreamResult)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *types.CheckUpstreamReq) error); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockLLMServiceComponent_CheckUpstream_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CheckUpstream'
+type MockLLMServiceComponent_CheckUpstream_Call struct {
+	*mock.Call
+}
+
+// CheckUpstream is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req *types.CheckUpstreamReq
+func (_e *MockLLMServiceComponent_Expecter) CheckUpstream(ctx interface{}, req interface{}) *MockLLMServiceComponent_CheckUpstream_Call {
+	return &MockLLMServiceComponent_CheckUpstream_Call{Call: _e.mock.On("CheckUpstream", ctx, req)}
+}
+
+func (_c *MockLLMServiceComponent_CheckUpstream_Call) Run(run func(ctx context.Context, req *types.CheckUpstreamReq)) *MockLLMServiceComponent_CheckUpstream_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(*types.CheckUpstreamReq))
+	})
+	return _c
+}
+
+func (_c *MockLLMServiceComponent_CheckUpstream_Call) Return(_a0 *types.CheckUpstreamResult, _a1 error) *MockLLMServiceComponent_CheckUpstream_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockLLMServiceComponent_CheckUpstream_Call) RunAndReturn(run func(context.Context, *types.CheckUpstreamReq) (*types.CheckUpstreamResult, error)) *MockLLMServiceComponent_CheckUpstream_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // CreateLLMConfig provides a mock function with given fields: ctx, req
 func (_m *MockLLMServiceComponent) CreateLLMConfig(ctx context.Context, req *types.CreateLLMConfigReq) (*types.LLMConfig, error) {
 	ret := _m.Called(ctx, req)
@@ -716,65 +775,6 @@ func (_c *MockLLMServiceComponent_ShowPromptConfig_Call) Return(_a0 *types.Promp
 }
 
 func (_c *MockLLMServiceComponent_ShowPromptConfig_Call) RunAndReturn(run func(context.Context, int64) (*types.PromptPrefix, error)) *MockLLMServiceComponent_ShowPromptConfig_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// TestUpstream provides a mock function with given fields: ctx, req
-func (_m *MockLLMServiceComponent) TestUpstream(ctx context.Context, req *types.TestUpstreamReq) (*types.TestUpstreamResult, error) {
-	ret := _m.Called(ctx, req)
-
-	if len(ret) == 0 {
-		panic("no return value specified for TestUpstream")
-	}
-
-	var r0 *types.TestUpstreamResult
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *types.TestUpstreamReq) (*types.TestUpstreamResult, error)); ok {
-		return rf(ctx, req)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, *types.TestUpstreamReq) *types.TestUpstreamResult); ok {
-		r0 = rf(ctx, req)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*types.TestUpstreamResult)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, *types.TestUpstreamReq) error); ok {
-		r1 = rf(ctx, req)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// MockLLMServiceComponent_TestUpstream_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'TestUpstream'
-type MockLLMServiceComponent_TestUpstream_Call struct {
-	*mock.Call
-}
-
-// TestUpstream is a helper method to define mock.On call
-//   - ctx context.Context
-//   - req *types.TestUpstreamReq
-func (_e *MockLLMServiceComponent_Expecter) TestUpstream(ctx interface{}, req interface{}) *MockLLMServiceComponent_TestUpstream_Call {
-	return &MockLLMServiceComponent_TestUpstream_Call{Call: _e.mock.On("TestUpstream", ctx, req)}
-}
-
-func (_c *MockLLMServiceComponent_TestUpstream_Call) Run(run func(ctx context.Context, req *types.TestUpstreamReq)) *MockLLMServiceComponent_TestUpstream_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(*types.TestUpstreamReq))
-	})
-	return _c
-}
-
-func (_c *MockLLMServiceComponent_TestUpstream_Call) Return(_a0 *types.TestUpstreamResult, _a1 error) *MockLLMServiceComponent_TestUpstream_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *MockLLMServiceComponent_TestUpstream_Call) RunAndReturn(run func(context.Context, *types.TestUpstreamReq) (*types.TestUpstreamResult, error)) *MockLLMServiceComponent_TestUpstream_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -509,18 +509,18 @@ type UpdateUpstreamReq struct {
 	Metadata              *UpstreamMetadata  `json:"metadata"`
 }
 
-// TestUpstreamReq is the request to test connectivity to an upstream endpoint.
+// CheckUpstreamReq is the request to test connectivity to an upstream endpoint.
 // The upstream is identified by its database ID; the backend fetches the
 // upstream's URL, model name and auth header from the database so that the
 // frontend never needs to send credentials or perform cross-origin requests.
-type TestUpstreamReq struct {
+type CheckUpstreamReq struct {
 	ID int64 `json:"id" binding:"required"`
 }
 
-// TestUpstreamResult is the result of an upstream connectivity test.
+// CheckUpstreamResult is the result of an upstream connectivity test.
 // The request summary is masked so that sensitive header values (such as
 // API keys) are never leaked to the frontend.
-type TestUpstreamResult struct {
+type CheckUpstreamResult struct {
 	// Request is the masked request summary (url, method, headers, body).
 	Request string `json:"request"`
 	// OK indicates whether the upstream returned a 2xx status code.

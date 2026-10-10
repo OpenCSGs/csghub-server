@@ -138,19 +138,19 @@ func appendRequestSummaryValue(summary map[string]any, key string, value any) {
 	summary[key] = value
 }
 
-// upstreamTestParams carries the sample-specific inputs for an upstream
+// upstreamCheckParams carries the sample-specific inputs for an upstream
 // connection test.
-type upstreamTestParams struct {
+type upstreamCheckParams struct {
 	url         string
 	modelName   string
 	authHeaders map[string]string
 	tasks       []string
 }
 
-// doUpstreamTest performs the protocol-specific sample request against the
+// doUpstreamCheck performs the protocol-specific sample request against the
 // upstream and returns the test result. It applies the provider's inference
 // policy to both the request context and HTTP client.
-func doUpstreamTest(ctx context.Context, provider aigatewaytypes.SampleProvider, params upstreamTestParams) (*types.TestUpstreamResult, error) {
+func doUpstreamCheck(ctx context.Context, provider aigatewaytypes.SampleProvider, params upstreamCheckParams) (*types.CheckUpstreamResult, error) {
 	policy, err := provider.ExecutionPolicy(aigatewaytypes.SampleKindInference)
 	if err != nil {
 		return nil, fmt.Errorf("get sample execution policy: %w", err)
@@ -200,7 +200,7 @@ func doUpstreamTest(ctx context.Context, provider aigatewaytypes.SampleProvider,
 	}
 	summaryBytes, _ := json.MarshalIndent(summary, "", "  ")
 	if execution.Error != nil {
-		return &types.TestUpstreamResult{
+		return &types.CheckUpstreamResult{
 			Request: string(summaryBytes),
 			Error:   execution.Error.Error(),
 		}, nil
@@ -216,7 +216,7 @@ func doUpstreamTest(ctx context.Context, provider aigatewaytypes.SampleProvider,
 		prettyBody = rawText
 	}
 
-	return &types.TestUpstreamResult{
+	return &types.CheckUpstreamResult{
 		Request:      string(summaryBytes),
 		OK:           execution.StatusCode >= 200 && execution.StatusCode < 300,
 		Status:       execution.StatusCode,
@@ -226,8 +226,8 @@ func doUpstreamTest(ctx context.Context, provider aigatewaytypes.SampleProvider,
 	}, nil
 }
 
-// TestUpstream tests connectivity to an upstream endpoint by ID.
-func (s *llmServiceComponentImpl) TestUpstream(ctx context.Context, req *types.TestUpstreamReq) (*types.TestUpstreamResult, error) {
+// CheckUpstream tests connectivity to an upstream endpoint by ID.
+func (s *llmServiceComponentImpl) CheckUpstream(ctx context.Context, req *types.CheckUpstreamReq) (*types.CheckUpstreamResult, error) {
 	dbUp, err := s.upstreamStore.GetByID(ctx, req.ID)
 	if err != nil {
 		return nil, fmt.Errorf("upstream not found: %w", err)
@@ -244,7 +244,7 @@ func (s *llmServiceComponentImpl) TestUpstream(ctx context.Context, req *types.T
 
 	provider, ok := s.sampleRegistry.Find(url)
 	if !ok {
-		return nil, errorx.ErrUpstreamConnectionTestNotSupported
+		return nil, errorx.ErrUpstreamConnectionCheckNotSupported
 	}
 
 	authHeaders, err := parseAuthHeader(dbUp.AuthHeader)
@@ -259,7 +259,7 @@ func (s *llmServiceComponentImpl) TestUpstream(ctx context.Context, req *types.T
 		slog.String("url", url),
 	)
 
-	return doUpstreamTest(ctx, provider, upstreamTestParams{
+	return doUpstreamCheck(ctx, provider, upstreamCheckParams{
 		url:         url,
 		modelName:   modelName,
 		authHeaders: authHeaders,
