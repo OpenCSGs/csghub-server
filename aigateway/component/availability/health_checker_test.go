@@ -981,6 +981,50 @@ func TestPersistHealthStateAsync_SequencesSameUpstream(t *testing.T) {
 	}, 5*time.Second, time.Millisecond)
 }
 
+func TestHealthChecker_StopDropsQueuedPersistence(t *testing.T) {
+	mockStore := mockdatabase.NewMockAIGatewayUpstreamHealthStateStore(t)
+	var mutations atomic.Int32
+	started := make(chan struct{}, 1)
+	release := make(chan struct{})
+	mockStore.EXPECT().MutateByUpstreamID(mock.Anything, mock.Anything).
+		Run(func(context.Context, database.AIGatewayUpstreamHealthStateMutation) {
+			started <- struct{}{}
+			<-release
+			mutations.Add(1)
+		}).
+		Return(&database.AIGatewayUpstreamHealthState{}, nil)
+
+	checker := &healthCheckerImpl{
+		config: HealthCheckerConfig{
+			ProbeWorkers: 1, PersistenceWorkers: 1,
+			Config: types.HealthCheckConfig{
+				Enabled:     true,
+				HealthRules: types.HealthRulesConfig{ConsecutiveFailuresForUnhealthy: 3},
+			},
+		},
+		healthStore:      mockStore,
+		stateCache:       NewStateCache(nil),
+		stopCh:           make(chan struct{}),
+		multimodalProbes: newMultimodalProbeScheduler(NewStateCache(nil)),
+		now:              time.Now,
+	}
+	require.NoError(t, checker.Start(context.Background()))
+	t.Cleanup(func() { require.NoError(t, checker.Stop()) })
+
+	policy := types.SampleExecutionPolicy{}
+	checker.persistHealthStateAsync(context.Background(), &types.HealthCheckResult{UpstreamID: 1, Timestamp: time.Now(), Error: "first"}, policy)
+	// The worker is now busy inside the blocked mutation, so the next job
+	// stays queued. Cancel must happen before the mutation is released,
+	// otherwise the queued job would still be processed legitimately.
+	<-started
+	checker.persistHealthStateAsync(context.Background(), &types.HealthCheckResult{UpstreamID: 1, Timestamp: time.Now().Add(time.Second), Error: "second"}, policy)
+
+	checker.cancel()
+	close(release)
+	require.NoError(t, checker.Stop())
+	require.Equal(t, int32(1), mutations.Load(), "jobs still queued at shutdown must be dropped, not persisted")
+}
+
 func TestHealthChecker_StopCancelsBlockedProbe(t *testing.T) {
 	mockUpstreamStore := mockdatabase.NewMockUpstreamStore(t)
 	upstream := &database.Upstream{ID: 1, URL: "https://api.example.com/v1/chat/completions", ModelName: "model"}

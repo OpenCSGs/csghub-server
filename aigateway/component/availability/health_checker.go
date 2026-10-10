@@ -251,6 +251,12 @@ func (h *healthCheckerImpl) runPersistenceWorker(ctx context.Context, jobs chan 
 		case <-ctx.Done():
 			return
 		case job := <-jobs:
+			if ctx.Err() != nil {
+				// The select above races ctx.Done() against queued jobs, so a
+				// job enqueued before shutdown can still land here; drop it
+				// instead of persisting with a canceled context.
+				continue
+			}
 			if prom.AIGatewayHealthCheckPersistenceQueue != nil {
 				prom.AIGatewayHealthCheckPersistenceQueue.Set(float64(h.persistenceQueueDepth()))
 			}
