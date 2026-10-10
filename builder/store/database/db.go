@@ -134,6 +134,10 @@ func NewDB(ctx context.Context, config DBConfig) (db *DB, err error) {
 	err = bunDB.PingContext(ctx)
 	if err != nil {
 		err = fmt.Errorf("pinging %s database: %w", config.Dialect, err)
+		_ = bunDB.Close()
+		if db.pgxPool != nil {
+			db.pgxPool.Close()
+		}
 		return
 	}
 

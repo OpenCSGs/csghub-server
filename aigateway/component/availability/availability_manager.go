@@ -2,6 +2,7 @@ package availability
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -22,6 +23,7 @@ type AvailabilityManager interface {
 type availabilityManagerImpl struct {
 	healthChecker  HealthChecker
 	circuitBreaker CircuitBreaker
+	cancel         context.CancelFunc
 }
 
 // NewAvailabilityManagerFromConfig creates a new availability manager from config
@@ -67,17 +69,27 @@ func NewAvailabilityManagerFromConfig(cfg *config.Config) (AvailabilityManager, 
 }
 
 func (m *availabilityManagerImpl) Start(ctx context.Context) error {
-	if err := m.healthChecker.Start(ctx); err != nil {
+	managerCtx, cancel := context.WithCancel(ctx)
+	m.cancel = cancel
+	if err := m.healthChecker.Start(managerCtx); err != nil {
+		cancel()
 		return err
 	}
-	return m.circuitBreaker.Start(ctx)
+	if err := m.circuitBreaker.Start(managerCtx); err != nil {
+		cancel()
+		_ = m.healthChecker.Stop()
+		return err
+	}
+	return nil
 }
 
 func (m *availabilityManagerImpl) Stop() error {
-	if err := m.circuitBreaker.Stop(); err != nil {
-		return err
+	if m.cancel != nil {
+		m.cancel()
 	}
-	return m.healthChecker.Stop()
+	circuitErr := m.circuitBreaker.Stop()
+	healthErr := m.healthChecker.Stop()
+	return errors.Join(circuitErr, healthErr)
 }
 
 func (m *availabilityManagerImpl) RecordRequestResult(ctx context.Context, upstreamID int64, modelID string, success bool, err error) error {

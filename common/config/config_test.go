@@ -43,6 +43,8 @@ func TestConfig_loadConfig(t *testing.T) {
 		require.Equal(t, "https://example.posthog.test", cfg.PostHog.APIHost)
 		require.Equal(t, "staging", cfg.PostHog.Environment)
 		require.False(t, cfg.Organization.EnableUnit)
+		require.Equal(t, 32, cfg.AIGateway.HealthCheckProbeWorkers)
+		require.Equal(t, 4, cfg.AIGateway.HealthCheckPersistenceWorkers)
 		require.Equal(t, 1000, cfg.Rebac.OpenFGAListObjectMaxResult)
 		require.Equal(t, 60, cfg.Search.RepositoryAccessListCacheTTL)
 	})

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -171,10 +172,17 @@ func (h *OpenAIHandlerImpl) Shutdown(ctx context.Context) error {
 			comp.ShutdownCapacityAdmission()
 		}
 	}
-	if h == nil || h.llmTracer == nil {
+	if h == nil {
 		return nil
 	}
-	return h.llmTracer.Shutdown(ctx)
+	var shutdownErrors []error
+	if h.availabilityManager != nil {
+		shutdownErrors = append(shutdownErrors, h.availabilityManager.Stop())
+	}
+	if h.llmTracer != nil {
+		shutdownErrors = append(shutdownErrors, h.llmTracer.Shutdown(ctx))
+	}
+	return errors.Join(shutdownErrors...)
 }
 
 func insufficientBalanceMessage(frontendURL string) string {

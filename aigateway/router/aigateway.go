@@ -60,6 +60,12 @@ func NewRouter(config *config.Config) (*gin.Engine, func(), error) {
 	if err != nil {
 		return nil, nil, fmt.Errorf("error creating openai handler :%w", err)
 	}
+	routerInitialized := false
+	defer func() {
+		if !routerInitialized {
+			_ = openAIhandler.Shutdown(context.Background())
+		}
+	}()
 
 	// AnthropicHandlerImpl embeds OpenAIHandlerImpl and adds the
 	// Anthropic Messages protocol on top of the shared infrastructure.
@@ -132,6 +138,7 @@ func NewRouter(config *config.Config) (*gin.Engine, func(), error) {
 		_ = openAIhandler.Shutdown(context.Background())
 	})
 
+	routerInitialized = true
 	return r, cleanup, nil
 }
 
