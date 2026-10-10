@@ -171,6 +171,7 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 		keysGroup.PUT("/:uuid/apikeys/builtin/refresh", mustLogin(), acHandler.RefreshBuiltinKey)
 		keysGroup.GET("/:uuid/apikeys", mustLogin(), acHandler.GetAPIKeys)
 		keysGroup.PUT("/:uuid/apikeys/:id", mustLogin(), acHandler.UpdateAPIKey)
+		keysGroup.PUT("/:uuid/apikeys/:id/status", mustLogin(), acHandler.UpdateAPIKeyStatus)
 		keysGroup.DELETE("/:uuid/apikeys/:id", mustLogin(), acHandler.DeleteAPIKey)
 	}
 	// routers for access tokens and API keys

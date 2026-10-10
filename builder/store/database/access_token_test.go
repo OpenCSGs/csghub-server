@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/tests"
 	"opencsg.com/csghub-server/common/types"
 )
@@ -454,22 +455,81 @@ func TestAccessTokenStore_FindByNsUUID(t *testing.T) {
 		IsActive:    true,
 	}
 
+	// A disabled key is kept in the namespace list (so the UI can show its
+	// status); only soft-deleted keys are hidden.
+	token3 := &database.AccessToken{
+		GitID:       1236,
+		Name:        "ns-token-3",
+		Token:       "ns-token-value-3",
+		UserID:      1,
+		Application: types.AccessTokenAppAIGateway,
+		NsUUID:      nsUUID,
+		IsActive:    false,
+	}
+
 	err := atStore.Create(ctx, token1, nil)
 	require.Nil(t, err)
 	err = atStore.Create(ctx, token2, nil)
+	require.Nil(t, err)
+	err = atStore.Create(ctx, token3, nil)
 	require.Nil(t, err)
 
 	// Find tokens by namespace UUID
 	tokens, err := atStore.FindByNsUUID(ctx, nsUUID, string(types.AccessTokenAppAIGateway))
 	require.Nil(t, err)
-	require.Len(t, tokens, 2)
+	require.Len(t, tokens, 3)
 
 	// Verify tokens are returned in descending order by ID
-	require.Equal(t, token2.ID, tokens[0].ID)
-	require.Equal(t, token1.ID, tokens[1].ID)
+	require.Equal(t, token3.ID, tokens[0].ID)
+	require.Equal(t, token2.ID, tokens[1].ID)
+	require.Equal(t, token1.ID, tokens[2].ID)
 
 	// Find with non-existent namespace UUID
 	tokens, err = atStore.FindByNsUUID(ctx, "nonexistent-uuid", string(types.AccessTokenAppAIGateway))
 	require.Nil(t, err)
 	require.Empty(t, tokens)
+}
+
+func TestAccessTokenStore_SetActiveByID(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+
+	ctx := context.TODO()
+	atStore := database.NewAccessTokenStoreWithDB(db)
+
+	token := &database.AccessToken{
+		GitID:       1234,
+		Name:        "set-active-token",
+		Token:       "set-active-token-value",
+		UserID:      1,
+		Application: types.AccessTokenAppAIGateway,
+		IsActive:    true,
+	}
+
+	err := atStore.Create(ctx, token, nil)
+	require.Nil(t, err)
+	require.True(t, token.IsActive)
+
+	// Disable the key. The row is kept but auth lookups refuse it.
+	err = atStore.SetActiveByID(ctx, token.ID, false)
+	require.Nil(t, err)
+
+	storedToken, err := atStore.FindByID(ctx, token.ID)
+	require.Nil(t, err)
+	require.False(t, storedToken.IsActive)
+
+	_, err = atStore.FindByToken(ctx, "set-active-token-value", string(types.AccessTokenAppAIGateway))
+	require.ErrorIs(t, err, errorx.ErrDatabaseNoRows)
+
+	// Re-enable the key so it grants access again.
+	err = atStore.SetActiveByID(ctx, token.ID, true)
+	require.Nil(t, err)
+
+	storedToken, err = atStore.FindByID(ctx, token.ID)
+	require.Nil(t, err)
+	require.True(t, storedToken.IsActive)
+
+	foundToken, err := atStore.FindByToken(ctx, "set-active-token-value", string(types.AccessTokenAppAIGateway))
+	require.Nil(t, err)
+	require.Equal(t, token.ID, foundToken.ID)
 }

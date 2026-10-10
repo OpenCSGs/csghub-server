@@ -220,6 +220,7 @@ type CheckAccessTokenResp struct {
 	CreatedAt time.Time                     `json:"created_at"`
 	UpdatedAt time.Time                     `json:"updated_at"`
 	TokenType string                        `json:"token_type"`
+	IsActive  bool                          `json:"is_active"`
 }
 
 // AccountAccessTokenQuotaResp is the response representation of a single quota
@@ -259,6 +260,15 @@ type UpdateAPIKeyRequest struct {
 	ExpiredAt   *time.Time `json:"expired_at"`
 	// Quotas supports submitting multiple quota records in one request.
 	Quotas []UpdateAPIKeyQuotaItem `json:"quotas"`
+}
+
+// UpdateAPIKeyStatusRequest enables or disables an API key without deleting it.
+type UpdateAPIKeyStatusRequest struct {
+	CurrentUser string `json:"-"`
+	OpUUID      string `json:"-"`
+	NSUUID      string `json:"-"`
+	ID          int64  `json:"-"`
+	IsActive    *bool  `json:"is_active" binding:"required"`
 }
 
 // UpdateAPIKeyQuotaItem describes a single quota entry within a batch update.

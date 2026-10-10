@@ -637,6 +637,203 @@ func TestAccessTokenComponentImpl_Update(t *testing.T) {
 	})
 }
 
+func TestAccessTokenComponentImpl_SetActive(t *testing.T) {
+	nsUUID := "test-ns-uuid"
+	tokenValue := "test-token-value"
+
+	t.Run("token not found", func(t *testing.T) {
+		mockTokenStore := mockdb.NewMockAccessTokenStore(t)
+		mockTokenStore.EXPECT().FindByID(mock.Anything, int64(1)).
+			Return(nil, errorx.ErrDatabaseNoRows).Once()
+
+		ac := &accessTokenComponentImpl{ts: mockTokenStore}
+
+		isActive := false
+		resp, err := ac.SetActive(context.Background(), &types.UpdateAPIKeyStatusRequest{
+			ID:          1,
+			NSUUID:      nsUUID,
+			CurrentUser: "user1",
+			IsActive:    &isActive,
+		})
+		require.Error(t, err)
+		require.ErrorIs(t, err, errorx.ErrNotFound)
+		require.Nil(t, resp)
+	})
+
+	t.Run("nsuuid mismatch", func(t *testing.T) {
+		mockTokenStore := mockdb.NewMockAccessTokenStore(t)
+		mockTokenStore.EXPECT().FindByID(mock.Anything, int64(1)).
+			Return(&database.AccessToken{ID: 1, NsUUID: "other-ns-uuid"}, nil).Once()
+
+		ac := &accessTokenComponentImpl{ts: mockTokenStore}
+
+		isActive := false
+		resp, err := ac.SetActive(context.Background(), &types.UpdateAPIKeyStatusRequest{
+			ID:          1,
+			NSUUID:      nsUUID,
+			CurrentUser: "user1",
+			IsActive:    &isActive,
+		})
+		require.Error(t, err)
+		require.ErrorIs(t, err, errorx.ErrNotFound)
+		require.Nil(t, resp)
+	})
+
+	t.Run("builtin token cannot be disabled", func(t *testing.T) {
+		mockTokenStore := mockdb.NewMockAccessTokenStore(t)
+		mockTokenStore.EXPECT().FindByID(mock.Anything, int64(1)).
+			Return(&database.AccessToken{
+				ID:        1,
+				NsUUID:    nsUUID,
+				TokenType: types.AccessTokenTypeBuiltIn,
+			}, nil).Once()
+
+		ac := &accessTokenComponentImpl{ts: mockTokenStore}
+
+		isActive := false
+		resp, err := ac.SetActive(context.Background(), &types.UpdateAPIKeyStatusRequest{
+			ID:          1,
+			NSUUID:      nsUUID,
+			CurrentUser: "user1",
+			IsActive:    &isActive,
+		})
+		require.Error(t, err)
+		require.ErrorIs(t, err, errorx.ErrUnauthorized)
+		require.Nil(t, resp)
+	})
+
+	t.Run("forbidden namespace permission", func(t *testing.T) {
+		mockTokenStore := mockdb.NewMockAccessTokenStore(t)
+		mockTokenStore.EXPECT().FindByID(mock.Anything, int64(1)).
+			Return(&database.AccessToken{
+				ID:        1,
+				Token:     tokenValue,
+				NsUUID:    nsUUID,
+				TokenType: types.AccessTokenTypeOwner,
+			}, nil).Once()
+
+		mockNsStore := mockdb.NewMockNamespaceStore(t)
+		mockNsStore.EXPECT().FindByUUID(mock.Anything, nsUUID).
+			Return(database.Namespace{UUID: nsUUID, Path: "user1", NamespaceType: database.UserNamespace}, nil).Once()
+
+		mockUserStore := mockdb.NewMockUserStore(t)
+		mockUserStore.EXPECT().FindByUsername(mock.Anything, "user1").
+			Return(database.User{Username: "user1", UUID: "user1-uuid"}, nil).Once()
+
+		mockAuthorizer := mockrebac.NewMockAuthorizer(t)
+		mockAuthorizer.EXPECT().Check(mock.Anything, rebac.CheckRequest{
+			Subject:     rebac.UserSubject("user1-uuid"),
+			Relation:    rebac.NamespaceCanAdmin,
+			Object:      rebac.NamespaceObject(nsUUID),
+			Consistency: rebac.ConsistencyHigher,
+		}).Return(rebac.Decision{Allowed: false}, nil).Once()
+
+		ac := &accessTokenComponentImpl{
+			ts:      mockTokenStore,
+			nsStore: mockNsStore,
+			us:      mockUserStore,
+			rebac:   mockAuthorizer,
+		}
+
+		isActive := false
+		resp, err := ac.SetActive(context.Background(), &types.UpdateAPIKeyStatusRequest{
+			ID:          1,
+			NSUUID:      nsUUID,
+			CurrentUser: "user1",
+			IsActive:    &isActive,
+		})
+		require.Error(t, err)
+		require.ErrorIs(t, err, errorx.ErrForbidden)
+		require.Nil(t, resp)
+	})
+
+	t.Run("success disable", func(t *testing.T) {
+		mockTokenStore := mockdb.NewMockAccessTokenStore(t)
+		mockTokenStore.EXPECT().FindByID(mock.Anything, int64(1)).
+			Return(&database.AccessToken{
+				ID:          1,
+				Token:       tokenValue,
+				Name:        "test-key",
+				Application: types.AccessTokenAppAIGateway,
+				NsUUID:      nsUUID,
+				TokenType:   types.AccessTokenTypeOwner,
+				IsActive:    true,
+			}, nil).Once()
+
+		mockNsStore := mockdb.NewMockNamespaceStore(t)
+		mockNsStore.EXPECT().FindByUUID(mock.Anything, nsUUID).
+			Return(database.Namespace{UUID: nsUUID, Path: "user1", NamespaceType: database.UserNamespace}, nil).Once()
+
+		mockUserStore := mockdb.NewMockUserStore(t)
+		mockUserStore.EXPECT().FindByUsername(mock.Anything, "user1").
+			Return(database.User{Username: "user1", UUID: "user1-uuid", RoleMask: "admin"}, nil).Once()
+
+		mockTokenStore.EXPECT().SetActiveByID(mock.Anything, int64(1), false).
+			Return(nil).Once()
+
+		ac := &accessTokenComponentImpl{
+			ts:      mockTokenStore,
+			nsStore: mockNsStore,
+			us:      mockUserStore,
+		}
+
+		isActive := false
+		resp, err := ac.SetActive(context.Background(), &types.UpdateAPIKeyStatusRequest{
+			ID:          1,
+			NSUUID:      nsUUID,
+			CurrentUser: "user1",
+			IsActive:    &isActive,
+		})
+		require.NoError(t, err)
+		require.NotNil(t, resp)
+		require.False(t, resp.IsActive)
+		require.Equal(t, int64(1), resp.ID)
+	})
+
+	t.Run("success enable", func(t *testing.T) {
+		mockTokenStore := mockdb.NewMockAccessTokenStore(t)
+		mockTokenStore.EXPECT().FindByID(mock.Anything, int64(1)).
+			Return(&database.AccessToken{
+				ID:          1,
+				Token:       tokenValue,
+				Name:        "test-key",
+				Application: types.AccessTokenAppAIGateway,
+				NsUUID:      nsUUID,
+				TokenType:   types.AccessTokenTypeOwner,
+				IsActive:    false,
+			}, nil).Once()
+
+		mockNsStore := mockdb.NewMockNamespaceStore(t)
+		mockNsStore.EXPECT().FindByUUID(mock.Anything, nsUUID).
+			Return(database.Namespace{UUID: nsUUID, Path: "user1", NamespaceType: database.UserNamespace}, nil).Once()
+
+		mockUserStore := mockdb.NewMockUserStore(t)
+		mockUserStore.EXPECT().FindByUsername(mock.Anything, "user1").
+			Return(database.User{Username: "user1", UUID: "user1-uuid", RoleMask: "admin"}, nil).Once()
+
+		mockTokenStore.EXPECT().SetActiveByID(mock.Anything, int64(1), true).
+			Return(nil).Once()
+
+		ac := &accessTokenComponentImpl{
+			ts:      mockTokenStore,
+			nsStore: mockNsStore,
+			us:      mockUserStore,
+		}
+
+		isActive := true
+		resp, err := ac.SetActive(context.Background(), &types.UpdateAPIKeyStatusRequest{
+			ID:          1,
+			NSUUID:      nsUUID,
+			CurrentUser: "user1",
+			IsActive:    &isActive,
+		})
+		require.NoError(t, err)
+		require.NotNil(t, resp)
+		require.True(t, resp.IsActive)
+		require.Equal(t, int64(1), resp.ID)
+	})
+}
+
 func TestAccessTokenComponentImpl_UpdateAccessTokenQuotas_CreateWhenMissing(t *testing.T) {
 	mockQuotaStore := mockdb.NewMockAccountAccessTokenQuotaStore(t)
 	mockBillStore := mockdb.NewMockAccountBillStore(t)

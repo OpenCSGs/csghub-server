@@ -592,6 +592,73 @@ func (h *AccessTokenHandler) UpdateAPIKey(ctx *gin.Context) {
 	httpbase.OK(ctx, token)
 }
 
+// UpdateAPIKeyStatus godoc
+// @Security     ApiKey
+// @Summary      Enable or disable an API key for an organization or user
+// @Tags         API Key
+// @Accept       json
+// @Produce      json
+// @Param        uuid path string true "organization or user namespace uuid"
+// @Param        id path string true "API key id"
+// @Param        body body types.UpdateAPIKeyStatusRequest true "body"
+// @Success      200  {object}  types.Response{data=types.CheckAccessTokenResp} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      401  {object}  error "Unauthorized - builtin key cannot be disabled"
+// @Failure      403  {object}  error "Forbidden - user is not org admin"
+// @Failure      404  {object}  error "API key not found"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /namespaces/{uuid}/apikeys/{id}/status [put]
+func (h *AccessTokenHandler) UpdateAPIKeyStatus(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+	userUUID := httpbase.GetCurrentUserUUID(ctx)
+
+	nsUUID := ctx.Param("uuid")
+	if nsUUID == "" {
+		httpbase.BadRequestWithExt(ctx, errorx.ReqParamInvalid(errors.New("uuid is required"), nil))
+		return
+	}
+	id := ctx.Param("id")
+	if id == "" {
+		httpbase.BadRequestWithExt(ctx, errorx.ReqParamInvalid(errors.New("id is required"), nil))
+		return
+	}
+	idInt, err := strconv.ParseInt(id, 10, 64)
+	if err != nil {
+		httpbase.BadRequestWithExt(ctx, errorx.ReqParamInvalid(err, nil))
+		return
+	}
+
+	var req types.UpdateAPIKeyStatusRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
+		httpbase.BadRequestWithExt(ctx, err)
+		return
+	}
+
+	req.ID = idInt
+	req.CurrentUser = currentUser
+	req.OpUUID = userUUID
+	req.NSUUID = nsUUID
+
+	token, err := h.c.SetActive(ctx, &req)
+	if err != nil {
+		switch {
+		case errors.Is(err, errorx.ErrForbidden):
+			httpbase.ForbiddenError(ctx, err)
+		case errors.Is(err, errorx.ErrNotFound):
+			httpbase.NotFoundError(ctx, err)
+		case errors.Is(err, errorx.ErrUnauthorized):
+			httpbase.UnauthorizedError(ctx, err)
+		default:
+			slog.ErrorContext(ctx.Request.Context(), "Failed to update API key status", slog.Any("req", req), slog.Any("error", err))
+			httpbase.ServerError(ctx, err)
+		}
+		return
+	}
+
+	httpbase.OK(ctx, token)
+}
+
 // DeleteAPIKey godoc
 // @Security     ApiKey
 // @Summary      Delete an API key for an organization or user

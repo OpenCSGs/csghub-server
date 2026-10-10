@@ -480,6 +480,65 @@ func (_c *MockAccessTokenComponent_RefreshToken_Call) RunAndReturn(run func(cont
 	return _c
 }
 
+// SetActive provides a mock function with given fields: ctx, req
+func (_m *MockAccessTokenComponent) SetActive(ctx context.Context, req *types.UpdateAPIKeyStatusRequest) (*types.CheckAccessTokenResp, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SetActive")
+	}
+
+	var r0 *types.CheckAccessTokenResp
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *types.UpdateAPIKeyStatusRequest) (*types.CheckAccessTokenResp, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *types.UpdateAPIKeyStatusRequest) *types.CheckAccessTokenResp); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*types.CheckAccessTokenResp)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *types.UpdateAPIKeyStatusRequest) error); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAccessTokenComponent_SetActive_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SetActive'
+type MockAccessTokenComponent_SetActive_Call struct {
+	*mock.Call
+}
+
+// SetActive is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req *types.UpdateAPIKeyStatusRequest
+func (_e *MockAccessTokenComponent_Expecter) SetActive(ctx interface{}, req interface{}) *MockAccessTokenComponent_SetActive_Call {
+	return &MockAccessTokenComponent_SetActive_Call{Call: _e.mock.On("SetActive", ctx, req)}
+}
+
+func (_c *MockAccessTokenComponent_SetActive_Call) Run(run func(ctx context.Context, req *types.UpdateAPIKeyStatusRequest)) *MockAccessTokenComponent_SetActive_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(*types.UpdateAPIKeyStatusRequest))
+	})
+	return _c
+}
+
+func (_c *MockAccessTokenComponent_SetActive_Call) Return(_a0 *types.CheckAccessTokenResp, _a1 error) *MockAccessTokenComponent_SetActive_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAccessTokenComponent_SetActive_Call) RunAndReturn(run func(context.Context, *types.UpdateAPIKeyStatusRequest) (*types.CheckAccessTokenResp, error)) *MockAccessTokenComponent_SetActive_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Update provides a mock function with given fields: ctx, req
 func (_m *MockAccessTokenComponent) Update(ctx context.Context, req *types.UpdateAPIKeyRequest) (*types.CheckAccessTokenResp, error) {
 	ret := _m.Called(ctx, req)

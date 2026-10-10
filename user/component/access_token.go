@@ -33,6 +33,7 @@ type AccessTokenComponent interface {
 	RefreshToken(ctx context.Context, req *types.RefreshTokenReq) (types.CheckAccessTokenResp, error)
 	GetOrCreateFirstAvaiToken(ctx context.Context, userName, app, tokenName string) (string, error)
 	Update(ctx context.Context, req *types.UpdateAPIKeyRequest) (*types.CheckAccessTokenResp, error)
+	SetActive(ctx context.Context, req *types.UpdateAPIKeyStatusRequest) (*types.CheckAccessTokenResp, error)
 	GetAPIKeyQuotas(ctx context.Context, apiKey string) ([]database.AccountAccessTokenQuota, error)
 	GetOrCreateBuiltinAPIKey(ctx context.Context, req *types.GetAccessTokenRequest) (*types.CheckAccessTokenResp, error)
 }
@@ -273,6 +274,7 @@ func (c *accessTokenComponentImpl) Check(ctx context.Context, req *types.CheckAc
 	resp.CreatedAt = t.CreatedAt
 	resp.UpdatedAt = t.UpdatedAt
 	resp.TokenType = string(t.TokenType)
+	resp.IsActive = t.IsActive
 	return resp, nil
 }
 
@@ -332,6 +334,7 @@ func (c *accessTokenComponentImpl) GetTokens(ctx context.Context, req *types.Get
 		resp.CreatedAt = t.CreatedAt
 		resp.UpdatedAt = t.UpdatedAt
 		resp.TokenType = string(t.TokenType)
+		resp.IsActive = t.IsActive
 
 		quotas, err := c.tokenQuotaStore.FindByTokenID(ctx, t.ID)
 		if err != nil {
@@ -446,6 +449,7 @@ func (c *accessTokenComponentImpl) RefreshToken(ctx context.Context, refreshReq 
 	resp.NSUUID = newToken.NsUUID
 	resp.CreatedAt = newToken.CreatedAt
 	resp.UpdatedAt = newToken.UpdatedAt
+	resp.IsActive = newToken.IsActive
 
 	return resp, nil
 }
@@ -638,6 +642,7 @@ func (c *accessTokenComponentImpl) Update(ctx context.Context, req *types.Update
 		CreatedAt:   result.CreatedAt,
 		UpdatedAt:   result.UpdatedAt,
 		TokenType:   string(result.TokenType),
+		IsActive:    result.IsActive,
 	}
 	for _, q := range quotas {
 		resp.Quotas = append(resp.Quotas, types.AccountAccessTokenQuotaResp{
@@ -654,6 +659,52 @@ func (c *accessTokenComponentImpl) Update(ctx context.Context, req *types.Update
 	}
 
 	return &resp, nil
+}
+
+// SetActive enables or disables an API key without deleting it. Builtin keys
+// are system-managed and cannot be disabled, mirroring Delete.
+func (c *accessTokenComponentImpl) SetActive(ctx context.Context, req *types.UpdateAPIKeyStatusRequest) (*types.CheckAccessTokenResp, error) {
+	token, err := c.ts.FindByID(ctx, req.ID)
+	if err != nil {
+		if errors.Is(err, errorx.ErrDatabaseNoRows) {
+			return nil, errorx.ErrNotFound
+		}
+		return nil, fmt.Errorf("failed to find api key by id %d, error: %w", req.ID, err)
+	}
+	if req.NSUUID != token.NsUUID {
+		return nil, errorx.ErrNotFound
+	}
+	if token.TokenType == types.AccessTokenTypeBuiltIn {
+		return nil, errorx.ErrUnauthorized
+	}
+
+	checkReq := &types.CreateUserTokenRequest{
+		Username: req.CurrentUser,
+		OpUUID:   req.OpUUID,
+		NSUUID:   req.NSUUID,
+	}
+	// Validate org namespace and admin permission
+	if _, err = c.validateNamespacePermission(ctx, checkReq); err != nil {
+		return nil, err
+	}
+
+	if err = c.ts.SetActiveByID(ctx, req.ID, *req.IsActive); err != nil {
+		return nil, fmt.Errorf("failed to change api key active state, error: %w", err)
+	}
+
+	resp := &types.CheckAccessTokenResp{
+		ID:          token.ID,
+		Token:       maskToken(token.Token),
+		TokenName:   token.Name,
+		Application: token.Application,
+		ExpireAt:    token.ExpiredAt,
+		NSUUID:      token.NsUUID,
+		CreatedAt:   token.CreatedAt,
+		UpdatedAt:   token.UpdatedAt,
+		TokenType:   string(token.TokenType),
+		IsActive:    *req.IsActive,
+	}
+	return resp, nil
 }
 
 func maskToken(token string) string {
@@ -690,6 +741,7 @@ func (c *accessTokenComponentImpl) GetOrCreateBuiltinAPIKey(ctx context.Context,
 		CreatedAt:   defaultToken.CreatedAt,
 		UpdatedAt:   defaultToken.UpdatedAt,
 		TokenType:   string(defaultToken.TokenType),
+		IsActive:    defaultToken.IsActive,
 	}
 	return resp, nil
 }
