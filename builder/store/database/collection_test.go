@@ -129,7 +129,7 @@ func TestCollectionStore_GetCollections(t *testing.T) {
 
 	collections := []*database.Collection{
 		{Name: "col1-1", Private: false, Likes: 20},
-		{Name: "col1-2", Private: true, Likes: 40},
+		{Name: "col1-2", Username: "user", Private: true, Likes: 40},
 		{Name: "col1-3", Private: false, Likes: 50},
 		{Name: "col2-1", Private: false, Likes: 30},
 	}
@@ -147,27 +147,26 @@ func TestCollectionStore_GetCollections(t *testing.T) {
 		}
 		return names
 	}
-	cs, total, err := store.GetCollections(ctx, &types.CollectionFilter{}, 10, 1, false)
+	cs, total, err := store.GetCollections(ctx, &types.CollectionFilter{}, 10, 1)
 	require.Nil(t, err)
 	require.Equal(t, 3, total)
 	require.Equal(t, []string{"col1-1", "col1-3", "col2-1"}, names(cs))
 
-	// showPrivate param is not used here
-	cs, total, err = store.GetCollections(ctx, &types.CollectionFilter{}, 10, 1, true)
+	cs, total, err = store.GetCollections(ctx, &types.CollectionFilter{Username: "user"}, 10, 1)
 	require.Nil(t, err)
-	require.Equal(t, 3, total)
-	require.Equal(t, []string{"col1-1", "col1-3", "col2-1"}, names(cs))
+	require.Equal(t, 4, total)
+	require.Equal(t, []string{"col1-1", "col1-2", "col1-3", "col2-1"}, names(cs))
 
 	cs, total, err = store.GetCollections(ctx, &types.CollectionFilter{
 		Search: "cOl1",
-	}, 10, 1, false)
+	}, 10, 1)
 	require.Nil(t, err)
 	require.Equal(t, 2, total)
 	require.Equal(t, []string{"col1-1", "col1-3"}, names(cs))
 
 	cs, total, err = store.GetCollections(ctx, &types.CollectionFilter{
 		Sort: "most_favorite",
-	}, 10, 1, false)
+	}, 10, 1)
 	require.Nil(t, err)
 	require.Equal(t, 3, total)
 	require.Equal(t, []string{"col1-3", "col2-1", "col1-1"}, names(cs))
@@ -202,10 +201,18 @@ func TestCollectionStore_GetCollections(t *testing.T) {
 	}
 	cs, total, err = store.GetCollections(ctx, &types.CollectionFilter{
 		Sort: "trending",
-	}, 10, 1, false)
+	}, 10, 1)
 	require.Nil(t, err)
 	require.Equal(t, 3, total)
 	require.Equal(t, []string{"col1-1", "col1-3", "col2-1"}, names(cs))
+
+	cs, total, err = store.GetCollections(ctx, &types.CollectionFilter{
+		Sort:     "trending",
+		Username: "user",
+	}, 10, 1)
+	require.Nil(t, err)
+	require.Equal(t, 4, total)
+	require.Equal(t, []string{"col1-1", "col1-3", "col2-1", "col1-2"}, names(cs))
 
 }
 

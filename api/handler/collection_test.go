@@ -58,14 +58,15 @@ func TestCollectionHandler_Index(t *testing.T) {
 
 			if !c.error {
 				tester.mocks.collection.EXPECT().GetCollections(tester.Ctx(), &types.CollectionFilter{
-					Search: "foo",
-					Sort:   c.sort,
+					Search:   "foo",
+					Sort:     c.sort,
+					Username: "u",
 				}, 10, 1).Return([]types.Collection{
 					{Name: "cc"},
 				}, 100, nil)
 			}
 
-			tester.AddPagination(1, 10).WithQuery("search", "foo").
+			tester.WithUser().AddPagination(1, 10).WithQuery("search", "foo").
 				WithQuery("sort", c.sort).Execute()
 
 			if c.error {

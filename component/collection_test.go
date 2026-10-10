@@ -18,7 +18,7 @@ func TestCollectionComponent_GetCollections(t *testing.T) {
 	cc := initializeTestCollectionComponent(ctx, t)
 
 	filter := &types.CollectionFilter{Search: "foo"}
-	cc.mocks.stores.CollectionMock().EXPECT().GetCollections(ctx, filter, 10, 1, true).Return(
+	cc.mocks.stores.CollectionMock().EXPECT().GetCollections(ctx, filter, 10, 1).Return(
 		[]database.Collection{{Name: "n"}}, 100, nil,
 	)
 	data, total, err := cc.GetCollections(ctx, filter, 10, 1)

@@ -54,6 +54,7 @@ type CollectionHandler struct {
 func (c *CollectionHandler) Index(ctx *gin.Context) {
 	filter := new(types.CollectionFilter)
 	filter = getCollectionFilter(ctx, filter)
+	filter.Username = httpbase.GetCurrentUser(ctx)
 	if !slices.Contains(types.CollectionSorts, filter.Sort) {
 		msg := fmt.Sprintf("sort parameter must be one of %v", types.CollectionSorts)
 		err := errorx.ReqParamInvalid(errors.New(msg),

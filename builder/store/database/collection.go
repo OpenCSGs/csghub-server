@@ -18,7 +18,7 @@ type collectionStoreImpl struct {
 
 type CollectionStore interface {
 	// query collections in the database
-	GetCollections(ctx context.Context, filter *types.CollectionFilter, per, page int, showPrivate bool) (collections []Collection, total int, err error)
+	GetCollections(ctx context.Context, filter *types.CollectionFilter, per, page int) (collections []Collection, total int, err error)
 	// query collections in the database
 	QueryByTrending(ctx context.Context, filter *types.CollectionFilter, per, page int) (collections []Collection, total int, err error)
 	CreateCollection(ctx context.Context, collection Collection) (*Collection, error)
@@ -85,15 +85,15 @@ var Fields = []string{"id", "download_count", "likes", "path", "private", "repos
 
 // query collections in the database
 func (cs *collectionStoreImpl) GetCollections(
-	ctx context.Context, filter *types.CollectionFilter, per, page int, showPrivate bool) (
+	ctx context.Context, filter *types.CollectionFilter, per, page int) (
 	collections []Collection, total int, err error) {
 	if filter.Sort == "trending" {
 		return cs.QueryByTrending(ctx, filter, per, page)
 	}
 	query := cs.db.Operator.Core.
 		NewSelect().
-		Model(&collections).
-		Where("private =  ?", false)
+		Model(&collections)
+	applyCollectionVisibilityFilter(query, filter.Username)
 	if filter.Search != "" {
 		filter.Search = strings.ToLower(filter.Search)
 		query.Where(
@@ -132,7 +132,7 @@ func (cs *collectionStoreImpl) QueryByTrending(
 		Join("LEFT JOIN repositories r ON cr.repository_id = r.id").
 		Join("LEFT JOIN recom_op_weights ropw ON r.id = ropw.repository_id").
 		Join("LEFT JOIN recom_repo_scores rors ON r.id = rors.repository_id")
-	query.Where("collection.private = ?", false)
+	applyCollectionVisibilityFilter(query, filter.Username)
 	if filter.Search != "" {
 		filter.Search = strings.ToLower(filter.Search)
 		query.Where(
@@ -159,6 +159,19 @@ func (cs *collectionStoreImpl) QueryByTrending(
 	}
 
 	return cs.GetCollectionsByIDs(ctx, collections, ids, total, true)
+}
+
+func applyCollectionVisibilityFilter(query *bun.SelectQuery, username string) {
+	if username == "" {
+		query.Where("collection.private = ?", false)
+		return
+	}
+
+	query.WhereGroup(" AND ", func(query *bun.SelectQuery) *bun.SelectQuery {
+		return query.
+			Where("collection.private = ?", false).
+			WhereOr("collection.username = ?", username)
+	})
 }
 
 func (cs *collectionStoreImpl) CreateCollection(ctx context.Context, collection Collection) (*Collection, error) {
