@@ -50,6 +50,30 @@ type OrganizationUnitSummary struct {
 	SubtreeMemberCount  int `json:"subtree_member_count"`
 }
 
+// OrganizationUnitTree is a hierarchy organization unit with recursively nested children.
+type OrganizationUnitTree struct {
+	OrganizationUnit
+	Children []OrganizationUnitTree `json:"children"`
+}
+
+// OrganizationUnitTreeStatus describes the result state of a hierarchy tree query.
+type OrganizationUnitTreeStatus int
+
+const (
+	// OrganizationUnitTreeStatusOrganizationNotFound means no active top-level organization exists.
+	OrganizationUnitTreeStatusOrganizationNotFound OrganizationUnitTreeStatus = 1
+	// OrganizationUnitTreeStatusNoPermission means the current user is not a hierarchy organization member.
+	OrganizationUnitTreeStatusNoPermission OrganizationUnitTreeStatus = 2
+	// OrganizationUnitTreeStatusSuccess means the hierarchy tree was returned successfully.
+	OrganizationUnitTreeStatusSuccess OrganizationUnitTreeStatus = 3
+)
+
+// OrganizationUnitTreeResp contains the query state and the hierarchy tree data.
+type OrganizationUnitTreeResp struct {
+	Status OrganizationUnitTreeStatus `json:"status"`
+	Data   []OrganizationUnitTree     `json:"data"`
+}
+
 // CreateOrganizationUnitReq contains organization metadata and structural placement.
 type CreateOrganizationUnitReq struct {
 	OrganizationUUID string  `json:"-"`
