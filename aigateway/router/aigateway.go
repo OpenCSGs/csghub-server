@@ -39,8 +39,6 @@ func NewRouter(config *config.Config) (*gin.Engine, func(), error) {
 	})
 	r.Use(sessions.Sessions("opencsg_jwt_session", store))
 	r.Use(middleware.BuildJwtSession(config.JWT.SigningKey))
-	i18n.InitLocalizersFromEmbedFile()
-	r.Use(middleware.ModifyAcceptLanguageMiddleware(), middleware.LocalizedErrorMiddleware())
 	r.Use(middleware.Authenticator(config))
 
 	bldprometheus.InitMetrics()
@@ -122,6 +120,10 @@ func NewRouter(config *config.Config) (*gin.Engine, func(), error) {
 
 	apiV1Group := r.Group("/api/v1")
 	adminGroup := apiV1Group.Group("/admin", middlewareCollection.Auth.NeedAdmin)
+	// Only admin routes need localized error messages; customer-facing
+	// inference APIs skip i18n initialization entirely.
+	i18n.InitLocalizersFromEmbedFile()
+	adminGroup.Use(middleware.ModifyAcceptLanguageMiddleware(), middleware.LocalizedErrorMiddleware())
 
 	mcpProxy, err := handler.NewMCPProxyHandler(config)
 	if err != nil {
