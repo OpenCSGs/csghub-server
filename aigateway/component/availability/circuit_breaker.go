@@ -114,37 +114,53 @@ func (c *circuitBreakerImpl) IsAvailable(ctx context.Context, upstreamID int64) 
 	case types.CircuitStateClosed:
 		return true, nil
 	case types.CircuitStateOpen:
-		if state.NextRetryAt != nil && now.After(*state.NextRetryAt) {
-			transitioned, transitionErr := c.stateCache.TryTransitionToHalfOpen(ctx, upstreamID, now, circuitStateCacheTTL)
-			if transitionErr != nil {
-				slog.WarnContext(ctx, "failed to transition circuit to half-open atomically", "error", transitionErr,
-					"upstream_id", upstreamID)
+		if state.NextRetryAt != nil && !now.After(*state.NextRetryAt) {
+			return false, nil
+		}
+		// Retry window elapsed, or next_retry_at is missing (legacy rows
+		// written before the record scripts preserved it). Allow the
+		// half-open probe instead of blocking the upstream forever.
+		//
+		// Cache-less mode accepts two documented limitations: half-open
+		// probes are not limited (the slot check allows everything) and a
+		// caller holding a stale 4s local cache may be rejected for up to
+		// one TTL after the transition. Both self-correct: the next
+		// recorded failure re-opens the circuit.
+		if !c.stateCache.Enabled() {
+			if !c.transitionToHalfOpenInDB(ctx, upstreamID, now) {
 				return false, nil
 			}
-			if transitioned {
-				slog.InfoContext(ctx, "circuit breaker transitioned to half-open",
-					"upstream_id", upstreamID,
-					"old_state", string(types.CircuitStateOpen),
-					"new_state", string(types.CircuitStateHalfOpen),
-				)
-				// Invalidate localCache so the next getCircuitState reads the
-				// freshly-transitioned half_open state from Redis instead of
-				// returning the stale open state.
-				c.invalidateLocalCache(c.localCacheKey(upstreamID))
-				updated, getErr := c.getCircuitState(ctx, upstreamID)
-				if getErr == nil {
-					_ = c.persistCircuitState(ctx, updated)
-				}
-				return true, nil
-			}
-
-			// Also invalidate localCache here so we don't read a stale open state
-			// that was cached before another goroutine transitioned to half_open.
+			return true, nil
+		}
+		transitioned, transitionErr := c.stateCache.TryTransitionToHalfOpen(ctx, upstreamID, now, circuitStateCacheTTL)
+		if transitionErr != nil {
+			slog.WarnContext(ctx, "failed to transition circuit to half-open atomically", "error", transitionErr,
+				"upstream_id", upstreamID)
+			return false, nil
+		}
+		if transitioned {
+			slog.InfoContext(ctx, "circuit breaker transitioned to half-open",
+				"upstream_id", upstreamID,
+				"old_state", string(types.CircuitStateOpen),
+				"new_state", string(types.CircuitStateHalfOpen),
+			)
+			// Invalidate localCache so the next getCircuitState reads the
+			// freshly-transitioned half_open state from Redis instead of
+			// returning the stale open state.
 			c.invalidateLocalCache(c.localCacheKey(upstreamID))
-			latest, getErr := c.getCircuitState(ctx, upstreamID)
-			if getErr == nil && latest.CircuitState != types.CircuitStateOpen {
-				return true, nil
+			updated, getErr := c.getCircuitState(ctx, upstreamID)
+			if getErr == nil {
+				_ = c.persistCircuitState(ctx, updated)
 			}
+			return true, nil
+		}
+
+		// Also invalidate localCache here so we don't read a stale open state
+		// that was cached before another goroutine transitioned to half_open.
+		c.invalidateLocalCache(c.localCacheKey(upstreamID))
+		latest, getErr := c.getCircuitState(ctx, upstreamID)
+		if getErr == nil && latest.CircuitState != types.CircuitStateOpen {
+			return true, nil
 		}
 		return false, nil
 	case types.CircuitStateHalfOpen:
@@ -202,8 +218,13 @@ func (c *circuitBreakerImpl) RecordSuccess(ctx context.Context, upstreamID int64
 		state.CircuitState = types.CircuitStateClosed
 		state.LastStateChange = now
 		state.SuccessCount = 0
+		state.NextRetryAt = nil
+	} else if state.CircuitState != types.CircuitStateOpen {
+		// An open circuit keeps its retry deadline: clearing it here (an
+		// in-flight request finishing after the trip) would strand the
+		// circuit open with no eligible retry time.
+		state.NextRetryAt = nil
 	}
-	state.NextRetryAt = nil
 	return c.persistCircuitState(ctx, state)
 }
 
@@ -398,7 +419,17 @@ func (c *circuitBreakerImpl) checkAndTransitionOpenCircuits(ctx context.Context)
 
 	now := time.Now()
 	for _, dbState := range openStates {
-		if dbState.NextRetryAt == nil || !now.After(*dbState.NextRetryAt) {
+		// A missing NextRetryAt is treated as an elapsed retry window so
+		// legacy/corrupted open rows are still recovered instead of being
+		// skipped forever.
+		if dbState.NextRetryAt != nil && !now.After(*dbState.NextRetryAt) {
+			continue
+		}
+
+		if !c.stateCache.Enabled() {
+			// No state cache configured: the Redis-based atomic transition
+			// can never run, so transition directly in the database.
+			c.transitionToHalfOpenInDB(ctx, dbState.UpstreamID, now)
 			continue
 		}
 
@@ -407,6 +438,9 @@ func (c *circuitBreakerImpl) checkAndTransitionOpenCircuits(ctx context.Context)
 			slog.WarnContext(ctx, "failed to set circuit state after transition",
 				"error", err,
 				"upstream_id", dbState.UpstreamID)
+			// State cache unavailable: close the circuit in the database so
+			// it cannot stay open until Redis recovers.
+			c.closeCircuitInDBOnCacheUnavailable(ctx, dbState.UpstreamID, err)
 			continue
 		}
 
@@ -415,6 +449,7 @@ func (c *circuitBreakerImpl) checkAndTransitionOpenCircuits(ctx context.Context)
 			slog.WarnContext(ctx, "failed to transition circuit to half-open",
 				"error", err,
 				"upstream_id", dbState.UpstreamID)
+			c.closeCircuitInDBOnCacheUnavailable(ctx, dbState.UpstreamID, err)
 			continue
 		}
 		if !transitioned {
@@ -441,6 +476,74 @@ func (c *circuitBreakerImpl) checkAndTransitionOpenCircuits(ctx context.Context)
 				"upstream_id", dbState.UpstreamID)
 		}
 	}
+}
+
+// transitionToHalfOpenInDB transitions an open circuit to half_open directly
+// in the database. It is the fallback used when the state cache is disabled,
+// where the Redis-based atomic transition cannot run. It reports whether the
+// transition was performed by this call.
+func (c *circuitBreakerImpl) transitionToHalfOpenInDB(ctx context.Context, upstreamID int64, now time.Time) bool {
+	dbState, err := c.circuitStore.GetByUpstreamID(ctx, upstreamID)
+	if err != nil {
+		slog.WarnContext(ctx, "failed to read circuit state for db half-open transition",
+			"error", err,
+			"upstream_id", upstreamID)
+		return false
+	}
+	if dbState == nil || dbState.CircuitState != string(types.CircuitStateOpen) {
+		return false
+	}
+	if dbState.NextRetryAt != nil && now.Before(*dbState.NextRetryAt) {
+		return false
+	}
+	dbState.CircuitState = string(types.CircuitStateHalfOpen)
+	dbState.FailureCount = 0
+	dbState.SuccessCount = 0
+	dbState.LastStateChange = now
+	dbState.NextRetryAt = nil
+	if err := c.circuitStore.Upsert(ctx, dbState); err != nil {
+		slog.WarnContext(ctx, "failed to persist half-open circuit state in db",
+			"error", err,
+			"upstream_id", upstreamID)
+		return false
+	}
+	c.invalidateLocalCache(c.localCacheKey(upstreamID))
+	slog.InfoContext(ctx, "circuit breaker transitioned to half-open in db",
+		"upstream_id", upstreamID,
+		"old_state", string(types.CircuitStateOpen),
+		"new_state", string(types.CircuitStateHalfOpen),
+	)
+	return true
+}
+
+// closeCircuitInDBOnCacheUnavailable force-closes a circuit directly in the
+// database when the state cache is unavailable, so a circuit whose retry
+// window has elapsed cannot stay open until Redis recovers. The local cache
+// is left pointing at the closed state so this instance immediately fails
+// open; the Redis copy, if any, expires with its TTL.
+//
+// Provider/ModelName are written empty and circuit metadata is cleared by the
+// Upsert — the same as every other persist path, since no writer populates
+// circuit-state metadata today.
+func (c *circuitBreakerImpl) closeCircuitInDBOnCacheUnavailable(ctx context.Context, upstreamID int64, cause error) {
+	now := time.Now()
+	status := &types.ProviderCircuitStatus{
+		UpstreamID:      upstreamID,
+		CircuitState:    types.CircuitStateClosed,
+		LastStateChange: now,
+	}
+	if err := c.persistCircuitState(ctx, status); err != nil {
+		slog.ErrorContext(ctx, "failed to close circuit in db while state cache unavailable",
+			"error", err,
+			"upstream_id", upstreamID,
+			"cause", cause)
+		return
+	}
+	slog.InfoContext(ctx, "circuit breaker closed because state cache is unavailable",
+		"upstream_id", upstreamID,
+		"old_state", string(types.CircuitStateOpen),
+		"new_state", string(types.CircuitStateClosed),
+		"cause", cause)
 }
 
 func (c *circuitBreakerImpl) getCircuitState(ctx context.Context, upstreamID int64) (*types.ProviderCircuitStatus, error) {

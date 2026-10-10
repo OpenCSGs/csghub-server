@@ -57,7 +57,10 @@ func (h *OpenAIHandlerImpl) reportChatAttemptFailure(ctx context.Context, event 
 	if err := h.chatAttemptFailureReporter.ReportChatAttemptFailure(ctx, event); err != nil {
 		slog.WarnContext(ctx, "failed to report chat attempt failure", slog.Any("error", err), slog.Any("event", event))
 	}
-	if h.availabilityManager != nil && types.ShouldAttemptFailureStatus(event.StatusCode) {
+	// 429 (throttling) and 499 (client closed) carry no signal about upstream
+	// availability and must not trip the circuit breaker.
+	if h.availabilityManager != nil && types.ShouldAttemptFailureStatus(event.StatusCode) &&
+		!types.IsCircuitNeutralStatus(event.StatusCode) {
 		recordErr := h.availabilityManager.RecordRequestResult(
 			ctx,
 			event.UpstreamID,
@@ -130,7 +133,9 @@ func (h *OpenAIHandlerImpl) reportChatAttemptResult(ctx context.Context, p chatA
 			defer cancel()
 			h.reportChatAttemptFailure(timeoutCtx, event)
 		}()
-	} else {
+	} else if !types.IsCircuitNeutralStatus(p.StatusCode) {
+		// 499 (client closed) is neutral for the circuit breaker: recording
+		// it as a success could spuriously close a half-open circuit.
 		upstreamID := p.UpstreamID
 		modelID := resolveFailureEventModelID(p.RequestModelID, p.Model)
 		go func() {

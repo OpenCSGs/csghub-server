@@ -283,3 +283,110 @@ func (s *stubAvailabilityManager) IsAvailable(_ context.Context, _ int64) (bool,
 func (s *stubAvailabilityManager) GetCircuitState(_ context.Context, _ int64) (*types.ProviderCircuitStatus, error) {
 	return &types.ProviderCircuitStatus{CircuitState: types.CircuitStateClosed}, nil
 }
+
+type recordedRequestResult struct {
+	upstreamID int64
+	modelID    string
+	success    bool
+	err        error
+}
+
+// recordingAvailabilityManager records RecordRequestResult calls so tests can
+// assert which statuses reach the circuit breaker.
+type recordingAvailabilityManager struct {
+	stubAvailabilityManager
+	mu    sync.Mutex
+	calls []recordedRequestResult
+}
+
+func (r *recordingAvailabilityManager) RecordRequestResult(_ context.Context, upstreamID int64, modelID string, success bool, err error) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.calls = append(r.calls, recordedRequestResult{upstreamID: upstreamID, modelID: modelID, success: success, err: err})
+	return nil
+}
+
+func (r *recordingAvailabilityManager) callsSnapshot() []recordedRequestResult {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return append([]recordedRequestResult(nil), r.calls...)
+}
+
+func TestReportChatAttemptResult_CircuitRecording(t *testing.T) {
+	t.Run("429 reports failure event but skips circuit recording", func(t *testing.T) {
+		reporter := newAsyncTestChatAttemptFailureReporter()
+		am := &recordingAvailabilityManager{}
+		h := &OpenAIHandlerImpl{
+			chatAttemptFailureReporter: reporter,
+			availabilityManager:        am,
+		}
+
+		h.reportChatAttemptResult(context.Background(), chatAttemptReportParams{
+			UpstreamID: 1,
+			StatusCode: 429,
+		})
+
+		reporter.wait(t)
+		require.Equal(t, 1, reporter.len(), "429 is still reported as a failure event")
+		time.Sleep(50 * time.Millisecond)
+		require.Empty(t, am.callsSnapshot(), "429 (throttling) must not be recorded as a circuit failure")
+	})
+
+	t.Run("499 skips both event and circuit recording", func(t *testing.T) {
+		reporter := newAsyncTestChatAttemptFailureReporter()
+		am := &recordingAvailabilityManager{}
+		h := &OpenAIHandlerImpl{
+			chatAttemptFailureReporter: reporter,
+			availabilityManager:        am,
+		}
+
+		h.reportChatAttemptResult(context.Background(), chatAttemptReportParams{
+			UpstreamID: 1,
+			StatusCode: 499,
+		})
+
+		time.Sleep(50 * time.Millisecond)
+		require.Equal(t, 0, reporter.len(), "499 is not a failure event")
+		require.Empty(t, am.callsSnapshot(), "499 (client closed) is neutral: neither failure nor success for the circuit breaker")
+	})
+
+	t.Run("503 reports event and records circuit failure", func(t *testing.T) {
+		reporter := newAsyncTestChatAttemptFailureReporter()
+		am := &recordingAvailabilityManager{}
+		h := &OpenAIHandlerImpl{
+			chatAttemptFailureReporter: reporter,
+			availabilityManager:        am,
+		}
+
+		h.reportChatAttemptResult(context.Background(), chatAttemptReportParams{
+			UpstreamID: 1,
+			StatusCode: 503,
+		})
+
+		reporter.wait(t)
+		calls := am.callsSnapshot()
+		require.Len(t, calls, 1)
+		require.False(t, calls[0].success)
+		require.NotNil(t, calls[0].err)
+	})
+
+	t.Run("200 records circuit success", func(t *testing.T) {
+		reporter := newAsyncTestChatAttemptFailureReporter()
+		am := &recordingAvailabilityManager{}
+		h := &OpenAIHandlerImpl{
+			chatAttemptFailureReporter: reporter,
+			availabilityManager:        am,
+		}
+
+		h.reportChatAttemptResult(context.Background(), chatAttemptReportParams{
+			UpstreamID: 1,
+			StatusCode: 200,
+		})
+
+		time.Sleep(50 * time.Millisecond)
+		require.Equal(t, 0, reporter.len())
+		calls := am.callsSnapshot()
+		require.Len(t, calls, 1)
+		require.True(t, calls[0].success)
+	})
+}
