@@ -37,13 +37,13 @@ type contentSafetyAdapter struct {
 }
 
 func (a *contentSafetyAdapter) Check(ctx context.Context, model *types.Model, promptText, nsUUID, task string, streaming bool, provider string) (bool, string, error) {
-	// Only token-generating protocols (chat/responses/messages) go through
-	// the SensitivePolicy gate here.  Other tasks (text-to-image,
+	// Only token-generating protocols (chat/responses/messages/systemone) go
+	// through the SensitivePolicy gate here.  Other tasks (text-to-image,
 	// text-to-video, audio, ocr, embedding, rerank) either skip content
 	// safety entirely or use CheckImagePrompts directly in their Execute
 	// phase, which bypasses the SensitivePolicy gate intentionally.
 	switch task {
-	case "chat", "responses", "messages":
+	case "chat", "responses", "messages", "systemone":
 		// fall through
 	default:
 		return false, "", nil

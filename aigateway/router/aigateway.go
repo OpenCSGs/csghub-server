@@ -77,6 +77,7 @@ func NewRouter(config *config.Config) (*gin.Engine, func(), error) {
 	videoHandler := handler.NewVideoHandler(openAIhandler)
 	responsesHandler := handler.NewResponsesHandler(openAIhandler)
 	chatHandler := handler.NewChatHandler(openAIhandler)
+	jevHandler := handler.NewJevHandler(openAIhandler)
 	// Metrics middleware: manages request lifecycle metrics for inference
 	// routes.  Each route opts in by including metricsMw in its handler chain.
 	// Returns a no-op handler + cleanup when the metrics feature is not
@@ -96,6 +97,7 @@ func NewRouter(config *config.Config) (*gin.Engine, func(), error) {
 	v1Group.GET("/models/*model", openAIhandler.GetModel)
 	v1Group.POST("/responses", middlewareCollection.Auth.MustUserOrgApiKey, quotaMW, metricsMw, responsesHandler.Responses)
 	v1Group.POST("/chat/completions", middlewareCollection.Auth.MustUserOrgApiKey, quotaMW, metricsMw, chatHandler.Chat)
+	v1Group.POST("/systemone", middlewareCollection.Auth.MustUserOrgApiKey, quotaMW, metricsMw, jevHandler.SystemOne)
 	v1Group.POST("/messages", middlewareCollection.Auth.MustUserOrgApiKey, quotaMW, metricsMw, anthropicHandler.Messages)
 	v1Group.POST("/embeddings", middlewareCollection.Auth.MustUserOrgApiKey, quotaMW, metricsMw, embeddingHandler.Embedding)
 	v1Group.POST("/rerank", middlewareCollection.Auth.MustUserOrgApiKey, quotaMW, metricsMw, rerankHandler.Rerank)

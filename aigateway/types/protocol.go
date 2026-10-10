@@ -10,6 +10,9 @@ const (
 	ProtocolResponses Protocol = "responses"
 	// ProtocolMessages is the Anthropic Messages API (/v1/messages).
 	ProtocolMessages Protocol = "messages"
+	// ProtocolSystemOne is the Jev (System One) state-and-questions API
+	// (/v1/systemone), following the TypeSafe SDK guide.
+	ProtocolSystemOne Protocol = "systemone"
 )
 
 // ProtocolCapability describes the feature set of a protocol implementation.
@@ -63,6 +66,18 @@ var DefaultProtocolCapabilities = map[Protocol]ProtocolCapability{
 		Vision:           true,
 		Thinking:         true,
 		PromptCaching:    true,
+		StructuredOutput: false,
+	},
+	ProtocolSystemOne: {
+		// The System One protocol is a single synchronous request/response
+		// evaluation call: no streaming, no tools, no vision, no sampling
+		// controls.
+		Protocol:         ProtocolSystemOne,
+		Streaming:        false,
+		Tools:            false,
+		Vision:           false,
+		Thinking:         false,
+		PromptCaching:    false,
 		StructuredOutput: false,
 	},
 }

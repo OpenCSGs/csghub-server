@@ -78,6 +78,10 @@ var adapterMatrix = map[types.Protocol]map[types.Protocol]AdapterKind{
 		types.ProtocolChat:      AdapterMessagesToChat,
 		types.ProtocolResponses: AdapterMessagesToResponses,
 	},
+	// System One is a self-contained evaluation protocol with no adapters in
+	// either direction: a systemone request is only served by a systemone
+	// upstream (native passthrough), and vice versa.
+	types.ProtocolSystemOne: {},
 }
 
 // ResolveRouting determines how a client request should be routed to the
@@ -163,7 +167,7 @@ func DetectUpstreamProtocol(target RoutingTarget) types.Protocol {
 	if target.ProtocolOverride != "" {
 		p := strings.TrimSpace(strings.ToLower(target.ProtocolOverride))
 		switch types.Protocol(p) {
-		case types.ProtocolChat, types.ProtocolResponses, types.ProtocolMessages:
+		case types.ProtocolChat, types.ProtocolResponses, types.ProtocolMessages, types.ProtocolSystemOne:
 			return types.Protocol(p)
 		}
 	}
@@ -192,7 +196,7 @@ func hasExplicitProtocolMetadata(target RoutingTarget) bool {
 	}
 	p := strings.TrimSpace(strings.ToLower(target.ProtocolOverride))
 	switch types.Protocol(p) {
-	case types.ProtocolChat, types.ProtocolResponses, types.ProtocolMessages:
+	case types.ProtocolChat, types.ProtocolResponses, types.ProtocolMessages, types.ProtocolSystemOne:
 		return true
 	}
 	return false
@@ -220,6 +224,8 @@ func inferProtocolFromURL(rawURL string) (types.Protocol, bool) {
 		return types.ProtocolResponses, true
 	case pathEndsWithSegments(path, "chat", "completions"):
 		return types.ProtocolChat, true
+	case pathEndsWithSegments(path, "systemone"):
+		return types.ProtocolSystemOne, true
 	}
 	return "", false
 }
@@ -247,6 +253,8 @@ func adaptBackendURL(target RoutingTarget, upstreamProtocol types.Protocol) stri
 			return appendEndpointPath(parsed, "v1", "responses")
 		case types.ProtocolMessages:
 			return appendEndpointPath(parsed, "v1", "messages")
+		case types.ProtocolSystemOne:
+			return appendEndpointPath(parsed, "v1", "systemone")
 		}
 	}
 

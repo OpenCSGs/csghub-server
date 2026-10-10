@@ -22,6 +22,7 @@ const (
 	speechRoute                    = "/audio/speech"
 	batchSpeechRoute               = "/audio/speech/batch"
 	videoGenerationsRoute          = "/video/generations"
+	systemoneRoute                 = "/systemone"
 	responsesSampleMaxOutputTokens = 16
 	defaultAnthropicVersion        = "2023-06-01"
 )
@@ -178,4 +179,25 @@ func batchSpeechRequest(input types.SampleInput) (*types.SampleRequest, error) {
 func videoGenerationsRequest(input types.SampleInput) (*types.SampleRequest, error) {
 	dto := types.VideoGenerationRequest{Model: input.Model, Prompt: sampleText(input)}
 	return jsonRequest(input, dto)
+}
+
+// systemoneRequest builds a minimal Jev (System One) inference sample: one
+// noul question over the sample text.  The protocol has no sampling knobs,
+// so the upstream answers with a short scored response.
+func systemoneRequest(input types.SampleInput) (*types.SampleRequest, error) {
+	state, err := json.Marshal(sampleText(input))
+	if err != nil {
+		return nil, fmt.Errorf("marshal systemone sample state: %w", err)
+	}
+	dto := types.JevRequest{
+		Model: input.Model,
+		State: state,
+		Questions: map[string]types.JevQuestion{
+			"sample": {
+				Type:         "noul",
+				Instructions: json.RawMessage(`"Score whether the state is a normal customer message."`),
+			},
+		},
+	}
+	return jsonRequest(input, &dto)
 }
