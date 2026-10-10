@@ -57,5 +57,6 @@ func TestParseAgentFile_MissingName(t *testing.T) {
 
 func TestSupportedSandboxRuntimeKinds(t *testing.T) {
 	require.True(t, SupportedSandboxRuntimeKinds["codex"])
+	require.True(t, SupportedSandboxRuntimeKinds["dsh"])
 	require.False(t, SupportedSandboxRuntimeKinds["openclaw"])
 }
