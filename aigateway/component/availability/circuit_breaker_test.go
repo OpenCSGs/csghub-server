@@ -59,10 +59,28 @@ func (s *fakeCircuitStore) GetByUpstreamID(_ context.Context, upstreamID int64) 
 }
 
 func (s *fakeCircuitStore) GetAllOpen(_ context.Context) ([]database.AIGatewayUpstreamCircuitState, error) {
-	return nil, nil
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var results []database.AIGatewayUpstreamCircuitState
+	for _, state := range s.states {
+		if state.CircuitState == string(types.CircuitStateOpen) {
+			copied := *state
+			results = append(results, copied)
+		}
+	}
+	return results, nil
 }
 func (s *fakeCircuitStore) GetAllClosed(_ context.Context) ([]database.AIGatewayUpstreamCircuitState, error) {
-	return nil, nil
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var results []database.AIGatewayUpstreamCircuitState
+	for _, state := range s.states {
+		if state.CircuitState == string(types.CircuitStateClosed) {
+			copied := *state
+			results = append(results, copied)
+		}
+	}
+	return results, nil
 }
 
 func (s *fakeCircuitStore) DeleteByUpstreamID(_ context.Context, upstreamID int64) error {
@@ -794,4 +812,204 @@ func assertCircuitMetricValue(t *testing.T, reg *prometheus.Registry, upstreamID
 	require.Equal(t, provider, gotLabels["provider"])
 	require.Equal(t, circuitState, gotLabels["circuit_state"])
 	require.Equal(t, "", gotLabels["url"], "url label should not exist")
+}
+
+func seedCircuitStoreState(t *testing.T, store *fakeCircuitStore, upstreamID int64, state types.CircuitState, nextRetryAt *time.Time) {
+	t.Helper()
+	require.NoError(t, store.Upsert(context.Background(), &database.AIGatewayUpstreamCircuitState{
+		UpstreamID:      upstreamID,
+		CircuitState:    string(state),
+		FailureCount:    0,
+		SuccessCount:    0,
+		LastStateChange: time.Now(),
+		NextRetryAt:     nextRetryAt,
+	}))
+}
+
+// TestCircuitBreaker_RecordSuccess_FallbackOpenStatePreservesNextRetryAt
+// guards against the incident where a success recorded while the circuit was
+// open (an in-flight request finishing after the trip) wiped next_retry_at,
+// leaving the circuit open with no eligible retry time.
+func TestCircuitBreaker_RecordSuccess_FallbackOpenStatePreservesNextRetryAt(t *testing.T) {
+	store := newFakeCircuitStore()
+	nextRetry := time.Now().Add(30 * time.Second)
+	seedCircuitStoreState(t, store, 1, types.CircuitStateOpen, &nextRetry)
+	cb := NewCircuitBreaker(types.CircuitBreakerConfig{Enabled: true}, store, nil)
+
+	require.NoError(t, cb.RecordSuccess(context.Background(), int64(1)))
+
+	dbState, err := store.GetByUpstreamID(context.Background(), int64(1))
+	require.NoError(t, err)
+	require.Equal(t, string(types.CircuitStateOpen), dbState.CircuitState, "success while open must not change the state")
+	require.Equal(t, 1, dbState.SuccessCount)
+	require.NotNil(t, dbState.NextRetryAt, "success while open must preserve next_retry_at")
+	require.WithinDuration(t, nextRetry, *dbState.NextRetryAt, time.Second)
+}
+
+func TestCircuitBreaker_RecordFailure_FallbackOpenStatePreservesNextRetryAt(t *testing.T) {
+	store := newFakeCircuitStore()
+	nextRetry := time.Now().Add(30 * time.Second)
+	seedCircuitStoreState(t, store, 1, types.CircuitStateOpen, &nextRetry)
+	cb := NewCircuitBreaker(types.CircuitBreakerConfig{Enabled: true, FailureThreshold: 3}, store, nil)
+
+	require.NoError(t, cb.RecordFailure(context.Background(), int64(1), "test-model", errors.New("boom")))
+
+	dbState, err := store.GetByUpstreamID(context.Background(), int64(1))
+	require.NoError(t, err)
+	require.Equal(t, string(types.CircuitStateOpen), dbState.CircuitState, "failure below threshold while open must stay open")
+	require.Equal(t, 1, dbState.FailureCount)
+	require.NotNil(t, dbState.NextRetryAt, "failure while open must preserve next_retry_at")
+	require.WithinDuration(t, nextRetry, *dbState.NextRetryAt, time.Second)
+}
+
+func TestCircuitBreaker_IsAvailable_OpenWithoutNextRetryAt_NoCache_TransitionsInDB(t *testing.T) {
+	store := newFakeCircuitStore()
+	// Reproduces the incident row: open with a wiped next_retry_at.
+	seedCircuitStoreState(t, store, 1, types.CircuitStateOpen, nil)
+	cb := NewCircuitBreaker(types.CircuitBreakerConfig{Enabled: true}, store, nil)
+
+	available, err := cb.IsAvailable(context.Background(), int64(1))
+	require.NoError(t, err)
+	require.True(t, available, "open circuit with missing next_retry_at must be probed, not blocked forever")
+
+	dbState, err := store.GetByUpstreamID(context.Background(), int64(1))
+	require.NoError(t, err)
+	require.Equal(t, string(types.CircuitStateHalfOpen), dbState.CircuitState)
+	require.Nil(t, dbState.NextRetryAt)
+}
+
+// TestCircuitBreaker_IsAvailable_OpenMissingNextRetryAt_CacheEnabled covers the
+// request path (not just the Lua script) when the state cache is enabled and a
+// cached open state carries no next_retry_at: the transition must be attempted
+// and the request admitted.
+func TestCircuitBreaker_IsAvailable_OpenMissingNextRetryAt_CacheEnabled(t *testing.T) {
+	redisClient := mockcache.NewMockRedisClient(t)
+	store := newFakeCircuitStore()
+	cb := NewCircuitBreaker(types.CircuitBreakerConfig{Enabled: true}, store, redisClient).(*circuitBreakerImpl)
+
+	// Fresh read: open state with no next_retry_at field (the wiped-deadline shape).
+	redisClient.EXPECT().
+		HGetAll(mock.Anything, "aigateway:availability:circuit:1").
+		Return(map[string]string{
+			"circuit_state":     "open",
+			"failure_count":     "0",
+			"success_count":     "0",
+			"last_state_change": fmt.Sprintf("%d", time.Now().Unix()),
+		}, nil).
+		Once()
+	// Missing deadline counts as an elapsed retry window: the transition wins.
+	redisClient.EXPECT().
+		RunScript(mock.Anything, transitionToHalfOpenScript, mock.Anything, mock.Anything, mock.Anything).
+		Return(int64(1), nil).
+		Once()
+	// After invalidation, the re-read finds the freshly transitioned half_open.
+	redisClient.EXPECT().
+		HGetAll(mock.Anything, "aigateway:availability:circuit:1").
+		Return(map[string]string{
+			"circuit_state":     "half_open",
+			"failure_count":     "0",
+			"success_count":     "0",
+			"last_state_change": fmt.Sprintf("%d", time.Now().Unix()),
+		}, nil).
+		Once()
+	// persistCircuitState → SetCircuitState (no retry deadline) + Expire.
+	redisClient.EXPECT().
+		HMSet(mock.Anything, "aigateway:availability:circuit:1",
+			mock.Anything, mock.Anything, mock.Anything, mock.Anything,
+			mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		Return(nil).
+		Once()
+	redisClient.EXPECT().
+		HDel(mock.Anything, "aigateway:availability:circuit:1", "next_retry_at").
+		Return(nil).
+		Once()
+	redisClient.EXPECT().
+		Expire(mock.Anything, "aigateway:availability:circuit:1", 10*time.Second).
+		Return(nil).
+		Once()
+
+	available, err := cb.IsAvailable(context.Background(), int64(1))
+	require.NoError(t, err)
+	require.True(t, available, "open circuit with missing next_retry_at must transition to half-open and admit the probe")
+
+	dbState, err := store.GetByUpstreamID(context.Background(), int64(1))
+	require.NoError(t, err)
+	require.Equal(t, string(types.CircuitStateHalfOpen), dbState.CircuitState)
+}
+
+func TestCircuitBreaker_IsAvailable_OpenElapsedRetry_NoCache_TransitionsInDB(t *testing.T) {
+	store := newFakeCircuitStore()
+	seedCircuitStoreState(t, store, 1, types.CircuitStateOpen, ptrTime(time.Now().Add(-time.Minute)))
+	cb := NewCircuitBreaker(types.CircuitBreakerConfig{Enabled: true}, store, nil)
+
+	available, err := cb.IsAvailable(context.Background(), int64(1))
+	require.NoError(t, err)
+	require.True(t, available, "open circuit with elapsed retry must transition to half-open without a cache")
+
+	dbState, err := store.GetByUpstreamID(context.Background(), int64(1))
+	require.NoError(t, err)
+	require.Equal(t, string(types.CircuitStateHalfOpen), dbState.CircuitState)
+}
+
+func TestCircuitBreaker_IsAvailable_OpenFutureRetry_NoCache_Unavailable(t *testing.T) {
+	store := newFakeCircuitStore()
+	seedCircuitStoreState(t, store, 1, types.CircuitStateOpen, ptrTime(time.Now().Add(time.Minute)))
+	cb := NewCircuitBreaker(types.CircuitBreakerConfig{Enabled: true}, store, nil)
+
+	available, err := cb.IsAvailable(context.Background(), int64(1))
+	require.NoError(t, err)
+	require.False(t, available)
+
+	dbState, err := store.GetByUpstreamID(context.Background(), int64(1))
+	require.NoError(t, err)
+	require.Equal(t, string(types.CircuitStateOpen), dbState.CircuitState, "retry window still open: state must stay open")
+}
+
+func TestCircuitBreaker_Watcher_NoCache_TransitionsElapsedRowsToHalfOpen(t *testing.T) {
+	store := newFakeCircuitStore()
+	seedCircuitStoreState(t, store, 1, types.CircuitStateOpen, ptrTime(time.Now().Add(-time.Minute)))
+	seedCircuitStoreState(t, store, 2, types.CircuitStateOpen, ptrTime(time.Now().Add(time.Minute)))
+	cb := NewCircuitBreaker(types.CircuitBreakerConfig{Enabled: true}, store, nil).(*circuitBreakerImpl)
+
+	cb.checkAndTransitionOpenCircuits(context.Background())
+
+	state1, err := store.GetByUpstreamID(context.Background(), int64(1))
+	require.NoError(t, err)
+	require.Equal(t, string(types.CircuitStateHalfOpen), state1.CircuitState, "elapsed retry must transition without a cache")
+
+	state2, err := store.GetByUpstreamID(context.Background(), int64(2))
+	require.NoError(t, err)
+	require.Equal(t, string(types.CircuitStateOpen), state2.CircuitState, "future retry must stay open")
+}
+
+func TestCircuitBreaker_Watcher_RedisUnavailable_ClosesCircuitInDB(t *testing.T) {
+	redisClient := mockcache.NewMockRedisClient(t)
+	store := newFakeCircuitStore()
+	seedCircuitStoreState(t, store, 1, types.CircuitStateOpen, ptrTime(time.Now().Add(-time.Minute)))
+	cb := NewCircuitBreaker(types.CircuitBreakerConfig{Enabled: true}, store, redisClient).(*circuitBreakerImpl)
+
+	// SetCircuitState (seeding the open state before the transition) fails:
+	// Redis is unavailable.
+	redisClient.EXPECT().
+		HMSet(mock.Anything, "aigateway:availability:circuit:1",
+			mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything,
+			mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		Return(errors.New("redis unavailable")).
+		Once()
+	// closeCircuitInDBOnCacheUnavailable persists the closed state; its Redis
+	// write also fails but must not stop the DB fallback.
+	redisClient.EXPECT().
+		HMSet(mock.Anything, "aigateway:availability:circuit:1",
+			mock.Anything, mock.Anything, mock.Anything, mock.Anything,
+			mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		Return(errors.New("redis unavailable")).
+		Once()
+
+	cb.checkAndTransitionOpenCircuits(context.Background())
+
+	dbState, err := store.GetByUpstreamID(context.Background(), int64(1))
+	require.NoError(t, err)
+	require.Equal(t, string(types.CircuitStateClosed), dbState.CircuitState,
+		"circuit must be closed in db when the state cache is unavailable")
+	require.Nil(t, dbState.NextRetryAt)
 }

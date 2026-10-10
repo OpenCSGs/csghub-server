@@ -27,9 +27,6 @@ if not state or state ~= 'open' then
 	return 0
 end
 local next_retry_at = tonumber(redis.call('HGET', KEYS[1], 'next_retry_at') or '0')
-if next_retry_at == 0 then
-	return 0
-end
 if next_retry_at > tonumber(ARGV[1]) then
 	return 0
 end
@@ -64,7 +61,11 @@ local success = 0
 local now_ts = tonumber(ARGV[3])
 local threshold = tonumber(ARGV[1])
 local open_duration = tonumber(ARGV[2])
-local next_retry_at = 0
+-- Preserve the current retry deadline unless the circuit transitions below:
+-- a failure recorded while already open (in-flight request finishing after
+-- the trip) must not wipe next_retry_at, or the circuit can never leave the
+-- open state.
+local next_retry_at = tonumber(redis.call('HGET', KEYS[1], 'next_retry_at') or '0')
 
 if state == 'half_open' or failure >= threshold then
 	state = 'open'
@@ -95,10 +96,16 @@ end
 local failure = 0
 local success = tonumber(redis.call('HGET', KEYS[1], 'success_count') or '0') + 1
 local now_ts = tonumber(ARGV[1])
+-- Preserve the current retry deadline unless the circuit closes below:
+-- a success recorded while the circuit is open (in-flight request finishing
+-- after the trip) must not wipe next_retry_at, or the circuit can never
+-- leave the open state.
+local next_retry_at = tonumber(redis.call('HGET', KEYS[1], 'next_retry_at') or '0')
 
 if state == 'half_open' then
 	state = 'closed'
 	success = 0
+	next_retry_at = 0
 	redis.call('DEL', KEYS[2])
 end
 
@@ -106,10 +113,14 @@ redis.call('HSET', KEYS[1], 'circuit_state', state)
 redis.call('HSET', KEYS[1], 'failure_count', failure)
 redis.call('HSET', KEYS[1], 'success_count', success)
 redis.call('HSET', KEYS[1], 'last_state_change', now_ts)
-redis.call('HDEL', KEYS[1], 'next_retry_at')
+if next_retry_at > 0 then
+	redis.call('HSET', KEYS[1], 'next_retry_at', next_retry_at)
+else
+	redis.call('HDEL', KEYS[1], 'next_retry_at')
+end
 redis.call('EXPIRE', KEYS[1], ARGV[2])
 
-return {state, failure, success, now_ts, 0}
+return {state, failure, success, now_ts, next_retry_at}
 `
 
 const renewLeaderScript = `
@@ -272,6 +283,9 @@ func (s *stateCacheImpl) TryTransitionToHalfOpen(ctx context.Context, upstreamID
 
 func (s *stateCacheImpl) TryAcquireHalfOpenSlot(ctx context.Context, upstreamID int64, maxRequests int, ttl time.Duration) (bool, int64, error) {
 	if !s.Enabled() {
+		// No cache: probe limiting is impossible, so every half-open probe
+		// is admitted. Accepted for cache-less deployments (the next
+		// recorded failure re-opens the circuit).
 		return true, 1, nil
 	}
 	if maxRequests <= 0 {
