@@ -65,7 +65,7 @@ type collectionComponentImpl struct {
 }
 
 func (cc *collectionComponentImpl) GetCollections(ctx context.Context, filter *types.CollectionFilter, per, page int) ([]types.Collection, int, error) {
-	collections, total, err := cc.collectionStore.GetCollections(ctx, filter, per, page, true)
+	collections, total, err := cc.collectionStore.GetCollections(ctx, filter, per, page)
 	if err != nil {
 		return nil, 0, err
 	}

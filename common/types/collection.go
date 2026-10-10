@@ -100,8 +100,9 @@ func (r CollectionRepository) NamespaceAndName() (namespace string, name string)
 }
 
 type CollectionFilter struct {
-	Sort   string
-	Search string
+	Sort     string
+	Search   string
+	Username string
 }
 
 type UpdateCollectionRepoReq struct {
