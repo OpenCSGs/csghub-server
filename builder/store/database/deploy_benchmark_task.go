@@ -11,29 +11,29 @@ import (
 )
 
 type DeployBenchmarkTask struct {
-	ID                 int64      `bun:",pk,autoincrement" json:"id"`
-	DeployID           int64      `bun:",notnull" json:"deploy_id"`
-	SourceDeployTaskID int64      `bun:",nullzero" json:"source_deploy_task_id"`
-	WorkflowID         string     `bun:",nullzero" json:"workflow_id"`
-	TriggerSource      string     `bun:",notnull" json:"trigger_source"`
-	TriggerKey         string     `bun:",notnull" json:"trigger_key"`
-	BenchmarkType      string     `bun:",notnull" json:"benchmark_type"`
-	Status             string     `bun:",notnull" json:"status"`
-	RuntimeFramework   string     `bun:",notnull" json:"runtime_framework"`
-	Task               string     `bun:",notnull" json:"task"`
-	Endpoint           string     `bun:",notnull" json:"endpoint"`
-	SvcName            string     `bun:",notnull" json:"svc_name"`
-	ClusterID          string     `bun:",notnull" json:"cluster_id"`
-	OwnerNamespace     string     `bun:",notnull" json:"owner_namespace"`
-	UserUUID           string     `bun:",notnull" json:"user_uuid"`
-	Hardware           map[string]any              `bun:"type:jsonb,notnull" json:"hardware"`
+	ID                 int64                         `bun:",pk,autoincrement" json:"id"`
+	DeployID           int64                         `bun:",notnull" json:"deploy_id"`
+	SourceDeployTaskID int64                         `bun:",nullzero" json:"source_deploy_task_id"`
+	WorkflowID         string                        `bun:",nullzero" json:"workflow_id"`
+	TriggerSource      string                        `bun:",notnull" json:"trigger_source"`
+	TriggerKey         string                        `bun:",notnull" json:"trigger_key"`
+	BenchmarkType      string                        `bun:",notnull" json:"benchmark_type"`
+	Status             string                        `bun:",notnull" json:"status"`
+	RuntimeFramework   string                        `bun:",notnull" json:"runtime_framework"`
+	Task               string                        `bun:",notnull" json:"task"`
+	Endpoint           string                        `bun:",notnull" json:"endpoint"`
+	SvcName            string                        `bun:",notnull" json:"svc_name"`
+	ClusterID          string                        `bun:",notnull" json:"cluster_id"`
+	OwnerNamespace     string                        `bun:",notnull" json:"owner_namespace"`
+	UserUUID           string                        `bun:",notnull" json:"user_uuid"`
+	Hardware           map[string]any                `bun:"type:jsonb,notnull" json:"hardware"`
 	RequestTemplate    types.DeployBenchmarkTemplate `bun:"type:jsonb,notnull" json:"request_template"`
 	BenchmarkConfig    types.DeployBenchmarkConfig   `bun:"type:jsonb,notnull" json:"benchmark_config"`
 	ResultSummary      types.DeployBenchmarkSummary  `bun:"type:jsonb,notnull" json:"result_summary"`
-	RawResult          map[string]any               `bun:"type:jsonb,notnull" json:"raw_result"`
-	ErrorMessage       string     `bun:",type:text,nullzero" json:"error_message"`
-	StartedAt          *time.Time `bun:",nullzero" json:"started_at,omitempty"`
-	FinishedAt         *time.Time `bun:",nullzero" json:"finished_at,omitempty"`
+	RawResult          map[string]any                `bun:"type:jsonb,notnull" json:"raw_result"`
+	ErrorMessage       string                        `bun:",type:text,nullzero" json:"error_message"`
+	StartedAt          *time.Time                    `bun:",nullzero" json:"started_at,omitempty"`
+	FinishedAt         *time.Time                    `bun:",nullzero" json:"finished_at,omitempty"`
 	times
 }
 

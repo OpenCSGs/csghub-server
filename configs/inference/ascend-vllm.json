@@ -74,7 +74,10 @@
     {
       "name": "enforce-eager",
       "value": "disable",
-      "format": "--enforce-eager"
+      "format": "--enforce-eager",
+      "conflicts_with": [
+        "spec-decode-method"
+      ]
     },
     {
       "name": "enable-tool-calling",
@@ -85,6 +88,49 @@
       "name": "enable-expert-parallel",
       "value": "disable",
       "format": "--enable-expert-parallel"
+    },
+    {
+      "name": "spec-decode-method",
+      "value": "",
+      "format": "%s",
+      "options": [
+        "off",
+        "mtp",
+        "eagle3",
+        "ngram"
+      ],
+      "virtual": true
+    },
+    {
+      "name": "spec-num-tokens",
+      "value": "",
+      "format": "%s",
+      "virtual": true
+    },
+    {
+      "name": "spec-draft-model",
+      "value": "",
+      "format": "%s",
+      "virtual": true
+    },
+    {
+      "name": "spec-decode-scene",
+      "value": "",
+      "format": "%s",
+      "options": [
+        "rag",
+        "code-completion",
+        "rewrite",
+        "summarization",
+        "other"
+      ],
+      "recommend_ngram": [
+        "rag",
+        "code-completion",
+        "rewrite",
+        "summarization"
+      ],
+      "virtual": true
     },
     {
       "name": "custom-options",

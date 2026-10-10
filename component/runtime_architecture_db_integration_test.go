@@ -40,7 +40,7 @@ func TestRuntimeFrameworkSyncPersistsMergedEngineArgsPerImage(t *testing.T) {
 		computeType string
 		imageArgs   []string
 	}{
-		{"opencsghq/vllm:v0.28.0", "gpu", []string{"async-scheduling"}},
+		{"opencsghq/vllm:v0.28.0", "gpu", []string{"async-scheduling", "spec-decode-method", "spec-num-tokens", "spec-draft-model", "spec-decode-scene"}},
 		{"opencsghq/vllm-cpu:v0.24.0", "cpu", []string{"async-scheduling"}},
 		{"opencsghq/vllm:v0.9.2-cu118", "gpu", []string{"guided-decoding-backend", "swap-space"}},
 		{"opencsghq/vllm:v0.8.5-dtk25.04", "dcu", []string{"guided-decoding-backend", "swap-space"}},

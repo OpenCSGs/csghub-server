@@ -321,6 +321,10 @@ type Config struct {
 		// for which PD disaggregation recommendations are generated. Models with params
 		// below this threshold are skipped. Default is 100B.
 		PDRecommendParamsThreshold float32 `env:"STARHUB_SERVER_MODEL_PD_RECOMMEND_PARAMS_THRESHOLD" default:"100"`
+		// AutoSpeculativeDecoding enables automatic MTP speculative decoding for
+		// model deployments whose checkpoint embeds MTP weights, when the user did
+		// not select a spec-decode method. Default is false.
+		AutoSpeculativeDecoding bool `env:"STARHUB_SERVER_MODEL_AUTO_SPECULATIVE_DECODING" default:"false"`
 	}
 
 	Search struct {

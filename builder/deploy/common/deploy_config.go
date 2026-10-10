@@ -36,6 +36,9 @@ type DeployConfig struct {
 	StuckTimeoutMin       int
 	RunningReconcileHour  int
 	UnhealthyReconcileMin int
+	// AutoSpeculativeDecoding turns on automatic MTP speculative decoding
+	// injection for model deployments (see config.Model.AutoSpeculativeDecoding).
+	AutoSpeculativeDecoding bool
 }
 
 func BuildDeployConfig(cfg *config.Config) DeployConfig {
@@ -68,5 +71,6 @@ func BuildDeployConfig(cfg *config.Config) DeployConfig {
 		StuckTimeoutMin:         cfg.DeployReconcile.StuckTimeoutMin,
 		RunningReconcileHour:    cfg.DeployReconcile.RunningReconcileHour,
 		UnhealthyReconcileMin:   cfg.DeployReconcile.UnhealthyReconcileMin,
+		AutoSpeculativeDecoding: cfg.Model.AutoSpeculativeDecoding,
 	}
 }
