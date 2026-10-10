@@ -57,7 +57,7 @@ type AccountMetering struct {
 }
 
 func (am *accountMeteringStoreImpl) Create(ctx context.Context, input AccountMetering, extra types.MeteringExtra) error {
-	err := am.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+	return runWithAccountMeteringIdempotency(ctx, am.db, func(ctx context.Context, tx bun.Tx) error {
 		res, err := tx.NewInsert().Model(&input).Exec(ctx, &input)
 		if err := assertAffectedOneRow(res, err); err != nil {
 			return fmt.Errorf("failed to insert metering event, error: %w", err)
@@ -110,8 +110,6 @@ func (am *accountMeteringStoreImpl) Create(ctx context.Context, input AccountMet
 
 		return nil
 	})
-
-	return err
 }
 
 func (am *accountMeteringStoreImpl) ListByUserIDAndTime(ctx context.Context, req types.ActStatementsReq) ([]AccountMetering, int, error) {
