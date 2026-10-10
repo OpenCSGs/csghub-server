@@ -1554,8 +1554,91 @@ func TestMirrorComponent_CreateMirrorRepoFetchesSkillMetadata(t *testing.T) {
 	require.Nil(t, input.MCPServer)
 }
 
-// TestMirrorComponent_CreateMirrorRepoRejectsUnsupportedMetadataSources verifies MCP and skill metadata APIs are never inferred from arbitrary Git hosts.
-func TestMirrorComponent_CreateMirrorRepoRejectsUnsupportedMetadataSources(t *testing.T) {
+// TestMirrorComponent_CreateMirrorRepoSkipsMetadataForUnsupportedHosts verifies that a source
+// host which is neither OpenCSG SaaS nor backed by a configured mirror source skips metadata
+// fetching and still creates the mirror repository with empty metadata fields.
+func TestMirrorComponent_CreateMirrorRepoSkipsMetadataForUnsupportedHosts(t *testing.T) {
+	tests := []struct {
+		name           string
+		repoType       types.RepositoryType
+		sourceURL      string
+		mirrorSourceID int64
+		mirrorSource   *database.MirrorSource
+	}{
+		{
+			name:      "GitHub skill without mirror source",
+			repoType:  types.SkillRepo,
+			sourceURL: "https://github.com/upstream/reviewer.git",
+		},
+		{
+			name:      "GitLab MCP without mirror source",
+			repoType:  types.MCPServerRepo,
+			sourceURL: "https://gitlab.com/upstream/server.git",
+		},
+		{
+			name:           "mirror source without info API URL",
+			repoType:       types.SkillRepo,
+			sourceURL:      "https://github.com/upstream/reviewer.git",
+			mirrorSourceID: 52,
+			mirrorSource: &database.MirrorSource{
+				ID: 52,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.TODO()
+			mc := initializeTestMirrorComponent(ctx, t)
+			expectMirrorTargetNamespaceExists(mc)
+			fakeStore := &fakeMirrorRepoStore{}
+			mc.mirrorRepoStore = fakeStore
+			req := types.CreateMirrorRepoReq{
+				SourceNamespace:   "upstream",
+				SourceName:        "repo",
+				MirrorSourceID:    tt.mirrorSourceID,
+				RepoType:          tt.repoType,
+				SourceGitCloneUrl: tt.sourceURL,
+				CurrentUser:       "admin",
+				ForkNamespace:     "local",
+				ForkName:          "repo",
+			}
+
+			mc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "admin", "local", rebac.NamespaceCanWrite).Return(true, nil)
+			mc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, tt.repoType, "local", "repo").Return(nil, sql.ErrNoRows)
+			if tt.mirrorSourceID != 0 {
+				mc.mocks.stores.MirrorSourceMock().EXPECT().Get(ctx, tt.mirrorSourceID).Return(tt.mirrorSource, nil)
+			}
+			mc.mirrorMetadataClientFactory = func(endpoint, accessToken string) multisync.Client {
+				t.Fatal("unsupported metadata hosts must skip client creation")
+				return nil
+			}
+			mc.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "local").Return(database.Namespace{
+				Path: "local", NamespaceType: database.UserNamespace, User: database.User{UUID: "admin-uuid"},
+			}, nil)
+			mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "admin").Return(database.User{
+				ID: 1, Username: "admin", Email: "admin@example.com", RoleMask: "admin",
+			}, nil)
+			expectMirrorRepositoryRelationship(mc)
+
+			got, err := mc.CreateMirrorRepo(ctx, req)
+			require.NoError(t, err)
+			require.NotNil(t, got)
+			require.Len(t, fakeStore.inputs, 1)
+			input := fakeStore.inputs[0]
+			require.Equal(t, tt.repoType, input.Repository.RepositoryType)
+			// Metadata was skipped, so source-owned fields stay empty and the
+			// nickname falls back to the repo name.
+			require.Equal(t, "repo", input.Repository.Nickname)
+			require.Empty(t, input.Repository.Description)
+			require.Empty(t, input.Repository.License)
+		})
+	}
+}
+
+// TestMirrorComponent_CreateMirrorRepoRejectsInvalidMirrorSourceConfig verifies that mirror
+// source configuration errors (missing source, invalid info API URL) still abort creation.
+func TestMirrorComponent_CreateMirrorRepoRejectsInvalidMirrorSourceConfig(t *testing.T) {
 	tests := []struct {
 		name             string
 		repoType         types.RepositoryType
@@ -1567,20 +1650,6 @@ func TestMirrorComponent_CreateMirrorRepoRejectsUnsupportedMetadataSources(t *te
 		wantError        error
 	}{
 		{
-			name:             "GitHub skill without mirror source",
-			repoType:         types.SkillRepo,
-			sourceURL:        "https://github.com/upstream/reviewer.git",
-			wantErrorMessage: "neither a configured mirror source nor OpenCSG SaaS",
-			wantError:        errorx.ErrMirrorSourceURLInvalid,
-		},
-		{
-			name:             "GitLab MCP without mirror source",
-			repoType:         types.MCPServerRepo,
-			sourceURL:        "https://gitlab.com/upstream/server.git",
-			wantErrorMessage: "neither a configured mirror source nor OpenCSG SaaS",
-			wantError:        errorx.ErrMirrorSourceURLInvalid,
-		},
-		{
 			name:             "missing mirror source",
 			repoType:         types.SkillRepo,
 			sourceURL:        "https://github.com/upstream/reviewer.git",
@@ -1588,17 +1657,6 @@ func TestMirrorComponent_CreateMirrorRepoRejectsUnsupportedMetadataSources(t *te
 			mirrorSourceErr:  sql.ErrNoRows,
 			wantErrorMessage: "mirror source 51 does not exist",
 			wantError:        errorx.ErrBadRequest,
-		},
-		{
-			name:           "mirror source without info API URL",
-			repoType:       types.SkillRepo,
-			sourceURL:      "https://github.com/upstream/reviewer.git",
-			mirrorSourceID: 52,
-			mirrorSource: &database.MirrorSource{
-				ID: 52,
-			},
-			wantErrorMessage: "neither configured by mirror source 52 nor OpenCSG SaaS",
-			wantError:        errorx.ErrMirrorSourceURLInvalid,
 		},
 		{
 			name:           "mirror source with invalid info API URL",
@@ -1634,11 +1692,9 @@ func TestMirrorComponent_CreateMirrorRepoRejectsUnsupportedMetadataSources(t *te
 
 			mc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "admin", "local", rebac.NamespaceCanWrite).Return(true, nil)
 			mc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, tt.repoType, "local", "repo").Return(nil, sql.ErrNoRows)
-			if tt.mirrorSourceID != 0 {
-				mc.mocks.stores.MirrorSourceMock().EXPECT().Get(ctx, tt.mirrorSourceID).Return(tt.mirrorSource, tt.mirrorSourceErr)
-			}
+			mc.mocks.stores.MirrorSourceMock().EXPECT().Get(ctx, tt.mirrorSourceID).Return(tt.mirrorSource, tt.mirrorSourceErr)
 			mc.mirrorMetadataClientFactory = func(endpoint, accessToken string) multisync.Client {
-				t.Fatal("unsupported metadata sources must be rejected before creating a client")
+				t.Fatal("invalid mirror source config must be rejected before creating a client")
 				return nil
 			}
 
@@ -1940,6 +1996,50 @@ func TestMirrorComponent_SyncMirrorRefreshesSkillMetadata(t *testing.T) {
 		RepoType: types.SkillRepo, Namespace: "local", Name: "reviewer", CurrentUser: "admin",
 	})
 	require.NoError(t, err)
+}
+
+// TestMirrorComponent_SyncMirrorSkipsSkillMetadataForUnsupportedHost verifies a skill imported
+// without a persisted source path can still be requeued when its Git host has no metadata API.
+func TestMirrorComponent_SyncMirrorSkipsSkillMetadataForUnsupportedHost(t *testing.T) {
+	ctx := context.TODO()
+	mc := initializeTestMirrorComponent(ctx, t)
+	repo := &database.Repository{
+		ID: 22, Path: "local/reviewer", Name: "reviewer", Nickname: "Existing Skill",
+		Description: "existing description", License: "MIT", DefaultBranch: "main", RepositoryType: types.SkillRepo,
+	}
+	mirror := &database.Mirror{
+		ID: 32, RepositoryID: repo.ID, Repository: repo,
+		SourceUrl: "https://gitlab.example.com/upstream/reviewer.git", Priority: types.HighMirrorPriority,
+	}
+
+	mc.mirrorMetadataClientFactory = func(endpoint, accessToken string) multisync.Client {
+		t.Fatal("unsupported metadata hosts must skip client creation")
+		return nil
+	}
+	mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "admin").Return(database.User{RoleMask: "admin"}, nil)
+	mc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.SkillRepo, "local", "reviewer").Return(repo, nil)
+	mc.mocks.stores.MirrorMock().EXPECT().FindByRepoID(ctx, repo.ID).Return(mirror, nil)
+
+	taskJobStore := mockdb.NewMockMirrorTaskJobStore(t)
+	mc.mirrorTaskJobStore = taskJobStore
+	useFakeMirrorJobClient(mc)
+	taskJobStore.EXPECT().RequeueMirrorRepoTask(ctx, mock.MatchedBy(func(input database.RequeueMirrorRepoTaskInput) bool {
+		return input.MirrorID == mirror.ID &&
+			input.RepositoryID == repo.ID &&
+			input.Metadata == nil &&
+			input.Priority == types.HighMirrorPriority &&
+			input.JobClient != nil &&
+			input.JobCancelClient != nil
+	})).Return(database.MirrorTask{ID: 102}, nil)
+
+	err := mc.SyncMirror(ctx, types.SyncMirrorReq{
+		RepoType: types.SkillRepo, Namespace: "local", Name: "reviewer", CurrentUser: "admin",
+	})
+	require.NoError(t, err)
+	require.Equal(t, "Existing Skill", repo.Nickname)
+	require.Equal(t, "existing description", repo.Description)
+	require.Equal(t, "MIT", repo.License)
+	require.Equal(t, "main", repo.DefaultBranch)
 }
 
 // TestEnsureMirrorOrgNamespaceNoopWhenExists verifies an existing user

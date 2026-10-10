@@ -50,6 +50,12 @@ func (m *mirrorComponentImpl) prepareExistingMirrorRepoMetadataUpdate(ctx contex
 	if sourcePath == "" {
 		_, sourcePath, _ = common.GetSourceTypeAndPathFromURL(mirror.SourceUrl)
 		sourcePath = strings.Trim(strings.TrimSuffix(sourcePath, ".git"), "/")
+		if sourcePath == "" {
+			parsedURL, err := url.Parse(mirror.SourceUrl)
+			if err == nil {
+				sourcePath = strings.Trim(strings.TrimSuffix(parsedURL.Path, ".git"), "/")
+			}
+		}
 	}
 	sourceNamespace, sourceName := path.Split(sourcePath)
 	sourceNamespace = strings.Trim(sourceNamespace, "/")
@@ -288,6 +294,16 @@ func (m *mirrorComponentImpl) fetchMirrorRepoMetadata(ctx context.Context, req t
 
 	endpoint, err := m.resolveMirrorMetadataEndpoint(ctx, req)
 	if err != nil {
+		// A source host that is neither OpenCSG SaaS nor backed by a configured
+		// mirror source has no metadata API to call. Skip the fetch instead of
+		// aborting creation; repository fields stay empty and README content is
+		// supplied by the mirrored Git repository itself.
+		if errors.Is(err, errorx.ErrMirrorSourceURLInvalid) {
+			slog.InfoContext(ctx, "skip mirror metadata fetch: source host is not OpenCSG SaaS and has no configured mirror source",
+				slog.String("repo type", string(req.RepoType)),
+				slog.String("source url", req.SourceGitCloneUrl))
+			return nil, nil
+		}
 		return nil, err
 	}
 
