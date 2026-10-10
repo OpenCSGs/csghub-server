@@ -267,7 +267,7 @@ func shouldAdmitCapacity(task string) bool {
 	switch task {
 	case "chat", "responses", "messages", "text-to-image",
 		"embedding", "rerank", "speech",
-		"audio", "ocr", "text-to-video":
+		"audio", "ocr", "text-to-video", "systemone":
 		return true
 	default:
 		return false

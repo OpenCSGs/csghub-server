@@ -23,5 +23,6 @@ func NewDefaultRegistry() *Registry {
 		newProtocolProvider(batchSpeechRoute, modelsL7Request(batchSpeechRoute), batchSpeechRequest, defaultSampleTimeout),
 		newProtocolProvider(voiceUploadRoute, modelsL7Request(voiceUploadRoute), voiceUploadRequest, defaultSampleTimeout),
 		newProtocolProvider(videoGenerationsRoute, modelsL7Request(videoGenerationsRoute), videoGenerationsRequest, defaultSampleTimeout),
+		newProtocolProvider(systemoneRoute, modelsL7Request(systemoneRoute), systemoneRequest, defaultSampleTimeout),
 	)
 }
