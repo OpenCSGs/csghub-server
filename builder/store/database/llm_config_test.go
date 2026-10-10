@@ -3,6 +3,8 @@ package database_test
 import (
 	"context"
 	"errors"
+	"fmt"
+	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -505,6 +507,64 @@ func TestLLMConfigStore_Index_SortByModelSizeB(t *testing.T) {
 	require.Equal(t, "size-large", cfgsDesc[0].ModelName)
 	require.Equal(t, "size-medium", cfgsDesc[1].ModelName)
 	require.Equal(t, "size-small", cfgsDesc[2].ModelName)
+}
+
+func TestLLMConfigStore_Index_PagesFollowATotalOrder(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+	config, err := config.LoadConfig()
+	require.Nil(t, err)
+	store := database.NewLLMConfigStoreWithDB(db, config)
+
+	// Configs sharing a sort key are the norm (every config the deploy sync
+	// creates has model_size_b = 0). Paged reads must partition them
+	// deterministically, or one config is listed twice while another is skipped.
+	const (
+		modelCount = 120
+		pageSize   = 50
+	)
+	search := &types.SearchLLMConfig{
+		Keyword:   "tied-paging-",
+		Types:     []int{database.LLMTypeAigatewayExternal},
+		SortBy:    "model_size_b",
+		SortOrder: "DESC",
+	}
+
+	var createdIDs []int64
+	for i := 0; i < modelCount; i++ {
+		cfg, err := store.Create(ctx, database.LLMConfig{
+			ModelName:  fmt.Sprintf("tied-paging-%03d", i),
+			Type:       database.LLMTypeAigatewayExternal,
+			Enabled:    true,
+			ModelSizeB: 0,
+		})
+		require.Nil(t, err)
+		createdIDs = append(createdIDs, cfg.ID)
+	}
+	// Updating rows moves them to the end of the heap, so the physical order no
+	// longer matches the ids: an implicit tie order would now differ from the
+	// tie-breaker the sort promises.
+	_, err = db.Core.NewRaw(
+		`UPDATE llm_configs SET provider = 'moved' WHERE model_name ~ 'tied-paging-[0-9]*[13579]$'`,
+	).Exec(ctx)
+	require.Nil(t, err)
+
+	expected := slices.Clone(createdIDs)
+	slices.Sort(expected)
+
+	var listed []int64
+	for page := 1; ; page++ {
+		cfgs, _, err := store.Index(ctx, pageSize, page, search)
+		require.Nil(t, err)
+		for _, cfg := range cfgs {
+			listed = append(listed, cfg.ID)
+		}
+		if len(cfgs) < pageSize {
+			break
+		}
+	}
+	require.Equal(t, expected, listed, "pages must follow the sort's total order: every tied config exactly once, ordered by id")
 }
 
 func TestLLMConfig_PopulateDerivedFields_NoUpstreams(t *testing.T) {

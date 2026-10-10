@@ -329,6 +329,13 @@ func buildSearchLLMConfigQuery(
 
 // applyLLMConfigSort applies an allow-listed sort to the query.
 // Defaults to updated_at DESC so that the most recently changed configs surface first.
+//
+// The primary key always closes the sort so that the ordering is total. Without a
+// unique tie-breaker, rows sharing the sort key (every config the deploy sync
+// creates has model_size_b = 0) come back in whatever order the planner produces
+// for that query, and pages read separately can order the same tie group
+// differently: LIMIT/OFFSET windows then overlap, listing one config twice while
+// skipping another.
 func applyLLMConfigSort(q *bun.SelectQuery, sortBy, sortOrder string) {
 	column := "llm_config.updated_at"
 	switch sortBy {
@@ -342,6 +349,7 @@ func applyLLMConfigSort(q *bun.SelectQuery, sortBy, sortOrder string) {
 		direction = "ASC"
 	}
 	q.OrderExpr(column + " " + direction)
+	q.OrderExpr("llm_config.id ASC")
 }
 
 // PopulateDerivedFields fills ApiEndpoint, AuthHeader, Provider, and ModelName from the best available upstream.
