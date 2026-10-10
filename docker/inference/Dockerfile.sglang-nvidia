@@ -1,8 +1,8 @@
-FROM nvcr.io/nvidia/sglang:25.10-py3
+FROM nvcr.io/nvidia/sglang:25.12-py3
 RUN pip config set global.index-url https://mirrors.aliyun.com/pypi/simple && \
     apt-get update && \
     apt-get install -y dumb-init && apt-get clean && rm -rf /var/lib/apt/lists/*
-RUN pip install --no-cache-dir csghub-sdk==0.7.6
+RUN pip install --no-cache-dir csghub-sdk==0.7.4
 COPY ./sglang/ /etc/csghub/
 RUN chmod +x /etc/csghub/*.sh
 

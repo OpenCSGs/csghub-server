@@ -579,6 +579,8 @@ func (a *DeployActivity) createDeployRequest(ctx context.Context, task *database
 	var engineArgsTemplates []types.EngineArg
 	var toolCallParsers map[string]string
 	var engineVersion string
+	var engineName string
+	var computeType string
 	if len(deployInfo.RuntimeFramework) > 0 {
 		framework, err := a.rfs.FindByImageID(ctx, deployInfo.ImageID)
 		if err != nil {
@@ -588,6 +590,8 @@ func (a *DeployActivity) createDeployRequest(ctx context.Context, task *database
 			return nil, fmt.Errorf("runtime framework not found for image %s, deploy task id %d", deployInfo.ImageID, task.ID)
 		}
 		engineVersion = framework.FrameVersion
+		engineName = framework.FrameName
+		computeType = framework.ComputeType
 		trimmedEngineArgs := strings.TrimSpace(framework.EngineArgs)
 		if len(trimmedEngineArgs) > 0 {
 			if err := json.Unmarshal([]byte(trimmedEngineArgs), &engineArgsTemplates); err != nil {
@@ -623,6 +627,8 @@ func (a *DeployActivity) createDeployRequest(ctx context.Context, task *database
 			EngineArgsTemplates: engineArgsTemplates,
 			ToolCallParsers:     toolCallParsers,
 			EngineVersion:       engineVersion,
+			EngineName:          engineName,
+			ComputeType:         computeType,
 		},
 		RepoInfo: repoInfo,
 	})
@@ -713,6 +719,8 @@ type runtimeConfig struct {
 	EngineArgsTemplates []types.EngineArg
 	ToolCallParsers     map[string]string
 	EngineVersion       string
+	EngineName          string
+	ComputeType         string
 }
 
 // makeDeployEnvRequest consolidates all inputs to makeDeployEnv except context.
@@ -755,12 +763,12 @@ func (a *DeployActivity) makeDeployEnv(ctx context.Context, req makeDeployEnvReq
 		return nil, err
 	}
 
-	a.setEngineArgs(ctx, logger, envMap, req.DeployInfo, req.Runtime)
+	specState := a.setEngineArgs(ctx, logger, envMap, req.DeployInfo, req.Runtime, req.RepoInfo.Path)
 
 	common.UpdateEvaluationEnvHardware(envMap, req.Hardware)
 
 	a.setSpaceEnv(envMap, req.DeployInfo, req.RepoInfo)
-	a.setInferenceEnv(envMap, req.DeployInfo, req.Hardware, req.Runtime.EngineVersion)
+	a.setInferenceEnv(envMap, req.DeployInfo, req.Hardware, req.Runtime.EngineVersion, specState)
 	a.setFinetuneEnv(envMap, req.DeployInfo, req.AccessToken)
 	a.setNotebookEnv(envMap, req.DeployInfo)
 	a.setContextPathEnv(envMap, req.DeployInfo)
@@ -813,17 +821,23 @@ func (a *DeployActivity) setGitEnv(ctx context.Context, envMap map[string]string
 
 var booleanValues = []string{"false", "0", "", "disable"}
 
-func (a *DeployActivity) setEngineArgs(ctx context.Context, logger log.Logger, envMap map[string]string, deployInfo *database.Deploy, rc runtimeConfig) {
+// setEngineArgs composes the ENGINE_ARGS env for a deploy. repoPath
+// ("namespace/name") feeds the eagle3 draft registry lookup.
+func (a *DeployActivity) setEngineArgs(ctx context.Context, logger log.Logger, envMap map[string]string, deployInfo *database.Deploy, rc runtimeConfig, repoPath string) specDecodeState {
 	if len(rc.EngineArgsTemplates) == 0 {
-		return
+		return specDecodeState{}
 	}
 
 	var engineArgs strings.Builder
 	argValuesMap, err := utilcommon.JsonStrToMap(deployInfo.EngineArgs)
+	engineArgsValid := err == nil
 	if err != nil {
 		logger.Error("Deploy engine args is invalid json data", "deploy", *deployInfo, "error", err)
 	} else {
 		for _, arg := range rc.EngineArgsTemplates {
+			if arg.Virtual {
+				continue
+			}
 			paramValue := arg.Value
 			value, ok := argValuesMap[arg.Name]
 			if ok {
@@ -856,9 +870,98 @@ func (a *DeployActivity) setEngineArgs(ctx context.Context, logger log.Logger, e
 		engineArgsStr = applyToolCallParser(logger, engineArgsStr, modelArch, rc.ToolCallParsers)
 	}
 
+	var specState specDecodeState
+	// eagle3 draft resolution (issue #1489): an explicitly filled
+	// spec-draft-model always wins; otherwise consult the static registry
+	// (configs/eagle3/models.toml) so users can select eagle3 without knowing
+	// the draft repo name. The value must be in place before
+	// composeSpeculativeArgs, which refuses eagle3 without a draft model, and
+	// is later exported as SPEC_DRAFT_REPO_ID. The revision is stored locally
+	// and only written to envMap after compose succeeds (fail-closed: a
+	// failed compose must not leak DRAFT_REVISION into the container env).
+	var draftRevision string
+	if argValuesMap != nil &&
+		strings.TrimSpace(argValuesMap[specArgMethod]) == specMethodEagle3 &&
+		strings.TrimSpace(argValuesMap[specArgDraftModel]) == "" {
+		if entry := lookupEagle3DraftRepo(repoPath); entry != nil {
+			logger.Info("eagle3 draft repo resolved from registry",
+				"repo", repoPath, "draft_repo", entry.DraftRepo)
+			argValuesMap[specArgDraftModel] = entry.DraftRepo
+			draftRevision = entry.Revision
+		}
+	}
+
+	engineArgsStr, specState = composeSpeculativeArgs(logger, speculativeComposeInput{
+		EngineArgsStr: engineArgsStr,
+		ArgValues:     argValuesMap,
+		Runtime:       rc,
+		ArchLookup:    func() string { return a.getModelArchitecture(ctx, deployInfo.RepoID) },
+	})
+
+	// Automatic MTP injection only applies when the user made no spec-decode
+	// choice at all: the template default is "" so an untouched form submits
+	// "", while an explicit "off" or unknown method must never be overridden.
+	// The feature flag must be on, and this is not a PD disaggregation deploy
+	// (prefill/decode shares a hand-tuned ENGINE_ARGS split). Corrupt
+	// engine_args JSON must not trigger auto-inject either, because the
+	// nil map makes method appear empty (issue #1489 review).
+	method := strings.TrimSpace(argValuesMap[specArgMethod])
+	if !specState.Active && method == "" && engineArgsValid && a.cfg.AutoSpeculativeDecoding && deployInfo.PD == nil {
+		engineArgsStr, specState = autoInjectMTPSpeculativeArgs(logger, speculativeAutoInjectInput{
+			EngineArgsStr: engineArgsStr,
+			Runtime:       rc,
+			MTPMeta: func() (bool, int) {
+				metadata, err := a.mds.FindByRepoID(ctx, deployInfo.RepoID)
+				if err != nil {
+					logger.Warn("Failed to get metadata from database", "error", err, "repo_id", deployInfo.RepoID)
+					return false, 0
+				}
+				return metadata.HasMTPWeights, metadata.NumNextNPredictLayers
+			},
+			ArchLookup: func() string { return a.getModelArchitecture(ctx, deployInfo.RepoID) },
+		})
+	}
+
+	// eagle3 draft weights are downloaded by the container entry script before
+	// the engine starts (see docker/inference/*/entry.py); the env names match
+	// the issue #1489 contract (SPEC_DRAFT_REPO_ID, DRAFT_REVISION).
+	if specState.Active && method == specMethodEagle3 {
+		if draft := strings.TrimSpace(argValuesMap[specArgDraftModel]); draft != "" {
+			envMap["SPEC_DRAFT_REPO_ID"] = draft
+		}
+		if draftRevision != "" {
+			envMap["DRAFT_REVISION"] = draftRevision
+		}
+	}
+
+	// Issue #1489: enforce-eager disables CUDA graphs and eats most of the
+	// speculative speedup; surface the combination instead of failing silently.
+	if specState.Active && vllmEnforceEagerEnabled(deployInfo.EngineArgs) {
+		logger.Warn("--enforce-eager is enabled together with speculative decoding, which significantly reduces its benefit",
+			"deploy_id", deployInfo.ID)
+	}
+	// Issue #1489: explicitly enabled --async-scheduling combined with
+	// speculative decoding can reduce or negate the speedup on conflicting
+	// vLLM versions; surface the combination as a server-side warning.
+	if specState.Active && asyncSchedulingEnabled(deployInfo.EngineArgs) {
+		logger.Warn("--async-scheduling is explicitly enabled together with speculative decoding, which may reduce its benefit",
+			"deploy_id", deployInfo.ID)
+	}
+	// Issue #1489 review R11: surface a visible skip reason when the user
+	// selected a spec-decode method but composition was rejected (fail-closed).
+	// The reason is exported as a container env var so operators can see that
+	// the user's selection was silently dropped without reading server logs.
+	if specState.SkipReason != "" {
+		envMap["SPEC_DECODE_SKIP_REASON"] = specState.SkipReason
+		logger.Warn("speculative decoding was requested but not applied",
+			"deploy_id", deployInfo.ID, "skip_reason", specState.SkipReason)
+	}
+
 	logger.Info("makeDeployEnv", "ENGINE_ARGS", engineArgsStr, "ENGINE_ARGS.length", len(engineArgsStr),
 		"deployName", deployInfo.DeployName, "deployID", deployInfo.ID)
 	envMap["ENGINE_ARGS"] = engineArgsStr
+
+	return specState
 }
 
 func (a *DeployActivity) setSpaceEnv(envMap map[string]string, deployInfo *database.Deploy, repoInfo common.RepoInfo) {
@@ -893,7 +996,7 @@ func (a *DeployActivity) setSpaceEnv(envMap map[string]string, deployInfo *datab
 	}
 }
 
-func (a *DeployActivity) setInferenceEnv(envMap map[string]string, deployInfo *database.Deploy, hardware types.HardWare, engineVersion string) {
+func (a *DeployActivity) setInferenceEnv(envMap map[string]string, deployInfo *database.Deploy, hardware types.HardWare, engineVersion string, specState specDecodeState) {
 	if deployInfo.Type != types.InferenceType && deployInfo.Type != types.ServerlessType {
 		return
 	}
@@ -906,7 +1009,7 @@ func (a *DeployActivity) setInferenceEnv(envMap map[string]string, deployInfo *d
 	if vllmEnforceEagerEnabled(deployInfo.EngineArgs) {
 		envMap["VLLM_ENFORCE_EAGER"] = "1"
 	}
-	if asyncSchedulingDisabled(deployInfo.EngineArgs) {
+	if asyncSchedulingDisabled(deployInfo.EngineArgs) || specState.AsyncConflict {
 		envMap["ASYNC_SCHEDULING_DISABLED"] = "true"
 	}
 	if model := hardware.GetResXPUMode(); model != "" {
@@ -1019,6 +1122,29 @@ func asyncSchedulingDisabled(engineArgs string) bool {
 	}
 	switch value {
 	case "disable", "false", "0":
+		return true
+	default:
+		return false
+	}
+}
+
+// asyncSchedulingEnabled reports whether the user explicitly enabled
+// async-scheduling. Used to warn when speculative decoding is also active,
+// since the combination can reduce or negate the spec-decode speedup.
+func asyncSchedulingEnabled(engineArgs string) bool {
+	if engineArgs == "" {
+		return false
+	}
+	argValuesMap, err := utilcommon.JsonStrToMap(engineArgs)
+	if err != nil {
+		return false
+	}
+	value, ok := argValuesMap["async-scheduling"]
+	if !ok {
+		return false
+	}
+	switch value {
+	case "enable", "true", "1":
 		return true
 	default:
 		return false

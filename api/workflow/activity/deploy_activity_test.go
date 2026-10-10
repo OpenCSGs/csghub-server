@@ -1256,7 +1256,7 @@ func TestSetEngineArgs(t *testing.T) {
 			deployInfo := &database.Deploy{EngineArgs: tt.deployEngineArgs}
 			rc := runtimeConfig{EngineArgsTemplates: tt.templates}
 
-			activity.setEngineArgs(ctx, logger, envMap, deployInfo, rc)
+			activity.setEngineArgs(ctx, logger, envMap, deployInfo, rc, "")
 
 			if tt.wantEngineArgsSet {
 				require.Contains(t, envMap, "ENGINE_ARGS")

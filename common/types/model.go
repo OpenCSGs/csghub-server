@@ -489,6 +489,11 @@ type ModelInfo struct {
 	// MoE expert fields parsed from config.json
 	TotalExperts  int `json:"total_experts"`
 	ActiveExperts int `json:"active_experts"`
+	// Multi-token prediction capability detected from config.json plus the
+	// safetensors index (see HasMTPWeights). NumNextNPredictLayers mirrors the
+	// config declaration (0 when absent, e.g. community "-mtp" checkpoints).
+	HasMTPWeights         bool `json:"has_mtp_weights"`
+	NumNextNPredictLayers int  `json:"num_nextn_predict_layers"`
 }
 type Quantization struct {
 	VERSION         string  `json:"version"`
@@ -516,14 +521,27 @@ type ModelConfig struct {
 	NumExpertsPerTok int `json:"num_experts_per_tok,omitempty"`
 	// NumActivatedExperts is an alternative field name for active experts (used by some models).
 	NumActivatedExperts int `json:"num_activated_experts,omitempty"`
+	// MTP (multi-token prediction) fields parsed from config.json. DeepSeek/GLM
+	// models declare NumNextNPredictLayers at the top level; MiniMax models use
+	// the UseMTP/NumMTPModules/MTPTransformerLayers trio, whose presence does
+	// NOT guarantee the checkpoint ships MTP weights (see HasMTPWeights).
+	NumNextNPredictLayers int  `json:"num_nextn_predict_layers,omitempty"`
+	UseMTP                bool `json:"use_mtp,omitempty"`
+	NumMTPModules         int  `json:"num_mtp_modules,omitempty"`
+	MTPTransformerLayers  int  `json:"mtp_transformer_layers,omitempty"`
+	// Qwen3.5 declares MTP layers inside text_config as mtp_num_hidden_layers.
+	// The weights use a separate mtp.* namespace (mtp.layers.0.self_attn.* etc.)
+	// rather than the DeepSeek model.layers.N.* convention.
+	MtpNumHiddenLayers int `json:"mtp_num_hidden_layers,omitempty"`
 }
 
 type ModelTextConfig struct {
-	NumHiddenLayers   int    `json:"num_hidden_layers"`
-	HiddenSize        int    `json:"hidden_size"`
-	NumAttentionHeads int    `json:"num_attention_heads"`
-	Dtype             string `json:"dtype"`
-	TorchDtype        string `json:"torch_dtype"`
+	NumHiddenLayers    int    `json:"num_hidden_layers"`
+	HiddenSize         int    `json:"hidden_size"`
+	NumAttentionHeads  int    `json:"num_attention_heads"`
+	Dtype              string `json:"dtype"`
+	TorchDtype         string `json:"torch_dtype"`
+	MtpNumHiddenLayers int    `json:"mtp_num_hidden_layers,omitempty"`
 }
 
 func (c *ModelConfig) UnmarshalJSON(data []byte) error {
@@ -541,6 +559,7 @@ func (c *ModelConfig) UnmarshalJSON(data []byte) error {
 		c.NumHiddenLayers = cfg.TextConfig.NumHiddenLayers
 		c.HiddenSize = cfg.TextConfig.HiddenSize
 		c.NumAttentionHeads = cfg.TextConfig.NumAttentionHeads
+		c.MtpNumHiddenLayers = cfg.TextConfig.MtpNumHiddenLayers
 		if cfg.TextConfig.Dtype != "" {
 			c.TorchDtype = cfg.TextConfig.Dtype
 		}

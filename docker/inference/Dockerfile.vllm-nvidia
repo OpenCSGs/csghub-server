@@ -11,7 +11,7 @@ RUN sed -i 's|http://archive.ubuntu.com/ubuntu|http://mirrors.aliyun.com/ubuntu|
 
 # alias python='python3'
 RUN pip config set global.index-url https://mirrors.aliyun.com/pypi/simple
-RUN pip install --no-cache-dir csghub-sdk==0.7.6 supervisor
+RUN pip install --no-cache-dir csghub-sdk==0.7.4 supervisor
 RUN mkdir -p /var/log/supervisord
 COPY ./supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 COPY ./vllm/ /etc/csghub/

@@ -111,8 +111,10 @@ func TestMultiSyncComponent_SyncAsClient(t *testing.T) {
 		User: &types.User{Nickname: "nn"},
 		Path: "Ns/User",
 		Metadata: types.Metadata{
-			ModelParams:      0,
-			ModelParamsValid: &modelParamsValid,
+			ModelParams:           0,
+			ModelParamsValid:      &modelParamsValid,
+			HasMTPWeights:         true,
+			NumNextNPredictLayers: 1,
 		},
 		Tags: []types.RepoTag{{Name: "t1"}},
 		Scores: []types.WeightScore{{
@@ -183,9 +185,11 @@ func TestMultiSyncComponent_SyncAsClient(t *testing.T) {
 		Repository:   dbrepo,
 	}).Return(nil, nil)
 	mc.mocks.stores.MetadataMock().EXPECT().Upsert(ctx, &database.Metadata{
-		RepositoryID:     1,
-		ModelParams:      0,
-		ModelParamsValid: true,
+		RepositoryID:          1,
+		ModelParams:           0,
+		ModelParamsValid:      true,
+		HasMTPWeights:         true,
+		NumNextNPredictLayers: 1,
 	}).Return(nil)
 	mc.mocks.stores.RecomMock().EXPECT().UpsertScore(ctx, []*database.RecomRepoScore{
 		{RepositoryID: 1, WeightName: database.RecomWeightOp, Score: 40},

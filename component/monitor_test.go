@@ -589,5 +589,4 @@ func TestMonitor_CPUUsage(t *testing.T) {
 			},
 		},
 	})
-
 }

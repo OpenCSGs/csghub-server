@@ -309,16 +309,18 @@ func (c *runtimeArchitectureComponentImpl) UpdateModelMetadata(ctx context.Conte
 		return nil, fmt.Errorf("fail to get model metadata from %s, %w", modelFormat, err)
 	}
 	metadata := &database.Metadata{
-		RepositoryID:      repo.ID,
-		ModelParams:       modelInfo.ParamsBillions,
-		ModelParamsValid:  modelInfo.ParamsValid,
-		TensorType:        modelInfo.TensorType,
-		MiniGPUMemoryGB:   modelInfo.MiniGPUMemoryGB,
-		MiniGPUFinetuneGB: modelInfo.MiniGPUFinetuneGB,
-		Architecture:      modelInfo.Architecture,
-		ModelType:         modelInfo.ModelType,
-		ClassName:         modelInfo.ClassName,
-		Quantizations:     modelInfo.Quantizations,
+		RepositoryID:          repo.ID,
+		ModelParams:           modelInfo.ParamsBillions,
+		ModelParamsValid:      modelInfo.ParamsValid,
+		TensorType:            modelInfo.TensorType,
+		MiniGPUMemoryGB:       modelInfo.MiniGPUMemoryGB,
+		MiniGPUFinetuneGB:     modelInfo.MiniGPUFinetuneGB,
+		Architecture:          modelInfo.Architecture,
+		ModelType:             modelInfo.ModelType,
+		ClassName:             modelInfo.ClassName,
+		Quantizations:         modelInfo.Quantizations,
+		HasMTPWeights:         modelInfo.HasMTPWeights,
+		NumNextNPredictLayers: modelInfo.NumNextNPredictLayers,
 	}
 	err = c.metadataStore.Upsert(ctx, metadata)
 	if err != nil {
@@ -577,6 +579,8 @@ func (c *runtimeArchitectureComponentImpl) GetMetadataFromSafetensors(ctx contex
 		modelInfo.NumAttentionHeads = config.NumAttentionHeads
 		modelInfo.TotalExperts = config.TotalExpertCount()
 		modelInfo.ActiveExperts = config.ActiveExpertCount()
+		modelInfo.NumNextNPredictLayers = config.NumNextNPredictLayers
+		modelInfo.HasMTPWeights = c.hasMTPWeights(ctx, repo, config)
 		if modelInfo.HiddenSize != 0 {
 			kvcacheSize := common.GetKvCacheSize(modelInfo.ContextSize, modelInfo.BatchSize, modelInfo.HiddenSize, modelInfo.NumHiddenLayers, modelInfo.BytesPerParam)
 			activateMemory := common.GetActivationMemory(modelInfo.BatchSize, modelInfo.ContextSize, modelInfo.NumHiddenLayers, modelInfo.HiddenSize, modelInfo.NumAttentionHeads, modelInfo.BytesPerParam)
@@ -670,6 +674,23 @@ func parsePaddleInferModelName(content string) (string, error) {
 		return "", fmt.Errorf("no model_name found in Global section")
 	}
 	return cfg.Global.ModelName, nil
+}
+
+// hasMTPWeights checks whether the checkpoint carries MTP weights by inspecting
+// model.safetensors.index.json (types.HasMTPWeights). Without an MTP
+// declaration in config.json the index is never fetched. A missing index
+// (single-file or GGUF repos) or any parse failure means "no evidence" and
+// returns false.
+func (c *runtimeArchitectureComponentImpl) hasMTPWeights(ctx context.Context, repo *database.Repository, config *types.ModelConfig) bool {
+	if !config.MTPConfigured() {
+		return false
+	}
+	content, err := c.getConfigContent(ctx, ModelSafetensorsIndex, repo)
+	if err != nil {
+		slog.Debug("no safetensors index, skipping MTP weight check", slog.Any("repo", repo.Path), slog.Any("err", err))
+		return false
+	}
+	return types.HasMTPWeights(config, []byte(content))
 }
 
 func (c *runtimeArchitectureComponentImpl) getConfigContent(ctx context.Context, configFileName string, repo *database.Repository) (string, error) {
