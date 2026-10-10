@@ -172,14 +172,17 @@ func (s *llmServiceComponentImpl) ListMetricEvents(ctx context.Context, query ty
 
 	logs := make([]*types.AIGatewayMetricEventLog, 0, len(dbEvents))
 	for _, e := range dbEvents {
-		var startTime *time.Time
+		// Times are pre-formatted in the global product timezone so the
+		// client displays wall-clock times instead of raw UTC.
+		loc := config.GetGlobalTimeZone()
+		startTime := ""
 		if !e.StartTime.IsZero() {
-			startTime = &e.StartTime
+			startTime = e.StartTime.In(loc).Format(time.DateTime)
 		}
 		logs = append(logs, &types.AIGatewayMetricEventLog{
 			RequestID:           e.RequestID,
 			StartTime:           startTime,
-			CreatedAt:           e.CreatedAt,
+			CreatedAt:           e.CreatedAt.In(loc).Format(time.DateTime),
 			Model:               e.Model,
 			Provider:            e.Provider,
 			APIKeyMasked:        e.APIKeyMasked,

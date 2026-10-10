@@ -400,29 +400,30 @@ type AIGatewayMetricEventQuery struct {
 // can link to the llm config detail page.
 type AIGatewayMetricEventLog struct {
 	RequestID string `json:"request_id"`
-	// StartTime is the full-precision request start time; nil (omitted in
-	// JSON) for rows written before the diagnostics columns existed, so the
-	// frontend can fall back to CreatedAt.
-	StartTime           *time.Time `json:"start_time,omitempty"`
-	CreatedAt           time.Time  `json:"created_at"`
-	Model               string     `json:"model"`
-	Provider            string     `json:"provider"`
-	APIKeyMasked        string     `json:"api_key_masked"`
-	Username            string     `json:"username"`
-	StatusCode          int        `json:"status_code"`
-	IsStream            bool       `json:"is_stream"`
-	ErrorType           string     `json:"error_type"`
-	ErrorMessage        string     `json:"error_message"`
-	LatencyMs           int64      `json:"latency_ms"`
-	TTFTMs              int64      `json:"ttft_ms"`
-	QueueWaitMs         int64      `json:"queue_wait_ms"`
-	PromptTokens        int64      `json:"prompt_tokens"`
-	CompletionTokens    int64      `json:"completion_tokens"`
-	TotalTokens         int64      `json:"total_tokens"`
-	CachedTokens        int64      `json:"cached_tokens"`
-	CacheCreationTokens int64      `json:"cache_creation_tokens"`
-	UpstreamID          int64      `json:"upstream_id"`
-	LlmConfigID         int64      `json:"llm_config_id"`
+	// StartTime is the full-precision request start time, pre-formatted in
+	// the global product timezone ("2006-01-02 15:04:05"); empty for rows
+	// written before the diagnostics columns existed, so the frontend can
+	// fall back to CreatedAt.
+	StartTime           string `json:"start_time,omitempty"`
+	CreatedAt           string `json:"created_at"`
+	Model               string `json:"model"`
+	Provider            string `json:"provider"`
+	APIKeyMasked        string `json:"api_key_masked"`
+	Username            string `json:"username"`
+	StatusCode          int    `json:"status_code"`
+	IsStream            bool   `json:"is_stream"`
+	ErrorType           string `json:"error_type"`
+	ErrorMessage        string `json:"error_message"`
+	LatencyMs           int64  `json:"latency_ms"`
+	TTFTMs              int64  `json:"ttft_ms"`
+	QueueWaitMs         int64  `json:"queue_wait_ms"`
+	PromptTokens        int64  `json:"prompt_tokens"`
+	CompletionTokens    int64  `json:"completion_tokens"`
+	TotalTokens         int64  `json:"total_tokens"`
+	CachedTokens        int64  `json:"cached_tokens"`
+	CacheCreationTokens int64  `json:"cache_creation_tokens"`
+	UpstreamID          int64  `json:"upstream_id"`
+	LlmConfigID         int64  `json:"llm_config_id"`
 }
 
 type SearchPromptPrefix struct {
