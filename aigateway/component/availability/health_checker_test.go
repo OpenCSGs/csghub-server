@@ -775,6 +775,275 @@ func TestHealthChecker_PerformL7APIChecks_StoreError(t *testing.T) {
 	checker.performL7APIChecks(context.Background())
 }
 
+func TestHealthChecker_PerformL7APIChecks_BoundsProbeAndPersistenceWorkers(t *testing.T) {
+	const upstreamCount = 8
+	mockStore := mockdatabase.NewMockAIGatewayUpstreamHealthStateStore(t)
+	mockUpstreamStore := mockdatabase.NewMockUpstreamStore(t)
+	upstreams := make([]*database.Upstream, 0, upstreamCount)
+	for i := 1; i <= upstreamCount; i++ {
+		upstreams = append(upstreams, &database.Upstream{
+			ID: int64(i), URL: "https://api.example.com/v1/chat/completions", ModelName: "model",
+		})
+	}
+	mockUpstreamStore.EXPECT().ListHealthCheckEnabled(mock.Anything).Return(upstreams, nil).Once()
+
+	var activePersistence atomic.Int32
+	var maxPersistence atomic.Int32
+	var totalPersistence atomic.Int32
+	mockStore.EXPECT().MutateByUpstreamID(mock.Anything, mock.Anything).
+		RunAndReturn(func(ctx context.Context, mutation database.AIGatewayUpstreamHealthStateMutation) (*database.AIGatewayUpstreamHealthState, error) {
+			require.NoError(t, ctx.Err(), "persistence job context must stay live after the probe returns")
+			totalPersistence.Add(1)
+			active := activePersistence.Add(1)
+			updateMaxInt32(&maxPersistence, active)
+			defer activePersistence.Add(-1)
+			time.Sleep(5 * time.Millisecond)
+			state := &database.AIGatewayUpstreamHealthState{UpstreamID: mutation.UpstreamID, HealthState: string(types.HealthStateHealthy)}
+			require.NoError(t, mutation.Mutate(state))
+			return state, nil
+		}).Times(upstreamCount)
+
+	var activeProbes atomic.Int32
+	var maxProbes atomic.Int32
+	twoProbesStarted := make(chan struct{})
+	var probesReady sync.Once
+	provider := executingSampleProvider{
+		executionPolicy: func(types.SampleKind) (types.SampleExecutionPolicy, error) {
+			return types.SampleExecutionPolicy{Timeout: time.Second}, nil
+		},
+		execute: func(_ context.Context, _ types.SampleKind, input types.SampleInput, _ types.HTTPDoer) (*types.SampleExecutionResult, error) {
+			active := activeProbes.Add(1)
+			updateMaxInt32(&maxProbes, active)
+			defer activeProbes.Add(-1)
+			if active == 2 {
+				probesReady.Do(func() { close(twoProbesStarted) })
+			}
+			select {
+			case <-twoProbesStarted:
+			case <-time.After(time.Second):
+			}
+			return &types.SampleExecutionResult{
+				Request: &types.SampleRequest{Endpoint: input.Endpoint}, StatusCode: http.StatusOK,
+			}, nil
+		},
+	}
+
+	checker := &healthCheckerImpl{
+		config: HealthCheckerConfig{
+			ProbeWorkers: 2, PersistenceWorkers: 1,
+			Config: types.HealthCheckConfig{
+				Enabled:     true,
+				L7APICheck:  types.L7APICheckConfig{Timeout: time.Second},
+				HealthRules: types.HealthRulesConfig{ConsecutiveFailuresForUnhealthy: 3},
+			},
+		},
+		healthStore:      mockStore,
+		upstreamStore:    mockUpstreamStore,
+		stateCache:       NewStateCache(nil),
+		sampleRegistry:   sample.NewRegistry(provider),
+		stopCh:           make(chan struct{}),
+		multimodalProbes: newMultimodalProbeScheduler(NewStateCache(nil)),
+		now:              time.Now,
+	}
+	require.NoError(t, checker.Start(context.Background()))
+	t.Cleanup(func() { require.NoError(t, checker.Stop()) })
+	checker.isLeader.Store(true)
+	require.Equal(t, 4, cap(checker.persistenceShards[0]))
+
+	checker.performL7APIChecks(context.Background())
+
+	// Persistence is fire-and-forget for these upstreams: wait for the queued
+	// jobs to drain before Stop, otherwise queued mutations would be dropped.
+	require.Eventually(t, func() bool {
+		return totalPersistence.Load() == upstreamCount
+	}, 5*time.Second, time.Millisecond)
+	require.Equal(t, int32(2), maxProbes.Load())
+	require.Equal(t, int32(1), maxPersistence.Load())
+}
+
+func TestHealthChecker_PerformL7APIChecks_SkipsOverlappingSweep(t *testing.T) {
+	mockStore := mockdatabase.NewMockAIGatewayUpstreamHealthStateStore(t)
+	mockUpstreamStore := mockdatabase.NewMockUpstreamStore(t)
+	upstream := &database.Upstream{ID: 1, URL: "https://api.example.com/v1/chat/completions", ModelName: "model"}
+	mockUpstreamStore.EXPECT().ListHealthCheckEnabled(mock.Anything).Return([]*database.Upstream{upstream}, nil).Once()
+	var persisted atomic.Int32
+	mockStore.EXPECT().MutateByUpstreamID(mock.Anything, mock.Anything).
+		RunAndReturn(func(ctx context.Context, mutation database.AIGatewayUpstreamHealthStateMutation) (*database.AIGatewayUpstreamHealthState, error) {
+			require.NoError(t, ctx.Err(), "persistence job context must stay live after the probe returns")
+			persisted.Add(1)
+			state := &database.AIGatewayUpstreamHealthState{UpstreamID: mutation.UpstreamID, HealthState: string(types.HealthStateHealthy)}
+			require.NoError(t, mutation.Mutate(state))
+			return state, nil
+		}).Once()
+
+	started := make(chan struct{})
+	release := make(chan struct{})
+	var once sync.Once
+	provider := executingSampleProvider{
+		executionPolicy: func(types.SampleKind) (types.SampleExecutionPolicy, error) {
+			return types.SampleExecutionPolicy{Timeout: time.Second}, nil
+		},
+		execute: func(_ context.Context, _ types.SampleKind, input types.SampleInput, _ types.HTTPDoer) (*types.SampleExecutionResult, error) {
+			once.Do(func() { close(started) })
+			<-release
+			return &types.SampleExecutionResult{
+				Request: &types.SampleRequest{Endpoint: input.Endpoint}, StatusCode: http.StatusOK,
+			}, nil
+		},
+	}
+	checker := &healthCheckerImpl{
+		config: HealthCheckerConfig{
+			ProbeWorkers: 1, PersistenceWorkers: 1,
+			Config: types.HealthCheckConfig{
+				Enabled:     true,
+				L7APICheck:  types.L7APICheckConfig{Timeout: time.Second},
+				HealthRules: types.HealthRulesConfig{ConsecutiveFailuresForUnhealthy: 3},
+			},
+		},
+		healthStore: mockStore, upstreamStore: mockUpstreamStore, stateCache: NewStateCache(nil),
+		sampleRegistry: sample.NewRegistry(provider), stopCh: make(chan struct{}),
+		multimodalProbes: newMultimodalProbeScheduler(NewStateCache(nil)), now: time.Now,
+	}
+	require.NoError(t, checker.Start(context.Background()))
+	t.Cleanup(func() { require.NoError(t, checker.Stop()) })
+	checker.isLeader.Store(true)
+
+	done := make(chan struct{})
+	go func() {
+		checker.performL7APIChecks(context.Background())
+		close(done)
+	}()
+	<-started
+	checker.performL7APIChecks(context.Background())
+	close(release)
+	<-done
+	// The healthy upstream's persistence is fire-and-forget: wait for the
+	// queued mutation before Stop, otherwise it could be dropped at shutdown.
+	require.Eventually(t, func() bool { return persisted.Load() == 1 }, 5*time.Second, time.Millisecond)
+}
+
+func TestPersistHealthStateAsync_ShardsByUpstream(t *testing.T) {
+	checker := &healthCheckerImpl{
+		workerCtx: context.Background(),
+		persistenceShards: []chan healthPersistenceJob{
+			make(chan healthPersistenceJob, 4),
+			make(chan healthPersistenceJob, 4),
+		},
+	}
+	now := time.Now()
+	oldResult := &types.HealthCheckResult{UpstreamID: 1, Timestamp: now, Error: "old"}
+	newResult := &types.HealthCheckResult{UpstreamID: 1, Timestamp: now.Add(time.Second), Error: "new"}
+	otherResult := &types.HealthCheckResult{UpstreamID: 2, Timestamp: now, Error: "other"}
+
+	checker.persistHealthStateAsync(context.Background(), oldResult, types.SampleExecutionPolicy{})
+	checker.persistHealthStateAsync(context.Background(), newResult, types.SampleExecutionPolicy{})
+	checker.persistHealthStateAsync(context.Background(), otherResult, types.SampleExecutionPolicy{})
+
+	shard := checker.persistenceShards[1]
+	require.Len(t, shard, 2, "same-upstream results must share one FIFO shard")
+	first := <-shard
+	second := <-shard
+	require.Same(t, oldResult, first.result)
+	require.Same(t, newResult, second.result)
+	require.Len(t, checker.persistenceShards[0], 1, "other upstream lands on the other shard")
+}
+
+func TestPersistHealthStateAsync_SequencesSameUpstream(t *testing.T) {
+	mockStore := mockdatabase.NewMockAIGatewayUpstreamHealthStateStore(t)
+	latest := expectStatefulMultimodalHealthStore(t, mockStore, 2)
+	checker := &healthCheckerImpl{
+		config: HealthCheckerConfig{
+			ProbeWorkers: 1, PersistenceWorkers: 2,
+			Config: types.HealthCheckConfig{
+				Enabled:     true,
+				HealthRules: types.HealthRulesConfig{ConsecutiveFailuresForUnhealthy: 3},
+			},
+		},
+		healthStore:      mockStore,
+		stateCache:       NewStateCache(nil),
+		stopCh:           make(chan struct{}),
+		multimodalProbes: newMultimodalProbeScheduler(NewStateCache(nil)),
+		now:              time.Now,
+	}
+	require.NoError(t, checker.Start(context.Background()))
+	t.Cleanup(func() { require.NoError(t, checker.Stop()) })
+
+	now := time.Now()
+	policy := types.SampleExecutionPolicy{}
+	checker.persistHealthStateAsync(context.Background(), &types.HealthCheckResult{UpstreamID: 1, Timestamp: now, Error: "old"}, policy)
+	checker.persistHealthStateAsync(context.Background(), &types.HealthCheckResult{UpstreamID: 1, Timestamp: now.Add(time.Second), Error: "new"}, policy)
+
+	// Both failures must apply in enqueue order; if the newer one committed
+	// first, the older would be dropped as stale and the count would stay at 1.
+	require.Eventually(t, func() bool {
+		state := latest()
+		return state != nil && state.ConsecutiveFailures == 2
+	}, 5*time.Second, time.Millisecond)
+}
+
+func TestHealthChecker_StopCancelsBlockedProbe(t *testing.T) {
+	mockUpstreamStore := mockdatabase.NewMockUpstreamStore(t)
+	upstream := &database.Upstream{ID: 1, URL: "https://api.example.com/v1/chat/completions", ModelName: "model"}
+	mockUpstreamStore.EXPECT().ListHealthCheckEnabled(mock.Anything).Return([]*database.Upstream{upstream}, nil).Once()
+	probeStarted := make(chan struct{})
+	provider := executingSampleProvider{
+		executionPolicy: func(types.SampleKind) (types.SampleExecutionPolicy, error) {
+			return types.SampleExecutionPolicy{Timeout: time.Minute}, nil
+		},
+		execute: func(ctx context.Context, _ types.SampleKind, _ types.SampleInput, _ types.HTTPDoer) (*types.SampleExecutionResult, error) {
+			close(probeStarted)
+			<-ctx.Done()
+			return nil, ctx.Err()
+		},
+	}
+	checker := &healthCheckerImpl{
+		config: HealthCheckerConfig{
+			ProbeWorkers: 1, PersistenceWorkers: 1,
+			Config: types.HealthCheckConfig{
+				Enabled:     true,
+				L7APICheck:  types.L7APICheckConfig{Timeout: time.Minute},
+				HealthRules: types.HealthRulesConfig{ConsecutiveFailuresForUnhealthy: 3},
+			},
+		},
+		upstreamStore: mockUpstreamStore, stateCache: NewStateCache(nil),
+		sampleRegistry: sample.NewRegistry(provider), stopCh: make(chan struct{}),
+		multimodalProbes: newMultimodalProbeScheduler(NewStateCache(nil)), now: time.Now,
+	}
+	require.NoError(t, checker.Start(context.Background()))
+	checker.isLeader.Store(true)
+
+	sweepDone := make(chan struct{})
+	go func() {
+		checker.performL7APIChecks(context.Background())
+		close(sweepDone)
+	}()
+	<-probeStarted
+
+	stopDone := make(chan error, 1)
+	go func() {
+		stopDone <- checker.Stop()
+	}()
+	select {
+	case err := <-stopDone:
+		require.NoError(t, err)
+	case <-time.After(time.Second):
+		t.Fatal("Stop did not cancel the blocked probe")
+	}
+	select {
+	case <-sweepDone:
+	case <-time.After(time.Second):
+		t.Fatal("health-check sweep did not exit after Stop")
+	}
+}
+
+func updateMaxInt32(maximum *atomic.Int32, value int32) {
+	for current := maximum.Load(); value > current; current = maximum.Load() {
+		if maximum.CompareAndSwap(current, value) {
+			return
+		}
+	}
+}
+
 func TestHealthChecker_PerformL7APICheck_UrlNotChatCompletions(t *testing.T) {
 	checker := &healthCheckerImpl{
 		config: HealthCheckerConfig{

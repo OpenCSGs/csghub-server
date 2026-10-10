@@ -65,12 +65,12 @@ var cmdLaunch = &cobra.Command{
 			},
 			r,
 		)
-		if cleanup != nil {
-			server.RegisterOnShutdown(cleanup)
-		}
 		server.RegisterOnShutdown(upstreamSyncConsumer.Stop)
 		slog.Info("http server is running", slog.Any("port", cfg.AIGateway.Port))
 		server.Run()
+		if cleanup != nil {
+			cleanup()
+		}
 		_ = stopOtel(context.Background())
 		return nil
 	},

@@ -29,6 +29,8 @@ const (
 	defaultHealthCheckL7Interval            = 60 * time.Second
 	defaultHealthCheckL7Timeout             = 15 * time.Second
 	defaultMultimodalInferenceCheckInterval = 60 * time.Minute
+	defaultHealthCheckProbeWorkers          = 32
+	defaultHealthCheckPersistenceWorkers    = 4
 )
 
 var errStaleHealthCheckResult = errors.New("stale health check result")
@@ -40,25 +42,51 @@ type HealthChecker interface {
 }
 
 type HealthCheckerConfig struct {
-	Config types.HealthCheckConfig
+	Config             types.HealthCheckConfig
+	ProbeWorkers       int
+	PersistenceWorkers int
 }
 
 type healthCheckerImpl struct {
-	circuitBreaker   CircuitBreaker
-	config           HealthCheckerConfig
-	healthStore      database.AIGatewayUpstreamHealthStateStore
-	upstreamStore    database.UpstreamStore
-	llmConfigStore   database.LLMConfigStore
-	stateCache       StateCache
-	httpClient       *http.Client
-	sampleRegistry   *sample.Registry
-	stopCh           chan struct{}
-	wg               sync.WaitGroup
-	leaderNodeID     string
-	isLeader         atomic.Bool
-	lastSeenLeader   string
-	multimodalProbes multimodalProbeScheduler
-	now              func() time.Time
+	circuitBreaker    CircuitBreaker
+	config            HealthCheckerConfig
+	healthStore       database.AIGatewayUpstreamHealthStateStore
+	upstreamStore     database.UpstreamStore
+	llmConfigStore    database.LLMConfigStore
+	stateCache        StateCache
+	httpClient        *http.Client
+	sampleRegistry    *sample.Registry
+	stopCh            chan struct{}
+	wg                sync.WaitGroup
+	stopOnce          sync.Once
+	cancel            context.CancelFunc
+	workerCtx         context.Context
+	probeJobs         chan healthProbeJob
+	persistenceShards []chan healthPersistenceJob
+	sweepRunning      atomic.Bool
+	leaderNodeID      string
+	isLeader          atomic.Bool
+	lastSeenLeader    string
+	multimodalProbes  multimodalProbeScheduler
+	now               func() time.Time
+}
+
+type healthProbeJob struct {
+	ctx        context.Context
+	upstream   *database.Upstream
+	completion chan<- struct{}
+}
+
+type healthPersistenceJob struct {
+	ctx      context.Context
+	result   *types.HealthCheckResult
+	policy   types.SampleExecutionPolicy
+	response chan<- healthPersistenceResult
+}
+
+type healthPersistenceResult struct {
+	health    multimodalHealthState
+	persisted bool
 }
 
 func NewHealthChecker(
@@ -75,6 +103,8 @@ func NewHealthChecker(
 	}
 
 	healthConfig := HealthCheckerConfig{
+		ProbeWorkers:       cfg.AIGateway.HealthCheckProbeWorkers,
+		PersistenceWorkers: cfg.AIGateway.HealthCheckPersistenceWorkers,
 		Config: types.HealthCheckConfig{
 			Enabled: cfg.AIGateway.HealthCheckEnabled,
 			L7APICheck: types.L7APICheckConfig{
@@ -127,22 +157,131 @@ func (h *healthCheckerImpl) Start(ctx context.Context) error {
 		return nil
 	}
 
-	slog.InfoContext(ctx, "Starting health checker", "leader_node", h.leaderNodeID)
+	probeWorkers := h.probeWorkerCount()
+	persistenceWorkers := h.persistenceWorkerCount()
+	h.workerCtx, h.cancel = context.WithCancel(ctx)
+	h.probeJobs = make(chan healthProbeJob, probeWorkers)
+	// One queue per persistence worker, sharded by upstream ID: results for the
+	// same upstream always land on the same FIFO queue, so persistence for one
+	// upstream executes in enqueue order even across consecutive sweeps.
+	shardCap := max(1, 2*probeWorkers/persistenceWorkers)
+	h.persistenceShards = make([]chan healthPersistenceJob, persistenceWorkers)
+
+	for range probeWorkers {
+		h.wg.Add(1)
+		go h.runProbeWorker(h.workerCtx)
+	}
+	for i := range persistenceWorkers {
+		h.persistenceShards[i] = make(chan healthPersistenceJob, shardCap)
+		h.wg.Add(1)
+		go h.runPersistenceWorker(h.workerCtx, h.persistenceShards[i])
+	}
+
+	slog.InfoContext(ctx, "Starting health checker",
+		"leader_node", h.leaderNodeID,
+		"probe_workers", probeWorkers,
+		"persistence_workers", persistenceWorkers,
+		"persistence_queue_capacity", shardCap*persistenceWorkers,
+	)
 
 	h.wg.Add(1)
-	go h.runLeaderElection(ctx)
+	go h.runLeaderElection(h.workerCtx)
 
 	if h.config.Config.L7APICheck.Enabled {
 		h.wg.Add(1)
-		go h.runL7APICheckRoutine(ctx)
+		go h.runL7APICheckRoutine(h.workerCtx)
 	}
 	return nil
 }
 
 func (h *healthCheckerImpl) Stop() error {
-	close(h.stopCh)
+	h.stopOnce.Do(func() {
+		close(h.stopCh)
+		if h.cancel != nil {
+			h.cancel()
+		}
+	})
 	h.wg.Wait()
 	return nil
+}
+
+func (h *healthCheckerImpl) probeWorkerCount() int {
+	if h.config.ProbeWorkers > 0 {
+		return h.config.ProbeWorkers
+	}
+	return defaultHealthCheckProbeWorkers
+}
+
+func (h *healthCheckerImpl) persistenceWorkerCount() int {
+	if h.config.PersistenceWorkers > 0 {
+		return h.config.PersistenceWorkers
+	}
+	return defaultHealthCheckPersistenceWorkers
+}
+
+func (h *healthCheckerImpl) runProbeWorker(ctx context.Context) {
+	defer h.wg.Done()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case job := <-h.probeJobs:
+			if prom.AIGatewayHealthCheckProbeActive != nil {
+				prom.AIGatewayHealthCheckProbeActive.Inc()
+			}
+			jobCtx, cancelJob := workerJobContext(ctx, job.ctx)
+			h.performUpstreamHealthCheck(jobCtx, job.upstream)
+			cancelJob()
+			if prom.AIGatewayHealthCheckProbeActive != nil {
+				prom.AIGatewayHealthCheckProbeActive.Dec()
+			}
+			select {
+			case job.completion <- struct{}{}:
+			case <-ctx.Done():
+				return
+			}
+		}
+	}
+}
+
+func (h *healthCheckerImpl) runPersistenceWorker(ctx context.Context, jobs chan healthPersistenceJob) {
+	defer h.wg.Done()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case job := <-jobs:
+			if prom.AIGatewayHealthCheckPersistenceQueue != nil {
+				prom.AIGatewayHealthCheckPersistenceQueue.Set(float64(h.persistenceQueueDepth()))
+			}
+			if prom.AIGatewayHealthCheckPersistenceActive != nil {
+				prom.AIGatewayHealthCheckPersistenceActive.Inc()
+			}
+			jobCtx, cancelJob := workerJobContext(ctx, job.ctx)
+			health, persisted := h.updateHealthStateForPolicy(jobCtx, job.result, job.policy)
+			cancelJob()
+			if prom.AIGatewayHealthCheckPersistenceActive != nil {
+				prom.AIGatewayHealthCheckPersistenceActive.Dec()
+			}
+			if job.response == nil {
+				continue
+			}
+			select {
+			case job.response <- healthPersistenceResult{health: health, persisted: persisted}:
+			case <-ctx.Done():
+				return
+			}
+		}
+	}
+}
+
+func workerJobContext(workerCtx, jobCtx context.Context) (context.Context, context.CancelFunc) {
+	ctx, cancel := context.WithCancel(jobCtx)
+	stopWorkerCancellation := context.AfterFunc(workerCtx, cancel)
+	return ctx, func() {
+		stopWorkerCancellation()
+		cancel()
+	}
 }
 
 func (h *healthCheckerImpl) runLeaderElection(ctx context.Context) {
@@ -235,6 +374,14 @@ func (h *healthCheckerImpl) performL7APIChecks(ctx context.Context) {
 	if !h.isLeader.Load() {
 		return
 	}
+	if !h.sweepRunning.CompareAndSwap(false, true) {
+		if prom.AIGatewayHealthCheckSweepsSkipped != nil {
+			prom.AIGatewayHealthCheckSweepsSkipped.Inc()
+		}
+		slog.WarnContext(ctx, "health check sweep skipped because another sweep is running")
+		return
+	}
+	defer h.sweepRunning.Store(false)
 
 	upstreams, err := h.upstreamStore.ListHealthCheckEnabled(ctx)
 	if err != nil {
@@ -247,15 +394,49 @@ func (h *healthCheckerImpl) performL7APIChecks(ctx context.Context) {
 	}
 	h.multimodalProbes.cleanup(activeUpstreamIDs)
 
-	var wg sync.WaitGroup
+	startedAt := time.Now()
+	defer func() {
+		if prom.AIGatewayHealthCheckSweepDuration != nil {
+			prom.AIGatewayHealthCheckSweepDuration.Observe(time.Since(startedAt).Seconds())
+		}
+	}()
+	completion := make(chan struct{}, len(upstreams))
+	submitted := 0
 	for _, upstream := range upstreams {
-		wg.Add(1)
-		go func(u *database.Upstream) {
-			defer wg.Done()
-			h.performUpstreamHealthCheck(ctx, u)
-		}(upstream)
+		if h.probeJobs == nil {
+			h.performUpstreamHealthCheck(ctx, upstream)
+			continue
+		}
+		select {
+		case h.probeJobs <- healthProbeJob{ctx: ctx, upstream: upstream, completion: completion}:
+			submitted++
+		case <-ctx.Done():
+			return
+		case <-h.stopCh:
+			return
+		}
 	}
-	wg.Wait()
+	for range submitted {
+		select {
+		case <-completion:
+		case <-ctx.Done():
+			return
+		case <-h.stopCh:
+			return
+		}
+	}
+	duration := time.Since(startedAt)
+	slog.InfoContext(ctx, "health check sweep completed",
+		"upstream_count", len(upstreams),
+		"duration", duration,
+		"persistence_queue_depth", h.persistenceQueueDepth(),
+	)
+	if duration > h.l7Interval() {
+		slog.WarnContext(ctx, "health check sweep exceeded interval; overlapping sweep skipped",
+			"duration", duration,
+			"interval", h.l7Interval(),
+		)
+	}
 }
 
 func (h *healthCheckerImpl) performUpstreamHealthCheck(ctx context.Context, upstream *database.Upstream) {
@@ -331,27 +512,29 @@ func (h *healthCheckerImpl) performUpstreamHealthCheck(ctx context.Context, upst
 		result = h.performInferenceCheck(ctx, upstream, inferencePolicy.Timeout)
 		result.LatencyMs += l7Outcome.result.LatencyMs
 		result.UsedInferenceFallback = true
-		health, persisted := h.updateHealthStateForPolicy(ctx, result, inferencePolicy)
-		if inferencePolicy.Multimodal {
-			if !persisted {
-				return
-			}
-			if err := h.multimodalProbes.recordInferenceSchedule(
-				ctx, upstream.ID, h.currentTime(), true, health.Inference.ConsecutiveFailures, probePolicy, probeTTL,
-			); err != nil {
-				slog.WarnContext(ctx, "Failed to persist multimodal inference schedule",
-					"error", err,
-					"upstream_id", upstream.ID)
-			}
+		if !inferencePolicy.Multimodal {
+			h.persistHealthStateAsync(ctx, result, inferencePolicy)
+			return
+		}
+		health, persisted := h.persistHealthStateForPolicy(ctx, result, inferencePolicy)
+		if !persisted {
+			return
+		}
+		if err := h.multimodalProbes.recordInferenceSchedule(
+			ctx, upstream.ID, h.currentTime(), true, health.Inference.ConsecutiveFailures, probePolicy, probeTTL,
+		); err != nil {
+			slog.WarnContext(ctx, "Failed to persist multimodal inference schedule",
+				"error", err,
+				"upstream_id", upstream.ID)
 		}
 		return
 	}
 	if !result.Healthy {
-		h.updateHealthStateForPolicy(ctx, result, inferencePolicy)
+		h.persistHealthStateAsync(ctx, result, inferencePolicy)
 		return
 	}
 	if inferencePolicy.Multimodal {
-		_, persisted := h.updateHealthStateForPolicy(ctx, result, inferencePolicy)
+		_, persisted := h.persistHealthStateForPolicy(ctx, result, inferencePolicy)
 		if !persisted {
 			return
 		}
@@ -380,18 +563,20 @@ func (h *healthCheckerImpl) performUpstreamHealthCheck(ctx context.Context, upst
 	}
 
 	result = h.performInferenceCheck(ctx, upstream, inferencePolicy.Timeout)
-	health, persisted := h.updateHealthStateForPolicy(ctx, result, inferencePolicy)
-	if inferencePolicy.Multimodal {
-		if !persisted {
-			return
-		}
-		if err := h.multimodalProbes.recordInferenceSchedule(
-			ctx, upstream.ID, h.currentTime(), false, health.Inference.ConsecutiveFailures, probePolicy, probeTTL,
-		); err != nil {
-			slog.WarnContext(ctx, "Failed to persist multimodal inference schedule",
-				"error", err,
-				"upstream_id", upstream.ID)
-		}
+	if !inferencePolicy.Multimodal {
+		h.persistHealthStateAsync(ctx, result, inferencePolicy)
+		return
+	}
+	health, persisted := h.persistHealthStateForPolicy(ctx, result, inferencePolicy)
+	if !persisted {
+		return
+	}
+	if err := h.multimodalProbes.recordInferenceSchedule(
+		ctx, upstream.ID, h.currentTime(), false, health.Inference.ConsecutiveFailures, probePolicy, probeTTL,
+	); err != nil {
+		slog.WarnContext(ctx, "Failed to persist multimodal inference schedule",
+			"error", err,
+			"upstream_id", upstream.ID)
 	}
 }
 
@@ -892,6 +1077,78 @@ func (h *healthCheckerImpl) updateHealthStateForPolicy(
 		return h.updateMultimodalHealthState(ctx, result)
 	}
 	return multimodalHealthState{}, h.updateHealthState(ctx, result)
+}
+
+func (h *healthCheckerImpl) persistHealthStateForPolicy(
+	ctx context.Context,
+	result *types.HealthCheckResult,
+	policy types.SampleExecutionPolicy,
+) (multimodalHealthState, bool) {
+	if len(h.persistenceShards) == 0 {
+		return h.updateHealthStateForPolicy(ctx, result, policy)
+	}
+
+	response := make(chan healthPersistenceResult, 1)
+	job := healthPersistenceJob{ctx: ctx, result: result, policy: policy, response: response}
+	select {
+	case h.persistenceShard(result.UpstreamID) <- job:
+		h.recordPersistenceQueueDepth()
+	case <-ctx.Done():
+		return multimodalHealthState{}, false
+	case <-h.workerCtx.Done():
+		return multimodalHealthState{}, false
+	}
+
+	select {
+	case persisted := <-response:
+		return persisted.health, persisted.persisted
+	case <-ctx.Done():
+		return multimodalHealthState{}, false
+	case <-h.workerCtx.Done():
+		return multimodalHealthState{}, false
+	}
+}
+
+// persistHealthStateAsync enqueues persistence without waiting for the outcome.
+// The probe's job context is canceled as soon as the probe returns, so the
+// queued job must run on the worker context instead of the caller's context.
+func (h *healthCheckerImpl) persistHealthStateAsync(
+	ctx context.Context,
+	result *types.HealthCheckResult,
+	policy types.SampleExecutionPolicy,
+) {
+	if len(h.persistenceShards) == 0 {
+		h.updateHealthStateForPolicy(ctx, result, policy)
+		return
+	}
+
+	job := healthPersistenceJob{ctx: h.workerCtx, result: result, policy: policy}
+	select {
+	case h.persistenceShard(result.UpstreamID) <- job:
+		h.recordPersistenceQueueDepth()
+	case <-ctx.Done():
+	case <-h.workerCtx.Done():
+	}
+}
+
+// persistenceShard returns the FIFO persistence queue for an upstream, keeping
+// per-upstream persistence in enqueue order across concurrent sweeps.
+func (h *healthCheckerImpl) persistenceShard(upstreamID int64) chan healthPersistenceJob {
+	return h.persistenceShards[upstreamID%int64(len(h.persistenceShards))]
+}
+
+func (h *healthCheckerImpl) persistenceQueueDepth() int {
+	depth := 0
+	for _, shard := range h.persistenceShards {
+		depth += len(shard)
+	}
+	return depth
+}
+
+func (h *healthCheckerImpl) recordPersistenceQueueDepth() {
+	if prom.AIGatewayHealthCheckPersistenceQueue != nil {
+		prom.AIGatewayHealthCheckPersistenceQueue.Set(float64(h.persistenceQueueDepth()))
+	}
 }
 
 func (h *healthCheckerImpl) GetHealthState(ctx context.Context, upstreamID int64) (*types.ProviderHealthStatus, error) {

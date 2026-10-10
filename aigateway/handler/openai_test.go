@@ -949,3 +949,27 @@ func buildVideoAudioForm(t *testing.T, count int, contentType string, content []
 	require.NoError(t, req.ParseMultipartForm(int64(body.Len()+1024)))
 	return req.MultipartForm
 }
+
+func TestOpenAIHandlerShutdownStopsAvailabilityWithoutTracer(t *testing.T) {
+	manager := &shutdownAvailabilityManager{}
+	handler := &OpenAIHandlerImpl{availabilityManager: manager}
+
+	require.NoError(t, handler.Shutdown(context.Background()))
+	require.True(t, manager.stopped)
+}
+
+type shutdownAvailabilityManager struct {
+	stopped bool
+}
+
+func (m *shutdownAvailabilityManager) Start(context.Context) error { return nil }
+func (m *shutdownAvailabilityManager) Stop() error {
+	m.stopped = true
+	return nil
+}
+func (m *shutdownAvailabilityManager) RecordRequestResult(context.Context, int64, string, bool, error) error {
+	return nil
+}
+func (m *shutdownAvailabilityManager) GetCircuitState(context.Context, int64) (*types.ProviderCircuitStatus, error) {
+	return nil, nil
+}

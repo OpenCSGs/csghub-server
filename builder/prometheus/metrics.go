@@ -18,7 +18,12 @@ var (
 	// AIGateway upstream circuit breaker metrics
 	AIGatewayUpstreamCircuitState *prometheus.GaugeVec
 	// AIGateway upstream health check latency
-	AIGatewayUpstreamHealthLatency *prometheus.GaugeVec
+	AIGatewayUpstreamHealthLatency        *prometheus.GaugeVec
+	AIGatewayHealthCheckProbeActive       prometheus.Gauge
+	AIGatewayHealthCheckPersistenceActive prometheus.Gauge
+	AIGatewayHealthCheckPersistenceQueue  prometheus.Gauge
+	AIGatewayHealthCheckSweepDuration     prometheus.Histogram
+	AIGatewayHealthCheckSweepsSkipped     prometheus.Counter
 	// AIGateway chat upstream attempt count
 	AIGatewayChatUpstreamAttemptTotal *prometheus.CounterVec
 
@@ -98,6 +103,30 @@ func InitMetrics() {
 		Name: "csghub_aigateway_upstream_health_latency_ms",
 		Help: "Last health check latency in milliseconds for aigateway upstreams",
 	}, []string{"upstream_id", "url"})
+
+	AIGatewayHealthCheckProbeActive = promauto.NewGauge(prometheus.GaugeOpts{
+		Name: "csghub_aigateway_health_check_probe_active",
+		Help: "Number of active AIGateway upstream health probes",
+	})
+	AIGatewayHealthCheckPersistenceActive = promauto.NewGauge(prometheus.GaugeOpts{
+		Name: "csghub_aigateway_health_check_persistence_active",
+		Help: "Number of active AIGateway health-state persistence operations",
+	})
+	AIGatewayHealthCheckPersistenceQueue = promauto.NewGauge(prometheus.GaugeOpts{
+		Name: "csghub_aigateway_health_check_persistence_queue_depth",
+		Help: "Number of queued AIGateway health-state persistence operations",
+	})
+	AIGatewayHealthCheckSweepDuration = promauto.NewHistogram(prometheus.HistogramOpts{
+		Name: "csghub_aigateway_health_check_sweep_duration_seconds",
+		Help: "Duration of an AIGateway health-check sweep in seconds",
+		// Cover at least one full check interval so over-interval sweeps are
+		// distinguishable from +Inf.
+		Buckets: []float64{1, 5, 15, 30, 60, 120, 300},
+	})
+	AIGatewayHealthCheckSweepsSkipped = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "csghub_aigateway_health_check_sweeps_skipped_total",
+		Help: "Number of AIGateway health-check sweeps skipped because another sweep was running",
+	})
 
 	// AIGateway chat upstream attempt count.
 	AIGatewayChatUpstreamAttemptTotal = promauto.NewCounterVec(prometheus.CounterOpts{

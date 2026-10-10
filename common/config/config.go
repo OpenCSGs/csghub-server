@@ -632,6 +632,8 @@ type Config struct {
 		HealthCheckL7APIEnabled                bool   `env:"OPENCSG_AIGATEWAY_HEALTH_CHECK_L7_API_ENABLED" default:"true"`
 		HealthCheckL7APIInterval               int    `env:"OPENCSG_AIGATEWAY_HEALTH_CHECK_L7_API_INTERVAL" default:"60"`
 		HealthCheckL7APITimeout                int    `env:"OPENCSG_AIGATEWAY_HEALTH_CHECK_L7_API_TIMEOUT" default:"15"`
+		HealthCheckProbeWorkers                int    `env:"OPENCSG_AIGATEWAY_HEALTH_CHECK_PROBE_WORKERS" default:"32"`
+		HealthCheckPersistenceWorkers          int    `env:"OPENCSG_AIGATEWAY_HEALTH_CHECK_PERSISTENCE_WORKERS" default:"4"`
 		HealthCheckModalInferenceInterval      int    `env:"OPENCSG_AIGATEWAY_HEALTH_CHECK_MULTIMODAL_INFERENCE_INTERVAL" default:"3600"`
 		HealthCheckConsecutiveFailures         int    `env:"OPENCSG_AIGATEWAY_HEALTH_CHECK_CONSECUTIVE_FAILURES" default:"3"`
 		HealthCheckLatencyDegradedMs           int    `env:"OPENCSG_AIGATEWAY_HEALTH_CHECK_LATENCY_DEGRADED_MS" default:"10000"`
