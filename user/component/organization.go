@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"sort"
 	"time"
 
 	"github.com/google/uuid"
@@ -513,6 +514,16 @@ func (c *organizationComponentImpl) ListCurrentUserWritableNamespaces(ctx contex
 			organizationUUIDs = append(organizationUUIDs, namespace.UUID)
 		}
 	}
+	sort.SliceStable(namespaceUUIDs, func(i, j int) bool {
+		left := namespaceByUUID[namespaceUUIDs[i]]
+		right := namespaceByUUID[namespaceUUIDs[j]]
+		leftIsCurrentUser := left.Path == currentUser
+		rightIsCurrentUser := right.Path == currentUser
+		if leftIsCurrentUser != rightIsCurrentUser {
+			return leftIsCurrentUser
+		}
+		return left.CreatedAt.After(right.CreatedAt)
+	})
 
 	usersByUUID := make(map[string]*database.User, len(userUUIDs))
 	if len(userUUIDs) > 0 {
