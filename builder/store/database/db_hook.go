@@ -4,4 +4,4 @@ package database
 
 import "github.com/uptrace/bun"
 
-func registerDatabaseHooks(_ *bun.DB) {}
+func registerDatabaseHooks(_ *bun.DB, _ bool) {}

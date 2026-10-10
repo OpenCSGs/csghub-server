@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/argoproj/argo-workflows/v3/pkg/apis/workflow/v1alpha1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"opencsg.com/csghub-server/common/types"
@@ -41,6 +42,26 @@ func TestInitInMemoryDB(t *testing.T) {
 			assert.Equal(t, 0, count, "new table should be empty")
 		})
 	}
+
+	var auditTableCount int
+	err = db.BunDB.NewRaw("SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'audit_logs'").
+		Scan(ctx, &auditTableCount)
+	require.NoError(t, err)
+	assert.Zero(t, auditTableCount, "runner in-memory database should not own the audit log table")
+
+	workflowStore := NewArgoWorkFlowStoreWithDB(db)
+	workflow, err := workflowStore.CreateWorkFlow(ctx, ArgoWorkflow{
+		Username: "runner-user",
+		TaskName: "runner-task",
+		TaskId:   "runner-task-id",
+		TaskType: types.TaskTypeEvaluation,
+		Status:   v1alpha1.WorkflowPending,
+	})
+	require.NoError(t, err)
+
+	workflow.Status = v1alpha1.WorkflowRunning
+	_, err = workflowStore.UpdateWorkFlow(ctx, *workflow)
+	require.NoError(t, err, "runner workflow updates must not depend on an audit_logs table")
 }
 
 func TestCreateTables(t *testing.T) {

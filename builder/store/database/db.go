@@ -34,6 +34,9 @@ type DBConfig struct {
 	Dialect DatabaseDialect `json:"dialect" comment:"database vendor to use, valid value: pg, sqlite"`
 	// e.g.: postgresql://starhub:starhub@localhost:5433/starhub?sslmode=disable
 	DSN string `json:"dsn" comment:"e.g.: postgresql://starhub:starhub@localhost:5433/starhub?sslmode=disable"`
+	// DisableAuditHook prevents this connection from recording automatic audit logs.
+	// It is intended for process-local databases that do not own an audit_logs table.
+	DisableAuditHook bool `json:"-"`
 }
 
 // DB is where all database operation lives
@@ -129,7 +132,7 @@ func NewDB(ctx context.Context, config DBConfig) (db *DB, err error) {
 		bunotel.WithDBName("csghub"),
 		bunotel.WithFormattedQueries(true),
 	))
-	registerDatabaseHooks(bunDB)
+	registerDatabaseHooks(bunDB, config.DisableAuditHook)
 
 	err = bunDB.PingContext(ctx)
 	if err != nil {
