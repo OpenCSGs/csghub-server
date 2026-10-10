@@ -266,6 +266,10 @@ type CreateMirrorRepoReq struct {
 	Description string `json:"description"`
 	License     string `json:"license"`
 	CurrentUser string `json:"current_user"`
+	// AutoCreateOrganization is the admin user's choice, accepted from the
+	// admin-protected /mirror/repo request body. Nil preserves the legacy default
+	// of allowing organization creation when older clients omit the field.
+	AutoCreateOrganization *bool `json:"auto_create_organization,omitempty"`
 	// AllowAutoCreateOrganization is set only by the admin-protected mirror
 	// handler. It is intentionally excluded from JSON so external and shared
 	// component callers cannot grant themselves organization ownership.
@@ -290,12 +294,20 @@ type ResolveNamespaceReq struct {
 	SourceNamespace string         `json:"source_namespace" form:"source_namespace" binding:"required"`
 	SourceName      string         `json:"source_name" form:"source_name" binding:"required"`
 	RepoType        RepositoryType `json:"repo_type" form:"repo_type" binding:"required"`
+	// TargetNamespace overrides the mapped target namespace so callers can
+	// check existence of an arbitrary namespace the user typed. When empty,
+	// the target is resolved from SourceNamespace as before.
+	TargetNamespace string `json:"target_namespace" form:"target_namespace"`
 }
 
 type ResolveNamespaceResp struct {
 	TargetNamespace string `json:"target_namespace"`
 	TargetName      string `json:"target_name"`
-	Exists          bool   `json:"exists"`
+	// Exists reports whether the target repository already exists.
+	Exists bool `json:"exists"`
+	// NamespaceExists reports whether the target organization namespace
+	// already exists, so the admin UI can warn before submit.
+	NamespaceExists bool `json:"namespace_exists"`
 }
 
 type MCPServerAttributes struct {
