@@ -140,7 +140,13 @@ func (c *repoComponentImpl) CheckAccountAndResource(ctx context.Context, chkReq 
 	return &types.CheckExclusiveResp{}, nil
 }
 
-func (c *repoComponentImpl) allowPublic(repo *database.Repository) error {
+// authorizeVisibilityChange relies on the repository write check in UpdateRepo for CE.
+func (c *repoComponentImpl) authorizeVisibilityChange(_ database.User, _ types.RepositoryType) error {
+	return nil
+}
+
+// allowPublic adds no further restriction to public repositories in CE.
+func (c *repoComponentImpl) allowPublic(_ *database.Repository) error {
 	return nil
 }
 
