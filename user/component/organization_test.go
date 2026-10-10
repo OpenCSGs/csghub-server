@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/riverqueue/river"
@@ -116,25 +117,32 @@ func TestOrganizationComponent_ListCurrentUserWritableNamespaces(t *testing.T) {
 	ctx := context.Background()
 	userUUID := "user-uuid"
 	organizationUUID := uuid.New()
+	newerOrganizationUUID := uuid.New()
 	actor := database.User{ID: 42, Username: "current-user", UUID: userUUID}
 	organizationNamespaceUUID := organizationUUID.String()
-	userNamespace := database.Namespace{Path: "alice", UUID: userUUID, NamespaceType: database.UserNamespace}
+	newerOrganizationNamespaceUUID := newerOrganizationUUID.String()
+	userNamespace := database.Namespace{Path: actor.Username, UUID: userUUID, NamespaceType: database.UserNamespace}
+	userNamespace.CreatedAt = time.Date(2026, 9, 17, 0, 0, 0, 0, time.UTC)
 	organizationNamespace := database.Namespace{Path: "engineering", UUID: organizationNamespaceUUID, NamespaceType: database.OrgNamespace}
+	organizationNamespace.CreatedAt = time.Date(2026, 9, 19, 0, 0, 0, 0, time.UTC)
+	newerOrganizationNamespace := database.Namespace{Path: "research", UUID: newerOrganizationNamespaceUUID, NamespaceType: database.OrgNamespace}
+	newerOrganizationNamespace.CreatedAt = time.Date(2026, 9, 19, 0, 0, 0, 0, time.UTC)
 	organization := database.Organization{ID: 1, Name: "engineering", Nickname: "IT Department", UUID: organizationUUID}
+	newerOrganization := database.Organization{ID: 2, Name: "research", Nickname: "Research", UUID: newerOrganizationUUID}
 
 	userStore := mockdb.NewMockUserStore(t)
 	userStore.EXPECT().FindByUsername(mock.Anything, actor.Username).Return(actor, nil).Once()
 	userStore.EXPECT().FindByUUIDs(mock.Anything, []string{userUUID}).Return([]*database.User{{UUID: userUUID, Username: actor.Username, NickName: "Alice"}}, nil).Once()
 	orgStore := mockdb.NewMockOrgStore(t)
-	orgStore.EXPECT().FindByUUIDs(mock.Anything, []string{organizationNamespaceUUID}).Return([]database.Organization{organization}, nil).Once()
+	orgStore.EXPECT().FindByUUIDs(mock.Anything, []string{organizationNamespaceUUID, newerOrganizationNamespaceUUID}).Return([]database.Organization{organization, newerOrganization}, nil).Once()
 	nsStore := mockdb.NewMockNamespaceStore(t)
-	nsStore.EXPECT().FindByUUIDs(mock.Anything, []string{userUUID, organizationNamespaceUUID}).Return([]database.Namespace{userNamespace, organizationNamespace}, nil).Once()
+	nsStore.EXPECT().FindByUUIDs(mock.Anything, []string{organizationNamespaceUUID, userUUID, newerOrganizationNamespaceUUID}).Return([]database.Namespace{organizationNamespace, userNamespace, newerOrganizationNamespace}, nil).Once()
 	authorizer := mockrebac.NewMockAuthorizer(t)
 	authorizer.EXPECT().ListObjects(ctx, rebac.ListObjectsRequest{
 		Subject: rebac.UserSubject(userUUID), Relation: rebac.NamespaceCanWrite,
 		ObjectType: rebac.ObjectTypeNamespace, Consistency: rebac.ConsistencyHigher,
 	}).Return(rebac.ListObjectsResult{Objects: []rebac.Object{
-		rebac.NamespaceObject(userUUID), rebac.NamespaceObject(organizationNamespaceUUID),
+		rebac.NamespaceObject(organizationNamespaceUUID), rebac.NamespaceObject(userUUID), rebac.NamespaceObject(newerOrganizationNamespaceUUID),
 	}}, nil).Once()
 
 	component := &organizationComponentImpl{userStore: userStore, nsStore: nsStore, orgStore: orgStore, rebac: authorizer}
@@ -142,8 +150,9 @@ func TestOrganizationComponent_ListCurrentUserWritableNamespaces(t *testing.T) {
 
 	require.NoError(t, err)
 	require.Equal(t, []types.WritableNamespace{
-		{Path: "alice", Type: "user", Name: "Alice", UUID: userUUID},
+		{Path: actor.Username, Type: "user", Name: "Alice", UUID: userUUID},
 		{Path: "engineering", Type: "organization", Name: "IT Department", UUID: organizationNamespaceUUID},
+		{Path: "research", Type: "organization", Name: "Research", UUID: newerOrganizationNamespaceUUID},
 	}, result)
 }
 
