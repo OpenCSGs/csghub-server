@@ -580,19 +580,23 @@ func (c *multiSyncComponentImpl) createLocalModel(ctx context.Context, m *types.
 		return fmt.Errorf("failed to create database model, cause: %w", err)
 	}
 
-	// sync metadata
+	// Sync metadata. Every column must be carried explicitly: the store's
+	// Upsert does ON CONFLICT DO UPDATE over all columns, so a field missing
+	// here would reset the local value to zero on every sync.
 	err = c.metadataStore.Upsert(ctx, &database.Metadata{
-		RepositoryID:      newDBRepo.ID,
-		ModelParams:       m.Metadata.ModelParams,
-		ModelParamsValid:  modelParamsValidFromSync(m.Metadata.ModelParamsValid, m.Metadata.ModelParams),
-		TensorType:        m.Metadata.TensorType,
-		MiniGPUMemoryGB:   m.Metadata.MiniGPUMemoryGB,
-		MiniGPUFinetuneGB: m.Metadata.MiniGPUFinetuneGB,
-		Architecture:      m.Metadata.Architecture,
-		ModelType:         m.Metadata.ModelType,
-		ClassName:         m.Metadata.ClassName,
-		Quantizations:     m.Metadata.Quantizations,
-		PDRecommendation:  m.Metadata.PDRecommendation,
+		RepositoryID:          newDBRepo.ID,
+		ModelParams:           m.Metadata.ModelParams,
+		ModelParamsValid:      modelParamsValidFromSync(m.Metadata.ModelParamsValid, m.Metadata.ModelParams),
+		TensorType:            m.Metadata.TensorType,
+		MiniGPUMemoryGB:       m.Metadata.MiniGPUMemoryGB,
+		MiniGPUFinetuneGB:     m.Metadata.MiniGPUFinetuneGB,
+		Architecture:          m.Metadata.Architecture,
+		ModelType:             m.Metadata.ModelType,
+		ClassName:             m.Metadata.ClassName,
+		Quantizations:         m.Metadata.Quantizations,
+		PDRecommendation:      m.Metadata.PDRecommendation,
+		HasMTPWeights:         m.Metadata.HasMTPWeights,
+		NumNextNPredictLayers: m.Metadata.NumNextNPredictLayers,
 	})
 	if err != nil {
 		slog.Error("failed to sync metadata", slog.Any("error", err), slog.Int64("repo_id", newDBRepo.ID))

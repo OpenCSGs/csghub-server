@@ -1,0 +1,34 @@
+# EAGLE-3 draft model registry (issue #1489).
+#
+# When a user selects the eagle3 speculative-decoding method but leaves
+# spec-draft-model empty, the deploy activity looks the target repository
+# path ("namespace/name") up in this file and, on a hit, injects the draft
+# repo into the deployment (SPEC_DRAFT_REPO_ID, plus DRAFT_REVISION when a
+# revision is set). The user always wins: an explicitly filled
+# spec-draft-model is never overridden, and a miss keeps the previous
+# behavior (eagle3 composition fails until a draft model is given).
+#
+# Matching is a case-insensitive substring match of model_name against the
+# repository path. When several entries match, the longest model_name wins,
+# so write keys as specifically as possible: a draft head must match the
+# base model's architecture AND size (Llama-3.1-8B-Instruct and
+# Llama-3.1-70B-Instruct need different heads).
+#
+# draft_repo must be a repository on this platform's hub: mirror the
+# upstream EAGLE-3 head first (issue #1489 asks for platform-hub mirrors to
+# avoid external dependencies), then uncomment the entry. The file ships
+# with no active entries on purpose; the mechanism degrades to no-op until
+# ops mirrors a draft repo and enables it here.
+#
+# Fields:
+#   model_name - case-insensitive substring matched against the repo path
+#   draft_repo - draft repository on the platform hub ("namespace/name")
+#   revision   - optional draft revision, defaults to main
+
+# [[models]]
+# model_name = "Llama-3.1-8B-Instruct"
+# draft_repo = "opencsg/EAGLE3-Llama-3.1-8B-Instruct"
+
+# [[models]]
+# model_name = "Llama-3.3-70B-Instruct"
+# draft_repo = "opencsg/EAGLE3-Llama-3.3-70B-Instruct"

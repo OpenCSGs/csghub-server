@@ -264,6 +264,22 @@ type (
 		Name   string `json:"name"`
 		Value  string `json:"value"`
 		Format string `json:"format"`
+		// Options enumerates the selectable values for UI dropdowns.
+		Options []string `json:"options,omitempty"`
+		// RecommendNgram lists the option values of this parameter for which
+		// the deployment form should suggest enabling ngram speculative
+		// decoding (high-repetition workloads, issue #1489). Rendering the
+		// suggestion stays the frontend's call.
+		RecommendNgram []string `json:"recommend_ngram,omitempty"`
+		// Virtual marks parameters that are never rendered as standalone
+		// flags; the deploy render layer composes them into engine-specific
+		// arguments (e.g. the spec-decode-* group).
+		Virtual bool `json:"virtual,omitempty"`
+		// ConflictsWith is a declarative UI hint listing parameter names that
+		// should not be enabled together with this one. Whether the conflict
+		// applies given the current values is the frontend's call (e.g.
+		// enforce-eager only conflicts with spec-decode-method when enabled).
+		ConflictsWith []string `json:"conflicts_with,omitempty"`
 	}
 
 	TrafficTarget struct {

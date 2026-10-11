@@ -854,6 +854,9 @@ var engineArgsUnsupportedByVersion = map[string]map[string][]string{
 	"sglang.json": {
 		"v0.5.14": {"enable-ep-moe"},
 	},
+	"nvidia-sglang.json": {
+		"25.12-py3": {"enable-ep-moe"},
+	},
 }
 
 // engineArgsSupportedByVersion pins flags that the declared engine versions do
@@ -864,12 +867,6 @@ var engineArgsSupportedByVersion = map[string]map[string][]string{
 		"v0.9.2":  {"swap-space", "guided-decoding-backend"},
 		"v0.24.0": {"async-scheduling"},
 		"v0.28.0": {"async-scheduling"},
-	},
-	"nvidia-sglang.json": {
-		// sglang 0.5.3rc1 still accepts --enable-ep-moe as a deprecated shim
-		// that sets ep_size to tp_size. sglang 0.5.5 removed the flag, so
-		// moving this image to a newer tag means using --ep-size instead.
-		"25.10-py3": {"enable-ep-moe"},
 	},
 }
 
@@ -933,7 +930,7 @@ func TestEngineConfigValueTakingArgsHaveDefaults(t *testing.T) {
 		t.Run(filepath.Base(configPath), func(t *testing.T) {
 			for version, args := range readEngineArgsByVersion(t, configPath) {
 				for _, arg := range args {
-					if arg.Name == types.EngineArgCustomOptions || !strings.Contains(arg.Format, "%") {
+					if arg.Name == types.EngineArgCustomOptions || arg.Virtual || !strings.Contains(arg.Format, "%") {
 						continue
 					}
 					require.NotEmptyf(t, arg.Value,
@@ -979,4 +976,47 @@ func engineArgNameSet(argsByVersion map[string][]types.EngineArg, version string
 		names[arg.Name] = true
 	}
 	return names, true
+}
+
+func TestHasMTPWeightsFromIndex(t *testing.T) {
+	ctx := context.TODO()
+	repo := &database.Repository{
+		Path:           "deepseek-ai/DeepSeek-V3.1",
+		DefaultBranch:  "main",
+		RepositoryType: types.ModelRepo,
+	}
+	config := &types.ModelConfig{
+		Architectures:         []string{"DeepseekV3ForCausalLM"},
+		NumHiddenLayers:       61,
+		NumNextNPredictLayers: 1,
+	}
+	index := `{"weight_map":{
+		"model.layers.60.self_attn.q_proj.weight":"model-00001-of-00009.safetensors",
+		"model.layers.61.eh_proj.weight":"model-00009-of-00009.safetensors",
+		"model.layers.61.enorm.weight":"model-00009-of-00009.safetensors",
+		"model.layers.61.hnorm.weight":"model-00009-of-00009.safetensors",
+		"model.layers.61.shared_head.head.weight":"model-00009-of-00009.safetensors"
+	}}`
+
+	t.Run("index with MTP weights", func(t *testing.T) {
+		rc := initializeTestRuntimeArchComponent(ctx, t)
+		rc.mocks.gitServer.EXPECT().GetRepoFileRaw(
+			mock.Anything, mock.Anything,
+		).Return(index, nil).Once()
+		require.True(t, rc.hasMTPWeights(ctx, repo, config))
+	})
+
+	t.Run("missing index means no evidence", func(t *testing.T) {
+		// A missing index (single-file checkpoint) means no evidence.
+		rc := initializeTestRuntimeArchComponent(ctx, t)
+		rc.mocks.gitServer.EXPECT().GetRepoFileRaw(
+			mock.Anything, mock.Anything,
+		).Return("", errors.New("file not found")).Once()
+		require.False(t, rc.hasMTPWeights(ctx, repo, config))
+	})
+
+	t.Run("no MTP declaration skips the index fetch", func(t *testing.T) {
+		rc := initializeTestRuntimeArchComponent(ctx, t)
+		require.False(t, rc.hasMTPWeights(ctx, repo, &types.ModelConfig{NumHiddenLayers: 61}))
+	})
 }

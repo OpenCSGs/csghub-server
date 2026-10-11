@@ -206,6 +206,11 @@ type Metadata struct {
 	ClassName         string            `json:"class_name"`
 	Quantizations     []Quantization    `json:"quantizations,omitempty"`
 	PDRecommendation  *PDRecommendation `json:"pd_recommendation,omitempty"`
+	// Multi-token prediction capability detected by the model scan (see
+	// HasMTPWeights). Carried through the model API so multi-sync keeps the
+	// local metadata columns in sync instead of resetting them to zero.
+	HasMTPWeights         bool `json:"has_mtp_weights"`
+	NumNextNPredictLayers int  `json:"num_nextn_predict_layers"`
 }
 
 type RepoPageOpts struct {
