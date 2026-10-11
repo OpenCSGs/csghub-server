@@ -683,6 +683,53 @@ func (_c *MockOrganizationUnitStore_Update_Call) RunAndReturn(run func(context.C
 	return _c
 }
 
+// ListTree provides a mock function with given fields: ctx, rootOrganizationID
+func (_m *MockOrganizationUnitStore) ListTree(ctx context.Context, rootOrganizationID int64) ([]types.OrganizationUnit, error) {
+	ret := _m.Called(ctx, rootOrganizationID)
+	if len(ret) == 0 {
+		panic("no return value specified for ListTree")
+	}
+	var r0 []types.OrganizationUnit
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, int64) ([]types.OrganizationUnit, error)); ok {
+		return rf(ctx, rootOrganizationID)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, int64) []types.OrganizationUnit); ok {
+		r0 = rf(ctx, rootOrganizationID)
+	} else if ret.Get(0) != nil {
+		r0 = ret.Get(0).([]types.OrganizationUnit)
+	}
+	if rf, ok := ret.Get(1).(func(context.Context, int64) error); ok {
+		r1 = rf(ctx, rootOrganizationID)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockOrganizationUnitStore_ListTree_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListTree'
+type MockOrganizationUnitStore_ListTree_Call struct{ *mock.Call }
+
+// ListTree is a helper method to define mock.On call.
+func (_e *MockOrganizationUnitStore_Expecter) ListTree(ctx interface{}, rootOrganizationID interface{}) *MockOrganizationUnitStore_ListTree_Call {
+	return &MockOrganizationUnitStore_ListTree_Call{Call: _e.mock.On("ListTree", ctx, rootOrganizationID)}
+}
+
+func (_c *MockOrganizationUnitStore_ListTree_Call) Run(run func(ctx context.Context, rootOrganizationID int64)) *MockOrganizationUnitStore_ListTree_Call {
+	_c.Call.Run(func(args mock.Arguments) { run(args[0].(context.Context), args[1].(int64)) })
+	return _c
+}
+
+func (_c *MockOrganizationUnitStore_ListTree_Call) Return(_a0 []types.OrganizationUnit, _a1 error) *MockOrganizationUnitStore_ListTree_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockOrganizationUnitStore_ListTree_Call) RunAndReturn(run func(context.Context, int64) ([]types.OrganizationUnit, error)) *MockOrganizationUnitStore_ListTree_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // NewMockOrganizationUnitStore creates a new instance of MockOrganizationUnitStore. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func NewMockOrganizationUnitStore(t interface {

@@ -72,6 +72,7 @@ type OrganizationUnitStore interface {
 	Delete(ctx context.Context, input DeleteOrganizationUnitInput) (*types.DeleteOrganizationUnitResp, error)
 	ListRoots(ctx context.Context, input ListOrganizationUnitInput) ([]types.OrganizationUnitSummary, int, error)
 	ListChildren(ctx context.Context, input ListOrganizationUnitInput) ([]types.OrganizationUnitSummary, int, error)
+	ListTree(ctx context.Context, rootOrganizationID int64) ([]types.OrganizationUnit, error)
 }
 
 // CreateRootOrganizationInput contains the root organization records and creator membership.
@@ -1082,6 +1083,23 @@ func (s *organizationUnitStoreImpl) ListRoots(ctx context.Context, input ListOrg
 // ListChildren returns only direct child organizations of one unit.
 func (s *organizationUnitStoreImpl) ListChildren(ctx context.Context, input ListOrganizationUnitInput) ([]types.OrganizationUnitSummary, int, error) {
 	return s.listSummaries(ctx, input, "ou.parent_unit_id = ?", []any{input.UnitID})
+}
+
+// ListTree returns every active unit in one hierarchy, including its structural root unit.
+func (s *organizationUnitStoreImpl) ListTree(ctx context.Context, rootOrganizationID int64) ([]types.OrganizationUnit, error) {
+	units := make([]OrganizationUnit, 0)
+	err := unitSelectQuery(s.db.Core, &units).
+		Where("ou.root_organization_id = ?", rootOrganizationID).
+		OrderExpr("ou.sort_order ASC, LOWER(organization.name) ASC, organization.uuid ASC").
+		Scan(ctx)
+	if err != nil {
+		return nil, errorx.HandleDBError(err, nil)
+	}
+	result := make([]types.OrganizationUnit, 0, len(units))
+	for index := range units {
+		result = append(result, toOrganizationUnit(&units[index]))
+	}
+	return result, nil
 }
 
 // listSummaries returns one hierarchy level with direct-child and distinct subtree-member counts.

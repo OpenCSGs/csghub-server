@@ -542,6 +542,15 @@ func TestOrganizationUnitStore_TreeLifecycle(t *testing.T) {
 	require.Equal(t, 1, total)
 	require.Equal(t, platform.UUID, children[0].UUID)
 
+	tree, err := store.ListTree(ctx, root.ID)
+	require.NoError(t, err)
+	require.Len(t, tree, 5)
+	require.Equal(t, root.UUID.String(), tree[0].UUID)
+	require.Equal(t, root.UUID.String(), tree[0].RootOrganizationUUID)
+	require.Equal(t, engineering.UUID, tree[1].UUID)
+	require.NotNil(t, tree[2].ParentUnitUUID)
+	require.Equal(t, engineering.UUID, *tree[2].ParentUnitUUID)
+
 	deleted, err := store.Delete(ctx, coredb.DeleteOrganizationUnitInput{RootOrganizationID: root.ID, UnitID: record.ID})
 	require.NoError(t, err)
 	require.Equal(t, 3, deleted.UnitsDeleted)
