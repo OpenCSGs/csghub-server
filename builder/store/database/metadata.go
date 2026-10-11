@@ -49,6 +49,13 @@ type Metadata struct {
 	Quantizations     []types.Quantization    `bun:"type:jsonb" json:"quantizations,omitempty"`
 	ModelArchType     types.ModelArchType     `bun:"," json:"model_arch_type"`
 	PDRecommendation  *types.PDRecommendation `bun:"type:jsonb,nullzero" json:"pd_recommendation,omitempty"`
+	// Multi-token prediction detection results (see types.HasMTPWeights).
+	// NumNextNPredictLayers pins the column explicitly: bun's default
+	// underscore rule would derive num_next_n_predict_layers from the field
+	// name, but the migration (and the DeepSeek config.json key) spell it
+	// num_nextn_predict_layers.
+	HasMTPWeights         bool `bun:"," json:"has_mtp_weights"`
+	NumNextNPredictLayers int  `bun:"column:num_nextn_predict_layers" json:"num_nextn_predict_layers"`
 	times
 }
 

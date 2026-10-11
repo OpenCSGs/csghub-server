@@ -6,9 +6,9 @@
   "engine_images": [
     {
       "compute_type": "gpu",
-      "image": "opencsghq/nvidia-sglang:25.10-py3",
+      "image": "opencsghq/nvidia-sglang:25.12-py3",
       "driver_version": "13.0",
-      "engine_version": "25.10-py3"
+      "engine_version": "25.12-py3"
     }
   ],
   "engine_args": [
@@ -43,9 +43,47 @@
       "format": "--enable-dp-attention"
     },
     {
-      "name": "enable-ep-moe",
-      "value": "enable",
-      "format": "--enable-ep-moe"
+      "name": "spec-decode-method",
+      "value": "",
+      "format": "%s",
+      "options": [
+        "off",
+        "mtp",
+        "eagle3",
+        "ngram"
+      ],
+      "virtual": true
+    },
+    {
+      "name": "spec-num-tokens",
+      "value": "",
+      "format": "%s",
+      "virtual": true
+    },
+    {
+      "name": "spec-draft-model",
+      "value": "",
+      "format": "%s",
+      "virtual": true
+    },
+    {
+      "name": "spec-decode-scene",
+      "value": "",
+      "format": "%s",
+      "options": [
+        "rag",
+        "code-completion",
+        "rewrite",
+        "summarization",
+        "other"
+      ],
+      "recommend_ngram": [
+        "rag",
+        "code-completion",
+        "rewrite",
+        "summarization"
+      ],
+      "virtual": true
     },
     {
       "name": "custom-options",

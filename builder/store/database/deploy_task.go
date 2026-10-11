@@ -301,22 +301,24 @@ func (s *deployTaskStoreImpl) UpdateInTx(ctx context.Context, deployColumns, dep
 		}
 	}
 
-	for _, t := range deployTasks {
-		t.UpdatedAt = time.Now()
-	}
-	deployTaskColumns = append(deployTaskColumns, "updated_at")
-	_, err = tx.NewUpdate().
-		Model(&deployTasks).
-		// Column("status", "message", "updated_at").
-		Column(deployTaskColumns...).
-		Bulk().
-		Exec(ctx)
-	err = errorx.HandleDBError(err, nil)
-	if err != nil {
-		if ree := tx.Rollback(); ree != nil {
-			slog.Error("rollback failed", "error", err)
+	if len(deployTasks) > 0 {
+		for _, t := range deployTasks {
+			t.UpdatedAt = time.Now()
 		}
-		return fmt.Errorf("failed to update deploy tasks in tx,%w", err)
+		deployTaskColumns = append(deployTaskColumns, "updated_at")
+		_, err = tx.NewUpdate().
+			Model(&deployTasks).
+			// Column("status", "message", "updated_at").
+			Column(deployTaskColumns...).
+			Bulk().
+			Exec(ctx)
+		err = errorx.HandleDBError(err, nil)
+		if err != nil {
+			if ree := tx.Rollback(); ree != nil {
+				slog.Error("rollback failed", "error", err)
+			}
+			return fmt.Errorf("failed to update deploy tasks in tx,%w", err)
+		}
 	}
 
 	return tx.Commit()
