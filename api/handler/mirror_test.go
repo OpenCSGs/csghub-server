@@ -45,6 +45,7 @@ func TestMirrorHandler_CreateMirrorRepo(t *testing.T) {
 	tester.WithUser()
 	private := false
 	createTargetRepo := true
+	autoCreateOrganization := true
 
 	tester.mocks.mirror.EXPECT().CreateMirrorRepo(tester.Ctx(), mock.MatchedBy(func(req types.CreateMirrorRepoReq) bool {
 		return req.SourceNamespace == "ns" &&
@@ -60,23 +61,80 @@ func TestMirrorHandler_CreateMirrorRepo(t *testing.T) {
 			req.CreateTargetRepo != nil &&
 			*req.CreateTargetRepo &&
 			req.Priority == types.HighMirrorPriority &&
+			req.AutoCreateOrganization != nil &&
+			*req.AutoCreateOrganization &&
+			req.AllowAutoCreateOrganization
+	})).Return(&database.Mirror{}, nil)
+	tester.WithBody(t, &types.CreateMirrorRepoReq{
+		SourceNamespace:        "ns",
+		SourceName:             "sn",
+		MirrorSourceID:         1,
+		RepoType:               types.ModelRepo,
+		SourceGitCloneUrl:      "url",
+		ForkNamespace:          "target-ns",
+		ForkName:               "target-name",
+		Private:                &private,
+		CreateTargetRepo:       &createTargetRepo,
+		Priority:               types.HighMirrorPriority,
+		AutoCreateOrganization: &autoCreateOrganization,
+	}).Execute()
+
+	tester.ResponseEq(t, 200, tester.OKText, nil)
+
+}
+
+// TestMirrorHandler_CreateMirrorRepoAutoCreateOrganizationDisabled verifies the
+// admin checkbox value flows through to the component-level flag, so an
+// unchecked box does not grant organization auto-creation.
+func TestMirrorHandler_CreateMirrorRepoAutoCreateOrganizationDisabled(t *testing.T) {
+	tester := NewMirrorTester(t).WithHandleFunc(func(h *MirrorHandler) gin.HandlerFunc {
+		return h.CreateMirrorRepo
+	})
+	tester.WithUser()
+	autoCreateOrganization := false
+
+	tester.mocks.mirror.EXPECT().CreateMirrorRepo(tester.Ctx(), mock.MatchedBy(func(req types.CreateMirrorRepoReq) bool {
+		return req.CurrentUser == "u" &&
+			req.AutoCreateOrganization != nil &&
+			!*req.AutoCreateOrganization &&
+			!req.AllowAutoCreateOrganization
+	})).Return(&database.Mirror{}, nil)
+	tester.WithBody(t, &types.CreateMirrorRepoReq{
+		SourceNamespace:        "ns",
+		SourceName:             "sn",
+		RepoType:               types.ModelRepo,
+		SourceGitCloneUrl:      "url",
+		ForkNamespace:          "target-ns",
+		ForkName:               "target-name",
+		AutoCreateOrganization: &autoCreateOrganization,
+	}).Execute()
+
+	tester.ResponseEq(t, 200, tester.OKText, nil)
+}
+
+// TestMirrorHandler_CreateMirrorRepoAutoCreateOrganizationDefaultsEnabled verifies
+// older clients that omit the field retain the legacy auto-create behavior.
+func TestMirrorHandler_CreateMirrorRepoAutoCreateOrganizationDefaultsEnabled(t *testing.T) {
+	tester := NewMirrorTester(t).WithHandleFunc(func(h *MirrorHandler) gin.HandlerFunc {
+		return h.CreateMirrorRepo
+	})
+	tester.WithUser()
+
+	tester.mocks.mirror.EXPECT().CreateMirrorRepo(tester.Ctx(), mock.MatchedBy(func(req types.CreateMirrorRepoReq) bool {
+		return req.CurrentUser == "u" &&
+			req.AutoCreateOrganization == nil &&
 			req.AllowAutoCreateOrganization
 	})).Return(&database.Mirror{}, nil)
 	tester.WithBody(t, &types.CreateMirrorRepoReq{
 		SourceNamespace:   "ns",
 		SourceName:        "sn",
-		MirrorSourceID:    1,
 		RepoType:          types.ModelRepo,
 		SourceGitCloneUrl: "url",
 		ForkNamespace:     "target-ns",
 		ForkName:          "target-name",
-		Private:           &private,
-		CreateTargetRepo:  &createTargetRepo,
-		Priority:          types.HighMirrorPriority,
 	}).Execute()
 
 	tester.ResponseEq(t, 200, tester.OKText, nil)
-
 }
 
 // TestMirrorHandler_CreateMirrorRepoIgnoresMCPServerAttributes verifies callers cannot inject internal MCP metadata through JSON.

@@ -57,7 +57,7 @@ func (h *MirrorHandler) CreateMirrorRepo(ctx *gin.Context) {
 	}
 
 	req.CurrentUser = currentUser
-	req.AllowAutoCreateOrganization = true
+	req.AllowAutoCreateOrganization = req.AutoCreateOrganization == nil || *req.AutoCreateOrganization
 	m, err := h.mirror.CreateMirrorRepo(ctx.Request.Context(), req)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "failed to create mirror repo", slog.Any("error", err))
@@ -254,6 +254,7 @@ func (h *MirrorHandler) Delete(ctx *gin.Context) {
 // @Param        source_namespace query string true "source namespace"
 // @Param        source_name query string true "source name"
 // @Param        repo_type query string true "repo type (model, dataset, code)"
+// @Param        target_namespace query string false "target namespace override"
 // @Success      200  {object}  types.Response{data=types.ResolveNamespaceResp} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
