@@ -18,6 +18,11 @@ import (
 	"opencsg.com/csghub-server/common/types"
 )
 
+// TestRepoComponent_UpdateRepo_VisibilityWithWrite verifies CE visibility authorization.
+func TestRepoComponent_UpdateRepo_VisibilityWithWrite(t *testing.T) {
+	testRepoVisibilityWithWrite(t)
+}
+
 func TestRepoComponent_DeployUpdate(t *testing.T) {
 	ctx := context.TODO()
 	repo := initializeTestRepoComponent(ctx, t)

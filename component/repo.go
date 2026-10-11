@@ -376,6 +376,7 @@ func (c *repoComponentImpl) CreateRepo(ctx context.Context, req types.CreateRepo
 	return gitRepo, newDBRepo, commitFilesReq, nil
 }
 
+// UpdateRepo applies repository settings after edition-specific visibility authorization and applicable repository write checks.
 func (c *repoComponentImpl) UpdateRepo(ctx context.Context, req types.UpdateRepoReq) (*database.Repository, error) {
 	repo, err := c.repoStore.Find(ctx, req.Namespace, string(req.RepoType), req.Name)
 	if err != nil {
@@ -394,9 +395,10 @@ func (c *repoComponentImpl) UpdateRepo(ctx context.Context, req types.UpdateRepo
 		return nil, errors.New("user does not exist")
 	}
 
-	// Dataset visibility changes are restricted to platform administrators.
-	if req.Private != nil && req.RepoType == types.DatasetRepo && !user.CanAdmin() {
-		return nil, errorx.ErrForbiddenMsg("only platform administrators can change dataset visibility")
+	if req.Private != nil {
+		if err := c.authorizeVisibilityChange(user, req.RepoType); err != nil {
+			return nil, err
+		}
 	}
 
 	// Admin users have full permissions.
@@ -431,34 +433,13 @@ func (c *repoComponentImpl) UpdateRepo(ctx context.Context, req types.UpdateRepo
 			return nil, errorx.ErrForbiddenMsg("users do not have permission to update repo in this namespace")
 		}
 
-		// Preserve the edition-independent privacy rules for non-platform administrators.
-		if namespace.NamespaceType == database.OrgNamespace {
-			if req.Private != nil {
-				if !*req.Private {
-					if err := c.allowPublic(repo); err != nil {
-						return nil, err
-					}
-				}
-				repo.Private = *req.Private
-			}
-		} else {
-			// Repository administrators can change the privacy of personal repositories.
-			if req.Private != nil {
-				canAdmin, err := c.CheckUserRepoPermission(ctx, req.Username, repo, rebac.RepositoryCanAdmin)
-				if err != nil {
+		if req.Private != nil {
+			if !*req.Private {
+				if err := c.allowPublic(repo); err != nil {
 					return nil, err
 				}
-				if !canAdmin {
-					return nil, errorx.ErrForbiddenMsg("users do not have permission to update repo privacy in this namespace")
-				}
-				// Additional check if making the repository public.
-				if !*req.Private {
-					if err := c.allowPublic(repo); err != nil {
-						return nil, err
-					}
-				}
-				repo.Private = *req.Private
 			}
+			repo.Private = *req.Private
 		}
 	}
 
