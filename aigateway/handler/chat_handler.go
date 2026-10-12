@@ -103,15 +103,6 @@ func (b *chatParsedBody) HasMultimodalContent() bool {
 	return b.Req.HasMultimodalContent()
 }
 
-// AutoRouteContext satisfies types.AutoRouteContextProvider so the Planner
-// can describe the turn to the model ranking service.
-func (b *chatParsedBody) AutoRouteContext() types.AutoRouteInput {
-	if b == nil || b.Req == nil {
-		return types.AutoRouteInput{}
-	}
-	return b.Req.AutoRouteContext()
-}
-
 // --- Phase 1: Extract ---
 
 func (h *chatPipelineHandler) Extract(c *gin.Context) (*types.RequestMetadata, error) {
@@ -258,7 +249,7 @@ func (h *chatPipelineHandler) Execute(c *gin.Context, meta *types.RequestMetadat
 	}
 	log.InfoContext(ctx, "proxy chat request to model target", slog.Int("status", primaryWriter.statusCode), slog.Int64("proxy_latency(ms)", time.Since(proxyStartTime).Milliseconds()), slog.Int64("ttft(ms)", retryWriterTTFTMs(primaryWriter, proxyStartTime)))
 
-	finalWriter, err := h.handler.executeChatWithFallback(c, chatCtx, mt, chatReq, primaryWriter, username, modelID, p, types.Protocol(meta.Protocol))
+	finalWriter, err := h.handler.executeChatWithFallback(c, chatCtx, mt, chatReq, primaryWriter, username, modelID, p)
 	fallbackLog := chatLog("fallback_target")
 	if err != nil {
 		finishLLMTraceWithError(generationRecorder, err, types.TraceErrUpstreamUnavailable)

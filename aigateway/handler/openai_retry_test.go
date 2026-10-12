@@ -408,6 +408,26 @@ func TestRetryChatWithFallback_ReturnsNilWithoutFallbackTargets(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestExecuteChatWithFallback_ReplaysFailureWithoutFallbackTargets(t *testing.T) {
+	tester, c, _ := setupTest(t)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
+	downstream := newTestCommonResponseWriter()
+	primary := newChatRetryResponseWriter(downstream)
+	primary.WriteHeader(http.StatusServiceUnavailable)
+	_, err := primary.Write([]byte("primary unavailable"))
+	require.NoError(t, err)
+	modelTarget := &resolvedModelTarget{
+		Model: &types.Model{BaseModel: types.BaseModel{ID: "test-model"}},
+	}
+
+	final, err := tester.handler.executeChatWithFallback(c, &chatContext{}, modelTarget, nil, primary, "testuser", "test-model", nil)
+
+	require.NoError(t, err)
+	require.Same(t, primary, final)
+	require.Equal(t, http.StatusServiceUnavailable, downstream.statusCode)
+	require.Equal(t, "primary unavailable", downstream.body.String())
+}
+
 func TestRetryChatWithFallback_ReplaysLastRetryableFallbackResponse(t *testing.T) {
 	tester, c, _ := setupTest(t)
 	tester.mocks.openAIComp.ExpectedCalls = nil
