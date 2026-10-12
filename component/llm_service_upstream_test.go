@@ -494,12 +494,16 @@ func TestValidateAPIFormat(t *testing.T) {
 		require.NoError(t, validateAPIFormat("https://api.example.com/v1", false, map[types.ApiFormat]string{"messages": "https://api.deepseek.com/anthropic"}))
 	})
 
-	t.Run("base URL must not end with a protocol path", func(t *testing.T) {
+	t.Run("base URL must not end with a protocol resource path", func(t *testing.T) {
 		require.Error(t, validateAPIFormat("https://api.example.com/v1/chat/completions", false, nil))
 		require.Error(t, validateAPIFormat("https://api.example.com/v1/responses", false, nil))
 		require.Error(t, validateAPIFormat("https://api.deepseek.com/anthropic/messages", false, map[types.ApiFormat]string{"messages": ""}))
 		require.NoError(t, validateAPIFormat("https://api.example.com/v1", false, nil))
 		require.NoError(t, validateAPIFormat("https://api.example.com/api", false, nil))
+		// A terminal /anthropic is a namespace prefix, not a resource path:
+		// it is a valid base URL (the gateway appends /v1/messages), and the
+		// migration-shaped rows stay updatable.
+		require.NoError(t, validateAPIFormat("https://vpc.example.com/compatible-mode/apps/anthropic", false, map[types.ApiFormat]string{"messages": ""}))
 		// Full-URL mode is exempt: that is exactly what the toggle is for.
 		require.NoError(t, validateAPIFormat("https://api.example.com/v1/chat/completions", true, map[types.ApiFormat]string{"chat": ""}))
 	})
