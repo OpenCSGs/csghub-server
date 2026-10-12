@@ -2,7 +2,6 @@ package handler
 
 import (
 	"errors"
-	"fmt"
 	"log/slog"
 
 	"github.com/gin-gonic/gin"
@@ -78,8 +77,8 @@ func (h *JWTHandler) Verify(ctx *gin.Context) {
 	token := ctx.Param("token")
 	user, err := h.c.ParseToken(ctx.Request.Context(), token)
 	if err != nil {
-		slog.ErrorContext(ctx.Request.Context(), "failed to verify JWT token", slog.Any("error", err), slog.String("token", token))
-		httpbase.ServerError(ctx, fmt.Errorf("failed to verify JWT token '%s': %w", token, err))
+		slog.ErrorContext(ctx.Request.Context(), "failed to verify JWT token", slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
 		return
 	}
 

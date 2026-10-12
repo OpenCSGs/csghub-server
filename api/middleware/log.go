@@ -8,6 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/api/httpbase"
+	commonlog "opencsg.com/csghub-server/common/log"
 	commonutils "opencsg.com/csghub-server/common/utils/common"
 	"opencsg.com/csghub-server/common/utils/trace"
 )
@@ -59,7 +60,7 @@ func Log() gin.HandlerFunc {
 				slog.Int("status", status),
 				slog.String("current_user", httpbase.GetCurrentUser(ctx)),
 				slog.Any("auth_type", httpbase.GetAuthType(ctx)),
-				slog.String("url", ctx.Request.URL.RequestURI()),
+				slog.String("url", commonlog.SafeURLString(ctx.Request.URL.RequestURI())),
 				slog.String("full_path", ctx.FullPath()),
 			)
 		}()

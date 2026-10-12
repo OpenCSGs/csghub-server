@@ -25,6 +25,7 @@ import (
 	"go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
 	"opencsg.com/csghub-server/common/config"
+	commonlog "opencsg.com/csghub-server/common/log"
 )
 
 func convEndpoint(s string) (string, error) {
@@ -166,7 +167,7 @@ func SetupOTelSDK(ctx context.Context, config *config.Config, serviceName string
 			slog.Default().Handler(),
 			otelslog.NewHandler("csghub-server"),
 		}
-		slog.SetDefault(slog.New(slogmulti.Fanout(handlers...)))
+		slog.SetDefault(slog.New(commonlog.NewRedactingHandler(slogmulti.Fanout(handlers...))))
 
 		shutdownFuncs = append(shutdownFuncs, loggerProvider.Shutdown)
 		global.SetLoggerProvider(loggerProvider)

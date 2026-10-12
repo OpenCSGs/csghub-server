@@ -20,6 +20,7 @@ import (
 	"go.opentelemetry.io/contrib/bridges/otelslog"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"opencsg.com/csghub-server/common/config"
+	commonlog "opencsg.com/csghub-server/common/log"
 )
 
 type HttpDoer interface {
@@ -53,7 +54,7 @@ func NewHttpClient(endpoint string, opts ...RequestOption) *HttpClient {
 	if err != nil {
 		slog.Error("failed to load config", "error", err)
 		// return default client without proxy but with otel and logging
-		defaultClient.logger = slog.New(slog.NewJSONHandler(os.Stdout, nil))
+		defaultClient.logger = slog.New(commonlog.NewRedactingHandler(slog.NewJSONHandler(os.Stdout, nil)))
 		return defaultClient
 	}
 
@@ -68,7 +69,7 @@ func NewHttpClient(endpoint string, opts ...RequestOption) *HttpClient {
 	if cfg.Instrumentation.OTLPEndpoint != "" && cfg.Instrumentation.OTLPLogging {
 		handlers = append(handlers, otelslog.NewHandler("csghub-server"))
 	}
-	defaultClient.logger = slog.New(slogmulti.Fanout(handlers...))
+	defaultClient.logger = slog.New(commonlog.NewRedactingHandler(slogmulti.Fanout(handlers...)))
 
 	if !cfg.Proxy.Enable || cfg.Proxy.URL == "" {
 		return defaultClient
@@ -181,7 +182,7 @@ func (c *HttpClient) Post(ctx context.Context, path string, data interface{}, ou
 
 func (c *HttpClient) Do(req *http.Request) (resp *http.Response, err error) {
 	ctx := req.Context()
-	fullPath := req.URL.String()
+	fullPath := commonlog.SafeURLString(req.URL.String())
 	traceID := trace.PropagateTrace(ctx, req.Header)
 	startTime := time.Now()
 	retryTime := time.Now()
@@ -195,7 +196,7 @@ func (c *HttpClient) Do(req *http.Request) (resp *http.Response, err error) {
 				if r != nil {
 					_ = r.Body.Close()
 				}
-				return fmt.Errorf("failed to do http request, path:%s, err:%w", fullPath, doErr)
+				return fmt.Errorf("failed to do http request, path:%s, err:%w", fullPath, commonlog.SafeError(doErr))
 			}
 			resp = r
 			return nil

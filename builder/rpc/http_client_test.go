@@ -59,6 +59,23 @@ func TestHttpClient_Get_WithRetry(t *testing.T) {
 	assert.Equal(t, 3, httpmock.GetTotalCallCount())
 }
 
+func TestHttpClient_DoDoesNotExposeURLCredentialOnError(t *testing.T) {
+	const secret = "query-secret"
+	httpmock.RegisterResponder(http.MethodGet, "http://test.com/fail?access_token="+secret, httpmock.NewErrorResponder(errors.New("network error")))
+	client := NewHttpClient("http://test.com")
+	request, err := http.NewRequestWithContext(context.Background(), http.MethodGet, "http://test.com/fail?access_token="+secret, nil)
+	require.NoError(t, err)
+
+	response, err := client.Do(request)
+	if response != nil {
+		defer response.Body.Close()
+	}
+
+	require.Error(t, err)
+	require.NotContains(t, err.Error(), secret)
+	require.Contains(t, err.Error(), "%5BREDACTED%5D")
+}
+
 func TestHttpClient_Post(t *testing.T) {
 	httpmock.RegisterResponder("POST", "http://test.com/api/v1/test",
 		func(req *http.Request) (*http.Response, error) {

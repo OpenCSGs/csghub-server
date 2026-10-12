@@ -90,7 +90,7 @@ func GetCurrentUserFromHeader() gin.HandlerFunc {
 				authHeader = strings.TrimPrefix(authHeader, "Basic ")
 				authInfo, err := base64.StdEncoding.DecodeString(authHeader)
 				if err != nil {
-					slog.Info("Failed to decode basic auth header", slog.Any("header", authHeader), slog.Any("error", err))
+					slog.Info("Failed to decode basic auth header", slog.Any("error", err))
 					c.Next()
 					return
 				}
@@ -98,7 +98,7 @@ func GetCurrentUserFromHeader() gin.HandlerFunc {
 				token = strings.Split(string(authInfo), ":")[1]
 				user, err := userStore.FindByGitAccessToken(c.Request.Context(), token)
 				if err != nil {
-					slog.Info("Failed to find user by git access token", slog.Any("header", authHeader), slog.Any("token", token), slog.Any("error", err))
+					slog.Info("Failed to find user by git access token", slog.String("username", username), slog.Any("error", err))
 					c.Next()
 					return
 				}
@@ -111,7 +111,7 @@ func GetCurrentUserFromHeader() gin.HandlerFunc {
 				token = strings.TrimPrefix(authHeader, "Bearer ")
 				user, err := userStore.FindByGitAccessToken(c.Request.Context(), token)
 				if err != nil {
-					slog.Info("Failed to find user by git access token", slog.Any("header", authHeader), slog.Any("token", token), slog.Any("error", err))
+					slog.Info("Failed to find user by git access token", slog.Any("error", err))
 					c.Next()
 					return
 				}

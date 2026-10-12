@@ -10,6 +10,7 @@ import (
 	"opencsg.com/csghub-server/builder/proxy"
 	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/common/config"
+	commonlog "opencsg.com/csghub-server/common/log"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/component"
 )
@@ -98,7 +99,7 @@ func (h *DataflowProxyHandler) Proxy(ctx *gin.Context) {
 		ctx.Request.Header.Set("isadmin", fmt.Sprintf("%t", u.CanAdmin()))
 	}
 	// Log the request URL and header
-	slog.Debug("http request", slog.Any("request", ctx.Request.URL), slog.Any("header", ctx.Request.Header))
+	slog.Debug("http request", slog.Any("request", commonlog.SafeURL(ctx.Request.URL)), slog.Any("header", commonlog.SafeHeaders(ctx.Request.Header)))
 	// Serve the request using the router
 	h.rp.ServeHTTP(ctx.Writer, ctx.Request, "", "")
 }
@@ -110,7 +111,7 @@ func (h *DataflowProxyHandler) Proxy(ctx *gin.Context) {
 // apiGroup.PUT("/dataflow/job/get/:id", userProxyHandler.ProxyToApi("/api/v1/dataflow/job/get/%v", "id"))
 func (h *DataflowProxyHandler) ProxyToApi(api string, originParams ...string) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-		slog.Info("proxy dataflow request", slog.Any("request", ctx.Request.URL), slog.Any("header", ctx.Request.Header))
+		slog.Info("proxy dataflow request", slog.Any("request", commonlog.SafeURL(ctx.Request.URL)), slog.Any("header", commonlog.SafeHeaders(ctx.Request.Header)))
 		finalApi := api
 		if len(originParams) > 0 {
 			var params []any

@@ -10,12 +10,19 @@ import (
 	"github.com/casdoor/casdoor-go-sdk/casdoorsdk"
 	"golang.org/x/oauth2"
 	"opencsg.com/csghub-server/common/errorx"
+	commonlog "opencsg.com/csghub-server/common/log"
 	"opencsg.com/csghub-server/common/utils/common"
 )
 
 type casdoorClientImpl struct {
 	casClient *casdoorsdk.Client
 }
+
+// casdoorOAuthError hides arbitrary SDK response text while preserving its cause.
+type casdoorOAuthError struct{ cause error }
+
+func (e *casdoorOAuthError) Error() string { return "casdoor OAuth token exchange failed" }
+func (e *casdoorOAuthError) Unwrap() error { return e.cause }
 
 var (
 	_ SSOInterface = (*casdoorClientImpl)(nil)
@@ -87,10 +94,10 @@ func (c *casdoorClientImpl) UpdateUserInfo(ctx context.Context, userInfo *SSOUpd
 func (c *casdoorClientImpl) GetUserInfo(ctx context.Context, accessToken string) (*SSOUserInfo, error) {
 	claims, err := c.casClient.ParseJwtToken(accessToken)
 	if err != nil {
-		slog.Error("ParseJwtToken failed from casdoor", "err", err, "accessToken", accessToken)
+		slog.Error("ParseJwtToken failed from casdoor", "err", err)
 		return nil, errorx.RemoteSvcFail(err,
 			errorx.Ctx().Set("service", "casdoor").
-				Set("accessToken", accessToken),
+				Set("operation", "parse access token"),
 		)
 	}
 
@@ -122,10 +129,13 @@ func (c *casdoorClientImpl) GetUserInfo(ctx context.Context, accessToken string)
 func (c *casdoorClientImpl) GetOAuthToken(ctx context.Context, code, state string) (*oauth2.Token, error) {
 	token, err := c.casClient.GetOAuthToken(code, state)
 	if err != nil {
-		slog.Error("GetOAuthToken failed from casdoor", "err", err, "code", code, "state", state)
-		return nil, errorx.RemoteSvcFail(err,
+		safeErr := &casdoorOAuthError{cause: err}
+		codeFingerprint := commonlog.CredentialFingerprint("oauth_code", code)
+		stateFingerprint := commonlog.CredentialFingerprint("oauth_state", state)
+		slog.ErrorContext(ctx, "GetOAuthToken failed from casdoor", "error", safeErr, "provider", "casdoor", "code_fingerprint", codeFingerprint, "state_fingerprint", stateFingerprint)
+		return nil, errorx.RemoteSvcFail(safeErr,
 			errorx.Ctx().Set("service", "casdoor").
-				Set("code", code).Set("state", state),
+				Set("code_fingerprint", codeFingerprint).Set("state_fingerprint", stateFingerprint),
 		)
 	}
 	return token, nil

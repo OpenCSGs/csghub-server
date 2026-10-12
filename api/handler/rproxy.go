@@ -16,6 +16,7 @@ import (
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/errorx"
+	commonlog "opencsg.com/csghub-server/common/log"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/utils/common"
 	"opencsg.com/csghub-server/component"
@@ -71,7 +72,7 @@ func (r *RProxyHandler) Proxy(ctx *gin.Context) {
 		return
 	}
 
-	slog.Debug("http request proxy", slog.Any("request", ctx.Request.URL), slog.Any("header", ctx.Request.Header))
+	slog.Debug("http request proxy", slog.Any("request", commonlog.SafeURL(ctx.Request.URL)), slog.Any("header", commonlog.SafeHeaders(ctx.Request.Header)))
 	appSvcName := r.getSvcName(ctx)
 	deploy, err := r.rproxyDeploy.GetDeployBySvcName(ctx.Request.Context(), appSvcName)
 	isSandboxDeploy := err == nil && deploy != nil && types.IsSandboxType(deploy.Type)
@@ -80,7 +81,7 @@ func (r *RProxyHandler) Proxy(ctx *gin.Context) {
 		return
 	}
 	if err != nil {
-		slog.ErrorContext(ctx.Request.Context(), "failed to get deploy in rproxy", slog.Any("error", err), slog.Any("appSrvName", appSvcName), slog.Any("request", ctx.Request.URL), slog.Any("header", ctx.Request.Header))
+		slog.ErrorContext(ctx.Request.Context(), "failed to get deploy in rproxy", slog.Any("error", err), slog.Any("appSrvName", appSvcName), slog.Any("request", commonlog.SafeURL(ctx.Request.URL)), slog.Any("header", commonlog.SafeHeaders(ctx.Request.Header)))
 		httpbase.ServerError(ctx, fmt.Errorf("failed to get deploy, %w", err))
 		return
 	}
@@ -106,7 +107,7 @@ func (r *RProxyHandler) Proxy(ctx *gin.Context) {
 		apiname := ctx.Param("api")
 		target, host, err := r.getSvcTargetAddress(ctx.Request.Context(), appSvcName, deploy)
 		if err != nil {
-			slog.ErrorContext(ctx.Request.Context(), "failed to get svc target address", slog.Any("error", err), slog.Any("appSvcName", appSvcName), slog.Any("request", ctx.Request.URL), slog.Any("header", ctx.Request.Header))
+			slog.ErrorContext(ctx.Request.Context(), "failed to get svc target address", slog.Any("error", err), slog.Any("appSvcName", appSvcName), slog.Any("request", commonlog.SafeURL(ctx.Request.URL)), slog.Any("header", commonlog.SafeHeaders(ctx.Request.Header)))
 			httpbase.ServerError(ctx, fmt.Errorf("failed to forward request for svc %s, %w", appSvcName, err))
 			return
 		}

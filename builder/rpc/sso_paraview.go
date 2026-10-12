@@ -13,6 +13,7 @@ import (
 	"golang.org/x/oauth2"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/errorx"
+	commonlog "opencsg.com/csghub-server/common/log"
 )
 
 type paraviewClientImpl struct {
@@ -46,23 +47,20 @@ func (p *paraviewClientImpl) GetOAuthToken(ctx context.Context, code, state stri
 
 	resp, err := http.Post(endpoint, "x-www-form-urlencoded", nil)
 	if err != nil {
-		slog.Error("GetOAuthToken Failed from paraview", slog.Any("err", err), slog.Any("url", endpoint), slog.Any("code", code))
-		return nil, errorx.RemoteSvcFail(err,
+		safeErr := commonlog.SafeError(err)
+		slog.Error("GetOAuthToken Failed from paraview", slog.Any("err", safeErr), slog.String("provider", "paraview"))
+		return nil, errorx.RemoteSvcFail(safeErr,
 			errorx.Ctx().Set("service", "paraview").
-				Set("code", code),
+				Set("operation", "exchange oauth code"),
 		)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, err := io.ReadAll(resp.Body)
-		if err != nil {
-			return nil, err
-		}
-		slog.Error("GetOAuthToken Failed", slog.Any("status_code", resp.StatusCode), slog.Any("body", string(body)))
-		return nil, errorx.RemoteSvcFail(err,
+		slog.Error("GetOAuthToken Failed", slog.Any("status_code", resp.StatusCode), slog.String("provider", "paraview"))
+		return nil, errorx.RemoteSvcFail(fmt.Errorf("paraview oauth token endpoint returned status %d", resp.StatusCode),
 			errorx.Ctx().Set("service", "paraview").
-				Set("code", code),
+				Set("operation", "exchange oauth code"),
 		)
 	}
 
@@ -83,23 +81,20 @@ func (p *paraviewClientImpl) GetUserInfo(ctx context.Context, accessToken string
 	endpoint := fmt.Sprintf("%s/esc-sso/oauth2.0/profile?access_token=%s", p.endpoint, accessToken)
 	resp, err := http.Get(endpoint)
 	if err != nil {
-		slog.Error("GetUserInfo Failed from paraview", slog.Any("err", err), slog.Any("url", endpoint), slog.Any("access_token", accessToken))
-		return nil, errorx.RemoteSvcFail(err,
+		safeErr := commonlog.SafeError(err)
+		slog.Error("GetUserInfo Failed from paraview", slog.Any("err", safeErr), slog.String("provider", "paraview"))
+		return nil, errorx.RemoteSvcFail(safeErr,
 			errorx.Ctx().Set("service", "paraview").
-				Set("access_token", accessToken),
+				Set("operation", "get user info"),
 		)
 	}
 
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		body, err := io.ReadAll(resp.Body)
-		if err != nil {
-			return nil, err
-		}
-		slog.Error("GetUserInfo Failed from paraview", slog.Any("status_code", resp.StatusCode), slog.Any("body", string(body)))
-		return nil, errorx.RemoteSvcFail(err,
+		slog.Error("GetUserInfo Failed from paraview", slog.Any("status_code", resp.StatusCode), slog.String("provider", "paraview"))
+		return nil, errorx.RemoteSvcFail(fmt.Errorf("paraview profile endpoint returned status %d", resp.StatusCode),
 			errorx.Ctx().Set("service", "paraview").
-				Set("access_token", accessToken),
+				Set("operation", "get user info"),
 		)
 	}
 

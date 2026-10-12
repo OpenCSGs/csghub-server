@@ -37,12 +37,12 @@ func CheckGitlabShellJWTToken(config *config.Config) gin.HandlerFunc {
 		}
 		pass, err := parseGitlabShellJWTToken(config.GitalyServer.JWTSecret, tokenString)
 		if err != nil {
-			slog.Debug("fail to parse gitlab-shell jwt token", slog.String("token_get", tokenString), slog.Any("error", err))
+			slog.Debug("fail to parse gitlab-shell jwt token", slog.Any("error", err))
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 			return
 		}
 		if !pass {
-			slog.Debug("invalid gilab-shell jwt token", slog.String("token_get", tokenString))
+			slog.Debug("invalid gitlab-shell jwt token")
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid gitlab-shell jwt token"})
 			return
 		}
