@@ -15,4 +15,15 @@ var (
 	// recharge orders are released back to the invoicable pool and a new
 	// invoice application must be made for them.
 	ErrInvoiceAlreadyFailed = errors.New("failed invoice cannot be updated")
+
+	// ErrInvoiceNotFound is returned when an invoice does not exist.
+	ErrInvoiceNotFound = errors.New("invoice not found")
+
+	// ErrInvoiceNotIssued is returned when trying to send an invoice email for
+	// an invoice whose status is not issued.
+	ErrInvoiceNotIssued = errors.New("invoice email can only be sent for issued invoices")
+
+	// ErrInvoiceURLMissing is returned when an issued invoice has no download
+	// URL to send.
+	ErrInvoiceURLMissing = errors.New("invoice url is missing")
 )
