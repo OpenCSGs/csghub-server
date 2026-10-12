@@ -413,6 +413,16 @@ type EmailInvoiceCreatedNotification struct {
 	Amount        string `json:"amount"`
 }
 
+type EmailInvoiceIssuedNotification struct {
+	Email        string `json:"email"`
+	UserName     string `json:"user_name"`
+	InvoiceTitle string `json:"invoice_title"`
+	InvoiceType  string `json:"invoice_type"`
+	Amount       string `json:"amount"`
+	InvoiceDate  string `json:"invoice_date"`
+	InvoiceURL   string `json:"invoice_url"`
+}
+
 // EmailGitlabIssueFeedbackNotification gitlab issue feedback email notification parameters
 type EmailGitlabIssueFeedbackNotification struct {
 	UserEmail            string `json:"user_email"`
