@@ -360,59 +360,91 @@ func (uc UpstreamConfig) DeclaredProtocolEndpoint(p ApiFormat) string {
 // gets the declared protocol's standard path appended — chat first when
 // several formats are declared.
 func ResolveSampleEndpoint(uc UpstreamConfig) string {
-	// A per-protocol endpoint override is always a complete URL.
+	declared := uc.declaredApiFormats()
+	// Probe preference is chat > responses > messages regardless of which
+	// format carries a per-protocol endpoint override: chat is the canonical,
+	// most widely compatible check. A declared format's own override (when
+	// set) is resolved with the same rules as the main URL — a URL that
+	// already carries the protocol's path is probed as-is, otherwise it is a
+	// base URL and the standard path is appended (e.g. an Anthropic Messages
+	// Base URL .../apps/anthropic is probed at .../v1/messages).
 	for _, order := range RoutableApiFormats {
-		for key, endpoint := range uc.SupportedEndpoints {
-			if key.Normalized() == order && strings.TrimSpace(endpoint) != "" {
-				return strings.TrimSpace(endpoint)
-			}
-		}
-	}
-	raw := strings.TrimSpace(uc.URL)
-	if raw == "" || uc.IsFullURL {
-		return raw
-	}
-	if _, ok := InferProtocolFromURLPath(raw); ok {
-		return raw
-	}
-	declared := uc.SupportedEndpoints
-	if len(declared) == 0 && uc.Source == UpstreamSourceCSGHubDeploy && csghubDeployServesChat(uc.deployTask()) {
-		// CSGHub LLM deploys (vLLM/SGLang) expose a bare service root and
-		// serve chat completions at /v1/chat/completions — probe there.
-		// Multimodal deploys (image/audio/video tasks) do not serve chat;
-		// keeping the URL raw makes the sample registry skip them (legacy
-		// behavior) instead of probing a 404 and marking them unhealthy.
-		declared = map[ApiFormat]string{ApiFormatChat: ""}
-	}
-	for _, order := range RoutableApiFormats {
-		if _, declaredMatch := declared[order]; !declaredMatch {
+		if _, isDeclared := declared[order]; !isDeclared {
 			continue
 		}
-		segments := order.StandardPathSegments()
-		if len(segments) == 0 {
+		if override := strings.TrimSpace(uc.SupportedEndpoints[order]); override != "" {
+			if resolved, ok := probeURLFor(override, order); ok {
+				return resolved
+			}
+			return override
+		}
+		raw := strings.TrimSpace(uc.URL)
+		if raw == "" || uc.IsFullURL {
 			return raw
 		}
-		// Deduplicate a trailing /v1 on the base path, mirroring the native
-		// routing path construction.
-		trimmed := raw
-		if !strings.Contains(trimmed, "://") {
-			trimmed = "http://" + trimmed
+		// ProbeOverrideURL keeps the /anthropic namespace in the base and
+		// appends /v1/messages to it (migration-shaped rows), appends the
+		// standard path to plain base URLs, and passes complete endpoints
+		// through as-is.
+		if resolved, ok := order.ProbeOverrideURL(raw); ok {
+			return resolved
 		}
-		parsed, err := url.Parse(trimmed)
-		if err != nil {
-			return raw
+		return raw
+	}
+	raw := strings.TrimSpace(uc.URL)
+	// Undeclared upstreams: CSGHub LLM deploys (vLLM/SGLang) expose a bare
+	// service root and serve chat completions at /v1/chat/completions —
+	// probe there. Multimodal deploys (image/audio/video tasks) do not serve
+	// chat; keeping the URL raw makes the sample registry skip them (legacy
+	// behavior) instead of probing a 404 and marking them unhealthy. Every
+	// other undeclared upstream also stays raw (registry skips).
+	if len(declared) == 0 && raw != "" && !uc.IsFullURL && uc.Source == UpstreamSourceCSGHubDeploy && csghubDeployServesChat(uc.deployTask()) {
+		if resolved, ok := probeURLFor(raw, ApiFormatChat); ok {
+			return resolved
 		}
-		baseSegments := strings.Split(strings.TrimRight(parsed.Path, "/"), "/")
-		if len(baseSegments) > 0 && strings.EqualFold(baseSegments[len(baseSegments)-1], PathSegV1) {
-			segments = segments[1:]
-		}
-		// Rebuild from the parsed URL so the base query (e.g. Azure's
-		// ?api-version=...) survives the append.
-		parsed.Path = strings.TrimRight(parsed.Path, "/") + "/" + strings.Join(segments, "/")
-		parsed.RawPath = ""
-		return parsed.String()
 	}
 	return raw
+}
+
+// ProbeOverrideURL resolves a per-protocol endpoint override (or a declared
+// main URL) into the probe/serve URL for its format: a URL that already
+// carries the format's resource path is used as-is; a base URL gets the
+// standard path appended (deduplicating a trailing /v1, preserving the base
+// query such as Azure's ?api-version=...). A terminal /anthropic segment is
+// a namespace prefix, not the Messages resource path: /v1/messages is
+// appended to keep the namespace. Mirrors the native routing URL
+// construction so the connection test probes exactly what routing serves.
+func (format ApiFormat) ProbeOverrideURL(rawURL string) (string, bool) {
+	segments := format.StandardPathSegments()
+	if len(segments) == 0 {
+		return rawURL, false
+	}
+	trimmed := rawURL
+	if !strings.Contains(trimmed, "://") {
+		trimmed = "http://" + trimmed
+	}
+	parsed, err := url.Parse(trimmed)
+	if err != nil || parsed.Host == "" {
+		return rawURL, false
+	}
+	if inferred, ok := InferProtocolFromURLPath(rawURL); ok && inferred == format {
+		parts := strings.Split(strings.Trim(parsed.Path, "/"), "/")
+		if !strings.EqualFold(parts[len(parts)-1], PathSegAnthropic) {
+			return rawURL, true
+		}
+	}
+	baseSegments := strings.Split(strings.TrimRight(parsed.Path, "/"), "/")
+	if len(baseSegments) > 0 && strings.EqualFold(baseSegments[len(baseSegments)-1], PathSegV1) && segments[0] == PathSegV1 {
+		segments = segments[1:]
+	}
+	parsed.Path = strings.TrimRight(parsed.Path, "/") + "/" + strings.Join(segments, "/")
+	parsed.RawPath = ""
+	return parsed.String(), true
+}
+
+// probeURLFor builds the probe URL for one declared format.
+func probeURLFor(rawURL string, format ApiFormat) (string, bool) {
+	return format.ProbeOverrideURL(rawURL)
 }
 
 // csghubDeployServesChat reports whether a CSGHub deploy with the given
@@ -439,10 +471,13 @@ func (uc UpstreamConfig) deployTask() string {
 
 // InferProtocolFromURLPath guesses the API format from a URL's terminal path
 // segments: .../chat/completions → ApiFormatChat, .../responses →
-// ApiFormatResponses, .../messages or .../anthropic → ApiFormatMessages,
-// .../systemone → ApiFormatSystemOne. It mirrors the URL inference used by
-// the AIGateway protocol router so admin CRUD, backfill and routing all
-// agree on what a URL means.
+// ApiFormatResponses, .../messages → ApiFormatMessages, .../systemone →
+// ApiFormatSystemOne. A URL ending in .../anthropic also infers Messages —
+// but that terminal segment is usually an /anthropic NAMESPACE prefix
+// (DeepSeek, DashScope apps) whose real endpoint is .../anthropic/v1/messages,
+// so probe/append callers (probeURLFor, nativeBackendURL) must keep the
+// namespace in the base URL instead of treating the URL as a complete
+// endpoint.
 func InferProtocolFromURLPath(rawURL string) (ApiFormat, bool) {
 	if strings.TrimSpace(rawURL) == "" {
 		return "", false
@@ -471,6 +506,40 @@ func InferProtocolFromURLPath(rawURL string) (ApiFormat, bool) {
 		return ApiFormatMessages, true
 	case PathSegSystemOne:
 		return ApiFormatSystemOne, true
+	}
+	return "", false
+}
+
+// InferResourcePathFromURL infers the API format only from URL tails that
+// are actual RESOURCE paths (chat/completions, responses, messages). A
+// terminal /anthropic segment is a namespace prefix and deliberately returns
+// false here: such a URL is a base URL whose endpoint is
+// .../anthropic/v1/messages, so base-URL validation must accept it and
+// probe/append resolution must append the standard path to it.
+func InferResourcePathFromURL(rawURL string) (ApiFormat, bool) {
+	if strings.TrimSpace(rawURL) == "" {
+		return "", false
+	}
+	trimmed := rawURL
+	if !strings.Contains(trimmed, "://") {
+		trimmed = "http://" + trimmed
+	}
+	parsed, err := url.Parse(trimmed)
+	if err != nil {
+		return "", false
+	}
+	parts := strings.Split(strings.Trim(parsed.Path, "/"), "/")
+	if len(parts) == 0 || parts[0] == "" {
+		return "", false
+	}
+	last := strings.ToLower(parts[len(parts)-1])
+	switch {
+	case last == PathSegResponses:
+		return ApiFormatResponses, true
+	case last == PathSegMessages:
+		return ApiFormatMessages, true
+	case last == PathSegCompletions && len(parts) >= 2 && strings.EqualFold(parts[len(parts)-2], PathSegChat):
+		return ApiFormatChat, true
 	}
 	return "", false
 }
