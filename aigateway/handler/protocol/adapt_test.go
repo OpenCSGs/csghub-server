@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"opencsg.com/csghub-server/aigateway/types"
+	commontypes "opencsg.com/csghub-server/common/types"
 )
 
 func TestDetectUpstreamProtocol(t *testing.T) {
@@ -457,5 +458,162 @@ func TestPathEndsWithSegments(t *testing.T) {
 		t.Run(tt.path, func(t *testing.T) {
 			assert.Equal(t, tt.expected, pathEndsWithSegments(tt.path, tt.segments...))
 		})
+	}
+}
+
+func TestResolveRoutingDeclaredFormat(t *testing.T) {
+	t.Run("declared chat on base URL appends client path", func(t *testing.T) {
+		decision, err := ResolveRouting(types.ProtocolChat, RoutingTarget{
+			Target:             "https://dashscope.aliyuncs.com/compatible-mode/v1",
+			SupportedEndpoints: map[commontypes.ApiFormat]string{"chat": ""},
+		})
+		require.NoError(t, err)
+		assert.Equal(t, ModeNative, decision.Mode)
+		assert.Equal(t, "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions", decision.BackendURL)
+		assert.Equal(t, "declared_format_match", decision.Reason)
+	})
+
+	t.Run("declared multiple formats route each client protocol natively", func(t *testing.T) {
+		target := RoutingTarget{
+			Target:             "https://gw.example.com/v1",
+			SupportedEndpoints: map[commontypes.ApiFormat]string{"chat": "", "responses": "", "messages": ""},
+		}
+		for _, tc := range []struct {
+			client       types.Protocol
+			expectedPath string
+		}{
+			{types.ProtocolChat, "/chat/completions"},
+			{types.ProtocolResponses, "/responses"},
+			{types.ProtocolMessages, "/messages"},
+		} {
+			decision, err := ResolveRouting(tc.client, target)
+			require.NoError(t, err)
+			assert.Equal(t, ModeNative, decision.Mode)
+			assert.Equal(t, "https://gw.example.com/v1"+tc.expectedPath, decision.BackendURL)
+		}
+	})
+
+	t.Run("full URL is used as-is", func(t *testing.T) {
+		decision, err := ResolveRouting(types.ProtocolChat, RoutingTarget{
+			Target:             "https://api.openai.com/v1/chat/completions",
+			SupportedEndpoints: map[commontypes.ApiFormat]string{"chat": ""},
+			IsFullURL:          true,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, ModeNative, decision.Mode)
+		assert.Equal(t, "https://api.openai.com/v1/chat/completions", decision.BackendURL)
+	})
+
+	t.Run("declared format strips protocol tail before appending another", func(t *testing.T) {
+		decision, err := ResolveRouting(types.ProtocolResponses, RoutingTarget{
+			Target:             "https://gw.example.com/v1/chat/completions",
+			SupportedEndpoints: map[commontypes.ApiFormat]string{"chat": "", "responses": ""},
+		})
+		require.NoError(t, err)
+		assert.Equal(t, ModeNative, decision.Mode)
+		assert.Equal(t, "https://gw.example.com/v1/responses", decision.BackendURL)
+	})
+
+	t.Run("declared format on CSGHub-hosted bare host appends path", func(t *testing.T) {
+		decision, err := ResolveRouting(types.ProtocolChat, RoutingTarget{
+			Target:             "http://model-svc:8080",
+			CSGHubHosted:       true,
+			SupportedEndpoints: map[commontypes.ApiFormat]string{"chat": ""},
+		})
+		require.NoError(t, err)
+		assert.Equal(t, ModeNative, decision.Mode)
+		assert.Equal(t, "http://model-svc:8080/v1/chat/completions", decision.BackendURL)
+	})
+
+	t.Run("undeclared client protocol falls back to legacy adapter", func(t *testing.T) {
+		decision, err := ResolveRouting(types.ProtocolResponses, RoutingTarget{
+			Target:             "https://dashscope.aliyuncs.com/compatible-mode/v1",
+			SupportedEndpoints: map[commontypes.ApiFormat]string{"chat": ""},
+		})
+		require.NoError(t, err)
+		assert.Equal(t, ModeAdapter, decision.Mode)
+		assert.Equal(t, AdapterResponsesToChat, decision.AdapterKind)
+		// The declared base URL gets the chat path appended for the adapter.
+		assert.Equal(t, "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions", decision.BackendURL)
+	})
+
+	t.Run("declared chat blocks undeclared passthrough for non-chat clients", func(t *testing.T) {
+		// Without a declaration an un-inferable external URL passes the
+		// client protocol through natively; a chat declaration must keep the
+		// adapter path instead.
+		decision, err := ResolveRouting(types.ProtocolMessages, RoutingTarget{
+			Target:             "https://gw.example.com/custom",
+			SupportedEndpoints: map[commontypes.ApiFormat]string{"chat": ""},
+		})
+		require.NoError(t, err)
+		assert.Equal(t, ModeAdapter, decision.Mode)
+		assert.Equal(t, AdapterMessagesToChat, decision.AdapterKind)
+	})
+
+	t.Run("undeclared un-inferable external URL keeps legacy passthrough", func(t *testing.T) {
+		decision, err := ResolveRouting(types.ProtocolMessages, RoutingTarget{
+			Target: "https://gw.example.com/custom",
+		})
+		require.NoError(t, err)
+		assert.Equal(t, ModeNative, decision.Mode)
+		assert.Equal(t, "https://gw.example.com/custom", decision.BackendURL)
+	})
+
+	t.Run("per-protocol endpoint override with matching tail is used as-is", func(t *testing.T) {
+		decision, err := ResolveRouting(types.ProtocolMessages, RoutingTarget{
+			Target:             "https://api.deepseek.com/v1",
+			SupportedEndpoints: map[commontypes.ApiFormat]string{"chat": "", "messages": "https://api.deepseek.com/anthropic/messages"},
+		})
+		require.NoError(t, err)
+		assert.Equal(t, ModeNative, decision.Mode)
+		assert.Equal(t, "https://api.deepseek.com/anthropic/messages", decision.BackendURL)
+	})
+
+	t.Run("per-protocol endpoint override without tail gets the standard path", func(t *testing.T) {
+		decision, err := ResolveRouting(types.ProtocolMessages, RoutingTarget{
+			Target:             "https://api.deepseek.com/v1",
+			SupportedEndpoints: map[commontypes.ApiFormat]string{"chat": "", "messages": "https://relay.example.com/deepseek"},
+		})
+		require.NoError(t, err)
+		assert.Equal(t, ModeNative, decision.Mode)
+		assert.Equal(t, "https://relay.example.com/deepseek/v1/messages", decision.BackendURL)
+	})
+
+	t.Run("main URL serves protocols with empty override values", func(t *testing.T) {
+		decision, err := ResolveRouting(types.ProtocolChat, RoutingTarget{
+			Target:             "https://api.deepseek.com/v1",
+			SupportedEndpoints: map[commontypes.ApiFormat]string{"chat": "", "messages": "https://api.deepseek.com/anthropic/messages"},
+		})
+		require.NoError(t, err)
+		assert.Equal(t, ModeNative, decision.Mode)
+		assert.Equal(t, "https://api.deepseek.com/v1/chat/completions", decision.BackendURL)
+	})
+
+	t.Run("metadata protocol merges into declared set", func(t *testing.T) {
+		decision, err := ResolveRouting(types.ProtocolMessages, RoutingTarget{
+			Target:             "https://api.anthropic.com/v1",
+			SupportedEndpoints: map[commontypes.ApiFormat]string{"chat": ""},
+			ProtocolOverride:   "messages",
+		})
+		require.NoError(t, err)
+		assert.Equal(t, ModeNative, decision.Mode)
+		assert.Equal(t, "https://api.anthropic.com/v1/messages", decision.BackendURL)
+	})
+}
+
+func TestStripProtocolTail(t *testing.T) {
+	tests := []struct {
+		raw      string
+		expected string
+	}{
+		{"https://api.openai.com/v1/chat/completions", "https://api.openai.com/v1"},
+		{"https://api.openai.com/v1/responses", "https://api.openai.com/v1"},
+		{"https://api.anthropic.com/v1/messages", "https://api.anthropic.com/v1"},
+		{"https://api.deepseek.com/anthropic/messages", "https://api.deepseek.com/anthropic"},
+		{"https://gw.example.com/v1", "https://gw.example.com/v1"},
+		{"http://model-svc:8080", "http://model-svc:8080"},
+	}
+	for _, tt := range tests {
+		assert.Equal(t, tt.expected, StripProtocolTail(tt.raw), tt.raw)
 	}
 }

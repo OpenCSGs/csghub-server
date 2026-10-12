@@ -21,6 +21,7 @@ type modelResolverAdapter struct {
 func (a *modelResolverAdapter) ResolveModelTarget(ctx context.Context, nsUUID, modelID string, headers http.Header, opts plan.ResolveOptions) (*types.ModelTarget, error) {
 	resolved, err := a.handler.resolveModelTargetWithOptions(ctx, nsUUID, modelID, headers, modelTargetResolveOptions{
 		RequiredUpstreamID: opts.RequiredUpstreamID,
+		ClientProtocol:     opts.ClientProtocol,
 	})
 	if err != nil {
 		return nil, err

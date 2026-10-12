@@ -184,11 +184,13 @@ func (h *responsesPipelineHandler) Execute(c *gin.Context, meta *types.RequestMe
 	// protocol routing matrix and disabled check, while responsespkg.ResolveRouting
 	// decides whether to use the native Responses endpoint or adapt to Chat.
 	decision, err := responsespkg.ResolveRouting(responsespkg.RoutingTarget{
-		ModelID:          mt.Model.ID,
-		Target:           mt.Target,
-		CSGHubHosted:     isCSGHubHostedModel(mt.Model),
-		RuntimeFramework: mt.Model.RuntimeFramework,
-		ImageID:          mt.Model.ImageID,
+		ModelID:            mt.Model.ID,
+		Target:             mt.Target,
+		CSGHubHosted:       isCSGHubHostedModel(mt.Model),
+		RuntimeFramework:   mt.Model.RuntimeFramework,
+		ImageID:            mt.Model.ImageID,
+		SupportedEndpoints: mt.Upstream.SupportedEndpoints,
+		IsFullURL:          mt.Upstream.IsFullURL,
 	})
 	if err != nil {
 		writeResponsesError(c, http.StatusBadRequest, "unsupported_feature", "invalid_request_error", err.Error())

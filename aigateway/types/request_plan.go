@@ -79,6 +79,11 @@ type RequestPlan struct {
 	ModelTarget *ModelTarget
 	// BackendURL is the URL to proxy the request to.
 	BackendURL string
+	// ClientProtocol is the API format the client called with ("chat" /
+	// "responses" / "messages").  Attempt-level consumers (e.g. chat
+	// fallback) use it to resolve fallback upstream URLs the same way the
+	// planner resolved the primary one.  Empty when unknown.
+	ClientProtocol string
 	// RouteMode is the routing decision: "native", "adapter", or "disabled".
 	RouteMode string
 	// AdapterKind identifies which adapter to use when RouteMode == "adapter".

@@ -511,10 +511,15 @@ func (h *OpenAIHandlerImpl) executeChatWithFallback(
 		return primaryWriter, nil
 	}
 
+	firstFallbackURL := ""
+	if len(modelTarget.AttemptTargets) > 0 {
+		firstFallbackURL = modelTarget.AttemptTargets[0].URL
+	}
 	slog.InfoContext(c.Request.Context(), "retry chat request with fallback endpoint",
 		slog.String("model_id", modelID),
 		slog.String("user_name", username),
 		slog.Int("available_fallback_attempts", len(modelTarget.AttemptTargets)),
+		slog.String("first_fallback_endpoint", firstFallbackURL),
 		slog.String("retry_reason", chatRetryReason(primaryStatusCode)),
 		slog.Int("status_code", primaryStatusCode))
 
@@ -647,8 +652,22 @@ func (h *OpenAIHandlerImpl) retryChatWithFallback(c *gin.Context, w CommonRespon
 		return nil, nil
 	}
 	fallbackTargets := modelTarget.AttemptTargets
+	// p can be nil in some direct-invocation paths; an empty client protocol
+	// makes the fallback URL resolution fall back to the raw upstream URL.
+	clientProtocol := ""
+	if p != nil {
+		clientProtocol = p.ClientProtocol
+	}
 	for idx, fallbackTarget := range fallbackTargets {
-		applyChatFallbackTarget(c.Request.Context(), c.Request.Header, modelTarget, fallbackTarget, tokenCounter, logCapture)
+		applyChatFallbackTarget(chatFallbackAttempt{
+			ctx:            c.Request.Context(),
+			headers:        c.Request.Header,
+			modelTarget:    modelTarget,
+			upstream:       fallbackTarget,
+			clientProtocol: clientProtocol,
+			tokenCounter:   tokenCounter,
+			logCapture:     logCapture,
+		})
 		slog.DebugContext(c.Request.Context(), "retrying chat request with fallback endpoint",
 			slog.String("model_id", modelTarget.Model.ID),
 			slog.String("retry_endpoint", modelTarget.Model.Endpoint),

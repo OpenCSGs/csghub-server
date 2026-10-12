@@ -26,9 +26,29 @@ type SetMetricsModelParams struct {
 }
 
 type resolvedModelTarget struct {
-	Model           *types.Model
-	Upstream        commonType.UpstreamConfig
-	TargetReq       commonType.EndpointReq
+	// Model is the resolved logical model. It is MUTABLE across attempts:
+	// applyEndpointOverrides/applyChatFallbackTarget write the active
+	// upstream's AuthHead/Provider/UpstreamID onto it, and its Endpoint field
+	// tracks the active backend URL (the chat proxy derives the upstream path
+	// from it via resolveProxyPathFromModelEndpoint).
+	Model *types.Model
+	// Upstream is the upstream config of the CURRENT attempt: the
+	// router-picked one for the primary attempt, replaced wholesale by each
+	// fallback (applyChatFallbackTarget). Consumers read AuthHeader,
+	// Provider, SupportedEndpoints, IsFullURL, health/circuit state and the
+	// per-attempt reporting fields (ID, URL) from it.
+	Upstream commonType.UpstreamConfig
+	// TargetReq is the legacy CSGHub cluster-deploy endpoint descriptor
+	// (cluster ID / svc name / endpoint). It is kept in sync with Target but
+	// is NOT part of the proxy path — its only consumer is error reporting
+	// (modelTargetError → handleModelTargetError logs it as "targetReq").
+	TargetReq commonType.EndpointReq
+	// Target is the URL the reverse proxy dials for the current attempt. For
+	// the primary attempt it is the planner's BackendURL (see withBackendURL:
+	// protocol-routed — native, chat-fallback rewritten, or adapter target);
+	// for fallback attempts the protocol-resolved fallback upstream URL
+	// (applyChatFallbackTarget). modelTarget.Target is also the URL that
+	// must be logged as the routing destination.
 	Target          string
 	TokenizerTarget string
 	Host            string
@@ -72,6 +92,11 @@ type modelTargetErrorOptions struct {
 
 type modelTargetResolveOptions struct {
 	RequiredUpstreamID int64
+	// ClientProtocol is the inference API format the caller is serving.
+	// When set, upstream selection prefers candidates that natively support
+	// it. Empty for callers that do not do protocol-aware resolution (e.g.
+	// multimodal tasks).
+	ClientProtocol commonType.ApiFormat
 }
 
 type modelTargetErrorParams struct {
@@ -89,6 +114,7 @@ type endpointTargetResolveInput struct {
 	Headers            http.Header
 	TargetReq          *commonType.EndpointReq
 	RequiredUpstreamID int64
+	ClientProtocol     commonType.ApiFormat
 }
 
 type endpointTargetResolveResult struct {
@@ -203,6 +229,7 @@ func (h *OpenAIHandlerImpl) resolveModelTargetWithOptions(ctx context.Context, n
 			Headers:            headers,
 			TargetReq:          &targetReq,
 			RequiredUpstreamID: options.RequiredUpstreamID,
+			ClientProtocol:     options.ClientProtocol,
 		})
 		if err != nil {
 			return nil, err
@@ -251,7 +278,12 @@ func (h *OpenAIHandlerImpl) resolveEndpointModelTarget(
 	if availabilityErr != nil {
 		return nil, availabilityErr
 	}
-	input.Model.Upstreams = availableUpstreams
+	// Keep the full available set on the model, ordered native-capable first,
+	// so downstream consumers that iterate in order (capacity admission
+	// re-selection) prefer native passthrough while retaining every fallback
+	// candidate.
+	orderedUpstreams := orderNativeFirst(availableUpstreams, input.ClientProtocol)
+	input.Model.Upstreams = orderedUpstreams
 
 	if input.RequiredUpstreamID != 0 {
 		for _, upstream := range input.Model.Upstreams {
@@ -282,11 +314,17 @@ func (h *OpenAIHandlerImpl) resolveEndpointModelTarget(
 		)
 	}
 
+	// Prefer upstreams that natively support the client's protocol: when at
+	// least one declared/inferable candidate can serve the protocol natively,
+	// the router strategy picks from that subset only, so a native
+	// passthrough beats a protocol adaptation whenever possible. Fallback
+	// candidates keep the same native-first order (full set, all candidates).
+	nativeCandidates := preferNativeUpstreams(availableUpstreams, input.ClientProtocol)
 	// PickUpstream by router strategy
 	upstream, err := h.sessionRouter.PickUpstream(
 		input.Model.ID,
 		sessionKey,
-		input.Model.Upstreams,
+		nativeCandidates,
 		input.Model.RoutingPolicy,
 	)
 	slog.InfoContext(
@@ -322,7 +360,11 @@ func (h *OpenAIHandlerImpl) resolveEndpointModelTarget(
 	// orverride models's AuthHead, Provider with upstream
 	applyEndpointOverrides(input.Model, upstream)
 	modelName := resolveEndpointModelName(input.Model.ID, upstream)
-	attemptTargets := buildChatAttemptTargets(upstream, availableUpstreams, h.chatMaxFallbackAttempts())
+	attemptTargets := buildChatAttemptTargets(
+		upstream,
+		orderedUpstreams,
+		h.chatMaxFallbackAttempts(),
+	)
 
 	return &endpointTargetResolveResult{
 		Upstream:       upstream,
@@ -434,6 +476,63 @@ func upstreamHostOverride(upstream commonType.UpstreamConfig) string {
 		return upstream.Metadata.HostOverride
 	}
 	return ""
+}
+
+// nativeCapableForClient reports whether an upstream can serve the client
+// protocol natively: its API-format declaration (or URL/metadata inference)
+// includes the protocol, or its format is unknown — unknown-format upstreams
+// keep the legacy behavior of a native passthrough for whatever protocol the
+// client speaks.
+func nativeCapableForClient(u commonType.UpstreamConfig, clientProtocol commonType.ApiFormat) bool {
+	return u.SupportsProtocol(clientProtocol) || !u.HasProtocolDeclaration()
+}
+
+// orderNativeFirst partitions the candidate list into native-capable
+// upstreams first, preserving relative order within each group. The full
+// candidate set is kept (unlike preferNativeUpstreams, which narrows), so
+// downstream consumers that iterate in order — capacity admission
+// re-selection, fallback target ordering — prefer native passthrough but can
+// still fall back to adapter-served upstreams.
+func orderNativeFirst(upstreams []commonType.UpstreamConfig, clientProtocol commonType.ApiFormat) []commonType.UpstreamConfig {
+	if strings.TrimSpace(string(clientProtocol)) == "" || len(upstreams) <= 1 {
+		return upstreams
+	}
+	native := make([]commonType.UpstreamConfig, 0, len(upstreams))
+	rest := make([]commonType.UpstreamConfig, 0, len(upstreams))
+	for _, u := range upstreams {
+		if nativeCapableForClient(u, clientProtocol) {
+			native = append(native, u)
+		} else {
+			rest = append(rest, u)
+		}
+	}
+	if len(native) == 0 || len(rest) == 0 {
+		return upstreams
+	}
+	return append(native, rest...)
+}
+
+// preferNativeUpstreams narrows the candidate list to the upstreams that can
+// serve the client protocol natively. When no candidate natively supports the
+// protocol (or the client protocol is not protocol-aware routing), the
+// original list is returned unchanged and the legacy adapter routing decides.
+func preferNativeUpstreams(upstreams []commonType.UpstreamConfig, clientProtocol commonType.ApiFormat) []commonType.UpstreamConfig {
+	if strings.TrimSpace(string(clientProtocol)) == "" || len(upstreams) <= 1 {
+		return upstreams
+	}
+	native := make([]commonType.UpstreamConfig, 0, len(upstreams))
+	rest := make([]commonType.UpstreamConfig, 0, len(upstreams))
+	for _, u := range upstreams {
+		if nativeCapableForClient(u, clientProtocol) {
+			native = append(native, u)
+		} else {
+			rest = append(rest, u)
+		}
+	}
+	if len(native) == 0 || len(rest) == 0 {
+		return upstreams
+	}
+	return native
 }
 
 func extractSessionKeyForModel(model *types.Model, headers http.Header, fallbackSessionKey string) string {

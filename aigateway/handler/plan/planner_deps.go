@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/aigateway/types"
+	commontypes "opencsg.com/csghub-server/common/types"
 )
 
 // ModelResolver resolves a model ID to a concrete upstream target.
@@ -27,6 +28,11 @@ type ResolveOptions struct {
 	// this ID.  Used by the Responses protocol when the client supplies a
 	// previous_response_id whose original upstream must be reused.
 	RequiredUpstreamID int64
+	// ClientProtocol is the inference API format the client is calling with.
+	// The resolver uses it to prefer upstreams that natively support the
+	// format. Empty when the caller does not do protocol-aware resolution
+	// (e.g. multimodal tasks).
+	ClientProtocol commontypes.ApiFormat
 }
 
 // BalanceChecker verifies that the tenant has sufficient balance.

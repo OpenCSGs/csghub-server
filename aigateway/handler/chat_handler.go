@@ -226,13 +226,20 @@ func (h *chatPipelineHandler) Execute(c *gin.Context, meta *types.RequestMetadat
 	}
 
 	proxyStartTime := time.Now()
-	log := slog.With(
-		slog.String("proxy_start_time", proxyStartTime.Format(time.RFC3339)),
-		slog.Any("model_name", mt.ModelName),
-		slog.Any("current_user", username),
-		slog.Any("target", mt.Target),
-		slog.Any("host", mt.Host),
-	)
+	// The fallback loop mutates mt in place (applyChatFallbackTarget), so the
+	// phase loggers must bind the target that is current at their time — the
+	// primary logger binds the primary target, the fallback one re-binds
+	// mt.Target after executeChatWithFallback returns.
+	chatLog := func(targetKey string) *slog.Logger {
+		return slog.With(
+			slog.String("proxy_start_time", proxyStartTime.Format(time.RFC3339)),
+			slog.Any("model_name", mt.ModelName),
+			slog.Any("current_user", username),
+			slog.Any(targetKey, mt.Target),
+			slog.Any("host", mt.Host),
+		)
+	}
+	log := chatLog("target")
 	primaryWriter, proxyErr := h.handler.executeChatProxyAttempt(c, chatCtx.responseWriter, mt, chatReq, p)
 	if proxyErr != nil {
 		finishLLMTraceWithError(generationRecorder, proxyErr, types.TraceErrUpstreamUnavailable)
@@ -243,13 +250,14 @@ func (h *chatPipelineHandler) Execute(c *gin.Context, meta *types.RequestMetadat
 	log.InfoContext(ctx, "proxy chat request to model target", slog.Int("status", primaryWriter.statusCode), slog.Int64("proxy_latency(ms)", time.Since(proxyStartTime).Milliseconds()), slog.Int64("ttft(ms)", retryWriterTTFTMs(primaryWriter, proxyStartTime)))
 
 	finalWriter, err := h.handler.executeChatWithFallback(c, chatCtx, mt, chatReq, primaryWriter, username, modelID, p)
+	fallbackLog := chatLog("fallback_target")
 	if err != nil {
 		finishLLMTraceWithError(generationRecorder, err, types.TraceErrUpstreamUnavailable)
 		h.handler.handleProxyError(c, chatReq.Stream, err)
-		log.ErrorContext(ctx, "failed to execute chat fallback", slog.Int("status", retryWriterStatusCode(finalWriter)), slog.Any("error", err))
+		fallbackLog.ErrorContext(ctx, "failed to execute chat fallback", slog.Int("status", retryWriterStatusCode(finalWriter)), slog.Any("error", err))
 		return nil
 	}
-	log.InfoContext(ctx, "fallback chat request to model target", slog.Int("status", retryWriterStatusCode(finalWriter)), slog.Int64("proxy_latency(ms)", time.Since(proxyStartTime).Milliseconds()),
+	fallbackLog.InfoContext(ctx, "fallback chat request to model target", slog.Int("status", retryWriterStatusCode(finalWriter)), slog.Int64("proxy_latency(ms)", time.Since(proxyStartTime).Milliseconds()),
 		slog.Int64("ttft(ms)", retryWriterTTFTMs(finalWriter, proxyStartTime)))
 
 	// Surface upstream error bodies for troubleshooting: the retry writer
@@ -258,7 +266,7 @@ func (h *chatPipelineHandler) Execute(c *gin.Context, meta *types.RequestMetadat
 	// per-request metrics event (error_message column).
 	if status := retryWriterStatusCode(finalWriter); status != http.StatusOK {
 		responseBody := truncateChatResponseBodyForLog(finalWriter.responseBodyForLog())
-		log.ErrorContext(ctx, "chat upstream returned non-200 response",
+		fallbackLog.ErrorContext(ctx, "chat upstream returned non-200 response",
 			slog.Int("status", status),
 			slog.String("response_body", responseBody))
 		SetMetricsError(c, "upstream_error", fmt.Sprintf("upstream returned %d: %s", status, responseBody))

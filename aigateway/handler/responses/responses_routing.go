@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"strings"
 
+	"opencsg.com/csghub-server/aigateway/handler/protocol"
+	commontypes "opencsg.com/csghub-server/common/types"
 	commonutils "opencsg.com/csghub-server/common/utils/common"
 )
 
@@ -30,6 +32,68 @@ type RoutingTarget struct {
 	CSGHubHosted     bool
 	RuntimeFramework string
 	ImageID          string
+	// SupportedEndpoints maps a declared API format (chat / responses /
+	// messages) to an optional per-protocol endpoint URL. An empty value
+	// means the main Target serves that protocol.
+	SupportedEndpoints map[commontypes.ApiFormat]string
+	// IsFullURL marks the Target as a complete endpoint URL used as-is.
+	IsFullURL bool
+}
+
+// DeclaredProtocols returns the explicit API-format declaration set (empty
+// when the upstream declares nothing).
+func (t RoutingTarget) DeclaredProtocols() map[string]bool {
+	set := make(map[string]bool, len(t.SupportedEndpoints))
+	for key := range t.SupportedEndpoints {
+		if normalized := key.Normalized(); normalized != "" {
+			set[string(normalized)] = true
+		}
+	}
+	return set
+}
+
+// declaredEndpoint returns the per-protocol endpoint override for the given
+// protocol (trimmed; empty when the protocol is served by the main URL).
+func (t RoutingTarget) declaredEndpoint(format string) string {
+	for key, value := range t.SupportedEndpoints {
+		if key.Normalized() == commontypes.ApiFormat(format).Normalized() {
+			return strings.TrimSpace(value)
+		}
+	}
+	return ""
+}
+
+// resolveEndpointFor resolves the URL serving the given protocol: the
+// per-protocol endpoint override when set, otherwise the main URL. A
+// per-protocol override that already carries a recognizable protocol path is
+// used as-is, anything else is treated as a base URL and gets the standard
+// path segments appended (mirroring the protocol router's native URL
+// construction). The main URL honors the IsFullURL flag.
+func (t RoutingTarget) resolveEndpointFor(protocolName string, segments ...string) string {
+	endpoint := t.declaredEndpoint(protocolName)
+	isOverride := endpoint != ""
+	if !isOverride {
+		endpoint = strings.TrimSpace(t.Target)
+		if endpoint == "" || t.IsFullURL {
+			return endpoint
+		}
+	} else if inferred, ok := commontypes.InferProtocolFromURLPath(endpoint); ok && string(inferred) == protocolName {
+		return endpoint
+	}
+	base := protocol.StripProtocolTail(endpoint)
+	parsed, err := url.Parse(base)
+	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+		return endpoint
+	}
+	// Deduplicate a trailing /v1 on the base path, mirroring the protocol
+	// router's native URL construction.
+	if len(segments) > 0 && strings.EqualFold(segments[0], commontypes.PathSegV1) {
+		pathSegments := strings.Split(strings.TrimRight(parsed.Path, "/"), "/")
+		if len(pathSegments) > 0 && strings.EqualFold(pathSegments[len(pathSegments)-1], commontypes.PathSegV1) {
+			segments = segments[1:]
+		}
+	}
+	return appendEndpointPath(parsed, segments...)
 }
 
 func ResolveRouting(modelTarget RoutingTarget) (RoutingDecision, error) {
@@ -42,11 +106,41 @@ func ResolveRouting(modelTarget RoutingTarget) (RoutingDecision, error) {
 		return RoutingDecision{}, fmt.Errorf("cannot resolve responses mode from upstream url %q: %w", target, err)
 	}
 
+	// Explicit API-format declaration wins over URL inference for external
+	// upstreams: a declared responses upstream is native (the admin asserts
+	// the endpoint speaks Responses), a declared chat-only upstream goes
+	// through the chat adapter without further probing.
+	//
+	// CSGHub-hosted targets are exempt: their declaration is backfilled/sync
+	// derived ({"chat": null}), not an admin assertion, so they always go
+	// through resolveHostedRouting whose runtime version gating decides
+	// between native responses and the chat adapter.
+	declared := modelTarget.DeclaredProtocols()
+	if len(declared) > 0 && !modelTarget.CSGHubHosted {
+		switch {
+		case declared[string(commontypes.ApiFormatResponses)]:
+			return RoutingDecision{
+				Mode:       ResponsesModeNative,
+				BackendURL: modelTarget.resolveEndpointFor(string(commontypes.ApiFormatResponses), commontypes.ApiFormatResponses.StandardPathSegments()...),
+				Reason:     "declared_format_responses",
+			}, nil
+		case declared[string(commontypes.ApiFormatChat)]:
+			return RoutingDecision{
+				Mode:       ResponsesModeChatAdapter,
+				BackendURL: modelTarget.resolveEndpointFor(string(commontypes.ApiFormatChat), commontypes.ApiFormatChat.StandardPathSegments()...),
+				Reason:     "declared_format_chat_adapter",
+			}, nil
+		}
+		// Declared messages-only upstream: no responses support and no chat
+		// adapter target — fall through to the legacy inference, which ends
+		// in Disabled for unsupported upstreams.
+	}
+
 	path := strings.TrimRight(parsed.Path, "/")
 	switch {
-	case PathEndsWithSegments(path, "responses"):
+	case PathEndsWithSegments(path, commontypes.PathSegResponses):
 		return RoutingDecision{Mode: ResponsesModeNative, BackendURL: target, Reason: "upstream_url_responses"}, nil
-	case PathEndsWithSegments(path, "chat", "completions"):
+	case PathEndsWithSegments(path, commontypes.PathSegChat, commontypes.PathSegCompletions):
 		return RoutingDecision{Mode: ResponsesModeChatAdapter, BackendURL: target, Reason: "upstream_url_chat_completions"}, nil
 	}
 
@@ -222,7 +316,7 @@ func versionAtLeast(pattern *regexp.Regexp, value string, major, minor, patch in
 func appendEndpointPath(base *url.URL, segments ...string) string {
 	u := *base
 	u.Path = commonutils.JoinURLPath(u.Path, segments...)
-	u.RawQuery = ""
-	u.Fragment = ""
+	// Keep the base URL's query (e.g. Azure's ?api-version=...): only the
+	// path is rewritten.
 	return u.String()
 }

@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	commontypes "opencsg.com/csghub-server/common/types"
 )
 
 func TestResolveResponsesRoutingNativeResponsesURL(t *testing.T) {
@@ -239,4 +240,97 @@ func TestResolveResponsesRoutingInvalidURL(t *testing.T) {
 	})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "cannot resolve responses mode")
+}
+
+func TestResolveResponsesRoutingDeclaredFormats(t *testing.T) {
+	t.Run("declared responses on base URL is native with the standard path", func(t *testing.T) {
+		decision, err := ResolveRouting(RoutingTarget{
+			ModelID:            "gw-model",
+			Target:             "https://gw.example.com/v1",
+			SupportedEndpoints: map[commontypes.ApiFormat]string{commontypes.ApiFormatResponses: ""},
+		})
+		require.NoError(t, err)
+		require.Equal(t, ResponsesModeNative, decision.Mode)
+		require.Equal(t, "https://gw.example.com/v1/responses", decision.BackendURL)
+		require.Equal(t, "declared_format_responses", decision.Reason)
+	})
+
+	t.Run("declared responses endpoint override is used as-is when it carries the protocol path", func(t *testing.T) {
+		decision, err := ResolveRouting(RoutingTarget{
+			ModelID: "gw-model",
+			Target:  "https://gw.example.com/v1",
+			SupportedEndpoints: map[commontypes.ApiFormat]string{
+				commontypes.ApiFormatResponses: "https://responses.example.com/v1/responses",
+			},
+		})
+		require.NoError(t, err)
+		require.Equal(t, ResponsesModeNative, decision.Mode)
+		require.Equal(t, "https://responses.example.com/v1/responses", decision.BackendURL)
+	})
+
+	t.Run("declared chat-only upstream goes through the chat adapter", func(t *testing.T) {
+		decision, err := ResolveRouting(RoutingTarget{
+			ModelID:            "gw-model",
+			Target:             "https://gw.example.com/v1",
+			SupportedEndpoints: map[commontypes.ApiFormat]string{commontypes.ApiFormatChat: ""},
+		})
+		require.NoError(t, err)
+		require.Equal(t, ResponsesModeChatAdapter, decision.Mode)
+		require.Equal(t, "https://gw.example.com/v1/chat/completions", decision.BackendURL)
+		require.Equal(t, "declared_format_chat_adapter", decision.Reason)
+	})
+
+	t.Run("declared chat with endpoint override targets the override", func(t *testing.T) {
+		decision, err := ResolveRouting(RoutingTarget{
+			ModelID: "gw-model",
+			Target:  "https://gw.example.com/v1",
+			SupportedEndpoints: map[commontypes.ApiFormat]string{
+				commontypes.ApiFormatChat: "https://chat.example.com/openai/v1",
+			},
+		})
+		require.NoError(t, err)
+		require.Equal(t, ResponsesModeChatAdapter, decision.Mode)
+		require.Equal(t, "https://chat.example.com/openai/v1/chat/completions", decision.BackendURL)
+	})
+
+	t.Run("declared messages-only upstream falls through to disabled for external URLs", func(t *testing.T) {
+		decision, err := ResolveRouting(RoutingTarget{
+			ModelID:            "gw-model",
+			Target:             "https://gw.example.com/v1",
+			SupportedEndpoints: map[commontypes.ApiFormat]string{commontypes.ApiFormatMessages: ""},
+		})
+		require.NoError(t, err)
+		require.Equal(t, ResponsesModeDisabled, decision.Mode)
+	})
+
+	t.Run("CSGHub-hosted targets keep runtime version gating despite the backfilled chat declaration", func(t *testing.T) {
+		// The migration backfills {"chat": null} for csghub rows; that derived
+		// declaration must not bypass resolveHostedRouting's version gating.
+		decision, err := ResolveRouting(RoutingTarget{
+			ModelID:            "hosted-model",
+			Target:             "http://model-svc:8080",
+			CSGHubHosted:       true,
+			RuntimeFramework:   "vllm",
+			ImageID:            "opencsghq/vllm:v0.25.1",
+			SupportedEndpoints: map[commontypes.ApiFormat]string{commontypes.ApiFormatChat: ""},
+		})
+		require.NoError(t, err)
+		require.Equal(t, ResponsesModeNative, decision.Mode)
+		require.Equal(t, "http://model-svc:8080/v1/responses", decision.BackendURL)
+		require.NotEqual(t, "declared_format_chat_adapter", decision.Reason)
+	})
+
+	t.Run("CSGHub-hosted targets below the native responses version keep the chat adapter", func(t *testing.T) {
+		decision, err := ResolveRouting(RoutingTarget{
+			ModelID:            "hosted-model",
+			Target:             "http://model-svc:8080",
+			CSGHubHosted:       true,
+			RuntimeFramework:   "vllm",
+			ImageID:            "opencsghq/vllm:v0.23.0",
+			SupportedEndpoints: map[commontypes.ApiFormat]string{commontypes.ApiFormatChat: ""},
+		})
+		require.NoError(t, err)
+		require.Equal(t, ResponsesModeChatAdapter, decision.Mode)
+		require.Equal(t, "http://model-svc:8080/v1/chat/completions", decision.BackendURL)
+	})
 }

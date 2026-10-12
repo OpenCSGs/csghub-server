@@ -45,11 +45,11 @@ func (p *policyCapturingSampleProvider) Execute(ctx context.Context, _ aigateway
 
 func TestValidateHealthCheckEndpoint(t *testing.T) {
 	mc := &llmServiceComponentImpl{sampleRegistry: sample.NewDefaultRegistry()}
-	require.NoError(t, mc.validateHealthCheckEndpoint("https://api.example.com/v1/embeddings", false))
-	require.NoError(t, mc.validateHealthCheckEndpoint("https://api.example.com/v1/chat/completions", true))
-	require.NoError(t, mc.validateHealthCheckEndpoint("https://api.example.com/v1/responses", true))
+	require.NoError(t, mc.validateHealthCheckEndpoint(types.UpstreamConfig{URL: "https://api.example.com/v1/embeddings", IsFullURL: false, Source: types.UpstreamSourceExternal, SupportedEndpoints: nil}, false))
+	require.NoError(t, mc.validateHealthCheckEndpoint(types.UpstreamConfig{URL: "https://api.example.com/v1/chat/completions", IsFullURL: true, Source: types.UpstreamSourceExternal, SupportedEndpoints: nil}, true))
+	require.NoError(t, mc.validateHealthCheckEndpoint(types.UpstreamConfig{URL: "https://api.example.com/v1/responses", IsFullURL: true, Source: types.UpstreamSourceExternal, SupportedEndpoints: nil}, true))
 
-	err := mc.validateHealthCheckEndpoint("https://api.example.com/v1/ocr", true)
+	err := mc.validateHealthCheckEndpoint(types.UpstreamConfig{URL: "https://api.example.com/v1/ocr", IsFullURL: true, Source: types.UpstreamSourceExternal, SupportedEndpoints: nil}, true)
 	require.Error(t, err)
 	customErr, ok := errorx.GetFirstCustomError(err)
 	require.True(t, ok)
@@ -57,7 +57,7 @@ func TestValidateHealthCheckEndpoint(t *testing.T) {
 
 	customRegistry := sample.NewRegistry(&policyCapturingSampleProvider{})
 	customComponent := &llmServiceComponentImpl{sampleRegistry: customRegistry}
-	require.NoError(t, customComponent.validateHealthCheckEndpoint("https://api.example.com/v1/ocr", true))
+	require.NoError(t, customComponent.validateHealthCheckEndpoint(types.UpstreamConfig{URL: "https://api.example.com/v1/ocr", IsFullURL: true, Source: types.UpstreamSourceExternal, SupportedEndpoints: nil}, true))
 }
 
 func TestParseAuthHeader(t *testing.T) {
@@ -469,4 +469,65 @@ func TestLLMServiceComponent_CheckUpstream_NotFound(t *testing.T) {
 	}
 	_, err := mc.CheckUpstream(ctx, &types.CheckUpstreamReq{ID: 99})
 	require.Error(t, err)
+}
+
+func TestValidateAPIFormat(t *testing.T) {
+	t.Run("empty declaration is allowed", func(t *testing.T) {
+		require.NoError(t, validateAPIFormat("https://api.example.com/v1", false, nil))
+		require.NoError(t, validateAPIFormat("https://api.example.com/v1", true, nil))
+	})
+
+	t.Run("valid declarations", func(t *testing.T) {
+		require.NoError(t, validateAPIFormat("https://api.example.com/v1", false, map[types.ApiFormat]string{"chat": "", "responses": "", "messages": ""}))
+		require.NoError(t, validateAPIFormat("https://api.example.com/v1", true, map[types.ApiFormat]string{" chat ": ""}))
+		require.NoError(t, validateAPIFormat("https://api.example.com/v1", true, map[types.ApiFormat]string{"chat": "", "messages": "https://api.deepseek.com/anthropic"}))
+	})
+
+	t.Run("invalid key rejected", func(t *testing.T) {
+		err := validateAPIFormat("https://api.example.com/v1", false, map[types.ApiFormat]string{"chat": "", "embeddings": ""})
+		require.Error(t, err)
+	})
+
+	t.Run("endpoint override must be a valid http(s) URL", func(t *testing.T) {
+		require.Error(t, validateAPIFormat("https://api.example.com/v1", false, map[types.ApiFormat]string{"messages": "not-a-url"}))
+		require.Error(t, validateAPIFormat("https://api.example.com/v1", false, map[types.ApiFormat]string{"messages": "ftp://x/y"}))
+		require.NoError(t, validateAPIFormat("https://api.example.com/v1", false, map[types.ApiFormat]string{"messages": "https://api.deepseek.com/anthropic"}))
+	})
+
+	t.Run("base URL must not end with a protocol path", func(t *testing.T) {
+		require.Error(t, validateAPIFormat("https://api.example.com/v1/chat/completions", false, nil))
+		require.Error(t, validateAPIFormat("https://api.example.com/v1/responses", false, nil))
+		require.Error(t, validateAPIFormat("https://api.deepseek.com/anthropic/messages", false, map[types.ApiFormat]string{"messages": ""}))
+		require.NoError(t, validateAPIFormat("https://api.example.com/v1", false, nil))
+		require.NoError(t, validateAPIFormat("https://api.example.com/api", false, nil))
+		// Full-URL mode is exempt: that is exactly what the toggle is for.
+		require.NoError(t, validateAPIFormat("https://api.example.com/v1/chat/completions", true, map[types.ApiFormat]string{"chat": ""}))
+	})
+
+	t.Run("full URL cannot serve responses from the main URL", func(t *testing.T) {
+		err := validateAPIFormat("https://api.example.com/v1/chat/completions", true, map[types.ApiFormat]string{"chat": "", "responses": ""})
+		require.Error(t, err)
+		// Migration-backfilled rows whose main URL IS the responses endpoint
+		// stay updatable.
+		require.NoError(t, validateAPIFormat("https://api.example.com/v1/responses", true, map[types.ApiFormat]string{"responses": ""}))
+		// With its own endpoint, responses is fine next to a full main URL.
+		require.NoError(t, validateAPIFormat("https://api.example.com/v1/chat/completions", true, map[types.ApiFormat]string{
+			"chat":      "",
+			"responses": "https://responses.example.com/v1/responses",
+		}))
+	})
+
+	t.Run("full URL allows at most one format without its own endpoint", func(t *testing.T) {
+		err := validateAPIFormat("https://api.example.com/v1", true, map[types.ApiFormat]string{"chat": "", "responses": ""})
+		require.Error(t, err)
+		require.NoError(t, validateAPIFormat("https://api.example.com/v1", true, map[types.ApiFormat]string{"chat": ""}))
+	})
+}
+
+func TestNormalizeSupportedEndpoints(t *testing.T) {
+	require.Nil(t, normalizeSupportedEndpoints(nil))
+	require.Nil(t, normalizeSupportedEndpoints(map[types.ApiFormat]string{"": "", "  ": " "}))
+	require.Nil(t, normalizeSupportedEndpoints(map[types.ApiFormat]string{}))
+	require.Equal(t, map[types.ApiFormat]string{"chat": "", "responses": "https://x.example.com/v1/responses"},
+		normalizeSupportedEndpoints(map[types.ApiFormat]string{" Chat ": "", "responses": " https://x.example.com/v1/responses "}))
 }
