@@ -298,6 +298,7 @@ func (h *OpenAIHandlerImpl) ListModels(c *gin.Context) {
 		HasAssociatedModel: hasAssociatedModel,
 		Per:                per,
 		Page:               page,
+		ModelScope:         types.ParseModelScope(httpbase.GetAPIKeyModelScope(c)),
 	})
 	if err != nil {
 		slog.ErrorContext(c.Request.Context(), "failed to get available models", "error", err.Error(), "current_user", currentUser)
@@ -391,6 +392,18 @@ func (h *OpenAIHandlerImpl) GetModel(c *gin.Context) {
 		return
 	}
 	if model == nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": types.Error{
+				Code:    "model_not_found",
+				Message: fmt.Sprintf("model '%s' not found", modelID),
+				Type:    "invalid_request_error",
+			}})
+		return
+	}
+
+	// A model outside the API key's model scope is reported as unknown, the
+	// same way a nonexistent one is, so the two are indistinguishable.
+	if scope := types.ParseModelScope(httpbase.GetAPIKeyModelScope(c)); len(scope) > 0 && !types.ModelInScope(scope, model.ID) {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": types.Error{
 				Code:    "model_not_found",

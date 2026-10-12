@@ -8,6 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/aigateway/handler/protocol"
 	"opencsg.com/csghub-server/aigateway/types"
+	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/common/errorx"
 	commontypes "opencsg.com/csghub-server/common/types"
 )
@@ -24,11 +25,11 @@ import (
 // the protocol handler's HandlePlanError so it can render the correct
 // protocol-specific error response.
 type plannerImpl struct {
-	modelResolver     ModelResolver
-	balanceChecker    BalanceChecker
-	contentSafety     ContentSafetyChecker
-	admissionChecker  AdmissionChecker
-	metricsEnricher   MetricsEnricher
+	modelResolver    ModelResolver
+	balanceChecker   BalanceChecker
+	contentSafety    ContentSafetyChecker
+	admissionChecker AdmissionChecker
+	metricsEnricher  MetricsEnricher
 	// queueMaxRePlans bounds the re-plans triggered by an admission reroute
 	// (an upstream turned unavailable while the request waited in its
 	// reservation queue). The queue never picks another upstream itself;
@@ -40,11 +41,11 @@ type plannerImpl struct {
 // PlannerDeps bundles the Planner's dependencies so the set can grow
 // without breaking every call site. AdmissionChecker is optional.
 type PlannerDeps struct {
-	ModelResolver     ModelResolver
-	BalanceChecker    BalanceChecker
-	ContentSafety     ContentSafetyChecker
-	AdmissionChecker  AdmissionChecker
-	MetricsEnricher   MetricsEnricher
+	ModelResolver    ModelResolver
+	BalanceChecker   BalanceChecker
+	ContentSafety    ContentSafetyChecker
+	AdmissionChecker AdmissionChecker
+	MetricsEnricher  MetricsEnricher
 }
 
 // PlannerOption customizes optional planner behavior.
@@ -65,12 +66,12 @@ func WithQueueMaxRePlans(n int) PlannerOption {
 // package provides concrete adapters at the composition root.
 func NewPlanner(deps PlannerDeps, opts ...PlannerOption) Planner {
 	p := &plannerImpl{
-		modelResolver:     deps.ModelResolver,
-		balanceChecker:    deps.BalanceChecker,
-		contentSafety:     deps.ContentSafety,
-		admissionChecker:  deps.AdmissionChecker,
-		metricsEnricher:   deps.MetricsEnricher,
-		queueMaxRePlans:   1,
+		modelResolver:    deps.ModelResolver,
+		balanceChecker:   deps.BalanceChecker,
+		contentSafety:    deps.ContentSafety,
+		admissionChecker: deps.AdmissionChecker,
+		metricsEnricher:  deps.MetricsEnricher,
+		queueMaxRePlans:  1,
 	}
 	for _, opt := range opts {
 		opt(p)
@@ -102,9 +103,14 @@ func (p *plannerImpl) planOnce(c *gin.Context, meta *types.RequestMetadata) (pl 
 	ctx := c.Request.Context()
 	pl = &types.RequestPlan{}
 
-	// 1. Model Resolution.  Automatic model selection already ran in Plan,
-	// so meta.Model names a concrete model here and ctx carries whichever
-	// decision produced it.
+	// 1. Model Resolution. A scoped API key cannot address another model.
+	if scope := types.ParseModelScope(httpbase.GetAPIKeyModelScope(c)); len(scope) > 0 && !types.ModelInScope(scope, meta.Model) {
+		if p.metricsEnricher != nil {
+			p.metricsEnricher.SetModelTarget(c, meta.Model, nil, meta.Streaming)
+		}
+		pl.ErrorCode = types.PlanErrModelNotFound
+		return pl, fmt.Errorf("model '%s' not found", meta.Model), false
+	}
 	mt, err := p.modelResolver.ResolveModelTarget(ctx, meta.TenantID, meta.Model, meta.Headers, ResolveOptions{
 		RequiredUpstreamID: meta.RequiredUpstreamID,
 		ClientProtocol:     commontypes.ApiFormat(meta.Protocol),

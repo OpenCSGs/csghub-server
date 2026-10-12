@@ -513,6 +513,44 @@ func TestOpenAIHandler_GetModel(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, "simple-model:svc1", response.ID)
 	})
+
+	t.Run("model outside the api key scope is unknown", func(t *testing.T) {
+		tester, c, w := setupTest(t)
+		httpbase.SetAPIKeyModelScope(c, "model-a,model-b")
+		model := &types.Model{
+			BaseModel: types.BaseModel{
+				ID:      "secret-model:svc1",
+				Object:  "model",
+				OwnedBy: "testuser",
+			},
+		}
+		c.Params = []gin.Param{{Key: "model", Value: "secret-model:svc1"}}
+		// The scope is judged on the resolved model, after the lookup.
+		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuuid", "secret-model:svc1").Return(model, nil)
+
+		tester.handler.GetModel(c)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+		assert.Contains(t, w.Body.String(), "model_not_found")
+	})
+
+	t.Run("model inside the api key scope resolves", func(t *testing.T) {
+		tester, c, w := setupTest(t)
+		httpbase.SetAPIKeyModelScope(c, "model-a,model-b:svc1")
+		model := &types.Model{
+			BaseModel: types.BaseModel{
+				ID:      "model-b:svc1",
+				Object:  "model",
+				OwnedBy: "testuser",
+			},
+		}
+		c.Params = []gin.Param{{Key: "model", Value: "model-b:svc1"}}
+		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuuid", "model-b:svc1").Return(model, nil)
+
+		tester.handler.GetModel(c)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+	})
 }
 func TestOpenAIHandler_GetVideo(t *testing.T) {
 	tester, c, w := setupTest(t)
