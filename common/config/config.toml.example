@@ -37,6 +37,27 @@ unsafe_rules = [
     { level = "Controversial", category = "Politically Sensitive Topics" }
 ]
 
+# Automatic model selection.  Leave server_url empty to disable: the
+# virtual model is then not published and every request must name a
+# concrete model.
+[aigateway.semantic_router]
+server_url = ""
+model_id = "auto"
+timeout_seconds = 5
+health_ttl_seconds = 300
+
+[agent]
+orchestrator_readiness_timeout_seconds = 1800
+orchestrator_gateway_wait_timeout_seconds = 30
+# Temporary static cap on concurrent executions across sessions on one actor
+# runtime, until load-aware admission is available.
+orchestrator_max_concurrent_executions_per_allocation = 4
+orchestrator_execution_reserved_timeout_seconds = 60
+orchestrator_execution_heartbeat_interval_seconds = 30
+orchestrator_execution_heartbeat_timeout_seconds = 90
+orchestrator_execution_unknown_capacity_hold_seconds = 3600
+orchestrator_resume_wait_timeout_seconds = 60
+
 [llmwiki]
 host = "http://127.0.0.1"
 port = 8100
@@ -335,7 +356,9 @@ drop_msg_timeout = 60
 max_retries = 3
 retry_interval = 1
 health_interval = 5
-line_separator= "\\n"
+line_separator = "\\n"
+max_store_time_day = 7
+query_last_report_timeout = 10
 
 [git]
 operation_timeout = 10

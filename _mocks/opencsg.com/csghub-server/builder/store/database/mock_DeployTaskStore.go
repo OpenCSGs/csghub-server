@@ -555,6 +555,65 @@ func (_c *MockDeployTaskStore_FindActiveSandboxByDeployName_Call) RunAndReturn(r
 	return _c
 }
 
+// FindActiveSandboxByResourceKey provides a mock function with given fields: ctx, resourceKey
+func (_m *MockDeployTaskStore) FindActiveSandboxByResourceKey(ctx context.Context, resourceKey string) (*database.Deploy, error) {
+	ret := _m.Called(ctx, resourceKey)
+
+	if len(ret) == 0 {
+		panic("no return value specified for FindActiveSandboxByResourceKey")
+	}
+
+	var r0 *database.Deploy
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*database.Deploy, error)); ok {
+		return rf(ctx, resourceKey)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) *database.Deploy); ok {
+		r0 = rf(ctx, resourceKey)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*database.Deploy)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, resourceKey)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockDeployTaskStore_FindActiveSandboxByResourceKey_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FindActiveSandboxByResourceKey'
+type MockDeployTaskStore_FindActiveSandboxByResourceKey_Call struct {
+	*mock.Call
+}
+
+// FindActiveSandboxByResourceKey is a helper method to define mock.On call
+//   - ctx context.Context
+//   - resourceKey string
+func (_e *MockDeployTaskStore_Expecter) FindActiveSandboxByResourceKey(ctx interface{}, resourceKey interface{}) *MockDeployTaskStore_FindActiveSandboxByResourceKey_Call {
+	return &MockDeployTaskStore_FindActiveSandboxByResourceKey_Call{Call: _e.mock.On("FindActiveSandboxByResourceKey", ctx, resourceKey)}
+}
+
+func (_c *MockDeployTaskStore_FindActiveSandboxByResourceKey_Call) Run(run func(ctx context.Context, resourceKey string)) *MockDeployTaskStore_FindActiveSandboxByResourceKey_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockDeployTaskStore_FindActiveSandboxByResourceKey_Call) Return(_a0 *database.Deploy, _a1 error) *MockDeployTaskStore_FindActiveSandboxByResourceKey_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockDeployTaskStore_FindActiveSandboxByResourceKey_Call) RunAndReturn(run func(context.Context, string) (*database.Deploy, error)) *MockDeployTaskStore_FindActiveSandboxByResourceKey_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // FindByDeployNameAndType provides a mock function with given fields: ctx, uuid, deployName, deployType
 func (_m *MockDeployTaskStore) FindByDeployNameAndType(ctx context.Context, uuid string, deployName string, deployType int) (*database.Deploy, error) {
 	ret := _m.Called(ctx, uuid, deployName, deployType)
@@ -612,6 +671,65 @@ func (_c *MockDeployTaskStore_FindByDeployNameAndType_Call) Return(_a0 *database
 }
 
 func (_c *MockDeployTaskStore_FindByDeployNameAndType_Call) RunAndReturn(run func(context.Context, string, string, int) (*database.Deploy, error)) *MockDeployTaskStore_FindByDeployNameAndType_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// FindLatestSandboxByResourceKey provides a mock function with given fields: ctx, resourceKey
+func (_m *MockDeployTaskStore) FindLatestSandboxByResourceKey(ctx context.Context, resourceKey string) (*database.Deploy, error) {
+	ret := _m.Called(ctx, resourceKey)
+
+	if len(ret) == 0 {
+		panic("no return value specified for FindLatestSandboxByResourceKey")
+	}
+
+	var r0 *database.Deploy
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*database.Deploy, error)); ok {
+		return rf(ctx, resourceKey)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) *database.Deploy); ok {
+		r0 = rf(ctx, resourceKey)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*database.Deploy)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, resourceKey)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockDeployTaskStore_FindLatestSandboxByResourceKey_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FindLatestSandboxByResourceKey'
+type MockDeployTaskStore_FindLatestSandboxByResourceKey_Call struct {
+	*mock.Call
+}
+
+// FindLatestSandboxByResourceKey is a helper method to define mock.On call
+//   - ctx context.Context
+//   - resourceKey string
+func (_e *MockDeployTaskStore_Expecter) FindLatestSandboxByResourceKey(ctx interface{}, resourceKey interface{}) *MockDeployTaskStore_FindLatestSandboxByResourceKey_Call {
+	return &MockDeployTaskStore_FindLatestSandboxByResourceKey_Call{Call: _e.mock.On("FindLatestSandboxByResourceKey", ctx, resourceKey)}
+}
+
+func (_c *MockDeployTaskStore_FindLatestSandboxByResourceKey_Call) Run(run func(ctx context.Context, resourceKey string)) *MockDeployTaskStore_FindLatestSandboxByResourceKey_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockDeployTaskStore_FindLatestSandboxByResourceKey_Call) Return(_a0 *database.Deploy, _a1 error) *MockDeployTaskStore_FindLatestSandboxByResourceKey_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockDeployTaskStore_FindLatestSandboxByResourceKey_Call) RunAndReturn(run func(context.Context, string) (*database.Deploy, error)) *MockDeployTaskStore_FindLatestSandboxByResourceKey_Call {
 	_c.Call.Return(run)
 	return _c
 }

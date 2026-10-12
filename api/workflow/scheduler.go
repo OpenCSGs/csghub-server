@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	CronJobQueueName      = "workflow_cron_queue"
+	CronJobQueueName      = types.AgentAllocationDispatchTaskQueue
 	BatchMigrateQueueName = "workflow_batch_migrate_queue"
 )
 

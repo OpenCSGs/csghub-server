@@ -148,6 +148,8 @@ type DeployTaskStore interface {
 	FindByDeployNameAndType(ctx context.Context, uuid, deployName string, deployType int) (*Deploy, error)
 	FindActiveDeployByNameAndType(ctx context.Context, userUUID, deployName string, deployType int) (*Deploy, error)
 	FindActiveSandboxByDeployName(ctx context.Context, uuid, deployName string) (*Deploy, error)
+	FindActiveSandboxByResourceKey(ctx context.Context, resourceKey string) (*Deploy, error)
+	FindLatestSandboxByResourceKey(ctx context.Context, resourceKey string) (*Deploy, error)
 	CountRunningDeploysByNodeName(ctx context.Context, nodeName string) (int, error)
 	ListDeploysNeedingReconcile(ctx context.Context, statuses []int, timeoutMin int, limit int) ([]Deploy, error)
 	CountByRepoID(ctx context.Context, repoID int64) (int, error)
@@ -927,6 +929,47 @@ func (s *deployTaskStoreImpl) FindActiveSandboxByDeployName(ctx context.Context,
 		Order("id DESC").
 		Limit(1).
 		Scan(ctx, &result)
+	if err != nil {
+		err = errorx.HandleDBError(err, nil)
+		if errors.Is(err, errorx.ErrDatabaseNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &result, nil
+}
+
+// FindActiveSandboxByResourceKey performs the global collision check required
+// for orchestrated resource keys. Ownership is verified separately from the
+// persisted allocation annotations; the key alone never authorizes adoption.
+func (s *deployTaskStoreImpl) FindActiveSandboxByResourceKey(ctx context.Context, resourceKey string) (*Deploy, error) {
+	if strings.TrimSpace(resourceKey) == "" {
+		return nil, errorx.BadRequest(errors.New("sandbox resource key is required"), nil)
+	}
+	var result Deploy
+	err := s.db.Operator.Core.NewSelect().Model(&result).
+		Where("(deploy_name = ? OR svc_name = ?) AND type IN (?) AND status != ?", resourceKey, resourceKey,
+			bun.In([]int{types.SandboxType, types.SandboxEphemeralType}), common.Deleted).
+		Order("id DESC").Limit(1).Scan(ctx, &result)
+	if err != nil {
+		err = errorx.HandleDBError(err, nil)
+		if errors.Is(err, errorx.ErrDatabaseNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &result, nil
+}
+
+func (s *deployTaskStoreImpl) FindLatestSandboxByResourceKey(ctx context.Context, resourceKey string) (*Deploy, error) {
+	if strings.TrimSpace(resourceKey) == "" {
+		return nil, errorx.BadRequest(errors.New("sandbox resource key is required"), nil)
+	}
+	var result Deploy
+	err := s.db.Operator.Core.NewSelect().Model(&result).
+		Where("(deploy_name = ? OR svc_name = ?) AND type IN (?)", resourceKey, resourceKey,
+			bun.In([]int{types.SandboxType, types.SandboxEphemeralType})).
+		Order("id DESC").Limit(1).Scan(ctx, &result)
 	if err != nil {
 		err = errorx.HandleDBError(err, nil)
 		if errors.Is(err, errorx.ErrDatabaseNoRows) {

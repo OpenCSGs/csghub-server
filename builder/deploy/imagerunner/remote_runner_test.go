@@ -17,6 +17,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	mockdb "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/types"
 	runnerTypes "opencsg.com/csghub-server/runner/types"
@@ -29,6 +30,46 @@ type mockHTTPClient struct {
 
 func (m *mockHTTPClient) Do(req *http.Request) (*http.Response, error) {
 	return m.doFunc(req)
+}
+
+func TestRemoteRunnerGetSandboxDecodesResponseEnvelope(t *testing.T) {
+	expected := &runnerTypes.SandboxDetail{
+		ID: "agent-alloc-1", Status: 5,
+		Annotations: map[string]string{"agent_allocation_id": "1"},
+	}
+	runner := &RemoteRunner{
+		remote: &url.URL{Scheme: "http", Host: "runner.example.com"},
+		config: common.DeployConfig{APIKey: "runner-token"},
+		client: &mockHTTPClient{doFunc: func(req *http.Request) (*http.Response, error) {
+			require.Equal(t, "/api/v1/sandboxes", req.URL.Path)
+			require.Equal(t, "agent-alloc-1", req.URL.Query().Get("sandbox_name"))
+			require.Equal(t, "Bearer runner-token", req.Header.Get("Authorization"))
+			body, err := json.Marshal(map[string]any{"msg": "OK", "data": expected})
+			require.NoError(t, err)
+			return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(bytes.NewReader(body))}, nil
+		}},
+	}
+
+	actual, err := runner.GetSandbox(context.Background(), "", "agent-alloc-1")
+
+	require.NoError(t, err)
+	require.Equal(t, expected, actual)
+}
+
+func TestRemoteRunnerGetSandboxRejectsEmptyEnvelope(t *testing.T) {
+	runner := &RemoteRunner{
+		remote: &url.URL{Scheme: "http", Host: "runner.example.com"},
+		client: &mockHTTPClient{doFunc: func(*http.Request) (*http.Response, error) {
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader(`{"msg":"OK"}`)),
+			}, nil
+		}},
+	}
+
+	_, err := runner.GetSandbox(context.Background(), "", "agent-alloc-1")
+
+	require.ErrorContains(t, err, "empty sandbox response")
 }
 
 func TestRemoteRunner_insideCluster_Status(t *testing.T) {

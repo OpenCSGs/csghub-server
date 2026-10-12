@@ -28,6 +28,7 @@ type kserviceExecutorImpl struct {
 	cfg                   *config.Config
 	deployTaskStore       database.DeployTaskStore
 	namespaceStore        database.NamespaceStore
+	orchestratorStore     database.AgentOrchestratorStore
 	notificationSvcClient rpc.NotificationSvcClient
 }
 
@@ -40,6 +41,7 @@ func NewKServiceExecutor(config *config.Config) (KServiceExecutor, error) {
 		cfg:                   config,
 		deployTaskStore:       database.NewDeployTaskStore(),
 		namespaceStore:        database.NewNamespaceStore(),
+		orchestratorStore:     database.NewAgentOrchestratorStore(),
 		notificationSvcClient: notificationSvcClient,
 	}
 	// register the kservice executor for webhook callback func ProcessEvent
@@ -146,6 +148,18 @@ func (k *kserviceExecutorImpl) updateDeployStatus(ctx context.Context, event *ty
 	if event.Status == common.Stopped {
 		deploy.Instances = []types.Instance{}
 	}
+
+	if event.Status == common.Sleeping {
+		// Record the allocation transition before persisting Sleeping. If this
+		// fails, leaving the previous deploy status intact keeps the webhook
+		// retry actionable. Recording is idempotent, so it is safe to repeat if
+		// the subsequent deploy update fails. Non-orchestrated deploys have no
+		// allocation and are ignored by the store.
+		if err := k.orchestratorStore.RecordAllocationSuspended(ctx, deploy.ID); err != nil {
+			return fmt.Errorf("failed to record allocation suspension for deploy %d in webhook error: %w", deploy.ID, err)
+		}
+	}
+
 	err = k.deployTaskStore.UpdateDeploy(ctx, deploy)
 	if err != nil {
 		return fmt.Errorf("failed to update deploy %s status %d in webhook error: %w", event.ServiceName, event.Status, err)

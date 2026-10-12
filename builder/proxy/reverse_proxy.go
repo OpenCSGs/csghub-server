@@ -3,6 +3,7 @@ package proxy
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"net/http/httputil"
@@ -15,6 +16,11 @@ import (
 
 type ReverseProxy interface {
 	ServeHTTP(w http.ResponseWriter, r *http.Request, api, svcHost string)
+}
+
+type ErrorReportingReverseProxy interface {
+	ReverseProxy
+	ServeHTTPWithError(w http.ResponseWriter, r *http.Request, api, svcHost string) error
 }
 
 type reverseProxyImpl struct {
@@ -68,13 +74,19 @@ func NewReverseProxy(target string, opts ...ReverseProxyOption) (ReverseProxy, e
 }
 
 func (rp *reverseProxyImpl) ServeHTTP(w http.ResponseWriter, r *http.Request, api, svcHost string) {
+	_ = rp.ServeHTTPWithError(w, r, api, svcHost)
+}
+
+func (rp *reverseProxyImpl) ServeHTTPWithError(w http.ResponseWriter, r *http.Request, api, svcHost string) (proxyErr error) {
 	defer func() {
-		if r := recover(); r != nil {
-			slog.Debug("Connection to target server interrupted", slog.Any("error", r))
+		if recovered := recover(); recovered != nil {
+			proxyErr = fmt.Errorf("connection to target server interrupted: %v", recovered)
+			slog.Debug("Connection to target server interrupted", slog.Any("error", recovered))
 		}
 	}()
 	proxy := httputil.NewSingleHostReverseProxy(rp.target)
 	proxy.ErrorHandler = func(rw http.ResponseWriter, req *http.Request, err error) {
+		proxyErr = err
 		if errors.Is(err, context.Canceled) {
 			slog.InfoContext(context.WithoutCancel(req.Context()), "http: proxy request canceled", slog.Any("error", err))
 			rw.WriteHeader(commonutils.StatusClientClosedRequest)
@@ -147,4 +159,5 @@ func (rp *reverseProxyImpl) ServeHTTP(w http.ResponseWriter, r *http.Request, ap
 		return nil
 	}
 	proxy.ServeHTTP(w, r)
+	return proxyErr
 }

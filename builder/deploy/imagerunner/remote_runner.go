@@ -605,11 +605,16 @@ func (h *RemoteRunner) GetSandbox(ctx context.Context, clusterID, sandboxName st
 		return nil, fmt.Errorf("unexpected http status: %d", resp.StatusCode)
 	}
 
-	var res runnerTypes.SandboxDetail
+	var res struct {
+		Data *runnerTypes.SandboxDetail `json:"data"`
+	}
 	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
 		return nil, errorx.InternalServerError(err, nil)
 	}
-	return &res, nil
+	if res.Data == nil || res.Data.ID == "" {
+		return nil, fmt.Errorf("runner returned an empty sandbox response")
+	}
+	return res.Data, nil
 }
 
 func (h *RemoteRunner) CreateDataflowWorkflow(ctx context.Context, req *types.DataflowArgoJobReq) (*types.DataflowArgoJobResp, error) {
@@ -644,7 +649,6 @@ func (h *RemoteRunner) DeleteDataflowWorkflow(ctx context.Context, req *types.Da
 	defer response.Body.Close()
 	return nil
 }
-
 
 func (h *RemoteRunner) BatchStatus(ctx context.Context, req *runnerTypes.BatchStatusRequest) (*runnerTypes.BatchStatusResponse, error) {
 	remote, err := h.GetRemoteRunnerHost(ctx, req.ClusterID)

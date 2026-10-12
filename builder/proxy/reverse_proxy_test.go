@@ -24,7 +24,7 @@ func TestReverseProxy_AcceptEncodingDefaultGzip(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	resp := httptest.NewRecorder()
-	rp.ServeHTTP(resp, req, "", "")
+	require.NoError(t, serveHTTPWithError(t, rp, resp, req))
 
 	require.Equal(t, http.StatusOK, resp.Code)
 	require.Equal(t, "gzip", downstreamAcceptEncoding)
@@ -44,7 +44,7 @@ func TestReverseProxy_AcceptEncodingDisabled(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("Accept-Encoding", "br")
 	resp := httptest.NewRecorder()
-	rp.ServeHTTP(resp, req, "", "")
+	require.NoError(t, serveHTTPWithError(t, rp, resp, req))
 
 	require.Equal(t, http.StatusOK, resp.Code)
 	require.Equal(t, "identity", downstreamAcceptEncoding)
@@ -68,7 +68,7 @@ func TestReverseProxy_RemovesConfiguredRequestHeaders(t *testing.T) {
 	req.Header.Set("Cookie", "session=secret")
 	req.Header.Set("X-Preserved", "value")
 	resp := httptest.NewRecorder()
-	rp.ServeHTTP(resp, req, "", "")
+	require.NoError(t, serveHTTPWithError(t, rp, resp, req))
 
 	require.Equal(t, http.StatusOK, resp.Code)
 	require.Empty(t, authorization)
@@ -97,7 +97,7 @@ func TestReverseProxy_AppliesResponseModifiersInOrder(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	resp := httptest.NewRecorder()
-	rp.ServeHTTP(resp, req, "", "")
+	require.NoError(t, serveHTTPWithError(t, rp, resp, req))
 
 	require.Equal(t, http.StatusAccepted, resp.Code)
 	require.Equal(t, "initial-first-second", resp.Header().Get("X-Value"))
@@ -116,7 +116,7 @@ func TestReverseProxy_ResponseModifierErrorWritesBadGateway(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	resp := httptest.NewRecorder()
-	rp.ServeHTTP(resp, req, "", "")
+	require.ErrorContains(t, serveHTTPWithError(t, rp, resp, req), "invalid upstream response")
 
 	require.Equal(t, http.StatusBadGateway, resp.Code)
 }
@@ -134,9 +134,16 @@ func TestReverseProxy_ContextCanceledWritesClientClosed(t *testing.T) {
 	cancel()
 	req := httptest.NewRequest(http.MethodGet, "/", nil).WithContext(ctx)
 	resp := httptest.NewRecorder()
-	rp.ServeHTTP(resp, req, "", "")
+	require.ErrorIs(t, serveHTTPWithError(t, rp, resp, req), context.Canceled)
 
 	require.Equal(t, commonutils.StatusClientClosedRequest, resp.Code)
+}
+
+func serveHTTPWithError(t *testing.T, rp ReverseProxy, w http.ResponseWriter, r *http.Request) error {
+	t.Helper()
+	errorReportingProxy, ok := rp.(ErrorReportingReverseProxy)
+	require.True(t, ok)
+	return errorReportingProxy.ServeHTTPWithError(w, r, "", "")
 }
 
 // import (

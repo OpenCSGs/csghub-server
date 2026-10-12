@@ -28,9 +28,21 @@ type clientImpl struct {
 	workers []worker.Worker
 }
 
-var _client Client = &clientImpl{}
+var _client = &clientImpl{}
 
 func NewClient(options client.Options, serviceName string) (*clientImpl, error) {
+	return newClient(options, serviceName, false)
+}
+
+func NewLazyClient(options client.Options, serviceName string) (*clientImpl, error) {
+	return newClient(options, serviceName, true)
+}
+
+func newClient(options client.Options, serviceName string, lazy bool) (*clientImpl, error) {
+	if _client.Client != nil {
+		return _client, nil
+	}
+
 	tracingInterceptor, err := opentelemetry.NewTracingInterceptor(opentelemetry.TracerOptions{
 		Tracer: otel.Tracer(serviceName),
 	})
@@ -39,21 +51,23 @@ func NewClient(options client.Options, serviceName string) (*clientImpl, error) 
 	}
 	options.Interceptors = []interceptor.ClientInterceptor{tracingInterceptor}
 
-	t, err := client.Dial(options)
+	var t client.Client
+	if lazy {
+		t, err = client.NewLazyClient(options)
+	} else {
+		t, err = client.Dial(options)
+	}
 	if err != nil {
 		return nil, err
 	}
-	c := _client.(*clientImpl)
-	c.Client = t
+	_client.Client = t
 
-	return c, nil
+	return _client, nil
 }
 
 // used in test only
 func Assign(temporalClient client.Client) {
-	c := _client.(*clientImpl)
-	c.Client = temporalClient
-
+	_client.Client = temporalClient
 }
 
 func (c *clientImpl) NewWorker(queue string, options worker.Options) worker.Registry {
@@ -87,6 +101,16 @@ func (c *clientImpl) Stop() {
 }
 
 func GetClient() Client {
+	if _client.Client == nil {
+		panic("temporal client is not initialized")
+	}
+	return _client
+}
+
+func GetClientIfInitialized() Client {
+	if _client.Client == nil {
+		return nil
+	}
 	return _client
 }
 

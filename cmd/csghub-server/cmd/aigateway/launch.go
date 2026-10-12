@@ -4,15 +4,19 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-
-	"opencsg.com/csghub-server/builder/instrumentation"
+	"time"
 
 	"github.com/spf13/cobra"
+	"go.temporal.io/sdk/client"
+	"go.temporal.io/sdk/log"
+
 	"opencsg.com/csghub-server/aigateway/component/upstream"
 	"opencsg.com/csghub-server/aigateway/router"
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/builder/event"
+	"opencsg.com/csghub-server/builder/instrumentation"
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/builder/temporal"
 	"opencsg.com/csghub-server/common/config"
 )
 
@@ -42,6 +46,17 @@ var cmdLaunch = &cobra.Command{
 		if err != nil {
 			panic(err)
 		}
+		allocationDispatchClient, err := temporal.NewLazyClient(client.Options{
+			HostPort: cfg.WorkFLow.Endpoint,
+			Logger:   log.NewStructuredLogger(slog.Default()),
+			ConnectionOptions: client.ConnectionOptions{
+				GetSystemInfoTimeout: time.Duration(cfg.Temporal.GetSystemInfoTimeout) * time.Second,
+			},
+		}, instrumentation.Aigateway)
+		if err != nil {
+			slog.Warn("agent allocation immediate dispatch is unavailable", slog.Any("error", err))
+			allocationDispatchClient = nil
+		}
 
 		err = event.InitEventPublisher(cfg)
 		if err != nil {
@@ -65,6 +80,12 @@ var cmdLaunch = &cobra.Command{
 			},
 			r,
 		)
+		if cleanup != nil {
+			server.RegisterOnShutdown(cleanup)
+		}
+		if allocationDispatchClient != nil {
+			server.RegisterOnShutdown(allocationDispatchClient.Stop)
+		}
 		server.RegisterOnShutdown(upstreamSyncConsumer.Stop)
 		slog.Info("http server is running", slog.Any("port", cfg.AIGateway.Port))
 		server.Run()

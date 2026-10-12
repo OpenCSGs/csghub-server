@@ -37,6 +37,9 @@ var LaunchDeployBenchmark LaunchDeployBenchmarkFunc
 
 type Deployer interface {
 	SandboxV2Deployer
+	// Prepare persists a deploy and its build/run tasks without starting a
+	// workflow. Durable orchestrators use it so their own workflow owns launch.
+	Prepare(ctx context.Context, dr types.DeployRequest) (buildTask, runTask *database.DeployTask, err error)
 	Deploy(ctx context.Context, dr types.DeployRequest) (deployID int64, err error)
 	Status(ctx context.Context, dr types.DeployRequest, needDetails bool) (srvName string, status int, instances []types.Instance, err error)
 	Logs(ctx context.Context, dr types.DeployRequest) (*MultiLogReader, error)
@@ -246,16 +249,27 @@ func (d *deployer) buildDeploy(ctx context.Context, dr types.DeployRequest) (*da
 }
 
 func (d *deployer) Deploy(ctx context.Context, dr types.DeployRequest) (int64, error) {
+	buildTask, runTask, err := d.Prepare(ctx, dr)
+	if err != nil {
+		return -1, err
+	}
+
+	go DeployWorkflow(buildTask, runTask)
+	d.reportDeployPrepared(buildTask)
+	return runTask.DeployID, nil
+}
+
+func (d *deployer) Prepare(ctx context.Context, dr types.DeployRequest) (*database.DeployTask, *database.DeployTask, error) {
 	//check reserved resource
 	err := d.checkOrderDetail(ctx, dr)
 	if err != nil {
-		return -1, err
+		return nil, nil, err
 	}
 
 	deploy, err := d.buildDeploy(ctx, dr)
 	slog.Debug("do deployer.Deploy", slog.Any("dr", dr), slog.Any("deploy", deploy))
 	if err != nil || deploy == nil {
-		return -1, fmt.Errorf("failed to create deploy in db, %w", err)
+		return nil, nil, fmt.Errorf("failed to create deploy in db, %w", err)
 	}
 
 	bldTaskStatus := common.TaskStatusBuildPending
@@ -277,7 +291,7 @@ func (d *deployer) Deploy(ctx context.Context, dr types.DeployRequest) (int64, e
 	}
 	err = d.deployTaskStore.CreateDeployTask(ctx, buildTask)
 	if err != nil {
-		return -1, fmt.Errorf("create build task for repo %d failed: %w", dr.RepoID, err)
+		return nil, nil, fmt.Errorf("create build task for repo %d failed: %w", dr.RepoID, err)
 	}
 	runTask := &database.DeployTask{
 		DeployID: deploy.ID,
@@ -285,14 +299,17 @@ func (d *deployer) Deploy(ctx context.Context, dr types.DeployRequest) (int64, e
 	}
 	err = d.deployTaskStore.CreateDeployTask(ctx, runTask)
 	if err != nil {
-		return -1, fmt.Errorf("create deploy task for repo %d failed: %w", dr.RepoID, err)
+		return nil, nil, fmt.Errorf("create deploy task for repo %d failed: %w", dr.RepoID, err)
 	}
 
 	buildTask.Deploy = deploy
 	runTask.Deploy = deploy
 
-	go DeployWorkflow(buildTask, runTask)
+	return buildTask, runTask, nil
+}
 
+func (d *deployer) reportDeployPrepared(buildTask *database.DeployTask) {
+	deploy := buildTask.Deploy
 	d.logReporter.Report(types.LogEntry{
 		Message:  types.PreBuildSubmit.String(),
 		DeployID: strconv.FormatInt(deploy.ID, 10),
@@ -304,7 +321,6 @@ func (d *deployer) Deploy(ctx context.Context, dr types.DeployRequest) (int64, e
 			types.StreamKeyDeployTaskID: strconv.FormatInt(buildTask.ID, 10),
 		},
 	})
-	return deploy.ID, nil
 }
 
 func (d *deployer) Status(ctx context.Context, dr types.DeployRequest, needDetails bool) (string, int, []types.Instance, error) {

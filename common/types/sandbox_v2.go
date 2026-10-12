@@ -11,6 +11,18 @@ package types
 // route proxy requests to the V2 runner endpoint instead of the V1 one.
 const SandboxV2RuntimeFramework = "sandbox-v2"
 
+const AgentOrchestratedRuntimeResourcePrefix = "aor-"
+
+// Agent runtime annotations carry immutable orchestrator ownership and policy
+// through the deploy workflow and onto the Sandbox workload.
+const (
+	AgentAllocationIDAnnotation      = "agent_allocation_id"
+	AgentRuntimeGenerationAnnotation = "agent_runtime_generation"
+	AgentOperationKeyAnnotation      = "agent_operation_key"
+	AgentBlueprintSHAAnnotation      = "agent_blueprint_sha256"
+	AgentStoragePolicyAnnotation     = "agent_storage_policy"
+)
+
 // SandboxV2CreateRequest is the component-layer create request for a sandbox-v2
 // sandbox. It deliberately does NOT carry resource-derived fields (Hardware,
 // ClusterID, SKU): those are resolved inside SandboxV2Component.Create from
@@ -34,6 +46,49 @@ type SandboxV2CreateRequest struct {
 	VolumeMounts    []VolumeMount          `json:"volume_mounts,omitempty"`
 	MinReplica      int                    `json:"min_replica,omitempty"`
 	MaxReplica      int                    `json:"max_replica,omitempty"`
+}
+
+// SandboxV2EnsurePersistentRequest identifies an orchestrated sandbox by an
+// immutable allocation identity. DeployName and SvcName are derived from
+// ResourceKey; callers cannot choose an unrelated sandbox to adopt.
+type SandboxV2EnsurePersistentRequest struct {
+	ResourceKey       string                 `json:"resource_key"`
+	AllocationID      int64                  `json:"allocation_id"`
+	RuntimeGeneration int64                  `json:"runtime_generation"`
+	OperationKey      string                 `json:"operation_key"`
+	BlueprintSHA256   string                 `json:"blueprint_sha256"`
+	StoragePolicy     AgentStoragePolicy     `json:"storage_policy"`
+	Create            SandboxV2CreateRequest `json:"create"`
+}
+
+// SandboxV2EnsurePersistentResult is deliberately a prepared lifecycle result:
+// no deployment workflow is launched by EnsurePersistent. The allocation
+// workflow owns execution of the returned build/run tasks.
+type SandboxV2EnsurePersistentResult struct {
+	DeployID    int64 `json:"deploy_id"`
+	BuildTaskID int64 `json:"build_task_id"`
+	RunTaskID   int64 `json:"run_task_id"`
+	Adopted     bool  `json:"adopted"`
+}
+
+type SandboxV2InspectPersistentRequest struct {
+	ResourceKey       string             `json:"resource_key"`
+	DeployID          int64              `json:"deploy_id"`
+	AllocationID      int64              `json:"allocation_id"`
+	RuntimeGeneration int64              `json:"runtime_generation"`
+	OperationKey      string             `json:"operation_key"`
+	BlueprintSHA256   string             `json:"blueprint_sha256"`
+	StoragePolicy     AgentStoragePolicy `json:"storage_policy"`
+	UserUUID          string             `json:"user_uuid"`
+}
+
+// SandboxV2DeletePersistentRequest identifies an allocation-owned sandbox for
+// deletion. RuntimeGeneration and operation identity are deliberately omitted:
+// deletion owns every generation created for the allocation.
+type SandboxV2DeletePersistentRequest struct {
+	ResourceKey  string `json:"resource_key"`
+	AllocationID int64  `json:"allocation_id"`
+	UserUUID     string `json:"user_uuid"`
 }
 
 type SandboxV2Type string

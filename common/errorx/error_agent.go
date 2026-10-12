@@ -34,6 +34,10 @@ const (
 	knowledgeBaseContentIDInvalid
 	csgclawSubdomainInvalid
 	csgclawAgentNameInvalid
+	agentAllocationLifecycleConflict
+	agentExecutionSessionBusy
+	agentExecutionCapacityExceeded
+	agentGuestUsageLimitExceeded
 )
 
 var (
@@ -412,6 +416,58 @@ var (
 	//
 	// zh-HK: 無效的知識庫內容ID: {{.content_id}}
 	ErrKnowledgeBaseContentIDInvalid error = CustomError{prefix: errAgentPrefix, code: knowledgeBaseContentIDInvalid}
+
+	// agent allocation lifecycle conflicts with the requested operation
+	//
+	// Description: The agent allocation cannot accept the requested operation because it is deleting, released, or otherwise incompatible with the current lifecycle state.
+	//
+	// Description_ZH: 智能体分配当前处于删除、已释放或其他不兼容的生命周期状态，无法接受请求的操作。
+	//
+	// en-US: Agent runtime lifecycle conflict
+	//
+	// zh-CN: 智能体运行时生命周期冲突
+	//
+	// zh-HK: 智能體運行時生命週期衝突
+	ErrAgentAllocationLifecycleConflict error = CustomError{prefix: errAgentPrefix, code: agentAllocationLifecycleConflict}
+
+	// the session already has an active execution
+	//
+	// Description: The agent session already has an active execution. Overlapping turns within one session are not allowed; wait for the current execution to finish or resolve it.
+	//
+	// Description_ZH: 该智能体会话已有正在进行的执行。同一会话内不允许重叠执行，请等待当前执行完成或将其解决。
+	//
+	// en-US: Agent session already has an active execution
+	//
+	// zh-CN: 智能体会话已有正在进行的执行
+	//
+	// zh-HK: 智能體會話已有正在進行的執行
+	ErrAgentExecutionSessionBusy error = CustomError{prefix: errAgentPrefix, code: agentExecutionSessionBusy}
+
+	// the runtime reached its concurrent execution capacity
+	//
+	// Description: The agent runtime reached its concurrent execution capacity across sessions. Retry after a short delay.
+	//
+	// Description_ZH: 智能体运行时的跨会话并发执行已达容量上限，请稍后重试。
+	//
+	// en-US: Agent runtime execution capacity exhausted
+	//
+	// zh-CN: 智能体运行时执行容量已耗尽
+	//
+	// zh-HK: 智能體運行時執行容量已耗盡
+	ErrAgentExecutionCapacityExceeded error = CustomError{prefix: errAgentPrefix, code: agentExecutionCapacityExceeded}
+
+	// the anonymous guest reached the publisher's per-guest question limit
+	//
+	// Description: This anonymous visitor has used all allowed questions for this agent. Clear local storage or wait for the publisher to raise the limit.
+	//
+	// Description_ZH: 该匿名访客已用尽此智能体的提问次数。清除本地存储或等待发布者提高限额。
+	//
+	// en-US: Guest usage limit exceeded
+	//
+	// zh-CN: 访客使用次数已达上限
+	//
+	// zh-HK: 訪客使用次數已達上限
+	ErrAgentGuestUsageLimitExceeded error = CustomError{prefix: errAgentPrefix, code: agentGuestUsageLimitExceeded}
 )
 
 func InstanceQuotaExceeded(err error, ctx context) error {
@@ -650,5 +706,41 @@ func AgentTemplateSensitiveCheckMakePublicPending(err error, ctx context) error 
 		context: ctx,
 		err:     err,
 		code:    int(agentTemplateSensitiveCheckMakePublicPending),
+	}
+}
+
+func AgentAllocationLifecycleConflict(err error, ctx context) error {
+	return CustomError{
+		prefix:  errAgentPrefix,
+		context: ctx,
+		err:     err,
+		code:    int(agentAllocationLifecycleConflict),
+	}
+}
+
+func AgentExecutionSessionBusy(err error, ctx context) error {
+	return CustomError{
+		prefix:  errAgentPrefix,
+		context: ctx,
+		err:     err,
+		code:    int(agentExecutionSessionBusy),
+	}
+}
+
+func AgentExecutionCapacityExceeded(err error, ctx context) error {
+	return CustomError{
+		prefix:  errAgentPrefix,
+		context: ctx,
+		err:     err,
+		code:    int(agentExecutionCapacityExceeded),
+	}
+}
+
+func AgentGuestUsageLimitExceeded(err error, ctx context) error {
+	return CustomError{
+		prefix:  errAgentPrefix,
+		context: ctx,
+		err:     err,
+		code:    int(agentGuestUsageLimitExceeded),
 	}
 }
