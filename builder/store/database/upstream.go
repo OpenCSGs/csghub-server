@@ -16,24 +16,48 @@ import (
 type Upstream struct {
 	bun.BaseModel `bun:"table:ai_gateway_upstreams"`
 
-	ID                    int64                          `bun:",pk,autoincrement" json:"id"`
-	LLMConfigID           int64                          `bun:",notnull" json:"llm_config_id"`
-	URL                   string                         `bun:",notnull" json:"url"`
-	Weight                int                            `bun:",notnull,default:1" json:"weight"`
-	Enabled               bool                           `bun:",notnull,default:true" json:"enabled"`
-	ModelName             string                         `bun:",nullzero" json:"model_name"`
-	AuthHeader            string                         `bun:",nullzero" json:"auth_header"`
-	Provider              string                         `bun:",nullzero" json:"provider"`
-	HealthCheckEnabled    bool                           `bun:",notnull,default:false" json:"health_check_enabled"`
-	CircuitBreakerEnabled bool                           `bun:",notnull,default:false" json:"circuit_breaker_enabled"`
-	Source                types.UpstreamSource           `bun:",notnull,default:external" json:"source"`
-	SourceID              int64                          `bun:",notnull,default:0" json:"source_id"`
-	Tags                  map[string]string              `bun:",type:jsonb,nullzero" json:"tags,omitempty"`
-	Metadata              *types.UpstreamMetadata        `bun:",type:jsonb,nullzero" json:"metadata,omitempty"`
-	CapacityPolicy        *types.CapacityPolicy          `bun:",type:jsonb,nullzero" json:"capacity_policy,omitempty"`
-	HealthState           *AIGatewayUpstreamHealthState  `bun:"rel:has-one,join:id=upstream_id" json:"health_state,omitempty"`
-	CircuitState          *AIGatewayUpstreamCircuitState `bun:"rel:has-one,join:id=upstream_id" json:"circuit_state,omitempty"`
+	ID                    int64                `bun:",pk,autoincrement" json:"id"`
+	LLMConfigID           int64                `bun:",notnull" json:"llm_config_id"`
+	URL                   string               `bun:",notnull" json:"url"`
+	Weight                int                  `bun:",notnull,default:1" json:"weight"`
+	Enabled               bool                 `bun:",notnull,default:true" json:"enabled"`
+	ModelName             string               `bun:",nullzero" json:"model_name"`
+	AuthHeader            string               `bun:",nullzero" json:"auth_header"`
+	Provider              string               `bun:",nullzero" json:"provider"`
+	HealthCheckEnabled    bool                 `bun:",notnull,default:false" json:"health_check_enabled"`
+	CircuitBreakerEnabled bool                 `bun:",notnull,default:false" json:"circuit_breaker_enabled"`
+	Source                types.UpstreamSource `bun:",notnull,default:external" json:"source"`
+	SourceID              int64                `bun:",notnull,default:0" json:"source_id"`
+	// IsFullURL marks the URL as a complete endpoint URL that must be used
+	// as-is. When false, the URL is a base URL and the client protocol path
+	// is appended for natively supported API formats.
+	IsFullURL bool `bun:",notnull,default:false" json:"is_full_url"`
+	// SupportedEndpoints maps a protocol (chat/responses/messages) to an
+	// optional per-protocol endpoint URL; an empty value means "use the main
+	// URL field".
+	SupportedEndpoints map[types.ApiFormat]string     `bun:",type:jsonb,nullzero" json:"supported_endpoints,omitempty"`
+	Tags               map[string]string              `bun:",type:jsonb,nullzero" json:"tags,omitempty"`
+	Metadata           *types.UpstreamMetadata        `bun:",type:jsonb,nullzero" json:"metadata,omitempty"`
+	CapacityPolicy     *types.CapacityPolicy          `bun:",type:jsonb,nullzero" json:"capacity_policy,omitempty"`
+	HealthState        *AIGatewayUpstreamHealthState  `bun:"rel:has-one,join:id=upstream_id" json:"health_state,omitempty"`
+	CircuitState       *AIGatewayUpstreamCircuitState `bun:"rel:has-one,join:id=upstream_id" json:"circuit_state,omitempty"`
 	times
+}
+
+// EffectiveSampleEndpoint resolves the concrete endpoint a health check or
+// connection test should probe for this upstream (see
+// commontypes.ResolveSampleEndpoint): full URLs and URLs already carrying a
+// protocol path are used as-is; base URLs declared with API formats (or
+// CSGHub-hosted deploys, which default to chat) get the protocol's standard
+// path appended.
+func (u *Upstream) EffectiveSampleEndpoint() string {
+	return types.UpstreamConfig{
+		URL:                u.URL,
+		IsFullURL:          u.IsFullURL,
+		Source:             u.Source,
+		SupportedEndpoints: u.SupportedEndpoints,
+		Metadata:           u.Metadata,
+	}.EffectiveSampleEndpoint()
 }
 
 // UpstreamStore is the data access interface for upstreams.

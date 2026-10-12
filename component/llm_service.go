@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"math"
+	"net/url"
 	"strings"
 	"time"
 
@@ -398,6 +399,8 @@ func (s *llmServiceComponentImpl) CreateLLMConfig(ctx context.Context, req *type
 			ModelName:             strings.TrimSpace(u.ModelName),
 			AuthHeader:            u.AuthHeader,
 			Provider:              strings.TrimSpace(u.Provider),
+			IsFullURL:             u.IsFullURL,
+			SupportedEndpoints:    normalizeSupportedEndpoints(u.SupportedEndpoints),
 			HealthCheckEnabled:    u.HealthCheckEnabled,
 			CircuitBreakerEnabled: u.CircuitBreakerEnabled,
 			Source:                types.UpstreamSourceExternal,
@@ -495,6 +498,88 @@ func validateCapacityPolicy(p *types.CapacityPolicy) error {
 	return nil
 }
 
+// normalizeSupportedEndpoints lowercases and trims the declared per-protocol
+// endpoint map; an all-empty input yields nil so no empty jsonb object is
+// stored.
+func normalizeSupportedEndpoints(endpoints map[types.ApiFormat]string) map[types.ApiFormat]string {
+	if len(endpoints) == 0 {
+		return nil
+	}
+	out := make(map[types.ApiFormat]string, len(endpoints))
+	for key, value := range endpoints {
+		format := key.Normalized()
+		if format == "" {
+			continue
+		}
+		out[format] = strings.TrimSpace(value)
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+// validateAPIFormat checks the declared per-protocol endpoints
+// (supported_endpoints). Keys must be valid protocol names; values must be
+// empty (the main URL serves that protocol) or a valid http(s) URL.
+//
+// Two mode rules mirror the Edit Upstream dialog:
+//   - base-URL mode (!fullURL): the main URL must end at the version path —
+//     a URL ending in a recognizable protocol resource path (/chat/completions,
+//     /responses, /messages, /anthropic) is rejected, because the gateway
+//     would append the protocol path to it and produce a broken target.
+//     (Legacy backfilled rows carry is_full_url=true for such URLs, so they
+//     stay valid.)
+//   - full-URL mode: the main URL serves exactly one protocol and always
+//     routes as-is, so an OpenAI Responses declaration cannot rely on it
+//     (responses requests would be posted to the chat endpoint); responses
+//     must carry its own endpoint. At most one declared format may rely on
+//     the main URL (empty value) — additional formats need their own endpoint.
+func validateAPIFormat(upstreamURL string, fullURL bool, endpoints map[types.ApiFormat]string) error {
+	if !fullURL {
+		if _, ok := types.InferProtocolFromURLPath(upstreamURL); ok {
+			return fmt.Errorf("%w: base URL must not end with a protocol path (/chat/completions, /responses, /messages, /anthropic); fill the URL up to the version path and use is_full_url for a complete endpoint", ErrInvalidLLMConfig)
+		}
+	}
+	if len(endpoints) == 0 {
+		// Undeclared upstreams keep the legacy behavior (URL passthrough);
+		// the Edit Upstream dialog enforces the full-URL toggle for its
+		// Custom pseudo-format on top of this permissive backend rule.
+		return nil
+	}
+	emptyCount := 0
+	for key, value := range endpoints {
+		format := key.Normalized()
+		if !format.Routable() {
+			return fmt.Errorf("%w: supported_endpoints keys must be one of chat, responses, messages", ErrInvalidLLMConfig)
+		}
+		v := strings.TrimSpace(value)
+		if v == "" {
+			if fullURL && format == types.ApiFormatResponses {
+				// Exempt upstreams whose main URL IS a Responses endpoint
+				// (e.g. the migration-backfilled .../v1/responses rows):
+				// routing serves responses natively from that URL as-is, so
+				// the exclusivity rule (full URL = single chat endpoint)
+				// does not apply to them.
+				if inferred, _ := types.InferProtocolFromURLPath(upstreamURL); inferred != types.ApiFormatResponses {
+					return fmt.Errorf("%w: a full-URL upstream cannot serve OpenAI Responses from the main URL; give responses its own endpoint or use base-URL mode", ErrInvalidLLMConfig)
+				}
+			}
+			emptyCount++
+			continue
+		}
+		parsed, err := url.Parse(v)
+		if err != nil || parsed.Scheme == "" || parsed.Host == "" ||
+			(parsed.Scheme != "http" && parsed.Scheme != "https") {
+			return fmt.Errorf("%w: supported_endpoints[%s] must be a valid http(s) URL or empty", ErrInvalidLLMConfig, format)
+		}
+	}
+	if fullURL && emptyCount > 1 {
+		return fmt.Errorf("%w: a full-URL upstream serves a single protocol; at most one declared format may use the main URL without its own endpoint", ErrInvalidLLMConfig)
+	}
+	return nil
+}
+
 func (s *llmServiceComponentImpl) CreatePromptPrefix(ctx context.Context, req *types.CreatePromptPrefixReq) (*types.PromptPrefix, error) {
 	dbPromptPrefix := database.PromptPrefix{
 		ZH:   req.ZH,
@@ -577,6 +662,9 @@ func (s *llmServiceComponentImpl) validateLLMEndpointConfig(upstreams []types.Up
 		if err := validateCapacityPolicy(upstream.CapacityPolicy); err != nil {
 			return err
 		}
+		if err := validateAPIFormat(upstream.URL, upstream.IsFullURL, upstream.SupportedEndpoints); err != nil {
+			return err
+		}
 		if upstream.Enabled {
 			enabledCount++
 		}
@@ -640,7 +728,13 @@ func (s *llmServiceComponentImpl) CreateUpstream(ctx context.Context, req *types
 		return nil, fmt.Errorf("%w: upstream url cannot be empty", ErrInvalidLLMConfig)
 	}
 	if req.HealthCheckEnabled != nil {
-		if err := s.validateHealthCheckEndpoint(req.URL, *req.HealthCheckEnabled); err != nil {
+		createProbe := types.UpstreamConfig{
+			URL:                req.URL,
+			IsFullURL:          req.IsFullURL,
+			Source:             types.UpstreamSourceExternal,
+			SupportedEndpoints: req.SupportedEndpoints,
+		}
+		if err := s.validateHealthCheckEndpoint(createProbe, *req.HealthCheckEnabled); err != nil {
 			return nil, err
 		}
 	}
@@ -655,6 +749,9 @@ func (s *llmServiceComponentImpl) CreateUpstream(ctx context.Context, req *types
 	if err := validateCapacityPolicy(req.CapacityPolicy); err != nil {
 		return nil, err
 	}
+	if err := validateAPIFormat(req.URL, req.IsFullURL, req.SupportedEndpoints); err != nil {
+		return nil, err
+	}
 	dbUp := &database.Upstream{
 		LLMConfigID:           req.LLMConfigID,
 		URL:                   strings.TrimSpace(req.URL),
@@ -663,6 +760,8 @@ func (s *llmServiceComponentImpl) CreateUpstream(ctx context.Context, req *types
 		ModelName:             strings.TrimSpace(req.ModelName),
 		AuthHeader:            req.AuthHeader,
 		Provider:              strings.TrimSpace(req.Provider),
+		IsFullURL:             req.IsFullURL,
+		SupportedEndpoints:    normalizeSupportedEndpoints(req.SupportedEndpoints),
 		HealthCheckEnabled:    req.HealthCheckEnabled != nil && *req.HealthCheckEnabled,
 		CircuitBreakerEnabled: req.CircuitBreakerEnabled != nil && *req.CircuitBreakerEnabled,
 		Source:                types.UpstreamSourceExternal,
@@ -685,15 +784,42 @@ func (s *llmServiceComponentImpl) UpdateUpstream(ctx context.Context, req *types
 	if err != nil {
 		return nil, fmt.Errorf("upstream not found: %w", err)
 	}
+	// Protect source-owned fields on internal (csghub) upstreams.
+	// These fields are managed by the deploy sync and must not be overwritten
+	// by admin API updates. Only UI-configured fields are editable.
+	isCSGHubSource := dbUp.Source == types.UpstreamSourceCSGHubDeploy
+
 	effectiveURL := dbUp.URL
 	if req.URL != nil {
 		effectiveURL = strings.TrimSpace(*req.URL)
+	}
+	effectiveIsFullURL := dbUp.IsFullURL
+	effectiveSupported := dbUp.SupportedEndpoints
+	if isCSGHubSource {
+		// Source-owned probe fields are ignored for csghub upstreams, so the
+		// stored values — not the request's — decide whether the health
+		// check can probe the endpoint.
+		effectiveURL = dbUp.URL
+	} else {
+		if req.IsFullURL != nil {
+			effectiveIsFullURL = *req.IsFullURL
+		}
+		if req.SupportedEndpoints != nil {
+			effectiveSupported = normalizeSupportedEndpoints(*req.SupportedEndpoints)
+		}
 	}
 	effectiveHealthCheckEnabled := dbUp.HealthCheckEnabled
 	if req.HealthCheckEnabled != nil {
 		effectiveHealthCheckEnabled = *req.HealthCheckEnabled
 	}
-	if err := s.validateHealthCheckEndpoint(effectiveURL, effectiveHealthCheckEnabled); err != nil {
+	probe := types.UpstreamConfig{
+		URL:                effectiveURL,
+		IsFullURL:          effectiveIsFullURL,
+		Source:             dbUp.Source,
+		SupportedEndpoints: effectiveSupported,
+		Metadata:           dbUp.Metadata,
+	}
+	if err := s.validateHealthCheckEndpoint(probe, effectiveHealthCheckEnabled); err != nil {
 		return nil, err
 	}
 	// Snapshot old state to detect transitions
@@ -701,14 +827,22 @@ func (s *llmServiceComponentImpl) UpdateUpstream(ctx context.Context, req *types
 	wasHealthCheckEnabled := dbUp.HealthCheckEnabled
 	wasCircuitBreakerEnabled := dbUp.CircuitBreakerEnabled
 
-	// Protect source-owned fields on internal (csghub) upstreams.
-	// These fields are managed by the deploy sync and must not be overwritten
-	// by admin API updates. Only UI-configured fields are editable.
-	isCSGHubSource := dbUp.Source == types.UpstreamSourceCSGHubDeploy
-
 	// Apply partial updates
 	if req.URL != nil && !isCSGHubSource {
 		dbUp.URL = strings.TrimSpace(*req.URL)
+	}
+	if req.IsFullURL != nil && !isCSGHubSource {
+		dbUp.IsFullURL = *req.IsFullURL
+	}
+	if req.SupportedEndpoints != nil && !isCSGHubSource {
+		dbUp.SupportedEndpoints = normalizeSupportedEndpoints(*req.SupportedEndpoints)
+	}
+	// Re-validate the effective combination: an update may flip is_full_url while
+	// keeping the stored declaration (or vice versa).
+	if !isCSGHubSource {
+		if err := validateAPIFormat(dbUp.URL, dbUp.IsFullURL, dbUp.SupportedEndpoints); err != nil {
+			return nil, err
+		}
 	}
 	if req.Weight != nil {
 		dbUp.Weight = *req.Weight
@@ -885,6 +1019,8 @@ func buildUpstreamConfigs(dbUpstreams []database.Upstream) []types.UpstreamConfi
 			ModelName:             u.ModelName,
 			AuthHeader:            u.AuthHeader,
 			Provider:              u.Provider,
+			IsFullURL:             u.IsFullURL,
+			SupportedEndpoints:    u.SupportedEndpoints,
 			HealthCheckEnabled:    u.HealthCheckEnabled,
 			CircuitBreakerEnabled: u.CircuitBreakerEnabled,
 			Tags:                  u.Tags,

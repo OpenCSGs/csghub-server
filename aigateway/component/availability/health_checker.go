@@ -446,7 +446,10 @@ func (h *healthCheckerImpl) performL7APIChecks(ctx context.Context) {
 }
 
 func (h *healthCheckerImpl) performUpstreamHealthCheck(ctx context.Context, upstream *database.Upstream) {
-	provider, ok := h.getSampleRegistry().Find(upstream.URL)
+	// Base-URL upstreams (declared API formats without a protocol path) are
+	// probed at the declared protocol's standard path instead of the raw URL.
+	probeEndpoint := upstream.EffectiveSampleEndpoint()
+	provider, ok := h.getSampleRegistry().Find(probeEndpoint)
 	if !ok {
 		slog.InfoContext(ctx, "Skipping health check for unsupported upstream protocol",
 			"upstream_id", upstream.ID,
@@ -756,17 +759,18 @@ func (h *healthCheckerImpl) performSampleCheck(ctx context.Context, upstream *da
 	if kind == types.SampleKindL7API {
 		checkType = types.HealthCheckTypeL7API
 	}
+	probeEndpoint := upstream.EffectiveSampleEndpoint()
 	result := &types.HealthCheckResult{
 		UpstreamID: upstream.ID,
 		Provider:   upstream.Provider,
 		ModelName:  upstream.ModelName,
-		Endpoint:   upstream.URL,
+		Endpoint:   probeEndpoint,
 		CheckType:  checkType,
 		Timestamp:  startTime,
 	}
 	outcome := &sampleCheckOutcome{result: result}
 
-	provider, ok := h.getSampleRegistry().Find(upstream.URL)
+	provider, ok := h.getSampleRegistry().Find(probeEndpoint)
 	if !ok {
 		// performL7APICheck is also used directly by existing callers and tests.
 		// The scheduled health-check routine skips unsupported protocols before
@@ -785,7 +789,7 @@ func (h *healthCheckerImpl) performSampleCheck(ctx context.Context, upstream *da
 		tasks = database.ResolveLLMTasks(ctx, h.llmConfigStore, upstream.LLMConfigID)
 	}
 	execution, err := provider.Execute(checkCtx, kind, types.SampleInput{
-		Endpoint:             upstream.URL,
+		Endpoint:             probeEndpoint,
 		Headers:              headers,
 		Model:                upstream.ModelName,
 		Text:                 "hi",

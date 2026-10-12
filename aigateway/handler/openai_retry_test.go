@@ -267,15 +267,20 @@ func TestApplyChatFallbackTarget(t *testing.T) {
 		Target:    "https://primary.example.com/v1/chat/completions",
 	}
 
-	applyChatFallbackTarget(context.Background(), headers, modelTarget,
-		commontypes.UpstreamConfig{
+	applyChatFallbackTarget(chatFallbackAttempt{
+		ctx:         context.Background(),
+		headers:     headers,
+		modelTarget: modelTarget,
+		upstream: commontypes.UpstreamConfig{
 			ID:         77,
 			URL:        "https://fallback.example.com/v1/chat/completions",
 			Enabled:    true,
 			Provider:   "fallback-provider",
 			AuthHeader: `{"Authorization":"Bearer fallback-token"}`,
 			ModelName:  "fallback-model",
-		}, nil, nil)
+		},
+		clientProtocol: "chat",
+	})
 
 	require.Equal(t, "https://fallback.example.com/v1/chat/completions", modelTarget.Target)
 	require.Equal(t, "https://fallback.example.com/v1/chat/completions", modelTarget.Model.Endpoint)
@@ -1079,4 +1084,63 @@ func TestExecuteChatProxyAttempt_ResponsesCompatRewritePreservesPrefix(t *testin
 	require.Equal(t, chatURL, modelTarget.Model.Endpoint)
 	require.Equal(t, "/api/v1/chat/completions", receivedPath)
 	require.Equal(t, http.StatusOK, retryWriter.StatusCode())
+}
+
+func TestApplyChatFallbackTarget_ResolvesBaseUrlProtocolPath(t *testing.T) {
+	headers := http.Header{}
+	modelTarget := &resolvedModelTarget{
+		Model: &types.Model{
+			BaseModel:         types.BaseModel{ID: "test-model"},
+			ExternalModelInfo: types.ExternalModelInfo{AuthHead: `{"Authorization":"Bearer primary-token"}`, Provider: "primary-provider"},
+		},
+		Target:    "https://primary.example.com/v1/chat/completions",
+		ModelName: "test-model",
+	}
+
+	// Base-URL upstream (is_full_url=false) with a declared chat format: the
+	// fallback target must keep the client protocol path appended, the same
+	// way the planner resolves the primary attempt.
+	applyChatFallbackTarget(chatFallbackAttempt{
+		ctx:         context.Background(),
+		headers:     headers,
+		modelTarget: modelTarget,
+		upstream: commontypes.UpstreamConfig{
+			ID:                 88,
+			URL:                "https://fallback.example.com/v1",
+			Enabled:            true,
+			Provider:           "fallback-provider",
+			IsFullURL:          false,
+			SupportedEndpoints: map[commontypes.ApiFormat]string{commontypes.ApiFormatChat: ""},
+			ModelName:          "fallback-model",
+		},
+		clientProtocol: "chat",
+	})
+
+	require.Equal(t, "https://fallback.example.com/v1/chat/completions", modelTarget.Target)
+	require.Equal(t, "https://fallback.example.com/v1/chat/completions", modelTarget.Model.Endpoint)
+	require.Equal(t, "https://fallback.example.com/v1", modelTarget.Upstream.URL)
+	require.Equal(t, int64(88), modelTarget.Model.UpstreamID)
+}
+
+func TestApplyChatFallbackTarget_FullURLPassesThrough(t *testing.T) {
+	headers := http.Header{}
+	modelTarget := &resolvedModelTarget{
+		Model:     &types.Model{BaseModel: types.BaseModel{ID: "test-model"}},
+		Target:    "https://primary.example.com/v1/chat/completions",
+		ModelName: "test-model",
+	}
+
+	applyChatFallbackTarget(chatFallbackAttempt{
+		ctx: context.Background(), headers: headers, modelTarget: modelTarget,
+		upstream: commontypes.UpstreamConfig{
+			ID:        89,
+			URL:       "https://fallback.example.com/v1/chat/completions",
+			Enabled:   true,
+			IsFullURL: true,
+		}, clientProtocol: "chat",
+		tokenCounter: nil, logCapture: nil,
+	})
+
+	require.Equal(t, "https://fallback.example.com/v1/chat/completions", modelTarget.Target)
+	require.Equal(t, "https://fallback.example.com/v1/chat/completions", modelTarget.Model.Endpoint)
 }

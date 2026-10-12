@@ -9,6 +9,7 @@ import (
 	"opencsg.com/csghub-server/aigateway/handler/protocol"
 	"opencsg.com/csghub-server/aigateway/types"
 	"opencsg.com/csghub-server/common/errorx"
+	commontypes "opencsg.com/csghub-server/common/types"
 )
 
 // plannerImpl is the protocol-agnostic request planner.  It is shared across
@@ -106,6 +107,7 @@ func (p *plannerImpl) planOnce(c *gin.Context, meta *types.RequestMetadata) (pl 
 	// decision produced it.
 	mt, err := p.modelResolver.ResolveModelTarget(ctx, meta.TenantID, meta.Model, meta.Headers, ResolveOptions{
 		RequiredUpstreamID: meta.RequiredUpstreamID,
+		ClientProtocol:     commontypes.ApiFormat(meta.Protocol),
 	})
 	// Enrich metrics with the resolved model target right after resolution,
 	// before error checking.  When resolution fails (mt == nil) the enricher
@@ -280,13 +282,16 @@ func shouldAdmitCapacity(task string) bool {
 // router-picked target and again when capacity admission re-selects a
 // different upstream, whose protocol may differ.
 func applyProtocolRouting(pl *types.RequestPlan, meta *types.RequestMetadata, mt *types.ModelTarget) error {
+	pl.ClientProtocol = meta.Protocol
 	decision, err := protocol.ResolveRouting(types.Protocol(meta.Protocol), protocol.RoutingTarget{
-		ModelID:          mt.Model.ID,
-		Target:           mt.Target,
-		CSGHubHosted:     mt.Model.SvcName != "",
-		RuntimeFramework: mt.Model.RuntimeFramework,
-		ImageID:          mt.Model.ImageID,
-		ProtocolOverride: mt.Upstream.MetadataProtocol(),
+		ModelID:            mt.Model.ID,
+		Target:             mt.Target,
+		CSGHubHosted:       mt.Model.SvcName != "",
+		RuntimeFramework:   mt.Model.RuntimeFramework,
+		ImageID:            mt.Model.ImageID,
+		ProtocolOverride:   mt.Upstream.MetadataProtocol(),
+		SupportedEndpoints: mt.Upstream.SupportedEndpoints,
+		IsFullURL:          mt.Upstream.IsFullURL,
 	})
 	if err != nil {
 		return err

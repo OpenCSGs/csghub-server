@@ -12,6 +12,7 @@ import (
 
 	"opencsg.com/csghub-server/aigateway/component/router"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"opencsg.com/csghub-server/aigateway/types"
@@ -685,4 +686,41 @@ func TestFilterAvailableUpstreams_DBCircuitOpen_RTCacheError_AllowsUpstream(t *t
 	require.Len(t, result, 2)
 	require.Equal(t, "https://api.example.com/cb_open", result[0].URL)
 	require.Equal(t, "https://api.example.com/healthy", result[1].URL)
+}
+
+func TestPreferNativeUpstreams(t *testing.T) {
+	chatOnly := commontypes.UpstreamConfig{ID: 1, URL: "https://a.example.com/v1", SupportedEndpoints: map[commontypes.ApiFormat]string{"chat": ""}}
+	multi := commontypes.UpstreamConfig{ID: 2, URL: "https://b.example.com/v1", SupportedEndpoints: map[commontypes.ApiFormat]string{"chat": "", "messages": ""}}
+	unknown := commontypes.UpstreamConfig{ID: 3, URL: "https://c.example.com/custom"}
+	fullURLMsgs := commontypes.UpstreamConfig{ID: 4, URL: "https://d.example.com/v1/messages", IsFullURL: true, SupportedEndpoints: map[commontypes.ApiFormat]string{"messages": ""}}
+
+	t.Run("no client protocol returns list unchanged", func(t *testing.T) {
+		list := []commontypes.UpstreamConfig{chatOnly, multi}
+		assert.Equal(t, list, preferNativeUpstreams(list, ""))
+	})
+
+	t.Run("single candidate returns list unchanged", func(t *testing.T) {
+		list := []commontypes.UpstreamConfig{chatOnly}
+		assert.Equal(t, list, preferNativeUpstreams(list, "messages"))
+	})
+
+	t.Run("declared non-supporting upstreams are filtered out", func(t *testing.T) {
+		got := preferNativeUpstreams([]commontypes.UpstreamConfig{chatOnly, multi, fullURLMsgs}, "messages")
+		require.Len(t, got, 2)
+		assert.Equal(t, int64(2), got[0].ID)
+		assert.Equal(t, int64(4), got[1].ID)
+	})
+
+	t.Run("unknown-format upstreams count as native capable", func(t *testing.T) {
+		got := preferNativeUpstreams([]commontypes.UpstreamConfig{chatOnly, unknown}, "responses")
+		// chatOnly declares chat only; unknown has no declaration so it keeps
+		// the legacy passthrough behavior for any protocol.
+		require.Len(t, got, 1)
+		assert.Equal(t, int64(3), got[0].ID)
+	})
+
+	t.Run("all native returns list unchanged", func(t *testing.T) {
+		list := []commontypes.UpstreamConfig{chatOnly, multi}
+		assert.Equal(t, list, preferNativeUpstreams(list, "chat"))
+	})
 }

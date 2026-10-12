@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"strings"
 
+	"opencsg.com/csghub-server/aigateway/handler/protocol"
 	responsespkg "opencsg.com/csghub-server/aigateway/handler/responses"
 	"opencsg.com/csghub-server/aigateway/types"
 	commonType "opencsg.com/csghub-server/common/types"
@@ -237,8 +238,46 @@ func rewriteResponsesURLToChatCompletions(rawURL string) (string, bool) {
 	return parsed.String(), true
 }
 
-func applyChatFallbackTarget(ctx context.Context, headers http.Header, modelTarget *resolvedModelTarget, upstream commonType.UpstreamConfig, tokenCounter token.ChatTokenCounter, logCapture component.LLMLogRecorder) {
+// chatFallbackAttempt bundles one fallback attempt's inputs so
+// applyChatFallbackTarget's signature stays stable as fields are added.
+type chatFallbackAttempt struct {
+	// ctx and headers come from the inbound chat request.
+	ctx     context.Context
+	headers http.Header
+	// modelTarget is mutated in place: Target/Model.Endpoint/Upstream/
+	// ModelName/Model overrides all move to the attempted upstream.
+	modelTarget *resolvedModelTarget
+	// upstream is the fallback candidate to attempt.
+	upstream commonType.UpstreamConfig
+	// clientProtocol is the API format the client called with (from
+	// RequestPlan.ClientProtocol); it drives the fallback URL resolution.
+	clientProtocol string
+	tokenCounter   token.ChatTokenCounter
+	logCapture     component.LLMLogRecorder
+}
+
+func applyChatFallbackTarget(p chatFallbackAttempt) {
+	ctx := p.ctx
+	headers := p.headers
+	modelTarget := p.modelTarget
+	upstream := p.upstream
+	clientProtocol := p.clientProtocol
+	tokenCounter := p.tokenCounter
+	logCapture := p.logCapture
 	targetURL := upstream.URL
+	// Resolve the effective backend URL with the same protocol routing the
+	// planner used for the primary attempt: base-URL upstreams keep the
+	// client protocol path on fallback, full URLs pass through as-is, and
+	// the chat_fallback rewrite covers /responses-tailed upstreams.
+	if decision, err := protocol.ResolveRouting(types.Protocol(clientProtocol), protocol.RoutingTarget{
+		Target:             targetURL,
+		CSGHubHosted:       modelTarget.Model != nil && modelTarget.Model.SvcName != "",
+		SupportedEndpoints: upstream.SupportedEndpoints,
+		IsFullURL:          upstream.IsFullURL,
+		ProtocolOverride:   upstream.MetadataProtocol(),
+	}); err == nil && decision.BackendURL != "" {
+		targetURL = decision.BackendURL
+	}
 	modelTarget.Target = targetURL
 	modelTarget.Model.Endpoint = targetURL
 	modelTarget.Upstream = upstream

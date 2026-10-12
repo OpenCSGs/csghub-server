@@ -864,6 +864,7 @@ func TestLLMServiceComponent_CreateUpstream_HealthCheckExplicitTrue(t *testing.T
 	upstreamStore.EXPECT().Create(ctx, &database.Upstream{
 		LLMConfigID:           100,
 		URL:                   "http://upstream.example.com/v1/chat/completions",
+		IsFullURL:             true,
 		Weight:                1,
 		Enabled:               true,
 		HealthCheckEnabled:    true,
@@ -879,6 +880,7 @@ func TestLLMServiceComponent_CreateUpstream_HealthCheckExplicitTrue(t *testing.T
 	req := &types.CreateUpstreamReq{
 		LLMConfigID:           100,
 		URL:                   "http://upstream.example.com/v1/chat/completions",
+		IsFullURL:             true,
 		Enabled:               true,
 		HealthCheckEnabled:    &healthCheckTrue,
 		CircuitBreakerEnabled: &circuitBreakerTrue,
@@ -908,8 +910,9 @@ func TestLLMServiceComponent_CreateUpstream_RejectsUnsupportedHealthCheck(t *tes
 func TestLLMServiceComponent_UpdateUpstream_RejectsExplicitUnsupportedHealthCheck(t *testing.T) {
 	upstreamStore := mockdatabase.NewMockUpstreamStore(t)
 	upstreamStore.EXPECT().GetByID(mock.Anything, int64(10)).Return(&database.Upstream{
-		ID:  10,
-		URL: "https://api.example.com/v1/chat/completions",
+		ID:        10,
+		URL:       "https://api.example.com/v1/chat/completions",
+		IsFullURL: true,
 	}, nil).Once()
 	healthCheckEnabled := true
 	unsupportedURL := "https://api.example.com/v1/ocr"
@@ -934,6 +937,7 @@ func TestLLMServiceComponent_UpdateUpstream_RejectsUnsupportedURLWhenHealthCheck
 	upstreamStore.EXPECT().GetByID(mock.Anything, int64(10)).Return(&database.Upstream{
 		ID:                 10,
 		URL:                "https://api.example.com/v1/chat/completions",
+		IsFullURL:          true,
 		HealthCheckEnabled: true,
 	}, nil).Once()
 	unsupportedURL := "https://api.example.com/v1/ocr"
@@ -964,6 +968,7 @@ func TestLLMServiceComponent_UpdateUpstream_AllowsUnsupportedURLWhenHealthCheckD
 			return &database.Upstream{
 				ID:                 10,
 				URL:                "https://api.example.com/v1/chat/completions",
+				IsFullURL:          true,
 				Enabled:            true,
 				HealthCheckEnabled: true,
 			}, nil
@@ -2298,6 +2303,7 @@ func TestUpdateUpstream_ResetStaleStateOnReEnable(t *testing.T) {
 		disabledUp := &database.Upstream{
 			ID:                    10,
 			URL:                   "http://upstream.example.com/v1/chat/completions",
+			IsFullURL:             true,
 			Enabled:               false,
 			HealthCheckEnabled:    true,
 			CircuitBreakerEnabled: true,
@@ -2307,6 +2313,7 @@ func TestUpdateUpstream_ResetStaleStateOnReEnable(t *testing.T) {
 		enabledUp := &database.Upstream{
 			ID:                    10,
 			URL:                   "http://upstream.example.com/v1/chat/completions",
+			IsFullURL:             true,
 			Enabled:               true,
 			HealthCheckEnabled:    true,
 			CircuitBreakerEnabled: true,
@@ -2367,6 +2374,7 @@ func TestUpdateUpstream_ResetStaleStateOnReEnable(t *testing.T) {
 				return &database.Upstream{
 					ID:                    10,
 					URL:                   "http://upstream.example.com/v1/chat/completions",
+					IsFullURL:             true,
 					Enabled:               true,
 					HealthCheckEnabled:    false,
 					CircuitBreakerEnabled: false,
@@ -2376,6 +2384,7 @@ func TestUpdateUpstream_ResetStaleStateOnReEnable(t *testing.T) {
 			return &database.Upstream{
 				ID:                    10,
 				URL:                   "http://upstream.example.com/v1/chat/completions",
+				IsFullURL:             true,
 				Enabled:               true,
 				HealthCheckEnabled:    true,
 				CircuitBreakerEnabled: false,
@@ -2472,6 +2481,7 @@ func TestUpdateUpstream_ResetStaleStateOnReEnable(t *testing.T) {
 				return &database.Upstream{
 					ID:                    10,
 					URL:                   "http://old-endpoint/v1/chat/completions",
+					IsFullURL:             true,
 					Enabled:               true,
 					HealthCheckEnabled:    true,
 					CircuitBreakerEnabled: true,
@@ -2482,6 +2492,7 @@ func TestUpdateUpstream_ResetStaleStateOnReEnable(t *testing.T) {
 			return &database.Upstream{
 				ID:                    10,
 				URL:                   "http://new-endpoint/v1/chat/completions",
+				IsFullURL:             true,
 				Enabled:               true,
 				HealthCheckEnabled:    true,
 				CircuitBreakerEnabled: true,
@@ -2518,6 +2529,7 @@ func TestUpdateUpstream_ResetStaleStateOnReEnable(t *testing.T) {
 				return &database.Upstream{
 					ID:                    10,
 					URL:                   "http://upstream.example.com/v1/chat/completions",
+					IsFullURL:             true,
 					Enabled:               false,
 					HealthCheckEnabled:    true,
 					CircuitBreakerEnabled: true,
@@ -2528,6 +2540,7 @@ func TestUpdateUpstream_ResetStaleStateOnReEnable(t *testing.T) {
 			return &database.Upstream{
 				ID:                    10,
 				URL:                   "http://upstream.example.com/v1/chat/completions",
+				IsFullURL:             true,
 				Enabled:               true,
 				HealthCheckEnabled:    true,
 				CircuitBreakerEnabled: true,
@@ -2571,6 +2584,7 @@ func TestUpdateUpstream_ResetStaleStateOnReEnable(t *testing.T) {
 				return &database.Upstream{
 					ID:                    10,
 					URL:                   "http://upstream.example.com/v1/chat/completions",
+					IsFullURL:             true,
 					Enabled:               true,
 					HealthCheckEnabled:    true,
 					CircuitBreakerEnabled: true,
@@ -2581,6 +2595,7 @@ func TestUpdateUpstream_ResetStaleStateOnReEnable(t *testing.T) {
 			return &database.Upstream{
 				ID:                    10,
 				URL:                   "http://upstream.example.com/v1/chat/completions",
+				IsFullURL:             true,
 				Enabled:               false,
 				HealthCheckEnabled:    true,
 				CircuitBreakerEnabled: true,

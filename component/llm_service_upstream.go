@@ -242,7 +242,9 @@ func (s *llmServiceComponentImpl) CheckUpstream(ctx context.Context, req *types.
 		return nil, fmt.Errorf("upstream model_name is empty")
 	}
 
-	provider, ok := s.sampleRegistry.Find(url)
+	// Base-URL upstreams are probed at the declared protocol's standard path.
+	probeURL := dbUp.EffectiveSampleEndpoint()
+	provider, ok := s.sampleRegistry.Find(probeURL)
 	if !ok {
 		return nil, errorx.ErrUpstreamConnectionCheckNotSupported
 	}
@@ -260,18 +262,23 @@ func (s *llmServiceComponentImpl) CheckUpstream(ctx context.Context, req *types.
 	)
 
 	return doUpstreamCheck(ctx, provider, upstreamCheckParams{
-		url:         url,
+		url:         probeURL,
 		modelName:   modelName,
 		authHeaders: authHeaders,
 		tasks:       tasks,
 	})
 }
 
-func (s *llmServiceComponentImpl) validateHealthCheckEndpoint(url string, healthCheckEnabled bool) error {
+// validateHealthCheckEndpoint checks that the sample registry supports
+// probing the upstream. Base-URL upstreams are validated against the declared
+// protocol's standard path, mirroring the probe endpoint used by the
+// scheduled health-check routine. The upstream carries the probe-relevant
+// fields (URL, IsFullURL, Source, SupportedEndpoints).
+func (s *llmServiceComponentImpl) validateHealthCheckEndpoint(upstream types.UpstreamConfig, healthCheckEnabled bool) error {
 	if !healthCheckEnabled {
 		return nil
 	}
-	if _, ok := s.sampleRegistry.Find(strings.TrimSpace(url)); !ok {
+	if _, ok := s.sampleRegistry.Find(upstream.EffectiveSampleEndpoint()); !ok {
 		return errorx.ErrUpstreamHealthCheckNotSupported
 	}
 	return nil

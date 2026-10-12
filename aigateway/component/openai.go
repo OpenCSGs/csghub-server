@@ -815,6 +815,8 @@ func dbUpstreamsToConfigs(dbUpstreams []database.Upstream, capacityDefaults comm
 			ModelName:             u.ModelName,
 			AuthHeader:            u.AuthHeader,
 			Provider:              u.Provider,
+			IsFullURL:             u.IsFullURL,
+			SupportedEndpoints:    u.SupportedEndpoints,
 			HealthCheckEnabled:    u.HealthCheckEnabled,
 			CircuitBreakerEnabled: u.CircuitBreakerEnabled,
 			Tags:                  u.Tags,

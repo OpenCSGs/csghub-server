@@ -3,6 +3,7 @@ package types
 import (
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -240,6 +241,16 @@ type UpstreamConfig struct {
 	AuthHeader string `json:"auth_header"`
 	// Provider identifies upstream provider for this specific endpoint.
 	Provider string `json:"provider"`
+	// IsFullURL marks the URL as a complete endpoint URL used as-is (no path
+	// appended). When false the URL is a base URL and the client protocol
+	// path is appended for natively supported API formats.
+	IsFullURL bool `json:"is_full_url"`
+	// SupportedEndpoints maps a protocol (chat / responses / messages) to an
+	// optional per-protocol endpoint URL. An empty value means the protocol
+	// is served by the main URL field (full URL as-is, or base URL with the
+	// protocol path appended). A missing key means the protocol is not
+	// declared; routing falls back to URL inference and legacy adapters.
+	SupportedEndpoints map[ApiFormat]string `json:"supported_endpoints,omitempty"`
 	// CapacityPolicy controls per-upstream capacity limits (concurrency, RPM, TPM, queue).
 	CapacityPolicy *CapacityPolicy   `json:"capacity_policy,omitempty"`
 	Tags           map[string]string `json:"tags,omitempty"`
@@ -252,6 +263,216 @@ func (uc UpstreamConfig) MetadataProtocol() string {
 		return ""
 	}
 	return uc.Metadata.Protocol
+}
+
+// HasProtocolDeclaration reports whether the upstream carries an explicit or
+// inferable API-format declaration (SupportedEndpoints, metadata.protocol, a
+// recognizable URL terminal path, or the CSGHub-hosted chat default). When
+// false the upstream's protocol is unknown and the legacy routing applies:
+// the request is passed through natively with the client's own protocol.
+func (uc UpstreamConfig) HasProtocolDeclaration() bool {
+	if len(uc.SupportedEndpoints) > 0 || uc.MetadataProtocol() != "" {
+		return true
+	}
+	if _, ok := InferProtocolFromURLPath(uc.URL); ok {
+		return true
+	}
+	return uc.Source == UpstreamSourceCSGHubDeploy
+}
+
+// legacyDeclaredEndpoints resolves the declared endpoint map for upstreams
+// without an explicit SupportedEndpoints config (legacy rows): the
+// metadata.protocol override, the URL terminal path inference, or the
+// CSGHub-hosted chat default. Returns nil when nothing is declared.
+func (uc UpstreamConfig) legacyDeclaredEndpoints() map[ApiFormat]string {
+	if proto := uc.MetadataProtocol(); proto != "" {
+		return map[ApiFormat]string{ApiFormat(proto).Normalized(): ""}
+	}
+	if inferred, ok := InferProtocolFromURLPath(uc.URL); ok {
+		return map[ApiFormat]string{ApiFormat(inferred): ""}
+	}
+	if uc.Source == UpstreamSourceCSGHubDeploy {
+		return map[ApiFormat]string{ApiFormatChat: ""}
+	}
+	return nil
+}
+
+// SupportsProtocol reports whether the upstream natively supports the given
+// client protocol ("chat" / "responses" / "messages", matching the Protocol
+// constants of aigateway/types). The explicit SupportedEndpoints map wins;
+// when it is empty the declaration is inferred from the metadata.protocol
+// declaration or the URL terminal path (legacy rows), and an undeclared
+// CSGHub-hosted upstream defaults to chat.
+func (uc UpstreamConfig) SupportsProtocol(p ApiFormat) bool {
+	declared := uc.declaredApiFormats()
+	if len(declared) == 0 {
+		declared = uc.legacyDeclaredEndpoints()
+		if declared == nil {
+			return false
+		}
+	}
+	_, ok := declared[p.Normalized()]
+	return ok
+}
+
+// declaredApiFormats returns the EXPLICIT declaration set: the
+// SupportedEndpoints keys unioned with the legacy metadata.protocol override
+// (an override whose format is already a map key is folded in; its endpoint
+// value stays the map's). This mirrors SupportedProtocolsOf in the protocol
+// router so candidate selection and routing agree on what an upstream
+// explicitly declares. URL inference and the CSGHub chat default are NOT
+// part of this set — those are legacy fallbacks applied by the callers.
+func (uc UpstreamConfig) declaredApiFormats() map[ApiFormat]string {
+	declared := make(map[ApiFormat]string, len(uc.SupportedEndpoints)+1)
+	for key, value := range uc.SupportedEndpoints {
+		declared[key.Normalized()] = strings.TrimSpace(value)
+	}
+	if proto := uc.MetadataProtocol(); proto != "" {
+		if f := ApiFormat(proto).Normalized(); f != "" {
+			if _, exists := declared[f]; !exists {
+				declared[f] = ""
+			}
+		}
+	}
+	return declared
+}
+
+// DeclaredProtocolEndpoint returns the per-protocol endpoint URL for the
+// given protocol: the explicit SupportedEndpoints value when declared (may be
+// empty, meaning the main URL serves this protocol), or "" when the protocol
+// is not declared.
+func (uc UpstreamConfig) DeclaredProtocolEndpoint(p ApiFormat) string {
+	declared := uc.SupportedEndpoints
+	if len(declared) == 0 {
+		declared = uc.legacyDeclaredEndpoints()
+		if declared == nil {
+			return ""
+		}
+	}
+	return strings.TrimSpace(declared[p.Normalized()])
+}
+
+// ResolveSampleEndpoint resolves the concrete endpoint a protocol sample
+// (health check / connection test) should probe. A per-protocol endpoint
+// override is used as-is when set; otherwise full URLs and URLs that already
+// carry a recognizable protocol path are used as-is, and a base URL with a
+// declared API format (or a CSGHub-hosted deploy, which defaults to chat)
+// gets the declared protocol's standard path appended — chat first when
+// several formats are declared.
+func ResolveSampleEndpoint(uc UpstreamConfig) string {
+	// A per-protocol endpoint override is always a complete URL.
+	for _, order := range RoutableApiFormats {
+		for key, endpoint := range uc.SupportedEndpoints {
+			if key.Normalized() == order && strings.TrimSpace(endpoint) != "" {
+				return strings.TrimSpace(endpoint)
+			}
+		}
+	}
+	raw := strings.TrimSpace(uc.URL)
+	if raw == "" || uc.IsFullURL {
+		return raw
+	}
+	if _, ok := InferProtocolFromURLPath(raw); ok {
+		return raw
+	}
+	declared := uc.SupportedEndpoints
+	if len(declared) == 0 && uc.Source == UpstreamSourceCSGHubDeploy && csghubDeployServesChat(uc.deployTask()) {
+		// CSGHub LLM deploys (vLLM/SGLang) expose a bare service root and
+		// serve chat completions at /v1/chat/completions — probe there.
+		// Multimodal deploys (image/audio/video tasks) do not serve chat;
+		// keeping the URL raw makes the sample registry skip them (legacy
+		// behavior) instead of probing a 404 and marking them unhealthy.
+		declared = map[ApiFormat]string{ApiFormatChat: ""}
+	}
+	for _, order := range RoutableApiFormats {
+		if _, declaredMatch := declared[order]; !declaredMatch {
+			continue
+		}
+		segments := order.StandardPathSegments()
+		if len(segments) == 0 {
+			return raw
+		}
+		// Deduplicate a trailing /v1 on the base path, mirroring the native
+		// routing path construction.
+		trimmed := raw
+		if !strings.Contains(trimmed, "://") {
+			trimmed = "http://" + trimmed
+		}
+		parsed, err := url.Parse(trimmed)
+		if err != nil {
+			return raw
+		}
+		baseSegments := strings.Split(strings.TrimRight(parsed.Path, "/"), "/")
+		if len(baseSegments) > 0 && strings.EqualFold(baseSegments[len(baseSegments)-1], PathSegV1) {
+			segments = segments[1:]
+		}
+		// Rebuild from the parsed URL so the base query (e.g. Azure's
+		// ?api-version=...) survives the append.
+		parsed.Path = strings.TrimRight(parsed.Path, "/") + "/" + strings.Join(segments, "/")
+		parsed.RawPath = ""
+		return parsed.String()
+	}
+	return raw
+}
+
+// csghubDeployServesChat reports whether a CSGHub deploy with the given
+// InternalModelInfo.Task serves chat completions. An unknown task ("") keeps
+// the chat probe (LLM deploys are the norm); known multimodal tasks opt out.
+func csghubDeployServesChat(task string) bool {
+	t := strings.ToLower(strings.TrimSpace(task))
+	return t == "" || t == "text-generation"
+}
+
+// EffectiveSampleEndpoint resolves the health-check / connection-test probe
+// endpoint for this upstream (see ResolveSampleEndpoint).
+func (uc UpstreamConfig) EffectiveSampleEndpoint() string {
+	return ResolveSampleEndpoint(uc)
+}
+
+// deployTask extracts the CSGHub deploy task from metadata, if any.
+func (uc UpstreamConfig) deployTask() string {
+	if uc.Metadata != nil && uc.Metadata.InternalModelInfo != nil {
+		return uc.Metadata.InternalModelInfo.Task
+	}
+	return ""
+}
+
+// InferProtocolFromURLPath guesses the API format from a URL's terminal path
+// segments: .../chat/completions → ApiFormatChat, .../responses →
+// ApiFormatResponses, .../messages or .../anthropic → ApiFormatMessages,
+// .../systemone → ApiFormatSystemOne. It mirrors the URL inference used by
+// the AIGateway protocol router so admin CRUD, backfill and routing all
+// agree on what a URL means.
+func InferProtocolFromURLPath(rawURL string) (ApiFormat, bool) {
+	if strings.TrimSpace(rawURL) == "" {
+		return "", false
+	}
+	// url.Parse interprets a bare host:port/path as scheme=host, so prepend a
+	// scheme when absent to ensure the path is parsed correctly.
+	if !strings.Contains(rawURL, "://") {
+		rawURL = "http://" + rawURL
+	}
+	parsed, err := url.Parse(rawURL)
+	if err != nil {
+		return "", false
+	}
+	parts := strings.Split(strings.Trim(parsed.Path, "/"), "/")
+	if len(parts) == 0 || parts[0] == "" {
+		return "", false
+	}
+	switch last := strings.ToLower(parts[len(parts)-1]); last {
+	case PathSegCompletions:
+		if len(parts) >= 2 && strings.EqualFold(parts[len(parts)-2], PathSegChat) {
+			return ApiFormatChat, true
+		}
+	case PathSegResponses:
+		return ApiFormatResponses, true
+	case PathSegMessages, PathSegAnthropic:
+		return ApiFormatMessages, true
+	case PathSegSystemOne:
+		return ApiFormatSystemOne, true
+	}
+	return "", false
 }
 
 // RoutingPolicy controls how a request selects one upstream from Upstreams.
@@ -471,18 +692,25 @@ type CreatePromptPrefixReq struct {
 
 // CreateUpstreamReq is the request to add a new upstream to an existing LLM config.
 type CreateUpstreamReq struct {
-	LLMConfigID           int64             `json:"llm_config_id" binding:"required"`
-	URL                   string            `json:"url" binding:"required"`
-	Weight                int               `json:"weight,omitempty"`
-	Enabled               bool              `json:"enabled"`
-	ModelName             string            `json:"model_name,omitempty"`
-	AuthHeader            string            `json:"auth_header,omitempty"`
-	Provider              string            `json:"provider,omitempty"`
-	HealthCheckEnabled    *bool             `json:"health_check_enabled"`
-	CircuitBreakerEnabled *bool             `json:"circuit_breaker_enabled"`
-	CapacityPolicy        *CapacityPolicy   `json:"capacity_policy,omitempty"`
-	Tags                  map[string]string `json:"tags,omitempty"`
-	Metadata              *UpstreamMetadata `json:"metadata,omitempty"`
+	LLMConfigID           int64  `json:"llm_config_id" binding:"required"`
+	URL                   string `json:"url" binding:"required"`
+	Weight                int    `json:"weight,omitempty"`
+	Enabled               bool   `json:"enabled"`
+	ModelName             string `json:"model_name,omitempty"`
+	AuthHeader            string `json:"auth_header,omitempty"`
+	Provider              string `json:"provider,omitempty"`
+	HealthCheckEnabled    *bool  `json:"health_check_enabled"`
+	CircuitBreakerEnabled *bool  `json:"circuit_breaker_enabled"`
+	// IsFullURL marks the URL as a complete endpoint URL used as-is; when false
+	// the URL is a base URL and the client protocol path is appended for the
+	// supported API formats.
+	IsFullURL bool `json:"is_full_url"`
+	// SupportedEndpoints maps a declared protocol to an optional per-protocol
+	// endpoint URL (empty value = the main URL serves that protocol).
+	SupportedEndpoints map[ApiFormat]string `json:"supported_endpoints,omitempty"`
+	CapacityPolicy     *CapacityPolicy      `json:"capacity_policy,omitempty"`
+	Tags               map[string]string    `json:"tags,omitempty"`
+	Metadata           *UpstreamMetadata    `json:"metadata,omitempty"`
 }
 
 // UpdateUpstreamReq is the request to update an existing upstream.
@@ -495,18 +723,22 @@ type CreateUpstreamReq struct {
 // binds an explicit JSON null to the OMITTED state, so over HTTP the stored
 // policy can only be replaced or disabled (Enabled=false), never nulled.
 type UpdateUpstreamReq struct {
-	ID                    int64              `json:"id"`
-	URL                   *string            `json:"url"`
-	Weight                *int               `json:"weight"`
-	Enabled               *bool              `json:"enabled"`
-	ModelName             *string            `json:"model_name"`
-	AuthHeader            *string            `json:"auth_header"`
-	Provider              *string            `json:"provider"`
-	HealthCheckEnabled    *bool              `json:"health_check_enabled"`
-	CircuitBreakerEnabled *bool              `json:"circuit_breaker_enabled"`
-	CapacityPolicy        **CapacityPolicy   `json:"capacity_policy"`
-	Tags                  *map[string]string `json:"tags"`
-	Metadata              *UpstreamMetadata  `json:"metadata"`
+	ID                    int64   `json:"id"`
+	URL                   *string `json:"url"`
+	Weight                *int    `json:"weight"`
+	Enabled               *bool   `json:"enabled"`
+	ModelName             *string `json:"model_name"`
+	AuthHeader            *string `json:"auth_header"`
+	Provider              *string `json:"provider"`
+	HealthCheckEnabled    *bool   `json:"health_check_enabled"`
+	CircuitBreakerEnabled *bool   `json:"circuit_breaker_enabled"`
+	// IsFullURL/SupportedEndpoints follow the pointer contract above: nil =
+	// omitted (keep stored value), non-nil = replace.
+	IsFullURL          *bool                 `json:"is_full_url"`
+	SupportedEndpoints *map[ApiFormat]string `json:"supported_endpoints"`
+	CapacityPolicy     **CapacityPolicy      `json:"capacity_policy"`
+	Tags               *map[string]string    `json:"tags"`
+	Metadata           *UpstreamMetadata     `json:"metadata"`
 }
 
 // CheckUpstreamReq is the request to test connectivity to an upstream endpoint.
