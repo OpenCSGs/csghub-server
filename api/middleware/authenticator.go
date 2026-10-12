@@ -3,6 +3,7 @@ package middleware
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -38,7 +39,7 @@ func BuildJwtSession(jwtSignKey string) gin.HandlerFunc {
 		}
 		claims, err := parseJWTToken(jwtSignKey, token)
 		if err != nil {
-			slog.Debug("fail to parse jwt token", slog.String("token_get", token), slog.Any("error", err))
+			slog.Debug("fail to parse jwt token", slog.Any("error", err))
 			httpbase.UnauthorizedError(c, errorx.InvalidAuthHeader(err, nil))
 			c.Abort()
 			return
@@ -131,7 +132,7 @@ func Authenticator(config *config.Config) gin.HandlerFunc {
 			slog.ErrorContext(c, "invalid Bearer token",
 				slog.String("ip", c.ClientIP()),
 				slog.String("method", c.Request.Method),
-				slog.String("url", c.Request.URL.RequestURI()),
+				slog.String("path", c.Request.URL.Path),
 			)
 			httpbase.UnauthorizedError(c, errorx.ErrInvalidAuthHeader)
 			c.Abort()
@@ -146,7 +147,7 @@ func Authenticator(config *config.Config) gin.HandlerFunc {
 			slog.ErrorContext(c, "invalid OAuth token",
 				slog.String("ip", c.ClientIP()),
 				slog.String("method", c.Request.Method),
-				slog.String("url", c.Request.URL.RequestURI()),
+				slog.String("path", c.Request.URL.Path),
 			)
 			httpbase.UnauthorizedError(c, errorx.ErrInvalidAuthHeader)
 			c.Abort()
@@ -161,7 +162,7 @@ func Authenticator(config *config.Config) gin.HandlerFunc {
 			slog.ErrorContext(c, "invalid Basic token",
 				slog.String("ip", c.ClientIP()),
 				slog.String("method", c.Request.Method),
-				slog.String("url", c.Request.URL.RequestURI()),
+				slog.String("path", c.Request.URL.Path),
 			)
 			httpbase.UnauthorizedError(c, errorx.ErrInvalidAuthHeader)
 			c.Abort()
@@ -229,7 +230,7 @@ func isValidJWTToken(c *gin.Context, config *config.Config, token string, rc cac
 		if rc != nil {
 			isMember, _ := rc.SIsMember(c.Request.Context(), jwtBlacklistKey, token)
 			if isMember {
-				slog.WarnContext(c.Request.Context(), "jwt token is in blacklist", slog.String("token", token))
+				slog.WarnContext(c.Request.Context(), "jwt token is in blacklist")
 				return false
 			}
 		}
@@ -307,7 +308,7 @@ func parseJWTToken(signKey, tokenString string) (*types.JWTClaims, error) {
 	if ok {
 		return claims, nil
 	}
-	err = fmt.Errorf("JWT token claims not match: %+v", *token)
+	err = errors.New("JWT token claims do not match expected claims type")
 	return nil, errorx.InvalidAuthHeader(err, nil)
 }
 
@@ -342,7 +343,7 @@ func NeedAPIKey(config *config.Config) gin.HandlerFunc {
 
 		// Check Authorization Header format
 		if authHeader == "" {
-			slog.Info("missing authorization header", slog.Any("url", c.Request.URL))
+			slog.Info("missing authorization header", slog.String("path", c.Request.URL.Path))
 			httpbase.UnauthorizedError(c, errorx.ErrInvalidAuthHeader)
 			c.Abort()
 			return

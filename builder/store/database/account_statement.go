@@ -734,7 +734,7 @@ func updateFeeBill(ctx context.Context, tx bun.Tx, input AccountStatement, billV
 	if len(input.APIKey) > 0 {
 		err := UpdateAPIKeyUsage(ctx, tx, input)
 		if err != nil {
-			slog.WarnContext(ctx, "failed to update api key usage", slog.Any("err", err), slog.String("api_key", input.APIKey))
+			slog.WarnContext(ctx, "failed to update api key usage", slog.Any("err", err), slog.Int64("token_id", input.TokenID))
 		}
 	}
 

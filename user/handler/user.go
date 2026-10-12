@@ -17,6 +17,7 @@ import (
 	"opencsg.com/csghub-server/builder/temporal"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/errorx"
+	commonlog "opencsg.com/csghub-server/common/log"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/utils/common"
 	apicomponent "opencsg.com/csghub-server/component"
@@ -385,11 +386,11 @@ func (h *UserHandler) Index(ctx *gin.Context) {
 func (h *UserHandler) Casdoor(ctx *gin.Context) {
 	code := ctx.Query("code")
 	state := ctx.Query("state")
-	slog.DebugContext(ctx.Request.Context(), "get casdoor callback", slog.String("code", code), slog.String("state", state))
+	slog.DebugContext(ctx.Request.Context(), "get casdoor callback", slog.String("code_fingerprint", commonlog.CredentialFingerprint("oauth_code", code)), slog.String("state_fingerprint", commonlog.CredentialFingerprint("oauth_state", state)))
 
 	jwtToken, signed, err := h.c.Signin(ctx.Request.Context(), code, state)
 	if err != nil {
-		slog.ErrorContext(ctx.Request.Context(), "Failed to signin", slog.Any("error", err), slog.String("code", code), slog.String("state", state))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to signin", slog.Any("error", commonlog.SafeError(err)), slog.String("code_fingerprint", commonlog.CredentialFingerprint("oauth_code", code)), slog.String("state_fingerprint", commonlog.CredentialFingerprint("oauth_state", state)))
 		var customErr errorx.CustomError
 		if errors.As(err, &customErr) {
 			if handleConflictCustomError(ctx, customErr, h.signinFailureRedirectURL) {
@@ -413,7 +414,7 @@ func (h *UserHandler) Casdoor(ctx *gin.Context) {
 		starshipApiKey, err = h.getStarshipApiKey(ctx, jwtToken.CurrentUser, "codesouler-"+state)
 		if err != nil {
 			errMsg := fmt.Sprintf("failed to get user %s starship apikey for login from %s", jwtToken.CurrentUser, state)
-			slog.ErrorContext(ctx.Request.Context(), errMsg, slog.String("code", code), slog.Any("error", err))
+			slog.ErrorContext(ctx.Request.Context(), errMsg, slog.String("code_fingerprint", commonlog.CredentialFingerprint("oauth_code", code)), slog.Any("error", commonlog.SafeError(err)))
 			errorMsg := url.QueryEscape(errMsg)
 			errorRedirectURL := fmt.Sprintf("%s?error_code=500&error_message=%s", h.signinFailureRedirectURL, errorMsg)
 			slog.InfoContext(ctx.Request.Context(), "redirecting to error page", slog.String("url", errorRedirectURL))
@@ -429,7 +430,7 @@ func (h *UserHandler) Casdoor(ctx *gin.Context) {
 		liteToken, err := h.atc.GetOrCreateFirstAvaiToken(ctx, jwtToken.CurrentUser, string(types.AccessTokenAppCSGHub), "csglite")
 		if err != nil {
 			errMsg := fmt.Sprintf("failed to get user %s csghub access token for login from %s", jwtToken.CurrentUser, state)
-			slog.ErrorContext(ctx.Request.Context(), errMsg, slog.String("code", code), slog.Any("error", err))
+			slog.ErrorContext(ctx.Request.Context(), errMsg, slog.String("code_fingerprint", commonlog.CredentialFingerprint("oauth_code", code)), slog.Any("error", commonlog.SafeError(err)))
 			errorMsg := url.QueryEscape(errMsg)
 			errorRedirectURL := fmt.Sprintf("%s?error_code=500&error_message=%s", h.signinFailureRedirectURL, errorMsg)
 			slog.InfoContext(ctx.Request.Context(), "redirecting to error page", slog.String("url", errorRedirectURL))
@@ -445,8 +446,8 @@ func (h *UserHandler) Casdoor(ctx *gin.Context) {
 		var err error
 		flowURL, err = url.Parse(state)
 		if err != nil || flowURL.Host == "" {
-			errMsg := fmt.Sprintf("invalid state format for 'flows', not a valid URL: %s", state)
-			slog.ErrorContext(ctx.Request.Context(), errMsg, slog.String("code", code), slog.Any("error", err))
+			errMsg := "invalid state format for 'flows', not a valid URL"
+			slog.ErrorContext(ctx.Request.Context(), errMsg, slog.String("code_fingerprint", commonlog.CredentialFingerprint("oauth_code", code)), slog.Any("error", commonlog.SafeError(err)))
 			errorMsg := url.QueryEscape(errMsg)
 			errorRedirectURL := fmt.Sprintf("%s?error_code=500&error_message=%s",
 				h.signinFailureRedirectURL, errorMsg)
@@ -461,7 +462,7 @@ func (h *UserHandler) Casdoor(ctx *gin.Context) {
 		targetUrl = flowURL.String()
 	}
 
-	slog.InfoContext(ctx.Request.Context(), "generate login redirect url", slog.Any("targetUrl", targetUrl))
+	slog.InfoContext(ctx.Request.Context(), "generate login redirect url", slog.String("target_url", commonlog.SafeURLString(targetUrl)))
 	redirectWithoutBody(ctx, http.StatusFound, targetUrl)
 }
 

@@ -312,7 +312,7 @@ func (h *AccessTokenHandler) Get(ctx *gin.Context) {
 			httpbase.NotFoundError(ctx, err)
 			return
 		}
-		slog.ErrorContext(ctx.Request.Context(), "Failed to check user access token", slog.Any("error", err), slog.Any("req", req))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to check user access token", slog.Any("error", err), slog.String("application", req.Application))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -733,7 +733,7 @@ func (h *AccessTokenHandler) GetAPIKeyQuotas(ctx *gin.Context) {
 
 	quotas, err := h.c.GetAPIKeyQuotas(ctx.Request.Context(), apiKey)
 	if err != nil {
-		slog.ErrorContext(ctx.Request.Context(), "Failed to get API key quotas", slog.String("api_key", apiKey), slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get API key quotas", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}

@@ -1,10 +1,12 @@
 package handler
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -229,6 +231,16 @@ func TestUserHandler_GetAdminEmails(t *testing.T) {
 
 func TestUserHandler_Casdoor(t *testing.T) {
 	gin.SetMode(gin.TestMode)
+	var logs bytes.Buffer
+	originalLogger := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&logs, &slog.HandlerOptions{Level: slog.LevelDebug})))
+	t.Cleanup(func() {
+		slog.SetDefault(originalLogger)
+		for _, secret := range []string{"signed_token", "starship_token", "csghub_token"} {
+			assert.NotContains(t, logs.String(), secret)
+		}
+		assert.Contains(t, logs.String(), "generate login redirect url")
+	})
 	const (
 		mockSigninSuccessRedirectURL       = "http://localhost:8080/signin/success"
 		mockSigninFailureRedirectURL       = "http://localhost:8080/signin/failure"
@@ -462,6 +474,24 @@ func TestUserHandler_Casdoor(t *testing.T) {
 		assert.True(t, contentLength == "" || contentLength == "0", "Content-Length should be either empty or 0, got %s", contentLength)
 		mockUserComp.AssertExpectations(t)
 	})
+}
+
+func TestUserHandler_CasdoorFailureDoesNotLogOAuthCredentials(t *testing.T) {
+	var logs bytes.Buffer
+	originalLogger := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&logs, &slog.HandlerOptions{Level: slog.LevelDebug})))
+	t.Cleanup(func() { slog.SetDefault(originalLogger) })
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodGet, "/casdoor?code=code-secret&state=state-secret", nil)
+	comp := component.NewMockUserComponent(t)
+	comp.EXPECT().Signin(mock.Anything, "code-secret", "state-secret").Return(nil, "", errors.New("signin failed"))
+	h := &UserHandler{c: comp, signinFailureRedirectURL: "https://example.com/failure", config: &config.Config{}}
+	h.Casdoor(c)
+	assert.Equal(t, http.StatusFound, w.Code)
+	assert.NotContains(t, logs.String(), "code-secret")
+	assert.NotContains(t, logs.String(), "state-secret")
+	assert.Contains(t, logs.String(), "code_fingerprint")
 }
 
 func TestHandleConflictCustomError(t *testing.T) {

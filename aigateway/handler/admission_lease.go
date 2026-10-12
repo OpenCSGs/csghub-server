@@ -12,6 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/aigateway/token"
 	"opencsg.com/csghub-server/aigateway/types"
+	commonlog "opencsg.com/csghub-server/common/log"
 )
 
 // Capacity admission lease helpers shared by the chat and responses
@@ -112,14 +113,13 @@ func clientCanceledAttempt(ctx context.Context, statusCode int) bool {
 	return errors.Is(ctx.Err(), context.Canceled)
 }
 
-// admissionTokenAttr returns the log attribute tying a decision to its
-// admission lease token (nil-safe). Search logs by request ID (trace_id) to
-// find the token, by admission_token to find the request.
+// admissionTokenAttr returns a non-reversible correlation value for the
+// admission lease token (nil-safe).
 func admissionTokenAttr(decision *types.AdmissionDecision) slog.Attr {
 	if decision == nil || decision.Lease == nil {
-		return slog.String("admission_token", "")
+		return slog.String("admission_credential_fingerprint", "")
 	}
-	return slog.String("admission_token", decision.Lease.Token)
+	return slog.String("admission_credential_fingerprint", commonlog.CredentialFingerprint("admission", decision.Lease.Token))
 }
 
 // admissionLeaseFromPlan extracts the current admission lease from the plan.

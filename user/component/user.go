@@ -1469,10 +1469,9 @@ func (c *userComponentImpl) VerifyFederationToken(ctx context.Context, token str
 	cu, err := c.sso.GetUserInfo(ctx, token)
 	if err != nil {
 		slog.WarnContext(ctx, "failed to get user info from sso",
-			slog.Any("token", token),
 			slog.Any("error", err),
 		)
-		return nil, "", errorx.UserNotFound(err, errorx.Ctx().Set("token", token))
+		return nil, "", errorx.UserNotFound(err, errorx.Ctx().Set("operation", "verify federation token"))
 	}
 
 	user, err := c.userStore.FindByUUID(ctx, cu.UUID)

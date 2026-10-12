@@ -108,7 +108,7 @@ func setupLog(lvl, format string) {
 		handler = slog.NewTextHandler(os.Stdout, opt)
 	}
 	// Wrap the default handler with the TraceIDHandler
-	h := &log.ContextHandler{Handler: handler}
+	h := &log.ContextHandler{Handler: log.NewRedactingHandler(handler)}
 
 	fmt.Printf("init logger, level: %s, format: %s\n", logLevel.String(), format)
 	logger = slog.New(h)
