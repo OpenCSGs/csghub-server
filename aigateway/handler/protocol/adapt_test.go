@@ -233,10 +233,13 @@ func TestResolveRoutingChatFallback(t *testing.T) {
 			expectedURL:    "https://api.anthropic.com/v1/chat/completions",
 		},
 		{
-			name:           "chat to messages via /anthropic path - rewrite path",
+			name:           "chat to a DeepSeek-style /anthropic messages endpoint - rewrite path",
 			clientProtocol: types.ProtocolChat,
-			target:         RoutingTarget{Target: "https://api.anthropic.com/v1/anthropic"},
-			expectedURL:    "https://api.anthropic.com/v1/chat/completions",
+			// DeepSeek-style /anthropic namespaces expose only Messages; their
+			// chat-completions endpoint lives OUTSIDE the namespace, so the
+			// fallback strips the namespace tail together with /messages.
+			target:      RoutingTarget{Target: "https://api.anthropic.com/v1/anthropic/messages"},
+			expectedURL: "https://api.anthropic.com/v1/chat/completions",
 		},
 		{
 			name:           "chat to responses with path prefix - preserve prefix",

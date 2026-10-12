@@ -308,14 +308,12 @@ func nativeBackendURL(clientProtocol types.Protocol, target RoutingTarget) strin
 	if override := declaredEndpointValue(target, clientProtocol); override != "" {
 		// The declared key tells us WHICH protocol the override serves, not
 		// the URL's shape: the value may be a complete endpoint URL (pass
-		// through untouched — e.g. DeepSeek's /anthropic/messages, where
-		// stripping the tail and re-appending /v1/messages would mangle the
-		// namespace) or a base URL (append the standard path). Inspect the
-		// path to tell the two shapes apart.
-		if proto, ok := inferProtocolFromURL(override); ok && proto == clientProtocol {
-			return override
-		}
-		if resolved, ok := appendProtocolPath(override, clientProtocol); ok {
+		// through untouched — e.g. DeepSeek's /anthropic/messages) or a
+		// base URL (append the standard path — e.g. a DashScope apps
+		// .../apps/anthropic namespace gets /v1/messages appended).
+		// probeURLFor inspects the path to tell the two shapes apart and
+		// shares those rules with the connection-test probe.
+		if resolved, ok := commontypes.ApiFormat(clientProtocol).ProbeOverrideURL(override); ok {
 			return resolved
 		}
 		return override
@@ -360,8 +358,7 @@ func StripProtocolTail(rawURL string) string {
 	case n >= 2 && strings.EqualFold(parts[n-2], commontypes.PathSegChat) && strings.EqualFold(parts[n-1], commontypes.PathSegCompletions):
 		kept = parts[:n-2]
 	case strings.EqualFold(parts[n-1], commontypes.PathSegResponses),
-		strings.EqualFold(parts[n-1], commontypes.PathSegMessages),
-		strings.EqualFold(parts[n-1], commontypes.PathSegAnthropic):
+		strings.EqualFold(parts[n-1], commontypes.PathSegMessages):
 		kept = parts[:n-1]
 	default:
 		return rawURL
