@@ -85,6 +85,11 @@ func NewRouter(config *config.Config) (*gin.Engine, func(), error) {
 	metricsMw, metricsCleanup := newMetricsMiddleware(config)
 	// quota limit middleware
 	quotaMW := gwmw.NewApiKeyQuotaMiddleware(config)
+	// api key scope resolution middleware: records the model/priority scope
+	// on the media inference routes that do not run the quota middleware, so
+	// the planner's model scope guard sees the same scope there. It never
+	// parses request bodies and never enforces usage limits.
+	scopeMW := gwmw.NewApiKeyScopeMiddleware(config)
 
 	// text token routes
 	// Also mount the Anthropic Messages API under /anthropic/v1 to match the
@@ -93,8 +98,13 @@ func NewRouter(config *config.Config) (*gin.Engine, func(), error) {
 	anthropicGroup := r.Group("/anthropic/v1")
 	anthropicGroup.POST("/messages", middlewareCollection.Auth.MustUserOrgApiKey, quotaMW, metricsMw, anthropicHandler.Messages)
 
-	v1Group.GET("/models", openAIhandler.ListModels)
-	v1Group.GET("/models/*model", openAIhandler.GetModel)
+	// The scope middleware feeds the API key model scope consumed by
+	// ListModels/GetModel. The full quota middleware would bring usage
+	// limits (429) into these metadata endpoints and probe the user
+	// service with non-API-key tokens (JWT/OAuth), so only scope is
+	// resolved here; non-API-key identities pass through unrestricted.
+	v1Group.GET("/models", scopeMW, openAIhandler.ListModels)
+	v1Group.GET("/models/*model", scopeMW, openAIhandler.GetModel)
 	v1Group.POST("/responses", middlewareCollection.Auth.MustUserOrgApiKey, quotaMW, metricsMw, responsesHandler.Responses)
 	v1Group.POST("/chat/completions", middlewareCollection.Auth.MustUserOrgApiKey, quotaMW, metricsMw, chatHandler.Chat)
 	v1Group.POST("/systemone", middlewareCollection.Auth.MustUserOrgApiKey, quotaMW, metricsMw, jevHandler.SystemOne)
@@ -103,22 +113,22 @@ func NewRouter(config *config.Config) (*gin.Engine, func(), error) {
 	v1Group.POST("/rerank", middlewareCollection.Auth.MustUserOrgApiKey, quotaMW, metricsMw, rerankHandler.Rerank)
 
 	// image and audio and video routes
-	v1Group.POST("/images/generations", middlewareCollection.Auth.MustUserOrgApiKey, metricsMw, imageHandler.GenerateImage)
-	v1Group.POST("/images/edits", middlewareCollection.Auth.MustUserOrgApiKey, metricsMw, imageHandler.EditImage)
-	v1Group.POST("/audio/transcriptions", middlewareCollection.Auth.MustUserOrgApiKey, metricsMw, audioHandler.Transcription)
-	v1Group.POST("/audio/speech", middlewareCollection.Auth.MustUserOrgApiKey, metricsMw, speechHandler.Speech)
-	v1Group.POST("/audio/speech/batch", middlewareCollection.Auth.MustUserOrgApiKey, metricsMw, speechHandler.SpeechBatch)
+	v1Group.POST("/images/generations", middlewareCollection.Auth.MustUserOrgApiKey, scopeMW, metricsMw, imageHandler.GenerateImage)
+	v1Group.POST("/images/edits", middlewareCollection.Auth.MustUserOrgApiKey, scopeMW, metricsMw, imageHandler.EditImage)
+	v1Group.POST("/audio/transcriptions", middlewareCollection.Auth.MustUserOrgApiKey, scopeMW, metricsMw, audioHandler.Transcription)
+	v1Group.POST("/audio/speech", middlewareCollection.Auth.MustUserOrgApiKey, scopeMW, metricsMw, speechHandler.Speech)
+	v1Group.POST("/audio/speech/batch", middlewareCollection.Auth.MustUserOrgApiKey, scopeMW, metricsMw, speechHandler.SpeechBatch)
 	v1Group.GET("/audio/voices", middlewareCollection.Auth.MustUserOrgApiKey, openAIhandler.ListVoices)
 	v1Group.POST("/audio/voices", middlewareCollection.Auth.MustUserOrgApiKey, openAIhandler.UploadVoice)
 	v1Group.PUT("/audio/voices", middlewareCollection.Auth.MustUserOrgApiKey, openAIhandler.UpdateVoice)
 	v1Group.DELETE("/audio/voices/:name", middlewareCollection.Auth.MustUserOrgApiKey, openAIhandler.DeleteVoice)
-	v1Group.POST("/videos", middlewareCollection.Auth.MustUserOrgApiKey, metricsMw, videoHandler.CreateVideo)
+	v1Group.POST("/videos", middlewareCollection.Auth.MustUserOrgApiKey, scopeMW, metricsMw, videoHandler.CreateVideo)
 	v1Group.GET("/videos/:video_id", middlewareCollection.Auth.MustUserOrgApiKey, metricsMw, videoHandler.GetVideo)
 	v1Group.GET("/videos/:video_id/content", middlewareCollection.Auth.MustUserOrgApiKey, metricsMw, videoHandler.GetVideoContent)
-	v1Group.POST("/video/generations", middlewareCollection.Auth.MustUserOrgApiKey, metricsMw, videoHandler.CreateVideo)
+	v1Group.POST("/video/generations", middlewareCollection.Auth.MustUserOrgApiKey, scopeMW, metricsMw, videoHandler.CreateVideo)
 	v1Group.GET("/video/generations/:video_id", middlewareCollection.Auth.MustUserOrgApiKey, metricsMw, videoHandler.GetVideo)
 	v1Group.GET("/video/generations/:video_id/content", middlewareCollection.Auth.MustUserOrgApiKey, metricsMw, videoHandler.GetVideoContent)
-	v1Group.POST("/ocr", middlewareCollection.Auth.MustUserOrgApiKey, metricsMw, ocrHandler.OCR)
+	v1Group.POST("/ocr", middlewareCollection.Auth.MustUserOrgApiKey, scopeMW, metricsMw, ocrHandler.OCR)
 
 	apiV1Group := r.Group("/api/v1")
 	adminGroup := apiV1Group.Group("/admin", middlewareCollection.Auth.NeedAdmin)

@@ -280,6 +280,10 @@ type ListModelsReq struct {
 	LLMTypes           []string `json:"llm_types"` // filter by llm_type
 	Task               string   `json:"task"`      // filter by task
 	HasAssociatedModel *bool    `json:"has_associated_model"`
+	// ModelScope, when non-empty, restricts the listing to the model IDs the
+	// caller's API key may access. The handler derives it from the API key's
+	// model scope, never from request input.
+	ModelScope []string `json:"-"`
 }
 
 // UserPreferenceRequest defines the request parameters for UserPreference method

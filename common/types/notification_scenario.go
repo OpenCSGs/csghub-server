@@ -175,6 +175,21 @@ const (
 	// @BuildTags saas
 	MessageScenarioInvoiceCreated MessageScenario = "invoice-created"
 
+	// invoice issued notification (email the user that their invoice is ready)
+	// @Scenario invoice-issued
+	// @Channels email
+	// @PayloadFields user_name, invoice_title, amount, invoice_url
+	// @Template {
+	//  "email": {
+	//    "zh-CN": {
+	//      "title": "发票已开具",
+	//      "content": "您的发票已开具，开票金额：¥{{.amount}}，点击链接下载发票"
+	//    },
+	//  },
+	// }
+	// @BuildTags saas
+	MessageScenarioInvoiceIssued MessageScenario = "invoice-issued"
+
 	// csgbot critical error notification
 	MessageScenarioCSGBotCriticalError MessageScenario = "csgbot-critical-error"
 

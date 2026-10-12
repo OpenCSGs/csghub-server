@@ -537,8 +537,13 @@ func normalizeSupportedEndpoints(endpoints map[types.ApiFormat]string) map[types
 //     the main URL (empty value) — additional formats need their own endpoint.
 func validateAPIFormat(upstreamURL string, fullURL bool, endpoints map[types.ApiFormat]string) error {
 	if !fullURL {
-		if _, ok := types.InferProtocolFromURLPath(upstreamURL); ok {
-			return fmt.Errorf("%w: base URL must not end with a protocol path (/chat/completions, /responses, /messages, /anthropic); fill the URL up to the version path and use is_full_url for a complete endpoint", ErrInvalidLLMConfig)
+		// Only actual RESOURCE paths (/chat/completions, /responses,
+		// /messages) are forbidden on a base URL — appending the protocol
+		// path to them would duplicate the path. A terminal /anthropic is a
+		// namespace prefix (e.g. DashScope apps, DeepSeek) and is a valid
+		// base: the gateway appends /v1/messages to it.
+		if _, ok := types.InferResourcePathFromURL(upstreamURL); ok {
+			return fmt.Errorf("%w: base URL must not end with a protocol resource path (/chat/completions, /responses, /messages); fill the URL up to the version path and use is_full_url for a complete endpoint", ErrInvalidLLMConfig)
 		}
 	}
 	if len(endpoints) == 0 {

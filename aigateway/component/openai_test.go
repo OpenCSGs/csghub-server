@@ -279,6 +279,27 @@ func TestFilterAndPaginateModels(t *testing.T) {
 		assert.Equal(t, "beta-gen", resp.Data[0].ID)
 		assert.False(t, resp.HasMore)
 	})
+
+	t.Run("model scope keeps only allowed ids and feeds pagination totals", func(t *testing.T) {
+		resp := filterAndPaginateModels(models, types.ListModelsReq{ModelScope: []string{"gpt-3.5:svc2", "gpt-4o:svc4"}})
+		assert.Equal(t, 2, resp.TotalCount)
+		require.Len(t, resp.Data, 2)
+		assert.Equal(t, "gpt-3.5:svc2", resp.Data[0].ID)
+		assert.Equal(t, "gpt-4o:svc4", resp.Data[1].ID)
+	})
+
+	t.Run("model scope combines with pagination", func(t *testing.T) {
+		resp := filterAndPaginateModels(models, types.ListModelsReq{ModelScope: []string{"gpt-4:svc1", "gpt-3.5:svc2"}, Per: 1, Page: 2})
+		assert.Equal(t, 2, resp.TotalCount)
+		require.Len(t, resp.Data, 1)
+		assert.Equal(t, "gpt-3.5:svc2", resp.Data[0].ID)
+		assert.False(t, resp.HasMore)
+	})
+
+	t.Run("empty model scope is unrestricted", func(t *testing.T) {
+		resp := filterAndPaginateModels(models, types.ListModelsReq{ModelScope: nil})
+		assert.Equal(t, 4, resp.TotalCount)
+	})
 }
 
 func TestSanitizeMeteringEventForLog(t *testing.T) {

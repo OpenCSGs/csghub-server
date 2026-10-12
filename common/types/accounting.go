@@ -966,10 +966,11 @@ type AccInvoiceRechargeOrder struct {
 }
 
 type AdminUpdateInvoiceReq struct {
-	ID         int64  `json:"-"`
-	Status     string `json:"status" binding:"required"` //Invoice status eq processing,issued,failed
-	Reason     string `json:"reason"`
-	InvoiceURL string `json:"invoice_url"`
+	ID            int64  `json:"-"`
+	Status        string `json:"status" binding:"required"` //Invoice status eq processing,issued,failed
+	Reason        string `json:"reason"`
+	InvoiceURL    string `json:"invoice_url"`
+	AutoSendEmail bool   `json:"auto_send_email"`
 }
 
 type RechargeStats struct {

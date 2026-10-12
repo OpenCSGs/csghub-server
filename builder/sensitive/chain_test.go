@@ -31,6 +31,7 @@ func TestChainImpl_AliYun_PassTextCheck(t *testing.T) {
 	}
 	if result == nil {
 		t.Fatalf("expected non-nil result, got nil")
+		return
 	}
 	if result.IsSensitive {
 		t.Fatalf("expected non-sensitive result, got sensitive")
@@ -59,6 +60,7 @@ func TestChainImpl_AliYun_PassTextCheck_Sensitive(t *testing.T) {
 	}
 	if result == nil {
 		t.Fatalf("expected non-nil result, got nil")
+		return
 	}
 	if !result.IsSensitive {
 		t.Fatalf("expected sensitive result, got non-sensitive")
@@ -85,6 +87,7 @@ func TestChainImpl_AliYun_PassImageCheck(t *testing.T) {
 	}
 	if result == nil {
 		t.Fatalf("expected non-nil result, got nil")
+		return
 	}
 	if result.IsSensitive {
 		t.Fatalf("expected non-sensitive result, got sensitive")
@@ -108,6 +111,7 @@ func TestChainImpl_AliYun_PassImageCheck_Sensitive(t *testing.T) {
 	}
 	if result == nil {
 		t.Fatalf("expected non-nil result, got nil")
+		return
 	}
 	if !result.IsSensitive {
 		t.Fatalf("expected sensitive result, got non-sensitive")
@@ -135,6 +139,7 @@ func TestChainImpl_AliYun_PassImageURLCheck(t *testing.T) {
 	}
 	if result == nil {
 		t.Fatalf("expected non-nil result, got nil")
+		return
 	}
 	if result.IsSensitive {
 		t.Fatalf("expected non-sensitive result, got sensitive")
@@ -162,6 +167,7 @@ func TestChainImpl_AliYun_PassImageURLCheck_Sensitive(t *testing.T) {
 	}
 	if result == nil {
 		t.Fatalf("expected non-nil result, got nil")
+		return
 	}
 	if !result.IsSensitive {
 		t.Fatalf("expected sensitive result, got non-sensitive")
@@ -189,6 +195,7 @@ func TestChainImpl_AliYun_PassLLMCheck(t *testing.T) {
 	}
 	if result == nil {
 		t.Fatalf("expected non-nil result, got nil")
+		return
 	}
 	if result.IsSensitive {
 		t.Fatalf("expected non-sensitive result, got sensitive")
@@ -218,6 +225,7 @@ func TestChainImpl_AliYun_PassLLMCheck_Sensitive(t *testing.T) {
 	}
 	if result == nil {
 		t.Fatalf("expected non-nil result, got nil")
+		return
 	}
 	if !result.IsSensitive {
 		t.Fatalf("expected sensitive result, got non-sensitive")

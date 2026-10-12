@@ -100,7 +100,37 @@ func (m *openaiComponentImpl) GetAvailableModels(c context.Context, nsUUID strin
 	if err != nil {
 		return nil, err
 	}
+	return m.enrichAndPreferModels(c, nsUUID, models)
+}
 
+// visibleModels reads only models named in a scoped API key. An empty scope
+// retains the ordinary full catalogue.
+func (m *openaiComponentImpl) visibleModels(c context.Context, nsUUID string, scope []string) ([]types.Model, error) {
+	if len(scope) == 0 {
+		return m.GetAvailableModels(c, nsUUID)
+	}
+	models := make([]types.Model, 0, len(scope))
+	seen := make(map[string]struct{}, len(scope))
+	for _, modelID := range scope {
+		if _, duplicate := seen[modelID]; duplicate {
+			continue
+		}
+		seen[modelID] = struct{}{}
+		cfg, err := m.extllmStore.GetByModelName(c, modelID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get llm config by model name %q: %w", modelID, err)
+		}
+		if cfg == nil || !cfg.Enabled {
+			continue
+		}
+		if model, ok := m.llmConfigToModel(c, cfg, nsUUID); ok {
+			models = append(models, model)
+		}
+	}
+	return m.enrichAndPreferModels(c, nsUUID, models)
+}
+
+func (m *openaiComponentImpl) enrichAndPreferModels(c context.Context, nsUUID string, models []types.Model) ([]types.Model, error) {
 	models = m.enrichModelsWithPrice(c, models)
 
 	if strings.TrimSpace(nsUUID) != "" {
@@ -120,7 +150,7 @@ func (m *openaiComponentImpl) GetAvailableModels(c context.Context, nsUUID strin
 }
 
 func (m *openaiComponentImpl) ListModels(c context.Context, nsUUID string, req types.ListModelsReq) (types.ModelList, error) {
-	models, err := m.GetAvailableModels(c, nsUUID)
+	models, err := m.visibleModels(c, nsUUID, req.ModelScope)
 	if err != nil {
 		return types.ModelList{}, err
 	}
@@ -219,6 +249,12 @@ func filterByHasAssociatedModel(hasAssociatedModel bool) modelFilter {
 	}
 }
 
+func filterByModelScope(scope []string) modelFilter {
+	return func(m *types.Model) bool {
+		return slices.Contains(scope, m.ID)
+	}
+}
+
 func applyFilters(models []types.Model, filters []modelFilter) []types.Model {
 	if len(filters) == 0 {
 		return models
@@ -254,6 +290,9 @@ func filterAndPaginateModels(models []types.Model, req types.ListModelsReq) type
 	}
 	if req.HasAssociatedModel != nil {
 		filters = append(filters, filterByHasAssociatedModel(*req.HasAssociatedModel))
+	}
+	if len(req.ModelScope) > 0 {
+		filters = append(filters, filterByModelScope(req.ModelScope))
 	}
 
 	models = applyFilters(models, filters)
