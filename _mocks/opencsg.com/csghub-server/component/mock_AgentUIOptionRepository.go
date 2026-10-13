@@ -22,9 +22,9 @@ func (_m *MockAgentUIOptionRepository) EXPECT() *MockAgentUIOptionRepository_Exp
 	return &MockAgentUIOptionRepository_Expecter{mock: &_m.Mock}
 }
 
-// ListAgentUIOptions provides a mock function with given fields: ctx, currentUser, per, page
-func (_m *MockAgentUIOptionRepository) ListAgentUIOptions(ctx context.Context, currentUser string, per int, page int) ([]types.AgentUIOption, int, error) {
-	ret := _m.Called(ctx, currentUser, per, page)
+// ListAgentUIOptions provides a mock function with given fields: ctx, currentUser, namespace, per, page
+func (_m *MockAgentUIOptionRepository) ListAgentUIOptions(ctx context.Context, currentUser string, namespace string, per int, page int) ([]types.AgentUIOption, int, error) {
+	ret := _m.Called(ctx, currentUser, namespace, per, page)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ListAgentUIOptions")
@@ -33,25 +33,25 @@ func (_m *MockAgentUIOptionRepository) ListAgentUIOptions(ctx context.Context, c
 	var r0 []types.AgentUIOption
 	var r1 int
 	var r2 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, int, int) ([]types.AgentUIOption, int, error)); ok {
-		return rf(ctx, currentUser, per, page)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, int, int) ([]types.AgentUIOption, int, error)); ok {
+		return rf(ctx, currentUser, namespace, per, page)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, int, int) []types.AgentUIOption); ok {
-		r0 = rf(ctx, currentUser, per, page)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, int, int) []types.AgentUIOption); ok {
+		r0 = rf(ctx, currentUser, namespace, per, page)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]types.AgentUIOption)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, int, int) int); ok {
-		r1 = rf(ctx, currentUser, per, page)
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, int, int) int); ok {
+		r1 = rf(ctx, currentUser, namespace, per, page)
 	} else {
 		r1 = ret.Get(1).(int)
 	}
 
-	if rf, ok := ret.Get(2).(func(context.Context, string, int, int) error); ok {
-		r2 = rf(ctx, currentUser, per, page)
+	if rf, ok := ret.Get(2).(func(context.Context, string, string, int, int) error); ok {
+		r2 = rf(ctx, currentUser, namespace, per, page)
 	} else {
 		r2 = ret.Error(2)
 	}
@@ -67,15 +67,16 @@ type MockAgentUIOptionRepository_ListAgentUIOptions_Call struct {
 // ListAgentUIOptions is a helper method to define mock.On call
 //   - ctx context.Context
 //   - currentUser string
+//   - namespace string
 //   - per int
 //   - page int
-func (_e *MockAgentUIOptionRepository_Expecter) ListAgentUIOptions(ctx interface{}, currentUser interface{}, per interface{}, page interface{}) *MockAgentUIOptionRepository_ListAgentUIOptions_Call {
-	return &MockAgentUIOptionRepository_ListAgentUIOptions_Call{Call: _e.mock.On("ListAgentUIOptions", ctx, currentUser, per, page)}
+func (_e *MockAgentUIOptionRepository_Expecter) ListAgentUIOptions(ctx interface{}, currentUser interface{}, namespace interface{}, per interface{}, page interface{}) *MockAgentUIOptionRepository_ListAgentUIOptions_Call {
+	return &MockAgentUIOptionRepository_ListAgentUIOptions_Call{Call: _e.mock.On("ListAgentUIOptions", ctx, currentUser, namespace, per, page)}
 }
 
-func (_c *MockAgentUIOptionRepository_ListAgentUIOptions_Call) Run(run func(ctx context.Context, currentUser string, per int, page int)) *MockAgentUIOptionRepository_ListAgentUIOptions_Call {
+func (_c *MockAgentUIOptionRepository_ListAgentUIOptions_Call) Run(run func(ctx context.Context, currentUser string, namespace string, per int, page int)) *MockAgentUIOptionRepository_ListAgentUIOptions_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(int), args[3].(int))
+		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(int), args[4].(int))
 	})
 	return _c
 }
@@ -85,7 +86,7 @@ func (_c *MockAgentUIOptionRepository_ListAgentUIOptions_Call) Return(_a0 []type
 	return _c
 }
 
-func (_c *MockAgentUIOptionRepository_ListAgentUIOptions_Call) RunAndReturn(run func(context.Context, string, int, int) ([]types.AgentUIOption, int, error)) *MockAgentUIOptionRepository_ListAgentUIOptions_Call {
+func (_c *MockAgentUIOptionRepository_ListAgentUIOptions_Call) RunAndReturn(run func(context.Context, string, string, int, int) ([]types.AgentUIOption, int, error)) *MockAgentUIOptionRepository_ListAgentUIOptions_Call {
 	_c.Call.Return(run)
 	return _c
 }

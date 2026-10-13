@@ -143,6 +143,66 @@ func (_c *MockSpaceComponent_Create_Call) RunAndReturn(run func(context.Context,
 	return _c
 }
 
+// CreateWithFiles provides a mock function with given fields: ctx, req, extraFiles
+func (_m *MockSpaceComponent) CreateWithFiles(ctx context.Context, req types.CreateSpaceReq, extraFiles []types.SpaceSeedFile) (*types.Space, error) {
+	ret := _m.Called(ctx, req, extraFiles)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CreateWithFiles")
+	}
+
+	var r0 *types.Space
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.CreateSpaceReq, []types.SpaceSeedFile) (*types.Space, error)); ok {
+		return rf(ctx, req, extraFiles)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.CreateSpaceReq, []types.SpaceSeedFile) *types.Space); ok {
+		r0 = rf(ctx, req, extraFiles)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*types.Space)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.CreateSpaceReq, []types.SpaceSeedFile) error); ok {
+		r1 = rf(ctx, req, extraFiles)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockSpaceComponent_CreateWithFiles_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateWithFiles'
+type MockSpaceComponent_CreateWithFiles_Call struct {
+	*mock.Call
+}
+
+// CreateWithFiles is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req types.CreateSpaceReq
+//   - extraFiles []types.SpaceSeedFile
+func (_e *MockSpaceComponent_Expecter) CreateWithFiles(ctx interface{}, req interface{}, extraFiles interface{}) *MockSpaceComponent_CreateWithFiles_Call {
+	return &MockSpaceComponent_CreateWithFiles_Call{Call: _e.mock.On("CreateWithFiles", ctx, req, extraFiles)}
+}
+
+func (_c *MockSpaceComponent_CreateWithFiles_Call) Run(run func(ctx context.Context, req types.CreateSpaceReq, extraFiles []types.SpaceSeedFile)) *MockSpaceComponent_CreateWithFiles_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.CreateSpaceReq), args[2].([]types.SpaceSeedFile))
+	})
+	return _c
+}
+
+func (_c *MockSpaceComponent_CreateWithFiles_Call) Return(_a0 *types.Space, _a1 error) *MockSpaceComponent_CreateWithFiles_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockSpaceComponent_CreateWithFiles_Call) RunAndReturn(run func(context.Context, types.CreateSpaceReq, []types.SpaceSeedFile) (*types.Space, error)) *MockSpaceComponent_CreateWithFiles_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Delete provides a mock function with given fields: ctx, namespace, name, currentUser
 func (_m *MockSpaceComponent) Delete(ctx context.Context, namespace string, name string, currentUser string) error {
 	ret := _m.Called(ctx, namespace, name, currentUser)

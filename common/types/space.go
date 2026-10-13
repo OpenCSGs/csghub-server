@@ -82,6 +82,15 @@ type CreateSpaceReq struct {
 	MinReplica    int    `json:"min_replica" example:"0" binding:"min=0"`
 }
 
+// SpaceSeedFile is an extra file committed into a newly created space repo
+// alongside the default files. Content is raw bytes; the space component
+// base64-encodes it for the git commit. Server-side only (not bindable from
+// the public create-space API).
+type SpaceSeedFile struct {
+	Path    string
+	Content []byte
+}
+
 // Space is the domain object for spaces
 type Space struct {
 	ID            int64       `json:"id,omitempty"`

@@ -233,15 +233,15 @@ type RepoComponent interface {
 }
 
 type AgentUIOptionRepository interface {
-	ListAgentUIOptions(ctx context.Context, currentUser string, per, page int) ([]types.AgentUIOption, int, error)
+	ListAgentUIOptions(ctx context.Context, currentUser, namespace string, per, page int) ([]types.AgentUIOption, int, error)
 }
 
-func (c *repoComponentImpl) ListAgentUIOptions(ctx context.Context, currentUser string, per, page int) ([]types.AgentUIOption, int, error) {
+func (c *repoComponentImpl) ListAgentUIOptions(ctx context.Context, currentUser, namespace string, per, page int) ([]types.AgentUIOption, int, error) {
 	scope, err := c.loadRepositoryReadScope(ctx, currentUser)
 	if err != nil {
 		return nil, 0, err
 	}
-	return database.NewAgentUIOptionStore().List(ctx, scope, per, page)
+	return database.NewAgentUIOptionStore().List(ctx, scope, namespace, per, page)
 }
 
 func NewRepoComponentImpl(config *config.Config) (*repoComponentImpl, error) {

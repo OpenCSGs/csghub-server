@@ -25,13 +25,14 @@ func TestAgentUIOptionStore_ListFiltersAndPaginates(t *testing.T) {
 
 	type spaceFixture struct {
 		id      int64
+		repoID  int64
 		svcName string
 	}
-	createSpace := func(name string, private, withTag bool, latestStatus int) spaceFixture {
+	createSpace := func(ns, name string, private, withTag bool, latestStatus int) spaceFixture {
 		t.Helper()
 		uniqueName := name + "-" + uuid.NewString()[:8]
 		repo := &database.Repository{
-			UserID: 1, Path: "ui-test/" + uniqueName, GitPath: "ui-test/" + uniqueName,
+			UserID: 1, Path: ns + "/" + uniqueName, GitPath: ns + "/" + uniqueName,
 			Name: uniqueName, Nickname: uniqueName, DefaultBranch: "main", Private: private,
 			RepositoryType: types.SpaceRepo,
 		}
@@ -60,27 +61,104 @@ func TestAgentUIOptionStore_ListFiltersAndPaginates(t *testing.T) {
 			_, updateErr := db.Core.NewUpdate().Table("deploys").Set("created_at = ?", time.Now()).Where("deploy_name = ?", deploy.DeployName).Exec(ctx)
 			require.NoError(t, updateErr)
 		}
-		return spaceFixture{id: space.ID, svcName: deploy.SvcName}
+		return spaceFixture{id: space.ID, repoID: repo.ID, svcName: deploy.SvcName}
+	}
+	// createSpaceNoDeploy creates a tagged, public space with no deploy rows.
+	createSpaceNoDeploy := func(ns, name string) spaceFixture {
+		t.Helper()
+		uniqueName := name + "-" + uuid.NewString()[:8]
+		repo := &database.Repository{
+			UserID: 1, Path: ns + "/" + uniqueName, GitPath: ns + "/" + uniqueName,
+			Name: uniqueName, Nickname: uniqueName, DefaultBranch: "main",
+			RepositoryType: types.SpaceRepo,
+		}
+		require.NoError(t, db.Core.NewInsert().Model(repo).Scan(ctx, repo))
+		_, err := spaceStore.Create(ctx, database.Space{RepositoryID: repo.ID, Sdk: types.GRADIO.Name})
+		require.NoError(t, err)
+		space, err := spaceStore.ByRepoID(ctx, repo.ID)
+		require.NoError(t, err)
+		_, err = db.Core.NewInsert().Model(&database.RepositoryTag{RepositoryID: repo.ID, TagID: tag.ID, Count: 1}).Exec(ctx)
+		require.NoError(t, err)
+		return spaceFixture{id: space.ID, repoID: repo.ID}
 	}
 
-	first := createSpace("first", false, true, common.Running)
-	second := createSpace("second", false, true, common.Running)
-	createSpace("private", true, true, common.Running)
-	createSpace("untagged", false, false, common.Running)
-	createSpace("stopped", false, true, common.Stopped)
+	createSpace("ui-test", "first", false, true, common.Running)
+	second := createSpace("ui-test", "second", false, true, common.Running)
+	private := createSpace("ui-test", "private", true, true, common.Running)
+	createSpace("ui-test", "untagged", false, false, common.Running)
+	stopped := createSpace("ui-test", "stopped", false, true, common.Stopped)
+	noDeploy := createSpaceNoDeploy("ui-test", "nodeploy")
 
-	options, total, err := store.List(ctx, database.NewRepositoryAccessScope(database.RepositoryAccessReadable, []int64{first.id}), 1, 1)
-	require.NoError(t, err)
-	require.Equal(t, 2, total)
-	require.Len(t, options, 1)
-	require.Equal(t, second.id, options[0].SpaceID)
-	require.Equal(t, second.svcName, options[0].SvcName)
+	t.Run("public spaces are listed regardless of read scope or deploy status", func(t *testing.T) {
+		// an empty granted-ID set simulates a read-scope cache that has not
+		// caught up yet: public spaces must still appear immediately
+		options, total, err := store.List(ctx, database.NewRepositoryAccessScope(database.RepositoryAccessReadable, nil), "", 10, 1)
+		require.NoError(t, err)
+		require.Equal(t, 4, total)
+		require.Len(t, options, 4)
+		byID := make(map[int64]types.AgentUIOption)
+		for _, o := range options {
+			byID[o.SpaceID] = o
+		}
+		// raw deploy status and svc name are returned for the component to aggregate
+		require.Equal(t, common.Running, *byID[second.id].DeployStatus)
+		require.Equal(t, second.svcName, byID[second.id].SvcName)
+		require.Equal(t, common.Stopped, *byID[stopped.id].DeployStatus)
+		require.Nil(t, byID[noDeploy.id].DeployStatus)
+		require.Empty(t, byID[noDeploy.id].SvcName)
+		// without a grant, the private space is not listed
+		require.NotContains(t, byID, private.id)
+	})
 
-	options, total, err = store.List(ctx, database.NewRepositoryAccessScope(database.RepositoryAccessReadable, []int64{first.id}), 1, 2)
-	require.NoError(t, err)
-	require.Equal(t, 2, total)
-	require.Len(t, options, 1)
-	require.Equal(t, first.id, options[0].SpaceID)
+	t.Run("granted private space is listed alongside public ones", func(t *testing.T) {
+		options, total, err := store.List(ctx, database.NewRepositoryAccessScope(database.RepositoryAccessReadable, []int64{private.repoID}), "", 10, 1)
+		require.NoError(t, err)
+		require.Equal(t, 5, total)
+		byID := make(map[int64]types.AgentUIOption)
+		for _, o := range options {
+			byID[o.SpaceID] = o
+		}
+		require.Contains(t, byID, private.id)
+		require.True(t, byID[private.id].Private)
+	})
+
+	t.Run("admin scope lists all tagged including private", func(t *testing.T) {
+		_, total, err := store.List(ctx, database.NewRepositoryAccessScope(database.RepositoryAccessAdmin, nil), "", 10, 1)
+		require.NoError(t, err)
+		require.Equal(t, 5, total)
+	})
+
+	t.Run("ordering is space id DESC", func(t *testing.T) {
+		options, total, err := store.List(ctx, database.NewRepositoryAccessScope(database.RepositoryAccessReadable, nil), "", 1, 1)
+		require.NoError(t, err)
+		require.Equal(t, 4, total)
+		require.Len(t, options, 1)
+		require.Equal(t, noDeploy.id, options[0].SpaceID)
+	})
+
+	t.Run("namespace filter returns only that namespace's spaces", func(t *testing.T) {
+		other1 := createSpace("ui-other", "other1", false, true, common.Running)
+		other2 := createSpaceNoDeploy("ui-other", "other2")
+		scope := database.NewRepositoryAccessScope(database.RepositoryAccessReadable, nil)
+
+		options, total, err := store.List(ctx, scope, "ui-other", 10, 1)
+		require.NoError(t, err)
+		require.Equal(t, 2, total)
+		require.Len(t, options, 2)
+		for _, o := range options {
+			require.True(t, o.SpaceID == other1.id || o.SpaceID == other2.id)
+			require.Contains(t, o.Path, "ui-other/")
+		}
+
+		_, total, err = store.List(ctx, scope, "ui-test", 10, 1)
+		require.NoError(t, err)
+		require.Equal(t, 4, total)
+
+		// empty namespace returns all namespaces
+		_, total, err = store.List(ctx, scope, "", 10, 1)
+		require.NoError(t, err)
+		require.Equal(t, 6, total)
+	})
 }
 
 func TestAgentUIOptionStore_HasAgentUITag(t *testing.T) {

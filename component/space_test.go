@@ -2,6 +2,7 @@ package component
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"slices"
@@ -1361,4 +1362,116 @@ func TestSpaceComponent_CreateGradio(t *testing.T) {
 		Path:       "ns/n",
 	}, space)
 	wg.Wait()
+}
+
+func TestSpaceComponent_CreateWithFiles(t *testing.T) {
+	newCreateReq := func() types.CreateSpaceReq {
+		return types.CreateSpaceReq{
+			Sdk:        types.GRADIO.Name,
+			ResourceID: 1,
+			ClusterID:  "cluster",
+			CreateRepoReq: types.CreateRepoReq{
+				DefaultBranch: "main",
+				Namespace:     "ns",
+				Name:          "n",
+				License:       "MIT",
+				Username:      "user",
+			},
+		}
+	}
+
+	setupMocks := func(sc *testSpaceWithMocks, commitMatcher any) *sync.WaitGroup {
+		ctx := context.TODO()
+		sc.mocks.stores.SpaceResourceMock().EXPECT().FindByID(ctx, int64(1)).Return(&database.SpaceResource{
+			ID:        1,
+			Name:      "sp",
+			Resources: `{"memory": "foo"}`,
+		}, nil)
+		sc.mocks.components.repo.EXPECT().CheckAccountAndResource(ctx, mock.Anything, mock.Anything).Return(&types.CheckExclusiveResp{}, nil)
+		sc.mocks.components.repo.EXPECT().CreateRepo(ctx, mock.Anything).Return(nil, &database.Repository{
+			ID:   321,
+			User: database.User{Username: "user", Email: "foo@bar.com", UUID: "user-uuid"},
+			Path: "ns/n",
+		}, nil, nil)
+		sc.mocks.stores.SpaceMock().EXPECT().CreateAndUpdateRepoPath(ctx, mock.Anything, "ns/n").Return(&database.Space{
+			RepositoryID: 321,
+			Repository:   &database.Repository{ID: 321, Path: "ns/n"},
+		}, nil)
+		sc.mocks.gitServer.EXPECT().CommitFiles(mock.Anything, commitMatcher).Return(nil)
+		var wg sync.WaitGroup
+		wg.Add(1)
+		sc.mocks.components.repo.EXPECT().SendAssetManagementMsg(mock.Anything, mock.Anything).
+			RunAndReturn(func(ctx context.Context, req types.RepoNotificationReq) error {
+				wg.Done()
+				return nil
+			})
+		return &wg
+	}
+
+	t.Run("extra files are committed with defaults", func(t *testing.T) {
+		ctx := context.TODO()
+		sc := initializeTestSpaceComponent(ctx, t)
+		wg := setupMocks(sc, mock.MatchedBy(func(req gitserver.CommitFilesReq) bool {
+			paths := make(map[string]string)
+			for _, f := range req.Files {
+				paths[f.Path] = f.Content
+			}
+			_, hasReadme := paths[types.ReadmeFileName]
+			_, hasGitattributes := paths[types.GitattributesFileName]
+			appContent, hasApp := paths["app.py"]
+			return hasReadme && hasGitattributes && hasApp &&
+				appContent == base64.StdEncoding.EncodeToString([]byte("import gradio"))
+		}))
+		_, err := sc.CreateWithFiles(ctx, newCreateReq(), []types.SpaceSeedFile{
+			{Path: "app.py", Content: []byte("import gradio")},
+		})
+		require.NoError(t, err)
+		wg.Wait()
+	})
+
+	t.Run("framework README replaces synthesized readme", func(t *testing.T) {
+		ctx := context.TODO()
+		sc := initializeTestSpaceComponent(ctx, t)
+		wg := setupMocks(sc, mock.MatchedBy(func(req gitserver.CommitFilesReq) bool {
+			readmeCount := 0
+			var readmeContent string
+			for _, f := range req.Files {
+				if f.Path == types.ReadmeFileName {
+					readmeCount++
+					readmeContent = f.Content
+				}
+			}
+			return readmeCount == 1 &&
+				readmeContent == base64.StdEncoding.EncodeToString([]byte("# framework readme"))
+		}))
+		_, err := sc.CreateWithFiles(ctx, newCreateReq(), []types.SpaceSeedFile{
+			{Path: types.ReadmeFileName, Content: []byte("# framework readme")},
+			{Path: "app.py", Content: []byte("import gradio")},
+		})
+		require.NoError(t, err)
+		wg.Wait()
+	})
+
+	t.Run("extra files never duplicate a default file path", func(t *testing.T) {
+		ctx := context.TODO()
+		sc := initializeTestSpaceComponent(ctx, t)
+		wg := setupMocks(sc, mock.MatchedBy(func(req gitserver.CommitFilesReq) bool {
+			counts := make(map[string]int)
+			contents := make(map[string]string)
+			for _, f := range req.Files {
+				counts[f.Path]++
+				contents[f.Path] = f.Content
+			}
+			// each path committed exactly once, extra file content wins
+			return counts[types.GitattributesFileName] == 1 &&
+				contents[types.GitattributesFileName] == base64.StdEncoding.EncodeToString([]byte("* binary")) &&
+				counts[types.ReadmeFileName] == 1
+		}))
+		_, err := sc.CreateWithFiles(ctx, newCreateReq(), []types.SpaceSeedFile{
+			{Path: types.GitattributesFileName, Content: []byte("* binary")},
+			{Path: "app.py", Content: []byte("import gradio")},
+		})
+		require.NoError(t, err)
+		wg.Wait()
+	})
 }

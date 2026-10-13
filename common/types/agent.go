@@ -452,14 +452,37 @@ type AgentInstanceFilter struct {
 }
 
 type AgentUIOption struct {
-	SpaceID  int64  `json:"space_id" bun:"space_id"`
-	Path     string `json:"path"`
-	Name     string `json:"name"`
+	SpaceID int64  `json:"space_id" bun:"space_id"`
+	Path    string `json:"path"`
+	Name    string `json:"name"`
+	// Private is the space's repo visibility. A private bound space is only
+	// reachable through the agent's custom domain, never via its own endpoint.
 	Private  bool   `json:"private"`
 	SDK      string `json:"sdk"`
 	Status   string `json:"status"`
 	Endpoint string `json:"endpoint"`
 	SvcName  string `json:"-" bun:"svc_name"`
+	// DeployStatus is the raw status of the space's latest deploy (nil when the
+	// space has never been deployed); the component maps it to Status.
+	DeployStatus *int `json:"-" bun:"deploy_status"`
+}
+
+// CreateAgentUISpaceReq is the request body for creating a custom UI space for
+// csgclaw agents. When Name is empty, the server generates a unique space name
+// under the requested namespace; the framework source, SDK, and compute
+// resource are also chosen by the server. Namespace may name the current user
+// or one of their orgs.
+type CreateAgentUISpaceReq struct {
+	Name        string `json:"name"`
+	Namespace   string `json:"namespace" binding:"required"`
+	Nickname    string `json:"nickname"`
+	Description string `json:"description"`
+}
+
+// AgentUISpace is the result of creating a custom UI space.
+type AgentUISpace struct {
+	SpaceID int64  `json:"space_id"`
+	Path    string `json:"path"`
 }
 
 type UpdateAgentInstanceRequest struct {

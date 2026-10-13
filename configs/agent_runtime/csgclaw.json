@@ -19,5 +19,10 @@
     "CSGCLAW_ROLE": "server",
     "CSGCLAW_PVC_MOUNT_PATH": "/home/picoclaw/.csgclaw",
     "SKILLS_POLL_INTERVAL": "600"
+  },
+  "custom_ui": {
+    "url": "https://opencsg-public-resource.oss-cn-beijing.aliyuncs.com/agentichub/agent-ui-framework/v1.0.0/bundle.tar.gz",
+    "sha256": "746f9378c5e7415a93fb57eebcaad54d7dd22218d9e33faf8cb233f079c5265e",
+    "sdk": "gradio"
   }
 }

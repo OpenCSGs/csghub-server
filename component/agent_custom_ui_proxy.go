@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"opencsg.com/csghub-server/builder/deploy/common"
+	"opencsg.com/csghub-server/builder/rebac"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
@@ -20,14 +21,18 @@ type agentCustomUIProxyComponent struct {
 	spaceStore  database.SpaceStore
 	deployStore database.DeployTaskStore
 	shareStore  database.AgentShareStore
+	userStore   database.UserStore
+	repoComp    RepoComponent
 }
 
-func NewAgentCustomUIProxyComponent() AgentCustomUIProxyComponent {
+func NewAgentCustomUIProxyComponent(repoComp RepoComponent) AgentCustomUIProxyComponent {
 	return &agentCustomUIProxyComponent{
 		agentStore:  database.NewAgentInstanceStore(),
 		spaceStore:  database.NewSpaceStore(),
 		deployStore: database.NewDeployTaskStore(),
 		shareStore:  database.NewAgentShareStore(),
+		userStore:   database.NewUserStore(),
+		repoComp:    repoComp,
 	}
 }
 
@@ -77,8 +82,27 @@ func (c *agentCustomUIProxyComponent) Resolve(ctx context.Context, agentContentI
 	if space == nil || space.Repository == nil {
 		return nil, true, errorx.ErrNotFound
 	}
+	// A private bound space is allowed: the public agent's binding authorizes
+	// anonymous access to the space's deployment through the agent's custom
+	// domain. The space's own endpoint stays access-controlled via the normal
+	// RProxy path. The binding is resolved on every request, so unbinding or
+	// making the agent private (rejected above) cuts access immediately.
 	if space.Repository.Private {
-		return nil, true, errorx.ErrForbidden
+		// Fail closed when the agent owner no longer has write access to the
+		// private bound space (e.g. org membership revoked after binding):
+		// binding is a publish action, and losing the permission that
+		// authorized the publish must cut the anonymous exposure.
+		owner, err := c.userStore.FindByUUID(ctx, agent.UserUUID)
+		if err != nil {
+			return nil, true, fmt.Errorf("failed to resolve agent owner for custom UI permission check: %w", err)
+		}
+		canWrite, err := c.repoComp.CheckUserRepoPermission(ctx, owner.Username, space.Repository, rebac.RepositoryCanWrite)
+		if err != nil {
+			return nil, true, fmt.Errorf("failed to recheck custom UI Space write access: %w", err)
+		}
+		if !canWrite {
+			return nil, true, errorx.ErrForbidden
+		}
 	}
 	info := &types.AgentCustomUIProxyInfo{
 		AgentContentID: agent.ContentID,
