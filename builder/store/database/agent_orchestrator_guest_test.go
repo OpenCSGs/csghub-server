@@ -55,6 +55,39 @@ func TestAgentOrchestratorStoreGuestChargesCreatorQuota(t *testing.T) {
 	require.ErrorIs(t, err, errorx.ErrInstanceQuotaExceeded)
 }
 
+func TestAgentOrchestratorStoreGuestUnboundedCapacityTracksReservations(t *testing.T) {
+	db := tests.InitTransactionTestDB()
+	defer db.Close()
+	ctx := context.Background()
+	store := database.NewAgentOrchestratorStoreWithDB(db)
+	creator := uuid.NewString()
+	logical := createPublicLogicalAgent(t, ctx, db, creator, "logical-"+uuid.NewString())
+	insertGuestUsers(t, ctx, db, creator)
+
+	firstInput := guestReserveInput(logical.ID, "guest-a", creator, 0)
+	firstInput.UnboundedRuntimeCapacity = true
+	_, err := store.ReserveAllocation(ctx, firstInput)
+	require.NoError(t, err)
+	secondInput := guestReserveInput(logical.ID, "guest-b", creator, 0)
+	secondInput.UnboundedRuntimeCapacity = true
+	_, err = store.ReserveAllocation(ctx, secondInput)
+	require.NoError(t, err)
+
+	counter := new(database.AgentCapacityCounter)
+	require.NoError(t, db.Core.NewSelect().Model(counter).
+		Where("scope_kind = 'user' AND scope_id = ? AND resource_kind = 'agent_runtime_instance'", creator).
+		Scan(ctx))
+	require.Equal(t, int64(2), counter.Reserved)
+	require.Zero(t, counter.Consumed)
+	require.Equal(t, int64(2), counter.CapacityLimit)
+
+	reservationCount, err := db.Core.NewSelect().Model((*database.AgentCapacityReservation)(nil)).
+		Where("scope_kind = 'user' AND scope_id = ? AND resource_kind = 'agent_runtime_instance'", creator).
+		Count(ctx)
+	require.NoError(t, err)
+	require.Equal(t, 2, reservationCount)
+}
+
 func TestAgentOrchestratorStoreGuestSessionHiddenFromUserAPIs(t *testing.T) {
 	db := tests.InitTransactionTestDB()
 	defer db.Close()
