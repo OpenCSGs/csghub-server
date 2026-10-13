@@ -3,7 +3,9 @@ package reposyncer
 import (
 	"context"
 	"crypto/tls"
+	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -11,12 +13,16 @@ import (
 	"strings"
 	"time"
 
+	"github.com/goccy/go-yaml"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"opencsg.com/csghub-server/builder/git"
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/temporal"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/utils/common"
 	"opencsg.com/csghub-server/component"
@@ -231,15 +237,6 @@ func (w *RepoSyncWorker) SyncRepo(
 	if err != nil {
 		return RepoSyncResult{Task: mt}, fmt.Errorf("failed to get repo last commit: %w", err)
 	}
-
-	mt.BeforeLastCommitID = beforeCommitID
-	mt.AfterLastCommitID = commit.ID
-	if err := w.updateCommitCheckpoint(ctx, mt, "", commit.ID); err != nil {
-		return RepoSyncResult{Task: mt}, err
-	}
-
-	w.generateDescriptionFromReadme(ctx, mirror.Repository.RepositoryType, namespace, name, commit.ID)
-
 	if beforeCommitID != "" && commit.ID != beforeCommitID {
 		// Point HEAD to old commit
 		slog.Info(
@@ -249,14 +246,7 @@ func (w *RepoSyncWorker) SyncRepo(
 			slog.Any("name", name),
 		)
 
-		err = w.git.UpdateRef(ctx, gitserver.UpdateRefReq{
-			Namespace:    namespace,
-			Name:         name,
-			Ref:          fmt.Sprintf("refs/heads/%s", branch),
-			RepoType:     mirror.Repository.RepositoryType,
-			NewObjectId:  beforeCommitID,
-			RelativePath: relativePath,
-		})
+		err = w.updateRepoRef(ctx, mirror.Repository, namespace, name, branch, beforeCommitID)
 		if err != nil {
 			return RepoSyncResult{Task: mt}, fmt.Errorf("failed to point HEAD to old commit: %w", err)
 		}
@@ -267,6 +257,26 @@ func (w *RepoSyncWorker) SyncRepo(
 			slog.Any("name", name),
 		)
 	}
+
+	commit, err = w.ensureSkillMetadataFile(ctx, skillMetadataEnsureRequest{
+		repository:      mirror.Repository,
+		namespace:       namespace,
+		name:            name,
+		branch:          branch,
+		restoreCommitID: beforeCommitID,
+		commit:          commit,
+	})
+	if err != nil {
+		return RepoSyncResult{Task: mt}, err
+	}
+
+	mt.BeforeLastCommitID = beforeCommitID
+	mt.AfterLastCommitID = commit.ID
+	if err := w.updateCommitCheckpoint(ctx, mt, "", commit.ID); err != nil {
+		return RepoSyncResult{Task: mt}, err
+	}
+
+	w.generateDescriptionFromReadme(ctx, mirror.Repository.RepositoryType, namespace, name, commit.ID)
 
 	// Fast path: repos with no LFS objects publish the new commit immediately and
 	// skip the LFS queue entirely. Code and skill repos usually have no LFS files,
@@ -301,6 +311,142 @@ func (w *RepoSyncWorker) SyncRepo(
 	}
 
 	return RepoSyncResult{Task: mt, NoLFS: false}, nil
+}
+
+// ensureSkillMetadataFile adds the required metadata file when an imported
+// skill repository does not provide one and returns the resulting HEAD commit.
+type skillMetadataEnsureRequest struct {
+	repository      *database.Repository
+	namespace       string
+	name            string
+	branch          string
+	restoreCommitID string
+	commit          *types.Commit
+}
+
+func (w *RepoSyncWorker) ensureSkillMetadataFile(ctx context.Context, req skillMetadataEnsureRequest) (result *types.Commit, err error) {
+	repository := req.repository
+	commit := req.commit
+	if repository.RepositoryType != types.SkillRepo {
+		return commit, nil
+	}
+	if _, err := w.git.GetRepoFileRaw(ctx, gitserver.GetRepoInfoByPathReq{
+		Namespace: req.namespace,
+		Name:      req.name,
+		RepoType:  repository.RepositoryType,
+		Path:      "SKILL.md",
+		Ref:       commit.ID,
+	}); err != nil {
+		// GetRepoFileRaw maps both gRPC NotFound and InvalidArgument to
+		// ErrGitFileNotFound. Only an explicit NotFound means SKILL.md is
+		// genuinely absent; InvalidArgument (e.g. an invalid revision) is a
+		// real read failure and must not trigger metadata generation on top of
+		// a broken state.
+		if !errors.Is(err, errorx.ErrGitFileNotFound) || status.Code(err) != codes.NotFound {
+			return commit, fmt.Errorf("failed to check imported skill SKILL.md: %w", err)
+		}
+	} else {
+		return commit, nil
+	}
+
+	username := repository.User.Username
+	if username == "" {
+		username = "opencsg"
+	}
+	email := repository.User.Email
+	if email == "" {
+		email = fmt.Sprintf("%s@users.noreply.csghub.com", username)
+	}
+	skillName := repository.Name
+	if skillName == "" {
+		skillName = req.name
+	}
+	content, err := buildDefaultSkillMetadata(skillName, repository.Description)
+	if err != nil {
+		return commit, err
+	}
+	// CommitFiles may move the branch even when it reports an error. Restore
+	// every exit after this point, including when the imported commit already
+	// equals the previous commit and no initial switch is necessary.
+	defer func() {
+		err = w.restoreSkillRef(req, err)
+	}()
+	if req.restoreCommitID != "" && req.restoreCommitID != commit.ID {
+		if err := w.updateRepoRef(ctx, repository, req.namespace, req.name, req.branch, commit.ID); err != nil {
+			return commit, fmt.Errorf("failed to switch to imported skill commit before creating SKILL.md: %w", err)
+		}
+	}
+	if err := w.git.CommitFiles(ctx, gitserver.CommitFilesReq{
+		Namespace: req.namespace,
+		Name:      req.name,
+		RepoType:  repository.RepositoryType,
+		Revision:  req.branch,
+		Username:  username,
+		Email:     email,
+		Message:   "Add default SKILL.md",
+		Files: []gitserver.CommitFile{{
+			Path: "SKILL.md", Content: base64.StdEncoding.EncodeToString([]byte(content)), Action: gitserver.CommitActionCreate,
+		}},
+	}); err != nil {
+		return commit, fmt.Errorf("failed to create default SKILL.md: %w", err)
+	}
+	generatedCommit, err := w.getRepoLastCommit(
+		ctx, req.namespace, req.name, req.branch, repository.RepositoryType, repository.GitalyPath(),
+	)
+	if err != nil {
+		return commit, fmt.Errorf("failed to get commit after creating default SKILL.md: %w", err)
+	}
+	return generatedCommit, nil
+}
+
+func buildDefaultSkillMetadata(name, description string) (string, error) {
+	metadata, err := yaml.Marshal(struct {
+		Name        string `yaml:"name"`
+		Description string `yaml:"description"`
+	}{
+		Name:        name,
+		Description: description,
+	})
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal default SKILL.md metadata: %w", err)
+	}
+	return fmt.Sprintf("---\n%s---", metadata), nil
+}
+
+// skillRefRestoreTimeout bounds branch restoration after metadata generation.
+// Restoration runs independently of task cancellation on both success and failure.
+const skillRefRestoreTimeout = 30 * time.Second
+
+func (w *RepoSyncWorker) restoreSkillRef(
+	req skillMetadataEnsureRequest,
+	cause error,
+) error {
+	if req.restoreCommitID == "" {
+		return cause
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), skillRefRestoreTimeout)
+	defer cancel()
+	if err := w.updateRepoRef(
+		ctx, req.repository, req.namespace, req.name, req.branch, req.restoreCommitID,
+	); err != nil {
+		return errors.Join(cause, fmt.Errorf("failed to restore previous commit after SKILL.md generation: %w", err))
+	}
+	return cause
+}
+
+func (w *RepoSyncWorker) updateRepoRef(
+	ctx context.Context,
+	repository *database.Repository,
+	namespace, name, branch, commitID string,
+) error {
+	return w.git.UpdateRef(ctx, gitserver.UpdateRefReq{
+		Namespace:    namespace,
+		Name:         name,
+		Ref:          fmt.Sprintf("refs/heads/%s", branch),
+		RepoType:     repository.RepositoryType,
+		NewObjectId:  commitID,
+		RelativePath: repository.GitalyPath(),
+	})
 }
 
 func (w *RepoSyncWorker) updateCommitCheckpoint(ctx context.Context, mt *database.MirrorTask, beforeCommitID, afterCommitID string) error {
