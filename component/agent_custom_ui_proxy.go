@@ -84,6 +84,7 @@ func (c *agentCustomUIProxyComponent) Resolve(ctx context.Context, agentContentI
 		AgentContentID: agent.ContentID,
 		AgentName:      agentName,
 		ShareName:      share.ShareName,
+		Kind:           types.AgentInstanceKind(agent.Kind),
 		SpaceID:        spaceID,
 	}
 	deploy, err := c.deployStore.GetLatestDeployBySpaceID(ctx, spaceID)

@@ -606,17 +606,17 @@ func TestAgentInstanceStore_IsInstanceExistsByContentID_EmptyParameters(t *testi
 
 	// Test with empty type
 	exists, err := store.IsInstanceExistsByContentID(ctx, "", "some-content-id")
-	require.NoError(t, err)
+	require.Error(t, err)
 	require.False(t, exists)
 
 	// Test with empty content_id
 	exists, err = store.IsInstanceExistsByContentID(ctx, "langflow", "")
-	require.NoError(t, err)
+	require.Error(t, err)
 	require.False(t, exists)
 
 	// Test with both empty
 	exists, err = store.IsInstanceExistsByContentID(ctx, "", "")
-	require.NoError(t, err)
+	require.Error(t, err)
 	require.False(t, exists)
 }
 

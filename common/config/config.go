@@ -554,13 +554,24 @@ type Config struct {
 	}
 
 	Agent struct {
-		AutoHubServiceHost        string `env:"OPENCSG_AGENT_AUTOHUB_SERVICE_HOST" default:"http://internal.opencsg-stg.com:8190"`
-		AgentHubServiceHost       string `env:"OPENCSG_AGENT_AGENTHUB_SERVICE_HOST" default:""`
-		AgentHubServiceToken      string `env:"OPENCSG_AGENT_AGENTHUB_SERVICE_TOKEN" default:""`
-		MCPInspectMaxConcurrency  int    `env:"OPENCSG_AGENT_MCP_INSPECT_MAX_CONCURRENCY" default:"50"`
-		ShareSessionTokenValidDay int    `env:"STARHUB_SERVER_AGENT_SHARE_SESSION_TOKEN_VALIDATE_Day" default:"365"` // 1 year
-		BalanceThreshold          int    `env:"OPENCSG_AGENT_BALANCE_THRESHOLD" default:"5000"`
-		BalanceCheckCacheTTL      int    `env:"OPENCSG_AGENT_BALANCE_CHECK_CACHE_TTL" default:"86400"`
+		AutoHubServiceHost                    string `env:"OPENCSG_AGENT_AUTOHUB_SERVICE_HOST" default:"http://internal.opencsg-stg.com:8190"`
+		AgentHubServiceHost                   string `env:"OPENCSG_AGENT_AGENTHUB_SERVICE_HOST" default:""`
+		AgentHubServiceToken                  string `env:"OPENCSG_AGENT_AGENTHUB_SERVICE_TOKEN" default:""`
+		MCPInspectMaxConcurrency              int    `env:"OPENCSG_AGENT_MCP_INSPECT_MAX_CONCURRENCY" default:"50"`
+		ShareSessionTokenValidDay             int    `env:"STARHUB_SERVER_AGENT_SHARE_SESSION_TOKEN_VALIDATE_Day" default:"365"` // 1 year
+		BalanceThreshold                      int    `env:"OPENCSG_AGENT_BALANCE_THRESHOLD" default:"5000"`
+		BalanceCheckCacheTTL                  int    `env:"OPENCSG_AGENT_BALANCE_CHECK_CACHE_TTL" default:"86400"`
+		OrchestratorReadinessTimeoutSeconds   int    `env:"OPENCSG_AGENT_ORCHESTRATOR_READINESS_TIMEOUT_SECONDS" default:"1800"`
+		OrchestratorGatewayWaitTimeoutSeconds int    `env:"OPENCSG_AGENT_ORCHESTRATOR_GATEWAY_WAIT_TIMEOUT_SECONDS" default:"30"`
+		// OrchestratorMaxConcurrentExecutionsPerAllocation caps concurrent
+		// executions across sessions on one actor runtime. Temporary static
+		// value until load-aware admission is available.
+		OrchestratorMaxConcurrentExecutionsPerAllocation int `env:"OPENCSG_AGENT_ORCHESTRATOR_MAX_CONCURRENT_EXECUTIONS_PER_ALLOCATION" default:"4"`
+		OrchestratorExecutionReservedTimeoutSeconds      int `env:"OPENCSG_AGENT_ORCHESTRATOR_EXECUTION_RESERVED_TIMEOUT_SECONDS" default:"60"`
+		OrchestratorExecutionHeartbeatIntervalSeconds    int `env:"OPENCSG_AGENT_ORCHESTRATOR_EXECUTION_HEARTBEAT_INTERVAL_SECONDS" default:"30"`
+		OrchestratorExecutionHeartbeatTimeoutSeconds     int `env:"OPENCSG_AGENT_ORCHESTRATOR_EXECUTION_HEARTBEAT_TIMEOUT_SECONDS" default:"90"`
+		OrchestratorExecutionUnknownCapacityHoldSeconds  int `env:"OPENCSG_AGENT_ORCHESTRATOR_EXECUTION_UNKNOWN_CAPACITY_HOLD_SECONDS" default:"3600"`
+		OrchestratorResumeWaitTimeoutSeconds             int `env:"OPENCSG_AGENT_ORCHESTRATOR_RESUME_WAIT_TIMEOUT_SECONDS" default:"60"`
 		// UseLatestImage replaces the csgclaw runtime profile image tag with :latest;
 		// Kubernetes then defaults the sandbox container's imagePullPolicy to Always.
 		// Intended for staging environments where images are updated frequently;

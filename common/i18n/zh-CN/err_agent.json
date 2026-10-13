@@ -91,5 +91,8 @@
     },
     "error.AGENT-ERR-30": {
         "other": "CSGClaw 智能体名称无效。只能使用字母、数字、句点、下划线或连字符。"
+    },
+    "error.AGENT-ERR-31": {
+        "other": "智能体运行时生命周期冲突"
     }
 }

@@ -580,6 +580,9 @@ func TestKServiceExecutor_updateDeployStatus_triggerHandleDeployRunningOnSleepin
 
 	dts.EXPECT().UpdateDeploy(ctx, mock.Anything).Return(nil)
 
+	orchestratorStore := mockdb.NewMockAgentOrchestratorStore(t)
+	orchestratorStore.EXPECT().RecordAllocationSuspended(mock.Anything, int64(1)).Return(nil)
+
 	// handleDeployRunning runs in a goroutine and calls GetDeployByIDWithRelations
 	var goroutineDone sync.WaitGroup
 	goroutineDone.Add(1)
@@ -594,6 +597,7 @@ func TestKServiceExecutor_updateDeployStatus_triggerHandleDeployRunningOnSleepin
 	executor := &kserviceExecutorImpl{
 		cfg:                   cfg,
 		deployTaskStore:       dts,
+		orchestratorStore:     orchestratorStore,
 		notificationSvcClient: mockNotificationRpc,
 	}
 
@@ -635,7 +639,10 @@ func TestKServiceExecutor_updateDeployStatus_noHandleDeployRunningWhenAlreadySle
 
 	dts.EXPECT().UpdateDeploy(ctx, mock.Anything).Return(nil)
 
-	exec := NewTestKServiceExecutor(cfg, dts)
+	orchestratorStore := mockdb.NewMockAgentOrchestratorStore(t)
+	orchestratorStore.EXPECT().RecordAllocationSuspended(mock.Anything, int64(1)).Return(nil)
+
+	exec := &kserviceExecutorImpl{cfg: cfg, deployTaskStore: dts, orchestratorStore: orchestratorStore}
 	err = exec.updateDeployStatus(ctx, event)
 	require.NoError(t, err)
 }
@@ -1178,4 +1185,84 @@ func types2Name(deployType int) string {
 	default:
 		return "other"
 	}
+}
+
+func TestKServiceExecutor_updateDeployStatus_recordsSuspensionOnEverySleepingEvent(t *testing.T) {
+	ctx := context.TODO()
+	cfg := &config.Config{}
+
+	event := &types.ServiceEvent{
+		ServiceName: "svc-test",
+		Status:      common.Sleeping,
+		TaskID:      100,
+	}
+
+	dts := mockdb.NewMockDeployTaskStore(t)
+	dts.EXPECT().GetDeployTask(ctx, event.TaskID).Return(&database.DeployTask{
+		ID: int64(100), DeployID: int64(1), TaskType: common.TaskTypeDeploy,
+	}, nil)
+	dts.EXPECT().GetLastTaskByType(ctx, int64(1), common.TaskTypeDeploy).Return(&database.DeployTask{
+		ID: int64(100),
+	}, nil)
+	// The deploy is already Sleeping: this is a repeated event after a
+	// previous recording failure, and the recording must still be attempted.
+	dts.EXPECT().GetDeployBySvcName(ctx, event.ServiceName).Return(&database.Deploy{
+		ID: int64(1), SvcName: event.ServiceName, Status: common.Sleeping,
+	}, nil)
+	dts.EXPECT().UpdateDeploy(ctx, mock.Anything).Return(nil)
+
+	orchestratorStore := mockdb.NewMockAgentOrchestratorStore(t)
+	orchestratorStore.EXPECT().RecordAllocationSuspended(mock.Anything, int64(1)).Return(nil)
+
+	exec := &kserviceExecutorImpl{cfg: cfg, deployTaskStore: dts, orchestratorStore: orchestratorStore}
+	require.NoError(t, exec.updateDeployStatus(ctx, event))
+}
+
+func TestKServiceExecutor_updateDeployStatus_doesNotPersistSleepingWhenSuspensionRecordingFails(t *testing.T) {
+	ctx := context.TODO()
+	cfg := &config.Config{}
+	event := &types.ServiceEvent{ServiceName: "svc-test", Status: common.Sleeping, TaskID: 100}
+
+	dts := mockdb.NewMockDeployTaskStore(t)
+	dts.EXPECT().GetDeployTask(ctx, event.TaskID).Return(&database.DeployTask{
+		ID: int64(100), DeployID: int64(1), TaskType: common.TaskTypeDeploy,
+	}, nil)
+	dts.EXPECT().GetLastTaskByType(ctx, int64(1), common.TaskTypeDeploy).Return(&database.DeployTask{ID: int64(100)}, nil)
+	dts.EXPECT().GetDeployBySvcName(ctx, event.ServiceName).Return(&database.Deploy{
+		ID: int64(1), SvcName: event.ServiceName, Status: common.Running,
+	}, nil)
+
+	recordErr := errors.New("record suspension")
+	orchestratorStore := mockdb.NewMockAgentOrchestratorStore(t)
+	orchestratorStore.EXPECT().RecordAllocationSuspended(mock.Anything, int64(1)).Return(recordErr)
+
+	exec := &kserviceExecutorImpl{cfg: cfg, deployTaskStore: dts, orchestratorStore: orchestratorStore}
+	err := exec.updateDeployStatus(ctx, event)
+	require.ErrorIs(t, err, recordErr)
+}
+
+func TestKServiceExecutor_updateDeployStatus_retriesSleepingAfterDeployUpdateFailure(t *testing.T) {
+	ctx := context.TODO()
+	cfg := &config.Config{}
+	event := &types.ServiceEvent{ServiceName: "svc-test", Status: common.Sleeping, TaskID: 100}
+
+	dts := mockdb.NewMockDeployTaskStore(t)
+	dts.EXPECT().GetDeployTask(ctx, event.TaskID).Return(&database.DeployTask{
+		ID: int64(100), DeployID: int64(1), TaskType: common.TaskTypeDeploy,
+	}, nil).Twice()
+	dts.EXPECT().GetLastTaskByType(ctx, int64(1), common.TaskTypeDeploy).Return(&database.DeployTask{ID: int64(100)}, nil).Twice()
+	dts.EXPECT().GetDeployBySvcName(ctx, event.ServiceName).Return(&database.Deploy{
+		ID: int64(1), SvcName: event.ServiceName, Status: common.Sleeping,
+	}, nil).Twice()
+	updateErr := errors.New("update deploy")
+	dts.EXPECT().UpdateDeploy(ctx, mock.Anything).Return(updateErr).Once()
+	dts.EXPECT().UpdateDeploy(ctx, mock.Anything).Return(nil).Once()
+
+	orchestratorStore := mockdb.NewMockAgentOrchestratorStore(t)
+	orchestratorStore.EXPECT().RecordAllocationSuspended(mock.Anything, int64(1)).Return(nil).Twice()
+
+	exec := &kserviceExecutorImpl{cfg: cfg, deployTaskStore: dts, orchestratorStore: orchestratorStore}
+	err := exec.updateDeployStatus(ctx, event)
+	require.ErrorIs(t, err, updateErr)
+	require.NoError(t, exec.updateDeployStatus(ctx, event))
 }

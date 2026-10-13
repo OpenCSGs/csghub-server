@@ -15,6 +15,7 @@ type AgentCustomUIProxyInfo struct {
 	AgentContentID string
 	AgentName      string
 	ShareName      string
+	Kind           AgentInstanceKind
 	SpaceID        int64
 	SpaceSvcName   string
 	SpaceEndpoint  string
@@ -111,9 +112,34 @@ const (
 	// Custom UI invocation context is set by RProxy after resolving the public agent.
 	CSGHubAgentBaseURLHeader     = "X-CSGHub-Agent-Base-URL"
 	CSGHubAgentAuthModeHeader    = "X-CSGHub-Agent-Auth-Mode"
+	CSGHubAgentKindHeader        = "X-CSGHub-Agent-Kind"
 	CSGHubAgentAuthModeAnonymous = "anonymous"
 	CSGHubAgentAuthModeUserToken = "user-token"
+
+	// CSGHubGuestIDHeader carries a client-generated UUIDv4 for anonymous
+	// logical-agent execution on the shared-sandbox responses path.
+	CSGHubGuestIDHeader = "X-CSG-Guest-ID"
 )
+
+// GuestLogicalShareTarget is the minimal logical-agent identity needed for
+// anonymous shared-sandbox execution after visibility checks succeed.
+type GuestLogicalShareTarget struct {
+	LogicalInstanceID int64
+	OwnerUUID         string
+	Metadata          *map[string]any
+}
+
+// GuestLogicalShareResolution is the explicit outcome of share-name dispatch.
+//
+// Semantics:
+//   - unknown / non-instance / runtime share: Matched=false, err=nil
+//   - logical but private / deleting / wrong type: Matched=true, ErrNotFound
+//   - executable logical: Matched=true, Target!=nil
+//   - database failure: non-nil infrastructure error
+type GuestLogicalShareResolution struct {
+	Matched bool
+	Target  *GuestLogicalShareTarget
+}
 
 // LLM-Wiki trust headers injected by CSGHub when proxying to llmservice.
 const HeaderCSGHubActorID = "X-CSGHub-Actor-ID"
@@ -184,37 +210,222 @@ type UpdateAgentTemplateRequest struct {
 
 // AgentInstance represents an instance created from an agent template
 type AgentInstance struct {
-	ID          int64           `json:"id"`
-	TemplateID  *int64          `json:"template_id" binding:"omitempty,gte=1"` // Associated with the id in the template table
-	UserUUID    *string         `json:"-"`                                     // Will be set from HTTP header using httpbase.GetCurrentUserUUID
-	Name        *string         `json:"name"`                                  // Instance name
-	Description *string         `json:"description" binding:"omitempty"`       // Instance description
-	Type        *string         `json:"type"`                                  // Possible values: langflow, agno, code, etc.
-	ContentID   *string         `json:"content_id" binding:"omitempty"`        // Used to specify the unique id of the instance resource
-	Public      *bool           `json:"public"`                                // Whether the instance is public
-	Editable    bool            `json:"editable"`                              // Whether the instance is editable
-	IsRunning   bool            `json:"is_running"`                            // Whether the instance is running
-	BuiltIn     bool            `json:"built_in"`                              // Whether the instance is built-in
-	IsPinned    bool            `json:"is_pinned"`                             // Whether the instance is pinned by the user
-	IsShared    bool            `json:"is_shared"`                             // Whether the instance has been shared via agent_shares
-	Config      map[string]any  `json:"config,omitempty"`                      // Per-user instance configuration from user preferences
-	Metadata    *map[string]any `json:"metadata,omitempty"`                    // Instance metadata
-	Data        json.RawMessage `json:"-"`                                     // Request-only flow data; excluded from responses
-	CreatedAt   time.Time       `json:"created_at"`                            // When the instance was created
-	UpdatedAt   time.Time       `json:"updated_at"`                            // When the instance was last updated
+	ID            int64               `json:"id"`
+	TemplateID    *int64              `json:"template_id" binding:"omitempty,gte=1"` // Associated with the id in the template table
+	UserUUID      *string             `json:"-"`                                     // Will be set from HTTP header using httpbase.GetCurrentUserUUID
+	Name          *string             `json:"name"`                                  // Instance name
+	Description   *string             `json:"description" binding:"omitempty"`       // Instance description
+	Type          *string             `json:"type"`                                  // Possible values: langflow, agno, code, etc.
+	ContentID     *string             `json:"content_id" binding:"omitempty"`        // Used to specify the unique id of the instance resource
+	Public        *bool               `json:"public"`                                // Whether the instance is public
+	Editable      bool                `json:"editable"`                              // Whether the instance is editable
+	IsRunning     bool                `json:"is_running"`                            // Whether the instance is running
+	BuiltIn       bool                `json:"built_in"`                              // Whether the instance is built-in
+	IsPinned      bool                `json:"is_pinned"`                             // Whether the instance is pinned by the user
+	IsShared      bool                `json:"is_shared"`                             // Whether the instance has been shared via agent_shares
+	Config        map[string]any      `json:"config,omitempty"`                      // Per-user instance configuration from user preferences
+	Metadata      *map[string]any     `json:"metadata,omitempty"`                    // Instance metadata
+	Data          json.RawMessage     `json:"-"`                                     // Request-only flow data; excluded from responses
+	Kind          AgentInstanceKind   `json:"kind"`
+	EffectiveMode *AgentServingMode   `json:"mode,omitempty"`
+	StoragePolicy *AgentStoragePolicy `json:"storage_policy,omitempty"`
+	CreatedAt     time.Time           `json:"created_at"` // When the instance was created
+	UpdatedAt     time.Time           `json:"updated_at"` // When the instance was last updated
 }
 
 // CreateAgentInstanceRequest represents a request to create an agent instance.
 type CreateAgentInstanceRequest struct {
-	Name        *string         `json:"name"`
-	Description *string         `json:"description,omitempty"`
-	Type        *string         `json:"type"`
-	ContentID   *string         `json:"content_id,omitempty"`
-	Public      *bool           `json:"public"`
-	Metadata    *map[string]any `json:"metadata,omitempty"`
-	TemplateID  *int64          `json:"template_id" binding:"omitempty,gte=1"`
-	Data        json.RawMessage `json:"data,omitempty"`
+	Name                    *string            `json:"name"`
+	Description             *string            `json:"description,omitempty"`
+	Type                    *string            `json:"type"`
+	ContentID               *string            `json:"content_id,omitempty"`
+	Public                  *bool              `json:"public"`
+	Metadata                *map[string]any    `json:"metadata,omitempty"`
+	TemplateID              *int64             `json:"template_id" binding:"omitempty,gte=1"`
+	Data                    json.RawMessage    `json:"data,omitempty"`
+	Kind                    *AgentInstanceKind `json:"kind,omitempty"`
+	Mode                    *AgentServingMode  `json:"mode,omitempty"`
+	clientBlueprintProvided bool
 }
+
+func (r *CreateAgentInstanceRequest) UnmarshalJSON(data []byte) error {
+	type requestAlias CreateAgentInstanceRequest
+	var decoded requestAlias
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(data, &fields); err != nil {
+		return err
+	}
+	*r = CreateAgentInstanceRequest(decoded)
+	_, r.clientBlueprintProvided = fields["blueprint"]
+	return nil
+}
+
+func (r CreateAgentInstanceRequest) HasClientBlueprint() bool {
+	return r.clientBlueprintProvided
+}
+
+// AgentRuntimeBlueprint is the immutable, actor-neutral provisioning input of
+// a logical agent. Runtime identity and PVC ownership are always supplied by
+// the allocation workflow, never by the publisher.
+type AgentRuntimeBlueprint struct {
+	ImageID              string                 `json:"image_id"`
+	TemplateIdentifier   string                 `json:"template_identifier"`
+	Model                string                 `json:"model,omitempty"`
+	RuntimeProfileSHA    string                 `json:"runtime_profile_sha"`
+	Env                  map[string]string      `json:"env,omitempty"`
+	ContainerPort        int                    `json:"container_port,omitempty"`
+	ResourceID           int64                  `json:"resource_id,omitempty"`
+	MinCPU               string                 `json:"min_cpu,omitempty"`
+	MinMemory            string                 `json:"min_memory,omitempty"`
+	ReadinessProbe       *SandboxReadinessProbe `json:"readiness_probe,omitempty"`
+	Timeout              int                    `json:"timeout,omitempty"`
+	VolumeMounts         []VolumeMount          `json:"volume_mounts,omitempty"`
+	MinReplica           int                    `json:"min_replica,omitempty"`
+	MaxReplica           int                    `json:"max_replica,omitempty"`
+	IntegrationVersion   string                 `json:"integration_version"`
+	RequiredCapabilities []string               `json:"required_capabilities,omitempty"`
+}
+
+type UseAgentInstanceRequest struct {
+	SessionID   string `json:"session_id,omitempty"`
+	SessionName string `json:"session_name,omitempty"`
+}
+
+type UseAgentInstanceResponse struct {
+	Status            string `json:"status"`
+	RetryAfterSeconds int    `json:"retry_after_seconds,omitempty"`
+}
+
+// UseAgentInstanceResult carries the public use status together with the
+// internal allocation route required by AIGateway. AllocationID, RuntimePrincipal,
+// and RuntimeGeneration are never serialized to clients.
+type UseAgentInstanceResult struct {
+	Response          UseAgentInstanceResponse `json:"-"`
+	AllocationID      int64                    `json:"-"`
+	RuntimePrincipal  string                   `json:"-"`
+	RuntimeGeneration int64                    `json:"-"`
+	// Resuming marks that the allocation was suspended and a resume operation
+	// is in flight, so callers can apply the resume wait timeout.
+	Resuming bool `json:"-"`
+}
+
+type AgentRuntimeStatusResponse struct {
+	Status            string `json:"status"`
+	RetryAfterSeconds int    `json:"retry_after_seconds,omitempty"`
+}
+
+// AgentActorKind identifies whether an orchestrated actor is a signed-in user
+// or an anonymous guest.
+type AgentActorKind string
+
+const (
+	AgentActorKindUser  AgentActorKind = "user"
+	AgentActorKindGuest AgentActorKind = "guest"
+)
+
+// AgentActor is the internal identity used for allocation ownership, readiness,
+// proxy authorization, admission, recovery, and resume.
+type AgentActor struct {
+	Kind AgentActorKind
+	ID   string
+}
+
+type AgentExecutionAdmissionRequest struct {
+	AllocationID             int64
+	Actor                    AgentActor
+	SessionUUID              string
+	SessionName              string
+	ExpectedRuntimePrincipal string
+	PinnedRuntimeGeneration  int64
+	// GuestUsageMaxCount is the limited guest policy max. Nil means absent or unlimited.
+	GuestUsageMaxCount *int64
+}
+
+// AgentAllocationProxyRequest authorizes a pinned allocation for proxy resolution.
+type AgentAllocationProxyRequest struct {
+	AllocationID             int64
+	Actor                    AgentActor
+	ExpectedRuntimePrincipal string
+	PinnedRuntimeGeneration  int64
+}
+
+// AuthorizedAgentAllocationProxyTarget is an already-authorized runtime target
+// for Runner URL resolution. It carries no lifecycle or actor identity.
+type AuthorizedAgentAllocationProxyTarget struct {
+	RuntimePrincipal string
+	ResourceKey      string
+}
+
+type AgentExecutionAdmissionResponse struct {
+	AdmissionID       int64  `json:"admission_id"`
+	ExecutionID       string `json:"execution_id"`
+	RuntimeGeneration int64  `json:"runtime_generation"`
+	Status            string `json:"status"`
+}
+
+type AgentAllocationOperationDispatch struct {
+	ID            int64  `json:"id"`
+	OperationKey  string `json:"operation_key"`
+	OperationType string `json:"operation_type"`
+}
+
+type AgentAllocationProvisionPrepareResult struct {
+	Sandbox                 SandboxV2EnsurePersistentResult `json:"sandbox"`
+	ReadinessTimeoutSeconds int                             `json:"readiness_timeout_seconds"`
+}
+
+const (
+	DefaultAgentOrchestratorReadinessTimeoutSeconds   = 30 * 60
+	DefaultAgentOrchestratorGatewayWaitTimeoutSeconds = 30
+	// Temporary static defaults until load-aware admission is available.
+	DefaultAgentOrchestratorMaxConcurrentExecutionsPerAllocation = 4
+	DefaultAgentOrchestratorExecutionReservedTimeoutSeconds      = 60
+	DefaultAgentOrchestratorExecutionHeartbeatIntervalSeconds    = 30
+	DefaultAgentOrchestratorExecutionHeartbeatTimeoutSeconds     = 90
+	DefaultAgentOrchestratorExecutionUnknownCapacityHoldSeconds  = 3600
+	DefaultAgentOrchestratorResumeWaitTimeoutSeconds             = 60
+	AgentAllocationDispatchTaskQueue                             = "workflow_cron_queue"
+	AgentAllocationProvisionTaskQueue                            = "agent-allocation-task-queue"
+	AgentAllocationImmediateDispatchWorkflowName                 = "AgentAllocationImmediateDispatchWorkflow"
+
+	AgentRuntimeStatusNotStarted   = "not_started"
+	AgentRuntimeStatusProvisioning = "provisioning"
+	AgentRuntimeStatusReady        = "ready"
+	AgentRuntimeStatusFailed       = "failed"
+	AgentRuntimeStatusDeleting     = "deleting"
+	AgentRuntimeStatusReleased     = "released"
+)
+
+type ClaimAgentAllocationOperationsRequest struct {
+	Owner        string `json:"owner"`
+	Limit        int    `json:"limit"`
+	LeaseSeconds int    `json:"lease_seconds"`
+	OperationID  int64  `json:"operation_id,omitempty"`
+}
+
+type AgentInstanceKind string
+
+const (
+	AgentInstanceKindLogical AgentInstanceKind = "logical"
+	AgentInstanceKindRuntime AgentInstanceKind = "runtime"
+)
+
+type AgentServingMode string
+
+const (
+	AgentServingModeReadOnly  AgentServingMode = "read_only"
+	AgentServingModeReadWrite AgentServingMode = "read_write"
+)
+
+type AgentStoragePolicy string
+
+const (
+	AgentStoragePolicyNone            AgentStoragePolicy = "none"
+	AgentStoragePolicyActorPersistent AgentStoragePolicy = "actor_persistent"
+)
 
 type AgentType string
 
@@ -233,10 +444,11 @@ func (t AgentType) String() string {
 type AgentInstanceFilter struct {
 	Search     string
 	Type       string
-	TemplateID *int64 `json:"template_id,omitempty"`
-	BuiltIn    *bool  `json:"built_in"`
-	Public     *bool  `json:"public"`
-	Editable   *bool  `json:"editable"`
+	TemplateID *int64             `json:"template_id,omitempty"`
+	BuiltIn    *bool              `json:"built_in"`
+	Public     *bool              `json:"public"`
+	Editable   *bool              `json:"editable"`
+	Kind       *AgentInstanceKind `json:"kind,omitempty"`
 }
 
 type AgentUIOption struct {
@@ -262,6 +474,13 @@ type AgentInstanceCreationResult struct {
 	Name        string
 	Description string
 	Metadata    map[string]any // Additional metadata for the agent instance
+}
+
+// DeleteAgentInstanceResult carries the outcome of an agent instance deletion.
+// Pending is true while durable logical cascade deletion still has work.
+type DeleteAgentInstanceResult struct {
+	Instance *AgentInstance
+	Pending  bool
 }
 
 // LangFlowChatRequest represents a chat request to an agent instance
@@ -441,6 +660,7 @@ type AgentSharedInstanceResponse struct {
 	SharedSandboxName string            `json:"shared_sandbox_name"`
 	CustomUI          map[string]string `json:"custom_ui,omitempty"`
 	GuestUsageLimit   *GuestUsageLimit  `json:"guest_usage_limit,omitempty"`
+	Kind              AgentInstanceKind `json:"kind"`
 }
 
 // AgentSharedSessionResponse represents the public shared session response.
@@ -451,11 +671,12 @@ type AgentSharedSessionResponse struct {
 
 // AgentSharedSession represents the minimal shared session view.
 type AgentSharedSession struct {
-	SessionUUID string `json:"session_uuid"`
-	InstanceID  int64  `json:"instance_id"`
-	MaxTurn     int64  `json:"max_turn"`
-	UserUUID    string `json:"user_uuid"`
-	Name        string `json:"name"`
+	SessionUUID  string            `json:"session_uuid"`
+	InstanceID   int64             `json:"instance_id"`
+	InstanceKind AgentInstanceKind `json:"instance_kind"`
+	MaxTurn      int64             `json:"max_turn"`
+	UserUUID     string            `json:"user_uuid"`
+	Name         string            `json:"name"`
 }
 
 type AgentSessionHistoryFeedback string

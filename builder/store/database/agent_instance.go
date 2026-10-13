@@ -2,6 +2,7 @@ package database
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"time"
 
@@ -28,21 +29,27 @@ type AgentTemplate struct {
 
 // AgentInstance represents an instance created from an agent template
 type AgentInstance struct {
-	ID          int64          `bun:",pk,autoincrement" json:"id"`
-	TemplateID  int64          `bun:"" json:"template_id"`          // Associated with the id in the template table
-	UserUUID    string         `bun:",notnull" json:"user_uuid"`    // Associated with the corresponding field in the User table
-	Type        string         `bun:",notnull" json:"type"`         // Possible values: langflow, agno, code, etc.
-	ContentID   string         `bun:",notnull" json:"content_id"`   // Used to specify the unique id of the instance resource
-	Public      bool           `bun:",notnull" json:"public"`       // Whether the instance is public
-	Name        string         `bun:",nullzero" json:"name"`        // Instance name
-	Description string         `bun:",nullzero" json:"description"` // Instance description
-	BuiltIn     bool           `bun:",notnull" json:"built_in"`     // Whether the instance is built-in
-	Metadata    map[string]any `bun:",type:jsonb" json:"metadata"`  // Instance metadata
-	DeletedAt   time.Time      `bun:",soft_delete,nullzero" json:"deleted_at"`
-	IsPinned    bool           `bun:",scanonly" json:"is_pinned"` // Whether the instance is pinned (from LEFT JOIN, scanonly means not used in INSERT/UPDATE)
-	PinnedAt    *time.Time     `bun:",scanonly" json:"pinned_at"` // When the instance was pinned (from LEFT JOIN)
-	Config      map[string]any `bun:",scanonly" json:"config"`    // Per-user config from agent_user_preferences (config-instance action)
-	IsShared    bool           `bun:",scanonly" json:"is_shared"` // Whether the instance has an agent_shares record (from EXISTS subquery)
+	ID                int64          `bun:",pk,autoincrement" json:"id"`
+	TemplateID        int64          `bun:"" json:"template_id"`          // Associated with the id in the template table
+	UserUUID          string         `bun:",notnull" json:"user_uuid"`    // Associated with the corresponding field in the User table
+	Type              string         `bun:",notnull" json:"type"`         // Possible values: langflow, agno, code, etc.
+	ContentID         string         `bun:",notnull" json:"content_id"`   // Used to specify the unique id of the instance resource
+	Public            bool           `bun:",notnull" json:"public"`       // Whether the instance is public
+	Name              string         `bun:",nullzero" json:"name"`        // Instance name
+	Description       string         `bun:",nullzero" json:"description"` // Instance description
+	BuiltIn           bool           `bun:",notnull" json:"built_in"`     // Whether the instance is built-in
+	Metadata          map[string]any `bun:",type:jsonb" json:"metadata"`  // Instance metadata
+	DeletedAt         time.Time      `bun:",soft_delete,nullzero" json:"deleted_at"`
+	IsPinned          bool           `bun:",scanonly" json:"is_pinned"` // Whether the instance is pinned (from LEFT JOIN, scanonly means not used in INSERT/UPDATE)
+	PinnedAt          *time.Time     `bun:",scanonly" json:"pinned_at"` // When the instance was pinned (from LEFT JOIN)
+	Config            map[string]any `bun:",scanonly" json:"config"`    // Per-user config from agent_user_preferences (config-instance action)
+	IsShared          bool           `bun:",scanonly" json:"is_shared"` // Whether the instance has an agent_shares record (from EXISTS subquery)
+	Kind              string         `bun:",notnull,default:'runtime'" json:"kind"`
+	DeletionStartedAt *time.Time     `bun:"deletion_started_at" json:"-"`
+	EffectiveMode     *string        `bun:"effective_mode" json:"effective_mode,omitempty"`
+	StoragePolicy     *string        `bun:"storage_policy" json:"storage_policy,omitempty"`
+	Blueprint         map[string]any `bun:",type:jsonb,nullzero" json:"blueprint,omitempty"`
+	BlueprintSHA256   string         `bun:",nullzero" json:"blueprint_sha256,omitempty"`
 	times
 }
 
@@ -60,6 +67,7 @@ type AgentTemplateStore interface {
 type AgentInstanceStore interface {
 	Create(ctx context.Context, instance *AgentInstance) (*AgentInstance, error)
 	FindByID(ctx context.Context, id int64) (*AgentInstance, error)
+	FindByIDWithDeleted(ctx context.Context, id int64) (*AgentInstance, error)
 	FindByIDs(ctx context.Context, ids []int64) ([]AgentInstance, error)
 	FindByContentID(ctx context.Context, instanceType string, contentID string) (*AgentInstance, error)
 	IsInstanceExistsByContentID(ctx context.Context, instanceType string, contentID string) (bool, error)
@@ -260,6 +268,20 @@ func (s *agentInstanceStoreImpl) FindByID(ctx context.Context, id int64) (*Agent
 	return instance, nil
 }
 
+// FindByIDWithDeleted retrieves an AgentInstance by its ID, including
+// soft-deleted rows. Deletion routing needs tombstoned logical agents so
+// cascade-deletion retries stay idempotent.
+func (s *agentInstanceStoreImpl) FindByIDWithDeleted(ctx context.Context, id int64) (*AgentInstance, error) {
+	instance := &AgentInstance{}
+	err := s.db.Core.NewSelect().Model(instance).WhereAllWithDeleted().Where("id = ?", id).Scan(ctx, instance)
+	if err != nil {
+		return nil, errorx.HandleDBError(err, map[string]any{
+			"instance_id": id,
+		})
+	}
+	return instance, nil
+}
+
 // FindByIDs retrieves AgentInstances by their IDs
 func (s *agentInstanceStoreImpl) FindByIDs(ctx context.Context, ids []int64) ([]AgentInstance, error) {
 	instances := make([]AgentInstance, len(ids))
@@ -274,6 +296,9 @@ func (s *agentInstanceStoreImpl) FindByIDs(ctx context.Context, ids []int64) ([]
 
 // FindByContentID retrieves an AgentInstance by its content ID
 func (s *agentInstanceStoreImpl) FindByContentID(ctx context.Context, instanceType string, contentID string) (*AgentInstance, error) {
+	if strings.TrimSpace(instanceType) == "" || strings.TrimSpace(contentID) == "" {
+		return nil, errorx.BadRequest(errors.New("instance type and content id are required"), nil)
+	}
 	instance := &AgentInstance{}
 	err := s.db.Core.NewSelect().
 		TableExpr("agent_instances AS ai").
@@ -293,6 +318,9 @@ func (s *agentInstanceStoreImpl) FindByContentID(ctx context.Context, instanceTy
 }
 
 func (s *agentInstanceStoreImpl) IsInstanceExistsByContentID(ctx context.Context, instanceType string, contentID string) (bool, error) {
+	if strings.TrimSpace(instanceType) == "" || strings.TrimSpace(contentID) == "" {
+		return false, errorx.BadRequest(errors.New("instance type and content id are required"), nil)
+	}
 	exists, err := s.db.Core.NewSelect().
 		Model((*AgentInstance)(nil)).
 		Where("type = ? AND content_id = ?", instanceType, contentID).
@@ -336,6 +364,9 @@ func (s *agentInstanceStoreImpl) applyAgentInstanceFilters(query *bun.SelectQuer
 		} else {
 			query = query.Where("ai.user_uuid != ?", userUUID)
 		}
+	}
+	if filter.Kind != nil {
+		query = query.Where("ai.kind = ?", string(*filter.Kind))
 	}
 
 	return query
@@ -478,7 +509,7 @@ func (s *agentInstanceStoreImpl) Delete(ctx context.Context, id int64) error {
 func (s *agentInstanceStoreImpl) CountByUserAndType(ctx context.Context, userUUID string, instanceType string) (int, error) {
 	count, err := s.db.Core.NewSelect().
 		Model((*AgentInstance)(nil)).
-		Where("user_uuid = ? AND type = ?", userUUID, instanceType).
+		Where("user_uuid = ? AND type = ? AND kind = ?", userUUID, instanceType, AgentInstanceKindRuntime).
 		Count(ctx)
 	if err != nil {
 		return 0, errorx.HandleDBError(err, map[string]any{
@@ -492,7 +523,7 @@ func (s *agentInstanceStoreImpl) CountByUserAndType(ctx context.Context, userUUI
 func (s *agentInstanceStoreImpl) IsInstanceNameExists(ctx context.Context, userUUID string, instanceName string) (bool, error) {
 	exists, err := s.db.Core.NewSelect().
 		Model((*AgentInstance)(nil)).
-		Where("user_uuid = ? AND name = ?", userUUID, instanceName).
+		Where("user_uuid = ? AND name = ? AND kind = ?", userUUID, instanceName, AgentInstanceKindRuntime).
 		Exists(ctx)
 	if err != nil {
 		return false, errorx.HandleDBError(err, map[string]any{

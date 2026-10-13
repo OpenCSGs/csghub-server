@@ -20,7 +20,7 @@ func TestAgentCustomUIProxyComponent_Resolve(t *testing.T) {
 	shares := mockdatabase.NewMockAgentShareStore(t)
 	comp := &agentCustomUIProxyComponent{agentStore: agents, spaceStore: spaces, deployStore: deploys, shareStore: shares}
 	agent := &database.AgentInstance{
-		ID: 12, Type: "csgclaw", ContentID: "agent-host", Public: true,
+		ID: 12, Type: "csgclaw", ContentID: "agent-host", Public: true, Kind: string(types.AgentInstanceKindLogical),
 		Metadata: map[string]any{
 			"provision_request": map[string]any{"custom_ui_space_id": float64(7)},
 			"template_metadata": map[string]any{"agent_file": map[string]any{"name": "agent-name"}},
@@ -35,7 +35,7 @@ func TestAgentCustomUIProxyComponent_Resolve(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, matched)
 	require.Equal(t, &types.AgentCustomUIProxyInfo{
-		AgentContentID: "agent-host", AgentName: "agent-name", ShareName: "s-a-12", SpaceID: 7,
+		AgentContentID: "agent-host", AgentName: "agent-name", ShareName: "s-a-12", Kind: types.AgentInstanceKindLogical, SpaceID: 7,
 		SpaceSvcName: "ui-svc", SpaceEndpoint: "https://ui.example", SpaceClusterID: "cluster-1", Available: true,
 	}, info)
 }

@@ -275,14 +275,16 @@ func TestRProxyHandler_CustomUI(t *testing.T) {
 	if !rproxyCustomUIEnabled {
 		t.Skip("custom UI routing is available in EE and SaaS")
 	}
-	var upstreamPath, upstreamAgentBaseURL, upstreamAuthMode, upstreamAgentName, upstreamAuthorization, upstreamCookie string
+	var upstreamPath, upstreamAgentBaseURL, upstreamAuthMode, upstreamAgentKind, upstreamAgentName, upstreamAuthorization, upstreamCookie, upstreamGuestID string
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		upstreamPath = r.URL.Path
 		upstreamAgentBaseURL = r.Header.Get(types.CSGHubAgentBaseURLHeader)
 		upstreamAuthMode = r.Header.Get(types.CSGHubAgentAuthModeHeader)
+		upstreamAgentKind = r.Header.Get(types.CSGHubAgentKindHeader)
 		upstreamAgentName = r.Header.Get(types.CSGBotHeaderAgentName)
 		upstreamAuthorization = r.Header.Get("Authorization")
 		upstreamCookie = r.Header.Get("Cookie")
+		upstreamGuestID = r.Header.Get(types.CSGHubGuestIDHeader)
 		_, _ = w.Write([]byte("space frontend"))
 	}))
 	defer upstream.Close()
@@ -298,14 +300,16 @@ func TestRProxyHandler_CustomUI(t *testing.T) {
 	ctx.Request.Header.Set("Cookie", "session=browser-session")
 	ctx.Request.Header.Set(types.CSGHubAgentBaseURLHeader, "https://attacker.example/target")
 	ctx.Request.Header.Set(types.CSGHubAgentAuthModeHeader, types.CSGHubAgentAuthModeUserToken)
+	ctx.Request.Header.Set(types.CSGHubAgentKindHeader, string(types.AgentInstanceKindRuntime))
 	ctx.Request.Header.Set(types.CSGBotHeaderAgentName, "attacker-agent")
+	ctx.Request.Header.Set(types.CSGHubGuestIDHeader, "550e8400-e29b-41d4-a716-446655440000")
 	handler := &RProxyHandler{
 		repoComp:     repos,
 		rproxyDeploy: &rproxyDeployComponentStub{deploy: &database.Deploy{Type: types.SandboxType, Status: deploycommon.Running}},
 		cfg:          cfg,
 		customUIComp: &customUIProxyComponentStub{matched: true, info: &types.AgentCustomUIProxyInfo{
 			AgentContentID: "my-agent", AgentName: "generic-assistant-lj1", ShareName: "s-a-11",
-			SpaceSvcName: "ui-space", SpaceEndpoint: upstream.URL, Available: true,
+			Kind: types.AgentInstanceKindLogical, SpaceSvcName: "ui-space", SpaceEndpoint: upstream.URL, Available: true,
 		}},
 	}
 
@@ -315,7 +319,9 @@ func TestRProxyHandler_CustomUI(t *testing.T) {
 	require.Equal(t, "/assets/app.js", upstreamPath)
 	require.Equal(t, "https://gateway.example.com/v1/shared/sandboxes/s-a-11", upstreamAgentBaseURL)
 	require.Equal(t, types.CSGHubAgentAuthModeAnonymous, upstreamAuthMode)
+	require.Equal(t, string(types.AgentInstanceKindLogical), upstreamAgentKind)
 	require.Equal(t, "generic-assistant-lj1", upstreamAgentName)
+	require.Equal(t, "550e8400-e29b-41d4-a716-446655440000", upstreamGuestID)
 	require.Empty(t, upstreamAuthorization)
 	require.Empty(t, upstreamCookie)
 	body, err := io.ReadAll(recorder.Body)
@@ -381,10 +387,11 @@ func TestRProxyHandler_ExistingDeployDoesNotCheckAgentForCustomUI(t *testing.T) 
 }
 
 func TestRProxyHandler_OrdinaryDeployStripsAgentContextHeaders(t *testing.T) {
-	var upstreamBaseURL, upstreamAuthMode, upstreamAgentName string
+	var upstreamBaseURL, upstreamAuthMode, upstreamAgentKind, upstreamAgentName string
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		upstreamBaseURL = r.Header.Get(types.CSGHubAgentBaseURLHeader)
 		upstreamAuthMode = r.Header.Get(types.CSGHubAgentAuthModeHeader)
+		upstreamAgentKind = r.Header.Get(types.CSGHubAgentKindHeader)
 		upstreamAgentName = r.Header.Get(types.CSGBotHeaderAgentName)
 		w.WriteHeader(http.StatusOK)
 	}))
@@ -398,6 +405,7 @@ func TestRProxyHandler_OrdinaryDeployStripsAgentContextHeaders(t *testing.T) {
 	ctx.Request = httptest.NewRequest(http.MethodGet, "http://ordinary-service.space.opencsg.com/", nil)
 	ctx.Request.Header.Set(types.CSGHubAgentBaseURLHeader, "https://attacker.example/target")
 	ctx.Request.Header.Set(types.CSGHubAgentAuthModeHeader, types.CSGHubAgentAuthModeUserToken)
+	ctx.Request.Header.Set(types.CSGHubAgentKindHeader, string(types.AgentInstanceKindLogical))
 	ctx.Request.Header.Set(types.CSGBotHeaderAgentName, "attacker-agent")
 
 	handler := &RProxyHandler{repoComp: repos, rproxyDeploy: &rproxyDeployComponentStub{deploy: deploy}, cfg: &config.Config{}}
@@ -406,6 +414,7 @@ func TestRProxyHandler_OrdinaryDeployStripsAgentContextHeaders(t *testing.T) {
 	require.Equal(t, http.StatusOK, recorder.Code)
 	require.Empty(t, upstreamBaseURL)
 	require.Empty(t, upstreamAuthMode)
+	require.Empty(t, upstreamAgentKind)
 	require.Empty(t, upstreamAgentName)
 }
 

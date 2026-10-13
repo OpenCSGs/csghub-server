@@ -1439,6 +1439,74 @@ func (_c *MockDeployer_Logs_Call) RunAndReturn(run func(context.Context, commont
 	return _c
 }
 
+// Prepare provides a mock function with given fields: ctx, dr
+func (_m *MockDeployer) Prepare(ctx context.Context, dr commontypes.DeployRequest) (*database.DeployTask, *database.DeployTask, error) {
+	ret := _m.Called(ctx, dr)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Prepare")
+	}
+
+	var r0 *database.DeployTask
+	var r1 *database.DeployTask
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, commontypes.DeployRequest) (*database.DeployTask, *database.DeployTask, error)); ok {
+		return rf(ctx, dr)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, commontypes.DeployRequest) *database.DeployTask); ok {
+		r0 = rf(ctx, dr)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*database.DeployTask)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, commontypes.DeployRequest) *database.DeployTask); ok {
+		r1 = rf(ctx, dr)
+	} else {
+		if ret.Get(1) != nil {
+			r1 = ret.Get(1).(*database.DeployTask)
+		}
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, commontypes.DeployRequest) error); ok {
+		r2 = rf(ctx, dr)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
+// MockDeployer_Prepare_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Prepare'
+type MockDeployer_Prepare_Call struct {
+	*mock.Call
+}
+
+// Prepare is a helper method to define mock.On call
+//   - ctx context.Context
+//   - dr commontypes.DeployRequest
+func (_e *MockDeployer_Expecter) Prepare(ctx interface{}, dr interface{}) *MockDeployer_Prepare_Call {
+	return &MockDeployer_Prepare_Call{Call: _e.mock.On("Prepare", ctx, dr)}
+}
+
+func (_c *MockDeployer_Prepare_Call) Run(run func(ctx context.Context, dr commontypes.DeployRequest)) *MockDeployer_Prepare_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(commontypes.DeployRequest))
+	})
+	return _c
+}
+
+func (_c *MockDeployer_Prepare_Call) Return(buildTask *database.DeployTask, runTask *database.DeployTask, err error) *MockDeployer_Prepare_Call {
+	_c.Call.Return(buildTask, runTask, err)
+	return _c
+}
+
+func (_c *MockDeployer_Prepare_Call) RunAndReturn(run func(context.Context, commontypes.DeployRequest) (*database.DeployTask, *database.DeployTask, error)) *MockDeployer_Prepare_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Purge provides a mock function with given fields: ctx, dr
 func (_m *MockDeployer) Purge(ctx context.Context, dr commontypes.DeployRequest) error {
 	ret := _m.Called(ctx, dr)
