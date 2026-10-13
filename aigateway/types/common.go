@@ -7,6 +7,10 @@ import (
 )
 
 func ApplyRequestAuthHeaders(header http.Header, authHeadStr string) error {
+	header.Del("Authorization")
+	if authHeadStr == "" {
+		return nil
+	}
 	authMap, err := commontypes.ParseAuthHeaders(authHeadStr)
 	if err != nil {
 		return err
