@@ -96,6 +96,11 @@ type ModelComponent interface {
 	ListInferenceVersions(ctx context.Context, verReq types.DeployActReq) ([]types.ListInferenceVersionsResp, error)
 	UpdateInferenceVersionTraffic(ctx context.Context, verReq types.DeployActReq, req []types.UpdateInferenceVersionTrafficReq) error
 	DeleteInferenceVersion(ctx context.Context, verReq types.DeployActReq, commitID string) error
+	// OptimizeEngineArgs returns optimized engine args based on the runtime
+	// environment (runtime framework, hardware resource, deploy scenario) and
+	// the user's current values. Only parameters that differ from the user's
+	// input are returned.
+	OptimizeEngineArgs(ctx context.Context, namespace, name, currentUser string, req types.OptimizeEngineArgsReq) (*types.OptimizeEngineArgsResp, error)
 }
 
 func NewModelComponent(config *config.Config) (ModelComponent, error) {

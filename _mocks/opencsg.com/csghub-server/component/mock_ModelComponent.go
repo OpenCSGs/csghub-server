@@ -959,6 +959,68 @@ func (_c *MockModelComponent_ListQuantizations_Call) RunAndReturn(run func(conte
 	return _c
 }
 
+// OptimizeEngineArgs provides a mock function with given fields: ctx, namespace, name, currentUser, req
+func (_m *MockModelComponent) OptimizeEngineArgs(ctx context.Context, namespace string, name string, currentUser string, req types.OptimizeEngineArgsReq) (*types.OptimizeEngineArgsResp, error) {
+	ret := _m.Called(ctx, namespace, name, currentUser, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for OptimizeEngineArgs")
+	}
+
+	var r0 *types.OptimizeEngineArgsResp
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, types.OptimizeEngineArgsReq) (*types.OptimizeEngineArgsResp, error)); ok {
+		return rf(ctx, namespace, name, currentUser, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, types.OptimizeEngineArgsReq) *types.OptimizeEngineArgsResp); ok {
+		r0 = rf(ctx, namespace, name, currentUser, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*types.OptimizeEngineArgsResp)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, string, types.OptimizeEngineArgsReq) error); ok {
+		r1 = rf(ctx, namespace, name, currentUser, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockModelComponent_OptimizeEngineArgs_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'OptimizeEngineArgs'
+type MockModelComponent_OptimizeEngineArgs_Call struct {
+	*mock.Call
+}
+
+// OptimizeEngineArgs is a helper method to define mock.On call
+//   - ctx context.Context
+//   - namespace string
+//   - name string
+//   - currentUser string
+//   - req types.OptimizeEngineArgsReq
+func (_e *MockModelComponent_Expecter) OptimizeEngineArgs(ctx interface{}, namespace interface{}, name interface{}, currentUser interface{}, req interface{}) *MockModelComponent_OptimizeEngineArgs_Call {
+	return &MockModelComponent_OptimizeEngineArgs_Call{Call: _e.mock.On("OptimizeEngineArgs", ctx, namespace, name, currentUser, req)}
+}
+
+func (_c *MockModelComponent_OptimizeEngineArgs_Call) Run(run func(ctx context.Context, namespace string, name string, currentUser string, req types.OptimizeEngineArgsReq)) *MockModelComponent_OptimizeEngineArgs_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(string), args[4].(types.OptimizeEngineArgsReq))
+	})
+	return _c
+}
+
+func (_c *MockModelComponent_OptimizeEngineArgs_Call) Return(_a0 *types.OptimizeEngineArgsResp, _a1 error) *MockModelComponent_OptimizeEngineArgs_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockModelComponent_OptimizeEngineArgs_Call) RunAndReturn(run func(context.Context, string, string, string, types.OptimizeEngineArgsReq) (*types.OptimizeEngineArgsResp, error)) *MockModelComponent_OptimizeEngineArgs_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // OrgModels provides a mock function with given fields: ctx, req
 func (_m *MockModelComponent) OrgModels(ctx context.Context, req *types.OrgModelsReq) ([]types.Model, int, error) {
 	ret := _m.Called(ctx, req)

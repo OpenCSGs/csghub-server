@@ -807,6 +807,10 @@ func createModelRoutes(config *config.Config,
 		modelsMonitorGroup.GET("/:namespace/:name/serverless/:id/request/:instance/count", monitorHandler.RequestCount)
 		modelsMonitorGroup.GET("/:namespace/:name/serverless/:id/request/:instance/latency", monitorHandler.RequestLatency)
 	}
+
+	// Engine args optimization
+	apiGroup.POST("/models/:namespace/:name/engine_args/optimize",
+		middlewareCollection.Auth.NeedLogin, modelHandler.OptimizeEngineArgs)
 }
 
 func createDatasetRoutes(

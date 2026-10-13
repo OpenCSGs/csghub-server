@@ -54,23 +54,6 @@ if [[ "$ENGINE_VER_NUM" =~ ^[0-9]+\.[0-9]+$ ]]; then
 fi
 
 GPU_MEMORY_UTILIZATION=0.9
-MAX_NUM_BATCHED_TOKENS=4096
-if $ENGINE_VER_OK && [[ -n "${XPU_MODEL:-}" ]]; then
-    case "$(echo "$XPU_MODEL" | tr '[:upper:]' '[:lower:]')" in
-        *h100*|*h200*)
-            GPU_MEMORY_UTILIZATION=0.92
-            MAX_NUM_BATCHED_TOKENS=8192
-            ;;
-        *a100*)
-            GPU_MEMORY_UTILIZATION=0.90
-            MAX_NUM_BATCHED_TOKENS=8192
-            ;;
-        *h20*)
-            GPU_MEMORY_UTILIZATION=0.90
-            MAX_NUM_BATCHED_TOKENS=4096
-            ;;
-    esac
-fi
 ENGINE_ARGS="${ENGINE_ARGS:-} --trust-remote-code --model $REPO_ID --port 8000"
 if [[ ! $ENGINE_ARGS == *"--tensor-parallel-size"* ]]; then
     ENGINE_ARGS="$ENGINE_ARGS --tensor-parallel-size $GPU_NUM"
@@ -85,53 +68,12 @@ if [[ ! $ENGINE_ARGS == *"--distributed-executor-backend"* ]]; then
     ENGINE_ARGS="$ENGINE_ARGS --distributed-executor-backend ray"
 fi
 
-if [[ ! $ENGINE_ARGS == *"--max-model-len"* ]]; then
-    if $ENGINE_VER_OK; then
-        LimitedMaxToken=$(($TOTAL_GPU * 5120))
-        if [[ -n "${XPU_MODEL:-}" ]]; then
-            case "$(echo "$XPU_MODEL" | tr '[:upper:]' '[:lower:]')" in
-                *h100*|*h200*) LimitedMaxToken=$(($TOTAL_GPU * 16384)) ;;
-                *a100*)        LimitedMaxToken=$(($TOTAL_GPU * 10240)) ;;
-            esac
-        fi
-        if (( LimitedMaxToken < 9016 )); then
-            LimitedMaxToken=9016
-        fi
-        configfile="/workspace/$REPO_ID/config.json"
-        if [[ -f "$configfile" ]]; then
-            MODEL_MAX_LEN=$(grep '"max_position_embeddings"' "$configfile" | head -n1 | cut -d":" -f2 | sed 's/[^0-9]*//g' | tr -d '\n\r ') || true
-            if [ -n "$MODEL_MAX_LEN" ] && (( MODEL_MAX_LEN < LimitedMaxToken )); then
-                LimitedMaxToken=$MODEL_MAX_LEN
-            fi
-        fi
-    else
-        LimitedMaxToken=9016
-    fi
-    ENGINE_ARGS="$ENGINE_ARGS --max-model-len $LimitedMaxToken"
-fi
 tokenizer_config="/workspace/$REPO_ID/tokenizer_config.json"
 if [[ -f "$tokenizer_config" ]] && ! grep -q "chat_template" "$tokenizer_config"; then
     if [ -f "/workspace/$REPO_ID/chat_template.jinja" ]; then
         ENGINE_ARGS="$ENGINE_ARGS --chat_template /workspace/$REPO_ID/chat_template.jinja"
     else
         ENGINE_ARGS="$ENGINE_ARGS --chat_template /etc/csghub/chat_template.jinja"
-    fi
-fi
-if { [[ "${VLLM_ENFORCE_EAGER:-}" == "true" ]] || [[ "${VLLM_ENFORCE_EAGER:-}" == "1" ]]; } &&
-    [[ ! $ENGINE_ARGS == *"--enforce-eager"* ]]; then
-    ENGINE_ARGS="$ENGINE_ARGS --enforce-eager"
-    echo "Enabled --enforce-eager via env var."
-fi
-
-# Default async-scheduling (only for NVIDIA GPU + new vLLM + PP<=1, not explicitly disabled)
-if $ENGINE_VER_OK && [[ "${ASYNC_SCHEDULING_DISABLED:-}" != "true" ]] && [[ ! $ENGINE_ARGS == *"--async-scheduling"* ]]; then
-    PP_SIZE=1
-    if [[ "$ENGINE_ARGS" =~ --pipeline-parallel-size[=[:space:]]([0-9]+) ]]; then
-        PP_SIZE=${BASH_REMATCH[1]}
-    fi
-    if (( PP_SIZE <= 1 )) && [[ -n "${XPU_MODEL:-}" ]] && \
-       echo "$XPU_MODEL" | grep -iqE 'nvidia|h100|h200|a100|h20|a10|l4|l40|a800'; then
-        ENGINE_ARGS="$ENGINE_ARGS --async-scheduling"
     fi
 fi
 
@@ -141,11 +83,6 @@ if $ENGINE_VER_OK && [[ ! $ENGINE_ARGS == *"--compilation-config"* ]]; then
        echo "$XPU_MODEL" | grep -iqE 'nvidia|h100|h200|a100|h20|a10|l4|l40|a800'; then
         ENGINE_ARGS="$ENGINE_ARGS --compilation-config {\"mode\":3}"
     fi
-fi
-
-# Default max-num-batched-tokens (tiered by GPU model)
-if $ENGINE_VER_OK && [[ ! $ENGINE_ARGS == *"--max-num-batched-tokens"* ]]; then
-    ENGINE_ARGS="$ENGINE_ARGS --max-num-batched-tokens $MAX_NUM_BATCHED_TOKENS"
 fi
 
 get_parallel_size() {
