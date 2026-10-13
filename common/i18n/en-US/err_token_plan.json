@@ -1,0 +1,14 @@
+{
+    "error.TOKENPLAN-ERR-0": {
+        "other": "Please retry later or contact admin to check Token plan error"
+    },
+    "error.TOKENPLAN-ERR-1": {
+        "other": "Token plan is in using"
+    },
+    "error.TOKENPLAN-ERR-2": {
+        "other": "Token plan price lower lower than the current plan price"
+    },
+    "error.TOKENPLAN-ERR-3": {
+        "other": "Token plan latest period is not paid"
+    }
+}

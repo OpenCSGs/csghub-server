@@ -100,6 +100,10 @@ type AccountStatement struct {
 	CostCompletionSkuID *int64  `bun:",nullzero" json:"cost_completion_sku_id"`
 	Provider            string  `bun:",notnull,default:''" json:"provider"`
 	UpstreamID          int64   `bun:",notnull,default:0" json:"upstream_id"`
+	// token plan
+	BalanceValuePrev  float64 `bun:",nullzero" json:"balance_value_prev"`
+	TokenPlanPeriodID int64   `bun:",nullzero" json:"token_plan_period_id"`
+	RecordedAtUnix    int64   `bun:",nullzero" json:"recorded_at_unix"`
 }
 
 type AccountStatementRes struct {
@@ -466,6 +470,7 @@ func deductFeeToBalance(ctx context.Context, tx bun.Tx, input AccountStatement, 
 		statementValue = 0 - balanceValue
 	}
 
+	input.BalanceValuePrev = balanceValue
 	input.Value = statementValue
 	input.BalanceValue = balanceValue + statementValue
 	input.BalanceType = types.ChargeBalance
@@ -494,6 +499,7 @@ func deductFeeToCashBalance(ctx context.Context, tx bun.Tx, input AccountStateme
 		statementValue = 0 - cashBalanceValue
 	}
 
+	input.BalanceValuePrev = cashBalanceValue
 	input.Value = statementValue
 	input.BalanceValue = cashBalanceValue + statementValue
 	input.BalanceType = types.ChargeCashBalance
@@ -512,6 +518,7 @@ func deductFeeToCashBalance(ctx context.Context, tx bun.Tx, input AccountStateme
 func deductFeeAllInCashBalance(ctx context.Context, tx bun.Tx, input AccountStatement, feeValue, cashBalanceValue float64) (float64, float64, error) {
 	remainValue := cashBalanceValue + feeValue
 
+	input.BalanceValuePrev = cashBalanceValue
 	input.Value = feeValue
 	input.BalanceValue = remainValue
 	input.BalanceType = types.ChargeCashBalance

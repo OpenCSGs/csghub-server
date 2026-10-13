@@ -8,6 +8,6 @@ import (
 	"opencsg.com/csghub-server/common/config"
 )
 
-func createAdvancedRoutes(apiGroup *gin.RouterGroup, config *config.Config, mqFactory bldmq.MessageQueueFactory) error {
+func createAdvancedRoutes(apiGroup *gin.RouterGroup, adminGroup *gin.RouterGroup, config *config.Config, mqFactory bldmq.MessageQueueFactory) error {
 	return nil
 }

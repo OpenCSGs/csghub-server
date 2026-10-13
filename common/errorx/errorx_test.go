@@ -237,6 +237,46 @@ func Test_Err_SYS_HandleDB(t *testing.T) {
 	)
 }
 
+func Test_Err_TokenPlan_Handle(t *testing.T) {
+	t.Run(
+		"Test_ErrDatabaseNoRows",
+		func(t *testing.T) {
+			getErr := HandleTokenPlanError(sql.ErrNoRows, map[string]interface{}{"tt": "tt"})
+
+			assert.True(t, errors.Is(getErr, ErrDatabaseNoRows))
+			assert.True(t, errors.Is(getErr, sql.ErrNoRows))
+			assert.False(t, errors.Is(getErr, ErrTokenPlanLatestPeriodNotPaid))
+
+			getFirstCustom, ok := GetFirstCustomError(getErr)
+			assert.True(t, ok)
+			assert.Equal(t, getFirstCustom, CustomError{
+				prefix:  errSysPrefix,
+				code:    int(databaseNoRows),
+				err:     sql.ErrNoRows,
+				context: map[string]interface{}{"tt": "tt"},
+			})
+		},
+	)
+	t.Run(
+		"Test_ErrTokenPlanError",
+		func(t *testing.T) {
+			getErr := HandleTokenPlanError(sql.ErrConnDone, nil)
+
+			assert.True(t, errors.Is(getErr, ErrTokenPlanError))
+			assert.True(t, errors.Is(getErr, sql.ErrConnDone))
+			assert.False(t, errors.Is(getErr, ErrDatabaseNoRows))
+
+			getFirstCustom, ok := GetFirstCustomError(getErr)
+			assert.True(t, ok)
+			assert.Equal(t, getFirstCustom, CustomError{
+				prefix: errTokenPlanPrefix,
+				code:   int(tokenPlanError),
+				err:    sql.ErrConnDone,
+			})
+		},
+	)
+}
+
 func Test_Err_FEDAP_RepositoryAlreadyExists(t *testing.T) {
 	// The repository-exists error is a fedap business error, not a database duplicate-key error.
 	err := FederationAdapterRepositoryAlreadyExistsErr(errors.New("repository exists"), Ctx().Set("site_id", "site-1"))
