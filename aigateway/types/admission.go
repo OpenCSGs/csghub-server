@@ -73,13 +73,16 @@ const (
 // AdmissionPriorityFromSource resolves the queue priority from the API
 // key's server-side priority scope, set by the quota middleware from the
 // key's quota configuration (the ONLY source: clients cannot influence
-// queue scheduling). Unrecognized or missing scope values default to low.
+// queue scheduling). The default for missing or unrecognized scope values
+// is HIGH: unconfigured keys are interactive chat traffic and must not be
+// queued behind explicitly demoted batch keys — only an explicit "low"
+// scope demotes a key to the low-priority class.
 func AdmissionPriorityFromSource(priorityScope string) AdmissionPriority {
 	switch strings.ToLower(strings.TrimSpace(priorityScope)) {
-	case "high":
-		return AdmissionPriorityHigh
-	default:
+	case "low":
 		return AdmissionPriorityLow
+	default:
+		return AdmissionPriorityHigh
 	}
 }
 

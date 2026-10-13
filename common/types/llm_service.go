@@ -602,6 +602,26 @@ func (p *CapacityPolicy) QueueEnabled() bool {
 	return p != nil && p.MaxQueueDepth > 0 && p.QueueWaitSeconds > 0
 }
 
+// UpstreamQueueStatus is the live admission-queue snapshot of one
+// queue-enabled upstream, read from Redis by the admin LLM config UI. It is
+// observational only: a snapshot taken at read time (T0) says nothing about
+// the state a moment later.
+type UpstreamQueueStatus struct {
+	UpstreamID int64 `json:"upstream_id"`
+	// QueueDepth is the total number of tickets waiting in the upstream's
+	// admission reservation queue (high + low priority).
+	QueueDepth int64 `json:"queue_depth"`
+	// HighPriorityWaiting is the number of waiting tickets whose queue
+	// priority is high (promoted first).
+	HighPriorityWaiting int64 `json:"high_priority_waiting"`
+	// LowPriorityWaiting is the number of waiting tickets whose queue
+	// priority is low.
+	LowPriorityWaiting int64 `json:"low_priority_waiting"`
+	// CurrentConcurrency is the number of in-flight leases (executing
+	// requests) on the upstream at read time.
+	CurrentConcurrency int64 `json:"current_concurrency"`
+}
+
 // ApplyDefaults populates an enabled policy only when every limit is unset:
 // an all-zero enabled policy is replaced by the configured defaults as a
 // queue-mode policy (concurrency + queue depth + queue wait; TPM/RPM stay
