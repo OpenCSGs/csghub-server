@@ -34,6 +34,13 @@ const (
 	TitleTypeEnterpriseOrdinary = "enterprise_ordinary"
 )
 
+// Invoice email send status constants
+const (
+	InvoiceEmailSendStatusNone   = "none"
+	InvoiceEmailSendStatusSent   = "sent"
+	InvoiceEmailSendStatusFailed = "failed"
+)
+
 // InvoiceListParams defines the parameters for listing invoices.
 type InvoiceListParams struct {
 	UserUUID string `json:"user_uuid"` // Specify the user's UUID
@@ -56,6 +63,10 @@ type AccountInvoiceStore interface {
 	// UpdateInvoiceNotFailed updates an existing invoice record only if its
 	// current status is not failed. It reports whether a row was updated.
 	UpdateInvoiceNotFailed(ctx context.Context, invoice *AccountInvoice) (bool, error)
+	// UpdateInvoiceEmailSendStatus records the outcome of sending the invoice
+	// email notification. sentAt is written only when it is non-zero, i.e. for
+	// a successful send; a failed send leaves email_sent_at untouched.
+	UpdateInvoiceEmailSendStatus(ctx context.Context, invoiceID int64, status string, sentAt time.Time) error
 	// DeleteInvoice deletes an invoice record by its ID.
 	DeleteInvoice(ctx context.Context, id int64) error
 	// ListInvoices lists invoices with pagination.
@@ -187,6 +198,10 @@ func (a *accountInvoiceImpl) UpdateInvoiceNotFailed(ctx context.Context, invoice
 		Model(invoice).
 		Where("id = ?", invoice.ID).
 		Where("status != ?", InvoiceStatusFailed).
+		// Email send tracking columns are owned by the async notification
+		// path; writing them here would clobber a concurrent send result and
+		// could materialise a NULL email_sent_at as a zero timestamp.
+		ExcludeColumn("email_send_status", "email_sent_at").
 		Exec(ctx)
 	if err != nil {
 		return false, fmt.Errorf("update invoice %d, error: %w", invoice.ID, err)
@@ -196,6 +211,25 @@ func (a *accountInvoiceImpl) UpdateInvoiceNotFailed(ctx context.Context, invoice
 		return false, fmt.Errorf("retrieving affected row count of invoice %d update: %w", invoice.ID, err)
 	}
 	return affected == 1, nil
+}
+
+// UpdateInvoiceEmailSendStatus records the outcome of sending the invoice
+// email notification. Only the email send columns are touched, so other
+// invoice fields are left intact. sentAt is written only when non-zero, which
+// lets a failed send leave email_sent_at at its previous value.
+func (a *accountInvoiceImpl) UpdateInvoiceEmailSendStatus(ctx context.Context, invoiceID int64, status string, sentAt time.Time) error {
+	q := a.db.Core.NewUpdate().
+		Model((*AccountInvoice)(nil)).
+		Where("id = ?", invoiceID).
+		Set("email_send_status = ?", status)
+	if !sentAt.IsZero() {
+		q = q.Set("email_sent_at = ?", sentAt)
+	}
+	res, err := q.Exec(ctx)
+	if assertAffectedOneRow(res, err) != nil {
+		return err
+	}
+	return nil
 }
 
 // ListInvoices implements the method to list invoices with pagination.
@@ -378,6 +412,10 @@ type AccountInvoice struct {
 	RegisteredAddr string `bun:"registered_addr,notnull" json:"registered_addr"` // Registered address
 	ContactPhone   string `bun:"contact_phone,notnull" json:"contact_phone"`     // Contact phone number
 	Email          string `bun:"email,notnull" json:"email"`                     // Email address
+	// Email send tracking. email_send_status is none/sent/failed; email_sent_at
+	// is the timestamp of the last successful send.
+	EmailSendStatus string       `bun:"email_send_status,notnull,default:'none'" json:"email_send_status"`
+	EmailSentAt     bun.NullTime `bun:"email_sent_at" json:"email_sent_at"`
 
 	times
 }

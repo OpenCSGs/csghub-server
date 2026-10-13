@@ -917,8 +917,12 @@ type AccInvoiceResp struct {
 	RegisteredAddr string    `json:"registered_addr"` // Registered address
 	ContactPhone   string    `json:"contact_phone"`   // Contact phone number
 	Email          string    `json:"email"`           // Email address
-	CreatedAt      time.Time `json:"created_at"`      // Creation time
-	UpdatedAt      time.Time `json:"updated_at"`      // Update time
+	// EmailSendStatus is none/sent/failed; EmailSentAt is the timestamp of the
+	// last successful send, null when no email has been sent yet.
+	EmailSendStatus string     `json:"email_send_status"`
+	EmailSentAt     *time.Time `json:"email_sent_at"`
+	CreatedAt       time.Time  `json:"created_at"` // Creation time
+	UpdatedAt       time.Time  `json:"updated_at"` // Update time
 
 	// Recharge orders invoiced together. Empty for legacy bill-cycle invoices
 	// (bill_cycle is non-empty there) and populated for recharge-based invoices.
