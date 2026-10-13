@@ -364,6 +364,11 @@ func TestReportChatAttemptResult_CircuitRecording(t *testing.T) {
 		})
 
 		reporter.wait(t)
+		// The circuit recording runs in the same background goroutine after the
+		// failure event is reported, so wait for it instead of sampling once.
+		require.Eventually(t, func() bool {
+			return len(am.callsSnapshot()) == 1
+		}, time.Second, 10*time.Millisecond, "circuit failure must be recorded")
 		calls := am.callsSnapshot()
 		require.Len(t, calls, 1)
 		require.False(t, calls[0].success)

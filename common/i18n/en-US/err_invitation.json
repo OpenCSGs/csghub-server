@@ -1,0 +1,11 @@
+{
+    "error.INVITATION-ERR-0": {
+        "other": "phone number is not set, cannot create invitation code"
+    },
+    "error.INVITATION-ERR-1": {
+        "other": "Invitation not found"
+    },
+    "error.INVITATION-ERR-2": {
+        "other": "Invitation code already exists"
+    }
+}

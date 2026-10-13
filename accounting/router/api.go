@@ -28,6 +28,7 @@ func NewAccountRouter(config *config.Config, mqFactory bldmq.MessageQueueFactory
 		return nil, fmt.Errorf("error create validator, error: %w", err)
 	}
 	apiGroup := r.Group("/api/v1/accounting")
+	adminGroup := apiGroup.Group("/admin")
 
 	// metering
 	meterHandler, err := handler.NewMeteringHandler()
@@ -35,7 +36,7 @@ func NewAccountRouter(config *config.Config, mqFactory bldmq.MessageQueueFactory
 		return nil, fmt.Errorf("error creating multi sync handler, error: %w", err)
 	}
 	createMeteringRoutes(apiGroup, meterHandler)
-	err = createAdvancedRoutes(apiGroup, config, mqFactory)
+	err = createAdvancedRoutes(apiGroup, adminGroup, config, mqFactory)
 	if err != nil {
 		return nil, fmt.Errorf("error creating accounting advanced routes, error:%w", err)
 	}

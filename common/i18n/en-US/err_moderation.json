@@ -1,0 +1,8 @@
+{
+    "error.MOD-ERR-0": {
+        "other": "The group name cannot be empty."
+    },
+    "error.MOD-ERR-1": {
+        "other": "The word cannot be empty."
+    }
+}

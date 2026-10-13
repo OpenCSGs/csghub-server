@@ -533,15 +533,20 @@ type ModelConfig struct {
 	// The weights use a separate mtp.* namespace (mtp.layers.0.self_attn.* etc.)
 	// rather than the DeepSeek model.layers.N.* convention.
 	MtpNumHiddenLayers int `json:"mtp_num_hidden_layers,omitempty"`
+	// MaxPositionEmbeddings is the model's maximum sequence length. Multimodal
+	// models (Qwen-VL/Qwen2.5-VL) often declare it only inside text_config;
+	// UnmarshalJSON merges that value to the top level.
+	MaxPositionEmbeddings int `json:"max_position_embeddings,omitempty"`
 }
 
 type ModelTextConfig struct {
-	NumHiddenLayers    int    `json:"num_hidden_layers"`
-	HiddenSize         int    `json:"hidden_size"`
-	NumAttentionHeads  int    `json:"num_attention_heads"`
-	Dtype              string `json:"dtype"`
-	TorchDtype         string `json:"torch_dtype"`
-	MtpNumHiddenLayers int    `json:"mtp_num_hidden_layers,omitempty"`
+	NumHiddenLayers       int    `json:"num_hidden_layers"`
+	HiddenSize            int    `json:"hidden_size"`
+	NumAttentionHeads     int    `json:"num_attention_heads"`
+	Dtype                 string `json:"dtype"`
+	TorchDtype            string `json:"torch_dtype"`
+	MtpNumHiddenLayers    int    `json:"mtp_num_hidden_layers,omitempty"`
+	MaxPositionEmbeddings int    `json:"max_position_embeddings,omitempty"`
 }
 
 func (c *ModelConfig) UnmarshalJSON(data []byte) error {
@@ -560,6 +565,9 @@ func (c *ModelConfig) UnmarshalJSON(data []byte) error {
 		c.HiddenSize = cfg.TextConfig.HiddenSize
 		c.NumAttentionHeads = cfg.TextConfig.NumAttentionHeads
 		c.MtpNumHiddenLayers = cfg.TextConfig.MtpNumHiddenLayers
+		if c.MaxPositionEmbeddings == 0 {
+			c.MaxPositionEmbeddings = cfg.TextConfig.MaxPositionEmbeddings
+		}
 		if cfg.TextConfig.Dtype != "" {
 			c.TorchDtype = cfg.TextConfig.Dtype
 		}
@@ -568,6 +576,20 @@ func (c *ModelConfig) UnmarshalJSON(data []byte) error {
 		}
 	}
 	return nil
+}
+
+// OptimizeEngineArgsReq is the request body for the engine args optimization API.
+type OptimizeEngineArgsReq struct {
+	RuntimeFrameworkID int64  `json:"runtime_framework_id" binding:"required"`
+	ResourceID         int64  `json:"resource_id" binding:"required"`
+	EngineArgs         string `json:"engine_args"`
+	EnablePD           bool   `json:"enable_pd"`
+}
+
+// OptimizeEngineArgsResp returns only the parameters whose optimized value
+// differs from the user's current input.
+type OptimizeEngineArgsResp struct {
+	EngineArgs map[string]string `json:"engine_args"`
 }
 
 type EngineConfig struct {

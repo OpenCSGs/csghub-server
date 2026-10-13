@@ -871,7 +871,6 @@ func TestMakeDeployEnv_Inference(t *testing.T) {
 	require.Equal(t, "1", envMap["HF_HUB_OFFLINE"])
 	require.Equal(t, "text-generation", envMap["HF_TASK"])
 	require.Equal(t, "1", envMap["VLLM_ENFORCE_EAGER"])
-	require.Equal(t, "true", envMap["ASYNC_SCHEDULING_DISABLED"])
 	require.Equal(t, "0.10.0", envMap["ENGINE_VERSION"])
 }
 

@@ -42,6 +42,14 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Name:** `negativePrice`
 - **Description:** The price specified in the request is negative.
 
+---
+
+### `ACT-ERR-5`
+
+- **Error Code:** `ACT-ERR-5`
+- **Error Name:** `sceneNotAllowed`
+- **Description:** The specified scene type is not in the allowed list for sync deduction operations.
+
 ## Agent Errors
 
 ### `AGENT-ERR-0`
@@ -217,6 +225,78 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Code:** `AGENT-ERR-21`
 - **Error Name:** `agentProvisionRequestModelUnavailable`
 - **Description:** The model pinned in the agent instance provision request is not in the available llm model catalog. The error message includes the model name and the agent instance type.
+
+---
+
+### `AGENT-ERR-22`
+
+- **Error Code:** `AGENT-ERR-22`
+- **Error Name:** `csgclawTemplateNotFound`
+- **Description:** No csgclaw agent template matches the repository path in the instance provision request.
+
+---
+
+### `AGENT-ERR-23`
+
+- **Error Code:** `AGENT-ERR-23`
+- **Error Name:** `agentTemplateSensitiveCheckCreateAgentBlocked`
+- **Description:**
+
+---
+
+### `AGENT-ERR-24`
+
+- **Error Code:** `AGENT-ERR-24`
+- **Error Name:** `agentTemplateSensitiveCheckMakePublicBlocked`
+- **Description:**
+
+---
+
+### `AGENT-ERR-25`
+
+- **Error Code:** `AGENT-ERR-25`
+- **Error Name:** `agentTemplateSensitiveCheckCreateAgentPending`
+- **Description:**
+
+---
+
+### `AGENT-ERR-26`
+
+- **Error Code:** `AGENT-ERR-26`
+- **Error Name:** `agentTemplateSensitiveCheckMakePublicPending`
+- **Description:**
+
+---
+
+### `AGENT-ERR-27`
+
+- **Error Code:** `AGENT-ERR-27`
+- **Error Name:** `knowledgeBaseContentIDAlreadyExists`
+- **Description:** A knowledge base with the same content ID already exists. Content IDs are globally unique across knowledge bases.
+
+---
+
+### `AGENT-ERR-28`
+
+- **Error Code:** `AGENT-ERR-28`
+- **Error Name:** `knowledgeBaseContentIDInvalid`
+- **Description:** The knowledge base content ID is missing or has an invalid format. It is also used as the knowledge base's MCP server name, so it must start with a letter or digit, contain only letters, digits, underscores, or hyphens, and be at most 32 characters. The error message includes the offending value.
+
+---
+
+### `AGENT-ERR-29`
+
+- **Error Code:** `AGENT-ERR-29`
+- **Error Name:** `csgclawSubdomainInvalid`
+- **Description:**
+
+---
+
+### `AGENT-ERR-30`
+
+- **Error Code:** `AGENT-ERR-30`
+- **Error Name:** `csgclawAgentNameInvalid`
+- **Description:** The CSGClaw manifest agent name is invalid.
 
 ## Auth Errors
 
@@ -425,6 +505,14 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Code:** `DEPLOY-ERR-0`
 - **Error Name:** `codeDeployNameAlreadyExistsErr`
 - **Description:** A deploy with the same name already exists for this deploy type.
+
+---
+
+### `DEPLOY-ERR-1`
+
+- **Error Code:** `DEPLOY-ERR-1`
+- **Error Name:** `codeDeployStopFirstErr`
+- **Description:** The deploy is still running, please stop it first before updating.
 
 ## Federation_adapter Errors
 
@@ -898,6 +986,30 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Name:** `gitInvalidURL`
 - **Description:** The provided git URL is invalid or malformed. Please check the URL format and try again.
 
+## Import Errors
+
+### `IMPORT-ERR-0`
+
+- **Error Code:** `IMPORT-ERR-0`
+- **Error Name:** `importGitlabInstanceInvalid`
+- **Description:** The provided base URL is not a valid GitLab instance. The GitLab version endpoint did not return a recognizable GitLab response.
+
+---
+
+### `IMPORT-ERR-1`
+
+- **Error Code:** `IMPORT-ERR-1`
+- **Error Name:** `importGitlabInstanceUnreachable`
+- **Description:** The GitLab instance could not be reached. The request to the GitLab version endpoint failed due to a network or URL error.
+
+---
+
+### `IMPORT-ERR-2`
+
+- **Error Code:** `IMPORT-ERR-2`
+- **Error Name:** `importGitlabInstanceUnauthorized`
+- **Description:** The access token was rejected by the GitLab instance. The GitLab version endpoint returned an authentication error.
+
 ## Invitation Errors
 
 ### `INVITATION-ERR-0`
@@ -938,6 +1050,30 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Name:** `licenseExpired`
 - **Description:** The license is expired, could not be verified and imported.
 
+---
+
+### `LICENSE-ERR-2`
+
+- **Error Code:** `LICENSE-ERR-2`
+- **Error Name:** `licenseFeatureDisabled`
+- **Description:** The feature is not enabled by the current license.
+
+---
+
+### `LICENSE-ERR-3`
+
+- **Error Code:** `LICENSE-ERR-3`
+- **Error Name:** `licenseLimitExceeded`
+- **Description:** The operation exceeds the limit allowed by the current license.
+
+---
+
+### `LICENSE-ERR-4`
+
+- **Error Code:** `LICENSE-ERR-4`
+- **Error Name:** `invalidLicenseExtra`
+- **Description:** The license extra data is invalid, could not be created, updated or imported.
+
 ## Mcp_gateway Errors
 
 ### `MCPGW-ERR-0`
@@ -953,6 +1089,22 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Code:** `MCPGW-ERR-1`
 - **Error Name:** `gatewayMCPServerInvalidName`
 - **Description:** The MCP server name does not meet naming requirements.
+
+## Media Errors
+
+### `MEDIA-ERR-0`
+
+- **Error Code:** `MEDIA-ERR-0`
+- **Error Name:** `codeMediaModerationPending`
+- **Description:** The comment is under media moderation and cannot be edited.
+
+---
+
+### `MEDIA-ERR-1`
+
+- **Error Code:** `MEDIA-ERR-1`
+- **Error Name:** `codeMediaModerationUnavailable`
+- **Description:** The media moderation service is unavailable.
 
 ## Mirror Errors
 
@@ -1042,6 +1194,54 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Name:** `codeWordRequire`
 - **Description:** The request parameter does not match the server requirements, and the server cannot process the request.
 
+## Organization Errors
+
+### `ORG-ERR-0`
+
+- **Error Code:** `ORG-ERR-0`
+- **Error Name:** `organizationMemberNotFound`
+- **Description:** The requested user does not have a membership in the specified organization.
+
+---
+
+### `ORG-ERR-1`
+
+- **Error Code:** `ORG-ERR-1`
+- **Error Name:** `organizationNotFound`
+- **Description:** The requested organization does not exist.
+
+---
+
+### `ORG-ERR-2`
+
+- **Error Code:** `ORG-ERR-2`
+- **Error Name:** `organizationManageForbidden`
+- **Description:** The user does not have permission to manage the requested organization.
+
+---
+
+### `ORG-ERR-3`
+
+- **Error Code:** `ORG-ERR-3`
+- **Error Name:** `organizationAccessForbidden`
+- **Description:** The user does not have permission to access the requested organization.
+
+---
+
+### `ORG-ERR-4`
+
+- **Error Code:** `ORG-ERR-4`
+- **Error Name:** `organizationModeIncompatible`
+- **Description:** The current organization architecture does not support viewing this organization. Please migrate the organization.
+
+---
+
+### `ORG-ERR-5`
+
+- **Error Code:** `ORG-ERR-5`
+- **Error Name:** `organizationAlreadyExists`
+- **Description:** The system already has an organization and cannot create another one.
+
 ## Pd Errors
 
 ### `PD-ERR-0`
@@ -1121,6 +1321,22 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Code:** `REPO-ERR-8`
 - **Error Name:** `codeSensitiveCheckNotPassedErr`
 - **Description:** The repository cannot be made public because the compliance scan has not passed.
+
+---
+
+### `REPO-ERR-9`
+
+- **Error Code:** `REPO-ERR-9`
+- **Error Name:** `codeRepoZipDownloadFailedErr`
+- **Description:** Failed to download repository as zip archive.
+
+---
+
+### `REPO-ERR-10`
+
+- **Error Code:** `REPO-ERR-10`
+- **Error Name:** `codeRepoAuthorizationNotFoundErr`
+- **Description:** The repository authorization relationship does not exist.
 
 ## Req Errors
 
@@ -1258,6 +1474,22 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Name:** `errTransferNotSupported`
 - **Description:** The repository cannot be transferred because it does not have a hashed path. Only repositories with hashed paths support ownership transfer.
 
+---
+
+### `REQ-ERR-17`
+
+- **Error Code:** `REQ-ERR-17`
+- **Error Name:** `errUpstreamConnectionCheckNotSupported`
+- **Description:** The configured upstream endpoint does not support connection testing.
+
+---
+
+### `REQ-ERR-18`
+
+- **Error Code:** `REQ-ERR-18`
+- **Error Name:** `errUpstreamHealthCheckNotSupported`
+- **Description:** The configured upstream endpoint does not support health checks.
+
 ## Resource Errors
 
 ### `RESOURCE-ERR-0`
@@ -1346,6 +1578,14 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Name:** `codeSandboxNameInvalidCharErr`
 - **Description:** Sandbox name has invalid characters or format (only a-z, 0-9, -, . allowed; cannot start/end with -/. or have consecutive -/. ).
 
+---
+
+### `SANDBOX-ERR-4`
+
+- **Error Code:** `SANDBOX-ERR-4`
+- **Error Name:** `codeSandboxCrossClusterRestartErr`
+- **Description:** A sandbox cannot be restarted onto a resource in a different cluster because its persistent data is cluster-scoped.
+
 ## Sensitive Errors
 
 ### `SENSITIVE-ERR-0`
@@ -1425,6 +1665,14 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Code:** `SERVERLESS-ERR-8`
 - **Error Name:** `codeInvalidCommitIDErr`
 - **Description:** The commit id is invalid.
+
+---
+
+### `SERVERLESS-ERR-9`
+
+- **Error Code:** `SERVERLESS-ERR-9`
+- **Error Name:** `codeUpdateFailedErr`
+- **Description:**
 
 ## Skill Errors
 
@@ -1658,6 +1906,38 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Name:** `resourceStatusUncertain`
 - **Description:** The resource availability could not be determined because the cluster lacks ClusterRole permissions to query node resources and no ResourceQuota is configured in the namespace. This error occurs when the system cannot verify if enough resources are available for the task.
 
+## Token_plan Errors
+
+### `TOKENPLAN-ERR-0`
+
+- **Error Code:** `TOKENPLAN-ERR-0`
+- **Error Name:** `tokenPlanError`
+- **Description:** Please retry later or contact admin to check TokenPlan error.
+
+---
+
+### `TOKENPLAN-ERR-1`
+
+- **Error Code:** `TOKENPLAN-ERR-1`
+- **Error Name:** `tokenPlanInUsing`
+- **Description:** The token plan in request is already in using.
+
+---
+
+### `TOKENPLAN-ERR-2`
+
+- **Error Code:** `TOKENPLAN-ERR-2`
+- **Error Name:** `tokenPlanPriceLower`
+- **Description:** The token plan price in request is lower than the current plan price.
+
+---
+
+### `TOKENPLAN-ERR-3`
+
+- **Error Code:** `TOKENPLAN-ERR-3`
+- **Error Name:** `tokenPlanLatestPeriodNotPaid`
+- **Description:** The token plan latest period in request is not paid.
+
 ## User Errors
 
 ### `USER-ERR-0`
@@ -1784,7 +2064,7 @@ This document lists all the custom error codes defined in the project, categoriz
 
 - **Error Code:** `USER-ERR-15`
 - **Error Name:** `userHasOrganizations`
-- **Description:** The user who owns organizations cannot be deleted.
+- **Description:** The user who administers organizations cannot be deleted.
 
 ---
 
@@ -1825,3 +2105,11 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Code:** `USER-ERR-20`
 - **Error Name:** `namespaceAlreadyExists`
 - **Description:** The namespace already exists in the system.
+
+---
+
+### `USER-ERR-21`
+
+- **Error Code:** `USER-ERR-21`
+- **Error Name:** `tagIDsNotExist`
+- **Description:** One or more of the provided tag IDs do not exist in the system. Please verify all tag IDs are valid.

@@ -25,5 +25,11 @@
     },
     "error.REPO-ERR-8": {
         "other": "合規掃描未通過，無法將倉庫設置為公開。"
+    },
+    "error.REPO-ERR-9": {
+        "other": "下載倉庫 zip 歸檔失敗"
+    },
+    "error.REPO-ERR-10": {
+        "other": "儲存庫授權關係不存在"
     }
 }

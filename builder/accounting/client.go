@@ -46,6 +46,19 @@ type AccountingClient interface {
 	QueryStatisticsByUserID(req types.AcctBillsReq) (any, error)
 	QueryStatisticsDetailByUserID(req types.AcctBillsDetailReq) (any, error)
 	GetStatisticsSummary(req types.AcctBillsReq) (any, error)
+	CreateTokenPlan(req types.AcctTokenPlanCreateReq) (any, error)
+	GetTokenPlan(req types.AcctTokenPlanGetReq) (any, error)
+	UpdateTokenPlan(req types.AcctTokenPlanUpdateReq) (any, error)
+	DeleteTokenPlan(req types.AcctTokenPlanDelReq) (any, error)
+	ListTokenPlans(req types.AcctTokenPlanListReq) (any, error)
+	SummaryTokenPlans() (any, error)
+	ListPlansForNS(req types.AcctTokenPlanNSListReq) (any, error)
+	ListHistoryForNS(req types.AcctTokenPlanHistoryReq) (any, error)
+	PurchasePlanForNS(req types.AcctTokenPlanPurchaseReq) (any, error)
+	GetCurrentSubForNS(req types.AcctTokenPlanNSGetReq) (any, error)
+	CancelPlanForNS(req types.AcctTokenPlanCancelReq) (any, error)
+	UpgradePlanForNS(req types.AcctTokenPlanUpgradeReq) (any, error)
+	UpdatePlanForNS(req types.AcctTokenPlanUpdateNSReq) (any, error)
 }
 type accountingClientImpl struct {
 	remote    *url.URL
@@ -99,12 +112,20 @@ func (ac *accountingClientImpl) doRequest(method, subPath string, data any) (*ht
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		var errData any
-		err := json.NewDecoder(resp.Body).Decode(&errData)
-		if err != nil {
-			return nil, fmt.Errorf("unexpected http status code: %d, %w", resp.StatusCode, err)
-		} else {
-			return nil, fmt.Errorf("unexpected http status and error: %d, %v", resp.StatusCode, errData)
+		bodyErr := json.NewDecoder(resp.Body).Decode(&errData)
+		if bodyErr != nil {
+			return nil, fmt.Errorf("unexpected http status code: %d, %w", resp.StatusCode, bodyErr)
 		}
+
+		errMap, mapOK := errData.(map[string]any)
+		if mapOK {
+			code, codeOK := errMap["code"].(string)
+			if codeOK && errorx.IsValidErrorCode(code) {
+				return nil, errorx.ParseError(code, errorx.NewCustomError("SYS-ERR", 0, err, nil),
+					errorx.Ctx().Set("detail", errData))
+			}
+		}
+		return nil, fmt.Errorf("unexpected http status and error: %d, %v", resp.StatusCode, errData)
 	}
 
 	return resp, nil

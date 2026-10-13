@@ -603,7 +603,7 @@ func (a *accountSubscriptionStoreImpl) renewCancelSub(ctx context.Context, tx bu
 		subBill.AmountPaid = float64(price.SkuPrice)
 		subBill.Discount = price.Discount
 	}
-	subBill.Status = types.BillingStatusFailed
+	subBill.Status = types.BillingStatusUnpaid
 	subBill.Reason = reason
 	subBill.PeriodStart = now
 	subBill.PeriodEnd = now
