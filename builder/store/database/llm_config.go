@@ -171,7 +171,7 @@ func ResolveLLMTasks(ctx context.Context, store LLMConfigStore, llmConfigID int6
 
 func (s *lLMConfigStoreImpl) GetOptimization(ctx context.Context) (*LLMConfig, error) {
 	var config LLMConfig
-	err := s.db.Operator.Core.NewSelect().Model(&config).Relation("Upstreams").Where("(type & ?) > 0 and enabled = true", LLMTypeOptimization).Limit(1).Scan(ctx)
+	err := s.db.Operator.Core.NewSelect().Model(&config).Relation("Upstreams").Relation("Upstreams.HealthState").Where("(type & ?) > 0 and enabled = true", LLMTypeOptimization).Limit(1).Scan(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("select optimization llm, %w", err)
 	}
@@ -180,7 +180,7 @@ func (s *lLMConfigStoreImpl) GetOptimization(ctx context.Context) (*LLMConfig, e
 
 func (s *lLMConfigStoreImpl) GetModelForSummaryReadme(ctx context.Context) (*LLMConfig, error) {
 	var config LLMConfig
-	err := s.db.Operator.Core.NewSelect().Model(&config).Relation("Upstreams").Where("(type & ?) > 0 and enabled = true", LLMTypeSummaryReadme).Limit(1).Scan(ctx)
+	err := s.db.Operator.Core.NewSelect().Model(&config).Relation("Upstreams").Relation("Upstreams.HealthState").Where("(type & ?) > 0 and enabled = true", LLMTypeSummaryReadme).Limit(1).Scan(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("select llm for summary readme, %w", err)
 	}
@@ -189,7 +189,7 @@ func (s *lLMConfigStoreImpl) GetModelForSummaryReadme(ctx context.Context) (*LLM
 
 func (s *lLMConfigStoreImpl) GetByType(ctx context.Context, llmType int) (*LLMConfig, error) {
 	var config LLMConfig
-	err := s.db.Operator.Core.NewSelect().Model(&config).Relation("Upstreams").Where("(type & ?) > 0 and enabled = true", llmType).Limit(1).Scan(ctx)
+	err := s.db.Operator.Core.NewSelect().Model(&config).Relation("Upstreams").Relation("Upstreams.HealthState").Where("(type & ?) > 0 and enabled = true", llmType).Limit(1).Scan(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("select llm by type %d, %w", llmType, err)
 	}
@@ -410,6 +410,12 @@ func (u *Upstream) isHealthy() bool {
 		return true // no health state yet, assume healthy
 	}
 	return u.HealthState.HealthState != "unhealthy"
+}
+
+// IsHealthy reports whether this upstream has a healthy health state.
+// An upstream is considered healthy if it is not explicitly marked unhealthy.
+func (u *Upstream) IsHealthy() bool {
+	return u.isHealthy()
 }
 
 // PrimaryEndpoint returns the URL of the best available upstream.

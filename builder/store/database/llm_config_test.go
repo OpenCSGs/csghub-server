@@ -23,22 +23,22 @@ func TestLLMConfigStore_GetOptimization(t *testing.T) {
 	require.Nil(t, err)
 	store := database.NewLLMConfigStoreWithDB(db, config)
 	_, err = db.Core.NewInsert().Model(&database.LLMConfig{
-		Type:         1,
-		Enabled:      true,
-		ModelName:    "c1",
-		Metadata:     map[string]any{"source": "test"},
+		Type:      1,
+		Enabled:   true,
+		ModelName: "c1",
+		Metadata:  map[string]any{"source": "test"},
 	}).Exec(ctx)
 	require.Nil(t, err)
 	_, err = db.Core.NewInsert().Model(&database.LLMConfig{
-		Type:         2,
-		Enabled:      true,
-		ModelName:    "c2",
+		Type:      2,
+		Enabled:   true,
+		ModelName: "c2",
 	}).Exec(ctx)
 	require.Nil(t, err)
 	_, err = db.Core.NewInsert().Model(&database.LLMConfig{
-		Type:         1,
-		Enabled:      false,
-		ModelName:    "c3",
+		Type:      1,
+		Enabled:   false,
+		ModelName: "c3",
 	}).Exec(ctx)
 	require.Nil(t, err)
 
@@ -46,6 +46,51 @@ func TestLLMConfigStore_GetOptimization(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, "c1", cfg.ModelName)
 	require.Equal(t, map[string]any{"source": "test"}, cfg.Metadata)
+}
+
+// The internal llm client selects upstreams by health (builder/llm
+// preferredUpstreams), so the queries backing GetOptimization and friends
+// must load Upstreams.HealthState; otherwise an unhealthy upstream would
+// still be picked first.
+func TestLLMConfigStore_GetOptimization_LoadsUpstreamHealthState(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+	config, err := config.LoadConfig()
+	require.Nil(t, err)
+	store := database.NewLLMConfigStoreWithDB(db, config)
+
+	cfgRow := &database.LLMConfig{Type: 1, Enabled: true, ModelName: "c-health"}
+	_, err = db.Core.NewInsert().Model(cfgRow).Exec(ctx)
+	require.Nil(t, err)
+
+	upstreamA := &database.Upstream{LLMConfigID: cfgRow.ID, URL: "https://a.example.com", Enabled: true, ModelName: "ma"}
+	_, err = db.Core.NewInsert().Model(upstreamA).Exec(ctx)
+	require.Nil(t, err)
+	upstreamB := &database.Upstream{LLMConfigID: cfgRow.ID, URL: "https://b.example.com", Enabled: true, ModelName: "mb"}
+	_, err = db.Core.NewInsert().Model(upstreamB).Exec(ctx)
+	require.Nil(t, err)
+
+	// The gateway marked upstream A unhealthy.
+	_, err = db.Core.NewInsert().Model(&database.AIGatewayUpstreamHealthState{
+		UpstreamID:  upstreamA.ID,
+		HealthState: "unhealthy",
+		LastCheckAt: time.Now(),
+	}).Exec(ctx)
+	require.Nil(t, err)
+
+	cfg, err := store.GetOptimization(ctx)
+	require.Nil(t, err)
+	require.Len(t, cfg.Upstreams, 2)
+	for _, u := range cfg.Upstreams {
+		switch u.URL {
+		case "https://a.example.com":
+			require.NotNil(t, u.HealthState, "health state must be loaded for selection")
+			require.Equal(t, "unhealthy", u.HealthState.HealthState)
+		case "https://b.example.com":
+			require.Nil(t, u.HealthState)
+		}
+	}
 }
 
 func TestLLMConfigStore_GetModelForSummaryReadme(t *testing.T) {
@@ -56,10 +101,10 @@ func TestLLMConfigStore_GetModelForSummaryReadme(t *testing.T) {
 	require.Nil(t, err)
 	store := database.NewLLMConfigStoreWithDB(db, config)
 	_, err = db.Core.NewInsert().Model(&database.LLMConfig{
-		Type:         5,
-		Enabled:      true,
-		ModelName:    "summary1",
-		Metadata:     map[string]any{"k": "v"},
+		Type:      5,
+		Enabled:   true,
+		ModelName: "summary1",
+		Metadata:  map[string]any{"k": "v"},
 	}).Exec(ctx)
 	require.Nil(t, err)
 
@@ -93,10 +138,10 @@ func TestLLMConfigStore_GetByID(t *testing.T) {
 	store := database.NewLLMConfigStoreWithDB(db, config)
 
 	dbInput := database.LLMConfig{
-		Type:         5,
-		Enabled:      true,
-		ModelName:    "summary1",
-		Metadata:     map[string]any{"k": "v"},
+		Type:      5,
+		Enabled:   true,
+		ModelName: "summary1",
+		Metadata:  map[string]any{"k": "v"},
 	}
 	_, err = db.Core.NewInsert().Model(&dbInput).Exec(ctx)
 	require.Nil(t, err)
@@ -116,8 +161,8 @@ func TestLLMConfigStore_CRUD(t *testing.T) {
 	require.Nil(t, err)
 	store := database.NewLLMConfigStoreWithDB(db, config)
 	dbInput := database.LLMConfig{
-		Type:     5,
-		Enabled:  true,
+		Type:      5,
+		Enabled:   true,
 		ModelName: "summary1",
 		RoutingPolicy: types.RoutingPolicy{
 			Strategy:      "session_hash",
@@ -298,15 +343,15 @@ func TestLLMConfigStore_Index_EnabledFilter(t *testing.T) {
 		Type: searchType,
 	}
 	_, err = store.Create(ctx, database.LLMConfig{
-		ModelName:    "idx-en-on",
-		Enabled:      true,
-		Type:         base.Type,
+		ModelName: "idx-en-on",
+		Enabled:   true,
+		Type:      base.Type,
 	})
 	require.Nil(t, err)
 	_, err = store.Create(ctx, database.LLMConfig{
-		ModelName:    "idx-en-off",
-		Enabled:      false,
-		Type:         base.Type,
+		ModelName: "idx-en-off",
+		Enabled:   false,
+		Type:      base.Type,
 	})
 	require.Nil(t, err)
 
@@ -390,18 +435,18 @@ func TestLLMConfigStore_IndexWithRepo(t *testing.T) {
 	enabled := true
 
 	_, err = store.Create(ctx, database.LLMConfig{
-		ModelName:    "with-repo-model",
-		Type:         llmType,
-		Enabled:      true,
-		RepoID:       repo.ID,
+		ModelName: "with-repo-model",
+		Type:      llmType,
+		Enabled:   true,
+		RepoID:    repo.ID,
 	})
 	require.Nil(t, err)
 
 	_, err = store.Create(ctx, database.LLMConfig{
-		ModelName:    "no-repo-model",
-		Type:         llmType,
-		Enabled:      true,
-		RepoID:       0,
+		ModelName: "no-repo-model",
+		Type:      llmType,
+		Enabled:   true,
+		RepoID:    0,
 	})
 	require.Nil(t, err)
 
@@ -589,18 +634,18 @@ func TestLLMConfig_PopulateDerivedFields_HealthyUpstream(t *testing.T) {
 		Provider:    "original-provider",
 		Upstreams: []database.Upstream{
 			{
-				URL:      "http://disabled-upstream",
-				Enabled:  false,
-				ModelName: "disabled-model",
+				URL:        "http://disabled-upstream",
+				Enabled:    false,
+				ModelName:  "disabled-model",
 				AuthHeader: `{"Authorization":"disabled"}`,
-				Provider: "disabled-provider",
+				Provider:   "disabled-provider",
 			},
 			{
-				URL:      "http://healthy-upstream",
-				Enabled:  true,
-				ModelName: "healthy-model",
+				URL:        "http://healthy-upstream",
+				Enabled:    true,
+				ModelName:  "healthy-model",
 				AuthHeader: `{"Authorization":"healthy"}`,
-				Provider: "healthy-provider",
+				Provider:   "healthy-provider",
 				HealthState: &database.AIGatewayUpstreamHealthState{
 					HealthState: "healthy",
 				},
@@ -620,21 +665,21 @@ func TestLLMConfig_PopulateDerivedFields_UnhealthyUpstream(t *testing.T) {
 		ApiEndpoint: "original-endpoint",
 		Upstreams: []database.Upstream{
 			{
-				URL:      "http://unhealthy-upstream",
-				Enabled:  true,
-				ModelName: "unhealthy-model",
+				URL:        "http://unhealthy-upstream",
+				Enabled:    true,
+				ModelName:  "unhealthy-model",
 				AuthHeader: `{"Authorization":"unhealthy"}`,
-				Provider: "unhealthy-provider",
+				Provider:   "unhealthy-provider",
 				HealthState: &database.AIGatewayUpstreamHealthState{
 					HealthState: "unhealthy",
 				},
 			},
 			{
-				URL:      "http://fallback-upstream",
-				Enabled:  true,
-				ModelName: "fallback-model",
+				URL:        "http://fallback-upstream",
+				Enabled:    true,
+				ModelName:  "fallback-model",
 				AuthHeader: `{"Authorization":"fallback"}`,
-				Provider: "fallback-provider",
+				Provider:   "fallback-provider",
 			},
 		},
 	}
@@ -650,11 +695,11 @@ func TestLLMConfig_PopulateDerivedFields_DegradedIsHealthy(t *testing.T) {
 		ModelName: "original-model",
 		Upstreams: []database.Upstream{
 			{
-				URL:      "http://degraded-upstream",
-				Enabled:  true,
-				ModelName: "degraded-model",
+				URL:        "http://degraded-upstream",
+				Enabled:    true,
+				ModelName:  "degraded-model",
 				AuthHeader: `{"Authorization":"degraded"}`,
-				Provider: "degraded-provider",
+				Provider:   "degraded-provider",
 				HealthState: &database.AIGatewayUpstreamHealthState{
 					HealthState: "degraded",
 				},
@@ -672,11 +717,11 @@ func TestLLMConfig_PopulateDerivedFields_OverridesModelName(t *testing.T) {
 		ModelName: "config-model",
 		Upstreams: []database.Upstream{
 			{
-				URL:       "http://upstream",
-				Enabled:   true,
-				ModelName: "upstream-model",
+				URL:        "http://upstream",
+				Enabled:    true,
+				ModelName:  "upstream-model",
 				AuthHeader: "{}",
-				Provider:  "upstream-provider",
+				Provider:   "upstream-provider",
 			},
 		},
 	}
@@ -689,11 +734,11 @@ func TestLLMConfig_PopulateDerivedFields_EmptyUpstreamModelName(t *testing.T) {
 		ModelName: "config-model",
 		Upstreams: []database.Upstream{
 			{
-				URL:       "http://upstream",
-				Enabled:   true,
-				ModelName: "",
+				URL:        "http://upstream",
+				Enabled:    true,
+				ModelName:  "",
 				AuthHeader: "{}",
-				Provider:  "upstream-provider",
+				Provider:   "upstream-provider",
 			},
 		},
 	}
