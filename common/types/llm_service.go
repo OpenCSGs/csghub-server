@@ -234,6 +234,15 @@ type UpstreamConfig struct {
 	IsAvailable bool `json:"is_available"`
 	// AvailabilityStatus is a readable aggregate status: available/degraded/unavailable/disabled.
 	AvailabilityStatus string `json:"availability_status,omitempty"`
+	// LastError is the detail of the latest failed health check (reason/HTTP code/response),
+	// populated for admin views from the health state table.
+	LastError string `json:"last_error,omitempty"`
+	// LastCheckAt is the time of the latest health check, populated for admin views.
+	LastCheckAt *time.Time `json:"last_check_at,omitempty"`
+	// LatencyMs is the latency of the latest health check in milliseconds.
+	LatencyMs int64 `json:"latency_ms,omitempty"`
+	// ConsecutiveFailures counts consecutive failed health checks.
+	ConsecutiveFailures int `json:"consecutive_failures,omitempty"`
 	// ModelName overrides the upstream request model ID when this upstream uses
 	ModelName string `json:"model_name"`
 	// AuthHeader is endpoint-specific auth header value.
@@ -662,6 +671,11 @@ type SearchLLMConfig struct {
 	Enabled   *bool  `json:"enabled"`    // Enabled filter
 	SortBy    string `json:"sort_by"`    // Sortable field: model_size_b | updated_at
 	SortOrder string `json:"sort_order"` // ASC | DESC
+	// AvailableFirst prepends an availability-first ordering before the
+	// configured sort. Only the admin LLM config listing sets it; public
+	// (external LLMs) and gateway model listings keep their historical
+	// ordering.
+	AvailableFirst bool `json:"available_first"`
 }
 
 // AIGatewayMetricEventQuery is the filter/pagination parameters for listing

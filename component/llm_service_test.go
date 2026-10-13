@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -261,13 +262,19 @@ func TestLLMServiceComponent_IndexLLMConfig(t *testing.T) {
 	search := &types.SearchLLMConfig{
 		Keyword: "",
 	}
+	// IndexLLMConfig always requests the availability-first ordering for the
+	// admin listing; the store receives a copy with the flag set.
+	expectedSearch := &types.SearchLLMConfig{
+		Keyword:        "",
+		AvailableFirst: true,
+	}
 	dbLLMConfig := &database.LLMConfig{
 		ID:        123,
 		ModelName: "new-model",
 		Type:      666,
 		Enabled:   true,
 	}
-	stores.LLMConfigMock().EXPECT().Index(ctx, per, page, search).Return([]*database.LLMConfig{dbLLMConfig}, 1, nil)
+	stores.LLMConfigMock().EXPECT().Index(ctx, per, page, expectedSearch).Return([]*database.LLMConfig{dbLLMConfig}, 1, nil)
 	res, total, err := mc.IndexLLMConfig(ctx, per, page, search)
 	require.Nil(t, err)
 	require.NotNil(t, res)
@@ -387,6 +394,7 @@ func TestLLMServiceComponent_IndexLLMConfig_WithSource(t *testing.T) {
 	per := 10
 	page := 1
 	search := &types.SearchLLMConfig{Keyword: ""}
+	expectedSearch := &types.SearchLLMConfig{Keyword: "", AvailableFirst: true}
 
 	// LLM config with two external upstreams — aggregated source should be "external"
 	dbLLMConfig := &database.LLMConfig{
@@ -421,7 +429,7 @@ func TestLLMServiceComponent_IndexLLMConfig_WithSource(t *testing.T) {
 		},
 	}
 
-	stores.LLMConfigMock().EXPECT().Index(ctx, per, page, search).
+	stores.LLMConfigMock().EXPECT().Index(ctx, per, page, expectedSearch).
 		Return([]*database.LLMConfig{dbLLMConfig, dbLLMConfigMixed, dbLLMConfigCSGHub}, 3, nil)
 
 	res, total, err := mc.IndexLLMConfig(ctx, per, page, search)
@@ -2291,6 +2299,92 @@ func TestBuildUpstreamConfigs_UnknownStateWhenNoDBRecord(t *testing.T) {
 	}
 }
 
+func TestBuildUpstreamConfigs_HealthErrorDetails(t *testing.T) {
+	checkAt := time.Date(2026, 9, 20, 10, 0, 0, 0, time.UTC)
+
+	t.Run("unhealthy record exposes last error details", func(t *testing.T) {
+		result := buildUpstreamConfigs([]database.Upstream{{
+			ID:                 1,
+			URL:                "http://upstream.example.com/v1",
+			Enabled:            true,
+			HealthCheckEnabled: true,
+			HealthState: &database.AIGatewayUpstreamHealthState{
+				HealthState:         string(aigatewaytypes.HealthStateUnhealthy),
+				LastCheckAt:         checkAt,
+				LastError:           "HTTP 401, url: http://upstream.example.com/v1/chat/completions, response: {\"error\":\"invalid api key\"}",
+				ConsecutiveFailures: 3,
+				LatencyMs:           250,
+			},
+		}})
+		require.Len(t, result, 1)
+		require.Equal(t, "HTTP 401, url: http://upstream.example.com/v1/chat/completions, response: {\"error\":\"invalid api key\"}", result[0].LastError)
+		require.NotNil(t, result[0].LastCheckAt)
+		require.Equal(t, checkAt, *result[0].LastCheckAt)
+		require.Equal(t, int64(250), result[0].LatencyMs)
+		require.Equal(t, 3, result[0].ConsecutiveFailures)
+	})
+
+	t.Run("no health record leaves error fields empty", func(t *testing.T) {
+		result := buildUpstreamConfigs([]database.Upstream{{
+			ID:                 2,
+			URL:                "http://upstream.example.com/v1",
+			Enabled:            true,
+			HealthCheckEnabled: true,
+			HealthState:        nil,
+		}})
+		require.Len(t, result, 1)
+		require.Empty(t, result[0].LastError)
+		require.Nil(t, result[0].LastCheckAt)
+		require.Zero(t, result[0].LatencyMs)
+		require.Zero(t, result[0].ConsecutiveFailures)
+	})
+
+	t.Run("disabled upstream does not expose error details", func(t *testing.T) {
+		// A disabled upstream serves no traffic, so the stored error details
+		// carry no current meaning and must not surface.
+		result := buildUpstreamConfigs([]database.Upstream{{
+			ID:                 4,
+			URL:                "http://upstream.example.com/v1",
+			Enabled:            false,
+			HealthCheckEnabled: true,
+			HealthState: &database.AIGatewayUpstreamHealthState{
+				HealthState:         string(aigatewaytypes.HealthStateUnhealthy),
+				LastError:           "HTTP 401, url: http://upstream.example.com/v1/chat/completions, response: {}",
+				ConsecutiveFailures: 3,
+				LatencyMs:           250,
+			},
+		}})
+		require.Len(t, result, 1)
+		require.Empty(t, result[0].LastError)
+		require.Nil(t, result[0].LastCheckAt)
+		require.Zero(t, result[0].LatencyMs)
+		require.Zero(t, result[0].ConsecutiveFailures)
+	})
+
+	t.Run("disabled health check does not leak stale error details", func(t *testing.T) {
+		// Disabling the health check keeps the stored state record while
+		// health_state reports unknown; the stale error details must not
+		// surface in the admin API.
+		result := buildUpstreamConfigs([]database.Upstream{{
+			ID:                 3,
+			URL:                "http://upstream.example.com/v1",
+			Enabled:            true,
+			HealthCheckEnabled: false,
+			HealthState: &database.AIGatewayUpstreamHealthState{
+				HealthState:         string(aigatewaytypes.HealthStateUnhealthy),
+				LastError:           "HTTP 401, url: http://upstream.example.com/v1/chat/completions, response: {}",
+				ConsecutiveFailures: 3,
+				LatencyMs:           250,
+			},
+		}})
+		require.Len(t, result, 1)
+		require.Empty(t, result[0].LastError)
+		require.Nil(t, result[0].LastCheckAt)
+		require.Zero(t, result[0].LatencyMs)
+		require.Zero(t, result[0].ConsecutiveFailures)
+	})
+}
+
 func TestUpdateUpstream_ResetStaleStateOnReEnable(t *testing.T) {
 	ctx := context.TODO()
 
@@ -2330,11 +2424,24 @@ func TestUpdateUpstream_ResetStaleStateOnReEnable(t *testing.T) {
 		}).Times(2)
 		upstreamStore.EXPECT().Update(ctx, mock.Anything).Return(nil)
 
-		// Health state should be atomically updated to unknown.
+		// Health state should be atomically updated to unknown, and the stale
+		// error details from the previous probing round must be cleared so
+		// they cannot surface before the next probe completes.
 		healthStateStore.EXPECT().MutateByUpstreamID(ctx, mock.MatchedBy(func(m database.AIGatewayUpstreamHealthStateMutation) bool {
-			state := &database.AIGatewayUpstreamHealthState{UpstreamID: 10, HealthState: string(aigatewaytypes.HealthStateHealthy)}
+			state := &database.AIGatewayUpstreamHealthState{
+				UpstreamID:          10,
+				HealthState:         string(aigatewaytypes.HealthStateHealthy),
+				LastError:           "HTTP 401, url: http://upstream.example.com/v1/chat/completions, response: {}",
+				LastCheckAt:         time.Date(2026, 9, 29, 10, 0, 0, 0, time.UTC),
+				ConsecutiveFailures: 3,
+				LatencyMs:           250,
+			}
 			return m.UpstreamID == 10 && !m.CreateIfMissing && m.Mutate(state) == nil &&
-				state.HealthState == string(aigatewaytypes.HealthStateUnknown)
+				state.HealthState == string(aigatewaytypes.HealthStateUnknown) &&
+				state.LastError == "" &&
+				state.LastCheckAt.IsZero() &&
+				state.ConsecutiveFailures == 0 &&
+				state.LatencyMs == 0
 		})).Return(&database.AIGatewayUpstreamHealthState{UpstreamID: 10, HealthState: string(aigatewaytypes.HealthStateUnknown)}, nil)
 
 		// Circuit state should be fetched and updated to unknown
