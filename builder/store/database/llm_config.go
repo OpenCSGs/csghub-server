@@ -324,10 +324,31 @@ func buildSearchLLMConfigQuery(
 	if search.Enabled != nil {
 		q.Where("llm_config.enabled = ?", *search.Enabled)
 	}
-	applyLLMConfigSort(q, search.SortBy, search.SortOrder)
+	applyLLMConfigSort(q, search.SortBy, search.SortOrder, search.AvailableFirst)
 }
 
+// llmAvailableSQL is the SQL mirror of the component-level availability
+// computation (computeUpstreamAvailability + computeLLMAvailability): an LLM
+// config is available when it is enabled and (it has no upstream rows at all —
+// the Go side returns available for an empty upstream list — or at least one
+// enabled upstream that is not explicitly bad: an unhealthy health state or an
+// open circuit). Missing state records mean "not yet probed" and do not block
+// availability, matching the Go-side "unknown does not block" rule.
+const llmAvailableSQL = `(llm_config.enabled AND (
+	NOT EXISTS (SELECT 1 FROM ai_gateway_upstreams u0 WHERE u0.llm_config_id = llm_config.id)
+	OR EXISTS (
+		SELECT 1 FROM ai_gateway_upstreams u
+		LEFT JOIN ai_gateway_upstream_health_states h ON h.upstream_id = u.id
+		LEFT JOIN ai_gateway_upstream_circuit_states c ON c.upstream_id = u.id
+		WHERE u.llm_config_id = llm_config.id
+			AND u.enabled
+			AND (NOT u.health_check_enabled OR COALESCE(h.health_state, 'unknown') <> 'unhealthy')
+			AND (NOT u.circuit_breaker_enabled OR COALESCE(c.circuit_state, 'unknown') <> 'open'))))`
+
 // applyLLMConfigSort applies an allow-listed sort to the query.
+// When availableFirst is set (admin LLM config listing only), available configs
+// surface first (the boolean availability predicate sorts before the
+// allow-listed key) and the rest follows the requested sort.
 // Defaults to updated_at DESC so that the most recently changed configs surface first.
 //
 // The primary key always closes the sort so that the ordering is total. Without a
@@ -336,7 +357,10 @@ func buildSearchLLMConfigQuery(
 // for that query, and pages read separately can order the same tie group
 // differently: LIMIT/OFFSET windows then overlap, listing one config twice while
 // skipping another.
-func applyLLMConfigSort(q *bun.SelectQuery, sortBy, sortOrder string) {
+func applyLLMConfigSort(q *bun.SelectQuery, sortBy, sortOrder string, availableFirst bool) {
+	if availableFirst {
+		q.OrderExpr(llmAvailableSQL + " DESC")
+	}
 	column := "llm_config.updated_at"
 	switch sortBy {
 	case "model_size_b":

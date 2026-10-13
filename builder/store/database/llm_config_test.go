@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	mockdatabase "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/database"
@@ -757,4 +758,83 @@ func TestResolveLLMTasks(t *testing.T) {
 		}, nil).Once()
 		require.Equal(t, []string{"auto-speech-recognition"}, database.ResolveLLMTasks(ctx, store, 7))
 	})
+}
+
+func TestLLMConfigStore_Index_AvailableFirst(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+	config, err := config.LoadConfig()
+	require.Nil(t, err)
+	store := database.NewLLMConfigStoreWithDB(db, config)
+
+	insertConfig := func(t *testing.T, name string, enabled bool) int64 {
+		cfg := &database.LLMConfig{Type: 16, Enabled: enabled, ModelName: name}
+		_, err := db.Core.NewInsert().Model(cfg).Exec(ctx)
+		require.Nil(t, err)
+		return cfg.ID
+	}
+	insertUpstream := func(t *testing.T, llmConfigID int64, enabled, healthCheckEnabled bool) int64 {
+		up := &database.Upstream{
+			LLMConfigID:        llmConfigID,
+			URL:                "http://upstream.example.com/v1",
+			Enabled:            enabled,
+			HealthCheckEnabled: healthCheckEnabled,
+		}
+		_, err := db.Core.NewInsert().Model(up).Exec(ctx)
+		require.Nil(t, err)
+		return up.ID
+	}
+	setHealth := func(t *testing.T, upstreamID int64, state string) {
+		_, err := db.Core.NewInsert().Model(&database.AIGatewayUpstreamHealthState{
+			UpstreamID:  upstreamID,
+			HealthState: state,
+			LastCheckAt: time.Now(),
+		}).Exec(ctx)
+		require.Nil(t, err)
+	}
+
+	// inserted in "wrong" order on purpose: unhealthy first, then unavailable.
+	unhealthyID := insertConfig(t, "model-unhealthy", true)
+	unhealthyUp := insertUpstream(t, unhealthyID, true, true)
+	setHealth(t, unhealthyUp, "unhealthy")
+
+	disabledID := insertConfig(t, "model-disabled", false)
+	insertUpstream(t, disabledID, true, true)
+
+	availableID := insertConfig(t, "model-available", true)
+	availableUp := insertUpstream(t, availableID, true, true)
+	setHealth(t, availableUp, "healthy")
+
+	// mirrors computeLLMAvailability: zero upstream rows count as available
+	insertConfig(t, "model-no-upstream", true)
+
+	// upstream rows exist but none is enabled -> unavailable
+	noEnabledID := insertConfig(t, "model-no-enabled-upstream", true)
+	insertUpstream(t, noEnabledID, false, true)
+
+	configs, total, err := store.Index(ctx, 10, 1, &types.SearchLLMConfig{AvailableFirst: true})
+	require.Nil(t, err)
+	require.Equal(t, 5, total)
+	require.Len(t, configs, 5)
+	// available surfaces first (including the zero-upstream config, whose
+	// is_available flag is also true); the unavailable ones (disabled config,
+	// unhealthy upstream, only-disabled upstreams) follow in the default
+	// updated_at/id order.
+	require.ElementsMatch(
+		t, []string{"model-available", "model-no-upstream"},
+		[]string{configs[0].ModelName, configs[1].ModelName},
+	)
+	require.ElementsMatch(
+		t, []string{"model-unhealthy", "model-disabled", "model-no-enabled-upstream"},
+		[]string{configs[2].ModelName, configs[3].ModelName, configs[4].ModelName},
+	)
+
+	// without the flag the historical ordering applies (no availability key)
+	configs, total, err = store.Index(ctx, 10, 1, &types.SearchLLMConfig{})
+	require.Nil(t, err)
+	require.Equal(t, 5, total)
+	names := []string{configs[0].ModelName, configs[1].ModelName, configs[2].ModelName, configs[3].ModelName, configs[4].ModelName}
+	require.Contains(t, names, "model-available")
+	require.Contains(t, names, "model-no-upstream")
 }

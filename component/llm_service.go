@@ -98,7 +98,15 @@ func (s *llmServiceComponentImpl) IndexLLMConfig(ctx context.Context, per, page 
 			return nil, 0, err
 		}
 	}
-	dbLLMConfigs, total, err := s.llmConfigStore.Index(ctx, per, page, search)
+	// The admin listing surfaces available configs first; the availability
+	// ordering is scoped to this path — public (external LLMs) and gateway
+	// model listings keep their historical ordering.
+	adminSearch := &types.SearchLLMConfig{AvailableFirst: true}
+	if search != nil {
+		*adminSearch = *search
+		adminSearch.AvailableFirst = true
+	}
+	dbLLMConfigs, total, err := s.llmConfigStore.Index(ctx, per, page, adminSearch)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -957,6 +965,13 @@ func (s *llmServiceComponentImpl) resetHealthStateToUnknown(ctx context.Context,
 		UpstreamID: upstreamID,
 		Mutate: func(state *database.AIGatewayUpstreamHealthState) error {
 			state.HealthState = string(aigatewaytypes.HealthStateUnknown)
+			// A re-enabled upstream starts a fresh probing cycle: the previous
+			// round's error details are no longer the current failure cause,
+			// so clear them instead of exposing them until the next probe lands.
+			state.LastError = ""
+			state.LastCheckAt = time.Time{}
+			state.ConsecutiveFailures = 0
+			state.LatencyMs = 0
 			return nil
 		},
 	})
@@ -1043,6 +1058,18 @@ func buildUpstreamConfigs(dbUpstreams []database.Upstream) []types.UpstreamConfi
 			uc.CircuitState = u.CircuitState.CircuitState
 		} else {
 			uc.CircuitState = string(aigatewaytypes.CircuitStateUnknown)
+		}
+		// Expose health check error details for admin views. Gated on the
+		// upstream being enabled and the health check being enabled: a
+		// disabled upstream serves no traffic, and disabling the check keeps
+		// the stored state record (with a stale last_error) while health_state
+		// reports "unknown" — in both cases the stale details must not leak.
+		if u.Enabled && u.HealthCheckEnabled && u.HealthState != nil {
+			uc.LastError = u.HealthState.LastError
+			checkAt := u.HealthState.LastCheckAt
+			uc.LastCheckAt = &checkAt
+			uc.LatencyMs = u.HealthState.LatencyMs
+			uc.ConsecutiveFailures = u.HealthState.ConsecutiveFailures
 		}
 		uc.IsAvailable, _ = computeUpstreamAvailability(uc)
 		uc.AvailabilityStatus = computeUpstreamAvailabilityStatus(uc)
