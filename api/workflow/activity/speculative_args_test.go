@@ -32,15 +32,14 @@ func composeForTest(t *testing.T, engineName, version string, argValues map[stri
 
 func TestComposeSpeculativeArgs(t *testing.T) {
 	tests := []struct {
-		name              string
-		engineName        string
-		version           string
-		argValues         map[string]string
-		arch              string
-		wantContains      string
-		wantNotInject     bool
-		wantActive        bool
-		wantAsyncConflict bool
+		name          string
+		engineName    string
+		version       string
+		argValues     map[string]string
+		arch          string
+		wantContains  string
+		wantNotInject bool
+		wantActive    bool
 	}{
 		{
 			name:         "vllm NGC 25.11 mtp default tokens",
@@ -49,32 +48,27 @@ func TestComposeSpeculativeArgs(t *testing.T) {
 			argValues:    map[string]string{"spec-decode-method": "mtp"},
 			wantContains: `--speculative-config {"method":"mtp","num_speculative_tokens":2}`,
 			wantActive:   true,
-			// NGC 25.11 = vLLM 0.11.0, still inside the async-scheduling
-			// conflict window.
-			wantAsyncConflict: true,
 		},
 		{
-			name:              "vllm upstream 0.10.2 uses deepseek_mtp alias and conflicts with async scheduling",
-			engineName:        "vllm",
-			version:           "v0.10.2-cu128",
-			argValues:         map[string]string{"spec-decode-method": "mtp"},
-			arch:              "DeepseekV3ForCausalLM",
-			wantContains:      `--speculative-config {"method":"deepseek_mtp","num_speculative_tokens":2}`,
-			wantActive:        true,
-			wantAsyncConflict: true,
+			name:         "vllm upstream 0.10.2 uses deepseek_mtp alias",
+			engineName:   "vllm",
+			version:      "v0.10.2-cu128",
+			argValues:    map[string]string{"spec-decode-method": "mtp"},
+			arch:         "DeepseekV3ForCausalLM",
+			wantContains: `--speculative-config {"method":"deepseek_mtp","num_speculative_tokens":2}`,
+			wantActive:   true,
 		},
 		{
-			name:              "vllm NGC 25.10 maps to 0.10.x behavior",
-			engineName:        "nvidia-vllm",
-			version:           "25.10-py3",
-			argValues:         map[string]string{"spec-decode-method": "mtp"},
-			arch:              "DeepseekV3ForCausalLM",
-			wantContains:      `--speculative-config {"method":"deepseek_mtp","num_speculative_tokens":2}`,
-			wantActive:        true,
-			wantAsyncConflict: true,
+			name:         "vllm NGC 25.10 maps to 0.10.x behavior",
+			engineName:   "nvidia-vllm",
+			version:      "25.10-py3",
+			argValues:    map[string]string{"spec-decode-method": "mtp"},
+			arch:         "DeepseekV3ForCausalLM",
+			wantContains: `--speculative-config {"method":"deepseek_mtp","num_speculative_tokens":2}`,
+			wantActive:   true,
 		},
 		{
-			name:         "vllm 0.28.0 has no async scheduling conflict",
+			name:         "vllm 0.28.0 mtp is composed",
 			engineName:   "vllm",
 			version:      "v0.28.0",
 			argValues:    map[string]string{"spec-decode-method": "mtp"},
@@ -82,7 +76,7 @@ func TestComposeSpeculativeArgs(t *testing.T) {
 			wantActive:   true,
 		},
 		{
-			name:         "vllm NGC 25.12 has no async scheduling conflict",
+			name:         "vllm NGC 25.12 mtp is composed",
 			engineName:   "nvidia-vllm",
 			version:      "25.12-py3",
 			argValues:    map[string]string{"spec-decode-method": "mtp"},
@@ -96,9 +90,6 @@ func TestComposeSpeculativeArgs(t *testing.T) {
 			argValues:    map[string]string{"spec-decode-method": "mtp", "spec-num-tokens": "1"},
 			wantContains: `--speculative-config {"method":"mtp","num_speculative_tokens":1}`,
 			wantActive:   true,
-			// NGC 25.11 = vLLM 0.11.0, still inside the async-scheduling
-			// conflict window.
-			wantAsyncConflict: true,
 		},
 		{
 			name:          "vllm pre 0.10 is skipped",
@@ -122,9 +113,6 @@ func TestComposeSpeculativeArgs(t *testing.T) {
 			arch:         "LlamaForCausalLM",
 			wantContains: `--speculative-config {"method":"eagle3","model":"/workspace/opencsg/eagle3-llama","num_speculative_tokens":3}`,
 			wantActive:   true,
-			// NGC 25.11 = vLLM 0.11.0, still inside the async-scheduling
-			// conflict window.
-			wantAsyncConflict: true,
 		},
 		{
 			name:          "vllm eagle3 without draft model is skipped",
@@ -170,8 +158,6 @@ func TestComposeSpeculativeArgs(t *testing.T) {
 			arch:         "Qwen2ForCausalLM",
 			wantContains: `--speculative-config {"method":"eagle3","model":"/workspace/opencsg/eagle3-qwen","num_speculative_tokens":3}`,
 			wantActive:   true,
-			// 0.10.1 is inside the async-scheduling conflict window.
-			wantAsyncConflict: true,
 		},
 		{
 			// NGC 25.09 ships upstream 0.10.1, so minicpm targets are still
@@ -190,9 +176,6 @@ func TestComposeSpeculativeArgs(t *testing.T) {
 			argValues:    map[string]string{"spec-decode-method": "mtp"},
 			wantContains: `--speculative-config {"method":"mtp","num_speculative_tokens":2}`,
 			wantActive:   true,
-			// NGC 25.11 = vLLM 0.11.0, still inside the async-scheduling
-			// conflict window.
-			wantAsyncConflict: true,
 		},
 		{
 			name:          "vllm eagle3 draft model with shell metacharacters is rejected",
@@ -217,9 +200,6 @@ func TestComposeSpeculativeArgs(t *testing.T) {
 			argValues:    map[string]string{"spec-decode-method": "ngram", "spec-num-tokens": "4"},
 			wantContains: `--speculative-config {"method":"ngram","num_speculative_tokens":4,"prompt_lookup_max":4,"prompt_lookup_min":2}`,
 			wantActive:   true,
-			// NGC 25.11 = vLLM 0.11.0, still inside the async-scheduling
-			// conflict window.
-			wantAsyncConflict: true,
 		},
 		{
 			name:         "sglang NGC 25.10 mtp renders NEXTN with upstream defaults",
@@ -291,13 +271,12 @@ func TestComposeSpeculativeArgs(t *testing.T) {
 			wantNotInject: true,
 		},
 		{
-			name:              "spec num tokens at max boundary is accepted",
-			engineName:        "nvidia-vllm",
-			version:           "25.11-py3",
-			argValues:         map[string]string{"spec-decode-method": "mtp", "spec-num-tokens": "8"},
-			wantContains:      `"num_speculative_tokens":8`,
-			wantActive:        true,
-			wantAsyncConflict: true,
+			name:         "spec num tokens at max boundary is accepted",
+			engineName:   "nvidia-vllm",
+			version:      "25.11-py3",
+			argValues:    map[string]string{"spec-decode-method": "mtp", "spec-num-tokens": "8"},
+			wantContains: `"num_speculative_tokens":8`,
+			wantActive:   true,
 		},
 		{
 			name:          "unsupported engine is skipped",
@@ -314,12 +293,10 @@ func TestComposeSpeculativeArgs(t *testing.T) {
 			if tt.wantNotInject {
 				require.Equal(t, "--max-model-len 8192", args)
 				require.False(t, state.Active)
-				require.False(t, state.AsyncConflict)
 				return
 			}
 			require.Contains(t, args, tt.wantContains)
 			require.Equal(t, tt.wantActive, state.Active)
-			require.Equal(t, tt.wantAsyncConflict, state.AsyncConflict)
 		})
 	}
 }
@@ -373,14 +350,6 @@ func TestEngineVersionGates(t *testing.T) {
 	require.True(t, vllmSupportsMTPAlias(ngc(25, 11)))
 	require.False(t, vllmSupportsMTPAlias(sem(0, 10, 2)))
 	require.True(t, vllmSupportsMTPAlias(sem(0, 11, 0)))
-
-	require.True(t, vllmAsyncSchedulingConflict(ngc(25, 9)))
-	require.True(t, vllmAsyncSchedulingConflict(ngc(25, 11)))
-	require.False(t, vllmAsyncSchedulingConflict(ngc(25, 12)))
-	require.True(t, vllmAsyncSchedulingConflict(sem(0, 10, 0)))
-	require.True(t, vllmAsyncSchedulingConflict(sem(0, 11, 9)))
-	require.False(t, vllmAsyncSchedulingConflict(sem(0, 12, 0)))
-	require.False(t, vllmAsyncSchedulingConflict(sem(0, 9, 2)))
 
 	require.True(t, sglangSupportsSpeculative(ngc(25, 10)))
 	require.True(t, sglangSupportsSpeculative(sem(0, 4, 6)))
@@ -449,37 +418,18 @@ func TestSetEngineArgsSkipsVirtualParams(t *testing.T) {
 	require.True(t, state.Active)
 }
 
-// The async-scheduling suppression must also fire from the speculative
-// composition outcome, not only from an explicit async-scheduling engine arg.
-func TestSetInferenceEnvAsyncConflict(t *testing.T) {
-	a := &DeployActivity{}
-
-	envMap := map[string]string{}
-	a.setInferenceEnv(envMap, &database.Deploy{Type: types.InferenceType}, types.HardWare{}, "25.10-py3", specDecodeState{AsyncConflict: true})
-	require.Equal(t, "true", envMap["ASYNC_SCHEDULING_DISABLED"])
-
-	envMap = map[string]string{}
-	a.setInferenceEnv(envMap, &database.Deploy{Type: types.InferenceType}, types.HardWare{}, "25.12-py3", specDecodeState{})
-	require.NotContains(t, envMap, "ASYNC_SCHEDULING_DISABLED")
-
-	envMap = map[string]string{}
-	a.setInferenceEnv(envMap, &database.Deploy{Type: types.FinetuneType}, types.HardWare{}, "25.10-py3", specDecodeState{AsyncConflict: true})
-	require.NotContains(t, envMap, "ASYNC_SCHEDULING_DISABLED")
-}
-
 func TestAutoInjectMTPSpeculativeArgs(t *testing.T) {
 	tests := []struct {
-		name              string
-		engineName        string
-		computeType       string
-		version           string
-		hasWeights        bool
-		declaredLayers    int
-		arch              string
-		wantContains      string
-		wantNotInject     bool
-		wantActive        bool
-		wantAsyncConflict bool
+		name           string
+		engineName     string
+		computeType    string
+		version        string
+		hasWeights     bool
+		declaredLayers int
+		arch           string
+		wantContains   string
+		wantNotInject  bool
+		wantActive     bool
 	}{
 		{
 			name:           "vllm NGC 25.11 clamps tokens to declared MTP layers",
@@ -490,33 +440,28 @@ func TestAutoInjectMTPSpeculativeArgs(t *testing.T) {
 			declaredLayers: 1,
 			wantContains:   `--speculative-config {"method":"mtp","num_speculative_tokens":1}`,
 			wantActive:     true,
-			// NGC 25.11 = vLLM 0.11.0, still inside the async-scheduling
-			// conflict window.
-			wantAsyncConflict: true,
 		},
 		{
-			name:              "vllm NGC 25.10 uses deepseek_mtp and caps tokens at default",
-			engineName:        "nvidia-vllm",
-			computeType:       "gpu",
-			version:           "25.10-py3",
-			hasWeights:        true,
-			declaredLayers:    3,
-			arch:              "DeepseekV3ForCausalLM",
-			wantContains:      `--speculative-config {"method":"deepseek_mtp","num_speculative_tokens":2}`,
-			wantActive:        true,
-			wantAsyncConflict: true,
+			name:           "vllm NGC 25.10 uses deepseek_mtp and caps tokens at default",
+			engineName:     "nvidia-vllm",
+			computeType:    "gpu",
+			version:        "25.10-py3",
+			hasWeights:     true,
+			declaredLayers: 3,
+			arch:           "DeepseekV3ForCausalLM",
+			wantContains:   `--speculative-config {"method":"deepseek_mtp","num_speculative_tokens":2}`,
+			wantActive:     true,
 		},
 		{
-			name:              "vllm NGC 25.10 GLM uses glm4_moe_mtp alias",
-			engineName:        "nvidia-vllm",
-			computeType:       "gpu",
-			version:           "25.10-py3",
-			hasWeights:        true,
-			declaredLayers:    2,
-			arch:              "Glm4moeForCausalLM",
-			wantContains:      `--speculative-config {"method":"glm4_moe_mtp","num_speculative_tokens":2}`,
-			wantActive:        true,
-			wantAsyncConflict: true,
+			name:           "vllm NGC 25.10 GLM uses glm4_moe_mtp alias",
+			engineName:     "nvidia-vllm",
+			computeType:    "gpu",
+			version:        "25.10-py3",
+			hasWeights:     true,
+			declaredLayers: 2,
+			arch:           "Glm4moeForCausalLM",
+			wantContains:   `--speculative-config {"method":"glm4_moe_mtp","num_speculative_tokens":2}`,
+			wantActive:     true,
 		},
 		{
 			name:           "vllm NGC 25.10 unknown arch skips injection (fail-closed)",
@@ -656,12 +601,10 @@ func TestAutoInjectMTPSpeculativeArgs(t *testing.T) {
 			if tt.wantNotInject {
 				require.Equal(t, "--max-model-len 8192", args)
 				require.False(t, state.Active)
-				require.False(t, state.AsyncConflict)
 				return
 			}
 			require.Contains(t, args, tt.wantContains)
 			require.Equal(t, tt.wantActive, state.Active)
-			require.Equal(t, tt.wantAsyncConflict, state.AsyncConflict)
 		})
 	}
 }

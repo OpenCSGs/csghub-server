@@ -39,17 +39,11 @@ const (
 )
 
 // specDecodeState carries the spec-decode composition outcome to later render
-// phases. Today the consumers are setInferenceEnv (which must suppress the
-// serve script's default --async-scheduling on conflicting vLLM versions) and
-// setEngineArgs (which surfaces a visible skip reason when the user's
-// spec-decode selection was rejected).
+// phases. Today the consumer is setEngineArgs (which surfaces a visible skip
+// reason when the user's spec-decode selection was rejected).
 type specDecodeState struct {
 	// Active is true when a speculative config was composed into ENGINE_ARGS.
 	Active bool
-	// AsyncConflict marks vLLM versions where speculative decoding
-	// hard-conflicts with --async-scheduling (upstream 0.10.0-0.11.x, mapped
-	// NGC 25.09-25.11; lifted upstream in 0.12.0).
-	AsyncConflict bool
 	// SkipReason carries a short reason when the user selected a spec-decode
 	// method but composition was rejected (fail-closed). Empty when Active or
 	// when the user did not select a method. Surfaced as
@@ -124,9 +118,6 @@ func composeSpeculativeArgs(logger log.Logger, in speculativeComposeInput) (stri
 
 	state := specDecodeState{Active: true}
 	if family == "vllm" {
-		if vllmAsyncSchedulingConflict(ver) {
-			state.AsyncConflict = true
-		}
 		// Architecture lookup is deferred until needed: eagle3 requires it for
 		// the target whitelist, and MTP on pre-0.11 versions needs it for the
 		// architecture-specific alias. Other methods (ngram, MTP on 0.11+)
@@ -223,9 +214,6 @@ func autoInjectMTPSpeculativeArgs(logger log.Logger, in speculativeAutoInjectInp
 		// speculative token when weights were detected without a declared
 		// layer count.
 		tokens := min(defaultSpecNumTokens, max(1, declaredLayers))
-		if vllmAsyncSchedulingConflict(ver) {
-			state.AsyncConflict = true
-		}
 		// Only look up architecture when the version lacks the unified "mtp"
 		// alias (pre-0.11): those versions need an architecture-specific name
 		// (deepseek_mtp / glm4_moe_mtp). 0.11+ uses "mtp" for all archs.
@@ -432,17 +420,6 @@ func mtpMethodAlias(ver engineVersion, arch string) string {
 	default:
 		return ""
 	}
-}
-
-// vllmAsyncSchedulingConflict reports the window where vLLM rejects
-// speculative decoding combined with --async-scheduling at startup:
-// upstream 0.10.0-0.11.x, lifted in 0.12.0. NGC 25.09-25.11 map to that
-// window.
-func vllmAsyncSchedulingConflict(v engineVersion) bool {
-	if v.isNGC {
-		return v.major == 25 && v.minor >= 9 && v.minor <= 11
-	}
-	return v.ok && v.major == 0 && v.minor >= 10 && v.minor < 12
 }
 
 // sglangSupportsSpeculative gates the NEXTN/EAGLE3 methods: both predate the

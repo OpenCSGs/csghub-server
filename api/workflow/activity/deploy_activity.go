@@ -763,12 +763,12 @@ func (a *DeployActivity) makeDeployEnv(ctx context.Context, req makeDeployEnvReq
 		return nil, err
 	}
 
-	specState := a.setEngineArgs(ctx, logger, envMap, req.DeployInfo, req.Runtime, req.RepoInfo.Path)
+	a.setEngineArgs(ctx, logger, envMap, req.DeployInfo, req.Runtime, req.RepoInfo.Path)
 
 	common.UpdateEvaluationEnvHardware(envMap, req.Hardware)
 
 	a.setSpaceEnv(envMap, req.DeployInfo, req.RepoInfo)
-	a.setInferenceEnv(envMap, req.DeployInfo, req.Hardware, req.Runtime.EngineVersion, specState)
+	a.setInferenceEnv(envMap, req.DeployInfo, req.Hardware, req.Runtime.EngineVersion)
 	a.setFinetuneEnv(envMap, req.DeployInfo, req.AccessToken)
 	a.setNotebookEnv(envMap, req.DeployInfo)
 	a.setContextPathEnv(envMap, req.DeployInfo)
@@ -996,7 +996,7 @@ func (a *DeployActivity) setSpaceEnv(envMap map[string]string, deployInfo *datab
 	}
 }
 
-func (a *DeployActivity) setInferenceEnv(envMap map[string]string, deployInfo *database.Deploy, hardware types.HardWare, engineVersion string, specState specDecodeState) {
+func (a *DeployActivity) setInferenceEnv(envMap map[string]string, deployInfo *database.Deploy, hardware types.HardWare, engineVersion string) {
 	if deployInfo.Type != types.InferenceType && deployInfo.Type != types.ServerlessType {
 		return
 	}
@@ -1008,9 +1008,6 @@ func (a *DeployActivity) setInferenceEnv(envMap map[string]string, deployInfo *d
 	envMap["HF_TASK"] = string(deployInfo.Task)
 	if vllmEnforceEagerEnabled(deployInfo.EngineArgs) {
 		envMap["VLLM_ENFORCE_EAGER"] = "1"
-	}
-	if asyncSchedulingDisabled(deployInfo.EngineArgs) || specState.AsyncConflict {
-		envMap["ASYNC_SCHEDULING_DISABLED"] = "true"
 	}
 	if model := hardware.GetResXPUMode(); model != "" {
 		envMap["XPU_MODEL"] = model
@@ -1099,29 +1096,6 @@ func vllmEnforceEagerEnabled(engineArgs string) bool {
 	}
 	switch value {
 	case "enable", "true", "1":
-		return true
-	default:
-		return false
-	}
-}
-
-// asyncSchedulingDisabled reports whether the user explicitly set async-scheduling to disable.
-// When true, shell scripts must not auto-inject --async-scheduling even if the flag is absent
-// from ENGINE_ARGS (the Go boolean-arg path skips disable values, so the flag won't be present).
-func asyncSchedulingDisabled(engineArgs string) bool {
-	if engineArgs == "" {
-		return false
-	}
-	argValuesMap, err := utilcommon.JsonStrToMap(engineArgs)
-	if err != nil {
-		return false
-	}
-	value, ok := argValuesMap["async-scheduling"]
-	if !ok {
-		return false
-	}
-	switch value {
-	case "disable", "false", "0":
 		return true
 	default:
 		return false
