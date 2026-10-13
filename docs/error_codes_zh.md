@@ -42,6 +42,14 @@
 - **错误名:** `negativePrice`
 - **描述:** 请求中指定的价格为负数。
 
+---
+
+### `ACT-ERR-5`
+
+- **错误代码:** `ACT-ERR-5`
+- **错误名:** `sceneNotAllowed`
+- **描述:** 指定的场景类型不在同步扣费允许的列表中。
+
 ## Agent 错误
 
 ### `AGENT-ERR-0`
@@ -217,6 +225,78 @@
 - **错误代码:** `AGENT-ERR-21`
 - **错误名:** `agentProvisionRequestModelUnavailable`
 - **描述:** 智能体实例部署请求中指定的模型不在可用 llm 模型目录中。错误消息中包含模型名称和智能体实例类型。
+
+---
+
+### `AGENT-ERR-22`
+
+- **错误代码:** `AGENT-ERR-22`
+- **错误名:** `csgclawTemplateNotFound`
+- **描述:** 未找到与实例部署请求中的仓库路径匹配的 csgclaw 智能体模板。
+
+---
+
+### `AGENT-ERR-23`
+
+- **错误代码:** `AGENT-ERR-23`
+- **错误名:** `agentTemplateSensitiveCheckCreateAgentBlocked`
+- **描述:**
+
+---
+
+### `AGENT-ERR-24`
+
+- **错误代码:** `AGENT-ERR-24`
+- **错误名:** `agentTemplateSensitiveCheckMakePublicBlocked`
+- **描述:**
+
+---
+
+### `AGENT-ERR-25`
+
+- **错误代码:** `AGENT-ERR-25`
+- **错误名:** `agentTemplateSensitiveCheckCreateAgentPending`
+- **描述:**
+
+---
+
+### `AGENT-ERR-26`
+
+- **错误代码:** `AGENT-ERR-26`
+- **错误名:** `agentTemplateSensitiveCheckMakePublicPending`
+- **描述:**
+
+---
+
+### `AGENT-ERR-27`
+
+- **错误代码:** `AGENT-ERR-27`
+- **错误名:** `knowledgeBaseContentIDAlreadyExists`
+- **描述:** 已存在相同内容ID的知识库。内容ID在所有知识库中全局唯一。
+
+---
+
+### `AGENT-ERR-28`
+
+- **错误代码:** `AGENT-ERR-28`
+- **错误名:** `knowledgeBaseContentIDInvalid`
+- **描述:** 知识库内容ID缺失或格式无效。该ID同时用作知识库的MCP服务器名称，必须以字母或数字开头，只能包含字母、数字、下划线和短横线，最长32个字符。错误消息中包含出错的值。
+
+---
+
+### `AGENT-ERR-29`
+
+- **错误代码:** `AGENT-ERR-29`
+- **错误名:** `csgclawSubdomainInvalid`
+- **描述:**
+
+---
+
+### `AGENT-ERR-30`
+
+- **错误代码:** `AGENT-ERR-30`
+- **错误名:** `csgclawAgentNameInvalid`
+- **描述:** CSGClaw 清单中的智能体名称无效。
 
 ## Auth 错误
 
@@ -425,6 +505,14 @@
 - **错误代码:** `DEPLOY-ERR-0`
 - **错误名:** `codeDeployNameAlreadyExistsErr`
 - **描述:** 同类型下已存在同名部署
+
+---
+
+### `DEPLOY-ERR-1`
+
+- **错误代码:** `DEPLOY-ERR-1`
+- **错误名:** `codeDeployStopFirstErr`
+- **描述:** 部署实例仍在运行中，请先停止后再更新
 
 ## Federation_adapter 错误
 
@@ -898,6 +986,30 @@
 - **错误名:** `gitInvalidURL`
 - **描述:** 提供的 Git URL 无效或格式错误。请检查 URL 格式并重试。
 
+## Import 错误
+
+### `IMPORT-ERR-0`
+
+- **错误代码:** `IMPORT-ERR-0`
+- **错误名:** `importGitlabInstanceInvalid`
+- **描述:** 提供的地址不是有效的 GitLab 实例。GitLab 版本接口未返回可识别的 GitLab 响应。
+
+---
+
+### `IMPORT-ERR-1`
+
+- **错误代码:** `IMPORT-ERR-1`
+- **错误名:** `importGitlabInstanceUnreachable`
+- **描述:** 无法访问 GitLab 实例。由于网络或地址错误，请求 GitLab 版本接口失败。
+
+---
+
+### `IMPORT-ERR-2`
+
+- **错误代码:** `IMPORT-ERR-2`
+- **错误名:** `importGitlabInstanceUnauthorized`
+- **描述:** 访问令牌被 GitLab 实例拒绝。GitLab 版本接口返回了鉴权错误。
+
 ## Invitation 错误
 
 ### `INVITATION-ERR-0`
@@ -938,6 +1050,30 @@
 - **错误名:** `licenseExpired`
 - **描述:** 许可证已过期，无法验证和导入。
 
+---
+
+### `LICENSE-ERR-2`
+
+- **错误代码:** `LICENSE-ERR-2`
+- **错误名:** `licenseFeatureDisabled`
+- **描述:** 当前许可证未启用该功能。
+
+---
+
+### `LICENSE-ERR-3`
+
+- **错误代码:** `LICENSE-ERR-3`
+- **错误名:** `licenseLimitExceeded`
+- **描述:** 当前操作超出许可证允许的限制。
+
+---
+
+### `LICENSE-ERR-4`
+
+- **错误代码:** `LICENSE-ERR-4`
+- **错误名:** `invalidLicenseExtra`
+- **描述:** 许可证扩展数据无效，无法创建、更新或导入。
+
 ## Mcp_gateway 错误
 
 ### `MCPGW-ERR-0`
@@ -953,6 +1089,22 @@
 - **错误代码:** `MCPGW-ERR-1`
 - **错误名:** `gatewayMCPServerInvalidName`
 - **描述:** MCP服务器名称不符合命名规范。
+
+## Media 错误
+
+### `MEDIA-ERR-0`
+
+- **错误代码:** `MEDIA-ERR-0`
+- **错误名:** `codeMediaModerationPending`
+- **描述:** 评论正在审核中，无法编辑
+
+---
+
+### `MEDIA-ERR-1`
+
+- **错误代码:** `MEDIA-ERR-1`
+- **错误名:** `codeMediaModerationUnavailable`
+- **描述:** 媒体审核服务不可用
 
 ## Mirror 错误
 
@@ -1042,6 +1194,54 @@
 - **错误名:** `codeWordRequire`
 - **描述:** 请求参数不匹配, 服务器无法处理该请求。
 
+## Organization 错误
+
+### `ORG-ERR-0`
+
+- **错误代码:** `ORG-ERR-0`
+- **错误名:** `organizationMemberNotFound`
+- **描述:** 请求的用户在指定组织中不存在成员关系。
+
+---
+
+### `ORG-ERR-1`
+
+- **错误代码:** `ORG-ERR-1`
+- **错误名:** `organizationNotFound`
+- **描述:** 请求的组织不存在。
+
+---
+
+### `ORG-ERR-2`
+
+- **错误代码:** `ORG-ERR-2`
+- **错误名:** `organizationManageForbidden`
+- **描述:** 用户没有管理该组织的权限。
+
+---
+
+### `ORG-ERR-3`
+
+- **错误代码:** `ORG-ERR-3`
+- **错误名:** `organizationAccessForbidden`
+- **描述:** 用户没有访问该组织的权限。
+
+---
+
+### `ORG-ERR-4`
+
+- **错误代码:** `ORG-ERR-4`
+- **错误名:** `organizationModeIncompatible`
+- **描述:** 当前架构不支持查看该组织，请迁移组织。
+
+---
+
+### `ORG-ERR-5`
+
+- **错误代码:** `ORG-ERR-5`
+- **错误名:** `organizationAlreadyExists`
+- **描述:** 当前系统已存在组织，不能再创建新的组织。
+
 ## Pd 错误
 
 ### `PD-ERR-0`
@@ -1121,6 +1321,22 @@
 - **错误代码:** `REPO-ERR-8`
 - **错误名:** `codeSensitiveCheckNotPassedErr`
 - **描述:** 合规扫描未通过，无法将仓库设置为公开。
+
+---
+
+### `REPO-ERR-9`
+
+- **错误代码:** `REPO-ERR-9`
+- **错误名:** `codeRepoZipDownloadFailedErr`
+- **描述:** 下载仓库 zip 归档失败
+
+---
+
+### `REPO-ERR-10`
+
+- **错误代码:** `REPO-ERR-10`
+- **错误名:** `codeRepoAuthorizationNotFoundErr`
+- **描述:** 仓库授权关系不存在
 
 ## Req 错误
 
@@ -1258,6 +1474,22 @@
 - **错误名:** `errTransferNotSupported`
 - **描述:** 该仓库不支持所有权转移，因为它没有哈希路径。只有具有哈希路径的仓库才支持所有权转移。
 
+---
+
+### `REQ-ERR-17`
+
+- **错误代码:** `REQ-ERR-17`
+- **错误名:** `errUpstreamConnectionCheckNotSupported`
+- **描述:** 配置的上游端点不支持连接测试。
+
+---
+
+### `REQ-ERR-18`
+
+- **错误代码:** `REQ-ERR-18`
+- **错误名:** `errUpstreamHealthCheckNotSupported`
+- **描述:** 配置的上游端点不支持健康检查。
+
 ## Resource 错误
 
 ### `RESOURCE-ERR-0`
@@ -1346,6 +1578,14 @@
 - **错误名:** `codeSandboxNameInvalidCharErr`
 - **描述:** 沙箱名称包含非法字符或格式错误（仅允许小写字母、数字、连字符、点；不能以连字符/点开头/结尾，不能有连续的连字符/点）
 
+---
+
+### `SANDBOX-ERR-4`
+
+- **错误代码:** `SANDBOX-ERR-4`
+- **错误名:** `codeSandboxCrossClusterRestartErr`
+- **描述:** 沙箱不能跨集群重启：持久化数据仅存在于原集群
+
 ## Sensitive 错误
 
 ### `SENSITIVE-ERR-0`
@@ -1425,6 +1665,14 @@
 - **错误代码:** `SERVERLESS-ERR-8`
 - **错误名:** `codeInvalidCommitIDErr`
 - **描述:** 无效的commitId
+
+---
+
+### `SERVERLESS-ERR-9`
+
+- **错误代码:** `SERVERLESS-ERR-9`
+- **错误名:** `codeUpdateFailedErr`
+- **描述:**
 
 ## Skill 错误
 
@@ -1658,6 +1906,38 @@
 - **错误名:** `resourceStatusUncertain`
 - **描述:** 无法确定资源可用性，因为集群缺少 ClusterRole 权限来查询节点资源，且命名空间中未配置 ResourceQuota。当系统无法验证是否有足够资源运行任务时，会出现此错误。
 
+## Token_plan 错误
+
+### `TOKENPLAN-ERR-0`
+
+- **错误代码:** `TOKENPLAN-ERR-0`
+- **错误名:** `tokenPlanError`
+- **描述:** Please retry later or contact admin to check TokenPlan error.
+
+---
+
+### `TOKENPLAN-ERR-1`
+
+- **错误代码:** `TOKENPLAN-ERR-1`
+- **错误名:** `tokenPlanInUsing`
+- **描述:** TokenPlan已在使用
+
+---
+
+### `TOKENPLAN-ERR-2`
+
+- **错误代码:** `TOKENPLAN-ERR-2`
+- **错误名:** `tokenPlanPriceLower`
+- **描述:** TokenPlan价格低于当前周期价格
+
+---
+
+### `TOKENPLAN-ERR-3`
+
+- **错误代码:** `TOKENPLAN-ERR-3`
+- **错误名:** `tokenPlanLatestPeriodNotPaid`
+- **描述:** TokenPlan最新周期未支付
+
 ## User 错误
 
 ### `USER-ERR-0`
@@ -1784,7 +2064,7 @@
 
 - **错误代码:** `USER-ERR-15`
 - **错误名:** `userHasOrganizations`
-- **描述:** 拥有组织的用户不能被删除。
+- **描述:** 担任组织管理员的用户不能被删除。
 
 ---
 
@@ -1825,3 +2105,11 @@
 - **错误代码:** `USER-ERR-20`
 - **错误名:** `namespaceAlreadyExists`
 - **描述:** 命名空间已存在于系统中。
+
+---
+
+### `USER-ERR-21`
+
+- **错误代码:** `USER-ERR-21`
+- **错误名:** `tagIDsNotExist`
+- **描述:** 提供的一个或多个标签ID不存在，请确认所有标签ID均有效。

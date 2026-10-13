@@ -145,6 +145,8 @@ var (
 	// starship
 	SceneStarship SceneType = 20 // starship is deprecated
 	SceneGuiAgent SceneType = 22 // gui agent is deprecated
+	// token plan
+	SceneTokenPlan SceneType = 23 // token plan
 	// academy
 	SceneAcademyPurchase SceneType = 30 // AI Academy course purchase
 	// dataset

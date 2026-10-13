@@ -1,0 +1,14 @@
+{
+    "error.TOKENPLAN-ERR-0": {
+        "other": "请稍后重试或联系管理员处理TokenPlan错误"
+    },
+    "error.TOKENPLAN-ERR-1": {
+        "other": "TokenPlan已在使用"
+    },
+    "error.TOKENPLAN-ERR-2": {
+        "other": "TokenPlan价格低于当前周期价格"
+    },
+    "error.TOKENPLAN-ERR-3": {
+        "other": "TokenPlan最新周期未支付"
+    }
+}

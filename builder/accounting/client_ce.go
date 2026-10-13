@@ -129,3 +129,55 @@ func (ac *accountingClientImpl) QueryStatisticsDetailByUserID(req types.AcctBill
 func (ac *accountingClientImpl) GetStatisticsSummary(req types.AcctBillsReq) (any, error) {
 	return nil, nil
 }
+
+func (ac *accountingClientImpl) CreateTokenPlan(req types.AcctTokenPlanCreateReq) (any, error) {
+	return nil, nil
+}
+
+func (ac *accountingClientImpl) GetTokenPlan(req types.AcctTokenPlanGetReq) (any, error) {
+	return nil, nil
+}
+
+func (ac *accountingClientImpl) UpdateTokenPlan(req types.AcctTokenPlanUpdateReq) (any, error) {
+	return nil, nil
+}
+
+func (ac *accountingClientImpl) DeleteTokenPlan(req types.AcctTokenPlanDelReq) (any, error) {
+	return nil, nil
+}
+
+func (ac *accountingClientImpl) ListTokenPlans(req types.AcctTokenPlanListReq) (any, error) {
+	return nil, nil
+}
+
+func (ac *accountingClientImpl) SummaryTokenPlans() (any, error) {
+	return nil, nil
+}
+
+func (ac *accountingClientImpl) ListPlansForNS(req types.AcctTokenPlanNSListReq) (any, error) {
+	return nil, nil
+}
+
+func (ac *accountingClientImpl) ListHistoryForNS(req types.AcctTokenPlanHistoryReq) (any, error) {
+	return nil, nil
+}
+
+func (ac *accountingClientImpl) PurchasePlanForNS(req types.AcctTokenPlanPurchaseReq) (any, error) {
+	return nil, nil
+}
+
+func (ac *accountingClientImpl) GetCurrentSubForNS(req types.AcctTokenPlanNSGetReq) (any, error) {
+	return nil, nil
+}
+
+func (ac *accountingClientImpl) CancelPlanForNS(req types.AcctTokenPlanCancelReq) (any, error) {
+	return nil, nil
+}
+
+func (ac *accountingClientImpl) UpgradePlanForNS(req types.AcctTokenPlanUpgradeReq) (any, error) {
+	return nil, nil
+}
+
+func (ac *accountingClientImpl) UpdatePlanForNS(req types.AcctTokenPlanUpdateNSReq) (any, error) {
+	return nil, nil
+}

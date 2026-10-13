@@ -1,0 +1,8 @@
+{
+    "error.MOD-ERR-0": {
+        "other": "组名 不能为空"
+    },
+    "error.MOD-ERR-1": {
+        "other": "内容 不能为空"
+    }
+}

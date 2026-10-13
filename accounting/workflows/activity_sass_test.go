@@ -16,11 +16,14 @@ func TestSubscriptionActivity_ScanAndConfirmPeriodicalSubscriptions(t *testing.T
 
 	t.Run("success", func(t *testing.T) {
 		mockSubComp := mockcomponent.NewMockSubscriptionComponent(t)
+		mockTokenPlanComp := mockcomponent.NewMockTokenPlanComponent(t)
 		act := &subscriptionActivityImpl{
-			subComp: mockSubComp,
+			subComp:       mockSubComp,
+			tokenPlanComp: mockTokenPlanComp,
 		}
 
 		mockSubComp.EXPECT().ScanAndConfirmSubscriptions(ctx).Return(nil)
+		mockTokenPlanComp.EXPECT().ScanAndConfirmPeriodicalTokenPlans(ctx).Return(nil)
 
 		err := act.ScanAndConfirmPeriodicalSubscriptions(ctx)
 		require.Nil(t, err)
@@ -28,11 +31,29 @@ func TestSubscriptionActivity_ScanAndConfirmPeriodicalSubscriptions(t *testing.T
 
 	t.Run("error", func(t *testing.T) {
 		mockSubComp := mockcomponent.NewMockSubscriptionComponent(t)
+		mockTokenPlanComp := mockcomponent.NewMockTokenPlanComponent(t)
 		act := &subscriptionActivityImpl{
-			subComp: mockSubComp,
+			subComp:       mockSubComp,
+			tokenPlanComp: mockTokenPlanComp,
 		}
 
 		mockSubComp.EXPECT().ScanAndConfirmSubscriptions(ctx).Return(assert.AnError)
+		mockTokenPlanComp.EXPECT().ScanAndConfirmPeriodicalTokenPlans(ctx).Return(nil)
+
+		err := act.ScanAndConfirmPeriodicalSubscriptions(ctx)
+		require.Error(t, err)
+	})
+
+	t.Run("token plan error", func(t *testing.T) {
+		mockSubComp := mockcomponent.NewMockSubscriptionComponent(t)
+		mockTokenPlanComp := mockcomponent.NewMockTokenPlanComponent(t)
+		act := &subscriptionActivityImpl{
+			subComp:       mockSubComp,
+			tokenPlanComp: mockTokenPlanComp,
+		}
+
+		mockSubComp.EXPECT().ScanAndConfirmSubscriptions(ctx).Return(nil)
+		mockTokenPlanComp.EXPECT().ScanAndConfirmPeriodicalTokenPlans(ctx).Return(assert.AnError)
 
 		err := act.ScanAndConfirmPeriodicalSubscriptions(ctx)
 		require.Error(t, err)

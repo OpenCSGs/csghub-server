@@ -79,6 +79,64 @@ func (_c *MockAccountingClient_BatchCreatePrice_Call) RunAndReturn(run func(stri
 	return _c
 }
 
+// CancelPlanForNS provides a mock function with given fields: req
+func (_m *MockAccountingClient) CancelPlanForNS(req types.AcctTokenPlanCancelReq) (any, error) {
+	ret := _m.Called(req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CancelPlanForNS")
+	}
+
+	var r0 any
+	var r1 error
+	if rf, ok := ret.Get(0).(func(types.AcctTokenPlanCancelReq) (any, error)); ok {
+		return rf(req)
+	}
+	if rf, ok := ret.Get(0).(func(types.AcctTokenPlanCancelReq) any); ok {
+		r0 = rf(req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(any)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(types.AcctTokenPlanCancelReq) error); ok {
+		r1 = rf(req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAccountingClient_CancelPlanForNS_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CancelPlanForNS'
+type MockAccountingClient_CancelPlanForNS_Call struct {
+	*mock.Call
+}
+
+// CancelPlanForNS is a helper method to define mock.On call
+//   - req types.AcctTokenPlanCancelReq
+func (_e *MockAccountingClient_Expecter) CancelPlanForNS(req interface{}) *MockAccountingClient_CancelPlanForNS_Call {
+	return &MockAccountingClient_CancelPlanForNS_Call{Call: _e.mock.On("CancelPlanForNS", req)}
+}
+
+func (_c *MockAccountingClient_CancelPlanForNS_Call) Run(run func(req types.AcctTokenPlanCancelReq)) *MockAccountingClient_CancelPlanForNS_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(types.AcctTokenPlanCancelReq))
+	})
+	return _c
+}
+
+func (_c *MockAccountingClient_CancelPlanForNS_Call) Return(_a0 any, _a1 error) *MockAccountingClient_CancelPlanForNS_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAccountingClient_CancelPlanForNS_Call) RunAndReturn(run func(types.AcctTokenPlanCancelReq) (any, error)) *MockAccountingClient_CancelPlanForNS_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // CreateOrUpdateQuota provides a mock function with given fields: currentUser, req
 func (_m *MockAccountingClient) CreateOrUpdateQuota(currentUser string, req types.AcctQuotaReq) (any, error) {
 	ret := _m.Called(currentUser, req)
@@ -315,6 +373,64 @@ func (_c *MockAccountingClient_CreateQuotaStatement_Call) RunAndReturn(run func(
 	return _c
 }
 
+// CreateTokenPlan provides a mock function with given fields: req
+func (_m *MockAccountingClient) CreateTokenPlan(req types.AcctTokenPlanCreateReq) (any, error) {
+	ret := _m.Called(req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CreateTokenPlan")
+	}
+
+	var r0 any
+	var r1 error
+	if rf, ok := ret.Get(0).(func(types.AcctTokenPlanCreateReq) (any, error)); ok {
+		return rf(req)
+	}
+	if rf, ok := ret.Get(0).(func(types.AcctTokenPlanCreateReq) any); ok {
+		r0 = rf(req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(any)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(types.AcctTokenPlanCreateReq) error); ok {
+		r1 = rf(req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAccountingClient_CreateTokenPlan_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateTokenPlan'
+type MockAccountingClient_CreateTokenPlan_Call struct {
+	*mock.Call
+}
+
+// CreateTokenPlan is a helper method to define mock.On call
+//   - req types.AcctTokenPlanCreateReq
+func (_e *MockAccountingClient_Expecter) CreateTokenPlan(req interface{}) *MockAccountingClient_CreateTokenPlan_Call {
+	return &MockAccountingClient_CreateTokenPlan_Call{Call: _e.mock.On("CreateTokenPlan", req)}
+}
+
+func (_c *MockAccountingClient_CreateTokenPlan_Call) Run(run func(req types.AcctTokenPlanCreateReq)) *MockAccountingClient_CreateTokenPlan_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(types.AcctTokenPlanCreateReq))
+	})
+	return _c
+}
+
+func (_c *MockAccountingClient_CreateTokenPlan_Call) Return(_a0 any, _a1 error) *MockAccountingClient_CreateTokenPlan_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAccountingClient_CreateTokenPlan_Call) RunAndReturn(run func(types.AcctTokenPlanCreateReq) (any, error)) *MockAccountingClient_CreateTokenPlan_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // DeletePrice provides a mock function with given fields: currentUser, id
 func (_m *MockAccountingClient) DeletePrice(currentUser string, id int64) (any, error) {
 	ret := _m.Called(currentUser, id)
@@ -370,6 +486,122 @@ func (_c *MockAccountingClient_DeletePrice_Call) Return(_a0 any, _a1 error) *Moc
 }
 
 func (_c *MockAccountingClient_DeletePrice_Call) RunAndReturn(run func(string, int64) (any, error)) *MockAccountingClient_DeletePrice_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// DeleteTokenPlan provides a mock function with given fields: req
+func (_m *MockAccountingClient) DeleteTokenPlan(req types.AcctTokenPlanDelReq) (any, error) {
+	ret := _m.Called(req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteTokenPlan")
+	}
+
+	var r0 any
+	var r1 error
+	if rf, ok := ret.Get(0).(func(types.AcctTokenPlanDelReq) (any, error)); ok {
+		return rf(req)
+	}
+	if rf, ok := ret.Get(0).(func(types.AcctTokenPlanDelReq) any); ok {
+		r0 = rf(req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(any)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(types.AcctTokenPlanDelReq) error); ok {
+		r1 = rf(req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAccountingClient_DeleteTokenPlan_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteTokenPlan'
+type MockAccountingClient_DeleteTokenPlan_Call struct {
+	*mock.Call
+}
+
+// DeleteTokenPlan is a helper method to define mock.On call
+//   - req types.AcctTokenPlanDelReq
+func (_e *MockAccountingClient_Expecter) DeleteTokenPlan(req interface{}) *MockAccountingClient_DeleteTokenPlan_Call {
+	return &MockAccountingClient_DeleteTokenPlan_Call{Call: _e.mock.On("DeleteTokenPlan", req)}
+}
+
+func (_c *MockAccountingClient_DeleteTokenPlan_Call) Run(run func(req types.AcctTokenPlanDelReq)) *MockAccountingClient_DeleteTokenPlan_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(types.AcctTokenPlanDelReq))
+	})
+	return _c
+}
+
+func (_c *MockAccountingClient_DeleteTokenPlan_Call) Return(_a0 any, _a1 error) *MockAccountingClient_DeleteTokenPlan_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAccountingClient_DeleteTokenPlan_Call) RunAndReturn(run func(types.AcctTokenPlanDelReq) (any, error)) *MockAccountingClient_DeleteTokenPlan_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetCurrentSubForNS provides a mock function with given fields: req
+func (_m *MockAccountingClient) GetCurrentSubForNS(req types.AcctTokenPlanNSGetReq) (any, error) {
+	ret := _m.Called(req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetCurrentSubForNS")
+	}
+
+	var r0 any
+	var r1 error
+	if rf, ok := ret.Get(0).(func(types.AcctTokenPlanNSGetReq) (any, error)); ok {
+		return rf(req)
+	}
+	if rf, ok := ret.Get(0).(func(types.AcctTokenPlanNSGetReq) any); ok {
+		r0 = rf(req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(any)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(types.AcctTokenPlanNSGetReq) error); ok {
+		r1 = rf(req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAccountingClient_GetCurrentSubForNS_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetCurrentSubForNS'
+type MockAccountingClient_GetCurrentSubForNS_Call struct {
+	*mock.Call
+}
+
+// GetCurrentSubForNS is a helper method to define mock.On call
+//   - req types.AcctTokenPlanNSGetReq
+func (_e *MockAccountingClient_Expecter) GetCurrentSubForNS(req interface{}) *MockAccountingClient_GetCurrentSubForNS_Call {
+	return &MockAccountingClient_GetCurrentSubForNS_Call{Call: _e.mock.On("GetCurrentSubForNS", req)}
+}
+
+func (_c *MockAccountingClient_GetCurrentSubForNS_Call) Run(run func(req types.AcctTokenPlanNSGetReq)) *MockAccountingClient_GetCurrentSubForNS_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(types.AcctTokenPlanNSGetReq))
+	})
+	return _c
+}
+
+func (_c *MockAccountingClient_GetCurrentSubForNS_Call) Return(_a0 any, _a1 error) *MockAccountingClient_GetCurrentSubForNS_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAccountingClient_GetCurrentSubForNS_Call) RunAndReturn(run func(types.AcctTokenPlanNSGetReq) (any, error)) *MockAccountingClient_GetCurrentSubForNS_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -667,6 +899,64 @@ func (_c *MockAccountingClient_GetStatisticsSummary_Call) RunAndReturn(run func(
 	return _c
 }
 
+// GetTokenPlan provides a mock function with given fields: req
+func (_m *MockAccountingClient) GetTokenPlan(req types.AcctTokenPlanGetReq) (any, error) {
+	ret := _m.Called(req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetTokenPlan")
+	}
+
+	var r0 any
+	var r1 error
+	if rf, ok := ret.Get(0).(func(types.AcctTokenPlanGetReq) (any, error)); ok {
+		return rf(req)
+	}
+	if rf, ok := ret.Get(0).(func(types.AcctTokenPlanGetReq) any); ok {
+		r0 = rf(req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(any)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(types.AcctTokenPlanGetReq) error); ok {
+		r1 = rf(req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAccountingClient_GetTokenPlan_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetTokenPlan'
+type MockAccountingClient_GetTokenPlan_Call struct {
+	*mock.Call
+}
+
+// GetTokenPlan is a helper method to define mock.On call
+//   - req types.AcctTokenPlanGetReq
+func (_e *MockAccountingClient_Expecter) GetTokenPlan(req interface{}) *MockAccountingClient_GetTokenPlan_Call {
+	return &MockAccountingClient_GetTokenPlan_Call{Call: _e.mock.On("GetTokenPlan", req)}
+}
+
+func (_c *MockAccountingClient_GetTokenPlan_Call) Run(run func(req types.AcctTokenPlanGetReq)) *MockAccountingClient_GetTokenPlan_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(types.AcctTokenPlanGetReq))
+	})
+	return _c
+}
+
+func (_c *MockAccountingClient_GetTokenPlan_Call) Return(_a0 any, _a1 error) *MockAccountingClient_GetTokenPlan_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAccountingClient_GetTokenPlan_Call) RunAndReturn(run func(types.AcctTokenPlanGetReq) (any, error)) *MockAccountingClient_GetTokenPlan_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetVoucherDashboard provides a mock function with given fields: req
 func (_m *MockAccountingClient) GetVoucherDashboard(req types.VoucherDashboardReq) (any, error) {
 	ret := _m.Called(req)
@@ -841,6 +1131,64 @@ func (_c *MockAccountingClient_ListBillsDetailByUserID_Call) RunAndReturn(run fu
 	return _c
 }
 
+// ListHistoryForNS provides a mock function with given fields: req
+func (_m *MockAccountingClient) ListHistoryForNS(req types.AcctTokenPlanHistoryReq) (any, error) {
+	ret := _m.Called(req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListHistoryForNS")
+	}
+
+	var r0 any
+	var r1 error
+	if rf, ok := ret.Get(0).(func(types.AcctTokenPlanHistoryReq) (any, error)); ok {
+		return rf(req)
+	}
+	if rf, ok := ret.Get(0).(func(types.AcctTokenPlanHistoryReq) any); ok {
+		r0 = rf(req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(any)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(types.AcctTokenPlanHistoryReq) error); ok {
+		r1 = rf(req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAccountingClient_ListHistoryForNS_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListHistoryForNS'
+type MockAccountingClient_ListHistoryForNS_Call struct {
+	*mock.Call
+}
+
+// ListHistoryForNS is a helper method to define mock.On call
+//   - req types.AcctTokenPlanHistoryReq
+func (_e *MockAccountingClient_Expecter) ListHistoryForNS(req interface{}) *MockAccountingClient_ListHistoryForNS_Call {
+	return &MockAccountingClient_ListHistoryForNS_Call{Call: _e.mock.On("ListHistoryForNS", req)}
+}
+
+func (_c *MockAccountingClient_ListHistoryForNS_Call) Run(run func(req types.AcctTokenPlanHistoryReq)) *MockAccountingClient_ListHistoryForNS_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(types.AcctTokenPlanHistoryReq))
+	})
+	return _c
+}
+
+func (_c *MockAccountingClient_ListHistoryForNS_Call) Return(_a0 any, _a1 error) *MockAccountingClient_ListHistoryForNS_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAccountingClient_ListHistoryForNS_Call) RunAndReturn(run func(types.AcctTokenPlanHistoryReq) (any, error)) *MockAccountingClient_ListHistoryForNS_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ListMeteringsByUserIDAndTime provides a mock function with given fields: req
 func (_m *MockAccountingClient) ListMeteringsByUserIDAndTime(req types.ActStatementsReq) (any, error) {
 	ret := _m.Called(req)
@@ -895,6 +1243,64 @@ func (_c *MockAccountingClient_ListMeteringsByUserIDAndTime_Call) Return(_a0 any
 }
 
 func (_c *MockAccountingClient_ListMeteringsByUserIDAndTime_Call) RunAndReturn(run func(types.ActStatementsReq) (any, error)) *MockAccountingClient_ListMeteringsByUserIDAndTime_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ListPlansForNS provides a mock function with given fields: req
+func (_m *MockAccountingClient) ListPlansForNS(req types.AcctTokenPlanNSListReq) (any, error) {
+	ret := _m.Called(req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListPlansForNS")
+	}
+
+	var r0 any
+	var r1 error
+	if rf, ok := ret.Get(0).(func(types.AcctTokenPlanNSListReq) (any, error)); ok {
+		return rf(req)
+	}
+	if rf, ok := ret.Get(0).(func(types.AcctTokenPlanNSListReq) any); ok {
+		r0 = rf(req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(any)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(types.AcctTokenPlanNSListReq) error); ok {
+		r1 = rf(req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAccountingClient_ListPlansForNS_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListPlansForNS'
+type MockAccountingClient_ListPlansForNS_Call struct {
+	*mock.Call
+}
+
+// ListPlansForNS is a helper method to define mock.On call
+//   - req types.AcctTokenPlanNSListReq
+func (_e *MockAccountingClient_Expecter) ListPlansForNS(req interface{}) *MockAccountingClient_ListPlansForNS_Call {
+	return &MockAccountingClient_ListPlansForNS_Call{Call: _e.mock.On("ListPlansForNS", req)}
+}
+
+func (_c *MockAccountingClient_ListPlansForNS_Call) Run(run func(req types.AcctTokenPlanNSListReq)) *MockAccountingClient_ListPlansForNS_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(types.AcctTokenPlanNSListReq))
+	})
+	return _c
+}
+
+func (_c *MockAccountingClient_ListPlansForNS_Call) Return(_a0 any, _a1 error) *MockAccountingClient_ListPlansForNS_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAccountingClient_ListPlansForNS_Call) RunAndReturn(run func(types.AcctTokenPlanNSListReq) (any, error)) *MockAccountingClient_ListPlansForNS_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -1131,6 +1537,64 @@ func (_c *MockAccountingClient_ListStatementByUserIDAndTime_Call) RunAndReturn(r
 	return _c
 }
 
+// ListTokenPlans provides a mock function with given fields: req
+func (_m *MockAccountingClient) ListTokenPlans(req types.AcctTokenPlanListReq) (any, error) {
+	ret := _m.Called(req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListTokenPlans")
+	}
+
+	var r0 any
+	var r1 error
+	if rf, ok := ret.Get(0).(func(types.AcctTokenPlanListReq) (any, error)); ok {
+		return rf(req)
+	}
+	if rf, ok := ret.Get(0).(func(types.AcctTokenPlanListReq) any); ok {
+		r0 = rf(req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(any)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(types.AcctTokenPlanListReq) error); ok {
+		r1 = rf(req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAccountingClient_ListTokenPlans_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListTokenPlans'
+type MockAccountingClient_ListTokenPlans_Call struct {
+	*mock.Call
+}
+
+// ListTokenPlans is a helper method to define mock.On call
+//   - req types.AcctTokenPlanListReq
+func (_e *MockAccountingClient_Expecter) ListTokenPlans(req interface{}) *MockAccountingClient_ListTokenPlans_Call {
+	return &MockAccountingClient_ListTokenPlans_Call{Call: _e.mock.On("ListTokenPlans", req)}
+}
+
+func (_c *MockAccountingClient_ListTokenPlans_Call) Run(run func(req types.AcctTokenPlanListReq)) *MockAccountingClient_ListTokenPlans_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(types.AcctTokenPlanListReq))
+	})
+	return _c
+}
+
+func (_c *MockAccountingClient_ListTokenPlans_Call) Return(_a0 any, _a1 error) *MockAccountingClient_ListTokenPlans_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAccountingClient_ListTokenPlans_Call) RunAndReturn(run func(types.AcctTokenPlanListReq) (any, error)) *MockAccountingClient_ListTokenPlans_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // OffLinePrice provides a mock function with given fields: req
 func (_m *MockAccountingClient) OffLinePrice(req types.AcctPriceOffLineReq) (any, error) {
 	ret := _m.Called(req)
@@ -1244,6 +1708,64 @@ func (_c *MockAccountingClient_PresentAccountingUser_Call) Return(_a0 any, _a1 e
 }
 
 func (_c *MockAccountingClient_PresentAccountingUser_Call) RunAndReturn(run func(string, types.ActivityReq) (any, error)) *MockAccountingClient_PresentAccountingUser_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// PurchasePlanForNS provides a mock function with given fields: req
+func (_m *MockAccountingClient) PurchasePlanForNS(req types.AcctTokenPlanPurchaseReq) (any, error) {
+	ret := _m.Called(req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for PurchasePlanForNS")
+	}
+
+	var r0 any
+	var r1 error
+	if rf, ok := ret.Get(0).(func(types.AcctTokenPlanPurchaseReq) (any, error)); ok {
+		return rf(req)
+	}
+	if rf, ok := ret.Get(0).(func(types.AcctTokenPlanPurchaseReq) any); ok {
+		r0 = rf(req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(any)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(types.AcctTokenPlanPurchaseReq) error); ok {
+		r1 = rf(req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAccountingClient_PurchasePlanForNS_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PurchasePlanForNS'
+type MockAccountingClient_PurchasePlanForNS_Call struct {
+	*mock.Call
+}
+
+// PurchasePlanForNS is a helper method to define mock.On call
+//   - req types.AcctTokenPlanPurchaseReq
+func (_e *MockAccountingClient_Expecter) PurchasePlanForNS(req interface{}) *MockAccountingClient_PurchasePlanForNS_Call {
+	return &MockAccountingClient_PurchasePlanForNS_Call{Call: _e.mock.On("PurchasePlanForNS", req)}
+}
+
+func (_c *MockAccountingClient_PurchasePlanForNS_Call) Run(run func(req types.AcctTokenPlanPurchaseReq)) *MockAccountingClient_PurchasePlanForNS_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(types.AcctTokenPlanPurchaseReq))
+	})
+	return _c
+}
+
+func (_c *MockAccountingClient_PurchasePlanForNS_Call) Return(_a0 any, _a1 error) *MockAccountingClient_PurchasePlanForNS_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAccountingClient_PurchasePlanForNS_Call) RunAndReturn(run func(types.AcctTokenPlanPurchaseReq) (any, error)) *MockAccountingClient_PurchasePlanForNS_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -1775,6 +2297,63 @@ func (_c *MockAccountingClient_StatementsIndex_Call) RunAndReturn(run func(types
 	return _c
 }
 
+// SummaryTokenPlans provides a mock function with no fields
+func (_m *MockAccountingClient) SummaryTokenPlans() (any, error) {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for SummaryTokenPlans")
+	}
+
+	var r0 any
+	var r1 error
+	if rf, ok := ret.Get(0).(func() (any, error)); ok {
+		return rf()
+	}
+	if rf, ok := ret.Get(0).(func() any); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(any)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAccountingClient_SummaryTokenPlans_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SummaryTokenPlans'
+type MockAccountingClient_SummaryTokenPlans_Call struct {
+	*mock.Call
+}
+
+// SummaryTokenPlans is a helper method to define mock.On call
+func (_e *MockAccountingClient_Expecter) SummaryTokenPlans() *MockAccountingClient_SummaryTokenPlans_Call {
+	return &MockAccountingClient_SummaryTokenPlans_Call{Call: _e.mock.On("SummaryTokenPlans")}
+}
+
+func (_c *MockAccountingClient_SummaryTokenPlans_Call) Run(run func()) *MockAccountingClient_SummaryTokenPlans_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockAccountingClient_SummaryTokenPlans_Call) Return(_a0 any, _a1 error) *MockAccountingClient_SummaryTokenPlans_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAccountingClient_SummaryTokenPlans_Call) RunAndReturn(run func() (any, error)) *MockAccountingClient_SummaryTokenPlans_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // TokenReportIndex provides a mock function with given fields: req
 func (_m *MockAccountingClient) TokenReportIndex(req types.TokenReportReq) (any, error) {
 	ret := _m.Called(req)
@@ -1829,6 +2408,64 @@ func (_c *MockAccountingClient_TokenReportIndex_Call) Return(_a0 any, _a1 error)
 }
 
 func (_c *MockAccountingClient_TokenReportIndex_Call) RunAndReturn(run func(types.TokenReportReq) (any, error)) *MockAccountingClient_TokenReportIndex_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// UpdatePlanForNS provides a mock function with given fields: req
+func (_m *MockAccountingClient) UpdatePlanForNS(req types.AcctTokenPlanUpdateNSReq) (any, error) {
+	ret := _m.Called(req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdatePlanForNS")
+	}
+
+	var r0 any
+	var r1 error
+	if rf, ok := ret.Get(0).(func(types.AcctTokenPlanUpdateNSReq) (any, error)); ok {
+		return rf(req)
+	}
+	if rf, ok := ret.Get(0).(func(types.AcctTokenPlanUpdateNSReq) any); ok {
+		r0 = rf(req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(any)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(types.AcctTokenPlanUpdateNSReq) error); ok {
+		r1 = rf(req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAccountingClient_UpdatePlanForNS_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdatePlanForNS'
+type MockAccountingClient_UpdatePlanForNS_Call struct {
+	*mock.Call
+}
+
+// UpdatePlanForNS is a helper method to define mock.On call
+//   - req types.AcctTokenPlanUpdateNSReq
+func (_e *MockAccountingClient_Expecter) UpdatePlanForNS(req interface{}) *MockAccountingClient_UpdatePlanForNS_Call {
+	return &MockAccountingClient_UpdatePlanForNS_Call{Call: _e.mock.On("UpdatePlanForNS", req)}
+}
+
+func (_c *MockAccountingClient_UpdatePlanForNS_Call) Run(run func(req types.AcctTokenPlanUpdateNSReq)) *MockAccountingClient_UpdatePlanForNS_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(types.AcctTokenPlanUpdateNSReq))
+	})
+	return _c
+}
+
+func (_c *MockAccountingClient_UpdatePlanForNS_Call) Return(_a0 any, _a1 error) *MockAccountingClient_UpdatePlanForNS_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAccountingClient_UpdatePlanForNS_Call) RunAndReturn(run func(types.AcctTokenPlanUpdateNSReq) (any, error)) *MockAccountingClient_UpdatePlanForNS_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -1889,6 +2526,122 @@ func (_c *MockAccountingClient_UpdatePrice_Call) Return(_a0 any, _a1 error) *Moc
 }
 
 func (_c *MockAccountingClient_UpdatePrice_Call) RunAndReturn(run func(string, types.AcctPriceUpdateReq, int64) (any, error)) *MockAccountingClient_UpdatePrice_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// UpdateTokenPlan provides a mock function with given fields: req
+func (_m *MockAccountingClient) UpdateTokenPlan(req types.AcctTokenPlanUpdateReq) (any, error) {
+	ret := _m.Called(req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdateTokenPlan")
+	}
+
+	var r0 any
+	var r1 error
+	if rf, ok := ret.Get(0).(func(types.AcctTokenPlanUpdateReq) (any, error)); ok {
+		return rf(req)
+	}
+	if rf, ok := ret.Get(0).(func(types.AcctTokenPlanUpdateReq) any); ok {
+		r0 = rf(req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(any)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(types.AcctTokenPlanUpdateReq) error); ok {
+		r1 = rf(req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAccountingClient_UpdateTokenPlan_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdateTokenPlan'
+type MockAccountingClient_UpdateTokenPlan_Call struct {
+	*mock.Call
+}
+
+// UpdateTokenPlan is a helper method to define mock.On call
+//   - req types.AcctTokenPlanUpdateReq
+func (_e *MockAccountingClient_Expecter) UpdateTokenPlan(req interface{}) *MockAccountingClient_UpdateTokenPlan_Call {
+	return &MockAccountingClient_UpdateTokenPlan_Call{Call: _e.mock.On("UpdateTokenPlan", req)}
+}
+
+func (_c *MockAccountingClient_UpdateTokenPlan_Call) Run(run func(req types.AcctTokenPlanUpdateReq)) *MockAccountingClient_UpdateTokenPlan_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(types.AcctTokenPlanUpdateReq))
+	})
+	return _c
+}
+
+func (_c *MockAccountingClient_UpdateTokenPlan_Call) Return(_a0 any, _a1 error) *MockAccountingClient_UpdateTokenPlan_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAccountingClient_UpdateTokenPlan_Call) RunAndReturn(run func(types.AcctTokenPlanUpdateReq) (any, error)) *MockAccountingClient_UpdateTokenPlan_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// UpgradePlanForNS provides a mock function with given fields: req
+func (_m *MockAccountingClient) UpgradePlanForNS(req types.AcctTokenPlanUpgradeReq) (any, error) {
+	ret := _m.Called(req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpgradePlanForNS")
+	}
+
+	var r0 any
+	var r1 error
+	if rf, ok := ret.Get(0).(func(types.AcctTokenPlanUpgradeReq) (any, error)); ok {
+		return rf(req)
+	}
+	if rf, ok := ret.Get(0).(func(types.AcctTokenPlanUpgradeReq) any); ok {
+		r0 = rf(req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(any)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(types.AcctTokenPlanUpgradeReq) error); ok {
+		r1 = rf(req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAccountingClient_UpgradePlanForNS_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpgradePlanForNS'
+type MockAccountingClient_UpgradePlanForNS_Call struct {
+	*mock.Call
+}
+
+// UpgradePlanForNS is a helper method to define mock.On call
+//   - req types.AcctTokenPlanUpgradeReq
+func (_e *MockAccountingClient_Expecter) UpgradePlanForNS(req interface{}) *MockAccountingClient_UpgradePlanForNS_Call {
+	return &MockAccountingClient_UpgradePlanForNS_Call{Call: _e.mock.On("UpgradePlanForNS", req)}
+}
+
+func (_c *MockAccountingClient_UpgradePlanForNS_Call) Run(run func(req types.AcctTokenPlanUpgradeReq)) *MockAccountingClient_UpgradePlanForNS_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(types.AcctTokenPlanUpgradeReq))
+	})
+	return _c
+}
+
+func (_c *MockAccountingClient_UpgradePlanForNS_Call) Return(_a0 any, _a1 error) *MockAccountingClient_UpgradePlanForNS_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAccountingClient_UpgradePlanForNS_Call) RunAndReturn(run func(types.AcctTokenPlanUpgradeReq) (any, error)) *MockAccountingClient_UpgradePlanForNS_Call {
 	_c.Call.Return(run)
 	return _c
 }

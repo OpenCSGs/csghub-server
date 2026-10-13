@@ -16,6 +16,7 @@ const (
 	SubscriptionStatusActive   SubscriptionStatus = "active"
 	SubscriptionStatusCanceled SubscriptionStatus = "canceled"
 	SubscriptionStatusClosed   SubscriptionStatus = "closed"
+	SubscriptionStatusExpired  SubscriptionStatus = "expired"
 )
 
 type BillingReasion string
@@ -28,13 +29,14 @@ const (
 	BillingReasionSubscriptionClose     BillingReasion = "subscription_close"
 	BillingReasonBalanceInsufficient    BillingReasion = "balance_insufficient"
 	BillingReasonLostPrice              BillingReasion = "lost_price"
+	BillingReasonDeductFailed           BillingReasion = "deduct_failed"
 )
 
 type BillingStatus string
 
 const (
 	BillingStatusPaid   BillingStatus = "paid"
-	BillingStatusFailed BillingStatus = "unpaid"
+	BillingStatusUnpaid BillingStatus = "unpaid"
 )
 
 type SubscriptionUpdateReq struct {
