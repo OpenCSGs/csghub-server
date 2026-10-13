@@ -6,7 +6,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 	mockdatabase "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/database"
+	mockcomponent "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
 	deploycommon "opencsg.com/csghub-server/builder/deploy/common"
+	"opencsg.com/csghub-server/builder/rebac"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
@@ -38,6 +40,70 @@ func TestAgentCustomUIProxyComponent_Resolve(t *testing.T) {
 		AgentContentID: "agent-host", AgentName: "agent-name", ShareName: "s-a-12", Kind: types.AgentInstanceKindLogical, SpaceID: 7,
 		SpaceSvcName: "ui-svc", SpaceEndpoint: "https://ui.example", SpaceClusterID: "cluster-1", Available: true,
 	}, info)
+}
+
+func TestAgentCustomUIProxyComponent_ResolvePrivateSpace(t *testing.T) {
+	ctx := context.Background()
+	agents := mockdatabase.NewMockAgentInstanceStore(t)
+	spaces := mockdatabase.NewMockSpaceStore(t)
+	deploys := mockdatabase.NewMockDeployTaskStore(t)
+	shares := mockdatabase.NewMockAgentShareStore(t)
+	users := mockdatabase.NewMockUserStore(t)
+	repos := mockcomponent.NewMockRepoComponent(t)
+	comp := &agentCustomUIProxyComponent{agentStore: agents, spaceStore: spaces, deployStore: deploys, shareStore: shares, userStore: users, repoComp: repos}
+	agent := &database.AgentInstance{
+		ID: 12, Type: "csgclaw", ContentID: "agent-host", Public: true, UserUUID: "owner-uuid",
+		Metadata: map[string]any{
+			"provision_request": map[string]any{"custom_ui_space_id": float64(7)},
+			"template_metadata": map[string]any{"agent_file": map[string]any{"name": "agent-name"}},
+		},
+	}
+	agents.EXPECT().FindByContentID(ctx, "csgclaw", "agent-host").Return(agent, nil)
+	shares.EXPECT().FindByShareName(ctx, types.CSGClawAutomaticShareName(12)).Return(&database.AgentShare{InstanceID: 12, ShareName: "s-a-12"}, nil)
+	// a private bound space resolves while the agent owner still has write
+	// access: the agent's public binding authorizes anonymous access through
+	// the agent's custom domain
+	repo := &database.Repository{Private: true}
+	spaces.EXPECT().ByID(ctx, int64(7)).Return(&database.Space{Repository: repo}, nil)
+	users.EXPECT().FindByUUID(ctx, "owner-uuid").Return(&database.User{Username: "alice"}, nil)
+	repos.EXPECT().CheckUserRepoPermission(ctx, "alice", repo, rebac.RepositoryCanWrite).Return(true, nil)
+	deploys.EXPECT().GetLatestDeployBySpaceID(ctx, int64(7)).Return(&database.Deploy{Status: deploycommon.Running, SvcName: "ui-svc", Endpoint: "https://ui.example", ClusterID: "cluster-1"}, nil)
+
+	info, matched, err := comp.Resolve(ctx, "agent-host")
+	require.NoError(t, err)
+	require.True(t, matched)
+	require.True(t, info.Available)
+	require.Equal(t, "ui-svc", info.SpaceSvcName)
+}
+
+func TestAgentCustomUIProxyComponent_ResolvePrivateSpaceOwnerAccessRevoked(t *testing.T) {
+	ctx := context.Background()
+	agents := mockdatabase.NewMockAgentInstanceStore(t)
+	spaces := mockdatabase.NewMockSpaceStore(t)
+	shares := mockdatabase.NewMockAgentShareStore(t)
+	users := mockdatabase.NewMockUserStore(t)
+	repos := mockcomponent.NewMockRepoComponent(t)
+	comp := &agentCustomUIProxyComponent{agentStore: agents, spaceStore: spaces, shareStore: shares, userStore: users, repoComp: repos}
+	agent := &database.AgentInstance{
+		ID: 12, Type: "csgclaw", ContentID: "agent-host", Public: true, UserUUID: "owner-uuid",
+		Metadata: map[string]any{
+			"provision_request": map[string]any{"custom_ui_space_id": float64(7)},
+			"template_metadata": map[string]any{"agent_file": map[string]any{"name": "agent-name"}},
+		},
+	}
+	agents.EXPECT().FindByContentID(ctx, "csgclaw", "agent-host").Return(agent, nil)
+	shares.EXPECT().FindByShareName(ctx, types.CSGClawAutomaticShareName(12)).Return(&database.AgentShare{InstanceID: 12, ShareName: "s-a-12"}, nil)
+	// the agent owner lost write access after binding (e.g. removed from the
+	// org): the anonymous exposure must be cut, failing closed
+	repo := &database.Repository{Private: true}
+	spaces.EXPECT().ByID(ctx, int64(7)).Return(&database.Space{Repository: repo}, nil)
+	users.EXPECT().FindByUUID(ctx, "owner-uuid").Return(&database.User{Username: "alice"}, nil)
+	repos.EXPECT().CheckUserRepoPermission(ctx, "alice", repo, rebac.RepositoryCanWrite).Return(false, nil)
+
+	info, matched, err := comp.Resolve(ctx, "agent-host")
+	require.ErrorIs(t, err, errorx.ErrForbidden)
+	require.True(t, matched)
+	require.Nil(t, info)
 }
 
 func TestAgentCustomUIProxyComponent_ResolvePrivateAgent(t *testing.T) {

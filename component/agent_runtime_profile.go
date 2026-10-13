@@ -28,7 +28,16 @@ type CSGClawRuntimeProfile struct {
 	Command        []string                     `json:"command"`
 	ReadinessProbe SandboxRuntimeReadinessProbe `json:"readiness_probe"`
 	DefaultEnv     map[string]string            `json:"default_env"`
+	CustomUI       *CSGClawCustomUI             `json:"custom_ui,omitempty"`
 	ContentSHA     string                       `json:"content_sha"`
+}
+
+// CSGClawCustomUI pins the custom UI framework bundle used to scaffold agent UI
+// spaces. URL must point to a tar.gz archive whose content hashes to SHA256.
+type CSGClawCustomUI struct {
+	URL    string `json:"url"`
+	SHA256 string `json:"sha256"`
+	SDK    string `json:"sdk"`
 }
 
 type SandboxRuntimeReadinessProbe = types.SandboxReadinessProbe
@@ -145,14 +154,37 @@ func validateSandboxRuntimeProfile(profile *CSGClawRuntimeProfile, expectedAgent
 			return fmt.Errorf("%s runtime profile command cannot contain empty arguments", expectedAgentType)
 		}
 	}
-	if profile.ReadinessProbe.Protocol == "" && profile.ReadinessProbe.Path == "" {
+	if profile.ReadinessProbe.Protocol != "" || profile.ReadinessProbe.Path != "" {
+		if profile.ReadinessProbe.Protocol != "http" {
+			return fmt.Errorf("csgclaw runtime profile readiness_probe.protocol must be http")
+		}
+		if !strings.HasPrefix(profile.ReadinessProbe.Path, "/") {
+			return fmt.Errorf("csgclaw runtime profile readiness_probe.path must start with /")
+		}
+	}
+	return validateCSGClawCustomUI(profile.CustomUI)
+}
+
+var csgclawCustomUISDKs = map[string]bool{
+	types.GRADIO.Name:    true,
+	types.STREAMLIT.Name: true,
+}
+
+func validateCSGClawCustomUI(customUI *CSGClawCustomUI) error {
+	if customUI == nil {
 		return nil
 	}
-	if profile.ReadinessProbe.Protocol != "http" {
-		return fmt.Errorf("%s runtime profile readiness_probe.protocol must be http", expectedAgentType)
+	if !strings.HasPrefix(customUI.URL, "https://") {
+		return fmt.Errorf("csgclaw custom_ui.url must be an https URL")
 	}
-	if !strings.HasPrefix(profile.ReadinessProbe.Path, "/") {
-		return fmt.Errorf("%s runtime profile readiness_probe.path must start with /", expectedAgentType)
+	if len(customUI.SHA256) != 64 {
+		return fmt.Errorf("csgclaw custom_ui.sha256 must be a 64-char hex digest")
+	}
+	if _, err := hex.DecodeString(customUI.SHA256); err != nil {
+		return fmt.Errorf("csgclaw custom_ui.sha256 must be a 64-char hex digest")
+	}
+	if !csgclawCustomUISDKs[customUI.SDK] {
+		return fmt.Errorf("csgclaw custom_ui.sdk must be one of gradio, streamlit")
 	}
 	return nil
 }

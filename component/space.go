@@ -45,6 +45,9 @@ enableXsrfProtection = false
 
 type SpaceComponent interface {
 	Create(ctx context.Context, req types.CreateSpaceReq) (*types.Space, error)
+	// CreateWithFiles behaves like Create and additionally commits extraFiles
+	// into the new repo in the same initial commit as the default files.
+	CreateWithFiles(ctx context.Context, req types.CreateSpaceReq, extraFiles []types.SpaceSeedFile) (*types.Space, error)
 	Show(ctx context.Context, namespace, name, currentUser string, needOpWeight bool) (*types.Space, error)
 	Update(ctx context.Context, req *types.UpdateSpaceReq) (*types.Space, error)
 	Index(ctx context.Context, repoFilter *types.RepoFilter, per, page int, needOpWeight bool) ([]*types.Space, int, error)
@@ -72,6 +75,10 @@ type SpaceComponent interface {
 }
 
 func (c *spaceComponentImpl) Create(ctx context.Context, req types.CreateSpaceReq) (*types.Space, error) {
+	return c.CreateWithFiles(ctx, req, nil)
+}
+
+func (c *spaceComponentImpl) CreateWithFiles(ctx context.Context, req types.CreateSpaceReq, extraFiles []types.SpaceSeedFile) (*types.Space, error) {
 	var nickname string
 	if req.Nickname != "" {
 		nickname = req.Nickname
@@ -154,13 +161,14 @@ func (c *spaceComponentImpl) Create(ctx context.Context, req types.CreateSpaceRe
 
 	dbRepo.Path = repoPath
 
-	err = c.createSpaceDefaultFiles(ctx, dbRepo, req, templatePath)
+	err = c.createSpaceDefaultFiles(ctx, dbRepo, req, templatePath, extraFiles)
 	if err != nil {
 		slog.Error("failed to create new space default files", slog.Any("req", req), slog.Any("error", err))
 		return nil, errorx.ErrSpaceInitFailed
 	}
 
 	space := &types.Space{
+		ID:            resSpace.ID,
 		Creator:       req.Username,
 		License:       req.License,
 		Path:          repoPath,
@@ -218,25 +226,36 @@ func (c *spaceComponentImpl) getSpaceDockerTemplatePath(ctx context.Context, req
 }
 
 func (c *spaceComponentImpl) createSpaceDefaultFiles(ctx context.Context, dbRepo *database.Repository,
-	req types.CreateSpaceReq, templatePath string) error {
+	req types.CreateSpaceReq, templatePath string, extraFiles []types.SpaceSeedFile) error {
 
 	var commitFiles []gitserver.CommitFile
 
+	// Default files are skipped when an extra file already provides the same
+	// path: two create actions on one path would fail the initial commit.
+	extraPaths := make(map[string]bool, len(extraFiles))
+	for _, f := range extraFiles {
+		extraPaths[f.Path] = true
+	}
+
 	// readme
-	commitFiles = append(commitFiles, gitserver.CommitFile{
-		Content: base64.StdEncoding.EncodeToString([]byte(req.Readme)),
-		Path:    types.ReadmeFileName,
-		Action:  gitserver.CommitActionCreate,
-	})
+	if !extraPaths[types.ReadmeFileName] {
+		commitFiles = append(commitFiles, gitserver.CommitFile{
+			Content: base64.StdEncoding.EncodeToString([]byte(req.Readme)),
+			Path:    types.ReadmeFileName,
+			Action:  gitserver.CommitActionCreate,
+		})
+	}
 
 	// gitattributes
-	commitFiles = append(commitFiles, gitserver.CommitFile{
-		Content: base64.StdEncoding.EncodeToString([]byte(spaceGitattributesContent)),
-		Path:    types.GitattributesFileName,
-		Action:  gitserver.CommitActionCreate,
-	})
+	if !extraPaths[types.GitattributesFileName] {
+		commitFiles = append(commitFiles, gitserver.CommitFile{
+			Content: base64.StdEncoding.EncodeToString([]byte(spaceGitattributesContent)),
+			Path:    types.GitattributesFileName,
+			Action:  gitserver.CommitActionCreate,
+		})
+	}
 
-	if req.Sdk == types.STREAMLIT.Name {
+	if req.Sdk == types.STREAMLIT.Name && !extraPaths[streamlitConfig] {
 		commitFiles = append(commitFiles, gitserver.CommitFile{
 			Content: base64.StdEncoding.EncodeToString([]byte(streamlitConfigContent)),
 			Path:    streamlitConfig,
@@ -266,6 +285,14 @@ func (c *spaceComponentImpl) createSpaceDefaultFiles(ctx context.Context, dbRepo
 			return fmt.Errorf("failed to list space nginx template files, error: %w", err)
 		}
 		commitFiles = append(commitFiles, nginxFiles...)
+	}
+
+	for _, f := range extraFiles {
+		commitFiles = append(commitFiles, gitserver.CommitFile{
+			Content: base64.StdEncoding.EncodeToString(f.Content),
+			Path:    f.Path,
+			Action:  gitserver.CommitActionCreate,
+		})
 	}
 
 	commitReq := gitserver.CommitFilesReq{
