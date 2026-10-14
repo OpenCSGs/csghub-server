@@ -33,6 +33,11 @@ type AccountTokenPlan struct {
 	AccountTokenPlanCommon
 	LatestVersionID int64     `bun:",notnull,default:0" json:"latest_version_id"`
 	DeletedAt       time.Time `bun:",soft_delete,nullzero" json:"deleted_at"`
+
+	// ActiveSubscriptionCount is not persisted. It is calculated for admin
+	// token plan listing and counts active AccountTokenPlanInstance rows that
+	// reference this plan.
+	ActiveSubscriptionCount int64 `bun:"-" json:"active_subscription_count"`
 }
 
 // AccountTokenPlanVersion is an immutable snapshot of a plan configuration

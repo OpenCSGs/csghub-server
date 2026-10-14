@@ -194,9 +194,14 @@ func (p *plannerImpl) planOnce(c *gin.Context, meta *types.RequestMetadata) (pl 
 	// capacity to run anyway.
 	promptText := meta.PromptText()
 	if promptText != "" {
-		isSensitive, message, checkErr := p.contentSafety.Check(
-			ctx, mt.Model, promptText, meta.TenantID, meta.Task, meta.Streaming, mt.Upstream.Provider,
-		)
+		isSensitive, message, checkErr := p.contentSafety.Check(ensureModerationSessionID(c), ContentSafetyCheckRequest{
+			Model:      mt.Model,
+			PromptText: promptText,
+			TenantID:   meta.TenantID,
+			Task:       meta.Task,
+			Streaming:  meta.Streaming,
+			Provider:   mt.Upstream.Provider,
+		})
 		if checkErr != nil {
 			slog.WarnContext(ctx, "planner sensitive check error", slog.Any("error", checkErr))
 		} else if isSensitive {

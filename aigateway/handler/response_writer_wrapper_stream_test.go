@@ -2,6 +2,7 @@ package handler
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -22,7 +23,7 @@ func TestResponseWriterWrapper_NewResponseWriterWrapper(t *testing.T) {
 	w := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(w)
 
-	rw := newStreamResponseWriter(ctx.Writer, component.NewMockModeration(t), mocktoken.NewMockChatTokenCounter(t), nil)
+	rw := newStreamResponseWriter(ChatWriterParams{InternalWriter: ctx.Writer, ModerationComponent: component.NewMockModeration(t), TokenCounter: mocktoken.NewMockChatTokenCounter(t), Recorder: nil, RequestCtx: context.Background()})
 	require.NotNil(t, rw, "NewResponseWriterWrapper should not return nil")
 	if rw.internalWritter != ctx.Writer {
 		t.Error("internalWritter should be set correctly")
@@ -41,7 +42,7 @@ func TestResponseWriterWrapper_NewResponseWriterWrapper(t *testing.T) {
 func TestResponseWriterWrapper_Header_WriteHeader_Flush_ClearBuffer(t *testing.T) {
 	w := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(w)
-	rw := newStreamResponseWriter(ctx.Writer, nil, nil, nil)
+	rw := newStreamResponseWriter(ChatWriterParams{InternalWriter: ctx.Writer, ModerationComponent: nil, TokenCounter: nil, Recorder: nil, RequestCtx: context.Background()})
 
 	rw.WriteHeader(http.StatusOK)
 	if w.Code != http.StatusOK {
@@ -55,7 +56,7 @@ func TestResponseWriterWrapper_Write_NormalContent(t *testing.T) {
 	w := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(w)
 	mockMod := component.NewMockModeration(t)
-	rw := newStreamResponseWriter(ctx.Writer, mockMod, nil, nil)
+	rw := newStreamResponseWriter(ChatWriterParams{InternalWriter: ctx.Writer, ModerationComponent: mockMod, TokenCounter: nil, Recorder: nil, RequestCtx: context.Background()})
 
 	normalChunk := types.ChatCompletionChunk{
 		ID:     "test-id",
@@ -90,7 +91,7 @@ func TestResponseWriterWrapper_Write_DoneMessage(t *testing.T) {
 	w := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(w)
 	mockMod := component.NewMockModeration(t)
-	rw := newStreamResponseWriter(ctx.Writer, mockMod, nil, nil)
+	rw := newStreamResponseWriter(ChatWriterParams{InternalWriter: ctx.Writer, ModerationComponent: mockMod, TokenCounter: nil, Recorder: nil, RequestCtx: context.Background()})
 
 	mockMod.EXPECT().CloseStreamCheck(mock.Anything, rw.id).Return(&rpc.CheckResult{IsSensitive: false}, nil)
 
@@ -109,7 +110,7 @@ func TestResponseWriterWrapper_Write_SensitiveContent(t *testing.T) {
 	w := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(w)
 	mockMod := component.NewMockModeration(t)
-	rw := newStreamResponseWriter(ctx.Writer, mockMod, nil, nil)
+	rw := newStreamResponseWriter(ChatWriterParams{InternalWriter: ctx.Writer, ModerationComponent: mockMod, TokenCounter: nil, Recorder: nil, RequestCtx: context.Background()})
 
 	sensitiveChunk := types.ChatCompletionChunk{
 		ID:     "test-id",
@@ -148,7 +149,7 @@ func TestResponseWriterWrapper_Write_SensitiveReasoningContent(t *testing.T) {
 	w := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(w)
 	mockMod := component.NewMockModeration(t)
-	rw := newStreamResponseWriter(ctx.Writer, mockMod, nil, nil)
+	rw := newStreamResponseWriter(ChatWriterParams{InternalWriter: ctx.Writer, ModerationComponent: mockMod, TokenCounter: nil, Recorder: nil, RequestCtx: context.Background()})
 	sensitiveChunk := types.ChatCompletionChunk{
 		ID:     "test-id",
 		Object: "chat.completion.chunk",
@@ -188,7 +189,7 @@ func TestResponseWriterWrapper_Write_ModerationServiceError(t *testing.T) {
 	ctx, _ := gin.CreateTestContext(w)
 	mockMod := component.NewMockModeration(t)
 
-	rw := newStreamResponseWriter(ctx.Writer, mockMod, nil, nil)
+	rw := newStreamResponseWriter(ChatWriterParams{InternalWriter: ctx.Writer, ModerationComponent: mockMod, TokenCounter: nil, Recorder: nil, RequestCtx: context.Background()})
 	testChunk := types.ChatCompletionChunk{
 		ID:     "test-id",
 		Object: "chat.completion.chunk",
@@ -222,7 +223,7 @@ func TestResponseWriterWrapper_Write_ModerationServiceError(t *testing.T) {
 func TestResponseWriterWrapper_Write_NilModerationComponent(t *testing.T) {
 	w := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(w)
-	rw := newStreamResponseWriter(ctx.Writer, nil, nil, nil)
+	rw := newStreamResponseWriter(ChatWriterParams{InternalWriter: ctx.Writer, ModerationComponent: nil, TokenCounter: nil, Recorder: nil, RequestCtx: context.Background()})
 
 	// Test CheckChatStreamResponse with nil component
 	normalChunk := types.ChatCompletionChunk{
@@ -267,7 +268,7 @@ func TestResponseWriterWrapper_Write_DoneMessageSensitive(t *testing.T) {
 	w := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(w)
 	mockMod := component.NewMockModeration(t)
-	rw := newStreamResponseWriter(ctx.Writer, mockMod, nil, nil)
+	rw := newStreamResponseWriter(ChatWriterParams{InternalWriter: ctx.Writer, ModerationComponent: mockMod, TokenCounter: nil, Recorder: nil, RequestCtx: context.Background()})
 
 	mockMod.EXPECT().CloseStreamCheck(mock.Anything, rw.id).Return(&rpc.CheckResult{IsSensitive: true, Reason: "sensitive done"}, nil)
 
@@ -287,7 +288,7 @@ func TestResponseWriterWrapper_Write_DoneMessageError(t *testing.T) {
 	w := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(w)
 	mockMod := component.NewMockModeration(t)
-	rw := newStreamResponseWriter(ctx.Writer, mockMod, nil, nil)
+	rw := newStreamResponseWriter(ChatWriterParams{InternalWriter: ctx.Writer, ModerationComponent: mockMod, TokenCounter: nil, Recorder: nil, RequestCtx: context.Background()})
 
 	mockMod.EXPECT().CloseStreamCheck(mock.Anything, rw.id).Return(nil, errors.New("done check error"))
 
@@ -305,7 +306,7 @@ func TestResponseWriterWrapper_Write_DoneMessageError(t *testing.T) {
 func TestResponseWriterWrapper_Write_InvalidJSON(t *testing.T) {
 	w := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(w)
-	rw := newStreamResponseWriter(ctx.Writer, component.NewMockModeration(t), nil, nil)
+	rw := newStreamResponseWriter(ChatWriterParams{InternalWriter: ctx.Writer, ModerationComponent: component.NewMockModeration(t), TokenCounter: nil, Recorder: nil, RequestCtx: context.Background()})
 
 	invalidData := []byte("data: invalid json data\n\n")
 
@@ -323,7 +324,7 @@ func TestResponseWriterWrapper_Write_NilTokenCounter(t *testing.T) {
 	w := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(w)
 	mockMod := component.NewMockModeration(t)
-	rw := newStreamResponseWriter(ctx.Writer, mockMod, nil, nil)
+	rw := newStreamResponseWriter(ChatWriterParams{InternalWriter: ctx.Writer, ModerationComponent: mockMod, TokenCounter: nil, Recorder: nil, RequestCtx: context.Background()})
 
 	normalChunk := types.ChatCompletionChunk{
 		ID:     "test-id",
@@ -366,7 +367,7 @@ func TestResponseWriterWrapper_Write_TokenCounterAppendsChunk(t *testing.T) {
 	ctx, _ := gin.CreateTestContext(w)
 	mockMod := component.NewMockModeration(t)
 	mockTokenCounter := mocktoken.NewMockChatTokenCounter(t)
-	rw := newStreamResponseWriter(ctx.Writer, mockMod, mockTokenCounter, nil)
+	rw := newStreamResponseWriter(ChatWriterParams{InternalWriter: ctx.Writer, ModerationComponent: mockMod, TokenCounter: mockTokenCounter, Recorder: nil, RequestCtx: context.Background()})
 
 	normalChunk := types.ChatCompletionChunk{
 		ID:     "test-id",
@@ -402,7 +403,7 @@ func TestResponseWriterWrapper_Write_TokenCounterAppendsChunk(t *testing.T) {
 func TestResponseWriterWrapper_Write_PassthroughUpstreamJSONError(t *testing.T) {
 	w := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(w)
-	rw := newStreamResponseWriter(ctx.Writer, nil, nil, nil)
+	rw := newStreamResponseWriter(ChatWriterParams{InternalWriter: ctx.Writer, ModerationComponent: nil, TokenCounter: nil, Recorder: nil, RequestCtx: context.Background()})
 
 	rw.Header().Set("Content-Type", "application/json")
 	rw.WriteHeader(http.StatusTooManyRequests)

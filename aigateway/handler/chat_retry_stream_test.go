@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -14,7 +15,7 @@ func TestChatRetryResponseWriter_ReplaysJSONErrorToStreamWrapper(t *testing.T) {
 	rec := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(rec)
 
-	downstream := newStreamResponseWriter(ctx.Writer, nil, nil, nil)
+	downstream := newStreamResponseWriter(ChatWriterParams{InternalWriter: ctx.Writer, ModerationComponent: nil, TokenCounter: nil, Recorder: nil, RequestCtx: context.Background()})
 	retryWriter := newChatRetryResponseWriter(downstream)
 
 	errorBody := `{"error":{"message":"bad gateway","type":"api_error"}}`

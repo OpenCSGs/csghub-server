@@ -480,7 +480,14 @@ func (h *OpenAIHandlerImpl) setupChatContext(
 		slog.WarnContext(ctx, "failed to initialize llmlog training capture", slog.Any("error", err))
 	}
 
-	responseWriter := NewResponseWriterWrapper(ginWriter, chatReq.Stream, modComponent, tokenCounter, logCapture)
+	responseWriter := NewResponseWriterWrapper(ChatWriterParams{
+		InternalWriter:      ginWriter,
+		Stream:              chatReq.Stream,
+		ModerationComponent: modComponent,
+		TokenCounter:        tokenCounter,
+		Recorder:            logCapture,
+		RequestCtx:          ctx,
+	})
 
 	return &chatContext{
 		tokenCounter:   tokenCounter,

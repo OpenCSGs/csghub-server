@@ -328,7 +328,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		return nil, fmt.Errorf("error creating user proxy handler:%w", err)
 	}
 
-	createUserRoutes(apiGroup, middlewareCollection, userProxyHandler, userHandler)
+	createUserRoutes(apiGroup, adminGrp, middlewareCollection, userProxyHandler, userHandler)
 
 	createTokenRoutes(apiGroup, middlewareCollection, userProxyHandler)
 
@@ -434,13 +434,10 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	event := apiGroup.Group("/events")
 	event.POST("", middlewareCollection.Auth.NeedLogin, eventHandler.Create)
 
-	adminGroup := apiGroup.Group("/admin")
-	adminGroup.Use(middleware.NeedAdmin(config))
-
-	adminGroup.POST("/:repo_type/:namespace/:name/change_path", repoCommonHandler.ChangePath)
+	adminGrp.POST("/:repo_type/:namespace/:name/change_path", repoCommonHandler.ChangePath)
 
 	// Admin user get repo path list
-	adminGroup.GET("/repos", repoCommonHandler.GetRepos)
+	adminGrp.GET("/repos", repoCommonHandler.GetRepos)
 
 	// Batch get repository extra information for multiple repositories
 	apiGroup.POST("/repos/extra", repoCommonHandler.BatchGetRepoExtra)
@@ -451,7 +448,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		return nil, fmt.Errorf("error creating broadcast handler:%w", err)
 	}
 	broadcast := apiGroup.Group("/broadcasts")
-	adminBroadcast := adminGroup.Group("/broadcasts")
+	adminBroadcast := adminGrp.Group("/broadcasts")
 
 	broadcast.GET("/active", broadcastHandler.Active)
 	adminBroadcast.POST("", broadcastHandler.Create)
@@ -560,7 +557,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		return nil, fmt.Errorf("error creating clawhub routes:%w", err)
 	}
 
-	err = createAdvancedRoutes(apiGroup, adminGroup, middlewareCollection, config, mqFactory, activityLogComp)
+	err = createAdvancedRoutes(apiGroup, adminGrp, middlewareCollection, config, mqFactory, activityLogComp)
 	if err != nil {
 		return nil, fmt.Errorf("error creating advance routes:%w", err)
 	}
@@ -1036,7 +1033,7 @@ func createSpaceRoutes(config *config.Config,
 	}
 }
 
-func createUserRoutes(apiGroup *gin.RouterGroup, middlewareCollection middleware.MiddlewareCollection, userProxyHandler *handler.InternalServiceProxyHandler, userHandler *handler.UserHandler) {
+func createUserRoutes(apiGroup *gin.RouterGroup, adminGroup *gin.RouterGroup, middlewareCollection middleware.MiddlewareCollection, userProxyHandler *handler.InternalServiceProxyHandler, userHandler *handler.UserHandler) {
 	// api keys
 	keysGroup := apiGroup.Group("/namespaces")
 	keysGroup.Use(middlewareCollection.Auth.NeedLogin)
@@ -1128,6 +1125,8 @@ func createUserRoutes(apiGroup *gin.RouterGroup, middlewareCollection middleware
 	// directly in NewRouter.
 	apiGroup.GET("/users", middlewareCollection.Auth.NeedLogin, userProxyHandler.Proxy)
 
+	// Look up namespaces in batch for admin
+	adminGroup.POST("/namespaces/lookup", userProxyHandler.Proxy)
 	createExtendedUserRoutes(apiGroup, middlewareCollection, userProxyHandler)
 }
 

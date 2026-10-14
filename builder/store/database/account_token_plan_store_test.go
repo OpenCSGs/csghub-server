@@ -428,6 +428,64 @@ func TestAccountTokenPlanStore_SummaryActiveSubscriptions(t *testing.T) {
 	}, res)
 }
 
+func TestAccountTokenPlanStore_List_FillsActiveSubscriptionCounts(t *testing.T) {
+	ctx := context.Background()
+	db := tests.InitTestDB()
+	defer db.Close()
+
+	newPlan := func(code string) database.AccountTokenPlan {
+		return database.AccountTokenPlan{
+			AccountTokenPlanCommon: database.AccountTokenPlanCommon{
+				PlanCode:  code,
+				PlanName:  code,
+				CreatedBy: "tester",
+				Quotas:    []types.AccountTokenPlanModelQuota{},
+				NsUUIDs:   []string{},
+			},
+		}
+	}
+	plans := []database.AccountTokenPlan{
+		newPlan("list-active-plans-1"),
+		newPlan("list-active-plans-2"),
+	}
+	for i := range plans {
+		_, err := db.Core.NewInsert().Model(&plans[i]).Exec(ctx, &plans[i])
+		require.NoError(t, err)
+	}
+
+	newInstance := func(planID int64, status types.SubscriptionStatus) database.AccountTokenPlanInstance {
+		return database.AccountTokenPlanInstance{
+			NsUUID:    "ns-" + uuid.NewString(),
+			PlanID:    planID,
+			Status:    status,
+			CreatedBy: "tester",
+		}
+	}
+	instances := []database.AccountTokenPlanInstance{
+		newInstance(plans[0].ID, types.SubscriptionStatusActive),
+		newInstance(plans[0].ID, types.SubscriptionStatusActive),
+		newInstance(plans[0].ID, types.SubscriptionStatusCanceled),
+		newInstance(plans[1].ID, types.SubscriptionStatusActive),
+	}
+	for i := range instances {
+		_, err := db.Core.NewInsert().Model(&instances[i]).Exec(ctx, &instances[i])
+		require.NoError(t, err)
+	}
+
+	store := database.NewAccountTokenPlanStoreWithDB(db)
+	got, total, err := store.List(ctx, types.AcctTokenPlanListReq{Per: 20, Page: 1})
+	require.NoError(t, err)
+	require.Equal(t, 2, total)
+	require.Len(t, got, 2)
+
+	counts := map[int64]int64{}
+	for _, plan := range got {
+		counts[plan.ID] = plan.ActiveSubscriptionCount
+	}
+	require.Equal(t, int64(2), counts[plans[0].ID])
+	require.Equal(t, int64(1), counts[plans[1].ID])
+}
+
 func TestAccountTokenPlanStore_CancelInstance(t *testing.T) {
 	ctx := context.Background()
 	db := tests.InitTestDB()

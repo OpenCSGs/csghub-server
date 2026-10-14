@@ -141,6 +141,11 @@ stream_check_mode = "async"
 async_buffer_max_chars = 50
 # aliyun green max content length: 2000 | qwen guard max content length: 7000
 max_content_length = 7000
+# prompt moderation tiers: prompts worth at most one moderation call are
+# checked synchronously; within prompt_max_chunks calls asynchronously
+# (request proceeds without waiting); above it prompt moderation is skipped.
+# Zero keeps the legacy all-synchronous behavior.
+prompt_max_chunks = 3
 
 [sensitive_check.llm]
 enable = false
@@ -232,6 +237,7 @@ signin_success_redirect_url = "http://localhost:3000/server/callback"
 codesouler_vscode_redirect_url = "http://127.0.0.1:37678/callback"
 codesouler_jetbrains_redirect_url = "http://127.0.0.1:37679/callback"
 lite_redirect_url = "http://127.0.0.1:11437/api/cloud/auth/callback"
+namespace_lookup_max_uuids = 100
 
 [multi_sync]
 saasApiDomain = "https://hub.opencsg.com"

@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/openai/openai-go/v3"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/aigateway/component"
@@ -25,7 +27,7 @@ func TestNonStreamResponseWriter_Write(t *testing.T) {
 		w := httptest.NewRecorder()
 		ctx, _ := gin.CreateTestContext(w)
 		modComponent := component.NewMockModeration(t)
-		nsw := newNonStreamResponseWriter(ctx.Writer, modComponent, nil, nil)
+		nsw := newNonStreamResponseWriter(ChatWriterParams{InternalWriter: ctx.Writer, ModerationComponent: modComponent, TokenCounter: nil, Recorder: nil, RequestCtx: context.Background()})
 		// Execute write operation
 		data := []byte("Hello, World!")
 		n, err := nsw.Write(data)
@@ -41,7 +43,7 @@ func TestNonStreamResponseWriter_Write(t *testing.T) {
 		w.Header().Set("Content-Encoding", "")
 		ctx, _ := gin.CreateTestContext(w)
 		modComponent := component.NewMockModeration(t)
-		nsw := newNonStreamResponseWriter(ctx.Writer, modComponent, nil, nil)
+		nsw := newNonStreamResponseWriter(ChatWriterParams{InternalWriter: ctx.Writer, ModerationComponent: modComponent, TokenCounter: nil, Recorder: nil, RequestCtx: context.Background()})
 
 		// Create valid ChatCompletion data
 		completion := types.ChatCompletion{
@@ -73,7 +75,7 @@ func TestNonStreamResponseWriter_Write(t *testing.T) {
 		w := httptest.NewRecorder()
 		w.Header().Set("Content-Encoding", "")
 		ctx, _ := gin.CreateTestContext(w)
-		nsw := newNonStreamResponseWriter(ctx.Writer, nil, nil, nil)
+		nsw := newNonStreamResponseWriter(ChatWriterParams{InternalWriter: ctx.Writer, ModerationComponent: nil, TokenCounter: nil, Recorder: nil, RequestCtx: context.Background()})
 
 		completion := types.ChatCompletion{
 			ChatCompletion: openai.ChatCompletion{
@@ -100,7 +102,7 @@ func TestNonStreamResponseWriter_Write(t *testing.T) {
 		w.Header().Set("Content-Encoding", "")
 		ctx, _ := gin.CreateTestContext(w)
 		mockMod := component.NewMockModeration(t)
-		nsw := newNonStreamResponseWriter(ctx.Writer, mockMod, nil, nil)
+		nsw := newNonStreamResponseWriter(ChatWriterParams{InternalWriter: ctx.Writer, ModerationComponent: mockMod, TokenCounter: nil, Recorder: nil, RequestCtx: context.Background()})
 
 		// Create valid ChatCompletion data without choices
 		completion := types.ChatCompletion{
@@ -128,7 +130,7 @@ func TestNonStreamResponseWriter_WithModeration(t *testing.T) {
 		w.Header().Set("Content-Encoding", "")
 		ctx, _ := gin.CreateTestContext(w)
 		mockMod := component.NewMockModeration(t)
-		nsw := newNonStreamResponseWriter(ctx.Writer, mockMod, nil, nil)
+		nsw := newNonStreamResponseWriter(ChatWriterParams{InternalWriter: ctx.Writer, ModerationComponent: mockMod, TokenCounter: nil, Recorder: nil, RequestCtx: context.Background()})
 
 		// Create valid ChatCompletion data
 		completion := types.ChatCompletion{
@@ -162,7 +164,7 @@ func TestNonStreamResponseWriter_WithModeration(t *testing.T) {
 		w.Header().Set("Content-Encoding", "")
 		ctx, _ := gin.CreateTestContext(w)
 		mockMod := component.NewMockModeration(t)
-		nsw := newNonStreamResponseWriter(ctx.Writer, mockMod, nil, nil)
+		nsw := newNonStreamResponseWriter(ChatWriterParams{InternalWriter: ctx.Writer, ModerationComponent: mockMod, TokenCounter: nil, Recorder: nil, RequestCtx: context.Background()})
 
 		// Create valid ChatCompletion data
 		completion := types.ChatCompletion{
@@ -200,7 +202,7 @@ func TestNonStreamResponseWriter_compressedData(t *testing.T) {
 		w.Header().Set("Content-Encoding", "gzip")
 		ctx, _ := gin.CreateTestContext(w)
 		mockMod := component.NewMockModeration(t)
-		nsw := newNonStreamResponseWriter(ctx.Writer, mockMod, nil, nil)
+		nsw := newNonStreamResponseWriter(ChatWriterParams{InternalWriter: ctx.Writer, ModerationComponent: mockMod, TokenCounter: nil, Recorder: nil, RequestCtx: context.Background()})
 
 		// Create valid ChatCompletion data and compress
 		completion := types.ChatCompletion{
@@ -234,7 +236,7 @@ func TestNonStreamResponseWriter_compressedData(t *testing.T) {
 		w := httptest.NewRecorder()
 		w.Header().Set("Content-Encoding", "gzip")
 		ctx, _ := gin.CreateTestContext(w)
-		nsw := newNonStreamResponseWriter(ctx.Writer, component.NewMockModeration(t), nil, nil)
+		nsw := newNonStreamResponseWriter(ChatWriterParams{InternalWriter: ctx.Writer, ModerationComponent: component.NewMockModeration(t), TokenCounter: nil, Recorder: nil, RequestCtx: context.Background()})
 
 		// Create valid ChatCompletion data and compress
 		completion := types.ChatCompletion{
@@ -264,7 +266,7 @@ func TestNonStreamResponseWriter_compressedData(t *testing.T) {
 		w.Header().Set("Content-Encoding", "gzip")
 		ctx, _ := gin.CreateTestContext(w)
 		mockMod := component.NewMockModeration(t)
-		nsw := newNonStreamResponseWriter(ctx.Writer, mockMod, nil, nil)
+		nsw := newNonStreamResponseWriter(ChatWriterParams{InternalWriter: ctx.Writer, ModerationComponent: mockMod, TokenCounter: nil, Recorder: nil, RequestCtx: context.Background()})
 
 		// Create valid ChatCompletion data and compress
 		completion := types.ChatCompletion{
@@ -304,7 +306,7 @@ func TestNonStreamResponseWriter_multipleWrites(t *testing.T) {
 		w.Header().Set("Content-Encoding", "")
 		ctx, _ := gin.CreateTestContext(w)
 		mockMod := component.NewMockModeration(t)
-		nsw := newNonStreamResponseWriter(ctx.Writer, mockMod, nil, nil)
+		nsw := newNonStreamResponseWriter(ChatWriterParams{InternalWriter: ctx.Writer, ModerationComponent: mockMod, TokenCounter: nil, Recorder: nil, RequestCtx: context.Background()})
 
 		// Create valid ChatCompletion data
 		completion := types.ChatCompletion{
@@ -341,7 +343,7 @@ func TestNonStreamResponseWriter_ClearBuffer(t *testing.T) {
 		// Prepare test data
 		w := httptest.NewRecorder()
 		ctx, _ := gin.CreateTestContext(w)
-		nsw := newNonStreamResponseWriter(ctx.Writer, component.NewMockModeration(t), nil, nil)
+		nsw := newNonStreamResponseWriter(ChatWriterParams{InternalWriter: ctx.Writer, ModerationComponent: component.NewMockModeration(t), TokenCounter: nil, Recorder: nil, RequestCtx: context.Background()})
 
 		// Write some data without triggering processing
 		data := []byte("incomplete data")
@@ -363,7 +365,7 @@ func TestNonStreamResponseWriter_HeaderAndWriteHeader(t *testing.T) {
 		// Prepare test data
 		w := httptest.NewRecorder()
 		ctx, _ := gin.CreateTestContext(w)
-		nsw := newNonStreamResponseWriter(ctx.Writer, component.NewMockModeration(t), nil, nil)
+		nsw := newNonStreamResponseWriter(ChatWriterParams{InternalWriter: ctx.Writer, ModerationComponent: component.NewMockModeration(t), TokenCounter: nil, Recorder: nil, RequestCtx: context.Background()})
 
 		// Test Header method
 		header := nsw.Header()
@@ -381,4 +383,42 @@ type Usage struct {
 	PromptTokens     int64 `json:"prompt_tokens"`
 	CompletionTokens int64 `json:"completion_tokens"`
 	TotalTokens      int64 `json:"total_tokens"`
+}
+
+func TestNonStreamResponseWriter_BlockedResponseStripsToolCalls(t *testing.T) {
+	w := httptest.NewRecorder()
+	w.Header().Set("Content-Encoding", "")
+	ctx, _ := gin.CreateTestContext(w)
+	mockMod := component.NewMockModeration(t)
+	nsw := newNonStreamResponseWriter(ChatWriterParams{InternalWriter: ctx.Writer, ModerationComponent: mockMod, RequestCtx: context.Background()})
+
+	completion := types.ChatCompletion{
+		ChatCompletion: openai.ChatCompletion{
+			Choices: []openai.ChatCompletionChoice{{
+				Message: openai.ChatCompletionMessage{
+					Content: "",
+					ToolCalls: []openai.ChatCompletionMessageToolCallUnion{{
+						ID:       "call-1",
+						Type:     "function",
+						Function: openai.ChatCompletionMessageFunctionToolCallFunction{Name: "run_shell", Arguments: "{\"cmd\":\"ls\"}"},
+					}},
+				},
+				FinishReason: "tool_calls",
+			}},
+		},
+	}
+	raw, err := json.Marshal(completion)
+	require.NoError(t, err)
+
+	mockMod.EXPECT().CheckChatNonStreamResponse(mock.Anything, mock.Anything).
+		Return(&rpc.CheckResult{IsSensitive: true, Reason: "toxic"}, nil).Once()
+
+	n, err := nsw.Write(raw)
+	require.NoError(t, err)
+	assert.Positive(t, n)
+
+	var out types.ChatCompletion
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &out))
+	assert.Equal(t, "The message includes inappropriate content and has been blocked. We appreciate your understanding and cooperation.", out.Choices[0].Message.Content)
+	assert.Empty(t, out.Choices[0].Message.ToolCalls, "a gated response must not carry executable tool calls")
 }
