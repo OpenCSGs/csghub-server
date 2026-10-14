@@ -21,8 +21,8 @@
     "SKILLS_POLL_INTERVAL": "600"
   },
   "custom_ui": {
-    "url": "https://opencsg-public-resource.oss-cn-beijing.aliyuncs.com/agentichub/agent-ui-framework/v1.0.0/bundle.tar.gz",
-    "sha256": "746f9378c5e7415a93fb57eebcaad54d7dd22218d9e33faf8cb233f079c5265e",
+    "url": "https://opencsg-public-resource.oss-cn-beijing.aliyuncs.com/agentichub/agent-ui-framework/v1.0.1/bundle.tar.gz",
+    "sha256": "c7edc74816b3e71a523f5eab3d4ec90028335e9418614499d8d53369b5c0188d",
     "sdk": "gradio"
   }
 }

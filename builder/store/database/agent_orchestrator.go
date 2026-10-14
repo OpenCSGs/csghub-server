@@ -143,14 +143,15 @@ type AgentExecutionLease struct {
 }
 
 type ReserveAgentAllocationInput struct {
-	LogicalInstanceID int64
-	ActorKind         string
-	ActorID           string
-	RuntimePrincipal  string
-	BillingOwner      string
-	InstanceQuota     int64
-	SessionUUID       string
-	SessionName       string
+	LogicalInstanceID        int64
+	ActorKind                string
+	ActorID                  string
+	RuntimePrincipal         string
+	BillingOwner             string
+	InstanceQuota            int64
+	UnboundedRuntimeCapacity bool
+	SessionUUID              string
+	SessionName              string
 }
 
 type ReserveAgentAllocationResult struct {
@@ -392,7 +393,9 @@ func (s *agentOrchestratorStoreImpl) reserveAllocationAttempt(ctx context.Contex
 		if !errors.Is(err, sql.ErrNoRows) {
 			return err
 		}
-		counter, err := lockAgentRuntimeCounter(ctx, tx, input.RuntimePrincipal, input.InstanceQuota)
+		counter, err := lockAgentRuntimeCounter(
+			ctx, tx, input.RuntimePrincipal, input.InstanceQuota, input.UnboundedRuntimeCapacity,
+		)
 		if err != nil {
 			return err
 		}
@@ -402,7 +405,7 @@ func (s *agentOrchestratorStoreImpl) reserveAllocationAttempt(ctx context.Contex
 		} else if !errors.Is(err, sql.ErrNoRows) {
 			return err
 		}
-		if counter.Reserved+counter.Consumed >= input.InstanceQuota {
+		if !input.UnboundedRuntimeCapacity && counter.Reserved+counter.Consumed >= input.InstanceQuota {
 			return errorx.InstanceQuotaExceeded(nil, errorx.Ctx().Set("instance_count", counter.Reserved+counter.Consumed).Set("quota", input.InstanceQuota))
 		}
 		if err := insertReservedAllocation(ctx, tx, input, logical, counter, result); err != nil {
@@ -502,8 +505,20 @@ func insertProvisionRetryOperation(ctx context.Context, db bun.IDB, allocation *
 	return operation, nil
 }
 
-func lockAgentRuntimeCounter(ctx context.Context, tx bun.Tx, actorID string, limit int64) (*AgentCapacityCounter, error) {
-	counter := &AgentCapacityCounter{ScopeKind: "user", ScopeID: actorID, ResourceKind: "agent_runtime_instance", CapacityLimit: limit}
+func lockAgentRuntimeCounter(
+	ctx context.Context,
+	tx bun.Tx,
+	actorID string,
+	limit int64,
+	unbounded bool,
+) (*AgentCapacityCounter, error) {
+	initialLimit := limit
+	if unbounded {
+		initialLimit = 1
+	}
+	counter := &AgentCapacityCounter{
+		ScopeKind: "user", ScopeID: actorID, ResourceKind: "agent_runtime_instance", CapacityLimit: initialLimit,
+	}
 	if _, err := tx.NewInsert().Model(counter).Column("scope_kind", "scope_id", "resource_kind", "capacity_limit").
 		On("CONFLICT (scope_kind, scope_id, resource_kind) DO NOTHING").Exec(ctx); err != nil {
 		return nil, fmt.Errorf("initialize agent capacity counter: %w", err)
@@ -513,8 +528,11 @@ func lockAgentRuntimeCounter(ctx context.Context, tx bun.Tx, actorID string, lim
 		For("UPDATE").Scan(ctx); err != nil {
 		return nil, fmt.Errorf("lock agent capacity counter: %w", err)
 	}
+	usage := counter.Reserved + counter.Consumed
 	effectiveLimit := limit
-	if usage := counter.Reserved + counter.Consumed; effectiveLimit < usage {
+	if unbounded {
+		effectiveLimit = max(counter.CapacityLimit, usage+1)
+	} else if effectiveLimit < usage {
 		effectiveLimit = usage
 	}
 	if counter.CapacityLimit != effectiveLimit {
@@ -683,7 +701,8 @@ func consumeGuestUsage(ctx context.Context, tx bun.IDB, logicalInstanceID int64,
 }
 
 func validateReserveAgentAllocationInput(input ReserveAgentAllocationInput) error {
-	if input.LogicalInstanceID <= 0 || input.ActorID == "" || input.RuntimePrincipal == "" || input.InstanceQuota <= 0 {
+	invalidQuota := input.InstanceQuota < 0 || (!input.UnboundedRuntimeCapacity && input.InstanceQuota == 0)
+	if input.LogicalInstanceID <= 0 || input.ActorID == "" || input.RuntimePrincipal == "" || invalidQuota {
 		return errorx.BadRequest(fmt.Errorf("invalid allocation reservation input"), nil)
 	}
 	if input.ActorKind != "user" && input.ActorKind != "guest" {

@@ -238,7 +238,7 @@ type CreateAgentInstanceRequest struct {
 	Name                    *string            `json:"name"`
 	Description             *string            `json:"description,omitempty"`
 	Type                    *string            `json:"type"`
-	ContentID               *string            `json:"content_id,omitempty"`
+	ContentID               *string            `json:"content_id,omitempty"` // Generated for logical agents when omitted.
 	Public                  *bool              `json:"public"`
 	Metadata                *map[string]any    `json:"metadata,omitempty"`
 	TemplateID              *int64             `json:"template_id" binding:"omitempty,gte=1"`
