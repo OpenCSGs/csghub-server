@@ -54,6 +54,7 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 	jwtGroup := apiV1Group.Group("/jwt")
 	userGroup := apiV1Group.Group("/user")
 	tokenGroup := apiV1Group.Group("/token")
+	adminGroup := apiV1Group.Group("/admin")
 	internalGroup := apiV1Group.Group("/internal", needAPIKey)
 	internalUserGroup := internalGroup.Group("/user")
 	internalOrganizationGroup := internalGroup.Group("/organization")
@@ -116,6 +117,7 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 		return nil, fmt.Errorf("error extending routes:%w", err)
 	}
 	apiV1Group.GET("/namespaces/mine/writable", mustLogin(), orgHandler.ListCurrentUserWritableNamespaces)
+	adminGroup.POST("/namespaces/lookup", middlewareCollection.Auth.NeedAdmin, nsCtrl.GetInfoByUUIDs)
 
 	apiV1Group.Use(mustLogin())
 	userMatch := userMatch()

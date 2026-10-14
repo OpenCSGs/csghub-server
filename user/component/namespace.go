@@ -17,6 +17,7 @@ type namespaceComponentImpl struct {
 type NamespaceComponent interface {
 	GetInfo(ctx context.Context, path string) (*types.Namespace, error)
 	GetInfoByUUID(ctx context.Context, uuid string) (*types.Namespace, error)
+	GetInfoByUUIDs(ctx context.Context, uuids []string) ([]*types.Namespace, error)
 }
 
 func NewNamespaceComponent(config *config.Config) (NamespaceComponent, error) {
@@ -40,6 +41,22 @@ func (c *namespaceComponentImpl) GetInfoByUUID(ctx context.Context, uuid string)
 		return nil, err
 	}
 	return c.buildNamespace(ctx, &dbns)
+}
+
+func (c *namespaceComponentImpl) GetInfoByUUIDs(ctx context.Context, uuids []string) ([]*types.Namespace, error) {
+	namespaces := make([]*types.Namespace, 0, len(uuids))
+	dbNamespaces, err := c.ns.FindByUUIDs(ctx, uuids)
+	if err != nil {
+		return namespaces, fmt.Errorf("failed to find namespaces by uuids, error: %w", err)
+	}
+	for i := range dbNamespaces {
+		namespace, err := c.buildNamespace(ctx, &dbNamespaces[i])
+		if err != nil {
+			return namespaces, fmt.Errorf("failed to build namespace, uuid: %s, error: %w", dbNamespaces[i].UUID, err)
+		}
+		namespaces = append(namespaces, namespace)
+	}
+	return namespaces, nil
 }
 
 func (c *namespaceComponentImpl) buildNamespace(ctx context.Context, dbns *database.Namespace) (*types.Namespace, error) {

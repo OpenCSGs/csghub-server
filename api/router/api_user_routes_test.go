@@ -74,7 +74,9 @@ func newUserRoutesTestRouter(t *testing.T) *gin.Engine {
 	router.Use(setTestUser)
 
 	apiGroup := router.Group("/api/v1")
-	createUserRoutes(apiGroup, mc, proxyHandler, &handler.UserHandler{})
+	adminGroup := apiGroup.Group("/admin")
+	adminGroup.Use(needAdminMock())
+	createUserRoutes(apiGroup, adminGroup, mc, proxyHandler, &handler.UserHandler{})
 
 	return router
 }
@@ -90,6 +92,7 @@ func TestUserRoutes_AnonymousAccess_Returns401(t *testing.T) {
 		{http.MethodDelete, "/api/v1/user/testuser"},
 		{http.MethodDelete, "/api/v1/user/testuser/close_account"},
 		{http.MethodGet, "/api/v1/user/testuser/tokens"},
+		{http.MethodPost, "/api/v1/admin/namespaces/lookup"},
 	}
 
 	for _, tc := range tests {
@@ -126,6 +129,30 @@ func TestUserRoutes_Admin_DeleteUser_PassesThrough(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, resp.Code,
 		"admin DELETE /user/:username should reach the proxy handler")
+}
+
+func TestAdminRoutes_NormalUser_BatchNamespaceLookup_Returns403(t *testing.T) {
+	router := newUserRoutesTestRouter(t)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/namespaces/lookup", nil)
+	req.Header.Set("X-Test-User", "normaluser")
+	resp := httptest.NewRecorder()
+	router.ServeHTTP(resp, req)
+
+	assert.Equal(t, http.StatusForbidden, resp.Code,
+		"normal user POST /api/v1/admin/namespaces/lookup should return 403")
+}
+
+func TestAdminRoutes_Admin_BatchNamespaceLookup_PassesThrough(t *testing.T) {
+	router := newUserRoutesTestRouter(t)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/namespaces/lookup", nil)
+	req.Header.Set("X-Test-User", "admin")
+	resp := httptest.NewRecorder()
+	router.ServeHTTP(resp, req)
+
+	assert.Equal(t, http.StatusOK, resp.Code,
+		"admin POST /api/v1/admin/namespaces/lookup should reach the proxy handler")
 }
 
 func TestUserRoutes_LoginUser_CloseAccount_PassesThrough(t *testing.T) {
@@ -385,7 +412,9 @@ func newGetUsersTestRouter(t *testing.T) *gin.Engine {
 	router.Use(setTestUser)
 
 	apiGroup := router.Group("/api/v1")
-	createUserRoutes(apiGroup, mc, proxyHandler, &handler.UserHandler{})
+	adminGroup := apiGroup.Group("/admin")
+	adminGroup.Use(needAdminMock())
+	createUserRoutes(apiGroup, adminGroup, mc, proxyHandler, &handler.UserHandler{})
 
 	return router
 }
