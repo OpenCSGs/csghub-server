@@ -1,4 +1,4 @@
-//go:build !saas
+//go:build !saas && !ee
 
 package trigger
 
