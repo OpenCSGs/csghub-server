@@ -23,7 +23,8 @@ type RequestMetadata struct {
 	// APIKeyID is the API key identifier.
 	APIKeyID string
 	// PriorityScope is the server-side queue priority scope assigned to the
-	// API key by its quota configuration ("high"/"low"; empty = unset). It
+	// API key by its quota configuration ("high"/"low"; empty = unset, which
+	// resolves to the high class — see AdmissionPriorityFromSource). It
 	// is populated by the Extract phase from the request context and is the
 	// sole source of the queue priority in the admission reservation queue.
 	PriorityScope string

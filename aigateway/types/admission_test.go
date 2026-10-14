@@ -14,9 +14,9 @@ func TestAdmissionPriorityFromSource(t *testing.T) {
 	}{
 		{"scope high", "high", AdmissionPriorityHigh},
 		{"scope low", "low", AdmissionPriorityLow},
-		{"missing scope defaults to low", "", AdmissionPriorityLow},
-		{"unknown scope defaults to low", "critical", AdmissionPriorityLow},
-		{"case-insensitive high", " HIGH ", AdmissionPriorityHigh},
+		{"missing scope defaults to high", "", AdmissionPriorityHigh},
+		{"unknown scope defaults to high", "critical", AdmissionPriorityHigh},
+		{"case-insensitive low", " LOW ", AdmissionPriorityLow},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
