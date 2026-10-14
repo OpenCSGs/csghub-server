@@ -66,7 +66,15 @@ func (a *BroadcastEmailActivity) GetEmailFromUserActivity(ctx context.Context, i
 	}, nil
 }
 
+func (a *BroadcastEmailActivity) SendExplicitEmailListActivity(ctx context.Context, emailReq types.EmailReq) error {
+	return a.sendEmails(ctx, emailReq, emailReq.To)
+}
+
 func (a *BroadcastEmailActivity) SendEmailBatchActivity(ctx context.Context, emailReq types.EmailReq, emails []string) error {
+	return a.sendEmails(ctx, emailReq, emails)
+}
+
+func (a *BroadcastEmailActivity) sendEmails(ctx context.Context, emailReq types.EmailReq, emails []string) error {
 	logger := activity.GetLogger(ctx)
 	logger.Debug("broadcast email started", "emailReq", emailReq, "emailCount", len(emails))
 

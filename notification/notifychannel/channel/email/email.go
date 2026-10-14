@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"log/slog"
 
+	"go.temporal.io/api/enums/v1"
 	"go.temporal.io/sdk/client"
+	sdktemporal "go.temporal.io/sdk/temporal"
 	"opencsg.com/csghub-server/builder/temporal"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
@@ -22,7 +24,10 @@ type EmailChannel struct {
 	subjectPrefix string
 }
 
-const individualEmailMaxAttempts = 2
+const (
+	individualEmailMaxAttempts      = 2
+	defaultDirectEmailMaxRecipients = 5
+)
 
 func NewChannel(conf *config.Config, emailService emailclient.EmailService) notifychannel.Notifier {
 	return &EmailChannel{
@@ -69,11 +74,21 @@ func (s *EmailChannel) Send(ctx context.Context, req *notifychannel.NotifyReques
 	}
 
 	if req.Receiver.IsBroadcast {
-		return s.broadcastEmail(ctx, emailReq)
-	} else {
-		emailReq.To = req.Receiver.GetUserEmails()
-		return s.sendEmailToUsers(emailReq)
+		return s.broadcastEmail(ctx, emailReq, req.MsgUUID)
 	}
+
+	emailReq.To = req.Receiver.GetUserEmails()
+	if len(emailReq.To) > s.directEmailMaxRecipients() {
+		return s.broadcastEmail(ctx, emailReq, req.MsgUUID)
+	}
+	return s.sendEmailToUsers(emailReq)
+}
+
+func (s *EmailChannel) directEmailMaxRecipients() int {
+	if s.config.Notification.DirectEmailMaxRecipients <= 0 {
+		return defaultDirectEmailMaxRecipients
+	}
+	return s.config.Notification.DirectEmailMaxRecipients
 }
 
 func (s *EmailChannel) sendEmailToUsers(msg types.EmailReq) error {
@@ -119,18 +134,30 @@ func (s *EmailChannel) sendEmailToUsers(msg types.EmailReq) error {
 	return nil
 }
 
-func (s *EmailChannel) broadcastEmail(ctx context.Context, msg types.EmailReq) error {
-	// slog.Info("broadcast email to all users", "subject", msg.Subject)
-	slog.InfoContext(ctx, "broadcast email to all users", "subject", msg.Subject)
+func (s *EmailChannel) broadcastEmail(ctx context.Context, msg types.EmailReq, msgUUID string) error {
+	slog.InfoContext(ctx, "start email workflow", "subject", msg.Subject, "explicit_recipients", len(msg.To))
 
-	workflowClient := temporal.GetClient()
 	workflowOptions := client.StartWorkflowOptions{
 		TaskQueue: emailworkflow.WorkflowBroadcastEmailQueueName,
 	}
+	if msgUUID != "" {
+		workflowOptions.ID = notificationEmailWorkflowID(msgUUID)
+		workflowOptions.WorkflowIDReusePolicy = enums.WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE_FAILED_ONLY
+	}
+
+	workflowClient := temporal.GetClient()
 	we, err := workflowClient.ExecuteWorkflow(ctx, workflowOptions, emailworkflow.BroadcastEmailWorkflow, msg, s.config.Notification.BroadcastEmailPageSize)
+	if sdktemporal.IsWorkflowExecutionAlreadyStartedError(err) {
+		slog.InfoContext(ctx, "email workflow already started", "workflow_id", workflowOptions.ID)
+		return nil
+	}
 	if err != nil {
 		return utils.NewErrSendMsg(err, "failed to start broadcast email workflow")
 	}
-	slog.InfoContext(ctx, "start broadcast email workflow", slog.Any("workflow id", we.GetID()))
+	slog.InfoContext(ctx, "email workflow started", slog.Any("workflow id", we.GetID()))
 	return nil
+}
+
+func notificationEmailWorkflowID(msgUUID string) string {
+	return "notification-email-" + msgUUID
 }
