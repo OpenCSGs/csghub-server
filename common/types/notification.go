@@ -350,6 +350,13 @@ type EmailRechargeSuccessNotification struct {
 	PayChannel string `json:"pay_channel"`
 }
 
+type EmailRechargeSuccessRemindNotification struct {
+	Email       string `json:"email"`
+	UserName    string `json:"user_name"`
+	OrderNumber string `json:"order_number"`
+	Amount      string `json:"amount"`
+}
+
 type EmailWeeklyRechargesNotification struct {
 	Emails    []string `json:"emails"`
 	FileData  string   `json:"file_data"`
