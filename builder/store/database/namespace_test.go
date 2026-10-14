@@ -50,6 +50,30 @@ func TestNamespaceStore_All(t *testing.T) {
 	require.NotNil(t, err)
 }
 
+func TestNamespaceStore_FindByUUIDsLoadsUser(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	userStore := database.NewUserStoreWithDB(db)
+	namespaceStore := database.NewNamespaceStoreWithDB(db)
+	namespaceUUID := "33333333-3333-4333-8333-333333333333"
+	err := userStore.Create(ctx, &database.User{
+		GitID:    10001,
+		NickName: "Batch User",
+		Username: "batch-user",
+		Password: "password",
+		UUID:     "44444444-4444-4444-8444-444444444444",
+	}, &database.Namespace{Path: "batch-user", UUID: namespaceUUID})
+	require.NoError(t, err)
+
+	namespaces, err := namespaceStore.FindByUUIDs(ctx, []string{namespaceUUID})
+	require.NoError(t, err)
+	require.Len(t, namespaces, 1)
+	require.Equal(t, namespaceUUID, namespaces[0].UUID)
+	require.Equal(t, "batch-user", namespaces[0].User.Username)
+}
+
 func TestNamespaceStoreFindByPathCaseConflicts(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()

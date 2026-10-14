@@ -265,12 +265,14 @@ func TestUserHandler_Casdoor(t *testing.T) {
 			CodeSoulerJetBrainsRedirectURL string `env:"OPENCSG_USER_SERVER_CODESOULER_JETBRAINS_REDIRECT_URL" default:"http://127.0.0.1:37679/callback"`
 			LiteRedirectURL                string `env:"OPENCSG_USER_SERVER_LITE_REDIRECT_URL" default:"http://127.0.0.1:11437/api/cloud/auth/callback"`
 			AwardSelfRegisterCredit        int    `env:"OPENCSG_USER_SERVER_AWARD_SELF_REGISTER_CREDIT" default:"5000"`
+			NamespaceLookupMaxUUIDs        int    `env:"OPENCSG_USER_SERVER_NAMESPACE_LOOKUP_MAX_UUIDS" default:"100"`
 		}{
 			SigninSuccessRedirectURL:       mockSigninSuccessRedirectURL,
 			CodeSoulerVScodeRedirectURL:    mockCodeSoulerVScodeRedirectURL,
 			CodeSoulerJetBrainsRedirectURL: mockCodeSoulerJetbrainsRedirectURL,
 			LiteRedirectURL:                mockLiteRedirectURL,
 			AwardSelfRegisterCredit:        5000,
+			NamespaceLookupMaxUUIDs:        100,
 		},
 		ServerFailureRedirectURL: mockSigninFailureRedirectURL,
 	}

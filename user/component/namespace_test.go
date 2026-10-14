@@ -173,3 +173,71 @@ func TestNamespaceComponent_GetInfoByUUID(t *testing.T) {
 		require.EqualValues(t, expected, actual)
 	})
 }
+
+func TestNamespaceComponent_GetInfoByUUIDs(t *testing.T) {
+	t.Run("user and org namespaces by uuids", func(t *testing.T) {
+		userNamespaceUUID := "11111111-1111-4111-8111-111111111111"
+		orgNamespaceUUID := "22222222-2222-4222-8222-222222222222"
+		user := database.User{
+			ID:       1,
+			Username: "user1",
+			Avatar:   "user_avatar",
+		}
+		org := database.Organization{
+			ID:      1,
+			Name:    "org1",
+			Logo:    "org_logo",
+			OrgType: "enterprise",
+		}
+		userNamespace := database.Namespace{
+			ID:            1,
+			Path:          user.Username,
+			UUID:          userNamespaceUUID,
+			UserID:        user.ID,
+			User:          user,
+			NamespaceType: database.UserNamespace,
+			Mirrored:      false,
+		}
+		orgNamespace := database.Namespace{
+			ID:            2,
+			Path:          org.Name,
+			UUID:          orgNamespaceUUID,
+			UserID:        user.ID,
+			User:          user,
+			NamespaceType: database.OrgNamespace,
+			Mirrored:      false,
+		}
+
+		mockNamespaceStore := mockdb.NewMockNamespaceStore(t)
+		mockNamespaceStore.EXPECT().FindByUUIDs(mock.Anything, []string{userNamespaceUUID, orgNamespaceUUID}).
+			Return([]database.Namespace{userNamespace, orgNamespace}, nil).Once()
+		mockOrgStore := mockdb.NewMockOrgStore(t)
+		mockOrgStore.EXPECT().FindByPath(mock.Anything, org.Name).Return(org, nil).Once()
+
+		mc := &namespaceComponentImpl{
+			ns: mockNamespaceStore,
+			os: mockOrgStore,
+		}
+		actual, err := mc.GetInfoByUUIDs(context.Background(), []string{userNamespaceUUID, orgNamespaceUUID})
+		require.NoError(t, err)
+
+		require.Equal(t, []*types.Namespace{
+			{
+				Path:   user.Username,
+				Type:   string(database.UserNamespace),
+				UUID:   userNamespaceUUID,
+				Avatar: user.Avatar,
+				NSType: string(database.UserNamespace),
+				User:   types.User{ID: user.ID, Username: user.Username},
+			},
+			{
+				Path:   org.Name,
+				Type:   org.OrgType,
+				UUID:   orgNamespaceUUID,
+				Avatar: org.Logo,
+				NSType: string(database.OrgNamespace),
+				User:   types.User{ID: user.ID, Username: user.Username},
+			},
+		}, actual)
+	})
+}

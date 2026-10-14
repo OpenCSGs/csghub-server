@@ -131,7 +131,8 @@ func (s *NamespaceStoreImpl) FindByUUIDs(ctx context.Context, uuids []string) (n
 	err = s.db.Operator.Core.
 		NewSelect().
 		Model(&namespaces).
-		Where("uuid IN (?)", bun.In(uuids)).
+		Relation("User").
+		Where("namespace.uuid IN (?)", bun.In(uuids)).
 		Scan(ctx)
 	if err != nil {
 		return namespaces, errorx.HandleDBError(err, errorx.Ctx().Set("uuids", uuids))

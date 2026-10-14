@@ -198,7 +198,51 @@ func (a *accountTokenPlanStoreImpl) List(ctx context.Context, req types.AcctToke
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to list token plans, error: %w", err)
 	}
+
+	if len(result) > 0 {
+		err = a.fillActiveSubscriptionCounts(ctx, result)
+		if err != nil {
+			return nil, 0, fmt.Errorf("failed to fill active subscription counts, error: %w", err)
+		}
+	}
 	return result, count, nil
+}
+
+type tokenPlanActiveSubscriptionCount struct {
+	PlanID int64 `bun:"plan_id"`
+	Count  int64 `bun:"count"`
+}
+
+// fillActiveSubscriptionCounts counts active token plan instances grouped by
+// plan id and writes the value into each plan's ActiveSubscriptionCount field.
+func (a *accountTokenPlanStoreImpl) fillActiveSubscriptionCounts(ctx context.Context, plans []AccountTokenPlan) error {
+	planIDs := make([]int64, 0, len(plans))
+	for _, plan := range plans {
+		planIDs = append(planIDs, plan.ID)
+	}
+
+	var counts []tokenPlanActiveSubscriptionCount
+	err := a.db.Core.NewSelect().
+		Model((*AccountTokenPlanInstance)(nil)).
+		ModelTableExpr("account_token_plan_instances AS i").
+		Column("i.plan_id").
+		ColumnExpr("COUNT(*) AS count").
+		Where("i.status = ?", types.SubscriptionStatusActive).
+		Where("i.plan_id IN (?)", bun.In(planIDs)).
+		Group("i.plan_id").
+		Scan(ctx, &counts)
+	if err != nil {
+		return errorx.HandleDBError(err, nil)
+	}
+
+	countByPlan := make(map[int64]int64, len(counts))
+	for _, count := range counts {
+		countByPlan[count.PlanID] = count.Count
+	}
+	for i := range plans {
+		plans[i].ActiveSubscriptionCount = countByPlan[plans[i].ID]
+	}
+	return nil
 }
 
 // Summary counts token plans grouped by status and subject type for the admin
