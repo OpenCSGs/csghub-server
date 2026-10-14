@@ -1,26 +1,18 @@
 package types
 
 import (
-	"encoding/json"
 	"net/http"
-	"strings"
+
+	commontypes "opencsg.com/csghub-server/common/types"
 )
 
 func ApplyRequestAuthHeaders(header http.Header, authHeadStr string) error {
-	// Never forward the caller's Authorization to upstream providers.
-	// Empty AuthHead means the upstream needs no auth (e.g. public Whisper space).
 	header.Del("Authorization")
 	if authHeadStr == "" {
 		return nil
 	}
-
-	var authMap map[string]string
-	if err := json.Unmarshal([]byte(authHeadStr), &authMap); err != nil {
-		authHead := strings.TrimSpace(authHeadStr)
-		if strings.HasPrefix(strings.ToLower(authHead), "bearer ") {
-			header.Set("Authorization", authHead)
-			return nil
-		}
+	authMap, err := commontypes.ParseAuthHeaders(authHeadStr)
+	if err != nil {
 		return err
 	}
 	for authKey, authVal := range authMap {

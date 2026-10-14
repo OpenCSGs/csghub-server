@@ -4,10 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -431,7 +433,7 @@ func TestClient_readToChannel(t *testing.T) {
 	t.Run("read multiple lines", func(t *testing.T) {
 		c := &Client{}
 		rc := io.NopCloser(strings.NewReader("line1\nline2\nline3\n"))
-		ch := c.readToChannel(rc)
+		ch := c.readToChannel(context.Background(), rc)
 
 		var lines []string
 		for msg := range ch {
@@ -443,7 +445,7 @@ func TestClient_readToChannel(t *testing.T) {
 	t.Run("skip empty lines", func(t *testing.T) {
 		c := &Client{}
 		rc := io.NopCloser(strings.NewReader("line1\n\nline2\n\n"))
-		ch := c.readToChannel(rc)
+		ch := c.readToChannel(context.Background(), rc)
 
 		var lines []string
 		for msg := range ch {
@@ -455,13 +457,71 @@ func TestClient_readToChannel(t *testing.T) {
 	t.Run("empty input closes channel immediately", func(t *testing.T) {
 		c := &Client{}
 		rc := io.NopCloser(strings.NewReader(""))
-		ch := c.readToChannel(rc)
+		ch := c.readToChannel(context.Background(), rc)
 
 		var lines []string
 		for msg := range ch {
 			lines = append(lines, msg)
 		}
 		assert.Empty(t, lines)
+	})
+
+	t.Run("mid-stream read error emits error line", func(t *testing.T) {
+		pr, pw := io.Pipe()
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		c := &Client{}
+		ch := c.readToChannel(ctx, pr)
+
+		go func() {
+			if _, err := pw.Write([]byte("line-1\n")); err != nil {
+				return
+			}
+			pw.CloseWithError(errors.New("connection reset"))
+		}()
+
+		var lines []string
+		for line := range ch {
+			lines = append(lines, line)
+		}
+		require.Len(t, lines, 2)
+		assert.Equal(t, "line-1", lines[0])
+		var errPayload map[string]any
+		require.NoError(t, json.Unmarshal([]byte(lines[1]), &errPayload))
+		errBody, ok := errPayload["error"].(map[string]any)
+		require.True(t, ok, "mid-stream failure must end with an error line, got %v", lines[1])
+		assert.Contains(t, errBody["message"], "connection reset")
+	})
+
+	t.Run("cancel with stopped consumer aborts goroutine", func(t *testing.T) {
+		pr, pw := io.Pipe()
+		defer pw.Close()
+		ctx, cancel := context.WithCancel(context.Background())
+		c := &Client{}
+		ch := c.readToChannel(ctx, pr)
+
+		// Produce more lines than the channel buffer (cap 2) from a
+		// separate goroutine, so the reader goroutine ends up blocked on
+		// send with no consumer.
+		go func() {
+			for i := 0; i < 5; i++ {
+				if _, err := fmt.Fprintf(pw, "line-%d\n", i); err != nil {
+					return
+				}
+			}
+		}()
+		time.Sleep(100 * time.Millisecond)
+
+		// Cancel while nobody reads: the goroutine must abort on ctx
+		// cancellation and close the channel instead of blocking forever.
+		cancel()
+		select {
+		case <-ch:
+			for range ch {
+			}
+		case <-time.After(2 * time.Second):
+			t.Fatal("readToChannel goroutine leaked: channel not closed after cancel")
+		}
 	})
 }
 
