@@ -300,6 +300,58 @@ func TestUpdateInvoiceNotFailed(t *testing.T) {
 	require.Equal(t, "rejected by tax bureau", stored.Reason)
 }
 
+func TestUpdateInvoiceEmailSendStatus(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewAccountInvoiceStoreWithDB(db)
+	recharge := createTestRecharge("r-email-send-status")
+	persistTestRecharges(t, db, recharge)
+	invoice := createTestInvoice()
+	invoice.BillCycle = ""
+	require.Nil(t, store.CreateInvoiceWithRecharges(ctx, invoice, []*database.AccountRecharge{recharge}))
+
+	sentAt := time.Date(2026, 9, 28, 10, 0, 0, 0, time.UTC)
+
+	// A successful send records both the status and the timestamp.
+	require.Nil(t, store.UpdateInvoiceEmailSendStatus(ctx, int64(invoice.ID), database.InvoiceEmailSendStatusSent, sentAt))
+	stored, err := store.GetInvoice(ctx, int64(invoice.ID))
+	require.Nil(t, err)
+	require.Equal(t, database.InvoiceEmailSendStatusSent, stored.EmailSendStatus)
+	require.False(t, stored.EmailSentAt.IsZero())
+	sentAtStored := stored.EmailSentAt.Time
+
+	// A failed send records the status but leaves the previous timestamp
+	// untouched, because the caller passes a zero time.
+	require.Nil(t, store.UpdateInvoiceEmailSendStatus(ctx, int64(invoice.ID), database.InvoiceEmailSendStatusFailed, time.Time{}))
+	stored, err = store.GetInvoice(ctx, int64(invoice.ID))
+	require.Nil(t, err)
+	require.Equal(t, database.InvoiceEmailSendStatusFailed, stored.EmailSendStatus)
+	require.False(t, stored.EmailSentAt.IsZero())
+	require.True(t, stored.EmailSentAt.Time.Equal(sentAtStored))
+}
+
+func TestCreateInvoiceEmailSentAtIsNull(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewAccountInvoiceStoreWithDB(db)
+	recharge := createTestRecharge("r-email-sent-at-null")
+	persistTestRecharges(t, db, recharge)
+	invoice := createTestInvoice()
+	invoice.BillCycle = ""
+	require.Nil(t, store.CreateInvoiceWithRecharges(ctx, invoice, []*database.AccountRecharge{recharge}))
+
+	// A newly created invoice has no successful email send, so email_sent_at
+	// must remain NULL rather than a zero timestamp.
+	stored, err := store.GetInvoice(ctx, int64(invoice.ID))
+	require.Nil(t, err)
+	require.Equal(t, database.InvoiceEmailSendStatusNone, stored.EmailSendStatus)
+	require.True(t, stored.EmailSentAt.IsZero())
+}
+
 func TestListInvoices(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
