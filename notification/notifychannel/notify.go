@@ -17,6 +17,8 @@ type NotifyRequest struct {
 	Receiver *Receiver
 	// message priority
 	Priority types.MessagePriority
+	// scenario message id, used to dedupe channel work across redelivery
+	MsgUUID string
 }
 
 type Notifier interface {

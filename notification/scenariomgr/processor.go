@@ -178,6 +178,7 @@ func (p *MessageProcessor) processChannel(ctx context.Context, msg types.Scenari
 
 	var sendReq notifychannel.NotifyRequest
 	sendReq.Priority = msg.Priority
+	sendReq.MsgUUID = msg.MsgUUID
 	sendReq.Message = notificationData.Message
 	sendReq.Receiver = notificationData.Receiver
 

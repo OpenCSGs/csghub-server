@@ -19,6 +19,7 @@ const (
 	GetEmailFromNotificationSettingActivity string = "GetEmailFromNotificationSettingActivity"
 	GetEmailFromUserActivity                string = "GetEmailFromUserActivity"
 	SendEmailBatchActivity                  string = "SendEmailBatchActivity"
+	SendExplicitEmailListActivity           string = "SendExplicitEmailListActivity"
 )
 
 func init() {
@@ -48,4 +49,5 @@ func createBroadcastEmailWorker(config *config.Config, temporalClient temporal.C
 	beWorker.RegisterActivityWithOptions(act.GetEmailFromNotificationSettingActivity, temporalActivity.RegisterOptions{Name: GetEmailFromNotificationSettingActivity})
 	beWorker.RegisterActivityWithOptions(act.GetEmailFromUserActivity, temporalActivity.RegisterOptions{Name: GetEmailFromUserActivity})
 	beWorker.RegisterActivityWithOptions(act.SendEmailBatchActivity, temporalActivity.RegisterOptions{Name: SendEmailBatchActivity})
+	beWorker.RegisterActivityWithOptions(act.SendExplicitEmailListActivity, temporalActivity.RegisterOptions{Name: SendExplicitEmailListActivity})
 }

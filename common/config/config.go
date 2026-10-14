@@ -825,6 +825,7 @@ type Config struct {
 		NotificationRetryCount      int    `env:"STARHUB_SERVER_NOTIFIER_NOTIFICATION_RETRY_COUNT" default:"3"`
 		BroadcastUserPageSize       int    `env:"STARHUB_SERVER_NOTIFIER_BROADCAST_USER_PAGE_SIZE" default:"100"`
 		BroadcastEmailPageSize      int    `env:"STARHUB_SERVER_NOTIFIER_BROADCAST_EMAIL_PAGE_SIZE" default:"100"`
+		DirectEmailMaxRecipients    int    `env:"STARHUB_SERVER_NOTIFIER_DIRECT_EMAIL_MAX_RECIPIENTS" default:"5"`
 		MsgDispatcherCount          int    `env:"STARHUB_SERVER_NOTIFIER_MSG_DISPATCHER_COUNT" default:"20"`
 		HighPriorityMsgBufferSize   int    `env:"STARHUB_SERVER_NOTIFIER_HIGH_PRIORITY_MSG_BUFFER_SIZE" default:"100"`
 		NormalPriorityMsgBufferSize int    `env:"STARHUB_SERVER_NOTIFIER_NORMAL_PRIORITY_MSG_BUFFER_SIZE" default:"50"`
