@@ -758,3 +758,82 @@ func TestComputeURLAndHost_ClusterLookupError_FallsBackToEndpoint(t *testing.T) 
 	assert.Equal(t, "http://svc.default.svc.cluster.local:8080/v1", url)
 	assert.Equal(t, "", host)
 }
+
+// =====================================================================
+// Protocol override for fixed-protocol engines (laya → systemone)
+// =====================================================================
+
+func TestSyncRunningDeploy_LayaDeploy_SetsSystemOneProtocol(t *testing.T) {
+	comp, _, mockUpstream, mockLLMConfig, _ := newSyncComponent(t)
+	ctx := context.TODO()
+	info := testInfo(700, "ns/laya", "svc-700")
+	info.RuntimeFramework = "laya"
+
+	mockUpstream.EXPECT().GetBySourceID(ctx, commontypes.UpstreamSourceCSGHubDeploy, int64(700)).Return(nil, nil)
+	mockLLMConfig.EXPECT().GetByModelName(ctx, info.LegacyModelID).Return(nil, nil)
+	mockLLMConfig.EXPECT().Create(ctx, mock.MatchedBy(func(c database.LLMConfig) bool {
+		return c.ModelName == info.LegacyModelID
+	})).Return(&database.LLMConfig{ID: 70}, nil)
+
+	mockUpstream.EXPECT().UpsertInternalDeployTarget(ctx, mock.MatchedBy(func(u *database.Upstream) bool {
+		return u.SourceID == 700 &&
+			u.Metadata != nil &&
+			u.Metadata.Protocol == "systemone"
+	})).Return(nil)
+
+	err := comp.SyncRunningDeploy(ctx, info)
+	require.NoError(t, err)
+}
+
+func TestSyncRunningDeploy_NonLayaDeploy_LeavesProtocolEmpty(t *testing.T) {
+	comp, _, mockUpstream, mockLLMConfig, _ := newSyncComponent(t)
+	ctx := context.TODO()
+	info := testInfo(800, "ns/model-vllm", "svc-800")
+	// testInfo sets RuntimeFramework: "vllm" by default
+
+	mockUpstream.EXPECT().GetBySourceID(ctx, commontypes.UpstreamSourceCSGHubDeploy, int64(800)).Return(nil, nil)
+	mockLLMConfig.EXPECT().GetByModelName(ctx, info.LegacyModelID).Return(nil, nil)
+	mockLLMConfig.EXPECT().Create(ctx, mock.MatchedBy(func(c database.LLMConfig) bool {
+		return c.ModelName == info.LegacyModelID
+	})).Return(&database.LLMConfig{ID: 80}, nil)
+
+	mockUpstream.EXPECT().UpsertInternalDeployTarget(ctx, mock.MatchedBy(func(u *database.Upstream) bool {
+		return u.SourceID == 800 &&
+			u.Metadata != nil &&
+			u.Metadata.Protocol == ""
+	})).Return(nil)
+
+	err := comp.SyncRunningDeploy(ctx, info)
+	require.NoError(t, err)
+}
+
+func TestSyncRunningDeploy_LayaReSync_OverridesAdminProtocol(t *testing.T) {
+	comp, _, mockUpstream, mockLLMConfig, _ := newSyncComponent(t)
+	ctx := context.TODO()
+	info := testInfo(700, "ns/laya", "svc-700")
+	info.RuntimeFramework = "laya"
+
+	// Existing upstream has Protocol: "chat" (admin changed it via admin API).
+	existing := &database.Upstream{
+		ID:          777,
+		LLMConfigID: 70,
+		Source:      commontypes.UpstreamSourceCSGHubDeploy,
+		SourceID:    700,
+		Enabled:     true,
+		Metadata: &commontypes.UpstreamMetadata{
+			Protocol: "chat",
+		},
+	}
+	mockUpstream.EXPECT().GetBySourceID(ctx, commontypes.UpstreamSourceCSGHubDeploy, int64(700)).Return(existing, nil)
+	mockLLMConfig.EXPECT().GetByID(ctx, int64(70)).Return(&database.LLMConfig{ID: 70, ModelName: info.LegacyModelID}, nil)
+
+	// Re-sync must override "chat" back to "systemone".
+	mockUpstream.EXPECT().Update(ctx, mock.MatchedBy(func(u *database.Upstream) bool {
+		return u.ID == 777 &&
+			u.Metadata != nil &&
+			u.Metadata.Protocol == "systemone"
+	})).Return(nil)
+
+	err := comp.SyncRunningDeploy(ctx, info)
+	require.NoError(t, err)
+}

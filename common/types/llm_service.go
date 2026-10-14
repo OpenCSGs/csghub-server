@@ -111,7 +111,7 @@ type UpstreamMetadata struct {
 	InternalModelInfo    *InternalModelInfo    `json:"internal_model_info,omitempty"`
 	HostOverride         string                `json:"host_override,omitempty"`
 	ResponsesChatAdapter *ResponsesChatAdapter `json:"responses_chat_adapter,omitempty"`
-	// Protocol is an explicit upstream protocol declaration (chat/responses/messages).
+	// Protocol is an explicit upstream protocol declaration (chat/responses/messages/systemone).
 	// When set, it overrides URL-based protocol inference.
 	Protocol string `json:"protocol,omitempty"`
 }

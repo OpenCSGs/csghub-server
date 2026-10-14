@@ -99,6 +99,19 @@ docker buildx build --platform linux/amd64,linux/arm64 \
   -t ${OPENCSG_ACR}/opencsghq/funasr-cpu:${IMAGE_TAG} \
   -f Dockerfile.funasr-cpu \
   --push .
+# For Laya GPU: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/laya:0.3.22
+export IMAGE_TAG=0.3.22
+docker buildx build --platform linux/amd64 \
+  -t ${OPENCSG_ACR}/opencsghq/laya:${IMAGE_TAG} \
+  -t ${OPENCSG_ACR}/opencsghq/laya:latest \
+  -f Dockerfile.laya \
+  --push .
+# For Laya CPU: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/laya-cpu:0.3.22
+export IMAGE_TAG=0.3.22
+docker buildx build --platform linux/amd64,linux/arm64 \
+  -t ${OPENCSG_ACR}/opencsghq/laya-cpu:${IMAGE_TAG} \
+  -f Dockerfile.laya-cpu \
+  --push .
 # For PaddleOCR CUDA: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/paddleocr:3.7.0
 export IMAGE_TAG=3.7.0
 docker buildx build --platform linux/amd64 \
@@ -254,15 +267,21 @@ curl --max-time 600 -X POST http://127.0.0.1:8000/v1/audio/transcriptions \
   -F "model=local" \
   -F "response_format=text"
 
-# Call FunASR OpenAI-compatible translation API (any language -> English).
-# Only works when REPO_ID is a multilingual Whisper model (e.g. openai/whisper-large-v3);
-# turbo, English-only (.en) checkpoints (e.g. openai/whisper-small.en), and non-Whisper
-# models (Fun-ASR, SenseVoice, Paraformer, Qwen3-ASR) return 501. Translation is passed
-# to the underlying Whisper model via FunASR's DecodingOptions (task=translate).
-curl --max-time 600 -X POST http://127.0.0.1:8000/v1/audio/translations \
-  -F "file=@/path/to/audio.mp3" \
-  -F "model=local" \
-  -F "response_format=text"
+# Run Laya typed-decision engine with a CSGHub model
+docker run -d \
+  --name laya-test \
+  --gpus device=0 \
+  -p 8000:8000 \
+  -e REPO_ID="convaiinnovations/laya" \
+  -e REVISION="main" \
+  -e ACCESS_TOKEN="xxx" \
+  -e HF_ENDPOINT="https://hub.opencsg.com" \
+  opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/laya:0.3.22
+
+# Call Laya System-1 decision API
+curl -X POST http://127.0.0.1:8000/v1/systemone \
+  -H "Content-Type: application/json" \
+  -d '{"model":"english","state":"Is water wet?","questions":{"answer":{"type":"noul","instructions":"Is water wet?"}}}'
 
 # Run image editing with a CSGHub Diffusers model
 docker run -d \
@@ -384,6 +403,8 @@ ROCm-specific limits:
 |speech recognition| funasr | cuda12.8 | 12.8 |-|
 |speech recognition| funasr-rocm | rocm7.2.2 | - |-|
 |speech recognition| funasr-cpu | latest | - |-|
+|typed decision| laya | 0.3.22 | 12.8 |Laya System-1 decision engine, /v1/systemone API|
+|typed decision| laya-cpu | 0.3.22 | - |Laya System-1 decision engine, CPU only|
 |image generation / editing| diffusers | 0.39.0 | 12.8 |diffusers 0.39.0, transformers 5.13.0|
 |image generation / editing| diffusers | 0.38.0 | 12.8 |legacy runtime retained for existing pipelines|
 |image generation / editing| diffusers-rocm | 0.39.0 | - |diffusers 0.39.0, transformers 5.13.0, ROCm 7.2.2|
