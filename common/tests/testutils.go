@@ -230,6 +230,51 @@ func InitTransactionTestDB() *database.DB {
 	}
 }
 
+// InitTransactionTestDBWithHooks is like InitTransactionTestDB but builds the
+// handle through database.NewDB, so edition query hooks (e.g. the audit log
+// hook in ee/saas builds) are registered and Operator.Core is fully wired.
+func InitTransactionTestDBWithHooks() *database.DB {
+	transactionTestDBOnce.Do(func() {
+		transactionTestDBInitErr = initTransactionTestDBTemplate()
+	})
+	if transactionTestDBInitErr != nil {
+		panic(transactionTestDBInitErr)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	databaseName := "csghub_test_tx_" + uuid.New().String()
+	transactionTestDBCloneMu.Lock()
+	err := cloneTransactionTestDB(ctx, databaseName)
+	transactionTestDBCloneMu.Unlock()
+	if err != nil {
+		panic(err)
+	}
+
+	// The admin-derived DSN carries driver-level timeout params that pgxpool
+	// would forward to the server as unrecognized runtime params.
+	dsn := transactionTestDatabaseDSN(databaseName)
+	parsed, err := url.Parse(dsn)
+	if err != nil {
+		panic(fmt.Errorf("parse transaction test database connection string: %w", err))
+	}
+	query := parsed.Query()
+	query.Del("dial_timeout")
+	query.Del("read_timeout")
+	query.Del("write_timeout")
+	parsed.RawQuery = query.Encode()
+
+	db, err := database.NewDB(ctx, database.DBConfig{
+		Dialect: database.DialectPostgres,
+		DSN:     parsed.String(),
+	})
+	if err != nil {
+		panic(err)
+	}
+	return db
+}
+
 func initTransactionTestDBTemplate() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 180*time.Second)
 	defer cancel()

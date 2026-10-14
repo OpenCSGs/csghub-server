@@ -1064,7 +1064,7 @@ func (s *historyArchiveStoreImpl) backfillTable(ctx context.Context, table Histo
 		conflictColumns = []string{table.PrimaryKey, table.TimeColumn}
 	}
 
-	txErr := s.db.BunDB.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+	txErr := s.db.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		// Scope a generous statement timeout to this transaction so a tight
 		// global statement_timeout (e.g. 5s) does not cancel the batch INSERT.
 		// SET LOCAL reverts at transaction end; other sessions/queries are

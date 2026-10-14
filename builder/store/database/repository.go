@@ -821,7 +821,7 @@ func (s *repoStoreImpl) migrateSyncVersion(ctx context.Context, tx Operator, old
 }
 
 func (s *repoStoreImpl) DeleteRepo(ctx context.Context, input Repository) error {
-	err := s.db.BunDB.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+	err := s.db.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		_, err := deleteRepositoriesByIDs(ctx, tx, []int64{input.ID}, s.repositoryDeletionJobClient)
 		return err
 	})

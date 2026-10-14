@@ -204,7 +204,7 @@ func (s *organizationUnitStoreImpl) CreateRoot(ctx context.Context, input Create
 	input.Organization.IsRoot = true
 	input.Organization.IsHierarchical = true
 	input.Namespace.NamespaceType = OrgNamespace
-	err := s.db.BunDB.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+	err := s.db.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		if tx.Dialect().Name() == dialect.PG {
 			if _, err := tx.NewRaw("SELECT pg_advisory_xact_lock(?)", hierarchicalRootOrganizationLockKey).Exec(ctx); err != nil {
 				return fmt.Errorf("lock hierarchical root organization creation: %w", err)
@@ -273,7 +273,7 @@ func (s *organizationUnitStoreImpl) CreateRoot(ctx context.Context, input Create
 // DeleteRoot atomically soft-deletes a top-level organization and its complete hierarchy.
 func (s *organizationUnitStoreImpl) DeleteRoot(ctx context.Context, input DeleteRootOrganizationInput) (*types.DeleteRootOrganizationResp, error) {
 	result := &types.DeleteRootOrganizationResp{}
-	err := s.db.BunDB.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+	err := s.db.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		var root Organization
 		if err := tx.NewSelect().Model(&root).WhereAllWithDeleted().
 			Where("organization.uuid = ? AND organization.is_hierarchical = TRUE", input.OrganizationUUID).
@@ -584,7 +584,7 @@ func (s *organizationUnitStoreImpl) Create(ctx context.Context, input CreateOrga
 		return nil, errorx.ReqParamInvalid(errors.New("child organization and namespace are required"), nil)
 	}
 	unit := &OrganizationUnit{RootOrganizationID: input.RootOrganizationID, SortOrder: input.SortOrder}
-	err := s.db.BunDB.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+	err := s.db.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		if err := lockOrganization(ctx, tx, input.RootOrganizationID); err != nil {
 			return err
 		}
@@ -710,7 +710,7 @@ func pointerToOrganizationUnit(unit *OrganizationUnit) *types.OrganizationUnit {
 
 // Update atomically updates a root or child organization and its structural sort order.
 func (s *organizationUnitStoreImpl) Update(ctx context.Context, input UpdateOrganizationUnitInput) (*types.OrganizationUnit, error) {
-	err := s.db.BunDB.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+	err := s.db.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		if err := lockOrganization(ctx, tx, input.RootOrganizationID); err != nil {
 			return err
 		}
@@ -833,7 +833,7 @@ func loadOrganizationHierarchyRelationships(
 // Delete soft-deletes every child organization and unit in a subtree and removes derived closure rows.
 func (s *organizationUnitStoreImpl) Delete(ctx context.Context, input DeleteOrganizationUnitInput) (*types.DeleteOrganizationUnitResp, error) {
 	result := &types.DeleteOrganizationUnitResp{}
-	err := s.db.BunDB.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+	err := s.db.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		// Retain the hierarchy write lock even when retrying after root deletion.
 		var root Organization
 		if err := tx.NewSelect().Model(&root).WhereAllWithDeleted().
