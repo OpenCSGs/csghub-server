@@ -82,7 +82,7 @@ func (s *organizationUnitMemberStoreImpl) UpsertMembers(ctx context.Context, inp
 	if err := validateOrganizationUnitRole(input.Role); err != nil {
 		return nil, err
 	}
-	err := s.db.BunDB.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+	err := s.db.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		if err := lockOrganization(ctx, tx, input.RootOrganizationID); err != nil {
 			return err
 		}
@@ -258,7 +258,7 @@ func (s *organizationUnitMemberStoreImpl) RemoveMembers(ctx context.Context, inp
 		MembersRemoved: []string{},
 		Skipped:        []string{},
 	}
-	err := s.db.BunDB.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+	err := s.db.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		if err := lockOrganization(ctx, tx, input.RootOrganizationID); err != nil {
 			return err
 		}
@@ -306,7 +306,7 @@ func (s *organizationUnitMemberStoreImpl) UpdateMemberRole(ctx context.Context, 
 	if err := validateOrganizationUnitRole(input.Role); err != nil {
 		return err
 	}
-	return s.db.BunDB.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+	return s.db.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		if err := lockOrganization(ctx, tx, input.RootOrganizationID); err != nil {
 			return err
 		}

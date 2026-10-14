@@ -3,7 +3,8 @@ package database
 import (
 	"context"
 	"fmt"
-	"log/slog"
+
+	"github.com/uptrace/bun"
 )
 
 type repoRelationsStoreImpl struct {
@@ -67,30 +68,19 @@ func (r *repoRelationsStoreImpl) Override(ctx context.Context, from int64, to ..
 		})
 	}
 
-	tx, err := r.db.Core.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("failed to begin transaction: %w", err)
-	}
-	_, err = tx.NewDelete().Model((*RepoRelation)(nil)).Where("from_repo_id = ?", from).Exec(ctx)
-	if err != nil {
-		if er := tx.Rollback(); er != nil {
-			slog.Error("rollback failed", "error", er)
-		}
-		return fmt.Errorf("failed to delete existing relations: %w", err)
-	}
-
-	if len(relations) > 0 {
-		_, err = tx.NewInsert().Model(&relations).
-			Exec(ctx)
+	return r.db.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		_, err := tx.NewDelete().Model((*RepoRelation)(nil)).Where("from_repo_id = ?", from).Exec(ctx)
 		if err != nil {
-			if er := tx.Rollback(); er != nil {
-				slog.Error("tx rollback failed", "error", er)
-			}
-			return fmt.Errorf("failed to insert relations: %w", err)
+			return fmt.Errorf("failed to delete existing relations: %w", err)
 		}
-	}
 
-	return tx.Commit()
+		if len(relations) > 0 {
+			if _, err := tx.NewInsert().Model(&relations).Exec(ctx); err != nil {
+				return fmt.Errorf("failed to insert relations: %w", err)
+			}
+		}
+		return nil
+	})
 }
 
 // Delete removes a relationship from a repository to another

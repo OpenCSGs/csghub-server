@@ -144,7 +144,7 @@ func NewDB(ctx context.Context, config DBConfig) (db *DB, err error) {
 		return
 	}
 
-	db.Operator = Operator{Core: bunDB}
+	db.Operator = Operator{Core: txPropagatingIDB{bunDB}}
 	db.BunDB = bunDB
 
 	db.BunDB.RegisterModel((*RepositoryTag)(nil))
@@ -157,9 +157,41 @@ func NewDB(ctx context.Context, config DBConfig) (db *DB, err error) {
 // If the function returns an error, the transaction is rolled back.
 // Otherwise, the transaction is committed.
 func (db *DB) RunInTx(ctx context.Context, fn func(ctx context.Context, tx Operator) error) error {
-	return db.BunDB.RunInTx(ctx, &sql.TxOptions{}, func(ctx context.Context, tx bun.Tx) error {
+	return db.Core.RunInTx(ctx, &sql.TxOptions{}, func(ctx context.Context, tx bun.Tx) error {
 		op := Operator{Core: tx}
 		return fn(ctx, op)
+	})
+}
+
+// txCtxKey carries the active bun.Tx so that query hooks can reuse the
+// transaction's connection instead of acquiring another one from the pool.
+type txCtxKey struct{}
+
+// txContextValue pairs the active bun.Tx with the *bun.DB that started it, so
+// a hook fired by a different DB handle (multi-instance deployments) does not
+// mistake the transaction for its own.
+type txContextValue struct {
+	tx    bun.Tx
+	owner *bun.DB
+}
+
+func contextWithTx(ctx context.Context, tx bun.Tx, owner *bun.DB) context.Context {
+	return context.WithValue(ctx, txCtxKey{}, txContextValue{tx: tx, owner: owner})
+}
+
+// txPropagatingIDB injects the active bun.Tx into the ctx passed to RunInTx's fn.
+type txPropagatingIDB struct{ bun.IDB }
+
+func (w txPropagatingIDB) RunInTx(ctx context.Context, opts *sql.TxOptions,
+	fn func(context.Context, bun.Tx) error) error {
+	owner, ok := w.IDB.(*bun.DB)
+	if !ok {
+		// Not a root DB handle; leave ctx untouched rather than propagate a tx
+		// whose owner is unknown.
+		return w.IDB.RunInTx(ctx, opts, fn)
+	}
+	return w.IDB.RunInTx(ctx, opts, func(ctx context.Context, tx bun.Tx) error {
+		return fn(contextWithTx(ctx, tx, owner), tx)
 	})
 }
 

@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"log/slog"
 	"slices"
 	"strconv"
 	"strings"
@@ -278,52 +277,41 @@ func (s *deployTaskStoreImpl) GetNewTaskFirst(ctx context.Context) (*DeployTask,
 }
 
 func (s *deployTaskStoreImpl) UpdateInTx(ctx context.Context, deployColumns, deployTaskColumns []string, deploy *Deploy, deployTasks ...*DeployTask) error {
-	tx, err := s.db.Core.BeginTx(ctx, nil)
-	err = errorx.HandleDBError(err, nil)
-	if err != nil {
-		return fmt.Errorf("failed to begin transaction,%w", err)
-	}
-
-	if deploy != nil {
-		deployColumns = append(deployColumns, "updated_at")
-		deploy.UpdatedAt = time.Now()
-		if slices.Contains(deployColumns, "status") {
-			deployColumns = append(deployColumns, "status_update_at")
-			deploy.StatusUpdateAt = time.Now()
-		}
-		_, err = tx.NewUpdate().Model(deploy).
-			Column(deployColumns...).
-			WherePK().Exec(ctx)
-		err = errorx.HandleDBError(err, nil)
-		if err != nil {
-			if ree := tx.Rollback(); ree != nil {
-				slog.Error("rollback failed", "error", err)
+	return s.db.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		if deploy != nil {
+			deployColumns = append(deployColumns, "updated_at")
+			deploy.UpdatedAt = time.Now()
+			if slices.Contains(deployColumns, "status") {
+				deployColumns = append(deployColumns, "status_update_at")
+				deploy.StatusUpdateAt = time.Now()
 			}
-			return fmt.Errorf("failed to update deploy,%w", err)
-		}
-	}
-
-	if len(deployTasks) > 0 {
-		for _, t := range deployTasks {
-			t.UpdatedAt = time.Now()
-		}
-		deployTaskColumns = append(deployTaskColumns, "updated_at")
-		_, err = tx.NewUpdate().
-			Model(&deployTasks).
-			// Column("status", "message", "updated_at").
-			Column(deployTaskColumns...).
-			Bulk().
-			Exec(ctx)
-		err = errorx.HandleDBError(err, nil)
-		if err != nil {
-			if ree := tx.Rollback(); ree != nil {
-				slog.Error("rollback failed", "error", err)
+			_, err := tx.NewUpdate().Model(deploy).
+				Column(deployColumns...).
+				WherePK().Exec(ctx)
+			err = errorx.HandleDBError(err, nil)
+			if err != nil {
+				return fmt.Errorf("failed to update deploy,%w", err)
 			}
-			return fmt.Errorf("failed to update deploy tasks in tx,%w", err)
 		}
-	}
 
-	return tx.Commit()
+		if len(deployTasks) > 0 {
+			for _, t := range deployTasks {
+				t.UpdatedAt = time.Now()
+			}
+			deployTaskColumns = append(deployTaskColumns, "updated_at")
+			_, err := tx.NewUpdate().
+				Model(&deployTasks).
+				Column(deployTaskColumns...).
+				Bulk().
+				Exec(ctx)
+			err = errorx.HandleDBError(err, nil)
+			if err != nil {
+				return fmt.Errorf("failed to update deploy tasks in tx,%w", err)
+			}
+		}
+
+		return nil
+	})
 }
 
 // ListDeploy returns the deploys of a repo visible to the user: the deploys
