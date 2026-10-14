@@ -66,6 +66,23 @@ type AdmissionReleaser interface {
 	ReleaseAdmission(c *gin.Context, p *types.RequestPlan)
 }
 
+// ContentSafetyCheckRequest carries the inputs of the plan-phase prompt
+// content safety check.
+type ContentSafetyCheckRequest struct {
+	// Model is the final resolved model target the request will run on.
+	Model *types.Model
+	// PromptText is the flattened prompt to check.
+	PromptText string
+	// TenantID is the namespace/user uuid the request is attributed to.
+	TenantID string
+	// Task is the protocol task name (e.g. "chat", "responses").
+	Task string
+	// Streaming reports whether the request expects a streamed response.
+	Streaming bool
+	// Provider is the final upstream's provider (feeds the whitelist targets).
+	Provider string
+}
+
 // ContentSafetyChecker checks prompt text for sensitive content.
 // Returns (isSensitive, message, error). The handler adapter converts
 // *rpc.CheckResult to this simplified contract so the Planner never
@@ -77,7 +94,7 @@ type AdmissionReleaser interface {
 // are skipped here because they use a separate CheckImagePrompts path
 // that bypasses the gate — those remain in each handler's Execute).
 type ContentSafetyChecker interface {
-	Check(ctx context.Context, model *types.Model, promptText, nsUUID, task string, streaming bool, provider string) (bool, string, error)
+	Check(ctx context.Context, req ContentSafetyCheckRequest) (bool, string, error)
 }
 
 // CodedError is implemented by errors that carry a structured error code.

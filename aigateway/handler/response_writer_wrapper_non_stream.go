@@ -13,6 +13,7 @@ import (
 	"opencsg.com/csghub-server/builder/rpc"
 
 	"github.com/gin-gonic/gin"
+	"github.com/openai/openai-go/v3"
 	"opencsg.com/csghub-server/aigateway/component"
 	"opencsg.com/csghub-server/aigateway/token"
 	"opencsg.com/csghub-server/aigateway/types"
@@ -24,15 +25,24 @@ type nonStreamResponseWriter struct {
 	moderationComponent component.Moderation
 	tokenCounter        token.ChatTokenCounter
 	recorder            component.LLMLogRecorder
-	buffer              bytes.Buffer
+	// requestCtx is the request context the writer was built from; the
+	// non-stream body check derives its moderation context from it so the
+	// per-request moderation session id travels along.
+	requestCtx context.Context
+	buffer     bytes.Buffer
 }
 
-func newNonStreamResponseWriter(internalWritter gin.ResponseWriter, moderationComponent component.Moderation, tokenCounter token.ChatTokenCounter, recorder component.LLMLogRecorder) *nonStreamResponseWriter {
+func newNonStreamResponseWriter(p ChatWriterParams) *nonStreamResponseWriter {
+	requestCtx := p.RequestCtx
+	if requestCtx == nil {
+		requestCtx = context.Background()
+	}
 	return &nonStreamResponseWriter{
-		internalWritter:     internalWritter,
-		moderationComponent: moderationComponent,
-		tokenCounter:        tokenCounter,
-		recorder:            recorder,
+		internalWritter:     p.InternalWriter,
+		moderationComponent: p.ModerationComponent,
+		tokenCounter:        p.TokenCounter,
+		recorder:            p.Recorder,
+		requestCtx:          requestCtx,
 	}
 }
 
@@ -99,7 +109,7 @@ func (nsw *nonStreamResponseWriter) nonStreamWrite(originData []byte) (int, erro
 	}
 
 	// Step 6: Perform content moderation if service is available
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(nsw.requestCtx, 5*time.Second)
 	defer cancel()
 
 	result, err := nsw.CheckChatNonStreamResponse(ctx, completion)
@@ -112,6 +122,10 @@ func (nsw *nonStreamResponseWriter) nonStreamWrite(originData []byte) (int, erro
 			slog.Any("content", completion),
 			slog.Any("reason", result.Reason))
 		completion.Choices[0].Message.Content = "The message includes inappropriate content and has been blocked. We appreciate your understanding and cooperation."
+		// A gated response must not carry executable tool calls.
+		completion.Choices[0].Message.ToolCalls = nil
+		//nolint:staticcheck // legacy field still emitted by some upstreams and must stay cleared
+		completion.Choices[0].Message.FunctionCall = openai.ChatCompletionMessageFunctionCall{}
 
 		// Re-encode modified completion
 		modifiedData, _ := json.Marshal(completion)

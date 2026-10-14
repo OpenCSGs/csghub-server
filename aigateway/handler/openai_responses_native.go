@@ -71,7 +71,14 @@ func (h *OpenAIHandlerImpl) executeNativeResponses(c *gin.Context, req *types.Re
 		slog.String("responses_route_model", modelTarget.ModelName),
 	)
 	proxyPath := resolveProxyPathFromModelEndpoint(backendURL, modelTarget.ModelName)
-	writer := newResponsesNativeResponseWriter(c.Writer, req.Stream, transformer, moderation, newResponsesModerationSessionID())
+	// Reuse the per-request moderation session id the planner generated so
+	// an asynchronous prompt verdict recorded under it gates this response;
+	// when the prompt check never ran, fall back to a writer-local id.
+	sessionID := types.ModerationSessionIDFromContext(c.Request.Context())
+	if sessionID == "" {
+		sessionID = newResponsesModerationSessionID()
+	}
+	writer := newResponsesNativeResponseWriter(c.Writer, req.Stream, transformer, moderation, sessionID)
 	proxyStartTime := time.Now()
 	rp.ServeHTTP(writer, c.Request, proxyPath, modelTarget.Host)
 	if err := writer.Finalize(); err != nil {

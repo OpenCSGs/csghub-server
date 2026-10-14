@@ -22,9 +22,9 @@ type recordingSafetyChecker struct {
 	checkedProvider string
 }
 
-func (m *recordingSafetyChecker) Check(_ context.Context, _ *types.Model, _, _, _ string, _ bool, provider string) (bool, string, error) {
+func (m *recordingSafetyChecker) Check(_ context.Context, req ContentSafetyCheckRequest) (bool, string, error) {
 	m.called = true
-	m.checkedProvider = provider
+	m.checkedProvider = req.Provider
 	return false, "", nil
 }
 

@@ -37,7 +37,14 @@ func (h *OpenAIHandlerImpl) executeAdapterResponses(c *gin.Context, req *types.R
 	if err := applyModelAuthHeaders(c.Request.Header, modelTarget.Model); err != nil {
 		slog.WarnContext(c.Request.Context(), "invalid auth header", slog.String("model", modelTarget.ModelName), slog.Any("error", err))
 	}
-	writer := newResponsesAdapterResponseWriter(c.Writer, req.Stream, publicModelID, responsesCounter, moderation, newResponsesModerationSessionID(), logCapture)
+	// Reuse the per-request moderation session id the planner generated so
+	// an asynchronous prompt verdict recorded under it gates this response;
+	// when the prompt check never ran, fall back to a writer-local id.
+	sessionID := types.ModerationSessionIDFromContext(c.Request.Context())
+	if sessionID == "" {
+		sessionID = newResponsesModerationSessionID()
+	}
+	writer := newResponsesAdapterResponseWriter(c.Writer, req.Stream, publicModelID, responsesCounter, moderation, sessionID, logCapture)
 	setResponsesAdapterToolResolver(writer, toolAliases)
 	proxyStartTime := time.Now()
 	primaryWriter, proxyErr := h.executeChatProxyAttempt(c, writer, modelTarget, chatReq, p)

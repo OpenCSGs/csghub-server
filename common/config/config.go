@@ -211,6 +211,15 @@ type Config struct {
 		AsyncBufferMaxChars int      `env:"STARHUB_SERVER_SENSITIVE_CHECK_ASYNC_BUFFER_MAX_CHARS" default:"50"`
 		// aliyun green max content length: 2000 | qwen guard max content length: 7000
 		MaxContentLength int `env:"STARHUB_SERVER_SENSITIVE_CHECK_MAX_CONTENT_LENGTH" default:"2000"`
+		// PromptMaxChunks caps how many moderation calls a single LLM prompt is
+		// worth, estimated as ceil(prompt length / MaxContentLength). A prompt
+		// within one call is checked synchronously as before; a prompt worth
+		// more than one call but within this limit is checked asynchronously
+		// (the request proceeds without waiting for the verdict); a prompt
+		// exceeding this limit skips prompt moderation entirely and only logs.
+		// Zero or negative keeps the legacy behavior: every prompt is checked
+		// synchronously regardless of size.
+		PromptMaxChunks int `env:"STARHUB_SERVER_SENSITIVE_CHECK_PROMPT_MAX_CHUNKS" default:"3"`
 		// ImageCheckEnable controls whether image files are sent to the remote
 		// moderation service for content safety checking. Disabled by default
 		// because image moderation incurs extra API costs.

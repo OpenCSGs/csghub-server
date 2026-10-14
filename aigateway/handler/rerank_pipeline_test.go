@@ -147,9 +147,9 @@ func TestRerankPipeline_HandlePlanError_Sensitive(t *testing.T) {
 }
 
 var (
-	errRerankModelNotFound     = &testErr{msg: "model not found"}
+	errRerankModelNotFound       = &testErr{msg: "model not found"}
 	errRerankInsufficientBalance = &testErr{msg: "insufficient balance"}
-	errRerankSensitive         = &testErr{msg: "content blocked"}
+	errRerankSensitive           = &testErr{msg: "content blocked"}
 )
 
 type testErr struct{ msg string }

@@ -47,7 +47,10 @@ func (s *sensitivePolicyImpl) CheckChatSensitive(ctx context.Context, model *typ
 // prompt string instead of an OpenAI SDK message slice. The Responses API path
 // flattens Instructions + Input into a single string before the check, so the
 // same gate logic applies (NeedSensitiveCheck, namespace whitelist) without
-// requiring the caller to map back into the SDK shape.
+// requiring the caller to map back into the SDK shape. The moderation session
+// id travels on the request context: the planner generates it when the prompt
+// check runs, and the moderation component reads it from there to correlate
+// an asynchronous verdict with the response of the same request.
 func (s *sensitivePolicyImpl) CheckResponsesSensitive(ctx context.Context, model *types.Model, promptText string, userUUID string, stream bool, provider string) (bool, *rpc.CheckResult, error) {
 	enabled, key, err := s.prepareSensitiveCheck(ctx, model, userUUID, provider)
 	if err != nil || !enabled {

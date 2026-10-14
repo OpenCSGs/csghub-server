@@ -47,9 +47,9 @@ type mockContentSafetyChecker struct {
 	err         error
 }
 
-func (m *mockContentSafetyChecker) Check(ctx context.Context, model *types.Model, promptText, nsUUID, task string, streaming bool, provider string) (bool, string, error) {
+func (m *mockContentSafetyChecker) Check(ctx context.Context, req ContentSafetyCheckRequest) (bool, string, error) {
 	// Mirror the real adapter: non-token tasks skip safety entirely.
-	switch task {
+	switch req.Task {
 	case "chat", "responses", "messages":
 	default:
 		return false, "", nil
