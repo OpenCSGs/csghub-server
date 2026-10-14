@@ -2923,11 +2923,7 @@ func (c *repoComponentImpl) CommitFiles(ctx context.Context, req types.CommitFil
 }
 
 func (c *repoComponentImpl) IsExists(ctx context.Context, repoType types.RepositoryType, namespace, name string) (bool, error) {
-	_, err := c.repoStore.FindByPath(ctx, repoType, namespace, name)
-	if err != nil {
-		return false, err
-	}
-	return true, nil
+	return c.repoStore.Exists(ctx, repoType, namespace, name)
 }
 
 func parseGitattributesContent(content string) map[string][]string {

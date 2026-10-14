@@ -137,7 +137,7 @@ func TestRepoComponentCreateForkWritesOwnerTuple(t *testing.T) {
 		RepositoryType: types.ModelRepo,
 	}
 	repo.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "source-ns", "source").Return(sourceRepo, nil).Once()
-	repo.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "alice", "fork").Return(nil, sql.ErrNoRows).Once()
+	repo.mocks.stores.RepoMock().EXPECT().Exists(ctx, types.ModelRepo, "alice", "fork").Return(false, nil).Once()
 	repo.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "alice").Return(database.Namespace{
 		Path:          "alice",
 		UUID:          "alice-namespace-uuid",
@@ -232,7 +232,7 @@ func TestRepoComponent_CreateForkRejectsUnwritableTargetNamespace(t *testing.T) 
 		Object:      rebac.RepositoryObject(sourceRepo.ID),
 		Consistency: rebac.ConsistencyHigher,
 	}).Return(rebac.Decision{Allowed: true}, nil).Once()
-	repo.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, targetNamespace.Path, "fork").Return(nil, sql.ErrNoRows).Once()
+	repo.mocks.stores.RepoMock().EXPECT().Exists(ctx, types.ModelRepo, targetNamespace.Path, "fork").Return(false, nil).Once()
 	repo.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, targetNamespace.Path).Return(targetNamespace, nil).Twice()
 	repoAuthorizerMock(repo).EXPECT().Check(ctx, rebac.CheckRequest{
 		Subject:  rebac.UserSubject(user.UUID),
@@ -4579,25 +4579,25 @@ func TestRepoComponent_IsExists(t *testing.T) {
 
 	repoComp := initializeTestRepoComponent(ctx, t)
 
-	repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "namespace", "name").
-		Return(&database.Repository{ID: 1}, nil).Once()
+	repoComp.mocks.stores.RepoMock().EXPECT().Exists(ctx, types.ModelRepo, "namespace", "name").
+		Return(true, nil).Once()
 
 	exists, err := repoComp.IsExists(ctx, types.ModelRepo, "namespace", "name")
 	require.NoError(t, err)
 	require.True(t, exists)
 
-	repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "namespace", "name").
-		Return(nil, errors.New("error")).Once()
+	repoComp.mocks.stores.RepoMock().EXPECT().Exists(ctx, types.ModelRepo, "namespace", "name").
+		Return(false, nil).Once()
+
+	exists, err = repoComp.IsExists(ctx, types.ModelRepo, "namespace", "name")
+	require.NoError(t, err)
+	require.False(t, exists)
+
+	repoComp.mocks.stores.RepoMock().EXPECT().Exists(ctx, types.ModelRepo, "namespace", "name").
+		Return(false, errors.New("error")).Once()
 
 	exists, err = repoComp.IsExists(ctx, types.ModelRepo, "namespace", "name")
 	require.Error(t, err)
-	require.False(t, exists)
-
-	repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "namespace", "name").
-		Return(nil, sql.ErrNoRows).Once()
-
-	exists, err = repoComp.IsExists(ctx, types.ModelRepo, "namespace", "name")
-	require.NotNil(t, err)
 	require.False(t, exists)
 }
 
