@@ -1,0 +1,14 @@
+# EE organization initialization: every name and path must be globally unique.
+# name is the display name; path follows the existing namespace naming rules.
+organization:
+  name: 集团
+  path: group
+  description: 集团总部
+units:
+  - name: 研发中心
+    path: research
+    children:
+      - name: 平台组
+        path: platform
+  - name: 产品中心
+    path: product
