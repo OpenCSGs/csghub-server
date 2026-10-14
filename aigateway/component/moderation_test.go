@@ -2,6 +2,10 @@ package component
 
 import (
 	"context"
+	"crypto/md5"
+	"encoding/json"
+	"errors"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -10,6 +14,7 @@ import (
 	"github.com/openai/openai-go/v3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	mockcache "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/cache"
 	"opencsg.com/csghub-server/aigateway/types"
 	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/common/config"
@@ -31,6 +36,9 @@ func (m *MockModerationSvcClient) PassLLMRespCheck(ctx context.Context, req comm
 
 func (m *MockModerationSvcClient) PassLLMPromptCheck(ctx context.Context, req commontypes.LLMCheckRequest) (*rpc.CheckResult, error) {
 	args := m.Called(ctx, req)
+	if rf, ok := args.Get(0).(func(context.Context, commontypes.LLMCheckRequest) (*rpc.CheckResult, error)); ok {
+		return rf(ctx, req)
+	}
 	if args.Get(0) != nil {
 		return args.Get(0).(*rpc.CheckResult), args.Error(1)
 	}
@@ -579,5 +587,522 @@ func TestModerationImpl_CheckTextStreamResponse(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, expected, res)
 		mockChecker.AssertExpectations(t)
+	})
+}
+
+func TestModerationImpl_checkLLMPromptChunkLimit(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("within one moderation call stays synchronous", func(t *testing.T) {
+		mockSvcClient := new(MockModerationSvcClient)
+		mockSvcClient.On("PassLLMPromptCheck", mock.Anything, mock.Anything).
+			Return(&rpc.CheckResult{IsSensitive: false}, nil).Once()
+		modImpl := &moderationImpl{
+			modSvcClient:     mockSvcClient,
+			maxContentLength: 100,
+			promptMaxChunks:  3,
+		}
+
+		res, err := modImpl.checkLLMPrompt(ctx, strings.Repeat("a", 50), "key", false)
+		assert.NoError(t, err)
+		assert.False(t, res.IsSensitive)
+		mockSvcClient.AssertExpectations(t)
+	})
+
+	t.Run("over one call but within limit runs asynchronously", func(t *testing.T) {
+		mockSvcClient := new(MockModerationSvcClient)
+		// 25 chars / maxContentLength 10 => 3 estimated calls <= limit 3.
+		mockSvcClient.On("PassLLMPromptCheck", mock.Anything, mock.Anything).
+			Return(&rpc.CheckResult{IsSensitive: false}, nil).Once()
+		modImpl := &moderationImpl{
+			modSvcClient:     mockSvcClient,
+			maxContentLength: 10,
+			promptMaxChunks:  3,
+		}
+
+		res, err := modImpl.checkLLMPrompt(ctx, strings.Repeat("a", 25), "key", false)
+		assert.NoError(t, err)
+		assert.False(t, res.IsSensitive)
+
+		time.Sleep(100 * time.Millisecond)
+		mockSvcClient.AssertExpectations(t)
+	})
+
+	t.Run("sensitive verdict from async check does not block the request", func(t *testing.T) {
+		mockSvcClient := new(MockModerationSvcClient)
+		mockSvcClient.On("PassLLMPromptCheck", mock.Anything, mock.Anything).
+			Return(&rpc.CheckResult{IsSensitive: true, Reason: "toxic"}, nil).Once()
+		modImpl := &moderationImpl{
+			modSvcClient:     mockSvcClient,
+			maxContentLength: 10,
+			promptMaxChunks:  3,
+		}
+
+		res, err := modImpl.checkLLMPrompt(ctx, strings.Repeat("a", 25), "key", false)
+		assert.NoError(t, err)
+		assert.False(t, res.IsSensitive)
+
+		time.Sleep(100 * time.Millisecond)
+		mockSvcClient.AssertExpectations(t)
+	})
+
+	t.Run("over chunk limit skips moderation and proceeds", func(t *testing.T) {
+		mockSvcClient := new(MockModerationSvcClient)
+		// 100 chars / maxContentLength 10 => 10 estimated calls > limit 3.
+		modImpl := &moderationImpl{
+			modSvcClient:     mockSvcClient,
+			maxContentLength: 10,
+			promptMaxChunks:  3,
+		}
+
+		res, err := modImpl.checkLLMPrompt(ctx, strings.Repeat("a", 100), "key", false)
+		assert.NoError(t, err)
+		assert.False(t, res.IsSensitive)
+		mockSvcClient.AssertNotCalled(t, "PassLLMPromptCheck")
+	})
+
+	t.Run("zero limit keeps legacy synchronous chunking", func(t *testing.T) {
+		mockSvcClient := new(MockModerationSvcClient)
+		// A 25-char sentence fits one 2000-char chunk; it exceeds
+		// maxContentLength 10, so one buffer flush makes a single call.
+		mockSvcClient.On("PassLLMPromptCheck", mock.Anything, mock.Anything).
+			Return(&rpc.CheckResult{IsSensitive: false}, nil).Once()
+		modImpl := &moderationImpl{
+			modSvcClient:     mockSvcClient,
+			maxContentLength: 10,
+		}
+
+		res, err := modImpl.checkLLMPrompt(ctx, strings.Repeat("a", 25), "key", false)
+		assert.NoError(t, err)
+		assert.False(t, res.IsSensitive)
+		mockSvcClient.AssertExpectations(t)
+	})
+}
+
+func TestModerationImpl_checkSingleChunkCache(t *testing.T) {
+	ctx := context.Background()
+	content := "some prompt content"
+	expectedKey := moderationCachePromptPrefix + fmt.Sprintf("%x", md5.Sum([]byte(content)))
+
+	t.Run("cache miss checks service and stores result under content hash", func(t *testing.T) {
+		mockSvcClient := new(MockModerationSvcClient)
+		mockCache := mockcache.NewMockRedisClient(t)
+		mockCache.On("Get", ctx, expectedKey).Return("", errors.New("redis: nil")).Once()
+		mockSvcClient.On("PassLLMPromptCheck", mock.Anything, mock.Anything).
+			Return(&rpc.CheckResult{IsSensitive: false}, nil).Once()
+		cached, _ := json.Marshal(rpc.CheckResult{IsSensitive: false})
+		mockCache.On("SetEx", ctx, expectedKey, string(cached), cacheTTL).Return(nil).Once()
+
+		modImpl := &moderationImpl{
+			modSvcClient: mockSvcClient,
+			cacheClient:  mockCache,
+		}
+		res, err := modImpl.checkSingleChunk(ctx, content, "key", false)
+		assert.NoError(t, err)
+		assert.False(t, res.IsSensitive)
+	})
+
+	t.Run("cache hit skips the service call", func(t *testing.T) {
+		mockSvcClient := new(MockModerationSvcClient)
+		mockCache := mockcache.NewMockRedisClient(t)
+		cached, _ := json.Marshal(rpc.CheckResult{IsSensitive: false})
+		mockCache.On("Get", ctx, expectedKey).Return(string(cached), nil).Once()
+
+		modImpl := &moderationImpl{
+			modSvcClient: mockSvcClient,
+			cacheClient:  mockCache,
+		}
+		res, err := modImpl.checkSingleChunk(ctx, content, "key", false)
+		assert.NoError(t, err)
+		assert.False(t, res.IsSensitive)
+		mockSvcClient.AssertNotCalled(t, "PassLLMPromptCheck")
+	})
+}
+
+func TestPromptMaxChunksFromConfig(t *testing.T) {
+	assert.Equal(t, 0, promptMaxChunksFromConfig(nil))
+	cfg := &config.Config{}
+	assert.Equal(t, 0, promptMaxChunksFromConfig(cfg))
+	cfg.SensitiveCheck.PromptMaxChunks = 3
+	assert.Equal(t, 3, promptMaxChunksFromConfig(cfg))
+	cfg.SensitiveCheck.PromptMaxChunks = -1
+	assert.Equal(t, 0, promptMaxChunksFromConfig(cfg))
+}
+
+func TestModerationImpl_PendingPromptVerdictGatesResponse(t *testing.T) {
+	ctx := context.Background()
+
+	newModImpl := func() *moderationImpl {
+		mockSvcClient := new(MockModerationSvcClient)
+		modImpl := &moderationImpl{
+			modSvcClient:        mockSvcClient,
+			maxContentLength:    10,
+			promptMaxChunks:     3,
+			pendingPromptChecks: newPendingPromptCheckCache(),
+		}
+		// 25 chars / maxContentLength 10 => 3 estimated calls => async path.
+		mockSvcClient.On("PassLLMPromptCheck", mock.Anything, mock.Anything).
+			Return(&rpc.CheckResult{IsSensitive: true, Reason: "toxic"}, nil).Once()
+		// Response-text checks polled before the verdict lands pass through.
+		mockSvcClient.On("PassTextCheck", mock.Anything, mock.Anything, mock.Anything).
+			Return(&rpc.CheckResult{IsSensitive: false}, nil).Maybe()
+		return modImpl
+	}
+
+	t.Run("async sensitive verdict blocks stream chunks", func(t *testing.T) {
+		modImpl := newModImpl()
+		streamCtx := types.WithModerationSessionID(ctx, "session-1")
+		res, err := modImpl.checkLLMPrompt(streamCtx, strings.Repeat("a", 25), "key", true)
+		assert.NoError(t, err)
+		assert.False(t, res.IsSensitive)
+
+		// The verdict lands asynchronously; once present it gates every
+		// chunk check for the same session.
+		assert.Eventually(t, func() bool {
+			r, err := modImpl.CheckChatStreamResponse(streamCtx, types.ChatCompletionChunk{}, "session-1")
+			return err == nil && r.IsSensitive && r.Reason == "toxic"
+		}, time.Second, 10*time.Millisecond)
+
+		// Peeking does not consume: a later chunk is still blocked, and the
+		// close check reports the verdict and removes it.
+		r, err := modImpl.CheckChatStreamResponse(streamCtx, types.ChatCompletionChunk{}, "session-1")
+		assert.NoError(t, err)
+		assert.True(t, r.IsSensitive)
+		closeRes, err := modImpl.CloseStreamCheck(streamCtx, "session-1")
+		assert.NoError(t, err)
+		assert.True(t, closeRes.IsSensitive)
+
+		// Consumed: a new stream with the same id is not blocked.
+		r, err = modImpl.CheckChatStreamResponse(streamCtx, types.ChatCompletionChunk{}, "session-1")
+		assert.NoError(t, err)
+		assert.False(t, r.IsSensitive)
+	})
+
+	t.Run("async sensitive verdict blocks non-stream response once", func(t *testing.T) {
+		modImpl := newModImpl()
+		nonStreamCtx := types.WithModerationSessionID(ctx, "session-2")
+		_, err := modImpl.checkLLMPrompt(nonStreamCtx, strings.Repeat("a", 25), "key", false)
+		assert.NoError(t, err)
+
+		completion := types.ChatCompletion{ChatCompletion: openai.ChatCompletion{
+			Choices: []openai.ChatCompletionChoice{{Message: openai.ChatCompletionMessage{Content: "hello"}}},
+		}}
+
+		assert.Eventually(t, func() bool {
+			r, err := modImpl.CheckChatNonStreamResponse(nonStreamCtx, completion)
+			return err == nil && r.IsSensitive
+		}, time.Second, 10*time.Millisecond)
+
+		// Consumed by the non-stream read: a second check passes through to
+		// the (mocked) response-text path rather than the pending verdict.
+		res, err := modImpl.CheckChatNonStreamResponse(nonStreamCtx, completion)
+		assert.NoError(t, err)
+		assert.False(t, res.IsSensitive)
+	})
+
+	t.Run("empty-content completion with tool calls awaits and gates", func(t *testing.T) {
+		// A non-stream agent response with empty content but tool calls must
+		// not bypass the gate: the writer relies on this single call and the
+		// client may execute the returned calls.
+		mockSvcClient := new(MockModerationSvcClient)
+		modImpl := &moderationImpl{
+			modSvcClient:        mockSvcClient,
+			maxContentLength:    10,
+			promptMaxChunks:     3,
+			pendingPromptChecks: newPendingPromptCheckCache(),
+		}
+		release := make(chan struct{})
+		mockSvcClient.On("PassLLMPromptCheck", mock.Anything, mock.Anything).
+			Return(func(ctx context.Context, req commontypes.LLMCheckRequest) (*rpc.CheckResult, error) {
+				<-release
+				return &rpc.CheckResult{IsSensitive: true, Reason: "toxic"}, nil
+			}).Once()
+
+		checkCtx := types.WithModerationSessionID(context.Background(), "session-tool")
+		_, err := modImpl.checkLLMPrompt(checkCtx, strings.Repeat("a", 25), "key", false)
+		assert.NoError(t, err)
+
+		go func() {
+			time.Sleep(100 * time.Millisecond)
+			close(release)
+		}()
+		waitCtx, cancel := context.WithTimeout(
+			types.WithModerationSessionID(context.Background(), "session-tool"), 5*time.Second)
+		defer cancel()
+		completion := types.ChatCompletion{ChatCompletion: openai.ChatCompletion{
+			Choices: []openai.ChatCompletionChoice{{Message: openai.ChatCompletionMessage{
+				ToolCalls: []openai.ChatCompletionMessageToolCallUnion{{
+					Function: openai.ChatCompletionMessageFunctionToolCallFunction{Name: "run_shell", Arguments: "{\"cmd\":\"rm -rf /\"}"},
+				}},
+			}}},
+		}}
+		r, err := modImpl.CheckChatNonStreamResponse(waitCtx, completion)
+		assert.NoError(t, err)
+		assert.True(t, r.IsSensitive, "tool-call-only completion must await the verdict and gate")
+		mockSvcClient.AssertExpectations(t)
+	})
+
+	t.Run("tool call text is submitted to response checking", func(t *testing.T) {
+		mockSvcClient := new(MockModerationSvcClient)
+		modImpl := &moderationImpl{modSvcClient: mockSvcClient}
+		mockSvcClient.On("PassTextCheck", mock.Anything, commontypes.ScenarioChatDetection, "run_shell\n{\"cmd\":\"ls\"}").
+			Return(&rpc.CheckResult{IsSensitive: false}, nil).Once()
+
+		completion := types.ChatCompletion{ChatCompletion: openai.ChatCompletion{
+			Choices: []openai.ChatCompletionChoice{{Message: openai.ChatCompletionMessage{
+				ToolCalls: []openai.ChatCompletionMessageToolCallUnion{{
+					Function: openai.ChatCompletionMessageFunctionToolCallFunction{Name: "run_shell", Arguments: "{\"cmd\":\"ls\"}"},
+				}},
+			}}},
+		}}
+		r, err := modImpl.CheckChatNonStreamResponse(context.Background(), completion)
+		assert.NoError(t, err)
+		assert.False(t, r.IsSensitive)
+		mockSvcClient.AssertExpectations(t)
+	})
+
+	t.Run("detached response context still gates via the writer session id", func(t *testing.T) {
+		// responses writers check with a context deliberately detached from
+		// the request (ModerationContext), so the verdict must also be found
+		// through the writer session id passed as Key.
+		modImpl := newModImpl()
+		promptCtx := types.WithModerationSessionID(ctx, "session-5")
+		_, err := modImpl.checkLLMPrompt(promptCtx, strings.Repeat("a", 25), "key", false)
+		assert.NoError(t, err)
+
+		detachedCtx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+
+		assert.Eventually(t, func() bool {
+			r, err := modImpl.CheckText(detachedCtx, types.TextModerationRequest{
+				Content: "hello",
+				Key:     "session-5",
+				Phase:   types.TextModerationPhaseResponse,
+				Mode:    types.TextModerationModeNonStream,
+			})
+			return err == nil && r.IsSensitive
+		}, time.Second, 10*time.Millisecond)
+	})
+
+	t.Run("verdict respects ModerationBypassSensitiveCheck at read time", func(t *testing.T) {
+		modImpl := newModImpl()
+		modImpl.config = &config.Config{}
+		modImpl.config.AIGateway.ModerationBypassSensitiveCheck = true
+		bypassCtx := types.WithModerationSessionID(ctx, "session-3")
+		_, err := modImpl.checkLLMPrompt(bypassCtx, strings.Repeat("a", 25), "key", true)
+		assert.NoError(t, err)
+
+		assert.Eventually(t, func() bool {
+			r, _ := modImpl.CheckChatStreamResponse(bypassCtx, types.ChatCompletionChunk{}, "session-3")
+			return !r.IsSensitive
+		}, time.Second, 10*time.Millisecond)
+	})
+
+	t.Run("other sessions are not affected", func(t *testing.T) {
+		modImpl := newModImpl()
+		otherCtx := types.WithModerationSessionID(ctx, "session-4")
+		_, err := modImpl.checkLLMPrompt(otherCtx, strings.Repeat("a", 25), "key", true)
+		assert.NoError(t, err)
+
+		assert.Eventually(t, func() bool {
+			_, ok := modImpl.peekPendingPromptVerdict(context.Background(), "session-4")
+			return ok
+		}, time.Second, 10*time.Millisecond)
+
+		// A different request carries a different moderation session id in
+		// its own context; it must not be blocked by session-4's verdict.
+		otherRequestCtx := types.WithModerationSessionID(ctx, "session-other")
+		r, err := modImpl.CheckChatStreamResponse(otherRequestCtx, types.ChatCompletionChunk{}, "session-other")
+		assert.NoError(t, err)
+		assert.False(t, r.IsSensitive)
+
+		// A request context without any session id is not blocked either.
+		r, err = modImpl.CheckChatStreamResponse(ctx, types.ChatCompletionChunk{}, "session-other")
+		assert.NoError(t, err)
+		assert.False(t, r.IsSensitive)
+	})
+}
+
+func TestModerationImpl_AwaitPendingPromptVerdictAtFinalization(t *testing.T) {
+	t.Run("response finalization waits for an in-flight async verdict", func(t *testing.T) {
+		mockSvcClient := new(MockModerationSvcClient)
+		modImpl := &moderationImpl{
+			modSvcClient:        mockSvcClient,
+			maxContentLength:    10,
+			promptMaxChunks:     3,
+			pendingPromptChecks: newPendingPromptCheckCache(),
+		}
+		release := make(chan struct{})
+		mockSvcClient.On("PassLLMPromptCheck", mock.Anything, mock.Anything).
+			Return(func(ctx context.Context, req commontypes.LLMCheckRequest) (*rpc.CheckResult, error) {
+				<-release
+				return &rpc.CheckResult{IsSensitive: true, Reason: "toxic"}, nil
+			}).Once()
+
+		checkCtx := types.WithModerationSessionID(context.Background(), "session-wait")
+		res, err := modImpl.checkLLMPrompt(checkCtx, strings.Repeat("a", 25), "key", false)
+		assert.NoError(t, err)
+		assert.False(t, res.IsSensitive)
+
+		// The response reaches its finalization boundary while the verdict is
+		// still in flight; it must wait for the check and gate on the verdict.
+		go func() {
+			time.Sleep(100 * time.Millisecond)
+			close(release)
+		}()
+		waitCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		r, err := modImpl.CheckText(waitCtx, types.TextModerationRequest{
+			Content: "hello",
+			Key:     "session-wait",
+			Phase:   types.TextModerationPhaseResponse,
+			Mode:    types.TextModerationModeNonStream,
+		})
+		assert.NoError(t, err)
+		assert.True(t, r.IsSensitive, "finalization must gate on the awaited verdict")
+		mockSvcClient.AssertExpectations(t)
+	})
+
+	t.Run("await grace expires without blocking or cancelling the body check", func(t *testing.T) {
+		mockSvcClient := new(MockModerationSvcClient)
+		modImpl := &moderationImpl{
+			modSvcClient:        mockSvcClient,
+			maxContentLength:    10,
+			promptMaxChunks:     3,
+			pendingPromptChecks: newPendingPromptCheckCache(),
+			pendingVerdictWait:  80 * time.Millisecond, // dedicated wait budget
+		}
+		mockSvcClient.On("PassLLMPromptCheck", mock.Anything, mock.Anything).
+			Return(func(ctx context.Context, req commontypes.LLMCheckRequest) (*rpc.CheckResult, error) {
+				<-ctx.Done() // outlives the wait window
+				return nil, ctx.Err()
+			}).Once()
+		// The body check must run on a live context after the wait expired.
+		mockSvcClient.On("PassTextCheck", mock.Anything, mock.Anything, mock.Anything).
+			Return(&rpc.CheckResult{IsSensitive: false}, nil).Once()
+
+		checkCtx := types.WithModerationSessionID(context.Background(), "session-grace")
+		_, err := modImpl.checkLLMPrompt(checkCtx, strings.Repeat("a", 25), "key", false)
+		assert.NoError(t, err)
+
+		waitCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		r, err := modImpl.CheckText(waitCtx, types.TextModerationRequest{
+			Content: "hello",
+			Key:     "session-grace",
+			Phase:   types.TextModerationPhaseResponse,
+			Mode:    types.TextModerationModeNonStream,
+		})
+		assert.NoError(t, err)
+		assert.False(t, r.IsSensitive, "grace expiry must let the response proceed")
+		mockSvcClient.AssertExpectations(t)
+	})
+}
+
+func TestModerationImpl_CheckImagePrompts_FullySynchronous(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("oversized image prompt is still checked (no skip tier)", func(t *testing.T) {
+		mockSvcClient := new(MockModerationSvcClient)
+		// 100 chars / maxContentLength 10 => the chat path would skip (est 10
+		// > 3); the image path must run the check synchronously instead: a
+		// single 2000-char chunk flushed once.
+		mockSvcClient.On("PassLLMPromptCheck", mock.Anything, mock.Anything).
+			Return(&rpc.CheckResult{IsSensitive: false}, nil).Once()
+		modImpl := &moderationImpl{
+			modSvcClient:     mockSvcClient,
+			maxContentLength: 10,
+			promptMaxChunks:  3,
+		}
+
+		res, err := modImpl.CheckImagePrompts(ctx, strings.Repeat("a", 100), "key")
+		assert.NoError(t, err)
+		assert.False(t, res.IsSensitive)
+		mockSvcClient.AssertExpectations(t)
+	})
+
+	t.Run("sensitive oversized image prompt is blocked synchronously", func(t *testing.T) {
+		mockSvcClient := new(MockModerationSvcClient)
+		mockSvcClient.On("PassLLMPromptCheck", mock.Anything, mock.Anything).
+			Return(&rpc.CheckResult{IsSensitive: true, Reason: "toxic"}, nil).Once()
+		modImpl := &moderationImpl{
+			modSvcClient:     mockSvcClient,
+			maxContentLength: 10,
+			promptMaxChunks:  3,
+		}
+
+		res, err := modImpl.CheckImagePrompts(ctx, strings.Repeat("a", 100), "key")
+		assert.NoError(t, err)
+		assert.True(t, res.IsSensitive)
+		assert.Equal(t, "toxic", res.Reason)
+	})
+}
+
+func TestModerationImpl_AsyncTierReplay(t *testing.T) {
+	ctx := context.Background()
+	content := strings.Repeat("a", 25) // 25 chars / maxContentLength 10 => est 3 => async tier
+	chunkKey := moderationCachePromptPrefix + fmt.Sprintf("%x", md5.Sum([]byte(content)))
+	sensitiveJSON, _ := json.Marshal(rpc.CheckResult{IsSensitive: true, Reason: "toxic"})
+	safeJSON, _ := json.Marshal(rpc.CheckResult{IsSensitive: false})
+
+	t.Run("replayed sensitive prompt is blocked from the chunk cache", func(t *testing.T) {
+		mockSvcClient := new(MockModerationSvcClient)
+		mockCache := mockcache.NewMockRedisClient(t)
+		mockCache.On("Get", mock.Anything, chunkKey).Return("", errors.New("redis: nil")).Twice()
+		mockSvcClient.On("PassLLMPromptCheck", mock.Anything, mock.Anything).
+			Return(&rpc.CheckResult{IsSensitive: true, Reason: "toxic"}, nil).Once()
+		mockCache.On("SetEx", mock.Anything, chunkKey, string(sensitiveJSON), cacheTTL).Return(nil).Once()
+		// Replay: the pre-scan finds the cached sensitive chunk verdict.
+		mockCache.On("Get", mock.Anything, chunkKey).Return(string(sensitiveJSON), nil).Once()
+
+		modImpl := &moderationImpl{
+			modSvcClient:        mockSvcClient,
+			cacheClient:         mockCache,
+			maxContentLength:    10,
+			promptMaxChunks:     3,
+			pendingPromptChecks: newPendingPromptCheckCache(),
+			pendingVerdictWait:  time.Second,
+		}
+
+		first, err := modImpl.checkLLMPrompt(ctx, content, "key", false)
+		assert.NoError(t, err)
+		assert.False(t, first.IsSensitive, "first pass is the async tier")
+
+		time.Sleep(80 * time.Millisecond) // let the background check land
+
+		second, err := modImpl.checkLLMPrompt(ctx, content, "key", false)
+		assert.NoError(t, err)
+		assert.True(t, second.IsSensitive, "replay must be blocked from the cached chunk verdict")
+		mockSvcClient.AssertExpectations(t)
+	})
+
+	t.Run("replayed safe prompt returns without another moderation call", func(t *testing.T) {
+		mockSvcClient := new(MockModerationSvcClient)
+		mockCache := mockcache.NewMockRedisClient(t)
+		mockCache.On("Get", mock.Anything, chunkKey).Return("", errors.New("redis: nil")).Twice()
+		mockSvcClient.On("PassLLMPromptCheck", mock.Anything, mock.Anything).
+			Return(&rpc.CheckResult{IsSensitive: false}, nil).Once()
+		mockCache.On("SetEx", mock.Anything, chunkKey, string(safeJSON), cacheTTL).Return(nil).Once()
+		mockCache.On("Get", mock.Anything, chunkKey).Return(string(safeJSON), nil).Once()
+
+		modImpl := &moderationImpl{
+			modSvcClient:        mockSvcClient,
+			cacheClient:         mockCache,
+			maxContentLength:    10,
+			promptMaxChunks:     3,
+			pendingPromptChecks: newPendingPromptCheckCache(),
+			pendingVerdictWait:  time.Second,
+		}
+
+		first, err := modImpl.checkLLMPrompt(ctx, content, "key", false)
+		assert.NoError(t, err)
+		assert.False(t, first.IsSensitive)
+
+		time.Sleep(80 * time.Millisecond)
+
+		second, err := modImpl.checkLLMPrompt(ctx, content, "key", false)
+		assert.NoError(t, err)
+		assert.False(t, second.IsSensitive, "fully cached safe replay passes without RPC")
+		mockSvcClient.AssertExpectations(t)
 	})
 }

@@ -39,8 +39,12 @@ type ResponseWriterWrapper struct {
 	tokenCounter        token.ChatTokenCounter
 	recorder            component.LLMLogRecorder
 	id                  string
-	statusCode          int
-	sseStarted          bool
+	// requestCtx is the request context the writer was built from; the
+	// stream checks derive their moderation contexts from it so the
+	// per-request moderation session id travels along.
+	requestCtx context.Context
+	statusCode int
+	sseStarted bool
 }
 
 // Hijack allows the HTTP connection upgrading to a different protocol, such as WebSockets or HTTP/2.
@@ -48,27 +52,64 @@ func (rw *ResponseWriterWrapper) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	return rw.internalWritter.Hijack()
 }
 
-func NewResponseWriterWrapper(internalWritter gin.ResponseWriter, useStream bool, moderationComponent component.Moderation, tokenCounter token.ChatTokenCounter, recorder component.LLMLogRecorder) CommonResponseWriter {
-	if useStream {
-		return newStreamResponseWriter(internalWritter, moderationComponent, tokenCounter, recorder)
-	} else {
-		return newNonStreamResponseWriter(internalWritter, moderationComponent, tokenCounter, recorder)
-	}
+// ChatWriterParams carries the dependencies for building the chat response
+// writer that wraps an upstream response for the client.
+type ChatWriterParams struct {
+	// InternalWriter is the gin response writer to delegate writes to.
+	InternalWriter gin.ResponseWriter
+	// Stream selects the streaming SSE writer over the buffered one.
+	Stream bool
+	// ModerationComponent performs response-side content checks; may be nil
+	// when the model is not enrolled in sensitive checking.
+	ModerationComponent component.Moderation
+	// TokenCounter accumulates completion usage; may be nil.
+	TokenCounter token.ChatTokenCounter
+	// Recorder captures the response for LLM log training; may be nil.
+	Recorder component.LLMLogRecorder
+	// RequestCtx is the request context the writer is built from; it carries
+	// the per-request moderation session id the planner generated, which the
+	// writer derives its id (falling back to a writer-local one for callers
+	// that never went through the planner) and its moderation check
+	// contexts from.
+	RequestCtx context.Context
 }
 
-func newStreamResponseWriter(internalWritter gin.ResponseWriter, moderationComponent component.Moderation, tokenCounter token.ChatTokenCounter, recorder component.LLMLogRecorder) *ResponseWriterWrapper {
-	id := uuid.New().ID()
+// NewResponseWriterWrapper builds the chat response writer.
+func NewResponseWriterWrapper(p ChatWriterParams) CommonResponseWriter {
+	if p.Stream {
+		return newStreamResponseWriter(p)
+	}
+	return newNonStreamResponseWriter(p)
+}
+
+func newStreamResponseWriter(p ChatWriterParams) *ResponseWriterWrapper {
+	requestCtx := p.RequestCtx
+	if requestCtx == nil {
+		requestCtx = context.Background()
+	}
+	id := types.ModerationSessionIDFromContext(requestCtx)
+	if id == "" {
+		id = fmt.Sprint(uuid.New().ID())
+	}
 	return &ResponseWriterWrapper{
-		internalWritter:     internalWritter,
-		moderationComponent: moderationComponent,
-		tokenCounter:        tokenCounter,
+		internalWritter:     p.InternalWriter,
+		moderationComponent: p.ModerationComponent,
+		tokenCounter:        p.TokenCounter,
 		eventStreamDecoder:  streamdecoder.NewSSE(),
-		recorder:            recorder,
-		id:                  fmt.Sprint(id),
+		recorder:            p.Recorder,
+		id:                  id,
+		requestCtx:          requestCtx,
 	}
 }
 
 func (rw *ResponseWriterWrapper) ClearBuffer() {}
+
+// moderationContext derives a bounded moderation check context from the
+// request context, so the per-request moderation session id travels with
+// every response-side check.
+func (rw *ResponseWriterWrapper) moderationContext() (context.Context, context.CancelFunc) {
+	return context.WithTimeout(rw.requestCtx, 5*time.Second)
+}
 
 func (rw *ResponseWriterWrapper) Header() http.Header {
 	return rw.internalWritter.Header()
@@ -99,7 +140,7 @@ func (rw *ResponseWriterWrapper) streamWrite(data []byte) (int, error) {
 		rw.sseStarted = true
 		if string(event.Data) == "[DONE]" {
 			// trigger async check for sensitive content on remaining buffer
-			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			ctx, cancel := rw.moderationContext()
 			defer cancel()
 			res, err := rw.closeStreamCheck(ctx, rw.id)
 			if err != nil {
@@ -129,7 +170,7 @@ func (rw *ResponseWriterWrapper) streamWrite(data []byte) (int, error) {
 			rw.recorder.AppendCompletionChunk(chunk)
 		}
 		// call moderation service
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		ctx, cancel := rw.moderationContext()
 		defer cancel()
 		result, err := rw.checkChatStreamResponse(ctx, chunk, rw.id)
 		if err != nil {

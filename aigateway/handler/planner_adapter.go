@@ -37,20 +37,20 @@ type contentSafetyAdapter struct {
 	policy component.SensitivePolicy
 }
 
-func (a *contentSafetyAdapter) Check(ctx context.Context, model *types.Model, promptText, nsUUID, task string, streaming bool, provider string) (bool, string, error) {
+func (a *contentSafetyAdapter) Check(ctx context.Context, req plan.ContentSafetyCheckRequest) (bool, string, error) {
 	// Only token-generating protocols (chat/responses/messages/systemone) go
 	// through the SensitivePolicy gate here.  Other tasks (text-to-image,
 	// text-to-video, audio, ocr, embedding, rerank) either skip content
 	// safety entirely or use CheckImagePrompts directly in their Execute
 	// phase, which bypasses the SensitivePolicy gate intentionally.
-	switch task {
+	switch req.Task {
 	case "chat", "responses", "messages", "systemone":
 		// fall through
 	default:
 		return false, "", nil
 	}
 
-	shouldCheck, result, err := a.policy.CheckResponsesSensitive(ctx, model, promptText, nsUUID, streaming, provider)
+	shouldCheck, result, err := a.policy.CheckResponsesSensitive(ctx, req.Model, req.PromptText, req.TenantID, req.Streaming, req.Provider)
 	if err != nil {
 		return false, "", err
 	}
