@@ -61,14 +61,17 @@ func (a *contentSafetyAdapter) Check(ctx context.Context, req plan.ContentSafety
 }
 
 // newPlannerDeps builds the dependency set needed by plan.NewPlanner from
-// an OpenAIHandlerImpl. The openai component satisfies the balance interface.
+// an OpenAIHandlerImpl.  The openai component satisfies several of the
+// interfaces directly, including automatic model selection.
 func newPlannerDeps(h *OpenAIHandlerImpl) plan.PlannerDeps {
 	return plan.PlannerDeps{
-		ModelResolver:     &modelResolverAdapter{handler: h},
-		BalanceChecker:    h.openaiComponent,
-		ContentSafety:     &contentSafetyAdapter{policy: h.sensitivePolicy},
-		AdmissionChecker:  newAdmissionChecker(h),
-		MetricsEnricher:   metricsEnricherAdapter{},
+		ModelResolver:         &modelResolverAdapter{handler: h},
+		BalanceChecker:        h.openaiComponent,
+		ContentSafety:         &contentSafetyAdapter{policy: h.sensitivePolicy},
+		AdmissionChecker:      newAdmissionChecker(h),
+		MetricsEnricher:       metricsEnricherAdapter{},
+		AutoModelSelector:     h.openaiComponent,
+		TokenPlanQuotaChecker: h.tokenPlanQuotaChecker,
 	}
 }
 

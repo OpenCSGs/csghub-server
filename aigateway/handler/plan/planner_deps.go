@@ -40,6 +40,23 @@ type BalanceChecker interface {
 	CheckBalance(ctx context.Context, nsUUID string) error
 }
 
+// TokenPlanQuotaChecker verifies that the tenant's active token plan
+// subscription still has allowance for one concrete model. The Planner runs
+// it after the model has been resolved — so automatic routing has already
+// replaced the virtual model with the one that will serve the turn — and
+// next to the balance check.
+//
+// An implementation must return *types.TokenPlanQuotaExceededError when the
+// plan's per-model quota is exhausted, and any other error for an
+// infrastructure failure (for example the accounting service being
+// unavailable). The Planner maps the former to PlanErrQuotaExceeded (HTTP
+// 429) and the latter to an internal error. A nil checker skips the check
+// entirely (the CE build); a tenant without an active token plan
+// subscription must be allowed through.
+type TokenPlanQuotaChecker interface {
+	CheckTokenPlanQuota(ctx context.Context, req commontypes.TokenPlanQuotaReq) error
+}
+
 // AdmissionChecker enforces capacity admission (CapacityPolicy) for the
 // resolved model target. It runs BEFORE the content-safety check (step 7 vs
 // 8): the sensitive check is the expensive Plan-phase step (whitelist query
