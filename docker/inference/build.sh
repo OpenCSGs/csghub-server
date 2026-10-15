@@ -84,6 +84,13 @@ case "${IMAGE%:*}" in
   paddleocr-cpu)
     DOCKERFILE="Dockerfile.paddleocr-cpu"
     ;;
+  laya)
+    PLATFORMS="linux/amd64"
+    DOCKERFILE="Dockerfile.laya"
+    ;;
+  laya-cpu)
+    DOCKERFILE="Dockerfile.laya-cpu"
+    ;;
 esac
 
 docker buildx build --platform ${PLATFORMS} \

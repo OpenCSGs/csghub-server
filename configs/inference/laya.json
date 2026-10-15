@@ -1,0 +1,28 @@
+{
+  "engine_name": "laya",
+  "enabled": 1,
+  "container_port": 8000,
+  "model_format": "safetensors",
+  "description": "Laya System-1 typed decision engine (choice/score/yes-no, Jev /v1/systemone API)",
+  "engine_images": [
+    {
+      "compute_type": "gpu",
+      "image": "opencsghq/laya:0.3.22",
+      "driver_version": "12.8",
+      "engine_version": "0.3.22"
+    },
+    {
+      "compute_type": "cpu",
+      "image": "opencsghq/laya-cpu:0.3.22",
+      "engine_version": "0.3.22"
+    }
+  ],
+  "supported_archs": [
+    "LayaTypedDecisions"
+  ],
+  "supported_models": [
+    "laya",
+    "laya-multilingual",
+    "laya-typed-decisions"
+  ]
+}

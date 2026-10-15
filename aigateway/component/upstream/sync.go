@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"strings"
 
+	aigatewaytypes "opencsg.com/csghub-server/aigateway/types"
 	deploybuilder "opencsg.com/csghub-server/builder/deploy"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
@@ -172,6 +173,7 @@ func (c *aiGatewayUpstreamSyncComponentImpl) SyncRunningDeploy(ctx context.Conte
 		SourceID:    info.DeployID,
 		Metadata: &commontypes.UpstreamMetadata{
 			InternalModelInfo: c.buildInternalModelInfo(info, hostOverride),
+			Protocol:          protocolForRuntimeFramework(info.RuntimeFramework),
 		},
 	}
 
@@ -236,6 +238,14 @@ func (c *aiGatewayUpstreamSyncComponentImpl) mergeSyncOwnedMetadata(existing *co
 	if existing != nil {
 		responsesChatAdapter = existing.ResponsesChatAdapter
 		protocol = existing.Protocol
+	}
+	// Override protocol for engines that speak a fixed protocol (e.g. laya
+	// only supports systemone). This intentionally breaks the "preserve
+	// admin-configured protocol" semantics for these engines: the endpoint
+	// physically cannot serve any other protocol, so any admin override is
+	// reverted on every re-sync.
+	if p := protocolForRuntimeFramework(info.RuntimeFramework); p != "" {
+		protocol = p
 	}
 	return &commontypes.UpstreamMetadata{
 		InternalModelInfo:    c.buildInternalModelInfo(info, hostOverride),
@@ -376,4 +386,14 @@ func (c *aiGatewayUpstreamSyncComponentImpl) buildInternalModelInfo(info *common
 		Host:             hostOverride,
 		SecureLevel:      info.SecureLevel,
 	}
+}
+
+// protocolForRuntimeFramework returns the fixed upstream protocol for
+// engines that speak a protocol other than the default chat. Returns empty
+// string for engines that should use the default (chat or admin-configured).
+func protocolForRuntimeFramework(framework string) string {
+	if framework == "laya" {
+		return string(aigatewaytypes.ProtocolSystemOne)
+	}
+	return ""
 }
