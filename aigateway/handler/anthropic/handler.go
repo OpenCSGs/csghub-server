@@ -403,6 +403,10 @@ func (h *Handler) HandlePlanError(c *gin.Context, meta *types.RequestMetadata, p
 			writeError(c, http.StatusPaymentRequired, ErrTypeInvalidRequest,
 				fmt.Sprintf("insufficient balance: %v", err))
 			return
+		case types.PlanErrQuotaExceeded:
+			// The tenant's token plan allowance for this model is spent.
+			writeError(c, http.StatusTooManyRequests, ErrTypeRateLimit, err.Error())
+			return
 		case types.PlanErrQueueTimeout:
 			// The client's queue-wait tolerance expired, not the capacity
 			// gate: 408, no Retry-After.

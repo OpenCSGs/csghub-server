@@ -101,3 +101,18 @@ func TestHandleOpenAIPlanError_InsufficientBalanceWithEmptyFrontendURL(t *testin
 		t.Errorf("expected relative recharge link in body, got %q", w.Body.String())
 	}
 }
+
+func TestHandleOpenAIPlanError_QuotaExceeded(t *testing.T) {
+	c, w := newPlanErrorContext(t)
+	meta := &types.RequestMetadata{Model: "test-model"}
+	p := &types.RequestPlan{ErrorCode: types.PlanErrQuotaExceeded}
+
+	handleOpenAIPlanError(c, meta, p, errors.New("token plan quota exceeded for model test-model"), "")
+
+	if w.Code != http.StatusTooManyRequests {
+		t.Fatalf("expected status %d, got %d", http.StatusTooManyRequests, w.Code)
+	}
+	if !strings.Contains(w.Body.String(), "token_plan_quota_exceeded") {
+		t.Errorf("expected token_plan_quota_exceeded code, got %q", w.Body.String())
+	}
+}

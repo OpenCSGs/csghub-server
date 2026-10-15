@@ -1,9 +1,11 @@
 package plan
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/aigateway/handler/protocol"
@@ -25,11 +27,16 @@ import (
 // the protocol handler's HandlePlanError so it can render the correct
 // protocol-specific error response.
 type plannerImpl struct {
-	modelResolver    ModelResolver
-	balanceChecker   BalanceChecker
-	contentSafety    ContentSafetyChecker
-	admissionChecker AdmissionChecker
-	metricsEnricher  MetricsEnricher
+	modelResolver     ModelResolver
+	balanceChecker    BalanceChecker
+	contentSafety     ContentSafetyChecker
+	admissionChecker  AdmissionChecker
+	metricsEnricher   MetricsEnricher
+	autoModelSelector AutoModelSelector
+	// tokenPlanQuotaChecker enforces the per-model token allowance of a
+	// tenant's active token plan subscription. Nil disables the check (the
+	// CE build, or a gateway with no accounting service configured).
+	tokenPlanQuotaChecker TokenPlanQuotaChecker
 	// queueMaxRePlans bounds the re-plans triggered by an admission reroute
 	// (an upstream turned unavailable while the request waited in its
 	// reservation queue). The queue never picks another upstream itself;
@@ -39,13 +46,16 @@ type plannerImpl struct {
 }
 
 // PlannerDeps bundles the Planner's dependencies so the set can grow
-// without breaking every call site. AdmissionChecker is optional.
+// without breaking every call site.  AdmissionChecker and AutoModelSelector
+// are optional: when either is nil that step is simply skipped.
 type PlannerDeps struct {
-	ModelResolver    ModelResolver
-	BalanceChecker   BalanceChecker
-	ContentSafety    ContentSafetyChecker
-	AdmissionChecker AdmissionChecker
-	MetricsEnricher  MetricsEnricher
+	ModelResolver         ModelResolver
+	BalanceChecker        BalanceChecker
+	ContentSafety         ContentSafetyChecker
+	AdmissionChecker      AdmissionChecker
+	MetricsEnricher       MetricsEnricher
+	AutoModelSelector     AutoModelSelector
+	TokenPlanQuotaChecker TokenPlanQuotaChecker
 }
 
 // PlannerOption customizes optional planner behavior.
@@ -66,12 +76,14 @@ func WithQueueMaxRePlans(n int) PlannerOption {
 // package provides concrete adapters at the composition root.
 func NewPlanner(deps PlannerDeps, opts ...PlannerOption) Planner {
 	p := &plannerImpl{
-		modelResolver:    deps.ModelResolver,
-		balanceChecker:   deps.BalanceChecker,
-		contentSafety:    deps.ContentSafety,
-		admissionChecker: deps.AdmissionChecker,
-		metricsEnricher:  deps.MetricsEnricher,
-		queueMaxRePlans:  1,
+		modelResolver:         deps.ModelResolver,
+		balanceChecker:        deps.BalanceChecker,
+		contentSafety:         deps.ContentSafety,
+		admissionChecker:      deps.AdmissionChecker,
+		metricsEnricher:       deps.MetricsEnricher,
+		autoModelSelector:     deps.AutoModelSelector,
+		tokenPlanQuotaChecker: deps.TokenPlanQuotaChecker,
+		queueMaxRePlans:       1,
 	}
 	for _, opt := range opts {
 		opt(p)
@@ -81,8 +93,22 @@ func NewPlanner(deps PlannerDeps, opts ...PlannerOption) Planner {
 
 // Plan produces a RequestPlan from the RequestMetadata.
 func (p *plannerImpl) Plan(c *gin.Context, meta *types.RequestMetadata) (*types.RequestPlan, error) {
+	// 0. Automatic model selection.  It runs once for the request, ahead
+	// of any re-plan: a reroute is about an upstream of the chosen model
+	// going away, not about the choice itself, and by then the model has
+	// already been named.
+	routed := &types.RequestPlan{}
+	if err := p.applyAutoModel(c, meta, routed); err != nil {
+		return routed, err
+	}
+
 	for attempt := 0; ; attempt++ {
 		pl, err, reroute := p.planOnce(c, meta)
+		// planOnce builds a fresh plan each time, so the decision taken
+		// above is carried onto whichever plan is returned.
+		if pl != nil {
+			pl.AutoRoute = routed.AutoRoute
+		}
 		if !reroute {
 			return pl, err
 		}
@@ -103,13 +129,16 @@ func (p *plannerImpl) planOnce(c *gin.Context, meta *types.RequestMetadata) (pl 
 	ctx := c.Request.Context()
 	pl = &types.RequestPlan{}
 
-	// 1. Model Resolution. A scoped API key cannot address another model.
+	// 1. Model Resolution.  Automatic model selection already ran in Plan,
+	// so meta.Model names a concrete model here and ctx carries whichever
+	// decision produced it.
 	if scope := types.ParseModelScope(httpbase.GetAPIKeyModelScope(c)); len(scope) > 0 && !types.ModelInScope(scope, meta.Model) {
+		// Attribute the rejected request the same way the not-found path
+		// does: with the requested model ID and no resolved target.
 		if p.metricsEnricher != nil {
 			p.metricsEnricher.SetModelTarget(c, meta.Model, nil, meta.Streaming)
 		}
-		pl.ErrorCode = types.PlanErrModelNotFound
-		return pl, fmt.Errorf("model '%s' not found", meta.Model), false
+		return pl, rejectUnknownModel(pl, meta.Model), false
 	}
 	mt, err := p.modelResolver.ResolveModelTarget(ctx, meta.TenantID, meta.Model, meta.Headers, ResolveOptions{
 		RequiredUpstreamID: meta.RequiredUpstreamID,
@@ -126,8 +155,7 @@ func (p *plannerImpl) planOnce(c *gin.Context, meta *types.RequestMetadata) (pl 
 		return pl, err, false
 	}
 	if mt == nil {
-		pl.ErrorCode = types.PlanErrModelNotFound
-		return pl, fmt.Errorf("model '%s' not found", meta.Model), false
+		return pl, rejectUnknownModel(pl, meta.Model), false
 	}
 	pl.ModelTarget = mt
 
@@ -139,6 +167,13 @@ func (p *plannerImpl) planOnce(c *gin.Context, meta *types.RequestMetadata) (pl 
 			return pl, err, false
 		}
 		pl.ErrorCode = types.PlanErrUnknown
+		return pl, err, false
+	}
+
+	// 3.5 Token plan quota. Enforced for the plan's resolved target so that
+	// aliases, legacy IDs and the automatic-routing choice all resolve to the
+	// model that will actually serve the request; see checkTokenPlanQuota.
+	if err := p.checkTokenPlanQuota(ctx, pl, meta); err != nil {
 		return pl, err, false
 	}
 
@@ -212,6 +247,46 @@ func (p *plannerImpl) planOnce(c *gin.Context, meta *types.RequestMetadata) (pl 
 	}
 
 	return pl, nil, false
+}
+
+// checkTokenPlanQuota enforces the per-model token allowance of the tenant's
+// active token plan subscription for the plan's resolved target. It returns
+// nil when the request may proceed; otherwise it sets the plan's ErrorCode --
+// PlanErrQuotaExceeded for an exhausted allowance, PlanErrInternal for an
+// infrastructure failure (an accounting outage must never be reported to the
+// client as quota exhaustion) -- and returns the error for the caller to
+// propagate.
+//
+// The lookup is keyed on the resolved model's public ID rather than the raw
+// request string, so aliases, legacy IDs and the automatic-routing choice are
+// all canonicalized to the model that will actually serve the turn. The
+// requested ID is only a fallback for the abnormal case where resolution left
+// the resolved ID unset. A nil checker (editions without token plans) or a
+// request without a tenant allows the request through.
+func (p *plannerImpl) checkTokenPlanQuota(ctx context.Context, pl *types.RequestPlan, meta *types.RequestMetadata) error {
+	if p.tokenPlanQuotaChecker == nil || meta.TenantID == "" {
+		return nil
+	}
+
+	quotaModelID := meta.Model
+	if mt := pl.ModelTarget; mt != nil && mt.Model != nil && mt.Model.ID != "" {
+		quotaModelID = mt.Model.ID
+	}
+
+	err := p.tokenPlanQuotaChecker.CheckTokenPlanQuota(ctx, commontypes.TokenPlanQuotaReq{
+		NsUUID:  meta.TenantID,
+		ModelID: quotaModelID,
+	})
+	if err == nil {
+		return nil
+	}
+
+	if _, ok := errors.AsType[*types.TokenPlanQuotaExceededError](err); ok {
+		pl.ErrorCode = types.PlanErrQuotaExceeded
+	} else {
+		pl.ErrorCode = types.PlanErrInternal
+	}
+	return err
 }
 
 // applyAdmissionOutcome folds one admission decision into the plan. It
@@ -333,6 +408,87 @@ var _ Planner = (*plannerImpl)(nil)
 
 // categorizePlanError inspects a Plan-phase error and returns its category.
 // Protocol handlers use this to select the correct HTTP status and error type.
+// applyAutoModel replaces the virtual model ID with the model the ranking
+// service chose for this turn.  It is a no-op for every other model ID.
+// A failure here is reported as a model resolution failure: the caller
+// asked for a model the gateway could not turn into a concrete one.
+func (p *plannerImpl) applyAutoModel(c *gin.Context, meta *types.RequestMetadata, pl *types.RequestPlan) error {
+	ctx := c.Request.Context()
+	if p.autoModelSelector == nil {
+		return nil
+	}
+	// The virtual ID is matched exactly, like every other model ID, so
+	// that the listing, this step and the catalogue lookup all agree on
+	// which requests are for the virtual model.
+	autoID := p.autoModelSelector.AutoModelID()
+	if autoID == "" || strings.TrimSpace(meta.Model) != autoID {
+		return nil
+	}
+
+	decision, err := p.autoModelSelector.ResolveAutoModel(ctx, types.AutoRouteRequest{
+		TenantID:           meta.TenantID,
+		Input:              meta.AutoRouteContext(),
+		RequiredUpstreamID: meta.RequiredUpstreamID,
+		ModelScope:         types.ParseModelScope(httpbase.GetAPIKeyModelScope(c)),
+	})
+	if err != nil {
+		// The plan-error path only renders an HTTP response, so without
+		// this the request would be rejected with no trace of why.  The
+		// selector has already logged the call itself; this adds the
+		// request context that only the Planner has.
+		slog.WarnContext(ctx, "automatic model routing failed, rejecting the request",
+			slog.String("requested_model", meta.Model),
+			slog.String("protocol", meta.Protocol),
+			slog.String("task", meta.Task),
+			slog.String("tenant", meta.TenantID),
+			slog.Any("error", err),
+		)
+		// A ranking service that is merely down must surface as a
+		// retryable 503, not as a model that does not exist; the selector
+		// codes its errors so the shared categorization decides.
+		pl.ErrorCode = categorizePlanError(err)
+		return fmt.Errorf("automatic model routing failed: %w", err)
+	}
+
+	// The decision always names a model, and naming it here is what keeps
+	// the rest of the pipeline working on one canonical ID.
+	meta.Model = decision.ModelID
+	// The routing identity headers are gateway-internal: strip them from the
+	// outbound request so the model gateway never sees them.  X-Session-ID
+	// is left in place because the SessionRouter still uses it for upstream
+	// affinity.
+	c.Request.Header.Del(types.HeaderRouterSessionID)
+	c.Request.Header.Del(types.HeaderRouterTurnID)
+	if decision.Shadowed {
+		// A real model of this caller's owns the virtual ID, so this is an
+		// ordinary request for that model and is not recorded as a routing
+		// decision.
+		return nil
+	}
+	pl.AutoRoute = decision
+	// Echo the router-assigned identity back to the client on the response
+	// headers so it can send the same IDs back on later turns of this
+	// session.  Empty for a pinned decision, where the router was not called.
+	if decision.SessionID != "" {
+		c.Writer.Header().Set(types.HeaderRouterSessionID, decision.SessionID)
+	}
+	if decision.TurnID != "" {
+		c.Writer.Header().Set(types.HeaderRouterTurnID, decision.TurnID)
+	}
+	// Carry the decision on the request context so the recording paths can
+	// attribute the usage to automatic routing.
+	c.Request = c.Request.WithContext(types.WithAutoRouteDecision(ctx, decision))
+	return nil
+}
+
+// rejectUnknownModel marks the plan as a model-not-found failure and returns
+// the error to render. A model outside the API key's scope and a nonexistent
+// one share this answer on purpose, so the two are indistinguishable.
+func rejectUnknownModel(pl *types.RequestPlan, modelID string) error {
+	pl.ErrorCode = types.PlanErrModelNotFound
+	return fmt.Errorf("model '%s' not found", modelID)
+}
+
 func categorizePlanError(err error) types.PlanErrorCategory {
 	if err == nil {
 		return types.PlanErrUnknown

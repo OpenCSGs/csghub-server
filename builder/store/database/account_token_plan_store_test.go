@@ -858,6 +858,199 @@ func TestAccountTokenPlanStore_UpgradeInstance(t *testing.T) {
 	require.Equal(t, float64(-1250), stmt.Value)
 }
 
+func TestAccountTokenPlanStore_GetActiveSubscription(t *testing.T) {
+	ctx := context.Background()
+	db := tests.InitTestDB()
+	defer db.Close()
+	store := database.NewAccountTokenPlanStoreWithDB(db)
+
+	t.Run("no active subscription", func(t *testing.T) {
+		sub, err := store.GetActiveSubscription(ctx, "ns-no-subscription-"+uuid.NewString())
+		require.NoError(t, err)
+		require.Nil(t, sub)
+	})
+
+	t.Run("returns the active instance policy", func(t *testing.T) {
+		instance := insertTokenPlanInstance(ctx, t, db, database.AccountTokenPlanInstance{
+			NsUUID:        "ns-active-" + uuid.NewString(),
+			PlanID:        61,
+			OveragePolicy: types.OveragePolicyReject,
+			Status:        types.SubscriptionStatusActive,
+			CreatedBy:     "tester",
+		})
+
+		sub, err := store.GetActiveSubscription(ctx, instance.NsUUID)
+		require.NoError(t, err)
+		require.NotNil(t, sub)
+		require.Equal(t, instance.ID, sub.InstanceID)
+		require.Equal(t, types.OveragePolicyReject, sub.OveragePolicy)
+	})
+
+	t.Run("ignores inactive instances", func(t *testing.T) {
+		nsUUID := "ns-inactive-" + uuid.NewString()
+		active := insertTokenPlanInstance(ctx, t, db, database.AccountTokenPlanInstance{
+			NsUUID:        nsUUID,
+			PlanID:        62,
+			OveragePolicy: types.OveragePolicyReject,
+			Status:        types.SubscriptionStatusActive,
+			CreatedBy:     "tester",
+		})
+		// Inserted after the active one, so an unfiltered newest-first lookup
+		// would return the expired instance instead.
+		insertTokenPlanInstance(ctx, t, db, database.AccountTokenPlanInstance{
+			NsUUID:        nsUUID,
+			PlanID:        63,
+			OveragePolicy: types.OveragePolicyPayAsYouGo,
+			Status:        types.SubscriptionStatusExpired,
+			CreatedBy:     "tester",
+		})
+
+		sub, err := store.GetActiveSubscription(ctx, nsUUID)
+		require.NoError(t, err)
+		require.NotNil(t, sub)
+		require.Equal(t, active.ID, sub.InstanceID)
+		require.Equal(t, types.OveragePolicyReject, sub.OveragePolicy)
+	})
+}
+
+func TestAccountTokenPlanStore_GetLatestPeriodModelQuota(t *testing.T) {
+	ctx := context.Background()
+	db := tests.InitTestDB()
+	defer db.Close()
+	store := database.NewAccountTokenPlanStoreWithDB(db)
+	now := time.Now().Unix()
+
+	insertPeriod := func(t *testing.T, instanceID, periodNo, startAt, endAt int64) database.AccountTokenPlanInstancePeriod {
+		return insertTokenPlanPeriod(ctx, t, db, database.AccountTokenPlanInstancePeriod{
+			InstanceID: instanceID,
+			PeriodNo:   periodNo,
+			StartAt:    startAt,
+			EndAt:      endAt,
+			Status:     types.BillingStatusPaid,
+			Reason:     types.BillingReasonSubscriptionCycle,
+		})
+	}
+	insertQuota := func(t *testing.T, periodID int64, modelID string, usedTokens, quotaTokens int64) {
+		_, err := db.Core.NewInsert().Model(&database.AccountTokenPlanPeriodModelQuota{
+			PeriodID:    periodID,
+			ModelID:     modelID,
+			TaskType:    "text-generation",
+			QuotaTokens: quotaTokens,
+			UsedTokens:  usedTokens,
+		}).Exec(ctx)
+		require.NoError(t, err)
+	}
+
+	t.Run("no period yet", func(t *testing.T) {
+		instance := insertTokenPlanInstance(ctx, t, db, database.AccountTokenPlanInstance{
+			NsUUID:        "ns-no-period-" + uuid.NewString(),
+			PlanID:        71,
+			OveragePolicy: types.OveragePolicyReject,
+			Status:        types.SubscriptionStatusActive,
+			CreatedBy:     "tester",
+		})
+
+		got, err := store.GetLatestPeriodModelQuota(ctx, instance.ID, "model-a")
+		require.NoError(t, err)
+		require.Nil(t, got)
+	})
+
+	t.Run("model not covered", func(t *testing.T) {
+		instance := insertTokenPlanInstance(ctx, t, db, database.AccountTokenPlanInstance{
+			NsUUID:        "ns-not-covered-" + uuid.NewString(),
+			PlanID:        72,
+			OveragePolicy: types.OveragePolicyReject,
+			Status:        types.SubscriptionStatusActive,
+			CreatedBy:     "tester",
+		})
+		period := insertPeriod(t, instance.ID, 1, now-tokenPlanDay, now+tokenPlanDay)
+		insertQuota(t, period.ID, "model-a", 0, 1000)
+
+		got, err := store.GetLatestPeriodModelQuota(ctx, instance.ID, "model-b")
+		require.NoError(t, err)
+		require.NotNil(t, got)
+		require.Equal(t, period.ID, got.PeriodID)
+		require.Nil(t, got.Quota)
+	})
+
+	t.Run("returns the latest period model quota", func(t *testing.T) {
+		instance := insertTokenPlanInstance(ctx, t, db, database.AccountTokenPlanInstance{
+			NsUUID:        "ns-quota-" + uuid.NewString(),
+			PlanID:        73,
+			OveragePolicy: types.OveragePolicyReject,
+			Status:        types.SubscriptionStatusActive,
+			CreatedBy:     "tester",
+		})
+		period := insertPeriod(t, instance.ID, 1, now-tokenPlanDay, now+10*tokenPlanDay)
+		_, err := db.Core.NewInsert().Model(&database.AccountTokenPlanPeriodModelQuota{
+			PeriodID:          period.ID,
+			ModelID:           "model-a",
+			TaskType:          "text-generation",
+			QuotaTokens:       1000,
+			UsedTokens:        120,
+			QuotaRequestCount: 10,
+			UsedRequestCount:  5,
+		}).Exec(ctx)
+		require.NoError(t, err)
+
+		got, err := store.GetLatestPeriodModelQuota(ctx, instance.ID, "model-a")
+		require.NoError(t, err)
+		require.NotNil(t, got)
+		require.Equal(t, period.ID, got.PeriodID)
+		require.Equal(t, period.StartAt, got.StartAt)
+		require.Equal(t, period.EndAt, got.EndAt)
+		require.NotNil(t, got.Quota)
+		require.Equal(t, "model-a", got.Quota.ModelID)
+		require.Equal(t, int64(120), got.Quota.UsedTokens)
+		require.Equal(t, int64(1000), got.Quota.QuotaTokens)
+		require.Equal(t, int64(5), got.Quota.UsedRequestCount)
+		require.Equal(t, int64(10), got.Quota.QuotaRequestCount)
+	})
+
+	t.Run("uses the latest period", func(t *testing.T) {
+		instance := insertTokenPlanInstance(ctx, t, db, database.AccountTokenPlanInstance{
+			NsUUID:        "ns-latest-period-" + uuid.NewString(),
+			PlanID:        74,
+			OveragePolicy: types.OveragePolicyReject,
+			Status:        types.SubscriptionStatusActive,
+			CreatedBy:     "tester",
+		})
+		older := insertPeriod(t, instance.ID, 1, now-20*tokenPlanDay, now-10*tokenPlanDay)
+		newer := insertPeriod(t, instance.ID, 2, now-10*tokenPlanDay, now+20*tokenPlanDay)
+		insertQuota(t, older.ID, "model-a", 10, 1000)
+		insertQuota(t, newer.ID, "model-a", 900, 1000)
+
+		got, err := store.GetLatestPeriodModelQuota(ctx, instance.ID, "model-a")
+		require.NoError(t, err)
+		require.NotNil(t, got)
+		require.Equal(t, newer.ID, got.PeriodID)
+		require.NotNil(t, got.Quota)
+		require.Equal(t, int64(900), got.Quota.UsedTokens)
+	})
+
+	t.Run("latest period without a quota does not fall back to an older period", func(t *testing.T) {
+		instance := insertTokenPlanInstance(ctx, t, db, database.AccountTokenPlanInstance{
+			NsUUID:        "ns-latest-uncovered-" + uuid.NewString(),
+			PlanID:        75,
+			OveragePolicy: types.OveragePolicyReject,
+			Status:        types.SubscriptionStatusActive,
+			CreatedBy:     "tester",
+		})
+		older := insertPeriod(t, instance.ID, 1, now-20*tokenPlanDay, now-10*tokenPlanDay)
+		newer := insertPeriod(t, instance.ID, 2, now-10*tokenPlanDay, now+20*tokenPlanDay)
+		// The model was covered in the previous period but not in the current
+		// one; the lookup must return the current period with no quota.
+		insertQuota(t, older.ID, "model-a", 900, 1000)
+		insertQuota(t, newer.ID, "model-b", 0, 1000)
+
+		got, err := store.GetLatestPeriodModelQuota(ctx, instance.ID, "model-a")
+		require.NoError(t, err)
+		require.NotNil(t, got)
+		require.Equal(t, newer.ID, got.PeriodID)
+		require.Nil(t, got.Quota)
+	})
+}
+
 func insertTokenPlanInstance(ctx context.Context, t *testing.T, db *database.DB,
 	instance database.AccountTokenPlanInstance) database.AccountTokenPlanInstance {
 	t.Helper()
