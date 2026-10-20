@@ -64,11 +64,12 @@ func (a *contentSafetyAdapter) Check(ctx context.Context, req plan.ContentSafety
 // an OpenAIHandlerImpl. The openai component satisfies the balance interface.
 func newPlannerDeps(h *OpenAIHandlerImpl) plan.PlannerDeps {
 	return plan.PlannerDeps{
-		ModelResolver:     &modelResolverAdapter{handler: h},
-		BalanceChecker:    h.openaiComponent,
-		ContentSafety:     &contentSafetyAdapter{policy: h.sensitivePolicy},
-		AdmissionChecker:  newAdmissionChecker(h),
-		MetricsEnricher:   metricsEnricherAdapter{},
+		ModelResolver:         &modelResolverAdapter{handler: h},
+		BalanceChecker:        h.openaiComponent,
+		ContentSafety:         &contentSafetyAdapter{policy: h.sensitivePolicy},
+		AdmissionChecker:      newAdmissionChecker(h),
+		MetricsEnricher:       metricsEnricherAdapter{},
+		TokenPlanQuotaChecker: h.tokenPlanQuotaChecker,
 	}
 }
 

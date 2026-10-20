@@ -39,6 +39,15 @@ func handleOpenAIPlanError(c *gin.Context, meta *types.RequestMetadata, p *types
 				"type":    "insufficient_balance",
 			}})
 			return
+		case types.PlanErrQuotaExceeded:
+			// The tenant's own token plan allowance for this model is spent:
+			// a client-facing 429, not an outage (which stays PlanErrInternal).
+			c.JSON(http.StatusTooManyRequests, gin.H{"error": gin.H{
+				"code":    "token_plan_quota_exceeded",
+				"message": err.Error(),
+				"type":    "rate_limit_error",
+			}})
+			return
 		case types.PlanErrQueueTimeout:
 			// The client's queue-wait tolerance expired, not the capacity
 			// gate: 408, no Retry-After (the retry decision is the

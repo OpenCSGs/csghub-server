@@ -215,3 +215,8 @@ type AcctTokenPlanUpgradeReq struct {
 }
 
 type AcctTokenPlanRecycleReq = AcctTokenPlanNSGetReq
+
+type TokenPlanQuotaReq struct {
+	NsUUID  string
+	ModelID string
+}

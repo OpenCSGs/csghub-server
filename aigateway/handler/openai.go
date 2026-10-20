@@ -25,6 +25,7 @@ import (
 	"opencsg.com/csghub-server/aigateway/component/adapter/text2video"
 	"opencsg.com/csghub-server/aigateway/component/availability"
 	llmtrace "opencsg.com/csghub-server/aigateway/component/trace"
+	"opencsg.com/csghub-server/aigateway/handler/plan"
 	responsespkg "opencsg.com/csghub-server/aigateway/handler/responses"
 	"opencsg.com/csghub-server/aigateway/token"
 	"opencsg.com/csghub-server/aigateway/types"
@@ -97,6 +98,11 @@ func NewOpenAIHandlerFromConfig(config *config.Config) (*OpenAIHandlerImpl, erro
 	whitelistRule := database.NewRepositoryFileCheckRuleStore()
 	aiGenerationStore := database.NewAIGenerationStore()
 	handler := newOpenAIHandler(modelService, repoComp, modComponent, clusterComp, token.NewCounterFactory(), text2image.NewRegistry(), text2video.NewRegistry(), audioadapter.NewRegistry(), config, storage, whitelistRule, aiGenerationStore)
+
+	// Build the token plan quota checker once here so every protocol handler
+	// built from this instance shares it. Nil in editions without token plans,
+	// where the Planner skips the check.
+	handler.tokenPlanQuotaChecker = newTokenPlanQuotaChecker()
 
 	if config.AIGateway.EnableLLMTrace && config.Instrumentation.OTLPEndpoint != "" {
 		llmTracer, traceErr := llmtrace.NewSigilTracer(llmtrace.SigilConfig{
@@ -227,6 +233,10 @@ type OpenAIHandlerImpl struct {
 	responsesIDMapper          *responsespkg.IDMapper
 	responsesIDMapperOnce      sync.Once
 	responsesIDMapperErr       error
+	// tokenPlanQuotaChecker enforces a tenant's token plan allowance before
+	// inference. Nil when the edition or configuration has no accounting
+	// service, in which case the Planner skips the check.
+	tokenPlanQuotaChecker plan.TokenPlanQuotaChecker
 }
 
 // ListModels godoc

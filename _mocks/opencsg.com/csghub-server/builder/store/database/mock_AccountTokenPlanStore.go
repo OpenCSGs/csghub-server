@@ -307,6 +307,65 @@ func (_c *MockAccountTokenPlanStore_GetActiveInstanceByNsUUID_Call) RunAndReturn
 	return _c
 }
 
+// GetActiveSubscription provides a mock function with given fields: ctx, nsUUID
+func (_m *MockAccountTokenPlanStore) GetActiveSubscription(ctx context.Context, nsUUID string) (*database.TokenPlanActiveSubscription, error) {
+	ret := _m.Called(ctx, nsUUID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetActiveSubscription")
+	}
+
+	var r0 *database.TokenPlanActiveSubscription
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*database.TokenPlanActiveSubscription, error)); ok {
+		return rf(ctx, nsUUID)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) *database.TokenPlanActiveSubscription); ok {
+		r0 = rf(ctx, nsUUID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*database.TokenPlanActiveSubscription)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, nsUUID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAccountTokenPlanStore_GetActiveSubscription_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetActiveSubscription'
+type MockAccountTokenPlanStore_GetActiveSubscription_Call struct {
+	*mock.Call
+}
+
+// GetActiveSubscription is a helper method to define mock.On call
+//   - ctx context.Context
+//   - nsUUID string
+func (_e *MockAccountTokenPlanStore_Expecter) GetActiveSubscription(ctx interface{}, nsUUID interface{}) *MockAccountTokenPlanStore_GetActiveSubscription_Call {
+	return &MockAccountTokenPlanStore_GetActiveSubscription_Call{Call: _e.mock.On("GetActiveSubscription", ctx, nsUUID)}
+}
+
+func (_c *MockAccountTokenPlanStore_GetActiveSubscription_Call) Run(run func(ctx context.Context, nsUUID string)) *MockAccountTokenPlanStore_GetActiveSubscription_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockAccountTokenPlanStore_GetActiveSubscription_Call) Return(_a0 *database.TokenPlanActiveSubscription, _a1 error) *MockAccountTokenPlanStore_GetActiveSubscription_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAccountTokenPlanStore_GetActiveSubscription_Call) RunAndReturn(run func(context.Context, string) (*database.TokenPlanActiveSubscription, error)) *MockAccountTokenPlanStore_GetActiveSubscription_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetByID provides a mock function with given fields: ctx, id
 func (_m *MockAccountTokenPlanStore) GetByID(ctx context.Context, id int64) (*database.AccountTokenPlan, error) {
 	ret := _m.Called(ctx, id)
@@ -421,6 +480,66 @@ func (_c *MockAccountTokenPlanStore_GetByPlanCode_Call) Return(_a0 *database.Acc
 }
 
 func (_c *MockAccountTokenPlanStore_GetByPlanCode_Call) RunAndReturn(run func(context.Context, string) (*database.AccountTokenPlan, error)) *MockAccountTokenPlanStore_GetByPlanCode_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetLatestPeriodModelQuota provides a mock function with given fields: ctx, instanceID, modelID
+func (_m *MockAccountTokenPlanStore) GetLatestPeriodModelQuota(ctx context.Context, instanceID int64, modelID string) (*database.TokenPlanPeriodQuota, error) {
+	ret := _m.Called(ctx, instanceID, modelID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetLatestPeriodModelQuota")
+	}
+
+	var r0 *database.TokenPlanPeriodQuota
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, int64, string) (*database.TokenPlanPeriodQuota, error)); ok {
+		return rf(ctx, instanceID, modelID)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, int64, string) *database.TokenPlanPeriodQuota); ok {
+		r0 = rf(ctx, instanceID, modelID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*database.TokenPlanPeriodQuota)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, int64, string) error); ok {
+		r1 = rf(ctx, instanceID, modelID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAccountTokenPlanStore_GetLatestPeriodModelQuota_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetLatestPeriodModelQuota'
+type MockAccountTokenPlanStore_GetLatestPeriodModelQuota_Call struct {
+	*mock.Call
+}
+
+// GetLatestPeriodModelQuota is a helper method to define mock.On call
+//   - ctx context.Context
+//   - instanceID int64
+//   - modelID string
+func (_e *MockAccountTokenPlanStore_Expecter) GetLatestPeriodModelQuota(ctx interface{}, instanceID interface{}, modelID interface{}) *MockAccountTokenPlanStore_GetLatestPeriodModelQuota_Call {
+	return &MockAccountTokenPlanStore_GetLatestPeriodModelQuota_Call{Call: _e.mock.On("GetLatestPeriodModelQuota", ctx, instanceID, modelID)}
+}
+
+func (_c *MockAccountTokenPlanStore_GetLatestPeriodModelQuota_Call) Run(run func(ctx context.Context, instanceID int64, modelID string)) *MockAccountTokenPlanStore_GetLatestPeriodModelQuota_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(int64), args[2].(string))
+	})
+	return _c
+}
+
+func (_c *MockAccountTokenPlanStore_GetLatestPeriodModelQuota_Call) Return(_a0 *database.TokenPlanPeriodQuota, _a1 error) *MockAccountTokenPlanStore_GetLatestPeriodModelQuota_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAccountTokenPlanStore_GetLatestPeriodModelQuota_Call) RunAndReturn(run func(context.Context, int64, string) (*database.TokenPlanPeriodQuota, error)) *MockAccountTokenPlanStore_GetLatestPeriodModelQuota_Call {
 	_c.Call.Return(run)
 	return _c
 }

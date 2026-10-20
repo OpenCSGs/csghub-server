@@ -131,6 +131,12 @@ const (
 	// as the admission_lease path; the response rarely reaches the client.
 	PlanErrQueueCancelled
 	PlanErrInternal
+	// PlanErrQuotaExceeded marks a request rejected because the tenant's
+	// active token plan subscription has exhausted the requested model's
+	// allowance for the current period and its overage policy rejects
+	// further use. It is rendered as HTTP 429. Deliberately appended after
+	// PlanErrInternal so the existing constant values do not shift.
+	PlanErrQuotaExceeded
 )
 
 // ModelTarget is the protocol-agnostic model target information produced by

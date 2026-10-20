@@ -40,12 +40,41 @@ type AccountTokenPlanStore interface {
 	RecycleNSInstance(ctx context.Context, req types.AcctTokenPlanRecycleReq) error
 	CancelInstance(ctx context.Context, req types.AcctTokenPlanCancelReq) (*AccountTokenPlanInstance, error)
 	UpdateInstanceOveragePolicy(ctx context.Context, req types.AcctTokenPlanUpdateNSReq) (*AccountTokenPlanInstance, error)
+	// GetActiveSubscription returns the namespace's active token plan
+	// subscription, or nil when it has none. It is the first hop of the
+	// read-only inference quota pre-check and never reconciles plan state.
+	GetActiveSubscription(ctx context.Context, nsUUID string) (*TokenPlanActiveSubscription, error)
+	// GetLatestPeriodModelQuota returns the latest billing period of a
+	// subscription instance together with the per-model quota row of that
+	// period, in one read-only query. It returns nil when the instance has no
+	// period yet; Quota is nil when the period does not cover the model.
+	GetLatestPeriodModelQuota(ctx context.Context, instanceID int64, modelID string) (*TokenPlanPeriodQuota, error)
 }
 
 type InstanceReconcileResult struct {
 	NextVal string
 	Explain string
 	Err     error
+}
+
+// TokenPlanActiveSubscription is the first hop of the inference quota
+// pre-check: whether a namespace has an active token plan subscription and,
+// when it does, which overage policy governs it and which instance the current
+// period is read from. Tenants without a subscription, and tenants whose
+// overage policy bills overage instead of rejecting, need no further lookup.
+type TokenPlanActiveSubscription struct {
+	InstanceID    int64
+	OveragePolicy types.OveragePolicy
+}
+
+// TokenPlanPeriodQuota is the second hop of the inference quota pre-check: the
+// latest billing period of a subscription instance and the quota row of one
+// model in that period. Quota is nil when the period does not cover the model.
+type TokenPlanPeriodQuota struct {
+	PeriodID int64
+	StartAt  int64
+	EndAt    int64
+	Quota    *AccountTokenPlanPeriodModelQuota
 }
 
 type ReconcileReq struct {
@@ -491,6 +520,108 @@ func loadPeriodUsages(ctx context.Context, tx bun.Tx, period *AccountTokenPlanIn
 	}
 
 	return nil
+}
+
+// GetActiveSubscription returns the namespace's active token plan
+// subscription, or nil when it has none. It is the first hop of the inference
+// quota pre-check: a tenant without an active subscription is allowed through
+// without reading any period or quota.
+//
+// It is deliberately read-only: the AI gateway calls it on the inference
+// request path, so it must not reconcile, bill or otherwise write. Period
+// rollover is owned by the periodic reconciler
+// (ScanAndConfirmPeriodicalTokenPlans).
+func (a *accountTokenPlanStoreImpl) GetActiveSubscription(ctx context.Context, nsUUID string) (*TokenPlanActiveSubscription, error) {
+	var instance AccountTokenPlanInstance
+	err := a.db.Core.NewSelect().Model(&instance).
+		Where("ns_uuid = ?", nsUUID).
+		Where("status = ?", types.SubscriptionStatusActive).
+		Order("id DESC").
+		Limit(1).
+		Scan(ctx)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, errorx.HandleDBError(err, nil)
+	}
+	return &TokenPlanActiveSubscription{
+		InstanceID:    instance.ID,
+		OveragePolicy: instance.OveragePolicy,
+	}, nil
+}
+
+// latestPeriodModelQuotaRow is the flat projection of the period/quota join.
+// The quota columns are nullable because the latest period may not cover the
+// requested model; the LEFT JOIN still returns the period row in that case.
+// The fields map to the projected column names by bun's default snake_case
+// conversion.
+type latestPeriodModelQuotaRow struct {
+	PeriodID int64
+	StartAt  int64
+	EndAt    int64
+
+	QuotaID           sql.NullInt64
+	QuotaModelID      sql.NullString
+	QuotaTaskType     sql.NullString
+	QuotaTokens       sql.NullInt64
+	UsedTokens        sql.NullInt64
+	QuotaRequestCount sql.NullInt64
+	UsedRequestCount  sql.NullInt64
+	QuotaCreatedAt    sql.NullTime
+	QuotaUpdatedAt    sql.NullTime
+}
+
+// GetLatestPeriodModelQuota returns the latest billing period of the instance
+// together with the quota row of one model in that period, in a single query.
+// It returns (nil, nil) when the instance has no period yet, and the returned
+// Quota is nil when the latest period does not cover the model.
+//
+// The lookup never falls back to an older period: the allowance enforced is the
+// current one. It is read-only for the same reason as GetActiveSubscription.
+func (a *accountTokenPlanStoreImpl) GetLatestPeriodModelQuota(ctx context.Context, instanceID int64, modelID string) (*TokenPlanPeriodQuota, error) {
+	var row latestPeriodModelQuotaRow
+	err := a.db.Core.NewSelect().
+		TableExpr("account_token_plan_instance_periods AS p").
+		ColumnExpr("p.id AS period_id, p.start_at, p.end_at").
+		ColumnExpr("q.id AS quota_id, q.model_id AS quota_model_id, q.task_type AS quota_task_type").
+		ColumnExpr("q.quota_tokens, q.used_tokens, q.quota_request_count, q.used_request_count").
+		ColumnExpr("q.created_at AS quota_created_at, q.updated_at AS quota_updated_at").
+		// "quota" is one of bun's non-pluralized table names (see
+		// AccountTokenPlanPeriodModelQuota); the join must use that exact name.
+		Join("LEFT JOIN account_token_plan_period_model_quota AS q ON q.period_id = p.id AND q.model_id = ?", modelID).
+		Where("p.instance_id = ?", instanceID).
+		OrderExpr("p.id DESC").
+		Limit(1).
+		Scan(ctx, &row)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, errorx.HandleDBError(err, nil)
+	}
+
+	periodQuota := &TokenPlanPeriodQuota{
+		PeriodID: row.PeriodID,
+		StartAt:  row.StartAt,
+		EndAt:    row.EndAt,
+	}
+	if row.QuotaID.Valid {
+		quota := &AccountTokenPlanPeriodModelQuota{
+			ID:                row.QuotaID.Int64,
+			PeriodID:          row.PeriodID,
+			ModelID:           row.QuotaModelID.String,
+			TaskType:          row.QuotaTaskType.String,
+			QuotaTokens:       row.QuotaTokens.Int64,
+			UsedTokens:        row.UsedTokens.Int64,
+			QuotaRequestCount: row.QuotaRequestCount.Int64,
+			UsedRequestCount:  row.UsedRequestCount.Int64,
+		}
+		quota.CreatedAt = row.QuotaCreatedAt.Time
+		quota.UpdatedAt = row.QuotaUpdatedAt.Time
+		periodQuota.Quota = quota
+	}
+	return periodQuota, nil
 }
 
 func (a *accountTokenPlanStoreImpl) CreateInstanceWithPeriod(ctx context.Context, req types.AcctTokenPlanPurchaseReq) (*AccountTokenPlanInstance, error) {

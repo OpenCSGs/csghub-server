@@ -1,6 +1,7 @@
 package plan
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -30,6 +31,10 @@ type plannerImpl struct {
 	contentSafety    ContentSafetyChecker
 	admissionChecker AdmissionChecker
 	metricsEnricher  MetricsEnricher
+	// tokenPlanQuotaChecker enforces the per-model token allowance of a
+	// tenant's active token plan subscription. Nil disables the check (the
+	// CE build, or a gateway with no accounting service configured).
+	tokenPlanQuotaChecker TokenPlanQuotaChecker
 	// queueMaxRePlans bounds the re-plans triggered by an admission reroute
 	// (an upstream turned unavailable while the request waited in its
 	// reservation queue). The queue never picks another upstream itself;
@@ -41,11 +46,12 @@ type plannerImpl struct {
 // PlannerDeps bundles the Planner's dependencies so the set can grow
 // without breaking every call site. AdmissionChecker is optional.
 type PlannerDeps struct {
-	ModelResolver    ModelResolver
-	BalanceChecker   BalanceChecker
-	ContentSafety    ContentSafetyChecker
-	AdmissionChecker AdmissionChecker
-	MetricsEnricher  MetricsEnricher
+	ModelResolver         ModelResolver
+	BalanceChecker        BalanceChecker
+	ContentSafety         ContentSafetyChecker
+	AdmissionChecker      AdmissionChecker
+	MetricsEnricher       MetricsEnricher
+	TokenPlanQuotaChecker TokenPlanQuotaChecker
 }
 
 // PlannerOption customizes optional planner behavior.
@@ -66,12 +72,13 @@ func WithQueueMaxRePlans(n int) PlannerOption {
 // package provides concrete adapters at the composition root.
 func NewPlanner(deps PlannerDeps, opts ...PlannerOption) Planner {
 	p := &plannerImpl{
-		modelResolver:    deps.ModelResolver,
-		balanceChecker:   deps.BalanceChecker,
-		contentSafety:    deps.ContentSafety,
-		admissionChecker: deps.AdmissionChecker,
-		metricsEnricher:  deps.MetricsEnricher,
-		queueMaxRePlans:  1,
+		modelResolver:         deps.ModelResolver,
+		balanceChecker:        deps.BalanceChecker,
+		contentSafety:         deps.ContentSafety,
+		admissionChecker:      deps.AdmissionChecker,
+		metricsEnricher:       deps.MetricsEnricher,
+		tokenPlanQuotaChecker: deps.TokenPlanQuotaChecker,
+		queueMaxRePlans:       1,
 	}
 	for _, opt := range opts {
 		opt(p)
@@ -139,6 +146,13 @@ func (p *plannerImpl) planOnce(c *gin.Context, meta *types.RequestMetadata) (pl 
 			return pl, err, false
 		}
 		pl.ErrorCode = types.PlanErrUnknown
+		return pl, err, false
+	}
+
+	// 3.5 Token plan quota. Enforced for the plan's resolved target so that
+	// aliases, legacy IDs and the automatic-routing choice all resolve to the
+	// model that will actually serve the request; see checkTokenPlanQuota.
+	if err := p.checkTokenPlanQuota(ctx, pl, meta); err != nil {
 		return pl, err, false
 	}
 
@@ -212,6 +226,46 @@ func (p *plannerImpl) planOnce(c *gin.Context, meta *types.RequestMetadata) (pl 
 	}
 
 	return pl, nil, false
+}
+
+// checkTokenPlanQuota enforces the per-model token allowance of the tenant's
+// active token plan subscription for the plan's resolved target. It returns
+// nil when the request may proceed; otherwise it sets the plan's ErrorCode --
+// PlanErrQuotaExceeded for an exhausted allowance, PlanErrInternal for an
+// infrastructure failure (an accounting outage must never be reported to the
+// client as quota exhaustion) -- and returns the error for the caller to
+// propagate.
+//
+// The lookup is keyed on the resolved model's public ID rather than the raw
+// request string, so aliases, legacy IDs and the automatic-routing choice are
+// all canonicalized to the model that will actually serve the turn. The
+// requested ID is only a fallback for the abnormal case where resolution left
+// the resolved ID unset. A nil checker (editions without token plans) or a
+// request without a tenant allows the request through.
+func (p *plannerImpl) checkTokenPlanQuota(ctx context.Context, pl *types.RequestPlan, meta *types.RequestMetadata) error {
+	if p.tokenPlanQuotaChecker == nil || meta.TenantID == "" {
+		return nil
+	}
+
+	quotaModelID := meta.Model
+	if mt := pl.ModelTarget; mt != nil && mt.Model != nil && mt.Model.ID != "" {
+		quotaModelID = mt.Model.ID
+	}
+
+	err := p.tokenPlanQuotaChecker.CheckTokenPlanQuota(ctx, commontypes.TokenPlanQuotaReq{
+		NsUUID:  meta.TenantID,
+		ModelID: quotaModelID,
+	})
+	if err == nil {
+		return nil
+	}
+
+	if _, ok := errors.AsType[*types.TokenPlanQuotaExceededError](err); ok {
+		pl.ErrorCode = types.PlanErrQuotaExceeded
+	} else {
+		pl.ErrorCode = types.PlanErrInternal
+	}
+	return err
 }
 
 // applyAdmissionOutcome folds one admission decision into the plan. It
