@@ -51,7 +51,7 @@ func NewRouter(config *config.Config) (*gin.Engine, func(), error) {
 	middlewareCollection.Auth.NeedAccessToken = middleware.NeedAccessToken()
 	middlewareCollection.License.Check = middleware.CheckLicense(config)
 	middlewareCollection.Auth.MustUserOrgApiKey = middleware.MustUserOrgApiKey(config)
-	APIKeyWM := middlewareCollection.Auth.MustUserOrgApiKey
+	APIKeyMW := middlewareCollection.Auth.MustUserOrgApiKey
 
 	v1Group := r.Group("/v1")
 
@@ -83,7 +83,7 @@ func NewRouter(config *config.Config) (*gin.Engine, func(), error) {
 	// routes.  Each route opts in by including metricsMw in its handler chain.
 	// Returns a no-op handler + cleanup when the metrics feature is not
 	// compiled in (ce build).
-	metricsMw, metricsCleanup := newMetricsMiddleware(config)
+	metricsMW, metricsCleanup := newMetricsMiddleware(config)
 	// quota limit middleware
 	quotaMW := gwmw.NewApiKeyQuotaMiddleware(config)
 
@@ -98,7 +98,7 @@ func NewRouter(config *config.Config) (*gin.Engine, func(), error) {
 	// official Anthropic API path layout. Both /v1/messages and
 	// /anthropic/v1/messages are supported.
 	anthropicGroup := r.Group("/anthropic/v1")
-	anthropicGroup.POST("/messages", APIKeyWM, quotaMW, metricsMw, anthropicHandler.Messages)
+	anthropicGroup.POST("/messages", APIKeyMW, quotaMW, metricsMW, anthropicHandler.Messages)
 
 	// The scope middleware feeds the API key model scope consumed by
 	// ListModels/GetModel. The full quota middleware would bring usage
@@ -107,30 +107,30 @@ func NewRouter(config *config.Config) (*gin.Engine, func(), error) {
 	// resolved here; non-API-key identities pass through unrestricted.
 	v1Group.GET("/models", scopeMW, openAIhandler.ListModels)
 	v1Group.GET("/models/*model", scopeMW, openAIhandler.GetModel)
-	v1Group.POST("/responses", APIKeyWM, quotaMW, metricsMw, responsesHandler.Responses)
-	v1Group.POST("/chat/completions", APIKeyWM, quotaMW, metricsMw, chatHandler.Chat)
-	v1Group.POST("/systemone", APIKeyWM, quotaMW, metricsMw, jevHandler.SystemOne)
-	v1Group.POST("/messages", APIKeyWM, quotaMW, metricsMw, anthropicHandler.Messages)
-	v1Group.POST("/embeddings", APIKeyWM, quotaMW, metricsMw, embeddingHandler.Embedding)
-	v1Group.POST("/rerank", APIKeyWM, quotaMW, metricsMw, rerankHandler.Rerank)
+	v1Group.POST("/responses", APIKeyMW, quotaMW, metricsMW, responsesHandler.Responses)
+	v1Group.POST("/chat/completions", APIKeyMW, quotaMW, metricsMW, chatHandler.Chat)
+	v1Group.POST("/systemone", APIKeyMW, quotaMW, metricsMW, jevHandler.SystemOne)
+	v1Group.POST("/messages", APIKeyMW, quotaMW, metricsMW, anthropicHandler.Messages)
+	v1Group.POST("/embeddings", APIKeyMW, quotaMW, metricsMW, embeddingHandler.Embedding)
+	v1Group.POST("/rerank", APIKeyMW, quotaMW, metricsMW, rerankHandler.Rerank)
 
 	// image and audio and video routes
-	v1Group.POST("/images/generations", APIKeyWM, scopeMW, metricsMw, imageHandler.GenerateImage)
-	v1Group.POST("/images/edits", APIKeyWM, scopeMW, metricsMw, imageHandler.EditImage)
-	v1Group.POST("/audio/transcriptions", APIKeyWM, scopeMW, metricsMw, audioHandler.Transcription)
-	v1Group.POST("/audio/speech", APIKeyWM, scopeMW, metricsMw, speechHandler.Speech)
-	v1Group.POST("/audio/speech/batch", APIKeyWM, scopeMW, metricsMw, speechHandler.SpeechBatch)
-	v1Group.GET("/audio/voices", APIKeyWM, openAIhandler.ListVoices)
-	v1Group.POST("/audio/voices", APIKeyWM, openAIhandler.UploadVoice)
-	v1Group.PUT("/audio/voices", APIKeyWM, openAIhandler.UpdateVoice)
-	v1Group.DELETE("/audio/voices/:name", APIKeyWM, openAIhandler.DeleteVoice)
-	v1Group.POST("/videos", APIKeyWM, scopeMW, metricsMw, videoHandler.CreateVideo)
-	v1Group.GET("/videos/:video_id", APIKeyWM, metricsMw, videoHandler.GetVideo)
-	v1Group.GET("/videos/:video_id/content", APIKeyWM, metricsMw, videoHandler.GetVideoContent)
-	v1Group.POST("/video/generations", APIKeyWM, scopeMW, metricsMw, videoHandler.CreateVideo)
-	v1Group.GET("/video/generations/:video_id", APIKeyWM, metricsMw, videoHandler.GetVideo)
-	v1Group.GET("/video/generations/:video_id/content", APIKeyWM, metricsMw, videoHandler.GetVideoContent)
-	v1Group.POST("/ocr", APIKeyWM, scopeMW, metricsMw, ocrHandler.OCR)
+	v1Group.POST("/images/generations", APIKeyMW, scopeMW, metricsMW, imageHandler.GenerateImage)
+	v1Group.POST("/images/edits", APIKeyMW, scopeMW, metricsMW, imageHandler.EditImage)
+	v1Group.POST("/audio/transcriptions", APIKeyMW, scopeMW, metricsMW, audioHandler.Transcription)
+	v1Group.POST("/audio/speech", APIKeyMW, scopeMW, metricsMW, speechHandler.Speech)
+	v1Group.POST("/audio/speech/batch", APIKeyMW, scopeMW, metricsMW, speechHandler.SpeechBatch)
+	v1Group.GET("/audio/voices", APIKeyMW, openAIhandler.ListVoices)
+	v1Group.POST("/audio/voices", APIKeyMW, openAIhandler.UploadVoice)
+	v1Group.PUT("/audio/voices", APIKeyMW, openAIhandler.UpdateVoice)
+	v1Group.DELETE("/audio/voices/:name", APIKeyMW, openAIhandler.DeleteVoice)
+	v1Group.POST("/videos", APIKeyMW, scopeMW, metricsMW, videoHandler.CreateVideo)
+	v1Group.GET("/videos/:video_id", APIKeyMW, metricsMW, videoHandler.GetVideo)
+	v1Group.GET("/videos/:video_id/content", APIKeyMW, metricsMW, videoHandler.GetVideoContent)
+	v1Group.POST("/video/generations", APIKeyMW, scopeMW, metricsMW, videoHandler.CreateVideo)
+	v1Group.GET("/video/generations/:video_id", APIKeyMW, metricsMW, videoHandler.GetVideo)
+	v1Group.GET("/video/generations/:video_id/content", APIKeyMW, metricsMW, videoHandler.GetVideoContent)
+	v1Group.POST("/ocr", APIKeyMW, scopeMW, metricsMW, ocrHandler.OCR)
 
 	apiV1Group := r.Group("/api/v1")
 	adminGroup := apiV1Group.Group("/admin", middlewareCollection.Auth.NeedAdmin)
