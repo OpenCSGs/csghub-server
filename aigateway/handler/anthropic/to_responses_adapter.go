@@ -516,7 +516,7 @@ func (w *toResponsesResponseWriter) handleResponsesStreamEvent(eventType string,
 			})
 		}
 
-	case "response.completed":
+	case "response.completed", "response.incomplete":
 		var event struct {
 			Response struct {
 				Status string `json:"status"`

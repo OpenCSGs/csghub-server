@@ -181,3 +181,38 @@ func TestResponsesAdapterStreamWriterModeratesRefusalDelta(t *testing.T) {
 	require.Contains(t, body, responsespkg.BlockedMessage)
 	require.NotContains(t, body, "blocked refusal")
 }
+
+func TestResponsesAdapterStreamWriterReportsIncompleteWhenOutputIsCutOff(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	rec := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(rec)
+
+	w := newResponsesAdapterStreamWriter(ctx.Writer, "public-model", nil, nil, "")
+	w.WriteHeader(http.StatusOK)
+	_, err := w.Write([]byte(`data: {"id":"chatcmpl_1","choices":[{"index":0,"delta":{"content":"cut o"},"finish_reason":"length"}]}` + "\n\n"))
+	require.NoError(t, err)
+	require.NoError(t, w.Finalize(http.StatusOK))
+
+	body := rec.Body.String()
+	require.Contains(t, body, "event: response.incomplete")
+	require.NotContains(t, body, "response.completed")
+	require.Contains(t, body, `"status":"incomplete"`)
+	require.Contains(t, body, `"incomplete_details":{"reason":"max_output_tokens"}`)
+}
+
+func TestResponsesAdapterStreamWriterReportsCompletedOnStop(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	rec := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(rec)
+
+	w := newResponsesAdapterStreamWriter(ctx.Writer, "public-model", nil, nil, "")
+	w.WriteHeader(http.StatusOK)
+	_, err := w.Write([]byte(`data: {"id":"chatcmpl_1","choices":[{"index":0,"delta":{"content":"done"},"finish_reason":"stop"}]}` + "\n\n"))
+	require.NoError(t, err)
+	require.NoError(t, w.Finalize(http.StatusOK))
+
+	body := rec.Body.String()
+	require.Contains(t, body, "event: response.completed")
+	require.Contains(t, body, `"status":"completed"`)
+	require.NotContains(t, body, "incomplete_details")
+}

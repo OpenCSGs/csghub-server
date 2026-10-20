@@ -28,6 +28,7 @@ type responsesAdapterStreamWriter struct {
 	eventBuf           bytes.Buffer
 	started            bool
 	completed          bool
+	finishReason       string
 	failed             bool
 	passthrough        bool
 	textStarted        bool
@@ -198,6 +199,7 @@ func (w *responsesAdapterStreamWriter) Write(data []byte) (int, error) {
 				if w.logCapture != nil {
 					w.logCapture.CaptureFinishReason(choice.FinishReason)
 				}
+				w.finishReason = choice.FinishReason
 				if choice.FinishReason == "tool_calls" {
 					w.finishToolCallItems()
 				} else {
@@ -218,9 +220,14 @@ func (w *responsesAdapterStreamWriter) finishResponseStream() {
 	w.finishReasoningItem()
 	w.completed = true
 	w.captureCompletedStreamLog()
-	w.writeResponsesEvent("response.completed", responsespkg.StreamResponseEvent{
-		Type:     "response.completed",
-		Response: w.completedResponse(),
+	response := w.completedResponse()
+	eventType := "response.completed"
+	if response.Status == "incomplete" {
+		eventType = "response.incomplete"
+	}
+	w.writeResponsesEvent(eventType, responsespkg.StreamResponseEvent{
+		Type:     eventType,
+		Response: response,
 	})
 	w.writeData("data: [DONE]")
 }
@@ -642,6 +649,10 @@ func (w *responsesAdapterStreamWriter) responseWithStatus(status string) respons
 
 func (w *responsesAdapterStreamWriter) completedResponse() responsespkg.StreamResponse {
 	response := w.responseWithStatus("completed")
+	if reason := responsesIncompleteReason(w.finishReason); reason != "" {
+		response.Status = "incomplete"
+		response.IncompleteDetails = &responsespkg.StreamIncompleteDetails{Reason: reason}
+	}
 	var outputItems []struct {
 		index int
 		item  any

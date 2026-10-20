@@ -16,6 +16,13 @@ type StreamResponse struct {
 	Output     []any                 `json:"output,omitempty"`
 	OutputText string                `json:"output_text,omitempty"`
 	Usage      *types.ResponsesUsage `json:"usage,omitempty"`
+
+	IncompleteDetails *StreamIncompleteDetails `json:"incomplete_details,omitempty"`
+}
+
+// StreamIncompleteDetails explains why a response ended with status "incomplete".
+type StreamIncompleteDetails struct {
+	Reason string `json:"reason"`
 }
 
 type StreamOutputItemEvent struct {

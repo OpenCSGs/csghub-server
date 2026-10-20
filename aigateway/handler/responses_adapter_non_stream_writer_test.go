@@ -209,3 +209,26 @@ func encodeGzip(t *testing.T, data []byte) ([]byte, error) {
 	}
 	return buf.Bytes(), nil
 }
+
+func TestResponsesAdapterNonStreamWriterReportsIncompleteWhenOutputIsCutOff(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	rec := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(rec)
+
+	w := newResponsesAdapterNonStreamWriter(ctx.Writer, "public-model", nil, nil, "")
+	w.Header().Set("Content-Encoding", "identity")
+	_, err := w.Write([]byte(`{
+		"id":"chat-1",
+		"object":"chat.completion",
+		"created":1700000000,
+		"model":"upstream-model",
+		"choices":[{"index":0,"message":{"role":"assistant","content":"cut o"},"finish_reason":"length"}],
+		"usage":{"prompt_tokens":3,"completion_tokens":5,"total_tokens":8}
+	}`))
+	require.NoError(t, err)
+	require.NoError(t, w.Finalize(http.StatusOK))
+
+	body := rec.Body.String()
+	require.Contains(t, body, `"status":"incomplete"`)
+	require.Contains(t, body, `"incomplete_details":{"reason":"max_output_tokens"}`)
+}
