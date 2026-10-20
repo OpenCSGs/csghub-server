@@ -582,8 +582,8 @@ func (w *toChatResponseWriter) handleChatStreamChunk(data []byte) {
 // toolCallState returns the state of the tool call a streamed delta belongs to.
 // A delta with an index uses it as the key. Providers that omit the index
 // (Gemini's OpenAI-compatible endpoint) send each parallel call whole: a delta
-// with a new id starts a new call, and a delta without an id continues the last
-// one.
+// with a new id starts a new call, and a delta without an id, or repeating the
+// last call's id, continues it.
 func (w *toChatResponseWriter) toolCallState(tcMap map[string]any) *toChatToolCallState {
 	idxFloat, hasIndex := tcMap["index"].(float64)
 	id, _ := tcMap["id"].(string)
@@ -591,7 +591,7 @@ func (w *toChatResponseWriter) toolCallState(tcMap map[string]any) *toChatToolCa
 	switch {
 	case hasIndex:
 		key = int(idxFloat)
-	case id == "" && w.lastToolCall != nil:
+	case w.lastToolCall != nil && (id == "" || id == w.lastToolCall.id):
 		return w.lastToolCall
 	default:
 		w.unindexedToolCalls++

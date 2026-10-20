@@ -251,3 +251,20 @@ func TestToChatStreamIndexedCallsAreUnchanged(t *testing.T) {
 	assert.Equal(t, "call_tokyo", blocks[1].ID)
 	assert.JSONEq(t, `{"city":"Tokyo"}`, blocks[1].Input)
 }
+
+// Some upstreams repeat the id on every fragment of one call.
+func TestToChatStreamFragmentsRepeatingTheIDContinueLastCall(t *testing.T) {
+	blocks, stopReason := streamToolCalls(t,
+		chatChunk(toolCallDelta(`{"id":"call_paris","type":"function","function":{"name":"get_weather","arguments":"{\"city\":"}}`), `null`),
+		chatChunk(toolCallDelta(`{"id":"call_paris","type":"function","function":{"arguments":"\"Paris\"}"}}`), `null`),
+		chatChunk(toolCallDelta(wholeToolCall("call_tokyo", "Tokyo")), `null`),
+		chatChunk(`{}`, `"stop"`),
+	)
+
+	assert.Equal(t, "tool_use", stopReason)
+	require.Len(t, blocks, 2)
+	assert.Equal(t, "call_paris", blocks[0].ID)
+	assert.JSONEq(t, `{"city":"Paris"}`, blocks[0].Input)
+	assert.Equal(t, "call_tokyo", blocks[1].ID)
+	assert.JSONEq(t, `{"city":"Tokyo"}`, blocks[1].Input)
+}
