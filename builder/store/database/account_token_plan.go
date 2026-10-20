@@ -102,6 +102,7 @@ type AccountTokenPlanPeriodModelQuota struct {
 	UsedTokens        int64  `bun:",notnull,default:0" json:"used_tokens"`
 	QuotaRequestCount int64  `bun:",notnull,default:0" json:"quota_request_count"`
 	UsedRequestCount  int64  `bun:",notnull,default:0" json:"used_request_count"`
+	LatestUsedAt      int64  `bun:",notnull,default:0" json:"latest_used_at"`
 	times
 }
 
@@ -118,6 +119,7 @@ type AccountTokenPlanPeriodKeyQuota struct {
 	QuotaRequestCount int64  `bun:",notnull,default:0" json:"quota_request_count"`
 	UsedRequestCount  int64  `bun:",notnull,default:0" json:"used_request_count"`
 	Remark            string `bun:",nullzero" json:"remark"`
+	LatestUsedAt      int64  `bun:",notnull,default:0" json:"latest_used_at"`
 	times
 }
 
