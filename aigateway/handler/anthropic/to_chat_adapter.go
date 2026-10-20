@@ -165,7 +165,12 @@ type toChatResponseWriter struct {
 	outputTokens     int64
 	cacheReadTokens  int64
 	reasoningTokens  int64
-	stopReason       string
+	finishReason     string
+	// lastToolCall is the call that unindexed argument fragments continue.
+	lastToolCall *toChatToolCallState
+	// unindexedToolCalls counts calls opened without a tool_calls[].index; they
+	// are keyed by negative numbers so they never collide with real indexes.
+	unindexedToolCalls int
 
 	// Stream error tracking.
 	streamFailed    bool
@@ -190,7 +195,6 @@ func newToChatResponseWriter(w gin.ResponseWriter, stream bool, publicModel, ups
 		decoder:        streamdecoder.NewSSE(),
 		toolCallStates: make(map[int]*toChatToolCallState),
 		msgID:          newMessagesResponseID(),
-		stopReason:     "end_turn",
 		header:         make(http.Header),
 	}
 }
@@ -336,6 +340,7 @@ func (w *toChatResponseWriter) Finalize() error {
 					"type": "content_block_stop", "index": tc.blockIdx,
 				})
 			}
+			hasToolUse := len(sortedToolCalls) > 0
 			// message_delta with stop_reason and usage.
 			usageMap := map[string]any{
 				"input_tokens":  w.inputTokens,
@@ -346,7 +351,7 @@ func (w *toChatResponseWriter) Finalize() error {
 			}
 			writeSSEEventRaw(w.ginWriter, "message_delta", map[string]any{
 				"type":  "message_delta",
-				"delta": map[string]any{"stop_reason": w.stopReason, "stop_sequence": nil},
+				"delta": map[string]any{"stop_reason": chatStopReason(w.finishReason, hasToolUse), "stop_sequence": nil},
 				"usage": usageMap,
 			})
 			writeSSEEventRaw(w.ginWriter, "message_stop", map[string]any{"type": "message_stop"})
@@ -491,7 +496,7 @@ func (w *toChatResponseWriter) handleChatStreamChunk(data []byte) {
 	// not silently dropped.  The message_stop and message_delta events are
 	// emitted later in Finalize().
 	if choice.FinishReason != nil {
-		w.stopReason = chatFinishReasonToStopReason(*choice.FinishReason)
+		w.finishReason = *choice.FinishReason
 	}
 
 	// Handle text content.
@@ -539,16 +544,7 @@ func (w *toChatResponseWriter) handleChatStreamChunk(data []byte) {
 			if !ok {
 				continue
 			}
-			idxFloat, _ := tcMap["index"].(float64)
-			idx := int(idxFloat)
-			state, exists := w.toolCallStates[idx]
-			if !exists {
-				state = &toChatToolCallState{
-					blockIdx: w.nextBlockIdx,
-				}
-				w.nextBlockIdx++
-				w.toolCallStates[idx] = state
-			}
+			state := w.toolCallState(tcMap)
 			if !state.started {
 				state.started = true
 				if fn, ok := tcMap["function"].(map[string]any); ok {
@@ -581,6 +577,34 @@ func (w *toChatResponseWriter) handleChatStreamChunk(data []byte) {
 			}
 		}
 	}
+}
+
+// toolCallState returns the state of the tool call a streamed delta belongs to.
+// A delta with an index uses it as the key. Providers that omit the index
+// (Gemini's OpenAI-compatible endpoint) send each parallel call whole: a delta
+// with a new id starts a new call, and a delta without an id continues the last
+// one.
+func (w *toChatResponseWriter) toolCallState(tcMap map[string]any) *toChatToolCallState {
+	idxFloat, hasIndex := tcMap["index"].(float64)
+	id, _ := tcMap["id"].(string)
+	var key int
+	switch {
+	case hasIndex:
+		key = int(idxFloat)
+	case id == "" && w.lastToolCall != nil:
+		return w.lastToolCall
+	default:
+		w.unindexedToolCalls++
+		key = -w.unindexedToolCalls
+	}
+	state, exists := w.toolCallStates[key]
+	if !exists {
+		state = &toChatToolCallState{blockIdx: w.nextBlockIdx}
+		w.nextBlockIdx++
+		w.toolCallStates[key] = state
+	}
+	w.lastToolCall = state
+	return state
 }
 
 // chatStreamUsage is the usage payload of a Chat SSE chunk.
