@@ -465,3 +465,70 @@ func TestUpstreamStore_CapacityPolicyRoundTrip(t *testing.T) {
 	require.NotNil(t, found)
 	require.Nil(t, found.CapacityPolicy)
 }
+
+func TestUpstreamStore_ListHealthCheckEnabled(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+	store := database.NewUpstreamStoreWithDB(db, nil)
+	enabledCfg := createTestLLMConfigForUpstream(ctx, t, db, "test-hc-list-enabled")
+
+	disabledCfg := &database.LLMConfig{
+		ModelName: "test-hc-list-disabled",
+		Type:      database.LLMTypeAigatewayExternal,
+		Enabled:   false,
+	}
+	_, err := db.Core.NewInsert().Model(disabledCfg).Exec(ctx)
+	require.NoError(t, err)
+
+	// Upstream.Enabled carries a bun default:true, so a disabled upstream must
+	// be created via an explicit update (same as TestUpstreamStore_ListEnabledBySource).
+	upListed := &database.Upstream{
+		LLMConfigID: enabledCfg.ID, URL: "http://hc-listed:8080/v1", Weight: 1, Enabled: true,
+		ModelName: "hc-listed", HealthCheckEnabled: true,
+	}
+	upNoProbe := &database.Upstream{
+		LLMConfigID: enabledCfg.ID, URL: "http://hc-no-probe:8080/v1", Weight: 1, Enabled: true,
+		ModelName: "hc-no-probe",
+	}
+	upDisabledUpstream := &database.Upstream{
+		LLMConfigID: enabledCfg.ID, URL: "http://hc-disabled-upstream:8080/v1", Weight: 1,
+		ModelName: "hc-disabled-upstream", HealthCheckEnabled: true,
+	}
+	upDisabledConfig := &database.Upstream{
+		LLMConfigID: disabledCfg.ID, URL: "http://hc-disabled-config:8080/v1", Weight: 1, Enabled: true,
+		ModelName: "hc-disabled-config", HealthCheckEnabled: true,
+	}
+	upMissingConfig := &database.Upstream{
+		LLMConfigID: disabledCfg.ID + 1000000, URL: "http://hc-missing-config:8080/v1", Weight: 1, Enabled: true,
+		ModelName: "hc-missing-config", HealthCheckEnabled: true,
+	}
+	for _, u := range []*database.Upstream{upListed, upNoProbe, upDisabledUpstream, upDisabledConfig, upMissingConfig} {
+		require.NoError(t, store.Create(ctx, u))
+	}
+	_, err = db.Core.NewUpdate().Model((*database.Upstream)(nil)).
+		Set("enabled = false").
+		Where("id = ?", upDisabledUpstream.ID).
+		Exec(ctx)
+	require.NoError(t, err)
+
+	// The test DB is shared across the package's tests, so assertions are
+	// scoped to this test's URLs instead of the full row count.
+	result, err := store.ListHealthCheckEnabled(ctx)
+	require.NoError(t, err)
+	listedURLs := make(map[string]bool, len(result))
+	for _, u := range result {
+		listedURLs[u.URL] = true
+	}
+	require.True(t, listedURLs[upListed.URL],
+		"an enabled upstream with health check enabled under an enabled LLM config must be listed")
+	for _, excluded := range []string{
+		upNoProbe.URL,
+		upDisabledUpstream.URL,
+		upDisabledConfig.URL,
+		upMissingConfig.URL,
+	} {
+		require.False(t, listedURLs[excluded],
+			"upstream %s must not be listed (probe disabled, upstream disabled, config disabled, or config missing)", excluded)
+	}
+}

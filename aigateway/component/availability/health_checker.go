@@ -72,8 +72,13 @@ type healthCheckerImpl struct {
 }
 
 type healthProbeJob struct {
-	ctx        context.Context
-	upstream   *database.Upstream
+	ctx      context.Context
+	upstream *database.Upstream
+	// l7Probe is the upstream group's shared memoized L7 probe: group members
+	// run as separate jobs (so their inference probes stay parallel) but all
+	// consume the same single /models outcome. It takes the calling job's
+	// context so shutdown cancellation reaches the blocked probe.
+	l7Probe    func(context.Context) *sampleCheckOutcome
 	completion chan<- struct{}
 }
 
@@ -230,7 +235,7 @@ func (h *healthCheckerImpl) runProbeWorker(ctx context.Context) {
 				prom.AIGatewayHealthCheckProbeActive.Inc()
 			}
 			jobCtx, cancelJob := workerJobContext(ctx, job.ctx)
-			h.performUpstreamHealthCheck(jobCtx, job.upstream)
+			h.applyUpstreamHealthCheck(jobCtx, job.upstream, job.l7Probe)
 			cancelJob()
 			if prom.AIGatewayHealthCheckProbeActive != nil {
 				prom.AIGatewayHealthCheckProbeActive.Dec()
@@ -406,15 +411,28 @@ func (h *healthCheckerImpl) performL7APIChecks(ctx context.Context) {
 			prom.AIGatewayHealthCheckSweepDuration.Observe(time.Since(startedAt).Seconds())
 		}
 	}()
+	probeGroups := groupUpstreamsByL7Probe(upstreams)
+	// Each upstream runs as its own probe job so per-upstream inference
+	// probes stay parallel across the worker pool, matching the original
+	// per-upstream scheduling. The only difference: members of a group share
+	// one memoized /models probe, resolved per upstream by ID.
+	l7Probes := make(map[int64]func(context.Context) *sampleCheckOutcome, len(upstreams))
+	for _, group := range probeGroups {
+		l7Probe := h.newSharedL7Probe(group)
+		for _, upstream := range group {
+			l7Probes[upstream.ID] = l7Probe
+		}
+	}
+
 	completion := make(chan struct{}, len(upstreams))
 	submitted := 0
 	for _, upstream := range upstreams {
 		if h.probeJobs == nil {
-			h.performUpstreamHealthCheck(ctx, upstream)
+			h.applyUpstreamHealthCheck(ctx, upstream, l7Probes[upstream.ID])
 			continue
 		}
 		select {
-		case h.probeJobs <- healthProbeJob{ctx: ctx, upstream: upstream, completion: completion}:
+		case h.probeJobs <- healthProbeJob{ctx: ctx, upstream: upstream, l7Probe: l7Probes[upstream.ID], completion: completion}:
 			submitted++
 		case <-ctx.Done():
 			return
@@ -445,7 +463,96 @@ func (h *healthCheckerImpl) performL7APIChecks(ctx context.Context) {
 	}
 }
 
+// l7ProbeGroupKey identifies upstreams whose L7 /models probe request is
+// identical: the probe carries only the effective sample endpoint and the
+// auth headers (no model name), so those upstreams can share one probe
+// result per sweep.
+type l7ProbeGroupKey struct {
+	endpoint   string
+	authHeader string
+}
+
+// groupUpstreamsByL7Probe buckets upstreams by identical L7 probe request,
+// preserving first-seen group order for deterministic scheduling.
+func groupUpstreamsByL7Probe(upstreams []*database.Upstream) [][]*database.Upstream {
+	groups := make([][]*database.Upstream, 0, len(upstreams))
+	index := make(map[l7ProbeGroupKey]int, len(upstreams))
+	for _, upstream := range upstreams {
+		key := l7ProbeGroupKey{
+			endpoint:   upstream.EffectiveSampleEndpoint(),
+			authHeader: upstream.AuthHeader,
+		}
+		i, ok := index[key]
+		if !ok {
+			i = len(groups)
+			index[key] = i
+			groups = append(groups, nil)
+		}
+		groups[i] = append(groups[i], upstream)
+	}
+	return groups
+}
+
+// performUpstreamHealthCheck probes one upstream's L7 endpoint and applies
+// the outcome. The scheduled sweep uses performGroupHealthCheck instead, so
+// upstreams sharing the same probe endpoint and auth headers probe once.
 func (h *healthCheckerImpl) performUpstreamHealthCheck(ctx context.Context, upstream *database.Upstream) {
+	h.applyUpstreamHealthCheck(ctx, upstream, func(context.Context) *sampleCheckOutcome {
+		return h.performL7APICheckOutcome(ctx, upstream)
+	})
+}
+
+// newSharedL7Probe returns a memoized probe closure shared by one group of
+// upstreams with identical probe endpoint and auth headers: the first member
+// reaching its probe point issues the single /models request and the rest
+// consume the same outcome. The probe runs under the context of the member
+// that triggers it, so shutdown cancellation still reaches a blocked probe.
+// The returned closure is safe for concurrent use by the members' probe jobs.
+func (h *healthCheckerImpl) newSharedL7Probe(group []*database.Upstream) func(context.Context) *sampleCheckOutcome {
+	var (
+		once    sync.Once
+		outcome *sampleCheckOutcome
+	)
+	return func(ctx context.Context) *sampleCheckOutcome {
+		once.Do(func() {
+			if len(group) > 1 {
+				slog.DebugContext(ctx, "Sharing L7 health probe across upstreams",
+					"upstream_count", len(group),
+					"endpoint", group[0].EffectiveSampleEndpoint())
+			}
+			outcome = h.performL7APICheckOutcome(ctx, group[0])
+		})
+		return outcome
+	}
+}
+
+// cloneL7OutcomeForUpstream re-targets a shared L7 probe outcome at one group
+// member: verdict fields (healthy, latency, error, timestamp) are identical
+// for everyone sharing the probe endpoint and auth headers, while identity
+// fields are per upstream.
+func cloneL7OutcomeForUpstream(outcome *sampleCheckOutcome, upstream *database.Upstream) *sampleCheckOutcome {
+	if outcome == nil {
+		return nil
+	}
+	resultCopy := *outcome.result
+	cloned := &sampleCheckOutcome{
+		result:                    &resultCopy,
+		inferenceFallbackRequired: outcome.inferenceFallbackRequired,
+	}
+	cloned.result.UpstreamID = upstream.ID
+	cloned.result.Provider = upstream.Provider
+	cloned.result.ModelName = upstream.ModelName
+	cloned.result.Endpoint = upstream.EffectiveSampleEndpoint()
+	return cloned
+}
+
+// applyUpstreamHealthCheck runs the per-upstream check flow with a lazy L7
+// probe: it validates the inference policy, applies the multimodal probe
+// cadence, and persists exactly one health result per sweep. The probe
+// closure only runs (under this job's context) when the flow actually
+// reaches the probe point, so members skipped by cadence gating never
+// trigger the shared probe.
+func (h *healthCheckerImpl) applyUpstreamHealthCheck(ctx context.Context, upstream *database.Upstream, l7Probe func(context.Context) *sampleCheckOutcome) {
 	// Base-URL upstreams (declared API formats without a protocol path) are
 	// probed at the declared protocol's standard path instead of the raw URL.
 	probeEndpoint := upstream.EffectiveSampleEndpoint()
@@ -495,7 +602,7 @@ func (h *healthCheckerImpl) performUpstreamHealthCheck(ctx context.Context, upst
 			"upstream_id", upstream.ID)
 	}
 
-	l7Outcome := h.performL7APICheckOutcome(ctx, upstream)
+	l7Outcome := cloneL7OutcomeForUpstream(l7Probe(ctx), upstream)
 	result := l7Outcome.result
 	if l7Outcome.inferenceFallbackRequired {
 		if inferencePolicy.Multimodal {

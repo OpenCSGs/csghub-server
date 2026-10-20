@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -128,7 +129,6 @@ func TestDefaultResponsesAndMessagesProvidersRequestInferenceFallbackWhenModelsE
 func TestModelsL7ProviderDoesNotFallbackForOperationalFailures(t *testing.T) {
 	for _, statusCode := range []int{
 		http.StatusUnauthorized,
-		http.StatusTooManyRequests,
 		http.StatusInternalServerError,
 	} {
 		t.Run(http.StatusText(statusCode), func(t *testing.T) {
@@ -141,7 +141,30 @@ func TestModelsL7ProviderDoesNotFallbackForOperationalFailures(t *testing.T) {
 
 			require.NoError(t, err)
 			require.Equal(t, statusCode, result.StatusCode)
+			require.False(t, result.InferenceFallbackRequired)
 			require.Equal(t, 1, callCount)
+		})
+	}
+}
+
+func TestModelsL7ProviderRequestsInferenceFallbackWhenModelsEndpointIsRateLimited(t *testing.T) {
+	for _, statusCode := range []int{http.StatusTooManyRequests, statusClientClosedRequest} {
+		t.Run(strconv.Itoa(statusCode), func(t *testing.T) {
+			endpoint := "https://api.example.com/v1/chat/completions"
+			provider := newProtocolProvider(chatCompletionsRoute, modelsL7Request(chatCompletionsRoute), chatCompletionsRequest, defaultSampleTimeout)
+			requests := make([]*http.Request, 0, 1)
+			result, err := provider.Execute(context.Background(), types.SampleKindL7API, sampleInput(endpoint, "chat-model"), sampleHTTPDoer(func(req *http.Request) (*http.Response, error) {
+				requests = append(requests, req)
+				return &http.Response{StatusCode: statusCode, Body: io.NopCloser(strings.NewReader("rate limited"))}, nil
+			}))
+
+			require.NoError(t, err)
+			require.Equal(t, statusCode, result.StatusCode)
+			require.True(t, result.InferenceFallbackRequired)
+			require.Len(t, requests, 1)
+			require.Equal(t, http.MethodGet, requests[0].Method)
+			require.Equal(t, "https://api.example.com/v1/models", requests[0].URL.String())
+			require.Equal(t, "Bearer test-token", requests[0].Header.Get("Authorization"))
 		})
 	}
 }
