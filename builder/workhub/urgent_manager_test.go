@@ -251,8 +251,8 @@ func TestUrgentManagerBeginNormalIsPreemptedBeforeUrgentStarts(t *testing.T) {
 		return errors.Is(context.Cause(ctx), ErrUrgentPreempt)
 	}, time.Second, time.Millisecond)
 	select {
-	case <-urgentReady:
-		t.Fatal("urgent work started before normal work exited")
+	case err := <-urgentReady:
+		t.Fatalf("urgent work started before normal work exited: %v", err)
 	default:
 	}
 
