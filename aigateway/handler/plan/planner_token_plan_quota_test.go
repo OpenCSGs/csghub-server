@@ -75,31 +75,6 @@ func TestPlan_TokenPlanQuotaInfraFailureIsInternal(t *testing.T) {
 		"an accounting outage must not be reported as quota exhaustion")
 }
 
-func TestPlan_TokenPlanQuotaChecksTheAutoRoutedModel(t *testing.T) {
-	checker := &mockTokenPlanQuotaChecker{}
-	selector := &mockAutoModelSelector{autoID: "auto", decision: &types.AutoRouteDecision{ModelID: "glm-5.1"}}
-	resolver := &mockModelResolver{target: makeResolvedTarget("http://upstream/v1/chat/completions", "")}
-	// The resolver returns the target of the model the router picked, whose
-	// public ID is what the plan quota is keyed on.
-	resolver.target.Model.ID = "glm-5.1"
-	resolver.target.ModelName = "glm-5.1"
-	deps := PlannerDeps{
-		ModelResolver:         resolver,
-		BalanceChecker:        &mockBalanceChecker{},
-		ContentSafety:         &mockContentSafetyChecker{},
-		AutoModelSelector:     selector,
-		TokenPlanQuotaChecker: checker,
-	}
-
-	plan, err := NewPlanner(deps).Plan(newTestGinContext(), autoRouteMeta("auto"))
-
-	require.NoError(t, err)
-	require.NotNil(t, plan)
-	assert.True(t, checker.called)
-	assert.Equal(t, "glm-5.1", checker.gotModelID,
-		"the quota of the model that will actually serve the turn must be enforced")
-}
-
 // TestPlan_TokenPlanQuotaUsesResolvedModelID proves the lookup is keyed on the
 // model the resolver canonicalized to, not the raw request string: an alias or
 // legacy spelling must still enforce the canonical model's allowance.
