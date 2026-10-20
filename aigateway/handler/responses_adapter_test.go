@@ -2455,3 +2455,74 @@ func TestResponsesToChatRequestToolChoiceHandlesCollisions(t *testing.T) {
 		require.Equal(t, "read_file", choice.Function.Name)
 	})
 }
+
+// Gemini's OpenAI-compatible endpoint streams every parallel call whole, in its own chunk, without tool_calls[].index.
+func TestResponsesAdapterStreamWriterKeepsUnindexedParallelToolCallsApart(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(w)
+	writer := newResponsesAdapterStreamWriter(ctx.Writer, "public-model", nil, nil, "")
+	writer.WriteHeader(200)
+
+	for _, chunk := range []string{
+		`{"id":"chatcmpl_1","choices":[{"index":0,"delta":{"tool_calls":[{"id":"call_paris","type":"function","function":{"name":"get_weather","arguments":"{\"city\":\"Paris\"}"}}]}}]}`,
+		`{"id":"chatcmpl_1","choices":[{"index":0,"delta":{"tool_calls":[{"id":"call_london","type":"function","function":{"name":"get_weather","arguments":"{\"city\":\"London\"}"}}]}}]}`,
+		`{"id":"chatcmpl_1","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}`,
+	} {
+		_, err := writer.Write([]byte("data: " + chunk + "\n\n"))
+		require.NoError(t, err)
+	}
+	_, err := writer.Write([]byte("data: [DONE]\n\n"))
+	require.NoError(t, err)
+
+	callIDs := []string{}
+	arguments := map[string]string{}
+	for _, event := range parseResponsesAdapterSSEEvents(t, w.Body.String()) {
+		switch event["type"] {
+		case "response.output_item.added":
+			item, _ := event["item"].(map[string]any)
+			if item["type"] == "function_call" {
+				callIDs = append(callIDs, item["call_id"].(string))
+			}
+		case "response.function_call_arguments.delta":
+			arguments[event["item_id"].(string)] += event["delta"].(string)
+		}
+	}
+	require.Equal(t, []string{"call_paris", "call_london"}, callIDs)
+	require.Equal(t, `{"city":"Paris"}`, arguments["call_paris"])
+	require.Equal(t, `{"city":"London"}`, arguments["call_london"])
+}
+
+func TestResponsesAdapterStreamWriterContinuesUnindexedToolCallFragments(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(w)
+	writer := newResponsesAdapterStreamWriter(ctx.Writer, "public-model", nil, nil, "")
+	writer.WriteHeader(200)
+
+	for _, chunk := range []string{
+		`{"id":"chatcmpl_1","choices":[{"index":0,"delta":{"tool_calls":[{"id":"call_1","type":"function","function":{"name":"lookup","arguments":"{\"q\""}}]}}]}`,
+		`{"id":"chatcmpl_1","choices":[{"index":0,"delta":{"tool_calls":[{"function":{"arguments":":\"x\"}"}}]}}]}`,
+		`{"id":"chatcmpl_1","choices":[{"index":0,"delta":{},"finish_reason":"tool_calls"}]}`,
+	} {
+		_, err := writer.Write([]byte("data: " + chunk + "\n\n"))
+		require.NoError(t, err)
+	}
+	_, err := writer.Write([]byte("data: [DONE]\n\n"))
+	require.NoError(t, err)
+
+	added := 0
+	arguments := ""
+	for _, event := range parseResponsesAdapterSSEEvents(t, w.Body.String()) {
+		switch event["type"] {
+		case "response.output_item.added":
+			if item, _ := event["item"].(map[string]any); item["type"] == "function_call" {
+				added++
+			}
+		case "response.function_call_arguments.delta":
+			arguments += event["delta"].(string)
+		}
+	}
+	require.Equal(t, 1, added)
+	require.Equal(t, `{"q":"x"}`, arguments)
+}
