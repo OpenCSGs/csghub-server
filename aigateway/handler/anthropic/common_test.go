@@ -384,6 +384,19 @@ func TestResponsesResponseToMessagesResponse(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "max_tokens", *result.StopReason)
 	})
+
+	t.Run("incomplete status with content_filter", func(t *testing.T) {
+		resp := &types.ResponsesResponse{
+			Status:            "incomplete",
+			IncompleteDetails: json.RawMessage(`{"reason":"content_filter"}`),
+			Output: []types.ResponsesOutputItem{
+				{Type: "message", Role: "assistant", Content: []types.ResponsesContentPart{{Type: "output_text", Text: "partial"}}},
+			},
+		}
+		result, err := responsesResponseToMessagesResponse(resp, "claude-3")
+		require.NoError(t, err)
+		assert.Equal(t, "refusal", *result.StopReason)
+	})
 }
 
 func TestMessagesToResponsesRequest(t *testing.T) {

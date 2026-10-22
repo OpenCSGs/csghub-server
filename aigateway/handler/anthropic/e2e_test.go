@@ -488,6 +488,7 @@ func TestE2E_ToResponses_Stream_Incomplete(t *testing.T) {
 		wantStopReason string
 	}{
 		{name: "max_output_tokens", details: `{"reason":"max_output_tokens"}`, wantStopReason: "max_tokens"},
+		{name: "content_filter", details: `{"reason":"content_filter"}`, wantStopReason: "refusal"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
