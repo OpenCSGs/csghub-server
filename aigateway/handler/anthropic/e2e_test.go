@@ -481,6 +481,48 @@ func TestE2E_ToResponses_Stream_200(t *testing.T) {
 	assert.Contains(t, bodyStr, "message_stop")
 }
 
+func TestE2E_ToResponses_Stream_Incomplete(t *testing.T) {
+	tests := []struct {
+		name           string
+		details        string
+		wantStopReason string
+	}{
+		{name: "max_output_tokens", details: `{"reason":"max_output_tokens"}`, wantStopReason: "max_tokens"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "text/event-stream")
+				w.WriteHeader(200)
+				flusher := w.(http.Flusher)
+				events := []string{
+					`event: response.created\ndata: {"type":"response.created","response":{"id":"resp_1","status":"in_progress","model":"test"}}`,
+					`event: response.output_text.delta\ndata: {"type":"response.output_text.delta","delta":"Hello"}`,
+					`event: response.incomplete\ndata: {"type":"response.incomplete","response":{"id":"resp_1","status":"incomplete","incomplete_details":` + tt.details + `,"model":"test","usage":{"input_tokens":5,"output_tokens":2}}}`,
+				}
+				for _, e := range events {
+					e = strings.ReplaceAll(e, `\n`, "\n")
+					fmt.Fprint(w, e+"\n\n")
+					flusher.Flush()
+				}
+			}))
+			defer upstream.Close()
+
+			body := strings.Replace(validMessagesBody("test-model"), `"max_tokens": 1024`, `"max_tokens": 1024, "stream": true`, 1)
+			target := makeMessagesTarget(upstream.URL+"/v1/responses", "")
+			planner := &fakePlanner{target: target}
+			handler := makeTestHandlerWithPlanner(planner)
+			w := dispatchWithTarget(t, handler, body, planner)
+
+			require.Equal(t, 200, w.Code)
+			bodyStr := w.Body.String()
+			assert.Contains(t, bodyStr, `"stop_reason":"`+tt.wantStopReason+`"`)
+			assert.Contains(t, bodyStr, `"output_tokens":2`)
+			assert.Contains(t, bodyStr, "message_stop")
+		})
+	}
+}
+
 // --- Error status code tests ---
 
 func TestE2E_Native_404(t *testing.T) {
