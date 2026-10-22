@@ -71,7 +71,7 @@ func (p protocolProvider) Execute(ctx context.Context, kind types.SampleKind, in
 		return nil, err
 	}
 	result, err := executeSampleFactory(ctx, factory, input, client)
-	if err == nil && kind == types.SampleKindL7API && modelsEndpointUnsupported(result) {
+	if err == nil && kind == types.SampleKindL7API && modelsProbeNeedsInferenceFallback(result) {
 		result.InferenceFallbackRequired = true
 	}
 	return result, err
@@ -125,12 +125,31 @@ func executeSampleRequest(ctx context.Context, sampleRequest *types.SampleReques
 	return result
 }
 
-func modelsEndpointUnsupported(result *types.SampleExecutionResult) bool {
+// statusClientClosedRequest is the nginx-specific status for requests dropped
+// before a response arrives; the standard library defines no constant for it.
+const statusClientClosedRequest = 499
+
+// modelsProbeNeedsInferenceFallback reports whether a failed L7 /models probe
+// must be verified with a real inference request instead of counting as a
+// health-check failure: 404/405 mean the models endpoint is not served at
+// all, and 429/499 mean the models route is rate-limited or dropped while
+// inference may still be healthy (providers such as Aliyun throttle
+// concurrent /models calls but serve /chat/completions normally). Auth and
+// bad-request failures stay terminal: the inference probe would fail the
+// same way.
+func modelsProbeNeedsInferenceFallback(result *types.SampleExecutionResult) bool {
 	if result == nil || result.Request == nil || result.Error != nil || result.Request.Method != http.MethodGet {
 		return false
 	}
-	unsupportedStatus := result.StatusCode == http.StatusNotFound || result.StatusCode == http.StatusMethodNotAllowed
-	return unsupportedStatus && endpointMatchesRoute(result.Request.Endpoint, "/models")
+	if !endpointMatchesRoute(result.Request.Endpoint, "/models") {
+		return false
+	}
+	switch result.StatusCode {
+	case http.StatusNotFound, http.StatusMethodNotAllowed, http.StatusTooManyRequests, statusClientClosedRequest:
+		return true
+	default:
+		return false
+	}
 }
 
 func sampleText(input types.SampleInput) string {

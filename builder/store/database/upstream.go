@@ -74,7 +74,9 @@ type UpstreamStore interface {
 	ListByLLMConfigID(ctx context.Context, llmConfigID int64) ([]*Upstream, error)
 	// ListAllEnabled returns all enabled upstreams across all llm_configs.
 	ListAllEnabled(ctx context.Context) ([]*Upstream, error)
-	// ListHealthCheckEnabled returns all upstreams with health_check_enabled=true.
+	// ListHealthCheckEnabled returns all enabled upstreams with
+	// health_check_enabled=true whose LLM config still exists and is enabled
+	// (inner join on llm_configs).
 	ListHealthCheckEnabled(ctx context.Context) ([]*Upstream, error)
 	// DeleteByLLMConfigID deletes all upstreams for a given llm_config.
 	DeleteByLLMConfigID(ctx context.Context, llmConfigID int64) error
@@ -170,9 +172,11 @@ func (s *upstreamStoreImpl) ListAllEnabled(ctx context.Context) ([]*Upstream, er
 func (s *upstreamStoreImpl) ListHealthCheckEnabled(ctx context.Context) ([]*Upstream, error) {
 	var upstreams []*Upstream
 	err := s.db.Core.NewSelect().Model(&upstreams).
-		Where("enabled = true").
-		Where("health_check_enabled = true").
-		Order("id ASC").
+		Join("JOIN llm_configs AS c ON c.id = upstream.llm_config_id").
+		Where("upstream.enabled = true").
+		Where("upstream.health_check_enabled = true").
+		Where("c.enabled = true").
+		Order("upstream.id ASC").
 		Scan(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("list health check enabled upstreams: %w", err)

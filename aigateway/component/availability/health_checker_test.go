@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"sync"
@@ -1714,6 +1715,204 @@ func TestHealthChecker_PerformL7APIChecks_LeaderWithUpstreams(t *testing.T) {
 		"should make HTTP calls for each upstream (L7 API + inference)")
 	require.Equal(t, int32(2), upsertCount.Load(),
 		"should upsert health state for each upstream")
+}
+
+func TestHealthChecker_PerformL7APIChecks_SharesL7ProbeAcrossSameEndpointUpstreams(t *testing.T) {
+	mockStore := mockdatabase.NewMockAIGatewayUpstreamHealthStateStore(t)
+	mockUpstreamStore := mockdatabase.NewMockUpstreamStore(t)
+
+	sharedAuth := `{"authorization":"Bearer shared-token"}`
+	upstreams := []*database.Upstream{
+		{ID: 1, URL: "https://api.example.com/v1/chat/completions", ModelName: "model-a", Provider: "openai", AuthHeader: sharedAuth},
+		{ID: 2, URL: "https://api.example.com/v1/chat/completions", ModelName: "model-b", Provider: "openai", AuthHeader: sharedAuth},
+		{ID: 3, URL: "https://api.example.com/v1/chat/completions", ModelName: "model-c", Provider: "openai", AuthHeader: `{"authorization":"Bearer other-token"}`},
+	}
+	mockUpstreamStore.EXPECT().ListHealthCheckEnabled(mock.Anything).Return(upstreams, nil).Once()
+
+	var mutex sync.Mutex
+	mutatedUpstreamIDs := make(map[int64]int)
+	mockStore.EXPECT().MutateByUpstreamID(mock.Anything, mock.Anything).
+		RunAndReturn(func(_ context.Context, mutation database.AIGatewayUpstreamHealthStateMutation) (*database.AIGatewayUpstreamHealthState, error) {
+			state := &database.AIGatewayUpstreamHealthState{UpstreamID: mutation.UpstreamID, HealthState: string(types.HealthStateHealthy)}
+			require.NoError(t, mutation.Mutate(state))
+			mutex.Lock()
+			mutatedUpstreamIDs[mutation.UpstreamID]++
+			mutex.Unlock()
+			return state, nil
+		}).Times(3)
+
+	var l7Calls, inferenceCalls atomic.Int32
+	checker := &healthCheckerImpl{
+		healthStore:   mockStore,
+		upstreamStore: mockUpstreamStore,
+		stateCache:    NewStateCache(nil),
+		config: HealthCheckerConfig{Config: types.HealthCheckConfig{
+			L7APICheck:  types.L7APICheckConfig{Timeout: 5 * time.Second},
+			HealthRules: types.HealthRulesConfig{ConsecutiveFailuresForUnhealthy: 3},
+		}},
+		httpClient: &http.Client{Transport: &mockTransport{roundTrip: func(req *http.Request) (*http.Response, error) {
+			if req.Method == http.MethodGet {
+				l7Calls.Add(1)
+			} else {
+				inferenceCalls.Add(1)
+			}
+			return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(bytes.NewReader([]byte(`{"data":[]}`))), Header: make(http.Header)}, nil
+		}}},
+	}
+	checker.isLeader.Store(true)
+
+	checker.performL7APIChecks(context.Background())
+
+	require.Equal(t, int32(2), l7Calls.Load(),
+		"upstreams sharing the same endpoint and auth headers must share one /models probe")
+	require.Equal(t, int32(3), inferenceCalls.Load(),
+		"the inference probe stays per upstream because it carries the model name")
+	require.Equal(t, map[int64]int{1: 1, 2: 1, 3: 1}, mutatedUpstreamIDs,
+		"every upstream must get its own health-state update from the shared probe")
+}
+
+func TestHealthChecker_PerformL7APIChecks_GroupMembersRunInParallel(t *testing.T) {
+	const upstreamCount = 3
+	mockStore := mockdatabase.NewMockAIGatewayUpstreamHealthStateStore(t)
+	mockUpstreamStore := mockdatabase.NewMockUpstreamStore(t)
+
+	sharedAuth := `{"authorization":"Bearer shared-token"}`
+	upstreams := make([]*database.Upstream, 0, upstreamCount)
+	for i := 1; i <= upstreamCount; i++ {
+		upstreams = append(upstreams, &database.Upstream{
+			ID: int64(i), URL: "https://api.example.com/v1/chat/completions",
+			ModelName: fmt.Sprintf("model-%d", i), Provider: "openai", AuthHeader: sharedAuth,
+		})
+	}
+	mockUpstreamStore.EXPECT().ListHealthCheckEnabled(mock.Anything).Return(upstreams, nil).Once()
+
+	var mutateCount atomic.Int32
+	mockStore.EXPECT().MutateByUpstreamID(mock.Anything, mock.Anything).
+		RunAndReturn(func(_ context.Context, mutation database.AIGatewayUpstreamHealthStateMutation) (*database.AIGatewayUpstreamHealthState, error) {
+			state := &database.AIGatewayUpstreamHealthState{UpstreamID: mutation.UpstreamID, HealthState: string(types.HealthStateHealthy)}
+			require.NoError(t, mutation.Mutate(state))
+			mutateCount.Add(1)
+			return state, nil
+		}).Times(upstreamCount)
+
+	var l7Calls, inferenceCalls, activeInference, maxInference atomic.Int32
+	provider := executingSampleProvider{
+		executionPolicy: func(types.SampleKind) (types.SampleExecutionPolicy, error) {
+			return types.SampleExecutionPolicy{Timeout: time.Second}, nil
+		},
+		execute: func(_ context.Context, kind types.SampleKind, input types.SampleInput, _ types.HTTPDoer) (*types.SampleExecutionResult, error) {
+			if kind == types.SampleKindL7API {
+				l7Calls.Add(1)
+				return &types.SampleExecutionResult{
+					Request: &types.SampleRequest{Endpoint: input.Endpoint}, StatusCode: http.StatusOK,
+				}, nil
+			}
+			active := activeInference.Add(1)
+			updateMaxInt32(&maxInference, active)
+			defer activeInference.Add(-1)
+			time.Sleep(100 * time.Millisecond)
+			inferenceCalls.Add(1)
+			return &types.SampleExecutionResult{
+				Request: &types.SampleRequest{Endpoint: input.Endpoint}, StatusCode: http.StatusOK,
+			}, nil
+		},
+	}
+
+	checker := &healthCheckerImpl{
+		config: HealthCheckerConfig{
+			ProbeWorkers: 3, PersistenceWorkers: 1,
+			Config: types.HealthCheckConfig{
+				Enabled:     true,
+				L7APICheck:  types.L7APICheckConfig{Timeout: time.Second},
+				HealthRules: types.HealthRulesConfig{ConsecutiveFailuresForUnhealthy: 3},
+			},
+		},
+		healthStore:      mockStore,
+		upstreamStore:    mockUpstreamStore,
+		stateCache:       NewStateCache(nil),
+		sampleRegistry:   sample.NewRegistry(provider),
+		stopCh:           make(chan struct{}),
+		multimodalProbes: newMultimodalProbeScheduler(NewStateCache(nil)),
+		now:              time.Now,
+	}
+	require.NoError(t, checker.Start(context.Background()))
+	t.Cleanup(func() { require.NoError(t, checker.Stop()) })
+	checker.isLeader.Store(true)
+
+	checker.performL7APIChecks(context.Background())
+
+	require.Eventually(t, func() bool { return mutateCount.Load() == upstreamCount },
+		5*time.Second, time.Millisecond)
+	require.Equal(t, int32(1), l7Calls.Load(),
+		"the group must issue exactly one shared /models probe")
+	require.Equal(t, int32(3), inferenceCalls.Load(),
+		"each member must run its own inference probe")
+	require.GreaterOrEqual(t, maxInference.Load(), int32(2),
+		"group members must run their inference probes in parallel, not serially inside one worker")
+}
+
+func TestHealthChecker_PerformL7APIChecks_ModelsRateLimitedFallsBackToInference(t *testing.T) {
+	upstream := &database.Upstream{
+		ID:         1,
+		URL:        "https://api.example.com/v1/chat/completions",
+		ModelName:  "deepseek-v4",
+		Provider:   "openai",
+		AuthHeader: `{"authorization":"Bearer token"}`,
+	}
+	setup := func(t *testing.T, inferenceStatus int) ([]*http.Request, func() *database.AIGatewayUpstreamHealthState) {
+		mockStore := mockdatabase.NewMockAIGatewayUpstreamHealthStateStore(t)
+		mockUpstreamStore := mockdatabase.NewMockUpstreamStore(t)
+		mockUpstreamStore.EXPECT().ListHealthCheckEnabled(mock.Anything).Return([]*database.Upstream{upstream}, nil).Once()
+		latestState := expectStatefulMultimodalHealthStore(t, mockStore, 1)
+
+		var mutex sync.Mutex
+		requests := make([]*http.Request, 0, 2)
+		checker := &healthCheckerImpl{
+			healthStore:   mockStore,
+			upstreamStore: mockUpstreamStore,
+			stateCache:    NewStateCache(nil),
+			config: HealthCheckerConfig{Config: types.HealthCheckConfig{
+				L7APICheck:  types.L7APICheckConfig{Timeout: 5 * time.Second},
+				HealthRules: types.HealthRulesConfig{ConsecutiveFailuresForUnhealthy: 3},
+			}},
+			httpClient: &http.Client{Transport: &mockTransport{roundTrip: func(req *http.Request) (*http.Response, error) {
+				mutex.Lock()
+				requests = append(requests, req)
+				mutex.Unlock()
+				if req.Method == http.MethodGet {
+					return &http.Response{StatusCode: http.StatusTooManyRequests, Body: io.NopCloser(bytes.NewReader([]byte("rate limited"))), Header: make(http.Header)}, nil
+				}
+				return &http.Response{StatusCode: inferenceStatus, Body: io.NopCloser(bytes.NewReader([]byte("inference response"))), Header: make(http.Header)}, nil
+			}}},
+		}
+		checker.isLeader.Store(true)
+
+		checker.performL7APIChecks(context.Background())
+		return requests, latestState
+	}
+
+	t.Run("successful inference probe keeps the upstream healthy", func(t *testing.T) {
+		requests, latestState := setup(t, http.StatusOK)
+
+		require.Len(t, requests, 2, "the 429 /models probe must be followed by an inference probe")
+		require.Equal(t, http.MethodGet, requests[0].Method)
+		require.Equal(t, "https://api.example.com/v1/models", requests[0].URL.String())
+		require.Equal(t, http.MethodPost, requests[1].Method)
+		require.Equal(t, upstream.URL, requests[1].URL.String())
+		state := latestState()
+		require.Equal(t, string(types.HealthStateHealthy), state.HealthState)
+		require.Zero(t, state.ConsecutiveFailures)
+		require.Empty(t, state.LastError)
+	})
+
+	t.Run("failed inference probe counts toward the unhealthy threshold", func(t *testing.T) {
+		_, latestState := setup(t, http.StatusInternalServerError)
+
+		state := latestState()
+		require.Equal(t, 1, state.ConsecutiveFailures)
+		require.NotEqual(t, string(types.HealthStateUnhealthy), state.HealthState)
+		require.Contains(t, state.LastError, "HTTP 500")
+	})
 }
 
 func TestHealthChecker_PerformInferenceCheck_UsesProvidedTimeout(t *testing.T) {
