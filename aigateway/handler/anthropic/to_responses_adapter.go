@@ -516,11 +516,12 @@ func (w *toResponsesResponseWriter) handleResponsesStreamEvent(eventType string,
 			})
 		}
 
-	case "response.completed":
+	case "response.completed", "response.incomplete":
 		var event struct {
 			Response struct {
-				Status string `json:"status"`
-				Usage  *struct {
+				Status            string          `json:"status"`
+				IncompleteDetails json.RawMessage `json:"incomplete_details"`
+				Usage             *struct {
 					InputTokens        int64 `json:"input_tokens"`
 					OutputTokens       int64 `json:"output_tokens"`
 					InputTokensDetails *struct {
@@ -545,7 +546,7 @@ func (w *toResponsesResponseWriter) handleResponsesStreamEvent(eventType string,
 					w.reasoningTokens = event.Response.Usage.OutputTokensDetails.ReasoningTokens
 				}
 			}
-			w.stopReason = responsesStatusToStopReason(event.Response.Status)
+			w.stopReason = responsesStatusToStopReason(event.Response.Status, responsesIncompleteReason(event.Response.IncompleteDetails))
 		}
 		if w.recorder != nil {
 			finishReason := messagesStopReasonToFinishReason(w.stopReason)

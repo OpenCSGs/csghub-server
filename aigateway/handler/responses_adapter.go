@@ -1060,6 +1060,10 @@ func chatResponseToResponsesWithToolAliases(data []byte, publicModel string, too
 	if len(chat.Choices) == 0 {
 		return resp, nil
 	}
+	if reason := responsesIncompleteReason(chat.Choices[0].FinishReason); reason != "" {
+		resp.Status = "incomplete"
+		resp.IncompleteDetails = json.RawMessage(`{"reason":"` + reason + `"}`)
+	}
 	msg := chat.Choices[0].Message
 	if len(msg.ToolCalls) > 0 {
 		for _, call := range msg.ToolCalls {
@@ -1151,5 +1155,19 @@ func responsesReasoningOutputItem(reasoning string) types.ResponsesOutputItem {
 			Type: "summary_text",
 			Text: reasoning,
 		}},
+	}
+}
+
+// responsesIncompleteReason maps a Chat Completions finish_reason that means the
+// output was cut off to the incomplete_details.reason of the Responses API. It
+// returns "" when the response is complete.
+func responsesIncompleteReason(finishReason string) string {
+	switch finishReason {
+	case "length":
+		return "max_output_tokens"
+	case "content_filter":
+		return "content_filter"
+	default:
+		return ""
 	}
 }

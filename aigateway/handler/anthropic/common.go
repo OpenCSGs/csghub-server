@@ -386,6 +386,8 @@ func messagesStopReasonToFinishReason(stopReason string) string {
 		return "tool_calls"
 	case "stop_sequence":
 		return "stop_sequence"
+	case "refusal":
+		return "content_filter"
 	default:
 		return "stop"
 	}
@@ -467,17 +469,31 @@ func responsesResponseToMessagesResponse(resp *types.ResponsesResponse, model st
 	}
 	result.Content = contentBlocks
 
-	stopReason := responsesStatusToStopReason(resp.Status)
+	stopReason := responsesStatusToStopReason(resp.Status, responsesIncompleteReason(resp.IncompleteDetails))
 	result.StopReason = &stopReason
 
 	return result, nil
 }
 
-func responsesStatusToStopReason(status string) string {
+// responsesIncompleteReason reads incomplete_details.reason, or "" when absent.
+func responsesIncompleteReason(details json.RawMessage) string {
+	var parsed struct {
+		Reason string `json:"reason"`
+	}
+	if len(details) == 0 || json.Unmarshal(details, &parsed) != nil {
+		return ""
+	}
+	return parsed.Reason
+}
+
+func responsesStatusToStopReason(status, incompleteReason string) string {
 	switch status {
 	case "completed":
 		return "end_turn"
 	case "incomplete":
+		if incompleteReason == "content_filter" {
+			return "refusal"
+		}
 		return "max_tokens"
 	default:
 		return "end_turn"
