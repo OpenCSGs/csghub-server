@@ -323,7 +323,7 @@ func chatResponseToMessagesResponse(data []byte, model string) (*types.Anthropic
 	}
 	resp.Content = contentBlocks
 
-	stopReason := chatFinishReasonToStopReason(string(choice.FinishReason))
+	stopReason := chatStopReason(string(choice.FinishReason), len(msg.ToolCalls) > 0)
 	resp.StopReason = &stopReason
 
 	return resp, nil
@@ -371,6 +371,19 @@ func chatFinishReasonToStopReason(finishReason string) string {
 	default:
 		return "end_turn"
 	}
+}
+
+// chatStopReason derives the Messages stop_reason from the Chat finish_reason
+// and the content that was actually produced. Some OpenAI-compatible upstreams
+// (Gemini) end a tool-calling turn with finish_reason "stop", so a message with
+// tool_use blocks reports tool_use; a truncated message ("length") still wins
+// and reports max_tokens.
+func chatStopReason(finishReason string, hasToolUse bool) string {
+	stopReason := chatFinishReasonToStopReason(finishReason)
+	if hasToolUse && stopReason != "max_tokens" {
+		return "tool_use"
+	}
+	return stopReason
 }
 
 // messagesStopReasonToFinishReason is the inverse of chatFinishReasonToStopReason,
