@@ -2526,3 +2526,49 @@ func TestResponsesAdapterStreamWriterContinuesUnindexedToolCallFragments(t *test
 	require.Equal(t, 1, added)
 	require.Equal(t, `{"q":"x"}`, arguments)
 }
+
+// An upstream that repeats the function name (with or without the id) on every fragment of a call, and sends no
+// tool_calls[].index, still streams one call.
+func TestResponsesAdapterStreamWriterContinuesRepeatedNameFragments(t *testing.T) {
+	cases := map[string][]string{
+		"repeated id and name": {
+			`{"id":"chatcmpl_1","choices":[{"index":0,"delta":{"tool_calls":[{"id":"call_1","type":"function","function":{"name":"lookup","arguments":"{\"q\""}}]}}]}`,
+			`{"id":"chatcmpl_1","choices":[{"index":0,"delta":{"tool_calls":[{"id":"call_1","type":"function","function":{"name":"lookup","arguments":":\"x\"}"}}]}}]}`,
+		},
+		"repeated name, id sent once": {
+			`{"id":"chatcmpl_1","choices":[{"index":0,"delta":{"tool_calls":[{"id":"call_1","type":"function","function":{"name":"lookup","arguments":"{\"q\""}}]}}]}`,
+			`{"id":"chatcmpl_1","choices":[{"index":0,"delta":{"tool_calls":[{"type":"function","function":{"name":"lookup","arguments":":\"x\"}"}}]}}]}`,
+		},
+	}
+	for name, chunks := range cases {
+		t.Run(name, func(t *testing.T) {
+			gin.SetMode(gin.TestMode)
+			w := httptest.NewRecorder()
+			ctx, _ := gin.CreateTestContext(w)
+			writer := newResponsesAdapterStreamWriter(ctx.Writer, "public-model", nil, nil, "")
+			writer.WriteHeader(200)
+
+			for _, chunk := range append(chunks, `{"id":"chatcmpl_1","choices":[{"index":0,"delta":{},"finish_reason":"tool_calls"}]}`) {
+				_, err := writer.Write([]byte("data: " + chunk + "\n\n"))
+				require.NoError(t, err)
+			}
+			_, err := writer.Write([]byte("data: [DONE]\n\n"))
+			require.NoError(t, err)
+
+			added := 0
+			arguments := ""
+			for _, event := range parseResponsesAdapterSSEEvents(t, w.Body.String()) {
+				switch event["type"] {
+				case "response.output_item.added":
+					if item, _ := event["item"].(map[string]any); item["type"] == "function_call" {
+						added++
+					}
+				case "response.function_call_arguments.delta":
+					arguments += event["delta"].(string)
+				}
+			}
+			require.Equal(t, 1, added)
+			require.Equal(t, `{"q":"x"}`, arguments)
+		})
+	}
+}

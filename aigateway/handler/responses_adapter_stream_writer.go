@@ -288,9 +288,10 @@ func (w *responsesAdapterStreamWriter) writeToolCallDeltas(chunk types.ChatCompl
 
 // toolCallIndex returns the key of the tool call a streamed delta belongs to.
 // OpenAI numbers every call, but Gemini's OpenAI-compatible endpoint streams each
-// parallel call whole, in its own chunk, without an index. A delta without an index
-// starts a new call when it brings an id that differs from the latest call's, or a
-// name after the latest call already has one; anything else continues the latest call.
+// parallel call whole, in its own chunk, without an index. When the latest call has an
+// id, that id decides: a delta with a different id starts a new call, one with the same
+// id or none continues it, even if it repeats the function name. Only when the latest
+// call has no id does a name after the latest call's own name start a new call.
 func (w *responsesAdapterStreamWriter) toolCallIndex(call openai.ChatCompletionChunkChoiceDeltaToolCall) int {
 	if call.JSON.Index.Valid() {
 		return int(call.Index)
@@ -299,8 +300,15 @@ func (w *responsesAdapterStreamWriter) toolCallIndex(call openai.ChatCompletionC
 	if latest == nil {
 		return 0
 	}
-	startsNewCall := (call.ID != "" && latest.UpstreamID != "" && call.ID != latest.UpstreamID) ||
-		(call.Function.Name != "" && latest.Name != "")
+	var startsNewCall bool
+	switch {
+	case latest.UpstreamID != "" && call.ID != "":
+		startsNewCall = call.ID != latest.UpstreamID
+	case latest.UpstreamID != "":
+		startsNewCall = false
+	default:
+		startsNewCall = call.Function.Name != "" && latest.Name != ""
+	}
 	if startsNewCall {
 		return w.lastToolCallIndex + 1
 	}
