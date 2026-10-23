@@ -13,6 +13,7 @@ import (
 	responsespkg "opencsg.com/csghub-server/aigateway/handler/responses"
 
 	"github.com/gin-gonic/gin"
+	"github.com/openai/openai-go/v3"
 	"opencsg.com/csghub-server/aigateway/component"
 	"opencsg.com/csghub-server/aigateway/handler/streamdecoder"
 	"opencsg.com/csghub-server/aigateway/token"
@@ -51,6 +52,7 @@ type responsesAdapterStreamWriter struct {
 	responsesCounter   token.ResponsesTokenCounter
 	usage              *types.ResponsesUsage
 	toolCallItems      map[int]*responsesToolCallStreamState
+	lastToolCallIndex  int
 	moderation         component.Moderation
 	sessionID          string
 	logCapture         *responsespkg.LLMLogRecorder
@@ -60,6 +62,7 @@ type responsesAdapterStreamWriter struct {
 type responsesToolCallStreamState struct {
 	OutputIndex           int
 	CallID                string
+	UpstreamID            string
 	Name                  string
 	Namespace             string
 	Arguments             strings.Builder
@@ -276,7 +279,7 @@ func (w *responsesAdapterStreamWriter) captureChatStreamUsage(chunk types.ChatCo
 func (w *responsesAdapterStreamWriter) writeToolCallDeltas(chunk types.ChatCompletionChunk) {
 	for _, choice := range chunk.Choices {
 		for _, call := range choice.Delta.ToolCalls {
-			index := int(call.Index)
+			index := w.toolCallIndex(call)
 			callID := call.ID
 			name := call.Function.Name
 			state := w.ensureToolCallItem(index, callID, name)
@@ -290,6 +293,35 @@ func (w *responsesAdapterStreamWriter) writeToolCallDeltas(chunk types.ChatCompl
 	}
 }
 
+// toolCallIndex returns the key of the tool call a streamed delta belongs to.
+// OpenAI numbers every call, but Gemini's OpenAI-compatible endpoint streams each
+// parallel call whole, in its own chunk, without an index. When the latest call has an
+// id, that id decides: a delta with a different id starts a new call, one with the same
+// id or none continues it, even if it repeats the function name. Only when the latest
+// call has no id does a name after the latest call's own name start a new call.
+func (w *responsesAdapterStreamWriter) toolCallIndex(call openai.ChatCompletionChunkChoiceDeltaToolCall) int {
+	if call.JSON.Index.Valid() {
+		return int(call.Index)
+	}
+	latest := w.toolCallItems[w.lastToolCallIndex]
+	if latest == nil {
+		return 0
+	}
+	var startsNewCall bool
+	switch {
+	case latest.UpstreamID != "" && call.ID != "":
+		startsNewCall = call.ID != latest.UpstreamID
+	case latest.UpstreamID != "":
+		startsNewCall = false
+	default:
+		startsNewCall = call.Function.Name != "" && latest.Name != ""
+	}
+	if startsNewCall {
+		return w.lastToolCallIndex + 1
+	}
+	return w.lastToolCallIndex
+}
+
 func (w *responsesAdapterStreamWriter) ensureToolCallItem(index int, callID, name string) *responsesToolCallStreamState {
 	state := w.toolCallItems[index]
 	if state == nil {
@@ -300,13 +332,18 @@ func (w *responsesAdapterStreamWriter) ensureToolCallItem(index int, callID, nam
 		state = &responsesToolCallStreamState{
 			OutputIndex: w.nextOutputIndex(),
 			CallID:      itemID,
+			UpstreamID:  callID,
 		}
 		w.toolCallItems[index] = state
+		w.lastToolCallIndex = index
 		if w.logCapture != nil {
 			w.logCapture.CaptureResponseID(w.respID)
 		}
 	} else if state.CallID == "" && callID != "" {
 		state.CallID = callID
+	}
+	if state.UpstreamID == "" && callID != "" {
+		state.UpstreamID = callID
 	}
 	// The chat upstream may send the tool name after argument fragments already
 	// arrived. Buffer those fragments until the name is known, resolve it to the
