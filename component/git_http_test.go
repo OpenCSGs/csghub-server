@@ -4,9 +4,12 @@ import (
 	"context"
 	"crypto/hmac"
 	"database/sql"
+	"encoding/base64"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"net/url"
 	"os"
@@ -250,7 +253,7 @@ func TestGitHTTPComponent_Batch(t *testing.T) {
 			hasWriteAccess: true,
 			exist:          true,
 			resp: &types.BatchResponse{
-				Transfer:       "basic",
+				Transfer: "basic",
 				Objects: []*types.ObjectResponse{
 					{
 						Pointer: types.Pointer{Oid: existOID, Size: 100},
@@ -362,23 +365,29 @@ func TestGitHTTPComponent_BatchMultipart(t *testing.T) {
 	)
 	u := &url.URL{Scheme: "http", Host: "url", Path: "/path"}
 	gc.mocks.s3Core.EXPECT().NewMultipartUpload(ctx, mock.Anything, mock.Anything, mock.Anything).Return("uploadId", nil)
-	gc.mocks.s3Client.EXPECT().PresignHeader(ctx, http.MethodPut, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(u, nil)
+	for part := 1; part <= 2; part++ {
+		gc.mocks.s3Client.EXPECT().PresignHeader(ctx, http.MethodPut, mock.Anything, mock.Anything, types.OssFileExpire, url.Values{
+			"uploadId":   {"uploadId"},
+			"partNumber": {strconv.Itoa(part)},
+		}, http.Header(nil)).Return(u, nil).Once()
+	}
 
 	resp, err := gc.LFSBatch(ctx, types.BatchRequest{
-		Operation:   types.LFSBatchUpload,
-		Namespace:   "ns",
-		Name:        "n",
-		RepoType:    types.ModelRepo,
-		CurrentUser: user,
-		Transfers:   []string{"multipart"},
+		Operation:     types.LFSBatchUpload,
+		Namespace:     "ns",
+		Name:          "n",
+		RepoType:      types.ModelRepo,
+		CurrentUser:   user,
+		Transfers:     []string{"multipart"},
+		Authorization: "Bearer platform-token",
 		Objects: []types.Pointer{
-			{Oid: oid, Size: 100},
+			{Oid: oid, Size: 16*1024*1024 + 1},
 		},
 	})
 	require.Nil(t, err)
 	pointer := types.Pointer{
 		Oid:  oid,
-		Size: 100,
+		Size: 16*1024*1024 + 1,
 	}
 
 	respE := &types.BatchResponse{
@@ -391,13 +400,15 @@ func TestGitHTTPComponent_BatchMultipart(t *testing.T) {
 						Href: "abc",
 						Header: map[string]any{
 							"1":          "http://url/path",
+							"2":          "http://url/path",
 							"chunk_size": strconv.Itoa(16 * 1024 * 1024),
 						},
 					},
 					"verify": {
 						Href: "https://foo.com/models/ns/n.git/info/lfs/verify",
 						Header: map[string]any{
-							"Accept": "application/vnd.git-lfs+json",
+							"Accept":        types.LfsMediaType,
+							"Authorization": "Bearer platform-token",
 						},
 					},
 				},
@@ -408,6 +419,110 @@ func TestGitHTTPComponent_BatchMultipart(t *testing.T) {
 	require.Equal(t, respE.Objects[0].Pointer, resp.Objects[0].Pointer)
 	require.Equal(t, respE.Objects[0].Actions["upload"].Header, resp.Objects[0].Actions["upload"].Header)
 	require.Equal(t, respE.Objects[0].Actions["verify"], resp.Objects[0].Actions["verify"])
+}
+
+func TestGitHTTPComponent_BatchUploadAuthorization(t *testing.T) {
+	const authorization = "Bearer platform-token"
+	cases := []struct {
+		name       string
+		direct     bool
+		uploadURL  string
+		presignErr error
+	}{
+		{name: "proxy"},
+		{name: "JDCloud", direct: true, uploadURL: "https://bucket.s3.cn-north-1.jdcloud-oss.com/object?X-Amz-Signature=signed"},
+		{name: "AWS", direct: true, uploadURL: "https://bucket.s3.amazonaws.com/object?X-Amz-Signature=signed"},
+		{name: "MinIO", direct: true, uploadURL: "http://minio:9000/bucket/object?X-Amz-Signature=signed"},
+		{name: "custom domain", direct: true, uploadURL: "https://storage.example.com/object?X-Amz-Signature=signed"},
+		{name: "same origin", direct: true, uploadURL: "https://foo.com/storage/object?X-Amz-Signature=signed"},
+		{name: "presign fallback", direct: true, presignErr: errors.New("presign failed")},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			gc := initializeTestGitHTTPComponent(ctx, t)
+			gc.config.Git.SkipLfsFileValidation = tc.direct
+			pointer := types.Pointer{Oid: "c39e7f5f1d61fa58ec6dbcd3b60a50870c577f0988d7c080fc88d1b460e7f5f1", Size: 100}
+			gc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "ns", "n").Return(&database.Repository{ID: 123}, nil)
+			gc.mocks.components.repo.EXPECT().AllowWriteAccess(ctx, types.ModelRepo, "ns", "n", "user").Return(true, nil).Once()
+			gc.mocks.stores.LfsMetaObjectMock().EXPECT().FindByRepoID(ctx, int64(123)).Return([]database.LfsMetaObject{}, nil).Once()
+			if tc.direct {
+				u, err := url.Parse(tc.uploadURL)
+				require.NoError(t, err)
+				gc.mocks.s3Client.EXPECT().PresignHeader(ctx, http.MethodPut, gc.config.S3.Bucket, mock.Anything, types.OssFileExpire, url.Values{
+					"X-Amz-Checksum-SHA256":    {base64.StdEncoding.EncodeToString([]byte(pointer.Oid))},
+					"X-Amz-Checksum-Algorithm": {"SHA256"},
+				}, http.Header(nil)).Return(u, tc.presignErr).Once()
+			}
+			resp, err := gc.LFSBatch(ctx, types.BatchRequest{
+				Operation: types.LFSBatchUpload, Namespace: "ns", Name: "n", RepoType: types.ModelRepo,
+				CurrentUser: "user", Authorization: authorization, Objects: []types.Pointer{pointer},
+			})
+			require.NoError(t, err)
+			require.Equal(t, "basic", resp.Transfer)
+			require.Len(t, resp.Objects, 1)
+			upload := resp.Objects[0].Actions["upload"]
+			if tc.direct && tc.presignErr == nil {
+				require.Equal(t, tc.uploadURL, upload.Href)
+				require.Empty(t, upload.Header)
+			} else {
+				require.Equal(t, "https://foo.com/models/ns/n.git/info/lfs/objects/"+pointer.Oid+"/100", upload.Href)
+				require.Equal(t, map[string]any{"Authorization": authorization}, upload.Header)
+			}
+			require.Equal(t, &types.Link{
+				Href:   "https://foo.com/models/ns/n.git/info/lfs/verify",
+				Header: map[string]any{"Authorization": authorization, "Accept": types.LfsMediaType},
+			}, resp.Objects[0].Actions["verify"])
+		})
+	}
+}
+
+func TestObjectStoreUploadHeaders(t *testing.T) {
+	cases := []struct {
+		name   string
+		header map[string]any
+		want   map[string]any
+	}{
+		{name: "nil", want: map[string]any{}},
+		{name: "empty", header: map[string]any{}, want: map[string]any{}},
+		{
+			name: "platform auth is case insensitive",
+			header: map[string]any{
+				"Authorization": "Bearer token", "authorization": "Basic token", "AUTHORIZATION": "another token",
+				"Content-Type": "application/octet-stream", "X-Amz-Checksum-Sha256": "checksum", "chunk_size": 1024,
+			},
+			want: map[string]any{"Content-Type": "application/octet-stream", "X-Amz-Checksum-Sha256": "checksum", "chunk_size": 1024},
+		},
+		{name: "no auth", header: map[string]any{"Content-Type": "application/octet-stream"}, want: map[string]any{"Content-Type": "application/octet-stream"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			original := maps.Clone(tc.header)
+			filtered := objectStoreUploadHeaders(tc.header)
+			require.Equal(t, tc.want, filtered)
+			filtered["Content-Type"] = "changed"
+			require.Equal(t, original, tc.header)
+		})
+	}
+}
+
+func TestGitHTTPComponent_MultipartResumeHeaders(t *testing.T) {
+	ctx := context.Background()
+	gc := initializeTestGitHTTPComponent(ctx, t)
+	gc.config.Git.MinMultipartSize = 16 * 1024 * 1024
+	gc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "ns", "n").Return(&database.Repository{ID: 123}, nil).Once()
+	presignErr := errors.New("presign failed")
+	gc.mocks.s3Client.EXPECT().PresignHeader(ctx, http.MethodPut, gc.config.S3.Bucket, mock.Anything, types.OssFileExpire, url.Values{
+		"uploadId": {"existing-upload"}, "partNumber": {"1"}, "Content-Type": {"application/octet-stream"},
+	}, http.Header(nil)).Return(nil, presignErr).Once()
+	header := map[string]any{"authorization": "Bearer platform-token", "Content-Type": "application/octet-stream"}
+	original := maps.Clone(header)
+	link, err := gc.buildMultipartUploadLink(ctx, types.BatchRequest{
+		Namespace: "ns", Name: "n", RepoType: types.ModelRepo, UploadID: "existing-upload",
+	}, types.Pointer{Oid: "c39e7f5f1d61fa58ec6dbcd3b60a50870c577f0988d7c080fc88d1b460e7f5f1", Size: 100}, header)
+	require.ErrorIs(t, err, presignErr)
+	require.Nil(t, link)
+	require.Equal(t, original, header)
 }
 
 func TestGitHTTPComponent_LfsUpload(t *testing.T) {
