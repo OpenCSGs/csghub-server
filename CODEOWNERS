@@ -1,33 +1,22 @@
-* @hhwang @zhzhang @dlei @james @rbqin @Cemeng @jluo @hshao @apzhang
+* @hhwang @zhzhang @dlei @james @rbqin @bhqin @Cemeng
 
 /accounting/ @hhwang
 /payment/ @hhwang
 /dataviewer/ @hhwang
-
 /builder/mq @hhwang
 /builder/parquet @hhwang
-/builder/deploy/ @james @rbqin @hhwang @Cemeng @apzhang
-/builder/git/ @zhzhang
-
 /mq @hhwang
 
-/multisync/ @zhzhang @hshao
-/mirror/ @zhzhang @hshao
+/multisync/ @zhzhang
+/mirror/ @zhzhang
+/builder/git/ @zhzhang
 
-/runner/ @james @rbqin @hhwang @Cemeng @apzhang
+/runner/ @james @rbqin @hhwang
+/builder/deploy/ @james @rbqin @hhwang
+/api/handler/collection.go @james
+/component/collection.go @james
 
-/docker/ @james @apzhang
+/user/ @dlei
+/moderation/ @dlei
 
-/user/ @dlei  @hshao
-
-/moderation/ @dlei @Cemeng
-
-/logcollector @Cemeng @rbqin
-
-/aigateway @Cemeng
-/llmlog @jluo
-
-/notification @jluo
-
-/fedap @rbqin @hshao
-/trustregistry  @rbqin @hshao
+/logcollector @Cemeng
