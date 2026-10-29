@@ -1166,7 +1166,25 @@ func (c *runtimeArchitectureComponentImpl) removeFrameAndArchByVersion(ctx conte
 	return nil
 }
 
-func getJsonfiles(subPath string) (list []string, err error) {
+func getJsonfiles(subPath string) ([]string, error) {
+	list, err := listConfigJSONFiles(subPath)
+	if err != nil {
+		return nil, fmt.Errorf("get engine path %s error: %w", subPath, err)
+	}
+	if !loadEEConfigs {
+		return list, nil
+	}
+	eeFiles, err := listConfigJSONFiles(filepath.Join(subPath, "ee"))
+	if err != nil {
+		if os.IsNotExist(err) {
+			return list, nil
+		}
+		return nil, fmt.Errorf("get engine path %s/ee error: %w", subPath, err)
+	}
+	return append(list, eeFiles...), nil
+}
+
+func listConfigJSONFiles(subPath string) ([]string, error) {
 	currentDir, err := filepath.Abs(filepath.Dir("."))
 	if err != nil {
 		return nil, fmt.Errorf("getting current directory error: %w", err)
@@ -1174,15 +1192,14 @@ func getJsonfiles(subPath string) (list []string, err error) {
 	// replace cmd/csghub-server
 	currentDir = strings.Replace(currentDir, "cmd/csghub-server", "", 1)
 	enginePath := filepath.Join(currentDir, "configs", subPath)
-	_, err = os.Stat(enginePath)
-	if err != nil {
-		return nil, fmt.Errorf("get engine path %s error: %w", enginePath, err)
+	if _, err = os.Stat(enginePath); err != nil {
+		return nil, err
 	}
-	// get all json files in enginePath
 	entries, err := os.ReadDir(enginePath)
 	if err != nil {
 		return nil, fmt.Errorf("read dir %s error: %w", enginePath, err)
 	}
+	var list []string
 	for _, entry := range entries {
 		if entry.IsDir() {
 			continue
@@ -1191,6 +1208,5 @@ func getJsonfiles(subPath string) (list []string, err error) {
 			list = append(list, filepath.Join(enginePath, entry.Name()))
 		}
 	}
-
 	return list, nil
 }

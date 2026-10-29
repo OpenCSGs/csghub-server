@@ -4,7 +4,9 @@ ldconfig 2>/dev/null || echo "Unable to refresh the dynamic linker cache; contin
 
 export PYTHONPATH="$(pwd):$PYTHONPATH"
 
-python3 /etc/csghub/entry.py
+# CSGHUB_PYTHON lets an image install the downloader in its own environment
+# instead of the one the inference engine runs in.
+"${CSGHUB_PYTHON:-python3}" /etc/csghub/entry.py
 cp "/workspace/$REPO_ID/tokenizer_config.json" /etc/csghub/tokenizer_config.json
 filename="/etc/csghub/tokenizer_config.json"
 insert_string=$(cat << 'EOF'
@@ -19,6 +21,18 @@ fi
 
 if [ -z "$GPU_NUM" ]; then
     GPU_NUM=1
+fi
+
+# text-generation-router embeds libpython but lives outside that interpreter,
+# so it loads another stdlib. On the ROCm image that is Python 3.11.0rc1, whose
+# MetadataPathFinder.invalidate_caches is not a classmethod, and tokenizer import
+# crashes. Point the embedded interpreter at the venv base after the downloader:
+# the downloader venv is a different Python and cannot start with this PYTHONHOME.
+if [ -x /app/.venv/bin/python3 ]; then
+    _tgi_python_home="$(/app/.venv/bin/python3 -c 'import sys; print(sys.base_prefix)')"
+    if [ -n "$_tgi_python_home" ] && [ "$_tgi_python_home" != /usr ]; then
+        export PYTHONHOME="$_tgi_python_home"
+    fi
 fi
 
 exec text-generation-launcher \

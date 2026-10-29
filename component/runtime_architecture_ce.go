@@ -24,3 +24,5 @@ func (c *runtimeArchitectureComponentImpl) updatePDRecommendation(ctx context.Co
 func (c *runtimeArchitectureComponentImpl) loadPDRecommendations(ctx context.Context) error {
 	return nil
 }
+
+const loadEEConfigs = false

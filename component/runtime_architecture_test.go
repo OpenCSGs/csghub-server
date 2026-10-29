@@ -849,7 +849,8 @@ var engineArgsUnsupportedByVersion = map[string]map[string][]string{
 		"0.28.0": {"swap-space", "guided-decoding-backend"},
 	},
 	"ascend-vllm.json": {
-		"v0.25.1rc": {"swap-space"},
+		"v0.27.1rc1":      {"swap-space"},
+		"v0.27.1rc1-310p": {"swap-space"},
 	},
 	"sglang.json": {
 		"v0.5.14": {"enable-ep-moe"},
@@ -883,7 +884,11 @@ func TestEngineConfigEngineArgsPerVersion(t *testing.T) {
 
 	for configFile, unsupportedByVersion := range engineArgsUnsupportedByVersion {
 		t.Run("unsupported/"+configFile, func(t *testing.T) {
-			argsByVersion := readEngineArgsByVersion(t, configPaths[configFile])
+			configPath, ok := configPaths[configFile]
+			if !ok {
+				t.Skipf("%s is not loaded in this edition", configFile)
+			}
+			argsByVersion := readEngineArgsByVersion(t, configPath)
 			require.Len(t, argsByVersion, len(unsupportedByVersion))
 			for version, unsupported := range unsupportedByVersion {
 				names, ok := engineArgNameSet(argsByVersion, version)
