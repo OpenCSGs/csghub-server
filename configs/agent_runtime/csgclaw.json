@@ -1,7 +1,7 @@
 {
   "agent_type": "csgclaw",
-  "version": "v0.7.0",
-  "image": "opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/csgclaw-server-sandbox:2026091805",
+  "version": "v0.8.0-beta.3",
+  "image": "opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/csgclaw-server-sandbox:2026100902",
   "port": 18080,
   "command": [
     "/sbin/tini",
@@ -21,8 +21,8 @@
     "SKILLS_POLL_INTERVAL": "600"
   },
   "custom_ui": {
-    "url": "https://opencsg-public-resource.oss-cn-beijing.aliyuncs.com/agentichub/agent-ui-framework/v1.0.1/bundle.tar.gz",
-    "sha256": "c7edc74816b3e71a523f5eab3d4ec90028335e9418614499d8d53369b5c0188d",
+    "url": "https://opencsg-public-resource.oss-cn-beijing.aliyuncs.com/agentichub/agent-ui-framework/v1.0.2/bundle.tar.gz",
+    "sha256": "aa797ed3016885403cf1fe2980446232432df69d8b70d27c64b30bede14ec66a",
     "sdk": "gradio"
   }
 }
