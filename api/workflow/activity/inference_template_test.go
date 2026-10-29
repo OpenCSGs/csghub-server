@@ -20,6 +20,9 @@ func TestInferenceTemplatesSpecDecodeContract(t *testing.T) {
 	for _, engine := range []string{"nvidia-vllm", "ascend-vllm", "nvidia-sglang"} {
 		t.Run(engine, func(t *testing.T) {
 			path := filepath.Join("..", "..", "..", "configs", "inference", engine+".json")
+			if engine == "ascend-vllm" {
+				path = filepath.Join("..", "..", "..", "configs", "inference", "ee", engine+".json")
+			}
 			data, err := os.ReadFile(path)
 			require.NoError(t, err)
 

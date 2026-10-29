@@ -87,4 +87,28 @@ if $ENGINE_VER_OK && [[ ! $ENGINE_ARGS == *"--compilation-config"* ]]; then
     fi
 fi
 
+# Atlas 300I Duo has no BF16. An unset dtype, or --dtype auto, follows
+# the checkpoint and selects bfloat16, which fails in aclnnInplaceNormal.
+# vLLM keeps the last --dtype, so appending float16 replaces auto.
+# Any other explicit dtype is left unchanged. An unset max-model-len
+# uses the model default (262144 for Qwen3.5); the 310P attention mask
+# is allocated as max_model_len squared.
+# This path does not add --enforce-eager. Graph mode follows the vLLM
+# default: the 310P image sets VLLM_ENFORCE_EAGER=0, so graph capture
+# stays on. ACL graph capture can still fail when stream resources are
+# exhausted. Deployments that want eager mode must pass --enforce-eager.
+if [ "${ASCEND_310P:-}" = "1" ]; then
+    last_dtype=$(grep -oE -- '--dtype(=|[[:space:]]+)[^[:space:]]+' <<< "$ENGINE_ARGS" | tail -n 1)
+    last_dtype_value=${last_dtype#*dtype}
+    last_dtype_value=${last_dtype_value#=}
+    last_dtype_value=${last_dtype_value# }
+    if [ -z "$last_dtype_value" ] || [ "$last_dtype_value" = "auto" ]; then
+        ENGINE_ARGS="$ENGINE_ARGS --dtype float16"
+    fi
+    if [[ ! $ENGINE_ARGS == *"--max-model-len"* ]] && [[ ! $ENGINE_ARGS == *"--max_model_len"* ]]; then
+        ENGINE_ARGS="$ENGINE_ARGS --max-model-len 8192"
+    fi
+    echo "310P engine args: $ENGINE_ARGS"
+fi
+
 python3 -m vllm.entrypoints.openai.api_server $ENGINE_ARGS
