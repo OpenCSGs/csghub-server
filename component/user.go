@@ -816,7 +816,7 @@ func (c *userComponentImpl) ListDeploysByNamespace(ctx context.Context, req *typ
 }
 
 func (c *userComponentImpl) GetUserByName(ctx context.Context, userName string) (*database.User, error) {
-	user, err := c.userStore.FindByUsername(ctx, userName)
+	user, err := c.userStore.FindByUsername(ctx, userName, types.UserWithAdminPermissions)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check for the presence of the user %s,error:%w", userName, err)
 	}

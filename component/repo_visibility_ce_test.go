@@ -43,7 +43,7 @@ func testRepoVisibilityWithWrite(t *testing.T) {
 			repo.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "ns").Return(database.Namespace{
 				Path: "ns", NamespaceType: tc.namespaceType,
 			}, nil)
-			repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "writer").Return(database.User{
+			repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "writer", types.UserWithAdminPermissions).Return(database.User{
 				Username: "writer", UUID: "writer-uuid",
 			}, nil).Twice()
 			repoAuthorizerMock(repo).EXPECT().Check(ctx, mock.MatchedBy(func(req rebac.CheckRequest) bool {

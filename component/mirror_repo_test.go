@@ -129,7 +129,7 @@ func TestMirrorComponent_SyncMirrorRoutesRequestedQueue(t *testing.T) {
 				ID: 456, RepositoryID: repo.ID, Repository: repo, Priority: types.HighMirrorPriority,
 			}
 
-			mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "admin").Return(database.User{RoleMask: "admin"}, nil)
+			mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "admin", types.UserWithAdminPermissions).Return(database.User{RoleAssignments: superAdminRoleAssignments()}, nil)
 			mc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "ns", "name").Return(repo, nil)
 			mc.mocks.stores.MirrorMock().EXPECT().FindByRepoID(ctx, repo.ID).Return(mirror, nil)
 			expectMirrorRepoRequeue(ctx, t, mc, repo, mirror, nil, nil, types.HighMirrorPriority, urgent)
@@ -141,6 +141,24 @@ func TestMirrorComponent_SyncMirrorRoutesRequestedQueue(t *testing.T) {
 			require.NoError(t, err)
 		})
 	}
+}
+
+// TestMirrorComponent_SyncMirrorAdminAuthorized preserves scheduling rules without requiring repository permissions.
+func TestMirrorComponent_SyncMirrorAdminAuthorized(t *testing.T) {
+	ctx := types.WithAdminAuthorization(context.Background())
+	mc := initializeTestMirrorComponent(ctx, t)
+	repo := &database.Repository{ID: 123, Path: "ns/name", RepositoryType: types.ModelRepo}
+	mirror := &database.Mirror{ID: 456, RepositoryID: repo.ID, Repository: repo, Priority: types.HighMirrorPriority}
+	mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "module-admin", types.UserWithAdminPermissions).
+		Return(database.User{Username: "module-admin"}, nil).Once()
+	mc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "ns", "name").Return(repo, nil).Once()
+	mc.mocks.stores.MirrorMock().EXPECT().FindByRepoID(ctx, repo.ID).Return(mirror, nil).Once()
+	expectMirrorRepoRequeue(ctx, t, mc, repo, mirror, nil, nil, mirror.Priority, true)
+
+	err := mc.SyncMirror(ctx, types.SyncMirrorReq{
+		RepoType: types.ModelRepo, Namespace: "ns", Name: "name", CurrentUser: "module-admin", Urgent: true,
+	})
+	require.NoError(t, err)
 }
 
 // TestMirrorComponent_SyncMirrorRequiresWritePermission verifies repository writers can sync while readers cannot.
@@ -161,7 +179,7 @@ func TestMirrorComponent_SyncMirrorRequiresWritePermission(t *testing.T) {
 				ID: 456, RepositoryID: repo.ID, Repository: repo, Priority: types.LowMirrorPriority,
 			}
 
-			mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "member").Return(database.User{}, nil)
+			mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "member", types.UserWithAdminPermissions).Return(database.User{}, nil)
 			mc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "ns", "name").Return(repo, nil)
 			mc.mocks.components.repo.EXPECT().
 				CheckUserRepoPermission(ctx, "member", repo, rebac.RepositoryCanWrite).
@@ -807,10 +825,10 @@ func TestMirrorComponent_CreateMirrorRepoPreservesForkTargetCase(t *testing.T) {
 		User:          database.User{UUID: "alice-team-uuid"},
 	}, nil)
 	mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "admin").Return(database.User{
-		ID:       1,
-		Username: "admin",
-		Email:    "admin@example.com",
-		RoleMask: "admin",
+		ID:              1,
+		Username:        "admin",
+		Email:           "admin@example.com",
+		RoleAssignments: superAdminRoleAssignments(),
 	}, nil)
 
 	got, err := mc.CreateMirrorRepo(ctx, req)
@@ -877,10 +895,10 @@ func TestMirrorComponent_CreateMirrorRepoPersistsNormalizedSourceAndCredentials(
 		User:          database.User{UUID: "alice-uuid"},
 	}, nil)
 	mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "admin").Return(database.User{
-		ID:       1,
-		Username: "admin",
-		Email:    "admin@example.com",
-		RoleMask: "admin",
+		ID:              1,
+		Username:        "admin",
+		Email:           "admin@example.com",
+		RoleAssignments: superAdminRoleAssignments(),
 	}, nil)
 
 	got, err := mc.CreateMirrorRepo(ctx, req)
@@ -923,10 +941,10 @@ func TestMirrorComponent_CreateMirrorRepoUsesExplicitVisibility(t *testing.T) {
 		User:          database.User{UUID: "alice-uuid"},
 	}, nil)
 	mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "admin").Return(database.User{
-		ID:       1,
-		Username: "admin",
-		Email:    "admin@example.com",
-		RoleMask: "admin",
+		ID:              1,
+		Username:        "admin",
+		Email:           "admin@example.com",
+		RoleAssignments: superAdminRoleAssignments(),
 	}, nil)
 
 	got, err := mc.CreateMirrorRepo(ctx, req)
@@ -1377,10 +1395,10 @@ func TestMirrorComponent_CreateMirrorRepoCreatesAllMirrorRepoTypes(t *testing.T)
 				User:          database.User{UUID: "mapped-user-uuid"},
 			}, nil)
 			mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "admin").Return(database.User{
-				ID:       1,
-				Username: "admin",
-				Email:    "admin@example.com",
-				RoleMask: "admin",
+				ID:              1,
+				Username:        "admin",
+				Email:           "admin@example.com",
+				RoleAssignments: superAdminRoleAssignments(),
 			}, nil)
 
 			got, err := mc.CreateMirrorRepo(ctx, req)
@@ -1468,7 +1486,7 @@ func TestMirrorComponent_CreateMirrorRepoFetchesMCPMetadata(t *testing.T) {
 		Path: "local", NamespaceType: database.UserNamespace, User: database.User{UUID: "admin-uuid"},
 	}, nil)
 	mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "admin").Return(database.User{
-		ID: 1, Username: "admin", Email: "admin@example.com", RoleMask: "admin",
+		ID: 1, Username: "admin", Email: "admin@example.com", RoleAssignments: superAdminRoleAssignments(),
 	}, nil)
 	expectMirrorRepositoryRelationship(mc)
 
@@ -1536,7 +1554,7 @@ func TestMirrorComponent_CreateMirrorRepoFetchesSkillMetadata(t *testing.T) {
 		Path: "local", NamespaceType: database.UserNamespace, User: database.User{UUID: "admin-uuid"},
 	}, nil)
 	mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "admin").Return(database.User{
-		ID: 1, Username: "admin", Email: "admin@example.com", RoleMask: "admin",
+		ID: 1, Username: "admin", Email: "admin@example.com", RoleAssignments: superAdminRoleAssignments(),
 	}, nil)
 	expectMirrorRepositoryRelationship(mc)
 
@@ -1617,7 +1635,7 @@ func TestMirrorComponent_CreateMirrorRepoSkipsMetadataForUnsupportedHosts(t *tes
 				Path: "local", NamespaceType: database.UserNamespace, User: database.User{UUID: "admin-uuid"},
 			}, nil)
 			mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "admin").Return(database.User{
-				ID: 1, Username: "admin", Email: "admin@example.com", RoleMask: "admin",
+				ID: 1, Username: "admin", Email: "admin@example.com", RoleAssignments: superAdminRoleAssignments(),
 			}, nil)
 			expectMirrorRepositoryRelationship(mc)
 
@@ -1768,10 +1786,10 @@ func TestMirrorComponent_CreateMirrorRepoSkipSourcePath(t *testing.T) {
 		Path: "alice", NamespaceType: database.UserNamespace, User: database.User{UUID: "admin-uuid"},
 	}, nil)
 	mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "admin").Return(database.User{
-		ID:       1,
-		Username: "admin",
-		Email:    "admin@example.com",
-		RoleMask: "admin",
+		ID:              1,
+		Username:        "admin",
+		Email:           "admin@example.com",
+		RoleAssignments: superAdminRoleAssignments(),
 	}, nil)
 	expectMirrorRepositoryRelationship(mc)
 
@@ -1977,7 +1995,7 @@ func TestMirrorComponent_SyncMirrorRefreshesSkillMetadata(t *testing.T) {
 	mc.mocks.multiSyncClient.EXPECT().SkillInfo(ctx, version).Return(&types.Skill{
 		Nickname: "Fresh Skill", Description: "fresh description", License: "MIT", DefaultBranch: "develop", UpdatedAt: updatedAt,
 	}, nil)
-	mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "admin").Return(database.User{RoleMask: "admin"}, nil)
+	mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "admin", types.UserWithAdminPermissions).Return(database.User{RoleAssignments: superAdminRoleAssignments()}, nil)
 	mc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.SkillRepo, "local", "reviewer").Return(repo, nil)
 	mc.mocks.stores.MirrorMock().EXPECT().FindByRepoID(ctx, repo.ID).Return(mirror, nil)
 
@@ -2016,7 +2034,7 @@ func TestMirrorComponent_SyncMirrorSkipsSkillMetadataForUnsupportedHost(t *testi
 		t.Fatal("unsupported metadata hosts must skip client creation")
 		return nil
 	}
-	mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "admin").Return(database.User{RoleMask: "admin"}, nil)
+	mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "admin", types.UserWithAdminPermissions).Return(database.User{RoleAssignments: superAdminRoleAssignments()}, nil)
 	mc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.SkillRepo, "local", "reviewer").Return(repo, nil)
 	mc.mocks.stores.MirrorMock().EXPECT().FindByRepoID(ctx, repo.ID).Return(mirror, nil)
 
@@ -2462,7 +2480,7 @@ func TestCreateMirrorRepoAutoCreatesTargetOrganization(t *testing.T) {
 	// auto-created as an organization.
 	mc.mocks.stores.NamespaceMock().EXPECT().Exists(ctx, "imported-models").Return(false, nil)
 	mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "admin").Return(database.User{
-		ID: 1, Username: "admin", Email: "admin@example.com", UUID: "admin-uuid", RoleMask: "admin",
+		ID: 1, Username: "admin", Email: "admin@example.com", UUID: "admin-uuid", RoleAssignments: superAdminRoleAssignments(),
 	}, nil)
 	// Organization + namespace + admin membership created atomically.
 	mc.mocks.stores.OrgMock().EXPECT().CreateWithRelations(ctx, mock.MatchedBy(func(org *database.Organization) bool {
@@ -2489,7 +2507,7 @@ func TestCreateMirrorRepoAutoCreatesTargetOrganization(t *testing.T) {
 	}, nil)
 	// prepareMirrorRepository re-loads the operator user (needs non-empty email).
 	mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "admin").Return(database.User{
-		ID: 1, Username: "admin", Email: "admin@example.com", UUID: "admin-uuid", RoleMask: "admin",
+		ID: 1, Username: "admin", Email: "admin@example.com", UUID: "admin-uuid", RoleAssignments: superAdminRoleAssignments(),
 	}, nil)
 	// createMirrorRepoRecords (createRepository=true) reconciles the repository->namespace
 	// ReBAC tuple, which for an org namespace looks up the organization by path.

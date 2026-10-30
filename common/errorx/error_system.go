@@ -26,6 +26,7 @@ const (
 
 	cannotPromoteSelfToAdmin
 	cannotSetRepoVisibility
+	lastAccountAdmin
 )
 
 var (
@@ -138,6 +139,11 @@ var (
 	//
 	// zh-HK: 禁止更改存儲庫的可见性設置
 	ErrCannotSetRepoVisibility = CustomError{prefix: errSysPrefix, code: cannotSetRepoVisibility}
+	// ErrLastAccountAdmin prevents role revocation or user deletion from removing the last administrator manager.
+	// en-US: Cannot perform this operation: at least one user must retain permission to manage administrators.
+	// zh-CN: 无法执行此操作：至少需要保留一名有权管理管理员的用户。
+	// zh-HK: 無法執行此操作：至少需要保留一名有權管理管理員的使用者。
+	ErrLastAccountAdmin = CustomError{prefix: errSysPrefix, code: lastAccountAdmin}
 )
 
 // Used in DB to convert db error to custom error

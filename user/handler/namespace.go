@@ -79,8 +79,9 @@ func (h *NamespaceHandler) GetInfoByUUID(ctx *gin.Context) {
 }
 
 // GetInfoByUUIDs godoc
+// @Security     ApiKey
 // @Summary      Get namespace info by UUIDs.
-// @Description  get namespace info by uuids
+// @Description  Requires apigateway/token_plan administrator permission, independently verified by the User service.
 // @Tags         Namespace
 // @Accept       json
 // @Produce      json
@@ -88,6 +89,8 @@ func (h *NamespaceHandler) GetInfoByUUID(ctx *gin.Context) {
 // @Success      200 {object} types.Response{data=[]types.Namespace} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Failure      401  {object}  types.APIUnauthorized "Unauthorized"
+// @Failure      403  {object}  types.APIForbidden "Forbidden"
 // @Router       /admin/namespaces/lookup [post]
 func (h *NamespaceHandler) GetInfoByUUIDs(ctx *gin.Context) {
 	var uuids []string

@@ -43,7 +43,8 @@ func createXnetRoutes(_ *gin.Engine, _ middleware.MiddlewareCollection, _ *confi
 	return nil
 }
 
-func createComputingRoutes(_ *gin.RouterGroup, _ *handler.ClusterHandler) error {
+// createComputingRoutes leaves advanced compute administration disabled in CE.
+func createComputingRoutes(_ *gin.RouterGroup, _ middleware.MiddlewareCollection, _ *handler.ClusterHandler) error {
 	return nil
 }
 

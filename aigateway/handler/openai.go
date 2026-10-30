@@ -431,7 +431,6 @@ var _ openai.ChatCompletionChunk
 
 type chatPostProcessInput struct {
 	NSUUID          string
-	ApiKey          string
 	TokenID         int64
 	Model           *types.Model
 	TargetModelName string
@@ -632,7 +631,7 @@ func (h *OpenAIHandlerImpl) runChatPostProcessAsync(ctx context.Context, input c
 		}
 
 		if usage != nil && isSuccessfulStatus(input.StatusCode) {
-			if err := h.openaiComponent.RecordUsageFromTokenUsage(usageCtx, input.NSUUID, input.Model, input.TargetModelName, usage, input.ApiKey, input.TokenID); err != nil {
+			if err := h.openaiComponent.RecordUsageFromTokenUsage(usageCtx, input.NSUUID, input.Model, input.TargetModelName, usage, input.TokenID); err != nil {
 				slog.ErrorContext(usageCtx, "failed to record token usage", slog.Any("error", err))
 			}
 		}

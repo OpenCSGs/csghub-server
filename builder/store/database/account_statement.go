@@ -126,11 +126,11 @@ func (as *accountStatementStoreImpl) Create(ctx context.Context, input AccountSt
 	}
 }
 
-// ChargeAccountFee handles the core logic for charging (adding) funds to an account.
+// chargeAccountFee handles the core logic for charging (adding) funds to an account.
 // It performs: upsert account_user → lock account → check duplicate → update balance → insert statement.
 // It does NOT call updateFeeBill — the caller is responsible for that (same pattern as DeductAccountFee).
 // The input.AccountStatement is modified in-place: BalanceType and BalanceValue are set.
-func ChargeAccountFee(ctx context.Context, tx bun.Tx, input *AccountStatement) error {
+func chargeAccountFee(ctx context.Context, tx bun.Tx, input *AccountStatement) error {
 	if input.Value <= 0 {
 		return fmt.Errorf("charge fee statement value must be positive, got: %f", input.Value)
 	}
@@ -170,9 +170,11 @@ func ChargeAccountFee(ctx context.Context, tx bun.Tx, input *AccountStatement) e
 
 	runSql := ""
 	if input.Scene == types.SceneCashCharge {
+		input.BalanceValuePrev = acctUser.CashBalance
 		input.BalanceType = types.ChargeCashBalance
 		runSql = "update account_users set cash_balance=cash_balance + ? where user_uuid=?"
 	} else {
+		input.BalanceValuePrev = acctUser.Balance
 		input.BalanceType = types.ChargeBalance
 		runSql = "update account_users set balance=balance + ? where user_uuid=?"
 	}
@@ -212,7 +214,7 @@ func ChargeAccountFee(ctx context.Context, tx bun.Tx, input *AccountStatement) e
 
 func (as *accountStatementStoreImpl) chargeFeeStatement(ctx context.Context, input AccountStatement) error {
 	err := as.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		if err := ChargeAccountFee(ctx, tx, &input); err != nil {
+		if err := chargeAccountFee(ctx, tx, &input); err != nil {
 			return err
 		}
 
@@ -247,14 +249,16 @@ func (as *accountStatementStoreImpl) deductFeeStatement(ctx context.Context, inp
 		initEventValue := input.Value
 
 		if utils.IsGetTokenID(input.Scene) && len(input.APIKey) > 0 {
-			token, err := findByTokenValue(ctx, tx, input.APIKey)
+			// parse token ID string to int64
+			tokenIntID, err := strconv.ParseInt(input.APIKey, 10, 64)
 			if err != nil {
-				slog.ErrorContext(ctx, "find token by value failed, error", slog.Any("error", err), slog.Any("input", input))
-			}
-			if token != nil {
-				input.TokenID = token.ID
+				slog.ErrorContext(ctx, "parse api key ID str to int64 fail in deduct fee statement",
+					slog.Any("error", err),
+					slog.Any("event_uuid", input.EventUUID),
+					slog.Any("user_uuid", input.UserUUID),
+					slog.Any("token_id_str", input.APIKey))
 			} else {
-				slog.WarnContext(ctx, "token is nil", slog.Any("input", input))
+				input.TokenID = tokenIntID
 			}
 		}
 
@@ -333,7 +337,7 @@ func (as *accountStatementStoreImpl) CreateTradeStatements(ctx context.Context, 
 		}
 
 		// 2. Credit to seller
-		if err := ChargeAccountFee(ctx, tx, &sellerStmt); err != nil {
+		if err := chargeAccountFee(ctx, tx, &sellerStmt); err != nil {
 			return fmt.Errorf("credit seller fee, error: %w", err)
 		}
 
@@ -631,6 +635,7 @@ func deductFeeToVoucher(ctx context.Context, tx bun.Tx, input AccountStatement, 
 		statementValue = 0 - available
 	}
 
+	input.BalanceValuePrev = available
 	input.Value = statementValue
 	input.BalanceValue = available + statementValue
 	input.BalanceType = types.ChargeVoucher

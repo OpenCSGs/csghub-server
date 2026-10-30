@@ -96,7 +96,6 @@ func (h *embeddingPipelineHandler) Extract(c *gin.Context) (*types.RequestMetada
 		Model:         req.Model,
 		TenantID:      nsUUID,
 		UserID:        username,
-		APIKeyID:      httpbase.GetAccessToken(c),
 		PriorityScope: httpbase.GetAPIKeyPriorityScope(c),
 		Streaming:     false,
 		Headers:       c.Request.Header,
@@ -109,7 +108,6 @@ func (h *embeddingPipelineHandler) Extract(c *gin.Context) (*types.RequestMetada
 func (h *embeddingPipelineHandler) Execute(c *gin.Context, meta *types.RequestMetadata, p *types.RequestPlan) error {
 	ctx := c.Request.Context()
 	nsUUID := meta.TenantID
-	apikey := meta.APIKeyID
 	requestID := commontrace.GetTraceIDInGinContext(c)
 
 	if pt := plan.GetPreflightTracer(c); pt != nil {
@@ -215,7 +213,7 @@ func (h *embeddingPipelineHandler) Execute(c *gin.Context, meta *types.RequestMe
 
 		if usage != nil && isSuccessfulStatus(w.StatusCode()) {
 			tokenID := httpbase.GetCurrentTokenID(c)
-			if err := h.handler.openaiComponent.RecordUsageFromTokenUsage(usageCtx, nsUUID, mt.Model, mt.ModelName, usage, apikey, tokenID); err != nil {
+			if err := h.handler.openaiComponent.RecordUsageFromTokenUsage(usageCtx, nsUUID, mt.Model, mt.ModelName, usage, tokenID); err != nil {
 				slog.ErrorContext(usageCtx, "failed to record embedding token usage", "error", err)
 			}
 		}

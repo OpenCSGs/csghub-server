@@ -41,6 +41,7 @@ type MirrorStore interface {
 	BatchUpdate(ctx context.Context, mirrors []Mirror) error
 	BatchCreate(ctx context.Context, mirrors []Mirror) error
 	ToBeScheduled(ctx context.Context) ([]Mirror, error)
+	DeferScheduledMirror(ctx context.Context, mirrorID int64, until time.Time) error
 	Delete(ctx context.Context, mirror *Mirror) error
 	DeleteWithTaskCancelTx(ctx context.Context, mirrorID int64, jobCancelClient MirrorJobCancelClient) error
 }
@@ -534,10 +535,16 @@ func (s *mirrorStoreImpl) UpdateMirrorAndRepository(ctx context.Context, mirror 
 }
 
 func (s *mirrorStoreImpl) FindBySourceURLs(ctx context.Context, sourceURLs []string) ([]Mirror, error) {
+	// Preserve exact host/path matching while recognizing historical URLs without .git.
+	candidates := make([]string, 0, len(sourceURLs)*2)
+	for _, sourceURL := range sourceURLs {
+		base := strings.TrimSuffix(sourceURL, ".git")
+		candidates = append(candidates, base, base+".git")
+	}
 	var mirrors []Mirror
 	_, err := s.db.Operator.Core.NewSelect().
 		Model(&mirrors).
-		Where("source_url in (?)", bun.In(sourceURLs)).
+		Where("source_url in (?)", bun.In(candidates)).
 		Exec(ctx, &mirrors)
 	return mirrors, err
 }
@@ -567,9 +574,24 @@ func (s *mirrorStoreImpl) ToBeScheduled(ctx context.Context) ([]Mirror, error) {
 			"mirror.remote_updated_at > mirror.updated_at or (mirror.repository_id = 0 and mirror.status = ?)",
 			types.MirrorQueued,
 		).
-		Distinct().
+		Where("mirror.repository_id != 0 OR mirror.next_execution_timestamp IS NULL OR mirror.next_execution_timestamp <= ?", time.Now()).
+		// Bound mirrors with active work wait outside the limited scheduling batch.
+		Where("mirror.repository_id = 0 OR NOT EXISTS (SELECT 1 FROM mirror_tasks AS active_task WHERE active_task.id = mirror.current_task_id AND active_task.status IN (?))", bun.In(activeMirrorTaskStatuses)).
+		// Fresh work precedes retries even when the cron interval exceeds the backoff.
+		OrderExpr("CASE WHEN mirror.repository_id = 0 AND mirror.next_execution_timestamp IS NOT NULL THEN 1 ELSE 0 END ASC").
+		OrderExpr("CASE WHEN mirror.repository_id = 0 THEN mirror.next_execution_timestamp END ASC NULLS FIRST").
 		Order("mirror_priority asc").
+		Order("mirror.id asc").
 		Limit(100).
 		Scan(ctx)
 	return mirrors, err
+}
+
+// DeferScheduledMirror releases a legacy scheduling slot without overwriting source
+// metadata that a concurrent crawler may have refreshed.
+func (s *mirrorStoreImpl) DeferScheduledMirror(ctx context.Context, mirrorID int64, until time.Time) error {
+	_, err := s.db.Operator.Core.NewUpdate().Model((*Mirror)(nil)).
+		Set("next_execution_timestamp = ?", until).
+		Where("id = ?", mirrorID).Where("repository_id = 0").Exec(ctx)
+	return err
 }

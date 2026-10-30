@@ -9,6 +9,7 @@ type Namespace struct {
 	User   User   `json:"user,omitempty"`
 }
 
+// User carries profile data and trusted authorization facts returned by the user service.
 type User struct {
 	ID                int64          `json:"id,omitempty"`
 	Username          string         `json:"username"`
@@ -23,6 +24,15 @@ type User struct {
 	LastLoginAt       string         `json:"last_login_at,omitempty"`
 	Orgs              []Organization `json:"orgs,omitempty"`
 	CanChangeUserName bool           `json:"can_change_username,omitempty"`
+	// Admin reports active membership in an existing administrator role.
+	Admin bool `json:"is_admin,omitempty"`
+	// SuperAdmin reports an active global wildcard grant, independent of role names.
+	SuperAdmin bool `json:"is_super_admin,omitempty"`
+}
+
+// IsSuperAdmin reports global administrator authorization verified by the user service.
+func (u User) IsSuperAdmin() bool {
+	return u.SuperAdmin
 }
 
 type Organization struct {

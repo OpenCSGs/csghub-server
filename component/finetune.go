@@ -89,7 +89,7 @@ func (c *finetuneComponentImpl) CreateFinetuneJob(ctx context.Context, req types
 	if req.Namespace == "" {
 		req.Namespace = operatorUsername
 	}
-	user, err := c.userStore.FindByUsername(ctx, operatorUsername)
+	user, err := c.userStore.FindByUsername(ctx, operatorUsername, types.UserWithAdminPermissions)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get current user %s, error: %w", req.Username, err)
 	}

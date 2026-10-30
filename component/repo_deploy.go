@@ -156,13 +156,14 @@ func (c *repoComponentImpl) checkFrameNameExist(frameName string, frameList []ty
 	return false, 0
 }
 
+// CreateRuntimeFramework honors the route grant while retaining legacy super administrator access.
 func (c *repoComponentImpl) CreateRuntimeFramework(ctx context.Context, req *types.RuntimeFrameworkReq) (*types.RuntimeFramework, error) {
 	// found user id
-	user, err := c.userStore.FindByUsername(ctx, req.CurrentUser)
+	user, err := c.userStore.FindByUsername(ctx, req.CurrentUser, types.UserWithAdminPermissions)
 	if err != nil {
 		return nil, fmt.Errorf("cannot find user for runtime framework, %w", err)
 	}
-	isAdmin := c.IsAdminRole(user)
+	isAdmin := types.IsAdminAuthorized(ctx) || c.IsAdminRole(user)
 	if !isAdmin {
 		return nil, errorx.ErrForbiddenMsg("need admin permission for runtime framework")
 	}
@@ -194,13 +195,14 @@ func (c *repoComponentImpl) CreateRuntimeFramework(ctx context.Context, req *typ
 	return frame, nil
 }
 
+// UpdateRuntimeFramework honors the route grant while retaining legacy super administrator access.
 func (c *repoComponentImpl) UpdateRuntimeFramework(ctx context.Context, id int64, req *types.RuntimeFrameworkReq) (*types.RuntimeFramework, error) {
 	// found user id
-	user, err := c.userStore.FindByUsername(ctx, req.CurrentUser)
+	user, err := c.userStore.FindByUsername(ctx, req.CurrentUser, types.UserWithAdminPermissions)
 	if err != nil {
 		return nil, fmt.Errorf("cannot find user for runtime framework, %w", err)
 	}
-	isAdmin := c.IsAdminRole(user)
+	isAdmin := types.IsAdminAuthorized(ctx) || c.IsAdminRole(user)
 	if !isAdmin {
 		return nil, errorx.ErrForbiddenMsg("need admin permission for runtime framework")
 	}
@@ -230,13 +232,14 @@ func (c *repoComponentImpl) UpdateRuntimeFramework(ctx context.Context, id int64
 	}, nil
 }
 
+// DeleteRuntimeFramework honors the route grant while retaining legacy super administrator access.
 func (c *repoComponentImpl) DeleteRuntimeFramework(ctx context.Context, currentUser string, id int64) error {
 	// found user id
-	user, err := c.userStore.FindByUsername(ctx, currentUser)
+	user, err := c.userStore.FindByUsername(ctx, currentUser, types.UserWithAdminPermissions)
 	if err != nil {
 		return fmt.Errorf("cannot find user for runtime framework, %w", err)
 	}
-	isAdmin := c.IsAdminRole(user)
+	isAdmin := types.IsAdminAuthorized(ctx) || c.IsAdminRole(user)
 	if !isAdmin {
 		return errorx.ErrForbiddenMsg("need admin permission for runtime framework")
 	}
@@ -361,12 +364,13 @@ func (c *repoComponentImpl) CheckDeployPermissionForUser(ctx context.Context, de
 	return c.getDeployForAccess(ctx, deployReq.CurrentUser, deployReq.DeployID, types.DeployAccessRead)
 }
 
+// checkDeployPermissionForServerless honors the route grant while retaining legacy super administrator access.
 func (c *repoComponentImpl) checkDeployPermissionForServerless(ctx context.Context, deployReq types.DeployActReq) (*database.User, *database.Deploy, error) {
-	user, err := c.userStore.FindByUsername(ctx, deployReq.CurrentUser)
+	user, err := c.userStore.FindByUsername(ctx, deployReq.CurrentUser, types.UserWithAdminPermissions)
 	if err != nil {
 		return nil, nil, fmt.Errorf("deploy permission check user failed, %w", err)
 	}
-	isAdmin := c.IsAdminRole(user)
+	isAdmin := types.IsAdminAuthorized(ctx) || c.IsAdminRole(user)
 	if !isAdmin {
 		return nil, nil, errorx.ErrForbiddenMsg("need admin permission for Serverless deploy")
 	}
@@ -376,6 +380,9 @@ func (c *repoComponentImpl) checkDeployPermissionForServerless(ctx context.Conte
 	}
 	if deploy == nil {
 		return nil, nil, fmt.Errorf("do not found serverless deploy %v", deployReq.DeployID)
+	}
+	if deploy.Type != types.ServerlessType {
+		return nil, nil, errorx.ErrForbiddenMsg("deployment is not a Serverless instance")
 	}
 	return &user, deploy, nil
 }
@@ -424,6 +431,7 @@ func (c *repoComponentImpl) ListDeploy(ctx context.Context, repoType types.Repos
 	return resDeploys, nil
 }
 
+// DeleteDeploy applies Serverless administration or ordinary deployment access before cleanup.
 func (c *repoComponentImpl) DeleteDeploy(ctx context.Context, delReq types.DeployActReq) error {
 	repoPath := ""
 	if delReq.DeployType == types.ServerlessType {
@@ -442,7 +450,14 @@ func (c *repoComponentImpl) DeleteDeploy(ctx context.Context, delReq types.Deplo
 			return fmt.Errorf("no deploy found for serverless type")
 		}
 	}
-	_, deploy, err := c.getDeployForAccess(ctx, delReq.CurrentUser, delReq.DeployID, types.DeployAccessOperate)
+	// Serverless administration follows its route grant, independently of the creator's namespace.
+	var deploy *database.Deploy
+	var err error
+	if delReq.DeployType == types.ServerlessType {
+		_, deploy, err = c.checkDeployPermissionForServerless(ctx, delReq)
+	} else {
+		_, deploy, err = c.getDeployForAccess(ctx, delReq.CurrentUser, delReq.DeployID, types.DeployAccessOperate)
+	}
 	if err != nil {
 		return err
 	}
@@ -819,17 +834,18 @@ func (c *repoComponentImpl) checkAccessDeployForUser(ctx context.Context, repoID
 	return true, nil
 }
 
+// checkAccessDeployForServerless honors the route grant while retaining legacy super administrator access.
 func (c *repoComponentImpl) checkAccessDeployForServerless(ctx context.Context, repoID int64, currentUser string, deploy *database.Deploy) (bool, error) {
-	user, err := c.userStore.FindByUsername(ctx, currentUser)
+	user, err := c.userStore.FindByUsername(ctx, currentUser, types.UserWithAdminPermissions)
 	if err != nil {
 		return false, fmt.Errorf("user %s does not exist", currentUser)
 	}
-	isAdmin := c.IsAdminRole(user)
+	isAdmin := types.IsAdminAuthorized(ctx) || c.IsAdminRole(user)
 	if !isAdmin {
 		return false, errorx.ErrForbiddenMsg("need admin permission to see Serverless deploy instances")
 	}
-	if deploy.RepoID != repoID {
-		// deny access for invalid repo
+	if deploy.Type != types.ServerlessType || deploy.RepoID != repoID {
+		// Module authorization does not allow using a Serverless route for a different resource kind.
 		return false, errors.New("invalid deploy found")
 	}
 	return true, nil

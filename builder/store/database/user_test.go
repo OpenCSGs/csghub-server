@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -14,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/uptrace/bun"
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/tests"
 	"opencsg.com/csghub-server/common/types"
@@ -63,61 +63,124 @@ func (h *userDeletionNamespaceLockHook) AfterQuery(ctx context.Context, event *b
 	}
 }
 
+// TestUserStore_Roles verifies persisted roles are the only source of role output.
 func TestUserStore_Roles(t *testing.T) {
-	type fields struct {
-		RoleMask string
-	}
-	tests := []struct {
-		name   string
-		fields fields
-		want   []string
+	for _, tc := range []struct {
+		name string
+		user database.User
+		want []string
 	}{
-		// TODO: Add test cases.
+		{name: "no roles", want: []string{}},
+		{name: "legacy roles are not a fallback", user: database.User{RoleMask: "admin,super_user"}, want: []string{}},
 		{
-			name: "test no role",
-			fields: fields{
-				RoleMask: "",
-			},
-			want: []string{},
+			name: "ordinary and administrator roles are retained",
+			user: database.User{RoleMask: "legacy", RoleAssignments: []database.UserRole{
+				{RoleCode: "personal_user"}, {RoleCode: "asset_admin"},
+				{RoleCode: "revoked", DeletedAt: time.Now()},
+			}},
+			want: []string{"personal_user", "asset_admin"},
 		},
-		{
-			name: "test one role",
-			fields: fields{
-				RoleMask: "admin",
-			},
-			want: []string{"admin"},
-		},
-		{
-			name: "test two roles",
-			fields: fields{
-				RoleMask: "admin,super_user",
-			},
-			want: []string{"admin", "super_user"},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			u := &database.User{
-				RoleMask: tt.fields.RoleMask,
-			}
-			if got := u.Roles(); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("User.Roles() = %v, want %v", got, tt.want)
-			}
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			require.Equal(t, tc.want, tc.user.Roles())
 		})
 	}
 }
 
+// TestUserAdminRolePredicates checks administrator identity separately from global grants.
+func TestUserAdminRolePredicates(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		user   database.User
+		admin  bool
+		global bool
+	}{
+		{name: "legacy names do not grant membership", user: database.User{RoleMask: "admin,super_user,super_admin"}},
+		{name: "undefined role is ordinary", user: database.User{RoleAssignments: []database.UserRole{{RoleCode: "super_admin"}}}},
+		{
+			name: "defined ordinary role with global grant is not an administrator",
+			user: database.User{RoleAssignments: []database.UserRole{{RoleCode: "member", Role: &database.Role{
+				RoleCode: "member", Permissions: []database.AdminRolePermission{{PermissionCode: types.AdminPermissionAll}},
+			}}}},
+		},
+		{
+			name:  "defined role without grants is an administrator",
+			user:  database.User{RoleAssignments: []database.UserRole{{RoleCode: "super_admin", Role: &database.Role{IsAdmin: true, RoleCode: "super_admin"}}}},
+			admin: true,
+		},
+		{
+			name: "module wildcard is not global",
+			user: database.User{RoleAssignments: []database.UserRole{{RoleCode: "operator", Role: &database.Role{IsAdmin: true,
+				RoleCode: "operator", Permissions: []database.AdminRolePermission{{PermissionCode: "account/*"}},
+			}}}},
+			admin: true,
+		},
+		{
+			name: "legacy mask does not elevate a scoped administrator",
+			user: database.User{RoleMask: "admin,super_user", RoleAssignments: []database.UserRole{{RoleCode: "asset_admin", Role: &database.Role{IsAdmin: true,
+				RoleCode: "asset_admin", Permissions: []database.AdminRolePermission{{PermissionCode: "asset/*"}},
+			}}}},
+			admin: true,
+		},
+		{
+			name: "custom name with global grant",
+			user: database.User{RoleAssignments: []database.UserRole{{RoleCode: "owner", Role: &database.Role{IsAdmin: true,
+				RoleCode: "owner", Permissions: []database.AdminRolePermission{{PermissionCode: types.AdminPermissionAll}},
+			}}}},
+			admin: true, global: true,
+		},
+		{
+			name: "revoked global role grants nothing",
+			user: database.User{RoleAssignments: []database.UserRole{{RoleCode: "owner", DeletedAt: time.Now(), Role: &database.Role{IsAdmin: true,
+				RoleCode: "owner", Permissions: []database.AdminRolePermission{{PermissionCode: types.AdminPermissionAll}},
+			}}}},
+		},
+		{
+			name: "deleted user grants nothing",
+			user: database.User{DeletedAt: time.Now(), RoleAssignments: []database.UserRole{{RoleCode: "owner", Role: &database.Role{IsAdmin: true,
+				RoleCode: "owner", Permissions: []database.AdminRolePermission{{PermissionCode: types.AdminPermissionAll}},
+			}}}},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			require.Equal(t, tc.admin, tc.user.HasAdminRole())
+			require.Equal(t, tc.global, tc.user.HasSuperAdminPermission())
+			require.Equal(t, tc.global, tc.user.CanAdmin())
+		})
+	}
+}
+
+// TestUserStore_GetAdminRecipients verifies notifications use active global grants without duplicate recipients.
 func TestUserStore_GetAdminRecipients(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
 	ctx := context.Background()
 	userStore := database.NewUserStoreWithDB(db)
+	roles := []database.Role{
+		{RoleCode: "recipient_owner", DisplayName: "Recipient owner", IsAdmin: true},
+		{RoleCode: "recipient_operator", DisplayName: "Recipient operator", IsAdmin: true},
+		{RoleCode: "recipient_member", DisplayName: "Recipient member", IsAdmin: false},
+	}
+	_, err := db.Core.NewInsert().Model(&roles).Exec(ctx)
+	require.NoError(t, err)
+	permissions := []database.AdminRolePermission{
+		{RoleCode: "recipient_owner", PermissionCode: types.AdminPermissionAll},
+		{RoleCode: "recipient_operator", PermissionCode: "compute/*"},
+		{RoleCode: "recipient_member", PermissionCode: types.AdminPermissionAll},
+	}
+	_, err = db.Core.NewInsert().Model(&permissions).Exec(ctx)
+	require.NoError(t, err)
 
 	testUsers := []database.User{
-		{GitID: 99001, Username: "admin-recipient", UUID: "admin-recipient-uuid", Email: "admin@example.com", RoleMask: "admin"},
-		{GitID: 99002, Username: "super-user-recipient", UUID: "super-user-recipient-uuid", Email: "super-user@example.com", RoleMask: "user,super_user"},
+		{GitID: 99001, Username: "admin-recipient", UUID: "admin-recipient-uuid", Email: "admin@example.com"},
+		{GitID: 99002, Username: "super-user-recipient", UUID: "super-user-recipient-uuid", Email: "super-user@example.com"},
 		{GitID: 99003, Username: "ordinary-recipient", UUID: "ordinary-recipient-uuid", Email: "ordinary@example.com", RoleMask: "user"},
-		{GitID: 99004, Username: "admin-without-email", UUID: "admin-without-email-uuid", RoleMask: "admin"},
+		{GitID: 99004, Username: "admin-without-email", UUID: "admin-without-email-uuid"},
+		{GitID: 99005, Username: "legacy-admin", UUID: "legacy-admin-uuid", Email: "legacy@example.com", RoleMask: "admin,super_user"},
+		{GitID: 99006, Username: "scoped-admin", UUID: "scoped-admin-uuid", Email: "scoped@example.com", RoleMask: "admin"},
+		{GitID: 99007, Username: "revoked-admin", UUID: "revoked-admin-uuid", Email: "revoked@example.com", RoleMask: "admin"},
+		{GitID: 99008, Username: "deleted-admin", UUID: "deleted-admin-uuid", Email: "deleted@example.com", DeletedAt: time.Now()},
+		{GitID: 99009, Username: "admin-without-uuid", Email: "no-uuid@example.com"},
 	}
 	for i := range testUsers {
 		err := userStore.Create(ctx, &testUsers[i], &database.Namespace{
@@ -125,6 +188,19 @@ func TestUserStore_GetAdminRecipients(t *testing.T) {
 		})
 		require.NoError(t, err)
 	}
+	assignments := []database.UserRole{
+		{UserID: testUsers[0].ID, RoleCode: "recipient_owner"},
+		{UserID: testUsers[1].ID, RoleCode: "recipient_owner"},
+		{UserID: testUsers[1].ID, RoleCode: "super_admin"},
+		{UserID: testUsers[2].ID, RoleCode: "recipient_member"},
+		{UserID: testUsers[3].ID, RoleCode: "recipient_owner"},
+		{UserID: testUsers[5].ID, RoleCode: "recipient_operator"},
+		{UserID: testUsers[6].ID, RoleCode: "recipient_owner", DeletedAt: time.Now()},
+		{UserID: testUsers[7].ID, RoleCode: "recipient_owner"},
+		{UserID: testUsers[8].ID, RoleCode: "recipient_owner"},
+	}
+	_, err = db.Core.NewInsert().Model(&assignments).Exec(ctx)
+	require.NoError(t, err)
 
 	adminUUIDs, err := userStore.GetAdminUserUUIDs(ctx)
 	require.NoError(t, err)
@@ -139,6 +215,7 @@ func TestUserStore_GetAdminRecipients(t *testing.T) {
 	require.ElementsMatch(t, []string{
 		"admin@example.com",
 		"super-user@example.com",
+		"no-uuid@example.com",
 	}, adminEmails)
 }
 
@@ -628,6 +705,7 @@ func TestUserStore_UpdatePhone(t *testing.T) {
 	require.Equal(t, "+86", user.PhoneArea)
 }
 
+// TestUserStore_IndexWithCursor1 verifies role relationships survive paginated cursor exports.
 func TestUserStore_IndexWithCursor1(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
@@ -664,14 +742,43 @@ func TestUserStore_IndexWithCursor1(t *testing.T) {
 		Search: "u-foo",
 		Per:    1,
 	}
+	role := database.Role{IsAdmin: true, RoleCode: "cursor_owner", DisplayName: "Cursor owner"}
+	_, err = db.Core.NewInsert().Model(&role).Exec(ctx)
+	require.NoError(t, err)
+	grant := database.AdminRolePermission{RoleCode: role.RoleCode, PermissionCode: types.AdminPermissionAll}
+	_, err = db.Core.NewInsert().Model(&grant).Exec(ctx)
+	require.NoError(t, err)
+	assignments := []database.UserRole{
+		{UserID: 1, RoleCode: "personal_user"}, {UserID: 1, RoleCode: role.RoleCode},
+		{UserID: 2, RoleCode: role.RoleCode, DeletedAt: time.Now()},
+		{UserID: 3, RoleCode: "personal_user"},
+	}
+	_, err = db.Core.NewInsert().Model(&assignments).Exec(ctx)
+	require.NoError(t, err)
 
-	ch, err := us.IndexWithCursor(ctx, req)
+	ch, err := us.IndexWithCursor(ctx, req, types.UserWithAdminPermissions)
 	require.NoError(t, err)
 
 	total := 0
 	for wrapper := range ch {
 		require.NoError(t, wrapper.Err)
 		total += len(wrapper.Users)
+		for _, user := range wrapper.Users {
+			switch user.ID {
+			case 1:
+				require.ElementsMatch(t, []string{"personal_user", "cursor_owner"}, user.Roles())
+				require.True(t, user.HasAdminRole())
+				require.True(t, user.HasSuperAdminPermission())
+			case 2:
+				require.Empty(t, user.Roles())
+				require.False(t, user.HasAdminRole())
+				require.False(t, user.HasSuperAdminPermission())
+			case 3:
+				require.Equal(t, []string{"personal_user"}, user.Roles())
+				require.False(t, user.HasAdminRole())
+				require.False(t, user.HasSuperAdminPermission())
+			}
+		}
 	}
 
 	require.Equal(t, 3, total)
@@ -935,6 +1042,205 @@ func TestUserStore_SoftDeleteUserAndRelationsLastOrgAdmin(t *testing.T) {
 		Count(ctx)
 	require.NoError(t, err)
 	require.Equal(t, 1, memberCount)
+}
+
+// TestUserStore_UserDeletionAdminProtection rechecks current assignments before hard or soft deletion touches related data.
+func TestUserStore_UserDeletionAdminProtection(t *testing.T) {
+	for _, soft := range []bool{false, true} {
+		for _, tc := range []struct {
+			name, grant string
+			isAdmin     bool
+			revoked     bool
+			another     bool
+			multiple    bool
+		}{
+			{name: "last global administrator", grant: "*", isAdmin: true},
+			{name: "last user with multiple management roles", grant: "*", isAdmin: true, multiple: true},
+			{name: "last account administrator", grant: "account/admin", isAdmin: true},
+			{name: "last account wildcard", grant: "account/*", isAdmin: true},
+			{name: "administrator with another manager", grant: "account/admin", isAdmin: true, another: true},
+			{name: "other module administrator", grant: "asset/model", isAdmin: true},
+			{name: "administrator without permissions", isAdmin: true},
+			{name: "revoked administrator", grant: "*", isAdmin: true, revoked: true},
+			{name: "ordinary role with wildcard", grant: "*"},
+			{name: "ordinary user"},
+		} {
+			t.Run(fmt.Sprintf("soft=%v/%s", soft, tc.name), func(t *testing.T) {
+				db := tests.InitTestDB()
+				defer db.Close()
+				ctx := context.Background()
+				store := database.NewUserStoreWithDB(db)
+				target := &database.User{GitID: time.Now().UnixNano(), UUID: uuid.NewString(), Username: "admin-delete-target"}
+				require.NoError(t, store.Create(ctx, target, &database.Namespace{Path: target.Username}))
+				role := &database.Role{RoleCode: "delete_target", DisplayName: "Target", IsAdmin: tc.isAdmin}
+				_, err := db.Core.NewInsert().Model(role).Exec(ctx)
+				require.NoError(t, err)
+				if tc.grant != "" {
+					_, err = db.Core.NewInsert().Model(&database.AdminRolePermission{RoleCode: role.RoleCode, PermissionCode: types.AdminPermission(tc.grant)}).Exec(ctx)
+					require.NoError(t, err)
+				}
+				assignment := &database.UserRole{UserID: target.ID, RoleCode: role.RoleCode}
+				if tc.revoked {
+					assignment.DeletedAt = time.Now()
+				}
+				_, err = db.Core.NewInsert().Model(assignment).Exec(ctx)
+				require.NoError(t, err)
+				if tc.multiple {
+					_, err = db.Core.NewInsert().Model(&database.Role{RoleCode: "delete_second", DisplayName: "Second", IsAdmin: true}).Exec(ctx)
+					require.NoError(t, err)
+					_, err = db.Core.NewInsert().Model(&database.AdminRolePermission{RoleCode: "delete_second", PermissionCode: types.AdminPermissionAll}).Exec(ctx)
+					require.NoError(t, err)
+					_, err = db.Core.NewInsert().Model(&database.UserRole{UserID: target.ID, RoleCode: "delete_second"}).Exec(ctx)
+					require.NoError(t, err)
+				}
+				if tc.another {
+					other := &database.User{GitID: time.Now().UnixNano(), UUID: uuid.NewString(), Username: "admin-delete-other"}
+					require.NoError(t, store.Create(ctx, other, &database.Namespace{Path: other.Username}))
+					_, err = db.Core.NewInsert().Model(&database.UserRole{UserID: other.ID, RoleCode: role.RoleCode}).Exec(ctx)
+					require.NoError(t, err)
+				}
+				if soft {
+					err = store.SoftDeleteUserAndRelations(ctx, *target, types.CloseAccountReq{})
+				} else {
+					err = store.DeleteUserAndRelations(ctx, *target, types.CloseAccountReq{})
+				}
+				protected := tc.isAdmin && !tc.revoked
+				if protected {
+					management := tc.grant == "*" || config.SupportsMultipleAdminRoles() && (tc.grant == "account/admin" || tc.grant == "account/*")
+					if management && !tc.another {
+						require.ErrorIs(t, err, errorx.ErrLastAccountAdmin)
+					} else {
+						require.ErrorIs(t, err, errorx.ErrAdminUserCannotBeDeleted)
+					}
+					stored, err := store.FindByUsername(ctx, target.Username)
+					require.NoError(t, err)
+					require.Empty(t, stored.RetainData, "a rejection must not update the account")
+					var namespace database.Namespace
+					require.NoError(t, db.Core.NewSelect().Model(&namespace).Where("user_id = ?", target.ID).Scan(ctx))
+				} else {
+					require.NoError(t, err)
+					_, err = store.FindByUsername(ctx, target.Username)
+					require.Error(t, err)
+				}
+			})
+		}
+	}
+}
+
+// adminDeletionOperationKey distinguishes the competing transactions in the shared-lock test.
+type adminDeletionOperationKey struct{}
+
+// adminDeletionLockHook coordinates overlapping PostgreSQL deletion and revocation transactions.
+type adminDeletionLockHook struct {
+	first              string
+	locked, attempted  chan struct{}
+	release            <-chan struct{}
+	lockedOnce, second sync.Once
+}
+
+// BeforeQuery records when the competing transaction tries to acquire the administrator lock.
+func (h *adminDeletionLockHook) BeforeQuery(ctx context.Context, event *bun.QueryEvent) context.Context {
+	if strings.HasPrefix(event.Query, "SELECT pg_advisory_xact_lock(") && ctx.Value(adminDeletionOperationKey{}) != h.first {
+		h.second.Do(func() { close(h.attempted) })
+	}
+	return ctx
+}
+
+// AfterQuery keeps the first lock held until the competing transaction attempts the same lock.
+func (h *adminDeletionLockHook) AfterQuery(ctx context.Context, event *bun.QueryEvent) {
+	if event.Err == nil && strings.HasPrefix(event.Query, "SELECT pg_advisory_xact_lock(") && ctx.Value(adminDeletionOperationKey{}) == h.first {
+		h.lockedOnce.Do(func() { close(h.locked) })
+		select {
+		case <-h.release:
+		case <-ctx.Done():
+		}
+	}
+}
+
+// TestUserStore_UserDeletionSerializesWithRoleRevocation uses real PostgreSQL transactions in both execution orders.
+func TestUserStore_UserDeletionSerializesWithRoleRevocation(t *testing.T) {
+	for _, first := range []string{"delete", "revoke"} {
+		t.Run(first, func(t *testing.T) {
+			db := tests.InitTransactionTestDB()
+			t.Cleanup(func() { require.NoError(t, db.Close()) })
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			store := database.NewUserStoreWithDB(db)
+			users := []*database.User{
+				{GitID: time.Now().UnixNano(), UUID: uuid.NewString(), Username: "delete-first"},
+				{GitID: time.Now().UnixNano() + 1, UUID: uuid.NewString(), Username: "revoke-second"},
+			}
+			role := &database.Role{RoleCode: "concurrent_owner", DisplayName: "Owner", IsAdmin: true}
+			_, err := db.Core.NewInsert().Model(role).Exec(ctx)
+			require.NoError(t, err)
+			_, err = db.Core.NewInsert().Model(&database.AdminRolePermission{RoleCode: role.RoleCode, PermissionCode: types.AdminPermissionAll}).Exec(ctx)
+			require.NoError(t, err)
+			for _, user := range users {
+				require.NoError(t, store.Create(ctx, user, &database.Namespace{Path: user.Username}))
+				_, err = db.Core.NewInsert().Model(&database.UserRole{UserID: user.ID, RoleCode: role.RoleCode}).Exec(ctx)
+				require.NoError(t, err)
+			}
+			release := make(chan struct{})
+			var releaseOnce sync.Once
+			releaseLock := func() { releaseOnce.Do(func() { close(release) }) }
+			t.Cleanup(releaseLock)
+			hook := &adminDeletionLockHook{first: first, locked: make(chan struct{}), attempted: make(chan struct{}), release: release}
+			db.BunDB.AddQueryHook(hook)
+			deleteResult, revokeResult := make(chan error, 1), make(chan error, 1)
+			for _, operation := range []string{"delete", "revoke"} {
+				go func() {
+					if operation != first {
+						select {
+						case <-hook.locked:
+						case <-ctx.Done():
+							if operation == "delete" {
+								deleteResult <- ctx.Err()
+							} else {
+								revokeResult <- ctx.Err()
+							}
+							return
+						}
+					}
+					operationCtx := context.WithValue(ctx, adminDeletionOperationKey{}, operation)
+					if operation == "delete" {
+						deleteResult <- store.DeleteUserAndRelations(operationCtx, *users[0], types.CloseAccountReq{})
+					} else {
+						revokeResult <- database.NewUserRoleStoreWithDB(db).RemoveAdminRole(operationCtx, types.AdminUserRoleRequest{
+							UserID: users[1].ID, RoleCode: role.RoleCode, CurrentUser: users[0].Username, GlobalOnly: !config.SupportsMultipleAdminRoles(),
+						})
+					}
+				}()
+			}
+			select {
+			case <-hook.attempted:
+				releaseLock()
+			case <-ctx.Done():
+				t.Fatal(ctx.Err())
+			}
+			select {
+			case err = <-deleteResult:
+				if first == "delete" {
+					require.ErrorIs(t, err, errorx.ErrAdminUserCannotBeDeleted)
+				} else {
+					require.ErrorIs(t, err, errorx.ErrLastAccountAdmin)
+				}
+			case <-ctx.Done():
+				t.Fatal(ctx.Err())
+			}
+			select {
+			case err = <-revokeResult:
+				require.NoError(t, err)
+			case <-ctx.Done():
+				t.Fatal(ctx.Err())
+			}
+			var active int
+			active, err = db.Core.NewSelect().Model((*database.UserRole)(nil)).Where("role_code = ?", role.RoleCode).Count(ctx)
+			require.NoError(t, err)
+			require.Equal(t, 1, active)
+			_, err = store.FindByUsername(ctx, users[0].Username)
+			require.NoError(t, err)
+		})
+	}
 }
 
 func createDeleteUserTestFixtures(t *testing.T, ctx context.Context, db *database.DB, us database.UserStore, os database.OrgStore, suffix string) *database.User {

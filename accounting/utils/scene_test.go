@@ -82,14 +82,16 @@ func TestScene_GetSKUTypeByScene(t *testing.T) {
 }
 
 func TestAccountUsersStore_IsNeedCheckUserSubscription(t *testing.T) {
+	// The subscription check covers hardware compute resource scenes only;
+	// serverless / GuiAgent / Starship usage is not subscription-gated.
 	scenes := map[types.SceneType]bool{
 		types.SceneModelInference:  true,
 		types.SceneSpace:           true,
 		types.SceneModelFinetune:   true,
 		types.SceneEvaluation:      true,
-		types.SceneModelServerless: true,
+		types.SceneModelServerless: false,
 		types.SceneGuiAgent:        false,
-		types.SceneStarship:        true,
+		types.SceneStarship:        false,
 	}
 
 	for scene, skuType := range scenes {

@@ -1,6 +1,8 @@
 package httpbase
 
 import (
+	"context"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -38,32 +40,36 @@ func GetCurrentUser(ctx *gin.Context) string {
 	return ctx.GetString(CurrentUserCtxVar)
 }
 
+// SetCurrentUser preserves the authenticated username in both transport and request contexts.
 func SetCurrentUser(ctx *gin.Context, user string) {
-	ctx.Set(CurrentUserCtxVar, user)
+	setAuditContextValue(ctx, CurrentUserCtxVar, user)
 }
 
 func GetAccessToken(ctx *gin.Context) string {
 	return ctx.GetString(AccessTokenCtxVar)
 }
 
-func SetAccessToken(ctx *gin.Context, user string) {
-	ctx.Set(AccessTokenCtxVar, user)
+// SetAccessToken preserves the authenticated token in both contexts for existing audit consumers.
+func SetAccessToken(ctx *gin.Context, token string) {
+	setAuditContextValue(ctx, AccessTokenCtxVar, token)
 }
 
 func GetAuthType(ctx *gin.Context) AuthType {
 	return AuthType(ctx.GetString(AuthTypeCtxVar))
 }
 
+// SetAuthType preserves the authentication method in both transport and request contexts.
 func SetAuthType(ctx *gin.Context, t AuthType) {
-	ctx.Set(AuthTypeCtxVar, string(t))
+	setAuditContextValue(ctx, AuthTypeCtxVar, string(t))
 }
 
 func GetCurrentUserUUID(ctx *gin.Context) string {
 	return ctx.GetString(CurrentUserUUIDCtxVar)
 }
 
+// SetCurrentUserUUID preserves the authenticated operator UUID in both contexts.
 func SetCurrentUserUUID(ctx *gin.Context, userUUID string) {
-	ctx.Set(CurrentUserUUIDCtxVar, userUUID)
+	setAuditContextValue(ctx, CurrentUserUUIDCtxVar, userUUID)
 }
 
 func GetCurrentNamespaceUUID(ctx *gin.Context) string {
@@ -86,8 +92,19 @@ func SetCurrentTokenName(ctx *gin.Context, name string) {
 	ctx.Set(AccessTokenNameCtxVar, name)
 }
 
+// SetIPAddress preserves the resolved client IP in both contexts for audit attribution.
 func SetIPAddress(ctx *gin.Context, ip string) {
-	ctx.Set(IPctxVar, ip)
+	setAuditContextValue(ctx, IPctxVar, ip)
+}
+
+// setAuditContextValue keeps existing Gin readers and request-context audit readers consistent.
+// String keys preserve the audit hook's existing contract; a missing request still permits Gin-only use.
+// Deriving from the current request context retains authorization, tracing and cancellation.
+func setAuditContextValue(ctx *gin.Context, key, value string) {
+	ctx.Set(key, value)
+	if ctx.Request != nil {
+		ctx.Request = ctx.Request.WithContext(context.WithValue(ctx.Request.Context(), key, value))
+	}
 }
 
 func GetIPAddress(ctx *gin.Context) string {

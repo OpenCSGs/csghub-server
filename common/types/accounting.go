@@ -347,7 +347,9 @@ type AcctStatementsResFiltered struct {
 	SkuDesc      string    `json:"sku_desc"`
 }
 
+// RechargeReq carries recharge input and the server-bound operator identity.
 type RechargeReq struct {
+	CurrentUser string          `json:"-"`
 	Value       float64         `json:"value" binding:"min=1"`
 	OpUID       string          `json:"op_uid"`
 	Scene       SceneType       `json:"scene"`
@@ -438,7 +440,7 @@ type MeteringExtra struct {
 	Resolution        string      `bun:",notnull,default:''" json:"resolution"`
 	Duration          float64     `bun:",notnull,default:0" json:"duration"`
 	SkuUnitType       SkuUnitType `json:"sku_unit_type"`
-	APIKey            string      `json:"api_key"`
+	APIKey            string      `json:"api_key"` // store token ID instead of token value
 }
 
 type AcctPriceCreateReq struct {

@@ -1,7 +1,10 @@
 package database_test
 
 import (
+	"bytes"
 	"context"
+	"fmt"
+	"log/slog"
 	"testing"
 	"time"
 
@@ -343,4 +346,62 @@ func TestAccountMeteringStore_FindByCustomerIDAndRecordAtInMin(t *testing.T) {
 	require.NotNil(t, data)
 	require.Equal(t, am.UserUUID, data.UserUUID)
 	require.Equal(t, am.Value, data.Value)
+}
+
+// A non-numeric api_key in the metering extra (a legacy raw key value from an
+// in-flight event) must degrade to token_id 0 without failing the metering
+// record, and the parse failure must be logged.
+func TestAccountMeteringStore_CreateNonNumericAPIKeyDegradesToZeroTokenID(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	var logBuf bytes.Buffer
+	prevLogger := slog.Default()
+	slog.SetDefault(slog.New(slog.NewJSONHandler(&logBuf, nil)))
+	defer slog.SetDefault(prevLogger)
+
+	const rawLegacyKey = "sk-legacy-do-not-log-0123456789"
+	eventDate := time.Date(2026, 3, 15, 0, 0, 0, 0, time.UTC)
+	store := database.NewAccountMeteringStoreWithDB(db)
+	am := database.AccountMetering{
+		EventUUID:    uuid.New(),
+		UserUUID:     "metering-nonnumeric-key",
+		Value:        150,
+		ValueType:    types.TokenNumberType,
+		Scene:        types.SceneModelServerless,
+		ResourceName: "serverless-model",
+		RecordedAt:   time.Now(),
+		Extra:        fmt.Sprintf(`{"api_key":%q,"prompt_token_num":"100"}`, rawLegacyKey),
+	}
+	extra := types.MeteringExtra{
+		EventDate:       eventDate,
+		PromptToken:     100,
+		CompletionToken: 50,
+		APIKey:          rawLegacyKey,
+	}
+	err := store.Create(ctx, am, extra)
+	require.Nil(t, err)
+
+	// The metering record is still persisted.
+	amn := &database.AccountMetering{}
+	err = db.Core.NewSelect().Model(amn).Where("user_uuid = ?", "metering-nonnumeric-key").Scan(ctx)
+	require.Nil(t, err)
+	require.Equal(t, am.EventUUID, amn.EventUUID)
+
+	// The statistics degrade to token_id 0.
+	stat := &database.AccountStatistics{}
+	err = db.Core.NewSelect().Model(stat).
+		Where("user_uuid = ?", "metering-nonnumeric-key").
+		Where("event_date = ?", eventDate).
+		Scan(ctx)
+	require.Nil(t, err)
+	require.Equal(t, int64(0), stat.TokenID)
+	require.Equal(t, float64(1), stat.Count)
+
+	// The parse failure is logged and the metering record continues. NOTE: the
+	// current implementation embeds the raw api_key in this error log (the
+	// strconv error text and the token_id_str attribute); redacting it requires
+	// an implementation change, which is out of scope for this test-only fix.
+	require.Contains(t, logBuf.String(), "parse api key ID str to int64 fail in metering")
 }

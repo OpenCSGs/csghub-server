@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"slices"
 	"strings"
 	"time"
 
@@ -16,40 +17,41 @@ import (
 	"opencsg.com/csghub-server/common/types"
 )
 
-// Define the UserStore interface
+// UserStore persists users and loads active roles in user queries.
+// Pass UserWithAdminPermissions when the caller needs administrator membership or grants.
 type UserStore interface {
-	Index(ctx context.Context) ([]User, error)
-	IndexWithSearch(ctx context.Context, req types.UserListReq) ([]User, int, error)
+	Index(ctx context.Context, options ...types.UserQueryOption) ([]User, error)
+	IndexWithSearch(ctx context.Context, req types.UserListReq, options ...types.UserQueryOption) ([]User, int, error)
 	// SearchByKeywordExcludingIDs searches users by name, username, or email while excluding the supplied user IDs.
-	SearchByKeywordExcludingIDs(ctx context.Context, search string, excludedIDs []int64, limit int) ([]User, error)
-	FindByUsername(ctx context.Context, username string) (User, error)
-	FindByEmail(ctx context.Context, email string) (User, error)
+	SearchByKeywordExcludingIDs(ctx context.Context, search string, excludedIDs []int64, limit int, options ...types.UserQueryOption) ([]User, error)
+	FindByUsername(ctx context.Context, username string, options ...types.UserQueryOption) (User, error)
+	FindByEmail(ctx context.Context, email string, options ...types.UserQueryOption) (User, error)
 	// Update write the user data back to db. odlUserName should not be empty if username changed
 	Update(ctx context.Context, user *User, oldUserName string) error
 	ChangeUserName(ctx context.Context, username string, newUsername string) error
 	Create(ctx context.Context, user *User, namespace *Namespace) error
 	IsExist(ctx context.Context, username string) (bool, error)
 	IsExistByUUID(ctx context.Context, uuid string) (bool, error)
-	FindByGitAccessToken(ctx context.Context, token string) (*User, error)
-	FindByUUID(ctx context.Context, uuid string) (*User, error)
+	FindByGitAccessToken(ctx context.Context, token string, options ...types.UserQueryOption) (*User, error)
+	FindByUUID(ctx context.Context, uuid string, options ...types.UserQueryOption) (*User, error)
 	DeleteUserAndRelations(ctx context.Context, input User, req types.CloseAccountReq) error
 	CountUsers(ctx context.Context) (int, error)
 	UpdateVerifyStatus(ctx context.Context, uuid string, status types.VerifyStatus) error
 	UpdateLabels(ctx context.Context, uuid string, labels []string) error
-	FindByUUIDs(ctx context.Context, uuids []string) ([]*User, error)
+	FindByUUIDs(ctx context.Context, uuids []string, options ...types.UserQueryOption) ([]*User, error)
 	SoftDeleteUserAndRelations(ctx context.Context, input User, req types.CloseAccountReq) (err error)
-	IndexWithDeleted(ctx context.Context) (users []User, err error)
-	FindByUsernameWithDeleted(ctx context.Context, username string) (User, error)
+	IndexWithDeleted(ctx context.Context, options ...types.UserQueryOption) (users []User, err error)
+	FindByUsernameWithDeleted(ctx context.Context, username string, options ...types.UserQueryOption) (User, error)
 	IsExistWithDeleted(ctx context.Context, username string) (bool, error)
 	GetEmails(ctx context.Context, per, page int) ([]string, int, error)
 	GetUserUUIDs(ctx context.Context, per, page int) ([]string, int, error)
 	GetAdminUserUUIDs(ctx context.Context) ([]string, error)
 	GetAdminEmails(ctx context.Context) ([]string, error)
 	UpdatePhone(ctx context.Context, userID int64, phone string, phoneArea string) error
-	IndexWithCursor(ctx context.Context, req types.UserIndexReq) (ch chan Wrapper, err error)
-	FindByID(ctx context.Context, userID int64) (User, error)
+	IndexWithCursor(ctx context.Context, req types.UserIndexReq, options ...types.UserQueryOption) (ch chan Wrapper, err error)
+	FindByID(ctx context.Context, userID int64, options ...types.UserQueryOption) (User, error)
 	// FindByIDs returns active users for a set of IDs in one query.
-	FindByIDs(ctx context.Context, ids []int64) ([]User, error)
+	FindByIDs(ctx context.Context, ids []int64, options ...types.UserQueryOption) ([]User, error)
 }
 
 // Implement the UserStore interface in UserStoreImpl
@@ -188,6 +190,8 @@ type User struct {
 	Password     string        `bun:",notnull" json:"-"`
 	AccessTokens []AccessToken `bun:"rel:has-many,join:id=user_id"`
 	Namespaces   []Namespace   `bun:"rel:has-many,join:id=user_id" json:"namespace"`
+	// RoleAssignments contains active role memberships loaded with the user.
+	RoleAssignments []UserRole `bun:"rel:has-many,join:id=user_id" json:"-"`
 	// TODO:add unique index after migration
 	UUID string `bun:"," json:"uuid"`
 	// user registered from default login page, from casdoor, etc. Possible values:
@@ -234,32 +238,81 @@ type Wrapper struct {
 	Err   error  `json:"error"`
 }
 
+// Roles returns active role codes, including roles without administrator definitions.
+// Legacy RoleMask values are not a fallback for persisted assignments.
 func (u *User) Roles() []string {
-	if len(u.RoleMask) == 0 {
-		return []string{}
+	roles := make([]string, 0, len(u.RoleAssignments))
+	for _, assignment := range u.RoleAssignments {
+		if assignment.DeletedAt.IsZero() {
+			roles = append(roles, assignment.RoleCode)
+		}
 	}
-	return strings.Split(u.RoleMask, ",")
+	return roles
 }
 
-// CanAdmin checks if the user has admin or super_user roles.
-// It returns a boolean indicating whether the user has admin or super_user roles.
+// HasAdminRole reports active membership in any defined administrator role.
+func (u *User) HasAdminRole() bool {
+	if !u.DeletedAt.IsZero() {
+		return false
+	}
+	for _, assignment := range u.RoleAssignments {
+		if assignment.DeletedAt.IsZero() && assignment.Role != nil && assignment.Role.IsAdmin {
+			return true
+		}
+	}
+	return false
+}
+
+// HasSuperAdminPermission requires an active administrator role with a stored global grant.
+// A role's name alone never grants global administrator access.
+func (u *User) HasSuperAdminPermission() bool {
+	if !u.DeletedAt.IsZero() {
+		return false
+	}
+	for _, assignment := range u.RoleAssignments {
+		if !assignment.DeletedAt.IsZero() || assignment.Role == nil || !assignment.Role.IsAdmin {
+			continue
+		}
+		for _, permission := range assignment.Role.Permissions {
+			if permission.PermissionCode == types.AdminPermissionAll {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// CanAdmin reports whether the loaded active roles grant super administrator permission.
+// It requires the global wildcard grant and uses the same rule as SuperAdmin responses.
 func (u *User) CanAdmin() bool {
-	return strings.Contains(u.RoleMask, "admin") || strings.Contains(u.RoleMask, "super_user")
+	return u.HasSuperAdminPermission()
 }
 
 func (u *User) SetRoles(roles []string) {
 	u.RoleMask = strings.Join(roles, ",")
 }
 
-func (s *UserStoreImpl) Index(ctx context.Context) (users []User, err error) {
-	err = s.db.Operator.Core.NewSelect().Model(&users).Scan(ctx, &users)
+// userQueryRelations selects role codes by default and administrator grants only on request.
+func userQueryRelations(options ...types.UserQueryOption) func(*bun.SelectQuery) *bun.SelectQuery {
+	return func(query *bun.SelectQuery) *bun.SelectQuery {
+		if slices.Contains(options, types.UserWithAdminPermissions) {
+			return query.Relation("RoleAssignments.Role.Permissions")
+		}
+		return query.Relation("RoleAssignments")
+	}
+}
+
+// Index returns active users with roles and optionally administrator grants.
+func (s *UserStoreImpl) Index(ctx context.Context, options ...types.UserQueryOption) (users []User, err error) {
+	err = s.db.Operator.Core.NewSelect().Model(&users).Apply(userQueryRelations(options...)).Scan(ctx)
 	return users, errorx.HandleDBError(err, nil)
 }
 
-func (s *UserStoreImpl) IndexWithSearch(ctx context.Context, req types.UserListReq) (users []User, count int, err error) {
+// IndexWithSearch filters and paginates active users, batch-loading role relationships for the page.
+func (s *UserStoreImpl) IndexWithSearch(ctx context.Context, req types.UserListReq, options ...types.UserQueryOption) (users []User, count int, err error) {
 	search := strings.ToLower(req.Search)
 	query := s.db.Operator.Core.NewSelect().
-		Model(&users)
+		Model(&users).Apply(userQueryRelations(options...))
 	if search != "" {
 		if req.ExactMatch {
 			query.Where("LOWER(username) = ? OR LOWER(email) = ? OR phone = ?", strings.ToLower(search), strings.ToLower(search), search)
@@ -289,17 +342,17 @@ func (s *UserStoreImpl) IndexWithSearch(ctx context.Context, req types.UserListR
 		req.SortOrder = "asc"
 	}
 	query.Order(fmt.Sprintf("%s %s", req.SortBy, req.SortOrder)).Limit(req.Per).Offset((req.Page - 1) * req.Per)
-	err = query.Scan(ctx, &users)
+	err = query.Scan(ctx)
 	return users, count, errorx.HandleDBError(err, nil)
 }
 
 // SearchByKeywordExcludingIDs searches users by display name, username, or email.
-func (s *UserStoreImpl) SearchByKeywordExcludingIDs(ctx context.Context, search string, excludedIDs []int64, limit int) (users []User, err error) {
+func (s *UserStoreImpl) SearchByKeywordExcludingIDs(ctx context.Context, search string, excludedIDs []int64, limit int, options ...types.UserQueryOption) (users []User, err error) {
 	if limit <= 0 {
 		limit = 20
 	}
 	pattern := fmt.Sprintf("%%%s%%", strings.ToLower(search))
-	query := s.db.Operator.Core.NewSelect().Model(&users).Where(
+	query := s.db.Operator.Core.NewSelect().Model(&users).Apply(userQueryRelations(options...)).Where(
 		"LOWER(name) LIKE ? OR LOWER(username) LIKE ? OR LOWER(email) LIKE ?", pattern, pattern, pattern,
 	)
 	if len(excludedIDs) > 0 {
@@ -309,35 +362,38 @@ func (s *UserStoreImpl) SearchByKeywordExcludingIDs(ctx context.Context, search 
 	return users, errorx.HandleDBError(err, nil)
 }
 
-func (s *UserStoreImpl) FindByUsername(ctx context.Context, username string) (user User, err error) {
+// FindByUsername returns an active user with namespaces and role relationships.
+func (s *UserStoreImpl) FindByUsername(ctx context.Context, username string, options ...types.UserQueryOption) (user User, err error) {
 	user.Username = username
 	err = s.db.Operator.Core.NewSelect().
-		Model(&user).Relation("Namespaces").
+		Model(&user).Relation("Namespaces").Apply(userQueryRelations(options...)).
 		Where("username = ?", username).
 		Scan(ctx)
 	return user, errorx.HandleDBError(err, map[string]interface{}{"username": username})
 }
 
-func (s *UserStoreImpl) FindByEmail(ctx context.Context, email string) (user User, err error) {
+// FindByEmail returns an active user with role relationships by email.
+func (s *UserStoreImpl) FindByEmail(ctx context.Context, email string, options ...types.UserQueryOption) (user User, err error) {
 	user.Email = email
-	err = s.db.Operator.Core.NewSelect().Model(&user).Where("email = ?", email).Scan(ctx)
+	err = s.db.Operator.Core.NewSelect().Model(&user).Apply(userQueryRelations(options...)).Where("email = ?", email).Scan(ctx)
 	return user, errorx.HandleDBError(err, nil)
 }
 
-func (s *UserStoreImpl) FindByID(ctx context.Context, id int64) (user User, err error) {
+// FindByID returns an active user with role relationships by ID.
+func (s *UserStoreImpl) FindByID(ctx context.Context, id int64, options ...types.UserQueryOption) (user User, err error) {
 	user.ID = id
-	err = s.db.Operator.Core.NewSelect().Model(&user).WherePK().Scan(ctx)
+	err = s.db.Operator.Core.NewSelect().Model(&user).Apply(userQueryRelations(options...)).WherePK().Scan(ctx)
 	err = errorx.HandleDBError(err, nil)
 	return
 }
 
-// FindByIDs returns active users for a set of IDs in one query.
-func (s *UserStoreImpl) FindByIDs(ctx context.Context, ids []int64) (users []User, err error) {
+// FindByIDs returns active users and batch-loads role relationships for a set of IDs.
+func (s *UserStoreImpl) FindByIDs(ctx context.Context, ids []int64, options ...types.UserQueryOption) (users []User, err error) {
 	users = make([]User, 0)
 	if len(ids) == 0 {
 		return users, nil
 	}
-	err = s.db.Operator.Core.NewSelect().Model(&users).
+	err = s.db.Operator.Core.NewSelect().Model(&users).Apply(userQueryRelations(options...)).
 		Where("id IN (?)", bun.In(ids)).
 		Order("id ASC").Scan(ctx)
 	return users, errorx.HandleDBError(err, nil)
@@ -436,11 +492,11 @@ func (s *UserStoreImpl) IsExistByUUID(ctx context.Context, uuid string) (exists 
 	return exists, errorx.HandleDBError(err, nil)
 }
 
-// FindByAccessToken retrieves user information based on the access token. The access token must be active and not expired.
-func (s *UserStoreImpl) FindByGitAccessToken(ctx context.Context, token string) (*User, error) {
+// FindByGitAccessToken retrieves an active user and role relationships through an unexpired Git token.
+func (s *UserStoreImpl) FindByGitAccessToken(ctx context.Context, token string, options ...types.UserQueryOption) (*User, error) {
 	var user User
 	err := s.db.Operator.Core.NewSelect().
-		Model(&user).
+		Model(&user).Apply(userQueryRelations(options...)).
 		Join(`JOIN access_tokens AS t ON t.user_id = "user".id`).
 		Where("t.token = ? and t.is_active = true and (t.expired_at is null or t.expired_at > now()) and t.app = 'git'", token).
 		Scan(ctx)
@@ -451,10 +507,11 @@ func (s *UserStoreImpl) FindByGitAccessToken(ctx context.Context, token string) 
 	return &user, nil
 }
 
-func (s *UserStoreImpl) FindByUUID(ctx context.Context, uuid string) (*User, error) {
+// FindByUUID returns an active user with namespaces and role relationships by UUID.
+func (s *UserStoreImpl) FindByUUID(ctx context.Context, uuid string, options ...types.UserQueryOption) (*User, error) {
 	var user User
 	err := s.db.Operator.Core.NewSelect().
-		Model(&user).Relation("Namespaces").
+		Model(&user).Relation("Namespaces").Apply(userQueryRelations(options...)).
 		Where("uuid = ?", uuid).
 		Scan(ctx)
 	if err != nil {
@@ -471,6 +528,7 @@ func (s *UserStoreImpl) GetActiveUserCount(ctx context.Context) (int, error) {
 	return count, errorx.HandleDBError(err, nil)
 }
 
+// DeleteUserAndRelations protects active administrators before permanently deleting a user and related data.
 func (s *UserStoreImpl) DeleteUserAndRelations(ctx context.Context, input User, req types.CloseAccountReq) (err error) {
 	exists, err := s.IsExistWithDeleted(ctx, input.Username)
 	if err != nil {
@@ -480,7 +538,10 @@ func (s *UserStoreImpl) DeleteUserAndRelations(ctx context.Context, input User, 
 		return errorx.ErrDatabaseNoRows
 	}
 
-	err = s.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+	err = s.db.Operator.Core.RunInTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted}, func(ctx context.Context, tx bun.Tx) error {
+		if err := protectAdministratorFromUserDeletion(ctx, tx, input.ID); err != nil {
+			return err
+		}
 		if err := s.runTransactionCleanup(ctx, tx, input.ID); err != nil {
 			return err
 		}
@@ -613,14 +674,15 @@ func (s *UserStoreImpl) UpdateLabels(ctx context.Context, uuid string, labels []
 	return errorx.HandleDBError(err, nil)
 }
 
-func (s *UserStoreImpl) FindByUUIDs(ctx context.Context, uuids []string) ([]*User, error) {
+// FindByUUIDs batch-loads active users, namespaces, and role relationships for UUIDs.
+func (s *UserStoreImpl) FindByUUIDs(ctx context.Context, uuids []string, options ...types.UserQueryOption) ([]*User, error) {
 	var users []*User
 	if len(uuids) == 0 {
 		return users, nil
 	}
 
 	err := s.db.Operator.Core.NewSelect().
-		Model(&users).Relation("Namespaces").
+		Model(&users).Relation("Namespaces").Apply(userQueryRelations(options...)).
 		Where("uuid IN (?)", bun.In(uuids)).
 		Scan(ctx)
 	if err != nil {
@@ -630,12 +692,14 @@ func (s *UserStoreImpl) FindByUUIDs(ctx context.Context, uuids []string) ([]*Use
 	return users, nil
 }
 
-func (s *UserStoreImpl) IndexWithDeleted(ctx context.Context) (users []User, err error) {
-	err = s.db.Operator.Core.NewSelect().Model(&users).WhereAllWithDeleted().Scan(ctx, &users)
+// IndexWithDeleted includes deleted users while loading only active role assignments.
+func (s *UserStoreImpl) IndexWithDeleted(ctx context.Context, options ...types.UserQueryOption) (users []User, err error) {
+	err = s.db.Operator.Core.NewSelect().Model(&users).Apply(userQueryRelations(options...)).WhereAllWithDeleted().Scan(ctx)
 	err = errorx.HandleDBError(err, nil)
 	return
 }
 
+// SoftDeleteUserAndRelations applies the same administrator protection before closing a user account.
 func (s *UserStoreImpl) SoftDeleteUserAndRelations(ctx context.Context, input User, req types.CloseAccountReq) (err error) {
 	exists, err := s.IsExist(ctx, input.Username)
 	if err != nil {
@@ -644,7 +708,10 @@ func (s *UserStoreImpl) SoftDeleteUserAndRelations(ctx context.Context, input Us
 	if !exists {
 		return errorx.ErrDatabaseNoRows
 	}
-	err = s.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+	err = s.db.Operator.Core.RunInTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted}, func(ctx context.Context, tx bun.Tx) error {
+		if err := protectAdministratorFromUserDeletion(ctx, tx, input.ID); err != nil {
+			return err
+		}
 		if err := s.runTransactionCleanup(ctx, tx, input.ID); err != nil {
 			return err
 		}
@@ -723,9 +790,10 @@ func (s *UserStoreImpl) SoftDeleteUserAndRelations(ctx context.Context, input Us
 	return errorx.HandleDBError(err, nil)
 }
 
-func (s *UserStoreImpl) FindByUsernameWithDeleted(ctx context.Context, username string) (user User, err error) {
+// FindByUsernameWithDeleted includes deleted users while loading active role assignments.
+func (s *UserStoreImpl) FindByUsernameWithDeleted(ctx context.Context, username string, options ...types.UserQueryOption) (user User, err error) {
 	user.Username = username
-	err = s.db.Operator.Core.NewSelect().Model(&user).WhereAllWithDeleted().Where("username = ?", username).Scan(ctx)
+	err = s.db.Operator.Core.NewSelect().Model(&user).Apply(userQueryRelations(options...)).WhereAllWithDeleted().Where("username = ?", username).Scan(ctx)
 	err = errorx.HandleDBError(err, nil)
 	return
 }
@@ -766,52 +834,40 @@ func (s *UserStoreImpl) GetUserUUIDs(ctx context.Context, per, page int) (uuids 
 	return uuids, count, nil
 }
 
+// GetAdminUserUUIDs returns active super administrators with a nonempty UUID.
 func (s *UserStoreImpl) GetAdminUserUUIDs(ctx context.Context) ([]string, error) {
-	var users []User
-	err := s.db.Operator.Core.NewSelect().
-		Model(&users).
-		Column("uuid", "role_mask").
-		Where("uuid IS NOT NULL AND uuid != ''").
-		Where(
-			"role_mask = ? OR role_mask = ? OR role_mask LIKE ? OR role_mask LIKE ? OR role_mask LIKE ? OR role_mask LIKE ? OR role_mask LIKE ? OR role_mask LIKE ?",
-			"admin", "super_user", "admin,%", "%,admin", "%,admin,%", "super_user,%", "%,super_user", "%,super_user,%",
-		).
-		Scan(ctx)
-	if err != nil {
-		return nil, errorx.HandleDBError(err, nil)
-	}
-
 	adminUUIDs := make([]string, 0)
-	for _, user := range users {
-		if user.CanAdmin() {
-			adminUUIDs = append(adminUUIDs, user.UUID)
-		}
-	}
-	return adminUUIDs, nil
+	err := s.db.Operator.Core.NewSelect().
+		Model((*User)(nil)).
+		Column("uuid").
+		Where("uuid IS NOT NULL AND uuid != ''").
+		Where("EXISTS (?)", s.db.Operator.Core.NewSelect().Model((*UserRole)(nil)).
+			ColumnExpr("1").
+			Join("JOIN roles AS ar ON ar.role_code = ur.role_code").
+			Where("ar.is_admin = ?", true).
+			Join("JOIN admin_role_permissions AS arp ON arp.role_code = ar.role_code").
+			Where("ur.user_id = ?", bun.Ident("user.id")).
+			Where("arp.permission_code = ?", types.AdminPermissionAll)).
+		Scan(ctx, &adminUUIDs)
+	return adminUUIDs, errorx.HandleDBError(err, nil)
 }
 
+// GetAdminEmails returns active super administrators with a nonempty email.
 func (s *UserStoreImpl) GetAdminEmails(ctx context.Context) ([]string, error) {
-	var users []User
-	err := s.db.Operator.Core.NewSelect().
-		Model(&users).
-		Column("email", "role_mask").
-		Where("email IS NOT NULL AND email != ''").
-		Where(
-			"role_mask = ? OR role_mask = ? OR role_mask LIKE ? OR role_mask LIKE ? OR role_mask LIKE ? OR role_mask LIKE ? OR role_mask LIKE ? OR role_mask LIKE ?",
-			"admin", "super_user", "admin,%", "%,admin", "%,admin,%", "super_user,%", "%,super_user", "%,super_user,%",
-		).
-		Scan(ctx)
-	if err != nil {
-		return nil, errorx.HandleDBError(err, nil)
-	}
-
 	adminEmails := make([]string, 0)
-	for _, user := range users {
-		if user.CanAdmin() {
-			adminEmails = append(adminEmails, user.Email)
-		}
-	}
-	return adminEmails, nil
+	err := s.db.Operator.Core.NewSelect().
+		Model((*User)(nil)).
+		Column("email").
+		Where("email IS NOT NULL AND email != ''").
+		Where("EXISTS (?)", s.db.Operator.Core.NewSelect().Model((*UserRole)(nil)).
+			ColumnExpr("1").
+			Join("JOIN roles AS ar ON ar.role_code = ur.role_code").
+			Where("ar.is_admin = ?", true).
+			Join("JOIN admin_role_permissions AS arp ON arp.role_code = ar.role_code").
+			Where("ur.user_id = ?", bun.Ident("user.id")).
+			Where("arp.permission_code = ?", types.AdminPermissionAll)).
+		Scan(ctx, &adminEmails)
+	return adminEmails, errorx.HandleDBError(err, nil)
 }
 
 func (s *UserStoreImpl) UpdatePhone(ctx context.Context, userID int64, phone string, phoneArea string) error {
@@ -825,7 +881,8 @@ func (s *UserStoreImpl) UpdatePhone(ctx context.Context, userID int64, phone str
 	return errorx.HandleDBError(err, nil)
 }
 
-func (s *UserStoreImpl) IndexWithCursor(ctx context.Context, req types.UserIndexReq) (chan Wrapper, error) {
+// IndexWithCursor exports active users in batches with their role relationships.
+func (s *UserStoreImpl) IndexWithCursor(ctx context.Context, req types.UserIndexReq, options ...types.UserQueryOption) (chan Wrapper, error) {
 	batchSize := req.Per
 	if batchSize == 0 {
 		batchSize = 100
@@ -882,6 +939,9 @@ func (s *UserStoreImpl) IndexWithCursor(ctx context.Context, req types.UserIndex
 				if len(batch) == 0 {
 					break
 				}
+				if err := loadUserRoleAssignments(ctx, tx.Core, batch, options...); err != nil {
+					return err
+				}
 
 				result <- Wrapper{Users: batch}
 			}
@@ -900,4 +960,31 @@ func (s *UserStoreImpl) IndexWithCursor(ctx context.Context, req types.UserIndex
 	}()
 
 	return result, nil
+}
+
+// loadUserRoleAssignments batch-loads active roles and optional grants for raw cursor results.
+func loadUserRoleAssignments(ctx context.Context, db bun.IDB, users []User, options ...types.UserQueryOption) error {
+	if len(users) == 0 {
+		return nil
+	}
+	ids := make([]int64, 0, len(users))
+	indexes := make(map[int64]int, len(users))
+	for i := range users {
+		ids = append(ids, users[i].ID)
+		indexes[users[i].ID] = i
+		users[i].RoleAssignments = nil
+	}
+	var assignments []UserRole
+	query := db.NewSelect().Model(&assignments)
+	if slices.Contains(options, types.UserWithAdminPermissions) {
+		query.Relation("Role.Permissions")
+	}
+	if err := query.Where("ur.user_id IN (?)", bun.In(ids)).Order("ur.id ASC").Scan(ctx); err != nil {
+		return fmt.Errorf("load user role assignments: %w", err)
+	}
+	for _, assignment := range assignments {
+		index := indexes[assignment.UserID]
+		users[index].RoleAssignments = append(users[index].RoleAssignments, assignment)
+	}
+	return nil
 }

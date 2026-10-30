@@ -71,14 +71,14 @@ type UserComponent interface {
 	UpdateByUUID(ctx context.Context, req *types.UpdateUserRequest) error
 	// Update(ctx context.Context, req *types.UpdateUserRequest, opUser string) error
 	Delete(ctx context.Context, operator, username string) error
-	// CanAdmin checks if a user has admin privileges.
+	// CanAdmin checks whether a user's active roles grant global super administrator permission.
 	//
 	// Parameters:
 	// - ctx: The context.Context object for the function.
 	// - username: The username of the user to check.
 	//
 	// Returns:
-	// - bool: True if the user has admin privileges, false otherwise.
+	// - bool: True if the user has the global wildcard grant, false otherwise.
 	// - error: An error if the user cannot be found in the database.
 	CanAdmin(ctx context.Context, username string) (bool, error)
 	// GetInternal get *full* user info by username or uuid
@@ -92,6 +92,10 @@ type UserComponent interface {
 	CheckIfUserHasRunningOrBuildingDeployments(ctx context.Context, userName string) (bool, error)
 	CheckIfUserHasBills(ctx context.Context, userName string) (bool, error)
 	Index(ctx context.Context, req types.UserListReq) ([]*types.User, int, error)
+	// UserChoices returns minimal user candidates after route-level submodule authorization.
+	UserChoices(ctx context.Context, req types.UserListReq) ([]types.UserChoice, int, error)
+	// UserChoice resolves a voucher recipient without returning a full account profile.
+	UserChoice(ctx context.Context, username string) (*types.UserChoiceDetail, error)
 	Signin(ctx context.Context, code, state string) (*types.JWTClaims, string, error)
 	UpdateUserLabels(ctx context.Context, req *types.UserLabelsRequest) error
 	FindByUUIDs(ctx context.Context, uuids []string) ([]*types.User, error)
@@ -261,13 +265,12 @@ func (c *userComponentImpl) createFromSSOUser(ctx context.Context, cu *rpc.SSOUs
 		NamespaceType: database.UserNamespace,
 	}
 	user := &database.User{
-		Username:    userName,
-		NickName:    userName,
-		Email:       email,
-		UUID:        cu.UUID,
-		RegProvider: c.config.SSOType,
-		Gender:      cu.Gender,
-		// RoleMask:        "", //will be updated when admin set user role
+		Username:        userName,
+		NickName:        userName,
+		Email:           email,
+		UUID:            cu.UUID,
+		RegProvider:     c.config.SSOType,
+		Gender:          cu.Gender,
 		Phone:           cu.Phone,
 		PhoneArea:       cu.PhoneArea,
 		PhoneVerified:   false,
@@ -302,6 +305,7 @@ func (c *userComponentImpl) createFromSSOUser(ctx context.Context, cu *rpc.SSOUs
 	return user, nil
 }
 
+// UpdateByUUID permits authorized administrator updates while preserving profile validation and existing legacy roles.
 func (c *userComponentImpl) UpdateByUUID(ctx context.Context, req *types.UpdateUserRequest) error {
 	c.lazyInit()
 
@@ -328,12 +332,12 @@ func (c *userComponentImpl) UpdateByUUID(ctx context.Context, req *types.UpdateU
 	var opUser database.User
 	if user.Username != opUserName {
 		//find op user by username
-		opUser, err = c.userStore.FindByUsername(ctx, opUserName)
+		opUser, err = c.userStore.FindByUsername(ctx, opUserName, types.UserWithAdminPermissions)
 		if err != nil {
 			return fmt.Errorf("failed to find op user by name in db,user: '%s', error:%w", opUserName, err)
 		}
 
-		if !opUser.CanAdmin() {
+		if !(types.IsAdminAuthorized(ctx) || opUser.CanAdmin()) {
 			return errorx.ErrForbidden
 		}
 	} else {
@@ -341,12 +345,6 @@ func (c *userComponentImpl) UpdateByUUID(ctx context.Context, req *types.UpdateU
 	}
 
 	shouldSyncToIAM := false
-	if req.Roles != nil {
-		if can, reason := c.canChangeRole(*user, opUser); !can {
-			return errors.New(reason)
-		}
-	}
-
 	if req.NewUserName != nil && user.Username != *req.NewUserName {
 		if can, reason := c.canChangeUserName(ctx, *user, opUser, *req.NewUserName); !can {
 			return errors.New(reason)
@@ -452,16 +450,6 @@ func (c *userComponentImpl) UpdateByUUID(ctx context.Context, req *types.UpdateU
 
 }
 
-func (c *userComponentImpl) canChangeRole(user, opuser database.User) (can bool, reason string) {
-	if opuser.ID == user.ID {
-		return false, "user can not change roles of self"
-	}
-	if !opuser.CanAdmin() {
-		return false, "op user is not admin"
-	}
-	return true, ""
-}
-
 func (c *userComponentImpl) canChangeUserName(ctx context.Context, user, opuser database.User, newUserName string) (can bool, reason string) {
 	if opuser.ID != user.ID {
 		return false, "user name can only be changed by the user itself"
@@ -560,6 +548,7 @@ func (c *userComponentImpl) canChangeEmail(ctx context.Context, user, opuser dat
 // 	return nil
 // }
 
+// setChangedProps applies profile changes without changing legacy role assignments.
 func (c *userComponentImpl) setChangedProps(oldUser *database.User, req *types.UpdateUserRequest) *database.User {
 	user := *oldUser
 	if req.NewUserName != nil {
@@ -581,9 +570,6 @@ func (c *userComponentImpl) setChangedProps(oldUser *database.User, req *types.U
 	if req.Nickname != nil {
 		user.NickName = *req.Nickname
 	}
-	if req.Roles != nil {
-		user.SetRoles(*req.Roles)
-	}
 	if req.Phone != nil {
 		user.Phone = *req.Phone
 	}
@@ -594,6 +580,8 @@ func (c *userComponentImpl) setChangedProps(oldUser *database.User, req *types.U
 	return &user
 }
 
+// Delete removes persisted user data before cleaning external relationships.
+// The store revalidates administrator protection because this method also runs in asynchronous workflows.
 func (c *userComponentImpl) Delete(ctx context.Context, operator, username string) error {
 	var retainData types.CloseAccountReq
 	user, err := c.userStore.FindByUsernameWithDeleted(ctx, username)
@@ -656,7 +644,7 @@ func (c *userComponentImpl) Delete(ctx context.Context, operator, username strin
 	// delete user from db
 	err = c.userStore.DeleteUserAndRelations(ctx, user, retainData)
 	if err != nil {
-		return fmt.Errorf("failed to delete user and user relations: %v", err)
+		return fmt.Errorf("failed to delete user and user relations: %w", err)
 	}
 	if err := deleteUserOrganizationReBACRelationships(ctx, c.rebac, organizationReBACCleanups); err != nil {
 		return fmt.Errorf("failed to delete user organization ReBAC relationships: %w", err)
@@ -695,17 +683,17 @@ func (c *userComponentImpl) Delete(ctx context.Context, operator, username strin
 	return nil
 }
 
-// CanAdmin checks if a user has admin privileges.
+// CanAdmin checks whether a user's active roles grant global super administrator permission.
 //
 // Parameters:
 // - ctx: The context.Context object for the function.
 // - username: The username of the user to check.
 //
 // Returns:
-// - bool: True if the user has admin privileges, false otherwise.
+// - bool: True if the user has the global wildcard grant, false otherwise.
 // - error: An error if the user cannot be found in the database.
 func (c *userComponentImpl) CanAdmin(ctx context.Context, username string) (bool, error) {
-	user, err := c.userStore.FindByUsername(ctx, username)
+	user, err := c.userStore.FindByUsername(ctx, username, types.UserWithAdminPermissions)
 	if err != nil {
 		newError := fmt.Errorf("failed to find user by name '%s' in db,error:%w", username, err)
 		return false, newError
@@ -720,9 +708,9 @@ func (c *userComponentImpl) GetInternal(ctx context.Context, userNameOrUUID stri
 	var dbuser = new(database.User)
 	var err error
 	if useUUID {
-		dbuser, err = c.userStore.FindByUUID(ctx, userNameOrUUID)
+		dbuser, err = c.userStore.FindByUUID(ctx, userNameOrUUID, types.UserWithAdminPermissions)
 	} else {
-		*dbuser, err = c.userStore.FindByUsername(ctx, userNameOrUUID)
+		*dbuser, err = c.userStore.FindByUsername(ctx, userNameOrUUID, types.UserWithAdminPermissions)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to find user by name or uuid '%s' in db,error:%w", userNameOrUUID, err)
@@ -730,13 +718,21 @@ func (c *userComponentImpl) GetInternal(ctx context.Context, userNameOrUUID stri
 	return c.buildUserInfo(ctx, dbuser, false)
 }
 
+// Get exposes full profiles to authorized administrator requests, the owner, or legacy global administrators.
+// It loads administrator grants only when the visitor can see the target's full profile.
+// Username-based self lookups load them immediately; other full profiles are enriched by user ID.
 func (c *userComponentImpl) Get(ctx context.Context, userNameOrUUID, visitorName string, useUUID bool) (*types.User, error) {
+	permissionsLoaded := visitorName != "" && !useUUID && userNameOrUUID == visitorName
+	var options []types.UserQueryOption
+	if permissionsLoaded {
+		options = append(options, types.UserWithAdminPermissions)
+	}
 	var dbuser = new(database.User)
 	var err error
 	if useUUID {
-		dbuser, err = c.userStore.FindByUUID(ctx, userNameOrUUID)
+		dbuser, err = c.userStore.FindByUUID(ctx, userNameOrUUID, options...)
 	} else {
-		*dbuser, err = c.userStore.FindByUsername(ctx, userNameOrUUID)
+		*dbuser, err = c.userStore.FindByUsername(ctx, userNameOrUUID, options...)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to find user by name or uuid  '%s' in db,error:%w", userNameOrUUID, err)
@@ -746,7 +742,7 @@ func (c *userComponentImpl) Get(ctx context.Context, userNameOrUUID, visitorName
 	//allow anonymous user to get basic info
 	if visitorName == "" {
 		onlyBasicInfo = true
-	} else if userName != visitorName {
+	} else if userName != visitorName && !types.IsAdminAuthorized(ctx) {
 		canAdmin, err := c.CanAdmin(ctx, visitorName)
 		if err != nil {
 			return nil, fmt.Errorf("failed to check visitor user permission, visitor: %s, error: %w", visitorName, err)
@@ -757,27 +753,36 @@ func (c *userComponentImpl) Get(ctx context.Context, userNameOrUUID, visitorName
 		}
 	}
 
+	if !onlyBasicInfo && !permissionsLoaded {
+		userWithPermissions, err := c.userStore.FindByID(ctx, dbuser.ID, types.UserWithAdminPermissions)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load user %s administrator permissions: %w", dbuser.Username, err)
+		}
+		dbuser.RoleAssignments = userWithPermissions.RoleAssignments
+	}
+
 	return c.buildUserInfo(ctx, dbuser, onlyBasicInfo)
 }
 
+// CheckOperatorAndUser authorizes the operator and protects every active administrator account.
 func (c *userComponentImpl) CheckOperatorAndUser(ctx context.Context, operator, username string) (bool, error) {
-	opUser, err := c.userStore.FindByUsername(ctx, operator)
+	opUser, err := c.userStore.FindByUsername(ctx, operator, types.UserWithAdminPermissions)
 	if err != nil {
 		newError := fmt.Errorf("failed to find operator by name in db,error:%w", err)
 		return true, newError
 	}
 
-	user, err := c.userStore.FindByUsernameWithDeleted(ctx, username)
+	user, err := c.userStore.FindByUsernameWithDeleted(ctx, username, types.UserWithAdminPermissions)
 	if err != nil {
 		newError := fmt.Errorf("failed to find user by name in db,error:%w", err)
 		return true, newError
 	}
-	if !opUser.CanAdmin() {
+	if !types.IsAdminAuthorized(ctx) && !opUser.CanAdmin() {
 		return false, errors.New("only admin user or the user can delete the user")
 	}
 
-	if user.CanAdmin() {
-		return false, errors.New("admin user can not be deleted")
+	if user.HasAdminRole() {
+		return false, errorx.ErrAdminUserCannotBeDeleted
 	}
 	return false, nil
 }
@@ -831,6 +836,7 @@ func (c *userComponentImpl) CheckIfUserHasBills(ctx context.Context, userName st
 	return false, nil
 }
 
+// buildUserInfo includes loaded role assignments and administrator flags only in full user profiles.
 func (c *userComponentImpl) buildUserInfo(ctx context.Context, dbuser *database.User, onlyBasicInfo bool) (*types.User, error) {
 	var tags []types.RepoTag
 
@@ -875,6 +881,8 @@ func (c *userComponentImpl) buildUserInfo(ctx context.Context, dbuser *database.
 		u.PhoneArea = dbuser.PhoneArea
 		u.Phone = dbuser.Phone
 		u.Roles = dbuser.Roles()
+		u.Admin = dbuser.HasAdminRole()
+		u.SuperAdmin = dbuser.HasSuperAdminPermission()
 		u.VerifyStatus = string(dbuser.VerifyStatus)
 		u.Labels = dbuser.Labels
 		u.CreatedAt = dbuser.CreatedAt
@@ -916,19 +924,65 @@ func (c *userComponentImpl) buildUserInfo(ctx context.Context, dbuser *database.
 	return &u, nil
 }
 
+// UserChoices searches active users without loading administrator grants or projecting account details.
+// The calling route must independently authorize its own administrator submodule.
+func (c *userComponentImpl) UserChoices(ctx context.Context, req types.UserListReq) ([]types.UserChoice, int, error) {
+	users, total, err := c.userStore.IndexWithSearch(ctx, req)
+	if err != nil {
+		return nil, total, fmt.Errorf("failed to find user choices: %w", err)
+	}
+	choices := make([]types.UserChoice, 0, len(users))
+	for _, user := range users {
+		choices = append(choices, types.UserChoice{
+			ID: user.ID, UUID: user.UUID, Username: user.Username,
+			Nickname: user.NickName, Avatar: user.Avatar,
+		})
+	}
+	return choices, total, nil
+}
+
+// UserChoice returns display identity and active personal namespaces after route-level authorization.
+// It never calls Get/buildUserInfo or loads administrator permissions, even with an administrator context.
+func (c *userComponentImpl) UserChoice(ctx context.Context, username string) (*types.UserChoiceDetail, error) {
+	user, err := c.userStore.FindByUsername(ctx, username)
+	if err != nil {
+		return nil, fmt.Errorf("find voucher user choice: %w", err)
+	}
+	choice := &types.UserChoiceDetail{
+		UserChoice: types.UserChoice{ID: user.ID, UUID: user.UUID, Username: user.Username, Nickname: user.NickName, Avatar: user.Avatar},
+		Namespaces: make([]types.NamespaceChoice, 0, len(user.Namespaces)),
+	}
+	for _, namespace := range user.Namespaces {
+		if namespace.NamespaceType != database.UserNamespace || !namespace.DeletedAt.IsZero() {
+			continue
+		}
+		choice.Namespaces = append(choice.Namespaces, types.NamespaceChoice{Path: namespace.Path, Type: string(namespace.NamespaceType), UUID: namespace.UUID})
+	}
+	return choice, nil
+}
+
+// Index preserves list filters and returns profiles with role facts for authorized or legacy global administrators.
 func (c *userComponentImpl) Index(ctx context.Context, req types.UserListReq) ([]*types.User, int, error) {
 	var (
 		respUsers     []*types.User
 		onlyBasicInfo bool
 	)
-	canAdmin, err := c.CanAdmin(ctx, req.VisitorName)
-	if err != nil {
-		return nil, 0, fmt.Errorf("failed to check visitor user permission, visitor: %s, error: %w", req.VisitorName, err)
+	canAdmin := types.IsAdminAuthorized(ctx)
+	if !canAdmin {
+		var err error
+		canAdmin, err = c.CanAdmin(ctx, req.VisitorName)
+		if err != nil {
+			return nil, 0, fmt.Errorf("failed to check visitor user permission, visitor: %s, error: %w", req.VisitorName, err)
+		}
 	}
 	if !canAdmin {
 		onlyBasicInfo = true
 	}
-	dbusers, count, err := c.userStore.IndexWithSearch(ctx, req)
+	var options []types.UserQueryOption
+	if !onlyBasicInfo {
+		options = append(options, types.UserWithAdminPermissions)
+	}
+	dbusers, count, err := c.userStore.IndexWithSearch(ctx, req, options...)
 	if err != nil {
 		newError := fmt.Errorf("failed to find user by name in db,error:%w", err)
 		return nil, count, newError
@@ -957,6 +1011,8 @@ func (c *userComponentImpl) Index(ctx context.Context, req types.UserListReq) ([
 		}
 
 		if !onlyBasicInfo {
+			// Administrator selectors need the numeric ID accepted by role-assignment APIs.
+			user.ID = dbuser.ID
 			user.Email = dbuser.Email
 			user.UUID = dbuser.UUID
 			user.Bio = dbuser.Bio
@@ -964,6 +1020,8 @@ func (c *userComponentImpl) Index(ctx context.Context, req types.UserListReq) ([
 			user.Phone = dbuser.Phone
 			user.PhoneArea = dbuser.PhoneArea
 			user.Roles = dbuser.Roles()
+			user.Admin = dbuser.HasAdminRole()
+			user.SuperAdmin = dbuser.HasSuperAdminPermission()
 			user.VerifyStatus = string(dbuser.VerifyStatus)
 			user.Labels = dbuser.Labels
 			user.LastLoginAt = dbuser.LastLoginAt
@@ -1115,15 +1173,20 @@ func (c *userComponentImpl) lazyInit() {
 	})
 }
 
+// UpdateUserLabels accepts route authorization or the legacy super administrator grant.
 func (c *userComponentImpl) UpdateUserLabels(ctx context.Context, req *types.UserLabelsRequest) error {
-	isAdmin, err := c.CanAdmin(ctx, req.OpUser)
-	if err != nil {
-		return fmt.Errorf("failed to check visitor user permission, userName: %s, error: %w", req.OpUser, err)
+	isAdmin := types.IsAdminAuthorized(ctx)
+	if !isAdmin {
+		var err error
+		isAdmin, err = c.CanAdmin(ctx, req.OpUser)
+		if err != nil {
+			return fmt.Errorf("failed to check visitor user permission, userName: %s, error: %w", req.OpUser, err)
+		}
 	}
 	if !isAdmin {
 		return fmt.Errorf("permission denied: cannot modify user labels. username: %s", req.OpUser)
 	}
-	err = c.userStore.UpdateLabels(ctx, req.UUID, req.Labels)
+	err := c.userStore.UpdateLabels(ctx, req.UUID, req.Labels)
 	if err != nil {
 		newError := fmt.Errorf("failed to update user labels '%s',error:%w", req.UUID, err)
 		return newError
@@ -1395,10 +1458,11 @@ func (c *userComponentImpl) ResetUserTags(ctx context.Context, uid string, tagID
 	return nil
 }
 
+// StreamExportUsers exports full user profiles with their loaded role assignments and administrator flags.
 func (c *userComponentImpl) StreamExportUsers(ctx context.Context, req types.UserIndexReq) (data chan types.UserIndexResp, err error) {
 	data = make(chan types.UserIndexResp)
 
-	ch, err := c.userStore.IndexWithCursor(ctx, req)
+	ch, err := c.userStore.IndexWithCursor(ctx, req, types.UserWithAdminPermissions)
 	if err != nil {
 		slog.ErrorContext(ctx, "failed to query users by cursor",
 			slog.Any("req", req),
@@ -1443,6 +1507,8 @@ func (c *userComponentImpl) StreamExportUsers(ctx context.Context, req types.Use
 					Phone:        originalUser.Phone,
 					PhoneArea:    originalUser.PhoneArea,
 					Roles:        originalUser.Roles(),
+					Admin:        originalUser.HasAdminRole(),
+					SuperAdmin:   originalUser.HasSuperAdminPermission(),
 					VerifyStatus: string(originalUser.VerifyStatus),
 					Labels:       originalUser.Labels,
 					LastLoginAt:  originalUser.LastLoginAt,

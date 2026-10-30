@@ -40,10 +40,10 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 	apiV1Group.POST("/media", sc.Media)
 	apiV1Group.POST("/media/result", sc.MediaResult)
 
-	adminGroup := apiV1Group.Group("/admin")
+	adminGroup := apiV1Group.Group("/admin", middleware.Authenticator(config))
 
 	// route: /admin/*
-	createAdminRoutes(adminGroup)
+	createAdminRoutes(adminGroup, middleware.NewPlatformAdmin())
 
 	return r, nil
 }

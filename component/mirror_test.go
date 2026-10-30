@@ -149,3 +149,18 @@ func TestMirrorComponent_Statistic(t *testing.T) {
 	}, s)
 
 }
+
+func TestMirrorComponentBatchCreateReusesLegacyURLAfterMigration(t *testing.T) {
+	ctx := context.Background()
+	mc := initializeTestMirrorComponent(ctx, t)
+	stored := database.Mirror{ID: 42, RepositoryID: 10, SourceUrl: "https://example.com/org/model"}
+	updatedAt := time.Date(2026, 9, 30, 0, 0, 0, 0, time.UTC)
+	updated := stored
+	updated.RemoteUpdatedAt = updatedAt
+	updated.Priority = types.LowMirrorPriority
+	mc.mocks.stores.MirrorMock().EXPECT().FindBySourceURLs(ctx, []string{stored.SourceUrl + ".git"}).Return([]database.Mirror{stored}, nil).Twice()
+	mc.mocks.stores.MirrorMock().EXPECT().BatchUpdate(ctx, []database.Mirror{updated}).Return(nil).Twice()
+	for i := 0; i < 2; i++ {
+		require.NoError(t, mc.BatchCreate(ctx, types.BatchCreateMirrorReq{Mirrors: []types.MirrorReq{{SourceURL: stored.SourceUrl + ".git", UpdatedAt: updatedAt}}}))
+	}
+}

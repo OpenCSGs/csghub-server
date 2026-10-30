@@ -640,11 +640,12 @@ func TestUserComponent_ListServerless_StatusFilter(t *testing.T) {
 	}, data)
 }
 
+// TestUserComponent_GetUserByName checks the expected user query options.
 func TestUserComponent_GetUserByName(t *testing.T) {
 	ctx := context.TODO()
 	uc := initializeTestUserComponent(ctx, t)
 
-	uc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(
+	uc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user", types.UserWithAdminPermissions).Return(
 		database.User{ID: 1, UUID: "uuid"}, nil,
 	)
 	user, err := uc.GetUserByName(ctx, "user")

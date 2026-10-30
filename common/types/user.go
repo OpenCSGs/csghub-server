@@ -7,6 +7,13 @@ import (
 	"opencsg.com/csghub-server/builder/rebac"
 )
 
+// UserQueryOption controls optional data loaded alongside a user's active roles.
+type UserQueryOption uint8
+
+// UserWithAdminPermissions loads administrator definitions and grants for permission checks.
+// Without this option, user queries load role codes only.
+const UserWithAdminPermissions UserQueryOption = 1
+
 // UserRole represents a user's permission level in an organization.
 type UserRole string
 
@@ -48,6 +55,7 @@ type CreateUserRequest struct {
 	RegProvider string `json:"reg_provider"`
 }
 
+// UpdateUserRequest contains editable user profile fields.
 type UpdateUserRequest struct {
 	// Display name of the user
 	Nickname *string `json:"name,omitempty"`
@@ -58,11 +66,9 @@ type UpdateUserRequest struct {
 	Phone                 *string `json:"phone,omitempty"`
 	PhoneArea             *string `json:"phone_area,omitempty"`
 	UUID                  *string `json:"-"`
-	// should be updated by admin
-	Roles    *[]string `json:"roles,omitempty" example:"[super_user, admin, personal_user]"`
-	Avatar   *string   `json:"avatar,omitempty"`
-	Homepage *string   `json:"homepage,omitempty"`
-	Bio      *string   `json:"bio,omitempty"`
+	Avatar                *string `json:"avatar,omitempty"`
+	Homepage              *string `json:"homepage,omitempty"`
+	Bio                   *string `json:"bio,omitempty"`
 
 	//if use want to change username, this should be the only field to send in request body
 	NewUserName *string `json:"new_username,omitempty"`
@@ -316,6 +322,29 @@ type OffsetPagination struct {
 	Offset int `json:"offset"`
 }
 
+// UserChoice contains only identifiers and display fields needed by administrator selectors.
+// It intentionally excludes account contact details, roles, tags, and authentication metadata.
+type UserChoice struct {
+	ID       int64  `json:"id"`
+	UUID     string `json:"uuid"`
+	Username string `json:"username"`
+	Nickname string `json:"nickname"`
+	Avatar   string `json:"avatar"`
+}
+
+// UserChoiceDetail adds only active personal namespace identifiers needed to issue a voucher.
+type UserChoiceDetail struct {
+	UserChoice
+	Namespaces []NamespaceChoice `json:"namespaces"`
+}
+
+// UserChoiceList preserves the existing nested pagination envelope for user selectors.
+type UserChoiceList struct {
+	Data  []UserChoice `json:"data"`
+	Total int          `json:"total"`
+}
+
+// User contains visible profile data and authorization facts computed by the user service.
 type User struct {
 	ID                int64          `json:"id,omitempty"`
 	Username          string         `json:"username"`
@@ -336,15 +365,16 @@ type User struct {
 	CreatedAt         time.Time      `json:"created_at"`
 	Tags              []RepoTag      `json:"tags,omitempty"`
 	Namespaces        []Namespace    `json:"namespaces,omitempty"`
+	// Admin identifies membership in an existing administrator role, regardless of its grants.
+	Admin bool `json:"is_admin,omitempty"`
+	// SuperAdmin identifies an active role assignment granting the global wildcard permission.
+	SuperAdmin bool `json:"is_super_admin,omitempty"`
 }
 
-func (u User) IsAdmin() bool {
-	for _, role := range u.Roles {
-		if role == "admin" || role == "super_user" {
-			return true
-		}
-	}
-	return false
+// IsSuperAdmin reports global administrator authorization verified by the user service.
+// Role names alone never grant the unrestricted access required by legacy consumers.
+func (u User) IsSuperAdmin() bool {
+	return u.SuperAdmin
 }
 
 type UserLikesRequest struct {

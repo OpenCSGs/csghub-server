@@ -7,6 +7,7 @@ import (
 	"opencsg.com/csghub-server/common/types"
 )
 
+// CreateMCPServerRoutes registers business routes with separate permissions for administrator operations.
 func CreateMCPServerRoutes(
 	apiGroup *gin.RouterGroup,
 	middlewareCollection middleware.MiddlewareCollection,

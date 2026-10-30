@@ -20,6 +20,7 @@ import (
 	"opencsg.com/csghub-server/builder/rebac"
 	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/utils/common"
 )
@@ -369,6 +370,24 @@ func TestMCPServerComponent_Index_HalfCreatedRepos(t *testing.T) {
 	require.Len(t, res, 1)
 }
 
+// TestMCPServerComponent_PropertiesAdminAuthorized verifies request authorization removes repository scope filtering.
+func TestMCPServerComponent_PropertiesAdminAuthorized(t *testing.T) {
+	ctx := types.WithAdminAuthorization(context.Background())
+	mc := initializeTestMCPServerComponent(ctx, t)
+	req := &types.MCPPropertyFilter{CurrentUser: "module-admin", Kind: types.MCPPropTool, Search: "tool", Per: 10, Page: 2}
+	mc.mocks.userSvcClient.EXPECT().GetUserInfo(ctx, req.CurrentUser, req.CurrentUser).
+		Return(&rpc.User{UUID: "module-admin-uuid", Roles: []string{"asset_admin"}}, nil).Once()
+	mc.mocks.stores.MCPServerMock().EXPECT().ListProperties(ctx, mock.MatchedBy(func(filter *types.MCPPropertyFilter) bool {
+		return filter.IsAdmin && len(filter.AccessibleRepositoryIDs) == 0 &&
+			filter.Kind == types.MCPPropTool && filter.Search == "tool" && filter.Per == 10 && filter.Page == 2
+	})).Return(nil, 0, nil).Once()
+
+	result, total, err := mc.Properties(ctx, req)
+	require.NoError(t, err)
+	require.Empty(t, result)
+	require.Zero(t, total)
+}
+
 func TestMCPServerComponent_Properties(t *testing.T) {
 	ctx := context.TODO()
 	mc := initializeTestMCPServerComponent(ctx, t)
@@ -379,8 +398,9 @@ func TestMCPServerComponent_Properties(t *testing.T) {
 	}
 
 	mc.mocks.userSvcClient.EXPECT().GetUserInfo(ctx, "user", "user").Return(&rpc.User{
-		Username: "user",
-		Roles:    []string{"admin"},
+		Username:   "user",
+		Roles:      []string{"maintainer"},
+		SuperAdmin: true,
 	}, nil)
 
 	mc.mocks.stores.MCPServerMock().EXPECT().ListProperties(ctx, req).Return([]database.MCPServerProperty{
@@ -486,6 +506,56 @@ func TestMCPServerComponent_updateSpaceMetaTag(t *testing.T) {
 
 	err := mc.updateSpaceMetaTag(req, user)
 	require.Nil(t, err)
+}
+
+// TestMCPServerComponent_DeploySuperAdminAuthorization stops at persistence after checking the namespace gate.
+func TestMCPServerComponent_DeploySuperAdminAuthorization(t *testing.T) {
+	for _, tc := range []struct {
+		name, role string
+		superAdmin bool
+	}{
+		{name: "module administrator", role: "asset_admin"},
+		{name: "legacy administrator", role: "admin"},
+		{name: "custom global administrator", role: "maintainer", superAdmin: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			mc := initializeTestMCPServerComponent(ctx, t)
+			req := &types.DeployMCPServerReq{
+				CurrentUser: "alice", MCPRepo: types.RepoRequest{Namespace: "source", Name: "mcp"},
+				CreateRepoReq: types.CreateRepoReq{Username: "alice", Namespace: "target", Name: "space"},
+				ResourceID:    1, ClusterID: "cluster",
+			}
+			source := &database.Repository{ID: 4, DefaultBranch: "main"}
+			resource := &database.SpaceResource{ID: 1}
+			mc.mocks.stores.MCPServerMock().EXPECT().ByPath(ctx, "source", "mcp").Return(&database.MCPServer{Repository: source}, nil).Once()
+			mc.mocks.components.repo.EXPECT().CheckUserRepoPermission(ctx, "alice", source, rebac.RepositoryCanRead).Return(true, nil).Once()
+			mc.mocks.stores.SpaceResourceMock().EXPECT().FindByID(ctx, req.ResourceID).Return(resource, nil).Once()
+			mc.mocks.components.repo.EXPECT().CheckAccountAndResource(ctx, types.CheckResourceAndAccountReq{
+				UserName: "alice", CurrentUser: "alice", ClusterID: "cluster",
+			}, resource).Return(&types.CheckExclusiveResp{}, nil).Once()
+			mc.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "target").Return(database.Namespace{Path: "target"}, nil).Once()
+			mc.mocks.userSvcClient.EXPECT().GetUserInfo(ctx, "alice", "alice").Return(&rpc.User{
+				ID: 7, UUID: "alice-uuid", Username: "alice", Email: "alice@example.com",
+				Roles: []string{tc.role}, SuperAdmin: tc.superAdmin,
+			}, nil).Once()
+			persistErr := fmt.Errorf("stop at persistence")
+			if tc.superAdmin {
+				mc.mocks.stores.MCPServerMock().EXPECT().CreateSpaceAndRepoForDeploy(ctx, mock.Anything, mock.Anything).Return(persistErr).Once()
+			} else {
+				mc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "alice", "target", rebac.NamespaceCanWrite).Return(false, nil).Once()
+			}
+			result, err := mc.Deploy(ctx, req)
+			require.Nil(t, result)
+			if tc.superAdmin {
+				require.ErrorIs(t, err, persistErr)
+				mc.mocks.components.repo.AssertNotCalled(t, "CheckCurrentUserPermission", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+			} else {
+				require.ErrorIs(t, err, errorx.ErrForbidden)
+				mc.mocks.stores.MCPServerMock().AssertNotCalled(t, "CreateSpaceAndRepoForDeploy", mock.Anything, mock.Anything, mock.Anything)
+			}
+		})
+	}
 }
 
 func TestMCPServerComponent_CheckDeployBranch(t *testing.T) {

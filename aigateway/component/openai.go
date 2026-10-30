@@ -30,9 +30,8 @@ type OpenAIComponent interface {
 	GetAvailableModels(c context.Context, nsUUID string) ([]types.Model, error)
 	ListModels(c context.Context, nsUUID string, req types.ListModelsReq) (types.ModelList, error)
 	GetModelByID(c context.Context, nsUUID, modelID string) (*types.Model, error)
-	RecordUsage(c context.Context, nsUUID string, model *types.Model, targetModelName string, tokenCounter token.Counter, apikey string, tokenID int64) error
-	RecordUsageFromTokenUsage(c context.Context, nsUUID string, model *types.Model, targetModelName string, usage *token.Usage, apikey string, tokenID int64) error
-	BuildUsageMeteringEvent(c context.Context, nsUUID string, model *types.Model, targetModelName string, usage *token.Usage, apikey string) (*commontypes.MeteringEvent, error)
+	RecordUsageFromTokenUsage(c context.Context, nsUUID string, model *types.Model, targetModelName string, usage *token.Usage, tokenID int64) error
+	BuildUsageMeteringEvent(c context.Context, nsUUID string, model *types.Model, targetModelName string, usage *token.Usage, tokenID int64) (*commontypes.MeteringEvent, error)
 	CheckBalance(ctx context.Context, nsUUID string) error
 	// CheckCapacityAdmission evaluates per-upstream CapacityPolicy admission
 	// for the router-owned candidate set carried in the request (initial
@@ -620,7 +619,7 @@ func (m *openaiComponentImpl) CanManageModel(ctx context.Context, username, nsUU
 	if model == nil {
 		return false, fmt.Errorf("model is nil")
 	}
-	user, err := m.userStore.FindByUsername(ctx, username)
+	user, err := m.userStore.FindByUsername(ctx, username, commontypes.UserWithAdminPermissions)
 	if err != nil {
 		return false, fmt.Errorf("failed to find user by username in db, error: %w", err)
 	}
@@ -655,7 +654,7 @@ type usageMeteringExtra struct {
 	CompletionTokenNum  string                     `json:"completion_token_num"`
 	ReasoningTokenNum   string                     `json:"reasoning_token_num"`
 	OwnerType           commontypes.TokenUsageType `json:"owner_type"`
-	APIKey              string                     `json:"api_key"`
+	APIKey              string                     `json:"api_key"` // store token ID instead of token value
 	Provider            string                     `json:"provider"`
 	ModelName           string                     `json:"model_name"`
 	// UpstreamID is the ai_gateway_upstreams.id that served the request, as a
@@ -687,14 +686,14 @@ func upstreamIDExtraValue(upstreamID int64) string {
 	return strconv.FormatInt(upstreamID, 10)
 }
 
-func buildUsageExtraData(usageModel *types.Model, upstreamModelName string, usage *token.Usage, apikey string, meteringInfo usageMeteringInfo) (string, error) {
+func buildUsageExtraData(usageModel *types.Model, upstreamModelName string, usage *token.Usage, tokenID int64, meteringInfo usageMeteringInfo) (string, error) {
 	extra := usageMeteringExtra{
 		PromptTokenNum:       fmt.Sprintf("%d", usage.PromptTokens),
 		PromptTokenCacheNum:  fmt.Sprintf("%d", usage.CachedPromptTokens),
 		CompletionTokenNum:   fmt.Sprintf("%d", usage.CompletionTokens),
 		ReasoningTokenNum:    fmt.Sprintf("%d", usage.ReasoningTokens),
 		OwnerType:            meteringInfo.OwnerType,
-		APIKey:               apikey,
+		APIKey:               strconv.FormatInt(tokenID, 10), // store token ID instead of token value
 		Provider:             usageModel.Provider,
 		ModelName:            upstreamModelName,
 		UpstreamID:           upstreamIDExtraValue(usageModel.UpstreamID),
@@ -710,15 +709,7 @@ func buildUsageExtraData(usageModel *types.Model, upstreamModelName string, usag
 	return string(extraData), nil
 }
 
-func (m *openaiComponentImpl) RecordUsage(c context.Context, nsUUID string, model *types.Model, targetModelName string, counter token.Counter, apikey string, tokenID int64) error {
-	usage, err := counter.Usage(c)
-	if err != nil {
-		return fmt.Errorf("failed to get token usage from counter: %w", err)
-	}
-	return m.RecordUsageFromTokenUsage(c, nsUUID, model, targetModelName, usage, apikey, tokenID)
-}
-
-func (m *openaiComponentImpl) BuildUsageMeteringEvent(c context.Context, nsUUID string, model *types.Model, targetModelName string, usage *token.Usage, apikey string) (*commontypes.MeteringEvent, error) {
+func (m *openaiComponentImpl) BuildUsageMeteringEvent(c context.Context, nsUUID string, model *types.Model, targetModelName string, usage *token.Usage, tokenID int64) (*commontypes.MeteringEvent, error) {
 	if usage == nil {
 		return nil, fmt.Errorf("cannot record usage: nil token usage")
 	}
@@ -739,7 +730,7 @@ func (m *openaiComponentImpl) BuildUsageMeteringEvent(c context.Context, nsUUID 
 		valueType = commontypes.CountNumberType
 		value = usage.CompletionRC
 	}
-	extraData, err := buildUsageExtraData(model, targetModelName, usage, apikey, meteringInfo)
+	extraData, err := buildUsageExtraData(model, targetModelName, usage, tokenID, meteringInfo)
 	if err != nil {
 		return nil, err
 	}
@@ -759,8 +750,8 @@ func (m *openaiComponentImpl) BuildUsageMeteringEvent(c context.Context, nsUUID 
 	return &event, nil
 }
 
-func (m *openaiComponentImpl) RecordUsageFromTokenUsage(c context.Context, nsUUID string, model *types.Model, targetModelName string, usage *token.Usage, apikey string, tokenID int64) error {
-	event, err := m.BuildUsageMeteringEvent(c, nsUUID, model, targetModelName, usage, apikey)
+func (m *openaiComponentImpl) RecordUsageFromTokenUsage(c context.Context, nsUUID string, model *types.Model, targetModelName string, usage *token.Usage, tokenID int64) error {
+	event, err := m.BuildUsageMeteringEvent(c, nsUUID, model, targetModelName, usage, tokenID)
 	if err != nil {
 		return err
 	}

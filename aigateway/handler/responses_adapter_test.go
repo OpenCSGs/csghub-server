@@ -1563,14 +1563,14 @@ func TestRecordResponsesUsageFallsBackToTokenCounter(t *testing.T) {
 				usage.PromptTokens == tokenUsage.PromptTokens &&
 				usage.CompletionTokens == tokenUsage.CompletionTokens &&
 				usage.TotalTokens == tokenUsage.TotalTokens
-		}), "api-key", mock.Anything).
-		RunAndReturn(func(ctx context.Context, userUUID string, model *types.Model, targetModelName string, usage *token.Usage, apikey string, _ int64) error {
+		}), mock.Anything).
+		RunAndReturn(func(ctx context.Context, userUUID string, model *types.Model, targetModelName string, usage *token.Usage, _ int64) error {
 			wg.Done()
 			return nil
 		}).
 		Once()
 
-	tester.handler.recordResponsesUsageWithTrace(c, counter, nil, "testuuid", modelTarget, "api-key", nil, responsesTracePostProcessInput{StatusCode: http.StatusOK}, nil)
+	tester.handler.recordResponsesUsageWithTrace(c, counter, nil, "testuuid", modelTarget, nil, responsesTracePostProcessInput{StatusCode: http.StatusOK}, nil)
 	wg.Wait()
 }
 
@@ -1592,14 +1592,14 @@ func TestRecordResponsesUsagePrefersResponsesUsage(t *testing.T) {
 				usage.PromptTokens == 5 &&
 				usage.CompletionTokens == 6 &&
 				usage.TotalTokens == 11
-		}), "api-key", mock.Anything).
-		RunAndReturn(func(ctx context.Context, userUUID string, model *types.Model, targetModelName string, usage *token.Usage, apikey string, _ int64) error {
+		}), mock.Anything).
+		RunAndReturn(func(ctx context.Context, userUUID string, model *types.Model, targetModelName string, usage *token.Usage, _ int64) error {
 			wg.Done()
 			return nil
 		}).
 		Once()
 
-	tester.handler.recordResponsesUsageWithTrace(c, counter, nil, "testuuid", modelTarget, "api-key", nil, responsesTracePostProcessInput{StatusCode: http.StatusOK}, nil)
+	tester.handler.recordResponsesUsageWithTrace(c, counter, nil, "testuuid", modelTarget, nil, responsesTracePostProcessInput{StatusCode: http.StatusOK}, nil)
 	wg.Wait()
 }
 

@@ -16,7 +16,7 @@ import (
 	"opencsg.com/csghub-server/builder/proxy"
 )
 
-func (h *OpenAIHandlerImpl) executeNativeResponses(c *gin.Context, req *types.ResponsesRequest, modelTarget *resolvedModelTarget, decision responsespkg.RoutingDecision, owner, nsUUID, apikey, publicModelID, publicPreviousResponseID string, moderation component.Moderation, logCapture *responsespkg.LLMLogRecorder, generationRecorder llmtrace.GenerationRecorder, p *types.RequestPlan) {
+func (h *OpenAIHandlerImpl) executeNativeResponses(c *gin.Context, req *types.ResponsesRequest, modelTarget *resolvedModelTarget, decision responsespkg.RoutingDecision, owner, nsUUID, publicModelID, publicPreviousResponseID string, moderation component.Moderation, logCapture *responsespkg.LLMLogRecorder, generationRecorder llmtrace.GenerationRecorder, p *types.RequestPlan) {
 	backendURL := decision.BackendURL
 	// Capacity admission: the plan-phase lease covers the pinned primary
 	// upstream; rotate when this execution resolves a different upstream.
@@ -101,5 +101,5 @@ func (h *OpenAIHandlerImpl) executeNativeResponses(c *gin.Context, req *types.Re
 		Usage:          responsesUsage,
 	})
 	traceInput := newResponsesTracePostProcessInput(generationRecorder, req, writer.StatusCode(), writer.FirstWriteAt())
-	h.recordResponsesUsageWithTrace(c, responsesCounter, responsesUsage, nsUUID, modelTarget, apikey, logCapture, traceInput, admissionLeaseFromPlan(p))
+	h.recordResponsesUsageWithTrace(c, responsesCounter, responsesUsage, nsUUID, modelTarget, logCapture, traceInput, admissionLeaseFromPlan(p))
 }

@@ -373,6 +373,7 @@ func TestAccessTokenComponentImpl_GetOrCreateFirstAvaiToken(t *testing.T) {
 	})
 }
 
+// TestAccessTokenComponentImpl_Update checks the expected user query options.
 func TestAccessTokenComponentImpl_Update(t *testing.T) {
 	t.Run("token not found", func(t *testing.T) {
 		mockTokenStore := mockdb.NewMockAccessTokenStore(t)
@@ -434,7 +435,7 @@ func TestAccessTokenComponentImpl_Update(t *testing.T) {
 			}, nil).Once()
 
 		mockUserStore := mockdb.NewMockUserStore(t)
-		mockUserStore.EXPECT().FindByUsername(mock.Anything, "user1").
+		mockUserStore.EXPECT().FindByUsername(mock.Anything, "user1", types.UserWithAdminPermissions).
 			Return(database.User{Username: "user1", UUID: "user1-uuid"}, nil).Once()
 
 		mockAuthorizer := mockrebac.NewMockAuthorizer(t)
@@ -491,7 +492,7 @@ func TestAccessTokenComponentImpl_Update(t *testing.T) {
 			}, nil).Once()
 
 		mockUserStore := mockdb.NewMockUserStore(t)
-		mockUserStore.EXPECT().FindByUsername(mock.Anything, "user1").
+		mockUserStore.EXPECT().FindByUsername(mock.Anything, "user1", types.UserWithAdminPermissions).
 			Return(database.User{Username: "user1", UUID: "user1-uuid"}, nil).Once()
 
 		mockAuthorizer := mockrebac.NewMockAuthorizer(t)
@@ -585,7 +586,7 @@ func TestAccessTokenComponentImpl_Update(t *testing.T) {
 			}, nil).Once()
 
 		mockUserStore := mockdb.NewMockUserStore(t)
-		mockUserStore.EXPECT().FindByUsername(mock.Anything, "admin").
+		mockUserStore.EXPECT().FindByUsername(mock.Anything, "admin", types.UserWithAdminPermissions).
 			Return(database.User{Username: "admin", UUID: "admin-uuid"}, nil).Once()
 
 		mockAuthorizer := mockrebac.NewMockAuthorizer(t)
@@ -637,6 +638,7 @@ func TestAccessTokenComponentImpl_Update(t *testing.T) {
 	})
 }
 
+// TestAccessTokenComponentImpl_SetActive checks the expected user query options.
 func TestAccessTokenComponentImpl_SetActive(t *testing.T) {
 	nsUUID := "test-ns-uuid"
 	tokenValue := "test-token-value"
@@ -717,7 +719,7 @@ func TestAccessTokenComponentImpl_SetActive(t *testing.T) {
 			Return(database.Namespace{UUID: nsUUID, Path: "user1", NamespaceType: database.UserNamespace}, nil).Once()
 
 		mockUserStore := mockdb.NewMockUserStore(t)
-		mockUserStore.EXPECT().FindByUsername(mock.Anything, "user1").
+		mockUserStore.EXPECT().FindByUsername(mock.Anything, "user1", types.UserWithAdminPermissions).
 			Return(database.User{Username: "user1", UUID: "user1-uuid"}, nil).Once()
 
 		mockAuthorizer := mockrebac.NewMockAuthorizer(t)
@@ -765,8 +767,8 @@ func TestAccessTokenComponentImpl_SetActive(t *testing.T) {
 			Return(database.Namespace{UUID: nsUUID, Path: "user1", NamespaceType: database.UserNamespace}, nil).Once()
 
 		mockUserStore := mockdb.NewMockUserStore(t)
-		mockUserStore.EXPECT().FindByUsername(mock.Anything, "user1").
-			Return(database.User{Username: "user1", UUID: "user1-uuid", RoleMask: "admin"}, nil).Once()
+		mockUserStore.EXPECT().FindByUsername(mock.Anything, "user1", types.UserWithAdminPermissions).
+			Return(database.User{Username: "user1", UUID: "user1-uuid", RoleAssignments: superAdminRoleAssignments()}, nil).Once()
 
 		mockTokenStore.EXPECT().SetActiveByID(mock.Anything, int64(1), false).
 			Return(nil).Once()
@@ -808,8 +810,8 @@ func TestAccessTokenComponentImpl_SetActive(t *testing.T) {
 			Return(database.Namespace{UUID: nsUUID, Path: "user1", NamespaceType: database.UserNamespace}, nil).Once()
 
 		mockUserStore := mockdb.NewMockUserStore(t)
-		mockUserStore.EXPECT().FindByUsername(mock.Anything, "user1").
-			Return(database.User{Username: "user1", UUID: "user1-uuid", RoleMask: "admin"}, nil).Once()
+		mockUserStore.EXPECT().FindByUsername(mock.Anything, "user1", types.UserWithAdminPermissions).
+			Return(database.User{Username: "user1", UUID: "user1-uuid", RoleAssignments: superAdminRoleAssignments()}, nil).Once()
 
 		mockTokenStore.EXPECT().SetActiveByID(mock.Anything, int64(1), true).
 			Return(nil).Once()
@@ -862,6 +864,7 @@ func TestAccessTokenComponentImpl_UpdateAccessTokenQuotas_CreateWhenMissing(t *t
 	require.Equal(t, "test-api-key", result[0].APIKey)
 }
 
+// TestAccessTokenComponentImpl_UpdateWithMultipleQuotas checks the expected user query options.
 func TestAccessTokenComponentImpl_UpdateWithMultipleQuotas(t *testing.T) {
 	nsUUID := "org-ns-uuid"
 	tokenValue := "org-token-value"
@@ -882,7 +885,7 @@ func TestAccessTokenComponentImpl_UpdateWithMultipleQuotas(t *testing.T) {
 		Return(database.Namespace{Path: "admin", UUID: nsUUID, NamespaceType: database.UserNamespace}, nil).Maybe()
 
 	mockUserStore := mockdb.NewMockUserStore(t)
-	mockUserStore.EXPECT().FindByUsername(mock.Anything, "admin").
+	mockUserStore.EXPECT().FindByUsername(mock.Anything, "admin", types.UserWithAdminPermissions).
 		Return(database.User{Username: "admin", UUID: "admin-uuid"}, nil).Once()
 
 	mockAuthorizer := mockrebac.NewMockAuthorizer(t)

@@ -427,6 +427,33 @@ type OrgRunDeploysReq struct {
 	PageOpts
 }
 
+// OrganizationChoice contains only organization identifiers and display fields for selectors.
+type OrganizationChoice struct {
+	Name      string           `json:"path"`
+	Nickname  string           `json:"name"`
+	Logo      string           `json:"logo"`
+	UUID      uuid.UUID        `json:"uuid"`
+	Namespace *NamespaceChoice `json:"namespace,omitempty"`
+	// IsHierarchical preserves edition-mode validation without exposing organization metadata.
+	IsHierarchical bool `json:"-"`
+}
+
+// OrganizationChoiceList preserves the nested pagination envelope used by selectors.
+type OrganizationChoiceList struct {
+	Data  []OrganizationChoice `json:"data"`
+	Total int                  `json:"total"`
+}
+
+// OrganizationChoiceListRequest preserves existing selector search and filter inputs.
+type OrganizationChoiceListRequest struct {
+	Search       string
+	Per          int
+	Page         int
+	OrgType      string
+	VerifyStatus string
+	Tag          string
+}
+
 type Organization struct {
 	// unique name of the organization
 	Name        string `json:"path"`

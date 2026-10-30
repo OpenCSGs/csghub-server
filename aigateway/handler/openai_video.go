@@ -188,10 +188,10 @@ func parseCreateVideoProviderResponse(c *gin.Context, ctx context.Context, adapt
 	return videoProviderResp, true
 }
 
-func (h *OpenAIHandlerImpl) createVideoGenerationTask(c *gin.Context, ctx context.Context, nsUUID, apikey string, input *createVideoInput, modelTarget *resolvedModelTarget, videoProviderResp *text2video.ProviderResponse, videoResp *types.VideoObject, recorder llmtrace.GenerationRecorder) (string, bool) {
+func (h *OpenAIHandlerImpl) createVideoGenerationTask(c *gin.Context, ctx context.Context, nsUUID string, tokenID int64, input *createVideoInput, modelTarget *resolvedModelTarget, videoProviderResp *text2video.ProviderResponse, videoResp *types.VideoObject, recorder llmtrace.GenerationRecorder) (string, bool) {
 	providerResourceID := videoResp.ID
 	videoID := newGatewayResourceID()
-	meteringEvent, err := h.createVideoMeteringEvent(ctx, nsUUID, apikey, input, modelTarget)
+	meteringEvent, err := h.createVideoMeteringEvent(ctx, nsUUID, tokenID, input, modelTarget)
 	if err != nil {
 		finishModalGenerationTraceWithError(recorder, err, types.TraceErrUpstreamError)
 		slog.ErrorContext(ctx, "failed to build video metering metadata", slog.Any("error", err), slog.String("video_id", videoID))
@@ -218,7 +218,7 @@ func (h *OpenAIHandlerImpl) createVideoGenerationTask(c *gin.Context, ctx contex
 	return videoID, true
 }
 
-func (h *OpenAIHandlerImpl) createVideoMeteringEvent(ctx context.Context, nsUUID, apikey string, input *createVideoInput, modelTarget *resolvedModelTarget) (*commontypes.MeteringEvent, error) {
+func (h *OpenAIHandlerImpl) createVideoMeteringEvent(ctx context.Context, nsUUID string, tokenID int64, input *createVideoInput, modelTarget *resolvedModelTarget) (*commontypes.MeteringEvent, error) {
 	if input == nil || modelTarget == nil || modelTarget.Model == nil {
 		return nil, fmt.Errorf("missing video metering input")
 	}
@@ -232,7 +232,7 @@ func (h *OpenAIHandlerImpl) createVideoMeteringEvent(ctx context.Context, nsUUID
 		CompletionRC:   1,
 		CompletionDesc: input.adapterReq.Prompt,
 	}
-	return h.openaiComponent.BuildUsageMeteringEvent(ctx, nsUUID, modelTarget.Model, modelTarget.ModelName, usage, apikey)
+	return h.openaiComponent.BuildUsageMeteringEvent(ctx, nsUUID, modelTarget.Model, modelTarget.ModelName, usage, tokenID)
 }
 
 func writeVideoAPIError(c *gin.Context, status int, code, message, errorType string) {

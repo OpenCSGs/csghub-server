@@ -3,8 +3,9 @@ package handler
 import (
 	"fmt"
 
-	"github.com/gin-gonic/gin"
 	"net/http"
+
+	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/aigateway/component/adapter/text2video"
 	llmtrace "opencsg.com/csghub-server/aigateway/component/trace"
 	"opencsg.com/csghub-server/aigateway/handler/plan"
@@ -84,7 +85,6 @@ func (h *videoPipelineHandler) Extract(c *gin.Context) (*types.RequestMetadata, 
 		Model:         input.modelID,
 		TenantID:      nsUUID,
 		UserID:        username,
-		APIKeyID:      httpbase.GetAccessToken(c),
 		PriorityScope: httpbase.GetAPIKeyPriorityScope(c),
 		Streaming:     false,
 		Headers:       c.Request.Header,
@@ -97,7 +97,6 @@ func (h *videoPipelineHandler) Extract(c *gin.Context) (*types.RequestMetadata, 
 func (h *videoPipelineHandler) Execute(c *gin.Context, meta *types.RequestMetadata, p *types.RequestPlan) error {
 	ctx := c.Request.Context()
 	nsUUID := meta.TenantID
-	apikey := meta.APIKeyID
 	requestID := commontrace.GetTraceIDInGinContext(c)
 
 	if pt := plan.GetPreflightTracer(c); pt != nil {
@@ -172,7 +171,8 @@ func (h *videoPipelineHandler) Execute(c *gin.Context, meta *types.RequestMetada
 		}
 		videoResp = videoProviderResp.Video
 		if videoResp != nil && videoResp.ID != "" && h.handler.aiGenerationStore != nil {
-			videoID, ok := h.handler.createVideoGenerationTask(c, ctx, nsUUID, apikey, input, resolvedMT, videoProviderResp, videoResp, generationRecorder)
+			tokenID := httpbase.GetCurrentTokenID(c)
+			videoID, ok := h.handler.createVideoGenerationTask(c, ctx, nsUUID, tokenID, input, resolvedMT, videoProviderResp, videoResp, generationRecorder)
 			if !ok {
 				return nil
 			}

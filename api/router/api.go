@@ -83,6 +83,7 @@ func RunServer(config *config.Config, enableSwagger bool) {
 
 }
 
+// NewRouter initializes handlers and registers authenticated service routes.
 func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	r := gin.New()
 	middleware.SetInfraMiddleware(r, config, instrumentation.Server)
@@ -99,6 +100,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	middlewareCollection.Auth.NeedAPIKey = middleware.NeedAPIKey(config)
 	middlewareCollection.Auth.NeedLogin = middleware.MustLogin()
 	middlewareCollection.Auth.NeedAdmin = middleware.NeedAdmin(config)
+	middlewareCollection.Auth.PlatformAdmin = middleware.NewPlatformAdmin()
 	middlewareCollection.Auth.UserMatch = middleware.UserMatch()
 	middlewareCollection.Auth.NeedPhoneVerified = middleware.NeedPhoneVerified(config)
 	middlewareCollection.Repo.RepoExists = middleware.RepoExists(config)
@@ -224,8 +226,9 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		return nil, fmt.Errorf("error create validator, error: %w", err)
 	}
 	apiGroup := r.Group("/api/v1")
-	adminGrp := apiGroup.Group("/admin")
-	adminGrp.Use(middleware.NeedAdmin(config))
+	// Legacy administrator operations keep their existing global authorization.
+	adminGrp := apiGroup.Group("/admin", middlewareCollection.Auth.NeedAdmin)
+	createAdminAccountAdminRoutes(apiGroup, middlewareCollection, handler.NewAdminHandler())
 
 	versionHandler := handler.NewVersionHandler()
 	apiGroup.GET("/version", versionHandler.Version)
@@ -261,9 +264,13 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 
 	// Model routes
 	createModelRoutes(config, apiGroup, middlewareCollection, modelHandler, repoCommonHandler, monitorHandler)
+	createAdminAssetModelRoutes(apiGroup, middlewareCollection, modelHandler, repoCommonHandler)
+	createAdminModelCrossRoutes(apiGroup, middlewareCollection, modelHandler, repoCommonHandler)
+	createAdminAssetMirrorRoutes(apiGroup, middlewareCollection, repoCommonHandler)
 
 	// Dataset routes
 	createDatasetRoutes(config, apiGroup, middlewareCollection, dsHandler, repoCommonHandler)
+	createAdminAssetDatasetRoutes(apiGroup, middlewareCollection, dsHandler, repoCommonHandler)
 
 	codeHandler, err := handler.NewCodeHandler(config)
 	if err != nil {
@@ -271,6 +278,8 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	}
 	// Code routes
 	createCodeRoutes(config, apiGroup, middlewareCollection, codeHandler, repoCommonHandler)
+	createAdminAssetCodeRoutes(apiGroup, middlewareCollection, codeHandler, repoCommonHandler)
+	createAdminMarketingCodeRoute(apiGroup, middlewareCollection, codeHandler)
 
 	skillHandler, err := handler.NewSkillHandler(config)
 	if err != nil {
@@ -278,6 +287,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	}
 	// Skill routes
 	createSkillRoutes(config, apiGroup, middlewareCollection, skillHandler, repoCommonHandler)
+	createAdminAssetSkillRoutes(apiGroup, middlewareCollection, skillHandler, repoCommonHandler)
 
 	spaceHandler, err := handler.NewSpaceHandler(config)
 	if err != nil {
@@ -285,6 +295,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	}
 	// space routers
 	createSpaceRoutes(config, apiGroup, middlewareCollection, spaceHandler, repoCommonHandler, monitorHandler)
+	createAdminAssetSpaceRoutes(apiGroup, middlewareCollection, spaceHandler, repoCommonHandler)
 
 	notebookHandler, err := handler.NewNotebookHandler(config)
 	if err != nil {
@@ -301,14 +312,15 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	spaceResource := apiGroup.Group("space_resources")
 	{
 		spaceResource.GET("", spaceResourceHandler.Index)
-		spaceResource.POST("", middlewareCollection.License.Check, middlewareCollection.Auth.NeedAdmin, spaceResourceHandler.Create)
-		spaceResource.PUT("/:id", middlewareCollection.License.Check, middlewareCollection.Auth.NeedAdmin, spaceResourceHandler.Update)
-		spaceResource.DELETE("/:id", middlewareCollection.License.Check, middlewareCollection.Auth.NeedAdmin, spaceResourceHandler.Delete)
+		spaceResource.POST("", middlewareCollection.License.Check, middlewareCollection.Auth.PlatformAdmin(types.AdminComputeSpec), spaceResourceHandler.Create)
+		spaceResource.PUT("/:id", middlewareCollection.License.Check, middlewareCollection.Auth.PlatformAdmin(types.AdminComputeSpec), spaceResourceHandler.Update)
+		spaceResource.DELETE("/:id", middlewareCollection.License.Check, middlewareCollection.Auth.PlatformAdmin(types.AdminComputeSpec), spaceResourceHandler.Delete)
 		spaceResource.GET("/hardware_types", spaceResourceHandler.ListHardwareTypes)
 		spaceResource.GET("/scenarios", spaceResourceHandler.ListScenarios)
 	}
-	adminGrp.GET("/space_resources", spaceResourceHandler.ListAll)
-	adminGrp.PUT("/scenario_constraints/:id", spaceResourceHandler.UpdateScenarioConstraint)
+	apiGroup.GET("/admin/space_resources", middlewareCollection.Auth.PlatformAdmin(types.AdminComputeInstance), spaceResourceHandler.ListAll)
+	apiGroup.PUT("/admin/scenario_constraints/:id", middlewareCollection.Auth.PlatformAdmin(types.AdminComputeScenario), spaceResourceHandler.UpdateScenarioConstraint)
+	createAdminSharedResourceRoutes(apiGroup, middlewareCollection, spaceResourceHandler)
 
 	spaceSdkHandler, err := handler.NewSpaceSdkHandler(config)
 	if err != nil {
@@ -328,7 +340,10 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		return nil, fmt.Errorf("error creating user proxy handler:%w", err)
 	}
 
-	createUserRoutes(apiGroup, adminGrp, middlewareCollection, userProxyHandler, userHandler)
+	createUserRoutes(apiGroup, middlewareCollection, userProxyHandler, userHandler)
+	createAdminAccountUserRoutes(apiGroup, middlewareCollection, userProxyHandler)
+	createAdminCommonUserRoutes(apiGroup, middlewareCollection, userProxyHandler)
+	createAdminSharedUserProxyRoutes(apiGroup, middlewareCollection, userProxyHandler)
 
 	createTokenRoutes(apiGroup, middlewareCollection, userProxyHandler)
 
@@ -354,11 +369,16 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		return nil, fmt.Errorf("error creating tag controller:%w", err)
 	}
 	createTagsRoutes(apiGroup, middlewareCollection, tagCtrl)
+	createAdminCommonTagRoute(apiGroup, middlewareCollection, tagCtrl.AllTags)
+	createAdminAssetTagReadRoutes(apiGroup, middlewareCollection, tagCtrl)
+	createAdminAccountOrganizationRoutes(apiGroup, middlewareCollection, userProxyHandler, tagCtrl)
 
+	// Administrator session refresh retains independent authorization in the user service.
+	createAdminCommonJWTRoutes(apiGroup, middlewareCollection, userProxyHandler)
 	// JWT token
 	apiGroup.POST("/jwt/token", middlewareCollection.Auth.NeedAPIKey, userProxyHandler.Proxy)
 	apiGroup.GET("/jwt/:token", middlewareCollection.Auth.NeedAPIKey, userProxyHandler.ProxyToApi("/api/v1/jwt/%s", "token"))
-	apiGroup.GET("/users/stream-export", middlewareCollection.Auth.NeedAdmin, userProxyHandler.Proxy)
+	apiGroup.GET("/users/stream-export", middlewareCollection.Auth.PlatformAdmin(types.AdminAccountUser), userProxyHandler.Proxy)
 
 	// callback
 	callbackCtrl, err := callback.NewGitCallbackHandler(config)
@@ -381,16 +401,17 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		return nil, fmt.Errorf("error creating mirror source controller:%w", err)
 	}
 
-	apiGroup.GET("/mirrors", middlewareCollection.License.Check, middlewareCollection.Auth.NeedAdmin, mirrorHandler.Index)
+	apiGroup.GET("/mirrors", middlewareCollection.License.Check, middlewareCollection.Auth.PlatformAdmin(types.AdminAssetMirror), mirrorHandler.Index)
 
 	lfsSyncProxyHandler, err := handler.NewInternalServiceProxyHandler(fmt.Sprintf("%s:%d", config.LfsSync.Host, config.LfsSync.Port))
 	if err != nil {
 		return nil, fmt.Errorf("error creating multi sync proxy handler:%w", err)
 	}
 	createLfsSyncRoutes(apiGroup, middlewareCollection, lfsSyncProxyHandler)
+	createAdminAssetSyncRoutes(apiGroup, middlewareCollection, repoCommonHandler.SyncMirror, lfsSyncProxyHandler.ProxyToApi("/api/v1/admin/asset/sync/lfs_sync/cancel"))
 
 	mirror := apiGroup.Group("/mirror")
-	mirror.Use(middlewareCollection.Auth.NeedAdmin)
+	mirror.Use(middlewareCollection.Auth.PlatformAdmin(types.AdminAssetMirror))
 	{
 		mirror.GET("/sources", msHandler.Index)
 		mirror.POST("/sources", msHandler.Create)
@@ -398,7 +419,6 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		mirror.DELETE("/sources/:id", msHandler.Delete)
 		mirror.GET("/sources/:id", msHandler.Get)
 		mirror.POST("/repo", mirrorHandler.CreateMirrorRepo)
-		mirror.GET("/repos", mirrorHandler.Repos)
 		mirror.GET("/statistics", mirrorHandler.Statistics)
 		mirror.POST("/batch", mirrorHandler.BatchCreate)
 		mirror.GET("/tasks", lfsSyncProxyHandler.ProxyToApi("/api/v1/mirror/tasks"))
@@ -422,7 +442,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		collections.PUT("/:id/repos/:repo_id", middlewareCollection.Auth.NeedLogin, collectionHandler.UpdateCollectionRepo)
 	}
 
-	err = createClusterRoutes(apiGroup, adminGrp, middlewareCollection, config)
+	err = createClusterRoutes(apiGroup, middlewareCollection, config)
 	if err != nil {
 		return nil, fmt.Errorf("error creating cluster routes:%w", err)
 	}
@@ -435,9 +455,10 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	event.POST("", middlewareCollection.Auth.NeedLogin, eventHandler.Create)
 
 	adminGrp.POST("/:repo_type/:namespace/:name/change_path", repoCommonHandler.ChangePath)
+	createAdminAssetChangePathRoutes(apiGroup, middlewareCollection, repoCommonHandler)
 
 	// Admin user get repo path list
-	adminGrp.GET("/repos", repoCommonHandler.GetRepos)
+	apiGroup.GET("/admin/repos", middlewareCollection.Auth.PlatformAdmin(types.AdminAssetMirror), repoCommonHandler.GetRepos)
 
 	// Batch get repository extra information for multiple repositories
 	apiGroup.POST("/repos/extra", repoCommonHandler.BatchGetRepoExtra)
@@ -448,13 +469,10 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		return nil, fmt.Errorf("error creating broadcast handler:%w", err)
 	}
 	broadcast := apiGroup.Group("/broadcasts")
-	adminBroadcast := adminGrp.Group("/broadcasts")
 
 	broadcast.GET("/active", broadcastHandler.Active)
-	adminBroadcast.POST("", broadcastHandler.Create)
-	adminBroadcast.PUT("/:id", broadcastHandler.Update)
-	adminBroadcast.GET("", broadcastHandler.Index)
-	adminBroadcast.GET("/:id", broadcastHandler.Show)
+	createAdminBroadcastRoutes(apiGroup, middlewareCollection, broadcastHandler)
+	createAdminCommonReadRoutes(apiGroup, middlewareCollection, broadcastHandler, versionHandler)
 	broadcast.GET("/:id", broadcastHandler.Show)
 	// end routes for broadcast
 
@@ -464,6 +482,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	}
 
 	createRuntimeFrameworkRoutes(apiGroup, middlewareCollection, modelHandler, runtimeArchHandler, repoCommonHandler)
+	createAdminRuntimeFrameworkRoute(apiGroup, middlewareCollection, modelHandler)
 
 	syncHandler, err := handler.NewSyncHandler(config)
 	if err != nil {
@@ -477,9 +496,8 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	{
 		syncGroup.GET("/version/latest", middlewareCollection.Auth.NeedLogin, syncHandler.Latest)
 		// syncGroup.GET("/version/oldest", syncHandler.Oldest)
-		syncGroup.GET("/client_setting", middlewareCollection.License.Check, middlewareCollection.Auth.NeedAdmin, syncClientSettingHandler.Show)
-		syncGroup.POST("/client_setting", middlewareCollection.License.Check, middlewareCollection.Auth.NeedAdmin, syncClientSettingHandler.Create)
 	}
+	createAdminAssetSyncExclusiveRoutes(apiGroup, middlewareCollection, syncClientSettingHandler, mirrorHandler)
 
 	meteringHandler, err := handler.NewAccountingHandler(config)
 	if err != nil {
@@ -487,15 +505,14 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	}
 
 	createMeteringRoutes(apiGroup, middlewareCollection, meteringHandler)
+	createAdminSystemConfigSelectorRoutes(apiGroup, middlewareCollection, modelHandler, tagCtrl, meteringHandler)
+	createAdminCommercialAPISelectorRoutes(apiGroup, middlewareCollection, modelHandler, tagCtrl, meteringHandler)
 
 	recomHandler, err := handler.NewRecomHandler(config)
 	if err != nil {
 		return nil, fmt.Errorf("error creating recomHandler,%w", err)
 	}
-	recomGroup := apiGroup.Group("/recom")
-	{
-		recomGroup.POST("opweight", middlewareCollection.License.Check, middlewareCollection.Auth.NeedAdmin, recomHandler.SetOpWeight)
-	}
+	createAdminAssetRecommendationRoutes(apiGroup, middlewareCollection, recomHandler.SetOpWeight)
 
 	// telemetry
 	telemetryHandler, err := handler.NewTelemetryHandler()
@@ -589,6 +606,8 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		return nil, fmt.Errorf("error creating mcp server handler: %w", err)
 	}
 	CreateMCPServerRoutes(apiGroup, middlewareCollection, mcpHandler, repoCommonHandler)
+	createAdminAssetMCPRoutes(apiGroup, middlewareCollection, mcpHandler, repoCommonHandler)
+	createAdminMCPToolsRoute(apiGroup, middlewareCollection, mcpHandler)
 
 	if err := createNotificationRoutes(config, apiGroup, middlewareCollection); err != nil {
 		return nil, fmt.Errorf("error creating notifier routes: %w", err)
@@ -605,7 +624,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	}
 	createFinetuneRoutes(apiGroup, middlewareCollection, finetuneJobHandler)
 
-	err = createForwardRoutes(apiGroup, config)
+	err = createForwardRoutes(apiGroup, middlewareCollection, config)
 	if err != nil {
 		return nil, fmt.Errorf("error creating forward routes:%w", err)
 	}
@@ -648,6 +667,7 @@ func createFinetuneRoutes(apiGroup *gin.RouterGroup, middlewareCollection middle
 	}
 }
 
+// createModelRoutes registers business routes with separate permissions for administrator operations.
 func createModelRoutes(config *config.Config,
 	apiGroup *gin.RouterGroup,
 	middlewareCollection middleware.MiddlewareCollection,
@@ -784,16 +804,16 @@ func createModelRoutes(config *config.Config,
 	{
 		// deploy model as serverless
 		modelsServerlessGroup.GET("/:namespace/:name/serverless", modelHandler.GetDeployServerless)
-		modelsServerlessGroup.POST("/:namespace/:name/serverless", middlewareCollection.License.Check, middlewareCollection.Auth.NeedAdmin, modelHandler.DeployServerless)
-		modelsServerlessGroup.DELETE("/:namespace/:name/serverless", middlewareCollection.License.Check, middlewareCollection.Auth.NeedAdmin, modelHandler.RemoveServerless)
-		modelsServerlessGroup.PUT("/:namespace/:name/serverless/:id/start", middlewareCollection.Auth.NeedAdmin, modelHandler.ServerlessStart)
-		modelsServerlessGroup.PUT("/:namespace/:name/serverless/:id/stop", middlewareCollection.Auth.NeedAdmin, modelHandler.ServerlessStop)
-		modelsServerlessGroup.GET("/:namespace/:name/serverless/:id", middlewareCollection.Auth.NeedAdmin, repoCommonHandler.ServerlessDetail)
+		modelsServerlessGroup.POST("/:namespace/:name/serverless", middlewareCollection.License.Check, middlewareCollection.Auth.PlatformAdmin(types.AdminAPIGatewayPublicInference), modelHandler.DeployServerless)
+		modelsServerlessGroup.DELETE("/:namespace/:name/serverless", middlewareCollection.License.Check, middlewareCollection.Auth.PlatformAdmin(types.AdminAPIGatewayPublicInference), modelHandler.RemoveServerless)
+		modelsServerlessGroup.PUT("/:namespace/:name/serverless/:id/start", middlewareCollection.Auth.PlatformAdmin(types.AdminAPIGatewayPublicInference), modelHandler.ServerlessStart)
+		modelsServerlessGroup.PUT("/:namespace/:name/serverless/:id/stop", middlewareCollection.Auth.PlatformAdmin(types.AdminAPIGatewayPublicInference), modelHandler.ServerlessStop)
+		modelsServerlessGroup.GET("/:namespace/:name/serverless/:id", middlewareCollection.Auth.PlatformAdmin(types.AdminAPIGatewayPublicInference), repoCommonHandler.ServerlessDetail)
 		modelsServerlessGroup.GET("/:namespace/:name/serverless/:id/status", middlewareCollection.Auth.NeedAdmin, repoCommonHandler.ServerlessStatus)
 		modelsServerlessGroup.GET("/:namespace/:name/serverless/:id/logs", middlewareCollection.Auth.NeedAdmin, repoCommonHandler.ServerlessLogs)
-		modelsServerlessGroup.GET("/:namespace/:name/serverless/:id/logs/last", middlewareCollection.Auth.NeedAdmin, repoCommonHandler.ServerlessLastLogs)
+		modelsServerlessGroup.GET("/:namespace/:name/serverless/:id/logs/last", middlewareCollection.Auth.PlatformAdmin(types.AdminAPIGatewayPublicInference), repoCommonHandler.ServerlessLastLogs)
 		modelsServerlessGroup.GET("/:namespace/:name/serverless/:id/versions/:commit_id", middlewareCollection.Auth.NeedAdmin, repoCommonHandler.ServerlessVersionLogs)
-		modelsServerlessGroup.PUT("/:namespace/:name/serverless/:id", middlewareCollection.Auth.NeedAdmin, repoCommonHandler.ServerlessUpdate)
+		modelsServerlessGroup.PUT("/:namespace/:name/serverless/:id", middlewareCollection.Auth.PlatformAdmin(types.AdminAPIGatewayPublicInference), repoCommonHandler.ServerlessUpdate)
 		registerServerlessBenchmarkRoutes(modelsServerlessGroup, middlewareCollection, repoCommonHandler)
 
 	}
@@ -810,6 +830,7 @@ func createModelRoutes(config *config.Config,
 		middlewareCollection.Auth.NeedLogin, modelHandler.OptimizeEngineArgs)
 }
 
+// createDatasetRoutes registers business routes with separate permissions for administrator operations.
 func createDatasetRoutes(
 	config *config.Config,
 	apiGroup *gin.RouterGroup,
@@ -868,6 +889,7 @@ func createDatasetRoutes(
 	}
 }
 
+// createCodeRoutes registers business routes with separate permissions for administrator operations.
 func createCodeRoutes(
 	config *config.Config,
 	apiGroup *gin.RouterGroup,
@@ -949,6 +971,7 @@ func createNotebookRoutes(
 	}
 }
 
+// createSpaceRoutes registers business routes with separate permissions for administrator operations.
 func createSpaceRoutes(config *config.Config,
 	apiGroup *gin.RouterGroup,
 	middlewareCollection middleware.MiddlewareCollection,
@@ -1033,7 +1056,8 @@ func createSpaceRoutes(config *config.Config,
 	}
 }
 
-func createUserRoutes(apiGroup *gin.RouterGroup, adminGroup *gin.RouterGroup, middlewareCollection middleware.MiddlewareCollection, userProxyHandler *handler.InternalServiceProxyHandler, userHandler *handler.UserHandler) {
+// createUserRoutes registers ordinary user routes and independently authorized administrator lookups.
+func createUserRoutes(apiGroup *gin.RouterGroup, middlewareCollection middleware.MiddlewareCollection, userProxyHandler *handler.InternalServiceProxyHandler, userHandler *handler.UserHandler) {
 	// api keys
 	keysGroup := apiGroup.Group("/namespaces")
 	keysGroup.Use(middlewareCollection.Auth.NeedLogin)
@@ -1050,15 +1074,15 @@ func createUserRoutes(apiGroup *gin.RouterGroup, adminGroup *gin.RouterGroup, mi
 	{
 		apiGroup.GET("/user/:username", userProxyHandler.Proxy)
 		apiGroup.PUT("/user/:username", middlewareCollection.Auth.NeedLogin, userProxyHandler.Proxy)
-		apiGroup.DELETE("/user/:username", middlewareCollection.Auth.NeedAdmin, userProxyHandler.Proxy)
-		apiGroup.PUT("/user/labels", middlewareCollection.Auth.NeedAdmin, userProxyHandler.Proxy)
+		apiGroup.DELETE("/user/:username", middlewareCollection.Auth.PlatformAdmin(types.AdminAccountUser), userProxyHandler.Proxy)
+		apiGroup.PUT("/user/labels", middlewareCollection.Auth.PlatformAdmin(types.AdminAccountUser), userProxyHandler.Proxy)
 		// Deprecated: remove this proxy route after all clients migrate away from the user organization list API.
 		apiGroup.GET("/user/:username/organizations", userProxyHandler.Proxy)
 	}
 
 	{
 		apiGroup.POST("/user/verify", middlewareCollection.Auth.NeedLogin, userProxyHandler.Proxy)
-		apiGroup.PUT("/user/verify/:id", middlewareCollection.Auth.NeedAdmin, userProxyHandler.ProxyToApi("/api/v1/user/verify/%s", "id"))
+		apiGroup.PUT("/user/verify/:id", middlewareCollection.Auth.PlatformAdmin(types.AdminAccountUser), userProxyHandler.ProxyToApi("/api/v1/user/verify/%s", "id"))
 		apiGroup.GET("/user/verify/:id", middlewareCollection.Auth.NeedLogin, userProxyHandler.ProxyToApi("/api/v1/user/verify/%s", "id"))
 		apiGroup.DELETE("/user/:username/close_account", middlewareCollection.Auth.NeedLogin, userProxyHandler.Proxy)
 		apiGroup.POST("/user/email-verification-code/:email", middlewareCollection.Auth.NeedLogin, userProxyHandler.Proxy)
@@ -1107,7 +1131,7 @@ func createUserRoutes(apiGroup *gin.RouterGroup, adminGroup *gin.RouterGroup, mi
 	apiGroup.GET("/user/:username/tokens", middlewareCollection.Auth.NeedLogin, userProxyHandler.ProxyToApi("/api/v1/user/%s/tokens", "username"))
 
 	// serverless list
-	apiGroup.GET("/user/:username/run/serverless", middlewareCollection.License.Check, middlewareCollection.Auth.NeedAdmin, userHandler.GetRunServerless)
+	apiGroup.GET("/user/:username/run/serverless", middlewareCollection.License.Check, middlewareCollection.Auth.PlatformAdmin(types.AdminAPIGatewayPublicInference), userHandler.GetRunServerless)
 	// get user resource
 	apiGroup.GET("/user/:username/order/resources", middlewareCollection.Auth.UserMatch, userHandler.GetUserResource)
 	// create user resource
@@ -1125,20 +1149,21 @@ func createUserRoutes(apiGroup *gin.RouterGroup, adminGroup *gin.RouterGroup, mi
 	// directly in NewRouter.
 	apiGroup.GET("/users", middlewareCollection.Auth.NeedLogin, userProxyHandler.Proxy)
 
-	// Look up namespaces in batch for admin
-	adminGroup.POST("/namespaces/lookup", userProxyHandler.Proxy)
+	// Register separately from the legacy global-admin group so module grants are sufficient.
+	apiGroup.POST("/admin/namespaces/lookup", middlewareCollection.Auth.PlatformAdmin(types.AdminAPIGatewayTokenPlan), (&adminSharedRouteHandler{target: userProxyHandler.Proxy}).TokenPlanNamespaces)
 	createExtendedUserRoutes(apiGroup, middlewareCollection, userProxyHandler)
 }
 
+// createRuntimeFrameworkRoutes registers business routes with separate permissions for administrator operations.
 func createRuntimeFrameworkRoutes(apiGroup *gin.RouterGroup, middlewareCollection middleware.MiddlewareCollection, modelHandler *handler.ModelHandler, runtimeArchHandler *handler.RuntimeArchitectureHandler, repoCommonHandler *handler.RepoHandler) {
 	needAdmin := middlewareCollection.Auth.NeedAdmin
 	runtimeFramework := apiGroup.Group("/runtime_framework") // TODO: check license
 	{
 		runtimeFramework.GET("/:id/models", middlewareCollection.Auth.NeedLogin, modelHandler.ListByRuntimeFrameworkID)
 		runtimeFramework.GET("", middlewareCollection.Auth.NeedLogin, modelHandler.ListAllRuntimeFramework)
-		runtimeFramework.POST("", middlewareCollection.Auth.NeedLogin, repoCommonHandler.RuntimeFrameworkCreate)
-		runtimeFramework.PUT("/:id", middlewareCollection.Auth.NeedLogin, repoCommonHandler.RuntimeFrameworkUpdate)
-		runtimeFramework.DELETE("/:id", middlewareCollection.Auth.NeedLogin, repoCommonHandler.RuntimeFrameworkDelete)
+		runtimeFramework.POST("", middlewareCollection.Auth.PlatformAdmin(types.AdminAssetRuntimeFramework), repoCommonHandler.RuntimeFrameworkCreate)
+		runtimeFramework.PUT("/:id", middlewareCollection.Auth.PlatformAdmin(types.AdminAssetRuntimeFramework), repoCommonHandler.RuntimeFrameworkUpdate)
+		runtimeFramework.DELETE("/:id", middlewareCollection.Auth.PlatformAdmin(types.AdminAssetRuntimeFramework), repoCommonHandler.RuntimeFrameworkDelete)
 		runtimeFramework.PUT("/:id/models", middlewareCollection.Auth.NeedAdmin, modelHandler.UpdateModelRuntimeFrameworks)
 		runtimeFramework.DELETE("/:id/models", middlewareCollection.Auth.NeedAdmin, modelHandler.DeleteModelRuntimeFrameworks)
 		runtimeFramework.GET("/models", middlewareCollection.Auth.NeedLogin, modelHandler.ListModelsOfRuntimeFrameworks)
@@ -1147,7 +1172,7 @@ func createRuntimeFrameworkRoutes(apiGroup *gin.RouterGroup, middlewareCollectio
 		runtimeFramework.PUT("/:id/architecture", needAdmin, runtimeArchHandler.UpdateArchitecture)
 		runtimeFramework.DELETE("/:id/architecture", needAdmin, runtimeArchHandler.DeleteArchitecture)
 		runtimeFramework.POST("/scan", needAdmin, runtimeArchHandler.ScanArchitecture)
-		runtimeFramework.POST("/:namespace/:name/scan", middlewareCollection.Auth.NeedLogin, runtimeArchHandler.ScanArchForSingleModel)
+		runtimeFramework.POST("/:namespace/:name/scan", middlewareCollection.Auth.PlatformAdmin(types.AdminAssetModel), runtimeArchHandler.ScanArchForSingleModel)
 	}
 }
 
@@ -1364,6 +1389,7 @@ func createMemoryRoutes(apiGroup *gin.RouterGroup, middlewareCollection middlewa
 	}
 }
 
+// createTagsRoutes registers business routes with separate permissions for administrator operations.
 func createTagsRoutes(apiGroup *gin.RouterGroup, middlewareCollection middleware.MiddlewareCollection, tagHandler *handler.TagsHandler) {
 	tagsGrp := apiGroup.Group("/tags")
 	{
@@ -1371,15 +1397,15 @@ func createTagsRoutes(apiGroup *gin.RouterGroup, middlewareCollection middleware
 		categoryGrp := tagsGrp.Group("/categories")
 		{
 			categoryGrp.GET("", tagHandler.AllCategories)
-			categoryGrp.POST("", middlewareCollection.License.Check, middlewareCollection.Auth.NeedAdmin, tagHandler.CreateCategory)
-			categoryGrp.PUT("/:id", middlewareCollection.License.Check, middlewareCollection.Auth.NeedAdmin, tagHandler.UpdateCategory)
-			categoryGrp.DELETE("/:id", middlewareCollection.License.Check, middlewareCollection.Auth.NeedAdmin, tagHandler.DeleteCategory)
+			categoryGrp.POST("", middlewareCollection.License.Check, middlewareCollection.Auth.PlatformAdmin(types.AdminAssetTag), tagHandler.CreateCategory)
+			categoryGrp.PUT("/:id", middlewareCollection.License.Check, middlewareCollection.Auth.PlatformAdmin(types.AdminAssetTag), tagHandler.UpdateCategory)
+			categoryGrp.DELETE("/:id", middlewareCollection.License.Check, middlewareCollection.Auth.PlatformAdmin(types.AdminAssetTag), tagHandler.DeleteCategory)
 		}
 		tagsGrp.GET("", tagHandler.AllTags)
-		tagsGrp.POST("", middlewareCollection.License.Check, middlewareCollection.Auth.NeedAdmin, tagHandler.CreateTag)
-		tagsGrp.GET("/:id", middlewareCollection.License.Check, middlewareCollection.Auth.NeedAdmin, tagHandler.GetTagByID)
-		tagsGrp.PUT("/:id", middlewareCollection.License.Check, middlewareCollection.Auth.NeedAdmin, tagHandler.UpdateTag)
-		tagsGrp.DELETE("/:id", middlewareCollection.License.Check, middlewareCollection.Auth.NeedAdmin, tagHandler.DeleteTag)
+		tagsGrp.POST("", middlewareCollection.License.Check, middlewareCollection.Auth.PlatformAdmin(types.AdminAssetTag), tagHandler.CreateTag)
+		tagsGrp.GET("/:id", middlewareCollection.License.Check, middlewareCollection.Auth.PlatformAdmin(types.AdminAssetTag), tagHandler.GetTagByID)
+		tagsGrp.PUT("/:id", middlewareCollection.License.Check, middlewareCollection.Auth.PlatformAdmin(types.AdminAssetTag), tagHandler.UpdateTag)
+		tagsGrp.DELETE("/:id", middlewareCollection.License.Check, middlewareCollection.Auth.PlatformAdmin(types.AdminAssetTag), tagHandler.DeleteTag)
 	}
 }
 
@@ -1411,12 +1437,13 @@ func createSpaceTemplateRoutes(apiGroup *gin.RouterGroup, middlewareCollection m
 	}
 }
 
+// createLfsSyncRoutes registers business routes with separate permissions for administrator operations.
 func createLfsSyncRoutes(apiGroup *gin.RouterGroup, middlewareCollection middleware.MiddlewareCollection, lfsSyncHandler *handler.InternalServiceProxyHandler) {
 	lfsSyncGrp := apiGroup.Group("/lfs_sync")
 	{
 		lfsSyncGrp.POST("/stop_worker_by_id", middlewareCollection.Auth.NeedAdmin, lfsSyncHandler.ProxyToApi("/api/v1/lfs_sync/stop_worker_by_id"))
-		lfsSyncGrp.POST("/sync_now", middlewareCollection.Auth.NeedAdmin, lfsSyncHandler.ProxyToApi("/api/v1/lfs_sync/sync_now"))
-		lfsSyncGrp.POST("/cancel", middlewareCollection.Auth.NeedAdmin, lfsSyncHandler.ProxyToApi("/api/v1/lfs_sync/cancel"))
+		lfsSyncGrp.POST("/sync_now", middlewareCollection.Auth.PlatformAdmin(types.AdminAssetMirror), lfsSyncHandler.ProxyToApi("/api/v1/lfs_sync/sync_now"))
+		lfsSyncGrp.POST("/cancel", middlewareCollection.Auth.PlatformAdmin(types.AdminAssetMirror), lfsSyncHandler.ProxyToApi("/api/v1/admin/asset/mirror/lfs_sync/cancel"))
 	}
 }
 
@@ -1465,11 +1492,12 @@ func createOrgRoutes(apiGroup *gin.RouterGroup, middlewareCollection middleware.
 	apiGroup.GET("/namespaces/mine/writable", middlewareCollection.Auth.NeedLogin, userProxyHandler.Proxy)
 	{
 		apiGroup.POST("/organization/verify", middlewareCollection.Auth.NeedLogin, userProxyHandler.Proxy)
-		apiGroup.PUT("/organization/verify/:id", middlewareCollection.Auth.NeedAdmin, userProxyHandler.ProxyToApi("/api/v1/organization/verify/%s", "id"))
+		apiGroup.PUT("/organization/verify/:id", middlewareCollection.Auth.PlatformAdmin(types.AdminAccountOrganization), userProxyHandler.ProxyToApi("/api/v1/organization/verify/%s", "id"))
 		apiGroup.GET("/organization/verify/:namespace", middlewareCollection.Auth.NeedLogin, userProxyHandler.ProxyToApi("/api/v1/organization/verify/%s", "namespace"))
 	}
 }
 
+// createNotificationRoutes registers business routes with separate permissions for administrator operations.
 func createNotificationRoutes(config *config.Config, apiGroup *gin.RouterGroup, middlewareCollection middleware.MiddlewareCollection) error {
 	notificationProxyHandler, err := handler.NewInternalServiceProxyHandler(fmt.Sprintf("%s:%d", config.Notification.Host, config.Notification.Port))
 	if err != nil {
@@ -1490,6 +1518,8 @@ func createNotificationRoutes(config *config.Config, apiGroup *gin.RouterGroup, 
 		notificationsGroup.GET("/poll/:limit", notificationProxyHandler.Proxy)
 		notificationsGroup.GET("/message-types", notificationProxyHandler.Proxy)
 	}
+	createAdminMarketingEmailNotificationRoute(apiGroup, middlewareCollection, notificationProxyHandler)
+	createAdminCommonNotificationRoutes(apiGroup, middlewareCollection, notificationProxyHandler)
 
 	return nil
 }
@@ -1519,7 +1549,8 @@ func createCustomValidator() error {
 	}
 }
 
-func createClusterRoutes(apiGroup *gin.RouterGroup, adminGrp *gin.RouterGroup, middlewareCollection middleware.MiddlewareCollection, config *config.Config) error {
+// createClusterRoutes registers business routes with separate permissions for administrator operations.
+func createClusterRoutes(apiGroup *gin.RouterGroup, middlewareCollection middleware.MiddlewareCollection, config *config.Config) error {
 	// cluster infos
 	clusterHandler, err := handler.NewClusterHandler(config)
 	if err != nil {
@@ -1532,11 +1563,12 @@ func createClusterRoutes(apiGroup *gin.RouterGroup, adminGrp *gin.RouterGroup, m
 		clusterGrp.GET("/deploys", middlewareCollection.Auth.NeedAdmin, clusterHandler.GetDeploys)
 		clusterGrp.GET("/deploys_report", middlewareCollection.Auth.NeedAdmin, clusterHandler.GetDeploysReport)
 		clusterGrp.GET("/:id", middlewareCollection.Auth.NeedLogin, clusterHandler.GetClusterById)
-		clusterGrp.PUT("/:id", middlewareCollection.Auth.NeedAdmin, clusterHandler.Update)
+		clusterGrp.PUT("/:id", middlewareCollection.Auth.PlatformAdmin(types.AdminComputeCluster), clusterHandler.Update)
 		clusterGrp.GET("/public", clusterHandler.GetClusterPublic)
 	}
+	createAdminSharedClusterRoutes(apiGroup, middlewareCollection, clusterHandler)
 
-	err = createComputingRoutes(adminGrp, clusterHandler)
+	err = createComputingRoutes(apiGroup, middlewareCollection, clusterHandler)
 	if err != nil {
 		return fmt.Errorf("error creating computing routes: %w", err)
 	}
@@ -1544,6 +1576,7 @@ func createClusterRoutes(apiGroup *gin.RouterGroup, adminGrp *gin.RouterGroup, m
 	return nil
 }
 
+// createSkillRoutes registers business routes with separate permissions for administrator operations.
 func createSkillRoutes(
 	config *config.Config,
 	apiGroup *gin.RouterGroup,

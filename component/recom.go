@@ -12,6 +12,8 @@ import (
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/errorx"
+	"opencsg.com/csghub-server/common/types"
 )
 
 type recomComponentImpl struct {
@@ -21,8 +23,10 @@ type recomComponentImpl struct {
 	gitServer  gitserver.GitServer
 }
 
+// RecomComponent manages repository recommendation weights and score calculations.
 type RecomComponent interface {
-	SetOpWeight(ctx context.Context, repoID, weight int64) error
+	// SetOpWeight confines a recommendation update to the repository type authorized by its route.
+	SetOpWeight(ctx context.Context, repoType types.RepositoryType, repoID, weight int64) error
 	// loop through repositories and calculate the recom score of the repository
 	CalculateRecomScore(ctx context.Context, batchSize int) error
 	// CalcTotalScore(ctx context.Context, repo *database.Repository, weights map[string]string) (float64, error)
@@ -42,10 +46,20 @@ func NewRecomComponent(cfg *config.Config) (RecomComponent, error) {
 	}, nil
 }
 
-func (rc *recomComponentImpl) SetOpWeight(ctx context.Context, repoID, weight int64) error {
-	_, err := rc.repoStore.FindById(ctx, repoID)
+// SetOpWeight verifies the stored asset type before applying its recommendation weight.
+// The expected type comes from trusted route registration, never from the request body.
+func (rc *recomComponentImpl) SetOpWeight(ctx context.Context, repoType types.RepositoryType, repoID, weight int64) error {
+	switch repoType {
+	case types.ModelRepo, types.DatasetRepo, types.CodeRepo, types.SpaceRepo, types.MCPServerRepo, types.SkillRepo:
+	default:
+		return errorx.ErrForbiddenMsg("unsupported repository type for recommendation updates")
+	}
+	repo, err := rc.repoStore.FindById(ctx, repoID)
 	if err != nil {
 		return fmt.Errorf("failed to find repository with id %d, err:%w", repoID, err)
+	}
+	if repo == nil || repo.RepositoryType != repoType {
+		return errorx.ErrForbiddenMsg("repository does not belong to the authorized asset type")
 	}
 
 	return rc.recomStore.UpsetOpWeights(ctx, repoID, weight)

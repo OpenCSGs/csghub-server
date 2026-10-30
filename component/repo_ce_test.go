@@ -468,6 +468,7 @@ func TestRepoComponent_DeployStart_ExistButNotRunning(t *testing.T) {
 	require.Nil(t, err)
 }
 
+// TestRepoComponentImpl_Update checks the expected user query options.
 func TestRepoComponentImpl_Update(t *testing.T) {
 	ctx := context.TODO()
 
@@ -494,7 +495,7 @@ func TestRepoComponentImpl_Update(t *testing.T) {
 
 		repo.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "test-namespace").Return(mockNamespace, nil)
 
-		mockUserRepoAdminPermission(ctx, repo.mocks.stores, "test-user")
+		mockUserRepoAdminPermission(ctx, repo.mocks.stores, "test-user", types.UserWithAdminPermissions)
 
 		// Mock Git server update
 		repo.mocks.gitServer.EXPECT().UpdateRepo(ctx, mock.Anything).Return(&gitserver.CreateRepoResp{}, nil)
@@ -605,7 +606,7 @@ func TestRepoComponentImpl_Update(t *testing.T) {
 		repo.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "test-namespace").Return(mockNamespace, nil)
 
 		// Mock user permission check
-		mockUserRepoAdminPermission(ctx, repo.mocks.stores, "test-user")
+		mockUserRepoAdminPermission(ctx, repo.mocks.stores, "test-user", types.UserWithAdminPermissions)
 
 		// Mock Git server update failure
 		repo.mocks.gitServer.EXPECT().UpdateRepo(ctx, mock.Anything).Return(nil, errors.New("git server error"))
@@ -654,7 +655,7 @@ func TestRepoComponentImpl_Update(t *testing.T) {
 		repo.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "test-namespace").Return(mockNamespace, nil)
 
 		// Mock user permission check
-		mockUserRepoAdminPermission(ctx, repo.mocks.stores, "test-user")
+		mockUserRepoAdminPermission(ctx, repo.mocks.stores, "test-user", types.UserWithAdminPermissions)
 
 		// Mock successful Git server update
 		repo.mocks.gitServer.EXPECT().UpdateRepo(ctx, mock.Anything).Return(&gitserver.CreateRepoResp{}, nil)
@@ -705,7 +706,7 @@ func TestRepoComponentImpl_Update(t *testing.T) {
 		repo.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "test-namespace").Return(mockNamespace, nil)
 
 		// Mock user permission check
-		mockUserRepoAdminPermission(ctx, repo.mocks.stores, "test-user")
+		mockUserRepoAdminPermission(ctx, repo.mocks.stores, "test-user", types.UserWithAdminPermissions)
 
 		// Mock successful Git server update
 		repo.mocks.gitServer.EXPECT().UpdateRepo(ctx, mock.Anything).Return(&gitserver.CreateRepoResp{}, nil)
@@ -760,7 +761,7 @@ func TestRepoComponentImpl_Update(t *testing.T) {
 		repo.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "test-namespace").Return(mockNamespace, nil)
 
 		// Mock user permission check
-		mockUserRepoAdminPermission(ctx, repo.mocks.stores, "test-user")
+		mockUserRepoAdminPermission(ctx, repo.mocks.stores, "test-user", types.UserWithAdminPermissions)
 
 		// Mock successful Git server update
 		repo.mocks.gitServer.EXPECT().UpdateRepo(ctx, mock.Anything).Return(&gitserver.CreateRepoResp{}, nil)

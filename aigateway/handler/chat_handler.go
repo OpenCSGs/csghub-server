@@ -109,7 +109,6 @@ func (h *chatPipelineHandler) Extract(c *gin.Context) (*types.RequestMetadata, e
 	ctx := c.Request.Context()
 	username := httpbase.GetCurrentUser(c)
 	nsUUID := httpbase.GetCurrentNamespaceUUID(c)
-	apikey := httpbase.GetAccessToken(c)
 
 	chatReq := &types.ChatCompletionRequest{}
 	if err := c.BindJSON(chatReq); err != nil {
@@ -124,7 +123,6 @@ func (h *chatPipelineHandler) Extract(c *gin.Context) (*types.RequestMetadata, e
 		Model:         chatReq.Model,
 		TenantID:      nsUUID,
 		UserID:        username,
-		APIKeyID:      apikey,
 		PriorityScope: httpbase.GetAPIKeyPriorityScope(c),
 		Streaming:     chatReq.Stream,
 		Headers:       c.Request.Header,
@@ -140,7 +138,6 @@ func (h *chatPipelineHandler) Execute(c *gin.Context, meta *types.RequestMetadat
 	chatReq := pb.Req
 	username := meta.UserID
 	nsUUID := meta.TenantID
-	apikey := meta.APIKeyID
 	modelID := meta.Model
 	tokenID := httpbase.GetCurrentTokenID(c)
 
@@ -285,7 +282,6 @@ func (h *chatPipelineHandler) Execute(c *gin.Context, meta *types.RequestMetadat
 
 	h.handler.runChatPostProcessAsync(ctx, chatPostProcessInput{
 		NSUUID:          nsUUID,
-		ApiKey:          apikey,
 		TokenID:         tokenID,
 		Model:           mt.Model,
 		TargetModelName: mt.ModelName,

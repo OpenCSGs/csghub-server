@@ -534,7 +534,7 @@ func (c *accessTokenComponentImpl) validateNamespacePermission(ctx context.Conte
 		return database.User{}, fmt.Errorf("failed to find namespace by uuid, uuid: %s, error: %w", req.NSUUID, err)
 	}
 
-	user, err := c.us.FindByUsername(ctx, req.Username)
+	user, err := c.us.FindByUsername(ctx, req.Username, types.UserWithAdminPermissions)
 	if err != nil {
 		return database.User{}, fmt.Errorf("failed to find user by username: %s error: %w", req.Username, err)
 	}
