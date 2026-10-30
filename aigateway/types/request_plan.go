@@ -20,8 +20,6 @@ type RequestMetadata struct {
 	TenantID string
 	// UserID is the username.
 	UserID string
-	// APIKeyID is the API key identifier.
-	APIKeyID string
 	// PriorityScope is the server-side queue priority scope assigned to the
 	// API key by its quota configuration ("high"/"low"; empty = unset, which
 	// resolves to the high class — see AdmissionPriorityFromSource). It

@@ -78,9 +78,54 @@ func (_c *MockOpenAIComponent_AcquireCapacityAdmission_Call) RunAndReturn(run fu
 	return _c
 }
 
-// BuildUsageMeteringEvent provides a mock function with given fields: c, nsUUID, model, targetModelName, usage, apikey
-func (_m *MockOpenAIComponent) BuildUsageMeteringEvent(c context.Context, nsUUID string, model *types.Model, targetModelName string, usage *token.Usage, apikey string) (*commontypes.MeteringEvent, error) {
-	ret := _m.Called(c, nsUUID, model, targetModelName, usage, apikey)
+// AutoModelID provides a mock function with no fields
+func (_m *MockOpenAIComponent) AutoModelID() string {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for AutoModelID")
+	}
+
+	var r0 string
+	if rf, ok := ret.Get(0).(func() string); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	return r0
+}
+
+// MockOpenAIComponent_AutoModelID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'AutoModelID'
+type MockOpenAIComponent_AutoModelID_Call struct {
+	*mock.Call
+}
+
+// AutoModelID is a helper method to define mock.On call
+func (_e *MockOpenAIComponent_Expecter) AutoModelID() *MockOpenAIComponent_AutoModelID_Call {
+	return &MockOpenAIComponent_AutoModelID_Call{Call: _e.mock.On("AutoModelID")}
+}
+
+func (_c *MockOpenAIComponent_AutoModelID_Call) Run(run func()) *MockOpenAIComponent_AutoModelID_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockOpenAIComponent_AutoModelID_Call) Return(_a0 string) *MockOpenAIComponent_AutoModelID_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockOpenAIComponent_AutoModelID_Call) RunAndReturn(run func() string) *MockOpenAIComponent_AutoModelID_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// BuildUsageMeteringEvent provides a mock function with given fields: c, nsUUID, model, targetModelName, usage, tokenID
+func (_m *MockOpenAIComponent) BuildUsageMeteringEvent(c context.Context, nsUUID string, model *types.Model, targetModelName string, usage *token.Usage, tokenID int64) (*commontypes.MeteringEvent, error) {
+	ret := _m.Called(c, nsUUID, model, targetModelName, usage, tokenID)
 
 	if len(ret) == 0 {
 		panic("no return value specified for BuildUsageMeteringEvent")
@@ -88,19 +133,19 @@ func (_m *MockOpenAIComponent) BuildUsageMeteringEvent(c context.Context, nsUUID
 
 	var r0 *commontypes.MeteringEvent
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, *types.Model, string, *token.Usage, string) (*commontypes.MeteringEvent, error)); ok {
-		return rf(c, nsUUID, model, targetModelName, usage, apikey)
+	if rf, ok := ret.Get(0).(func(context.Context, string, *types.Model, string, *token.Usage, int64) (*commontypes.MeteringEvent, error)); ok {
+		return rf(c, nsUUID, model, targetModelName, usage, tokenID)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, *types.Model, string, *token.Usage, string) *commontypes.MeteringEvent); ok {
-		r0 = rf(c, nsUUID, model, targetModelName, usage, apikey)
+	if rf, ok := ret.Get(0).(func(context.Context, string, *types.Model, string, *token.Usage, int64) *commontypes.MeteringEvent); ok {
+		r0 = rf(c, nsUUID, model, targetModelName, usage, tokenID)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*commontypes.MeteringEvent)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, *types.Model, string, *token.Usage, string) error); ok {
-		r1 = rf(c, nsUUID, model, targetModelName, usage, apikey)
+	if rf, ok := ret.Get(1).(func(context.Context, string, *types.Model, string, *token.Usage, int64) error); ok {
+		r1 = rf(c, nsUUID, model, targetModelName, usage, tokenID)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -119,14 +164,14 @@ type MockOpenAIComponent_BuildUsageMeteringEvent_Call struct {
 //   - model *types.Model
 //   - targetModelName string
 //   - usage *token.Usage
-//   - apikey string
-func (_e *MockOpenAIComponent_Expecter) BuildUsageMeteringEvent(c interface{}, nsUUID interface{}, model interface{}, targetModelName interface{}, usage interface{}, apikey interface{}) *MockOpenAIComponent_BuildUsageMeteringEvent_Call {
-	return &MockOpenAIComponent_BuildUsageMeteringEvent_Call{Call: _e.mock.On("BuildUsageMeteringEvent", c, nsUUID, model, targetModelName, usage, apikey)}
+//   - tokenID int64
+func (_e *MockOpenAIComponent_Expecter) BuildUsageMeteringEvent(c interface{}, nsUUID interface{}, model interface{}, targetModelName interface{}, usage interface{}, tokenID interface{}) *MockOpenAIComponent_BuildUsageMeteringEvent_Call {
+	return &MockOpenAIComponent_BuildUsageMeteringEvent_Call{Call: _e.mock.On("BuildUsageMeteringEvent", c, nsUUID, model, targetModelName, usage, tokenID)}
 }
 
-func (_c *MockOpenAIComponent_BuildUsageMeteringEvent_Call) Run(run func(c context.Context, nsUUID string, model *types.Model, targetModelName string, usage *token.Usage, apikey string)) *MockOpenAIComponent_BuildUsageMeteringEvent_Call {
+func (_c *MockOpenAIComponent_BuildUsageMeteringEvent_Call) Run(run func(c context.Context, nsUUID string, model *types.Model, targetModelName string, usage *token.Usage, tokenID int64)) *MockOpenAIComponent_BuildUsageMeteringEvent_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(*types.Model), args[3].(string), args[4].(*token.Usage), args[5].(string))
+		run(args[0].(context.Context), args[1].(string), args[2].(*types.Model), args[3].(string), args[4].(*token.Usage), args[5].(int64))
 	})
 	return _c
 }
@@ -136,7 +181,7 @@ func (_c *MockOpenAIComponent_BuildUsageMeteringEvent_Call) Return(_a0 *commonty
 	return _c
 }
 
-func (_c *MockOpenAIComponent_BuildUsageMeteringEvent_Call) RunAndReturn(run func(context.Context, string, *types.Model, string, *token.Usage, string) (*commontypes.MeteringEvent, error)) *MockOpenAIComponent_BuildUsageMeteringEvent_Call {
+func (_c *MockOpenAIComponent_BuildUsageMeteringEvent_Call) RunAndReturn(run func(context.Context, string, *types.Model, string, *token.Usage, int64) (*commontypes.MeteringEvent, error)) *MockOpenAIComponent_BuildUsageMeteringEvent_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -589,17 +634,17 @@ func (_c *MockOpenAIComponent_ListModels_Call) RunAndReturn(run func(context.Con
 	return _c
 }
 
-// RecordUsage provides a mock function with given fields: c, nsUUID, model, targetModelName, tokenCounter, apikey, tokenID
-func (_m *MockOpenAIComponent) RecordUsage(c context.Context, nsUUID string, model *types.Model, targetModelName string, tokenCounter token.Counter, apikey string, tokenID int64) error {
-	ret := _m.Called(c, nsUUID, model, targetModelName, tokenCounter, apikey, tokenID)
+// RecordUsage provides a mock function with given fields: c, nsUUID, model, targetModelName, tokenCounter, tokenID
+func (_m *MockOpenAIComponent) RecordUsage(c context.Context, nsUUID string, model *types.Model, targetModelName string, tokenCounter token.Counter, tokenID int64) error {
+	ret := _m.Called(c, nsUUID, model, targetModelName, tokenCounter, tokenID)
 
 	if len(ret) == 0 {
 		panic("no return value specified for RecordUsage")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, *types.Model, string, token.Counter, string, int64) error); ok {
-		r0 = rf(c, nsUUID, model, targetModelName, tokenCounter, apikey, tokenID)
+	if rf, ok := ret.Get(0).(func(context.Context, string, *types.Model, string, token.Counter, int64) error); ok {
+		r0 = rf(c, nsUUID, model, targetModelName, tokenCounter, tokenID)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -618,15 +663,14 @@ type MockOpenAIComponent_RecordUsage_Call struct {
 //   - model *types.Model
 //   - targetModelName string
 //   - tokenCounter token.Counter
-//   - apikey string
 //   - tokenID int64
-func (_e *MockOpenAIComponent_Expecter) RecordUsage(c interface{}, nsUUID interface{}, model interface{}, targetModelName interface{}, tokenCounter interface{}, apikey interface{}, tokenID interface{}) *MockOpenAIComponent_RecordUsage_Call {
-	return &MockOpenAIComponent_RecordUsage_Call{Call: _e.mock.On("RecordUsage", c, nsUUID, model, targetModelName, tokenCounter, apikey, tokenID)}
+func (_e *MockOpenAIComponent_Expecter) RecordUsage(c interface{}, nsUUID interface{}, model interface{}, targetModelName interface{}, tokenCounter interface{}, tokenID interface{}) *MockOpenAIComponent_RecordUsage_Call {
+	return &MockOpenAIComponent_RecordUsage_Call{Call: _e.mock.On("RecordUsage", c, nsUUID, model, targetModelName, tokenCounter, tokenID)}
 }
 
-func (_c *MockOpenAIComponent_RecordUsage_Call) Run(run func(c context.Context, nsUUID string, model *types.Model, targetModelName string, tokenCounter token.Counter, apikey string, tokenID int64)) *MockOpenAIComponent_RecordUsage_Call {
+func (_c *MockOpenAIComponent_RecordUsage_Call) Run(run func(c context.Context, nsUUID string, model *types.Model, targetModelName string, tokenCounter token.Counter, tokenID int64)) *MockOpenAIComponent_RecordUsage_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(*types.Model), args[3].(string), args[4].(token.Counter), args[5].(string), args[6].(int64))
+		run(args[0].(context.Context), args[1].(string), args[2].(*types.Model), args[3].(string), args[4].(token.Counter), args[5].(int64))
 	})
 	return _c
 }
@@ -636,22 +680,22 @@ func (_c *MockOpenAIComponent_RecordUsage_Call) Return(_a0 error) *MockOpenAICom
 	return _c
 }
 
-func (_c *MockOpenAIComponent_RecordUsage_Call) RunAndReturn(run func(context.Context, string, *types.Model, string, token.Counter, string, int64) error) *MockOpenAIComponent_RecordUsage_Call {
+func (_c *MockOpenAIComponent_RecordUsage_Call) RunAndReturn(run func(context.Context, string, *types.Model, string, token.Counter, int64) error) *MockOpenAIComponent_RecordUsage_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// RecordUsageFromTokenUsage provides a mock function with given fields: c, nsUUID, model, targetModelName, usage, apikey, tokenID
-func (_m *MockOpenAIComponent) RecordUsageFromTokenUsage(c context.Context, nsUUID string, model *types.Model, targetModelName string, usage *token.Usage, apikey string, tokenID int64) error {
-	ret := _m.Called(c, nsUUID, model, targetModelName, usage, apikey, tokenID)
+// RecordUsageFromTokenUsage provides a mock function with given fields: c, nsUUID, model, targetModelName, usage, tokenID
+func (_m *MockOpenAIComponent) RecordUsageFromTokenUsage(c context.Context, nsUUID string, model *types.Model, targetModelName string, usage *token.Usage, tokenID int64) error {
+	ret := _m.Called(c, nsUUID, model, targetModelName, usage, tokenID)
 
 	if len(ret) == 0 {
 		panic("no return value specified for RecordUsageFromTokenUsage")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, *types.Model, string, *token.Usage, string, int64) error); ok {
-		r0 = rf(c, nsUUID, model, targetModelName, usage, apikey, tokenID)
+	if rf, ok := ret.Get(0).(func(context.Context, string, *types.Model, string, *token.Usage, int64) error); ok {
+		r0 = rf(c, nsUUID, model, targetModelName, usage, tokenID)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -670,15 +714,14 @@ type MockOpenAIComponent_RecordUsageFromTokenUsage_Call struct {
 //   - model *types.Model
 //   - targetModelName string
 //   - usage *token.Usage
-//   - apikey string
 //   - tokenID int64
-func (_e *MockOpenAIComponent_Expecter) RecordUsageFromTokenUsage(c interface{}, nsUUID interface{}, model interface{}, targetModelName interface{}, usage interface{}, apikey interface{}, tokenID interface{}) *MockOpenAIComponent_RecordUsageFromTokenUsage_Call {
-	return &MockOpenAIComponent_RecordUsageFromTokenUsage_Call{Call: _e.mock.On("RecordUsageFromTokenUsage", c, nsUUID, model, targetModelName, usage, apikey, tokenID)}
+func (_e *MockOpenAIComponent_Expecter) RecordUsageFromTokenUsage(c interface{}, nsUUID interface{}, model interface{}, targetModelName interface{}, usage interface{}, tokenID interface{}) *MockOpenAIComponent_RecordUsageFromTokenUsage_Call {
+	return &MockOpenAIComponent_RecordUsageFromTokenUsage_Call{Call: _e.mock.On("RecordUsageFromTokenUsage", c, nsUUID, model, targetModelName, usage, tokenID)}
 }
 
-func (_c *MockOpenAIComponent_RecordUsageFromTokenUsage_Call) Run(run func(c context.Context, nsUUID string, model *types.Model, targetModelName string, usage *token.Usage, apikey string, tokenID int64)) *MockOpenAIComponent_RecordUsageFromTokenUsage_Call {
+func (_c *MockOpenAIComponent_RecordUsageFromTokenUsage_Call) Run(run func(c context.Context, nsUUID string, model *types.Model, targetModelName string, usage *token.Usage, tokenID int64)) *MockOpenAIComponent_RecordUsageFromTokenUsage_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(*types.Model), args[3].(string), args[4].(*token.Usage), args[5].(string), args[6].(int64))
+		run(args[0].(context.Context), args[1].(string), args[2].(*types.Model), args[3].(string), args[4].(*token.Usage), args[5].(int64))
 	})
 	return _c
 }
@@ -688,7 +731,66 @@ func (_c *MockOpenAIComponent_RecordUsageFromTokenUsage_Call) Return(_a0 error) 
 	return _c
 }
 
-func (_c *MockOpenAIComponent_RecordUsageFromTokenUsage_Call) RunAndReturn(run func(context.Context, string, *types.Model, string, *token.Usage, string, int64) error) *MockOpenAIComponent_RecordUsageFromTokenUsage_Call {
+func (_c *MockOpenAIComponent_RecordUsageFromTokenUsage_Call) RunAndReturn(run func(context.Context, string, *types.Model, string, *token.Usage, int64) error) *MockOpenAIComponent_RecordUsageFromTokenUsage_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ResolveAutoModel provides a mock function with given fields: c, req
+func (_m *MockOpenAIComponent) ResolveAutoModel(c context.Context, req types.AutoRouteRequest) (*types.AutoRouteDecision, error) {
+	ret := _m.Called(c, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ResolveAutoModel")
+	}
+
+	var r0 *types.AutoRouteDecision
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.AutoRouteRequest) (*types.AutoRouteDecision, error)); ok {
+		return rf(c, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.AutoRouteRequest) *types.AutoRouteDecision); ok {
+		r0 = rf(c, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*types.AutoRouteDecision)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.AutoRouteRequest) error); ok {
+		r1 = rf(c, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockOpenAIComponent_ResolveAutoModel_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ResolveAutoModel'
+type MockOpenAIComponent_ResolveAutoModel_Call struct {
+	*mock.Call
+}
+
+// ResolveAutoModel is a helper method to define mock.On call
+//   - c context.Context
+//   - req types.AutoRouteRequest
+func (_e *MockOpenAIComponent_Expecter) ResolveAutoModel(c interface{}, req interface{}) *MockOpenAIComponent_ResolveAutoModel_Call {
+	return &MockOpenAIComponent_ResolveAutoModel_Call{Call: _e.mock.On("ResolveAutoModel", c, req)}
+}
+
+func (_c *MockOpenAIComponent_ResolveAutoModel_Call) Run(run func(c context.Context, req types.AutoRouteRequest)) *MockOpenAIComponent_ResolveAutoModel_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.AutoRouteRequest))
+	})
+	return _c
+}
+
+func (_c *MockOpenAIComponent_ResolveAutoModel_Call) Return(_a0 *types.AutoRouteDecision, _a1 error) *MockOpenAIComponent_ResolveAutoModel_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockOpenAIComponent_ResolveAutoModel_Call) RunAndReturn(run func(context.Context, types.AutoRouteRequest) (*types.AutoRouteDecision, error)) *MockOpenAIComponent_ResolveAutoModel_Call {
 	_c.Call.Return(run)
 	return _c
 }

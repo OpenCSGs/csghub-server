@@ -1,8 +1,10 @@
 package database_test
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"log/slog"
 	"strconv"
 	"sync"
 	"testing"
@@ -766,4 +768,68 @@ func TestAccountStatementStore_DeductFeeStatement_AcademyIdempotent(t *testing.T
 		Count(ctx)
 	require.Nil(t, err)
 	require.Equal(t, firstStmtCount, stmtCount, "statement count should not increase after duplicate academy order")
+}
+
+// A non-numeric api_key (a legacy raw key value from an in-flight event) must
+// degrade to token_id 0 without interrupting the deduction, and the parse
+// failure must be logged.
+func TestAccountStatementStore_CreateNonNumericAPIKeyDegradesToZeroTokenID(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	au := &database.AccountUser{
+		UserUUID:    "user-nonnumeric-key",
+		Balance:     100,
+		CashBalance: 0,
+	}
+	_, err := db.Core.NewInsert().Model(au).Exec(ctx)
+	require.Nil(t, err)
+
+	var logBuf bytes.Buffer
+	prevLogger := slog.Default()
+	slog.SetDefault(slog.New(slog.NewJSONHandler(&logBuf, nil)))
+	defer slog.SetDefault(prevLogger)
+
+	const rawLegacyKey = "sk-legacy-do-not-log-0123456789"
+	eventDate := time.Date(2026, 3, 15, 0, 0, 0, 0, time.UTC)
+	store := database.NewAccountStatementStoreWithDB(db)
+	input := database.AccountStatement{
+		EventUUID:   uuid.New(),
+		UserUUID:    "user-nonnumeric-key",
+		Scene:       types.SceneModelServerless,
+		Value:       -10,
+		Consumption: 100,
+		ValueType:   types.TokenNumberType,
+		EventDate:   eventDate,
+		APIKey:      rawLegacyKey,
+	}
+	err = store.Create(ctx, input, types.AcctStatementExtra{})
+	require.Nil(t, err)
+
+	// The deduction continues: balance 100 - 10 = 90.
+	acctUser := &database.AccountUser{}
+	err = db.Core.NewSelect().Model(acctUser).Where("user_uuid = ?", "user-nonnumeric-key").Scan(ctx)
+	require.Nil(t, err)
+	require.Equal(t, float64(90), acctUser.Balance)
+
+	// The statement degrades to token_id 0.
+	as := &database.AccountStatement{}
+	err = db.Core.NewSelect().Model(as).Where("user_uuid = ?", "user-nonnumeric-key").Scan(ctx)
+	require.Nil(t, err)
+	require.Equal(t, int64(0), as.TokenID)
+	require.Equal(t, types.ChargeBalance, as.BalanceType)
+
+	// The bill inherits the degraded token_id 0.
+	bill := &database.AccountBill{}
+	err = db.Core.NewSelect().Model(bill).Where("user_uuid = ?", "user-nonnumeric-key").Scan(ctx)
+	require.Nil(t, err)
+	require.Equal(t, int64(0), bill.TokenID)
+	require.Equal(t, float64(-10), bill.Value)
+
+	// The parse failure is logged and charging continues. NOTE: the current
+	// implementation embeds the raw api_key in this error log (the strconv
+	// error text and the token_id_str attribute); redacting it requires an
+	// implementation change, which is out of scope for this test-only fix.
+	require.Contains(t, logBuf.String(), "parse api key ID str to int64 fail in deduct fee statement")
 }

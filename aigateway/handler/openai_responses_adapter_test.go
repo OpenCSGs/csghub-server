@@ -37,12 +37,12 @@ func TestExecuteAdapterResponsesSetsStreamHeader(t *testing.T) {
 	}
 	tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "adapter-model").Return(model, nil).Maybe()
 	tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil).Maybe()
-	tester.mocks.openAIComp.EXPECT().RecordUsageFromTokenUsage(mock.Anything, mock.Anything, model, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
+	tester.mocks.openAIComp.EXPECT().RecordUsageFromTokenUsage(mock.Anything, mock.Anything, model, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 
 	req := &types.ResponsesRequest{Model: "adapter-model", Input: json.RawMessage(`"hi"`), Stream: true}
 	modelTarget := &resolvedModelTarget{Model: model, ModelName: "upstream-model", Target: upstream.URL + "/v1/chat/completions", Host: upstream.URL}
 
-	tester.handler.executeAdapterResponses(c, req, modelTarget, "testuuid", "apikey", "adapter-model", nil, nil, nil, nil)
+	tester.handler.executeAdapterResponses(c, req, modelTarget, "testuuid", "adapter-model", nil, nil, nil, nil)
 
 	require.Equal(t, "text/event-stream", c.Writer.Header().Get("Content-Type"))
 }
@@ -70,12 +70,12 @@ func TestExecuteAdapterResponsesStreamPassthroughUpstreamJSONError(t *testing.T)
 			ModelName: "upstream-model",
 		}},
 	}
-	tester.mocks.openAIComp.EXPECT().RecordUsageFromTokenUsage(mock.Anything, mock.Anything, model, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
+	tester.mocks.openAIComp.EXPECT().RecordUsageFromTokenUsage(mock.Anything, mock.Anything, model, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 
 	req := &types.ResponsesRequest{Model: "adapter-model", Input: json.RawMessage(`"hi"`), Stream: true}
 	modelTarget := &resolvedModelTarget{Model: model, ModelName: "upstream-model", Target: upstream.URL + "/v1/chat/completions", Host: upstream.URL}
 
-	tester.handler.executeAdapterResponses(c, req, modelTarget, "testuuid", "apikey", "adapter-model", nil, nil, nil, nil)
+	tester.handler.executeAdapterResponses(c, req, modelTarget, "testuuid", "adapter-model", nil, nil, nil, nil)
 
 	require.Equal(t, http.StatusTooManyRequests, w.Code)
 	require.Equal(t, "application/json", w.Header().Get("Content-Type"))

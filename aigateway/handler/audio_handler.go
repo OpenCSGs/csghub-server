@@ -122,7 +122,6 @@ func (h *audioPipelineHandler) Extract(c *gin.Context) (*types.RequestMetadata, 
 		Model:         modelID,
 		TenantID:      nsUUID,
 		UserID:        username,
-		APIKeyID:      httpbase.GetAccessToken(c),
 		PriorityScope: httpbase.GetAPIKeyPriorityScope(c),
 		Streaming:     isStream,
 		Headers:       c.Request.Header,
@@ -135,7 +134,6 @@ func (h *audioPipelineHandler) Extract(c *gin.Context) (*types.RequestMetadata, 
 func (h *audioPipelineHandler) Execute(c *gin.Context, meta *types.RequestMetadata, p *types.RequestPlan) error {
 	ctx := c.Request.Context()
 	nsUUID := meta.TenantID
-	apikey := meta.APIKeyID
 	requestID := commontrace.GetTraceIDInGinContext(c)
 
 	if pt := plan.GetPreflightTracer(c); pt != nil {
@@ -243,7 +241,7 @@ func (h *audioPipelineHandler) Execute(c *gin.Context, meta *types.RequestMetada
 
 		if isSuccessfulStatus(w.StatusCode()) && usage != nil {
 			tokenID := httpbase.GetCurrentTokenID(c)
-			if err := h.handler.openaiComponent.RecordUsageFromTokenUsage(usageCtx, nsUUID, mt.Model, mt.ModelName, usage, apikey, tokenID); err != nil {
+			if err := h.handler.openaiComponent.RecordUsageFromTokenUsage(usageCtx, nsUUID, mt.Model, mt.ModelName, usage, tokenID); err != nil {
 				slog.ErrorContext(usageCtx, "failed to record audio transcription usage", slog.Any("error", err))
 			}
 		}

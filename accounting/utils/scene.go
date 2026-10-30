@@ -112,13 +112,12 @@ func IsNeedCheckMeteringInMinute(scene types.SceneType, valueType types.ChargeVa
 }
 
 func IsNeedCheckUserSubscription(scene types.SceneType) bool {
+	// to check user subscription for hardware compute resource
 	switch types.SceneType(scene) {
 	case types.SceneModelInference,
 		types.SceneSpace,
 		types.SceneModelFinetune,
-		types.SceneEvaluation,
-		types.SceneModelServerless,
-		types.SceneStarship:
+		types.SceneEvaluation:
 		return true
 	default:
 		return false

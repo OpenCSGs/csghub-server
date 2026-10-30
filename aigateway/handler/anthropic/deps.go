@@ -52,7 +52,7 @@ type ProxyExecutor interface {
 
 // UsageRecorder records token usage for billing/metering.
 type UsageRecorder interface {
-	RecordUsage(ctx context.Context, nsUUID string, model *types.Model, targetModelName string, usage *token.Usage, apikey string, tokenID int64) error
+	RecordUsage(ctx context.Context, nsUUID string, model *types.Model, targetModelName string, usage *token.Usage, tokenID int64) error
 }
 
 // AdmissionFinalizer closes the capacity admission lease after the upstream
@@ -117,7 +117,6 @@ type SensitiveResult struct {
 // the upstream response completes.  It mirrors handler.runChatPostProcessAsync.
 type postProcessInput struct {
 	NSUUID          string
-	ApiKey          string
 	TokenID         int64
 	Model           *types.Model
 	TargetModelName string

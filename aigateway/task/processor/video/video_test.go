@@ -35,15 +35,23 @@ func (c *fakeOpenAIComponent) GetModelByID(ctx context.Context, nsUUID, modelID 
 	return c.model, nil
 }
 
-func (c *fakeOpenAIComponent) RecordUsage(ctx context.Context, nsUUID string, model *aigwtypes.Model, targetModelName string, tokenCounter token.Counter, apikey string, tokenID int64) error {
+func (c *fakeOpenAIComponent) AutoModelID() string {
+	return ""
+}
+
+func (c *fakeOpenAIComponent) ResolveAutoModel(ctx context.Context, req aigwtypes.AutoRouteRequest) (*aigwtypes.AutoRouteDecision, error) {
+	return nil, nil
+}
+
+func (c *fakeOpenAIComponent) RecordUsage(ctx context.Context, nsUUID string, model *aigwtypes.Model, targetModelName string, tokenCounter token.Counter, tokenID int64) error {
 	return nil
 }
 
-func (c *fakeOpenAIComponent) RecordUsageFromTokenUsage(ctx context.Context, nsUUID string, model *aigwtypes.Model, targetModelName string, usage *token.Usage, apikey string, tokenID int64) error {
+func (c *fakeOpenAIComponent) RecordUsageFromTokenUsage(ctx context.Context, nsUUID string, model *aigwtypes.Model, targetModelName string, usage *token.Usage, tokenID int64) error {
 	return nil
 }
 
-func (c *fakeOpenAIComponent) BuildUsageMeteringEvent(ctx context.Context, nsUUID string, model *aigwtypes.Model, targetModelName string, usage *token.Usage, apikey string) (*commontypes.MeteringEvent, error) {
+func (c *fakeOpenAIComponent) BuildUsageMeteringEvent(ctx context.Context, nsUUID string, model *aigwtypes.Model, targetModelName string, usage *token.Usage, tokenID int64) (*commontypes.MeteringEvent, error) {
 	return nil, nil
 }
 

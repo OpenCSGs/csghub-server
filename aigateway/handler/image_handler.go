@@ -140,7 +140,6 @@ func (h *imagePipelineHandler) Extract(c *gin.Context) (*types.RequestMetadata, 
 			Model:         modelID,
 			TenantID:      nsUUID,
 			UserID:        username,
-			APIKeyID:      httpbase.GetAccessToken(c),
 			PriorityScope: httpbase.GetAPIKeyPriorityScope(c),
 			Streaming:     false,
 			Headers:       c.Request.Header,
@@ -168,7 +167,6 @@ func (h *imagePipelineHandler) Extract(c *gin.Context) (*types.RequestMetadata, 
 		Model:         req.Model,
 		TenantID:      nsUUID,
 		UserID:        username,
-		APIKeyID:      httpbase.GetAccessToken(c),
 		PriorityScope: httpbase.GetAPIKeyPriorityScope(c),
 		Streaming:     false,
 		Headers:       c.Request.Header,
@@ -181,7 +179,6 @@ func (h *imagePipelineHandler) Extract(c *gin.Context) (*types.RequestMetadata, 
 func (h *imagePipelineHandler) Execute(c *gin.Context, meta *types.RequestMetadata, p *types.RequestPlan) error {
 	ctx := c.Request.Context()
 	nsUUID := meta.TenantID
-	apikey := meta.APIKeyID
 	requestID := commontrace.GetTraceIDInGinContext(c)
 
 	if pt := plan.GetPreflightTracer(c); pt != nil {
@@ -260,12 +257,12 @@ func (h *imagePipelineHandler) Execute(c *gin.Context, meta *types.RequestMetada
 	}
 
 	if parsed.IsEdit {
-		return h.executeEditImage(c, ctx, nsUUID, meta.Model, meta.UserID, mt, parsed, generationRecorder, apikey)
+		return h.executeEditImage(c, ctx, nsUUID, meta.Model, meta.UserID, mt, parsed, generationRecorder)
 	}
-	return h.executeGenerateImage(c, ctx, nsUUID, meta.Model, meta.UserID, mt, parsed.GenerateReq, generationRecorder, apikey)
+	return h.executeGenerateImage(c, ctx, nsUUID, meta.Model, meta.UserID, mt, parsed.GenerateReq, generationRecorder)
 }
 
-func (h *imagePipelineHandler) executeGenerateImage(c *gin.Context, ctx context.Context, nsUUID, modelID, userID string, mt *types.ModelTarget, req *types.ImageGenerationRequest, generationRecorder llmtrace.GenerationRecorder, apikey string) error {
+func (h *imagePipelineHandler) executeGenerateImage(c *gin.Context, ctx context.Context, nsUUID, modelID, userID string, mt *types.ModelTarget, req *types.ImageGenerationRequest, generationRecorder llmtrace.GenerationRecorder) error {
 	adapter := h.handler.t2iRegistry.GetAdapter(mt.Model)
 	if adapter == nil {
 		finishModalGenerationTraceWithError(generationRecorder, fmt.Errorf("no adapter for model '%s'", modelID), types.TraceErrUpstreamUnavailable)
@@ -333,11 +330,11 @@ func (h *imagePipelineHandler) executeGenerateImage(c *gin.Context, ctx context.
 	}
 
 	rp.ServeHTTP(w, c.Request, proxyToApi, mt.Host)
-	h.finishImageTrace(c, ctx, nsUUID, apikey, mt, imageWrapper, imageCounter, generationRecorder)
+	h.finishImageTrace(c, ctx, nsUUID, mt, imageWrapper, imageCounter, generationRecorder)
 	return nil
 }
 
-func (h *imagePipelineHandler) executeEditImage(c *gin.Context, ctx context.Context, nsUUID, modelID, userID string, mt *types.ModelTarget, parsed *imageParsedBody, generationRecorder llmtrace.GenerationRecorder, apikey string) error {
+func (h *imagePipelineHandler) executeEditImage(c *gin.Context, ctx context.Context, nsUUID, modelID, userID string, mt *types.ModelTarget, parsed *imageParsedBody, generationRecorder llmtrace.GenerationRecorder) error {
 	body, contentType, err := rebuildImageEditMultipartBody(parsed.Form, mt.ModelName)
 	if err != nil {
 		finishModalGenerationTraceWithError(generationRecorder, err, types.TraceErrUpstreamUnavailable)
@@ -378,13 +375,13 @@ func (h *imagePipelineHandler) executeEditImage(c *gin.Context, ctx context.Cont
 	}
 
 	rp.ServeHTTP(w, c.Request, proxyToApi, mt.Host)
-	h.finishImageTrace(c, ctx, nsUUID, apikey, mt, imageWrapper, imageCounter, generationRecorder)
+	h.finishImageTrace(c, ctx, nsUUID, mt, imageWrapper, imageCounter, generationRecorder)
 	return nil
 }
 
 // finishImageTrace handles Finalize + async usage recording shared by both
 // generate and edit image.
-func (h *imagePipelineHandler) finishImageTrace(c *gin.Context, ctx context.Context, nsUUID, apikey string, mt *types.ModelTarget, imageWrapper *wrapper.ImageGeneration, imageCounter *token.ImageUsageCounter, generationRecorder llmtrace.GenerationRecorder) {
+func (h *imagePipelineHandler) finishImageTrace(c *gin.Context, ctx context.Context, nsUUID string, mt *types.ModelTarget, imageWrapper *wrapper.ImageGeneration, imageCounter *token.ImageUsageCounter, generationRecorder llmtrace.GenerationRecorder) {
 	if err := imageWrapper.Finalize(); err != nil {
 		finishModalGenerationTraceWithError(generationRecorder, err, types.TraceErrUpstreamError)
 		slog.ErrorContext(ctx, "failed to finalize image response", slog.Any("error", err))
@@ -424,7 +421,7 @@ func (h *imagePipelineHandler) finishImageTrace(c *gin.Context, ctx context.Cont
 		}
 		if isSuccessfulStatus(imageWrapper.StatusCode()) && usage != nil {
 			tokenID := httpbase.GetCurrentTokenID(c)
-			if err := h.handler.openaiComponent.RecordUsageFromTokenUsage(usageCtx, nsUUID, mt.Model, mt.ModelName, usage, apikey, tokenID); err != nil {
+			if err := h.handler.openaiComponent.RecordUsageFromTokenUsage(usageCtx, nsUUID, mt.Model, mt.ModelName, usage, tokenID); err != nil {
 				slog.ErrorContext(usageCtx, "failed to record image usage", slog.Any("error", err))
 			}
 		}
