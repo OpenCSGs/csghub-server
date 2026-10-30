@@ -608,6 +608,7 @@ func (c *mcpServerComponentImpl) addWeightsToMCP(ctx context.Context, repoID int
 	}
 }
 
+// Deploy creates an MCP space after checking source access and destination namespace authorization.
 func (m *mcpServerComponentImpl) Deploy(ctx context.Context, req *types.DeployMCPServerReq) (*types.Space, error) {
 	mcpServer, err := m.mcpServerStore.ByPath(ctx, req.MCPRepo.Namespace, req.MCPRepo.Name)
 	if err != nil {
@@ -658,10 +659,7 @@ func (m *mcpServerComponentImpl) Deploy(ctx context.Context, req *types.DeployMC
 		return nil, errorx.ErrNoEmail
 	}
 
-	dbUser := database.User{}
-	dbUser.SetRoles(user.Roles)
-
-	if !dbUser.CanAdmin() {
+	if !user.IsSuperAdmin() {
 		canWrite, err := m.repoComponent.CheckCurrentUserPermission(ctx, req.Username, req.Namespace, rebac.NamespaceCanWrite)
 		if err != nil {
 			return nil, fmt.Errorf("failed to check user %s permission for namespace %s, error: %w", req.CurrentUser, req.Namespace, err)

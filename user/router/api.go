@@ -15,6 +15,7 @@ import (
 	"opencsg.com/csghub-server/user/handler"
 )
 
+// NewRouter registers user APIs and independently authorizes proxied administrator requests.
 func NewRouter(config *config.Config) (*gin.Engine, error) {
 	r := gin.New()
 	middleware.SetInfraMiddleware(r, config, instrumentation.User)
@@ -70,7 +71,6 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 		apiV1Group.GET("/callback/casdoor", userHandler.Casdoor)
 		//user
 		userGroup.GET("/:username", userHandler.Get)
-		userGroup.DELETE("/:username", userHandler.Delete)
 		// find user by uuids
 		apiV1Group.GET("/users/by-uuids", userHandler.FindByUUIDs)
 		userGroup.DELETE("/:username/close_account", userHandler.CloseAccount)
@@ -113,11 +113,18 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 	middlewareCollection.Auth.NeedAPIKey = needAPIKey
 	middlewareCollection.Auth.NeedLogin = mustLogin()
 	middlewareCollection.Auth.NeedAdmin = needAdmin(userHandler)
+	middlewareCollection.Auth.PlatformAdmin = middleware.NewPlatformAdmin()
+	createAdminUserRoutes(apiV1Group, middlewareCollection, userHandler)
+	createAdminCommonUserRoutes(apiV1Group, middlewareCollection, userHandler)
+	createAdminCommonJWTRoutes(apiV1Group, middlewareCollection, jwtHandler)
+	createAdminOrganizationVerificationRoutes(apiV1Group, middlewareCollection, orgHandler)
+	createAdminOrganizationQueryRoutes(apiV1Group, middlewareCollection, orgHandler)
+	createAdminBillingOrganizationRoutes(apiV1Group, middlewareCollection, orgHandler)
 	if err := extendRoutes(apiV1Group, middlewareCollection, config, userHandler); err != nil {
 		return nil, fmt.Errorf("error extending routes:%w", err)
 	}
 	apiV1Group.GET("/namespaces/mine/writable", mustLogin(), orgHandler.ListCurrentUserWritableNamespaces)
-	adminGroup.POST("/namespaces/lookup", middlewareCollection.Auth.NeedAdmin, nsCtrl.GetInfoByUUIDs)
+	createAdminNamespaceLookupRoute(adminGroup, middlewareCollection, nsCtrl.GetInfoByUUIDs)
 
 	apiV1Group.Use(mustLogin())
 	userMatch := userMatch()
@@ -134,23 +141,18 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 		userGroup.GET("/:username/tokens/first", userMatch, acHandler.GetOrCreateFirstAvaiTokens)
 		// get user list
 		apiV1Group.GET("/users", mustLogin(), userHandler.Index)
-		// export user info
-		apiV1Group.GET("/users/stream-export", mustLogin(), userHandler.ExportUserInfo)
-
-		// user labels
-		userGroup.PUT("/labels", mustLogin(), userHandler.UpdateUserLabels)
 		// get user's email addresses
 		userGroup.GET("/emails", mustLogin(), userHandler.GetEmails)
 	}
 	// routers for user verify
 	{
 		userGroup.POST("/verify", mustLogin(), userHandler.CreateVerify)
-		userGroup.PUT("/verify/:id", mustLogin(), userHandler.UpdateVerify)
 		userGroup.GET("/verify/:id", mustLogin(), userHandler.GetVerify)
 	}
 	// Legacy organization mutations and membership APIs are unavailable in hierarchy mode.
 	if !config.IsHierarchicalOrganization() {
 		apiV1Group.POST("/organizations", orgHandler.Create)
+		createAdminOrganizationCreateRoute(apiV1Group, middlewareCollection, orgHandler.Create)
 		apiV1Group.PUT("/organization/:namespace", orgHandler.Update)
 		apiV1Group.DELETE("/organization/:namespace", orgHandler.Delete)
 		apiV1Group.GET("/organization/:namespace/members/:username", userMatch, memberCtrl.GetMemberRole)
@@ -162,7 +164,6 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 	// routers for organization verify
 	{
 		apiV1Group.POST("/organization/verify", mustLogin(), orgHandler.CreateVerify)
-		apiV1Group.PUT("/organization/verify/:id", mustLogin(), orgHandler.UpdateVerify)
 		apiV1Group.GET("/organization/verify/:namespace", orgHandler.GetVerify)
 	}
 	keysGroup := apiV1Group.Group("/namespaces")

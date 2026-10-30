@@ -34,6 +34,10 @@ type OrganizationComponent interface {
 	// ListCurrentUserWritableNamespaces returns namespaces where the current user can write.
 	ListCurrentUserWritableNamespaces(ctx context.Context, currentUser string) ([]types.WritableNamespace, error)
 	Get(ctx context.Context, orgName string) (*types.Organization, error)
+	// OrganizationChoices lists minimal organization candidates for independently authorized submodules.
+	OrganizationChoices(ctx context.Context, req types.OrganizationChoiceListRequest) ([]types.OrganizationChoice, int, error)
+	// OrganizationChoice resolves one voucher recipient with no organization detail projection.
+	OrganizationChoice(ctx context.Context, orgName string) (*types.OrganizationChoice, error)
 	GetByUUID(ctx context.Context, uuid string) (*types.Organization, error)
 	Delete(ctx context.Context, req *types.DeleteOrgReq) error
 	Update(ctx context.Context, req *types.EditOrgReq) (*database.Organization, error)
@@ -632,6 +636,41 @@ func (c *organizationComponentImpl) toOrgList(ctx context.Context, dborgs []data
 		orgs = append(orgs, org)
 	}
 	return orgs, nil
+}
+
+// OrganizationChoices preserves search filters without loading tags or projecting organization details.
+func (c *organizationComponentImpl) OrganizationChoices(ctx context.Context, req types.OrganizationChoiceListRequest) ([]types.OrganizationChoice, int, error) {
+	organizations, total, err := c.orgStore.Search(ctx, req.Search, req.Per, req.Page, req.OrgType, req.VerifyStatus, req.Tag)
+	if err != nil {
+		return nil, total, fmt.Errorf("find organization choices: %w", err)
+	}
+	choices := make([]types.OrganizationChoice, 0, len(organizations))
+	for i := range organizations {
+		choices = append(choices, buildOrganizationChoice(&organizations[i]))
+	}
+	return choices, total, nil
+}
+
+// OrganizationChoice returns only the identity needed to select an organization voucher recipient.
+func (c *organizationComponentImpl) OrganizationChoice(ctx context.Context, orgName string) (*types.OrganizationChoice, error) {
+	organization, err := c.orgStore.FindByPath(ctx, orgName)
+	if err != nil {
+		return nil, fmt.Errorf("find organization choice: %w", err)
+	}
+	choice := buildOrganizationChoice(&organization)
+	return &choice, nil
+}
+
+// buildOrganizationChoice shares the same minimal projection between organization lists and details.
+func buildOrganizationChoice(organization *database.Organization) types.OrganizationChoice {
+	choice := types.OrganizationChoice{
+		Name: organization.Name, Nickname: organization.Nickname, Logo: organization.Logo,
+		UUID: organization.UUID, IsHierarchical: organization.IsHierarchical,
+	}
+	if organization.Namespace != nil {
+		choice.Namespace = &types.NamespaceChoice{Path: organization.Namespace.Path, Type: string(organization.Namespace.NamespaceType), UUID: organization.Namespace.UUID}
+	}
+	return choice
 }
 
 func (c *organizationComponentImpl) Get(ctx context.Context, orgName string) (*types.Organization, error) {

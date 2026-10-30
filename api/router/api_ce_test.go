@@ -37,3 +37,16 @@ func TestAddOrgRoutes_CE(t *testing.T) {
 	assertNoRoute(t, engine.Routes(), http.MethodGet, "/api/v1/:repo_type/:namespace/:name/authorization/inheritance")
 	require.Empty(t, engine.Routes())
 }
+
+// TestSystemConfigSelectorRoutesAbsent_CE verifies CE does not expose edition-specific system configuration routes.
+func TestSystemConfigSelectorRoutesAbsent_CE(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	engine := gin.New()
+	apiGroup := engine.Group("/api/v1")
+
+	createAdminSystemConfigSelectorRoutes(apiGroup, middleware.MiddlewareCollection{}, &handler.ModelHandler{}, &handler.TagsHandler{}, &handler.AccountingHandler{})
+
+	assertNoRoute(t, engine.Routes(), http.MethodGet, "/api/v1/admin/system/system_config/models")
+	assertNoRoute(t, engine.Routes(), http.MethodGet, "/api/v1/admin/system/system_config/tags")
+	require.Empty(t, engine.Routes())
+}

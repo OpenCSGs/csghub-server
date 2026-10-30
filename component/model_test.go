@@ -919,7 +919,7 @@ func TestModelComponent_SetRelationDatasets(t *testing.T) {
 	mc := initializeTestModelComponent(ctx, t)
 
 	mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{
-		RoleMask: "admin",
+		RoleAssignments: superAdminRoleAssignments(),
 	}, nil)
 	mc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "ns", "n").Return(
 		&database.Repository{}, nil,
@@ -955,7 +955,7 @@ func TestModelComponent_AddRelationDataset(t *testing.T) {
 	mc := initializeTestModelComponent(ctx, t)
 
 	mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{
-		RoleMask: "admin",
+		RoleAssignments: superAdminRoleAssignments(),
 	}, nil)
 	mc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "ns", "n").Return(
 		&database.Repository{}, nil,
@@ -991,7 +991,7 @@ func TestModelComponent_DeleteRelationDataset(t *testing.T) {
 	mc := initializeTestModelComponent(ctx, t)
 
 	mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{
-		RoleMask: "admin",
+		RoleAssignments: superAdminRoleAssignments(),
 	}, nil)
 	mc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "ns", "n").Return(
 		&database.Repository{}, nil,

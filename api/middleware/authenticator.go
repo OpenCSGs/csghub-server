@@ -14,7 +14,6 @@ import (
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/cache"
-	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
@@ -379,6 +378,7 @@ func MustLogin() gin.HandlerFunc {
 	}
 }
 
+// NeedAdmin requires the global administrator grant reported by the user service.
 func NeedAdmin(config *config.Config) gin.HandlerFunc {
 	userSvcClient := rpc.NewUserSvcHttpClient(fmt.Sprintf("%s:%d", config.User.Host, config.User.Port),
 		rpc.AuthWithApiKey(config.APIToken))
@@ -399,11 +399,7 @@ func NeedAdmin(config *config.Config) gin.HandlerFunc {
 			return
 		}
 
-		dbUser := &database.User{
-			RoleMask: strings.Join(user.Roles, ","),
-		}
-
-		if !dbUser.CanAdmin() {
+		if !user.IsSuperAdmin() {
 			httpbase.ForbiddenError(ctx, errorx.ErrUserNotAdmin)
 			ctx.Abort()
 			return
@@ -476,6 +472,9 @@ type MiddlewareCollection struct {
 		NeedLogin gin.HandlerFunc
 		//user must be admin role to access
 		NeedAdmin gin.HandlerFunc
+		// PlatformAdmin validates administrator access for the supplied permission requirements.
+		// An empty list denies access. AdminPermissionAny preserves business authorization.
+		PlatformAdmin func(...types.AdminPermission) gin.HandlerFunc
 		// user must be the owner of the resource
 		UserMatch gin.HandlerFunc
 		// user must have phone verified

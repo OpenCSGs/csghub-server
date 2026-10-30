@@ -4,9 +4,10 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/gin-gonic/gin"
 	"log/slog"
 	"net/http"
+
+	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/aigateway/component"
 	"opencsg.com/csghub-server/aigateway/handler/plan"
 	responsespkg "opencsg.com/csghub-server/aigateway/handler/responses"
@@ -109,7 +110,6 @@ func (b *responsesParsedBody) HasMultimodalContent() bool {
 func (h *responsesPipelineHandler) Extract(c *gin.Context) (*types.RequestMetadata, error) {
 	username := httpbase.GetCurrentUser(c)
 	nsUUID := httpbase.GetCurrentNamespaceUUID(c)
-	apikey := httpbase.GetAccessToken(c)
 	owner := responsesOwnerBinding(c)
 
 	req := &types.ResponsesRequest{}
@@ -148,7 +148,6 @@ func (h *responsesPipelineHandler) Extract(c *gin.Context) (*types.RequestMetada
 		Model:         publicModelID,
 		TenantID:      nsUUID,
 		UserID:        username,
-		APIKeyID:      apikey,
 		PriorityScope: httpbase.GetAPIKeyPriorityScope(c),
 		Streaming:     req.Stream,
 		Headers:       c.Request.Header,
@@ -240,9 +239,9 @@ func (h *responsesPipelineHandler) Execute(c *gin.Context, meta *types.RequestMe
 
 	switch decision.Mode {
 	case responsespkg.ResponsesModeNative:
-		h.handler.executeNativeResponses(c, req, resolvedTarget, decision, pb.Owner, meta.TenantID, meta.APIKeyID, pb.PublicModelID, pb.PublicPreviousRespID, responsesModeration, responseCapture, generationRecorder, p)
+		h.handler.executeNativeResponses(c, req, resolvedTarget, decision, pb.Owner, meta.TenantID, pb.PublicModelID, pb.PublicPreviousRespID, responsesModeration, responseCapture, generationRecorder, p)
 	case responsespkg.ResponsesModeChatAdapter:
-		h.handler.executeAdapterResponses(c, req, resolvedTarget, meta.TenantID, meta.APIKeyID, pb.PublicModelID, responsesModeration, responseCapture, generationRecorder, p)
+		h.handler.executeAdapterResponses(c, req, resolvedTarget, meta.TenantID, pb.PublicModelID, responsesModeration, responseCapture, generationRecorder, p)
 	default:
 		writeResponsesError(c, http.StatusBadRequest, "unsupported_feature", "invalid_request_error", "unsupported responses execution mode")
 	}

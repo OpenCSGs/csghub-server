@@ -15,7 +15,7 @@ import (
 	"opencsg.com/csghub-server/builder/compress"
 )
 
-func (h *OpenAIHandlerImpl) executeAdapterResponses(c *gin.Context, req *types.ResponsesRequest, modelTarget *resolvedModelTarget, nsUUID, apikey, publicModelID string, moderation component.Moderation, logCapture *responsespkg.LLMLogRecorder, generationRecorder llmtrace.GenerationRecorder, p *types.RequestPlan) {
+func (h *OpenAIHandlerImpl) executeAdapterResponses(c *gin.Context, req *types.ResponsesRequest, modelTarget *resolvedModelTarget, nsUUID, publicModelID string, moderation component.Moderation, logCapture *responsespkg.LLMLogRecorder, generationRecorder llmtrace.GenerationRecorder, p *types.RequestPlan) {
 	if err := validateResponsesAdapterRequest(req); err != nil {
 		finishLLMTraceWithError(generationRecorder, err, types.TraceErrUpstreamError)
 		writeResponsesError(c, http.StatusBadRequest, adapterErrorCode(err), "invalid_request_error", err.Error())
@@ -79,7 +79,7 @@ func (h *OpenAIHandlerImpl) executeAdapterResponses(c *gin.Context, req *types.R
 	})
 
 	traceInput := newResponsesTracePostProcessInput(generationRecorder, req, retryWriterStatusCode(finalWriter), finalWriter.FirstWriteAt())
-	h.recordResponsesUsageWithTrace(c, responsesCounter, responsesUsage, nsUUID, modelTarget, apikey, logCapture, traceInput, admissionLeaseFromPlan(p))
+	h.recordResponsesUsageWithTrace(c, responsesCounter, responsesUsage, nsUUID, modelTarget, logCapture, traceInput, admissionLeaseFromPlan(p))
 }
 
 func decodeResponsesAdapterChatBody(bufferWriter *bufferCommonResponseWriter) ([]byte, error) {

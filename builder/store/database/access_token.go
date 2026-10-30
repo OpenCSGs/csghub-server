@@ -426,15 +426,6 @@ func (s *accessTokenStoreImpl) FindByNsUUID(ctx context.Context, nsUUID string, 
 	return tokens, nil
 }
 
-func findByTokenValue(ctx context.Context, tx bun.Tx, tokenValue string) (*AccessToken, error) {
-	var token AccessToken
-	err := tx.NewSelect().Model(&token).Where("token = ?", tokenValue).Scan(ctx)
-	if err != nil {
-		return nil, errorx.HandleDBError(err, nil)
-	}
-	return &token, nil
-}
-
 // FindBuiltinByNsUUID finds first builtin API key by namespace uuid
 func (s *accessTokenStoreImpl) FindBuiltinByNsUUID(ctx context.Context, nsUUID string, app string) (*AccessToken, error) {
 	var token AccessToken

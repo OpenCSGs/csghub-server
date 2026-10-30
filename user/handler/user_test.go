@@ -2,6 +2,7 @@ package handler
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,16 +13,22 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
+	jwtlib "github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+	mockapicomp "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
 	"opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/user/component"
 	"opencsg.com/csghub-server/api/httpbase"
+	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/testutil"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
+	usercomponent "opencsg.com/csghub-server/user/component"
 )
 
 // TestUserHandler_RejectsLastOrganizationAdmin verifies deletion and account closure return lastOrgAdmin.
@@ -43,8 +50,8 @@ func TestUserHandler_RejectsLastOrganizationAdmin(t *testing.T) {
 		mockUserComponent := component.NewMockUserComponent(t)
 		handler := &UserHandler{c: mockUserComponent}
 		tester.Handler(handler.Delete)
-		mockUserComponent.EXPECT().CheckOperatorAndUser(tester.Gctx(), "u", "u").Return(false, nil)
-		mockUserComponent.EXPECT().CheckIfUserIsLastOrgAdmin(tester.Gctx(), "u").Return(true, nil)
+		mockUserComponent.EXPECT().CheckOperatorAndUser(tester.Ctx(), "u", "u").Return(false, nil)
+		mockUserComponent.EXPECT().CheckIfUserIsLastOrgAdmin(tester.Ctx(), "u").Return(true, nil)
 
 		tester.WithUser().WithParam("username", "u").Execute()
 
@@ -62,6 +69,17 @@ func TestUserHandler_RejectsLastOrganizationAdmin(t *testing.T) {
 
 		tester.ResponseEqSimple(t, http.StatusConflict, expectedResponse)
 	})
+}
+
+// TestUserHandler_RejectsAdministratorDeletion stops before scheduling a workflow for an administrator target.
+func TestUserHandler_RejectsAdministratorDeletion(t *testing.T) {
+	tester := testutil.NewGinTester()
+	userComponent := component.NewMockUserComponent(t)
+	tester.Handler((&UserHandler{c: userComponent}).Delete)
+	userComponent.EXPECT().CheckOperatorAndUser(tester.Ctx(), "u", "target").Return(false, errorx.ErrAdminUserCannotBeDeleted).Once()
+	tester.WithUser().WithParam("username", "target").Execute()
+	custom := errorx.ErrAdminUserCannotBeDeleted.(errorx.CustomError)
+	tester.ResponseEqSimple(t, http.StatusBadRequest, httpbase.R{Code: custom.Code(), Msg: custom.Error()})
 }
 
 func TestUserHandler_ResetUserTags_Success(t *testing.T) {
@@ -784,6 +802,283 @@ func TestRedirectWithoutBody(t *testing.T) {
 
 			// Verify that the response was aborted (no further processing)
 			assert.True(t, ctx.IsAborted(), "Context should be aborted")
+		})
+	}
+}
+
+// TestUserHandler_RequestAdminAuthorization verifies user handlers forward request grants without relying on Gin context fallback.
+func TestUserHandler_RequestAdminAuthorization(t *testing.T) {
+	for _, authorized := range []bool{false, true} {
+		for _, operation := range []string{"get", "internal get", "index", "update"} {
+			t.Run(fmt.Sprintf("%s/authorized=%t", operation, authorized), func(t *testing.T) {
+				requestContext := context.Background()
+				if authorized {
+					requestContext = types.WithAdminAuthorization(requestContext)
+				}
+				ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+				ctx.Request = httptest.NewRequest(http.MethodPut, "/user/target?page=2&per=20", strings.NewReader(`{"name":"Updated"}`)).WithContext(requestContext)
+				ctx.Request.Header.Set("Content-Type", "application/json")
+				ctx.Params = gin.Params{{Key: "username", Value: "target"}, {Key: "id", Value: "target-uuid"}}
+				httpbase.SetCurrentUser(ctx, "operator")
+				if operation == "internal get" {
+					httpbase.SetAuthType(ctx, httpbase.AuthTypeSystemApiKey)
+				}
+				requestContext = ctx.Request.Context()
+				users := component.NewMockUserComponent(t)
+				h := &UserHandler{c: users}
+				switch operation {
+				case "get":
+					users.EXPECT().Get(requestContext, "target", "operator", false).Return(&types.User{Username: "target"}, nil).Once()
+					h.Get(ctx)
+				case "internal get":
+					users.EXPECT().GetInternal(requestContext, "target", false).Return(&types.User{Username: "target"}, nil).Once()
+					h.Get(ctx)
+				case "index":
+					users.EXPECT().Index(requestContext, mock.MatchedBy(func(req types.UserListReq) bool {
+						return req.VisitorName == "operator" && req.Page == 2 && req.Per == 20
+					})).Return(nil, 0, nil).Once()
+					h.Index(ctx)
+				case "update":
+					sensitive := mockapicomp.NewMockSensitiveComponent(t)
+					sensitive.EXPECT().CheckRequestV2(ctx, mock.Anything).Return(true, nil).Once()
+					h.sc = sensitive
+					users.EXPECT().UpdateByUUID(requestContext, mock.MatchedBy(func(req *types.UpdateUserRequest) bool {
+						return req.UUID != nil && *req.UUID == "target-uuid" && req.OpUser == "operator"
+					})).Return(nil).Once()
+					h.Update(ctx)
+				}
+				require.Equal(t, http.StatusOK, ctx.Writer.Status())
+			})
+		}
+	}
+}
+
+// userVerificationContextMock embeds the component's private method and mocks only the tested HTTP operations.
+type userVerificationContextMock struct {
+	usercomponent.UserVerifyComponent
+	mock.Mock
+}
+
+// Get records the request context and target UUID supplied by the verification handler.
+func (m *userVerificationContextMock) Get(ctx context.Context, uuid string) (*database.UserVerify, error) {
+	args := m.Called(ctx, uuid)
+	return args.Get(0).(*database.UserVerify), args.Error(1)
+}
+
+// Update records the request context and unchanged verification update arguments.
+func (m *userVerificationContextMock) Update(ctx context.Context, id int64, status types.VerifyStatus, reason string) (*database.UserVerify, error) {
+	args := m.Called(ctx, id, status, reason)
+	return args.Get(0).(*database.UserVerify), args.Error(1)
+}
+
+// assertVerificationRequestContext checks authorization and cancellation without enabling Gin context fallback.
+func assertVerificationRequestContext(t *testing.T, actual, expected context.Context, authorized bool) {
+	t.Helper()
+	require.Same(t, expected, actual)
+	require.Equal(t, authorized, types.IsAdminAuthorized(actual))
+	expectedDeadline, expectedHasDeadline := expected.Deadline()
+	deadline, hasDeadline := actual.Deadline()
+	require.True(t, expectedHasDeadline)
+	require.Equal(t, expectedHasDeadline, hasDeadline)
+	require.Equal(t, expectedDeadline, deadline)
+	require.Equal(t, expected.Done(), actual.Done())
+	require.Equal(t, expected.Err(), actual.Err())
+}
+
+// TestUserHandler_VerificationRequestContext covers admin and ordinary verification reads and updates.
+func TestUserHandler_VerificationRequestContext(t *testing.T) {
+	for _, authorized := range []bool{false, true} {
+		for _, canceled := range []bool{false, true} {
+			for _, operation := range []string{"get", "update"} {
+				t.Run(fmt.Sprintf("%s/admin=%t/canceled=%t", operation, authorized, canceled), func(t *testing.T) {
+					requestContext, cancel := context.WithDeadline(context.Background(), time.Now().Add(time.Minute))
+					t.Cleanup(cancel)
+					if authorized {
+						requestContext = types.WithAdminAuthorization(requestContext)
+					}
+					if canceled {
+						cancel()
+					}
+					ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+					ctx.Request = httptest.NewRequest(http.MethodPut, "/user/verify/42", strings.NewReader(`{"status":"approved"}`)).WithContext(requestContext)
+					ctx.Request.Header.Set("Content-Type", "application/json")
+					verification := &database.UserVerify{ID: 42, UUID: "target-user", Status: types.VerifyStatusApproved}
+					component := &userVerificationContextMock{}
+					component.Test(t)
+					t.Cleanup(func() { component.AssertExpectations(t) })
+					checkContext := func(args mock.Arguments) {
+						assertVerificationRequestContext(t, args.Get(0).(context.Context), requestContext, authorized)
+					}
+					h := &UserHandler{uv: component}
+					if operation == "get" {
+						ctx.Params = gin.Params{{Key: "id", Value: "target-user"}}
+						component.On("Get", requestContext, "target-user").Run(checkContext).Return(verification, nil).Once()
+						h.GetVerify(ctx)
+					} else {
+						ctx.Params = gin.Params{{Key: "id", Value: "42"}}
+						component.On("Update", requestContext, int64(42), types.VerifyStatusApproved, "").Run(checkContext).Return(verification, nil).Once()
+						h.UpdateVerify(ctx)
+					}
+					require.Equal(t, http.StatusOK, ctx.Writer.Status())
+				})
+			}
+		}
+	}
+}
+
+// TestJWTHandlerRefreshAdmin binds refresh to the authenticated JWT and preserves the component's expiry.
+func TestJWTHandlerRefreshAdmin(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	expiry := time.Now().UTC().Add(15 * time.Minute).Truncate(time.Second)
+	for _, tc := range []struct {
+		name, uuid, authorization, body string
+		authType                        httpbase.AuthType
+		componentErr                    error
+		want                            int
+		call                            bool
+	}{
+		{name: "current administrator", uuid: "self", authorization: "Bearer old-jwt", body: `{"uuid":"self","old_token":"old-jwt"}`, authType: httpbase.AuthTypeJwt, want: http.StatusOK, call: true},
+		{name: "missing identity", authorization: "Bearer old-jwt", body: `{"uuid":"self","old_token":"old-jwt"}`, authType: httpbase.AuthTypeJwt, want: http.StatusUnauthorized},
+		{name: "API key cannot refresh", uuid: "self", authorization: "Bearer old-jwt", body: `{"uuid":"self","old_token":"old-jwt"}`, authType: httpbase.AuthTypeSystemApiKey, want: http.StatusUnauthorized},
+		{name: "PAT cannot refresh", uuid: "self", authorization: "Bearer old-jwt", body: `{"uuid":"self","old_token":"old-jwt"}`, authType: httpbase.AuthTypeAccessToken, want: http.StatusUnauthorized},
+		{name: "missing bearer", uuid: "self", body: `{"uuid":"self","old_token":"old-jwt"}`, authType: httpbase.AuthTypeJwt, want: http.StatusUnauthorized},
+		{name: "other user", uuid: "self", authorization: "Bearer old-jwt", body: `{"uuid":"other","old_token":"old-jwt"}`, authType: httpbase.AuthTypeJwt, want: http.StatusForbidden},
+		{name: "other token", uuid: "self", authorization: "Bearer old-jwt", body: `{"uuid":"self","old_token":"other-jwt"}`, authType: httpbase.AuthTypeJwt, want: http.StatusForbidden},
+		{name: "missing old token", uuid: "self", authorization: "Bearer old-jwt", body: `{"uuid":"self"}`, authType: httpbase.AuthTypeJwt, want: http.StatusBadRequest},
+		{name: "invalid body", uuid: "self", authorization: "Bearer old-jwt", body: `{`, authType: httpbase.AuthTypeJwt, want: http.StatusBadRequest},
+		{name: "expired token", uuid: "self", authorization: "Bearer old-jwt", body: `{"uuid":"self","old_token":"old-jwt"}`, authType: httpbase.AuthTypeJwt, componentErr: errorx.ErrInvalidJWT, want: http.StatusUnauthorized, call: true},
+		{name: "component unavailable", uuid: "self", authorization: "Bearer old-jwt", body: `{"uuid":"self","old_token":"old-jwt"}`, authType: httpbase.AuthTypeJwt, componentErr: errors.New("unavailable"), want: http.StatusInternalServerError, call: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			c := component.NewMockJwtComponent(t)
+			if tc.call {
+				c.EXPECT().RefreshToken(mock.Anything, types.RefreshJWTReq{UUID: "self", OldToken: "old-jwt"}).Run(func(ctx context.Context, _ types.RefreshJWTReq) {
+					require.False(t, types.IsAdminAuthorized(ctx))
+					require.Equal(t, "self", ctx.Value(httpbase.CurrentUserUUIDCtxVar))
+				}).Return(&types.JWTClaims{RegisteredClaims: jwtlib.RegisteredClaims{ExpiresAt: jwtlib.NewNumericDate(expiry)}}, "new-jwt", tc.componentErr)
+			}
+			engine := gin.New()
+			engine.Use(func(ctx *gin.Context) {
+				httpbase.SetCurrentUserUUID(ctx, tc.uuid)
+				httpbase.SetAuthType(ctx, tc.authType)
+			})
+			engine.POST("/api/v1/admin/common/jwt/token", (&JWTHandler{c: c}).RefreshAdmin)
+			request := httptest.NewRequest(http.MethodPost, "/api/v1/admin/common/jwt/token", strings.NewReader(tc.body))
+			request.Header.Set("Authorization", tc.authorization)
+			request.Header.Set("Content-Type", "application/json")
+			response := httptest.NewRecorder()
+			engine.ServeHTTP(response, request)
+			require.Equal(t, tc.want, response.Code, response.Body.String())
+			if tc.want == http.StatusOK {
+				var result struct {
+					Data types.CreateJWTResp `json:"data"`
+				}
+				require.NoError(t, json.Unmarshal(response.Body.Bytes(), &result))
+				require.Equal(t, "new-jwt", result.Data.Token)
+				require.Equal(t, expiry, result.Data.ExpireAt)
+			}
+		})
+	}
+}
+
+// TestUserHandler_UserChoicesResponse restricts a single-submodule administrator to selector fields.
+// The permission gate is simulated here; downstream route tests independently cover module isolation.
+func TestUserHandler_UserChoicesResponse(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	for _, permission := range []types.AdminPermission{
+		types.AdminAssetModel, types.AdminAssetDataset, types.AdminComputeNode,
+		types.AdminAcademyUserPermission, types.AdminAccountOrganization, types.AdminAccountingComputeVoucher,
+	} {
+		t.Run(string(permission), func(t *testing.T) {
+			userComponent := component.NewMockUserComponent(t)
+			h := &UserHandler{c: userComponent}
+			userComponent.EXPECT().UserChoices(mock.MatchedBy(func(ctx context.Context) bool {
+				return types.IsAdminAuthorized(ctx)
+			}), types.UserListReq{VisitorName: "module-admin", Search: "alice", Page: 2, Per: 10, ExactMatch: true}).
+				Return([]types.UserChoice{{ID: 42, UUID: "alice-uuid", Username: "alice", Nickname: "Alice", Avatar: "avatar.png"}}, 11, nil).Once()
+			engine := gin.New()
+			engine.GET("/users", func(ctx *gin.Context) {
+				httpbase.SetCurrentUser(ctx, "module-admin")
+				if ctx.GetHeader("X-Test-Permission") != string(permission) {
+					ctx.AbortWithStatus(http.StatusForbidden)
+					return
+				}
+				ctx.Request = ctx.Request.WithContext(types.WithAdminAuthorization(ctx.Request.Context()))
+				ctx.Next()
+			}, h.UserChoices)
+			request := httptest.NewRequest(http.MethodGet, "/users?page=2&per=10&search=alice&exact_match=true", nil)
+			request.Header.Set("X-Test-Permission", string(permission))
+			response := httptest.NewRecorder()
+			engine.ServeHTTP(response, request)
+			require.Equal(t, http.StatusOK, response.Code)
+			require.JSONEq(t, `{"msg":"OK","data":{"data":[{"id":42,"uuid":"alice-uuid","username":"alice","nickname":"Alice","avatar":"avatar.png"}],"total":11}}`, response.Body.String())
+		})
+	}
+}
+
+// TestUserHandler_UserListValidation keeps ordinary and selector validation consistent before component calls.
+func TestUserHandler_UserListValidation(t *testing.T) {
+	for _, query := range []struct{ key, value string }{
+		{"exact_match", "invalid"}, {"page", "invalid"}, {"per", "invalid"},
+	} {
+		for _, choices := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/choices=%t", query.key, choices), func(t *testing.T) {
+				userComponent := component.NewMockUserComponent(t)
+				h := &UserHandler{c: userComponent}
+				tester := testutil.NewGinTester()
+				if choices {
+					tester.Handler(h.UserChoices)
+				} else {
+					tester.Handler(h.Index)
+				}
+				tester.WithQuery(query.key, query.value).Execute()
+				tester.ResponseEqCode(t, http.StatusBadRequest)
+			})
+		}
+	}
+}
+
+// TestUserHandler_AccountUserListResponse preserves full profile fields at the authorized account list entry.
+func TestUserHandler_AccountUserListResponse(t *testing.T) {
+	tester := testutil.NewGinTester()
+	userComponent := component.NewMockUserComponent(t)
+	ctx := types.WithAdminAuthorization(tester.Ctx())
+	tester.Gctx().Request = tester.Gctx().Request.WithContext(ctx)
+	users := []*types.User{{ID: 42, Username: "alice", Email: "private@example.com", Phone: "123456", Roles: []string{"personal_user"}}}
+	userComponent.EXPECT().Index(ctx, types.UserListReq{VisitorName: "u", Per: 10, Page: 1}).Return(users, 1, nil).Once()
+	tester.Handler((&UserHandler{c: userComponent}).Index)
+	tester.WithUser().AddPagination(1, 10).Execute()
+	tester.ResponseEq(t, http.StatusOK, "OK", gin.H{"data": users, "total": 1})
+}
+
+// TestUserHandler_UserChoiceResponse proves a voucher administrator receives no account details for another user.
+func TestUserHandler_UserChoiceResponse(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		err    error
+		status int
+	}{
+		{name: "another user", status: http.StatusOK}, {name: "missing user", err: errorx.ErrDatabaseNoRows, status: http.StatusNotFound},
+		{name: "store failure", err: errors.New("store unavailable"), status: http.StatusInternalServerError},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			userComponent := component.NewMockUserComponent(t)
+			userComponent.EXPECT().UserChoice(mock.MatchedBy(func(ctx context.Context) bool { return types.IsAdminAuthorized(ctx) }), "alice").
+				Return(&types.UserChoiceDetail{UserChoice: types.UserChoice{ID: 42, UUID: "user-uuid", Username: "alice", Nickname: "Alice", Avatar: "avatar.png"},
+					Namespaces: []types.NamespaceChoice{{Path: "alice", Type: "user", UUID: "personal-ns"}}}, tc.err).Once()
+			engine := gin.New()
+			engine.GET("/admin/accounting/compute_voucher/user/:username", func(ctx *gin.Context) {
+				httpbase.SetCurrentUser(ctx, "voucher-only-admin")
+				httpbase.SetAuthType(ctx, httpbase.AuthTypeSystemApiKey)
+				ctx.Request = ctx.Request.WithContext(types.WithAdminAuthorization(ctx.Request.Context()))
+				ctx.Next()
+			}, (&UserHandler{c: userComponent}).UserChoice)
+			response := httptest.NewRecorder()
+			engine.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/admin/accounting/compute_voucher/user/alice?type=uuid&full=true", nil))
+			require.Equal(t, tc.status, response.Code)
+			if tc.status == http.StatusOK {
+				require.JSONEq(t, `{"msg":"OK","data":{"id":42,"uuid":"user-uuid","username":"alice","nickname":"Alice","avatar":"avatar.png","namespaces":[{"Path":"alice","Type":"user","UUID":"personal-ns"}]}}`, response.Body.String())
+			}
 		})
 	}
 }

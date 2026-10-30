@@ -51,6 +51,7 @@ func NewTestFinetuneComponent(config *config.Config,
 	return c
 }
 
+// TestEvaluationComponent_CreateFinetune checks the expected user query options.
 func TestEvaluationComponent_CreateFinetune(t *testing.T) {
 	req := types.FinetuneReq{
 		Username:           "testuser",
@@ -117,11 +118,11 @@ func TestEvaluationComponent_CreateFinetune(t *testing.T) {
 	c := NewTestFinetuneComponent(cfg, mockDeployer, mockUser, modelStore, spaceResStore, datasetStore, mirrorStore,
 		tokenStore, repoStore, frameStore, argoStore, acctComp, repoComp, nil, nil, clusterStore)
 
-	mockUser.EXPECT().FindByUsername(ctx, req.Username).Return(database.User{
-		Username: req.Username,
-		UUID:     req.Username,
-		ID:       1,
-		RoleMask: "admin",
+	mockUser.EXPECT().FindByUsername(ctx, req.Username, types.UserWithAdminPermissions).Return(database.User{
+		Username:        req.Username,
+		UUID:            req.Username,
+		ID:              1,
+		RoleAssignments: superAdminRoleAssignments(),
 	}, nil).Once()
 
 	modelStore.EXPECT().FindByPath(ctx, "opencsg", "wukong").Return(&database.Model{
@@ -167,6 +168,7 @@ func TestEvaluationComponent_CreateFinetune(t *testing.T) {
 	require.Nil(t, err)
 }
 
+// TestFinetuneComponent_CreateFinetuneJob_UsesRequestedDatasetRevision checks the expected user query options.
 func TestFinetuneComponent_CreateFinetuneJob_UsesRequestedDatasetRevision(t *testing.T) {
 	req := types.FinetuneReq{
 		Username:           "testuser",
@@ -197,11 +199,11 @@ func TestFinetuneComponent_CreateFinetuneJob_UsesRequestedDatasetRevision(t *tes
 	c := NewTestFinetuneComponent(cfg, mockDeployer, mockUser, modelStore, spaceResStore, datasetStore, mirrorStore,
 		tokenStore, repoStore, frameStore, argoStore, acctComp, repoComp, nil, nil, nil)
 
-	mockUser.EXPECT().FindByUsername(ctx, req.Username).Return(database.User{
-		Username: req.Username,
-		UUID:     req.Username,
-		ID:       1,
-		RoleMask: "admin",
+	mockUser.EXPECT().FindByUsername(ctx, req.Username, types.UserWithAdminPermissions).Return(database.User{
+		Username:        req.Username,
+		UUID:            req.Username,
+		ID:              1,
+		RoleAssignments: superAdminRoleAssignments(),
 	}, nil).Once()
 
 	modelStore.EXPECT().FindByPath(ctx, "opencsg", "wukong").Return(&database.Model{
@@ -228,6 +230,7 @@ func TestFinetuneComponent_CreateFinetuneJob_UsesRequestedDatasetRevision(t *tes
 	require.Nil(t, e)
 }
 
+// TestFinetuneComponent_CreateFinetuneJob_NonAdminNamespace checks the expected user query options.
 func TestFinetuneComponent_CreateFinetuneJob_NonAdminNamespace(t *testing.T) {
 	ctx := context.TODO()
 	cfg := &config.Config{}
@@ -260,7 +263,7 @@ func TestFinetuneComponent_CreateFinetuneJob_NonAdminNamespace(t *testing.T) {
 	t.Run("namespace_permission_error", func(t *testing.T) {
 		c := NewTestFinetuneComponent(cfg, mockDeployer, mockUser, modelStore, spaceResStore, datasetStore, mirrorStore,
 			tokenStore, repoStore, frameStore, argoStore, acctComp, repoComp, nil, nil, nil)
-		mockUser.EXPECT().FindByUsername(ctx, req.Username).Return(database.User{
+		mockUser.EXPECT().FindByUsername(ctx, req.Username, types.UserWithAdminPermissions).Return(database.User{
 			Username: req.Username,
 			UUID:     req.Username,
 			ID:       1,
@@ -274,7 +277,7 @@ func TestFinetuneComponent_CreateFinetuneJob_NonAdminNamespace(t *testing.T) {
 	t.Run("namespace_forbidden", func(t *testing.T) {
 		c := NewTestFinetuneComponent(cfg, mockDeployer, mockUser, modelStore, spaceResStore, datasetStore, mirrorStore,
 			tokenStore, repoStore, frameStore, argoStore, acctComp, repoComp, nil, nil, nil)
-		mockUser.EXPECT().FindByUsername(ctx, req.Username).Return(database.User{
+		mockUser.EXPECT().FindByUsername(ctx, req.Username, types.UserWithAdminPermissions).Return(database.User{
 			Username: req.Username,
 			UUID:     req.Username,
 			ID:       1,
@@ -395,8 +398,10 @@ func TestFinetuneComponent_ReadJobLogsNonStream(t *testing.T) {
 		}
 
 		mockUserSvcClient.EXPECT().GetUserByName(ctx, "testuser").Return(&types.User{
-			UUID:  "testuser",
-			Roles: []string{"admin"},
+			UUID:       "testuser",
+			Roles:      []string{"super_admin"},
+			Admin:      true,
+			SuperAdmin: true,
 		}, nil)
 
 		argoStore.EXPECT().FindByID(ctx, int64(1)).Return(database.ArgoWorkflow{
@@ -452,8 +457,10 @@ func TestFinetuneComponent_ReadJobLogsNonStream(t *testing.T) {
 		}
 
 		mockUserSvcClient.EXPECT().GetUserByName(ctx, "testuser").Return(&types.User{
-			UUID:  "testuser",
-			Roles: []string{"admin"},
+			UUID:       "testuser",
+			Roles:      []string{"super_admin"},
+			Admin:      true,
+			SuperAdmin: true,
 		}, nil)
 
 		argoStore.EXPECT().FindByID(ctx, int64(1)).Return(database.ArgoWorkflow{
@@ -494,8 +501,10 @@ func TestFinetuneComponent_ReadJobLogsInStream(t *testing.T) {
 		}
 
 		mockUserSvcClient.EXPECT().GetUserByName(ctx, "testuser").Return(&types.User{
-			UUID:  "testuser",
-			Roles: []string{"admin"},
+			UUID:       "testuser",
+			Roles:      []string{"super_admin"},
+			Admin:      true,
+			SuperAdmin: true,
 		}, nil)
 
 		argoStore.EXPECT().FindByID(ctx, int64(1)).Return(database.ArgoWorkflow{

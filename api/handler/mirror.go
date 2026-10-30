@@ -83,7 +83,8 @@ func (h *MirrorHandler) CreateMirrorRepo(ctx *gin.Context) {
 
 // GetMirrorRepos godoc
 // @Security     ApiKey
-// @Summary      Get mirror repos, used for admin
+// @Summary      Get repositories in the multi-source synchronization queue
+// @Description  Requires asset/sync administrator permission.
 // @Tags         Mirror
 // @Accept       json
 // @Produce      json
@@ -91,6 +92,8 @@ func (h *MirrorHandler) CreateMirrorRepo(ctx *gin.Context) {
 // @Param        page query int false "page" default(1)
 // @Success      200  {object}  types.Response{data=[]types.MirrorRepo,total=int} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      401  {object}  types.APIUnauthorized "Unauthorized"
+// @Failure      403  {object}  types.APIForbidden "Forbidden"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /mirror/repos [get]
 func (h *MirrorHandler) Repos(ctx *gin.Context) {

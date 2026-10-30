@@ -27,6 +27,47 @@ var defaultTestMetrics = metricNames{
 	metricKeys:     []string{"pod", "service_name", "namespace", "response_code_class", "le"},
 }
 
+// TestMonitor_DeploySuperAdminAuthorization verifies module roles retain deployment ownership checks.
+func TestMonitor_DeploySuperAdminAuthorization(t *testing.T) {
+	for _, tc := range []struct {
+		name, role string
+		superAdmin bool
+		owner      bool
+	}{
+		{name: "module administrator denied", role: "asset_admin"},
+		{name: "legacy administrator denied", role: "admin"},
+		{name: "module administrator owns deployment", role: "asset_admin", owner: true},
+		{name: "custom global administrator", role: "maintainer", superAdmin: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			userClient := mock_rpc.NewMockUserSvcClient(t)
+			repoStore := mockdb.NewMockRepoStore(t)
+			deployStore := mockdb.NewMockDeployTaskStore(t)
+			userClient.EXPECT().GetUserInfo(ctx, "alice", "alice").Return(&rpc.User{
+				ID: 7, Username: "alice", Roles: []string{tc.role}, SuperAdmin: tc.superAdmin,
+			}, nil).Once()
+			req := &types.MonitorReq{CurrentUser: "alice", RepoType: types.SpaceRepo, Namespace: "team", Name: "space", DeployID: 9, Instance: "service-pod"}
+			if !tc.superAdmin {
+				repoStore.EXPECT().FindByPath(ctx, req.RepoType, req.Namespace, req.Name).Return(&database.Repository{ID: 8}, nil).Once()
+				ownerID := int64(99)
+				if tc.owner {
+					ownerID = 7
+				}
+				deployStore.EXPECT().GetDeployByID(ctx, req.DeployID).Return(&database.Deploy{ID: 9, RepoID: 8, UserID: ownerID, SvcName: "service"}, nil).Once()
+			}
+			monitor := &monitorComponentImpl{userSvcClient: userClient, repoStore: repoStore, deployTaskStore: deployStore, k8sNameSpace: "spaces"}
+			allowed, err, namespace, container := monitor.hasPermissionForDeploy(ctx, req)
+			require.NoError(t, err)
+			require.Equal(t, tc.superAdmin || tc.owner, allowed)
+			if allowed {
+				require.Equal(t, "spaces", namespace)
+				require.NotEmpty(t, container)
+			}
+		})
+	}
+}
+
 func TestMonitorComponent_getMetrics(t *testing.T) {
 	m := &monitorComponentImpl{
 		metrics: defaultTestMetrics,

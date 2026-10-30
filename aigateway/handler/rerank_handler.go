@@ -105,7 +105,6 @@ func (h *rerankPipelineHandler) Extract(c *gin.Context) (*types.RequestMetadata,
 		Model:         req.Model,
 		TenantID:      nsUUID,
 		UserID:        username,
-		APIKeyID:      httpbase.GetAccessToken(c),
 		PriorityScope: httpbase.GetAPIKeyPriorityScope(c),
 		Streaming:     false,
 		Headers:       c.Request.Header,
@@ -118,7 +117,6 @@ func (h *rerankPipelineHandler) Extract(c *gin.Context) (*types.RequestMetadata,
 func (h *rerankPipelineHandler) Execute(c *gin.Context, meta *types.RequestMetadata, p *types.RequestPlan) error {
 	ctx := c.Request.Context()
 	nsUUID := meta.TenantID
-	apikey := meta.APIKeyID
 
 	// End the preflight span that was started by the entry handler.
 	if pt := plan.GetPreflightTracer(c); pt != nil {
@@ -203,7 +201,7 @@ func (h *rerankPipelineHandler) Execute(c *gin.Context, meta *types.RequestMetad
 
 		if usage != nil && isSuccessfulStatus(w.StatusCode()) {
 			tokenID := httpbase.GetCurrentTokenID(c)
-			if err := h.handler.openaiComponent.RecordUsageFromTokenUsage(usageCtx, nsUUID, mt.Model, mt.ModelName, usage, apikey, tokenID); err != nil {
+			if err := h.handler.openaiComponent.RecordUsageFromTokenUsage(usageCtx, nsUUID, mt.Model, mt.ModelName, usage, tokenID); err != nil {
 				slog.ErrorContext(usageCtx, "failed to record rerank token usage", "error", err)
 			}
 		}

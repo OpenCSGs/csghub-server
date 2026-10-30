@@ -21,6 +21,7 @@ import (
 	"opencsg.com/csghub-server/common/i18n"
 )
 
+// NewRouter initializes handlers and registers authenticated service routes.
 func NewRouter(config *config.Config) (*gin.Engine, func(), error) {
 	r := gin.New()
 	middleware.SetInfraMiddleware(r, config, instrumentation.Aigateway)
@@ -47,6 +48,7 @@ func NewRouter(config *config.Config) (*gin.Engine, func(), error) {
 	middlewareCollection := middleware.MiddlewareCollection{}
 	middlewareCollection.Auth.NeedLogin = middleware.MustLogin()
 	middlewareCollection.Auth.NeedAdmin = middleware.NeedAdmin(config)
+	middlewareCollection.Auth.PlatformAdmin = middleware.NewPlatformAdmin()
 	middlewareCollection.Auth.NeedPhoneVerified = middleware.NeedPhoneVerified(config)
 	middlewareCollection.Auth.NeedAccessToken = middleware.NeedAccessToken()
 	middlewareCollection.License.Check = middleware.CheckLicense(config)
@@ -133,11 +135,12 @@ func NewRouter(config *config.Config) (*gin.Engine, func(), error) {
 	v1Group.POST("/ocr", APIKeyMW, scopeMW, metricsMW, ocrHandler.OCR)
 
 	apiV1Group := r.Group("/api/v1")
-	adminGroup := apiV1Group.Group("/admin", middlewareCollection.Auth.NeedAdmin)
+	adminGroup := apiV1Group.Group("/admin")
 	// Only admin routes need localized error messages; customer-facing
 	// inference APIs skip i18n initialization entirely.
 	i18n.InitLocalizersFromEmbedFile()
 	adminGroup.Use(middleware.ModifyAcceptLanguageMiddleware(), middleware.LocalizedErrorMiddleware())
+	createAdminTokenPlanModelRoutes(adminGroup, middlewareCollection, openAIhandler, scopeMW)
 
 	mcpProxy, err := handler.NewMCPProxyHandler(config)
 	if err != nil {

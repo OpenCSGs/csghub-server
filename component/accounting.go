@@ -2,6 +2,7 @@ package component
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"opencsg.com/csghub-server/builder/accounting"
@@ -30,11 +31,15 @@ type accountingComponentImpl struct {
 type AccountingComponent interface {
 	QueryAllUsersBalance(ctx context.Context, per, page int) (interface{}, error)
 	QueryBalanceByUserID(ctx context.Context, currentUser, UUID string) (interface{}, error)
+	// QueryUserBalanceForAdmin confines an authorized account/user request to an active personal user.
+	QueryUserBalanceForAdmin(ctx context.Context, currentUser, UUID string) (interface{}, error)
 	QueryBalanceByUserIDInternal(ctx context.Context, currentUser string) (*types.UserBalanceResp, error)
 	ListStatementByUserIDAndTime(ctx context.Context, req types.ActStatementsReq) (interface{}, error)
 	ListBillsByUserIDAndDate(ctx context.Context, req types.ActStatementsReq) (interface{}, error)
 	ListBillsDetailByUserID(ctx context.Context, req types.AcctBillsDetailReq) (interface{}, error)
 	RechargeAccountingUser(ctx context.Context, UUID string, req types.RechargeReq) (interface{}, error)
+	// RechargeUserForAdmin confines an authorized account/user recharge to an active personal user.
+	RechargeUserForAdmin(ctx context.Context, UUID string, req types.RechargeReq) (interface{}, error)
 	CreateOrUpdateQuota(currentUser string, req types.AcctQuotaReq) (interface{}, error)
 	GetQuotaByID(currentUser string) (interface{}, error)
 	CreateQuotaStatement(currentUser string, req types.AcctQuotaStatementReq) (interface{}, error)
@@ -89,6 +94,41 @@ func NewAccountingComponent(config *config.Config) (AccountingComponent, error) 
 	}, nil
 }
 
+// QueryUserBalanceForAdmin validates the user-only administration boundary before reusing balance retrieval.
+func (ac *accountingComponentImpl) QueryUserBalanceForAdmin(ctx context.Context, currentUser, UUID string) (interface{}, error) {
+	if err := ac.requireAdminUserTarget(ctx, UUID); err != nil {
+		return nil, err
+	}
+	return ac.QueryBalanceByUserID(ctx, currentUser, UUID)
+}
+
+// RechargeUserForAdmin validates the user-only administration boundary before resolving the real recharge operator.
+func (ac *accountingComponentImpl) RechargeUserForAdmin(ctx context.Context, UUID string, req types.RechargeReq) (interface{}, error) {
+	if err := ac.requireAdminUserTarget(ctx, UUID); err != nil {
+		return nil, err
+	}
+	return ac.RechargeAccountingUser(ctx, UUID, req)
+}
+
+// requireAdminUserTarget accepts only active personal user records for an already authorized administrator request.
+// Global administrator permission does not expand this entry point to organization billing accounts.
+func (ac *accountingComponentImpl) requireAdminUserTarget(ctx context.Context, targetUUID string) error {
+	if !types.IsAdminAuthorized(ctx) || targetUUID == "" {
+		return errorx.ErrForbidden
+	}
+	user, err := ac.userStore.FindByUUID(ctx, targetUUID)
+	if errors.Is(err, errorx.ErrDatabaseNoRows) {
+		return errorx.ErrForbidden
+	}
+	if err != nil {
+		return fmt.Errorf("find administrator accounting user target: %w", err)
+	}
+	if user == nil || user.UUID != targetUUID || !user.DeletedAt.IsZero() {
+		return errorx.ErrForbidden
+	}
+	return nil
+}
+
 func (ac *accountingComponentImpl) ListMeteringsByUserIDAndTime(ctx context.Context, req types.ActStatementsReq) (interface{}, error) {
 	if _, err := checkOwnerOrOrgMemberPermission(ctx, ac.userSvcClient, ac.rebac, req.CurrentUser, req.UserUUID); err != nil {
 		return nil, errorx.Forbidden(err, map[string]any{
@@ -98,10 +138,10 @@ func (ac *accountingComponentImpl) ListMeteringsByUserIDAndTime(ctx context.Cont
 	return ac.accountingClient.ListMeteringsByUserIDAndTime(req)
 }
 
-// CanQueryUserData checks if the current user has permission to query the target user's data.
+// checkOwnerOrOrgMemberPermission checks permission to query the target user's data.
 // Permission is granted if:
 // 1. Current user is the same as the target user (querying own data)
-// 2. Current user is an admin
+// 2. The request has administrator authorization or the user has global super administrator permission
 // 3. Current user can read the organization namespace that owns the target user's namespace
 func checkOwnerOrOrgMemberPermission(ctx context.Context, userSvcClient rpc.UserSvcClient, authorizer rebac.Authorizer, currentUser, targetUUID string) (*rpc.Namespace, error) {
 	user, err := userSvcClient.GetUserByName(ctx, currentUser)
@@ -114,7 +154,7 @@ func checkOwnerOrOrgMemberPermission(ctx context.Context, userSvcClient rpc.User
 		return ns, fmt.Errorf("target namespace not found: %w", err)
 	}
 
-	if user.IsAdmin() || user.UUID == targetUUID {
+	if types.IsAdminAuthorized(ctx) || user.IsSuperAdmin() || user.UUID == targetUUID {
 		return ns, nil
 	}
 

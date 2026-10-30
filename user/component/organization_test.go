@@ -3,6 +3,7 @@ package component
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"testing"
 	"time"
@@ -958,4 +959,66 @@ func TestOrganizationComponent_DeleteDefersFailedCleanup(t *testing.T) {
 			require.NoError(t, component.Delete(ctx, req))
 		})
 	}
+}
+
+// TestOrganizationComponent_Choices enforces one minimal projection for lists and voucher details.
+func TestOrganizationComponent_Choices(t *testing.T) {
+	ctx := types.WithAdminAuthorization(context.Background())
+	org := database.Organization{Name: "org", Nickname: "Organization", UUID: uuid.MustParse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"), Logo: "logo.png",
+		Description: "private description", Homepage: "https://example.com", Verified: true, IsHierarchical: true,
+		Namespace: &database.Namespace{Path: "org", NamespaceType: database.OrgNamespace, UUID: "org-ns"},
+	}
+	want := `{"path":"org","name":"Organization","uuid":"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa","logo":"logo.png","namespace":{"Path":"org","Type":"organization","UUID":"org-ns"}}`
+	t.Run("search filters and projection", func(t *testing.T) {
+		store := mockdb.NewMockOrgStore(t)
+		req := types.OrganizationChoiceListRequest{Search: "org", Per: 10, Page: 2, OrgType: "school", VerifyStatus: "verified", Tag: "industry"}
+		store.EXPECT().Search(ctx, req.Search, req.Per, req.Page, req.OrgType, req.VerifyStatus, req.Tag).Return([]database.Organization{org}, 11, nil).Once()
+		choices, total, err := (&organizationComponentImpl{orgStore: store}).OrganizationChoices(ctx, req)
+		require.NoError(t, err)
+		require.Equal(t, 11, total)
+		require.Len(t, choices, 1)
+		require.True(t, choices[0].IsHierarchical)
+		encoded, err := json.Marshal(choices[0])
+		require.NoError(t, err)
+		require.JSONEq(t, want, string(encoded))
+	})
+	t.Run("recipient detail", func(t *testing.T) {
+		store := mockdb.NewMockOrgStore(t)
+		store.EXPECT().FindByPath(ctx, "org").Return(org, nil).Once()
+		choice, err := (&organizationComponentImpl{orgStore: store}).OrganizationChoice(ctx, "org")
+		require.NoError(t, err)
+		require.True(t, choice.IsHierarchical)
+		encoded, err := json.Marshal(choice)
+		require.NoError(t, err)
+		require.JSONEq(t, want, string(encoded))
+	})
+	t.Run("empty list", func(t *testing.T) {
+		store := mockdb.NewMockOrgStore(t)
+		store.EXPECT().Search(ctx, "", 10, 1, "", "", "").Return(nil, 0, nil).Once()
+		choices, total, err := (&organizationComponentImpl{orgStore: store}).OrganizationChoices(ctx, types.OrganizationChoiceListRequest{Per: 10, Page: 1})
+		require.NoError(t, err)
+		require.Zero(t, total)
+		require.NotNil(t, choices)
+		require.Empty(t, choices)
+	})
+	t.Run("detail without namespace", func(t *testing.T) {
+		store := mockdb.NewMockOrgStore(t)
+		withoutNamespace := org
+		withoutNamespace.Namespace = nil
+		store.EXPECT().FindByPath(ctx, "org").Return(withoutNamespace, nil).Once()
+		choice, err := (&organizationComponentImpl{orgStore: store}).OrganizationChoice(ctx, "org")
+		require.NoError(t, err)
+		require.Nil(t, choice.Namespace)
+	})
+	t.Run("errors propagate", func(t *testing.T) {
+		store := mockdb.NewMockOrgStore(t)
+		storeErr := errors.New("store unavailable")
+		store.EXPECT().Search(ctx, "", 10, 1, "", "", "").Return(nil, 0, storeErr).Once()
+		store.EXPECT().FindByPath(ctx, "missing").Return(database.Organization{}, storeErr).Once()
+		c := &organizationComponentImpl{orgStore: store}
+		_, _, err := c.OrganizationChoices(ctx, types.OrganizationChoiceListRequest{Per: 10, Page: 1})
+		require.ErrorIs(t, err, storeErr)
+		_, err = c.OrganizationChoice(ctx, "missing")
+		require.ErrorIs(t, err, storeErr)
+	})
 }

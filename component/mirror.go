@@ -735,9 +735,9 @@ func (m *mirrorComponentImpl) UpdateMirror(ctx context.Context, req types.Update
 	return mirror, nil
 }
 
-// SyncMirror validates access to an existing mirror repository and enqueues a new repo sync task.
+// SyncMirror honors request authorization or existing user permissions before enqueuing a repository sync task.
 func (m *mirrorComponentImpl) SyncMirror(ctx context.Context, req types.SyncMirrorReq) error {
-	user, err := m.userStore.FindByUsername(ctx, req.CurrentUser)
+	user, err := m.userStore.FindByUsername(ctx, req.CurrentUser, types.UserWithAdminPermissions)
 	if err != nil {
 		return errors.New("user does not exist")
 	}
@@ -745,7 +745,7 @@ func (m *mirrorComponentImpl) SyncMirror(ctx context.Context, req types.SyncMirr
 	if err != nil {
 		return fmt.Errorf("failed to find repo, error: %w", err)
 	}
-	if !user.CanAdmin() {
+	if !(types.IsAdminAuthorized(ctx) || user.CanAdmin()) {
 		canWrite, err := m.repoComp.CheckUserRepoPermission(ctx, req.CurrentUser, repo, rebac.RepositoryCanWrite)
 		if err != nil {
 			return fmt.Errorf("failed to check permission to sync mirror: %w", err)
@@ -927,7 +927,11 @@ func (m *mirrorComponentImpl) BatchCreate(ctx context.Context, req types.BatchCr
 		return fmt.Errorf("failed to get mirrors: %v", err)
 	}
 	for _, eMirror := range existingMirrors {
-		if mirror, ok := sourceURLMirrorMapping[eMirror.SourceUrl]; ok {
+		sourceURL, _, _, err := normalizeMirrorSource(eMirror.SourceUrl, "", "")
+		if err != nil {
+			return fmt.Errorf("failed to normalize stored mirror %d source: %w", eMirror.ID, err)
+		}
+		if mirror, ok := sourceURLMirrorMapping[sourceURL]; ok {
 			if mirror.Priority == 0 {
 				mirror.Priority = int8(types.LowMirrorPriority)
 			}
@@ -939,7 +943,7 @@ func (m *mirrorComponentImpl) BatchCreate(ctx context.Context, req types.BatchCr
 			}
 			toBeUpdatedMirrors = append(toBeUpdatedMirrors, eMirror)
 		}
-		existingSourceURLs = append(existingSourceURLs, eMirror.SourceUrl)
+		existingSourceURLs = append(existingSourceURLs, sourceURL)
 	}
 	for _, mirror := range req.Mirrors {
 		if mirror.Priority == 0 {

@@ -781,3 +781,123 @@ func TestMirrorStoreToBeScheduledOrdersByPriority(t *testing.T) {
 // 	require.Equal(t, 1, len(ms))
 // 	require.Equal(t, ms[0].SourceUrl, "https://opencsg.com/models/repo1")
 // }
+
+func TestMirrorStoreDeferredLegacyDoesNotStarveReadyMirror(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.Background()
+	store := database.NewMirrorStoreWithDB(db)
+	future := time.Now().Add(time.Hour)
+	var waiting []*database.Mirror
+	for i := 0; i < 100; i++ {
+		m := &database.Mirror{SourceUrl: "https://example.com/wait.git", Status: types.MirrorQueued, Priority: types.HighMirrorPriority, RemoteUpdatedAt: future}
+		_, err := store.Create(ctx, m)
+		require.NoError(t, err)
+		require.NoError(t, store.DeferScheduledMirror(ctx, m.ID, future))
+		waiting = append(waiting, m)
+	}
+	ready := &database.Mirror{SourceUrl: "https://example.com/ready.git", Status: types.MirrorQueued, Priority: types.LowMirrorPriority}
+	_, err := store.Create(ctx, ready)
+	require.NoError(t, err)
+	rows, err := store.ToBeScheduled(ctx)
+	require.NoError(t, err)
+	require.Len(t, rows, 1)
+	require.Equal(t, ready.ID, rows[0].ID)
+	before, err := store.FindByID(ctx, waiting[0].ID)
+	require.NoError(t, err)
+	require.Equal(t, types.MirrorQueued, before.Status)
+	require.True(t, before.UpdatedAt.Equal(waiting[0].UpdatedAt))
+	// Expired deferrals remain eligible, but must not fill the next batch ahead of fresh work.
+	for _, m := range waiting {
+		require.NoError(t, store.DeferScheduledMirror(ctx, m.ID, time.Now().Add(-time.Minute)))
+	}
+	rows, err = store.ToBeScheduled(ctx)
+	require.NoError(t, err)
+	require.Len(t, rows, 100)
+	require.Equal(t, ready.ID, rows[0].ID)
+}
+
+func TestMirrorStoreFindBySourceURLsMatchesGitSuffix(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.Background()
+	store := database.NewMirrorStoreWithDB(db)
+	a := &database.Mirror{SourceUrl: "https://example.com/org/one"}
+	b := &database.Mirror{SourceUrl: "https://example.com/org/two.git"}
+	for _, m := range []*database.Mirror{a, b, {SourceUrl: "https://other.com/org/one"}, {SourceUrl: "https://example.com/other/one"}} {
+		_, err := store.Create(ctx, m)
+		require.NoError(t, err)
+	}
+	rows, err := store.FindBySourceURLs(ctx, []string{a.SourceUrl + ".git", "https://example.com/org/two"})
+	require.NoError(t, err)
+	require.Len(t, rows, 2)
+	require.ElementsMatch(t, []int64{a.ID, b.ID}, []int64{rows[0].ID, rows[1].ID})
+}
+
+func TestMirrorStoreDeferDoesNotModifyBoundMirror(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.Background()
+	store := database.NewMirrorStoreWithDB(db)
+	m := &database.Mirror{RepositoryID: 42, SourceUrl: "https://example.com/bound.git", RemoteUpdatedAt: time.Now().Add(time.Hour)}
+	_, err := store.Create(ctx, m)
+	require.NoError(t, err)
+	require.NoError(t, store.DeferScheduledMirror(ctx, m.ID, time.Now().Add(time.Hour)))
+	current, err := store.FindByID(ctx, m.ID)
+	require.NoError(t, err)
+	require.True(t, current.NextExecutionTimestamp.IsZero())
+	rows, err := store.ToBeScheduled(ctx)
+	require.NoError(t, err)
+	require.Len(t, rows, 1)
+}
+
+func TestMirrorStoreRetriesOldestDeferralBeforePriority(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.Background()
+	store := database.NewMirrorStoreWithDB(db)
+	older := &database.Mirror{SourceUrl: "https://example.com/older.git", Status: types.MirrorQueued, Priority: types.LowMirrorPriority}
+	newer := &database.Mirror{SourceUrl: "https://example.com/newer.git", Status: types.MirrorQueued, Priority: types.HighMirrorPriority}
+	for _, m := range []*database.Mirror{older, newer} {
+		_, err := store.Create(ctx, m)
+		require.NoError(t, err)
+	}
+	require.NoError(t, store.DeferScheduledMirror(ctx, older.ID, time.Now().Add(-time.Hour)))
+	require.NoError(t, store.DeferScheduledMirror(ctx, newer.ID, time.Now().Add(-time.Minute)))
+	rows, err := store.ToBeScheduled(ctx)
+	require.NoError(t, err)
+	require.Len(t, rows, 2)
+	require.Equal(t, older.ID, rows[0].ID)
+}
+
+func TestMirrorStoreActiveBoundTasksDoNotFillSchedulingBatch(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.Background()
+	store := database.NewMirrorStoreWithDB(db)
+	tasks := database.NewMirrorTaskJobStoreWithDB(db)
+	var first database.MirrorTask
+	for i := 0; i < 100; i++ {
+		mirror, err := store.Create(ctx, &database.Mirror{RepositoryID: int64(i + 1), SourceUrl: "https://example.com/busy.git", Priority: types.HighMirrorPriority, RemoteUpdatedAt: time.Now().Add(time.Hour)})
+		require.NoError(t, err)
+		statuses := []types.MirrorTaskStatus{types.MirrorLfsSyncStart, types.MirrorRepoSyncFailed, types.MirrorLfsSyncFailed}
+		task, err := tasks.Create(ctx, database.MirrorTask{MirrorID: mirror.ID, Status: statuses[i%len(statuses)]})
+		require.NoError(t, err)
+		require.NoError(t, tasks.SetMirrorCurrentTaskID(ctx, task))
+		if i == 0 {
+			first = task
+		}
+	}
+	ready, err := store.Create(ctx, &database.Mirror{SourceUrl: "https://example.com/ready.git", Status: types.MirrorQueued, Priority: types.LowMirrorPriority})
+	require.NoError(t, err)
+	rows, err := store.ToBeScheduled(ctx)
+	require.NoError(t, err)
+	require.Len(t, rows, 1)
+	require.Equal(t, ready.ID, rows[0].ID)
+	_, err = db.Core.NewUpdate().Model((*database.MirrorTask)(nil)).Set("status = ?", types.MirrorLfsSyncFinished).Where("id = ?", first.ID).Exec(ctx)
+	require.NoError(t, err)
+	rows, err = store.ToBeScheduled(ctx)
+	require.NoError(t, err)
+	require.Len(t, rows, 2)
+	require.Equal(t, first.MirrorID, rows[0].ID)
+}

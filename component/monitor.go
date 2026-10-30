@@ -389,6 +389,7 @@ func (m *monitorComponentImpl) hasPermission(ctx context.Context, req *types.Mon
 	}
 }
 
+// hasPermissionForDeploy allows global administrators or the deployment's owner to read its metrics.
 func (m *monitorComponentImpl) hasPermissionForDeploy(ctx context.Context, req *types.MonitorReq) (bool, error, string, string) {
 	namespace := m.k8sNameSpace
 	container := rtypes.UserContainerName
@@ -399,11 +400,7 @@ func (m *monitorComponentImpl) hasPermissionForDeploy(ctx context.Context, req *
 	if user == nil {
 		return false, fmt.Errorf("user %s not found", req.CurrentUser), "", ""
 	}
-	dbUser := &database.User{
-		RoleMask: strings.Join(user.Roles, ","),
-	}
-	isAdmin := dbUser.CanAdmin()
-	if isAdmin {
+	if user.IsSuperAdmin() {
 		return true, nil, namespace, container
 	}
 	repo, err := m.repoStore.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)

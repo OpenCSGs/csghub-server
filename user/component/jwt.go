@@ -38,7 +38,7 @@ func NewJwtComponent(signKey string, validHour int) JwtComponent {
 }
 
 func (c *jwtComponentImpl) GenerateLoginToken(ctx context.Context, req types.CreateJWTReq) (claims *types.JWTClaims, signed string, err error) {
-	u, err := c.us.FindByUUID(ctx, req.UUID)
+	u, err := c.us.FindByUUID(ctx, req.UUID, types.UserWithAdminPermissions)
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to find user by uuid '%s',error: %w", req.UUID, err)
 	}
@@ -53,7 +53,7 @@ func (c *jwtComponentImpl) GenerateLoginToken(ctx context.Context, req types.Cre
 }
 
 func (c *jwtComponentImpl) RefreshToken(ctx context.Context, req types.RefreshJWTReq) (claims *types.JWTClaims, signed string, err error) {
-	u, err := c.us.FindByUUID(ctx, req.UUID)
+	u, err := c.us.FindByUUID(ctx, req.UUID, types.UserWithAdminPermissions)
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to find user by uuid '%s',error: %w", req.UUID, err)
 	}
@@ -74,7 +74,7 @@ func (c *jwtComponentImpl) GenerateToken(ctx context.Context, req types.CreateJW
 	if req.OldToken != "" {
 		return c.RefreshToken(ctx, types.RefreshJWTReq{UUID: req.UUID, OldToken: req.OldToken})
 	}
-	u, err := c.us.FindByUUID(ctx, req.UUID)
+	u, err := c.us.FindByUUID(ctx, req.UUID, types.UserWithAdminPermissions)
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to find user by uuid '%s',error: %w", req.UUID, err)
 	}
@@ -89,13 +89,14 @@ func (c *jwtComponentImpl) GenerateToken(ctx context.Context, req types.CreateJW
 	return claims, signed, nil
 }
 
+// ParseToken verifies the token and returns current role assignments and administrator flags from the user store.
 func (c *jwtComponentImpl) ParseToken(ctx context.Context, token string) (user *types.User, err error) {
 	claims, err := c.parseClaims(token)
 	if err != nil {
 		return nil, fmt.Errorf("parse jwt token failed: %w", err)
 	}
 
-	dbu, err := c.us.FindByUsername(ctx, claims.CurrentUser)
+	dbu, err := c.us.FindByUsername(ctx, claims.CurrentUser, types.UserWithAdminPermissions)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find user by name '%s', %w", claims.CurrentUser, err)
 	}
@@ -106,6 +107,8 @@ func (c *jwtComponentImpl) ParseToken(ctx context.Context, token string) (user *
 		Username:          dbu.Username,
 		Email:             dbu.Email,
 		Roles:             dbu.Roles(),
+		Admin:             dbu.HasAdminRole(),
+		SuperAdmin:        dbu.HasSuperAdminPermission(),
 		CanChangeUserName: dbu.CanChangeUserName,
 	}
 	return u, nil

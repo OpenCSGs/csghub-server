@@ -123,7 +123,7 @@ func NewUserHandler(config *config.Config) (*UserHandler, error) {
 // UpdateUser godoc
 // @Security     ApiKey
 // @Summary      Update user. If change user name, should only send 'new_username' in the request body.
-// @Description  update user
+// @Description  Update user profile fields. Role assignments are managed through administrator role APIs.
 // @Tags         User
 // @Accept       json
 // @Produce      json
@@ -181,6 +181,7 @@ func (h *UserHandler) Update(ctx *gin.Context) {
 // DeleteUser godoc
 // @Security     ApiKey
 // @Summary      Delete user
+// @Description  Active administrator roles must be revoked before deletion. This endpoint schedules an asynchronous workflow; administrator membership is checked again in the deletion transaction before related data is removed.
 // @Tags         User
 // @Accept       json
 // @Produce      json
@@ -196,7 +197,7 @@ func (h *UserHandler) Delete(ctx *gin.Context) {
 	userName := ctx.Param("username")
 
 	// Check if operator can delete user
-	isServerErr, err := h.c.CheckOperatorAndUser(ctx, operator, userName)
+	isServerErr, err := h.c.CheckOperatorAndUser(ctx.Request.Context(), operator, userName)
 
 	if err != nil {
 		if isServerErr {
@@ -210,7 +211,7 @@ func (h *UserHandler) Delete(ctx *gin.Context) {
 	}
 
 	// Prevent deleting the only administrator of any organization.
-	isLastOrganizationAdmin, err := h.c.CheckIfUserIsLastOrgAdmin(ctx, userName)
+	isLastOrganizationAdmin, err := h.c.CheckIfUserIsLastOrgAdmin(ctx.Request.Context(), userName)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "Check last organization administrator failed", slog.String("user", userName), slog.Any("err", err))
 		httpbase.ServerError(ctx, fmt.Errorf("failed to check last organization administrator: %w", err))
@@ -226,7 +227,7 @@ func (h *UserHandler) Delete(ctx *gin.Context) {
 		return
 	}
 	// Check if user has running or building deployments
-	hasDeployments, err := h.c.CheckIfUserHasRunningOrBuildingDeployments(ctx, userName)
+	hasDeployments, err := h.c.CheckIfUserHasRunningOrBuildingDeployments(ctx.Request.Context(), userName)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "Check if user has deployments failed", slog.String("user", userName), slog.Any("err", err))
 		httpbase.ServerError(ctx, fmt.Errorf("failed to check if user has deployments, error: %w", err))
@@ -239,7 +240,7 @@ func (h *UserHandler) Delete(ctx *gin.Context) {
 	}
 
 	// Check if user has bills, Saas only
-	hasBills, err := h.c.CheckIfUserHasBills(ctx, userName)
+	hasBills, err := h.c.CheckIfUserHasBills(ctx.Request.Context(), userName)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "Check if user has bills failed", slog.String("user", userName), slog.Any("err", err))
 		httpbase.ServerError(ctx, fmt.Errorf("failed to check if user has bills, error: %w", err))
@@ -295,9 +296,9 @@ func (h *UserHandler) Get(ctx *gin.Context) {
 	var user *types.User
 	var err error
 	if authType == httpbase.AuthTypeSystemApiKey {
-		user, err = h.c.GetInternal(ctx, userNameOrUUID, useUUID)
+		user, err = h.c.GetInternal(ctx.Request.Context(), userNameOrUUID, useUUID)
 	} else {
-		user, err = h.c.Get(ctx, userNameOrUUID, visitorName, useUUID)
+		user, err = h.c.Get(ctx.Request.Context(), userNameOrUUID, visitorName, useUUID)
 	}
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "Failed to get user", slog.Any("error", err))
@@ -330,45 +331,12 @@ func (h *UserHandler) Get(ctx *gin.Context) {
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /users [get]
 func (h *UserHandler) Index(ctx *gin.Context) {
-	visitorName := httpbase.GetCurrentUser(ctx)
-	search := ctx.Query("search")
-	sortBy := ctx.Query("sort_by")
-	sortOrder := ctx.Query("sort_order")
-
-	per, page, err := common.GetPerAndPageFromContext(ctx)
+	req, err := parseUserListRequest(ctx)
 	if err != nil {
-		slog.ErrorContext(ctx.Request.Context(), "Failed to get per and page", slog.Any("error", err))
 		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
-	_labels := ctx.QueryArray("labels")
-	labels := types.ParseLabels(_labels)
-	verifyStatus := ctx.Query("verify_status")
-	exactMatchQuery := ctx.Query("exact_match")
-	exactMatch := false
-	if exactMatchQuery != "" {
-		var err error
-		exactMatch, err = strconv.ParseBool(exactMatchQuery)
-		if err != nil {
-			slog.ErrorContext(ctx.Request.Context(), "Failed to parse exact_match", slog.Any("error", err), slog.String("exact_match", exactMatchQuery))
-			ext := errorx.Ctx().Set("query", "exact_match")
-			httpbase.BadRequestWithExt(ctx, errorx.ReqParamInvalid(err, ext))
-			return
-		}
-
-	}
-	req := types.UserListReq{
-		VisitorName:  visitorName,
-		Search:       search,
-		VerifyStatus: verifyStatus,
-		Labels:       labels,
-		Per:          per,
-		Page:         page,
-		SortBy:       sortBy,
-		SortOrder:    sortOrder,
-		ExactMatch:   exactMatch,
-	}
-	users, count, err := h.c.Index(ctx, req)
+	users, count, err := h.c.Index(ctx.Request.Context(), req)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "Failed to get user", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -381,6 +349,80 @@ func (h *UserHandler) Index(ctx *gin.Context) {
 
 	slog.InfoContext(ctx.Request.Context(), "Get users succeed")
 	httpbase.OK(ctx, respData)
+}
+
+// UserChoices serves minimal candidates through independently documented submodule route handlers.
+// It shares search parsing with Index but never returns the full account-list projection.
+func (h *UserHandler) UserChoices(ctx *gin.Context) {
+	req, err := parseUserListRequest(ctx)
+	if err != nil {
+		httpbase.BadRequestWithExt(ctx, err)
+		return
+	}
+	users, total, err := h.c.UserChoices(ctx.Request.Context(), req)
+	if err != nil {
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get user choices", slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	httpbase.OK(ctx, types.UserChoiceList{Data: users, Total: total})
+}
+
+// UserChoice serves a voucher recipient projection through an independently documented submodule handler.
+func (h *UserHandler) UserChoice(ctx *gin.Context) {
+	username := ctx.Param("username")
+	if username == "" {
+		httpbase.BadRequestWithExt(ctx, errorx.ReqParamInvalid(errors.New("username is empty"), nil))
+		return
+	}
+	user, err := h.c.UserChoice(ctx.Request.Context(), username)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) || errors.Is(err, errorx.ErrDatabaseNoRows) {
+			httpbase.NotFoundError(ctx, err)
+		} else {
+			httpbase.ServerError(ctx, err)
+		}
+		return
+	}
+	httpbase.OK(ctx, user)
+}
+
+// parseUserListRequest preserves pagination, filtering, and validation for both list projections.
+func parseUserListRequest(ctx *gin.Context) (types.UserListReq, error) {
+	visitorName := httpbase.GetCurrentUser(ctx)
+	search := ctx.Query("search")
+	sortBy := ctx.Query("sort_by")
+	sortOrder := ctx.Query("sort_order")
+
+	per, page, err := common.GetPerAndPageFromContext(ctx)
+	if err != nil {
+		return types.UserListReq{}, err
+	}
+	_labels := ctx.QueryArray("labels")
+	labels := types.ParseLabels(_labels)
+	verifyStatus := ctx.Query("verify_status")
+	exactMatchQuery := ctx.Query("exact_match")
+	exactMatch := false
+	if exactMatchQuery != "" {
+		var err error
+		exactMatch, err = strconv.ParseBool(exactMatchQuery)
+		if err != nil {
+			ext := errorx.Ctx().Set("query", "exact_match")
+			return types.UserListReq{}, errorx.ReqParamInvalid(err, ext)
+		}
+
+	}
+	return types.UserListReq{
+		VisitorName:  visitorName,
+		Search:       search,
+		VerifyStatus: verifyStatus,
+		Labels:       labels,
+		Per:          per,
+		Page:         page,
+		SortBy:       sortBy,
+		SortOrder:    sortOrder,
+		ExactMatch:   exactMatch,
+	}, nil
 }
 
 func (h *UserHandler) Casdoor(ctx *gin.Context) {
@@ -506,7 +548,7 @@ func (h *UserHandler) CreateVerify(ctx *gin.Context) {
 	httpbase.OK(ctx, orgVerify)
 }
 
-// UpdateVerify godoc
+// UpdateVerify updates verification while preserving request authorization and cancellation in the component.
 // @Security     ApiKey
 // @Summary      Update user verification
 // @Description  update user verification status (approved or rejected)
@@ -543,7 +585,7 @@ func (h *UserHandler) UpdateVerify(ctx *gin.Context) {
 
 	}
 
-	orgVerify, err := h.uv.Update(ctx, vID, req.Status, req.Reason)
+	orgVerify, err := h.uv.Update(ctx.Request.Context(), vID, req.Status, req.Reason)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "Failed to update organization Verify", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -554,7 +596,7 @@ func (h *UserHandler) UpdateVerify(ctx *gin.Context) {
 	httpbase.OK(ctx, orgVerify)
 }
 
-// GetVerify godoc
+// GetVerify reads verification while preserving request authorization and cancellation in the component.
 // @Security     ApiKey
 // @Summary      Get user verification
 // @Description  get user verification information by user ID
@@ -568,7 +610,7 @@ func (h *UserHandler) UpdateVerify(ctx *gin.Context) {
 // @Router       /user/verify/{id} [get]
 func (h *UserHandler) GetVerify(ctx *gin.Context) {
 	id := ctx.Param("id")
-	orgVerify, err := h.uv.Get(ctx, id)
+	orgVerify, err := h.uv.Get(ctx.Request.Context(), id)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "Failed to get organization Verify", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)

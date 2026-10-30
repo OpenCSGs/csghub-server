@@ -69,7 +69,7 @@ func TestExecuteNativeResponses_ProxiesBackendURLPathToUpstream(t *testing.T) {
 				BackendURL: backendURL,
 			}
 			tester.mocks.openAIComp.EXPECT().
-				RecordUsageFromTokenUsage(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+				RecordUsageFromTokenUsage(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 				Maybe().
 				Return(nil)
 
@@ -81,7 +81,7 @@ func TestExecuteNativeResponses_ProxiesBackendURLPathToUpstream(t *testing.T) {
 			c.Request.Header.Set("Content-Type", "application/json")
 
 			h := tester.handler
-			h.executeNativeResponses(c, req, modelTarget, decision, "testuuid", "testuuid", "apikey", "test-model", "", nil, nil, nil, nil)
+			h.executeNativeResponses(c, req, modelTarget, decision, "testuuid", "testuuid", "test-model", "", nil, nil, nil, nil)
 
 			require.Equal(t, tt.wantReceivedPath, receivedPath)
 			require.Equal(t, http.StatusOK, w.Code)
@@ -128,7 +128,7 @@ func TestExecuteNativeResponses_BackendURL404Passthrough(t *testing.T) {
 	c.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", bytes.NewReader([]byte(`{"model":"test-model","input":"hi"}`)))
 	c.Request.Header.Set("Content-Type", "application/json")
 
-	tester.handler.executeNativeResponses(c, req, modelTarget, decision, "testuuid", "testuuid", "apikey", "test-model", "", nil, nil, nil, nil)
+	tester.handler.executeNativeResponses(c, req, modelTarget, decision, "testuuid", "testuuid", "test-model", "", nil, nil, nil, nil)
 
 	require.Equal(t, http.StatusNotFound, w.Code)
 	require.Contains(t, w.Body.String(), "not found")

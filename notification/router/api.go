@@ -38,5 +38,8 @@ func NewNotifierRouter(conf *config.Config) (*gin.Engine, error) {
 		notificationsGroup.GET("/message-types", messageHandler.GetAllMessageTypes)
 	}
 
+	platformAdmin := middleware.NewPlatformAdmin()
+	createAdminRoutes(r.Group("/api/v1"), platformAdmin, messageHandler)
+	createAdminCommonNotificationRoutes(r.Group("/api/v1"), platformAdmin, messageHandler)
 	return r, nil
 }

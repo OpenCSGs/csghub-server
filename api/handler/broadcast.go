@@ -52,8 +52,6 @@ func (h *BroadcastHandler) Index(ctx *gin.Context) {
 // @Failure     500	{object}  types.APIInternalServerError "Internal server error"
 // @Router /broadcasts [post]
 func (h *BroadcastHandler) Create(ctx *gin.Context) {
-	//TODO: authentication?
-
 	var broadcast types.Broadcast
 	if err := ctx.ShouldBindJSON(&broadcast); err != nil {
 		err = fmt.Errorf("cant parse as Broadcast,%w", err)

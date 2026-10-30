@@ -12,3 +12,7 @@ import (
 func extendRoutes(_ *gin.RouterGroup, _ middleware.MiddlewareCollection, _ *config.Config, _ *handler.UserHandler) error {
 	return nil
 }
+
+// createAdminBillingOrganizationRoutes leaves billing organization selectors unavailable in this edition.
+func createAdminBillingOrganizationRoutes(_ *gin.RouterGroup, _ middleware.MiddlewareCollection, _ *handler.OrganizationHandler) {
+}

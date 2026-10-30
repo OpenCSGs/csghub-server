@@ -1744,3 +1744,54 @@ func TestMirrorTaskStore_RequeueMirrorRepoTaskRollsBackSkillMetadata(t *testing.
 	require.NoError(t, err)
 	require.True(t, storedSkill.LastUpdatedAt.Equal(oldUpdatedAt))
 }
+
+func TestMirrorTaskStore_AutomaticRequeuePreservesActiveTask(t *testing.T) {
+	for _, tc := range []struct{ active, terminal types.MirrorTaskStatus }{
+		{types.MirrorQueued, types.MirrorCanceled},
+		{types.MirrorRepoSyncStart, types.MirrorRepoSyncFatal},
+		{types.MirrorRepoSyncFinished, types.MirrorLfsIncomplete},
+		{types.MirrorLfsSyncStart, types.MirrorLfsSyncFinished},
+		{types.MirrorRepoSyncFailed, types.MirrorRepoTooLarge},
+		{types.MirrorLfsSyncFailed, types.MirrorLfsSyncFatal},
+	} {
+		status := tc.active
+		t.Run(string(status), func(t *testing.T) {
+			db := tests.InitTestDB()
+			defer db.Close()
+			ctx := context.Background()
+			store := database.NewMirrorTaskJobStoreWithDB(db)
+			mirrors := database.NewMirrorStoreWithDB(db)
+			repo, err := database.NewRepoStoreWithDB(db).CreateRepo(ctx, database.Repository{Path: "test/automatic", RepositoryType: types.ModelRepo, SyncStatus: types.SyncStatusInProgress})
+			require.NoError(t, err)
+			mirror, err := mirrors.Create(ctx, &database.Mirror{RepositoryID: repo.ID, SourceUrl: "https://example.com/test/automatic.git"})
+			require.NoError(t, err)
+			task, err := store.Create(ctx, database.MirrorTask{MirrorID: mirror.ID, Status: status, RepoJobID: 101, LFSJobID: 202})
+			require.NoError(t, err)
+			require.NoError(t, store.SetMirrorCurrentTaskID(ctx, task))
+			before, err := mirrors.FindByID(ctx, mirror.ID)
+			require.NoError(t, err)
+			jobs := &fakeMirrorRepoJobClient{}
+			cancel := &fakeMirrorJobCancelClient{}
+			input := database.RequeueMirrorRepoTaskInput{MirrorID: mirror.ID, RepositoryID: repo.ID, PreserveActiveTask: true, JobClient: jobs, JobCancelClient: cancel}
+			_, err = store.RequeueMirrorRepoTask(ctx, input)
+			require.ErrorIs(t, err, database.ErrMirrorTaskActive)
+			require.Empty(t, jobs.inputs)
+			require.Empty(t, cancel.jobIDs)
+			current, err := store.FindByID(ctx, task.ID)
+			require.NoError(t, err)
+			require.Equal(t, status, current.Status)
+			after, err := mirrors.FindByID(ctx, mirror.ID)
+			require.NoError(t, err)
+			require.Equal(t, before.CurrentTaskID, after.CurrentTaskID)
+			require.True(t, before.UpdatedAt.Equal(after.UpdatedAt))
+			// Every terminal outcome releases automatic scheduling.
+			_, err = db.Core.NewUpdate().Model((*database.MirrorTask)(nil)).Set("status = ?", tc.terminal).Where("id = ?", task.ID).Exec(ctx)
+			require.NoError(t, err)
+			next, err := store.RequeueMirrorRepoTask(ctx, input)
+			require.NoError(t, err)
+			require.NotEqual(t, task.ID, next.ID)
+			require.Len(t, jobs.inputs, 1)
+			require.Empty(t, cancel.jobIDs)
+		})
+	}
+}

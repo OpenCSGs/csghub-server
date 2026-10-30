@@ -51,6 +51,7 @@ func newTestEvaluationComponentForClaw(t *testing.T) (*evaluationComponentImpl, 
 	return c, mockDeployer, mockRepo, mockWorkflow
 }
 
+// TestEvaluationComponent_CreateClawEvaluation checks the expected user query options.
 func TestEvaluationComponent_CreateClawEvaluation(t *testing.T) {
 	ctx := context.Background()
 	req := types.EvaluationReq{
@@ -74,7 +75,7 @@ func TestEvaluationComponent_CreateClawEvaluation(t *testing.T) {
 	mockCluster := c.clusterStore.(*mockdb.MockClusterInfoStore)
 	mockToken := c.tokenStore.(*mockdb.MockAccessTokenStore)
 
-	mockUser.EXPECT().FindByUsername(ctx, "user1").Return(database.User{Username: "user1", UUID: "uuid1", RoleMask: "admin"}, nil)
+	mockUser.EXPECT().FindByUsername(ctx, "user1", types.UserWithAdminPermissions).Return(database.User{Username: "user1", UUID: "uuid1", RoleAssignments: superAdminRoleAssignments()}, nil)
 	mockFrame.EXPECT().FindEnabledByID(ctx, int64(1)).Return(&database.RuntimeFramework{
 		ID:          1,
 		FrameName:   "claw-eval-codex",
@@ -119,6 +120,7 @@ func TestEvaluationComponent_CreateClawEvaluation(t *testing.T) {
 	require.Equal(t, "task-1", resp.TaskId)
 }
 
+// TestEvaluationComponent_CreateClawEvaluation_AutoBuiltinJudgeAPIKey checks the expected user query options.
 func TestEvaluationComponent_CreateClawEvaluation_AutoBuiltinJudgeAPIKey(t *testing.T) {
 	ctx := context.Background()
 	req := types.EvaluationReq{
@@ -139,7 +141,7 @@ func TestEvaluationComponent_CreateClawEvaluation_AutoBuiltinJudgeAPIKey(t *test
 	mockCluster := c.clusterStore.(*mockdb.MockClusterInfoStore)
 	mockToken := c.tokenStore.(*mockdb.MockAccessTokenStore)
 
-	mockUser.EXPECT().FindByUsername(ctx, "user1").Return(database.User{Username: "user1", UUID: "uuid1", RoleMask: "admin"}, nil)
+	mockUser.EXPECT().FindByUsername(ctx, "user1", types.UserWithAdminPermissions).Return(database.User{Username: "user1", UUID: "uuid1", RoleAssignments: superAdminRoleAssignments()}, nil)
 	mockFrame.EXPECT().FindEnabledByID(ctx, int64(1)).Return(&database.RuntimeFramework{
 		FrameName:   types.ClawEvalFrameName,
 		FrameImage:  "opencsghq/claw-eval:1.0.0",
@@ -176,6 +178,7 @@ func TestEvaluationComponent_CreateClawEvaluation_AutoBuiltinJudgeAPIKey(t *test
 	require.Equal(t, "task-123", resp.TaskId)
 }
 
+// TestEvaluationComponent_CreateClawEvaluation_AutoJudgeAPIKeyFallback checks the expected user query options.
 func TestEvaluationComponent_CreateClawEvaluation_AutoJudgeAPIKeyFallback(t *testing.T) {
 	ctx := context.Background()
 	req := types.EvaluationReq{
@@ -197,7 +200,7 @@ func TestEvaluationComponent_CreateClawEvaluation_AutoJudgeAPIKeyFallback(t *tes
 	mockToken := c.tokenStore.(*mockdb.MockAccessTokenStore)
 	mockUserSvc := c.userSvcClient.(*mockrpc.MockUserSvcClient)
 
-	mockUser.EXPECT().FindByUsername(ctx, "user1").Return(database.User{Username: "user1", UUID: "uuid1", RoleMask: "admin"}, nil)
+	mockUser.EXPECT().FindByUsername(ctx, "user1", types.UserWithAdminPermissions).Return(database.User{Username: "user1", UUID: "uuid1", RoleAssignments: superAdminRoleAssignments()}, nil)
 	mockFrame.EXPECT().FindEnabledByID(ctx, int64(1)).Return(&database.RuntimeFramework{
 		FrameName:   types.ClawEvalFrameName,
 		FrameImage:  "opencsghq/claw-eval:1.0.0",
@@ -266,6 +269,7 @@ func TestEvaluationComponent_CheckEvaluationLogPermission(t *testing.T) {
 	require.ErrorIs(t, err, errorx.ErrForbidden)
 }
 
+// TestEvaluationComponent_CreateClawEvaluation_InvalidResourceJSON checks the expected user query options.
 func TestEvaluationComponent_CreateClawEvaluation_InvalidResourceJSON(t *testing.T) {
 	ctx := context.Background()
 	req := types.EvaluationReq{
@@ -283,7 +287,7 @@ func TestEvaluationComponent_CreateClawEvaluation_InvalidResourceJSON(t *testing
 	mockFrame := c.runtimeFrameworkStore.(*mockdb.MockRuntimeFrameworksStore)
 	mockSpaceRes := c.spaceResourceStore.(*mockdb.MockSpaceResourceStore)
 
-	mockUser.EXPECT().FindByUsername(ctx, "user1").Return(database.User{Username: "user1", RoleMask: "admin"}, nil)
+	mockUser.EXPECT().FindByUsername(ctx, "user1", types.UserWithAdminPermissions).Return(database.User{Username: "user1", RoleAssignments: superAdminRoleAssignments()}, nil)
 	mockFrame.EXPECT().FindEnabledByID(ctx, int64(1)).Return(&database.RuntimeFramework{
 		FrameName:   types.ClawEvalFrameName,
 		ComputeType: "cpu",
@@ -296,6 +300,7 @@ func TestEvaluationComponent_CreateClawEvaluation_InvalidResourceJSON(t *testing
 	require.Error(t, err)
 }
 
+// TestEvaluationComponent_CreateClawEvaluation_Forbidden checks the expected user query options.
 func TestEvaluationComponent_CreateClawEvaluation_Forbidden(t *testing.T) {
 	ctx := context.Background()
 	req := types.EvaluationReq{
@@ -312,7 +317,7 @@ func TestEvaluationComponent_CreateClawEvaluation_Forbidden(t *testing.T) {
 	c, _, mockRepo, _ := newTestEvaluationComponentForClaw(t)
 	mockUser := c.userStore.(*mockdb.MockUserStore)
 
-	mockUser.EXPECT().FindByUsername(ctx, "user1").Return(database.User{Username: "user1"}, nil)
+	mockUser.EXPECT().FindByUsername(ctx, "user1", types.UserWithAdminPermissions).Return(database.User{Username: "user1"}, nil)
 	mockRepo.EXPECT().CheckCurrentUserPermission(ctx, "user1", "org1", rebac.NamespaceCanWrite).Return(false, nil)
 
 	_, err := c.CreateEvaluation(ctx, req)
@@ -454,13 +459,14 @@ func TestEvaluationComponent_DeleteClawEvaluation(t *testing.T) {
 	require.NoError(t, err)
 }
 
+// TestEvaluationComponent_CreateClawEvaluation_MissingFields checks the expected user query options.
 func TestEvaluationComponent_CreateClawEvaluation_MissingFields(t *testing.T) {
 	ctx := context.Background()
 	c, _, _, _ := newTestEvaluationComponentForClaw(t)
 	mockUser := c.userStore.(*mockdb.MockUserStore)
 	mockFrame := c.runtimeFrameworkStore.(*mockdb.MockRuntimeFrameworksStore)
 
-	mockUser.EXPECT().FindByUsername(ctx, "user1").Return(database.User{Username: "user1", RoleMask: "admin"}, nil)
+	mockUser.EXPECT().FindByUsername(ctx, "user1", types.UserWithAdminPermissions).Return(database.User{Username: "user1", RoleAssignments: superAdminRoleAssignments()}, nil)
 	mockFrame.EXPECT().FindEnabledByID(ctx, int64(1)).Return(&database.RuntimeFramework{
 		FrameName: types.ClawEvalFrameName,
 	}, nil)

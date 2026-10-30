@@ -3,7 +3,9 @@ package database
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/looplab/fsm"
@@ -11,6 +13,15 @@ import (
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
+
+// ErrMirrorTaskActive means automatic scheduling must wait for current work to finish.
+var ErrMirrorTaskActive = errors.New("mirror task is still active")
+
+// Retryable failures still own River jobs; only fatal failures end that work.
+var activeMirrorTaskStatuses = []types.MirrorTaskStatus{
+	types.MirrorQueued, types.MirrorRepoSyncStart, types.MirrorRepoSyncFinished, types.MirrorLfsSyncStart,
+	types.MirrorRepoSyncFailed, types.MirrorLfsSyncFailed,
+}
 
 type mirrorTaskStoreImpl struct {
 	db *DB
@@ -80,8 +91,11 @@ type CompleteRepoSyncInput struct {
 	SkipLFSJob bool
 }
 
-// RequeueMirrorRepoTaskInput carries the data needed to manually enqueue a repository mirror sync.
+// RequeueMirrorRepoTaskInput carries the data needed to enqueue a repository mirror sync.
 type RequeueMirrorRepoTaskInput struct {
+	// PreserveActiveTask makes automatic scheduling reject replacement of an active task.
+	// The check runs under the task lock; manual re-sync keeps the default replacement behavior.
+	PreserveActiveTask bool
 	// MirrorID identifies the mirror that should be synchronized again.
 	MirrorID int64
 	// RepositoryID identifies the local repository bound to the mirror.
@@ -459,6 +473,9 @@ func (m *mirrorTaskStoreImpl) RequeueMirrorRepoTask(ctx context.Context, input R
 				return fmt.Errorf("failed to lock current mirror task: %w", err)
 			}
 			currentTask = &oldTask
+		}
+		if input.PreserveActiveTask && currentTask != nil && slices.Contains(activeMirrorTaskStatuses, currentTask.Status) {
+			return ErrMirrorTaskActive
 		}
 		now := time.Now()
 		if currentTask != nil && isRequeueCancelableMirrorTaskStatus(currentTask.Status) {

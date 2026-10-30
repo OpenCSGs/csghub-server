@@ -29,7 +29,7 @@ func NewStatHandler(config *config.Config) (*StatHandler, error) {
 // GetStatSnap godoc
 // @Security     ApiKey
 // @Summary      Get stat snapshot
-// @Description  Retrieve statistical snapshot for a given target and date type
+// @Description  Retrieve statistical snapshot for a given target and date type. Requires system/dashboard admin permission.
 // @Tags         Stat
 // @Accept       json
 // @Produce      json
@@ -37,6 +37,8 @@ func NewStatHandler(config *config.Config) (*StatHandler, error) {
 // @Param        date_type   query string true "Date type" Enums(year,month,week,day)
 // @Success      200  {object}  types.Response{data=types.StatSnapshotResp} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      401  {object}  types.APIUnauthorized "Unauthorized"
+// @Failure      403  {object}  types.APIForbidden "Forbidden"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /stat/snapshot [get]
 func (h *StatHandler) GetStatSnap(ctx *gin.Context) {
@@ -72,12 +74,13 @@ func (h *StatHandler) GetStatSnap(ctx *gin.Context) {
 // StatRunningDeploys godoc
 // @Security     ApiKey
 // @Summary      Get running deploy statistics
-// @Description  Retrieve the number of running deployments, CPU usage, and GPU usage per project
+// @Description  Retrieve the number of running deployments, CPU usage, and GPU usage per project. Requires system/dashboard admin permission.
 // @Tags         Stat
 // @Accept       json
 // @Produce      json
 // @Success      200  {object}  types.Response{data=map[int]types.StatRunningDeploy} "OK"
 // @Failure      401  {object}  types.APIUnauthorized "Unauthorized"
+// @Failure      403  {object}  types.APIForbidden "Forbidden"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /stat/running-deploys [get]
 func (h *StatHandler) StatRunningDeploys(ctx *gin.Context) {
