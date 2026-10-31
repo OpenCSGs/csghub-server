@@ -416,8 +416,11 @@ func newMessagesResponseID() string {
 // uncachedInputTokens converts an OpenAI-style prompt/input token count, which
 // includes cache reads, into Anthropic's input_tokens, which excludes them.
 func uncachedInputTokens(prompt, cached int) int {
-	if cached <= 0 || cached > prompt {
+	if cached <= 0 {
 		return prompt
+	}
+	if cached >= prompt {
+		return 0
 	}
 	return prompt - cached
 }

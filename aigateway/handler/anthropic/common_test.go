@@ -619,7 +619,7 @@ func TestExtractCarriesPriorityScope(t *testing.T) {
 func TestUncachedInputTokens(t *testing.T) {
 	assert.Equal(t, 70, uncachedInputTokens(100, 30))
 	assert.Equal(t, 100, uncachedInputTokens(100, 0))
-	assert.Equal(t, 100, uncachedInputTokens(100, 150), "cached larger than prompt must not go negative")
+	assert.Equal(t, 0, uncachedInputTokens(100, 150), "cached larger than prompt must not go negative")
 }
 
 func TestUsageExcludesCacheReads(t *testing.T) {
