@@ -266,11 +266,7 @@ func (w *responsesAdapterStreamWriter) captureChatStreamUsage(chunk types.ChatCo
 	if chunk.Usage.PromptTokens == 0 && chunk.Usage.CompletionTokens == 0 && chunk.Usage.TotalTokens == 0 {
 		return
 	}
-	w.usage = &types.ResponsesUsage{
-		InputTokens:  int64(chunk.Usage.PromptTokens),
-		OutputTokens: int64(chunk.Usage.CompletionTokens),
-		TotalTokens:  int64(chunk.Usage.TotalTokens),
-	}
+	w.usage = responsesUsageFromChat(chunk.Usage)
 	if w.responsesCounter != nil {
 		w.responsesCounter.Response(&types.ResponsesResponse{Usage: w.usage})
 	}

@@ -2572,3 +2572,63 @@ func TestResponsesAdapterStreamWriterContinuesRepeatedNameFragments(t *testing.T
 		})
 	}
 }
+
+func TestChatResponseToResponsesKeepsUsageDetails(t *testing.T) {
+	resp, err := chatResponseToResponsesWithToolAliases([]byte(`{
+		"id":"chatcmpl_1",
+		"created":123,
+		"model":"upstream-model",
+		"choices":[{"message":{"role":"assistant","content":"hi"},"finish_reason":"stop"}],
+		"usage":{
+			"prompt_tokens":100,
+			"completion_tokens":40,
+			"total_tokens":140,
+			"prompt_tokens_details":{"cached_tokens":64},
+			"completion_tokens_details":{"reasoning_tokens":25}
+		}
+	}`), "public-model", nil)
+	require.NoError(t, err)
+	require.NotNil(t, resp.Usage)
+	require.Equal(t, int64(100), resp.Usage.InputTokens)
+	require.NotNil(t, resp.Usage.InputTokensDetails)
+	require.Equal(t, int64(64), resp.Usage.InputTokensDetails.CachedTokens)
+	require.NotNil(t, resp.Usage.OutputTokensDetails)
+	require.Equal(t, int64(25), resp.Usage.OutputTokensDetails.ReasoningTokens)
+}
+
+func TestChatResponseToResponsesOmitsEmptyUsageDetails(t *testing.T) {
+	resp, err := chatResponseToResponsesWithToolAliases([]byte(`{
+		"id":"chatcmpl_1",
+		"created":123,
+		"model":"upstream-model",
+		"choices":[{"message":{"role":"assistant","content":"hi"},"finish_reason":"stop"}],
+		"usage":{"prompt_tokens":10,"completion_tokens":5,"total_tokens":15}
+	}`), "public-model", nil)
+	require.NoError(t, err)
+	require.Nil(t, resp.Usage.InputTokensDetails)
+	require.Nil(t, resp.Usage.OutputTokensDetails)
+}
+
+func TestCaptureChatStreamUsageKeepsUsageDetails(t *testing.T) {
+	var chunk types.ChatCompletionChunk
+	require.NoError(t, json.Unmarshal([]byte(`{
+		"id":"chatcmpl_1",
+		"choices":[],
+		"usage":{
+			"prompt_tokens":100,
+			"completion_tokens":40,
+			"total_tokens":140,
+			"prompt_tokens_details":{"cached_tokens":64},
+			"completion_tokens_details":{"reasoning_tokens":25}
+		}
+	}`), &chunk))
+
+	w := &responsesAdapterStreamWriter{}
+	w.captureChatStreamUsage(chunk)
+
+	require.NotNil(t, w.usage)
+	require.NotNil(t, w.usage.InputTokensDetails)
+	require.Equal(t, int64(64), w.usage.InputTokensDetails.CachedTokens)
+	require.NotNil(t, w.usage.OutputTokensDetails)
+	require.Equal(t, int64(25), w.usage.OutputTokensDetails.ReasoningTokens)
+}
