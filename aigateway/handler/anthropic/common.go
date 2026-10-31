@@ -270,7 +270,7 @@ func chatResponseToMessagesResponse(data []byte, model string) (*types.Anthropic
 		Role:  "assistant",
 		Model: model,
 		Usage: types.AnthropicMessagesUsage{
-			InputTokens:          int(chat.Usage.PromptTokens),
+			InputTokens:          uncachedInputTokens(int(chat.Usage.PromptTokens), int(chat.Usage.PromptTokensDetails.CachedTokens)),
 			OutputTokens:         int(chat.Usage.CompletionTokens),
 			CacheReadInputTokens: int(chat.Usage.PromptTokensDetails.CachedTokens),
 		},
@@ -413,6 +413,15 @@ func newMessagesResponseID() string {
 
 // --- OpenAI Responses → Anthropic Messages response conversion ---
 
+// uncachedInputTokens converts an OpenAI-style prompt/input token count, which
+// includes cache reads, into Anthropic's input_tokens, which excludes them.
+func uncachedInputTokens(prompt, cached int) int {
+	if cached <= 0 || cached > prompt {
+		return prompt
+	}
+	return prompt - cached
+}
+
 // responsesResponseToMessagesResponse converts an OpenAI Responses response
 // to an Anthropic Messages response.
 func responsesResponseToMessagesResponse(resp *types.ResponsesResponse, model string) (*types.AnthropicMessagesResponse, error) {
@@ -429,6 +438,7 @@ func responsesResponseToMessagesResponse(resp *types.ResponsesResponse, model st
 			OutputTokens: int(resp.Usage.OutputTokens),
 		}
 		if resp.Usage.InputTokensDetails != nil {
+			usage.InputTokens = uncachedInputTokens(usage.InputTokens, int(resp.Usage.InputTokensDetails.CachedTokens))
 			usage.CacheReadInputTokens = int(resp.Usage.InputTokensDetails.CachedTokens)
 			usage.CacheCreationInputTokens = int(resp.Usage.InputTokensDetails.CachedCreationTokens)
 		}
