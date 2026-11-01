@@ -158,6 +158,63 @@ func TestHandleAdmissionDenied_QueueTimeout_Renders408(t *testing.T) {
 	require.Contains(t, w.Body.String(), "timeout_error")
 }
 
+// A stream request does not imply the stream has started: a plan-phase
+// admission denial reaches the renderer before any byte is written, and the
+// head must still carry the real status instead of the implicit 200 a bare
+// Write would commit. Chat pre-sets the SSE content type on the uncommitted
+// head, so the JSON rendering also has to clear it.
+func TestHandleAdmissionDenied_StreamBeforeHeadCommit_Renders429(t *testing.T) {
+	tester, c, w := setupTest(t)
+	c.Writer.Header().Set("Content-Type", "text/event-stream")
+
+	err := &types.AdmissionDeniedError{Decision: &types.AdmissionDecision{
+		Action:            types.AdmissionReject,
+		Reason:            types.AdmissionReasonTPMExceeded,
+		RetryAfterSeconds: 30,
+	}}
+	handled := tester.handler.handleAdmissionDenied(c, true, err)
+	require.True(t, handled)
+	require.Equal(t, http.StatusTooManyRequests, w.Code)
+	require.Equal(t, "30", w.Header().Get("Retry-After"))
+	require.Contains(t, w.Body.String(), "capacity_exceeded")
+	require.Contains(t, w.Header().Get("Content-Type"), "application/json")
+}
+
+func TestHandleAdmissionDenied_StreamBeforeHeadCommit_Renders408(t *testing.T) {
+	tester, c, w := setupTest(t)
+	c.Writer.Header().Set("Content-Type", "text/event-stream")
+
+	err := &types.AdmissionDeniedError{Decision: &types.AdmissionDecision{
+		Action: types.AdmissionReject,
+		Reason: types.AdmissionReasonQueueTimeout,
+	}}
+	handled := tester.handler.handleAdmissionDenied(c, true, err)
+	require.True(t, handled)
+	require.Equal(t, http.StatusRequestTimeout, w.Code)
+	require.Empty(t, w.Header().Get("Retry-After"))
+	require.Contains(t, w.Body.String(), "timeout_error")
+}
+
+// Once the head is committed (denial after the stream started) the status
+// can no longer change, so the same envelope goes into the event stream.
+func TestHandleAdmissionDenied_StreamAfterHeadCommit_WritesErrorEvent(t *testing.T) {
+	tester, c, w := setupTest(t)
+	c.Writer.Header().Set("Content-Type", "text/event-stream")
+	c.Writer.WriteHeader(http.StatusOK)
+	_, _ = c.Writer.Write([]byte("data: {}\n\n"))
+
+	err := &types.AdmissionDeniedError{Decision: &types.AdmissionDecision{
+		Action: types.AdmissionReject,
+		Reason: types.AdmissionReasonTPMExceeded,
+	}}
+	handled := tester.handler.handleAdmissionDenied(c, true, err)
+	require.True(t, handled)
+	require.Equal(t, http.StatusOK, w.Code)
+	require.Contains(t, w.Body.String(), "data: ")
+	require.Contains(t, w.Body.String(), "capacity_exceeded")
+	require.Contains(t, w.Body.String(), "data: [DONE]")
+}
+
 func TestHandleAdmissionDenied_QueueCancelled_Renders408(t *testing.T) {
 	tester, c, w := setupTest(t)
 

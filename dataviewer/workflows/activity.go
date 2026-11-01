@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"math"
 	"net/http"
 	"net/url"
 	"os"
@@ -150,11 +151,13 @@ func (dva *dataViewerActivityImpl) ScanRepoFiles(ctx context.Context, scanParam 
 			Limit:     types.MaxFileTreeSize,
 			Cursor:    cursor,
 		})
-		if err != nil {
-			return nil, fmt.Errorf("failed to scan repo %s/%s branch %s files error: %w", scanParam.Req.Namespace, scanParam.Req.Name, scanParam.Req.Branch, err)
-		}
 		if resp == nil {
 			break
+		}
+
+		cursor = resp.Cursor
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan repo %s/%s branch %s files error: %w", scanParam.Req.Namespace, scanParam.Req.Name, scanParam.Req.Branch, err)
 		}
 
 		for _, file := range resp.Files {
@@ -167,7 +170,6 @@ func (dva *dataViewerActivityImpl) ScanRepoFiles(ctx context.Context, scanParam 
 		if resp.Cursor == "" {
 			break
 		}
-		cursor = resp.Cursor
 	}
 
 	return &fileClass, nil
@@ -446,20 +448,12 @@ func (dva *dataViewerActivityImpl) CopyParquetFiles(ctx context.Context, copyReq
 	if err != nil {
 		return nil, fmt.Errorf("failed to create duckdb reader, cause: %w", err)
 	}
-	var paths []string
-	for _, info := range copyReq.ComputedCardData.DatasetInfos {
-		for _, split := range info.Splits {
-			for idx := range split.Origins {
-				paths = append(paths, fmt.Sprintf("%s/%s/%05d.parquet", info.ConfigName, split.Name, idx))
-			}
-		}
-	}
-	repoAllFiles, err := dva.getExistingRepoFiles(ctx, types.UpdateViewerReq{
+	repoAllFiles, err := dva.getRepoFiles(ctx, types.UpdateViewerReq{
 		Namespace: copyReq.Req.Namespace,
 		Name:      copyReq.Req.Name,
 		RepoType:  copyReq.Req.RepoType,
 		Branch:    copyReq.NewBranch,
-	}, paths)
+	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get repo files, cause: %w", err)
 	}
@@ -566,23 +560,21 @@ func (dva *dataViewerActivityImpl) CopyParquetFiles(ctx context.Context, copyReq
 	return &cardData, nil
 }
 
-func (dva *dataViewerActivityImpl) getExistingRepoFiles(ctx context.Context, req types.UpdateViewerReq, paths []string) (map[string]string, error) {
-	allFiles := make(map[string]string)
-	if len(paths) == 0 {
-		return allFiles, nil
-	}
-	files, err := dva.gitServer.GetFilesByRevisionAndPaths(ctx, gitserver.GetFilesByRevisionAndPathsReq{
+func (dva *dataViewerActivityImpl) getRepoFiles(ctx context.Context, req types.UpdateViewerReq) (map[string]string, error) {
+	resp, err := dva.gitServer.GetTree(ctx, types.GetTreeRequest{
 		Namespace: req.Namespace,
 		Name:      req.Name,
 		RepoType:  req.RepoType,
-		Revision:  req.Branch,
-		Paths:     paths,
+		Ref:       req.Branch,
+		Recursive: true,
+		Limit:     math.MaxInt,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("fail to get repo %s/%s branch %s files by paths error: %w", req.Namespace, req.Name, req.Branch, err)
+		return nil, fmt.Errorf("fail to get repo %s/%s branch %s all files error: %w", req.Namespace, req.Name, req.Branch, err)
 	}
-	for _, file := range files {
-		if file == nil || file.Path == "" {
+	allFiles := make(map[string]string)
+	for _, file := range resp.Files {
+		if file.Type == "dir" {
 			continue
 		}
 		allFiles[file.Path] = file.Path
@@ -829,52 +821,17 @@ func (dva *dataViewerActivityImpl) ConvertToParquetFiles(ctx context.Context, co
 	return nil
 }
 
-func collectUploadParquetPaths(uploadReq dvCom.UploadParquetReq) ([]string, error) {
-	var paths []string
-	for _, subset := range uploadReq.DownloadCard.Subsets {
-		for _, split := range subset.Splits {
-			if split.ExportPath == "" {
-				continue
-			}
-			entries, err := os.ReadDir(split.ExportPath)
-			if err != nil {
-				slog.Error("read export dir error", slog.Any("exportPath", split.ExportPath), slog.Any("error", err))
-				return nil, fmt.Errorf("failed to read dir %s, cause: %w", split.ExportPath, err)
-			}
-			for _, entry := range entries {
-				fileName := entry.Name()
-				if !entry.Type().IsRegular() || !IsValidParquetFile(fileName) {
-					continue
-				}
-				extName := filepath.Ext(fileName)
-				fileNameSeq := fileName[:len(fileName)-len(extName)]
-				fileNameSeqInt, err := strconv.Atoi(fileNameSeq)
-				if err != nil {
-					continue
-				}
-				newFileName := fmt.Sprintf("%05d%s", fileNameSeqInt, extName)
-				paths = append(paths, fmt.Sprintf("%s/%s/%s", subset.ConfigName, split.Name, newFileName))
-			}
-		}
-	}
-	return paths, nil
-}
-
 func (dva *dataViewerActivityImpl) UploadParquetFiles(ctx context.Context, uploadReq dvCom.UploadParquetReq) (*dvCom.CardData, error) {
 	r, err := parquet.NewS3Reader(ctx, dva.cfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create duckdb reader, cause: %w", err)
 	}
-	paths, err := collectUploadParquetPaths(uploadReq)
-	if err != nil {
-		return nil, err
-	}
-	repoAllFiles, err := dva.getExistingRepoFiles(ctx, types.UpdateViewerReq{
+	repoAllFiles, err := dva.getRepoFiles(ctx, types.UpdateViewerReq{
 		Namespace: uploadReq.Req.Namespace,
 		Name:      uploadReq.Req.Name,
 		RepoType:  uploadReq.Req.RepoType,
 		Branch:    uploadReq.NewBranch,
-	}, paths)
+	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get repo files, cause: %w", err)
 	}

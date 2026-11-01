@@ -66,7 +66,7 @@ func TestOrganizationUnitStore_CreateRoot(t *testing.T) {
 	ctx := context.Background()
 	creator := createOrganizationUnitMemberTestUser(t, ctx, db, "root-creator")
 	organizationUUID := uuid.New()
-	store := coredb.NewOrganizationUnitStoreWithDBAndDeletionJobClient(db, &testRepositoryDeletionJobClient{})
+	store := coredb.NewOrganizationUnitStoreWithDBAndJobClients(db, &testRepositoryDeletionJobClient{}, nil, tests.NewFixtureRebacTupleJobClient(db))
 	created, err := store.CreateRoot(ctx, coredb.CreateRootOrganizationInput{
 		Organization: &coredb.Organization{
 			Name: "root-created", Nickname: "Root Created", UUID: organizationUUID, UserID: creator.ID, IsRoot: true,
@@ -140,7 +140,7 @@ func TestOrganizationUnitStore_CreateRootAllowsOnlyOneActiveHierarchyRoot(t *tes
 	defer db.Close()
 	ctx := context.Background()
 	creator := createOrganizationUnitMemberTestUser(t, ctx, db, "root-unique-creator")
-	store := coredb.NewOrganizationUnitStoreWithDB(db)
+	store := coredb.NewOrganizationUnitStoreWithDBAndJobClients(db, nil, nil, tests.NewFixtureRebacTupleJobClient(db))
 
 	firstUUID := uuid.New()
 	_, err := store.CreateRoot(ctx, coredb.CreateRootOrganizationInput{
@@ -174,18 +174,18 @@ func TestOrganizationUnitStore_DeleteRoot(t *testing.T) {
 	creator := createOrganizationUnitMemberTestUser(t, ctx, db, "root-delete-creator")
 	member := createOrganizationUnitMemberTestUser(t, ctx, db, "root-delete-member")
 	rootUUID := uuid.New()
-	root, err := coredb.NewOrganizationUnitStoreWithDBAndDeletionJobClient(db, &testRepositoryDeletionJobClient{}).CreateRoot(ctx, coredb.CreateRootOrganizationInput{
+	root, err := coredb.NewOrganizationUnitStoreWithDBAndJobClients(db, &testRepositoryDeletionJobClient{}, nil, tests.NewFixtureRebacTupleJobClient(db)).CreateRoot(ctx, coredb.CreateRootOrganizationInput{
 		Organization: &coredb.Organization{Name: "root-delete", Nickname: "Root Delete", UUID: rootUUID, UserID: creator.ID, IsRoot: true, IsHierarchical: true},
 		Namespace:    &coredb.Namespace{Path: "root-delete", UUID: rootUUID.String()}, CreatorUserID: creator.ID,
 	})
 	require.NoError(t, err)
-	store := coredb.NewOrganizationUnitStoreWithDBAndDeletionJobClient(db, &testRepositoryDeletionJobClient{})
+	store := coredb.NewOrganizationUnitStoreWithDBAndJobClients(db, &testRepositoryDeletionJobClient{}, nil, tests.NewFixtureRebacTupleJobClient(db))
 	child := createChild(t, ctx, store, root, "root-delete-child", nil, 1)
 	grandchild := createChild(t, ctx, store, root, "root-delete-grandchild", &child.UUID, 1)
 	childID := organizationIDForUnit(t, ctx, store, child.UUID)
 	grandchildID := organizationIDForUnit(t, ctx, store, grandchild.UUID)
-	require.NoError(t, coredb.NewMemberStoreWithDB(db).Add(ctx, childID, member.ID, string(types.UserRead)))
-	require.NoError(t, coredb.NewMemberStoreWithDB(db).Add(ctx, grandchildID, member.ID, string(types.UserWrite)))
+	require.NoError(t, coredb.NewMemberStoreWithRebacTupleJobClient(db, tests.NewFixtureRebacTupleJobClient(db)).Add(ctx, childID, member.ID, string(types.UserRead)))
+	require.NoError(t, coredb.NewMemberStoreWithRebacTupleJobClient(db, tests.NewFixtureRebacTupleJobClient(db)).Add(ctx, grandchildID, member.ID, string(types.UserWrite)))
 
 	result, err := store.DeleteRoot(ctx, coredb.DeleteRootOrganizationInput{OrganizationUUID: root.UUID.String()})
 	require.NoError(t, err)
@@ -242,7 +242,7 @@ func TestOrganizationUnitStore_DeleteRootRepositories(t *testing.T) {
 	ctx := context.Background()
 	creator := createOrganizationUnitMemberTestUser(t, ctx, db, "root-repository-delete-creator")
 	jobClient := &testRepositoryDeletionJobClient{}
-	store := coredb.NewOrganizationUnitStoreWithDBAndDeletionJobClient(db, jobClient)
+	store := coredb.NewOrganizationUnitStoreWithDBAndJobClients(db, jobClient, nil, tests.NewFixtureRebacTupleJobClient(db))
 	rootUUID := uuid.New()
 	root, err := store.CreateRoot(ctx, coredb.CreateRootOrganizationInput{
 		Organization: &coredb.Organization{Name: "root-repository-delete", UUID: rootUUID, UserID: creator.ID, IsRoot: true, IsHierarchical: true},
@@ -306,7 +306,7 @@ func TestOrganizationUnitStore_DeleteRepositories(t *testing.T) {
 	ctx := context.Background()
 	creator := createOrganizationUnitMemberTestUser(t, ctx, db, "subtree-repository-delete-creator")
 	jobClient := &testRepositoryDeletionJobClient{}
-	store := coredb.NewOrganizationUnitStoreWithDBAndDeletionJobClient(db, jobClient)
+	store := coredb.NewOrganizationUnitStoreWithDBAndJobClients(db, jobClient, nil, tests.NewFixtureRebacTupleJobClient(db))
 	rootUUID := uuid.New()
 	root, err := store.CreateRoot(ctx, coredb.CreateRootOrganizationInput{
 		Organization: &coredb.Organization{Name: "subtree-repository-root", UUID: rootUUID, UserID: creator.ID, IsRoot: true, IsHierarchical: true},
@@ -352,7 +352,7 @@ func TestOrganizationUnitStore_DeleteRepositoriesRollback(t *testing.T) {
 	ctx := context.Background()
 	creator := createOrganizationUnitMemberTestUser(t, ctx, db, "subtree-repository-rollback-creator")
 	jobClient := &testRepositoryDeletionJobClient{err: errors.New("forced repository deletion enqueue failure")}
-	store := coredb.NewOrganizationUnitStoreWithDBAndDeletionJobClient(db, jobClient)
+	store := coredb.NewOrganizationUnitStoreWithDBAndJobClients(db, jobClient, nil, tests.NewFixtureRebacTupleJobClient(db))
 	rootUUID := uuid.New()
 	root, err := store.CreateRoot(ctx, coredb.CreateRootOrganizationInput{
 		Organization: &coredb.Organization{Name: "subtree-repository-rollback-root", UUID: rootUUID, UserID: creator.ID, IsRoot: true, IsHierarchical: true},
@@ -412,8 +412,8 @@ func TestOrganizationUnitStore_DeleteRootRepositoriesSerializesWithRepositoryCre
 	defer db.Close()
 	ctx := context.Background()
 	creator := createOrganizationUnitMemberTestUser(t, ctx, db, "hierarchy-concurrent-delete-creator")
-	store := coredb.NewOrganizationUnitStoreWithDBAndDeletionJobClient(db, &testRepositoryDeletionJobClient{})
-	repoStore := coredb.NewRepoStoreWithDB(db)
+	store := coredb.NewOrganizationUnitStoreWithDBAndJobClients(db, &testRepositoryDeletionJobClient{}, nil, tests.NewFixtureRebacTupleJobClient(db))
+	repoStore := coredb.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
 	rootUUID := uuid.New()
 	root, err := store.CreateRoot(ctx, coredb.CreateRootOrganizationInput{
 		Organization: &coredb.Organization{Name: "hierarchy-concurrent-root", UUID: rootUUID, UserID: creator.ID, IsRoot: true, IsHierarchical: true},
@@ -491,7 +491,7 @@ func TestOrganizationUnitStore_CreateRootDoesNotOverwriteNamespace(t *testing.T)
 	require.NoError(t, err)
 
 	organizationUUID := uuid.New()
-	_, err = coredb.NewOrganizationUnitStoreWithDBAndDeletionJobClient(db, &testRepositoryDeletionJobClient{}).CreateRoot(ctx, coredb.CreateRootOrganizationInput{
+	_, err = coredb.NewOrganizationUnitStoreWithDBAndJobClients(db, &testRepositoryDeletionJobClient{}, nil, tests.NewFixtureRebacTupleJobClient(db)).CreateRoot(ctx, coredb.CreateRootOrganizationInput{
 		Organization: &coredb.Organization{
 			Name: existingNamespace.Path, UUID: organizationUUID, UserID: creator.ID, IsRoot: true,
 		},
@@ -518,7 +518,7 @@ func TestOrganizationUnitStore_TreeLifecycle(t *testing.T) {
 	defer db.Close()
 	ctx := context.Background()
 	root := createRootOrganization(t, ctx, db, "tree")
-	store := coredb.NewOrganizationUnitStoreWithDBAndDeletionJobClient(db, &testRepositoryDeletionJobClient{})
+	store := coredb.NewOrganizationUnitStoreWithDBAndJobClients(db, &testRepositoryDeletionJobClient{}, nil, tests.NewFixtureRebacTupleJobClient(db))
 
 	engineering := createChild(t, ctx, store, root, "engineering", nil, 10)
 	platform := createChild(t, ctx, store, root, "platform", &engineering.UUID, 20)
@@ -615,7 +615,7 @@ func TestOrganizationUnitStore_ChildOrganizationFields(t *testing.T) {
 	defer db.Close()
 	ctx := context.Background()
 	root := createRootOrganization(t, ctx, db, "fields")
-	store := coredb.NewOrganizationUnitStoreWithDBAndDeletionJobClient(db, &testRepositoryDeletionJobClient{})
+	store := coredb.NewOrganizationUnitStoreWithDBAndJobClients(db, &testRepositoryDeletionJobClient{}, nil, tests.NewFixtureRebacTupleJobClient(db))
 	unit := createChild(t, ctx, store, root, "fields-child", nil, 1)
 	record, err := store.FindByUUID(ctx, unit.UUID)
 	require.NoError(t, err)
@@ -663,7 +663,7 @@ func TestOrganizationUnitStore_CreatorIsRecordOnly(t *testing.T) {
 	ctx := context.Background()
 	root := createRootOrganization(t, ctx, db, "creator-record")
 	creator := createOrganizationUnitMemberTestUser(t, ctx, db, "child-creator")
-	store := coredb.NewOrganizationUnitStoreWithDBAndDeletionJobClient(db, &testRepositoryDeletionJobClient{})
+	store := coredb.NewOrganizationUnitStoreWithDBAndJobClients(db, &testRepositoryDeletionJobClient{}, nil, tests.NewFixtureRebacTupleJobClient(db))
 	organizationUUID := uuid.New()
 	childOrganization := &coredb.Organization{
 		Name: "unit-creator-" + uuid.NewString()[:8], Nickname: "Creator Child", UUID: organizationUUID, UserID: creator.ID, IsRoot: false,
@@ -707,7 +707,7 @@ func TestOrganizationUnitStore_FindActiveHierarchicalRoot(t *testing.T) {
 	defer db.Close()
 	setOrgStoreTestDB(t, db)
 	ctx := context.Background()
-	store := coredb.NewOrganizationUnitStoreWithDBAndDeletionJobClient(db, &testRepositoryDeletionJobClient{})
+	store := coredb.NewOrganizationUnitStoreWithDBAndJobClients(db, &testRepositoryDeletionJobClient{}, nil, tests.NewFixtureRebacTupleJobClient(db))
 	legacy := &coredb.Organization{Name: "legacy-root-lookup", UUID: uuid.New(), IsRoot: true}
 	require.NoError(t, coredb.NewOrgStore(false, nil).Create(ctx, legacy, &coredb.Namespace{Path: legacy.Name}))
 
@@ -734,7 +734,7 @@ func TestOrganizationUnitStore_FindActiveHierarchicalRoot(t *testing.T) {
 func createRootOrganization(t *testing.T, ctx context.Context, db *coredb.DB, suffix string) *coredb.Organization {
 	t.Helper()
 	organization := &coredb.Organization{Name: "unit-root-" + suffix, Nickname: "Unit Root " + suffix, UUID: uuid.New(), IsRoot: true}
-	created, err := coredb.NewOrganizationUnitStoreWithDBAndDeletionJobClient(db, &testRepositoryDeletionJobClient{}).CreateRoot(ctx, coredb.CreateRootOrganizationInput{
+	created, err := coredb.NewOrganizationUnitStoreWithDBAndJobClients(db, &testRepositoryDeletionJobClient{}, nil, tests.NewFixtureRebacTupleJobClient(db)).CreateRoot(ctx, coredb.CreateRootOrganizationInput{
 		Organization: organization,
 		Namespace:    &coredb.Namespace{Path: organization.Name, UUID: organization.UUID.String()},
 	})

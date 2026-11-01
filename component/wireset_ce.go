@@ -33,6 +33,7 @@ type Mocks struct {
 	components       *mockedComponents
 	gitServer        *mock_git.MockGitServer
 	userSvcClient    *mock_rpc.MockUserSvcClient
+	xnetClient       *mock_rpc.MockXnetSvcClient
 	s3Client         *mock_s3.MockClient
 	deployer         *mock_deploy.MockDeployer
 	cache            *mock_cache.MockCache
@@ -45,7 +46,6 @@ type Mocks struct {
 	multiSyncClient  *mock_multisync.MockClient
 	s3Core           *mock_s3.MockCore
 	checker          *mock_checker.MockGitCallbackChecker
-	xnetClient       *mock_rpc.MockXnetSvcClient
 }
 
 var AllMockSet = wire.NewSet(

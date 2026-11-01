@@ -50,8 +50,8 @@ type Cache interface {
 	RemoveRunningTask(ctx context.Context, workID int) error
 	// DeleteLfsSyncFileCache removes upload, progress, and part cache for one LFS file.
 	DeleteLfsSyncFileCache(ctx context.Context, repoID int64, oid, partSize string) error
-	// DeleteRepoSyncCache removes all LFS sync cache for a repository under one part size.
-	DeleteRepoSyncCache(ctx context.Context, repoID int64, partSize string) error
+	// DeleteRepoSyncCache removes all LFS sync cache for a repository across all part sizes.
+	DeleteRepoSyncCache(ctx context.Context, repoID int64) error
 }
 
 // cacheImpl implements Cache with Redis.
@@ -85,32 +85,27 @@ func (c *cacheImpl) DeleteLfsSyncFileCache(ctx context.Context, repoID int64, oi
 	return err
 }
 
-// DeleteRepoSyncCache removes all LFS sync cache for a repository under one part size.
-func (c *cacheImpl) DeleteRepoSyncCache(ctx context.Context, repoID int64, partSize string) error {
-	uploadIDKey := lfsUploadIDCacheKey(repoID, partSize)
-	progressKey := lfsProgressCacheKey(repoID, partSize)
-	uploads, err := c.redis.HGetAll(ctx, uploadIDKey)
-	if err != nil {
-		return err
-	}
-
-	keys := make([]string, 0, len(uploads)+2)
-	for oid := range uploads {
-		keys = append(keys, lfsPartCacheKey(repoID, partSize, oid))
-	}
-	keys = append(keys, uploadIDKey, progressKey)
-
-	_, err = c.redis.Pipelined(ctx, func(pipe redis.Pipeliner) error {
-		for start := 0; start < len(keys); start += repoSyncCacheDeleteBatchSize {
-			end := start + repoSyncCacheDeleteBatchSize
-			if end > len(keys) {
-				end = len(keys)
-			}
-			pipe.Del(ctx, keys[start:end]...)
+// DeleteRepoSyncCache removes all LFS sync cache for a repository across all part sizes.
+func (c *cacheImpl) DeleteRepoSyncCache(ctx context.Context, repoID int64) error {
+	pattern := fmt.Sprintf("%s:repo:%d:partsize:*", LfsSyncKeyPrefix, repoID)
+	var cursor uint64
+	for {
+		keys, next, err := c.redis.Scan(ctx, cursor, pattern, repoSyncCacheDeleteBatchSize)
+		if err != nil {
+			return fmt.Errorf("scan repository LFS cache: %w", err)
 		}
-		return nil
-	})
-	return err
+		// SCAN's count is a hint; bound each DEL even when Redis returns more keys.
+		for start := 0; start < len(keys); start += repoSyncCacheDeleteBatchSize {
+			end := min(start+repoSyncCacheDeleteBatchSize, len(keys))
+			if err := c.redis.Del(ctx, keys[start:end]...); err != nil {
+				return fmt.Errorf("delete repository LFS cache: %w", err)
+			}
+		}
+		cursor = next
+		if cursor == 0 {
+			return nil
+		}
+	}
 }
 
 // CacheUploadID stores the multipart upload ID for one LFS object.

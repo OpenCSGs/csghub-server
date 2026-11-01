@@ -1,0 +1,73 @@
+## Building for Runtime Framework ##
+generate:child:framework:pipeline:
+  stage: build
+  script:
+    - |
+      if [ -z $DOCKERFILE_SUFFIX ] || [ -z $BUILD_IMAGE_TAG ] || [ -z $BUILD_FRAMEWORK_CONTEXT ]; then
+        echo "Valid runtime framework name and tag and context should be specified."
+        exit 1
+      fi
+      
+      if [ -z $BUILD_IMAGE_NAME ]; then
+        BUILD_IMAGE_NAME=$DOCKERFILE_SUFFIX
+      fi
+      
+      cat > ${CI_PROJECT_DIR}/child-pipelines.yml <<EOF
+      ---
+      include:
+        - local: '.gitlab/ci/.build-ci.yml'
+      
+      build:${BUILD_FRAMEWORK_CONTEXT}:${DOCKERFILE_SUFFIX}:
+        extends: .build
+        variables:
+          BUILD_TAG: "$DOCKERFILE_SUFFIX"
+          BUILD_PLATFORMS: "$BUILD_FRAMEWORK_PLATFORMS"
+          DOCKER_CONTEXT: "docker/$BUILD_FRAMEWORK_CONTEXT"
+          IMAGE_PREFIX: "opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/$BUILD_IMAGE_NAME"
+          IMAGE_TAG: "$BUILD_IMAGE_TAG"
+          DOCKERFILE: "Dockerfile.$DOCKERFILE_SUFFIX"
+          BUILD_OUTPUT: false
+        tags:
+          - external
+      EOF
+#      push:${BUILD_FRAMEWORK_CONTEXT}:${DOCKERFILE_SUFFIX}:
+#        image: ${ALI_ACR_REGISTRY}/docker:27.3
+#        variables:
+#          IMAGE_PREFIX: "opencsghq/$DOCKERFILE_SUFFIX"
+#          IMAGE_TAG: "$BUILD_IMAGE_TAG"
+#        before_script:
+#          - sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
+#          - apk add --no-cache skopeo
+#        needs:
+#          - job: build:${BUILD_FRAMEWORK_CONTEXT}:${DOCKERFILE_SUFFIX}
+#            artifacts: true
+#        script:
+#          - |
+#            skopeo copy --all \
+#              --dest-creds=\${DOCKER_REGISTRY_USER}:\${DOCKER_REGISTRY_PASSWORD} \
+#              oci-archive:csghub-server-\${IMAGE_TAG}.tar \
+#              docker://docker.io/\${IMAGE_PREFIX}:\${IMAGE_TAG}
+#        tags:
+#          - external
+  artifacts:
+    paths:
+      - ./child-pipelines.yml
+  rules:
+    # Only the framework schedules define BUILD_FRAMEWORK_PLATFORMS; other schedules
+    # (QA) must not create a framework child pipeline.
+    - if: $CI_PIPELINE_SOURCE == "schedule" && $BUILD_FRAMEWORK_PLATFORMS
+
+trigger-child-component:
+  stage: build
+  needs:
+    - job: generate:child:framework:pipeline
+      artifacts: true
+  trigger:
+    include:
+      - job: generate:child:framework:pipeline
+        artifact: child-pipelines.yml
+    forward:
+      pipeline_variables: true
+    strategy: depend
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule" && $BUILD_FRAMEWORK_PLATFORMS

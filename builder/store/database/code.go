@@ -171,11 +171,10 @@ func (s *codeStoreImpl) FindByPath(ctx context.Context, namespace string, repoPa
 		Relation("Repository.User").
 		Relation("Repository.Mirror").
 		Relation("Repository.Mirror.CurrentTask").
-		Relation("Repository.Statistics").
-		Where("repository.path =?", fmt.Sprintf("%s/%s", namespace, repoPath)).
+		Where("LOWER(repository.path) = LOWER(?)", fmt.Sprintf("%s/%s", namespace, repoPath)).
 		Scan(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find code: %w", err)
+		return nil, fmt.Errorf("failed to find code: %w", resourceLookupError(err, namespace, repoPath))
 	}
 	err = s.db.Operator.Core.NewSelect().
 		Model(resCode.Repository).

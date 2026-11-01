@@ -4,6 +4,6 @@ package filter
 
 import "opencsg.com/csghub-server/common/config"
 
-func NewRepoFilter(_ *config.Config) RepoFilter {
+func NewRepoFilter(config *config.Config) RepoFilter {
 	return nil
 }

@@ -94,6 +94,7 @@ func TestModelStore_CRUD(t *testing.T) {
 	require.NotNil(t, err)
 }
 
+// TestModelStore_ListByPath verifies input path grouping without ordering models that share a path.
 func TestModelStore_ListByPath(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
@@ -174,10 +175,15 @@ func TestModelStore_ListByPath(t *testing.T) {
 	require.Equal(t, []string{}, tags)
 
 	names := []string{}
+	paths := []string{}
 	for _, ds := range dss {
 		names = append(names, ds.Repository.Name)
+		paths = append(paths, ds.Repository.Path)
 	}
-	require.Equal(t, []string{"repo2", "repo", "repo3"}, names)
+	// Path groups follow the request; models within the same group have no defined order.
+	require.Equal(t, []string{"bar/foo", "foo/bar", "foo/bar"}, paths)
+	require.Equal(t, "repo2", names[0])
+	require.ElementsMatch(t, []string{"repo", "repo3"}, names[1:])
 
 }
 

@@ -158,3 +158,28 @@ func TestAgentInstanceStoreFindByIDWithDeletedReturnsTombstonedLogicalAgent(t *t
 	require.Equal(t, database.AgentInstanceKindLogical, tombstoned.Kind)
 	require.False(t, tombstoned.DeletedAt.IsZero())
 }
+
+func TestAgentCatalogStoreCreateLogicalDuplicateNameIsFriendly(t *testing.T) {
+	db := tests.InitTransactionTestDB()
+	defer db.Close()
+	ctx := context.Background()
+	store := database.NewAgentCatalogStoreWithDB(db)
+	owner := uuid.NewString()
+	name := "shared-logical-name"
+
+	first := newLogicalAgentTestInstance(owner, "logical-"+uuid.NewString())
+	first.Name = name
+	_, err := store.CreateLogicalAgent(ctx, first)
+	require.NoError(t, err)
+
+	second := newLogicalAgentTestInstance(owner, "logical-"+uuid.NewString())
+	second.Name = name
+	_, err = store.CreateLogicalAgent(ctx, second)
+	require.ErrorIs(t, err, errorx.ErrInstanceNameAlreadyExists)
+
+	// A different owner may reuse the name.
+	other := newLogicalAgentTestInstance(uuid.NewString(), "logical-"+uuid.NewString())
+	other.Name = name
+	_, err = store.CreateLogicalAgent(ctx, other)
+	require.NoError(t, err)
+}

@@ -5,3 +5,8 @@ type MultiSource struct {
 	MSPath  string `json:"ms_path"`
 	CSGPath string `json:"csg_path"`
 }
+
+type CaptchaResponse struct {
+	ID   string `json:"id"`
+	B64s string `json:"bs64"`
+}

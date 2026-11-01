@@ -73,18 +73,25 @@ type MirrorRepoMetadataUpdate struct {
 }
 
 type mirrorRepoStoreImpl struct {
-	db        *DB
-	jobClient MirrorJobClient
+	// rebacTupleJobClient records permission changes on this Store's business transaction.
+	rebacTupleJobClient RebacTupleJobClient
+	db                  *DB
+	jobClient           MirrorJobClient
 }
 
 // NewMirrorRepoStore creates a MirrorRepoStore using the default database.
 func NewMirrorRepoStore(jobClient MirrorJobClient) MirrorRepoStore {
-	return &mirrorRepoStoreImpl{db: defaultDB, jobClient: jobClient}
+	return NewMirrorRepoStoreWithJobClients(defaultDB, jobClient, nil)
 }
 
 // NewMirrorRepoStoreWithDB creates a MirrorRepoStore using the provided database.
 func NewMirrorRepoStoreWithDB(db *DB, jobClient MirrorJobClient) MirrorRepoStore {
-	return &mirrorRepoStoreImpl{db: db, jobClient: jobClient}
+	return NewMirrorRepoStoreWithJobClients(db, jobClient, nil)
+}
+
+// NewMirrorRepoStoreWithJobClients injects mirror and permission job producers.
+func NewMirrorRepoStoreWithJobClients(db *DB, mirrorJobs MirrorJobClient, tupleJobs RebacTupleJobClient) MirrorRepoStore {
+	return &mirrorRepoStoreImpl{db: db, jobClient: mirrorJobs, rebacTupleJobClient: tupleJobs}
 }
 
 // CreateMirrorRepoRecords creates all business-visible mirror repository rows atomically.
@@ -102,6 +109,10 @@ func (s *mirrorRepoStoreImpl) CreateMirrorRepoRecords(ctx context.Context, input
 	mirror := input.Mirror
 	err := s.db.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		if input.CreateRepository {
+			// Lock the namespace before inserting any records so deletion cannot miss this repository.
+			if err := lockRepositoryNamespaceForWrite(ctx, tx, *input.Repository); err != nil {
+				return err
+			}
 			createdRepo, err := createRepository(ctx, tx, *input.Repository)
 			if err != nil {
 				return err
@@ -176,6 +187,9 @@ func (s *mirrorRepoStoreImpl) CreateMirrorRepoRecords(ctx context.Context, input
 			}
 		}
 
+		if input.CreateRepository {
+			return enqueueRepositoryTupleTx(ctx, tx, s.rebacTupleJobClient, nil, input.Repository)
+		}
 		return nil
 	})
 	if err != nil {

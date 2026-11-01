@@ -112,6 +112,7 @@ func TestDeployer_StartDeploy(t *testing.T) {
 	d := &deployer{
 		snowflakeNode:   node,
 		deployTaskStore: mockTaskStore,
+		// scheduler:       mockSch,
 	}
 	err := d.StartDeploy(context.TODO(), &dbdeploy)
 

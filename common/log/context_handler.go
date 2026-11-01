@@ -4,10 +4,9 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"opencsg.com/csghub-server/common/utils/trace"
 	"path/filepath"
 	"runtime"
-
-	"opencsg.com/csghub-server/common/utils/trace"
 )
 
 // ContextHandler is a slog.Handler that adds trace ID and session ID to every log record.

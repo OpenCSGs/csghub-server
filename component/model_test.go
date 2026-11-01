@@ -919,7 +919,7 @@ func TestModelComponent_SetRelationDatasets(t *testing.T) {
 	mc := initializeTestModelComponent(ctx, t)
 
 	mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{
-		RoleMask: "admin",
+		RoleAssignments: superAdminRoleAssignments(),
 	}, nil)
 	mc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "ns", "n").Return(
 		&database.Repository{}, nil,
@@ -955,7 +955,7 @@ func TestModelComponent_AddRelationDataset(t *testing.T) {
 	mc := initializeTestModelComponent(ctx, t)
 
 	mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{
-		RoleMask: "admin",
+		RoleAssignments: superAdminRoleAssignments(),
 	}, nil)
 	mc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "ns", "n").Return(
 		&database.Repository{}, nil,
@@ -991,7 +991,7 @@ func TestModelComponent_DeleteRelationDataset(t *testing.T) {
 	mc := initializeTestModelComponent(ctx, t)
 
 	mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{
-		RoleMask: "admin",
+		RoleAssignments: superAdminRoleAssignments(),
 	}, nil)
 	mc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "ns", "n").Return(
 		&database.Repository{}, nil,
@@ -1264,4 +1264,96 @@ func TestModelComponent_IndexV2_Empty(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, 0, total)
 	require.Len(t, data, 0)
+}
+
+func TestModelComponent_Deploy_TypedDecisionsTask(t *testing.T) {
+	tests := []struct {
+		name      string
+		frameName string
+		tags      []database.Tag
+		wantTask  string
+	}{
+		{
+			name:      "laya model tags on the laya engine",
+			frameName: "laya",
+			tags:      []database.Tag{{Name: "system-one"}, {Name: "laya"}},
+			wantTask:  string(types.TypedDecisions),
+		},
+		{
+			name:      "decision model tag on llama.cpp",
+			frameName: "llama.cpp",
+			tags:      []database.Tag{{Name: "decision-model"}},
+			wantTask:  string(types.TypedDecisions),
+		},
+		{
+			name:      "decision model tag on an engine without SystemOne",
+			frameName: "vllm",
+			tags:      []database.Tag{{Name: "decision-model"}},
+			wantTask:  string(types.TextGeneration),
+		},
+		{
+			name:      "plain model keeps built-in task",
+			frameName: "vllm",
+			tags:      []database.Tag{{Name: string(types.TextGeneration)}},
+			wantTask:  string(types.TextGeneration),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.TODO()
+			mc := initializeTestModelComponent(ctx, t)
+
+			mc.mocks.stores.ModelMock().EXPECT().FindByPath(ctx, "ns", "n").Return(&database.Model{
+				RepositoryID: int64(123),
+				Repository: &database.Repository{
+					ID:   1,
+					Path: "foo",
+					Tags: tt.tags,
+				},
+			}, nil)
+			mc.mocks.stores.DeployTaskMock().EXPECT().GetServerlessDeployByRepID(ctx, int64(1)).Return(nil, nil)
+			mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{
+				RoleAssignments: superAdminRoleAssignments(),
+				UUID:            "user-uuid",
+			}, nil)
+			mc.mocks.stores.RuntimeFrameworkMock().EXPECT().FindEnabledByID(ctx, int64(11)).Return(
+				&database.RuntimeFramework{FrameName: tt.frameName}, nil,
+			)
+			mc.mocks.stores.SpaceResourceMock().EXPECT().FindByID(ctx, int64(123)).Return(
+				&database.SpaceResource{
+					ID:        123,
+					Resources: `{"memory": "foo"}`,
+					ClusterID: "cluster",
+				}, nil,
+			)
+			mc.mocks.components.repo.EXPECT().GetNamespaceBillingUUID(ctx, "ns").Return("ns-billing-uuid", nil)
+			mc.mocks.components.repo.EXPECT().CheckAccountAndResource(ctx, types.CheckResourceAndAccountReq{UserName: "ns", ClusterID: "cluster", OrderDetailID: 0, CurrentUser: "user"}, &database.SpaceResource{
+				ID:        123,
+				Resources: `{"memory": "foo"}`,
+				ClusterID: "cluster",
+			}).Return(&types.CheckExclusiveResp{}, nil)
+
+			mc.mocks.deployer.EXPECT().Deploy(ctx, mock.MatchedBy(func(dp types.DeployRequest) bool {
+				return dp.Task == tt.wantTask && dp.RuntimeFramework == tt.frameName
+			})).Return(333, nil)
+
+			id, err := mc.Deploy(ctx, types.DeployActReq{
+				Namespace:   "ns",
+				Name:        "n",
+				CurrentUser: "user",
+				DeployType:  types.ServerlessType,
+			}, types.ModelRunReq{
+				RuntimeFrameworkID: 11,
+				ResourceID:         123,
+				ClusterID:          "cluster",
+				DeployName:         "dp",
+				OwnerNamespace:     "ns",
+				// llama.cpp frames require an entrypoint; ignored by the others.
+				Entrypoint: "model.gguf",
+			})
+			require.Nil(t, err)
+			require.Equal(t, int64(333), id)
+		})
+	}
 }

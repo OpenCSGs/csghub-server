@@ -131,6 +131,7 @@ func (h *SpaceHandler) Index(ctx *gin.Context) {
 // @Param        need_op_weight query bool false "need op weight" default(false)
 // @Success      200  {object}  types.Response{data=types.Space} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      404  {object}  types.Response "Resource not found"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /spaces/{namespace}/{name} [get]
 func (h *SpaceHandler) Show(ctx *gin.Context) {
@@ -149,6 +150,10 @@ func (h *SpaceHandler) Show(ctx *gin.Context) {
 
 	detail, err := h.space.Show(ctx.Request.Context(), namespace, name, currentUser, needOpWeight)
 	if err != nil {
+		if errors.Is(err, errorx.ErrRepoNotFound) {
+			httpbase.NotFoundError(ctx, err)
+			return
+		}
 		if errors.Is(err, errorx.ErrUnauthorized) {
 			httpbase.UnauthorizedError(ctx, err)
 			return

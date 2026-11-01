@@ -87,10 +87,15 @@ func (p *promptTextProvider) PromptText() string { return p.text }
 
 // stubMetricsEnricher records the last SetModelTarget call for assertions.
 type stubMetricsEnricher struct {
-	called   bool
-	modelID  string
-	target   *types.ModelTarget
-	isStream bool
+	called       bool
+	requestModel string
+	modelID      string
+	target       *types.ModelTarget
+	isStream     bool
+}
+
+func (s *stubMetricsEnricher) SetRequestModel(_ *gin.Context, requestModel string) {
+	s.requestModel = requestModel
 }
 
 func (s *stubMetricsEnricher) SetModelTarget(c *gin.Context, modelID string, target *types.ModelTarget, isStream bool) {

@@ -68,39 +68,6 @@ func namespaceRelationship(namespace database.Namespace, subjectUUID string) (re
 	}, nil
 }
 
-// ensureUserObjectOwnerRelationship reconciles the owner tuple for a user object.
-// The tuple is separate from the owner tuple of the user's namespace.
-func ensureUserObjectOwnerRelationship(ctx context.Context, authorizer rebac.Authorizer, userUUID string) error {
-	if authorizer == nil {
-		return fmt.Errorf("user object ReBAC authorizer is required")
-	}
-	if userUUID == "" {
-		return fmt.Errorf("user UUID is required")
-	}
-
-	relationship := rebac.Relationship{
-		Subject:  rebac.UserSubject(userUUID),
-		Relation: rebac.RelationOwner,
-		Object:   rebac.UserObject(userUUID),
-	}
-	decision, err := authorizer.Check(ctx, rebac.CheckRequest{
-		Subject:     relationship.Subject,
-		Relation:    relationship.Relation,
-		Object:      relationship.Object,
-		Consistency: rebac.ConsistencyHigher,
-	})
-	if err != nil {
-		return fmt.Errorf("failed to check user object owner relationship: %w", err)
-	}
-	if decision.Allowed {
-		return nil
-	}
-	if err := authorizer.Write(ctx, []rebac.Relationship{relationship}); err != nil {
-		return fmt.Errorf("failed to write user object owner relationship: %w", err)
-	}
-	return nil
-}
-
 // ensureRepositoryNamespaceRelationship reconciles the active direct relationship between a repository and its namespace owner.
 // User namespaces write repository#owner@user; organization namespaces write either repository#organization@organization
 // or repository#organization_direct@organization when inheritance is blocked.

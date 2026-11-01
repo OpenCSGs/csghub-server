@@ -53,6 +53,6 @@ docs/swagger.yaml
 docs/docs.go
 pgdata15/
 .prd/
-.specs/
 cmd/dev/
 run_moderation_local.sh
+.omo

@@ -115,14 +115,14 @@ func TestRecordResponsesUsageHappyPathCallsComponent(t *testing.T) {
 		wg.Add(1)
 		var seenUsage *token.Usage
 		tester.mocks.openAIComp.EXPECT().RecordUsageFromTokenUsage(
-			mock.Anything, "testuuid", model, "upstream", mock.Anything, "apikey", mock.Anything,
-		).RunAndReturn(func(_ context.Context, _ string, _ *types.Model, _ string, usage *token.Usage, _ string, _ int64) error {
+			mock.Anything, "testuuid", model, "upstream", mock.Anything, mock.Anything,
+		).RunAndReturn(func(_ context.Context, _ string, _ *types.Model, _ string, usage *token.Usage, _ int64) error {
 			seenUsage = usage
 			wg.Done()
 			return nil
 		}).Once()
 
-		tester.handler.recordResponsesUsageWithTrace(c, counter, nil, "testuuid", modelTarget, "apikey", nil, responsesTracePostProcessInput{StatusCode: http.StatusOK}, nil)
+		tester.handler.recordResponsesUsageWithTrace(c, counter, nil, "testuuid", modelTarget, nil, responsesTracePostProcessInput{StatusCode: http.StatusOK}, nil)
 
 		synctest.Wait()
 		require.NotNil(t, seenUsage)
@@ -174,8 +174,8 @@ func TestRecordResponsesUsagePublishesLLMLog(t *testing.T) {
 		var wg sync.WaitGroup
 		wg.Add(2)
 		tester.mocks.openAIComp.EXPECT().RecordUsageFromTokenUsage(
-			mock.Anything, "testuuid", model, "upstream", mock.Anything, "apikey", mock.Anything,
-		).RunAndReturn(func(_ context.Context, _ string, _ *types.Model, _ string, _ *token.Usage, _ string, _ int64) error {
+			mock.Anything, "testuuid", model, "upstream", mock.Anything, mock.Anything,
+		).RunAndReturn(func(_ context.Context, _ string, _ *types.Model, _ string, _ *token.Usage, _ int64) error {
 			wg.Done()
 			return nil
 		}).Once()
@@ -183,7 +183,7 @@ func TestRecordResponsesUsagePublishesLLMLog(t *testing.T) {
 			wg.Done()
 		}
 
-		tester.handler.recordResponsesUsageWithTrace(c, counter, nil, "testuuid", modelTarget, "apikey", recorder, responsesTracePostProcessInput{StatusCode: http.StatusOK}, nil)
+		tester.handler.recordResponsesUsageWithTrace(c, counter, nil, "testuuid", modelTarget, recorder, responsesTracePostProcessInput{StatusCode: http.StatusOK}, nil)
 
 		synctest.Wait()
 		require.NotNil(t, publisher.payload)
@@ -232,13 +232,13 @@ func TestRecordResponsesUsageRecordsLLMTrace(t *testing.T) {
 		var wg sync.WaitGroup
 		wg.Add(1)
 		tester.mocks.openAIComp.EXPECT().RecordUsageFromTokenUsage(
-			mock.Anything, "testuuid", model, "upstream", mock.Anything, "apikey", mock.Anything,
-		).RunAndReturn(func(_ context.Context, _ string, _ *types.Model, _ string, _ *token.Usage, _ string, _ int64) error {
+			mock.Anything, "testuuid", model, "upstream", mock.Anything, mock.Anything,
+		).RunAndReturn(func(_ context.Context, _ string, _ *types.Model, _ string, _ *token.Usage, _ int64) error {
 			wg.Done()
 			return nil
 		}).Once()
 
-		tester.handler.recordResponsesUsageWithTrace(c, counter, nil, "testuuid", modelTarget, "apikey", recorder, traceInput, nil)
+		tester.handler.recordResponsesUsageWithTrace(c, counter, nil, "testuuid", modelTarget, recorder, traceInput, nil)
 
 		synctest.Wait()
 		usage, usageEnded, usageEvents := traceRecorder.snapshot()
@@ -275,13 +275,13 @@ func TestRecordResponsesUsageSkipsBillingOnErrorStatus(t *testing.T) {
 
 		var billingCalled atomic.Bool
 		tester.mocks.openAIComp.EXPECT().
-			RecordUsageFromTokenUsage(mock.Anything, "testuuid", model, "upstream", mock.Anything, "apikey", mock.Anything).
-			Run(func(context.Context, string, *types.Model, string, *token.Usage, string, int64) {
+			RecordUsageFromTokenUsage(mock.Anything, "testuuid", model, "upstream", mock.Anything, mock.Anything).
+			Run(func(context.Context, string, *types.Model, string, *token.Usage, int64) {
 				billingCalled.Store(true)
 			}).
 			Maybe()
 
-		tester.handler.recordResponsesUsageWithTrace(c, counter, nil, "testuuid", modelTarget, "apikey", nil, responsesTracePostProcessInput{
+		tester.handler.recordResponsesUsageWithTrace(c, counter, nil, "testuuid", modelTarget, nil, responsesTracePostProcessInput{
 			StatusCode: http.StatusInternalServerError,
 		}, nil)
 
@@ -307,13 +307,13 @@ func TestRecordResponsesUsageSkipsBillingOnRedirectStatus(t *testing.T) {
 
 		var billingCalled atomic.Bool
 		tester.mocks.openAIComp.EXPECT().
-			RecordUsageFromTokenUsage(mock.Anything, "testuuid", model, "upstream", mock.Anything, "apikey", mock.Anything).
-			Run(func(context.Context, string, *types.Model, string, *token.Usage, string, int64) {
+			RecordUsageFromTokenUsage(mock.Anything, "testuuid", model, "upstream", mock.Anything, mock.Anything).
+			Run(func(context.Context, string, *types.Model, string, *token.Usage, int64) {
 				billingCalled.Store(true)
 			}).
 			Maybe()
 
-		tester.handler.recordResponsesUsageWithTrace(c, counter, nil, "testuuid", modelTarget, "apikey", nil, responsesTracePostProcessInput{
+		tester.handler.recordResponsesUsageWithTrace(c, counter, nil, "testuuid", modelTarget, nil, responsesTracePostProcessInput{
 			StatusCode: http.StatusFound,
 		}, nil)
 

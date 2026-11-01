@@ -24,20 +24,13 @@ func Push(address, apiKey string, event *types.WebHookSendEvent) error {
 		return nil
 	}
 
-	client := rpc.NewHttpClient(address, rpc.AuthWithApiKey(apiKey))
+	client := rpc.NewHttpClient(address, rpc.AuthWithApiKey(apiKey)).WithRetry(3).WithDelay(time.Second * 2)
 	urlPath := "/api/v1/webhook/runner"
 	var (
 		err        error
 		statusCode int
 	)
-
-	for range 3 {
-		statusCode, err = pushWithRetry(client, urlPath, event)
-		if err == nil {
-			break
-		}
-		time.Sleep(2 * time.Second)
-	}
+	statusCode, err = pushWithRetry(client, urlPath, event)
 
 	if err != nil {
 		failedEventCache.PushBack(*event)

@@ -10,6 +10,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/aigateway/component/router"
+	"opencsg.com/csghub-server/aigateway/handler/plan"
 	"opencsg.com/csghub-server/aigateway/types"
 	commonType "opencsg.com/csghub-server/common/types"
 )
@@ -90,15 +91,6 @@ type modelTargetErrorOptions struct {
 	Host      string
 }
 
-type modelTargetResolveOptions struct {
-	RequiredUpstreamID int64
-	// ClientProtocol is the inference API format the caller is serving.
-	// When set, upstream selection prefers candidates that natively support
-	// it. Empty for callers that do not do protocol-aware resolution (e.g.
-	// multimodal tasks).
-	ClientProtocol commonType.ApiFormat
-}
-
 type modelTargetErrorParams struct {
 	Status  int
 	Code    string
@@ -115,6 +107,9 @@ type endpointTargetResolveInput struct {
 	TargetReq          *commonType.EndpointReq
 	RequiredUpstreamID int64
 	ClientProtocol     commonType.ApiFormat
+	// Caller is the authenticated caller identity; its UserPriority decides
+	// the eligible upstream channel. May be nil for legacy callers.
+	Caller *commonType.GatewayWhitelistCaller
 }
 
 type endpointTargetResolveResult struct {
@@ -151,9 +146,9 @@ func newModelTargetError(params modelTargetErrorParams) *modelTargetError {
 func newInternalModelTargetError(err error) *modelTargetError {
 	return newModelTargetError(modelTargetErrorParams{
 		Status:  http.StatusInternalServerError,
-		Code:    "internal_error",
+		Code:    types.ErrCodeInternal,
 		Message: err.Error(),
-		Type:    "internal_error",
+		Type:    types.ErrTypeServer,
 		Options: modelTargetErrorOptions{Cause: err},
 	})
 }
@@ -163,7 +158,7 @@ func newInvalidRequestModelTargetError(code, message string, options modelTarget
 		Status:  http.StatusBadRequest,
 		Code:    code,
 		Message: message,
-		Type:    "invalid_request_error",
+		Type:    types.ErrTypeInvalidRequest,
 		Options: options,
 	})
 }
@@ -173,27 +168,79 @@ func newServerModelTargetError(code, message string, options modelTargetErrorOpt
 		Status:  http.StatusInternalServerError,
 		Code:    code,
 		Message: message,
-		Type:    "server_error",
+		Type:    types.ErrTypeServer,
 		Options: options,
 	})
 }
 
-func (h *OpenAIHandlerImpl) resolveModelTarget(ctx context.Context, nsUUID, modelID string, headers http.Header) (*resolvedModelTarget, error) {
-	return h.resolveModelTargetWithOptions(ctx, nsUUID, modelID, headers, modelTargetResolveOptions{})
+// resolveModelTargetReq bundles the inputs of resolveModelTarget, the gin
+// convenience form: the context and caller identity are derived from the
+// request. Future conditions are added as fields of
+// resolveModelTargetWithOptionsReq, not as new function parameters.
+type resolveModelTargetReq struct {
+	C       *gin.Context
+	ModelID string
+	Headers http.Header
 }
 
-func (h *OpenAIHandlerImpl) resolveModelTargetWithOptions(ctx context.Context, nsUUID, modelID string, headers http.Header, options modelTargetResolveOptions) (*resolvedModelTarget, error) {
-	model, err := h.openaiComponent.GetModelByID(ctx, nsUUID, modelID)
+// resolveModelTargetWithOptionsReq bundles the full inputs of
+// resolveModelTargetWithOptions for callers that already hold a context and
+// caller identity (planner adapter, tests). Future resolution conditions are
+// added as fields here without changing the function signature.
+type resolveModelTargetWithOptionsReq struct {
+	Ctx    context.Context
+	Caller *commonType.GatewayWhitelistCaller
+	// ModelID is the logical model identifier the client asked for.
+	ModelID string
+	// Headers carry session-routing headers (X-Session-ID etc.) used for
+	// session-affine upstream selection.
+	Headers http.Header
+	// RequiredUpstreamID forces selection of the upstream with this ID
+	// (Responses previous_response_id pinning). Zero for normal selection.
+	RequiredUpstreamID int64
+	// ClientProtocol is the inference API format the caller is serving.
+	// When set, upstream selection prefers candidates that natively support
+	// it. Empty for callers that do not do protocol-aware resolution (e.g.
+	// multimodal tasks).
+	ClientProtocol commonType.ApiFormat
+}
+
+func (h *OpenAIHandlerImpl) resolveModelTarget(req resolveModelTargetReq) (*resolvedModelTarget, error) {
+	return h.resolveModelTargetWithOptions(resolveModelTargetWithOptionsReq{
+		Ctx:     req.C.Request.Context(),
+		Caller:  plan.ModelCallerFromGin(req.C),
+		ModelID: req.ModelID,
+		Headers: req.Headers,
+	})
+}
+
+func (h *OpenAIHandlerImpl) resolveModelTargetWithOptions(req resolveModelTargetWithOptionsReq) (*resolvedModelTarget, error) {
+	ctx := req.Ctx
+	model, err := h.openaiComponent.GetModelByID(ctx, &types.GetModelByIDReq{
+		Caller:  req.Caller,
+		ModelID: req.ModelID,
+	})
 	if err != nil {
 		return nil, newInternalModelTargetError(err)
 	}
 	if model == nil {
-		return nil, newInvalidRequestModelTargetError("model_not_found", fmt.Sprintf("model '%s' not found", modelID), modelTargetErrorOptions{})
+		return nil, newInvalidRequestModelTargetError(types.ErrCodeModelNotFound, fmt.Sprintf("model '%s' not found", req.ModelID), modelTargetErrorOptions{})
+	}
+	// The virtual automatic-routing model is replaced with a real model by
+	// the Planner before resolution.  Reaching here means an endpoint that
+	// does not support automatic routing was asked for it, so say that
+	// rather than failing later with a confusing "model not running".
+	if model.AutoRoute {
+		return nil, newInvalidRequestModelTargetError(
+			"auto_routing_unsupported",
+			fmt.Sprintf("model '%s' selects automatic routing, which this endpoint does not support", req.ModelID),
+			modelTargetErrorOptions{Model: model},
+		)
 	}
 	requiresSKUPrice, hasConfiguredSKUPrice := modelSKUPriceStatus(model)
 	if requiresSKUPrice && !hasConfiguredSKUPrice {
 		return nil, newServerModelTargetError(
-			"model_price_not_configured",
+			types.ErrCodeModelPriceNotConfigured,
 			"target model has no configured SKU price",
 			modelTargetErrorOptions{Model: model},
 		)
@@ -224,12 +271,13 @@ func (h *OpenAIHandlerImpl) resolveModelTargetWithOptions(ctx context.Context, n
 	} else {
 		result, err := h.resolveEndpointModelTarget(ctx, endpointTargetResolveInput{
 			Model:              model,
-			ModelID:            modelID,
-			NsUUID:             nsUUID,
-			Headers:            headers,
+			ModelID:            req.ModelID,
+			NsUUID:             req.Caller.NsUUID,
+			Headers:            req.Headers,
 			TargetReq:          &targetReq,
-			RequiredUpstreamID: options.RequiredUpstreamID,
-			ClientProtocol:     options.ClientProtocol,
+			RequiredUpstreamID: req.RequiredUpstreamID,
+			ClientProtocol:     req.ClientProtocol,
+			Caller:             req.Caller,
 		})
 		if err != nil {
 			return nil, err
@@ -244,7 +292,7 @@ func (h *OpenAIHandlerImpl) resolveModelTargetWithOptions(ctx context.Context, n
 	if len(resolved.Target) < 1 {
 		return nil, newInvalidRequestModelTargetError(
 			"model_not_running",
-			fmt.Sprintf("model '%s' not running", modelID),
+			fmt.Sprintf("model '%s' not running", req.ModelID),
 			modelTargetErrorOptions{
 				Model:     model,
 				TargetReq: resolved.TargetReq,
@@ -278,11 +326,32 @@ func (h *OpenAIHandlerImpl) resolveEndpointModelTarget(
 	if availabilityErr != nil {
 		return nil, availabilityErr
 	}
-	// Keep the full available set on the model, ordered native-capable first,
-	// so downstream consumers that iterate in order (capacity admission
-	// re-selection) prefer native passthrough while retaining every fallback
-	// candidate.
-	orderedUpstreams := orderNativeFirst(availableUpstreams, input.ClientProtocol)
+	// Enforce the caller's upstream channel priority (hard gate: a caller may
+	// never reach an upstream whose priority exceeds their own, e.g. a
+	// low-priority tagged user is confined to priority-0 upstreams) and sort
+	// the survivors by descending priority so higher-priority channels lead
+	// the candidate list handed to the session router (affinity semantics
+	// preserved; the order guides single/round-robin and fallback ordering).
+	userPriority := callerUserPriority(input.Caller)
+	eligibleUpstreams := router.EligibleUpstreamsForPriority(availableUpstreams, userPriority)
+	// An empty availableUpstreams list (no upstreams at all) falls through to
+	// the legacy "model_not_running" handling below; only a non-empty
+	// candidate set killed entirely by the priority gate is a denial.
+	if len(availableUpstreams) > 0 && len(eligibleUpstreams) == 0 {
+		return nil, newModelTargetError(modelTargetErrorParams{
+			Status:  http.StatusForbidden,
+			Code:    types.ErrCodeUpstreamPriorityDenied,
+			Message: fmt.Sprintf("caller priority does not admit any available upstream of model '%s'", input.ModelID),
+			Type:    types.ErrTypePermission,
+			Options: modelTargetErrorOptions{Model: input.Model},
+		})
+	}
+	// Keep the full eligible set on the model, ordered by descending priority
+	// tier with native-capable upstreams first WITHIN each tier, so downstream
+	// consumers that iterate in order (capacity admission re-selection,
+	// fallback attempts) never prefer a lower tier over a higher one and
+	// still prefer native passthrough inside a tier.
+	orderedUpstreams := orderByTierThenNative(eligibleUpstreams, input.ClientProtocol)
 	input.Model.Upstreams = orderedUpstreams
 
 	if input.RequiredUpstreamID != 0 {
@@ -305,7 +374,7 @@ func (h *OpenAIHandlerImpl) resolveEndpointModelTarget(
 			}, nil
 		}
 		return nil, newInvalidRequestModelTargetError(
-			"required_upstream_unavailable",
+			types.ErrCodeRequiredUpstreamUnavailable,
 			fmt.Sprintf("required upstream %d for model '%s' is unavailable", input.RequiredUpstreamID, input.ModelID),
 			modelTargetErrorOptions{
 				Model:     input.Model,
@@ -314,12 +383,13 @@ func (h *OpenAIHandlerImpl) resolveEndpointModelTarget(
 		)
 	}
 
-	// Prefer upstreams that natively support the client's protocol: when at
-	// least one declared/inferable candidate can serve the protocol natively,
-	// the router strategy picks from that subset only, so a native
-	// passthrough beats a protocol adaptation whenever possible. Fallback
-	// candidates keep the same native-first order (full set, all candidates).
-	nativeCandidates := preferNativeUpstreams(availableUpstreams, input.ClientProtocol)
+	// Channel priority dominates protocol preference: narrow to the highest
+	// priority tier present FIRST, then prefer upstreams that natively serve
+	// the client's protocol within that tier. A high-priority channel must not
+	// lose the primary pick to a lower-tier native upstream; when the tier has
+	// no native candidate the router falls back to protocol adaptation for
+	// that tier.
+	nativeCandidates := preferNativeUpstreams(router.TopPriorityTier(eligibleUpstreams), input.ClientProtocol)
 	// PickUpstream by router strategy
 	upstream, err := h.sessionRouter.PickUpstream(
 		input.Model.ID,
@@ -338,6 +408,12 @@ func (h *OpenAIHandlerImpl) resolveEndpointModelTarget(
 		upstream.Provider,
 		"upstream_weight",
 		upstream.Weight,
+		"upstream_priority",
+		upstream.Priority,
+		// -1 marks an unrestricted caller; the numeric sentinel (math.MaxInt)
+		// is unreadable when eyeballing logs.
+		"user_priority",
+		userPriorityLogValue(userPriority),
 		"routing_policy",
 		input.Model.RoutingPolicy,
 	)
@@ -396,13 +472,32 @@ func (h *OpenAIHandlerImpl) filterAvailableUpstreams(
 	if len(filtered) == 0 {
 		return nil, newModelTargetError(modelTargetErrorParams{
 			Status:  http.StatusServiceUnavailable,
-			Code:    "model_unavailable",
+			Code:    types.ErrCodeModelUnavailable,
 			Message: fmt.Sprintf("model '%s' has no available upstream endpoint", model.ID),
-			Type:    "service_unavailable_error",
+			Type:    types.ErrTypeServiceUnavailable,
 			Options: modelTargetErrorOptions{Model: model},
 		})
 	}
 	return filtered, nil
+}
+
+// userPriorityLogValue renders the channel priority for logs: -1 for the
+// unrestricted (no routing tag) caller instead of math.MaxInt.
+func userPriorityLogValue(priority int) int {
+	if priority >= commonType.UnrestrictedUpstreamPriority {
+		return -1
+	}
+	return priority
+}
+
+// callerUserPriority returns the caller's upstream channel priority;
+// UnrestrictedUpstreamPriority when the caller carries none (anonymous,
+// legacy paths, or a user without routing tags).
+func callerUserPriority(caller *commonType.GatewayWhitelistCaller) int {
+	if caller == nil || caller.UserPriority == nil {
+		return commonType.UnrestrictedUpstreamPriority
+	}
+	return *caller.UserPriority
 }
 
 // IsCacheUpstreamCircuitOpen returns true only when the runtime circuit cache
@@ -487,29 +582,43 @@ func nativeCapableForClient(u commonType.UpstreamConfig, clientProtocol commonTy
 	return u.SupportsProtocol(clientProtocol) || !u.HasProtocolDeclaration()
 }
 
-// orderNativeFirst partitions the candidate list into native-capable
-// upstreams first, preserving relative order within each group. The full
-// candidate set is kept (unlike preferNativeUpstreams, which narrows), so
-// downstream consumers that iterate in order — capacity admission
-// re-selection, fallback target ordering — prefer native passthrough but can
-// still fall back to adapter-served upstreams.
-func orderNativeFirst(upstreams []commonType.UpstreamConfig, clientProtocol commonType.ApiFormat) []commonType.UpstreamConfig {
+// orderByTierThenNative orders the candidate list by descending priority tier
+// and, within each tier, native-capable upstreams first (relative order is
+// preserved inside each group; the input is expected priority-descending, see
+// router.EligibleUpstreamsForPriority). The full candidate set is kept
+// (unlike preferNativeUpstreams, which narrows), so downstream consumers that
+// iterate in order — capacity admission re-selection, fallback target
+// ordering — never prefer a lower tier over a higher one while still
+// preferring native passthrough inside a tier.
+func orderByTierThenNative(upstreams []commonType.UpstreamConfig, clientProtocol commonType.ApiFormat) []commonType.UpstreamConfig {
 	if strings.TrimSpace(string(clientProtocol)) == "" || len(upstreams) <= 1 {
 		return upstreams
 	}
-	native := make([]commonType.UpstreamConfig, 0, len(upstreams))
-	rest := make([]commonType.UpstreamConfig, 0, len(upstreams))
-	for _, u := range upstreams {
-		if nativeCapableForClient(u, clientProtocol) {
-			native = append(native, u)
-		} else {
-			rest = append(rest, u)
+	ordered := make([]commonType.UpstreamConfig, 0, len(upstreams))
+	for i := 0; i < len(upstreams); {
+		j := i + 1
+		for j < len(upstreams) && upstreams[j].Priority == upstreams[i].Priority {
+			j++
 		}
+		tier := upstreams[i:j]
+		native := make([]commonType.UpstreamConfig, 0, len(tier))
+		rest := make([]commonType.UpstreamConfig, 0, len(tier))
+		for _, u := range tier {
+			if nativeCapableForClient(u, clientProtocol) {
+				native = append(native, u)
+			} else {
+				rest = append(rest, u)
+			}
+		}
+		if len(native) == 0 || len(rest) == 0 {
+			ordered = append(ordered, tier...)
+		} else {
+			ordered = append(ordered, native...)
+			ordered = append(ordered, rest...)
+		}
+		i = j
 	}
-	if len(native) == 0 || len(rest) == 0 {
-		return upstreams
-	}
-	return append(native, rest...)
+	return ordered
 }
 
 // preferNativeUpstreams narrows the candidate list to the upstreams that can
@@ -569,17 +678,17 @@ func handleModelTargetError(c *gin.Context, ctx context.Context, modelID, logMes
 	if !errors.As(err, &targetErr) {
 		slog.ErrorContext(ctx, logMessage, slog.String("model_id", modelID), slog.Any("error", err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": types.Error{
-			Code:    "internal_error",
+			Code:    types.ErrCodeInternal,
 			Message: err.Error(),
-			Type:    "internal_error",
+			Type:    types.ErrTypeServer,
 		}})
 		return
 	}
 
 	switch targetErr.APIError.Code {
-	case "internal_error":
+	case types.ErrCodeInternal:
 		slog.ErrorContext(ctx, "failed to get model by id", slog.String("model_id", modelID), slog.Any("error", targetErr.Cause))
-	case "model_not_running":
+	case types.ErrCodeModelNotRunning:
 		slog.ErrorContext(ctx, logMessage, slog.Any("model", targetErr.Model), slog.Any("targetReq", targetErr.TargetReq),
 			slog.String("model_id", modelID), slog.String("target", targetErr.Target), slog.String("host", targetErr.Host))
 	}

@@ -43,7 +43,13 @@ type MemberComponent interface {
 	GetMemberRoleByUUID(ctx context.Context, orgUUID, userName string) (types.UserRole, error)
 }
 
+// NewMemberComponent injects the permission producer for organization membership transactions.
 func NewMemberComponent(config *config.Config) (MemberComponent, error) {
+	tupleJobs, err := newRebacTupleJobClient()
+	if err != nil {
+		return nil, err
+	}
+
 	gs, err := git.NewGitServer(config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create git server:%w", err)
@@ -55,7 +61,7 @@ func NewMemberComponent(config *config.Config) (MemberComponent, error) {
 		return nil, fmt.Errorf("create ReBAC authorizer: %w", err)
 	}
 	return &memberComponentImpl{
-		memberStore:           database.NewMemberStore(),
+		memberStore:           database.NewMemberStoreWithRebacTupleJobClient(database.GetDB(), tupleJobs),
 		orgStore:              database.NewOrgStore(config.IsHierarchicalOrganization(), nil),
 		userStore:             database.NewUserStore(),
 		gitServer:             gs,
@@ -184,10 +190,6 @@ func (c *memberComponentImpl) ChangeMemberRole(ctx context.Context, orgName, use
 	if err != nil {
 		return fmt.Errorf("failed to update member role,caused by:%w", err)
 	}
-	if err := reconcileOrganizationMemberRelationships(ctx, c.rebac, org.UUID.String(), []string{user.UUID},
-		desiredOrganizationMemberRoles([]string{user.UUID}, memberRole)); err != nil {
-		return fmt.Errorf("sync updated organization member role to ReBAC: %w", err)
-	}
 
 	userUUIDs, err := c.memberStore.UserUUIDsByOrganizationID(ctx, org.ID)
 	if err != nil {
@@ -277,10 +279,8 @@ func (c *memberComponentImpl) AddMembers(ctx context.Context, orgName string, us
 		}
 		// Reconcile existing memberships as well so retries can repair missing or stale tuples.
 		if m != nil {
-			existingRole := types.UserRole(m.Role)
-			if err := reconcileOrganizationMemberRelationships(ctx, c.rebac, org.UUID.String(), []string{user.UUID},
-				desiredOrganizationMemberRoles([]string{user.UUID}, existingRole)); err != nil {
-				return fmt.Errorf("sync existing organization member to ReBAC: %w", err)
+			if err := c.memberStore.ReconcileTuples(ctx, org.ID, user.ID); err != nil {
+				return err
 			}
 			continue
 		}
@@ -288,10 +288,6 @@ func (c *memberComponentImpl) AddMembers(ctx context.Context, orgName string, us
 		if err != nil {
 			err = fmt.Errorf("failed to create db member, org:%s, user:%s,caused by:%w", orgName, userName, err)
 			return err
-		}
-		if err := reconcileOrganizationMemberRelationships(ctx, c.rebac, org.UUID.String(), []string{user.UUID},
-			desiredOrganizationMemberRoles([]string{user.UUID}, memberRole)); err != nil {
-			return fmt.Errorf("sync added organization member to ReBAC: %w", err)
 		}
 
 		userUUIDs, err := c.memberStore.UserUUIDsByOrganizationID(ctx, org.ID)
@@ -387,18 +383,12 @@ func (c *memberComponentImpl) Delete(ctx context.Context, orgName, userName, ope
 	}
 	// Reconcile absent memberships as well so retries can remove stale tuples.
 	if m == nil {
-		if err := reconcileOrganizationMemberRelationships(ctx, c.rebac, org.UUID.String(), []string{user.UUID}, nil); err != nil {
-			return fmt.Errorf("sync absent organization member to ReBAC: %w", err)
-		}
-		return nil
+		return c.memberStore.ReconcileTuples(ctx, org.ID, user.ID)
 	}
 	err = c.memberStore.Delete(ctx, org.ID, user.ID)
 	if err != nil {
 		err = fmt.Errorf("failed to delete member,caused by:%w", err)
 		return err
-	}
-	if err := reconcileOrganizationMemberRelationships(ctx, c.rebac, org.UUID.String(), []string{user.UUID}, nil); err != nil {
-		return fmt.Errorf("sync removed organization member to ReBAC: %w", err)
 	}
 	userUUIDs, err := c.memberStore.UserUUIDsByOrganizationID(ctx, org.ID)
 	if err != nil {

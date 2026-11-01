@@ -10,6 +10,8 @@ Finetune {{.deploy_name}}/{{.deploy_id}} Is Running
 Evaluation {{.deploy_name}} Starts Running
 {{else if eq .deploy_type "serverless"}}
 Serverless Is Running
+{{else if eq .deploy_type "notebook"}}
+Notebook {{.deploy_name}}/{{.deploy_id}} Is Running
 {{else}}
 Instance Is Running
 {{end}}
@@ -28,6 +30,8 @@ Instance Is Running
             Evaluation {{.deploy_name}} Starts Running.
             {{else if eq .deploy_type "serverless"}}
             Serverless Is Running
+            {{else if eq .deploy_type "notebook"}}
+            Notebook {{.deploy_name}}/{{.deploy_id}} Is Running
             {{else}}
             Instance Is Running
             {{end}} 
@@ -43,6 +47,8 @@ Instance Is Running
             Your evaluation task <strong>{{.deploy_name}}</strong> starts running successfully.
             {{else if eq .deploy_type "serverless"}}
             Your serverless instance is running successfully.
+            {{else if eq .deploy_type "notebook"}}
+            Your notebook instance <strong>{{.deploy_name}}/{{.deploy_id}}</strong> is running successfully.
             {{else}}
             Your instance is running successfully.
             {{end}}

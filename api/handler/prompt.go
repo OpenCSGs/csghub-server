@@ -172,6 +172,7 @@ func (h *PromptHandler) ListPrompt(ctx *gin.Context) {
 // @Param        need_multi_sync query bool false "need multi sync" default(false)
 // @Success      200  {object}  types.Response{data=types.PromptRes} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      404  {object}  types.Response "Resource not found"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /prompts_info/{namespace}/{name} [get]
 func (h *PromptHandler) PromptDetail(ctx *gin.Context) {
@@ -197,6 +198,10 @@ func (h *PromptHandler) PromptDetail(ctx *gin.Context) {
 
 	detail, err := h.prompt.Show(ctx.Request.Context(), namespace, name, currentUser, needOpWeight, needMultiSync)
 	if err != nil {
+		if errors.Is(err, errorx.ErrRepoNotFound) {
+			httpbase.NotFoundError(ctx, err)
+			return
+		}
 		if errors.Is(err, errorx.ErrUnauthorized) {
 			httpbase.UnauthorizedError(ctx, err)
 			return

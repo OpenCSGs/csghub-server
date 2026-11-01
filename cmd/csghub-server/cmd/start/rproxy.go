@@ -1,8 +1,10 @@
 package start
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
+	"opencsg.com/csghub-server/builder/instrumentation"
 
 	"github.com/spf13/cobra"
 	"opencsg.com/csghub-server/api/httpbase"
@@ -19,6 +21,10 @@ var rproxyCmd = &cobra.Command{
 		cfg, err := config.LoadConfig()
 		if err != nil {
 			return err
+		}
+		stopOtel, err := instrumentation.SetupOTelSDK(context.Background(), cfg, instrumentation.RProxy)
+		if err != nil {
+			panic(err)
 		}
 
 		dbConfig := database.DBConfig{
@@ -41,7 +47,7 @@ var rproxyCmd = &cobra.Command{
 			r,
 		)
 		server.Run()
-
+		_ = stopOtel(context.Background())
 		return nil
 	},
 }

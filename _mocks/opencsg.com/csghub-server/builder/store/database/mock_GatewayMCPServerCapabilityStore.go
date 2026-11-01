@@ -317,6 +317,111 @@ func (_c *MockGatewayMCPServerCapabilityStore_FindByServerAndConfig_Call) RunAnd
 	return _c
 }
 
+// ListRevisions provides a mock function with given fields: ctx
+func (_m *MockGatewayMCPServerCapabilityStore) ListRevisions(ctx context.Context) ([]database.GatewayMCPServerCapabilityRevision, error) {
+	ret := _m.Called(ctx)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListRevisions")
+	}
+
+	var r0 []database.GatewayMCPServerCapabilityRevision
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context) ([]database.GatewayMCPServerCapabilityRevision, error)); ok {
+		return rf(ctx)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context) []database.GatewayMCPServerCapabilityRevision); ok {
+		r0 = rf(ctx)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]database.GatewayMCPServerCapabilityRevision)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = rf(ctx)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockGatewayMCPServerCapabilityStore_ListRevisions_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListRevisions'
+type MockGatewayMCPServerCapabilityStore_ListRevisions_Call struct {
+	*mock.Call
+}
+
+// ListRevisions is a helper method to define mock.On call
+//   - ctx context.Context
+func (_e *MockGatewayMCPServerCapabilityStore_Expecter) ListRevisions(ctx interface{}) *MockGatewayMCPServerCapabilityStore_ListRevisions_Call {
+	return &MockGatewayMCPServerCapabilityStore_ListRevisions_Call{Call: _e.mock.On("ListRevisions", ctx)}
+}
+
+func (_c *MockGatewayMCPServerCapabilityStore_ListRevisions_Call) Run(run func(ctx context.Context)) *MockGatewayMCPServerCapabilityStore_ListRevisions_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context))
+	})
+	return _c
+}
+
+func (_c *MockGatewayMCPServerCapabilityStore_ListRevisions_Call) Return(_a0 []database.GatewayMCPServerCapabilityRevision, _a1 error) *MockGatewayMCPServerCapabilityStore_ListRevisions_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockGatewayMCPServerCapabilityStore_ListRevisions_Call) RunAndReturn(run func(context.Context) ([]database.GatewayMCPServerCapabilityRevision, error)) *MockGatewayMCPServerCapabilityStore_ListRevisions_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// UpsertError provides a mock function with given fields: ctx, cap
+func (_m *MockGatewayMCPServerCapabilityStore) UpsertError(ctx context.Context, cap *database.GatewayMCPServerCapability) error {
+	ret := _m.Called(ctx, cap)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpsertError")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, *database.GatewayMCPServerCapability) error); ok {
+		r0 = rf(ctx, cap)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockGatewayMCPServerCapabilityStore_UpsertError_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpsertError'
+type MockGatewayMCPServerCapabilityStore_UpsertError_Call struct {
+	*mock.Call
+}
+
+// UpsertError is a helper method to define mock.On call
+//   - ctx context.Context
+//   - cap *database.GatewayMCPServerCapability
+func (_e *MockGatewayMCPServerCapabilityStore_Expecter) UpsertError(ctx interface{}, cap interface{}) *MockGatewayMCPServerCapabilityStore_UpsertError_Call {
+	return &MockGatewayMCPServerCapabilityStore_UpsertError_Call{Call: _e.mock.On("UpsertError", ctx, cap)}
+}
+
+func (_c *MockGatewayMCPServerCapabilityStore_UpsertError_Call) Run(run func(ctx context.Context, cap *database.GatewayMCPServerCapability)) *MockGatewayMCPServerCapabilityStore_UpsertError_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(*database.GatewayMCPServerCapability))
+	})
+	return _c
+}
+
+func (_c *MockGatewayMCPServerCapabilityStore_UpsertError_Call) Return(_a0 error) *MockGatewayMCPServerCapabilityStore_UpsertError_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockGatewayMCPServerCapabilityStore_UpsertError_Call) RunAndReturn(run func(context.Context, *database.GatewayMCPServerCapability) error) *MockGatewayMCPServerCapabilityStore_UpsertError_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // NewMockGatewayMCPServerCapabilityStore creates a new instance of MockGatewayMCPServerCapabilityStore. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func NewMockGatewayMCPServerCapabilityStore(t interface {

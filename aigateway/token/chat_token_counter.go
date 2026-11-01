@@ -12,7 +12,6 @@ import (
 
 	"github.com/openai/openai-go/v3"
 	"opencsg.com/csghub-server/aigateway/types"
-	commontypes "opencsg.com/csghub-server/common/types"
 )
 
 var _ Counter = (*chatTokenCounterImpl)(nil)
@@ -25,18 +24,14 @@ type ChatTokenCounter interface {
 }
 
 type chatTokenCounterImpl struct {
-	prompts       []openai.ChatCompletionMessageParamUnion
-	completion    *types.ChatCompletion
-	chunks        []types.ChatCompletionChunk
-	tokenizer     Tokenizer
-	modalDataType commontypes.DataType
+	prompts    []openai.ChatCompletionMessageParamUnion
+	completion *types.ChatCompletion
+	chunks     []types.ChatCompletionChunk
+	tokenizer  Tokenizer
 }
 
 func (l *chatTokenCounterImpl) AppendPrompts(prompts []openai.ChatCompletionMessageParamUnion) {
 	l.prompts = append(l.prompts, prompts...)
-	if l.modalDataType == "" {
-		l.modalDataType = modalDataTypeFromChatMessages(prompts)
-	}
 }
 
 func NewLLMTokenCounter(tokenizer Tokenizer) ChatTokenCounter {
@@ -81,7 +76,7 @@ func (l *chatTokenCounterImpl) AppendCompletionChunk(chunk types.ChatCompletionC
 func (l *chatTokenCounterImpl) Usage(c context.Context) (*Usage, error) {
 	if l.completion != nil {
 		if l.completion.Usage.TotalTokens > 0 {
-			return l.withPromptModalUsage(&Usage{
+			return &Usage{
 				PromptTokens:              l.completion.Usage.PromptTokens,
 				CompletionTokens:          l.completion.Usage.CompletionTokens,
 				TotalTokens:               l.completion.Usage.TotalTokens,
@@ -89,7 +84,7 @@ func (l *chatTokenCounterImpl) Usage(c context.Context) (*Usage, error) {
 				ReasoningTokens:           l.completion.Usage.CompletionTokensDetails.ReasoningTokens,
 				CacheCreationPromptTokens: 0,
 				Duration:                  completionUsageSeconds(l.completion.Usage),
-			}), nil
+			}, nil
 		}
 		slog.WarnContext(c, "chat completion usage not found, fallback to local token estimate")
 	}
@@ -114,7 +109,7 @@ func (l *chatTokenCounterImpl) Usage(c context.Context) (*Usage, error) {
 		// contains usage data
 		if chunk.Usage.TotalTokens > 0 {
 			slog.Debug("llmTokenCounter generated", slog.String("content", contentBuf.String()))
-			return l.withPromptModalUsage(&Usage{
+			return &Usage{
 				PromptTokens:              chunk.Usage.PromptTokens,
 				CompletionTokens:          chunk.Usage.CompletionTokens,
 				TotalTokens:               chunk.Usage.TotalTokens,
@@ -122,12 +117,13 @@ func (l *chatTokenCounterImpl) Usage(c context.Context) (*Usage, error) {
 				ReasoningTokens:           chunk.Usage.CompletionTokensDetails.ReasoningTokens,
 				CacheCreationPromptTokens: 0,
 				Duration:                  completionUsageSeconds(chunk.Usage),
-			}), nil
+			}, nil
 		}
 	}
 
 	if l.tokenizer == nil {
 		promptTokens, completionTokens := approximatePromptAndCompletionTokens(l.prompts, contentBuf.String())
+		promptTokens += promptImageEstimate(l.prompts)
 		if promptTokens <= 0 && completionTokens <= 0 {
 			return nil, errors.New("no usage found in completion, and tokenizer not set")
 		}
@@ -136,11 +132,11 @@ func (l *chatTokenCounterImpl) Usage(c context.Context) (*Usage, error) {
 			slog.Int64("prompt_tokens", promptTokens),
 			slog.Int64("completion_tokens", completionTokens),
 			slog.Int64("total_tokens", totalTokens))
-		return l.withPromptModalUsage(&Usage{
+		return &Usage{
 			PromptTokens:     promptTokens,
 			CompletionTokens: completionTokens,
 			TotalTokens:      totalTokens,
-		}), nil
+		}, nil
 	}
 
 	var totalTokens, completionTokens, promptTokens int64
@@ -229,53 +225,58 @@ func (l *chatTokenCounterImpl) Usage(c context.Context) (*Usage, error) {
 	}
 	// between prompt and response
 	promptTokens += 3
+	promptTokens += promptImageEstimate(l.prompts)
 	totalTokens = promptTokens + completionTokens
-	return l.withPromptModalUsage(&Usage{
+	return &Usage{
 		CompletionTokens: completionTokens,
 		PromptTokens:     promptTokens,
 		TotalTokens:      totalTokens,
-	}), nil
+	}, nil
 }
 
-func (l *chatTokenCounterImpl) withPromptModalUsage(usage *Usage) *Usage {
-	if usage == nil || l.modalDataType == "" {
-		return usage
-	}
-	usage.DataType = string(l.modalDataType)
-	usage.CompletionRC = 1
-	return usage
+// fallbackImageTokensPerImage estimates the prompt tokens of one image when
+// the upstream returns no usage and the gateway must bill from a local
+// estimate. It approximates the typical per-image token cost of hosted
+// vision models (DeepSeek caps one image at 1024 tokens, Doubao
+// detail=high at 1280, Qwen3-VL bills a 1024x1024 image at ~1024).
+const fallbackImageTokensPerImage = int64(1024)
+
+// promptImageEstimate returns the estimated prompt tokens for the images in
+// the request messages; audio and file parts are not estimated.
+func promptImageEstimate(messages []openai.ChatCompletionMessageParamUnion) int64 {
+	return int64(countPromptImages(messages)) * fallbackImageTokensPerImage
 }
 
-func modalDataTypeFromChatMessages(messages []openai.ChatCompletionMessageParamUnion) commontypes.DataType {
+func countPromptImages(messages []openai.ChatCompletionMessageParamUnion) int {
+	count := 0
 	for _, message := range messages {
-		if dataType := modalDataTypeFromContentParts(message.GetContent().AsAny()); dataType != "" {
-			return dataType
-		}
+		count += countImageParts(message.GetContent().AsAny())
 	}
-	return ""
+	return count
 }
 
-func modalDataTypeFromContentParts(content any) commontypes.DataType {
+func countImageParts(content any) int {
 	switch parts := content.(type) {
 	case *[]openai.ChatCompletionContentPartUnionParam:
-		return modalDataTypeFromParts(*parts)
+		if parts == nil {
+			return 0
+		}
+		return countImagePartsInUnion(*parts)
 	case []openai.ChatCompletionContentPartUnionParam:
-		return modalDataTypeFromParts(parts)
+		return countImagePartsInUnion(parts)
 	default:
-		return ""
+		return 0
 	}
 }
 
-func modalDataTypeFromParts(parts []openai.ChatCompletionContentPartUnionParam) commontypes.DataType {
+func countImagePartsInUnion(parts []openai.ChatCompletionContentPartUnionParam) int {
+	count := 0
 	for _, part := range parts {
 		if part.OfImageURL != nil {
-			return commontypes.DataTypeImage
-		}
-		if part.OfInputAudio != nil {
-			return commontypes.DataTypeAudio
+			count++
 		}
 	}
-	return ""
+	return count
 }
 
 func approximatePromptAndCompletionTokens(prompts []openai.ChatCompletionMessageParamUnion, completion string) (int64, int64) {

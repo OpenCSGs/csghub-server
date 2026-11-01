@@ -21,7 +21,7 @@ func TestNotebookComponentImpl_CreateNotebook(t *testing.T) {
 	ctx := context.TODO()
 	nc := initializeTestNotebookComponent(ctx, t)
 	username := "testuser"
-	nc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, username).Return(database.User{ID: 1, Username: username, RoleMask: "admin"}, nil)
+	nc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, username, types.UserWithAdminPermissions).Return(database.User{ID: 1, Username: username, RoleAssignments: superAdminRoleAssignments()}, nil)
 	nc.mocks.stores.RuntimeFrameworkMock().EXPECT().FindEnabledByID(ctx, int64(1)).Return(&database.RuntimeFramework{ID: 1, FrameName: "rf1", FrameImage: "abc/notebook:latest"}, nil)
 	nc.mocks.stores.SpaceResourceMock().EXPECT().FindByID(ctx, int64(1)).Return(&database.SpaceResource{ID: 1, ClusterID: "1", Name: "sr1", Resources: `{"memory": "foo"}`}, nil)
 	nc.mocks.components.repo.EXPECT().CheckAccountAndResource(ctx, types.CheckResourceAndAccountReq{UserName: "testuser", ClusterID: "1", OrderDetailID: 0, CurrentUser: "testuser"}, &database.SpaceResource{ID: 1, ClusterID: "1", Name: "sr1", Resources: `{"memory": "foo"}`}).Return(&types.CheckExclusiveResp{
@@ -101,12 +101,13 @@ func TestNotebookComponentImpl_CreateNotebook(t *testing.T) {
 	require.Equal(t, int64(123), res.ID)
 }
 
+// TestNotebookComponentImpl_CreateNotebook_NonAdminOwnerNamespace checks the expected user query options.
 func TestNotebookComponentImpl_CreateNotebook_NonAdminOwnerNamespace(t *testing.T) {
 	ctx := context.TODO()
 
 	t.Run("owner_namespace_permission_error", func(t *testing.T) {
 		nc := initializeTestNotebookComponent(ctx, t)
-		nc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "testuser").Return(database.User{ID: 1, Username: "testuser", RoleMask: ""}, nil)
+		nc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "testuser", types.UserWithAdminPermissions).Return(database.User{ID: 1, Username: "testuser", RoleMask: ""}, nil)
 		nc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "testuser", "org1", rebac.NamespaceCanWrite).Return(false, errors.New("rpc error"))
 		_, err := nc.CreateNotebook(ctx, &types.CreateNotebookReq{
 			CurrentUser:        "testuser",
@@ -120,7 +121,7 @@ func TestNotebookComponentImpl_CreateNotebook_NonAdminOwnerNamespace(t *testing.
 	})
 	t.Run("owner_namespace_forbidden", func(t *testing.T) {
 		nc := initializeTestNotebookComponent(ctx, t)
-		nc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "testuser").Return(database.User{ID: 1, Username: "testuser", RoleMask: ""}, nil)
+		nc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "testuser", types.UserWithAdminPermissions).Return(database.User{ID: 1, Username: "testuser", RoleMask: ""}, nil)
 		nc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "testuser", "org1", rebac.NamespaceCanWrite).Return(false, nil)
 		_, err := nc.CreateNotebook(ctx, &types.CreateNotebookReq{
 			CurrentUser:        "testuser",

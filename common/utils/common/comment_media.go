@@ -14,6 +14,7 @@ import (
 	markdowntext "github.com/yuin/goldmark/text"
 	markdownutil "github.com/yuin/goldmark/util"
 	"golang.org/x/net/html"
+	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
 )
 
@@ -37,16 +38,18 @@ type commentMediaIdentity struct {
 // refs. Every media URL must point at the configured public bucket and use a
 // UUID object name, which identifies immutable uploaded content. It fails
 // closed on external or mutable URLs, unsupported types, or when
-// len(refs) > maxRefs.
-func ExtractCommentMediaRefs(content, publicBucket, publicEndpoint string, maxRefs int) ([]types.MediaRef, error) {
-	return ExtractEnabledCommentMediaRefs(content, publicBucket, publicEndpoint, maxRefs, true, true)
+// len(refs) > maxRefs. region is used to match historical URLs against
+// region-less AWS endpoint forms (e.g. the s3.amazonaws.com global endpoint or
+// legacy hyphen-style hosts).
+func ExtractCommentMediaRefs(content, publicBucket, publicEndpoint, region string, maxRefs int) ([]types.MediaRef, error) {
+	return ExtractEnabledCommentMediaRefs(content, publicBucket, publicEndpoint, region, maxRefs, true, true)
 }
 
 // ExtractEnabledCommentMediaRefs parses and validates only media types whose
 // moderation feature is enabled. Disabled types are ignored so turning a
 // checker off preserves the pre-moderation comment contract.
 func ExtractEnabledCommentMediaRefs(
-	content, publicBucket, publicEndpoint string,
+	content, publicBucket, publicEndpoint, region string,
 	maxRefs int,
 	imagesEnabled, avEnabled bool,
 ) ([]types.MediaRef, error) {
@@ -54,10 +57,10 @@ func ExtractEnabledCommentMediaRefs(
 	document := goldmark.DefaultParser().Parse(markdowntext.NewReader(source))
 	refs := make([]types.MediaRef, 0)
 	seen := make(map[commentMediaIdentity]struct{})
-	if err := extractMarkdownImageRefs(document, publicBucket, publicEndpoint, imagesEnabled, avEnabled, &refs, seen); err != nil {
+	if err := extractMarkdownImageRefs(document, publicBucket, publicEndpoint, region, imagesEnabled, avEnabled, &refs, seen); err != nil {
 		return nil, err
 	}
-	if err := extractHTMLMediaRefs(source, document, publicBucket, publicEndpoint, imagesEnabled, avEnabled, &refs, seen); err != nil {
+	if err := extractHTMLMediaRefs(source, document, publicBucket, publicEndpoint, region, imagesEnabled, avEnabled, &refs, seen); err != nil {
 		return nil, err
 	}
 	if maxRefs > 0 && len(refs) > maxRefs {
@@ -71,7 +74,7 @@ func ExtractEnabledCommentMediaRefs(
 
 func extractMarkdownImageRefs(
 	document markdownast.Node,
-	publicBucket, publicEndpoint string,
+	publicBucket, publicEndpoint, region string,
 	imagesEnabled, avEnabled bool,
 	refs *[]types.MediaRef,
 	seen map[commentMediaIdentity]struct{},
@@ -99,14 +102,14 @@ func extractMarkdownImageRefs(
 			if mediaType == types.MediaTypeAudio || mediaType == types.MediaTypeVideo {
 				// Audio/video must resolve to the configured public bucket so
 				// ResourceKey() can be computed; fail closed otherwise.
-				ref, err := commentMediaRef(rawURL, publicBucket, publicEndpoint, mediaType)
+				ref, err := commentMediaRef(rawURL, publicBucket, publicEndpoint, region, mediaType)
 				if err != nil {
 					return markdownast.WalkStop, err
 				}
 				appendUniqueMediaRef(refs, seen, ref)
 				return markdownast.WalkContinue, nil
 			}
-			ref, err := commentMediaRef(rawURL, publicBucket, publicEndpoint, mediaType)
+			ref, err := commentMediaRef(rawURL, publicBucket, publicEndpoint, region, mediaType)
 			if err != nil {
 				return markdownast.WalkStop, err
 			}
@@ -119,7 +122,7 @@ func extractMarkdownImageRefs(
 func extractHTMLMediaRefs(
 	source []byte,
 	document markdownast.Node,
-	publicBucket, publicEndpoint string,
+	publicBucket, publicEndpoint, region string,
 	imagesEnabled, avEnabled bool,
 	refs *[]types.MediaRef,
 	seen map[commentMediaIdentity]struct{},
@@ -163,7 +166,7 @@ func extractHTMLMediaRefs(
 			token := tokenizer.Token()
 			tag := strings.ToLower(token.Data)
 			if tag == "audio" || tag == "video" || tag == "source" || tag == "img" {
-				if err := appendHTMLMediaRef(tag, token.Attr, parents, publicBucket, publicEndpoint, imagesEnabled, avEnabled, refs, seen); err != nil {
+				if err := appendHTMLMediaRef(tag, token.Attr, parents, publicBucket, publicEndpoint, region, imagesEnabled, avEnabled, refs, seen); err != nil {
 					return err
 				}
 			}
@@ -186,7 +189,7 @@ func appendHTMLMediaRef(
 	tag string,
 	attrs []html.Attribute,
 	parents []string,
-	publicBucket, publicEndpoint string,
+	publicBucket, publicEndpoint, region string,
 	imagesEnabled, avEnabled bool,
 	refs *[]types.MediaRef,
 	seen map[commentMediaIdentity]struct{},
@@ -206,14 +209,14 @@ func appendHTMLMediaRef(
 			return nil
 		}
 		if mediaType == types.MediaTypeAudio || mediaType == types.MediaTypeVideo {
-			ref, err := commentMediaRef(rawURL, publicBucket, publicEndpoint, mediaType)
+			ref, err := commentMediaRef(rawURL, publicBucket, publicEndpoint, region, mediaType)
 			if err != nil {
 				return err
 			}
 			appendUniqueMediaRef(refs, seen, ref)
 			return nil
 		}
-		ref, err := commentMediaRef(rawURL, publicBucket, publicEndpoint, mediaType)
+		ref, err := commentMediaRef(rawURL, publicBucket, publicEndpoint, region, mediaType)
 		if err != nil {
 			return err
 		}
@@ -230,7 +233,7 @@ func appendHTMLMediaRef(
 	if !commentMediaTypeEnabled(mediaType, imagesEnabled, avEnabled) {
 		return nil
 	}
-	ref, err := commentMediaRef(rawURL, publicBucket, publicEndpoint, mediaType)
+	ref, err := commentMediaRef(rawURL, publicBucket, publicEndpoint, region, mediaType)
 	if err != nil {
 		return err
 	}
@@ -245,7 +248,7 @@ func commentMediaTypeEnabled(mediaType types.MediaType, imagesEnabled, avEnabled
 	return avEnabled
 }
 
-func commentMediaRef(rawURL, publicBucket, publicEndpoint string, mediaType types.MediaType) (types.MediaRef, error) {
+func commentMediaRef(rawURL, publicBucket, publicEndpoint, region string, mediaType types.MediaType) (types.MediaRef, error) {
 	parsed, err := url.Parse(rawURL)
 	if err != nil || parsed.Scheme == "" || parsed.Hostname() == "" {
 		return types.MediaRef{}, fmt.Errorf("invalid media URL %q", rawURL)
@@ -256,7 +259,7 @@ func commentMediaRef(rawURL, publicBucket, publicEndpoint string, mediaType type
 	if parsed.RawQuery != "" || parsed.Fragment != "" {
 		return types.MediaRef{}, fmt.Errorf("media URL %q must not contain query parameters or fragments", rawURL)
 	}
-	bucket, objectKey := commentMediaBucketAndObject(parsed, publicBucket, publicEndpoint)
+	bucket, objectKey := commentMediaBucketAndObject(parsed, publicBucket, publicEndpoint, region)
 	if bucket == "" || objectKey == "" {
 		return types.MediaRef{}, fmt.Errorf(
 			"media URL must use public bucket %q at public endpoint %q",
@@ -273,20 +276,34 @@ func commentMediaRef(rawURL, publicBucket, publicEndpoint string, mediaType type
 	}, nil
 }
 
-func commentMediaBucketAndObject(parsed *url.URL, publicBucket, publicEndpoint string) (string, string) {
+func commentMediaBucketAndObject(parsed *url.URL, publicBucket, publicEndpoint, region string) (string, string) {
 	endpointAuthority := commentMediaEndpointAuthority(publicEndpoint)
 	if publicBucket == "" || endpointAuthority == "" || parsed.User != nil {
 		return "", ""
 	}
-	requestAuthority := strings.ToLower(parsed.Host)
-	virtualAuthority := strings.ToLower(publicBucket + "." + endpointAuthority)
+	// Normalize both authorities to the same AWS host form so media URLs
+	// persisted with the standard, dual-stack, legacy hyphen-style, or global
+	// AWS host keep matching after endpoint normalization
+	// (config.NormalizeS3Endpoint). The configured endpoint is already
+	// normalized at config load, so its form determines the target form;
+	// non-Amazon endpoints are returned unchanged, keeping the comparison exact
+	// for them. The bucket prefix is stripped before normalizing so bucket names
+	// are never rewritten and different buckets can never share an identity.
+	targetDualstack := strings.HasPrefix(endpointAuthority, "s3.dualstack.")
+	endpointAuthority = config.NormalizeS3Endpoint(endpointAuthority, targetDualstack, region)
 	objectKey := strings.TrimPrefix(parsed.Path, "/")
-	if requestAuthority == virtualAuthority {
+
+	requestHost := strings.ToLower(parsed.Host)
+	virtualPrefix := strings.ToLower(publicBucket) + "."
+	if strings.HasPrefix(requestHost, virtualPrefix) &&
+		config.NormalizeS3Endpoint(requestHost[len(virtualPrefix):], targetDualstack, region) == endpointAuthority {
 		return publicBucket, objectKey
 	}
-	parts := strings.SplitN(objectKey, "/", 2)
-	if requestAuthority == endpointAuthority && len(parts) == 2 && strings.EqualFold(parts[0], publicBucket) {
-		return publicBucket, parts[1]
+	if config.NormalizeS3Endpoint(requestHost, targetDualstack, region) == endpointAuthority {
+		parts := strings.SplitN(objectKey, "/", 2)
+		if len(parts) == 2 && strings.EqualFold(parts[0], publicBucket) {
+			return publicBucket, parts[1]
+		}
 	}
 	return "", ""
 }

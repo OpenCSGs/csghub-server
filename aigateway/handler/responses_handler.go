@@ -4,9 +4,10 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/gin-gonic/gin"
 	"log/slog"
 	"net/http"
+
+	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/aigateway/component"
 	"opencsg.com/csghub-server/aigateway/handler/plan"
 	responsespkg "opencsg.com/csghub-server/aigateway/handler/responses"
@@ -104,21 +105,29 @@ func (b *responsesParsedBody) HasMultimodalContent() bool {
 	return b.Req.HasMultimodalContent()
 }
 
+// AutoRouteContext satisfies types.AutoRouteContextProvider so the Planner
+// can describe the turn to the model ranking service.
+func (b *responsesParsedBody) AutoRouteContext() types.AutoRouteInput {
+	if b == nil || b.Req == nil {
+		return types.AutoRouteInput{}
+	}
+	return b.Req.AutoRouteContext()
+}
+
 // --- Phase 1: Extract ---
 
 func (h *responsesPipelineHandler) Extract(c *gin.Context) (*types.RequestMetadata, error) {
 	username := httpbase.GetCurrentUser(c)
 	nsUUID := httpbase.GetCurrentNamespaceUUID(c)
-	apikey := httpbase.GetAccessToken(c)
 	owner := responsesOwnerBinding(c)
 
-	req := &types.ResponsesRequest{}
+	req := &types.ResponsesRequest{RetainRoutingBody: h.handler.retainAutoRoutingBody}
 	if err := c.BindJSON(req); err != nil {
-		writeResponsesError(c, http.StatusBadRequest, "invalid_request_error", "invalid_request_error", err.Error())
+		writeResponsesError(c, http.StatusBadRequest, types.ErrCodeInvalidRequest, types.ErrTypeInvalidRequest, err.Error())
 		return nil, err
 	}
 	if err := req.Validate(); err != nil {
-		writeResponsesError(c, http.StatusBadRequest, "invalid_request_error", "invalid_request_error", err.Error())
+		writeResponsesError(c, http.StatusBadRequest, types.ErrCodeInvalidRequest, types.ErrTypeInvalidRequest, err.Error())
 		return nil, err
 	}
 
@@ -148,7 +157,6 @@ func (h *responsesPipelineHandler) Extract(c *gin.Context) (*types.RequestMetada
 		Model:         publicModelID,
 		TenantID:      nsUUID,
 		UserID:        username,
-		APIKeyID:      apikey,
 		PriorityScope: httpbase.GetAPIKeyPriorityScope(c),
 		Streaming:     req.Stream,
 		Headers:       c.Request.Header,
@@ -169,6 +177,8 @@ func (h *responsesPipelineHandler) Execute(c *gin.Context, meta *types.RequestMe
 	ctx := c.Request.Context()
 	pb := meta.ParsedBody.(*responsesParsedBody)
 	req := pb.Req
+	// Planning has consumed the routing snapshot; do not retain it during streaming.
+	req.RawBody = nil
 
 	// Record resolved model on the preflight span and end it.
 	if pt := plan.GetPreflightTracer(c); pt != nil {
@@ -193,11 +203,11 @@ func (h *responsesPipelineHandler) Execute(c *gin.Context, meta *types.RequestMe
 		IsFullURL:          mt.Upstream.IsFullURL,
 	})
 	if err != nil {
-		writeResponsesError(c, http.StatusBadRequest, "unsupported_feature", "invalid_request_error", err.Error())
+		writeResponsesError(c, http.StatusBadRequest, types.ErrCodeUnsupportedFeature, types.ErrTypeInvalidRequest, err.Error())
 		return nil
 	}
 	if decision.Mode == responsespkg.ResponsesModeDisabled {
-		writeResponsesError(c, http.StatusBadRequest, "unsupported_feature", "invalid_request_error", "/v1/responses is disabled for this model")
+		writeResponsesError(c, http.StatusBadRequest, types.ErrCodeUnsupportedFeature, types.ErrTypeInvalidRequest, "/v1/responses is disabled for this model")
 		return nil
 	}
 
@@ -240,11 +250,11 @@ func (h *responsesPipelineHandler) Execute(c *gin.Context, meta *types.RequestMe
 
 	switch decision.Mode {
 	case responsespkg.ResponsesModeNative:
-		h.handler.executeNativeResponses(c, req, resolvedTarget, decision, pb.Owner, meta.TenantID, meta.APIKeyID, pb.PublicModelID, pb.PublicPreviousRespID, responsesModeration, responseCapture, generationRecorder, p)
+		h.handler.executeNativeResponses(c, req, resolvedTarget, decision, pb.Owner, meta.TenantID, pb.PublicModelID, pb.PublicPreviousRespID, responsesModeration, responseCapture, generationRecorder, p)
 	case responsespkg.ResponsesModeChatAdapter:
-		h.handler.executeAdapterResponses(c, req, resolvedTarget, meta.TenantID, meta.APIKeyID, pb.PublicModelID, responsesModeration, responseCapture, generationRecorder, p)
+		h.handler.executeAdapterResponses(c, req, resolvedTarget, meta.TenantID, pb.PublicModelID, responsesModeration, responseCapture, generationRecorder, p)
 	default:
-		writeResponsesError(c, http.StatusBadRequest, "unsupported_feature", "invalid_request_error", "unsupported responses execution mode")
+		writeResponsesError(c, http.StatusBadRequest, types.ErrCodeUnsupportedFeature, types.ErrTypeInvalidRequest, "unsupported responses execution mode")
 	}
 
 	return nil
@@ -280,8 +290,8 @@ func (h *responsesPipelineHandler) HandlePlanError(c *gin.Context, meta *types.R
 	// 503 model_unavailable that handleOpenAIPlanError would render).
 	if p != nil && p.ErrorCode == types.PlanErrModelUnavailable {
 		var ce plan.CodedError
-		if errors.As(err, &ce) && ce.ModelErrorCode() == "required_upstream_unavailable" {
-			writeResponsesError(c, http.StatusBadRequest, "response_route_unavailable", "invalid_request_error",
+		if errors.As(err, &ce) && ce.ModelErrorCode() == types.ErrCodeRequiredUpstreamUnavailable {
+			writeResponsesError(c, http.StatusBadRequest, types.ErrCodeResponseRouteUnavailable, types.ErrTypeInvalidRequest,
 				"previous_response_id was created by an upstream that is no longer available")
 			return
 		}

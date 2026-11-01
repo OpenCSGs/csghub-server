@@ -253,6 +253,7 @@ func (h *InternalHandler) PostReceive(ctx *gin.Context) {
 	//start workflow to handle push request
 	workflowOptions := client.StartWorkflowOptions{
 		TaskQueue: workflow.HandlePushQueueName,
+		ID:        fmt.Sprintf("post-receive-%s-%s-%s-%s", types.RepositoryType(strings.TrimSuffix(paths[0], "s")), paths[1], paths[2], strs[1]),
 	}
 
 	we, err := h.temporalClient.ExecuteWorkflow(

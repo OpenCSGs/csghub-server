@@ -1,0 +1,60 @@
+include:
+  # SaaS prod: release tags
+  - component: git-devops.opencsg.com/gitlab/ci-components/build@v1.4.10
+    inputs:
+      environment: prod
+      edition: saas
+      dockerfile: docker/Dockerfile-saas
+      images:
+        - "$CI_REGISTRY_IMAGE:$CI_COMMIT_TAG"
+        - "registry.opencsg.com/opencsg_public/starhub-server:$CI_COMMIT_TAG"
+        # prd 的部署从 ACR 拉镜像（deploy-prd-saas 的 chart_set 里 global.image.registry 指向 ACR），
+        # 而 prod 没有 stg 那样的 retag 步骤，所以构建时直接推一份到 ACR。
+        - "opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/starhub-server:$CI_COMMIT_TAG"
+      build_args:
+        - "CSGHUB_TAGS=$BUILD_EDITION"
+        - "IMAGE_TAG=$CI_COMMIT_TAG"
+        - "CI_COMMIT_SHORT_SHA=$CI_COMMIT_SHORT_SHA"
+      rules:
+        - if: '$CI_COMMIT_TAG =~ /^v(\d+\.\d+\.\d+(\.\d+)?)-[a-z]+-saas$/'
+
+  # SaaS 生产部署 —— **手动触发**：只有 vX.Y.Z-<region>-saas 这种 tag 才创建 job，
+  # 创建后停在 blocked（等 build-prod-saas 推完镜像），由人工点 play 才真正 helm upgrade。
+  #
+  # chart 来源：clone saas-prd 仓库（chart 就在仓库根目录），见 scripts/deploy-saas-chart.sh。
+  # chart_set 只推 starhub-server 的镜像版本，值取本次发版 tag。其余参数一律不传 —— 组件的
+  # chart_values 没设置时 helm 走 --reset-then-reuse-values，复用 release 上当前生效的 values，
+  # 服务器本地维护的配置不会被 CI 覆盖。portal / xnet / csgbot / langflow 的镜像由各自项目维护。
+  - component: git-devops.opencsg.com/gitlab/ci-components/deploy@v1.4.10
+    inputs:
+      environment: prd
+      edition: saas
+      mode: helm
+      kubeconfig: KUBECONFIG_SAAS_PRD
+      needs: ["build-prod-saas"]
+      chart_repo: ""
+      chart_name: /tmp/saas-prd-chart
+      custom_script:
+        - . .gitlab/ci/scripts/deploy-saas-chart.sh saas-prd . /tmp/saas-prd-chart
+      custom_script_position: script_before
+      chart_set:
+        # —— starhub-server 镜像（本项目的发布物）——
+        - 'image.tag=$CI_COMMIT_TAG'
+        - 'global.image.tag=$CI_COMMIT_TAG'
+        - 'runner.image.tag=$CI_COMMIT_TAG'
+        # —— registry：与 deploy-qa-saas 的 chart_set 结构对齐 ——
+        # ⚠️ 值按 prd 现状填（ACR，与 stg 相同）。qa 用的是 registry.opencsg.com，别互相抄。
+        - 'global.image.registry=opencsg-registry.cn-beijing.cr.aliyuncs.com'
+        - 'global.imageRegistry=opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public'
+        - 'image.registry=opencsg-registry.cn-beijing.cr.aliyuncs.com'
+        # —— 其他组件的镜像由各自项目维护，这里留模板（同 staging）——
+        # - 'portal.image.tag=$PORTAL_IMAGE_TAG'
+        # - 'xnet.image.tag=$XNET_IMAGE_TAG'
+        # - 'agentichub.agenticflow.image.tag=$AGENTICFLOW_IMAGE_TAG'
+        # - 'agentichub.csgbot.image.tag=$CSGBOT_IMAGE_TAG'
+      rules:
+        - if: '$CI_COMMIT_TAG =~ /^v(\d+\.\d+\.\d+(\.\d+)?)-[a-z]+-saas$/'
+          when: manual
+
+
+

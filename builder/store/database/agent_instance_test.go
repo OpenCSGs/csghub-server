@@ -725,6 +725,22 @@ func TestAgentInstanceStore_CountByUserAndType(t *testing.T) {
 	count, err = store.CountByUserAndType(ctx, userUUID1, "non-existent-type")
 	require.NoError(t, err)
 	require.Equal(t, 0, count)
+
+	// Test case 7: Built-in instances do not count against the user quota
+	builtInInstance := &database.AgentInstance{
+		TemplateID: 6,
+		UserUUID:   userUUID1,
+		Type:       instanceType1,
+		ContentID:  "content-builtin",
+		Public:     false,
+		BuiltIn:    true,
+	}
+	_, err = store.Create(ctx, builtInInstance)
+	require.NoError(t, err)
+
+	count, err = store.CountByUserAndType(ctx, userUUID1, instanceType1)
+	require.NoError(t, err)
+	require.Equal(t, 3, count, "built-in instance should not be counted")
 }
 
 func TestAgentInstanceStore_Delete_WithCascadingSoftDelete(t *testing.T) {
@@ -970,6 +986,48 @@ func TestAgentInstanceStore_IsInstanceNameExists(t *testing.T) {
 
 	// Test case 5: Both user and instance name different
 	exists, err = store.IsInstanceNameExists(ctx, userUUID2, "different-instance-name")
+	require.NoError(t, err)
+	require.False(t, exists)
+}
+
+func TestAgentInstanceStore_IsInstanceNameExists_AcrossKinds(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewAgentInstanceStoreWithDB(db)
+
+	userUUID := uuid.New().String()
+	instanceName := "test-cross-kind-name"
+
+	exists, err := store.IsInstanceNameExists(ctx, userUUID, instanceName)
+	require.NoError(t, err)
+	require.False(t, exists)
+
+	// The per-user name check sees both kinds (best-effort: the unique index
+	// remains per-kind, so this is not a hard cross-kind uniqueness guarantee).
+	runtimeInstance := &database.AgentInstance{
+		UserUUID: userUUID, Type: "langflow", ContentID: "content-runtime", Name: instanceName,
+	}
+	_, err = store.Create(ctx, runtimeInstance)
+	require.NoError(t, err)
+	exists, err = store.IsInstanceNameExists(ctx, userUUID, instanceName)
+	require.NoError(t, err)
+	require.True(t, exists)
+
+	mode := database.AgentServingModeReadOnly
+	storagePolicy := database.AgentStoragePolicyNone
+	logicalInstance := &database.AgentInstance{
+		UserUUID: userUUID, Type: "csgclaw", ContentID: "content-logical", Name: "logical-" + instanceName,
+		Kind: database.AgentInstanceKindLogical, EffectiveMode: &mode, StoragePolicy: &storagePolicy,
+		Blueprint: map[string]any{"image_id": "image:tag"}, BlueprintSHA256: "blueprint-hash",
+	}
+	_, err = store.Create(ctx, logicalInstance)
+	require.NoError(t, err)
+	exists, err = store.IsInstanceNameExists(ctx, userUUID, "logical-"+instanceName)
+	require.NoError(t, err)
+	require.True(t, exists)
+	exists, err = store.IsInstanceNameExists(ctx, uuid.New().String(), "logical-"+instanceName)
 	require.NoError(t, err)
 	require.False(t, exists)
 }

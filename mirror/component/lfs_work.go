@@ -2,6 +2,7 @@ package component
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"time"
@@ -10,6 +11,7 @@ import (
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/workhub"
 	"opencsg.com/csghub-server/common/types"
+	sharedcomponent "opencsg.com/csghub-server/component"
 )
 
 // lfsWorker handles Git LFS mirror jobs registered on the mirror LFS queue.
@@ -18,6 +20,7 @@ type lfsWorker struct {
 	mirrorTaskStore mirrorTaskStore
 	syncer          lfsSyncer
 	urgentManager   *workhub.UrgentManager
+	reporter        *sharedcomponent.MirrorMetricsReporter
 }
 
 // Timeout returns the per-job timeout for Git LFS mirror jobs.
@@ -38,12 +41,15 @@ type LFSWorkDeps struct {
 	Syncer lfsSyncer
 	// MaxWorkers controls the Git LFS mirror queue concurrency.
 	MaxWorkers int
+	// Reporter observes execution without changing business outcomes.
+	Reporter *sharedcomponent.MirrorMetricsReporter
 }
 
 // Work runs the LFS sync task.
 func (w *lfsWorker) Work(ctx context.Context, job *river.Job[workhub.LFSArgs]) error {
 	return runWorkWithLog(ctx, job, mirrorWorkConfig[workhub.LFSArgs]{
 		manager:   w.urgentManager,
+		reporter:  w.reporter,
 		urgent:    job.Args.Urgent,
 		args:      job.Args.MirrorArgs,
 		stage:     "lfs",
@@ -79,6 +85,7 @@ func (w *lfsWorker) work(ctx context.Context, args workhub.LFSArgs, retryCount i
 			)...)
 		return task, nil
 	}
+	sharedcomponent.MirrorMetricsRunning(ctx, metricTaskDetails(task))
 	task.RetryCount = retryCount
 
 	beforeStatus := task.Status
@@ -114,7 +121,8 @@ func (w *lfsWorker) work(ctx context.Context, args workhub.LFSArgs, retryCount i
 		if _, updateErr := w.mirrorTaskStore.UpdateStatusAndRepoSyncStatus(ctx, *task, action); updateErr != nil {
 			slog.ErrorContext(ctx, "failed to update status of mirror LFS task",
 				mirrorTaskSlogArgs(args.MirrorArgs, task, slog.String("error", updateErr.Error()))...)
-			return task, fmt.Errorf("mark LFS sync failed: %w", updateErr)
+			// Preserve the sync failure so a canceled status update cannot turn it into a pure pause.
+			return task, errors.Join(err, fmt.Errorf("mark LFS sync failed: %w", updateErr))
 		}
 		return task, err
 	}
@@ -122,6 +130,7 @@ func (w *lfsWorker) work(ctx context.Context, args workhub.LFSArgs, retryCount i
 	if err := ctx.Err(); err != nil {
 		return task, err
 	}
+	sharedcomponent.MirrorMetricsOperation(ctx, "publish")
 	task.Progress = 100
 	if _, err := w.mirrorTaskStore.UpdateStatusAndRepoSyncStatus(ctx, *task, database.MirrorSuccess); err != nil {
 		slog.ErrorContext(ctx, "failed to finish mirror LFS task",
@@ -161,6 +170,7 @@ func NewLFSWorkClient(ctx context.Context, databaseDSN string, deps LFSWorkDeps)
 func newLFSWorker(deps LFSWorkDeps) *lfsWorker {
 	return &lfsWorker{
 		mirrorTaskStore: deps.MirrorTaskStore,
+		reporter:        deps.Reporter,
 		syncer:          deps.Syncer,
 	}
 }
@@ -181,6 +191,7 @@ func newLFSRiverConfigForWorker(deps LFSWorkDeps, worker *lfsWorker) *river.Conf
 	})
 
 	return &river.Config{
+		JobLease:     newMirrorJobLeaseConfig(),
 		ErrorHandler: newMirrorJobErrorHandler(deps.MirrorTaskStore),
 		Queues: map[string]river.QueueConfig{
 			workhub.MirrorLFSQueue:       {MaxWorkers: maxWorkers},

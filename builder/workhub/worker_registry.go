@@ -12,6 +12,8 @@ import (
 // Kinds without an override receive a maintenance worker so a schema-wide River
 // leader can safely evaluate every registered job kind without consuming its queue.
 type WorkerOverrides struct {
+	// RebacTuple applies committed permission changes.
+	RebacTuple river.Worker[RebacTupleArgs]
 	// MirrorRepo is the real repository mirror worker when this client owns that queue.
 	MirrorRepo river.Worker[RepoArgs]
 	// MirrorLFS is the real Git LFS mirror worker when this client owns that queue.
@@ -27,6 +29,7 @@ type WorkerOverrides struct {
 // of these workers the current client can execute during normal job processing.
 func NewWorkerRegistry(overrides WorkerOverrides) *river.Workers {
 	workers := river.NewWorkers()
+	river.AddWorker(workers, workerForRegistry(overrides.RebacTuple, RebacTupleQueue, RebacTupleJobTimeout))
 	river.AddWorker(workers, workerForRegistry(overrides.MirrorRepo, MirrorRepoQueue, MirrorRepoJobTimeout))
 	river.AddWorker(workers, workerForRegistry(overrides.MirrorLFS, MirrorLFSQueue, MirrorLFSJobTimeout))
 	river.AddWorker(workers, workerForRegistry(overrides.RepositoryDeletion, RepositoryDeletionQueue, RepositoryDeletionJobTimeout))

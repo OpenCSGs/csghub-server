@@ -248,6 +248,66 @@ func (_c *MockLLMConfigStore_GetByModelName_Call) RunAndReturn(run func(context.
 	return _c
 }
 
+// GetByModelNameForCaller provides a mock function with given fields: ctx, modelName, caller
+func (_m *MockLLMConfigStore) GetByModelNameForCaller(ctx context.Context, modelName string, caller *types.GatewayWhitelistCaller) (*database.LLMConfig, error) {
+	ret := _m.Called(ctx, modelName, caller)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetByModelNameForCaller")
+	}
+
+	var r0 *database.LLMConfig
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, *types.GatewayWhitelistCaller) (*database.LLMConfig, error)); ok {
+		return rf(ctx, modelName, caller)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, *types.GatewayWhitelistCaller) *database.LLMConfig); ok {
+		r0 = rf(ctx, modelName, caller)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*database.LLMConfig)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, *types.GatewayWhitelistCaller) error); ok {
+		r1 = rf(ctx, modelName, caller)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockLLMConfigStore_GetByModelNameForCaller_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetByModelNameForCaller'
+type MockLLMConfigStore_GetByModelNameForCaller_Call struct {
+	*mock.Call
+}
+
+// GetByModelNameForCaller is a helper method to define mock.On call
+//   - ctx context.Context
+//   - modelName string
+//   - caller *types.GatewayWhitelistCaller
+func (_e *MockLLMConfigStore_Expecter) GetByModelNameForCaller(ctx interface{}, modelName interface{}, caller interface{}) *MockLLMConfigStore_GetByModelNameForCaller_Call {
+	return &MockLLMConfigStore_GetByModelNameForCaller_Call{Call: _e.mock.On("GetByModelNameForCaller", ctx, modelName, caller)}
+}
+
+func (_c *MockLLMConfigStore_GetByModelNameForCaller_Call) Run(run func(ctx context.Context, modelName string, caller *types.GatewayWhitelistCaller)) *MockLLMConfigStore_GetByModelNameForCaller_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(*types.GatewayWhitelistCaller))
+	})
+	return _c
+}
+
+func (_c *MockLLMConfigStore_GetByModelNameForCaller_Call) Return(_a0 *database.LLMConfig, _a1 error) *MockLLMConfigStore_GetByModelNameForCaller_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockLLMConfigStore_GetByModelNameForCaller_Call) RunAndReturn(run func(context.Context, string, *types.GatewayWhitelistCaller) (*database.LLMConfig, error)) *MockLLMConfigStore_GetByModelNameForCaller_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetByRepoPath provides a mock function with given fields: ctx, repoPath
 func (_m *MockLLMConfigStore) GetByRepoPath(ctx context.Context, repoPath string) (*database.LLMConfig, error) {
 	ret := _m.Called(ctx, repoPath)
@@ -614,6 +674,143 @@ func (_c *MockLLMConfigStore_IndexWithRepo_Call) Return(_a0 []*database.LLMConfi
 }
 
 func (_c *MockLLMConfigStore_IndexWithRepo_Call) RunAndReturn(run func(context.Context, int, int, *types.SearchLLMConfig) ([]*database.LLMConfig, int, error)) *MockLLMConfigStore_IndexWithRepo_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// IndexWithRepoForCaller provides a mock function with given fields: ctx, per, page, search, caller
+func (_m *MockLLMConfigStore) IndexWithRepoForCaller(ctx context.Context, per int, page int, search *types.SearchLLMConfig, caller *types.GatewayWhitelistCaller) ([]*database.LLMConfig, int, error) {
+	ret := _m.Called(ctx, per, page, search, caller)
+
+	if len(ret) == 0 {
+		panic("no return value specified for IndexWithRepoForCaller")
+	}
+
+	var r0 []*database.LLMConfig
+	var r1 int
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, int, int, *types.SearchLLMConfig, *types.GatewayWhitelistCaller) ([]*database.LLMConfig, int, error)); ok {
+		return rf(ctx, per, page, search, caller)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, int, int, *types.SearchLLMConfig, *types.GatewayWhitelistCaller) []*database.LLMConfig); ok {
+		r0 = rf(ctx, per, page, search, caller)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]*database.LLMConfig)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, int, int, *types.SearchLLMConfig, *types.GatewayWhitelistCaller) int); ok {
+		r1 = rf(ctx, per, page, search, caller)
+	} else {
+		r1 = ret.Get(1).(int)
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, int, int, *types.SearchLLMConfig, *types.GatewayWhitelistCaller) error); ok {
+		r2 = rf(ctx, per, page, search, caller)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
+// MockLLMConfigStore_IndexWithRepoForCaller_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'IndexWithRepoForCaller'
+type MockLLMConfigStore_IndexWithRepoForCaller_Call struct {
+	*mock.Call
+}
+
+// IndexWithRepoForCaller is a helper method to define mock.On call
+//   - ctx context.Context
+//   - per int
+//   - page int
+//   - search *types.SearchLLMConfig
+//   - caller *types.GatewayWhitelistCaller
+func (_e *MockLLMConfigStore_Expecter) IndexWithRepoForCaller(ctx interface{}, per interface{}, page interface{}, search interface{}, caller interface{}) *MockLLMConfigStore_IndexWithRepoForCaller_Call {
+	return &MockLLMConfigStore_IndexWithRepoForCaller_Call{Call: _e.mock.On("IndexWithRepoForCaller", ctx, per, page, search, caller)}
+}
+
+func (_c *MockLLMConfigStore_IndexWithRepoForCaller_Call) Run(run func(ctx context.Context, per int, page int, search *types.SearchLLMConfig, caller *types.GatewayWhitelistCaller)) *MockLLMConfigStore_IndexWithRepoForCaller_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(int), args[2].(int), args[3].(*types.SearchLLMConfig), args[4].(*types.GatewayWhitelistCaller))
+	})
+	return _c
+}
+
+func (_c *MockLLMConfigStore_IndexWithRepoForCaller_Call) Return(_a0 []*database.LLMConfig, _a1 int, _a2 error) *MockLLMConfigStore_IndexWithRepoForCaller_Call {
+	_c.Call.Return(_a0, _a1, _a2)
+	return _c
+}
+
+func (_c *MockLLMConfigStore_IndexWithRepoForCaller_Call) RunAndReturn(run func(context.Context, int, int, *types.SearchLLMConfig, *types.GatewayWhitelistCaller) ([]*database.LLMConfig, int, error)) *MockLLMConfigStore_IndexWithRepoForCaller_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ListGatewayModels provides a mock function with given fields: ctx, limit, offset, q
+func (_m *MockLLMConfigStore) ListGatewayModels(ctx context.Context, limit int, offset int, q *types.GatewayModelListQuery) ([]*database.LLMConfig, int, error) {
+	ret := _m.Called(ctx, limit, offset, q)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListGatewayModels")
+	}
+
+	var r0 []*database.LLMConfig
+	var r1 int
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, int, int, *types.GatewayModelListQuery) ([]*database.LLMConfig, int, error)); ok {
+		return rf(ctx, limit, offset, q)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, int, int, *types.GatewayModelListQuery) []*database.LLMConfig); ok {
+		r0 = rf(ctx, limit, offset, q)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]*database.LLMConfig)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, int, int, *types.GatewayModelListQuery) int); ok {
+		r1 = rf(ctx, limit, offset, q)
+	} else {
+		r1 = ret.Get(1).(int)
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, int, int, *types.GatewayModelListQuery) error); ok {
+		r2 = rf(ctx, limit, offset, q)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
+// MockLLMConfigStore_ListGatewayModels_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListGatewayModels'
+type MockLLMConfigStore_ListGatewayModels_Call struct {
+	*mock.Call
+}
+
+// ListGatewayModels is a helper method to define mock.On call
+//   - ctx context.Context
+//   - limit int
+//   - offset int
+//   - q *types.GatewayModelListQuery
+func (_e *MockLLMConfigStore_Expecter) ListGatewayModels(ctx interface{}, limit interface{}, offset interface{}, q interface{}) *MockLLMConfigStore_ListGatewayModels_Call {
+	return &MockLLMConfigStore_ListGatewayModels_Call{Call: _e.mock.On("ListGatewayModels", ctx, limit, offset, q)}
+}
+
+func (_c *MockLLMConfigStore_ListGatewayModels_Call) Run(run func(ctx context.Context, limit int, offset int, q *types.GatewayModelListQuery)) *MockLLMConfigStore_ListGatewayModels_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(int), args[2].(int), args[3].(*types.GatewayModelListQuery))
+	})
+	return _c
+}
+
+func (_c *MockLLMConfigStore_ListGatewayModels_Call) Return(_a0 []*database.LLMConfig, _a1 int, _a2 error) *MockLLMConfigStore_ListGatewayModels_Call {
+	_c.Call.Return(_a0, _a1, _a2)
+	return _c
+}
+
+func (_c *MockLLMConfigStore_ListGatewayModels_Call) RunAndReturn(run func(context.Context, int, int, *types.GatewayModelListQuery) ([]*database.LLMConfig, int, error)) *MockLLMConfigStore_ListGatewayModels_Call {
 	_c.Call.Return(run)
 	return _c
 }

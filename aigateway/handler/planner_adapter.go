@@ -19,7 +19,11 @@ type modelResolverAdapter struct {
 }
 
 func (a *modelResolverAdapter) ResolveModelTarget(ctx context.Context, nsUUID, modelID string, headers http.Header, opts plan.ResolveOptions) (*types.ModelTarget, error) {
-	resolved, err := a.handler.resolveModelTargetWithOptions(ctx, nsUUID, modelID, headers, modelTargetResolveOptions{
+	resolved, err := a.handler.resolveModelTargetWithOptions(resolveModelTargetWithOptionsReq{
+		Ctx:                ctx,
+		Caller:             opts.Caller,
+		ModelID:            modelID,
+		Headers:            headers,
 		RequiredUpstreamID: opts.RequiredUpstreamID,
 		ClientProtocol:     opts.ClientProtocol,
 	})
@@ -61,7 +65,8 @@ func (a *contentSafetyAdapter) Check(ctx context.Context, req plan.ContentSafety
 }
 
 // newPlannerDeps builds the dependency set needed by plan.NewPlanner from
-// an OpenAIHandlerImpl. The openai component satisfies the balance interface.
+// an OpenAIHandlerImpl.  The openai component satisfies several of the
+// interfaces directly, including automatic model selection.
 func newPlannerDeps(h *OpenAIHandlerImpl) plan.PlannerDeps {
 	return plan.PlannerDeps{
 		ModelResolver:         &modelResolverAdapter{handler: h},
@@ -69,6 +74,7 @@ func newPlannerDeps(h *OpenAIHandlerImpl) plan.PlannerDeps {
 		ContentSafety:         &contentSafetyAdapter{policy: h.sensitivePolicy},
 		AdmissionChecker:      newAdmissionChecker(h),
 		MetricsEnricher:       metricsEnricherAdapter{},
+		AutoModelSelector:     h.openaiComponent,
 		TokenPlanQuotaChecker: h.tokenPlanQuotaChecker,
 	}
 }
@@ -77,6 +83,10 @@ func newPlannerDeps(h *OpenAIHandlerImpl) plan.PlannerDeps {
 // build-tag-gated SetMetricsModelTarget helper.  In CE builds the helper is a
 // no-op, so this adapter is also a no-op.
 type metricsEnricherAdapter struct{}
+
+func (metricsEnricherAdapter) SetRequestModel(c *gin.Context, requestModel string) {
+	SetMetricsRequestModel(c, requestModel)
+}
 
 func (metricsEnricherAdapter) SetModelTarget(c *gin.Context, modelID string, target *types.ModelTarget, isStream bool) {
 	var rt *resolvedModelTarget

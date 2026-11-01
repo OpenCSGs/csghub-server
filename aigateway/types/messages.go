@@ -10,20 +10,23 @@ import (
 // following the Anthropic Messages API specification.
 // Unknown fields are preserved in ExtraFields for native passthrough.
 type AnthropicMessagesRequest struct {
-	Model         string                     `json:"model"`
-	Messages      []AnthropicMessage         `json:"messages"`
-	System        json.RawMessage            `json:"system,omitempty"` // string or []AnthropicContentBlock
-	MaxTokens     int                        `json:"max_tokens"`
-	Metadata      *AnthropicMetadata         `json:"metadata,omitempty"`
-	StopSequences []string                   `json:"stop_sequences,omitempty"`
-	Stream        bool                       `json:"stream,omitempty"`
-	Temperature   *float64                   `json:"temperature,omitempty"`
-	TopP          *float64                   `json:"top_p,omitempty"`
-	TopK          *int                       `json:"top_k,omitempty"`
-	Tools         []AnthropicTool            `json:"tools,omitempty"`
-	ToolChoice    json.RawMessage            `json:"tool_choice,omitempty"`
-	Thinking      *AnthropicThinking         `json:"thinking,omitempty"`
-	ExtraFields   map[string]json.RawMessage `json:"-"`
+	// RetainRoutingBody controls routing-only snapshots; nil preserves direct decode compatibility.
+	RetainRoutingBody func(string) bool          `json:"-"`
+	RawBody           json.RawMessage            `json:"-"`
+	Model             string                     `json:"model"`
+	Messages          []AnthropicMessage         `json:"messages"`
+	System            json.RawMessage            `json:"system,omitempty"` // string or []AnthropicContentBlock
+	MaxTokens         int                        `json:"max_tokens"`
+	Metadata          *AnthropicMetadata         `json:"metadata,omitempty"`
+	StopSequences     []string                   `json:"stop_sequences,omitempty"`
+	Stream            bool                       `json:"stream,omitempty"`
+	Temperature       *float64                   `json:"temperature,omitempty"`
+	TopP              *float64                   `json:"top_p,omitempty"`
+	TopK              *int                       `json:"top_k,omitempty"`
+	Tools             []AnthropicTool            `json:"tools,omitempty"`
+	ToolChoice        json.RawMessage            `json:"tool_choice,omitempty"`
+	Thinking          *AnthropicThinking         `json:"thinking,omitempty"`
+	ExtraFields       map[string]json.RawMessage `json:"-"`
 }
 
 // AnthropicMessage is a single message in the messages array.
@@ -151,6 +154,10 @@ func (r *AnthropicMessagesRequest) UnmarshalJSON(data []byte) error {
 		delete(allFields, key)
 	}
 	tmp.ExtraFields = allFields
+	tmp.RetainRoutingBody = r.RetainRoutingBody
+	if r.RetainRoutingBody == nil || r.RetainRoutingBody(tmp.Model) {
+		tmp.RawBody = append(json.RawMessage(nil), data...)
+	}
 	*r = AnthropicMessagesRequest(tmp)
 	return nil
 }

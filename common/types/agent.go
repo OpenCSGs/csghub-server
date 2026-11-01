@@ -178,17 +178,18 @@ type UpdateAgentConfigReq struct {
 // AgentTemplate represents the template for an agent
 type AgentTemplate struct {
 	ID          int64           `json:"id"`
-	Type        *string         `json:"type" binding:"required"`                 // Possible values: langflow, agno, code, etc.
-	UserUUID    *string         `json:"-"`                                       // Will be set from HTTP header using httpbase.GetCurrentUserUUID
-	Name        *string         `json:"name" binding:"required,max=255"`         // Agent template name
-	Description *string         `json:"description" binding:"omitempty,max=500"` // Agent template description
-	Content     *string         `json:"content,omitempty"`                       // Used to store the complete content of the template
-	Public      *bool           `json:"public,omitempty"`                        // Whether the template is public
-	Editable    bool            `json:"editable"`                                // Whether the template is editable (only the owner can delete)
-	Metadata    *map[string]any `json:"metadata,omitempty"`                      // Template metadata
-	IsPinned    bool            `json:"is_pinned"`                               // Whether the template is pinned by the user
-	CreatedAt   time.Time       `json:"created_at"`                              // When the template was created
-	UpdatedAt   time.Time       `json:"updated_at"`                              // When the template was last updated
+	Type        *string         `json:"type" binding:"required"`                        // Possible values: langflow, agno, code, etc.
+	UserUUID    *string         `json:"-"`                                              // Will be set from HTTP header using httpbase.GetCurrentUserUUID
+	Name        *string         `json:"name" binding:"required,max=255"`                // Agent template name
+	Nickname    *string         `json:"nickname,omitempty" binding:"omitempty,max=255"` // Agent template display name
+	Description *string         `json:"description" binding:"omitempty,max=500"`        // Agent template description
+	Content     *string         `json:"content,omitempty"`                              // Used to store the complete content of the template
+	Public      *bool           `json:"public,omitempty"`                               // Whether the template is public
+	Editable    bool            `json:"editable"`                                       // Whether the template is editable (only the owner can delete)
+	Metadata    *map[string]any `json:"metadata,omitempty"`                             // Template metadata
+	IsPinned    bool            `json:"is_pinned"`                                      // Whether the template is pinned by the user
+	CreatedAt   time.Time       `json:"created_at"`                                     // When the template was created
+	UpdatedAt   time.Time       `json:"updated_at"`                                     // When the template was last updated
 }
 
 type AgentTemplateFilter struct {
@@ -202,6 +203,7 @@ type AgentTemplateFilter struct {
 type UpdateAgentTemplateRequest struct {
 	Type        *string         `json:"type,omitempty"`
 	Name        *string         `json:"name,omitempty" binding:"omitempty,max=255"`
+	Nickname    *string         `json:"nickname,omitempty" binding:"omitempty,max=255"`
 	Description *string         `json:"description,omitempty" binding:"omitempty,max=500"`
 	Content     *string         `json:"content,omitempty"`
 	Public      *bool           `json:"public,omitempty"`
@@ -426,6 +428,32 @@ const (
 	AgentStoragePolicyNone            AgentStoragePolicy = "none"
 	AgentStoragePolicyActorPersistent AgentStoragePolicy = "actor_persistent"
 )
+
+// AgentReasoningEffort is the llm reasoning effort level selected at agent
+// creation (provision_request.llm.reasoning_effort); reusable across agent types.
+type AgentReasoningEffort string
+
+const (
+	// AgentReasoningEffortAuto is the default when the request omits the level.
+	AgentReasoningEffortAuto    AgentReasoningEffort = "auto"
+	AgentReasoningEffortNone    AgentReasoningEffort = "none"
+	AgentReasoningEffortMinimal AgentReasoningEffort = "minimal"
+	AgentReasoningEffortLow     AgentReasoningEffort = "low"
+	AgentReasoningEffortMedium  AgentReasoningEffort = "medium"
+	AgentReasoningEffortHigh    AgentReasoningEffort = "high"
+	AgentReasoningEffortXHigh   AgentReasoningEffort = "xhigh"
+)
+
+// Valid reports whether e is an accepted reasoning effort level.
+func (e AgentReasoningEffort) Valid() bool {
+	switch e {
+	case AgentReasoningEffortAuto, AgentReasoningEffortNone, AgentReasoningEffortMinimal,
+		AgentReasoningEffortLow, AgentReasoningEffortMedium, AgentReasoningEffortHigh, AgentReasoningEffortXHigh:
+		return true
+	default:
+		return false
+	}
+}
 
 type AgentType string
 
@@ -1016,8 +1044,9 @@ type AgentMCPServerInspectBatchRequest struct {
 }
 
 type InspectMCPServerResponse struct {
-	Status       string         `json:"status"`                 // Status: 'connected' or 'error'
-	Capabilities map[string]any `json:"capabilities,omitempty"` // Fetched capabilities (tools, resources, prompts, resource_templates)
+	Status          string         `json:"status"`                     // Status: 'connected' or 'error'
+	Capabilities    map[string]any `json:"capabilities,omitempty"`     // Fetched capabilities (tools, resources, prompts, resource_templates)
+	ProtocolVersion string         `json:"protocol_version,omitempty"` // Negotiated MCP protocol revision
 }
 
 type AgentMCPServerIDPrefix string

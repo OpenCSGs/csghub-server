@@ -1,0 +1,100 @@
+include:
+  # SaaS stg: default branch. CI_COMMIT_TAG is faked in rules below because the build
+  # component derives the saas region flags from ${CI_COMMIT_TAG#*-}.
+  - component: git-devops.opencsg.com/gitlab/ci-components/build@v1.4.10
+    inputs:
+      environment: stage
+      edition: saas
+      dockerfile: docker/Dockerfile-saas
+      images:
+        - "$CI_REGISTRY_IMAGE:$CI_COMMIT_TAG"
+        - "registry.opencsg.com/opencsg_public/starhub-server:$CI_COMMIT_TAG"
+      build_args:
+        - "CSGHUB_TAGS=$BUILD_EDITION"
+        - "IMAGE_TAG=$CI_COMMIT_TAG"
+        - "CI_COMMIT_SHORT_SHA=$CI_COMMIT_SHORT_SHA"
+      rules:
+        - if: $CI_PIPELINE_SOURCE != "schedule" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+          variables:
+            CI_COMMIT_TAG: "${CI_COMMIT_SHORT_SHA}-cn-saas"
+
+  # SaaS stg 部署 —— 【临时过渡：直接在本流水线里跑老部署脚本】
+  # stg 的 chart 还没就绪，所以这个 job 暂时不跑 chart_set 的 helm upgrade，而是：
+  #   · rules 是 main push 上的自动触发（不设 when: manual）：每次 main push 都真实部署一次，
+  #     部署失败会让 pipeline 变红；
+  #   · custom_script 指向 scripts/deploy-stg-legacy.sh：clone saas-stg 仓库、cd csghub-stg、
+  #     bash update.sh-stg —— 与 starhub-deployment 项目 .gitlab-ci.yml 的 deploy:new-stg-helm
+  #     完全一致；脚本末尾 exit 0，组件 script 段里的 helm upgrade 不会执行。
+  #   · kubeconfig 用本项目已有的 File 变量 KUBECONFIG_SAAS_STG（不再像最早那样借用
+  #     starhub-deployment 的 NEWSTG_KUBE_CONFIG）；tags 用 kubernetes —— 真实部署必须落在
+  #     能连集群的 runner 上，这个 tag 与 starhub-deployment 的 deploy:new-stg-helm 一致。
+  # needs 依赖 update:helm:stg：镜像先 retag 到 ACR、saas-stg 仓库里 update.sh-* 的 tag 先更新成
+  # ${CI_COMMIT_SHORT_SHA}-cn-saas，这里 clone 到的脚本才是本次构建的 tag。
+  # 现有的自动部署（update:helm:stg -> trigger:deploy:new-stg）原样保留，没动。
+  #
+  # chart 就绪后切回组件部署：
+  #   1. custom_script 换成：
+  #        - . .gitlab/ci/scripts/deploy-saas-chart.sh saas-stg csghub-stg /tmp/saas-stg-chart
+  #   2. （when: manual 与 allow_failure 已去掉，无需再动）
+  #   3. 删掉 scripts/deploy-stg-legacy.sh，并决定是否停掉 trigger:deploy:new-stg。
+  #
+  # chart_set 只推 starhub-server 的镜像版本和 registry，其余参数一律不传 —— 组件的
+  # chart_values 没设置时 helm 走 --reset-then-reuse-values，复用 release 上当前生效的 values，
+  # 所以服务器本地维护的配置不会被 CI 覆盖。
+  - component: git-devops.opencsg.com/gitlab/ci-components/deploy@v1.4.10
+    inputs:
+      environment: stg
+      edition: saas
+      mode: helm
+      kubeconfig: KUBECONFIG_SAAS_STG
+      needs: ["update:helm:stg"]
+      # 真实部署要落在能连集群的 runner 上（与 starhub-deployment 的 deploy:new-stg-helm 一致）。
+      tags: ["kubernetes"]
+      # 空 chart_repo + 本地路径 chart_name：chart 就绪后 helm 直接用 clone 下来的 chart 目录。
+      chart_repo: ""
+      chart_name: /tmp/saas-stg-chart/csghub-stg
+      custom_script:
+        # 临时：chart 就绪前先跑老部署脚本（脚本内 exit 0，组件的 helm upgrade 不会执行）。
+        - . .gitlab/ci/scripts/deploy-stg-legacy.sh
+      custom_script_position: script_before
+      chart_set:
+        # —— starhub-server 镜像（本项目的发布物）——
+        - 'image.tag=$CI_COMMIT_TAG'
+        - 'global.image.tag=$CI_COMMIT_TAG'
+        - 'runner.image.tag=$CI_COMMIT_TAG'
+        # —— registry：与 deploy-qa-saas 的 chart_set 结构对齐 ——
+        # ⚠️ 值按 stg 现状填（ACR）。qa 用的是 registry.opencsg.com，两个不是同一个仓库，别互相抄。
+        # global.image.registry 是全局的，会影响 casdoor / temporal / redis / gitaly / minio 等
+        # 所有子组件，改之前先确认目标 registry 里这些镜像都在。
+        - 'global.image.registry=opencsg-registry.cn-beijing.cr.aliyuncs.com'
+        - 'global.imageRegistry=opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public'
+        - 'image.registry=opencsg-registry.cn-beijing.cr.aliyuncs.com'
+        # —— 其他组件的镜像由各自项目维护，这里留模板 ——
+        # ⚠️ 放开前必须先在 GitLab 配好变量：变量缺失时组件的 envsubst 会展开成空串，helm 收到
+        # --set-string portal.image.tag= 会直接把镜像 tag 清空。放开的同时把变量名加进
+        # scripts/deploy-saas-chart.sh 的 saas_chart_vars，缺失就会 exit 1。
+        # - 'portal.image.tag=$PORTAL_IMAGE_TAG'
+        # - 'xnet.image.tag=$XNET_IMAGE_TAG'
+        # - 'agentichub.agenticflow.image.tag=$AGENTICFLOW_IMAGE_TAG'
+        # - 'agentichub.csgbot.image.tag=$CSGBOT_IMAGE_TAG'
+      rules:
+        - if: $CI_PIPELINE_SOURCE != "schedule" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+          variables:
+            # 与 build-stage-saas 同一个值：deploy-stg-legacy.sh 用它 pin 住 update.sh-stg 的镜像 tag，
+            # chart_set 里的 image.tag 也读它，两边不会错位。
+            CI_COMMIT_TAG: "${CI_COMMIT_SHORT_SHA}-cn-saas"
+
+# 覆盖组件的 image。deploy@v1.4.10 生成的 job 镜像在模板里写死是 alpine/helm:4（= helm v4），
+# 而 saas-stg 仓库的 csghub-stg/update.sh-stg 是 helm 3 的语法
+# （`helm upgrade --install <release> <chart>`），在 v4 下直接报 `"helm upgrade" requires 2 arguments`。
+# starhub-deployment 的 deploy:new-stg-helm 用的就是 3.18.6，这里对齐；helm 4 落地后再考虑去掉。
+# GitLab 允许在 include 之后重定义同名 job 来覆盖字段，script / variables / needs 仍来自组件。
+deploy-stg-saas:
+  image:
+    name: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/alpine/helm:3.18.6
+    entrypoint: [""]
+
+
+
+
+

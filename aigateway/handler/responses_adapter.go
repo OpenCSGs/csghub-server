@@ -94,7 +94,7 @@ func responsesToChatRequestResolved(ctx context.Context, req *types.ResponsesReq
 			}
 		}
 	}
-	messages, err := responsesInputToChatMessages(ctx, req, toolAliases)
+	messages, err := responsesInputToChatMessages(ctx, req, toolAliases, modelName)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -750,13 +750,11 @@ func floatPtrValue(v *float64) float64 {
 	return *v
 }
 
-func responsesInputToChatMessages(ctx context.Context, req *types.ResponsesRequest, toolAliases *responsesToolAliases) ([]map[string]any, error) {
-	messages := []map[string]any{}
-	if instructionText := types.ResponsesInstructionText(req.Instructions); instructionText != "" {
-		messages = append(messages, map[string]any{"role": "system", "content": instructionText})
-	}
+func responsesInputToChatMessages(ctx context.Context, req *types.ResponsesRequest, toolAliases *responsesToolAliases, modelName string) ([]map[string]any, error) {
+	instructionText := types.ResponsesInstructionText(req.Instructions)
 	var asString string
 	if err := json.Unmarshal(req.Input, &asString); err == nil {
+		messages := responsesInstructionMessages(instructionText)
 		messages = append(messages, map[string]any{"role": "user", "content": asString})
 		return messages, nil
 	}
@@ -764,6 +762,14 @@ func responsesInputToChatMessages(ctx context.Context, req *types.ResponsesReque
 	if err := json.Unmarshal(req.Input, &items); err != nil {
 		return nil, fmt.Errorf("unsupported responses input shape")
 	}
+	if requiresMergedDeveloperInstructions(modelName) {
+		var err error
+		instructionText, items, err = mergeResponsesDeveloperInstructions(instructionText, items)
+		if err != nil {
+			return nil, err
+		}
+	}
+	messages := responsesInstructionMessages(instructionText)
 	// Keep pending reasoning until the next assistant message or tool-call turn.
 	// Do not attach it to user/system messages.
 	pendingReasoning := ""
@@ -858,6 +864,78 @@ func responsesInputToChatMessages(ctx context.Context, req *types.ResponsesReque
 		}
 	}
 	return messages, nil
+}
+
+func responsesInstructionMessages(instructionText string) []map[string]any {
+	if instructionText == "" {
+		return []map[string]any{}
+	}
+	return []map[string]any{{"role": "system", "content": instructionText}}
+}
+
+func requiresMergedDeveloperInstructions(modelName string) bool {
+	normalized := strings.ToLower(strings.TrimSpace(modelName))
+	return strings.Contains(normalized, "qwen3.5") ||
+		strings.Contains(normalized, "qwen3.6") ||
+		strings.Contains(normalized, "qwen3.8")
+}
+
+func mergeResponsesDeveloperInstructions(instructionText string, items []map[string]any) (string, []map[string]any, error) {
+	parts := make([]string, 0, len(items)+1)
+	if instructionText != "" {
+		parts = append(parts, instructionText)
+	}
+	filteredItems := make([]map[string]any, 0, len(items))
+	for _, item := range items {
+		itemType, _ := item["type"].(string)
+		role, _ := item["role"].(string)
+		if (itemType == "message" || itemType == "") && role == "developer" {
+			text, err := responsesDeveloperInstructionText(item["content"])
+			if err != nil {
+				return "", nil, err
+			}
+			if text != "" {
+				parts = append(parts, text)
+			}
+			continue
+		}
+		filteredItems = append(filteredItems, item)
+	}
+	return strings.Join(parts, "\n\n"), filteredItems, nil
+}
+
+func responsesDeveloperInstructionText(content any) (string, error) {
+	switch value := content.(type) {
+	case nil:
+		return "", nil
+	case string:
+		return strings.TrimSpace(value), nil
+	case []any:
+		parts := make([]string, 0, len(value))
+		for _, part := range value {
+			object, ok := part.(map[string]any)
+			if !ok {
+				return "", unsupportedResponsesFeature("input.developer.content")
+			}
+			partType, _ := object["type"].(string)
+			switch partType {
+			case "input_text", "output_text", "text":
+				text, ok := object["text"].(string)
+				if !ok {
+					return "", unsupportedResponsesFeature("input.developer.content." + partType)
+				}
+				parts = append(parts, text)
+			default:
+				if partType == "" {
+					partType = "unknown"
+				}
+				return "", unsupportedResponsesFeature("input.developer.content." + partType)
+			}
+		}
+		return strings.TrimSpace(strings.Join(parts, "")), nil
+	default:
+		return "", unsupportedResponsesFeature("input.developer.content")
+	}
 }
 
 // responsesOpenToolCallMessage returns the most recent message when it is an

@@ -12,15 +12,15 @@ import (
 func TestMirrorNamespaceMappingComponent_Create(t *testing.T) {
 	ctx := context.TODO()
 	mc := initializeTestMirrorNamespaceMappingComponent(ctx, t)
-	mc.mocks.stores.NamespaceMock().EXPECT().Exists(ctx, "target-team").Return(true, nil)
+	mc.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "Target-Team").Return(database.Namespace{Path: "target-Team"}, nil)
 	mc.mocks.stores.MirrorNamespaceMappingMock().EXPECT().Create(ctx, &database.MirrorNamespaceMapping{
 		SourceNamespace: "SourceTeam",
-		TargetNamespace: "target-team",
+		TargetNamespace: "target-Team",
 	}).Return(&database.MirrorNamespaceMapping{ID: 1}, nil)
 
 	data, err := mc.Create(ctx, types.CreateMirrorNamespaceMappingReq{
 		SourceNamespace: "SourceTeam",
-		TargetNamespace: " Target-Team ",
+		TargetNamespace: "Target-Team",
 	})
 	require.Nil(t, err)
 	require.Equal(t, &database.MirrorNamespaceMapping{ID: 1}, data)
@@ -53,15 +53,15 @@ func TestMirrorNamespaceMappingComponent_Index(t *testing.T) {
 func TestMirrorNamespaceMappingComponent_Update(t *testing.T) {
 	ctx := context.TODO()
 	mc := initializeTestMirrorNamespaceMappingComponent(ctx, t)
-	mc.mocks.stores.NamespaceMock().EXPECT().Exists(ctx, "target-team").Return(true, nil)
+	mc.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "Target-Team").Return(database.Namespace{Path: "target-Team"}, nil)
 	mc.mocks.stores.MirrorNamespaceMappingMock().EXPECT().Update(ctx, &database.MirrorNamespaceMapping{
 		ID:              1,
 		SourceNamespace: "SourceTeam",
-		TargetNamespace: "target-team",
+		TargetNamespace: "target-Team",
 	}).Return(database.MirrorNamespaceMapping{
 		ID:              1,
 		SourceNamespace: "SourceTeam",
-		TargetNamespace: "target-team",
+		TargetNamespace: "target-Team",
 	}, nil)
 	var (
 		sn = "SourceTeam"
@@ -77,7 +77,7 @@ func TestMirrorNamespaceMappingComponent_Update(t *testing.T) {
 	require.Equal(t, &database.MirrorNamespaceMapping{
 		ID:              1,
 		SourceNamespace: "SourceTeam",
-		TargetNamespace: "target-team",
+		TargetNamespace: "target-Team",
 	}, data)
 }
 

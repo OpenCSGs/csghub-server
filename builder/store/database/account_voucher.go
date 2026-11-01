@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/uptrace/bun"
+	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
@@ -47,21 +48,25 @@ func NewAccountVoucherStoreWithDB(db *DB) AccountVoucherStore {
 }
 
 type AccountVoucher struct {
-	ID         int64                `bun:",pk,autoincrement" json:"id"`
-	VoucherNo  string               `bun:",notnull,unique" json:"voucher_no"`
-	TargetType NamespaceType        `bun:",notnull" json:"target_type"` // user or org
-	TargetUUID string               `bun:",notnull" json:"target_uuid"`
-	TargetName string               `bun:",notnull" json:"target_name"`
-	Total      float64              `bun:",notnull,default:0" json:"total"`
-	Used       float64              `bun:",notnull,default:0" json:"used"`
-	BeginDate  time.Time            `bun:",notnull" json:"begin_date"`
-	EndDate    time.Time            `bun:",notnull" json:"end_date"`
-	Status     types.VoucherStatus  `bun:",notnull" json:"status"`
-	Rules      []types.VoucherRules `bun:",type:jsonb,nullzero" json:"rules"`
-	Notes      string               `bun:",nullzero" json:"notes"`
-	IssueUUID  string               `bun:",notnull" json:"issue_uuid"`
-	IssueName  string               `bun:",notnull" json:"issue_name"`
+	ID         int64               `bun:",pk,autoincrement" json:"id"`
+	VoucherNo  string              `bun:",notnull,unique" json:"voucher_no"`
+	TargetType NamespaceType       `bun:",notnull" json:"target_type"` // user or org
+	TargetUUID string              `bun:",notnull" json:"target_uuid"`
+	TargetName string              `bun:",notnull" json:"target_name"`
+	Total      float64             `bun:",notnull,default:0" json:"total"`
+	Used       float64             `bun:",notnull,default:0" json:"used"`
+	BeginDate  time.Time           `bun:",notnull" json:"begin_date"`
+	EndDate    time.Time           `bun:",notnull" json:"end_date"`
+	Status     types.VoucherStatus `bun:",notnull" json:"status"`
+	Rules      types.VoucherRules  `bun:",type:jsonb,nullzero" json:"rules"`
+	Notes      string              `bun:",nullzero" json:"notes"`
+	IssueUUID  string              `bun:",notnull" json:"issue_uuid"`
+	IssueName  string              `bun:",notnull" json:"issue_name"`
 	times
+
+	VoucherType types.VoucherType `bun:",notnull" json:"voucher_type"`
+	VoucherName string            `bun:",nullzero" json:"voucher_name"`
+	BatchNo     string            `bun:",nullzero" json:"batch_no"`
 }
 
 func (a *accountVoucherStoreImpl) Create(ctx context.Context, input AccountVoucher) (*AccountVoucher, error) {
@@ -73,12 +78,12 @@ func (a *accountVoucherStoreImpl) Create(ctx context.Context, input AccountVouch
 		input.VoucherNo = voucherNo
 		res, err := tx.NewInsert().Model(&input).Exec(ctx, &input)
 		if err := assertAffectedOneRow(res, err); err != nil {
-			return fmt.Errorf("insert account voucher: %w", err)
+			return err
 		}
 		return nil
 	})
 	if err != nil {
-		return nil, fmt.Errorf("create account voucher in transaction: %w", err)
+		return nil, errorx.HandleDBError(err, nil)
 	}
 	return &input, nil
 }
@@ -144,6 +149,15 @@ func (a *accountVoucherStoreImpl) List(ctx context.Context, filter types.Voucher
 	var vouchers []AccountVoucher
 	q := a.db.Core.NewSelect().Model(&vouchers)
 
+	if len(filter.Type) > 0 {
+		q = q.Where("voucher_type = ?", filter.Type)
+	}
+	if len(filter.Name) > 0 {
+		q = q.Where("voucher_name LIKE ?", "%"+filter.Name+"%")
+	}
+	if len(filter.BatchNo) > 0 {
+		q = q.Where("batch_no = ?", filter.BatchNo)
+	}
 	if len(filter.TargetType) > 0 {
 		q = q.Where("target_type = ?", filter.TargetType)
 	}
@@ -208,7 +222,7 @@ func (a *accountVoucherStoreImpl) GetDashboard(ctx context.Context, req types.Vo
 }
 
 func updateVouchersStatus(ctx context.Context, tx bun.Tx) error {
-	now := time.Now()
+	now := time.Now().In(config.GetGlobalTimeZone())
 
 	// Pending vouchers whose begin_date has passed → active
 	_, err := tx.NewUpdate().Model(&AccountVoucher{}).

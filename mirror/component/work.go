@@ -5,24 +5,41 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strconv"
 	"time"
 
 	"github.com/riverqueue/river"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/workhub"
+	"opencsg.com/csghub-server/common/types"
+	sharedcomponent "opencsg.com/csghub-server/component"
 )
 
 const (
-	// urgentJobDelay controls how long preempted normal jobs wait before retrying.
-	urgentJobDelay = time.Minute
 	// urgentIdleDelay is the quiet period before normal queue restoration.
 	urgentIdleDelay = 10 * time.Second
-	// workerShutdownSnoozeDelay prevents immediate reacquisition while a worker client stops.
-	workerShutdownSnoozeDelay = 30 * time.Second
+	// mirrorPauseCleanupTimeout bounds business-state cleanup after execution cancellation.
+	mirrorPauseCleanupTimeout = 10 * time.Second
 )
+
+// newMirrorJobLeaseConfig reserves one cancellation budget for compensation,
+// business cleanup and River completion. FinalizeTimeout cannot extend an
+// earlier cancellation deadline: allow 30s for repo compensation, 10s for
+// pause cleanup, 30s for completion and 20s of scheduling/transport headroom.
+func newMirrorJobLeaseConfig() *river.JobLeaseConfig {
+	return &river.JobLeaseConfig{
+		CancelGracePeriod: 90 * time.Second,
+		LocalSafetyMargin: 100 * time.Second,
+		LeaseDuration:     180 * time.Second,
+		FinalizeTimeout:   30 * time.Second,
+	}
+}
 
 // mirrorWorkConfig contains immutable job metadata, lifecycle dependencies, and typed business work.
 type mirrorWorkConfig[T river.JobArgs] struct {
+	reporter  *sharedcomponent.MirrorMetricsReporter
 	args      workhub.MirrorArgs
 	urgent    bool
 	stage     string // repo/lfs
@@ -37,7 +54,10 @@ type mirrorTaskStore interface {
 	UpdateStatusAndRepoSyncStatus(ctx context.Context, task database.MirrorTask, statusAction string) (database.MirrorTask, error)
 }
 
+// runWorkWithLog records lifecycle outcomes without changing the business result.
 func runWorkWithLog[T river.JobArgs](ctx context.Context, job *river.Job[T], cfg mirrorWorkConfig[T]) error {
+	ctx, release := cfg.reporter.Track(ctx, metricJobDetails(cfg.args, cfg.stage))
+	defer release()
 	workLogs := []any{
 		slog.Int64("job_id", job.ID),
 		slog.String("stage", cfg.stage),
@@ -76,24 +96,11 @@ func runWorkWithLog[T river.JobArgs](ctx context.Context, job *river.Job[T], cfg
 	return execError
 }
 
+// runWork gates urgent execution and classifies business and lifecycle errors.
 func runWork[T river.JobArgs](ctx context.Context, job *river.Job[T], cfg mirrorWorkConfig[T]) error {
-	workCtx := ctx
-
-	if !cfg.urgent {
-		// Register normal work with the urgent-work manager.
-		normalCtx, normalDone, allowed := cfg.manager.BeginNormal(ctx)
-		if !allowed {
-			// Snooze rejected work and retry the pause transition in case an earlier update failed.
-			_ = pauseTaskWork(workCtx, cfg)
-			return river.JobSnooze(urgentJobDelay)
-		}
-		defer normalDone()
-
-		// Pass the manager-derived context to the business work.
-		ctx = normalCtx
-	} else {
+	if cfg.urgent {
 		// Reserve urgent execution and preempt normal work.
-		urgentDone, err := beginUrgentWork(cfg.manager, ctx)
+		urgentDone, err := cfg.manager.BeginUrgent(ctx)
 		if err != nil {
 			// Reservation usually fails during worker shutdown or context cancellation.
 			return err
@@ -108,29 +115,25 @@ func runWork[T river.JobArgs](ctx context.Context, job *river.Job[T], cfg mirror
 		return nil
 	}
 
-	var (
-		cancelErr *river.JobCancelError
-		snoozeErr *river.JobSnoozeError
-	)
+	var cancelErr *river.JobCancelError
 	switch {
-	// Resume locally preempted work after the urgent-job delay.
-	case isUrgentPreemption(workCtx, ctx, workErr):
-		workErr = river.JobSnooze(urgentJobDelay)
-		if err := pauseTaskWork(workCtx, cfg); err != nil {
-			workErr = errors.Join(workErr, fmt.Errorf("pause preempted mirror task: %w", err))
+	// Normalize only pure pause cancellation after business cleanup so River preserves claim order.
+	case isQueuePauseCancellation(ctx, workErr):
+		cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), mirrorPauseCleanupTimeout)
+		defer cancel()
+		if err := pauseTaskWork(cleanupCtx, cfg, job.ID); err != nil {
+			return errors.Join(workErr, fmt.Errorf("pause interrupted mirror task: %w", err))
 		}
-	// Retry timed-out work immediately without changing its business status.
-	case errors.Is(workCtx.Err(), context.DeadlineExceeded) && errors.Is(workErr, context.DeadlineExceeded):
-		workErr = river.JobSnooze(0)
+		slog.InfoContext(ctx, "mirror work paused", slog.Int64("job_id", job.ID), slog.String("stage", cfg.stage), slog.Any("error", workErr))
+		// River recognizes its own pause error, including when the original cancellation came from gRPC.
+		workErr = river.ErrQueuePaused
 	// Worker shutdown and Job.Cancel both cancel the River context.
 	// The Job.Cancel caller owns the task status update, so this path leaves it unchanged.
-	case errors.Is(workCtx.Err(), context.Canceled) && errors.Is(workErr, context.Canceled):
-		return river.JobSnooze(workerShutdownSnoozeDelay)
-	// Honor a JobSnooze returned explicitly by business work.
-	case errors.As(workErr, &snoozeErr):
-		if snoozeErr.Duration > time.Second {
-			// Attempt to pause the task; the upcoming retry can recover from an update failure.
-			_ = pauseTaskWork(workCtx, cfg)
+	case isWorkCancellation(ctx, workErr):
+		if !errors.Is(workErr, context.Canceled) {
+			slog.InfoContext(ctx, "mirror work canceled", slog.Int64("job_id", job.ID), slog.String("stage", cfg.stage), slog.Any("error", workErr))
+			// River recognizes Go cancellation when settling client shutdown.
+			workErr = context.Canceled
 		}
 	// JobCancel stops retries for invalid job metadata and leaves the task status unchanged.
 	// Business errors that cannot be retried must use the task state machine instead.
@@ -188,35 +191,93 @@ func checkMirrorTaskInfo(task *database.MirrorTask, args workhub.MirrorArgs) err
 	return nil
 }
 
-// beginUrgentWork reserves urgent execution and converts worker shutdown into a short River snooze.
-func beginUrgentWork(manager *workhub.UrgentManager, riverCtx context.Context) (func(), error) {
-	done, err := manager.BeginUrgent(riverCtx)
-	if errors.Is(err, workhub.ErrWorkerShutdown) {
-		return nil, river.JobSnooze(workerShutdownSnoozeDelay)
-	}
-	return done, err
-}
-
-func pauseTaskWork[T river.JobArgs](ctx context.Context, cfg mirrorWorkConfig[T]) error {
+// pauseTaskWork returns the current stage to waiting without touching River storage.
+func pauseTaskWork[T river.JobArgs](ctx context.Context, cfg mirrorWorkConfig[T], jobID int64) error {
 	task, err := cfg.taskStore.FindByID(ctx, cfg.args.MirrorTaskID)
 	if err != nil {
 		return fmt.Errorf("find mirror job error: %w", err)
+	}
+	if err := checkMirrorTaskInfo(task, cfg.args); err != nil {
+		return err
+	}
+	switch cfg.stage {
+	case "repo":
+		if task.RepoJobID != jobID {
+			return fmt.Errorf("repo job ID mismatch: task=%d job=%d", task.RepoJobID, jobID)
+		}
+	case "lfs":
+		if task.LFSJobID != jobID {
+			return fmt.Errorf("lfs job ID mismatch: task=%d job=%d", task.LFSJobID, jobID)
+		}
+	default:
+		return fmt.Errorf("unknown mirror work stage: %s", cfg.stage)
 	}
 	_, err = cfg.taskStore.UpdateStatusAndRepoSyncStatus(ctx, *task, database.MirrorPause)
 	return err
 }
 
-// isUrgentPreemption identifies local urgent cancellation without treating River cancellation as preemption.
-func isUrgentPreemption(riverCtx, ctx context.Context, workErr error) bool {
-	return riverCtx.Err() == nil && isUrgentWorkCancellation(ctx, workErr)
+// isWorkCancellation excludes queue pauses, explicit cancellation and business errors.
+func isWorkCancellation(ctx context.Context, err error) bool {
+	if ctx.Err() != context.Canceled || errors.Is(context.Cause(ctx), river.ErrQueuePaused) {
+		return false
+	}
+	var cancelErr *river.JobCancelError
+	return !errors.As(err, &cancelErr) && isCancellationOnly(err)
 }
 
-// isUrgentWorkCancellation reports whether urgent preemption stopped business work.
-func isUrgentWorkCancellation(ctx context.Context, err error) bool {
-	return errors.Is(context.Cause(ctx), workhub.ErrUrgentPreempt) &&
-		(errors.Is(err, context.Canceled) ||
-			errors.Is(err, context.DeadlineExceeded) ||
-			errors.Is(err, workhub.ErrUrgentPreempt))
+// isCancellationOnly requires every error branch to represent execution cancellation.
+func isCancellationOnly(err error) bool {
+	if err == nil {
+		return false
+	}
+	if joined, ok := err.(interface{ Unwrap() []error }); ok {
+		causes := joined.Unwrap()
+		if len(causes) == 0 {
+			return false
+		}
+		for _, cause := range causes {
+			if !isCancellationOnly(cause) {
+				return false
+			}
+		}
+		return true
+	}
+	if wrapped := errors.Unwrap(err); wrapped != nil {
+		return isCancellationOnly(wrapped)
+	}
+	// Inspect RPC status only at a leaf to preserve joined business errors.
+	return errors.Is(err, context.Canceled) || status.Code(err) == codes.Canceled
+}
+
+// isQueuePauseCancellation recognizes pure local pause errors, including RPC cancellations normalized before returning to River.
+func isQueuePauseCancellation(ctx context.Context, err error) bool {
+	var cancelErr *river.JobCancelError
+	return errors.Is(context.Cause(ctx), river.ErrQueuePaused) &&
+		!errors.As(err, &cancelErr) && isPauseCancellationOnly(err)
+}
+
+// isPauseCancellationOnly checks every joined error so checkpoint failures retain failure semantics.
+func isPauseCancellationOnly(err error) bool {
+	if err == nil {
+		return false
+	}
+	if joined, ok := err.(interface{ Unwrap() []error }); ok {
+		causes := joined.Unwrap()
+		if len(causes) == 0 {
+			return false
+		}
+		for _, cause := range causes {
+			if !isPauseCancellationOnly(cause) {
+				return false
+			}
+		}
+		return true
+	}
+	if wrapped := errors.Unwrap(err); wrapped != nil {
+		return isPauseCancellationOnly(wrapped)
+	}
+	// Inspect RPC status only at a leaf; checking a joined error can overlook its business-error branches.
+	return errors.Is(err, context.Canceled) || errors.Is(err, river.ErrQueuePaused) || status.Code(err) == codes.Canceled
 }
 
 // isWorkContextTermination reports whether work stopped because its execution context ended.
@@ -224,7 +285,28 @@ func isWorkContextTermination(ctx context.Context, err error) bool {
 	if ctx.Err() == nil {
 		return false
 	}
-	return isUrgentWorkCancellation(ctx, err) ||
-		errors.Is(err, ctx.Err()) ||
+	if errors.Is(context.Cause(ctx), river.ErrQueuePaused) {
+		return isQueuePauseCancellation(ctx, err)
+	}
+	return errors.Is(err, ctx.Err()) ||
 		errors.Is(err, context.Cause(ctx))
+}
+
+// metricJobDetails copies only the identifiers needed to display current work.
+func metricJobDetails(args workhub.MirrorArgs, stage string) types.MirrorMetricsTask {
+	return types.MirrorMetricsTask{TaskID: strconv.FormatInt(args.MirrorTaskID, 10), Stage: stage, Urgent: args.Urgent}
+}
+
+// metricTaskDetails copies the validated repository path and business start time.
+func metricTaskDetails(task *database.MirrorTask) types.MirrorMetricsTask {
+	result := types.MirrorMetricsTask{}
+	if !task.StartedAt.IsZero() {
+		at := task.StartedAt.UnixMilli()
+		result.StartedAtMS = &at
+	}
+	if task.Mirror != nil && task.Mirror.Repository != nil {
+		repo := task.Mirror.Repository
+		result.RepoPath = string(repo.RepositoryType) + "s/" + repo.Path
+	}
+	return result
 }

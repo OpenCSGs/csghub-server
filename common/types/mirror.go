@@ -250,7 +250,11 @@ type CreateMirrorRepoReq struct {
 
 	// repo basic info
 	RepoType RepositoryType `json:"repo_type" binding:"required"`
-	Private  *bool          `json:"private,omitempty"`
+	// Private selects target visibility; request ingress defaults to public and internal callers may omit it for privacy.
+	// Models stay private until synchronization permits publication.
+	// Other repository types use the selected visibility immediately.
+	// Existing targets retain their repository settings when synchronization is retried.
+	Private *bool `json:"private,omitempty"`
 	// CreateTargetRepo controls target repository creation. Nil selects automatically,
 	// true requires a new target, and false requires an existing target.
 	CreateTargetRepo *bool `json:"create_target_repo,omitempty"`
@@ -318,7 +322,8 @@ type MCPServerAttributes struct {
 }
 
 type BatchCreateMirrorReq struct {
-	Mirrors []MirrorReq `json:"mirrors"`
+	Mirrors     []MirrorReq `json:"mirrors" binding:"required,min=1,dive"`
+	CurrentUser string      `json:"-"`
 }
 
 type MirrorReq struct {
@@ -327,7 +332,7 @@ type MirrorReq struct {
 	Username string `json:"username"`
 	// AccessToken is the upstream Git HTTP access token.
 	AccessToken   string         `json:"access_token"`
-	SourceID      int64          `json:"mirror_source_id" binding:"required"`
+	SourceID      int64          `json:"mirror_source_id"`
 	RepoType      RepositoryType `json:"repo_type" binding:"required"`
 	DefaultBranch string         `json:"branch" binding:"required"`
 	Priority      int8           `json:"priority"`
@@ -469,4 +474,173 @@ type UpdateMirrorNamespaceMappingReq struct {
 type MirrorFilter struct {
 	Search string            `json:"search"`
 	Status *MirrorTaskStatus `json:"status"`
+}
+
+// MirrorMetricsQuery filters current workers and executing repositories.
+type MirrorMetricsQuery struct {
+	Service      string
+	InstanceID   string
+	TaskID       string
+	Page         int
+	Per          int
+	InstancePage int
+	InstancePer  int
+}
+
+// MirrorMetricsResponse exposes current ephemeral snapshots to administrators.
+type MirrorMetricsResponse struct {
+	SchemaVersion     int                          `json:"schema_version"`
+	ServerTimeMS      int64                        `json:"server_time_ms"`
+	RefreshAfterMS    int                          `json:"refresh_after_ms"`
+	FreshnessLimitsMS MirrorMetricsFreshnessLimits `json:"freshness_limits_ms"`
+	Status            string                       `json:"status"`
+	Overview          *MirrorMetricsOverview       `json:"overview"`
+	LFSWorkers        []MirrorMetricsLFSWorker     `json:"lfs_workers"`
+	Instances         MirrorMetricsInstancePage    `json:"instances"`
+	Tasks             MirrorMetricsTaskPage        `json:"tasks"`
+}
+
+// MirrorMetricsFreshnessLimits bounds current values during browser outages.
+type MirrorMetricsFreshnessLimits struct {
+	Speed    int64 `json:"speed"`
+	Snapshot int64 `json:"snapshot"`
+	Queue    int64 `json:"queue"`
+}
+
+// MirrorMetricsOverview combines cached queue counts with current worker snapshots.
+type MirrorMetricsOverview struct {
+	SampledAtMS        *int64                      `json:"sampled_at_ms"`
+	Freshness          string                      `json:"freshness"`
+	CountsValidUntilMS MirrorMetricsStageDeadlines `json:"counts_valid_until_ms"`
+	Queues             *MirrorMetricsQueues        `json:"queues"`
+	OnlineInstances    *MirrorMetricsStageCounts   `json:"online_instances"`
+	BusyInstances      *MirrorMetricsStageCounts   `json:"busy_instances"`
+	ExecutingTasks     *MirrorMetricsStageCounts   `json:"executing_tasks"`
+	Throughput         *MirrorMetricsThroughput    `json:"throughput"`
+}
+
+// MirrorMetricsStageDeadlines expires each service independently.
+type MirrorMetricsStageDeadlines struct {
+	Repo int64 `json:"repo"`
+	LFS  int64 `json:"lfs"`
+}
+
+// MirrorMetricsStageCounts separates Repo and LFS measurements.
+type MirrorMetricsStageCounts struct {
+	Repo int `json:"repo"`
+	LFS  int `json:"lfs"`
+}
+
+// MirrorMetricsQueues describes the current River queues by business stage.
+type MirrorMetricsQueues struct {
+	Repo MirrorMetricsQueue `json:"repo"`
+	LFS  MirrorMetricsQueue `json:"lfs"`
+}
+
+// MirrorMetricsQueue contains only the current count of waiting repositories.
+// Available, scheduled and retryable jobs are included; running and terminal jobs are excluded.
+type MirrorMetricsQueue struct {
+	Waiting int `json:"waiting"`
+}
+
+// MirrorMetricsThroughput keeps upload and download rates independent.
+type MirrorMetricsThroughput struct {
+	SampledAtMS        *int64   `json:"sampled_at_ms"`
+	ClusterDownloadBPS *float64 `json:"cluster_download_bps"`
+	ClusterUploadBPS   *float64 `json:"cluster_upload_bps"`
+}
+
+// MirrorMetricsLFSWorker provides chart choices and current rates independently of table pagination.
+type MirrorMetricsLFSWorker struct {
+	InstanceID   string   `json:"instance_id"`
+	Name         string   `json:"name"`
+	RuntimeState string   `json:"runtime_state"`
+	SampledAtMS  *int64   `json:"sampled_at_ms"`
+	DownloadBPS  *float64 `json:"download_bps"`
+	UploadBPS    *float64 `json:"upload_bps"`
+}
+
+// MirrorMetricsWorkerConfig reports the effective configuration of one process.
+type MirrorMetricsWorkerConfig struct {
+	WorkerNumber   int     `json:"worker_number"`
+	NormalWorkers  int     `json:"normal_workers"`
+	UrgentWorkers  int     `json:"urgent_workers"`
+	LFSConcurrency *int    `json:"lfs_concurrency"`
+	PartSizeBytes  *string `json:"part_size_bytes"`
+}
+
+// MirrorMetricsInstance is the latest observation from one worker process.
+type MirrorMetricsInstance struct {
+	InstanceID      string                    `json:"instance_id"`
+	Name            string                    `json:"name"`
+	Service         string                    `json:"service"`
+	StartedAtMS     int64                     `json:"started_at_ms"`
+	RuntimeState    string                    `json:"runtime_state"`
+	SampledAtMS     *int64                    `json:"sampled_at_ms"`
+	Freshness       string                    `json:"freshness"`
+	ExecutingTasks  int                       `json:"executing_tasks"`
+	Config          MirrorMetricsWorkerConfig `json:"config"`
+	UploadBPS       *float64                  `json:"upload_bps"`
+	UploadedBytes   *string                   `json:"uploaded_bytes"`
+	DownloadBPS     *float64                  `json:"download_bps"`
+	DownloadedBytes *string                   `json:"downloaded_bytes"`
+}
+
+// MirrorMetricsLFS contains verified object progress; byte strings preserve precision.
+type MirrorMetricsLFS struct {
+	TotalBytes         *string  `json:"total_bytes"`
+	CompleteBytes      *string  `json:"complete_bytes"`
+	ConfirmedPartBytes *string  `json:"confirmed_part_bytes"`
+	ProgressPercent    *float64 `json:"progress_percent"`
+	FilesDone          *int     `json:"files_done"`
+	FilesTotal         *int     `json:"files_total"`
+}
+
+// MirrorMetricsTask describes only work currently executing in a worker.
+type MirrorMetricsTask struct {
+	TaskID               string            `json:"task_id"`
+	InstanceID           *string           `json:"instance_id"`
+	RepoPath             string            `json:"repo_path"`
+	Stage                string            `json:"stage"`
+	Urgent               bool              `json:"urgent"`
+	SampledAtMS          *int64            `json:"sampled_at_ms"`
+	Freshness            string            `json:"freshness"`
+	Operation            *string           `json:"operation"`
+	ExecutionStartedAtMS *int64            `json:"execution_started_at_ms"`
+	StartedAtMS          *int64            `json:"started_at_ms"`
+	LFS                  *MirrorMetricsLFS `json:"lfs"`
+	UploadBPS            *float64          `json:"upload_bps"`
+	UploadedBytes        *string           `json:"uploaded_bytes"`
+	DownloadBPS          *float64          `json:"download_bps"`
+	DownloadedBytes      *string           `json:"downloaded_bytes"`
+}
+
+// MirrorMetricsInstancePage returns a stable, filtered view without changing totals.
+type MirrorMetricsInstancePage struct {
+	Page  int                     `json:"page"`
+	Per   int                     `json:"per"`
+	Total int                     `json:"total"`
+	Items []MirrorMetricsInstance `json:"items"`
+}
+
+// MirrorMetricsTaskPage paginates currently reported worker executions.
+type MirrorMetricsTaskPage struct {
+	Page  int                 `json:"page"`
+	Per   int                 `json:"per"`
+	Total int                 `json:"total"`
+	Items []MirrorMetricsTask `json:"items"`
+}
+
+// MirrorMetricsSnapshot is one worker's complete latest-value publication.
+type MirrorMetricsSnapshot struct {
+	SchemaVersion int                   `json:"schema_version"`
+	Instance      MirrorMetricsInstance `json:"instance"`
+	Executions    []MirrorMetricsTask   `json:"executions"`
+}
+
+// MirrorMetricsControl caches aggregate SQL counts without any task details.
+type MirrorMetricsControl struct {
+	SchemaVersion int                 `json:"schema_version"`
+	SampledAtMS   int64               `json:"sampled_at_ms"`
+	Queues        MirrorMetricsQueues `json:"queues"`
 }

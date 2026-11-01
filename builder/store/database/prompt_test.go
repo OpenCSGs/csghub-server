@@ -89,12 +89,12 @@ func TestPromptStore_ByRepoIDs(t *testing.T) {
 	defer cancel()
 
 	ps := database.NewPromptStoreWithDB(db)
-	rs := database.NewRepoStoreWithDB(db)
-	us := database.NewUserStoreWithDB(db)
+	rs := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
+	us := database.NewUserStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
 
 	err := us.Create(ctx, &database.User{
 		Username: "foo",
-	}, &database.Namespace{})
+	}, &database.Namespace{Path: "foo"})
 	require.Nil(t, err)
 	user, err := us.FindByUsername(ctx, "foo")
 	require.Nil(t, err)
@@ -105,7 +105,7 @@ func TestPromptStore_ByRepoIDs(t *testing.T) {
 		repo, err := rs.CreateRepo(ctx, database.Repository{
 			UserID:  user.ID,
 			Name:    r,
-			Path:    r,
+			Path:    user.Username + "/" + r,
 			GitPath: r,
 		})
 		require.Nil(t, err)
@@ -138,13 +138,13 @@ func TestPromptStore_FindByPath(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	rs := database.NewRepoStoreWithDB(db)
+	rs := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
 	ts := database.NewTagStoreWithDB(db)
 
-	repo, err := rs.CreateRepo(ctx, database.Repository{
+	repo, err := rs.CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
 		Path:    "a/b/c",
 		GitPath: "abc",
-	})
+	}))
 	require.Nil(t, err)
 
 	tags := []database.RepositoryTag{}
@@ -215,15 +215,15 @@ func TestPromptStore_ByUserName(t *testing.T) {
 	defer db.Close()
 	ctx := context.TODO()
 
-	us := database.NewUserStoreWithDB(db)
+	us := database.NewUserStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
 	err := us.Create(ctx, &database.User{
 		Username: "foo",
-	}, &database.Namespace{})
+	}, &database.Namespace{Path: "foo"})
 	require.Nil(t, err)
 	user, err := us.FindByUsername(ctx, "foo")
 	require.Nil(t, err)
 
-	rs := database.NewRepoStoreWithDB(db)
+	rs := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
 
 	// order: 4-6-2-1-3-5
 	repos := []struct {
@@ -244,7 +244,7 @@ func TestPromptStore_ByUserName(t *testing.T) {
 		r := database.Repository{
 			UserID:  user.ID,
 			Name:    repo.Name,
-			Path:    repo.Name,
+			Path:    user.Username + "/" + repo.Name,
 			GitPath: repo.Name,
 			Private: repo.Private,
 		}

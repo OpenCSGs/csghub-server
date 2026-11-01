@@ -38,6 +38,10 @@ type AccountPriceStore interface {
 	// CountEnabledUpstreamCostByResourceIDs counts enabled SKUUpstreamCost
 	// prices for the given upstream cost resource ids.
 	CountEnabledUpstreamCostByResourceIDs(ctx context.Context, resourceIDs []string) (int, error)
+	// ListGatewayModelPrices returns the latest enabled aigateway prices
+	// (sku_type 1, kinds 4/5/7) for the given metering resource ids, one row
+	// per billing tier, as materialized by the gatewayModelPricesQuery subquery (llm_config.go).
+	ListGatewayModelPrices(ctx context.Context, resourceIDs []string) ([]AccountPrice, error)
 }
 
 func NewAccountPriceStore() AccountPriceStore {
@@ -368,4 +372,21 @@ func (a *accountPriceStoreImpl) CountEnabledUpstreamCostByResourceIDs(ctx contex
 		Where("resource_id IN (?)", bun.In(resourceIDs)).
 		Count(ctx)
 	return count, errorx.HandleDBError(err, nil)
+}
+
+// ListGatewayModelPrices returns the latest enabled aigateway prices for the
+// given metering resource ids, one row per billing tier (the tier and
+// recency rules live in gatewayModelPricesQuery, declared in llm_config.go
+// alongside the catalogue query that also consumes it).
+func (a *accountPriceStoreImpl) ListGatewayModelPrices(ctx context.Context, resourceIDs []string) ([]AccountPrice, error) {
+	if len(resourceIDs) == 0 {
+		return []AccountPrice{}, nil
+	}
+	var prices []AccountPrice
+	err := a.db.Core.NewSelect().
+		TableExpr("(" + gatewayModelPricesQuery + ") AS vp").
+		ColumnExpr("vp.*").
+		Where("vp.resource_id IN (?)", bun.In(resourceIDs)).
+		Scan(ctx, &prices)
+	return prices, errorx.HandleDBError(err, nil)
 }

@@ -132,7 +132,7 @@ func (c *datasetComponentImpl) Create(ctx context.Context, req *types.CreateData
 		return nil, fmt.Errorf("namespace does not exist, error: %w", err)
 	}
 
-	user, err := c.userStore.FindByUsername(ctx, req.Username)
+	user, err := c.userStore.FindByUsername(ctx, req.Username, types.UserWithAdminPermissions)
 	if err != nil {
 		return nil, fmt.Errorf("user does not exist, error: %w", err)
 	}

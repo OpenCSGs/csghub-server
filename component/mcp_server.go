@@ -56,8 +56,13 @@ type mcpServerComponentImpl struct {
 	repositoryAccessCache storecache.RedisClient
 }
 
+// NewMCPServerComponent injects the permission producer used by deployment transactions.
 func NewMCPServerComponent(config *config.Config) (MCPServerComponent, error) {
-	var err error
+	tupleJobs, err := newRebacTupleJobClient()
+	if err != nil {
+		return nil, err
+	}
+
 	m := &mcpServerComponentImpl{}
 	m.config = config
 	m.repositoryAccessCache, err = storecache.NewCache(context.Background(), storecache.RedisConfig{
@@ -85,7 +90,7 @@ func NewMCPServerComponent(config *config.Config) (MCPServerComponent, error) {
 	m.gitServer = gs
 	userSvcAddr := fmt.Sprintf("%s:%d", config.User.Host, config.User.Port)
 	m.userSvcClient = rpc.NewUserSvcHttpClient(userSvcAddr, rpc.AuthWithApiKey(config.APIToken))
-	m.mcpServerStore = database.NewMCPServerStore()
+	m.mcpServerStore = database.NewMCPServerStoreWithRebacTupleJobClient(database.GetDB(), tupleJobs)
 	m.userLikesStore = database.NewUserLikesStore()
 	m.recomStore = database.NewRecomStore()
 	m.spaceStore = database.NewSpaceStore()
@@ -608,6 +613,7 @@ func (c *mcpServerComponentImpl) addWeightsToMCP(ctx context.Context, repoID int
 	}
 }
 
+// Deploy creates an MCP space after checking source access and destination namespace authorization.
 func (m *mcpServerComponentImpl) Deploy(ctx context.Context, req *types.DeployMCPServerReq) (*types.Space, error) {
 	mcpServer, err := m.mcpServerStore.ByPath(ctx, req.MCPRepo.Namespace, req.MCPRepo.Name)
 	if err != nil {
@@ -642,7 +648,7 @@ func (m *mcpServerComponentImpl) Deploy(ctx context.Context, req *types.DeployMC
 			resource.Name, req.MCPRepo.Namespace, req.MCPRepo.Name, err)
 	}
 
-	namespace, err := m.namespaceStore.FindByPath(ctx, req.Namespace)
+	_, err = m.namespaceStore.FindByPath(ctx, req.Namespace)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find namespace %s for deploy mcp server %s/%s, error: %w",
 			req.Namespace, req.MCPRepo.Namespace, req.MCPRepo.Name, err)
@@ -658,10 +664,7 @@ func (m *mcpServerComponentImpl) Deploy(ctx context.Context, req *types.DeployMC
 		return nil, errorx.ErrNoEmail
 	}
 
-	dbUser := database.User{}
-	dbUser.SetRoles(user.Roles)
-
-	if !dbUser.CanAdmin() {
+	if !user.IsSuperAdmin() {
 		canWrite, err := m.repoComponent.CheckCurrentUserPermission(ctx, req.Username, req.Namespace, rebac.NamespaceCanWrite)
 		if err != nil {
 			return nil, fmt.Errorf("failed to check user %s permission for namespace %s, error: %w", req.CurrentUser, req.Namespace, err)
@@ -707,13 +710,11 @@ func (m *mcpServerComponentImpl) Deploy(ctx context.Context, req *types.DeployMC
 		ClusterID:     req.ClusterID,
 	}
 
-	err = m.mcpServerStore.CreateSpaceAndRepoForDeploy(ctx, &dbRepo, &dbSpace)
+	// Retain the committed tuple so failure cleanup never resolves a deleted owner.
+	ownerTuple, err := m.mcpServerStore.CreateSpaceAndRepoForDeploy(ctx, &dbRepo, &dbSpace)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create mcp space and repo %s/%s to deploy mcp server %s/%s, %w",
 			req.Namespace, req.Name, req.MCPRepo.Namespace, req.MCPRepo.Name, err)
-	}
-	if err := ensureRepositoryNamespaceRelationship(ctx, m.rebac, m.orgStore, namespace, dbRepo.ID, dbRepo.OrgInheritBlocked); err != nil {
-		return nil, fmt.Errorf("failed to synchronize deployed repository namespace relationship: %w", err)
 	}
 
 	cloneReq := gitserver.CopyRepositoryReq{
@@ -725,12 +726,11 @@ func (m *mcpServerComponentImpl) Deploy(ctx context.Context, req *types.DeployMC
 	slog.Info("generate hashedPath for cloned repo", slog.Any("cloneReq", cloneReq))
 	err = m.gitServer.CopyRepository(ctx, cloneReq)
 	if err != nil {
-		delErr := m.mcpServerStore.DeleteSpaceAndRepoForDeploy(ctx, dbSpace.ID, dbRepo.ID)
+		delErr := m.mcpServerStore.DeleteSpaceAndRepoForDeploy(ctx, dbSpace.ID, dbRepo.ID, ownerTuple)
 		if delErr != nil {
 			slog.Error("failed to delete created space and repo after failed to clone mcp server files",
 				slog.Any("req", req), slog.Any("delErr", delErr))
 		}
-		m.cleanupFailedMCPDeploy(ctx, namespace, dbSpace.ID, dbRepo.ID)
 		return nil, fmt.Errorf("failed to clone mcp server %s/%s files to mcp space %s/%s with repo id %d, error: %w",
 			req.MCPRepo.Namespace, req.MCPRepo.Name, req.Namespace, req.Name, dbRepo.ID, err)
 	}
@@ -748,12 +748,11 @@ func (m *mcpServerComponentImpl) Deploy(ctx context.Context, req *types.DeployMC
 			slog.Error("failed to delete git repo after failed to create default files for new mcp space",
 				slog.Any("req", req), slog.Any("delGit", delGit))
 		}
-		delErr := m.mcpServerStore.DeleteSpaceAndRepoForDeploy(ctx, dbSpace.ID, dbRepo.ID)
+		delErr := m.mcpServerStore.DeleteSpaceAndRepoForDeploy(ctx, dbSpace.ID, dbRepo.ID, ownerTuple)
 		if delErr != nil {
 			slog.Error("failed to delete created space and repo after failed to create default files for new mcp space",
 				slog.Any("req", req), slog.Any("delErr", delErr))
 		}
-		m.cleanupFailedMCPDeploy(ctx, namespace, dbSpace.ID, dbRepo.ID)
 		return nil, fmt.Errorf("failed to create default files for mcp space %s/%s, error: %w", req.Namespace, req.Name, err)
 	}
 
@@ -776,19 +775,6 @@ func (m *mcpServerComponentImpl) Deploy(ctx context.Context, req *types.DeployMC
 		DefaultBranch: dbRepo.DefaultBranch,
 	}
 	return space, nil
-}
-
-// cleanupFailedMCPDeploy removes the repository namespace tuple during deploy compensation.
-func (m *mcpServerComponentImpl) cleanupFailedMCPDeploy(
-	ctx context.Context,
-	namespace database.Namespace,
-	spaceID int64,
-	repositoryID int64,
-) {
-	if err := deleteRepositoryNamespaceRelationship(ctx, m.rebac, m.orgStore, namespace, repositoryID); err != nil {
-		slog.ErrorContext(ctx, "failed to delete repository ReBAC relationship after failed mcp deploy",
-			slog.Int64("space_id", spaceID), slog.Int64("repository_id", repositoryID), slog.Any("error", err))
-	}
 }
 
 func (m *mcpServerComponentImpl) createDeployDefaultFiles(ctx context.Context, req *types.DeployMCPServerReq,

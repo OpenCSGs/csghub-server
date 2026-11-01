@@ -85,3 +85,7 @@ var (
 	// zh-HK: 該場景不允許同步扣費
 	ErrSceneNotAllowed error = CustomError{prefix: errAccountPrefix, code: sceneNotAllowed}
 )
+
+func InsufficientBalance(ctx context) error {
+	return CustomError{prefix: errAccountPrefix, code: insufficientBalance, context: ctx}
+}

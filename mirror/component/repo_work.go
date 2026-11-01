@@ -2,6 +2,7 @@ package component
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"time"
@@ -10,6 +11,7 @@ import (
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/workhub"
 	"opencsg.com/csghub-server/common/types"
+	sharedcomponent "opencsg.com/csghub-server/component"
 	"opencsg.com/csghub-server/mirror/reposyncer"
 )
 
@@ -20,6 +22,7 @@ type repoWorker struct {
 	syncer          repoSyncer
 	lfsJobClient    database.MirrorLFSJobClient
 	urgentManager   *workhub.UrgentManager
+	reporter        *sharedcomponent.MirrorMetricsReporter
 }
 
 // Timeout returns the per-job timeout for repository mirror jobs.
@@ -48,12 +51,15 @@ type RepoWorkDeps struct {
 	LFSJobClient database.MirrorLFSJobClient
 	// MaxWorkers controls the repository mirror queue concurrency.
 	MaxWorkers int
+	// Reporter observes execution without changing business outcomes.
+	Reporter *sharedcomponent.MirrorMetricsReporter
 }
 
 // Work runs the repository mirror task.
 func (w *repoWorker) Work(ctx context.Context, job *river.Job[workhub.RepoArgs]) error {
 	return runWorkWithLog(ctx, job, mirrorWorkConfig[workhub.RepoArgs]{
 		manager:   w.urgentManager,
+		reporter:  w.reporter,
 		urgent:    job.Args.Urgent,
 		args:      job.Args.MirrorArgs,
 		stage:     "repo",
@@ -100,11 +106,14 @@ func (w *repoWorker) work(ctx context.Context, args workhub.RepoArgs, retryCount
 		)...)
 		return task, err
 	}
+	// Publish the committed first-start timestamp returned by task preparation.
+	sharedcomponent.MirrorMetricsRunning(ctx, metricTaskDetails(task))
 	slog.InfoContext(ctx, "prepared mirror repo task", mirrorTaskSlogArgs(args.MirrorArgs, task,
 		slog.String("before_status", string(beforeStatus)),
 		slog.String("after_status", string(task.Status)),
 	)...)
 
+	sharedcomponent.MirrorMetricsOperation(ctx, "fetch_repo")
 	synced, err := w.syncer.SyncRepo(ctx, task.Mirror, task)
 	if err != nil {
 		if isWorkContextTermination(ctx, err) {
@@ -116,7 +125,8 @@ func (w *repoWorker) work(ctx context.Context, args workhub.RepoArgs, retryCount
 		task.ErrorMessage = err.Error()
 		if _, updateErr := w.mirrorTaskStore.UpdateStatusAndRepoSyncStatus(ctx, *task, database.MirrorFail); updateErr != nil {
 			slog.ErrorContext(ctx, "failed to update status of mirror repo task", mirrorTaskSlogArgs(args.MirrorArgs, task, slog.String("error", updateErr.Error()))...)
-			return task, fmt.Errorf("mark repo sync failed: %w", updateErr)
+			// Preserve the sync failure so a canceled status update cannot turn it into a pure pause.
+			return task, errors.Join(err, fmt.Errorf("mark repo sync failed: %w", updateErr))
 		}
 		return task, err
 	}
@@ -185,6 +195,7 @@ func NewRepoWorkClient(ctx context.Context, databaseDSN string, deps RepoWorkDep
 func newRepoWorker(deps RepoWorkDeps) *repoWorker {
 	return &repoWorker{
 		mirrorTaskStore: deps.MirrorTaskStore,
+		reporter:        deps.Reporter,
 		syncer:          deps.Syncer,
 		lfsJobClient:    deps.LFSJobClient,
 	}
@@ -206,6 +217,7 @@ func newRepoRiverConfigForWorker(deps RepoWorkDeps, worker *repoWorker) *river.C
 	})
 
 	return &river.Config{
+		JobLease:     newMirrorJobLeaseConfig(),
 		ErrorHandler: newMirrorJobErrorHandler(deps.MirrorTaskStore),
 		Queues: map[string]river.QueueConfig{
 			workhub.MirrorRepoQueue:       {MaxWorkers: maxWorkers},

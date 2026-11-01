@@ -14,14 +14,19 @@ type RequestMetadata struct {
 	Protocol string
 	// Task is the high-level task type: "chat", "messages", "text-to-image", ...
 	Task string
-	// Model is the raw model field from the request body (before resolution).
+	// Model is the model field being planned.  It starts as the raw model
+	// from the request body and is replaced by the concrete model when
+	// automatic routing selects one.
 	Model string
+	// RequestModel is the model ID the client actually asked for (for
+	// example the "auto" virtual model).  It is preserved before automatic
+	// routing rewrites Model so metrics can attribute the request to the
+	// requested model while Model keeps naming the serving upstream model.
+	RequestModel string
 	// TenantID is the namespace UUID (nsUUID).
 	TenantID string
 	// UserID is the username.
 	UserID string
-	// APIKeyID is the API key identifier.
-	APIKeyID string
 	// PriorityScope is the server-side queue priority scope assigned to the
 	// API key by its quota configuration ("high"/"low"; empty = unset, which
 	// resolves to the high class — see AdmissionPriorityFromSource). It
@@ -48,6 +53,9 @@ type RequestMetadata struct {
 	// RequestMetrics after the Plan phase so it lands in the per-request
 	// metrics event.
 	QueueWaitMs int64
+	// QueueDepth is the maximum admission queue depth observed across ALL
+	// plan rounds. The Orchestrator copies it onto the RequestMetrics.
+	QueueDepth int64
 }
 
 // PromptTextProvider is implemented by protocol-specific request types that
@@ -93,6 +101,9 @@ type RequestPlan struct {
 	UpstreamProtocol string
 	// UpstreamCap describes the capabilities of the upstream protocol.
 	UpstreamCap ProtocolCapability
+	// AutoRoute records the automatic model selection when the client
+	// requested the virtual model, and is nil for every other request.
+	AutoRoute *AutoRouteDecision
 	// BalanceOK indicates whether the balance check passed.
 	BalanceOK bool
 	// Safety holds the sensitive-content check result.  nil means no check
@@ -137,6 +148,12 @@ const (
 	// further use. It is rendered as HTTP 429. Deliberately appended after
 	// PlanErrInternal so the existing constant values do not shift.
 	PlanErrQuotaExceeded
+	PlanErrRoutingInputTooLarge
+	// PlanErrUpstreamPriorityDenied marks a request whose caller priority
+	// (from user tags) admits no available upstream of the model — e.g. a
+	// low-priority user with no priority-0 upstream configured. Rendered as
+	// HTTP 403. Appended last so the existing constant values do not shift.
+	PlanErrUpstreamPriorityDenied
 )
 
 // ModelTarget is the protocol-agnostic model target information produced by
@@ -179,4 +196,26 @@ type AdaptResult struct {
 type HTTPResponseWriter interface {
 	http.ResponseWriter
 	http.Flusher
+}
+
+// AutoRouteAlternatesRemaining reports how many ranked models are still
+// held in reserve for this request.  The attempt loop consumes them as it
+// tries them, so this is the live remaining budget rather than what the
+// ranking originally offered.
+func (p *RequestPlan) AutoRouteAlternatesRemaining() int {
+	if p == nil || p.AutoRoute == nil {
+		return 0
+	}
+	return len(p.AutoRoute.Alternates)
+}
+
+// TakeAutoRouteAlternate removes and returns the next ranked model to try,
+// or nil when the request has exhausted its alternates.
+func (p *RequestPlan) TakeAutoRouteAlternate() *AutoRouteCandidate {
+	if p.AutoRouteAlternatesRemaining() == 0 {
+		return nil
+	}
+	next := p.AutoRoute.Alternates[0]
+	p.AutoRoute.Alternates = p.AutoRoute.Alternates[1:]
+	return &next
 }

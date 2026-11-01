@@ -46,3 +46,15 @@ func TestCSGClawAgentName(t *testing.T) {
 		require.ErrorIs(t, err, ErrCSGClawAgentNameInvalid, invalidName)
 	}
 }
+
+func TestAgentReasoningEffortValid(t *testing.T) {
+	for _, level := range []AgentReasoningEffort{
+		AgentReasoningEffortAuto, AgentReasoningEffortNone, AgentReasoningEffortMinimal,
+		AgentReasoningEffortLow, AgentReasoningEffortMedium, AgentReasoningEffortHigh, AgentReasoningEffortXHigh,
+	} {
+		require.True(t, level.Valid(), string(level))
+	}
+	for _, level := range []AgentReasoningEffort{"", "extreme", "AUTO", "Auto"} {
+		require.False(t, level.Valid(), string(level))
+	}
+}

@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http/httptest"
@@ -17,7 +16,6 @@ import (
 
 	"github.com/alibabacloud-go/tea/tea"
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 	"github.com/minio/minio-go/v7"
 	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/assert"
@@ -40,6 +38,55 @@ import (
 	"opencsg.com/csghub-server/common/types"
 )
 
+// TestRepoComponent_CreateRepoForAuthorizedUser preserves the authorized identity and transactional tuple namespace.
+func TestRepoComponent_CreateRepoForAuthorizedUser(t *testing.T) {
+	t.Run("uses persisted active identity without rechecking current role", func(t *testing.T) {
+		ctx := context.Background()
+		repo := initializeTestRepoComponent(ctx, t)
+		user := database.User{ID: 42, UUID: "user-uuid", Username: "renamed-user", Email: "user@example.com", RoleMask: "user"}
+		namespace := database.Namespace{Path: "source-org", NamespaceType: database.OrgNamespace}
+		created := &database.Repository{ID: 9, UserID: user.ID, RepositoryType: types.ModelRepo}
+
+		repo.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, namespace.Path).Return(namespace, nil).Once()
+		repo.mocks.stores.UserMock().EXPECT().FindByID(ctx, user.ID).Return(user, nil).Once()
+		repo.mocks.stores.RepoMock().EXPECT().CreateRepo(ctx, mock.MatchedBy(func(got database.Repository) bool {
+			return got.UserID == user.ID && got.User.Username == user.Username && got.TupleNamespacePath == namespace.Path
+		})).Return(created, nil).Once()
+		repo.mocks.stores.RecomMock().EXPECT().UpsertScore(ctx, mock.Anything).Return(nil).Once()
+		repo.mocks.gitServer.EXPECT().CreateRepo(ctx, mock.MatchedBy(func(got gitserver.CreateRepoReq) bool {
+			return got.Username == user.Username
+		})).Return(&gitserver.CreateRepoResp{}, nil).Once()
+
+		_, got, _, err := repo.createRepoForAuthorizedUser(ctx, authorizedRepoCreateRequest{
+			UserID: user.ID,
+			Repo:   types.CreateRepoReq{Namespace: namespace.Path, Name: "repo", RepoType: types.ModelRepo},
+		})
+		require.NoError(t, err)
+		require.Same(t, created, got)
+	})
+
+	t.Run("rejects deleted identity", func(t *testing.T) {
+		ctx := context.Background()
+		repo := initializeTestRepoComponent(ctx, t)
+		repo.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "source-org").Return(database.Namespace{Path: "source-org"}, nil).Once()
+		repo.mocks.stores.UserMock().EXPECT().FindByID(ctx, int64(42)).Return(database.User{}, sql.ErrNoRows).Once()
+
+		_, _, _, err := repo.createRepoForAuthorizedUser(ctx, authorizedRepoCreateRequest{
+			UserID: 42,
+			Repo:   types.CreateRepoReq{Namespace: "source-org", Name: "repo", RepoType: types.ModelRepo},
+		})
+		require.ErrorIs(t, err, errorx.ErrUserNotFound)
+	})
+}
+
+// superAdminRoleAssignments builds the stored global grant used by administrator mocks.
+func superAdminRoleAssignments() []database.UserRole {
+	return []database.UserRole{{RoleCode: "super_admin", Role: &database.Role{IsAdmin: true,
+		RoleCode: "super_admin", Permissions: []database.AdminRolePermission{{PermissionCode: types.AdminPermissionAll}},
+	}}}
+}
+
+// TestRepoComponent_CreateRepo checks the expected user query options.
 func TestRepoComponent_CreateRepo(t *testing.T) {
 	ctx := context.TODO()
 	repo := initializeTestRepoComponent(ctx, t)
@@ -59,7 +106,7 @@ func TestRepoComponent_CreateRepo(t *testing.T) {
 		RoleMask: "user",
 		Email:    "foo@bar.com",
 	}
-	repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(dbuser, nil).Times(2)
+	repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user", types.UserWithAdminPermissions).Return(dbuser, nil).Times(2)
 	gitrepo := &gitserver.CreateRepoResp{
 		GitPath:       "gp",
 		DefaultBranch: "main",
@@ -87,18 +134,7 @@ func TestRepoComponent_CreateRepo(t *testing.T) {
 		Relation: rebac.NamespaceCanWrite,
 		Object:   rebac.NamespaceObject("namespace-uuid"),
 	}).Return(rebac.Decision{Allowed: true}, nil).Once()
-	relationship := rebac.Relationship{
-		Subject:  rebac.UserSubject("user-uuid"),
-		Relation: rebac.RelationOwner,
-		Object:   rebac.RepositoryObject(dbrepo.ID),
-	}
-	repoAuthorizerMock(repo).EXPECT().Check(ctx, rebac.CheckRequest{
-		Subject:     relationship.Subject,
-		Relation:    relationship.Relation,
-		Object:      relationship.Object,
-		Consistency: rebac.ConsistencyHigher,
-	}).Return(rebac.Decision{Allowed: false}, nil).Once()
-	repoAuthorizerMock(repo).EXPECT().Write(ctx, []rebac.Relationship{relationship}).Return(nil).Once()
+
 	r1, r2, _, err := repo.CreateRepo(ctx, types.CreateRepoReq{
 		Username:      "user",
 		Namespace:     "ns",
@@ -144,7 +180,7 @@ func TestRepoComponentCreateForkWritesOwnerTuple(t *testing.T) {
 		NamespaceType: database.UserNamespace,
 		User:          database.User{UUID: "alice-uuid"},
 	}, nil).Twice()
-	repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "alice").Return(database.User{
+	repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "alice", types.UserWithAdminPermissions).Return(database.User{
 		ID: 1, Username: "alice", UUID: "alice-uuid",
 	}, nil).Times(3)
 	repoAuthorizerMock(repo).EXPECT().Check(ctx, rebac.CheckRequest{
@@ -160,18 +196,7 @@ func TestRepoComponentCreateForkWritesOwnerTuple(t *testing.T) {
 	}).Return(rebac.Decision{Allowed: true}, nil).Once()
 	createdRepo := &database.Repository{ID: 100, RepositoryType: types.ModelRepo}
 	repo.mocks.stores.RepoMock().EXPECT().CreateRepo(ctx, mock.AnythingOfType("database.Repository")).Return(createdRepo, nil).Once()
-	relationship := rebac.Relationship{
-		Subject:  rebac.UserSubject("alice-uuid"),
-		Relation: rebac.RelationOwner,
-		Object:   rebac.RepositoryObject(createdRepo.ID),
-	}
-	repoAuthorizerMock(repo).EXPECT().Check(ctx, rebac.CheckRequest{
-		Subject:     relationship.Subject,
-		Relation:    relationship.Relation,
-		Object:      relationship.Object,
-		Consistency: rebac.ConsistencyHigher,
-	}).Return(rebac.Decision{}, nil).Once()
-	repoAuthorizerMock(repo).EXPECT().Write(ctx, []rebac.Relationship{relationship}).Return(nil).Once()
+
 	repo.mocks.stores.RecomMock().EXPECT().UpsertScore(ctx, mock.Anything).Return(nil).Once()
 	repo.mocks.gitServer.EXPECT().CreateFork(ctx, mock.AnythingOfType("gitserver.CreateForkReq")).Return(nil).Once()
 	repo.mocks.stores.LfsMetaObjectMock().EXPECT().FindByRepoID(ctx, sourceRepo.ID).Return(nil, nil).Once()
@@ -196,7 +221,7 @@ func TestRepoComponent_CreateForkRejectsUnreadableSource(t *testing.T) {
 	user := database.User{ID: 1, Username: "alice", UUID: "alice-uuid"}
 
 	repo.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "source-ns", "source").Return(sourceRepo, nil).Once()
-	repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, user.Username).Return(user, nil).Once()
+	repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, user.Username, types.UserWithAdminPermissions).Return(user, nil).Once()
 	repoAuthorizerMock(repo).EXPECT().Check(ctx, rebac.CheckRequest{
 		Subject:     rebac.UserSubject(user.UUID),
 		Relation:    rebac.RepositoryCanRead,
@@ -225,7 +250,7 @@ func TestRepoComponent_CreateForkRejectsUnwritableTargetNamespace(t *testing.T) 
 	targetNamespace := database.Namespace{Path: "team", UUID: "team-namespace-uuid", NamespaceType: database.OrgNamespace}
 
 	repo.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "source-ns", "source").Return(sourceRepo, nil).Once()
-	repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, user.Username).Return(user, nil).Times(3)
+	repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, user.Username, types.UserWithAdminPermissions).Return(user, nil).Times(3)
 	repoAuthorizerMock(repo).EXPECT().Check(ctx, rebac.CheckRequest{
 		Subject:     rebac.UserSubject(user.UUID),
 		Relation:    rebac.RepositoryCanRead,
@@ -252,6 +277,7 @@ func TestRepoComponent_CreateForkRejectsUnwritableTargetNamespace(t *testing.T) 
 	require.ErrorIs(t, err, errorx.ErrForbidden)
 }
 
+// TestRepoComponent_UpdateRepo checks the expected user query options.
 func TestRepoComponent_UpdateRepo(t *testing.T) {
 	ctx := context.TODO()
 	repo := initializeTestRepoComponent(ctx, t)
@@ -278,11 +304,11 @@ func TestRepoComponent_UpdateRepo(t *testing.T) {
 	}
 	repo.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "ns").Return(namespace, nil)
 	dbuser := database.User{
-		ID:       123,
-		RoleMask: "admin",
-		Email:    "foo@bar.com",
+		ID:              123,
+		RoleAssignments: superAdminRoleAssignments(),
+		Email:           "foo@bar.com",
 	}
-	repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(dbuser, nil)
+	repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user", types.UserWithAdminPermissions).Return(dbuser, nil)
 	gitrepo := &gitserver.CreateRepoResp{
 		GitPath:       "gp",
 		DefaultBranch: "main",
@@ -301,7 +327,7 @@ func TestRepoComponent_UpdateRepo(t *testing.T) {
 
 	dbrepo.Nickname = "nn2"
 	dbrepo.Description = "desc2"
-	repo.mocks.stores.RepoMock().EXPECT().UpdateRepo(ctx, *dbrepo).Return(dbrepo, nil)
+	repo.mocks.stores.RepoMock().EXPECT().UpdateRepo(ctx, *dbrepo, types.RepositoryUpdateOptions{Private: new(true)}).Return(dbrepo, nil)
 
 	r1, err := repo.UpdateRepo(ctx, types.UpdateRepoReq{
 		Username:    "user",
@@ -317,6 +343,7 @@ func TestRepoComponent_UpdateRepo(t *testing.T) {
 
 }
 
+// TestRepoComponent_DeleteRepo checks the expected user query options.
 func TestRepoComponent_DeleteRepo(t *testing.T) {
 	ctx := context.TODO()
 	repo := initializeTestRepoComponent(ctx, t)
@@ -343,12 +370,12 @@ func TestRepoComponent_DeleteRepo(t *testing.T) {
 		User:          database.User{UUID: "namespace-user-uuid"},
 	}, nil)
 	dbuser := database.User{
-		ID:       123,
-		UUID:     "user-uuid",
-		RoleMask: "admin",
-		Email:    "foo@bar.com",
+		ID:              123,
+		UUID:            "user-uuid",
+		RoleAssignments: superAdminRoleAssignments(),
+		Email:           "foo@bar.com",
 	}
-	repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(dbuser, nil)
+	repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user", types.UserWithAdminPermissions).Return(dbuser, nil)
 	repo.mocks.stores.RepoMock().EXPECT().DeleteRepo(ctx, *dbrepo).Return(nil)
 	repo.repoComponentImpl.repositoryAccessCache = mockcache.NewMockRedisClient(t)
 	accessCache := repo.repoComponentImpl.repositoryAccessCache.(*mockcache.MockRedisClient)
@@ -373,6 +400,7 @@ func (c *recordingMirrorSvcClient) CancelMirror(context.Context, int64) error {
 	return nil
 }
 
+// TestRepoComponent_DeleteRepoEnqueueFailureDoesNotCancelMirror checks the expected user query options.
 func TestRepoComponent_DeleteRepoEnqueueFailureDoesNotCancelMirror(t *testing.T) {
 	ctx := context.Background()
 	repo := initializeTestRepoComponent(ctx, t)
@@ -391,9 +419,9 @@ func TestRepoComponent_DeleteRepoEnqueueFailureDoesNotCancelMirror(t *testing.T)
 		Path:          "ns",
 		NamespaceType: database.UserNamespace,
 	}, nil)
-	repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{
-		ID:       123,
-		RoleMask: "admin",
+	repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user", types.UserWithAdminPermissions).Return(database.User{
+		ID:              123,
+		RoleAssignments: superAdminRoleAssignments(),
 	}, nil)
 	enqueueErr := errors.New("enqueue repository deletion job")
 	repo.mocks.stores.RepoMock().EXPECT().DeleteRepo(ctx, *dbrepo).Return(enqueueErr)
@@ -443,6 +471,68 @@ func TestRepoComponent_PublicToUser(t *testing.T) {
 	require.Nil(t, err)
 }
 
+// TestRepoComponent_RPCSuperAdminAuthorization keeps list and batch scopes tied to the explicit RPC grant.
+func TestRepoComponent_RPCSuperAdminAuthorization(t *testing.T) {
+	for _, tc := range []struct {
+		name, role string
+		superAdmin bool
+	}{
+		{name: "module administrator", role: "asset_admin"},
+		{name: "legacy administrator", role: "admin"},
+		{name: "legacy super user", role: "super_user"},
+		{name: "custom global administrator", role: "maintainer", superAdmin: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			repo := initializeTestRepoComponent(ctx, t)
+			repo.repositoryAccessCache = nil
+			repo.mocks.userSvcClient.EXPECT().GetUserInfo(ctx, "alice", "alice").Return(&rpc.User{
+				UUID: "alice-uuid", Roles: []string{tc.role}, SuperAdmin: tc.superAdmin,
+			}, nil).Twice()
+			if !tc.superAdmin {
+				repoAuthorizerMock(repo).EXPECT().ListObjects(ctx, rebac.ListObjectsRequest{
+					Subject: rebac.UserSubject("alice-uuid"), Relation: rebac.RepositoryCanRead,
+					ObjectType: rebac.ObjectTypeRepository, Consistency: rebac.ConsistencyHigher,
+				}).Return(rebac.ListObjectsResult{Objects: []rebac.Object{rebac.RepositoryObject(42)}}, nil).Once()
+				expectBatchRepositoryRead(repo, ctx, "alice-uuid", map[int64]bool{42: true})
+			}
+			scope, err := repo.loadRepositoryReadScope(ctx, "alice")
+			require.NoError(t, err)
+			repositories := []*database.Repository{{ID: 42, Private: true}, {ID: 99, Private: true}}
+			readable, err := repo.batchReadableRepositories(ctx, repositories, "alice")
+			require.NoError(t, err)
+			if tc.superAdmin {
+				require.Equal(t, database.RepositoryAccessAdmin, scope.Mode)
+				require.Equal(t, repositories, readable)
+			} else {
+				require.Equal(t, database.RepositoryAccessReadable, scope.Mode)
+				require.Equal(t, []int64{42}, scope.ReadableRepositoryIDs)
+				require.Equal(t, repositories[:1], readable)
+			}
+		})
+	}
+}
+
+// TestRepoComponent_AdminAuthorizedReadScope verifies module authorization bypasses ReBAC and the user scope cache.
+func TestRepoComponent_AdminAuthorizedReadScope(t *testing.T) {
+	ctx := types.WithAdminAuthorization(context.Background())
+	repo := initializeTestRepoComponent(ctx, t)
+	repo.repositoryAccessCache = mockcache.NewMockRedisClient(t)
+	repo.mocks.userSvcClient.EXPECT().GetUserInfo(ctx, "module-admin", "module-admin").Return(&rpc.User{
+		UUID: "module-admin-uuid", Roles: []string{"asset_admin"},
+	}, nil).Once()
+	filter := &types.RepoFilter{Search: "model", Owner: "organization"}
+	repositories := []*database.Repository{{ID: 42, Private: true}}
+	repo.mocks.stores.RepoMock().EXPECT().PublicToUserWithAccess(ctx, types.ModelRepo,
+		database.NewRepositoryAccessScope(database.RepositoryAccessAdmin, nil), filter, 10, 2).
+		Return(repositories, 1, nil).Once()
+
+	result, total, err := repo.PublicToUser(ctx, types.ModelRepo, "module-admin", filter, 10, 2)
+	require.NoError(t, err)
+	require.Equal(t, repositories, result)
+	require.Equal(t, 1, total)
+}
+
 func TestRepoComponent_LoadRepositoryReadScopeFromCache(t *testing.T) {
 	ctx := context.Background()
 	repo := initializeTestRepoComponent(ctx, t)
@@ -485,9 +575,14 @@ func TestRepoComponentLoadRepositoryReadScopeUsesOneMinuteFallback(t *testing.T)
 	require.Equal(t, []int64{42}, scope.ReadableRepositoryIDs)
 }
 
-func mockUserRepoAdminPermission(ctx context.Context, stores *tests.MockStores, userName string) {
-	stores.UserMock().EXPECT().FindByUsername(ctx, userName).Return(database.User{
-		RoleMask: "admin",
+// mockUserRepoAdminPermission returns a super administrator fixture with the expected query options.
+func mockUserRepoAdminPermission(ctx context.Context, stores *tests.MockStores, userName string, options ...types.UserQueryOption) {
+	queryOptions := make([]interface{}, len(options))
+	for i, option := range options {
+		queryOptions[i] = option
+	}
+	stores.UserMock().EXPECT().FindByUsername(ctx, userName, queryOptions...).Return(database.User{
+		RoleAssignments: superAdminRoleAssignments(),
 	}, nil).Once()
 	stores.NamespaceMock().EXPECT().FindByPath(ctx, "ns").Return(
 		database.Namespace{Path: "ns", NamespaceType: "user"}, nil,
@@ -532,6 +627,17 @@ func expectBatchRepositoryRead(repo *testRepoWithMocks, ctx context.Context, use
 	}).Once()
 }
 
+// TestRepoComponent_BatchReadableRepositoriesModuleGrant retains private results for an authorized administrator.
+func TestRepoComponent_BatchReadableRepositoriesModuleGrant(t *testing.T) {
+	ctx := types.WithAdminAuthorization(context.Background())
+	c := initializeTestRepoComponent(ctx, t)
+	c.mocks.userSvcClient.EXPECT().GetUserInfo(ctx, "operator", "operator").Return(&rpc.User{UUID: "operator-uuid"}, nil)
+	repos := []*database.Repository{{ID: 1, Private: true}, {ID: 2}}
+	readable, err := c.batchReadableRepositories(ctx, repos, "operator")
+	require.NoError(t, err)
+	require.Equal(t, repos, readable)
+}
+
 func TestRepoComponent_BatchReadableRepositoriesAcrossBatches(t *testing.T) {
 	ctx := context.Background()
 	repoComp := initializeTestRepoComponent(ctx, t)
@@ -559,6 +665,7 @@ func TestRepoComponent_BatchReadableRepositoriesAcrossBatches(t *testing.T) {
 	require.Len(t, readable, len(repos))
 }
 
+// TestRepoComponent_RelatedRepos checks the expected user query options.
 func TestRepoComponent_RelatedRepos(t *testing.T) {
 	ctx := context.TODO()
 	repo := initializeTestRepoComponent(ctx, t)
@@ -580,7 +687,7 @@ func TestRepoComponent_RelatedRepos(t *testing.T) {
 	}
 	repo.mocks.stores.RepoMock().EXPECT().FindByIds(ctx, []int64{1, 2, 3, 4}, opts...).Return(repos, nil)
 
-	repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{UUID: "user-uuid", RoleMask: "foo"}, nil)
+	repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user", types.UserWithAdminPermissions).Return(database.User{UUID: "user-uuid", RoleMask: "foo"}, nil)
 	repoAuthorizerMock(repo).EXPECT().Check(ctx, rebac.CheckRequest{
 		Subject: rebac.UserSubject("user-uuid"), Relation: rebac.RepositoryCanRead, Object: rebac.RepositoryObject(repos[2].ID),
 		Consistency: rebac.ConsistencyHigher,
@@ -599,6 +706,7 @@ func TestRepoComponent_RelatedRepos(t *testing.T) {
 
 }
 
+// TestRepoComponent_CreateFile checks the expected user query options.
 func TestRepoComponent_CreateFile(t *testing.T) {
 
 	cases := []struct {
@@ -620,7 +728,7 @@ func TestRepoComponent_CreateFile(t *testing.T) {
 
 			mockedRepo := &database.Repository{ID: 123, DefaultBranch: "main"}
 			repo.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "ns", "n").Return(mockedRepo, nil)
-			mockUserRepoAdminPermission(ctx, repo.mocks.stores, "user")
+			mockUserRepoAdminPermission(ctx, repo.mocks.stores, "user", types.UserWithAdminPermissions)
 			repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "un").Return(database.User{
 				Email: "foo@bar.com",
 			}, nil)
@@ -702,6 +810,7 @@ func TestRepoComponent_CreateFile(t *testing.T) {
 	}
 }
 
+// TestRepoComponent_UpdateFile checks the expected user query options.
 func TestRepoComponent_UpdateFile(t *testing.T) {
 
 	cases := []struct {
@@ -723,7 +832,7 @@ func TestRepoComponent_UpdateFile(t *testing.T) {
 
 			mockedRepo := &database.Repository{ID: 123, DefaultBranch: "main"}
 			repo.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "ns", "n").Return(mockedRepo, nil)
-			mockUserRepoAdminPermission(ctx, repo.mocks.stores, "user")
+			mockUserRepoAdminPermission(ctx, repo.mocks.stores, "user", types.UserWithAdminPermissions)
 			repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "un").Return(database.User{
 				Email: "foo@bar.com",
 			}, nil)
@@ -814,6 +923,7 @@ func TestRepoComponent_UpdateFile(t *testing.T) {
 	}
 }
 
+// TestRepoComponent_DeleteFile checks the expected user query options.
 func TestRepoComponent_DeleteFile(t *testing.T) {
 
 	cases := []struct {
@@ -831,7 +941,7 @@ func TestRepoComponent_DeleteFile(t *testing.T) {
 
 			mockedRepo := &database.Repository{ID: 123, DefaultBranch: "main"}
 			repo.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "ns", "n").Return(mockedRepo, nil)
-			mockUserRepoAdminPermission(ctx, repo.mocks.stores, "user")
+			mockUserRepoAdminPermission(ctx, repo.mocks.stores, "user", types.UserWithAdminPermissions)
 			repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "un").Return(database.User{
 				Email: "foo@bar.com",
 			}, nil)
@@ -945,6 +1055,7 @@ func TestRepoComponent_DeleteFileIgnoresPackageSyncFailure(t *testing.T) {
 	requireAsyncPackageSyncAttempt(t, syncDone)
 }
 
+// setupSkillFileWrite checks the expected user query options.
 func setupSkillFileWrite(t *testing.T, repo *testRepoWithMocks, ctx context.Context, includeGitattributes bool) *database.Repository {
 	t.Helper()
 	dbRepo := &database.Repository{
@@ -955,7 +1066,7 @@ func setupSkillFileWrite(t *testing.T, repo *testRepoWithMocks, ctx context.Cont
 	}
 	repo.repositoryPackageSyncer = newRepositoryPackageSyncer(repo.config, repo.mocks.stores.RepoMock(), repo.mocks.gitServer, repo.mocks.s3Client, nil)
 	repo.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.SkillRepo, "ns", "n").Return(dbRepo, nil)
-	mockUserRepoAdminPermission(ctx, repo.mocks.stores, "user")
+	mockUserRepoAdminPermission(ctx, repo.mocks.stores, "user", types.UserWithAdminPermissions)
 	repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "un").Return(database.User{Email: "foo@bar.com"}, nil)
 	repo.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "ns").Return(database.Namespace{}, nil)
 	if includeGitattributes {
@@ -995,6 +1106,7 @@ func requireAsyncPackageSyncAttempt(t *testing.T, done <-chan struct{}) {
 	}
 }
 
+// TestRepoComponent_Commits checks the expected user query options.
 func TestRepoComponent_Commits(t *testing.T) {
 
 	for _, user := range []string{"user", ""} {
@@ -1005,7 +1117,7 @@ func TestRepoComponent_Commits(t *testing.T) {
 			r := &database.Repository{Private: true}
 			repo.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "ns", "n").Return(r, nil)
 			if user != "" {
-				mockUserRepoAdminPermission(ctx, repo.mocks.stores, "user")
+				mockUserRepoAdminPermission(ctx, repo.mocks.stores, "user", types.UserWithAdminPermissions)
 				repo.mocks.gitServer.EXPECT().GetRepoCommits(ctx, gitserver.GetRepoCommitsReq{
 					Namespace: "ns",
 					Name:      "n",
@@ -1037,6 +1149,7 @@ func TestRepoComponent_Commits(t *testing.T) {
 
 }
 
+// TestRepoComponent_FileRaw checks the expected user query options.
 func TestRepoComponent_FileRaw(t *testing.T) {
 
 	cases := []struct {
@@ -1079,7 +1192,7 @@ func TestRepoComponent_FileRaw(t *testing.T) {
 			}
 
 			currentUser = "user"
-			mockUserRepoAdminPermission(ctx, repo.mocks.stores, "user")
+			mockUserRepoAdminPermission(ctx, repo.mocks.stores, "user", types.UserWithAdminPermissions)
 			rawContent := "readme1"
 			if c.source != types.LocalSource && c.path == "README.md" {
 				if c.mirrored {
@@ -1121,6 +1234,7 @@ func TestRepoComponent_FileRaw(t *testing.T) {
 
 }
 
+// TestRepoComponent_FileRawNotFound checks the expected user query options.
 func TestRepoComponent_FileRawNotFound(t *testing.T) {
 	ctx := context.TODO()
 	repo := initializeTestRepoComponent(ctx, t)
@@ -1133,7 +1247,7 @@ func TestRepoComponent_FileRawNotFound(t *testing.T) {
 	}
 	repo.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "ns", "n").Return(r, nil)
 	currentUser := "user"
-	mockUserRepoAdminPermission(ctx, repo.mocks.stores, "user")
+	mockUserRepoAdminPermission(ctx, repo.mocks.stores, "user", types.UserWithAdminPermissions)
 
 	repo.mocks.gitServer.EXPECT().GetRepoFileRaw(ctx, gitserver.GetRepoInfoByPathReq{
 		Namespace: "ns",
@@ -1155,13 +1269,14 @@ func TestRepoComponent_FileRawNotFound(t *testing.T) {
 	require.Equal(t, err, errorx.ErrNotFound)
 }
 
+// TestRepoComponent_DownloadFile checks the expected user query options.
 func TestRepoComponent_DownloadFile(t *testing.T) {
 	for _, lfs := range []bool{false, true} {
 		t.Run(fmt.Sprintf("is lfs: %v", lfs), func(t *testing.T) {
 			ctx := context.TODO()
 			repo := initializeTestRepoComponent(ctx, t)
 
-			mockUserRepoAdminPermission(ctx, repo.mocks.stores, "user")
+			mockUserRepoAdminPermission(ctx, repo.mocks.stores, "user", types.UserWithAdminPermissions)
 			mockedRepo := &database.Repository{}
 			repo.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "ns", "n").Return(
 				mockedRepo, nil,
@@ -1660,6 +1775,33 @@ func TestRepoComponent_ListRuntimeFrameworkV2_NoReorderWhenDeployTypeNotInferenc
 	require.Equal(t, "vllm", list[1].FrameName)
 }
 
+func TestRepoComponent_ListRuntimeFrameworkV2_GroupIDIsFrameName(t *testing.T) {
+	ctx := context.TODO()
+	repo := initializeTestRepoComponent(ctx, t)
+
+	repo.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "ns", "n").Return(&database.Repository{
+		ID:       123,
+		Name:     "test",
+		Tags:     []database.Tag{{Name: "safetensors", Category: "framework"}},
+		Metadata: database.Metadata{Architecture: "Qwen2ForCausalLM"},
+	}, nil)
+
+	frames := []database.RuntimeFramework{
+		{ID: 134, FrameName: "evalscope", FrameImage: "opencsghq/evalscope:1.11.1-cu130", Type: types.EvaluationType, ComputeType: "gpu", DriverVersion: "12.1"},
+		{ID: 133, FrameName: "evalscope", FrameImage: "opencsghq/evalscope:1.11.1-cpu", Type: types.EvaluationType, ComputeType: "cpu"},
+		{ID: 30, FrameName: "opencompass", FrameImage: "opencsghq/opencompass:0.4.2", Type: types.EvaluationType, ComputeType: "gpu", DriverVersion: "12.1"},
+	}
+	repo.mocks.stores.RuntimeFrameworkMock().EXPECT().ListByArchsNameAndType(ctx, "test", "safetensors", []string{"Qwen2ForCausalLM"}, types.EvaluationType).Return(frames, nil)
+
+	list, err := repo.ListRuntimeFrameworkV2(ctx, types.ModelRepo, "ns", "n", types.EvaluationType)
+	require.Nil(t, err)
+	require.Len(t, list, 2)
+	require.Equal(t, "evalscope", list[0].ID)
+	require.Len(t, list[0].Versions, 2)
+	require.Equal(t, "opencompass", list[1].ID)
+	require.Len(t, list[1].Versions, 1)
+}
+
 func TestRepoComponent_ListRuntimeFrameworkV2_VLLMAlreadyFirst(t *testing.T) {
 	ctx := context.TODO()
 	repo := initializeTestRepoComponent(ctx, t)
@@ -1684,6 +1826,7 @@ func TestRepoComponent_ListRuntimeFrameworkV2_VLLMAlreadyFirst(t *testing.T) {
 	require.Equal(t, "sglang", list[1].FrameName)
 }
 
+// TestRepoComponent_CreateRuntimeFramework checks the expected user query options.
 func TestRepoComponent_CreateRuntimeFramework(t *testing.T) {
 	ctx := context.TODO()
 	repo := initializeTestRepoComponent(ctx, t)
@@ -1696,7 +1839,7 @@ func TestRepoComponent_CreateRuntimeFramework(t *testing.T) {
 		ContainerPort: 321,
 		Type:          2,
 	}
-	repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{ID: 1, RoleMask: "admin"}, nil)
+	repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user", types.UserWithAdminPermissions).Return(database.User{ID: 1, RoleAssignments: superAdminRoleAssignments()}, nil)
 	repo.mocks.stores.RuntimeFrameworkMock().EXPECT().Add(ctx, frame).Return(nil, nil)
 
 	fn, err := repo.CreateRuntimeFramework(ctx, &types.RuntimeFrameworkReq{
@@ -1720,6 +1863,7 @@ func TestRepoComponent_CreateRuntimeFramework(t *testing.T) {
 
 }
 
+// TestRepoComponent_UpdateRuntimeFramework checks the expected user query options.
 func TestRepoComponent_UpdateRuntimeFramework(t *testing.T) {
 	ctx := context.TODO()
 	repo := initializeTestRepoComponent(ctx, t)
@@ -1733,7 +1877,7 @@ func TestRepoComponent_UpdateRuntimeFramework(t *testing.T) {
 		ContainerPort: 321,
 		Type:          2,
 	}
-	repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{ID: 1, RoleMask: "admin"}, nil)
+	repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user", types.UserWithAdminPermissions).Return(database.User{ID: 1, RoleAssignments: superAdminRoleAssignments()}, nil)
 	repo.mocks.stores.RuntimeFrameworkMock().EXPECT().Update(ctx, frame).Return(&frame, nil)
 
 	fn, err := repo.UpdateRuntimeFramework(ctx, 123, &types.RuntimeFrameworkReq{
@@ -1758,6 +1902,7 @@ func TestRepoComponent_UpdateRuntimeFramework(t *testing.T) {
 
 }
 
+// TestRepoComponent_DeleteRuntimeFramework checks the expected user query options.
 func TestRepoComponent_DeleteRuntimeFramework(t *testing.T) {
 	ctx := context.TODO()
 	repo := initializeTestRepoComponent(ctx, t)
@@ -1770,7 +1915,7 @@ func TestRepoComponent_DeleteRuntimeFramework(t *testing.T) {
 		ContainerPort: 321,
 		Type:          2,
 	}
-	repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{ID: 1, RoleMask: "admin"}, nil)
+	repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user", types.UserWithAdminPermissions).Return(database.User{ID: 1, RoleAssignments: superAdminRoleAssignments()}, nil)
 	repo.mocks.stores.RuntimeFrameworkMock().EXPECT().FindByID(ctx, int64(123)).Return(&frame, nil)
 	repo.mocks.stores.RuntimeFrameworkMock().EXPECT().Delete(ctx, frame).Return(nil)
 
@@ -2126,6 +2271,7 @@ func TestRepoComponent_AllowAccessEndpoint_PrivateForbidden(t *testing.T) {
 	require.False(t, allow)
 }
 
+// TestRepoComponent_AllowAccessEndpoint_PrivateOrgMemberAllowed checks the expected user query options.
 func TestRepoComponent_AllowAccessEndpoint_PrivateOrgMemberAllowed(t *testing.T) {
 	ctx := context.TODO()
 	repo := initializeTestRepoComponent(ctx, t)
@@ -2133,7 +2279,7 @@ func TestRepoComponent_AllowAccessEndpoint_PrivateOrgMemberAllowed(t *testing.T)
 		ID:       123,
 		Username: "owner",
 	}, nil)
-	repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "member").Return(database.User{
+	repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "member", types.UserWithAdminPermissions).Return(database.User{
 		ID:   456,
 		UUID: "member-uuid",
 	}, nil)
@@ -2361,6 +2507,7 @@ func TestRepoComponent_Tags(t *testing.T) {
 
 }
 
+// TestRepoComponent_UpdateTags checks the expected user query options.
 func TestRepoComponent_UpdateTags(t *testing.T) {
 	ctx := context.TODO()
 	repo := initializeTestRepoComponent(ctx, t)
@@ -2371,8 +2518,8 @@ func TestRepoComponent_UpdateTags(t *testing.T) {
 	repo.mocks.components.tag.EXPECT().UpdateRepoTagsByCategory(
 		ctx, types.ModelTagScope, int64(123), "cat", []string{"foo", "bar"},
 	).Return(nil)
-	repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{
-		RoleMask: "admin",
+	repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user", types.UserWithAdminPermissions).Return(database.User{
+		RoleAssignments: superAdminRoleAssignments(),
 	}, nil)
 
 	err := repo.UpdateTags(ctx, "ns", "n", types.ModelRepo, "cat", "user", []string{"foo", "bar"})
@@ -2412,12 +2559,13 @@ func TestRepoComponent_AdjustMaxFileSize(t *testing.T) {
 	assert.Equal(t, expected, result)
 }
 
+// TestRepoComponent_GetUserRepoPermissionUsesReBAC checks the expected user query options.
 func TestRepoComponent_GetUserRepoPermissionUsesReBAC(t *testing.T) {
 	ctx := context.Background()
 	repoComp := initializeTestRepoComponent(ctx, t)
 	repository := &database.Repository{ID: 42, Path: "organization/repository", Private: true}
 	user := database.User{Username: "member", UUID: "user-uuid"}
-	repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, user.Username).Return(user, nil).Once()
+	repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, user.Username, types.UserWithAdminPermissions).Return(user, nil).Once()
 
 	readCorrelationID := rebac.BatchCheckCorrelationID(0)
 	writeCorrelationID := rebac.BatchCheckCorrelationID(1)
@@ -2447,12 +2595,78 @@ func TestRepoComponent_GetUserRepoPermissionUsesReBAC(t *testing.T) {
 	require.Equal(t, &types.UserRepoPermission{CanRead: true, CanWrite: true, CanAdmin: false}, permission)
 }
 
+// TestRepoComponent_AdminRepositoryPermissions verifies request grants and legacy global grants preserve all repository permissions.
+func TestRepoComponent_AdminRepositoryPermissions(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		authorized bool
+		superAdmin bool
+	}{
+		{name: "authorized module administrator", authorized: true},
+		{name: "legacy super administrator", superAdmin: true},
+		{name: "ordinary user"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			if tc.authorized {
+				ctx = types.WithAdminAuthorization(ctx)
+			}
+			repo := initializeTestRepoComponent(ctx, t)
+			repo.repositoryAccessCache = mockcache.NewMockRedisClient(t)
+			user := database.User{Username: "user", UUID: "user-uuid"}
+			if tc.superAdmin {
+				user.RoleAssignments = superAdminRoleAssignments()
+			}
+			repository := &database.Repository{ID: 42, Private: true}
+			repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, user.Username, types.UserWithAdminPermissions).
+				Return(user, nil).Times(4)
+			allowed := tc.authorized || tc.superAdmin
+			if !allowed {
+				repoAuthorizerMock(repo).EXPECT().BatchCheck(ctx, mock.Anything).Return(rebac.BatchCheckResult{
+					Results: map[string]rebac.BatchCheckOutcome{
+						rebac.BatchCheckCorrelationID(0): {},
+						rebac.BatchCheckCorrelationID(1): {},
+						rebac.BatchCheckCorrelationID(2): {},
+					},
+				}, nil).Once()
+			}
+			permission, err := repo.GetUserRepoPermission(ctx, user.Username, repository)
+			require.NoError(t, err)
+			require.Equal(t, &types.UserRepoPermission{CanRead: allowed, CanWrite: allowed, CanAdmin: allowed}, permission)
+			for _, relation := range []rebac.Permission{rebac.RepositoryCanRead, rebac.RepositoryCanWrite, rebac.RepositoryCanAdmin} {
+				if !allowed {
+					repoAuthorizerMock(repo).EXPECT().Check(ctx, rebac.CheckRequest{
+						Subject: rebac.UserSubject(user.UUID), Relation: relation,
+						Object: rebac.RepositoryObject(repository.ID), Consistency: rebac.ConsistencyHigher,
+					}).Return(rebac.Decision{Allowed: false}, nil).Once()
+					if relation == rebac.RepositoryCanRead {
+						repo.repositoryAccessCache.(*mockcache.MockRedisClient).EXPECT().Del(ctx, "repo:access:read:v2:user-uuid").Return(nil).Once()
+					}
+				}
+				result, err := repo.CheckUserRepoPermission(ctx, user.Username, repository, relation)
+				require.NoError(t, err)
+				require.Equal(t, allowed, result)
+			}
+		})
+	}
+}
+
+// TestRepoComponent_AdminAuthorizationKeepsPermissionValidation rejects unsupported permissions even for authorized requests.
+func TestRepoComponent_AdminAuthorizationKeepsPermissionValidation(t *testing.T) {
+	ctx := types.WithAdminAuthorization(context.Background())
+	repo := initializeTestRepoComponent(ctx, t)
+	allowed, err := repo.CheckUserRepoPermission(ctx, "module-admin", &database.Repository{ID: 42}, rebac.Permission("unsupported"))
+	require.ErrorContains(t, err, "unsupported repository permission")
+	require.False(t, allowed)
+}
+
+// TestRepoComponent_CheckUserRepoPermissionUsesRepository checks the expected user query options.
 func TestRepoComponent_CheckUserRepoPermissionUsesRepository(t *testing.T) {
 	ctx := context.Background()
 	repoComp := initializeTestRepoComponent(ctx, t)
 	repository := &database.Repository{ID: 42, Path: "organization/repository", Private: true}
 	user := database.User{Username: "member", UUID: "user-uuid"}
-	repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, user.Username).Return(user, nil).Once()
+	repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, user.Username, types.UserWithAdminPermissions).Return(user, nil).Once()
 	repoAuthorizerMock(repoComp).EXPECT().Check(ctx, rebac.CheckRequest{
 		Subject:     rebac.UserSubject(user.UUID),
 		Relation:    rebac.RepositoryCanWrite,
@@ -2474,7 +2688,7 @@ func TestRepoComponentCheckUserRepoPermissionInvalidatesPrivateReadDenial(t *tes
 		cache := repoComp.repositoryAccessCache.(*mockcache.MockRedisClient)
 		user := database.User{Username: "member", UUID: "private-denied-user-uuid"}
 		repository := &database.Repository{ID: 42, Private: true}
-		repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, user.Username).Return(user, nil).Once()
+		repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, user.Username, types.UserWithAdminPermissions).Return(user, nil).Once()
 		repoAuthorizerMock(repoComp).EXPECT().Check(ctx, mock.AnythingOfType("rebac.CheckRequest")).Return(rebac.Decision{Allowed: false}, nil).Once()
 		cache.EXPECT().Del(ctx, "repo:access:read:v2:private-denied-user-uuid").Return(errors.New("redis unavailable")).Once()
 
@@ -2489,7 +2703,7 @@ func TestRepoComponentCheckUserRepoPermissionInvalidatesPrivateReadDenial(t *tes
 		repoComp.repositoryAccessCache = mockcache.NewMockRedisClient(t)
 		user := database.User{Username: "member", UUID: "public-user-uuid"}
 		repository := &database.Repository{ID: 42, Private: false}
-		repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, user.Username).Return(user, nil).Once()
+		repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, user.Username, types.UserWithAdminPermissions).Return(user, nil).Once()
 		repoAuthorizerMock(repoComp).EXPECT().Check(ctx, mock.AnythingOfType("rebac.CheckRequest")).Return(rebac.Decision{Allowed: false}, nil).Once()
 
 		allowed, err := repoComp.CheckUserRepoPermission(ctx, user.Username, repository, rebac.RepositoryCanRead)
@@ -2503,7 +2717,7 @@ func TestRepoComponentCheckUserRepoPermissionInvalidatesPrivateReadDenial(t *tes
 		repoComp.repositoryAccessCache = mockcache.NewMockRedisClient(t)
 		user := database.User{Username: "member", UUID: "error-user-uuid"}
 		repository := &database.Repository{ID: 42, Private: true}
-		repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, user.Username).Return(user, nil).Once()
+		repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, user.Username, types.UserWithAdminPermissions).Return(user, nil).Once()
 		repoAuthorizerMock(repoComp).EXPECT().Check(ctx, mock.AnythingOfType("rebac.CheckRequest")).Return(rebac.Decision{}, errors.New("rebac unavailable")).Once()
 
 		allowed, err := repoComp.CheckUserRepoPermission(ctx, user.Username, repository, rebac.RepositoryCanRead)
@@ -2512,6 +2726,7 @@ func TestRepoComponentCheckUserRepoPermissionInvalidatesPrivateReadDenial(t *tes
 	})
 }
 
+// TestRepoComponent_checkCurrentUserPermission checks the expected user query options.
 func TestRepoComponent_checkCurrentUserPermission(t *testing.T) {
 	expectNamespaceCheck := func(repoComp *testRepoWithMocks, userUUID, namespaceUUID string, permission rebac.Permission, allowed bool) {
 		repoAuthorizerMock(repoComp).EXPECT().Check(mock.Anything, rebac.CheckRequest{
@@ -2545,7 +2760,7 @@ func TestRepoComponent_checkCurrentUserPermission(t *testing.T) {
 		user := database.User{}
 		user.Username = "user_name"
 		user.UUID = "user-uuid"
-		repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username).Return(user, nil)
+		repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username, types.UserWithAdminPermissions).Return(user, nil)
 
 		expectNamespaceCheck(repoComp, user.UUID, ns.UUID, rebac.NamespaceCanRead, true)
 		yes, err := repoComp.CheckCurrentUserPermission(context.Background(), user.Username, ns.Path, rebac.NamespaceCanRead)
@@ -2571,7 +2786,7 @@ func TestRepoComponent_checkCurrentUserPermission(t *testing.T) {
 			Path:          "user_name",
 			UUID:          "namespace-uuid",
 		}, nil)
-		repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user_name").Return(database.User{
+		repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user_name", types.UserWithAdminPermissions).Return(database.User{
 			Username: "user_name",
 			UUID:     "user-uuid",
 		}, nil)
@@ -2591,7 +2806,7 @@ func TestRepoComponent_checkCurrentUserPermission(t *testing.T) {
 			Path:          "Org_Name",
 			UUID:          "namespace-uuid",
 		}, nil)
-		repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "member").Return(database.User{
+		repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "member", types.UserWithAdminPermissions).Return(database.User{
 			Username: "member",
 			UUID:     "user-uuid",
 		}, nil)
@@ -2616,7 +2831,7 @@ func TestRepoComponent_checkCurrentUserPermission(t *testing.T) {
 		user := database.User{}
 		user.Username = "user_name"
 		user.UUID = "user-uuid"
-		repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username).Return(user, nil)
+		repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username, types.UserWithAdminPermissions).Return(user, nil)
 
 		expectNamespaceCheck(repoComp, user.UUID, ns.UUID, rebac.NamespaceCanRead, false)
 		yes, err := repoComp.CheckCurrentUserPermission(context.Background(), user.Username, ns.Path, rebac.NamespaceCanRead)
@@ -2647,7 +2862,7 @@ func TestRepoComponent_checkCurrentUserPermission(t *testing.T) {
 		user := database.User{}
 		user.Username = "user_name"
 		user.UUID = "user-uuid"
-		repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username).Return(user, nil)
+		repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username, types.UserWithAdminPermissions).Return(user, nil)
 
 		// The provider denies all requested relations for a non-member.
 		expectNamespaceCheck(repoComp, user.UUID, ns.UUID, rebac.NamespaceCanRead, false)
@@ -2680,7 +2895,7 @@ func TestRepoComponent_checkCurrentUserPermission(t *testing.T) {
 		user := database.User{}
 		user.Username = "user_name"
 		user.UUID = "user-uuid"
-		repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username).Return(user, nil)
+		repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username, types.UserWithAdminPermissions).Return(user, nil)
 
 		// The provider returns the member's read-only decision.
 		expectNamespaceCheck(repoComp, user.UUID, ns.UUID, rebac.NamespaceCanRead, true)
@@ -2707,9 +2922,9 @@ func TestRepoComponent_checkCurrentUserPermission(t *testing.T) {
 
 		user := database.User{}
 		user.Username = "user_name_admin"
-		user.RoleMask = "admin"
+		user.RoleAssignments = superAdminRoleAssignments()
 		user.UUID = "user-uuid"
-		repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username).Return(user, nil).Times(3)
+		repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username, types.UserWithAdminPermissions).Return(user, nil).Times(3)
 
 		yes, err := repoComp.CheckCurrentUserPermission(context.Background(), user.Username, "org_name", rebac.NamespaceCanRead)
 		require.True(t, yes)
@@ -2730,9 +2945,9 @@ func TestRepoComponent_checkCurrentUserPermission(t *testing.T) {
 
 		user := database.User{}
 		user.Username = "user_name_admin"
-		user.RoleMask = "admin"
+		user.RoleAssignments = superAdminRoleAssignments()
 		user.UUID = "user-uuid"
-		repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username).Return(user, nil).Times(3)
+		repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username, types.UserWithAdminPermissions).Return(user, nil).Times(3)
 
 		yes, err := repoComp.CheckCurrentUserPermission(context.Background(), user.Username, "missing-namespace", rebac.NamespaceCanRead)
 		require.True(t, yes)
@@ -2748,6 +2963,7 @@ func TestRepoComponent_checkCurrentUserPermission(t *testing.T) {
 	})
 }
 
+// TestRepoComponent_LastCommit checks the expected user query options.
 func TestRepoComponent_LastCommit(t *testing.T) {
 	t.Run("can read self-owned", func(t *testing.T) {
 		ctx := context.TODO()
@@ -2764,7 +2980,7 @@ func TestRepoComponent_LastCommit(t *testing.T) {
 		user := database.User{}
 		user.Username = "user_name"
 		user.UUID = "user-uuid"
-		repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username).Return(user, nil)
+		repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username, types.UserWithAdminPermissions).Return(user, nil)
 
 		commit := &types.Commit{}
 		repoComp.mocks.gitServer.EXPECT().GetRepoLastCommit(mock.Anything, mock.Anything).Return(commit, nil)
@@ -2798,6 +3014,7 @@ func TestRepoComponent_LastCommit(t *testing.T) {
 	})
 }
 
+// TestRepoComponent_Tree checks the expected user query options.
 func TestRepoComponent_Tree(t *testing.T) {
 	{
 		t.Run("can read self-owned", func(t *testing.T) {
@@ -2806,7 +3023,7 @@ func TestRepoComponent_Tree(t *testing.T) {
 
 			user := database.User{}
 			user.Username = "user_name"
-			repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username).Return(user, nil)
+			repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username, types.UserWithAdminPermissions).Return(user, nil)
 			expectReBACCheck(repoComp, true)
 
 			ns := database.Namespace{}
@@ -2864,6 +3081,7 @@ func TestRepoComponent_AllowReadAccess(t *testing.T) {
 	})
 }
 
+// TestRepoComponent_AllowWriteAccess checks the expected user query options.
 func TestRepoComponent_AllowWriteAccess(t *testing.T) {
 	t.Run("should return false if username is empty", func(t *testing.T) {
 		ctx := context.TODO()
@@ -2905,7 +3123,7 @@ func TestRepoComponent_AllowWriteAccess(t *testing.T) {
 			Email:    "user@example.com",
 			RoleMask: "",
 		}
-		repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, user.Username).Return(user, nil)
+		repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, user.Username, types.UserWithAdminPermissions).Return(user, nil)
 		repoAuthorizerMock(repoComp).EXPECT().Check(ctx, rebac.CheckRequest{
 			Subject:     rebac.UserSubject(user.UUID),
 			Relation:    rebac.RepositoryCanWrite,
@@ -2919,6 +3137,7 @@ func TestRepoComponent_AllowWriteAccess(t *testing.T) {
 	})
 }
 
+// TestRepoComponent_AllowAdminAccess checks the expected user query options.
 func TestRepoComponent_AllowAdminAccess(t *testing.T) {
 	t.Run("should return false if username is empty", func(t *testing.T) {
 		ctx := context.TODO()
@@ -2960,7 +3179,7 @@ func TestRepoComponent_AllowAdminAccess(t *testing.T) {
 			Email:    "user@example.com",
 			RoleMask: "",
 		}
-		repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, user.Username).Return(user, nil)
+		repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, user.Username, types.UserWithAdminPermissions).Return(user, nil)
 		repoAuthorizerMock(repoComp).EXPECT().Check(ctx, rebac.CheckRequest{
 			Subject:     rebac.UserSubject(user.UUID),
 			Relation:    rebac.RepositoryCanAdmin,
@@ -2974,6 +3193,7 @@ func TestRepoComponent_AllowAdminAccess(t *testing.T) {
 	})
 }
 
+// TestRepoComponent_AllowReadAccessRepo checks the expected user query options.
 func TestRepoComponent_AllowReadAccessRepo(t *testing.T) {
 	t.Run("should return true if repo is public", func(t *testing.T) {
 		ctx := context.TODO()
@@ -3008,7 +3228,7 @@ func TestRepoComponent_AllowReadAccessRepo(t *testing.T) {
 		repoComp := initializeTestRepoComponent(ctx, t)
 		repository := &database.Repository{ID: 42, Path: "namespace/name", Private: true}
 		user := database.User{Username: "reader", UUID: "reader-uuid"}
-		repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, user.Username).Return(user, nil)
+		repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, user.Username, types.UserWithAdminPermissions).Return(user, nil)
 		repoAuthorizerMock(repoComp).EXPECT().Check(ctx, rebac.CheckRequest{
 			Subject:     rebac.UserSubject(user.UUID),
 			Relation:    rebac.RepositoryCanRead,
@@ -3023,13 +3243,14 @@ func TestRepoComponent_AllowReadAccessRepo(t *testing.T) {
 	})
 }
 
+// TestRepoComponent_AllFilesUsesRepositoryPermission checks the expected user query options.
 func TestRepoComponent_AllFilesUsesRepositoryPermission(t *testing.T) {
 	ctx := context.Background()
 	repoComp := initializeTestRepoComponent(ctx, t)
 	repository := &database.Repository{ID: 42, Path: "namespace/name", Private: true}
 	user := database.User{Username: "reader", UUID: "reader-uuid"}
 	repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "namespace", "name").Return(repository, nil)
-	repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, user.Username).Return(user, nil)
+	repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, user.Username, types.UserWithAdminPermissions).Return(user, nil)
 	repoAuthorizerMock(repoComp).EXPECT().Check(ctx, rebac.CheckRequest{
 		Subject:     rebac.UserSubject(user.UUID),
 		Relation:    rebac.RepositoryCanRead,
@@ -3062,13 +3283,14 @@ func TestRepoComponent_AllFilesUsesRepositoryPermission(t *testing.T) {
 	require.Same(t, want, got)
 }
 
+// TestRepoComponent_VisiableToUserUsesRepositoryPermission checks the expected user query options.
 func TestRepoComponent_VisiableToUserUsesRepositoryPermission(t *testing.T) {
 	ctx := context.Background()
 	repoComp := initializeTestRepoComponent(ctx, t)
 	privateRepo := &database.Repository{ID: 42, Path: "namespace/private", Private: true}
 	publicRepo := &database.Repository{ID: 43, Path: "namespace/public", Private: false}
 	user := database.User{Username: "reader", UUID: "reader-uuid"}
-	repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, user.Username).Return(user, nil)
+	repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, user.Username, types.UserWithAdminPermissions).Return(user, nil)
 	repoAuthorizerMock(repoComp).EXPECT().Check(ctx, rebac.CheckRequest{
 		Subject:     rebac.UserSubject(user.UUID),
 		Relation:    rebac.RepositoryCanRead,
@@ -3082,6 +3304,7 @@ func TestRepoComponent_VisiableToUserUsesRepositoryPermission(t *testing.T) {
 	require.Equal(t, []*database.Repository{privateRepo, publicRepo}, got)
 }
 
+// TestRepoComponent_TreeV2 checks the expected user query options.
 func TestRepoComponent_TreeV2(t *testing.T) {
 	{
 		t.Run("can read self-owned", func(t *testing.T) {
@@ -3090,7 +3313,7 @@ func TestRepoComponent_TreeV2(t *testing.T) {
 
 			user := database.User{}
 			user.Username = "user_name"
-			repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username).Return(user, nil)
+			repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username, types.UserWithAdminPermissions).Return(user, nil)
 			expectReBACCheck(repoComp, true)
 
 			ns := database.Namespace{}
@@ -3141,13 +3364,14 @@ func TestRepoComponent_TreeV2(t *testing.T) {
 
 }
 
+// TestRepoComponent_TreeV2Remote checks the expected user query options.
 func TestRepoComponent_TreeV2Remote(t *testing.T) {
 	ctx := context.TODO()
 	repoComp := initializeTestRepoComponent(ctx, t)
 
 	user := database.User{}
 	user.Username = "user_name"
-	repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username).Return(user, nil)
+	repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username, types.UserWithAdminPermissions).Return(user, nil)
 	expectReBACCheckTimes(repoComp, true, 3)
 
 	ns := database.Namespace{}
@@ -3195,6 +3419,7 @@ func TestRepoComponent_TreeV2Remote(t *testing.T) {
 	require.Equal(t, []*types.File{{Name: "f1"}, {Name: "f2"}}, files)
 }
 
+// TestRepoComponent_LogsTree checks the expected user query options.
 func TestRepoComponent_LogsTree(t *testing.T) {
 	{
 		t.Run("can read self-owned", func(t *testing.T) {
@@ -3203,7 +3428,7 @@ func TestRepoComponent_LogsTree(t *testing.T) {
 
 			user := database.User{}
 			user.Username = "user_name"
-			repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username).Return(user, nil)
+			repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username, types.UserWithAdminPermissions).Return(user, nil)
 			expectReBACCheck(repoComp, true)
 
 			ns := database.Namespace{}
@@ -3254,13 +3479,14 @@ func TestRepoComponent_LogsTree(t *testing.T) {
 
 }
 
+// TestRepoComponent_LogsTreeRemote checks the expected user query options.
 func TestRepoComponent_LogsTreeRemote(t *testing.T) {
 	ctx := context.TODO()
 	repoComp := initializeTestRepoComponent(ctx, t)
 
 	user := database.User{}
 	user.Username = "user_name"
-	repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username).Return(user, nil)
+	repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username, types.UserWithAdminPermissions).Return(user, nil)
 	expectReBACCheckTimes(repoComp, true, 3)
 
 	ns := database.Namespace{}
@@ -3339,13 +3565,14 @@ func TestRepoComponent_FixRepoSource(t *testing.T) {
 	require.Nil(t, err)
 }
 
+// TestRepoComponent_RemoteTree checks the expected user query options.
 func TestRepoComponent_RemoteTree(t *testing.T) {
 	ctx := context.TODO()
 	repoComp := initializeTestRepoComponent(ctx, t)
 
 	user := database.User{}
 	user.Username = "user_name"
-	repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username).Return(user, nil)
+	repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username, types.UserWithAdminPermissions).Return(user, nil)
 	expectReBACCheckTimes(repoComp, true, 3)
 
 	ns := database.Namespace{}
@@ -3392,6 +3619,7 @@ func TestRepoComponent_RemoteTree(t *testing.T) {
 	require.Equal(t, []*types.File{{Name: "f1"}, {Name: "f2"}}, files)
 }
 
+// TestRepoComponent_GetRepoSizeByBranch checks the expected user query options.
 func TestRepoComponent_GetRepoSizeByBranch(t *testing.T) {
 	t.Run("should return repo size when user has read permission", func(t *testing.T) {
 		ctx := context.TODO()
@@ -3399,7 +3627,7 @@ func TestRepoComponent_GetRepoSizeByBranch(t *testing.T) {
 
 		user := database.User{}
 		user.Username = "user_name"
-		repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username).Return(user, nil)
+		repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username, types.UserWithAdminPermissions).Return(user, nil)
 		expectReBACCheck(repoComp, true)
 
 		ns := database.Namespace{}
@@ -3439,7 +3667,7 @@ func TestRepoComponent_GetRepoSizeByBranch(t *testing.T) {
 
 		user := database.User{}
 		user.Username = "user_name"
-		repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username).Return(user, nil)
+		repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username, types.UserWithAdminPermissions).Return(user, nil)
 		expectReBACCheck(repoComp, false)
 
 		ns := database.Namespace{}
@@ -3465,7 +3693,7 @@ func TestRepoComponent_GetRepoSizeByBranch(t *testing.T) {
 
 		user := database.User{}
 		user.Username = "user_name"
-		repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username).Return(user, nil)
+		repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username, types.UserWithAdminPermissions).Return(user, nil)
 		expectReBACCheck(repoComp, true)
 
 		ns := database.Namespace{}
@@ -3495,9 +3723,10 @@ func TestRepoComponent_BatchGetRepoExtra(t *testing.T) {
 		repoComp := initializeTestRepoComponent(ctx, t)
 
 		repoComp.mocks.userSvcClient.EXPECT().GetUserInfo(ctx, "admin", "admin").Return(&rpc.User{
-			ID:    1,
-			Roles: []string{"admin"},
-			Orgs:  []rpc.Organization{},
+			ID:         1,
+			Roles:      []string{"maintainer"},
+			SuperAdmin: true,
+			Orgs:       []rpc.Organization{},
 		}, nil)
 
 		repos := []*database.Repository{
@@ -3754,6 +3983,7 @@ func TestRepoComponent_BatchGetRepoExtra(t *testing.T) {
 	})
 }
 
+// TestRepoComponent_DownloadCodeZip checks the expected user query options.
 func TestRepoComponent_DownloadCodeZip(t *testing.T) {
 	type packageWriteCall struct {
 		repoType types.RepositoryType
@@ -3799,7 +4029,7 @@ func TestRepoComponent_DownloadCodeZip(t *testing.T) {
 		}
 
 		user := database.User{Username: "user_name", UUID: "user-uuid"}
-		repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username).Return(user, nil)
+		repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username, types.UserWithAdminPermissions).Return(user, nil)
 		expectReBACCheck(repoComp, true)
 		ns := database.Namespace{NamespaceType: "user", Path: "user_name"}
 		repo := &database.Repository{
@@ -3845,7 +4075,7 @@ func TestRepoComponent_DownloadCodeZip(t *testing.T) {
 		}
 
 		user := database.User{Username: "user_name", UUID: "user-uuid"}
-		repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username).Return(user, nil)
+		repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username, types.UserWithAdminPermissions).Return(user, nil)
 		expectReBACCheck(repoComp, true)
 		ns := database.Namespace{NamespaceType: "user", Path: "user_name"}
 		repo := &database.Repository{
@@ -3887,7 +4117,7 @@ func TestRepoComponent_DownloadCodeZip(t *testing.T) {
 		}
 
 		user := database.User{Username: "user_name", UUID: "user-uuid"}
-		repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username).Return(user, nil)
+		repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username, types.UserWithAdminPermissions).Return(user, nil)
 		expectReBACCheck(repoComp, true)
 		ns := database.Namespace{NamespaceType: "user", Path: "user_name"}
 		repo := &database.Repository{
@@ -3936,7 +4166,7 @@ func TestRepoComponent_DownloadCodeZip(t *testing.T) {
 		}
 
 		user := database.User{Username: "user_name", UUID: "user-uuid"}
-		repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username).Return(user, nil)
+		repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username, types.UserWithAdminPermissions).Return(user, nil)
 		expectReBACCheck(repoComp, true)
 		ns := database.Namespace{NamespaceType: "user", Path: "user_name"}
 		repo := &database.Repository{
@@ -3981,7 +4211,7 @@ func TestRepoComponent_DownloadCodeZip(t *testing.T) {
 
 		user := database.User{}
 		user.Username = "user_name"
-		repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username).Return(user, nil)
+		repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username, types.UserWithAdminPermissions).Return(user, nil)
 		expectReBACCheck(repoComp, true)
 
 		ns := database.Namespace{}
@@ -4030,7 +4260,7 @@ func TestRepoComponent_DownloadCodeZip(t *testing.T) {
 
 		user := database.User{}
 		user.Username = "user_name"
-		repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username).Return(user, nil)
+		repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username, types.UserWithAdminPermissions).Return(user, nil)
 		expectReBACCheck(repoComp, true)
 
 		ns := database.Namespace{}
@@ -4096,7 +4326,7 @@ func TestRepoComponent_DownloadCodeZip(t *testing.T) {
 
 		user := database.User{}
 		user.Username = "user_name"
-		repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username).Return(user, nil)
+		repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username, types.UserWithAdminPermissions).Return(user, nil)
 		expectReBACCheck(repoComp, false)
 
 		ns := database.Namespace{}
@@ -4130,7 +4360,7 @@ func TestRepoComponent_DownloadCodeZip(t *testing.T) {
 
 		user := database.User{}
 		user.Username = "user_name"
-		repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username).Return(user, nil)
+		repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username, types.UserWithAdminPermissions).Return(user, nil)
 		expectReBACCheck(repoComp, true)
 
 		ns := database.Namespace{}
@@ -4171,7 +4401,7 @@ func TestRepoComponent_DownloadCodeZip(t *testing.T) {
 
 		user := database.User{}
 		user.Username = "user_name"
-		repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username).Return(user, nil)
+		repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username, types.UserWithAdminPermissions).Return(user, nil)
 		expectReBACCheck(repoComp, true)
 
 		ns := database.Namespace{}
@@ -4199,13 +4429,14 @@ func TestRepoComponent_DownloadCodeZip(t *testing.T) {
 	})
 }
 
+// TestRepoComponent_DiffBetweenTwoCommits checks the expected user query options.
 func TestRepoComponent_DiffBetweenTwoCommits(t *testing.T) {
 	ctx := context.TODO()
 	repoComp := initializeTestRepoComponent(ctx, t)
 
 	user := database.User{}
 	user.Username = "user_name"
-	repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username).Return(user, nil)
+	repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username, types.UserWithAdminPermissions).Return(user, nil)
 	expectReBACCheck(repoComp, true)
 
 	ns := database.Namespace{}
@@ -4249,6 +4480,7 @@ func TestRepoComponent_DiffBetweenTwoCommits(t *testing.T) {
 	}, diff)
 }
 
+// TestRepoComponent_Preupload checks the expected user query options.
 func TestRepoComponent_Preupload(t *testing.T) {
 	ctx := context.TODO()
 	repoComp := initializeTestRepoComponent(ctx, t)
@@ -4256,7 +4488,7 @@ func TestRepoComponent_Preupload(t *testing.T) {
 
 	user := database.User{}
 	user.Username = "user_name"
-	repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username).Return(user, nil)
+	repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username, types.UserWithAdminPermissions).Return(user, nil)
 	expectReBACCheck(repoComp, true)
 
 	ns := database.Namespace{}
@@ -4384,13 +4616,15 @@ func TestRepoComponent_Preupload(t *testing.T) {
 	}, res)
 }
 
+// TestRepoComponent_CommitFiles checks the expected user query options.
 func TestRepoComponent_CommitFiles(t *testing.T) {
 	ctx := context.TODO()
 	repoComp := initializeTestRepoComponent(ctx, t)
 
 	user := database.User{}
 	user.Username = "user_name"
-	repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username).Return(user, nil)
+	repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username).Return(user, nil).Once()
+	repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username, types.UserWithAdminPermissions).Return(user, nil).Once()
 	expectReBACCheck(repoComp, true)
 
 	ns := database.Namespace{}
@@ -4454,68 +4688,15 @@ func TestRepoComponent_CommitFiles(t *testing.T) {
 	require.Equal(t, nil, err)
 }
 
-func TestRepoComponent_CommitFilesRejectsOversizedNonLFSFile(t *testing.T) {
-	ctx := context.TODO()
-	repoComp := initializeTestRepoComponent(ctx, t)
-	repoComp.config.Git.MaxUnLfsFileSize = 4
-
-	user := database.User{Username: "user_name", UUID: "user-uuid"}
-	repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username).Return(user, nil)
-
-	ns := database.Namespace{NamespaceType: "user", Path: user.Username}
-
-	repo := &database.Repository{
-		ID:      1,
-		Name:    "repo_name",
-		Private: true,
-		User:    user,
-		Path:    fmt.Sprintf("%s/%s", ns.Path, "repo_name"),
-		Source:  types.OpenCSGSource,
-	}
-	repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(
-		mock.Anything, types.ModelRepo, ns.Path, repo.Name,
-	).Return(repo, nil)
-	expectReBACCheck(repoComp, true)
-	repoComp.mocks.gitServer.EXPECT().GetRepoAllFiles(ctx, gitserver.GetRepoAllFilesReq{
-		Namespace: ns.Path,
-		Name:      repo.Name,
-		Ref:       "main",
-		RepoType:  types.ModelRepo,
-	}).Return(nil, nil)
-
-	pointerPrefix := fmt.Sprintf(
-		"version https://git-lfs.github.com/spec/v1\noid sha256:%s\nsize 1\n",
-		strings.Repeat("a", 64),
-	)
-	err := repoComp.CommitFiles(ctx, types.CommitFilesReq{
-		Namespace:   ns.Path,
-		Name:        repo.Name,
-		RepoType:    types.ModelRepo,
-		Revision:    "main",
-		CurrentUser: user.Username,
-		Message:     "msg",
-		Files: []types.CommitFileReq{
-			{
-				Path:    "oversized.json",
-				Action:  types.CommitActionCreate,
-				Content: base64.StdEncoding.EncodeToString([]byte(pointerPrefix + "trailing content")),
-			},
-		},
-	})
-
-	require.ErrorContains(t, err, "exceeds the maximum allowed size for non-LFS files")
-	require.ErrorIs(t, err, errorx.ErrFileTooLarge)
-	repoComp.mocks.gitServer.AssertNotCalled(t, "CommitFiles", mock.Anything, mock.Anything)
-	repoComp.mocks.stores.LfsMetaObjectMock().AssertNotCalled(t, "UpdateOrCreate", mock.Anything, mock.Anything)
-}
-
+// TestRepoComponent_CommitFilesIgnoresPackageSyncFailure checks the expected user query options.
 func TestRepoComponent_CommitFilesIgnoresPackageSyncFailure(t *testing.T) {
 	ctx := context.TODO()
 	repoComp := initializeTestRepoComponent(ctx, t)
 	repoComp.repositoryPackageSyncer = newRepositoryPackageSyncer(repoComp.config, repoComp.mocks.stores.RepoMock(), repoComp.mocks.gitServer, repoComp.mocks.s3Client, nil)
 
 	user := database.User{Username: "user_name", UUID: "user-uuid"}
-	repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username).Return(user, nil)
+	repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username).Return(user, nil).Once()
+	repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username, types.UserWithAdminPermissions).Return(user, nil).Once()
 	expectReBACCheck(repoComp, true)
 
 	ns := database.Namespace{NamespaceType: "user", Path: "user_name"}
@@ -4681,76 +4862,6 @@ func TestParseNDJson_AllKeyTypes(t *testing.T) {
 	assert.Equal(t, types.CommitActionDelete, result.Files[3].Action)
 }
 
-func TestParseNDJson_AcceptsBase64ExpansionAtFileSizeLimit(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-
-	const maxUnLfsFileSize = 1 << 20
-	cfg := &config.Config{}
-	cfg.Git.MaxUnLfsFileSize = maxUnLfsFileSize
-
-	component := &repoComponentImpl{
-		config: cfg,
-	}
-
-	// HF sends regular file content as Base64. A file at the configured raw size
-	// limit therefore produces an NDJSON record larger than that limit.
-	largeContent := base64.StdEncoding.EncodeToString(
-		[]byte(strings.Repeat("a", maxUnLfsFileSize)),
-	)
-	largeFileJSON, err := json.Marshal(types.CommitFile{
-		Path:    "tokenizer.json",
-		Content: largeContent,
-	})
-	require.NoError(t, err)
-
-	requestBody := fmt.Sprintf(`{"key": "header", "value": {"summary": "Large file commit"}}
-{"key": "file", "value": %s}`, string(largeFileJSON))
-	require.Greater(t, len(requestBody), maxUnLfsFileSize)
-
-	req := httptest.NewRequest("POST", "/test", strings.NewReader(requestBody))
-	w := httptest.NewRecorder()
-	ctx, _ := gin.CreateTestContext(w)
-	ctx.Request = req
-
-	result, err := component.ParseNDJson(ctx)
-
-	require.NoError(t, err)
-	assert.Equal(t, "Large file commit", result.Message)
-	assert.Len(t, result.Files, 1)
-	assert.Equal(t, "tokenizer.json", result.Files[0].Path)
-	assert.Equal(t, largeContent, result.Files[0].Content)
-}
-
-func TestParseNDJson_RejectsOversizedRecord(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-
-	const maxUnLfsFileSize = 1 << 20
-	component := &repoComponentImpl{
-		config: &config.Config{},
-	}
-	component.config.Git.MaxUnLfsFileSize = maxUnLfsFileSize
-
-	oversizedContent := base64.StdEncoding.EncodeToString(
-		[]byte(strings.Repeat("a", 2*maxUnLfsFileSize)),
-	)
-	fileJSON, err := json.Marshal(types.CommitFile{
-		Path:    "oversized.json",
-		Content: oversizedContent,
-	})
-	require.NoError(t, err)
-
-	requestBody := fmt.Sprintf(`{"key":"file","value":%s}`, fileJSON)
-	req := httptest.NewRequest("POST", "/test", strings.NewReader(requestBody))
-	w := httptest.NewRecorder()
-	ctx, _ := gin.CreateTestContext(w)
-	ctx.Request = req
-
-	result, err := component.ParseNDJson(ctx)
-
-	require.Error(t, err)
-	assert.Nil(t, result)
-}
-
 func TestGetRepoUrl(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -4910,11 +5021,12 @@ func TestRepoComponent_ChangePath_RepoHashed(t *testing.T) {
 	repoComp.mocks.stores.AccountPriceMock().EXPECT().CountByResourceIDs(ctx, mock.Anything).Return(0, nil)
 
 	repoComp.mocks.stores.RepoMock().EXPECT().UpdateRepo(ctx, database.Repository{
-		ID:             1,
-		Path:           "new/path",
-		GitPath:        "models_new/path",
-		Hashed:         true,
-		RepositoryType: types.ModelRepo,
+		TupleNamespacePath: "new",
+		ID:                 1,
+		Path:               "new/path",
+		GitPath:            "models_new/path",
+		Hashed:             true,
+		RepositoryType:     types.ModelRepo,
 	}).Return(&database.Repository{
 		ID:             1,
 		Path:           "new/path",
@@ -4928,18 +5040,6 @@ func TestRepoComponent_ChangePath_RepoHashed(t *testing.T) {
 	repoComp.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "new").Return(database.Namespace{
 		Path: "new", NamespaceType: database.UserNamespace, User: database.User{UUID: "target-user-uuid"},
 	}, nil)
-	oldRelationship := rebac.Relationship{
-		Subject: rebac.UserSubject("source-user-uuid"), Relation: rebac.RelationOwner, Object: rebac.RepositoryObject(1),
-	}
-	newRelationship := rebac.Relationship{
-		Subject: rebac.UserSubject("target-user-uuid"), Relation: rebac.RelationOwner, Object: rebac.RepositoryObject(1),
-	}
-	repoAuthorizerMock(repoComp).EXPECT().Delete(ctx, []rebac.Relationship{oldRelationship}).Return(nil).Once()
-	repoAuthorizerMock(repoComp).EXPECT().Check(ctx, rebac.CheckRequest{
-		Subject: newRelationship.Subject, Relation: newRelationship.Relation, Object: newRelationship.Object,
-		Consistency: rebac.ConsistencyHigher,
-	}).Return(rebac.Decision{Allowed: false}, nil).Once()
-	repoAuthorizerMock(repoComp).EXPECT().Write(ctx, []rebac.Relationship{newRelationship}).Return(nil).Once()
 
 	err := repoComp.ChangePath(ctx, types.ChangePathReq{
 		RepoType:  types.ModelRepo,
@@ -4995,6 +5095,7 @@ func TestRepoComponent_ChangePath_NamespaceNotExist(t *testing.T) {
 	require.True(t, errors.Is(err, errorx.ErrTargetNamespaceNotFound))
 }
 
+// TestRepoComponent_TransferOwnership_Success checks the expected user query options.
 func TestRepoComponent_TransferOwnership_Success(t *testing.T) {
 	ctx := context.Background()
 	repoComp := initializeTestRepoComponent(ctx, t)
@@ -5006,7 +5107,7 @@ func TestRepoComponent_TransferOwnership_Success(t *testing.T) {
 	repoComp.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "targetorg").
 		Return(database.Namespace{Path: "targetorg", NamespaceType: database.OrgNamespace, UserID: 99}, nil)
 	// Mock current user (non-platform-admin, username matches source)
-	repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "sourceuser").
+	repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "sourceuser", types.UserWithAdminPermissions).
 		Return(database.User{RoleMask: ""}, nil)
 	expectNamespacePermissionCheck(repoComp, rebac.NamespaceCanAdmin, true)
 	expectNamespacePermissionCheck(repoComp, rebac.NamespaceCanAdmin, true)
@@ -5027,33 +5128,19 @@ func TestRepoComponent_TransferOwnership_Success(t *testing.T) {
 
 	// Mock UpdateRepo
 	repoComp.mocks.stores.RepoMock().EXPECT().UpdateRepo(ctx, database.Repository{
-		ID:             1,
-		UserID:         99,
-		Path:           "targetorg/reponame",
-		GitPath:        "models_targetorg/reponame",
-		Hashed:         true,
-		RepositoryType: types.ModelRepo,
+		TupleNamespacePath: "targetorg",
+		ID:                 1,
+		UserID:             99,
+		Path:               "targetorg/reponame",
+		GitPath:            "models_targetorg/reponame",
+		Hashed:             true,
+		RepositoryType:     types.ModelRepo,
 	}).Return(nil, nil)
 	// TransferOwnership loads both namespace records again for ReBAC synchronization.
 	repoComp.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "sourceuser").
 		Return(database.Namespace{Path: "sourceuser", NamespaceType: database.UserNamespace, User: database.User{UUID: "source-user-uuid"}}, nil)
 	repoComp.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "targetorg").
 		Return(database.Namespace{Path: "targetorg", NamespaceType: database.OrgNamespace, UserID: 99}, nil)
-	organization := database.Organization{UUID: uuid.MustParse("00000000-0000-0000-0000-000000000001")}
-	repoComp.mocks.stores.OrgMock().EXPECT().FindByPath(ctx, "targetorg").Return(organization, nil).Once()
-	oldRelationship := rebac.Relationship{
-		Subject: rebac.UserSubject("source-user-uuid"), Relation: rebac.RelationOwner, Object: rebac.RepositoryObject(1),
-	}
-	newRelationship := rebac.Relationship{
-		Subject:  rebac.NewSubject(rebac.ObjectTypeOrganization, organization.UUID.String()),
-		Relation: rebac.RelationOrganization, Object: rebac.RepositoryObject(1),
-	}
-	repoAuthorizerMock(repoComp).EXPECT().Delete(ctx, []rebac.Relationship{oldRelationship}).Return(nil).Once()
-	repoAuthorizerMock(repoComp).EXPECT().Check(ctx, rebac.CheckRequest{
-		Subject: newRelationship.Subject, Relation: newRelationship.Relation, Object: newRelationship.Object,
-		Consistency: rebac.ConsistencyHigher,
-	}).Return(rebac.Decision{Allowed: false}, nil).Once()
-	repoAuthorizerMock(repoComp).EXPECT().Write(ctx, []rebac.Relationship{newRelationship}).Return(nil).Once()
 
 	err := repoComp.TransferOwnership(ctx, types.TransferRepoReq{
 		RepoType:     types.ModelRepo,
@@ -5066,6 +5153,7 @@ func TestRepoComponent_TransferOwnership_Success(t *testing.T) {
 	require.Nil(t, err)
 }
 
+// TestRepoComponent_TransferOwnership_NoSourcePermission checks the expected user query options.
 func TestRepoComponent_TransferOwnership_NoSourcePermission(t *testing.T) {
 	ctx := context.Background()
 	repoComp := initializeTestRepoComponent(ctx, t)
@@ -5074,7 +5162,7 @@ func TestRepoComponent_TransferOwnership_NoSourcePermission(t *testing.T) {
 	repoComp.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "otheruser").
 		Return(database.Namespace{Path: "otheruser", NamespaceType: database.UserNamespace}, nil)
 	// Mock current user (non-admin, different from source namespace)
-	repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "currentuser").
+	repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "currentuser", types.UserWithAdminPermissions).
 		Return(database.User{RoleMask: ""}, nil)
 
 	// Mock source repo exists
@@ -5094,6 +5182,7 @@ func TestRepoComponent_TransferOwnership_NoSourcePermission(t *testing.T) {
 	assert.True(t, errors.Is(err, errorx.ErrNoSourceTransferPermission))
 }
 
+// TestRepoComponent_TransferOwnership_NoTargetPermission checks the expected user query options.
 func TestRepoComponent_TransferOwnership_NoTargetPermission(t *testing.T) {
 	ctx := context.Background()
 	repoComp := initializeTestRepoComponent(ctx, t)
@@ -5105,7 +5194,7 @@ func TestRepoComponent_TransferOwnership_NoTargetPermission(t *testing.T) {
 	repoComp.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "targetuser").
 		Return(database.Namespace{Path: "targetuser", NamespaceType: database.UserNamespace}, nil)
 	// Mock current user
-	repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "currentuser").
+	repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "currentuser", types.UserWithAdminPermissions).
 		Return(database.User{RoleMask: ""}, nil)
 
 	// Mock source repo exists
@@ -5126,6 +5215,7 @@ func TestRepoComponent_TransferOwnership_NoTargetPermission(t *testing.T) {
 	assert.True(t, errors.Is(err, errorx.ErrNoTargetTransferPermission))
 }
 
+// TestRepoComponent_TransferOwnership_SameNamespace checks the expected user query options.
 func TestRepoComponent_TransferOwnership_SameNamespace(t *testing.T) {
 	ctx := context.Background()
 	repoComp := initializeTestRepoComponent(ctx, t)
@@ -5134,7 +5224,7 @@ func TestRepoComponent_TransferOwnership_SameNamespace(t *testing.T) {
 	repoComp.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "sameuser").
 		Return(database.Namespace{Path: "sameuser", NamespaceType: database.UserNamespace}, nil)
 	// Mock current user
-	repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "sameuser").
+	repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "sameuser", types.UserWithAdminPermissions).
 		Return(database.User{RoleMask: ""}, nil)
 
 	// Mock source repo exists
@@ -5155,6 +5245,7 @@ func TestRepoComponent_TransferOwnership_SameNamespace(t *testing.T) {
 	assert.True(t, errors.Is(err, errorx.ErrTransferSameNamespace))
 }
 
+// TestRepoComponent_TransferOwnership_TargetExists checks the expected user query options.
 func TestRepoComponent_TransferOwnership_TargetExists(t *testing.T) {
 	ctx := context.Background()
 	repoComp := initializeTestRepoComponent(ctx, t)
@@ -5166,7 +5257,7 @@ func TestRepoComponent_TransferOwnership_TargetExists(t *testing.T) {
 	repoComp.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "targetorg").
 		Return(database.Namespace{Path: "targetorg", NamespaceType: database.OrgNamespace}, nil)
 	// Mock current user
-	repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "sourceuser").
+	repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "sourceuser", types.UserWithAdminPermissions).
 		Return(database.User{RoleMask: ""}, nil)
 	expectNamespacePermissionCheck(repoComp, rebac.NamespaceCanAdmin, true)
 	expectNamespacePermissionCheck(repoComp, rebac.NamespaceCanAdmin, true)
@@ -5190,6 +5281,7 @@ func TestRepoComponent_TransferOwnership_TargetExists(t *testing.T) {
 	assert.True(t, errors.Is(err, errorx.ErrTransferTargetExists))
 }
 
+// TestRepoComponent_TransferOwnership_NotHashed checks the expected user query options.
 func TestRepoComponent_TransferOwnership_NotHashed(t *testing.T) {
 	ctx := context.Background()
 	repoComp := initializeTestRepoComponent(ctx, t)
@@ -5201,7 +5293,7 @@ func TestRepoComponent_TransferOwnership_NotHashed(t *testing.T) {
 	repoComp.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "targetorg").
 		Return(database.Namespace{Path: "targetorg", NamespaceType: database.OrgNamespace}, nil)
 	// Mock current user
-	repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "sourceuser").
+	repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "sourceuser", types.UserWithAdminPermissions).
 		Return(database.User{RoleMask: ""}, nil)
 	expectNamespacePermissionCheck(repoComp, rebac.NamespaceCanAdmin, true)
 	expectNamespacePermissionCheck(repoComp, rebac.NamespaceCanAdmin, true)
@@ -5225,6 +5317,7 @@ func TestRepoComponent_TransferOwnership_NotHashed(t *testing.T) {
 	assert.True(t, errors.Is(err, errorx.ErrTransferNotSupported))
 }
 
+// TestRepoComponent_TransferOwnership_DependencyExists checks the expected user query options.
 func TestRepoComponent_TransferOwnership_DependencyExists(t *testing.T) {
 	ctx := context.Background()
 	repoComp := initializeTestRepoComponent(ctx, t)
@@ -5236,7 +5329,7 @@ func TestRepoComponent_TransferOwnership_DependencyExists(t *testing.T) {
 	repoComp.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "targetorg").
 		Return(database.Namespace{Path: "targetorg", NamespaceType: database.OrgNamespace}, nil)
 	// Mock current user
-	repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "sourceuser").
+	repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "sourceuser", types.UserWithAdminPermissions).
 		Return(database.User{RoleMask: ""}, nil)
 	expectNamespacePermissionCheck(repoComp, rebac.NamespaceCanAdmin, true)
 	expectNamespacePermissionCheck(repoComp, rebac.NamespaceCanAdmin, true)
@@ -5419,18 +5512,6 @@ func TestRepoComponent_ChangePath_DataviewerJobEmptyCardData(t *testing.T) {
 	repoComp.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "new").Return(database.Namespace{
 		Path: "new", NamespaceType: database.UserNamespace, User: database.User{UUID: "target-user-uuid"},
 	}, nil)
-	oldRelationship := rebac.Relationship{
-		Subject: rebac.UserSubject("source-user-uuid"), Relation: rebac.RelationOwner, Object: rebac.RepositoryObject(1),
-	}
-	newRelationship := rebac.Relationship{
-		Subject: rebac.UserSubject("target-user-uuid"), Relation: rebac.RelationOwner, Object: rebac.RepositoryObject(1),
-	}
-	repoAuthorizerMock(repoComp).EXPECT().Delete(ctx, []rebac.Relationship{oldRelationship}).Return(nil).Once()
-	repoAuthorizerMock(repoComp).EXPECT().Check(ctx, rebac.CheckRequest{
-		Subject: newRelationship.Subject, Relation: newRelationship.Relation, Object: newRelationship.Object,
-		Consistency: rebac.ConsistencyHigher,
-	}).Return(rebac.Decision{Allowed: false}, nil).Once()
-	repoAuthorizerMock(repoComp).EXPECT().Write(ctx, []rebac.Relationship{newRelationship}).Return(nil).Once()
 
 	err := repoComp.ChangePath(ctx, types.ChangePathReq{
 		RepoType:  types.ModelRepo,
@@ -5535,8 +5616,11 @@ func TestRepoComponent_GetMirrorTaskStatus(t *testing.T) {
 	assert.Equal(t, types.MirrorTaskStatus(""), mirrorTaskStatus)
 }
 
+// TestRepoComponent_UpdateRepo_PermissionChecks checks the expected user query options.
 func TestRepoComponent_UpdateRepo_PermissionChecks(t *testing.T) {
 	ctx := context.Background()
+	requireSensitiveCheck, err := (&repoComponentImpl{}).allowPublic(&database.Repository{SensitiveCheckStatus: types.SensitiveCheckPass})
+	require.NoError(t, err)
 	nickname := "new-nickname"
 	description := "new-description"
 
@@ -5548,6 +5632,33 @@ func TestRepoComponent_UpdateRepo_PermissionChecks(t *testing.T) {
 		expectError      bool
 		expectedErrorMsg string
 	}{
+		{
+			name: "Org writer changes privacy successfully",
+			req: types.UpdateRepoReq{
+				Username:  "test-user",
+				Namespace: "org-ns",
+				Name:      "test-repo",
+				RepoType:  types.ModelRepo,
+				Private:   tea.Bool(false),
+			},
+			setupMocks: func(repo *testRepoWithMocks, req types.UpdateRepoReq) {
+				repo.mocks.stores.RepoMock().EXPECT().Find(ctx, req.Namespace, string(req.RepoType), req.Name).Return(&database.Repository{
+					Private:              true,
+					SensitiveCheckStatus: types.SensitiveCheckPass,
+					RepositoryType:       types.ModelRepo,
+				}, nil)
+				repo.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, req.Namespace).Return(database.Namespace{Path: req.Namespace, NamespaceType: database.OrgNamespace}, nil)
+				repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, req.Username, types.UserWithAdminPermissions).Return(database.User{Username: "test-user"}, nil)
+				expectReBACCheck(repo, true)
+				repo.mocks.gitServer.EXPECT().UpdateRepo(ctx, mock.MatchedBy(func(updateReq gitserver.UpdateRepoReq) bool {
+					return !updateReq.Private
+				})).Return(&gitserver.CreateRepoResp{}, nil)
+				repo.mocks.stores.RepoMock().EXPECT().UpdateRepo(ctx, mock.MatchedBy(func(updated database.Repository) bool {
+					return !updated.Private
+				}), types.RepositoryUpdateOptions{Private: req.Private, RequireSensitiveCheckPass: requireSensitiveCheck}).Return(&database.Repository{Private: false}, nil)
+			},
+			expectError: false,
+		},
 		{
 			name: "Non-admin with write access updates org repo successfully without changing privacy",
 			req: types.UpdateRepoReq{
@@ -5561,7 +5672,7 @@ func TestRepoComponent_UpdateRepo_PermissionChecks(t *testing.T) {
 			setupMocks: func(repo *testRepoWithMocks, req types.UpdateRepoReq) {
 				repo.mocks.stores.RepoMock().EXPECT().Find(ctx, req.Namespace, string(req.RepoType), req.Name).Return(&database.Repository{}, nil)
 				repo.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, req.Namespace).Return(database.Namespace{Path: req.Namespace, NamespaceType: database.OrgNamespace}, nil)
-				repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, req.Username).Return(database.User{Username: "test-user"}, nil)
+				repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, req.Username, types.UserWithAdminPermissions).Return(database.User{Username: "test-user"}, nil)
 				expectReBACCheck(repo, true)
 				repo.mocks.gitServer.EXPECT().UpdateRepo(ctx, mock.Anything).Return(&gitserver.CreateRepoResp{}, nil)
 				repo.mocks.stores.RepoMock().EXPECT().UpdateRepo(ctx, mock.Anything).Return(&database.Repository{}, nil)
@@ -5579,7 +5690,7 @@ func TestRepoComponent_UpdateRepo_PermissionChecks(t *testing.T) {
 			setupMocks: func(repo *testRepoWithMocks, req types.UpdateRepoReq) {
 				repo.mocks.stores.RepoMock().EXPECT().Find(ctx, req.Namespace, string(req.RepoType), req.Name).Return(&database.Repository{}, nil)
 				repo.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, req.Namespace).Return(database.Namespace{Path: req.Namespace, NamespaceType: database.OrgNamespace}, nil)
-				repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, req.Username).Return(database.User{Username: "test-user"}, nil)
+				repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, req.Username, types.UserWithAdminPermissions).Return(database.User{Username: "test-user"}, nil)
 				expectReBACCheck(repo, false)
 			},
 			expectError:      true,
@@ -5596,11 +5707,34 @@ func TestRepoComponent_UpdateRepo_PermissionChecks(t *testing.T) {
 			setupMocks: func(repo *testRepoWithMocks, req types.UpdateRepoReq) {
 				repo.mocks.stores.RepoMock().EXPECT().Find(ctx, req.Namespace, string(req.RepoType), req.Name).Return(&database.Repository{}, nil)
 				repo.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, req.Namespace).Return(database.Namespace{Path: "another-user", NamespaceType: database.UserNamespace}, nil)
-				repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, req.Username).Return(database.User{Username: "test-user"}, nil)
+				repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, req.Username, types.UserWithAdminPermissions).Return(database.User{Username: "test-user"}, nil)
 				expectReBACCheck(repo, false)
 			},
 			expectError:      true,
 			expectedErrorMsg: "users do not have permission to update repo in this namespace",
+		},
+		{
+			name: "Non-admin updates their own repo to public successfully",
+			req: types.UpdateRepoReq{
+				Username:  "test-user",
+				Namespace: "test-user",
+				Name:      "test-repo",
+				RepoType:  types.ModelRepo,
+				Private:   tea.Bool(false),
+			},
+			setupMocks: func(repo *testRepoWithMocks, req types.UpdateRepoReq) {
+				repo.mocks.stores.RepoMock().EXPECT().Find(ctx, req.Namespace, string(req.RepoType), req.Name).Return(&database.Repository{
+					SensitiveCheckStatus: types.SensitiveCheckPass,
+					RepositoryType:       types.ModelRepo,
+				}, nil)
+				repo.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, req.Namespace).Return(database.Namespace{Path: "test-user", NamespaceType: database.UserNamespace}, nil)
+				repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, req.Username, types.UserWithAdminPermissions).Return(database.User{Username: "test-user"}, nil)
+				expectReBACCheck(repo, true)
+				repo.mocks.gitServer.EXPECT().UpdateRepo(ctx, mock.Anything).Return(&gitserver.CreateRepoResp{}, nil)
+				repo.mocks.stores.RepoMock().EXPECT().UpdateRepo(ctx, mock.Anything,
+					types.RepositoryUpdateOptions{Private: req.Private, RequireSensitiveCheckPass: requireSensitiveCheck}).Return(&database.Repository{}, nil)
+			},
+			expectError: false,
 		},
 		{
 			name: "Platform admin changes dataset visibility",
@@ -5616,7 +5750,7 @@ func TestRepoComponent_UpdateRepo_PermissionChecks(t *testing.T) {
 					Private: true,
 				}, nil)
 				repo.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, req.Namespace).Return(database.Namespace{Path: req.Namespace, NamespaceType: database.OrgNamespace}, nil)
-				repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, req.Username).Return(database.User{Username: "admin-user", RoleMask: "admin"}, nil)
+				repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, req.Username, types.UserWithAdminPermissions).Return(database.User{Username: "admin-user", RoleAssignments: superAdminRoleAssignments()}, nil)
 				repo.mocks.gitServer.EXPECT().UpdateRepo(ctx, mock.MatchedBy(func(updateReq gitserver.UpdateRepoReq) bool {
 					return !updateReq.Private
 				})).Return(&gitserver.CreateRepoResp{}, nil)
@@ -5643,6 +5777,75 @@ func TestRepoComponent_UpdateRepo_PermissionChecks(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 			}
+		})
+	}
+}
+
+// TestRepoComponent_UpdateRepoAdminAuthorized verifies authorized module requests use the existing administrator update rules.
+func TestRepoComponent_UpdateRepoAdminAuthorized(t *testing.T) {
+	for _, repoType := range []types.RepositoryType{types.ModelRepo, types.DatasetRepo, types.CodeRepo, types.SpaceRepo, types.MCPServerRepo, types.SkillRepo} {
+		t.Run(string(repoType), func(t *testing.T) {
+			ctx := types.WithAdminAuthorization(context.Background())
+			repo := initializeTestRepoComponent(ctx, t)
+			repository := &database.Repository{ID: 42, Private: true, DefaultBranch: "main", RepositoryType: repoType}
+			req := types.UpdateRepoReq{
+				Username: "module-admin", Namespace: "organization", Name: "repository", RepoType: repoType,
+				Private: tea.Bool(false), XnetEnabled: tea.Bool(true),
+			}
+			if types.SupportsLicenseCompliance(repoType) {
+				compliance := types.ComplianceStatusCompliant
+				req.ComplianceStatus = &compliance
+				repo.mocks.stores.RepoMock().EXPECT().UpdateLicenseCompliance(ctx, repository.ID, (*string)(nil),
+					compliance, repository.CommercialPermission).Return(nil).Once()
+			}
+			repo.mocks.stores.RepoMock().EXPECT().Find(ctx, req.Namespace, string(repoType), req.Name).Return(repository, nil).Once()
+			repo.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, req.Namespace).
+				Return(database.Namespace{NamespaceType: database.OrgNamespace}, nil).Once()
+			repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, req.Username, types.UserWithAdminPermissions).
+				Return(database.User{Username: req.Username}, nil).Once()
+			repo.mocks.gitServer.EXPECT().UpdateRepo(ctx, mock.MatchedBy(func(request gitserver.UpdateRepoReq) bool {
+				return request.RepoType == repoType && request.Namespace == req.Namespace && request.Name == req.Name && !request.Private
+			})).Return(&gitserver.CreateRepoResp{}, nil).Once()
+			var visibilitySetting []interface{}
+			if repoType == types.ModelRepo {
+				visibilitySetting = append(visibilitySetting, types.RepositoryUpdateOptions{Private: new(false)})
+			}
+			repo.mocks.stores.RepoMock().EXPECT().UpdateRepo(ctx, mock.MatchedBy(func(updated database.Repository) bool {
+				return !updated.Private && updated.XnetEnabled
+			}), visibilitySetting...).Return(repository, nil).Once()
+
+			result, err := repo.UpdateRepo(ctx, req)
+			require.NoError(t, err)
+			require.False(t, result.Private)
+			require.True(t, result.XnetEnabled)
+			if req.ComplianceStatus != nil {
+				require.Equal(t, *req.ComplianceStatus, result.ComplianceStatus)
+			}
+		})
+	}
+}
+
+// TestRepoComponent_UpdateRepoAdminAuthorizedValidatesCompliance preserves compliance constraints for administrator requests.
+func TestRepoComponent_UpdateRepoAdminAuthorizedValidatesCompliance(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		repoType   types.RepositoryType
+		compliance types.ComplianceStatus
+		message    string
+	}{
+		{name: "unsupported repository type", repoType: types.CodeRepo, compliance: types.ComplianceStatusCompliant, message: "license compliance can only be updated"},
+		{name: "invalid status", repoType: types.ModelRepo, compliance: "invalid", message: "invalid compliance status"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := types.WithAdminAuthorization(context.Background())
+			repo := initializeTestRepoComponent(ctx, t)
+			req := types.UpdateRepoReq{Username: "module-admin", Namespace: "organization", Name: "repository", RepoType: tc.repoType, ComplianceStatus: &tc.compliance}
+			repo.mocks.stores.RepoMock().EXPECT().Find(ctx, req.Namespace, string(req.RepoType), req.Name).Return(&database.Repository{ID: 42}, nil).Once()
+			repo.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, req.Namespace).Return(database.Namespace{}, nil).Once()
+			repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, req.Username, types.UserWithAdminPermissions).Return(database.User{}, nil).Once()
+
+			_, err := repo.UpdateRepo(ctx, req)
+			require.ErrorContains(t, err, tc.message)
 		})
 	}
 }
@@ -5683,4 +5886,201 @@ func TestRepoComponent_GetRepos(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 1, len(paths))
 	require.Equal(t, "ns/name", paths[0])
+}
+
+// TestRepoComponent_ServerlessModuleGrant keeps module authorization separate from ordinary global roles.
+func TestRepoComponent_ServerlessModuleGrant(t *testing.T) {
+	for _, authorized := range []bool{false, true} {
+		t.Run(fmt.Sprint(authorized), func(t *testing.T) {
+			ctx := context.Background()
+			if authorized {
+				ctx = types.WithAdminAuthorization(ctx)
+			}
+			c := initializeTestRepoComponent(ctx, t)
+			user := database.User{Username: "operator"}
+			c.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "operator", types.UserWithAdminPermissions).Return(user, nil)
+			if authorized {
+				c.mocks.stores.DeployTaskMock().EXPECT().GetDeployByID(ctx, int64(42)).Return(&database.Deploy{ID: 42, Type: types.ServerlessType}, nil)
+			}
+			_, deployment, err := c.checkDeployPermissionForServerless(ctx, types.DeployActReq{CurrentUser: "operator", DeployID: 42})
+			if authorized {
+				require.NoError(t, err)
+				require.Equal(t, int64(42), deployment.ID)
+			} else {
+				require.Error(t, err)
+			}
+		})
+	}
+}
+
+// TestRepoComponent_ServerlessGrantRejectsOtherDeployTypes prevents a module grant from operating private deployments.
+func TestRepoComponent_ServerlessGrantRejectsOtherDeployTypes(t *testing.T) {
+	ctx := types.WithAdminAuthorization(context.Background())
+	c := initializeTestRepoComponent(ctx, t)
+	c.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "operator", types.UserWithAdminPermissions).Return(database.User{Username: "operator"}, nil)
+	c.mocks.stores.DeployTaskMock().EXPECT().GetDeployByID(ctx, int64(42)).Return(&database.Deploy{ID: 42, Type: types.InferenceType}, nil)
+	_, _, err := c.checkDeployPermissionForServerless(ctx, types.DeployActReq{CurrentUser: "operator", DeployID: 42})
+	require.ErrorContains(t, err, "not a Serverless instance")
+}
+
+// TestRepoComponent_RuntimeFrameworkModuleGrant verifies all mutations accept a module-only administrator.
+func TestRepoComponent_RuntimeFrameworkModuleGrant(t *testing.T) {
+	for _, operation := range []string{"create", "update", "delete"} {
+		t.Run(operation, func(t *testing.T) {
+			ctx := types.WithAdminAuthorization(context.Background())
+			c := initializeTestRepoComponent(ctx, t)
+			c.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "operator", types.UserWithAdminPermissions).Return(database.User{Username: "operator"}, nil)
+			reached := errors.New("runtime store reached")
+			req := &types.RuntimeFrameworkReq{CurrentUser: "operator"}
+			var err error
+			switch operation {
+			case "create":
+				c.mocks.stores.RuntimeFrameworkMock().EXPECT().Add(ctx, mock.Anything).Return(nil, reached)
+				_, err = c.CreateRuntimeFramework(ctx, req)
+			case "update":
+				c.mocks.stores.RuntimeFrameworkMock().EXPECT().Update(ctx, mock.Anything).Return(nil, reached)
+				_, err = c.UpdateRuntimeFramework(ctx, 1, req)
+			case "delete":
+				c.mocks.stores.RuntimeFrameworkMock().EXPECT().FindByID(ctx, int64(1)).Return(nil, reached)
+				err = c.DeleteRuntimeFramework(ctx, "operator", 1)
+			}
+			require.ErrorIs(t, err, reached)
+		})
+	}
+}
+
+// TestRepoComponent_NamespaceModuleGrant avoids additional ReBAC checks but rejects unsupported permission names.
+func TestRepoComponent_NamespaceModuleGrant(t *testing.T) {
+	ctx := types.WithAdminAuthorization(context.Background())
+	c := initializeTestRepoComponent(ctx, t)
+	c.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "operator", types.UserWithAdminPermissions).Return(database.User{Username: "operator"}, nil)
+	allowed, err := c.CheckCurrentUserPermission(ctx, "operator", "other-organization", rebac.NamespaceCanWrite)
+	require.NoError(t, err)
+	require.True(t, allowed)
+	allowed, err = c.CheckCurrentUserPermission(ctx, "operator", "other-organization", rebac.Permission("invalid"))
+	require.Error(t, err)
+	require.False(t, allowed)
+}
+
+// TestRepoComponent_UpdateRepoPendingPublish verifies explicit private requests
+// cancel publication even when effective visibility does not change.
+func TestRepoComponent_UpdateRepoPendingPublish(t *testing.T) {
+	private, public := true, false
+	requireSensitiveCheck, err := (&repoComponentImpl{}).allowPublic(&database.Repository{SensitiveCheckStatus: types.SensitiveCheckPass})
+	require.NoError(t, err)
+	for _, tc := range []struct {
+		name           string
+		private        bool
+		pending        bool
+		setting        *bool
+		syncStatus     types.RepositorySyncStatus
+		wantPrivate    bool
+		wantPending    bool
+		withCompliance bool
+		writer         bool
+		mirrorBound    bool
+		sensitive      types.SensitiveCheckStatus
+	}{
+		{name: "cancel while already private", private: true, pending: true, setting: &private, syncStatus: types.SyncStatusPending, wantPrivate: true},
+		{name: "writer cancels while already private", private: true, pending: true, setting: &private, syncStatus: types.SyncStatusPending, wantPrivate: true, writer: true},
+		{name: "same private setting with compliance edit", private: true, pending: true, setting: &private, syncStatus: types.SyncStatusPending, wantPrivate: true, withCompliance: true},
+		{name: "private after publication", setting: &private, syncStatus: types.SyncStatusCompleted, wantPrivate: true},
+		{name: "public intent stays hidden during sync", private: true, setting: &public, syncStatus: types.SyncStatusPending, wantPrivate: true, wantPending: true},
+		{name: "writer requests public before sensitive checks", private: true, setting: &public, syncStatus: types.SyncStatusPending, wantPrivate: true, wantPending: true, writer: true},
+		{name: "metadata keeps pending publication", private: true, pending: true, syncStatus: types.SyncStatusPending, wantPrivate: true, wantPending: true},
+		{name: "completed sync allows manual public", private: true, setting: &public, syncStatus: types.SyncStatusCompleted},
+		{name: "completed sync with pending state allows manual public", private: true, pending: true, setting: &public, syncStatus: types.SyncStatusCompleted},
+		{name: "cancelled detached model allows public", private: true, pending: true, setting: &public, syncStatus: types.SyncStatusCanceled},
+		{name: "failed detached model allows public", private: true, pending: true, setting: &public, syncStatus: types.SyncStatusFailed},
+		{name: "writer publishes cancelled detached model", private: true, setting: &public, syncStatus: types.SyncStatusCanceled, writer: true, sensitive: types.SensitiveCheckPass},
+		{name: "writer publishes failed detached model", private: true, setting: &public, syncStatus: types.SyncStatusFailed, writer: true, sensitive: types.SensitiveCheckPass},
+		{name: "cancelled bound model stays hidden", private: true, setting: &public, syncStatus: types.SyncStatusCanceled, mirrorBound: true, wantPrivate: true, wantPending: true},
+		{name: "failed bound model stays hidden", private: true, setting: &public, syncStatus: types.SyncStatusFailed, mirrorBound: true, wantPrivate: true, wantPending: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			comp := initializeTestRepoComponent(ctx, t)
+			repo := &database.Repository{ID: 1, Path: "ns/model", RepositoryType: types.ModelRepo,
+				Private: tc.private, PendingPublish: tc.pending, SyncStatus: tc.syncStatus, SensitiveCheckStatus: tc.sensitive}
+			comp.mocks.stores.RepoMock().EXPECT().Find(ctx, "ns", "model", "model").Return(repo, nil)
+			if tc.setting != nil && !*tc.setting && (tc.syncStatus == types.SyncStatusCanceled || tc.syncStatus == types.SyncStatusFailed) {
+				if tc.mirrorBound {
+					comp.mocks.stores.MirrorMock().EXPECT().FindByRepoID(ctx, repo.ID).Return(&database.Mirror{ID: 2, RepositoryID: repo.ID}, nil)
+				} else {
+					comp.mocks.stores.MirrorMock().EXPECT().FindByRepoID(ctx, repo.ID).Return(nil, sql.ErrNoRows)
+				}
+			}
+			comp.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "ns").Return(database.Namespace{Path: "ns"}, nil)
+			username := "admin"
+			user := database.User{Username: username, RoleAssignments: superAdminRoleAssignments()}
+			lookups := 1
+			if tc.writer {
+				username = "writer"
+				user = database.User{Username: username, UUID: "writer-uuid"}
+				lookups = 2
+				repoAuthorizerMock(comp).EXPECT().Check(ctx, mock.Anything).Return(rebac.Decision{Allowed: true}, nil)
+			}
+			comp.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, username, types.UserWithAdminPermissions).
+				Return(user, nil).Times(lookups)
+			comp.mocks.gitServer.EXPECT().UpdateRepo(ctx, mock.MatchedBy(func(req gitserver.UpdateRepoReq) bool {
+				return req.Private == tc.wantPrivate
+			})).Return(&gitserver.CreateRepoResp{}, nil)
+			var setting []interface{}
+			if tc.setting != nil {
+				setting = append(setting, types.RepositoryUpdateOptions{Private: tc.setting, DeferPublication: tc.wantPending, RequireSensitiveCheckPass: requireSensitiveCheck && tc.writer && !*tc.setting && !tc.wantPending})
+			}
+			comp.mocks.stores.RepoMock().EXPECT().UpdateRepo(ctx, mock.MatchedBy(func(updated database.Repository) bool {
+				return updated.Private == tc.wantPrivate && updated.PendingPublish == tc.pending
+			}), setting...).Return(&database.Repository{Private: tc.wantPrivate, PendingPublish: tc.wantPending}, nil)
+			req := types.UpdateRepoReq{Username: username, Namespace: "ns", Name: "model", RepoType: types.ModelRepo, Private: tc.setting}
+			if tc.withCompliance {
+				status := types.ComplianceStatusCompliant
+				req.ComplianceStatus = &status
+				comp.mocks.stores.RepoMock().EXPECT().UpdateLicenseCompliance(ctx, repo.ID, (*string)(nil), status, repo.CommercialPermission).Return(nil)
+			}
+			got, err := comp.UpdateRepo(ctx, req)
+			require.NoError(t, err)
+			require.Equal(t, tc.wantPrivate, got.Private)
+			require.Equal(t, tc.wantPending, got.PendingPublish)
+		})
+	}
+}
+
+// TestRepoComponent_UpdateRepoDetachedModelBindingError prevents lookup errors from granting public visibility.
+func TestRepoComponent_UpdateRepoDetachedModelBindingError(t *testing.T) {
+	ctx := context.Background()
+	comp := initializeTestRepoComponent(ctx, t)
+	repo := &database.Repository{ID: 1, RepositoryType: types.ModelRepo, Private: true, SyncStatus: types.SyncStatusCanceled}
+	comp.mocks.stores.RepoMock().EXPECT().Find(ctx, "ns", "model", "model").Return(repo, nil)
+	lookupErr := errors.New("mirror lookup unavailable")
+	comp.mocks.stores.MirrorMock().EXPECT().FindByRepoID(ctx, repo.ID).Return(nil, lookupErr)
+	got, err := comp.UpdateRepo(ctx, types.UpdateRepoReq{Namespace: "ns", Name: "model", RepoType: types.ModelRepo, Private: new(false)})
+	require.ErrorIs(t, err, lookupErr)
+	require.Nil(t, got)
+}
+
+// TestRepoComponent_CreateRepoPendingPublish persists the internal publication intent
+// while keeping the initial Git repository and API repository private and passing
+// the real owner namespace to the transactional Store.
+func TestRepoComponent_CreateRepoPendingPublish(t *testing.T) {
+	ctx := context.Background()
+	comp := initializeTestRepoComponent(ctx, t)
+	user := database.User{ID: 42, UUID: "owner-uuid", Username: "owner", Email: "owner@example.com"}
+	namespace := "owner"
+	comp.mocks.stores.RepoMock().EXPECT().CreateRepo(ctx, mock.MatchedBy(func(repo database.Repository) bool {
+		return repo.Private && repo.PendingPublish && repo.SyncStatus == types.SyncStatusPending &&
+			repo.TupleNamespacePath == namespace && repo.UserID == user.ID
+	})).RunAndReturn(func(_ context.Context, repo database.Repository) (*database.Repository, error) {
+		repo.ID = 1
+		return &repo, nil
+	})
+	comp.mocks.stores.RecomMock().EXPECT().UpsertScore(ctx, mock.Anything).Return(nil)
+	comp.mocks.gitServer.EXPECT().CreateRepo(ctx, mock.MatchedBy(func(req gitserver.CreateRepoReq) bool { return req.Private })).
+		Return(&gitserver.CreateRepoResp{}, nil)
+	_, repo, _, err := comp.createRepoWithResolvedUser(ctx, types.CreateRepoReq{
+		Username: user.Username, Namespace: namespace, Name: "model", RepoType: types.ModelRepo, PendingPublish: true,
+	}, user)
+	require.NoError(t, err)
+	require.True(t, repo.Private)
+	require.True(t, repo.PendingPublish)
 }

@@ -373,6 +373,7 @@ func (h *ModelHandler) Delete(ctx *gin.Context) {
 // @Param        need_multi_sync query bool false "need multi sync" default(false)
 // @Success      200  {object}  types.Response{data=types.Model} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      404  {object}  types.Response "Resource not found"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /models/{namespace}/{name} [get]
 func (h *ModelHandler) Show(ctx *gin.Context) {
@@ -395,6 +396,10 @@ func (h *ModelHandler) Show(ctx *gin.Context) {
 	}
 	detail, err := h.model.Show(ctx.Request.Context(), namespace, name, currentUser, needOpWeight, needMultiSync)
 	if err != nil {
+		if errors.Is(err, errorx.ErrRepoNotFound) {
+			httpbase.NotFoundError(ctx, err)
+			return
+		}
 		if errors.Is(err, errorx.ErrForbidden) {
 			httpbase.ForbiddenError(ctx, err)
 			return
@@ -799,7 +804,6 @@ func (h *ModelHandler) DeployDedicated(ctx *gin.Context) {
 
 	slog.Debug("deploy model as inference created", slog.String("namespace", namespace),
 		slog.String("name", name), slog.Int64("deploy_id", deployID))
-	h.createAgentInstanceTask(ctx.Request.Context(), req.Agent, fmt.Sprintf("%d", deployID), types.AgentTaskTypeInference, currentUser)
 
 	h.createAgentInstanceTask(ctx.Request.Context(), req.Agent, fmt.Sprintf("%d", deployID), types.AgentTaskTypeInference, currentUser)
 

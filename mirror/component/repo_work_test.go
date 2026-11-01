@@ -14,18 +14,22 @@ import (
 	"github.com/riverqueue/river"
 	"github.com/riverqueue/river/rivertype"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/workhub"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/mirror/reposyncer"
 )
 
 // fakeRepoTaskStore records repo worker task state transitions.
 type fakeRepoTaskStore struct {
-	task        *database.MirrorTask
-	actions     []string
-	lfsInputs   []database.MirrorLFSJobInput
-	insertedLFS bool
+	task          *database.MirrorTask
+	actions       []string
+	lfsInputs     []database.MirrorLFSJobInput
+	insertedLFS   bool
+	failUpdateErr error
 }
 
 // FindByID returns the configured task.
@@ -39,9 +43,15 @@ func (s *fakeRepoTaskStore) UpdateStatusAndRepoSyncStatus(ctx context.Context, t
 	switch action {
 	case database.MirrorContinue:
 		task.Status = types.MirrorRepoSyncStart
+		if task.StartedAt.IsZero() {
+			task.StartedAt = time.Now()
+		}
 	case database.MirrorRetry:
 		task.Status = types.MirrorQueued
 	case database.MirrorFail:
+		if s.failUpdateErr != nil {
+			return task, s.failUpdateErr
+		}
 		task.Status = types.MirrorRepoSyncFailed
 	case database.MirrorPause:
 		task.Status = types.MirrorQueued
@@ -75,6 +85,7 @@ type fakeRepoSyncer struct {
 	returnSuccessAfterCancel bool
 	returnCauseAfterCancel   bool
 	noLFS                    bool
+	beforeReturn             func()
 }
 
 // SyncRepo returns the configured sync result.
@@ -92,6 +103,9 @@ func (s fakeRepoSyncer) SyncRepo(ctx context.Context, mirror *database.Mirror, m
 			return reposyncer.RepoSyncResult{Task: s.task, NoLFS: s.noLFS}, context.Cause(ctx)
 		}
 		return reposyncer.RepoSyncResult{Task: s.task, NoLFS: s.noLFS}, ctx.Err()
+	}
+	if s.beforeReturn != nil {
+		s.beforeReturn()
 	}
 	if s.err != nil {
 		return reposyncer.RepoSyncResult{Task: s.task, NoLFS: s.noLFS}, s.err
@@ -149,16 +163,6 @@ func captureMirrorWorkerLogs(t *testing.T) *synchronizedLogBuffer {
 	slog.SetDefault(slog.New(slog.NewJSONHandler(&output, nil)))
 	t.Cleanup(func() { slog.SetDefault(originalLogger) })
 	return &output
-}
-
-// requireWorkerJobLogPair verifies each started worker job has exactly one exit log.
-func requireWorkerJobLogPair(t *testing.T, logs, workingMessage, exitedMessage string) {
-	t.Helper()
-	working := `"msg":"` + workingMessage + `"`
-	exited := `"msg":"` + exitedMessage + `"`
-	require.Equal(t, 1, strings.Count(logs, working))
-	require.Equal(t, 1, strings.Count(logs, exited))
-	require.Less(t, strings.Index(logs, working), strings.Index(logs, exited))
 }
 
 // requireSingleWorkerExitLog returns the only matching exit record at the expected level.
@@ -270,6 +274,84 @@ func TestRepoWorker_WorkMarksOriginalTaskFailedWhenSyncReturnsNilTask(t *testing
 	require.Equal(t, job.Attempt, store.task.RetryCount)
 }
 
+// TestRepoWorker_WorkPreservesSyncErrorWhenFailureUpdateFails prevents persistence errors from hiding real sync failures.
+func TestRepoWorker_WorkPreservesSyncErrorWhenFailureUpdateFails(t *testing.T) {
+	for _, paused := range []bool{false, true} {
+		name := "database failure"
+		if paused {
+			name = "queue pause during sync failure"
+		}
+		t.Run(name, func(t *testing.T) {
+			ctx, cancel := context.WithCancelCause(context.Background())
+			defer cancel(nil)
+			syncErr := errors.New("repo fetch failed")
+			updateErr := errors.New("database unavailable")
+			var beforeReturn func()
+			if paused {
+				updateErr = context.Canceled
+				beforeReturn = func() { cancel(river.ErrQueuePaused) }
+			}
+			task := repoWorkerTask(types.MirrorQueued)
+			store := &fakeRepoTaskStore{task: task, failUpdateErr: updateErr}
+			worker := &repoWorker{
+				mirrorTaskStore: store,
+				syncer:          fakeRepoSyncer{err: syncErr, beforeReturn: beforeReturn},
+			}
+
+			err := worker.Work(ctx, riverJob(repoArgsFromTask(task)))
+
+			require.ErrorIs(t, err, syncErr)
+			require.ErrorIs(t, err, updateErr)
+			require.ErrorContains(t, err, "mark repo sync failed")
+			require.False(t, isQueuePauseCancellation(ctx, err))
+			require.Equal(t, []string{database.MirrorContinue, database.MirrorFail}, store.actions)
+			require.Equal(t, types.MirrorRepoSyncStart, store.task.Status)
+			require.False(t, store.insertedLFS)
+		})
+	}
+}
+
+// TestRepoWorker_GRPCPause distinguishes pure RPC cancellation from joined sync failures through the full Work path.
+func TestRepoWorker_GRPCPause(t *testing.T) {
+	rpcCanceled := errorx.ErrGitMirrorSyncFailed(status.Error(codes.Canceled, "fetch canceled"), errorx.Ctx())
+	checkpointErr := errors.New("checkpoint failed")
+	for _, tc := range []struct {
+		name      string
+		syncErr   error
+		wantPause bool
+	}{
+		{name: "pure RPC cancellation", syncErr: rpcCanceled, wantPause: true},
+		{name: "joined business failure", syncErr: errors.Join(rpcCanceled, checkpointErr)},
+		{name: "RPC unavailable", syncErr: status.Error(codes.Unavailable, "Gitaly unavailable")},
+		{name: "RPC timeout", syncErr: status.Error(codes.DeadlineExceeded, "fetch timed out")},
+		{name: "RPC permission denied", syncErr: status.Error(codes.PermissionDenied, "access denied")},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancelCause(context.Background())
+			defer cancel(nil)
+			task := repoWorkerTask(types.MirrorQueued)
+			store := &fakeRepoTaskStore{task: task, failUpdateErr: context.Canceled}
+			worker := &repoWorker{mirrorTaskStore: store, syncer: fakeRepoSyncer{
+				err: tc.syncErr, beforeReturn: func() { cancel(river.ErrQueuePaused) },
+			}}
+
+			err := worker.Work(ctx, riverJob(repoArgsFromTask(task)))
+
+			if tc.wantPause {
+				require.ErrorIs(t, err, river.ErrQueuePaused)
+				require.Equal(t, []string{database.MirrorContinue, database.MirrorPause}, store.actions)
+				require.Equal(t, types.MirrorQueued, store.task.Status)
+			} else {
+				require.ErrorIs(t, err, tc.syncErr)
+				require.ErrorIs(t, err, context.Canceled)
+				require.False(t, isQueuePauseCancellation(ctx, err))
+				require.Equal(t, []string{database.MirrorContinue, database.MirrorFail}, store.actions)
+			}
+			require.False(t, store.insertedLFS)
+		})
+	}
+}
+
 // TestRepoWorker_WorkMarksUnexpectedCancellationFailed verifies a live work context does not hide a sync error.
 func TestRepoWorker_WorkMarksUnexpectedCancellationFailed(t *testing.T) {
 	ctx := context.TODO()
@@ -349,7 +431,8 @@ func TestRepoWorker_WorkRejectsStaleCurrentTask(t *testing.T) {
 	require.False(t, store.insertedLFS)
 }
 
-func TestRepoWorker_WorkSnoozesWhenContextDeadlineStopsSync(t *testing.T) {
+// TestRepoWorker_WorkReturnsContextDeadline verifies timeouts remain ordinary retryable errors.
+func TestRepoWorker_WorkReturnsContextDeadline(t *testing.T) {
 	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(-time.Second))
 	defer cancel()
 	task := repoWorkerTask(types.MirrorQueued)
@@ -362,9 +445,7 @@ func TestRepoWorker_WorkSnoozesWhenContextDeadlineStopsSync(t *testing.T) {
 
 	err := worker.Work(ctx, riverJob(repoArgsFromTask(task)))
 
-	var snoozeErr *river.JobSnoozeError
-	require.ErrorAs(t, err, &snoozeErr)
-	require.Equal(t, time.Duration(0), snoozeErr.Duration)
+	require.ErrorIs(t, err, context.DeadlineExceeded)
 	require.Equal(t, []string{database.MirrorContinue}, store.actions)
 	require.Equal(t, types.MirrorRepoSyncStart, store.task.Status)
 }
@@ -399,6 +480,7 @@ func TestNewRepoRiverConfigUsesConfiguredMaxWorkers(t *testing.T) {
 	require.Equal(t, 7, config.Queues[workhub.MirrorRepoQueue].MaxWorkers)
 	require.Equal(t, 3, config.Queues[workhub.MirrorRepoUrgentQueue].MaxWorkers)
 	require.IsType(t, &mirrorJobErrorHandler{}, config.ErrorHandler)
+	require.NotNil(t, config.JobLease)
 	require.Len(t, config.Queues, 2)
 	_, consumesLFS := config.Queues[workhub.MirrorLFSQueue]
 	require.False(t, consumesLFS)
@@ -415,30 +497,38 @@ func TestNewRepoRiverConfigDefaultsMaxWorkers(t *testing.T) {
 	require.Equal(t, 1, config.Queues[workhub.MirrorRepoUrgentQueue].MaxWorkers)
 }
 
-// TestBeginUrgentWorkSnoozesManagerShutdownWithDelay verifies shutdown avoids immediate job reacquisition.
-func TestBeginUrgentWorkSnoozesManagerShutdownWithDelay(t *testing.T) {
+// TestRunWorkReturnsUrgentManagerShutdown verifies closure errors propagate without entering business execution.
+func TestRunWorkReturnsUrgentManagerShutdown(t *testing.T) {
 	manager := newWorkerTestManager(t)
 	manager.Close(workhub.ErrWorkerShutdown)
 
-	done, err := beginUrgentWork(manager, context.Background())
+	executed := false
+	err := runWork(context.Background(), &river.Job[workhub.RepoArgs]{
+		JobRow: &rivertype.JobRow{ID: 1, Attempt: 1, MaxAttempts: 1},
+	}, mirrorWorkConfig[workhub.RepoArgs]{
+		manager: manager,
+		urgent:  true,
+		work: func(context.Context, workhub.RepoArgs, int) (*database.MirrorTask, error) {
+			executed = true
+			return nil, nil
+		},
+	})
 
-	require.Nil(t, done)
-	var snoozeErr *river.JobSnoozeError
-	require.ErrorAs(t, err, &snoozeErr)
-	require.Equal(t, workerShutdownSnoozeDelay, snoozeErr.Duration)
+	require.Equal(t, workhub.ErrWorkerShutdown, err)
+	require.False(t, executed)
+	require.Zero(t, manager.UrgentReservations())
 }
 
-func TestIsUrgentPreemptionRequiresActiveRiverContext(t *testing.T) {
-	riverCtx, cancelRiver := context.WithCancel(context.Background())
-	ctx, cancelWork := context.WithCancelCause(riverCtx)
-	cancelWork(workhub.ErrUrgentPreempt)
-
-	require.True(t, isUrgentPreemption(riverCtx, ctx, context.Canceled))
-	require.True(t, isUrgentPreemption(riverCtx, ctx, workhub.ErrUrgentPreempt))
-
-	cancelRiver()
-	require.False(t, isUrgentPreemption(riverCtx, ctx, context.Canceled))
-	require.False(t, isUrgentPreemption(context.Background(), ctx, errors.New("business error")))
+// TestIsQueuePauseCancellationRequiresRiverCause verifies only pure pause cancellation is eligible.
+func TestIsQueuePauseCancellationRequiresRiverCause(t *testing.T) {
+	ctx, cancel := context.WithCancelCause(context.Background())
+	cancel(river.ErrQueuePaused)
+	require.True(t, isQueuePauseCancellation(ctx, context.Canceled))
+	require.True(t, isQueuePauseCancellation(ctx, river.ErrQueuePaused))
+	require.False(t, isQueuePauseCancellation(context.Background(), context.Canceled))
+	require.False(t, isQueuePauseCancellation(ctx, errors.New("business error")))
+	require.False(t, isQueuePauseCancellation(ctx, errors.Join(context.Canceled, errors.New("checkpoint failed"))))
+	require.False(t, isQueuePauseCancellation(ctx, river.JobCancel(context.Canceled)))
 }
 
 func newWorkerTestManager(t *testing.T) *workhub.UrgentManager {
@@ -505,33 +595,6 @@ func TestRepoWorker_StaleUrgentJobPreemptsBeforeTaskCheck(t *testing.T) {
 	require.Equal(t, 1, controller.removeCalls)
 }
 
-// TestRepoWorker_ManagerClosedUsesNormalRetryDelay verifies rejected normal jobs use the shared retry delay.
-func TestRepoWorker_ManagerClosedUsesNormalRetryDelay(t *testing.T) {
-	output := captureMirrorWorkerLogs(t)
-	manager := newWorkerTestManager(t)
-	manager.Close(workhub.ErrWorkerShutdown)
-	task := repoWorkerTask(types.MirrorQueued)
-	worker := &repoWorker{
-		mirrorTaskStore: &fakeRepoTaskStore{task: task},
-		urgentManager:   manager,
-		syncer:          failRepoSyncer{t: t},
-		lfsJobClient:    fakeMirrorLFSJobClient{},
-	}
-	job := riverJob(repoArgsFromTask(task))
-	job.Queue = workhub.MirrorRepoQueue
-
-	err := worker.Work(context.Background(), job)
-
-	var snoozeErr *river.JobSnoozeError
-	require.ErrorAs(t, err, &snoozeErr)
-	require.Equal(t, urgentJobDelay, snoozeErr.Duration)
-	logs := output.String()
-	requireWorkerJobLogPair(t, logs, "[repo] work start", "[repo] work exit")
-	exitLog := requireSingleWorkerExitLog(t, logs, "[repo] work exit", "INFO")
-	require.Contains(t, exitLog, `"success":false`)
-	require.Contains(t, exitLog, `"error":"JobSnoozeError: 1m0s"`)
-}
-
 func TestRepoWorker_UrgentJobPropagatesUrgentToLFS(t *testing.T) {
 	task := repoWorkerTask(types.MirrorQueued)
 	store := &fakeRepoTaskStore{task: task}
@@ -551,7 +614,8 @@ func TestRepoWorker_UrgentJobPropagatesUrgentToLFS(t *testing.T) {
 	require.True(t, store.lfsInputs[0].Urgent)
 }
 
-func TestRepoWorker_PreemptionBeforeSuccessCommitSnoozesWithoutEnqueueingLFS(t *testing.T) {
+// TestRepoWorker_PauseBeforeSuccessCommitDoesNotEnqueueLFS verifies River pause cancellation preserves the business waiting state.
+func TestRepoWorker_PauseBeforeSuccessCommitDoesNotEnqueueLFS(t *testing.T) {
 	manager := newWorkerTestManager(t)
 	task := repoWorkerTask(types.MirrorQueued)
 	store := &fakeRepoTaskStore{task: task}
@@ -568,29 +632,23 @@ func TestRepoWorker_PreemptionBeforeSuccessCommitSnoozesWithoutEnqueueingLFS(t *
 	job := riverJob(repoArgsFromTask(task))
 	job.Queue = workhub.MirrorRepoQueue
 
+	ctx, cancel := context.WithCancelCause(context.Background())
+	defer cancel(nil)
 	workResult := make(chan error, 1)
-	go func() { workResult <- worker.Work(context.Background(), job) }()
+	go func() { workResult <- worker.Work(ctx, job) }()
 	workCtx := <-started
-	urgentResult := make(chan error, 1)
-	var urgentDone func()
-	go func() {
-		var err error
-		urgentDone, err = manager.BeginUrgent(context.Background())
-		urgentResult <- err
-	}()
+	cancel(river.ErrQueuePaused)
 	<-workCtx.Done()
 
 	err := <-workResult
-	var snoozeErr *river.JobSnoozeError
-	require.ErrorAs(t, err, &snoozeErr)
+	require.True(t, isQueuePauseCancellation(ctx, err))
 	require.False(t, store.insertedLFS)
 	require.Equal(t, []string{database.MirrorContinue, database.MirrorPause}, store.actions)
 	require.Equal(t, types.MirrorQueued, store.task.Status)
-	require.NoError(t, <-urgentResult)
-	urgentDone()
 }
 
-func TestRepoWorker_NormalJobSnoozesWhenPreempted(t *testing.T) {
+// TestRepoWorker_NormalJobReturnsPauseCancellation verifies River pause cancellation preserves the business waiting state.
+func TestRepoWorker_NormalJobReturnsPauseCancellation(t *testing.T) {
 	output := captureMirrorWorkerLogs(t)
 	manager := newWorkerTestManager(t)
 	task := repoWorkerTask(types.MirrorQueued)
@@ -608,63 +666,26 @@ func TestRepoWorker_NormalJobSnoozesWhenPreempted(t *testing.T) {
 	job := riverJob(repoArgsFromTask(task))
 	job.Queue = workhub.MirrorRepoQueue
 
+	ctx, cancel := context.WithCancelCause(context.Background())
+	defer cancel(nil)
 	workResult := make(chan error, 1)
-	go func() { workResult <- worker.Work(context.Background(), job) }()
+	go func() { workResult <- worker.Work(ctx, job) }()
 	workCtx := <-started
 
-	urgentResult := make(chan error, 1)
-	var urgentDone func()
-	go func() {
-		var err error
-		urgentDone, err = manager.BeginUrgent(context.Background())
-		urgentResult <- err
-	}()
-
+	cancel(river.ErrQueuePaused)
 	<-workCtx.Done()
 	err := <-workResult
-	var snoozeErr *river.JobSnoozeError
-	require.ErrorAs(t, err, &snoozeErr)
-	require.Equal(t, time.Minute, snoozeErr.Duration)
+	require.True(t, isQueuePauseCancellation(ctx, err))
 	require.Equal(t, []string{database.MirrorContinue, database.MirrorPause}, store.actions)
 	require.Equal(t, types.MirrorQueued, store.task.Status)
-	require.NoError(t, <-urgentResult)
-	urgentDone()
 	exitLog := requireSingleWorkerExitLog(t, output.String(), "[repo] work exit", "INFO")
 	require.Contains(t, exitLog, `"success":false`)
-	require.Contains(t, exitLog, `"error":"JobSnoozeError: 1m0s"`)
-}
-
-// TestRepoWorker_NormalJobLogsWhenUrgentWorkBlocksExecution verifies delayed normal jobs remain observable.
-func TestRepoWorker_NormalJobLogsWhenUrgentWorkBlocksExecution(t *testing.T) {
-	output := captureMirrorWorkerLogs(t)
-	manager := newWorkerTestManager(t)
-	urgentDone, err := manager.BeginUrgent(context.Background())
-	require.NoError(t, err)
-	defer urgentDone()
-
-	task := repoWorkerTask(types.MirrorQueued)
-	store := &fakeRepoTaskStore{task: task}
-	worker := &repoWorker{
-		mirrorTaskStore: store,
-		urgentManager:   manager,
-		syncer:          failRepoSyncer{t: t},
-		lfsJobClient:    fakeMirrorLFSJobClient{},
-	}
-	job := riverJob(repoArgsFromTask(task))
-	job.Queue = workhub.MirrorRepoQueue
-
-	err = worker.Work(context.Background(), job)
-
-	var snoozeErr *river.JobSnoozeError
-	require.ErrorAs(t, err, &snoozeErr)
-	exitLog := requireSingleWorkerExitLog(t, output.String(), "[repo] work exit", "INFO")
-	require.Contains(t, exitLog, `"success":false`)
-	require.Contains(t, exitLog, `"error":"JobSnoozeError: 1m0s"`)
+	require.Contains(t, exitLog, `"error":"queue paused"`)
 }
 
 // TestRepoWorkerTimeout verifies the real repo worker uses the shared workhub timeout contract.
 func TestRepoWorkerTimeout(t *testing.T) {
-	require.Equal(t, workhub.MirrorRepoJobTimeout, (&repoWorker{}).Timeout(&river.Job[workhub.RepoArgs]{}))
+	require.Equal(t, 30*time.Minute, (&repoWorker{}).Timeout(&river.Job[workhub.RepoArgs]{}))
 }
 
 // TestPrepareRepoTaskHandlesExecutableStatuses verifies each accepted state produces a running repo task.

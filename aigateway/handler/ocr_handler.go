@@ -93,14 +93,14 @@ func (h *ocrPipelineHandler) Extract(c *gin.Context) (*types.RequestMetadata, er
 	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxOCRRequestSize)
 	if err := c.Request.ParseMultipartForm(maxOCRMultipartMemory); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": types.Error{
-			Code: "invalid_request_error", Message: "invalid multipart form: " + err.Error(), Type: "invalid_request_error",
+			Code: types.ErrCodeInvalidRequest, Message: "invalid multipart form: " + err.Error(), Type: types.ErrTypeInvalidRequest,
 		}})
 		return nil, err
 	}
 	form := c.Request.MultipartForm
 	if form == nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": types.Error{
-			Code: "invalid_request_error", Message: "request must be multipart/form-data", Type: "invalid_request_error",
+			Code: types.ErrCodeInvalidRequest, Message: "request must be multipart/form-data", Type: types.ErrTypeInvalidRequest,
 		}})
 		return nil, fmt.Errorf("request must be multipart/form-data")
 	}
@@ -108,7 +108,7 @@ func (h *ocrPipelineHandler) Extract(c *gin.Context) (*types.RequestMetadata, er
 	modelID := strings.TrimSpace(firstMultipartValue(form, "model"))
 	if modelID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": types.Error{
-			Code: "invalid_request_error", Message: "Model cannot be empty", Type: "invalid_request_error",
+			Code: types.ErrCodeInvalidRequest, Message: types.MsgModelEmpty, Type: types.ErrTypeInvalidRequest,
 		}})
 		return nil, fmt.Errorf("model cannot be empty")
 	}
@@ -116,13 +116,13 @@ func (h *ocrPipelineHandler) Extract(c *gin.Context) (*types.RequestMetadata, er
 	files := form.File["file"]
 	if len(files) == 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": types.Error{
-			Code: "invalid_request_error", Message: "File cannot be empty", Type: "invalid_request_error",
+			Code: types.ErrCodeInvalidRequest, Message: "File cannot be empty", Type: types.ErrTypeInvalidRequest,
 		}})
 		return nil, fmt.Errorf("file cannot be empty")
 	}
 	if len(files) > 1 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": types.Error{
-			Code: "invalid_request_error", Message: "Only one file is allowed", Type: "invalid_request_error",
+			Code: types.ErrCodeInvalidRequest, Message: "Only one file is allowed", Type: types.ErrTypeInvalidRequest,
 		}})
 		return nil, fmt.Errorf("only one file is allowed")
 	}
@@ -131,7 +131,7 @@ func (h *ocrPipelineHandler) Extract(c *gin.Context) (*types.RequestMetadata, er
 	pageRanges := strings.TrimSpace(firstMultipartValue(form, "page_ranges"))
 	if pageRanges != "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": types.Error{
-			Code: "invalid_request_error", Message: "page_ranges is not supported", Type: "invalid_request_error",
+			Code: types.ErrCodeInvalidRequest, Message: "page_ranges is not supported", Type: types.ErrTypeInvalidRequest,
 		}})
 		return nil, fmt.Errorf("page_ranges is not supported")
 	}
@@ -139,13 +139,13 @@ func (h *ocrPipelineHandler) Extract(c *gin.Context) (*types.RequestMetadata, er
 	contentType := strings.ToLower(strings.TrimSpace(fileHeader.Header.Get("Content-Type")))
 	if _, allowed := ocrAllowedContentTypes[contentType]; !allowed {
 		c.JSON(http.StatusBadRequest, gin.H{"error": types.Error{
-			Code: "invalid_request_error", Message: fmt.Sprintf("Unsupported file content type: %s", contentType), Type: "invalid_request_error",
+			Code: types.ErrCodeInvalidRequest, Message: fmt.Sprintf("Unsupported file content type: %s", contentType), Type: types.ErrTypeInvalidRequest,
 		}})
 		return nil, fmt.Errorf("unsupported content type %q", contentType)
 	}
 	if fileHeader.Size > maxOCRFileSize {
 		c.JSON(http.StatusBadRequest, gin.H{"error": types.Error{
-			Code: "invalid_request_error", Message: "File size exceeds the 20MB limit", Type: "invalid_request_error",
+			Code: types.ErrCodeInvalidRequest, Message: "File size exceeds the 20MB limit", Type: types.ErrTypeInvalidRequest,
 		}})
 		return nil, fmt.Errorf("file size %d exceeds limit %d", fileHeader.Size, maxOCRFileSize)
 	}
@@ -166,7 +166,6 @@ func (h *ocrPipelineHandler) Extract(c *gin.Context) (*types.RequestMetadata, er
 		Model:         modelID,
 		TenantID:      nsUUID,
 		UserID:        username,
-		APIKeyID:      httpbase.GetAccessToken(c),
 		PriorityScope: httpbase.GetAPIKeyPriorityScope(c),
 		Streaming:     false,
 		Headers:       c.Request.Header,
@@ -179,7 +178,6 @@ func (h *ocrPipelineHandler) Extract(c *gin.Context) (*types.RequestMetadata, er
 func (h *ocrPipelineHandler) Execute(c *gin.Context, meta *types.RequestMetadata, p *types.RequestPlan) error {
 	ctx := c.Request.Context()
 	nsUUID := meta.TenantID
-	apikey := meta.APIKeyID
 	requestID := commontrace.GetTraceIDInGinContext(c)
 
 	if pt := plan.GetPreflightTracer(c); pt != nil {
@@ -197,14 +195,14 @@ func (h *ocrPipelineHandler) Execute(c *gin.Context, meta *types.RequestMetadata
 	adapter := h.handler.ocrRegistry.GetAdapter(mt.Model)
 	if adapter == nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": types.Error{
-			Code: "unsupported_model", Message: fmt.Sprintf("model '%s' does not support OCR", meta.Model), Type: "invalid_request_error",
+			Code: types.ErrCodeUnsupportedModel, Message: fmt.Sprintf("model '%s' does not support OCR", meta.Model), Type: types.ErrTypeInvalidRequest,
 		}})
 		return nil
 	}
 	fileType, _ := ocrFileTypeForContentType(fileHeader.Header.Get("Content-Type"))
 	if !adapter.SupportsFileType(fileType) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": types.Error{
-			Code: "invalid_request_error", Message: "PDF input requires a paddleocr-vl runtime", Type: "invalid_request_error",
+			Code: types.ErrCodeInvalidRequest, Message: "PDF input requires a paddleocr-vl runtime", Type: types.ErrTypeInvalidRequest,
 		}})
 		return nil
 	}
@@ -232,7 +230,7 @@ func (h *ocrPipelineHandler) Execute(c *gin.Context, meta *types.RequestMetadata
 		finishModalGenerationTraceWithError(generationRecorder, err, types.TraceErrUpstreamUnavailable)
 		slog.ErrorContext(ctx, "failed to read ocr upload", slog.Any("error", err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": types.Error{
-			Code: "internal_error", Message: "failed to read uploaded file", Type: "internal_error",
+			Code: types.ErrCodeInternal, Message: "failed to read uploaded file", Type: types.ErrTypeServer,
 		}})
 		return nil
 	}
@@ -250,14 +248,14 @@ func (h *ocrPipelineHandler) Execute(c *gin.Context, meta *types.RequestMetadata
 		if errors.Is(err, ocr.ErrUnsupportedOption) {
 			finishModalGenerationTraceWithError(generationRecorder, err, types.TraceErrUpstreamUnavailable)
 			c.JSON(http.StatusBadRequest, gin.H{"error": types.Error{
-				Code: "invalid_request_error", Message: err.Error(), Type: "invalid_request_error",
+				Code: types.ErrCodeInvalidRequest, Message: err.Error(), Type: types.ErrTypeInvalidRequest,
 			}})
 			return nil
 		}
 		finishModalGenerationTraceWithError(generationRecorder, err, types.TraceErrUpstreamUnavailable)
 		slog.ErrorContext(ctx, "failed to build ocr upstream request", slog.Any("error", err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": types.Error{
-			Code: "internal_error", Message: err.Error(), Type: "internal_error",
+			Code: types.ErrCodeInternal, Message: err.Error(), Type: types.ErrTypeServer,
 		}})
 		return nil
 	}
@@ -275,7 +273,9 @@ func (h *ocrPipelineHandler) Execute(c *gin.Context, meta *types.RequestMetadata
 	if err != nil {
 		finishModalGenerationTraceWithError(generationRecorder, err, types.TraceErrUpstreamUnavailable)
 		slog.ErrorContext(ctx, "failed to create reverse proxy", slog.Any("error", err))
-		c.String(http.StatusInternalServerError, fmt.Errorf("failed to create reverse proxy:%w", err).Error())
+		c.JSON(http.StatusInternalServerError, gin.H{"error": types.Error{
+			Code: types.ErrCodeInternal, Message: types.MsgInternalError, Type: types.ErrTypeServer,
+		}})
 		return nil
 	}
 
@@ -343,7 +343,7 @@ func (h *ocrPipelineHandler) Execute(c *gin.Context, meta *types.RequestMetadata
 
 		if isSuccessfulStatus(w.StatusCode()) && usage != nil {
 			tokenID := httpbase.GetCurrentTokenID(c)
-			if err := h.handler.openaiComponent.RecordUsageFromTokenUsage(usageCtx, nsUUID, mt.Model, mt.ModelName, usage, apikey, tokenID); err != nil {
+			if err := h.handler.openaiComponent.RecordUsageFromTokenUsage(usageCtx, nsUUID, mt.Model, mt.ModelName, usage, tokenID); err != nil {
 				slog.ErrorContext(usageCtx, "failed to record ocr usage", slog.Any("error", err))
 			}
 		}

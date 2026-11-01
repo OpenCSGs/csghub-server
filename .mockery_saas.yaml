@@ -1,0 +1,213 @@
+with-expecter: true
+dir: "_mocks/{{.PackagePath}}"
+# new from v2.49.0, for more detail please refer to:
+# https://github.com/vektra/mockery/commit/13fc60740a1eab3fc705fcc131a4b9a6eacfd0fe#diff-4bc8f03915f15ecf2cb9965592fcf933bb06986003613b5633a8dea7962c31a9R40
+resolve-type-alias: false
+packages:
+  opencsg.com/csghub-server/builder/identity:
+    interfaces:
+      Provider:
+        config:
+          mock-build-tags: "saas"
+          filename: "mock_{{.InterfaceName}}_saas.go"
+  opencsg.com/csghub-server/component:
+    interfaces:
+      CustomerLicenseComponent:
+        config:
+          mock-build-tags: "saas"
+          filename: "mock_{{.InterfaceName}}_saas.go"
+      RepoComponent:
+        config:
+          mock-build-tags: "saas"
+          filename: "mock_{{.InterfaceName}}_saas.go"
+      AgentOrchestratorLifecycleComponent:
+        config:
+          mock-build-tags: "saas"
+          filename: "mock_{{.InterfaceName}}_saas.go"
+      LfsComponent:
+        config:
+          mock-build-tags: "saas"
+          filename: "mock_{{.InterfaceName}}_saas.go"
+      SandboxComponent:
+        config:
+          mock-build-tags: "saas"
+          filename: "mock_{{.InterfaceName}}_saas.go"
+      GatewayMCPServerComponent:
+        config:
+          mock-build-tags: "saas"
+          filename: "mock_{{.InterfaceName}}_saas.go"
+      AgentUserPreferenceComponent:
+        config:
+          mock-build-tags: "saas"
+          filename: "mock_{{.InterfaceName}}_saas.go"
+      BalanceChecker:
+        config:
+          mock-build-tags: "saas"
+          filename: "mock_{{.InterfaceName}}_saas.go"
+      AccountingTokenPlanComponent:
+        config:
+          mock-build-tags: "saas"
+          filename: "mock_{{.InterfaceName}}_saas.go"
+      AccountingVoucherComponent:
+        config:
+          mock-build-tags: "saas"
+          filename: "mock_{{.InterfaceName}}_saas.go"
+      AgentInstanceComponent:
+        config:
+          mock-build-tags: "saas"
+          filename: "mock_{{.InterfaceName}}_saas.go"
+      AgentSchedulerComponent:
+        config:
+          mock-build-tags: "saas"
+          filename: "mock_{{.InterfaceName}}_saas.go"
+      AgentCredentialComponent:
+        config:
+          mock-build-tags: "saas"
+          filename: "mock_{{.InterfaceName}}_saas.go"
+      LLMWikiManagementAccessComponent:
+        config:
+          mock-build-tags: "saas"
+          filename: "mock_{{.InterfaceName}}_saas.go"
+  opencsg.com/csghub-server/accounting/component:
+    interfaces:
+      AccountingInvoiceComponent:
+        config:
+          mock-build-tags: "saas"
+          filename: "mock_{{.InterfaceName}}_saas.go"
+      AccountingPresentComponent:
+        config:
+          mock-build-tags: "saas"
+          filename: "mock_{{.InterfaceName}}_saas.go"
+      AccountingStatementComponent:
+        config:
+          mock-build-tags: "saas"
+          filename: "mock_{{.InterfaceName}}_saas.go"
+      AccountingPriceComponent:
+        config:
+          mock-build-tags: "saas"
+          filename: "mock_{{.InterfaceName}}_saas.go"
+      AccountingVoucherComponent:
+        config:
+          mock-build-tags: "saas"
+          filename: "mock_{{.InterfaceName}}_saas.go"
+      TokenPlanComponent:
+        config:
+          mock-build-tags: "saas"
+          filename: "mock_{{.InterfaceName}}_saas.go"
+      TokenReportComponent:
+        config:
+          mock-build-tags: "saas"
+          filename: "mock_{{.InterfaceName}}_saas.go"
+  opencsg.com/csghub-server/aigateway/component:
+    interfaces:
+      MCPGatewayComponent:
+        config:
+          mock-build-tags: "saas"
+          filename: "mock_{{.InterfaceName}}_saas.go"
+  opencsg.com/csghub-server/builder/mcp:
+    interfaces:
+      Client:
+        config:
+          mock-build-tags: "saas"
+          filename: "mock_{{.InterfaceName}}_saas.go"
+      BackendSession:
+        config:
+          mock-build-tags: "saas"
+          filename: "mock_{{.InterfaceName}}_saas.go"
+      Gateway:
+        config:
+          mock-build-tags: "saas"
+          filename: "mock_{{.InterfaceName}}_saas.go"
+  opencsg.com/csghub-server/builder/deploy:
+    interfaces:
+      Deployer:
+        config:
+          mock-build-tags: "saas"
+          filename: "mock_{{.InterfaceName}}_saas.go"
+          replace-type:
+            - opencsg.com/csghub-server/common/types.ClawEvaluationReq=commontypes:opencsg.com/csghub-server/common/types.ClawEvaluationReq
+            - opencsg.com/csghub-server/common/types.ArgoWorkFlowRes=commontypes:opencsg.com/csghub-server/common/types.ArgoWorkFlowRes
+  opencsg.com/csghub-server/builder/deploy/imagerunner:
+    interfaces:
+      Runner:
+        config:
+          mock-build-tags: "saas"
+          filename: "mock_{{.InterfaceName}}_saas.go"
+  opencsg.com/csghub-server/builder/rebac:
+    interfaces:
+      Authorizer:
+        config:
+          mock-build-tags: "saas"
+          filename: "mock_{{.InterfaceName}}_saas.go"
+  opencsg.com/csghub-server/user/component:
+    interfaces:
+      IdentityComponent:
+        config:
+          mock-build-tags: "saas"
+          filename: "mock_{{.InterfaceName}}_saas.go"
+      OrganizationUnitComponent:
+        config:
+          mock-build-tags: "saas"
+          filename: "mock_{{.InterfaceName}}_saas.go"
+      OrganizationUnitMemberComponent:
+        config:
+          mock-build-tags: "saas"
+          filename: "mock_{{.InterfaceName}}_saas.go"
+  opencsg.com/csghub-server/builder/rpc:
+    interfaces:
+      AIGatewayModelClient:
+        config:
+          mock-build-tags: "saas"
+          filename: "mock_{{.InterfaceName}}_saas.go"
+      TrustRegistrySvcClient:
+        config:
+          mock-build-tags: "saas"
+          filename: "mock_{{.InterfaceName}}_saas.go"
+  opencsg.com/csghub-server/builder/store/database:
+    interfaces:
+      FederationSiteStore:
+        config:
+          mock-build-tags: "saas"
+          filename: "mock_{{.InterfaceName}}_saas.go"
+      FederationAdapterOAuthTokenStore:
+        config:
+          mock-build-tags: "saas"
+          filename: "mock_{{.InterfaceName}}_saas.go"
+      FederationAdapterSyncRecordStore:
+        config:
+          mock-build-tags: "saas"
+          filename: "mock_{{.InterfaceName}}_saas.go"
+  opencsg.com/csghub-server/aigateway/component/metrics:
+    interfaces:
+      MetricsSink:
+        config:
+          mock-build-tags: "saas"
+          filename: "mock_{{.InterfaceName}}_saas.go"
+  opencsg.com/csghub-server/trustregistry/component:
+    interfaces:
+      FederationSiteComponent:
+        config:
+          mock-build-tags: "saas"
+          filename: "mock_{{.InterfaceName}}_saas.go"
+  opencsg.com/csghub-server/fedap/component:
+    interfaces:
+      OAuthComponent:
+        config:
+          mock-build-tags: "saas"
+          filename: "mock_{{.InterfaceName}}_saas.go"
+      AuthorizationComponent:
+        config:
+          mock-build-tags: "saas"
+          filename: "mock_{{.InterfaceName}}_saas.go"
+      ProxyComponent:
+        config:
+          mock-build-tags: "saas"
+          filename: "mock_{{.InterfaceName}}_saas.go"
+      SiteConfigProvider:
+        config:
+          mock-build-tags: "saas"
+          filename: "mock_{{.InterfaceName}}_saas.go"
+      ApplicationScopesComponent:
+        config:
+          mock-build-tags: "saas"
+          filename: "mock_{{.InterfaceName}}_saas.go"

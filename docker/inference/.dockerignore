@@ -1,5 +1,3 @@
-# Keep unit tests out of runtime images (COPY ./funasr/ ...).
-funasr/test_*.py
-funasr/**/__pycache__/
 **/__pycache__/
-*.pyc
+**/*.pyc
+**/*_test.py

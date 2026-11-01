@@ -26,7 +26,8 @@ func TestLLMServiceComponent_ListMetricEvents(t *testing.T) {
 	dbEvents := []database.AIGatewayMetricEvent{
 		{
 			RequestID: "req-1", StartTime: start, CreatedAt: start,
-			Model: "kimi-k3", UpstreamID: 7, StatusCode: 200,
+			RequestModel: "auto", Model: "kimi-k3", UpstreamID: 7, StatusCode: 200,
+			QueueDepth:   3,
 			PromptTokens: 100, CompletionTokens: 10, TotalTokens: 110,
 		},
 		{
@@ -46,6 +47,9 @@ func TestLLMServiceComponent_ListMetricEvents(t *testing.T) {
 	require.Len(t, logs, 2)
 	require.Equal(t, "req-1", logs[0].RequestID)
 	require.Equal(t, int64(42), logs[0].LlmConfigID)
+	require.Equal(t, "auto", logs[0].RequestModel)
+	require.Equal(t, "kimi-k3", logs[0].Model)
+	require.Equal(t, int64(3), logs[0].QueueDepth)
 	// Upstream 8 has no matching upstream row: llm_config_id stays 0.
 	require.Equal(t, int64(0), logs[1].LlmConfigID)
 	require.Equal(t, "boom", logs[1].ErrorMessage)

@@ -427,6 +427,33 @@ type OrgRunDeploysReq struct {
 	PageOpts
 }
 
+// OrganizationChoice contains only organization identifiers and display fields for selectors.
+type OrganizationChoice struct {
+	Name      string           `json:"path"`
+	Nickname  string           `json:"name"`
+	Logo      string           `json:"logo"`
+	UUID      uuid.UUID        `json:"uuid"`
+	Namespace *NamespaceChoice `json:"namespace,omitempty"`
+	// IsHierarchical preserves edition-mode validation without exposing organization metadata.
+	IsHierarchical bool `json:"-"`
+}
+
+// OrganizationChoiceList preserves the nested pagination envelope used by selectors.
+type OrganizationChoiceList struct {
+	Data  []OrganizationChoice `json:"data"`
+	Total int                  `json:"total"`
+}
+
+// OrganizationChoiceListRequest preserves existing selector search and filter inputs.
+type OrganizationChoiceListRequest struct {
+	Search       string
+	Per          int
+	Page         int
+	OrgType      string
+	VerifyStatus string
+	Tag          string
+}
+
 type Organization struct {
 	// unique name of the organization
 	Name        string `json:"path"`
@@ -472,4 +499,37 @@ type OrgVerifyReq struct {
 type OrgVerifyStatusReq struct {
 	Status VerifyStatus `json:"status" binding:"required"` // approved,  rejected
 	Reason string       `json:"reason"`
+}
+
+// SearchOrganizationMembersReq searches direct memberships throughout one root hierarchy.
+type SearchOrganizationMembersReq struct {
+	OrganizationUUID string `json:"-"`
+	CurrentUser      string `json:"-"`
+	Search           string `json:"-"`
+	Per              int    `json:"-"`
+	Page             int    `json:"-"`
+}
+
+// OrganizationMemberOrganization describes a user's direct membership, excluding inherited permissions.
+type OrganizationMemberOrganization struct {
+	UUID     string   `json:"uuid"`
+	Name     string   `json:"name"`
+	Nickname string   `json:"nickname"`
+	Role     UserRole `json:"role"`
+}
+
+// OrganizationMemberSearchResult contains one user and all active direct memberships in the requested tree.
+type OrganizationMemberSearchResult struct {
+	UserUUID      string                           `json:"user_uuid"`
+	Username      string                           `json:"username"`
+	Nickname      string                           `json:"nickname"`
+	Email         string                           `json:"email"`
+	Avatar        string                           `json:"avatar"`
+	Organizations []OrganizationMemberOrganization `json:"organizations"`
+}
+
+// OrganizationMemberSearchResp paginates unique users rather than membership rows.
+type OrganizationMemberSearchResp struct {
+	Data  []OrganizationMemberSearchResult `json:"data"`
+	Total int                              `json:"total"`
 }

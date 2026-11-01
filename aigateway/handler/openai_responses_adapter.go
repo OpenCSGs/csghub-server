@@ -15,16 +15,16 @@ import (
 	"opencsg.com/csghub-server/builder/compress"
 )
 
-func (h *OpenAIHandlerImpl) executeAdapterResponses(c *gin.Context, req *types.ResponsesRequest, modelTarget *resolvedModelTarget, nsUUID, apikey, publicModelID string, moderation component.Moderation, logCapture *responsespkg.LLMLogRecorder, generationRecorder llmtrace.GenerationRecorder, p *types.RequestPlan) {
+func (h *OpenAIHandlerImpl) executeAdapterResponses(c *gin.Context, req *types.ResponsesRequest, modelTarget *resolvedModelTarget, nsUUID, publicModelID string, moderation component.Moderation, logCapture *responsespkg.LLMLogRecorder, generationRecorder llmtrace.GenerationRecorder, p *types.RequestPlan) {
 	if err := validateResponsesAdapterRequest(req); err != nil {
 		finishLLMTraceWithError(generationRecorder, err, types.TraceErrUpstreamError)
-		writeResponsesError(c, http.StatusBadRequest, adapterErrorCode(err), "invalid_request_error", err.Error())
+		writeResponsesError(c, http.StatusBadRequest, adapterErrorCode(err), types.ErrTypeInvalidRequest, err.Error())
 		return
 	}
 	chatReq, toolAliases, err := responsesToChatRequestResolved(c.Request.Context(), req, modelTarget.ModelName, modelTarget.Upstream.Metadata)
 	if err != nil {
 		finishLLMTraceWithError(generationRecorder, err, types.TraceErrUpstreamError)
-		writeResponsesError(c, http.StatusBadRequest, adapterErrorCode(err), "invalid_request_error", err.Error())
+		writeResponsesError(c, http.StatusBadRequest, adapterErrorCode(err), types.ErrTypeInvalidRequest, err.Error())
 		return
 	}
 	responsesCounter := h.newResponsesTokenCounter(modelTarget)
@@ -53,7 +53,7 @@ func (h *OpenAIHandlerImpl) executeAdapterResponses(c *gin.Context, req *types.R
 		h.handleProxyError(c, req.Stream, proxyErr)
 		return
 	}
-	finalWriter, fallbackErr := h.executeChatWithFallback(c, &chatContext{responseWriter: writer}, modelTarget, chatReq, primaryWriter, nsUUID, publicModelID, p)
+	finalWriter, fallbackErr := h.executeChatWithFallback(c, &chatContext{responseWriter: writer}, modelTarget, chatReq, primaryWriter, nsUUID, publicModelID, p, types.ProtocolResponses)
 	if fallbackErr != nil {
 		finishLLMTraceWithError(generationRecorder, fallbackErr, types.TraceErrUpstreamUnavailable)
 		h.handleProxyError(c, req.Stream, fallbackErr)
@@ -61,7 +61,7 @@ func (h *OpenAIHandlerImpl) executeAdapterResponses(c *gin.Context, req *types.R
 	}
 	if err := writer.Finalize(retryWriterStatusCode(finalWriter)); err != nil {
 		finishLLMTraceWithError(generationRecorder, err, types.TraceErrUpstreamError)
-		writeResponsesError(c, http.StatusBadGateway, "upstream_response_invalid", "api_error", err.Error())
+		writeResponsesError(c, http.StatusBadGateway, types.ErrCodeUpstreamResponseInvalid, types.ErrTypeAPI, err.Error())
 		return
 	}
 
@@ -79,7 +79,7 @@ func (h *OpenAIHandlerImpl) executeAdapterResponses(c *gin.Context, req *types.R
 	})
 
 	traceInput := newResponsesTracePostProcessInput(generationRecorder, req, retryWriterStatusCode(finalWriter), finalWriter.FirstWriteAt())
-	h.recordResponsesUsageWithTrace(c, responsesCounter, responsesUsage, nsUUID, modelTarget, apikey, logCapture, traceInput, admissionLeaseFromPlan(p))
+	h.recordResponsesUsageWithTrace(c, responsesCounter, responsesUsage, nsUUID, modelTarget, logCapture, traceInput, admissionLeaseFromPlan(p))
 }
 
 func decodeResponsesAdapterChatBody(bufferWriter *bufferCommonResponseWriter) ([]byte, error) {

@@ -38,7 +38,7 @@ type MirrorNamespaceMappingHandler struct {
 // @Param        body body types.CreateMirrorNamespaceMappingReq true "body"
 // @Success      200  {object}  types.Response{data=database.MirrorNamespaceMapping} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
-// @Failure      409  {object}  types.Response "Conflict"
+// @Failure      409  {object}  httpbase.R "Source namespace already has a mapping"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /mirror_namespace_mappings [post]
 func (h *MirrorNamespaceMappingHandler) Create(ctx *gin.Context) {
@@ -48,16 +48,16 @@ func (h *MirrorNamespaceMappingHandler) Create(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	msReq.SourceNamespace = strings.ToLower(msReq.SourceNamespace)
-	msReq.TargetNamespace = strings.ToLower(msReq.TargetNamespace)
+	msReq.SourceNamespace = strings.TrimSpace(msReq.SourceNamespace)
+	msReq.TargetNamespace = strings.TrimSpace(msReq.TargetNamespace)
 
 	ms, err := h.mirrorNamespaceMapping.Create(ctx.Request.Context(), msReq)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "Failed to create mirror namespace mapping", "error", err)
-		if errors.Is(err, errorx.ErrTargetNamespaceNotFound) {
-			httpbase.BadRequestWithExt(ctx, err)
-		} else if errors.Is(err, errorx.ErrSourceNamespaceMappingExists) {
+		if errors.Is(err, errorx.ErrSourceNamespaceMappingExists) {
 			httpbase.ConflictError(ctx, err)
+		} else if errors.Is(err, errorx.ErrTargetNamespaceNotFound) {
+			httpbase.BadRequestWithExt(ctx, err)
 		} else {
 			httpbase.ServerError(ctx, err)
 		}
@@ -97,7 +97,7 @@ func (h *MirrorNamespaceMappingHandler) Index(ctx *gin.Context) {
 // @Param        body body types.UpdateMirrorNamespaceMappingReq true "body"
 // @Success      200  {object}  types.Response{data=database.MirrorNamespaceMapping} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
-// @Failure      404  {object}  types.Response "Not found"
+// @Failure      404  {object}  types.APINotFound "Source namespace mapping not found"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /mirror_namespace_mappings/{id} [put]
 func (h *MirrorNamespaceMappingHandler) Update(ctx *gin.Context) {
@@ -125,10 +125,10 @@ func (h *MirrorNamespaceMappingHandler) Update(ctx *gin.Context) {
 	ms, err := h.mirrorNamespaceMapping.Update(ctx.Request.Context(), msReq)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "Failed to update mirror namespace mapping", "error", err)
-		if errors.Is(err, errorx.ErrTargetNamespaceNotFound) {
-			httpbase.BadRequestWithExt(ctx, err)
-		} else if errors.Is(err, errorx.ErrSourceNamespaceMappingNotFound) {
+		if errors.Is(err, errorx.ErrSourceNamespaceMappingNotFound) {
 			httpbase.NotFoundError(ctx, err)
+		} else if errors.Is(err, errorx.ErrTargetNamespaceNotFound) {
+			httpbase.BadRequestWithExt(ctx, err)
 		} else {
 			httpbase.ServerError(ctx, err)
 		}

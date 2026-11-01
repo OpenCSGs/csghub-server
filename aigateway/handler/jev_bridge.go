@@ -68,8 +68,8 @@ func (b *jevHandlerBridge) ServeProxy(c *gin.Context, backendURL, host string, r
 
 // --- UsageRecorder ---
 
-func (b *jevHandlerBridge) RecordUsage(ctx context.Context, nsUUID string, model *types.Model, targetModelName string, usage *token.Usage, apikey string, tokenID int64) error {
-	return b.handler.openaiComponent.RecordUsageFromTokenUsage(ctx, nsUUID, model, targetModelName, usage, apikey, tokenID)
+func (b *jevHandlerBridge) RecordUsage(ctx context.Context, nsUUID string, model *types.Model, targetModelName string, usage *token.Usage, tokenID int64) error {
+	return b.handler.openaiComponent.RecordUsageFromTokenUsage(ctx, nsUUID, model, targetModelName, usage, tokenID)
 }
 
 // --- AdmissionFinalizer ---

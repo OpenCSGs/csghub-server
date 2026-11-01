@@ -13,12 +13,20 @@ import (
 const (
 	SSOTypeCasdoor  = "casdoor"
 	SSOTypeParaview = "paraview"
+	SSOTypePortico  = "portico"
 )
 
 type SSOInterface interface {
 	UpdateUserInfo(ctx context.Context, userInfo *SSOUpdateUserInfo) error
 	GetUserInfo(ctx context.Context, accessToken string) (*SSOUserInfo, error)
 	GetOAuthToken(ctx context.Context, code, state string) (*oauth2.Token, error)
+	// BuildAuthorizationURL starts a backend-initiated OAuth sign-in flow and
+	// returns the URL of the SSO authorization endpoint together with the OAuth
+	// state token. The returned state token must be bound to the initiating
+	// browser (e.g. via an http-only session cookie) so the callback can reject
+	// a code redeemed from a different browser. Only supported by SSO providers
+	// that mandate PKCE, e.g. Portico.
+	BuildAuthorizationURL(ctx context.Context, state string) (redirectURL, oauthState string, err error)
 	DeleteUser(ctx context.Context, uuid string) error
 	IsExistByName(ctx context.Context, name string) (bool, error)
 	IsExistByEmail(ctx context.Context, email string) (bool, error)
@@ -42,9 +50,11 @@ func NewSSOClient(config *config.Config) (SSOInterface, error) {
 			Certificate:      string(certData),
 			OrganizationName: config.Casdoor.OrganizationName,
 			ApplicationName:  config.Casdoor.ApplicationName,
-		}), nil
+		}, config.Casdoor.InvitationQuota), nil
 	case SSOTypeParaview:
 		return NewParaviewClient(config), nil
+	case SSOTypePortico:
+		return NewPorticoClient(config)
 	default:
 		return nil, fmt.Errorf("invalid sso type: %s", config.SSOType)
 	}

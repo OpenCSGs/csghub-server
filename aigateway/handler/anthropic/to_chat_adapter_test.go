@@ -6,7 +6,23 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"opencsg.com/csghub-server/aigateway/types"
 )
+
+func TestMessagesToChatRequestOmitsMetadataUser(t *testing.T) {
+	req := &types.AnthropicMessagesRequest{
+		Model:     "test-model",
+		MaxTokens: 1024,
+		Messages:  []types.AnthropicMessage{{Role: "user", Content: json.RawMessage(`"hi"`)}},
+		Metadata:  &types.AnthropicMetadata{UserID: "claude-code-user"},
+	}
+
+	chatReq, err := messagesToChatRequest(req, "upstream-model", false)
+	require.NoError(t, err)
+
+	_, exists := chatReq["user"]
+	assert.False(t, exists, "metadata.user_id must not be forwarded as the OpenAI user field")
+}
 
 func TestMarshalToChatRequestBodyInjectsToolCallReasoningContent(t *testing.T) {
 	chatReq := map[string]any{

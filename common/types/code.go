@@ -51,5 +51,4 @@ type Code struct {
 	Scores               []WeightScore        `json:"scores"`
 	MultiSource
 	MirrorTaskStatus MirrorTaskStatus `json:"mirror_task_status"`
-	RepoSize         int64            `json:"repo_size"`
 }

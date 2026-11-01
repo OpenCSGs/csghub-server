@@ -15,6 +15,8 @@ type LicenseStore interface {
 	Update(ctx context.Context, input License) error
 	GetLatestActive(ctx context.Context) (*License, error)
 	GetNextUpcoming(ctx context.Context) (*License, error)
+	GetLatestActivePlatform(ctx context.Context) (*License, error)
+	GetNextUpcomingPlatform(ctx context.Context) (*License, error)
 	Delete(ctx context.Context, input License) error
 }
 
@@ -122,12 +124,24 @@ func (s *licenseStoreImpl) Delete(ctx context.Context, input License) error {
 }
 
 func (s *licenseStoreImpl) GetLatestActive(ctx context.Context) (*License, error) {
+	return s.getLatestActive(ctx, false)
+}
+
+// GetLatestActivePlatform excludes customer product licenses from platform authorization.
+func (s *licenseStoreImpl) GetLatestActivePlatform(ctx context.Context) (*License, error) {
+	return s.getLatestActive(ctx, true)
+}
+
+func (s *licenseStoreImpl) getLatestActive(ctx context.Context, platformOnly bool) (*License, error) {
 	var license License
-	err := s.db.Operator.Core.NewSelect().Model(&license).
+	query := s.db.Operator.Core.NewSelect().Model(&license).
 		Where("start_time <= NOW() AND expire_time >= NOW()").
 		Order("id DESC").
-		Limit(1).
-		Scan(ctx)
+		Limit(1)
+	if platformOnly {
+		query = query.Where("product = ?", types.LicenseProductCSGHub)
+	}
+	err := query.Scan(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("select latest active license with error: %w", err)
 	}
@@ -135,12 +149,23 @@ func (s *licenseStoreImpl) GetLatestActive(ctx context.Context) (*License, error
 }
 
 func (s *licenseStoreImpl) GetNextUpcoming(ctx context.Context) (*License, error) {
+	return s.getNextUpcoming(ctx, false)
+}
+
+func (s *licenseStoreImpl) GetNextUpcomingPlatform(ctx context.Context) (*License, error) {
+	return s.getNextUpcoming(ctx, true)
+}
+
+func (s *licenseStoreImpl) getNextUpcoming(ctx context.Context, platformOnly bool) (*License, error) {
 	var license License
-	err := s.db.Operator.Core.NewSelect().Model(&license).
+	query := s.db.Operator.Core.NewSelect().Model(&license).
 		Where("start_time > NOW() AND expire_time >= NOW()").
 		Order("start_time ASC", "id DESC").
-		Limit(1).
-		Scan(ctx)
+		Limit(1)
+	if platformOnly {
+		query = query.Where("product = ?", types.LicenseProductCSGHub)
+	}
+	err := query.Scan(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("select next upcoming license with error: %w", err)
 	}

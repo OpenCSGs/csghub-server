@@ -1,5 +1,7 @@
 package types
 
+import "opencsg.com/csghub-server/builder/rebac"
+
 const (
 	// OpenFgaStoreName is the name of the OpenFGA store.
 	OpenFgaStoreName = "opencsg"
@@ -22,3 +24,23 @@ const (
 	// OpenFgaAuthorizationModelIDLatest identifies the authorization model used by runtime checks.
 	OpenFgaAuthorizationModelIDLatest = OpenFgaAuthorizationModelIDVer1_2
 )
+
+// RebacTuple contains immutable operations to apply after a business commit.
+// Operations retain their order; River serializes jobs by permission sequence.
+type RebacTuple struct {
+	Version    int              `json:"version"`
+	ModelID    string           `json:"model_id"`
+	Source     string           `json:"source"`
+	Operations []TupleOperation `json:"operations"`
+}
+
+// TupleOperation records a write or delete without consulting mutable records.
+type TupleOperation struct {
+	Delete        bool                 `json:"delete"`
+	Relationships []rebac.Relationship `json:"relationships"`
+}
+
+// NewRebacTuple creates an event using the current authorization model.
+func NewRebacTuple(source string, operations ...TupleOperation) RebacTuple {
+	return RebacTuple{Version: 1, ModelID: OpenFgaAuthorizationModelIDVer1_2, Source: source, Operations: operations}
+}

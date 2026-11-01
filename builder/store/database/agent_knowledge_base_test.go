@@ -18,7 +18,7 @@ func TestAgentKnowledgeBaseStore_CRUD(t *testing.T) {
 	defer db.Close()
 	ctx := context.TODO()
 
-	store := database.NewAgentKnowledgeBaseStoreWithDB(db)
+	store := database.NewAgentKnowledgeBaseStoreWithRebacTupleJobClient(db, tests.NewFixtureRebacTupleJobClient(db))
 
 	// Test Create
 	userUUID := uuid.New().String()
@@ -73,7 +73,7 @@ func TestAgentKnowledgeBaseStore_CRUD(t *testing.T) {
 	kb.Description = "Updated knowledge base description"
 	kb.Public = true
 	kb.Metadata = map[string]any{"updated_key": "updated_value"}
-	err = store.Update(ctx, kb)
+	err = store.Update(ctx, kb, &kb.Public)
 	require.NoError(t, err)
 
 	// Verify update
@@ -98,7 +98,7 @@ func TestAgentKnowledgeBaseStore_List_WithPublicAndPrivate(t *testing.T) {
 	defer db.Close()
 	ctx := context.TODO()
 
-	store := database.NewAgentKnowledgeBaseStoreWithDB(db)
+	store := database.NewAgentKnowledgeBaseStoreWithRebacTupleJobClient(db, tests.NewFixtureRebacTupleJobClient(db))
 
 	userUUID1 := uuid.New().String()
 	userUUID2 := uuid.New().String()
@@ -176,7 +176,7 @@ func TestAgentKnowledgeBaseStore_Update_NonExistent(t *testing.T) {
 	defer db.Close()
 	ctx := context.TODO()
 
-	store := database.NewAgentKnowledgeBaseStoreWithDB(db)
+	store := database.NewAgentKnowledgeBaseStoreWithRebacTupleJobClient(db, tests.NewFixtureRebacTupleJobClient(db))
 
 	// Test Update with non-existent knowledge base
 	nonExistentKB := &database.AgentKnowledgeBase{
@@ -188,7 +188,7 @@ func TestAgentKnowledgeBaseStore_Update_NonExistent(t *testing.T) {
 		Public:      false,
 	}
 
-	err := store.Update(ctx, nonExistentKB)
+	err := store.Update(ctx, nonExistentKB, nil)
 	require.Error(t, err)
 }
 
@@ -197,7 +197,7 @@ func TestAgentKnowledgeBaseStore_Delete_NonExistent(t *testing.T) {
 	defer db.Close()
 	ctx := context.TODO()
 
-	store := database.NewAgentKnowledgeBaseStoreWithDB(db)
+	store := database.NewAgentKnowledgeBaseStoreWithRebacTupleJobClient(db, tests.NewFixtureRebacTupleJobClient(db))
 
 	// Test Delete with non-existent ID
 	err := store.Delete(ctx, 99999)
@@ -209,7 +209,7 @@ func TestAgentKnowledgeBaseStore_List_WithFilters(t *testing.T) {
 	defer db.Close()
 	ctx := context.TODO()
 
-	store := database.NewAgentKnowledgeBaseStoreWithDB(db)
+	store := database.NewAgentKnowledgeBaseStoreWithRebacTupleJobClient(db, tests.NewFixtureRebacTupleJobClient(db))
 
 	userUUID := uuid.New().String()
 
@@ -353,7 +353,7 @@ func TestAgentKnowledgeBaseStore_Create_WithEmptyDescription(t *testing.T) {
 	defer db.Close()
 	ctx := context.TODO()
 
-	store := database.NewAgentKnowledgeBaseStoreWithDB(db)
+	store := database.NewAgentKnowledgeBaseStoreWithRebacTupleJobClient(db, tests.NewFixtureRebacTupleJobClient(db))
 
 	userUUID := uuid.New().String()
 	kb := &database.AgentKnowledgeBase{
@@ -374,7 +374,7 @@ func TestAgentKnowledgeBaseStore_Create_WithEmptyMetadata(t *testing.T) {
 	defer db.Close()
 	ctx := context.TODO()
 
-	store := database.NewAgentKnowledgeBaseStoreWithDB(db)
+	store := database.NewAgentKnowledgeBaseStoreWithRebacTupleJobClient(db, tests.NewFixtureRebacTupleJobClient(db))
 
 	userUUID := uuid.New().String()
 	kb := &database.AgentKnowledgeBase{
@@ -396,7 +396,7 @@ func TestAgentKnowledgeBaseStore_UniqueContentID(t *testing.T) {
 	defer db.Close()
 	ctx := context.TODO()
 
-	store := database.NewAgentKnowledgeBaseStoreWithDB(db)
+	store := database.NewAgentKnowledgeBaseStoreWithRebacTupleJobClient(db, tests.NewFixtureRebacTupleJobClient(db))
 
 	userUUID := uuid.New().String()
 	contentID := uuid.New().String()
@@ -429,7 +429,7 @@ func TestAgentKnowledgeBaseStore_List_OrderByUpdatedAt(t *testing.T) {
 	defer db.Close()
 	ctx := context.TODO()
 
-	store := database.NewAgentKnowledgeBaseStoreWithDB(db)
+	store := database.NewAgentKnowledgeBaseStoreWithRebacTupleJobClient(db, tests.NewFixtureRebacTupleJobClient(db))
 
 	userUUID := uuid.New().String()
 
@@ -459,7 +459,7 @@ func TestAgentKnowledgeBaseStore_List_OrderByUpdatedAt(t *testing.T) {
 
 	// Update first knowledge base and give it a later timestamp.
 	createdKB1.Name = "Updated First Knowledge Base"
-	err = store.Update(ctx, createdKB1)
+	err = store.Update(ctx, createdKB1, nil)
 	require.NoError(t, err)
 	_, err = db.BunDB.ExecContext(ctx, "UPDATE agent_knowledge_bases SET updated_at = ? WHERE id = ?", baseTime.Add(time.Minute), createdKB1.ID)
 	require.NoError(t, err)
@@ -484,7 +484,7 @@ func TestAgentKnowledgeBaseStore_ExistsByContentID(t *testing.T) {
 	defer db.Close()
 	ctx := context.TODO()
 
-	store := database.NewAgentKnowledgeBaseStoreWithDB(db)
+	store := database.NewAgentKnowledgeBaseStoreWithRebacTupleJobClient(db, tests.NewFixtureRebacTupleJobClient(db))
 
 	userUUID := uuid.New().String()
 	contentID := uuid.New().String()
@@ -519,7 +519,7 @@ func TestAgentKnowledgeBaseStore_ExistsByContentID(t *testing.T) {
 
 	// Test case 4: Verify it still exists after update
 	createdKB.Name = "Updated Name"
-	err = store.Update(ctx, createdKB)
+	err = store.Update(ctx, createdKB, nil)
 	require.NoError(t, err)
 
 	exists, err = store.ExistsByContentID(ctx, contentID)
@@ -540,7 +540,7 @@ func TestAgentKnowledgeBaseStore_ExistsByContentID_MultipleKnowledgeBases(t *tes
 	defer db.Close()
 	ctx := context.TODO()
 
-	store := database.NewAgentKnowledgeBaseStoreWithDB(db)
+	store := database.NewAgentKnowledgeBaseStoreWithRebacTupleJobClient(db, tests.NewFixtureRebacTupleJobClient(db))
 
 	userUUID := uuid.New().String()
 
@@ -593,7 +593,7 @@ func TestAgentKnowledgeBaseStore_List_WithPinned(t *testing.T) {
 	defer db.Close()
 	ctx := context.TODO()
 
-	store := database.NewAgentKnowledgeBaseStoreWithDB(db)
+	store := database.NewAgentKnowledgeBaseStoreWithRebacTupleJobClient(db, tests.NewFixtureRebacTupleJobClient(db))
 	preferenceStore := database.NewAgentUserPreferenceStoreWithDB(db)
 
 	userUUID := uuid.New().String()
@@ -675,7 +675,7 @@ func TestAgentKnowledgeBaseStore_List_OrderByPinnedTypeAndUpdatedAt(t *testing.T
 	defer db.Close()
 	ctx := context.TODO()
 
-	store := database.NewAgentKnowledgeBaseStoreWithDB(db)
+	store := database.NewAgentKnowledgeBaseStoreWithRebacTupleJobClient(db, tests.NewFixtureRebacTupleJobClient(db))
 	preferenceStore := database.NewAgentUserPreferenceStoreWithDB(db)
 	userUUID := uuid.New().String()
 	baseTime := time.Now().UTC().Add(-time.Hour)
@@ -734,7 +734,7 @@ func TestAgentKnowledgeBaseStore_Exists(t *testing.T) {
 	defer db.Close()
 	ctx := context.TODO()
 
-	store := database.NewAgentKnowledgeBaseStoreWithDB(db)
+	store := database.NewAgentKnowledgeBaseStoreWithRebacTupleJobClient(db, tests.NewFixtureRebacTupleJobClient(db))
 
 	userUUID1 := uuid.New().String()
 	userUUID2 := uuid.New().String()
@@ -774,7 +774,7 @@ func TestAgentKnowledgeBaseStore_Exists(t *testing.T) {
 
 	// Test case 5: Verify it still exists after update
 	createdKB.Name = "Updated Name"
-	err = store.Update(ctx, createdKB)
+	err = store.Update(ctx, createdKB, nil)
 	require.NoError(t, err)
 
 	exists, err = store.Exists(ctx, userUUID1, "Updated Name")

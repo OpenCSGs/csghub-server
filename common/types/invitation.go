@@ -58,6 +58,8 @@ type InvitationActivityFilter struct {
 	EndDate       string                   `json:"end_date"`
 	Per           int                      `json:"per"`
 	Page          int                      `json:"page"`
+	BeforeID      int64                    `json:"-"`
+	OrderByID     bool                     `json:"-"`
 }
 
 type InvitationActivity struct {

@@ -12,3 +12,4 @@ go build -o bin/plugins/csghub_aliyun_checker/v1.0.0/csghub_aliyun_checker ./plu
 
 go build -ldflags="-s -w" -o bin/plugins/csghub_aliyun_checker/v1.0.0/csghub_aliyun_checker ./plugins/aliyun_checker/cmd
 ```
+

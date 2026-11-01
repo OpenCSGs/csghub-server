@@ -99,6 +99,7 @@ var (
 	SKUCSGHub       SKUType = 1 // csghub server
 	SKUStarship     SKUType = 2 // starship is deprecated
 	SKUUpstreamCost SKUType = 3 // upstream procurement cost; never used to charge users
+	SKUCSGLite      SKUType = 4 // CSGLite enterprise subscription
 )
 
 type SKUKind int
@@ -153,6 +154,7 @@ var (
 	SceneDatasetPurchase   SceneType = 40 // dataset purchase
 	SceneDatasetSaleIncome SceneType = 41 // dataset sale income for seller
 
+	SceneExpiredNewUserPresent SceneType = 98 // auto expire registration present credit
 	// unknow
 	SceneUnknow SceneType = 99 // unknow
 )
@@ -235,6 +237,7 @@ type AcctEventReq struct {
 	CostCompletionSkuID *int64  `json:"cost_completion_sku_id"`
 	Provider            string  `json:"provider"`
 	UpstreamID          int64   `json:"upstream_id"`
+	TokenPlanPeriodID   int64   `json:"token_plan_period_id"`
 }
 
 // generate charge event from client
@@ -283,6 +286,8 @@ type ActStatementsReq struct {
 	Per          int       `json:"per"`
 	Page         int       `json:"page"`
 	UserName     string    `json:"user_name"`
+	PeriodID     int64     `json:"period_id"`
+	VoucherNo    string    `json:"voucher_no"`
 }
 
 type AcctBillsReq struct {
@@ -294,6 +299,7 @@ type AcctBillsReq struct {
 	Per          int       `json:"per"`
 	Page         int       `json:"page"`
 	InstanceName string    `json:"instance_name"`
+	PeriodID     int64     `json:"period_id"`
 }
 
 type AcctBillsDetailReq struct {
@@ -306,6 +312,8 @@ type AcctBillsDetailReq struct {
 	Per          int         `json:"per"`
 	Page         int         `json:"page"`
 	UnitType     SkuUnitType `json:"unit_type"`
+	PeriodID     int64       `json:"period_id"`
+	TokenID      int64       `json:"token_id"`
 }
 
 type AcctStatementsRes struct {
@@ -347,7 +355,9 @@ type AcctStatementsResFiltered struct {
 	SkuDesc      string    `json:"sku_desc"`
 }
 
+// RechargeReq carries recharge input and the server-bound operator identity.
 type RechargeReq struct {
+	CurrentUser string          `json:"-"`
 	Value       float64         `json:"value" binding:"min=1"`
 	OpUID       string          `json:"op_uid"`
 	Scene       SceneType       `json:"scene"`
@@ -438,11 +448,11 @@ type MeteringExtra struct {
 	Resolution        string      `bun:",notnull,default:''" json:"resolution"`
 	Duration          float64     `bun:",notnull,default:0" json:"duration"`
 	SkuUnitType       SkuUnitType `json:"sku_unit_type"`
-	APIKey            string      `json:"api_key"`
+	APIKey            string      `json:"api_key"` // store token ID instead of token value
 }
 
 type AcctPriceCreateReq struct {
-	SkuType          SKUType     `json:"sku_type" binding:"required,oneof=1 2 3"`
+	SkuType          SKUType     `json:"sku_type" binding:"required,oneof=1 2 3 4"`
 	SkuPrice         int64       `json:"sku_price"`
 	SkuUnit          int64       `json:"sku_unit" binding:"required,min=1"`
 	SkuDesc          string      `json:"sku_desc" binding:"required"`
@@ -991,6 +1001,23 @@ const (
 	AccountPresentStatusUsed     AccountPresentStatus = 1
 	AccountPresentStatusCanceled AccountPresentStatus = 2
 )
+
+// AutoExpirePresentBatchResult describes one bounded auto-expire page. LastID
+// is the cursor for the next page and HasMore reports whether another page
+// exists; Deducted is the sum actually removed from non-cash balances. Failed
+// counts presents whose deduction failed inside this page and FailedSample
+// lists up to ten of their user UUIDs for quick diagnosis. Per-present
+// failures do not fail the batch: the failed presents stay unclaimed, so the
+// next daily scan retries them, and paging continues so one bad row cannot
+// stall the remaining pages. Only list-level errors fail the activity.
+type AutoExpirePresentBatchResult struct {
+	LastID       int64    `json:"last_id"`
+	Processed    int      `json:"processed"`
+	Deducted     float64  `json:"deducted"`
+	HasMore      bool     `json:"has_more"`
+	Failed       int      `json:"failed"`
+	FailedSample []string `json:"failed_sample,omitempty"`
+}
 
 type AcctPriceOffLineReq struct {
 	CurrentUser string  `json:"-"`

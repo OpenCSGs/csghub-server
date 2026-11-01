@@ -1,0 +1,119 @@
+with-expecter: true
+dir: "_mocks/{{.PackagePath}}"
+# new from v2.49.0, for more detail please refer to:
+# https://github.com/vektra/mockery/commit/13fc60740a1eab3fc705fcc131a4b9a6eacfd0fe#diff-4bc8f03915f15ecf2cb9965592fcf933bb06986003613b5633a8dea7962c31a9R40
+resolve-type-alias: false
+packages:
+  opencsg.com/csghub-server/builder/rpc:
+    interfaces:
+      AIGatewayModelClient:
+        config:
+          mock-build-tags: "ee"
+          filename: "mock_{{.InterfaceName}}_ee.go"
+  opencsg.com/csghub-server/component:
+    interfaces:
+      RepoComponent:
+        config:
+          mock-build-tags: "ee"
+          filename: "mock_{{.InterfaceName}}_ee.go"
+      AgentOrchestratorLifecycleComponent:
+        config:
+          mock-build-tags: "ee"
+          filename: "mock_{{.InterfaceName}}_ee.go"
+      LfsComponent:
+        config:
+          mock-build-tags: "ee"
+          filename: "mock_{{.InterfaceName}}_ee.go"
+      SandboxComponent:
+        config:
+          mock-build-tags: "ee"
+          filename: "mock_{{.InterfaceName}}_ee.go"
+      GatewayMCPServerComponent:
+        config:
+          mock-build-tags: "ee"
+          filename: "mock_{{.InterfaceName}}_ee.go"
+      AgentUserPreferenceComponent:
+        config:
+          mock-build-tags: "ee"
+          filename: "mock_{{.InterfaceName}}_ee.go"
+      AgentInstanceComponent:
+        config:
+          mock-build-tags: "ee"
+          filename: "mock_{{.InterfaceName}}_ee.go"
+      AgentSchedulerComponent:
+        config:
+          mock-build-tags: "ee"
+          filename: "mock_{{.InterfaceName}}_ee.go"
+      AgentCredentialComponent:
+        config:
+          mock-build-tags: "ee"
+          filename: "mock_{{.InterfaceName}}_ee.go"
+      LLMWikiManagementAccessComponent:
+        config:
+          mock-build-tags: "ee"
+          filename: "mock_{{.InterfaceName}}_ee.go"
+  opencsg.com/csghub-server/aigateway/component:
+    interfaces:
+      SandboxComponent:
+        config:
+          mock-build-tags: "ee || saas"
+          filename: "mock_{{.InterfaceName}}.go"
+      GuestLogicalShareComponent:
+        config:
+          mock-build-tags: "ee || saas"
+          filename: "mock_{{.InterfaceName}}.go"
+      MCPGatewayComponent:
+        config:
+          mock-build-tags: "ee"
+          filename: "mock_{{.InterfaceName}}_ee.go"
+  opencsg.com/csghub-server/aigateway/component/metrics:
+    interfaces:
+      MetricsSink:
+        config:
+          mock-build-tags: "ee"
+          filename: "mock_{{.InterfaceName}}_ee.go"
+  opencsg.com/csghub-server/builder/mcp:
+    interfaces:
+      Client:
+        config:
+          mock-build-tags: "ee"
+          filename: "mock_{{.InterfaceName}}_ee.go"
+      BackendSession:
+        config:
+          mock-build-tags: "ee"
+          filename: "mock_{{.InterfaceName}}_ee.go"
+      Gateway:
+        config:
+          mock-build-tags: "ee"
+          filename: "mock_{{.InterfaceName}}_ee.go"
+  opencsg.com/csghub-server/builder/deploy:
+    interfaces:
+      Deployer:
+        config:
+          mock-build-tags: "ee"
+          filename: "mock_{{.InterfaceName}}_ee.go"
+          replace-type:
+            - opencsg.com/csghub-server/common/types.ClawEvaluationReq=commontypes:opencsg.com/csghub-server/common/types.ClawEvaluationReq
+            - opencsg.com/csghub-server/common/types.ArgoWorkFlowRes=commontypes:opencsg.com/csghub-server/common/types.ArgoWorkFlowRes
+  opencsg.com/csghub-server/builder/deploy/imagerunner:
+    interfaces:
+      Runner:
+        config:
+          mock-build-tags: "ee"
+          filename: "mock_{{.InterfaceName}}_ee.go"
+  opencsg.com/csghub-server/builder/rebac:
+    interfaces:
+      Authorizer:
+        config:
+          mock-build-tags: "ee"
+          filename: "mock_{{.InterfaceName}}_ee.go"
+  opencsg.com/csghub-server/user/component:
+    interfaces:
+      OrganizationUnitComponent:
+        config:
+          mock-build-tags: "ee"
+          filename: "mock_{{.InterfaceName}}_ee.go"
+      OrganizationUnitMemberComponent:
+        config:
+          mock-build-tags: "ee"
+          filename: "mock_{{.InterfaceName}}_ee.go"

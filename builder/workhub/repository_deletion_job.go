@@ -15,11 +15,11 @@ const (
 	// RepositoryDeletionQueue is the dedicated queue and job kind for slow
 	// repository resource cleanup.
 	RepositoryDeletionQueue = "repository_deletion"
-	// RepositoryDeletionJobTimeout bounds one Git, LFS, ReBAC, and database
+	// RepositoryDeletionJobTimeout bounds one Git, LFS, and database
 	// cleanup attempt. River retries attempts that return an error.
-	RepositoryDeletionJobTimeout = 2 * time.Hour
+	RepositoryDeletionJobTimeout = 10 * time.Minute
 	// RepositoryDeletionJobMaxAttempts keeps destructive cleanup retryable
-	// through extended Git, object-storage, ReBAC, or mirror-service outages.
+	// through extended Git, object-storage, or mirror-service outages.
 	RepositoryDeletionJobMaxAttempts = 100
 )
 

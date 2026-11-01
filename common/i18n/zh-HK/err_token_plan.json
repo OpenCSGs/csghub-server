@@ -10,5 +10,8 @@
     },
     "error.TOKENPLAN-ERR-3": {
         "other": "TokenPlan 最新週期未支付"
+    },
+    "error.TOKENPLAN-ERR-4": {
+        "other": "TokenPlan名稱已存在：{{.plan_name}}"
     }
 }

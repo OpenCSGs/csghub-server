@@ -16,6 +16,6 @@ const (
 	LLMLog         = "llmlog"
 	Notification   = "notification"
 	TemporalWorker = "temporal-worker"
-	TrustRegistry  = "trustregistry"
 	Fedap          = "fedap" // FederationAdapter
+	TrustRegistry  = "trustregistry"
 )

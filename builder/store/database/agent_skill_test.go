@@ -17,15 +17,15 @@ func TestAgentSkillStore_ListForAgent_SyncStatusFilter(t *testing.T) {
 	ctx := context.TODO()
 
 	store := database.NewAgentSkillStoreWithDB(db)
-	userStore := database.NewUserStoreWithDB(db)
-	repoStore := database.NewRepoStoreWithDB(db)
+	userStore := database.NewUserStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
+	repoStore := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
 	skillStore := database.NewSkillStoreWithDB(db)
 
 	userUUID := uuid.New().String()
 	err := userStore.Create(ctx, &database.User{
 		Username: "testuser",
 		UUID:     userUUID,
-	}, &database.Namespace{})
+	}, &database.Namespace{Path: "testuser"})
 	require.NoError(t, err)
 
 	user, err := userStore.FindByUsername(ctx, "testuser")

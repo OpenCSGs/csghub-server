@@ -22,7 +22,7 @@ import (
 // ownership-guarded and idempotent: when the protocol's async usage commit
 // already finalized the lease (with real usage), this is a Redis no-op.
 func (o *Orchestrator) finalizePlan(c *gin.Context, meta *types.RequestMetadata, p *types.RequestPlan) func() {
-	recordQueueWait(c, meta)
+	recordAdmissionQueueMetrics(c, meta)
 	if o.admissionReleaser == nil || p == nil {
 		return nil
 	}

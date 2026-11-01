@@ -1,0 +1,71 @@
+syntax = "proto3";
+
+package csghub.plugins.securityscan.v1;
+
+option go_package = "opencsg.com/csghub-server/plugins/protocol/securityscan/v1;securityscanv1";
+
+service SecurityScanner {
+  rpc Capabilities(CapabilitiesRequest) returns (CapabilitiesResponse);
+  rpc Submit(SubmitRequest) returns (SubmitResponse);
+  rpc Poll(PollRequest) returns (PollResponse);
+  rpc Cancel(CancelRequest) returns (CancelResponse);
+}
+
+message CapabilitiesRequest {}
+
+message CapabilitiesResponse {
+  string protocol_version = 1;
+  string adapter_version = 2;
+  string tool_version = 3;
+  repeated string asset_types = 4;
+  repeated string scan_types = 5;
+  repeated string file_formats = 6;
+}
+
+message ScanFile {
+  string path = 1;
+  int64 size = 2;
+  string lfs_oid = 3;
+  string fetch_url = 4;
+}
+
+message SubmitRequest {
+  string task_id = 1;
+  string asset_type = 2;
+  int64 repository_id = 3;
+  string commit_sha = 4;
+  repeated ScanFile files = 5;
+  string fetch_token = 6;
+}
+
+message SubmitResponse { string job_id = 1; }
+
+message PollRequest { string job_id = 1; }
+
+message Finding {
+  string rule_id = 1;
+  string category = 2;
+  string severity = 3;
+  string path = 4;
+  int32 line = 5;
+  string description = 6;
+  string remediation = 7;
+}
+
+message Coverage {
+  string path = 1;
+  string status = 2;
+  string reason = 3;
+  string sha256 = 4;
+}
+
+message PollResponse {
+  string status = 1;
+  repeated Finding findings = 2;
+  repeated Coverage coverage = 3;
+  string log_summary = 4;
+  string error = 5;
+}
+
+message CancelRequest { string job_id = 1; }
+message CancelResponse {}

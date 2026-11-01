@@ -16,7 +16,6 @@ import (
 	"path"
 	"slices"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/minio/minio-go/v7"
@@ -284,12 +283,12 @@ func (c *gitHTTPComponentImpl) lfsBatchUploadInfo(ctx context.Context, req types
 		// need to be reuploaded. See:
 		// https://github.com/git-lfs/git-lfs/blob/main/docs/api/batch.md
 		// "If a client requests to upload an object that the server already has,the server should omit the actions property completely. The client will then assume the server already has it."
-		if _, ok := exists[obj.Oid]; ok {
-			objs = append(objs, &types.ObjectResponse{
-				Pointer: obj,
-			})
-			continue
-		}
+		// if _, ok := exists[obj.Oid]; ok {
+		// 	objs = append(objs, &types.ObjectResponse{
+		// 		Pointer: obj,
+		// 	})
+		// 	continue
+		// }
 		if !obj.Valid() {
 			objs = append(objs, &types.ObjectResponse{
 				Pointer: obj,
@@ -315,7 +314,7 @@ func (c *gitHTTPComponentImpl) lfsBatchUploadInfo(ctx context.Context, req types
 			}
 			resp.Actions["upload"] = link
 		} else {
-			resp.Actions["upload"] = c.buildUploadLink(ctx, req, obj, header)
+			resp.Actions["upload"] = &types.Link{Href: c.buildUploadLink(ctx, req, obj), Header: header}
 		}
 
 		verifyHeader := make(map[string]any)
@@ -750,45 +749,30 @@ func (c *gitHTTPComponentImpl) LfsDownload(ctx context.Context, req types.Downlo
 	return signedUrl, nil
 }
 
-// objectStoreUploadHeaders keeps platform credentials out of presigned S3
-// requests without changing the headers used by the platform's verify action.
-func objectStoreUploadHeaders(header map[string]any) map[string]any {
-	filtered := make(map[string]any, len(header))
-	for key, value := range header {
-		if !strings.EqualFold(key, "Authorization") {
-			filtered[key] = value
+func (c *gitHTTPComponentImpl) buildUploadLink(ctx context.Context, req types.BatchRequest, pointer types.Pointer) string {
+	if c.config.Git.SkipLfsFileValidation {
+		repo, err := c.repoStore.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
+		if err != nil {
+			return ""
 		}
+		encodedOid := base64.StdEncoding.EncodeToString([]byte(pointer.Oid))
+		reqHeader := make(url.Values)
+		reqHeader.Add("X-Amz-Checksum-SHA256", encodedOid)
+		reqHeader.Add("X-Amz-Checksum-Algorithm", "SHA256")
+		// u, err := c.s3Client.PresignedPutObject(ctx, c.config.S3.Bucket, common.BuildLfsPath(repo.ID, pointer.Oid, repo.Migrated), types.OssFileExpire)
+		u, err := c.s3Client.PresignHeader(
+			ctx,
+			http.MethodPut,
+			c.config.S3.Bucket,
+			common.BuildLfsPath(repo.ID, pointer.Oid, repo.Migrated),
+			types.OssFileExpire,
+			reqHeader, nil)
+		if err != nil {
+			return c.config.APIServer.PublicDomain + "/" + path.Join(fmt.Sprintf("%ss", req.RepoType), url.PathEscape(req.Namespace), url.PathEscape(req.Name+".git"), "info/lfs/objects", url.PathEscape(pointer.Oid), strconv.FormatInt(pointer.Size, 10))
+		}
+		return u.String()
 	}
-	return filtered
-}
-
-func (c *gitHTTPComponentImpl) buildUploadLink(ctx context.Context, req types.BatchRequest, pointer types.Pointer, header map[string]any) *types.Link {
-	link := &types.Link{
-		Href:   c.config.APIServer.PublicDomain + "/" + path.Join(fmt.Sprintf("%ss", req.RepoType), url.PathEscape(req.Namespace), url.PathEscape(req.Name+".git"), "info/lfs/objects", url.PathEscape(pointer.Oid), strconv.FormatInt(pointer.Size, 10)),
-		Header: header,
-	}
-	if !c.config.Git.SkipLfsFileValidation {
-		return link
-	}
-	repo, err := c.repoStore.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
-	if err != nil {
-		return &types.Link{Header: header}
-	}
-	encodedOid := base64.StdEncoding.EncodeToString([]byte(pointer.Oid))
-	reqHeader := make(url.Values)
-	reqHeader.Add("X-Amz-Checksum-SHA256", encodedOid)
-	reqHeader.Add("X-Amz-Checksum-Algorithm", "SHA256")
-	u, err := c.s3Client.PresignHeader(
-		ctx,
-		http.MethodPut,
-		c.config.S3.Bucket,
-		common.BuildLfsPath(repo.ID, pointer.Oid, repo.Migrated),
-		types.OssFileExpire,
-		reqHeader, nil)
-	if err != nil {
-		return link
-	}
-	return &types.Link{Href: u.String(), Header: objectStoreUploadHeaders(header)}
+	return c.config.APIServer.PublicDomain + "/" + path.Join(fmt.Sprintf("%ss", req.RepoType), url.PathEscape(req.Namespace), url.PathEscape(req.Name+".git"), "info/lfs/objects", url.PathEscape(pointer.Oid), strconv.FormatInt(pointer.Size, 10))
 }
 
 func (c *gitHTTPComponentImpl) buildVerifyLink(req types.BatchRequest) string {
@@ -821,7 +805,6 @@ func (c *gitHTTPComponentImpl) buildMultipartUploadLink(ctx context.Context, req
 	resp.Href = c.generateSignedCompleteURL(common.BuildLfsPath(repo.ID, pointer.Oid, repo.Migrated), uploadID)
 	resp.Header = make(map[string]any)
 	resp.Header["chunk_size"] = strconv.FormatInt(chunSize, 10)
-	header = objectStoreUploadHeaders(header)
 	for totalSize := pointer.Size; totalSize > 0; totalSize -= chunSize {
 		reqHeader := make(url.Values)
 		for k, v := range header {

@@ -25,6 +25,26 @@ the task, and do not overwrite changes that were already present.
 7. Report the behavior changed, the affected layers, and the exact validation
    commands and results. If a command cannot run, report the reason.
 
+## Edition and Publication Scope
+
+Before writing production code for a GitLab issue, read its labels. An `ee` or
+`saas` label means the feature is not open source. Keep edition-specific
+behavior, its tests, and examples in files with the matching filename suffix
+and Go build constraints. Shared foundational structures needed across editions
+or for CE-to-EE upgrades may remain shared: common types, database models and
+table/schema migrations, configuration declarations, interfaces, and neutral
+wiring or no-op stubs. A shared definition or migration alone is not evidence
+that CE implements the private feature. Trace callers and build constraints to
+verify that CE does not execute edition-specific behavior, and do not publish
+private implementation to the public GitHub repository.
+
+If the issue has no clear edition label, implement conservatively as EE and
+ask the user to confirm EE/SaaS scope once the production change is concrete
+and reviewable, before publishing or merging it. Continue independent work
+while awaiting an answer. If there is no reply after a reasonable opportunity,
+retain the EE default and state that assumption. An explicit user instruction
+about edition scope takes precedence over labels.
+
 ## Architecture
 
 CSGHub Server is a Go project organized as a set of microservices. Most request
@@ -177,10 +197,12 @@ go run cmd/csghub-server/main.go migration create_sql <name>
 ```
 
 Use `builder/store/database/migrations/20240201061926_create_spaces.go` as a
-reference for Go migrations. Preserve the generated timestamp, filename, and
-ordering; do not rename migration files or create timestamps by hand. After
-generation, implement the migration, review both the up and down paths, and
-validate forward and rollback behavior where applicable.
+reference for Go migrations. Preserve the generated timestamp and ordering;
+do not create timestamps by hand. For edition-specific Go migrations, add the
+appropriate edition suffix and build constraint after generation without
+changing the timestamp or migration name. After generation, implement the
+migration, review both the up and down paths, and validate forward and rollback
+behavior where applicable.
 
 ## Reference Implementations
 

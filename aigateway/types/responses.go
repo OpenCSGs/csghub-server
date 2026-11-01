@@ -8,6 +8,9 @@ import (
 // ResponsesRequest is the AIGateway-owned DTO for OpenAI-compatible
 // POST /v1/responses. Unknown fields are preserved for native passthrough.
 type ResponsesRequest struct {
+	// RetainRoutingBody controls routing-only snapshots; nil preserves direct decode compatibility.
+	RetainRoutingBody    func(string) bool          `json:"-"`
+	RawBody              json.RawMessage            `json:"-"`
 	Model                string                     `json:"model"`
 	Input                json.RawMessage            `json:"input,omitempty"`
 	Instructions         json.RawMessage            `json:"instructions,omitempty"`
@@ -61,6 +64,10 @@ func (r *ResponsesRequest) UnmarshalJSON(data []byte) error {
 		delete(allFields, key)
 	}
 	tmp.ExtraFields = allFields
+	tmp.RetainRoutingBody = r.RetainRoutingBody
+	if r.RetainRoutingBody == nil || r.RetainRoutingBody(tmp.Model) {
+		tmp.RawBody = append(json.RawMessage(nil), data...)
+	}
 	*r = ResponsesRequest(tmp)
 	return nil
 }

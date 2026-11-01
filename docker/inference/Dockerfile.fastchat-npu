@@ -1,0 +1,35 @@
+# Use the Ubuntu 22.04 image with CANN 8.0.rc1
+# More versions can be found at https://hub.docker.com/r/cosdt/cann/tags
+FROM docker.registry.cyou/ascendai/pytorch:2.1.0-ubuntu22.04
+
+# Define environments
+ENV SHELL=/bin/bash
+ENV TZ=Asia/Shanghai
+ENV HF_HOME=/workspace/.cache
+    
+RUN apt-get update && apt-get install -y git libgomp1 curl python3 python3-pip && apt-get clean
+
+#RUN ln -s /usr/bin/python3 /usr/bin/python
+RUN pip config set global.index-url https://mirrors.huaweicloud.com/repository/pypi/simple
+
+# Set the working directory
+WORKDIR /etc/csghub
+RUN git clone --depth 1 https://gitee.com/qzl66/FastChat.git
+
+# Install the llama-factory
+RUN cd FastChat && \
+    python -m pip install --upgrade pip && \
+    pip install --no-cache-dir -e ".[model_worker]"
+
+RUN pip3.10 install --no-cache-dir csghub-sdk==0.3.1
+
+COPY ./fastchat/ /etc/csghub/
+RUN chmod +x /etc/csghub/*.sh
+#ATTENTION: need copy /usr/local/bin/npu-smi and /usr/local/Ascend/driver to local
+COPY local/npu-smi /usr/local/bin/npu-smi
+COPY local/driver /usr/local/Ascend/driver
+
+# Create a working directory
+WORKDIR /workspace/
+ENTRYPOINT ["bash", "/etc/csghub/serve.sh"]
+EXPOSE 8000

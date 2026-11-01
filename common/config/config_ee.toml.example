@@ -1,0 +1,419 @@
+saas = false
+oversea = false
+instance_id = ""
+enable_swagger = false
+enable_https = false
+api_token = "f3a7b9c1d6e5f8e2a1b5d4f9e6a2b8d7c3a4e2b1d9f6e7a8d2c5a7b4c1e3f5b8a1d4f9b7d6e2f8a5d3b1e7f9c6a8b2d1e4f7d5b6e9f2a4b3c8e1d7f995hd82hf"
+lbs_service_key = "123456"
+city_to_cdn_domain = {}
+docs_host = "http://localhost:6636"
+timezone = "Asia/Shanghai"
+
+[posthog]
+enabled = false
+project_token = ""
+api_host = ""
+environment = "development"
+
+[organization]
+enable_unit = false
+
+[rebac]
+openfga_list_object_max_result = 1000
+
+[api_server]
+port = 8080
+public_domain = "http://localhost:8080"
+ssh_domain = "git@localhost:2222"
+
+[aigateway]
+responses_id_secret = "responses-id-secret"
+public_aigateway_url = "http://aigateway:8094/v1"
+metrics_collector_lookback_minutes = 60
+health_check_probe_workers = 32
+health_check_persistence_workers = 4
+unsafe_rules = [
+    { level = "Unsafe" },
+    { level = "Controversial", category = "Politically Sensitive Topics" }
+]
+
+# Automatic model selection.  Leave server_url empty to disable: the
+# virtual model is then not published and every request must name a
+# concrete model.
+[aigateway.semantic_router]
+server_url = ""
+model_id = "auto"
+timeout_seconds = 5
+health_ttl_seconds = 300
+
+[agent]
+orchestrator_readiness_timeout_seconds = 1800
+orchestrator_gateway_wait_timeout_seconds = 30
+# Temporary static cap on concurrent executions across sessions on one actor
+# runtime, until load-aware admission is available.
+orchestrator_max_concurrent_executions_per_allocation = 4
+orchestrator_execution_reserved_timeout_seconds = 60
+orchestrator_execution_heartbeat_interval_seconds = 30
+orchestrator_execution_heartbeat_timeout_seconds = 90
+orchestrator_execution_unknown_capacity_hold_seconds = 3600
+orchestrator_resume_wait_timeout_seconds = 60
+
+[llmwiki]
+host = "http://127.0.0.1"
+port = 8100
+
+[mirror]
+url = "http://localhost:8085"
+token = ""
+port = 8085
+session_secret_key = "mirror"
+proxy_url = ""
+worker_number = 5
+part_size = 100
+lfs_concurrency = 5
+
+[database]
+driver = "pg"
+dsn = "postgresql://postgres:postgres@localhost:5433/starhub_server?sslmode=disable"
+
+[redis]
+endpoint = "localhost:6379"
+max_retries = 3
+min_idle_connections = 0
+user = ""
+password = ""
+sentinel_mode = false
+sentinel_master = ""
+sentinel_endpoint = ""
+
+[git_server]
+url = "http://localhost:3000"
+type = "gitaly"
+host = "http://localhost:3000"
+secret_key = "619c849c49e03754454ccd4cda79a209ce0b30b3"
+username = "root"
+password = "password123"
+timeout_sec = 5
+
+[gitaly_server]
+address = "tcp://gitaly:8075"
+storage = "default"
+token = "abc123secret"
+jwt_secret = "signing-key"
+
+[mirror_server]
+enable = true
+url = "http://localhost:3000"
+type = "gitea"
+host = "http://localhost:3000"
+secret_key = "619c849c49e03754454ccd4cda79a209ce0b30b3"
+username = "root"
+password = "password123"
+
+[frontend]
+url = "https://opencsg.com"
+
+[s3]
+access_key_id = "H0xkbJj7e86gv2tJYucv"
+access_key_secret = "KNmbQNkgxUYwKarIPHeKXAWWgrjTp4fPt0PykXsG"
+region = ""
+endpoint = "localhost:9000"
+# AWS S3 only: use dual-stack (IPv4+IPv6) endpoints. When true, an amazonaws.com
+# endpoint is normalized to its s3.dualstack form so presigned URLs stay valid
+# when proxied through the storage gateway.
+enable_dualstack = true
+bucket = "opencsg-test"
+enable_ssl = false
+public_bucket = "opencsg-public-resource"
+
+[sensitive_check]
+enable = false
+image_check_enable = false
+access_key_id = ""
+access_key_secret = ""
+region = ""
+endpoint = "oss-cn-beijing.aliyuncs.com"
+enable_ssl = true
+oss_bucket = "sensitive-check"
+image_check_scenario = "baselineCheck"
+# Asynchronous audio/video moderation for discussion comments. Requires the
+# top-level sensitive_check.enable setting. When enabled,
+# a comment referencing pending audio/video is created in a pending state
+# (visible only to its author) and a temporal workflow polls the Aliyun result.
+media_moderation_enable = false
+# Max audio/video items a single comment may reference.
+media_moderation_max_refs = 3
+# How often the poll workflow queries the Aliyun result for each pending task.
+media_moderation_poll_interval = "30s"
+# How long the poll workflow runs before it finalizes (and deletes the comment
+# if media is still non-terminal).
+media_moderation_workflow_timeout = "30m"
+# "ac_automaton", "mutable_ac_automaton", "aliyun_green", "guard_llm"]
+check_chain = ["ac_automaton", "mutable_ac_automaton", "aliyun_green"]
+stream_check_mode = "async"
+async_buffer_max_chars = 50
+# aliyun green max content length: 2000 | qwen guard max content length: 7000
+max_content_length = 7000
+# prompt moderation tiers: prompts worth at most one moderation call are
+# checked synchronously; within prompt_max_chunks calls asynchronously
+# (request proceeds without waiting); above it prompt moderation is skipped.
+# Zero keeps the legacy all-synchronous behavior.
+prompt_max_chunks = 3
+
+[sensitive_check.llm]
+enable = false
+timeout_ms = 1200
+max_tokens = 50
+temperature = 0.0
+response_mode = "json_or_text"
+
+# Model configurations - each model must have a type: "guard" or "guard_stream"
+# Type "guard" is used for non-streaming content checks
+# Type "guard_stream" is used for streaming content checks
+[[sensitive_check.llm.model_configs]]
+model = "Qwen/Qwen3Guard-Gen-0.6B"
+type = "guard"
+# Optional: override default endpoint for this model
+endpoint = "https://aigateway.prod.com/v1/chat/completions"
+# Optional: override default headers for this model
+[sensitive_check.llm.model_configs.headers]
+Authorization = "Bearer custom-apikey-2"
+Host = "custom-host1.example.com"
+
+[[sensitive_check.llm.model_configs]]
+model = "Qwen/Qwen3Guard-Stream-0.6B"
+type = "guard_stream"
+# Optional: override default endpoint for this model
+endpoint = "https://aigateway.stream.com/v1/chat/completions"
+# Optional: override default headers for this model
+[sensitive_check.llm.model_configs.headers]
+Authorization = "Bearer custom-apikey-2"
+Host = "custom-host2.example.com"
+
+# Prompt-injection detection provider (issue #1581, EE/SaaS only). Add
+# "prompt_injection" to sensitive_check.check_chain to activate it. The
+# model speaks the SystemOne protocol (decision models: laya, jev-1.13);
+# override all three model settings — the defaults below only satisfy the
+# shape. mode "detect" records verdicts without blocking (shadow mode);
+# switch to "block" after tuning the threshold.
+[sensitive_check.prompt_injection]
+enable = true
+mode = "detect"
+risk_threshold = 0.6
+timeout_ms = 1500
+[sensitive_check.prompt_injection.model]
+model = "convaiinnovations/laya"
+endpoint = "https://ai.space.opencsg.com/v1/systemone"
+[sensitive_check.prompt_injection.model.headers]
+Authorization = "Bearer your-apikey"
+
+[jwt]
+signing_key = "signing-key"
+valid_hour = 24
+
+[space]
+public_docker_reg_base="opencsg-registry.cn-beijing.cr.aliyuncs.com"
+builder_endpoint = "http://localhost:8081"
+runner_endpoint = "http://localhost:8082"
+runner_server_port = 8082
+internal_root_domain = "internal.example.com"
+public_root_domain = "public.example.com"
+docker_reg_base = "registry.cn-beijing.aliyuncs.com/opencsg_public/"
+image_pull_secret = "opencsg-pull-secret"
+rproxy_server_port = 8083
+session_secret_key = "secret"
+deploy_timeout_in_min = 30
+readiness_delay_seconds = 120
+readiness_period_seconds = 10
+readiness_failure_threshold = 3
+pypi_index_url = ""
+
+[model]
+deploy_timeout_in_min = 60
+download_endpoint = "https://hub.opencsg.com"
+docker_reg_base = "opencsg-registry.cn-beijing.cr.aliyuncs.com/public/"
+nim_docker_secret_name = "ngc-secret"
+nim_ngc_secret_name = "nvidia-nim-secrets"
+
+[search]
+repo_search_cache_ttl = 300
+repository_access_list_cache_ttl = 60
+repo_search_limit = 2000
+
+[event]
+sync_interval = 1
+
+[casdoor]
+client_id = "client_id"
+client_secret = "client_secret"
+endpoint = "http://localhost:80"
+certificate = "/etc/casdoor/certificate.pem"
+organization_name = "opencsg"
+application_name = "opencsg"
+
+[nats]
+url = "nats://natsadmin:AkxjzcHaK4uRqInuPRLeoUYYV5xYKIWv3jlzCehgoe@127.0.0.1:4222"
+msg_fetch_timeout_in_sec = 5
+
+[accounting]
+host = "http://localhost"
+port = 8086
+charging_enable = false
+
+[user]
+host = "http://localhost"
+port = 8088
+signin_success_redirect_url = "http://localhost:3000/server/callback"
+codesouler_vscode_redirect_url = "http://127.0.0.1:37678/callback"
+codesouler_jetbrains_redirect_url = "http://127.0.0.1:37679/callback"
+lite_redirect_url = "http://127.0.0.1:11437/api/cloud/auth/callback"
+namespace_lookup_max_uuids = 100
+
+[multi_sync]
+saasApiDomain = "https://hub.opencsg.com"
+saasSyncDomain = "https://sync.opencsg.com"
+defaultRepoCountLimit = 10
+defaultSpeedLimit = 1024
+defaultTrafficLimit = 1024
+# Uncomment and set if the multi-sync feature is enabled
+# enabled = false
+refresh_account_sync_quota_cron_expression = "0 0 * * *"
+
+[telemetry]
+enable = true
+reportUrl = "http://hub.opencsg.com/api/v1/telemetry"
+
+[dataset]
+promptMaxJsonlFileSize = 1048576  # 1MB
+# default true
+allowCreatePublicDataset = true
+
+[dataflow]
+host = "http://127.0.0.1"
+port = 8000
+
+[academy]
+host = "http://127.0.0.1"
+port = 8000
+
+[supplydemand]
+host = "http://127.0.0.1"
+port = 8000
+
+[moderation]
+host = "http://localhost"
+port = 8089
+encodedSensitiveWords = "5Lmg6L+R5bmzLHhpamlucGluZw=="
+
+[memory]
+enabled = false
+host = "http://localhost"
+port = 8085
+base_path = "/api/v2"
+api_key = ""
+timeout_seconds = 10
+retry_count = 1
+retry_delay_millis = 100
+
+[workflow]
+endpoint = "localhost:7233"
+
+[cron_job]
+sync_as_client_cron_expression = "0 * * * *"
+calc_recom_score_cron_expression = "0 1 * * *"
+mirror_cron_expression = "* * * * *"
+public_model_repo_cron_expression = "* * * * *"
+glama_crawl_cron_expression = "0 1 * * *"
+aigateway_metrics_collector_cron_expression = "* * * * *"
+
+[dataviewer]
+host = "http://localhost"
+port = 8093
+
+[proxy]
+hosts = ["opencsg.com", "sync.opencsg.com"]
+
+[instrumentation]
+otlp_endpoint = "http://localhost:4317"
+otlp_logging = false
+
+[runner]
+image_builder_cluster_id = ""
+image_builder_git_image = "opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/alpine/git:2.36.2"
+image_builder_kaniko_image = "opencsg-registry.cn-beijing.cr.aliyuncs.com/public/kaniko-project-executor:v1.23.2"
+image_builder_job_ttl = 120
+image_builder_status_ttl = 300
+# Container image used by the one-shot reclaim Job that deletes a sandbox's
+# PVC subPath directory when the sandbox is deleted. Only requirement: a POSIX
+# shell + rm. Default points to the internal registry.
+reclaim_image = "opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/busybox:1.36"
+# Kaniko arguments to configure logging and registry access.
+# See official flags: https://github.com/GoogleContainerTools/kaniko?tab=readme-ov-file#additional-flags
+# --log-format=json : Output logs in JSON format for structured parsing.
+# --log-timestamp=true : Include timestamps in log entries.
+# --insecure : Allow connections to HTTP registries (non-HTTPS).
+# --skip-tls-verify : Disable TLS certificate validation for registries.
+# Uncomment the following line to enable pull images from a private registry without https
+# image_builder_kaniko_args = ["--insecure", "--skip-tls-verify"]
+system_cuda_version = ""
+webhook_endpoint = "http://localhost:8080"
+watch_configmap_name = "spaces-runner-config"
+watch_configmap_interval_in_sec = 60
+runner_namespace = "csghub"
+public_docker_reg_base = "opencsg-registry.cn-beijing.cr.aliyuncs.com"
+vgpu_memory_scaling_factor = 10
+gpu_model_label = '[{"type_label":"aliyun.accelerator/nvidia_name","capacity_label":"nvidia.com/gpu","mem_label":"aliyun.accelerator/nvidia_mem"}]'
+
+[cluster]
+cluster_id = ""
+region = "region-0"
+spaces_namespace = "spaces"
+resource_quota_namespace = "spaces"
+quota_name = ""
+allow_cpu_res_schedule_to_gpu_node = false
+
+[logcollector]
+port = 8096
+loki_url = "http://localhost:3100"
+watch_ns_interval = 1
+max_concurrent_streams = 1000
+batch_size = 1000
+batch_delay = 3
+drop_msg_timeout = 60
+max_retries = 3
+retry_interval = 1
+health_interval = 5
+line_separator = "\\n"
+max_store_time_day = 7
+query_last_report_timeout = 10
+
+[git]
+operation_timeout = 10
+check_file_size_enabled = true
+max_un_lfs_file_size = 20971520
+skip_lfs_file_validation = false
+
+[integration]
+github_token = ""
+github_api_base_url = "https://api.github.com"
+
+[notification]
+port = 8095
+host = "http://localhost"
+mailer_host = ""
+mailer_port = 465
+mailer_username = ""
+mailer_password = ""
+direct_mail_enabled = false
+direct_mail_access_key_id = ""
+direct_mail_access_key_secret = ""
+
+[prometheus]
+api_address = "http://prometheus.opencsg.com/api/v1/query"
+basic_auth = "myauth"
+cpu_usage_metric = "container_cpu_usage_seconds_total"
+cpu_limit_metric = "kube_pod_container_resource_limits"
+memory_usage_metric = "container_memory_usage_bytes"
+request_count_metric = "revision_request_count"
+request_latency_metric = "revision_app_request_latencies_bucket"
+metric_keys = ["pod", "service_name", "namespace", "http_response_status_code", "response_code_class", "le"]

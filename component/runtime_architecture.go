@@ -38,6 +38,10 @@ var (
 	ScanLock              sync.Mutex
 )
 
+// ModularModelIndexFileName is the only pipeline index of some diffusers
+// modular exports, such as FastVideo/FastVideo-FastH3-8-Step-V2.
+var ModularModelIndexFileName = "modular_model_index.json"
+
 type runtimeArchitectureComponentImpl struct {
 	repoComponent             RepoComponent
 	repoStore                 database.RepoStore
@@ -459,10 +463,10 @@ func (c *runtimeArchitectureComponentImpl) GetModelTypeFromConfig(ctx context.Co
 }
 
 // for text-to-image
-func (c *runtimeArchitectureComponentImpl) GetClassNameFromConfig(ctx context.Context, repo *database.Repository) (string, error) {
-	content, err := c.getConfigContent(ctx, ModelIndexFileName, repo)
+func (c *runtimeArchitectureComponentImpl) GetClassNameFromConfig(ctx context.Context, repo *database.Repository, indexFileName string) (string, error) {
+	content, err := c.getConfigContent(ctx, indexFileName, repo)
 	if err != nil {
-		return "", fmt.Errorf("fail to read model_index.json for relation, %w", err)
+		return "", fmt.Errorf("fail to read %s for relation, %w", indexFileName, err)
 	}
 	var config struct {
 		ClassName string `json:"_class_name"`
@@ -489,13 +493,21 @@ func (c *runtimeArchitectureComponentImpl) GetMetadataFromGGUF(ctx context.Conte
 	for _, file := range files {
 		ext := filepath.Ext(file.Name)
 		if ext == ".gguf" {
+			// multimodal projector files (mmproj-*.gguf) report architecture "clip",
+			// which must not override the main model's architecture
+			if strings.HasPrefix(strings.ToLower(file.Name), "mmproj") {
+				continue
+			}
 			if strings.Contains(file.Name, "00001-of-") || !strings.Contains(file.Name, "-of-") {
-				hasGGuf = true
 				fs, err := c.GetGGUFContent(ctx, file.Path, repo)
 				if err != nil {
 					return nil, fmt.Errorf("fail to get main gguf content, %w", err)
 				}
 				metadata := fs.Metadata()
+				if metadata.Type == "projector" {
+					continue
+				}
+				hasGGuf = true
 				var opts []gguf.GGUFRunEstimateOption
 				opts = append(opts, gguf.WithLLaMACppContextSize(int32(c.config.Model.MinContextForEstimation)))
 				opts = append(opts, gguf.WithParallelSize(int32(1)))
@@ -529,13 +541,17 @@ func (c *runtimeArchitectureComponentImpl) GetMetadataFromSafetensors(ctx contex
 	}
 	fileUrls := make([]string, 0)
 	var hasConfig bool
-	var hasModelIndex bool
+	// model_index.json wins when a repo ships both pipeline indexes.
+	var modelIndexFile string
 	for _, file := range files {
 		if file.Path == ConfigFileName {
 			hasConfig = true
 		}
 		if file.Path == ModelIndexFileName {
-			hasModelIndex = true
+			modelIndexFile = ModelIndexFileName
+		}
+		if file.Path == ModularModelIndexFileName && modelIndexFile == "" {
+			modelIndexFile = ModularModelIndexFileName
 		}
 		ext := filepath.Ext(file.Name)
 		if ext == ".safetensors" {
@@ -560,15 +576,15 @@ func (c *runtimeArchitectureComponentImpl) GetMetadataFromSafetensors(ctx contex
 	modelInfo := &types.ModelInfo{}
 	//check files contains config.json
 	if hasConfig {
-		modelInfo, err := common.GetModelInfo(fileUrls, c.config.Model.MinContextForEstimation)
-		if err != nil {
-			slog.Error("fail to get model info from safetensors", slog.Any("err", err), slog.Any("repo", repo.Path))
-			return nil, fmt.Errorf("fail to get model info from safetensors, %w, repo: %v", err, repo.Path)
-		}
 		config, err := c.GetArchitectureFromConfig(ctx, repo)
 		if err != nil || config == nil {
 			slog.Error("fail to get architecture from config", slog.Any("err", err))
 			return nil, fmt.Errorf("fail to get architecture from config, %w", err)
+		}
+		modelInfo, err := common.GetModelInfo(fileUrls, c.config.Model.MinContextForEstimation, config)
+		if err != nil {
+			slog.Error("fail to get model info from safetensors", slog.Any("err", err), slog.Any("repo", repo.Path))
+			return nil, fmt.Errorf("fail to get model info from safetensors, %w, repo: %v", err, repo.Path)
 		}
 		if len(config.Architectures) > 0 {
 			modelInfo.Architecture = config.Architectures[0]
@@ -602,17 +618,17 @@ func (c *runtimeArchitectureComponentImpl) GetMetadataFromSafetensors(ctx contex
 		}
 		return modelInfo, nil
 	}
-	if hasModelIndex {
-		className, err := c.GetClassNameFromConfig(ctx, repo)
+	if modelIndexFile != "" {
+		className, err := c.GetClassNameFromConfig(ctx, repo, modelIndexFile)
 		if err != nil {
-			slog.Error("fail to get class name from model_index.json", slog.Any("err", err))
-			return nil, fmt.Errorf("fail to get class name from model_index.json, %w", err)
+			slog.Error("fail to get class name from model index", slog.String("file", modelIndexFile), slog.Any("err", err))
+			return nil, fmt.Errorf("fail to get class name from %s, %w", modelIndexFile, err)
 		}
 		modelInfo.ClassName = className
 		return modelInfo, nil
 	}
 
-	return nil, fmt.Errorf("no model_index.json or config.json found, repo: %v", repo.Path)
+	return nil, fmt.Errorf("no model_index.json, modular_model_index.json or config.json found, repo: %v", repo.Path)
 }
 
 // GetMetadataFromPaddleStatic extracts metadata from a Paddle static

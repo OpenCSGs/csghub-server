@@ -30,7 +30,15 @@ type chatRetryResponseWriter struct {
 	committed     bool
 	streamStarted bool
 	firstWriteAt  time.Time
-	bufferedBody  bytes.Buffer
+	// bufferClientErrors holds back a client-argument failure (400) as
+	// well, because the request still has another ranked model to try.
+	// Such a failure is not worth another upstream of the same model, but
+	// it is worth another model: the caller asked the gateway to choose,
+	// so a model that rejects the request is the gateway's to route
+	// around.  Streaming the 400 through would commit the response and
+	// leave nothing to replace.
+	bufferClientErrors bool
+	bufferedBody       bytes.Buffer
 	// errorBody records body bytes of failed responses that were streamed
 	// straight through to the client (client-argument errors such as 400
 	// are not retried and never enter bufferedBody), so they stay available
@@ -39,10 +47,29 @@ type chatRetryResponseWriter struct {
 }
 
 func newChatRetryResponseWriter(downstream CommonResponseWriter) *chatRetryResponseWriter {
+	return newChatRetryResponseWriterWithClientErrors(downstream, false)
+}
+
+// newChatRetryResponseWriterWithClientErrors builds the attempt writer for a
+// request that can still be served by another model, so a client-argument
+// failure is buffered rather than committed to the client.
+func newChatRetryResponseWriterWithClientErrors(downstream CommonResponseWriter, bufferClientErrors bool) *chatRetryResponseWriter {
 	return &chatRetryResponseWriter{
-		downstream: downstream,
-		headers:    make(http.Header),
+		downstream:         downstream,
+		headers:            make(http.Header),
+		bufferClientErrors: bufferClientErrors,
 	}
+}
+
+// shouldBuffer reports whether a failure of this status can still be
+// replaced by another attempt, and therefore must not reach the client
+// yet.  A client-closed connection is never buffered: there is nobody
+// left to send a replacement to.
+func (w *chatRetryResponseWriter) shouldBuffer(statusCode int) bool {
+	if types.ShouldAttemptFailureStatus(statusCode) {
+		return true
+	}
+	return w.bufferClientErrors && statusCode == http.StatusBadRequest
 }
 
 func (w *chatRetryResponseWriter) Header() http.Header {
@@ -54,7 +81,7 @@ func (w *chatRetryResponseWriter) WriteHeader(statusCode int) {
 		return
 	}
 	w.statusCode = statusCode
-	if types.ShouldAttemptFailureStatus(statusCode) {
+	if w.shouldBuffer(statusCode) {
 		w.buffering = true
 		return
 	}
@@ -66,7 +93,7 @@ func (w *chatRetryResponseWriter) Write(data []byte) (int, error) {
 		if w.statusCode == 0 {
 			w.statusCode = http.StatusOK
 		}
-		if types.ShouldAttemptFailureStatus(w.statusCode) {
+		if w.shouldBuffer(w.statusCode) {
 			w.buffering = true
 		} else {
 			w.commit(w.statusCode)
@@ -154,6 +181,21 @@ func copyHeader(dst, src http.Header) {
 			dst.Add(k, v)
 		}
 	}
+}
+
+// shouldRetryChatAttemptWithAnotherModel reports whether a failed attempt
+// can be replaced by an attempt against a different ranked model.  It is
+// broader than the upstream-level predicate by exactly one case: a 400,
+// which says the request does not suit this model rather than that the
+// upstream is unwell, and which another model may well accept.
+func shouldRetryChatAttemptWithAnotherModel(statusCode int, streamStarted bool) bool {
+	if streamStarted {
+		return false
+	}
+	if statusCode == http.StatusBadRequest {
+		return true
+	}
+	return shouldRetryChatAttempt(statusCode, streamStarted)
 }
 
 func shouldRetryChatAttempt(statusCode int, streamStarted bool) bool {

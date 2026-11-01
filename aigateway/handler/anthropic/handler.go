@@ -13,11 +13,9 @@
 package anthropic
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -58,7 +56,7 @@ func (h *Handler) Extract(c *gin.Context) (*types.RequestMetadata, error) {
 	username := httpbase.GetCurrentUser(c)
 	nsUUID := httpbase.GetCurrentNamespaceUUID(c)
 
-	req := &types.AnthropicMessagesRequest{}
+	req := &types.AnthropicMessagesRequest{RetainRoutingBody: h.RetainRoutingBody}
 	if err := c.BindJSON(req); err != nil {
 		writeBadRequest(c, fmt.Sprintf("invalid request body: %v", err))
 		return nil, err
@@ -74,7 +72,6 @@ func (h *Handler) Extract(c *gin.Context) (*types.RequestMetadata, error) {
 		Model:         req.Model,
 		TenantID:      nsUUID,
 		UserID:        username,
-		APIKeyID:      httpbase.GetAccessToken(c),
 		PriorityScope: httpbase.GetAPIKeyPriorityScope(c),
 		Streaming:     req.Stream,
 		Headers:       c.Request.Header,
@@ -91,6 +88,11 @@ func (h *Handler) Extract(c *gin.Context) (*types.RequestMetadata, error) {
 //
 // If the adapt step fails the error is rendered inline and Execute returns nil.
 func (h *Handler) Execute(c *gin.Context, meta *types.RequestMetadata, p *types.RequestPlan) error {
+	// Planning has consumed the routing snapshot; adaptation uses the parsed fields.
+	if req, ok := meta.ParsedBody.(*types.AnthropicMessagesRequest); ok {
+		req.RawBody = nil
+	}
+
 	// Record resolved model on the preflight span and end it.
 	if pt := plan.GetPreflightTracer(c); pt != nil {
 		pt.SetTargetModel(meta.Model, p.ModelTarget)
@@ -119,7 +121,7 @@ func (h *Handler) Execute(c *gin.Context, meta *types.RequestMetadata, p *types.
 	}
 
 	// 1. Set the request body.
-	c.Request.Body = io.NopCloser(bytes.NewReader(adapted.Body))
+	c.Request.Body = types.NewRequestBody(adapted.Body)
 	c.Request.ContentLength = int64(len(adapted.Body))
 
 	// 2. Apply auth headers.
@@ -142,6 +144,9 @@ func (h *Handler) Execute(c *gin.Context, meta *types.RequestMetadata, p *types.
 	host := ""
 	if p.ModelTarget != nil {
 		host = p.ModelTarget.Host
+		if p.ModelTarget.Model != nil {
+			c.Request = c.Request.WithContext(types.WithRouteCallTarget(c.Request.Context(), types.RouteCallTarget{Model: p.ModelTarget.Model.ID, UpstreamID: p.ModelTarget.Upstream.ID, Protocol: string(p.UpstreamProtocol)}))
+		}
 	}
 	h.ProxyExecutor.ServeProxy(c, p.BackendURL, host, adapted.Writer)
 
@@ -172,7 +177,6 @@ func (h *Handler) Execute(c *gin.Context, meta *types.RequestMetadata, p *types.
 	}
 	h.runPostProcessAsync(c.Request.Context(), postProcessInput{
 		NSUUID:          meta.TenantID,
-		ApiKey:          httpbase.GetAccessToken(c),
 		TokenID:         httpbase.GetCurrentTokenID(c),
 		Model:           p.ModelTarget.Model,
 		TargetModelName: p.ModelTarget.ModelName,
@@ -319,7 +323,7 @@ func (h *Handler) runPostProcessAsync(ctx context.Context, input postProcessInpu
 
 		// Record usage (only on successful status).
 		if h.UsageRecorder != nil && input.Model != nil && input.Usage != nil && isSuccessfulStatus(input.StatusCode) {
-			if err := h.UsageRecorder.RecordUsage(usageCtx, input.NSUUID, input.Model, input.TargetModelName, input.Usage.toUsage(), input.ApiKey, input.TokenID); err != nil {
+			if err := h.UsageRecorder.RecordUsage(usageCtx, input.NSUUID, input.Model, input.TargetModelName, input.Usage.toUsage(), input.TokenID); err != nil {
 				slog.ErrorContext(usageCtx, "failed to record token usage", slog.Any("error", err))
 			}
 		}
@@ -391,6 +395,9 @@ func (h *Handler) HandlePlanError(c *gin.Context, meta *types.RequestMetadata, p
 		plan.SetPreflightTracer(c, nil)
 	}
 
+	if handleRoutingInputPlanError(c, p, err) {
+		return
+	}
 	if p != nil {
 		switch p.ErrorCode {
 		case types.PlanErrModelNotFound:
@@ -398,6 +405,11 @@ func (h *Handler) HandlePlanError(c *gin.Context, meta *types.RequestMetadata, p
 			return
 		case types.PlanErrModelUnavailable:
 			writeError(c, http.StatusServiceUnavailable, ErrTypeOverloaded, err.Error())
+			return
+		case types.PlanErrUpstreamPriorityDenied:
+			// The caller's user-tag priority admits no available upstream of
+			// this model: a client-facing 403, not an outage.
+			writeError(c, http.StatusForbidden, ErrTypePermission, err.Error())
 			return
 		case types.PlanErrInsufficientBalance:
 			writeError(c, http.StatusPaymentRequired, ErrTypeInvalidRequest,
@@ -411,7 +423,7 @@ func (h *Handler) HandlePlanError(c *gin.Context, meta *types.RequestMetadata, p
 			// The client's queue-wait tolerance expired, not the capacity
 			// gate: 408, no Retry-After.
 			writeError(c, http.StatusRequestTimeout, ErrTypeAPI,
-				"queued request exceeded its queue wait time for model capacity")
+				types.MsgQueueTimeout)
 			return
 		case types.PlanErrQueueCancelled:
 			// The request left the queue because the CLIENT went away
@@ -420,10 +432,10 @@ func (h *Handler) HandlePlanError(c *gin.Context, meta *types.RequestMetadata, p
 			// a disconnected client; this covers the race where the
 			// disconnect is only observed after the plan phase.
 			writeError(c, http.StatusRequestTimeout, ErrTypeAPI,
-				"request left the admission queue before being served")
+				types.MsgQueueCancelled)
 			return
 		case types.PlanErrCapacityExceeded:
-			message := "model capacity exceeded, please retry later"
+			message := types.MsgCapacityExceeded
 			retryAfter := int64(1)
 			if p.Admission != nil {
 				if p.Admission.Reason != "" {
@@ -443,10 +455,10 @@ func (h *Handler) HandlePlanError(c *gin.Context, meta *types.RequestMetadata, p
 			return
 		case types.PlanErrInternal:
 			writeError(c, http.StatusInternalServerError, ErrTypeAPI,
-				"an internal error occurred while processing the request")
+				types.MsgInternalError)
 			return
 		case types.PlanErrSensitive:
-			message := "content blocked due to safety policy"
+			message := types.MsgContentBlocked
 			if p.Safety != nil && p.Safety.Message != "" {
 				message = p.Safety.Message
 			}
@@ -478,7 +490,7 @@ func extractUnsupportedCapabilities(err error) []string {
 
 // writeSensitiveResponse writes a blocked-content response in Anthropic format.
 func writeSensitiveResponse(c *gin.Context, stream bool, result *SensitiveResult) {
-	message := "content blocked due to safety policy"
+	message := types.MsgContentBlocked
 	if result != nil && result.Message != "" {
 		message = result.Message
 	}

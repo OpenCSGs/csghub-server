@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 	mockupstream "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/aigateway/component/upstream"
 	mockdb "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/database"
+	aigatewaytypes "opencsg.com/csghub-server/aigateway/types"
 	"opencsg.com/csghub-server/builder/store/database"
 	commontypes "opencsg.com/csghub-server/common/types"
 )
@@ -832,6 +833,162 @@ func TestSyncRunningDeploy_LayaReSync_OverridesAdminProtocol(t *testing.T) {
 		return u.ID == 777 &&
 			u.Metadata != nil &&
 			u.Metadata.Protocol == "systemone"
+	})).Return(nil)
+
+	err := comp.SyncRunningDeploy(ctx, info)
+	require.NoError(t, err)
+}
+
+func TestEngineForcedProtocol(t *testing.T) {
+	const systemone = string(aigatewaytypes.ProtocolSystemOne)
+	tests := []struct {
+		name      string
+		framework string
+		task      string
+		want      string
+	}{
+		{"laya engine pins systemone", string(commontypes.Laya), "", systemone},
+		{"laya engine pins systemone regardless of task", string(commontypes.Laya), string(commontypes.TypedDecisions), systemone},
+		{"llama.cpp decision model pins systemone", string(commontypes.LlamaCpp), string(commontypes.TypedDecisions), systemone},
+		{"amd llama.cpp decision model pins systemone", string(commontypes.AMDLlamaCpp), string(commontypes.TypedDecisions), systemone},
+		{"llama.cpp chat model keeps default protocol", string(commontypes.LlamaCpp), string(commontypes.TextGeneration), ""},
+		{"vllm decision model has no systemone endpoint", "vllm", string(commontypes.TypedDecisions), ""},
+		{"unknown engine keeps default protocol", "sglang", string(commontypes.TypedDecisions), ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := engineForcedProtocol(&commontypes.DeployUpstreamInfo{
+				RuntimeFramework: tt.framework,
+				Task:             tt.task,
+			})
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestSyncRunningDeploy_LlamaCppDecisionModel_SetsSystemOneProtocol(t *testing.T) {
+	comp, _, mockUpstream, mockLLMConfig, _ := newSyncComponent(t)
+	ctx := context.TODO()
+	info := testInfo(900, "ns/laya-gguf", "svc-900")
+	info.RuntimeFramework = string(commontypes.LlamaCpp)
+	info.Task = string(commontypes.TypedDecisions)
+
+	mockUpstream.EXPECT().GetBySourceID(ctx, commontypes.UpstreamSourceCSGHubDeploy, int64(900)).Return(nil, nil)
+	mockLLMConfig.EXPECT().GetByModelName(ctx, info.LegacyModelID).Return(nil, nil)
+	mockLLMConfig.EXPECT().Create(ctx, mock.MatchedBy(func(c database.LLMConfig) bool {
+		return c.ModelName == info.LegacyModelID
+	})).Return(&database.LLMConfig{ID: 90}, nil)
+
+	mockUpstream.EXPECT().UpsertInternalDeployTarget(ctx, mock.MatchedBy(func(u *database.Upstream) bool {
+		return u.SourceID == 900 &&
+			u.Metadata != nil &&
+			u.Metadata.Protocol == "systemone"
+	})).Return(nil)
+
+	err := comp.SyncRunningDeploy(ctx, info)
+	require.NoError(t, err)
+}
+
+// =====================================================================
+// Multimodal deploys with task image-text-to-text are synced with the
+// text-generation label appended to InternalModelInfo.Tasks
+// (InternalModelSyncTasks) so /models filtering by task=text-generation
+// also surfaces them. Task keeps the raw single deploy task.
+// =====================================================================
+
+func TestSyncRunningDeploy_ImageTextToText_TaskExpanded(t *testing.T) {
+	comp, _, mockUpstream, mockLLMConfig, _ := newSyncComponent(t)
+	ctx := context.TODO()
+	info := testInfo(100, "ns/vlm-model", "svc-100")
+	info.Task = string(commontypes.ImageText2Text)
+
+	mockUpstream.EXPECT().GetBySourceID(ctx, commontypes.UpstreamSourceCSGHubDeploy, int64(100)).Return(nil, nil)
+	mockLLMConfig.EXPECT().GetByModelName(ctx, info.LegacyModelID).Return(nil, nil)
+	mockLLMConfig.EXPECT().Create(ctx, mock.MatchedBy(func(c database.LLMConfig) bool {
+		return c.ModelName == info.LegacyModelID
+	})).Return(&database.LLMConfig{ID: 42}, nil)
+	mockUpstream.EXPECT().UpsertInternalDeployTarget(ctx, mock.MatchedBy(func(u *database.Upstream) bool {
+		return u.Metadata != nil && u.Metadata.InternalModelInfo != nil &&
+			u.Metadata.InternalModelInfo.Task == "image-text-to-text" &&
+			assert.ObjectsAreEqual([]string{"image-text-to-text", "text-generation"}, u.Metadata.InternalModelInfo.Tasks)
+	})).Return(nil)
+
+	err := comp.SyncRunningDeploy(ctx, info)
+	require.NoError(t, err)
+}
+
+func TestSyncRunningDeploy_ExistingUpstream_TaskExpandedOnResync(t *testing.T) {
+	comp, _, mockUpstream, mockLLMConfig, _ := newSyncComponent(t)
+	ctx := context.TODO()
+	info := testInfo(100, "ns/vlm-model", "svc-100")
+	info.Task = string(commontypes.ImageText2Text)
+
+	// Step 1: upstream already exists with the legacy single-task metadata.
+	existing := &database.Upstream{
+		ID:          999,
+		LLMConfigID: 42,
+		Source:      commontypes.UpstreamSourceCSGHubDeploy,
+		SourceID:    100,
+		Enabled:     true,
+		Metadata: &commontypes.UpstreamMetadata{
+			InternalModelInfo: &commontypes.InternalModelInfo{
+				Task:           "image-text-to-text",
+				SourceDeployID: 100,
+			},
+		},
+	}
+	mockUpstream.EXPECT().GetBySourceID(ctx, commontypes.UpstreamSourceCSGHubDeploy, int64(100)).Return(existing, nil)
+	mockLLMConfig.EXPECT().GetByID(ctx, int64(42)).Return(&database.LLMConfig{ID: 42}, nil)
+
+	// In-place update rewrites the sync-owned task labels; Task stays raw.
+	mockUpstream.EXPECT().Update(ctx, mock.MatchedBy(func(u *database.Upstream) bool {
+		return u.ID == 999 &&
+			u.Metadata != nil && u.Metadata.InternalModelInfo != nil &&
+			u.Metadata.InternalModelInfo.Task == "image-text-to-text" &&
+			assert.ObjectsAreEqual([]string{"image-text-to-text", "text-generation"}, u.Metadata.InternalModelInfo.Tasks)
+	})).Return(nil)
+
+	err := comp.SyncRunningDeploy(ctx, info)
+	require.NoError(t, err)
+}
+
+// typed-decisions is carried as-is: decision models answer typed questions
+// through SystemOne, not chat completions, so they must not gain the
+// text-generation capability label even on a chat engine.
+func TestSyncRunningDeploy_TypedDecisions_NotExpanded(t *testing.T) {
+	comp, _, mockUpstream, mockLLMConfig, _ := newSyncComponent(t)
+	ctx := context.TODO()
+	info := testInfo(101, "ns/jev-model", "svc-101")
+	info.Task = string(commontypes.TypedDecisions)
+	info.RuntimeFramework = "vllm"
+
+	mockUpstream.EXPECT().GetBySourceID(ctx, commontypes.UpstreamSourceCSGHubDeploy, int64(101)).Return(nil, nil)
+	mockLLMConfig.EXPECT().GetByModelName(ctx, info.LegacyModelID).Return(nil, nil)
+	mockLLMConfig.EXPECT().Create(ctx, mock.MatchedBy(func(c database.LLMConfig) bool {
+		return c.ModelName == info.LegacyModelID
+	})).Return(&database.LLMConfig{ID: 43}, nil)
+	mockUpstream.EXPECT().UpsertInternalDeployTarget(ctx, mock.MatchedBy(func(u *database.Upstream) bool {
+		return u.Metadata != nil && u.Metadata.InternalModelInfo != nil &&
+			u.Metadata.InternalModelInfo.Task == "typed-decisions" &&
+			assert.ObjectsAreEqual([]string{"typed-decisions"}, u.Metadata.InternalModelInfo.Tasks)
+	})).Return(nil)
+
+	err := comp.SyncRunningDeploy(ctx, info)
+	require.NoError(t, err)
+}
+
+func TestSyncRunningDeploy_OtherTasksKeptVerbatim(t *testing.T) {
+	comp, _, mockUpstream, mockLLMConfig, _ := newSyncComponent(t)
+	ctx := context.TODO()
+	info := testInfo(300, "ns/t2i-model", "svc-300")
+	info.Task = "text-to-image"
+
+	mockUpstream.EXPECT().GetBySourceID(ctx, commontypes.UpstreamSourceCSGHubDeploy, int64(300)).Return(nil, nil)
+	mockLLMConfig.EXPECT().GetByModelName(ctx, info.LegacyModelID).Return(&database.LLMConfig{ID: 88}, nil)
+	mockUpstream.EXPECT().UpsertInternalDeployTarget(ctx, mock.MatchedBy(func(u *database.Upstream) bool {
+		return u.Metadata != nil && u.Metadata.InternalModelInfo != nil &&
+			u.Metadata.InternalModelInfo.Task == "text-to-image" &&
+			assert.ObjectsAreEqual([]string{"text-to-image"}, u.Metadata.InternalModelInfo.Tasks)
 	})).Return(nil)
 
 	err := comp.SyncRunningDeploy(ctx, info)

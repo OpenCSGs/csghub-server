@@ -135,16 +135,19 @@ func InitMetrics() {
 	}, []string{"phase", "provider", "model_name", "status_class", "retryable"})
 
 	// AIGateway request total (dashboard KPI: total requests / success rate).
-	// Labels: model, provider, status_class (2xx/4xx/5xx), is_stream, error_type.
+	// Labels: request_model (model ID the client asked for), model (upstream
+	// model), provider, status_class (2xx/4xx/5xx), status_code (exact HTTP
+	// status, bounded set — lets aggregation separate expected business
+	// states like 429/408/499 from real failures), is_stream, error_type.
 	// error_type is empty for successful requests; for failures it identifies
 	// the error category (e.g. "rate_limit", "timeout", "upstream_error").
 	AIGatewayRequestTotal = promauto.NewCounterVec(prometheus.CounterOpts{
 		Name: "csghub_aigateway_request_total",
 		Help: "Total number of AIGateway requests",
-	}, []string{"model", "provider", "status_class", "is_stream", "error_type"})
+	}, []string{"request_model", "model", "provider", "status_class", "status_code", "is_stream", "error_type"})
 
 	// AIGateway request duration in milliseconds (dashboard: total latency P50/P90).
-	// Labels: model, provider, is_stream.
+	// Labels: request_model, model, provider, is_stream.
 	// Buckets are chosen with extra density in the 500–5000 ms range where most
 	// inference requests land, so histogram_quantile() produces accurate P50/P90
 	// values.  Long-tail buckets (2m–1h) cover slow batch/long-generation requests.
@@ -155,10 +158,10 @@ func InitMetrics() {
 			50, 100, 200, 300, 500, 750, 1000, 1500, 2000, 3000, 5000, 10000, 30000, 60000,
 			120000, 300000, 600000, 1200000, 1800000, 3600000, // 2m, 5m, 10m, 20m, 30m, 1h
 		},
-	}, []string{"model", "provider", "is_stream"})
+	}, []string{"request_model", "model", "provider", "is_stream"})
 
 	// AIGateway TTFT (time to first token) in milliseconds (dashboard: TTFT P50/P90).
-	// Labels: model, provider, is_stream.
+	// Labels: request_model, model, provider, is_stream.
 	// TTFT is more latency-sensitive than total duration, so extra density is
 	// added in the 600–4000 ms range where streaming first-token typically lands.
 	AIGatewayTTFT = promauto.NewHistogramVec(prometheus.HistogramOpts{
@@ -167,14 +170,16 @@ func InitMetrics() {
 		Buckets: []float64{
 			50, 100, 200, 300, 500, 600, 700, 800, 900, 1000, 1200, 1500, 2000, 2500, 3000, 4000, 5000, 10000, 30000, 60000,
 		},
-	}, []string{"model", "provider", "is_stream"})
+	}, []string{"request_model", "model", "provider", "is_stream"})
 
-	// AIGateway token consumption (dashboard: total token usage).
-	// Labels: model, provider, token_type (prompt/completion/cached/cache_creation).
+	// AIGateway token consumption (dashboard: total token usage and token
+	// throughput via rate()).
+	// Labels: request_model, model, provider, token_type
+	// (prompt/completion/cached/cache_creation).
 	AIGatewayTokensTotal = promauto.NewCounterVec(prometheus.CounterOpts{
 		Name: "csghub_aigateway_tokens_total",
 		Help: "Total AIGateway token consumption",
-	}, []string{"model", "provider", "token_type"})
+	}, []string{"request_model", "model", "provider", "token_type"})
 
 	// AIGateway active requests (dashboard: real-time concurrency).
 	AIGatewayActiveRequests = promauto.NewGauge(prometheus.GaugeOpts{
@@ -226,21 +231,24 @@ func InitMetrics() {
 
 	// AIGateway admission reservation queue depth (valid tickets after
 	// expired-ticket cleanup, per upstream).
+	// Labels: request_model (model ID the client asked for), model (resolved
+	// model), provider, upstream_id.
 	AIGatewayAdmissionQueueDepth = promauto.NewGaugeVec(prometheus.GaugeOpts{
 		Name: "csghub_aigateway_admission_queue_depth",
 		Help: "Current number of valid tickets waiting in an upstream's admission reservation queue (observational)",
-	}, []string{"model", "upstream_id"})
+	}, []string{"request_model", "model", "provider", "upstream_id"})
 
 	// AIGateway admission queue wait duration in milliseconds, labeled by
 	// outcome: admitted (promoted to a lease), timeout (QueueWait exceeded,
 	// HTTP 408), disconnected (client gone), reroute (upstream unavailable).
+	// Labels: request_model, model, provider, outcome.
 	AIGatewayAdmissionQueueWait = promauto.NewHistogramVec(prometheus.HistogramOpts{
 		Name: "csghub_aigateway_admission_queue_wait_ms",
 		Help: "Time a request spent waiting in the admission reservation queue, by outcome",
 		Buckets: []float64{
 			10, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 20000, 30000, 60000, 120000, 300000,
 		},
-	}, []string{"model", "outcome"})
+	}, []string{"request_model", "model", "provider", "outcome"})
 
 	// AIGateway admission reservation queue lifecycle events:
 	// enqueued / promoted / queue_full / queue_timeout / queue_disconnect /

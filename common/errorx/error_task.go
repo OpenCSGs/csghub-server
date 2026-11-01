@@ -51,7 +51,7 @@ var (
 	// zh-CN: 不支持多主机 Notebook
 	//
 	// zh-HK: 不支援多主機 Notebook
-	ErrMultiHostNotebookNotSupported = CustomError{prefix: errTaskPrefix, code: multiHostNotebookNotSupported}
+	ErrMultiHostNotebookNotSupported  = CustomError{prefix: errTaskPrefix, code: multiHostNotebookNotSupported}
 	// multi-host inference only supports a minimum replica count greater than 0
 	//
 	// Description: For multi-host inference configuration, the minimum number of replicas must be greater than zero to ensure proper service operation.

@@ -1239,7 +1239,6 @@ func (c *modelComponentImpl) Deploy(ctx context.Context, deployReq types.DeployA
 	if req.Revision == "" {
 		req.Revision = m.Repository.DefaultBranch
 	}
-	task := GetBuiltInTaskFromTags(m.Repository.Tags)
 	if deployReq.DeployType == types.ServerlessType {
 		// only one service deploy was allowed
 		d, err := c.deployTaskStore.GetServerlessDeployByRepID(ctx, m.Repository.ID)
@@ -1260,6 +1259,7 @@ func (c *modelComponentImpl) Deploy(ctx context.Context, deployReq types.DeployA
 	if err != nil {
 		return -1, fmt.Errorf("cannot find available runtime framework, %w", err)
 	}
+	task := resolveDeployTask(m.Repository.Tags, frame.FrameName)
 
 	varStr, err := c.buildVariables(req, frame)
 	if err != nil {
@@ -1654,8 +1654,17 @@ func (c *modelComponentImpl) ListQuantizations(ctx context.Context, namespace, n
 	return ggufFiles, nil
 }
 
-// get built-int task from tags
-func GetBuiltInTaskFromTags(tags []database.Tag) string {
+// resolveDeployTask resolves the task recorded on a deploy. Decision models
+// serve typed decisions; everything else keeps the built-in tag mapping.
+// typed-decisions is only assigned on engines that implement the SystemOne
+// API: on any other engine the model keeps its built-in task, so a
+// decision-tagged model deployed there stays a regular chat or multimodal
+// deployment instead of losing its capability labels to a protocol the engine
+// cannot serve.
+func resolveDeployTask(tags []database.Tag, runtimeFramework string) string {
+	if isTypedDecisionModel(tags) && types.EngineServesSystemOne(runtimeFramework) {
+		return string(types.TypedDecisions)
+	}
 	for _, tag := range tags {
 		if tag.Name == string(types.TextGeneration) {
 			return tag.Name
@@ -1675,8 +1684,8 @@ func GetBuiltInTaskFromTags(tags []database.Tag) string {
 		if tag.Name == string(types.ImageText2Text) {
 			return tag.Name
 		}
-		if tag.Name == string(types.Text2Video) {
-			return tag.Name
+		if tag.Name == string(types.Text2Video) || tag.Name == string(types.Text2VideoSynthesis) {
+			return string(types.Text2Video)
 		}
 		if tag.Name == string(types.Image2Video) {
 			return tag.Name
@@ -1704,6 +1713,40 @@ func GetBuiltInTaskFromTags(tags []database.Tag) string {
 		}
 	}
 	return string(types.TextGeneration)
+}
+
+// isTypedDecisionModel reports whether the tags mark the model as a typed
+// decision model.
+//
+// "decision-model" is the tag the decision-model vendors use (JEV, GEV, clef,
+// d3, openjev, lev, kev, julia-1) and it always wins. The weaker "decision" tag
+// is accepted only when the repo is not also tagged text-generation: the
+// third-party GGUF quantizations of the LiquidAI d1 family keep "decision" but
+// drop "decision-model", and without it those repos fall back to
+// "image-text-to-text", which the token plan meters per request instead of per
+// token. A repo that explicitly claims text-generation is a chat model, so a
+// "decision" tag there must not turn it into a SystemOne deploy.
+//
+// The System-1 JEV/laya conjunction is a fallback for models carrying neither
+// tag. "typed-decisions" and "decision-index" are deliberately ignored:
+// FINAL-Bench/Darwin-27B-RSI, a System-2 reasoning model, carries both.
+func isTypedDecisionModel(tags []database.Tag) bool {
+	var decisionModel, decision, textGeneration, systemOne, jevOrLaya bool
+	for _, tag := range tags {
+		switch tag.Name {
+		case "decision-model":
+			decisionModel = true
+		case "decision":
+			decision = true
+		case string(types.TextGeneration):
+			textGeneration = true
+		case "system-one":
+			systemOne = true
+		case "jev", "laya":
+			jevOrLaya = true
+		}
+	}
+	return decisionModel || (decision && !textGeneration) || (systemOne && jevOrLaya)
 }
 
 func (c *modelComponentImpl) addWeightsToModel(ctx context.Context, repoID int64, resModel *types.Model, weightNames []database.RecomWeightName) {

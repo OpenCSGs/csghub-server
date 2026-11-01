@@ -16,34 +16,46 @@ import (
 )
 
 type fakeOpenAIComponent struct {
-	model          *aigwtypes.Model
-	lastNsUUID     string
-	getModelCalled bool
+	model             *aigwtypes.Model
+	lastNsUUID        string
+	lastNamespaceUUID string
+	getModelCalled    bool
 }
 
-func (c *fakeOpenAIComponent) GetAvailableModels(ctx context.Context, nsUUID string) ([]aigwtypes.Model, error) {
+func (c *fakeOpenAIComponent) GetAvailableModels(ctx context.Context, _ *aigwtypes.GetAvailableModelsReq) ([]aigwtypes.Model, error) {
 	return nil, nil
 }
 
-func (c *fakeOpenAIComponent) ListModels(ctx context.Context, nsUUID string, req aigwtypes.ListModelsReq) (aigwtypes.ModelList, error) {
+func (c *fakeOpenAIComponent) ListModels(ctx context.Context, req aigwtypes.ListModelsReq) (aigwtypes.ModelList, error) {
 	return aigwtypes.ModelList{}, nil
 }
 
-func (c *fakeOpenAIComponent) GetModelByID(ctx context.Context, nsUUID, modelID string) (*aigwtypes.Model, error) {
+func (c *fakeOpenAIComponent) GetModelByID(ctx context.Context, req *aigwtypes.GetModelByIDReq) (*aigwtypes.Model, error) {
 	c.getModelCalled = true
-	c.lastNsUUID = nsUUID
+	// NsUUID feeds the owner-only visibility of private internal models,
+	// NamespaceUUID is the API-key identity — both must carry the owner.
+	c.lastNsUUID = req.Caller.NsUUID
+	c.lastNamespaceUUID = req.Caller.NamespaceUUID
 	return c.model, nil
 }
 
-func (c *fakeOpenAIComponent) RecordUsage(ctx context.Context, nsUUID string, model *aigwtypes.Model, targetModelName string, tokenCounter token.Counter, apikey string, tokenID int64) error {
+func (c *fakeOpenAIComponent) AutoModelID() string {
+	return ""
+}
+
+func (c *fakeOpenAIComponent) ResolveAutoModel(ctx context.Context, req aigwtypes.AutoRouteRequest) (*aigwtypes.AutoRouteDecision, error) {
+	return nil, nil
+}
+
+func (c *fakeOpenAIComponent) RecordUsage(ctx context.Context, nsUUID string, model *aigwtypes.Model, targetModelName string, tokenCounter token.Counter, tokenID int64) error {
 	return nil
 }
 
-func (c *fakeOpenAIComponent) RecordUsageFromTokenUsage(ctx context.Context, nsUUID string, model *aigwtypes.Model, targetModelName string, usage *token.Usage, apikey string, tokenID int64) error {
+func (c *fakeOpenAIComponent) RecordUsageFromTokenUsage(ctx context.Context, nsUUID string, model *aigwtypes.Model, targetModelName string, usage *token.Usage, tokenID int64) error {
 	return nil
 }
 
-func (c *fakeOpenAIComponent) BuildUsageMeteringEvent(ctx context.Context, nsUUID string, model *aigwtypes.Model, targetModelName string, usage *token.Usage, apikey string) (*commontypes.MeteringEvent, error) {
+func (c *fakeOpenAIComponent) BuildUsageMeteringEvent(ctx context.Context, nsUUID string, model *aigwtypes.Model, targetModelName string, usage *token.Usage, tokenID int64) (*commontypes.MeteringEvent, error) {
 	return nil, nil
 }
 
@@ -131,6 +143,7 @@ func TestVideoProcessorRefreshUsesHTTPDoer(t *testing.T) {
 	require.True(t, doer.called)
 	require.True(t, openaiComp.getModelCalled, "GetModelByID should have been called")
 	require.Equal(t, "owner-uuid-123", openaiComp.lastNsUUID, "GetModelByID should receive the task owner UUID")
+	require.Equal(t, "owner-uuid-123", openaiComp.lastNamespaceUUID, "GetModelByID should receive the task owner namespace UUID")
 	require.Equal(t, string(commontypes.AIGatewayAsyncGenerationStatusCompleted), status.Status)
 	require.Equal(t, "completed", status.ProviderMetadata[text2video.ProviderStatusMetadataKey])
 }

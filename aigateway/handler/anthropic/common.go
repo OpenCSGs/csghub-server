@@ -64,38 +64,108 @@ func messagesToChatMessages(req *types.AnthropicMessagesRequest, includeReasonin
 			return nil, fmt.Errorf("parse message content: %w", err)
 		}
 
-switch msg.Role {
-			case "user":
-				userMsgs, err := anthropicUserBlocksToChat(blocks)
-				if err != nil {
-					return nil, err
-				}
-				messages = append(messages, userMsgs...)
-			case "assistant":
-				asstMsg, err := anthropicAssistantBlocksToChat(blocks, includeReasoning)
-				if err != nil {
-					return nil, err
-				}
-				if asstMsg != nil {
-					messages = append(messages, asstMsg)
-				}
-			case "system":
-				// Anthropic allows system messages in the messages array (e.g.
-				// Claude Code sends them).  Convert to a Chat-compatible system
-				// message — only the text content is meaningful.
-				text := types.AnthropicMessageContentText(msg.Content)
-				if text != "" {
-					messages = append(messages, map[string]any{
-						"role":    "system",
-						"content": text,
-					})
-				}
-			default:
+		switch msg.Role {
+		case "user":
+			userMsgs, err := anthropicUserBlocksToChat(blocks)
+			if err != nil {
+				return nil, err
+			}
+			messages = append(messages, userMsgs...)
+		case "assistant":
+			asstMsg, err := anthropicAssistantBlocksToChat(blocks, includeReasoning)
+			if err != nil {
+				return nil, err
+			}
+			if asstMsg != nil {
+				messages = append(messages, asstMsg)
+			}
+		case "system":
+			// Anthropic allows system messages in the messages array (e.g.
+			// Claude Code sends them).  Convert to a Chat-compatible system
+			// message — only the text content is meaningful.
+			text := types.AnthropicMessageContentText(msg.Content)
+			if text != "" {
+				messages = append(messages, map[string]any{
+					"role":    "system",
+					"content": text,
+				})
+			}
+		default:
 			return nil, fmt.Errorf("unsupported role: %s", msg.Role)
 		}
 	}
 
-	return messages, nil
+	return deferNonToolMessagesUntilToolBlockCloses(messages), nil
+}
+
+// deferNonToolMessagesUntilToolBlockCloses reorders converted messages so that
+// tool responses directly follow the assistant tool_calls message they answer,
+// before any interleaved non-tool message.  Clients such as Claude Code can
+// send a user turn that mixes tool_result blocks with new text, or a system
+// message between a tool call and its result; strict OpenAI-compatible
+// upstreams (e.g. DeepSeek) validate that adjacency and reject such sequences
+// with "An assistant message with 'tool_calls' must be followed by tool
+// messages responding to each 'tool_call_id'".  Non-tool messages that arrive
+// while a tool block is still open are held back and emitted once every
+// tool_call_id in the block has a response, or when the block is closed by the
+// next assistant message.  Dangling tool_calls without any response are left
+// untouched: native Anthropic upstreams reject those as well, so synthesizing
+// responses here would diverge from native behavior.
+func deferNonToolMessagesUntilToolBlockCloses(messages []map[string]any) []map[string]any {
+	out := make([]map[string]any, 0, len(messages))
+	var deferred []map[string]any
+	pendingToolCalls := map[string]bool{}
+
+	flushDeferred := func() {
+		out = append(out, deferred...)
+		deferred = nil
+	}
+
+	for _, msg := range messages {
+		role, _ := msg["role"].(string)
+		switch role {
+		case "assistant":
+			flushDeferred()
+			pendingToolCalls = map[string]bool{}
+			for _, id := range chatToolCallIDs(msg) {
+				pendingToolCalls[id] = true
+			}
+			out = append(out, msg)
+		case "tool":
+			toolCallID, _ := msg["tool_call_id"].(string)
+			out = append(out, msg)
+			if len(pendingToolCalls) > 0 {
+				delete(pendingToolCalls, toolCallID)
+				if len(pendingToolCalls) == 0 {
+					flushDeferred()
+				}
+			}
+		default:
+			if len(pendingToolCalls) > 0 {
+				deferred = append(deferred, msg)
+			} else {
+				out = append(out, msg)
+			}
+		}
+	}
+	flushDeferred()
+	return out
+}
+
+// chatToolCallIDs extracts the tool call ids from a converted assistant
+// message.
+func chatToolCallIDs(msg map[string]any) []string {
+	calls, ok := msg["tool_calls"].([]map[string]any)
+	if !ok {
+		return nil
+	}
+	ids := make([]string, 0, len(calls))
+	for _, call := range calls {
+		if id, ok := call["id"].(string); ok && id != "" {
+			ids = append(ids, id)
+		}
+	}
+	return ids
 }
 
 // anthropicUserBlocksToChat converts Anthropic user content blocks to Chat messages.
@@ -109,7 +179,7 @@ func anthropicUserBlocksToChat(blocks []types.AnthropicContentBlock) ([]map[stri
 		case "text":
 			otherParts = append(otherParts, map[string]any{"type": "text", "text": block.Text})
 		case "image":
-		 imageURL, err := anthropicImageToChatURL(block.Source)
+			imageURL, err := anthropicImageToChatURL(block.Source)
 			if err != nil {
 				return nil, err
 			}
@@ -129,7 +199,12 @@ func anthropicUserBlocksToChat(blocks []types.AnthropicContentBlock) ([]map[stri
 		}
 	}
 
+	// Tool results must be emitted before any user text: Anthropic places
+	// tool_result blocks at the start of the user message, and Chat upstreams
+	// expect the tool responses to directly follow the assistant tool_calls
+	// message they answer.
 	var messages []map[string]any
+	messages = append(messages, toolResults...)
 	if len(otherParts) > 0 {
 		// If there's only one text part, use a plain string for compatibility.
 		if len(otherParts) == 1 && otherParts[0]["type"] == "text" {
@@ -144,7 +219,6 @@ func anthropicUserBlocksToChat(blocks []types.AnthropicContentBlock) ([]map[stri
 			})
 		}
 	}
-	messages = append(messages, toolResults...)
 	return messages, nil
 }
 
@@ -558,9 +632,8 @@ func messagesToResponsesRequest(req *types.AnthropicMessagesRequest, modelName s
 		}
 		respReq.ToolChoice = converted
 	}
-	if req.Metadata != nil && req.Metadata.UserID != "" {
-		respReq.User = req.Metadata.UserID
-	}
+	// metadata is Anthropic-specific client metadata and is intentionally
+	// not translated into the upstream `user` field; see messagesToChatRequest.
 
 	// System prompt → instructions.
 	if len(req.System) > 0 && string(req.System) != "null" {
@@ -619,7 +692,7 @@ func messagesToResponsesInput(req *types.AnthropicMessagesRequest) ([]map[string
 						switch block.Source.Type {
 						case "base64":
 							contentParts = append(contentParts, map[string]any{
-								"type":      "input_image",
+								"type": "input_image",
 								"image_url": fmt.Sprintf("data:%s;base64,%s",
 									block.Source.MediaType, block.Source.Data),
 							})

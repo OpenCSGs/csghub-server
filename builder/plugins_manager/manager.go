@@ -1,6 +1,7 @@
 package pluginmanager
 
 import (
+	"crypto/sha256"
 	"fmt"
 	"os"
 	"os/exec"
@@ -14,6 +15,7 @@ import (
 // Definition describes a reusable host-side plugin connection.
 type Definition struct {
 	Name            string
+	Version         string
 	Command         []string
 	Env             []string
 	HandshakeConfig plugin.HandshakeConfig
@@ -144,9 +146,13 @@ func definitionKey(def Definition) (string, error) {
 			return "", fmt.Errorf("plugin command for %s contains an empty argument", def.Name)
 		}
 	}
-	return strings.Join([]string{
+	identity := strings.Join([]string{
 		def.Name,
+		def.Version,
 		def.HandshakeConfig.MagicCookieKey,
 		def.HandshakeConfig.MagicCookieValue,
-	}, "\x1f"), nil
+		strings.Join(def.Command, "\x00"),
+		strings.Join(def.Env, "\x00"),
+	}, "\x1f")
+	return fmt.Sprintf("%x", sha256.Sum256([]byte(identity))), nil
 }

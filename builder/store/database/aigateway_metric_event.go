@@ -27,8 +27,12 @@ type AIGatewayMetricEvent struct {
 	BucketTime time.Time `bun:"bucket_time,notnull" json:"bucket_time"`
 
 	// Dimensions
-	Model        string `bun:"model,notnull,default:''" json:"model"`
-	Provider     string `bun:"provider,notnull,default:''" json:"provider"`
+	Model    string `bun:"model,notnull,default:''" json:"model"`
+	Provider string `bun:"provider,notnull,default:''" json:"provider"`
+	// RequestModel is the model ID the client asked for (for example the
+	// "auto" virtual model). Model remains the upstream model that actually
+	// served the request.
+	RequestModel string `bun:"request_model,notnull,default:''" json:"request_model"`
 	UpstreamID   int64  `bun:"upstream_id,notnull,default:0" json:"upstream_id"`
 	APIKeyMasked string `bun:"api_key_masked,notnull,default:''" json:"api_key_masked"`
 	Username     string `bun:"username,notnull,default:''" json:"username"`
@@ -40,8 +44,13 @@ type AIGatewayMetricEvent struct {
 	TTFTMs     int64  `bun:"ttft_ms,notnull,default:0" json:"ttft_ms"`
 	LatencyMs  int64  `bun:"latency_ms,notnull,default:0" json:"latency_ms"`
 	// QueueWaitMs is the time the request spent waiting in an upstream
-	// admission reservation queue (0 when admitted immediately).
-	QueueWaitMs int64 `bun:"queue_wait_ms,notnull,default:0" json:"queue_wait_ms"`
+	// admission reservation queue. NULL means the request never entered a
+	// queue (no admission queueing happened) — queue statistics must not
+	// mix in non-queued requests.
+	QueueWaitMs int64 `bun:"queue_wait_ms,nullzero" json:"queue_wait_ms"`
+	// QueueDepth is the admission queue depth observed for this request.
+	// NULL unless the request entered a queue.
+	QueueDepth int64 `bun:"queue_depth,nullzero" json:"queue_depth"`
 	// ErrorMessage is a single-line, rune-safe truncated (<= 256 chars)
 	// excerpt of the upstream error body / gateway error message for
 	// non-200 responses. Empty for successful requests.
@@ -110,6 +119,9 @@ func (s *aigatewayMetricEventStoreImpl) applyListFilters(query types.AIGatewayMe
 		Where("ame.bucket_time >= ? AND ame.bucket_time <= ?", query.StartTime, query.EndTime)
 	if query.Model != "" {
 		q = q.Where("ame.model = ?", query.Model)
+	}
+	if query.RequestModel != "" {
+		q = q.Where("ame.request_model = ?", query.RequestModel)
 	}
 	if query.StatusCode != 0 {
 		q = q.Where("ame.status_code = ?", query.StatusCode)

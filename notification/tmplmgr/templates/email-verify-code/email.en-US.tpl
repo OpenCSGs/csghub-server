@@ -1,10 +1,10 @@
 {{/* title section */}}
-Verification Code
+验证码（Verification Code）
 ---
 {{/* content section */}}
 <html>
     <body>
-        <p>You have requested a verification code. Here is your code: <strong>{{.code}}</strong>.</p>
-        <p>Please enter this code within {{.ttl}} minutes. The code will expire after that time.</p>
+        <p>您请求的验证码为【{{.code}}】，有效期5分钟。</p>
+        <p>You have requested a verification code. Here is your code: [{{.code}}]. Please enter this code within 5 minutes.</p>
     </body>
 </html>

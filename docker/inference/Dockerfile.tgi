@@ -1,4 +1,4 @@
-FROM ghcr.io/huggingface/text-generation-inference:3.2.1
+FROM ghcr.dockerproxy.net/huggingface/text-generation-inference:3.2.1
 RUN curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py && \
     python get-pip.py && \
     rm get-pip.py
@@ -8,9 +8,9 @@ RUN apt-get update && apt-get install -y dumb-init && apt-get clean && rm -rf /v
 COPY ./tgi/ /etc/csghub/
 RUN chmod +x /etc/csghub/*.sh
 
-RUN mkdir -p /data
-ENV HUGGINGFACE_HUB_CACHE=/data \
-    HF_HUB_ENABLE_HF_TRANSFER=0 
+WORKDIR /workspace/
+ENV HUGGINGFACE_HUB_CACHE=/workspace/ \
+    HF_HUB_ENABLE_HF_TRANSFER=0
 ENV PORT=8000
 EXPOSE 8000
 ENTRYPOINT [ "/usr/bin/dumb-init", "--" ]

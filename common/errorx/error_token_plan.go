@@ -3,6 +3,7 @@ package errorx
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 )
 
 const errTokenPlanPrefix = "TOKENPLAN-ERR"
@@ -12,6 +13,7 @@ const (
 	tokenPlanInUsing
 	tokenPlanPriceLower
 	tokenPlanLatestPeriodNotPaid
+	tokenPlanNameDuplicate
 )
 
 var (
@@ -64,7 +66,32 @@ var (
 	//
 	// zh-HK: TokenPlan 最新週期未支付
 	ErrTokenPlanLatestPeriodNotPaid error = CustomError{prefix: errTokenPlanPrefix, code: tokenPlanLatestPeriodNotPaid}
+
+	// token plan name already exists
+	//
+	// Description: The token plan name in request is already used by another plan.
+	//
+	// Description_ZH: TokenPlan名称已被其他套餐使用
+	//
+	// en-US: Token plan name already exists
+	//
+	// zh-CN: TokenPlan名称已存在
+	//
+	// zh-HK: TokenPlan名稱已存在
+	ErrTokenPlanNameDuplicate error = CustomError{prefix: errTokenPlanPrefix, code: tokenPlanNameDuplicate}
 )
+
+// TokenPlanNameDuplicate builds the duplicate-name error. The conflicting name
+// is carried in context so the localized API layer can render it and so callers
+// can match the error with errors.Is(err, ErrTokenPlanNameDuplicate).
+func TokenPlanNameDuplicate(planName string) error {
+	return CustomError{
+		prefix:  errTokenPlanPrefix,
+		code:    tokenPlanNameDuplicate,
+		err:     fmt.Errorf("Token plan name already exists: %s", planName),
+		context: Ctx().Set("plan_name", planName),
+	}
+}
 
 func HandleTokenPlanError(err error, ctx map[string]interface{}) error {
 	if err == nil {

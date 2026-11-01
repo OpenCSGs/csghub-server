@@ -61,5 +61,32 @@
     },
     "error.USER-ERR-9": {
         "other": "Verification code can not be empty"
+    },
+    "error.USER-ERR-22": {
+        "other": "The name or identity card number is invalid"
+    },
+    "error.USER-ERR-23": {
+        "other": "Identity verification record not found"
+    },
+    "error.USER-ERR-24": {
+        "other": "Identity is already verified or the verification record has changed. Please refresh and try again"
+    },
+    "error.USER-ERR-25": {
+        "other": "Too many requests. Please try again later"
+    },
+    "error.USER-ERR-26": {
+        "other": "Identity verification service is temporarily unavailable"
+    },
+    "error.USER-ERR-27": {
+        "other": "The identity information was rejected or the verification flow has expired. Please check and try again"
+    },
+    "error.USER-ERR-28": {
+        "other": "Identity verification initialization timed out. Please start again"
+    },
+    "error.USER-ERR-29": {
+        "other": "The verification result is not yet confirmed. Please try again later"
+    },
+    "error.USER-ERR-30": {
+        "other": "Identity verification failed or expired. Please start again"
     }
 }

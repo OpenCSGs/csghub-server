@@ -103,19 +103,51 @@ func (b *chatParsedBody) HasMultimodalContent() bool {
 	return b.Req.HasMultimodalContent()
 }
 
+// AutoRouteContext satisfies types.AutoRouteContextProvider so the Planner
+// can describe the turn to the model ranking service.
+func (b *chatParsedBody) AutoRouteContext() types.AutoRouteInput {
+	if b == nil || b.Req == nil {
+		return types.AutoRouteInput{}
+	}
+	return b.Req.AutoRouteContext()
+}
+
 // --- Phase 1: Extract ---
 
 func (h *chatPipelineHandler) Extract(c *gin.Context) (*types.RequestMetadata, error) {
 	ctx := c.Request.Context()
 	username := httpbase.GetCurrentUser(c)
 	nsUUID := httpbase.GetCurrentNamespaceUUID(c)
-	apikey := httpbase.GetAccessToken(c)
 
 	chatReq := &types.ChatCompletionRequest{}
 	if err := c.BindJSON(chatReq); err != nil {
 		slog.ErrorContext(ctx, "invalid chat completion request body", slog.Any("error", err))
-		c.String(http.StatusBadRequest, fmt.Errorf("invalid chat completion request body:%w", err).Error())
+		c.JSON(http.StatusBadRequest, gin.H{"error": types.Error{
+			Code: "", Message: "invalid chat completion request body", Type: types.ErrTypeInvalidRequest,
+		}})
 		return nil, err
+	}
+
+	// PII masking rewrites the request before anything downstream sees it
+	// (planner checks, auto-route context, token counting, trace, LLM log,
+	// proxied body), so those consumers never observe the raw sensitive
+	// text. It only runs when the deployment enabled masking AND the client
+	// opted in via header — the gateway never rewrites payloads silently.
+	optIn := piiCheckRequested(c)
+	// The opt-in header is gateway control metadata: strip it so the
+	// reverse proxy never forwards it upstream (a chained gateway would
+	// re-mask, and strict upstreams may reject unknown control headers).
+	c.Request.Header.Del(PIICheckHeader)
+	if optIn {
+		// The client asked for the check: make every "did not happen"
+		// outcome visible at debug level so a missing mask is diagnosable.
+		if h.handler.piiMasker == nil || !h.handler.piiMasker.Enabled() {
+			slog.DebugContext(ctx, "pii check requested but disabled at deployment level")
+		} else if h.handler.piiMasker.MaskChatRequest(ctx, chatReq) {
+			slog.InfoContext(ctx, "pii check masked chat prompt")
+		} else {
+			slog.DebugContext(ctx, "pii check ran, nothing to mask")
+		}
 	}
 
 	return &types.RequestMetadata{
@@ -124,7 +156,6 @@ func (h *chatPipelineHandler) Extract(c *gin.Context) (*types.RequestMetadata, e
 		Model:         chatReq.Model,
 		TenantID:      nsUUID,
 		UserID:        username,
-		APIKeyID:      apikey,
 		PriorityScope: httpbase.GetAPIKeyPriorityScope(c),
 		Streaming:     chatReq.Stream,
 		Headers:       c.Request.Header,
@@ -140,7 +171,6 @@ func (h *chatPipelineHandler) Execute(c *gin.Context, meta *types.RequestMetadat
 	chatReq := pb.Req
 	username := meta.UserID
 	nsUUID := meta.TenantID
-	apikey := meta.APIKeyID
 	modelID := meta.Model
 	tokenID := httpbase.GetCurrentTokenID(c)
 
@@ -249,7 +279,7 @@ func (h *chatPipelineHandler) Execute(c *gin.Context, meta *types.RequestMetadat
 	}
 	log.InfoContext(ctx, "proxy chat request to model target", slog.Int("status", primaryWriter.statusCode), slog.Int64("proxy_latency(ms)", time.Since(proxyStartTime).Milliseconds()), slog.Int64("ttft(ms)", retryWriterTTFTMs(primaryWriter, proxyStartTime)))
 
-	finalWriter, err := h.handler.executeChatWithFallback(c, chatCtx, mt, chatReq, primaryWriter, username, modelID, p)
+	finalWriter, err := h.handler.executeChatWithFallback(c, chatCtx, mt, chatReq, primaryWriter, username, modelID, p, types.Protocol(meta.Protocol))
 	fallbackLog := chatLog("fallback_target")
 	if err != nil {
 		finishLLMTraceWithError(generationRecorder, err, types.TraceErrUpstreamUnavailable)
@@ -285,7 +315,6 @@ func (h *chatPipelineHandler) Execute(c *gin.Context, meta *types.RequestMetadat
 
 	h.handler.runChatPostProcessAsync(ctx, chatPostProcessInput{
 		NSUUID:          nsUUID,
-		ApiKey:          apikey,
 		TokenID:         tokenID,
 		Model:           mt.Model,
 		TargetModelName: mt.ModelName,

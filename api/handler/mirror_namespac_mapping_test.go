@@ -45,8 +45,8 @@ func TestMirrorNamespaceMappingHandler_Create(t *testing.T) {
 	tester.WithUser()
 
 	tester.mocks.mirrorNamespaceMapping.EXPECT().Create(tester.Ctx(), types.CreateMirrorNamespaceMappingReq{
-		SourceNamespace: "sn",
-		TargetNamespace: "u",
+		SourceNamespace: "SN",
+		TargetNamespace: "U",
 	}).Return(&database.MirrorNamespaceMapping{ID: 1}, nil)
 	tester.WithBody(t, &types.CreateMirrorNamespaceMappingReq{SourceNamespace: "SN", TargetNamespace: "U"}).Execute()
 
@@ -66,10 +66,7 @@ func TestMirrorNamespaceMappingHandler_CreateConflict(t *testing.T) {
 		errors.New("source namespace mapping exists"),
 		errorx.Ctx().Set("source_namespace", req.SourceNamespace),
 	)
-	tester.mocks.mirrorNamespaceMapping.EXPECT().Create(tester.Ctx(), types.CreateMirrorNamespaceMappingReq{
-		SourceNamespace: "sourceteam",
-		TargetNamespace: "targetteam",
-	}).Return(nil, err)
+	tester.mocks.mirrorNamespaceMapping.EXPECT().Create(tester.Ctx(), req).Return(nil, err)
 
 	tester.WithBody(t, &req).Execute()
 

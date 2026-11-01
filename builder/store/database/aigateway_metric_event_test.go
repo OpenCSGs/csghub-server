@@ -17,16 +17,9 @@ func TestAIGatewayMetricEventStore_List(t *testing.T) {
 
 	ctx := context.TODO()
 
-	// Ensure the table exists (created by migration; create_hypertable is
-	// optional when TimescaleDB is absent).
-	err := db.RunInTx(ctx, func(ctx context.Context, tx database.Operator) error {
-		_, err := tx.Core.NewCreateTable().
-			Model((*database.AIGatewayMetricEvent)(nil)).
-			IfNotExists().
-			Exec(ctx)
-		return err
-	})
-	require.NoError(t, err, "failed to ensure table exists")
+	// The metrics tables are created from the CURRENT models (self-contained
+	// fixture; the schema change is applied out-of-band in production).
+	ensureAIGatewayMetricsTables(t, db)
 
 	store := database.NewAIGatewayMetricEventStoreWithDB(db)
 	upstreamStore := database.NewUpstreamStoreWithDB(db, nil)
@@ -141,14 +134,7 @@ func TestAIGatewayMetricEventStore_List_MinuteAlignedBounds(t *testing.T) {
 	defer db.Close()
 
 	ctx := context.TODO()
-	err := db.RunInTx(ctx, func(ctx context.Context, tx database.Operator) error {
-		_, err := tx.Core.NewCreateTable().
-			Model((*database.AIGatewayMetricEvent)(nil)).
-			IfNotExists().
-			Exec(ctx)
-		return err
-	})
-	require.NoError(t, err)
+	ensureAIGatewayMetricsTables(t, db)
 
 	store := database.NewAIGatewayMetricEventStoreWithDB(db)
 

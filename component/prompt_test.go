@@ -16,6 +16,7 @@ import (
 	"opencsg.com/csghub-server/common/types"
 )
 
+// TestPromptComponent_CheckPermission checks the expected user query options.
 func TestPromptComponent_CheckPermission(t *testing.T) {
 	ctx := context.TODO()
 	pc := initializeTestPromptComponent(ctx, t)
@@ -32,7 +33,7 @@ func TestPromptComponent_CheckPermission(t *testing.T) {
 	require.Contains(t, err.Error(), "namespace does not exist")
 
 	pc.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "ns").Return(database.Namespace{}, nil).Once()
-	pc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "foo").Return(database.User{}, errors.New("")).Once()
+	pc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "foo", types.UserWithAdminPermissions).Return(database.User{}, errors.New("")).Once()
 	_, err = pc.checkPromptRepoPermission(ctx, req)
 	require.Contains(t, err.Error(), "user does not exist")
 
@@ -40,7 +41,7 @@ func TestPromptComponent_CheckPermission(t *testing.T) {
 		NamespaceType: database.UserNamespace,
 		Path:          "zzz",
 	}, nil).Once()
-	pc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "foo").Return(database.User{
+	pc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "foo", types.UserWithAdminPermissions).Return(database.User{
 		RoleMask: "foo",
 		Username: "zzz",
 	}, nil).Once()
@@ -52,7 +53,7 @@ func TestPromptComponent_CheckPermission(t *testing.T) {
 		NamespaceType: database.UserNamespace,
 		Path:          "uuu",
 	}, nil).Once()
-	pc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "foo").Return(database.User{
+	pc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "foo", types.UserWithAdminPermissions).Return(database.User{
 		RoleMask: "foo",
 		Username: "vvv",
 	}, nil).Once()
@@ -64,7 +65,7 @@ func TestPromptComponent_CheckPermission(t *testing.T) {
 		NamespaceType: database.UserNamespace,
 		Path:          "uuu",
 	}, nil).Once()
-	pc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "foo").Return(database.User{
+	pc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "foo", types.UserWithAdminPermissions).Return(database.User{
 		RoleMask: "foo",
 		Username: "uuu",
 	}, nil).Once()
@@ -75,8 +76,8 @@ func TestPromptComponent_CheckPermission(t *testing.T) {
 	pc.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "ns").Return(database.Namespace{
 		NamespaceType: database.OrgNamespace,
 	}, nil).Once()
-	pc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "foo").Return(database.User{
-		RoleMask: "super-admin",
+	pc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "foo", types.UserWithAdminPermissions).Return(database.User{
+		RoleAssignments: superAdminRoleAssignments(),
 	}, nil).Once()
 	_, err = pc.checkPromptRepoPermission(ctx, req)
 	require.Nil(t, err)
@@ -85,7 +86,7 @@ func TestPromptComponent_CheckPermission(t *testing.T) {
 	pc.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "ns").Return(database.Namespace{
 		NamespaceType: database.OrgNamespace,
 	}, nil).Once()
-	pc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "foo").Return(database.User{
+	pc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "foo", types.UserWithAdminPermissions).Return(database.User{
 		RoleMask: "person",
 	}, nil).Once()
 	pc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "foo", "ns", rebac.NamespaceCanWrite).Return(false, nil).Once()
@@ -96,7 +97,7 @@ func TestPromptComponent_CheckPermission(t *testing.T) {
 	pc.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "ns").Return(database.Namespace{
 		NamespaceType: database.OrgNamespace,
 	}, nil).Once()
-	pc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "foo").Return(database.User{
+	pc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "foo", types.UserWithAdminPermissions).Return(database.User{
 		RoleMask: "person",
 	}, nil).Once()
 	pc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "foo", "ns", rebac.NamespaceCanWrite).Return(true, nil).Once()
@@ -105,6 +106,7 @@ func TestPromptComponent_CheckPermission(t *testing.T) {
 	require.Nil(t, err)
 }
 
+// TestPromptComponent_CreatePrompt checks the expected user query options.
 func TestPromptComponent_CreatePrompt(t *testing.T) {
 	ctx := context.TODO()
 	pc := initializeTestPromptComponent(ctx, t)
@@ -115,10 +117,10 @@ func TestPromptComponent_CreatePrompt(t *testing.T) {
 			pc.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "ns").Return(database.Namespace{
 				NamespaceType: database.OrgNamespace,
 			}, nil).Once()
-			pc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "foo").Return(database.User{
-				UUID:     "user-uuid",
-				RoleMask: "foo-admin",
-				Email:    "foo@bar.com",
+			pc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "foo", types.UserWithAdminPermissions).Return(database.User{
+				UUID:            "user-uuid",
+				RoleAssignments: superAdminRoleAssignments(),
+				Email:           "foo@bar.com",
 			}, nil).Once()
 			if exist {
 				pc.mocks.gitServer.EXPECT().GetRepoFileRaw(ctx, gitserver.GetRepoInfoByPathReq{
@@ -177,6 +179,7 @@ func TestPromptComponent_CreatePrompt(t *testing.T) {
 
 }
 
+// TestPromptComponent_UpdatePrompt checks the expected user query options.
 func TestPromptComponent_UpdatePrompt(t *testing.T) {
 	ctx := context.TODO()
 	pc := initializeTestPromptComponent(ctx, t)
@@ -187,9 +190,9 @@ func TestPromptComponent_UpdatePrompt(t *testing.T) {
 			pc.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "ns").Return(database.Namespace{
 				NamespaceType: database.OrgNamespace,
 			}, nil).Once()
-			pc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "foo").Return(database.User{
-				RoleMask: "foo-admin",
-				Email:    "foo@bar.com",
+			pc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "foo", types.UserWithAdminPermissions).Return(database.User{
+				RoleAssignments: superAdminRoleAssignments(),
+				Email:           "foo@bar.com",
 			}, nil).Once()
 			if !exist {
 				pc.mocks.gitServer.EXPECT().GetRepoFileRaw(ctx, gitserver.GetRepoInfoByPathReq{
@@ -248,6 +251,7 @@ func TestPromptComponent_UpdatePrompt(t *testing.T) {
 
 }
 
+// TestPromptComponent_DeletePrompt checks the expected user query options.
 func TestPromptComponent_DeletePrompt(t *testing.T) {
 	ctx := context.TODO()
 	pc := initializeTestPromptComponent(ctx, t)
@@ -255,10 +259,10 @@ func TestPromptComponent_DeletePrompt(t *testing.T) {
 	pc.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "ns").Return(database.Namespace{
 		NamespaceType: database.OrgNamespace,
 	}, nil).Once()
-	pc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "foo").Return(database.User{
-		UUID:     "user-uuid",
-		RoleMask: "foo-admin",
-		Email:    "foo@bar.com",
+	pc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "foo", types.UserWithAdminPermissions).Return(database.User{
+		UUID:            "user-uuid",
+		RoleAssignments: superAdminRoleAssignments(),
+		Email:           "foo@bar.com",
 	}, nil).Once()
 
 	pc.mocks.components.repo.EXPECT().DeleteFile(ctx, &types.DeleteFileReq{
@@ -407,9 +411,9 @@ func TestPromptComponent_AddRelationModel(t *testing.T) {
 	pc := initializeTestPromptComponent(ctx, t)
 
 	pc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "foo").Return(database.User{
-		ID:       123,
-		Email:    "foo@bar.com",
-		RoleMask: "foo-admin",
+		ID:              123,
+		Email:           "foo@bar.com",
+		RoleAssignments: superAdminRoleAssignments(),
 	}, nil).Once()
 	repo := &database.Repository{}
 	pc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.PromptRepo, "ns", "n").Return(repo, nil).Once()
@@ -449,9 +453,9 @@ func TestPromptComponent_DelRelationModel(t *testing.T) {
 	pc := initializeTestPromptComponent(ctx, t)
 
 	pc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "foo").Return(database.User{
-		ID:       123,
-		Email:    "foo@bar.com",
-		RoleMask: "foo-admin",
+		ID:              123,
+		Email:           "foo@bar.com",
+		RoleAssignments: superAdminRoleAssignments(),
 	}, nil).Once()
 	repo := &database.Repository{}
 	pc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.PromptRepo, "ns", "n").Return(repo, nil).Once()
@@ -486,11 +490,12 @@ func TestPromptComponent_DelRelationModel(t *testing.T) {
 
 }
 
+// TestPromptComponent_CreatePromptRepo checks the expected user query options.
 func TestPromptComponent_CreatePromptRepo(t *testing.T) {
 	ctx := context.TODO()
 	pc := initializeTestPromptComponent(ctx, t)
 
-	pc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "foo").Return(database.User{
+	pc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "foo", types.UserWithAdminPermissions).Return(database.User{
 		ID:       123,
 		Email:    "foo@bar.com",
 		Username: "foo",

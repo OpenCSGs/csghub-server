@@ -18,10 +18,10 @@ func TestSkillStore_CRUD(t *testing.T) {
 	ctx := context.TODO()
 
 	store := database.NewSkillStoreWithDB(db)
-	repo, err := database.NewRepoStoreWithDB(db).CreateRepo(ctx, database.Repository{
+	repo, err := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db)).CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
 		Path:    "foo/bar",
 		Private: true,
-	})
+	}))
 	require.Nil(t, err)
 
 	_, err = store.Create(ctx, database.Skill{
@@ -97,21 +97,21 @@ func TestSkillStore_UserLikesSkills(t *testing.T) {
 
 	store := database.NewSkillStoreWithDB(db)
 
-	repo1, err := database.NewRepoStoreWithDB(db).CreateRepo(ctx, database.Repository{
+	repo1, err := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db)).CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
 		Path:    "foo/bar",
 		GitPath: "p1",
-	})
+	}))
 	require.Nil(t, err)
-	repo2, err := database.NewRepoStoreWithDB(db).CreateRepo(ctx, database.Repository{
+	repo2, err := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db)).CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
 		Path:    "foo/bar2",
 		GitPath: "p2",
-	})
+	}))
 	require.Nil(t, err)
 
-	repo3, err := database.NewRepoStoreWithDB(db).CreateRepo(ctx, database.Repository{
+	repo3, err := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db)).CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
 		Path:    "foo/bar3",
 		GitPath: "p3",
-	})
+	}))
 	require.Nil(t, err)
 
 	_, err = store.Create(ctx, database.Skill{
@@ -185,17 +185,17 @@ func TestSkillStore_ByRepoIDs_OnlyPublished(t *testing.T) {
 	ctx := context.TODO()
 
 	store := database.NewSkillStoreWithDB(db)
-	repoWithVersion, err := database.NewRepoStoreWithDB(db).CreateRepo(ctx, database.Repository{
+	repoWithVersion, err := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db)).CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
 		Name:    "with-version",
 		Path:    "foo/with-version",
 		GitPath: "skills_foo/with-version",
-	})
+	}))
 	require.Nil(t, err)
-	repoDraft, err := database.NewRepoStoreWithDB(db).CreateRepo(ctx, database.Repository{
+	repoDraft, err := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db)).CreateRepo(ctx, withTupleNamespace(t, db, database.Repository{
 		Name:    "draft",
 		Path:    "foo/draft",
 		GitPath: "skills_foo/draft",
-	})
+	}))
 	require.Nil(t, err)
 
 	skillWithVersion, err := store.Create(ctx, database.Skill{RepositoryID: repoWithVersion.ID})

@@ -55,22 +55,22 @@ func parseCreateVideoInput(c *gin.Context) (*createVideoInput, error, bool) {
 func parseCreateVideoMultipartInput(c *gin.Context, input *createVideoInput) (*createVideoInput, error, bool) {
 	form, err := c.MultipartForm()
 	if err != nil {
-		writeVideoAPIError(c, http.StatusBadRequest, "invalid_request_error", "invalid multipart form: "+err.Error(), "invalid_request_error")
+		writeVideoAPIError(c, http.StatusBadRequest, types.ErrCodeInvalidRequest, "invalid multipart form: "+err.Error(), types.ErrTypeInvalidRequest)
 		return nil, fmt.Errorf("invalid multipart form: %w", err), false
 	}
 	modelID := strings.TrimSpace(firstMultipartValue(form, "model"))
 	prompt := firstMultipartValue(form, "prompt")
 	if modelID == "" || strings.TrimSpace(prompt) == "" {
 		err := fmt.Errorf("model and prompt cannot be empty")
-		writeVideoAPIError(c, http.StatusBadRequest, "invalid_request_error", "Model and prompt cannot be empty", "invalid_request_error")
+		writeVideoAPIError(c, http.StatusBadRequest, types.ErrCodeInvalidRequest, "Model and prompt cannot be empty", types.ErrTypeInvalidRequest)
 		return nil, err, false
 	}
 	if err := validateVideoMultipartInputReference(form); err != nil {
-		writeVideoAPIError(c, http.StatusBadRequest, "invalid_request_error", err.Error(), "invalid_request_error")
+		writeVideoAPIError(c, http.StatusBadRequest, types.ErrCodeInvalidRequest, err.Error(), types.ErrTypeInvalidRequest)
 		return nil, err, false
 	}
 	if err := validateVideoMultipartAudio(form); err != nil {
-		writeVideoAPIError(c, http.StatusBadRequest, "invalid_request_error", err.Error(), "invalid_request_error")
+		writeVideoAPIError(c, http.StatusBadRequest, types.ErrCodeInvalidRequest, err.Error(), types.ErrTypeInvalidRequest)
 		return nil, err, false
 	}
 
@@ -87,7 +87,7 @@ func parseCreateVideoMultipartInput(c *gin.Context, input *createVideoInput) (*c
 		parsed, err := strconv.ParseInt(seconds, 10, 64)
 		if err != nil || parsed <= 0 {
 			err := fmt.Errorf("seconds must be a positive integer")
-			writeVideoAPIError(c, http.StatusBadRequest, "invalid_request_error", err.Error(), "invalid_request_error")
+			writeVideoAPIError(c, http.StatusBadRequest, types.ErrCodeInvalidRequest, err.Error(), types.ErrTypeInvalidRequest)
 			return nil, err, false
 		}
 		input.adapterReq.Seconds = parsed
@@ -97,17 +97,17 @@ func parseCreateVideoMultipartInput(c *gin.Context, input *createVideoInput) (*c
 
 func parseCreateVideoJSONInput(c *gin.Context, input *createVideoInput) (*createVideoInput, error, bool) {
 	if err := c.ShouldBindJSON(&input.adapterReq); err != nil {
-		writeVideoAPIError(c, http.StatusBadRequest, "invalid_request_error", err.Error(), "invalid_request_error")
+		writeVideoAPIError(c, http.StatusBadRequest, types.ErrCodeInvalidRequest, err.Error(), types.ErrTypeInvalidRequest)
 		return nil, err, false
 	}
 	input.modelID = input.adapterReq.Model
 	if strings.TrimSpace(input.modelID) == "" || strings.TrimSpace(input.adapterReq.Prompt) == "" {
 		err := fmt.Errorf("model and prompt cannot be empty")
-		writeVideoAPIError(c, http.StatusBadRequest, "invalid_request_error", "Model and prompt cannot be empty", "invalid_request_error")
+		writeVideoAPIError(c, http.StatusBadRequest, types.ErrCodeInvalidRequest, "Model and prompt cannot be empty", types.ErrTypeInvalidRequest)
 		return nil, err, false
 	}
 	if err := validateVideoJSONInputReference(input.adapterReq); err != nil {
-		writeVideoAPIError(c, http.StatusBadRequest, "invalid_request_error", err.Error(), "invalid_request_error")
+		writeVideoAPIError(c, http.StatusBadRequest, types.ErrCodeInvalidRequest, err.Error(), types.ErrTypeInvalidRequest)
 		return nil, err, false
 	}
 	return input, nil, true
@@ -115,16 +115,16 @@ func parseCreateVideoJSONInput(c *gin.Context, input *createVideoInput) (*create
 
 func validateCreateVideoAdapter(c *gin.Context, input *createVideoInput, adapter text2video.T2VAdapter, model *types.Model) bool {
 	if adapter == nil {
-		writeVideoAPIError(c, http.StatusBadRequest, "unsupported_model", fmt.Sprintf("no video adapter for model '%s'", input.modelID), "invalid_request_error")
+		writeVideoAPIError(c, http.StatusBadRequest, types.ErrCodeUnsupportedModel, fmt.Sprintf("no video adapter for model '%s'", input.modelID), types.ErrTypeInvalidRequest)
 		return false
 	}
 	caps := adapter.Capabilities(model)
 	if !caps.SupportsCreate {
-		writeVideoAPIError(c, http.StatusBadRequest, "unsupported_model", fmt.Sprintf("model '%s' does not support video generation", input.modelID), "invalid_request_error")
+		writeVideoAPIError(c, http.StatusBadRequest, types.ErrCodeUnsupportedModel, fmt.Sprintf("model '%s' does not support video generation", input.modelID), types.ErrTypeInvalidRequest)
 		return false
 	}
 	if err := validateVideoAdapterCompatibility(input.adapterReq, input.isMultipart, input.hasMultipartInputReference, input.multipartAudioCount, caps); err != nil {
-		writeVideoAPIError(c, http.StatusBadRequest, "invalid_request_error", err.Error(), "invalid_request_error")
+		writeVideoAPIError(c, http.StatusBadRequest, types.ErrCodeInvalidRequest, err.Error(), types.ErrTypeInvalidRequest)
 		return false
 	}
 	return true
@@ -142,10 +142,10 @@ func buildCreateVideoProviderRequest(c *gin.Context, ctx context.Context, input 
 		finishModalGenerationTraceWithError(recorder, err, types.TraceErrUpstreamUnavailable)
 		var requestValidationErr *text2video.RequestValidationError
 		if errors.As(err, &requestValidationErr) {
-			writeVideoAPIError(c, http.StatusBadRequest, "invalid_request_error", requestValidationErr.Error(), "invalid_request_error")
+			writeVideoAPIError(c, http.StatusBadRequest, types.ErrCodeInvalidRequest, requestValidationErr.Error(), types.ErrTypeInvalidRequest)
 			return nil, false
 		}
-		writeVideoAPIError(c, http.StatusInternalServerError, "internal_error", err.Error(), "internal_error")
+		writeVideoAPIError(c, http.StatusInternalServerError, types.ErrCodeInternal, err.Error(), types.ErrTypeServer)
 		return nil, false
 	}
 	return providerReq, true
@@ -160,7 +160,7 @@ func proxyCreateVideoRequest(c *gin.Context, ctx context.Context, providerReq *t
 	if err != nil {
 		finishModalGenerationTraceWithError(recorder, err, types.TraceErrUpstreamUnavailable)
 		slog.ErrorContext(ctx, "failed to create reverse proxy", slog.Any("error", err))
-		writeVideoAPIError(c, http.StatusInternalServerError, "internal_error", fmt.Errorf("failed to create reverse proxy:%w", err).Error(), "internal_error")
+		writeVideoAPIError(c, http.StatusInternalServerError, types.ErrCodeInternal, fmt.Errorf("failed to create reverse proxy:%w", err).Error(), types.ErrTypeServer)
 		return nil, false
 	}
 
@@ -175,27 +175,27 @@ func parseCreateVideoProviderResponse(c *gin.Context, ctx context.Context, adapt
 		finishModalGenerationTraceWithError(recorder, err, types.TraceErrUpstreamError)
 		var requestValidationErr *text2video.RequestValidationError
 		if errors.As(err, &requestValidationErr) {
-			writeVideoAPIError(c, http.StatusBadRequest, "invalid_request_error", requestValidationErr.Error(), "invalid_request_error")
+			writeVideoAPIError(c, http.StatusBadRequest, types.ErrCodeInvalidRequest, requestValidationErr.Error(), types.ErrTypeInvalidRequest)
 			return nil, false
 		}
 		message := "failed to parse downstream video response: " + err.Error()
 		if downstreamPayload := downstreamErrorPayload(body); downstreamPayload != "" {
 			message += "; downstream payload: " + downstreamPayload
 		}
-		writeVideoAPIError(c, http.StatusInternalServerError, "internal_error", message, "internal_error")
+		writeVideoAPIError(c, http.StatusInternalServerError, types.ErrCodeInternal, message, types.ErrTypeServer)
 		return nil, false
 	}
 	return videoProviderResp, true
 }
 
-func (h *OpenAIHandlerImpl) createVideoGenerationTask(c *gin.Context, ctx context.Context, nsUUID, apikey string, input *createVideoInput, modelTarget *resolvedModelTarget, videoProviderResp *text2video.ProviderResponse, videoResp *types.VideoObject, recorder llmtrace.GenerationRecorder) (string, bool) {
+func (h *OpenAIHandlerImpl) createVideoGenerationTask(c *gin.Context, ctx context.Context, nsUUID string, tokenID int64, input *createVideoInput, modelTarget *resolvedModelTarget, videoProviderResp *text2video.ProviderResponse, videoResp *types.VideoObject, recorder llmtrace.GenerationRecorder) (string, bool) {
 	providerResourceID := videoResp.ID
 	videoID := newGatewayResourceID()
-	meteringEvent, err := h.createVideoMeteringEvent(ctx, nsUUID, apikey, input, modelTarget)
+	meteringEvent, err := h.createVideoMeteringEvent(ctx, nsUUID, tokenID, input, modelTarget)
 	if err != nil {
 		finishModalGenerationTraceWithError(recorder, err, types.TraceErrUpstreamError)
 		slog.ErrorContext(ctx, "failed to build video metering metadata", slog.Any("error", err), slog.String("video_id", videoID))
-		writeVideoAPIError(c, http.StatusInternalServerError, "internal_error", "failed to build metering metadata", "internal_error")
+		writeVideoAPIError(c, http.StatusInternalServerError, types.ErrCodeInternal, "failed to build metering metadata", types.ErrTypeServer)
 		return "", false
 	}
 	if _, err := h.aiGenerationStore.Create(ctx, database.AIGeneration{
@@ -212,13 +212,13 @@ func (h *OpenAIHandlerImpl) createVideoGenerationTask(c *gin.Context, ctx contex
 	}); err != nil {
 		finishModalGenerationTraceWithError(recorder, err, types.TraceErrUpstreamError)
 		slog.ErrorContext(ctx, "failed to persist ai video generation", slog.Any("error", err), slog.String("video_id", videoID), slog.String("provider_resource_id", providerResourceID))
-		writeVideoAPIError(c, http.StatusInternalServerError, "internal_error", "failed to persist ai generation", "internal_error")
+		writeVideoAPIError(c, http.StatusInternalServerError, types.ErrCodeInternal, "failed to persist ai generation", types.ErrTypeServer)
 		return "", false
 	}
 	return videoID, true
 }
 
-func (h *OpenAIHandlerImpl) createVideoMeteringEvent(ctx context.Context, nsUUID, apikey string, input *createVideoInput, modelTarget *resolvedModelTarget) (*commontypes.MeteringEvent, error) {
+func (h *OpenAIHandlerImpl) createVideoMeteringEvent(ctx context.Context, nsUUID string, tokenID int64, input *createVideoInput, modelTarget *resolvedModelTarget) (*commontypes.MeteringEvent, error) {
 	if input == nil || modelTarget == nil || modelTarget.Model == nil {
 		return nil, fmt.Errorf("missing video metering input")
 	}
@@ -232,7 +232,7 @@ func (h *OpenAIHandlerImpl) createVideoMeteringEvent(ctx context.Context, nsUUID
 		CompletionRC:   1,
 		CompletionDesc: input.adapterReq.Prompt,
 	}
-	return h.openaiComponent.BuildUsageMeteringEvent(ctx, nsUUID, modelTarget.Model, modelTarget.ModelName, usage, apikey)
+	return h.openaiComponent.BuildUsageMeteringEvent(ctx, nsUUID, modelTarget.Model, modelTarget.ModelName, usage, tokenID)
 }
 
 func writeVideoAPIError(c *gin.Context, status int, code, message, errorType string) {
@@ -409,7 +409,7 @@ func (h *OpenAIHandlerImpl) GetVideoContent(c *gin.Context) {
 
 func ensureVideoContentReady(c *gin.Context, generation *database.AIGeneration) bool {
 	if generation == nil {
-		writeVideoAPIError(c, http.StatusInternalServerError, "internal_error", "ai generation not found", "internal_error")
+		writeVideoAPIError(c, http.StatusInternalServerError, types.ErrCodeInternal, "ai generation not found", types.ErrTypeServer)
 		return false
 	}
 	status := strings.ToLower(strings.TrimSpace(generation.Status))
@@ -421,15 +421,15 @@ func ensureVideoContentReady(c *gin.Context, generation *database.AIGeneration) 
 		if failReason := strings.TrimSpace(generation.FailReason); failReason != "" {
 			message += ": " + failReason
 		}
-		writeVideoAPIError(c, http.StatusBadRequest, videoErrorFailed, message, "invalid_request_error")
+		writeVideoAPIError(c, http.StatusBadRequest, videoErrorFailed, message, types.ErrTypeInvalidRequest)
 	case string(commontypes.AIGatewayAsyncGenerationStatusCancelled):
-		writeVideoAPIError(c, http.StatusBadRequest, videoErrorCancelled, "video generation was cancelled", "invalid_request_error")
+		writeVideoAPIError(c, http.StatusBadRequest, videoErrorCancelled, "video generation was cancelled", types.ErrTypeInvalidRequest)
 	default:
 		message := "video generation is not completed"
 		if status != "" {
 			message += fmt.Sprintf(", current status is %q", status)
 		}
-		writeVideoAPIError(c, http.StatusBadRequest, videoErrorNotReady, message, "invalid_request_error")
+		writeVideoAPIError(c, http.StatusBadRequest, videoErrorNotReady, message, types.ErrTypeInvalidRequest)
 	}
 	return false
 }
@@ -445,7 +445,7 @@ type videoGenerationTarget struct {
 }
 
 func (h *OpenAIHandlerImpl) resolveVideoGenerationRequest(c *gin.Context, ctx context.Context, nsUUID, videoID string) (*videoGenerationTarget, bool) {
-	generation, modelTarget, err := h.resolveAIGenerationTarget(ctx, nsUUID, videoID, c.Request.Header)
+	generation, modelTarget, err := h.resolveAIGenerationTarget(c, ctx, nsUUID, videoID, c.Request.Header)
 	if err != nil {
 		handleAIGenerationError(c, err)
 		return nil, false
@@ -459,7 +459,7 @@ func (h *OpenAIHandlerImpl) resolveVideoGenerationRequest(c *gin.Context, ctx co
 func (h *OpenAIHandlerImpl) videoAdapterForGeneration(c *gin.Context, target *videoGenerationTarget) (text2video.T2VAdapter, bool) {
 	adapter := h.t2vRegistry.GetAdapter(target.modelTarget.Model)
 	if adapter == nil {
-		writeVideoAPIError(c, http.StatusBadRequest, "unsupported_model", fmt.Sprintf("no video adapter for model '%s'", target.generation.ModelID), "invalid_request_error")
+		writeVideoAPIError(c, http.StatusBadRequest, types.ErrCodeUnsupportedModel, fmt.Sprintf("no video adapter for model '%s'", target.generation.ModelID), types.ErrTypeInvalidRequest)
 		return nil, false
 	}
 	return adapter, true
@@ -472,7 +472,7 @@ func newVideoReverseProxy(c *gin.Context, ctx context.Context, modelTarget *reso
 
 	rp, err := proxy.NewReverseProxy(modelTarget.Target, opts...)
 	if err != nil {
-		writeVideoAPIError(c, http.StatusInternalServerError, "internal_error", fmt.Errorf("failed to create reverse proxy:%w", err).Error(), "internal_error")
+		writeVideoAPIError(c, http.StatusInternalServerError, types.ErrCodeInternal, fmt.Errorf("failed to create reverse proxy:%w", err).Error(), types.ErrTypeServer)
 		return nil, false
 	}
 	return rp, true
@@ -499,7 +499,7 @@ func (h *OpenAIHandlerImpl) fetchVideoRetrieveResponse(c *gin.Context, ctx conte
 
 	videoProviderResp, err := adapter.ParseRetrieveResponse(ctx, capture.Body())
 	if err != nil {
-		writeVideoAPIError(c, http.StatusInternalServerError, "internal_error", "failed to parse downstream video response: "+err.Error(), "internal_error")
+		writeVideoAPIError(c, http.StatusInternalServerError, types.ErrCodeInternal, "failed to parse downstream video response: "+err.Error(), types.ErrTypeServer)
 		return nil, nil, false
 	}
 	h.updateVideoGenerationFromRetrieve(ctx, target.generation, videoProviderResp)
@@ -509,7 +509,7 @@ func (h *OpenAIHandlerImpl) fetchVideoRetrieveResponse(c *gin.Context, ctx conte
 func buildVideoRetrieveRequest(c *gin.Context, ctx context.Context, adapter text2video.T2VAdapter, target *videoGenerationTarget) (*text2video.ProviderRequest, bool) {
 	providerReq, err := adapter.BuildRetrieveRequest(ctx, target.modelTarget.Model, providerResourceID(target.generation), target.generation.ProviderMetadata)
 	if err != nil {
-		writeVideoAPIError(c, http.StatusInternalServerError, "internal_error", err.Error(), "internal_error")
+		writeVideoAPIError(c, http.StatusInternalServerError, types.ErrCodeInternal, err.Error(), types.ErrTypeServer)
 		return nil, false
 	}
 	return providerReq, true
@@ -553,7 +553,7 @@ func updateVideoGenerationTaskFields(generation *database.AIGeneration, video *t
 func buildVideoContentRequest(c *gin.Context, ctx context.Context, adapter text2video.T2VAdapter, target *videoGenerationTarget) (*text2video.ProviderRequest, bool) {
 	providerReq, err := adapter.BuildContentRequest(ctx, target.modelTarget.Model, providerResourceID(target.generation), target.generation.ProviderMetadata)
 	if err != nil {
-		writeVideoAPIError(c, http.StatusInternalServerError, "internal_error", err.Error(), "internal_error")
+		writeVideoAPIError(c, http.StatusInternalServerError, types.ErrCodeInternal, err.Error(), types.ErrTypeServer)
 		return nil, false
 	}
 	return providerReq, true
@@ -577,7 +577,7 @@ func (h *OpenAIHandlerImpl) resolveVideoContentDownload(c *gin.Context, ctx cont
 		}
 	}
 	if contentResp.DownloadURL == "" {
-		writeVideoAPIError(c, http.StatusInternalServerError, "internal_error", "provider response did not include a video download url", "internal_error")
+		writeVideoAPIError(c, http.StatusInternalServerError, types.ErrCodeInternal, "provider response did not include a video download url", types.ErrTypeServer)
 		return nil, false
 	}
 	return contentResp, true
@@ -590,7 +590,7 @@ func (h *OpenAIHandlerImpl) fetchAndPersistVideoContentResponse(c *gin.Context, 
 		return nil, false
 	}
 	if err != nil {
-		writeVideoAPIError(c, http.StatusInternalServerError, "internal_error", err.Error(), "internal_error")
+		writeVideoAPIError(c, http.StatusInternalServerError, types.ErrCodeInternal, err.Error(), types.ErrTypeServer)
 		return nil, false
 	}
 	h.updateVideoGenerationMetadata(ctx, target.generation, contentResp.ProviderMetadata)
@@ -766,14 +766,14 @@ func (e *aiGenerationError) Error() string {
 	return e.APIError.Message
 }
 
-func (h *OpenAIHandlerImpl) resolveAIGenerationTarget(ctx context.Context, nsUUID, videoID string, headers http.Header) (*database.AIGeneration, *resolvedModelTarget, error) {
+func (h *OpenAIHandlerImpl) resolveAIGenerationTarget(c *gin.Context, ctx context.Context, nsUUID, videoID string, headers http.Header) (*database.AIGeneration, *resolvedModelTarget, error) {
 	if strings.TrimSpace(videoID) == "" {
 		return nil, nil, &aiGenerationError{
 			Status: http.StatusBadRequest,
 			APIError: types.Error{
-				Code:    "invalid_request_error",
+				Code:    types.ErrCodeInvalidRequest,
 				Message: "video id cannot be empty",
-				Type:    "invalid_request_error",
+				Type:    types.ErrTypeInvalidRequest,
 			},
 		}
 	}
@@ -781,9 +781,9 @@ func (h *OpenAIHandlerImpl) resolveAIGenerationTarget(ctx context.Context, nsUUI
 		return nil, nil, &aiGenerationError{
 			Status: http.StatusInternalServerError,
 			APIError: types.Error{
-				Code:    "internal_error",
+				Code:    types.ErrCodeInternal,
 				Message: "ai generation store not configured",
-				Type:    "internal_error",
+				Type:    types.ErrTypeServer,
 			},
 		}
 	}
@@ -792,9 +792,9 @@ func (h *OpenAIHandlerImpl) resolveAIGenerationTarget(ctx context.Context, nsUUI
 		return nil, nil, &aiGenerationError{
 			Status: http.StatusNotFound,
 			APIError: types.Error{
-				Code:    "not_found",
+				Code:    types.ErrCodeNotFound,
 				Message: "video not found",
-				Type:    "invalid_request_error",
+				Type:    types.ErrTypeInvalidRequest,
 			},
 			Cause: err,
 		}
@@ -803,13 +803,13 @@ func (h *OpenAIHandlerImpl) resolveAIGenerationTarget(ctx context.Context, nsUUI
 		return nil, nil, &aiGenerationError{
 			Status: http.StatusNotFound,
 			APIError: types.Error{
-				Code:    "not_found",
+				Code:    types.ErrCodeNotFound,
 				Message: "video not found",
-				Type:    "invalid_request_error",
+				Type:    types.ErrTypeInvalidRequest,
 			},
 		}
 	}
-	target, err := h.resolveModelTarget(ctx, nsUUID, generation.ModelID, headers)
+	target, err := h.resolveModelTarget(resolveModelTargetReq{C: c, ModelID: generation.ModelID, Headers: headers})
 	if err != nil {
 		return nil, nil, err
 	}
@@ -850,9 +850,9 @@ func streamVideoDownloadURL(c *gin.Context, downloadURL string) {
 	parsed, err := url.Parse(downloadURL)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": types.Error{
-			Code:    "internal_error",
+			Code:    types.ErrCodeInternal,
 			Message: err.Error(),
-			Type:    "internal_error",
+			Type:    types.ErrTypeServer,
 		}})
 		return
 	}
@@ -860,9 +860,9 @@ func streamVideoDownloadURL(c *gin.Context, downloadURL string) {
 	rp, err := proxy.NewReverseProxy(target)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": types.Error{
-			Code:    "internal_error",
+			Code:    types.ErrCodeInternal,
 			Message: err.Error(),
-			Type:    "internal_error",
+			Type:    types.ErrTypeServer,
 		}})
 		return
 	}

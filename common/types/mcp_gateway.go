@@ -25,26 +25,39 @@ func ValidMCPServerName(s string) bool {
 
 // CreateGatewayMCPServerReq is the request body for creating a gateway MCP server.
 type CreateGatewayMCPServerReq struct {
-	Name        string         `json:"name" binding:"required"`
-	Description string         `json:"description"`
-	Protocol    string         `json:"protocol" binding:"required,oneof=streamable sse"`
-	URL         string         `json:"url" binding:"required,url"`
-	Headers     map[string]any `json:"headers"`
-	Env         map[string]any `json:"env"`
-	Metadata    map[string]any `json:"metadata"`
+	Name        string `json:"name" binding:"required"`
+	Description string `json:"description"`
+	Protocol    string `json:"protocol" binding:"required,oneof=streamable sse"`
+	// URL and SvcName are mutually exclusive backend sources. Exactly one must be provided.
+	URL      string         `json:"url" binding:"omitempty,url"`
+	SvcName  string         `json:"svc_name"`
+	Headers  map[string]any `json:"headers"`
+	Env      map[string]any `json:"env"`
+	Metadata map[string]any `json:"metadata"`
 }
 
 // GatewayMCPServerReq is the input for updating a gateway MCP server.
 // All scalar fields are pointers so callers can distinguish "not provided" from zero value,
 // enabling partial updates with the same struct.
 type GatewayMCPServerReq struct {
-	Name        *string        `json:"name" binding:"omitempty"`
-	Description *string        `json:"description"`
-	Protocol    *string        `json:"protocol" binding:"omitempty,oneof=streamable sse"`
-	URL         *string        `json:"url" binding:"omitempty,url"`
-	Headers     map[string]any `json:"headers"`
-	Env         map[string]any `json:"env"`
-	Metadata    map[string]any `json:"metadata"`
+	Name        *string `json:"name" binding:"omitempty"`
+	Description *string `json:"description"`
+	Protocol    *string `json:"protocol" binding:"omitempty,oneof=streamable sse"`
+	// URL and SvcName are mutually exclusive backend sources after applying the update.
+	URL      *string        `json:"url" binding:"omitempty,url"`
+	SvcName  *string        `json:"svc_name"`
+	Headers  map[string]any `json:"headers"`
+	Env      map[string]any `json:"env"`
+	Metadata map[string]any `json:"metadata"`
+}
+
+// InspectGatewayMCPServerRequest is the request body for inspecting a gateway MCP server.
+// URL and SvcName are mutually exclusive backend sources. Exactly one must be provided.
+type InspectGatewayMCPServerRequest struct {
+	Protocol string         `json:"protocol" binding:"required,oneof=streamable sse"`
+	URL      string         `json:"url" binding:"omitempty,url"`
+	SvcName  string         `json:"svc_name"`
+	Headers  map[string]any `json:"headers,omitempty"`
 }
 
 // GatewayBackendResponse represents a gateway backend response
@@ -87,19 +100,22 @@ type GatewayMCPServerFilter struct {
 
 // GatewayMCPServerResponse is the view of an MCP server including cached capability status.
 type GatewayMCPServerResponse struct {
-	ID           int64          `json:"id"`
-	Name         string         `json:"name"`
-	Description  string         `json:"description"`
-	Protocol     string         `json:"protocol"`
-	URL          string         `json:"url"`
-	Headers      map[string]any `json:"headers,omitempty"`
-	Metadata     map[string]any `json:"metadata,omitempty"`
-	CreatedAt    time.Time      `json:"created_at"`
-	UpdatedAt    time.Time      `json:"updated_at"`
-	Capabilities map[string]any `json:"capabilities,omitempty"`
-	Status       string         `json:"status,omitempty"`
-	Error        string         `json:"error,omitempty"`
-	RefreshedAt  *time.Time     `json:"refreshed_at,omitempty"`
+	ID              int64          `json:"id"`
+	Name            string         `json:"name"`
+	Description     string         `json:"description"`
+	Protocol        string         `json:"protocol"`
+	URL             string         `json:"url"`
+	SvcName         string         `json:"svc_name,omitempty"`
+	RepoPath        string         `json:"repo_path,omitempty"`
+	Headers         map[string]any `json:"headers,omitempty"`
+	Metadata        map[string]any `json:"metadata,omitempty"`
+	CreatedAt       time.Time      `json:"created_at"`
+	UpdatedAt       time.Time      `json:"updated_at"`
+	Capabilities    map[string]any `json:"capabilities,omitempty"`
+	Status          string         `json:"status,omitempty"`
+	Error           string         `json:"error,omitempty"`
+	ProtocolVersion string         `json:"protocol_version,omitempty"`
+	RefreshedAt     *time.Time     `json:"refreshed_at,omitempty"`
 }
 
 // MCPServerStatus represents the capability cache status of an MCP server.
@@ -121,6 +137,7 @@ type GatewayMCPServerInspectTarget struct {
 	Name       string         `json:"name"`
 	Protocol   string         `json:"protocol"`
 	URL        string         `json:"url"`
+	SvcName    string         `json:"svc_name,omitempty"`
 	Headers    map[string]any `json:"headers,omitempty"`
 	ConfigHash string         `json:"config_hash"`
 }

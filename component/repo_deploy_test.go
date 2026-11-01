@@ -24,6 +24,28 @@ import (
 
 var errTestDeployer = errors.New("deployer error")
 
+// TestRepoComponent_DeleteDeploy_ServerlessModuleGrant permits cross-owner administration and price cleanup.
+func TestRepoComponent_DeleteDeploy_ServerlessModuleGrant(t *testing.T) {
+	ctx := types.WithAdminAuthorization(context.Background())
+	c := initializeTestRepoComponent(ctx, t)
+	d := &database.Deploy{ID: 42, RepoID: 7, Type: types.ServerlessType, UserUUID: "another-user", OwnerNamespace: "other-org"}
+	c.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "ns", "model").Return(&database.Repository{ID: 7, Path: "ns/model"}, nil)
+	c.mocks.stores.DeployTaskMock().EXPECT().GetServerlessDeployByRepID(ctx, int64(7)).Return(d, nil)
+	c.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "operator", types.UserWithAdminPermissions).Return(database.User{Username: "operator"}, nil)
+	c.mocks.stores.DeployTaskMock().EXPECT().GetDeployByID(ctx, int64(42)).Return(d, nil)
+	dr := types.DeployRequest{DeployID: 42, Namespace: "ns", Name: "model"}
+	c.mocks.deployer.EXPECT().Purge(ctx, dr).Return(nil)
+	c.mocks.deployer.EXPECT().Exist(ctx, dr).Return(false, nil)
+	c.mocks.stores.DeployTaskMock().EXPECT().DeleteDeployNow(ctx, int64(42)).Return(nil)
+	c.mocks.components.accounting.EXPECT().OffLinePrice(ctx, types.AcctPriceOffLineReq{
+		SkuType: types.SKUCSGHub, ResourceID: "csghub://serverless/ns/model",
+	}).Return(nil, nil)
+	err := c.DeleteDeploy(ctx, types.DeployActReq{
+		RepoType: types.ModelRepo, Namespace: "ns", Name: "model", CurrentUser: "operator", DeployType: types.ServerlessType,
+	})
+	require.NoError(t, err)
+}
+
 func TestRepoComponent_DeployInstanceLastLogs_NormalUser(t *testing.T) {
 	ctx := context.TODO()
 	repo := initializeTestRepoComponent(ctx, t)
@@ -314,8 +336,8 @@ func TestCheckDeployPermissionForUser_PrivateEndpoint_AdminForbidden(t *testing.
 	repo := initializeTestRepoComponent(ctx, t)
 
 	dbUser := database.User{
-		ID:       456,
-		RoleMask: "admin",
+		ID:              456,
+		RoleAssignments: superAdminRoleAssignments(),
 	}
 	dbDeploy := &database.Deploy{
 		ID:          1,
@@ -345,9 +367,9 @@ func TestCheckDeployPermissionForUser_PrivateInference_AdminForbiddenWithOwnerNa
 	repo := initializeTestRepoComponent(ctx, t)
 
 	dbUser := database.User{
-		ID:       456,
-		UUID:     "admin-uuid",
-		RoleMask: "admin",
+		ID:              456,
+		UUID:            "admin-uuid",
+		RoleAssignments: superAdminRoleAssignments(),
 	}
 	dbDeploy := &database.Deploy{
 		ID:             1,
@@ -380,9 +402,9 @@ func TestCheckDeployPermissionForUser_PrivateInference_AdminWithNamespaceReadAll
 	repo := initializeTestRepoComponent(ctx, t)
 
 	dbUser := database.User{
-		ID:       456,
-		UUID:     "admin-uuid",
-		RoleMask: "admin",
+		ID:              456,
+		UUID:            "admin-uuid",
+		RoleAssignments: superAdminRoleAssignments(),
 	}
 	dbDeploy := &database.Deploy{
 		ID:             1,
@@ -446,8 +468,8 @@ func TestCheckDeployPermissionForUser_PublicEndpoint_AdminForbidden(t *testing.T
 	repo := initializeTestRepoComponent(ctx, t)
 
 	dbUser := database.User{
-		ID:       456,
-		RoleMask: "admin",
+		ID:              456,
+		RoleAssignments: superAdminRoleAssignments(),
 	}
 	dbDeploy := &database.Deploy{
 		ID:          1,
@@ -469,6 +491,7 @@ func TestCheckDeployPermissionForUser_PublicEndpoint_AdminForbidden(t *testing.T
 	require.Nil(t, deploy)
 }
 
+// TestCheckDeployPermissionForUser_PublicEndpoint_OwnerNamespaceReadMemberAllowed checks the expected user query options.
 func TestCheckDeployPermissionForUser_PublicEndpoint_OwnerNamespaceReadMemberAllowed(t *testing.T) {
 	// issue csghub-portal#3416: org members of the owner namespace can view the instance
 	ctx := context.TODO()
@@ -487,8 +510,8 @@ func TestCheckDeployPermissionForUser_PublicEndpoint_OwnerNamespaceReadMemberAll
 		OwnerNamespace: "org1",
 	}
 
-	repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "org-member").Return(dbUser, nil)
-	repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "org-member").Return(dbUser, nil)
+	repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "org-member").Return(dbUser, nil).Once()
+	repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "org-member", types.UserWithAdminPermissions).Return(dbUser, nil).Once()
 	repo.mocks.stores.DeployTaskMock().EXPECT().GetDeployByID(ctx, int64(1)).Return(dbDeploy, nil)
 	repo.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "org1").Return(database.Namespace{
 		UUID: "ns-uuid-1",
@@ -534,6 +557,7 @@ func TestCheckDeployPermissionForUser_PublicEndpoint_DifferentOrgForbidden(t *te
 	require.Nil(t, deploy)
 }
 
+// TestRepoComponent_DeployInstanceLastLogs_ServerlessType checks the expected user query options.
 func TestRepoComponent_DeployInstanceLastLogs_ServerlessType(t *testing.T) {
 	ctx := context.TODO()
 	repo := initializeTestRepoComponent(ctx, t)
@@ -549,10 +573,11 @@ func TestRepoComponent_DeployInstanceLastLogs_ServerlessType(t *testing.T) {
 	}
 
 	dbUser := database.User{
-		ID:       1,
-		RoleMask: "admin",
+		ID:              1,
+		RoleAssignments: superAdminRoleAssignments(),
 	}
 	dbDeploy := &database.Deploy{
+		Type:        types.ServerlessType,
 		ID:          6,
 		UserID:      1,
 		SvcName:     "svc-6",
@@ -560,7 +585,7 @@ func TestRepoComponent_DeployInstanceLastLogs_ServerlessType(t *testing.T) {
 		SecureLevel: types.EndpointPublic,
 	}
 
-	repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "admin-user").Return(dbUser, nil)
+	repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "admin-user", types.UserWithAdminPermissions).Return(dbUser, nil)
 	repo.mocks.stores.DeployTaskMock().EXPECT().GetDeployByID(ctx, int64(6)).Return(dbDeploy, nil)
 
 	lokiResp := &loki.LokiQueryResponse{}
@@ -1061,7 +1086,8 @@ func TestRepoComponent_DeployAccessOrgInstance(t *testing.T) {
 
 	t.Run("org member with read permission can view", func(t *testing.T) {
 		repo := initializeTestRepoComponent(ctx, t)
-		repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "member").Return(database.User{ID: 200, UUID: "member-uuid"}, nil)
+		repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "member").Return(database.User{ID: 200, UUID: "member-uuid"}, nil).Once()
+		repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "member", types.UserWithAdminPermissions).Return(database.User{ID: 200, UUID: "member-uuid"}, nil).Once()
 		repo.mocks.stores.DeployTaskMock().EXPECT().GetDeployByID(ctx, int64(1)).Return(newOrgDeploy(), nil)
 		repo.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "org1").Return(database.Namespace{UUID: "ns-uuid-1"}, nil)
 		expectNamespacePermissionCheck(repo, rebac.NamespaceCanRead, true)
@@ -1073,7 +1099,8 @@ func TestRepoComponent_DeployAccessOrgInstance(t *testing.T) {
 
 	t.Run("org member without read permission cannot view", func(t *testing.T) {
 		repo := initializeTestRepoComponent(ctx, t)
-		repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "member").Return(database.User{ID: 200, UUID: "member-uuid"}, nil)
+		repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "member").Return(database.User{ID: 200, UUID: "member-uuid"}, nil).Once()
+		repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "member", types.UserWithAdminPermissions).Return(database.User{ID: 200, UUID: "member-uuid"}, nil).Once()
 		repo.mocks.stores.DeployTaskMock().EXPECT().GetDeployByID(ctx, int64(1)).Return(newOrgDeploy(), nil)
 		repo.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "org1").Return(database.Namespace{UUID: "ns-uuid-1"}, nil)
 		expectNamespacePermissionCheck(repo, rebac.NamespaceCanRead, false)
@@ -1084,7 +1111,8 @@ func TestRepoComponent_DeployAccessOrgInstance(t *testing.T) {
 
 	t.Run("org member with only read permission cannot stop", func(t *testing.T) {
 		repo := initializeTestRepoComponent(ctx, t)
-		repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "member").Return(database.User{ID: 200, UUID: "member-uuid"}, nil)
+		repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "member").Return(database.User{ID: 200, UUID: "member-uuid"}, nil).Once()
+		repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "member", types.UserWithAdminPermissions).Return(database.User{ID: 200, UUID: "member-uuid"}, nil).Once()
 		repo.mocks.stores.DeployTaskMock().EXPECT().GetDeployByID(ctx, int64(1)).Return(newOrgDeploy(), nil)
 		repo.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "org1").Return(database.Namespace{UUID: "ns-uuid-1"}, nil)
 		expectNamespacePermissionCheck(repo, rebac.NamespaceCanWrite, false)
@@ -1099,7 +1127,8 @@ func TestRepoComponent_DeployAccessOrgInstance(t *testing.T) {
 
 	t.Run("org member with write permission can stop", func(t *testing.T) {
 		repo := initializeTestRepoComponent(ctx, t)
-		repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "member").Return(database.User{ID: 200, UUID: "member-uuid"}, nil)
+		repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "member").Return(database.User{ID: 200, UUID: "member-uuid"}, nil).Once()
+		repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "member", types.UserWithAdminPermissions).Return(database.User{ID: 200, UUID: "member-uuid"}, nil).Once()
 		repo.mocks.stores.DeployTaskMock().EXPECT().GetDeployByID(ctx, int64(1)).Return(newOrgDeploy(), nil)
 		repo.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "org1").Return(database.Namespace{UUID: "ns-uuid-1"}, nil)
 		expectNamespacePermissionCheck(repo, rebac.NamespaceCanWrite, true)
@@ -1117,7 +1146,7 @@ func TestRepoComponent_DeployAccessOrgInstance(t *testing.T) {
 
 	t.Run("personal instance is owner only for operate", func(t *testing.T) {
 		repo := initializeTestRepoComponent(ctx, t)
-		repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "other").Return(database.User{ID: 200}, nil)
+		repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "other").Return(database.User{ID: 200}, nil).Once()
 		// legacy personal deploy without owner namespace
 		repo.mocks.stores.DeployTaskMock().EXPECT().GetDeployByID(ctx, int64(1)).Return(&database.Deploy{
 			ID:          1,
@@ -1144,7 +1173,8 @@ func TestRepoComponent_DeleteDeploy_OrgMemberOperator(t *testing.T) {
 	ctx := context.TODO()
 	repo := initializeTestRepoComponent(ctx, t)
 	// operator is an org member with write permission, creator is user 100
-	repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "member").Return(database.User{ID: 200, UUID: "member-uuid"}, nil)
+	repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "member").Return(database.User{ID: 200, UUID: "member-uuid"}, nil).Once()
+	repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "member", types.UserWithAdminPermissions).Return(database.User{ID: 200, UUID: "member-uuid"}, nil).Once()
 	repo.mocks.stores.DeployTaskMock().EXPECT().GetDeployByID(ctx, int64(1)).Return(&database.Deploy{
 		ID:             1,
 		UserID:         100,

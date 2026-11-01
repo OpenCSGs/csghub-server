@@ -191,6 +191,7 @@ func cancelRunningWorkflow(ctx context.Context, temporalClient client.Client, wo
 		if err := temporalClient.CancelWorkflow(ctx, workflowID, describeResp.WorkflowExecutionInfo.Execution.RunId); err != nil {
 			return false, fmt.Errorf("failed to cancel existing running workflow: %w", err)
 		}
+		time.Sleep(2 * time.Second)
 		return true, nil
 	}
 

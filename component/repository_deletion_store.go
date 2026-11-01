@@ -22,3 +22,8 @@ func newRepositoryDeletionJobClientWithDB(db *database.DB) (database.RepositoryD
 	}
 	return workhub.NewRepositoryDeletionJobClient(client), nil
 }
+
+// newRebacTupleJobClient creates the permission producer injected into business Stores.
+func newRebacTupleJobClient() (database.RebacTupleJobClient, error) {
+	return workhub.NewRebacTupleJobClientWithDB(database.GetDB())
+}

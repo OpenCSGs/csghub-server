@@ -22,6 +22,11 @@ func NeedPhoneVerified(config *config.Config) gin.HandlerFunc {
 	return MustLogin()
 }
 
+// NeedEmailVerified falls back to the default login requirement in CE.
+func NeedEmailVerified(config *config.Config) gin.HandlerFunc {
+	return MustLogin()
+}
+
 // MustUserOrgApiKey validates the auth context for CE requests.
 func MustUserOrgApiKey(config *config.Config) gin.HandlerFunc {
 	return func(ctx *gin.Context) {

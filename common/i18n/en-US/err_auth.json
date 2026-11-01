@@ -46,5 +46,8 @@
     },
     "error.AUTH-ERR-9": {
         "other": "Need API key for authentication"
+    },
+    "error.AUTH-ERR-16": {
+        "other": "Email address not set"
     }
 }

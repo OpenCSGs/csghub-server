@@ -18,6 +18,17 @@ import (
 // testRepoVisibilityWithWrite verifies CE and EE visibility changes use repository write permission for every repository type.
 func testRepoVisibilityWithWrite(t *testing.T) {
 	ctx := context.Background()
+	t.Run("public does not require a sensitive check", func(t *testing.T) {
+		for _, status := range []types.SensitiveCheckStatus{
+			types.SensitiveCheckPass, types.SensitiveCheckPending, types.SensitiveCheckFail,
+			types.SensitiveCheckSkip, types.SensitiveCheckException,
+		} {
+			comp := &repoComponentImpl{}
+			requireSensitiveCheck, err := comp.allowPublic(&database.Repository{SensitiveCheckStatus: status})
+			require.NoError(t, err)
+			require.False(t, requireSensitiveCheck)
+		}
+	})
 	for _, tc := range []struct {
 		name          string
 		repoType      types.RepositoryType
@@ -43,7 +54,7 @@ func testRepoVisibilityWithWrite(t *testing.T) {
 			repo.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "ns").Return(database.Namespace{
 				Path: "ns", NamespaceType: tc.namespaceType,
 			}, nil)
-			repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "writer").Return(database.User{
+			repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "writer", types.UserWithAdminPermissions).Return(database.User{
 				Username: "writer", UUID: "writer-uuid",
 			}, nil).Twice()
 			repoAuthorizerMock(repo).EXPECT().Check(ctx, mock.MatchedBy(func(req rebac.CheckRequest) bool {
@@ -53,9 +64,13 @@ func testRepoVisibilityWithWrite(t *testing.T) {
 				repo.mocks.gitServer.EXPECT().UpdateRepo(ctx, mock.MatchedBy(func(req gitserver.UpdateRepoReq) bool {
 					return req.Private == tc.private
 				})).Return(&gitserver.CreateRepoResp{}, nil)
+				var visibilitySetting []interface{}
+				if tc.repoType == types.ModelRepo {
+					visibilitySetting = append(visibilitySetting, types.RepositoryUpdateOptions{Private: &tc.private})
+				}
 				repo.mocks.stores.RepoMock().EXPECT().UpdateRepo(ctx, mock.MatchedBy(func(updated database.Repository) bool {
 					return updated.Private == tc.private
-				})).Return(&database.Repository{Private: tc.private}, nil)
+				}), visibilitySetting...).Return(&database.Repository{Private: tc.private}, nil)
 			}
 
 			result, err := repo.UpdateRepo(ctx, types.UpdateRepoReq{

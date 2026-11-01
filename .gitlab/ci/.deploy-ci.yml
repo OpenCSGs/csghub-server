@@ -1,0 +1,98 @@
+## Deploy to Staging ###################################
+.deploy:
+  image: ${ALI_ACR_REGISTRY}/alpine:latest
+  stage: deploy
+  needs:
+    - "build-stage-saas"
+  before_script:
+    - sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
+    - apk add --no-cache curl
+  script:
+    - |
+      curl --fail-with-body \
+        --request POST \
+        --form "token=${STARHUB_DEPLOY_TRIGGER_TOKEN}" \
+        --form ref=main \
+        --form "variables[starhub_tag]=${IMAGE_TAG}" \
+        --form "variables[ENV_NAME]=$STG" \
+        https://git-devops.opencsg.com/api/v4/projects/58/trigger/pipeline
+  rules:
+    - if: $CI_PIPELINE_SOURCE != "schedule" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+## Trigger starhub-deploy project (only works for arch x86_64)
+# trigger:deploy:stg1:
+#   extends: .deploy
+#   variables:
+#     STG: "stg1"
+
+# trigger:deploy:stg2:
+#   extends: .deploy
+#   variables:
+#     STG: "stg2"
+
+## Update Helm values.yaml-stg for New Staging (GitOps) ######################
+.update-helm-stg:
+  image: ${ALI_ACR_REGISTRY}/docker:27.3
+  stage: deploy
+  needs:
+    - "build-stage-saas"
+  variables:
+    DOCKER_HOST: "tcp://docker:2375"
+    DOCKER_TLS_CERTDIR: ""
+    BUILDX_NO_DEFAULT_ATTESTATIONS: 1
+    DOCKERCACHE: "${CI_PROJECT_DIR}/.cache/docker"
+    IMAGE_TAG: "${CI_COMMIT_SHORT_SHA}-cn-saas"
+  services:
+    - name: ${ALI_ACR_REGISTRY}/docker:27.3-dind
+      command: ["--feature=containerd-snapshotter", "--experimental"]
+      alias: docker
+  before_script:
+    - . .gitlab/ci/scripts/update-helm-stg.sh
+    - update_helm_stg_setup
+  script:
+    - update_helm_stg_run
+
+  artifacts:
+    reports:
+      dotenv: image.env  
+
+  rules:
+        - if: $CI_PIPELINE_SOURCE != "schedule" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+update:helm:stg:
+  extends: .update-helm-stg
+
+# 新增job用于触发new-stg环境的部署
+trigger:deploy:new-stg:
+  extends: .deploy
+  variables:
+    STG: "new-stg"
+  needs:
+    - update:helm:stg
+  script:
+    - |
+      # 该 job 现在 rules: when: never（已停用，stg 部署由 deploy-stg-saas 负责）。
+      # 若将来回滚启用，注意别再往日志里打 token。
+      echo "trigger:deploy:new-stg: IMAGE_TAG=[$IMAGE_TAG] ENV_NAME=[$STG]"
+      if [ -z "$IMAGE_TAG" ]; then
+        echo "FATAL: IMAGE_TAG is empty (update:helm:stg 的 dotenv artifact 没传过来？)"
+        exit 1
+      fi
+      if [ -z "$NEWSTG_STARHUB_DEPLOY_TRIGGER_TOKEN" ]; then
+        echo "FATAL: NEWSTG_STARHUB_DEPLOY_TRIGGER_TOKEN is not set"
+        exit 1
+      fi
+
+      # --fail-with-body：HTTP 4xx/5xx 时让 job 变红，而不是静默成功
+      curl --fail-with-body \
+        --request POST \
+        --form "token=${NEWSTG_STARHUB_DEPLOY_TRIGGER_TOKEN}" \
+        --form ref=main \
+        --form "variables[starhub_tag]=${IMAGE_TAG}" \
+        --form "variables[ENV_NAME]=$STG" \
+        https://git-devops.opencsg.com/api/v4/projects/58/trigger/pipeline
+  rules:
+    # 【已停用】stg 部署改由本项目的 deploy-stg-saas 负责；要回滚成触发 project 58，把下面这行换回：
+    #   - if: $CI_PIPELINE_SOURCE != "schedule" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - when: never
+

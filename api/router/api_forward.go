@@ -9,7 +9,8 @@ import (
 	"opencsg.com/csghub-server/common/config"
 )
 
-func createForwardRoutes(apiGroup *gin.RouterGroup, config *config.Config) error {
+// createForwardRoutes initializes proxy handlers and registers their access gates.
+func createForwardRoutes(apiGroup *gin.RouterGroup, middlewareCollection middleware.MiddlewareCollection, config *config.Config) error {
 	// dataflow proxy
 	dataflowHandler, err := handler.NewDataflowProxyHandler(config)
 	if err != nil {
@@ -30,11 +31,18 @@ func createForwardRoutes(apiGroup *gin.RouterGroup, config *config.Config) error
 	dataflowGrp.Use(middleware.MustLogin())
 	dataflowGrp.Any("/*any", dataflowHandler.Proxy)
 
-	academyGrp := apiGroup.Group("/academy")
-	academyGrp.Any("/*any", academyHandler.Proxy)
+	createAcademyForwardRoutes(apiGroup, academyHandler.Proxy)
+	createAdminAcademyRoutes(apiGroup, middlewareCollection, academyHandler.AcademyProxyToAPI)
 
 	supplydemandGrp := apiGroup.Group("/supplydemand")
 	supplydemandGrp.Any("/*any", supplydemandHandler.Proxy)
 
 	return nil
+}
+
+// createAcademyForwardRoutes preserves public and personal academy requests.
+// The proxy handler rejects legacy administration paths before forwarding.
+func createAcademyForwardRoutes(apiGroup *gin.RouterGroup, forward gin.HandlerFunc) {
+	academyGrp := apiGroup.Group("/academy")
+	academyGrp.Any("/*any", forward)
 }

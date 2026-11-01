@@ -37,6 +37,7 @@ func expectEvaluationCommitLookups(c *testEvaluationWithMocks, ctx context.Conte
 	}).Return(&types.Commit{ID: evalDatasetCommit}, nil).Maybe()
 }
 
+// TestEvaluationComponent_CreateEvaluation checks the expected user query options.
 func TestEvaluationComponent_CreateEvaluation(t *testing.T) {
 	req := types.EvaluationReq{
 		TaskName:           "test",
@@ -79,11 +80,11 @@ func TestEvaluationComponent_CreateEvaluation(t *testing.T) {
 		c := initializeTestEvaluationComponent(ctx, t)
 		expectEvaluationCommitLookups(c, ctx)
 		c.config.Argo.QuotaGPUNumber = "1"
-		c.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, req.Username).Return(database.User{
-			RoleMask: "admin",
-			Username: req.Username,
-			UUID:     req.Username,
-			ID:       1,
+		c.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, req.Username, types.UserWithAdminPermissions).Return(database.User{
+			RoleAssignments: superAdminRoleAssignments(),
+			Username:        req.Username,
+			UUID:            req.Username,
+			ID:              1,
 		}, nil).Once()
 		c.mocks.stores.ModelMock().EXPECT().FindByPath(ctx, "opencsg", "wukong").Return(
 			&database.Model{
@@ -116,11 +117,11 @@ func TestEvaluationComponent_CreateEvaluation(t *testing.T) {
 		c := initializeTestEvaluationComponent(ctx, t)
 		expectEvaluationCommitLookups(c, ctx)
 		c.config.Argo.QuotaGPUNumber = "1"
-		c.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, req.Username).Return(database.User{
-			RoleMask: "admin",
-			Username: req.Username,
-			UUID:     req.Username,
-			ID:       1,
+		c.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, req.Username, types.UserWithAdminPermissions).Return(database.User{
+			RoleAssignments: superAdminRoleAssignments(),
+			Username:        req.Username,
+			UUID:            req.Username,
+			ID:              1,
 		}, nil).Once()
 		c.mocks.stores.ModelMock().EXPECT().FindByPath(ctx, "opencsg", "wukong").Return(
 			&database.Model{
@@ -183,11 +184,11 @@ func TestEvaluationComponent_CreateEvaluation(t *testing.T) {
 			Datasets:           []string{"opencsg/hellaswag"},
 			RuntimeFrameworkId: 1,
 		}
-		c.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, invalidReq.Username).Return(database.User{
-			RoleMask: "admin",
-			Username: invalidReq.Username,
-			UUID:     invalidReq.Username,
-			ID:       1,
+		c.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, invalidReq.Username, types.UserWithAdminPermissions).Return(database.User{
+			RoleAssignments: superAdminRoleAssignments(),
+			Username:        invalidReq.Username,
+			UUID:            invalidReq.Username,
+			ID:              1,
 		}, nil).Once()
 		c.mocks.stores.RuntimeFrameworkMock().EXPECT().FindEnabledByID(ctx, int64(1)).Return(&database.RuntimeFramework{
 			FrameName: "evalscope",
@@ -208,11 +209,11 @@ func TestEvaluationComponent_CreateEvaluation(t *testing.T) {
 			Datasets:           []string{"baddataset"},
 			RuntimeFrameworkId: 1,
 		}
-		c.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, invalidReq.Username).Return(database.User{
-			RoleMask: "admin",
-			Username: invalidReq.Username,
-			UUID:     invalidReq.Username,
-			ID:       1,
+		c.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, invalidReq.Username, types.UserWithAdminPermissions).Return(database.User{
+			RoleAssignments: superAdminRoleAssignments(),
+			Username:        invalidReq.Username,
+			UUID:            invalidReq.Username,
+			ID:              1,
 		}, nil).Once()
 		c.mocks.stores.RuntimeFrameworkMock().EXPECT().FindEnabledByID(ctx, int64(1)).Return(&database.RuntimeFramework{
 			FrameName: "evalscope",
@@ -242,11 +243,11 @@ func TestEvaluationComponent_CreateEvaluation(t *testing.T) {
 			CustomDataSets:     []string{"badcustomdataset"},
 			RuntimeFrameworkId: 1,
 		}
-		c.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, invalidReq.Username).Return(database.User{
-			RoleMask: "admin",
-			Username: invalidReq.Username,
-			UUID:     invalidReq.Username,
-			ID:       1,
+		c.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, invalidReq.Username, types.UserWithAdminPermissions).Return(database.User{
+			RoleAssignments: superAdminRoleAssignments(),
+			Username:        invalidReq.Username,
+			UUID:            invalidReq.Username,
+			ID:              1,
 		}, nil).Once()
 		c.mocks.stores.RuntimeFrameworkMock().EXPECT().FindEnabledByID(ctx, int64(1)).Return(&database.RuntimeFramework{
 			FrameName: "evalscope",
@@ -277,7 +278,7 @@ func TestEvaluationComponent_CreateEvaluation(t *testing.T) {
 			Datasets:           []string{"opencsg/hellaswag"},
 			RuntimeFrameworkId: 1,
 		}
-		c.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, req.Username).Return(database.User{
+		c.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, req.Username, types.UserWithAdminPermissions).Return(database.User{
 			RoleMask: "",
 			Username: req.Username,
 			UUID:     req.Username,
@@ -300,7 +301,7 @@ func TestEvaluationComponent_CreateEvaluation(t *testing.T) {
 			Datasets:           []string{"opencsg/hellaswag"},
 			RuntimeFrameworkId: 1,
 		}
-		c.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, req.Username).Return(database.User{
+		c.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, req.Username, types.UserWithAdminPermissions).Return(database.User{
 			RoleMask: "",
 			Username: req.Username,
 			UUID:     req.Username,
@@ -324,7 +325,7 @@ func TestEvaluationComponent_CreateEvaluation(t *testing.T) {
 			Datasets:           []string{"opencsg/hellaswag"},
 			RuntimeFrameworkId: 1,
 		}
-		c.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "testuser").Return(database.User{
+		c.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "testuser", types.UserWithAdminPermissions).Return(database.User{
 			RoleMask: "",
 			Username: "testuser",
 			UUID:     "user-uuid",

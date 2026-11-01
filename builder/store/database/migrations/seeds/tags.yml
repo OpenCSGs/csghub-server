@@ -186,6 +186,12 @@ tags:
   show_name: 关系抽取
   built_in: true
 - category: task
+  group: natural_language_processing
+  name: typed-decisions
+  scope: model
+  show_name: 类型化决策
+  built_in: true
+- category: task
   group: audio_processing
   name: auto-speech-recognition
   scope: model
@@ -761,4 +767,10 @@ tags:
   scope: space
   show_name: Agent UI
   i18n_key: agent-ui
+  built_in: true
+- category: user
+  group: user
+  name: low_priority
+  scope: user
+  show_name: 低优先级
   built_in: true

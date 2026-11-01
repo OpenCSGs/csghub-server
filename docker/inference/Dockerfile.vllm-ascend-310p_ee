@@ -1,0 +1,39 @@
+# vLLM Ascend image for Atlas 300I Duo / 310P.
+# The build can override this tag when upgrading the runtime.
+ARG VLLM_ASCEND_IMAGE=quay.io/ascend/vllm-ascend:v0.27.1rc1-310p
+FROM ${VLLM_ASCEND_IMAGE}
+
+# 310P does not support triton or triton-ascend. The base image uninstalls
+# both, but a leftover triton package can still be imported without
+# triton.language. torch._dynamo then crashes while loading torch_npu.
+RUN python3 -m pip config set global.index-url https://mirrors.aliyun.com/pypi/simple && \
+    python3 -m pip install --no-cache-dir csghub-sdk==0.7.3 supervisor && \
+    python3 -m pip uninstall -y triton triton-ascend && \
+    python3 -c 'import importlib.util, pathlib, shutil, site, sys; \
+[shutil.rmtree(p) if p.is_dir() and not p.is_symlink() else p.unlink(missing_ok=True) \
+ for root in map(pathlib.Path, site.getsitepackages()) \
+ for p in root.glob("triton*") \
+ if p.name == "triton" or p.name.startswith(("triton-", "triton_ascend"))]; \
+spec = importlib.util.find_spec("triton"); \
+sys.exit(0 if spec is None else "triton is still importable from " + str(spec.origin))'
+
+RUN mkdir -p /var/log/supervisord
+COPY ./supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+COPY ./vllm/ /etc/csghub/
+RUN chmod +x /etc/csghub/*.sh
+
+WORKDIR /workspace/
+# vLLM only forces spawn for CUDA/XPU, not NPU, so Ascend defaults to fork;
+# the forked EngineCore then dies with "Cannot re-initialize NPU in forked
+# subprocess". vllm-ascend has not set a default yet (vllm-ascend#4502).
+ENV HUGGINGFACE_HUB_CACHE=/workspace/ \
+    HF_HUB_ENABLE_HF_TRANSFER=0 \
+    VLLM_ENFORCE_EAGER=0 \
+    VLLM_WORKER_MULTIPROC_METHOD=spawn \
+    ASCEND_310P=1
+
+EXPOSE 8000
+
+# Drop the base image entrypoint so Kubernetes can override CMD.
+ENTRYPOINT []
+CMD ["/usr/local/python3.12.13/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]

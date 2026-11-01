@@ -20,8 +20,8 @@ func TestAgentPromptStore_ListByUsername(t *testing.T) {
 	ctx := context.TODO()
 
 	store := database.NewAgentPromptStoreWithDB(db)
-	userStore := database.NewUserStoreWithDB(db)
-	repoStore := database.NewRepoStoreWithDB(db)
+	userStore := database.NewUserStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
+	repoStore := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
 	promptStore := database.NewPromptStoreWithDB(db)
 	preferenceStore := database.NewAgentUserPreferenceStoreWithDB(db)
 
@@ -30,7 +30,7 @@ func TestAgentPromptStore_ListByUsername(t *testing.T) {
 	err := userStore.Create(ctx, &database.User{
 		Username: "testuser",
 		UUID:     userUUID,
-	}, &database.Namespace{})
+	}, &database.Namespace{Path: "testuser"})
 	require.NoError(t, err)
 
 	user, err := userStore.FindByUsername(ctx, "testuser")
@@ -187,8 +187,8 @@ func TestAgentPromptStore_FindByID(t *testing.T) {
 	ctx := context.TODO()
 
 	store := database.NewAgentPromptStoreWithDB(db)
-	userStore := database.NewUserStoreWithDB(db)
-	repoStore := database.NewRepoStoreWithDB(db)
+	userStore := database.NewUserStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
+	repoStore := database.NewRepoStoreWithDBAndJobClients(db, nil, tests.NewFixtureRebacTupleJobClient(db))
 	promptStore := database.NewPromptStoreWithDB(db)
 
 	// Create test user
@@ -196,7 +196,7 @@ func TestAgentPromptStore_FindByID(t *testing.T) {
 	err := userStore.Create(ctx, &database.User{
 		Username: "testuser2",
 		UUID:     userUUID,
-	}, &database.Namespace{})
+	}, &database.Namespace{Path: "testuser2"})
 	require.NoError(t, err)
 
 	user, err := userStore.FindByUsername(ctx, "testuser2")

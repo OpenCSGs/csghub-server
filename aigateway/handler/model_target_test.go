@@ -27,9 +27,9 @@ func TestResolveModelTarget_ExternalModel(t *testing.T) {
 		},
 		Upstreams: []commontypes.UpstreamConfig{{URL: "https://api.example.com/v1/chat/completions", Enabled: true, ModelName: "backend-model"}},
 	}
-	tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "model1").Return(model, nil).Once()
+	tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, &types.GetModelByIDReq{Caller: &commontypes.GatewayWhitelistCaller{}, ModelID: "model1"}).Return(model, nil).Once()
 
-	resolved, err := tester.handler.resolveModelTarget(context.Background(), "testuser", "model1", http.Header{})
+	resolved, err := tester.handler.resolveModelTargetWithOptions(resolveModelTargetWithOptionsReq{Ctx: context.Background(), Caller: &commontypes.GatewayWhitelistCaller{}, ModelID: "model1", Headers: http.Header{}})
 
 	require.NoError(t, err)
 	require.Equal(t, model, resolved.Model)
@@ -40,14 +40,31 @@ func TestResolveModelTarget_ExternalModel(t *testing.T) {
 
 func TestResolveModelTarget_ModelNotFound(t *testing.T) {
 	tester, _, _ := setupTest(t)
-	tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "missing-model").Return(nil, nil).Once()
+	tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, &types.GetModelByIDReq{Caller: &commontypes.GatewayWhitelistCaller{}, ModelID: "missing-model"}).Return(nil, nil).Once()
 
-	_, err := tester.handler.resolveModelTarget(context.Background(), "testuser", "missing-model", http.Header{})
+	_, err := tester.handler.resolveModelTargetWithOptions(resolveModelTargetWithOptionsReq{Ctx: context.Background(), Caller: &commontypes.GatewayWhitelistCaller{}, ModelID: "missing-model", Headers: http.Header{}})
 
 	require.Error(t, err)
 	targetErr, ok := err.(*modelTargetError)
 	require.True(t, ok)
 	require.Equal(t, "model_not_found", targetErr.APIError.Code)
+}
+
+// The virtual automatic-routing model has no upstream of its own.  The
+// Planner replaces it before resolution, so reaching the resolver means an
+// endpoint that cannot route automatically was asked to.
+func TestResolveModelTarget_VirtualAutoModelIsRejected(t *testing.T) {
+	tester, _, _ := setupTest(t)
+	tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, &types.GetModelByIDReq{Caller: &commontypes.GatewayWhitelistCaller{}, ModelID: "auto"}).
+		Return(&types.Model{BaseModel: types.BaseModel{ID: "auto"}, AutoRoute: true}, nil).Once()
+
+	_, err := tester.handler.resolveModelTargetWithOptions(resolveModelTargetWithOptionsReq{Ctx: context.Background(), Caller: &commontypes.GatewayWhitelistCaller{}, ModelID: "auto", Headers: http.Header{}})
+
+	require.Error(t, err)
+	targetErr, ok := err.(*modelTargetError)
+	require.True(t, ok)
+	require.Equal(t, "auto_routing_unsupported", targetErr.APIError.Code)
+	require.Contains(t, targetErr.APIError.Message, "automatic routing")
 }
 
 func TestResolveModelTargetWithOptionsRequiredUpstreamID(t *testing.T) {
@@ -59,9 +76,13 @@ func TestResolveModelTargetWithOptionsRequiredUpstreamID(t *testing.T) {
 			{ID: 2, URL: "https://native.example.com/v1/chat/completions", Enabled: true, Provider: "openai", ModelName: "gpt-4o"},
 		},
 	}
-	tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "public-model").Return(model, nil).Once()
+	tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, &types.GetModelByIDReq{Caller: &commontypes.GatewayWhitelistCaller{}, ModelID: "public-model"}).Return(model, nil).Once()
 
-	resolved, err := tester.handler.resolveModelTargetWithOptions(context.Background(), "testuser", "public-model", http.Header{}, modelTargetResolveOptions{
+	resolved, err := tester.handler.resolveModelTargetWithOptions(resolveModelTargetWithOptionsReq{
+		Ctx:                context.Background(),
+		Caller:             &commontypes.GatewayWhitelistCaller{},
+		ModelID:            "public-model",
+		Headers:            http.Header{},
 		RequiredUpstreamID: 2,
 	})
 	require.NoError(t, err)
@@ -86,9 +107,13 @@ func TestResolveModelTargetWithOptionsRequiredUpstreamIDUnavailable(t *testing.T
 			{ID: 1, URL: "https://adapter.example.com/v1/chat/completions", Enabled: true, Provider: "anthropic", ModelName: "claude"},
 		},
 	}
-	tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "public-model").Return(model, nil).Once()
+	tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, &types.GetModelByIDReq{Caller: &commontypes.GatewayWhitelistCaller{}, ModelID: "public-model"}).Return(model, nil).Once()
 
-	_, err := tester.handler.resolveModelTargetWithOptions(context.Background(), "testuser", "public-model", http.Header{}, modelTargetResolveOptions{
+	_, err := tester.handler.resolveModelTargetWithOptions(resolveModelTargetWithOptionsReq{
+		Ctx:                context.Background(),
+		Caller:             &commontypes.GatewayWhitelistCaller{},
+		ModelID:            "public-model",
+		Headers:            http.Header{},
 		RequiredUpstreamID: 2,
 	})
 	require.Error(t, err)
@@ -112,15 +137,15 @@ func TestResolveModelTarget_ExternalModelSessionHash(t *testing.T) {
 			HashReplicas: 64,
 		},
 	}
-	tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "model1").Return(model, nil).Twice()
+	tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, &types.GetModelByIDReq{Caller: &commontypes.GatewayWhitelistCaller{}, ModelID: "model1"}).Return(model, nil).Twice()
 
 	headers := http.Header{}
 	headers.Set("X-Session-ID", "session-1")
 
-	first, err := tester.handler.resolveModelTarget(context.Background(), "testuser", "model1", headers)
+	first, err := tester.handler.resolveModelTargetWithOptions(resolveModelTargetWithOptionsReq{Ctx: context.Background(), Caller: &commontypes.GatewayWhitelistCaller{}, ModelID: "model1", Headers: headers})
 	require.NoError(t, err)
 
-	second, err := tester.handler.resolveModelTarget(context.Background(), "testuser", "model1", headers)
+	second, err := tester.handler.resolveModelTargetWithOptions(resolveModelTargetWithOptionsReq{Ctx: context.Background(), Caller: &commontypes.GatewayWhitelistCaller{}, ModelID: "model1", Headers: headers})
 	require.NoError(t, err)
 
 	require.Equal(t, first.Target, second.Target)
@@ -142,12 +167,12 @@ func TestResolveModelTarget_ExternalModelSessionHash_FallbackToUsername(t *testi
 			HashReplicas: 64,
 		},
 	}
-	tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "model1").Return(model, nil).Twice()
+	tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, &types.GetModelByIDReq{Caller: &commontypes.GatewayWhitelistCaller{}, ModelID: "model1"}).Return(model, nil).Twice()
 
-	first, err := tester.handler.resolveModelTarget(context.Background(), "testuser", "model1", http.Header{})
+	first, err := tester.handler.resolveModelTargetWithOptions(resolveModelTargetWithOptionsReq{Ctx: context.Background(), Caller: &commontypes.GatewayWhitelistCaller{}, ModelID: "model1", Headers: http.Header{}})
 	require.NoError(t, err)
 
-	second, err := tester.handler.resolveModelTarget(context.Background(), "testuser", "model1", http.Header{})
+	second, err := tester.handler.resolveModelTargetWithOptions(resolveModelTargetWithOptionsReq{Ctx: context.Background(), Caller: &commontypes.GatewayWhitelistCaller{}, ModelID: "model1", Headers: http.Header{}})
 	require.NoError(t, err)
 
 	require.Equal(t, first.Target, second.Target)
@@ -168,9 +193,9 @@ func TestResolveModelTarget_ExternalModelFallsBackToFirstEnabledEndpoint(t *test
 			Strategy: router.RoutingStrategySingle,
 		},
 	}
-	tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "model1").Return(model, nil).Once()
+	tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, &types.GetModelByIDReq{Caller: &commontypes.GatewayWhitelistCaller{}, ModelID: "model1"}).Return(model, nil).Once()
 
-	resolved, err := tester.handler.resolveModelTarget(context.Background(), "testuser", "model1", http.Header{})
+	resolved, err := tester.handler.resolveModelTargetWithOptions(resolveModelTargetWithOptionsReq{Ctx: context.Background(), Caller: &commontypes.GatewayWhitelistCaller{}, ModelID: "model1", Headers: http.Header{}})
 	require.NoError(t, err)
 	require.Equal(t, "https://api.example.com/node-a/v1/chat/completions", resolved.Target)
 }
@@ -202,9 +227,9 @@ func TestResolveModelTarget_EndpointOverridesAuthAndProvider(t *testing.T) {
 			Strategy: router.RoutingStrategySingle,
 		},
 	}
-	tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "model1").Return(model, nil).Once()
+	tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, &types.GetModelByIDReq{Caller: &commontypes.GatewayWhitelistCaller{}, ModelID: "model1"}).Return(model, nil).Once()
 
-	resolved, err := tester.handler.resolveModelTarget(context.Background(), "testuser", "model1", http.Header{})
+	resolved, err := tester.handler.resolveModelTargetWithOptions(resolveModelTargetWithOptionsReq{Ctx: context.Background(), Caller: &commontypes.GatewayWhitelistCaller{}, ModelID: "model1", Headers: http.Header{}})
 	require.NoError(t, err)
 	require.Equal(t, "https://api.example.com/node-a/v1/chat/completions", resolved.Target)
 	require.Equal(t, "Bearer endpoint-level-token", resolved.Model.AuthHead)
@@ -229,9 +254,9 @@ func TestResolveModelTarget_EndpointOverridesModelName(t *testing.T) {
 			Strategy: router.RoutingStrategySingle,
 		},
 	}
-	tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "model1").Return(model, nil).Once()
+	tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, &types.GetModelByIDReq{Caller: &commontypes.GatewayWhitelistCaller{}, ModelID: "model1"}).Return(model, nil).Once()
 
-	resolved, err := tester.handler.resolveModelTarget(context.Background(), "testuser", "model1", http.Header{})
+	resolved, err := tester.handler.resolveModelTargetWithOptions(resolveModelTargetWithOptionsReq{Ctx: context.Background(), Caller: &commontypes.GatewayWhitelistCaller{}, ModelID: "model1", Headers: http.Header{}})
 	require.NoError(t, err)
 	require.Equal(t, "provider-specific-model", resolved.ModelName)
 	require.Len(t, resolved.AttemptTargets, 0)
@@ -241,9 +266,9 @@ func TestResolveModelTarget_EndpointOverridesModelName(t *testing.T) {
 func TestResolveModelTarget_GetModelByIDError(t *testing.T) {
 	tester, _, _ := setupTest(t)
 	expectedErr := errors.New("storage unavailable")
-	tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "model1").Return(nil, expectedErr).Once()
+	tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, &types.GetModelByIDReq{Caller: &commontypes.GatewayWhitelistCaller{}, ModelID: "model1"}).Return(nil, expectedErr).Once()
 
-	_, err := tester.handler.resolveModelTarget(context.Background(), "testuser", "model1", http.Header{})
+	_, err := tester.handler.resolveModelTargetWithOptions(resolveModelTargetWithOptionsReq{Ctx: context.Background(), Caller: &commontypes.GatewayWhitelistCaller{}, ModelID: "model1", Headers: http.Header{}})
 
 	require.Error(t, err)
 	targetErr, ok := err.(*modelTargetError)
@@ -267,9 +292,9 @@ func TestResolveModelTarget_CSGHubModel(t *testing.T) {
 		},
 		Endpoint: "https://model.internal/v1/chat/completions",
 	}
-	tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "model1").Return(model, nil).Once()
+	tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, &types.GetModelByIDReq{Caller: &commontypes.GatewayWhitelistCaller{}, ModelID: "model1"}).Return(model, nil).Once()
 
-	resolved, err := tester.handler.resolveModelTarget(context.Background(), "testuser", "model1", http.Header{})
+	resolved, err := tester.handler.resolveModelTargetWithOptions(resolveModelTargetWithOptionsReq{Ctx: context.Background(), Caller: &commontypes.GatewayWhitelistCaller{}, ModelID: "model1", Headers: http.Header{}})
 
 	require.NoError(t, err)
 	require.Equal(t, "https://model.internal/v1/chat/completions", resolved.Target)
@@ -395,9 +420,9 @@ func TestResolveModelTarget_ModelNotRunningWhenNoEndpoint(t *testing.T) {
 		Endpoint:  "",
 		Upstreams: []commontypes.UpstreamConfig{},
 	}
-	tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "model1").Return(model, nil).Once()
+	tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, &types.GetModelByIDReq{Caller: &commontypes.GatewayWhitelistCaller{}, ModelID: "model1"}).Return(model, nil).Once()
 
-	_, err := tester.handler.resolveModelTarget(context.Background(), "testuser", "model1", http.Header{})
+	_, err := tester.handler.resolveModelTargetWithOptions(resolveModelTargetWithOptionsReq{Ctx: context.Background(), Caller: &commontypes.GatewayWhitelistCaller{}, ModelID: "model1", Headers: http.Header{}})
 
 	require.Error(t, err)
 	targetErr, ok := err.(*modelTargetError)
@@ -419,9 +444,9 @@ func TestResolveModelTarget_PricedExternalLLM(t *testing.T) {
 		ExternalModelInfo: types.ExternalModelInfo{Provider: "openai"},
 		Upstreams:         []commontypes.UpstreamConfig{{URL: "https://api.example.com/v1/chat/completions", Enabled: true, ModelName: "provider-model"}},
 	}
-	tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "external-model").Return(model, nil).Once()
+	tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, &types.GetModelByIDReq{Caller: &commontypes.GatewayWhitelistCaller{}, ModelID: "external-model"}).Return(model, nil).Once()
 
-	resolved, err := tester.handler.resolveModelTarget(context.Background(), "testuser", "external-model", http.Header{})
+	resolved, err := tester.handler.resolveModelTargetWithOptions(resolveModelTargetWithOptionsReq{Ctx: context.Background(), Caller: &commontypes.GatewayWhitelistCaller{}, ModelID: "external-model", Headers: http.Header{}})
 
 	require.NoError(t, err)
 	require.Equal(t, "https://api.example.com/v1/chat/completions", resolved.Target)
@@ -444,9 +469,9 @@ func TestResolveModelTarget_InferenceWithoutPricingFlag(t *testing.T) {
 		},
 		Endpoint: "https://model.internal/v1/chat/completions",
 	}
-	tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "inference-model").Return(model, nil).Once()
+	tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, &types.GetModelByIDReq{Caller: &commontypes.GatewayWhitelistCaller{}, ModelID: "inference-model"}).Return(model, nil).Once()
 
-	resolved, err := tester.handler.resolveModelTarget(context.Background(), "testuser", "inference-model", http.Header{})
+	resolved, err := tester.handler.resolveModelTargetWithOptions(resolveModelTargetWithOptionsReq{Ctx: context.Background(), Caller: &commontypes.GatewayWhitelistCaller{}, ModelID: "inference-model", Headers: http.Header{}})
 
 	require.NoError(t, err)
 	require.Equal(t, "https://model.internal/v1/chat/completions", resolved.Target)
@@ -723,4 +748,138 @@ func TestPreferNativeUpstreams(t *testing.T) {
 		list := []commontypes.UpstreamConfig{chatOnly, multi}
 		assert.Equal(t, list, preferNativeUpstreams(list, "chat"))
 	})
+}
+
+func TestResolveModelTarget_UpstreamPriorityRouting(t *testing.T) {
+	newModel := func() *types.Model {
+		return &types.Model{
+			BaseModel: types.BaseModel{ID: "tiered-model"},
+			Upstreams: []commontypes.UpstreamConfig{
+				{ID: 1, URL: "https://low.example.com/v1/chat/completions", Enabled: true, ModelName: "backend-model"},
+				{ID: 2, URL: "https://high.example.com/v1/chat/completions", Enabled: true, ModelName: "backend-model", Priority: 100},
+			},
+		}
+	}
+
+	t.Run("low priority caller never reaches the high priority upstream", func(t *testing.T) {
+		tester, _, _ := setupTest(t)
+		model := newModel()
+		caller := &commontypes.GatewayWhitelistCaller{UserPriority: callerPriorityPtr(0)}
+		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, &types.GetModelByIDReq{Caller: caller, ModelID: "tiered-model"}).Return(model, nil).Once()
+
+		resolved, err := tester.handler.resolveModelTargetWithOptions(resolveModelTargetWithOptionsReq{Ctx: context.Background(), Caller: caller, ModelID: "tiered-model", Headers: http.Header{}})
+
+		require.NoError(t, err)
+		require.Equal(t, "https://low.example.com/v1/chat/completions", resolved.Target)
+		// The stored candidate set keeps only eligible upstreams, so fallback
+		// attempts cannot escalate into the high-priority channel either.
+		for _, candidate := range resolved.Model.Upstreams {
+			require.NotEqual(t, int64(2), candidate.ID)
+		}
+	})
+
+	t.Run("low priority caller with only high priority upstreams is denied", func(t *testing.T) {
+		tester, _, _ := setupTest(t)
+		model := &types.Model{
+			BaseModel: types.BaseModel{ID: "tiered-model"},
+			Upstreams: []commontypes.UpstreamConfig{
+				{ID: 2, URL: "https://high.example.com/v1/chat/completions", Enabled: true, ModelName: "backend-model", Priority: 100},
+			},
+		}
+		caller := &commontypes.GatewayWhitelistCaller{UserPriority: callerPriorityPtr(0)}
+		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, &types.GetModelByIDReq{Caller: caller, ModelID: "tiered-model"}).Return(model, nil).Once()
+
+		_, err := tester.handler.resolveModelTargetWithOptions(resolveModelTargetWithOptionsReq{Ctx: context.Background(), Caller: caller, ModelID: "tiered-model", Headers: http.Header{}})
+
+		require.Error(t, err)
+		targetErr, ok := err.(*modelTargetError)
+		require.True(t, ok)
+		require.Equal(t, types.ErrCodeUpstreamPriorityDenied, targetErr.APIError.Code)
+		require.Equal(t, http.StatusForbidden, targetErr.Status)
+	})
+
+	t.Run("unrestricted caller falls back to the low channel when high upstream is unhealthy", func(t *testing.T) {
+		tester, _, _ := setupTest(t)
+		model := &types.Model{
+			BaseModel: types.BaseModel{ID: "tiered-model"},
+			Upstreams: []commontypes.UpstreamConfig{
+				{ID: 2, URL: "https://high.example.com/v1/chat/completions", Enabled: true, ModelName: "backend-model", Priority: 100, HealthCheckEnabled: true, HealthState: "unhealthy"},
+				{ID: 1, URL: "https://low.example.com/v1/chat/completions", Enabled: true, ModelName: "backend-model"},
+			},
+		}
+		caller := &commontypes.GatewayWhitelistCaller{}
+		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, &types.GetModelByIDReq{Caller: caller, ModelID: "tiered-model"}).Return(model, nil).Once()
+
+		resolved, err := tester.handler.resolveModelTargetWithOptions(resolveModelTargetWithOptionsReq{Ctx: context.Background(), Caller: caller, ModelID: "tiered-model", Headers: http.Header{}})
+
+		require.NoError(t, err)
+		require.Equal(t, "https://low.example.com/v1/chat/completions", resolved.Target)
+	})
+
+	t.Run("intermediate numeric tag admits priority tiers up to its level", func(t *testing.T) {
+		tester, _, _ := setupTest(t)
+		model := &types.Model{
+			BaseModel: types.BaseModel{ID: "tiered-model"},
+			Upstreams: []commontypes.UpstreamConfig{
+				{ID: 1, URL: "https://low.example.com/v1/chat/completions", Enabled: true, ModelName: "backend-model"},
+				{ID: 2, URL: "https://mid.example.com/v1/chat/completions", Enabled: true, ModelName: "backend-model", Priority: 50},
+				{ID: 3, URL: "https://high.example.com/v1/chat/completions", Enabled: true, ModelName: "backend-model", Priority: 100},
+			},
+		}
+		caller := &commontypes.GatewayWhitelistCaller{UserPriority: callerPriorityPtr(50)}
+		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, &types.GetModelByIDReq{Caller: caller, ModelID: "tiered-model"}).Return(model, nil).Once()
+
+		resolved, err := tester.handler.resolveModelTargetWithOptions(resolveModelTargetWithOptionsReq{Ctx: context.Background(), Caller: caller, ModelID: "tiered-model", Headers: http.Header{}})
+
+		require.NoError(t, err)
+		require.Equal(t, int64(2), resolved.Upstream.ID)
+		// AttemptTargets carries the fallback candidates after the primary:
+		// the mid tier is picked first, the low tier is the only fallback,
+		// the priority-100 upstream is excluded for this caller.
+		require.Len(t, resolved.AttemptTargets, 1)
+		require.Equal(t, int64(1), resolved.AttemptTargets[0].ID)
+	})
+}
+
+// callerPriorityPtr returns a pointer to the given channel priority for
+// constructing restricted callers.
+func callerPriorityPtr(priority int) *int {
+	return &priority
+}
+
+func TestResolveModelTarget_PriorityDominatesNativePreference(t *testing.T) {
+	// A high-priority upstream that only declares chat (so serving the
+	// client's messages protocol needs an adapter) must still win the primary
+	// pick over a low-priority upstream that serves messages natively: the
+	// channel tier is an access/preference contract, the native pass-through
+	// is only a tie-breaker inside a tier.
+	tester, _, _ := setupTest(t)
+	model := &types.Model{
+		BaseModel: types.BaseModel{ID: "mixed-protocol-model"},
+		Upstreams: []commontypes.UpstreamConfig{
+			{
+				ID: 1, URL: "https://native-low.example.com/v1", Enabled: true, ModelName: "backend",
+				Priority:           0,
+				SupportedEndpoints: map[commontypes.ApiFormat]string{commontypes.ApiFormatChat: "", commontypes.ApiFormatMessages: ""},
+			},
+			{
+				ID: 2, URL: "https://adapter-high.example.com/v1", Enabled: true, ModelName: "backend",
+				Priority:           100,
+				SupportedEndpoints: map[commontypes.ApiFormat]string{commontypes.ApiFormatChat: ""},
+			},
+		},
+	}
+	caller := &commontypes.GatewayWhitelistCaller{}
+	tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, &types.GetModelByIDReq{Caller: caller, ModelID: "mixed-protocol-model"}).Return(model, nil).Once()
+
+	resolved, err := tester.handler.resolveModelTargetWithOptions(resolveModelTargetWithOptionsReq{
+		Ctx: context.Background(), Caller: caller, ModelID: "mixed-protocol-model",
+		Headers: http.Header{}, ClientProtocol: commontypes.ApiFormatMessages,
+	})
+	require.NoError(t, err)
+	require.Equal(t, int64(2), resolved.Upstream.ID, "the high-priority tier must win the primary pick")
+	// Fallback candidates stay ordered by tier: the low native upstream is
+	// the only fallback after the high-tier primary.
+	require.Len(t, resolved.AttemptTargets, 1)
+	require.Equal(t, int64(1), resolved.AttemptTargets[0].ID)
 }

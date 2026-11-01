@@ -24,6 +24,70 @@ func (_m *MockSSOInterface) EXPECT() *MockSSOInterface_Expecter {
 	return &MockSSOInterface_Expecter{mock: &_m.Mock}
 }
 
+// BuildAuthorizationURL provides a mock function with given fields: ctx, state
+func (_m *MockSSOInterface) BuildAuthorizationURL(ctx context.Context, state string) (string, string, error) {
+	ret := _m.Called(ctx, state)
+
+	if len(ret) == 0 {
+		panic("no return value specified for BuildAuthorizationURL")
+	}
+
+	var r0 string
+	var r1 string
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (string, string, error)); ok {
+		return rf(ctx, state)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) string); ok {
+		r0 = rf(ctx, state)
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) string); ok {
+		r1 = rf(ctx, state)
+	} else {
+		r1 = ret.Get(1).(string)
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, string) error); ok {
+		r2 = rf(ctx, state)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
+// MockSSOInterface_BuildAuthorizationURL_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'BuildAuthorizationURL'
+type MockSSOInterface_BuildAuthorizationURL_Call struct {
+	*mock.Call
+}
+
+// BuildAuthorizationURL is a helper method to define mock.On call
+//   - ctx context.Context
+//   - state string
+func (_e *MockSSOInterface_Expecter) BuildAuthorizationURL(ctx interface{}, state interface{}) *MockSSOInterface_BuildAuthorizationURL_Call {
+	return &MockSSOInterface_BuildAuthorizationURL_Call{Call: _e.mock.On("BuildAuthorizationURL", ctx, state)}
+}
+
+func (_c *MockSSOInterface_BuildAuthorizationURL_Call) Run(run func(ctx context.Context, state string)) *MockSSOInterface_BuildAuthorizationURL_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockSSOInterface_BuildAuthorizationURL_Call) Return(redirectURL string, oauthState string, err error) *MockSSOInterface_BuildAuthorizationURL_Call {
+	_c.Call.Return(redirectURL, oauthState, err)
+	return _c
+}
+
+func (_c *MockSSOInterface_BuildAuthorizationURL_Call) RunAndReturn(run func(context.Context, string) (string, string, error)) *MockSSOInterface_BuildAuthorizationURL_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // CreateInvitation provides a mock function with given fields: ctx, code
 func (_m *MockSSOInterface) CreateInvitation(ctx context.Context, code string) error {
 	ret := _m.Called(ctx, code)

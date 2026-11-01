@@ -94,9 +94,9 @@ func (w *OCR) Finalize() error {
 		w.internalWritter.Header().Set("Content-Type", "application/json")
 		w.internalWritter.WriteHeader(http.StatusInternalServerError)
 		return json.NewEncoder(w.internalWritter).Encode(gin.H{"error": types.Error{
-			Code:    "upstream_response_error",
+			Code:    types.ErrCodeUpstreamResponse,
 			Message: err.Error(),
-			Type:    "internal_error",
+			Type:    types.ErrTypeServer,
 		}})
 	}
 

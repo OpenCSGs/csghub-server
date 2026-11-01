@@ -1,9 +1,11 @@
 package deploy
 
 import (
+	"context"
 	"github.com/spf13/cobra"
 	"log/slog"
 	"opencsg.com/csghub-server/api/httpbase"
+	"opencsg.com/csghub-server/builder/instrumentation"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/logcollector/router"
 )
@@ -15,6 +17,10 @@ var logCollectorCmd = &cobra.Command{
 		cfg, err := config.LoadConfig()
 		if err != nil {
 			return err
+		}
+		stopOtel, err := instrumentation.SetupOTelSDK(context.Background(), cfg, instrumentation.Logcollector)
+		if err != nil {
+			panic(err)
 		}
 		s, logFactory, err := router.NewHttpServer(cmd.Context(), cfg)
 		if err != nil {
@@ -30,6 +36,7 @@ var logCollectorCmd = &cobra.Command{
 		)
 		server.Run()
 		logFactory.Stop()
+		_ = stopOtel(context.Background())
 		return nil
 	},
 }

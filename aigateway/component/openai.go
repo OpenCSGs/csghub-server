@@ -27,12 +27,20 @@ import (
 var apiKeyJSONFieldRegex = regexp.MustCompile(`"api_key"\s*:\s*"[^"]*"`)
 
 type OpenAIComponent interface {
-	GetAvailableModels(c context.Context, nsUUID string) ([]types.Model, error)
-	ListModels(c context.Context, nsUUID string, req types.ListModelsReq) (types.ModelList, error)
-	GetModelByID(c context.Context, nsUUID, modelID string) (*types.Model, error)
-	RecordUsage(c context.Context, nsUUID string, model *types.Model, targetModelName string, tokenCounter token.Counter, apikey string, tokenID int64) error
-	RecordUsageFromTokenUsage(c context.Context, nsUUID string, model *types.Model, targetModelName string, usage *token.Usage, apikey string, tokenID int64) error
-	BuildUsageMeteringEvent(c context.Context, nsUUID string, model *types.Model, targetModelName string, usage *token.Usage, apikey string) (*commontypes.MeteringEvent, error)
+	GetAvailableModels(c context.Context, req *types.GetAvailableModelsReq) ([]types.Model, error)
+	ListModels(c context.Context, req types.ListModelsReq) (types.ModelList, error)
+	GetModelByID(c context.Context, req *types.GetModelByIDReq) (*types.Model, error)
+	// AutoModelID returns the virtual model ID that selects automatic
+	// routing, or "" when automatic routing is not configured.
+	AutoModelID() string
+	// ResolveAutoModel picks the concrete model that should serve one
+	// turn requested against the virtual model.  The returned decision
+	// always names a model: it may be one a real model of the caller's
+	// already owns the virtual ID for, or the one a pinned conversation
+	// is bound to, and the decision says which.
+	ResolveAutoModel(c context.Context, req types.AutoRouteRequest) (*types.AutoRouteDecision, error)
+	RecordUsageFromTokenUsage(c context.Context, nsUUID string, model *types.Model, targetModelName string, usage *token.Usage, tokenID int64) error
+	BuildUsageMeteringEvent(c context.Context, nsUUID string, model *types.Model, targetModelName string, usage *token.Usage, tokenID int64) (*commontypes.MeteringEvent, error)
 	CheckBalance(ctx context.Context, nsUUID string) error
 	// CheckCapacityAdmission evaluates per-upstream CapacityPolicy admission
 	// for the router-owned candidate set carried in the request (initial
@@ -81,6 +89,7 @@ type openaiComponentImpl struct {
 	modelIDBuilder         upstream.ModelIDBuilder
 	capacityPolicyDefaults commontypes.CapacityPolicy
 	quotaRateComponent     QuotaRateComponent
+	autoRouter             AutoModelRouter
 }
 
 func (m *openaiComponentImpl) getModelIDBuilder() upstream.ModelIDBuilder {
@@ -90,48 +99,84 @@ func (m *openaiComponentImpl) getModelIDBuilder() upstream.ModelIDBuilder {
 	return m.modelIDBuilder
 }
 
+// callerOrDefault substitutes the anonymous identity for a nil caller, so
+// catalogue reads fail closed (whitelist models hidden) instead of
+// dereferencing nil or bypassing the whitelist filter.
+func callerOrDefault(caller *commontypes.GatewayWhitelistCaller) *commontypes.GatewayWhitelistCaller {
+	if caller == nil {
+		return &commontypes.GatewayWhitelistCaller{}
+	}
+	return caller
+}
+
 // GetAvailableModels returns all enabled models from the llm_config table.
 // Both internal (csghub deploy) and external models are served uniformly from
 // llm_config, which loads its upstreams as a relation. Visibility filtering
 // is applied per-model: internal non-serverless models are only visible to the
 // deploy owner; serverless and external models are visible to all users.
-func (m *openaiComponentImpl) GetAvailableModels(c context.Context, nsUUID string) ([]types.Model, error) {
-	models, err := m.getModelsFromLLMConfig(c, nsUUID)
+func (m *openaiComponentImpl) GetAvailableModels(c context.Context, req *types.GetAvailableModelsReq) ([]types.Model, error) {
+	req.Caller = callerOrDefault(req.Caller)
+	models, err := m.getModelsFromLLMConfig(c, req)
 	if err != nil {
 		return nil, err
 	}
-	return m.enrichAndPreferModels(c, nsUUID, models)
+	return m.enrichAndPreferModels(c, req.Caller.NsUUID, models)
 }
 
-// visibleModels reads only models named in a scoped API key. An empty scope
-// retains the ordinary full catalogue.
-func (m *openaiComponentImpl) visibleModels(c context.Context, nsUUID string, scope []string) ([]types.Model, error) {
+// visibleModels returns the model catalogue the caller may see. A non-empty
+// API key model scope REPLACES the tenant's full model list as the candidate
+// set: only the scoped IDs are fetched from the catalogue and run through the
+// same conversion, visibility and enrichment rules, so the rest of the
+// catalogue is never read. An empty scope keeps the full-list behaviour.
+func (m *openaiComponentImpl) visibleModels(c context.Context, caller *commontypes.GatewayWhitelistCaller, scope []string) ([]types.Model, error) {
 	if len(scope) == 0 {
-		return m.GetAvailableModels(c, nsUUID)
+		return m.GetAvailableModels(c, &types.GetAvailableModelsReq{Caller: caller})
 	}
+	models, err := m.scopedModels(c, caller, scope)
+	if err != nil {
+		return nil, err
+	}
+	return m.enrichAndPreferModels(c, caller.NsUUID, models)
+}
+
+// scopedModels resolves exactly the model IDs an API key's scope names. A
+// scope entry that does not exist, is disabled, or is not visible to the
+// caller simply drops out — a scoped key cannot name it anywhere else
+// either. Duplicate scope entries are fetched once.
+func (m *openaiComponentImpl) scopedModels(c context.Context, caller *commontypes.GatewayWhitelistCaller, scope []string) ([]types.Model, error) {
 	models := make([]types.Model, 0, len(scope))
 	seen := make(map[string]struct{}, len(scope))
 	for _, modelID := range scope {
-		if _, duplicate := seen[modelID]; duplicate {
+		if _, dup := seen[modelID]; dup {
 			continue
 		}
 		seen[modelID] = struct{}{}
-		cfg, err := m.extllmStore.GetByModelName(c, modelID)
+		cfg, err := m.extllmStore.GetByModelNameForCaller(c, modelID, caller)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get llm config by model name %q: %w", modelID, err)
 		}
 		if cfg == nil || !cfg.Enabled {
 			continue
 		}
-		if model, ok := m.llmConfigToModel(c, cfg, nsUUID); ok {
+		if model, ok := m.llmConfigToModel(c, cfg, caller.NsUUID); ok {
 			models = append(models, model)
 		}
 	}
-	return m.enrichAndPreferModels(c, nsUUID, models)
+	return models, nil
 }
 
+// enrichAndPreferModels applies price enrichment and the caller's user
+// preference ordering to a converted model list. It is the shared tail of
+// the full-catalogue and the scoped fetch paths, so both produce the same
+// shape of result.
 func (m *openaiComponentImpl) enrichAndPreferModels(c context.Context, nsUUID string, models []types.Model) ([]types.Model, error) {
-	models = m.enrichModelsWithPrice(c, models)
+	// Soft-fail on price read errors: the full-catalogue and single-model
+	// paths keep the previous behaviour of returning the models flagged as
+	// unconfigured (only the unscoped listing fails hard).
+	models, priceErr := m.enrichModelsWithPrice(c, models)
+	if priceErr != nil {
+		slog.WarnContext(c, "failed to enrich models with prices", slog.Any("error", priceErr))
+	}
 
 	if strings.TrimSpace(nsUUID) != "" {
 		req := &types.UserPreferenceRequest{
@@ -149,19 +194,230 @@ func (m *openaiComponentImpl) enrichAndPreferModels(c context.Context, nsUUID st
 	return models, nil
 }
 
-func (m *openaiComponentImpl) ListModels(c context.Context, nsUUID string, req types.ListModelsReq) (types.ModelList, error) {
-	models, err := m.visibleModels(c, nsUUID, req.ModelScope)
+func (m *openaiComponentImpl) ListModels(c context.Context, req types.ListModelsReq) (types.ModelList, error) {
+	// A non-empty API key model scope already narrows the fetch itself to a
+	// handful of point lookups; only the unscoped catalogue listing needs the
+	// SQL-pushdown path.
+	caller := callerOrDefault(req.Caller)
+	// The whitelist badge is filled only by the model-services path
+	// (listCatalogueModels with has_associated_model=true); the shared model
+	// conversion never carries it, so every other listing and detail path is
+	// safe by construction.
+	if len(req.ModelScope) > 0 {
+		return m.listScopedModels(c, caller, req)
+	}
+	return m.listCatalogueModels(c, caller, req)
+}
+
+// listScopedModels serves a scoped listing from the caller's visible scoped
+// models. The scope filter in filterAndPaginateModels then only has to drop
+// the injected virtual auto model when the scope does not name it.
+func (m *openaiComponentImpl) listScopedModels(c context.Context, caller *commontypes.GatewayWhitelistCaller, req types.ListModelsReq) (types.ModelList, error) {
+	models, err := m.visibleModels(c, caller, req.ModelScope)
 	if err != nil {
 		return types.ModelList{}, err
 	}
+	// Whether a real model owns the virtual ID must not depend on how
+	// healthy it is, or the listing and the request path would disagree
+	// about what that ID means.  The check therefore runs against the
+	// caller's full visible list, before unhealthy models are dropped.
+	auto, publishAuto := m.autoModel(c)
+	if publishAuto {
+		if shadow, found := findModelByID(models, auto.ID); found {
+			// Two entries with one ID would make the listing ambiguous, and
+			// the real model is the one the caller can actually name.
+			slog.WarnContext(c, "a real model owns the automatic routing model ID, not publishing the virtual one",
+				slog.String("model_id", shadow.ID))
+			publishAuto = false
+		}
+	}
+
 	models = computeModelListAvailability(models)
+	// The virtual model is added after availability is computed because it
+	// has no upstreams of its own and would otherwise be filtered out.  It
+	// is published only while the ranking service is answering, so a
+	// client never sees a model ID it cannot actually use.
+	if publishAuto {
+		models = append([]types.Model{auto}, models...)
+	}
 	modelList := filterAndPaginateModels(models, req)
 	return modelList, nil
 }
 
+// listCatalogueModels serves the unscoped listing straight from one SQL query
+// (LLMConfigStore.ListGatewayModels): keyword/type/task/association filters,
+// visibility, availability, the SaaS price-configured filter, pinned-first
+// ordering, and the pagination window are all pushed down. Only the page rows
+// are converted and price-enriched.
+func (m *openaiComponentImpl) listCatalogueModels(c context.Context, caller *commontypes.GatewayWhitelistCaller, req types.ListModelsReq) (types.ModelList, error) {
+	auto, publishAuto := m.autoModel(c)
+	if publishAuto {
+		if m.realModelOwnsID(c, caller, auto.ID) {
+			// Two entries with one ID would make the listing ambiguous, and
+			// the real model is the one the caller can actually name.
+			slog.WarnContext(c, "a real model owns the automatic routing model ID, not publishing the virtual one",
+				slog.String("model_id", auto.ID))
+			publishAuto = false
+		} else if !modelPassesListFilters(&auto, req) {
+			publishAuto = false
+		}
+	}
+
+	paginate := req.Per > 0 && req.Page > 0
+	per, page := req.Per, req.Page
+	if per > 100 {
+		per = 100
+	}
+	// The virtual model occupies the first slot of the first page, exactly as
+	// when it is prepended to the full catalogue before pagination.
+	limit, offset := -1, 0
+	if paginate {
+		if publishAuto {
+			if page == 1 {
+				limit = per - 1
+			} else {
+				limit, offset = per, (page-1)*per-1
+			}
+		} else {
+			limit, offset = per, (page-1)*per
+		}
+	}
+
+	query := &commontypes.GatewayModelListQuery{
+		Keyword:                req.ModelID,
+		LLMTypes:               req.LLMTypes,
+		Task:                   req.Task,
+		HasAssociatedModel:     req.HasAssociatedModel,
+		CallerUUID:             caller.NsUUID,
+		RequireConfiguredPrice: m.priceConfiguredFilterEnabled(),
+		WhitelistCaller:        caller,
+	}
+	query.PinnedUserUUID = m.pinnedUserUUID(caller.NsUUID)
+	// A preference-table failure degrades the listing to unpinned instead of
+	// failing it on the pinned decoration.
+	if query.PinnedUserUUID != "" && !m.pinnedOrderingAvailable(c, query.PinnedUserUUID) {
+		query.PinnedUserUUID = ""
+	}
+	configs, realTotal, err := m.extllmStore.ListGatewayModels(c, limit, offset, query)
+	if err != nil {
+		return types.ModelList{}, err
+	}
+
+	models := make([]types.Model, 0, len(configs))
+	// The whitelist badge rides only on the model-services query
+	// (has_associated_model=true) — the only place the frontend renders it —
+	// and only for whitelist-mode models: the column's "public" default stays
+	// off the wire.
+	modelServicesQuery := req.HasAssociatedModel != nil && *req.HasAssociatedModel
+	for _, cfg := range configs {
+		if model, ok := m.llmConfigToModel(c, cfg, caller.NsUUID); ok {
+			if modelServicesQuery && cfg.AccessPolicy == commontypes.LLMAccessPolicyWhitelist {
+				model.AccessPolicy = cfg.AccessPolicy
+			}
+			// The pinned flag comes from the same SQL statement that ordered
+			// the page, so it always agrees with the pinned-first ordering.
+			if cfg.IsPinned {
+				model.IsPinned = new(bool)
+				*model.IsPinned = true
+			}
+			models = append(models, model)
+		}
+	}
+	// Availability was already filtered inside the listing statement
+	// (is_available); annotate the returned rows without dropping any —
+	// dropping here would desynchronize the page from total_count.
+	annotateModelListAvailability(models)
+	// A price read error fails the request: the page was selected by the
+	// price filter, so returning rows flagged unconfigured would contradict
+	// the filter and the reported total.
+	models, err = m.enrichModelsWithPrice(c, models)
+	if err != nil {
+		return types.ModelList{}, err
+	}
+	if publishAuto && (page == 1 || !paginate) {
+		// The virtual model is added after availability is computed because
+		// it has no upstreams of its own and would otherwise be filtered out.
+		models = append([]types.Model{auto}, models...)
+	}
+
+	totalCount := realTotal
+	if publishAuto {
+		totalCount++
+	}
+	hasMore := paginate && page*per < totalCount
+	var firstID, lastID *string
+	if len(models) > 0 {
+		firstID = &models[0].ID
+		lastID = &models[len(models)-1].ID
+	}
+	return types.ModelList{
+		Object:     "list",
+		Data:       models,
+		FirstID:    firstID,
+		LastID:     lastID,
+		HasMore:    hasMore,
+		TotalCount: totalCount,
+	}, nil
+}
+
+// realModelOwnsID reports whether a real, enabled, caller-visible model
+// answers to the exact model ID — the single-ID equivalent of the full-list
+// shadow check in listScopedModels.
+func (m *openaiComponentImpl) realModelOwnsID(c context.Context, caller *commontypes.GatewayWhitelistCaller, modelID string) bool {
+	// Caller-aware on purpose: when a real model owns the virtual ID but is
+	// whitelist-hidden from this caller, the caller cannot name it, so the
+	// virtual auto model must stay publishable for them.
+	cfg, err := m.extllmStore.GetByModelNameForCaller(c, modelID, caller)
+	if err != nil || cfg == nil || !cfg.Enabled {
+		return false
+	}
+	_, ok := m.llmConfigToModel(c, cfg, caller.NsUUID)
+	return ok
+}
+
+// modelPassesListFilters runs the same request-level filters the full
+// catalogue listing applies (default edition filters plus the request's own),
+// so the injected virtual model is published under exactly the conditions a
+// real model with the same shape would be.
+func modelPassesListFilters(m *types.Model, req types.ListModelsReq) bool {
+	filters := modelListDefaultFilters()
+	if searchQuery := strings.ToLower(req.ModelID); searchQuery != "" {
+		filters = append(filters, filterByModelID(searchQuery))
+	}
+	if len(req.LLMTypes) > 0 {
+		filters = append(filters, filterByLLMTypes(req.LLMTypes))
+	}
+	if task := strings.ToLower(strings.TrimSpace(req.Task)); task != "" {
+		filters = append(filters, filterByTask(task))
+	}
+	if req.HasAssociatedModel != nil {
+		filters = append(filters, filterByHasAssociatedModel(*req.HasAssociatedModel))
+	}
+	return len(applyFilters([]types.Model{*m}, filters)) == 1
+}
+
+// findModelByID looks a model up by its exact ID.  Model identity is
+// exact everywhere else in the gateway — the catalogue is queried with a
+// plain equality on model_name — so the virtual ID is owned only by a
+// model spelled exactly the same way, and every path agrees on that.
+func findModelByID(models []types.Model, modelID string) (types.Model, bool) {
+	wanted := strings.TrimSpace(modelID)
+	if wanted == "" {
+		return types.Model{}, false
+	}
+	for _, model := range models {
+		if strings.TrimSpace(model.ID) == wanted {
+			return model, true
+		}
+	}
+	return types.Model{}, false
+}
+
 // computeModelListAvailability sets ModelAvailability.IsAvailable for each model
 // based on the already-loaded upstream health/circuit state (no extra DB call),
-// and returns only models whose IsAvailable is true.
+// and returns only models whose IsAvailable is true. Used by paths that hold
+// the complete candidate set in memory (scoped listing), where filtering and
+// counting stay consistent.
 func computeModelListAvailability(models []types.Model) []types.Model {
 	if len(models) == 0 {
 		return models
@@ -177,6 +433,20 @@ func computeModelListAvailability(models []types.Model) []types.Model {
 		}
 	}
 	return filtered
+}
+
+// annotateModelListAvailability fills ModelAvailability for each model WITHOUT
+// dropping rows. The catalogue listing already filtered on is_available inside
+// the same statement as the count; the upstream states reloaded as relations
+// may be marginally newer than that statement, so a row can be annotated
+// IsAvailable=false while remaining listed — dropping it here would shrink the
+// page below the reported total and skip it on the next offset.
+func annotateModelListAvailability(models []types.Model) {
+	for i := range models {
+		models[i].Availability = &types.ModelAvailability{
+			IsAvailable: modelUpstreamsAvailable(models[i].Upstreams),
+		}
+	}
 }
 
 // modelUpstreamsAvailable returns true if at least one upstream is not unavailable
@@ -249,6 +519,11 @@ func filterByHasAssociatedModel(hasAssociatedModel bool) modelFilter {
 	}
 }
 
+// filterByModelScope keeps only the models an API key's model scope allows.
+// The scope must be non-empty; an empty scope is unrestricted and the caller
+// skips the filter. With the scope-first fetch in visibleModels the real
+// models already come from the scope, so this mainly drops the injected
+// virtual auto model when the scope does not name it.
 func filterByModelScope(scope []string) modelFilter {
 	return func(m *types.Model) bool {
 		return slices.Contains(scope, m.ID)
@@ -285,7 +560,7 @@ func filterAndPaginateModels(models []types.Model, req types.ListModelsReq) type
 	if len(req.LLMTypes) > 0 {
 		filters = append(filters, filterByLLMTypes(req.LLMTypes))
 	}
-	if task := strings.ToLower(req.Task); task != "" {
+	if task := strings.ToLower(strings.TrimSpace(req.Task)); task != "" {
 		filters = append(filters, filterByTask(task))
 	}
 	if req.HasAssociatedModel != nil {
@@ -347,7 +622,10 @@ func (m *openaiComponentImpl) buildInternalModel(cfg *database.LLMConfig, info *
 			ID:                  modelID,
 			Created:             info.CreatedAt,
 			SupportFunctionCall: supportFunctionCall,
-			Task:                info.Task,
+			// Comma-joined capability labels: multimodal deploys carry both
+			// their raw task and text-generation, matching the external-model
+			// task output format. filterByTask splits on commas.
+			Task: strings.Join(info.TaskLabels(), ","),
 			Metadata: map[string]any{
 				types.MetaKeyLLMType:  commontypes.ProviderTypeFromDeployType(info.SvcType),
 				types.MetaKeyRepoPath: info.CSGHubModelID,
@@ -480,7 +758,7 @@ func (m *openaiComponentImpl) llmConfigToModel(ctx context.Context, cfg *databas
 //     only visible to the deploy owner (OwnerUUID == callerUUID).
 //
 // External models are always visible.
-func (m *openaiComponentImpl) getModelsFromLLMConfig(ctx context.Context, callerUUID string) ([]types.Model, error) {
+func (m *openaiComponentImpl) getModelsFromLLMConfig(ctx context.Context, req *types.GetAvailableModelsReq) ([]types.Model, error) {
 	enabled := true
 	search := &commontypes.SearchLLMConfig{
 		Enabled:   &enabled,
@@ -492,13 +770,15 @@ func (m *openaiComponentImpl) getModelsFromLLMConfig(ctx context.Context, caller
 	page := 1
 	var models []types.Model
 	for {
-		configs, _, err := m.extllmStore.IndexWithRepo(ctx, per, page, search)
+		// Whitelist enforcement rides in the same statement as the listing
+		// (LEFT JOIN LATERAL grant probe) — no separate access-check query.
+		configs, _, err := m.extllmStore.IndexWithRepoForCaller(ctx, per, page, search, req.Caller)
 		if err != nil {
 			return nil, fmt.Errorf("failed to list llm configs: %w", err)
 		}
 
 		for _, cfg := range configs {
-			model, ok := m.llmConfigToModel(ctx, cfg, callerUUID)
+			model, ok := m.llmConfigToModel(ctx, cfg, req.Caller.NsUUID)
 			if !ok {
 				continue
 			}
@@ -519,26 +799,33 @@ func (m *openaiComponentImpl) getModelsFromLLMConfig(ctx context.Context, caller
 // getModelsFromLLMConfig. Visibility filtering is applied: serverless models
 // and public (SecureLevel == EndpointPublic) models are visible to all users;
 // other non-serverless (private) models are only visible to the deploy owner.
-func (m *openaiComponentImpl) GetModelByID(c context.Context, nsUUID, modelID string) (*types.Model, error) {
-	cfg, err := m.extllmStore.GetByModelName(c, modelID)
+func (m *openaiComponentImpl) GetModelByID(c context.Context, req *types.GetModelByIDReq) (*types.Model, error) {
+	req.Caller = callerOrDefault(req.Caller)
+	cfg, err := m.extllmStore.GetByModelNameForCaller(c, req.ModelID, req.Caller)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get llm config by model name %q: %w", modelID, err)
+		return nil, fmt.Errorf("failed to get llm config by model name %q: %w", req.ModelID, err)
 	}
-	if cfg == nil {
-		return nil, nil
-	}
-	if !cfg.Enabled {
-		return nil, nil
+	if cfg != nil && cfg.Enabled {
+		if model, ok := m.llmConfigToModel(c, cfg, req.Caller.NsUUID); ok {
+			// Soft-fail: a price read error returns the model flagged as
+			// unconfigured, like the single-model path always did.
+			models, priceErr := m.enrichModelsWithPrice(c, []types.Model{model})
+			if priceErr != nil {
+				slog.WarnContext(c, "failed to enrich model with prices", slog.Any("error", priceErr))
+			}
+			return &models[0], nil
+		}
 	}
 
-	model, ok := m.llmConfigToModel(c, cfg, nsUUID)
-	if !ok {
-		return nil, nil
+	// No real model owns this ID, so it may be the virtual one.  The
+	// lookup is in this order, not the reverse, so that a real model can
+	// never be shadowed by automatic routing.
+	if autoID := m.AutoModelID(); autoID != "" && strings.TrimSpace(req.ModelID) == autoID {
+		if auto, ok := m.autoModel(c); ok {
+			return &auto, nil
+		}
 	}
-
-	models := []types.Model{model}
-	models = m.enrichModelsWithPrice(c, models)
-	return &models[0], nil
+	return nil, nil
 }
 
 // llmTypeFromModel returns metadata llm_type used to classify usage metering records.
@@ -580,7 +867,7 @@ func (m *openaiComponentImpl) resolveUsageMeteringInfo(c context.Context, nsUUID
 			Resource: types.MeteringResource{
 				ResourceID:   id,
 				ResourceName: id,
-				CustomerID:   model.SvcName,
+				CustomerID:   model.ID,
 			},
 			Scene: commontypes.SceneModelServerless,
 		}
@@ -620,7 +907,7 @@ func (m *openaiComponentImpl) CanManageModel(ctx context.Context, username, nsUU
 	if model == nil {
 		return false, fmt.Errorf("model is nil")
 	}
-	user, err := m.userStore.FindByUsername(ctx, username)
+	user, err := m.userStore.FindByUsername(ctx, username, commontypes.UserWithAdminPermissions)
 	if err != nil {
 		return false, fmt.Errorf("failed to find user by username in db, error: %w", err)
 	}
@@ -649,13 +936,14 @@ func (m *openaiComponentImpl) resolveUsageOwnerType(c context.Context, nsUUID st
 }
 
 // usageMeteringExtra is serialized into MeteringEvent.Extra for usage billing breakdown.
+// all fields value must be strings, otherwise accounting will failed.
 type usageMeteringExtra struct {
 	PromptTokenNum      string                     `json:"prompt_token_num"`
 	PromptTokenCacheNum string                     `json:"prompt_token_cache_num"`
 	CompletionTokenNum  string                     `json:"completion_token_num"`
 	ReasoningTokenNum   string                     `json:"reasoning_token_num"`
 	OwnerType           commontypes.TokenUsageType `json:"owner_type"`
-	APIKey              string                     `json:"api_key"`
+	APIKey              string                     `json:"api_key"` // store token ID instead of token value
 	Provider            string                     `json:"provider"`
 	ModelName           string                     `json:"model_name"`
 	// UpstreamID is the ai_gateway_upstreams.id that served the request, as a
@@ -687,14 +975,14 @@ func upstreamIDExtraValue(upstreamID int64) string {
 	return strconv.FormatInt(upstreamID, 10)
 }
 
-func buildUsageExtraData(usageModel *types.Model, upstreamModelName string, usage *token.Usage, apikey string, meteringInfo usageMeteringInfo) (string, error) {
+func buildUsageExtraData(usageModel *types.Model, upstreamModelName string, usage *token.Usage, tokenID int64, meteringInfo usageMeteringInfo) (string, error) {
 	extra := usageMeteringExtra{
 		PromptTokenNum:       fmt.Sprintf("%d", usage.PromptTokens),
 		PromptTokenCacheNum:  fmt.Sprintf("%d", usage.CachedPromptTokens),
 		CompletionTokenNum:   fmt.Sprintf("%d", usage.CompletionTokens),
 		ReasoningTokenNum:    fmt.Sprintf("%d", usage.ReasoningTokens),
 		OwnerType:            meteringInfo.OwnerType,
-		APIKey:               apikey,
+		APIKey:               strconv.FormatInt(tokenID, 10), // store token ID instead of token value
 		Provider:             usageModel.Provider,
 		ModelName:            upstreamModelName,
 		UpstreamID:           upstreamIDExtraValue(usageModel.UpstreamID),
@@ -710,15 +998,7 @@ func buildUsageExtraData(usageModel *types.Model, upstreamModelName string, usag
 	return string(extraData), nil
 }
 
-func (m *openaiComponentImpl) RecordUsage(c context.Context, nsUUID string, model *types.Model, targetModelName string, counter token.Counter, apikey string, tokenID int64) error {
-	usage, err := counter.Usage(c)
-	if err != nil {
-		return fmt.Errorf("failed to get token usage from counter: %w", err)
-	}
-	return m.RecordUsageFromTokenUsage(c, nsUUID, model, targetModelName, usage, apikey, tokenID)
-}
-
-func (m *openaiComponentImpl) BuildUsageMeteringEvent(c context.Context, nsUUID string, model *types.Model, targetModelName string, usage *token.Usage, apikey string) (*commontypes.MeteringEvent, error) {
+func (m *openaiComponentImpl) BuildUsageMeteringEvent(c context.Context, nsUUID string, model *types.Model, targetModelName string, usage *token.Usage, tokenID int64) (*commontypes.MeteringEvent, error) {
 	if usage == nil {
 		return nil, fmt.Errorf("cannot record usage: nil token usage")
 	}
@@ -739,7 +1019,7 @@ func (m *openaiComponentImpl) BuildUsageMeteringEvent(c context.Context, nsUUID 
 		valueType = commontypes.CountNumberType
 		value = usage.CompletionRC
 	}
-	extraData, err := buildUsageExtraData(model, targetModelName, usage, apikey, meteringInfo)
+	extraData, err := buildUsageExtraData(model, targetModelName, usage, tokenID, meteringInfo)
 	if err != nil {
 		return nil, err
 	}
@@ -759,8 +1039,8 @@ func (m *openaiComponentImpl) BuildUsageMeteringEvent(c context.Context, nsUUID 
 	return &event, nil
 }
 
-func (m *openaiComponentImpl) RecordUsageFromTokenUsage(c context.Context, nsUUID string, model *types.Model, targetModelName string, usage *token.Usage, apikey string, tokenID int64) error {
-	event, err := m.BuildUsageMeteringEvent(c, nsUUID, model, targetModelName, usage, apikey)
+func (m *openaiComponentImpl) RecordUsageFromTokenUsage(c context.Context, nsUUID string, model *types.Model, targetModelName string, usage *token.Usage, tokenID int64) error {
+	event, err := m.BuildUsageMeteringEvent(c, nsUUID, model, targetModelName, usage, tokenID)
 	if err != nil {
 		return err
 	}
@@ -855,6 +1135,7 @@ func dbUpstreamsToConfigs(dbUpstreams []database.Upstream, capacityDefaults comm
 			AuthHeader:            u.AuthHeader,
 			Provider:              u.Provider,
 			IsFullURL:             u.IsFullURL,
+			Priority:              u.Priority,
 			SupportedEndpoints:    u.SupportedEndpoints,
 			HealthCheckEnabled:    u.HealthCheckEnabled,
 			CircuitBreakerEnabled: u.CircuitBreakerEnabled,
