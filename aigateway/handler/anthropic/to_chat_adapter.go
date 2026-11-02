@@ -393,8 +393,9 @@ func (w *toChatResponseWriter) Finalize() error {
 			"failed to convert upstream response")
 		return nil
 	}
-	// Recording keeps OpenAI semantics (prompt tokens include cache reads).
-	w.inputTokens = int64(resp.Usage.InputTokens + resp.Usage.CacheReadInputTokens)
+	// Recording keeps the total the upstream reported, not a value rebuilt
+	// from the clamped usage exposed to the client.
+	w.inputTokens = rawChatPromptTokens(w.bodyBuf.Bytes())
 	w.outputTokens = int64(resp.Usage.OutputTokens)
 	w.cacheReadTokens = int64(resp.Usage.CacheReadInputTokens)
 	// The converted Messages usage has no reasoning field — read it from

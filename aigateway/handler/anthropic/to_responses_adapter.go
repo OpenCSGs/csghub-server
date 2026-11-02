@@ -251,7 +251,7 @@ func (w *toResponsesResponseWriter) Finalize() error {
 				})
 			}
 			usageMap := map[string]any{
-				"input_tokens":  int64(uncachedInputTokens(int(w.inputTokens), int(w.cacheReadTokens))),
+				"input_tokens":  int64(uncachedInputTokens(int(w.inputTokens), int(w.cacheReadTokens), int(w.cacheCreationTokens))),
 				"output_tokens": w.outputTokens,
 			}
 			if w.cacheReadTokens > 0 {
@@ -311,8 +311,11 @@ func (w *toResponsesResponseWriter) Finalize() error {
 			"failed to convert upstream response")
 		return nil
 	}
-	// Recording keeps OpenAI semantics (input tokens include cache reads).
-	w.inputTokens = int64(result.Usage.InputTokens + result.Usage.CacheReadInputTokens)
+	// Recording keeps the total the upstream reported, not a value rebuilt
+	// from the clamped usage exposed to the client.
+	if resp.Usage != nil {
+		w.inputTokens = resp.Usage.InputTokens
+	}
 	w.outputTokens = int64(result.Usage.OutputTokens)
 	w.cacheReadTokens = int64(result.Usage.CacheReadInputTokens)
 	w.cacheCreationTokens = int64(result.Usage.CacheCreationInputTokens)

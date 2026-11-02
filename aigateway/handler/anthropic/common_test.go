@@ -620,6 +620,27 @@ func TestUncachedInputTokens(t *testing.T) {
 	assert.Equal(t, 70, uncachedInputTokens(100, 30))
 	assert.Equal(t, 100, uncachedInputTokens(100, 0))
 	assert.Equal(t, 0, uncachedInputTokens(100, 150), "cached larger than prompt must not go negative")
+	assert.Equal(t, 50, uncachedInputTokens(100, 30, 20), "cache reads and writes are both excluded")
+	assert.Equal(t, 0, uncachedInputTokens(100, 80, 40), "combined cache larger than prompt must not go negative")
+}
+
+func TestResponsesUsageExcludesCacheReadsAndWrites(t *testing.T) {
+	resp := &types.ResponsesResponse{
+		ID: "resp_1", Status: "completed", Model: "gpt-4",
+		Output: []types.ResponsesOutputItem{{
+			Type: "message", Role: "assistant",
+			Content: []types.ResponsesContentPart{{Type: "output_text", Text: "Hi"}},
+		}},
+		Usage: &types.ResponsesUsage{
+			InputTokens: 100, OutputTokens: 5,
+			InputTokensDetails: &types.ResponsesInputTokenDetails{CachedTokens: 30, CachedCreationTokens: 20},
+		},
+	}
+	result, err := responsesResponseToMessagesResponse(resp, "claude-3")
+	require.NoError(t, err)
+	assert.Equal(t, 50, result.Usage.InputTokens)
+	assert.Equal(t, 30, result.Usage.CacheReadInputTokens)
+	assert.Equal(t, 20, result.Usage.CacheCreationInputTokens)
 }
 
 func TestUsageExcludesCacheReads(t *testing.T) {
