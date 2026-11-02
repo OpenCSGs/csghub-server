@@ -1048,11 +1048,7 @@ func chatResponseToResponsesWithToolAliases(data []byte, publicModel string, too
 		CreatedAt: chat.Created,
 		Status:    "completed",
 		Model:     publicModel,
-		Usage: &types.ResponsesUsage{
-			InputTokens:  chat.Usage.PromptTokens,
-			OutputTokens: chat.Usage.CompletionTokens,
-			TotalTokens:  chat.Usage.TotalTokens,
-		},
+		Usage:     chatUsageToResponses(chat.Usage),
 	}
 	if resp.CreatedAt == 0 {
 		resp.CreatedAt = time.Now().Unix()
@@ -1170,4 +1166,25 @@ func responsesIncompleteReason(finishReason string) string {
 	default:
 		return ""
 	}
+}
+
+// chatUsageToResponses converts chat completion usage into Responses usage,
+// keeping the cached prompt tokens and reasoning tokens the upstream reported.
+func chatUsageToResponses(usage openai.CompletionUsage) *types.ResponsesUsage {
+	out := &types.ResponsesUsage{
+		InputTokens:  usage.PromptTokens,
+		OutputTokens: usage.CompletionTokens,
+		TotalTokens:  usage.TotalTokens,
+	}
+	if usage.PromptTokensDetails.CachedTokens > 0 {
+		out.InputTokensDetails = &types.ResponsesInputTokenDetails{
+			CachedTokens: usage.PromptTokensDetails.CachedTokens,
+		}
+	}
+	if usage.CompletionTokensDetails.ReasoningTokens > 0 {
+		out.OutputTokensDetails = &types.ResponsesOutputTokenDetails{
+			ReasoningTokens: usage.CompletionTokensDetails.ReasoningTokens,
+		}
+	}
+	return out
 }

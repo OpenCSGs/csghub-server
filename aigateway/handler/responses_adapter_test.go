@@ -2572,3 +2572,35 @@ func TestResponsesAdapterStreamWriterContinuesRepeatedNameFragments(t *testing.T
 		})
 	}
 }
+
+func TestChatResponseToResponsesMapsCachedAndReasoningTokens(t *testing.T) {
+	resp, err := chatResponseToResponses([]byte(`{
+		"id":"chatcmpl_1",
+		"created":123,
+		"model":"upstream-model",
+		"choices":[{"message":{"role":"assistant","content":"hello"}}],
+		"usage":{"prompt_tokens":20,"completion_tokens":18,"total_tokens":38,
+			"prompt_tokens_details":{"cached_tokens":12},
+			"completion_tokens_details":{"reasoning_tokens":11}}
+	}`), "public-model")
+	require.NoError(t, err)
+	require.NotNil(t, resp.Usage.InputTokensDetails)
+	require.Equal(t, int64(12), resp.Usage.InputTokensDetails.CachedTokens)
+	require.NotNil(t, resp.Usage.OutputTokensDetails)
+	require.Equal(t, int64(11), resp.Usage.OutputTokensDetails.ReasoningTokens)
+}
+
+func TestResponsesAdapterStreamWriterCapturesCachedAndReasoningTokens(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(w)
+	writer := newResponsesAdapterStreamWriter(ctx.Writer, "public-model", nil, nil, "")
+	writer.WriteHeader(200)
+	_, err := writer.Write([]byte(`data: {"id":"chatcmpl_1","choices":[],"usage":{"prompt_tokens":20,"completion_tokens":18,"total_tokens":38,"prompt_tokens_details":{"cached_tokens":12},"completion_tokens_details":{"reasoning_tokens":11}}}` + "\n\n"))
+	require.NoError(t, err)
+	require.NotNil(t, writer.usage)
+	require.NotNil(t, writer.usage.InputTokensDetails)
+	require.Equal(t, int64(12), writer.usage.InputTokensDetails.CachedTokens)
+	require.NotNil(t, writer.usage.OutputTokensDetails)
+	require.Equal(t, int64(11), writer.usage.OutputTokensDetails.ReasoningTokens)
+}
