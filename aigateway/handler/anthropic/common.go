@@ -482,7 +482,14 @@ func responsesResponseToMessagesResponse(resp *types.ResponsesResponse, model st
 	}
 	result.Content = contentBlocks
 
-	stopReason := responsesStatusToStopReason(resp.Status, responsesIncompleteReason(resp.IncompleteDetails))
+	hasToolUse := false
+	for _, block := range contentBlocks {
+		if block.Type == "tool_use" {
+			hasToolUse = true
+			break
+		}
+	}
+	stopReason := responsesStopReason(resp.Status, responsesIncompleteReason(resp.IncompleteDetails), hasToolUse)
 	result.StopReason = &stopReason
 
 	return result, nil
@@ -497,6 +504,17 @@ func responsesIncompleteReason(details json.RawMessage) string {
 		return ""
 	}
 	return parsed.Reason
+}
+
+// responsesStopReason is responsesStatusToStopReason, except that a completed
+// response that emitted function calls reports "tool_use": Anthropic clients
+// such as Claude Code only run the requested tools on that stop reason.
+func responsesStopReason(status, incompleteReason string, hasToolUse bool) string {
+	reason := responsesStatusToStopReason(status, incompleteReason)
+	if reason == "end_turn" && hasToolUse {
+		return "tool_use"
+	}
+	return reason
 }
 
 func responsesStatusToStopReason(status, incompleteReason string) string {

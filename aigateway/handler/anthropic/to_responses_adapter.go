@@ -546,7 +546,7 @@ func (w *toResponsesResponseWriter) handleResponsesStreamEvent(eventType string,
 					w.reasoningTokens = event.Response.Usage.OutputTokensDetails.ReasoningTokens
 				}
 			}
-			w.stopReason = responsesStatusToStopReason(event.Response.Status, responsesIncompleteReason(event.Response.IncompleteDetails))
+			w.stopReason = responsesStopReason(event.Response.Status, responsesIncompleteReason(event.Response.IncompleteDetails), len(w.toolCallStates) > 0)
 		}
 		if w.recorder != nil {
 			finishReason := messagesStopReasonToFinishReason(w.stopReason)

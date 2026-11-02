@@ -996,6 +996,7 @@ func TestE2E_ToResponses_ToolUse_Stream(t *testing.T) {
 	assert.Contains(t, bodyStr, "tool_use")
 	assert.Contains(t, bodyStr, "call_xyz")
 	assert.Contains(t, bodyStr, "get_weather")
+	assert.Contains(t, bodyStr, `"stop_reason":"tool_use"`)
 	assert.Contains(t, bodyStr, "input_json_delta")
 	assert.Contains(t, bodyStr, "city")
 }

@@ -352,6 +352,19 @@ func TestResponsesResponseToMessagesResponse(t *testing.T) {
 		require.Len(t, result.Content, 1)
 		assert.Equal(t, "tool_use", result.Content[0].Type)
 		assert.Equal(t, "call_1", result.Content[0].ID)
+		assert.Equal(t, "tool_use", *result.StopReason)
+	})
+
+	t.Run("incomplete function call keeps max_tokens", func(t *testing.T) {
+		resp := &types.ResponsesResponse{
+			Status: "incomplete",
+			Output: []types.ResponsesOutputItem{
+				{Type: "function_call", CallID: "call_1", Name: "get_weather", Arguments: `{"city":`},
+			},
+		}
+		result, err := responsesResponseToMessagesResponse(resp, "claude-3")
+		require.NoError(t, err)
+		assert.Equal(t, "max_tokens", *result.StopReason)
 	})
 
 	t.Run("reasoning output", func(t *testing.T) {
